@@ -739,6 +739,12 @@ changes in sbcl-0.6.13 relative to sbcl-0.6.12:
 * a port to the Compaq/DEC Alpha CPU, thanks to Dan Barlow
 * Martin Atzmueller ported Tim Moore's marvellous CMU CL DISASSEMBLE
   patch, so that DISASSEMBLE output is much nicer.
+* The code in the SB-PROFILE package now seems reasonably stable.
+  I still haven't decided what the final interface should look like
+  (I'd like PROFILE to interact cleanly with TRACE, since both
+  facilities use function encapsulation) but if you have a need
+  for profiling now, you can probably use it successfully with
+  the current CMU-CL-style interface.
 * Pathnames and *DEFAULT-DIRECTORY-DEFAULTS* are much more
   ANSI-compliant, thanks to various fixes and tests from Dan Barlow.
   Also, at Dan Barlow's suggestion, TRUENAME on a dangling symbolic
@@ -775,12 +781,14 @@ changes in sbcl-0.6.13 relative to sbcl-0.6.12:
 * Some math functions have been fixed, and there are new
   optimizers for deriving the types of COERCE and ARRAY-ELEMENT-TYPE,
   thanks to Raymond Toy's work on CMU CL, ported by Martin Atzmueller.
+* (There are also some new optimizers in contrib/*-extras.lisp. Those
+  aren't built into sbcl-0.6.13, but are a sneak preview of what's
+  likely to be built into sbcl-0.7.0.)
 * A bug in COPY-READTABLE was fixed. (Joao Cachopo's patch to CMU
   CL, ported to SBCL by Martin Atzmueller)
 * DESCRIBE now gives more information in some cases. (Pierre Mai's
   patch to CMU CL, ported to SBCL by Martin Atzmueller)
-* The code in the SB-PROFILE package has been substantially 
-  improved, although it's still unstable.
+* Martin Atzmueller and Bill Newman fixed some bugs in INSPECT.
 * There's a new slam.sh hack to shorten the edit/compile/debug
   cycle for low-level changes to SBCL itself, and a new
   :SB-AFTER-XC-CORE target feature to control the generation of

@@ -425,17 +425,15 @@
   '(%find-position-vector-macro item sequence
 				from-end start end key test))
 
-^L
 ;;;; optimizations for floating point FLOOR, CEILING, TRUNCATE, and
 ;;;; ROUND, lifted from CMU CL 18c
 ;;;;
 ;;;; (Without these optimizations, these functions cons!)
 
-;; Convert (TRUNCATE x y) to the obvious implementation.  We only want
-;; this when under certain conditions and let the generic TRUNCATE
-;; handle the rest.  (Note: if Y = 1, the divide and multiply by Y
-;; should be removed by other DEFTRANSFORMs.)
-
+;;; Convert (TRUNCATE x y) to the obvious implementation.  We only want
+;;; this when under certain conditions and let the generic TRUNCATE
+;;; handle the rest.  (Note: if Y = 1, the divide and multiply by Y
+;;; should be removed by other DEFTRANSFORMs.)
 (deftransform truncate ((x &optional y)
                         (float &optional (or float integer)))
   '(let ((res (%unary-truncate (/ x y))))

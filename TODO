@@ -12,35 +12,12 @@
 some things that I'd like to do in 0.6.x, in no particular order:
 -------------------------------------------------------------------------------
 PROBLEM:
-	    The batch-related command line options for SBCL don't work
-	properly.
-	    A small part of making them work properly is making sure that
-	verbose GC messages end up piped to error output.
-	    Make sure that when the system dies due to an unhandled error
-	in batch mode, the error is printed successfully, whether
-	FINISH-OUTPUT or an extra newline or whatever is required.
-	    Make sure that make.sh dies gracefully when one of the SBCLs
-	it's running dies with an error.
-MUSING:
-	    Actually, the ANSI *DEBUGGER-HOOK* variable might be a better
-	place to put the die-on-unhandled-error functionality.
-FIX:
-	??
--------------------------------------------------------------------------------
-PROBLEM:
 	    As long as I'm working on the batch-related command-line options,
 	it would be reasonable to add one more option to "do what I'd want",
 	testing standard input for non-TTY-ness and running in no-programmer
 	mode if so.
 FIX:
 	?? Do it.
--------------------------------------------------------------------------------
-PROBLEM:
-	    In order to make a well-behaved backtrace when a batch program
-	terminates abnormally, it should be limited in length.
-FIX:
-	?? Add a *DEBUG-BACKTRACE-COUNT* variable, initially set to 64,
-	  to provide a default for the COUNT argument to BACKTRACE.
 -------------------------------------------------------------------------------
 PROBLEM:
 	    I used CMU CL for years, and dozens of times I cursed the
@@ -84,11 +61,6 @@ PROBLEM:
 	(SETF *PRINT-LEVEL* 2), and exiting the debugger would leave
 	(DEBUGGER-SPECIAL *PRINT-LEVEL*) set to 2, and upon reentry to the
 	debugger, *PRINT-LEVEL* would be set back to 2.
-FIX:
-	??
--------------------------------------------------------------------------------
-PROBLEM:
-	    The :SB-TEST target feature should do something.
 FIX:
 	??
 -------------------------------------------------------------------------------

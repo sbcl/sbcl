@@ -439,7 +439,7 @@ Function and macro commands:
 			    (*standard-output* *debug-io*))
   #!+sb-doc
   "Show a listing of the call stack going down from the current frame. In the
-   debugger, the current frame is indicated by the prompt. Count is how many
+   debugger, the current frame is indicated by the prompt. COUNT is how many
    frames to show."
   (fresh-line *standard-output*)
   (do ((frame (if *in-the-debugger* *current-frame* (sb!di:top-frame))
