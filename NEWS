@@ -1601,6 +1601,8 @@ changes in sbcl-0.7.14 relative to sbcl-0.7.13:
        on malformed property lists;
   * fixed SXHASH, giving different results for NIL depending on type
     declarations (SYMBOL or LIST). (thanks to Gerd Moellmann)
+  * fixed bug in DEFPARAMETER and DEFVAR: they could assign a lexical
+    variable. (found by Rolf Wester)
 
 planned incompatible changes in 0.7.x:
   * (not done yet, but planned:) When the profiling interface settles

@@ -97,6 +97,15 @@
 
 (assert (constantp (find-class 'symbol)))
 (assert (constantp #p""))
+
+;;; DEFPARAMETER must assign a dynamic variable
+(let ((var (gensym)))
+  (assert (equal (eval `(list (let ((,var 1))
+                                (defparameter ,var 2)
+                                ,var)
+                              ,var))
+                 '(1 2))))
+
 
 ;;; success
 (sb-ext:quit :unix-status 104)

@@ -228,7 +228,7 @@
      (declaim (special ,var))
      ,@(when valp
 	 `((unless (boundp ',var)
-	     (setq ,var ,val))))
+	     (set ',var ,val))))
      ,@(when docp
 	 `((setf (fdocumentation ',var 'variable) ',doc )))
      ',var))
@@ -242,7 +242,7 @@
   string for the parameter."
   `(progn
      (declaim (special ,var))
-     (setq ,var ,val)
+     (set ',var ,val)
      ,@(when docp
 	 `((setf (fdocumentation ',var 'variable) ',doc)))
      ',var))
