@@ -94,7 +94,7 @@ fail_on_compiler_note ()
           (compile-file "$1")
           (sb-ext:quit :unix-status 52))
 EOF
-    if [ $? != 52]; then
+    if [ $? != 52 ]; then
         echo compiler-note $1 test failed: $?
         exit 1
     fi

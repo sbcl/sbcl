@@ -11,7 +11,7 @@
 # absolutely no warranty. See the COPYING and CREDITS files for
 # more information.
 
-. expect.sh
+. ./expect.sh
 
 base_tmpfilename="compiler-test-$$-tmp"
 tmpfilename="$base_tmpfilename.lisp"

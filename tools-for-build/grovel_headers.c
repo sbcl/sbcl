@@ -149,7 +149,8 @@ main(int argc, char *argv[])
     DEFSIGNAL(SIGBUS);
     DEFSIGNAL(SIGCHLD);
     DEFSIGNAL(SIGCONT);
-#ifndef LISP_FEATURE_LINUX
+/* FIXME: Maybe #ifdef SIGEMT would be a smarter conditional? */
+#if (!(defined LISP_FEATURE_LINUX) || !((defined LISP_FEATURE_PPC) || (defined LISP_FEATURE_X86)))
     DEFSIGNAL(SIGEMT);
 #endif
     DEFSIGNAL(SIGFPE);
@@ -163,11 +164,11 @@ main(int argc, char *argv[])
     DEFSIGNAL(SIGPROF);
     DEFSIGNAL(SIGQUIT);
     DEFSIGNAL(SIGSEGV);
-#ifdef LISP_FEATURE_LINUX
+#if ((defined LISP_FEATURE_LINUX) && (defined LISP_FEATURE_X86))
     DEFSIGNAL(SIGSTKFLT);
 #endif
     DEFSIGNAL(SIGSTOP);
-#ifndef LISP_FEATURE_LINUX
+#if (!((defined LISP_FEATURE_LINUX) && (defined LISP_FEATURE_X86))) 
     DEFSIGNAL(SIGSYS);
 #endif
     DEFSIGNAL(SIGTERM);
@@ -179,7 +180,7 @@ main(int argc, char *argv[])
     DEFSIGNAL(SIGUSR1);
     DEFSIGNAL(SIGUSR2);
     DEFSIGNAL(SIGVTALRM);
-#ifdef LISP_FEATURE_SVR4
+#ifdef LISP_FEATURE_SUNOS
     DEFSIGNAL(SIGWAITING);
 #endif
     DEFSIGNAL(SIGWINCH);
