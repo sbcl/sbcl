@@ -93,67 +93,6 @@
 ;;;; LOOP-PREFER-POP (not true on CMU CL) and which has since been
 ;;;; removed. Thus, STEP-FUNCTION stuff could probably be removed too.
 
-;;;; miscellaneous environment things
-
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defvar *loop-real-data-type* 'real))
-
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defvar *loop-gentemp* nil)
-  (defun loop-gentemp (&optional (pref 'loopvar-))
-    (if *loop-gentemp*
-      (gentemp (string pref))
-      (gensym))))
-
-;;; @@@@ The following form takes a list of variables and a form which
-;;; presumably references those variables, and wraps it somehow so that the
-;;; compiler does not consider those variables have been referenced. The intent
-;;; of this is that iteration variables can be flagged as unused by the
-;;; compiler, e.g. I in (loop for i from 1 to 10 do (print t)), since we will
-;;; tell it when a usage of it is "invisible" or "not to be considered".
-;;;
-;;; We implicitly assume that a setq does not count as a reference. That is,
-;;; the kind of form generated for the above loop construct to step I,
-;;; simplified, is
-;;;   `(SETQ I ,(HIDE-VARIABLE-REFERENCES '(I) '(1+ I))).
-;;;
-;;; FIXME: This is a no-op except for Genera, now obsolete, so it
-;;; can be removed.
-(defun hide-variable-references (variable-list form)
-  (declare (ignore variable-list))
-  form)
-
-;;; @@@@ The following function takes a flag, a variable, and a form which
-;;; presumably references that variable, and wraps it somehow so that the
-;;; compiler does not consider that variable to have been referenced. The
-;;; intent of this is that iteration variables can be flagged as unused by the
-;;; compiler, e.g. I in (loop for i from 1 to 10 do (print t)), since we will
-;;; tell it when a usage of it is "invisible" or "not to be considered".
-;;;
-;;; We implicitly assume that a setq does not count as a reference. That is,
-;;; the kind of form generated for the above loop construct to step I,
-;;; simplified, is
-;;;   `(SETQ I ,(HIDE-VARIABLE-REFERENCES T 'I '(1+ I))).
-;;;
-;;; Certain cases require that the "invisibility" of the reference be
-;;; conditional upon something. This occurs in cases of "named" variables (the
-;;; USING clause). For instance, we want IDX in (LOOP FOR E BEING THE
-;;; VECTOR-ELEMENTS OF V USING (INDEX IDX) ...) to be "invisible" when it is
-;;; stepped, so that the user gets informed if IDX is not referenced. However,
-;;; if no USING clause is present, we definitely do not want to be informed
-;;; that some gensym or other is not used.
-;;;
-;;; It is easier for the caller to do this conditionally by passing a flag
-;;; (which happens to be the second value of NAMED-VARIABLE, q.v.) to this
-;;; function than for all callers to contain the conditional invisibility
-;;; construction.
-;;;
-;;; FIXME: This is a no-op except for Genera, now obsolete, so it
-;;; can be removed.
-(defun hide-variable-reference (really-hide variable form)
-  (declare (ignore really-hide variable))
-  form)
-
 ;;;; list collection macrology
 
 (sb!int:defmacro-mundanely with-loop-list-collection-head
@@ -252,9 +191,9 @@ constructed.
     (make-loop-minimax-internal
       :answer-variable answer-variable
       :type type
-      :temp-variable (loop-gentemp 'loop-maxmin-temp-)
+      :temp-variable (gensym "LOOP-MAXMIN-TEMP-")
       :flag-variable (and (not infinity-data)
-			  (loop-gentemp 'loop-maxmin-flag-))
+			  (gensym "LOOP-MAXMIN-FLAG-"))
       :operations nil
       :infinity-data infinity-data)))
 
@@ -263,7 +202,7 @@ constructed.
   (when (and (cdr (loop-minimax-operations minimax))
 	     (not (loop-minimax-flag-variable minimax)))
     (setf (loop-minimax-flag-variable minimax)
-	  (loop-gentemp 'loop-maxmin-flag-)))
+	  (gensym "LOOP-MAXMIN-FLAG-")))
   operation)
 
 (sb!int:defmacro-mundanely with-minimax-value (lm &body body)
@@ -289,13 +228,10 @@ constructed.
   (let* ((answer-var (loop-minimax-answer-variable lm))
 	 (temp-var (loop-minimax-temp-variable lm))
 	 (flag-var (loop-minimax-flag-variable lm))
-	 (test
-	   (hide-variable-reference
-	     t (loop-minimax-answer-variable lm)
-	     `(,(ecase operation
-		  (min '<)
-		  (max '>))
-	       ,temp-var ,answer-var))))
+	 (test `(,(ecase operation
+		    (min '<)
+		    (max '>))
+		 ,temp-var ,answer-var)))
     `(progn
        (setq ,temp-var ,form)
        (when ,(if flag-var `(or (not ,flag-var) ,test) test)
@@ -1053,7 +989,7 @@ a LET-like macro, and a SETQ-like macro, which perform LOOP-style destructuring.
 			   &optional iteration-variable-p)
   (cond ((null name)
 	 (cond ((not (null initialization))
-		(push (list (setq name (loop-gentemp 'loop-ignore-))
+		(push (list (setq name (gensym "LOOP-IGNORE-"))
 			    initialization)
 		      *loop-variables*)
 		(push `(ignore ,name) *loop-declarations*))))
@@ -1076,7 +1012,7 @@ a LET-like macro, and a SETQ-like macro, which perform LOOP-style destructuring.
 	 (cond (*loop-destructuring-hooks*
 		(loop-declare-variable name dtype)
 		(push (list name initialization) *loop-variables*))
-	       (t (let ((newvar (loop-gentemp 'loop-destructure-)))
+	       (t (let ((newvar (gensym "LOOP-DESTRUCTURE-")))
 		    (push (list newvar initialization) *loop-variables*)
 		    ;; *LOOP-DESETQ-CROCKS* gathered in reverse order.
 		    (setq *loop-desetq-crocks*
@@ -1111,7 +1047,7 @@ a LET-like macro, and a SETQ-like macro, which perform LOOP-style destructuring.
 (defun loop-maybe-bind-form (form data-type)
   (if (loop-constantp form)
       form
-      (loop-make-variable (loop-gentemp 'loop-bind-) form data-type)))
+      (loop-make-variable (gensym "LOOP-BIND-") form data-type)))
 
 (defun loop-do-if (for negatep)
   (let ((form (loop-get-form)) (*loop-inside-conditional* t) (it-p nil))
@@ -1231,8 +1167,8 @@ a LET-like macro, and a SETQ-like macro, which perform LOOP-style destructuring.
     (let ((tempvars (loop-collector-tempvars lc)))
       (unless tempvars
 	(setf (loop-collector-tempvars lc)
-	      (setq tempvars (list* (loop-gentemp 'loop-list-head-)
-				    (loop-gentemp 'loop-list-tail-)
+	      (setq tempvars (list* (gensym "LOOP-LIST-HEAD-")
+				    (gensym "LOOP-LIST-TAIL-")
 				    (and (loop-collector-name lc)
 					 (list (loop-collector-name lc))))))
 	(push `(with-loop-list-collection-head ,tempvars) *loop-wrappers*)
@@ -1257,7 +1193,7 @@ a LET-like macro, and a SETQ-like macro, which perform LOOP-style destructuring.
 	(setf (loop-collector-tempvars lc)
 	      (setq tempvars (list (loop-make-variable
 				     (or (loop-collector-name lc)
-					 (loop-gentemp 'loop-sum-))
+					 (gensym "LOOP-SUM-"))
 				     nil (loop-collector-dtype lc)))))
 	(unless (loop-collector-name lc)
 	  (loop-emit-final-value (car (loop-collector-tempvars lc)))))
@@ -1265,25 +1201,21 @@ a LET-like macro, and a SETQ-like macro, which perform LOOP-style destructuring.
 	(if (eq specifically 'count)
 	    `(when ,form
 	       (setq ,(car tempvars)
-		     ,(hide-variable-reference t
-					       (car tempvars)
-					       `(1+ ,(car tempvars)))))
+		     (1+ ,(car tempvars))))
 	    `(setq ,(car tempvars)
-		   (+ ,(hide-variable-reference t
-						(car tempvars)
-						(car tempvars))
+		   (+ ,(car tempvars)
 		      ,form)))))))
 
 (defun loop-maxmin-collection (specifically)
   (multiple-value-bind (lc form)
-      (loop-get-collection-info specifically 'maxmin *loop-real-data-type*)
-    (loop-check-data-type (loop-collector-dtype lc) *loop-real-data-type*)
+      (loop-get-collection-info specifically 'maxmin 'real)
+    (loop-check-data-type (loop-collector-dtype lc) 'real)
     (let ((data (loop-collector-data lc)))
       (unless data
 	(setf (loop-collector-data lc)
 	      (setq data (make-loop-minimax
 			   (or (loop-collector-name lc)
-			       (loop-gentemp 'loop-maxmin-))
+			       (gensym "LOOP-MAXMIN-"))
 			   (loop-collector-dtype lc))))
 	(unless (loop-collector-name lc)
 	  (loop-emit-final-value (loop-minimax-answer-variable data))))
@@ -1421,7 +1353,7 @@ a LET-like macro, and a SETQ-like macro, which perform LOOP-style destructuring.
 (defun loop-do-repeat ()
   (let ((form (loop-get-form))
 	(type (loop-check-data-type (loop-optional-type)
-				    *loop-real-data-type*)))
+				    'real)))
     (when (and (consp form)
 	       (eq (car form) 'the)
 	       (sb!xc:subtypep (second form) type))
@@ -1429,7 +1361,7 @@ a LET-like macro, and a SETQ-like macro, which perform LOOP-style destructuring.
     (multiple-value-bind (number constantp value)
 	(loop-constant-fold-if-possible form type)
       (cond ((and constantp (<= value 1)) `(t () () () ,(<= value 0) () () ()))
-	    (t (let ((var (loop-make-variable (loop-gentemp 'loop-repeat-)
+	    (t (let ((var (loop-make-variable (gensym "LOOP-REPEAT-")
 					      number
 					      type)))
 		 (if constantp
@@ -1441,7 +1373,7 @@ a LET-like macro, and a SETQ-like macro, which perform LOOP-style destructuring.
 (defun loop-when-it-variable ()
   (or *loop-when-it-variable*
       (setq *loop-when-it-variable*
-	    (loop-make-variable (loop-gentemp 'loop-it-) nil nil))))
+	    (loop-make-variable (gensym "LOOP-IT-") nil nil))))
 
 ;;;; various FOR/AS subdispatches
 
@@ -1462,8 +1394,8 @@ a LET-like macro, and a SETQ-like macro, which perform LOOP-style destructuring.
 
 (defun loop-for-across (var val data-type)
   (loop-make-iteration-variable var nil data-type)
-  (let ((vector-var (loop-gentemp 'loop-across-vector-))
-	(index-var (loop-gentemp 'loop-across-index-)))
+  (let ((vector-var (gensym "LOOP-ACROSS-VECTOR-"))
+	(index-var (gensym "LOOP-ACROSS-INDEX-")))
     (multiple-value-bind (vector-form constantp vector-value)
 	(loop-constant-fold-if-possible val 'vector)
       (loop-make-variable
@@ -1474,7 +1406,7 @@ a LET-like macro, and a SETQ-like macro, which perform LOOP-style destructuring.
       (loop-make-variable index-var 0 'fixnum)
       (let* ((length 0)
 	     (length-form (cond ((not constantp)
-				 (let ((v (loop-gentemp 'loop-across-limit-)))
+				 (let ((v (gensym "LOOP-ACROSS-LIMIT-")))
 				   (push `(setq ,v (length ,vector-var))
 					 *loop-prologue*)
 				   (loop-make-variable v 0 'fixnum)))
@@ -1512,7 +1444,7 @@ a LET-like macro, and a SETQ-like macro, which perform LOOP-style destructuring.
 	  ((and (consp stepper) (eq (car stepper) 'function))
 	   (list (cadr stepper) listvar))
 	  (t
-	   `(funcall ,(loop-make-variable (loop-gentemp 'loop-fn-)
+	   `(funcall ,(loop-make-variable (gensym "LOOP-FN-")
 					  stepper
 					  'function)
 		     ,listvar)))))
@@ -1523,23 +1455,21 @@ a LET-like macro, and a SETQ-like macro, which perform LOOP-style destructuring.
     (let ((listvar var))
       (cond ((and var (symbolp var))
 	     (loop-make-iteration-variable var list data-type))
-	    (t (loop-make-variable (setq listvar (loop-gentemp)) list 'list)
+	    (t (loop-make-variable (setq listvar (gensym)) list 'list)
 	       (loop-make-iteration-variable var nil data-type)))
       (let ((list-step (loop-list-step listvar)))
 	(let* ((first-endtest
-		(hide-variable-reference
-		 (eq var listvar)
-		 listvar
-		 ;; the following should use `atom' instead of `endp', per
-		 ;; [bug2428]
-		 `(atom ,listvar)))
+		;; mysterious comment from original CMU CL sources:
+		;;   the following should use `atom' instead of `endp',
+		;;   per [bug2428]
+		`(atom ,listvar))
 	       (other-endtest first-endtest))
 	  (when (and constantp (listp list-value))
 	    (setq first-endtest (null list-value)))
 	  (cond ((eq var listvar)
-		 ;; Contour of the loop is different because we use the user's
-		 ;; variable...
-		 `(() (,listvar ,(hide-variable-reference t listvar list-step))
+		 ;; The contour of the loop is different because we
+		 ;; use the user's variable...
+		 `(() (,listvar ,list-step)
 		   ,other-endtest () () () ,first-endtest ()))
 		(t (let ((step `(,var ,listvar))
 			 (pseudo `(,listvar ,list-step)))
@@ -1550,7 +1480,7 @@ a LET-like macro, and a SETQ-like macro, which perform LOOP-style destructuring.
 (defun loop-for-in (var val data-type)
   (multiple-value-bind (list constantp list-value)
       (loop-constant-fold-if-possible val)
-    (let ((listvar (loop-gentemp 'loop-list-)))
+    (let ((listvar (gensym "LOOP-LIST-")))
       (loop-make-iteration-variable var nil data-type)
       (loop-make-variable listvar list 'list)
       (let ((list-step (loop-list-step listvar)))
@@ -1650,7 +1580,7 @@ a LET-like macro, and a SETQ-like macro, which perform LOOP-style destructuring.
 (defun named-variable (name)
   (let ((tem (loop-tassoc name *loop-named-variables*)))
     (declare (list tem))
-    (cond ((null tem) (values (loop-gentemp) nil))
+    (cond ((null tem) (values (gensym) nil))
 	  (t (setq *loop-named-variables* (delete tem *loop-named-variables*))
 	     (values (cdr tem) t)))))
 
@@ -1759,12 +1689,12 @@ a LET-like macro, and a SETQ-like macro, which perform LOOP-style destructuring.
 	  (setq endform (if limit-constantp
 			    `',limit-value
 			    (loop-make-variable
-			      (loop-gentemp 'loop-limit-) form indexv-type))))
+			      (gensym "LOOP-LIMIT-") form indexv-type))))
 	 (:by
 	   (multiple-value-setq (form stepby-constantp stepby)
 	     (loop-constant-fold-if-possible form indexv-type))
 	   (unless stepby-constantp
-	     (loop-make-variable (setq stepby (loop-gentemp 'loop-step-by-))
+	     (loop-make-variable (setq stepby (gensym "LOOP-STEP-BY-"))
 				 form
 				 indexv-type)))
 	 (t (loop-error
@@ -1787,7 +1717,7 @@ a LET-like macro, and a SETQ-like macro, which perform LOOP-style destructuring.
 	    (when (or limit-given default-top)
 	      (unless limit-given
 		(loop-make-variable (setq endform
-					  (loop-gentemp 'loop-seq-limit-))
+					  (gensym "LOOP-SEQ-LIMIT-"))
 				    nil indexv-type)
 		(push `(setq ,endform ,default-top) *loop-prologue*))
 	      (setq testfn (if inclusive-iteration '> '>=)))
@@ -1804,12 +1734,10 @@ a LET-like macro, and a SETQ-like macro, which perform LOOP-style destructuring.
 		    (if (eql stepby 1) `(1- ,indexv) `(- ,indexv ,stepby)))))
      (when testfn
        (setq test
-	     (hide-variable-reference t indexv `(,testfn ,indexv ,endform))))
+	     `(,testfn ,indexv ,endform)))
      (when step-hack
        (setq step-hack
-	     `(,variable ,(hide-variable-reference indexv-user-specified-p
-						   indexv
-						   step-hack))))
+	     `(,variable ,step-hack)))
      (let ((first-test test) (remaining-tests test))
        (when (and stepby-constantp start-constantp limit-constantp)
 	 (when (setq first-test
@@ -1817,14 +1745,14 @@ a LET-like macro, and a SETQ-like macro, which perform LOOP-style destructuring.
 			      start-value
 			      limit-value))
 	   (setq remaining-tests t)))
-       `(() (,indexv ,(hide-variable-reference t indexv step))
+       `(() (,indexv ,step)
 	 ,remaining-tests ,step-hack () () ,first-test ,step-hack))))
 
 ;;;; interfaces to the master sequencer
 
 (defun loop-for-arithmetic (var val data-type kwd)
   (loop-sequencer
-    var (loop-check-data-type data-type *loop-real-data-type*) t
+    var (loop-check-data-type data-type 'real) t
     nil nil nil nil nil nil
     (loop-collect-prepositional-phrases
       '((:from :upfrom :downfrom) (:to :upto :downto :above :below) (:by))
@@ -1863,8 +1791,8 @@ a LET-like macro, and a SETQ-like macro, which perform LOOP-style destructuring.
 	 (loop-error "too many prepositions!"))
 	((null prep-phrases)
 	 (loop-error "missing OF or IN in ~S iteration path")))
-  (let ((ht-var (loop-gentemp 'loop-hashtab-))
-	(next-fn (loop-gentemp 'loop-hashtab-next-))
+  (let ((ht-var (gensym "LOOP-HASHTAB-"))
+	(next-fn (gensym "LOOP-HASHTAB-NEXT-"))
 	(dummy-predicate-var nil)
 	(post-steps nil))
     (multiple-value-bind (other-var other-p)
@@ -1887,12 +1815,12 @@ a LET-like macro, and a SETQ-like macro, which perform LOOP-style destructuring.
 	(push `(with-hash-table-iterator (,next-fn ,ht-var)) *loop-wrappers*)
 	(when (consp key-var)
 	  (setq post-steps
-		`(,key-var ,(setq key-var (loop-gentemp 'loop-hash-key-temp-))
+		`(,key-var ,(setq key-var (gensym "LOOP-HASH-KEY-TEMP-"))
 			   ,@post-steps))
 	  (push `(,key-var nil) bindings))
 	(when (consp val-var)
 	  (setq post-steps
-		`(,val-var ,(setq val-var (loop-gentemp 'loop-hash-val-temp-))
+		`(,val-var ,(setq val-var (gensym "LOOP-HASH-VAL-TEMP-"))
 			   ,@post-steps))
 	  (push `(,val-var nil) bindings))
 	`(,bindings				;bindings
@@ -1911,8 +1839,8 @@ a LET-like macro, and a SETQ-like macro, which perform LOOP-style destructuring.
 	 (loop-error "missing OF or IN in ~S iteration path")))
   (unless (symbolp variable)
     (loop-error "Destructuring is not valid for package symbol iteration."))
-  (let ((pkg-var (loop-gentemp 'loop-pkgsym-))
-	(next-fn (loop-gentemp 'loop-pkgsym-next-)))
+  (let ((pkg-var (gensym "LOOP-PKGSYM-"))
+	(next-fn (gensym "LOOP-PKGSYM-NEXT-")))
     (push `(with-package-iterator (,next-fn ,pkg-var ,@symbol-types))
 	  *loop-wrappers*)
     `(((,variable nil ,data-type) (,pkg-var ,(cadar prep-phrases)))
@@ -1928,7 +1856,7 @@ a LET-like macro, and a SETQ-like macro, which perform LOOP-style destructuring.
 
 (defun make-ansi-loop-universe (extended-p)
   (let ((w (make-standard-loop-universe
-	     :keywords `((named (loop-do-named))
+	     :keywords '((named (loop-do-named))
 			 (initially (loop-do-initially))
 			 (finally (loop-do-finally))
 			 (do (loop-do-do))
@@ -1941,10 +1869,10 @@ a LET-like macro, and a SETQ-like macro, which perform LOOP-style destructuring.
 			 (nconc (loop-list-collection nconc))
 			 (nconcing (loop-list-collection nconc))
 			 (count (loop-sum-collection count
-						     ,*loop-real-data-type*
+						     real
 						     fixnum))
 			 (counting (loop-sum-collection count
-							,*loop-real-data-type*
+							real
 							fixnum))
 			 (sum (loop-sum-collection sum number number))
 			 (summing (loop-sum-collection sum number number))
