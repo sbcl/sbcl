@@ -1311,7 +1311,8 @@
   "Return a sequence formed by destructively removing the elements satisfying
   the specified PREDICATE from the given SEQUENCE."
   (declare (fixnum start))
-  (let ((end (or end length)))
+  (let ((end (or end length))
+	(predicate (%coerce-callable-to-fun predicate)))
     (declare (type index end))
     (seq-dispatch sequence
 		  (if from-end
@@ -1347,7 +1348,8 @@
   "Return a sequence formed by destructively removing the elements not
   satisfying the specified PREDICATE from the given SEQUENCE."
   (declare (fixnum start))
-  (let ((end (or end length)))
+  (let ((end (or end length))
+	(predicate (%coerce-callable-to-fun predicate)))
     (declare (type index end))
     (seq-dispatch sequence
 		  (if from-end
@@ -1510,7 +1512,8 @@
   "Return a copy of sequence with elements such that predicate(element)
    is non-null removed"
   (declare (fixnum start))
-  (let ((end (or end length)))
+  (let ((end (or end length))
+	(predicate (%coerce-callable-to-fun predicate)))
     (declare (type index end))
     (seq-dispatch sequence
 		  (if from-end
@@ -1526,7 +1529,8 @@
   "Return a copy of sequence with elements such that predicate(element)
    is null removed"
   (declare (fixnum start))
-  (let ((end (or end length)))
+  (let ((end (or end length))
+	(predicate (%coerce-callable-to-fun predicate)))
     (declare (type index end))
     (seq-dispatch sequence
 		  (if from-end
@@ -1830,7 +1834,7 @@
   manual for details."
   (declare (fixnum start))
   (let ((end (or end length))
-        (test pred)
+        (test (%coerce-callable-to-fun pred))
 	test-not
 	old)
     (declare (type index length end))
@@ -1844,7 +1848,7 @@
   See manual for details."
   (declare (fixnum start))
   (let ((end (or end length))
-        (test pred)
+        (test (%coerce-callable-to-fun pred))
 	test-not
 	old)
     (declare (type index length end))
@@ -1911,7 +1915,8 @@
    except that all elements satisfying the PRED are replaced with NEW. 
    SEQUENCE may be destructively modified. See manual for details."
   (declare (fixnum start))
-  (let ((end (or end length)))
+  (let ((end (or end length))
+	(pred (%coerce-callable-to-fun pred)))
     (declare (fixnum end))
     (if (listp sequence)
 	(if from-end
@@ -1951,7 +1956,8 @@
    except that all elements not satisfying the TEST are replaced with NEW.
    SEQUENCE may be destructively modified. See manual for details."
   (declare (fixnum start))
-  (let ((end (or end length)))
+  (let ((end (or end length))
+	(pred (%coerce-callable-to-fun pred)))
     (declare (fixnum end))
     (if (listp sequence)
 	(if from-end
@@ -2100,7 +2106,8 @@
   #!+sb-doc
   "Return the number of elements in SEQUENCE satisfying PRED(el)."
   (declare (fixnum start))
-  (let ((end (or end length)))
+  (let ((end (or end length))
+	(pred (%coerce-callable-to-fun pred)))
     (declare (type index end))
     (seq-dispatch sequence
 		  (if from-end
@@ -2115,7 +2122,8 @@
   #!+sb-doc
   "Return the number of elements in SEQUENCE not satisfying TEST(el)."
   (declare (fixnum start))
-  (let ((end (or end length)))
+  (let ((end (or end length))
+	(pred (%coerce-callable-to-fun pred)))
     (declare (type index end))
     (seq-dispatch sequence
 		  (if from-end
