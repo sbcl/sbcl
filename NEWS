@@ -12,6 +12,10 @@ changes in sbcl-0.8.22 relative to sbcl-0.8.21:
   * fixed bug 376: CONJUGATE type deriver.
   * fixed infinite looping of ALIEN-FUNCALL, compiled with high DEBUG.
     (reported by Baughn on #lisp)
+  * fixed some bugs related to Unicode integration:
+    ** the restarts for recovering from input and output encoding
+       errors only appear when there is in fact such an error to
+       handle.
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** MISC.549 and similar: late transformation of unsafe type
        assertions into derived types caused unexpected code
