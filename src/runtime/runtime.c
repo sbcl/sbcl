@@ -220,7 +220,7 @@ main(int argc, char *argv[], char *envp[])
 
     if (!noinform) {
 	printf(
-"This is SBCL " SBCL_VERSION_STRING ", an implementation of ANSI Common Lisp.\n\
+"This is SBCL %s, an implementation of ANSI Common Lisp.\n\
 \n\
 SBCL is derived from the CMU CL system created at Carnegie Mellon University.\n\
 Besides software and documentation originally created at Carnegie Mellon\n\
@@ -238,7 +238,7 @@ used under BSD-style licenses allowing copying only under certain conditions.\n\
 See the COPYING file in the distribution for more information.\n\
 \n\
 More information about SBCL is available at <http://sbcl.sourceforge.net/>.\n\
-");
+", SBCL_VERSION_STRING);
 	fflush(stdout);
     }
 

@@ -196,6 +196,15 @@
 	 #!+long-float (long-float 0.0L0 #!+x86 96 #!+sparc 128
 				   ,sb!vm:simple-array-long-float-widetag)
 	 (bit 0 1 ,sb!vm:simple-bit-vector-widetag)
+	 ;; KLUDGE: The fact that these UNSIGNED-BYTE entries come
+	 ;; before their SIGNED-BYTE partners is significant in the
+	 ;; implementation of the compiler; some of the cross-compiler
+	 ;; code (see e.g. COERCE-TO-SMALLEST-ELTYPE in
+	 ;; src/compiler/debug-dump.lisp) attempts to create an array
+	 ;; specialized on (UNSIGNED-BYTE FOO), where FOO could be 7;
+	 ;; (UNSIGNED-BYTE 7) is SUBTYPEP (SIGNED-BYTE 8), so if we're
+	 ;; not careful we could get the wrong specialized array when
+	 ;; we try to FIND-IF, below. -- CSR, 2002-07-08
 	 ((unsigned-byte 2) 0 2 ,sb!vm:simple-array-unsigned-byte-2-widetag)
 	 ((unsigned-byte 4) 0 4 ,sb!vm:simple-array-unsigned-byte-4-widetag)
 	 ((unsigned-byte 8) 0 8 ,sb!vm:simple-array-unsigned-byte-8-widetag)
@@ -214,10 +223,64 @@
 			,sb!vm:simple-array-complex-long-float-widetag)
 	 (t 0 32 ,sb!vm:simple-vector-widetag))))
 
+(deftransform make-array ((dims &key initial-element element-type
+				     adjustable fill-pointer)
+			  (t &rest *))
+  (when (null initial-element)
+    (give-up-ir1-transform))
+  (let* ((eltype (cond ((not element-type) t)
+		       ((not (constant-continuation-p element-type))
+			(give-up-ir1-transform
+			 "ELEMENT-TYPE is not constant."))
+		       (t
+			(continuation-value element-type))))
+	 (eltype-type (specifier-type eltype))
+	 (saetp (find-if (lambda (saetp)
+			   (csubtypep eltype-type (saetp-ctype saetp)))
+			 *specialized-array-element-type-properties*))
+	 (creation-form `(make-array dims :element-type ',eltype
+			             ,@(when fill-pointer
+				         '(:fill-pointer fill-pointer))
+			             ,@(when adjustable
+				         '(:adjustable adjustable)))))
+
+    (unless saetp
+      (give-up-ir1-transform "ELEMENT-TYPE not found in *SAETP*: ~S" eltype))
+    
+    (cond ((or (null initial-element)
+	       (and (constant-continuation-p initial-element)
+		    (eql (continuation-value initial-element)
+			 (saetp-initial-element-default saetp))))
+	   (unless (csubtypep (ctype-of (saetp-initial-element-default saetp))
+			      eltype-type)
+	     ;; This situation arises e.g. in (MAKE-ARRAY 4
+	     ;; :ELEMENT-TYPE '(INTEGER 1 5)) ANSI's definition of
+	     ;; MAKE-ARRAY says "If INITIAL-ELEMENT is not supplied,
+	     ;; the consequences of later reading an uninitialized
+	     ;; element of new-array are undefined," so this could be
+	     ;; legal code as long as the user plans to write before
+	     ;; he reads, and if he doesn't we're free to do anything
+	     ;; we like. But in case the user doesn't know to write
+	     ;; elements before he reads elements (or to read manuals
+	     ;; before he writes code:-), we'll signal a STYLE-WARNING
+	     ;; in case he didn't realize this.
+	     (compiler-note "The default initial element ~S is not a ~S."
+			    (saetp-initial-element-default saetp)
+			    eltype))
+	   creation-form)
+	  (t
+	   `(let ((array ,creation-form))
+	     (multiple-value-bind (vector)
+		 (%data-vector-and-index array 0)
+	       (fill vector initial-element))
+	     array)))))
+			 
 ;;; The integer type restriction on the length ensures that it will be
 ;;; a vector. The lack of :ADJUSTABLE, :FILL-POINTER, and
-;;; :DISPLACED-TO keywords ensures that it will be simple.
-(deftransform make-array ((length &key initial-element element-type)
+;;; :DISPLACED-TO keywords ensures that it will be simple; the lack of
+;;; :INITIAL-ELEMENT relies on another transform to deal with that
+;;; kind of initialization efficiently.
+(deftransform make-array ((length &key element-type)
 			  (integer &rest *))
   (let* ((eltype (cond ((not element-type) t)
 		       ((not (constant-continuation-p element-type))
@@ -237,8 +300,7 @@
       (give-up-ir1-transform
        "cannot open-code creation of ~S" result-type-spec))
 
-    (let* ((initial-element-default (saetp-initial-element-default saetp))
-	   (n-bits-per-element (saetp-n-bits saetp))
+    (let* ((n-bits-per-element (saetp-n-bits saetp))
 	   (typecode (saetp-typecode saetp))
 	   (n-pad-elements (saetp-n-pad-elements saetp))
 	   (padded-length-form (if (zerop n-pad-elements)
@@ -252,47 +314,22 @@
 		(let ((n-elements-per-word (/ sb!vm:n-word-bits
 					      n-bits-per-element)))
 		  (declare (type index n-elements-per-word)) ; i.e., not RATIO
-		  `(ceiling ,padded-length-form ,n-elements-per-word))))
-	   (bare-constructor-form
-	    `(truly-the ,result-type-spec
-			(allocate-vector ,typecode length ,n-words-form)))
-	   (initial-element-form (if initial-element
-				     'initial-element
-				     initial-element-default)))
+		  `(ceiling ,padded-length-form ,n-elements-per-word)))))
       (values
-       (cond (;; Can we skip the FILL step?
-	      (or (null initial-element)
-		  (and (constant-continuation-p initial-element)
-		       (eql (continuation-value initial-element)
-			    initial-element-default)))
-	      (unless (csubtypep (ctype-of initial-element-default)
-				 eltype-type)
-		;; This situation arises e.g. in
-		;;   (MAKE-ARRAY 4 :ELEMENT-TYPE '(INTEGER 1 5))
-		;; ANSI's definition of MAKE-ARRAY says "If
-		;; INITIAL-ELEMENT is not supplied, the consequences
-		;; of later reading an uninitialized element of
-		;; new-array are undefined," so this could be legal
-		;; code as long as the user plans to write before he
-		;; reads, and if he doesn't we're free to do anything
-		;; we like. But in case the user doesn't know to write
-		;; elements before he reads elements (or to read
-		;; manuals before he writes code:-), we'll signal a
-		;; STYLE-WARNING in case he didn't realize this.
-		(compiler-note "The default initial element ~S is not a ~S."
-			       initial-element-default
-			       eltype))
-	      bare-constructor-form)
-	     (t
-	      `(truly-the ,result-type-spec
-			  (fill ,bare-constructor-form
-				,initial-element-form))))
+       `(truly-the ,result-type-spec
+	 (allocate-vector ,typecode length ,n-words-form))
        '((declare (type index length)))))))
 
 ;;; The list type restriction does not ensure that the result will be a
 ;;; multi-dimensional array. But the lack of adjustable, fill-pointer,
 ;;; and displaced-to keywords ensures that it will be simple.
-(deftransform make-array ((dims &key initial-element element-type)
+;;;
+;;; FIXME: should we generalize this transform to non-simple (though
+;;; non-displaced-to) arrays, given that we have %WITH-ARRAY-DATA to
+;;; deal with those? Maybe when the DEFTRANSFORM
+;;; %DATA-VECTOR-AND-INDEX in the VECTOR case problem is solved? --
+;;; CSR, 2002-07-01
+(deftransform make-array ((dims &key element-type)
 			  (list &rest *))
   (unless (or (null element-type) (constant-continuation-p element-type))
     (give-up-ir1-transform
@@ -307,8 +344,6 @@
        dims))
     (if (= (length dims) 1)
 	`(make-array ',(car dims)
-		     ,@(when initial-element
-			 '(:initial-element initial-element))
 		     ,@(when element-type
 			 '(:element-type element-type)))
 	(let* ((total-size (reduce #'* dims))
@@ -326,9 +361,7 @@
 	     (setf (%array-data-vector header)
 		   (make-array ,total-size
 			       ,@(when element-type
-				   '(:element-type element-type))
-			       ,@(when initial-element
-				   '(:initial-element initial-element))))
+				   '(:element-type element-type))))
 	     (setf (%array-displaced-p header) nil)
 	     ,@(let ((axis -1))
 		 (mapcar (lambda (dim)
