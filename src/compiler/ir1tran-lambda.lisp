@@ -285,12 +285,10 @@
 
   (let* ((bind (make-bind))
 	 (lambda (make-lambda :vars vars
-			      :bind bind
-			      :%source-name source-name
-			      :%debug-name debug-name))
+                  :bind bind
+                  :%source-name source-name
+                  :%debug-name debug-name))
 	 (result (or result (make-continuation))))
-
-    (continuation-starts-block result)
 
     ;; just to check: This function should fail internal assertions if
     ;; we didn't set up a valid debug name above.
@@ -302,7 +300,7 @@
 
     (setf (lambda-home lambda) lambda)
     (collect ((svars)
-	      (new-venv nil cons))
+             (new-venv nil cons))
 
       (dolist (var vars)
 	;; As far as I can see, LAMBDA-VAR-HOME should never have
@@ -324,27 +322,28 @@
 	(setf (bind-lambda bind) lambda)
 	(setf (node-lexenv bind) *lexenv*)
 
-	(let ((cont1 (make-continuation))
-	      (cont2 (make-continuation)))
-	  (continuation-starts-block cont1)
-	  (link-node-to-previous-continuation bind cont1)
-	  (use-continuation bind cont2)
-	  (ir1-convert-special-bindings cont2 result body
-					aux-vars aux-vals (svars)))
+	(let ((block (continuation-starts-block result)))
+	  (let ((return (make-return :result result :lambda lambda))
+                (tail-set (make-tail-set :funs (list lambda)))
+                (dummy (make-continuation)))
+            (setf (lambda-tail-set lambda) tail-set)
+            (setf (lambda-return lambda) return)
+            (setf (continuation-dest result) return)
+            (flush-continuation-externally-checkable-type result)
+            (setf (block-last block) return)
+            (link-node-to-previous-continuation return result)
+            (use-continuation return dummy))
+          (link-blocks block (component-tail *current-component*)))
 
-	(let ((block (continuation-block result)))
-	  (when block
-	    (let ((return (make-return :result result :lambda lambda))
-		  (tail-set (make-tail-set :funs (list lambda)))
-		  (dummy (make-continuation)))
-	      (setf (lambda-tail-set lambda) tail-set)
-	      (setf (lambda-return lambda) return)
-	      (setf (continuation-dest result) return)
-              (flush-continuation-externally-checkable-type result)
-	      (setf (block-last block) return)
-	      (link-node-to-previous-continuation return result)
-	      (use-continuation return dummy))
-	    (link-blocks block (component-tail *current-component*))))))
+        (with-component-last-block (*current-component*
+                                    (continuation-block result))
+          (let ((cont1 (make-continuation))
+                (cont2 (make-continuation)))
+            (continuation-starts-block cont1)
+            (link-node-to-previous-continuation bind cont1)
+            (use-continuation bind cont2)
+            (ir1-convert-special-bindings cont2 result body
+                                          aux-vars aux-vals (svars))))))
 
     (link-blocks (component-head *current-component*) (node-block bind))
     (push lambda (component-new-functionals *current-component*))

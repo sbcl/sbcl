@@ -388,7 +388,7 @@
 	  (let ((index (car subs))
 		(dim (%array-dimension array axis)))
 	    (declare (fixnum dim))
-	    (unless (< -1 index dim)
+	    (unless (and (fixnump index) (< -1 index dim))
 	      (if invalid-index-error-p
 		  (error 'simple-type-error
 			 :format-control "invalid index ~W~[~;~:; on axis ~:*~W~] in ~S"
@@ -400,7 +400,7 @@
 	    (setf chunk-size (* chunk-size dim))))
 	(let ((index (first subscripts))
 	      (length (length (the (simple-array * (*)) array))))
-	  (unless (< -1 index length)
+	  (unless (and (fixnump index) (< -1 index length))
 	    (if invalid-index-error-p
 		;; FIXME: perhaps this should share a format-string
 		;; with INVALID-ARRAY-INDEX-ERROR or
@@ -415,7 +415,7 @@
 
 (defun array-in-bounds-p (array &rest subscripts)
   #!+sb-doc
-  "Return T if the Subscipts are in bounds for the Array, Nil otherwise."
+  "Return T if the SUBSCIPTS are in bounds for the ARRAY, NIL otherwise."
   (if (%array-row-major-index array subscripts nil)
       t))
 
@@ -424,7 +424,7 @@
 
 (defun aref (array &rest subscripts)
   #!+sb-doc
-  "Return the element of the Array specified by the Subscripts."
+  "Return the element of the ARRAY specified by the SUBSCRIPTS."
   (row-major-aref array (%array-row-major-index array subscripts)))
 
 (defun %aset (array &rest stuff)

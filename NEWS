@@ -1879,6 +1879,10 @@ changes in sbcl-0.8.1 relative to sbcl-0.8.0:
        treated by SLOT-BOUNDP, SLOT-VALUE, (SETF SLOT-VALUE) and
        SLOT-MAKUNBOUND in the specified fashion.
 
+changes in sbcl-0.8.1 relative to sbcl-0.8.0:
+  * fixed bug 148: failure to inline-expand a local function left
+    garbage, confusing the compiler.
+
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles
     down, it might impact TRACE. They both encapsulate functions, and

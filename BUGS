@@ -566,29 +566,6 @@ WORKAROUND:
 
   See also bugs #45.c and #183
 
-148:
-  COMPILE-FILE on the file
-    (defun u-b-sra (ad0)
-      (declare (special *foo* *bar*))
-      (declare (optimize (safety 3) (speed 2) (space 1)))
-      (labels ((c.frob ())
-               (ad.frob (ad)
-                   (if *foo*
-                       (mapc #'ad.frob *bar*)
-                       (dolist (b *bar*)
-                         (c.frob)))))
-        (declare (inline c.frob ad.frob))
-        (ad.frob ad0)))
-  fails with
-    debugger invoked on condition of type TYPE-ERROR:
-      The value NIL is not of type SB-C::NODE.
-
-  (Python LET-converts C.FROB into AD.FROB, then tries to inline
-  expand AD.FROB. Having partially done it, it sees a call of C.FROB,
-  which already does not exist. So it gives up on expansion, leaving
-  garbage consisting of infinished blocks of the partially converted
-  function.)
-
 162:
   (reported by Robert E. Brown 2002-04-16) 
   When a function is called with too few arguments, causing the
@@ -1060,6 +1037,21 @@ WORKAROUND:
   complex attribute. (Now this is probably not important, because
   currently checks for complex arrays seem to be performed by
   callees.)
+
+258:
+  Compiler fails on
+
+    (defun u-b-sra (ad0)
+      (declare (special *foo* *bar*))
+      (declare (optimize (safety 3) (speed 2) (space 1) (debug 1)))
+      (labels ((c.frob (x)
+                 (random x))
+               (ad.frob (ad)
+                 (mapcar #'c.frob ad)))
+        (declare (inline c.frob ad.frob))
+        (list (the list ad0)
+              (funcall (if (listp ad0) #'ad.frob #'print) ad0)
+              (funcall (if (listp ad0) #'ad.frob #'print) (reverse ad0)))))
 
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:

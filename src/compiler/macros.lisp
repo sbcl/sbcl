@@ -639,6 +639,16 @@
 	 (when (eq ,n-next ,n-start)
 	   (return nil))))))
 
+(defmacro do-nodes-carefully ((node-var cont-var block) &body body)
+  (with-unique-names (n-block n-last)
+    `(loop with ,n-block = ,block
+           with ,n-last = (block-last ,n-block)
+           for ,cont-var = (block-start ,n-block) then (node-cont ,node-var)
+           for ,node-var = (and ,cont-var (continuation-next ,cont-var))
+           while ,node-var
+           do (progn ,@body)
+           until (eq ,node-var ,n-last))))
+
 ;;; Bind the IR1 context variables to the values associated with NODE,
 ;;; so that new, extra IR1 conversion related to NODE can be done
 ;;; after the original conversion pass has finished.

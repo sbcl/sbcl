@@ -1070,18 +1070,20 @@
 ;;; We mark the START as has having no next and remove the last node
 ;;; from its CONT's uses. We also flush the DEST for all continuations
 ;;; whose values are received by nodes in the block.
-(defun delete-block (block)
+(defun delete-block (block &optional silent)
   (declare (type cblock block))
   (aver (block-component block))      ; else block is already deleted!
-  (note-block-deletion block)
+  (unless silent
+    (note-block-deletion block))
   (setf (block-delete-p block) t)
 
-  (let* ((last (block-last block))
-	 (cont (node-cont last)))
-    (delete-continuation-use last)
-    (if (eq (continuation-kind cont) :unused)
-	(delete-continuation cont)
-	(reoptimize-continuation cont)))
+  (let ((last (block-last block)))
+    (when last
+      (let ((cont (node-cont last)))
+        (delete-continuation-use last)
+        (if (eq (continuation-kind cont) :unused)
+            (delete-continuation cont)
+            (reoptimize-continuation cont)))))
 
   (dolist (b (block-pred block))
     (unlink-blocks b block)
@@ -1095,7 +1097,7 @@
   (dolist (b (block-succ block))
     (unlink-blocks block b))
 
-  (do-nodes (node cont block)
+  (do-nodes-carefully (node cont block)
     (typecase node
       (ref (delete-ref node))
       (cif
@@ -1106,42 +1108,42 @@
       ;; careful that this LET has not already been partially deleted.
       (basic-combination
        (when (and (eq (basic-combination-kind node) :local)
-		  ;; Guards COMBINATION-LAMBDA agains the REF being deleted.
-		  (continuation-use (basic-combination-fun node)))
-	 (let ((fun (combination-lambda node)))
-	   ;; If our REF was the second-to-last ref, and has been
-	   ;; deleted, then FUN may be a LET for some other
-	   ;; combination.
-	   (when (and (functional-letlike-p fun)
-		      (eq (let-combination fun) node))
-	     (delete-lambda fun))))
+                  ;; Guards COMBINATION-LAMBDA agains the REF being deleted.
+                  (continuation-use (basic-combination-fun node)))
+         (let ((fun (combination-lambda node)))
+           ;; If our REF was the second-to-last ref, and has been
+           ;; deleted, then FUN may be a LET for some other
+           ;; combination.
+           (when (and (functional-letlike-p fun)
+                      (eq (let-combination fun) node))
+             (delete-lambda fun))))
        (flush-dest (basic-combination-fun node))
        (dolist (arg (basic-combination-args node))
-	 (when arg (flush-dest arg))))
+         (when arg (flush-dest arg))))
       (bind
        (let ((lambda (bind-lambda node)))
-	 (unless (eq (functional-kind lambda) :deleted)
-	   (delete-lambda lambda))))
+         (unless (eq (functional-kind lambda) :deleted)
+           (delete-lambda lambda))))
       (exit
        (let ((value (exit-value node))
-	     (entry (exit-entry node)))
-	 (when value
-	   (flush-dest value))
-	 (when entry
-	   (setf (entry-exits entry)
-		 (delete node (entry-exits entry))))))
+             (entry (exit-entry node)))
+         (when value
+           (flush-dest value))
+         (when entry
+           (setf (entry-exits entry)
+                 (delete node (entry-exits entry))))))
       (creturn
        (flush-dest (return-result node))
        (delete-return node))
       (cset
        (flush-dest (set-value node))
        (let ((var (set-var node)))
-	 (setf (basic-var-sets var)
-	       (delete node (basic-var-sets var)))))
+         (setf (basic-var-sets var)
+               (delete node (basic-var-sets var)))))
       (cast
        (flush-dest (cast-value node))))
 
-    (delete-continuation (node-prev node)))
+       (delete-continuation (node-prev node)))
 
   (remove-from-dfo block)
   (values))

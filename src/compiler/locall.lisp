@@ -334,27 +334,35 @@
 			(>= speed compilation-speed)))
 	   (not (eq (functional-kind (node-home-lambda call)) :external))
 	   (inline-expansion-ok call))
-      (multiple-value-bind (losing-local-functional converted-lambda)
-	  (catch 'locall-already-let-converted
-	    (with-ir1-environment-from-node call
-	      (let ((*lexenv* (functional-lexenv original-functional)))
-		(values nil
-			(ir1-convert-lambda
-			 (functional-inline-expansion original-functional)
-			 :debug-name (debug-namify
-				      "local inline ~A"
-				      (leaf-debug-name
-				       original-functional)))))))
-	(cond (losing-local-functional
-	       (let ((*compiler-error-context* call))
-		 (compiler-notify "couldn't inline expand because expansion ~
+      (let* ((end (component-last-block (node-component call)))
+             (pred (block-prev end)))
+        (multiple-value-bind (losing-local-functional converted-lambda)
+            (catch 'locall-already-let-converted
+              (with-ir1-environment-from-node call
+                (let ((*lexenv* (functional-lexenv original-functional)))
+                  (values nil
+                          (ir1-convert-lambda
+                           (functional-inline-expansion original-functional)
+                           :debug-name (debug-namify
+                                        "local inline ~A"
+                                        (leaf-debug-name
+                                         original-functional)))))))
+          (cond (losing-local-functional
+                 (let ((*compiler-error-context* call))
+                   (compiler-notify "couldn't inline expand because expansion ~
 		                   calls this LET-converted local function:~
 		                   ~%  ~S"
-				(leaf-debug-name losing-local-functional)))
-	       original-functional)
-	      (t
-	       (change-ref-leaf ref converted-lambda)
-	       converted-lambda)))
+                                    (leaf-debug-name losing-local-functional)))
+                 (loop for block = (block-next pred) then (block-next block)
+                       until (eq block end)
+                       do (setf (block-delete-p block) t))
+                 (loop for block = (block-next pred) then (block-next block)
+                       until (eq block end)
+                       do (delete-block block t))
+                 original-functional)
+                (t
+                 (change-ref-leaf ref converted-lambda)
+                 converted-lambda))))
       original-functional))
 
 ;;; Dispatch to the appropriate function to attempt to convert a call.
