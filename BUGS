@@ -1190,14 +1190,20 @@ WORKAROUND:
 229:
   (subtypep 'function '(function)) => nil, t.
 
-232:
-  (shown by Paul Dietz' test suite)
+233:
+  Bug in constraint propagation:
 
-  (loop for v fixnum being each hash-key in ...)
+  (defun foo (x)
+    (declare (optimize (speed 2) (safety 3)))
+    (let ((y 0d0))
+      (values
+       (the double-float x)
+       (setq y (+ x 1d0))
+       (setq x 3d0)
+       (quux y (+ y 2d0) (* y 3d0)))))
+  (foo 4) => segmentation violation
 
-  in 0.7.10.29 signals an error "NIL is not of type FIXNUM".
-  (fixed in 0.7.10.30)
-
+  (see usage of CONTINUATION-ASSERTED-TYPE in USE-RESULT-CONSTRAINTS)
 
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:
