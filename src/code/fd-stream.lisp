@@ -1245,6 +1245,7 @@
 		     ;; input (output) routine in fast-read-byte.
 		     (or character-stream-p
 			 (equal target-type '(unsigned-byte 8)))
+		     (not output-p) ; temporary disable on :io streams
 		     #+(or)
 		     (or (eq type 'unsigned-byte)
 			 (eq type :default)))
