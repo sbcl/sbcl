@@ -121,7 +121,9 @@
 		      (defmacro-error "&ENVIRONMENT" error-kind name))))
 	      ((or (eq var '&rest)
 		   (eq var '&body))
-	       (cond ((and (cdr rest-of-args) (symbolp (cadr rest-of-args)))
+	       (cond (restp
+		      (defmacro-error (symbol-name var) error-kind name))
+		     ((and (cdr rest-of-args) (symbolp (cadr rest-of-args)))
 		      (setq rest-of-args (cdr rest-of-args))
 		      (setq restp t)
 		      (push-let-binding (car rest-of-args) path nil))
@@ -140,8 +142,10 @@
 	      ((eq var '&aux)
 	       (setq now-processing :auxs))
 	      ((listp var)
-	       (cond ; (since it's too early to use CASE)
-		 ((eq now-processing :required)
+	       (case now-processing
+		 ((:required)
+		  (when restp
+		    (defmacro-error "required argument after &REST/&BODY" error-kind name))  
 		  (let ((sub-list-name (gensym "SUBLIST-")))
 		    (push-sub-list-binding sub-list-name `(car ,path) var
 					   name error-kind error-fun)
@@ -150,7 +154,7 @@
 		  (setq path `(cdr ,path)
 			minimum (1+ minimum)
 			maximum (1+ maximum)))
-		 ((eq now-processing :optionals)
+		 ((:optionals)
 		  (destructuring-bind (varname &optional initform supplied-p)
 		      var
 		    (push-optional-binding varname initform supplied-p
@@ -158,7 +162,7 @@
 					   name error-kind error-fun))
 		  (setq path `(cdr ,path)
 			maximum (1+ maximum)))
-		 ((eq now-processing :keywords)
+		 ((:keywords)
 		  (let* ((keyword-given (consp (car var)))
 			 (variable (if keyword-given
 				       (cadar var)
@@ -169,33 +173,33 @@
 			 (supplied-p (caddr var)))
 		    (push-optional-binding variable (cadr var) supplied-p
 					   `(keyword-supplied-p ',keyword
-								,rest-name)
+					     ,rest-name)
 					   `(lookup-keyword ',keyword
-							    ,rest-name)
+					     ,rest-name)
 					   name error-kind error-fun)
 		    (push keyword keys)))
-		 ((eq now-processing :auxs)
+		 ((:auxs)
 		  (push-let-binding (car var) (cadr var) nil))))
 	      ((symbolp var)
-	       (cond ; (too early in bootstrapping to use CASE)
-		;; FIXME: ^ This "too early in bootstrapping" is no
-		;; longer an issue in current SBCL bootstrapping.
-		 ((eq now-processing :required)
+	       (case now-processing
+		 ((:required)
+		  (when restp
+		    (defmacro-error "required argument after &REST/&BODY" error-kind name))
 		  (push-let-binding var `(car ,path) nil)
 		  (setq minimum (1+ minimum)
 			maximum (1+ maximum)
 			path `(cdr ,path)))
-		 ((eq now-processing :optionals)
+		 ((:optionals)
 		  (push-let-binding var `(car ,path) nil `(not (null ,path)))
 		  (setq path `(cdr ,path)
 			maximum (1+ maximum)))
-		 ((eq now-processing :keywords)
+		 ((:keywords)
 		  (let ((key (keywordicate var)))
 		    (push-let-binding var
 				      `(lookup-keyword ,key ,rest-name)
 				      nil)
 		    (push key keys)))
-		 ((eq now-processing :auxs)
+		 ((:auxs)
 		  (push-let-binding var nil nil))))
 	      (t
 	       (error "non-symbol in lambda-list: ~S" var)))))

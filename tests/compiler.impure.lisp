@@ -574,6 +574,11 @@ BUG 48c, not yet fixed:
 (defun bug221 (b x)
   (funcall (if b #'bug221f1 #'bug221f2) x))
 
+;;; bug 172: macro lambda lists were too permissive until 0.7.9.28
+;;; (fix provided by Matthew Danish) on sbcl-devel
+(assert (null (ignore-errors
+		(defmacro bug172 (&rest rest foo) `(list ,rest ,foo)))))
+
 ;;;; tests not in the problem domain, but of the consistency of the
 ;;;; compiler machinery itself
 
