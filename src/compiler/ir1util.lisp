@@ -235,7 +235,6 @@
 ;;; the LEXENV-LAMBDA may be deleted, we must chain up the
 ;;; LAMBDA-CALL-LEXENV thread until we find a CLAMBDA that isn't
 ;;; deleted, and then return its home.
-(declaim (maybe-inline node-home-lambda))
 (defun node-home-lambda (node)
   (declare (type node node))
   (do ((fun (lexenv-lambda (node-lexenv node))
@@ -245,22 +244,17 @@
     (when (eq (lambda-home fun) fun)
       (return fun))))
 
-#!-sb-fluid (declaim (inline node-block node-tlf-number))
-(declaim (maybe-inline node-physenv))
 (defun node-block (node)
   (declare (type node node))
   (the cblock (continuation-block (node-prev node))))
 (defun node-physenv (node)
   (declare (type node node))
-  #!-sb-fluid (declare (inline node-home-lambda))
   (the physenv (lambda-physenv (node-home-lambda node))))
 
-#!-sb-fluid (declaim (maybe-inline lambda-block))
 (defun lambda-block (clambda)
   (declare (type clambda clambda))
   (node-block (lambda-bind clambda)))
 (defun lambda-component (clambda)
-  (declare (inline lambda-block))
   (block-component (lambda-block clambda)))
 
 ;;; Return the enclosing cleanup for environment of the first or last
@@ -275,7 +269,6 @@
 ;;; Return the non-LET LAMBDA that holds BLOCK's code.
 (defun block-home-lambda (block)
   (declare (type cblock block))
-  #!-sb-fluid (declare (inline node-home-lambda))
   (if (node-p (block-last block))
       ;; This is the old CMU CL way of doing it.
       (node-home-lambda (block-last block))
@@ -296,7 +289,6 @@
 ;;; Return the IR1 physical environment for BLOCK.
 (defun block-physenv (block)
   (declare (type cblock block))
-  #!-sb-fluid (declare (inline node-home-lambda))
   (lambda-physenv (block-home-lambda block)))
 
 ;;; Return the Top Level Form number of PATH, i.e. the ordinal number
@@ -384,7 +376,6 @@
 ;;;; flow/DFO/component hackery
 
 ;;; Join BLOCK1 and BLOCK2.
-#!-sb-fluid (declaim (inline link-blocks))
 (defun link-blocks (block1 block2)
   (declare (type cblock block1 block2))
   (setf (block-succ block1)
@@ -1278,8 +1269,7 @@
     (elt (combination-args (let-combination fun))
 	 (position-or-lose var (lambda-vars fun)))))
 
-;;; Return the LAMBDA that is called by the local Call.
-#!-sb-fluid (declaim (inline combination-lambda))
+;;; Return the LAMBDA that is called by the local CALL.
 (defun combination-lambda (call)
   (declare (type basic-combination call))
   (aver (eq (basic-combination-kind call) :local))

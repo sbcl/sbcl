@@ -193,6 +193,18 @@
 ;;; that we find to be related. Return whatever COMPONENT we actually
 ;;; merged into.
 ;;;
+;;; (Note: The analogous CMU CL code only scavenged call-based
+;;; dependencies, not closure dependencies. That seems to've been by
+;;; oversight, not by design, as per the bug reported by WHN on
+;;; cmucl-imp ca. 2001-11-29 and explained by DTC shortly after.)
+;;;
+;;; FIXME: Very likely we should be scavenging NLX-based dependencies
+;;; here too. OTOH, there's a lot of global weirdness in NLX handling,
+;;; so it might be taken care of some other way that I haven't figured
+;;; out yet. Perhaps the best way to address this would be to try to
+;;; construct a NLX-based test case which fails in the same way as the
+;;; closure-based test case on cmucl-imp 2001-11-29.)
+;;;
 ;;; If the function is in an initial component, then we move its head
 ;;; and tail to COMPONENT and add it to COMPONENT's lambdas. It is
 ;;; harmless to move the tail (even though the return might be
@@ -240,18 +252,21 @@
 	(let ((return-block (node-block return)))
 	  (link-blocks return-block (component-tail component))
 	  (unlink-blocks return-block (component-tail old-lambda-component))))
-      (let ((calls (if (eq (functional-kind fun) :external)
-		       (append (find-reference-funs fun)
-			       (lambda-calls fun))
-		       (lambda-calls fun))))
-	(do ((res (find-initial-dfo-aux bind-block component)
-		  (dfo-scavenge-dependency-graph (first remaining-calls) res))
-	     (remaining-calls calls (rest remaining-calls)))
-	    ((null remaining-calls)
-	     res)
-	  (declare (type component res))))))))
+      (let ((res (find-initial-dfo-aux bind-block component)))
+	(declare (type component res))
+	;; Scavenge call relationships.
+	(let ((calls (if (eq (functional-kind fun) :external)
+			 (append (find-reference-funs fun)
+				 (lambda-calls fun))
+			 (lambda-calls fun))))
+	  (dolist (call calls)
+	    (setf res (dfo-scavenge-dependency-graph call res))))
+	;; TO DO: Scavenge closure-over relationships.
+	(values)
+	;; Voila.
+	res)))))
 
-;;; Return true if FUN is either an XEP or has EXITS to some of its
+;;; Return true if FUN either is an XEP or has EXITS to some of its
 ;;; ENTRIES.
 (defun has-xep-or-nlx (fun)
   (declare (type clambda fun))
