@@ -56,13 +56,15 @@
        allocated objects into static space so that they stay pure. This takes
        somewhat longer than the normal GC which is otherwise done, but it's
        only done once, and subsequent GC's will be done less often and will
-       take less time in the resulting core file. See PURIFY.
+       take less time in the resulting core file. See the PURIFY function.
     :ROOT-STRUCTURES
        This should be a list of the main entry points in any newly loaded
        systems. This need not be supplied, but locality and/or GC performance
-       may be better if they are. Meaningless if :PURIFY is NIL. See PURIFY.
+       may be better if they are. Meaningless if :PURIFY is NIL. See the
+       PURIFY function.
     :ENVIRONMENT-NAME
-       This is also passed to PURIFY when :PURIFY is T. (rarely used)
+       This is also passed to the PURIFY function when :PURIFY is T.
+       (rarely used)
 
   The save/load process changes the values of some global variables:
     *STANDARD-OUTPUT*, *DEBUG-IO*, etc.

@@ -315,14 +315,23 @@
        (if (dd-class-p dd)
 	   (let ((inherits (inherits-for-structure dd)))
 	     `(progn
+		;; Note we intentionally call %DEFSTRUCT first, and
+		;; especially before %COMPILER-DEFSTRUCT. %DEFSTRUCT
+		;; has the tests (and resulting CERROR) for collisions
+		;; with LAYOUTs which already exist in the runtime. If
+		;; there are any collisions, we want the user's
+		;; response to CERROR to control what happens.
+		;; Especially, if the user responds to the collision
+		;; with ABORT, we don't want %COMPILER-DEFSTRUCT to
+		;; modify the definition of the class.
+		(%defstruct ',dd ',inherits)
 		(eval-when (:compile-toplevel :load-toplevel :execute)
 		  (%compiler-defstruct ',dd ',inherits))
-		(%defstruct ',dd ',inherits)
 		,@(unless expanding-into-code-for-xc-host-p
 		    (append ;; FIXME: We've inherited from CMU CL nonparallel
 			    ;; code for creating copiers for typed and untyped
 			    ;; structures. This should be fixed.
-					;(copier-definition dd)
+			    ;(copier-definition dd)
 			    (constructor-definitions dd)
 			    (class-method-definitions dd)))
 		',name))
@@ -997,19 +1006,37 @@
   (declare (type sb!xc:class class) (type layout old-layout new-layout))
   (let ((name (class-proper-name class)))
     (restart-case
-	(error "redefining class ~S incompatibly with the current definition"
+	(error "~@<attempt to redefine the ~S class ~S incompatibly with the current definition~:@>"
+	       'structure-object
 	       name)
       (continue ()
-	:report "Invalidate current definition."
-	(warn "Previously loaded ~S accessors will no longer work." name)
-	(register-layout new-layout))
+       :report (lambda (s)
+		 (format s
+			 "~@<Use the new definition of ~S, invalidating ~
+                          already-loaded code and instances.~@:>"
+			 name))
+       (register-layout new-layout))
+      (recklessly-continue ()
+       :report (lambda (s)
+		 (format s
+			 "~@<Use the new definition of ~S as if it were ~
+                          compatible, allowing old accessors to use new ~
+                          instances and allowing new accessors to use old ~
+                          instances.~@:>"
+			 name))
+       ;; classic CMU CL warning: "Any old ~S instances will be in a bad way. 
+       ;; I hope you know what you're doing..."
+       (register-layout new-layout
+			:invalidate nil
+			:destruct-layout old-layout))
       (clobber-it ()
-	:report "Smash current layout, preserving old code."
-	(warn "Any old ~S instances will be in a bad way.~@
-	       I hope you know what you're doing..."
-	      name)
-	(register-layout new-layout :invalidate nil
-			 :destruct-layout old-layout))))
+       ;; FIXME: deprecated 2002-10-16, and since it's only interactive
+       ;; hackery instead of a supported feature, can probably be deleted
+       ;; in early 2003
+       :report "(deprecated synonym for RECKLESSLY-CONTINUE)"
+       (register-layout new-layout
+			:invalidate nil
+			:destruct-layout old-layout))))
   (values))
 
 ;;; This is called when we are about to define a structure class. It

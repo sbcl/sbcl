@@ -497,7 +497,7 @@
        ;; get you out to here.
        (with-simple-restart
 	   (abort
-	    "Reduce debugger level (leaving debugger, returning to toplevel).")
+	    "~@<Reduce debugger level (leaving debugger, returning to toplevel).~@:>")
 	 (catch 'toplevel-catcher
 	   #!-sunos (sb!unix:unix-sigsetmask 0)	; FIXME: What is this for?
 	   ;; in the event of a control-stack-exhausted-error, we should

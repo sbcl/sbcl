@@ -29,8 +29,6 @@ for early 0.7.x:
 		are now implemented as closures (because
 		they're structure slot accessors) won't be so
 		nasty in the debugger
-* rewrote long-standing confusing error restarts for redefining
-	DEFSTRUCTs
 * outstanding embarrassments
 	** cut-and-pasted DEF-BOOLEAN-ATTRIBUTE (maybe easier to fix
 		now that EVAL-WHEN works correctly..)

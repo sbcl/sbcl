@@ -78,9 +78,9 @@
 	  *debug-command-level*))
   
 (defparameter *debug-help-string*
-"The prompt is square brackets, with number(s) indicating the current control
-  stack level and, if you've entered the debugger recursively, how deeply
-  recursed you are.
+"The debug prompt is square brackets, with number(s) indicating the current
+  control stack level and, if you've entered the debugger recursively, how
+  deeply recursed you are.
 Any command -- including the name of a restart -- may be uniquely abbreviated.
 The debugger rebinds various special variables for controlling i/o, sometimes
   to defaults (much like WITH-STANDARD-IO-SYNTAX does) and sometimes to 
@@ -94,8 +94,8 @@ Getting in and out of the debugger:
   RESTART  invokes restart numbered as shown (prompt if not given).
   ERROR    prints the error condition and restart cases.
   The number of any restart, or its name, or a unique abbreviation for its
-    name, is a valid command, and is the same as using RESTART to invoke that
-    restart.
+    name, is a valid command, and is the same as using RESTART to invoke
+    that restart.
 
 Changing frames:
   U      up frame     D    down frame
@@ -855,7 +855,7 @@ reset to ~S."
 	    (let ((level *debug-command-level*)
 		  (restart-commands (make-restart-commands)))
 	      (with-simple-restart (abort
-				   "Reduce debugger level (to debug level ~W)."
+				   "~@<Reduce debugger level (to debug level ~W).~@:>"
 				    level)
 		(debug-prompt *debug-io*)
 		(force-output *debug-io*)
@@ -1239,9 +1239,8 @@ reset to ~S."
 ;;;  (throw 'sb!impl::toplevel-catcher nil))
 
 ;;; CMU CL supported this GO debug command, but SBCL doesn't -- in
-;;; SBCL you just type the CONTINUE restart name instead (or "RESTART
-;;; CONTINUE", that's OK too).
-
+;;; SBCL you just type the CONTINUE restart name instead (or "C" or
+;;; "RESTART CONTINUE", that's OK too).
 ;;;(!def-debug-command "GO" ()
 ;;;  (continue *debug-condition*)
 ;;;  (error "There is no restart named CONTINUE."))
