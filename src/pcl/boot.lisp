@@ -1524,8 +1524,6 @@ bootstrapping.
 		 *))))
 
 (defun defgeneric-declaration (spec lambda-list)
-  (when (consp spec)
-    (setq spec (get-setf-fun-name (cadr spec))))
   `(ftype ,(ftype-declaration-from-lambda-list lambda-list spec) ,spec))
 
 ;;;; early generic function support
