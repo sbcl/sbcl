@@ -649,7 +649,7 @@ Lisp extension proposal by David N. Gray"
  #s(sb-cold:package-data
     :name "SB!INT"
     :doc
-"private: miscellaneous unsupported extensions to the ANSI spec. Most of
+"private: miscellaneous unsupported extensions to the ANSI spec. Much of
 the stuff in here originated in CMU CL's EXTENSIONS package and is
 retained, possibly temporariliy, because it might be used internally."
     :use ("CL" "SB!ALIEN" "SB!C-CALL" "SB!GRAY" "SB!FASL" "SB!SYS")
@@ -677,16 +677,6 @@ retained, possibly temporariliy, because it might be used internally."
              ;; hash mixing operations
              "MIX" "MIXF"
              
-             ;; optimization idioms
-             "*OPTIMIZE-BYTE-COMPILATION*"
-             "*OPTIMIZE-EXTERNAL-DESPITE-BYTE-COMPILATION*"
-
-             ;; Arguably there's no one right value for the system
-             ;; prompt. But Common Lisp makes it easy for you to write
-             ;; your own REPL if you really care, so I'm not convinced we
-             ;; need this as a supported extension.
-             "*PROMPT*"
-
              ;; I'm not convinced that FDEFINITIONs are the ideal
              ;; solution, so exposing ways to peek into the system
              ;; seems undesirable, since it makes it harder to get
@@ -704,6 +694,9 @@ retained, possibly temporariliy, because it might be used internally."
              ;; in the cross-compiler's environment
              "DEF!MACRO" "DEF!METHOD" "DEF!STRUCT" "DEF!TYPE"
 
+	     ;; stuff for hinting to the compiler
+	     "NAMED-LAMBDA"
+	     
              ;; other variations on DEFFOO stuff useful for bootstrapping
              ;; and cross-compiling
              "DEFMACRO-MUNDANELY"

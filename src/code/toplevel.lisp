@@ -247,10 +247,6 @@
 (defvar +++ nil #!+sb-doc "the previous value of ++")
 (defvar -   nil #!+sb-doc "the form currently being evaluated")
 
-;;; the top level prompt string, or a function of no arguments that
-;;; returns a simple-string
-(defvar *prompt* "* ")
-
 (defun interactive-eval (form)
   "Evaluate FORM, returning whatever it returns and adjusting ***, **, *,
    +++, ++, +, ///, //, /, and -."
@@ -495,14 +491,11 @@
      ;; FIXME: It seems bad to have GC behavior depend on scrubbing the
      ;; control stack before each interactive command. Isn't there some
      ;; way we can convince the GC to just ignore dead areas of the
-     ;; control stack, so that we don't need to rely on this
-     ;; half-measure?
+     ;; control stack, so that we don't need to rely on this half-measure?
      (scrub-control-stack)
      (unless noprint
        (fresh-line)
-       (princ (if (functionp *prompt*)
-		  (funcall *prompt*)
-		  *prompt*))
+       (write-string "* ") ; arbitrary but customary REPL prompt
        (flush-standard-output-streams))
      (let ((form (read *standard-input* nil eof-marker)))
        (cond ((eq form eof-marker)

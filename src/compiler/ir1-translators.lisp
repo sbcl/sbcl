@@ -398,13 +398,15 @@
 			       ,@(subseq args 0 required)
 			       ,@(subseq args min)))))
 
-;;;; QUOTE and FUNCTION
+;;;; QUOTE
 
 (def-ir1-translator quote ((thing) start cont)
   #!+sb-doc
   "QUOTE Value
   Return Value without evaluating it."
   (reference-constant start cont thing))
+
+;;;; FUNCTION and NAMED-LAMBDA
 
 (def-ir1-translator function ((thing) start cont)
   #!+sb-doc
@@ -434,6 +436,34 @@
       (let ((var (find-lexically-apparent-function
 		  thing "as the argument to FUNCTION")))
 	(reference-leaf start cont var))))
+
+;;; `(NAMED-LAMBDA ,NAME ,@REST) is like `(FUNCTION (LAMBDA ,@REST)),
+;;; except that the value of NAME is passed to the compiler for use in
+;;; creation of debug information for the resulting function.
+;;;
+;;; Eventually we might use this for NAME values other than legal
+;;; function names, e.g.
+;;;   NAME = (:FLET FOO BAR)
+;;; for the FLET function in
+;;;   (DEFUN BAR (X)
+;;;     (FLET ((FOO (Y) (+ X Y)))
+;;;       FOO))
+;;; or
+;;;   NAME = (:METHOD PRINT-OBJECT (STARSHIP T))
+;;; for the function used to implement
+;;;   (DEFMETHOD PRINT-OBJECT ((SS STARSHIP) STREAM) ...).
+;;; However, as of this writing (while defining/implementing it in
+;;; sbcl-0.pre7.108) NAME is always a legal function name.
+;;;
+;;; If NAME is a legal function name, then the caller should be
+;;; planning to set (FDEFINITION NAME) to the created function.
+;;; (Otherwise the debug names will be inconsistent and thus
+;;; unnecessarily confusing.)
+(def-ir1-translator named-lambda ((name &rest rest) start cont)
+  (reference-leaf start
+		  cont
+		  (ir1-convert-lambda `(lambda ,@rest)
+				      :source-name name)))
 
 ;;;; FUNCALL
 
