@@ -227,7 +227,7 @@
     (let ((code (%primitive sb!c:allocate-code-object box-num code-length))
 	  (index (+ sb!vm:code-trace-table-offset-slot box-num)))
       (declare (type index index))
-      #!-gengc (setf (%code-debug-info code) (pop-stack))
+      (setf (%code-debug-info code) (pop-stack))
       (dotimes (i box-num)
 	(declare (fixnum i))
 	(setf (code-header-ref code (decf index)) (pop-stack)))

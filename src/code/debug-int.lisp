@@ -564,7 +564,7 @@
 (defun stack-ref (s n) (stack-ref s n))
 (defun %set-stack-ref (s n value) (%set-stack-ref s n value))
 (defun function-code-header (fun) (function-code-header fun))
-#!-gengc (defun lra-code-header (lra) (lra-code-header lra))
+(defun lra-code-header (lra) (lra-code-header lra))
 (defun make-lisp-obj (value) (make-lisp-obj value))
 (defun get-lisp-obj-address (thing) (get-lisp-obj-address thing))
 (defun function-word-offset (fun) (function-word-offset fun))
@@ -582,11 +582,11 @@
        (sap> (int-sap control-stack-end) x)
        (zerop (logand (sap-int x) #b11))))
 
-#!+(or gengc x86)
+#!+x86
 (sb!alien:def-alien-routine component-ptr-from-pc (system-area-pointer)
   (pc system-area-pointer))
 
-#!+(or gengc x86)
+#!+x86
 (defun component-from-component-ptr (component-ptr)
   (declare (type system-area-pointer component-ptr))
   (make-lisp-obj (logior (sap-int component-ptr)
@@ -912,7 +912,7 @@
 ;;; Note: Sometimes LRA is actually a fixnum. This happens when lisp
 ;;; calls into C. In this case, the code object is stored on the stack
 ;;; after the LRA, and the LRA is the word offset.
-#!-(or gengc x86)
+#!-x86
 (defun compute-calling-frame (caller lra up-frame)
   (declare (type system-area-pointer caller))
   (when (cstack-pointer-valid-p caller)
@@ -1093,7 +1093,6 @@
 ;;; Find the code object corresponding to the object represented by
 ;;; bits and return it. We assume bogus functions correspond to the
 ;;; undefined-function.
-#!-gengc
 (defun code-object-from-bits (bits)
   (declare (type (unsigned-byte 32) bits))
   (let ((object (make-lisp-obj bits)))
@@ -1183,9 +1182,9 @@
 		   (sap-ref-32 catch
 				      (* sb!vm:catch-block-current-cont-slot
 					 sb!vm:word-bytes))))
-	(let* (#!-(or gengc x86)
+	(let* (#!-x86
 	       (lra (stack-ref catch sb!vm:catch-block-entry-pc-slot))
-	       #!+(or gengc x86)
+	       #!+x86
 	       (ra (sap-ref-sap
 		    catch (* sb!vm:catch-block-entry-pc-slot
 			     sb!vm:word-bytes)))

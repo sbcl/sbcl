@@ -85,8 +85,7 @@
   byte-code-function
   byte-code-closure
   closure-function-header
-  #!-gengc return-pc-header
-  #!+gengc forwarding-pointer
+  return-pc-header
   value-cell-header
   symbol-header
   base-char
@@ -94,8 +93,7 @@
   unbound-marker
   weak-pointer
   instance-header
-  fdefn
-  )
+  fdefn)
 
 ;;; the different vector subtypes
 (defenum (:prefix vector- :suffix -subtype)

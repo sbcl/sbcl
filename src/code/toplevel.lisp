@@ -25,7 +25,6 @@
 
 ;;; FIXME: The DEFVAR here is redundant with the (DECLAIM (SPECIAL ..))
 ;;; of all static symbols in early-impl.lisp.
-#!-gengc
 (progn
   (defvar *current-catch-block*)
   (defvar *current-unwind-protect-block*)

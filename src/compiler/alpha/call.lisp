@@ -498,7 +498,7 @@ default-value-8
   (:temporary (:sc control-stack :offset nfp-save-offset) nfp-save)
   (:temporary (:scs (non-descriptor-reg)) temp)
   (:generator 5
-    (let (#!-gengc (label (gen-label))
+    (let ((label (gen-label))
 	  (cur-nfp (current-nfp-tn vop)))
       (when cur-nfp
 	(store-stack-tn nfp-save cur-nfp))

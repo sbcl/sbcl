@@ -156,7 +156,6 @@
 	    (setf (svref *!load-time-values* (third toplevel-thing))
 		  (funcall (second toplevel-thing))))
 	   (:load-time-value-fixup
-	    #!-gengc
 	    (setf (sap-ref-32 (second toplevel-thing) 0)
 		  (get-lisp-obj-address
 		   (svref *!load-time-values* (third toplevel-thing)))))
@@ -225,7 +224,7 @@
   (setf *cold-init-complete-p* t)
 
   ;; The system is finally ready for GC.
-  #!-gengc (setf *already-maybe-gcing* nil)
+  (setf *already-maybe-gcing* nil)
   (/show0 "enabling GC")
   (gc-on)
   (/show0 "doing first GC")

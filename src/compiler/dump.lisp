@@ -995,11 +995,9 @@
       ;; Dump the offset of the trace table.
       (dump-object code-length fasl-output)
       ;; FIXME: As long as we don't have GENGC, the trace table is
-      ;; hardwired to be empty. So we might be able to get rid of
-      ;; trace tables? However, we should probably wait for the first
-      ;; port to a system where CMU CL uses GENGC to see whether GENGC
-      ;; is really gone. (I.e. maybe other non-X86 ports will want to
-      ;; use it, just as in CMU CL.)
+      ;; hardwired to be empty. And SBCL doesn't have GENGC (and as
+      ;; far as I know no modern CMU CL does either -- WHN
+      ;; 2001-10-05). So might we be able to get rid of trace tables?
 
       ;; Dump the constants, noting any :entries that have to be fixed up.
       (do ((i sb!vm:code-constants-offset (1+ i)))
@@ -1067,9 +1065,7 @@
 
 (defun dump-assembler-routines (code-segment length fixups routines file)
   (dump-fop 'fop-assembler-code file)
-  (dump-unsigned-32 #!+gengc (ceiling length 4)
-		    #!-gengc length
-		    file)
+  (dump-unsigned-32 length file)
   (write-segment-contents code-segment (fasl-output-stream file))
   (dolist (routine routines)
     (dump-fop 'fop-normal-load file)
@@ -1152,123 +1148,6 @@
 				      entry-handle
 				      file))
 	    (remhash entry (fasl-output-patch-table file)))))))
-  (values))
-
-(defun dump-byte-code-object (segment code-length constants file)
-  (declare (type sb!assem:segment segment)
-	   (type index code-length)
-	   (type vector constants)
-	   (type fasl-output file))
-  (collect ((entry-patches))
-
-    ;; Dump the debug info.
-    #!+gengc
-    (let ((info (sb!c::make-debug-info
-		 :name (sb!c::component-name *component-being-compiled*)))
-	  (*dump-only-valid-structures* nil))
-      (dump-object info file)
-      (let ((info-handle (dump-pop file)))
-	(dump-push info-handle file)
-	(push info-handle (fasl-output-debug-info file))))
-
-    ;; The "trace table" is initialized by loader to hold a list of
-    ;; all byte functions in this code object (for debug info.)
-    (dump-object nil file)
-
-    ;; Dump the constants.
-    ;;
-    ;; FIXME: There's a family resemblance between this and the
-    ;; corresponding code in DUMP-CODE-OBJECT. Could some be shared?
-    (dotimes (i (length constants))
-      (let ((entry (aref constants i)))
-	(etypecase entry
-	  (constant
-	   (dump-object (sb!c::constant-value entry) file))
-	  (null
-	   (dump-fop 'fop-misc-trap file))
-	  (list
-	   (ecase (car entry)
-	     (:entry
-	      (let* ((info (sb!c::leaf-info (cdr entry)))
-		     (handle (gethash info
-				      (fasl-output-entry-table file))))
-		(cond
-		 (handle
-		  (dump-push handle file))
-		 (t
-		  (entry-patches (cons info
-				       (+ i sb!vm:code-constants-offset)))
-		  (dump-fop 'fop-misc-trap file)))))
-	     (:load-time-value
-	      (dump-push (cdr entry) file))
-	     (:fdefinition
-	      (dump-object (cdr entry) file)
-	      (dump-fop 'fop-fdefinition file))
-	     (:type-predicate
-	      (dump-object 'load-type-predicate file)
-	      (let ((*unparse-function-type-simplify* t))
-		(dump-object (type-specifier (cdr entry)) file))
-	      (dump-fop 'fop-funcall file)
-	      (dump-byte 1 file)))))))
-
-    ;; Dump the debug info.
-    #!-gengc
-    (let ((info (sb!c::make-debug-info :name
-				       (sb!c::component-name
-					*component-being-compiled*)))
-	  (*dump-only-valid-structures* nil))
-      (dump-object info file)
-      (let ((info-handle (dump-pop file)))
-	(dump-push info-handle file)
-	(push info-handle (fasl-output-debug-info file))))
-
-    (let ((num-consts #!+gengc (+ (length constants) 2)
-		      #!-gengc (1+ (length constants)))
-	  (code-length #!+gengc (ceiling code-length 4)
-		       #!-gengc code-length))
-      (cond ((and (< num-consts #x100) (< code-length #x10000))
-	     (dump-fop 'fop-small-code file)
-	     (dump-byte num-consts file)
-	     (dump-integer-as-n-bytes code-length 2 file))
-	    (t
-	     (dump-fop 'fop-code file)
-	     (dump-unsigned-32 num-consts file)
-	     (dump-unsigned-32 code-length file))))
-    (dump-segment segment code-length file)
-    (let ((code-handle (dump-pop file))
-	  (patch-table (fasl-output-patch-table file)))
-      (dolist (patch (entry-patches))
-	(push (cons code-handle (cdr patch))
-	      (gethash (car patch) patch-table)))
-      code-handle)))
-
-;;; Dump a byte-component. This is similar to FASL-DUMP-COMPONENT, but
-;;; different.
-(defun fasl-dump-byte-component (segment length constants xeps file)
-  (declare (type sb!assem:segment segment)
-	   (type index length)
-	   (type vector constants)
-	   (type list xeps)
-	   (type fasl-output file))
-
-  (let ((code-handle (dump-byte-code-object segment length constants file)))
-    (dolist (noise xeps)
-      (let* ((lambda (car noise))
-	     (info (sb!c::lambda-info lambda))
-	     (xep (cdr noise)))
-	(dump-byte-function xep code-handle file)
-	(let* ((entry-handle (dump-pop file))
-	       (patch-table (fasl-output-patch-table file))
-	       (old (gethash info patch-table)))
-	  (setf (gethash info (fasl-output-entry-table file))
-		entry-handle)
-	  (when old
-	    (dolist (patch old)
-	      (dump-alter-code-object (car patch)
-				      (cdr patch)
-				      entry-handle
-				      file))
-	    (remhash info patch-table))))))
   (values))
 
 (defun dump-push-previously-dumped-fun (fun fasl-output)

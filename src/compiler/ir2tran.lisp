@@ -153,12 +153,11 @@
 ;;; the called function, since local call analysis converts all
 ;;; closure references. If a TL-XEP, we know it is not a closure.
 ;;;
-;;; If a closed-over lambda-var has no refs (is deleted), then we
+;;; If a closed-over LAMBDA-VAR has no refs (is deleted), then we
 ;;; don't initialize that slot. This can happen with closures over
 ;;; top-level variables, where optimization of the closure deleted the
 ;;; variable. Since we committed to the closure format when we
 ;;; pre-analyzed the top-level code, we just leave an empty slot.
-#!-gengc
 (defun ir2-convert-closure (node block leaf res)
   (declare (type ref node) (type ir2-block block)
 	   (type functional leaf) (type tn res))

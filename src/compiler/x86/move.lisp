@@ -290,8 +290,9 @@
        (inst jmp :o bignum)
        (emit-label done)
        ;; KLUDGE: The sequence above leaves a DESCRIPTOR-REG Y in a
-       ;; non-descriptor state for a while. Does that matter? Does it matter in
-       ;; GENGC but not in GENCGC? Is this written down anywhere?
+       ;; non-descriptor state for a while. Does that matter? Does it
+       ;; matter in GENGC but not in GENCGC? Is this written down
+       ;; anywhere?
        ;;   -- WHN 19990916
        ;;
        ;; Also, the sequence above seems rather twisty. Why not something

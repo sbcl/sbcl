@@ -139,8 +139,8 @@
 (define-primitive-object (function :type function
 				   :lowtag function-pointer-type
 				   :header function-header-type)
-  #!-(or gengc x86) (self :ref-trans %function-self
-			  :set-trans (setf %function-self))
+  #!-x86 (self :ref-trans %function-self
+	       :set-trans (setf %function-self))
   #!+x86 (self
 	  ;; KLUDGE: There's no :SET-KNOWN, :SET-TRANS, :REF-KNOWN, or
 	  ;; :REF-TRANS here in this case. Instead, there's separate
@@ -157,7 +157,6 @@
 	  ;; stuff here in order to allow this old hack to work in the
 	  ;; new world. -- WHN 2001-08-82
 	  )
-  #!+gengc (entry-point :c-type "char *")
   (next :type (or function null)
 	:ref-known (flushable)
 	:ref-trans %function-next
@@ -177,21 +176,19 @@
 	:set-trans (setf %function-type))
   (code :rest-p t :c-type "unsigned char"))
 
-#!-gengc
 (define-primitive-object (return-pc :lowtag other-pointer-type :header t)
   (return-point :c-type "unsigned char" :rest-p t))
 
 (define-primitive-object (closure :lowtag function-pointer-type
 				  :header closure-header-type)
-  #!-gengc (function :init :arg :ref-trans %closure-function)
-  #!+gengc (entry-point :c-type "char *")
+  (function :init :arg :ref-trans %closure-function)
   (info :rest-p t))
 
 (define-primitive-object (funcallable-instance
 			  :lowtag function-pointer-type
 			  :header funcallable-instance-header-type
 			  :alloc-trans %make-funcallable-instance)
-  #!-(or gengc x86)
+  #!-x86
   (function
    :ref-known (flushable) :ref-trans %funcallable-instance-function
    :set-known (unsafe) :set-trans (setf %funcallable-instance-function))
@@ -207,13 +204,11 @@
    ;; the new world of sbcl-0.6.12.63, where multiple DEFKNOWNs for
    ;; the same operator cause an error (instead of silently deleting
    ;; all information associated with the old DEFKNOWN, as before).
-   ;; It's definitely not very clean, with too many #!+ conditionals,
-   ;; too little documentation, and an implicit assumption that GENGC
-   ;; and X86 are mutually exclusive, but I have more urgent things to
+   ;; It's definitely not very clean, with too many #!+ conditionals and
+   ;; too little documentation, but I have more urgent things to
    ;; clean up right now, so I've just left it as a literal
    ;; translation without trying to fix it. -- WHN 2001-08-02
    )
-  #!+gengc (entry-point :c-type "char *")
   (lexenv :ref-known (flushable) :ref-trans %funcallable-instance-lexenv
 	  :set-known (unsafe) :set-trans (setf %funcallable-instance-lexenv))
   (layout :init :arg
@@ -280,27 +275,15 @@
 
 ;;;; symbols
 
-#!+gengc
-(defknown %make-symbol (index simple-string) symbol
-  (flushable movable))
-
-#!+gengc
-(defknown symbol-hash (symbol) index
-  (flushable movable))
-
 #!+x86
 (defknown symbol-hash (symbol) (integer 0 #.*target-most-positive-fixnum*)
   (flushable movable))
 
 (define-primitive-object (symbol :lowtag other-pointer-type
 				 :header symbol-header-type
-				 #!-x86 :alloc-trans
-				 #!-(or gengc x86) make-symbol
-				 #!+gengc %make-symbol)
+				 #!-x86 :alloc-trans #!-x86 make-symbol)
   (value :set-trans %set-symbol-value
 	 :init :unbound)
-  #!-(or gengc x86) unused
-  #!+gengc (hash :init :arg)
   #!+x86 (hash)
   (plist :ref-trans symbol-plist
 	 :set-trans %set-symbol-plist
