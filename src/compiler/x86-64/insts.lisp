@@ -80,8 +80,7 @@
 	   (type sb!disassem:disassem-state dstate))
   (print-reg-with-width
    (if (consp value) (car value) value)
-   (or (sb!disassem:dstate-get-prop dstate 'word-width)
-       (and (consp value) :qword)
+   (or (sb!disassem:dstate-get-prop dstate 'reg-width)
        +default-operand-size+)
    stream
    dstate))
@@ -127,13 +126,6 @@
       (print-reg value stream dstate)
     (print-mem-access value stream t dstate)))
 
-(defun print-sized-rex-reg/mem (value stream dstate)
-  (declare (type (or list full-reg) value)
-	   (type stream stream)
-	   (type sb!disassem:disassem-state dstate))
-  (setf (sb!disassem:dstate-get-prop dstate 'reg-width) :qword)
-  (print-sized-reg/mem value stream dstate))
-
 (defun print-byte-reg/mem (value stream dstate)
   (declare (type (or list full-reg) value)
 	   (type stream stream)
@@ -162,14 +154,13 @@
 	  (rex.wrxb (second value)))
       (declare (type (or null (unsigned-byte 4)) rex.wrxb)
 	       (type (unsigned-byte 3) reg))
-      (if rex.wrxb
-	  (progn
-	    (setf (sb!disassem:dstate-get-prop dstate 'reg-width) :qword)
-	    (list
-	     (if (plusp (logand rex.wrxb #b0100))
-		 (+ 8 reg)
-	       reg)))
-	reg))))
+	(setf (sb!disassem:dstate-get-prop dstate 'reg-width)
+	      (if (and rex.wrxb (plusp (logand rex.wrxb #b1000)))
+		  :qword
+		+default-operand-size+))
+	(if (plusp (logand rex.wrxb #b0100))
+	    (+ 8 reg)
+	  reg))))
   
 ;;; Returns either an integer, meaning a register, or a list of
 ;;; (BASE-REG OFFSET INDEX-REG INDEX-SCALE), where any component
@@ -184,12 +175,17 @@
     (declare (type (unsigned-byte 2) mod)
 	     (type (unsigned-byte 3) r/m)
 	     (type (or null (unsigned-byte 4)) rex.wrxb))
+    
+    (setf (sb!disassem:dstate-get-prop dstate 'reg-width)
+	  (if (and rex.wrxb (plusp (logand rex.wrxb #b1000)))
+	      :qword
+	    +default-operand-size+))
 
-    (when rex.wrxb
-      (setf (sb!disassem:dstate-get-prop dstate 'reg-width) :qword))
-
-    (let ((full-reg (if (and rex.wrxb (= 1 (logand rex.wrxb #b0001)))
-			(+ 8 r/m) 
+    (let ((full-reg (if (and rex.wrxb (plusp (logand rex.wrxb #b0001)))
+			(progn
+			  (setf (sb!disassem:dstate-get-prop dstate 'reg-width)
+				:qword)
+			  (+ 8 r/m) )
 		      r/m)))
       (declare (type full-reg full-reg))
       (cond ((= mod #b11)
@@ -233,16 +229,17 @@
 (defun prefilter-width (value dstate)
   (setf (sb!disassem:dstate-get-prop dstate 'width)
 	(if (zerop value)
-	    :byte
-	    (let ((word-width
+	    (setf (sb!disassem:dstate-get-prop dstate 'reg-width)
+		  :byte)
+	    (let ((reg-width
 		   ;; set by a prefix instruction
-		   (or (sb!disassem:dstate-get-prop dstate 'word-width)
+		   (or (sb!disassem:dstate-get-prop dstate 'reg-width)
 		       +default-operand-size+)))
-	      (when (not (eql word-width +default-operand-size+))
+	      (when (not (eql reg-width +default-operand-size+))
 		;; Reset it.
-		(setf (sb!disassem:dstate-get-prop dstate 'word-width)
+		(setf (sb!disassem:dstate-get-prop dstate 'reg-width)
 		      +default-operand-size+))
-	      word-width))))
+	      reg-width))))
 
 (defun read-address (value dstate)
   (declare (ignore value))		; always nil anyway
@@ -328,7 +325,7 @@
   :prefilter (lambda (value dstate)
 	       (declare (ignore value)) ; always nil anyway
 	       (let ((width
-		      (or (sb!disassem:dstate-get-prop dstate 'word-width)
+		      (or (sb!disassem:dstate-get-prop dstate 'reg-width)
 			  +default-operand-size+)))
 		 (sb!disassem:read-suffix (width-bits width) dstate))))
 
@@ -360,7 +357,7 @@
   ;; Same as reg/mem, but prints an explicit size indicator for
   ;; memory references.
   :prefilter #'prefilter-reg/mem
-  :printer #'print-sized-rex-reg/mem)
+  :printer #'print-sized-reg/mem)
 
 ;;; added by jrd
 (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
@@ -383,11 +380,11 @@
 		 (or (null value)
 		     (and (numberp value) (zerop value))) ; zzz jrd
 		 (princ 'b stream)
-		 (let ((word-width
+		 (let ((reg-width
 			;; set by a prefix instruction
-			(or (sb!disassem:dstate-get-prop dstate 'word-width)
+			(or (sb!disassem:dstate-get-prop dstate 'reg-width)
 			    +default-operand-size+)))
-		   (princ (schar (symbol-name word-width) 0) stream)))))
+		   (princ (schar (symbol-name reg-width) 0) stream)))))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
 (defparameter *conditions*
@@ -572,7 +569,6 @@
 					  :tab
 					  ,(swap-if 'dir 'reg/mem ", " 'reg)))
   (rex    :field (byte 4 4)  :value #b0100)
-  (wrxb  :field (byte 4 0))
   (op  :field (byte 6 10))
   (dir :field (byte 1 9)))
 
