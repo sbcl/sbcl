@@ -17,8 +17,8 @@
 (declaim (special *posix-argv*
 		  *!initial-fdefn-objects*
 		  *read-only-space-free-pointer*
-		  *static-space-free-pointer*
-		  *initial-dynamic-space-free-pointer*
+		  sb!vm:*static-space-free-pointer*
+		  sb!vm:*initial-dynamic-space-free-pointer*
 		  *current-catch-block*
 		  *current-unwind-protect-block*
 		  sb!c::*eval-stack-top*

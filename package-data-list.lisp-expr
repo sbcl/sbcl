@@ -1204,20 +1204,7 @@ is a good idea, but see SB-SYS for blurring of boundaries."
              "%SETELT" "%SET-ROW-MAJOR-AREF" "%SET-FILL-POINTER"
              "%SET-FDEFINITION" "%SCHARSET" "%SBITSET" "%RPLACD"
              "%RPLACA" "%PUT" "%CHARSET" "%BITSET" "%ASET"
-             "%ARRAY-TYPEP" "%SET-SAP-REF-DESCRIPTOR"
-
-             ;; Note: These are out of lexicographical order only because
-             ;; historically in CMU CL they were imported into package VM
-             ;; from LISP instead of being exported from package VM. In
-             ;; SBCL we achieve more or less the same effect by putting them
-             ;; in SB!KERNEL, where they're visible both in SB!IMPL and in
-             ;; SB!VM. But as far as I can tell, though, there's no
-             ;; fundamental reason that they're different from the other
-             ;; exports. -- WHN 19991020
-             "STATIC-SPACE-START" "READ-ONLY-SPACE-START"
-             "DYNAMIC-1-SPACE-START" "DYNAMIC-0-SPACE-START"
-             "CURRENT-DYNAMIC-SPACE-START" "*STATIC-SPACE-FREE-POINTER*"
-             "*READ-ONLY-SPACE-FREE-POINTER*"))
+             "%ARRAY-TYPEP" "%SET-SAP-REF-DESCRIPTOR"))
 
  #s(sb-cold:package-data
     :name "SB!LOOP"
@@ -1598,6 +1585,7 @@ structure representations"
              "CONTEXT-PC" "CONTEXT-REGISTER"
              "CONTROL-STACK-FORK" "CONTROL-STACK-RESUME"
              "CONTROL-STACK-RETURN" "CONTROL-STACK-SC-NUMBER" "COUNT-NO-OPS"
+             "CURRENT-DYNAMIC-SPACE-START"
              "CURRENT-FLOAT-TRAP" "DEFINE-FOR-EACH-PRIMITIVE-OBJECT"
              "DESCRIPTOR-REG-SC-NUMBER" "DESCRIPTOR-VS-NON-DESCRIPTOR-STORAGE"
              "DOUBLE-FLOAT-EXPONENT-BYTE" "DOUBLE-FLOAT-BIAS"
@@ -1635,7 +1623,7 @@ structure representations"
              "FUNCALLABLE-INSTANCE-LEXENV-SLOT"
              "GENESIS" "HALT-TRAP" "IGNORE-ME-SC-NUMBER"
              "IMMEDIATE-BASE-CHAR-SC-NUMBER" "IMMEDIATE-SAP-SC-NUMBER"
-             "IMMEDIATE-SC-NUMBER"
+             "IMMEDIATE-SC-NUMBER" "*INITIAL-DYNAMIC-SPACE-FREE-POINTER*"
              "INSTANCE-HEADER-TYPE" "INSTANCE-POINTER-TYPE"
              "INSTANCE-SLOTS-OFFSET" "INSTANCE-USAGE"
              "INTERIOR-REG-SC-NUMBER" "INTERNAL-ERROR-ARGUMENTS"
@@ -1660,6 +1648,7 @@ structure representations"
              "PRIMITIVE-OBJECT-VARIABLE-LENGTH" "PRINT-ALLOCATED-OBJECTS"
              "RANDOM-IMMEDIATE-SC-NUMBER" "RATIO-DENOMINATOR-SLOT"
              "RATIO-NUMERATOR-SLOT" "RATIO-SIZE" "RATIO-TYPE"
+             "*READ-ONLY-SPACE-FREE-POINTER*"
              "REGISTER-SAVE-PENALTY" "RETURN-PC-HEADER-TYPE"
              "RETURN-PC-RETURN-POINT-OFFSET" "SANCTIFY-FOR-EXECUTION"
              "SAP-POINTER-SLOT" "SAP-REG-SC-NUMBER" "SAP-SIZE"
@@ -1693,14 +1682,15 @@ structure representations"
              "SINGLE-VALUE-RETURN-BYTE-OFFSET" "SLOT-DOCS"
              "SLOT-LENGTH" "SLOT-NAME" "SLOT-OFFSET" "SLOT-OPTIONS"
              "SLOT-REST-P" "*STATIC-FUNCTIONS*" "STATIC-FUNCTION-OFFSET"
-             "STATIC-SYMBOL-OFFSET" "STATIC-SYMBOL-P" "*STATIC-SYMBOLS*"
+             "STATIC-SYMBOL-OFFSET" "STATIC-SYMBOL-P"
+             "*STATIC-SPACE-FREE-POINTER*" "*STATIC-SYMBOLS*"
              "STRUCTURE-USAGE" "SYMBOL-FUNCTION-SLOT"
              "SYMBOL-HASH-SLOT" "SYMBOL-HEADER-TYPE" "SYMBOL-NAME-SLOT"
              "SYMBOL-PACKAGE-SLOT" "SYMBOL-PLIST-SLOT"
              "SYMBOL-RAW-FUNCTION-ADDR-SLOT" "SYMBOL-SETF-FUNCTION-SLOT"
              "SYMBOL-SIZE" "SYMBOL-UNUSED-SLOT" "SYMBOL-VALUE-SLOT"
-             "*BINDING-STACK-START*" "TARGET-BYTE-ORDER"
-             "*CONTROL-STACK-START*" "*DYNAMIC-SPACE-START*"
+             "BINDING-STACK-START" "TARGET-BYTE-ORDER"
+             "CONTROL-STACK-START" "*DYNAMIC-SPACE-START*"
              "TARGET-FASL-CODE-FORMAT" "TARGET-FASL-FILE-TYPE"
              "TARGET-HEAP-ADDRESS-SPACE" "*TARGET-MOST-NEGATIVE-FIXNUM*"
              "*TARGET-MOST-POSITIVE-FIXNUM*" "*READ-ONLY-SPACE-START*"

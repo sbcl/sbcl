@@ -16,8 +16,8 @@
 
 ;;;; DYNAMIC-USAGE and friends
 
-(declaim (special *read-only-space-free-pointer*
-		  *static-space-free-pointer*))
+(declaim (special sb!vm:*read-only-space-free-pointer*
+		  sb!vm:*static-space-free-pointer*))
 
 (eval-when (:compile-toplevel :execute)
   (sb!xc:defmacro def-c-var-frob (lisp-fun c-var-name)
@@ -26,31 +26,27 @@
        (defun ,lisp-fun ()
 	 (sb!alien:extern-alien ,c-var-name (sb!alien:unsigned 32))))))
 
-(def-c-var-frob read-only-space-start       "read_only_space")
-(def-c-var-frob static-space-start	    "static_space")
-(def-c-var-frob dynamic-0-space-start       "dynamic_0_space")
-(def-c-var-frob dynamic-1-space-start       "dynamic_1_space")
-(def-c-var-frob control-stack-start	    "control_stack")
-#!+x86 (def-c-var-frob control-stack-end    "control_stack_end")
-(def-c-var-frob binding-stack-start	    "binding_stack")
-(def-c-var-frob current-dynamic-space-start "current_dynamic_space")
+(def-c-var-frob sb!vm:control-stack-start	    "control_stack")
+#!+x86 (def-c-var-frob control-stack-end            "control_stack_end")
+(def-c-var-frob sb!vm:binding-stack-start	    "binding_stack")
+(def-c-var-frob sb!vm:current-dynamic-space-start "current_dynamic_space")
 
 #!-sb-fluid (declaim (inline dynamic-usage))
 #!-(or cgc gencgc)
 (defun dynamic-usage ()
   (the (unsigned-byte 32)
        (- (sb!sys:sap-int (sb!c::dynamic-space-free-pointer))
-	  (current-dynamic-space-start))))
+	  (sb!vm:current-dynamic-space-start))))
 #!+(or cgc gencgc)
 (def-c-var-frob dynamic-usage "bytes_allocated")
 
 (defun static-space-usage ()
-  (- (* sb!impl::*static-space-free-pointer* sb!vm:word-bytes)
-     (static-space-start)))
+  (- (* sb!vm:*static-space-free-pointer* sb!vm:word-bytes)
+     sb!vm:*static-space-start*))
 
 (defun read-only-space-usage ()
-  (- (* sb!impl::*read-only-space-free-pointer* sb!vm:word-bytes)
-     (read-only-space-start)))
+  (- (* sb!vm::*read-only-space-free-pointer* sb!vm:word-bytes)
+     sb!vm:*read-only-space-start*))
 
 (defun control-stack-usage ()
   #!-x86 (- (sb!sys:sap-int (sb!c::control-stack-pointer-sap))
@@ -59,26 +55,17 @@
 	    (sb!sys:sap-int (sb!c::control-stack-pointer-sap))))
 
 (defun binding-stack-usage ()
-  (- (sb!sys:sap-int (sb!c::binding-stack-pointer-sap)) (binding-stack-start)))
-
-(defun current-dynamic-space ()
-  (let ((start (current-dynamic-space-start)))
-    (cond ((= start (dynamic-0-space-start))
-	   0)
-	  ((= start (dynamic-1-space-start))
-	   1)
-	  (t
-	   (error "Oh no! The current dynamic space is missing!")))))
+  (- (sb!sys:sap-int (sb!c::binding-stack-pointer-sap))
+     (sb!vm:binding-stack-start)))
 
 ;;;; ROOM
 
 (defun room-minimal-info ()
-  (format t "Dynamic Space Usage:    ~10:D bytes.~%" (dynamic-usage))
-  (format t "Read-Only Space Usage:  ~10:D bytes.~%" (read-only-space-usage))
-  (format t "Static Space Usage:     ~10:D bytes.~%" (static-space-usage))
-  (format t "Control Stack Usage:    ~10:D bytes.~%" (control-stack-usage))
-  (format t "Binding Stack Usage:    ~10:D bytes.~%" (binding-stack-usage))
-  (format t "The current dynamic space is ~D.~%" (current-dynamic-space))
+  (format t "Dynamic space usage is:   ~10:D bytes.~%" (dynamic-usage))
+  (format t "Read-only space usage is: ~10:D bytes.~%" (read-only-space-usage))
+  (format t "Static space usage is:    ~10:D bytes.~%" (static-space-usage))
+  (format t "Control stack usage is:   ~10:D bytes.~%" (control-stack-usage))
+  (format t "Binding stack usage is:   ~10:D bytes.~%" (binding-stack-usage))
   (format t "Garbage collection is currently ~:[enabled~;DISABLED~].~%"
 	  *gc-inhibit*))
 
@@ -273,7 +260,7 @@
 
 #!+ibmrt
 (defun set-auto-gc-trigger (bytes)
-  (let ((words (ash (+ (current-dynamic-space-start) bytes) -2)))
+  (let ((words (ash (+ (sb!vm:current-dynamic-space-start) bytes) -2)))
     (unless (and (fixnump words) (plusp words))
       (clear-auto-gc-trigger)
       (warn "attempt to set GC trigger to something bogus: ~S" bytes))

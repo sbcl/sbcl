@@ -493,7 +493,9 @@ changes in sbcl-0.6.8 relative to sbcl-0.6.7:
   have been added.
 * Raymond Wiker's patches to port dynamic loading from Linux to
   FreeBSD have been added.
-?? The debugger now flushes standard output streams before it begins
+* The BUGS file is now more nearly up to date, thanks in large part
+  to Martin Atzmueller's review of it.
+* The debugger now flushes standard output streams before it begins
   its output ("debugger invoked" and so forth).
 ?? FINISH-OUTPUT now works better than it did before. (It used to 
   have trouble with characters which weren't followed by a linefeed.)

@@ -110,17 +110,20 @@
 
 ;;;; MAP-ALLOCATED-OBJECTS
 
-(declaim (type fixnum *static-space-free-pointer*
-	       *read-only-space-free-pointer* ))
+;;; Since they're represented as counts of words, we should never
+;;; need bignums to represent these:
+(declaim (type fixnum
+	       *static-space-free-pointer*
+	       *read-only-space-free-pointer*))
 
 (defun space-bounds (space)
   (declare (type spaces space))
   (ecase space
     (:static
-     (values (int-sap (static-space-start))
+     (values (int-sap *static-space-start*)
 	     (int-sap (* *static-space-free-pointer* word-bytes))))
     (:read-only
-     (values (int-sap (read-only-space-start))
+     (values (int-sap *read-only-space-start*)
 	     (int-sap (* *read-only-space-free-pointer* word-bytes))))
     (:dynamic
      (values (int-sap (current-dynamic-space-start))

@@ -2474,13 +2474,13 @@
 	    ;; Check that the pointer is valid. XXX Could do a better
 	    ;; job. FIXME: e.g. by calling out to an is_valid_pointer
 	    ;; routine in the C runtime support code
-	    (or (< (sb!impl::read-only-space-start) val
-		   (* sb!impl::*read-only-space-free-pointer*
+	    (or (< sb!vm:*read-only-space-start* val
+		   (* sb!vm:*read-only-space-free-pointer*
 		      sb!vm:word-bytes))
-		(< (sb!impl::static-space-start) val
-		   (* sb!impl::*static-space-free-pointer*
+		(< sb!vm::*static-space-start* val
+		   (* sb!vm:*static-space-free-pointer*
 		      sb!vm:word-bytes))
-		(< (sb!impl::current-dynamic-space-start) val
+		(< (sb!vm:current-dynamic-space-start) val
 		   (sap-int (dynamic-space-free-pointer))))))
       (make-lisp-obj val)
       :invalid-object))

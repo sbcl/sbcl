@@ -63,17 +63,6 @@ TODO file. Eventually more such information may move here.)
 * It should cause a STYLE-WARNING, not a WARNING, when the system ignores
   an FTYPE proclamation for a slot accessor.
 
-* Missing ordinary arguments in a macro call aren't reported when the 
-  macro lambda list contains &KEY:
-	(DEFMACRO FOO (BAR &KEY) BAR) => FOO
-	(FOO) => NIL
-  Also in DESTRUCTURING-BIND:
-	(DESTRUCTURING-BIND (X Y &REST REST) '(1) (VECTOR X Y REST))
-	=> #(1 NIL NIL)
-  Also with &REST lists:
-	(DEFMACRO FOO (BAR &REST REST) BAR) => FOO
-	(FOO) => NIL
-
 * Error reporting on various stream-requiring operations is not 
   very good when the stream argument has the wrong type, because
   the operation tries to fall through to Gray stream code, and then
@@ -178,10 +167,6 @@ TODO file. Eventually more such information may move here.)
 	DEFINE-METHOD-COMBINATION or a method on the generic
 	function COMPUTE-EFFECTIVE-METHOD).
   This is not very helpful..
-
-* The message "The top of the stack was encountered." from the debugger
-  is not helpful when I type "FRAME 0" -- I know I'm going to the top
-  of the stack.
 
 * (SUBTYPEP '(FUNCTION (T BOOLEAN) NIL)
             '(FUNCTION (FIXNUM FIXNUM) NIL)) => T, T
@@ -292,46 +277,6 @@ becomes FASL:
   instead handle the error, perhaps issuing (and handling)
   a secondary error "caught ERROR: unrecoverable error during compilation"
   and then return with FAILURE-P true,
-
-* The print system doesn't conform to ANSI
-  "22.1.3.3.1 Package Prefixes for Symbols" for keywords printed when
-  *PACKAGE* is the KEYWORD package.
-
-  from a message by Ray Toy on CMU CL mailing list Fri, 28 Apr 2000:
-
-In a discussion on comp.lang.lisp, the following code was given (by
-Erik Naggum):
-
-(let ((*package* (find-package :keyword)))
-  (write-to-string object :readably t))
-
-If OBJECT is a keyword, CMUCL prints out the keyword, but without a
-colon.  Hence, it's not readable, as requested.
-
-I think the following patch will make this work as expected.  The
-patch just basically checks for the keyword package first before
-checking the current package.
-
-Ray
-
---- ../cmucl-18c/src/code/print.lisp    Wed Dec  8 14:33:47 1999
-+++ ../cmucl-18c/new/code/print.lisp    Fri Apr 28 09:21:29 2000
-@@ -605,12 +605,12 @@
-       (let ((package (symbol-package object))
-            (name (symbol-name object)))
-        (cond
--        ;; If the symbol's home package is the current one, then a
--        ;; prefix is never necessary.
--        ((eq package *package*))
-         ;; If the symbol is in the keyword package, output a colon.
-         ((eq package *keyword-package*)
-          (write-char #\: stream))
-+        ;; If the symbol's home package is the current one, then a
-+        ;; prefix is never necessary.
-+        ((eq package *package*))
-         ;; Uninterned symbols print with a leading #:.
-         ((null package)
-          (when (or *print-gensym* *print-readably*)
 
 * from CMU CL mailing list 01 May 2000 
 
