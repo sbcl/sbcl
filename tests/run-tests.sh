@@ -19,7 +19,7 @@
 # pathname, but now we take care to bind it to an absolute pathname (still
 # generated relative to `pwd` in the tests/ directory) so that tests
 # can chdir before invoking SBCL and still work.
-SBCL="${1:-`pwd`/../src/runtime/sbcl --core `pwd`/../output/sbcl.core --noinform --sysinit /dev/null --userinit /dev/null --noprint --noprogrammer}"
+SBCL="${1:-`pwd`/../src/runtime/sbcl --core `pwd`/../output/sbcl.core --noinform --sysinit /dev/null --userinit /dev/null --noprint --disable-debugger}"
 export SBCL
 echo /running tests on SBCL=\'$SBCL\'
 

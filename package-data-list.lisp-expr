@@ -597,6 +597,14 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
              ;; saving Lisp images
              "SAVE-LISP-AND-DIE"
 
+	     ;; provided for completeness to make it more convenient
+	     ;; to use command-line --disable-debugger functionality
+	     ;; in oddball situations (like building core files using
+	     ;; scripts which run unattended, when the core files are
+	     ;; intended for interactive use)
+	     "DISABLE-DEBUGGER"
+	     "ENABLE-DEBUGGER"
+
              ;; miscellaneous useful supported extensions
              "QUIT"
 

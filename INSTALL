@@ -48,11 +48,17 @@ This software has been built successfully on these systems:
 		os = FreeBSD 3.4 or 4.0
 			host lisp = CMU CL
 			host lisp = SBCL itself
-		os = OpenBSD 2.6
+		os = OpenBSD 2.6, 2.7, 2.8, 2.9, and 3.0
 			host lisp = SBCL itself
-It is known not to build under CLISP, because CLISP doesn't support
-MAKE-LOAD-FORM. Reports of other systems that it works on, or help in
-making it run on more systems, would be appreciated.
+It is known not to build under CLISP because of (as of early June 2002)
+bugs in the CLISP garbage collector, and it is known not to build under
+other systems like OpenMCL because of (as of early June 2002) remaining
+dependencies of SBCL bootstrapping on CMUCLisms like the representation
+of BYTE. 
+
+Reports of other systems that it works on (or doesn't work on, for
+that matter), or help in making it run on more systems, would be
+appreciated.
 
 		CAUTION CAUTION CAUTION CAUTION CAUTION
 	    SBCL, like CMU CL, overcommits memory. That is, it

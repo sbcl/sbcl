@@ -68,7 +68,7 @@ fi
 # and the SBCL-vs-CMUCL dependence of --core/-core argument syntax
 # make it too messy to try deal with arbitrary SBCL_XC_HOST variants.
 # So you have no choice:
-export SBCL_XC_HOST='sbcl --noprogrammer'
+export SBCL_XC_HOST='sbcl --disable-debugger'
 
 # (We don't do make-host-1.sh at all. Hopefully nothing relevant has
 # changed.)

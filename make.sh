@@ -25,19 +25,22 @@
 #                 even though you have stuff in your initialization files
 #                 which makes it behave in such a non-standard way that
 #                 it keeps the build from working
-#   "sbcl --noprogrammer"
+#   "sbcl --disable-debugger"
 #                 to use an existing SBCL binary as a cross-compilation host
-#                 and tell it to handle errors as best it can by itself,
-#                 without trying to use *DEBUG-IO* to ask for help from
-#                 the programmer
+#                 and tell it to handle errors as best it can by itself
+#                 (probably by dying with an error code) instead of waiting
+#                 endlessly for a programmer to help it out with input
+#                 on *DEBUG-IO*
 #   "lisp -batch" to use an existing CMU CL binary as a cross-compilation host
 #   "lisp -noinit -batch" 
 #                 to use an existing CMU CL binary as a cross-compilation host
 #                 when you have weird things in your .cmucl-init file
-# Someday CLISP should work
+# Someday any sufficiently ANSI Common Lisp, perhaps CLISP and/or
+# OpenMCL should work
 #   "clisp"
-# but as of sbcl-0.7.1.17, it still doesn't. (SBCL's fault: too much 
-# unportable code!)
+#   "??"
+# but not yet as of sbcl-0.7.4. (There are still some weird dependencies
+# on idiosyncrasies of the way CMU CL implements Common Lisp.)
 #
 # FIXME: Make a more sophisticated command line parser, probably
 # accepting "sh make.sh --xc-host foolisp" instead of the
@@ -50,6 +53,13 @@
 # require a second pass, just testing at build-the-cross-compiler time
 # whether the cross-compilation host returns suitable values from 
 # UPGRADED-ARRAY-ELEMENT-TYPE?)
+# FIXME: --noprogrammer was deprecated in sbcl-0.7.5, replaced by 
+# --disable-debugger. We still use the old form here because the
+# change was not preannounced, and it would be rude to make our new
+# version of SBCL unbootstrappable by immediately prior versions.
+# But in a year or so the --noprogrammer here can change to
+# --disable-debugger (and the deprecated --noprogrammer support can
+# go away completely).
 SBCL_XC_HOST="${1:-sbcl --noprogrammer}"
 export SBCL_XC_HOST
 echo //SBCL_XC_HOST=\"$SBCL_XC_HOST\"

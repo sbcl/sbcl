@@ -270,8 +270,9 @@ options.
 .TP 3
 .B --noinform
 Suppress the printing of any banner or other informational message at
-startup. (This makes it easier to write Lisp programs which work in
-Unix pipelines. See also the "--noprogrammer" and "--noprint" options.)
+startup. (This makes it easier to write Lisp programs which work
+cleanly in Unix pipelines. See also the "--noprint" and
+"--disable-debugger" options.)
 .PP
 
 In the future, runtime options may be added to control behavior such
@@ -310,9 +311,11 @@ from shell scripts.
 When ordinarily the toplevel "read-eval-print loop" would be executed,
 execute a "read-eval loop" instead, i.e. don't print a prompt and
 don't echo results. Combined with the --noinform runtime option, this
-makes it easier to write Lisp "scripts" which work in Unix pipelines.
+makes it easier to write Lisp "scripts" which work cleanly in Unix
+pipelines.
 .TP 3
-.B --noprogrammer
+.B --disable-debugger
+This is equivalent to --eval '(sb-ext:disable-debugger)'.
 By default, a Common Lisp system tries to ask the programmer for help
 when it gets in trouble (by printing a debug prompt on *DEBUG-IO*).
 However, this is not useful behavior for a system running with no
@@ -323,6 +326,8 @@ to raise an error if any input is requested from it, and we set
 *DEBUGGER-HOOK* to output a backtrace, then exit the process with a
 failure code. Because it is implemented by modifying special variables,
 its effects persist in .core files created by SB-EXT:SAVE-LISP-AND-DIE.
+(If you want to undo its effects, see the SB-EXT:ENABLE-DEBUGGER
+command.)
 .PP
 
 Regardless of the order in which --sysinit, --userinit, and --eval

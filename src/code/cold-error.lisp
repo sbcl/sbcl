@@ -126,7 +126,7 @@
 
 ;;; like BREAK, but without rebinding *DEBUGGER-HOOK* to NIL, so that
 ;;; we can use it in system code (e.g. in SIGINT handling) without
-;;; messing up --noprogrammer mode (which works by setting
+;;; messing up --disable-debugger mode (which works by setting
 ;;; *DEBUGGER-HOOK*); or for that matter, without messing up ordinary
 ;;; applications which try to do similar things with *DEBUGGER-HOOK*
 (defun %break (what &optional (datum "break") &rest arguments)

@@ -285,7 +285,6 @@
 	(reversed-evals nil) ; values of --eval options, in reverse order; and
 	                     ; also --load options, translated into --eval
 	(noprint nil)        ; Has a --noprint option been seen?
-	(noprogrammer nil)   ; Has a --noprogrammer option been seen?
 	(options (rest *posix-argv*))) ; skipping program name
 
     (/show0 "done with outer LET in TOPLEVEL-INIT")
@@ -338,9 +337,16 @@
 		    ((string= option "--noprint")
 		     (pop-option)
 		     (setf noprint t))
+		    ;; FIXME: --noprogrammer was deprecated in 0.7.5, and
+		    ;; in a year or so this backwards compatibility can
+		    ;; go away.
 		    ((string= option "--noprogrammer")
+		     (warn "treating deprecated --noprogrammer as --disable-debugger")
 		     (pop-option)
-		     (setf noprogrammer t))
+		     (push '(disable-debugger) reversed-evals))
+		    ((string= option "--disable-debugger")
+		     (pop-option)
+		     (push '(disable-debugger) reversed-evals))
 		    ((string= option "--end-toplevel-options")
 		     (pop-option)
 		     (return))
@@ -364,14 +370,6 @@
     ;; Excise all the options that we processed, so that only
     ;; user-level options are left visible to user code.
     (setf (rest *posix-argv*) options)
-
-    ;; Handle --noprogrammer option. We intentionally do this
-    ;; early so that it will affect the handling of initialization
-    ;; files and --eval options.
-    (/show0 "handling --noprogrammer option in TOPLEVEL-INIT")
-    (when noprogrammer
-      (setf *debugger-hook* 'noprogrammer-debugger-hook-fun
-	    *debug-io* *error-output*))
 
     ;; Handle initialization files.
     (/show0 "handling initialization files in TOPLEVEL-INIT")
@@ -449,6 +447,15 @@
       ;; (classic CMU CL error message: "You're certainly a clever child.":-)
       (critically-unreachable "after TOPLEVEL-REPL"))))
 
+;;; halt-on-failures and prompt-on-failures modes, suitable for
+;;; noninteractive and interactive use respectively
+(defun disable-debugger ()
+  (setf *debugger-hook* 'noprogrammer-debugger-hook-fun
+	*debug-io* *error-output*))
+(defun enable-debugger ()
+  (setf *debugger-hook* nil
+	*debug-io* *query-io*))
+
 ;;; read-eval-print loop for the default system toplevel
 (defun toplevel-repl (noprint)
   (/show0 "entering TOPLEVEL-REPL")
@@ -505,10 +512,11 @@
 		    (fresh-line)
 		    (prin1 result))))))))))
 
+;;; suitable value for *DEBUGGER-HOOK* for a noninteractive Unix-y program
 (defun noprogrammer-debugger-hook-fun (condition old-debugger-hook)
   (declare (ignore old-debugger-hook))
   (flet ((failure-quit (&key recklessly-p)
-           (/show0 "in FAILURE-QUIT (in noprogrammer debugger hook)")
+           (/show0 "in FAILURE-QUIT (in --disable-debugger debugger hook)")
 	   (quit :unix-status 1 :recklessly-p recklessly-p)))
     ;; This HANDLER-CASE is here mostly to stop output immediately
     ;; (and fall through to QUIT) when there's an I/O error. Thus,
@@ -530,8 +538,9 @@
 	  ;; (Where to truncate the BACKTRACE is of course arbitrary, but
 	  ;; it seems as though we should at least truncate it somewhere.)
 	  (sb!debug:backtrace 128 *error-output*)
-	  (format *error-output*
-		  "~%unhandled condition in --noprogrammer mode, quitting~%")
+	  (format
+	   *error-output*
+	   "~%unhandled condition in --disable-debugger mode, quitting~%")
 	  (finish-output *error-output*)
 	  (failure-quit))
       (condition ()
@@ -552,7 +561,8 @@
 	;; what that is responsible, but that it's possible at all
 	;; means that we should IGNORE-ERRORS here. -- WHN 2001-04-24
         (ignore-errors
-         (%primitive print "Argh! error within --noprogrammer error handling"))
+         (%primitive print
+		     "Argh! error within --disable-debugger error handling"))
 	(failure-quit :recklessly-p t)))))
 
 ;;; a convenient way to get into the assembly-level debugger

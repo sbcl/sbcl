@@ -86,7 +86,7 @@
 
 ;;; SIGINT is handled like BREAK, except that ANSI BREAK ignores
 ;;; *DEBUGGER-HOOK*, but we want SIGINT's BREAK to respect it, so that
-;;; SIGINT in --noprogrammer mode will cleanly terminate the system
+;;; SIGINT in --disable-debugger mode will cleanly terminate the system
 ;;; (by respecting the *DEBUGGER-HOOK* established in that mode).
 (defun sigint-%break (format-string &rest format-arguments)
   (apply #'%break 'sigint format-string format-arguments))

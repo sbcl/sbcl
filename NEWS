@@ -1141,6 +1141,15 @@ changes in sbcl-0.7.5 relative to sbcl-0.7.4:
     count as they should.
   * bug fix: classes with :METACLASS STRUCTURE-CLASS now print
     correctly. (thanks to Pierre Mai)
+  * minor incompatible change: The --noprogrammer option is deprecated
+    in favor of the new name --disable-debugger option, which takes
+    effect at a slightly different time at startup (so that e.g.
+    handling of errors in --sysinit and --userinit files will be affected
+    differently). The SB-EXT:DISABLE-DEBUGGER and SB-EXT:ENABLE-DEBUGGER
+    functions have been added to allow this functionality to be controlled
+    from ordinary Lisp code. (ENABLE-DEBUGGER should help people like the
+    Debian maintainers, who might want to run non-interactive scripts to
+    build SBCL cores which will later be used interactively.)
   * minor incompatible change: The LOAD function no longer, when given
     a wild pathname to load, loads all files matching that pathname;
     instead, an error of type FILE-ERROR is signalled.
