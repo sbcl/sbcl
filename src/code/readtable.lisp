@@ -16,6 +16,11 @@
 
 ;;; constants for readtable character attributes. These are all as in
 ;;; the manual.
+;;;
+;;; FIXME: wait a minute.  Firstly, I doubt they're in the manual.
+;;; Secondly, the numerical order of these constants is coupled with
+;;; code in CHAR-CLASS{,2,3} in the reader implementation, so beware
+;;; when changing them.
 (def!constant +char-attr-whitespace+ 0)
 (def!constant +char-attr-terminating-macro+ 1)
 (def!constant +char-attr-escape+ 2)
@@ -36,7 +41,8 @@
 
 (def!constant +char-attr-multiple-escape+ 11)
 (def!constant +char-attr-package-delimiter+ 12)
-(def!constant +char-attr-delimiter+ 13) ; (a fake for READ-UNQUALIFIED-TOKEN)
+(def!constant +char-attr-invalid+ 13)
+(def!constant +char-attr-delimiter+ 14) ; (a fake for READ-UNQUALIFIED-TOKEN)
 
 (sb!xc:defstruct (readtable (:conc-name nil)
 			    (:predicate readtablep)

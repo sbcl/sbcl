@@ -167,7 +167,9 @@
   (!set-secondary-attribute #\f +char-attr-constituent-expt+)
   (!set-secondary-attribute #\d +char-attr-constituent-expt+)
   (!set-secondary-attribute #\s +char-attr-constituent-expt+)
-  (!set-secondary-attribute #\l +char-attr-constituent-expt+))
+  (!set-secondary-attribute #\l +char-attr-constituent-expt+)
+  (!set-secondary-attribute (code-char 8) +char-attr-invalid+)
+  (!set-secondary-attribute (code-char 127) +char-attr-invalid+))
 
 (defmacro get-secondary-attribute (char)
   `(elt *secondary-attribute-table*
@@ -662,9 +664,11 @@
                   (aref ,attarray (char-code ,char))
                   (gethash ,char ,atthash +char-attr-constituent+))))
      (declare (fixnum att))
-     (if (<= att +char-attr-terminating-macro+)
-	 +char-attr-delimiter+
-	 att)))
+     (cond
+       ((<= att +char-attr-terminating-macro+) +char-attr-delimiter+)
+       ((= att +char-attr-invalid+) 
+	(%reader-error stream "invalid constituent"))
+       (t att))))
 
 ;;; Return the character class for CHAR, which might be part of a
 ;;; rational number.
@@ -673,13 +677,13 @@
                   (aref ,attarray (char-code ,char))
                   (gethash ,char ,atthash +char-attr-constituent+))))
      (declare (fixnum att))
-     (if (<= att +char-attr-terminating-macro+)
-	 +char-attr-delimiter+
-	 (if (digit-char-p ,char *read-base*)
-	     +char-attr-constituent-digit+
-	     (if (= att +char-attr-constituent-digit+)
-		 +char-attr-constituent+
-		 att)))))
+     (cond
+       ((<= att +char-attr-terminating-macro+) +char-attr-delimiter+)
+       ((digit-char-p ,char *read-base*) +char-attr-constituent-digit+)
+       ((= att +char-attr-constituent-digit+) +char-attr-constituent+)
+       ((= att +char-attr-invalid+) 
+	(%reader-error stream "invalid constituent"))
+       (t att))))
 
 ;;; Return the character class for a char which might be part of a
 ;;; rational or floating number. (Assume that it is a digit if it
@@ -689,23 +693,25 @@
                   (aref ,attarray (char-code ,char))
                   (gethash ,char ,atthash +char-attr-constituent+))))
      (declare (fixnum att))
-     (if possibly-rational
-	 (setq possibly-rational
-	       (or (digit-char-p ,char *read-base*)
-		   (= att +char-attr-constituent-slash+))))
-     (if possibly-float
-	 (setq possibly-float
-	       (or (digit-char-p ,char 10)
-		   (= att +char-attr-constituent-dot+))))
-     (if (<= att +char-attr-terminating-macro+)
-	 +char-attr-delimiter+
-	 (if (digit-char-p ,char (max *read-base* 10))
-	     (if (digit-char-p ,char *read-base*)
-		 (if (= att +char-attr-constituent-expt+)
-		     +char-attr-constituent-digit-or-expt+
-		     +char-attr-constituent-digit+)
-		 +char-attr-constituent-decimal-digit+)
-	     att))))
+     (when possibly-rational
+       (setq possibly-rational
+	     (or (digit-char-p ,char *read-base*)
+		 (= att +char-attr-constituent-slash+))))
+     (when possibly-float
+       (setq possibly-float
+	     (or (digit-char-p ,char 10)
+		 (= att +char-attr-constituent-dot+))))
+     (cond
+       ((<= att +char-attr-terminating-macro+) +char-attr-delimiter+)
+       ((digit-char-p ,char (max *read-base* 10))
+	(if (digit-char-p ,char *read-base*)
+	    (if (= att +char-attr-constituent-expt+)
+		+char-attr-constituent-digit-or-expt+
+	        +char-attr-constituent-digit+)
+	    +char-attr-constituent-decimal-digit+))
+       ((= att +char-attr-invalid+)
+	(%reader-error stream "invalid constituent"))
+       (t att))))
 
 ;;;; token fetching
 
@@ -799,6 +805,7 @@
 	(#.+char-attr-escape+ (go ESCAPE))
 	(#.+char-attr-package-delimiter+ (go COLON))
 	(#.+char-attr-multiple-escape+ (go MULT-ESCAPE))
+	(#.+char-attr-invalid+ (%reader-error "invalid constituent"))
 	;; can't have eof, whitespace, or terminating macro as first char!
 	(t (go SYMBOL)))
      SIGN ; saw "sign"
