@@ -5,8 +5,7 @@
 
 #+sbcl
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  (require 'sb-introspect)
-  )
+  (require 'sb-introspect))
 
 (defparameter *documentation-types*
   '(compiler-macro
@@ -35,6 +34,7 @@
   (let* ((package (find-package package))
          (package-doc (documentation package t))
          (result nil))
+    (check-type package package)
     (do-external-symbols (symbol package)
       (let ((docs (documentation-for-symbol symbol)))
         (when docs (setf result (nconc docs result)))))
@@ -61,18 +61,10 @@
 ;;; Begin, rest and end of definition.
 
 (defun argument-list (fname)
-  (prog1
-      ;; arglist accessors looked up in slime; FIXME: can we depend on
-      ;; swank instead?  Some of the arglist accessors (not found
-      ;; here) are hairy ...
-      #+clisp (ext:arglist fname)
-      #+sbcl (sb-introspect:function-arglist fname)
-      #+openmcl (ccl:arglist fname)
-      '(arglist not supported in this implementation)
-  ))
+  (sb-introspect:function-arglist fname))
 
 (defvar *character-replacements*
-  '((#\* . "star") (#\/ . "slash"))
+  '((#\* . "star") (#\/ . "slash") (#\+ . "plus"))
   "Characters and their replacement names that `alphanumize'
   uses.  If the replacements contain any of the chars they're
   supposed to replace, you deserve to lose.")
@@ -115,11 +107,12 @@
              (package "package")
              (setf "setf-expander")
              (structure "struct")
-             (type (if (find-class symbol)
-                       (if (documentation symbol 'structure) ; cheesy structness check
-                           "struct"
-                           "class")
-                       "type"))
+             (type (let ((class (find-class symbol)))
+		     (etypecase class
+		       (structure-class "struct")
+		       (standard-class "class")
+		       (sb-pcl::condition-class "condition")
+		       (null "type"))))
              (variable (if (constantp symbol)
                            "constant"
                            "var")))
@@ -137,11 +130,12 @@
     (package "@deffn Package")
     (setf "@deffn {Setf Expander}")
     (structure "@deftp Structure")
-    (type (if (find-class symbol)
-              (if (documentation symbol 'structure) ; cheesy structness check
-                  "@deftp Structure"
-                  "@deftp Class")
-              "@deftp Type"))
+    (type (let ((class (find-class symbol)))
+	    (etypecase class
+	      (structure-class "@deftp Structure")
+	      (standard-class "@deftp Class")
+	      (sb-pcl::condition-class "@deftp Condition")
+	      (null "@deftp Type"))))
     (variable (if (constantp symbol)
                   "@defvr Constant"
                   "@defvar"))))
@@ -176,12 +170,7 @@
     (method-combination "@end deffn")
     (package "@end deffn")
     (setf "@end deffn")
-    ;;(structure "@end deftp") ; caught by `type'
-    (type (if (find-class symbol)
-              (if (documentation symbol 'structure) ; cheesy structness check
-                  "@end deftp"
-                  "@end deftp")
-              "@end deftp"))
+    (type "@end deftp")
     (variable (if (constantp symbol)
                   "@end defvr"
                   "@defvar"))))
