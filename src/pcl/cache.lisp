@@ -364,29 +364,37 @@
       (aver layout)
       layout))))
 
-;;; FIXME: The immediately following macros could become inline functions.
+(defconstant +first-wrapper-cache-number-index+ 0)
 
-(defmacro first-wrapper-cache-number-index ()
-  0)
+(declaim (inline next-wrapper-cache-number-index))
+(defun next-wrapper-cache-number-index (field-number)
+  (and (< field-number #.(1- wrapper-cache-number-vector-length))
+       (1+ field-number)))
 
-(defmacro next-wrapper-cache-number-index (field-number)
-  `(and (< ,field-number #.(1- wrapper-cache-number-vector-length))
-	(1+ ,field-number)))
-
+;;; FIXME: Why are there two layers here, with one operator trivially
+;;; defined in terms of the other? It'd be nice either to have a
+;;; comment explaining why the separation is valuable, or to collapse
+;;; it into a single layer.
+;;;
+;;; FIXME (?): These are logically inline functions, but they need to
+;;; be SETFable, and for now it seems not worth the trouble to DEFUN
+;;; both inline FOO and inline (SETF FOO) for each one instead of a
+;;; single macro. Perhaps the best thing would be to make them
+;;; immutable (since it seems sort of surprising and gross to be able
+;;; to modify hash values) so that they can become inline functions
+;;; with no muss or fuss. I (WHN) didn't do this only because I didn't
+;;; know whether any code anywhere depends on the values being
+;;; modified.
 (defmacro cache-number-vector-ref (cnv n)
   `(wrapper-cache-number-vector-ref ,cnv ,n))
-
 (defmacro wrapper-cache-number-vector-ref (wrapper n)
   `(sb-kernel:layout-clos-hash ,wrapper ,n))
 
-(defmacro class-no-of-instance-slots (class)
-  `(wrapper-no-of-instance-slots (class-wrapper ,class)))
-
-(defmacro wrapper-class* (wrapper)
-  `(let ((wrapper ,wrapper))
-     (or (wrapper-class wrapper)
-	 (find-structure-class
-	  (cl:class-name (sb-kernel:layout-class wrapper))))))
+(declaim (inline wrapper-class*))
+(defun wrapper-class* (wrapper)
+  (or (wrapper-class wrapper)
+      (find-structure-class
+       (cl:class-name (sb-kernel:layout-class wrapper)))))
 
 ;;; The wrapper cache machinery provides general mechanism for
 ;;; trapping on the next access to any instance of a given class. This
@@ -401,9 +409,9 @@
 ;;; SLOT-VALUE-USING-CLASS check the wrapper validity as well. This is
 ;;; done by calling CHECK-WRAPPER-VALIDITY.
 
-;;; FIXME: could become inline function
-(defmacro invalid-wrapper-p (wrapper)
-  `(neq (wrapper-state ,wrapper) t))
+(declaim (inline invalid-wrapper-p))
+(defun invalid-wrapper-p (wrapper)
+  (neq (wrapper-state wrapper) t))
 
 (defvar *previous-nwrappers* (make-hash-table))
 
@@ -479,7 +487,7 @@
       (setf (cache-nkeys cache) nkeys
 	    (cache-valuep cache) valuep
 	    (cache-nlines cache) nlines
-	    (cache-field cache) (first-wrapper-cache-number-index)
+	    (cache-field cache) +first-wrapper-cache-number-index+
 	    (cache-limit-fn cache) limit-fn
 	    (cache-mask cache) cache-mask
 	    (cache-size cache) actual-size
@@ -493,7 +501,7 @@
       cache)))
 
 (defun get-cache-from-cache (old-cache new-nlines
-			     &optional (new-field (first-wrapper-cache-number-index)))
+			     &optional (new-field +first-wrapper-cache-number-index+))
   (let ((nkeys (cache-nkeys old-cache))
 	(valuep (cache-valuep old-cache))
 	(cache (or (sb-sys:without-interrupts (pop *free-caches*))
@@ -1359,12 +1367,3 @@
       (mapcar #'free-cache-vector
 	      (mapcar #'get-cache-vector
 		      (make-list n :initial-element size))))))
-
-(defun caches-to-allocate ()
-  (sort (let ((l nil))
-	  (maphash (lambda (size entry)
-		     (push (list (car entry) size) l))
-		   sb-pcl::*free-caches*)
-	  l)
-	#'>
-	:key #'cadr))

@@ -1151,17 +1151,6 @@
 					     plist)
 	nwrapper)))
 
-(defmacro copy-instance-internal (instance)
-  `(progn
-     (let* ((class (class-of instance))
-	    (copy (allocate-instance class)))
-       (if (std-instance-p ,instance)
-	   (setf (std-instance-slots ,instance)
-		 (std-instance-slots ,instance))
-	 (setf (fsc-instance-slots ,instance)
-	       (fsc-instance-slots ,instance)))
-       copy)))
-
 (defun change-class-internal (instance new-class)
   (let* ((old-class (class-of instance))
 	 (copy (allocate-instance new-class))

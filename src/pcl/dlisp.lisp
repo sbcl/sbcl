@@ -121,7 +121,7 @@
   (let ((instance nil)
 	(arglist  ())
 	(closure-variables ())
-	(field (first-wrapper-cache-number-index))
+	(field +first-wrapper-cache-number-index+)
 	(readp (eq reader/writer :reader))
 	(read-form (emit-slot-read-form class-slot-p 'index 'slots)))
     ;;we need some field to do the fast obsolete check
