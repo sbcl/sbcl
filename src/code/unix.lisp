@@ -979,8 +979,8 @@
 (def-unix-error ESRCH 3 "No such process")
 |#
 (def-unix-error EINTR 4 "Interrupted system call")
-#|
 (def-unix-error EIO 5 "I/O error")
+#|
 (def-unix-error ENXIO 6 "No such device or address")
 (def-unix-error E2BIG 7 "Arg list too long")
 (def-unix-error ENOEXEC 8 "Exec format error")

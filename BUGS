@@ -802,3 +802,5 @@ Error in function C::GET-LAMBDA-TO-COMPILE:
   (This is particularly annoying because several Lisp functions like
   PRINT *precede* their output with a newline, instead of following
   it with a newline.)
+
+* (SUBTYPEP '(AND ZILCH INTEGER) 'ZILCH) => NIL, NIL

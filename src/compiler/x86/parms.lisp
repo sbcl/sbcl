@@ -125,17 +125,16 @@
 ;;; Note: Mostly these values are black magic, inherited from CMU CL
 ;;; without any documentation. However, there have been a few changes
 ;;; since the fork:
-;;;   * The non-Linux *TARGET-STATIC-SPACE-START* value was bumped up
-;;;     from #x28000000 to #x30000000 when non-Linux ld.so dynamic linking
+;;;   * The FreeBSD *TARGET-STATIC-SPACE-START* value was bumped up
+;;;     from #x28000000 to #x30000000 when FreeBSD ld.so dynamic linking
 ;;;     support was added for FreeBSD ca. 20000910. This was to keep from
 ;;;     stomping on an address range that the dynamic libraries want to use. 
 ;;;     (They want to use this address range even if we try to reserve it
 ;;;     with a call to validate() as the first operation in main().)
 #!-linux (defparameter *target-read-only-space-start* #x10000000)
 #!-linux (defparameter *target-static-space-start*
-                       ;; FIXME: was #x28000000 until RAW's RUN-PROGRAM
-                       ;; patches, why the change?
-                       #x30000000)
+                       #!+freebsd #x30000000
+                       #!+openbsd #x28000000)
 #!-linux (defparameter *target-dynamic-space-start*   #x48000000)
 #!+linux (defparameter *target-read-only-space-start* #x01000000)
 #!+linux (defparameter *target-static-space-start*    #x05000000)

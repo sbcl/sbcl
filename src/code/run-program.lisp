@@ -22,7 +22,7 @@
   (options sb-c-call:int)
   (rusage sb-c-call:int))
 
-(eval-when (load eval compile)
+(eval-when (:compile-toplevel :load-toplevel :execute)
   (defconstant wait-wnohang #-svr4 1 #+svr4 #o100)
   (defconstant wait-wuntraced #-svr4 2 #+svr4 4)
   (defconstant wait-wstopped #-svr4 #o177 #+svr4 wait-wuntraced))
@@ -213,13 +213,18 @@
 
 #+FreeBSD
 (def-alien-type nil
-    (struct sgttyb
-	    (sg-ispeed sb-c-call:char)	; input speed
-	    (sg-ospeed sb-c-call:char)	; output speed
-	    (sg-erase sb-c-call:char)	; erase character
-	    (sg-kill sb-c-call:char)	; kill character
-	    (sg-flags sb-c-call:short)	; mode flags
-	    ))
+  (struct sgttyb
+	  (sg-ispeed sb-c-call:char)	; input speed
+	  (sg-ospeed sb-c-call:char)	; output speed
+	  (sg-erase sb-c-call:char)	; erase character
+	  (sg-kill sb-c-call:char)	; kill character
+	  (sg-flags sb-c-call:short)))	; mode flags
+#+OpenBSD
+(def-alien-type nil
+  (struct sgttyb
+	  (sg-four sb-c-call:int)
+	  (sg-chars (array sb-c-call:char 4))
+	  (sg-flags sb-c-call:int)))
 
 ;;; Find a pty that is not in use. Return three values: the file
 ;;; descriptor for the master side of the pty, the file descriptor for
@@ -238,17 +243,32 @@
 					      sb-unix:o_rdwr
 					      #o666)))
 	    (when slave-fd
-					; Maybe put a vhangup here?
-              #-linux
+	      ;; comment from classic CMU CL:
+	      ;;   Maybe put a vhangup here?
+	      ;;
+	      ;; FIXME: It seems as though this logic should be in
+	      ;; OPEN-PTY, not FIND-A-PTY (both from the comments
+	      ;; documenting DEFUN FIND-A-PTY, and from the
+	      ;; connotations of the function names).
+	      ;;
+	      ;; FIXME: It would be nice to have a note, and/or a pointer
+	      ;; to some reference material somewhere, explaining
+	      ;; why we need this on *BSD and not on Linux.
+              #+bsd
 	      (sb-alien:with-alien ((stuff (sb-alien:struct sgttyb)))
 		(let ((sap (sb-alien:alien-sap stuff)))
 		  (sb-unix:unix-ioctl slave-fd sb-unix:TIOCGETP sap)
 		  (setf (sb-alien:slot stuff 'sg-flags)
-			#o300)		; EVENP|ODDP
+			;; This is EVENP|ODDP, the same numeric code
+			;; both on FreeBSD and on OpenBSD. -- WHN 20000929
+			#o300) ; EVENP|ODDP
 		  (sb-unix:unix-ioctl slave-fd sb-unix:TIOCSETP sap)
 		  (sb-unix:unix-ioctl master-fd sb-unix:TIOCGETP sap)
 		  (setf (sb-alien:slot stuff 'sg-flags)
 			(logand (sb-alien:slot stuff 'sg-flags)
+				;; This is ~ECHO, the same numeric
+				;; code both on FreeBSD and on OpenBSD.
+				;; -- WHN 20000929
 				(lognot 8))) ; ~ECHO
 		  (sb-unix:unix-ioctl master-fd sb-unix:TIOCSETP sap)))
 	      (return-from find-a-pty

@@ -27,6 +27,9 @@
  *	0x48000000->0xC8000000 2GB  Dynamic Space.
  *	0xE0000000->           256M C stack - Alien stack.
  *
+ *  OpenBSD:
+ *      almost the same as FreeBSD
+ *
  *  Linux: Note that this map has some problems and requires some further
  *	   development so is not implemented below.
  *	0x00000000->0x08000000 128M Unused.
@@ -47,8 +50,16 @@
 #define READ_ONLY_SPACE_START   (0x10000000)
 #define READ_ONLY_SPACE_SIZE    (0x0ffff000) /* 256MB - 1 page */
 
+#if defined __FreeBSD__
 #define STATIC_SPACE_START	(0x30000000)
 #define STATIC_SPACE_SIZE	(0x07fff000) /* 128M - 1 page */
+#elif defined __OpenBSD__
+#define STATIC_SPACE_START      (0x28000000)
+#define STATIC_SPACE_SIZE	(0x0ffff000) /* 256M - 1 page */
+#else
+#error unsupported BSD variant
+#endif
+
 
 #define BINDING_STACK_START	(0x38000000)
 #define BINDING_STACK_SIZE	(0x07fff000) /* 128MB - 1 page */

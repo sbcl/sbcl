@@ -245,6 +245,10 @@ os_install_interrupt_handlers(void)
 }
 
 #endif /* !defined GENCGC */
+
+/*
+ * stuff to help work with dynamically linked libraries
+ */
 
 /* feh!
  *
@@ -254,7 +258,15 @@ os_install_interrupt_handlers(void)
  * sbcl.nm).
  *
  * FIXME: This flag should be set in Config.bsd */
+#if defined __FreeBSD__
 #define DL_WORKAROUND 1
+#elif defined __OpenBSD__
+/* SBCL doesn't (yet?) work at all with dynamic libs on OpenBSD, so we
+ * wouldn't get any use out of these stubs. -- WHN 20001001 */
+#define DL_WORKAROUND 0
+#else
+#error unsupported BSD variant
+#endif
 
 #if DL_WORKAROUND
 #include <unistd.h>

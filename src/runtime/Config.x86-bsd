@@ -16,7 +16,10 @@ OS_SRC = bsd-os.c os-common.c undefineds.c
 # worked fine for most things, but LOAD-FOREIGN & friends require
 # dlopen() etc., which in turn depend on dynamic linking of the
 # runtime.
-OS_LINK_FLAGS=-dynamic -export-dynamic
+#for OpenBSD:
+OS_LINK_FLAGS=-static
+#for FreeBSD:
+#OS_LINK_FLAGS=-dynamic -export-dynamic
 OS_LIBS=-lm # -ldl
 
 GC_SRC= gencgc.c
