@@ -41,7 +41,7 @@
   ;; meaningful concept and in any case would have happened long ago,
   ;; so just execute the forms at load time (i.e. basically as soon as
   ;; possible).
-  #+sb-xc-host `(let () ,@forms))
+  #+sb-xc-host `(progn ,@forms))
 
 (defmacro !defun-from-collected-cold-init-forms (name)
   #-sb-xc-host `(progn

@@ -233,10 +233,14 @@
                    ((fun-type-wild-args type1)
                     (cond ((fun-type-keyp type2) (values nil nil))
                           ((not (fun-type-rest type2)) (values nil t))
-                          ((not (null (fun-type-required type2))) (values nil t))
-                          (t (and/type (type= *universal-type* (fun-type-rest type2))
-                                       (every/type #'type= *universal-type*
-                                                   (fun-type-optional type2))))))
+                          ((not (null (fun-type-required type2)))
+			   (values nil t))
+                          (t (and/type (type= *universal-type*
+					      (fun-type-rest type2))
+                                       (every/type #'type=
+						   *universal-type*
+                                                   (fun-type-optional
+						    type2))))))
                    ((not (and (fun-type-simple-p type1)
                               (fun-type-simple-p type2)))
                     (values nil nil))
@@ -245,10 +249,12 @@
                           (cond ((or (> max1 max2) (< min1 min2))
                                  (values nil t))
                                 ((and (= min1 min2) (= max1 max2))
-                                 (and/type (every-csubtypep (fun-type-required type1)
-                                                            (fun-type-required type2))
-                                           (every-csubtypep (fun-type-optional type1)
-                                                            (fun-type-optional type2))))
+                                 (and/type (every-csubtypep
+					    (fun-type-required type1)
+					    (fun-type-required type2))
+                                           (every-csubtypep
+					    (fun-type-optional type1)
+					    (fun-type-optional type2))))
                                 (t (every-csubtypep
                                     (concatenate 'list
                                                  (fun-type-required type1)
@@ -1609,17 +1615,41 @@
 	  ((consp low-bound)
 	   (let ((low-value (car low-bound)))
 	     (or (eql low-value high-bound)
-		 (and (eql low-value (load-time-value (make-unportable-float :single-float-negative-zero))) (eql high-bound 0f0))
-		 (and (eql low-value 0f0) (eql high-bound (load-time-value (make-unportable-float :single-float-negative-zero))))
-		 (and (eql low-value (load-time-value (make-unportable-float :double-float-negative-zero))) (eql high-bound 0d0))
-		 (and (eql low-value 0d0) (eql high-bound (load-time-value (make-unportable-float :double-float-negative-zero)))))))
+		 (and (eql low-value
+			   (load-time-value (make-unportable-float
+					     :single-float-negative-zero)))
+		      (eql high-bound 0f0))
+		 (and (eql low-value 0f0)
+		      (eql high-bound
+			   (load-time-value (make-unportable-float
+					     :single-float-negative-zero))))
+		 (and (eql low-value
+			   (load-time-value (make-unportable-float
+					     :double-float-negative-zero)))
+		      (eql high-bound 0d0))
+		 (and (eql low-value 0d0)
+		      (eql high-bound
+			   (load-time-value (make-unportable-float
+					     :double-float-negative-zero)))))))
 	  ((consp high-bound)
 	   (let ((high-value (car high-bound)))
 	     (or (eql high-value low-bound)
-		 (and (eql high-value (load-time-value (make-unportable-float :single-float-negative-zero))) (eql low-bound 0f0))
-		 (and (eql high-value 0f0) (eql low-bound (load-time-value (make-unportable-float :single-float-negative-zero))))
-		 (and (eql high-value (load-time-value (make-unportable-float :double-float-negative-zero))) (eql low-bound 0d0))
-		 (and (eql high-value 0d0) (eql low-bound (load-time-value (make-unportable-float :double-float-negative-zero)))))))
+		 (and (eql high-value
+			   (load-time-value (make-unportable-float
+					     :single-float-negative-zero)))
+		      (eql low-bound 0f0))
+		 (and (eql high-value 0f0)
+		      (eql low-bound
+			   (load-time-value (make-unportable-float
+					     :single-float-negative-zero))))
+		 (and (eql high-value
+			   (load-time-value (make-unportable-float
+					     :double-float-negative-zero)))
+		      (eql low-bound 0d0))
+		 (and (eql high-value 0d0)
+		      (eql low-bound
+			   (load-time-value (make-unportable-float
+					     :double-float-negative-zero)))))))
 	  ((and (eq (numeric-type-class low) 'integer)
 		(eq (numeric-type-class high) 'integer))
 	   (eql (1+ low-bound) high-bound))

@@ -80,8 +80,10 @@
 	    (t
 	     decl-spec)))))
 
+(defvar *queued-proclaims*) ; initialized in !COLD-INIT-FORMS
+
 (!begin-collecting-cold-init-forms)
-(!cold-init-forms (defvar *queued-proclaims* nil))
+(!cold-init-forms (setf *queued-proclaims* nil))
 (!defun-from-collected-cold-init-forms !early-proclaim-cold-init)
 
 (defun sb!xc:proclaim (raw-form)
