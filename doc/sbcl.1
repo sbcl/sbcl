@@ -10,6 +10,8 @@
 .\"   If you want to use this code or any part of CMU Common Lisp, please
 .\"   contact Scott Fahlman or slisp-group@cs.cmu.edu.
 .\"   **********************************************************************
+.\" Most of SBCL, including this man page, is in the public domain. See
+.\" COPYING in the distribution for more information.
 .\"
 .TH SBCL 1 "$Date$"
 .AT 3
@@ -63,7 +65,7 @@ options.
 .B --noinform
 Suppress the printing of any banner or other informational message at
 startup. (This makes it easier to write Lisp programs which work in
-Unix pipelines. See also the "--noinform" option.)
+Unix pipelines. See also the "--noprogrammer" and "--noprint" options.)
 .PP
 
 In the future, runtime options may be added to control behavior such
@@ -250,13 +252,10 @@ doc strings and online help built into the SBCL executable
 
 .SH SYSTEM REQUIREMENTS
 
-Unlike its distinguished ancestor CMU CL, SBCL is currently only
-supported on X86. Linux, FreeBSD, and OpenBSD ports are currently
-available. It would probably be straightforward to port the CMU CL
-support for SPARC or Alpha, or to port to NetBSD. Some work on a
-port to the Alpha has been reported on the mailing lists; check
-the archives (available from the home page at
-<http://sbcl.sourceforge.net/>) for information.
+Unlike its distinguished ancestor CMU CL, SBCL is currently on X86
+(Linux, FreeBSD, and OpenBSD) and Alpha (Linux). It would probably be
+straightforward to port the CMU CL support for SPARC, or to port to
+NetBSD.
 
 As of version 0.6.11, SBCL requires on the order of 16Mb to run. In
 some future version, this number could shrink significantly, since
@@ -313,13 +312,14 @@ SBCL implementation of] Common Lisp makes it harder for you to shoot
 yourself in the foot, but when you do, the entire universe explodes."
 .TP 3
 \--
-The system doesn't deal well with stack overflow.
+The system doesn't deal well with stack overflow. (It tends to cause
+a segmentation fault instead of being caught cleanly.)
 .TP 3
 \--
-The SBCL system overcommits memory at startup. On typical Unix-alikes
-like Linux and *BSD, this means that if the SBCL system turns out to
-use more virtual memory than the system has available for it, other
-processes to be killed randomly (!)
+Like CMU CL, the SBCL system overcommits memory at startup. On typical
+Unix-alikes like Linux and FreeBSD, this means that if the SBCL system
+turns out to use more virtual memory than the system has available for
+it, other processes tend to be killed randomly (!).
 .PP
 
 The compiler is overaggressive about static typing, assuming that a
