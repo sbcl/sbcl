@@ -787,6 +787,18 @@ Error in function C::GET-LAMBDA-TO-COMPILE:
     invokes the debugger: "B is not of type list".
   SBCL does the same thing.
 
+82: 
+  Functions are assigned names based on the context in which they're
+  defined. This is less than ideal for the functions which are
+  used to implement CLOS methods. E.g. the output of 
+  (DESCRIBE 'PRINT-OBJECT) lists functions like 
+	#<FUNCTION "DEF!STRUCT (TRACE-INFO (:MAKE-LOAD-FORM-FUN SB-KERNEL:JUST-DUMP-IT-NORMALLY) (:PRINT-OBJECT #))" {1020E49}> 
+  and
+	#<FUNCTION "MACROLET ((FORCE-DELAYED-DEF!METHODS NIL #))" {1242871}>
+  It would be better if these functions' names always identified
+  them as methods, and identified their generic functions and
+  specializers.
+
 
 KNOWN BUGS RELATED TO THE IR1 INTERPRETER
 

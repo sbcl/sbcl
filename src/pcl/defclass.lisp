@@ -92,23 +92,22 @@
 				      mclass
 				      *the-class-structure-class*))))))
 	(let ((defclass-form
-                (eval-when (:load-toplevel :execute)
-                  `(progn
-                    ,@(mapcar #'(lambda (x)
-                                  `(declaim (ftype (function (t) t) ,x)))
-                              *readers*)
-                    ,@(mapcar #'(lambda (x)
-                                  `(declaim (ftype (function (t t) t) ,x)))
-                              *writers*)
-                    (let ,(mapcar #'cdr *initfunctions*)
-                      (load-defclass ',name
-                                     ',metaclass
-                                     ',supers
-                                     (list ,@canonical-slots)
-                                     (list ,@(apply #'append
-                                                    (when defstruct-p
-                                                      '(:from-defclass-p t))
-                                                    other-initargs))))))))
+		`(progn
+		   ,@(mapcar (lambda (x)
+			       `(declaim (ftype (function (t) t) ,x)))
+			     *readers*)
+		   ,@(mapcar (lambda (x)
+			       `(declaim (ftype (function (t t) t) ,x)))
+			     *writers*)
+		   (let ,(mapcar #'cdr *initfunctions*)
+		     (load-defclass ',name
+				    ',metaclass
+				    ',supers
+				    (list ,@canonical-slots)
+				    (list ,@(apply #'append
+						   (when defstruct-p
+						     '(:from-defclass-p t))
+						   other-initargs)))))))
 	  (if defstruct-p
 	      (progn
 		(eval defclass-form) ; Define the class now, so that..

@@ -105,8 +105,6 @@ bootstrapping.
 ;;; early definition. Do this in a way that makes sure that if we
 ;;; redefine one of the early definitions the redefinition will take
 ;;; effect. This makes development easier.
-(eval-when (:load-toplevel :execute)
-  
 (dolist (fns *!early-functions*)
   (let ((name (car fns))
 	(early-name (cadr fns)))
@@ -115,7 +113,6 @@ bootstrapping.
              (lambda (&rest args)
 	       (apply (fdefinition early-name) args))
              name))))
-) ; EVAL-WHEN
 
 ;;; *!GENERIC-FUNCTION-FIXUPS* is used by !FIX-EARLY-GENERIC-FUNCTIONS
 ;;; to convert the few functions in the bootstrap which are supposed
@@ -387,27 +384,27 @@ bootstrapping.
 					;; prefixes.)
 					(*package* sb-int:*keyword-package*))
 				    (format nil "~S" mname)))))
-	  `(eval-when (:load-toplevel :execute)
-	    (defun ,mname-sym ,(cadr fn-lambda)
-	      ,@(cddr fn-lambda))
-	    ,(make-defmethod-form-internal
-	      name qualifiers `',specls
-	      unspecialized-lambda-list method-class-name
-	      `(list* ,(cadr initargs-form)
-		      #',mname-sym
-		      ,@(cdddr initargs-form))
-	      pv-table-symbol)))
-      (make-defmethod-form-internal
-       name qualifiers
-	  `(list ,@(mapcar #'(lambda (specializer)
-			       (if (consp specializer)
-				   ``(,',(car specializer)
-				      ,,(cadr specializer))
-				   `',specializer))
-                           specializers))
-	  unspecialized-lambda-list method-class-name
-	  initargs-form
-	  pv-table-symbol))))
+	  `(progn
+	     (defun ,mname-sym ,(cadr fn-lambda)
+	       ,@(cddr fn-lambda))
+	     ,(make-defmethod-form-internal
+	       name qualifiers `',specls
+	       unspecialized-lambda-list method-class-name
+	       `(list* ,(cadr initargs-form)
+		       #',mname-sym
+		       ,@(cdddr initargs-form))
+	       pv-table-symbol)))
+	(make-defmethod-form-internal
+	 name qualifiers
+	 `(list ,@(mapcar #'(lambda (specializer)
+			      (if (consp specializer)
+				  ``(,',(car specializer)
+				     ,,(cadr specializer))
+				  `',specializer))
+			  specializers))
+	 unspecialized-lambda-list method-class-name
+	 initargs-form
+	 pv-table-symbol))))
 
 (defun make-defmethod-form-internal
     (name qualifiers specializers-form unspecialized-lambda-list
@@ -2190,8 +2187,7 @@ bootstrapping.
 		     (cons (if (listp arg) (cadr arg) t) specializers)
 		     (cons (if (listp arg) (car arg) arg) required)))))))
 
-(eval-when (:load-toplevel :execute)
-  (setq *boot-state* 'early))
+(setq *boot-state* 'early)
 
 ;;; FIXME: In here there was a #-CMU definition of SYMBOL-MACROLET
 ;;; which used %WALKER stuff. That suggests to me that maybe the code

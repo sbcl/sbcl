@@ -94,7 +94,7 @@
 
 ;;; Print the specified kind of documentation about the given NAME. If
 ;;; NAME is null, or not a valid name, then don't print anything.
-(declaim (ftype (function (symbol stream t t) (values)) %describe-doc))
+(declaim (ftype (function (t stream t t) (values)) %describe-doc))
 (defun %describe-doc (name s kind kind-doc)
   (when (and name (typep name '(or symbol cons)))
     (let ((doc (fdocumentation name kind)))
@@ -104,24 +104,28 @@
   (values))
 
 ;;; Describe various stuff about the functional semantics attached to
-;;; the specified Name. Type-Spec is the function type specifier
+;;; the specified NAME, if NAME is the kind of thing you can look
+;;; up as a name. (In the case of anonymous closures and other
+;;; things, it might not be.) TYPE-SPEC is the function type specifier
 ;;; extracted from the definition, or NIL if none.
-(declaim (ftype (function ((or symbol cons) stream t)) %describe-function-name))
+(declaim (ftype (function (t stream t)) %describe-function-name))
 (defun %describe-function-name (name s type-spec) 
-  (multiple-value-bind (type where)
-      (if (or (symbolp name) (and (listp name) (eq (car name) 'setf)))
-	  (values (type-specifier (info :function :type name))
-		  (info :function :where-from name))
-	  (values type-spec :defined))
-    (when (consp type)
-      (format s "~@:_Its ~(~A~) argument types are:~@:_  ~S"
-	      where (second type))
-      (format s "~@:_Its result type is:~@:_  ~S" (third type))))
-  (let ((inlinep (info :function :inlinep name)))
-    (when inlinep
-      (format s "~@:_It is currently declared ~(~A~);~
+  (when (and name (typep name '(or symbol cons)))
+    (multiple-value-bind (type where)
+	(if (or (symbolp name) (and (listp name) (eq (car name) 'setf)))
+	    (values (type-specifier (info :function :type name))
+		    (info :function :where-from name))
+	    (values type-spec :defined))
+      (when (consp type)
+	(format s "~@:_Its ~(~A~) argument types are:~@:_  ~S"
+		where (second type))
+	(format s "~@:_Its result type is:~@:_  ~S" (third type))))
+    (let ((inlinep (info :function :inlinep name)))
+      (when inlinep
+	(format s
+		"~@:_It is currently declared ~(~A~);~
 		 ~:[no~;~] expansion is available."
-	      inlinep (info :function :inline-expansion name)))))
+		inlinep (info :function :inline-expansion name))))))
 
 ;;; Interpreted function describing; handles both closure and
 ;;; non-closure functions. Instead of printing the compiled-from info,

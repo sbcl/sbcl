@@ -23,18 +23,20 @@
 
 (in-package "SB-PCL")
 
-
-(eval-when (:load-toplevel :execute)
-  (when (eq *boot-state* 'complete)
-    (error "Trying to load (or compile) PCL in an environment in which it~%~
-	    has already been loaded. This doesn't work, you will have to~%~
-	    get a fresh lisp (reboot) and then load PCL."))
-  (when *boot-state*
-    (cerror "Try loading (or compiling) PCL anyways."
-	    "Trying to load (or compile) PCL in an environment in which it~%~
-	     has already been partially loaded. This may not work, you may~%~
-	     need to get a fresh lisp (reboot) and then load PCL."))
-  ) ; EVAL-WHEN
+;;; (These are left over from the days when PCL was an add-on package
+;;; for a pre-CLOS Common Lisp. They shouldn't happen in a normal
+;;; build, of course, but they might happen if someone is experimenting
+;;; and debugging, and it's probably worth complaining if they do,
+;;; so we've left 'em in.)
+(when (eq *boot-state* 'complete)
+  (error "Trying to load (or compile) PCL in an environment in which it~%~
+	  has already been loaded. This doesn't work, you will have to~%~
+	  get a fresh lisp (reboot) and then load PCL."))
+(when *boot-state*
+  (cerror "Try loading (or compiling) PCL anyways."
+	  "Trying to load (or compile) PCL in an environment in which it~%~
+	   has already been partially loaded. This may not work, you may~%~
+	   need to get a fresh lisp (reboot) and then load PCL."))
 
 ;;; comments from CMU CL version of PCL:
 ;;;     This is like fdefinition on the Lispm. If Common Lisp had
