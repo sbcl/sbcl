@@ -1,5 +1,11 @@
-<!-- -*- mode: SGML; sgml-parent-document: ("user-manual.sgml" "BOOK") -*- -->
-<chapter id="beyond-ansi"><title>Beyond The &ANSI; Standard</>
+<?xml version="1.0" encoding="iso-8859-1"?>
+<!DOCTYPE book PUBLIC "-//OASIS//DTD DocBook XML V4.2//EN"
+"http://www.oasis-open.org/docbook/xml/4.2/docbookx.dtd" [
+<!ENTITY % myents SYSTEM "entities.inc">
+%myents;
+]>
+
+<chapter id="beyond-ansi"><title>Beyond The &ANSI; Standard</title>
 
 <para>&SBCL; is mostly an implementation of the &ANSI; standard for
 Common Lisp. However, there's some important behavior which extends
@@ -7,21 +13,21 @@ or clarifies the standard, and various behavior which outright
 violates the standard.
 </para>
 
-<sect1 id="non-conformance"><title>Non-Conformance With The &ANSI; Standard</>
+<sect1 id="non-conformance"><title>Non-Conformance With The &ANSI; Standard</title>
 
 <para>
-Essentially every type of non-conformance is considered a bug.
-(The exceptions involve internal inconsistencies in the standard.)
-In &SBCL; 0.7.6, the master record of known bugs is in
-the <filename>BUGS</> file in the distribution.
-Some highlight information about bugs may also be found in the
-manual page. The recommended way to report bugs is through the sbcl-help or
-sbcl-devel mailings lists.
+  Essentially every type of non-conformance is considered a bug.
+  (The exceptions involve internal inconsistencies in the standard.)
+  In &SBCL; 0.7.6, the master record of known bugs is in
+  the <filename>BUGS</filename> file in the distribution.
+  Some highlight information about bugs may also be found in the
+  manual page. The recommended way to report bugs is through the sbcl-help or
+  sbcl-devel mailings lists.
 </para>
 
 </sect1>
 
-<sect1 id="idiosyncrasies"><title>Idiosyncrasies</>
+<sect1 id="idiosyncrasies"><title>Idiosyncrasies</title>
 
 <para>The information in this section describes some of the ways
 that &SBCL; deals with choices that the &ANSI; standard 
@@ -34,24 +40,24 @@ compiler from quite satisfying this principle, are discussed in the
 
 <para>&SBCL; is essentially a compiler-only implementation of
 &CommonLisp;. That is, for all but a few special cases,
-<function>eval</> creates a
-lambda expression, calls <function>compile</> on the lambda
+<function>eval</function> creates a
+lambda expression, calls <function>compile</function> on the lambda
 expression to create a compiled function, and then calls
-<function>funcall</> on the resulting function object. This 
+<function>funcall</function> on the resulting function object. This 
 is explicitly allowed by the &ANSI; standard, but leads to some
-oddities, e.g. collapsing <function>functionp</> and 
-<function>compiled-function-p</> into the same predicate.</para>
+oddities, e.g. collapsing <function>functionp</function> and 
+<function>compiled-function-p</function> into the same predicate.</para>
 
 <para>&SBCL; is quite strict about ANSI's definition of
-<function>defconstant</>. ANSI says that doing <function>defconstant</>
+<function>defconstant</function>. ANSI says that doing <function>defconstant</function>
 of the same symbol more than once is undefined unless the new value
-is <function>eql</> to the old value. Conforming to this specification
+is <function>eql</function> to the old value. Conforming to this specification
 is a nuisance when the "constant" value is only constant under some
-weaker test like <function>string=</> or <function>equal</>. It's
-especially annoying because, in &SBCL;, <function>defconstant</> takes effect
+weaker test like <function>string=</function> or <function>equal</function>. It's
+especially annoying because, in &SBCL;, <function>defconstant</function> takes effect
 not only at load time but also at compile time, so that just 
 compiling and loading reasonable code like 
-<programlisting>(defconstant +foobyte+ '(1 4))</>
+<programlisting>(defconstant +foobyte+ '(1 4))</programlisting>
 runs into this undefined behavior. Many
 implementations of Common Lisp try to help the programmer around
 this annoyance by silently accepting the undefined code and 
@@ -60,9 +66,9 @@ treats the undefined behavior as an error. Often
 such code can be rewritten
 in portable &ANSI; Common Lisp which has the desired behavior.
 E.g., the code above can be given an exactly defined meaning by replacing
-<function>defconstant</> either with <function>defparameter</> or 
+<function>defconstant</function> either with <function>defparameter</function> or 
 with a customized macro which does the right thing, possibly along the
-lines of the <function>defconstant-eqx</> macro used internally in the
+lines of the <function>defconstant-eqx</function> macro used internally in the
 implementation of &SBCL; itself.  In circumstances where this is not 
 appropriate, the programmer can handle the condition type 
 <errortype>sb-ext:defconstant-uneql</errortype>, and choose either the 
@@ -72,17 +78,17 @@ appropriate.</para>
 <para>&SBCL; gives style warnings about various kinds of perfectly
 legal code, e.g.
 <itemizedlist>
-  <listitem><para><function>defmethod</> without
-    <function>defgeneric</></para></listitem>
-  <listitem><para>multiple <function>defun</>s of the same
-    symbol</para></listitem>
+  <listitem><para><function>defmethod</function> without
+  <function>defgeneric</function></para></listitem>
+  <listitem><para>multiple <function>defun</function>s of the same
+  symbol</para></listitem>
   <listitem><para>special variables not named in the conventional
-    <varname>*foo*</> style, and lexical variables unconventionally named
-    in the <varname>*foo*</> style</para></listitem>
+  <varname>*foo*</varname> style, and lexical variables unconventionally named
+  in the <varname>*foo*</varname> style</para></listitem>
 </itemizedlist>
 This causes friction with people
 who point out that other ways of organizing code (especially
-avoiding the use of <function>defgeneric</>)
+avoiding the use of <function>defgeneric</function>)
 are just as aesthetically stylish.
 However, these warnings should be read not
 as "warning, bad aesthetics detected, you have no style" but
@@ -92,20 +98,20 @@ unless the compiler warns about such conditions, there's no
 way for the compiler to warn 
 about some programming errors which would otherwise be
 easy to overlook. (related bug: The warning about
-multiple <function>defun</>s is pointlessly annoying when you compile
-and then load a function containing <function>defun</> wrapped
-in <function>eval-when</>, and ideally should be suppressed in 
+multiple <function>defun</function>s is pointlessly annoying when you compile
+and then load a function containing <function>defun</function> wrapped
+in <function>eval-when</function>, and ideally should be suppressed in 
 that case, but still isn't as of &SBCL; 0.7.6.)</para>
 
 </sect1>
 
-<sect1 id="extensions"><title>Extensions</>
+<sect1 id="extensions"><title>Extensions</title>
 
 <para>&SBCL; is derived from &CMUCL;, which implements many extensions
 to the &ANSI; standard. &SBCL; doesn't support as many extensions as
 &CMUCL;, but it still has quite a few.</para>
 
-<sect2><title>Things Which Might Be In The Next &ANSI; Standard</>
+<sect2><title>Things Which Might Be In The Next &ANSI; Standard</title>
 
 <para>&SBCL; provides extensive support for 
 calling external C code, described 
@@ -119,7 +125,7 @@ GCed.</para> <!-- FIXME: Actually documenting these would be good.:-| -->
 
 <para>&SBCL; supports Gray streams, user-overloadable CLOS classes
 whose instances can be used as Lisp streams (e.g. passed as the
-first argument to <function>format</>).  Additionally, the 
+first argument to <function>format</function>).  Additionally, the 
 bundled contrib module <interface>sb-simple-streams</interface>
 implements a subset of the Franz Allegro simple-streams proposal.</para>  
 
@@ -127,23 +133,23 @@ implements a subset of the Franz Allegro simple-streams proposal.</para>
 compatible with &AMOP;; present exceptions to this (as distinct from
 current bugs) are:</para>
 <itemizedlist>
-  <listitem><para>the abstract <classname>metaobject</> class is not
-    present in the class hierarchy;</para></listitem>
-  <listitem><para>the <classname>standard-object</> and
-    <classname>funcallable-standard-object</> classes are
-    disjoint;</para></listitem>
-  <listitem><para><function>compute-effective-method</> only returns
-    one value, not two;</para></listitem>
-  <listitem><para>the system-supplied <property>:around</> method for
-    <function>compute-slots</> specialized on
-    <classname>funcallable-standard-class</> does not respect the
-    requested order from a user-supplied primary method.</para>
-</listitem>
+  <listitem><para>the abstract <classname>metaobject</classname> class is not
+  present in the class hierarchy;</para></listitem>
+  <listitem><para>the <classname>standard-object</classname> and
+  <classname>funcallable-standard-object</classname> classes are
+  disjoint;</para></listitem>
+  <listitem><para><function>compute-effective-method</function> only returns
+  one value, not two;</para></listitem>
+  <listitem><para>the system-supplied <property>:around</property> method for
+  <function>compute-slots</function> specialized on
+  <classname>funcallable-standard-class</classname> does not respect the
+  requested order from a user-supplied primary method.</para>
+  </listitem>
 </itemizedlist>
 
 </sect2>
 
-<sect2><title>Threading (a.k.a Multiprocessing)</>
+<sect2><title>Threading (a.k.a Multiprocessing)</title>
 
 <para>&SBCL; (as of version 0.8.3, on Linux x86 only) supports a
 fairly low-level threading interface that maps onto the host operating
@@ -187,15 +193,15 @@ start a new thread in its own `session'.
 <para>Mutexes and condition variables are available for 
 managing access to shared data: see 
 <itemizedlist>
-<listitem>
-<programlisting>(apropos "mutex" :sb-thread)</programlisting> 
-</listitem>
-<listitem>
-<programlisting>(apropos "condition" :sb-thread)</programlisting> 
-</listitem>
-<listitem> <para>and the <structname>waitqueue</structname> structure
-</para>
-</listitem>
+  <listitem>
+    <programlisting>(apropos "mutex" :sb-thread)</programlisting> 
+  </listitem>
+  <listitem>
+    <programlisting>(apropos "condition" :sb-thread)</programlisting> 
+  </listitem>
+  <listitem> <para>and the <structname>waitqueue</structname> structure
+  </para>
+  </listitem>
 </itemizedlist>
 and poke around in their documentation strings.</para>
 </sect3>
@@ -270,13 +276,13 @@ found to be embarrassing.
 
 </sect2>
 
-<sect2><title>Support For Unix</>
+<sect2><title>Support For Unix</title>
 
 <para>The UNIX command line can be read from the variable
-<varname>sb-ext:*posix-argv*</>. The UNIX environment can be queried with the
-<function>sb-ext:posix-getenv</> function.</para>
+<varname>sb-ext:*posix-argv*</varname>. The UNIX environment can be queried with the
+<function>sb-ext:posix-getenv</function> function.</para>
 
-<para>The &SBCL; system can be terminated with <function>sb-ext:quit</>,
+<para>The &SBCL; system can be terminated with <function>sb-ext:quit</function>,
 optionally returning a specified numeric value to the calling Unix
 process. The normal Unix idiom of terminating on end of file on input
 is also supported.</para>
@@ -301,22 +307,22 @@ don't currently remember how -->
 <sect2><title>Tools To Help Developers</title>
 
 <para>&SBCL; provides a profiler and other extensions to the &ANSI;
-<function>trace</> facility. See the online function documentation for
-<function>trace</> for more information.</para>
+<function>trace</function> facility. See the online function documentation for
+<function>trace</function> for more information.</para>
 
 <para>The debugger supports a number of options. Its documentation is
-accessed by typing <userinput>help</> at the debugger prompt.</para>
+accessed by typing <userinput>help</userinput> at the debugger prompt.</para>
 <!-- FIXME:
      A true debugger section in the manual would be good. Start
      with CMU CL's debugger section, but remember:
-       * no QUIT command (TOPLEVEL restart instead)
-       * no GO command (CONTINUE restart instead)
-       * Limitations of the x86 port of the debugger should be 
-         documented or fixed where possible.
-       * Discuss TRACE and its unification with PROFILE. -->
+     * no QUIT command (TOPLEVEL restart instead)
+     * no GO command (CONTINUE restart instead)
+     * Limitations of the x86 port of the debugger should be 
+     documented or fixed where possible.
+     * Discuss TRACE and its unification with PROFILE. -->
 
-<para>Documentation for <function>inspect</> is accessed by typing
-<userinput>help</> at the <function>inspect</> prompt.</para>
+<para>Documentation for <function>inspect</function> is accessed by typing
+<userinput>help</userinput> at the <function>inspect</function> prompt.</para>
 
 </sect2>
 
@@ -325,7 +331,7 @@ accessed by typing <userinput>help</> at the debugger prompt.</para>
 <para>&SBCL; has the ability to save its state as a file for later
 execution. This functionality is important for its bootstrapping
 process, and is also provided as an extension to the user See the
-documentation for <function>sb-ext:save-lisp-and-die</> for more
+documentation for <function>sb-ext:save-lisp-and-die</function> for more
 information.</para>
 
 <note><para>&SBCL; has inherited from &CMUCL; various hooks to allow
@@ -336,7 +342,7 @@ up. If you have urgent need of them, look at the code in
 developers' mailing list.</para></note>
 
 <note><para>&SBCL; has various hooks inherited from &CMUCL;, like
-<function>sb-ext:float-denormalized-p</>, to allow a program to take
+<function>sb-ext:float-denormalized-p</function>, to allow a program to take
 advantage of &IEEE; floating point arithmetic properties which aren't
 conveniently or efficiently expressible using the &ANSI; standard. These
 look good, and their interface looks good, but &IEEE; support is
@@ -361,23 +367,23 @@ fixed addresses, a precondition for using copy-on-write to share code
 between multiple Lisp processes. is less important with modern
 generational garbage collectors. </para>
 
-<para>The <function>sb-ext:truly-the</> declares the type of the
+<para>The <function>sb-ext:truly-the</function> declares the type of the
 result of the operations, producing its argument; the declaration is
 not checked. In short: don't use it.</para>
 
-<para>The <function>sb-ext:freeze-type</> declaration declares that a
+<para>The <function>sb-ext:freeze-type</function> declaration declares that a
 type will never change, which can make type testing
-(<function>typep</>, etc.) more efficient for structure types.</para>
+(<function>typep</function>, etc.) more efficient for structure types.</para>
 
-<para>The <function>sb-ext:constant-function</> declaration specifies
+<para>The <function>sb-ext:constant-function</function> declaration specifies
 that a function will always return the same value for the same
 arguments, which may allow the compiler to optimize calls
-to it. This is appropriate for functions like <function>sqrt</>, but
-is <emphasis>not</> appropriate for functions like <function>aref</>,
+to it. This is appropriate for functions like <function>sqrt</function>, but
+is <emphasis>not</emphasis> appropriate for functions like <function>aref</function>,
 which can change their return values when the underlying data are
 changed.</para>
-<!-- FIXME: This declaration does not seem to be supported in the --
-  -- current compiler. -->
+<!-- FIXME: This declaration does not seem to be supported in the 
+     current compiler. -->
 
 </sect2>
 

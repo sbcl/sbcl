@@ -22,6 +22,10 @@ rm -rf obj/* output/* doc/user-manual \
 # distribution, we automatically clean up after it here in the 
 # standard clean.sh file.)
 
+# Ensure we know GNUMAKE
+. find-gnumake.sh
+find_gnumake
+
 # Ask some other directories to clean themselves up.
 original_pwd=`pwd`
 for d in tools-for-build; do
@@ -31,7 +35,7 @@ for d in tools-for-build; do
     # this script is just the operations done by these make's, which
     # is misleading when this script does lotso other operations too.
     # -- WHN
-    make -s clean
+    $GNUMAKE -I ../src/runtime -s clean
     cd $original_pwd  > /dev/null
 done
 

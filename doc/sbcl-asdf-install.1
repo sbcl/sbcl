@@ -1,0 +1,133 @@
+.TH SBCL-ASDF-INSTALL 1 "$Date$"
+.AT 3
+.SH NAME
+.BI SBCL-ASDF-INSTALL
+ -- Download and Install ASDF Systems
+
+.SH SYNOPSIS
+.BI sbcl-asdf-install 
+[packages ...]
+
+Each argument may be
+.TP 3
+\--
+The name of a cliki page.  asdf-install visits that page and finds
+the download location from the `:(package)' tag - usually rendered
+as "Download ASDF package from ..."
+.TP 3
+\--
+A URL, which is downloaded directly
+.TP 3
+\--
+A local tar.gz file, which is installed
+
+
+.SH DESCRIPTION
+Downloads and installs an ASDF system or anything else that looks
+convincingly like one, including updating the ASDF:*CENTRAL-REGISTRY*
+symlinks for all the toplevel .asd files it contains.  Please read
+this file before use: in particular: this is an automatic tool that
+downloads and compiles stuff it finds on the 'net.  Please look at the
+SECURITY section and be sure you understand the implications
+
+
+.SH SECURITY CONCERNS: READ THIS CAREFULLY
+When you invoke asdf-install, you are asking SBCL to download,
+compile, and install software from some random site on the web.  Given
+that it's indirected through a page on CLiki, any malicious third party
+doesn't even need to hack the distribution server to replace the
+package with something else: he can just edit the link.  
+
+For this reason, we encourage package providers to crypto-sign their
+packages (see details at the URL in the PACKAGE CREATION section) and
+users to check the signatures.  asdf-install has three levels of
+automatic signature checking: "on", "off" and "unknown sites", which
+can be set using the configuration variables described in
+CUSTOMIZATION below.  The default is "unknown sites", which will
+expect a GPG signature on all downloads except those from
+presumed-good sites.  The current default presumed-good sites are
+CCLAN nodes, and two web sites run by SBCL maintainers: again, see
+below for customization details
+
+
+.SH CUSTOMIZATION
+
+If the file $HOME/.asdf-install exists, it is loaded.  This can be
+used to override the default values of exported special variables.
+Presently these are 
+.TP 3
+\--
+*PROXY*         
+
+defaults to $http_proxy environment variable
+.TP 3
+\--
+*CCLAN-MIRROR*        
+
+preferred/nearest CCLAN node.  See the list at 
+http://ww.telent.net/cclan-choose-mirror
+.TP 3
+\--
+*SBCL-HOME*
+
+Set from $SBCL_HOME environment variable.  This should already be 
+correct for whatever SBCL is running, if it's been installed correctly
+.TP 3
+\--
+*VERIFY-GPG-SIGNATURES*
+
+Verify GPG signatures for the downloaded packages?   
+
+NIL - no, T - yes, :UNKNOWN-LOCATIONS - only for URLs which aren't in CCLAN and don't begin with one of the prefixes in *SAFE-URL-PREFIXES*
+.TP 3
+\--
+*LOCATIONS*
+
+Possible places in the filesystem to install packages into.  See default
+value for format
+.TP 3
+\--
+*SAFE-URL-PREFIXES* 
+
+List of locations for which GPG signature checking won't be done when
+*verify-gpg-signatures* is :unknown-locations
+
+
+.SH PACKAGE CREATION
+
+If you want to create your own packages that can be installed using this
+loader, see the "Making your package downloadable..." section at
+<http://www.cliki.net/asdf-install> 
+
+
+.SH HACKERS NOTE
+
+Listen very carefully: I will say this only as often as it appears to
+be necessary to say it.  asdf-install is not a good example of how to
+write a URL parser, HTTP client, or anything else, really.
+Well-written extensible and robust URL parsers, HTTP clients, FTP
+clients, etc would definitely be nice things to have, but it would be
+nicer to have them in CCLAN where anyone can use them - after having
+downloaded them with asdf-install - than in SBCL contrib where they're
+restricted to SBCL users and can only be updated once a month via SBCL
+developers.  This is a bootstrap tool, and as such, will tend to
+resist changes that make it longer or dependent on more other
+packages, unless they also add to its usefulness for bootstrapping.
+
+
+.SH TODO
+
+.TP 3
+a)
+gpg signature checking would be better if it actually checked against
+a list of "trusted to write Lisp" keys, instead of just "trusted to be
+who they say they are"
+.TP 3
+b)
+nice to have: resume half-done downloads instead of starting from scratch
+every time.  but right now we're dealing in fairly small packages, this is not
+an immediate concern
+
+
+.SH SEE ALSO
+.BR sbcl (1)
