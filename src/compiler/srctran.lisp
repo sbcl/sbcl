@@ -29,12 +29,14 @@
 (define-source-transform identity (x) `(prog1 ,x))
 (define-source-transform values (x) `(prog1 ,x))
 
-;;; Bind the values and make a closure that returns them.
+;;; Bind the value and make a closure that returns them.
 (define-source-transform constantly (value)
-  (let ((rest (gensym "CONSTANTLY-REST-")))
-    `(lambda (&rest ,rest)
-       (declare (ignore ,rest))
-       ,value)))
+  (let ((rest (gensym "CONSTANTLY-REST-"))
+	(n-value (gensym "CONSTANTLY-VALUE-")))
+    `(let ((,n-value ,value))
+      (lambda (&rest ,rest)
+	(declare (ignore ,rest))
+	,n-value))))
 
 ;;; If the function has a known number of arguments, then return a
 ;;; lambda with the appropriate fixed number of args. If the

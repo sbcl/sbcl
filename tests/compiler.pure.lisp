@@ -311,3 +311,13 @@
                        (push node path))
                   (when (funcall equalp key (node-key node))
                     (return (values node path t))))))))
+
+;;; CONSTANTLY should return a side-effect-free function (bug caught
+;;; by Paul Dietz' test suite)
+(let ((i 0))
+  (let ((fn (constantly (progn (incf i) 1))))
+    (assert (= i 1))
+    (assert (= (funcall fn) 1))
+    (assert (= i 1))
+    (assert (= (funcall fn) 1))
+    (assert (= i 1))))

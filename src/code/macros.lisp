@@ -197,16 +197,19 @@
   (let ((keyform-value (gensym))
 	(clauses ())
 	(keys ()))
-    (dolist (case cases)
+    (do* ((cases cases (cdr cases))
+	  (case (car cases) (car cases)))
+	 ((null cases) nil)
       (unless (list-of-length-at-least-p case 1)
 	(error "~S -- bad clause in ~S" case name))
       (destructuring-bind (keyoid &rest forms) case
-	(cond ((memq keyoid '(t otherwise))
+	(cond ((and (memq keyoid '(t otherwise))
+		    (null (cdr cases)))
 	       (if errorp
 		   (progn
-		     ;; FIXME: this message could probably do with
-		     ;; some loving pretty-printer format controls.
-		     (style-warn "Treating bare ~A in ~A as introducing a normal-clause, not an otherwise-clause" keyoid name)
+		     (style-warn "~@<Treating bare ~A in ~A as introducing a ~
+                                  normal-clause, not an otherwise-clause~@:>"
+				 keyoid name)
 		     (push keyoid keys)
 		     (push `((,test ,keyform-value ',keyoid) nil ,@forms)
 			   clauses))
