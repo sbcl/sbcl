@@ -68,5 +68,27 @@
   (assert (= 1 (slot (slot s1 'x) 'y)))
   (assert (= 2 (slot (slot s2 'x) 'y))))
 
+;;; "Alien bug" on sbcl-devel 2004-10-11 by Thomas F. Burdick caused
+;;; by recursive struct definition.
+(let ((fname "alien-bug-2004-10-11.tmp.lisp"))
+  (unwind-protect 
+       (progn
+         (with-open-file (f fname :direction :output)
+           (mapc (lambda (form) (print form f))
+                 '((defpackage :alien-bug
+                     (:use :cl :sb-alien))
+                   (in-package :alien-bug)
+                   (define-alien-type objc-class
+                       (struct objc-class
+                        (protocols 
+                         (* (struct protocol-list
+                                    (list (array (* (struct objc-class))))))))))))
+           (load fname)
+           (load fname)
+           (load (compile-file fname))
+           (load (compile-file fname)))
+    (delete-file (compile-file-pathname fname))
+    (delete-file fname)))
+
 ;;; success
 (quit :unix-status 104)

@@ -1,4 +1,12 @@
 changes in sbcl-0.8.16 relative to sbcl-0.8.15:
+  * enhancement: saving cores with foreign code loaded is now
+    supported on x86/NetBSD and sparc/Linux in addition to the previously
+    supported platforms.
+  * bug fix: parsing self-recursive alien record types multiple times
+    no longer causes infinite recursion. (reported by Thomas F. Burdick,
+    original patch by Helmut Eller for CMUCL)
+  * bug fix: stack-exhaustion detection works now on NetBSD as well.
+    (thanks to Richard Kreuter)
   * bug fix: defining classes whose accessors are methods on existing
     generic functions in other (locked) packages no longer signals
     bogus package lock violations. (reported by François-René Rideau)

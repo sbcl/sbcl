@@ -75,7 +75,7 @@ SB-EXT:SAVE-LISP-AND-DIE for details."
 ;;; Open libraries in *SHARED-OBJECTS* and the runtime. Called during
 ;;; initialization. 
 (defun reopen-shared-objects ()
-  ;; Ensure that the runtime is present in the list
+  ;; Ensure that the runtime is open
   (setf *runtime-dlhandle* (dlopen-or-lose nil)
         *shared-objects* (mapcar #'try-reopen-shared-object *shared-objects*)))
 
