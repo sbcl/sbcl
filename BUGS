@@ -1275,6 +1275,17 @@ WORKAROUND:
     Is (1 . 1) of type CONS a cons? => NIL
   without signalling an error.
 
+154:
+  There's some sort of problem with aborting back out of the debugger
+  after a %DETECT-STACK-EXHAUSTION error in sbcl-0.7.1.38. In some cases
+  telling the debugger to ABORT doesn't get you back to the main REPL,
+  but instead just gives you another stack exhaustion error. The problem
+  doesn't occur in the trivial case
+    * (defun frob () (frob) (frob))
+    FROB
+    * (frob)
+  but it has happened in more complicated cases (which I haven't
+  figured out how to reproduce).
 
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:

@@ -73,12 +73,16 @@ sh make-config.sh || exit 1
 #   Copy src/runtime/sbcl.h from the host system to the target system.
 #   On the target system:
 #     sh make-target-1.sh
-#   Copy src/runtime/sbcl.nm from the target system to the host system.
+#   Copy src/runtime/sbcl.nm and output/stuff-groveled-from-headers.lisp
+#     from the target system to the host system.
 #   On the host system:
 #     SBCL_XC_HOST=<whatever> sh make-host-2.sh
 #   Copy output/cold-sbcl.core from the host system to the target system.
 #   On the target system:
 #     sh make-host-2.sh
+# Or, if you can set up the files somewhere shared (with NFS, AFS, or
+# whatever) between the host machine and the target machine, the basic
+# procedure above should still work, but you can skip the "copy" steps.
 sh make-host-1.sh   || exit 1
 sh make-target-1.sh || exit 1
 sh make-host-2.sh   || exit 1
