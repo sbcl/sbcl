@@ -972,18 +972,6 @@ WORKAROUND:
       (let ((x (1+ x)))
         (call-next-method)))
   Now (FOO 3) should return 3, but instead it returns 4.
-    
-137:
-  (SB-DEBUG:BACKTRACE) output should start with something
-  including the name BACKTRACE, not (as in 0.pre7.88)
-  just "0: (\"hairy arg processor\" ...)". Until about
-  sbcl-0.pre7.109, the names in BACKTRACE were all screwed
-  up compared to the nice useful names in sbcl-0.6.13.
-  Around sbcl-0.pre7.109, they were mostly fixed by using
-  NAMED-LAMBDA to implement DEFUN. However, there are still
-  some screwups left, e.g. as of sbcl-0.pre7.109, there are
-  still some functions named "hairy arg processor" and
-  "SB-INT:&MORE processor".
 
 141: 
   Pretty-printing nested backquotes doesn't work right, as 

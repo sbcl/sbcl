@@ -181,6 +181,33 @@
   (assert (= (a-accessor foo) 4))
   (assert (= (c-accessor foo) 5)))
 
+;;; At least as of sbcl-0.7.4, PCL has code to support a special
+;;; encoding of effective method functions for slot accessors as
+;;; FIXNUMs. Given this special casing, it'd be easy for slot accessor
+;;; functions to get broken in special ways even though ordinary
+;;; generic functions work. As of sbcl-0.7.4 we didn't have any tests
+;;; for that possibility. Now we have a few tests:
+(defclass fish ()
+  ((fin :reader ffin :writer ffin!)
+   (tail :reader ftail :writer ftail!)))
+(defvar *fish* (make-instance 'fish))
+(ffin! 'triangular-fin *fish*)
+(defclass cod (fish) ())
+(defvar *cod* (make-instance 'cod))
+(defparameter *clos-dispatch-side-fx* (make-array 0 :fill-pointer 0))
+(defmethod ffin! (new-fin (cod cod))
+  (format t "~&about to set ~S fin to ~S~%" cod new-fin)
+  (vector-push-extend '(cod) *clos-dispatch-side-fx*)
+  (prog1
+      (call-next-method)
+    (format t "~&done setting ~S fin to ~S~%" cod new-fin)))
+(defmethod ffin! :before (new-fin (cod cod))
+  (vector-push-extend '(:before cod) *clos-dispatch-side-fx*)
+  (format t "~&exploring the CLOS dispatch zoo with COD fins~%"))
+(ffin! 'almost-triang-fin *cod*)
+(assert (eq (ffin *cod*) 'almost-triang-fin))
+(assert (equalp #((:before cod) (cod)) *clos-dispatch-side-fx*))
+
 ;;;; success
 
 (sb-ext:quit :unix-status 104)

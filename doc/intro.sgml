@@ -6,7 +6,7 @@ specific to &SBCL;, not on behavior which is common to all
 implementations of &ANSI; &CommonLisp;.</para>
 
 <sect1 id="more-cl-info">
-<title>Where To Go For More Information on &CommonLisp; in General</title>
+<title>Where To Go For More Information about &CommonLisp; in General</title>
 
 <para>Regardless of your ability level, two very useful resources
 for working with any implementation of
@@ -50,7 +50,7 @@ but need to learn about Lisp, three books stand out.
 </sect1>
 
 <sect1>
-<title>Where To Go For More Information On &SBCL;</title>
+<title>Where To Go For More Information About &SBCL;</title>
 
 <para>Before you read this user manual, you should probably read
 two other things.

@@ -1054,7 +1054,7 @@
 	)
        ((functional-p var)
 	(setf (leaf-ever-used var) t))
-       ((lambda-var-specvar var)
+       ((and (lambda-var-specvar var) (eq (first spec) 'ignore))
 	;; ANSI's definition for "Declaration IGNORE, IGNORABLE"
 	;; requires that this be a STYLE-WARNING, not a full WARNING.
 	(compiler-style-warn "declaring special variable ~S to be ignored"

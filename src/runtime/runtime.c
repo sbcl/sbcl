@@ -233,7 +233,7 @@ It is mostly in the public domain, but also includes some software copyrighted\n
 used under BSD-style licenses allowing copying only under certain conditions.\n\
 See the COPYING file in the distribution for more information.\n\
 \n\
-More information on SBCL is available at <http://sbcl.sourceforge.net/>.\n\
+More information about SBCL is available at <http://sbcl.sourceforge.net/>.\n\
 ");
 	fflush(stdout);
     }
