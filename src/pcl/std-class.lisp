@@ -1328,7 +1328,9 @@
 	class)))
 
 (defmethod make-instances-obsolete ((class symbol))
-  (make-instances-obsolete (find-class class)))
+  (make-instances-obsolete (find-class class))
+  ;; ANSI wants the class name when called with a symbol.
+  class)
 
 ;;; OBSOLETE-INSTANCE-TRAP is the internal trap that is called when we
 ;;; see an obsolete instance. The times when it is called are:

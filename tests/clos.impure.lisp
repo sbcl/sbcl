@@ -777,5 +777,12 @@
     ((magic :initarg :size :initform 2)))
   (assert (= 1 (slot-value i 'magic))))
 
+;;; MAKE-INSTANCES-OBSOLETE return values
+(defclass one-more-to-obsolete () ())
+(assert (eq 'one-more-to-obsolete 
+	    (make-instances-obsolete 'one-more-to-obsolete)))
+(assert (eq (find-class 'one-more-to-obsolete) 
+	    (make-instances-obsolete (find-class 'one-more-to-obsolete))))
+
 ;;;; success
 (sb-ext:quit :unix-status 104)
