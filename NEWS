@@ -2440,6 +2440,9 @@ changes in sbcl-0.8.11 relative to sbcl-0.8.10:
   * fixed bug: as reported by Peter Graves on #lisp IRC, passing a NIL
     in keyword position to MAKE-PACKAGE was not being reported as
     invalid.
+  * fixed bug: as reported by Juan Ripoll on cmucl-imp,
+    MULTIPLE-VALUE-BIND should be able to lexically bind lambda list
+    keywords.
   * optimization: rearranged the expansion of various defining macros
     so that each expands into only one top-level form in a
     :LOAD-TOPLEVEL context; this appears to decrease fasl sizes by
@@ -2462,7 +2465,6 @@ changes in sbcl-0.8.11 relative to sbcl-0.8.10:
        it so.  (thanks to Markus Ziegler)
     ** on the Alpha, the compiler succeeds in compiling functions
        returning a known number of arguments greater than 63.
-
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles

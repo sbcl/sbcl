@@ -59,5 +59,13 @@
   (defconstant +const+ 3))
 (assert (= (oidentity +const+) 3))
 
+;;; MULTIPLE-VALUE-BIND and lambda list keywords
+(multiple-value-bind (&rest &optional &key &allow-other-keys)
+    (values 1 2 3)
+  (assert (= &rest 1))
+  (assert (= &optional 2))
+  (assert (= &key 3))
+  (assert (null &allow-other-keys)))
+
 ;;; success
 (quit :unix-status 104)
