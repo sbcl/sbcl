@@ -55,11 +55,13 @@ This software has been built successfully on these systems:
 			host lisp = SBCL itself
 		os = Solaris 8
 			host lisp = SBCL itself
+	cpu = powerpc
+		os = Debian GNU/Linux 2.2 with libc >= 2.1
+			host lisp = OpenMCL 0.12
+			host lisp = SBCL itself
+
 It is known not to build under CLISP because of (as of early June 2002)
-bugs in the CLISP garbage collector, and it is known not to build under
-other systems like OpenMCL because of (as of early June 2002) remaining
-dependencies of SBCL bootstrapping on CMUCLisms like the representation
-of BYTE. 
+bugs in the CLISP garbage collector.
 
 Reports of other systems that it works on (or doesn't work on, for
 that matter), or help in making it run on more systems, would be

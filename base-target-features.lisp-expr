@@ -75,10 +75,11 @@
  ;; the executable I'm running.
  :sb-doc
 
- ;; Do regression and other tests when building the system. You
- ;; might or might not want this if you're not a developer,
- ;; depending on how paranoid you are. You probably do want it if
- ;; you are a developer.
+ ;; Do regression and other tests when building the system. You might
+ ;; or might not want this if you're not a developer, depending on how
+ ;; paranoid you are. You probably do want it if you are a developer.
+ ;; This test does not affect the target system (in much the same way
+ ;; as :sb-after-xc-core, below).
  :sb-test
 
  ;; Make more debugging information available (for debugging SBCL
@@ -239,14 +240,20 @@
  ;;      any Intel 386 or better, or compatibles like the AMD K6 or K7
  ;;   :alpha
  ;;      DEC/Compaq Alpha CPU
- ;; (No other CPUs are supported by SBCL as of 0.6.12.15, but SPARC or
- ;; PowerPC support could be ported from CMU CL if anyone is
- ;; sufficiently motivated to do so, or if you're *really* motivated,
- ;; you could write a port from scratch for a new CPU architecture.)
+ ;;   :sparc
+ ;;      any Sun UltraSPARC (possibly also non-Ultras -- currently untested)
+ ;;   :ppc
+ ;;      any PowerPC CPU
+ ;;
+ ;; (No other CPUs are supported by SBCL as of 0.7.5, but MIPS or HPPA
+ ;; support could be ported from CMU CL if anyone is sufficiently
+ ;; motivated to do so, or if you're *really* motivated, you could
+ ;; write a port from scratch for a new CPU architecture.)
+ ;;
  ;; (CMU CL also had a :pentium feature, which affected the definition
- ;; of some floating point vops. It was present but not enabled or 
- ;; documented in the CMU CL code that SBCL is derived from, and is
- ;; present but stale in SBCL as of 0.6.12.)
+ ;; of some floating point vops. It was present but not enabled or
+ ;; documented in the CMU CL code that SBCL is derived from, and has
+ ;; now been moved to the backend-subfeatures mechanism.)
  ;;
  ;; properties derived from the machine architecture
  ;;   :control-stack-grows-downward-not-upward
@@ -267,9 +274,13 @@
  ;;              is not exclusive with the features which indicate which
  ;;              particular version of BSD we're intended to run under.)
  ;;   :freebsd = We're intended to run under FreeBSD.
- ;;   :openbsd = We're intended to run under FreeBSD.
- ;; (No others are supported by SBCL as of 0.6.7, but :hpux or
- ;; :solaris support could be ported from CMU CL if anyone is
+ ;;   :openbsd = We're intended to run under OpenBSD.
+ ;;   :sunos   = We're intended to run under Solaris user environment
+ ;;              with the SunOS kernel.
+ ;;   :osf1    = We're intended to run under Tru64 (aka Digital Unix
+ ;;              aka OSF/1).
+ ;; (No others are supported by SBCL as of 0.7.5, but :hpux or
+ ;; :irix support could be ported from CMU CL if anyone is
  ;; sufficiently motivated to do so, and it'd even be possible,
  ;; though harder, to port the system to Microsoft Windows.)
  )

@@ -655,7 +655,7 @@
 	    (all-lengths)
 	    (args))
     (dolist (seq sequences)
-      (declare (ignore seq))
+      (declare (ignorable seq))
       (let ((n-seq (gensym))
 	    (n-length (gensym)))
 	(args n-seq)
