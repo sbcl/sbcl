@@ -107,9 +107,9 @@ known bugs, known performance problems, and missing extensions are
 likely to be fixed, tuned, or added. </para>
 
 <para>&SBCL; is descended from &CMUCL;, which is itself descended from
-Spice Lisp. Early implementations for the Mach operating system on the
-IBM RT, back in the 1980s. Design decisions from that time are still
-reflected in the current implementation:
+Spice Lisp, including early implementations for the Mach operating
+system on the IBM RT, back in the 1980s. Design decisions from that
+time are still reflected in the current implementation:
 <itemizedlist>
   <listitem><para>The system expects to be loaded into a 
     fixed-at-compile-time location in virtual memory, and also expects
@@ -122,7 +122,8 @@ reflected in the current implementation:
   <listitem><para>A word is a 32-bit quantity. The system has been 
     ported to many processor architectures without altering this
     basic principle. Some hacks allow the system to run on the Alpha
-    chip (a 64-bit architecture) but the assumption that a word is
+    chip (a 64-bit architecture) but even there 32-bit words are
+    used. The assumption that a word is
     32 bits wide is implicit in hundreds of places in the
     system.</para></listitem>
   <listitem><para>The system is implemented as a C program which is 
@@ -160,8 +161,8 @@ debugging) do not work particularly well there. &SBCL; should be able
 to improve in these areas (and has already improved in some other
 areas), but it takes a while.</para>
 
-<para>The &SBCL; GC, like the GC on the X86 port of &CMUCL;, is
-<emphasis>conservative</>. This means that it doesn't maintain a
+<para>On the x86, &SBCL; like the X86 port of &CMUCL;, uses a 
+<emphasis>conservative</> GC. This means that it doesn't maintain a
 strict separation between tagged and untagged data, instead treating
 some untagged data (e.g. raw floating point numbers) as
 possibly-tagged data and so not collecting any Lisp objects that they
@@ -182,7 +183,7 @@ running system with new versions. This quasi-build procedure can cause
 various bizarre bootstrapping hangups, especially when a major change
 is made to the system. It also makes the connection between the
 current source code and the current executable more tenuous than in
-any other software system I'm aware of -- it's easy to accidentally
+other software systems -- it's easy to accidentally
 <quote>build</> a &CMUCL; system containing characteristics not
 reflected in the current version of the source code.</para>
 

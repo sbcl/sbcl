@@ -447,7 +447,7 @@ warnings.</para>
 
 </sect2>
 
-<sect2><title>Precise Type Checking</>
+<sect2 id="precisetypechecking"><title>Precise Type Checking</>
 <!--INDEX precise type checking-->
 <!--INDEX {type checking}{precise}-->
 
@@ -526,20 +526,21 @@ or nonexistent runtime checking.</para>
 <!--INDEX {compatibility with other Lisps}
     (should also have an entry in the non-&ANSI;-isms section)-->
 
-<para>Since &SBCL;'s compiler does much more comprehensive type
-checking than other Lisp compilers, &SBCL; will detect type errors in
-many programs that have been debugged using other compilers. These
-errors are mostly incorrect declarations, although compile-time type
-errors can find actual bugs if parts of the program have never been
-tested.</para>
+<para>Since &SBCL;'s compiler, like &CMUCL;'s compiler, does much more
+comprehensive type checking than most Lisp compilers, &SBCL; may
+detect type errors in programs that have been debugged using other
+compilers. These errors are mostly incorrect declarations, although
+compile-time type errors can find actual bugs if parts of the program
+have never been tested.</para>
 
 <para>Some incorrect declarations can only be detected by run-time
-type checking. It is very important to initially compile programs with
-full type checks and then test this version. After the checking
-version has been tested, then you can consider weakening or
-eliminating type checks. <emphasis>This applies even to previously
-debugged programs,</emphasis> because the &SBCL; compiler does much
-more type inference than other &CommonLisp; compilers, so an incorrect
+type checking. It is very important to initially compile a program
+with full type checks (high <parameter>safety</> optimization) and
+then test this safe version. After the checking version has been
+tested, then you can consider weakening or eliminating type checks.
+<emphasis>This applies even to previously debugged
+programs,</emphasis> because the &SBCL; compiler does much more type
+inference than other &CommonLisp; compilers, so an incorrect
 declaration can do more damage.</para>
 
 <para>The most common problem is with variables whose constant initial
@@ -600,9 +601,7 @@ type of the result of evaluating a macro argument, then put a
   `(the fixnum (1+ (the fixnum ,x))))</programlisting>
 
 In this case, it would be stylistically preferable to change this
-macro back to a function and declare it inline. Macros have no
-efficiency advantage over inline functions when using the
-&SBCL; compiler.
+macro back to a function and declare it inline. 
 <!--FIXME: <xref>inline-expansion</>, once we crib the 
     relevant text from the CMU CL manual.-->
 </para>
@@ -634,15 +633,15 @@ compiled using other compilers.</para>
 
 <para>In this case, the fix is to weaken the type declaration to
 <type>(or fixnum null)</>.
-<footnote><para>Actually, this declaration is unnecessary
-  unnecessary in &SBCL;, since it already knows <function>position</>
+<footnote><para>Actually, this declaration is 
+  unnecessary in &SBCL;, since it already knows that <function>position</>
   returns a non-negative <type>fixnum</> or <literal>nil</>.
   </para></footnote>
 
 Note that there is usually little performance penalty for weakening a
-declaration in this way.  Any numeric operations in the body can still
-assume the variable is a <type>fixnum</>, since <literal>nil</> is not a legal
-numeric argument.  Another possible fix would be to say:
+declaration in this way. Any numeric operations in the body can still
+assume that the variable is a <type>fixnum</>, since <literal>nil</>
+is not a legal numeric argument. Another possible fix would be to say:
 
 <programlisting>(do ((pos 0 (position #\a string :start (1+ pos))))
     ((null pos))
@@ -657,10 +656,6 @@ variable in the loop body.
      CMU CL manual. -->
 </para>
 
-<para>In summary, remember that <emphasis>all</> values that a variable
-<emphasis>ever</> has must be of the declared type, and that you
-should test using safe compilation options initially.</para>
-
 </sect2>
 
 </sect1>
@@ -668,7 +663,7 @@ should test using safe compilation options initially.</para>
 <sect1 id="compiler-policy"><title>Compiler Policy</>
 
 <para>As of version 0.6.4, &SBCL; still uses most of the &CMUCL; code
-for compiler policy. Thi &CMUCL; code has many features and high-quality
+for compiler policy. The &CMUCL; code has many features and high-quality
 documentation, but the two unfortunately do not match. So this area of
 the compiler and its interface needs to be cleaned up. Meanwhile, here
 is some rudimentary documentation on the current behavior of the
@@ -696,8 +691,8 @@ compiler and its interface are cleaned up. The current name is
 misleading, because it mostly inhibits optimization notes, not
 warnings. And making it an optimization quality is misleading, because
 it shouldn't affect the resulting code at all. It may become a
-declaration identifier with a name like SB-EXT:INHIBIT-NOTES, so that
-what's currently written
+declaration identifier with a name like
+<parameter>sb-ext:inhibit-notes</>, so that what's currently written
 
 <programlisting>(declaim (optimize (sb-ext:inhibit-warnings 2)))</>
 
@@ -717,10 +712,10 @@ of types, array bounds, and so forth is suppressed.</para>
 <para>When <parameter>safety</> is less than <parameter>speed</>, any
 and all type checks may be suppressed. At some point in the past,
 &CMUCL; had <link linkend="weakened-type-checking">a more nuanced
-interpretation of this.</link> At some point in the future, &SBCL; may
-restore that interpretation, or something like it. Until then, setting
-<parameter>safety</> less than <parameter>speed</> may have roughly
-the same effect as setting <parameter>safety</> to zero.</para>
+interpretation of this</link>. However, &SBCL; doesn't support that
+interpretation, and setting <parameter>safety</> less than
+<parameter>speed</> may have roughly the same effect as setting
+<parameter>safety</> to zero.</para>
 
 <para>The value of <parameter>space</> mostly influences the
 compiler's decision whether to inline operations, which tend to

@@ -36,9 +36,6 @@ what it would be. (WHN 2001-10-15)
 <style-specification id="html" use="docbook">
 <style-specification-body>
 
-;;; FIXME: It would be nice to have output files have ".html" extensions
-;;; instead of ".htm" extensions.
-
 ;;; Essentially all the stuff in the "Programming languages and
 ;;; constructs" section (pp. 40-41 of _DocBook: The Definitive Guide_)
 ;;; is to be monospaced. The one exception is "replaceable", which

@@ -599,10 +599,10 @@
 (define-alien-type-class (enum :include (integer (bits 32))
 			       :include-args (signed))
   name		; name of this enum (if any)
-  from		; alist from keywords to integers.
-  to		; alist or vector from integers to keywords.
-  kind		; Kind of from mapping, :vector or :alist.
-  offset)	; Offset to add to value for :vector from mapping.
+  from		; alist from keywords to integers
+  to		; alist or vector from integers to keywords
+  kind		; kind of from mapping, :VECTOR or :ALIST
+  offset)	; offset to add to value for :VECTOR from mapping
 
 (define-alien-type-translator enum (&whole
 				 type name

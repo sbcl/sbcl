@@ -1,35 +1,502 @@
 <chapter id="ffi"><title>The Foreign Function Interface</>
 
-<para>FIXME: The material in the &CMUCL; manual about the foreign
-function interface should be reviewed, reformatted in DocBook, 
-lightly edited for &SBCL;, and substituted into this manual. But in
-the meantime, the original &CMUCL; manual is still 95+% correct for
-the &SBCL; version of the foreign function interface. (The main
-difference is that the package names have changed. CMU CL's FFI
-is in two packages named <quote><literal>ALIEN</></> and
-<quote><literal>C-CALL</></>. The corresponding SBCL FFI is
-in a single package named 
-<quote><literal>SB-ALIEN</></>.)
-        <!-- FIXME: Oh, and I seem to remember that the CMUCL manual
-	     was out of date about how to test for a null pointer,
-	     there's a builtin operator to do it, you don't need to
-	     do the nasty idiom the manual says you need to do. -->
-	<!-- FIXME: Also, the CMU CL alien documentation claims you
-	     can just do (DEFINE-ALIEN-VARIABLE "errno" INT), but it's
-	     wrong. That fails with the multithreading hacks hacks
-	     now built into the C library. -->
-	<!-- FIXME: Also, we support not only LOAD-FOREIGN but
-	     also LOAD-1-FOREIGN. -->
-See the sections
+<para>This chapter describes &SBCL;'s interface to C programs and
+libraries (and, since C interfaces are a sort of <foreignphrase>lingua
+franca</> of the Unix world, to other programs and libraries in
+general.)</para>
+
+<note><para>In the modern Lisp world, the usual term for this
+functionality is Foreign Function Interface, or <acronym>FFI</>, where
+despite the mention of <quote>function</> in this term, <acronym>FFI</> also
+refers to direct manipulation of C data structures as well as
+functions. The traditional &CMUCL; terminology is Alien Interface, and
+while that older terminology is no longer used much in the system
+documentation, it still reflected in internal names in the
+implementation, notably in the name of the <literal>SB-ALIEN</>
+package.</para></note>
+
+<sect1><title>Introduction to the Foreign Function Interface</>
+<!-- AKA "Introduction to Aliens" in the CMU CL manual -->
+
+<para>
+Because of Lisp's emphasis on dynamic memory allocation and garbage
+collection, Lisp implementations use unconventional memory representations
+for objects.  This representation mismatch creates problems when a Lisp
+program must share objects with programs written in another language.  There
+are three different approaches to establishing communication:
 <itemizedlist>
-  <listitem><para>Type Translations</></>
-  <listitem><para>System Area Pointers</></>
-  <listitem><para>Alien Objects</></>
-  <listitem><para>Alien Types</></>
-  <listitem><para>Alien Operations</></>
-  <listitem><para>Alien Variables</></>
-  <listitem><para>Alien Function Calls</></>
+  <listitem><para>The burden can be placed on the foreign program
+    (and programmer) by requiring the knowledge and use of the
+    representations used internally by the Lisp implementation.
+    This can require a considerable amount of <quote>glue</> code on the 
+    C side, and that code tends to be sensitively dependent on the
+    internal implementation details of the Lisp system.</para></listitem>
+  <listitem><para>The Lisp system can automatically convert objects
+    back and forth between the Lisp and foreign representations.
+    This is convenient, but translation becomes prohibitively slow
+    when large or complex data structures must be shared. This approach
+    is supported by the &SBCL; <acronym>FFI</>, and used automatically
+    by the when passing integers and strings.</para></listitem>
+  <listitem><para>The Lisp program can directly manipulate foreign
+    objects through the use of extensions to the Lisp language.
+    </para></listitem>
+</itemizedlist>
+
+<para>&SBCL;, like &CMUCL; before it,
+relies primarily on the automatic conversion and direct manipulation
+approaches. Aliens of simple scalar types are automatically converted,
+complex types are directly manipulated in their foreign
+representation. Furthermore, Lisp strings are represented internally 
+with null termination bytes so that they can be passed directly to
+C interfaces without allocating new zero-terminated copies.</para>
+
+<para>Any foreign objects that can't automatically be converted into
+Lisp values are represented by objects of type <type>alien-value</>.
+Since Lisp is a dynamically typed language, even foreign objects must
+have a run-time type; this type information is provided by
+encapsulating the raw pointer to the foreign data within an
+<type>alien-value</> object.</para>
+
+<para>The type language and operations on foreign types are
+intentionally similar to those of the C language. And as discussed
+above, they are applicable not only to communication with native C
+programs, but also to programs in other languages which provide
+C-level interfaces. </para>
+
+</sect1>
+
+<sect1><title>Foreign Types</>
+<!-- AKA "Alien Types" in the CMU CL manual -->
+
+<para>Alien types have a description language based on nested list
+structure. For example the C type
+<programlisting>
+struct foo {
+    int a;
+    struct foo *b[100];
+};</programlisting>
+has the corresponding &SBCL; FFI type
+<programlisting>
+(struct foo
+  (a int)
+  (b (array (* (struct foo)) 100)))</programlisting>
+</para>
+
+<sect2><title>Defining Foreign Types</>
+
+<para>
+Types may be either named or anonymous.  With structure and union
+types, the name is part of the type specifier, allowing recursively
+defined types such as:
+<programlisting>
+(struct foo (a (* (struct foo))))</programlisting>
+An anonymous structure or union type is specified by using the name
+<literal>nil</>.  The <function>with-alien</> macro defines a local
+scope which <quote>captures</> any named type definitions.  Other types
+are not inherently named, but can be given named abbreviations using
+the <function>define-alien-type</> macro.
+</para>
+
+</sect2>
+
+<sect2><title>Foreign Types and Lisp Types</>
+
+<para>
+The foreign types form a subsystem of the &SBCL; type system.  An
+<type>alien</> type specifier provides a way to use any foreign type as a
+Lisp type specifier.  For example
+<programlisting>
+(typep foo '(alien (* int)))</programlisting>
+can be used to determine whether <varname>foo</> is a pointer to a foreign
+<type>int</>. <type>alien</> type specifiers can be used in the same ways
+as ordinary Lisp type specifiers (like <type>string</>.)  Alien type
+declarations are subject to the same
+precise type checking <!-- FIXME: should be linked to id="precisetypechecking" -->
+as any other declaration.
+</para>
+
+<para>
+Note that the type identifiers used in the
+foreign type system overlap with native Lisp type
+specifiers in some cases.  For example, the type specifier
+<type>(alien single-float)</type> is identical to <type>single-float</>, since
+foreign floats are automatically converted to Lisp floats.  When
+<function>type-of</> is called on an Alien value that is not automatically
+converted to a Lisp value, then it will return an <type>alien</> type
+specifier.
+</para>
+
+</sect2>
+
+<sect2><title>Foreign Type Specifiers</>
+
+<note><para>
+All foreign type names are exported from the <literal>sb-alien</>
+package. Some foreign type names are also symbols in
+the <literal>common-lisp</> package, in which case they are
+reexported from the <literal>sb-alien</> package, so that
+e.g. it is legal to refer to <type>sb-alien:single-float</>.
+</para></note>
+
+<para>
+These are the basic foreign type specifiers: 
+<!-- FIXME: There must be some better way of formatting definitions
+     in DocBook than this. I haven't found it yet, but suggestions 
+     or patches would be welcome. -->
+<itemizedlist>
+  <listitem>
+    <para>
+      The foreign type specifier <type>(* foo)</> describes a
+      pointer to an object of type <type>foo</>.  A pointed-to type
+      <type>foo</> of <type>t</> indicates a pointer to anything,
+      similar to <type>void *</> in ANSI C. A null alien pointer can
+      be detected with the <function>sb-alien:null-alien</>
+      function.
+    </para>
+  </listitem>
+  <listitem>
+    <para> 
+      The foreign type specifier <type>(array foo &amp;optional dimensions)</>
+      describes array of the specified <literal>dimensions</>, holding
+      elements of type <type>foo</>. Note that (unlike in C) <type>(* foo)</>
+      <type>(array foo)}</> are considered to be different types when
+      type checking is done. If equivalence of pointer and array types
+      is desired, it may be explicitly coerced using
+      <function>sb-alien:cast</>.
+    </para>
+    <para>
+      Arrays are accessed using <function>sb-alien:deref</>, passing
+      the indices as additional arguments.  Elements are stored in
+      column-major order (as in C), so the first dimension determines
+      only the size of the memory block, and not the layout of the
+      higher dimensions.  An array whose first dimension is variable
+      may be specified by using <literal>nil</> as the first dimension.
+      Fixed-size arrays can be allocated as array elements, structure
+      slots or <function>sb-alien:with-alien</> variables. Dynamic
+      arrays can only be allocated using <function>sb-alien:make-alien</>.
+    </para>
+  </listitem>
+  <listitem>
+    <para>
+      The foreign type specifier
+      <type>(sb-alien:struct name &amp;rest fields)</>
+      describes a structure type with the specified <varname>name</> and
+      <varname>fields</>. Fields are allocated at the same offsets
+      used by the implementation's C compiler. If <varname>name</>
+      is <literal>nil</> then the structure is anonymous.
+    </para>  
+    <para>
+      If a named foreign <type>struct</> specifier is passed to
+      <function>define-alien-type</> or <function>with-alien</>,
+      then this defines, respectively, a new global or local foreign
+      structure type.  If no <varname>fields</> are specified, then
+      the fields are taken from the current (local or global) Alien
+      structure type definition of <varname>name</>.
+    </para>
+  </listitem>
+  <listitem>
+    <para>
+      The foreign type specifier
+      <type>(sb-alien:union name &amp;rest fields)</>
+      is similar to <type>sb-alien:struct</>, but describes a union type.
+      All fields are allocated at the same offset, and the size of the
+      union is the size of the largest field.  The programmer must
+      determine which field is active from context.
+    </para>
+  </listitem>
+  <listitem>
+    <para>
+      The foreign type specifier <type>(sb-alien:enum name &amp;rest specs)</>
+      describes an enumeration type that maps between integer values
+      and keywords. If <varname>name</> is <literal>nil</>, then the
+      type is anonymous.  Each element of the <varname>specs</>
+      list is either a Lisp keyword, or a list <literal>(keyword value)</>.
+      <varname>value</> is an integer. If <varname>value</> is not
+      supplied, then it defaults to one greater than the value for
+      the preceding spec (or to zero if it is the first spec.)
+    <para>
+  </listitem>
+  <listitem>
+    <para>
+      The foreign type specifier <type>(sb-alien:signed &amp;optional bits)</>
+      specifies a signed integer with the specified number of
+      <varname>bits</> precision. The upper limit on integer
+      precision is determined by the machine's word
+      size. If <varname>bits</> is not specified, the maximum
+      size will be used.
+    </para>
+  </listitem>
+  <listitem>
+    <para>
+      The foreign type specifier <type>(integer &amp;optional bits)</> is 
+      equivalent to the corresponding type specifier using 
+      <type>sb-alien:signed</> instead of <type>integer</>.
+    </para>
+  </listitem>
+  <listitem>
+    <para>
+      The foreign type specifier
+      <type>(sb-alien:unsigned &amp;optional bits)</>
+      is like corresponding type specifier using <type>sb-alien:signed</>
+      except that the variable is treated as an unsigned integer.
+    </para>
+  </listitem>
+  <listitem>
+    <para>
+      The foreign type specifier <type>(boolean &amp;optional bits)</> is
+      similar to an enumeration type, but maps from Lisp <literal>nil</>
+      and <literal>t</> to C <literal>0</> and <literal>1</>
+      respectively. <varname>bits</> determines the amount of
+      storage allocated to hold the truth value.
+    </para>
+  </listitem>
+  <listitem>
+    <para>
+      The foreign type specifier <type>single-float</> describes a 
+      floating-point number in IEEE single-precision format.
+    </para>
+  </listitem>
+  <listitem>
+    <para>
+      The foreign type specifier <type>double-float</> describes a 
+      floating-point number in IEEE double-precision format.
+    </para>
+  </listitem>
+  <listitem>
+    <para>
+      The foreign type specifier
+      <type>(function result-type &amp;rest arg-types)</>
+      describes a foreign function that takes arguments of the specified
+      <varname>arg-types</> and returns a result of type <type>result-type</>.
+      Note that the only context where a foreign <type>function</> type
+      is directly specified is in the argument to
+      <function>sb-alien:alien-funcall</>.
+      In all other contexts, foreign functions are represented by
+      foreign function pointer types: <type>(* (function ...))</>.
+    </para>
+  </listitem>
+  <listitem>
+    <para>
+      The foreign type specifier <type>sb-alien:system-area-pointer</>
+      describes a pointer which is represented in Lisp as a
+      <type>system-area-pointer</> object. &SBCL; exports this type from
+      <literal>sb-alien</> because &CMUCL; did, but tentatively (as of
+      the first draft of this section of the manual, 2002-07-04) it is
+      deprecated, since it doesn't seem to be required by user code.
+    </para>
+  </listitem>
+  <listitem>
+    <para>
+      The foreign type specifier <type>sb-alien:void</> is 
+      used in function types to declare that no useful value
+      is returned.  Using <function>alien-funcall</>
+      to call a <type>void</> foreign function will return
+      zero values.
+    </para>
+  </listitem>
+  <listitem>
+    <para>
+      The foreign type specifier <type>sb-alien:c-string</>
+      is similar to \code{(* char)}, but is interpreted as a
+      null-terminated string, and is automatically converted into a
+      Lisp string when accessed; or if the pointer is C <literal>NULL</>
+      or <literal>0</>, then accessing it gives Lisp <literal>nil</>.
+    </para>  
+    <para>
+      Assigning a Lisp string to a \code{c-string} structure field or
+      variable stores the contents of the string to the memory already
+      pointed to by that variable.  When a foreign object of type
+      <type>(* char)</> is assigned to a <type>c-string</>, then the
+      <type>c-string</> pointer is assigned to.  This allows
+      <type>c-string</> pointers to be initialized.  For example:
+      <programlisting>
+        (cl:in-package "CL-USER") ; which USEs package "SB-ALIEN"
+        (define-alien-type nil (struct foo (str c-string)))
+        (defun make-foo (str) (let ((my-foo (make-alien (struct foo))))
+        (setf (slot my-foo 'str) (make-alien char (length str))
+              (slot my-foo 'str) str) my-foo))</programlisting>
+      Storing Lisp <literal>NIL</> in a <type>c-string</> writes C
+      <literal>NULL</> to the variable.
+    </para>
+  </listitem>
+  <listitem>
+    <para>
+      <literal>sb-alien</> also exports translations of these C type
+      specifiers as foreign type specifiers:
+        <type>sb-alien:char</>,
+	<type>sb-alien:short</>,
+	<type>sb-alien:int</>,
+	<type>sb-alien:long</>,
+	<type>sb-alien:unsigned-char</>,
+	<type>sb-alien:unsigned-short</>,
+	<type>sb-alien:unsigned-int</>,
+	<type>sb-alien:unsigned-long</>,
+	<type>sb-alien:float</>, and
+	<type>sb-alien:double</>.
+    </para>
+  </listitem>
+
+</itemizedlist>
+
+</sect1>
+
+<sect1><title>Operations On Foreign Values</>
+<!-- AKA "Alien Operations" in the CMU CL manual -->
+
+<para>This section describes how to read foreign values as Lisp
+values, how to coerce foreign values to different kinds of foreign values, and
+how to dynamically allocate and free foreign variables.</para>
+
+<sect2><title>Accessing Foreign Values</>
+
+<synopsis>(sb-alien:deref pointer-or-array &amp;rest indices)</>
+
+<para>The <function>sb-alien:deref</> function returns the value pointed to by
+a foreign pointer, or the value of a foreign array element. When
+dereferencing a pointer, an optional single index can be specified to
+give the equivalent of C pointer arithmetic; this index is scaled by
+the size of the type pointed to. When dereferencing an array, the
+number of indices must be the same as the number of dimensions in the
+array type. <function>deref</> can be set with <function>setf</> to
+assign a new value.</para>
+
+<synopsis>(sb-alien:slot struct-or-union &amp;rest slot-names)</>
+  
+<para>The <function>sb-alien:slot</> function extracts the value of
+the slot named <varname>slot-name</> from a foreign <type>struct</> or
+<type>union</>. If <varname>struct-or-union</> is a pointer to a
+structure or union, then it is automatically dereferenced.
+<function>sb-alien:slot</> can be set with <function>setf</> to assign
+a new value. Note that <varname>slot-name</> is evaluated, and need
+not be a compile-time constant (but only constant slot accesses are
+efficiently compiled.)</para>
+
+</sect2>
+
+<sect2><title>Coercing Foreign Values</>
+
+<synopsis>(sb-alien:addr alien-expr)</>
+  
+<para>
+The <function>sb-alien:addr</> macro
+returns a pointer to the location specified by
+<varname>alien-expr</>, which must be either a foreign variable, a use of
+<function>sb-alien:deref</>, a use of <function>sb-alien:slot</>, or a use of
+<function>sb-alien:extern-alien</>.
+</para>
+
+<synopsis>(sb-alien:cast foreign-value new-type)</>
+  
+<para>The <function>sb-alien:cast</>
+converts <varname>foreign-value</> to a new foreign value with the specified
+<varname>new-type</>. Both types, old and new, must be foreign pointer,
+array or function types.  Note that the resulting Lisp 
+foreign variable object 
+is not <function>eq</> to the
+argument, but it does refer to the same foreign data bits.</para>
+
+<synopsis>(sb-alien:sap-alien sap type)</>
+  
+<para>The <function>sb-alien:sap-alien</> function converts <varname>sap</>
+(a system area pointer) to a foreign value with the specified
+<varname>type</>. <varname>type</> is not evaluated.
+As of 2002-07-04, it looks as though this and other SAP functionality
+may become deprecated, since it shouldn't be needed by user code.
+</para>
+
+<para>The <varname>type</> must be some foreign pointer, array, or
+record type.</para>
+
+<synopsis>(sb-alien:alien-sap foreign-value type)</>
+
+<para>The <function>sb-alien:alien-sap</> function
+returns the SAP which points to \var{alien-value}'s data.
+As of 2002-07-04, it looks as though this and other SAP functionality
+may become deprecated, since it shouldn't be needed by user code.
+</para>
+
+<para>The <varname>foreign-value</> must be of some foreign pointer,
+array, or record type.</para>
+
+</sect2>
+
+<sect2><title>Foreign Dynamic Allocation</>
+
+<para>Lisp code can call the C standard library functions
+<function>malloc</> and <function>free</> to dynamically allocate and
+deallocate foreign variables. The Lisp code shares the same allocator
+with foreign C code, so it's OK for foreign code to call
+<function>free</> on the result of Lisp
+<function>sb-alien:make-alien</>, or for Lisp code to call
+<function>sb-alien:free-alien</> on foreign objects allocated by C
+code.</para>
+
+<synopsis>(sb-alien:make-alien type size)</>
+  
+<para>The <function>sb-alien:make-alien</> macro
+returns a dynamically allocated foreign value of the specified
+<varname>type</> (which is not evaluated.)  The allocated memory is not
+initialized, and may contain arbitrary junk.  If supplied,
+<varname>size</> is an expression to evaluate to compute the size of the
+allocated object.  There are two major cases:
+<itemizedlist>
+  <listitem>
+    <para>When <varname>type</> is a foreign array type, an array of
+    that type is allocated and a pointer to it is returned.  Note that you
+    must use <function>deref</> to change the result to an array before you
+    can use <function>deref</> to read or write elements:
+    <programlisting>
+      (cl:in-package "CL-USER") ; which USEs package "SB-ALIEN"
+      (defvar *foo* (make-alien (array char 10)))
+      (type-of *foo*) => (alien (* (array (signed 8) 10)))
+      (setf (deref (deref foo) 0) 10) => 10</programlisting>
+    If supplied, <varname>size</> is used as the first dimension for the
+    array.</para>
+  </listitem>
+  <listitem>    
+    <para>When <varname>type</> is any other foreign type, then an
+    object for that type is allocated, and a pointer to it is
+    returned.  So <function>(make-alien int)</> returns a <type>(* int)</>.
+    If <varname>size</> is specified, then a block of that many
+    objects is allocated, with the result pointing to the first one.</para>
+  </listitem>
 </itemizedlist>
 </para>
+ 
+<synopsis>(sb-alien:free-alien foreign-value)</>
+
+<para>The <function>sb-alien:free-alien</> function
+frees the storage for <varname>foreign-value</>, 
+which must have been allocated with Lisp <function>make-alien</>
+or C <function>malloc</>.</para>
+
+<para>See also the <function>sb-alien:with-alien</> macro, which
+allocates foreign values on the stack.</para>
+
+</sect1>
+
+<sect1><title>Foreign Variables</>
+<!-- AKA "Alien Variables" in the CMU CL manual -->
+<para>(TO DO: Update corresponding section of &CMUCL; manual.)</para>
+</sect1>
+
+<sect1><title>Foreign Data Structure Example</>
+<!-- AKA "Alien Data Structure Example" in the CMU CL manual -->
+<para>(TO DO: Update corresponding section of &CMUCL; manual.)</para>
+</sect1>
+
+<sect1><title>Loading Unix Object Files</>
+<para>(TO DO: Update corresponding section of &CMUCL; manual.)</para>
+</sect1>
+
+<sect1><title>Foreign Function Calls</>
+<!-- AKA "Alien Function Calls" in the CMU CL manual -->
+<para>(TO DO: Update corresponding section of &CMUCL; manual.)</para>
+</sect1>
+
+<sect1><title>Step-by-Step Example of the Foreign Function Interface</>
+<!-- AKA "Step-by-Step Alien Example" in the CMU CL manual -->
+<para>(TO DO: Update corresponding section of &CMUCL; manual.)</para>
+</sect1>
 
 </chapter>
