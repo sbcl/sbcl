@@ -88,6 +88,20 @@
                               ;2~%~
                               ;3x"))))
 
+;;; bug 141b: not enough care taken to disambiguate ,.FOO and ,@FOO
+;;; from , .FOO and , @FOO
+(assert (equal
+	 (with-output-to-string (s)
+	   (write '`(,  .foo) :stream s :pretty t :readably t))
+	 "`(, .FOO)"))
+(assert (equal
+	 (with-output-to-string (s)
+	   (write '`(,  @foo) :stream s :pretty t :readably t))
+	 "`(, @FOO)"))
+(assert (equal
+	 (with-output-to-string (s)
+	   (write '`(,  ?foo) :stream s :pretty t :readably t))
+	 "`(,?FOO)"))
 
 ;;; success
 (quit :unix-status 104)

@@ -464,12 +464,6 @@ WORKAROUND:
     * '``(FOO ,@',@S)
     ``(FOO SB-IMPL::BACKQ-COMMA-AT S)
 
-  b.
-    * (write '`(, .ala.) :readably t :pretty t)
-    `(,.ALA.)
-
-  (note the space between the comma and the point)
-
 143:
   (reported by Jesse Bouwman 2001-10-24 through the unfortunately
   prominent SourceForge web/db bug tracking system, which is 

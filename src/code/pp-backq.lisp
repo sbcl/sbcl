@@ -78,7 +78,18 @@
      (princ ",@" stream))
     (backq-comma-dot
      (princ ",." stream)))
-  (write (cadr form) :stream stream))
+  ;; Ha!  an example of where the per-process specials for stream
+  ;; attributes rather than per-stream actually makes life easier.
+  ;; Since all of the attributes are shared in the dynamic state, we
+  ;; can do... -- CSR, 2003-09-30
+  (let ((output (with-output-to-string (s)
+		  (write (cadr form) :stream s))))
+    (unless (= (length output) 0)
+      (when (and (eql (car form) 'backq-comma)
+		 (or (char= (char output 0) #\.)
+		     (char= (char output 0) #\@)))
+	(write-char #\Space stream))
+      (write-sequence output stream))))
 
 ;;; This is called by !PPRINT-COLD-INIT, fairly late, because
 ;;; SET-PPRINT-DISPATCH doesn't work until the compiler works.

@@ -263,6 +263,10 @@ struct thread *find_thread_by_pid(pid_t pid)
     return 0;
 }
 
+/* These are not needed unless #+SB-THREAD, and since sigwaitinfo()
+ * doesn't seem to be easily available everywhere (OpenBSD...) it's
+ * more trouble than it's worth to compile it when not needed. */
+#if defined LISP_FEATURE_SB_THREAD
 void block_sigcont(void)
 {
     /* don't allow ourselves to receive SIGCONT while we're in the
@@ -274,10 +278,6 @@ void block_sigcont(void)
     sigprocmask(SIG_BLOCK, &newset, 0); 
 }
 
-/* This is not needed unless #+SB-THREAD, and since sigwaitinfo()
- * doesn't seem to be easily available everywhere (OpenBSD...) it's
- * more trouble than it's worth to compile it when not needed. */
-#if defined LISP_FEATURE_SB_THREAD
 void unblock_sigcont_and_sleep(void)
 {
     sigset_t set;
