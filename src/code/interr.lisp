@@ -103,21 +103,6 @@
 	 :datum object
 	 :expected-type 'simple-string))
 
-(deferr object-not-simple-base-string-error (object)
-  (error 'type-error
-	 :datum object
-	 :expected-type 'simple-base-string))
-
-(deferr object-not-simple-bit-vector-error (object)
-  (error 'type-error
-	 :datum object
-	 :expected-type 'simple-bit-vector))
-
-(deferr object-not-simple-vector-error (object)
-  (error 'type-error
-	 :datum object
-	 :expected-type 'simple-vector))
-
 (deferr object-not-fixnum-error (object)
   (error 'type-error
 	 :datum object
@@ -286,81 +271,23 @@
 	 :datum object
 	 :expected-type '(unsigned-byte 32)))
 
-(deferr object-not-simple-array-nil-error (object)
-  (error 'type-error
-	 :datum object
-	 :expected-type '(simple-array nil (*))))
-
-(deferr object-not-simple-array-unsigned-byte-2-error (object)
-  (error 'type-error
-	 :datum object
-	 :expected-type '(simple-array (unsigned-byte 2) (*))))
-
-(deferr object-not-simple-array-unsigned-byte-4-error (object)
-  (error 'type-error
-	 :datum object
-	 :expected-type '(simple-array (unsigned-byte 4) (*))))
-
-(deferr object-not-simple-array-unsigned-byte-8-error (object)
-  (error 'type-error
-	 :datum object
-	 :expected-type '(simple-array (unsigned-byte 8) (*))))
-
-(deferr object-not-simple-array-unsigned-byte-16-error (object)
-  (error 'type-error
-	 :datum object
-	 :expected-type '(simple-array (unsigned-byte 16) (*))))
-
-(deferr object-not-simple-array-unsigned-byte-32-error (object)
-  (error 'type-error
-	 :datum object
-	 :expected-type '(simple-array (unsigned-byte 32) (*))))
-
-(deferr object-not-simple-array-signed-byte-8-error (object)
-  (error 'type-error
-	 :datum object
-	 :expected-type '(simple-array (signed-byte 8) (*))))
-
-(deferr object-not-simple-array-signed-byte-16-error (object)
-  (error 'type-error
-	 :datum object
-	 :expected-type '(simple-array (signed-byte 16) (*))))
-
-(deferr object-not-simple-array-signed-byte-30-error (object)
-  (error 'type-error
-	 :datum object
-	 :expected-type '(simple-array (signed-byte 30) (*))))
-
-(deferr object-not-simple-array-signed-byte-32-error (object)
-  (error 'type-error
-	 :datum object
-	 :expected-type '(simple-array (signed-byte 32) (*))))
-
-(deferr object-not-simple-array-single-float-error (object)
-  (error 'type-error
-	 :datum object
-	 :expected-type '(simple-array single-float (*))))
-
-(deferr object-not-simple-array-double-float-error (object)
-  (error 'type-error
-	 :datum object
-	 :expected-type '(simple-array double-float (*))))
-
-(deferr object-not-simple-array-complex-single-float-error (object)
-  (error 'type-error
-	 :datum object
-	 :expected-type '(simple-array (complex single-float) (*))))
-
-(deferr object-not-simple-array-complex-double-float-error (object)
-  (error 'type-error
-	 :datum object
-	 :expected-type '(simple-array (complex double-float) (*))))
-
-#!+long-float
-(deferr object-not-simple-array-complex-long-float-error (object)
-  (error 'type-error
-	 :datum object
-	 :expected-type '(simple-array (complex long-float) (*))))
+(macrolet
+    ((define-simple-array-internal-errors ()
+	 `(progn
+	   ,@(map 'list
+		  (lambda (saetp)
+		    `(deferr ,(symbolicate
+			       "OBJECT-NOT-"
+			       (sb!vm:saetp-primitive-type-name saetp)
+			       "-ERROR")
+		              (object)
+		      (error 'type-error
+		             :datum object
+		             :expected-type `(simple-array
+					      ,(sb!vm:saetp-specifier saetp)
+					      (*)))))
+		  sb!vm:*specialized-array-element-type-properties*))))
+  (define-simple-array-internal-errors))
 
 (deferr object-not-complex-error (object)
   (error 'type-error
