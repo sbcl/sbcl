@@ -615,6 +615,14 @@
   (disp :field (byte 16 8))
   (level :field (byte 8 24)))
 
+(sb!disassem:define-instruction-format (prefetch 24
+						 :default-printer
+						 '(:name ", " reg/mem))
+  (prefix :field (byte 8 0) :value #b00001111)
+  (op :field (byte 8 8) :value #b00011000)
+  (reg/mem :fields (list (byte 2 22) (byte 3 16)) :type 'byte-reg/mem)
+  (reg :field (byte 3 19) :type 'reg))
+
 ;;; Single byte instruction with an immediate byte argument.
 (sb!disassem:define-instruction-format (byte-imm 16
 				     :default-printer '(:name :tab code))
@@ -1839,6 +1847,43 @@
   (:printer byte ((op #b11001001)))
   (:emitter
    (emit-byte segment #b11001001)))
+
+;;;; prefetch
+(define-instruction prefetchnta (segment ea)
+  (:printer prefetch ((op #b00011000) (reg #b000)))
+  (:emitter
+   (aver (typep ea 'ea))
+   (aver (eq :byte (ea-size ea)))
+   (emit-byte segment #b00001111)
+   (emit-byte segment #b00011000)
+   (emit-ea segment ea #b000)))
+
+(define-instruction prefetcht0 (segment ea)
+  (:printer prefetch ((op #b00011000) (reg #b001)))
+  (:emitter
+   (aver (typep ea 'ea))
+   (aver (eq :byte (ea-size ea)))
+   (emit-byte segment #b00001111)
+   (emit-byte segment #b00011000)
+   (emit-ea segment ea #b001)))
+
+(define-instruction prefetcht1 (segment ea)
+  (:printer prefetch ((op #b00011000) (reg #b010)))
+  (:emitter
+   (aver (typep ea 'ea))
+   (aver (eq :byte (ea-size ea)))
+   (emit-byte segment #b00001111)
+   (emit-byte segment #b00011000)
+   (emit-ea segment ea #b010)))
+
+(define-instruction prefetcht2 (segment ea)
+  (:printer prefetch ((op #b00011000) (reg #b011)))
+  (:emitter
+   (aver (typep ea 'ea))
+   (aver (eq :byte (ea-size ea)))
+   (emit-byte segment #b00001111)
+   (emit-byte segment #b00011000)
+   (emit-ea segment ea #b011)))
 
 ;;;; interrupt instructions
 

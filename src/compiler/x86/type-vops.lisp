@@ -62,6 +62,14 @@
   (unless al-loaded
     (move eax-tn value)
     (inst and al-tn lowtag-mask))
+  ;; FIXME: another 'optimization' which doesn't appear to work:
+  ;; prefetching the hypothetically pointed-to version should help,
+  ;; but this is in fact non-ideal in plenty of ways: we emit way too
+  ;; many of these prefetch instructions; pointed-to objects are very
+  ;; often in the cache anyway; etc. etc.  Still, as proof-of-concept,
+  ;; not too bad.  -- CSR, 2004-07-27
+  (when (member :prefetch *backend-subfeatures*)
+    (inst prefetchnta (make-ea :byte :base value :disp (- lowtag))))
   (inst cmp al-tn lowtag)
   (inst jmp (if not-p :ne :e) target))
   
