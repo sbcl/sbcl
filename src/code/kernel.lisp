@@ -21,23 +21,23 @@
 (defun set-header-data (x val)
   (set-header-data x val))
 
-;;; Return the length of the closure X. This is one more than the
-;;; number of variables closed over.
+;;; the length of the closure X, i.e. one more than the
+;;; number of variables closed over
 (defun get-closure-length (x)
   (get-closure-length x))
 
-;;; Return the three-bit lowtag for the object X.
-(defun get-lowtag (x)
-  (get-lowtag x))
+(defun lowtag-of (x)
+  (lowtag-of x))
 
-;;; Return the 8-bit header type for the object X.
-(defun get-type (x)
-  (get-type x))
+(defun widetag-of (x)
+  (widetag-of x))
 
 ;;; Return a System-Area-Pointer pointing to the data for the vector
 ;;; X, which must be simple.
 ;;;
-;;; FIXME: so it should be SIMPLE-VECTOR-SAP, right?
+;;; FIXME: So it should be SIMPLE-VECTOR-SAP, right? (or UNHAIRY-VECTOR-SAP,
+;;; if the meaning is (SIMPLE-ARRAY * 1) instead of SIMPLE-VECTOR)
+;;; (or maybe SIMPLE-VECTOR-DATA-SAP or UNHAIRY-VECTOR-DATA-SAP?)
 (defun vector-sap (x)
   (declare (type (simple-unboxed-array (*)) x))
   (vector-sap x))

@@ -340,10 +340,6 @@
  ("src/code/late-type")
  ("src/code/deftypes-for-target")
 
-
- ;; REMOVEME: was here until sbcl-0.pre7.74
- #+nil("src/code/target-defstruct" :not-host)
-
  ;; defines IR1-ATTRIBUTES macro, needed by proclaim.lisp
  ("src/compiler/knownfun")
 
@@ -369,7 +365,7 @@
  ;; CHECK-FUN-NAME defined in proclaim.lisp.
  ("src/code/force-delayed-defbangstructs")
 
- ("src/code/typep")
+ ("src/code/typep" :not-host)
 
  ("src/compiler/compiler-error")
 

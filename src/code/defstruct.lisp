@@ -281,17 +281,17 @@
 	     (%slotplace-accessor-funs (slotplace instance-type-check-form)
 	       (/show "macroexpanding %SLOTPLACE-ACCESSOR-FUNS" slotplace instance-type-check-form)
 	       `(values (lambda (instance)
-			  (/show0 "in %SLOTPLACE-ACCESSOR-FUNS-defined reader")
+			  (/noshow0 "in %SLOTPLACE-ACCESSOR-FUNS-defined reader")
 			  ,instance-type-check-form
-			  (/show0 "back from INSTANCE-TYPE-CHECK-FORM")
+			  (/noshow0 "back from INSTANCE-TYPE-CHECK-FORM")
 			  ,slotplace)
 			(let ((typecheckfun (typespec-typecheckfun dsd-type)))
 			  (lambda (new-value instance)
-			    (/show0 "in %SLOTPLACE-ACCESSOR-FUNS-defined writer")
+			    (/noshow0 "in %SLOTPLACE-ACCESSOR-FUNS-defined writer")
 			    ,instance-type-check-form
-			    (/show0 "back from INSTANCE-TYPE-CHECK-FORM")
+			    (/noshow0 "back from INSTANCE-TYPE-CHECK-FORM")
 			    (funcall typecheckfun new-value)
-			    (/show0 "back from TYPECHECKFUN")
+			    (/noshow0 "back from TYPECHECKFUN")
 			    (setf ,slotplace new-value))))))
 
     (let ((dsd-index (dsd-index dsd))
@@ -325,7 +325,9 @@
         |#
 	))))
 
-;;;; REMOVEME: baby steps for the new out-of-line slot accessor functions
+;;;; baby steps for the new out-of-line slot accessor functions
+;;;;
+;;;; REMOVEME after new structure code works
 
 #|
 (in-package :sb-kernel)
@@ -569,7 +571,7 @@
 	    (when (and accessor-name
 		       (not (eq accessor-name '%instance-ref)))
 	      (res `(/show0 "doing one slot, ACCESSOR-NAME=.."))
-	      (res `(/hexstr accessor-name))
+	      (res `(/hexstr ',accessor-name))
 	      (res `(declaim (inline ,accessor-name)))
 	      (res `(/show0 "done with reader DECLAIM INLINE"))
 	      (res `(declaim (ftype (function (,dtype) ,slot-type)

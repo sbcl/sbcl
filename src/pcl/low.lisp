@@ -228,7 +228,8 @@
 	    (:predicate nil)
 	    (:constructor %%allocate-instance--class ())
 	    (:copier nil)
-	    (:alternate-metaclass sb-kernel:instance cl:standard-class
+	    (:alternate-metaclass sb-kernel:instance
+				  cl:standard-class
 				  sb-kernel:make-standard-class))
   (slots nil))
 

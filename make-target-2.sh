@@ -35,6 +35,11 @@ echo //doing warm init
 
         ;; Until PRINT-OBJECT and other machinery is set up,
 	;; we want limits on printing to avoid infinite output.
+	;; (Don't forget to undo these tweaks after the printer
+	;; is set up. It'd be cleaner to use LET to make sure 
+	;; that happens automatically, but LET is implemented
+	;; in terms of the compiler, and the compiler isn't 
+        ;; initialized yet.)
         (setq *print-length* 10)
 	(setq *print-level* 5)
 
@@ -47,7 +52,8 @@ echo //doing warm init
         #-sb-fluid (sb-impl::!unintern-init-only-stuff)
 
         ;; Now that the whole system is built, we don't need to 
-        ;; hobble the printer any more.
+        ;; hobble the printer any more, so we can restore printer 
+	;; control variables to their ANSI defaults.
         (setq *print-length* nil)
 	(setq *print-level* nil)
 

@@ -975,12 +975,12 @@
     (if (functionp object)
 	(or (fun-code-header object)
 	    :undefined-function)
-	(let ((lowtag (get-lowtag object)))
+	(let ((lowtag (lowtag-of object)))
 	  (if (= lowtag sb!vm:other-pointer-lowtag)
-	      (let ((type (get-type object)))
-		(cond ((= type sb!vm:code-header-widetag)
+	      (let ((widetag (widetag-of object)))
+		(cond ((= widetag sb!vm:code-header-widetag)
 		       object)
-		      ((= type sb!vm:return-pc-header-widetag)
+		      ((= widetag sb!vm:return-pc-header-widetag)
 		       (lra-code-header object))
 		      (t
 		       nil))))))))
@@ -1173,7 +1173,7 @@
 ;;; Return a DEBUG-FUN that represents debug information for FUN.
 (defun fun-debug-fun (fun)
   (declare (type function fun))
-  (ecase (get-type fun)
+  (ecase (widetag-of fun)
     (#.sb!vm:closure-header-widetag
      (fun-debug-fun (%closure-fun fun)))
     (#.sb!vm:funcallable-instance-header-widetag
@@ -2547,8 +2547,8 @@
 ;;; this to determine if the value stored is the actual value or an
 ;;; indirection cell.
 (defun indirect-value-cell-p (x)
-  (and (= (get-lowtag x) sb!vm:other-pointer-lowtag)
-       (= (get-type x) sb!vm:value-cell-header-widetag)))
+  (and (= (lowtag-of x) sb!vm:other-pointer-lowtag)
+       (= (widetag-of x) sb!vm:value-cell-header-widetag)))
 
 ;;; Return three values reflecting the validity of DEBUG-VAR's value
 ;;; at BASIC-CODE-LOCATION:

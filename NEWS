@@ -869,15 +869,6 @@ changes in sbcl-0.7.0 relative to sbcl-0.6.13:
   advantage of the new EVAL-WHEN stuff and to clean them up in 
   general, and they are now more ANSI-compliant in a number of
   ways. Martin Atzmueller is responsible for a lot of this.
-?? Inlining can now be controlled the ANSI way, without
-  MAYBE-INLINE, since the idiom
-	(DECLAIM (INLINE FOO))
-	(DEFUN FOO (..) ..)
-	(DECLAIM (NOTINLINE FOO))
-	(DEFUN BAR (..) (FOO ..))
-	(DEFUN BLETCH (..) (DECLARE (INLINE FOO)) (FOO ..))
-  now does what ANSI says it should. The CMU-CL-style 
-  SB-EXT:MAYBE-INLINE declaration is now deprecated and ignored.
 * A bug in LOOP operations on hash tables has been fixed, thanks
   to a bug report and patch from Alexey Dejneka.
 * PPRINT-LOGICAL-BLOCK now copies the *PRINT-LINES* value on entry
@@ -908,21 +899,27 @@ changes in sbcl-0.7.0 relative to sbcl-0.6.13:
   a number of bugs which came into existence in the pre7 branch
   (internal to the CVS repository), so that they never showed
   up in release versions.
-?? Old operator names in the style DEF-FOO are now deprecated in favor
-  of new corresponding names DEFINE-FOO, for consistency with the
-  naming convention used in the ANSI standard). This mostly affects
-  internal symbols, but a few external symbols like
-  SB-ALIEN:DEF-ALIEN-FUNCTION are also affected.
 * :SB-CONSTRAIN-FLOAT-TYPE, :SB-PROPAGATE-FLOAT-TYPE, and
   :SB-PROPAGATE-FUN-TYPE are no longer considered to be optional
   features. Instead, the code that they used to control is always
   built into the system.
-?? The value of INTERNAL-TIME-UNITS-PER-SECOND has been increased
-  from 100 to 1000.
-* The default value of *BYTES-CONSED-BETWEEN-GCS* has been 
-  doubled, to 4 million. (If your application spends a lot of time
-  GCing and you have a lot of RAM, you might want to experiment with
-  increasing it even more.)
+?? minor incompatible change: The debugger prompt sequence now goes
+  "5]", "5[2]", "5[3]", etc. as you get deeper into recursive calls
+  to the debugger command loop, instead of the old "5]", "5]]",
+  "5]]]" sequence. (I was motivated to do this when squabbles between
+  ILISP and SBCL left me very deeply nested in the debugger. In the
+  short term, this change will probably provoke more ILISP/SBCL 
+  squabbles, but hopefully it will be an improvement in the long run.)
+?? minor incompatible change: The default output representation for
+  unprintable ASCII characters which, unlike e.g. #\Newline, don't
+  have names defined in the ANSI Common Lisp standard, is now based
+  on their ASCII symbolic names: #\Nul, #\Soh, #\Stx, etc.
+?? Old operator names in the style DEF-FOO are now deprecated in
+  favor of new corresponding names DEFINE-FOO, for consistency with
+  the naming convention used in the ANSI standard (DEFSTRUCT, DEFVAR,
+  DEFINE-CONDITION, DEFINE-MODIFY-MACRO..). This mostly affects
+  internal symbols, but a few external symbols like
+  SB-ALIEN:DEF-ALIEN-FUNCTION are also affected.
 * minor incompatible change: DEFINE-ALIEN-FUNCTION (also known by 
   the old deprecated name DEF-ALIEN-FUNCTION) now does DECLAIM FTYPE
   for the defined function, since declaiming return types involving
@@ -930,6 +927,12 @@ changes in sbcl-0.7.0 relative to sbcl-0.6.13:
   to efficient compilation of code which calls such functions (and
   since people writing calls-to-C code aren't likely to be bothered
   by implicit assumptions of static typing).
+* The value of INTERNAL-TIME-UNITS-PER-SECOND has been increased
+  from 100 to 1000.
+* The default value of *BYTES-CONSED-BETWEEN-GCS* has been 
+  doubled, to 4 million. (If your application spends a lot of time
+  GCing and you have a lot of RAM, you might want to experiment with
+  increasing it even more.)
 * The interpreter, EVAL, has been rewritten. Now it calls the
   native compiler for the difficult cases, where it used to call
   the old specialized IR1 interpreter code. 
@@ -943,31 +946,22 @@ changes in sbcl-0.7.0 relative to sbcl-0.6.13:
   are more systematic and consistent, converting C macros to inline
   functions, systematizing indentation, making symbol packaging
   more logical, and so forth
-* The fasl file version number changed again, for about a dozen
-  reasons, some of which are apparent above.
+* The fasl file version number changed again, for dozens of reasons,
+  some of which are apparent above.
 
 planned incompatible changes in 0.7.x:
-* The debugger prompt sequence now goes "5]", "5[2]", "5[3]", etc.
-  as you get deeper into recursive calls to the debugger command loop,
-  instead of the old "5]", "5]]", "5]]]" sequence. (I was motivated
-  to do this when squabbles between ILISP and SBCL left me
-  very deeply nested in the debugger.)
-* The default output representation for unprintable ASCII characters 
-  which, unlike e.g. #\Newline, don't have names defined in the 
-  ANSI Common Lisp standard, may change to their ASCII symbolic
-  names: #\Nul, #\Soh, #\Stx, etc.
-* INTERNAL-TIME-UNITS-PER-SECOND might increase, e.g. to 1000.
-* FASL file extensions change to ".fasl", instead of the various
-  CPU-dependent values (".x86f", ".axpf", etc.) inherited from CMU CL.
-* MAYBE-INLINE will probably go away at some point, maybe 0.7.x,
-  maybe later, in favor of the ANSI-recommended idiom for making
-  a function optionally inline.
 * When the profiling interface settles down, maybe in 0.7.x, maybe
   later, it might impact TRACE. They both encapsulate functions, and
   it's not clear yet how e.g. UNPROFILE will interact with TRACE
   and UNTRACE. (This shouldn't matter, though, unless you are
   using profiling. If you never profile anything, TRACE should
   continue to behave as before.)
-* The BYTE-COMPILE &KEY argument for COMPILE-FILE is deprecated,
-  since this behavior can be controlled by (DECLAIM (OPTIMIZE (SPEED 0))).
-  ("An ounce of orthogonality is worth a pound of features.")
+?? Inlining can now be controlled the ANSI way, without
+  MAYBE-INLINE, since the idiom
+	(DECLAIM (INLINE FOO))
+	(DEFUN FOO (..) ..)
+	(DECLAIM (NOTINLINE FOO))
+	(DEFUN BAR (..) (FOO ..))
+	(DEFUN BLETCH (..) (DECLARE (INLINE FOO)) (FOO ..))
+  now does what ANSI says it should. The CMU-CL-style 
+  SB-EXT:MAYBE-INLINE declaration is now deprecated and ignored.

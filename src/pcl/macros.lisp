@@ -23,8 +23,10 @@
 ;;;; This software is made available AS IS, and Xerox Corporation makes no
 ;;;; warranty about the software, its performance or its conformity to any
 ;;;; specification.
-
+
 (in-package "SB-PCL")
+
+(/show "starting pcl/macros.lisp")
 
 (declaim (declaration
 	  ;; These three nonstandard declarations seem to be used
@@ -37,44 +39,99 @@
 	  ;; information around, I'm not sure. -- WHN 2000-12-30
 	  %variable-rebinding))
 
+(/show "done with DECLAIM DECLARATION")
+
 ;;; FIXME: This looks like SBCL's PARSE-BODY, and should be shared.
 (eval-when (:compile-toplevel :load-toplevel :execute)
+
+;;; REMOVEME after fixing print-the-CONDITION (?) bug
+(progn
+  (/show *print-circle*)
+
+  (/show (sb-kernel:lowtag-of *package*))
+  (/show (sb-kernel:widetag-of *package*))
+  (let ((*print-length* 32))
+    (/show (sb-kernel:layout-of *package*)))
+  (/show "about to TYPEP *package* 'cl:class")
+  (/show (typep *package* 'cl:class))
+  (/show "about to SPECIFIER-TYPE 'SB-KERNEL:INSTANCE")
+  (let ((ctype (sb-kernel:specifier-type 'sb-kernel:instance)))
+    (/show "about to CLASS-TYPEP")
+    (/show (sb-kernel:class-typep (sb-kernel:layout-of *package*) ctype *package*))
+    (/show "about to %%TYPEP *PACKAGE* (SPECIFIER-TYPE 'SB-KERNEL:INSTANCE)")
+    (/show (sb-kernel::%%typep *package* ctype)))
+  (/show "about to TYPEP *PACKAGE* 'SB-KERNEL:INSTANCE")
+  (/show (typep *package* 'sb-kernel:instance))
+  (/show "about to TYPEP *package* '(ARRAY T *)")
+  (/show (typep *package* '(array t *)))
+
+  (let (;; a warning similar to the one constructed in WARN
+	(w (sb-kernel::coerce-to-condition "foowarningmessage"
+					   nil
+					   'sb-kernel::simple-warning
+					   'warn)))
+    (/show (sb-kernel:lowtag-of w))
+    (/show (sb-kernel:widetag-of w))
+    (/show "about to LAYOUT-OF W")
+    (let ((*print-length* 32))
+      (/show (sb-kernel:layout-of w)))
+    (/show "about to TYPEP W 'CL:CLASS")
+    (/show (typep w 'cl:class))
+    (/show "about to SPECIFIER-TYPE 'SB-KERNEL:INSTANCE")
+    (let ((ctype (sb-kernel:specifier-type 'sb-kernel:instance)))
+      (/show "about to CLASS-TYPEP")
+      (/show (sb-kernel:class-typep (sb-kernel:layout-of w) ctype w))
+      (/show "about to %%TYPEP W (SPECIFIER-TYPE 'SB-KERNEL:INSTANCE)")
+      (/show (sb-kernel::%%typep w ctype)))
+    (/show "about to TYPEP W 'SB-KERNEL:INSTANCE")
+    (/show (typep w 'sb-kernel:instance))
+    (/show "about to TYPEP W '(ARRAY T *)")
+    (/show (typep w '(array t *))))
+  (/show "about to MAKE-HASH-TABLE")
+  (when (plusp (hash-table-count (make-hash-table)))
+    (/show "oops! can't happen"))
+  (/show "back from MAKE-HASH-TABLE"))
+
 (defun extract-declarations (body &optional environment)
   ;;(declare (values documentation declarations body))
   (let (documentation
-	declarations
-	form)
+        declarations
+        form)
     (when (and (stringp (car body))
-	       (cdr body))
+               (cdr body))
       (setq documentation (pop body)))
     (block outer
       (loop
-	(when (null body) (return-from outer nil))
-	(setq form (car body))
-	(when (block inner
-		(loop (cond ((not (listp form))
-			     (return-from outer nil))
-			    ((eq (car form) 'declare)
-			     (return-from inner t))
-			    (t
-			     (multiple-value-bind (newform macrop)
-				  (macroexpand-1 form environment)
-			       (if (or (not (eq newform form)) macrop)
-				   (setq form newform)
-				 (return-from outer nil)))))))
-	  (pop body)
-	  (dolist (declaration (cdr form))
-	    (push declaration declarations)))))
+        (when (null body) (return-from outer nil))
+        (setq form (car body))
+        (when (block inner
+                (loop (cond ((not (listp form))
+                             (return-from outer nil))
+                            ((eq (car form) 'declare)
+                             (return-from inner t))
+                            (t
+                             (multiple-value-bind (newform macrop)
+                                  (macroexpand-1 form environment)
+                               (if (or (not (eq newform form)) macrop)
+                                   (setq form newform)
+                                 (return-from outer nil)))))))
+          (pop body)
+          (dolist (declaration (cdr form))
+            (push declaration declarations)))))
     (values documentation
-	    (and declarations `((declare ,.(nreverse declarations))))
-	    body)))
+            (and declarations `((declare ,.(nreverse declarations))))
+            body)))
 ) ; EVAL-WHEN
+
+(/show "done with EVAL-WHEN (..) DEFUN EXTRACT-DECLARATIONS")
 
 (defun get-declaration (name declarations &optional default)
   (dolist (d declarations default)
     (dolist (form (cdr d))
       (when (and (consp form) (eq (car form) name))
 	(return-from get-declaration (cdr form))))))
+
+(/show "pcl/macros.lisp 85")
 
 (defmacro collecting-once (&key initial-value)
    `(let* ((head ,initial-value)
@@ -86,6 +143,8 @@
 				 (setq tail
 				       (cdr (rplacd tail (list value)))))))
 		  #'(lambda nil head))))
+
+(/show "pcl/macros.lisp 98")
 
 (defmacro doplist ((key val) plist &body body &environment env)
   (multiple-value-bind (doc decls bod)
@@ -99,6 +158,8 @@
 	       (error "malformed plist, odd number of elements"))
 	     (setq ,val (pop .plist-tail.))
 	     (progn ,@bod)))))
+
+(/show "pcl/macros.lisp 113")
 
 (defmacro dolist-carefully ((var list improper-list-handler) &body body)
   `(let ((,var nil)
@@ -115,6 +176,8 @@
 ;;;; This is documented in the CLOS specification. FIXME: Except that
 ;;;; SBCL deviates from the spec by having CL:FIND-CLASS distinct from
 ;;;; PCL:FIND-CLASS, alas.
+
+(/show "pcl/macros.lisp 132")
 
 (defvar *find-class* (make-hash-table :test 'eq))
 
@@ -137,6 +200,8 @@
 	(unless (legal-class-name-p symbol)
 	  (error "~S is not a legal class name." symbol))
 	(setf (gethash symbol *find-class*) (make-find-class-cell symbol)))))
+
+(/show "pcl/macros.lisp 157")
 
 (defvar *create-classes-from-internal-structure-definitions-p* t)
 
@@ -180,6 +245,8 @@
 ;;;   (DECLAIM (TYPE (MEMBER NIL :EARLY :BRAID :COMPLETE) *BOOT-STATE*))
 (defvar *boot-state* nil)
 
+(/show "pcl/macros.lisp 199")
+
 ;;; Note that in SBCL as in CMU CL,
 ;;;   COMMON-LISP:FIND-CLASS /= SB-PCL:FIND-CLASS.
 ;;; (Yes, this is a KLUDGE!)
@@ -221,6 +288,8 @@
 	new-value)
       (error "~S is not a legal class name." symbol)))
 
+(/show "pcl/macros.lisp 242")
+
 (defun (setf find-class-predicate)
        (new-value symbol)
   (if (legal-class-name-p symbol)
@@ -248,6 +317,8 @@
 		       value)))
 	     #'(lambda () result))))
 
+(/show "pcl/macros.lisp 271")
+
 ;;; These are augmented definitions of LIST-ELEMENTS and LIST-TAILS from
 ;;; iterate.lisp. These versions provide the extra :BY keyword which can
 ;;; be used to specify the step function through the list.
@@ -272,9 +343,12 @@
 
 (defmacro function-apply (form &rest args)
   `(apply (the function ,form) ,@args))
-
 
+(/show "pcl/macros.lisp 299")
+
 (defun get-setf-fun-name (name)
   `(setf ,name))
 
 (defsetf slot-value set-slot-value)
+
+(/show "finished with pcl/macros.lisp")

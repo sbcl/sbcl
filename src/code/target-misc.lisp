@@ -17,7 +17,7 @@
 ;;; cobbled from stuff in describe.lisp.
 (defun function-doc (x)
   (let ((name
-	 (case (get-type x)
+	 (case (widetag-of x)
 	   (#.sb!vm:closure-header-widetag
 	    (%simple-fun-name (%closure-fun x)))
 	   ((#.sb!vm:simple-fun-header-widetag

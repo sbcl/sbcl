@@ -489,7 +489,7 @@
 (defun array-element-type (array)
   #!+sb-doc
   "Return the type of the elements of the array"
-  (let ((type (get-type array)))
+  (let ((widetag (widetag-of array)))
     (macrolet ((pick-element-type (&rest stuff)
 		 `(cond ,@(mapcar #'(lambda (stuff)
 				      (cons
@@ -498,11 +498,11 @@
 						t)
 					       ((listp item)
 						(cons 'or
-						      (mapcar #'(lambda (x)
-								  `(= type ,x))
+						      (mapcar (lambda (x)
+								`(= widetag ,x))
 							      item)))
 					       (t
-						`(= type ,item))))
+						`(= widetag ,item))))
 				       (cdr stuff)))
 						   stuff))))
       ;; FIXME: The data here are redundant with

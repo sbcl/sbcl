@@ -194,7 +194,7 @@
     (:macro (format s "Macro-function: ~S" x))
     (:function (format s "Function: ~S" x))
     ((nil) (format s "~S is a function." x)))
-  (case (get-type x)
+  (case (widetag-of x)
     (#.sb-vm:closure-header-widetag
      (%describe-function-compiled (%closure-fun x) s kind name)
      (format s "~@:_Its closure environment is:")
