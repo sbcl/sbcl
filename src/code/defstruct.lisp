@@ -69,10 +69,9 @@
   ;; the arguments to the :INCLUDE option, or NIL if no included
   ;; structure
   (include nil :type list)
-  ;; The arguments to the :ALTERNATE-METACLASS option (an extension
-  ;; used to define structure-like objects with an arbitrary
-  ;; superclass and that may not have STRUCTURE-CLASS as the
-  ;; metaclass.) Syntax is:
+  ;; properties used to define structure-like classes with an
+  ;; arbitrary superclass and that may not have STRUCTURE-CLASS as the
+  ;; metaclass. Syntax is:
   ;;    (superclass-name metaclass-name metaclass-constructor)
   (alternate-metaclass nil :type list)
   ;; a list of DEFSTRUCT-SLOT-DESCRIPTION objects for all slots
@@ -305,11 +304,6 @@
 	(structure
 	 #+sb-xc (/show0 "case of DSD-TYPE = STRUCTURE")
 	 (%native-slot-accessor-funs %instance-ref))
-	#| ; now moved to DEFSTRUCT-WITH-ALTERNATE-METACLASS
-	(funcallable-structure
-	 #+sb-xc (/show0 "case of DSD-TYPE = FUNCALLABLE-STRUCTURE")
-	 (%native-slot-accessor-funs %funcallable-instance-info))
-        |#
 				     
 	;; structures with the :TYPE option
 
@@ -735,8 +729,6 @@
 	   (error "can't :INCLUDE class ~S (has alternate metaclass)"
 		  included-class-name)))
        (setf (dd-include dd) args))
-      (:alternate-metaclass
-       (setf (dd-alternate-metaclass dd) args))
       (:print-function
        (require-no-print-options-so-far dd)
        (setf (dd-print-function dd)
@@ -1681,7 +1673,7 @@
 			 ;; The index starts at 1 for ordinary
 			 ;; named slots because slot 0 is
 			 ;; magical, used for LAYOUT in
-			 ;; CONDITIONS or for something (?) in
+			 ;; CONDITIONs or for something (?) in
 			 ;; funcallable instances.
 			 (index 1))
 		     (dolist (slot-name slot-names)

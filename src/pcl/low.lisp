@@ -38,7 +38,8 @@
 (in-package "SB-PCL")
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
-(defvar *optimize-speed* '(optimize (speed 3) (safety 0)))
+(defvar *optimize-speed*
+  '(optimize (speed 3) (safety 0)))
 ) ; EVAL-WHEN
 
 (defmacro dotimes-fixnum ((var count &optional (result nil)) &body body)
@@ -46,25 +47,34 @@
      (declare (fixnum ,var))
      ,@body))
 
+;;;; early definition of WRAPPER
+;;;;
+;;;; Most WRAPPER stuff is defined later, but the DEFSTRUCT itself
+;;;; is here early so that things like (TYPEP .. 'WRAPPER) can be
+;;;; compiled efficiently.
+
+;;; Note that for SBCL, as for CMU CL, the WRAPPER of a built-in or
+;;; structure class will be some other kind of SB-KERNEL:LAYOUT, but
+;;; this shouldn't matter, since the only two slots that WRAPPER adds
+;;; are meaningless in those cases.
+(defstruct (wrapper
+	    (:include sb-kernel:layout
+		      ;; KLUDGE: In CMU CL, the initialization default
+		      ;; for LAYOUT-INVALID was NIL. In SBCL, that has
+		      ;; changed to :UNINITIALIZED, but PCL code might
+		      ;; still expect NIL for the initialization
+		      ;; default of WRAPPER-INVALID. Instead of trying
+		      ;; to find out, I just overrode the LAYOUT
+		      ;; default here. -- WHN 19991204
+		      (invalid nil))
+	    (:conc-name %wrapper-)
+	    (:constructor make-wrapper-internal)
+	    (:copier nil))
+  (instance-slots-layout nil :type list)
+  (class-slots nil :type list))
+#-sb-fluid (declaim (sb-ext:freeze-type wrapper))
+
 ;;;; PCL's view of funcallable instances
-
-;;; REMOVEME: old CMU-CL-style code
-#| 
-(defstruct (pcl-funcallable-instance
-	    (:alternate-metaclass sb-kernel:funcallable-instance
-				  sb-kernel:random-pcl-class
-				  sb-kernel:make-random-pcl-class)
-	    (:type sb-kernel:funcallable-structure)
-	    (:constructor allocate-funcallable-instance-1 ())
-	    (:copier nil)
-	    (:conc-name nil))
-  ;; Note: The PCL wrapper is in the layout slot.
-
-  ;; PCL data vector.
-  (pcl-funcallable-instance-slots nil)
-  ;; The debug-name for this function.
-  (funcallable-instance-name nil))
-|#
 
 (sb-kernel:!defstruct-with-alternate-metaclass pcl-funcallable-instance
   ;; KLUDGE: Note that neither of these slots is ever accessed by its
@@ -243,9 +253,11 @@
 (defun pcl-instance-p (x)
   (typep (sb-kernel:layout-of x) 'wrapper))
 
-;;; We define this as STANDARD-INSTANCE, since we're going to clobber
-;;; the layout with some STANDARD-INSTANCE layout as soon as we make
-;;; it, and we want the accessor to still be type-correct.
+;;; CMU CL comment:
+;;;   We define this as STANDARD-INSTANCE, since we're going to
+;;;   clobber the layout with some standard-instance layout as soon as
+;;;   we make it, and we want the accessor to still be type-correct.
+#|
 (defstruct (standard-instance
 	    (:predicate nil)
 	    (:constructor %%allocate-instance--class ())
@@ -254,6 +266,15 @@
 				  cl:standard-class
 				  sb-kernel:make-standard-class))
   (slots nil))
+|#
+(sb-kernel:!defstruct-with-alternate-metaclass standard-instance
+  :slot-names (slots)
+  :boa-constructor %make-standard-instance
+  :superclass-name sb-kernel:instance
+  :metaclass-name cl:standard-class
+  :metaclass-constructor sb-kernel:make-standard-class
+  :dd-type structure
+  :runtime-type-checks-p nil)
 
 ;;; Both of these operations "work" on structures, which allows the above
 ;;; weakening of STD-INSTANCE-P.

@@ -54,21 +54,6 @@
 
 ) ; EVAL-WHEN
 
-;;; REMOVEME
-#|
-(defstruct (condition
-	    (:constructor make-condition-object (actual-initargs))
-	    (:alternate-metaclass instance
-				  condition-class
-				  make-condition-class)
-	    (:copier nil))
-  ;; actual initargs supplied to MAKE-CONDITION
-  (actual-initargs (missing-arg) :type list)
-  ;; a plist mapping slot names to any values that were assigned or
-  ;; defaulted after creation
-  (assigned-slots () :type list))
-|#
-
 (!defstruct-with-alternate-metaclass condition
   :slot-names (actual-initargs assigned-slots)
   :boa-constructor %make-condition-object

@@ -175,12 +175,6 @@
 	     (return-from warn nil)))
 	 (/show0 "back from RESTART-CASE MUFFLE-WARNING (i.e. normal return)")
 
-	 ;; REMOVEME
-	 #!+sb-show
-	 (progn
-	   (/show0 "Let's try just PRINTing the condition before FORMAT..")
-	   (print condition))
-
 	 (let ((badness (etypecase condition
 			  (style-warning 'style-warning)
 			  (warning 'warning))))
