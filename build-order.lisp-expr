@@ -478,6 +478,7 @@
 
  ("src/compiler/target/insts")
  ("src/compiler/target/macros")
+ ("src/compiler/generic/early-type-vops")
 
  ("src/assembly/target/support")
 
@@ -522,7 +523,9 @@
   ;; src/compiler/x86/array for a candidate patch.) -- WHN 19990323
   :ignore-failure-p)
  ("src/compiler/target/pred")
+
  ("src/compiler/target/type-vops")
+ ("src/compiler/generic/late-type-vops")
 
  ("src/assembly/target/assem-rtns" :assem)
  ("src/assembly/target/array"      :assem)

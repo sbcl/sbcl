@@ -13,96 +13,6 @@
 
 ;;;; test generation utilities
 
-(eval-when (:compile-toplevel :execute)
-
-(defparameter *immediate-types*
-  (list unbound-marker-widetag base-char-widetag))
-
-(defparameter *fun-header-widetags*
-  (list funcallable-instance-header-widetag
-	simple-fun-header-widetag
-	closure-fun-header-widetag
-	closure-header-widetag))
-
-(defun canonicalize-headers (headers)
-  (collect ((results))
-    (let ((start nil)
-	  (prev nil)
-	  (delta (- other-immediate-1-lowtag other-immediate-0-lowtag)))
-      (flet ((emit-test ()
-	       (results (if (= start prev)
-			    start
-			    (cons start prev)))))
-	(dolist (header (sort headers #'<))
-	  (cond ((null start)
-		 (setf start header)
-		 (setf prev header))
-		((= header (+ prev delta))
-		 (setf prev header))
-		(t
-		 (emit-test)
-		 (setf start header)
-		 (setf prev header))))
-	(emit-test)))
-    (results)))
-
-) ; EVAL-WHEN
-
-(macrolet ((test-type (value target not-p &rest type-codes)
-  ;; Determine what interesting combinations we need to test for.
-  (let* ((type-codes (mapcar #'eval type-codes))
-	 (fixnump (and (member even-fixnum-lowtag type-codes)
-		       (member odd-fixnum-lowtag type-codes)
-		       t))
-	 (lowtags (remove lowtag-limit type-codes :test #'<))
-	 (extended (remove lowtag-limit type-codes :test #'>))
-	 (immediates (intersection extended *immediate-types* :test #'eql))
-	 (headers (set-difference extended *immediate-types* :test #'eql))
-	 (function-p (if (intersection headers *fun-header-widetags*)
-			 (if (subsetp headers *fun-header-widetags*)
-			     t
-			     (error "can't test for mix of function subtypes ~
-				     and normal header types"))
-			 nil)))
-    (unless type-codes
-      (error "At least one type must be supplied for TEST-TYPE."))
-    (cond
-     (fixnump
-      (when (remove-if (lambda (x)
-			 (or (= x even-fixnum-lowtag)
-			     (= x odd-fixnum-lowtag)))
-		       lowtags)
-	(error "can't mix fixnum testing with other lowtags"))
-      (when function-p
-	(error "can't mix fixnum testing with function subtype testing"))
-      (when immediates
-	(error "can't mix fixnum testing with other immediates"))
-      (if headers
-	  `(%test-fixnum-and-headers ,value ,target ,not-p
-				     ',(canonicalize-headers headers))
-	  `(%test-fixnum ,value ,target ,not-p)))
-     (immediates
-      (when headers
-	(error "can't mix testing of immediates with testing of headers"))
-      (when lowtags
-	(error "can't mix testing of immediates with testing of lowtags"))
-      (when (cdr immediates)
-	(error "can't test multiple immediates at the same time"))
-      `(%test-immediate ,value ,target ,not-p ,(car immediates)))
-     (lowtags
-      (when (cdr lowtags)
-	(error "can't test multiple lowtags at the same time"))
-      (if headers
-	  `(%test-lowtag-and-headers
-	    ,value ,target ,not-p ,(car lowtags)
-	    ,function-p ',(canonicalize-headers headers))
-	  `(%test-lowtag ,value ,target ,not-p ,(car lowtags))))
-     (headers
-      `(%test-headers ,value ,target ,not-p ,function-p
-		      ',(canonicalize-headers headers)))
-     (t
-      (error "nothing to test?"))))))
-
 ;;; Emit the most compact form of the test immediate instruction,
 ;;; using an 8 bit test when the immediate is only 8 bits and the
 ;;; value is one of the four low registers (eax, ebx, ecx, edx) or the
@@ -195,47 +105,6 @@
 		   (inst jmp :be when-true))))))) ; was :le
       (emit-label drop-through))))
 
-;; pw -- based on RISC version. Not sure extra hair is needed yet.
-;; difference is that this one uses SUB which overwrites operand
-;; both cmp and sub take 2 cycles so maybe its a wash
-#+nil
-(defun %test-headers (value target not-p function-p headers
-			    &optional (drop-through (gen-label)) al-loaded)
-  (let ((lowtag (if function-p fun-pointer-lowtag other-pointer-lowtag)))
-    (multiple-value-bind (equal less-or-equal when-true when-false)
-	;; EQUAL and LESS-OR-EQUAL are the conditions for branching to TARGET.
-	;; WHEN-TRUE and WHEN-FALSE are the labels to branch to when we know
-	;; it's true and when we know it's false respectively.
-	(if not-p
-	    (values :ne :a drop-through target)
-	    (values :e :na target drop-through))
-      (%test-lowtag value when-false t lowtag al-loaded)
-      (inst mov al-tn (make-ea :byte :base value :disp (- lowtag)))
-      (let ((delta 0))
-	(do ((remaining headers (cdr remaining)))
-	    ((null remaining))
-	  (let ((header (car remaining))
-		(last (null (cdr remaining))))
-	    (cond
-	      ((atom header)
-	       (inst sub al-tn (- header delta))
-	       (setf delta header)
-	       (if last
-		   (inst jmp equal target)
-		   (inst jmp :e when-true)))
-	      (t
-	       (let ((start (car header))
-		     (end (cdr header)))
-		 (unless (= start bignum-widetag)
-		   (inst sub al-tn (- start delta))
-		   (setf delta start)
-		   (inst jmp :l when-false))
-		 (inst sub al-tn (- end delta))
-		 (setf delta end)
-		 (if last
-		     (inst jmp less-or-equal target)
-		     (inst jmp :le when-true))))))))
-      (emit-label drop-through))))
 
 ;;;; type checking and testing
 
@@ -270,309 +139,34 @@
   (:info target not-p)
   (:policy :fast-safe))
 
-(eval-when (:compile-toplevel :execute)
-
 (defun cost-to-test-types (type-codes)
   (+ (* 2 (length type-codes))
      (if (> (apply #'max type-codes) lowtag-limit) 7 2)))
 
-); EVAL-WHEN
-
-;;; FIXME: DEF-TYPE-VOPS and DEF-SIMPLE-TYPE-VOPS are only used in
-;;; this file, so they should be in the EVAL-WHEN above, or otherwise
-;;; tweaked so that they don't appear in the target system.
-
-(defmacro def-type-vops (pred-name check-name ptype error-code
-				   &rest type-codes)
-  (let ((cost (cost-to-test-types (mapcar #'eval type-codes))))
+(defmacro !define-type-vops (pred-name check-name ptype error-code
+			     (&rest type-codes)
+			     &key (variant nil variant-p) &allow-other-keys)
+  ;; KLUDGE: UGH. Why do we need this eval? Can't we put this in the
+  ;; expansion?
+  (let* ((cost (cost-to-test-types (mapcar #'eval type-codes)))
+	 (prefix (if variant-p
+		     (concatenate 'string (string variant) "-")
+		     "")))
     `(progn
        ,@(when pred-name
-	   `((define-vop (,pred-name type-predicate)
+	   `((define-vop (,pred-name ,(intern (concatenate 'string prefix "TYPE-PREDICATE")))
 	       (:translate ,pred-name)
 	       (:generator ,cost
-		 (test-type value target not-p ,@type-codes)))))
+		 (test-type value target not-p (,@type-codes))))))
        ,@(when check-name
-	   `((define-vop (,check-name check-type)
+	   `((define-vop (,check-name ,(intern (concatenate 'string prefix "CHECK-TYPE")))
 	       (:generator ,cost
 		 (let ((err-lab
 			(generate-error-code vop ,error-code value)))
-		   (test-type value err-lab t ,@type-codes)
+		   (test-type value err-lab t (,@type-codes))
 		   (move result value))))))
        ,@(when ptype
 	   `((primitive-type-vop ,check-name (:check) ,ptype))))))
-
-(defmacro def-simple-type-vops (pred-name check-name ptype error-code
-					  &rest type-codes)
-  (let ((cost (cost-to-test-types (mapcar #'eval type-codes))))
-    `(progn
-       ,@(when pred-name
-	   `((define-vop (,pred-name simple-type-predicate)
-	       (:translate ,pred-name)
-	       (:generator ,cost
-		 (test-type value target not-p ,@type-codes)))))
-       ,@(when check-name
-	   `((define-vop (,check-name simple-check-type)
-	       (:generator ,cost
-		 (let ((err-lab
-			(generate-error-code vop ,error-code value)))
-		   (test-type value err-lab t ,@type-codes)
-		   (move result value))))))
-       ,@(when ptype
-	   `((primitive-type-vop ,check-name (:check) ,ptype))))))
-
-(def-simple-type-vops fixnump check-fixnum fixnum object-not-fixnum-error
-  even-fixnum-lowtag odd-fixnum-lowtag)
-
-(def-type-vops functionp check-fun function
-  object-not-fun-error fun-pointer-lowtag)
-
-(def-type-vops listp check-list list object-not-list-error
-  list-pointer-lowtag)
-
-(def-type-vops %instancep check-instance instance object-not-instance-error
-  instance-pointer-lowtag)
-
-(def-type-vops bignump check-bignum bignum
-  object-not-bignum-error bignum-widetag)
-
-(def-type-vops ratiop check-ratio ratio
-  object-not-ratio-error ratio-widetag)
-
-(def-type-vops complexp check-complex complex object-not-complex-error
-  complex-widetag complex-single-float-widetag complex-double-float-widetag
-  #!+long-float complex-long-float-widetag)
-
-(def-type-vops complex-rational-p check-complex-rational nil
-  object-not-complex-rational-error complex-widetag)
-
-(def-type-vops complex-float-p check-complex-float nil
-  object-not-complex-float-error
-  complex-single-float-widetag complex-double-float-widetag
-  #!+long-float complex-long-float-widetag)
-
-(def-type-vops complex-single-float-p check-complex-single-float
-  complex-single-float object-not-complex-single-float-error
-  complex-single-float-widetag)
-
-(def-type-vops complex-double-float-p check-complex-double-float
-  complex-double-float object-not-complex-double-float-error
-  complex-double-float-widetag)
-
-#!+long-float
-(def-type-vops complex-long-float-p check-complex-long-float
-  complex-long-float object-not-complex-long-float-error
-  complex-long-float-widetag)
-
-(def-type-vops single-float-p check-single-float single-float
-  object-not-single-float-error single-float-widetag)
-
-(def-type-vops double-float-p check-double-float double-float
-  object-not-double-float-error double-float-widetag)
-
-#!+long-float
-(def-type-vops long-float-p check-long-float long-float
-  object-not-long-float-error long-float-widetag)
-
-(def-type-vops simple-string-p check-simple-string simple-string
-  object-not-simple-string-error simple-string-widetag)
-
-(def-type-vops simple-bit-vector-p check-simple-bit-vector simple-bit-vector
-  object-not-simple-bit-vector-error simple-bit-vector-widetag)
-
-(def-type-vops simple-vector-p check-simple-vector simple-vector
-  object-not-simple-vector-error simple-vector-widetag)
-
-(def-type-vops simple-array-unsigned-byte-2-p
-  check-simple-array-unsigned-byte-2
-  simple-array-unsigned-byte-2
-  object-not-simple-array-unsigned-byte-2-error
-  simple-array-unsigned-byte-2-widetag)
-
-(def-type-vops simple-array-unsigned-byte-4-p
-  check-simple-array-unsigned-byte-4
-  simple-array-unsigned-byte-4
-  object-not-simple-array-unsigned-byte-4-error
-  simple-array-unsigned-byte-4-widetag)
-
-(def-type-vops simple-array-unsigned-byte-8-p
-  check-simple-array-unsigned-byte-8
-  simple-array-unsigned-byte-8
-  object-not-simple-array-unsigned-byte-8-error
-  simple-array-unsigned-byte-8-widetag)
-
-(def-type-vops simple-array-unsigned-byte-16-p
-  check-simple-array-unsigned-byte-16
-  simple-array-unsigned-byte-16
-  object-not-simple-array-unsigned-byte-16-error
-  simple-array-unsigned-byte-16-widetag)
-
-(def-type-vops simple-array-unsigned-byte-32-p
-  check-simple-array-unsigned-byte-32
-  simple-array-unsigned-byte-32
-  object-not-simple-array-unsigned-byte-32-error
-  simple-array-unsigned-byte-32-widetag)
-
-(def-type-vops simple-array-signed-byte-8-p
-  check-simple-array-signed-byte-8
-  simple-array-signed-byte-8
-  object-not-simple-array-signed-byte-8-error
-  simple-array-signed-byte-8-widetag)
-
-(def-type-vops simple-array-signed-byte-16-p
-  check-simple-array-signed-byte-16
-  simple-array-signed-byte-16
-  object-not-simple-array-signed-byte-16-error
-  simple-array-signed-byte-16-widetag)
-
-(def-type-vops simple-array-signed-byte-30-p
-  check-simple-array-signed-byte-30
-  simple-array-signed-byte-30
-  object-not-simple-array-signed-byte-30-error
-  simple-array-signed-byte-30-widetag)
-
-(def-type-vops simple-array-signed-byte-32-p
-  check-simple-array-signed-byte-32
-  simple-array-signed-byte-32
-  object-not-simple-array-signed-byte-32-error
-  simple-array-signed-byte-32-widetag)
-
-(def-type-vops simple-array-single-float-p check-simple-array-single-float
-  simple-array-single-float object-not-simple-array-single-float-error
-  simple-array-single-float-widetag)
-
-(def-type-vops simple-array-double-float-p check-simple-array-double-float
-  simple-array-double-float object-not-simple-array-double-float-error
-  simple-array-double-float-widetag)
-
-#!+long-float
-(def-type-vops simple-array-long-float-p check-simple-array-long-float
-  simple-array-long-float object-not-simple-array-long-float-error
-  simple-array-long-float-widetag)
-
-(def-type-vops simple-array-complex-single-float-p
-  check-simple-array-complex-single-float
-  simple-array-complex-single-float
-  object-not-simple-array-complex-single-float-error
-  simple-array-complex-single-float-widetag)
-
-(def-type-vops simple-array-complex-double-float-p
-  check-simple-array-complex-double-float
-  simple-array-complex-double-float
-  object-not-simple-array-complex-double-float-error
-  simple-array-complex-double-float-widetag)
-
-#!+long-float
-(def-type-vops simple-array-complex-long-float-p
-  check-simple-array-complex-long-float
-  simple-array-complex-long-float
-  object-not-simple-array-complex-long-float-error
-  simple-array-complex-long-float-widetag)
-
-(def-type-vops base-char-p check-base-char base-char
-  object-not-base-char-error base-char-widetag)
-
-(def-type-vops system-area-pointer-p check-system-area-pointer
-  system-area-pointer object-not-sap-error sap-widetag)
-
-(def-type-vops weak-pointer-p check-weak-pointer weak-pointer
-  object-not-weak-pointer-error weak-pointer-widetag)
-
-(def-type-vops code-component-p nil nil nil
-  code-header-widetag)
-
-(def-type-vops lra-p nil nil nil
-  return-pc-header-widetag)
-
-(def-type-vops fdefn-p nil nil nil
-  fdefn-widetag)
-
-(def-type-vops funcallable-instance-p nil nil nil
-  funcallable-instance-header-widetag)
-
-(def-type-vops array-header-p nil nil nil
-  simple-array-widetag complex-string-widetag complex-bit-vector-widetag
-  complex-vector-widetag complex-array-widetag)
-
-(def-type-vops stringp check-string nil object-not-string-error
-  simple-string-widetag complex-string-widetag)
-
-(def-type-vops bit-vector-p check-bit-vector nil object-not-bit-vector-error
-  simple-bit-vector-widetag complex-bit-vector-widetag)
-
-(def-type-vops vectorp check-vector nil object-not-vector-error
-  simple-string-widetag simple-bit-vector-widetag simple-vector-widetag
-  simple-array-unsigned-byte-2-widetag simple-array-unsigned-byte-4-widetag
-  simple-array-unsigned-byte-8-widetag simple-array-unsigned-byte-16-widetag
-  simple-array-unsigned-byte-32-widetag
-  simple-array-signed-byte-8-widetag simple-array-signed-byte-16-widetag
-  simple-array-signed-byte-30-widetag simple-array-signed-byte-32-widetag
-  simple-array-single-float-widetag simple-array-double-float-widetag
-  #!+long-float simple-array-long-float-widetag
-  simple-array-complex-single-float-widetag
-  simple-array-complex-double-float-widetag
-  #!+long-float simple-array-complex-long-float-widetag
-  complex-string-widetag complex-bit-vector-widetag complex-vector-widetag)
-
-;;; Note that this "type VOP" is sort of an oddball; it doesn't so
-;;; much test for a Lisp-level type as just expose a low-level type
-;;; code at the Lisp level. It is used as a building block to help us
-;;; to express things like the test for (TYPEP FOO '(VECTOR T))
-;;; efficiently in Lisp code, but it doesn't correspond to any type
-;;; expression which would actually occur in reasonable application
-;;; code. (Common Lisp doesn't have any natural way of expressing this
-;;; type.) Thus, there's no point in building up the full machinery of
-;;; associated backend type predicates and so forth as we do for
-;;; ordinary type VOPs.
-(def-type-vops complex-vector-p check-complex-vector nil object-not-complex-vector-error
-  complex-vector-widetag)
-
-(def-type-vops simple-array-p check-simple-array nil object-not-simple-array-error
-  simple-array-widetag simple-string-widetag simple-bit-vector-widetag
-  simple-vector-widetag simple-array-unsigned-byte-2-widetag
-  simple-array-unsigned-byte-4-widetag simple-array-unsigned-byte-8-widetag
-  simple-array-unsigned-byte-16-widetag simple-array-unsigned-byte-32-widetag
-  simple-array-signed-byte-8-widetag simple-array-signed-byte-16-widetag
-  simple-array-signed-byte-30-widetag simple-array-signed-byte-32-widetag
-  simple-array-single-float-widetag simple-array-double-float-widetag
-  #!+long-float simple-array-long-float-widetag
-  simple-array-complex-single-float-widetag
-  simple-array-complex-double-float-widetag
-  #!+long-float simple-array-complex-long-float-widetag)
-
-(def-type-vops arrayp check-array nil object-not-array-error
-  simple-array-widetag simple-string-widetag simple-bit-vector-widetag
-  simple-vector-widetag simple-array-unsigned-byte-2-widetag
-  simple-array-unsigned-byte-4-widetag simple-array-unsigned-byte-8-widetag
-  simple-array-unsigned-byte-16-widetag simple-array-unsigned-byte-32-widetag
-  simple-array-signed-byte-8-widetag simple-array-signed-byte-16-widetag
-  simple-array-signed-byte-30-widetag simple-array-signed-byte-32-widetag
-  simple-array-single-float-widetag simple-array-double-float-widetag
-  #!+long-float simple-array-long-float-widetag
-  simple-array-complex-single-float-widetag
-  simple-array-complex-double-float-widetag
-  #!+long-float simple-array-complex-long-float-widetag
-  complex-string-widetag complex-bit-vector-widetag complex-vector-widetag
-  complex-array-widetag)
-
-(def-type-vops numberp check-number nil object-not-number-error
-  even-fixnum-lowtag odd-fixnum-lowtag bignum-widetag ratio-widetag
-  single-float-widetag double-float-widetag
-  #!+long-float long-float-widetag
-  complex-widetag complex-single-float-widetag complex-double-float-widetag
-  #!+long-float complex-long-float-widetag)
-
-(def-type-vops rationalp check-rational nil object-not-rational-error
-  even-fixnum-lowtag odd-fixnum-lowtag ratio-widetag bignum-widetag)
-
-(def-type-vops integerp check-integer nil object-not-integer-error
-  even-fixnum-lowtag odd-fixnum-lowtag bignum-widetag)
-
-(def-type-vops floatp check-float nil object-not-float-error
-  single-float-widetag double-float-widetag #!+long-float long-float-widetag)
-
-(def-type-vops realp check-real nil object-not-real-error
-  even-fixnum-lowtag odd-fixnum-lowtag ratio-widetag bignum-widetag
-  single-float-widetag double-float-widetag #!+long-float long-float-widetag)
 
 ;;;; other integer ranges
 
@@ -717,7 +311,7 @@
     (let ((is-symbol-label (if not-p drop-thru target)))
       (inst cmp value nil-value)
       (inst jmp :e is-symbol-label)
-      (test-type value target not-p symbol-header-widetag))
+      (test-type value target not-p (symbol-header-widetag)))
     DROP-THRU))
 
 (define-vop (check-symbol check-type)
@@ -725,7 +319,7 @@
     (let ((error (generate-error-code vop object-not-symbol-error value)))
       (inst cmp value nil-value)
       (inst jmp :e drop-thru)
-      (test-type value error t symbol-header-widetag))
+      (test-type value error t (symbol-header-widetag)))
     DROP-THRU
     (move result value)))
 
@@ -735,7 +329,7 @@
     (let ((is-not-cons-label (if not-p target drop-thru)))
       (inst cmp value nil-value)
       (inst jmp :e is-not-cons-label)
-      (test-type value target not-p list-pointer-lowtag))
+      (test-type value target not-p (list-pointer-lowtag)))
     DROP-THRU))
 
 (define-vop (check-cons check-type)
@@ -743,7 +337,5 @@
     (let ((error (generate-error-code vop object-not-cons-error value)))
       (inst cmp value nil-value)
       (inst jmp :e error)
-      (test-type value error t list-pointer-lowtag)
+      (test-type value error t (list-pointer-lowtag))
       (move result value))))
-
-) ; MACROLET

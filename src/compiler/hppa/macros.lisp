@@ -1,3 +1,13 @@
+;;;; various useful macros for generating HPPA code
+
+;;;; This software is part of the SBCL system. See the README file for
+;;;; more information.
+;;;;
+;;;; This software is derived from the CMU CL system, which was
+;;;; written at Carnegie Mellon University and released into the
+;;;; public domain. The software is in the public domain and is
+;;;; provided with absolutely no warranty. See the COPYING and CREDITS
+;;;; files for more information.
 (in-package "SB!VM")
 
 
@@ -80,7 +90,6 @@
 ;;; Load-Stack-TN, Store-Stack-TN  --  Interface
 ;;;
 ;;;    Move a stack TN to a register and vice-versa.
-;;;
 (defmacro load-stack-tn (reg stack)
   `(let ((reg ,reg)
 	 (stack ,stack))
@@ -97,9 +106,6 @@
 	 ((control-stack)
 	  (storew reg cfp-tn offset))))))
 
-
-;;; MAYBE-LOAD-STACK-TN  --  Interface
-;;;
 (defmacro maybe-load-stack-tn (reg reg-or-stack)
   "Move the TN Reg-Or-Stack into Reg if it isn't already there."
   (once-only ((n-reg reg)
@@ -133,22 +139,6 @@
 
 
 ;;;; Error Code
-
-(defvar *adjustable-vectors* nil)
-
-(defmacro with-adjustable-vector ((var) &rest body)
-  `(let ((,var (or (pop *adjustable-vectors*)
-		   (make-array 16
-			       :element-type '(unsigned-byte 8)
-			       :fill-pointer 0
-			       :adjustable t))))
-     (declare (type (vector (unsigned-byte 8) 16) ,var))
-     (setf (fill-pointer ,var) 0)
-     (unwind-protect
-	 (progn
-	   ,@body)
-       (push ,var *adjustable-vectors*))))
-
 (eval-when (compile load eval)
   (defun emit-error-break (vop kind code values)
     (let ((vector (gensym)))

@@ -176,22 +176,6 @@
      ,@body))
 
 ;;;; error code
-
-(defvar *adjustable-vectors* nil)
-
-(defmacro with-adjustable-vector ((var) &rest body)
-  `(let ((,var (or (pop *adjustable-vectors*)
-		   (make-array 16
-			       :element-type '(unsigned-byte 8)
-			       :fill-pointer 0
-			       :adjustable t))))
-     (declare (type (vector (unsigned-byte 8) 16) ,var))
-     (setf (fill-pointer ,var) 0)
-     (unwind-protect
-	 (progn
-	   ,@body)
-       (push ,var *adjustable-vectors*))))
-
 (eval-when (:compile-toplevel :load-toplevel :execute) 
   (defun emit-error-break (vop kind code values)
     (let ((vector (gensym)))
