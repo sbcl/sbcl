@@ -615,7 +615,7 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
 
 (defun use-dispatch-dfun-p (gf &optional (caching-p (use-caching-dfun-p gf)))
   (when (eq *boot-state* 'complete)
-    (unless caching-p
+    (unless (or caching-p (gf-requires-emf-keyword-checks gf))
       ;; This should return T when almost all dispatching is by
       ;; eql specializers or built-in classes. In other words,
       ;; return NIL if we might ever need to do more than
@@ -684,14 +684,20 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
 (setq *wrapper-of-cost* 15)
 (setq *secondary-dfun-call-cost* 30)
 
+(declaim (inline make-callable))
+(defun make-callable (gf methods generator method-alist wrappers)
+  (let* ((*applicable-methods* methods)
+	 (callable (function-funcall generator method-alist wrappers)))
+    callable))
+
 (defun make-dispatch-dfun (gf)
   (values (get-dispatch-function gf) nil (dispatch-dfun-info)))
 
 (defun get-dispatch-function (gf)
-  (let ((methods (generic-function-methods gf)))
-    (function-funcall (get-secondary-dispatch-function1 gf methods nil nil nil
-							nil nil t)
-		      nil nil)))
+  (let* ((methods (generic-function-methods gf))
+	 (generator (get-secondary-dispatch-function1
+		     gf methods nil nil nil nil nil t)))
+    (make-callable gf methods generator nil nil)))
 
 (defun make-final-dispatch-dfun (gf)
   (make-dispatch-dfun gf))
@@ -1134,11 +1140,12 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
   (let* ((for-accessor-p (eq state 'accessor))
 	 (for-cache-p (or (eq state 'caching) (eq state 'accessor)))
 	 (emf (if (or cam-std-p all-applicable-and-sorted-p)
-		  (function-funcall (get-secondary-dispatch-function1
-				     gf methods types nil (and for-cache-p
-							       wrappers)
-				     all-applicable-and-sorted-p)
-				    nil (and for-cache-p wrappers))
+		  (let ((generator
+			 (get-secondary-dispatch-function1
+			  gf methods types nil (and for-cache-p wrappers)
+			  all-applicable-and-sorted-p)))
+		    (make-callable gf methods generator
+				   nil (and for-cache-p wrappers)))
 		  (default-secondary-dispatch-function gf))))
     (multiple-value-bind (index accessor-type)
 	(and for-accessor-p all-applicable-and-sorted-p methods
@@ -1623,14 +1630,13 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
   (dolist (method (generic-function-methods generic-function))
     (remhash method *effective-method-cache*)))
 
-(defun get-secondary-dispatch-function (gf methods types &optional
-							 method-alist wrappers)
-  (function-funcall (get-secondary-dispatch-function1
-		     gf methods types
-		     (not (null method-alist))
-		     (not (null wrappers))
-		     (not (methods-contain-eql-specializer-p methods)))
-		    method-alist wrappers))
+(defun get-secondary-dispatch-function (gf methods types
+					&optional method-alist wrappers)
+  (let ((generator
+	 (get-secondary-dispatch-function1
+	  gf methods types (not (null method-alist)) (not (null wrappers))
+	  (not (methods-contain-eql-specializer-p methods)))))
+    (make-callable gf methods generator method-alist wrappers)))
 
 (defun get-secondary-dispatch-function1 (gf methods types method-alist-p
 					    wrappers-p
@@ -1687,11 +1693,10 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
 
 (defun get-effective-method-function (gf methods
 					 &optional method-alist wrappers)
-  (function-funcall (get-secondary-dispatch-function1 gf methods nil
-						      (not (null method-alist))
-						      (not (null wrappers))
-						      t)
-		    method-alist wrappers))
+  (let ((generator
+	 (get-secondary-dispatch-function1
+	  gf methods nil (not (null method-alist)) (not (null wrappers)) t)))
+    (make-callable gf methods generator method-alist wrappers)))
 
 (defun get-effective-method-function1 (gf methods &optional (sorted-p t))
   (get-secondary-dispatch-function1 gf methods nil nil nil t sorted-p))

@@ -640,8 +640,7 @@ WORKAROUND:
      classes).  This means that at present erroneous attempts to use
      WITH-SLOTS and the like on classes with metaclass STRUCTURE-CLASS
      won't get the corresponding STYLE-WARNING.
-  c. the examples in CLHS 7.6.5.1 (regarding generic function lambda
-     lists and &KEY arguments) do not signal errors when they should.
+  c. (fixed in 0.8.4.23)
 
 201: "Incautious type inference from compound types"
   a. (reported by APD sbcl-devel 2002-09-17)

@@ -2124,6 +2124,8 @@ changes in sbcl-0.8.5 relative to sbcl-0.8.4:
     as unknown types.  (reported by piso on #lisp)
   * bug fix: the :IF-EXISTS argument to OPEN now behaves correctly
     with values NIL and :ERROR.  (thanks to Milan Zamazal)
+  * fixed bug 191c: CLOS now does proper keyword argument checking as
+    described in CLHS 7.6.5 and 7.6.5.1.
   * compiler enhancement: SIGNUM is now better able to derive the type
     of its result.
   * type declarations inside WITH-SLOTS are checked.  (reported by

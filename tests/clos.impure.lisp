@@ -700,5 +700,25 @@
                    (declare (notinline slot-value))
                    a))
 
+;;; from CLHS 7.6.5.1
+(defclass character-class () ((char :initarg :char)))
+(defclass picture-class () ((glyph :initarg :glyph)))
+(defclass character-picture-class (character-class picture-class) ())
+
+(defmethod width ((c character-class) &key font) font)
+(defmethod width ((p picture-class) &key pixel-size) pixel-size)
+
+(assert (raises-error? 
+	 (width (make-instance 'character-class :char #\Q) 
+		:font 'baskerville :pixel-size 10)
+	 program-error))
+(assert (raises-error?
+	 (width (make-instance 'picture-class :glyph #\Q)
+		:font 'baskerville :pixel-size 10)
+	 program-error))
+(assert (eq (width (make-instance 'character-picture-class :char #\Q)
+		   :font 'baskerville :pixel-size 10)
+	    'baskerville))
+
 ;;;; success
 (sb-ext:quit :unix-status 104)

@@ -665,9 +665,10 @@
   (let ((types (mapcar #'class-eq-type classes)))
     (multiple-value-bind (methods all-applicable-and-sorted-p)
 	(compute-applicable-methods-using-types gf types)
-      (function-funcall (get-secondary-dispatch-function1
-			 gf methods types nil t all-applicable-and-sorted-p)
-			nil (mapcar #'class-wrapper classes)))))
+      (let ((generator (get-secondary-dispatch-function1
+			gf methods types nil t all-applicable-and-sorted-p)))
+	(make-callable gf methods generator
+		       nil (mapcar #'class-wrapper classes))))))
 
 (defun value-for-caching (gf classes)
   (let ((methods (compute-applicable-methods-using-types

@@ -167,7 +167,7 @@
 		     (let ((consts (funcall constant-converter f)))
 		       (if consts
 			   (progn
-			     (setq collect (nconc collect consts))
+			     (setq collect (append collect consts))
 			     (values f t))
 			   f)))))
     collect))

@@ -1907,7 +1907,7 @@ bootstrapping.
 			     (method-lambda-list method)))
 		     (k (member '&key ll)))
 		(if k
-		    (append (ldiff ll (cdr k)) '(&allow-other-keys))
+		    (ldiff ll (cdr k))
 		    ll))))
 	(arg-info-lambda-list arg-info))))
 
