@@ -1,4 +1,4 @@
-;;; This is asdf: Another System Definition Facility.  $\Revision: 1.59 $
+;;; This is asdf: Another System Definition Facility.  $\Revision: 1.62 $
 ;;;
 ;;; Feedback, bug reports, and patches are all welcome: please mail to
 ;;; <cclan-list@lists.sf.net>.  But note first that the canonical
@@ -87,7 +87,7 @@
 
 (in-package #:asdf)
 
-(defvar *asdf-revision* (let* ((v "$\Revision: 1.59 $")
+(defvar *asdf-revision* (let* ((v "$\Revision: 1.62 $")
 			       (colon (position #\: v))
 			       (dot (position #\. v)))
 			  (and v colon dot 
@@ -709,7 +709,32 @@ system."))
 (defclass load-source-op (operation) ())
 
 (defmethod perform ((o load-source-op) (c cl-source-file))
-  (load (component-pathname c)))
+  (let ((source (component-pathname c)))
+    (setf (component-property c 'last-loaded-as-source)
+          (and (load source)
+               (get-universal-time)))))
+
+(defmethod perform ((operation load-source-op) (c static-file))
+  nil)
+
+(defmethod output-files ((operation load-source-op) (c component))
+  nil)
+
+;;; FIXME: we simply copy load-op's dependencies.  this is Just Not Right.
+(defmethod component-depends-on ((o load-source-op) (c component))
+  (let ((what-would-load-op-do (cdr (assoc 'load-op
+                                           (slot-value c 'in-order-to)))))
+    (mapcar (lambda (dep)
+              (if (eq (car dep) 'load-op)
+                  (cons 'load-source-op (cdr dep))
+                  dep))
+            what-would-load-op-do)))
+
+(defmethod operation-done-p ((o load-source-op) (c source-file))
+  (if (or (not (component-property c 'last-loaded-as-source))
+	  (> (file-write-date (component-pathname c))
+	     (component-property c 'last-loaded-as-source)))
+      nil t))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -960,12 +985,12 @@ output to *trace-output*.  Returns the shell's exit code."
   
   (pushnew
    (merge-pathnames "site-systems/"
-		    (truename (sb-ext:posix-getenv "SBCL_HOME")))
+ 		    (truename (sb-ext:posix-getenv "SBCL_HOME")))
    *central-registry*)
   
   (pushnew
-   (merge-pathnames ".sbcl/systems"
-		    (user-homedir-pathname))
+   (merge-pathnames ".sbcl/systems/"
+ 		    (user-homedir-pathname))
    *central-registry*)
   
   (pushnew 'module-provide-asdf sb-ext:*module-provider-functions*))
