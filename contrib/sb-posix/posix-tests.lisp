@@ -12,7 +12,7 @@
 (defvar *current-directory* *default-pathname-defaults*)
 
 (defvar *this-file* *load-truename*)
-
+
 (deftest chdir.1
   (sb-posix:chdir *test-directory*)
   0)
@@ -47,7 +47,7 @@
     (sb-posix:syscall-error (c)
       (sb-posix:syscall-errno c)))
   #.sb-posix::enotdir)
-
+
 (deftest mkdir.1
   (let ((dne (make-pathname :directory '(:relative "mkdir.does-not-exist.1"))))
     (unwind-protect
@@ -84,7 +84,7 @@
     (sb-posix:syscall-error (c)
       (sb-posix:syscall-errno c)))
   #.sb-posix::eacces)
-
+
 (deftest rmdir.1
   (let ((dne (make-pathname :directory '(:relative "rmdir.does-not-exist.1"))))
     (ensure-directories-exist (merge-pathnames dne *test-directory*))
@@ -153,7 +153,7 @@
 	(sb-posix:rmdir dir)
 	(sb-posix:syscall-errno c))))
   #.sb-posix::eacces)
-
+
 (deftest stat.1
   (let* ((stat (sb-posix:stat *test-directory*))
 	 (mode (sb-posix::stat-mode stat)))
@@ -205,7 +205,73 @@
 	(sb-posix:rmdir dir)
 	(sb-posix:syscall-errno c))))
   #.sb-posix::eacces)
+
+;;; stat-mode tests
+(defmacro with-stat-mode ((mode pathname) &body body)
+  (let ((stat (gensym)))
+    `(let* ((,stat (sb-posix:stat ,pathname))
+            (,mode (sb-posix::stat-mode ,stat)))
+       ,@body)))
 
+(defmacro with-lstat-mode ((mode pathname) &body body)
+  (let ((stat (gensym)))
+    `(let* ((,stat (sb-posix:lstat ,pathname))
+            (,mode (sb-posix::stat-mode ,stat)))
+       ,@body)))
+
+(deftest stat-mode.1
+  (with-stat-mode (mode *test-directory*)
+    (sb-posix:s-isreg mode))
+  0)
+
+(deftest stat-mode.2
+  (with-stat-mode (mode *test-directory*)
+    (zerop (sb-posix:s-isdir mode)))
+  nil)
+
+(deftest stat-mode.3
+  (with-stat-mode (mode *test-directory*)
+    (sb-posix:s-ischr mode))
+  0)
+
+(deftest stat-mode.4
+  (with-stat-mode (mode *test-directory*)
+    (sb-posix:s-isblk mode))
+  0)
+
+(deftest stat-mode.5
+  (with-stat-mode (mode *test-directory*)
+    (sb-posix:s-isfifo mode))
+  0)
+
+(deftest stat-mode.6
+  (with-stat-mode (mode *test-directory*)
+    (sb-posix:s-issock mode))
+  0)
+
+(deftest stat-mode.7
+  (let ((link-pathname (make-pathname :name "stat-mode.7"
+                                      :defaults *test-directory*)))
+    (unwind-protect
+         (progn
+           (sb-posix:symlink *test-directory* link-pathname)
+           (with-lstat-mode (mode link-pathname)
+             (zerop (sb-posix:s-islnk mode))))
+      (ignore-errors (sb-posix:unlink link-pathname))))
+  nil)
+
+(deftest stat-mode.8
+  (let ((pathname (make-pathname :name "stat-mode.8"
+                                 :defaults *test-directory*)))
+    (unwind-protect
+         (progn
+           (with-open-file (out pathname :direction :output)
+             (write-line "test" out))
+           (with-stat-mode (mode pathname)
+             (zerop (sb-posix:s-isreg mode))))
+      (ignore-errors (delete-file pathname))))
+  nil)
+
 ;;; see comment in filename's designator definition, in macros.lisp
 (deftest filename-designator.1
   (let ((file (format nil "~A/[foo].txt" (namestring *test-directory*))))

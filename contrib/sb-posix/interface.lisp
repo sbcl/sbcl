@@ -33,8 +33,6 @@
 (define-call "fdatasync" int minusp (fd file-descriptor))
 (define-call "ftruncate" int minusp (fd file-descriptor) (length sb-posix::off-t))
 (define-call "fsync" int minusp (fd file-descriptor))
-;;; no lchown on Darwin
-#-darwin 
 (define-call "lchown" int minusp (pathname filename)
 	     (owner sb-posix::uid-t)  (group sb-posix::gid-t))
 (define-call "link" int minusp (oldpath filename) (newpath filename))
@@ -65,26 +63,26 @@
 ;;; uid, gid
 
 (define-call "geteuid" sb-posix::uid-t never-fails) ; "always successful", it says
-#+linux (define-call "getresuid" sb-posix::uid-t never-fails)
+(define-call "getresuid" sb-posix::uid-t never-fails)
 (define-call "getuid" sb-posix::uid-t never-fails)
 (define-call "seteuid" int minusp (uid sb-posix::uid-t))
-#+linux (define-call "setfsuid" int minusp (uid sb-posix::uid-t))
+(define-call "setfsuid" int minusp (uid sb-posix::uid-t))
 (define-call "setreuid" int minusp
 	     (ruid sb-posix::uid-t) (euid sb-posix::uid-t))
-#+linux (define-call "setresuid" int minusp
+(define-call "setresuid" int minusp
 	     (ruid sb-posix::uid-t) (euid sb-posix::uid-t)
 	     (suid sb-posix::uid-t))
 (define-call "setuid" int minusp (uid sb-posix::uid-t))
 
 (define-call "getegid" sb-posix::gid-t never-fails)
 (define-call "getgid" sb-posix::gid-t never-fails)
-#+linux (define-call "getresgid" sb-posix::gid-t never-fails)
+(define-call "getresgid" sb-posix::gid-t never-fails)
 (define-call "setegid" int minusp (gid sb-posix::gid-t))
-#+linux (define-call "setfsgid" int minusp (gid sb-posix::gid-t))
+(define-call "setfsgid" int minusp (gid sb-posix::gid-t))
 (define-call "setgid" int minusp (gid sb-posix::gid-t))
 (define-call "setregid" int minusp
 	     (rgid sb-posix::gid-t) (egid sb-posix::gid-t))
-#+linux (define-call "setresgid" int minusp
+(define-call "setresgid" int minusp
 	     (rgid sb-posix::gid-t)
 	     (egid sb-posix::gid-t) (sgid sb-posix::gid-t))
 
@@ -152,6 +150,16 @@
 (define-stat-call "fstat" fd sb-posix::file-descriptor
 		  (function int int (* t)))
 
+
+;;; mode flags
+(define-call "s_isreg" sb-posix::mode-t never-fails (mode sb-posix::mode-t))
+(define-call "s_isdir" sb-posix::mode-t never-fails (mode sb-posix::mode-t))
+(define-call "s_ischr" sb-posix::mode-t never-fails (mode sb-posix::mode-t))
+(define-call "s_isblk" sb-posix::mode-t never-fails (mode sb-posix::mode-t))
+(define-call "s_isfifo" sb-posix::mode-t never-fails (mode sb-posix::mode-t))
+(define-call "s_islnk" sb-posix::mode-t never-fails (mode sb-posix::mode-t))
+(define-call "s_issock" sb-posix::mode-t never-fails (mode sb-posix::mode-t))
+
 (export 'sb-posix::pipe :sb-posix)
 (declaim (inline sb-posix::pipe))
 (defun sb-posix::pipe (&optional filedes2)
@@ -166,3 +174,4 @@
       (syscall-error)))
   (values (aref filedes2 0) (aref filedes2 1)))
   
+(define-call "frobozz" int minusp)

@@ -298,9 +298,12 @@
 
 ;;; SB!SYS:GET-DYNAMIC-FOREIGN-SYMBOL-ADDRESS is in foreign.lisp, on
 ;;; platforms that have dynamic loading
+(defun foreign-symbol-address-as-integer-or-nil (foreign-symbol)
+  (or (find-foreign-symbol-in-table foreign-symbol *static-foreign-symbols*)
+      (sb!sys:get-dynamic-foreign-symbol-address foreign-symbol)))
+    
 (defun foreign-symbol-address-as-integer (foreign-symbol)
-  (or (find-foreign-symbol-in-table  foreign-symbol *static-foreign-symbols*)
-      (sb!sys:get-dynamic-foreign-symbol-address foreign-symbol)
+  (or (foreign-symbol-address-as-integer-or-nil foreign-symbol)
       (error "unknown foreign symbol: ~S" foreign-symbol)))
 
 (defun foreign-symbol-address (symbol)

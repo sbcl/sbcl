@@ -43,22 +43,26 @@
 
 (defmacro define-call (name return-type error-predicate &rest arguments)
   (let ((lisp-name (lisp-for-c-symbol name)))
-    `(progn
-      (export ',lisp-name :sb-posix)
-      (declaim (inline ,lisp-name))
-      (defun ,lisp-name ,(mapcar #'car arguments)
-	(let ((r (alien-funcall
-		  (extern-alien
-		   ,name
-		   (function ,return-type
-			     ,@(mapcar
-				(lambda (x)
-				  (gethash (cadr x) *designator-types* (cadr x)))
-				arguments)))
-		  ,@(mapcar (lambda (x)
-			      (if (nth-value 1 (gethash (cadr x) *designator-types*))
-				  `(,(intern (symbol-name (cadr x)) :sb-posix)
-				    ,(car x))
-				  (car x)))
-			    arguments))))
-	  (if (,error-predicate r) (syscall-error) r))))))
+    (if (sb-fasl::foreign-symbol-address-as-integer-or-nil name)
+	`(progn
+	  (export ',lisp-name :sb-posix)
+	  (declaim (inline ,lisp-name))
+	  (defun ,lisp-name ,(mapcar #'car arguments)
+	    (let ((r (alien-funcall
+		      (extern-alien
+		       ,name
+		       (function ,return-type
+				 ,@(mapcar
+				    (lambda (x)
+				      (gethash (cadr x) *designator-types* (cadr x)))
+				    arguments)))
+		      ,@(mapcar (lambda (x)
+				  (if (nth-value 1 (gethash (cadr x) *designator-types*))
+				      `(,(intern (symbol-name (cadr x)) :sb-posix)
+					,(car x))
+				      (car x)))
+				arguments))))
+	      (if (,error-predicate r) (syscall-error) r))))
+	`(progn
+	  (export ',lisp-name :sb-posix)
+	  (sb-int:style-warn "Didn't find definition for ~S" ,name)))))
