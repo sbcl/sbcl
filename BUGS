@@ -1306,6 +1306,14 @@ WORKAROUND:
        (INTEGERP (CAR (MAKE-SEQUENCE '(CONS INTEGER *) 2)))
      can erroneously return T.
 
+214:
+  SBCL 0.6.12.43 fails to compile
+
+  (locally
+      (declare (optimize (inhibit-warnings 0) (compilation-speed 2)))
+    (flet ((foo (&key (x :vx x-p)) (list x x-p)))
+      (foo 1 2)))
+
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:
     These labels were used for bugs related to the old IR1 interpreter.
