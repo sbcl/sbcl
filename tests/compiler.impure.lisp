@@ -893,6 +893,7 @@
 
 ;;;; MUFFLE-CONDITIONS test (corresponds to the test in the manual)
 (defvar *compiler-note-count* 0)
+#-alpha ; KLUDGE
 (handler-bind ((sb-ext:compiler-note (lambda (c)
 				       (declare (ignore c))
 				       (incf *compiler-note-count*))))

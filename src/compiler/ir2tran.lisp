@@ -1282,15 +1282,17 @@
     (vop reset-stack-pointer node block
 	 (first (ir2-lvar-locs 2lvar)))))
 
-(defoptimizer (%nip-values ir2-convert) ((last-nipped last-preserved &rest moved)
+(defoptimizer (%nip-values ir2-convert) ((last-nipped last-preserved 
+						      &rest moved)
                                          node block)
-  #!-x86
+  #!-(or x86 alpha)
   (bug "%NIP-VALUES is not implemented on this platform.")
-  #!+x86
-  (let ((2after (lvar-info (lvar-value last-nipped)))
-                                        ; pointer immediately after the nipped block
+  #!+(or x86 alpha)
+  (let (;; pointer immediately after the nipped block
+	(2after (lvar-info (lvar-value last-nipped)))
+	;; pointer to the first nipped word
         (2first (lvar-info (lvar-value last-preserved)))
-                                        ; pointer to the first nipped word
+
         (moved-tns (loop for lvar-ref in moved
                          for lvar = (lvar-value lvar-ref)
                          for 2lvar = (lvar-info lvar)
