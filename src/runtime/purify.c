@@ -17,6 +17,9 @@
 #include <sys/types.h>
 #include <stdlib.h>
 #include <strings.h>
+#include <sys/ptrace.h>
+#include <linux/user.h>
+#include <errno.h>
 
 #include "runtime.h"
 #include "os.h"
@@ -28,6 +31,7 @@
 #include "interr.h"
 #include "gc.h"
 #include "gc-internal.h"
+#include "thread.h"
 #include "genesis/primitive-objects.h"
 #include "genesis/static-symbols.h"
 
@@ -1301,7 +1305,7 @@ purify(lispobj static_roots, lispobj read_only_roots)
     lispobj *clean;
     int count, i;
     struct later *laters, *next;
-
+    struct thread *thread;
 
 #ifdef PRINTNOISE
     printf("[doing purification:");
@@ -1310,7 +1314,8 @@ purify(lispobj static_roots, lispobj read_only_roots)
 #ifdef LISP_FEATURE_GENCGC
     gc_alloc_update_all_page_tables();
 #endif
-    if (fixnum_value(SymbolValue(FREE_INTERRUPT_CONTEXT_INDEX)) != 0) {
+    for_each_thread(thread)
+	if (fixnum_value(SymbolValue(FREE_INTERRUPT_CONTEXT_INDEX,thread)) != 0) {
 	/* FIXME: 1. What does this mean? 2. It shouldn't be reporting
 	 * its error simply by a. printing a string b. to stdout instead
 	 * of stderr. */
@@ -1321,23 +1326,42 @@ purify(lispobj static_roots, lispobj read_only_roots)
 
 #if defined(__i386__)
     dynamic_space_free_pointer =
-      (lispobj*)SymbolValue(ALLOCATION_POINTER);
+      (lispobj*)SymbolValue(ALLOCATION_POINTER,0);
 #endif
 
     read_only_end = read_only_free =
-        (lispobj *)SymbolValue(READ_ONLY_SPACE_FREE_POINTER);
+        (lispobj *)SymbolValue(READ_ONLY_SPACE_FREE_POINTER,0);
     static_end = static_free =
-        (lispobj *)SymbolValue(STATIC_SPACE_FREE_POINTER);
+        (lispobj *)SymbolValue(STATIC_SPACE_FREE_POINTER,0);
 
 #ifdef PRINTNOISE
     printf(" roots");
     fflush(stdout);
 #endif
 
+#if 0
+    /* can't do this unless the threads in question are suspended with
+     * ptrace
+     */
 #if (defined(LISP_FEATURE_GENCGC) && defined(LISP_FEATURE_X86))
-    gc_assert((lispobj *)CONTROL_STACK_END > ((&read_only_roots)+1));
-    setup_i386_stack_scav(((&static_roots)-2), (lispobj *)CONTROL_STACK_END);
+    for_each_thread(thread) {
+	void **ptr;
+	struct user_regs_struct regs;
+	if(ptrace(PTRACE_GETREGS,thread->pid,0,&regs)){
+	    fprintf(stderr,"child pid %d, %s\n",thread->pid,strerror(errno));
+	    lose("PTRACE_GETREGS");
+	}
+	setup_i386_stack_scav(regs.ebp,
+			      ((void *)thread->control_stack_start)
+			      +THREAD_CONTROL_STACK_SIZE);
+    }
 #endif
+#endif
+    setup_i386_stack_scav(((&static_roots)-2),
+			  ((void *)all_threads->control_stack_start)
+			  +THREAD_CONTROL_STACK_SIZE);
+
+
 
     pscav(&static_roots, 1, 0);
     pscav(&read_only_roots, 1, 1);
@@ -1346,8 +1370,9 @@ purify(lispobj static_roots, lispobj read_only_roots)
     printf(" handlers");
     fflush(stdout);
 #endif
-    pscav((lispobj *) interrupt_handlers,
-          sizeof(interrupt_handlers) / sizeof(lispobj),
+    pscav((lispobj *) all_threads->interrupt_data->interrupt_handlers,
+          sizeof(all_threads->interrupt_data->interrupt_handlers)
+	  / sizeof(lispobj),
           0);
 
 #ifdef PRINTNOISE
@@ -1373,10 +1398,18 @@ purify(lispobj static_roots, lispobj read_only_roots)
 	  (lispobj *)current_binding_stack_pointer - (lispobj *)BINDING_STACK_START,
 	  0);
 #else
-    pscav( (lispobj *)BINDING_STACK_START,
-	  (lispobj *)SymbolValue(BINDING_STACK_POINTER) -
-	  (lispobj *)BINDING_STACK_START,
+    for_each_thread(thread) {
+	pscav( (lispobj *)thread->binding_stack_start,
+	       (lispobj *)SymbolValue(BINDING_STACK_POINTER,thread) -
+	       (lispobj *)thread->binding_stack_start,
 	  0);
+	pscav( (lispobj *) (thread+1),
+	       fixnum_value(SymbolValue(FREE_TLS_INDEX,0)) -
+	       (sizeof (struct thread))/(sizeof (lispobj)),
+	  0);
+    }
+
+
 #endif
 
     /* The original CMU CL code had scavenge-read-only-space code
@@ -1449,8 +1482,8 @@ purify(lispobj static_roots, lispobj read_only_roots)
 
     /* It helps to update the heap free pointers so that free_heap can
      * verify after it's done. */
-    SetSymbolValue(READ_ONLY_SPACE_FREE_POINTER, (lispobj)read_only_free);
-    SetSymbolValue(STATIC_SPACE_FREE_POINTER, (lispobj)static_free);
+    SetSymbolValue(READ_ONLY_SPACE_FREE_POINTER, (lispobj)read_only_free,0);
+    SetSymbolValue(STATIC_SPACE_FREE_POINTER, (lispobj)static_free,0);
 
 #if !defined(__i386__)
     dynamic_space_free_pointer = current_dynamic_space;

@@ -1,14 +1,7 @@
 (in-package :sb!thread)
 
-#+sb-xc-host
-(defun make-mutex (&key name value) nil)
-
-#+sb-xc-host
-(defmacro with-recursive-lock ((mutex) &body body)
-  `(progn ,@body))
-
-#-sb-xc-host
-(defmacro with-recursive-lock ((mutex) &body body)
+(sb!xc:defmacro with-recursive-lock ((mutex) &body body)
+  #!+sb-thread
   (let ((cfp (gensym "CFP")))
     `(let ((,cfp (ash (sb!sys:sap-int (sb!vm::current-fp) ) -2)))
       (unless (and (mutex-value ,mutex)
@@ -17,15 +10,23 @@
 	(get-mutex ,mutex ,cfp))
       (unwind-protect
 	   (progn ,@body)
-	(when (eql (mutex-value ,mutex) ,cfp) (release-mutex ,mutex))))))
+	(when (eql (mutex-value ,mutex) ,cfp) (release-mutex ,mutex)))))
+  #!-sb-thread
+  `(progn ,@body))
 
+#!+sb-thread
 (defun get-foreground ()
-  (when (not (eql (mutex-value *session-lock*)  (CURRENT-THREAD-ID)))
+  (when (not (eql (mutex-value *session-lock*) (current-thread-id)))
     (get-mutex *session-lock*))
   (sb!sys:enable-interrupt :sigint #'sb!unix::sigint-handler)
   t)
+#!-sb-thread
+(defun get-foreground () t)
 
+#!+sb-thread
 (defun release-foreground ()
   (sb!sys:enable-interrupt :sigint :ignore)
   (release-mutex *session-lock*)
   t)
+#!-sb-thread
+(defun release-foreground () t)

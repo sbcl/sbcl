@@ -21,6 +21,9 @@
 #include "os.h"
 #include "interrupt.h"
 #include "lispregs.h"
+#ifdef LISP_FEATURE_GENCGC
+#include "gencgc-alloc-region.h"
+#endif
 #include "genesis/static-symbols.h"
 #include "genesis/primitive-objects.h"
 
@@ -148,6 +151,7 @@ static int
 previous_info(struct call_info *info)
 {
     struct call_frame *this_frame;
+    struct thread *thread=arch_os_get_current_thread();
     int free;
 
     if (!cs_valid_pointer_p(info->frame)) {
@@ -165,10 +169,10 @@ previous_info(struct call_info *info)
 
     if (info->lra == NIL) {
         /* We were interrupted. Find the correct signal context. */
-        free = SymbolValue(FREE_INTERRUPT_CONTEXT_INDEX)>>2;
+        free = SymbolValue(FREE_INTERRUPT_CONTEXT_INDEX,thread)>>2;
         while (free-- > 0) {
 	    os_context_t *context = 
-		lisp_interrupt_contexts[free];
+		thread->interrupt_contexts[free];
             if ((struct call_frame *)(*os_context_register_addr(context,
 								reg_CFP))
 		== info->frame) {

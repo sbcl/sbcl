@@ -206,7 +206,7 @@
 
   #!+stack-grows-downward-not-upward
   (let* ((csp (sap-int (sb!c::control-stack-pointer-sap)))
-	 (end-of-stack (+ sb!vm:control-stack-start sb!c:*backend-page-size*))
+	 (end-of-stack (+ sb!vm::*control-stack-start* sb!c:*backend-page-size*))
 	 (initial-offset (logand csp (1- bytes-per-scrub-unit))))
     (labels
 	((scrub (ptr offset count)
@@ -296,7 +296,8 @@
 (defun toplevel-init ()
 
   (/show0 "entering TOPLEVEL-INIT")
-  
+  (setf sb!thread::*session-lock* (sb!thread:make-mutex :name "the terminal"))
+  (sb!thread::get-foreground)
   (let ((sysinit nil)        ; value of --sysinit option
 	(userinit nil)       ; value of --userinit option
 	(reversed-evals nil) ; values of --eval options, in reverse order; and

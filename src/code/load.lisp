@@ -16,6 +16,12 @@
 
 (in-package "SB!FASL")
 
+;;;; There looks to be an exciting amount of state being modified
+;;;; here: certainly enough that I (dan, 2003.1.22) don't want to mess
+;;;; around deciding how to thread-safetify it.  So we use a Big Lock.
+;;;; Because this code is mutually recursive with the compiler, we use
+;;;; the *big-compiler-lock*
+
 ;;;; miscellaneous load utilities
 
 ;;; Output the current number of semicolons after a fresh-line.
@@ -327,25 +333,21 @@
   (when (zerop (file-length stream))
     (error "attempt to load an empty FASL file:~%  ~S" (namestring stream)))
   (maybe-announce-load stream verbose)
-  (let* ((*fasl-input-stream* stream)
-	 (*current-fop-table* (or (pop *free-fop-tables*) (make-array 1000)))
-	 (*current-fop-table-size* (length *current-fop-table*))
-	 (*fop-stack-pointer-on-entry* *fop-stack-pointer*))
-    (unwind-protect
-	;; FIXME: This should probably become
-	;;   (LOOP WHILE (LOAD-FASL-GROUP-STREAM))
-	;; but as a LOOP newbie I don't want to do that until I can
-	;; test it.
-	(do ((loaded-group (load-fasl-group stream) (load-fasl-group stream)))
-	    ((not loaded-group)))
-      (setq *fop-stack-pointer* *fop-stack-pointer-on-entry*)
-      (push *current-fop-table* *free-fop-tables*)
-      ;; NIL out the stack and table, so that we don't hold onto garbage.
-      ;;
-      ;; FIXME: Couldn't we just get rid of the free fop table pool so
-      ;; that some of this NILing out would go away?
-      (fill *fop-stack* nil :end *fop-stack-pointer-on-entry*)
-      (fill *current-fop-table* nil)))
+  (sb!thread:with-recursive-lock (sb!c::*big-compiler-lock*)
+    (let* ((*fasl-input-stream* stream)
+	   (*current-fop-table* (or (pop *free-fop-tables*) (make-array 1000)))
+	   (*current-fop-table-size* (length *current-fop-table*))
+	   (*fop-stack-pointer-on-entry* *fop-stack-pointer*))
+      (unwind-protect
+	   (loop while (load-fasl-group stream))
+	(setq *fop-stack-pointer* *fop-stack-pointer-on-entry*)
+	(push *current-fop-table* *free-fop-tables*)
+	;; NIL out the stack and table, so that we don't hold onto garbage.
+	;;
+	;; FIXME: Couldn't we just get rid of the free fop table pool so
+	;; that some of this NILing out would go away?
+	(fill *fop-stack* nil :end *fop-stack-pointer-on-entry*)
+	(fill *current-fop-table* nil))))
   t)
 
 ;;; This is used in in target-load and also genesis, using

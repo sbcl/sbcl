@@ -209,27 +209,57 @@
 
 (define-vop (alloc-alien-stack-space)
   (:info amount)
+  #!+sb-thread (:temporary (:sc unsigned-reg) temp)
   (:results (result :scs (sap-reg any-reg)))
+  #!+sb-thread
   (:generator 0
     (aver (not (location= result esp-tn)))
     (unless (zerop amount)
       (let ((delta (logandc2 (+ amount 3) 3)))
-	(inst sub (make-ea :dword
-			   :disp (+ nil-value
-				    (static-symbol-offset '*alien-stack*)
-				    (ash symbol-value-slot word-shift)
-				    (- other-pointer-lowtag)))
-	      delta)))
+	(inst mov temp
+	      (make-ea :dword
+		       :disp (+ nil-value
+				(static-symbol-offset '*alien-stack*)
+				(ash symbol-tls-index-slot word-shift)
+				(- other-pointer-lowtag))))
+	(inst fs-segment-prefix)
+	(inst sub (make-ea :dword :scale 1 :index temp) delta)))
+    (load-tl-symbol-value result *alien-stack*))
+  #!-sb-thread
+  (:generator 0
+    (aver (not (location= result esp-tn)))
+    (unless (zerop amount)
+      (let ((delta (logandc2 (+ amount 3) 3)))
+        (inst sub (make-ea :dword
+                           :disp (+ nil-value
+                                    (static-symbol-offset '*alien-stack*)
+                                    (ash symbol-value-slot word-shift)
+                                    (- other-pointer-lowtag)))
+              delta)))
     (load-symbol-value result *alien-stack*)))
 
 (define-vop (dealloc-alien-stack-space)
   (:info amount)
+  #!+sb-thread (:temporary (:sc unsigned-reg) temp)
+  #!+sb-thread
   (:generator 0
     (unless (zerop amount)
       (let ((delta (logandc2 (+ amount 3) 3)))
-	(inst add (make-ea :dword
+	(inst mov temp
+	      (make-ea :dword
 			   :disp (+ nil-value
 				    (static-symbol-offset '*alien-stack*)
-				    (ash symbol-value-slot word-shift)
-				    (- other-pointer-lowtag)))
-	      delta)))))
+				(ash symbol-tls-index-slot word-shift)
+				(- other-pointer-lowtag))))
+	(inst fs-segment-prefix)
+	(inst add (make-ea :dword :scale 1 :index temp) delta))))
+  #!-sb-thread
+  (:generator 0
+    (unless (zerop amount)
+      (let ((delta (logandc2 (+ amount 3) 3)))
+        (inst add (make-ea :dword
+                           :disp (+ nil-value
+                                    (static-symbol-offset '*alien-stack*)
+                                    (ash symbol-value-slot word-shift)
+                                    (- other-pointer-lowtag)))
+              delta)))))

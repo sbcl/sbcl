@@ -71,6 +71,7 @@
   "Should the debugger display beginner-oriented help messages?")
 
 (defun debug-prompt (stream)
+  (sb!thread::get-foreground)
   (format stream
 	  "~%~W~:[~;[~W~]] "
 	  (sb!di:frame-number *current-frame*)
@@ -650,6 +651,9 @@ Other commands:
       (let ((*debugger-hook* nil))
 	(funcall old-hook condition old-hook))))
 
+  ;; If we're a background thread and *background-threads-wait-for-debugger*
+  ;; is NIL, this will invoke a restart
+
   ;; Note: CMU CL had (SB-UNIX:UNIX-SIGSETMASK 0) here. I deleted it
   ;; around sbcl-0.7.8.5 (by which time it had mutated to have a
   ;; #!-SUNOS prefix and a FIXME note observing that it wasn't needed
@@ -703,6 +707,7 @@ reset to ~S."
 	   (*readtable* *debug-readtable*)
 	   (*print-readably* nil)
 	   (*package* original-package)
+	   (background-p nil)
 	   (*print-pretty* original-print-pretty))
 
        ;; Before we start our own output, finish any pending output.
@@ -747,6 +752,10 @@ reset to ~S."
        ;; older debugger code which was written to do i/o on whatever
        ;; stream was in fashion at the time, and not all of it has
        ;; been converted to behave this way. -- WHN 2000-11-16)
+
+       (setf background-p
+	     (sb!thread::debugger-wait-until-foreground-thread *debug-io*))
+       (unwind-protect
        (let (;; FIXME: Rebinding *STANDARD-OUTPUT* here seems wrong,
 	     ;; violating the principle of least surprise, and making
 	     ;; it impossible for the user to do reasonable things
@@ -773,7 +782,8 @@ reset to ~S."
 		     '*debug-condition*
 		     '*debug-beginner-help-p*))
 	   (show-restarts *debug-restarts* *debug-io*))
-	 (internal-debug))))))
+	      (internal-debug))
+	 (when background-p (sb!thread::release-foreground)))))))
 
 (defun show-restarts (restarts s)
   (cond ((null restarts)

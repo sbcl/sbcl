@@ -29,29 +29,42 @@ extern struct thread *all_threads;
 extern int dynamic_values_bytes;
 extern struct thread *find_thread_by_pid(pid_t pid);
 
+#ifdef LISP_FEATURE_SB_THREAD
 #define for_each_thread(th) for(th=all_threads;th;th=th->next)
+#else
+/* there's some possibility a SSC could notice this never actually
+ * loops  */
+#define for_each_thread(th) for(th=all_threads;th;th=0)
+#endif
 
 static inline lispobj SymbolValue(u32 tagged_symbol_pointer, void *thread) {
     struct symbol *sym= (struct symbol *)
 	(tagged_symbol_pointer-OTHER_POINTER_LOWTAG);
+#ifdef LISP_FEATURE_SB_THREAD
     if(thread && sym->tls_index) {
 	lispobj r=
 	    ((union per_thread_data *)thread)
 	    ->dynamic_values[fixnum_value(sym->tls_index)];
 	if(r!=UNBOUND_MARKER_WIDETAG) return r;
     }
+#endif
     return sym->value;
 }
 static inline lispobj SymbolTlValue(u32 tagged_symbol_pointer, void *thread) {
     struct symbol *sym= (struct symbol *)
 	(tagged_symbol_pointer-OTHER_POINTER_LOWTAG);
+#ifdef LISP_FEATURE_SB_THREAD
     return ((union per_thread_data *)thread)
 	->dynamic_values[fixnum_value(sym->tls_index)];
+#else
+    return sym->value;
+#endif
 }
 
 static inline void SetSymbolValue(u32 tagged_symbol_pointer,lispobj val, void *thread) {
     struct symbol *sym=	(struct symbol *)
 	(tagged_symbol_pointer-OTHER_POINTER_LOWTAG);
+#ifdef LISP_FEATURE_SB_THREAD
     if(thread && sym->tls_index) {
 	lispobj *pr= &(((union per_thread_data *)thread)
 		       ->dynamic_values[fixnum_value(sym->tls_index)]);
@@ -60,14 +73,19 @@ static inline void SetSymbolValue(u32 tagged_symbol_pointer,lispobj val, void *t
 	    return;
 	}
     }
+#endif
     sym->value = val;
 }
 static inline void SetTlSymbolValue(u32 tagged_symbol_pointer,lispobj val, void *thread) {
+#ifdef LISP_FEATURE_SB_THREAD
     struct symbol *sym=	(struct symbol *)
 	(tagged_symbol_pointer-OTHER_POINTER_LOWTAG);
     ((union per_thread_data *)thread)
 	->dynamic_values[fixnum_value(sym->tls_index)]
 	=val;
+#else
+    SetSymbolValue(tagged_symbol_pointer,val,thread) ;
+#endif
 }
 
     

@@ -41,6 +41,7 @@ int
 new_thread_trampoline(struct thread *th)
 {
     lispobj function;
+    lispobj *args = NULL;
     function = th->unbound_marker;
     if(go==0) {
 	fprintf(stderr, "/pausing 0x%lx(%d,%d) before new_thread_trampoline(0x%lx)\n",
@@ -54,7 +55,11 @@ new_thread_trampoline(struct thread *th)
 
     if(arch_os_thread_init(th)==0) 
 	return 1;		/* failure.  no, really */
-    return funcall0(function);
+#ifdef LISP_FEATURE_SB_THREAD
+    return call_into_lisp(function,args,0);
+#else
+    return call_into_lisp_first_time(function,args,0);
+#endif
 }
 
 /* this is called from any other thread to create the new one, and
@@ -99,6 +104,7 @@ pid_t create_thread(lispobj initial_function) {
 		 make_fixnum(MAX_INTERRUPTS+
 			     sizeof(struct thread)/sizeof(lispobj)),
 		 0);
+#ifdef LISP_FEATURE_SB_THREAD
 #define STATIC_TLS_INIT(sym,field) \
   ((struct symbol *)(sym-OTHER_POINTER_LOWTAG))->tls_index= \
   make_fixnum(THREAD_SLOT_OFFSET_WORDS(field))
@@ -110,6 +116,7 @@ pid_t create_thread(lispobj initial_function) {
 	STATIC_TLS_INIT(PSEUDO_ATOMIC_ATOMIC,pseudo_atomic_atomic);
 	STATIC_TLS_INIT(PSEUDO_ATOMIC_INTERRUPTED,pseudo_atomic_interrupted);
 #undef STATIC_TLS_INIT
+#endif
     }
 
     th->control_stack_start = spaces;
@@ -131,6 +138,21 @@ pid_t create_thread(lispobj initial_function) {
      * sure why, but it appears to help */
     th->pseudo_atomic_atomic=make_fixnum(1);
     gc_set_region_empty(&th->alloc_region);
+
+#ifndef LISP_FEATURE_SB_THREAD
+    /* the tls-points-into-struct-thread trick is only good for threaded
+     * sbcl, because unithread sbcl doesn't have tls.  So, we copy the
+     * appropriate values from struct thread here, and make sure that 
+     * we use the appropriate SymbolValue macros to access any of the
+     * variable quantities from the C runtime.  It's not quite OAOOM,
+     * it just feels like it */
+    SetSymbolValue(BINDING_STACK_START,th->binding_stack_start,th);
+    SetSymbolValue(BINDING_STACK_POINTER,th->binding_stack_pointer,th);
+    SetSymbolValue(CONTROL_STACK_START,th->control_stack_start,th);
+    SetSymbolValue(ALIEN_STACK,th->alien_stack_pointer,th);
+    SetSymbolValue(PSEUDO_ATOMIC_ATOMIC,th->pseudo_atomic_atomic,th);
+    SetSymbolValue(PSEUDO_ATOMIC_INTERRUPTED,th->pseudo_atomic_interrupted,th);
+#endif
     
     bind_variable(CURRENT_CATCH_BLOCK,make_fixnum(0),th);
     bind_variable(CURRENT_UNWIND_PROTECT_BLOCK,make_fixnum(0),th); 
@@ -146,9 +168,9 @@ pid_t create_thread(lispobj initial_function) {
 	memcpy(th->interrupt_data,global_interrupt_data,
 	       sizeof (struct interrupt_data));
 
-
-#if defined(LISP_FEATURE_X86) && defined (LISP_FEATURE_LINUX)
     th->unbound_marker=initial_function;
+#ifdef LISP_FEATURE_SB_THREAD
+#if defined(LISP_FEATURE_X86) && defined (LISP_FEATURE_LINUX)
     kid_pid=
 	clone(new_thread_trampoline,
 	      (((void*)th->control_stack_start)+THREAD_CONTROL_STACK_SIZE-4),
@@ -159,7 +181,9 @@ pid_t create_thread(lispobj initial_function) {
 #else
 #error this stuff presently only works on x86 Linux
 #endif
-
+#else
+    kid_pid=getpid();
+#endif
     get_spinlock(&all_threads_lock,kid_pid);
     th->next=all_threads;
     all_threads=th;
@@ -169,6 +193,11 @@ pid_t create_thread(lispobj initial_function) {
     protect_control_stack_guard_page(th->pid,1);
     all_threads_lock=0;
     th->pid=kid_pid;		/* child will not start until this is set */
+#ifndef LISP_FEATURE_SB_THREAD
+    new_thread_trampoline(all_threads);	/*  call_into_lisp */
+    lose("Clever child?  Idiot savant, verging on the.");
+#endif
+
     return th->pid;
  cleanup:
     /* if(th && th->tls_cookie>=0) os_free_tls_pointer(th); */

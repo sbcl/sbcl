@@ -24,6 +24,7 @@
 #include "interr.h"
 #include "breakpoint.h"
 #include "monitor.h"
+#include "thread.h"
 
 #include "genesis/static-symbols.h"
 #include "genesis/symbol.h"
@@ -115,13 +116,14 @@ arch_internal_error_arguments(os_context_t *context)
 boolean
 arch_pseudo_atomic_atomic(os_context_t *context)
 {
-    return SymbolValue(PSEUDO_ATOMIC_ATOMIC);
+    return SymbolValue(PSEUDO_ATOMIC_ATOMIC,arch_os_get_current_thread());
 }
 
 void
 arch_set_pseudo_atomic_interrupted(os_context_t *context)
 {
-    SetSymbolValue(PSEUDO_ATOMIC_INTERRUPTED, make_fixnum(1));
+    SetSymbolValue(PSEUDO_ATOMIC_INTERRUPTED, make_fixnum(1),
+		   arch_os_get_current_thread());
 }
 
 /*
@@ -316,6 +318,7 @@ call_into_lisp(lispobj fun, lispobj *args, int nargs);
  * could be in registers depending on what the compiler likes. So we
  * copy the args into a portable vector and let the assembly language
  * call-in function figure it out. */
+
 lispobj
 funcall0(lispobj function)
 {

@@ -59,16 +59,7 @@ void globals_init(void)
 
     /* Set foreign function call active. */
     foreign_function_call_active = 1;
-
-    /* Initialize the current Lisp state. */
-#ifdef LISP_FEATURE_STACK_GROWS_DOWNWARD_NOT_UPWARD
-    current_control_stack_pointer = (lispobj *)CONTROL_STACK_END;
-#else
-    current_control_stack_pointer = (lispobj *)CONTROL_STACK_START;
-#endif
-
-    current_control_frame_pointer = (lispobj *)0;
-#ifndef BINDING_STACK_POINTER
-    current_binding_stack_pointer = native_pointer(BINDING_STACK_START);
+#ifdef LISP_FEATURE_SB_THREAD
+    parent_pid=getpid();
 #endif
 }

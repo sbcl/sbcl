@@ -39,7 +39,7 @@ C_SRCS =alloc.c backtrace.c breakpoint.c coreparse.c \
 	dynbind.c gc-common.c globals.c interr.c interrupt.c \
 	monitor.c parse.c print.c purify.c \
 	regnames.c run-program.c runtime.c save.c search.c \
-	time.c util.c validate.c vars.c wrap.c 
+	thread.c time.c util.c validate.c vars.c wrap.c 
 
 SRCS=	$(C_SRCS) ${ARCH_SRC} ${ASSEM_SRC} ${OS_SRC} ${GC_SRC}
 

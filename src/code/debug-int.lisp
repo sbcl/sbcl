@@ -527,15 +527,20 @@
 #!-sb-fluid (declaim (inline control-stack-pointer-valid-p))
 (defun control-stack-pointer-valid-p (x)
   (declare (type system-area-pointer x))
+  (let* ((control-stack-start
+	  (descriptor-sap sb!vm::*control-stack-start*))
+	 (control-stack-end
+	  (sap+
+	   (descriptor-sap sb!vm::*binding-stack-start*) -4)))
   #!-stack-grows-downward-not-upward
   (and (sap< x (current-sp))
-       (sap<= (int-sap control-stack-start)
+	 (sap<= control-stack-start
 	      x)
        (zerop (logand (sap-int x) #b11)))
   #!+stack-grows-downward-not-upward
   (and (sap>= x (current-sp))
-       (sap> (int-sap control-stack-end) x)
-       (zerop (logand (sap-int x) #b11))))
+	 (sap> control-stack-end x)
+	 (zerop (logand (sap-int x) #b11)))))
 
 #!+x86
 (sb!alien:define-alien-routine component-ptr-from-pc (system-area-pointer)
@@ -711,7 +716,7 @@
 		     (when (control-stack-pointer-valid-p fp)
 		       #!+x86
 			(multiple-value-bind (ra ofp) (x86-call-context fp)
-			  (compute-calling-frame ofp ra frame))
+			 (and ra (compute-calling-frame ofp ra frame)))
 			#!-x86
 		       (compute-calling-frame
 			#!-alpha
@@ -883,14 +888,20 @@
 			     escaped)))))
 
 #!+x86
+(defun nth-interrupt-context (n)
+  (declare (type (unsigned-byte 32) n)
+	   (optimize (speed 3) (safety 0)))
+  (sb!alien:sap-alien (sb!vm::current-thread-offset-sap 
+		       (+ sb!vm::thread-interrupt-contexts-offset n))
+		      (* os-context-t)))
+
+#!+x86
 (defun find-escaped-frame (frame-pointer)
   (declare (type system-area-pointer frame-pointer))
   (/noshow0 "entering FIND-ESCAPED-FRAME")
   (dotimes (index *free-interrupt-context-index* (values nil 0 nil))
-    (sb!alien:with-alien
-	((lisp-interrupt-contexts (array (* os-context-t) nil) :extern))
       (/noshow0 "at head of WITH-ALIEN")
-      (let ((context (sb!alien:deref lisp-interrupt-contexts index)))
+    (let ((context (nth-interrupt-context index)))
 	(/noshow0 "got CONTEXT")
 	(when (= (sap-int frame-pointer)
 		 (sb!vm:context-register context sb!vm::cfp-offset))
@@ -922,7 +933,7 @@
 			 pc-offset code))
 	       (/noshow0 "returning from FIND-ESCAPED-FRAME")
 	       (return
-		(values code pc-offset context))))))))))
+	       (values code pc-offset context)))))))))
 
 #!-x86
 (defun find-escaped-frame (frame-pointer)

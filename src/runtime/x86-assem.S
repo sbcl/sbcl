@@ -19,8 +19,8 @@
 #include "genesis/closure.h"
 #include "genesis/fdefn.h"
 #include "genesis/static-symbols.h"
-#include "genesis/symbol.h"	
-
+#include "genesis/symbol.h"
+#include "genesis/thread.h"
 	
 /* Minimize conditionalization for different OS naming schemes. */
 #if defined __linux__  || defined __FreeBSD__ /* (but *not* OpenBSD) */
@@ -43,6 +43,7 @@
 
 	.text
 	.global	GNAME(foreign_function_call_active)
+	.global	GNAME(all_threads)
 	
 
 /*
@@ -127,19 +128,38 @@ Lfp_rtn_value:
 
 
 	.text	
+	.global GNAME(call_into_lisp_first_time)
+	.type  GNAME(call_into_lisp_first_time),@function
+		
+/* The *ALIEN-STACK* pointer is set up on the first call_into_lisp when
+ * the stack changes.  We don't worry too much about saving registers 
+ * here, because we never expect to return from the initial call to lisp 
+ * anyway */
+	
+	.align	align_16byte,0x90
+GNAME(call_into_lisp_first_time):
+	pushl	%ebp		# Save old frame pointer.
+	movl	%esp,%ebp	# Establish new frame.
+	movl    %esp,ALIEN_STACK + SYMBOL_VALUE_OFFSET
+	movl    all_threads,%eax
+	movl    THREAD_CONTROL_STACK_START_OFFSET(%eax) ,%esp
+	/* don't think too hard about what happens if we get interrupted
+	* here */
+	addl 	$THREAD_CONTROL_STACK_SIZE-4,%esp
+	jmp     Lstack
+
+	.text	
 	.global GNAME(call_into_lisp)
 	.type  GNAME(call_into_lisp),@function
 		
 /* The C conventions require that ebx, esi, edi, and ebp be preserved
  * across function calls. */
-/* The *ALIEN-STACK* pointer is set up on the first call_into_lisp when
- * the stack changes. */
 	
 	.align	align_16byte,0x90
 GNAME(call_into_lisp):
 	pushl	%ebp		# Save old frame pointer.
 	movl	%esp,%ebp	# Establish new frame.
-
+Lstack:
 /* Save the NPX state */
 	fwait			# Catch any pending NPX exceptions.
 	subl	$108,%esp	# Make room for the NPX state.
@@ -178,15 +198,6 @@ GNAME(call_into_lisp):
 	movl	%eax, GNAME(foreign_function_call_active)
 
 	movl	%esp,%ebx	# remember current stack
-	cmpl	$CONTROL_STACK_START,%esp
-	jbe	ChangeToLispStack
-	cmpl	$CONTROL_STACK_END,%esp
-	jbe	OnLispStack
-ChangeToLispStack:
-	/* Setup the *alien-stack* pointer */
-	movl	%esp,ALIEN_STACK + SYMBOL_VALUE_OFFSET
-	movl	$CONTROL_STACK_END,%esp		# new stack
-OnLispStack:
 	pushl	%ebx		# Save entry stack on (maybe) new stack.
 
 	/* Establish Lisp args. */
@@ -662,7 +673,7 @@ GNAME(alloc_16_to_edi):
 		
 
 
-#ifdef LISP_FEATURE_GENCGC_INLINE_ALLOC /* disabled at present */
+#ifdef GENCGC_INLINE_ALLOC /* LISP_FEATURE_GENCGC */
 
 /* These routines are called from Lisp when an inline allocation 
  * overflows. Every register except the result needs to be preserved.

@@ -280,10 +280,21 @@ function should notify the user that the system has finished GC'ing.")
 
 (sb!alien:define-alien-routine clear-auto-gc-trigger sb!alien:void)
 
+#!+sb-thread
+(def-c-var-frob gc-thread-pid "gc_thread_pid")
+#!+sb-thread
+(defun other-thread-collect-garbage (gen)
+  (setf (sb!alien:extern-alien "maybe_gc_pending" (sb!alien:unsigned 32))
+	(1+ gen))
+  (sb!unix:unix-kill (gc-thread-pid) :SIGALRM))
+
 ;;; This variable contains the function that does the real GC. This is
 ;;; for low-level GC experimentation. Do not touch it if you do not
 ;;; know what you are doing.
-(defvar *internal-gc* #'collect-garbage)
+(defvar *internal-gc*
+  #!+sb-thread #'other-thread-collect-garbage
+  #!-sb-thread #'collect-garbage)
+	
 
 ;;;; SUB-GC
 

@@ -87,6 +87,11 @@
 ;;; normally causes nested uses to be no-ops).
 (defvar *in-compilation-unit* nil)
 
+;;; This lock is siezed in the same situation: the compiler is not
+;;; presently thread-safe
+(defvar *big-compiler-lock*
+  (sb!thread:make-mutex :name "big compiler lock"))
+
 ;;; Count of the number of compilation units dynamically enclosed by
 ;;; the current active WITH-COMPILATION-UNIT that were unwound out of.
 (defvar *aborted-compilation-unit-count*)
@@ -127,7 +132,7 @@
 	;; Inside another WITH-COMPILATION-UNIT, a WITH-COMPILATION-UNIT is
 	;; ordinarily (unless OVERRIDE) basically a no-op.
 	(unwind-protect
-	    (multiple-value-prog1 (funcall fn) (setf succeeded-p t))
+	     (multiple-value-prog1 (funcall fn) (setf succeeded-p t))
 	  (unless succeeded-p
 	    (incf *aborted-compilation-unit-count*)))
 	;; FIXME: Now *COMPILER-FOO-COUNT* stuff is bound in more than
@@ -140,16 +145,17 @@
 	      (*compiler-note-count* 0)
 	      (*undefined-warnings* nil)
 	      (*in-compilation-unit* t))
-	  (handler-bind ((parse-unknown-type
-			  (lambda (c)
-			    (note-undefined-reference
-			     (parse-unknown-type-specifier c)
-			     :type))))
-	    (unwind-protect
-		(multiple-value-prog1 (funcall fn) (setf succeeded-p t))
-	      (unless succeeded-p
-		(incf *aborted-compilation-unit-count*))
-	      (summarize-compilation-unit (not succeeded-p))))))))
+	  (sb!thread:with-recursive-lock (*big-compiler-lock*)
+	    (handler-bind ((parse-unknown-type
+			    (lambda (c)
+			      (note-undefined-reference
+			       (parse-unknown-type-specifier c)
+			       :type))))
+	      (unwind-protect
+		   (multiple-value-prog1 (funcall fn) (setf succeeded-p t))
+		(unless succeeded-p
+		  (incf *aborted-compilation-unit-count*))
+		(summarize-compilation-unit (not succeeded-p)))))))))
 
 ;;; This is to be called at the end of a compilation unit. It signals
 ;;; any residual warnings about unknown stuff, then prints the total

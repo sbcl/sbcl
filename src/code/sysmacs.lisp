@@ -10,24 +10,30 @@
 ;;;; files for more information.
 
 (in-package "SB!IMPL")
-
 
-#!-sb-thread
-(defmacro atomic-incf (symbol-name &optional (delta 1))
-  `(incf ,symbol-name ,delta))
+;;; FIXME Not the most sensible way to do this: we could just use
+;;; LOCK ADD, given that we don't need the old version.  This will
+;;; do until we get around to writing new VOPs
+;;; FIXME in fact we're not SMP-safe without LOCK anyway, but
+;;; this will do us for UP systems
 
-(defmacro atomic-decf (place &optional (delta 1))
-  `(atomic-incf ,place ,(- delta)))
-
+(defmacro atomic-incf/symbol (symbol-name &optional (delta 1))
+  #!-sb-thread
+  `(incf ,symbol-name ,delta)
+  #!+sb-thread
+  `(locally
+    (declare (optimize (safety 0) (speed 3)))
+    (sb!vm::fast-symbol-global-value-xadd ',symbol-name ,delta)
+    ,symbol-name))
 
 (defmacro without-gcing (&rest body)
   #!+sb-doc
   "Executes the forms in the body without doing a garbage collection."
   `(unwind-protect
     (progn
-      (atomic-incf *gc-inhibit*)
+      (atomic-incf/symbol *gc-inhibit*)
       ,@body)
-    (atomic-decf *gc-inhibit*)
+    (atomic-incf/symbol *gc-inhibit* -1)
     (when (and *need-to-collect-garbage* (zerop *gc-inhibit*))
       (maybe-gc nil))))
 

@@ -23,12 +23,11 @@
 #include "alloc.h"
 #include "globals.h"
 #include "gc.h"
-#include "genesis/static-symbols.h"
+#include "thread.h"
 #include "genesis/vector.h"
 #include "genesis/cons.h"
 #include "genesis/bignum.h"
 #include "genesis/sap.h"
-#include "genesis/symbol.h"
 
 #define GET_FREE_POINTER() dynamic_space_free_pointer
 #define SET_FREE_POINTER(new_value) \
@@ -45,11 +44,12 @@ lispobj *
 pa_alloc(int bytes) 
 {
     lispobj *result=0;
-    SetSymbolValue(PSEUDO_ATOMIC_INTERRUPTED, make_fixnum(0));
-    SetSymbolValue(PSEUDO_ATOMIC_ATOMIC, make_fixnum(1));
+    struct thread *th=arch_os_get_current_thread();
+    SetSymbolValue(PSEUDO_ATOMIC_INTERRUPTED, make_fixnum(0),th);
+    SetSymbolValue(PSEUDO_ATOMIC_ATOMIC, make_fixnum(1),th);
     result=alloc(bytes);
-    SetSymbolValue(PSEUDO_ATOMIC_ATOMIC, make_fixnum(0));
-    if (SymbolValue(PSEUDO_ATOMIC_INTERRUPTED)) 
+    SetSymbolValue(PSEUDO_ATOMIC_ATOMIC, make_fixnum(0),th);
+    if (SymbolValue(PSEUDO_ATOMIC_INTERRUPTED,th)) 
 	/* even if we gc at this point, the new allocation will be
 	 * protected from being moved, because result is on the c stack
 	 * and points to it */

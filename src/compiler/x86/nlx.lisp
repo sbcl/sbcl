@@ -44,15 +44,16 @@
   (:results (catch :scs (descriptor-reg))
 	    (alien-stack :scs (descriptor-reg)))
   (:generator 13
-    (load-symbol-value catch *current-catch-block*)
-    (load-symbol-value alien-stack *alien-stack*)))
+    (load-tl-symbol-value catch *current-catch-block*)
+    (load-tl-symbol-value alien-stack *alien-stack*)))
 
 (define-vop (restore-dynamic-state)
   (:args (catch :scs (descriptor-reg))
 	 (alien-stack :scs (descriptor-reg)))
+  #!+sb-thread (:temporary (:sc unsigned-reg) temp)
   (:generator 10
-    (store-symbol-value catch *current-catch-block*)
-    (store-symbol-value alien-stack *alien-stack*)))
+    (store-tl-symbol-value catch *current-catch-block* temp)
+    (store-tl-symbol-value alien-stack *alien-stack* temp)))
 
 (define-vop (current-stack-pointer)
   (:results (res :scs (any-reg control-stack)))
@@ -62,7 +63,7 @@
 (define-vop (current-binding-pointer)
   (:results (res :scs (any-reg descriptor-reg)))
   (:generator 1
-    (load-symbol-value res *binding-stack-pointer*)))
+    (load-tl-symbol-value res *binding-stack-pointer*)))
 
 ;;;; unwind block hackery
 
@@ -75,7 +76,7 @@
   (:results (block :scs (any-reg)))
   (:generator 22
     (inst lea block (catch-block-ea tn))
-    (load-symbol-value temp *current-unwind-protect-block*)
+    (load-tl-symbol-value temp *current-unwind-protect-block*)
     (storew temp block unwind-block-current-uwp-slot)
     (storew ebp-tn block unwind-block-current-cont-slot)
     (storew (make-fixup nil :code-object entry-label)
@@ -91,42 +92,42 @@
   (:temporary (:sc descriptor-reg) temp)
   (:generator 44
     (inst lea block (catch-block-ea tn))
-    (load-symbol-value temp *current-unwind-protect-block*)
+    (load-tl-symbol-value temp *current-unwind-protect-block*)
     (storew temp block  unwind-block-current-uwp-slot)
     (storew ebp-tn block  unwind-block-current-cont-slot)
     (storew (make-fixup nil :code-object entry-label)
 	    block catch-block-entry-pc-slot)
     (storew tag block catch-block-tag-slot)
-    (load-symbol-value temp *current-catch-block*)
+    (load-tl-symbol-value temp *current-catch-block*)
     (storew temp block catch-block-previous-catch-slot)
-    (store-symbol-value block *current-catch-block*)))
+    (store-tl-symbol-value block *current-catch-block* temp)))
 
 ;;; Just set the current unwind-protect to TN's address. This instantiates an
 ;;; unwind block as an unwind-protect.
 (define-vop (set-unwind-protect)
   (:args (tn))
-  (:temporary (:sc unsigned-reg) new-uwp)
+  (:temporary (:sc unsigned-reg) new-uwp #!+sb-thread tls)
   (:generator 7
     (inst lea new-uwp (catch-block-ea tn))
-    (store-symbol-value new-uwp *current-unwind-protect-block*)))
+    (store-tl-symbol-value new-uwp *current-unwind-protect-block* tls)))
 
 (define-vop (unlink-catch-block)
-  (:temporary (:sc unsigned-reg) block)
+  (:temporary (:sc unsigned-reg) #!+sb-thread tls block)
   (:policy :fast-safe)
   (:translate %catch-breakup)
   (:generator 17
-    (load-symbol-value block *current-catch-block*)
+    (load-tl-symbol-value block *current-catch-block*)
     (loadw block block catch-block-previous-catch-slot)
-    (store-symbol-value block *current-catch-block*)))
+    (store-tl-symbol-value block *current-catch-block* tls)))
 
 (define-vop (unlink-unwind-protect)
-    (:temporary (:sc unsigned-reg) block)
+    (:temporary (:sc unsigned-reg) block #!+sb-thread tls)
   (:policy :fast-safe)
   (:translate %unwind-protect-breakup)
   (:generator 17
-    (load-symbol-value block *current-unwind-protect-block*)
+    (load-tl-symbol-value block *current-unwind-protect-block*)
     (loadw block block unwind-block-current-uwp-slot)
-    (store-symbol-value block *current-unwind-protect-block*)))
+    (store-tl-symbol-value block *current-unwind-protect-block* tls)))
 
 ;;;; NLX entry VOPs
 (define-vop (nlx-entry)

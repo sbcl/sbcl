@@ -197,7 +197,7 @@
 
   (declare (ignore start count))
 
-  (load-symbol-value catch *current-catch-block*)
+  (load-tl-symbol-value catch *current-catch-block*)
 
   LOOP
 
@@ -232,7 +232,7 @@
     (inst or block block)		; check for NULL pointer
     (inst jmp :z error))
 
-  (load-symbol-value uwp *current-unwind-protect-block*)
+  (load-tl-symbol-value uwp *current-unwind-protect-block*)
 
   ;; Does *CURRENT-UNWIND-PROTECT-BLOCK* match the value stored in
   ;; argument's CURRENT-UWP-SLOT?
@@ -247,7 +247,9 @@
   (move block uwp)
   ;; Set next unwind protect context.
   (loadw uwp uwp unwind-block-current-uwp-slot)
-  (store-symbol-value uwp *current-unwind-protect-block*)
+  ;; we're about to reload ebp anyway, so let's borrow it here as a
+  ;; temporary.  Hope this works
+  (store-tl-symbol-value uwp *current-unwind-protect-block* ebp-tn)
 
   DO-EXIT
 

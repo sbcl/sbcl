@@ -50,16 +50,45 @@
        ;; Else, value not immediate.
        (storew value object offset lowtag))))
 
+
+
 ;;;; symbol hacking VOPs
 
 ;;; these next two cf the sparc version, by jrd.
 ;;; FIXME: Deref this ^ reference.
 
+
 ;;; The compiler likes to be able to directly SET symbols.
+#!+sb-thread
+(define-vop (set)
+  (:args (symbol :scs (descriptor-reg))
+         (value :scs (descriptor-reg any-reg)))
+  (:translate sb!kernel:%set-symbol-value)
+  (:temporary (:sc descriptor-reg ) tls)
+  ;;(:policy :fast-safe)
+  (:generator 4
+    (let ((global-val (gen-label))
+	  (done (gen-label)))
+      (loadw tls symbol symbol-tls-index-slot other-pointer-lowtag)
+      (inst or tls tls)
+      (inst jmp :z global-val)
+      (inst fs-segment-prefix)
+      (inst cmp (make-ea :dword :scale 1 :index tls) unbound-marker-widetag)
+      (inst jmp :z global-val)
+      (inst fs-segment-prefix)
+      (inst mov (make-ea :dword :scale 1 :index tls) value)
+      (inst jmp done)
+      (emit-label global-val)
+      (storew value symbol symbol-value-slot other-pointer-lowtag)
+      (emit-label done))))
+
+;; unithreaded it's a lot simpler ...
+#!-sb-thread 
 (define-vop (set cell-set)
   (:variant symbol-value-slot other-pointer-lowtag))
 
 ;;; Do a cell ref with an error check for being unbound.
+;;; XXX stil used? I can't see where -dan
 (define-vop (checked-cell-ref)
   (:args (object :scs (descriptor-reg) :target obj-temp))
   (:results (value :scs (descriptor-reg any-reg)))
@@ -70,6 +99,33 @@
 
 ;;; With Symbol-Value, we check that the value isn't the trap object. So
 ;;; Symbol-Value of NIL is NIL.
+#!+sb-thread
+(define-vop (symbol-value)
+  (:translate symbol-value)
+  (:policy :fast-safe)
+  (:args (object :scs (descriptor-reg) :to (:result 1)))
+  (:results (value :scs (descriptor-reg any-reg)))
+  (:vop-var vop)
+  (:save-p :compute-only)
+  (:generator 9
+    (let* ((err-lab (generate-error-code vop unbound-symbol-error object))
+	   (ret-lab (gen-label)))
+      (loadw value object symbol-tls-index-slot other-pointer-lowtag)
+      (inst fs-segment-prefix)
+      (inst mov value (make-ea :dword :index value :scale 1))
+      (inst cmp value unbound-marker-widetag)
+      (inst jmp :ne ret-lab)
+      (loadw value object symbol-value-slot other-pointer-lowtag)
+      (inst cmp value unbound-marker-widetag)
+      (inst jmp :e err-lab)
+      (emit-label ret-lab))))
+
+#!+sb-thread
+(define-vop (fast-symbol-value symbol-value)
+  (:policy :fast)
+  (:translate symbol-value))
+
+#!-sb-thread
 (define-vop (symbol-value)
   (:translate symbol-value)
   (:policy :fast-safe)
@@ -83,18 +139,49 @@
       (inst cmp value unbound-marker-widetag)
       (inst jmp :e err-lab))))
 
+#!-sb-thread
 (define-vop (fast-symbol-value cell-ref)
   (:variant symbol-value-slot other-pointer-lowtag)
   (:policy :fast)
   (:translate symbol-value))
 
-(defknown fast-symbol-value-xadd (symbol fixnum) fixnum ())
-(define-vop (fast-symbol-value-xadd cell-xadd)
+(defknown fast-symbol-global-value-xadd (symbol fixnum) fixnum ())
+
+(define-vop (fast-symbol-global-value-xadd cell-xadd)
   (:variant symbol-value-slot other-pointer-lowtag)
   (:policy :fast)
-  (:translate fast-symbol-value-xadd)
+  (:translate fast-symbol-global-value-xadd)
   (:arg-types * tagged-num))
 
+#!+sb-thread
+(define-vop (boundp)
+  (:translate boundp)
+  (:policy :fast-safe)
+  (:args (object :scs (descriptor-reg)))
+  (:conditional)
+  (:info target not-p)
+  (:temporary (:sc descriptor-reg #+nil(:from (:argument 0))) value)
+  (:generator 9
+    (if not-p
+	(let ((not-target (gen-label)))
+	  (loadw value object symbol-value-slot other-pointer-lowtag)
+	  (inst cmp value unbound-marker-widetag)
+	  (inst jmp :ne not-target)
+	  (loadw value object symbol-tls-index-slot other-pointer-lowtag)
+	  (inst fs-segment-prefix)
+	  (inst cmp (make-ea :dword :index value :scale 1) unbound-marker-widetag)
+	  (inst jmp  :e  target)
+	  (emit-label not-target))
+	(progn
+	  (loadw value object symbol-value-slot other-pointer-lowtag)
+	  (inst cmp value unbound-marker-widetag)
+	  (inst jmp :ne target)
+	  (loadw value object symbol-tls-index-slot other-pointer-lowtag)
+	  (inst fs-segment-prefix)
+	  (inst cmp (make-ea :dword :index value :scale 1) unbound-marker-widetag)
+	  (inst jmp  :ne  target)))))
+
+#!-sb-thread
 (define-vop (boundp)
   (:translate boundp)
   (:policy :fast-safe)
@@ -106,6 +193,7 @@
     (loadw value object symbol-value-slot other-pointer-lowtag)
     (inst cmp value unbound-marker-widetag)
     (inst jmp (if not-p :e :ne) target)))
+
 
 (define-vop (symbol-hash)
   (:policy :fast-safe)
@@ -176,9 +264,38 @@
 ;;; the symbol on the binding stack and stuff the new value into the
 ;;; symbol.
 
+#!+sb-thread
 (define-vop (bind)
   (:args (val :scs (any-reg descriptor-reg))
 	 (symbol :scs (descriptor-reg)))
+  (:temporary (:sc unsigned-reg) tls-index temp bsp)
+  (:generator 5
+    (let ((tls-index-valid (gen-label)))
+      (load-tl-symbol-value bsp *binding-stack-pointer*)
+      (loadw tls-index symbol symbol-tls-index-slot other-pointer-lowtag)
+      (inst add bsp (* binding-size n-word-bytes))
+      (store-tl-symbol-value bsp *binding-stack-pointer* temp)
+      
+      (inst or tls-index tls-index)
+      (inst jmp :ne tls-index-valid)
+      ;; allocate a new tls-index
+      (load-symbol-value tls-index *free-tls-index*)
+      (inst add tls-index 4)		;XXX surely we can do this more
+      (store-symbol-value tls-index *free-tls-index*) ;succintly
+      (inst sub tls-index 4)
+      (storew tls-index symbol symbol-tls-index-slot other-pointer-lowtag)
+      (emit-label tls-index-valid)
+      (inst fs-segment-prefix) 
+      (inst mov temp (make-ea :dword :scale 1 :index tls-index))
+      (storew temp bsp (- binding-value-slot binding-size))
+      (storew symbol bsp (- binding-symbol-slot binding-size))
+      (inst fs-segment-prefix)
+      (inst mov (make-ea :dword :scale 1 :index tls-index) val))))
+
+#!-sb-thread
+(define-vop (bind)
+  (:args (val :scs (any-reg descriptor-reg))
+         (symbol :scs (descriptor-reg)))
   (:temporary (:sc unsigned-reg) temp bsp)
   (:generator 5
     (load-symbol-value bsp *binding-stack-pointer*)
@@ -189,6 +306,26 @@
     (storew symbol bsp (- binding-symbol-slot binding-size))
     (storew val symbol symbol-value-slot other-pointer-lowtag)))
 
+
+#!+sb-thread
+(define-vop (unbind)
+    ;; four temporaries?   
+  (:temporary (:sc unsigned-reg) symbol value bsp tls-index)
+  (:generator 0
+    (load-tl-symbol-value bsp *binding-stack-pointer*)
+    (loadw symbol bsp (- binding-symbol-slot binding-size))
+    (loadw value bsp (- binding-value-slot binding-size))
+
+    (loadw tls-index symbol symbol-tls-index-slot other-pointer-lowtag)    
+    (inst fs-segment-prefix)
+    (inst mov (make-ea :dword :scale 1 :index tls-index) value)
+
+    (storew 0 bsp (- binding-symbol-slot binding-size))
+    (inst sub bsp (* binding-size n-word-bytes))
+    ;; we're done with value, so we can use it as a temp here
+    (store-tl-symbol-value bsp *binding-stack-pointer* value)))
+
+#!-sb-thread
 (define-vop (unbind)
   (:temporary (:sc unsigned-reg) symbol value bsp)
   (:generator 0
@@ -200,11 +337,12 @@
     (inst sub bsp (* binding-size n-word-bytes))
     (store-symbol-value bsp *binding-stack-pointer*)))
 
+
 (define-vop (unbind-to-here)
   (:args (where :scs (descriptor-reg any-reg)))
-  (:temporary (:sc unsigned-reg) symbol value bsp)
+  (:temporary (:sc unsigned-reg) symbol value bsp #!+sb-thread tls-index)
   (:generator 0
-    (load-symbol-value bsp *binding-stack-pointer*)
+    (load-tl-symbol-value bsp *binding-stack-pointer*)
     (inst cmp where bsp)
     (inst jmp :e done)
 
@@ -213,16 +351,24 @@
     (inst or symbol symbol)
     (inst jmp :z skip)
     (loadw value bsp (- binding-value-slot binding-size))
-    (storew value symbol symbol-value-slot other-pointer-lowtag)
+    #!-sb-thread (storew value symbol symbol-value-slot other-pointer-lowtag)
+
+    #!+sb-thread (loadw
+		  tls-index symbol symbol-tls-index-slot other-pointer-lowtag)
+    #!+sb-thread (inst fs-segment-prefix)
+    #!+sb-thread (inst mov (make-ea :dword :scale 1 :index tls-index) value)
     (storew 0 bsp (- binding-symbol-slot binding-size))
 
     SKIP
     (inst sub bsp (* binding-size n-word-bytes))
     (inst cmp where bsp)
     (inst jmp :ne loop)
-    (store-symbol-value bsp *binding-stack-pointer*)
+    ;; we're done with value, so can use it as a temporary
+    (store-tl-symbol-value bsp *binding-stack-pointer* value)
 
     DONE))
+
+
 
 ;;;; closure indexing
 
@@ -284,6 +430,32 @@
 
 (define-full-setter instance-index-set * instance-slots-offset
   instance-pointer-lowtag (any-reg descriptor-reg) * %instance-set)
+
+
+(defknown %instance-set-conditional (instance index t t) t
+	  (unsafe))
+
+(define-vop (instance-set-conditional)
+  (:translate %instance-set-conditional)
+  (:args (object :scs (descriptor-reg) :to :eval)
+	 (slot :scs (any-reg) :to :result)
+	 (old-value :scs (descriptor-reg any-reg) :target eax)
+	 (new-value :scs (descriptor-reg any-reg)))
+  (:arg-types instance positive-fixnum * *)
+  (:temporary (:sc descriptor-reg :offset eax-offset
+		   :from (:argument 2) :to :result :target result)  eax)
+  (:results (result :scs (descriptor-reg any-reg)))
+  ;(:guard (backend-featurep :i486))
+  (:policy :fast-safe)
+  (:generator 5
+    (move eax old-value)
+    (inst cmpxchg (make-ea :dword :base object :index slot :scale 1
+			   :disp (- (* instance-slots-offset n-word-bytes)
+				    instance-pointer-lowtag))
+	  new-value)
+    (move result eax)))
+
+
 
 ;;;; code object frobbing
 

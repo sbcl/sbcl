@@ -38,11 +38,10 @@
 #include "arch.h"
 #include "gc.h"
 #include "gc-internal.h"
+#include "thread.h"
 #include "genesis/vector.h"
 #include "genesis/weak-pointer.h"
 #include "genesis/simple-fun.h"
-#include "genesis/static-symbols.h"
-#include "genesis/symbol.h"
 /* assembly language stub that executes trap_PendingInterrupt */
 void do_pending_interrupt(void);
 
@@ -246,6 +245,13 @@ unsigned int  gencgc_oldest_gen_to_gc = NUM_GENERATIONS-1;
  * search of the heap. XX Gencgc obviously needs to be better
  * integrated with the Lisp code. */
 static int  last_free_page;
+
+/* This lock is to prevent multiple threads from simultaneously
+ * allocating new regions which overlap each other.  Note that the
+ * majority of GC is single-threaded, but alloc() may be called
+ * from >1 thread at a time and must be thread-safe */
+static lispobj free_pages_lock=0;
+
 
 /*
  * miscellaneous heap functions
@@ -490,7 +496,7 @@ gc_alloc_new_region(int nbytes, int unboxed, struct alloc_region *alloc_region)
     gc_assert((alloc_region->first_page == 0)
 	      && (alloc_region->last_page == -1)
 	      && (alloc_region->free_pointer == alloc_region->end_addr));
-
+    get_spinlock(&free_pages_lock,alloc_region);
     if (unboxed) {
 	first_page =
 	    generations[gc_alloc_generation].alloc_unboxed_start_page;
@@ -509,20 +515,6 @@ gc_alloc_new_region(int nbytes, int unboxed, struct alloc_region *alloc_region)
 	+ page_address(first_page);
     alloc_region->free_pointer = alloc_region->start_addr;
     alloc_region->end_addr = alloc_region->start_addr + bytes_found;
-
-    if (gencgc_zero_check) {
-	int *p;
-	for (p = (int *)alloc_region->start_addr;
-	    p < (int *)alloc_region->end_addr; p++) {
-	    if (*p != 0) {
-		/* KLUDGE: It would be nice to use %lx and explicit casts
-		 * (long) in code like this, so that it is less likely to
-		 * break randomly when running on a machine with different
-		 * word sizes. -- WHN 19991129 */
-		lose("The new region at %x is not zero.", p);
-	    }
-	}
-    }
 
     /* Set up the pages. */
 
@@ -559,13 +551,30 @@ gc_alloc_new_region(int nbytes, int unboxed, struct alloc_region *alloc_region)
 	    alloc_region->start_addr - page_address(i);
 	page_table[i].allocated |= OPEN_REGION_PAGE ;
     }
-
     /* Bump up last_free_page. */
     if (last_page+1 > last_free_page) {
 	last_free_page = last_page+1;
 	SetSymbolValue(ALLOCATION_POINTER,
-		       (lispobj)(((char *)heap_base) + last_free_page*4096));
+		       (lispobj)(((char *)heap_base) + last_free_page*4096),
+		       0);
     }
+    free_pages_lock=0;
+    
+    /* we can do this after releasing free_pages_lock */
+    if (gencgc_zero_check) {
+	int *p;
+	for (p = (int *)alloc_region->start_addr;
+	     p < (int *)alloc_region->end_addr; p++) {
+	    if (*p != 0) {
+		/* KLUDGE: It would be nice to use %lx and explicit casts
+		 * (long) in code like this, so that it is less likely to
+		 * break randomly when running on a machine with different
+		 * word sizes. -- WHN 19991129 */
+		lose("The new region at %x is not zero.", p);
+	    }
+    }
+}
+
 }
 
 /* If the record_new_objects flag is 2 then all new regions created
@@ -836,6 +845,8 @@ gc_alloc_large(int nbytes, int unboxed, struct alloc_region *alloc_region)
        index ahead of the current region and bumped up here to save a
        lot of re-scanning. */
 
+    get_spinlock(&free_pages_lock,alloc_region);
+
     if (unboxed) {
 	first_page =
 	    generations[gc_alloc_generation].alloc_large_unboxed_start_page;
@@ -932,8 +943,9 @@ gc_alloc_large(int nbytes, int unboxed, struct alloc_region *alloc_region)
     if (last_page+1 > last_free_page) {
 	last_free_page = last_page+1;
 	SetSymbolValue(ALLOCATION_POINTER,
-		       (lispobj)(((char *)heap_base) + last_free_page*4096));
+		       (lispobj)(((char *)heap_base) + last_free_page*4096),0);
     }
+    free_pages_lock=0;
 
     return((void *)(page_address(first_page)+orig_first_page_bytes_used));
 }
@@ -951,6 +963,7 @@ gc_find_freeish_pages(int *restart_page_ptr, int nbytes, int unboxed, struct all
     int num_pages;
     int large = !alloc_region && (nbytes >= large_object_size);
 
+    gc_assert(free_pages_lock);
     /* Search for a contiguous free space of at least nbytes. If it's a
        large object then align it on a page boundary by searching for a
        free page. */
@@ -2088,7 +2101,7 @@ static lispobj*
 search_read_only_space(lispobj *pointer)
 {
     lispobj* start = (lispobj*)READ_ONLY_SPACE_START;
-    lispobj* end = (lispobj*)SymbolValue(READ_ONLY_SPACE_FREE_POINTER);
+    lispobj* end = (lispobj*)SymbolValue(READ_ONLY_SPACE_FREE_POINTER,0);
     if ((pointer < start) || (pointer >= end))
 	return NULL;
     return (search_space(start, (pointer+2)-start, pointer));
@@ -2098,7 +2111,7 @@ static lispobj *
 search_static_space(lispobj *pointer)
 {
     lispobj* start = (lispobj*)STATIC_SPACE_START;
-    lispobj* end = (lispobj*)SymbolValue(STATIC_SPACE_FREE_POINTER);
+    lispobj* end = (lispobj*)SymbolValue(STATIC_SPACE_FREE_POINTER,0);
     if ((pointer < start) || (pointer >= end))
 	return NULL;
     return (search_space(start, (pointer+2)-start, pointer));
@@ -2163,7 +2176,10 @@ possibly_valid_dynamic_space_pointer(lispobj *pointer)
      *   (2) Perhaps find some other hack to protect against this, e.g.
      *       recording the result of the last call to allocate-lisp-memory,
      *       and returning true from this function when *pointer is
-     *       a reference to that result. */
+     *       a reference to that result. 
+     *
+     * (surely pseudo-atomic is supposed to be used for exactly this?)
+     */
     switch (lowtag_of((lispobj)pointer)) {
     case FUN_POINTER_LOWTAG:
 	/* Start_addr should be the enclosing code object, or a closure
@@ -3231,7 +3247,7 @@ verify_space(lispobj *start, size_t words)
     int is_in_dynamic_space = (find_page_index((void*)start) != -1);
     int is_in_readonly_space =
 	(READ_ONLY_SPACE_START <= (unsigned)start &&
-	 (unsigned)start < SymbolValue(READ_ONLY_SPACE_FREE_POINTER));
+	 (unsigned)start < SymbolValue(READ_ONLY_SPACE_FREE_POINTER,0));
 
     while (words > 0) {
 	size_t count = 1;
@@ -3241,10 +3257,10 @@ verify_space(lispobj *start, size_t words)
 	    int page_index = find_page_index((void*)thing);
 	    int to_readonly_space =
 		(READ_ONLY_SPACE_START <= thing &&
-		 thing < SymbolValue(READ_ONLY_SPACE_FREE_POINTER));
+		 thing < SymbolValue(READ_ONLY_SPACE_FREE_POINTER,0));
 	    int to_static_space =
 		(STATIC_SPACE_START <= thing &&
-		 thing < SymbolValue(STATIC_SPACE_FREE_POINTER));
+		 thing < SymbolValue(STATIC_SPACE_FREE_POINTER,0));
 
 	    /* Does it point to the dynamic space? */
 	    if (page_index != -1) {
@@ -3439,18 +3455,20 @@ verify_gc(void)
      * to grep for all foo_size and rename the appropriate ones to
      * foo_count. */
     int read_only_space_size =
-	(lispobj*)SymbolValue(READ_ONLY_SPACE_FREE_POINTER)
+	(lispobj*)SymbolValue(READ_ONLY_SPACE_FREE_POINTER,0)
 	- (lispobj*)READ_ONLY_SPACE_START;
     int static_space_size =
-	(lispobj*)SymbolValue(STATIC_SPACE_FREE_POINTER)
+	(lispobj*)SymbolValue(STATIC_SPACE_FREE_POINTER,0)
 	- (lispobj*)STATIC_SPACE_START;
+    struct thread *th;
+    for_each_thread(th) {
     int binding_stack_size =
-	(lispobj*)SymbolValue(BINDING_STACK_POINTER)
-	- (lispobj*)BINDING_STACK_START;
-
+	    (lispobj*)SymbolValue(BINDING_STACK_POINTER,th)
+	    - (lispobj*)th->binding_stack_start;
+	verify_space(th->binding_stack_start, binding_stack_size);
+    }
     verify_space((lispobj*)READ_ONLY_SPACE_START, read_only_space_size);
     verify_space((lispobj*)STATIC_SPACE_START   , static_space_size);
-    verify_space((lispobj*)BINDING_STACK_START  , binding_stack_size);
 }
 
 static void
@@ -3588,7 +3606,7 @@ garbage_collect_generation(int generation, int raise)
     unsigned long bytes_freed;
     unsigned long i;
     unsigned long static_space_size;
-
+    struct thread *th;
     gc_assert(generation <= (NUM_GENERATIONS-1));
 
     /* The oldest generation can't be raised. */
@@ -3630,11 +3648,33 @@ garbage_collect_generation(int generation, int raise)
      * be un-protected anyway before unmapping later. */
     unprotect_oldspace();
 
-    /* Scavenge the stack's conservative roots. */
-    {
+    /* Scavenge the stacks' conservative roots. */
+    for_each_thread(th) {
 	void **ptr;
-	for (ptr = (void **)CONTROL_STACK_END - 1;
+#ifdef LISP_FEATURE_SB_THREAD
+	struct user_regs_struct regs;
+	if(ptrace(PTRACE_GETREGS,th->pid,0,&regs)){
+	    /* probably doesn't exist any more. */
+	    fprintf(stderr,"child pid %d, %s\n",th->pid,strerror(errno));
+	    perror("PTRACE_GETREGS");
+	}
+	preserve_pointer(regs.ebx);
+	preserve_pointer(regs.ecx);
+	preserve_pointer(regs.edx);
+	preserve_pointer(regs.esi);
+	preserve_pointer(regs.edi);
+	preserve_pointer(regs.ebp);
+	preserve_pointer(regs.eax);
+#endif
+	for (ptr = ((void **)
+		    ((void *)th->control_stack_start
+		     + THREAD_CONTROL_STACK_SIZE)
+		    -1);
+#ifdef LISP_FEATURE_SB_THREAD
+	     ptr > regs.esp;
+#else
 	     ptr > (void **)&raise;
+#endif
 	     ptr--) {
 	    preserve_pointer(*ptr);
 	}
@@ -3656,18 +3696,31 @@ garbage_collect_generation(int generation, int raise)
 
     /* Scavenge the Lisp functions of the interrupt handlers, taking
      * care to avoid SIG_DFL and SIG_IGN. */
+    for_each_thread(th) {
+	struct interrupt_data *data=th->interrupt_data;
     for (i = 0; i < NSIG; i++) {
-	union interrupt_handler handler = interrupt_handlers[i];
+	    union interrupt_handler handler = data->interrupt_handlers[i];
 	if (!ARE_SAME_HANDLER(handler.c, SIG_IGN) &&
 	    !ARE_SAME_HANDLER(handler.c, SIG_DFL)) {
-	    scavenge((lispobj *)(interrupt_handlers + i), 1);
+		scavenge((lispobj *)(data->interrupt_handlers + i), 1);
+	    }
 	}
     }
-
-    /* Scavenge the binding stack. */
-    scavenge((lispobj *) BINDING_STACK_START,
-	     (lispobj *)SymbolValue(BINDING_STACK_POINTER) -
-	     (lispobj *)BINDING_STACK_START);
+    /* Scavenge the binding stacks. */
+ {
+     struct thread *th;
+     for_each_thread(th) {
+	 long len= (lispobj *)SymbolValue(BINDING_STACK_POINTER,th) -
+	     th->binding_stack_start;
+	 scavenge((lispobj *) th->binding_stack_start,len);
+#ifdef LISP_FEATURE_SB_THREAD
+	 /* do the tls as well */
+	 len=fixnum_value(SymbolValue(FREE_TLS_INDEX,0)) -
+	     (sizeof (struct thread))/(sizeof (lispobj));
+         scavenge((lispobj *) (th+1),len);
+#endif
+	}
+    }
 
     /* The original CMU CL code had scavenge-read-only-space code
      * controlled by the Lisp-level variable
@@ -3690,7 +3743,7 @@ garbage_collect_generation(int generation, int raise)
 
     /* Scavenge static space. */
     static_space_size =
-	(lispobj *)SymbolValue(STATIC_SPACE_FREE_POINTER) -
+	(lispobj *)SymbolValue(STATIC_SPACE_FREE_POINTER,0) -
 	(lispobj *)STATIC_SPACE_START;
     if (gencgc_verbose > 1) {
 	FSHOW((stderr,
@@ -3801,7 +3854,7 @@ update_x86_dynamic_space_free_pointer(void)
     last_free_page = last_page+1;
 
     SetSymbolValue(ALLOCATION_POINTER,
-		   (lispobj)(((char *)heap_base) + last_free_page*4096));
+		   (lispobj)(((char *)heap_base) + last_free_page*4096),0);
     return 0; /* dummy value: return something ... */
 }
 
@@ -4005,7 +4058,7 @@ gc_free_heap(void)
     gc_set_region_empty(&unboxed_region);
 
     last_free_page = 0;
-    SetSymbolValue(ALLOCATION_POINTER, (lispobj)((char *)heap_base));
+    SetSymbolValue(ALLOCATION_POINTER, (lispobj)((char *)heap_base),0);
 
     if (verify_after_free_heap) {
 	/* Check whether purify has left any bad pointers. */
@@ -4076,7 +4129,7 @@ gencgc_pickup_dynamic(void)
 {
     int page = 0;
     int addr = DYNAMIC_SPACE_START;
-    int alloc_ptr = SymbolValue(ALLOCATION_POINTER);
+    int alloc_ptr = SymbolValue(ALLOCATION_POINTER,0);
 
     /* Initialize the first region. */
     do {
@@ -4120,18 +4173,20 @@ extern boolean maybe_gc_pending ;
 char *
 alloc(int nbytes)
 {
-    struct alloc_region *region=  &boxed_region; 
+    struct thread *th=arch_os_get_current_thread();
+    struct alloc_region *region= 
+	th ? &(th->alloc_region) : &boxed_region; 
     void *new_obj;
     void *new_free_pointer;
 
     /* Check for alignment allocation problems. */
     gc_assert((((unsigned)region->free_pointer & 0x7) == 0)
 	      && ((nbytes & 0x7) == 0));
-    /* At this point we should either be in pseudo-atomic, or early
-     * enough in cold initn that interrupts are not yet enabled anyway.
-     * It would be nice to assert same.
-     */
-    gc_assert(SymbolValue(PSEUDO_ATOMIC_ATOMIC));
+    if(all_threads)
+	/* there are a few places in the C code that allocate data in the
+	 * heap before Lisp starts.  This is before interrupts are enabled,
+	 * so we don't need to check for pseudo-atomic */
+	gc_assert(SymbolValue(PSEUDO_ATOMIC_ATOMIC,th));
 
     /* maybe we can do this quickly ... */
     new_free_pointer = region->free_pointer + nbytes;
@@ -4149,7 +4204,7 @@ alloc(int nbytes)
 	/* set things up so that GC happens when we finish the PA
 	 * section.  */
 	maybe_gc_pending=1;
-	SetSymbolValue(PSEUDO_ATOMIC_INTERRUPTED, make_fixnum(1));
+	SetSymbolValue(PSEUDO_ATOMIC_INTERRUPTED, make_fixnum(1),th);
     }
     new_obj = gc_alloc_with_region(nbytes,0,region,0);
     return (new_obj);
@@ -4260,6 +4315,9 @@ unhandled_sigmemoryfault()
 gc_alloc_update_all_page_tables(void)
 {
     /* Flush the alloc regions updating the tables. */
+    struct thread *th;
+    for_each_thread(th) 
+        gc_alloc_update_page_tables(0, &th->alloc_region);
     gc_alloc_update_page_tables(1, &unboxed_region);
     gc_alloc_update_page_tables(0, &boxed_region);
 }

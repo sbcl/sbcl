@@ -163,7 +163,7 @@
   (:translate binding-stack-pointer-sap)
   (:policy :fast-safe)
   (:generator 1
-    (load-symbol-value int *binding-stack-pointer*)))
+    (load-tl-symbol-value int *binding-stack-pointer*)))
 
 (defknown (setf binding-stack-pointer-sap)
     (system-area-pointer) system-area-pointer ())
@@ -173,10 +173,11 @@
   (:arg-types system-area-pointer)
   (:results (int :scs (sap-reg)))
   (:result-types system-area-pointer)
+  #!+sb-thread (:temporary (:sc any-reg) temp)
   (:translate (setf binding-stack-pointer-sap))
   (:policy :fast-safe)
   (:generator 1
-    (store-symbol-value new-value *binding-stack-pointer*)
+    (store-tl-symbol-value new-value *binding-stack-pointer* temp)
     (move int new-value)))
 
 (define-vop (control-stack-pointer-sap)
@@ -272,6 +273,26 @@
   (:translate sb!unix::receive-pending-interrupt)
   (:generator 1
     (inst break pending-interrupt-trap)))
+
+(defknown current-thread-offset-sap ((unsigned-byte 32))  
+  system-area-pointer (flushable))
+
+(define-vop (current-thread-offset-sap)
+  (:results (sap :scs (sap-reg)))
+  (:result-types system-area-pointer)
+  (:translate current-thread-offset-sap)
+  (:args (n :scs (unsigned-reg) #!+sb-thread :target #!+sb-thread sap))
+  #!-sb-thread (:temporary (:sc unsigned-reg :target sap) temp)
+  (:arg-types unsigned-num)
+  (:policy :fast-safe)
+  #!+sb-thread
+  (:generator 2
+    (inst fs-segment-prefix)
+    (inst mov sap (make-ea :dword :disp 0 :index n :scale 4)))
+  #!-sb-thread
+  (:generator 2
+    (inst mov temp (make-fixup (extern-alien-name "all_threads") :foreign))
+    (inst mov sap (make-ea :dword :base temp :index n :scale 4))))
 
 (define-vop (halt)
   (:generator 1

@@ -84,7 +84,35 @@
 			   (- other-pointer-lowtag)))
 	 ,reg))
 
+#!+sb-thread
+(defmacro load-tl-symbol-value (reg symbol)
+  `(progn
+    (inst mov ,reg
+     (make-ea :dword
+      :disp (+ nil-value
+	       (static-symbol-offset ',symbol)
+	       (ash symbol-tls-index-slot word-shift)
+	       (- other-pointer-lowtag))))
+    (inst fs-segment-prefix)
+    (inst mov ,reg (make-ea :dword :scale 1 :index ,reg))))
+#!-sb-thread
+(defmacro load-tl-symbol-value (reg symbol) `(load-symbol-value ,reg ,symbol))
 
+#!+sb-thread
+(defmacro store-tl-symbol-value (reg symbol temp)
+  `(progn
+    (inst mov ,temp
+     (make-ea :dword
+      :disp (+ nil-value
+	       (static-symbol-offset ',symbol)
+	       (ash symbol-tls-index-slot word-shift)
+	       (- other-pointer-lowtag))))
+    (inst fs-segment-prefix)
+    (inst mov (make-ea :dword :scale 1 :index ,temp) ,reg)))
+#!-sb-thread
+(defmacro store-tl-symbol-value (reg symbol temp)
+  `(store-symbol-value ,reg ,symbol))
+  
 (defmacro load-type (target source &optional (offset 0))
   #!+sb-doc
   "Loads the type bits of a pointer into target independent of
@@ -277,31 +305,53 @@
 
 ;;; FIXME: It appears that PSEUDO-ATOMIC is used to wrap operations which leave
 ;;; untagged memory lying around, but some documentation would be nice.
+#!+sb-thread
+(defmacro pseudo-atomic (&rest forms)
+  (let ((label (gensym "LABEL-")))
+    `(let ((,label (gen-label)))
+      (inst fs-segment-prefix)
+      (inst mov (make-ea :byte :disp (* 4 thread-pseudo-atomic-atomic-slot)) 1)
+      (inst fs-segment-prefix)
+      (inst mov (make-ea :byte 
+		 :disp (* 4 thread-pseudo-atomic-interrupted-slot)) 0) 
+      ,@forms
+      (inst fs-segment-prefix)
+      (inst mov (make-ea :byte :disp (* 4 thread-pseudo-atomic-atomic-slot)) 0)
+      (inst fs-segment-prefix)
+      (inst cmp (make-ea :byte
+		 :disp (* 4 thread-pseudo-atomic-interrupted-slot)) 0)
+      (inst jmp :eq ,label)
+      ;; if PAI was set, interrupts were disabled at the same time
+      ;; using the process signal mask.  
+      (inst break pending-interrupt-trap)
+      (emit-label ,label))))
+
+#!-sb-thread
 (defmacro pseudo-atomic (&rest forms)
   (let ((label (gensym "LABEL-")))
     `(let ((,label (gen-label)))
       ;; FIXME: The MAKE-EA noise should become a MACROLET macro or
       ;; something. (perhaps SVLB, for static variable low byte)
       (inst mov (make-ea :byte :disp (+ nil-value
-					(static-symbol-offset
-					 '*pseudo-atomic-interrupted*)
-					(ash symbol-value-slot word-shift)
-					;; FIXME: Use mask, not minus, to
-					;; take out type bits.
-					(- other-pointer-lowtag)))
+                                        (static-symbol-offset
+                                         '*pseudo-atomic-interrupted*)
+                                        (ash symbol-value-slot word-shift)
+                                        ;; FIXME: Use mask, not minus, to
+                                        ;; take out type bits.
+                                        (- other-pointer-lowtag)))
        0)
       (inst mov (make-ea :byte :disp (+ nil-value
-					(static-symbol-offset
-					 '*pseudo-atomic-atomic*)
-					(ash symbol-value-slot word-shift)
-					(- other-pointer-lowtag)))
+                                        (static-symbol-offset
+                                         '*pseudo-atomic-atomic*)
+                                        (ash symbol-value-slot word-shift)
+                                        (- other-pointer-lowtag)))
        (fixnumize 1))
       ,@forms
       (inst mov (make-ea :byte :disp (+ nil-value
-					(static-symbol-offset
-					 '*pseudo-atomic-atomic*)
-					(ash symbol-value-slot word-shift)
-					(- other-pointer-lowtag)))
+                                        (static-symbol-offset
+                                         '*pseudo-atomic-atomic*)
+                                        (ash symbol-value-slot word-shift)
+                                        (- other-pointer-lowtag)))
        0)
       ;; KLUDGE: Is there any requirement for interrupts to be
       ;; handled in order? It seems as though an interrupt coming
@@ -310,17 +360,19 @@
       ;; are pending? I wish I could find the documentation for
       ;; pseudo-atomics.. -- WHN 19991130
       (inst cmp (make-ea :byte
-		 :disp (+ nil-value
-			  (static-symbol-offset
-			   '*pseudo-atomic-interrupted*)
-			  (ash symbol-value-slot word-shift)
-			  (- other-pointer-lowtag)))
+                 :disp (+ nil-value
+                          (static-symbol-offset
+                           '*pseudo-atomic-interrupted*)
+                          (ash symbol-value-slot word-shift)
+                          (- other-pointer-lowtag)))
        0)
       (inst jmp :eq ,label)
       ;; if PAI was set, interrupts were disabled at the same time
       ;; using the process signal mask.  
       (inst break pending-interrupt-trap)
       (emit-label ,label))))
+
+
 
 ;;;; indexed references
 

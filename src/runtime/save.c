@@ -24,6 +24,7 @@
 #include "lispregs.h"
 #include "validate.h"
 #include "gc-internal.h"
+#include "thread.h"
 
 #include "genesis/static-symbols.h"
 #include "genesis/symbol.h"
@@ -83,6 +84,7 @@ boolean
 save(char *filename, lispobj init_function)
 {
     FILE *file;
+    struct thread *th;
 
     /* Open the output file. We don't actually need the file yet, but
      * the fopen() might fail for some reason, and we want to detect
@@ -99,9 +101,11 @@ save(char *filename, lispobj init_function)
      * being SAVE-LISP-AND-DIE instead of SAVE-LISP-AND-GO-ON). */
     printf("[undoing binding stack and other enclosing state... ");
     fflush(stdout);
-    unbind_to_here((lispobj *)BINDING_STACK_START);
-    SetSymbolValue(CURRENT_CATCH_BLOCK, 0);
-    SetSymbolValue(CURRENT_UNWIND_PROTECT_BLOCK, 0);
+    for_each_thread(th)	{	/* XXX really? */
+	unbind_to_here((lispobj *)th->binding_stack_start,th);
+	SetSymbolValue(CURRENT_CATCH_BLOCK, 0,th);
+	SetSymbolValue(CURRENT_UNWIND_PROTECT_BLOCK, 0,th);
+    }
     printf("done]\n");
     fflush(stdout);
     
@@ -135,11 +139,11 @@ save(char *filename, lispobj init_function)
     output_space(file,
 		 READ_ONLY_CORE_SPACE_ID,
 		 (lispobj *)READ_ONLY_SPACE_START,
-		 (lispobj *)SymbolValue(READ_ONLY_SPACE_FREE_POINTER));
+		 (lispobj *)SymbolValue(READ_ONLY_SPACE_FREE_POINTER,0));
     output_space(file,
 		 STATIC_CORE_SPACE_ID,
 		 (lispobj *)STATIC_SPACE_START,
-		 (lispobj *)SymbolValue(STATIC_SPACE_FREE_POINTER));
+		 (lispobj *)SymbolValue(STATIC_SPACE_FREE_POINTER,0));
 #ifdef reg_ALLOC
     output_space(file,
 		 DYNAMIC_CORE_SPACE_ID,
@@ -154,7 +158,7 @@ save(char *filename, lispobj init_function)
     output_space(file,
 		 DYNAMIC_CORE_SPACE_ID,
 		 (lispobj *)DYNAMIC_SPACE_START,
-		 (lispobj *)SymbolValue(ALLOCATION_POINTER));
+		 (lispobj *)SymbolValue(ALLOCATION_POINTER,0));
 #endif
 
     putw(INITIAL_FUN_CORE_ENTRY_TYPE_CODE, file);

@@ -17,35 +17,44 @@
 #include "sbcl.h"
 #include "globals.h"
 #include "dynbind.h"
+#include "thread.h"
 #include "genesis/symbol.h"
 #include "genesis/binding.h"
-#include "genesis/static-symbols.h"
+#include "genesis/thread.h"
 
 #if defined(__i386__)
-#define GetBSP() ((struct binding *)SymbolValue(BINDING_STACK_POINTER))
-#define SetBSP(value) SetSymbolValue(BINDING_STACK_POINTER, (lispobj)(value))
+#define GetBSP() ((struct binding *)SymbolValue(BINDING_STACK_POINTER,thread))
+#define SetBSP(value) SetSymbolValue(BINDING_STACK_POINTER, (lispobj)(value),thread)
 #else
 #define GetBSP() ((struct binding *)current_binding_stack_pointer)
 #define SetBSP(value) (current_binding_stack_pointer=(lispobj *)(value))
 #endif
 
-void bind_variable(lispobj symbol, lispobj value)
+void bind_variable(lispobj symbol, lispobj value, void *th)
 {
-    lispobj old_value;
+    lispobj old_tl_value;
     struct binding *binding;
-
-    old_value = SymbolValue(symbol);
+    struct thread *thread=(struct thread *)th;
+    struct symbol *sym=(struct symbol *)native_pointer(symbol);
     binding = GetBSP();
     SetBSP(binding+1);
-
-    binding->value = old_value;
+#ifdef LISP_FEATURE_SB_THREAD
+    if(!sym->tls_index) {
+	sym->tls_index=SymbolValue(FREE_TLS_INDEX,0);
+	SetSymbolValue(FREE_TLS_INDEX,
+		       make_fixnum(fixnum_value(sym->tls_index)+1),0);
+    }
+#endif
+    old_tl_value=SymbolTlValue(symbol,thread);
+    binding->value = old_tl_value;
     binding->symbol = symbol;
-    SetSymbolValue(symbol, value);
+    SetTlSymbolValue(symbol, value,thread);
 }
 
 void
-unbind(void)
+unbind(void *th)
 {
+    struct thread *thread=(struct thread *)th;
     struct binding *binding;
     lispobj symbol;
 	
@@ -53,7 +62,7 @@ unbind(void)
 		
     symbol = binding->symbol;
 
-    SetSymbolValue(symbol, binding->value);
+    SetTlSymbolValue(symbol, binding->value,thread);
 
     binding->symbol = 0;
 
@@ -61,8 +70,9 @@ unbind(void)
 }
 
 void
-unbind_to_here(lispobj *bsp)
+unbind_to_here(lispobj *bsp,void *th)
 {
+    struct thread *thread=(struct thread *)th;
     struct binding *target = (struct binding *)bsp;
     struct binding *binding = GetBSP();
     lispobj symbol;
@@ -71,12 +81,10 @@ unbind_to_here(lispobj *bsp)
 	binding--;
 
 	symbol = binding->symbol;
-
 	if (symbol) {
-	    SetSymbolValue(symbol, binding->value);
+	    SetTlSymbolValue(symbol, binding->value,thread);
 	    binding->symbol = 0;
 	}
-
     }
     SetBSP(binding);
 }

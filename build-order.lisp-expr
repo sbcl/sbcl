@@ -427,7 +427,8 @@
  ;; (and so that they don't cause lots of annoying compiler warnings
  ;; about undefined types). 
  ("src/compiler/generic/core")
-
+ ("src/code/cross-thread" :not-target)
+ ("src/code/thread")
  ("src/code/load")
 
  ("src/code/fop") ; needs macros from code/load.lisp
@@ -507,6 +508,7 @@
  ("src/compiler/early-aliencomp")
  ("src/compiler/target/c-call")
  ("src/compiler/target/cell")
+ ("src/code/late-symbol" :not-host)
  ("src/compiler/target/values")
  ("src/compiler/target/alloc")
  ("src/compiler/target/call")
@@ -602,6 +604,10 @@
                                           ;   from "code/pathname"
  ("src/code/sharpm"            :not-host) ; uses stuff from "code/reader"
 
+ #!+sb-thread
+ ("src/code/target-thread"     :not-host)
+ #!-sb-thread
+ ("src/code/target-unithread"  :not-host)
  ;; defines SB!DI:DO-DEBUG-FUN-BLOCKS, needed by target-disassem.lisp
  ("src/code/debug-int" :not-host)
 
