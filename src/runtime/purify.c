@@ -66,7 +66,7 @@ static lispobj *read_only_end, *static_end;
 
 static lispobj *read_only_free, *static_free;
 
-static lispobj *pscav(lispobj *addr, int nwords, boolean constant);
+static lispobj *pscav(lispobj *addr, long nwords, boolean constant);
 
 #define LATERBLOCKSIZE 1020
 #define LATERMAXCOUNT 10
@@ -76,10 +76,16 @@ later {
     struct later *next;
     union {
         lispobj *ptr;
-        int count;
+        long count;
     } u[LATERBLOCKSIZE];
 } *later_blocks = NULL;
-static int later_count = 0;
+static long later_count = 0;
+
+#if N_WORD_BITS == 32
+ #define SIMPLE_ARRAY_WORD_WIDETAG SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG
+#elif N_WORD_BITS == 64
+ #define SIMPLE_ARRAY_WORD_WIDETAG SIMPLE_ARRAY_UNSIGNED_BYTE_64_WIDETAG
+#endif
 
 /* FIXME: Shouldn't this be defined in sbcl.h?  See also notes in
  * cheneygc.c */
@@ -115,7 +121,7 @@ dynamic_pointer_p(lispobj ptr)
 }
 
 static inline lispobj *
-newspace_alloc(int nwords, int constantp) 
+newspace_alloc(long nwords, int constantp) 
 {
     lispobj *ret;
     nwords=CEILING(nwords,2);
@@ -131,7 +137,7 @@ newspace_alloc(int nwords, int constantp)
 
 
 
-#ifdef LISP_FEATURE_X86
+#if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
 
 #ifdef LISP_FEATURE_GENCGC
 /*
@@ -173,27 +179,28 @@ valid_dynamic_space_pointer(lispobj *pointer, lispobj *start_addr)
 	    break;
 	case CLOSURE_HEADER_WIDETAG:
 	case FUNCALLABLE_INSTANCE_HEADER_WIDETAG:
-	    if ((int)pointer != ((int)start_addr+FUN_POINTER_LOWTAG)) {
+	    if ((long)pointer != ((long)start_addr+FUN_POINTER_LOWTAG)) {
 		if (pointer_filter_verbose) {
-		    fprintf(stderr,"*Wf2: %x %x %x\n", (unsigned int) pointer, 
-			    (unsigned int) start_addr, *start_addr);
+		    fprintf(stderr,"*Wf2: %x %x %x\n", 
+			    (unsigned long) pointer, 
+			    (unsigned long) start_addr, *start_addr);
 		}
 		return 0;
 	    }
 	    break;
 	default:
 	    if (pointer_filter_verbose) {
-		fprintf(stderr,"*Wf3: %x %x %x\n", (unsigned int) pointer, 
-			(unsigned int) start_addr, *start_addr);
+		fprintf(stderr,"*Wf3: %x %x %x\n", (unsigned long) pointer, 
+			(unsigned long) start_addr, *start_addr);
 	    }
 	    return 0;
 	}
 	break;
     case LIST_POINTER_LOWTAG:
-	if ((int)pointer != ((int)start_addr+LIST_POINTER_LOWTAG)) {
+	if ((long)pointer != ((long)start_addr+LIST_POINTER_LOWTAG)) {
 	    if (pointer_filter_verbose)
-		fprintf(stderr,"*Wl1: %x %x %x\n", (unsigned int) pointer, 
-			(unsigned int) start_addr, *start_addr);
+		fprintf(stderr,"*Wl1: %x %x %x\n", (unsigned long) pointer, 
+			(unsigned long) start_addr, *start_addr);
 	    return 0;
 	}
 	/* Is it plausible cons? */
@@ -208,40 +215,40 @@ valid_dynamic_space_pointer(lispobj *pointer, lispobj *start_addr)
 	    break;
 	} else {
 	    if (pointer_filter_verbose) {
-		fprintf(stderr,"*Wl2: %x %x %x\n", (unsigned int) pointer, 
-			(unsigned int) start_addr, *start_addr);
+		fprintf(stderr,"*Wl2: %x %x %x\n", (unsigned long) pointer, 
+			(unsigned long) start_addr, *start_addr);
 	    }
 	    return 0;
 	}
     case INSTANCE_POINTER_LOWTAG:
-	if ((int)pointer != ((int)start_addr+INSTANCE_POINTER_LOWTAG)) {
+	if ((long)pointer != ((long)start_addr+INSTANCE_POINTER_LOWTAG)) {
 	    if (pointer_filter_verbose) {
-		fprintf(stderr,"*Wi1: %x %x %x\n", (unsigned int) pointer, 
-			(unsigned int) start_addr, *start_addr);
+		fprintf(stderr,"*Wi1: %x %x %x\n", (unsigned long) pointer, 
+			(unsigned long) start_addr, *start_addr);
 	    }
 	    return 0;
 	}
 	if (widetag_of(start_addr[0]) != INSTANCE_HEADER_WIDETAG) {
 	    if (pointer_filter_verbose) {
-		fprintf(stderr,"*Wi2: %x %x %x\n", (unsigned int) pointer, 
-			(unsigned int) start_addr, *start_addr);
+		fprintf(stderr,"*Wi2: %x %x %x\n", (unsigned long) pointer, 
+			(unsigned long) start_addr, *start_addr);
 	    }
 	    return 0;
 	}
 	break;
     case OTHER_POINTER_LOWTAG:
-	if ((int)pointer != ((int)start_addr+OTHER_POINTER_LOWTAG)) {
+	if ((long)pointer != ((long)start_addr+OTHER_POINTER_LOWTAG)) {
 	    if (pointer_filter_verbose) {
-		fprintf(stderr,"*Wo1: %x %x %x\n", (unsigned int) pointer, 
-			(unsigned int) start_addr, *start_addr);
+		fprintf(stderr,"*Wo1: %x %x %x\n", (unsigned long) pointer, 
+			(unsigned long) start_addr, *start_addr);
 	    }
 	    return 0;
 	}
 	/* Is it plausible? Not a cons. XXX should check the headers. */
 	if (is_lisp_pointer(start_addr[0]) || ((start_addr[0] & 3) == 0)) {
 	    if (pointer_filter_verbose) {
-		fprintf(stderr,"*Wo2: %x %x %x\n", (unsigned int) pointer, 
-			(unsigned int) start_addr, *start_addr);
+		fprintf(stderr,"*Wo2: %x %x %x\n", (unsigned long) pointer, 
+			(unsigned long) start_addr, *start_addr);
 	    }
 	    return 0;
 	}
@@ -249,8 +256,8 @@ valid_dynamic_space_pointer(lispobj *pointer, lispobj *start_addr)
 	case UNBOUND_MARKER_WIDETAG:
 	case BASE_CHAR_WIDETAG:
 	    if (pointer_filter_verbose) {
-		fprintf(stderr,"*Wo3: %x %x %x\n", (unsigned int) pointer, 
-			(unsigned int) start_addr, *start_addr);
+		fprintf(stderr,"*Wo3: %x %x %x\n", (unsigned long) pointer, 
+			(unsigned long) start_addr, *start_addr);
 	    }
 	    return 0;
 
@@ -258,15 +265,15 @@ valid_dynamic_space_pointer(lispobj *pointer, lispobj *start_addr)
 	case CLOSURE_HEADER_WIDETAG:
 	case FUNCALLABLE_INSTANCE_HEADER_WIDETAG:
 	    if (pointer_filter_verbose) {
-		fprintf(stderr,"*Wo4: %x %x %x\n", (unsigned int) pointer, 
-			(unsigned int) start_addr, *start_addr);
+		fprintf(stderr,"*Wo4: %x %x %x\n", (unsigned long) pointer, 
+			(unsigned long) start_addr, *start_addr);
 	    }
 	    return 0;
 
 	case INSTANCE_HEADER_WIDETAG:
 	    if (pointer_filter_verbose) {
-		fprintf(stderr,"*Wo5: %x %x %x\n", (unsigned int) pointer, 
-			(unsigned int) start_addr, *start_addr);
+		fprintf(stderr,"*Wo5: %x %x %x\n", (unsigned long) pointer, 
+			(unsigned long) start_addr, *start_addr);
 	    }
 	    return 0;
 
@@ -308,9 +315,20 @@ valid_dynamic_space_pointer(lispobj *pointer, lispobj *start_addr)
 	case SIMPLE_ARRAY_UNSIGNED_BYTE_8_WIDETAG:
 	case SIMPLE_ARRAY_UNSIGNED_BYTE_15_WIDETAG:
 	case SIMPLE_ARRAY_UNSIGNED_BYTE_16_WIDETAG:
+#ifdef SIMPLE_ARRAY_UNSIGNED_BYTE_29_WIDETAG
 	case SIMPLE_ARRAY_UNSIGNED_BYTE_29_WIDETAG:
+#endif
 	case SIMPLE_ARRAY_UNSIGNED_BYTE_31_WIDETAG:
 	case SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG:
+#ifdef SIMPLE_ARRAY_UNSIGNED_BYTE_60_WIDETAG
+		case SIMPLE_ARRAY_UNSIGNED_BYTE_60_WIDETAG:
+#endif
+#ifdef SIMPLE_ARRAY_UNSIGNED_BYTE_63_WIDETAG
+		case SIMPLE_ARRAY_UNSIGNED_BYTE_63_WIDETAG:
+#endif
+#ifdef SIMPLE_ARRAY_UNSIGNED_BYTE_64_WIDETAG
+		case SIMPLE_ARRAY_UNSIGNED_BYTE_64_WIDETAG:
+#endif
 #ifdef SIMPLE_ARRAY_SIGNED_BYTE_8_WIDETAG
 	case SIMPLE_ARRAY_SIGNED_BYTE_8_WIDETAG:
 #endif
@@ -322,6 +340,12 @@ valid_dynamic_space_pointer(lispobj *pointer, lispobj *start_addr)
 #endif
 #ifdef SIMPLE_ARRAY_SIGNED_BYTE_32_WIDETAG
 	case SIMPLE_ARRAY_SIGNED_BYTE_32_WIDETAG:
+#endif
+#ifdef SIMPLE_ARRAY_SIGNED_BYTE_61_WIDETAG
+		case SIMPLE_ARRAY_SIGNED_BYTE_61_WIDETAG:
+#endif
+#ifdef SIMPLE_ARRAY_SIGNED_BYTE_64_WIDETAG
+		case SIMPLE_ARRAY_SIGNED_BYTE_64_WIDETAG:
 #endif
 	case SIMPLE_ARRAY_SINGLE_FLOAT_WIDETAG:
 	case SIMPLE_ARRAY_DOUBLE_FLOAT_WIDETAG:
@@ -343,16 +367,16 @@ valid_dynamic_space_pointer(lispobj *pointer, lispobj *start_addr)
 
 	default:
 	    if (pointer_filter_verbose) {
-		fprintf(stderr,"*Wo6: %x %x %x\n", (unsigned int) pointer, 
-			(unsigned int) start_addr, *start_addr);
+		fprintf(stderr,"*Wo6: %x %x %x\n", (unsigned long) pointer, 
+			(unsigned long) start_addr, *start_addr);
 	    }
 	    return 0;
 	}
 	break;
     default:
 	if (pointer_filter_verbose) {
-	    fprintf(stderr,"*W?: %x %x %x\n", (unsigned int) pointer, 
-		    (unsigned int) start_addr, *start_addr);
+	    fprintf(stderr,"*W?: %x %x %x\n", (unsigned long) pointer, 
+		    (unsigned long) start_addr, *start_addr);
 	}
 	return 0;
     }
@@ -363,12 +387,12 @@ valid_dynamic_space_pointer(lispobj *pointer, lispobj *start_addr)
 
 #define MAX_STACK_POINTERS 256
 lispobj *valid_stack_locations[MAX_STACK_POINTERS];
-unsigned int num_valid_stack_locations;
+unsigned long num_valid_stack_locations;
 
 #define MAX_STACK_RETURN_ADDRESSES 128
 lispobj *valid_stack_ra_locations[MAX_STACK_RETURN_ADDRESSES];
 lispobj *valid_stack_ra_code_objects[MAX_STACK_RETURN_ADDRESSES];
-unsigned int num_valid_stack_ra_locations;
+unsigned long num_valid_stack_ra_locations;
 
 /* Identify valid stack slots. */
 static void
@@ -395,7 +419,7 @@ setup_i386_stack_scav(lispobj *lowaddr, lispobj *base)
 			  MAX_STACK_RETURN_ADDRESSES);
 		valid_stack_ra_locations[num_valid_stack_ra_locations] = sp;
 		valid_stack_ra_code_objects[num_valid_stack_ra_locations++] =
-		    (lispobj *)((int)start_addr + OTHER_POINTER_LOWTAG);
+		    (lispobj *)((long)start_addr + OTHER_POINTER_LOWTAG);
 	    } else {
 		if (valid_dynamic_space_pointer((void *)thing, start_addr)) {
 		    gc_assert(num_valid_stack_locations < MAX_STACK_POINTERS);
@@ -415,7 +439,7 @@ setup_i386_stack_scav(lispobj *lowaddr, lispobj *base)
 static void
 pscav_i386_stack(void)
 {
-    int i;
+    long i;
 
     for (i = 0; i < num_valid_stack_locations; i++)
 	pscav(valid_stack_locations[i], 1, 0);
@@ -426,13 +450,13 @@ pscav_i386_stack(void)
 	if (pointer_filter_verbose) {
 	    fprintf(stderr,"*C moved RA %x to %x; for code object %x to %x\n",
 		    *valid_stack_ra_locations[i],
-		    (int)(*valid_stack_ra_locations[i])
-		    - ((int)valid_stack_ra_code_objects[i] - (int)code_obj),
-		    (unsigned int) valid_stack_ra_code_objects[i], code_obj);
+		    (long)(*valid_stack_ra_locations[i])
+		    - ((long)valid_stack_ra_code_objects[i] - (long)code_obj),
+		    (unsigned long) valid_stack_ra_code_objects[i], code_obj);
 	}
 	*valid_stack_ra_locations[i] =
-	    ((int)(*valid_stack_ra_locations[i])
-	     - ((int)valid_stack_ra_code_objects[i] - (int)code_obj));
+	    ((long)(*valid_stack_ra_locations[i])
+	     - ((long)valid_stack_ra_code_objects[i] - (long)code_obj));
     }
 }
 #endif
@@ -440,7 +464,7 @@ pscav_i386_stack(void)
 
 
 static void
-pscav_later(lispobj *where, int count)
+pscav_later(lispobj *where, long count)
 {
     struct later *new;
 
@@ -471,7 +495,7 @@ pscav_later(lispobj *where, int count)
 static lispobj
 ptrans_boxed(lispobj thing, lispobj header, boolean constant)
 {
-    int nwords;
+    long nwords;
     lispobj result, *new, *old;
 
     nwords = 1 + HeaderValue(header);
@@ -514,7 +538,7 @@ ptrans_instance(lispobj thing, lispobj header, boolean /* ignored */ constant)
 	     * space placed into it (e.g. the cache-name slot), but
 	     * the lists and arrays at the time of a purify can be
 	     * moved to the RO space. */
-	    int nwords;
+	    long nwords;
 	    lispobj result, *new, *old;
 
 	    nwords = 1 + HeaderValue(header);
@@ -544,7 +568,7 @@ ptrans_instance(lispobj thing, lispobj header, boolean /* ignored */ constant)
 static lispobj
 ptrans_fdefn(lispobj thing, lispobj header)
 {
-    int nwords;
+    long nwords;
     lispobj result, *new, *old, oldfn;
     struct fdefn *fdefn;
 
@@ -574,7 +598,7 @@ ptrans_fdefn(lispobj thing, lispobj header)
 static lispobj
 ptrans_unboxed(lispobj thing, lispobj header)
 {
-    int nwords;
+    long nwords;
     lispobj result, *new, *old;
     
     nwords = 1 + HeaderValue(header);
@@ -594,15 +618,16 @@ ptrans_unboxed(lispobj thing, lispobj header)
 }
 
 static lispobj
-ptrans_vector(lispobj thing, int bits, int extra,
+ptrans_vector(lispobj thing, long bits, long extra,
 	      boolean boxed, boolean constant)
 {
     struct vector *vector;
-    int nwords;
+    long nwords;
     lispobj result, *new;
 
     vector = (struct vector *)native_pointer(thing);
-    nwords = 2 + (CEILING((fixnum_value(vector->length)+extra)*bits,32)>>5);
+    nwords = 2 + (CEILING((fixnum_value(vector->length)+extra)*bits,
+			  N_WORD_BITS)>>5);
 
     new=newspace_alloc(nwords, (constant || !boxed));
     bcopy(vector, new, nwords * sizeof(lispobj));
@@ -616,11 +641,11 @@ ptrans_vector(lispobj thing, int bits, int extra,
     return result;
 }
 
-#ifdef LISP_FEATURE_X86
+#if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
 static void
 apply_code_fixups_during_purify(struct code *old_code, struct code *new_code)
 {
-    int nheader_words, ncode_words, nwords;
+    long nheader_words, ncode_words, nwords;
     void  *constants_start_addr, *constants_end_addr;
     void  *code_start_addr, *code_end_addr;
     lispobj fixups = NIL;
@@ -631,10 +656,10 @@ apply_code_fixups_during_purify(struct code *old_code, struct code *new_code)
     nheader_words = HeaderValue(*(lispobj *)new_code);
     nwords = ncode_words + nheader_words;
 
-    constants_start_addr = (void *)new_code + 5*4;
-    constants_end_addr = (void *)new_code + nheader_words*4;
-    code_start_addr = (void *)new_code + nheader_words*4;
-    code_end_addr = (void *)new_code + nwords*4;
+    constants_start_addr = (void *)new_code + 5 * N_WORD_BYTES;
+    constants_end_addr = (void *)new_code + nheader_words*N_WORD_BYTES;
+    code_start_addr = (void *)new_code + nheader_words*N_WORD_BYTES;
+    code_end_addr = (void *)new_code + nwords*N_WORD_BYTES;
 
     /* The first constant should be a pointer to the fixups for this
      * code objects. Check. */
@@ -662,12 +687,11 @@ apply_code_fixups_during_purify(struct code *old_code, struct code *new_code)
 	    (struct vector *)native_pointer(*(lispobj *)fixups_vector);
     }
 
-    if (widetag_of(fixups_vector->header) ==
-	SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG) {
+    if (widetag_of(fixups_vector->header) == SIMPLE_ARRAY_WORD_WIDETAG) {
 	/* We got the fixups for the code block. Now work through the
 	 * vector, and apply a fixup at each address. */
-	int length = fixnum_value(fixups_vector->length);
-	int i;
+	long length = fixnum_value(fixups_vector->length);
+	long i;
 	for (i=0; i<length; i++) {
 	    unsigned offset = fixups_vector->data[i];
 	    /* Now check the current value of offset. */
@@ -677,7 +701,7 @@ apply_code_fixups_during_purify(struct code *old_code, struct code *new_code)
 	    /* If it's within the old_code object then it must be an
 	     * absolute fixup (relative ones are not saved) */
 	    if ((old_value>=(unsigned)old_code)
-		&& (old_value<((unsigned)old_code + nwords*4)))
+		&& (old_value<((unsigned)old_code + nwords * N_WORD_BYTES)))
 		/* So add the dispacement. */
 		*(unsigned *)((unsigned)code_start_addr + offset) = old_value
 		    + displacement;
@@ -704,7 +728,7 @@ static lispobj
 ptrans_code(lispobj thing)
 {
     struct code *code, *new;
-    int nwords;
+    long nwords;
     lispobj func, result;
 
     code = (struct code *)native_pointer(thing);
@@ -714,7 +738,7 @@ ptrans_code(lispobj thing)
 
     bcopy(code, new, nwords * sizeof(lispobj));
 
-#ifdef LISP_FEATURE_X86
+#if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
     apply_code_fixups_during_purify(code,new);
 #endif
 
@@ -759,13 +783,13 @@ ptrans_code(lispobj thing)
         gc_assert(lowtag_of(func) == FUN_POINTER_LOWTAG);
         gc_assert(!dynamic_pointer_p(func));
 
-#ifdef LISP_FEATURE_X86
+#if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
 	/* Temporarily convert the self pointer to a real function pointer. */
 	((struct simple_fun *)native_pointer(func))->self
 	    -= FUN_RAW_ADDR_OFFSET;
 #endif
         pscav(&((struct simple_fun *)native_pointer(func))->self, 2, 1);
-#ifdef LISP_FEATURE_X86
+#if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
 	((struct simple_fun *)native_pointer(func))->self
 	    += FUN_RAW_ADDR_OFFSET;
 #endif
@@ -778,7 +802,7 @@ ptrans_code(lispobj thing)
 static lispobj
 ptrans_func(lispobj thing, lispobj header)
 {
-    int nwords;
+    long nwords;
     lispobj code, *new, *old, result;
     struct simple_fun *function;
 
@@ -856,7 +880,7 @@ static lispobj
 ptrans_list(lispobj thing, boolean constant)
 {
     struct cons *old, *new, *orig;
-    int length;
+    long length;
 
     orig = (struct cons *) newspace_alloc(0,constant);
     length = 0;
@@ -968,6 +992,25 @@ ptrans_otherptr(lispobj thing, lispobj header, boolean constant)
 #endif
         return ptrans_vector(thing, 32, 0, 0, constant);
 
+#if N_WORD_BITS == 64
+#ifdef SIMPLE_ARRAY_UNSIGNED_BYTE_60_WIDETAG
+      case SIMPLE_ARRAY_UNSIGNED_BYTE_60_WIDETAG:
+#endif
+#ifdef SIMPLE_ARRAY_UNSIGNED_BYTE_63_WIDETAG
+      case SIMPLE_ARRAY_UNSIGNED_BYTE_63_WIDETAG:
+#endif
+#ifdef SIMPLE_ARRAY_UNSIGNED_BYTE_64_WIDETAG
+      case SIMPLE_ARRAY_UNSIGNED_BYTE_64_WIDETAG:
+#endif
+#ifdef SIMPLE_ARRAY_SIGNED_BYTE_61_WIDETAG
+      case SIMPLE_ARRAY_SIGNED_BYTE_61_WIDETAG:
+#endif
+#ifdef SIMPLE_ARRAY_SIGNED_BYTE_64_WIDETAG
+      case SIMPLE_ARRAY_SIGNED_BYTE_64_WIDETAG:
+#endif
+        return ptrans_vector(thing, 64, 0, 0, constant);
+#endif
+		
       case SIMPLE_ARRAY_SINGLE_FLOAT_WIDETAG:
         return ptrans_vector(thing, 32, 0, 0, constant);
 
@@ -1014,13 +1057,14 @@ ptrans_otherptr(lispobj thing, lispobj header, boolean constant)
 	return ptrans_fdefn(thing, header);
 
       default:
+	fprintf(stderr, "Invalid widetag: %d\n", widetag_of(header));
         /* Should only come across other pointers to the above stuff. */
         gc_abort();
 	return NIL;
     }
 }
 
-static int
+static long
 pscav_fdefn(struct fdefn *fdefn)
 {
     boolean fix_func;
@@ -1033,12 +1077,12 @@ pscav_fdefn(struct fdefn *fdefn)
     return sizeof(struct fdefn) / sizeof(lispobj);
 }
 
-#ifdef LISP_FEATURE_X86
+#if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
 /* now putting code objects in static space */
-static int
+static long
 pscav_code(struct code*code)
 {
-    int nwords;
+    long nwords;
     lispobj func;
     nwords = HeaderValue(code->header) + fixnum_value(code->code_size);
 
@@ -1056,14 +1100,14 @@ pscav_code(struct code*code)
         gc_assert(lowtag_of(func) == FUN_POINTER_LOWTAG);
         gc_assert(!dynamic_pointer_p(func));
 
-#ifdef LISP_FEATURE_X86
+#if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
 	/* Temporarily convert the self pointer to a real function
 	 * pointer. */
 	((struct simple_fun *)native_pointer(func))->self
 	    -= FUN_RAW_ADDR_OFFSET;
 #endif
         pscav(&((struct simple_fun *)native_pointer(func))->self, 2, 1);
-#ifdef LISP_FEATURE_X86
+#if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
 	((struct simple_fun *)native_pointer(func))->self
 	    += FUN_RAW_ADDR_OFFSET;
 #endif
@@ -1075,10 +1119,10 @@ pscav_code(struct code*code)
 #endif
 
 static lispobj *
-pscav(lispobj *addr, int nwords, boolean constant)
+pscav(lispobj *addr, long nwords, boolean constant)
 {
     lispobj thing, *thingp, header;
-    int count = 0; /* (0 = dummy init value to stop GCC warning) */
+    long count = 0; /* (0 = dummy init value to stop GCC warning) */
     struct vector *vector;
 
     while (nwords > 0) {
@@ -1258,7 +1302,7 @@ pscav(lispobj *addr, int nwords, boolean constant)
 #endif
 
               case CODE_HEADER_WIDETAG:
-#ifndef LISP_FEATURE_X86
+#if !defined(LISP_FEATURE_X86) && !defined(LISP_FEATURE_X86_64)
                 gc_abort(); /* no code headers in static space */
 #else
 		count = pscav_code((struct code*)addr);
@@ -1272,7 +1316,7 @@ pscav(lispobj *addr, int nwords, boolean constant)
                 gc_abort();
 		break;
 
-#ifdef LISP_FEATURE_X86
+#if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
 	      case CLOSURE_HEADER_WIDETAG:
 	      case FUNCALLABLE_INSTANCE_HEADER_WIDETAG:
 		/* The function self pointer needs special care on the
@@ -1321,7 +1365,7 @@ int
 purify(lispobj static_roots, lispobj read_only_roots)
 {
     lispobj *clean;
-    int count, i;
+    long count, i;
     struct later *laters, *next;
     struct thread *thread;
 
@@ -1350,7 +1394,7 @@ purify(lispobj static_roots, lispobj read_only_roots)
         return 0;
     }
 
-#if defined(LISP_FEATURE_X86)
+#if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
     dynamic_space_free_pointer =
       (lispobj*)SymbolValue(ALLOCATION_POINTER,0);
 #endif
@@ -1365,7 +1409,7 @@ purify(lispobj static_roots, lispobj read_only_roots)
     fflush(stdout);
 #endif
 
-#if (defined(LISP_FEATURE_GENCGC) && defined(LISP_FEATURE_X86))
+#if defined(LISP_FEATURE_GENCGC) && (defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64))
     /* note this expects only one thread to be active.  We'd have to 
      * stop all the others in the same way as GC does if we wanted 
      * PURIFY to work when >1 thread exists */
@@ -1389,7 +1433,7 @@ purify(lispobj static_roots, lispobj read_only_roots)
     printf(" stack");
     fflush(stdout);
 #endif
-#ifndef LISP_FEATURE_X86
+#if !defined(LISP_FEATURE_X86) && !defined(LISP_FEATURE_X86_64)
     pscav((lispobj *)all_threads->control_stack_start,
 	  current_control_stack_pointer - 
 	  all_threads->control_stack_start,
@@ -1484,7 +1528,7 @@ purify(lispobj static_roots, lispobj read_only_roots)
 
     /* Zero the stack. Note that the stack is also zeroed by SUB-GC
      * calling SCRUB-CONTROL-STACK - this zeros the stack on the x86. */
-#ifndef LISP_FEATURE_X86
+#if !defined(LISP_FEATURE_X86) && !defined(LISP_FEATURE_X86_64)
     os_zero((os_vm_address_t) current_control_stack_pointer,
             (os_vm_size_t)
 	    ((all_threads->control_stack_end -

@@ -219,10 +219,8 @@
 
 ;;; mmap, msync
 (define-call "mmap" sb-sys:system-area-pointer
-  ;; KLUDGE: #XFFFFFFFF is (void *)-1, which is the charming return
-  ;; value of mmap on failure.  Except on 64 bit systems ...
   (lambda (res)
-    (= (sb-sys:sap-int res) #-alpha #XFFFFFFFF #+alpha #xffffffffffffffff))
+    (= (sb-sys:sap-int res) #.(1- (expt 2 sb-vm::n-word-bits))))
   (addr sap-or-nil) (length unsigned) (prot unsigned)
   (flags unsigned) (fd file-descriptor) (offset sb-posix::off-t))
 

@@ -760,18 +760,17 @@
   (:args (hi-bits :scs (signed-reg))
 	 (lo-bits :scs (unsigned-reg)))
   (:results (res :scs (double-reg)))
-  (:temporary (:sc double-stack) temp)
+  (:temporary (:sc unsigned-reg) temp)
   (:arg-types signed-num unsigned-num)
   (:result-types double-float)
   (:translate make-double-float)
   (:policy :fast-safe)
   (:vop-var vop)
   (:generator 2
-    (let ((offset (1+ (tn-offset temp))))
-      (storew hi-bits rbp-tn (- offset))
-      (storew lo-bits rbp-tn (- (1+ offset)))
-      (inst movd res (make-ea :dword :base rbp-tn
-			      :disp (- (* (1+ offset) n-word-bytes)))))))
+    (move temp hi-bits)
+    (inst shl temp 32)
+    (inst or temp lo-bits)
+    (inst movd res temp)))
 
 (define-vop (single-float-bits)
   (:args (float :scs (single-reg descriptor-reg)

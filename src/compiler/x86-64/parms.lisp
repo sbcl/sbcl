@@ -109,8 +109,12 @@
 (def!constant static-space-end      #x07fff000)
 
 (def!constant dynamic-space-start   #x09000000)
-(def!constant dynamic-space-end     #x29000000)
+(def!constant dynamic-space-end     #x79000000)
 
+(def!constant linkage-table-space-start #x08000000)
+(def!constant linkage-table-space-end   #x08fff000)
+
+(def!constant linkage-table-entry-size 16)
 
 ;;;; other miscellaneous constants
 

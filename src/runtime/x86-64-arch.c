@@ -355,3 +355,39 @@ funcall3(lispobj function, lispobj arg0, lispobj arg1, lispobj arg2)
     args[2] = arg2;
     return call_into_lisp(function, args, 3);
 }
+
+
+#ifdef LISP_FEATURE_LINKAGE_TABLE
+/* FIXME: It might be cleaner to generate these from the lisp side of
+ * things.
+ */
+
+void 
+arch_write_linkage_table_jmp(char * reloc, void * fun)
+{
+    unsigned long addr = (unsigned long) fun;
+    int i;
+
+    *reloc++ = 0xFF; /* Opcode for near jump to absolute reg/mem64. */
+    *reloc++ = 0x25; /* ModRM #b00 100 101, i.e. RIP-relative. */
+    *reloc++ = 0x00; /* 32-bit displacement field = 0 */
+    *reloc++ = 0x00; /* ... */
+    *reloc++ = 0x00; /* ... */
+    *reloc++ = 0x00; /* ... */
+
+    for (i = 0; i < 8; i++) {
+	*reloc++ = addr & 0xff;
+	addr >>= 8;
+    }
+
+    /* write a nop for good measure. */
+    *reloc = 0x90;
+}
+
+void
+arch_write_linkage_table_ref(void * reloc, void * data)
+{
+    *(unsigned long *)reloc = (unsigned long)data;
+}
+
+#endif
