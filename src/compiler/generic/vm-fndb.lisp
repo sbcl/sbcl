@@ -27,11 +27,25 @@
 	   simple-array-unsigned-byte-2-p
 	   simple-array-unsigned-byte-4-p simple-array-unsigned-byte-7-p
 	   simple-array-unsigned-byte-8-p simple-array-unsigned-byte-15-p
-	   simple-array-unsigned-byte-16-p simple-array-unsigned-byte-29-p
+	   simple-array-unsigned-byte-16-p
+           #!+#.(cl:if (cl:= 32 sb!vm:n-word-bits) '(and) '(or))
+           simple-array-unsigned-byte-29-p
 	   simple-array-unsigned-byte-31-p
 	   simple-array-unsigned-byte-32-p
+           #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
+           simple-array-unsigned-byte-60-p
+           #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
+           simple-array-unsigned-byte-63-p
+           #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
+           simple-array-unsigned-byte-64-p
 	   simple-array-signed-byte-8-p simple-array-signed-byte-16-p
-	   simple-array-signed-byte-30-p simple-array-signed-byte-32-p
+           #!+#.(cl:if (cl:= 32 sb!vm:n-word-bits) '(and) '(or))
+	   simple-array-signed-byte-30-p
+           simple-array-signed-byte-32-p
+           #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
+           simple-array-signed-byte-61-p
+           #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
+           simple-array-signed-byte-64-p
 	   simple-array-single-float-p simple-array-double-float-p
 	   #!+long-float simple-array-long-float-p
 	   simple-array-complex-single-float-p

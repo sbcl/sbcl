@@ -13,8 +13,8 @@
  * files for more information.
  */
 
-#include "runtime.h"
 #include "sbcl.h"
+#include "runtime.h"
 #include "globals.h"
 #include "dynbind.h"
 #include "thread.h"

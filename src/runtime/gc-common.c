@@ -28,8 +28,8 @@
 #include <stdio.h>
 #include <signal.h>
 #include <string.h>
-#include "runtime.h"
 #include "sbcl.h"
+#include "runtime.h"
 #include "os.h"
 #include "interr.h"
 #include "globals.h"
@@ -743,8 +743,6 @@ size_unboxed(lispobj *where)
 static int
 /* vector-like objects */
 
-#define NWORDS(x,y) (CEILING((x),(y)) / (y))
-
 scav_base_string(lispobj *where, lispobj object)
 {
     struct vector *vector;
@@ -755,7 +753,7 @@ scav_base_string(lispobj *where, lispobj object)
 
     vector = (struct vector *) where;
     length = fixnum_value(vector->length) + 1;
-    nwords = CEILING(NWORDS(length, 4) + 2, 2);
+    nwords = CEILING(NWORDS(length, 8) + 2, 2);
 
     return nwords;
 }
@@ -773,7 +771,7 @@ trans_base_string(lispobj object)
 
     vector = (struct vector *) native_pointer(object);
     length = fixnum_value(vector->length) + 1;
-    nwords = CEILING(NWORDS(length, 4) + 2, 2);
+    nwords = CEILING(NWORDS(length, 8) + 2, 2);
 
     return copy_large_unboxed_object(object, nwords);
 }
@@ -790,7 +788,7 @@ size_base_string(lispobj *where)
 
     vector = (struct vector *) where;
     length = fixnum_value(vector->length) + 1;
-    nwords = CEILING(NWORDS(length, 4) + 2, 2);
+    nwords = CEILING(NWORDS(length, 8) + 2, 2);
 
     return nwords;
 }
@@ -852,7 +850,7 @@ scav_vector_bit(lispobj *where, lispobj object)
 
     vector = (struct vector *) where;
     length = fixnum_value(vector->length);
-    nwords = CEILING(NWORDS(length, 32) + 2, 2);
+    nwords = CEILING(NWORDS(length, 1) + 2, 2);
 
     return nwords;
 }
@@ -867,7 +865,7 @@ trans_vector_bit(lispobj object)
 
     vector = (struct vector *) native_pointer(object);
     length = fixnum_value(vector->length);
-    nwords = CEILING(NWORDS(length, 32) + 2, 2);
+    nwords = CEILING(NWORDS(length, 1) + 2, 2);
 
     return copy_large_unboxed_object(object, nwords);
 }
@@ -880,7 +878,7 @@ size_vector_bit(lispobj *where)
 
     vector = (struct vector *) where;
     length = fixnum_value(vector->length);
-    nwords = CEILING(NWORDS(length, 32) + 2, 2);
+    nwords = CEILING(NWORDS(length, 1) + 2, 2);
 
     return nwords;
 }
@@ -893,7 +891,7 @@ scav_vector_unsigned_byte_2(lispobj *where, lispobj object)
 
     vector = (struct vector *) where;
     length = fixnum_value(vector->length);
-    nwords = CEILING(NWORDS(length, 16) + 2, 2);
+    nwords = CEILING(NWORDS(length, 2) + 2, 2);
 
     return nwords;
 }
@@ -908,7 +906,7 @@ trans_vector_unsigned_byte_2(lispobj object)
 
     vector = (struct vector *) native_pointer(object);
     length = fixnum_value(vector->length);
-    nwords = CEILING(NWORDS(length, 16) + 2, 2);
+    nwords = CEILING(NWORDS(length, 2) + 2, 2);
 
     return copy_large_unboxed_object(object, nwords);
 }
@@ -921,7 +919,7 @@ size_vector_unsigned_byte_2(lispobj *where)
 
     vector = (struct vector *) where;
     length = fixnum_value(vector->length);
-    nwords = CEILING(NWORDS(length, 16) + 2, 2);
+    nwords = CEILING(NWORDS(length, 2) + 2, 2);
 
     return nwords;
 }
@@ -934,7 +932,7 @@ scav_vector_unsigned_byte_4(lispobj *where, lispobj object)
 
     vector = (struct vector *) where;
     length = fixnum_value(vector->length);
-    nwords = CEILING(NWORDS(length, 8) + 2, 2);
+    nwords = CEILING(NWORDS(length, 4) + 2, 2);
 
     return nwords;
 }
@@ -949,7 +947,7 @@ trans_vector_unsigned_byte_4(lispobj object)
 
     vector = (struct vector *) native_pointer(object);
     length = fixnum_value(vector->length);
-    nwords = CEILING(NWORDS(length, 8) + 2, 2);
+    nwords = CEILING(NWORDS(length, 4) + 2, 2);
 
     return copy_large_unboxed_object(object, nwords);
 }
@@ -961,7 +959,7 @@ size_vector_unsigned_byte_4(lispobj *where)
 
     vector = (struct vector *) where;
     length = fixnum_value(vector->length);
-    nwords = CEILING(NWORDS(length, 8) + 2, 2);
+    nwords = CEILING(NWORDS(length, 4) + 2, 2);
 
     return nwords;
 }
@@ -975,7 +973,7 @@ scav_vector_unsigned_byte_8(lispobj *where, lispobj object)
 
     vector = (struct vector *) where;
     length = fixnum_value(vector->length);
-    nwords = CEILING(NWORDS(length, 4) + 2, 2);
+    nwords = CEILING(NWORDS(length, 8) + 2, 2);
 
     return nwords;
 }
@@ -994,7 +992,7 @@ trans_vector_unsigned_byte_8(lispobj object)
 
     vector = (struct vector *) native_pointer(object);
     length = fixnum_value(vector->length);
-    nwords = CEILING(NWORDS(length, 4) + 2, 2);
+    nwords = CEILING(NWORDS(length, 8) + 2, 2);
 
     return copy_large_unboxed_object(object, nwords);
 }
@@ -1007,7 +1005,7 @@ size_vector_unsigned_byte_8(lispobj *where)
 
     vector = (struct vector *) where;
     length = fixnum_value(vector->length);
-    nwords = CEILING(NWORDS(length, 4) + 2, 2);
+    nwords = CEILING(NWORDS(length, 8) + 2, 2);
 
     return nwords;
 }
@@ -1021,7 +1019,7 @@ scav_vector_unsigned_byte_16(lispobj *where, lispobj object)
 
     vector = (struct vector *) where;
     length = fixnum_value(vector->length);
-    nwords = CEILING(NWORDS(length, 2) + 2, 2);
+    nwords = CEILING(NWORDS(length, 16) + 2, 2);
 
     return nwords;
 }
@@ -1036,7 +1034,7 @@ trans_vector_unsigned_byte_16(lispobj object)
 
     vector = (struct vector *) native_pointer(object);
     length = fixnum_value(vector->length);
-    nwords = CEILING(NWORDS(length, 2) + 2, 2);
+    nwords = CEILING(NWORDS(length, 16) + 2, 2);
 
     return copy_large_unboxed_object(object, nwords);
 }
@@ -1049,7 +1047,7 @@ size_vector_unsigned_byte_16(lispobj *where)
 
     vector = (struct vector *) where;
     length = fixnum_value(vector->length);
-    nwords = CEILING(NWORDS(length, 2) + 2, 2);
+    nwords = CEILING(NWORDS(length, 16) + 2, 2);
 
     return nwords;
 }
@@ -1062,7 +1060,7 @@ scav_vector_unsigned_byte_32(lispobj *where, lispobj object)
 
     vector = (struct vector *) where;
     length = fixnum_value(vector->length);
-    nwords = CEILING(length + 2, 2);
+    nwords = CEILING(NWORDS(length, 32) + 2, 2);
 
     return nwords;
 }
@@ -1077,7 +1075,7 @@ trans_vector_unsigned_byte_32(lispobj object)
 
     vector = (struct vector *) native_pointer(object);
     length = fixnum_value(vector->length);
-    nwords = CEILING(length + 2, 2);
+    nwords = CEILING(NWORDS(length, 32) + 2, 2);
 
     return copy_large_unboxed_object(object, nwords);
 }
@@ -1090,10 +1088,53 @@ size_vector_unsigned_byte_32(lispobj *where)
 
     vector = (struct vector *) where;
     length = fixnum_value(vector->length);
-    nwords = CEILING(length + 2, 2);
+    nwords = CEILING(NWORDS(length, 32) + 2, 2);
 
     return nwords;
 }
+
+#if N_WORD_BITS == 64
+static int
+scav_vector_unsigned_byte_64(lispobj *where, lispobj object)
+{
+    struct vector *vector;
+    int length, nwords;
+
+    vector = (struct vector *) where;
+    length = fixnum_value(vector->length);
+    nwords = CEILING(NWORDS(length, 64) + 2, 2);
+
+    return nwords;
+}
+
+static lispobj
+trans_vector_unsigned_byte_64(lispobj object)
+{
+    struct vector *vector;
+    int length, nwords;
+
+    gc_assert(is_lisp_pointer(object));
+
+    vector = (struct vector *) native_pointer(object);
+    length = fixnum_value(vector->length);
+    nwords = CEILING(NWORDS(length, 64) + 2, 2);
+
+    return copy_large_unboxed_object(object, nwords);
+}
+
+static int
+size_vector_unsigned_byte_64(lispobj *where)
+{
+    struct vector *vector;
+    int length, nwords;
+
+    vector = (struct vector *) where;
+    length = fixnum_value(vector->length);
+    nwords = CEILING(NWORDS(length, 64) + 2, 2);
+
+    return nwords;
+}
+#endif
 
 static int
 scav_vector_single_float(lispobj *where, lispobj object)
@@ -1520,12 +1561,26 @@ gc_init_tables(void)
 	scav_vector_unsigned_byte_16;
     scavtab[SIMPLE_ARRAY_UNSIGNED_BYTE_16_WIDETAG] =
 	scav_vector_unsigned_byte_16;
+#ifdef SIMPLE_ARRAY_SIGNED_BYTE_29_WIDETAG
     scavtab[SIMPLE_ARRAY_UNSIGNED_BYTE_29_WIDETAG] =
 	scav_vector_unsigned_byte_32;
+#endif
     scavtab[SIMPLE_ARRAY_UNSIGNED_BYTE_31_WIDETAG] =
 	scav_vector_unsigned_byte_32;
     scavtab[SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG] =
 	scav_vector_unsigned_byte_32;
+#ifdef SIMPLE_ARRAY_UNSIGNED_BYTE_60_WIDETAG
+    scavtab[SIMPLE_ARRAY_UNSIGNED_BYTE_64_WIDETAG] =
+	scav_vector_unsigned_byte_64;
+#endif
+#ifdef SIMPLE_ARRAY_UNSIGNED_BYTE_63_WIDETAG
+    scavtab[SIMPLE_ARRAY_UNSIGNED_BYTE_64_WIDETAG] =
+	scav_vector_unsigned_byte_64;
+#endif
+#ifdef SIMPLE_ARRAY_UNSIGNED_BYTE_64_WIDETAG
+    scavtab[SIMPLE_ARRAY_UNSIGNED_BYTE_64_WIDETAG] =
+	scav_vector_unsigned_byte_64;
+#endif
 #ifdef SIMPLE_ARRAY_SIGNED_BYTE_8_WIDETAG
     scavtab[SIMPLE_ARRAY_SIGNED_BYTE_8_WIDETAG] = scav_vector_unsigned_byte_8;
 #endif
@@ -1540,6 +1595,14 @@ gc_init_tables(void)
 #ifdef SIMPLE_ARRAY_SIGNED_BYTE_32_WIDETAG
     scavtab[SIMPLE_ARRAY_SIGNED_BYTE_32_WIDETAG] =
 	scav_vector_unsigned_byte_32;
+#endif
+#ifdef SIMPLE_ARRAY_SIGNED_BYTE_61_WIDETAG
+    scavtab[SIMPLE_ARRAY_SIGNED_BYTE_61_WIDETAG] =
+	scav_vector_unsigned_byte_64;
+#endif
+#ifdef SIMPLE_ARRAY_SIGNED_BYTE_64_WIDETAG
+    scavtab[SIMPLE_ARRAY_SIGNED_BYTE_64_WIDETAG] =
+	scav_vector_unsigned_byte_64;
 #endif
     scavtab[SIMPLE_ARRAY_SINGLE_FLOAT_WIDETAG] = scav_vector_single_float;
     scavtab[SIMPLE_ARRAY_DOUBLE_FLOAT_WIDETAG] = scav_vector_double_float;
@@ -1624,12 +1687,26 @@ gc_init_tables(void)
 	trans_vector_unsigned_byte_16;
     transother[SIMPLE_ARRAY_UNSIGNED_BYTE_16_WIDETAG] =
 	trans_vector_unsigned_byte_16;
+#ifdef SIMPLE_ARRAY_UNSIGNED_BYTE_29_WIDETAG
     transother[SIMPLE_ARRAY_UNSIGNED_BYTE_29_WIDETAG] =
 	trans_vector_unsigned_byte_32;
+#endif
     transother[SIMPLE_ARRAY_UNSIGNED_BYTE_31_WIDETAG] =
 	trans_vector_unsigned_byte_32;
     transother[SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG] =
 	trans_vector_unsigned_byte_32;
+#ifdef SIMPLE_ARRAY_UNSIGNED_BYTE_60_WIDETAG
+    transother[SIMPLE_ARRAY_UNSIGNED_BYTE_60_WIDETAG] =
+	trans_vector_unsigned_byte_32;
+#endif
+#ifdef SIMPLE_ARRAY_UNSIGNED_BYTE_63_WIDETAG
+    transother[SIMPLE_ARRAY_UNSIGNED_BYTE_63_WIDETAG] =
+	trans_vector_unsigned_byte_64;
+#endif
+#ifdef SIMPLE_ARRAY_UNSIGNED_BYTE_64_WIDETAG
+    transother[SIMPLE_ARRAY_UNSIGNED_BYTE_64_WIDETAG] =
+	trans_vector_unsigned_byte_64;
+#endif
 #ifdef SIMPLE_ARRAY_SIGNED_BYTE_8_WIDETAG
     transother[SIMPLE_ARRAY_SIGNED_BYTE_8_WIDETAG] =
 	trans_vector_unsigned_byte_8;
@@ -1645,6 +1722,14 @@ gc_init_tables(void)
 #ifdef SIMPLE_ARRAY_SIGNED_BYTE_32_WIDETAG
     transother[SIMPLE_ARRAY_SIGNED_BYTE_32_WIDETAG] =
 	trans_vector_unsigned_byte_32;
+#endif
+#ifdef SIMPLE_ARRAY_SIGNED_BYTE_61_WIDETAG
+    transother[SIMPLE_ARRAY_SIGNED_BYTE_61_WIDETAG] =
+	trans_vector_unsigned_byte_64;
+#endif
+#ifdef SIMPLE_ARRAY_SIGNED_BYTE_64_WIDETAG
+    transother[SIMPLE_ARRAY_SIGNED_BYTE_64_WIDETAG] =
+	trans_vector_unsigned_byte_64;
 #endif
     transother[SIMPLE_ARRAY_SINGLE_FLOAT_WIDETAG] =
 	trans_vector_single_float;
@@ -1689,14 +1774,14 @@ gc_init_tables(void)
     for (i = 0; i < ((sizeof sizetab)/(sizeof sizetab[0])); i++)
 	sizetab[i] = size_lose;
     for (i = 0; i < (1<<(N_WIDETAG_BITS-N_LOWTAG_BITS)); i++) {
-	sizetab[EVEN_FIXNUM_LOWTAG|(i<<3)] = size_immediate;
-	sizetab[FUN_POINTER_LOWTAG|(i<<3)] = size_pointer;
+	sizetab[EVEN_FIXNUM_LOWTAG|(i<<N_LOWTAG_BITS)] = size_immediate;
+	sizetab[FUN_POINTER_LOWTAG|(i<<N_LOWTAG_BITS)] = size_pointer;
 	/* skipping OTHER_IMMEDIATE_0_LOWTAG */
-	sizetab[LIST_POINTER_LOWTAG|(i<<3)] = size_pointer;
-	sizetab[ODD_FIXNUM_LOWTAG|(i<<3)] = size_immediate;
-	sizetab[INSTANCE_POINTER_LOWTAG|(i<<3)] = size_pointer;
+	sizetab[LIST_POINTER_LOWTAG|(i<<N_LOWTAG_BITS)] = size_pointer;
+	sizetab[ODD_FIXNUM_LOWTAG|(i<<N_LOWTAG_BITS)] = size_immediate;
+	sizetab[INSTANCE_POINTER_LOWTAG|(i<<N_LOWTAG_BITS)] = size_pointer;
 	/* skipping OTHER_IMMEDIATE_1_LOWTAG */
-	sizetab[OTHER_POINTER_LOWTAG|(i<<3)] = size_pointer;
+	sizetab[OTHER_POINTER_LOWTAG|(i<<N_LOWTAG_BITS)] = size_pointer;
     }
     sizetab[BIGNUM_WIDETAG] = size_unboxed;
     sizetab[RATIO_WIDETAG] = size_boxed;
@@ -1732,12 +1817,26 @@ gc_init_tables(void)
 	size_vector_unsigned_byte_16;
     sizetab[SIMPLE_ARRAY_UNSIGNED_BYTE_16_WIDETAG] =
 	size_vector_unsigned_byte_16;
+#ifdef SIMPLE_ARRAY_UNSIGNED_BYTE_29_WIDETAG
     sizetab[SIMPLE_ARRAY_UNSIGNED_BYTE_29_WIDETAG] =
 	size_vector_unsigned_byte_32;
+#endif
     sizetab[SIMPLE_ARRAY_UNSIGNED_BYTE_31_WIDETAG] =
 	size_vector_unsigned_byte_32;
     sizetab[SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG] =
 	size_vector_unsigned_byte_32;
+#ifdef SIMPLE_ARRAY_UNSIGNED_BYTE_60_WIDETAG
+    sizetab[SIMPLE_ARRAY_UNSIGNED_BYTE_60_WIDETAG] =
+	size_vector_unsigned_byte_64;
+#endif
+#ifdef SIMPLE_ARRAY_UNSIGNED_BYTE_63_WIDETAG
+    sizetab[SIMPLE_ARRAY_UNSIGNED_BYTE_63_WIDETAG] =
+	size_vector_unsigned_byte_64;
+#endif
+#ifdef SIMPLE_ARRAY_UNSIGNED_BYTE_64_WIDETAG
+    sizetab[SIMPLE_ARRAY_UNSIGNED_BYTE_64_WIDETAG] =
+	size_vector_unsigned_byte_64;
+#endif
 #ifdef SIMPLE_ARRAY_SIGNED_BYTE_8_WIDETAG
     sizetab[SIMPLE_ARRAY_SIGNED_BYTE_8_WIDETAG] = size_vector_unsigned_byte_8;
 #endif
@@ -1752,6 +1851,14 @@ gc_init_tables(void)
 #ifdef SIMPLE_ARRAY_SIGNED_BYTE_32_WIDETAG
     sizetab[SIMPLE_ARRAY_SIGNED_BYTE_32_WIDETAG] =
 	size_vector_unsigned_byte_32;
+#endif
+#ifdef SIMPLE_ARRAY_SIGNED_BYTE_61_WIDETAG
+    sizetab[SIMPLE_ARRAY_SIGNED_BYTE_61_WIDETAG] =
+	size_vector_unsigned_byte_64;
+#endif
+#ifdef SIMPLE_ARRAY_SIGNED_BYTE_64_WIDETAG
+    sizetab[SIMPLE_ARRAY_SIGNED_BYTE_64_WIDETAG] =
+	size_vector_unsigned_byte_64;
 #endif
     sizetab[SIMPLE_ARRAY_SINGLE_FLOAT_WIDETAG] = size_vector_single_float;
     sizetab[SIMPLE_ARRAY_DOUBLE_FLOAT_WIDETAG] = size_vector_double_float;

@@ -110,8 +110,15 @@
 ;;;
 ;;; rather than two separate tests and jumps 
 (defenum (:suffix -widetag
+          ;; The first widetag must be greater than SB!VM:LOWTAG-LIMIT
+          ;; otherwise code in generic/early-type-vops will suffer
+          ;; a long, horrible death.  --njf, 2004-08-09
 	  :start (+ (ash 1 n-lowtag-bits) other-immediate-0-lowtag)
 	  :step 4)
+  ;; NOTE: the binary numbers off to the side are only valid for 32-bit
+  ;; ports; add #x1000 if you want to know the values for 64-bit ports.
+  ;; And note that the numbers get a little scrambled further down.
+  ;;   --njf, 2004-08-09
   bignum                            ; 00001010
   ratio                             ; 00001110
   single-float                      ; 00010010
@@ -146,8 +153,10 @@
   unused07                          ; 01110110
   unused08                          ; 01111010
   unused09                          ; 01111110
-  
+
+  #!+#.(cl:if (cl:= 32 sb!vm:n-word-bits) '(and) '(or))
   unused10                          ; 10000010
+  #!+#.(cl:if (cl:= 32 sb!vm:n-word-bits) '(and) '(or))
   unused11                          ; 10000110
 
   simple-array-unsigned-byte-2      ; 10001010
@@ -160,13 +169,25 @@
   simple-base-string                ; 10100110
   simple-bit-vector                 ; 10101010
   simple-vector                     ; 10101110
+  #!+#.(cl:if (cl:= 32 sb!vm:n-word-bits) '(and) '(or))
   simple-array-unsigned-byte-29     ; 10110010
   simple-array-unsigned-byte-31     ; 10110110
   simple-array-unsigned-byte-32     ; 10111010
+  #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
+  simple-array-unsigned-byte-60
+  #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
+  simple-array-unsigned-byte-63
+  #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
+  simple-array-unsigned-byte-64
   simple-array-signed-byte-8        ; 10111110
   simple-array-signed-byte-16       ; 11000010
+  #!+#.(cl:if (cl:= 32 sb!vm:n-word-bits) '(and) '(or))
   simple-array-signed-byte-30       ; 11000110
   simple-array-signed-byte-32       ; 11001010
+  #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
+  simple-array-signed-byte-61
+  #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
+  simple-array-signed-byte-64
   simple-array-single-float         ; 11001110
   simple-array-double-float         ; 11010010
   simple-array-complex-single-float ; 11010110
@@ -178,8 +199,11 @@
   complex-vector                    ; 11101110
   complex-array                     ; 11110010
 
+  #!+#.(cl:if (cl:= 32 sb!vm:n-word-bits) '(and) '(or))
   unused12                          ; 11110110
+  #!+#.(cl:if (cl:= 32 sb!vm:n-word-bits) '(and) '(or))
   unused13                          ; 11111010
+  #!+#.(cl:if (cl:= 32 sb!vm:n-word-bits) '(and) '(or))
   unused14                          ; 11111110
 )
 

@@ -12,6 +12,7 @@
 #ifndef _PRINT_H_
 #define _PRINT_H_
 
+#include "sbcl.h"
 #include "runtime.h"
 
 extern char *lowtag_Names[], *subtype_Names[];

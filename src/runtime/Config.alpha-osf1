@@ -8,9 +8,10 @@
 # files for more information.
 
 CFLAGS += -Dalpha -Dosf1 -O0 -g -D_XOPEN_SOURCE=500 -D_OSF_SOURCE=500
+CFLAGS += -msg_disable newlocale
 ASFLAGS += -Dalpha -Dosf1 #-ULANGUAGE_ASSEMBLY
-LD = ld -taso 
-LINKFLAGS = -taso -non_shared # dynamic -v -g  -Wl,-T  -Wl,ld-script.alpha-linux
+LD = ld -xtaso
+LINKFLAGS = -non_shared # dynamic -v -g  -Wl,-T  -Wl,ld-script.alpha-linux
 # Digital^WCompaq^WHP's cc declares `static inline' functions to exist
 # in multiple places in the binary; we add the '-g' flag to suppress all
 # internal (i.e. static) function names being spat out.  GENESIS

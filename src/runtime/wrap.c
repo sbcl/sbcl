@@ -32,8 +32,8 @@
 #include <pwd.h>
 #include <stdio.h>
 
-#include "runtime.h"
 #include "sbcl.h"
+#include "runtime.h"
 #include "util.h"
 
 /* Although it might seem as though this should be in some standard

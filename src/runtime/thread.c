@@ -8,8 +8,8 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 
-#include "runtime.h"
 #include "sbcl.h"
+#include "runtime.h"
 #include "validate.h"		/* for CONTROL_STACK_SIZE etc */
 #include "thread.h"
 #include "arch.h"
@@ -19,6 +19,9 @@
 #include "dynbind.h"
 #include "genesis/cons.h"
 #include "genesis/fdefn.h"
+#include "interr.h"             /* for lose() */
+#include "gc-internal.h"
+
 #define ALIEN_STACK_SIZE (1*1024*1024) /* 1Mb size chosen at random */
 
 int dynamic_values_bytes=4096*sizeof(lispobj);	/* same for all threads */
@@ -157,13 +160,13 @@ struct thread * create_thread_struct(lispobj initial_function) {
      * we use the appropriate SymbolValue macros to access any of the
      * variable quantities from the C runtime.  It's not quite OAOOM,
      * it just feels like it */
-    SetSymbolValue(BINDING_STACK_START,th->binding_stack_start,th);
-    SetSymbolValue(CONTROL_STACK_START,th->control_stack_start,th);
-    SetSymbolValue(CONTROL_STACK_END,th->control_stack_end,th);
+    SetSymbolValue(BINDING_STACK_START,(lispobj)th->binding_stack_start,th);
+    SetSymbolValue(CONTROL_STACK_START,(lispobj)th->control_stack_start,th);
+    SetSymbolValue(CONTROL_STACK_END,(lispobj)th->control_stack_end,th);
 #ifdef LISP_FEATURE_X86
-    SetSymbolValue(BINDING_STACK_POINTER,th->binding_stack_pointer,th);
-    SetSymbolValue(ALIEN_STACK,th->alien_stack_pointer,th);
-    SetSymbolValue(PSEUDO_ATOMIC_ATOMIC,th->pseudo_atomic_atomic,th);
+    SetSymbolValue(BINDING_STACK_POINTER,(lispobj)th->binding_stack_pointer,th);
+    SetSymbolValue(ALIEN_STACK,(lispobj)th->alien_stack_pointer,th);
+    SetSymbolValue(PSEUDO_ATOMIC_ATOMIC,(lispobj)th->pseudo_atomic_atomic,th);
     SetSymbolValue(PSEUDO_ATOMIC_INTERRUPTED,th->pseudo_atomic_interrupted,th);
 #else
     current_binding_stack_pointer=th->binding_stack_pointer;

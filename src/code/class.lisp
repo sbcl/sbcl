@@ -1024,8 +1024,7 @@
       :translation (and integer (not fixnum))
       :inherits (integer rational real number)
       :codes (#.sb!vm:bignum-widetag)
-      ;; FIXME: wrong for 64-bit!
-      :prototype-form (expt 2 42))
+      :prototype-form (expt 2 #.(* sb!vm:n-word-bits (/ 3 2))))
 
      (array :translation array :codes (#.sb!vm:complex-array-widetag)
             :hierarchical-p nil
@@ -1091,6 +1090,7 @@
       :direct-superclasses (vector simple-array)
       :inherits (vector simple-array array sequence)
       :prototype-form (make-array 0 :element-type '(unsigned-byte 16)))
+     #!+#.(cl:if (cl:= 32 sb!vm:n-word-bits) '(and) '(or))
      (simple-array-unsigned-byte-29
       :translation (simple-array (unsigned-byte 29) (*))
       :codes (#.sb!vm:simple-array-unsigned-byte-29-widetag)
@@ -1109,6 +1109,27 @@
       :direct-superclasses (vector simple-array)
       :inherits (vector simple-array array sequence)
       :prototype-form (make-array 0 :element-type '(unsigned-byte 32)))
+     #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
+     (simple-array-unsigned-byte-60
+      :translation (simple-array (unsigned-byte 60) (*))
+      :codes (#.sb!vm:simple-array-unsigned-byte-60-widetag)
+      :direct-superclasses (vector simple-array)
+      :inherits (vector simple-array array sequence)
+      :prototype-form (make-array 0 :element-type '(unsigned-byte 60)))
+     #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
+     (simple-array-unsigned-byte-63
+      :translation (simple-array (unsigned-byte 63) (*))
+      :codes (#.sb!vm:simple-array-unsigned-byte-63-widetag)
+      :direct-superclasses (vector simple-array)
+      :inherits (vector simple-array array sequence)
+      :prototype-form (make-array 0 :element-type '(unsigned-byte 63)))
+     #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
+     (simple-array-unsigned-byte-64
+      :translation (simple-array (unsigned-byte 64) (*))
+      :codes (#.sb!vm:simple-array-unsigned-byte-64-widetag)
+      :direct-superclasses (vector simple-array)
+      :inherits (vector simple-array array sequence)
+      :prototype-form (make-array 0 :element-type '(unsigned-byte 64)))
      (simple-array-signed-byte-8
       :translation (simple-array (signed-byte 8) (*))
       :codes (#.sb!vm:simple-array-signed-byte-8-widetag)
@@ -1121,6 +1142,7 @@
       :direct-superclasses (vector simple-array)
       :inherits (vector simple-array array sequence)
       :prototype-form (make-array 0 :element-type '(signed-byte 16)))
+     #!+#.(cl:if (cl:= 32 sb!vm:n-word-bits) '(and) '(or))
      (simple-array-signed-byte-30
       :translation (simple-array (signed-byte 30) (*))
       :codes (#.sb!vm:simple-array-signed-byte-30-widetag)
@@ -1133,6 +1155,20 @@
       :direct-superclasses (vector simple-array)
       :inherits (vector simple-array array sequence)
       :prototype-form (make-array 0 :element-type '(signed-byte 32)))
+     #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
+     (simple-array-signed-byte-61
+      :translation (simple-array (signed-byte 61) (*))
+      :codes (#.sb!vm:simple-array-signed-byte-61-widetag)
+      :direct-superclasses (vector simple-array)
+      :inherits (vector simple-array array sequence)
+      :prototype-form (make-array 0 :element-type '(signed-byte 61)))
+     #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
+     (simple-array-signed-byte-64
+      :translation (simple-array (signed-byte 64) (*))
+      :codes (#.sb!vm:simple-array-signed-byte-64-widetag)
+      :direct-superclasses (vector simple-array)
+      :inherits (vector simple-array array sequence)
+      :prototype-form (make-array 0 :element-type '(signed-byte 64)))
      (simple-array-single-float
       :translation (simple-array single-float (*))
       :codes (#.sb!vm:simple-array-single-float-widetag)

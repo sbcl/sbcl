@@ -18,8 +18,8 @@
 #include <signal.h>
 #include <unistd.h>
 
-#include "runtime.h"
 #include "sbcl.h"
+#include "runtime.h"
 
 /* Almost all of this file can be skipped if we're not supporting LDB. */
 #if defined(LISP_FEATURE_SB_LDB)

@@ -11,11 +11,11 @@
 
 #include <stdio.h>
 
+#include "sbcl.h"
 #include "runtime.h"
 #include "globals.h"
 #include "validate.h"
 #include "os.h"
-#include "sbcl.h"
 #include "arch.h"
 #include "lispregs.h"
 #include "signal.h"

@@ -15,8 +15,8 @@
 
 #include <stdio.h>
 #include <signal.h>
-#include "runtime.h"
 #include "sbcl.h"
+#include "runtime.h"
 #include "globals.h"
 #include "os.h"
 #include "interrupt.h"

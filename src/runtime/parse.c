@@ -15,8 +15,8 @@
 #include <ctype.h>
 #include <signal.h>
 
-#include "runtime.h"
 #include "sbcl.h"
+#include "runtime.h"
 
 #if defined(LISP_FEATURE_SB_LDB)
 

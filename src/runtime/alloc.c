@@ -18,7 +18,6 @@
 #include <string.h>
 
 #include "sbcl.h"
-#include "genesis/config.h"
 #include "runtime.h"
 #include "os.h"
 #include "alloc.h"

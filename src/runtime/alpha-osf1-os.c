@@ -19,6 +19,7 @@
 #include <stdio.h>
 #include <sys/param.h>
 #include <sys/file.h>
+#include "sbcl.h"
 #include "./signal.h"
 #include "os.h"
 #include "arch.h"
@@ -26,7 +27,6 @@
 #include "interrupt.h"
 #include "interr.h"
 #include "lispregs.h"
-#include "sbcl.h"
 #include <sys/socket.h>
 #include <sys/utsname.h>
 

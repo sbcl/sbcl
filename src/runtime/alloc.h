@@ -12,6 +12,7 @@
 #ifndef _ALLOC_H_
 #define _ALLOC_H_
 
+#include "sbcl.h"
 #include "runtime.h"
 
 extern lispobj alloc_cons(lispobj car, lispobj cdr);

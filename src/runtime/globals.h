@@ -16,6 +16,7 @@
 
 #include <sys/types.h>
 #include <unistd.h>
+#include "sbcl.h"
 #include "runtime.h"
 
 extern int foreign_function_call_active;

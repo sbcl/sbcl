@@ -10,9 +10,9 @@
  */
 #include <stdio.h>
 
+#include "sbcl.h"
 #include "runtime.h"
 #include "arch.h"
-#include "sbcl.h"
 #include "globals.h"
 #include "validate.h"
 #include "os.h"

@@ -17,8 +17,8 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#include "runtime.h"
 #include "sbcl.h"
+#include "runtime.h"
 #include "globals.h"
 #include "validate.h"
 

@@ -17,6 +17,7 @@
 
 #define _OS_H_INCLUDED_
 
+#include "sbcl.h"
 #include "runtime.h"
 
 /* Some standard preprocessor definitions and typedefs are needed from

@@ -37,11 +37,6 @@
  * problem.. */
 #define QSHOW_SIGNALS 0
 
-#define N_LOWTAG_BITS 3
-#define LOWTAG_MASK ((1<<N_LOWTAG_BITS)-1)
-#define N_WIDETAG_BITS 8
-#define WIDETAG_MASK ((1<<N_WIDETAG_BITS)-1)
-
 /* FIXME: Make HeaderValue, CONS, SYMBOL, and FDEFN into inline
  * functions instead of macros. */
 
@@ -97,8 +92,8 @@ native_pointer(lispobj obj)
 
 /* FIXME: There seems to be no reason that make_fixnum and fixnum_value
  * can't be implemented as (possibly inline) functions. */
-#define make_fixnum(n) ((lispobj)((n)<<2))
-#define fixnum_value(n) (((long)n)>>2)
+#define make_fixnum(n) ((lispobj)((n)<<N_FIXNUM_TAG_BITS))
+#define fixnum_value(n) (((long)n)>>N_FIXNUM_TAG_BITS)
 
 /* Too bad ANSI C doesn't define "bool" as C++ does.. */
 typedef int boolean;

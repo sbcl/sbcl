@@ -28,8 +28,8 @@
 #include <signal.h>
 #include <errno.h>
 #include <string.h>
-#include "runtime.h"
 #include "sbcl.h"
+#include "runtime.h"
 #include "os.h"
 #include "interr.h"
 #include "globals.h"

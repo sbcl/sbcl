@@ -8,13 +8,13 @@
 #include <sys/param.h>
 #include <sys/utsname.h>
 
+#include "sbcl.h"
 #include "os.h"
 #include "arch.h"
 #include "interr.h"
 #include "interrupt.h"
 #include "globals.h"
 #include "validate.h"
-#include "sbcl.h"
 #include "target-arch-os.h"
 
 #define OS_VM_DEFAULT_PAGESIZE 8192

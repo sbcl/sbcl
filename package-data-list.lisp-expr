@@ -1278,15 +1278,38 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
 		       "OBJECT-NOT-SIMPLE-ARRAY-UNSIGNED-BYTE-15-ERROR"
 		       "OBJECT-NOT-SIMPLE-ARRAY-UNSIGNED-BYTE-16-ERROR"
 		       "OBJECT-NOT-SIMPLE-ARRAY-UNSIGNED-BYTE-2-ERROR"
+                       ;; KLUDGE: 32-bit and 64-bit ports implement a
+                       ;; different set of specialized array types.
+                       ;; Various bits of code in SBCL assume that
+                       ;; symbols connected to the specialized array
+                       ;; types are exported.  But there's not a good
+                       ;; way at this point to know whether the port
+                       ;; for which we're building is 32-bit or 64-bit.
+                       ;; Granted, we could hardcode the particulars
+                       ;; (or even come up with a special :64BIT feature),
+                       ;; but that seems a little inelegant.  For now,
+                       ;; we brute-force the issue by always exporting
+                       ;; all the names required for both 32-bit and 64-bit
+                       ;; ports.  Other bits connected to the same issue
+                       ;; are noted throughout the code below with the
+                       ;; tag "32/64-bit issues".  --njf, 2004-08-09
 		       "OBJECT-NOT-SIMPLE-ARRAY-UNSIGNED-BYTE-29-ERROR"
 		       "OBJECT-NOT-SIMPLE-ARRAY-UNSIGNED-BYTE-31-ERROR"
 		       "OBJECT-NOT-SIMPLE-ARRAY-UNSIGNED-BYTE-32-ERROR"
 		       "OBJECT-NOT-SIMPLE-ARRAY-UNSIGNED-BYTE-4-ERROR"
+                       ;; FIXME: 32/64-bit issues
+		       "OBJECT-NOT-SIMPLE-ARRAY-UNSIGNED-BYTE-60-ERROR"
+		       "OBJECT-NOT-SIMPLE-ARRAY-UNSIGNED-BYTE-63-ERROR"
+		       "OBJECT-NOT-SIMPLE-ARRAY-UNSIGNED-BYTE-64-ERROR"
 		       "OBJECT-NOT-SIMPLE-ARRAY-UNSIGNED-BYTE-7-ERROR"
 		       "OBJECT-NOT-SIMPLE-ARRAY-UNSIGNED-BYTE-8-ERROR"
 		       "OBJECT-NOT-SIMPLE-ARRAY-SIGNED-BYTE-16-ERROR"
+                       ;; FIXME: 32/64-bit issues
 		       "OBJECT-NOT-SIMPLE-ARRAY-SIGNED-BYTE-30-ERROR"
 		       "OBJECT-NOT-SIMPLE-ARRAY-SIGNED-BYTE-32-ERROR"
+                       ;; FIXME: 32/64-bit issues
+		       "OBJECT-NOT-SIMPLE-ARRAY-SIGNED-BYTE-61-ERROR"
+		       "OBJECT-NOT-SIMPLE-ARRAY-SIGNED-BYTE-64-ERROR"
 		       "OBJECT-NOT-SIMPLE-ARRAY-SIGNED-BYTE-8-ERROR"
 		       "OBJECT-NOT-SIMPLE-BIT-VECTOR-ERROR"
 		       "OBJECT-NOT-SIMPLE-BASE-STRING-ERROR"
@@ -1329,15 +1352,23 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
 		       "SIMPLE-ARRAY-UNSIGNED-BYTE-15-P"
 		       "SIMPLE-ARRAY-UNSIGNED-BYTE-16-P"
 		       "SIMPLE-ARRAY-UNSIGNED-BYTE-2-P"
+                       ;; FIXME: 32/64-bit issues
 		       "SIMPLE-ARRAY-UNSIGNED-BYTE-29-P"
 		       "SIMPLE-ARRAY-UNSIGNED-BYTE-31-P"
 		       "SIMPLE-ARRAY-UNSIGNED-BYTE-32-P"
 		       "SIMPLE-ARRAY-UNSIGNED-BYTE-4-P"
+                       ;; FIXME: 32/64-bit issues
+                       "SIMPLE-ARRAY-UNSIGNED-BYTE-60-P"
+                       "SIMPLE-ARRAY-UNSIGNED-BYTE-63-P"
+                       "SIMPLE-ARRAY-UNSIGNED-BYTE-64-P"
 		       "SIMPLE-ARRAY-UNSIGNED-BYTE-7-P"
 		       "SIMPLE-ARRAY-UNSIGNED-BYTE-8-P"
 		       "SIMPLE-ARRAY-SIGNED-BYTE-16-P"
 		       "SIMPLE-ARRAY-SIGNED-BYTE-30-P"
 		       "SIMPLE-ARRAY-SIGNED-BYTE-32-P"
+                       ;; FIXME: 32/64-bit issues
+		       "SIMPLE-ARRAY-SIGNED-BYTE-61-P"
+		       "SIMPLE-ARRAY-SIGNED-BYTE-64-P"
 		       "SIMPLE-ARRAY-SIGNED-BYTE-8-P"
 		       "SIMPLE-BASE-STRING-P"
 		       "SIMPLE-PACKAGE-ERROR"
@@ -2074,8 +2105,13 @@ structure representations"
 					"OBJECT-NOT-LIST-TRAP" "OBJECT-NOT-INSTANCE-TRAP"
 					"OCFP-SAVE-OFFSET"
 					"ODD-FIXNUM-LOWTAG"
-					"OFFSET-STATIC-SYMBOL" "OTHER-IMMEDIATE-0-LOWTAG"
-					"OTHER-IMMEDIATE-1-LOWTAG" "OTHER-POINTER-LOWTAG"
+					"OFFSET-STATIC-SYMBOL"
+                                        "OTHER-IMMEDIATE-0-LOWTAG"
+					"OTHER-IMMEDIATE-1-LOWTAG"
+                                        ;; FIXME: 32/64-bit issues
+                                        "OTHER-IMMEDIATE-2-LOWTAG"
+                                        "OTHER-IMMEDIATE-3-LOWTAG"
+                                        "OTHER-POINTER-LOWTAG"
 					"PAD-DATA-BLOCK" "PENDING-INTERRUPT-TRAP"
 					"PRIMITIVE-OBJECT" "PRIMITIVE-OBJECT-WIDETAG"
 					"PRIMITIVE-OBJECT-LOWTAG" "PRIMITIVE-OBJECT-NAME"
@@ -2107,15 +2143,24 @@ structure representations"
 					"SIMPLE-ARRAY-UNSIGNED-BYTE-15-WIDETAG"
 					"SIMPLE-ARRAY-UNSIGNED-BYTE-16-WIDETAG"
 					"SIMPLE-ARRAY-UNSIGNED-BYTE-2-WIDETAG"
+                                        ;; FIXME: 32/64-bit issues
 					"SIMPLE-ARRAY-UNSIGNED-BYTE-29-WIDETAG"
 					"SIMPLE-ARRAY-UNSIGNED-BYTE-31-WIDETAG"
 					"SIMPLE-ARRAY-UNSIGNED-BYTE-32-WIDETAG"
+                                        ;; FIXME: 32/64-bit issues
+					"SIMPLE-ARRAY-UNSIGNED-BYTE-60-WIDETAG"
+					"SIMPLE-ARRAY-UNSIGNED-BYTE-63-WIDETAG"
+					"SIMPLE-ARRAY-UNSIGNED-BYTE-64-WIDETAG"
 					"SIMPLE-ARRAY-UNSIGNED-BYTE-4-WIDETAG"
 					"SIMPLE-ARRAY-UNSIGNED-BYTE-7-WIDETAG"
 					"SIMPLE-ARRAY-UNSIGNED-BYTE-8-WIDETAG"
 					"SIMPLE-ARRAY-SIGNED-BYTE-16-WIDETAG"
-					"SIMPLE-ARRAY-SIGNED-BYTE-30-WIDETAG"
+                                        ;; FIXME: 32/64-bit issues
+                                        "SIMPLE-ARRAY-SIGNED-BYTE-30-WIDETAG"
 					"SIMPLE-ARRAY-SIGNED-BYTE-32-WIDETAG"
+                                        ;; FIXME: 32/64-bit issues
+					"SIMPLE-ARRAY-SIGNED-BYTE-61-WIDETAG"
+					"SIMPLE-ARRAY-SIGNED-BYTE-64-WIDETAG"
 					"SIMPLE-ARRAY-SIGNED-BYTE-8-WIDETAG"
 					"SIMPLE-BIT-VECTOR-WIDETAG"
 					"SIMPLE-BASE-STRING-WIDETAG"

@@ -80,9 +80,6 @@ later {
 } *later_blocks = NULL;
 static int later_count = 0;
 
-#define CEILING(x,y) (((x) + ((y) - 1)) & (~((y) - 1)))
-#define NWORDS(x,y) (CEILING((x),(y)) / (y))
-
 /* FIXME: Shouldn't this be defined in sbcl.h?  See also notes in
  * cheneygc.c */
 
@@ -1151,22 +1148,22 @@ pscav(lispobj *addr, int nwords, boolean constant)
 
               case SIMPLE_BASE_STRING_WIDETAG:
                 vector = (struct vector *)addr;
-                count = CEILING(NWORDS(fixnum_value(vector->length)+1,4)+2,2);
+                count = CEILING(NWORDS(fixnum_value(vector->length)+1,8)+2,2);
                 break;
 
               case SIMPLE_BIT_VECTOR_WIDETAG:
                 vector = (struct vector *)addr;
-                count = CEILING(NWORDS(fixnum_value(vector->length),32)+2,2);
+                count = CEILING(NWORDS(fixnum_value(vector->length),1)+2,2);
                 break;
 
               case SIMPLE_ARRAY_UNSIGNED_BYTE_2_WIDETAG:
                 vector = (struct vector *)addr;
-                count = CEILING(NWORDS(fixnum_value(vector->length),16)+2,2);
+                count = CEILING(NWORDS(fixnum_value(vector->length),2)+2,2);
                 break;
 
               case SIMPLE_ARRAY_UNSIGNED_BYTE_4_WIDETAG:
                 vector = (struct vector *)addr;
-                count = CEILING(NWORDS(fixnum_value(vector->length),8)+2,2);
+                count = CEILING(NWORDS(fixnum_value(vector->length),4)+2,2);
                 break;
 
               case SIMPLE_ARRAY_UNSIGNED_BYTE_8_WIDETAG:
@@ -1175,7 +1172,7 @@ pscav(lispobj *addr, int nwords, boolean constant)
               case SIMPLE_ARRAY_UNSIGNED_BYTE_7_WIDETAG:
 #endif
                 vector = (struct vector *)addr;
-                count = CEILING(NWORDS(fixnum_value(vector->length),4)+2,2);
+                count = CEILING(NWORDS(fixnum_value(vector->length),8)+2,2);
                 break;
 
               case SIMPLE_ARRAY_UNSIGNED_BYTE_16_WIDETAG:
@@ -1184,7 +1181,7 @@ pscav(lispobj *addr, int nwords, boolean constant)
               case SIMPLE_ARRAY_UNSIGNED_BYTE_15_WIDETAG:
 #endif
                 vector = (struct vector *)addr;
-                count = CEILING(NWORDS(fixnum_value(vector->length),2)+2,2);
+                count = CEILING(NWORDS(fixnum_value(vector->length),16)+2,2);
                 break;
 
               case SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG:
@@ -1197,8 +1194,23 @@ pscav(lispobj *addr, int nwords, boolean constant)
               case SIMPLE_ARRAY_UNSIGNED_BYTE_31_WIDETAG:
 #endif
                 vector = (struct vector *)addr;
-                count = CEILING(fixnum_value(vector->length)+2,2);
+                count = CEILING(NWORDS(fixnum_value(vector->length),32)+2,2);
                 break;
+
+#if N_WORD_BITS == 64
+              case SIMPLE_ARRAY_UNSIGNED_BYTE_64_WIDETAG:
+#ifdef SIMPLE_ARRAY_SIGNED_BYTE_61_WIDETAG
+              case SIMPLE_ARRAY_SIGNED_BYTE_61_WIDETAG:
+              case SIMPLE_ARRAY_UNSIGNED_BYTE_60_WIDETAG:
+#endif
+#ifdef SIMPLE_ARRAY_SIGNED_BYTE_64_WIDETAG
+              case SIMPLE_ARRAY_SIGNED_BYTE_64_WIDETAG:
+              case SIMPLE_ARRAY_UNSIGNED_BYTE_63_WIDETAG:
+#endif
+                vector = (struct vector *)addr;
+                count = CEILING(NWORDS(fixnum_value(vector->length),64)+2,2);
+                break;
+#endif
 
               case SIMPLE_ARRAY_SINGLE_FLOAT_WIDETAG:
                 vector = (struct vector *)addr;

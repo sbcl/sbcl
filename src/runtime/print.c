@@ -20,9 +20,9 @@
 
 #include <stdio.h>
 
+#include "sbcl.h"
 #include "print.h"
 #include "runtime.h"
-#include "sbcl.h"
 
 /* This file can be skipped if we're not supporting LDB. */
 #if defined(LISP_FEATURE_SB_LDB)

@@ -11,9 +11,9 @@
 #include <stdio.h>
 
 /* Copied from sparc-arch.c.  Not all of these are necessary, probably */
+#include "sbcl.h"
 #include "runtime.h"
 #include "arch.h"
-#include "sbcl.h"
 #include "globals.h"
 #include "validate.h"
 #include "os.h"

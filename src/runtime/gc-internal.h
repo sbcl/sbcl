@@ -29,7 +29,14 @@
 			__FILE__, __LINE__)
 
 #define CEILING(x,y) (((x) + ((y) - 1)) & (~((y) - 1)))
-#define NWORDS(x,y) (CEILING((x),(y)) / (y))
+
+static inline unsigned int
+NWORDS(unsigned int x, unsigned int n_bits)
+{
+    unsigned int elements_per_word = N_WORD_BITS/n_bits;
+
+    return CEILING(x, elements_per_word)/elements_per_word;
+}
 
 /* FIXME: Shouldn't this be defined in sbcl.h? */
 #define FUN_RAW_ADDR_OFFSET (6*sizeof(lispobj) - FUN_POINTER_LOWTAG)

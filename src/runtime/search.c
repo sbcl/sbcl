@@ -11,8 +11,8 @@
 
 #include <string.h>
 
-#include "runtime.h"
 #include "sbcl.h"
+#include "runtime.h"
 #include "os.h"
 #include "search.h"
 #include "thread.h"

@@ -308,7 +308,11 @@
 			   (- unsigned #x40000000)
 			   unsigned))))
 	    ((or (= lowtag sb!vm:other-immediate-0-lowtag)
-		 (= lowtag sb!vm:other-immediate-1-lowtag))
+		 (= lowtag sb!vm:other-immediate-1-lowtag)
+                 #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
+                 (= lowtag sb!vm:other-immediate-2-lowtag)
+                 #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
+                 (= lowtag sb!vm:other-immediate-3-lowtag))
 	     (format stream
 		     "for other immediate: #X~X, type #b~8,'0B"
 		     (ash (descriptor-bits des) (- sb!vm:n-widetag-bits))
@@ -364,15 +368,15 @@
 (defun descriptor-fixnum (des)
   (let ((bits (descriptor-bits des)))
     (if (logbitp (1- sb!vm:n-word-bits) bits)
-      ;; KLUDGE: The (- SB!VM:N-WORD-BITS 2) term here looks right to
-      ;; me, and it works, but in CMU CL it was (1- SB!VM:N-WORD-BITS),
-      ;; and although that doesn't make sense for me, or work for me,
-      ;; it's hard to see how it could have been wrong, since CMU CL
-      ;; genesis worked. It would be nice to understand how this came
-      ;; to be.. -- WHN 19990901
-      (logior (ash bits (- 1 sb!vm:n-lowtag-bits)) 
-	      (ash -1 (- sb!vm:n-word-bits (1- sb!vm:n-lowtag-bits))))
-      (ash bits  (- 1 sb!vm:n-lowtag-bits)))))
+        ;; KLUDGE: The (- SB!VM:N-WORD-BITS 2) term here looks right to
+        ;; me, and it works, but in CMU CL it was (1- SB!VM:N-WORD-BITS),
+        ;; and although that doesn't make sense for me, or work for me,
+        ;; it's hard to see how it could have been wrong, since CMU CL
+        ;; genesis worked. It would be nice to understand how this came
+        ;; to be.. -- WHN 19990901
+        (logior (ash bits (- 1 sb!vm:n-lowtag-bits))
+                (ash -1 (1+ sb!vm:n-positive-fixnum-bits)))
+        (ash bits (- 1 sb!vm:n-lowtag-bits)))))
 
 ;;; common idioms
 (defun descriptor-bytes (des)
@@ -1833,7 +1837,7 @@
 	      (note-load-time-code-fixup code-object
 					 after-header
 					 value
-					 kind)))))) ))
+					 kind))))))))
   (values))
 
 (defun resolve-assembler-fixups ()
@@ -2136,6 +2140,11 @@
 		 (31 (prog1 sb!vm:simple-array-unsigned-byte-31-widetag
 		       (setf sizebits 32)))
 		 (32 sb!vm:simple-array-unsigned-byte-32-widetag)
+                 #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
+                 (63 (prog1 sb!vm:simple-array-unsigned-byte-63-widetag
+                       (setf sizebits 64)))
+                 #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
+                 (64 (sb!vm:simple-array-unsigned-byte-64-widetag))
 		 (t (error "losing element size: ~W" sizebits))))
 	 (result (allocate-vector-object *dynamic* sizebits len type))
 	 (start (+ (descriptor-byte-offset result)
@@ -2631,6 +2640,22 @@
               (maybe-record-with-translated-name '("-START" "-END") 6)
               (maybe-record-with-translated-name '("-CORE-ENTRY-TYPE-CODE") 7)
               (maybe-record-with-translated-name '("-CORE-SPACE-ID") 8))))))
+    ;; KLUDGE: these constants are sort of important, but there's no
+    ;; pleasing way to inform the code above about them.  So we fake
+    ;; it for now.  nikodemus on #lisp (2004-08-09) suggested simply
+    ;; exporting every numeric constant from SB!VM; that would work,
+    ;; but the C runtime would have to be altered to use Lisp-like names
+    ;; rather than the munged names currently exported.  --njf, 2004-08-09
+    (dolist (c '(sb!vm:n-word-bits sb!vm:n-word-bytes
+                 sb!vm:n-lowtag-bits sb!vm:lowtag-mask
+                 sb!vm:n-widetag-bits sb!vm:widetag-mask
+                 sb!vm:n-fixnum-tag-bits sb!vm:fixnum-tag-mask))
+      (push (list (substitute #\_ #\- (symbol-name c))
+                  -1                    ; invent a new priority
+                  (symbol-value c)
+                  nil)
+            constants))
+
     (setf constants
 	  (sort constants
 		(lambda (const1 const2)

@@ -15,6 +15,7 @@
 
 #include <stdio.h>
 #include <time.h>
+#include "sbcl.h"
 #include "runtime.h"
 
 void get_timezone(time_t when, int *secwest, boolean *dst)

@@ -17,8 +17,8 @@
 #include <sys/time.h>
 #include <sys/resource.h>
 #include <signal.h>
-#include "runtime.h"
 #include "sbcl.h"
+#include "runtime.h"
 #include "os.h"
 #include "gc.h"
 #include "gc-internal.h"
@@ -540,8 +540,6 @@ scav_fdefn(lispobj *where, lispobj object)
 
 
 /* vector-like objects */
-
-/* #define NWORDS(x,y) (CEILING((x),(y)) / (y)) */
 
 static int
 scav_vector(lispobj *where, lispobj object)
