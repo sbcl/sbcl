@@ -669,7 +669,7 @@ simple-streams proposal.")
       (ansi-stream
        (%ansi-stream-read-sequence seq stream start end))
       (fundamental-stream
-       (sb-gray:stream-read-sequence seq stream start end)))))
+       (sb-gray:stream-read-sequence stream seq start end)))))
 
 (defun clear-input (&optional (stream *standard-input*) buffer-only)
   "Clears any buffered input associated with the Stream."
@@ -790,7 +790,7 @@ simple-streams proposal.")
       (ansi-stream
        (%ansi-stream-write-sequence seq stream start end))
       (fundamental-stream
-       (sb-gray:stream-write-sequence seq stream start end)))))
+       (sb-gray:stream-write-sequence stream seq start end)))))
 
 (defun terpri (&optional (stream *standard-output*))
   "Outputs a new line to the Stream."

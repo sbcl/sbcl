@@ -11,7 +11,7 @@
 		 (sb-grovel:grovel-constants-file
 		  "constants"
 		  :package :sb-posix :depends-on  ("defpackage"))
-		 (:file "interface" :depends-on ("constants" "macros"))))
+		 (:file "interface" :depends-on ("constants" "macros" "designator"))))
 
 (defmethod perform :after ((o test-op) (c (eql (find-system :sb-posix))))
   (provide 'sb-posix))
