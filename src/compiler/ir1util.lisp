@@ -37,17 +37,19 @@
 	   (type (or cleanup null) cleanup))
   (setf (component-reanalyze (block-component block1)) t)
   (with-ir1-environment-from-node node
-    (let* ((start (make-continuation))
-	   (block (continuation-starts-block start))
-	   (cont (make-continuation))
-	   (*lexenv* (if cleanup
-			 (make-lexenv :cleanup cleanup)
-			 *lexenv*)))
-      (change-block-successor block1 block2 block)
-      (link-blocks block block2)
-      (ir1-convert start cont form)
-      (setf (block-last block) (continuation-use cont))
-      block)))
+    (with-component-last-block (*current-component*
+                                (block-next (component-head *current-component*)))
+      (let* ((start (make-continuation))
+             (block (continuation-starts-block start))
+             (cont (make-continuation))
+             (*lexenv* (if cleanup
+                           (make-lexenv :cleanup cleanup)
+                           *lexenv*)))
+        (change-block-successor block1 block2 block)
+        (link-blocks block block2)
+        (ir1-convert start cont form)
+        (setf (block-last block) (continuation-use cont))
+        block))))
 
 ;;;; continuation use hacking
 
@@ -190,16 +192,16 @@
   (ecase (continuation-kind cont)
     (:unused
      (aver (not (continuation-block cont)))
-     (let* ((head (component-head *current-component*))
-	    (next (block-next head))
-	    (new-block (make-block cont)))
+     (let* ((next (component-last-block *current-component*))
+            (prev (block-prev next))
+            (new-block (make-block cont)))
        (setf (block-next new-block) next
-	     (block-prev new-block) head
-	     (block-prev next) new-block
-	     (block-next head) new-block
-	     (continuation-block cont) new-block
-	     (continuation-use cont) nil
-	     (continuation-kind cont) :block-start)
+             (block-prev new-block) prev
+             (block-prev next) new-block
+             (block-next prev) new-block
+             (continuation-block cont) new-block
+             (continuation-use cont) nil
+             (continuation-kind cont) :block-start)
        new-block))
     (:block-start
      (continuation-block cont))))
@@ -559,7 +561,7 @@
 (defun make-empty-component ()
   (let* ((head (make-block-key :start nil :component nil))
 	 (tail (make-block-key :start nil :component nil))
-	 (res (make-component :head head :tail tail)))
+	 (res (make-component head tail)))
     (setf (block-flag head) t)
     (setf (block-flag tail) t)
     (setf (block-component head) res)

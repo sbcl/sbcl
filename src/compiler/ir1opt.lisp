@@ -1168,21 +1168,24 @@
 ;;; possible to do this starting from debug names as well as source
 ;;; names, but as of sbcl-0.7.1.5, there was no need for this
 ;;; generality, since source names are always known to our callers.)
-(defun transform-call (node res source-name)
-  (declare (type combination node) (list res))
+(defun transform-call (call res source-name)
+  (declare (type combination call) (list res))
   (aver (and (legal-fun-name-p source-name)
 	     (not (eql source-name '.anonymous.))))
-  (with-ir1-environment-from-node node
+  (node-ends-block call)
+  (with-ir1-environment-from-node call
+    (with-component-last-block (*current-component*
+                                (block-next (node-block call)))
       (let ((new-fun (ir1-convert-inline-lambda
 		      res
 		      :debug-name (debug-namify "LAMBDA-inlined ~A"
 						(as-debug-name
 						 source-name
 						 "<unknown function>"))))
-	    (ref (continuation-use (combination-fun node))))
+	    (ref (continuation-use (combination-fun call))))
 	(change-ref-leaf ref new-fun)
-	(setf (combination-kind node) :full)
-	(locall-analyze-component *current-component*)))
+	(setf (combination-kind call) :full)
+	(locall-analyze-component *current-component*))))
   (values))
 
 ;;; Replace a call to a foldable function of constant arguments with

@@ -687,6 +687,19 @@
 (defmacro with-continuation-type-assertion ((cont ctype context) &body body)
   `(let ((*lexenv* (ir1ize-the-or-values ,ctype ,cont *lexenv* ,context)))
      ,@body))
+
+(defmacro with-component-last-block ((component block) &body body)
+  (let ((old-last-block (gensym "OLD-LAST-BLOCK")))
+    (once-only ((component component)
+                (block block))
+      `(let ((,old-last-block (component-last-block ,component)))
+         (unwind-protect
+              (progn (setf (component-last-block ,component)
+                           ,block)
+                     ,@body)
+           (setf (component-last-block ,component)
+                 ,old-last-block))))))
+
 
 ;;;; the EVENT statistics/trace utility
 

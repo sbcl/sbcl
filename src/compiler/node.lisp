@@ -330,7 +330,9 @@
 ;;;   size of flow analysis problems, this allows back-end data
 ;;;   structures to be reclaimed after the compilation of each
 ;;;   component.
-(defstruct (component (:copier nil))
+(defstruct (component (:copier nil)
+                      (:constructor
+                       make-component (head tail &aux (last-block tail))))
   ;; unique ID for debugging
   #!+sb-show (id (new-object-id) :read-only t)
   ;; the kind of component
@@ -364,13 +366,15 @@
   ;; the blocks that are the dummy head and tail of the DFO
   ;;
   ;; Entry/exit points have these blocks as their
-  ;; predecessors/successors. Null temporarily. The start and return
-  ;; from each non-deleted function is linked to the component head
-  ;; and tail. Until physical environment analysis links NLX entry
-  ;; stubs to the component head, every successor of the head is a
-  ;; function start (i.e. begins with a BIND node.)
-  (head nil :type (or null cblock))
-  (tail nil :type (or null cblock))
+  ;; predecessors/successors. The start and return from each
+  ;; non-deleted function is linked to the component head and
+  ;; tail. Until physical environment analysis links NLX entry stubs
+  ;; to the component head, every successor of the head is a function
+  ;; start (i.e. begins with a BIND node.)
+  (head (missing-arg) :type cblock)
+  (tail (missing-arg) :type cblock)
+  ;; New blocks are inserted before this.
+  (last-block (missing-arg) :type cblock)
   ;; This becomes a list of the CLAMBDA structures for all functions
   ;; in this component. OPTIONAL-DISPATCHes are represented only by
   ;; their XEP and other associated lambdas. This doesn't contain any
