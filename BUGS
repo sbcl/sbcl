@@ -1258,6 +1258,29 @@ WORKAROUND:
   code. Since then the warning has been downgraded to STYLE-WARNING, 
   so it's still a bug but at least it's a little less annoying.
 
+174:
+  The error message from attempting to use a #\Return format
+  directive:
+    (format nil "~^M") ; replace "^M" with a literal #\Return
+      debugger invoked on condition of type SB-FORMAT::FORMAT-ERROR:
+      error in format: 		 unknown format directive
+      ~
+       ^
+  is not terribly helpful; this is more noticeable than parallel cases
+  with e.g. #\Backspace because of the differing newline conventions
+  on various operating systems. (reported by Harald Hanche-Olsen on
+  cmucl-help 2002-05-31)
+
+175:
+  sbcl's CHANGE-CLASS does not accept and use initargs, so that e.g.:
+    (defclass foo () ((a :accessor a :initarg :a)))
+    (defclass bar () ((a :accessor a :initarg :a)
+                      (b :accessor b :initarg :b)))
+    (change-class (make-instance 'foo :a 1) 'bar :b 2)
+  should return an instance of class BAR with its A slot-value being 1
+  and its B slot-value being 2; at present (sbcl-0.7.4.8), it signals
+  an error.
+
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:
     These labels were used for bugs related to the old IR1 interpreter.
