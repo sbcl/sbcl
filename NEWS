@@ -2455,6 +2455,9 @@ changes in sbcl-0.8.11 relative to sbcl-0.8.10:
     functions.
   * fixed bug: the #S reader macro performs the keyword coercion
     specified for slot names.  (reported by Kalle Niemitalo)
+  * fixed bug: lambda lists may contain symbols whose names start with
+    & but are not lambda-list-keywords; their occurrence triggers a
+    STYLE-WARNING.
   * optimization: rearranged the expansion of various defining macros
     so that each expands into only one top-level form in a
     :LOAD-TOPLEVEL context; this appears to decrease fasl sizes by

@@ -64,10 +64,7 @@
                              :required :rest)
                      state))
       (dolist (arg list)
-        (if (and (symbolp arg)
-                 (let ((name (symbol-name arg)))
-                   (and (plusp (length name))
-                        (char= (char name 0) #\&))))
+        (if (member arg sb!xc:lambda-list-keywords)
             (case arg
               (&optional
                (unless (eq state :required)
@@ -101,30 +98,33 @@
                  (compiler-error "misplaced &AUX in lambda list: ~S" list))
                (setq auxp t
 		     state :aux))
-              ;; FIXME: I don't think ANSI says this is an error. (It
-              ;; should certainly be good for a STYLE-WARNING,
-              ;; though.)
-              (t
-               (compiler-error "unknown &KEYWORD in lambda list: ~S" arg)))
-            (case state
-              (:required (required arg))
-              (:optional (optional arg))
-              (:rest
-               (setq restp t
-                     rest arg
-                     state :post-rest))
-              (:more-context
-               (setq more-context arg
-                     state :more-count))
-              (:more-count
-               (setq more-count arg
-                     state :post-more))
-              (:key (keys arg))
-              (:aux (aux arg))
-              (t
-               (compiler-error "found garbage in lambda list when expecting ~
-                                a keyword: ~S"
-                               arg)))))
+              (t (bug "unknown LAMBDA-LIST-KEYWORD in lambda list: ~S." arg)))
+	    (progn
+	      (when (symbolp arg)
+		(let ((name (symbol-name arg)))
+		  (when (and (plusp (length name))
+			     (char= (char name 0) #\&))
+		    (style-warn
+		     "suspicious variable in lambda list: ~S." arg))))
+	      (case state
+		(:required (required arg))
+		(:optional (optional arg))
+		(:rest
+		 (setq restp t
+		       rest arg
+		       state :post-rest))
+		(:more-context
+		 (setq more-context arg
+		       state :more-count))
+		(:more-count
+		 (setq more-count arg
+		       state :post-more))
+		(:key (keys arg))
+		(:aux (aux arg))
+		(t
+		 (compiler-error "found garbage in lambda list when expecting ~
+                                  a keyword: ~S"
+				 arg))))))
       (when (eq state :rest)
         (compiler-error "&REST without rest variable"))
 

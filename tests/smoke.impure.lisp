@@ -67,5 +67,9 @@
   (assert (= &key 3))
   (assert (null &allow-other-keys)))
 
+(let ((fn (lambda (&foo &rest &bar) (cons &foo &bar))))
+  (assert (equal (funcall fn 1) '(1)))
+  (assert (equal (funcall fn 1 2 3) '(1 2 3))))
+
 ;;; success
 (quit :unix-status 104)
