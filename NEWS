@@ -27,6 +27,8 @@ changes in sbcl-0.8.18 relative to sbcl-0.8.17:
     TRACE).
   * bug fix: (SETF MACRO-FUNCTION) now accepts an optional environment
     argument, which must always be NIL. (reported by Kalle Niemitalo)
+  * bug fix: printing 1.0d+23 no longer results in an error.
+    (reported by Rolf Wester for CMUCL; bug fix from Raymond Toy)
   * fixed some bugs related to Unicode integration:
     ** RUN-PROGRAM can allow its child to take input from a Lisp
        stream.  (reported by Stefan Scholl)

@@ -313,5 +313,9 @@
 (assert (string= (format nil "~VR" nil 5) "five"))
 (assert (string= (format nil (formatter "~VR") nil 6) "six"))
 
+;;; CSR inserted a bug into Burger & Dybvig's float printer.  Caught
+;;; by Raymond Toy
+(assert (string= (format nil "~F" 1d23) "1.0d+23"))
+
 ;;; success
 (quit :unix-status 104)
