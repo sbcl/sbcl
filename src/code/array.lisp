@@ -316,11 +316,13 @@
 ;;;; accessor/setter functions
 (eval-when (:compile-toplevel :execute)
   (defparameter *specialized-array-element-types*
+    ;; FIXME: Ideally we would generate this list from
+    ;; SPECIALIZED-ARRAY-ELEMENT-TYPE-PROPERTIES.  However, this list
+    ;; is optimized for frequency of occurrence, not type lattice
+    ;; relationships, so it's tricky to do so cleanly.
     '(t
       character
       bit
-      (unsigned-byte 2)
-      (unsigned-byte 4)
       (unsigned-byte 8)
       (unsigned-byte 16)
       (unsigned-byte 32)
@@ -334,6 +336,8 @@
       (complex single-float)
       (complex double-float)
       #!+long-float (complex long-float)
+      (unsigned-byte 4)
+      (unsigned-byte 2)
       nil)))
 
 (defun hairy-data-vector-ref (array index)
@@ -877,8 +881,7 @@
   (unless (array-header-p vector)
     (macrolet ((frob (name &rest things)
 		 `(etypecase ,name
-		    ((simple-array nil (*)) (error 'cell-error
-					     :name 'nil-array-element))
+		    ((simple-array nil (*)) (error 'nil-array-accessed-error))
 		    ,@(mapcar (lambda (thing)
 				(destructuring-bind (type-spec fill-value)
 				    thing

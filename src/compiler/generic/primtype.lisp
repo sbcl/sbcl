@@ -100,45 +100,16 @@
 
 ;;; primitive other-pointer array types
 (/show0 "primtype.lisp 96")
-(!def-primitive-type simple-array-nil (descriptor-reg)
-  :type (simple-array nil (*)))
-(!def-primitive-type simple-base-string (descriptor-reg)
-  :type simple-base-string)
-(!def-primitive-type simple-bit-vector (descriptor-reg))
-(!def-primitive-type simple-vector (descriptor-reg))
-(!def-primitive-type simple-array-unsigned-byte-2 (descriptor-reg)
-  :type (simple-array (unsigned-byte 2) (*)))
-(!def-primitive-type simple-array-unsigned-byte-4 (descriptor-reg)
-  :type (simple-array (unsigned-byte 4) (*)))
-(!def-primitive-type simple-array-unsigned-byte-8 (descriptor-reg)
-  :type (simple-array (unsigned-byte 8) (*)))
-(!def-primitive-type simple-array-unsigned-byte-16 (descriptor-reg)
-  :type (simple-array (unsigned-byte 16) (*)))
-(!def-primitive-type simple-array-unsigned-byte-32 (descriptor-reg)
-  :type (simple-array (unsigned-byte 32) (*)))
-(!def-primitive-type simple-array-signed-byte-8 (descriptor-reg)
-  :type (simple-array (signed-byte 8) (*)))
-(!def-primitive-type simple-array-signed-byte-16 (descriptor-reg)
-  :type (simple-array (signed-byte 16) (*)))
-(!def-primitive-type simple-array-signed-byte-30 (descriptor-reg)
-  :type (simple-array (signed-byte 30) (*)))
-(!def-primitive-type simple-array-signed-byte-32 (descriptor-reg)
-  :type (simple-array (signed-byte 32) (*)))
-(!def-primitive-type simple-array-single-float (descriptor-reg)
-  :type (simple-array single-float (*)))
-(!def-primitive-type simple-array-double-float (descriptor-reg)
-  :type (simple-array double-float (*)))
-#!+long-float
-(!def-primitive-type simple-array-long-float (descriptor-reg)
-  :type (simple-array long-float (*)))
-(!def-primitive-type simple-array-complex-single-float (descriptor-reg)
-  :type (simple-array (complex single-float) (*)))
-(!def-primitive-type simple-array-complex-double-float (descriptor-reg)
-  :type (simple-array (complex double-float) (*)))
-#!+long-float
-(!def-primitive-type simple-array-complex-long-float (descriptor-reg)
-  :type (simple-array (complex long-float) (*)))
-
+(macrolet ((define-simple-array-primitive-types ()
+	       `(progn
+		 ,@(map 'list
+			(lambda (saetp)
+			  `(!def-primitive-type
+			    ,(saetp-primitive-type-name saetp)
+			    (descriptor-reg)
+			    :type (simple-array ,(saetp-specifier saetp) (*))))
+			*specialized-array-element-type-properties*))))
+  (define-simple-array-primitive-types))
 ;;; Note: The complex array types are not included, 'cause it is
 ;;; pointless to restrict VOPs to them.
 
@@ -160,31 +131,6 @@
 	   (primitive-type-or-lose 'list))
 	  (t
 	   *backend-t-primitive-type*))))
-
-(defvar *simple-array-primitive-types*
-  '((nil . simple-array-nil)
-    (base-char . simple-base-string)
-    (bit . simple-bit-vector)
-    ((unsigned-byte 2) . simple-array-unsigned-byte-2)
-    ((unsigned-byte 4) . simple-array-unsigned-byte-4)
-    ((unsigned-byte 8) . simple-array-unsigned-byte-8)
-    ((unsigned-byte 16) . simple-array-unsigned-byte-16)
-    ((unsigned-byte 32) . simple-array-unsigned-byte-32)
-    ((signed-byte 8) . simple-array-signed-byte-8)
-    ((signed-byte 16) . simple-array-signed-byte-16)
-    (fixnum . simple-array-signed-byte-30)
-    ((signed-byte 32) . simple-array-signed-byte-32)
-    (single-float . simple-array-single-float)
-    (double-float . simple-array-double-float)
-    #!+long-float (long-float . simple-array-long-float)
-    ((complex single-float) . simple-array-complex-single-float)
-    ((complex double-float) . simple-array-complex-double-float)
-    #!+long-float
-    ((complex long-float) . simple-array-complex-long-float)
-    (t . simple-vector))
-  #!+sb-doc
-  "An a-list for mapping simple array element types to their
-  corresponding primitive types.")
 
 ;;; Return the primitive type corresponding to a type descriptor
 ;;; structure. The second value is true when the primitive type is
@@ -329,6 +275,9 @@
 	     (let* ((dims (array-type-dimensions type))
 		    (etype (array-type-specialized-element-type type))
 		    (type-spec (type-specifier etype))
+		    ;; FIXME: We're _WHAT_?  Testing for type equality
+		    ;; with a specifier and #'EQUAL?  *BOGGLE*.  --
+		    ;; CSR, 2003-06-24
 		    (ptype (cdr (assoc type-spec *simple-array-primitive-types*
 				       :test #'equal))))
 	       (if (and (consp dims) (null (rest dims)) ptype)

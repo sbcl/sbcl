@@ -199,7 +199,7 @@
 	#'<=
 	:key #'template-cost))
 
-;;; Return a function type specifier describing Template's type computed
+;;; Return a function type specifier describing TEMPLATE's type computed
 ;;; from the operand type restrictions.
 (defun template-type-specifier (template)
   (declare (type template template))

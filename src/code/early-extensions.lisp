@@ -79,6 +79,14 @@
                       (t `(values ,@(cdr result) &optional)))))
     `(function ,args ,result)))
 
+;;; a type specifier
+;;;
+;;; FIXME: The SB!KERNEL:INSTANCE here really means CL:CLASS.
+;;; However, the CL:CLASS type is only defined once PCL is loaded,
+;;; which is before this is evaluated.  Once PCL is moved into cold
+;;; init, this might be fixable.
+(def!type type-specifier () '(or list symbol sb!kernel:instance))
+
 ;;; the default value used for initializing character data. The ANSI
 ;;; spec says this is arbitrary, so we use the value that falls
 ;;; through when we just let the low-level consing code initialize

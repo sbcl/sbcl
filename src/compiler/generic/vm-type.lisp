@@ -14,10 +14,6 @@
 
 (in-package "SB!KERNEL")
 
-(/show0 "vm-type.lisp 17")
-
-(!begin-collecting-cold-init-forms)
-
 ;;;; FIXME: I'm not sure where to put this. -- WHN 19990817
 
 (deftype sb!vm:word () `(unsigned-byte ,sb!vm:n-word-bits))
@@ -77,29 +73,6 @@
 (sb!xc:deftype bignum-index () 'index)
 
 ;;;; hooks into the type system
-
-;;; the kinds of specialized array that actually exist in this implementation
-(defvar *specialized-array-element-types*)
-(!cold-init-forms
-  (setf *specialized-array-element-types*
-	'(nil
-	  bit
-	  (unsigned-byte 2)
-	  (unsigned-byte 4)
-	  (unsigned-byte 8)
-	  (unsigned-byte 16)
-	  (unsigned-byte 32)
-	  (signed-byte 8)
-	  (signed-byte 16)
-	  (signed-byte 30)
-	  (signed-byte 32)
-	  (complex single-float)
-	  (complex double-float)
-	  #!+long-float (complex long-float)
-	  base-char
-	  single-float
-	  double-float
-	  #!+long-float long-float)))
 
 (sb!xc:deftype unboxed-array (&optional dims)
   (collect ((types (list 'or)))
@@ -186,7 +159,3 @@
      'sb!c:check-fun)
     (t
      nil)))
-
-(!defun-from-collected-cold-init-forms !vm-type-cold-init)
-
-(/show0 "vm-type.lisp end of file")

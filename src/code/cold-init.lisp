@@ -204,6 +204,9 @@
   ;; DEFTYPEs are.
   (setf *type-system-initialized* t)
 
+  ;; now that the type system is definitely initialized, fixup UNKNOWN
+  ;; types that have crept in.
+  (show-and-call !fixup-type-cold-init)
   ;; run the PROCLAIMs.
   (show-and-call !late-proclaim-cold-init)
   

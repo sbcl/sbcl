@@ -106,14 +106,6 @@
 ;;; semistandard types
 (sb!xc:deftype generalized-boolean () t)
 
-;;; a type specifier
-;;;
-;;; FIXME: The SB!KERNEL:INSTANCE here really means CL:CLASS.
-;;; However, the CL:CLASS type is only defined once PCL is loaded,
-;;; which is before this is evaluated.  Once PCL is moved into cold
-;;; init, this might be fixable.
-(sb!xc:deftype type-specifier () '(or list symbol sb!kernel:instance))
-
 ;;; array rank, total size...
 (sb!xc:deftype array-rank () `(integer 0 (,sb!xc:array-rank-limit)))
 (sb!xc:deftype array-total-size ()
