@@ -2192,6 +2192,15 @@ possibly_valid_dynamic_space_pointer(lispobj *pointer)
 #endif
 	case SIMPLE_ARRAY_UNSIGNED_BYTE_31_WIDETAG:
 	case SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG:
+#ifdef  SIMPLE_ARRAY_UNSIGNED_BYTE_60_WIDETAG:
+	case SIMPLE_ARRAY_UNSIGNED_BYTE_60_WIDETAG:
+#endif
+#ifdef  SIMPLE_ARRAY_UNSIGNED_BYTE_63_WIDETAG:
+	case SIMPLE_ARRAY_UNSIGNED_BYTE_63_WIDETAG:
+#endif
+#ifdef  SIMPLE_ARRAY_UNSIGNED_BYTE_64_WIDETAG:
+	case SIMPLE_ARRAY_UNSIGNED_BYTE_64_WIDETAG:
+#endif
 #ifdef SIMPLE_ARRAY_SIGNED_BYTE_8_WIDETAG
 	case SIMPLE_ARRAY_SIGNED_BYTE_8_WIDETAG:
 #endif
@@ -2203,6 +2212,12 @@ possibly_valid_dynamic_space_pointer(lispobj *pointer)
 #endif
 #ifdef SIMPLE_ARRAY_SIGNED_BYTE_32_WIDETAG
 	case SIMPLE_ARRAY_SIGNED_BYTE_32_WIDETAG:
+#endif
+#ifdef SIMPLE_ARRAY_SIGNED_BYTE_61_WIDETAG
+	case SIMPLE_ARRAY_SIGNED_BYTE_61_WIDETAG:
+#endif
+#ifdef SIMPLE_ARRAY_SIGNED_BYTE_64_WIDETAG
+	case SIMPLE_ARRAY_SIGNED_BYTE_64_WIDETAG:
 #endif
 	case SIMPLE_ARRAY_SINGLE_FLOAT_WIDETAG:
 	case SIMPLE_ARRAY_DOUBLE_FLOAT_WIDETAG:
@@ -2282,6 +2297,15 @@ maybe_adjust_large_object(lispobj *where)
 #endif
     case SIMPLE_ARRAY_UNSIGNED_BYTE_31_WIDETAG:
     case SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG:
+#ifdef SIMPLE_ARRAY_UNSIGNED_BYTE_60_WIDETAG
+    case SIMPLE_ARRAY_UNSIGNED_BYTE_60_WIDETAG:
+#endif
+#ifdef SIMPLE_ARRAY_UNSIGNED_BYTE_63_WIDETAG
+    case SIMPLE_ARRAY_UNSIGNED_BYTE_63_WIDETAG:
+#endif
+#ifdef SIMPLE_ARRAY_UNSIGNED_BYTE_64_WIDETAG
+    case SIMPLE_ARRAY_UNSIGNED_BYTE_64_WIDETAG:
+#endif
 #ifdef SIMPLE_ARRAY_SIGNED_BYTE_8_WIDETAG
     case SIMPLE_ARRAY_SIGNED_BYTE_8_WIDETAG:
 #endif
@@ -2293,6 +2317,12 @@ maybe_adjust_large_object(lispobj *where)
 #endif
 #ifdef SIMPLE_ARRAY_SIGNED_BYTE_32_WIDETAG
     case SIMPLE_ARRAY_SIGNED_BYTE_32_WIDETAG:
+#endif
+#ifdef SIMPLE_ARRAY_SIGNED_BYTE_61_WIDETAG
+    case SIMPLE_ARRAY_SIGNED_BYTE_61_WIDETAG:
+#endif
+#ifdef SIMPLE_ARRAY_SIGNED_BYTE_64_WIDETAG
+    case SIMPLE_ARRAY_SIGNED_BYTE_64_WIDETAG:
 #endif
     case SIMPLE_ARRAY_SINGLE_FLOAT_WIDETAG:
     case SIMPLE_ARRAY_DOUBLE_FLOAT_WIDETAG:
@@ -3234,6 +3264,15 @@ verify_space(lispobj *start, size_t words)
 #endif
 		case SIMPLE_ARRAY_UNSIGNED_BYTE_31_WIDETAG:
 		case SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG:
+#ifdef SIMPLE_ARRAY_UNSIGNED_BYTE_60_WIDETAG
+		case SIMPLE_ARRAY_UNSIGNED_BYTE_60_WIDETAG:
+#endif
+#ifdef SIMPLE_ARRAY_UNSIGNED_BYTE_63_WIDETAG
+		case SIMPLE_ARRAY_UNSIGNED_BYTE_63_WIDETAG:
+#endif
+#ifdef SIMPLE_ARRAY_UNSIGNED_BYTE_64_WIDETAG
+		case SIMPLE_ARRAY_UNSIGNED_BYTE_64_WIDETAG:
+#endif
 #ifdef SIMPLE_ARRAY_SIGNED_BYTE_8_WIDETAG
 		case SIMPLE_ARRAY_SIGNED_BYTE_8_WIDETAG:
 #endif
@@ -3245,6 +3284,12 @@ verify_space(lispobj *start, size_t words)
 #endif
 #ifdef SIMPLE_ARRAY_SIGNED_BYTE_32_WIDETAG
 		case SIMPLE_ARRAY_SIGNED_BYTE_32_WIDETAG:
+#endif
+#ifdef SIMPLE_ARRAY_SIGNED_BYTE_61_WIDETAG
+		case SIMPLE_ARRAY_SIGNED_BYTE_61_WIDETAG:
+#endif
+#ifdef SIMPLE_ARRAY_SIGNED_BYTE_64_WIDETAG
+		case SIMPLE_ARRAY_SIGNED_BYTE_64_WIDETAG:
 #endif
 		case SIMPLE_ARRAY_SINGLE_FLOAT_WIDETAG:
 		case SIMPLE_ARRAY_DOUBLE_FLOAT_WIDETAG:
@@ -3451,8 +3496,6 @@ garbage_collect_generation(int generation, int raise)
      * done. Set up this new generation. There should be no pages
      * allocated to it yet. */
     if (!raise) {
-	 fprintf(stderr, "bytes_allocated %d\n", 
-		 generations[NUM_GENERATIONS].bytes_allocated);
 	 gc_assert(generations[NUM_GENERATIONS].bytes_allocated == 0);
     }
 
@@ -4034,8 +4077,8 @@ alloc(long nbytes)
     void *new_free_pointer;
     gc_assert(nbytes>0);
     /* Check for alignment allocation problems. */
-    gc_assert((((unsigned)region->free_pointer & 0x7) == 0)
-	      && ((nbytes & 0x7) == 0));
+    gc_assert((((unsigned)region->free_pointer & LOWTAG_MASK) == 0)
+	      && ((nbytes & LOWTAG_MASK) == 0));
 #if 0
     if(all_threads)
 	/* there are a few places in the C code that allocate data in the

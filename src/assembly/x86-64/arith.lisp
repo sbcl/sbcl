@@ -90,19 +90,19 @@
     OKAY)
 
   (define-generic-arith-routine (* 30)
-    (move rax x)			  ; must use eax for 64-bit result
-    (inst sar rax 3)		      ; remove *4 fixnum bias
-    (inst imul y)			 ; result in edx:eax
+    (move rax x)	           ; must use eax for 64-bit result
+    (inst sar rax 3)		   ; remove *4 fixnum bias
+    (inst imul y)		   ; result in edx:eax
     (inst jmp :no okay)		   ; still fixnum
 
     ;; zzz jrd changed edx to ebx in here, as edx isn't listed as a temp, above
     ;;     pfw says that loses big -- edx is target for arg x and result res
     ;;     note that 'edx' is not defined -- using x
     (inst shrd rax x 3)		   ; high bits from edx
-    (inst sar x 3)			; now shift edx too
+    (inst sar x 3)		   ; now shift edx too
 
-    (move rcx x)			  ; save high bits from cdq
-    (inst cdq)			    ; edx:eax <- sign-extend of eax
+    (move rcx x)		   ; save high bits from cqo
+    (inst cqo)			   ; edx:eax <- sign-extend of eax
     (inst cmp x rcx)
     (inst jmp :e SINGLE-WORD-BIGNUM)
 

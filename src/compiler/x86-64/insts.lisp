@@ -2893,6 +2893,13 @@
    (emit-byte segment #x54)
    (emit-ea segment src (reg-tn-encoding dst))))
 
+(define-instruction andps (segment dst src)
+  (:emitter
+   (maybe-emit-rex-for-ea segment src dst)
+   (emit-byte segment #x0f)
+   (emit-byte segment #x54)
+   (emit-ea segment src (reg-tn-encoding dst))))
+
 (define-instruction comisd (segment dst src)
 ;  (:printer reg-reg/mem ((op #x10) (width 1))) ;wrong
   (:emitter

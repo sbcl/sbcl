@@ -439,21 +439,21 @@
 (macrolet ((frob (op sinst sname scost dinst dname dcost)
 	     `(progn
 		(define-vop (,sname single-float-op)
-		  (:translate ,op)
-		  ;; XXX :from (:argument 0) cargo-culted from x86 vops
-		  ;; that also overwrite one source. Seems to work, but
-		  ;; I might be misunderstanding it's purpose. --JES
-		  (:results (r :scs (single-reg) :from (:argument 0)))
+		    (:translate ,op)
+		  (:results (r :scs (single-reg)))
+		  (:temporary (:sc single-reg) tmp)
 		  (:generator ,scost
-		    (inst movss r x)
-		    (inst ,sinst r y)))
+                    (inst movss tmp x)
+		    (inst ,sinst tmp y)
+		    (inst movss r tmp)))
 		(define-vop (,dname double-float-op)
 		  (:translate ,op)
-		  ;; ibid
-		  (:results (r :scs (double-reg) :from (:argument 0)))
+		  (:results (r :scs (double-reg)))
+		  (:temporary (:sc single-reg) tmp)
 		  (:generator ,dcost
-		    (inst movsd r x)
-		    (inst ,dinst r y))))))
+                    (inst movsd tmp x)
+		    (inst ,dinst tmp y)
+		    (inst movsd r tmp))))))
   (frob + addss +/single-float 2 addsd +/double-float 2)
   (frob - subss -/single-float 2 subsd -/double-float 2)
   (frob * mulss */single-float 4 mulsd */double-float 5)
@@ -463,7 +463,7 @@
 
 (macrolet ((frob ((name translate sc type) &body body)
 	     `(define-vop (,name)
-		  (:args (x :scs (,sc) ))
+		  (:args (x :scs (,sc)))
 		(:results (y :scs (,sc)))
 		(:translate ,translate)
 		(:policy :fast-safe)
@@ -471,40 +471,37 @@
 		(:result-types ,type)
 		(:temporary (:sc any-reg) hex8)
 		(:temporary
-		 (:sc ,sc :from :argument :to :result) xmm)
+		 (:sc ,sc) xmm)
 		(:note "inline float arithmetic")
 		(:vop-var vop)
 		(:save-p :compute-only)
 		(:generator 1
-		  (note-this-location vop :internal-error)
-		  ;; we should be able to do this better.  what we 
-		  ;; really would like to do is use the target as the
-		  ;; temp whenever it's not also the source
-		  (unless (location= x y)
-		    (inst movq y x))
-		  ,@body))))
+			    (note-this-location vop :internal-error)
+			    ;; we should be able to do this better.  what we 
+			    ;; really would like to do is use the target as the
+			    ;; temp whenever it's not also the source
+			    (unless (location= x y)
+			      (inst movq y x))
+			    ,@body))))
   (frob (%negate/double-float %negate double-reg double-float)
 	(inst lea hex8 (make-ea :qword :disp 1))
-	(inst ror hex8 1)	; #x8000000000000000
+	(inst ror hex8 1)		; #x8000000000000000
 	(inst movd xmm hex8)
-	(inst xorpd xmm y))
+	(inst xorpd y xmm))
   (frob (%negate/single-float %negate single-reg single-float)
 	(inst lea hex8 (make-ea :qword :disp 1))
 	(inst rol hex8 31)
-	(inst movd 
-	      ;; this random-tn trickery is to cast to 32 bit quantity
-	      (make-random-tn :kind :normal :sc (tn-sc hex8) :offset (tn-offset hex8))
-	      hex8) 
-	(inst xorps xmm y))
+	(inst movd xmm hex8)
+	(inst xorps y xmm))
   (frob (abs/double-float abs  double-reg double-float)
-	(inst movsd hex8 x)
-	(inst shl hex8 1)
+	(inst mov hex8 -1)
 	(inst shr hex8 1)
-	(inst movsd y hex8))
+	(inst movd xmm hex8)
+	(inst andpd y xmm))
   (frob (abs/single-float abs  single-reg single-float)
-	(inst movss hex8 x)
-	(inst and hex8 #x7fffffff)
-	(inst movss y hex8)))
+	(inst mov hex8 -1)
+	(inst movd xmm hex8)
+	(inst andps y xmm)))
 
 ;;;; comparison
 
@@ -788,17 +785,9 @@
        (sc-case float
 	 (single-reg
 	  (inst movss stack-temp float)
-	  (move bits stack-temp)
-	  ;; The upper 32 bits might contain garbage since writing a
-	  ;; single-float on the stack doesn't clear them. Zero them
-	  ;; out on the load.
-	  (inst shl bits 32)
-	  (inst shr bits 32))
+	  (move bits stack-temp))
 	 (single-stack
-	  (move bits float)
-	  ;; As above.
-	  (inst shl bits 32)
-	  (inst shr bits 32))
+	  (move bits float))
 	 (descriptor-reg
 	  (loadw
 	   bits float single-float-value-slot
@@ -806,7 +795,10 @@
       (signed-stack
        (sc-case float
 	 (single-reg
-	  (inst movss bits float)))))))
+	  (inst movss bits float)))))
+    ;; Sign-extend
+    (inst shl bits 32)
+    (inst sar bits 32)))
 
 (define-vop (double-float-high-bits)
   (:args (float :scs (double-reg descriptor-reg)
@@ -828,7 +820,7 @@
        (descriptor-reg
 	(loadw hi-bits float double-float-value-slot
 	       other-pointer-lowtag)))
-     (inst shr hi-bits 32)))
+     (inst sar hi-bits 32)))
 
 (define-vop (double-float-low-bits)
   (:args (float :scs (double-reg descriptor-reg)
@@ -851,7 +843,7 @@
 	(loadw lo-bits float double-float-value-slot
 	       other-pointer-lowtag)))
      (inst shl lo-bits 32)
-     (inst shr lo-bits 32)))
+     (inst sar lo-bits 32)))
 
 
 ;;;; float mode hackery

@@ -423,7 +423,7 @@
 (deftype address ()
   "Type used for addresses, for instance, program counters,
    code start/end locations etc."
-  '(unsigned-byte #+alpha 64 #-alpha 32))
+  'sb-vm::word)
 
 (defconstant +unknown-address+ 0
   "Constant representing an address that cannot be determined.")
