@@ -440,7 +440,7 @@
 (define-instruction gentrap (segment code)
   (:printer call-pal ((palcode #xaa0000)))
   (:emitter
-   (emit-lword segment #x000080)
+   (emit-lword segment #x000081)        ;actually bugchk
    (emit-lword segment code)))
 
 (define-instruction-macro move (src dst)

@@ -257,7 +257,7 @@ start_of_tramps:
         .ent    undefined_tramp_offset
 undefined_tramp = /* ### undefined_tramp_offset-call_into_lisp_LRA*/ 0x140+call_into_lisp_LRA_page
 undefined_tramp_offset:
-	bpt
+	call_pal PAL_bugchk
 	.long    trap_Error
         .byte    4                         /* what are these numbers? */
         .byte    23
@@ -311,7 +311,7 @@ function_end_breakpoint_guts:
 
 	.globl	function_end_breakpoint_trap
 function_end_breakpoint_trap:
-	call_pal PAL_gentrap
+	call_pal PAL_bugchk
 	.long	trap_FunctionEndBreakpoint
 	br	zero, function_end_breakpoint_trap
 

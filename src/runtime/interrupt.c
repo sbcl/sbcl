@@ -214,6 +214,7 @@ undo_fake_foreign_function_call(os_context_t *context)
      * FREE_INTERRUPT_CONTEXT_INDEX? If so, we should say so. And
      * perhaps yes, unbind_to_here() really would be clearer and less
      * fragile.. */
+    /* dan (2001.08.10) thinks the above supposition is probably correct */
     unbind();
 
 #ifdef reg_ALLOC

@@ -32,7 +32,7 @@
 #+(and sbcl alpha) ; SBCL/Alpha uses stop-and-copy, and Alphas have lotso RAM.
 (progn
   (sb-ext:gc-off)
-  (setf (bytes-consed-between-gcs) (* 20 (expt 10 6)))
+  (setf (sb-ext:bytes-consed-between-gcs) (* 20 (expt 10 6)))
   (sb-ext:gc-on)
   (sb-ext:gc))
 

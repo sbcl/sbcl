@@ -1,7 +1,6 @@
 /*
- * This is the x86 Linux incarnation of arch-dependent OS-dependent
- * routines. See also "linux-os.c".
- */
+ * This is the Compaq/Digital Alpha Linux incarnation of
+ * arch-dependent OS-dependent routines. See also "linux-os.c".  */
 
 /*
  * This software is part of the SBCL system. See the README file for
@@ -32,7 +31,6 @@
 
 #include <sys/types.h>
 #include <signal.h>
-/* #include <sys/sysinfo.h> */
 #include <sys/time.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -41,6 +39,7 @@
 size_t os_vm_page_size;
 
 #if defined GENCGC		/* unlikely ... */
+#error SBCL Alpha does not work with the GENCGC
 #include "gencgc.h"
 #endif
 
@@ -76,11 +75,5 @@ os_context_sigmask_addr(os_context_t *context)
 
 void os_flush_icache(os_vm_address_t address, os_vm_size_t length)
 {
-    /* XXX this really shouldn't be empty
-
-<dhd> dan_b: asm volatile ("call_pal imb")
-<dhd> or just "imb"
-<dhd> also : : "memory" 
-
-     */
+    asm volatile ("imb" : : : "memory" );
 }
