@@ -288,7 +288,7 @@
 (defmethod stream-start-line-p ((stream fundamental-character-output-stream))
   (eql (stream-line-column stream) 0))
 
-(defgeneric stream-write-string (stream string &optional (start 0) end)
+(defgeneric stream-write-string (stream string &optional start end)
   #+sb-doc
   (:documentation
    "This is used by WRITE-STRING. It writes the string to the stream,

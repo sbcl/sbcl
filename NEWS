@@ -1221,6 +1221,8 @@ changes in sbcl-0.7.7 relative to sbcl-0.7.6:
     LOGAND and stack-allocated arguments. (thanks to Raymond Toy)
   * Bug fix: We no longer segfault on passing a non-FILE-STREAM stream
     to a functions expecting a PATHNAME-DESIGNATOR.
+  * Bug fix: DEFGENERIC now enforces the ANSI restrictions on its
+    lambda lists. (thanks to Alexey Dejneka)
   * Minor incompatible change: COMPILE-FILE-PATHNAME now merges its
     OUTPUT-FILE argument with its INPUT-FILE argument, resulting in
     behaviour analogous to RENAME-FILE.  This puts its behaviour more

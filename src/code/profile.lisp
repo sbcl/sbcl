@@ -222,9 +222,7 @@
     (etypecase name
       (symbol (funcall function name))
       (list
-       ;; We call this just for the side effect of checking that
-       ;; NAME is a legal function name:
-       (fun-name-block-name name)
+       (legal-fun-name-or-type-error name)
        ;; Then we map onto it.
        (funcall function name))
       (string (let ((package (find-undeleted-package-or-lose name)))

@@ -1438,11 +1438,6 @@ WORKAROUND:
      results in a STYLE-WARNING:
        undefined-function 
          SB-SLOT-ACCESSOR-NAME::|COMMON-LISP-USER A-CLASS-X slot READER|
-  b. DEFGENERIC does not check lambda list syntax; from the REPL:
-       * (defgeneric gf ("a" #p"b"))
-
-       #<STANDARD-GENERIC-FUNCTION GF (0)>
-       * 
   c. the examples in CLHS 7.6.5.1 (regarding generic function lambda
      lists and &KEY arguments) do not signal errors when they should.
 

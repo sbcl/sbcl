@@ -157,7 +157,11 @@ bootstrapping.
 
 (defmacro defgeneric (fun-name lambda-list &body options)
   (declare (type list lambda-list))
-  (legal-fun-name-or-type-error fun-name)
+  (unless (legal-fun-name-p fun-name)
+    (error 'simple-program-error
+	   :format-control "illegal generic function name ~S"
+	   :format-arguments (list fun-name)))
+  (check-gf-lambda-list lambda-list)
   (let ((initargs ())
 	(methods ()))
     (flet ((duplicate-option (name)
@@ -228,6 +232,29 @@ bootstrapping.
          :lambda-list lambda-list
          :definition-source `((defgeneric ,fun-name) ,*load-truename*)
          initargs))
+
+;;; As per section 3.4.2 of the ANSI spec, generic function lambda
+;;; lists have a number of limitations, which we check here.
+(defun check-gf-lambda-list (lambda-list)
+  (macrolet ((ensure (condition)
+               `(unless ,condition
+                  (error "Invalid argument ~S in the generic function lambda list ~S."
+                         it lambda-list))))
+    (process-lambda-list lambda-list
+      (&required (ensure (symbolp it)))
+      (&optional (ensure (or (symbolp it)
+                             (and (consp it) (symbolp (car it)) (null (cdr it))))))
+      (&rest (ensure (symbolp it)))
+      (&key (ensure (or (symbolp it)
+                        (and (consp it)
+                             (or (symbolp (car it))
+                                 (and (consp (car it))
+                                      (symbolp (caar it))
+                                      (symbolp (cadar it))
+                                      (null (cddar it))))
+                             (null (cdr it))))))
+      ((&aux (error "&AUX is not allowed in the generic function lambda list ~S."
+                    lambda-list))))))
 
 (defmacro defmethod (&rest args &environment env)
   (multiple-value-bind (name qualifiers lambda-list body)

@@ -13,7 +13,7 @@
 (in-package "SB-IMPL") ;(SB-IMPL, not SB!IMPL, since we're built in warm load.)
 
 (declaim (ftype (function (t stream)) describe-object))
-(defgeneric describe-object ((x t) stream))
+(defgeneric describe-object (x stream))
 
 (defun describe (x &optional (stream-designator *standard-output*))
   #+sb-doc
@@ -209,7 +209,7 @@
 (defmethod describe-object ((x function) s)
   (%describe-fun x s :function))
 
-(defgeneric describe-symbol-fdefinition (function stream &key (name nil) ))
+(defgeneric describe-symbol-fdefinition (function stream &key name))
 
 (defmethod describe-symbol-fdefinition ((fun function) stream &key name)
   (%describe-fun fun stream :function name))

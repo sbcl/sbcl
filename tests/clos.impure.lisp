@@ -22,7 +22,7 @@
 (defmethod wiggle ((a struct-a))
   (+ (struct-a-x a)
      (struct-a-y a)))
-(defgeneric jiggle ((arg t)))
+(defgeneric jiggle (arg))
 (defmethod jiggle ((a struct-a))
   (- (struct-a-x a)
      (struct-a-y a)))
@@ -35,7 +35,7 @@
 
 ;;; Compiling DEFGENERIC should prevent "undefined function" style
 ;;; warnings from code within the same file.
-(defgeneric gf-defined-in-this-file ((x number) (y number)))
+(defgeneric gf-defined-in-this-file (x y))
 (defun function-using-gf-defined-in-this-file (x y n)
   (unless (minusp n)
     (gf-defined-in-this-file x y)))
@@ -61,21 +61,70 @@
       (ignore-errors (progn ,@body))
       (declare (ignore res))
       (typep condition 'error))))
-
 (assert (expect-error
          (macroexpand-1
           '(defmethod foo0 ((x t) &rest) nil))))
-
 (assert (expect-error (defgeneric foo1 (x &rest))))
 (assert (expect-error (defgeneric foo2 (x a &rest))))
-
 (defgeneric foo3 (x &rest y))
 (defmethod foo3 ((x t) &rest y) nil)
 (defmethod foo4 ((x t) &key y &rest z) nil)
-(defgeneric foo4 (x &key y &rest z))
-
+(defgeneric foo4 (x &rest z &key y))
 (assert (expect-error (defgeneric foo5 (x &rest))))
 (assert (expect-error (macroexpand-1 '(defmethod foo6 (x &rest)))))
+
+;;; more lambda-list checking
+;;;
+;;; DEFGENERIC lambda lists are subject to various limitations, as per
+;;; section 3.4.2 of the ANSI spec. Since Alexey Dejneka's patch for
+;;; bug 191-b ca. sbcl-0.7.22, these limitations should be enforced.
+(labels ((coerce-to-boolean (x)
+	   (if x t nil))
+	 (%like-or-dislike (expr expected-failure-p)
+           (declare (type boolean expected-failure-p))
+           (format t "~&trying ~S~%" expr)
+           (multiple-value-bind (fun warnings-p failure-p)
+	     (compile nil
+		      `(lambda ()
+                         ,expr))
+	     (declare (ignore fun))
+	     ;; In principle the constraint on WARNINGS-P below seems
+	     ;; reasonable, but in practice we get warnings about
+	     ;; undefined functions from the DEFGENERICs, apparently
+	     ;; because the DECLAIMs which ordinarily prevent such
+	     ;; warnings don't take effect because EVAL-WHEN
+	     ;; (:COMPILE-TOPLEVEL) loses its magic when compiled
+	     ;; within a LAMBDA. So maybe we can't test WARNINGS-P
+	     ;; after all?
+             ;;(unless expected-failure-p
+	     ;;  (assert (not warnings-p)))
+	     (assert (eq (coerce-to-boolean failure-p) expected-failure-p))))
+         (like (expr)
+           (%like-or-dislike expr nil))
+         (dislike (expr)
+           (%like-or-dislike expr t)))
+  ;; basic sanity
+  (dislike '(defgeneric gf-for-ll-test-0 ("a" #p"b")))
+  (like    '(defgeneric gf-for-ll-test-1 ()))
+  (like    '(defgeneric gf-for-ll-test-2 (x)))
+  ;; forbidden default or supplied-p for &OPTIONAL or &KEY arguments
+  (dislike '(defgeneric gf-for-ll-test-3 (x &optional (y 0)))) 
+  (like    '(defgeneric gf-for-ll-test-4 (x &optional y))) 
+  (dislike '(defgeneric gf-for-ll-test-5 (x y &key (z :z z-p)))) 
+  (like    '(defgeneric gf-for-ll-test-6 (x y &key z)))
+  (dislike '(defgeneric gf-for-ll-test-7 (x &optional (y 0) &key z))) 
+  (like    '(defgeneric gf-for-ll-test-8 (x &optional y &key z))) 
+  (dislike '(defgeneric gf-for-ll-test-9 (x &optional y &key (z :z)))) 
+  (like    '(defgeneric gf-for-ll-test-10 (x &optional y &key z))) 
+  (dislike '(defgeneric gf-for-ll-test-11 (&optional &key (k :k k-p))))
+  (like    '(defgeneric gf-for-ll-test-12 (&optional &key k)))
+  ;; forbidden &AUX
+  (dislike '(defgeneric gf-for-ll-test-13 (x y z &optional a &aux g h)))
+  (like    '(defgeneric gf-for-ll-test-14 (x y z &optional a)))
+  ;; also can't use bogoDEFMETHODish type-qualifier-ish decorations
+  ;; on required arguments
+  (dislike '(defgeneric gf-for-11-test-15 ((arg t))))
+  (like '(defgeneric gf-for-11-test-16 (arg))))
 
 ;;; structure-class tests setup
 (defclass structure-class-foo1 () () (:metaclass cl:structure-class))
@@ -153,7 +202,7 @@
 
 ;;; Until Pierre Mai's patch (sbcl-devel 2002-06-18, merged in
 ;;; sbcl-0.7.4.39) the :MOST-SPECIFIC-LAST option had no effect.
-(defgeneric bug180 ((x t))
+(defgeneric bug180 (x)
   (:method-combination list :most-specific-last))
 (defmethod bug180 list ((x number))
   'number)

@@ -938,7 +938,10 @@
       :state :read-only)
 
      ;; FIXME: Are COLLECTION and MUTABLE-COLLECTION used for anything
-     ;; any more? COLLECTION is not defined in ANSI Common Lisp..
+     ;; any more? COLLECTION is not defined in ANSI Common Lisp.
+     ;; (Zhivago in #lisp IRC 2002-08-14 said that these things, and
+     ;; also GENERIC-FOO, are related to Dylan functionality and so
+     ;; truly are irrelevant these days.)
      (collection :hierarchical-p nil :state :read-only)
      (mutable-collection :state :read-only
 			 :inherits (collection))

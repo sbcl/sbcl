@@ -440,12 +440,12 @@
 (defgeneric get-method (generic-function
 			qualifiers
 			specializers
-			&optional (errorp t)))
+			&optional errorp))
 
 (defgeneric find-method (generic-function
 			 qualifiers
 			 specializers
-			 &optional (errorp t)))
+			 &optional errorp))
 
 (defgeneric remove-named-method (generic-function-name
 				 argument-specifiers
