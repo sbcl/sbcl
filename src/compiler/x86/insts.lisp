@@ -588,6 +588,16 @@
 	   :type 'byte-reg/mem)
   (reg     :field (byte 3 19)	:value #b000))
 
+(sb!disassem:define-instruction-format (cond-move 24
+                                     :default-printer
+                                        '('cmov cc :tab reg ", " reg/mem))
+  (prefix  :field (byte 8 0)    :value #b00001111)
+  (op      :field (byte 4 12)   :value #b0100)
+  (cc      :field (byte 4 8)    :type 'condition-code)
+  (reg/mem :fields (list (byte 2 22) (byte 3 16))
+                                :type 'reg/mem)
+  (reg     :field (byte 3 19)   :type 'reg))
+
 (sb!disassem:define-instruction-format (enter-format 32
 				     :default-printer '(:name
 							:tab disp
@@ -1784,6 +1794,18 @@
    (emit-byte segment #b11100000)
    (emit-byte-displacement-backpatch segment target)))
 
+;;;; conditional move
+(define-instruction cmov (segment cond dst src)
+  (:printer cond-move ())
+  (:emitter
+   (aver (register-p dst))
+   (let ((size (matching-operand-size dst src)))
+     (aver (or (eq size :word) (eq size :dword)))
+     (maybe-emit-operand-size-prefix segment size))
+   (emit-byte segment #b00001111)
+   (emit-byte segment (dpb (conditional-opcode cond) (byte 4 0) #b01000000))
+   (emit-ea segment src (reg-tn-encoding dst))))
+
 ;;;; conditional byte set
 
 (define-instruction set (segment dst cond)

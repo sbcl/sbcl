@@ -788,6 +788,40 @@
     (inst shl result :cl)
 
     DONE))
+
+;;; FIXME: before making knowledge of this too public, it needs to be
+;;; fixed so that it's actually _faster_ than the non-CMOV version; at
+;;; least on my Celeron-XXX laptop, this version is marginally slower
+;;; than the above version with branches.  -- CSR, 2003-09-04
+(define-vop (fast-cmov-ash/unsigned=>unsigned)
+  (:translate ash)
+  (:policy :fast-safe)
+  (:args (number :scs (unsigned-reg) :target result)
+	 (amount :scs (signed-reg) :target ecx))
+  (:arg-types unsigned-num signed-num)
+  (:results (result :scs (unsigned-reg) :from (:argument 0)))
+  (:result-types unsigned-num)
+  (:temporary (:sc signed-reg :offset ecx-offset :from (:argument 1)) ecx)
+  (:temporary (:sc any-reg :from (:eval 0) :to (:eval 1)) zero)
+  (:note "inline ASH")
+  (:guard (member :cmov *backend-subfeatures*))
+  (:generator 4
+    (move result number)
+    (move ecx amount)
+    (inst or ecx ecx)
+    (inst jmp :ns positive)
+    (inst neg ecx)
+    (inst xor zero zero)
+    (inst shr result :cl)
+    (inst cmp ecx 31)
+    (inst cmov :nbe result zero)
+    (inst jmp done)
+    
+    POSITIVE
+    ;; The result-type ensures us that this shift will not overflow.
+    (inst shl result :cl)
+
+    DONE))
 
 ;;; Note: documentation for this function is wrong - rtfm
 (define-vop (signed-byte-32-len)
