@@ -207,19 +207,27 @@ stream instead"))
   ;; descriptor).  Presumably this is an oversight and we could also
   ;; get anything that write(2) would have given us.
 
-  ;; What we do: we catch EBADF.  It should only ever happen if
-  ;; (a) someone's closed the socket already (stream closing seems
-  ;; to have this effect) or (b) the caller is messing around with
-  ;; socket internals.  That's not supported, dude
-  
-  (if (slot-boundp socket 'stream)
-      (close (slot-value socket 'stream))  ;; closes socket as well
-    (handler-case
-     (if (= (sockint::close (socket-file-descriptor socket)) -1)
-         (socket-error "close"))
-     (bad-file-descriptor-error (c) (declare (ignore c)) nil)
-     (:no-error (c)  (declare (ignore c)) nil))))
+  ;; note that if you have a socket _and_ a stream on the same fd, 
+  ;; the socket will avoid doing anything to close the fd in case
+  ;; the stream has done it already - if so, it may have been
+  ;; reassigned to some other file, and closing it would be bad
 
+  (let ((fd (socket-file-descriptor socket)))
+    (cond ((eql fd -1) ; already closed
+	   nil)
+	  ((slot-boundp socket 'stream)
+	   (close (slot-value socket 'stream)) ;; closes fd
+	   (setf (slot-value socket 'file-descriptor) -1)
+	   (slot-makunbound socket 'stream))
+	  (t
+	   (sb-ext:cancel-finalization socket)
+	   (handler-case
+	       (if (= (sockint::close fd) -1)
+		   (socket-error "close"))
+	     (bad-file-descriptor-error (c) (declare (ignore c)) nil)
+	     (:no-error (c)  (declare (ignore c)) nil))))))
+
+    
 (defgeneric socket-make-stream (socket  &rest args)
     (:documentation "Find or create a STREAM that can be used for IO
 on SOCKET (which must be connected).  ARGS are passed onto

@@ -1,0 +1,55 @@
+
+* Mailing lists
+
+Your first recourse for support should probably be to the mailing list
+  sbcl-help@lists.sourceforge.net
+
+Remember that the people answering your qwuestion are volunteers, so
+you stand a much better chance of getting a good answer if you ask a
+good question: before sending mail, check
+ 
+- the list archives, to check if your question has been answered already
+   http://sourceforge.net/mailarchive/forum.php?forum_id=4134   
+ 
+    or (same list, different archive)
+ 
+   http://news.gmane.org/gmane.lisp.steel-bank.general  
+  
+- the BUGS file, to see if we know about it.  Note that some of the 
+  bugs in this file are old and it might be useful to have fresh reports, 
+  in particular if you have new information that might help debugging
+
+- advice on how to report bugs and ask questions that people want to
+  answer
+
+    http://www.chiark.greenend.org.uk/~sgtatham/bugs.html
+    http://www.catb.org/~esr/faqs/smart-questions.html
+
+
+* Consultants
+
+There is no formal organization developing SBCL, but if you need a
+paid support arrangement or custom SBCL development, we maintain a
+list of consultants in this file.  Use it to identify consultants with
+appropriate skills and interests, and contact them directly.
+
+The compilers of this file have made no attempt to verify the accuracy
+of the information or the competence of the people listed: you must
+make your own judgement of suitability from the available information
+- refer to the links they provide, the CREDITS file, mailing list
+archives, CVS commit messages, and so on.  Please feel free to ask for
+advice on the sbcl-help list.
+
+Name:      Daniel Barlow
+Email:     dan@metacircles.com
+PGP:       1024D/75908913 : FC7 3143 7340 DECA D17A  357D 1C32 B966 7590 8913
+Web:       http://web.metacircles.com/sbcl
+Expertise: Lowlevel issues (threads, GC, runtime support).  Ports to new systems.  Network/web applications.  ASDF, asdf-install, contrib issues.
+Offerings: Custom programming.   Email-based support (per-incident).  
+
+
+[ If you provide SBCL-related services, please add your details to
+this file keeping alphabetical order by surname, following the
+template used by existing entries.  Patches are welcome from those
+with no CVS commit access.  We don't maintain a PGP keyring, so please
+ensure your key can be found on the public servers ]
