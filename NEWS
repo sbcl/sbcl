@@ -1,7 +1,9 @@
 changes in sbcl-0.8.13 relative to sbcl-0.8.12:
   * new feature: SB-PACKAGE-LOCKS. See the "Package Locks" section of
-    the manual for details; add :SB-PACKAGE-LOCKS in
-    customize-target-features.lisp to enable them.
+    the manual for details; for now, package locks can be disabled by
+    removing :SB-PACKAGE-LOCKS in customize-target-features.lisp, but
+    if no major problems are found then it is likely that they will be
+    compiled in unconditionally.
   * minor incompatible change: as threatened around sbcl-0.8.0, the
     home package of MOP-related symbols is now SB-MOP, not SB-PCL.
     The symbols are also exported from SB-PCL for backwards

@@ -169,8 +169,11 @@
  ;; runtime
  ; :sb-futex
 
- ;; Package locking support.
- ; :sb-package-locks
+ ;; Support for detection of unportable code (when applied to the
+ ;; COMMON-LISP package, or SBCL-internal pacakges) or bad-neighbourly
+ ;; code (when applied to user-level packages), relating to material
+ ;; alteration to packages or to bindings in symbols in packages.
+ :sb-package-locks
  
  ;; This affects the definition of a lot of things in bignum.lisp. It
  ;; doesn't seem to be documented anywhere what systems it might apply
