@@ -413,6 +413,7 @@
  ("src/code/hash-table")
  ("src/code/readtable")
  ("src/code/pathname")
+ ("src/code/host-pprint")
  ("src/compiler/lexenv")
 
  ;; KLUDGE: Much stuff above here is the type system and/or the INFO

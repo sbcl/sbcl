@@ -811,17 +811,6 @@
 	    (pprint-dispatch-entry-priority entry)
 	    (pprint-dispatch-entry-initial-p entry))))
 
-(defstruct (pprint-dispatch-table (:copier nil))
-  ;; A list of all the entries (except for CONS entries below) in highest
-  ;; to lowest priority.
-  (entries nil :type list)
-  ;; A hash table mapping things to entries for type specifiers of the
-  ;; form (CONS (MEMBER <thing>)). If the type specifier is of this form,
-  ;; we put it in this hash table instead of the regular entries table.
-  (cons-entries (make-hash-table :test 'eql)))
-(def!method print-object ((table pprint-dispatch-table) stream)
-  (print-unreadable-object (table stream :type t :identity t)))
-
 (defun cons-type-specifier-p (spec)
   (and (consp spec)
        (eq (car spec) 'cons)
@@ -926,38 +915,43 @@
 
 (defun set-pprint-dispatch (type function &optional
 			    (priority 0) (table *print-pprint-dispatch*))
-  (declare (type (or null function) function)
+  (declare (type (or null callable) function)
 	   (type real priority)
 	   (type pprint-dispatch-table table))
   (/show0 "entering SET-PPRINT-DISPATCH, TYPE=...")
   (/hexstr type)
   (if function
-      (if (cons-type-specifier-p type)
-	  (setf (gethash (second (second type))
-			 (pprint-dispatch-table-cons-entries table))
-		(make-pprint-dispatch-entry :type type
-					    :priority priority
-					    :fun function))
-	  (let ((list (delete type (pprint-dispatch-table-entries table)
-			      :key #'pprint-dispatch-entry-type
-			      :test #'equal))
-		(entry (make-pprint-dispatch-entry
-			:type type
-			:test-fn (compute-test-fn type)
-			:priority priority
-			:fun function)))
-	    (do ((prev nil next)
-		 (next list (cdr next)))
-		((null next)
-		 (if prev
-		     (setf (cdr prev) (list entry))
-		     (setf list (list entry))))
-	      (when (entry< (car next) entry)
-		(if prev
-		    (setf (cdr prev) (cons entry next))
-		    (setf list (cons entry next)))
-		(return)))
-	    (setf (pprint-dispatch-table-entries table) list)))
+      ;; KLUDGE: this impairs debuggability, and probably isn't even
+      ;; conforming -- maybe we should not coerce to function, but
+      ;; cater downstream (in PPRINT-DISPATCH-ENTRY) for having
+      ;; callables here.
+      (let ((function (%coerce-callable-to-fun function)))
+	(if (cons-type-specifier-p type)
+	    (setf (gethash (second (second type))
+			   (pprint-dispatch-table-cons-entries table))
+		  (make-pprint-dispatch-entry :type type
+					      :priority priority
+					      :fun function))
+	    (let ((list (delete type (pprint-dispatch-table-entries table)
+				:key #'pprint-dispatch-entry-type
+				:test #'equal))
+		  (entry (make-pprint-dispatch-entry
+			  :type type
+			  :test-fn (compute-test-fn type)
+			  :priority priority
+			  :fun function)))
+	      (do ((prev nil next)
+		   (next list (cdr next)))
+		  ((null next)
+		   (if prev
+		       (setf (cdr prev) (list entry))
+		       (setf list (list entry))))
+		(when (entry< (car next) entry)
+		  (if prev
+		      (setf (cdr prev) (cons entry next))
+		      (setf list (cons entry next)))
+		  (return)))
+	      (setf (pprint-dispatch-table-entries table) list))))
       (if (cons-type-specifier-p type)
 	  (remhash (second (second type))
 		   (pprint-dispatch-table-cons-entries table))

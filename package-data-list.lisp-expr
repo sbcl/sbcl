@@ -880,7 +880,6 @@ retained, possibly temporariliy, because it might be used internally."
              "LEGAL-FUN-NAME-P" "LEGAL-FUN-NAME-OR-TYPE-ERROR"
              "FUN-NAME-BLOCK-NAME"
 	     "FUN-NAME-INLINE-EXPANSION"
-             "WHITESPACE-CHAR-P"
              "LISTEN-SKIP-WHITESPACE"
              "PACKAGE-INTERNAL-SYMBOL-COUNT" "PACKAGE-EXTERNAL-SYMBOL-COUNT"
              "PARSE-BODY" "PARSE-LAMBDA-LIST" "PARSE-LAMBDA-LIST-LIKE-THING"
@@ -1710,6 +1709,7 @@ definitely not guaranteed to be present in later versions of SBCL."
     :use ("CL" "SB!EXT" "SB!INT" "SB!KERNEL")
     :export ("OUTPUT-PRETTY-OBJECT"
 	     "PRETTY-STREAM" "PRETTY-STREAM-P"
+	     "PPRINT-DISPATCH-TABLE"
 	     "!PPRINT-COLD-INIT"))
 
  #s(sb-cold:package-data

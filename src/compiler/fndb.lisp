@@ -962,6 +962,41 @@
   (character character &optional (or readtable null)) (or callable null)
   ())
 
+(defknown copy-pprint-dispatch
+  (&optional (or sb!pretty:pprint-dispatch-table null))
+  sb!pretty:pprint-dispatch-table
+  ())
+(defknown pprint-dispatch
+  (t &optional (or sb!pretty:pprint-dispatch-table null))
+  (values callable boolean)
+  ())
+(defknown (pprint-fill pprint-linear)
+  (streamlike t &optional t t)
+  null
+  ())
+(defknown pprint-tabular
+  (streamlike t &optional t t unsigned-byte)
+  null
+  ())
+(defknown pprint-indent
+  ((member :block :current) real &optional streamlike)
+  null
+  ())
+(defknown pprint-newline
+  ((member :linear :fill :miser :mandatory) &optional streamlike)
+  null
+  ())
+(defknown pprint-tab
+  ((member :line :section :line-relative :section-relative)
+   unsigned-byte unsigned-byte &optional streamlike)
+  null
+  ())
+(defknown set-pprint-dispatch
+  (type-specifier (or null callable)
+   &optional real sb!pretty:pprint-dispatch-table)
+  null
+  ())
+
 ;;; may return any type due to eof-value...
 (defknown (read read-preserving-whitespace read-char-no-hang read-char)
   (&optional streamlike t t t) t (explicit-check))

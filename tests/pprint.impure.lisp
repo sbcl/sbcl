@@ -136,5 +136,13 @@
 	   (write '`(lambda (,x)) :stream s :pretty t :readably t))
 	 "`(LAMBDA (,X))"))
 
+;;; SET-PPRINT-DISPATCH should accept function name arguments
+(defun ppd-function-name (s o)
+  (print (length o) s))
+(set-pprint-dispatch '(cons (eql frob)) 'ppd-function-name)
+(let ((s (with-output-to-string (s)
+	   (pprint '(frob a b) s))))
+  (assert (position #\3 s)))
+
 ;;; success
 (quit :unix-status 104)
