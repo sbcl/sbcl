@@ -1,23 +1,26 @@
 ;;;; Out-of-line structure slot accessor functions need to do type
 ;;;; tests. These accessor functions aren't called very often, so it's
 ;;;; unreasonable to implement them all as different compiled
-;;;; functions. But when they are called, it's not reasonable to just
-;;;; punt to interpreted TYPEP. The system implemented here is 
-;;;; a solution to this problem.
+;;;; functions, because that's too much bloat. But when they are
+;;;; called, it's unreasonable to just punt to interpreted TYPEP,
+;;;; because that's unreasonably slow. The system implemented here 
+;;;; tries to be a reasonable compromise solution to this problem.
 ;;;;
 ;;;; Structure accessor functions are still implemented as closures,
 ;;;; but now one of the closed-over variables is a function which does
-;;;; the type test. When a type can be expanded fully into known
-;;;; types at compile time, we compile a LAMBDA which does TYPEP on it, and
-;;;; use that. If the function can't be expanded at compile time,
-;;;; then it can't be compiled efficiently anyway, so we just emit a note.
+;;;; the type test, i.e. a typecheckfun. When a type can be expanded
+;;;; fully into known types at compile time, we compile a LAMBDA which
+;;;; does TYPEP on it, and use that. If the function can't be expanded
+;;;; at compile time, then it can't be compiled efficiently anyway, so
+;;;; we just emit a note.
 ;;;;
-;;;; As a further wrinkle on this, we reuse the type-test functions,
-;;;; so that the dozens of slot accessors which have e.g. :TYPE SYMBOL
-;;;; can all share the same code instead of having to keep dozens of
-;;;; copies of the same function floating around. We can also pull a few
-;;;; other tricks to reduce bloat, like implementing tests for structure
-;;;; classes as a closure over structure LAYOUTs.
+;;;; As a further wrinkle on this, we reuse the typecheckfuns, so that
+;;;; the dozens of slot accessors which have e.g. :TYPE SYMBOL can all
+;;;; share the same typecheckfun instead of having to keep dozens of
+;;;; equivalent typecheckfun copies floating around. We can also pull
+;;;; a few other tricks to reduce bloat, like implementing all
+;;;; typecheckfuns for structure classes as a closure over structure
+;;;; LAYOUTs.
 
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
@@ -29,75 +32,82 @@
 ;;;; files for more information.
 
 (in-package "SB!KERNEL")
+
+;;;; setting up to precompile code for common types once and for all
 
-;;; setting up to precompile code for common types once and for all
-(declaim (type simple-vector *typecheckfun-standard-typespecs*))
-(declaim (type simple-vector *typecheckfun-standard-typespecs*))
+;;; initialization value for *COMMON-TYPESPECS*
 (eval-when (:compile-toplevel)
-  ;; When we generate collections of standard specialized array types,
-  ;; what should their element types be?
-  (defvar *typecheckfun-standard-element-typespecs*
-    ;; Note: This table is pretty arbitrary, just things I use a lot
-    ;; or see used a lot. If someone has ideas for better values,
-    ;; lemme know. -- WHN 2001-10-15
-    #(t
-      character
-      bit fixnum (unsigned-byte 32) (signed-byte 32)
-      single-float double-float))
-  ;; What are the standard testable types? (If a slot accessor looks
-  ;; up one of these types, it doesn't need to supply a compiled TYPEP
-  ;; function to initialize the possibly-empty entry: instead it's
-  ;; guaranteed that the entry is there. This should save some compile
-  ;; time and object file bloat.)
-  (defvar *typecheckfun-standard-typespecs*
-    (coerce (remove-duplicates
-	     (mapcar (lambda (typespec)
-		       (type-specifier (specifier-type typespec)))
-		     ;; Note: This collection of input values is
-		     ;; pretty arbitrary, just inspired by things I
-		     ;; use a lot or see being used a lot in the
-		     ;; system. If someone has ideas for better
-		     ;; values, lemme know. -- WHN 2001-10-15
-		     (concatenate
-		      'list
-		      ;; non-array types
-		      '(bit
-			boolean
-			character
-			cons
-			double-float
-			fixnum
-			hash-table
-			index
-			integer
-			list
-			package
-			signed-byte
-			(signed-byte 8)
-			single-float
-			structure-object
-			symbol
-			unsigned-byte
-			(unsigned-byte 8)
-			(unsigned-byte 32))
-		      ;; systematic names for array types
-		      (map 'list
-			   (lambda (element-type)
-			     `(simple-array ,element-type 1))
-			   *typecheckfun-standard-element-typespecs*)
-		      (map 'list
-			   (lambda (element-type)
-			     `(vector ,element-type))
-			   *typecheckfun-standard-element-typespecs*)
-		      ;; idiosyncratic names for array types
-		      '(simple-vector
-			bit-vector simple-bit-vector
-			string simple-string)))
-	     :test #'equal)
-	    'simple-vector)))
+  (defvar *compile-time-common-typespecs*
+    (let (;; When we generate collections of common specialized
+	  ;; array types, what should their element types be?
+	  (common-element-typespecs
+	   ;; Note: This table is pretty arbitrary, just things I use a lot
+	   ;; or see used a lot. If someone has ideas for better values,
+	   ;; lemme know. -- WHN 2001-10-15
+	   #(t
+	     character
+	     bit fixnum (unsigned-byte 32) (signed-byte 32)
+	     single-float double-float)))
+      (coerce (remove-duplicates
+	       (mapcar (lambda (typespec)
+			 (type-specifier (specifier-type typespec)))
+		       ;; Note: This collection of input values is
+		       ;; pretty arbitrary, just inspired by things I
+		       ;; use a lot or see being used a lot in the
+		       ;; system. If someone has ideas for better
+		       ;; values, lemme know. -- WHN 2001-10-15
+		       (concatenate
+			'list
+			;; non-array types
+			'(bit
+			  boolean
+			  character
+			  cons
+			  double-float
+			  fixnum
+			  hash-table
+			  index
+			  integer
+			  list
+			  package
+			  signed-byte
+			  (signed-byte 8)
+			  single-float
+			  structure-object
+			  symbol
+			  unsigned-byte
+			  (unsigned-byte 8)
+			  (unsigned-byte 32))
+			;; systematic names for array types
+			(map 'list
+			     (lambda (element-type)
+			       `(simple-array ,element-type 1))
+			     common-element-typespecs)
+			(map 'list
+			     (lambda (element-type)
+			       `(vector ,element-type))
+			     common-element-typespecs)
+			;; idiosyncratic names for array types
+			'(simple-vector
+			  bit-vector simple-bit-vector
+			  string simple-string)))
+	       :test #'equal)
+	      'simple-vector))))
 
-(defun ctype-is-standard-typecheckfun-type-p (ctype)
-  (position (type-specifier ctype) *typecheckfun-standard-typespecs*
+;;; What are the common testable types? (If a slot accessor looks up
+;;; one of these types, it doesn't need to supply a compiled TYPEP
+;;; function to initialize the possibly-empty entry: instead it's
+;;; guaranteed that the entry is there. Hopefully this will reduce
+;;; compile time and object file bloat.)
+(declaim (type simple-vector *common-typespecs*))
+(defvar *common-typespecs*)
+#-sb-xc (eval-when (:compile-toplevel :load-toplevel :execute)
+	  (setf *common-typespecs*
+		#.*compile-time-common-typespecs*))
+;; (#+SB-XC initialization is handled elsewhere, at cold init time.)
+
+(defun ctype-is-common-typecheckfun-type-p (ctype)
+  (position (type-specifier ctype) *common-typespecs*
 	    :test #'equal))
 
 (defun typecheck-failure (arg typespec)
@@ -106,7 +116,9 @@
 ;;; memoization cache for typecheckfuns: a map from fully-expanded type
 ;;; specifiers to functions which test the type of their argument
 (defvar *typecheckfuns*
-  (make-hash-table :test 'equal))
+  #-sb-xc (make-hash-table :test 'equal)
+  ;; (#+SB-XC initialization is handled elsewhere, at cold init time.)
+  )
 
 ;;; Memoize the FORM which returns a typecheckfun for TYPESPEC.
 (defmacro memoized-typecheckfun-form (form typespec)
@@ -116,23 +128,24 @@
 	   (setf (gethash ,n-typespec *typecheckfuns*)
 		 ,form)))))
 
-;;; Initialize the memoization cache with typecheckfuns for
-;;; *TYPECHECKFUN-STANDARD-TYPESPECS*.
-(macrolet ((macro ()
-             `(progn
-		,@(map 'list
-		       (lambda (typespec)
-			 `(setf (gethash ',typespec *typecheckfuns*)
-				(lambda (arg)
-				  (unless (typep arg ',typespec)
-				    (typecheck-failure arg ',typespec))
-				  (values))))
-		       *typecheckfun-standard-typespecs*))))
-  (macro)) 
-
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (warn "FIXME: Init *TYPECHECKFUN-STANDARD-TYPESPECS* at cold init time?")
-  (warn "FIXME: Don't forget to clear the cache when a structure type is undefined."))
+#+sb-xc
+(defun !typecheckfuns-cold-init ()
+  (setf *typecheckfuns* (make-hash-table :test 'equal))
+  ;; Initialize the table of common typespecs.
+  (setf *common-typespecs* #.*compile-time-common-typespecs*)
+  ;; Initialize *TYPECHECKFUNS* with typecheckfuns for common typespecs.
+  (macrolet ((macro ()
+	       `(progn
+		  ,@(map 'list
+			 (lambda (typespec)
+			   `(setf (gethash ',typespec *typecheckfuns*)
+				  (lambda (arg)
+				    (unless (typep arg ',typespec)
+				      (typecheck-failure arg ',typespec))
+				    (values))))
+			 *common-typespecs*))))
+    (macro))
+  (values))
 
 ;;; Return a trivial best-you-can-expect-when-you-don't-predefine-the-type
 ;;; implementation of a function which checks the type of its argument.
@@ -181,7 +194,7 @@
   ;; Until then this toy version should be good enough for some testing.
   (warn "FIXME: This is just a toy stub CTYPE-NEEDS-TO-BE-INTERPRETED-P.")
   (not (or (position (type-specifier ctype)
-		     *typecheckfun-standard-typespecs*
+		     *common-typespecs*
 		     :test #'equal)
 	   (member-type-p ctype)
 	   (numeric-type-p ctype)
@@ -194,15 +207,15 @@
 ;;; The name is slightly misleading, since some cases are memoized, so
 ;;; we might reuse a value which was made earlier instead of creating
 ;;; a new one from scratch.
-(declaim (ftype (function (t) function) make-typecheckfun))
-(defun make-typecheckfun (typespec)
+(declaim (ftype (function (t) function) typespec-typecheckfun))
+(defun typespec-typecheckfun (typespec)
   ;; a general-purpose default case, hopefully overridden by the
   ;; DEFINE-COMPILER-MACRO implementation
   (interpreted-typecheckfun typespec))
 
 ;;; If we know the value of the typespec at compile time, we might
 ;;; well be able to avoid interpreting it at runtime.
-(define-compiler-macro make-typecheckfun (&whole whole typespec-form)
+(define-compiler-macro typespec-typecheckfun (&whole whole typespec-form)
   (if (and (consp typespec-form)
 	   (eql (first typespec-form) 'quote))
       (let* ((typespec (second typespec-form))
@@ -218,7 +231,7 @@
 		   typespec
 		   ;; Unless we know that the function is already in the
 		   ;; memoization cache
-		   ,@(unless (ctype-is-standard-typecheckfun-type-p ctype)
+		   ,@(unless (ctype-is-common-typecheckfun-type-p ctype)
 		       ;; Note that we're arranging for the
 		       ;; UNMEMOIZED-TYPECHECKFUN argument value to be
 		       ;; constructed at compile time. This means the

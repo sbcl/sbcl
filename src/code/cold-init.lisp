@@ -84,6 +84,8 @@
         *cold-init-complete-p* nil
         *type-system-initialized* nil)
 
+  (show-and-call !typecheckfuns-cold-init)
+
   ;; Anyone might call RANDOM to initialize a hash value or something;
   ;; and there's nothing which needs to be initialized in order for
   ;; this to be initialized, so we initialize it right away.

@@ -352,6 +352,7 @@
  ("src/code/cross-type" :not-target)
  ("src/compiler/generic/vm-type")
  ("src/compiler/proclaim")
+ ("src/code/typecheckfuns")
 
  ;; The DEFSTRUCT machinery needs SB!XC:SUBTYPEP, defined in 
  ;; "code/late-type", and SB!XC:TYPEP, defined in "code/cross-type",
@@ -362,9 +363,6 @@
  ;; ALIEN-VALUE has to be defined as a class (done by DEFSTRUCT
  ;; machinery) before we can set its superclasses here.
  ("src/code/alien-type")
-
- ;; was here until sbcl-0.pre7.67
- #+nil ("src/compiler/knownfun")
 
  ;; This needs not just the SB!XC:DEFSTRUCT machinery, but also
  ;; the TYPE= stuff defined in late-type.lisp, and the
