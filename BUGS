@@ -1151,23 +1151,6 @@ WORKAROUND:
   Without (DECLARE (NOTINLINE MAPCAR)), Python cannot derive that Z is
   LIST.
 
-236: "THE semantics is broken"
-
-  (defun foo (a f)
-    (declare (optimize (speed 2) (safety 0)))
-    (+ 1d0
-       (the double-float
-         (multiple-value-prog1
-             (svref a 0)
-           (unless f (return-from foo 0))))))
-
-  (foo #(4) nil) => SEGV
-
-  VOP selection thinks that in unsafe code result type assertions
-  should be valid immediately. (See also bug 233a.)
-
-  The similar problem exists for TRULY-THE.
-
 237: "Environment arguments to type functions"
   a. Functions SUBTYPEP, TYPEP, UPGRADED-ARRAY-ELEMENT-TYPE, and 
      UPGRADED-COMPLEX-PART-TYPE now have an optional environment

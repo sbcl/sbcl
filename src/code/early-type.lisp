@@ -75,12 +75,14 @@
 
 (defun maybe-wild-type (type)
   (declare (type values-type type))
-  (if (and (null (values-type-required type))
-           (null (values-type-optional type))
-           (eq (values-type-rest type) *universal-type*)
-           (not (values-type-keyp type)))
-      *wild-type*
-      type))
+  (cond ((memq *empty-type* (values-type-required type))
+         *empty-type*)
+        ((and (null (values-type-required type))
+              (null (values-type-optional type))
+              (eq (values-type-rest type) *universal-type*)
+              (not (values-type-keyp type)))
+         *wild-type*)
+        (t type)))
 
 (defun-cached (make-values-type-cached
                :hash-bits 8
@@ -98,12 +100,14 @@
         (subseq optional 0 (1+ last-real))
         nil)))
 
-(defun make-values-type (&rest args &key optional rest keyp
+(defun make-values-type (&rest args &key required optional rest keyp
                          &allow-other-keys)
   (let ((args (if (and rest (not keyp))
                   `(:optional ,(values-adjust-optional optional rest) ,@args)
                   args)))
-    (make-values-type-cached args)))
+    (if (memq *empty-type* required)
+        *empty-type*
+        (make-values-type-cached args))))
 
 (!define-type-class values)
 

@@ -805,6 +805,7 @@
   (when (and (cast-type-check cast)
              (not (continuation-dest (node-cont cast))))
     ;; FIXME
+    (bug "IR2 type checking of unused values in not implemented.")
     )
   (values))
 
@@ -824,9 +825,14 @@
       (:unknown
        (annotate-unknown-values-continuation value))
       (:fixed
-       (annotate-fixed-values-continuation
-        value
-        (mapcar #'tn-primitive-type (ir2-continuation-locs 2cont))))))
+       (let* ((count (length (ir2-continuation-locs 2cont)))
+              (ctype (continuation-derived-type value)))
+         (multiple-value-bind (types rest)
+             (values-type-types ctype (specifier-type 'null))
+           (annotate-fixed-values-continuation
+            value
+            (mapcar #'primitive-type
+                    (adjust-list types count rest))))))))
   (values))
 
 

@@ -787,7 +787,7 @@
        (multiple-value-prog1
            (svref a 0)
          (unless f (return-from bug236 0))))))
-#+nil(assert (eql (bug236 #(4) 0)))
+(assert (eql (bug236 #(4) nil) 0))
 
 ;;; Bug reported by reported by rif on c.l.l 2003-03-05
 (defun test-type-of-special-1 (x)

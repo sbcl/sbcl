@@ -32,12 +32,7 @@ echo //doing warm init
 	;; Now that we use the compiler for macros, interpreted
 	;; /SHOW doesn't work until later in init.
         #+sb-show (print "/hello, world!")
-        (sb!ext:purify)
-
-        ;; FIXME
-        (defun sb!unix::get-timezone (x)
-          (declare (ignore x))
-          (values 0 0 nil))
+       (sb!ext:purify)
 
         ;; Until PRINT-OBJECT and other machinery is set up,
 	;; we want limits on printing to avoid infinite output.

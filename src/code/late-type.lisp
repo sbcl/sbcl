@@ -385,7 +385,7 @@
 	 (or (car (args-type-required type))
              (car (args-type-optional type))
 	     (args-type-rest type)
-             *empty-type*))
+             (specifier-type 'null)))
 	((eq type *wild-type*)
 	 *universal-type*)
 	(t
@@ -556,6 +556,8 @@
         (type2 (coerce-to-values type2)))
     (cond ((eq type1 *wild-type*) (values type2 t))
           ((eq type2 *wild-type*) (values type1 t))
+          ((or (eq type1 *empty-type*) (eq type2 *empty-type*))
+           *empty-type*)
           (t
            (args-type-op type1 type2
                          #'type-intersection
@@ -589,10 +591,12 @@
       (csubtypep type1 type2)
       (let ((type1 (coerce-to-values type1))
             (type2 (coerce-to-values type2)))
-        (cond ((eq type2 *wild-type*) (values t t))
+        (cond ((or (eq type2 *wild-type*) (eq type1 *empty-type*))
+               (values t t))
               ((eq type1 *wild-type*)
                (values (eq type2 *wild-type*) t))
-              ((not (values-types-equal-or-intersect type1 type2))
+              ((or (eq type2 *empty-type*)
+                   (not (values-types-equal-or-intersect type1 type2)))
                (values nil t))
               (t (multiple-value-bind (types1 rest1) (values-type-types type1)
                    (multiple-value-bind (types2 rest2) (values-type-types type2)

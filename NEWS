@@ -1632,4 +1632,4 @@ changes in cast branch:
 
   * changes in type checking closed the following bugs:
     ** type checking of unused values (192b, 203);
-    ** template selection based on unsafe type assertions (192c);
+    ** template selection based on unsafe type assertions (192c, 236);
