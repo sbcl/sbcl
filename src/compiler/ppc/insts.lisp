@@ -11,9 +11,14 @@
 
 (in-package "SB!VM")
 
-;(def-assembler-params
-;    :scheduler-p nil ; t when we trust the scheduler not to "fill delay slots"
-;  :max-locations 70)
+;;; needs a little more work in the assembler, to realise that the
+;;; delays requested here are not mandatory, so that the assembler
+;;; shouldn't fill gaps with NOPs but with real instructions.  -- CSR,
+;;; 2003-09-08
+#+nil 
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (setf sb!assem:*assem-scheduler-p* t)
+  (setf sb!assem:*assem-max-locations* 70))
 
 ;;;; Constants, types, conversion functions, some disassembler stuff.
 
@@ -722,7 +727,7 @@
                    (:printer x ((op ,op) (xo ,xo)))
                    (:delay ,cost)
                    (:cost ,cost)
-                   (:dependencies (reads ra) (reads rb) ,@ other-reads 
+                   (:dependencies (reads ra) (reads rb) (reads :memory) ,@other-reads 
                     (writes rt) ,@other-writes)
                    (:emitter
                     (emit-x-form-inst segment ,op 
@@ -772,7 +777,7 @@
                    (:delay ,cost)
                    (:cost ,cost)
                    (:dependencies (reads ra) (reads rb) (reads rs) ,@other-reads 
-                    ,@other-writes)
+                    (writes :memory :partially t) ,@other-writes)
                    (:emitter
                     (emit-x-form-inst segment ,op 
                      (reg-tn-encoding rs) 
@@ -788,7 +793,7 @@
                    (:delay ,cost)
                    (:cost ,cost)
                    (:dependencies (reads ra) (reads rb) (reads frs) ,@other-reads 
-                    ,@other-writes)
+                    (writes :memory :partially t) ,@other-writes)
                    (:emitter
                     (emit-x-form-inst segment ,op 
                      (fp-reg-tn-encoding frs) 
@@ -886,7 +891,7 @@
                    (:delay ,cost)
                    (:cost ,cost)
                    ,@(when pinned '(:pinned))
-                   (:dependencies (reads ra) ,@other-reads 
+                   (:dependencies (reads ra) (reads :memory) ,@other-reads 
                     (writes rt) ,@other-writes)
                    (:emitter
                     (emit-d-form-inst segment ,op (reg-tn-encoding rt) (reg-tn-encoding ra) si)))))
@@ -898,7 +903,7 @@
                    (:printer d-frt ((op ,op)))
                    (:delay ,cost)
                    (:cost ,cost)
-                   (:dependencies (reads ra) ,@other-reads 
+                   (:dependencies (reads ra) (reads :memory) ,@other-reads 
                     (writes frt) ,@other-writes)
                    (:emitter
                     (emit-d-form-inst segment ,op (fp-reg-tn-encoding frt) (reg-tn-encoding ra) si)))))
@@ -976,7 +981,7 @@
            
            (define-a-tac-instruction (name op xo rc &key (cost 1) other-dependencies)
                (multiple-value-bind (other-reads other-writes) (classify-dependencies other-dependencies)
-                 `(define-instruction ,name (segment frt fra frc)
+                 `(define-instruction ,name (segment frt fra frb)
                    (:printer a-tac ((op ,op) (xo ,xo) (rc ,rc)))
                    (:cost ,cost)
                    (:delay 1)
@@ -988,7 +993,7 @@
                      (fp-reg-tn-encoding frt) 
                      (fp-reg-tn-encoding fra) 
                      0
-                     (fp-reg-tn-encoding frc)
+                     (fp-reg-tn-encoding frb)
                      ,xo
                      ,rc)))))
            
@@ -1023,7 +1028,7 @@
 
   (define-instruction twi (segment tcond ra si)
     (:printer d-to ((op 3)))
-    (:delay 1)
+    (:delay 0)
     :pinned
     (:emitter (emit-d-form-inst segment 3 (valid-tcond-encoding tcond) (reg-tn-encoding ra) si)))
   
@@ -1072,7 +1077,8 @@
   (define-instruction bc (segment bo bi target)
     (:declare (type label target))
     (:printer b ((op 16) (aa 0) (lk 0)))
-    (:delay 1)
+    (:attributes branch)
+    (:delay 0)
     (:dependencies (reads :ccr))
     (:emitter
      (emit-conditional-branch segment bo bi target)))
@@ -1080,7 +1086,8 @@
   (define-instruction bcl (segment bo bi target)
     (:declare (type label target))
     (:printer b ((op 16) (aa 0) (lk 1)))
-    (:delay 1)
+    (:attributes branch)
+    (:delay 0)
     (:dependencies (reads :ccr))
     (:emitter
      (emit-conditional-branch segment bo bi target nil t)))
@@ -1088,7 +1095,8 @@
   (define-instruction bca (segment bo bi target)
     (:declare (type label target))
     (:printer b ((op 16) (aa 1) (lk 0)))
-    (:delay 1)
+    (:attributes branch)
+    (:delay 0)
     (:dependencies (reads :ccr))
     (:emitter
      (emit-conditional-branch segment bo bi target t)))
@@ -1096,19 +1104,21 @@
   (define-instruction bcla (segment bo bi target)
     (:declare (type label target))
     (:printer b ((op 16) (aa 1) (lk 1)))
-    (:delay 1)
+    (:attributes branch)
+    (:delay 0)
     (:dependencies (reads :ccr))
     (:emitter
      (emit-conditional-branch segment bo bi target t t)))
   
-;;; There may (or may not) be a good reason to use this in preference to "b[la] target".
-;;; I can't think of a -bad- reason ...
+;;; There may (or may not) be a good reason to use this in preference
+;;; to "b[la] target".  I can't think of a -bad- reason ...
   
   (define-instruction bu (segment target)
     (:declare (type label target))
     (:printer b ((op 16) (bo #.(valid-bo-encoding :bo-u)) (bi 0) (aa 0) (lk 0)) 
               '(:name :tab bd))
-    (:delay 1)
+    (:attributes branch)
+    (:delay 0)
     (:emitter
      (emit-conditional-branch segment #.(valid-bo-encoding :bo-u) 0 target nil nil)))
   
@@ -1116,19 +1126,22 @@
   (define-instruction bt (segment bi  target)
     (:printer b ((op 16) (bo #.(valid-bo-encoding :bo-t)) (aa 0) (lk 0))
               '(:name :tab bi "," bd))
-    (:delay 1)
+    (:attributes branch)
+    (:delay 0)
     (:emitter
      (emit-conditional-branch segment #.(valid-bo-encoding :bo-t) bi target nil nil)))
   
   (define-instruction bf (segment bi  target)
     (:printer b ((op 16) (bo #.(valid-bo-encoding :bo-f)) (aa 0) (lk 0))
               '(:name :tab bi "," bd))
-    (:delay 1)
+    (:attributes branch)
+    (:delay 0)
     (:emitter
      (emit-conditional-branch segment #.(valid-bo-encoding :bo-f) bi target nil nil)))
   
   (define-instruction b? (segment cr-field-name cr-name  &optional (target nil target-p))
-    (:delay 1)
+    (:attributes branch)
+    (:delay 0)
     (:emitter 
      (unless target-p
        (setq target cr-name cr-name cr-field-name cr-field-name :cr0))
@@ -1143,19 +1156,22 @@
   
   (define-instruction sc (segment)
     (:printer sc ((op 17)))
-    (:delay 1)
+    (:attributes branch)
+    (:delay 0)
     :pinned
     (:emitter (emit-sc-form-inst segment 17 2)))
 
   (define-instruction b (segment target)
     (:printer i ((op 18) (aa 0) (lk 0)))
-    (:delay 1)
+    (:attributes branch)
+    (:delay 0)
     (:emitter
      (emit-i-form-branch segment target nil)))
   
   (define-instruction ba (segment target)
     (:printer i-abs ((op 18) (aa 1) (lk 0)))
-    (:delay 1)
+    (:attributes branch)
+    (:delay 0)
     (:emitter
      (when (typep target 'fixup)
        (note-fixup segment :ba target)
@@ -1165,13 +1181,15 @@
   
   (define-instruction bl (segment target)
     (:printer i ((op 18) (aa 0) (lk 1)))
-    (:delay 1)
+    (:attributes branch)
+    (:delay 0)
     (:emitter
      (emit-i-form-branch segment target t)))
   
   (define-instruction bla (segment target)
     (:printer i-abs ((op 18) (aa 1) (lk 1)))
-    (:delay 1)
+    (:attributes branch)
+    (:delay 0)
     (:emitter
      (when (typep target 'fixup)
        (note-fixup segment :ba target)
@@ -1180,21 +1198,24 @@
   
   (define-instruction blr (segment)
     (:printer xl-bo-bi ((op 19) (xo 16) (bo #.(valid-bo-encoding :bo-u))(bi 0) (lk 0))  '(:name))
-    (:delay 1)
+    (:attributes branch)
+    (:delay 0)
     (:dependencies (reads :ccr) (reads :ctr))
     (:emitter
      (emit-x-form-inst segment 19 (valid-bo-encoding :bo-u) 0 0 16 0)))
   
   (define-instruction bclr (segment bo bi)
     (:printer xl-bo-bi ((op 19) (xo 16)))
-    (:delay 1)
+    (:attributes branch)
+    (:delay 0)
     (:dependencies (reads :ccr) (reads :lr))
     (:emitter
      (emit-x-form-inst segment 19 (valid-bo-encoding bo) (valid-bi-encoding bi) 0 16 0)))
   
   (define-instruction bclrl (segment bo bi)
     (:printer xl-bo-bi ((op 19) (xo 16) (lk 1)))
-    (:delay 1)
+    (:attributes branch)
+    (:delay 0)
     (:dependencies (reads :ccr) (reads :lr))
     (:emitter
      (emit-x-form-inst segment 19 (valid-bo-encoding bo)
@@ -1217,28 +1238,32 @@
   
   (define-instruction bcctr (segment bo bi)
     (:printer xl-bo-bi ((op 19) (xo 528)))
-    (:delay 1)
+    (:attributes branch)
+    (:delay 0)
     (:dependencies (reads :ccr) (reads :ctr))
     (:emitter
      (emit-x-form-inst segment 19 (valid-bo-encoding bo) (valid-bi-encoding bi) 0 528 0)))
   
   (define-instruction bcctrl (segment bo bi)
     (:printer xl-bo-bi ((op 19) (xo 528) (lk 1)))
-    (:delay 1)
+    (:attributes branch)
+    (:delay 0)
     (:dependencies (reads :ccr) (reads :ctr) (writes :lr))
     (:emitter
      (emit-x-form-inst segment 19 (valid-bo-encoding bo) (valid-bi-encoding bi) 0 528 1)))
   
   (define-instruction bctr (segment)
     (:printer xl-bo-bi ((op 19) (xo 528) (bo #.(valid-bo-encoding :bo-u)) (bi 0) (lk 0))  '(:name))
-    (:delay 1)
+    (:attributes branch)
+    (:delay 0)
     (:dependencies (reads :ccr) (reads :ctr))
     (:emitter
      (emit-x-form-inst segment 19 #.(valid-bo-encoding :bo-u) 0 0  528 0)))
   
   (define-instruction bctrl (segment)
     (:printer xl-bo-bi ((op 19) (xo 528) (bo #.(valid-bo-encoding :bo-u)) (bi 0) (lk 1))  '(:name))
-    (:delay 1)
+    (:attributes branch)
+    (:delay 0)
     (:dependencies (reads :ccr) (reads :ctr))
     (:emitter
      (emit-x-form-inst segment 19 #.(valid-bo-encoding :bo-u) 0 0  528 1)))
@@ -1318,7 +1343,8 @@
   
   (define-instruction tw (segment tcond ra rb)
     (:printer x-19 ((op 31) (xo 4)))
-    (:delay 1)
+    (:attributes branch)
+    (:delay 0)
     :pinned
     (:emitter (emit-x-form-inst segment 31 (valid-tcond-encoding tcond) (reg-tn-encoding ra) (reg-tn-encoding rb) 4 0)))
   
@@ -1461,7 +1487,7 @@
                                               (:unless (:same-as rs) "," rb)))
     (:delay 1)
     (:cost 1)
-    (:dependencies (reads rb) (reads rs) (writes ra))
+    (:dependencies (reads rb) (reads rs) (writes ra) (writes :ccr))
     (:emitter
      (emit-x-form-inst segment
                        31
@@ -1589,7 +1615,7 @@
     (:printer x-9 ((op 31) (xo 824) (rc 1)))
     (:cost 1)
     (:delay 1)
-    (:dependencies (reads rs) (writes ra))
+    (:dependencies (reads rs) (writes ra) (writes :ccr))
     (:emitter
      (emit-x-form-inst segment 31
                        (reg-tn-encoding rs) 
@@ -1615,7 +1641,7 @@
     (:printer d ((op 32)))
     (:delay 2)
     (:cost 2)
-    (:dependencies (reads ra) (writes rt))
+    (:dependencies (reads ra) (writes rt) (reads :memory))
     (:emitter
      (when (typep si 'fixup)
        (note-fixup segment :l si)
@@ -1718,7 +1744,7 @@
   (define-instruction mffs. (segment frd)
   (:printer x-22 ((op 63)  (xo 583) (rc 1)))
   (:delay 1)
-  (:dependencies (reads :fpscr) (writes frd))
+  (:dependencies (reads :fpscr) (writes frd) (writes :ccr))
   (:emitter (emit-x-form-inst segment 
                           63 
                           (fp-reg-tn-encoding frd)
