@@ -455,17 +455,13 @@
 	       numbytes
 	       eof-error-p))
      ((<= numbytes num-buffered)
-      (%primitive sb!c:byte-blt
-		  in-buffer
-		  index
-		  buffer
-		  start
-		  (+ start numbytes))
+      (%byte-blt in-buffer index
+		 buffer start (+ start numbytes))
       (setf (lisp-stream-in-index stream) (+ index numbytes))
       numbytes)
      (t
       (let ((end (+ start num-buffered)))
-	(%primitive sb!c:byte-blt in-buffer index buffer start end)
+	(%byte-blt in-buffer index buffer start end)
 	(setf (lisp-stream-in-index stream) +in-buffer-length+)
 	(+ (funcall (lisp-stream-n-bin stream)
 		    stream
@@ -1284,12 +1280,8 @@
 	    (let* ((new-length (* current 2))
 		   (new-workspace (make-string new-length)))
 	      (declare (simple-string new-workspace))
-	      (%primitive sb!c:byte-blt
-			  workspace
-			  start
-			  new-workspace
-			  0
-			  current)
+	      (%byte-blt workspace start
+			 new-workspace 0 current)
 	      (setf workspace new-workspace)
 	      (setf offset-current current)
 	      (set-array-header buffer workspace new-length
@@ -1314,12 +1306,8 @@
 	    (let* ((new-length (+ (the fixnum (* current 2)) string-len))
 		   (new-workspace (make-string new-length)))
 	      (declare (simple-string new-workspace))
-	      (%primitive sb!c:byte-blt
-			  workspace
-			  dst-start
-			  new-workspace
-			  0
-			  current)
+	      (%byte-blt workspace dst-start
+			 new-workspace 0 current)
 	      (setf workspace new-workspace)
 	      (setf offset-current current)
 	      (setf offset-dst-end dst-end)
@@ -1331,12 +1319,8 @@
 				new-length
 				nil))
 	    (setf (fill-pointer buffer) dst-end))
-	(%primitive sb!c:byte-blt
-		    string
-		    start
-		    workspace
-		    offset-current
-		    offset-dst-end)))
+	(%byte-blt string start
+		   workspace offset-current offset-dst-end)))
     dst-end))
 
 (defun fill-pointer-misc (stream operation &optional arg1 arg2)

@@ -505,11 +505,12 @@
   (declare (type (simple-array (unsigned-byte 8) 1) bv))
   (declare (type sap sap))
   (declare (type fixnum offset))
-  ;; FIXME: Actually it looks as though this, and most other calls
-  ;; to COPY-TO-SYSTEM-AREA, could be written more concisely with BYTE-BLT.
-  ;; Except that the DST-END-DST-START convention for the length is confusing.
-  ;; Perhaps I could rename BYTE-BLT to BYTE-BLIT and replace the
-  ;; DST-END argument with an N-BYTES argument?
+  ;; FIXME: Actually it looks as though this, and most other calls to
+  ;; COPY-TO-SYSTEM-AREA, could be written more concisely with
+  ;; %BYTE-BLT. Except that the DST-END-DST-START convention for the
+  ;; length is confusing. Perhaps I could rename %BYTE-BLT to
+  ;; %BYTE-BLIT (and correspondingly rename the corresponding VOP) and
+  ;; replace the DST-END argument with an N-BYTES argument?
   (copy-to-system-area bv
 		       (* sb!vm:vector-data-offset sb!vm:word-bits)
 		       sap

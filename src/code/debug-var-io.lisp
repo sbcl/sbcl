@@ -70,7 +70,7 @@
   (once-only ((len `(read-var-integer ,vec ,index)))
     (once-only ((res `(make-string ,len)))
       `(progn
-	 (%primitive byte-blt ,vec ,index ,res 0 ,len)
+	 (%byte-blt ,vec ,index ,res 0 ,len)
 	 (incf ,index ,len)
 	 ,res))))
 
@@ -93,6 +93,6 @@
   (once-only ((n-bytes bytes))
     (once-only ((n-res `(make-array (* ,n-bytes 8) :element-type 'bit)))
       `(progn
-	 (%primitive byte-blt ,vec ,index ,n-res 0 ,n-bytes)
+	 (%byte-blt ,vec ,index ,n-res 0 ,n-bytes)
 	 (incf ,index ,n-bytes)
 	 ,n-res))))

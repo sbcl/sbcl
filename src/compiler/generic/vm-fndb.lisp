@@ -257,6 +257,14 @@
 	   (simple-unboxed-array (*)) index index)
   null
   ())
+
+;;; (not really a bit-bashing routine, but starting to take over from
+;;; bit-bashing routines in byte-sized copies as of sbcl-0.6.12.29:)
+(defknown %byte-blt
+  ((or (simple-unboxed-array (*)) system-area-pointer) index
+   (or (simple-unboxed-array (*)) system-area-pointer) index index)
+  null
+  ())
 
 ;;;; code/function/fdefn object manipulation routines
 

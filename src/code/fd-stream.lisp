@@ -575,7 +575,7 @@
 		      (car entry)
 		      (caddr entry))))))
 
-;;; Returns a string constructed from the sap, start, and end.
+;;; Return a string constructed from SAP, START, and END.
 (defun string-from-sap (sap start end)
   (declare (type index start end))
   (let* ((length (- end start))
@@ -585,9 +585,11 @@
 			   (* length sb!vm:byte-bits))
     string))
 
-;;; the N-BIN method for FD-STREAMs. This blocks in UNIX-READ. It is
-;;; generally used where there is a definite amount of reading to be
-;;; done, so blocking isn't too problematical.
+;;; the N-BIN method for FD-STREAMs
+;;;
+;;; Note that this blocks in UNIX-READ. It is generally used where
+;;; there is a definite amount of reading to be done, so blocking
+;;; isn't too problematical.
 (defun fd-stream-read-n-bytes (stream buffer start requested eof-error-p)
   (declare (type fd-stream stream))
   (declare (type index start requested))
@@ -598,23 +600,16 @@
 	   (head (fd-stream-ibuf-head stream))
 	   (tail (fd-stream-ibuf-tail stream))
 	   (available (- tail head))
-	   (this-copy (min remaining-request available))
+	   (n-this-copy (min remaining-request available))
 	   (this-start (+ start total-copied))
+	   (this-end (+ this-start n-this-copy))
 	   (sap (fd-stream-ibuf-sap stream)))
       (declare (type index remaining-request head tail available))
-      (declare (type index this-copy))
+      (declare (type index n-this-copy))
       ;; Copy data from stream buffer into user's buffer. 
-      (if (typep buffer 'system-area-pointer)
-	  (system-area-copy sap (* head sb!vm:byte-bits)
-			    buffer (* this-start sb!vm:byte-bits)
-			    (* this-copy sb!vm:byte-bits))
-	  (copy-from-system-area sap (* head sb!vm:byte-bits)
-				 buffer (+ (* this-start sb!vm:byte-bits)
-					   (* sb!vm:vector-data-offset
-					      sb!vm:word-bits))
-				 (* this-copy sb!vm:byte-bits)))
-      (incf (fd-stream-ibuf-head stream) this-copy)
-      (incf total-copied this-copy)
+      (%byte-blt sap head buffer this-start this-end)
+      (incf (fd-stream-ibuf-head stream) n-this-copy)
+      (incf total-copied n-this-copy)
       ;; Maybe we need to refill the stream buffer.
       (cond (;; If there were enough data in the stream buffer, we're done.
 	     (= total-copied requested)

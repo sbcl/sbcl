@@ -122,3 +122,6 @@
 	   (setf *standard-output* (third old-streams))
 	   (setf *error-output* (fourth old-streams)))))
   (values))
+
+(defun %byte-blt (src src-start dst dst-start dst-end)
+  (%byte-blt src src-start dst dst-start dst-end))

@@ -93,35 +93,6 @@
 		   `(char-code (char-ref ,index))))
 	,@body))))
 
-;;; The codes of the characters of STRING from START to END are used
-;;; as indices into the TABLE, which is a U-Vector of 8-bit bytes.
-;;; When the number picked up from the table bitwise ANDed with MASK
-;;; is non-zero, the current index into the STRING is returned.
-;;;
-;;; (This corresponds to SCANC on the Vax.)
-(defun %sp-find-character-with-attribute (string start end table mask)
-  (declare (type (simple-array (unsigned-byte 8) (256)) table)
-	   (type (or simple-string system-area-pointer) string)
-	   (fixnum start end mask))
-  (maybe-sap-maybe-string (string)
-    (do ((index start (1+ index)))
-	((>= index end) nil)
-      (declare (fixnum index))
-      (unless (zerop (logand (aref table (byte-ref index)) mask))
-	(return index)))))
-
-;;; like %SP-FIND-CHARACTER-WITH-ATTRIBUTE, only sdrawkcaB
-(defun %sp-reverse-find-character-with-attribute (string start end table mask)
-  (declare (type (or simple-string system-area-pointer) string)
-	   (fixnum start end mask)
-	   (type (array (unsigned-byte 8) (256)) table))
-  (maybe-sap-maybe-string (string)
-    (do ((index (1- end) (1- index)))
-	((< index start) nil)
-      (declare (fixnum index))
-      (unless (zerop (logand (aref table (byte-ref index)) mask))
-	(return index)))))
-
 ;;; Search STRING for the CHARACTER from START to END. If the
 ;;; character is found, the corresponding index into STRING is
 ;;; returned, otherwise NIL is returned.
