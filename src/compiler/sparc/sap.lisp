@@ -250,13 +250,6 @@
     unsigned-reg unsigned-num :long nil)
   (def-system-ref-and-set signed-sap-ref-32 %set-signed-sap-ref-32
     signed-reg signed-num :long t)
-  ;; FIXME
-  #+ignore
-  (def-system-ref-and-set sap-ref-64 %set-sap-ref-64
-    unsigned-reg unsigned-num :quad nil)
-  #+ignore
-  (def-system-ref-and-set signed-sap-ref-64 %set-signed-sap-ref-64
-    signed-reg signed-num :quad t)
   (def-system-ref-and-set sap-ref-sap %set-sap-ref-sap
     sap-reg system-area-pointer :long)
   (def-system-ref-and-set sap-ref-single %set-sap-ref-single
@@ -281,23 +274,19 @@
 	  (- (* vector-data-offset n-word-bytes) other-pointer-lowtag))))
 
 ;;; Transforms for 64-bit SAP accessors.
-#+ignore
 (deftransform sap-ref-64 ((sap offset) (* *))
   '(logior (ash (sap-ref-32 sap offset) 32)
 	   (sap-ref-32 sap (+ offset 4))))
 
-#+ignore
 (deftransform signed-sap-ref-64 ((sap offset) (* *))
   '(logior (ash (signed-sap-ref-32 sap offset) 32)
 	   (sap-ref-32 sap (+ 4 offset))))
 
-#+ignore
 (deftransform %set-sap-ref-64 ((sap offset value) (* * *))
   '(progn
      (%set-sap-ref-32 sap offset (ash value -32))
      (%set-sap-ref-32 sap (+ offset 4) (logand value #xffffffff))))
 
-#+ignore
 (deftransform %set-signed-sap-ref-64 ((sap offset value) (* * *))
   '(progn
      (%set-signed-sap-ref-32 sap offset (ash value -32))
