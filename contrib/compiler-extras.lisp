@@ -253,37 +253,4 @@
   (check-inlineability-of-find-position-if sequence from-end)
   '(%find-position-vector-macro item sequence
 				from-end start end key test))
-
-;;;; optimizations for floating point FLOOR, CEILING, TRUNCATE, and
-;;;; ROUND, lifted from CMU CL 18c
-;;;;
-;;;; (Without these optimizations, these functions cons!)
 
-;;; Convert (TRUNCATE x y) to the obvious implementation.  We only want
-;;; this when under certain conditions and let the generic TRUNCATE
-;;; handle the rest.  (Note: if Y = 1, the divide and multiply by Y
-;;; should be removed by other DEFTRANSFORMs.)
-(deftransform truncate ((x &optional y)
-                        (float &optional (or float integer)))
-  '(let ((res (%unary-truncate (/ x y))))
-     (values res (- x (* y res)))))
-
-(deftransform floor ((number &optional divisor)
-                     (float &optional (or integer float)))
-  '(multiple-value-bind (tru rem) (truncate number divisor)
-    (if (and (not (zerop rem))
-             (if (minusp divisor)
-                 (plusp number)
-                 (minusp number)))
-        (values (1- tru) (+ rem divisor))
-        (values tru rem))))
-
-(deftransform ceiling ((number &optional divisor)
-                       (float &optional (or integer float)))
-  '(multiple-value-bind (tru rem) (truncate number divisor)
-    (if (and (not (zerop rem))
-             (if (minusp divisor)
-                 (minusp number)
-                 (plusp number)))
-        (values (1+ tru) (- rem divisor))
-        (values tru rem))))

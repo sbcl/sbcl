@@ -11,110 +11,115 @@
 
 (in-package "SB!IMPL")
 
+;;; Like CMU CL, we use HEAPSORT. However, other than that, this code
+;;; isn't really related to the CMU CL code, since instead of trying
+;;; to generalize the CMU CL code to allow START and END values, this
+;;; code has been written from scratch following Chapter 7 of
+;;; _Introduction to Algorithms_ by Corman, Rivest, and Shamir.
+(macrolet ((%index (x) `(truly-the index ,x))
+	   (%parent (i) `(ash ,i -1))
+           (%left (i) `(%index (ash ,i 1)))
+           (%right (i) `(%index (1+ (ash ,i 1))))
+           (%heapify (i)
+	     `(do* ((i ,i)
+		    (left (%left i) (%left i)))
+		  ((> left current-heap-size))
+		(declare (type index i left))
+		(let* ((i-elt (%elt i))
+		       (i-key (funcall keyfun i-elt))
+		       (left-elt (%elt left))
+		       (left-key (funcall keyfun left-elt)))
+		  (multiple-value-bind (large large-elt large-key)
+		      (if (funcall predicate i-key left-key)
+			  (values left left-elt left-key)
+			  (values i i-elt i-key))
+		    (let ((right (%right i)))
+		      (multiple-value-bind (largest largest-elt)
+			  (if (> right current-heap-size)
+			      (values large large-elt)
+			      (let* ((right-elt (%elt right))
+				     (right-key (funcall keyfun right-elt)))
+				(if (funcall predicate large-key right-key)
+				    (values right right-elt)
+				    (values large large-elt))))
+			(cond ((= largest i)
+			       (return))
+			      (t
+			       (setf (%elt i) largest-elt
+				     (%elt largest) i-elt
+				     i largest)))))))))
+           (%sort-vector (keyfun &optional (vtype 'vector))
+             `(macrolet (;; KLUDGE: In SBCL ca. 0.6.10, I had trouble getting
+			 ;; type inference to propagate all the way
+			 ;; through this tangled mess of inlining. The
+			 ;; TRULY-THE here works around that. -- WHN
+			 (%elt (i)
+			   `(aref (truly-the ,',vtype vector)
+				  (%index (+ (%index ,i) start-1)))))
+		(let ((start-1 (1- start)) ; Heaps prefer 1-based addressing.
+		      (current-heap-size (- end start))
+		      (keyfun ,keyfun))
+		  (declare (type (integer -1 #.(1- most-positive-fixnum))
+				 start-1))
+		  (declare (type index current-heap-size))
+		  (declare (type function keyfun))
+		  (loop for i of-type index
+			from (ash current-heap-size -1) downto 1 do
+			(%heapify i))
+		  (loop 
+		   (when (< current-heap-size 2)
+		     (return))
+		   (rotatef (%elt 1) (%elt current-heap-size))
+		   (decf current-heap-size)
+		   (%heapify 1))))))
+
+  (declaim (inline sort-vector))
+  (defun sort-vector (vector start end predicate key)
+    (declare (type vector vector))
+    (declare (type index start end))
+    (declare (type function predicate))
+    (declare (type (or function null) key))
+    (declare (optimize (speed 3) (safety 3) (debug 1) (space 1)))
+    (if (typep vector 'simple-vector)
+	;; (VECTOR T) is worth optimizing for, and SIMPLE-VECTOR is
+	;; what we get from (VECTOR T) inside WITH-ARRAY-DATA.
+	(if (null key)
+	    ;; Special-casing the KEY=NIL case lets us avoid some
+	    ;; function calls.
+	    (%sort-vector #'identity simple-vector)
+	    (%sort-vector key simple-vector))
+	;; It's hard to anticipate many speed-critical applications for
+	;; sorting vector types other than (VECTOR T), so we just lump
+	;; them all together in one slow dynamically typed mess.
+	(locally
+	  (declare (optimize (speed 2) (space 2) (inhibit-warnings 3)))
+	  (%sort-vector (or key #'identity))))))
+
+;;; This is MAYBE-INLINE because it's not too hard to have an
+;;; application where sorting is a major bottleneck, and inlining it
+;;; allows the compiler to make enough optimizations that it might be
+;;; worth the (large) cost in space.
+(declaim (maybe-inline sort))
 (defun sort (sequence predicate &key key)
   #!+sb-doc
   "Destructively sort SEQUENCE. PREDICATE should return non-NIL if
    ARG1 is to precede ARG2."
-  (typecase sequence
-    (simple-vector
-     (if (> (the fixnum (length (the simple-vector sequence))) 0)
-	 (sort-simple-vector sequence predicate key)
-	 sequence))
-    (list
-     (sort-list sequence predicate key))
-    (vector
-     (if (> (the fixnum (length sequence)) 0)
-	 (sort-vector sequence predicate key)
-	 sequence))
-    (t
-     (error 'simple-type-error
-	    :datum sequence
-	    :expected-type 'sequence
-	    :format-control "~S is not a SEQUENCE."
-	    :format-arguments (list sequence)))))
-
-;;;; sorting vectors
-
-;;; Make sorting functions for SIMPLE-VECTOR and miscellaneous other VECTORs.
-(macrolet (;; BUILD-HEAP rearranges seq elements into a heap to start heap
-	   ;; sorting.
-	   (build-heap (seq type len-1 pred key)
-	     (let ((i (gensym)))
-	       `(do ((,i (floor ,len-1 2) (1- ,i)))
-		    ((minusp ,i) ,seq)
-		  (declare (fixnum ,i))
-		  (heapify ,seq ,type ,i ,len-1 ,pred ,key))))
-	   ;; HEAPIFY, assuming both sons of root are heaps,
-	   ;; percolates the root element through the sons to form a
-	   ;; heap at root. Root and max are zero based coordinates,
-	   ;; but the heap algorithm only works on arrays indexed from
-	   ;; 1 through N (not 0 through N-1); This is because a root
-	   ;; at I has sons at 2*I and 2*I+1 which does not work for a
-	   ;; root at 0. Because of this, boundaries, roots, and
-	   ;; termination are computed using 1..N indexes.
-	   (heapify (seq vector-ref root max pred key)
-	     (let ((heap-root (gensym))
-		   (heap-max (gensym))
-		   (root-ele (gensym))
-		   (root-key (gensym))
-		   (heap-max/2 (gensym))
-		   (heap-l-son (gensym))
-		   (one-son (gensym))
-		   (one-son-ele (gensym))
-		   (one-son-key (gensym))
-		   (r-son-ele (gensym))
-		   (r-son-key (gensym))
-		   (var-root (gensym)))
-	       `(let* ((,var-root ,root) ; (necessary to not clobber calling
-					 ; root var)
-		       (,heap-root (1+ ,root))
-		       (,heap-max (1+ ,max))
-		       (,root-ele (,vector-ref ,seq ,root))
-		       (,root-key (apply-key ,key ,root-ele))
-		       (,heap-max/2 (ash ,heap-max -1))) ; (floor heap-max 2)
-		  (declare (fixnum ,var-root ,heap-root ,heap-max ,heap-max/2))
-		  (loop
-		    (if (> ,heap-root ,heap-max/2) (return))
-		    (let* ((,heap-l-son (ash ,heap-root 1)) ; (* 2 heap-root)
-			   ;; l-son index in seq (0..N-1) is one less than heap
-			   ;; computation.
-			   (,one-son (1- ,heap-l-son))
-			   (,one-son-ele (,vector-ref ,seq ,one-son))
-			   (,one-son-key (apply-key ,key ,one-son-ele)))
-		      (declare (fixnum ,heap-l-son ,one-son))
-		      (if (< ,heap-l-son ,heap-max)
-			  ;; There is a right son.
-			  (let* ((,r-son-ele (,vector-ref ,seq ,heap-l-son))
-				 (,r-son-key (apply-key ,key ,r-son-ele)))
-			    ;; Choose the greater of the two sons.
-			    (when (funcall ,pred ,one-son-key ,r-son-key)
-			      (setf ,one-son ,heap-l-son)
-			      (setf ,one-son-ele ,r-son-ele)
-			      (setf ,one-son-key ,r-son-key))))
-		      ;; If greater son is less than root, then we've
-		      ;; formed a heap again..
-		      (if (funcall ,pred ,one-son-key ,root-key) (return))
-		      ;; ..else put greater son at root and make
-		      ;; greater son node be the root.
-		      (setf (,vector-ref ,seq ,var-root) ,one-son-ele)
-		      (setf ,heap-root (1+ ,one-son)) ; (one plus to be in heap coordinates)
-		      (setf ,var-root ,one-son)))     ; actual index into vector for root ele
-		  ;; Now really put percolated value into heap at the
-		  ;; appropriate root node.
-		  (setf (,vector-ref ,seq ,var-root) ,root-ele))))
-	   (def-vector-sort-fun (fun-name vector-ref)
-	     `(defun ,fun-name (seq pred key)
-		(let ((len-1 (1- (length (the vector seq)))))
-		  (declare (fixnum len-1))
-		  (build-heap seq ,vector-ref len-1 pred key)
-		  (do* ((i len-1 i-1)
-			(i-1 (1- i) (1- i-1)))
-		       ((zerop i) seq)
-		    (declare (fixnum i i-1))
-		    (rotatef (,vector-ref seq 0) (,vector-ref seq i))
-		    (heapify seq ,vector-ref 0 i-1 pred key))))))
-  (def-vector-sort-fun sort-vector aref)
-  (def-vector-sort-fun sort-simple-vector svref))
+  (let ((predicate-function (%coerce-callable-to-function predicate))
+	(key-function (and key (%coerce-callable-to-function key))))
+    (typecase sequence
+      (list (sort-list sequence predicate-function key-function))
+      (vector
+       (with-array-data ((vector (the vector sequence))
+			 (start 0)
+			 (end (length sequence)))
+         (sort-vector vector start end predicate-function key-function))
+       sequence)
+      (t
+       (error 'simple-type-error
+	      :datum sequence
+	      :expected-type 'sequence
+	      :format-control "~S is not a sequence."
+	      :format-arguments (list sequence))))))
 
 ;;;; stable sorting
 
@@ -280,10 +285,10 @@
 		 (incf ,i)))
 	(incf ,target-i)))))
 
-;;; VECTOR-MERGE-SORT is the same algorithm used to stable sort lists, but
-;;; it uses a temporary vector. Direction determines whether we are merging
-;;; into the temporary (T) or back into the given vector (NIL).
-
+;;; VECTOR-MERGE-SORT is the same algorithm used to stable sort lists,
+;;; but it uses a temporary vector. DIRECTION determines whether we
+;;; are merging into the temporary (T) or back into the given vector
+;;; (NIL).
 (sb!xc:defmacro vector-merge-sort (vector pred key vector-ref)
   (let ((vector-len (gensym)) (n (gensym))
 	(direction (gensym))  (unsorted (gensym))
@@ -351,7 +356,7 @@
 
 ) ; EVAL-when
 
-;;; Temporary vector for stable sorting vectors.
+;;; temporary vector for stable sorting vectors
 (defvar *merge-sort-temp-vector*
   (make-array 50))
 
@@ -369,10 +374,9 @@
 (eval-when (:compile-toplevel :execute)
 
 ;;; MERGE-VECTORS returns a new vector which contains an interleaving
-;;; of the elements of vector-1 and vector-2. Elements from vector-2 are
-;;; chosen only if they are strictly less than elements of vector-1,
-;;; (pred elt-2 elt-1), as specified in the manual.
-
+;;; of the elements of VECTOR-1 and VECTOR-2. Elements from VECTOR-2
+;;; are chosen only if they are strictly less than elements of
+;;; VECTOR-1, (PRED ELT-2 ELT-1), as specified in the manual.
 (sb!xc:defmacro merge-vectors (vector-1 length-1 vector-2 length-2
 			       result-vector pred key access)
   (let ((result-i (gensym))
@@ -411,8 +415,8 @@
 
 (defun merge (result-type sequence1 sequence2 predicate &key key)
   #!+sb-doc
-  "The sequences SEQUENCE1 and SEQUENCE2 are destructively merged into
-   a sequence of type RESULT-TYPE using PREDICATE to order the elements."
+  "Merge the sequences SEQUENCE1 and SEQUENCE2 destructively into a
+   sequence of type RESULT-TYPE using PREDICATE to order the elements."
   (if (eq result-type 'list)
       (let ((result (merge-lists* (coerce sequence1 'list)
 				  (coerce sequence2 'list)

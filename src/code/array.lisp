@@ -620,6 +620,11 @@
 	     :format-control "~S is not an array with a fill pointer."
 	     :format-arguments (list vector))))
 
+;;; FIXME: It'd probably make sense to use a MACROLET to share the
+;;; guts of VECTOR-PUSH between VECTOR-PUSH-EXTEND. Such a macro
+;;; should probably be based on the VECTOR-PUSH-EXTEND code (which is
+;;; new ca. sbcl-0.7.0) rather than the VECTOR-PUSH code (which dates
+;;; back to CMU CL).
 (defun vector-push (new-el array)
   #!+sb-doc
   "Attempt to set the element of ARRAY designated by its fill pointer
@@ -639,10 +644,35 @@
 (defun vector-push-extend (new-element
 			   vector
 			   &optional
-			   (extension (1+ (length vector))))
+			   (extension nil extension-p))
   #!+sb-doc
-  "This is like Vector-Push except that if the fill pointer gets too
-   large, the Vector is extended rather than Nil being returned."
+  "This is like VECTOR-PUSH except that if the fill pointer gets too
+   large, VECTOR is extended to allow the push to work."
+  (declare (type vector vector))
+  (let ((old-fill-pointer (fill-pointer vector)))
+    (declare (type index old-fill-pointer))
+    (when (= old-fill-pointer (%array-available-elements vector))
+      (adjust-array vector (+ old-fill-pointer
+			      (if extension-p
+				  (the (integer 1 #.most-positive-fixnum)
+				    extension)
+				  (1+ old-fill-pointer)))))
+    (setf (%array-fill-pointer vector)
+	  (1+ old-fill-pointer))
+    ;; Wrapping the type test and the AREF in the same WITH-ARRAY-DATA
+    ;; saves some time.
+    (with-array-data ((v vector) (i old-fill-pointer) (end)
+		      :force-inline t)
+      (declare (ignore end) (optimize (safety 0)))
+      (if (simple-vector-p v) ; if common special case
+          (setf (aref v i) new-element)
+	  (setf (aref v i) new-element)))
+    old-fill-pointer))
+
+(defun vector-push-extend (new-element
+			   vector
+			   &optional
+			   (extension (1+ (length vector))))
   (declare (vector vector) (fixnum extension))
   (let ((fill-pointer (fill-pointer vector)))
     (declare (fixnum fill-pointer))

@@ -30,18 +30,6 @@
 (deftransform %double-float ((n) (double-float) * :when :both)
   'n)
 
-;;; not strictly float functions, but primarily useful on floats:
-(macrolet ((frob (fun ufun)
-	     `(progn
-		(defknown ,ufun (real) integer (movable foldable flushable))
-		(deftransform ,fun ((x &optional by)
-				    (* &optional
-				       (constant-argument (member 1))))
-		  '(let ((res (,ufun x)))
-		     (values res (- x res)))))))
-  (frob truncate %unary-truncate)
-  (frob round %unary-round))
-
 ;;; RANDOM
 (macrolet ((frob (fun type)
 	     `(deftransform random ((num &optional state)
@@ -1260,3 +1248,48 @@
      #'cis))
 
 ) ; PROGN
+
+;;;; TRUNCATE, FLOOR, CEILING, and ROUND
+
+(macrolet ((define-frobs (fun ufun)
+	     `(progn
+		(defknown ,ufun (real) integer (movable foldable flushable))
+		(deftransform ,fun ((x &optional by)
+				    (* &optional
+				       (constant-argument (member 1))))
+		  '(let ((res (,ufun x)))
+		     (values res (- x res)))))))
+  (define-frobs truncate %unary-truncate)
+  (define-frobs round %unary-round))
+
+;;; Convert (TRUNCATE x y) to the obvious implementation.  We only want
+;;; this when under certain conditions and let the generic TRUNCATE
+;;; handle the rest.  (Note: if Y = 1, the divide and multiply by Y
+;;; should be removed by other DEFTRANSFORMs.)
+(deftransform truncate ((x &optional y)
+                        (float &optional (or float integer)))
+  (let ((defaulted-y (if y 'y 1)))
+    `(let ((res (%unary-truncate (/ x ,defaulted-y))))
+       (values res (- x (* ,defaulted-y res))))))
+
+(deftransform floor ((number &optional divisor)
+                     (float &optional (or integer float)))
+  (let ((defaulted-divisor (if divisor 'divisor 1)))
+    `(multiple-value-bind (tru rem) (truncate number ,defaulted-divisor)
+       (if (and (not (zerop rem))
+		(if (minusp ,defaulted-divisor)
+		    (plusp number)
+		    (minusp number)))
+	   (values (1- tru) (+ rem ,defaulted-divisor))
+	   (values tru rem)))))
+
+(deftransform ceiling ((number &optional divisor)
+                       (float &optional (or integer float)))
+  (let ((defaulted-divisor (if divisor 'divisor 1)))
+    `(multiple-value-bind (tru rem) (truncate number ,defaulted-divisor)
+       (if (and (not (zerop rem))
+		(if (minusp ,defaulted-divisor)
+		    (minusp number)
+		    (plusp number)))
+	   (values (1+ tru) (- rem ,defaulted-divisor))
+	   (values tru rem)))))
