@@ -11,10 +11,10 @@
 
 (in-package "SB!C")
 
-;;;; Derive-Type Optimizers
+;;;; DERIVE-TYPE optimizers
 
-;;; Array operations that use a specific number of indices implicitly assert
-;;; that the array is of that rank.
+;;; Array operations that use a specific number of indices implicitly
+;;; assert that the array is of that rank.
 (defun assert-array-rank (array rank)
   (assert-continuation-type
    array
@@ -45,8 +45,8 @@
       (assert-continuation-type new-value (array-type-element-type type))))
   (continuation-type new-value))
 
-;;; Return true if Arg is NIL, or is a constant-continuation whose value is
-;;; NIL, false otherwise.
+;;; Return true if Arg is NIL, or is a constant-continuation whose
+;;; value is NIL, false otherwise.
 (defun unsupplied-or-nil (arg)
   (declare (type (or continuation null) arg))
   (or (not arg)
@@ -425,11 +425,60 @@
 
 ;;;; array accessors
 
-;;; SVREF, %SVSET, SCHAR, %SCHARSET, CHAR,
-;;; %CHARSET, SBIT, %SBITSET, BIT, %BITSET
-;;;   --  source transforms.
-;;;
-;;; We convert all typed array accessors into aref and %aset with type
+;;; Handle the 1-dimensional case of %WITH-ARRAY-DATA specially. It's
+;;; important to do this efficiently if we want people to be able to
+;;; use vectors with fill pointers anywhere near inner loops, and
+;;; hence it's important to do this efficiently if we want people to
+;;; be able to use sequence functions anywhere near inner loops.
+(deftransform %with-array-data ((array start end)
+				(vector index index)
+				*
+				:important t
+				:node node
+				:policy (> speed space))
+  "avoid full call to %WITH-ARRAY-DATA at runtime"
+  (let* ((element-ctype (extract-upgraded-element-type array))
+	 (element-type-specifier (type-specifier element-ctype))
+	 (simple-array-type `(simple-array ,element-type-specifier 1)))
+    (declare (type ctype element-ctype))
+    #|
+    (when (eq element-type-specifier '*)
+      (give-up-ir1-transform
+       "upgraded array element type not known at compile time"))
+    |#
+    `(let* (;; FIXME: Instead of doing this hairy expression for SIZE,
+	    ;; it should just be (ARRAY-DIMENSION ARRAY 0), and there
+	    ;; should be a DEFTRANSFORM for ARRAY-DIMENSION which
+	    ;; expands that way.
+	    (size (if (array-header-p array)
+		      (%array-dimension array 0)
+		      (length (the ,simple-array-type array))))
+	    (end (if end
+		     (if (or ,(policy node (= safety 0))
+			     (<= (the index end) size))
+			 end
+			 (vector-data-start-out-of-range))
+		     size)))
+       (declare (type index end))
+       (unless (or ,(policy node (= safety 0))
+		   (<= start end))
+	 (vector-data-end-out-of-range))
+       (do (;; cumulative displacement
+	    (d 0 (truly-the index (+ d (%array-displacement array))))
+	    ;; eventually becomes bare data vector
+	    (v array (%array-data-vector v))) 
+	   ((not (array-header-p v))
+	    (values (the ,simple-array-type v)
+		    (truly-the index (+ d start))
+		    (truly-the index (+ d end))
+		    (the index d)))
+	 (declare (type index d))))))
+(defun vector-data-start-out-of-range ()
+  (error "The start of vector data was out of range."))
+(defun vector-data-end-out-of-range ()
+  (error "The end of vector data was out of range."))
+
+;;; We convert all typed array accessors into AREF and %ASET with type
 ;;; assertions on the array.
 (macrolet ((define-frob (reffer setter type)
 	     `(progn

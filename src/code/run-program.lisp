@@ -515,11 +515,9 @@
       (process-wait proc))
     proc))
 
-;;; COPY-DESCRIPTOR-TO-STREAM -- internal
-;;;
-;;;   Installs a handler for any input that shows up on the file descriptor.
-;;; The handler reads the data and writes it to the stream.
-;;; 
+;;; Install a handler for any input that shows up on the file
+;;; descriptor. The handler reads the data and writes it to the
+;;; stream.
 (defun copy-descriptor-to-stream (descriptor stream cookie)
   (incf (car cookie))
   (let ((string (make-string 256))

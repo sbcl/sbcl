@@ -31,11 +31,12 @@
 ;;; FIXME: centralize
 (declaim (special *universal-type*))
 
-;;; This is sorta semantically equivalent to SXHASH, but optimized for legal
-;;; function names. Note: semantically equivalent does *not* mean that it
-;;; always returns the same value as SXHASH, just that it satisfies the formal
-;;; definition of SXHASH. The ``sorta'' is because SYMBOL-HASH will not
-;;; necessarily return the same value in different lisp images.
+;;; This is sorta semantically equivalent to SXHASH, but optimized for
+;;; legal function names. Note: semantically equivalent does *not*
+;;; mean that it always returns the same value as SXHASH, just that it
+;;; satisfies the formal definition of SXHASH. The ``sorta'' is
+;;; because SYMBOL-HASH will not necessarily return the same value in
+;;; different lisp images.
 ;;;
 ;;; Why optimize? We want to avoid the fully-general TYPECASE in ordinary
 ;;; SXHASH, because
@@ -54,7 +55,7 @@
 ;;; to hold all manner of things, e.g. (INFO :TYPE :BUILTIN ..)
 ;;; which is called on values like (UNSIGNED-BYTE 29). Falling through
 ;;; to SXHASH lets us support all manner of things (as long as they
-;;; aren't used too early in cold boot).
+;;; aren't used too early in cold boot for SXHASH to run).
 #!-sb-fluid (declaim (inline globaldb-sxhashoid))
 (defun globaldb-sxhashoid (x)
   (cond #-sb-xc-host ; (SYMBOL-HASH doesn't exist on cross-compilation host.)
@@ -72,13 +73,14 @@
 
 ;;; Given any non-negative integer, return a prime number >= to it.
 ;;;
-;;; FIXME: This logic should be shared with ALMOST-PRIMIFY in hash-table.lisp.
-;;; Perhaps the merged logic should be PRIMIFY-HASH-TABLE-SIZE, implemented as
-;;; a lookup table of primes after integral powers of two:
+;;; FIXME: This logic should be shared with ALMOST-PRIMIFY in
+;;; hash-table.lisp. Perhaps the merged logic should be
+;;; PRIMIFY-HASH-TABLE-SIZE, implemented as a lookup table of primes
+;;; after integral powers of two:
 ;;;    #(17 37 67 131 ..)
-;;; (Or, if that's too coarse, after half-integral powers of two.) By thus
-;;; getting rid of any need for primality testing at runtime, we could
-;;; punt POSITIVE-PRIMEP, too.
+;;; (Or, if that's too coarse, after half-integral powers of two.) By
+;;; thus getting rid of any need for primality testing at runtime, we
+;;; could punt POSITIVE-PRIMEP, too.
 (defun primify (x)
   (declare (type unsigned-byte x))
   (do ((n (logior x 1) (+ n 2)))
@@ -128,9 +130,9 @@
 ;;; a map from type numbers to TYPE-INFO objects. There is one type
 ;;; number for each defined CLASS/TYPE pair.
 ;;;
-;;; We build its value at compile time (with calls to DEFINE-INFO-TYPE), then
-;;; generate code to recreate the compile time value, and arrange for that
-;;; code to be called in cold load.
+;;; We build its value at compile time (with calls to
+;;; DEFINE-INFO-TYPE), then generate code to recreate the compile time
+;;; value, and arrange for that code to be called in cold load.
 (defvar *info-types*)
 (declaim (type simple-vector *info-types*))
 (eval-when (:compile-toplevel :execute)
@@ -188,8 +190,8 @@
 
 ) ; EVAL-WHEN
 
-;;;; info classes, info types, and type numbers, part II: what's needed only at
-;;;; compile time, not at run time
+;;;; info classes, info types, and type numbers, part II: what's
+;;;; needed only at compile time, not at run time
 
 ;;; FIXME: Perhaps this stuff (the definition of DEFINE-INFO-CLASS
 ;;; and the calls to it) could/should go in a separate file,
@@ -197,10 +199,10 @@
 
 (eval-when (:compile-toplevel :execute)
 
-;;; Set up the data structures to support an info class. We make sure that
-;;; the class exists at compile time so that macros can use it, but don't
-;;; actually store the init function until load time so that we don't break the
-;;; running compiler.
+;;; Set up the data structures to support an info class. We make sure
+;;; that the class exists at compile time so that macros can use it,
+;;; but don't actually store the init function until load time so that
+;;; we don't break the running compiler.
 (#+sb-xc-host defmacro
  #-sb-xc-host sb!xc:defmacro
      define-info-class (class)
@@ -209,25 +211,26 @@
   Define a new class of global information."
   (declare (type keyword class))
   `(progn
-     ;; (We don't need to evaluate this at load time, compile time is enough.
-     ;; There's special logic elsewhere which deals with cold load
-     ;; initialization by inspecting the info class data structures at compile
-     ;; time and generating code to recreate those data structures.)
+     ;; (We don't need to evaluate this at load time, compile time is
+     ;; enough. There's special logic elsewhere which deals with cold
+     ;; load initialization by inspecting the info class data
+     ;; structures at compile time and generating code to recreate
+     ;; those data structures.)
      (eval-when (:compile-toplevel :execute)
        (unless (gethash ,class *info-classes*)
 	 (setf (gethash ,class *info-classes*) (make-class-info ,class))))
      ,class))
 
-;;; Find a type number not already in use by looking for a null entry in
-;;; *INFO-TYPES*.
+;;; Find a type number not already in use by looking for a null entry
+;;; in *INFO-TYPES*.
 (defun find-unused-type-number ()
   (or (position nil *info-types*)
       (error "no more INFO type numbers available")))
 
-;;; a list of forms for initializing the DEFAULT slots of TYPE-INFO objects,
-;;; accumulated during compilation and eventually converted into a function to
-;;; be called at cold load time after the appropriate TYPE-INFO objects have
-;;; been created
+;;; a list of forms for initializing the DEFAULT slots of TYPE-INFO
+;;; objects, accumulated during compilation and eventually converted
+;;; into a function to be called at cold load time after the
+;;; appropriate TYPE-INFO objects have been created
 ;;;
 ;;; Note: This is quite similar to the !COLD-INIT-FORMS machinery, but
 ;;; we can't conveniently use the ordinary !COLD-INIT-FORMS machinery
@@ -238,9 +241,9 @@
 ;;; cold load time.
 (defparameter *reversed-type-info-init-forms* nil)
 
-;;; The main thing we do is determine the type's number. We need to do this
-;;; at macroexpansion time, since both the COMPILE and LOAD time calls to
-;;; %DEFINE-INFO-TYPE must use the same type number.
+;;; The main thing we do is determine the type's number. We need to do
+;;; this at macroexpansion time, since both the COMPILE and LOAD time
+;;; calls to %DEFINE-INFO-TYPE must use the same type number.
 (#+sb-xc-host defmacro
  #-sb-xc-host sb!xc:defmacro
     define-info-type (&key (class (required-argument))
@@ -259,10 +262,11 @@
   (declare (type keyword class type))
   `(progn
      (eval-when (:compile-toplevel :execute)
-       ;; At compile time, ensure that the type number exists. It will need
-       ;; to be forced to exist at cold load time, too, but that's not handled
-       ;; here; it's handled by later code which looks at the compile time
-       ;; state and generates code to replicate it at cold load time.
+       ;; At compile time, ensure that the type number exists. It will
+       ;; need to be forced to exist at cold load time, too, but
+       ;; that's not handled here; it's handled by later code which
+       ;; looks at the compile time state and generates code to
+       ;; replicate it at cold load time.
        (let* ((class-info (class-info-or-lose ',class))
 	      (old-type-info (find-type-info ',type class-info)))
 	 (unless old-type-info
@@ -273,21 +277,23 @@
 				   :number new-type-number)))
 	     (setf (aref *info-types* new-type-number) new-type-info)
 	     (push new-type-info (class-info-types class-info)))))
-       ;; Arrange for TYPE-INFO-DEFAULT and TYPE-INFO-TYPE to be set at cold
-       ;; load time. (They can't very well be set at cross-compile time, since
-       ;; they differ between the cross-compiler and the target. The
-       ;; DEFAULT slot values differ because they're compiled closures, and
-       ;; the TYPE slot values differ in the use of SB!XC symbols instead
-       ;; of CL symbols.)
+       ;; Arrange for TYPE-INFO-DEFAULT and TYPE-INFO-TYPE to be set
+       ;; at cold load time. (They can't very well be set at
+       ;; cross-compile time, since they differ between the
+       ;; cross-compiler and the target. The DEFAULT slot values
+       ;; differ because they're compiled closures, and the TYPE slot
+       ;; values differ in the use of SB!XC symbols instead of CL
+       ;; symbols.)
        (push `(let ((type-info (type-info-or-lose ,',class ,',type)))
 		(setf (type-info-default type-info)
-		       ;; FIXME: This code is sort of nasty. It would be
-		       ;; cleaner if DEFAULT accepted a real function, instead
-		       ;; of accepting a statement which will be turned into a
-		       ;; lambda assuming that the argument name is NAME. It
-		       ;; might even be more microefficient, too, since many
-		       ;; DEFAULTs could be implemented as (CONSTANTLY NIL)
-		       ;; instead of full-blown (LAMBDA (X) NIL).
+		       ;; FIXME: This code is sort of nasty. It would
+		       ;; be cleaner if DEFAULT accepted a real
+		       ;; function, instead of accepting a statement
+		       ;; which will be turned into a lambda assuming
+		       ;; that the argument name is NAME. It might
+		       ;; even be more microefficient, too, since many
+		       ;; DEFAULTs could be implemented as (CONSTANTLY
+		       ;; NIL) instead of full-blown (LAMBDA (X) NIL).
 		       (lambda (name)
 			 (declare (ignorable name))
 			 ,',default))
@@ -299,13 +305,14 @@
 
 ;;;; generic info environments
 
-;;; Note: the CACHE-NAME slot is deliberately not shared for bootstrapping
-;;; reasons. If we access with accessors for the exact type, then the inline
-;;; type check will win. If the inline check didn't win, we would try to use
-;;; the type system before it was properly initialized.
+;;; Note: the CACHE-NAME slot is deliberately not shared for
+;;; bootstrapping reasons. If we access with accessors for the exact
+;;; type, then the inline type check will win. If the inline check
+;;; didn't win, we would try to use the type system before it was
+;;; properly initialized.
 (defstruct (info-env (:constructor nil))
-  ;; Some string describing what is in this environment, for printing purposes
-  ;; only.
+  ;; some string describing what is in this environment, for
+  ;; printing/debugging purposes only
   (name (required-argument) :type string))
 (def!method print-object ((x info-env) stream)
   (print-unreadable-object (x stream :type t)
@@ -435,12 +442,12 @@
 (defun clear-invalid-info-cache ()
   ;; Unless the cache is valid..
   (unless (eq *info-environment* *cached-info-environment*)
-    (;; In the target Lisp, this should be done without interrupts, but in the
-     ;; host Lisp when cross-compiling, we don't need to sweat it, since no
-     ;; affected-by-GC hashes should be used when running under the host Lisp
-     ;; (since that's non-portable) and since only one thread should be used
-     ;; when running under the host Lisp (because multiple threads are
-     ;; non-portable too).
+    (;; In the target Lisp, this should be done without interrupts,
+     ;; but in the host Lisp when cross-compiling, we don't need to
+     ;; sweat it, since no affected-by-GC hashes should be used when
+     ;; running under the host Lisp (since that's non-portable) and
+     ;; since only one thread should be used when running under the
+     ;; host Lisp (because multiple threads are non-portable too).
      #-sb-xc-host without-interrupts
      #+sb-xc-host progn
       (info-cache-clear)
@@ -455,27 +462,28 @@
 ;;; the type of the values in COMPACT-INFO-ENTRIES-INFO
 (deftype compact-info-entry () `(unsigned-byte ,(1+ type-number-bits)))
 
-;;; This is an open hashtable with rehashing. Since modification is not
-;;; allowed, we don't have to worry about deleted entries. We indirect through
-;;; a parallel vector to find the index in the ENTRIES at which the entries for
-;;; a given name starts.
+;;; This is an open hashtable with rehashing. Since modification is
+;;; not allowed, we don't have to worry about deleted entries. We
+;;; indirect through a parallel vector to find the index in the
+;;; ENTRIES at which the entries for a given name starts.
 (defstruct (compact-info-env (:include info-env)
 			     #-sb-xc-host (:pure :substructure))
-  ;; If this value is EQ to the name we want to look up, then the cache hit
-  ;; function can be called instead of the lookup function.
+  ;; If this value is EQ to the name we want to look up, then the
+  ;; cache hit function can be called instead of the lookup function.
   (cache-name 0)
-  ;; The index in ENTRIES for the CACHE-NAME, or NIL if that name has no
-  ;; entries.
+  ;; The index in ENTRIES for the CACHE-NAME, or NIL if that name has
+  ;; no entries.
   (cache-index nil :type (or compact-info-entries-index null))
-  ;; Hashtable of the names in this environment. If a bucket is unused, it is
-  ;; 0.
+  ;; hashtable of the names in this environment. If a bucket is
+  ;; unused, it is 0.
   (table (required-argument) :type simple-vector)
-  ;; Indirection vector parallel to TABLE, translating indices in TABLE to the
-  ;; start of the ENTRIES for that name. Unused entries are undefined.
+  ;; an indirection vector parallel to TABLE, translating indices in
+  ;; TABLE to the start of the ENTRIES for that name. Unused entries
+  ;; are undefined.
   (index (required-argument)
 	 :type (simple-array compact-info-entries-index (*)))
-  ;; Vector contining in contiguous ranges the values of for all the types of
-  ;; info for each name.
+  ;; a vector contining in contiguous ranges the values of for all the
+  ;; types of info for each name.
   (entries (required-argument) :type simple-vector)
   ;; Vector parallel to ENTRIES, indicating the type number for the value
   ;; stored in that location and whether this location is the last type of info
@@ -933,17 +941,18 @@
 
 (define-info-class :function)
 
-;;; The kind of functional object being described. If null, Name isn't a known
-;;; functional object.
+;;; the kind of functional object being described. If null, NAME isn't
+;;; a known functional object.
 (define-info-type
   :class :function
   :type :kind
   :type-spec (member nil :function :macro :special-form)
-  ;; I'm a little confused what the correct behavior of this default is. It's
-  ;; not clear how to generalize the FBOUNDP expression to the cross-compiler.
-  ;; As far as I can tell, NIL is a safe default -- it might keep the compiler
-  ;; from making some valid optimization, but it shouldn't produce incorrect
-  ;; code. -- WHN 19990330
+  ;; I'm a little confused what the correct behavior of this default
+  ;; is. It's not clear how to generalize the FBOUNDP expression to
+  ;; the cross-compiler. As far as I can tell, NIL is a safe default
+  ;; -- it might keep the compiler from making some valid
+  ;; optimization, but it shouldn't produce incorrect code. -- WHN
+  ;; 19990330
   :default
   #+sb-xc-host nil
   #-sb-xc-host (if (fboundp name) :function nil))
@@ -953,31 +962,32 @@
   :class :function
   :type :type
   :type-spec ctype
-  ;; Again (as in DEFINE-INFO-TYPE :CLASS :FUNCTION :TYPE :KIND) it's not clear
-  ;; how to generalize the FBOUNDP expression to the cross-compiler.
-  ;;  -- WHN 19990330
+  ;; Again (as in DEFINE-INFO-TYPE :CLASS :FUNCTION :TYPE :KIND) it's
+  ;; not clear how to generalize the FBOUNDP expression to the
+  ;; cross-compiler. -- WHN 19990330
   :default
   #+sb-xc-host (specifier-type 'function)
   #-sb-xc-host (if (fboundp name)
 		   (extract-function-type (fdefinition name))
 		   (specifier-type 'function)))
 
-;;; The Assumed-Type for this function, if we have to infer the type due to not
-;;; having a declaration or definition.
+;;; the ASSUMED-TYPE for this function, if we have to infer the type
+;;; due to not having a declaration or definition
 (define-info-type
   :class :function
   :type :assumed-type
   :type-spec (or approximate-function-type null))
 
-;;; Where this information came from:
+;;; where this information came from:
 ;;;  :DECLARED = from a declaration.
 ;;;  :ASSUMED  = from uses of the object.
 ;;;  :DEFINED  = from examination of the definition.
-;;; FIXME: The :DEFINED assumption that the definition won't change isn't ANSI.
-;;; KLUDGE: CMU CL uses function type information in a way which violates
-;;; its "type declarations are assertions" principle, and SBCL has inherited
-;;; that behavior. It would be really good to fix the compiler so that it
-;;; tests the return types of functions.. -- WHN ca. 19990801
+;;; FIXME: The :DEFINED assumption that the definition won't change
+;;; isn't ANSI. KLUDGE: CMU CL uses function type information in a way
+;;; which violates its "type declarations are assertions" principle,
+;;; and SBCL has inherited that behavior. It would be really good to
+;;; fix the compiler so that it tests the return types of functions..
+;;; -- WHN ca. 19990801
 (define-info-type
   :class :function
   :type :where-from
@@ -989,65 +999,66 @@
   #+sb-xc-host :assumed
   #-sb-xc-host (if (fboundp name) :defined :assumed))
 
-;;; Lambda used for inline expansion of this function.
+;;; lambda used for inline expansion of this function
 (define-info-type
   :class :function
   :type :inline-expansion
   :type-spec list)
 
-;;; Specifies whether this function may be expanded inline. If null, we
-;;; don't care.
+;;; This specifies whether this function may be expanded inline. If
+;;; null, we don't care.
 (define-info-type
   :class :function
   :type :inlinep
   :type-spec inlinep
   :default nil)
 
-;;; A macro-like function which transforms a call to this function
+;;; a macro-like function which transforms a call to this function
 ;;; into some other Lisp form. This expansion is inhibited if inline
-;;; expansion is inhibited.
+;;; expansion is inhibited
 (define-info-type
   :class :function
   :type :source-transform
   :type-spec (or function null))
 
-;;; The macroexpansion function for this macro.
+;;; the macroexpansion function for this macro
 (define-info-type
   :class :function
   :type :macro-function
   :type-spec (or function null)
   :default nil)
 
-;;; The compiler-macroexpansion function for this macro.
+;;; the compiler-macroexpansion function for this macro
 (define-info-type
   :class :function
   :type :compiler-macro-function
   :type-spec (or function null)
   :default nil)
 
-;;; A function which converts this special form into IR1.
+;;; a function which converts this special form into IR1
 (define-info-type
   :class :function
   :type :ir1-convert
   :type-spec (or function null))
 
-;;; A function which gets a chance to do stuff to the IR1 for any call to this
-;;; function.
+;;; a function which gets a chance to do stuff to the IR1 for any call
+;;; to this function.
 (define-info-type
   :class :function
   :type :ir1-transform
   :type-spec (or function null))
 
-;;; If a function is a slot accessor or setter, then this is the class that it
-;;; accesses slots of.
+;;; If a function is a slot accessor or setter, then this is the class
+;;; that it accesses slots of.
 (define-info-type
   :class :function
   :type :accessor-for
   :type-spec (or sb!xc:class null)
   :default nil)
 
-;;; If a function is "known" to the compiler, then this is FUNCTION-INFO
-;;; structure containing the info used to special-case compilation.
+;;; If a function is "known" to the compiler, then this is a
+;;; FUNCTION-INFO structure containing the info used to special-case
+;;; compilation.
 (define-info-type
   :class :function
   :type :info
@@ -1137,36 +1148,37 @@
   :type :documentation
   :type-spec (or string null))
 
-;;; Function that parses type specifiers into CTYPE structures.
+;;; function that parses type specifiers into CTYPE structures
 (define-info-type
   :class :type
   :type :translator
   :type-spec (or function null)
   :default nil)
 
-;;; If true, then the type coresponding to this name. Note that if this is a
-;;; built-in class with a translation, then this is the translation, not the
-;;; class object. This info type keeps track of various atomic types (NIL etc.)
-;;; and also serves as a cache to ensure that common standard types (atomic and
-;;; otherwise) are only consed once.
+;;; If true, then the type coresponding to this name. Note that if
+;;; this is a built-in class with a translation, then this is the
+;;; translation, not the class object. This info type keeps track of
+;;; various atomic types (NIL etc.) and also serves as a cache to
+;;; ensure that common standard types (atomic and otherwise) are only
+;;; consed once.
 (define-info-type
   :class :type
   :type :builtin
   :type-spec (or ctype null)
   :default nil)
 
-;;; If this is a class name, then the value is a cons (Name . Class), where
-;;; Class may be null if the class hasn't been defined yet. Note that for
-;;; built-in classes, the kind may be :PRIMITIVE and not :INSTANCE. The
-;;; the name is in the cons so that we can signal a meaningful error if we only
-;;; have the cons.
+;;; If this is a class name, then the value is a cons (NAME . CLASS),
+;;; where CLASS may be null if the class hasn't been defined yet. Note
+;;; that for built-in classes, the kind may be :PRIMITIVE and not
+;;; :INSTANCE. The the name is in the cons so that we can signal a
+;;; meaningful error if we only have the cons.
 (define-info-type
   :class :type
   :type :class
   :type-spec (or sb!kernel::class-cell null)
   :default nil)
 
-;;; Layout for this type being used by the compiler.
+;;; layout for this type being used by the compiler
 (define-info-type
   :class :type
   :type :compiler-layout
@@ -1239,8 +1251,8 @@
   :type-spec (or function null)
   :default nil)
 
-;;; Used for storing miscellaneous documentation types. The stuff is an alist
-;;; translating documentation kinds to values.
+;;; This is used for storing miscellaneous documentation types. The
+;;; stuff is an alist translating documentation kinds to values.
 (define-info-class :random-documentation)
 (define-info-type
   :class :random-documentation
@@ -1250,18 +1262,13 @@
 
 #!-sb-fluid (declaim (freeze-type info-env))
 
-;;; Now that we have finished initializing *INFO-CLASSES* and *INFO-TYPES* (at
-;;; compile time), generate code to set them at cold load time to the same
-;;; state they have currently.
+;;; Now that we have finished initializing *INFO-CLASSES* and
+;;; *INFO-TYPES* (at compile time), generate code to set them at cold
+;;; load time to the same state they have currently.
 (!cold-init-forms
   (/show0 "beginning *INFO-CLASSES* init, calling MAKE-HASH-TABLE")
   (setf *info-classes*
-	(make-hash-table :size #.(hash-table-size *info-classes*)
-			 ;; FIXME: These remaining arguments are only here
-			 ;; for debugging, to try track down weird cold
-			 ;; boot problems.
-			 #|:rehash-size 1.5
-			 :rehash-threshold 1|#))
+	(make-hash-table :size #.(hash-table-size *info-classes*)))
   (/show0 "done with MAKE-HASH-TABLE in *INFO-CLASSES* init")
   (dolist (class-info-name '#.(let ((result nil))
 				(maphash (lambda (key value)
@@ -1295,8 +1302,8 @@
 		     *info-types*)))
   (/show0 "done with *INFO-TYPES* initialization"))
 
-;;; At cold load time, after the INFO-TYPE objects have been created, we can
-;;; set their DEFAULT and TYPE slots.
+;;; At cold load time, after the INFO-TYPE objects have been created,
+;;; we can set their DEFAULT and TYPE slots.
 (macrolet ((frob ()
 	     `(!cold-init-forms
 		,@(reverse *reversed-type-info-init-forms*))))
@@ -1309,11 +1316,11 @@
 ;;;;     ..)
 ;;;;   (DEFSETF BAR SET-BAR) ; can't influence previous compilation
 ;;;;
-;;;; KLUDGE: Arguably it should be another class/type combination in the
-;;;; globaldb. However, IMHO the whole globaldb/fdefinition treatment of setf
-;;;; functions is a mess which ought to be rewritten, and I'm not inclined to
-;;;; mess with it short of that. So I just put this bag on the side of it
-;;;; instead..
+;;;; KLUDGE: Arguably it should be another class/type combination in
+;;;; the globaldb. However, IMHO the whole globaldb/fdefinition
+;;;; treatment of SETF functions is a mess which ought to be
+;;;; rewritten, and I'm not inclined to mess with it short of that. So
+;;;; I just put this bag on the side of it instead..
 
 ;;; true for symbols FOO which have been assumed to have '(SETF FOO)
 ;;; bound to a function

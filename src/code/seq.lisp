@@ -441,9 +441,9 @@
   (when (null source-end) (setq source-end (length source-sequence)))
   (mumble-replace-from-mumble))
 
-;;; REPLACE cannot default end arguments to the length of sequence since it
-;;; is not an error to supply nil for their values. We must test for ends
-;;; being nil in the body of the function.
+;;; REPLACE cannot default END arguments to the length of SEQUENCE since it
+;;; is not an error to supply NIL for their values. We must test for ENDs
+;;; being NIL in the body of the function.
 (defun replace (target-sequence source-sequence &key
 		((:start1 target-start) 0)
 		((:end1 target-end))

@@ -172,7 +172,7 @@
 	      (ecase (sb-c::debug-source-from source)
 		(:file
 		 (format s "~@:_~A~@:_  Created: " (namestring name))
-		 (sb-int:format-universal-time t (sb-c::debug-source-created
+		 (sb-int:format-universal-time s (sb-c::debug-source-created
 						  source)))
 		(:lisp (format s "~@:_~S" name))))))))))
 

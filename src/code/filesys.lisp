@@ -166,8 +166,8 @@
 				  (position #\. namestr :start (1+ start)
 					    :end last-dot :from-end t)))
 	 (version :newest))
-    ;; If there is a second-to-last dot, check to see whether there is a valid
-    ;; version after the last dot.
+    ;; If there is a second-to-last dot, check to see whether there is
+    ;; a valid version after the last dot.
     (when second-to-last-dot
       (cond ((and (= (+ last-dot 2) end)
 		  (char= (schar namestr (1+ last-dot)) #\*))
@@ -199,7 +199,8 @@
 (/show0 "filesys.lisp 200")
 
 ;;; Take a string and return a list of cons cells that mark the char
-;;; separated subseq. The first value t if absolute directories location.
+;;; separated subseq. The first value is true if absolute directories
+;;; location.
 (defun split-at-slashes (namestr start end)
   (declare (type simple-base-string namestr)
 	   (type index start end))
@@ -358,7 +359,7 @@
 	       (t
 		(pieces "/"))))
 	(:relative
-	 ;; Nothing special.
+	 ;; nothing special
 	 ))
       (dolist (dir directory)
 	(typecase dir
@@ -373,7 +374,8 @@
 	   (pieces "/"))
 	  (t
 	   (error "invalid directory component: ~S" dir)))))
-    (apply #'concatenate 'simple-string (pieces))))
+    (unless (null (pieces))
+      (apply #'concatenate 'simple-string (pieces)))))
 
 (defun unparse-unix-directory (pathname)
   (declare (type pathname pathname))
@@ -400,7 +402,8 @@
 	(strings (if (eq version :wild)
 		     ".*"
 		     (format nil ".~D" version)))))
-    (apply #'concatenate 'simple-string (strings))))
+    (unless (null (strings))
+      (apply #'concatenate 'simple-string (strings)))))
 
 (/show0 "filesys.lisp 406")
 
@@ -494,8 +497,10 @@
 (/show0 "filesys.lisp 498")
 
 ;;; FIXME: could maybe be EVAL-WHEN (COMPILE EVAL)
+
 (defmacro enumerate-matches ((var pathname &optional result
-				  &key (verify-existence t))
+				  &key (verify-existence t)
+                                  (follow-links t))
 			     &body body)
   (let ((body-name (gensym)))
     `(block nil
@@ -503,12 +508,13 @@
 		,@body))
 	 (%enumerate-matches (pathname ,pathname)
 			     ,verify-existence
+                             ,follow-links
 			     #',body-name)
 	 ,result))))
 
 (/show0 "filesys.lisp 500")
 
-(defun %enumerate-matches (pathname verify-existence function)
+(defun %enumerate-matches (pathname verify-existence follow-links function)
   (/show0 "entering %ENUMERATE-MATCHES")
   (when (pathname-type pathname)
     (unless (pathname-name pathname)
@@ -523,46 +529,95 @@
 	  (:absolute
 	   (/show0 "absolute directory")
 	   (%enumerate-directories "/" (cdr directory) pathname
-				   verify-existence function))
+				   verify-existence follow-links
+				   nil function))
 	  (:relative
 	   (/show0 "relative directory")
 	   (%enumerate-directories "" (cdr directory) pathname
-				   verify-existence function)))
+				   verify-existence follow-links
+				   nil function)))
 	(%enumerate-files "" pathname verify-existence function))))
 
-(defun %enumerate-directories (head tail pathname verify-existence function)
+(defun %enumerate-directories (head tail pathname verify-existence
+			       follow-links nodes function)
   (declare (simple-string head))
-  (if tail
-      (let ((piece (car tail)))
-	(etypecase piece
-	  (simple-string
-	   (%enumerate-directories (concatenate 'string head piece "/")
-				   (cdr tail) pathname verify-existence
-				   function))
-	  ((or pattern (member :wild :wild-inferiors))
-	   (let ((dir (sb!unix:open-dir head)))
+  (macrolet ((unix-xstat (name)
+	       `(if follow-links
+		    (sb!unix:unix-stat ,name)
+		    (sb!unix:unix-lstat ,name)))
+	     (with-directory-node-noted ((head) &body body)
+	       `(multiple-value-bind (res dev ino mode)
+		    (unix-xstat ,head)
+		  (when (and res (eql (logand mode sb!unix:s-ifmt)
+				      sb!unix:s-ifdir))
+		    (let ((nodes (cons (cons dev ino) nodes)))
+		      ,@body))))
+	     (do-directory-entries ((name directory) &body body)
+	       `(let ((dir (sb!unix:open-dir ,directory)))
 	     (when dir
 	       (unwind-protect
 		   (loop
-		     (let ((name (sb!unix:read-dir dir)))
-		       (cond ((null name)
+			  (let ((,name (sb!unix:read-dir dir)))
+			    (cond ((null ,name)
 			      (return))
-			     ((string= name "."))
-			     ((string= name ".."))
-			     ((pattern-matches piece name)
-			      (let ((subdir (concatenate 'string
-							 head name "/")))
-				(when (eq (sb!unix:unix-file-kind subdir)
-					  :directory)
-				  (%enumerate-directories
-				   subdir (cdr tail) pathname verify-existence
-				   function)))))))
-		 (sb!unix:close-dir dir)))))
+				  ((string= ,name "."))
+				  ((string= ,name ".."))
+				  (t
+				   ,@body))))
+		      (sb!unix:close-dir dir))))))
+    (if tail
+	(let ((piece (car tail)))
+	  (etypecase piece
+	    (simple-string
+	     (let ((head (concatenate 'string head piece)))
+	       (with-directory-node-noted (head)
+		 (%enumerate-directories (concatenate 'string head "/")
+					 (cdr tail) pathname
+					 verify-existence follow-links
+					 nodes function))))
+	    ((member :wild-inferiors)
+	     (%enumerate-directories head (rest tail) pathname
+				     verify-existence follow-links
+				     nodes function)
+	     (do-directory-entries (name head)
+	       (let ((subdir (concatenate 'string head name)))
+		 (multiple-value-bind (res dev ino mode)
+		     (unix-xstat subdir)
+		   (declare (type (or fixnum null) mode))
+		   (when (and res (eql (logand mode sb!unix:s-ifmt)
+				       sb!unix:s-ifdir))
+		     (unless (dolist (dir nodes nil)
+			       (when (and (eql (car dir) dev)
+					  (eql (cdr dir) ino))
+				 (return t)))
+		       (let ((nodes (cons (cons dev ino) nodes))
+			     (subdir (concatenate 'string subdir "/")))
+			 (%enumerate-directories subdir tail pathname
+						 verify-existence follow-links
+						 nodes function))))))))
+	    ((or pattern (member :wild))
+	     (do-directory-entries (name head)
+	       (when (or (eq piece :wild) (pattern-matches piece name))
+		 (let ((subdir (concatenate 'string head name)))
+		   (multiple-value-bind (res dev ino mode)
+		       (unix-xstat subdir)
+		     (declare (type (or fixnum null) mode))
+		     (when (and res
+				(eql (logand mode sb!unix:s-ifmt)
+				     sb!unix:s-ifdir))
+		       (let ((nodes (cons (cons dev ino) nodes))
+			     (subdir (concatenate 'string subdir "/")))
+			 (%enumerate-directories subdir (rest tail) pathname
+						 verify-existence follow-links
+						 nodes function))))))))
 	  ((member :up)
-	   (%enumerate-directories (concatenate 'string head "../")
-				   (cdr tail) pathname verify-existence
-				   function))))
-      (%enumerate-files head pathname verify-existence function)))
+	     (let ((head (concatenate 'string head "..")))
+	       (with-directory-node-noted (head)
+		 (%enumerate-directories (concatenate 'string head "/")
+					 (rest tail) pathname
+					 verify-existence follow-links
+					 nodes function))))))
+	(%enumerate-files head pathname verify-existence function))))
 
 (defun %enumerate-files (directory pathname verify-existence function)
   (declare (simple-string directory))
@@ -660,16 +715,13 @@
   ;; toy@rtp.ericsson.se: Let unix-namestring also handle logical
   ;; pathnames too.
   ;; FIXME: What does this ^ mean? A bug? A remark on a change already made?
-  (/show0 "entering UNIX-NAMESTRING")
   (let ((path (let ((lpn (pathname pathname)))
 		(if (typep lpn 'logical-pathname)
 		    (namestring (translate-logical-pathname lpn))
 		    pathname))))
-    (/show0 "PATH computed, enumerating search list")
     (enumerate-search-list
       (pathname path)
       (collect ((names))
-	(/show0 "collecting NAMES")
 	(enumerate-matches (name pathname nil :verify-existence for-input)
 			   (when (or (not executable-only)
 				     (and (eq (sb!unix:unix-file-kind name)
@@ -677,16 +729,12 @@
 					  (sb!unix:unix-access name
 							       sb!unix:x_ok)))
 			     (names name)))
-	(/show0 "NAMES collected")
 	(let ((names (names)))
 	  (when names
-	    (/show0 "NAMES is true.")
 	    (when (cdr names)
-	      (/show0 "Alas! CDR NAMES")
 	      (error 'simple-file-error
 		     :format-control "~S is ambiguous:~{~%  ~A~}"
 		     :format-arguments (list pathname names)))
-	    (/show0 "returning from UNIX-NAMESTRING")
 	    (return (car names))))))))
 
 ;;;; TRUENAME and PROBE-FILE
@@ -713,22 +761,17 @@
 (defun probe-file (pathname)
   #!+sb-doc
   "Return a pathname which is the truename of the file if it exists, NIL
-  otherwise. An error of type file-error is signaled if pathname is wild."
-  (/show0 "entering PROBE-FILE")
+  otherwise. An error of type FILE-ERROR is signaled if pathname is wild."
   (if (wild-pathname-p pathname)
       (error 'simple-file-error
 	     :pathname pathname
 	     :format-control "bad place for a wild pathname")
       (let ((namestring (unix-namestring pathname t)))
-	(/show0 "NAMESTRING computed")
 	(when (and namestring (sb!unix:unix-file-kind namestring))
-	  (/show0 "NAMESTRING is promising.")
 	  (let ((truename (sb!unix:unix-resolve-links
 			   (sb!unix:unix-maybe-prepend-current-directory
 			    namestring))))
-	    (/show0 "TRUENAME computed")
 	    (when truename
-	      (/show0 "TRUENAME is true.")
 	      (let ((*ignore-wildcards* t))
 		(pathname (sb!unix:unix-simplify-pathname truename)))))))))
 

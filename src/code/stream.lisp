@@ -613,20 +613,25 @@
   nil)
 
 (defun write-byte (integer stream)
-  (with-out-stream stream (lisp-stream-bout integer) (stream-write-byte))
-  integer)
+  (with-out-stream stream
+    ;; FIXME: CMU CL had 
+    ;;     (stream-write-byte integer)
+    ;; which was broken unless Gray streams were installed.
+    ;; In order to make this work again, MNA replaced it with
+    ;; bare (LISP-STREAM-BOUT). Something more complicated will
+    ;; probably be required when Gray stream support is restored,
+    ;; in order to make those work too; but I dunno what it will be.
+    (lisp-stream-bout integer)))
 
-;;; Stream-misc-dispatch
-;;;
-;;; Called from lisp-steam routines that encapsulate CLOS streams to
-;;; handle the misc routines and dispatch to the appropriate Gray
-;;; stream functions.
+;;; This is called from lisp-steam routines that encapsulate CLOS
+;;; streams to handle the misc routines and dispatch to the
+;;; appropriate Gray stream functions.
 (defun stream-misc-dispatch (stream operation &optional arg1 arg2)
   (declare (type fundamental-stream stream)
 	   (ignore arg2))
   (case operation
     (:listen
-     ;; Return true is input available, :eof for eof-of-file, otherwise Nil.
+     ;; Return true if input available, :EOF for end-of-file, otherwise NIL.
      (let ((char (stream-read-char-no-hang stream)))
        (when (characterp char)
 	 (stream-unread-char stream char))
@@ -665,7 +670,7 @@
 					   make-broadcast-stream
 					   #!+high-security-support
 					   %make-broadcast-stream (&rest streams)))
-  ;; This is a list of all the streams we broadcast to.
+  ;; a list of all the streams we broadcast to
   (streams () :type list :read-only t))
 
 #!+high-security-support
@@ -949,7 +954,7 @@
 				       :listen)
 			      (stream-misc-dispatch current :listen))))
 	       (cond ((eq stuff :eof)
-		      ;; Advance current, and try again.
+		      ;; Advance CURRENT, and try again.
 		      (pop (concatenated-stream-current stream))
 		      (setf current
 			    (car (concatenated-stream-current stream)))
@@ -960,7 +965,7 @@
 		      ;; Stuff's available.
 		      (return t))
 		     (t
-		      ;; Nothing available yet.
+		      ;; Nothing is available yet.
 		      (return nil))))))
 	  (:close
 	   (set-closed-flame stream))

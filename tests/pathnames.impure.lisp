@@ -16,11 +16,9 @@
 
 (in-package "CL-USER")
 
-;;(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defmacro grab-condition (&body body)
-    `(nth-value 1
-      (ignore-errors ,@body)))
-;;)
+(defmacro grab-condition (&body body)
+  `(nth-value 1
+     (ignore-errors ,@body)))
 
 (setf (logical-pathname-translations "demo0")
       '(("**;*.*.*" "/tmp/")))

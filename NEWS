@@ -626,12 +626,14 @@ changes in sbcl-0.6.10 relative to sbcl-0.6.9:
 * Fasl file format version numbers have increased again, because
   a rearrangement of internal implementation packages made some 
   dumped symbols in old fasl files unreadable in new cores.
-?? (DECLAIM (OPTIMIZE ..)) now works.
 * DECLARE/DECLAIM/PROCLAIM logic is more nearly ANSI in general, with
   many fewer weird special cases.
 * Bug #17 (differing COMPILE-FILE behavior between logical and 
   physical pathnames) has been fixed, and some related misbehavior too,
   thanks to a patch from Martin Atzmueller.
+?? Martin Atzmueller fixed several filesystem-related problems,
+  including bug #36, in part by porting CMU CL patches, which were
+  written in part by Paul Werkowski.
 ?? #'(SETF DOCUMENTATION) is now defined.
 * More compiler warnings in src/runtime/ are gone, thanks to 
   patches from Martin Atzmueller.

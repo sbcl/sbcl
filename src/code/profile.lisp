@@ -319,7 +319,7 @@
 	       (warn "preserving current definition of redefined function ~S"
 		     name)))
 	  (t
-	   (warn "~S is not a profiled function."))))
+	   (warn "~S is not a profiled function." name))))
   (values))
 
 (defmacro profile (&rest names)

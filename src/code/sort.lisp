@@ -13,8 +13,8 @@
 
 (defun sort (sequence predicate &key key)
   #!+sb-doc
-  "Destructively sorts sequence. Predicate should return non-Nil if
-   Arg1 is to precede Arg2."
+  "Destructively sort SEQUENCE. PREDICATE should return non-NIL if
+   ARG1 is to precede ARG2."
   (typecase sequence
     (simple-vector
      (if (> (the fixnum (length (the simple-vector sequence))) 0)
@@ -30,12 +30,12 @@
      (error 'simple-type-error
 	    :datum sequence
 	    :expected-type 'sequence
-	    :format-control "~S is not a sequence."
+	    :format-control "~S is not a SEQUENCE."
 	    :format-arguments (list sequence)))))
 
 ;;;; sorting vectors
 
-;;; Make simple-vector and miscellaneous vector sorting functions.
+;;; Make sorting functions for SIMPLE-VECTOR and miscellaneous other VECTORs.
 (macrolet (;; BUILD-HEAP rearranges seq elements into a heap to start heap
 	   ;; sorting.
 	   (build-heap (seq type len-1 pred key)
@@ -44,12 +44,13 @@
 		    ((minusp ,i) ,seq)
 		  (declare (fixnum ,i))
 		  (heapify ,seq ,type ,i ,len-1 ,pred ,key))))
-	   ;; HEAPIFY, assuming both sons of root are heaps, percolates the
-	   ;; root element through the sons to form a heap at root. Root and
-	   ;; max are zero based coordinates, but the heap algorithm only works
-	   ;; on arrays indexed from 1 through N (not 0 through N-1); This is
-	   ;; because a root at I has sons at 2*I and 2*I+1 which does not work
-	   ;; for a root at 0. Because of this, boundaries, roots, and
+	   ;; HEAPIFY, assuming both sons of root are heaps,
+	   ;; percolates the root element through the sons to form a
+	   ;; heap at root. Root and max are zero based coordinates,
+	   ;; but the heap algorithm only works on arrays indexed from
+	   ;; 1 through N (not 0 through N-1); This is because a root
+	   ;; at I has sons at 2*I and 2*I+1 which does not work for a
+	   ;; root at 0. Because of this, boundaries, roots, and
 	   ;; termination are computed using 1..N indexes.
 	   (heapify (seq vector-ref root max pred key)
 	     (let ((heap-root (gensym))
@@ -90,11 +91,11 @@
 			      (setf ,one-son ,heap-l-son)
 			      (setf ,one-son-ele ,r-son-ele)
 			      (setf ,one-son-key ,r-son-key))))
-		      ;; If greater son is less than root, then we've formed a
-		      ;; heap again..
+		      ;; If greater son is less than root, then we've
+		      ;; formed a heap again..
 		      (if (funcall ,pred ,one-son-key ,root-key) (return))
-		      ;; ..else put greater son at root and make greater son
-		      ;; node be the root.
+		      ;; ..else put greater son at root and make
+		      ;; greater son node be the root.
 		      (setf (,vector-ref ,seq ,var-root) ,one-son-ele)
 		      (setf ,heap-root (1+ ,one-son)) ; (one plus to be in heap coordinates)
 		      (setf ,var-root ,one-son)))     ; actual index into vector for root ele
@@ -137,18 +138,19 @@
 
 ;;; stable sort of lists
 
-;;; SORT-LIST uses a bottom up merge sort. First a pass is made over the list
-;;; grabbing one element at a time and merging it with the next one form pairs
-;;; of sorted elements. Then n is doubled, and elements are taken in runs of
-;;; two, merging one run with the next to form quadruples of sorted elements.
-;;; This continues until n is large enough that the inner loop only runs for
-;;; one iteration; that is, there are only two runs that can be merged, the
-;;; first run starting at the beginning of the list, and the second being the
+;;; SORT-LIST uses a bottom up merge sort. First a pass is made over
+;;; the list grabbing one element at a time and merging it with the
+;;; next one form pairs of sorted elements. Then n is doubled, and
+;;; elements are taken in runs of two, merging one run with the next
+;;; to form quadruples of sorted elements. This continues until n is
+;;; large enough that the inner loop only runs for one iteration; that
+;;; is, there are only two runs that can be merged, the first run
+;;; starting at the beginning of the list, and the second being the
 ;;; remaining elements.
 
 (defun sort-list (list pred key)
   (let ((head (cons :header list))  ; head holds on to everything
-	(n 1)		       ; bottom-up size of lists to be merged
+	(n 1)		            ; bottom-up size of lists to be merged
 	unsorted		    ; unsorted is the remaining list to be
 				    ;   broken into n size lists and merged
 	list-1			    ; list-1 is one length n list to be merged
@@ -184,9 +186,10 @@
 		(t (setf (cdr last) list-1)
 		   (return)))))
        (setf n (ash n 1)) ; (+ n n)
-       ;; If the inner loop only executed once, then there were only enough
-       ;; elements for two runs given n, so all the elements have been merged
-       ;; into one list. This may waste one outer iteration to realize.
+       ;; If the inner loop only executed once, then there were only
+       ;; enough elements for two runs given n, so all the elements
+       ;; have been merged into one list. This may waste one outer
+       ;; iteration to realize.
        (if (eq list-1 (cdr head))
 	   (return list-1))))))
 

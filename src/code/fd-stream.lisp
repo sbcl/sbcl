@@ -21,7 +21,8 @@
 
 ;;;; buffer manipulation routines
 
-;;; FIXME: Is it really good to maintain this pool separate from the GC?
+;;; FIXME: Is it really good to maintain this pool separate from the
+;;; GC and the C malloc logic?
 (defvar *available-buffers* ()
   #!+sb-doc
   "List of available buffers. Each buffer is an sap pointing to
@@ -45,40 +46,45 @@
 	    (:include lisp-stream
 		      (misc #'fd-stream-misc-routine)))
 
-  (name nil)		      ; The name of this stream
-  (file nil)		      ; The file this stream is for
-  ;; The backup file namestring for the old file, for :if-exists :rename or
-  ;; :rename-and-delete.
+  ;; the name of this stream
+  (name nil)
+  ;; the file this stream is for
+  (file nil)
+  ;; the backup file namestring for the old file, for :IF-EXISTS
+  ;; :RENAME or :RENAME-AND-DELETE.
   (original nil :type (or simple-string null))
   (delete-original nil)	      ; for :if-exists :rename-and-delete
-  ;;; Number of bytes per element.
+  ;;; the number of bytes per element
   (element-size 1 :type index)
-  (element-type 'base-char)   ; The type of element being transfered.
-  (fd -1 :type fixnum)	      ; The file descriptor
-  ;; Controls when the output buffer is flushed.
+  ;; the type of element being transfered
+  (element-type 'base-char)   
+  ;; the Unix file descriptor
+  (fd -1 :type fixnum)	      
+  ;; controls when the output buffer is flushed
   (buffering :full :type (member :full :line :none))
-  ;; Character position if known.
+  ;; character position (if known)
   (char-pos nil :type (or index null))
   ;; T if input is waiting on FD. :EOF if we hit EOF.
   (listen nil :type (member nil t :eof))
-  ;; The input buffer.
+
+  ;; the input buffer
   (unread nil)
   (ibuf-sap nil :type (or system-area-pointer null))
   (ibuf-length nil :type (or index null))
   (ibuf-head 0 :type index)
   (ibuf-tail 0 :type index)
 
-  ;; The output buffer.
+  ;; the output buffer
   (obuf-sap nil :type (or system-area-pointer null))
   (obuf-length nil :type (or index null))
   (obuf-tail 0 :type index)
 
-  ;; Output flushed, but not written due to non-blocking io.
+  ;; output flushed, but not written due to non-blocking io?
   (output-later nil)
   (handler nil)
-  ;; Timeout specified for this stream, or NIL if none.
+  ;; timeout specified for this stream, or NIL if none
   (timeout nil :type (or index null))
-  ;; Pathname of the file this stream is opened to (returned by PATHNAME.)
+  ;; pathname of the file this stream is opened to (returned by PATHNAME)
   (pathname nil :type (or pathname null)))
 (def!method print-object ((fd-stream fd-stream) stream)
   (declare (type stream stream))
@@ -93,9 +99,10 @@
   element-type output, the kind of buffering, the function name, and the number
   of bytes per element.")
 
-;;; Called by the server when we can write to the given file descriptor.
-;;; Attempt to write the data again. If it worked, remove the data from the
-;;; output-later list. If it didn't work, something is wrong.
+;;; This is called by the server when we can write to the given file
+;;; descriptor. Attempt to write the data again. If it worked, remove
+;;; the data from the OUTPUT-LATER list. If it didn't work, something
+;;; is wrong.
 (defun do-output-later (stream)
   (let* ((stuff (pop (fd-stream-output-later stream)))
 	 (base (car stuff))
@@ -146,9 +153,9 @@
       (setf (fd-stream-obuf-sap stream) new-buffer)
       (setf (fd-stream-obuf-length stream) bytes-per-buffer))))
 
-;;; Output the given noise. Check to see whether there are any pending writes.
-;;; If so, just queue this one. Otherwise, try to write it. If this would
-;;; block, queue it.
+;;; Output the given noise. Check to see whether there are any pending
+;;; writes. If so, just queue this one. Otherwise, try to write it. If
+;;; this would block, queue it.
 (defun do-output (stream base start end reuse-sap)
   (declare (type fd-stream stream)
 	   (type (or system-area-pointer (simple-array * (*))) base)
@@ -275,11 +282,12 @@
 			   (fd-stream-obuf-tail stream))
 	byte))
 
-;;; Does the actual output. If there is space to buffer the string, buffer
-;;; it. If the string would normally fit in the buffer, but doesn't because
-;;; of other stuff in the buffer, flush the old noise out of the buffer and
-;;; put the string in it. Otherwise we have a very long string, so just
-;;; send it directly (after flushing the buffer, of course).
+;;; Do the actual output. If there is space to buffer the string,
+;;; buffer it. If the string would normally fit in the buffer, but
+;;; doesn't because of other stuff in the buffer, flush the old noise
+;;; out of the buffer and put the string in it. Otherwise we have a
+;;; very long string, so just send it directly (after flushing the
+;;; buffer, of course).
 (defun output-raw-bytes (fd-stream thing &optional start end)
   #!+sb-doc
   "Output THING to FD-STREAM. THING can be any kind of vector or a SAP. If
@@ -336,14 +344,14 @@
 	     (flush-output-buffer fd-stream)
 	     (do-output fd-stream thing start end nil))))))
 
-;;; Routine to use to output a string. If the stream is unbuffered, slam
-;;; the string down the file descriptor, otherwise use OUTPUT-RAW-BYTES to
-;;; buffer the string. Update charpos by checking to see where the last newline
-;;; was.
+;;; the routine to use to output a string. If the stream is
+;;; unbuffered, slam the string down the file descriptor, otherwise
+;;; use OUTPUT-RAW-BYTES to buffer the string. Update charpos by
+;;; checking to see where the last newline was.
 ;;;
-;;; Note: some bozos (the FASL dumper) call write-string with things other
-;;; than strings. Therefore, we must make sure we have a string before calling
-;;; position on it.
+;;; Note: some bozos (the FASL dumper) call write-string with things
+;;; other than strings. Therefore, we must make sure we have a string
+;;; before calling POSITION on it.
 ;;; KLUDGE: It would be better to fix the bozos instead of trying to
 ;;; cover for them here. -- WHN 20000203
 (defun fd-sout (stream thing start end)
@@ -377,9 +385,9 @@
 	  (:none
 	   (do-output stream thing start end nil))))))
 
-;;; Find an output routine to use given the type and buffering. Return as
-;;; multiple values the routine, the real type transfered, and the number of
-;;; bytes per element.
+;;; Find an output routine to use given the type and buffering. Return
+;;; as multiple values the routine, the real type transfered, and the
+;;; number of bytes per element.
 (defun pick-output-routine (type buffering)
   (dolist (entry *output-routines*)
     (when (and (subtypep type (car entry))
@@ -395,9 +403,9 @@
   "List of all available input routines. Each element is a list of the
   element-type input, the function name, and the number of bytes per element.")
 
-;;; Fills the input buffer, and returns the first character. Throws to
-;;; eof-input-catcher if the eof was reached. Drops into system:server if
-;;; necessary.
+;;; Fill the input buffer, and return the first character. Throw to
+;;; EOF-INPUT-CATCHER if the eof was reached. Drop into SYSTEM:SERVER
+;;; if necessary.
 (defun do-input (stream)
   (let ((fd (fd-stream-fd stream))
 	(ibuf-sap (fd-stream-ibuf-sap stream))
@@ -469,8 +477,8 @@
 	    (t
 	     (incf (fd-stream-ibuf-tail stream) count))))))
 			
-;;; Makes sure there are at least ``bytes'' number of bytes in the input
-;;; buffer. Keeps calling do-input until that condition is met.
+;;; Make sure there are at least BYTES number of bytes in the input
+;;; buffer. Keep calling DO-INPUT until that condition is met.
 (defmacro input-at-least (stream bytes)
   (let ((stream-var (gensym))
 	(bytes-var (gensym)))
@@ -483,9 +491,7 @@
 	   (return))
 	 (do-input ,stream-var)))))
 
-;;; INPUT-WRAPPER -- intenal
-;;;
-;;;   Macro to wrap around all input routines to handle eof-error noise.
+;;; a macro to wrap around all input routines to handle EOF-ERROR noise
 (defmacro input-wrapper ((stream bytes eof-error eof-value) &body read-forms)
   (let ((stream-var (gensym))
 	(element-var (gensym)))
@@ -505,7 +511,6 @@
 		   (t
 		    (eof-or-lose ,stream-var ,eof-error ,eof-value))))))))
 
-;;; Defines an input routine.
 (defmacro def-input-routine (name
 			     (type size sap head)
 			     &rest body)
@@ -519,43 +524,44 @@
 	   (nconc *input-routines*
 		  (list (list ',type ',name ',size))))))
 
-;;; Routine to use in stream-in slot for reading string chars.
+;;; STREAM-IN routine for reading a string char
 (def-input-routine input-character
 		   (character 1 sap head)
   (code-char (sap-ref-8 sap head)))
 
-;;; Routine to read in an unsigned 8 bit number.
+;;; STREAM-IN routine for reading an unsigned 8 bit number
 (def-input-routine input-unsigned-8bit-byte
 		   ((unsigned-byte 8) 1 sap head)
   (sap-ref-8 sap head))
 
-;;; Routine to read in a signed 8 bit number.
+;;; STREAM-IN routine for reading a signed 8 bit number
 (def-input-routine input-signed-8bit-number
 		   ((signed-byte 8) 1 sap head)
   (signed-sap-ref-8 sap head))
 
-;;; Routine to read in an unsigned 16 bit number.
+;;; STREAM-IN routine for reading an unsigned 16 bit number
 (def-input-routine input-unsigned-16bit-byte
 		   ((unsigned-byte 16) 2 sap head)
   (sap-ref-16 sap head))
 
-;;; Routine to read in a signed 16 bit number.
+;;; STREAM-IN routine for reading a signed 16 bit number
 (def-input-routine input-signed-16bit-byte
 		   ((signed-byte 16) 2 sap head)
   (signed-sap-ref-16 sap head))
 
-;;; Routine to read in a unsigned 32 bit number.
+;;; STREAM-IN routine for reading a unsigned 32 bit number
 (def-input-routine input-unsigned-32bit-byte
 		   ((unsigned-byte 32) 4 sap head)
   (sap-ref-32 sap head))
 
-;;; Routine to read in a signed 32 bit number.
+;;; STREAM-IN routine for reading a signed 32 bit number
 (def-input-routine input-signed-32bit-byte
 		   ((signed-byte 32) 4 sap head)
   (signed-sap-ref-32 sap head))
 
-;;; Find an input routine to use given the type. Return as multiple values
-;;; the routine, the real type transfered, and the number of bytes per element.
+;;; Find an input routine to use given the type. Return as multiple
+;;; values the routine, the real type transfered, and the number of
+;;; bytes per element.
 (defun pick-input-routine (type)
   (dolist (entry *input-routines*)
     (when (subtypep type (car entry))
@@ -573,109 +579,9 @@
 			   (* length sb!vm:byte-bits))
     string))
 
-;;; old version, not good for implementing READ-SEQUENCE (and just complex)
-;;; FIXME: Remove once new FD-STREAM-READ-N-BYTES (below) is stable.
-#+nil
-(defun fd-stream-read-n-bytes (stream buffer start requested eof-error-p)
-  (declare (type stream stream) (type index start requested))
-  (let* ((sap (fd-stream-ibuf-sap stream))
-	 (offset start)
-	 (head (fd-stream-ibuf-head stream))
-	 (tail (fd-stream-ibuf-tail stream))
-	 (available (- tail head))
-	 (copy (min requested available)))
-    (declare (type index offset head tail available copy))
-    (unless (zerop copy)
-      (if (typep buffer 'system-area-pointer)
-	  (system-area-copy sap (* head sb!vm:byte-bits)
-			    buffer (* offset sb!vm:byte-bits)
-			    (* copy sb!vm:byte-bits))
-	  (copy-from-system-area sap (* head sb!vm:byte-bits)
-				 buffer (+ (* offset sb!vm:byte-bits)
-					   (* sb!vm:vector-data-offset
-					      sb!vm:word-bits))
-				 (* copy sb!vm:byte-bits)))
-      (incf (fd-stream-ibuf-head stream) copy))
-    (cond
-     ((or (= copy requested)
-	  (and (not eof-error-p) (/= copy 0)))
-      copy)
-     (t
-      (setf (fd-stream-ibuf-head stream) 0)
-      (setf (fd-stream-ibuf-tail stream) 0)
-      (setf (fd-stream-listen stream) nil)
-      (let ((now-needed (- requested copy))
-	    (len (fd-stream-ibuf-length stream)))
-	(declare (type index now-needed len))
-	(cond
-	 ((> now-needed len)
-	  ;; If the desired amount is greater than the stream buffer size, then
-	  ;; read directly into the destination, incrementing the start
-	  ;; accordingly.  In this case, we never leave anything in the stream
-	  ;; buffer.
-	  (sb!sys:without-gcing
-	    (loop
-	      (multiple-value-bind (count err)
-		  (sb!unix:unix-read (fd-stream-fd stream)
-				     (sap+ (if (typep buffer
-						      'system-area-pointer)
-					       buffer
-					     (vector-sap buffer))
-					   (+ offset copy))
-				     now-needed)
-		(declare (type (or index null) count))
-		(unless count
-		  (error "error reading ~S: ~A"
-			 stream
-			 (sb!unix:get-unix-error-msg err)))
-		(if eof-error-p
-		  (when (zerop count)
-		    (error 'end-of-file :stream stream))
-		  (return (- requested now-needed)))
-		(decf now-needed count)
-		(when (zerop now-needed)
-		  (return requested))
-		(incf offset count)))))
-	 (t
-	  ;; If we want less than the buffer size, then loop trying to fill the
-	  ;; stream buffer and copying what we get into the destination.  When
-	  ;; we have enough, we leave what's left in the stream buffer.
-	  (loop
-	    (multiple-value-bind (count err)
-		(sb!unix:unix-read (fd-stream-fd stream) sap len)
-	      (declare (type (or index null) count))
-	      (unless count
-		(error "error reading ~S: ~A"
-		       stream
-		       (sb!unix:get-unix-error-msg err)))
-	      (when (and eof-error-p (zerop count))
-		(error 'end-of-file :stream stream))
-
-	      (let* ((copy (min now-needed count))
-		     (copy-bits (* copy sb!vm:byte-bits))
-		     (buffer-start-bits
-		      (* (+ offset available) sb!vm:byte-bits)))
-		(declare (type index copy copy-bits buffer-start-bits))
-		(if (typep buffer 'system-area-pointer)
-		    (system-area-copy sap 0
-				      buffer buffer-start-bits
-				      copy-bits)
-		    (copy-from-system-area sap 0 
-					   buffer (+ buffer-start-bits
-						     (* sb!vm:vector-data-offset
-							sb!vm:word-bits))
-					   copy-bits))
-
-		(decf now-needed copy)
-		(when (or (zerop now-needed) (not eof-error-p))
-		  (setf (fd-stream-ibuf-head stream) copy)
-		  (setf (fd-stream-ibuf-tail stream) count)
-		  (return (- requested now-needed)))
-		(incf offset copy)))))))))))
-
-;;; the N-BIN method for FD-STREAMs. This blocks in UNIX-READ. It is generally
-;;; used where there is a definite amount of reading to be done, so blocking
-;;; isn't too problematical.
+;;; the N-BIN method for FD-STREAMs. This blocks in UNIX-READ. It is
+;;; generally used where there is a definite amount of reading to be
+;;; done, so blocking isn't too problematical.
 (defun fd-stream-read-n-bytes (stream buffer start requested eof-error-p)
   (declare (type fd-stream stream))
   (declare (type index start requested))
@@ -691,13 +597,6 @@
 	   (sap (fd-stream-ibuf-sap stream)))
       (declare (type index remaining-request head tail available))
       (declare (type index this-copy))
-      #+nil
-      (format t
-	      "/TOTAL-COPIED=~D HEAD=~D TAIL=~D THIS-COPY=~D~%"
-	      total-copied
-	      head
-	      tail
-	      this-copy)
       ;; Copy data from stream buffer into user's buffer. 
       (if (typep buffer 'system-area-pointer)
 	  (system-area-copy sap (* head sb!vm:byte-bits)
@@ -713,22 +612,18 @@
       ;; Maybe we need to refill the stream buffer.
       (cond (;; If there were enough data in the stream buffer, we're done.
 	     (= total-copied requested)
-	     #+nil
-	     (format t "/enough data~%")
 	     (return total-copied))
 	    (;; If EOF, we're done in another way.
 	     (zerop (refill-fd-stream-buffer stream))
-	     #+nil
-	     (format t "/end of file~%")
 	     (if eof-error-p
 		 (error 'end-of-file :stream stream)
 		 (return total-copied)))
-	    ;; Otherwise we refilled the stream buffer, so fall through into
-	    ;; another pass of the loop.
+	    ;; Otherwise we refilled the stream buffer, so fall
+	    ;; through into another pass of the loop.
 	    ))))
 
-;;; Try to refill the stream buffer. Return the number of bytes read. (For EOF,
-;;; the return value will be zero, otherwise positive.)
+;;; Try to refill the stream buffer. Return the number of bytes read.
+;;; (For EOF, the return value will be zero, otherwise positive.)
 (defun refill-fd-stream-buffer (stream)
   ;; We don't have any logic to preserve leftover bytes in the buffer,
   ;; so we should only be called when the buffer is empty.
@@ -755,9 +650,9 @@
 
 ;;;; utility functions (misc routines, etc)
 
-;;; Fill in the various routine slots for the given type. Input-p and
-;;; output-p indicate what slots to fill. The buffering slot must be set prior
-;;; to calling this routine.
+;;; Fill in the various routine slots for the given type. INPUT-P and
+;;; OUTPUT-P indicate what slots to fill. The buffering slot must be
+;;; set prior to calling this routine.
 (defun set-routines (stream type input-p output-p buffer-p)
   (let ((target-type (case type
 		       ((:default unsigned-byte)
@@ -878,9 +773,9 @@
 		  (setf (fd-stream-handler stream) nil))
 	    (when (and (fd-stream-file stream)
 		       (fd-stream-obuf-sap stream))
-	      ;; Can't do anything unless we know what file were dealing with,
-	      ;; and we don't want to do anything strange unless we were
-	      ;; writing to the file.
+	      ;; We can't do anything unless we know what file were
+	      ;; dealing with, and we don't want to do anything
+	      ;; strange unless we were writing to the file.
 	      (if (fd-stream-original stream)
 		  ;; We have a handle on the original, just revert.
 		  (multiple-value-bind (okay err)
@@ -891,7 +786,7 @@
 			"could not restore ~S to its original contents: ~A"
 			      (fd-stream-file stream)
 			      (sb!unix:get-unix-error-msg err))))
-		  ;; Can't restore the orignal, so nuke that puppy.
+		  ;; We can't restore the orignal, so nuke that puppy.
 		  (multiple-value-bind (okay err)
 		      (sb!unix:unix-unlink (fd-stream-file stream))
 		    (unless okay
@@ -953,6 +848,7 @@
     (:element-type
      (fd-stream-element-type stream))
     (:interactive-p
+      ;; FIXME: sb!unix:unix-isatty is undefined.
      (sb!unix:unix-isatty (fd-stream-fd stream)))
     (:line-length
      80)
@@ -968,11 +864,9 @@
 	 (error "error fstat'ing ~S: ~A"
 		stream
 		(sb!unix:get-unix-error-msg dev)))
-       (if (zerop (the index mode))
+       (if (zerop mode)
 	   nil
-	   ;; FIXME: It's not safe to assume that SIZE is an INDEX, there
-	   ;; are files bigger than that.
-	   (truncate (the index size) (fd-stream-element-size stream)))))
+	   (truncate size (fd-stream-element-size stream)))))
     (:file-position
      (fd-stream-file-position stream arg1))))
 
@@ -987,20 +881,20 @@
 	    (sb!unix:unix-lseek (fd-stream-fd stream) 0 sb!unix:l_incr)
 	  (declare (type (or index null) posn))
 	  (cond ((fixnump posn)
-		 ;; Adjust for buffered output:
-		 ;;  If there is any output buffered, the *real* file position
-		 ;; will be larger than reported by lseek because lseek
-		 ;; obviously cannot take into account output we have not
-		 ;; sent yet.
+		 ;; Adjust for buffered output: If there is any output
+		 ;; buffered, the *real* file position will be larger
+		 ;; than reported by lseek because lseek obviously
+		 ;; cannot take into account output we have not sent
+		 ;; yet.
 		 (dolist (later (fd-stream-output-later stream))
 		   (incf posn (- (the index (caddr later))
 				 (the index (cadr later)))))
 		 (incf posn (fd-stream-obuf-tail stream))
-		 ;; Adjust for unread input:
-		 ;;  If there is any input read from UNIX but not supplied to
-		 ;; the user of the stream, the *real* file position will
-		 ;; smaller than reported, because we want to look like the
-		 ;; unread stuff is still available.
+		 ;; Adjust for unread input: If there is any input
+		 ;; read from UNIX but not supplied to the user of the
+		 ;; stream, the *real* file position will smaller than
+		 ;; reported, because we want to look like the unread
+		 ;; stuff is still available.
 		 (decf posn (- (fd-stream-ibuf-tail stream)
 			       (fd-stream-ibuf-head stream)))
 		 (when (fd-stream-unread stream)
@@ -1016,15 +910,15 @@
 			  (sb!unix:get-unix-error-msg errno)))))))
       (let ((offset 0) origin)
 	(declare (type index offset))
-	;; Make sure we don't have any output pending, because if we move the
-	;; file pointer before writing this stuff, it will be written in the
-	;; wrong location.
+	;; Make sure we don't have any output pending, because if we
+	;; move the file pointer before writing this stuff, it will be
+	;; written in the wrong location.
 	(flush-output-buffer stream)
 	(do ()
 	    ((null (fd-stream-output-later stream)))
 	  (sb!sys:serve-all-events))
-	;; Clear out any pending input to force the next read to go to the
-	;; disk.
+	;; Clear out any pending input to force the next read to go to
+	;; the disk.
 	(setf (fd-stream-unread stream) nil)
 	(setf (fd-stream-ibuf-head stream) 0)
 	(setf (fd-stream-ibuf-tail stream) 0)
@@ -1137,9 +1031,9 @@
 	(return))))
   item)
 
-;;; Rename Namestring to Original. First, check whether we have write access,
-;;; since we don't want to trash unwritable files even if we technically can.
-;;; We return true if we succeed in renaming.
+;;; Rename NAMESTRING to ORIGINAL. First, check whether we have write
+;;; access, since we don't want to trash unwritable files even if we
+;;; technically can. We return true if we succeed in renaming.
 (defun do-old-rename (namestring original)
   (unless (sb!unix:unix-access namestring sb!unix:w_ok)
     (cerror "Try to rename it anyway."
@@ -1424,8 +1318,8 @@
 (defun beep (&optional (stream *terminal-io*))
   (funcall *beep-function* stream))
 
-;;; Kind of like FILE-POSITION, but is an internal hack used by the filesys
-;;; stuff to get and set the file name.
+;;; This is kind of like FILE-POSITION, but is an internal hack used
+;;; by the filesys stuff to get and set the file name.
 (defun file-name (stream &optional new-name)
   (when (typep stream 'fd-stream)
       (cond (new-name
@@ -1439,8 +1333,9 @@
 ;;;; international character support (which is trivial for our simple
 ;;;; character sets)
 
-;;;; (Those who do Lisp only in English might not remember that ANSI requires
-;;;; these functions to be exported from package COMMON-LISP.)
+;;;; (Those who do Lisp only in English might not remember that ANSI
+;;;; requires these functions to be exported from package
+;;;; COMMON-LISP.)
 
 (defun file-string-length (stream object)
   (declare (type (or string character) object) (type file-stream stream))
