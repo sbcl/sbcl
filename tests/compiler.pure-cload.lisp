@@ -35,3 +35,27 @@
 ;;; This is a slightly different way of getting the same symptoms out
 ;;; of the sbcl-0.6.11.13 byte compiler bug.
 (print (setq *print-level* *print-level*))
+
+;;; PROGV with different numbers of variables and values
+(let ((a 1))
+  (declare (special a))
+  (assert (equal (list a (progv '(a b) '(:a :b :c)
+                           (assert (eq (symbol-value 'nil) nil))
+                           (list (symbol-value 'a) (symbol-value 'b)))
+                       a)
+                 '(1 (:a :b) 1)))
+  (assert (equal (list a (progv '(a b) '(:a :b)
+                           (assert (eq (symbol-value 'nil) nil))
+                           (list (symbol-value 'a) (symbol-value 'b)))
+                       a)
+                 '(1 (:a :b) 1)))
+  (assert (not (boundp 'b))))
+
+(let ((a 1) (b 2))
+  (declare (special a b))
+  (assert (equal (list a b (progv '(a b) '(:a)
+                             (assert (eq (symbol-value 'nil) nil))
+                             (assert (not (boundp 'b)))
+                             (symbol-value 'a))
+                       a b)
+                 '(1 2 :a 1 2))))
