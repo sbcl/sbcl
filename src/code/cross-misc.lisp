@@ -144,3 +144,10 @@
 (defun sb!kernel:%with-array-data (array start end)
   (assert (typep array '(simple-array * (*))))
   (values array start end 0))
+
+#!+sparc
+(progn
+  (defun sb!vm::ash-right-signed (num shift)
+    (ash num (- shift)))
+  (defun sb!vm::ash-right-unsigned (num shift)
+    (ash num (- shift))))

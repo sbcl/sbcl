@@ -551,14 +551,15 @@ void arrange_return_to_lisp_function(os_context_t *context, lispobj function)
     build_fake_control_stack_frames(th,context);
 #endif
 
-    *os_context_pc_addr(context) = call_into_lisp;
 #ifdef LISP_FEATURE_X86
+    *os_context_pc_addr(context) = call_into_lisp;
     *os_context_register_addr(context,reg_ECX) = 0; 
     *os_context_register_addr(context,reg_EBP) = sp-2;
     *os_context_register_addr(context,reg_ESP) = sp-14;
 #else
     /* this much of the calling convention is common to all
        non-x86 ports */
+    *os_context_pc_addr(context) = code;
     *os_context_register_addr(context,reg_NARGS) = 0; 
     *os_context_register_addr(context,reg_LIP) = code;
     *os_context_register_addr(context,reg_CFP) = 

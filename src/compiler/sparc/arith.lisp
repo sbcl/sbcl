@@ -1203,15 +1203,14 @@
 
 ;; Need these so constant folding works with the deftransform.
 
-(defun ash-right-signed (num shift)
-  (declare (type (signed-byte #.sb!vm:n-word-bits) num)
-	   (type (integer 0 #.(1- sb!vm:n-word-bits)) shift))
-  (ash-right-signed num shift))
+;; FIXME KLUDGE ew yuk.
+#-sb-xc-host
+(progn
+  (defun ash-right-signed (num shift)
+    (ash-right-signed num shift))
 
-(defun ash-right-unsigned (num shift)
-  (declare (type (unsigned-byte #.sb!vm:n-word-bits) num)
-	   (type (integer 0 #.(1- sb!vm:n-word-bits)) shift))
-  (ash-right-unsigned num shift))
+  (defun ash-right-unsigned (num shuft)
+    (ash-right-unsigned num shift)))
 
 ;; If we can prove that we have a right shift, just do the right shift
 ;; instead of calling the inline ASH which has to check for the
