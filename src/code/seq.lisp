@@ -879,6 +879,16 @@
 		;; obviously correct solution is to make Python smart
 		;; enough that we can use an inline function instead
 		;; of a compiler macro (as above). -- WHN 20000410
+		;;
+		;; FIXME: The DEFINE-COMPILER-MACRO here can be
+		;; important for performance, and it'd be good to have
+		;; it be visible throughout the compilation of all the
+		;; target SBCL code. That could be done by defining
+		;; SB-XC:DEFINE-COMPILER-MACRO and using it here,
+		;; moving this DEFQUANTIFIER stuff (and perhaps other
+		;; inline definitions in seq.lisp as well) into a new
+		;; seq.lisp, and moving remaining target-only stuff
+		;; from the old seq.lisp into target-seq.lisp.
 		(define-compiler-macro ,name (pred first-seq &rest more-seqs)
 		  (let ((elements (make-gensym-list (1+ (length more-seqs))))
 			(blockname (gensym "BLOCK")))

@@ -34,7 +34,8 @@
   (setf (component-new-funs component) ())
   (dolist (fun (component-lambdas component))
     (reinit-lambda-physenv fun))
-  (mapc #'compute-closure (component-lambdas component))
+  (mapc #'add-lambda-vars-and-let-vars-to-closures
+	(component-lambdas component))
 
   (find-non-local-exits component)
   (find-cleanup-points component)
@@ -62,7 +63,7 @@
   (declare (type component component))
   (let ((found-it nil))
     (dolist (lambda (component-lambdas component))
-      (when (compute-closure lambda)
+      (when (add-lambda-vars-and-let-vars-to-closures lambda)
 	(setq found-it t)))
     found-it))
 
@@ -98,7 +99,7 @@
 (defun preallocate-physenvs-for-toplevelish-lambdas (component)
   (dolist (clambda (component-lambdas component))
     (when (lambda-toplevelish-p clambda)
-      (compute-closure clambda)))
+      (add-lambda-vars-and-let-vars-to-closures clambda)))
   (values))
 
 ;;; If CLAMBDA has a PHYSENV, return it, otherwise assign an empty one
@@ -148,6 +149,35 @@
   (declare (type node node))
   (get-lambda-physenv (node-home-lambda node)))
 
+;;; private guts of ADD-LAMBDA-VARS-AND-LET-VARS-TO-CLOSURES
+;;;
+;;; This is the old CMU CL COMPUTE-CLOSURE, which only works on
+;;; LAMBDA-VARS directly, not on the LAMBDA-VARS of LAMBDA-LETS. It
+;;; seems never to be valid to use this operation alone, so in SBCL,
+;;; it's private, and the public interface,
+;;; ADD-LAMBDA-VARS-AND-LET-VARS-TO-CLOSURES, always runs over all the
+;;; variables, not only the LAMBDA-VARS of CLAMBDA itself but also
+;;; the LAMBDA-VARS of CLAMBDA's LAMBDA-LETS.
+(defun %add-lambda-vars-to-closures (clambda)
+  (let ((physenv (get-lambda-physenv clambda))
+	(did-something nil))
+    (note-unreferenced-vars clambda)
+    (dolist (var (lambda-vars clambda))
+      (dolist (ref (leaf-refs var))
+	(let ((ref-physenv (get-node-physenv ref)))
+	  (unless (eq ref-physenv physenv)
+	    (when (lambda-var-sets var)
+	      (setf (lambda-var-indirect var) t))
+	    (setq did-something t)
+	    (close-over var ref-physenv physenv))))
+      (dolist (set (basic-var-sets var))
+	(let ((set-physenv (get-node-physenv set)))
+	  (unless (eq set-physenv physenv)
+	    (setq did-something t)
+	    (setf (lambda-var-indirect var) t)
+	    (close-over var set-physenv physenv)))))
+    did-something))
+
 ;;; Find any variables in CLAMBDA -- either directly in LAMBDA-VARS or
 ;;; in the LAMBDA-VARS of elements of LAMBDA-LETS -- with references
 ;;; outside of the home environment and close over them. If a
@@ -156,51 +186,18 @@
 ;;; value cell. We also warn about unreferenced variables here, just
 ;;; because it's a convenient place to do it. We return true if we
 ;;; close over anything.
-(defun compute-closure (clambda)
+(defun add-lambda-vars-and-let-vars-to-closures (clambda)
   (declare (type clambda clambda))
-  (flet (;; This is the old CMU CL COMPUTE-CLOSURE, which only works
-	 ;; on LAMBDA-VARS directly, not on the LAMBDA-VARS of
-	 ;; LAMBDA-LETS. It seems never to be valid to use this
-	 ;; operation alone, so in SBCL, it's private, and the public
-	 ;; interface always runs over all the variables, both the
-	 ;; LAMBDA-VARS of CLAMBDA itself and the LAMBDA-VARS of
-	 ;; CLAMBDA's LAMBDA-LETS.
-	 ;;
-	 ;; Note that we don't need to make a distinction between the
-	 ;; outer CLAMBDA argument and the inner one, or refer to the
-	 ;; outer CLAMBDA argument at all, because the LET-conversion
-	 ;; process carefully modifies all the necessary CLAMBDA slots
-	 ;; (e.g. LAMBDA-PHYSENV) of a LET-converted CLAMBDA to refer
-	 ;; to the new home.
-	 (%compute-closure (clambda)
-	   (let ((physenv (get-lambda-physenv clambda))
-		 (did-something nil))
-	     (note-unreferenced-vars clambda)
-	     (dolist (var (lambda-vars clambda))
-	       (dolist (ref (leaf-refs var))
-		 (let ((ref-physenv (get-node-physenv ref)))
-		   (unless (eq ref-physenv physenv)
-		     (when (lambda-var-sets var)
-		       (setf (lambda-var-indirect var) t))
-		     (setq did-something t)
-		     (close-over var ref-physenv physenv))))
-	       (dolist (set (basic-var-sets var))
-		 (let ((set-physenv (get-node-physenv set)))
-		   (unless (eq set-physenv physenv)
-		     (setq did-something t)
-		     (setf (lambda-var-indirect var) t)
-		     (close-over var set-physenv physenv)))))
-	     did-something)))
-    (let ((did-something nil))
-      (when (%compute-closure clambda)
-	(setf did-something t))
-      (dolist (lambda-let (lambda-lets clambda))
-	;; There's no need to recurse through full COMPUTE-CLOSURE
-	;; here, since LETS only go one layer deep.
-	(aver (null (lambda-lets lambda-let)))
-	(when (%compute-closure lambda-let)
-	  (setf did-something t)))
-      did-something)))
+  (let ((did-something nil))
+    (when (%add-lambda-vars-to-closures clambda)
+      (setf did-something t))
+    (dolist (lambda-let (lambda-lets clambda))
+      ;; There's no need to recurse through full COMPUTE-CLOSURE
+      ;; here, since LETS only go one layer deep.
+      (aver (null (lambda-lets lambda-let)))
+      (when (%add-lambda-vars-to-closures lambda-let)
+	(setf did-something t)))
+    did-something))
 
 ;;; Make sure that THING is closed over in REF-PHYSENV and in all
 ;;; PHYSENVs for the functions that reference REF-PHYSENV's function
@@ -208,12 +205,14 @@
 ;;; reach the home environment, we stop propagating the closure.
 (defun close-over (thing ref-physenv home-physenv)
   (declare (type physenv ref-physenv home-physenv))
-  (cond ((eq ref-physenv home-physenv))
-	((member thing (physenv-closure ref-physenv)))
-	(t
-	 (push thing (physenv-closure ref-physenv))
-	 (dolist (call (leaf-refs (physenv-lambda ref-physenv)))
-	   (close-over thing (get-node-physenv call) home-physenv))))
+  (let ((flooded-physenvs nil))
+    (named-let flood ((flooded-physenv ref-physenv))
+      (unless (or (eql flooded-physenv home-physenv)
+		  (member flooded-physenv flooded-physenvs))
+	(push flooded-physenv flooded-physenvs)
+	(pushnew thing (physenv-closure flooded-physenv))
+	(dolist (ref (leaf-refs (physenv-lambda flooded-physenv)))
+	  (flood (get-node-physenv ref))))))
   (values))
 
 ;;;; non-local exit

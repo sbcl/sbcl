@@ -268,7 +268,7 @@
 ;;; the continuation has no block, then we make it be in the block
 ;;; that the node is in. If the continuation heads its block, we end
 ;;; our block and link it to that block. If the continuation is not
-;;; currently used, then we set the derived-type for the continuation
+;;; currently used, then we set the DERIVED-TYPE for the continuation
 ;;; to that of the node, so that a little type propagation gets done.
 ;;;
 ;;; We also deal with a bit of THE's semantics here: we weaken the
@@ -320,11 +320,10 @@
 ;;; otherwise NIL is returned.
 ;;;
 ;;; This function may have arbitrary effects on the global environment
-;;; due to processing of PROCLAIMs and EVAL-WHENs. All syntax error
-;;; checking is done, with erroneous forms being replaced by a proxy
-;;; which signals an error if it is evaluated. Warnings about possibly
-;;; inconsistent or illegal changes to the global environment will
-;;; also be given.
+;;; due to processing of EVAL-WHENs. All syntax error checking is
+;;; done, with erroneous forms being replaced by a proxy which signals
+;;; an error if it is evaluated. Warnings about possibly inconsistent
+;;; or illegal changes to the global environment will also be given.
 ;;;
 ;;; We make the initial component and convert the form in a PROGN (and
 ;;; an optional NIL tacked on the end.) We then return the lambda. We
@@ -518,7 +517,7 @@
 ;;; Convert a reference to a symbolic constant or variable. If the
 ;;; symbol is entered in the LEXENV-VARIABLES we use that definition,
 ;;; otherwise we find the current global definition. This is also
-;;; where we pick off symbol macro and Alien variable references.
+;;; where we pick off symbol macro and alien variable references.
 (defun ir1-convert-variable (start cont name)
   (declare (type continuation start cont) (symbol name))
   (let ((var (or (lexenv-find name variables) (find-free-variable name))))
@@ -1137,8 +1136,8 @@
 	   key))))
     key))
 
-;;; Parse a lambda-list into a list of VAR structures, stripping off
-;;; any aux bindings. Each arg name is checked for legality, and
+;;; Parse a lambda list into a list of VAR structures, stripping off
+;;; any &AUX bindings. Each arg name is checked for legality, and
 ;;; duplicate names are checked for. If an arg is globally special,
 ;;; the var is marked as :SPECIAL instead of :LEXICAL. &KEY,
 ;;; &OPTIONAL and &REST args are annotated with an ARG-INFO structure
@@ -1150,8 +1149,8 @@
 ;;;  4. a list of the &AUX variables; and
 ;;;  5. a list of the &AUX values.
 (declaim (ftype (function (list) (values list boolean boolean list list))
-		find-lambda-vars))
-(defun find-lambda-vars (list)
+		make-lambda-vars))
+(defun make-lambda-vars (list)
   (multiple-value-bind (required optional restp rest keyp keys allowp aux
 			morep more-context more-count)
       (parse-lambda-list list)
@@ -1837,26 +1836,26 @@
 		    form))
   (unless (and (consp (cdr form)) (listp (cadr form)))
     (compiler-error
-     "The lambda expression has a missing or non-list lambda-list:~%  ~S"
+     "The lambda expression has a missing or non-list lambda list:~%  ~S"
      form))
 
   (multiple-value-bind (vars keyp allow-other-keys aux-vars aux-vals)
-      (find-lambda-vars (cadr form))
+      (make-lambda-vars (cadr form))
     (multiple-value-bind (forms decls) (sb!sys:parse-body (cddr form))
-      (let* ((cont (make-continuation))
+      (let* ((result-cont (make-continuation))
 	     (*lexenv* (process-decls decls
 				      (append aux-vars vars)
-				      nil cont))
+				      nil result-cont))
 	     (res (if (or (find-if #'lambda-var-arg-info vars) keyp)
 		      (ir1-convert-hairy-lambda forms vars keyp
 						allow-other-keys
-						aux-vars aux-vals cont
+						aux-vars aux-vals result-cont
 						:source-name source-name
 						:debug-name debug-name)
 		      (ir1-convert-lambda-body forms vars
 					       :aux-vars aux-vars
 					       :aux-vals aux-vals
-					       :result cont
+					       :result result-cont
 					       :source-name source-name
 					       :debug-name debug-name))))
 	(setf (functional-inline-expansion res) form)
