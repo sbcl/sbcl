@@ -250,7 +250,7 @@ and submit it as a patch."
 ;;; For GENCGC all generations < GEN will be GC'ed.
 
 #!+sb-thread
-(defun sub-gc (&key (gen 0))
+(defun sub-gc (&key (gen 0) &aux (pre-gc-dynamic-usage (dynamic-usage)))
   (setf *need-to-collect-garbage* t)
   (when (zerop *gc-inhibit*)
     (setf (sb!alien:extern-alien "maybe_gc_pending" (sb!alien:unsigned 32))
@@ -261,6 +261,8 @@ and submit it as a patch."
      (when (zerop
 	    (sb!alien:extern-alien "maybe_gc_pending" (sb!alien:unsigned 32)))
        (return nil)))
+    (incf *n-bytes-freed-or-purified*
+	  (max 0 (- pre-gc-dynamic-usage (dynamic-usage))))
     (setf *need-to-collect-garbage* nil)
     (scrub-control-stack))
   (values))
@@ -268,12 +270,14 @@ and submit it as a patch."
 #!-sb-thread
 (defvar *already-in-gc* nil "System is running SUB-GC")
 #!-sb-thread
-(defun sub-gc (&key (gen 0))
+(defun sub-gc (&key (gen 0) &aux (pre-gc-dynamic-usage (dynamic-usage)))
   (when *already-in-gc* (return-from sub-gc nil))
   (setf *need-to-collect-garbage* t)
   (when (zerop *gc-inhibit*)
     (let ((*already-in-gc* t))
       (without-interrupts (collect-garbage gen))
+      (incf *n-bytes-freed-or-purified*
+	    (max 0 (- pre-gc-dynamic-usage (dynamic-usage))))
       (setf *need-to-collect-garbage* nil))
     (scrub-control-stack))
   (values))
@@ -288,7 +292,7 @@ and submit it as a patch."
   #!+(and sb-doc (not gencgc))
   "Initiate a garbage collection. GEN may be provided for compatibility with
   generational garbage collectors, but is ignored in this implementation."
-  (sub-gc  :gen (if full 6 gen)))
+  (sub-gc :gen (if full 6 gen)))
 
 
 ;;;; auxiliary functions

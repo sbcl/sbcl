@@ -76,7 +76,7 @@
 ;;; versions which break binary compatibility. But it certainly should
 ;;; be incremented for release versions which break binary
 ;;; compatibility.
-(def!constant +fasl-file-version+ 41)
+(def!constant +fasl-file-version+ 42)
 ;;; (record of versions before 2003 deleted in 2003-04-26/0.pre8.107 or so)
 ;;; 38: (2003-01-05) changed names of internal SORT machinery
 ;;; 39: (2003-02-20) in 0.7.12.1 a slot was added to
@@ -84,6 +84,8 @@
 ;;; 40: (2003-03-11) changed value of (SXHASH NIL)
 ;;; 41: (2003-04-26) enforced binary incompatibility between +SB-THREAD
 ;;;     and -SB-THREAD builds
+;;; 42: (2003-05-22) %NAME slot changed to NAME in
+;;;     DEFSTRUCT-SLOT-DESCRIPTION
 
 ;;; the conventional file extension for our fasl files
 (declaim (type simple-string *fasl-file-type*))

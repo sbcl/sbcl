@@ -40,5 +40,12 @@
 (assert (typep (setq *baz* 1) 'integer))
 (assert (typep (in-package :cl-user) 'package))
 
+;;; PROFILE should run without obvious breakage
+(defun profiled-fun ()
+  (random 1d0))
+(profile profiled-fun)
+(loop repeat 100000 do (profiled-fun))
+(report)
+
 ;;; success
 (quit :unix-status 104)
