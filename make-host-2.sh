@@ -123,6 +123,7 @@ $SBCL_XC_HOST <<-'EOF' || exit 1
           #+cmu (ext:save-lisp "output/after-xc.core" :load-init-file nil)
           #+sbcl (sb-ext:save-lisp-and-die "output/after-xc.core")
 	  )
+        #+cmu (ext:quit)
 	EOF
 
 # Run GENESIS (again) in order to create cold-sbcl.core. (The first

@@ -44,4 +44,5 @@ $SBCL_XC_HOST <<-'EOF' || exit 1
 	  (load "tests/info.before-xc.lisp"))
         (host-cload-stem "src/compiler/generic/genesis")
 	(sb!vm:genesis :c-header-file-name "src/runtime/sbcl.h")
+        #+cmu (ext:quit)
 	EOF

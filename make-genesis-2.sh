@@ -50,6 +50,7 @@ $SBCL_XC_HOST <<-'EOF' || exit 1
 		       ;; The map file is not needed by the system, but can
 		       ;; be very handy when debugging cold init problems.
 		       :map-file-name "output/cold-sbcl.map")
+        #+cmu (ext:quit)
 	EOF
 
 echo //testing for consistency of first and second GENESIS passes

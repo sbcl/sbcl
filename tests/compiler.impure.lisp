@@ -555,6 +555,18 @@ BUG 48c, not yet fixed:
     (assert failure-p)
     (assert (raises-error? (funcall result) program-error))))
 
+;;; bug 217: wrong type inference
+(defun bug217-1 (x s)
+  (let ((f (etypecase x
+             (character #'write-char)
+             (integer #'write-byte))))
+    (funcall f x s)
+    (etypecase x
+      (character (write-char x s))
+      (integer (write-byte x s)))))
+
+(bug217-1 #\1 *standard-output*)
+
 
 ;;;; tests not in the problem domain, but of the consistency of the
 ;;;; compiler machinery itself

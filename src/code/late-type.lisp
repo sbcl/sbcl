@@ -69,7 +69,7 @@
   ;; If TYPE2 might be concealing something related to our class
   ;; hierarchy
   (if (type-might-contain-other-types-p type2)
-      ;; too confusing, gotta punt 
+      ;; too confusing, gotta punt
       (values nil nil)
       ;; ordinary case expected by old CMU CL code, where the taxonomy
       ;; of TYPE2's representation accurately reflects the taxonomy of
@@ -216,8 +216,45 @@
 ;;; Since all function types are equivalent to FUNCTION, they are all
 ;;; subtypes of each other.
 (!define-type-method (function :simple-subtypep) (type1 type2)
-  (declare (ignore type1 type2))
-  (values t t))
+   (flet ((fun-type-simple-p (type)
+            (not (or (fun-type-rest type)
+                     (fun-type-keyp type))))
+          (every-csubtypep (types1 types2)
+            (loop
+               for a1 in types1
+               for a2 in types2
+               do (multiple-value-bind (res sure-p)
+                      (csubtypep a1 a2)
+                    (unless res (return (values res sure-p))))
+               finally (return (values t t)))))
+     (macrolet ((3and (x y)
+                  `(multiple-value-bind (val1 win1)
+                       ,x
+                     (if (and (not val1) win1)
+                         (values nil t)
+                         (multiple-value-bind (val2 win2)
+                             ,y
+                           (if (and val1 val2)
+                               (values t t)
+                               (values nil (or win1 win2))))))))
+       (3and (csubtypep (fun-type-returns type1)
+                        (fun-type-returns type2))
+             (cond ((fun-type-wild-args type2)
+                    (values t t))
+                   ((fun-type-wild-args type1)
+                    (values nil t))
+                   ((not (or (fun-type-simple-p type1)
+                             (fun-type-simple-p type2)))
+                    (values nil nil))
+                   ((not (and (= (length (fun-type-required type1))
+                                 (length (fun-type-required type2)))
+                              (= (length (fun-type-optional type1))
+                                 (length (fun-type-optional type2)))))
+                    (values nil t))
+                   (t (3and (every-csubtypep (fun-type-required type1)
+                                             (fun-type-required type2))
+                            (every-csubtypep (fun-type-optional type1)
+                                             (fun-type-optional type2)))))))))
 
 (!define-superclasses function ((function)) !cold-init-forms)
 

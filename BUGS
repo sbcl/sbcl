@@ -1354,13 +1354,31 @@ WORKAROUND:
   the bad VECTOR-PUSH-EXTEND frame causes GC problems, though that may
   not be the actual problem. (CMU CL 18c doesn't have problems with this.)
 
-217:
+217: "Bad type operations with FUNCTION types"
   In sbcl.0.7.7:
 
     * (values-type-union (specifier-type '(function (base-char)))
                          (specifier-type '(function (integer))))
 
     #<FUN-TYPE (FUNCTION (BASE-CHAR) *)>
+
+  It causes insertion of wrong type assertions into generated
+  code. E.g.
+
+    (defun foo (x s)
+      (let ((f (etypecase x
+                 (character #'write-char)
+                 (integer #'write-byte))))
+        (funcall f x s)
+        (etypecase x
+          (character (write-char x s))
+          (integer (write-byte x s)))))
+
+   Then (FOO #\1 *STANDARD-OUTPUT*) signals type error.
+
+  (In 0.7.9.1 the result type is (FUNCTION * *), so Python does not
+  produce invalid code, but type checking is not accurate. Similar
+  problems exist with VALUES-TYPE-INTERSECTION.)
 
 
 DEFUNCT CATEGORIES OF BUGS
