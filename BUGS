@@ -1021,9 +1021,6 @@ WORKAROUND:
   currently checks for complex arrays seem to be performed by
   callees.)
 
-258:
-  (fixed in 0.8.1.3)
-
 259:
   (compile nil '(lambda () (aref (make-array 0) 0))) compiles without
   warning.  Analogous cases with the index and length being equal and
@@ -1032,14 +1029,16 @@ WORKAROUND:
   which is canonicalized to NIL.
 
 260:
+  a.
   (let* ((s (gensym))
          (t1 (specifier-type s)))
     (eval `(defstruct ,s))
     (type= t1 (specifier-type s)))
   => NIL, NIL
 
-  It causes WARNING when defining a structure, a slot of which
-  contains an instance of the same structure.
+  (fixed in 0.8.1.24)
+
+  b. The same for CSUBTYPEP.
 
 261:
     * (let () (list (the (values &optional fixnum) (eval '(values)))))

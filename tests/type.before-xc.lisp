@@ -128,14 +128,11 @@
   (assert-secondnil (sb-xc:subtypep t '(satisfies foo)))
   (assert-secondnil (sb-xc:subtypep t '(and (satisfies foo) (satisfies bar))))
   (assert-secondnil (sb-xc:subtypep t '(or (satisfies foo) (satisfies bar))))
-  ;; FIXME: Enable these tests when bug 84 is fixed.
-  #|
   (assert-secondnil (sb-xc:subtypep '(satisfies foo) nil))
   (assert-secondnil (sb-xc:subtypep '(and (satisfies foo) (satisfies bar))
 				    nil))
   (assert-secondnil (sb-xc:subtypep '(or (satisfies foo) (satisfies bar))
-				    nil))
-  |#)
+				    nil)))
 
 ;;; tests of 2-value quantifieroids FOO/TYPE
 (macrolet ((2= (v1 v2 expr2)

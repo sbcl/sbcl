@@ -135,9 +135,17 @@ Tests are in the file <tt>tests.lisp</tt> and also make good examples.
 
 #-sunos
 (deftest simple-local-client
-    (let ((s (make-instance 'local-socket :type :stream)))
-      (format t "~A~%" s)
-      (socket-connect s "/dev/log")
+    (let ((s (make-instance 'local-socket :type :datagram)))
+      (format t "Connecting ~A... " s)
+      (finish-output)
+      (handler-case
+          (socket-connect s "/dev/log")
+        (socket-error ()
+          (setq s (make-instance 'local-socket :type :stream))
+          (format t "failed~%Retrying with ~A... " s)
+          (finish-output)
+          (socket-connect s "/dev/log")))
+      (format t "ok.~%")
       (let ((stream (socket-make-stream s :input t :output t :buffering :none)))
 	(format stream
 		"<7>bsd-sockets: Don't panic.  We're testing local-domain client code; this message can safely be ignored")

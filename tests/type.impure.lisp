@@ -402,6 +402,13 @@
 (deftype bar () 'single-float)
 (assert (eql (foo (make-array 3 :element-type 'bar :initial-element 0.0f0))
 	     0.0f0))
+
+;;; bug 260a
+(assert-t-t
+ (let* ((s (gensym))
+        (t1 (sb-kernel:specifier-type s)))
+   (eval `(defstruct ,s))
+   (sb-kernel:type= t1 (sb-kernel:specifier-type s))))
 
 ;;; success
 (quit :unix-status 104)

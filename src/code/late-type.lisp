@@ -1148,8 +1148,12 @@
   (values nil nil))
 
 (!define-type-method (hairy :complex-=) (type1 type2)
-  (declare (ignore type1 type2))
-  (values nil nil))
+  (if (unknown-type-p type2)
+      (let ((type2 (specifier-type (unknown-type-specifier type2))))
+        (if (unknown-type-p type2)
+            (values nil nil)
+            (type= type1 type2)))
+  (values nil nil)))
 
 (!define-type-method (hairy :simple-intersection2 :complex-intersection2) 
 		     (type1 type2)

@@ -20,11 +20,11 @@
   (defvar *cold-init-forms*))
 
 (defmacro !begin-collecting-cold-init-forms ()
-  #-sb-xc-host '(eval-when (:compile-toplevel :execute)
-		  (when (boundp '*cold-init-forms*)
-		    (warn "discarding old *COLD-INIT-FORMS* value"))
-		  (setf *cold-init-forms* nil))
-  #+sb-xc-host nil)
+  #+sb-xc '(eval-when (:compile-toplevel :execute)
+             (when (boundp '*cold-init-forms*)
+               (warn "discarding old *COLD-INIT-FORMS* value"))
+             (setf *cold-init-forms* nil))
+  #-sb-xc nil)
 
 ;;; Note: Unlike the analogous COLD-INIT macro in CMU CL, this macro
 ;;; makes no attempt to simulate a top level situation by treating
@@ -33,24 +33,24 @@
   ;; In the target Lisp, stuff the forms into a named function which
   ;; will presumably be executed at the appropriate stage of cold load
   ;; (i.e. basically as soon as possible).
-  #-sb-xc-host (progn
-		 (setf *cold-init-forms*
-		       (nconc *cold-init-forms* (copy-list forms)))
-		 nil)
+  #+sb-xc (progn
+            (setf *cold-init-forms*
+                  (nconc *cold-init-forms* (copy-list forms)))
+            nil)
   ;; In the cross-compilation host Lisp, cold load might not be a
   ;; meaningful concept and in any case would have happened long ago,
   ;; so just execute the forms at load time (i.e. basically as soon as
   ;; possible).
-  #+sb-xc-host `(progn ,@forms))
+  #-sb-xc `(progn ,@forms))
 
 (defmacro !defun-from-collected-cold-init-forms (name)
-  #-sb-xc-host `(progn
-		  (defun ,name ()
-		    ,@*cold-init-forms*
-		    (values))
-		  (eval-when (:compile-toplevel :execute)
-		    (makunbound '*cold-init-forms*)))
-  #+sb-xc-host (declare (ignore name)))
+  #+sb-xc `(progn
+             (defun ,name ()
+               ,@*cold-init-forms*
+               (values))
+             (eval-when (:compile-toplevel :execute)
+               (makunbound '*cold-init-forms*)))
+  #-sb-xc (declare (ignore name)))
 
 ;;; FIXME: Consider renaming this file asap.lisp,
 ;;; and the renaming the various things
