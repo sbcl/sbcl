@@ -108,8 +108,8 @@
 (defun find-class-from-cell (symbol cell &optional (errorp t))
   (or (find-class-cell-class cell)
       (and *create-classes-from-internal-structure-definitions-p*
-	   (structure-type-p symbol)
-	   (find-structure-class symbol))
+	   (or (structure-type-p symbol) (condition-type-p symbol))
+	   (ensure-non-standard-class symbol))
       (cond ((null errorp) nil)
 	    ((legal-class-name-p symbol)
 	     (error "There is no class named ~S." symbol))

@@ -443,15 +443,14 @@
     (remf initargs :metaclass)
     (loop (unless (remf initargs :direct-superclasses) (return)))
     (loop (unless (remf initargs :direct-slots) (return)))
-    (values meta
-            (list* :direct-superclasses
-                   (and (neq supplied-supers unsupplied)
-                        (mapcar #'fix-super supplied-supers))
-                   :direct-slots
-                   (and (neq supplied-slots unsupplied) supplied-slots)
-                   initargs))))
+    (values
+     meta
+     (nconc
+      (when (neq supplied-supers unsupplied)
+	(list :direct-superclasses (mapcar #'fix-super supplied-supers)))
+      (when (neq supplied-slots unsupplied)
+	(list :direct-slots supplied-slots))))))
 
-
 (defmethod shared-initialize :after
 	   ((class std-class)
 	    slot-names
@@ -529,6 +528,22 @@
   (map-dependents class
 		  (lambda (dependent)
 		    (apply #'update-dependent class dependent initargs))))
+
+(defmethod shared-initialize :after ((class condition-class) slot-names
+				     &key direct-superclasses)
+  (declare (ignore slot-names))
+  (let ((classoid (find-classoid (class-name class))))
+    (with-slots (wrapper class-precedence-list prototype predicate-name
+			 (direct-supers direct-superclasses))
+	class
+      (setf (classoid-pcl-class classoid) class)
+      (setq direct-supers direct-superclasses)
+      (setq wrapper (classoid-layout classoid))
+      (setq class-precedence-list (compute-class-precedence-list class))
+      (setq prototype (make-condition (class-name class)))
+      (add-direct-subclasses class direct-superclasses)
+      (setq predicate-name (make-class-predicate-name (class-name class)))
+      (make-class-predicate class predicate-name))))
 
 (defmethod shared-initialize :after
     ((slotd structure-slot-definition) slot-names &key
@@ -653,7 +668,7 @@
                                         (class-name class))))))
     (make-class-predicate class predicate-name)
     (add-slot-accessors class direct-slots)))
-  
+
 (defmethod direct-slot-definition-class ((class structure-class) initargs)
   (declare (ignore initargs))
   (find-class 'structure-direct-slot-definition))

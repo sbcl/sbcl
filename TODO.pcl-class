@@ -1,11 +1,3 @@
-** CONDITION-CLASS
-
-(find-class 'warning) gives an object of type STRUCTURE-CLASS.
-However, a WARNING is not a STRUCTURE-OBJECT, but a CONDITION-OBJECT,
-which contradicts the requirement that instances of STRUCTURE-CLASS be
-STRUCTURE-OBJECTs.  Fix this, probably by teaching PCL about
-CONDITION-CLASS analogously to STRUCTURE-CLASS.
-
 ** CLASS-PROTOTYPE
 
 [ fixed the (CLASS-PROTOTYPE (FIND-CLASS 'NULL)) issue; more general
@@ -19,4 +11,13 @@ conforming to AMOP.
 
 ** LEGAL-CLASS-NAME-P
 
-NIL is probably not a legal class name
+NIL is probably not a legal class name.  Hmm, except that 
+  (FIND-CLASS NIL NIL) 
+still probably doesn't want to be an error (ASDF executes this
+internally, for a start).
+
+** DOCUMENTATION/DESCRIBE-OBJECT
+
+Can be done post-merge, but some of these methods talk about
+SB-KERNEL:CLASSOIDs rather than CL:CLASSes.  Should be fixed to refer
+to user-relevant data, probably.

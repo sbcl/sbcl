@@ -95,7 +95,7 @@
   (setf (info :type :documentation (class-name x)) new-value))
 
 (defmethod (setf documentation) (new-value (x symbol) (doc-type (eql 'type)))
-  (if (structure-type-p x)	; Catch structures first.
+  (if (or (structure-type-p x) (condition-type-p x))
       (setf (info :type :documentation x) new-value)
       (let ((class (find-class x nil)))
 	(if class

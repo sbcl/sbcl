@@ -98,7 +98,7 @@
 
 (defun named-object-print-function (instance stream
 				    &optional (extra nil extra-p))
-  (print-unreadable-object (instance stream :type t :identity t)
+  (print-unreadable-object (instance stream :type t)
     (if extra-p					
 	(format stream
 		"~S ~:S"

@@ -151,7 +151,7 @@
 	;; FIXME: do we still need this?
 	((and (null args) (typep type 'classoid))
 	 (or (classoid-pcl-class type)
-	     (find-structure-class (classoid-name type))))
+	     (ensure-non-structure-class (classoid-name type))))
 	((specializerp type) type)))
 
 ;;; interface
@@ -562,6 +562,8 @@
 (defclass forward-referenced-class (pcl-class) ())
 
 (defclass built-in-class (pcl-class) ())
+
+(defclass condition-class (pcl-class) ())
 
 (defclass structure-class (slot-class)
   ((defstruct-form

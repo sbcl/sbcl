@@ -524,8 +524,6 @@
 (defun wrapper-of (x)
   (wrapper-of-macro x))
 
-(defvar *find-structure-class* nil)
-
 (defun eval-form (form)
   (lambda () (eval form)))
 
@@ -538,22 +536,29 @@
     :initform ,(structure-slotd-init-form slotd)
     :initfunction ,(eval-form (structure-slotd-init-form slotd))))
 
-(defun find-structure-class (symbol)
-  (if (structure-type-p symbol)
-      (unless (eq *find-structure-class* symbol)
-	(let ((*find-structure-class* symbol))
-	  (ensure-class symbol
-			:metaclass 'structure-class
-			:name symbol
-			:direct-superclasses
-                        (mapcar #'classoid-name
-                                (classoid-direct-superclasses
-                                 (find-classoid symbol)))
-			:direct-slots
-			(mapcar #'slot-initargs-from-structure-slotd
-				(structure-type-slot-description-list
-				 symbol)))))
-      (error "~S is not a legal structure class name." symbol)))
+(defun ensure-non-standard-class (name)
+  (flet
+      ((ensure (metaclass &optional (slots nil slotsp))
+	 (let ((supers
+		(mapcar #'classoid-name (classoid-direct-superclasses
+					 (find-classoid name)))))
+	   (if slotsp
+	       (ensure-class-using-class name nil
+					 :metaclass metaclass :name name
+					 :direct-superclasses supers
+					 :direct-slots slots)
+	       (let ((supers (nsubstitute t 'instance supers)))
+		 (ensure-class-using-class name nil
+					   :metaclass metaclass :name name
+					   :direct-superclasses supers))))))
+    (cond ((structure-type-p name)
+	   (ensure 'structure-class
+		   (mapcar #'slot-initargs-from-structure-slotd
+			   (structure-type-slot-description-list name))))
+	  ((condition-type-p name)
+	   (ensure 'condition-class))
+	  (t
+	   (error "~@<~S is not the name of a class.~@:>" name)))))
 
 (defun make-class-predicate (class name)
   (let* ((gf (ensure-generic-function name))
