@@ -1440,3 +1440,23 @@
 			                (type (unsigned-byte 32) x y))
 			       (logand #xffffffff (ash x y))))
 		1 257)))
+
+;;; code instrumenting problems
+(compile nil
+  '(lambda ()
+    (declare (optimize (debug 3)))
+    (list (the integer (if nil 14 t)))))
+
+(compile nil
+  '(LAMBDA (A B C D)
+    (DECLARE (NOTINLINE LOGORC1 BYTE MASK-FIELD))
+    (DECLARE
+     (OPTIMIZE (SPEED 1)
+      (SPACE 1)
+      (SAFETY 1)
+      (DEBUG 3)
+      (COMPILATION-SPEED 0)))
+    (MASK-FIELD (BYTE 7 26)
+     (PROGN
+       (TAGBODY (THE INTEGER (CATCH 'CT4 (LOGORC1 C -15950))) 1)
+       B))))
