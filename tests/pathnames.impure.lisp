@@ -79,17 +79,21 @@
 ;;; FIXME: currently SBCL throws NAMESTRING-PARSE-ERROR: should this be
 ;;; a TYPE-ERROR?
 
-(assert (not (ignore-errors
-               (make-pathname :host "FOO" :directory "!bla" :name "bar"))))
-
-;; error: name-component not valid
-(assert (not (ignore-errors
-               (make-pathname :host "FOO" :directory "bla" :name "!bar"))))
-
-;; error: type-component not valid.
-(assert (not (ignore-errors
-               (make-pathname :host "FOO" :directory "bla" :name "bar"
-                              :type "&baz"))))
+(locally
+  ;; MAKE-PATHNAME is UNSAFELY-FLUSHABLE
+  (declare (optimize safety))
+  
+  (assert (not (ignore-errors
+		(make-pathname :host "FOO" :directory "!bla" :name "bar"))))
+  
+  ;; error: name-component not valid
+  (assert (not (ignore-errors
+		(make-pathname :host "FOO" :directory "bla" :name "!bar"))))
+  
+  ;; error: type-component not valid.
+  (assert (not (ignore-errors
+		(make-pathname :host "FOO" :directory "bla" :name "bar"
+			       :type "&baz")))))
 
 ;;; We may need to parse the host as a LOGICAL-NAMESTRING HOST. The
 ;;; HOST in PARSE-NAMESTRING can be either a string or :UNSPECIFIC

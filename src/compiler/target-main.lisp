@@ -61,6 +61,7 @@
 	     (*last-format-args* nil)
 	     (*last-message-count* 0)
 	     (*gensym-counter* 0)
+	     (*policy* (lexenv-policy *lexenv*))
 	     ;; FIXME: ANSI doesn't say anything about CL:COMPILE
 	     ;; interacting with these variables, so we shouldn't. As
 	     ;; of SBCL 0.6.7, COMPILE-FILE controls its verbosity by

@@ -67,6 +67,17 @@ echo //doing warm init
 	  (sb-int:/show "done with warm.lisp, about to GC :FULL T")
 	  (gc :full t))
 
+        ;; resetting compilation policy to neutral values in
+        ;; preparation for SAVE-LISP-AND-DIE as final SBCL core (not
+        ;; in warm.lisp because SB-C::*POLICY* has file scope)
+        (sb-int:/show "setting compilation policy to neutral values")
+        (proclaim '(optimize (compilation-speed 1)
+		             (debug 1)
+		             (inhibit-warnings 1)
+		             (safety 1)
+		             (space 1)
+		             (speed 1)))
+
         (sb-int:/show "done with warm.lisp, about to SAVE-LISP-AND-DIE")
 	;; Even if /SHOW output was wanted during build, it's probably
 	;; not wanted by default after build is complete. (And if it's

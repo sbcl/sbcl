@@ -269,14 +269,3 @@
 ;;; through the cold boot process. They need to be set somewhere. Maybe the
 ;;; easiest thing to do is to read them out of package-data-list.lisp-expr
 ;;; now?
-
-;;;; resetting compilation policy to neutral values in preparation for
-;;;; SAVE-LISP-AND-DIE as final SBCL core
-
-(sb-int:/show "setting compilation policy to neutral values")
-(proclaim '(optimize (compilation-speed 1)
-		     (debug 1)
-		     (inhibit-warnings 1)
-		     (safety 1)
-		     (space 1)
-		     (speed 1)))

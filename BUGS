@@ -979,14 +979,6 @@ WORKAROUND:
           :ACCRUED-EXCEPTIONS (:INEXACT)
           :FAST-MODE NIL)
 
-185: "top-level forms at the REPL"
-  * (locally (defstruct foo (a 0 :type fixnum)))
-  gives an error:
-  ; caught ERROR:
-  ;   (in macroexpansion of (SB-KERNEL::%DELAYED-GET-COMPILER-LAYOUT BAR))
-  however, compiling and loading the same expression in a file works
-  as expected.
-
 187: "type inference confusion around DEFTRANSFORM time"
   (reported even more verbosely on sbcl-devel 2002-06-28 as "strange
   bug in DEFTRANSFORM")
@@ -1386,6 +1378,22 @@ WORKAROUND:
   (defun test (x y) (the (values integer) (truncate x y)))
   (test 10 4) => 2
 
+219: "DEFINE-COMPILER-MACRO in non-toplevel contexts evaluated at compile-time"
+  In sbcl-0.7.9:
+
+  * (defun foo (x) 
+      (when x
+        (define-compiler-macro bar (&whole whole)
+          (declare (ignore whole))
+          (print "expanding compiler macro")
+          1)))
+  FOO
+  * (defun baz (x) (bar))
+  [ ... ]
+  "expanding compiler macro"
+  BAZ
+  * (baz t)
+  1
 
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:
