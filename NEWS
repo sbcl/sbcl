@@ -1916,9 +1916,14 @@ changes in sbcl-0.8.2 relative to sbcl-0.8.1:
   * fixed bug: if last continuation of a deleted block has a
     destination, this destination should be deleted too. (reported by
     ohler on #lisp)
+  * fixed a bug in the bootstrap process: the host compiler's values
+    of ARRAY-DIMENSION-LIMIT and ARRAY-TOTAL-SIZE-LIMIT no longer leak
+    into the newly-built SBCL. (reported by Eric Marsden on #lisp,
+    test case from Patrik Nordebo)
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** LAST and [N]BUTLAST should accept a bignum.
     ** condition slot accessors are methods.
+    ** (VECTOR NIL) is a subtype of STRING.
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles

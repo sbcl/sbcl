@@ -130,3 +130,14 @@
 (multiple-value-bind (fun warn fail)
     (compile nil '(lambda () (make-array 5 :element-type 'undefined-type)))
   (assert warn))
+
+(flet ((opaque-identity (x) x))
+  (declare (notinline opaque-identity))
+  ;; we used to have leakage from cross-compilation hosts of the INDEX
+  ;; type, which prevented us from actually using all the large array
+  ;; dimensions that we promised.  Let's make sure that we can create
+  ;; an array with more than 2^24 elements, since that was a symptom
+  ;; from the CLISP and OpenMCL hosts.
+  (let ((big-array (opaque-identity 
+		    (make-array (expt 2 26) :element-type 'bit))))
+    (assert (= (length big-array) (expt 2 26)))))

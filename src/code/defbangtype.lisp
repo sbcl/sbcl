@@ -28,11 +28,11 @@
 ;;; completely parallel, at which time they should be merged to
 ;;; eliminate the duplicate code.
 
-(defmacro def!type (&rest rest)
+(defmacro def!type (name &rest rest)
   `(progn
-     (deftype ,@rest)
+     (deftype ,name ,@rest)
      #+sb-xc-host 
-     ,(let ((form `(sb!xc:deftype ,@(uncross rest))))
+     ,(let ((form `(sb!xc:deftype ,(uncross name) ,@rest)))
 	(if (boundp '*delayed-def!types*)
 	    `(push ',form *delayed-def!types*)
 	    form))))
