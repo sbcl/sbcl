@@ -3383,7 +3383,7 @@
 (defoptimizer (compile derive-type) ((nameoid function))
   (when (csubtypep (continuation-type nameoid)
 		   (specifier-type 'null))
-    (specifier-type 'function)))
+    (values-specifier-type '(values function boolean boolean))))
 
 ;;; FIXME: Maybe also STREAM-ELEMENT-TYPE should be given some loving
 ;;; treatment along these lines? (See discussion in COERCE DERIVE-TYPE
