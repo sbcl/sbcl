@@ -1579,11 +1579,4 @@ WORKAROUND:
   qualifier patterns.
 
 340: SETF of VALUES using too many values
-  (reported by Kalle Olavi Niemetalo via the Debian bug system, with
-  bug id #256764)
-
-    (let ((a t) (b t) (c t) (d t))
-      (setf (values (values a b) (values c d)) (values 1 2 3 4))
-      (list a b c d))
-  should return (1 NIL 2 NIL), but under sbcl-0.8.12.x returns 
-  (1 2 3 4) instead.
+  (fixed in sbcl-0.8.12.10)

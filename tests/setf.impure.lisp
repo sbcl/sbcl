@@ -29,5 +29,15 @@
   (shiftf (values (car x) (car y)) (values (car y) (car x)))
   (assert (equal (list x y) '((2) (1)))))
 
+;;; SETF of values with multiple-value place forms
+(let ((a t) (b t) (c t) (d t))
+  (let ((list (multiple-value-list
+	       (setf (values (values a b) (values c d)) (values 1 2 3 4)))))
+    (assert (equal list '(1 2)))
+    (assert (eql a 1))
+    (assert (eql c 2))
+    (assert (null b))
+    (assert (null d))))
+
 ;;; success
 (quit :unix-status 104)

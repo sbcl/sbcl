@@ -85,9 +85,12 @@
       (dolist (place places)
 	(multiple-value-bind (dummies vals newval setter getter)
 	    (sb!xc:get-setf-expansion place env)
-	  (setq all-dummies (append all-dummies dummies)
-		all-vals (append all-vals vals)
-		newvals (append newvals newval))
+	  ;; ANSI 5.1.2.3 explains this logic quite precisely.  --
+	  ;; CSR, 2004-06-29
+	  (setq all-dummies (append all-dummies dummies (cdr newval))
+		all-vals (append all-vals vals
+				 (mapcar (constantly nil) (cdr newval)))
+		newvals (append newvals (list (car newval))))
 	  (setters setter)
 	  (getters getter)))
       (values all-dummies all-vals newvals

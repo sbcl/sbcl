@@ -2554,14 +2554,14 @@ changes in sbcl-0.8.12 relative to sbcl-0.8.11:
     instances corresponding to C structs.
 
 changes in sbcl-0.8.13 relative to sbcl-0.8.12:
+  * new feature: SB-PACKAGE-LOCKS. See the "Package Locks" section of
+    the manual for details; add :SB-PACKAGE-LOCKS in
+    customize-target-features.lisp to enable them.
   * minor incompatible change: as threatened around sbcl-0.8.0, the
     home package of MOP-related symbols is now SB-MOP, not SB-PCL.
     The symbols are also exported from SB-PCL for backwards
     compatibility, but more so than before SB-PCL should be treated as
     an implementation-internal package.
-  * new feature: SB-PACKAGE-LOCKS. See the fine manual for details,
-    add :SB-PACKAGE-LOCKS in customize-target-features.lisp to
-    enable them.
   * the SB-SPROF contrib now works on (most) non-x86 architectures.
     It is known as of this release not to work on the Alpha, however.
   * fixed bug #338: instances of EQL-SPECIFIER are now valid type
@@ -2569,6 +2569,9 @@ changes in sbcl-0.8.13 relative to sbcl-0.8.12:
   * fixed bug #333: CHECK-TYPE now ensures that the type error
     signalled, if any, has the right object to be accessed by
     TYPE-ERROR-DATUM.  (reported by Tony Martinez)
+  * fixed bug #340: SETF of VALUES obeys the specification in ANSI
+    5.1.2.3 for multiple-value place subforms.  (reported by Kalle
+    Olavi Niemetalo)
   * fixed a bug: #\Space (and other whitespace characters) are no
     longer considered to be macro characters in standard syntax by
     GET-MACRO-CHARACTER.
