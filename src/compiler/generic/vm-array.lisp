@@ -21,7 +21,7 @@
 	      initial-element-default
 	      n-bits
 	      primitive-type-name
-	      &key (n-pad-elements 0) complex-typecode
+	      &key (n-pad-elements 0) complex-typecode (importance 0)
 	      &aux (typecode
 		    (eval (symbolicate primitive-type-name "-WIDETAG")))))
 	    (:copier nil))
@@ -48,7 +48,12 @@
   ;; low level hackery (e.g., one element for arrays of BASE-CHAR,
   ;; which is used for a fixed #\NULL so that when we call out to C
   ;; we don't need to cons a new copy)
-  (n-pad-elements (missing-arg) :type index :read-only t))
+  (n-pad-elements (missing-arg) :type index :read-only t)
+  ;; the relative importance of this array type.  Used for determining
+  ;; the order of the TYPECASE in HAIRY-DATA-VECTOR-{REF,SET}.  High
+  ;; positive numbers are near the top; low negative numbers near the
+  ;; bottom.
+  (importance (missing-arg) :type fixnum :read-only t))
 
 (defparameter *specialized-array-element-type-properties*
   (map 'simple-vector
@@ -57,19 +62,22 @@
        `(;; Erm.  Yeah.  There aren't a lot of things that make sense
 	 ;; for an initial element for (ARRAY NIL). -- CSR, 2002-03-07
 	 (nil #:mu 0 simple-array-nil
-	      :complex-typecode #.sb!vm:complex-vector-nil-widetag)
+	      :complex-typecode #.sb!vm:complex-vector-nil-widetag
+	      :importance -3)
 	 (base-char ,(code-char 0) 8 simple-base-string
 		    ;; (SIMPLE-BASE-STRINGs are stored with an extra
 		    ;; trailing #\NULL for convenience in calling out
 		    ;; to C.)
 		    :n-pad-elements 1
-	            :complex-typecode #.sb!vm:complex-base-string-widetag)
+	            :complex-typecode #.sb!vm:complex-base-string-widetag
+	            :importance 2)
 	 (single-float 0.0f0 32 simple-array-single-float)
 	 (double-float 0.0d0 64 simple-array-double-float)
 	 #!+long-float
 	 (long-float 0.0l0 #!+x86 96 #!+sparc 128 simple-array-long-float)
 	 (bit 0 1 simple-bit-vector
-	      :complex-typecode #.sb!vm:complex-bit-vector-widetag)
+	      :complex-typecode #.sb!vm:complex-bit-vector-widetag
+	      :importance 1)
 	 ;; KLUDGE: The fact that these UNSIGNED-BYTE entries come
 	 ;; before their SIGNED-BYTE partners is significant in the
 	 ;; implementation of the compiler; some of the cross-compiler
@@ -79,8 +87,10 @@
 	 ;; (UNSIGNED-BYTE 7) is SUBTYPEP (SIGNED-BYTE 8), so if we're
 	 ;; not careful we could get the wrong specialized array when
 	 ;; we try to FIND-IF, below. -- CSR, 2002-07-08
-	 ((unsigned-byte 2) 0 2 simple-array-unsigned-byte-2)
-	 ((unsigned-byte 4) 0 4 simple-array-unsigned-byte-4)
+	 ((unsigned-byte 2) 0 2 simple-array-unsigned-byte-2
+	                    :importance -2)
+	 ((unsigned-byte 4) 0 4 simple-array-unsigned-byte-4
+	                    :importance -1)
 	 ((unsigned-byte 8) 0 8 simple-array-unsigned-byte-8)
 	 ((unsigned-byte 16) 0 16 simple-array-unsigned-byte-16)
 	 ((unsigned-byte 32) 0 32 simple-array-unsigned-byte-32)
@@ -98,7 +108,7 @@
 	 #!+long-float
 	 ((complex long-float) #C(0.0l0 0.0l0) #!+x86 192 #!+sparc 256
 	  simple-array-complex-long-float)
-	 (t 0 32 simple-vector))))
+	 (t 0 32 simple-vector :importance 3))))
 
 (defvar sb!kernel::*specialized-array-element-types*
   (map 'list

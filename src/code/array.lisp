@@ -282,42 +282,20 @@
   (coerce (the list objects) 'simple-vector))
 
 ;;;; accessor/setter functions
-(eval-when (:compile-toplevel :execute)
-  (defparameter *specialized-array-element-types*
-    ;; FIXME: Ideally we would generate this list from
-    ;; SPECIALIZED-ARRAY-ELEMENT-TYPE-PROPERTIES.  However, this list
-    ;; is optimized for frequency of occurrence, not type lattice
-    ;; relationships, so it's tricky to do so cleanly.
-    '(t
-      character
-      bit
-      (unsigned-byte 8)
-      (unsigned-byte 16)
-      (unsigned-byte 32)
-      (signed-byte 8)
-      (signed-byte 16)
-      (signed-byte 30)
-      (signed-byte 32)
-      single-float
-      double-float
-      #!+long-float long-float
-      (complex single-float)
-      (complex double-float)
-      #!+long-float (complex long-float)
-      (unsigned-byte 4)
-      (unsigned-byte 2)
-      nil)))
-
 (defun hairy-data-vector-ref (array index)
   (with-array-data ((vector array) (index index) (end))
     (declare (ignore end))
     (etypecase vector .
-	       #.(mapcar (lambda (type)
-			   (let ((atype `(simple-array ,type (*))))
-			     `(,atype
-			       (data-vector-ref (the ,atype vector)
-						index))))
-			 *specialized-array-element-types*))))
+	       #.(map 'list
+		      (lambda (saetp)
+			(let* ((type (sb!vm:saetp-specifier saetp))
+			       (atype `(simple-array ,type (*))))
+			  `(,atype
+			    (data-vector-ref (the ,atype vector) index))))
+		      (sort
+		       (copy-seq
+			sb!vm:*specialized-array-element-type-properties*)
+		       #'> :key #'sb!vm:saetp-importance)))))
 
 ;;; (Ordinary DATA-VECTOR-REF usage compiles into a vop, but
 ;;; DATA-VECTOR-REF is also FOLDABLE, and this ordinary function
@@ -329,20 +307,23 @@
   (with-array-data ((vector array) (index index) (end))
     (declare (ignore end))
     (etypecase vector .
-	       #.(mapcar (lambda (type)
-			   (let ((atype `(simple-array ,type (*))))
-			     `(,atype
-			       (data-vector-set (the ,atype vector)
-						index
-						(the ,type
-						  new-value))
-			       ;; For specialized arrays, the return
-			       ;; from data-vector-set would have to
-			       ;; be reboxed to be a (Lisp) return
-			       ;; value; instead, we use the
-			       ;; already-boxed value as the return.
-			       new-value)))
-			 *specialized-array-element-types*))))
+	       #.(map 'list
+		      (lambda (saetp)
+			(let* ((type (sb!vm:saetp-specifier saetp))
+			       (atype `(simple-array ,type (*))))
+			  `(,atype
+			    (data-vector-set (the ,atype vector) index
+			                     (the ,type new-value))
+			    ;; For specialized arrays, the return from
+			    ;; data-vector-set would have to be
+			    ;; reboxed to be a (Lisp) return value;
+			    ;; instead, we use the already-boxed value
+			    ;; as the return.
+			    new-value)))
+		      (sort
+		       (copy-seq
+			sb!vm:*specialized-array-element-type-properties*)
+		       #'> :key #'sb!vm:saetp-importance)))))
 
 (defun %array-row-major-index (array subscripts
 				     &optional (invalid-index-error-p t))
