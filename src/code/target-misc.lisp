@@ -123,6 +123,16 @@
   "Return a string giving the name of the local machine."
   (sb!unix:unix-gethostname))
 
+(defvar *machine-version*)
+
+(defun machine-version ()
+  #!+sb-doc
+  "Return a string describing the version of the computer hardware we
+are running on, or NIL if we can't find any useful information."
+  (unless (boundp '*machine-version*)
+    (setf *machine-version* (get-machine-version)))
+  *machine-version*)
+  
 ;;; FIXME: Don't forget to set these in a sample site-init file.
 ;;; FIXME: Perhaps the functions could be SETFable instead of having the
 ;;; interface be through special variables? As far as I can tell

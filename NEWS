@@ -1879,7 +1879,7 @@ changes in sbcl-0.8.1 relative to sbcl-0.8.0:
        treated by SLOT-BOUNDP, SLOT-VALUE, (SETF SLOT-VALUE) and
        SLOT-MAKUNBOUND in the specified fashion.
 
-changes in sbcl-0.8.1 relative to sbcl-0.8.0:
+changes in sbcl-0.8.2 relative to sbcl-0.8.1:
   * fixed bug 148: failure to inline-expand a local function left
     garbage, confusing the compiler.
   * fixed bugs 3cd: structure slot readers perform type check if the
@@ -1888,6 +1888,8 @@ changes in sbcl-0.8.1 relative to sbcl-0.8.0:
   * bug fix: the compiler now traps array references to elements off
     the end of an array; previously, the bounds checking in some
     circumstances could go off-by-one.
+  * improved MACHINE-VERSION, especially on Linux (thanks to Lars
+    Brinkhoff)
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles

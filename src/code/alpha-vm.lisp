@@ -22,9 +22,10 @@
 (defun machine-type ()
   "Return a string describing the type of the local machine."
   "Alpha")
-(defun machine-version ()
-  "Return a string describing the version of the local machine."
-  "Alpha")
+
+;;; support for CL:MACHINE-VERSION defined OAOO elsewhere
+(defun get-machine-version ()
+  nil)
 
 (defun fixup-code-object (code offset value kind)
   (unless (zerop (rem offset n-word-bytes))
