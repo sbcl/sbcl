@@ -1677,7 +1677,9 @@
 (deftransform values ((&rest vals) * * :node node)
   (unless (lvar-single-value-p (node-lvar node))
     (give-up-ir1-transform))
-  (setf (node-derived-type node) *wild-type*)
+  (setf (node-derived-type node)
+        (make-short-values-type (list (single-value-type
+                                       (node-derived-type node)))))
   (principal-lvar-single-valuify (node-lvar node))
   (if vals
       (let ((dummies (make-gensym-list (length (cdr vals)))))

@@ -13,16 +13,16 @@
 
 ;;; variables for accumulating the results of parsing a DEFMACRO. (Declarations
 ;;; in DEFMACRO are the reason this isn't as easy as it sounds.)
-(defvar *arg-tests* nil) ; tests that do argument counting at expansion time
+(defvar *arg-tests*) ; tests that do argument counting at expansion time
 (declaim (type list *arg-tests*))
-(defvar *system-lets* nil) ; LET bindings done to allow lambda-list parsing
+(defvar *system-lets*) ; LET bindings done to allow lambda-list parsing
 (declaim (type list *system-lets*))
-(defvar *user-lets* nil) ; LET bindings that the user has explicitly supplied
+(defvar *user-lets*) ; LET bindings that the user has explicitly supplied
 (declaim (type list *user-lets*))
-(defvar *env-var* nil) ; &ENVIRONMENT variable name
+(defvar *env-var*) ; &ENVIRONMENT variable name
 
 ;; the default default for unsupplied &OPTIONAL and &KEY args
-(defvar *default-default* nil)
+(defvar *default-default*)
 
 ;;; temps that we introduce and might not reference
 (defvar *ignorable-vars*)

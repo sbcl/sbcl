@@ -959,7 +959,11 @@
                          next-block)))
     (move-return-stuff fun call next-block)
     (merge-lets fun call)
-    (setf (node-tail-p call) nil)))
+    (setf (node-tail-p call) nil)
+    ;; If CALL has a derive type NIL, it means that "its return" is
+    ;; unreachable, but the next BIND is still reachable; in order to
+    ;; not confuse MAYBE-TERMINATE-BLOCK...
+    (setf (node-derived-type call) *wild-type*)))
 
 ;;; Reoptimize all of CALL's args and its result.
 (defun reoptimize-call (call)
