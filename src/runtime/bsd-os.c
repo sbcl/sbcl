@@ -218,9 +218,6 @@ os_install_interrupt_handlers(void)
 #ifdef LISP_FEATURE_SB_THREAD
 #error "Define threading support functions"
 #else
-struct thread *arch_os_get_current_thread() {
-    return all_threads;
-}
 int arch_os_thread_init(struct thread *thread) {
   stack_t sigstack;
 #ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK

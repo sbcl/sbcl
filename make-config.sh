@@ -95,6 +95,7 @@ ln -s $sbcl_arch-lispregs.h target-lispregs.h
 case `uname` in 
     Linux)
 	printf ' :linux' >> $ltf
+	sbcl_os="linux"
 	if [ "`uname -m`" = "x86_64" ]; then
 	    ln -s Config.x86_64-linux Config
 	else
@@ -108,6 +109,7 @@ case `uname` in
         # the marketers forgot to tell the engineers about Digital Unix
         # _or_ OSF/1 ...
 	printf ' :osf1' >> $ltf
+	sbcl_os="osf1"
         ln -s Config.$sbcl_arch-osf1 Config
 	ln -s $sbcl_arch-osf1-os.h target-arch-os.h
 	ln -s osf1-os.h target-os.h
@@ -119,10 +121,12 @@ case `uname` in
 	case `uname` in
 	    FreeBSD)
 		printf ' :freebsd' >> $ltf
+		sbcl_os="freebsd"
 		ln -s Config.$sbcl_arch-freebsd Config
 		;;
 	    OpenBSD)
 		printf ' :openbsd' >> $ltf
+		sbcl_os="openbsd"
 		ln -s Config.$sbcl_arch-openbsd Config
 		;;
 	    *)
@@ -133,6 +137,7 @@ case `uname` in
 	;;
     Darwin)
 	printf ' :bsd' >> $ltf
+	sbcl_os="darwin"
 	ln -s $sbcl_arch-darwin-os.h target-arch-os.h
 	ln -s bsd-os.h target-os.h
 	printf ' :darwin' >> $ltf
@@ -140,6 +145,7 @@ case `uname` in
 	;;
     SunOS)
         printf ' :sunos' >> $ltf
+	sbcl_os="sunos"
 	ln -s Config.$sbcl_arch-sunos Config
 	ln -s $sbcl_arch-sunos-os.h target-arch-os.h
 	ln -s sunos-os.h target-os.h
@@ -166,6 +172,12 @@ elif [ "$sbcl_arch" = "mips" ] ; then
     # cross-compilers!
     $GNUMAKE -C tools-for-build determine-endianness
     tools-for-build/determine-endianness >> $ltf
+elif [ "$sbcl_arch" = "ppc" -a "$sbcl_os" = "linux" ]; then
+    # Use a C program to detect which kind of glibc we're building on,
+    # to bandage across the break in source compatibility between
+    # versions 2.3.1 and 2.3.2
+    $GNUMAKE -C tools-for-build where-is-mcontext
+    tools-for-build/where-is-mcontext > src/runtime/ppc-linux-mcontext.h
 else
     # Nothing need be done in this case, but sh syntax wants a placeholder.
     echo > /dev/null

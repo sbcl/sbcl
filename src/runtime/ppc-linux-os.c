@@ -36,11 +36,10 @@
 #include <unistd.h>
 
 #include "validate.h"
+#include "ppc-linux-mcontext.h"
+
 size_t os_vm_page_size;
 
-struct thread *arch_os_get_current_thread() {
-    return all_threads;
-}
 int arch_os_thread_init(struct thread *thread) {
     return 1;			/* success */
 }
@@ -51,25 +50,41 @@ int arch_os_thread_cleanup(struct thread *thread) {
 os_context_register_t   *
 os_context_register_addr(os_context_t *context, int offset)
 {
+#if defined(GLIBC231_STYLE_UCONTEXT)
     return &((context->uc_mcontext.regs)->gpr[offset]);
+#elif defined(GLIBC232_STYLE_UCONTEXT)
+    return &((context->uc_regs->gregs)[offset]);
+#endif
 }
 
 os_context_register_t *
 os_context_pc_addr(os_context_t *context)
 {
+#if defined(GLIBC231_STYLE_UCONTEXT)
     return &((context->uc_mcontext.regs)->nip);
+#elif defined(GLIBC232_STYLE_UCONTEXT)
+    return &((context->uc_regs->gregs)[PT_NIP]);
+#endif
 }
 
 os_context_register_t *
 os_context_lr_addr(os_context_t *context)
 {
+#if defined(GLIBC231_STYLE_UCONTEXT)
     return &((context->uc_mcontext.regs)->link);
+#elif defined(GLIBC232_STYLE_UCONTEXT)
+    return &((context->uc_regs->gregs)[PT_LNK]);
+#endif
 }
 
 sigset_t *
 os_context_sigmask_addr(os_context_t *context)
 {
+#if defined(GLIBC231_STYLE_UCONTEXT)
     return &context->uc_sigmask;
+#elif defined(GLIBC232_STYLE_UCONTEXT)
+    return &context->uc_oldsigmask;
+#endif
 }
 
 unsigned long
@@ -80,7 +95,11 @@ os_context_fp_control(os_context_t *context)
        registers, and PT_FPSCR is an offset that is larger than 32
        (the number of ppc registers), but that happens to get the
        right answer. -- CSR, 2002-07-11 */
+#if defined(GLIBC231_STYLE_UCONTEXT)
     return context->uc_mcontext.regs->gpr[PT_FPSCR]; 
+#elif defined(GLIBC232_STYLE_UCONTEXT)
+    return context->uc_regs->gregs[PT_FPSCR]; 
+#endif
 }
 
 void 

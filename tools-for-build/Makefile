@@ -7,11 +7,11 @@
 # provided with absolutely no warranty. See the COPYING and CREDITS
 # files for more information.
 
-include ../src/runtime/Config
+-include ../src/runtime/Config
 
 CPPFLAGS=-I../src/runtime
 
-all: grovel_headers determine-endianness
+all: grovel_headers determine-endianness where-is-mcontext
 
 clean: 
-	rm -f *.o grovel_headers determine-endianness
+	rm -f *.o grovel_headers determine-endianness where-is-mcontext
