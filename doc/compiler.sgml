@@ -274,10 +274,10 @@ gives this error:
 
 <screen>in: DEFUN FOO
   (DO ((CURRENT L #) (# NIL)) (WHEN (EQ # E) (RETURN CURRENT)) )
-caught ERROR: (during macroexpansion)
-
-error in function LISP::FROB-DO-BODY:
-   DO step variable is not a symbol: (ATOM CURRENT)</screen>
+caught ERROR: 
+  (in macroexpansion of (DO # #))
+  (hint: For more precise location, try *BREAK-ON-SIGNALS*.)
+  DO step variable is not a symbol: (ATOM CURRENT)</screen>
 </para>
 
 </sect2>

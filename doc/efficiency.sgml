@@ -28,7 +28,7 @@ few other points to keep in mind.
 <itemizedlist>
   <listitem><para>The &CMUCL; manual doesn't seem to state it explicitly,
     but &Python; has a mental block about type inference when
-    assignment is. involved &Python; is very aggressive and clever
+    assignment is involved. &Python; is very aggressive and clever
     about inferring the types of values bound with <function>let</>,
     <function>let*</>, inline function call, and so forth. However,
     it's much more passive and dumb about inferring the types of

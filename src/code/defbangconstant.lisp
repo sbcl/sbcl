@@ -22,15 +22,15 @@
 ;;; confident in my understanding, I might try to do drastic surgery,
 ;;; but my head is currently spinning (host? target? both?) so I'll go
 ;;; for the minimal changeset... -- CSR, 2002-05-11
-(defmacro def!constant (&rest rest name value &optional doc)
+(defmacro def!constant (&whole whole name value &optional doc)
   `(progn
      #-sb-xc-host
-     (defconstant ,@rest)
+     (defconstant ,@(cdr whole))
      #+sb-xc-host
      ,(unless (eql (find-symbol (symbol-name name) :cl) name)
-	`(defconstant ,@rest))
+	`(defconstant ,@(cdr whole)))
      #+sb-xc-host 
-     ,(let ((form `(sb!xc:defconstant ,@rest)))
+     ,(let ((form `(sb!xc:defconstant ,@(cdr whole))))
 	(if (boundp '*delayed-def!constants*)
 	    `(push ',form *delayed-def!constants*)
 	    form))))

@@ -1235,6 +1235,14 @@ WORKAROUND:
     (DEFCLASS FOO () ((A :SILLY T))) 
   signals a SIMPLE-ERROR, not a PROGRAM-ERROR.
 
+172:
+  sbcl's treatment of at least macro lambda lists is too permissive;
+  e.g., in sbcl-0.7.3.7:
+    (defmacro foo (&rest rest bar) `(,bar ,rest))
+    (macroexpand '(foo quux zot)) -> (QUUX (QUUX ZOT))
+  whereas section 3.4.4 of the CLHS doesn't allow required parameters
+  to come after the rest argument.
+
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:
     These labels were used for bugs related to the old IR1 interpreter.

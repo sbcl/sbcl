@@ -561,7 +561,7 @@
 				;; haven't tried to understand the
 				;; performance issues involved. --
 				;; WHN, and also CSR 2002-05-26
-				(simple-array index (or index null))
+				((or vector simple-array) index (or index null))
 				*
 				:important t
 				:node node
