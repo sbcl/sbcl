@@ -10,16 +10,6 @@
 
 ;;; (pushnew :sb-simple-stream *features*)
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  #+(or X86) (pushnew :little-endian *features*))
-
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  #-little-endian (pushnew :big-endian *features*))
-
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  #-(or big-endian little-endian) (error "Unsupported architecture"))
-
-
 ;;;
 ;;; TYPES FOR BUFFER AND STRATEGY FUNCTIONS
 ;;;

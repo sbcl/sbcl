@@ -209,12 +209,14 @@
   (declare (type unix-fd fd))
   (int-syscall ("isatty" int) fd))
 
-;;; Accept a file descriptor and move the file pointer ahead
-;;; a certain offset for that file. WHENCE can be any of the following:
-;;;  L_SET     Set the file pointer.
-;;;  L_INCR    Increment the file pointer.
-;;;  L_XTND    Extend the file size.
 (defun unix-lseek (fd offset whence)
+  "Unix-lseek accepts a file descriptor and moves the file pointer by 
+   OFFSET octets.  Whence can be any of the following:
+
+   L_SET        Set the file pointer.
+   L_INCR       Increment the file pointer.
+   L_XTND       Extend the file size.
+  "
   (declare (type unix-fd fd)
 	   (type (integer 0 2) whence))
   (int-syscall ("lseek" int off-t int) fd offset whence))
@@ -401,7 +403,7 @@
 (defun unix-ioctl (fd cmd arg)
   (declare (type unix-fd fd)
 	   (type (signed-byte 32) cmd))
-  (void-syscall ("ioctl" int signed-int (* char)) fd cmd arg))
+  (void-syscall ("ioctl" int int (* char)) fd cmd arg))
 
 ;;;; sys/resource.h
 

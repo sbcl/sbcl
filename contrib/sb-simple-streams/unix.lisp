@@ -13,24 +13,6 @@
 (in-package "SB-UNIX")
 
 
-;;; TODO (Rudi 2003-05-12): Check whether this bug exists in sbcl, fix
-;;; it if yes, and take care not to break platforms where the offset
-;;; is not a 32-bit signed integer.
-
-;; Fix bug that claims offset is unsigned, so seeking backwards works!
-(defun unix-lseek (fd offset whence)
-  "Unix-lseek accepts a file descriptor and moves the file pointer ahead
-   a certain offset for that file.  Whence can be any of the following:
-
-   l_set        Set the file pointer.
-   l_incr       Increment the file pointer.
-   l_xtnd       Extend the file size.
-  "
-  (declare (type unix-fd fd)
-           (type (signed-byte 32) offset)
-           (type (integer 0 2) whence))
-  (int-syscall ("lseek" int off-t int) fd offset whence))
-
 (export '(prot-read prot-write prot-exec prot-none
           map-shared map-private map-fixed
           unix-mmap unix-munmap
