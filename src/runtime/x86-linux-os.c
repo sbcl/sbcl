@@ -40,13 +40,12 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <asm/ldt.h>
-#include "modify-ldt-struct-name.h"
 #include <linux/unistd.h>
 #include <sys/mman.h>
+#include <linux/version.h>
 #include "thread.h"		/* dynamic_values_bytes */
 
-#ifndef MODIFY_LDT_STRUCT_NAMED_USER_DESC
-/* old glibc */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
 #define user_desc  modify_ldt_ldt_s 
 #endif
 

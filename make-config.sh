@@ -167,10 +167,6 @@ cd $original_dir
 # similar with :STACK-GROWS-FOOWARD, too. -- WHN 2002-03-03
 if [ "$sbcl_arch" = "x86" ] ; then
     printf ' :gencgc :stack-grows-downward-not-upward :c-stack-is-control-stack' >> $ltf
-    cd tools-for-build
-    $GNUMAKE -I ../src/runtime modify-ldt-struct-name
-    ./modify-ldt-struct-name > ../src/runtime/modify-ldt-struct-name.h
-    cd ..
 elif [ "$sbcl_arch" = "mips" ] ; then
     # Use a little C program to try to guess the endianness.  Ware
     # cross-compilers!
