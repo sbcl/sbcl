@@ -2104,10 +2104,7 @@ core and return a descriptor to it."
 
 (clone-cold-fop (fop-character-string)
 		(fop-small-character-string)
-  (let* ((len (clone-arg))
-	 (string (make-string len)))
-    (read-string-as-bytes *fasl-input-stream* string)
-    (base-string-to-core string)))
+  (bug "CHARACTER-STRING dumped by cross-compiler."))
 
 (clone-cold-fop (fop-vector)
 		(fop-small-vector)

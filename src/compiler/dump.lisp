@@ -601,6 +601,11 @@
 	(t
 	 (unless *cold-load-dump*
 	   (dump-fop 'fop-normal-load file))
+         #+sb-xc-host
+         (dump-simple-base-string
+          (coerce (package-name pkg) 'simple-base-string)
+          file)
+         #-sb-xc-host
 	 (dump-simple-character-string
 	  (coerce (package-name pkg) '(simple-array character (*)))
 	  file)
@@ -734,10 +739,17 @@
 					(*)))
 			    x)))
     (typecase simple-version
+      #+sb-xc-host
+      (simple-string
+       (unless (string-check-table x file)
+         (dump-simple-base-string simple-version file)
+         (string-save-object x file)))
+      #-sb-xc-host
       (simple-base-string
        (unless (string-check-table x file)
 	 (dump-simple-base-string simple-version file)
 	 (string-save-object x file)))
+      #-sb-xc-host
       ((simple-array character (*))
        (unless (string-check-table x file)
 	 (dump-simple-character-string simple-version file)
@@ -900,7 +912,7 @@
 (defun dump-base-chars-of-string (s fasl-output)
   (declare (type base-string s) (type fasl-output fasl-output))
   (dovector (c s)
-    (dump-byte (char-code c) fasl-output))
+    (dump-byte (sb!xc:char-code c) fasl-output))
   (values))
 
 ;;; Dump a SIMPLE-BASE-STRING.
@@ -908,20 +920,6 @@
   (declare (type simple-base-string s))
   (dump-fop* (length s) fop-small-base-string fop-base-string file)
   (dump-base-chars-of-string s file)
-  (values))
-
-;;; a helper function shared by DUMP-SIMPLE-CHARACTER-STRING and DUMP-SYMBOL
-(defun dump-characters-of-string (s fasl-output)
-  (declare (type string s) (type fasl-output fasl-output))
-  (dovector (c s)
-    ;; DUMP-UNSIGNED-32 soon
-    (dump-byte (char-code c) fasl-output))
-  (values))
-
-(defun dump-simple-character-string (s file)
-  (declare (type (simple-array character (*)) s))
-  (dump-fop* (length s) fop-small-character-string fop-character-string file)
-  (dump-characters-of-string s file)
   (values))
 
 ;;; If we get here, it is assumed that the symbol isn't in the table,
@@ -971,7 +969,8 @@
 		      file)
 	   (dump-unsigned-32 pname-length file)))
 
-    (dump-characters-of-string pname file)
+    #+sb-xc-host (dump-base-chars-of-string pname file)
+    #-sb-xc-host (dump-characters-of-string pname file)
 
     (unless *cold-load-dump*
       (setf (gethash s (fasl-output-eq-table file))

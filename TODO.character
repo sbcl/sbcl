@@ -109,6 +109,19 @@ even current bloated sbcl.core look tiny.)
      (Note that the symbol printer has multiple bugs in its logic
      which have not been fixed by this branch.)
 
+** fix GENESIS (and the cross-compiler in general) to dump
+BASE-STRINGs always.  (Rationale: SBCL aspires to portability, so
+should not use any non-STANDARD-CHAR in its source code.  By
+definition, therefore, all strings and stringlike objects are dumpable
+as BASE-STRING, which allows for identical cold fasls and cores to be
+generated from lisps with different BASE-CHAR/CHARACTER distinctions.)
+  -- done: the cross-compiler type system, the cross-compiler dumper
+     and genesis cooperate to make every host string look like a
+     target base-string.
+  -- (Note that dubious uses of CL:TYPE-OF in portions of the
+     compiler such as CONVERT-MEMBER-TYPE, TWO-ARG-DERIVE-TYPE
+     remain.)
+
 ** implement an SB-ALIEN:UTF8-STRING parallel to SB-ALIEN:C-STRING.
 (Rationale: for calling out to Pango or similar.  Actually, a valid
 use might be in Unix libc/kernel functions: at least under Linux, I
@@ -121,32 +134,6 @@ layer go away.
 support people other than simply those living in non-Eurozone Western
 Europe or the United States of America.)  This requires at minimum
 adjusting the dumper/fop code and the low-level memory accessors.
-
-** fix GENESIS to dump BASE-STRINGs always.  (Rationale: SBCL aspires
-to portability, so should not use any non-STANDARD-CHAR in its source
-code.  By definition, therefore, all strings and stringlike objects
-are dumpable as BASE-STRING, which allows for identical cold fasls and
-cores to be generated from lisps with different BASE-CHAR/CHARACTER
-distinctions.)
-  -- NOTE I: This is actually moderately tricky, because not only do
-     GENESIS (src/compiler/generic/genesis) and the regular dumper
-     (src/compiler/dump) need to be adjusted, in relatively simple
-     ways, but also the cross-compiler's versions of various
-     type-investigating predicates (CTYPE-OF, SB!XC:TYPEP) must be
-     taught that objects which are any kind of string on the host will
-     become BASE-STRINGs on the new lisp.  Probably best to do this
-     after the two string representations are separated, so that any
-     breakage will be immediately obvious -- but it may be that this
-     is too hard to implement properly at all.
-  -- NOTE II: (while investigating and writing NOTE I) there are a
-     couple of extremely dubious uses of CL:TYPE-OF in bits of the
-     compiler: see the functions CONVERT-MEMBER-TYPE,
-     TWO-ARG-DERIVE-TYPE.
-  -- NOTE III: (while writing NOTE II) The current system is probably
-     equally broken, as the cross-compiler version of CTYPE-OF will
-     happily create types which need not exist in the target lisp (in
-     the ARRAY clause).  Using SPECIALIZE-ARRAY-TYPE would probably be
-     better, if the above TODO item is not done in its entirety.
 
 ** possibly retain a CHAR-CODE-LIMIT = 256 build option, with
 character point encoding dependent on locale.  This requires
