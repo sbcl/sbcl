@@ -75,7 +75,9 @@ static int later_count = 0;
 #define CEILING(x,y) (((x) + ((y) - 1)) & (~((y) - 1)))
 #define NWORDS(x,y) (CEILING((x),(y)) / (y))
 
-/* FIXME: Shouldn't this be defined in sbcl.h? */
+/* FIXME: Shouldn't this be defined in sbcl.h?  See also notes in
+ * cheneygc.c */
+
 #ifdef sparc
 #define FUN_RAW_ADDR_OFFSET 0
 #else

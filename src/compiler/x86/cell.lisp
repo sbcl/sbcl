@@ -116,13 +116,8 @@
   (:generator 2
     ;; The symbol-hash slot of NIL holds NIL because it is also the
     ;; cdr slot, so we have to strip off the two low bits to make sure
-    ;; it is a fixnum.
-    ;;
-    ;; FIXME: Is this still true? It seems to me from my reading of
-    ;; the DEFINE-PRIMITIVE-OBJECT in objdef.lisp that the symbol-hash
-    ;; is the second slot, and offset 0 = tags and stuff (and CAR slot in
-    ;; a CONS), offset 1 = value slot (and CDR slot in a CONS), and
-    ;; offset 2 = hash slot.
+    ;; it is a fixnum.  The lowtag selection magic that is required to
+    ;; ensure this is explained in the comment in objdef.lisp
     (loadw res symbol symbol-hash-slot other-pointer-lowtag)
     (inst and res (lognot #b11))))
 

@@ -60,15 +60,13 @@ tv_diff(struct timeval *x, struct timeval *y)
 
 #define BYTES_ZERO_BEFORE_END (1<<12)
 
-#ifdef alpha
-#define U32 u32
-#else
-#define U32 unsigned long
-#endif
+/* FIXME do we need this?  Doesn't it duplicate lisp code in 
+ * scrub-control-stack? */
+
 static void
 zero_stack(void)
 {
-    U32 *ptr = (U32 *)current_control_stack_pointer;
+    u32 *ptr = (u32 *)current_control_stack_pointer;
  search:
     do {
 	if (*ptr)
@@ -83,7 +81,6 @@ zero_stack(void)
 
     goto search;
 }
-#undef U32
 
 
 void *
@@ -155,23 +152,6 @@ collect_garbage(unsigned ignore)
 	lose("GC lossage.  Current dynamic space is bogus!\n");
     }
     new_space_free_pointer = new_space;
-#if 0
-    /* at one time we had the bright idea of using mprotect() to
-     * hide the semispace that we're not using at the moment, so
-     * we'd see immediately if anyone had a pointer to it.
-     * Unfortunately, if we gc during a call to an assembler
-     * routine with a "raw" return style, at least on PPC we are
-     * expected to return into oldspace because we can't easily
-     * update the link register - it's not tagged, and we can't do
-     * it as an offset of reg_CODE because the calling routine
-     * might be nowhere near our code vector.  We hope that we
-     * don't run very far in oldspace before it catapults us into
-     * newspace by either calling something else or returning
-     */
-
-    /* write-enable */
-    os_protect(new_space,DYNAMIC_SPACE_SIZE,OS_VM_PROT_ALL);
-#endif
 
     /* Initialize the weak pointer list. */
     weak_pointers = (struct weak_pointer *) NULL;
@@ -296,17 +276,9 @@ collect_garbage(unsigned ignore)
     printf("%10.2f M bytes/sec collected.\n", gc_rate);
 #endif
     /* os_flush_icache((os_vm_address_t) 0, sizeof(unsigned long)); */
-
-#if 0
-    /* see comment above about mprotecting oldspace */
-
-    /* zero the from space now, to make it easier to find stale
-       pointers to it */
-
-    /* pray that both dynamic spaces are the same size ... */
-    memset(from_space,(DYNAMIC_0_SPACE_END-DYNAMIC_0_SPACE_START-1),0);
-    os_protect(from_space,DYNAMIC_SPACE_SIZE,0); /* write-protect */
-#endif
+    /* Maybe FIXME: it's possible that we could significantly reduce 
+     * RSS by zeroing the from_space or madvise(MADV_DONTNEED) or 
+     * similar os-dependent tricks here */
 }
 
 
@@ -514,11 +486,16 @@ print_garbage(lispobj *from_space, lispobj *from_space_free_pointer)
 
 /* code and code-related objects */
 
-/* FIXME: Shouldn't this be defined in sbcl.h? */
+/* FIXME (1) this could probably be defined using something like
+ *  sizeof(lispobj)*floor(sizeof(struct simple_fun)/sizeof(lispobj))
+ *    -  FUN_POINTER_LOWTAG
+ * as I'm reasonably sure that simple_fun->code must always be the 
+ * last slot in the object 
 
+ * FIXME (2) it also appears in purify.c, and it has a different value
+ * for SPARC users in that bit
+ */
 
-/* static lispobj trans_fun_header(lispobj object); */
-/* static lispobj trans_boxed(lispobj object); */
 #define FUN_RAW_ADDR_OFFSET (6*sizeof(lispobj) - FUN_POINTER_LOWTAG)
 
 /* Note: on the sparc we don't have to do anything special for fdefns, */
