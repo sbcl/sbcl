@@ -1507,3 +1507,23 @@ WORKAROUND:
     imaginary part is the real part of the correct answer.
   (fixes for both of these were sent CSR sbcl-devel 2004-06-02, to be merged
    post-0.8.11)
+
+336: "slot-definitions must retain the generic functions of accessors"
+  reported by Tony Martinez:
+    (defclass foo () ((bar :reader foo-bar)))
+    (defun foo-bar (x) x)
+    (defclass foo () ((bar :reader get-bar))) ; => error, should work
+
+  Note: just punting the accessor removal if the fdefinition
+  is not a generic function is not enough:
+
+   (defclass foo () ((bar :reader foo-bar)))
+   (defvar *reader* #'foo-bar)
+   (defun foo-bar (x) x)
+   (defclass foo () ((bar :initform 'ok :reader get-bar)))
+   (funcall *reader* (make-instance 'foo)) ; should be an error, since
+                                           ; the method must be removed
+                                           ; by the class redefinition
+
+  Fixing this should also fix a subset of #328 -- update the
+  description with a new test-case then.
