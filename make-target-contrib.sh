@@ -24,6 +24,15 @@ SBCL="`pwd`/src/runtime/sbcl --noinform --core `pwd`/output/sbcl.core --userinit
 SBCL_BUILDING_CONTRIB=1
 export SBCL SBCL_BUILDING_CONTRIB
 
+# deleting things here lets us not worry about interaction with stale
+# fasls.  This is not good, but is better than :FORCE on each asdf
+# operation, because that causes multiple builds of base systems such
+# as SB-RT and SB-GROVEL, but FIXME: there's probably a better
+# solution.  -- CSR, 2003-05-30
+
+find contrib/ \( -name '*.fasl' -o -name 'foo.c' -o -name 'a.out' \) \
+  -print | xargs rm -f
+
 mkdir -p contrib/systems
 rm -f contrib/systems/*
 

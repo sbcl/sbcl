@@ -5,7 +5,7 @@ all:
 	$(MAKE) -C ../asdf
 	$(SBCL) --eval '(load "../asdf/asdf")' \
 	  --eval "(setf asdf::*central-registry* '((MERGE-PATHNAMES \"systems/\" (TRUENAME (SB-EXT:POSIX-GETENV \"SBCL_HOME\")))))" \
-	  --eval "(asdf:operate 'asdf:load-op :$(SYSTEM) :force t)" \
+	  --eval "(asdf:operate 'asdf:load-op :$(SYSTEM))" \
 	  --eval "(quit)"
 
 test: all
