@@ -295,7 +295,8 @@
 	       (won nil)
 	       (res (catch 'local-call-lossage
 		      (prog1
-			  (ir1-convert-lambda (functional-inline-expansion fun))
+			  (ir1-convert-lambda (functional-inline-expansion
+					       fun))
 			(setq won t)))))
 	  (cond (won
 		 (change-ref-leaf ref res)
@@ -602,33 +603,33 @@
 
 ;;;; LET conversion
 ;;;;
-;;;; Converting to a LET has differing significance to various parts of the
-;;;; compiler:
-;;;; -- The body of a LET is spliced in immediately after the corresponding
-;;;;    combination node, making the control transfer explicit and allowing
-;;;;    LETs to be mashed together into a single block. The value of the LET is
-;;;;    delivered directly to the original continuation for the call,
-;;;;    eliminating the need to propagate information from the dummy result
-;;;;    continuation.
-;;;; -- As far as IR1 optimization is concerned, it is interesting in that
-;;;;    there is only one expression that the variable can be bound to, and
-;;;;    this is easily substitited for.
-;;;; -- LETs are interesting to environment analysis and to the back end
-;;;;    because in most ways a LET can be considered to be "the same function"
-;;;;    as its home function.
-;;;; -- LET conversion has dynamic scope implications, since control transfers
-;;;;    within the same environment are local. In a local control transfer,
-;;;;    cleanup code must be emitted to remove dynamic bindings that are no
-;;;;    longer in effect.
+;;;; Converting to a LET has differing significance to various parts
+;;;; of the compiler:
+;;;; -- The body of a LET is spliced in immediately after the
+;;;;    corresponding combination node, making the control transfer
+;;;;    explicit and allowing LETs to be mashed together into a single
+;;;;    block. The value of the LET is delivered directly to the
+;;;;    original continuation for the call,eliminating the need to
+;;;;    propagate information from the dummy result continuation.
+;;;; -- As far as IR1 optimization is concerned, it is interesting in
+;;;;    that there is only one expression that the variable can be bound
+;;;;    to, and this is easily substitited for.
+;;;; -- LETs are interesting to environment analysis and to the back
+;;;;    end because in most ways a LET can be considered to be "the
+;;;;    same function" as its home function.
+;;;; -- LET conversion has dynamic scope implications, since control
+;;;;    transfers within the same environment are local. In a local
+;;;;    control transfer, cleanup code must be emitted to remove
+;;;;    dynamic bindings that are no longer in effect.
 
-;;; Set up the control transfer to the called lambda. We split the call
-;;; block immediately after the call, and link the head of FUN to the call
-;;; block. The successor block after splitting (where we return to) is
-;;; returned.
+;;; Set up the control transfer to the called lambda. We split the
+;;; call block immediately after the call, and link the head of FUN to
+;;; the call block. The successor block after splitting (where we
+;;; return to) is returned.
 ;;;
-;;; If the lambda is is a different component than the call, then we call
-;;; JOIN-COMPONENTS. This only happens in block compilation before
-;;; FIND-INITIAL-DFO.
+;;; If the lambda is is a different component than the call, then we
+;;; call JOIN-COMPONENTS. This only happens in block compilation
+;;; before FIND-INITIAL-DFO.
 (defun insert-let-body (fun call)
   (declare (type clambda fun) (type basic-combination call))
   (let* ((call-block (node-block call))

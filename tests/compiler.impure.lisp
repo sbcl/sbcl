@@ -27,5 +27,17 @@
   (cons x y))
 (assert (equal (cons 1 2) (newfangled-cons 'right-thing 2 'left-thing 1)))
 
+;;; ANSI specifically says that duplicate keys are OK in lambda lists,
+;;; with no special exception for macro lambda lists. (As reported by
+;;; Pierre Mai on cmucl-imp 2001-03-30, Python didn't think so. The
+;;; rest of the thread had some entertainment value, at least for me
+;;; (WHN). The unbelievers were besmote and now even CMU CL will
+;;; conform to the spec in this regard. Who needs diplomacy when you
+;;; have brimstone?:-)
+(defmacro ayup-duplicate-keys-are-ok-i-see-the-lite (&key k)
+  k)
+(assert (equal (ayup-duplicate-keys-are-ok-i-see-the-lite :k 112) 112))
+(assert (equal (ayup-duplicate-keys-are-ok-i-see-the-lite :k 'x :k 'y) 'x))
+
 ;;; success
 (quit :unix-status 104)

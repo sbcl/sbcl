@@ -151,14 +151,11 @@
 			minimum (1+ minimum)
 			maximum (1+ maximum)))
 		 ((eq now-processing :optionals)
-		  (when (> (length var) 3)
-		    (cerror "Ignore extra noise."
-			    "more than variable, initform, and suppliedp ~
-			    in &optional binding: ~S"
-			    var))
-		  (push-optional-binding (car var) (cadr var) (caddr var)
-					 `(not (null ,path)) `(car ,path)
-					 name error-kind error-fun)
+		  (destructuring-bind (varname &optional initform supplied-p)
+		      var
+		    (push-optional-binding varname initform supplied-p
+					   `(not (null ,path)) `(car ,path)
+					   name error-kind error-fun))
 		  (setq path `(cdr ,path)
 			maximum (1+ maximum)))
 		 ((eq now-processing :keywords)
@@ -275,14 +272,15 @@
 	((symbolp value-var)
 	 (push-let-binding value-var path nil supplied-var init-form))
 	(t
-	 (error "Illegal optional variable name: ~S" value-var))))
+	 (error "illegal optional variable name: ~S" value-var))))
 
 (defun defmacro-error (problem kind name)
-  (error "Illegal or ill-formed ~A argument in ~A~@[ ~S~]."
+  (error "illegal or ill-formed ~A argument in ~A~@[ ~S~]"
 	 problem kind name))
 
-;;; Determine whether KEY-LIST is a valid list of keyword/value pairs. Do not
-;;; signal the error directly, 'cause we don't know how it should be signaled.
+;;; Determine whether KEY-LIST is a valid list of keyword/value pairs.
+;;; Do not signal the error directly, 'cause we don't know how it
+;;; should be signaled.
 (defun verify-keywords (key-list valid-keys allow-other-keys)
   (do ((already-processed nil)
        (unknown-keyword nil)
@@ -297,8 +295,6 @@
 	   (return (values :dotted-list key-list)))
 	  ((null (cdr remaining))
 	   (return (values :odd-length key-list)))
-	  ((member (car remaining) already-processed)
-	   (return (values :duplicate (car remaining))))
 	  ((or (eq (car remaining) :allow-other-keys)
 	       (member (car remaining) valid-keys))
 	   (push (car remaining) already-processed))

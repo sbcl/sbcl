@@ -93,14 +93,16 @@
   (:report (lambda (condition stream)
 	     (print-defmacro-ll-bind-error-intro condition stream)
 	     (format stream
+		     ;; FIXME: These should probably just be three
+		     ;; subclasses of the base class, so that we don't
+		     ;; need to maintain the set of tags both here and
+		     ;; implicitly wherever this macro is used.
 		     (ecase
 			 (defmacro-ll-broken-key-list-error-problem condition)
 		       (:dotted-list
 			"dotted keyword/value list: ~S")
 		       (:odd-length
 			"odd number of elements in keyword/value list: ~S")
-		       (:duplicate
-			"duplicate keyword: ~S")
 		       (:unknown-keyword
 			"~{unknown keyword: ~S; expected one of ~{~S~^, ~}~}"))
 		     (defmacro-ll-broken-key-list-error-info condition)))))

@@ -670,6 +670,7 @@ retained, possibly temporariliy, because it might be used internally."
              "ANY/TYPE" "EVERY/TYPE"
              "TYPE-BOUND-NUMBER"
              "CONSTANTLY-T" "CONSTANTLY-NIL" "CONSTANTLY-0"
+             "PSXHASH"
 
              ;; ..and macros..
              "COLLECT"
