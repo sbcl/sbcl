@@ -677,11 +677,28 @@
     :initform '()))
   (:report
    (lambda (condition stream)
-     (let ((error-stream (stream-error-stream condition)))
-       (format stream "READER-ERROR ~@[at ~W ~]on ~S:~%~?"
-	       (file-position error-stream) error-stream
-	       (reader-error-format-control condition)
-	       (reader-error-format-arguments condition))))))
+     (let* ((error-stream (stream-error-stream condition))
+	    (pos (file-position error-stream)))
+       (let (lineno colno)
+	 (when (and pos
+		    (< pos sb!xc:array-dimension-limit)
+		    (file-position error-stream :start))
+	   (let ((string
+		  (make-string pos
+			       :element-type (stream-element-type error-stream))))
+	     (when (= pos (read-sequence string error-stream))
+	       (setq lineno (1+ (count #\Newline string))
+		     colno (- pos
+			      (or (position #\Newline string :from-end t) 0)
+			      1))))
+	   (file-position error-stream pos))
+	 (format stream
+		 "READER-ERROR ~@[at ~W ~]~
+                  ~@[(line ~W~]~@[, column ~W) ~]~
+                  on ~S:~%~?"
+		 pos lineno colno error-stream
+		 (reader-error-format-control condition)
+		 (reader-error-format-arguments condition)))))))
 
 ;;;; various other (not specified by ANSI) CONDITIONs
 ;;;;
