@@ -48,34 +48,11 @@
     (apply #'initialize-instance instance initargs)
     instance))
 
-(defvar *default-initargs-flag* (list nil))
-
 (defmethod default-initargs ((class slot-class) supplied-initargs)
   (call-initialize-function
    (initialize-info-default-initargs-function
     (initialize-info class supplied-initargs))
-   nil supplied-initargs)
-  #||
-  ;; This implementation of default initargs is critically dependent
-  ;; on all-default-initargs not having any duplicate initargs in it.
-  (let ((all-default (class-default-initargs class))
-	(miss *default-initargs-flag*))
-    (flet ((getf* (plist key)
-	     (do ()
-		 ((null plist) miss)
-	       (if (eq (car plist) key)
-		   (return (cadr plist))
-		   (setq plist (cddr plist))))))
-      (labels ((default-1 (tail)
-		 (if (null tail)
-		     nil
-		     (if (eq (getf* supplied-initargs (caar tail)) miss)
-			 (list* (caar tail)
-				(funcall (cadar tail))
-				(default-1 (cdr tail)))
-			 (default-1 (cdr tail))))))
-	(append supplied-initargs (default-1 all-default)))))
-  ||#)
+   nil supplied-initargs))
 
 (defmethod initialize-instance ((instance slot-object) &rest initargs)
   (apply #'shared-initialize instance t initargs))

@@ -97,31 +97,16 @@
 
 (import 'sb-kernel:funcallable-instance-p)
 
-;;; This "works" on non-PCL FINs, which allows us to weaken
-;;; FUNCALLABLE-INSTANCE-P to return true for all FINs. This is also
-;;; necessary for bootstrapping to work, since the layouts for early
-;;; GFs are not initially initialized.
-(defmacro funcallable-instance-data-1 (fin slot)
-  (ecase (eval slot)
-    (wrapper `(sb-kernel:%funcallable-instance-layout ,fin))
-    (slots `(sb-kernel:%funcallable-instance-info ,fin 0))))
-
-;;; FIXME: Now that we no longer try to make our CLOS implementation
-;;; portable to other implementations of Common Lisp, all the
-;;; funcallable instance wrapper logic here can go away in favor
-;;; of direct calls to native SBCL funcallable instance operations.
 (defun set-funcallable-instance-fun (fin new-value)
   (declare (type function new-value))
   (aver (funcallable-instance-p fin))
   (setf (sb-kernel:funcallable-instance-fun fin) new-value))
 (defmacro fsc-instance-p (fin)
   `(funcallable-instance-p ,fin))
-(defmacro fsc-instance-class (fin)
-  `(wrapper-class (funcallable-instance-data-1 ,fin 'wrapper)))
 (defmacro fsc-instance-wrapper (fin)
-  `(funcallable-instance-data-1 ,fin 'wrapper))
+  `(sb-kernel:%funcallable-instance-layout ,fin))
 (defmacro fsc-instance-slots (fin)
-  `(funcallable-instance-data-1 ,fin 'slots))
+  `(sb-kernel:%funcallable-instance-info ,fin 0))
 
 (declaim (inline clos-slots-ref (setf clos-slots-ref)))
 (declaim (ftype (function (simple-vector index) t) clos-slots-ref))

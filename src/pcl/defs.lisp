@@ -283,30 +283,8 @@
 
 (defvar *name->class->slotd-table* (make-hash-table))
 
-;;; This is used by combined methods to communicate the next methods
-;;; to the methods they call. This variable is captured by a lexical
-;;; variable of the methods to give it the proper lexical scope.
-(defvar *next-methods* nil)
-
-(defvar *not-an-eql-specializer* '(not-an-eql-specializer))
-
-(defvar *umi-gfs*)
-(defvar *umi-complete-classes*)
-(defvar *umi-reorder*)
-
-(defvar *invalidate-discriminating-function-force-p* ())
-(defvar *invalid-dfuns-on-stack* ())
-
 (defvar *standard-method-combination*)
-
-(defvar *slotd-unsupplied* (list '*slotd-unsupplied*))	;***
 
-(defmacro define-gf-predicate (predicate-name &rest classes)
-  `(progn
-     (defmethod ,predicate-name ((x t)) nil)
-     ,@(mapcar (lambda (c) `(defmethod ,predicate-name ((x ,c)) t))
-	       classes)))
-
 (defun make-class-predicate-name (name)
   (intern (format nil "~A::~A class predicate"
 		  (package-name (symbol-package name))

@@ -62,22 +62,10 @@
 		      (emit-one-or-n-index-reader/writer-macro :writer nil nil)))))
    nil))
 
-;;; Note this list is set up in dlisp3.lisp when all the necessary
-;;; macros have been loaded.
-(defvar *checking-or-caching-function-list* nil)
-
-(defmacro emit-checking-or-caching-function-precompiled ()
-  `(cdr (assoc (list cached-emf-p return-value-p metatypes applyp)
-	       *checking-or-caching-function-list*
-	       :test #'equal)))
-
 (defun emit-checking-or-caching-function (cached-emf-p return-value-p metatypes applyp)
-  (let ((fn (emit-checking-or-caching-function-precompiled)))
-    (if fn
-	(values fn nil)
-	(values (emit-checking-or-caching-function-preliminary
-		 cached-emf-p return-value-p metatypes applyp)
-		t))))
+  (values (emit-checking-or-caching-function-preliminary
+	   cached-emf-p return-value-p metatypes applyp)
+	  t))
 
 (defvar *not-in-cache* (make-symbol "not in cache"))
 
