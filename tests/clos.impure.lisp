@@ -308,6 +308,17 @@
   (defmethod documentation ((x (eql '+)) y) "WRONG")
   (assert (string= (documentation '+ 'function) answer)))
 
+;;; only certain declarations are permitted in DEFGENERIC
+(macrolet ((assert-program-error (form)
+	     `(multiple-value-bind (value error)
+	          (ignore-errors ,form)
+	        (assert (null value))
+	        (assert (typep error 'program-error)))))
+  (assert-program-error (defgeneric bogus-declaration (x)
+			  (declare (special y))))
+  (assert-program-error (defgeneric bogus-declaration2 (x)
+			  (declare (notinline concatenate)))))
+
 ;;;; success
 
 (sb-ext:quit :unix-status 104)
