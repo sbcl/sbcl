@@ -1008,8 +1008,9 @@
 
 ;;;; hairy and unknown types
 
-(!define-type-method (hairy :unparse) (x) (hairy-type-specifier x))
-
+(!define-type-method (hairy :unparse) (x)
+  (hairy-type-specifier x))
+    
 (!define-type-method (hairy :simple-subtypep) (type1 type2)
   (let ((hairy-spec1 (hairy-type-specifier type1))
 	(hairy-spec2 (hairy-type-specifier type2)))
@@ -2018,9 +2019,10 @@
 
 (!define-type-method (member :unparse) (type)
   (let ((members (member-type-members type)))
-    (if (equal members '(nil))
-	'null
-	`(member ,@members))))
+    (cond
+      ((equal members '(nil)) 'null)
+      ((type= type (specifier-type 'standard-char)) 'standard-char)
+      (t `(member ,@members)))))
 
 (!define-type-method (member :simple-subtypep) (type1 type2)
   (values (subsetp (member-type-members type1) (member-type-members type2))
@@ -2181,6 +2183,8 @@
     ((type= type (specifier-type 'list)) 'list)
     ((type= type (specifier-type 'float)) 'float)
     ((type= type (specifier-type 'real)) 'real)
+    ((type= type (specifier-type 'sequence)) 'sequence)
+    ((type= type (specifier-type 'string-stream)) 'string-stream)
     (t `(or ,@(mapcar #'type-specifier (union-type-types type))))))
 
 ;;; Two union types are equal if they are each subtypes of each

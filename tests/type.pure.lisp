@@ -42,7 +42,15 @@
 			array
 			generic-function
 			simple-error
-			;; (NOT CONS)
+			;; so it might seem easy to change the HAIRY
+			;; :UNPARSE method to recognize that (NOT
+			;; CONS) should unparse as ATOM. However, we
+			;; then lose the nice (SUBTYPEP '(NOT ATOM)
+			;; 'CONS) => T,T behaviour that we get from
+			;; simplifying (NOT ATOM) -> (NOT (NOT CONS))
+			;; -> CONS. So, for now, we leave this
+			;; commented out.
+			;;
 			;; atom
 			hash-table
 			simple-string              
@@ -60,8 +68,7 @@
 			single-float               
 			bit-vector
 			long-float
-			;; MEMBER-TYPE #\a #\b ...
-			;; standard-char              
+			standard-char              
 			broadcast-stream
 			method
 			standard-class             
@@ -88,9 +95,7 @@
 			string                     
 			condition
 			pathname
-			;; OR STRING-INPUT-STREAM STRING-OUTPUT-STREAM
-			;; FILL-POINTER-OUTPUT-STREAM
-			;; string-stream
+			string-stream
 			cons
 			print-not-readable
 			structure-class            
@@ -121,6 +126,7 @@
 			;; obviously disjoint types and then do (the
 			;; extended-char foo), we'll get back FOO is
 			;; not a NIL. -- CSR, 2002-09-16.
+			;;
 			;; extended-char
 			real
 			type-error                 
@@ -128,8 +134,7 @@
 			restart
 			unbound-slot               
 			file-stream
-			;; (OR CONS NULL VECTOR)
-			;; sequence
+			sequence
 			unbound-variable           
 			fixnum
 			serious-condition
