@@ -102,7 +102,7 @@
 	 `(progn ,@body))))
 
 ;;; what's the best thing to do with these on unithread?
-#+NIl
+#+nil
 (defun condition-wait (queue lock)
   "Atomically release LOCK and enqueue ourselves on QUEUE.  Another
 thread may subsequently notify us using CONDITION-NOTIFY, at which
@@ -121,10 +121,11 @@ time we reacquire LOCK and return to the caller."
   "Notify one of the processes waiting on QUEUE"
   (signal-queue-head queue))
 
+(defun maybe-install-futex-functions () nil)
 
 ;;;; job control
 
+(defun init-job-control () t)
 (defun debugger-wait-until-foreground-thread (stream) t)
 (defun get-foreground () t)
 (defun release-foreground (&optional next) t)
-
