@@ -48,9 +48,11 @@
   'integer)
 
 (deftransform %rotate-byte ((count size pos integer)
-			    ((or (integer -31 -1) (integer 1 31))
+			    ((integer -31 31)
 			     (constant-arg (member 32))
 			     (constant-arg (member 0))
 			     (unsigned-byte 32)) *)
   "inline 32-bit rotation"
+  ;; FIXME: What happens when, as here, the two type specifiers for
+  ;; COUNT overlap?  Which gets to run first?
   '(%unsigned-32-rotate-byte count integer))

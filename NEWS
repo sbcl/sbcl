@@ -1714,6 +1714,8 @@ changes in sbcl-0.8.0 relative to sbcl-0.8alpha.0
   * a contributed module containing a partial implementation of the
     simple-streams interface has been included.  (thanks to Rudi
     Schlatte)
+  * a contributed module implementing the RFC1321 Message Digest
+    Algorithm, known as MD5, has been included.
   * minor incompatible change: the :NEGATIVE-ZERO-IS-NOT-ZERO feature
     no longer has any effect, as the code controlled by this feature
     has been deleted.  (As far as we know, no-one has ever built using
