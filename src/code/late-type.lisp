@@ -2248,7 +2248,6 @@
     ((type= type (specifier-type 'float)) 'float)
     ((type= type (specifier-type 'real)) 'real)
     ((type= type (specifier-type 'sequence)) 'sequence)
-    ((type= type (specifier-type 'string-stream)) 'string-stream)
     (t `(or ,@(mapcar #'type-specifier (union-type-types type))))))
 
 ;;; Two union types are equal if they are each subtypes of each

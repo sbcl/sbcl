@@ -1320,8 +1320,7 @@ WORKAROUND:
           (ignore-errors (progn (values-list (car (list '(1 . 2)))) t)))
 
 225:
-  As reported by Gilbert Baumann on free-clim mailing list 2002-11-11,
-  there is no class STRING-STREAM.
+  (fixed in 0.7.9.42)
 
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:

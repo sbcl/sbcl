@@ -1397,6 +1397,8 @@ changes in sbcl-0.7.10 relative to sbcl-0.7.9:
     Matthew Danish)
   * fixed Entomotomy PEEK-CHAR-WRONGLY-ECHOS-TO-ECHO-STREAM bug (thanks
     to Matthew Danish)
+  * fixed bug 225: STRING-STREAM is now a class (reported byg Gilbert
+    Baumann)
 
 planned incompatible changes in 0.7.x:
 * When the profiling interface settles down, maybe in 0.7.x, maybe

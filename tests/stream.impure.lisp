@@ -41,6 +41,20 @@
 			  (make-string-output-stream)
 			  (make-string-input-stream "foo"))
 			 type-error)))
+
+;;; bug 225: STRING-STREAM was not a class
+(eval `(defgeneric bug225 (s)
+         ,@(mapcar (lambda (class)
+                     `(:method :around ((s ,class)) (cons ',class (call-next-method))))
+                   '(stream string-stream sb-impl::string-input-stream
+                     sb-impl::string-output-stream))
+         (:method (class) nil)))
+
+(assert (equal (bug225 (make-string-input-stream "hello"))
+               '(sb-impl::string-input-stream string-stream stream)))
+(assert (equal (bug225 (make-string-output-stream))
+               '(sb-impl::string-output-stream string-stream stream)))
+
 
 ;;; success
 (quit :unix-status 104)

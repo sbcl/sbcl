@@ -11,10 +11,6 @@
 
 (in-package "SB!IMPL")
 
-(deftype string-stream ()
-  '(or string-input-stream string-output-stream
-       fill-pointer-output-stream))
-
 ;;;; standard streams
 
 ;;; The initialization of these streams is performed by
@@ -1039,18 +1035,25 @@
 	       (stream-misc-dispatch out operation arg1 arg2)))))))
 
 
+;;;; string streams
+(defstruct (string-stream
+             (:include ansi-stream)
+             (:constructor nil)
+             (:copier nil))
+  (string nil :type string))
+
 ;;;; string input streams
 
 (defstruct (string-input-stream
-	     (:include ansi-stream
+	     (:include string-stream
 		       (in #'string-inch)
 		       (bin #'string-binch)
 		       (n-bin #'string-stream-read-n-bytes)
-		       (misc #'string-in-misc))
+		       (misc #'string-in-misc)
+                       (string nil :type simple-string))
 	     (:constructor internal-make-string-input-stream
 			   (string current end))
 	     (:copier nil))
-  (string nil :type simple-string)
   (current nil :type index)
   (end nil :type index))
 
@@ -1134,14 +1137,14 @@
 ;;;; string output streams
 
 (defstruct (string-output-stream
-	    (:include ansi-stream
+	    (:include string-stream
 		      (out #'string-ouch)
 		      (sout #'string-sout)
-		      (misc #'string-out-misc))
+		      (misc #'string-out-misc)
+                      ;; The string we throw stuff in.
+                      (string (make-string 40) :type simple-string))
 	    (:constructor make-string-output-stream ())
 	    (:copier nil))
-  ;; The string we throw stuff in.
-  (string (make-string 40) :type simple-string)
   ;; Index of the next location to use.
   (index 0 :type fixnum))
 
@@ -1230,16 +1233,17 @@
 	(satisfies array-has-fill-pointer-p)))
 
 (defstruct (fill-pointer-output-stream
- 	    (:include ansi-stream
+ 	    (:include string-stream
 		      (out #'fill-pointer-ouch)
 		      (sout #'fill-pointer-sout)
-		      (misc #'fill-pointer-misc))
+		      (misc #'fill-pointer-misc)
+                      ;; a string with a fill pointer where we stuff
+                      ;; the stuff we write
+                      (string (error "missing argument")
+                              :type string-with-fill-pointer
+                              :read-only t))
 	    (:constructor make-fill-pointer-output-stream (string))
-	    (:copier nil))
-  ;; a string with a fill pointer where we stuff the stuff we write
-  (string (error "missing argument")
-	  :type string-with-fill-pointer
-	  :read-only t))
+	    (:copier nil)))
 
 (defun fill-pointer-ouch (stream character)
   (let* ((buffer (fill-pointer-output-stream-string stream))
