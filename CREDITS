@@ -246,6 +246,10 @@ Sean Hallgren is credited with most of the Alpha backend.  Julian
 Dolby created the CMU CL Alpha/linux port. Douglas Crosher added
 complex-float support.
 
+The original PPC backend was the work of Gary Byers.  Some bug fixes
+and other changes to update it for current CMUCL interfaces were made 
+by Eric Marsden and Douglas Crosher
+
 The CMU CL machine-independent disassembler (compiler/disassem.lisp)
 was written by Miles Bader.
 
