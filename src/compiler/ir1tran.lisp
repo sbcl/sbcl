@@ -2009,6 +2009,7 @@
 (defun ir1-convert-lambdalike (thing &rest args
 			       &key (source-name '.anonymous.)
 			       debug-name allow-debug-catch-tag)
+  (declare (ignorable source-name debug-name allow-debug-catch-tag))
   (ecase (car thing)
     ((lambda) (apply #'ir1-convert-lambda thing args))
     ((instance-lambda)

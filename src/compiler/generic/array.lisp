@@ -19,6 +19,7 @@
   (:arg-types simple-array-nil positive-fixnum)
   (:results (value :scs (descriptor-reg)))
   (:result-types *)
+  (:ignore index value)
   (:vop-var vop)
   (:save-p :compute-only)
   (:generator 1
@@ -41,8 +42,9 @@
 	 (index :scs (unsigned-reg))
 	 (value :scs (descriptor-reg)))
   (:arg-types simple-array-nil positive-fixnum *)
-  (:results (value :scs (descriptor-reg)))
+  (:results (result :scs (descriptor-reg)))
   (:result-types *)
+  (:ignore index value result)
   (:vop-var vop)
   (:save-p :compute-only)
   (:generator 1

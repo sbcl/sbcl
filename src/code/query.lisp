@@ -40,7 +40,7 @@
    n or N as a negative answer. It asks again if you enter any other
    characters."
   (flet ((print-query ()
-	   (maybe-print-query "(y or n)" format-string arguments)))
+	   (apply #'maybe-print-query "(y or n)" format-string arguments)))
     (loop (print-query)
 	  (case (query-read-char)
 	    ((#\y #\Y) (return t))
@@ -53,7 +53,7 @@
    input buffer, beeps, and uses READ-LINE to get the strings
    YES or NO."
   (flet ((print-query ()
-	   (maybe-print-query "(yes or no)" format-string arguments)))
+	   (apply #'maybe-print-query "(yes or no)" format-string arguments)))
     (beep *query-io*)
     (loop (print-query)
 	  (let ((input (query-read-line)))

@@ -56,10 +56,14 @@
 ;;; not be a generalized instance of ERROR, as otherwise code such as
 ;;; (IGNORE-ERRORS (DEFGENERIC IF (X))) will catch and claim to handle
 ;;; the COMPILER-ERROR.  So we make COMPILER-ERROR inherit from
-;;; SIMPLE-CONDITION and SERIOUS-CONDITION instead, as of
-;;; sbcl-0.8alpha.0.2x, so that unless the user claims to be able to
-;;; handle SERIOUS-CONDITION (and if he does, he deserves what's going
-;;; to happen :-)
+;;; SIMPLE-CONDITION instead, as of sbcl-0.8alpha.0.2x, so that unless
+;;; the user claims to be able to handle general CONDITIONs (and if he
+;;; does, he deserves what's going to happen :-) [ Note: we don't make
+;;; COMPILER-ERROR inherit from SERIOUS-CONDITION, because
+;;; conventionally SERIOUS-CONDITIONs, if unhandled, end up in the
+;;; debugger; although the COMPILER-ERROR might well trigger an entry
+;;; into the debugger, it won't be the COMPILER-ERROR itself that is
+;;; the direct cause. ]
 ;;;
 ;;; So, what if we're not inside the compiler, then?  Well, in that
 ;;; case we're in the evaluator, so we want to convert the
@@ -76,12 +80,15 @@
 ;;; COMPILER-ERROR call, and all is well.
 ;;;
 ;;; CSR, 2003-05-13
-(define-condition compiler-error (simple-condition serious-condition) ())
+(define-condition compiler-error (simple-condition) ())
 
 ;;; Signal the appropriate condition. COMPILER-ERROR calls the bailout
 ;;; function so that it never returns (but compilation continues).
 ;;; COMPILER-ABORT falls through to the default error handling, so
-;;; compilation terminates. 
+;;; compilation terminates.
+;;;
+;;; FIXME: what is COMPILER-ABORT for?  It isn't currently
+;;; (2003-05-27) used in SBCL at all.
 (declaim (ftype (function (string &rest t) nil) compiler-error compiler-abort))
 (declaim (ftype (function (string &rest t) (values))
 		compiler-warning compiler-style-warning))
