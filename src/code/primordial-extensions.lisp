@@ -10,7 +10,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!INT")
+(in-package "SB!IMPL")
 
 ;;;; target constants which need to appear as early as possible
 
@@ -35,20 +35,10 @@
 ;;; gencgc.c code on this value being a symbol. (This is only one of
 ;;; several nasty dependencies between that code and this, alas.)
 ;;; -- WHN 2001-08-17
-;;;
-;;; FIXME: We end up doing two DEFCONSTANT forms because (1) LispWorks
-;;; needs EVAL-WHEN wrapped around DEFCONSTANT, and (2) SBCL's
-;;; DEFCONSTANT expansion doesn't seem to behave properly inside
-;;; EVAL-WHEN, so that without this, the +EMPTY-HT-SLOT+ references in
-;;; e.g. DOHASH macroexpansions don't end up being replaced by
-;;; constant values, so that the system dies at cold init because
-;;; '+EMPTY-HT-SLOT+ isn't bound yet. It's hard to fix this properly
-;;; until SBCL's EVAL-WHEN is fixed, which is waiting for the IR1
-;;; interpreter to go away, which is waiting for sbcl-0.7.x..
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (def!constant +empty-ht-slot+ '%empty-ht-slot%))
 ;;; We shouldn't need this mess now that EVAL-WHEN works.
-#+nil (defconstant +empty-ht-slot+ '#.+empty-ht-slot+) ; egads.. See FIXME above.
+
 ;;; KLUDGE: Using a private symbol still leaves us vulnerable to users
 ;;; getting nonconforming behavior by messing around with
 ;;; DO-ALL-SYMBOLS. That seems like a fairly obscure problem, so for
@@ -287,3 +277,24 @@
 	   (bummer "already bound as a different constant value"))
 	  (t
 	   (symbol-value symbol)))))
+
+;;; a helper function for various macros which expect clauses of a
+;;; given length, etc.
+;;;
+;;; Return true if X is a proper list whose length is between MIN and
+;;; MAX (inclusive).
+(defun proper-list-of-length-p (x min &optional (max min))
+  ;; FIXME: This implementation will hang on circular list
+  ;; structure. Since this is an error-checking utility, i.e. its
+  ;; job is to deal with screwed-up input, it'd be good style to fix
+  ;; it so that it can deal with circular list structure.
+  (cond ((minusp max) nil)
+	((null x) (zerop min))
+	((consp x)
+	 (and (plusp max)
+	      (proper-list-of-length-p (cdr x)
+				       (if (plusp (1- min))
+					   (1- min)
+					   0)
+				       (1- max))))
+	(t nil)))

@@ -149,6 +149,7 @@
 ;;; Clear memoization of all type system operations that can be
 ;;; altered by type definition/redefinition.
 (defun clear-type-caches ()
+  (declare (special *type-system-initialized*))
   (when *type-system-initialized*
     (dolist (sym '(values-specifier-type-cache-clear
 		   values-type-union-cache-clear

@@ -101,20 +101,6 @@ WORKAROUND:
     (frob-stringwise-foo *stringwise-foo*)
   SEGV.
 
-6:
-  bogus warnings about undefined functions for magic functions like
-  SB!C::%%DEFUN and SB!C::%DEFCONSTANT when cross-compiling files
-  like src/code/float.lisp. Fixing this will probably require
-  straightening out enough bootstrap consistency issues that
-  the cross-compiler can run with *TYPE-SYSTEM-INITIALIZED*.
-  Instead, the cross-compiler runs in a slightly flaky state
-  which is sane enough to compile SBCL itself, but which is
-  also unstable in several ways, including its inability
-  to really grok function declarations.
-
-  As of sbcl-0.7.5, sbcl's cross-compiler does run with
-  *TYPE-SYSTEM-INITIALIZED*; however, this bug remains.
-
 7:
   The "compiling top-level form:" output ought to be condensed.
   Perhaps any number of such consecutive lines ought to turn into a
@@ -165,8 +151,8 @@ WORKAROUND:
 	(defmethod zut ((c ccc1)) 123)
   In sbcl-0.7.1.13, this gives an error, 
 	There is no class named CCC1.
-  DTC's recommended workaround from the mailing list 3 Mar 2000:
-	(setf (pcl::find-class 'ccc1) (pcl::find-class 'ccc))
+  In sbcl-0.pre8.20, this works, but prints style warnings about
+  undefined types.
 
 27:
   Sometimes (SB-EXT:QUIT) fails with 
@@ -252,8 +238,8 @@ WORKAROUND:
 45:
   a slew of floating-point-related errors reported by Peter Van Eynde
   on July 25, 2000:
-	b: SBCL's value for LEAST-POSITIVE-SHORT-FLOAT is bogus, and 
-	   should probably be 1.4012985e-45. In SBCL,
+	b: SBCL's value for LEAST-POSITIVE-SHORT-FLOAT on the x86 is 
+	   bogus, and should probably be 1.4012985e-45. In SBCL,
 	   (/ LEAST-POSITIVE-SHORT-FLOAT 2) returns a number smaller
 	   than LEAST-POSITIVE-SHORT-FLOAT. Similar problems 
 	   exist for LEAST-NEGATIVE-SHORT-FLOAT, LEAST-POSITIVE-LONG-FLOAT,
@@ -299,12 +285,6 @@ WORKAROUND:
 	      (DEFGENERIC FOO03 (X))
 	      (ADD-METHOD (FUNCTION FOO03) M)))
 	   should give an error, but SBCL allows it.
-
-52:
-  It has been reported (e.g. by Peter Van Eynde) that there are 
-  several metaobject protocol "errors". (In order to fix them, we might
-  need to document exactly what metaobject protocol specification
-  we're following -- the current code is just inherited from PCL.)
 
 60:
   The debugger LIST-LOCATIONS command doesn't work properly.
@@ -369,18 +349,6 @@ WORKAROUND:
 
   (partially alleviated in sbcl-0.7.9.32 by a fix by Matthew Danish to
    make the temporary filename less easily guessable)
-
-82: 
-  Functions are assigned names based on the context in which they're
-  defined. This is less than ideal for the functions which are
-  used to implement CLOS methods. E.g. the output of 
-  (DESCRIBE 'PRINT-OBJECT) lists functions like 
-	#<FUNCTION "DEF!STRUCT (TRACE-INFO (:MAKE-LOAD-FORM-FUN SB-KERNEL:JUST-DUMP-IT-NORMALLY) (:PRINT-OBJECT #))" {1020E49}> 
-  and
-	#<FUNCTION "MACROLET ((FORCE-DELAYED-DEF!METHODS NIL #))" {1242871}>
-  It would be better if these functions' names always identified
-  them as methods, and identified their generic functions and
-  specializers.
 
 83:
   RANDOM-INTEGER-EXTRA-BITS=10 may not be large enough for the RANDOM
@@ -715,6 +683,8 @@ WORKAROUND:
   of KIDIFY1, which already does not exist. So it gives up on
   expansion, leaving garbage consisting of infinished blocks of the
   partially converted function.)
+
+  (appears to be fixed in sbcl-0.pre8.21)
 
 162:
   (reported by Robert E. Brown 2002-04-16) 

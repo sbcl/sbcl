@@ -105,29 +105,6 @@
 
 ;;;; type-ish predicates
 
-;;; a helper function for various macros which expect clauses of a
-;;; given length, etc.
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  ;; Return true if X is a proper list whose length is between MIN and
-  ;; MAX (inclusive).
-  (defun proper-list-of-length-p (x min &optional (max min))
-    ;; FIXME: This implementation will hang on circular list
-    ;; structure. Since this is an error-checking utility, i.e. its
-    ;; job is to deal with screwed-up input, it'd be good style to fix
-    ;; it so that it can deal with circular list structure.
-    (cond ((minusp max)
-	   nil)
-	  ((null x)
-	   (zerop min))
-	  ((consp x)
-	   (and (plusp max)
-		(proper-list-of-length-p (cdr x)
-					 (if (plusp (1- min))
-					   (1- min)
-					   0)
-					 (1- max))))
-	  (t nil))))
-
 ;;; Is X a list containing a cycle?
 (defun cyclic-list-p (x)
   (and (listp x)
