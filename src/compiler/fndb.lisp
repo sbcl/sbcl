@@ -1341,3 +1341,8 @@
   ())
 (defknown %setnth (index list t) t (unsafe))
 (defknown %set-fill-pointer (vector index) index (unsafe))
+
+;;;; miscellaneous internal utilities
+
+(defknown %fun-name (function) t (flushable))
+(defknown (setf %fun-name) (t function) t (unsafe))

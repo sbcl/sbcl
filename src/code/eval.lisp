@@ -156,32 +156,6 @@
 		(%eval original-exp))))))
       (t
        exp))))
-
-(defun function-lambda-expression (fun)
-  "Return (VALUES DEFINING-LAMBDA-EXPRESSION CLOSURE-P NAME), where
-  DEFINING-LAMBDA-EXPRESSION is NIL if unknown, or a suitable argument
-  to COMPILE otherwise, CLOSURE-P is non-NIL if the function's definition
-  might have been enclosed in some non-null lexical environment, and
-  NAME is some name (for debugging only) or NIL if there is no name."
-    (declare (type function fun))
-    (let* ((fun (%simple-fun-self fun))
-	   (name (%simple-fun-name fun))
-	   (code (sb!di::fun-code-header fun))
-	   (info (sb!kernel:%code-debug-info code)))
-      (if info
-        (let ((source (first (sb!c::compiled-debug-info-source info))))
-          (cond ((and (eq (sb!c::debug-source-from source) :lisp)
-                      (eq (sb!c::debug-source-info source) fun))
-                 (values (second (svref (sb!c::debug-source-name source) 0))
-                         nil name))
-                ((stringp name)
-                 (values nil t name))
-                (t
-                 (let ((exp (fun-name-inline-expansion name)))
-                   (if exp
-                       (values exp nil name)
-                       (values nil t name))))))
-        (values nil t name))))
 
 ;;; miscellaneous full function definitions of things which are
 ;;; ordinarily handled magically by the compiler

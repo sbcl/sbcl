@@ -16,9 +16,13 @@ for 0.7.0:
 * global style systematization:
 	** s/#'(lambda/(lambda/
 	** four-space indentation in C
+* pending patches that go in (or else get rejected) before 0.7.0:
+	** Nathan Froyd "Goodbye ITERATE" 2001-12-15
 =======================================================================
 for early 0.7.x:
 
+* patches postponed until after 0.7.0:
+	** Christophe Rhodes "rough patch to fix bug 106" 2001-10-28
 * building with CLISP (or explaining why not)
 * faster bootstrapping (both make.sh and slam.sh)
 	** added mechanisms for automatically finding dead code, and

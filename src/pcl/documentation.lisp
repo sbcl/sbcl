@@ -25,10 +25,10 @@
 
 ;;; functions, macros, and special forms
 (defmethod documentation ((x function) (doc-type (eql 't)))
-  (function-doc x))
+  (%fun-doc x))
 
 (defmethod documentation ((x function) (doc-type (eql 'function)))
-  (function-doc x))
+  (%fun-doc x))
 
 (defmethod documentation ((x list) (doc-type (eql 'function)))
   ;; FIXME: could test harder to see whether it's a SETF function name,

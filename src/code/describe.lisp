@@ -194,6 +194,9 @@
     (:macro (format s "Macro-function: ~S" x))
     (:function (format s "Function: ~S" x))
     ((nil) (format s "~S is a function." x)))
+  (format s "~@:_Its associated name (as in ~S) is ~S."
+	  'function-lambda-expression
+	  (%fun-name x))
   (case (widetag-of x)
     (#.sb-vm:closure-header-widetag
      (%describe-function-compiled (%closure-fun x) s kind name)

@@ -240,7 +240,7 @@
 	 (symbol (values (info :variable :documentation x)))))
       (function
        (cond ((functionp x)
-	      (function-doc x))
+	      (%fun-doc x))
 	     ((legal-fun-name-p x)
 	      ;; FIXME: Is it really right to make
 	      ;; (DOCUMENTATION '(SETF FOO) 'FUNCTION) equivalent to
@@ -259,7 +259,7 @@
       (setf (info :setf :documentation x))
       ((t)
        (typecase x
-	 (function (function-doc x))
+	 (function (%fun-doc x))
 	 (package (package-doc-string x))
 	 (structure-class (values (info :type :documentation (class-name x))))
 	 (symbol (try-cmucl-random-doc x doc-type))))

@@ -170,10 +170,12 @@
   (unless (symbol-package (fun-name-block-name name))
     (warn "DEFUN of uninterned symbol ~S (tricky for GENESIS)" name))
   (multiple-value-bind (forms decls doc) (parse-body body)
-    (let* ((lambda `(lambda ,args
-		      ,@decls
-		      (block ,(fun-name-block-name name)
-			,@forms)))
+    (let* (;; stuff shared between LAMBDA and INLINE-LAMBDA
+	   (lambda-guts `(,args
+			  ,@decls
+			  (block ,(fun-name-block-name name)
+			    ,@forms)))
+	   (lambda `(lambda ,@lambda-guts))
 	   (inline-lambda
 	    (cond (;; Does the user not even want to inline?
 		   (not (inline-fun-name-p name))
@@ -197,7 +199,7 @@
 		   ;; simplified way.
 		   `(sb!c:lambda-with-lexenv
 		     nil nil nil ; i.e. no DECLS, no MACROS, no SYMMACS
-		     ,@(rest lambda))))))
+		     ,@lambda-guts)))))
       `(progn
 
 	 ;; In cross-compilation of toplevel DEFUNs, we arrange
@@ -225,6 +227,7 @@
     (/show0 "redefining NAME in %DEFUN")
     (style-warn "redefining ~S in DEFUN" name))
   (setf (sb!xc:fdefinition name) def)
+  (setf (%fun-name def) name)
   (when doc
     ;; FIXME: This should use shared SETF-name-parsing logic.
     (if (and (consp name) (eq (first name) 'setf))

@@ -13,28 +13,106 @@
 ;;;; files for more information.
 
 (in-package "SB!IMPL")
+
+;;;; function names and documentation
 
-;;; cobbled from stuff in describe.lisp.
-(defun function-doc (x)
-  (let ((name
-	 (case (widetag-of x)
-	   (#.sb!vm:closure-header-widetag
-	    (%simple-fun-name (%closure-fun x)))
-	   ((#.sb!vm:simple-fun-header-widetag
-	     #.sb!vm:closure-fun-header-widetag)
-	    (%simple-fun-name x))
-	   (#.sb!vm:funcallable-instance-header-widetag
-	    (%simple-fun-name
-	     (funcallable-instance-fun x))))))
+;;;; the ANSI interface to function names (and to other stuff too)
+(defun function-lambda-expression (fun)
+  "Return (VALUES DEFINING-LAMBDA-EXPRESSION CLOSURE-P NAME), where
+  DEFINING-LAMBDA-EXPRESSION is NIL if unknown, or a suitable argument
+  to COMPILE otherwise, CLOSURE-P is non-NIL if the function's definition
+  might have been enclosed in some non-null lexical environment, and
+  NAME is some name (for debugging only) or NIL if there is no name."
+    (declare (type function fun))
+    (let* ((fun (%simple-fun-self fun))
+	   (name (%fun-name fun))
+	   (code (sb!di::fun-code-header fun))
+	   (info (sb!kernel:%code-debug-info code)))
+      (if info
+        (let ((source (first (sb!c::compiled-debug-info-source info))))
+          (cond ((and (eq (sb!c::debug-source-from source) :lisp)
+                      (eq (sb!c::debug-source-info source) fun))
+                 (values (second (svref (sb!c::debug-source-name source) 0))
+                         nil
+			 name))
+                ((stringp name)
+                 (values nil t name))
+                (t
+                 (let ((exp (fun-name-inline-expansion name)))
+                   (if exp
+                       (values exp nil name)
+                       (values nil t name))))))
+        (values nil t name))))
+
+;;; a SETFable function to return the associated debug name for FUN
+;;; (i.e., the third value returned from CL:FUNCTION-LAMBDA-EXPRESSION),
+;;; or NIL if there's none
+(defun %fun-name (fun)
+  (case (widetag-of fun)
+    (#.sb!vm:closure-header-widetag
+     (%simple-fun-name (%closure-fun fun)))
+    ((#.sb!vm:simple-fun-header-widetag
+      #.sb!vm:closure-fun-header-widetag)
+     ;; KLUDGE: The pun that %SIMPLE-FUN-NAME is used for closure
+     ;; functions is left over from CMU CL (modulo various renaming
+     ;; that's gone on since the fork).
+     (%simple-fun-name fun))
+    (#.sb!vm:funcallable-instance-header-widetag
+     (%simple-fun-name
+      (funcallable-instance-fun fun)))))
+
+(defun (setf %fun-name) (new-name fun)
+  (let ((widetag (widetag-of fun)))
+    (case widetag
+      ((#.sb!vm:simple-fun-header-widetag
+	#.sb!vm:closure-fun-header-widetag)
+       ;; KLUDGE: The pun that %SIMPLE-FUN-NAME is used for closure
+       ;; functions is left over from CMU CL (modulo various renaming
+       ;; that's gone on since the fork).
+       (setf (%simple-fun-name fun) new-name))
+      (#.sb!vm:closure-header-widetag
+       ;; FIXME: It'd be nice to be able to set %FUN-NAME here on
+       ;; per-closure basis. Instead, we are still using the CMU CL
+       ;; approach of closures being named after their closure
+       ;; function, which doesn't work right e.g. for structure
+       ;; accessors, and might not be quite right for DEFUN
+       ;; in a non-null lexical environment either.
+       ;; When/if weak hash tables become supported
+       ;; again, it'll become easy to fix this, but for now there
+       ;; seems to be no easy way (short of the ugly way of adding a
+       ;; slot to every single closure header), so we don't. 
+       ;;
+       ;; Meanwhile, users might encounter this problem by doing DEFUN
+       ;; in a non-null lexical environment, so we try to give a
+       ;; reasonably meaningful user-level "error" message (but only
+       ;; as a warning because this is optional debugging
+       ;; functionality anyway, not some hard ANSI requirement).
+       (warn "can't set name for closure, leaving name unchanged"))
+      (t
+       ;; The other function subtype names are also un-settable
+       ;; but this problem seems less likely to be tickled by
+       ;; user-level code, so we can give a implementor-level
+       ;; "error" (warning) message.
+       (warn "can't set function name ((~S function)=~S), leaving it unchanged"
+	     'widetag-of widetag))))
+  new-name)
+
+(defun %fun-doc (x)
+  ;; FIXME: This business of going through %FUN-NAME and then globaldb
+  ;; is the way CMU CL did it, but it doesn't really seem right.
+  ;; When/if weak hash tables become supported again, using a weak
+  ;; hash table to maintain the object/documentation association would
+  ;; probably be better.
+  (let ((name (%fun-name x)))
     (when (and name (typep name '(or symbol cons)))
       (values (info :function :documentation name)))))
+
+;;; various environment inquiries
 
 (defvar *features* '#.sb-cold:*shebang-features*
   #!+sb-doc
   "a list of symbols that describe features provided by the
    implementation")
-
-;;; various environment inquiries
 
 (defun machine-instance ()
   #!+sb-doc
