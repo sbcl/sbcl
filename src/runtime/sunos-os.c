@@ -30,8 +30,13 @@ static os_vm_size_t real_page_size_difference=0;
    running on 5.8 to use MAP_ANON, but because of C's lack of
    introspection at runtime, we can't grab the right value because
    it's stuffed in a header file somewhere. We can, however, hardcode
-   it, and test at runtime for whether to use it... -- CSR, 2002-05-06 */
+   it, and test at runtime for whether to use it... -- CSR, 2002-05-06 
+
+   And, in fact, it sucks slightly more, as if you don't use MAP_ANON
+   you need to have /dev/zero open and pass the file descriptor to
+   mmap().  So overall, this counts as a KLUDGE. -- CSR, 2002-05-20 */
 int KLUDGE_MAYBE_MAP_ANON = 0x0;
+int kludge_mmap_fd = -1; /* default for MAP_ANON */
 
 void os_init(void)
 {
@@ -47,9 +52,15 @@ void os_init(void)
     minor_version = atoi(name.release+2);
     if (minor_version == 8) {
 	KLUDGE_MAYBE_MAP_ANON = 0x100;
-    }
-    if (minor_version > 8) {
+    } else if (minor_version > 8) {
 	FSHOW((stderr, "os_init: Solaris version greater than 8?\nUnknown MAP_ANON behaviour.\n"));
+	lose("Unknown mmap() interaction with MAP_ANON");
+    } else { /* minor_version < 8 */
+	kludge_mmap_fd = open("/dev/zero",O_RDONLY);
+	if (kludge_mmap_fd < 0) {
+	    perror("open");
+	    lose("Error in open(..)");
+	}
     }
 
     /* I do not understand this at all. FIXME. */
@@ -76,14 +87,14 @@ void os_init(void)
 os_vm_address_t os_validate(os_vm_address_t addr, os_vm_size_t len)
 {
     int flags = MAP_PRIVATE | MAP_NORESERVE | KLUDGE_MAYBE_MAP_ANON;
-    
     if (addr) 
 	flags |= MAP_FIXED;
-    
+
     addr = mmap(addr, len, 
 		OS_VM_PROT_ALL, 
 		flags, 
-		-1, 0);
+		kludge_mmap_fd, 0);
+
     if (addr == MAP_FAILED) {
 	perror("mmap");
 	lose ("Error in mmap(..)");
@@ -162,8 +173,8 @@ sigsegv_handler(int signal, siginfo_t *info, void* void_context)
     os_vm_address_t addr;
 
     addr = arch_get_bad_addr(signal, info, context);
-	/* There's some complicated recovery code in linux-os.c here
-	   that I'm currently too confused to understand. Fixme. */
+    /* There's some complicated recovery code in linux-os.c here
+       that I'm currently too confused to understand. FIXME. */
     if(!interrupt_maybe_gc(signal, info, context)) {
 	interrupt_handle_now(signal, info, context);
     }
