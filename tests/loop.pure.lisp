@@ -171,3 +171,11 @@
 		   collect it
 		   and collect it)
 	   '(a z b z c z d z))))
+
+(let ((ht (make-hash-table)))
+  (setf (gethash 1 ht) 3)
+  (setf (gethash 7 ht) 15)
+  (assert (= (loop for v fixnum being each hash-key in ht sum v) 8))
+  (assert (= (loop for v fixnum being each hash-value in ht sum v) 18))
+  (assert (raises-error? (loop for v float being each hash-value in ht sum v)
+                         type-error)))

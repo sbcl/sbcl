@@ -1852,22 +1852,22 @@ code to be loaded.
 	  (:hash-value (setq key-var (and other-p other-var)
 			     val-var variable)))
 	(push `(with-hash-table-iterator (,next-fn ,ht-var)) *loop-wrappers*)
-	(when (consp key-var)
-	  (setq post-steps
-		`(,key-var ,(setq key-var (gensym "LOOP-HASH-KEY-TEMP-"))
-			   ,@post-steps))
-	  (push `(,key-var nil) bindings))
-	(when (consp val-var)
-	  (setq post-steps
-		`(,val-var ,(setq val-var (gensym "LOOP-HASH-VAL-TEMP-"))
-			   ,@post-steps))
-	  (push `(,val-var nil) bindings))
-	`(,bindings				;bindings
-	  ()					;prologue
-	  ()					;pre-test
-	  ()					;parallel steps
+        (when (or (consp key-var) data-type)
+          (setq post-steps
+                `(,key-var ,(setq key-var (gensym "LOOP-HASH-KEY-TEMP-"))
+                           ,@post-steps))
+          (push `(,key-var nil) bindings))
+        (when (or (consp val-var) data-type)
+          (setq post-steps
+                `(,val-var ,(setq val-var (gensym "LOOP-HASH-VAL-TEMP-"))
+                           ,@post-steps))
+          (push `(,val-var nil) bindings))
+	`(,bindings                     ;bindings
+	  ()                            ;prologue
+	  ()                            ;pre-test
+	  ()                            ;parallel steps
 	  (not (multiple-value-setq (,dummy-predicate-var ,key-var ,val-var)
-		 (,next-fn)))	;post-test
+		 (,next-fn)))           ;post-test
 	  ,post-steps)))))
 
 (defun loop-package-symbols-iteration-path (variable data-type prep-phrases

@@ -14,8 +14,9 @@
 
 (cl:in-package :cl-user)
 
-(load "assertoid")
-(use-package "ASSERTOID")
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (load "assertoid")
+  (use-package "ASSERTOID"))
 
 (declaim (optimize (debug 3) (speed 2) (space 1)))
 

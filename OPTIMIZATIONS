@@ -1,0 +1,65 @@
+(defun mysl (s)
+    (declare (simple-string s))
+    (declare (optimize (speed 3) (safety 0) (debug 0)))
+    (let ((c 0))
+      (declare (fixnum c))
+      (dotimes (i (length s))
+        (when (eql (aref s i) #\1)
+          (incf c)))
+      c))
+
+* On X86 I is represented as a tagged integer.
+
+* EQL uses "CMP reg,reg" instead of "CMP reg,im". This causes
+  allocation of extra register and extra move.
+
+* Unnecessary move:
+  3: SLOT S!11[EDX] {SB-C::VECTOR-LENGTH 1 7} => t23[EAX]
+  4: MOVE t23[EAX] => t24[EBX]
+
+--------------------------------------------------------------------------------
+(defun quux (v)
+  (declare (optimize (speed 3) (safety 0) (space 2) (debug 0)))
+  (declare (type (simple-array double-float 1) v))
+  (let ((s 0d0))
+    (declare (type double-float s))
+    (dotimes (i (length v))
+      (setq s (+ s (aref v i))))
+    s))
+
+* Python does not combine + with AREF, so generates extra move and
+  allocates a register.
+
+* On X86 Python thinks that all FP registers are directly accessible
+  and emits costy MOVE ... => FR1.
+
+--------------------------------------------------------------------------------
+(defun bar (n)
+  (declare (optimize (speed 3) (safety 0) (space 2))
+           (type fixnum n))
+  (let ((v (make-list n)))
+    (setq v (make-array n))
+    (length v)))
+
+* IR1 does not optimize away (MAKE-LIST N).
+
+* IR1 thinks that the type of V in (LENGTH V) is (OR LIST SIMPLE-VECTOR), not
+  SIMPLE-VECTOR.
+--------------------------------------------------------------------------------
+(defun bar (v1 v2)
+  (declare (optimize (speed 3) (safety 0) (space 2))
+           (type (simple-array base-char 1) v1 v2))
+  (dotimes (i (length v1))
+    (setf (aref v2 i) (aref v1 i))))
+
+VOP DATA-VECTOR-SET/SIMPLE-STRING V2!14[EDI] t32[EAX] t30[S2]>t33[CL]
+                                  => t34[S2]<t35[AL] 
+        MOV     #<TN t33[CL]>, #<TN t30[S2]>
+        MOV     BYTE PTR [EDI+EAX+1], #<TN t33[CL]>
+        MOV     #<TN t35[AL]>, #<TN t33[CL]>
+        MOV     #<TN t34[S2]>, #<TN t35[AL]>
+
+* The value of DATA-VECTOR-SET is not used, so there is no need in the
+  last two moves.
+
+* And why two moves?
