@@ -805,7 +805,7 @@
   #|:derive-type #'result-type-last-arg|#)
 
 (defknown array-has-fill-pointer-p (array) boolean
-  (movable foldable flushable))
+  (movable foldable unsafely-flushable))
 (defknown fill-pointer (vector) index (foldable unsafely-flushable))
 (defknown vector-push (t vector) (or index null) ())
 (defknown vector-push-extend (t vector &optional index) index ())
