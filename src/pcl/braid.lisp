@@ -527,29 +527,32 @@
 (defun eval-form (form)
   (lambda () (eval form)))
 
-(defun slot-initargs-from-structure-slotd (slotd)
-  `(:name ,(structure-slotd-name slotd)
-    :defstruct-accessor-symbol ,(structure-slotd-accessor-symbol slotd)
-    :internal-reader-function ,(structure-slotd-reader-function slotd)
-    :internal-writer-function ,(structure-slotd-writer-function slotd)
-    :type ,(or (structure-slotd-type slotd) t)
-    :initform ,(structure-slotd-init-form slotd)
-    :initfunction ,(eval-form (structure-slotd-init-form slotd))))
-
-(defun ensure-non-standard-class (name)
+(defun ensure-non-standard-class (name &optional existing-class)
   (flet
       ((ensure (metaclass &optional (slots nil slotsp))
 	 (let ((supers
 		(mapcar #'classoid-name (classoid-direct-superclasses
 					 (find-classoid name)))))
 	   (if slotsp
-	       (ensure-class-using-class nil name
+	       (ensure-class-using-class existing-class name
 					 :metaclass metaclass :name name
 					 :direct-superclasses supers
 					 :direct-slots slots)
-	       (ensure-class-using-class nil name
+	       (ensure-class-using-class existing-class name
 					 :metaclass metaclass :name name
-					 :direct-superclasses supers)))))
+					 :direct-superclasses supers))))
+       (slot-initargs-from-structure-slotd (slotd)
+	 (let ((accessor (structure-slotd-accessor-symbol slotd)))
+	   `(:name ,(structure-slotd-name slotd)
+	     :defstruct-accessor-symbol ,accessor
+	     ,@(when (fboundp accessor)
+		 `(:internal-reader-function
+		   (structure-slotd-reader-function slotd)
+		   :internal-writer-function
+		   ,(structure-slotd-writer-function slotd)))
+	     :type ,(or (structure-slotd-type slotd) t)
+	     :initform ,(structure-slotd-init-form slotd)
+	     :initfunction ,(eval-form (structure-slotd-init-form slotd))))))
     (cond ((structure-type-p name)
 	   (ensure 'structure-class
 		   (mapcar #'slot-initargs-from-structure-slotd
@@ -558,6 +561,13 @@
 	   (ensure 'condition-class))
 	  (t
 	   (error "~@<~S is not the name of a class.~@:>" name)))))
+
+(defun maybe-reinitialize-structure-class (classoid)
+  (let ((class (classoid-pcl-class classoid)))
+    (when class
+      (ensure-non-standard-class (class-name class) class))))
+
+(pushnew 'maybe-reinitialize-structure-class sb-kernel::*defstruct-hooks*)
 
 (defun make-class-predicate (class name)
   (let* ((gf (ensure-generic-function name))

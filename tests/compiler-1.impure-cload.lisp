@@ -225,4 +225,12 @@
                        nil)
                '(444 #*0000)))
 
+(defstruct some-structure a)
+(eval-when (:compile-toplevel)
+  ;; in the big CLASS reorganization in pre8, this would fail with
+  ;; SOME-STRUCTURE-A is not FBOUNDP.  Fixed in 0.pre8.64
+  (find-class 'some-structure nil))
+(eval-when (:load-toplevel)
+  (assert (typep (find-class 'some-structure) 'class)))
+
 (sb-ext:quit :unix-status 104) ; success

@@ -142,6 +142,10 @@
 
 ;;;; target-only parts of the DEFSTRUCT top level code
 
+;;; A list of hooks designating functions of one argument, the
+;;; classoid, to be called when a defstruct is evaluated.
+(defvar *defstruct-hooks* nil)
+
 ;;; Catch attempts to mess up definitions of symbols in the CL package.
 (defun protect-cl (symbol)
   (/show0 "entering PROTECT-CL, SYMBOL=..")
@@ -236,6 +240,11 @@
     (setf (fdocumentation (dd-name dd) 'type)
 	  (dd-doc dd)))
 
+  ;; the BOUNDP test here is to get past cold-init.
+  (when (boundp '*defstruct-hooks*)
+    (dolist (fun *defstruct-hooks*)
+      (funcall fun (find-classoid (dd-name dd)))))
+  
   (/show0 "leaving %TARGET-DEFSTRUCT")
   (values))
 
