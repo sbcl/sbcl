@@ -1302,6 +1302,47 @@ WORKAROUND:
   c. the examples in CLHS 7.6.5.1 (regarding generic function lambda
      lists and &KEY arguments) do not signal errors when they should.
 
+192: "Python treats free type declarations as promises."
+  a. original report by Alexey Dejneka (on sbcl-devel 2002-08-26):
+       (declaim (optimize (speed 0) (safety 3)))
+       (defun f (x)
+         (declare (real x))
+         (+ x
+            (locally (declare (single-float x))
+            (sin x))))
+     Now (F NIL) correctly gives a type error, but (F 100) gives
+     a segmentation violation.
+  b. same fundamental problem in a different way, easy to stumble
+     across if you mistype and declare the wrong index in
+     (DOTIMES (I ...) (DOTIMES (J ...) (DECLARE ...) ...)):
+       (declaim (optimize (speed 1) (safety 3)))
+       (defun trust-assertion (i)
+         (dotimes (j i)
+           (declare (type (mod 4) i)) ; when commented out, behavior changes!
+           (unless (< i 5)
+             (print j))))
+       (trust-assertion 6) ; prints nothing unless DECLARE is commented out
+
+193: "unhelpful CLOS error reporting when the primary method is missing"
+  In sbcl-0.7.7, when
+    (defmethod foo :before ((x t)) (print x))
+  is the only method defined on FOO, the error reporting when e.g.
+    (foo 12)
+  is relatively unhelpful:
+    There is no primary method for the generic function
+      #<STANDARD-GENERIC-FUNCTION FOO (1)>.
+  with the offending argument nowhere visible in the backtrace. This 
+  continues even if there *are* primary methods, just not for the 
+  specified arg type, e.g. 
+    (defmethod foo ((x character)) (print x))
+    (defmethod foo ((x string)) (print x))
+    (defmethod foo ((x pathname)) ...)
+  In that case it could be very helpful to know what argument value is
+  falling through the cracks of the defined primary methods, but the
+  error message stays the same (even BACKTRACE doesn't tell you what the
+  bad argument value is).
+
+
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:
     These labels were used for bugs related to the old IR1 interpreter.

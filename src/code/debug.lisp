@@ -291,7 +291,7 @@ Other commands:
   (code-location-selector (missing-arg) :type (or symbol integer) :read-only t)
   ;; the number used when listing the active breakpoints, and when
   ;; deleting breakpoints
-  (breakpoint-number (missing-arg) :type integer) :read-only t)
+  (breakpoint-number (missing-arg) :type integer :read-only t))
 
 (defun create-breakpoint-info (place breakpoint code-location-selector
 				     &key (break #'identity)

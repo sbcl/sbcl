@@ -497,10 +497,6 @@
 	  (t
 	   (error "unknown option: ~S" (first option)))))
 
-      (when (all-writers)
-	(warn "Condition slot setters probably not allowed in ANSI CL:~%  ~S"
-	      (all-writers)))
-
       `(progn
 	 (eval-when (:compile-toplevel :load-toplevel :execute)
 	   (%compiler-define-condition ',name ',parent-types ',layout))
