@@ -96,8 +96,5 @@
 	 :arg-seqs (*list-2* *list-2* *vector-30*)
 	 :arg-types (list list vector))
 
-(print "returning successfully")
-(terpri)
-;;(sb-impl::flush-standard-output-streams)
-;;(finish-output)
+;;; success
 (quit :unix-status 104)
