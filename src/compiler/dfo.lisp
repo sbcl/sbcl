@@ -384,8 +384,7 @@
     ;; initial component tail (due NIL function terminated blocks)
     ;; are moved to the appropriate new component tail.
     (dolist (toplevel-lambda toplevel-lambdas)
-      (let* ((block (lambda-block toplevel-lambda))
-	     (old-component (block-component block))
+      (let* ((old-component (lambda-component toplevel-lambda))
 	     (old-component-lambdas (component-lambdas old-component))
 	     (new-component nil))
 	(aver (member toplevel-lambda old-component-lambdas))

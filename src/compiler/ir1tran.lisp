@@ -256,8 +256,7 @@
 
 ;;; This function sets up the back link between the node and the
 ;;; continuation which continues at it.
-#!-sb-fluid (declaim (inline prev-link))
-(defun prev-link (node cont)
+(defun link-node-to-previous-continuation (node cont)
   (declare (type node node) (type continuation cont))
   (aver (not (continuation-next cont)))
   (setf (continuation-next cont) node)
@@ -482,7 +481,7 @@
      (let* ((leaf (find-constant value))
 	    (res (make-ref (leaf-type leaf) leaf)))
        (push res (leaf-refs leaf))
-       (prev-link res start)
+       (link-node-to-previous-continuation res start)
        (use-continuation res cont)))
     (values)))
 
@@ -511,7 +510,7 @@
 			leaf)))
     (push res (leaf-refs leaf))
     (setf (leaf-ever-used leaf) t)
-    (prev-link res start)
+    (link-node-to-previous-continuation res start)
     (use-continuation res cont)))
 
 ;;; Convert a reference to a symbolic constant or variable. If the
@@ -710,7 +709,7 @@
 	    (ir1-convert this-start this-cont arg)
 	    (setq this-start this-cont)
 	    (arg-conts this-cont)))
-	(prev-link node this-start)
+	(link-node-to-previous-continuation node this-start)
 	(use-continuation node cont)
 	(setf (combination-args node) (arg-conts))))
     node))
@@ -1392,7 +1391,7 @@
 	(let ((cont1 (make-continuation))
 	      (cont2 (make-continuation)))
 	  (continuation-starts-block cont1)
-	  (prev-link bind cont1)
+	  (link-node-to-previous-continuation bind cont1)
 	  (use-continuation bind cont2)
 	  (ir1-convert-special-bindings cont2 result body aux-vars aux-vals
 					(svars)))
@@ -1406,7 +1405,7 @@
 	      (setf (lambda-return lambda) return)
 	      (setf (continuation-dest result) return)
 	      (setf (block-last block) return)
-	      (prev-link return result)
+	      (link-node-to-previous-continuation return result)
 	      (use-continuation return dummy))
 	    (link-blocks block (component-tail *current-component*))))))
 

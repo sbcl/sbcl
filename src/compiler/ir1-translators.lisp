@@ -37,7 +37,7 @@
 			:alternative else-block)))
     (setf (continuation-dest pred) node)
     (ir1-convert start pred test)
-    (prev-link node pred)
+    (link-node-to-previous-continuation node pred)
     (use-continuation node dummy-cont)
 
     (let ((start-block (continuation-block pred)))
@@ -75,7 +75,7 @@
 				:mess-up entry)))
     (push entry (lambda-entries (lexenv-lambda *lexenv*)))
     (setf (entry-cleanup entry) cleanup)
-    (prev-link entry start)
+    (link-node-to-previous-continuation entry start)
     (use-continuation entry dummy)
     
     (let* ((env-entry (list entry cont))
@@ -115,7 +115,7 @@
     (push exit (entry-exits entry))
     (setf (continuation-dest value-cont) exit)
     (ir1-convert start value-cont value)
-    (prev-link exit value-cont)
+    (link-node-to-previous-continuation exit value-cont)
     (let ((home-lambda (continuation-home-lambda-or-null start)))
       (when home-lambda
 	(push entry (lambda-calls-or-closes home-lambda))))
@@ -169,7 +169,7 @@
 				:mess-up entry)))
     (push entry (lambda-entries (lexenv-lambda *lexenv*)))
     (setf (entry-cleanup entry) cleanup)
-    (prev-link entry start)
+    (link-node-to-previous-continuation entry start)
     (use-continuation entry dummy)
 
     (collect ((tags)
@@ -204,7 +204,7 @@
 	 (entry (first found))
 	 (exit (make-exit :entry entry)))
     (push exit (entry-exits entry))
-    (prev-link exit start)
+    (link-node-to-previous-continuation exit start)
     (let ((home-lambda (continuation-home-lambda-or-null start)))
       (when home-lambda
 	(push entry (lambda-calls-or-closes home-lambda))))
@@ -822,7 +822,7 @@
       (setf (continuation-dest dest) res)
       (setf (leaf-ever-used var) t)
       (push res (basic-var-sets var))
-      (prev-link res dest)
+      (link-node-to-previous-continuation res dest)
       (use-continuation res cont))))
 
 ;;;; CATCH, THROW and UNWIND-PROTECT
@@ -971,7 +971,7 @@
 	    (ir1-convert this-start this-cont arg)
 	    (setq this-start this-cont)
 	    (arg-conts this-cont)))
-	(prev-link node this-start)
+	(link-node-to-previous-continuation node this-start)
 	(use-continuation node cont)
 	(setf (basic-combination-args node) (arg-conts))))))
 

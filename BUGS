@@ -1367,6 +1367,31 @@ Error in function C::GET-LAMBDA-TO-COMPILE:
   to do without explicit wildcards, e.g. (DIRECTORY "/tmp/"), 
   now needs explicit wildcards, e.g. (DIRECTORY "/tmp/*.*").
 
+140:
+  (reported by Alexey Dejneka sbcl-devel 2002-01-03)
+
+  SUBTYPEP does not work well with redefined classes:
+  ---
+  * (defclass a () ())
+  #<STANDARD-CLASS A>
+  * (defclass b () ())
+  #<STANDARD-CLASS B>
+  * (subtypep 'b 'a)
+  NIL
+  T
+  * (defclass b (a) ())
+  #<STANDARD-CLASS B>
+  * (subtypep 'b 'a)
+  T
+  T
+  * (defclass b () ())
+  #<STANDARD-CLASS B>
+   
+  ;;; And now...
+  * (subtypep 'b 'a)
+  T
+  T
+
 
 KNOWN BUGS RELATED TO THE IR1 INTERPRETER
 

@@ -319,7 +319,7 @@
 ;;; passes them on to CONT.
 (defun convert-type-check (cont types)
   (declare (type continuation cont) (type list types))
-  (with-ir1-environment (continuation-dest cont)
+  (with-belated-ir1-environment (continuation-dest cont)
 
     ;; Ensuring that CONT starts a block lets us freely manipulate its uses.
     (ensure-block-start cont)
@@ -360,7 +360,7 @@
 	;; said that somewhere in here we
 	;;   Set the new block's start and end cleanups to the *start*
 	;;   cleanup of PREV's block. This overrides the incorrect
-	;;   default from WITH-IR1-ENVIRONMENT.
+	;;   default from WITH-BELATED-IR1-ENVIRONMENT.
 	;; Unfortunately I can't find any code which corresponds to this.
 	;; Perhaps it was a stale comment? Or perhaps I just don't
 	;; understand.. -- WHN 19990521

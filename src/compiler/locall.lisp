@@ -178,7 +178,7 @@
 (defun make-external-entry-point (fun)
   (declare (type functional fun))
   (aver (not (functional-entry-fun fun)))
-  (with-ir1-environment (lambda-bind (main-entry fun))
+  (with-belated-ir1-environment (lambda-bind (main-entry fun))
     (let ((res (ir1-convert-lambda (make-xep-lambda-expression fun)
 				   :debug-name (debug-namify
 						"XEP for ~A"
@@ -277,7 +277,7 @@
 	      (t
 	       ;; Fix/check FUN's relationship to COMPONENT-LAMDBAS.
 	       (cond ((not (lambda-p fun))
-		      ;; Since FUN's not a LAMBDA, this doesn't apply: no-op.
+		      ;; Since FUN isn't a LAMBDA, this doesn't apply: no-op.
 		      (values))
 		     (new-fun ; FUN came from NEW-FUNS, hence is new.
 		      ;; FUN becomes part of COMPONENT-LAMBDAS now.
@@ -296,7 +296,7 @@
 		      ;; expansions of local functions might in
 		      ;; COMPONENT-LAMBDAS?)
 		      (values))
-		     (t ; FUN's old.
+		     (t ; FUN is old.
 		      ;; FUN should be in COMPONENT-LAMBDAS already.
 		      (aver (member fun (component-lambdas component)))))
 	       (locall-analyze-fun-1 fun)
@@ -330,7 +330,7 @@
 		   (and (>= speed space) (>= speed compilation-speed)))
 	   (not (eq (functional-kind (node-home-lambda call)) :external))
 	   (inline-expansion-ok call))
-      (with-ir1-environment call
+      (with-belated-ir1-environment call
 	(let* ((*lexenv* (functional-lexenv fun))
 	       (won nil)
 	       (res (catch 'local-call-lossage
@@ -523,7 +523,7 @@
   (declare (list vars ignores args) (type ref ref) (type combination call)
 	   (type clambda entry))
   (let ((new-fun
-	 (with-ir1-environment call
+	 (with-belated-ir1-environment call
 	   (ir1-convert-lambda
 	    `(lambda ,vars
 	       (declare (ignorable . ,ignores))

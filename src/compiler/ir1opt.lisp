@@ -568,7 +568,7 @@
 ;;; become unreachable, resulting in a spurious note.
 (defun convert-if-if (use node)
   (declare (type node use) (type cif node))
-  (with-ir1-environment node
+  (with-belated-ir1-environment node
     (let* ((block (node-block node))
 	   (test (if-test node))
 	   (cblock (if-consequent node))
@@ -580,7 +580,7 @@
 			      :consequent cblock
 			      :alternative ablock))
 	   (new-block (continuation-starts-block new-cont)))
-      (prev-link new-node new-cont)
+      (link-node-to-previous-continuation new-node new-cont)
       (setf (continuation-dest new-cont) new-node)
       (add-continuation-use new-node dummy-cont)
       (setf (block-last new-block) new-node)
@@ -818,7 +818,7 @@
 		 (change-ref-leaf ref res))))
 	(if ir1-p
 	    (frob)
-	    (with-ir1-environment call
+	    (with-belated-ir1-environment call
 	      (frob)
 	      (locall-analyze-component *current-component*))))
 
@@ -1083,7 +1083,7 @@
 ;;; integrated into the control flow.
 (defun transform-call (node res)
   (declare (type combination node) (list res))
-  (with-ir1-environment node
+  (with-belated-ir1-environment node
     (let ((new-fun (ir1-convert-inline-lambda
 		    res
 		    :debug-name "<something inlined in TRANSFORM-CALL>"))
@@ -1481,7 +1481,7 @@
 			    min)
 			   (t nil))))
 	  (when count
-	    (with-ir1-environment node
+	    (with-belated-ir1-environment node
 	      (let* ((dums (make-gensym-list count))
 		     (ignore (gensym))
 		     (fun (ir1-convert-lambda
@@ -1525,7 +1525,7 @@
 	       (mapc #'flush-dest (subseq vals nvars))
 	       (setq vals (subseq vals 0 nvars)))
 	      ((< nvals nvars)
-	       (with-ir1-environment use
+	       (with-belated-ir1-environment use
 		 (let ((node-prev (node-prev use)))
 		   (setf (node-prev use) nil)
 		   (setf (continuation-next node-prev) nil)
@@ -1536,7 +1536,8 @@
 			   do (reference-constant prev cont nil)
 			      (res cont))
 		     (setq vals (res)))
-		   (prev-link use (car (last vals)))))))
+		   (link-node-to-previous-continuation use
+						       (car (last vals)))))))
 	(setf (combination-args use) vals)
 	(flush-dest (combination-fun use))
 	(let ((fun-cont (basic-combination-fun call)))

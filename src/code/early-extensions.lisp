@@ -711,8 +711,7 @@
 ;;; guts of complex systems anyway, I replaced it too.)
 (defmacro aver (expr)
   `(unless ,expr
-     (%failed-aver ,(let ((*package* (find-package :keyword)))
-		      (format nil "~S" expr)))))
+     (%failed-aver ,(format nil "~A" expr))))
 (defun %failed-aver (expr-as-string)
   (error "~@<internal error, failed AVER: ~2I~_~S~:>" expr-as-string))
 (defmacro enforce-type (value type)

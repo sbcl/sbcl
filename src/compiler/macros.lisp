@@ -678,7 +678,7 @@
 ;;; after the main conversion pass has finished.
 ;;;
 ;;; The lexical environment is presumably already null...
-(defmacro with-ir1-environment (node &rest forms)
+(defmacro with-belated-ir1-environment (node &rest forms)
   (let ((n-node (gensym)))
     `(let* ((,n-node ,node)
 	    (*current-component* (block-component (node-block ,n-node)))
@@ -687,7 +687,7 @@
        ,@forms)))
 
 ;;; Bind the hashtables used for keeping track of global variables,
-;;; functions, &c. Also establish condition handlers.
+;;; functions, etc. Also establish condition handlers.
 (defmacro with-ir1-namespace (&body forms)
   `(let ((*free-variables* (make-hash-table :test 'eq))
 	 (*free-functions* (make-hash-table :test 'equal))
