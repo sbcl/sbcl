@@ -56,6 +56,7 @@
           (int-sap (sap-ref-32 (int-sap addr) 0))
           (int-sap addr)))))
 
+#-sb-xc-host
 (defun foreign-reinit ()
   #!+os-provides-dlopen
   (reopen-shared-objects)
@@ -63,6 +64,7 @@
   (linkage-table-reinit))
 
 ;;; Cleanups before saving a core
+#-sb-xc-host
 (defun foreign-deinit ()
   #!+(and os-provides-dlopen (not linkage-table))
   (let ((shared (remove-if #'null (mapcar #'sb!alien::shared-object-file
@@ -113,6 +115,7 @@
 ;;; How we learn about foreign symbols and dlhandles initially
 (defvar *!initial-foreign-symbols*)
 
+#-sb-xc-host
 (defun !foreign-cold-init ()
   (dolist (symbol *!initial-foreign-symbols*)
     (setf (gethash (car symbol) *static-foreign-symbols*) (cdr symbol)))
