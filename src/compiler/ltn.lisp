@@ -895,7 +895,7 @@
       ;; to implement an out-of-line version in terms of inline
       ;; transforms or VOPs or whatever.
       (unless template
-	(when (let ((funleaf (physenv-function (node-physenv call))))
+	(when (let ((funleaf (physenv-lambda (node-physenv call))))
 		(and (leaf-has-source-name-p funleaf)
 		     (eq (continuation-fun-name (combination-fun call))
 			 (leaf-source-name funleaf))

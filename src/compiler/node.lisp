@@ -323,6 +323,14 @@
 ;;; A COMPONENT structure provides a handle on a connected piece of
 ;;; the flow graph. Most of the passes in the compiler operate on
 ;;; COMPONENTs rather than on the entire flow graph.
+;;;
+;;; According to the CMU CL internals/front.tex, the reason for
+;;; separating compilation into COMPONENTs is
+;;;   to increase the efficiency of large block compilations. In
+;;;   addition to improving locality of reference and reducing the
+;;;   size of flow analysis problems, this allows back-end data
+;;;   structures to be reclaimed after the compilation of each
+;;;   component.
 (defstruct (component (:copier nil))
   ;; the kind of component
   ;;
@@ -488,7 +496,7 @@
 ;;; TNs, or eventually stack slots and registers). -- WHN 2001-09-29
 (defstruct (physenv (:copier nil))
   ;; the function that allocates this physical environment
-  (function (missing-arg) :type clambda)
+  (lambda (missing-arg) :type clambda :read-only t)
   #| ; seems not to be used as of sbcl-0.pre7.51
   ;; a list of all the lambdas that allocate variables in this
   ;; physical environment
@@ -508,7 +516,7 @@
   ;; some kind of info used by the back end
   (info nil))
 (defprinter (physenv :identity t)
-  function
+  lambda
   (closure :test closure)
   (nlx-info :test nlx-info))
 
@@ -1046,8 +1054,8 @@
 ;;; LAMBDA-VARs with no REFs are considered to be deleted; physical
 ;;; environment analysis isn't done on these variables, so the back
 ;;; end must check for and ignore unreferenced variables. Note that a
-;;; deleted lambda-var may have sets; in this case the back end is
-;;; still responsible for propagating the Set-Value to the set's Cont.
+;;; deleted LAMBDA-VAR may have sets; in this case the back end is
+;;; still responsible for propagating the SET-VALUE to the set's CONT.
 (def!struct (lambda-var (:include basic-var))
   ;; true if this variable has been declared IGNORE
   (ignorep nil :type boolean)

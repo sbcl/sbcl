@@ -809,7 +809,7 @@
 ;;; This is a special special form that makes an "escape function"
 ;;; which returns unknown values from named block. We convert the
 ;;; function, set its kind to :ESCAPE, and then reference it. The
-;;; :Escape kind indicates that this function's purpose is to
+;;; :ESCAPE kind indicates that this function's purpose is to
 ;;; represent a non-local control transfer, and that it might not
 ;;; actually have to be compiled.
 ;;;
@@ -818,7 +818,8 @@
 (def-ir1-translator %escape-function ((tag) start cont)
   (let ((fun (ir1-convert-lambda
 	      `(lambda ()
-		 (return-from ,tag (%unknown-values))))))
+		 (return-from ,tag (%unknown-values)))
+	      :debug-name (debug-namify "escape function for ~S" tag))))
     (setf (functional-kind fun) :escape)
     (reference-leaf start cont fun)))
 

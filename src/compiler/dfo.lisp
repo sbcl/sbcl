@@ -100,9 +100,8 @@
   (values))
 
 ;;; This function is called on each block by FIND-INITIAL-DFO-AUX
-;;; before it walks the successors. It looks at the home lambda's bind
-;;; block to see whether that block is in some other component:
-
+;;; before it walks the successors. It looks at the home CLAMBDA's
+;;; BIND block to see whether that block is in some other component:
 ;;; -- If the block is in the initial component, then do
 ;;;    DFO-WALK-CALL-GRAPH on the home function to move it
 ;;;    into COMPONENT.
@@ -221,23 +220,18 @@
 ;;; already be one.
 (defun dfo-scavenge-call-graph (fun component)
   (declare (type clambda fun) (type component component))
-  (/show "entering DFO-SCAVENGE-CALL-GRAPH" fun component)
   (let* ((bind-block (node-block (lambda-bind fun)))
 	 (old-lambda-component (block-component bind-block))
 	 (return (lambda-return fun)))
     (cond
      ((eq old-lambda-component component)
-      (/show "LAMBDA is already in COMPONENT")
       component)
      ((not (eq (component-kind old-lambda-component) :initial))
-      (/show "joining COMPONENTs")
       (join-components old-lambda-component component)
       old-lambda-component)
      ((block-flag bind-block)
-      (/show "do-nothing (BLOCK-FLAG BIND-BLOCK) case")
       component)
      (t
-      (/show "full scavenge case")
       (push fun (component-lambdas component))
       (setf (component-lambdas old-lambda-component)
 	    (delete fun (component-lambdas old-lambda-component)))
@@ -248,19 +242,15 @@
 	  (link-blocks return-block (component-tail component))
 	  (unlink-blocks return-block (component-tail old-lambda-component))))
 
-      (/show (functional-kind fun))
-      (/show (lambda-calls fun))
-      (when (eq (functional-kind fun) :external)
-	(/show (find-reference-funs fun)))
-
       (let ((calls (if (eq (functional-kind fun) :external)
 		       (append (find-reference-funs fun)
 			       (lambda-calls fun))
 		       (lambda-calls fun))))
 	(do ((res (find-initial-dfo-aux bind-block component)
-		  (dfo-scavenge-call-graph (first funs) res))
-	     (funs calls (rest funs)))
-	    ((null funs) res)
+		  (dfo-scavenge-call-graph (first remaining-calls) res))
+	     (remaining-calls calls (rest remaining-calls)))
+	    ((null remaining-calls)
+	     res)
 	  (declare (type component res))))))))
 
 ;;; Return true if FUN is either an XEP or has EXITS to some of its
@@ -342,7 +332,6 @@
 ;;; blocks. We assume that the FLAGS have already been cleared.
 (defun find-initial-dfo (toplevel-lambdas)
   (declare (list toplevel-lambdas))
-  (/show "entering FIND-INITIAL-DFO" toplevel-lambdas)
   (collect ((components))
     ;; We iterate over the lambdas in each initial component, trying
     ;; to put each function in its own component, but joining it to
@@ -352,15 +341,12 @@
     ;; initial component tail (due NIL function terminated blocks)
     ;; are moved to the appropriate newc component tail.
     (dolist (toplevel-lambda toplevel-lambdas)
-      (/show toplevel-lambda)
       (let* ((block (lambda-block toplevel-lambda))
 	     (old-component (block-component block))
 	     (old-component-lambdas (component-lambdas old-component))
 	     (new-component nil))
-	(/show old-component old-component-lambdas)
 	(aver (member toplevel-lambda old-component-lambdas))
 	(dolist (component-lambda old-component-lambdas)
-	  (/show component-lambda)
 	  (aver (member (functional-kind component-lambda)
 			'(:optional :external :toplevel nil :escape
 				    :cleanup)))
@@ -375,13 +361,11 @@
 		   component-lambda)))
 	  (let ((res (dfo-scavenge-call-graph component-lambda new-component)))
 	    (when (eq res new-component)
-	      (/show "saving" new-component (component-lambdas new-component))
 	      (aver (not (position new-component (components))))
 	      (components new-component)
 	      (setq new-component nil))))
 	(when (eq (component-kind old-component) :initial)
 	  (aver (null (component-lambdas old-component)))
-	  (/show "clearing/deleting OLD-COMPONENT because KIND=:INITIAL")
 	  (let ((tail (component-tail old-component)))
 	    (dolist (pred (block-pred tail))
 	      (let ((pred-component (block-component pred)))
@@ -401,7 +385,7 @@
     (separate-toplevelish-components (components))))
 
 ;;; Insert the code in LAMBDA at the end of RESULT-LAMBDA.
-(defun merge-1-tl-lambda (result-lambda lambda)
+(defun merge-1-toplevel-lambda (result-lambda lambda)
   (declare (type clambda result-lambda lambda))
 
   ;; Delete the lambda, and combine the LETs and entries.
@@ -498,7 +482,7 @@
 	    (add-continuation-use use new))))
 
       (dolist (lambda (rest lambdas))
-	(merge-1-tl-lambda result-lambda lambda)))
+	(merge-1-toplevel-lambda result-lambda lambda)))
      (t
       (dolist (lambda (rest lambdas))
 	(setf (functional-entry-fun lambda) nil)

@@ -865,9 +865,6 @@
 				    :source-name (or name '.anonymous.)
 				    :debug-name (unless name
 						  "top level form"))))
-      (/show "in MAKE-FUNCTIONAL-FROM-TOP-LEVEL-LAMBDA" locall-fun fun component)
-      (/show (component-lambdas component))
-      (/show (lambda-calls fun))
       (setf (functional-entry-fun fun) locall-fun
             (functional-kind fun) :external
             (functional-has-external-references-p fun) t)
@@ -893,15 +890,12 @@
 		  ;; nice default for things where we don't have a
 		  ;; real source path (as in e.g. inside CL:COMPILE).
 		  '(original-source-start 0 0)))
-  (/show "entering %COMPILE" lambda-expression name)
   (unless (or (null name) (legal-fun-name-p name))
     (error "not a legal function name: ~S" name))
   (let* ((*lexenv* (make-lexenv :policy *policy*))
          (fun (make-functional-from-toplevel-lambda lambda-expression
 						    :name name
 						    :path path)))
-    (/show "back in %COMPILE from M-F-FROM-TL-LAMBDA" fun)
-    (/show (lambda-component fun) (component-lambdas (lambda-component fun)))
 
     ;; FIXME: The compile-it code from here on is sort of a
     ;; twisted version of the code in COMPILE-TOPLEVEL. It'd be
@@ -911,17 +905,10 @@
     ;; the :LOCALL-ONLY option to IR1-FOR-LAMBDA. Then maybe the
     ;; whole FUNCTIONAL-KIND=:TOPLEVEL case could go away..)
 
-    #+nil (break "before LOCALL-ANALYZE-CLAMBDAS-UNTIL-DONE" fun)
     (locall-analyze-clambdas-until-done (list fun))
-    (/show (lambda-calls fun))
-    #+nil (break "back from LOCALL-ANALYZE-CLAMBDAS-UNTIL-DONE" fun)
     
     (multiple-value-bind (components-from-dfo top-components hairy-top)
         (find-initial-dfo (list fun))
-      (/show components-from-dfo top-components hairy-top)
-      (/show (mapcar #'component-lambdas components-from-dfo))
-      (/show (mapcar #'component-lambdas top-components))
-      (/show (mapcar #'component-lambdas hairy-top))
 
       (let ((*all-components* (append components-from-dfo top-components)))
 	;; FIXME: This is more monkey see monkey do based on CMU CL
@@ -932,7 +919,6 @@
 	(mapc #'preallocate-physenvs-for-toplevelish-lambdas hairy-top)
 	(mapc #'preallocate-physenvs-for-toplevelish-lambdas top-components)
         (dolist (component-from-dfo components-from-dfo)
-	  (/show component-from-dfo (component-lambdas component-from-dfo))
           (compile-component component-from-dfo)
           (replace-toplevel-xeps component-from-dfo)))
 
@@ -947,8 +933,7 @@
               (aver found-p)
               result))
         (mapc #'clear-ir1-info components-from-dfo)
-        (clear-stuff)
-	(/show "returning from %COMPILE")))))
+        (clear-stuff)))))
 
 (defun process-toplevel-cold-fset (name lambda-expression path)
   (unless (producing-fasl-file)

@@ -830,10 +830,7 @@
 	   (closure (ir2-physenv-environment 2env))
 	   (pc (ir2-physenv-return-pc-pass 2env))
 	   (fp (ir2-physenv-old-fp 2env))
-	   (2block (block-info
-		    (node-block
-		     (lambda-bind
-		      (physenv-function env))))))
+	   (2block (block-info (lambda-block (physenv-lambda env)))))
       (do ((conf (ir2-block-global-tns 2block)
 		 (global-conflicts-next conf)))
 	  ((null conf))

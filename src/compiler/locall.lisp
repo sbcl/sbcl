@@ -514,7 +514,10 @@
 	   (ir1-convert-lambda
 	    `(lambda ,vars
 	       (declare (ignorable . ,ignores))
-	       (%funcall ,entry . ,args))))))
+	       (%funcall ,entry . ,args))
+	    :debug-name (debug-namify "hairy fun entry ~S"
+				      (continuation-fun-name
+				       (basic-combination-fun call)))))))
     (convert-call ref call new-fun)
     (dolist (ref (leaf-refs entry))
       (convert-call-if-possible ref (continuation-dest (node-cont ref))))))
@@ -761,7 +764,7 @@
     (setf (lambda-physenv clambda) home-env)
 
     (let ((lets (lambda-lets clambda)))
-      ;; All CLAMBDA's LETs belong to HOME now.
+      ;; All of CLAMBDA's LETs belong to HOME now.
       (dolist (let lets)
 	(setf (lambda-home let) home)
 	(setf (lambda-physenv let) home-env))
@@ -780,7 +783,7 @@
     ;; which calls things.
     (setf (lambda-calls clambda) nil)
 
-    ;; All CLAMBDA's ENTRIES belong to HOME now.
+    ;; All of CLAMBDA's ENTRIES belong to HOME now.
     (setf (lambda-entries home)
 	  (nconc (lambda-entries clambda) (lambda-entries home)))
     ;; CLAMBDA no longer has an independent existence as an entity
@@ -911,7 +914,7 @@
 
 ;;; Actually do LET conversion. We call subfunctions to do most of the
 ;;; work. We change the CALL's CONT to be the continuation heading the
-;;; bind block, and also do REOPTIMIZE-CONTINUATION on the args and
+;;; BIND block, and also do REOPTIMIZE-CONTINUATION on the args and
 ;;; CONT so that LET-specific IR1 optimizations get a chance. We blow
 ;;; away any entry for the function in *FREE-FUNCTIONS* so that nobody
 ;;; will create new references to it.

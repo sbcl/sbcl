@@ -890,10 +890,10 @@
       (let ((*compiler-error-context* (lambda-bind fun)))
 	(unless (policy *compiler-error-context* (= inhibit-warnings 3))
 	  ;; ANSI section "3.2.5 Exceptional Situations in the Compiler"
-	  ;; requires this to be a STYLE-WARNING.
+	  ;; requires this to be no more than a STYLE-WARNING.
 	  (compiler-style-warning "The variable ~S is defined but never used."
 				  (leaf-debug-name var)))
-	(setf (leaf-ever-used var) t))))
+	(setf (leaf-ever-used var) t)))) ; to avoid repeated warnings? -- WHN
   (values))
 
 (defvar *deletion-ignored-objects* '(t nil))

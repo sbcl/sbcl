@@ -429,7 +429,7 @@
 
 ;;; The politically correct way to print out progress messages and
 ;;; such like. We clear the current error context so that we know that
-;;; it needs to be reprinted, and we also Force-Output so that the
+;;; it needs to be reprinted, and we also FORCE-OUTPUT so that the
 ;;; message gets seen right away.
 (declaim (ftype (function (string &rest t) (values)) compiler-mumble))
 (defun compiler-mumble (format-string &rest format-args)

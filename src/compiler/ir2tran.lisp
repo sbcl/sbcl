@@ -54,9 +54,9 @@
 ;;;; leaf reference
 
 ;;; Return the TN that holds the value of THING in the environment ENV.
+(declaim (ftype (function ((or nlx-info lambda-var) physenv) tn)
+		find-in-physenv))
 (defun find-in-physenv (thing physenv)
-  (declare (type (or nlx-info lambda-var) thing) (type physenv physenv)
-	   (values tn))
   (or (cdr (assoc thing (ir2-physenv-environment (physenv-info physenv))))
       (etypecase thing
 	(lambda-var

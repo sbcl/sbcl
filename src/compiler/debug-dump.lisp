@@ -175,14 +175,14 @@
 
 ;;; Dump the successors of Block, being careful not to fly into space
 ;;; on weird successors.
-(defun dump-block-successors (block env)
-  (declare (type cblock block) (type physenv env))
+(defun dump-block-successors (block physenv)
+  (declare (type cblock block) (type physenv physenv))
   (let* ((tail (component-tail (block-component block)))
 	 (succ (block-succ block))
 	 (valid-succ
 	  (if (and succ
 		   (or (eq (car succ) tail)
-		       (not (eq (block-physenv (car succ)) env))))
+		       (not (eq (block-physenv (car succ)) physenv))))
 	      ()
 	      succ)))
     (vector-push-extend
@@ -190,7 +190,7 @@
      *byte-buffer*)
     (let ((base (block-number
 		 (node-block
-		  (lambda-bind (physenv-function env))))))
+		  (lambda-bind (physenv-lambda physenv))))))
       (dolist (b valid-succ)
 	(write-var-integer
 	 (the index (- (block-number b) base))
@@ -209,17 +209,17 @@
   (setf (fill-pointer *byte-buffer*) 0)
   (let ((*previous-location* 0)
 	(tlf-num (find-tlf-number fun))
-	(env (lambda-physenv fun))
+	(physenv (lambda-physenv fun))
 	(prev-locs nil)
 	(prev-block nil))
     (collect ((elsewhere))
-      (do-physenv-ir2-blocks (2block env)
+      (do-physenv-ir2-blocks (2block physenv)
 	(let ((block (ir2-block-block 2block)))
 	  (when (eq (block-info block) 2block)
 	    (when prev-block
 	      (dump-block-locations prev-block prev-locs tlf-num var-locs))
 	    (setq prev-block block  prev-locs ())
-	    (dump-block-successors block env)))
+	    (dump-block-successors block physenv)))
 	
 	(collect ((here prev-locs))
 	  (dolist (loc (ir2-block-locations 2block))
@@ -304,13 +304,13 @@
   (make-sc-offset (sc-number (tn-sc tn))
 		  (tn-offset tn)))
 
-;;; Dump info to represent Var's location being TN. ID is an integer
-;;; that makes Var's name unique in the function. Buffer is the vector
-;;; we stick the result in. If Minimal is true, we suppress name
-;;; dumping, and set the minimal flag.
+;;; Dump info to represent VAR's location being TN. ID is an integer
+;;; that makes VAR's name unique in the function. BUFFER is the vector
+;;; we stick the result in. If MINIMAL, we suppress name dumping, and
+;;; set the minimal flag.
 ;;;
-;;; The debug-var is only marked as always-live if the TN is
-;;; environment live and is an argument. If a :debug-environment TN,
+;;; The DEBUG-VAR is only marked as always-live if the TN is
+;;; environment live and is an argument. If a :DEBUG-ENVIRONMENT TN,
 ;;; then we also exclude set variables, since the variable is not
 ;;; guaranteed to be live everywhere in that case.
 (defun dump-1-variable (fun var tn id minimal buffer)

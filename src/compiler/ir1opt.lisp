@@ -1242,7 +1242,7 @@
 ;;; changes. We look at each changed argument. If the corresponding
 ;;; variable is set, then we call PROPAGATE-FROM-SETS. Otherwise, we
 ;;; consider substituting for the variable, and also propagate
-;;; derived-type information for the arg to all the Var's refs.
+;;; derived-type information for the arg to all the VAR's refs.
 ;;;
 ;;; Substitution is inhibited when the arg leaf's derived type isn't a
 ;;; subtype of the argument's asserted type. This prevents type
@@ -1259,7 +1259,7 @@
 ;;; are done, then we delete the LET.
 ;;;
 ;;; Note that we are responsible for clearing the
-;;; Continuation-Reoptimize flags.
+;;; CONTINUATION-REOPTIMIZE flags.
 (defun propagate-let-args (call fun)
   (declare (type combination call) (type clambda fun))
   (loop for arg in (combination-args call)
@@ -1283,8 +1283,7 @@
 				  this-comp)
 			      t)
 			     (t
-			      (aver (eq (functional-kind (lambda-home fun))
-					:toplevel))
+			      (aver (lambda-toplevelish-p (lambda-home fun)))
 			      nil)))
 		   leaf var))
 		t)))))
