@@ -304,10 +304,10 @@
   (with-unique-names (label)
     `(let ((,label (gen-label)))
       (inst fs-segment-prefix)
-      (inst mov (make-ea :byte :disp (* 4 thread-pseudo-atomic-atomic-slot)) 1)
-      (inst fs-segment-prefix)
       (inst mov (make-ea :byte 
-		 :disp (* 4 thread-pseudo-atomic-interrupted-slot)) 0) 
+		 :disp (* 4 thread-pseudo-atomic-interrupted-slot)) 0)
+      (inst fs-segment-prefix)
+      (inst mov (make-ea :byte :disp (* 4 thread-pseudo-atomic-atomic-slot)) 1)
       ,@forms
       (inst fs-segment-prefix)
       (inst mov (make-ea :byte :disp (* 4 thread-pseudo-atomic-atomic-slot)) 0)
@@ -433,7 +433,7 @@
 	       value)
 	 (move result value)))))
 
-;;; helper for alien stuff
+;;; helper for alien stuff.
 (defmacro sb!sys::with-pinned-objects ((&rest objects) &body body)
   "Arrange with the garbage collector that the pages occupied by
 OBJECTS will not be moved in memory for the duration of BODY.
@@ -445,4 +445,9 @@ garbage collection"
 		 collect `(push-word-on-c-stack
 			   (int-sap (sb!kernel:get-lisp-obj-address ,p))))
 	 ,@body)
+     ;; If the body returned normally, we should restore the stack pointer
+     ;; for the benefit of any following code in the same function.  If
+     ;; there's a non-local exit in the body, sp is garbage anyway and
+     ;; will get set appropriately from {a, the} frame pointer before it's
+     ;; next needed
      (pop-words-from-c-stack ,(length objects))))

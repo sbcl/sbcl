@@ -1422,10 +1422,10 @@
 
 ;;;; ALIEN and call-out-to-C stuff
 
-;;; 'call' attribute because we store the arg on the stack, which is in
+;;; 'unsafe' attribute because we store the arg on the stack, which is in
 ;;; some sense 'passing it upwards'
-(defknown sb!vm::push-word-on-c-stack (system-area-pointer) (values) (call))
-(defknown sb!vm::pop-words-from-c-stack (index) (values) (call))
+(defknown sb!vm::push-word-on-c-stack (system-area-pointer) (values) (unsafe))
+(defknown sb!vm::pop-words-from-c-stack (index) (values) ())
 
 ;;;; miscellaneous internal utilities
 

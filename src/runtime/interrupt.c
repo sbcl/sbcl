@@ -425,6 +425,8 @@ interrupt_handle_now(int signal, siginfo_t *info, void *void_context)
 
 void
 run_deferred_handler(struct interrupt_data *data, void *v_context) {
+    fprintf(stderr,"Running deferred handler for %d, 0x%x\n",
+	    data->pending_signal, data->pending_handler);
     (*(data->pending_handler))
 	(data->pending_signal,&(data->pending_info), v_context);
 }
@@ -514,12 +516,15 @@ sig_stop_for_gc_handler(int signal, siginfo_t *info, void *void_context)
     sigemptyset(&block);
     sigaddset_blockable(&block);
     sigprocmask(SIG_BLOCK, &block, 0);
+
+    /* need the context stored so it can have registers scavenged */
+    fake_foreign_function_call(context); 
+
     get_spinlock(&all_threads_lock,thread->pid);
     countdown_to_gc--;
     release_spinlock(&all_threads_lock);
-    /* need the context stored so it can have registers scavenged */
-    fake_foreign_function_call(context); 
     kill(getpid(),SIGSTOP);
+
     undo_fake_foreign_function_call(context);
 }
 
