@@ -407,18 +407,19 @@
   "Read from STREAM and return the value read, preserving any whitespace
    that followed the object."
   (if recursivep
-    ;; a loop for repeating when a macro returns nothing
-    (loop
-      (let ((char (read-char stream eof-error-p *eof-object*)))
-	(cond ((eofp char) (return eof-value))
-	      ((whitespacep char))
-	      (t
-	       (let* ((macrofun (get-coerced-cmt-entry char *readtable*))
-		      (result (multiple-value-list
-			       (funcall macrofun stream char))))
-		 ;; Repeat if macro returned nothing.
-		  (if result (return (car result))))))))
-    (let ((*sharp-equal-alist* nil))
+      ;; a loop for repeating when a macro returns nothing
+      (loop
+       (let ((char (read-char stream eof-error-p *eof-object*)))
+         (cond ((eofp char) (return eof-value))
+               ((whitespacep char))
+               (t
+                (let* ((macrofun (get-coerced-cmt-entry char *readtable*))
+                       (result (multiple-value-list
+                                (funcall macrofun stream char))))
+                  ;; Repeat if macro returned nothing.
+		  (when result 
+                    (return (unless *read-suppress* (car result)))))))))
+      (let ((*sharp-equal-alist* nil))
 	(read-preserving-whitespace stream eof-error-p eof-value t))))
 
 ;;; Return NIL or a list with one thing, depending.
@@ -430,7 +431,8 @@
 		 (funcall (get-coerced-cmt-entry char *readtable*)
 			  stream
 			  char))))
-    (if retval (rplacd retval nil))))
+    (when (and retval (not *read-suppress*))
+      (rplacd retval nil))))
 
 (defun read (&optional (stream *standard-input*)
 		       (eof-error-p t)
@@ -442,9 +444,9 @@
 					    eof-error-p
 					    eof-value
 					    recursivep)))
-    ;; (This function generally discards trailing whitespace. If you
+    ;; This function generally discards trailing whitespace. If you
     ;; don't want to discard trailing whitespace, call
-    ;; CL:READ-PRESERVING-WHITESPACE instead.)
+    ;; CL:READ-PRESERVING-WHITESPACE instead.
     (unless (or (eql result eof-value) recursivep)
       (let ((next-char (read-char stream nil nil)))
 	(unless (or (null next-char)
@@ -1419,7 +1421,7 @@
   #!+sb-doc
   "A resource of string streams for Read-From-String.")
 
-(defun read-from-string (string &optional eof-error-p eof-value
+(defun read-from-string (string &optional (eof-error-p t) eof-value
 				&key (start 0) end
 				preserve-whitespace)
   #!+sb-doc

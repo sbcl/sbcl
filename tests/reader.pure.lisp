@@ -207,3 +207,20 @@
 		(unless fun (list char)))))))
     (let ((*readtable* (copy-readtable nil)))
       (assert (null (loop for c across standard-chars append (frob c)))))))
+
+;;; All these must return a primary value of NIL when *read-suppress* is T
+;;; Reported by Bruno Haible on cmucl-imp 2004-10-25.
+(let ((*read-suppress* t))
+  (assert (null (read-from-string "(1 2 3)")))
+  (assert (null (with-input-from-string (s "abc xyz)")
+                  (read-delimited-list #\) s))))
+  (assert (null (with-input-from-string (s "(1 2 3)")
+                  (read-preserving-whitespace s))))
+  (assert (null (with-input-from-string (s "(1 2 3)")
+                 (read s)))))
+
+;;; EOF-ERROR-P defaults to true. Reported by Bruno Haible on
+;;; cmucl-imp 2004-10-18.
+(multiple-value-bind (res err) (ignore-errors (read-from-string ""))
+  (assert (not res))
+  (assert (typep err 'end-of-file)))
