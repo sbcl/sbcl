@@ -550,9 +550,8 @@ interrupt_maybe_gc(int signal, siginfo_t *info, void *void_context)
 		 * have to do it ourselves.  Add small amount of space
 		 * to tide us over while GC is inhibited 
 		 */
-		set_auto_gc_trigger((u32)dynamic_space_free_pointer
-				    -(u32)current_dynamic_space
-				    +(u32)os_vm_page_size);
+		set_auto_gc_trigger(DYNAMIC_SPACE_SIZE
+				    -(u32)os_vm_page_size);
 	}       
 	return 1;
     } else {
