@@ -801,7 +801,7 @@ GNAME(post_signal_tramp):
 	 * using return_to_lisp_function */
 	addl $12,%esp  	/* clear call_into_lisp args from stack */
 	popa            /* restore registers */
-	popl %ebp       
+	leave
 	ret
 	.size GNAME(post_signal_tramp),.-GNAME(post_signal_tramp)
 

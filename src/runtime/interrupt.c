@@ -625,10 +625,31 @@ void arrange_return_to_lisp_function(os_context_t *context, lispobj function)
 #ifdef LISP_FEATURE_X86
     /* Suppose the existence of some function that saved all
      * registers, called call_into_lisp, then restored GP registers and
-     * returned.  We shortcut this: fake the stack that call_into_lisp
-     * would see, then arrange to have it called directly.  post_signal_tramp
-     * is the second half of this function
+     * returned.  It would look something like this:
+
+     push   ebp
+     mov    ebp esp
+     pushad
+     push   $0
+     push   $0
+     pushl  {address of function to call}
+     call   0x8058db0 <call_into_lisp>
+     addl   $12,%esp
+     popa
+     leave  
+     ret    
+
+     * What we do here is set up the stack that call_into_lisp would
+     * expect to see if it had been called by this code, and frob the
+     * signal context so that signal return goes directly to call_into_lisp,
+     * and when that function (and the lisp function it invoked) returns,
+     * it returns to the second half of this imaginary function which
+     * restores all registers and returns to C
+
+     * For this to work, the latter part of the imaginary function
+     * must obviously exist in reality.  That would be post_signal_tramp
      */
+
     u32 *sp=(u32 *)*os_context_register_addr(context,reg_ESP);
 
     *(sp-14) = post_signal_tramp; /* return address for call_into_lisp */
@@ -638,9 +659,9 @@ void arrange_return_to_lisp_function(os_context_t *context, lispobj function)
     /* this order matches that used in POPAD */
     *(sp-10)=*os_context_register_addr(context,reg_EDI);
     *(sp-9)=*os_context_register_addr(context,reg_ESI);
-    /* this gets overwritten again before it's used, anyway */
-    *(sp-8)=*os_context_register_addr(context,reg_EBP);
-    *(sp-7)=0 ; /* POPAD doesn't set ESP, but expects a gap for it anyway */
+
+    *(sp-8)=*os_context_register_addr(context,reg_ESP)-8;
+    *(sp-7)=0;
     *(sp-6)=*os_context_register_addr(context,reg_EBX);
 
     *(sp-5)=*os_context_register_addr(context,reg_EDX);

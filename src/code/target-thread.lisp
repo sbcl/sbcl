@@ -265,20 +265,22 @@ time we reacquire LOCK and return to the caller."
 	      ;; in time we'll move some of the binding presently done in C
 	      ;; here too
 	      (let ((sb!kernel::*restart-clusters* nil)
+		    (sb!kernel::*handler-clusters* nil)
+		    (sb!kernel::*condition-restarts* nil)
 		    (sb!impl::*descriptor-handlers* nil) ; serve-event
 		    (sb!impl::*available-buffers* nil)) ;for fd-stream
 		;; can't use handling-end-of-the-world, because that flushes
 		;; output streams, and we don't necessarily have any (or we
 		;; could be sharing them)
 		(sb!sys:enable-interrupt sb!unix:sigint :ignore)
-		(sb!unix:unix-exit
-		 (catch 'sb!impl::%end-of-the-world 
-		   (with-simple-restart 
-		       (destroy-thread
-			(format nil "~~@<Destroy this thread (~A)~~@:>"
-				(current-thread-id)))
-		     (funcall real-function))
-		   0))))))))
+		(catch 'sb!impl::%end-of-the-world 
+		  (with-simple-restart 
+		      (destroy-thread
+		       (format nil "~~@<Destroy this thread (~A)~~@:>"
+			       (current-thread-id)))
+		    (funcall real-function))
+		  0))
+	      (values))))))
     (with-mutex ((session-lock *session*))
       (pushnew tid (session-threads *session*)))
     tid))
