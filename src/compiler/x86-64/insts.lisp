@@ -2075,6 +2075,7 @@
 
 (define-instruction call (segment where)
   (:printer near-jump ((op #b11101000)))
+  (:printer rex-reg/mem ((op '(#b11111111 #b010))))
   (:printer reg/mem ((op '(#b1111111 #b010)) (width 1)))
   (:emitter
    (typecase where
