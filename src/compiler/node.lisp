@@ -103,7 +103,8 @@
   ;; Cached type which is checked by DEST. If NIL, then this must be
   ;; recomputed: see CONTINUATION-EXTERNALLY-CHECKABLE-TYPE.
   ;;
-  ;; Is it needed? -- APD, 2002-01-26
+  ;; Maybe replace it with CAST-EXTERNALLY-CHECKABLE-TYPE? -- APD,
+  ;; 2003-04-05
   (%externally-checkable-type nil :type (or null ctype))
   ;; something or other that the back end annotates this continuation with
   (info nil)

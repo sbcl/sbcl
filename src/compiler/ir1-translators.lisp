@@ -674,7 +674,8 @@
   (let ((type (coerce-to-values
                (if (ctype-p type) type
                    (compiler-values-specifier-type type)))))
-    (cond ((or (and (leaf-p value)
+    (cond ((or (eq type *wild-type*)
+               (and (leaf-p value)
                     (values-subtypep (leaf-type value) type))
                (and (sb!xc:constantp value)
                     (ctypep (constant-form-value value)

@@ -434,6 +434,25 @@
               (cond ((args-type-rest type))
                     (t default-type)))))
 
+;;; If COUNT values are supplied, which types should they have?
+(defun values-type-start (type count)
+  (declare (ctype type) (unsigned-byte count))
+  (if (eq type *wild-type*)
+      (make-list count :initial-element *universal-type*)
+      (collect ((res))
+        (flet ((process-types (types)
+                 (loop for type in types
+                       while (plusp count)
+                       do (decf count)
+                       do (res type))))
+          (process-types (values-type-required type))
+          (process-types (values-type-optional type))
+          (when (plusp count)
+            (loop with rest = (the ctype (values-type-rest type))
+                  repeat count
+                  do (res rest))))
+        (res))))
+
 ;;; Return a list of OPERATION applied to the types in TYPES1 and
 ;;; TYPES2, padding with REST2 as needed. TYPES1 must not be shorter
 ;;; than TYPES2. The second value is T if OPERATION always returned a

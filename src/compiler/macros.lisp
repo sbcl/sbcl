@@ -472,23 +472,11 @@
   (when (member 'flushable attributes)
     (pushnew 'unsafely-flushable attributes))
 
-  ;; FIXME: We use non-ANSI "exact" interpretation of VALUES types
-  ;; here. It would be better to give such ability to the user too. --
-  ;; APD, 2003-03-18
-  (setq result-type
-        (cond ((eq result-type '*) '*)
-              ((or (atom result-type)
-                   (neq (car result-type) 'values))
-               `(values ,result-type &optional))
-              ((intersection (cdr result-type) lambda-list-keywords)
-               result-type)
-              (t `(values ,@(cdr result-type) &optional))))
-
   `(%defknown ',(if (and (consp name)
 			 (not (legal-fun-name-p name)))
 		    name
 		    (list name))
-	      '(function ,arg-types ,result-type)
+	      '(sfunction ,arg-types ,result-type)
 	      (ir1-attributes ,@attributes)
 	      ,@keys))
 

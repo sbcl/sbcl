@@ -164,12 +164,12 @@
        (declare (optimize (safety 0)))
        (and ,@(when low
 		(if (consp low)
-		    `((> (the ,base ,n-object) ,(car low)))
-		    `((>= (the ,base ,n-object) ,low))))
+		    `((> (truly-the ,base ,n-object) ,(car low)))
+		    `((>= (truly-the ,base ,n-object) ,low))))
 	    ,@(when high
 		(if (consp high)
-		    `((< (the ,base ,n-object) ,(car high)))
-		    `((<= (the ,base ,n-object) ,high))))))))
+		    `((< (truly-the ,base ,n-object) ,(car high)))
+		    `((<= (truly-the ,base ,n-object) ,high))))))))
 
 #!+negative-zero-is-not-zero
 (defun transform-numeric-bound-test (n-object type base)
@@ -183,14 +183,14 @@
        (declare (optimize (safety 0)))
        (and ,@(when low
 		(if (consp low)
-		    `((let ((,x (the ,base ,n-object))
+		    `((let ((,x (truly-the ,base ,n-object))
 			    (,y ,(car low)))
 			,(if (not float-type-p)
 			    `(> ,x ,y)
 			    `(if (and (zerop ,x) (zerop ,y))
 				 (> (float-sign ,x) (float-sign ,y))
 				 (> ,x ,y)))))
-		    `((let ((,x (the ,base ,n-object))
+		    `((let ((,x (truly-the ,base ,n-object))
 			    (,y ,low))
 			,(if (not float-type-p)
 			    `(>= ,x ,y)
@@ -199,14 +199,14 @@
 				 (>= ,x ,y)))))))
 	    ,@(when high
 		(if (consp high)
-		    `((let ((,x (the ,base ,n-object))
+		    `((let ((,x (truly-the ,base ,n-object))
 			    (,y ,(car high)))
 			,(if (not float-type-p)
 			     `(< ,x ,y)
 			     `(if (and (zerop ,x) (zerop ,y))
 				  (< (float-sign ,x) (float-sign ,y))
 				  (< ,x ,y)))))
-		    `((let ((,x (the ,base ,n-object))
+		    `((let ((,x (truly-the ,base ,n-object))
 			    (,y ,high))
 			,(if (not float-type-p)
 			     `(<= ,x ,y)
@@ -244,8 +244,8 @@
 	       ,(transform-numeric-bound-test n-object type base)))
 	(:complex
 	 `(and (complexp ,n-object)
-	       ,(once-only ((n-real `(realpart (the complex ,n-object)))
-			    (n-imag `(imagpart (the complex ,n-object))))
+	       ,(once-only ((n-real `(realpart (truly-the complex ,n-object)))
+			    (n-imag `(imagpart (truly-the complex ,n-object))))
 		  `(progn
 		     ,n-imag ; ignorable
 		     (and (typep ,n-real ',base)

@@ -3,13 +3,15 @@ important things:
 * unite VOPs with CASTs
   ** (!) unsafe CAST on result - for VOP selection
   ** (?) safe CAST on argument - for type checking
-* (!) MV type checking
-* (!) errors in the number of return values
+* (!) MV type checking: &OPTIONAL
+* errors in the number of return values
 * (?) flush unused CASTs
 * good type error diagnostics
 * VALUES declaration
 * do we always check types of unused values?
 * (!) CONTINUATION-EXTERNALLY-CHECKABLE-TYPE
+
+* (!!) compilation speed
 
 =======================================================================
 for late cast branch or post-merge:

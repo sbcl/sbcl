@@ -22,16 +22,15 @@
 ;;; constant leaf.
 (defun constant-continuation-p (thing)
   (and (continuation-p thing)
-       (let ((use (continuation-use thing)))
-	 (and (ref-p use)
-	      (constant-p (ref-leaf use))))))
+       (let ((use (principal-continuation-use thing)))
+         (and (ref-p use) (constant-p (ref-leaf use))))))
 
 ;;; Return the constant value for a continuation whose only use is a
 ;;; constant node.
 (declaim (ftype (function (continuation) t) continuation-value))
 (defun continuation-value (cont)
-  (aver (constant-continuation-p cont))
-  (constant-value (ref-leaf (continuation-use cont))))
+  (let ((use (principal-continuation-use cont)))
+    (constant-value (ref-leaf use))))
 
 ;;;; interface for obtaining results of type inference
 
@@ -124,6 +123,10 @@
                           (setf (continuation-%externally-checkable-type arg)
                                 type)))
                   (continuation-%externally-checkable-type cont)))))))
+(declaim (inline flush-continuation-externally-checkable-type))
+(defun flush-continuation-externally-checkable-type (cont)
+  (declare (type continuation cont))
+  (setf (continuation-%externally-checkable-type cont) nil))
 
 ;;;; interface routines used by optimizers
 
@@ -158,6 +161,13 @@
       (setf (block-type-check (node-block node)) t)))
   (values))
 
+(defun reoptimize-continuation-uses (cont)
+  (declare (type continuation cont))
+  (dolist (use (find-uses cont))
+    (setf (node-reoptimize use) t)
+    (setf (block-reoptimize (node-block use)) t)
+    (setf (component-reoptimize (node-component use)) t)))
+
 ;;; Annotate NODE to indicate that its result has been proven to be
 ;;; TYPEP to RTYPE. After IR1 conversion has happened, this is the
 ;;; only correct way to supply information discovered about a node's
@@ -182,6 +192,11 @@
 		~%  ~S~%*** possible internal error? Please report this."
 	       (type-specifier rtype) (type-specifier node-type))))
 	  (setf (node-derived-type node) int)
+          (when (and (ref-p node)
+                     (member-type-p int)
+                     (null (rest (member-type-members int)))
+                     (lambda-var-p (ref-leaf node)))
+            (change-ref-leaf node (find-constant (first (member-type-members int)))))
 	  (reoptimize-continuation (node-cont node))))))
   (values))
 
@@ -639,7 +654,7 @@
 	   (new-block (continuation-starts-block new-cont)))
       (link-node-to-previous-continuation new-node new-cont)
       (setf (continuation-dest new-cont) new-node)
-      (setf (continuation-%externally-checkable-type new-cont) nil)
+      (flush-continuation-externally-checkable-type new-cont)
       (add-continuation-use new-node dummy-cont)
       (setf (block-last new-block) new-node)
 
@@ -1245,7 +1260,11 @@
 	(when (type/= int var-type)
 	  (setf (leaf-type leaf) int)
 	  (dolist (ref (leaf-refs leaf))
-	    (derive-node-type ref int))))
+	    (derive-node-type ref int)
+            (let* ((cont (node-cont ref))
+                   (dest (continuation-dest cont)))
+              (when (combination-p dest)
+                (reoptimize-continuation cont))))))
       (values))))
 
 ;;; Figure out the type of a LET variable that has sets. We compute
@@ -1393,11 +1412,11 @@
 		   leaf var))
 		t)))))
        ((and (null (rest (leaf-refs var)))
-	     (substitute-single-use-continuation arg var)))
+             (substitute-single-use-continuation arg var)))
        (t
 	(propagate-to-refs var (continuation-type arg))))))
 
-  (when (every #'null (combination-args call))
+  (when (every #'not (combination-args call))
     (delete-let fun))
 
   (values))
@@ -1648,14 +1667,15 @@
 	(let ((fun-cont (basic-combination-fun call)))
 	  (setf (continuation-dest fun-cont) use)
           (setf (combination-fun use) fun-cont)
-	  (setf (continuation-%externally-checkable-type fun-cont) nil))
+	  (flush-continuation-externally-checkable-type fun-cont))
 	(setf (combination-kind use) :local)
 	(setf (functional-kind fun) :let)
 	(flush-dest (first (basic-combination-args call)))
 	(unlink-node call)
 	(when vals
 	  (reoptimize-continuation (first vals)))
-	(propagate-to-args use fun))
+	(propagate-to-args use fun)
+        (reoptimize-call use))
       t)))
 
 ;;; If we see:
@@ -1681,7 +1701,7 @@
       (let ((args (combination-args use)))
 	(dolist (arg args)
 	  (setf (continuation-dest arg) node)
-          (setf (continuation-%externally-checkable-type arg) nil))
+          (flush-continuation-externally-checkable-type arg))
 	(setf (combination-args use) nil)
 	(flush-dest list)
 	(setf (combination-args node) args))
@@ -1743,11 +1763,22 @@
             (values-subtypep value-type
                              (cast-asserted-type cast)))
        (let ((cont (node-cont cast)))
-         (ensure-block-start value)
-         (ensure-block-start cont)
-         (substitute-continuation-uses cont value)
-         (unlink-node cast)
-         (setf (continuation-dest value) nil)))
+         (cond ((and (eq (continuation-kind cont) :inside-block)
+                     (eq (continuation-kind value) :inside-block))
+                (setf (continuation-dest value) nil)
+                (substitute-continuation value cont)
+                (unlink-node cast)
+                (setq cont value))
+               (t (ensure-block-start value)
+                  (ensure-block-start cont)
+                  (substitute-continuation-uses cont value)
+                  (unlink-node cast)
+                  (setf (continuation-dest value) nil)))
+         (reoptimize-continuation cont)
+         (when (continuation-single-value-p cont)
+           (note-single-valuified-continuation cont))
+         (when (not (continuation-dest cont))
+           (reoptimize-continuation-uses cont))))
       ((values-subtypep value-type
                         (cast-type-to-check cast))
        (setf (cast-%type-check cast) nil))))

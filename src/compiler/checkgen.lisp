@@ -223,87 +223,95 @@
          (ctype (cast-type-to-check cast))
          (atype (cast-asserted-type cast))
          (value (cast-value cast))
+         (vtype (continuation-derived-type value))
          (dest (continuation-dest cont)))
     (aver (not (eq ctype *wild-type*)))
     (flet ((adjust-cast-type (length)
              (let ((dtype (coerce-to-values (node-derived-type cast))))
                (setf (node-derived-type cast)
                      (make-values-type
-                      :required (adjust-list (values-type-types dtype)
-                                             length
-                                             (or (values-type-rest dtype)
-                                                 *universal-type*)))))))
+                      :required (values-type-start dtype length))))))
       (multiple-value-bind (ctypes count) (no-fun-values-types ctype)
         (multiple-value-bind (atypes acount) (no-fun-values-types atype)
-          (aver (eq count acount))
-          (cond ((not (eq count :unknown))
-                 (adjust-cast-type count)
-                 (if (or (exit-p dest)
-                         (and (return-p dest)
-                              (multiple-value-bind (ignore count)
-                                  (values-types (return-result-type dest))
-                                (declare (ignore ignore))
-                                (eq count :unknown))))
-                     (maybe-negate-check value ctypes atypes t)
-                     (maybe-negate-check value ctypes atypes force-hairy)))
-                ((and (continuation-single-value-p cont)
-                      (or (not (values-type-p ctype))
-                          (not (args-type-rest ctype))
-                          (eq (args-type-rest ctype) *universal-type*)))
-                 (when (values-type-p ctype)
-                   (let ((creq (car (args-type-required ctype))))
-                     (multiple-value-setq (ctype atype)
-                       (if creq
-                           (values creq (car (args-type-required atype)))
-                           (values (car (args-type-optional ctype))
-                                   (car (args-type-optional atype)))))
-                     (setf (cast-type-to-check cast)
-                           (make-values-type :required (list ctype)))
-                     (setf (cast-asserted-type cast)
-                           (make-values-type :required (list atype)))))
-                 (setf (node-derived-type cast)
-                       (single-value-type (node-derived-type cast)))
-                 (maybe-negate-check value
-                                     (list ctype) (list atype)
-                                     force-hairy))
-                ((and (mv-combination-p dest)
-                      (eq (mv-combination-kind dest) :local))
-                 (let* ((fun-ref (continuation-use (mv-combination-fun dest)))
-                        (length (length (lambda-vars (ref-leaf fun-ref)))))
-                   (adjust-cast-type length)
+          (multiple-value-bind (vtypes vcount) (values-types vtype)
+            (declare (ignore vtypes))
+            (aver (eq count acount))
+            (cond ((not (eq count :unknown))
+                   (adjust-cast-type count)
+                   (if (or (exit-p dest)
+                           (and (return-p dest)
+                                (multiple-value-bind (ignore count)
+                                    (values-types (return-result-type dest))
+                                  (declare (ignore ignore))
+                                  (eq count :unknown))))
+                       (maybe-negate-check value ctypes atypes t)
+                       (maybe-negate-check value ctypes atypes force-hairy)))
+                  ((and (continuation-single-value-p cont)
+                        (or (not (values-type-p ctype))
+                            (not (args-type-rest ctype))
+                            (eq (args-type-rest ctype) *universal-type*)))
+                   (when (values-type-p ctype)
+                     (let ((creq (car (args-type-required ctype))))
+                       (multiple-value-setq (ctype atype)
+                         (if creq
+                             (values creq (car (args-type-required atype)))
+                             (values (car (args-type-optional ctype))
+                                     (car (args-type-optional atype)))))
+                       (setf (cast-type-to-check cast)
+                             (make-values-type :required (list ctype)))
+                       (setf (cast-asserted-type cast)
+                             (make-values-type :required (list atype)))))
+                   (setf (node-derived-type cast)
+                         (single-value-type (node-derived-type cast)))
                    (maybe-negate-check value
-                                       ;; FIXME
-                                       (adjust-list (values-type-types ctype)
-                                                    length
-                                                    *universal-type*)
-                                       (adjust-list (values-type-types atype)
-                                                    length
-                                                    *universal-type*)
-                                       force-hairy)))
-                (t
-                 (values :too-hairy nil))))))))
+                                       (list ctype) (list atype)
+                                       force-hairy))
+                  ((and (mv-combination-p dest)
+                        (eq (mv-combination-kind dest) :local))
+                   (let* ((fun-ref (continuation-use (mv-combination-fun dest)))
+                          (length (length (lambda-vars (ref-leaf fun-ref)))))
+                     (adjust-cast-type length)
+                     (maybe-negate-check value
+                                         ;; FIXME
+                                         (adjust-list (values-type-types ctype)
+                                                      length
+                                                      *universal-type*)
+                                         (adjust-list (values-type-types atype)
+                                                      length
+                                                      *universal-type*)
+                                         force-hairy)))
+                  ((not (eq vcount :unknown))
+                   (maybe-negate-check value
+                                       (values-type-start ctype vcount)
+                                       (values-type-start atype vcount)
+                                       t))
+                  (t
+                   (values :too-hairy nil)))))))))
 
 ;;; Do we want to do a type check?
 (defun worth-type-check-p (cast)
   (declare (type cast cast))
-  (not (or (not (cast-type-check cast))
-           #+nil
-           (and (combination-p dest)
-                (eq (combination-kind dest) :full)
-                ;; The theory is that the type assertion is from a
-                ;; declaration in (or on) the callee, so the callee
-                ;; should be able to do the check. We want to let
-                ;; the callee do the check, because it is possible
-                ;; that by the time of call that declaration will be
-                ;; changed and we do not want to make people
-                ;; recompile all calls to a function when they were
-                ;; originally compiled with a bad declaration. (See
-                ;; also bug 35.)
-                (values-subtypep (continuation-externally-checkable-type cont)
-                                 (continuation-type-to-check cont)))
-           #+nil
-           (and (mv-combination-p dest) ; bug 220
-                (eq (mv-combination-kind dest) :full)))))
+  (let* ((cont (node-cont cast))
+         (dest (continuation-dest cont)))
+    (not (or (not (cast-type-check cast))
+             (and (combination-p dest)
+                  (let ((kind (combination-kind dest)))
+                    (or (eq kind :full)
+                        ;; The theory is that the type assertion is
+                        ;; from a declaration in (or on) the callee,
+                        ;; so the callee should be able to do the
+                        ;; check. We want to let the callee do the
+                        ;; check, because it is possible that by the
+                        ;; time of call that declaration will be
+                        ;; changed and we do not want to make people
+                        ;; recompile all calls to a function when they
+                        ;; were originally compiled with a bad
+                        ;; declaration. (See also bug 35.)
+                        (and (fun-info-p kind)
+                             (null (fun-info-templates kind))
+                             (not (fun-info-ir2-convert kind)))))
+                  (values-subtypep (continuation-externally-checkable-type cont)
+                                   (cast-type-to-check cast)))))))
 
 ;;; Return true if CONT is a continuation whose type the back end is
 ;;; likely to want to check. Since we don't know what template the
@@ -320,8 +328,7 @@
   (let* ((cont (node-cont cast))
          (dest (continuation-dest cont)))
     (cond ((not dest) nil)
-          ((continuation-single-value-p cont) t)
-          (t nil))
+          (t t))
     #+nil
     (cond ((or (not dest)
 	       (policy dest (zerop safety)))
@@ -463,7 +470,8 @@
             (cond ((worth-type-check-p node)
                    (casts (cons node (not (probable-type-check-p node)))))
                   (t
-                   (aver (null (cast-%type-check node)))))))
+                   (setf (cast-%type-check node) nil)
+                   (setf (cast-type-to-check node) *wild-type*)))))
 	(setf (block-type-check block) nil)))
     (dolist (cast (casts))
       (destructuring-bind (cast . force-hairy) cast

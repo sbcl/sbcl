@@ -63,6 +63,12 @@
     (:unused nil)
     (:deleted nil)))
 
+(defun principal-continuation-use (cont)
+  (let ((use (continuation-use cont)))
+    (if (cast-p use)
+        (principal-continuation-use (cast-value use))
+        use)))
+
 ;;; Update continuation use information so that NODE is no longer a
 ;;; use of its CONT. If the old continuation doesn't start its block,
 ;;; then we don't update the BLOCK-START-USES, since it will be
@@ -159,7 +165,7 @@
 
     (when dest (flush-dest old))
     (setf (continuation-dest new) dest)
-    (setf (continuation-%externally-checkable-type new) nil))
+    (flush-continuation-externally-checkable-type new))
   (values))
 
 ;;; Replace all uses of OLD with uses of NEW, where NEW has an
@@ -368,8 +374,8 @@
 ;;;   (BLOCK B (RETURN-FROM B) (SETQ X 3))
 ;;; where the block is just a placeholder during parsing and doesn't
 ;;; actually correspond to code which will be written anywhere.
+(declaim (ftype (sfunction (cblock) (or clambda null)) block-home-lambda-or-null))
 (defun block-home-lambda-or-null (block)
-  (declare (type cblock block))
   (if (node-p (block-last block))
       ;; This is the old CMU CL way of doing it.
       (node-home-lambda (block-last block))
@@ -451,6 +457,8 @@
 	(values nil nil))))
 
 ;;; Return the LAMBDA that is CONT's home, or NIL if there is none.
+(declaim (ftype (sfunction (continuation) (or clambda null))
+                continuation-home-lambda-or-null))
 (defun continuation-home-lambda-or-null (cont)
   ;; KLUDGE: This function is a post-CMU-CL hack by WHN, and this
   ;; implementation might not be quite right, or might be uglier than
@@ -927,7 +935,7 @@
   (unless (eq (continuation-kind cont) :deleted)
     (aver (continuation-dest cont))
     (setf (continuation-dest cont) nil)
-    (setf (continuation-%externally-checkable-type cont) nil)
+    (flush-continuation-externally-checkable-type cont)
     (do-uses (use cont)
       (let ((prev (node-prev use)))
 	(unless (eq (continuation-kind prev) :deleted)
@@ -987,7 +995,7 @@
 
   (setf (continuation-kind cont) :deleted)
   (setf (continuation-dest cont) nil)
-  (setf (continuation-%externally-checkable-type cont) nil)
+  (flush-continuation-externally-checkable-type cont)
   (setf (continuation-next cont) nil)
   (setf (continuation-%derived-type cont) *empty-type*)
   (setf (continuation-use cont) nil)
@@ -1316,7 +1324,7 @@
 	       (after-args (subseq outside-args (1+ arg-position))))
 	  (dolist (arg inside-args)
 	    (setf (continuation-dest arg) outside)
-            (setf (continuation-%externally-checkable-type arg) nil))
+            (flush-continuation-externally-checkable-type arg))
 	  (setf (combination-args inside) nil)
 	  (setf (combination-args outside)
 		(append before-args inside-args after-args))
@@ -1612,3 +1620,17 @@
   (when (cast-reoptimize cast)
     (ir1-optimize-cast cast t))
   (cast-%type-check cast))
+
+(defun note-single-valuified-continuation (cont)
+  (declare (type continuation cont))
+  (let ((use (continuation-use cont)))
+    (cond ((ref-p use)
+           (let ((leaf (ref-leaf use)))
+             (when (and (lambda-var-p leaf)
+                        (null (rest (leaf-refs leaf))))
+               (reoptimize-lambda-var leaf))))
+          ((or (null use) (combination-p use))
+           (dolist (node (find-uses cont))
+             (setf (node-reoptimize node) t)
+             (setf (block-reoptimize (node-block node)) t)
+             (setf (component-reoptimize (node-component node)) t))))))

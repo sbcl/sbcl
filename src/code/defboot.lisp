@@ -353,3 +353,30 @@
 					&body body)
   (declare (ignore declarations macros symbol-macros body))
   `#',whole)
+
+;;; this eliminates a whole bundle of unknown function STYLE-WARNINGs
+;;; when cross-compiling.  It's not critical for behaviour, but is
+;;; aesthetically pleasing, except inasmuch as there's this list of
+;;; magic functions here.  -- CSR, 2003-04-01
+#+sb-xc-host
+(sb!xc:proclaim '(ftype (function * *)
+		        ;; functions appearing in fundamental defining
+		        ;; macro expansions:
+		        %compiler-deftype
+		        %defun
+		        %defsetf
+		        sb!c:%compiler-defun
+		        sb!c::%define-symbol-macro
+		        sb!c::%defconstant
+		        sb!c::%define-compiler-macro
+		        sb!c::%defmacro
+		        sb!kernel::%compiler-defstruct
+		        sb!kernel::%compiler-define-condition
+		        sb!kernel::%defstruct
+		        sb!kernel::%define-condition
+		        ;; miscellaneous functions commonly appearing
+		        ;; as a result of macro expansions or compiler
+		        ;; transformations:
+		        sb!int:find-undeleted-package-or-lose ; IN-PACKAGE
+		        sb!kernel::arg-count-error ; PARSE-DEFMACRO
+		        ))

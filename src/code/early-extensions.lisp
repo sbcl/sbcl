@@ -65,6 +65,20 @@
 			  (* max-offset sb!vm:n-word-bytes))
 		       scale)))
 
+;;; Similar to FUNCTION, but the result type is "exactly" specified:
+;;; if it is an obkect type, then the function returns exactly one
+;;; value, if it is a short form of VALUES, then this short form
+;;; specifies the exact number of values.
+(def!type sfunction (args &optional result)
+  (let ((result (cond ((eq result '*) '*)
+                      ((or (atom result)
+                           (not (eq (car result) 'values)))
+                       `(values ,result &optional))
+                      ((intersection (cdr result) lambda-list-keywords)
+                       result)
+                      (t `(values ,@(cdr result) &optional)))))
+    `(function ,args ,result)))
+
 ;;; the default value used for initializing character data. The ANSI
 ;;; spec says this is arbitrary, so we use the value that falls
 ;;; through when we just let the low-level consing code initialize
