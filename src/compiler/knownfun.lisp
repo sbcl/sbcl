@@ -63,7 +63,7 @@
   unsafely-flushable
   ;; may be moved with impunity. Has no side effects except possibly
   ;; consing, and is affected only by its arguments.
-  movable
+  movable 
   ;; The function is a true predicate likely to be open-coded. Convert
   ;; any non-conditional uses into (IF <pred> T NIL). Not usually
   ;; specified to DEFKNOWN, since this is implementation dependent,

@@ -1255,6 +1255,9 @@
 
 (defknown get-bytes-consed () unsigned-byte (flushable))
 
+(defknown sb!thread::thread-stopped-p (t) boolean (foldable flushable movable))
+
+
 ;;; PCOUNTERs
 (defknown incf-pcounter (pcounter unsigned-byte) pcounter)
 (defknown pcounter->integer (pcounter) unsigned-byte)

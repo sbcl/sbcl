@@ -255,7 +255,8 @@
     *free-interrupt-context-index*
 
     *free-tls-index*
-
+    sb!thread::*foreground-thread-stack*
+    
     *allocation-pointer*
     *binding-stack-pointer*
     *binding-stack-start*

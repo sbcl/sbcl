@@ -32,17 +32,20 @@ volatile int go=1;
 int
 new_thread_trampoline(struct thread *th)
 {
-    lispobj function = th->unbound_marker;
+    lispobj function;
+    /* tcsetpgrp(0,getpid()); */
+    function = th->unbound_marker;
+    if(1 || go==0) {
+	fprintf(stderr, "/pausing 0x%lx(%d,%d) before new_thread_trampoline(0x%lx)\n",
+		(unsigned long)th,th->pid,getpid(),(unsigned long)function);
+	while(go==0) ;
+	fprintf(stderr, "/continue\n");
+    }
     th->unbound_marker = UNBOUND_MARKER_WIDETAG;
+
     /* wait here until our thread is linked into all_threads: see below */
     while(th->pid<1) sched_yield();
-    
-    if(go==0) {
-	FSHOW((stderr, "/pausing 0x%lx(%d,%d) before new_thread_trampoline(0x%lx)\n",
-	       (unsigned long)th,th->pid,getpid(),(unsigned long)function));
-	while(go==0) ;
-	FSHOW((stderr, "/continue\n"));
-    }
+
     if(arch_os_thread_init(th)==0) 
 	return 1;		/* failure.  no, really */
     else 
@@ -115,6 +118,7 @@ struct thread *create_thread(lispobj initial_function) {
     th->binding_stack_pointer=th->binding_stack_start;
     th->this=th;
     th->pid=0;
+    th->stopped_p=NIL;
 #ifdef LISP_FEATURE_STACK_GROWS_DOWNWARD_NOT_UPWARD
     th->alien_stack_pointer=((void *)th->alien_stack_start
 			     + ALIEN_STACK_SIZE-4); /* naked 4.  FIXME */

@@ -22,6 +22,7 @@
 		  *current-catch-block*
 		  *current-unwind-protect-block*
 		  sb!vm::*alien-stack*
+		  sb!thread::*foreground-thread-stack*
 		  sb!vm::*control-stack-start*
 		  sb!vm::*binding-stack-start*
 		  ;; FIXME: The pseudo-atomic variable stuff should be

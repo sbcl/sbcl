@@ -1,15 +1,25 @@
 (in-package "SB!THREAD")
 
 (sb!alien::define-alien-routine ("create_thread" %create-thread)
-     sb!alien:unsigned-long (lisp-fun-address sb!alien:unsigned-long))
+     sb!alien:unsigned-long
+  (lisp-fun-address sb!alien:unsigned-long))
 
-(defun make-thread (function)
-  (%create-thread
-   (sb!kernel:get-lisp-obj-address (coerce function 'function))))
+(defun make-thread (function &key (background-p t))
+  (let ((real-function
+	 (if background-p
+	     (lambda () (sb!unix::unix-setpgid 0 0) (funcall function))
+	     function)))
+    (%create-thread
+     (sb!kernel:get-lisp-obj-address (coerce real-function 'function)))))
+
 (defun destroy-thread (thread-id)
-  (sb!unix:unix-kill thread-id :sigterm))
+  (sb!unix:unix-kill thread-id :sigterm)
+  ;; may have been stopped on tty io, so now wake it up to deliver the TERM
+  (sb!unix:unix-kill thread-id :sigcont))
+
 (defun suspend-thread (thread-id)
   (sb!unix:unix-kill thread-id :sigstop))
+
 (defun resume-thread (thread-id)
   (sb!unix:unix-kill thread-id :sigcont))
 
@@ -17,12 +27,57 @@
   (sb!sys:sap-int
    (sb!vm::current-thread-offset-sap sb!vm::thread-pid-slot)))
 
+;;;; iterate over the in-memory threads
+
+(defun mapcar-threads (function)
+  "Call FUNCTION once for each known thread, giving it the thread structure as argument"
+  (let ((function (coerce function 'function)))
+    (loop for thread = (alien-sap (extern-alien "all_threads" (* t)))
+	  then  (sb!sys:sap-ref-sap thread (* 4 sb!vm::thread-next-slot))
+	  until (sb!sys:sap= thread (sb!sys:int-sap 0))
+	  collect (funcall function thread))))
+
+(defun thread-stopped-p (thread)
+  (sb!kernel:make-lisp-obj
+   (sb!sys:sap-ref-32 thread
+		      (* 4 sb!vm::thread-stopped-p-slot))))
+ ; (declare (optimize (speed 3) (safety 0)))
+;  (thread-stopped-p thread))
+
+;;;; job control
+(defun stopped-threads ()
+  (remove-if #'null
+	     (mapcar-threads
+	      (lambda (x)
+		(and (thread-stopped-p x)
+		     (sb!sys:sap-ref-32 x (* 4 sb!vm::thread-pid-slot)))))))
+
+(defvar *foreground-thread-stack* nil)
+
+(defun thread-to-tty (n)
+  (sb!unix::unix-tcsetpgrp 0 n)
+  ;; find_thread(n)->status = 0
+  (resume-thread n))
+
+(defun foreground-thread (n)
+  (push (current-thread-id) *foreground-thread-stack*)
+  (thread-to-tty n))
+
+(defun background-thread (&optional restart)
+  (if restart
+    (let* ((real-restart (sb!kernel::find-restart-or-lose restart))
+	   (args (sb!kernel::interactive-restart-arguments real-restart)))
+      (thread-to-tty (pop *foreground-thread-stack*))
+      (apply (sb!kernel::restart-function real-restart) args))
+    (thread-to-tty (pop *foreground-thread-stack*))))
+
 (defun make-listener-thread (tty-name)
   (assert (probe-file tty-name))
   (let* ((in (sb!unix:unix-open (namestring tty-name) sb!unix:o_rdwr #o666))
 	 (out (sb!unix:unix-dup in))
 	 (err (sb!unix:unix-dup in)))
     (labels ((thread-repl () 
+	       ;;; XXX also need to set up new *foreground-thread-stack*
 	       (let* ((sb!impl::*stdin* 
 		       (sb!sys:make-fd-stream in :input t :buffering :line))
 		      (sb!impl::*stdout* 

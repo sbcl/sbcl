@@ -709,7 +709,9 @@ undoably_install_low_level_interrupt_handler (int signal,
     sa.sa_sigaction = handler;
     sigemptyset(&sa.sa_mask);
     sigaddset_blockable(&sa.sa_mask);
-    sa.sa_flags = SA_SIGINFO | SA_RESTART;
+    sa.sa_flags = SA_SIGINFO ;
+    if((signal!=SIGTTOU) && (signal!=SIGTTIN))
+	sa.sa_flags|= SA_RESTART;
 #ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
     if(signal==SIG_MEMORY_FAULT) sa.sa_flags|= SA_ONSTACK;
 #endif
@@ -760,7 +762,9 @@ install_handler(int signal, void handler(int, siginfo_t*, void*))
 
 	sigemptyset(&sa.sa_mask);
 	sigaddset_blockable(&sa.sa_mask);
-	sa.sa_flags = SA_SIGINFO | SA_RESTART;
+	sa.sa_flags = SA_SIGINFO ;
+	if((signal!=SIGTTOU) && (signal!=SIGTTIN))
+	    sa.sa_flags|= SA_RESTART;
 	sigaction(signal, &sa, NULL);
     }
 
