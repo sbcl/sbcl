@@ -298,6 +298,18 @@
   (:arg-types unsigned-num)
   (:results (res :scs (unsigned-reg)))
   (:result-types positive-fixnum)
+  (:guard (member :cix *backend-subfeatures*))
+  (:generator 1
+    (inst ctpop zero arg res)))
+
+(define-vop (unsigned-byte-64-count)
+  (:translate logcount)
+  (:note "inline (unsigned-byte 64) logcount")
+  (:policy :fast-safe)
+  (:args (arg :scs (unsigned-reg) :target num))
+  (:arg-types unsigned-num)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types positive-fixnum)
   (:temporary (:scs (non-descriptor-reg) :from (:argument 0) :to (:result 0)
 		    :target res) num)
   (:temporary (:scs (non-descriptor-reg)) mask temp)

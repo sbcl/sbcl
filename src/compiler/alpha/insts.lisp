@@ -199,11 +199,15 @@
                               disp)))))
   (define-memory lda   #x08 :lda)
   (define-memory ldah  #x09 :ldah)
+  (define-memory ldbu  #x0a)            ; BWX extension
+  (define-memory ldwu  #x0c)            ; BWX extension
   (define-memory ldl   #x28)
   (define-memory ldq   #x29)
   (define-memory ldl_l #x2a)
   (define-memory ldq_q #x2b)
   (define-memory ldq_u #x0b)
+  (define-memory stw   #x0d)            ; BWX extension
+  (define-memory stb   #x0e)            ; BWX extension
   (define-memory stl   #x2c)
   (define-memory stq   #x2d)
   (define-memory stl_c #x2e)
@@ -357,7 +361,11 @@
   (define-operate mulq/v #x13 #x60)
   (define-operate mull/v #x13 #x40)
   (define-operate umulh  #x13 #x30)
-  (define-operate mulq   #x13 #x20))
+  (define-operate mulq   #x13 #x20)
+
+  (define-operate ctpop  #x1c #x30)     ; CIX extension
+  (define-operate ctlz   #x1c #x32)     ; CIX extension
+  (define-operate cttz   #x1c #x33))    ; CIX extension
 
 
 (macrolet ((define-fp-operate (name op fn &optional (args 3))

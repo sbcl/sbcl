@@ -11,7 +11,12 @@ CFLAGS += -Dalpha -Dosf1 -O0 -g -D_XOPEN_SOURCE=500 -D_OSF_SOURCE=500
 ASFLAGS += -Dalpha -Dosf1 #-ULANGUAGE_ASSEMBLY
 LD = ld -taso 
 LINKFLAGS = -non_shared # dynamic -v -g  -Wl,-T  -Wl,ld-script.alpha-linux
-NM = nm -B
+# Digital^WCompaq^WHP's cc declares `static inline' functions to exist
+# in multiple places in the binary; we add the '-g' flag to suppress all
+# internal (i.e. static) function names being spat out.  GENESIS
+# complains about the multiple references and they aren't referenceable
+# by anything outside the binary anyway.
+NM = nm -B -g
 
 ASSEM_SRC = alpha-assem.s # ldso-stubs.s
 ARCH_SRC = alpha-arch.c undefineds.c
