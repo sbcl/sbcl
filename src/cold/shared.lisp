@@ -109,9 +109,9 @@
 ;;; the procedure for finding full filenames from "stems"
 ;;;
 ;;; Compile the source file whose basic name is STEM, using some
-;;; standard-for-the-SBCL-build-process procedures to generate the full
-;;; pathnames of source file and object file. Return the pathname of the object
-;;; file for STEM. Several &KEY arguments are accepted:
+;;; standard-for-the-SBCL-build-process procedures to generate the
+;;; full pathnames of source file and object file. Return the pathname
+;;; of the object file for STEM. Several &KEY arguments are accepted:
 ;;;   :SRC-PREFIX, :SRC-SUFFIX =
 ;;;      strings to be concatenated to STEM to produce source filename
 ;;;   :OBJ-PREFIX, :OBJ-SUFFIX =
@@ -120,11 +120,12 @@
 ;;;      string to be appended to the name of an object file to produce 
 ;;;      the name of a temporary object file
 ;;;   :COMPILE-FILE, :IGNORE-FAILURE-P =
-;;;     :COMPILE-FILE is a function to use for compiling the file (with the
-;;;     same calling conventions as ANSI CL:COMPILE-FILE). If the third
-;;;     return value (FAILURE-P) of this function is true, a continuable
-;;;     error will be signalled, unless :IGNORE-FAILURE-P is set, in which
-;;;     case only a warning will be signalled.
+;;;     :COMPILE-FILE is a function to use for compiling the file
+;;;     (with the same calling conventions as ANSI CL:COMPILE-FILE).
+;;;     If the third return value (FAILURE-P) of this function is
+;;;     true, a continuable error will be signalled, unless
+;;;     :IGNORE-FAILURE-P is set, in which case only a warning will be
+;;;     signalled.
 (defun compile-stem (stem
 		     &key
 		     (obj-prefix "")
@@ -135,7 +136,9 @@
 		     (compile-file #'compile-file)
 		     ignore-failure-p)
 
- (let* (;; KLUDGE: Note that this CONCATENATE 'STRING stuff is not The Common
+  (format t "~&/entering COMPILE-STEM~%") ; REMOVEME
+
+  (let* (;; KLUDGE: Note that this CONCATENATE 'STRING stuff is not The Common
 	;; Lisp Way, although it works just fine for common UNIX environments.
 	;; Should it come to pass that the system is ported to environments
 	;; where version numbers and so forth become an issue, it might become
@@ -147,57 +150,59 @@
 	(obj (concatenate 'string obj-prefix stem obj-suffix))
 	(tmp-obj (concatenate 'string obj tmp-obj-suffix-suffix)))
 
-   (ensure-directories-exist obj :verbose t)
+    (ensure-directories-exist obj :verbose t)
 
-   ;; We're about to set about building a new object file. First, we
-   ;; delete any preexisting object file in order to avoid confusing
-   ;; ourselves later should we happen to bail out of compilation with an
-   ;; error.
-   (when (probe-file obj)
-     (delete-file obj))
+    ;; We're about to set about building a new object file. First, we
+    ;; delete any preexisting object file in order to avoid confusing
+    ;; ourselves later should we happen to bail out of compilation
+    ;; with an error.
+    (when (probe-file obj)
+      (delete-file obj))
 
-   ;; Work around a bug in CLISP 1999-01-08 #'COMPILE-FILE: CLISP mangles
-   ;; relative pathnames passed as :OUTPUT-FILE arguments, but works OK
-   ;; with absolute pathnames.
-   #+clisp
-   (setf tmp-obj
-	 ;; (Note that this idiom is taken from the ANSI documentation
-	 ;; for TRUENAME.)
-	 (with-open-file (stream tmp-obj :direction :output)
-	   (close stream)
-	   (truename stream)))
+    ;; Work around a bug in CLISP 1999-01-08 #'COMPILE-FILE: CLISP
+    ;; mangles relative pathnames passed as :OUTPUT-FILE arguments,
+    ;; but works OK with absolute pathnames.
+    #+clisp
+    (setf tmp-obj
+	  ;; (Note that this idiom is taken from the ANSI
+	  ;; documentation for TRUENAME.)
+	  (with-open-file (stream tmp-obj :direction :output)
+	    (close stream)
+	    (truename stream)))
 
-   ;; Try to use the compiler to generate a new temporary object file.
-   (multiple-value-bind (output-truename warnings-p failure-p)
-       (funcall compile-file src :output-file tmp-obj)
-     (declare (ignore warnings-p))
-     (cond ((not output-truename)
-	    (error "couldn't compile ~S" src))
-	   (failure-p
-	    (if ignore-failure-p
-		(warn "ignoring FAILURE-P return value from compilation of ~S"
-		      src)
-		(unwind-protect
-		    (progn
-		      ;; FIXME: This should have another option, redoing
-		      ;; compilation.
-		      (cerror "Continue, using possibly-bogus ~S."
-			      "FAILURE-P was set when creating ~S."
-			      obj)
-		      (setf failure-p nil))
-		  ;; Don't leave failed object files lying around.
-		  (when (and failure-p (probe-file tmp-obj))
-		    (delete-file tmp-obj)
-		    (format t "~&deleted ~S~%" tmp-obj)))))
-	   ;; Otherwise: success, just fall through.
-	   (t nil)))
+    ;; Try to use the compiler to generate a new temporary object file.
+    (multiple-value-bind (output-truename warnings-p failure-p)
+	(funcall compile-file src :output-file tmp-obj)
+      (declare (ignore warnings-p))
+      (cond ((not output-truename)
+	     (error "couldn't compile ~S" src))
+	    (failure-p
+	     (if ignore-failure-p
+		 (warn "ignoring FAILURE-P return value from compilation of ~S"
+		       src)
+		 (unwind-protect
+		     (progn
+		       ;; FIXME: This should have another option,
+		       ;; redoing compilation.
+		       (cerror "Continue, using possibly-bogus ~S."
+			       "FAILURE-P was set when creating ~S."
+			       obj)
+		       (setf failure-p nil))
+		   ;; Don't leave failed object files lying around.
+		   (when (and failure-p (probe-file tmp-obj))
+		     (delete-file tmp-obj)
+		     (format t "~&deleted ~S~%" tmp-obj)))))
+	    ;; Otherwise: success, just fall through.
+	    (t nil)))
 
-   ;; If we get to here, compilation succeeded, so it's OK to rename the
-   ;; temporary output file to the permanent object file.
-   (rename-file-a-la-unix tmp-obj obj)
+    ;; If we get to here, compilation succeeded, so it's OK to rename
+    ;; the temporary output file to the permanent object file.
+    (rename-file-a-la-unix tmp-obj obj)
 
-   ;; nice friendly traditional return value
-   (pathname obj)))
+    (format t "~&/nearly done with COMPILE-STEM~%") ; REMOVEME
+
+    ;; nice friendly traditional return value
+    (pathname obj)))
 (compile 'compile-stem)
 
 ;;; other miscellaneous tools
@@ -312,13 +317,14 @@
 ;;; (if necessary) in the appropriate environment, then loading it
 ;;; into the cross-compilation host Common lisp.
 (defun host-cload-stem (stem &key ignore-failure-p)
+  (format t "~&/entering HOST-CLOAD-STEM ~S ~S" stem ignore-failure-p) ; REMOVEME
   (load (in-host-compilation-mode
-	  (lambda ()
-	    (compile-stem stem
-			  :obj-prefix *host-obj-prefix*
-			  :obj-suffix *host-obj-suffix*
-			  :compile-file #'cl:compile-file
-			  :ignore-failure-p ignore-failure-p)))))
+	 (lambda ()
+	   (compile-stem stem
+			 :obj-prefix *host-obj-prefix*
+			 :obj-suffix *host-obj-suffix*
+			 :compile-file #'cl:compile-file
+			 :ignore-failure-p ignore-failure-p)))))
 (compile 'host-cload-stem)
 
 ;;; Like HOST-CLOAD-STEM, except that we don't bother to compile.

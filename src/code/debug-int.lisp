@@ -967,9 +967,10 @@
 ;;; to replace FRAME. The interpreted frame points to FRAME.
 (defun possibly-an-interpreted-frame (frame up-frame)
   (if (or (not frame)
-	  #!+sb-interpreter
-	  (not (eq (debug-function-name (frame-debug-function frame))
-		   'sb!eval::internal-apply-loop))
+	  #!+sb-interpreter (not (eq (debug-function-name (frame-debug-function
+							   frame))
+				     'sb!eval::internal-apply-loop))
+	  #!-sb-interpreter t
 	  *debugging-interpreter*
 	  (compiled-frame-escaped frame))
       frame
