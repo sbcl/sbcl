@@ -77,13 +77,19 @@
 ;;;; move functions
 
 ;;; X is source, Y is destination.
+
+(define-move-fun (load-fp-zero 1) (vop x y)
+  ((fp-single-zero) (single-reg)
+   (fp-double-zero) (double-reg))
+  (inst movq y fp-double-zero-tn))
+
 (define-move-fun (load-single 2) (vop x y)
   ((single-stack) (single-reg))
   (inst movss y (ea-for-sf-stack x)))
 
 (define-move-fun (store-single 2) (vop x y)
   ((single-reg) (single-stack))
-  (inst movss y (ea-for-sf-stack x)))
+  (inst movss (ea-for-sf-stack y) x))
 
 (define-move-fun (load-double 2) (vop x y)
   ((double-stack) (double-reg))
@@ -91,7 +97,7 @@
 
 (define-move-fun (store-double 2) (vop x y)
   ((double-reg) (double-stack))
-  (inst movsd y (ea-for-df-stack x)))
+  (inst movsd  (ea-for-df-stack y) x))
 
 (eval-when (:compile-toplevel :execute)
   (setf *read-default-float-format* 'single-float))
@@ -476,12 +482,12 @@
 		    (inst movq y x))
 		  ,@body))))
   (frob (%negate/double-float %negate double-reg double-float)
-	(inst movzx hex8 1)
+	(inst lea hex8 (make-ea :qword :disp 1))
 	(inst ror hex8 1)	; #x8000000000000000
 	(inst movd xmm hex8)
 	(inst xorpd xmm y))
   (frob (%negate/single-float %negate single-reg single-float)
-	(inst movzx hex8 1)
+	(inst lea hex8 (make-ea :qword :disp 1))
 	(inst rol hex8 31)
 	(inst movd 
 	      ;; this random-tn trickery is to cast to 32 bit quantity
@@ -489,13 +495,13 @@
 	      hex8) 
 	(inst xorps xmm y))
   (frob (abs/double-float abs  double-reg double-float)
-	(inst movzx hex8 1)
+	(inst lea hex8 (make-ea :qword :disp 1))
 	(inst ror hex8 1)
 	(inst sub hex8 1) ; #x7fffff..fff
 	(inst movd xmm hex8)
 	(inst andpd xmm y))
   (frob (abs/single-float abs  single-reg single-float)
-	(inst movzx hex8 1)
+	(inst lea hex8 (make-ea :qword :disp 1))
 	(inst rol hex8 31)
 	(inst sub hex8 1) ; #x7fffff..fff
 	(inst movd 
@@ -520,9 +526,11 @@
 
 (define-vop (single-float-compare)
   (:args (x :scs (single-reg)) (y :scs (single-reg)))
+  (:conditional)
   (:arg-types single-float single-float))
 (define-vop (double-float-compare)
   (:args (x :scs (double-reg)) (y :scs (double-reg)))
+  (:conditional)
   (:arg-types double-float double-float))
 
 (define-vop (=/single-float single-float-compare)
@@ -562,28 +570,28 @@
 ;; XXX all of these probably have bad NaN behaviour
 (define-vop (<double-float double-float-compare)
   (:translate <)
-  (:info target not-p y)
+  (:info target not-p)
   (:generator 2
     (inst comisd x y)
     (inst jmp (if not-p :nc :c) target)))
 
 (define-vop (<single-float single-float-compare)
   (:translate <)
-  (:info target not-p y)
+  (:info target not-p)
   (:generator 2
     (inst comiss x y)
     (inst jmp (if not-p :nc :c) target)))
 
 (define-vop (>double-float double-float-compare)
   (:translate <)
-  (:info target not-p y)
+  (:info target not-p)
   (:generator 2
     (inst comisd x y)
     (inst jmp (if not-p :na :a) target)))
 
 (define-vop (>single-float single-float-compare)
   (:translate <)
-  (:info target not-p y)
+  (:info target not-p)
   (:generator 2
     (inst comiss x y)
     (inst jmp (if not-p :na :a) target)))
@@ -768,7 +776,6 @@
       (inst movd res (make-ea :dword :base rbp-tn
 			      :disp (- (* (1+ offset) n-word-bytes)))))))
 
-#+nil
 (define-vop (single-float-bits)
   (:args (float :scs (single-reg descriptor-reg)
 		:load-if (not (sc-is float single-stack))))
@@ -784,9 +791,8 @@
       (signed-reg
        (sc-case float
 	 (single-reg
-	  (with-tn@fp-top(float)
-	    (inst fst stack-temp)
-	    (inst mov bits stack-temp)))
+	  (inst movss stack-temp float)
+	  (inst mov bits stack-temp))
 	 (single-stack
 	  (inst mov bits float))
 	 (descriptor-reg
@@ -796,10 +802,8 @@
       (signed-stack
        (sc-case float
 	 (single-reg
-	  (with-tn@fp-top(float)
-	    (inst fst bits))))))))
+	  (inst movss bits float)))))))
 
-#+nil
 (define-vop (double-float-high-bits)
   (:args (float :scs (double-reg descriptor-reg)
 		:load-if (not (sc-is float double-stack))))
@@ -813,11 +817,10 @@
   (:generator 5
      (sc-case float
        (double-reg
-	(with-tn@fp-top(float)
-	  (let ((where (make-ea :dword :base rbp-tn
-				:disp (- (* (+ 2 (tn-offset temp))
-					    n-word-bytes)))))
-	    (inst fstd where)))
+	(let ((where (make-ea :dword :base rbp-tn
+			      :disp (- (* (+ 2 (tn-offset temp))
+					  n-word-bytes)))))
+	  (inst movsd where float))
 	(loadw hi-bits rbp-tn (- (1+ (tn-offset temp)))))
        (double-stack
 	(loadw hi-bits rbp-tn (- (1+ (tn-offset float)))))
@@ -825,7 +828,6 @@
 	(loadw hi-bits float (1+ double-float-value-slot)
 	       other-pointer-lowtag)))))
 
-#+nil
 (define-vop (double-float-low-bits)
   (:args (float :scs (double-reg descriptor-reg)
 		:load-if (not (sc-is float double-stack))))
@@ -839,11 +841,10 @@
   (:generator 5
      (sc-case float
        (double-reg
-	(with-tn@fp-top(float)
-	  (let ((where (make-ea :dword :base rbp-tn
-				:disp (- (* (+ 2 (tn-offset temp))
-					    n-word-bytes)))))
-	    (inst fstd where)))
+	(let ((where (make-ea :dword :base rbp-tn
+			      :disp (- (* (+ 2 (tn-offset temp))
+					  n-word-bytes)))))
+	  (inst movsd where float))
 	(loadw lo-bits rbp-tn (- (+ 2 (tn-offset temp)))))
        (double-stack
 	(loadw lo-bits rbp-tn (- (+ 2 (tn-offset float)))))

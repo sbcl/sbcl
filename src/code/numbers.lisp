@@ -235,6 +235,7 @@
      (canonical-complex realpart imagpart))
     (float-contagion %%make-complex realpart imagpart (rational)))))
 
+#+nil
 (defun realpart (number)
   #!+sb-doc
   "Extract the real part of a number."
@@ -251,6 +252,7 @@
     (t
      number)))
 
+#+nil
 (defun imagpart (number)
   #!+sb-doc
   "Extract the imaginary part of a number."

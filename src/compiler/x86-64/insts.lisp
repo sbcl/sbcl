@@ -697,7 +697,7 @@
 
 (defun reg-tn-encoding (tn)
   (declare (type tn tn))
-  (aver (eq (sb-name (sc-sb (tn-sc tn))) 'registers))
+  (aver (member  (sb-name (sc-sb (tn-sc tn))) '(registers float-registers)))
   ;; ea only has space for three bits of register number: regs r8
   ;; and up are selected by a REX prefix byte which caller is responsible
   ;; for having emitted where necessary already
@@ -750,7 +750,7 @@
      ;; this would be eleganter if we had a function that would create
      ;; an ea given a tn
      (ecase (sb-name (sc-sb (tn-sc thing)))
-       (registers
+       ((registers float-registers)
 	(emit-mod-reg-r/m-byte segment #b11 reg (reg-tn-encoding thing)))
        (stack
 	;; Convert stack tns into an index off RBP.
@@ -913,8 +913,8 @@
 			   (and ea-p (ea-index ea))
 			   (cond (ea-p (ea-base ea))
 				 ((and (tn-p ea)
-				       (eql (sb-name (sc-sb (tn-sc ea))) 
-					    'registers))
+				       (member (sb-name (sc-sb (tn-sc ea))) 
+					       '(float-registers registers)))
 				  ea)
 				 (t nil)))))
 
@@ -2882,33 +2882,33 @@
   (:printer reg-reg/mem ((op #x10) (width 1))) ;wrong
   (:emitter
    (cond ((typep src 'tn) 
-	  (maybe-emit-rex-for-ea segment src dst)
-	  (emit-byte segment #xf2)
-	  (emit-byte segment #x0f)
-	  (emit-byte segment #x11)
-	  (emit-ea segment src (reg-tn-encoding dst)))
-	 (t
 	  (maybe-emit-rex-for-ea segment dst src)
 	  (emit-byte segment #xf2)
 	  (emit-byte segment #x0f)
+	  (emit-byte segment #x11)
+	  (emit-ea segment dst (reg-tn-encoding src)))
+	 (t
+	  (maybe-emit-rex-for-ea segment src dst)
+	  (emit-byte segment #xf2)
+	  (emit-byte segment #x0f)
 	  (emit-byte segment #x10)
-	  (emit-ea segment dst (reg-tn-encoding src))))))
+	  (emit-ea segment src (reg-tn-encoding dst))))))
 
 (define-instruction movss (segment dst src)
   (:printer reg-reg/mem ((op #x10) (width 1))) ;wrong
   (:emitter
-   (cond ((typep src 'tn) 
-	  (maybe-emit-rex-for-ea segment src dst)
-	  (emit-byte segment #xf3)
-	  (emit-byte segment #x0f)
-	  (emit-byte segment #x11)
-	  (emit-ea segment src (reg-tn-encoding dst)))
-	 (t
+   (cond ((tn-p src) 
 	  (maybe-emit-rex-for-ea segment dst src)
 	  (emit-byte segment #xf3)
 	  (emit-byte segment #x0f)
+	  (emit-byte segment #x11)
+	  (emit-ea segment dst (reg-tn-encoding src)))
+	 (t
+	  (maybe-emit-rex-for-ea segment src dst)
+	  (emit-byte segment #xf3)
+	  (emit-byte segment #x0f)
 	  (emit-byte segment #x10)
-	  (emit-ea segment dst (reg-tn-encoding src))))))
+	  (emit-ea segment src (reg-tn-encoding dst))))))
 
 (define-instruction andpd (segment dst src)
   (:printer reg-reg/mem ((op #x10) (width 1))) ;wrong

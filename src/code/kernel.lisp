@@ -125,17 +125,8 @@
 
 (defun make-single-float (x) (make-single-float x))
 (defun make-double-float (hi lo) (make-double-float hi lo))
-#!+long-float
-(defun make-long-float (exp hi #!+sparc mid lo)
-  (make-long-float exp hi #!+sparc mid lo))
+
 (defun single-float-bits (x) (single-float-bits x))
 (defun double-float-high-bits (x) (double-float-high-bits x))
 (defun double-float-low-bits (x) (double-float-low-bits x))
-#!+long-float
-(defun long-float-exp-bits (x) (long-float-exp-bits x))
-#!+long-float
-(defun long-float-high-bits (x) (long-float-high-bits x))
-#!+(and long-float sparc)
-(defun long-float-mid-bits (x) (long-float-mid-bits x))
-#!+long-float
-(defun long-float-low-bits (x) (long-float-low-bits x))
+

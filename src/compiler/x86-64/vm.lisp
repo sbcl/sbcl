@@ -191,6 +191,9 @@
   ;; non-immediate constants in the constant pool
   (constant constant)
 
+  (fp-single-zero immediate-constant)
+  (fp-double-zero immediate-constant)
+
   (immediate immediate-constant)
 
   ;;
@@ -294,15 +297,15 @@
 
   ;; non-descriptor SINGLE-FLOATs
   (single-reg float-registers
-	      :locations #.(loop for i from 0 to 15 collect i)
-	      :constant-scs nil ; (fp-constant)
+	      :locations #.(loop for i from 0 below 15 collect i)
+	      :constant-scs (fp-single-zero)
 	      :save-p t
 	      :alternate-scs (single-stack))
 
   ;; non-descriptor DOUBLE-FLOATs
   (double-reg float-registers
-	      :locations #.(loop for i from 0 to 15 collect i)
-	      :constant-scs nil ; (fp-constant)
+	      :locations #.(loop for i from 0 below 15 collect i)
+	      :constant-scs (fp-double-zero)
 	      :save-p t
 	      :alternate-scs (double-stack))
 
@@ -436,7 +439,7 @@
 		  (svref name-vec offset))
 	     ;; FIXME: Shouldn't this be an ERROR?
 	     (format nil "<unknown reg: off=~W, sc=~A>" offset sc-name))))
-      (float-registers (format nil "FR~D" offset))
+      (float-registers (format nil "FLOAT~D" offset))
       (stack (format nil "S~D" offset))
       (constant (format nil "Const~D" offset))
       (immediate-constant "Immed")

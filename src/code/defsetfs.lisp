@@ -41,12 +41,10 @@
 (defsetf %instance-ref %instance-set)
 (defsetf %raw-ref-single %raw-set-single)
 (defsetf %raw-ref-double %raw-set-double)
-#!+long-float
-(defsetf %raw-ref-long %raw-set-long)
+
 (defsetf %raw-ref-complex-single %raw-set-complex-single)
 (defsetf %raw-ref-complex-double %raw-set-complex-double)
-#!+long-float
-(defsetf %raw-ref-complex-long %raw-set-complex-long)
+
 (defsetf %instance-layout %set-instance-layout)
 (defsetf %funcallable-instance-info %set-funcallable-instance-info)
 

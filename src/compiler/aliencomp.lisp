@@ -346,11 +346,11 @@
     (/noshow (local-alien-info-force-to-memory-p info))
     (/noshow alien-type (unparse-alien-type alien-type) (alien-type-bits alien-type))
     (if (local-alien-info-force-to-memory-p info)
-      #!+x86 `(truly-the system-area-pointer
+      #!+(or x86 x86-64) `(truly-the system-area-pointer
 			 (%primitive alloc-alien-stack-space
 				     ,(ceiling (alien-type-bits alien-type)
 					       sb!vm:n-byte-bits)))
-      #!-x86 `(truly-the system-area-pointer
+      #!-(or x86 x86-64) `(truly-the system-area-pointer
 			 (%primitive alloc-number-stack-space
 				     ,(ceiling (alien-type-bits alien-type)
 					       sb!vm:n-byte-bits)))
@@ -434,10 +434,10 @@
   (let* ((info (lvar-value info))
 	 (alien-type (local-alien-info-type info)))
     (if (local-alien-info-force-to-memory-p info)
-      #!+x86 `(%primitive dealloc-alien-stack-space
+      #!+(or x86 x86-64) `(%primitive dealloc-alien-stack-space
 			  ,(ceiling (alien-type-bits alien-type)
 				    sb!vm:n-byte-bits))
-      #!-x86 `(%primitive dealloc-number-stack-space
+      #!-(or x86 x86-64) `(%primitive dealloc-number-stack-space
 			  ,(ceiling (alien-type-bits alien-type)
 				    sb!vm:n-byte-bits))
       nil)))
@@ -678,19 +678,19 @@
 	(let* ((arg (pop args))
 	       (sc (tn-sc tn))
 	       (scn (sc-number sc))
-	       #!-x86 (temp-tn (make-representation-tn (tn-primitive-type tn)
+	       #!-(or x86 x86-64) (temp-tn (make-representation-tn (tn-primitive-type tn)
 						       scn))
 	       (move-arg-vops (svref (sc-move-arg-vops sc) scn)))
 	  (aver arg)
 	  (unless (= (length move-arg-vops) 1)
 	    (error "no unique move-arg-vop for moves in SC ~S" (sc-name sc)))
-	  #!+x86 (emit-move-arg-template call
+	  #!+(or x86 x86-64) (emit-move-arg-template call
 					 block
 					 (first move-arg-vops)
 					 (lvar-tn call block arg)
 					 nsp
 					 tn)
-	  #!-x86 (progn
+	  #!-(or x86 x86-64) (progn
 		   (emit-move call
 			      block
 			      (lvar-tn call block arg)
