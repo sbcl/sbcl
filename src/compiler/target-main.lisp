@@ -48,13 +48,14 @@
   (with-compilation-values
     (sb!xc:with-compilation-unit ()
       (let* (;; FIXME: Do we need this rebinding here? It's a literal
-	     ;; translation of the old CMU CL rebinding to
-	     ;; (OR *BACKEND-INFO-ENVIRONMENT* *INFO-ENVIRONMENT*),
-	     ;; and it's not obvious whether the rebinding to itself is
-	     ;; needed that SBCL doesn't need *BACKEND-INFO-ENVIRONMENT*.
+	     ;; translation of the old CMU CL rebinding to (OR
+	     ;; *BACKEND-INFO-ENVIRONMENT* *INFO-ENVIRONMENT*), and
+	     ;; it's not obvious whether the rebinding to itself is
+	     ;; needed now that SBCL doesn't need
+	     ;; *BACKEND-INFO-ENVIRONMENT*.
 	     (*info-environment* *info-environment*)
 	     (*lexenv* (make-null-lexenv))
-	     (form `#',(get-lambda-to-compile definition))
+	     (form (get-lambda-to-compile definition))
 	     (*source-info* (make-lisp-source-info form))
 	     (*top-level-lambdas* ())
 	     (*block-compile* nil)
@@ -70,7 +71,6 @@
 	     (*last-format-string* nil)
 	     (*last-format-args* nil)
 	     (*last-message-count* 0)
-	     (*compile-object* (make-core-object))
 	     (*gensym-counter* 0)
 	     ;; FIXME: ANSI doesn't say anything about CL:COMPILE
 	     ;; interacting with these variables, so we shouldn't. As
@@ -82,24 +82,7 @@
 	     (*compile-print* nil))
 	(clear-stuff)
 	(find-source-paths form 0)
-	(let ((lambda (ir1-top-level form '(original-source-start 0 0) t)))
-
-	  (compile-fix-function-name lambda name)
-	  (let* ((component
-		  (block-component (node-block (lambda-bind lambda))))
-		 (*all-components* (list component)))
-	    (local-call-analyze component))
-
-	  (multiple-value-bind (components top-components)
-			       (find-initial-dfo (list lambda))
-	    (let ((*all-components* (append components top-components)))
-	      (dolist (component *all-components*)
-		(compile-component component))))
-
-	  (let ((compiled-fun (core-call-top-level-lambda lambda
-							  *compile-object*)))
-	    (fix-core-source-info *source-info* *compile-object* compiled-fun)
-	    compiled-fun))))))
+	(%compile form (make-core-object) :name name)))))
 
 (defun compile (name &optional (definition (fdefinition name)))
   #!+sb-doc

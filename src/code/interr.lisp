@@ -449,8 +449,13 @@
 		    (sb!alien:sap-alien context (* os-context-t)))))
      (multiple-value-bind (error-number arguments)
 	 (sb!vm:internal-error-arguments context)
+       (/show0 "back from INTERNAL-ERROR-ARGUMENTS, ERROR-NUMBER=..")
+       (/hexstr error-number)
+       (/show0 "ARGUMENTS=..")
+       (/hexstr arguments)
        (multiple-value-bind (name sb!debug:*stack-top-hint*)
 	   (find-interrupted-name)
+	 (/show0 "back from FIND-INTERRUPTED-NAME")
 	 (let ((fp (int-sap (sb!vm:context-register context
 						    sb!vm::cfp-offset)))
 	       (handler (and (< -1 error-number (length *internal-errors*))

@@ -1921,6 +1921,7 @@
   (values))
 
 (defun byte-compile-component (component)
+  (/show "entering BYTE-COMPILE-COMPONENT")
   (setf (component-info component) (make-byte-component-info))
   (maybe-mumble "ByteAnn ")
 
@@ -1983,6 +1984,7 @@
 	       (make-core-byte-component segment code-length constants xeps
 					 *compile-object*))
 	      (null))))))
+  (/show "leaving BYTE-COMPILE-COMPONENT")
   (values))
 
 ;;;; extra stuff for debugging

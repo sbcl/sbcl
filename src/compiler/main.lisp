@@ -374,6 +374,7 @@
   (values))
 
 (defun native-compile-component (component)
+  (/show "entering NATIVE-COMPILE-COMPONENT")
   (let ((*code-segment* nil)
 	(*elsewhere* nil))
     (maybe-mumble "GTN ")
@@ -465,6 +466,7 @@
   ;; We're done, so don't bother keeping anything around.
   (setf (component-info component) nil)
 
+  (/show "leaving NATIVE-COMPILE-COMPONENT")
   (values))
 
 (defun policy-byte-compile-p (thing)
@@ -919,6 +921,7 @@
 ;;; If NAME is provided, then we try to use it as the name of the
 ;;; function for debugging/diagnostic information.
 (defun %compile (lambda-expression *compile-object* &key name path)
+  (/show "entering %COMPILE" name)
   (unless (or (null name) (legal-function-name-p name))
     (error "not a legal function name: ~S" name))
   (let* ((*lexenv* (make-lexenv :policy *policy*))
@@ -937,11 +940,12 @@
     ;; whole FUNCTIONAL-KIND=:TOP-LEVEL case could go away..)
 
     (loop
-     (/noshow "at head of locall loop")
+     (/show "at head of locall loop")
      (let ((did-something nil))
        (let ((*all-components* (functional-components fun)))
          (dolist (component *all-components*)
            (when (component-new-functions component)
+	     (/show "non-null COMPONENT-NEW-FUNCTIONS")
              (/noshow (component-new-functions component))
              (setf did-something t)
              (local-call-analyze component))))
@@ -959,10 +963,12 @@
         (mapc #'pre-environment-analyze-top-level
               (append hairy-top top-components))
         (dolist (component-from-dfo components-from-dfo)
-          (/noshow component-from-dfo)
+          (/show "compiling a COMPONENT-FROM-DFO")
           (compile-component component-from-dfo)
+	  (/show "about to REPLACE-TOP-LEVEL-XEPS")
           (replace-top-level-xeps component-from-dfo)))
 
+      (/show "about to go into PROG1")
       (prog1
           (let ((entry-table (etypecase *compile-object*
                                (fasl-output (fasl-output-entry-table
@@ -974,7 +980,8 @@
               (aver found-p)
               result))
         (mapc #'clear-ir1-info components-from-dfo)
-        (clear-stuff)))))
+        (clear-stuff)
+	(/show "returning from %COMPILE")))))
 
 (defun process-top-level-cold-fset (name lambda-expression path)
   (/show "entering PROCESS-TOP-LEVEL-COLD-FSET" name)

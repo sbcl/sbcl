@@ -1743,8 +1743,8 @@
       (setf (compiled-debug-var-symbol (svref vars i))
 	    (intern (format nil "ARG-~V,'0D" width i)
 		    ;; KLUDGE: It's somewhat nasty to have a bare
-		    ;; package name string here. It would probably be
-		    ;; better to have #.(FIND-PACKAGE "SB!DEBUG")
+		    ;; package name string here. It would be
+		    ;; nicer to have #.(FIND-PACKAGE "SB!DEBUG")
 		    ;; instead, since then at least it would transform
 		    ;; correctly under package renaming and stuff.
 		    ;; However, genesis can't handle dumped packages..
@@ -1756,13 +1756,15 @@
 		    ;; would work fine) If this is possible, it would
 		    ;; probably be a good thing, since minimizing the
 		    ;; amount of stuff in cold init is basically good.
-		    "SB-DEBUG")))))
+		    (or (find-package "SB-DEBUG")
+			(find-package "SB!DEBUG")))))))
 
 ;;; Parse the packed representation of DEBUG-VARs from
 ;;; DEBUG-FUNCTION's SB!C::COMPILED-DEBUG-FUNCTION, returning a vector
 ;;; of DEBUG-VARs, or NIL if there was no information to parse.
 (defun parse-compiled-debug-vars (debug-function)
-  (let* ((cdebug-fun (compiled-debug-function-compiler-debug-fun debug-function))
+  (let* ((cdebug-fun (compiled-debug-function-compiler-debug-fun
+		      debug-function))
 	 (packed-vars (sb!c::compiled-debug-function-variables cdebug-fun))
 	 (args-minimal (eq (sb!c::compiled-debug-function-arguments cdebug-fun)
 			   :minimal)))
@@ -1778,7 +1780,8 @@
 	  (let* ((flags (geti))
 		 (minimal (logtest sb!c::compiled-debug-var-minimal-p flags))
 		 (deleted (logtest sb!c::compiled-debug-var-deleted-p flags))
-		 (live (logtest sb!c::compiled-debug-var-environment-live flags))
+		 (live (logtest sb!c::compiled-debug-var-environment-live
+				flags))
 		 (save (logtest sb!c::compiled-debug-var-save-loc-p flags))
 		 (symbol (if minimal nil (geti)))
 		 (id (if (logtest sb!c::compiled-debug-var-id-p flags)
