@@ -46,7 +46,7 @@
     (if (array-type-p ctype)
 	;; the other transform will kick in, so that's OK
 	(give-up-ir1-transform)
-	`(typecase string
+	`(etypecase string
 	  ((simple-array character (*)) (data-vector-ref string index))
 	  ((simple-array nil (*)) (data-vector-ref string index))))))
 
@@ -95,7 +95,7 @@
     (if (array-type-p ctype)
 	;; the other transform will kick in, so that's OK
 	(give-up-ir1-transform)
-	`(typecase string
+	`(etypecase string
 	  ((simple-array character (*))
 	   (data-vector-set string index new-value))
 	  ((simple-array nil (*))
