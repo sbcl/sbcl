@@ -1380,17 +1380,6 @@ WORKAROUND:
   the heap and certainly confuses the world if that string is used by
   C code.
 
-316: "SHIFTF and multiple values"
-  reported by Bruno Haible sbcl-devel "various SBCL bugs" from CLISP
-  test suite.
-    (shiftf (values x y) (values y x))
-  gives an error in sbcl-0.8.10.
-
-  Parts of the explanation of SHIFTF in ANSI CL talk about multiple
-  store variables, and the X3J13 vote
-  SETF-MULTIPLE-STORE-VARIABLES:ALLOW also says that SHIFTF should
-  support multiple value places.
-
 317: "FORMAT of floating point numbers"
   reported by Bruno Haible sbcl-devel "various SBCL bugs" from CLISP
   test suite.
@@ -1455,9 +1444,6 @@ WORKAROUND:
       (:method ((p1 string) (p2 t) s)
         (vector-push-extend (list 'string p1 p2) s))
       (:method ((p1 t) (p2 t) s) (vector-push-extend (list t p1 p2) s)))
-
-322: "DEFSTRUCT :TYPE LIST predicate and improper lists"
-  (fixed in sbcl-0.8.10.23)
 
 323: "REPLACE, BIT-BASH and large strings"
   The transform for REPLACE on simple-base-strings uses BIT-BASH, which

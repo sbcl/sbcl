@@ -165,23 +165,39 @@ GET-SETF-EXPANSION directly."
    returning the value of the leftmost."
   (when (< (length args) 2)
     (error "~S called with too few arguments: ~S" 'shiftf form))
-  (let ((resultvar (gensym)))
-    (do ((arglist args (cdr arglist))
-	 (bindlist nil)
-	 (storelist nil)
-	 (lastvar resultvar))
-	((atom (cdr arglist))
-	 (push `(,lastvar ,(first arglist)) bindlist)
-	 `(let* ,(nreverse bindlist) ,@(nreverse storelist) ,resultvar))
-      (multiple-value-bind (sm1 sm2 sm3 sm4 sm5)
-	  (get-setf-method (first arglist) env)
-	(mapc (lambda (var val)
-		(push `(,var ,val) bindlist))
-	      sm1
-	      sm2)
-	(push `(,lastvar ,sm5) bindlist)
-	(push sm4 storelist)
-	(setq lastvar (first sm3))))))
+  (let (let*-bindings mv-bindings setters getters)
+    (dolist (arg (butlast args))
+      (multiple-value-bind (temps subforms store-vars setter getter)
+	  (sb!xc:get-setf-expansion arg env)
+	(mapc (lambda (tmp form)
+		(push `(,tmp ,form) let*-bindings))
+	      temps
+	      subforms)
+	(push store-vars mv-bindings)
+	(push setter setters)
+	(push getter getters)))
+    ;; Handle the last arg specially here. The getter is just the last
+    ;; arg itself.
+    (push (car (last args)) getters)
+
+    ;; Reverse the collected lists so last bit looks nicer.
+    (setf let*-bindings (nreverse let*-bindings)
+	  mv-bindings (nreverse mv-bindings)
+	  setters (nreverse setters)
+	  getters (nreverse getters))
+
+    (labels ((thunk (mv-bindings getters)
+	       (if mv-bindings
+		   `((multiple-value-bind
+			   ,(car mv-bindings)
+			 ,(car getters)
+		       ,@(thunk (cdr mv-bindings) (cdr getters))))
+		   `(,@setters))))
+      `(let ,let*-bindings
+	(multiple-value-bind ,(car mv-bindings)
+	    ,(car getters)
+	  ,@(thunk mv-bindings (cdr getters))
+	  (values ,@(car mv-bindings)))))))
 
 (defmacro-mundanely push (obj place &environment env)
   #!+sb-doc

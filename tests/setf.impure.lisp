@@ -23,5 +23,11 @@
 ;;; environment object.
 (assert (multiple-value-list (get-setf-expansion '(foo))))
 
+;;; Regression test for SHIFTF of values.
+(let ((x (list 1))
+      (y (list 2)))
+  (shiftf (values (car x) (car y)) (values (car y) (car x)))
+  (assert (equal (list x y) '((2) (1)))))
+
 ;;; success
 (quit :unix-status 104)
