@@ -491,11 +491,12 @@ static void print_otherptr(lispobj obj)
                 print_slots(symbol_slots, count, ptr);
                 break;
 
+#if N_WORD_BITS == 32
             case SINGLE_FLOAT_WIDETAG:
                 NEWLINE_OR_RETURN;
                 printf("%g", ((struct single_float *)native_pointer(obj))->value);
                 break;
-
+#endif
             case DOUBLE_FLOAT_WIDETAG:
                 NEWLINE_OR_RETURN;
                 printf("%g", ((struct double_float *)native_pointer(obj))->value);

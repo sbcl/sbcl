@@ -11,7 +11,9 @@
 (in-package "SB!VM")
 
 (defparameter *immediate-types*
-  (list unbound-marker-widetag character-widetag))
+  (list* unbound-marker-widetag character-widetag
+	 (when (= sb!vm::n-word-bits 64)
+	   (list single-float-widetag))))
 
 (defparameter *fun-header-widetags*
   (list funcallable-instance-header-widetag
@@ -70,23 +72,42 @@
 	 (error "can't mix fixnum testing with other lowtags"))
        (when function-p
 	 (error "can't mix fixnum testing with function subtype testing"))
-       (when immediates
-	 (error "can't mix fixnum testing with other immediates"))
-       (if headers
-	   `(%test-fixnum-and-headers ,value ,target ,not-p
-	     ',(canonicalize-headers headers)
-	     ,@other-args)
-	   `(%test-fixnum ,value ,target ,not-p
-	     ,@other-args)))
+       (cond
+	 ((and (= sb!vm:n-word-bits 64) immediates headers)
+	  `(%test-fixnum-immediate-and-headers ,value ,target ,not-p
+					       ,(car immediates)
+					       ',(canonicalize-headers
+						  headers)
+					       ,@other-args))
+	 (immediates
+	  (if (= sb!vm:n-word-bits 64)
+	      `(%test-fixnum-and-immediate ,value ,target ,not-p
+					   ,(car immediates)
+					   ,@other-args)
+	      (error "can't mix fixnum testing with other immediates")))
+	 (headers
+	  `(%test-fixnum-and-headers ,value ,target ,not-p
+				     ',(canonicalize-headers headers)
+				     ,@other-args))
+	 (t
+	  `(%test-fixnum ,value ,target ,not-p
+			 ,@other-args))))
       (immediates
-       (when headers
-	 (error "can't mix testing of immediates with testing of headers"))
-       (when lowtags
-	 (error "can't mix testing of immediates with testing of lowtags"))
-       (when (cdr immediates)
-	 (error "can't test multiple immediates at the same time"))
-       `(%test-immediate ,value ,target ,not-p ,(car immediates)
-	 ,@other-args))
+       (cond
+	 (headers
+	  (if (= sb!vm:n-word-bits 64)
+	      `(%test-immediate-and-headers ,value ,target ,not-p
+					    ,(car immediates)
+					    ',(canonicalize-headers headers)
+					    ,@other-args)
+	      (error "can't mix testing of immediates with testing of headers")))
+	 (lowtags
+	  (error "can't mix testing of immediates with testing of lowtags"))
+	 ((cdr immediates)
+	  (error "can't test multiple immediates at the same time"))
+	 (t
+	  `(%test-immediate ,value ,target ,not-p ,(car immediates)
+			    ,@other-args))))
       (lowtags
        (when (cdr lowtags)
 	 (error "can't test multiple lowtags at the same time"))

@@ -205,12 +205,18 @@ valid_dynamic_space_pointer(lispobj *pointer, lispobj *start_addr)
 	}
 	/* Is it plausible cons? */
 	if ((is_lisp_pointer(start_addr[0])
-	    || ((start_addr[0] & 3) == 0) /* fixnum */
+	    || ((start_addr[0] & FIXNUM_TAG_MASK) == 0) /* fixnum */
 	    || (widetag_of(start_addr[0]) == CHARACTER_WIDETAG)
+#if N_WORD_BITS == 64
+	    || (widetag_of(start_addr[1]) == SINGLE_FLOAT_WIDETAG)
+#endif
 	    || (widetag_of(start_addr[0]) == UNBOUND_MARKER_WIDETAG))
 	   && (is_lisp_pointer(start_addr[1])
-	       || ((start_addr[1] & 3) == 0) /* fixnum */
+	       || ((start_addr[1] & FIXNUM_TAG_MASK) == 0) /* fixnum */
 	       || (widetag_of(start_addr[1]) == CHARACTER_WIDETAG)
+#if N_WORD_BITS == 64
+	       || (widetag_of(start_addr[1]) == SINGLE_FLOAT_WIDETAG)
+#endif
 	       || (widetag_of(start_addr[1]) == UNBOUND_MARKER_WIDETAG))) {
 	    break;
 	} else {
@@ -245,7 +251,7 @@ valid_dynamic_space_pointer(lispobj *pointer, lispobj *start_addr)
 	    return 0;
 	}
 	/* Is it plausible? Not a cons. XXX should check the headers. */
-	if (is_lisp_pointer(start_addr[0]) || ((start_addr[0] & 3) == 0)) {
+	if (is_lisp_pointer(start_addr[0]) || ((start_addr[0] & FIXNUM_TAG_MASK) == 0)) {
 	    if (pointer_filter_verbose) {
 		fprintf(stderr,"*Wo2: %x %x %x\n", (unsigned long) pointer, 
 			(unsigned long) start_addr, *start_addr);
@@ -255,6 +261,9 @@ valid_dynamic_space_pointer(lispobj *pointer, lispobj *start_addr)
 	switch (widetag_of(start_addr[0])) {
 	case UNBOUND_MARKER_WIDETAG:
 	case CHARACTER_WIDETAG:
+#if N_WORD_BITS == 64
+	case SINGLE_FLOAT_WIDETAG:
+#endif
 	    if (pointer_filter_verbose) {
 		fprintf(stderr,"*Wo3: %x %x %x\n", (unsigned long) pointer, 
 			(unsigned long) start_addr, *start_addr);
@@ -304,7 +313,9 @@ valid_dynamic_space_pointer(lispobj *pointer, lispobj *start_addr)
 	case FDEFN_WIDETAG:
 	case CODE_HEADER_WIDETAG:
 	case BIGNUM_WIDETAG:
+#if N_WORD_BITS != 64
 	case SINGLE_FLOAT_WIDETAG:
+#endif
 	case DOUBLE_FLOAT_WIDETAG:
 #ifdef LONG_FLOAT_WIDETAG
 	case LONG_FLOAT_WIDETAG:
@@ -1186,6 +1197,11 @@ pscav(lispobj *addr, long nwords, boolean constant)
             }
             count = 1;
         }
+#if N_WORD_BITS == 64
+        else if (widetag_of(thing) == SINGLE_FLOAT_WIDETAG) {
+	    count = 1;
+	}
+#endif
         else if (thing & FIXNUM_TAG_MASK) {
             /* It's an other immediate. Maybe the header for an unboxed */
             /* object. */

@@ -66,6 +66,7 @@
 	       :ref-trans %denominator
 	       :init :arg))
 
+#!+#.(cl:if (cl:= sb!vm:n-word-bits 32) '(and) '(or))
 (define-primitive-object (single-float :lowtag other-pointer-lowtag
 				       :widetag single-float-widetag)
   (value :c-type "float"))

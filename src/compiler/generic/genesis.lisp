@@ -690,6 +690,11 @@ core and return a descriptor to it."
 (defun float-to-core (x)
   (etypecase x
     (single-float
+     ;; 64-bit platforms have immediate single-floats.
+     #!+#.(cl:if (cl:= sb!vm:n-word-bits 64) '(and) '(or))
+     (make-random-descriptor (logior (ash (single-float-bits x) 32)
+				     sb!vm::single-float-widetag))
+     #!-#.(cl:if (cl:= sb!vm:n-word-bits 64) '(and) '(or))
      (let ((des (allocate-unboxed-object *dynamic*
 					 sb!vm:n-word-bits
 					 (1- sb!vm:single-float-size)

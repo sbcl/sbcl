@@ -1585,7 +1585,11 @@ gc_init_tables(void)
      * tag) get one entry each in the scavenge table. */
     scavtab[BIGNUM_WIDETAG] = scav_unboxed;
     scavtab[RATIO_WIDETAG] = scav_boxed;
+#if N_WORD_BITS == 64
+    scavtab[SINGLE_FLOAT_WIDETAG] = scav_immediate;
+#else
     scavtab[SINGLE_FLOAT_WIDETAG] = scav_unboxed;
+#endif
     scavtab[DOUBLE_FLOAT_WIDETAG] = scav_unboxed;
 #ifdef LONG_FLOAT_WIDETAG
     scavtab[LONG_FLOAT_WIDETAG] = scav_unboxed;
@@ -1716,7 +1720,12 @@ gc_init_tables(void)
 	transother[i] = trans_lose;
     transother[BIGNUM_WIDETAG] = trans_unboxed;
     transother[RATIO_WIDETAG] = trans_boxed;
+
+#if N_WORD_BITS == 64
+    transother[SINGLE_FLOAT_WIDETAG] = trans_immediate;
+#else
     transother[SINGLE_FLOAT_WIDETAG] = trans_unboxed;
+#endif
     transother[DOUBLE_FLOAT_WIDETAG] = trans_unboxed;
 #ifdef LONG_FLOAT_WIDETAG
     transother[LONG_FLOAT_WIDETAG] = trans_unboxed;
@@ -1852,7 +1861,11 @@ gc_init_tables(void)
     }
     sizetab[BIGNUM_WIDETAG] = size_unboxed;
     sizetab[RATIO_WIDETAG] = size_boxed;
+#if N_WORD_BITS == 64
+    sizetab[SINGLE_FLOAT_WIDETAG] = size_immediate;
+#else
     sizetab[SINGLE_FLOAT_WIDETAG] = size_unboxed;
+#endif
     sizetab[DOUBLE_FLOAT_WIDETAG] = size_unboxed;
 #ifdef LONG_FLOAT_WIDETAG
     sizetab[LONG_FLOAT_WIDETAG] = size_unboxed;

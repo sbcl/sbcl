@@ -42,14 +42,41 @@
     (inst jmp :z (if not-p drop-through target))
     (%test-headers value target not-p nil headers drop-through)))
 
-(defun %test-immediate (value target not-p immediate)
+(defun %test-fixnum-and-immediate (value target not-p immediate)
+  (let ((drop-through (gen-label)))
+    (generate-fixnum-test value)
+    (inst jmp :z (if not-p drop-through target))
+    (%test-immediate value target not-p immediate drop-through)))
+
+(defun %test-fixnum-immediate-and-headers (value target not-p immediate
+					   headers)
+  (let ((drop-through (gen-label)))
+    (generate-fixnum-test value)
+    (inst jmp :z (if not-p drop-through target))
+    (%test-immediate-and-headers value target not-p immediate headers
+				 drop-through)))
+
+(defun %test-immediate (value target not-p immediate
+			&optional (drop-through (gen-label)))
   ;; Code a single instruction byte test if possible.
   (cond ((sc-is value any-reg descriptor-reg)
 	 (inst cmp (make-byte-tn value) immediate))
 	(t
 	 (move rax-tn value)
 	 (inst cmp al-tn immediate)))
-  (inst jmp (if not-p :ne :e) target))
+  (inst jmp (if not-p :ne :e) target)  
+  (emit-label drop-through))  
+
+(defun %test-immediate-and-headers (value target not-p immediate headers
+				    &optional (drop-through (gen-label)))
+  ;; Code a single instruction byte test if possible.
+  (cond ((sc-is value any-reg descriptor-reg)
+	 (inst cmp (make-byte-tn value) immediate))
+	(t
+	 (move rax-tn value)
+	 (inst cmp al-tn immediate)))
+  (inst jmp :e (if not-p drop-through target))
+  (%test-headers value target not-p nil headers drop-through))
 
 (defun %test-lowtag (value target not-p lowtag)
   (move rax-tn value)

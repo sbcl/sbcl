@@ -44,7 +44,9 @@ changes in sbcl-0.8.21 (0.9alpha.1?) relative to sbcl-0.8.20:
   * contrib improvement: SB-INTROSPECT handles more of SLIME's needs
     than previously; in addition, its test suite is now run on build.
     (thanks to Luke Gorrie)
-  * a more robust x86-64 disassembler. (thanks to Lutz Euler)    
+  * a more robust x86-64 disassembler. (thanks to Lutz Euler)
+  * optimization: added a immediate representation for single-floats 
+    on x86-64
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** MISC.564: defined out-of-line version of %ATAN2 on x86.
 

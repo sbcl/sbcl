@@ -16,8 +16,6 @@
 	       :qword :base ,tn
 	       :disp (- (* ,slot n-word-bytes)
 			other-pointer-lowtag))))
-  (defun ea-for-sf-desc (tn)
-    (ea-for-xf-desc tn single-float-value-slot))
   (defun ea-for-df-desc (tn)
     (ea-for-xf-desc tn double-float-value-slot))
   ;; complex floats
@@ -207,13 +205,12 @@
 (define-vop (move-from-single)
   (:args (x :scs (single-reg) :to :save))
   (:results (y :scs (descriptor-reg)))
-  (:node-var node)
   (:note "float to pointer coercion")
-  (:generator 13
-     (with-fixed-allocation (y
-			     single-float-widetag
-			     single-float-size node)
-       (inst movss (ea-for-sf-desc y) x))))
+  (:generator 4
+    (inst movd y x)
+    (inst shl y 32)
+    (inst or y single-float-widetag)))
+
 (define-move-vop move-from-single :move
   (single-reg) (descriptor-reg))
 
@@ -247,11 +244,15 @@
 
 ;;; Move from a descriptor to a float register.
 (define-vop (move-to-single)
-  (:args (x :scs (descriptor-reg)))
+  (:args (x :scs (descriptor-reg) :target tmp))
+  (:temporary (:sc unsigned-reg) tmp)
   (:results (y :scs (single-reg)))
   (:note "pointer to float coercion")
   (:generator 2
-    (inst movss y (ea-for-sf-desc x))))
+    (move tmp x)
+    (inst shr tmp 32)
+    (inst movd y tmp)))
+
 (define-move-vop move-to-single :move (descriptor-reg) (single-reg))
 
 (define-vop (move-to-double)
@@ -430,7 +431,7 @@
 
 (macrolet ((frob (name sc ptype)
 	     `(define-vop (,name float-op)
-		(:args (x :scs (,sc))
+		(:args (x :scs (,sc) :target r)
 		       (y :scs (,sc)))
 		(:results (r :scs (,sc)))
 		(:arg-types ,ptype ,ptype)
@@ -468,6 +469,7 @@
   (frob - subss -/single-float 2 subsd -/double-float 2 nil)
   (frob * mulss */single-float 4 mulsd */double-float 5 t)
   (frob / divss //single-float 12 divsd //double-float 19 nil))
+
 
 
 (macrolet ((frob ((name translate sc type) &body body)
@@ -800,9 +802,8 @@
 	 (single-stack
 	  (move bits float))
 	 (descriptor-reg
-	  (loadw
-	   bits float single-float-value-slot
-	   other-pointer-lowtag))))
+	  (move bits float)
+	  (inst shr bits 32))))
       (signed-stack
        (sc-case float
 	 (single-reg
