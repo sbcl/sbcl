@@ -1,3 +1,6 @@
+(load "assertoid.lisp")
+(use-package "ASSERTOID")
+
 ;;; bug 254: compiler falure
 (defpackage :bug254 (:use :cl))
 (in-package :bug254)
@@ -138,6 +141,17 @@
                '((4 9 7) (3 8 6) (6 8 3))))
 
 (delete-package :bug258)
+
+;;;
+(defun bug233a (x)
+  (declare (optimize (speed 2) (safety 3)))
+  (let ((y 0d0))
+    (values
+     (the double-float x)
+     (setq y (+ x 1d0))
+     (setq x 3d0)
+     (funcall (eval ''list) y (+ y 2d0) (* y 3d0)))))
+(assert (raises-error? (bug233a 4) type-error))
 
 
 (sb-ext:quit :unix-status 104)

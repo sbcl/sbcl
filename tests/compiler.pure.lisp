@@ -512,10 +512,11 @@
 ;;; We suppose that INTEGER arithmetic cannot be efficient, and the
 ;;; compiler has an optimized VOP for +; so this code should cause an
 ;;; efficiency note.
-(assert (eq (handler-case
-                (compile nil '(lambda (i)
-                               (declare (optimize speed))
-                               (declare (type integer i))
-                               (+ i 2)))
-              (sb-ext:compiler-note (c) (return :good)))
+(assert (eq (block nil
+              (handler-case
+                  (compile nil '(lambda (i)
+                                 (declare (optimize speed))
+                                 (declare (type integer i))
+                                 (+ i 2)))
+                (sb-ext:compiler-note (c) (return :good))))
             :good))

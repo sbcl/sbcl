@@ -824,20 +824,6 @@ WORKAROUND:
   produce invalid code, but type checking is not accurate.)
 
 233: bugs in constraint propagation
-  a.
-  (defun foo (x)
-    (declare (optimize (speed 2) (safety 3)))
-    (let ((y 0d0))
-      (values
-       (the double-float x)
-       (setq y (+ x 1d0))
-       (setq x 3d0)
-       (quux y (+ y 2d0) (* y 3d0)))))
-  (foo 4) => segmentation violation
-
-  (see usage of CONTINUATION-ASSERTED-TYPE in USE-RESULT-CONSTRAINTS)
-  (see also bug 236)
-
   b.
   (declaim (optimize (speed 2) (safety 3)))
   (defun foo (x y)
@@ -1195,6 +1181,16 @@ WORKAROUND:
 
   The issue seems to be that construction of a discriminating function
   calls COMPUTE-EFFECTIVE-METHOD with methods that are not all applicable.
+
+282: "type checking in full calls"
+  In current (0.8.3.6) implementation a CAST in a full call argument
+  is not checked; but the continuation between the CAST and the
+  combination has the "checked" type and CAST performs unsafe
+  coercion; this may lead to errors: if FOO is declared to take a
+  FIXNUM, this code will produce garbage on a machine with 30-bit
+  fixnums:
+
+    (foo (aref (the (array (unsigned-byte 32)) x)))
 
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:

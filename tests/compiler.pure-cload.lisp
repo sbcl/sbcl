@@ -59,3 +59,28 @@
                              (symbol-value 'a))
                        a b)
                  '(1 2 :a 1 2))))
+
+;;; bug 282
+;;;
+;;; Verify type checking policy in full calls: the callee is supposed
+;;; to perform check, but the results should not be used before the
+;;; check will be actually performed.
+#+nil
+(locally
+    (declare (optimize (safety 3)))
+  (flet ((bar (f a)
+           (declare (type (simple-array (unsigned-byte 32) (*)) a))
+           (declare (type (function (fixnum)) f))
+           (funcall f (aref a 0))))
+    (assert
+     (eval `(let ((n (1+ most-positive-fixnum)))
+              (if (not (typep n '(unsigned-byte 32)))
+                  (warn 'style-warning
+                        "~@<This test is written for platforms with ~
+                        ~@<(proper-subtypep 'fixnum '(unsigned-byte 32))~:@>.~:@>")
+                  (block nil
+                    (funcall ,#'bar
+                             (lambda (x) (when (eql x n) (return t)))
+                             (make-array 1 :element-type '(unsigned-byte 32)
+                                         :initial-element n))
+                    nil)))))))

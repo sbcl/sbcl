@@ -44,10 +44,6 @@
 ;;;
 ;;; -- this code does not check whether SET appears between REF and a
 ;;; test (bug 233b)
-;;;
-;;; -- type check is assumed to be inserted immediately after a node
-;;; producing the value; it disagrees with the rest of Python (bug
-;;; 233a)
 
 (in-package "SB!C")
 
