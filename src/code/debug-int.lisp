@@ -3236,11 +3236,8 @@
 	  (trap-loc (foreign-symbol-address "fun_end_breakpoint_trap"))
 	  (length (sap- src-end src-start))
 	  (code-object
-	   (%primitive
-	    #!-(and x86 gencgc) sb!c:allocate-code-object
-	    #!+(and x86 gencgc) sb!c::allocate-dynamic-code-object
-	    (1+ bogus-lra-constants)
-	    length))
+	   (%primitive sb!c:allocate-code-object (1+ bogus-lra-constants)
+		       length))
 	  (dst-start (code-instructions code-object)))
      (declare (type system-area-pointer
 		    src-start src-end dst-start trap-loc)

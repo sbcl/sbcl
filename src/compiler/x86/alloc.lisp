@@ -71,49 +71,6 @@
 (define-vop (allocate-code-object)
   (:args (boxed-arg :scs (any-reg) :target boxed)
 	 (unboxed-arg :scs (any-reg) :target unboxed))
-  (:results (result :scs (descriptor-reg)))
-  (:temporary (:sc unsigned-reg :from :eval) temp)
-  (:temporary (:sc unsigned-reg :from (:argument 0)) boxed)
-  (:temporary (:sc unsigned-reg :from (:argument 1)) unboxed)
-  (:generator 100
-    (move boxed boxed-arg)
-    (inst add boxed (fixnumize (1+ code-trace-table-offset-slot)))
-    (inst and boxed (lognot lowtag-mask))
-    (move unboxed unboxed-arg)
-    (inst shr unboxed word-shift)
-    (inst add unboxed lowtag-mask)
-    (inst and unboxed (lognot lowtag-mask))
-    (pseudo-atomic
-     ;; comment from CMU CL code:
-     ;;   now loading code into static space cause it can't move
-     ;;
-     ;; KLUDGE: What? What's all the cruft about saving fixups for then?
-     ;; I think what's happened is that ALLOCATE-CODE-OBJECT is the basic
-     ;; CMU CL primitive; this ALLOCATE-CODE-OBJECT was hacked for
-     ;; static space only in a simple-minded port to the X86; and then
-     ;; in an attempt to improve the port to the X86,
-     ;; ALLOCATE-DYNAMIC-CODE-OBJECT was defined. If that's right, I'd like
-     ;; to know why not just go back to the basic CMU CL behavior of
-     ;; ALLOCATE-CODE-OBJECT, where it makes a relocatable code object.
-     ;;   -- WHN 19990916
-     ;;
-     ;; FIXME: should have a check for overflow of static space
-     (load-symbol-value temp *static-space-free-pointer*)
-     (inst lea result (make-ea :byte :base temp :disp other-pointer-lowtag))
-     (inst add temp boxed)
-     (inst add temp unboxed)
-     (store-symbol-value temp *static-space-free-pointer*)
-     (inst shl boxed (- n-widetag-bits word-shift))
-     (inst or boxed code-header-widetag)
-     (storew boxed result 0 other-pointer-lowtag)
-     (storew unboxed result code-code-size-slot other-pointer-lowtag)
-     (inst mov temp nil-value)
-     (storew temp result code-entry-points-slot other-pointer-lowtag))
-    (storew temp result code-debug-info-slot other-pointer-lowtag)))
-
-(define-vop (allocate-dynamic-code-object)
-  (:args (boxed-arg :scs (any-reg) :target boxed)
-	 (unboxed-arg :scs (any-reg) :target unboxed))
   (:results (result :scs (descriptor-reg) :from :eval))
   (:temporary (:sc unsigned-reg :from (:argument 0)) boxed)
   (:temporary (:sc unsigned-reg :from (:argument 1)) unboxed)
