@@ -1269,18 +1269,6 @@ WORKAROUND:
 
   The problem is that both EVALs sequentially write to the same LVAR.
 
-304:
-  (Thanks to Dave Roberts.)
-
-    (defun foo (a i)
-      (declare (optimize (speed 3) (safety 0) (space 0) (debug 0)))
-      (declare (type (alien (* (unsigned 8))) a)
-               (type (unsigned-byte 32) i))
-      (deref a i))
-
-  Under recent enough SBCL the output code contains (TWO-ARG-/ (* x 8)
-  8). (Two problems: opaque CAST and modular functions).
-
 305:
   (Reported by Dave Roberts.)
   Local INLINE/NOTINLINE declaration removes local FTYPE declaration:
