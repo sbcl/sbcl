@@ -1716,3 +1716,15 @@
 	    (let ((b (make-array 64 :element-type 'bit :initial-element 0)))
 	      (setf (sbit b 63) 1)
 	      b)))))
+
+;;; MISC.535: compiler failure
+(let ((c0 #c(4196.088977268509d0 -15943.3603515625d0)))
+    (assert (not (funcall
+     (compile
+      nil
+      `(lambda (p1 p2)
+	 (declare (optimize speed (safety 1))
+		  (type (eql ,c0) p1)
+		  (type number p2))
+	 (eql (the (complex double-float) p1) p2)))
+     c0 #c(12 612/979)))))

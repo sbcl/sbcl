@@ -193,7 +193,7 @@
                     ((constant-lvar-p arg2)
                      (add-complement-constraints if 'eql var1
                                                  (ref-leaf
-                                                  (lvar-uses arg2))
+                                                  (principal-lvar-use arg2))
                                                  nil)))))
            ((< >)
             (let* ((arg1 (first args))

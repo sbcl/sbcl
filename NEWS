@@ -62,6 +62,8 @@ changes in sbcl-0.8.20 (0.9alpha.0?) relative to sbcl-0.8.19:
        with one-dimensional arrays with fill pointers.
     ** TYPE-OF failed on a complex with an integer realpart and a
        RATIO imagpart.
+    ** compiler failure during type inference for the code of form
+       (IF (EQL X (THE ...)) ...) (MISC.535).
 
 changes in sbcl-0.8.19 relative to sbcl-0.8.18:
   * new port: SBCL now works in native 64-bit mode on x86-64/Linux

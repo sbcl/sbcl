@@ -63,10 +63,13 @@
         (list uses))))
 
 (defun principal-lvar-use (lvar)
-  (let ((use (lvar-uses lvar)))
-    (if (cast-p use)
-        (principal-lvar-use (cast-value use))
-        use)))
+  (labels ((plu (lvar)
+             (declare (type lvar lvar))
+             (let ((use (lvar-uses lvar)))
+               (if (cast-p use)
+                   (plu (cast-value use))
+                   use))))
+    (plu lvar)))
 
 ;;; Update lvar use information so that NODE is no longer a use of its
 ;;; LVAR.
