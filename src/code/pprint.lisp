@@ -905,7 +905,6 @@
 
 (defun pprint-dispatch (object &optional (table *print-pprint-dispatch*))
   (declare (type (or pprint-dispatch-table null) table))
-  (/show0 "entering PPRINT-DISPATCH")
   (let* ((table (or table *initial-pprint-dispatch*))
 	 (cons-entry
 	  (and (consp object)

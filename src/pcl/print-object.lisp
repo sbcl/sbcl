@@ -42,7 +42,6 @@
       #+sb-show (*/show* nil)
       ;; (another workaround for the problem of debugging while the
       ;; printer is disabled here)
-      #+sb-show
       (sb-impl::*print-object-is-disabled-p* t))
   (fmakunbound 'print-object)
   (defgeneric print-object (object stream))

@@ -441,7 +441,6 @@
 (declaim (ftype (function (symbol index simple-vector layout-depthoid) layout)
 		find-and-init-or-check-layout))
 (defun find-and-init-or-check-layout (name length inherits depthoid)
-  (/show0 "entering FIND-AND-INIT-OR-CHECK-LAYOUT")
   (let ((layout (find-layout name)))
     (init-or-check-layout layout
 			  (or (sb!xc:find-class name nil)
