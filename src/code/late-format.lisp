@@ -9,7 +9,7 @@
 
 (in-package "SB!FORMAT")
 
-(define-condition format-error (error)
+(define-condition format-error (error reference-condition)
   ((complaint :reader format-error-complaint :initarg :complaint)
    (args :reader format-error-args :initarg :args :initform nil)
    (control-string :reader format-error-control-string
@@ -21,7 +21,8 @@
                     :initarg :second-relative :initform nil)
    (print-banner :reader format-error-print-banner :initarg :print-banner
 		 :initform t))
-  (:report %print-format-error))
+  (:report %print-format-error)
+  (:default-initargs :references nil))
 
 (defun %print-format-error (condition stream)
   (format stream
@@ -106,7 +107,8 @@
                :offset (min pprint-offset justification-offset)
                :second-relative (- (max pprint-offset justification-offset)
                                    (min pprint-offset justification-offset)
-                                   1))))
+                                   1)
+               :references (list '(:ansi-cl :section (22 3 5 2))))))
     (nreverse result)))
 
 (defun parse-directive (string start)
@@ -124,7 +126,8 @@
 	       (error 'format-error
 		      :complaint "parameters found after #\\: or #\\@ modifier"
 		      :control-string string
-		      :offset posn))))
+		      :offset posn
+                      :references (list '(:ansi-cl :section (22 3)))))))
       (loop
 	(let ((char (get-char)))
 	  (cond ((or (char<= #\0 char #\9) (char= char #\+) (char= char #\-))
@@ -175,14 +178,16 @@
 		     (error 'format-error
 			    :complaint "too many colons supplied"
 			    :control-string string
-			    :offset posn)
+			    :offset posn
+                            :references (list '(:ansi-cl :section (22 3))))
 		     (setf colonp t)))
 		((char= char #\@)
 		 (if atsignp
 		     (error 'format-error
 			    :complaint "too many #\\@ characters supplied"
 			    :control-string string
-			    :offset posn)
+			    :offset posn
+                            :references (list '(:ansi-cl :section (22 3))))
 		     (setf atsignp t)))
 		(t
 		 (when (and (char= (schar string (1- posn)) #\,)
@@ -1030,9 +1035,10 @@
 	     ;; situation.
 	     (error 'format-error
 		    :complaint "~D illegal directive~:P found inside justification block"
-		    :args (list count)))
+		    :args (list count)
+                    :references (list '(:ansi-cl :section (22 3 5 2)))))
 	   (expand-format-justification segments colonp atsignp
-				      first-semi params)))
+                                        first-semi params)))
      remaining)))
 
 (def-complex-format-directive #\> ()
@@ -1056,7 +1062,9 @@
 			      "cannot include format directives inside the ~
 			       ~:[suffix~;prefix~] segment of ~~<...~~:>"
 			      :args (list prefix-p)
-			      :offset (1- (format-directive-end directive)))
+			      :offset (1- (format-directive-end directive))
+                              :references
+                              (list '(:ansi-cl :section (22 3 5 2))))
 		       (apply #'concatenate 'string list)))))
 	(case (length segments)
 	  (0 (values prefix-default nil suffix-default))

@@ -1067,7 +1067,8 @@
 		  ;; situation.
 		  (error 'format-error
 			 :complaint "~D illegal directive~:P found inside justification block"
-			 :args (list count)))
+			 :args (list count)
+                         :references (list '(:ansi-cl :section (22 3 5 2)))))
 		(interpret-format-justification stream orig-args args
 						segments colonp atsignp
 						first-semi params))))

@@ -822,7 +822,8 @@
 (def!method print-object :around ((o reference-condition) s)
   (call-next-method)
   (unless (or *print-escape* *print-readably*)
-    (when *print-condition-references*
+    (when (and *print-condition-references*
+               (reference-condition-references o))
       (format s "~&See also:~%")
       (pprint-logical-block (s nil :per-line-prefix "  ")
 	(do* ((rs (reference-condition-references o) (cdr rs))

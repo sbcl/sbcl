@@ -17,12 +17,19 @@
 ;;; compiler, it will only be a style-warning.
 (define-condition format-too-many-args-warning (simple-warning) ())
 
-;;; OAOOM warning: see condition.lisp -- we want a full definition in
-;;; the cross-compiler as well, in order to have nice error messages
-;;; instead of complaints of undefined-function
+;;; KLUDGE: OAOOM warning: see condition.lisp -- we want a full
+;;; definition in the cross-compiler as well, in order to have nice
+;;; error messages instead of complaints of undefined-function
 ;;; ENCAPSULATED-CONDITION.
 (define-condition encapsulated-condition (condition)
   ((condition :initarg :condition :reader encapsulated-condition)))
+
+;;; KLUDGE: another OAOOM problem, this time to allow conditions with
+;;; REFERENCE-CONDITION in their supercondition list on the host.
+;;; (This doesn't feel like the entirely right solution, it has to be
+;;; said.)  -- CSR, 2004-09-15
+(define-condition reference-condition ()
+  ((references :initarg :references :reader reference-condition-references)))
 
 (define-condition bug (simple-error)
   ()
