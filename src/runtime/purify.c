@@ -1344,12 +1344,14 @@ purify(lispobj static_roots, lispobj read_only_roots)
     fflush(stdout);
 #endif
 
+#if (defined(LISP_FEATURE_GENCGC) && defined(LISP_FEATURE_X86))
     /* note this expects only one thread to be active.  We'd have to 
      * stop all the others in the same way as GC does if we wanted 
      * PURIFY to work when >1 thread exists */
     setup_i386_stack_scav(((&static_roots)-2),
 			  ((void *)all_threads->control_stack_end));
-    
+#endif
+
     pscav(&static_roots, 1, 0);
     pscav(&read_only_roots, 1, 1);
 
