@@ -105,9 +105,9 @@ ${TXTFILE}: ${FOFILE}
 .PHONY: clean
 clean: 
 	@rm -f *~ *.bak *.orig \#*\# .\#* texput.log
-	@rm -rf html ${PSFILE} ${HTMLFILE} html-stamp
-	@rm -f ${TMPFILES} ${FOFILE}
-	@rm -f  ${DVIFILE} ${TXTFILE}
+	@rm -rf html $(PSFILE) $(HTMLFILE) $(PDFFILE) html-stamp
+	@rm -f $(TMPFILES) $(FOFILE)
+	@rm -f  $(DVIFILE) $(TXTFILE)
 
 .PHONY: distclean
 distclean: clean
