@@ -138,6 +138,7 @@ F(sethostname)
 #endif
 F(setitimer)
 F(setpgrp)
+F(setsid)
 #if !defined(SVR4) ||  defined(SOLARIS25)
 F(setpriority)
 #endif

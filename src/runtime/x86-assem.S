@@ -141,7 +141,7 @@ GNAME(call_into_lisp_first_time):
 	pushl	%ebp		# Save old frame pointer.
 	movl	%esp,%ebp	# Establish new frame.
 	movl    %esp,ALIEN_STACK + SYMBOL_VALUE_OFFSET
-	movl    all_threads,%eax
+	movl    GNAME(all_threads),%eax
 	movl    THREAD_CONTROL_STACK_START_OFFSET(%eax) ,%esp
 	/* don't think too hard about what happens if we get interrupted
 	* here */
