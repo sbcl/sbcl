@@ -43,7 +43,7 @@
 ;;; Return a list of TNs that can be used to snapshot the dynamic
 ;;; state for use with the SAVE- and RESTORE-DYNAMIC-ENVIRONMENT VOPs.
 (!def-vm-support-routine make-dynamic-state-tns ()
-  (make-n-tns 3 *backend-t-primitive-type*))
+  (make-n-tns 2 *backend-t-primitive-type*))
 
 (define-vop (save-dynamic-state)
   (:results (catch :scs (descriptor-reg))
