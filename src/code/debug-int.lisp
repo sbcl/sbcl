@@ -1365,14 +1365,14 @@
 
 ;;;; operations on DEBUG-FUNCTIONs
 
+;;; Execute the forms in a context with block-var bound to each
+;;; debug-block in debug-function successively. Result is an optional
+;;; form to execute for return values, and DO-DEBUG-FUNCTION-BLOCKS
+;;; returns nil if there is no result form. This signals a
+;;; no-debug-blocks condition when the debug-function lacks
+;;; debug-block information.
 (defmacro do-debug-function-blocks ((block-var debug-function &optional result)
 				    &body body)
-  #!+sb-doc
-  "Executes the forms in a context with block-var bound to each debug-block in
-   debug-function successively. Result is an optional form to execute for
-   return values, and DO-DEBUG-FUNCTION-BLOCKS returns nil if there is no
-   result form. This signals a no-debug-blocks condition when the
-   debug-function lacks debug-block information."
   (let ((blocks (gensym))
 	(i (gensym)))
     `(let ((,blocks (debug-function-debug-blocks ,debug-function)))
@@ -1381,14 +1381,13 @@
 	 (let ((,block-var (svref ,blocks ,i)))
 	   ,@body)))))
 
+;;; Execute body in a context with var bound to each debug-var in
+;;; debug-function. This returns the value of executing result (defaults to
+;;; nil). This may iterate over only some of debug-function's variables or none
+;;; depending on debug policy; for example, possibly the compilation only
+;;; preserved argument information.
 (defmacro do-debug-function-variables ((var debug-function &optional result)
 				       &body body)
-  #!+sb-doc
-  "Executes body in a context with var bound to each debug-var in
-   debug-function. This returns the value of executing result (defaults to
-   nil). This may iterate over only some of debug-function's variables or none
-   depending on debug policy; for example, possibly the compilation only
-   preserved argument information."
   (let ((vars (gensym))
 	(i (gensym)))
     `(let ((,vars (debug-function-debug-vars ,debug-function)))
@@ -1399,11 +1398,10 @@
 	       ,@body))
 	   ,result))))
 
+;;; Return the Common Lisp function associated with the debug-function. This
+;;; returns nil if the function is unavailable or is non-existent as a user
+;;; callable function object.
 (defun debug-function-function (debug-function)
-  #!+sb-doc
-  "Returns the Common Lisp function associated with the debug-function. This
-   returns nil if the function is unavailable or is non-existent as a user
-   callable function object."
   (let ((cached-value (debug-function-%function debug-function)))
     (if (eq cached-value :unparsed)
 	(setf (debug-function-%function debug-function)
@@ -1430,10 +1428,9 @@
 		(bogus-debug-function nil)))
 	cached-value)))
 
+;;; Return the name of the function represented by debug-function. This may
+;;; be a string or a cons; do not assume it is a symbol.
 (defun debug-function-name (debug-function)
-  #!+sb-doc
-  "Returns the name of the function represented by debug-function. This may
-   be a string or a cons; do not assume it is a symbol."
   (etypecase debug-function
     (compiled-debug-function
      (sb!c::compiled-debug-function-name
@@ -1444,9 +1441,8 @@
     (bogus-debug-function
      (bogus-debug-function-%name debug-function))))
 
+;;; Return a debug-function that represents debug information for function.
 (defun function-debug-function (fun)
-  #!+sb-doc
-  "Returns a debug-function that represents debug information for function."
   (case (get-type fun)
     (#.sb!vm:closure-header-type
      (function-debug-function (%closure-function fun)))
@@ -1483,10 +1479,9 @@
 					  (get-header-data component))
 				       sb!vm:word-bytes)))))))
 
+;;; Return the kind of the function, which is one of :OPTIONAL,
+;;; :EXTERNAL, TOP-level, :CLEANUP, or NIL.
 (defun debug-function-kind (debug-function)
-  #!+sb-doc
-  "Returns the kind of the function which is one of :OPTIONAL, :EXTERNAL,
-   :TOP-level, :CLEANUP, or NIL."
   ;; FIXME: This "is one of" information should become part of the function
   ;; declamation, not just a doc string
   (etypecase debug-function
@@ -1499,19 +1494,17 @@
     (bogus-debug-function
      nil)))
 
+;;; Is there any variable information for DEBUG-FUNCTION?
 (defun debug-var-info-available (debug-function)
-  #!+sb-doc
-  "Is there any variable information for DEBUG-FUNCTION?"
   (not (not (debug-function-debug-vars debug-function))))
 
+;;; Return a list of debug-vars in debug-function having the same name
+;;; and package as symbol. If symbol is uninterned, then this returns
+;;; a list of debug-vars without package names and with the same name
+;;; as symbol. The result of this function is limited to the
+;;; availability of variable information in debug-function; for
+;;; example, possibly DEBUG-FUNCTION only knows about its arguments.
 (defun debug-function-symbol-variables (debug-function symbol)
-  #!+sb-doc
-  "Returns a list of debug-vars in debug-function having the same name
-   and package as symbol. If symbol is uninterned, then this returns a list of
-   debug-vars without package names and with the same name as symbol. The
-   result of this function is limited to the availability of variable
-   information in debug-function; for example, possibly debug-function only
-   knows about its arguments."
   (let ((vars (ambiguous-debug-vars debug-function (symbol-name symbol)))
 	(package (and (symbol-package symbol)
 		      (package-name (symbol-package symbol)))))
@@ -1524,11 +1517,12 @@
 		     (stringp (debug-var-package-name var))))
 	       vars)))
 
+;;; Return a list of debug-vars in debug-function whose names contain
+;;; name-prefix-string as an intial substring. The result of this
+;;; function is limited to the availability of variable information in
+;;; debug-function; for example, possibly debug-function only knows
+;;; about its arguments.
 (defun ambiguous-debug-vars (debug-function name-prefix-string)
-   "Returns a list of debug-vars in debug-function whose names contain
-    name-prefix-string as an intial substring. The result of this function is
-    limited to the availability of variable information in debug-function; for
-    example, possibly debug-function only knows about its arguments."
   (declare (simple-string name-prefix-string))
   (let ((variables (debug-function-debug-vars debug-function)))
     (declare (type (or null simple-vector) variables))
@@ -1569,24 +1563,25 @@
 			       (string= x y :end1 name-len :end2 name-len))))
 	      :end (or end (length variables)))))
 
+;;; Return a list representing the lambda-list for DEBUG-FUNCTION. The
+;;; list has the following structure:
+;;;   (required-var1 required-var2
+;;;    ...
+;;;    (:optional var3 suppliedp-var4)
+;;;    (:optional var5)
+;;;    ...
+;;;    (:rest var6) (:rest var7)
+;;;    ...
+;;;    (:keyword keyword-symbol var8 suppliedp-var9)
+;;;    (:keyword keyword-symbol var10)
+;;;    ...
+;;;   )
+;;; Each VARi is a DEBUG-VAR; however it may be the symbol :DELETED if
+;;; it is unreferenced in DEBUG-FUNCTION. This signals a
+;;; LAMBDA-LIST-UNAVAILABLE condition when there is no argument list
+;;; information.
 (defun debug-function-lambda-list (debug-function)
   #!+sb-doc
-  "Returns a list representing the lambda-list for debug-function. The list
-   has the following structure:
-      (required-var1 required-var2
-       ...
-       (:optional var3 suppliedp-var4)
-       (:optional var5)
-       ...
-       (:rest var6) (:rest var7)
-       ...
-       (:keyword keyword-symbol var8 suppliedp-var9)
-       (:keyword keyword-symbol var10)
-       ...
-      )
-   Each VARi is a DEBUG-VAR; however it may be the symbol :deleted it
-   is unreferenced in debug-function. This signals a lambda-list-unavailable
-   condition when there is no argument list information."
   (etypecase debug-function
     (compiled-debug-function
      (compiled-debug-function-lambda-list debug-function))

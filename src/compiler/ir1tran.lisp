@@ -2028,31 +2028,37 @@
 ;;; call FUN (with no arguments).
 ;;;
 ;;; This is split off from the IR1 convert method so that it can be
-;;; shared by the special-case top-level form processing code.
+;;; shared by the special-case top-level MACROLET processing code.
 (defun funcall-in-macrolet-lexenv (definitions fun)
   (declare (type list definitions) (type function fun))
-  (let ((whole (gensym "WHOLE"))
-	(environment (gensym "ENVIRONMENT")))
-    (collect ((new-fenv))
-      (dolist (def definitions)
-	(let ((name (first def))
-	      (arglist (second def))
-	      (body (cddr def)))
-	  (unless (symbolp name)
-	    (compiler-error "The local macro name ~S is not a symbol." name))
-	  (when (< (length def) 2)
-	    (compiler-error
-	     "The list ~S is too short to be a legal local macro definition."
-	     name))
-	  (multiple-value-bind (body local-decs)
-	      (parse-defmacro arglist whole body name 'macrolet
-			      :environment environment)
-	    (new-fenv `(,(first def) macro .
-			,(coerce `(lambda (,whole ,environment)
-				    ,@local-decs (block ,name ,body))
-				 'function))))))
-      (let ((*lexenv* (make-lexenv :functions (new-fenv))))
-	(funcall fun))))
+  (let* ((whole (gensym "WHOLE"))
+	 (environment (gensym "ENVIRONMENT"))
+	 (processed-definitions
+	  (mapcar (lambda (definition)
+		    (unless (list-of-length-at-least-p definition 2)
+		      (compiler-error
+		       "The list ~S is too short to be a legal ~
+                       local macro definition."
+		       definition))
+		    (destructuring-bind (name arglist &body body) definition
+		      (unless (symbolp name)
+			(compiler-error
+			 "The local macro name ~S is not a symbol." name))
+		      (multiple-value-bind (body local-decls)
+			  (parse-defmacro arglist whole body name 'macrolet
+					  :environment environment)
+			`(,name macro .
+				,(compile nil
+					  `(lambda (,whole ,environment)
+					     ,@local-decls
+					     (block ,name ,body)))))))
+		  definitions))
+	 (*lexenv* (make-lexenv :functions processed-definitions)))
+    (unless (= (length definitions)
+	       (length (remove-duplicates definitions :key #'first)))
+      (compiler-style-warning
+       "duplicate macro names in MACROLET ~S" definitions))
+    (funcall fun))
   (values))
 
 (def-ir1-translator macrolet ((definitions &rest body) start cont)
@@ -2070,7 +2076,7 @@
 ;;; then call FUN (with no arguments).
 ;;;
 ;;; This is split off from the IR1 convert method so that it can be
-;;; shared by the special-case top-level form processing code.
+;;; shared by the special-case top-level SYMBOL-MACROLET processing code.
 (defun funcall-in-symbol-macrolet-lexenv (macrobindings fun)
   (declare (type list macrobindings) (type function fun))
   (let ((processed-macrobindings
@@ -2081,13 +2087,14 @@
 		   (destructuring-bind (name expansion) macrobinding
 		     (unless (symbolp name)
 		       (compiler-error
-			"The symbol macro name ~S is not a symbol." name))
+			"The local symbol macro name ~S is not a symbol."
+			name))
 		     `(,name . (MACRO . ,expansion))))
 		 macrobindings)))
     (unless (= (length macrobindings)
 	       (length (remove-duplicates macrobindings :key #'first)))
       (compiler-style-warning
-       "duplicate names in SYMBOL-MACROLET ~S" macrobindings))
+       "duplicate symbol macro names in SYMBOL-MACROLET ~S" macrobindings))
     (let ((*lexenv* (make-lexenv :variables processed-macrobindings)))
       (funcall fun)))
   (values))

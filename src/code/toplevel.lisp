@@ -157,16 +157,16 @@
 
 (defconstant bytes-per-scrub-unit 2048)
 
+;;; Zero the unused portion of the control stack so that old objects are not
+;;; kept alive because of uninitialized stack variables.
+;;;
+;;; FIXME: Why do we need to do this instead of just letting GC read
+;;; the stack pointer and avoid messing with the unused portion of
+;;; the control stack? (Is this a multithreading thing where there's
+;;; one control stack and stack pointer per thread, and it might not
+;;; be easy to tell what a thread's stack pointer value is when
+;;; looking in from another thread?)
 (defun scrub-control-stack ()
-  #!+sb-doc
-  "Zero the unused portion of the control stack so that old objects are not
-   kept alive because of uninitialized stack variables."
-  ;; FIXME: Why do we need to do this instead of just letting GC read
-  ;; the stack pointer and avoid messing with the unused portion of
-  ;; the control stack? (Is this a multithreading thing where there's
-  ;; one control stack and stack pointer per thread, and it might not
-  ;; be easy to tell what a thread's stack pointer value is when
-  ;; looking in from another thread?)
   (declare (optimize (speed 3) (safety 0))
 	   (values (unsigned-byte 20))) ; FIXME: DECLARE VALUES?
 

@@ -92,9 +92,9 @@
 	(setf sb!eval::*eval-stack* new-stack)))
     (setf *eval-stack-top* new-sp)
     (let ((stack sb!eval::*eval-stack*))
-      (do ((i sp (1+ i))) ; FIXME: DOTIMES? or just :INITIAL-ELEMENT in MAKE-ARRAY?
+      (do ((i sp (1+ i))) ; FIXME: Use CL:FILL.
 	  ((= i new-sp))
-	(setf (svref stack i) '#:uninitialized))))
+	(setf (svref stack i) '#:uninitialized-eval-stack-element))))
   (values))
 
 (defun pop-eval-stack ()

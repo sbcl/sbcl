@@ -444,11 +444,17 @@
 			    timeout-secs &optional (timeout-usecs 0))
   #!+sb-doc
   "Perform the UNIX select(2) system call."
-  (declare (type (integer 0 #.FD-SETSIZE) num-descriptors)
+  ;; FIXME: These DECLAREs don't belong at macroexpansion time. They
+  ;; should be done at runtime instead. Perhaps we could just redo
+  ;; UNIX-FAST-SELECT as an inline function, and then all the
+  ;; declarations would work nicely.
+  #|
+  (declare (type (integer 0 #.fd-setsize) num-descriptors)
 	   (type (or (alien (* (struct fd-set))) null)
 		 read-fds write-fds exception-fds)
 	   (type (or null (unsigned-byte 31)) timeout-secs)
-	   (type (unsigned-byte 31) timeout-usecs) )
+	   (type (unsigned-byte 31) timeout-usecs))
+  |#
   ;; FIXME: CMU CL had
   ;;   (optimize (speed 3) (safety 0) (inhibit-warnings 3))
   ;; in the declarations above. If they're important, they should
