@@ -4,6 +4,12 @@
 @settitle asdf Manual
 @c %**end of header
 
+@c for install-info
+@dircategory Software development
+@direntry
+* asdf: (asdf).           another system definition facility
+@end direntry
+
 @copying
 This manual describes asdf, a system definition facility for Common
 Lisp programs and libraries.

@@ -9,8 +9,8 @@ changes in sbcl-0.8.14 relative to sbcl-0.8.13:
     work for CMUCL)
   * documentation: documentation for SB-BSD-SOCKETS, SB-GRAY, 
     SB-SIMPLE-STREAMS, and SB-PROFILE have been integrated into the user 
-    manual.
-    has been integrated into the user manual.
+    manual. 
+  * documentation: ASDF manual is now distributed with SBCL.
   * bug fix: SBCL can now load its contributed modules with REQUIRE
     even if the system-provided entries have been removed from
     ASDF:*CENTRAL-REGISTRY*. Infinite recursion in REQUIRE is also

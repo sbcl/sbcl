@@ -28,6 +28,7 @@ ensure_dirs $BUILD_ROOT$INSTALL_ROOT $BUILD_ROOT$INSTALL_ROOT/bin \
     $BUILD_ROOT$INSTALL_ROOT/lib  \
     $BUILD_ROOT$MAN_DIR $BUILD_ROOT$MAN_DIR/man1 \
     $BUILD_ROOT$INFO_DIR $BUILD_ROOT$DOC_DIR \
+    $BUILD_ROOT$DOC_DIR/html \
     $BUILD_ROOT$SBCL_HOME $BUILD_ROOT$SBCL_HOME/systems \
     $BUILD_ROOT$SBCL_HOME/site-systems
 
@@ -98,8 +99,8 @@ done
 # html
 for html in doc/manual/sbcl doc/manual/asdf
 do
-  test -d $html && cp -r $html $BUILD_ROOT$DOC_DIR/`basename $html` \
-      && echo " html $BUILD_ROOT$DOC_DIR/`basename $html`/index.html"
+  test -d $html && cp -r $html $BUILD_ROOT$DOC_DIR/html/`basename $html` \
+      && echo " html $BUILD_ROOT$DOC_DIR/html/`basename $html`/index.html"
 done
 
 for f in BUGS SUPPORT CREDITS COPYING NEWS
