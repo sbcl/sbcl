@@ -135,7 +135,7 @@
 	   (sxhash-recurse (x &optional (depthoid +max-hash-depthoid+))
 	     (declare (type index depthoid))
 	     (typecase x
-	       (list
+	       (cons
 		(if (plusp depthoid)
 		    (mix (sxhash-recurse (car x) (1- depthoid))
 			 (sxhash-recurse (cdr x) (1- depthoid)))
@@ -187,7 +187,7 @@
     (array (array-psxhash key depthoid))
     (hash-table (hash-table-psxhash key))
     (structure-object (structure-object-psxhash key depthoid))
-    (list (list-psxhash key depthoid))
+    (cons (list-psxhash key depthoid))
     (number (number-psxhash key))
     (character (sxhash (char-upcase key)))
     (t (sxhash key))))

@@ -1169,17 +1169,6 @@ WORKAROUND:
 229:
   (subtypep 'function '(function)) => nil, t.
 
-231: "SETQ does not correctly check the type of a variable being set"
-  b.
-    (defun foo (x z)
-      (declare (type integer x))
-      (locally (declare (type (real 1) x))
-        (setq x z))
-      (list x z))
-    (foo 0 0) => (0 0).
-
-  (fixed in 0.7.12.8)
-
 233: bugs in constraint propagation
   a.
   (defun foo (x)

@@ -1593,11 +1593,14 @@ changes in sbcl-0.7.14 relative to sbcl-0.7.13:
        types got intertwined, has been fixed;
     ** the type system is now able to reason about the interaction
        between INTEGER and RATIO types more completely;
-    ** APPEND checks its arguments for being proper lists;
+    ** APPEND, [N]REVERSE and NRECONC check that those their
+       arguments, which must be proper lists, are really so;
     ** An array specialized to be unable to hold elements has been
        implemented (as required -- yes, really) by ANSI;
     ** GETF and GET-PROPERTIES throw a TYPE-ERROR, not a SIMPLE-ERROR,
        on malformed property lists;
+  * fixed SXHASH, giving different results for NIL depending on type
+    declarations (SYMBOL or LIST). (thanks to Gerd Moellmann)
 
 planned incompatible changes in 0.7.x:
   * (not done yet, but planned:) When the profiling interface settles

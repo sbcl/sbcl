@@ -579,7 +579,7 @@
 
 (sb!xc:defmacro list-reverse-macro (sequence)
   `(do ((new-list ()))
-       ((atom ,sequence) new-list)
+       ((endp ,sequence) new-list)
      (push (pop ,sequence) new-list)))
 
 ) ; EVAL-WHEN
@@ -615,7 +615,7 @@
 		(aref ,sequence right-index)))))
 
 (sb!xc:defmacro list-nreverse-macro (list)
-  `(do ((1st (cdr ,list) (if (atom 1st) 1st (cdr 1st)))
+  `(do ((1st (cdr ,list) (if (endp 1st) 1st (cdr 1st)))
 	(2nd ,list 1st)
 	(3rd '() 2nd))
        ((atom 2nd) 3rd)

@@ -42,7 +42,7 @@
 ;;; versions which break binary compatibility. But it certainly should
 ;;; be incremented for release versions which break binary
 ;;; compatibility.
-(def!constant +fasl-file-version+ 39)
+(def!constant +fasl-file-version+ 40)
 ;;; (record of versions before 0.7.0 deleted in 0.7.1.41)
 ;;; 23 = sbcl-0.7.0.1 deleted no-longer-used EVAL-STACK stuff,
 ;;;      causing changes in *STATIC-SYMBOLS*.
@@ -78,6 +78,7 @@
 ;;; 38: (2003-01-05) changed names of internal SORT machinery
 ;;; 39: (2003-02-20) in 0.7.12.1 a slot was added to
 ;;;     DEFSTRUCT-SLOT-DESCRIPTION
+;;; 40: (2003-03-11) changed value of (SXHASH NIL)
 
 ;;; the conventional file extension for our fasl files
 (declaim (type simple-string *fasl-file-type*))
