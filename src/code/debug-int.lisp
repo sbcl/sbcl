@@ -828,8 +828,7 @@
 			   "undefined function"))
 			 (:foreign-function
 			  (make-bogus-debug-fun
-			   (format nil "foreign function call land: ra=#x~X"
-				   (sap-int ra))))
+			   (format nil "foreign function call land:")))
 			 ((nil)
 			  (make-bogus-debug-fun
 			   "bogus stack frame"))

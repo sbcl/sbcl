@@ -211,13 +211,3 @@
 	       "public: the default package for user code and data")
 #+sb-doc (setf (documentation (find-package "KEYWORD") t)
 	       "public: home of keywords")
-
-;;; KLUDGE: It'd be nicer to do this in the table with the other
-;;; non-standard packages. -- WHN 19991206
-#+sb-doc (setf (documentation (find-package "SB-SLOT-ACCESSOR-NAME") t)
-	       "private: home of CLOS slot accessor internal names")
-
-;;; FIXME: There doesn't seem to be any easy way to get package doc strings
-;;; through the cold boot process. They need to be set somewhere. Maybe the
-;;; easiest thing to do is to read them out of package-data-list.lisp-expr
-;;; now?
