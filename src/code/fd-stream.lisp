@@ -871,7 +871,6 @@
     (:element-type
      (fd-stream-element-type fd-stream))
     (:interactive-p
-      ;; FIXME: sb!unix:unix-isatty is undefined.
      (= 1 (the (member 0 1)
             (sb!unix:unix-isatty (fd-stream-fd fd-stream)))))
     (:line-length

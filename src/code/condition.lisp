@@ -682,6 +682,17 @@
        (let (lineno colno)
 	 (when (and pos
 		    (< pos sb!xc:array-dimension-limit)
+		    ;; KLUDGE: lseek() (which is what FILE-POSITION
+		    ;; reduces to on file-streams) is undefined on
+		    ;; "some devices", which in practice means that it
+		    ;; can claim to succeed on /dev/stdin on Darwin
+		    ;; and Solaris.  This is obviously bad news,
+		    ;; because the READ-SEQUENCE below will then
+		    ;; block, not complete, and the report will never
+		    ;; be printed.  As a workaround, we exclude
+		    ;; interactive streams from this attempt to report
+		    ;; positions.  -- CSR, 2003-08-21
+		    (not (interactive-stream-p error-stream))
 		    (file-position error-stream :start))
 	   (let ((string
 		  (make-string pos
