@@ -1237,9 +1237,16 @@
 	  (dolist (arg opt)
 	    (cond ((consp arg)
 		   (destructuring-bind
-		       (name &optional (def (nth-value 1 (get-slot name))))
+			 ;; FIXME: this shares some logic (though not
+			 ;; code) with the &key case below (and it
+			 ;; looks confusing) -- factor out the logic
+			 ;; if possible. - CSR, 2002-04-19
+			 (name
+			  &optional
+			  (def (nth-value 1 (get-slot name)))
+			  (supplied-test nil supplied-test-p))
 		       arg
-		     (arglist `(,name ,def))
+		     (arglist `(,name ,def ,@(if supplied-test-p `(,supplied-test) nil)))
 		     (vars name)
 		     (types (get-slot name))))
 		  (t
@@ -1254,14 +1261,20 @@
 	  (arglist '&key)
 	  (dolist (key keys)
 	    (if (consp key)
-		(destructuring-bind (wot &optional (def nil def-p)) key
+		(destructuring-bind (wot
+                                     &optional
+                                     (def nil def-p)
+                                     (supplied-test nil supplied-test-p))
+                    key
 		  (let ((name (if (consp wot)
 				  (destructuring-bind (key var) wot
 				    (declare (ignore key))
 				    var)
 				  wot)))
-		    (multiple-value-bind (type slot-def) (get-slot name)
-		      (arglist `(,wot ,(if def-p def slot-def)))
+		    (multiple-value-bind (type slot-def)
+                        (get-slot name)
+		      (arglist `(,wot ,(if def-p def slot-def)
+                                 ,@(if supplied-test-p `(,supplied-test) nil)))
 		      (vars name)
 		      (types type))))
 		(do-default key))))

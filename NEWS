@@ -1096,6 +1096,9 @@ changes in sbcl-0.7.3 relative to sbcl-0.7.2:
     that superficially look like logical namestrings correctly.
   * USER-HOMEDIR-PATHNAME now returns a (physical) pathname that SBCL
     can deal with.
+  * Bugfix in DEFSTRUCT: BOA constructor lambda lists now accept (name
+    default supplied-p) for &optional and &key arguments. (thanks to
+    Martin Atzmueller)
 
 planned incompatible changes in 0.7.x:
 * When the profiling interface settles down, maybe in 0.7.x, maybe

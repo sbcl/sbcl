@@ -177,13 +177,26 @@
 ;;; debugger is having a bad day
 (defvar *instance*)
   
-(defmacro test-variant (defstructname &key colontype)
+(defmacro test-variant (defstructname &key colontype boa-constructor-p)
   `(progn
 
      (format t "~&/beginning PROGN for COLONTYPE=~S~%" ',colontype)
 
      (defstruct (,defstructname
-		  ,@(when colontype `((:type ,colontype))))
+		  ,@(when colontype `((:type ,colontype)))
+                  ,@(when boa-constructor-p
+                          `((:constructor ,(symbol+ "CREATE-" defstructname)
+                             (id
+			      &optional
+			      (optional-test 2 optional-test-p)
+                              &key
+                              (home nil home-p)
+                              (no-home-comment "Home package CL not provided.")
+                              (comment (if home-p "" no-home-comment))
+                              (refcount (if optional-test-p optional-test nil))
+                              hash
+                              weight)))))
+       
        ;; some ordinary tagged slots
        id
        (home nil :type package :read-only t)
@@ -197,12 +210,19 @@
      (format t "~&/done with DEFSTRUCT~%")
 
      (let* ((cn (string+ ',defstructname "-")) ; conc-name
-	    (ctor (symbol-function (symbol+ "MAKE-" ',defstructname)))
+	    (ctor (symbol-function ',(symbol+ (if boa-constructor-p
+                                               "CREATE-"
+                                               "MAKE-")
+                                             defstructname)))
 	    (*instance* (funcall ctor
-				 :id "some id"
+				 ,@(unless boa-constructor-p
+                                           `(:id)) "some id"
+				 ,@(when boa-constructor-p
+					 '(1))
 				 :home (find-package :cl)
 				 :hash (+ 14 most-positive-fixnum)
-				 :refcount 1)))
+				 ,@(unless boa-constructor-p
+					   `(:refcount 1)))))
 
        ;; Check that ctor set up slot values correctly. 
        (format t "~&/checking constructed structure~%")
@@ -273,6 +293,10 @@
 (test-variant vanilla-struct)
 (test-variant vector-struct :colontype vector)
 (test-variant list-struct :colontype list)
+(test-variant vanilla-struct :boa-constructor-p t)
+(test-variant vector-struct :colontype vector :boa-constructor-p t)
+(test-variant list-struct :colontype list :boa-constructor-p t)
+
 
 ;;;; testing raw slots harder
 ;;;;

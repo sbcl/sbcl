@@ -1282,25 +1282,6 @@ WORKAROUND:
             do (foo (svref array i))) (svref array (1+ i)))
   (reported by Eric Marsden sbcl-devel 2002-04-15)
 
-159:
-  * (lisp-implementation-version)
-  "0.7.2.6"
-  * (defstruct (foo
-                (:constructor make-foo (&key (bar nil bar-p)
-                                        &aux (baz (if bar-p bar 2)))))
-
-      bar
-      baz)
-  debugger invoked on condition of type SB-KERNEL::ARG-COUNT-ERROR:
-    error while parsing arguments to DESTRUCTURING-BIND:
-      invalid number of elements in
-        (BAR NIL BAR-P)
-      to satisfy lambda list
-        (SB-KERNEL::WOT &OPTIONAL (SB-KERNEL::DEF NIL SB-KERNEL::DEF-P)):
-      between 1 and 2 expected, but 3 found
-  (reported by Christophe Rhodes and Martin Atzmueller sbcl-devel
-  2002-05-15)
-
 162:
   (reported by Robert E. Brown 2002-04-16) 
   When a function is called with too few arguments, causing the
