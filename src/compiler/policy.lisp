@@ -24,7 +24,6 @@
 
 (eval-when (#-sb-xc-host :compile-toplevel :load-toplevel :execute)
   (defstruct policy-dependent-quality
-    dummy
     name
     expression
     getter
