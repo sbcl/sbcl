@@ -53,7 +53,7 @@
 
 (def!method print-object ((x ctran) stream)
   (print-unreadable-object (x stream :type t :identity t)
-    (format stream " #~D" (cont-num x))))
+    (format stream "~D" (cont-num x))))
 
 ;;; Linear VARiable. Multiple-value (possibly of unknown number)
 ;;; temporal storage.
@@ -83,10 +83,10 @@
 
 (def!method print-object ((x lvar) stream)
   (print-unreadable-object (x stream :type t :identity t)
-    (format stream " #~D" (cont-num x))))
+    (format stream "~D" (cont-num x))))
 
 (def!struct (node (:constructor nil)
-		 (:copier nil))
+		  (:copier nil))
   ;; unique ID for debugging
   #!+sb-show (id (new-object-id) :read-only t)
   ;; True if this node needs to be optimized. This is set to true
@@ -137,9 +137,9 @@
   (tail-p nil :type boolean))
 
 (def!struct (valued-node (:conc-name node-)
-                        (:include node)
-                        (:constructor nil)
-                        (:copier nil))
+			 (:include node)
+			 (:constructor nil)
+			 (:copier nil))
   ;; the bottom-up derived type for this node.
   (derived-type *wild-type* :type ctype)
   ;; Lvar, receiving the values, produced by this node. May be NIL if
@@ -192,10 +192,10 @@
 ;;; numbering in the debug-info (though that is relative to the start
 ;;; of the function.)
 (def!struct (cblock (:include sset-element)
-		   (:constructor make-block (start))
-		   (:constructor make-block-key)
-		   (:conc-name block-)
-		   (:predicate block-p))
+		    (:constructor make-block (start))
+		    (:constructor make-block-key)
+		    (:conc-name block-)
+		    (:predicate block-p))
   ;; a list of all the blocks that are predecessors/successors of this
   ;; block. In well-formed IR1, most blocks will have one successor.
   ;; The only exceptions are:
@@ -260,7 +260,7 @@
 ;;; different BLOCK-INFO annotation structures so that code
 ;;; (specifically control analysis) can be shared.
 (def!struct (block-annotation (:constructor nil)
-			     (:copier nil))
+			      (:copier nil))
   ;; The IR1 block that this block is in the INFO for.
   (block (missing-arg) :type cblock)
   ;; the next and previous block in emission order (not DFO). This
@@ -534,9 +534,11 @@
 ;;; non-local exits. This is effectively an annotation on the
 ;;; continuation, although it is accessed by searching in the
 ;;; PHYSENV-NLX-INFO.
-(def!struct (nlx-info (:constructor make-nlx-info
-                                    (cleanup exit &aux (lvar (node-lvar exit))))
-                      (:make-load-form-fun ignore-it))
+(def!struct (nlx-info
+	     (:constructor make-nlx-info (cleanup
+					  exit
+					  &aux (lvar (node-lvar exit))))
+	     (:make-load-form-fun ignore-it))
   ;; the cleanup associated with this exit. In a catch or
   ;; unwind-protect, this is the :CATCH or :UNWIND-PROTECT cleanup,
   ;; and not the cleanup for the escape block. The CLEANUP-KIND of
@@ -1118,12 +1120,12 @@
 ;;; initially (and forever) NIL, since REFs don't receive any values
 ;;; and don't have any IR1 optimizer.
 (def!struct (ref (:include valued-node (reoptimize nil))
-		(:constructor make-ref
-                              (leaf
-                               &aux (leaf-type (leaf-type leaf))
-                                    (derived-type
-                                     (make-single-value-type leaf-type))))
-		(:copier nil))
+		 (:constructor make-ref
+			       (leaf
+				&aux (leaf-type (leaf-type leaf))
+				(derived-type
+				 (make-single-value-type leaf-type))))
+		 (:copier nil))
   ;; The leaf referenced.
   (leaf nil :type leaf))
 (defprinter (ref :identity t)
@@ -1132,10 +1134,10 @@
 
 ;;; Naturally, the IF node always appears at the end of a block.
 (def!struct (cif (:include node)
-		(:conc-name if-)
-		(:predicate if-p)
-		(:constructor make-if)
-		(:copier copy-if))
+		 (:conc-name if-)
+		 (:predicate if-p)
+		 (:constructor make-if)
+		 (:copier copy-if))
   ;; LVAR for the predicate
   (test (missing-arg) :type lvar)
   ;; the blocks that we execute next in true and false case,
@@ -1150,10 +1152,10 @@
 (def!struct (cset (:include valued-node
 			   (derived-type (make-single-value-type
                                           *universal-type*)))
-		 (:conc-name set-)
-		 (:predicate set-p)
-		 (:constructor make-set)
-		 (:copier copy-set))
+		  (:conc-name set-)
+		  (:predicate set-p)
+		  (:constructor make-set)
+		  (:copier copy-set))
   ;; descriptor for the variable set
   (var (missing-arg) :type basic-var)
   ;; LVAR for the value form
@@ -1167,8 +1169,8 @@
 ;;; node appears at the end of its block and the body of the called
 ;;; function appears as the successor; the NODE-LVAR is null.
 (def!struct (basic-combination (:include valued-node)
-			      (:constructor nil)
-			      (:copier nil))
+			       (:constructor nil)
+			       (:copier nil))
   ;; LVAR for the function
   (fun (missing-arg) :type lvar)
   ;; list of LVARs for the args. In a local call, an argument lvar may
@@ -1194,8 +1196,8 @@
 ;;; including FUNCALL. This is distinct from BASIC-COMBINATION so that
 ;;; an MV-COMBINATION isn't COMBINATION-P.
 (def!struct (combination (:include basic-combination)
-			(:constructor make-combination (fun))
-			(:copier nil)))
+			 (:constructor make-combination (fun))
+			 (:copier nil)))
 (defprinter (combination :identity t)
   #!+sb-show id
   (fun :prin1 (lvar-uses fun))
@@ -1209,8 +1211,8 @@
 ;;; FUNCALL. This is used to implement all the multiple-value
 ;;; receiving forms.
 (def!struct (mv-combination (:include basic-combination)
-			   (:constructor make-mv-combination (fun))
-			   (:copier nil)))
+			    (:constructor make-mv-combination (fun))
+			    (:copier nil)))
 (defprinter (mv-combination)
   (fun :prin1 (lvar-uses fun))
   (args :prin1 (mapcar #'lvar-uses args)))
@@ -1218,7 +1220,7 @@
 ;;; The BIND node marks the beginning of a lambda body and represents
 ;;; the creation and initialization of the variables.
 (def!struct (bind (:include node)
-		 (:copier nil))
+		  (:copier nil))
   ;; the lambda we are binding variables for. Null when we are
   ;; creating the LAMBDA during IR1 translation.
   (lambda nil :type (or clambda null)))
@@ -1230,10 +1232,10 @@
 ;;; is also where we stick information used for TAIL-SET type
 ;;; inference.
 (def!struct (creturn (:include node)
-		    (:conc-name return-)
-		    (:predicate return-p)
-		    (:constructor make-return)
-		    (:copier copy-return))
+		     (:conc-name return-)
+		     (:predicate return-p)
+		     (:constructor make-return)
+		     (:copier copy-return))
   ;; the lambda we are returning from. Null temporarily during
   ;; ir1tran.
   (lambda nil :type (or clambda null))
@@ -1252,7 +1254,7 @@
 ;;; TYPE-TO-CHECK is performed and then the VALUE is declared to be of
 ;;; type ASSERTED-TYPE.
 (def!struct (cast (:include valued-node)
-                 (:constructor %make-cast))
+		  (:constructor %make-cast))
   (asserted-type (missing-arg) :type ctype)
   (type-to-check (missing-arg) :type ctype)
   ;; an indication of what we have proven about how this type
@@ -1284,7 +1286,7 @@
 ;;; lexical exit. It is the mess-up node for the corresponding :ENTRY
 ;;; cleanup.
 (def!struct (entry (:include node)
-		  (:copier nil))
+		   (:copier nil))
   ;; All of the EXIT nodes for potential non-local exits to this point.
   (exits nil :type list)
   ;; The cleanup for this entry. NULL only temporarily.
@@ -1300,7 +1302,7 @@
 ;;; lvar is the exit node's LVAR; physenv analysis also makes it the
 ;;; lvar of %NLX-ENTRY call.
 (def!struct (exit (:include valued-node)
-		 (:copier nil))
+		  (:copier nil))
   ;; the ENTRY node that this is an exit for. If null, this is a
   ;; degenerate exit. A degenerate exit is used to "fill" an empty
   ;; block (which isn't allowed in IR1.) In a degenerate exit, Value

@@ -1994,3 +1994,65 @@ WORKAROUND:
       we end up with a segfault.
     bug 367b: Comment out the (DECLAIM (FTYPE ... R367)), and compile 
       the file. The compiler fails with TYPE-ERROR at compile time.
+
+368: miscompiled OR (perhaps related to bug 367)
+  Trying to relax type declarations to find a workaround for bug 367,
+  it turns out that even when the return type isn't declared (or 
+  declared to be T, anyway) the system remains confused about type 
+  inference in code similar to that for bug 367:
+    (in-package :cl-user)
+    (declaim (optimize (safety 3) (debug 2) (speed 2) (space 1)))
+    (defstruct e368)
+    (defstruct i368)
+    (defstruct g368
+      (i368s (make-array 0 :fill-pointer t) :type (or (vector i368) null)))
+    (defstruct s368
+      (g368 (error "missing :G368") :type g368 :read-only t))
+    (declaim (ftype (function (fixnum (vector i368) e368) t) r368))
+    (declaim (ftype (function (fixnum (vector e368)) t) h368))
+    (defparameter *h368-was-called-p* nil)
+    (defun nsu (vertices e368)
+      (let ((i368s (g368-i368s (make-g368))))
+        (let ((fuis (r368 0 i368s e368)))
+          (format t "~&FUIS=~S~%" fuis)
+          (or fuis (h368 0 i368s)))))
+    (defun r368 (w x y)
+      (declare (ignore w x y))
+      nil)
+    (defun h368 (w x)
+      (declare (ignore w x))
+      (setf *h368-was-called-p* t)
+      (make-s368 :g368 (make-g368)))
+    (trace r368 h368)
+    (format t "~&calling NSU~%")
+    (let ((nsu (nsu #() (make-e368))))
+      (format t "~&NSU returned ~S~%" nsu)
+      (format t "~&*H368-WAS-CALLED-P*=~S~%" *h368-was-called-p*)
+      (assert (s368-p nsu))
+      (assert *h368-was-called-p*))
+  In sbcl-0.8.18, both ASSERTs fail, and (DISASSEMBLE 'NSU) shows
+  that no call to H368 is compiled.
+
+369: unlike-an-intersection behavior of VALUES-TYPE-INTERSECTION
+  In sbcl-0.8.18.2, the identity $(x \cap y \cap y)=(x \cap y)$ 
+  does not hold for VALUES-TYPE-INTERSECTION, even for types which
+  can be intersected exactly, so that ASSERTs fail in this test case:
+    (in-package :cl-user)
+    (let ((types (mapcar #'sb-c::values-specifier-type 
+                         '((values (vector package) &optional)
+                           (values (vector package) &rest t)
+                           (values (vector hash-table) &rest t)
+                           (values (vector hash-table) &optional)
+                           (values t &optional)
+                           (values t &rest t)
+                           (values nil &optional)
+                           (values nil &rest t)
+                           (values sequence &optional)
+                           (values sequence &rest t)
+                           (values list &optional)
+                           (values list &rest t)))))
+       (dolist (x types)
+         (dolist (y types)
+           (let ((i (sb-c::values-type-intersection x y)))
+             (assert (sb-c::type= i (sb-c::values-type-intersection i x)))
+             (assert (sb-c::type= i (sb-c::values-type-intersection i y)))))))
