@@ -319,12 +319,12 @@ interrupt_handle_now(int signal, siginfo_t *info, void *void_context)
      * rounding modes are under user control, then perhaps we should
      * leave this up to the user.)
      *
-     * For now we just suppress this code completely (just like the
+     * In the absence of a test case to show that this is really a
+     * problem, we just suppress this code completely (just like the
      * parallel code in maybe_now_maybe_later).
      * #ifdef __linux__
      *    SET_FPU_CONTROL_WORD(context->__fpregs_mem.cw);
-     * #endif
-     */
+     * #endif */
 
     handler = interrupt_handlers[signal];
 
@@ -405,8 +405,7 @@ maybe_now_maybe_later(int signal, siginfo_t *info, void *void_context)
      * For now, we just suppress this code completely.
      * #ifdef __linux__
      *    SET_FPU_CONTROL_WORD(context->__fpregs_mem.cw);
-     * #endif
-     */
+     * #endif */
 
     if (SymbolValue(INTERRUPTS_ENABLED) == NIL) {
 

@@ -467,9 +467,10 @@
       (and *byte-compile* *byte-compiling*)))
 
 ;;; Delete components with no external entry points before we try to
-;;; generate code. Unreachable closures can cause IR2 conversion to puke on
-;;; itself, since it is the reference to the closure which normally causes the
-;;; components to be combined. This doesn't really cover all cases...
+;;; generate code. Unreachable closures can cause IR2 conversion to
+;;; puke on itself, since it is the reference to the closure which
+;;; normally causes the components to be combined. This doesn't really
+;;; cover all cases...
 (defun delete-if-no-entries (component)
   (dolist (fun (component-lambdas component)
 	       (delete-component component))
@@ -1448,9 +1449,9 @@
 ;;; out of the compile, then abort the writing of the output file, so
 ;;; we don't overwrite it with known garbage.
 (defun sb!xc:compile-file
-    (source
+    (input-file
      &key
-     (output-file t) ; FIXME: ANSI says this should be a pathname designator.
+     (output-file (cfp-output-file-default input-file))
      ;; FIXME: ANSI doesn't seem to say anything about
      ;; *COMPILE-VERBOSE* and *COMPILE-PRINT* being rebound by this
      ;; function..
@@ -1461,9 +1462,9 @@
      ((:entry-points *entry-points*) nil)
      ((:byte-compile *byte-compile*) *byte-compile-default*))
   #!+sb-doc
-  "Compile SOURCE, producing a corresponding FASL file. 
+  "Compile INPUT-FILE, producing a corresponding fasl file. 
    :Output-File
-      The name of the fasl to output, NIL for none, T for the default.
+      The name of the fasl to output.
    :Block-Compile
       Determines whether multiple functions are compiled together as a unit,
       resolving function references at compile time. NIL means that global
@@ -1486,7 +1487,6 @@
 	 (compile-won nil)
 	 (warnings-p nil)
 	 (failure-p t) ; T in case error keeps this from being set later
-
 	 ;; KLUDGE: The listifying and unlistifying in the next calls
 	 ;; is to interface to old CMU CL code which accepted and
 	 ;; returned lists of multiple source files. It would be
@@ -1494,18 +1494,17 @@
 	 ;; VERIFY-SOURCE-FILE, accepting a single source file, and
 	 ;; do a similar transformation on MAKE-FILE-SOURCE-INFO too.
 	 ;; -- WHN 20000201
-	 (source (first (verify-source-files (list source))))
-	 (source-info (make-file-source-info (list source))))
+	 (input-pathname (first (verify-source-files (list input-file))))
+	 (source-info (make-file-source-info (list input-pathname))))
     (unwind-protect
 	(progn
 	  (when output-file
 	    (setq output-file-name
-		  (sb!xc:compile-file-pathname source
-					       :output-file output-file
-					       :byte-compile *byte-compile*))
+		  (sb!xc:compile-file-pathname input-file
+					       :output-file output-file))
 	    (setq fasl-file
 		  (open-fasl-file output-file-name
-				  (namestring source)
+				  (namestring input-pathname)
 				  (eq *byte-compile* t))))
 
 	  (when sb!xc:*compile-verbose*
@@ -1534,22 +1533,35 @@
 	    warnings-p
 	    failure-p)))
 
-(defun sb!xc:compile-file-pathname (file-path
-				    &key (output-file t) byte-compile
+;;; a helper function for COMPILE-FILE-PATHNAME: the default for
+;;; the OUTPUT-FILE argument
+;;;
+;;; ANSI: The defaults for the OUTPUT-FILE are taken from the pathname
+;;; that results from merging the INPUT-FILE with the value of
+;;; *DEFAULT-PATHNAME-DEFAULTS*, except that the type component should
+;;; default to the appropriate implementation-defined default type for
+;;; compiled files.
+(defun cfp-output-file-default (input-file)
+  (let* ((output-type (make-pathname :type *backend-fasl-file-type*))
+	 (merge1 (merge-pathnames output-type input-file))
+	 (merge2 (merge-pathnames merge1 *default-pathname-defaults*)))
+    merge2))
+	
+;;; KLUDGE: Part of the ANSI spec for this seems contradictory:
+;;;   If INPUT-FILE is a logical pathname and OUTPUT-FILE is unsupplied,
+;;;   the result is a logical pathname. If INPUT-FILE is a logical
+;;;   pathname, it is translated into a physical pathname as if by
+;;;   calling TRANSLATE-LOGICAL-PATHNAME.
+;;; So I haven't really tried to make this precisely ANSI-compatible
+;;; at the level of e.g. whether it returns logical pathname or a
+;;; physical pathname. Patches to make it more correct are welcome.
+;;; -- WHN 2000-12-09
+(defun sb!xc:compile-file-pathname (input-file
+				    &key
+				    (output-file (cfp-output-file-default
+						  input-file))
 				    &allow-other-keys)
   #!+sb-doc
   "Return a pathname describing what file COMPILE-FILE would write to given
    these arguments."
-  (declare (values (or null pathname)))
-  (let ((pathname (pathname file-path)))
-    (cond ((not (eq output-file t))
-	   (when output-file
-	     (translate-logical-pathname (pathname output-file))))
-	  ((and (typep pathname 'logical-pathname) (not (eq byte-compile t)))
-	   (make-pathname :type "FASL" :defaults pathname
-			  :case :common))
-	  (t
-	   (make-pathname :defaults (translate-logical-pathname pathname)
-			  :type (if (eq byte-compile t)
-				    (backend-byte-fasl-file-type)
-				    *backend-fasl-file-type*))))))
+  (pathname output-file))

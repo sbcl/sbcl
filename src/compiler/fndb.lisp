@@ -1009,9 +1009,9 @@
 
 ;;;; from the "File System Interface" chapter:
 
-;;; No pathname functions are foldable because they all potentially
+;;; (No pathname functions are FOLDABLE because they all potentially
 ;;; depend on *DEFAULT-PATHNAME-DEFAULTS*, e.g. to provide a default
-;;; host when parsing a namestring.
+;;; host when parsing a namestring.)
 
 (defknown wild-pathname-p (pathname-designator
 			   &optional

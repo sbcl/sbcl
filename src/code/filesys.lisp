@@ -979,13 +979,11 @@
 
 (/show0 "filesys.lisp 934")
 
-(defun !filesys-cold-init ()
-  (/show0 "entering !FILESYS-COLD-INIT")
-  (setf *default-pathname-defaults*
-	(%make-pathname *unix-host* nil nil nil nil :newest))
-  (setf (search-list "default:") (default-directory))
-  (/show0 "leaving !FILESYS-COLD-INIT")
-  nil)
+(/show0 "entering what used to be !FILESYS-COLD-INIT")
+(defvar *default-pathname-defaults*
+  (%make-pathname *unix-host* nil nil nil nil :newest))
+(setf (search-list "default:") (default-directory))
+(/show0 "leaving what used to be !FILESYS-COLD-INIT")
 
 (defun ensure-directories-exist (pathspec &key verbose (mode #o777))
   #!+sb-doc

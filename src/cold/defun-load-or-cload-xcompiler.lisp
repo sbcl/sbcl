@@ -22,17 +22,17 @@
   ;; compilation of the target.
   (let ((package-name "SB-XC"))
     (make-package package-name :use nil :nicknames nil)
-    (dolist (name '("*COMPILE-FILE-PATHNAME*"
-		    "*COMPILE-FILE-TRUENAME*"
-		    "*COMPILE-PRINT*"
-		    "*COMPILE-VERBOSE*"
-		    "ARRAY-RANK-LIMIT"
+    (dolist (name '("ARRAY-RANK-LIMIT"
 		    "ARRAY-DIMENSION-LIMIT"
 		    "ARRAY-TOTAL-SIZE-LIMIT"
 		    "BUILT-IN-CLASS"
 		    "CLASS" "CLASS-NAME" "CLASS-OF"
 		    "COMPILE-FILE"
 		    "COMPILE-FILE-PATHNAME"
+		    "*COMPILE-FILE-PATHNAME*"
+		    "*COMPILE-FILE-TRUENAME*"
+		    "*COMPILE-PRINT*"
+		    "*COMPILE-VERBOSE*"
 		    "COMPILER-MACRO-FUNCTION"
 		    "CONSTANTP"
 		    "DEFCONSTANT"

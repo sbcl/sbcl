@@ -20,20 +20,18 @@
   "Return a string describing the supporting software."
   (values "Linux"))
 
+(defvar *software-version* nil)
+
 (defun software-version ()
   #!+sb-doc
   "Return a string describing version of the supporting software, or NIL
   if not available."
-  ;; The old CMU CL code is NILed out here. If we wanted to do this, we should
-  ;; probably either use "/bin/uname -r", but since in any case we don't have
-  ;; RUN-PROGRAM working right now (sbcl-0.6.4), for now we just punt,
-  ;; returning NIL.
-  #+nil
-  (string-trim '(#\newline)
-	       (with-output-to-string (stream)
-		 (run-program "/usr/cs/etc/version" ; Site dependent???
-			      nil :output stream)))
-  nil)
+  (or *software-version*
+      (setf *software-version*
+	    (string-trim '(#\newline)
+			 (with-output-to-string (stream)
+			   (sb!ext:run-program "/bin/uname" `("-r")
+					       :output stream))))))
 
 ;;; OS-COLD-INIT-OR-REINIT initializes our operating-system interface.
 ;;; It sets the values of the global port variables to what they

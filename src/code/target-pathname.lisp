@@ -216,9 +216,6 @@
 
 ;;;; pathname functions
 
-;;; implementation-determined defaults to pathname slots
-(defvar *default-pathname-defaults*)
-
 (defun pathname= (pathname1 pathname2)
   (declare (type pathname pathname1)
 	   (type pathname pathname2))
@@ -627,7 +624,9 @@ a host-structure or string."
 	nil)))
 
 (defun parse-namestring (thing
-			 &optional host (defaults *default-pathname-defaults*)
+			 &optional
+			 host
+			 (defaults *default-pathname-defaults*)
 			 &key (start 0) end junk-allowed)
   #!+sb-doc
   "Converts pathname, a pathname designator, into a pathname structure,
@@ -712,7 +711,8 @@ a host-structure or string."
 	   pathname)))))
 
 (defun enough-namestring (pathname
-			  &optional (defaults *default-pathname-defaults*))
+			  &optional
+			  (defaults *default-pathname-defaults*))
   #!+sb-doc
   "Returns an abbreviated pathname sufficent to identify the pathname relative
    to the defaults."

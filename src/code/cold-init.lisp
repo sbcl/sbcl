@@ -199,7 +199,6 @@
   (setf *type-system-initialized* t)
 
   (show-and-call os-cold-init-or-reinit)
-  (show-and-call !filesys-cold-init)
 
   (show-and-call stream-cold-init-or-reset)
   (show-and-call !loader-cold-init)

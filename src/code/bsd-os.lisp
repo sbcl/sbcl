@@ -18,19 +18,18 @@
        #!+FreeBSD "FreeBSD"
        #!+OpenBSD "OpenBSD"))
 
+(defvar *software-version* nil)
+
 (defun software-version ()
   #!+sb-doc
   "Return a string describing version of the supporting software, or NIL
    if not available."
-  #+nil ; won't work until we support RUN-PROGRAM..
-  (unless *software-version*
-    (setf *software-version*
-	  (string-trim '(#\newline)
-		       (with-output-to-string (stream)
-			 (run-program "/usr/bin/uname"
-				      '("-r")
-				      :output stream)))))
-  nil)
+  (or *software-version*
+      (setf *software-version*
+	    (string-trim '(#\newline)
+			 (with-output-to-string (stream)
+			   (sb!ext:run-program "/usr/bin/uname" `("-r")
+					       :output stream))))))
 
 ;;; OS-COLD-INIT-OR-REINIT initializes our operating-system interface.
 ;;; It sets the values of the global port variables to what they
