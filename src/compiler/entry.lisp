@@ -81,7 +81,7 @@
 ;;;
 ;;; We deliberately don't use the normal reference deletion, since we
 ;;; don't want to trigger deletion of the XEP (although it shouldn't
-;;; hurt, since this is called after Component is compiled.) Instead,
+;;; hurt, since this is called after COMPONENT is compiled.) Instead,
 ;;; we just clobber the REF-LEAF.
 (defun replace-top-level-xeps (component)
   (let ((res nil))

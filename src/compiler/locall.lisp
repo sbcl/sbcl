@@ -253,7 +253,7 @@
 ;;; Note that there is a lot of action going on behind the scenes
 ;;; here, triggered by reference deletion. In particular, the
 ;;; COMPONENT-LAMBDAS are being hacked to remove newly deleted and let
-;;; converted lambdas, so it is important that the lambda is added to
+;;; converted LAMBDAs, so it is important that the LAMBDA is added to
 ;;; the COMPONENT-LAMBDAS when it is. Also, the
 ;;; COMPONENT-NEW-FUNCTIONS may contain all sorts of drivel, since it
 ;;; is not updated when we delete functions, etc. Only
@@ -281,7 +281,25 @@
 
   (values))
 
-;;; If policy is auspicious, CALL is not in an XEP, and we don't seem
+(defun local-call-analyze-until-done (clambdas)
+  (loop
+   (/show "at head of LOCAL-CALL-ANALYZE-UNTIL-DONE loop")
+   (let ((did-something nil))
+     (dolist (clambda clambdas)
+       (let* ((component (block-component (node-block (lambda-bind clambda))))
+	      (*all-components* (list component)))
+	 ;; The original CMU CL code seemed to implicitly assume that
+	 ;; COMPONENT is the only one here. Let's make that explicit.
+	 (aver (= 1 (length (functional-components clambda))))
+	 (aver (eql component (first (functional-components clambda))))
+	 (when (component-new-functions component)
+	   (setf did-something t)
+	   (local-call-analyze component))))
+     (unless did-something
+       (return))))
+  (values))
+
+;;; If policy is auspicious and CALL is not in an XEP and we don't seem
 ;;; to be in an infinite recursive loop, then change the reference to
 ;;; reference a fresh copy. We return whichever function we decide to
 ;;; reference.

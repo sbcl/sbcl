@@ -976,29 +976,16 @@
     ;; the :LOCALL-ONLY option to IR1-FOR-LAMBDA. Then maybe the
     ;; whole FUNCTIONAL-KIND=:TOP-LEVEL case could go away..)
 
-    (loop
-     (/show "at head of locall loop")
-     (let ((did-something nil))
-       (let ((*all-components* (functional-components fun)))
-         (dolist (component *all-components*)
-           (when (component-new-functions component)
-	     (/show "non-null COMPONENT-NEW-FUNCTIONS")
-             (/noshow (component-new-functions component))
-             (setf did-something t)
-             (local-call-analyze component))))
-       (unless did-something (return))))
+    (/show "about to LOCAL-CALL-ANALYZE-UNTIL-DONE")
+    (local-call-analyze-until-done (list fun))
 
     (multiple-value-bind (components-from-dfo top-components hairy-top)
         (find-initial-dfo (list fun))
 
       (let ((*all-components* (append components-from-dfo top-components)))
         (/noshow components-from-dfo top-components *all-components*)
-        ;; FIXME: I dunno whether we actually need to do
-        ;; PRE-ENVIRONMENT-ANALYZE-TOP-LEVEL for its side-effects
-        ;; like this. (In the original SUB-COMPILE-TOP-LEVEL-LAMBDAS
-        ;; it was used for its return value.)
-        (mapc #'pre-environment-analyze-top-level
-              (append hairy-top top-components))
+	(mapc #'preallocate-environments-for-top-levelish-lambdas
+	      (append hairy-top top-components))
         (dolist (component-from-dfo components-from-dfo)
           (/show "compiling a COMPONENT-FROM-DFO")
           (compile-component component-from-dfo)
@@ -1324,25 +1311,16 @@
 	  (object-call-top-level-lambda (elt lambdas loser))))))
   (values))
 
-;;; Compile LAMBDAS (a list of the lambda expressions for top-level
-;;; forms) into the object file. We loop doing local call analysis
-;;; until it converges, since a single pass might miss something due
-;;; to components being joined by LET conversion.
+;;; Compile LAMBDAS (a list of CLAMBDAs for top-level forms) into the
+;;; object file. 
 ;;;
 ;;; LOAD-TIME-VALUE-P seems to control whether it's MAKE-LOAD-FORM and
 ;;; COMPILE-LOAD-TIME-VALUE stuff. -- WHN 20000201
 (defun compile-top-level (lambdas load-time-value-p)
   (declare (list lambdas))
+
   (maybe-mumble "locall ")
-  (loop
-    (let ((did-something nil))
-      (dolist (lambda lambdas)
-	(let* ((component (block-component (node-block (lambda-bind lambda))))
-	       (*all-components* (list component)))
-	  (when (component-new-functions component)
-	    (setq did-something t)
-	    (local-call-analyze component))))
-      (unless did-something (return))))
+  (local-call-analyze-until-done lambdas)
 
   (maybe-mumble "IDFO ")
   (multiple-value-bind (components top-components hairy-top)

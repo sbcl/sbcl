@@ -165,8 +165,8 @@
 
 (defconstant bytes-per-scrub-unit 2048)
 
-;;; Zero the unused portion of the control stack so that old objects are not
-;;; kept alive because of uninitialized stack variables.
+;;; Zero the unused portion of the control stack so that old objects
+;;; are not kept alive because of uninitialized stack variables.
 ;;;
 ;;; FIXME: Why do we need to do this instead of just letting GC read
 ;;; the stack pointer and avoid messing with the unused portion of

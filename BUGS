@@ -389,9 +389,6 @@ WORKAROUND:
 
 49:
   LOOP bugs reported by Peter Van Eynde July 25, 2000:
-	a: (LOOP WITH (A B) DO (PRINT 1)) is a syntax error according to
-	   the definition of WITH clauses given in the ANSI spec, but
-	   compiles and runs happily in SBCL.
 	b: a messy one involving package iteration:
 interpreted Form: (LET ((PACKAGE (MAKE-PACKAGE "LOOP-TEST"))) (INTERN "blah" PACKAGE) (LET ((BLAH2 (INTERN "blah2" PACKAGE))) (EXPORT BLAH2 PACKAGE)) (LIST (SORT (LOOP FOR SYM BEING EACH PRESENT-SYMBOL OF PACKAGE FOR SYM-NAME = (SYMBOL-NAME SYM) COLLECT SYM-NAME) (FUNCTION STRING<)) (SORT (LOOP FOR SYM BEING EACH EXTERNAL-SYMBOL OF PACKAGE FOR SYM-NAME = (SYMBOL-NAME SYM) COLLECT SYM-NAME) (FUNCTION STRING<))))
 Should be: (("blah" "blah2") ("blah2"))

@@ -17,8 +17,8 @@
 
 ;;; Do environment analysis on the code in COMPONENT. This involves
 ;;; various things:
-;;;  1. Make an ENVIRONMENT structure for each non-let lambda, assigning 
-;;;     the lambda-environment for all lambdas.
+;;;  1. Make an ENVIRONMENT structure for each non-LET LAMBDA, assigning 
+;;;     the LAMBDA-ENVIRONMENT for all LAMBDAs.
 ;;;  2. Find all values that need to be closed over by each environment.
 ;;;  3. Scan the blocks in the component closing over non-local-exit
 ;;;     continuations.
@@ -57,7 +57,7 @@
 
   (values))
 
-;;; This is to be called on a COMPONENT with top-level lambdas before
+;;; This is to be called on a COMPONENT with top-level LAMBDAs before
 ;;; the compilation of the associated non-top-level code to detect
 ;;; closed over top-level variables. We just do COMPUTE-CLOSURE on all
 ;;; the lambdas. This will pre-allocate environments for all the
@@ -75,7 +75,37 @@
 	  (setq found-it t))))
     found-it))
 
-;;; If FUN has an environment, return it, otherwise assign one.
+;;; This is like old CMU CL PRE-ENVIRONMENT-ANALYZE-TOP-LEVEL, except
+;;;   (1) It's been brought into the post-0.7.0 world where the property
+;;;       HAS-EXTERNAL-REFERENCES-P is orthogonal to the property of
+;;;       being specialized/optimized for locall at top level.
+;;;   (2) There's no return value, since we don't care whether we
+;;;       find any possible closure variables.
+;;;
+;;; I wish I could find an explanation of why
+;;; PRE-ENVIRONMENT-ANALYZE-TOP-LEVEL is important. The old CMU CL
+;;; comments said
+;;;     Called on component with top-level lambdas before the
+;;;     compilation of the associated non-top-level code to detect
+;;;     closed over top-level variables. We just do COMPUTE-CLOSURE on
+;;;     all the lambdas. This will pre-allocate environments for all
+;;;     the functions with closed-over top-level variables. The
+;;;     post-pass will use the existing structure, rather than
+;;;     allocating a new one. We return true if we discover any
+;;;     possible closure vars.
+;;; But that doesn't seem to explain why it's important. I do observe
+;;; that when it's not done, compiler assertions occasionally fail. My
+;;; tentative hypothesis is that other environment analysis expects to
+;;; bottom out on the outermost enclosing thing, and (insert
+;;; mysterious reason here) it's important to set up bottomed-out-here
+;;; environments before anything else. -- WHN 2001-09-30
+(defun preallocate-environments-for-top-levelish-lambdas (component)
+  (dolist (clambda (component-lambdas component))
+    (when (lambda-top-levelish-p clambda)
+      (compute-closure clambda)))
+  (values))
+
+;;; If FUN has an environment, return it, otherwise assign an empty one.
 (defun get-lambda-environment (fun)
   (declare (type clambda fun))
   (let* ((fun (lambda-home fun))
@@ -84,26 +114,23 @@
 	(let ((res (make-environment :function fun)))
 	  (setf (lambda-environment fun) res)
 	  (dolist (letlambda (lambda-lets fun))
-	    ;; The first block of assertions here is more of an
-	    ;; experiment on the behavior of existing code than
-	    ;; something that I worked out as logically required: It's
-	    ;; easier to understand LAMBDA-ENVIRONMENTs of LET
-	    ;; variables if I know that they're always LETs and are
-	    ;; never rewritten. -- WHN 2001-09-27
-	    (aver (member (lambda-kind letlambda) '(:let :mv-let)))
+	    ;; This assertion is to make explicit an
+	    ;; apparently-otherwise-undocumented property of existing
+	    ;; code: We never overwrite an old LAMBDA-ENVIRONMENT.
+	    ;; -- WHN 2001-09-30
 	    (aver (null (lambda-environment letlambda)))
-	    ;; Enforce some invariants described in the slot comments.
+	    ;; I *think* this is true regardless of LAMBDA-KIND.
+	    ;; -- WHN 2001-09-30
 	    (aver (eql (lambda-home letlambda) fun))
-	    (aver (null (lambda-return letlambda)))
-	    (aver (null (lambda-lets letlambda)))
 	    (setf (lambda-environment letlambda) res))
 	  res))))
 
-;;; If FUN has no environment, assign one, otherwise clean up
-;;; variables that have no sets or refs. If a var has no references,
-;;; we remove it from the closure. If it has no sets, we clear the
-;;; INDIRECT flag. This is necessary because pre-analysis is done
-;;; before optimization.
+;;; If FUN has no physical environment, assign one, otherwise clean up
+;;; the old physical environment, removing/flagging variables that
+;;; have no sets or refs. If a var has no references, we remove it
+;;; from the closure. If it has no sets, we clear the INDIRECT flag.
+;;; This is necessary because pre-analysis is done before
+;;; optimization.
 (defun reinit-lambda-environment (fun)
   (let ((old (lambda-environment (lambda-home fun))))
     (cond (old

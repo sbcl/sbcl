@@ -362,10 +362,19 @@
   ;; (i.e. begins with a BIND node.)
   (head nil :type (or null cblock))
   (tail nil :type (or null cblock))
-  ;; a list of the CLAMBDA structures for all functions in this
-  ;; component. OPTIONAL-DISPATCHes are represented only by their XEP
-  ;; and other associated lambdas. This doesn't contain any deleted or
-  ;; LET lambdas.
+  ;; This becomes a list of the CLAMBDA structures for all functions
+  ;; in this component. OPTIONAL-DISPATCHes are represented only by
+  ;; their XEP and other associated lambdas. This doesn't contain any
+  ;; deleted or LET lambdas.
+  ;;
+  ;; Note that logical associations between CLAMBDAs and COMPONENTs
+  ;; seem to exist for a while before this is initialized. In
+  ;; particular, I got burned by writing some code to use this value
+  ;; to decide which components need LOCAL-CALL-ANALYZE, when it turns
+  ;; out that LOCAL-CALL-ANALYZE had a role in initializing this value
+  ;; (and DFO stuff does too, maybe). Also, even after it's
+  ;; initialized, it might change as CLAMBDAs are deleted or merged.
+  ;; -- WHN 2001-09-30
   (lambdas () :type list)
   ;; a list of FUNCTIONAL structures for functions that are newly
   ;; converted, and haven't been local-call analyzed yet. Initially
@@ -420,6 +429,9 @@
 ;;; which time it might be possible to replace the COMPONENT-KIND
 ;;; :TOP-LEVEL mess with a flag COMPONENT-HAS-EXTERNAL-REFERENCES-P
 ;;; along the lines of FUNCTIONAL-HAS-EXTERNAL-REFERENCES-P.
+(defun lambda-top-levelish-p (clambda)
+  (or (eql (lambda-kind clambda) :top-level)
+      (lambda-has-external-references-p clambda)))
 (defun component-top-levelish-p (component)
   (member (component-kind component)
 	  '(:top-level :complex-top-level)))
@@ -452,20 +464,42 @@
   mess-up
   (nlx-info :test nlx-info))
 
-;;; An ENVIRONMENT structure represents the result of environment
-;;; analysis.
+;;; original CMU CL comment:
+;;;   An ENVIRONMENT structure represents the result of environment
+;;;   analysis.
 ;;;
-;;; As far as I can tell, this is the physical environment in which
-;;; the thing is executing, holding information like how many slots
-;;; are allocated on the stack and where. (So it has only a vague
-;;; connection with lexical environments.) -- WHN 2001-09-27
+;;; As far as I can tell from reverse engineering, this IR1 structure
+;;; represents the physical environment (which is probably not the
+;;; standard Lispy term for this concept, but I dunno what is the
+;;; standard term): those things in the lexical environment which a
+;;; LAMBDA actually interacts with. Thus in
+;;;   (DEFUN FROB-THINGS (THINGS)
+;;;     (DOLIST (THING THINGS)
+;;;       (BLOCK FROBBING-ONE-THING
+;;;         (MAPCAR (LAMBDA (PATTERN)
+;;;                   (WHEN (FITS-P THING PATTERN)
+;;;                     (RETURN-FROM FROB-THINGS (LIST :FIT THING PATTERN))))
+;;;                 *PATTERNS*))))
+;;; the variables THINGS, THING, and PATTERN and the block names
+;;; FROB-THINGS and FROBBING-ONE-THING are all in the inner LAMBDA's
+;;; lexical environment, but of those only THING, PATTERN, and
+;;; FROB-THINGS are in its physical environment. In IR1, we largely
+;;; just collect the names of these things; in IR2 an IR2-ENVIRONMENT
+;;; structure is attached to INFO and used to keep track of
+;;; associations between these names and less-abstract things (like
+;;; TNs, or eventually stack slots and registers). -- WHN 2001-09-29
 (defstruct (environment (:copier nil))
   ;; the function that allocates this environment
   (function (required-argument) :type clambda)
   ;; a list of all the lambdas that allocate variables in this environment
   (lambdas nil :type list)
-  ;; a list of all the LAMBDA-VARs and NLX-INFOs needed from enclosing
-  ;; environments by code in this environment
+  ;; This ultimately converges to a list of all the LAMBDA-VARs and
+  ;; NLX-INFOs needed from enclosing environments by code in this
+  ;; environment. In the meantime, it may be
+  ;;   * NIL at object creation time
+  ;;   * a superset of the correct result, generated somewhat later
+  ;;   * smaller and smaller sets converging to the correct result as
+  ;;     we notice and delete unused elements in the superset
   (closure nil :type list)
   ;; a list of NLX-INFO structures describing all the non-local exits
   ;; into this environment
@@ -671,7 +705,7 @@
   ;;	Similar to NIL, but requires greater caution, since local call
   ;;	analysis may create new references to this function. Also, the
   ;;	function cannot be deleted even if it has *no* references. The
-  ;;	Optional-Dispatch is in the LAMDBA-OPTIONAL-DISPATCH.
+  ;;	OPTIONAL-DISPATCH is in the LAMDBA-OPTIONAL-DISPATCH.
   ;;
   ;;    :EXTERNAL
   ;;	an external entry point lambda. The function it is an entry
@@ -702,8 +736,8 @@
   ;;    :DELETED
   ;;	This function has been found to be uncallable, and has been
   ;;	marked for deletion.
-  (kind nil :type (member nil :optional :deleted :external :top-level :escape
-			  :cleanup :let :mv-let :assignment
+  (kind nil :type (member nil :optional :deleted :external :top-level
+			  :escape :cleanup :let :mv-let :assignment
 			  :top-level-xep))
   ;; Is this a function that some external entity (e.g. the fasl dumper)
   ;; refers to, so that even when it appears to have no references, it

@@ -1109,7 +1109,7 @@
 
 ;;;; local call optimization
 
-;;; Propagate Type to Leaf and its Refs, marking things changed. If
+;;; Propagate TYPE to LEAF and its REFS, marking things changed. If
 ;;; the leaf type is a function type, then just leave it alone, since
 ;;; TYPE is never going to be more specific than that (and
 ;;; TYPE-INTERSECTION would choke.)

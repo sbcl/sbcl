@@ -197,9 +197,9 @@
 	(setf (node-tail-p use) nil))))
   (values))
 
-;;; Make an IR2-NLX-Info structure for each NLX entry point recorded.
+;;; Make an IR2-NLX-INFO structure for each NLX entry point recorded.
 ;;; We call a VM supplied function to make the SAVE-SP restricted on
-;;; the stack. The NLX-Entry VOP's :FORCE-TO-STACK SAVE-P value
+;;; the stack. The NLX-ENTRY VOP's :FORCE-TO-STACK SAVE-P value
 ;;; doesn't do this, since the SP is an argument to the VOP, and thus
 ;;; isn't live afterwards.
 (defun assign-ir2-nlx-info (fun)

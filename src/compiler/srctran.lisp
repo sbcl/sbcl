@@ -3271,7 +3271,7 @@
                  (and (subtypep coerced-type 'integer)
                       (csubtypep value-type (specifier-type 'integer))))))
          (process-types (type)
-           ;; FIXME
+           ;; FIXME:
            ;; This needs some work because we should be able to derive
            ;; the resulting type better than just the type arg of
            ;; coerce.  That is, if x is (integer 10 20), the (coerce x
