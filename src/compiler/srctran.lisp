@@ -282,10 +282,7 @@
 			 (bound-value ,y))
 		    (or (consp ,x) (consp ,y))))))
 
-;;; NUMERIC-TYPE->INTERVAL
-;;;
 ;;; Convert a numeric-type object to an interval object.
-
 (defun numeric-type->interval (x)
   (declare (type numeric-type x))
   (make-interval :low (numeric-type-low x)
@@ -301,8 +298,6 @@
   (make-interval :low (copy-interval-limit (interval-low x))
 		 :high (copy-interval-limit (interval-high x))))
 
-;;; INTERVAL-SPLIT
-;;;
 ;;; Given a point P contained in the interval X, split X into two
 ;;; interval at the point P. If CLOSE-LOWER is T, then the left
 ;;; interval contains P. If CLOSE-UPPER is T, the right interval
@@ -315,8 +310,6 @@
 	(make-interval :low (if close-upper (list p) p)
 		       :high (copy-interval-limit (interval-high x)))))
 
-;;; INTERVAL-CLOSURE
-;;;
 ;;; Return the closure of the interval. That is, convert open bounds
 ;;; to closed bounds.
 (defun interval-closure (x)
@@ -331,8 +324,6 @@
 	   (>= (float-sign (float x))
 	       (float-sign (float y))))))
 
-;;; INTERVAL-RANGE-INFO
-;;;
 ;;; For an interval X, if X >= POINT, return '+. If X <= POINT, return
 ;;; '-. Otherwise return NIL.
 #+nil
@@ -361,8 +352,6 @@
 	    (t
 	     nil)))))
 
-;;; INTERVAL-BOUNDED-P
-;;;
 ;;; Test to see whether the interval X is bounded. HOW determines the
 ;;; test, and should be either ABOVE, BELOW, or BOTH.
 (defun interval-bounded-p (x how)
@@ -375,9 +364,8 @@
     ('both
      (and (interval-low x) (interval-high x)))))
 
-;;; Signed zero comparison functions. Use these functions if we need
+;;; signed zero comparison functions. Use these functions if we need
 ;;; to distinguish between signed zeroes.
-
 (defun signed-zero-< (x y)
   (declare (real x y))
   (or (< x y)
@@ -390,13 +378,11 @@
       (and (= x y)
 	   (> (float-sign (float x))
 	      (float-sign (float y))))))
-
 (defun signed-zero-= (x y)
   (declare (real x y))
   (and (= x y)
        (= (float-sign (float x))
 	  (float-sign (float y)))))
-
 (defun signed-zero-<= (x y)
   (declare (real x y))
   (or (< x y)
@@ -404,10 +390,8 @@
 	   (<= (float-sign (float x))
 	       (float-sign (float y))))))
 
-;;; INTERVAL-CONTAINS-P
-;;;
-;;; See whether the interval X contains the number P, taking into account
-;;; that the interval might not be closed.
+;;; See whether the interval X contains the number P, taking into
+;;; account that the interval might not be closed.
 (defun interval-contains-p (p x)
   (declare (type number p)
 	   (type interval x))
@@ -441,8 +425,6 @@
 	   ;; Interval with no bounds
 	   t))))
 
-;;; INTERVAL-INTERSECT-P
-;;;
 ;;; Determine if two intervals X and Y intersect. Return T if so. If
 ;;; CLOSED-INTERVALS-P is T, the treat the intervals as if they were
 ;;; closed. Otherwise the intervals are treated as they are.
@@ -481,8 +463,6 @@
     (or (adjacent (interval-low y) (interval-high x))
 	(adjacent (interval-low x) (interval-high y)))))
 
-;;; INTERVAL-INTERSECTION/DIFFERENCE
-;;;
 ;;; Compute the intersection and difference between two intervals.
 ;;; Two values are returned: the intersection and the difference.
 ;;;
@@ -545,13 +525,13 @@
 			   (y-hi-in-x
 			    (values y-hi (opposite-bound y-hi) x-hi)))
 		   (values (make-interval :low lo :high hi)
-			   (list (make-interval :low left-lo :high left-hi)
-				 (make-interval :low right-lo :high right-hi))))))
+			   (list (make-interval :low left-lo
+						:high left-hi)
+				 (make-interval :low right-lo
+						:high right-hi))))))
 	      (t
 	       (values nil (list x y))))))))
 
-;;; INTERVAL-MERGE-PAIR
-;;;
 ;;; If intervals X and Y intersect, return a new interval that is the
 ;;; union of the two. If they do not intersect, return NIL.
 (defun interval-merge-pair (x y)
@@ -587,36 +567,28 @@
 	(make-interval :low (select-bound x-lo y-lo #'< #'>)
 		       :high (select-bound x-hi y-hi #'> #'<))))))
 
-;;; Basic arithmetic operations on intervals. We probably should do
+;;; basic arithmetic operations on intervals. We probably should do
 ;;; true interval arithmetic here, but it's complicated because we
 ;;; have float and integer types and bounds can be open or closed.
 
-;;; INTERVAL-NEG
-;;;
 ;;; The negative of an interval
 (defun interval-neg (x)
   (declare (type interval x))
   (make-interval :low (bound-func #'- (interval-high x))
 		 :high (bound-func #'- (interval-low x))))
 
-;;; INTERVAL-ADD
-;;;
 ;;; Add two intervals
 (defun interval-add (x y)
   (declare (type interval x y))
   (make-interval :low (bound-binop + (interval-low x) (interval-low y))
 		 :high (bound-binop + (interval-high x) (interval-high y))))
 
-;;; INTERVAL-SUB
-;;;
 ;;; Subtract two intervals
 (defun interval-sub (x y)
   (declare (type interval x y))
   (make-interval :low (bound-binop - (interval-low x) (interval-high y))
 		 :high (bound-binop - (interval-high x) (interval-low y))))
 
-;;; INTERVAL-MUL
-;;;
 ;;; Multiply two intervals
 (defun interval-mul (x y)
   (declare (type interval x y))
@@ -661,8 +633,6 @@
 	    (t
 	     (error "This shouldn't happen!"))))))
 
-;;; INTERVAL-DIV
-;;;
 ;;; Divide two intervals.
 (defun interval-div (top bot)
   (declare (type interval top bot))
@@ -712,8 +682,6 @@
 	    (t
 	     (error "This shouldn't happen!"))))))
 
-;;; INTERVAL-FUNC
-;;;
 ;;; Apply the function F to the interval X. If X = [a, b], then the
 ;;; result is [f(a), f(b)]. It is up to the user to make sure the
 ;;; result makes sense. It will if F is monotonic increasing (or
@@ -724,8 +692,6 @@
 	(hi (bound-func f (interval-high x))))
     (make-interval :low lo :high hi)))
 
-;;; INTERVAL-<
-;;;
 ;;; Return T if X < Y. That is every number in the interval X is
 ;;; always less than any number in the interval Y.
 (defun interval-< (x y)
@@ -751,8 +717,6 @@
 	     ;; Don't overlap if one or the other are open.
 	     (or (consp left) (consp right)))))))
 
-;;; INVTERVAL->=
-;;;
 ;;; Return T if X >= Y. That is, every number in the interval X is
 ;;; always greater than any number in the interval Y.
 (defun interval->= (x y)
@@ -762,10 +726,8 @@
 	     (interval-bounded-p y 'above))
     (>= (bound-value (interval-low x)) (bound-value (interval-high y)))))
 
-;;; INTERVAL-ABS
-;;;
-;;; Return an interval that is the absolute value of X. Thus, if X =
-;;; [-1 10], the result is [0, 10].
+;;; Return an interval that is the absolute value of X. Thus, if
+;;; X = [-1 10], the result is [0, 10].
 (defun interval-abs (x)
   (declare (type interval x))
   (case (interval-range-info x)
@@ -777,8 +739,6 @@
      (destructuring-bind (x- x+) (interval-split 0 x t t)
        (interval-merge-pair (interval-neg x-) x+)))))
 
-;;; INTERVAL-SQR
-;;;
 ;;; Compute the square of an interval.
 (defun interval-sqr (x)
   (declare (type interval x))
@@ -788,10 +748,10 @@
 
 ;;;; numeric derive-type methods
 
-;;; Utility for defining derive-type methods of integer operations. If the
-;;; types of both X and Y are integer types, then we compute a new integer type
-;;; with bounds determined Fun when applied to X and Y. Otherwise, we use
-;;; Numeric-Contagion.
+;;; a utility for defining derive-type methods of integer operations. If
+;;; the types of both X and Y are integer types, then we compute a new
+;;; integer type with bounds determined Fun when applied to X and Y.
+;;; Otherwise, we use Numeric-Contagion.
 (defun derive-integer-type (x y fun)
   (declare (type continuation x y) (type function fun))
   (let ((x (continuation-type x))
@@ -811,7 +771,7 @@
 #!+(or propagate-float-type propagate-fun-type)
 (progn
 
-;; Simple utility to flatten a list
+;;; simple utility to flatten a list
 (defun flatten-list (x)
   (labels ((flatten-helper (x r);; 'r' is the stuff to the 'right'.
 	     (cond ((null x) r)
@@ -996,11 +956,15 @@
     (t
      type-list)))
 
+;;; FIXME: MAKE-CANONICAL-UNION-TYPE and CONVERT-MEMBER-TYPE probably
+;;; belong in the kernel's type logic, invoked always, instead of in
+;;; the compiler, invoked only during some type optimizations.
+
 ;;; Take a list of types and return a canonical type specifier,
-;;; combining any MEMBER types together. If both positive and
-;;; negative MEMBER types are present they are converted to a float
-;;; type. XXX This would be far simpler if the type-union methods could
-;;; handle member/number unions.
+;;; combining any MEMBER types together. If both positive and negative
+;;; MEMBER types are present they are converted to a float type.
+;;; XXX This would be far simpler if the type-union methods could handle
+;;; member/number unions.
 (defun make-canonical-union-type (type-list)
   (let ((members '())
 	(misc-types '()))
@@ -1027,24 +991,10 @@
       #!+negative-zero-is-not-zero
       (push (specifier-type '(single-float -0f0 0f0)) misc-types)
       (setf members (set-difference members '(-0f0 0f0))))
-    (cond ((null members)
-	   (let ((res (first misc-types)))
-	     (dolist (type (rest misc-types))
-	       (setq res (type-union res type)))
-	     res))
-	  ((null misc-types)
-	   (make-member-type :members members))
-	  (t
-	   (let ((res (first misc-types)))
-	     (dolist (type (rest misc-types))
-	       (setq res (type-union res type)))
-	     (dolist (type members)
-	       (setq res (type-union
-			  res (make-member-type :members (list type)))))
-	     res)))))
+    (if members
+	(apply #'type-union (make-member-type :members members) misc-types)
+	(apply #'type-union misc-types))))
 
-;;; Convert-Member-Type
-;;;
 ;;; Convert a member type with a single member to a numeric type.
 (defun convert-member-type (arg)
   (let* ((members (member-type-members arg))
@@ -1056,8 +1006,6 @@
 			   member-type)
 		      ,member ,member))))
 
-;;; ONE-ARG-DERIVE-TYPE
-;;;
 ;;; This is used in defoptimizers for computing the resulting type of
 ;;; a function.
 ;;;
@@ -1118,8 +1066,6 @@
 	      (make-canonical-union-type results)
 	      (first results)))))))
 
-;;; TWO-ARG-DERIVE-TYPE
-;;;
 ;;; Same as ONE-ARG-DERIVE-TYPE, except we assume the function takes
 ;;; two arguments. DERIVE-FCN takes 3 args in this case: the two
 ;;; original args and a third which is T to indicate if the two args
@@ -1358,7 +1304,7 @@
 	(make-numeric-type
 	 :class (if (and (eq (numeric-type-class x) 'integer)
 			 (eq (numeric-type-class y) 'integer))
-		    ;; The product of integers is always an integer
+		    ;; The product of integers is always an integer.
 		    'integer
 		    (numeric-type-class result-type))
 	 :format (numeric-type-format result-type)
@@ -1373,7 +1319,7 @@
   (if (and (numeric-type-real-p x)
 	   (numeric-type-real-p y))
       (let ((result
-	     ;; (/ x x) is always 1, except if x can contain 0. In
+	     ;; (/ X X) is always 1, except if X can contain 0. In
 	     ;; that case, we shouldn't optimize the division away
 	     ;; because we want 0/0 to signal an error.
 	     (if (and same-arg
@@ -1403,20 +1349,6 @@
 ) ; PROGN
 
 
-;;; ASH derive type optimizer
-;;;
-;;; Large resulting bounds are easy to generate but are not
-;;; particularly useful, so an open outer bound is returned for a
-;;; shift greater than 64 - the largest word size of any of the ports.
-;;; Large negative shifts are also problematic as the ASH
-;;; implementation only accepts shifts greater than
-;;; MOST-NEGATIVE-FIXNUM. These issues are handled by two local
-;;; functions:
-;;;   ASH-OUTER: Perform the shift when within an acceptable range,
-;;;     otherwise return an open bound.
-;;;   ASH-INNER: Perform the shift when within range, limited to a
-;;;     maximum of 64, otherwise returns the inner limit.
-;;;
 ;;; KLUDGE: All this ASH optimization is suppressed under CMU CL
 ;;; because as of version 2.4.6 for Debian, CMU CL blows up on (ASH
 ;;; 1000000000 -100000000000) (i.e. ASH of two bignums yielding zero)
@@ -1425,7 +1357,24 @@
 (progn
 #!-propagate-fun-type
 (defoptimizer (ash derive-type) ((n shift))
-   (flet ((ash-outer (n s)
+  ;; Large resulting bounds are easy to generate but are not
+  ;; particularly useful, so an open outer bound is returned for a
+  ;; shift greater than 64 - the largest word size of any of the ports.
+  ;; Large negative shifts are also problematic as the ASH
+  ;; implementation only accepts shifts greater than
+  ;; MOST-NEGATIVE-FIXNUM. These issues are handled by two local
+  ;; functions:
+  ;;   ASH-OUTER: Perform the shift when within an acceptable range,
+  ;;     otherwise return an open bound.
+  ;;   ASH-INNER: Perform the shift when within range, limited to a
+  ;;     maximum of 64, otherwise returns the inner limit.
+  ;;
+  ;; FIXME: The magic number 64 should be given a mnemonic name as a
+  ;; symbolic constant -- perhaps +MAX-REGISTER-SIZE+. And perhaps is
+  ;; should become an architecture-specific SB!VM:+MAX-REGISTER-SIZE+
+  ;; instead of trying to have a single magic number which covers
+  ;; all possible ports.
+  (flet ((ash-outer (n s)
             (when (and (fixnump s)
                        (<= s 64)
                        (> s sb!vm:*target-most-negative-fixnum*))
@@ -1544,29 +1493,29 @@
 #!+propagate-float-type
 (defoptimizer (lognot derive-type) ((int))
   (derive-integer-type int int
-		       #'(lambda (type type2)
-			   (declare (ignore type2))
-			   (let ((lo (numeric-type-low type))
-				 (hi (numeric-type-high type)))
-			     (values (if hi (lognot hi) nil)
-				     (if lo (lognot lo) nil)
-				     (numeric-type-class type)
-				     (numeric-type-format type))))))
+		       (lambda (type type2)
+			 (declare (ignore type2))
+			 (let ((lo (numeric-type-low type))
+			       (hi (numeric-type-high type)))
+			   (values (if hi (lognot hi) nil)
+				   (if lo (lognot lo) nil)
+				   (numeric-type-class type)
+				   (numeric-type-format type))))))
 
 #!+propagate-float-type
 (defoptimizer (%negate derive-type) ((num))
   (flet ((negate-bound (b)
 	   (set-bound (- (bound-value b)) (consp b))))
     (one-arg-derive-type num
-			 #'(lambda (type)
-			     (let ((lo (numeric-type-low type))
-				   (hi (numeric-type-high type))
-				   (result (copy-numeric-type type)))
-			       (setf (numeric-type-low result)
-				      (if hi (negate-bound hi) nil))
-			       (setf (numeric-type-high result)
-				     (if lo (negate-bound lo) nil))
-			       result))
+			 (lambda (type)
+			   (let ((lo (numeric-type-low type))
+				 (hi (numeric-type-high type))
+				 (result (copy-numeric-type type)))
+			     (setf (numeric-type-low result)
+				   (if hi (negate-bound hi) nil))
+			     (setf (numeric-type-high result)
+				   (if lo (negate-bound lo) nil))
+			     result))
 			 #'-)))
 
 #!-propagate-float-type
@@ -1911,8 +1860,8 @@
   (frob-opt ffloor floor-quotient-bound floor-rem-bound)
   (frob-opt fceiling ceiling-quotient-bound ceiling-rem-bound))
 
-;;; Functions to compute the bounds on the quotient and remainder for
-;;; the FLOOR function.
+;;; functions to compute the bounds on the quotient and remainder for
+;;; the FLOOR function
 (defun floor-quotient-bound (quot)
   ;; Take the floor of the quotient and then massage it into what we
   ;; need.
@@ -3436,7 +3385,7 @@
 (def-source-transform / (&rest args)
   (source-transform-intransitive '/ args '(/ 1)))
 
-;;;; APPLY
+;;;; transforming APPLY
 
 ;;; We convert APPLY into MULTIPLE-VALUE-CALL so that the compiler
 ;;; only needs to understand one kind of variable-argument call. It is
@@ -3449,7 +3398,7 @@
 		 (butlast args))
        (values-list ,(car (last args))))))
 
-;;;; FORMAT
+;;;; transforming FORMAT
 ;;;;
 ;;;; If the control string is a compile-time constant, then replace it
 ;;;; with a use of the FORMATTER macro so that the control string is

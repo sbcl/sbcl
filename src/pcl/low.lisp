@@ -96,8 +96,6 @@
   `(wrapper-class* (std-instance-wrapper ,instance)))
 
 
-;;; SET-FUNCTION-NAME
-;;;
 ;;; When given a function should give this function the name <new-name>.
 ;;; Note that <new-name> is sometimes a list. Some lisps get the upset
 ;;; in the tummy when they start thinking about functions which have

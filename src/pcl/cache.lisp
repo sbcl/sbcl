@@ -604,8 +604,6 @@
 ;;;  ENSURING  that the result is a fixnum
 ;;;  MASK      the result against the mask argument.
 
-;;; COMPUTE-PRIMARY-CACHE-LOCATION
-;;;
 ;;; The basic functional version. This is used by the cache miss code to
 ;;; compute the primary location of an entry.
 (defun compute-primary-cache-location (field mask wrappers)
@@ -634,8 +632,6 @@
 	  (incf i))
 	(the fixnum (1+ (logand mask location))))))
 
-;;; COMPUTE-PRIMARY-CACHE-LOCATION-FROM-LOCATION
-;;;
 ;;; This version is called on a cache line. It fetches the wrappers
 ;;; from the cache line and determines the primary location. Various
 ;;; parts of the cache filling code call this to determine whether it

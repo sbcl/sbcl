@@ -9,7 +9,11 @@
 
 (in-package "SB!KERNEL")
 
+(/show0 "entering early-defstructs.lisp")
+
 #.`(progn
      ,@(mapcar (lambda (args)
 		 `(defstruct ,@args))
 	       (sb-cold:read-from-file "src/code/early-defstruct-args.lisp-expr")))
+
+(/show0 "done with early-defstructs.lisp")

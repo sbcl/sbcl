@@ -1307,9 +1307,9 @@ a LET-like macro, and a SETQ-like macro, which perform LOOP-style destructuring.
 						      ,specifically
 						      ,form)))))
 
-;;;; value accumulation:  aggregate booleans
+;;;; value accumulation: aggregate booleans
 
-;;; ALWAYS and NEVER
+;;; handling the ALWAYS and NEVER loop keywords
 ;;;
 ;;; Under ANSI these are not permitted to appear under conditionalization.
 (defun loop-do-always (restrictive negate)
@@ -1319,7 +1319,7 @@ a LET-like macro, and a SETQ-like macro, which perform LOOP-style destructuring.
 		      ,(loop-construct-return nil)))
     (loop-emit-final-value t)))
 
-;;; THEREIS
+;;; handling the THEREIS loop keyword
 ;;;
 ;;; Under ANSI this is not permitted to appear under conditionalization.
 (defun loop-do-thereis (restrictive)

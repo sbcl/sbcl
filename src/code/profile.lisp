@@ -260,7 +260,7 @@
 	     consing 0
 	     profiles 0)))))
 
-;;; interfaces
+;;;; interfaces
 
 ;;; A symbol or (SETF FOO) list names a function, a string names all
 ;;; the functions named by symbols in the named package.

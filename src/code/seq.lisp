@@ -1953,7 +1953,7 @@
 
 ) ; EVAL-WHEN
 
-;;; POSITION
+;;;; POSITION
 
 (eval-when (:compile-toplevel :execute)
 

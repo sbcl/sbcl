@@ -37,12 +37,10 @@
 ;;;; part of the backend; different backends can support different
 ;;;; sets of predicates.
 
+;;; Establish an association between the type predicate NAME and the
+;;; corresponding TYPE. This causes the type predicate to be
+;;; recognized for purposes of optimization.
 (defmacro define-type-predicate (name type)
-  #!+sb-doc
-  "Define-Type-Predicate Name Type
-  Establish an association between the type predicate Name and the
-  corresponding Type. This causes the type predicate to be recognized for
-  purposes of optimization."
   `(%define-type-predicate ',name ',type))
 (defun %define-type-predicate (name specifier)
   (let ((type (specifier-type specifier)))
@@ -74,9 +72,9 @@
   (declare (type continuation object) (type ctype type))
   (let ((otype (continuation-type object)))
     (cond ((not (types-intersect otype type))
-	   'nil)
+	   nil)
 	  ((csubtypep otype type)
-	   't)
+	   t)
 	  (t
 	   (give-up-ir1-transform)))))
 
@@ -108,11 +106,15 @@
     `(or (class-cell-class ',cell)
 	 (error "class not yet defined: ~S" name))))
 
-;;;; standard type predicates
+;;;; standard type predicates, i.e. those defined in package COMMON-LISP,
+;;;; plus at least one oddball (%INSTANCEP)
+;;;;
+;;;; Various other type predicates (e.g. low-level representation
+;;;; stuff like SIMPLE-ARRAY-SINGLE-FLOAT-P) are defined elsewhere.
 
-;;; FIXME: needed only at cold load time, can be uninterned afterwards;
-;;; or perhaps could just be done at toplevel
-(defun define-standard-type-predicates ()
+;;; FIXME: This function is only called once, at top level. Why not
+;;; just expand all its operations into toplevel code?
+(defun !define-standard-type-predicates ()
   (define-type-predicate arrayp array)
   ; (The ATOM predicate is handled separately as (NOT CONS).)
   (define-type-predicate bit-vector-p bit-vector)
@@ -139,8 +141,7 @@
   (define-type-predicate funcallable-instance-p funcallable-instance)
   (define-type-predicate symbolp symbol)
   (define-type-predicate vectorp vector))
-
-(define-standard-type-predicates)
+(!define-standard-type-predicates)
 
 ;;;; transforms for type predicates not implemented primitively
 ;;;;
@@ -286,21 +287,19 @@
   (let* ((types (union-type-types type))
 	 (ltype (specifier-type 'list))
 	 (mtype (find-if #'member-type-p types)))
-    (cond ((and mtype (csubtypep ltype type))
-	   (let ((members (member-type-members mtype)))
-	     (once-only ((n-obj object))
-	       `(if (listp ,n-obj)
-		    t
-		    (typep ,n-obj
-			   '(or ,@(mapcar #'type-specifier
-					  (remove (specifier-type 'cons)
-						  (remove mtype types)))
-				(member ,@(remove nil members))))))))
-	  (t
-	   (once-only ((n-obj object))
-	     `(or ,@(mapcar (lambda (x)
-			      `(typep ,n-obj ',(type-specifier x)))
-			    types)))))))
+    (if (and mtype (csubtypep ltype type))
+	(let ((members (member-type-members mtype)))
+	  (once-only ((n-obj object))
+	    `(or (listp ,n-obj)
+		 (typep ,n-obj
+			'(or ,@(mapcar #'type-specifier
+				       (remove (specifier-type 'cons)
+					       (remove mtype types)))
+			     (member ,@(remove nil members)))))))
+	(once-only ((n-obj object))
+	  `(or ,@(mapcar (lambda (x)
+			   `(typep ,n-obj ',(type-specifier x)))
+			 types))))))
 
 ;;; Do source transformation for TYPEP of a known intersection type.
 (defun source-transform-intersection-typep (object type)
@@ -487,6 +486,12 @@
 ;;; simplification. Instance type tests are converted to
 ;;; %INSTANCE-TYPEP to allow type propagation.
 (def-source-transform typep (object spec)
+  ;; KLUDGE: It looks bad to only do this on explicitly quoted forms,
+  ;; since that would overlook other kinds of constants. But it turns
+  ;; out that the DEFTRANSFORM for TYPEP detects any constant
+  ;; continuation, transforms it into a quoted form, and gives this
+  ;; source transform another chance, so it all works out OK, in a
+  ;; weird roundabout way. -- WHN 2001-03-18
   (if (and (consp spec) (eq (car spec) 'quote))
       (let ((type (specifier-type (cadr spec))))
 	(or (let ((pred (cdr (assoc type *backend-type-predicates*

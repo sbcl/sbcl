@@ -26,7 +26,7 @@
   `(eval-when (:compile-toplevel :load-toplevel :execute)
      (setq *package* (find-undeleted-package-or-lose ',package-designator))))
 
-;;; MULTIPLE-VALUE-FOO
+;;;; MULTIPLE-VALUE-FOO
 
 (defun list-of-symbols-p (x)
   (and (listp x)

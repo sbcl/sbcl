@@ -489,10 +489,8 @@
 			     sb!vm:byte-bits))
       res)))
 
-;;; FOP-SIGNED-INT-VECTOR
-;;;
-;;; Same as FOP-INT-VECTOR, except this is for signed simple-arrays.
-;;; It appears that entry 50 and 51 are clear.
+;;; This is the same as FOP-INT-VECTOR, except this is for signed
+;;; SIMPLE-ARRAYs.
 (define-fop (fop-signed-int-vector 50)
   (prepare-for-fast-read-byte *fasl-file*
     (let* ((len (fast-read-u-integer 4))

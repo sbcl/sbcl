@@ -248,11 +248,13 @@
        (if (class-structure-p dd)
 	   (let ((inherits (inherits-for-structure dd)))
 	     `(progn
+		(/noshow0 "doing CLASS-STRUCTURE-P case for DEFSTRUCT " ,name)
 		(eval-when (:compile-toplevel :load-toplevel :execute)
 		  (%compiler-only-defstruct ',dd ',inherits))
 		(%defstruct ',dd ',inherits)
 		,@(when (eq (dd-type dd) 'structure)
 		    `((%compiler-defstruct ',dd)))
+		(/noshow0 "starting not-for-the-xc-host section in DEFSTRUCT")
 		,@(unless expanding-into-code-for-xc-host-p
 		    (append (raw-accessor-definitions dd)
 			    (predicate-definitions dd)
@@ -262,8 +264,10 @@
 					;(copier-definition dd)
 			    (constructor-definitions dd)
 			    (class-method-definitions dd)))
+		(/noshow0 "done with DEFSTRUCT " ,name)
 		',name))
 	   `(progn
+	      (/show0 "doing NOT CLASS-STRUCTURE-P case for DEFSTRUCT " ,name)
 	      (eval-when (:compile-toplevel :load-toplevel :execute)
 		(setf (info :typed-structure :info ',name) ',dd))
 	      ,@(unless expanding-into-code-for-xc-host-p
@@ -271,6 +275,7 @@
 			  (typed-predicate-definitions dd)
 			  (typed-copier-definitions dd)
 			  (constructor-definitions dd)))
+	      (/noshow0 "done with DEFSTRUCT " ,name)
 	      ',name)))))
 
 (sb!xc:defmacro defstruct (name-and-options &rest slot-descriptions)

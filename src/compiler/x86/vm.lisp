@@ -376,8 +376,6 @@
 		  :offset 31))		; Offset doesn't get used.
 |#
 
-;;; IMMEDIATE-CONSTANT-SC
-;;;
 ;;; If value can be represented as an immediate constant, then return
 ;;; the appropriate SC number, otherwise return NIL.
 (!def-vm-support-routine immediate-constant-sc (value)
@@ -420,8 +418,6 @@
 (defconstant cfp-offset ebp-offset)	; pfw - needed by stuff in /code
 					; related to signal context stuff
 
-;;; SINGLE-VALUE-RETURN-BYTE-OFFSET
-;;;
 ;;; This is used by the debugger.
 (defconstant single-value-return-byte-offset 2)
 

@@ -113,8 +113,8 @@
 	    (unless sub-value (return (values nil t)))
 	    (setf certain? nil))))))
 
-;;; Look for a nice intersection for types that intersect only when
-;;; one is a hierarchical subtype of the other.
+;;; Look for nice relationships for types that have nice relationships
+;;; only when one is a hierarchical subtype of the other.
 (defun hierarchical-intersection2 (type1 type2)
   (multiple-value-bind (subtypep1 win1) (csubtypep type1 type2)
     (multiple-value-bind (subtypep2 win2) (csubtypep type2 type1)
@@ -122,15 +122,15 @@
 	    (subtypep2 type2)
 	    ((and win1 win2) *empty-type*)
 	    (t nil)))))
-
-(defun vanilla-union (type1 type2)
+(defun hierarchical-union2 (type1 type2)
   (cond ((csubtypep type1 type2) type2)
 	((csubtypep type2 type1) type1)
 	(t nil)))
 
-;;; Hash two things (types) down to 8 bits. In CMU CL this was an EQ hash, but
-;;; since it now needs to run in vanilla ANSI Common Lisp at cross-compile
-;;; time, it's now based on the CTYPE-HASH-VALUE field instead.
+;;; Hash two things (types) down to 8 bits. In CMU CL this was an EQ
+;;; hash, but since it now needs to run in vanilla ANSI Common Lisp at
+;;; cross-compile time, it's now based on the CTYPE-HASH-VALUE field
+;;; instead.
 ;;;
 ;;; FIXME: This was a macro in CMU CL, and is now an INLINE function. Is
 ;;; it important for it to be INLINE, or could be become an ordinary

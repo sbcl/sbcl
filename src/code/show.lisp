@@ -101,8 +101,8 @@
 		    #!+sb-show
 		    (sb!sys:%primitive print
 				       ,(concatenate 'simple-string "/" s)))))
-(defmacro /noshow0 (s)
-  (declare (ignore s)))
+(defmacro /noshow0 (&rest rest)
+  (declare (ignore rest)))
 
 ;;; low-level display of a string, works even early in cold init
 (defmacro /primitive-print (thing)

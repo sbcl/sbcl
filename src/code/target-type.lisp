@@ -105,29 +105,18 @@
 		(values (not res) t)
 		(values nil nil))))
 	 (satisfies
-	  ;; KLUDGE: This stuff might well blow up if we tried to execute it
-	  ;; when cross-compiling. But since for the foreseeable future the
-	  ;; only code we'll try to cross-compile is SBCL itself, and SBCL is
-	  ;; built without using SATISFIES types, it's arguably not important
-	  ;; to worry about this. -- WHN 19990210.
-	  (let ((fun (second hairy-spec)))
-	    (cond ((and (consp fun)
-			(eq (car fun) 'lambda))
-		   (values (not (null (funcall (coerce fun 'function) obj)))
-			   t))
-		  ((and (symbolp fun) (fboundp fun))
-		   (values (not (null (funcall fun obj))) t))
-		  (t
-		   (values nil nil))))))))))
+	  (let ((predicate-name (second hairy-spec)))
+	    (declare (type symbol predicate-name)) ; by ANSI spec of SATISFIES
+	    (if (fboundp predicate-name)
+		(values (not (null (funcall predicate-name obj))) t)
+		(values nil nil)))))))))
 
-;;; LAYOUT-OF  --  Exported
-;;;
-;;;    Return the layout for an object. This is the basic operation for
-;;; finding out the "type" of an object, and is used for generic function
-;;; dispatch. The standard doesn't seem to say as much as it should about what
-;;; this returns for built-in objects. For example, it seems that we must
-;;; return NULL rather than LIST when X is NIL so that GF's can specialize on
-;;; NULL.
+;;; Return the layout for an object. This is the basic operation for
+;;; finding out the "type" of an object, and is used for generic
+;;; function dispatch. The standard doesn't seem to say as much as it
+;;; should about what this returns for built-in objects. For example,
+;;; it seems that we must return NULL rather than LIST when X is NIL
+;;; so that GF's can specialize on NULL.
 #!-sb-fluid (declaim (inline layout-of))
 (defun layout-of (x)
   (declare (optimize (speed 3) (safety 0)))
@@ -171,7 +160,7 @@
   (when *type-system-initialized*
     (dolist (sym '(values-specifier-type-cache-clear
 		   values-type-union-cache-clear
-		   type-union-cache-clear
+		   type-union2-cache-clear
 		   values-subtypep-cache-clear
 		   csubtypep-cache-clear
 		   type-intersection2-cache-clear

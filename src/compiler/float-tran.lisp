@@ -740,7 +740,6 @@
 	     (interval-expt-< pos y))))))
 
 ;;; Compute bounds for (expt x y).
-
 (defun interval-expt (x y)
   (case (interval-range-info x 1)
     ('+
@@ -865,8 +864,8 @@
 (defun merged-interval-expt (x y)
   (let* ((x-int (numeric-type->interval x))
 	 (y-int (numeric-type->interval y)))
-    (mapcar #'(lambda (type)
-		(fixup-interval-expt type x-int y-int x y))
+    (mapcar (lambda (type)
+	      (fixup-interval-expt type x-int y-int x y))
 	    (flatten-list (interval-expt x-int y-int)))))
 
 (defun expt-derive-type-aux (x y same-arg)
@@ -901,16 +900,13 @@
 (defun log-derive-type-aux-2 (x y same-arg)
   (let ((log-x (log-derive-type-aux-1 x))
 	(log-y (log-derive-type-aux-1 y))
-	(result '()))
-    ;; log-x or log-y might be union types. We need to run through
-    ;; the union types ourselves because /-derive-type-aux doesn't.
+	(accumulated-list nil))
+    ;; LOG-X or LOG-Y might be union types. We need to run through
+    ;; the union types ourselves because /-DERIVE-TYPE-AUX doesn't.
     (dolist (x-type (prepare-arg-for-derive-type log-x))
       (dolist (y-type (prepare-arg-for-derive-type log-y))
-	(push (/-derive-type-aux x-type y-type same-arg) result)))
-    (setf result (flatten-list result))
-    (if (rest result)
-	(make-union-type-or-something result)
-	(first result))))
+	(push (/-derive-type-aux x-type y-type same-arg) accumulated-list)))
+    (apply #'type-union (flatten-list accumulated-list))))
 
 (defoptimizer (log derive-type) ((x &optional y))
   (if y
@@ -1087,10 +1083,9 @@
 	     (rat-result-p (csubtypep element-type
 				      (specifier-type 'rational))))
 	(if rat-result-p
-	    (make-union-type-or-something
-	     (list element-type
-		   (specifier-type
-		    `(complex ,(numeric-type-class element-type)))))
+	    (type-union element-type
+			(specifier-type
+			 `(complex ,(numeric-type-class element-type))))
 	    (make-numeric-type :class (numeric-type-class element-type)
 			       :format (numeric-type-format element-type)
 			       :complexp (if rat-result-p

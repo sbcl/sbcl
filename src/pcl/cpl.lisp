@@ -23,8 +23,8 @@
 
 (in-package "SB-PCL")
 
-;;; compute-class-precedence-list
-;;;
+;;;; COMPUTE-CLASS-PRECEDENCE-LIST and friends
+
 ;;; Knuth section 2.2.3 has some interesting notes on this.
 ;;;
 ;;; What appears here is basically the algorithm presented there.

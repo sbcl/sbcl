@@ -23,11 +23,11 @@
 
 (in-package "SB-PCL")
 
-;;; This file is (almost) functionally equivalent to dlap.lisp, but easier to
-;;; read.
+;;; This file is (almost) functionally equivalent to dlap.lisp, but
+;;; easier to read.
 
-;;; Might generate faster code, too, depending on the compiler and whether an
-;;; implementation-specific lap assembler was used.
+;;; Might generate faster code, too, depending on the compiler and
+;;; whether an implementation-specific lap assembler was used.
 
 (defun emit-one-class-reader (class-slot-p)
   (emit-reader/writer :reader 1 class-slot-p))

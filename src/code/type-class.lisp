@@ -79,12 +79,8 @@
   ;;     TYPE-UNION, and TYPE-INTERSECTION handle those cases specially
   ;;     (and deal with canonicalization/simplification issues at the
   ;;     same time).
-  ;;
-  ;; FIXME: SIMPLE-UNION and COMPLEX-UNION methods haven't been
-  ;; converted to the new scheme yet. (Thus they never return NIL, I
-  ;; think. -- WHN 2001-03-11)
-  (simple-union #'vanilla-union :type function)
-  (complex-union nil :type (or function null))
+  (simple-union2 #'hierarchical-union2 :type function)
+  (complex-union2 nil :type (or function null))
   (simple-intersection2 #'hierarchical-intersection2 :type function)
   (complex-intersection2 nil :type (or function null))
   (simple-= #'must-supply-this :type function)
@@ -136,8 +132,8 @@
 		   :simple-subtypep       (type-class-simple-subtypep x)
 		   :complex-subtypep-arg1 (type-class-complex-subtypep-arg1 x)
 		   :complex-subtypep-arg2 (type-class-complex-subtypep-arg2 x)
-		   :simple-union	  (type-class-simple-union x)
-		   :complex-union	  (type-class-complex-union x)
+		   :simple-union2	  (type-class-simple-union2 x)
+		   :complex-union2	  (type-class-complex-union2 x)
 		   :simple-intersection2  (type-class-simple-intersection2 x)
 		   :complex-intersection2 (type-class-complex-intersection2 x)
 		   :simple-=	          (type-class-simple-= x)
@@ -150,8 +146,8 @@
   '((:simple-subtypep . type-class-simple-subtypep)
     (:complex-subtypep-arg1 . type-class-complex-subtypep-arg1)
     (:complex-subtypep-arg2 . type-class-complex-subtypep-arg2)
-    (:simple-union . type-class-simple-union)
-    (:complex-union . type-class-complex-union)
+    (:simple-union2 . type-class-simple-union2)
+    (:complex-union2 . type-class-complex-union2)
     (:simple-intersection2 . type-class-simple-intersection2)
     (:complex-intersection2 . type-class-complex-intersection2)
     (:simple-= . type-class-simple-=)

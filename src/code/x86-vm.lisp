@@ -295,18 +295,17 @@
   (declare (ignore component))
   nil)
 
-;;; FLOAT-WAIT
-;;;
 ;;; This is used in error.lisp to insure that floating-point exceptions
 ;;; are properly trapped. The compiler translates this to a VOP.
 (defun float-wait ()
   (float-wait))
 
-;;; FLOAT CONSTANTS
+;;; float constants
 ;;;
-;;; These are used by the FP MOVE-FROM-{SINGLE|DOUBLE} VOPs rather than the
-;;; i387 load constant instructions to avoid consing in some cases. Note these
-;;; are initialized by GENESIS as they are needed early.
+;;; These are used by the FP MOVE-FROM-{SINGLE|DOUBLE} VOPs rather
+;;; than the i387 load constant instructions to avoid consing in some
+;;; cases. Note these are initialized by GENESIS as they are needed
+;;; early.
 (defvar *fp-constant-0s0*)
 (defvar *fp-constant-1s0*)
 (defvar *fp-constant-0d0*)

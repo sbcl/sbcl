@@ -570,7 +570,6 @@ a host-structure or string."
 				 (%pathname-host pathname))
 				:lower)))))
 
-;;; PATHNAME-TYPE
 (defun pathname-type (pathname &key (case :local))
   #!+sb-doc
   "Accessor for the pathname's name."
@@ -583,7 +582,6 @@ a host-structure or string."
 				 (%pathname-host pathname))
 				:lower)))))
 
-;;; PATHNAME-VERSION
 (defun pathname-version (pathname)
   #!+sb-doc
   "Accessor for the pathname's version."

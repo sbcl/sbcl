@@ -832,6 +832,16 @@ Error in function C::GET-LAMBDA-TO-COMPILE:
   but ordinary COMPILE-FILE of a file containing (DECLAIM (SPEED 0))
   does not.
 
+88:
+  The type system doesn't understand that the intersection of the
+  types (MEMBER :FOO) and (OR KEYWORD NULL) is (MEMBER :FOO).
+
+89:
+  The type system doesn't understand the the intersection of the types
+  KEYWORD and (OR KEYWORD NULL) is KEYWORD, perhaps because KEYWORD
+  is itself an intersection type and that causes technical problems
+  with the simplification.
+
 
 KNOWN BUGS RELATED TO THE IR1 INTERPRETER
 

@@ -58,6 +58,23 @@
 	     (type-intersection (specifier-type '(satisfies keywordp))
 				*empty-type*)))
 
+(assert (type= (specifier-type 'list)
+	       (type-union (specifier-type 'cons) (specifier-type 'null))))
+(assert (type= (specifier-type 'list)
+	       (type-union (specifier-type 'null) (specifier-type 'cons))))
+(assert (type= (specifier-type 'sequence)
+	       (type-union (specifier-type 'list) (specifier-type 'vector))))
+(assert (type= (specifier-type 'sequence)
+	       (type-union (specifier-type 'vector) (specifier-type 'list))))
+(assert (type= (specifier-type 'list)
+	       (type-union (specifier-type 'cons) (specifier-type 'list))))
+(assert (not (csubtypep (type-union (specifier-type 'list)
+				    (specifier-type '(satisfies foo)))
+			(specifier-type 'list))))
+(assert (csubtypep (specifier-type 'list)
+		   (type-union (specifier-type 'list)
+			       (specifier-type '(satisfies foo)))))
+
 ;;; Identities should be identities.
 (dolist (type-specifier '(nil
 			  t
@@ -87,22 +104,15 @@
     (assert (type= ctype (type-intersection2 ctype *universal-type*)))
     (assert (type= ctype (type-intersection2 *universal-type* ctype)))
       
-    ;; FIXME: TYPE-UNION still acts CMU-CL-ish as of 0.6.11.13, so
-    ;; e.g. (TYPE-UNION #<HAIRY-TYPE (SATISFIES KEYWORDP)> *EMPTY-TYPE*)
-    ;; returns a UNION-TYPE instead of the HAIRY-TYPE. When that's
-    ;; fixed, these tests should be enabled.
-    ;;(assert (eql ctype (type-union ctype *empty-type*)))
-    ;;(assert (eql ctype (type-union *empty-type* ctype)))
+    (assert (eql *universal-type* (type-union ctype *universal-type*)))
+    (assert (eql *universal-type* (type-union *universal-type* ctype)))
+    (assert (eql *universal-type* (type-union2 ctype *universal-type*)))
+    (assert (eql *universal-type* (type-union2 *universal-type* ctype)))
 
-    ;; FIXME: TYPE-UNION2 is not defined yet as of 0.6.11.13, and when
-    ;; it's defined, these tests should be enabled.
-    ;;(assert (eql *empty-type* (type-union2 ctype *empty-type*)))
-    ;;(assert (eql *empty-type* (type-union2 *empty-type* ctype)))
-
-    ;;(assert (eql *universal-type* (type-union ctype *universal-type*)))
-    ;;(assert (eql *universal-type* (type-union *universal-type* ctype)))
-    ;;(assert (eql ctype (type-union2 ctype *universal-type*)))
-    ;;(assert (eql ctype (type-union2 *universal-type* ctype)))
+    (assert (type= ctype (type-union ctype *empty-type*)))
+    (assert (type= ctype (type-union *empty-type* ctype)))
+    (assert (type= ctype (type-union2 ctype *empty-type*)))
+    (assert (type= ctype (type-union2 *empty-type* ctype)))
 
     (assert (csubtypep *empty-type* ctype))
     (assert (csubtypep ctype *universal-type*))))
@@ -172,5 +182,17 @@
 (assert (null (type-intersection2 (specifier-type 'symbol)
 				  (specifier-type '(satisfies foo)))))
 (assert (intersection-type-p (specifier-type '(and symbol (satisfies foo)))))
+;; FIXME: As of sbcl-0.6.11.17, the system doesn't know how to do the
+;; type simplifications which would let these tests work. (bug 88)
+#|
+(let* ((type1 (specifier-type '(member :x86)))
+       (type2 (specifier-type '(or keyword null)))
+       (isect (type-intersection type1 type2)))
+  (assert (type= isect (type-intersection type2 type1)))
+  (assert (type= isect type1))
+  (assert (type= isect (type-intersection type2 type1 type2)))
+  (assert (type= isect (type-intersection type1 type1 type2 type1)))
+  (assert (type= isect (type-intersection type1 type2 type1 type2))))
+|#
 
 (/show "done with tests/type.before-xc.lisp")

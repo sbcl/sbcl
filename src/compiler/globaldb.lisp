@@ -1008,7 +1008,11 @@
 (define-info-type
   :class :function
   :type :assumed-type
-  :type-spec (or approximate-function-type null))
+  ;; FIXME: The type-spec really should be
+  ;;   (or approximate-function-type null)).
+  ;; It was changed to T as a hopefully-temporary hack while getting
+  ;; cold init problems untangled.
+  :type-spec t) 
 
 ;;; where this information came from:
 ;;;  :DECLARED = from a declaration.

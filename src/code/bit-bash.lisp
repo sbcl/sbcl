@@ -13,17 +13,15 @@
 
 ;;;; constants and types
 
-(defconstant unit-bits sb!vm:word-bits
-  #!+sb-doc
-  "The number of bits to process at a time.")
+;;; the number of bits to process at a time
+(defconstant unit-bits sb!vm:word-bits)
 
-(defconstant max-bits (ash most-positive-fixnum -2)
-  #!+sb-doc
-  "The maximum number of bits that can be delt with during a single call.")
+;;; the maximum number of bits that can be dealt with in a single call
+(defconstant max-bits (ash most-positive-fixnum -2))
 
-;;; FIXME: Do we really need EVAL-WHEN around these DEFTYPEs?
 (eval-when (:compile-toplevel :load-toplevel :execute)
 
+;;; FIXME: Do we really need EVAL-WHEN around the DEFTYPEs?
 (deftype unit ()
   `(unsigned-byte ,unit-bits))
 
@@ -61,12 +59,11 @@
   (def-frob 32bit-logical-orc1 x y)
   (def-frob 32bit-logical-orc2 x y))
 
+;;; Shift NUMBER by the low-order bits of COUNTOID, adding zero bits
+;;; at the "end" and removing bits from the "start". On big-endian
+;;; machines this is a left-shift and on little-endian machines this
+;;; is a right-shift.
 (defun shift-towards-start (number countoid)
-  #!+sb-doc
-  "Shift NUMBER by the low-order bits of COUNTOID, adding zero bits at
-  the ``end'' and removing bits from the ``start.''  On big-endian
-  machines this is a left-shift and on little-endian machines this is a
-  right-shift."
   (declare (type unit number) (fixnum countoid))
   (let ((count (ldb (byte (1- (integer-length unit-bits)) 0) countoid)))
     (declare (type bit-offset count))
@@ -78,11 +75,10 @@
 	  (:little-endian
 	   (ash number (- count)))))))
 
+;;; Shift NUMBER by COUNT bits, adding zero bits at the "start" and
+;;; removing bits from the "end". On big-endian machines this is a
+;;; right-shift and on little-endian machines this is a left-shift.
 (defun shift-towards-end (number count)
-  #!+sb-doc
-  "Shift NUMBER by COUNT bits, adding zero bits at the ``start'' and removing
-  bits from the ``end.''  On big-endian machines this is a right-shift and
-  on little-endian machines this is a left-shift."
   (declare (type unit number) (fixnum count))
   (let ((count (ldb (byte (1- (integer-length unit-bits)) 0) count)))
     (declare (type bit-offset count))
@@ -95,24 +91,25 @@
 	   (ash (ldb (byte (- unit-bits count) 0) number) count))))))
 
 #!-sb-fluid (declaim (inline start-mask end-mask fix-sap-and-offset))
+
+;;; Produce a mask that contains 1's for the COUNT "start" bits and
+;;; 0's for the remaining "end" bits. Only the lower 5 bits of COUNT
+;;; are significant (KLUDGE: because of hardwired implicit dependence
+;;; on 32-bit word size -- WHN 2001-03-19).
 (defun start-mask (count)
-  #!+sb-doc
-  "Produce a mask that contains 1's for the COUNT ``start'' bits and 0's for
-  the remaining ``end'' bits. Only the lower 5 bits of COUNT are significant."
   (declare (fixnum count))
   (shift-towards-start (1- (ash 1 unit-bits)) (- count)))
 
+;;; Produce a mask that contains 1's for the COUNT "end" bits and 0's
+;;; for the remaining "start" bits. Only the lower 5 bits of COUNT are
+;;; significant (KLUDGE: because of hardwired implicit dependence on
+;;; 32-bit word size -- WHN 2001-03-19).
 (defun end-mask (count)
-  #!+sb-doc
-  "Produce a mask that contains 1's for the COUNT ``end'' bits and 0's for
-  the remaining ``start'' bits. Only the lower 5 bits of COUNT are
-  significant."
   (declare (fixnum count))
   (shift-towards-end (1- (ash 1 unit-bits)) (- count)))
 
+;;; Align the SAP to a word boundary, and update the offset accordingly.
 (defun fix-sap-and-offset (sap offset)
-  #!+sb-doc
-  "Align the SAP to a word boundary, and update the offset accordingly."
   (declare (type system-area-pointer sap)
 	   (type index offset)
 	   (values system-area-pointer index))
@@ -138,10 +135,10 @@
 
 ;;;; DO-CONSTANT-BIT-BASH
 
+;;; Fill DST with VALUE starting at DST-OFFSET and continuing for
+;;; LENGTH bits.
 #!-sb-fluid (declaim (inline do-constant-bit-bash))
 (defun do-constant-bit-bash (dst dst-offset length value dst-ref-fn dst-set-fn)
-  #!+sb-doc
-  "Fill DST with VALUE starting at DST-OFFSET and continuing for LENGTH bits."
   (declare (type offset dst-offset) (type unit value)
 	   (type function dst-ref-fn dst-set-fn))
   (multiple-value-bind (dst-word-offset dst-bit-offset)

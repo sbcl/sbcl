@@ -29,7 +29,7 @@
 ;;; type is defined (or redefined).
 (defun-cached (values-specifier-type
 	       :hash-function (lambda (x)
-				;; FIXME: the THE FIXNUM stuff is
+				;; FIXME: The THE FIXNUM stuff is
 				;; redundant in SBCL (or modern CMU
 				;; CL) because of type inference.
 				(the fixnum
@@ -183,8 +183,7 @@
 ;;; A NUMERIC-TYPE represents any numeric type, including things
 ;;; such as FIXNUM.
 (defstruct (numeric-type (:include ctype
-				   (class-info (type-class-or-lose
-						'number)))
+				   (class-info (type-class-or-lose 'number)))
 			 #!+negative-zero-is-not-zero
 			 (:constructor %make-numeric-type))
   ;; the kind of numeric type we have, or NIL if not specified (just

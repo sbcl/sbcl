@@ -130,14 +130,14 @@
 
 ;;;; type specifier hackery
 
-;;; internal to this file.
+;;; internal to this file
 (defun coerce-to-class (class &optional make-forward-referenced-class-p)
   (if (symbolp class)
       (or (find-class class (not make-forward-referenced-class-p))
 	  (ensure-class class))
       class))
 
-;;; Interface
+;;; interface
 (defun specializer-from-type (type &aux args)
   (when (consp type)
     (setq args (cdr type) type (car type)))

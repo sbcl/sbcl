@@ -158,8 +158,6 @@
 
 ;;;; runtime C values that don't correspond directly to Lisp types
 
-;;; ALIEN-VALUE
-;;;
 ;;; Note: The DEFSTRUCT for ALIEN-VALUE lives in a separate file
 ;;; 'cause it has to be real early in the cold-load order.
 #!-sb-fluid (declaim (freeze-type alien-value))

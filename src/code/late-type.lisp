@@ -215,7 +215,7 @@
 (!define-superclasses function ((function)) !cold-init-forms)
 
 ;;; The union or intersection of two FUNCTION types is FUNCTION.
-(!define-type-method (function :simple-union) (type1 type2)
+(!define-type-method (function :simple-union2) (type1 type2)
   (declare (ignore type1 type2))
   (specifier-type 'function))
 (!define-type-method (function :simple-intersection2) (type1 type2)
@@ -330,7 +330,7 @@
 	(t
 	 type)))
 
-;;; Return the minmum number of arguments that a function can be
+;;; Return the minimum number of arguments that a function can be
 ;;; called with, and the maximum number or NIL. If not a function
 ;;; type, return NIL, NIL.
 (defun function-type-nargs (type)
@@ -414,7 +414,7 @@
 ;;; This has the virtue of always keeping the VALUES type specifier
 ;;; outermost, and retains all of the information that is really
 ;;; useful for static type analysis. We want to know what is always
-;;; true of each value independently. It is worthless to know that IF
+;;; true of each value independently. It is worthless to know that if
 ;;; the first value is B0 then the second will be B1.
 ;;;
 ;;; If the VALUES count signatures differ, then we produce a result with
@@ -606,27 +606,55 @@
 	(values (not res) t)
 	(values nil nil))))
 
+;;; the type method dispatch case of TYPE-UNION2
+(defun %type-union2 (type1 type2)
+  ;; As in %TYPE-INTERSECTION2, it seems to be a good idea to give
+  ;; both argument orders a chance at COMPLEX-INTERSECTION2. Unlike
+  ;; %TYPE-INTERSECTION2, though, I don't have a specific case which
+  ;; demonstrates this is actually necessary. Also unlike
+  ;; %TYPE-INTERSECTION2, there seems to be no need to distinguish
+  ;; between not finding a method and having a method return NIL.
+  (flet ((1way (x y)
+	   (let ((result (!invoke-type-method :simple-union2 :complex-union2
+					      x y
+					      :default nil)))
+	     ;; UNION2 type methods are supposed to return results
+	     ;; which are better than just brute-forcibly smashing the
+	     ;; terms together into UNION-TYPEs. But they're derived
+	     ;; from old CMU CL UNION type methods which played by
+	     ;; somewhat different rules. Here we check to make sure
+	     ;; we don't get ambushed by diehard old-style code.
+	     (assert (not (union-type-p result)))
+	     result)))
+    (declare (inline 1way))
+    (or (1way type1 type2)
+	(1way type2 type1))))
+
 ;;; Find a type which includes both types. Any inexactness is
 ;;; represented by the fuzzy element types; we return a single value
 ;;; that is precise to the best of our knowledge. This result is
-;;; simplified into the canonical form, thus is not a UNION type
-;;; unless there is no other way to represent the result.
-(defun-cached (type-union :hash-function type-cache-hash
-			  :hash-bits 8
-			  :init-wrapper !cold-init-forms)
+;;; simplified into the canonical form, thus is not a UNION-TYPE
+;;; unless we find no other way to represent the result.
+(defun-cached (type-union2 :hash-function type-cache-hash
+			   :hash-bits 8
+			   :init-wrapper !cold-init-forms)
 	      ((type1 eq) (type2 eq))
+  ;; KLUDGE: This was generated from TYPE-INTERSECTION2 by Ye Olde Cut And
+  ;; Paste technique of programming. If it stays around (as opposed to
+  ;; e.g. fading away in favor of some CLOS solution) the shared logic
+  ;; should probably become shared code. -- WHN 2001-03-16
   (declare (type ctype type1 type2))
-  (if (eq type1 type2)
-      type1
-      (let ((res (!invoke-type-method :simple-union :complex-union
-				      type1 type2
-				      :default :vanilla)))
-	(cond ((eq res :vanilla)
-	       (or (vanilla-union type1 type2)
-		   (make-union-type-or-something (list type1 type2))))
-	      (res)
-	      (t
-	       (make-union-type-or-something (list type1 type2)))))))
+  (cond ((eq type1 type2)
+	 type1)
+	((or (union-type-p type1)
+	     (union-type-p type2))
+	 ;; Unions of UNION-TYPE should have the UNION-TYPE-TYPES
+	 ;; values broken out and united separately. The full TYPE-UNION
+	 ;; function knows how to do this, so let it handle it.
+	 (type-union type1 type2))
+	(t
+	 ;; the ordinary case: we dispatch to type methods
+	 (%type-union2 type1 type2))))
 
 ;;; the type method dispatch case of TYPE-INTERSECTION2
 (defun %type-intersection2 (type1 type2)
@@ -647,9 +675,20 @@
   ;;
   ;; (Why yes, CLOS probably *would* be nicer..)
   (flet ((1way (x y)
-	   (!invoke-type-method :simple-intersection2 :complex-intersection2
-				x y
-				:default :no-type-method-found)))
+	   (let ((result
+		  (!invoke-type-method :simple-intersection2
+				       :complex-intersection2
+				       x y
+				       :default :no-type-method-found)))
+	     ;; INTERSECTION2 type methods are supposed to return
+	     ;; results which are better than just brute-forcibly
+	     ;; smashing the terms together into INTERSECTION-TYPEs.
+	     ;; But they're derived from old CMU CL INTERSECTION type
+	     ;; methods which played by somewhat different rules. Here
+	     ;; we check to make sure we don't get ambushed by diehard
+	     ;; old-style code.
+	     (assert (not (intersection-type-p result)))
+	     result)))
     (declare (inline 1way))
     (let ((xy (1way type1 type2)))
       (or (and (not (eql xy :no-type-method-found)) xy)
@@ -674,7 +713,7 @@
 	((or (intersection-type-p type1)
 	     (intersection-type-p type2))
 	 ;; Intersections of INTERSECTION-TYPE should have the
-	 ;; INTERSECTION-TYPE-TYPES objects broken out and intersected
+	 ;; INTERSECTION-TYPE-TYPES values broken out and intersected
 	 ;; separately. The full TYPE-INTERSECTION function knows how
 	 ;; to do that, so let it handle it.
 	 (type-intersection type1 type2))
@@ -742,7 +781,7 @@
 ;;; SIMPLIFY2 and replacing them by their simplified forms.
 (defun accumulate-compound-type (type types simplify2)
   (declare (type ctype type))
-  (declare (type (vector t) types))
+  (declare (type (vector ctype) types))
   (declare (type function simplify2))
   (dotimes (i (length types) (vector-push-extend type types))
     (let ((simplified2 (funcall simplify2 type (aref types i))))
@@ -755,48 +794,80 @@
 					  simplify2)))))
   (values))
 
+;;; shared logic for unions and intersections: Return a vector of
+;;; types representing the same types as INPUT-TYPES, but with 
+;;; COMPOUND-TYPEs satisfying %COMPOUND-TYPE-P broken up into their
+;;; component types, and with any SIMPLY2 simplifications applied.
+(defun simplified-compound-types (input-types %compound-type-p simplify2)
+  (let ((simplified-types (make-array (length input-types)
+				      :fill-pointer 0
+				      :element-type 'ctype
+				      ;; (This INITIAL-ELEMENT shouldn't
+				      ;; matter, but helps avoid type
+				      ;; warnings at compile time.)
+				      :initial-element *empty-type*)))
+    (flet ((accumulate (type)
+	     (accumulate-compound-type type simplified-types simplify2)))
+      (declare (inline accumulate))
+      (dolist (type input-types)
+	(if (funcall %compound-type-p type)
+	    (map nil #'accumulate (compound-type-types type))
+	    (accumulate type))))
+    simplified-types))
+
 ;;; shared logic for unions and intersections: Make a COMPOUND-TYPE
-;;; object whose components are the types in TYPES, or skip to
-;;; special cases when TYPES-VECTOR is short.
+;;; object whose components are the types in TYPES, or skip to special
+;;; cases when TYPES is short.
 (defun make-compound-type-or-something (constructor types enumerable identity)
   (declare (type function constructor))
-  (declare (type (vector t) types))
+  (declare (type (vector ctype) types))
   (declare (type ctype identity))
   (case (length types)
     (0 identity)
-    (1 (the ctype (aref types 0)))
-    (t (funcall constructor enumerable (coerce types 'list)))))
+    (1 (aref types 0))
+    (t (funcall constructor
+		enumerable
+		;; FIXME: This should be just (COERCE TYPES 'LIST), but as
+		;; of sbcl-0.6.11.17 the COERCE optimizer is really
+		;; brain-dead, so that would generate a full call to
+		;; SPECIFIER-TYPE at runtime, so we get into bootstrap
+		;; problems in cold init because 'LIST is a compound
+		;; type, so we need to MAKE-COMPOUND-TYPE-OR-SOMETHING
+		;; before we know what 'LIST is. Once the COERCE
+		;; optimizer is less brain-dead, we can make this
+		;; (COERCE TYPES 'LIST) again.
+		#+sb-xc-host (coerce types 'list)
+		#-sb-xc-host (coerce-to-list types)))))
 
 (defun type-intersection (&rest input-types)
-  (let (;; components of our result, accumulated as a vector
-	(simplified-types (make-array (length input-types) :fill-pointer 0)))
-    (flet ((accumulate (type)
-	     (accumulate-compound-type type
-				       simplified-types
-				       #'type-intersection2)))
-      (declare (inline accumulate))
-      (dolist (type input-types)
-	(if (intersection-type-p type)
-	    (map nil #'accumulate (intersection-type-types type))
-	    (accumulate type)))
-      ;; We want to have a canonical representation of types (or failing
-      ;; that, punt to HAIRY-TYPE). Canonical representation would have
-      ;; intersections inside unions but not vice versa, since you can
-      ;; always achieve that by the distributive rule. But we don't want
-      ;; to just apply the distributive rule, since it would be too easy
-      ;; to end up with unreasonably huge type expressions. So instead
-      ;; we punt to HAIRY-TYPE when this comes up.
-      (if (and (> (length simplified-types) 1)
-	       (some #'union-type-p simplified-types))
-	  (make-hairy-type
-	   :specifier `(and ,@(map 'list #'type-specifier simplified-types)))
-	  (make-compound-type-or-something #'%make-intersection-type
-					   simplified-types
-					   (some #'type-enumerable
-						 simplified-types)
-					   *universal-type*)))))
+  (let ((simplified-types (simplified-compound-types input-types
+						     #'intersection-type-p
+						     #'type-intersection2)))
+    ;; We want to have a canonical representation of types (or failing
+    ;; that, punt to HAIRY-TYPE). Canonical representation would have
+    ;; intersections inside unions but not vice versa, since you can
+    ;; always achieve that by the distributive rule. But we don't want
+    ;; to just apply the distributive rule, since it would be too easy
+    ;; to end up with unreasonably huge type expressions. So instead
+    ;; we punt to HAIRY-TYPE when this comes up.
+    (if (and (> (length simplified-types) 1)
+	     (some #'union-type-p simplified-types))
+	(make-hairy-type
+	 :specifier `(and ,@(map 'list #'type-specifier simplified-types)))
+	(make-compound-type-or-something #'%make-intersection-type
+					 simplified-types
+					 (some #'type-enumerable
+					       simplified-types)
+					 *universal-type*))))
 
-;;; FIXME: Define TYPE-UNION similar to TYPE-INTERSECTION.
+(defun type-union (&rest input-types)
+  (let ((simplified-types (simplified-compound-types input-types
+						     #'union-type-p
+						     #'type-union2)))
+    (make-compound-type-or-something #'%make-union-type
+				     simplified-types
+				     (every #'type-enumerable simplified-types)
+				     *empty-type*)))
 
 ;;;; built-in types
 
@@ -867,6 +938,11 @@
   ;;(assert (not (eq type2 *wild-type*))) ; * isn't really a type.
   (hierarchical-intersection2 type1 type2))
 
+(!define-type-method (named :complex-union2) (type1 type2)
+  ;; Perhaps when bug 85 is fixed this can be reenabled.
+  ;;(assert (not (eq type2 *wild-type*))) ; * isn't really a type.
+  (hierarchical-union2 type1 type2))
+
 (!define-type-method (named :unparse) (x)
   (named-type-name x))
 
@@ -907,9 +983,6 @@
   (declare (ignore type1 type2))
   nil)
 
-(!define-type-method (hairy :complex-union) (type1 type2)
-  (make-union-type-or-something (list type1 type2)))
-
 (!define-type-method (hairy :simple-=) (type1 type2)
   (if (equal (hairy-type-specifier type1)
 	     (hairy-type-specifier type2))
@@ -927,15 +1000,16 @@
 
 (!def-type-translator satisfies (&whole whole fun)
   (declare (ignore fun))
-  ;; Check legality of arguments of arguments.
+  ;; Check legality of arguments.
   (destructuring-bind (satisfies predicate-name) whole
     (declare (ignore satisfies))
     (unless (symbolp predicate-name)
       (error 'simple-type-error
 	     :datum predicate-name
-	     :expected-type symbol
+	     :expected-type 'symbol
 	     :format-control "~S is not a symbol."
 	     :format-arguments (list predicate-name))))
+  ;; Create object.
   (make-hairy-type :specifier whole))
 
 ;;;; numeric types
@@ -1187,7 +1261,7 @@
 ;;;
 ;;; ### Note: we give up early to keep from dropping lots of information on
 ;;; the floor by returning overly general types.
-(!define-type-method (number :simple-union) (type1 type2)
+(!define-type-method (number :simple-union2) (type1 type2)
   (declare (type numeric-type type1 type2))
   (cond ((csubtypep type1 type2) type2)
 	((csubtypep type2 type1) type1)
@@ -1225,9 +1299,9 @@
       (make-numeric-type :complexp :complex)
       (let ((type (specifier-type spec)))
 	(unless (numeric-type-p type)
-	  (error "Component type for Complex is not numeric: ~S." spec))
+	  (error "The component type for COMPLEX is not numeric: ~S" spec))
 	(when (eq (numeric-type-complexp type) :complex)
-	  (error "Component type for Complex is complex: ~S." spec))
+	  (error "The component type for COMPLEX is complex: ~S" spec))
 	(let ((res (copy-numeric-type type)))
 	  (setf (numeric-type-complexp res) :complex)
 	  res))))
@@ -1698,10 +1772,10 @@
 	      (t
 	       (make-member-type :members (members))))))))
 
-;;; We don't need a :COMPLEX-UNION, since the only interesting case is
+;;; We don't need a :COMPLEX-UNION2, since the only interesting case is
 ;;; a union type, and the member/union interaction is handled by the
 ;;; union type method.
-(!define-type-method (member :simple-union) (type1 type2)
+(!define-type-method (member :simple-union2) (type1 type2)
   (let ((mem1 (member-type-members type1))
 	(mem2 (member-type-members type2)))
     (cond ((subsetp mem1 mem2) type2)
@@ -1802,18 +1876,6 @@
 
 ;;;; union types
 
-;;; Make a union type from the specifier types, setting ENUMERABLE in
-;;; the result if all are enumerable; or take the easy way out if we
-;;; recognize a special case which can be represented more simply.
-(defun make-union-type-or-something (types)
-  (declare (list types))
-  (cond ((null types)
-	 *empty-type*)
-	((null (cdr types))
-	 (first types))
-	(t
-	 (%make-union-type (every #'type-enumerable types) types))))
-
 (!define-type-class union)
 
 ;;; The LIST type has a special name. Other union types just get
@@ -1861,32 +1923,6 @@
 (!define-type-method (union :complex-subtypep-arg2) (type1 type2)
   (union-complex-subtypep-arg2 type1 type2))
 
-(!define-type-method (union :complex-union) (type1 type2)
-  (let ((class1 (type-class-info type1)))
-    (collect ((res))
-      (let ((this-type type1))
-	(dolist (type (union-type-types type2)
-		      (if (res)
-			  (make-union-type-or-something (cons this-type (res)))
-			  this-type))
-	  (cond ((eq (type-class-info type) class1)
-		 (let ((union (funcall (type-class-simple-union class1)
-				       this-type type)))
-		   (if union
-		       (setq this-type union)
-		       (res type))))
-		((csubtypep type this-type))
-		((csubtypep type1 type) (return type2))
-		(t
-		 (res type))))))))
-
-;;; For the union of union types, we let the :COMPLEX-UNION method do
-;;; the work.
-(!define-type-method (union :simple-union) (type1 type2)
-  (let ((res type1))
-    (dolist (t2 (union-type-types type2) res)
-      (setq res (type-union res t2)))))
-
 (!define-type-method (union :simple-intersection2 :complex-intersection2)
  		     (type1 type2)
   ;; The CSUBTYPEP clauses here let us simplify e.g.
@@ -1906,19 +1942,39 @@
 	((union-complex-subtypep-arg1 type2 type1)
 	 type2)
 	(t 
-	 (let (;; a component of TYPE2 whose intersection with TYPE1
-	       ;; is nonempty
-	       (nontriv-t2 nil))
-	   (dolist (t2 (union-type-types type2) (or nontriv-t2 *empty-type*))
-	     (unless (eq *empty-type* (type-intersection type1 t2))
-	       (if nontriv-t2 ; if this is second nonempty intersection
-		   (return nil) ; too many: can't find nice result
-		   (setf nontriv-t2 t2))))))))
+	 (let ((accumulator *empty-type*))
+	   (dolist (t2 (union-type-types type2) accumulator)
+	     (setf accumulator
+		   (type-union2 accumulator
+				(type-intersection type1 t2)))
+	     ;; When our result isn't simple any more
+	     (when (or
+		    ;; (TYPE-UNION2 couldn't find a sufficiently simple
+		    ;; result, so we can't either.)
+		    (null accumulator)
+		    ;; (A result containing an intersection isn't
+		    ;; sufficiently simple for us. FIXME: Maybe it
+		    ;; should be sufficiently simple for us?
+		    ;; UNION-TYPEs aren't supposed to be nested inside
+		    ;; INTERSECTION-TYPEs, so if we punt with NIL,
+		    ;; we're condemning the expression to become a
+		    ;; HAIRY-TYPE. If it were possible for us to
+		    ;; return an INTERSECTION-TYPE, then the
+		    ;; INTERSECTION-TYPE-TYPES could be merged into
+		    ;; the outer INTERSECTION-TYPE which may be under
+		    ;; construction. E.g. if this function could
+		    ;; return an intersection type, and the calling
+		    ;; functions were smart enough to handle it, then
+		    ;; we could simplify (AND (OR FIXNUM KEYWORD)
+		    ;; SYMBOL) to KEYWORD, even though KEYWORD
+		    ;; is an intersection type.)
+		    (intersection-type-p accumulator))
+	       (return nil)))))))
 
 (!def-type-translator or (&rest type-specifiers)
-  (reduce #'type-union
-	  (mapcar #'specifier-type type-specifiers)
-	  :initial-value *empty-type*))
+  (apply #'type-union
+	 (mapcar #'specifier-type
+		 type-specifiers)))
 
 ;;;; CONS types
 
@@ -1953,7 +2009,7 @@
  
 ;;; Give up if a precise type is not possible, to avoid returning
 ;;; overly general types.
-(!define-type-method (cons :simple-union) (type1 type2)
+(!define-type-method (cons :simple-union2) (type1 type2)
   (declare (type cons-type type1 type2))
   (let ((car-type1 (cons-type-car-type type1))
 	(car-type2 (cons-type-car-type type2))
@@ -2013,7 +2069,6 @@
 		(when val (return))
 		(when (types-intersect x-type y-type)
 		  (return-from type-difference nil))))))
-
       (let ((y-mem (find-if #'member-type-p y-types)))
 	(when y-mem
 	  (let ((members (member-type-members y-mem)))
@@ -2023,11 +2078,7 @@
 		  (multiple-value-bind (val win) (ctypep member x-type)
 		    (when (or (not win) val)
 		      (return-from type-difference nil)))))))))
-
-      (cond ((null (res)) *empty-type*)
-	    ((null (rest (res))) (first (res)))
-	    (t
-	     (make-union-type-or-something (res)))))))
+      (apply #'type-union (res)))))
 
 (!def-type-translator array (&optional (element-type '*)
 				       (dimensions '*))

@@ -566,9 +566,11 @@
                                       ;   from "code/pathname"
  ("code/sharpm"            :not-host) ; uses stuff from "code/reader"
 
- ;; stuff for byte compilation. This works only in the target system,
- ;; because fundamental BYTE-FUNCTION-OR-CLOSURE types are implemented 
- ;; as nonportable FUNCALLABLE-INSTANCEs.
+ ;; stuff for byte compilation. Note that although byte code is
+ ;; "portable", it'd be hard to make it work on the cross-compilation
+ ;; host, because fundamental BYTE-FUNCTION-OR-CLOSURE types are
+ ;; implemented as FUNCALLABLE-INSTANCEs, and it's 
+ ;; not obvious how to make those portable.
  ("code/byte-types" :not-host)
  ("compiler/byte-comp")
  ("compiler/target-byte-comp" :not-host)
