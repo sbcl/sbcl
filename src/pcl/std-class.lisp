@@ -943,13 +943,21 @@
          :class class
          initargs))
 
+;;; I (CSR) am not sure, but I believe that the particular order of
+;;; slots is quite important: it is ideal to attempt to have a
+;;; constant slot location for the same notional slots as much as
+;;; possible, so that clever discriminating functions (ONE-INDEX et
+;;; al.) have a chance of working.  The below at least walks through
+;;; the slots predictably, but maybe it would be good to compute some
+;;; kind of optimal slot layout by looking at locations of slots in
+;;; superclasses?
 (defmethod compute-slots ((class std-class))
   ;; As specified, we must call COMPUTE-EFFECTIVE-SLOT-DEFINITION once
   ;; for each different slot name we find in our superclasses. Each
   ;; call receives the class and a list of the dslotds with that name.
   ;; The list is in most-specific-first order.
   (let ((name-dslotds-alist ()))
-    (dolist (c (class-precedence-list class))
+    (dolist (c (reverse (class-precedence-list class)))
       (dolist (slot (class-direct-slots c))
 	(let* ((name (slot-definition-name slot))
 	       (entry (assq name name-dslotds-alist)))
@@ -959,8 +967,8 @@
     (mapcar (lambda (direct)
 	      (compute-effective-slot-definition class
 						 (car direct)
-						 (nreverse (cdr direct))))
-	    name-dslotds-alist)))
+						 (cdr direct)))
+	    (nreverse name-dslotds-alist))))
 
 (defmethod compute-slots ((class standard-class))
   (call-next-method))

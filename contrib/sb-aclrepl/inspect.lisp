@@ -791,7 +791,7 @@ cons cells and LIST-TYPE is :normal, :dotted, or :cyclic"
 (defun inspected-standard-object-parts (object)
   (let ((components nil)
 	(class-slots (sb-pcl::class-slots (class-of object))))
-    (dolist (class-slot class-slots components)
+    (dolist (class-slot class-slots (nreverse components))
       (let* ((slot-name (slot-value class-slot 'sb-pcl::name))
 	     (slot-value (if (slot-boundp object slot-name)
 			     (slot-value object slot-name)
