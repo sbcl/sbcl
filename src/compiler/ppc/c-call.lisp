@@ -1,15 +1,21 @@
-;;; routines for call-out to C.
-;;;
-;;; Written by William Lott.
-;;;
+;;;; VOPs and other machine-specific support routines for call-out to C
+
+;;;; This software is part of the SBCL system. See the README file for
+;;;; more information.
+;;;;
+;;;; This software is derived from the CMU CL system, which was
+;;;; written at Carnegie Mellon University and released into the
+;;;; public domain. The software is in the public domain and is
+;;;; provided with absolutely no warranty. See the COPYING and CREDITS
+;;;; files for more information.
+
 (in-package "SB!VM")
 
-;;; Return the number of bytes needed for the current non-descriptor stack
-;;; frame.  Non-descriptor stack frames must be multiples of 16 bytes under
-;;; the PPC SVr4 ABI (though the EABI may be less restrictive.)  Two words
-;;; are reserved for the stack backlink and saved LR (see SB!VM::NUMBER-STACK-
-;;; DISPLACEMENT.)
-;;;
+;;; Return the number of bytes needed for the current non-descriptor
+;;; stack frame.  Non-descriptor stack frames must be multiples of 16
+;;; bytes under the PPC SVr4 ABI (though the EABI may be less
+;;; restrictive).  On linux, two words are reserved for the stack
+;;; backlink and saved LR (see SB!VM::NUMBER-STACK-DISPLACEMENT).
 
 (defconstant +stack-alignment-bytes+
   ;; Duh.  PPC Linux (and VxWorks) adhere to the EABI.
@@ -333,7 +339,11 @@
   (:temporary (:scs (unsigned-reg) :to (:result 0)) temp)
   (:generator 0
     (unless (zerop amount)
-      (let ((delta (- (logandc2 (+ amount 8 +stack-alignment-bytes+) 
+      ;; FIXME: I don't understand why we seem to be adding
+      ;; NUMBER-STACK-DISPLACEMENT twice here.  Weird.  -- CSR,
+      ;; 2003-08-20
+      (let ((delta (- (logandc2 (+ amount number-stack-displacement
+				   +stack-alignment-bytes+)
 				+stack-alignment-bytes+))))
 	(cond ((>= delta (ash -1 16))
 	       (inst stwu nsp-tn nsp-tn delta))
@@ -351,7 +361,8 @@
   (:policy :fast-safe)
   (:generator 0
     (unless (zerop amount)
-      (let ((delta (logandc2 (+ amount 8 +stack-alignment-bytes+) 
+      (let ((delta (logandc2 (+ amount number-stack-displacement
+				+stack-alignment-bytes+) 
 			     +stack-alignment-bytes+)))
 	(cond ((< delta (ash 1 16))
 	       (inst addi nsp-tn nsp-tn delta))

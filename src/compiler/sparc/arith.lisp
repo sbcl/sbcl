@@ -1,4 +1,4 @@
-;;;; the VM definition arithmetic VOPs for the Alpha
+;;;; the VM definition arithmetic VOPs for the SPARC
 
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
