@@ -23,43 +23,48 @@
 		 offset))
 
 (defstruct (arg-state (:copier nil))
+  (register-args 0)
+  (xmm-args 0)
   (stack-frame-size 0))
 
+(defun int-arg (state prim-type reg-sc stack-sc)
+  (let ((reg-args (arg-state-register-args state)))
+    (cond ((< reg-args 6)
+	   (setf (arg-state-register-args state) (1+ reg-args))
+	   (my-make-wired-tn prim-type reg-sc
+			     (nth reg-args *c-call-register-arg-offsets*)))
+	  (t
+	   (let ((frame-size (arg-state-stack-frame-size state)))
+	     (setf (arg-state-stack-frame-size state) (1+ frame-size))
+	     (my-make-wired-tn prim-type stack-sc frame-size))))))
+
 (define-alien-type-method (integer :arg-tn) (type state)
-  (let ((stack-frame-size (arg-state-stack-frame-size state)))
-    (setf (arg-state-stack-frame-size state) (1+ stack-frame-size))
-    (multiple-value-bind (ptype stack-sc)
-	(if (alien-integer-type-signed type)
-	    (values 'signed-byte-64 'signed-stack)
-	    (values 'unsigned-byte-64 'unsigned-stack))
-      (my-make-wired-tn ptype stack-sc stack-frame-size))))
+  (if (alien-integer-type-signed type)
+      (int-arg state 'signed-byte-64 'signed-reg 'signed-stack)
+      (int-arg state 'unsigned-byte-64 'unsigned-reg 'unsigned-stack)))
 
 (define-alien-type-method (system-area-pointer :arg-tn) (type state)
   (declare (ignore type))
-  (let ((stack-frame-size (arg-state-stack-frame-size state)))
-    (setf (arg-state-stack-frame-size state) (1+ stack-frame-size))
-    (my-make-wired-tn 'system-area-pointer
-		      'sap-stack
-		      stack-frame-size)))
+  (int-arg state 'system-area-pointer 'sap-reg 'sap-stack))
 
-#!+long-float
-(define-alien-type-method (long-float :arg-tn) (type state)
-  (declare (ignore type))
-  (let ((stack-frame-size (arg-state-stack-frame-size state)))
-    (setf (arg-state-stack-frame-size state) (+ stack-frame-size 3))
-    (my-make-wired-tn 'long-float 'long-stack stack-frame-size)))
+(defun float-arg (state prim-type reg-sc stack-sc)
+  (let ((xmm-args (arg-state-xmm-args state)))
+    (cond ((< xmm-args 8)
+	   (setf (arg-state-xmm-args state) (1+ xmm-args))
+	   (my-make-wired-tn prim-type reg-sc
+			     (nth xmm-args *float-regs*)))
+	  (t
+	   (let ((frame-size (arg-state-stack-frame-size state)))
+	     (setf (arg-state-stack-frame-size state) (1+ frame-size))
+	     (my-make-wired-tn prim-type stack-sc frame-size))))))
 
 (define-alien-type-method (double-float :arg-tn) (type state)
   (declare (ignore type))
-  (let ((stack-frame-size (arg-state-stack-frame-size state)))
-    (setf (arg-state-stack-frame-size state) (+ stack-frame-size 2))
-    (my-make-wired-tn 'double-float 'double-stack stack-frame-size)))
+  (float-arg state 'double-float 'double-reg 'double-stack))
 
 (define-alien-type-method (single-float :arg-tn) (type state)
   (declare (ignore type))
-  (let ((stack-frame-size (arg-state-stack-frame-size state)))
-    (setf (arg-state-stack-frame-size state) (1+ stack-frame-size))
-    (my-make-wired-tn 'single-float 'single-stack stack-frame-size)))
+  (float-arg state 'single-float 'single-reg 'single-stack))
 
 (defstruct (result-state (:copier nil))
   (num-results 0))
@@ -68,6 +73,8 @@
   (ecase slot
     (0 eax-offset)
     (1 edx-offset)))
+
+;; XXX The return handling probably doesn't conform to the ABI
 
 (define-alien-type-method (integer :result-tn) (type state)
   (let ((num-results (result-state-num-results state)))
@@ -84,13 +91,6 @@
     (setf (result-state-num-results state) (1+ num-results))
     (my-make-wired-tn 'system-area-pointer 'sap-reg
 		      (result-reg-offset num-results))))
-
-#!+long-float
-(define-alien-type-method (long-float :result-tn) (type state)
-  (declare (ignore type))
-  (let ((num-results (result-state-num-results state)))
-    (setf (result-state-num-results state) (1+ num-results))
-    (my-make-wired-tn 'long-float 'long-reg (* num-results 2))))
 
 (define-alien-type-method (double-float :result-tn) (type state)
   (declare (ignore type))

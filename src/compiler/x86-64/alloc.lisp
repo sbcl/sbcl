@@ -172,7 +172,7 @@
     (inst lea bytes
 	  (make-ea :qword :base extra :disp (* (1+ words) n-word-bytes)))
     (inst mov header bytes)
-    (inst shl header (- n-widetag-bits 2)) ; w+1 to length field
+    (inst shl header (- n-widetag-bits 3)) ; w+1 to length field
     (inst lea header			; (w-1 << 8) | type
 	  (make-ea :qword :base header :disp (+ (ash -2 n-widetag-bits) type)))
     (inst and bytes (lognot lowtag-mask))

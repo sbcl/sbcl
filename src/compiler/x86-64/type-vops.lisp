@@ -178,24 +178,30 @@
 (define-vop (signed-byte-32-p type-predicate)
   (:translate signed-byte-32-p)
   (:generator 45
-    ;; (and (fixnum) (no bits set >32))
+    ;; (and (fixnum) (or (no bits set >31) (all bits set >31))
     (move rax-tn value)
     (inst test rax-tn 7)
     (inst jmp :ne (if not-p target not-target))
-    (inst sar rax-tn (+ 32 3))
+    (inst sar rax-tn (+ 32 3 -1))    
     (inst jmp (if not-p :nz :z) target)
+    (inst cmp rax-tn #xffffffff)
+    (inst jmp (if not-p :ne :eq) target)
     NOT-TARGET))
 
 (define-vop (check-signed-byte-32 check-type)
   (:generator 45
     (let ((nope (generate-error-code vop
 				     object-not-signed-byte-32-error
-				     value)))
+				     value))
+	  (ok (gen-label)))
       (move rax-tn value)
       (inst test rax-tn 7)
       (inst jmp :ne nope)
-      (inst sar rax-tn (+ 32 3))
-      (inst jmp :nz nope)
+      (inst sar rax-tn (+ 32 3 -1))      
+      (inst jmp :z ok)
+      (inst cmp rax-tn #xffffffff)
+      (inst jmp :ne nope)
+      (emit-label OK)
       (move result value))))
 
 

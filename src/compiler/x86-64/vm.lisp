@@ -128,7 +128,8 @@
   ;; names and offsets for registers used to pass arguments
   (eval-when (:compile-toplevel :load-toplevel :execute)
     (defparameter *register-arg-names* '(rdx rdi rsi)))
-  (defregset    *register-arg-offsets* rdx rdi rsi))
+  (defregset    *register-arg-offsets* rdx rdi rsi)
+  (defregset    *c-call-register-arg-offsets* rdi rsi rdx rcx r8 r9))
 
 ;;;; SB definitions
 
