@@ -266,7 +266,6 @@
 		(return nil)))
 	(setf (getf (condition-assigned-slots res) (condition-slot-name hslot))
 	      (find-slot-default class hslot))))
-
     res))
 
 ;;;; DEFINE-CONDITION
@@ -558,6 +557,25 @@
 		       (condition-actual-initargs condition)
 		       (condition-assigned-slots condition))))
 
+;;;; MAKE-LOAD-FORM equivalent for conditions.
+
+;;; We need this to be able to dump arbitrary encapsulated conditions
+;;; with MAKE-LOAD-FORM for COMPILED-PROGRAM-ERRORs. Unfortunately
+;;; ANSI specifies that MAKE-LOAD-FORM for conditions should signal an
+;;; error, despite the fact that it also specifies that the
+;;; file-compiler should use MAKE-LOAD-FORM for conditions. Bah.
+;;; Badness results if this is called before PCL is in place. Unlike
+;;; real make-load-form we return just a single form, so that it can
+;;; easily be embedded in the surrounding condition.
+(defun make-condition-load-form (condition &optional env)
+  (with-unique-names (instance)
+    (multiple-value-bind (create init)
+        (make-load-form-saving-slots condition :environment env)
+      (let ((fixed-init (subst instance condition init)))
+        `(let ((,instance ,create))
+          ,fixed-init
+          ,instance)))))
+
 ;;;; various CONDITIONs specified by ANSI
 
 (define-condition serious-condition (condition) ())
@@ -828,7 +846,7 @@
 	  (print-reference r s)
 	  (unless (null (cdr rs))
 	    (terpri s)))))))
-    
+
 (define-condition duplicate-definition (reference-condition warning)
   ((name :initarg :name :reader duplicate-definition-name))
   (:report (lambda (c s)
@@ -901,15 +919,15 @@
 		     :reader package-error-format-arguments))
   (:report 
    (lambda (condition stream)
-     (let ((control (package-error-format-control condition))
-	   (*print-pretty* nil))
+     (let ((control (package-error-format-control condition)))
        (if control
-	   (format stream "Package lock on ~S violated when ~?."
-		   (package-error-package condition)
-		   control
-		   (package-error-format-arguments condition))
-	   (format stream "Package lock on ~S violated."
-		   (package-error-package condition))))))
+	   (apply #'format stream
+                  (format nil "~~@<Lock on package ~A violated when ~A.~~:@>"
+                          (package-name (package-error-package condition))
+                          control)
+                  (package-error-format-arguments condition))
+	   (format stream "~@<Lock on package ~A violated.~:@>"
+		   (package-name (package-error-package condition)))))))
   ;; no :default-initargs -- reference-stuff provided by the
   ;; signalling form in target-package.lisp
   #!+sb-doc
@@ -922,7 +940,6 @@ when a package-lock is violated."))
   (:documentation
    "Subtype of SB-EXT:PACKAGE-LOCK-VIOLATION. An error of this type is
 signalled when an operation on a package violates a package lock."))
-
 
 (define-condition symbol-package-locked-error (package-lock-violation)
   ((symbol :initarg :symbol :reader package-locked-error-symbol))
@@ -940,6 +957,16 @@ SB-EXT:PACKAGE-LOCKED-ERROR-SYMBOL."))
 ;;;; These might logically belong in other files; they're here, after
 ;;;; setup of CONDITION machinery, only because that makes it easier to
 ;;;; get cold init to work.
+
+(define-condition encapsulated-condition (condition)
+  ((condition :initarg :condition :reader encapsulated-condition)))
+
+;;; This comes to play if we have multiple levels of encapsulated
+;;; errors and we need to dump them with MAKE-CONDITION-LOAD-FORM.
+;;; Should not see much/any use, but better to have it.
+(def!method make-load-form ((condition encapsulated-condition) &optional env)
+  `(make-condition 'encapsulated-condition
+    :condition ,(make-condition-load-form (encapsulated-condition condition) env)))
 
 (define-condition values-type-error (type-error)
   ()

@@ -435,6 +435,16 @@
                        ,form)))
              package-lock-violation))))
 
+;;;; Program-errors from lexical violations
+(reset-test)
+(set-test-locks t)
+(dolist (pair *illegal-compile-time-forms-alist*)
+  (destructuring-bind (sym . form) pair
+      (declare (ignore sym))
+    (let ((fun (compile nil `(lambda ()
+			      ,form))))
+      (assert (raises-error? (funcall fun) program-error)))))
+
 ;;;; See that trace on functions in locked packages doesn't break
 ;;;; anything.
 (assert (trace test:function :break t))

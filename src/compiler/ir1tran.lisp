@@ -449,23 +449,20 @@
 (declaim (ftype (sfunction (ctran ctran (or lvar null) t) (values))
 		ir1-convert))
 (macrolet (;; Bind *COMPILER-ERROR-BAILOUT* to a function that throws
-	   ;; out of the body and converts a proxy form instead.
-	   (ir1-error-bailout ((start next result
-				form
-				&optional
-				(proxy ``(error 'simple-program-error
-					  :format-control "execution of a form compiled with errors:~% ~S"
-					  :format-arguments (list ',,form))))
-			       &body body)
-			      (with-unique-names (skip)
-				`(block ,skip
-				   (catch 'ir1-error-abort
+	   ;; out of the body and converts a condition signalling form
+	   ;; instead. The source form is converted to a string since it
+	   ;; may contain arbitrary non-externalizable objects.
+	   (ir1-error-bailout ((start next result form) &body body)
+	     (with-unique-names (skip condition)
+	       `(block ,skip
+		 (let ((,condition (catch 'ir1-error-abort
 				     (let ((*compiler-error-bailout*
-					    (lambda ()
-					      (throw 'ir1-error-abort nil))))
+					    (lambda (&optional e)
+					      (throw 'ir1-error-abort e))))
 				       ,@body
-				       (return-from ,skip nil)))
-				   (ir1-convert ,start ,next ,result ,proxy)))))
+				       (return-from ,skip nil)))))
+		   (ir1-convert ,start ,next ,result
+				(make-compiler-error-form ,condition ,form)))))))
 
   ;; Translate FORM into IR1. The code is inserted as the NEXT of the
   ;; CTRAN START. RESULT is the LVAR which receives the value of the
@@ -533,8 +530,7 @@
     (declare (type ctran start next)
              (type (or lvar null) result)
 	     (inline find-constant))
-    (ir1-error-bailout
-     (start next result value '(error "attempt to reference undumpable constant"))
+    (ir1-error-bailout (start next result value)
      (when (producing-fasl-file)
        (maybe-emit-make-load-forms value))
      (let* ((leaf (find-constant value))
@@ -923,8 +919,8 @@
              (new-vars nil cons))
       (dolist (var-name (rest decl))
 	(when (boundp var-name)
-	  (with-single-package-locked-error
-              (:symbol var-name "declaring the type of ~A")))
+          (compiler-assert-symbol-home-package-unlocked var-name
+                                                        "declaring the type of ~A"))
 	(let* ((bound-var (find-in-bindings vars var-name))
 	       (var (or bound-var
 			(lexenv-find var-name vars)
@@ -986,8 +982,8 @@
     (collect ((res nil cons))
       (dolist (name names)
 	(when (fboundp name)
-	  (with-single-package-locked-error
-              (:symbol name "declaring the ftype of ~A")))
+	  (compiler-assert-symbol-home-package-unlocked name
+                                                        "declaring the ftype of ~A"))
 	(let ((found (find name fvars
 			   :key #'leaf-source-name
 			   :test #'equal)))
@@ -1012,8 +1008,7 @@
   (declare (list spec vars) (type lexenv res))
   (collect ((new-venv nil cons))
     (dolist (name (cdr spec))
-      (with-single-package-locked-error
-          (:symbol name "declaring ~A special"))
+      (compiler-assert-symbol-home-package-unlocked name "declaring ~A special")
       (let ((var (find-in-bindings vars name)))
 	(etypecase var
 	  (cons

@@ -21,7 +21,7 @@
 ;;;; which are nice to have visible everywhere
 
 ;;; a function that is called to unwind out of COMPILER-ERROR
-(declaim (type (function () nil) *compiler-error-bailout*))
+(declaim (type (function (&optional condition) nil) *compiler-error-bailout*))
 (defvar *compiler-error-bailout*)
 
 ;;; an application programmer's error caught by the compiler
@@ -56,7 +56,7 @@
 ;;; not be a generalized instance of ERROR, as otherwise code such as
 ;;; (IGNORE-ERRORS (DEFGENERIC IF (X))) will catch and claim to handle
 ;;; the COMPILER-ERROR.  So we make COMPILER-ERROR inherit from
-;;; SIMPLE-CONDITION instead, as of sbcl-0.8alpha.0.2x, so that unless
+;;; CONDITION instead, as of sbcl-0.8alpha.0.2x, so that unless
 ;;; the user claims to be able to handle general CONDITIONs (and if he
 ;;; does, he deserves what's going to happen :-) [ Note: we don't make
 ;;; COMPILER-ERROR inherit from SERIOUS-CONDITION, because
@@ -80,41 +80,43 @@
 ;;; COMPILER-ERROR call, and all is well.
 ;;;
 ;;; CSR, 2003-05-13
-(define-condition compiler-error (simple-condition) ())
+(define-condition compiler-error (encapsulated-condition) ()
+  (:report (lambda (condition stream)
+	     (print-object (encapsulated-condition condition) stream))))
 
 ;;; Signal the appropriate condition. COMPILER-ERROR calls the bailout
 ;;; function so that it never returns (but compilation continues).
-;;; COMPILER-ABORT falls through to the default error handling, so
-;;; compilation terminates.
-;;;
-;;; FIXME: what is COMPILER-ABORT for?  It isn't currently
-;;; (2003-05-27) used in SBCL at all.
-(declaim (ftype (function (string &rest t) nil) compiler-error compiler-abort))
+(declaim (ftype (function (t &rest t) nil) compiler-error))
+(defun compiler-error (datum &rest arguments)
+  (let ((condition (coerce-to-condition datum arguments
+                                        'simple-program-error 'compiler-error)))
+    (restart-case
+        (progn
+          (cerror "Replace form with call to ERROR."
+                  'compiler-error
+                  :condition condition)
+          (funcall *compiler-error-bailout* condition)
+          (bug "Control returned from *COMPILER-ERROR-BAILOUT*."))
+      (signal-error ()
+        (error condition)))))
+
 (declaim (ftype (function (string &rest t) (values))
-		compiler-warn compiler-style-warn))
-(defun compiler-abort (format-string &rest format-args)
-  (error 'compiler-error
-	 :format-control format-string
-	 :format-arguments format-args))
-(defun compiler-error (format-string &rest format-args)
-  (restart-case
-      (progn
-	(cerror "Replace form with call to ERROR."
-		'compiler-error
-		:format-control format-string
-		:format-arguments format-args)
-	(funcall *compiler-error-bailout*)
-	(bug "Control returned from *COMPILER-ERROR-BAILOUT*."))
-    (signal-program-error ()
-      (error 'simple-program-error
-	     :format-control format-string
-	     :format-arguments format-args))))
+                compiler-warn compiler-style-warn))
 (defun compiler-warn (format-string &rest format-args)
   (apply #'warn format-string format-args)
   (values))
+
 (defun compiler-style-warn (format-string &rest format-args)
   (apply #'style-warn format-string format-args)
   (values))
+
+(defun make-compiler-error-form (condition source)
+  ;; The condition must be literal so the this form kicks off the
+  ;; MAKE-LOAD-FORM in the file-compiler for COMPILED-PROGRAM-ERROR,
+  ;; not the encapsulated condition.
+  `(error ,(make-condition 'compiled-program-error
+			   :condition condition
+			   :source source)))
 
 ;;; the condition of COMPILE-FILE being unable to READ from the
 ;;; source file

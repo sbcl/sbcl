@@ -17,6 +17,8 @@
 ;;; compiler, it will only be a style-warning.
 (define-condition format-too-many-args-warning (simple-warning) ())
 
+(define-condition encapsulated-condition () ())
+
 (define-condition bug (simple-error)
   ()
   (:report
@@ -33,3 +35,9 @@ an averrance that is violated (check your code!). If you are a user, ~
 please submit a bug report to the developers' mailing list, details of ~
 which can be found at <http://sbcl.sourceforge.net/>.~:@>"
 	     ()))))
+
+;;; These are should never be instantiated before the real definitions
+;;; come in.
+(deftype package-lock-violation () nil)
+(deftype package-locked-error () nil)
+(deftype symbol-package-locked-error () nil)

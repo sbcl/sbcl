@@ -26,17 +26,6 @@
 
 ;;;; source-hacking defining forms
 
-;;; to be passed to PARSE-DEFMACRO when we want compiler errors
-;;; instead of real errors
-#!-sb-fluid (declaim (inline convert-condition-into-compiler-error))
-(defun convert-condition-into-compiler-error (datum &rest stuff)
-  (if (stringp datum)
-      (apply #'compiler-error datum stuff)
-      (compiler-error "~A"
-		      (if (symbolp datum)
-			  (apply #'make-condition datum stuff)
-			  datum))))
-
 ;;; Parse a DEFMACRO-style lambda-list, setting things up so that a
 ;;; compiler error happens if the syntax is invalid.
 ;;;
@@ -53,7 +42,7 @@
     (multiple-value-bind (body decls doc)
 	(parse-defmacro lambda-list n-form body name "special form"
 			:environment n-env
-			:error-fun 'convert-condition-into-compiler-error
+			:error-fun 'compiler-error
                         :wrap-block nil)
       `(progn
 	 (declaim (ftype (function (ctran ctran (or lvar null) t) (values))

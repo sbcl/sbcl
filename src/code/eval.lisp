@@ -94,9 +94,9 @@
 	      (progn
 		(signal c)
 		nil)
-	      ;; ... if we're not in the compiler, better signal a
-	      ;; program error straight away.
-	      (invoke-restart 'sb!c::signal-program-error)))))
+	      ;; ... if we're not in the compiler, better signal the
+	      ;; error straight away.
+	      (invoke-restart 'sb!c::signal-error)))))
     (let ((exp (macroexpand original-exp lexenv)))
       (typecase exp
 	(symbol

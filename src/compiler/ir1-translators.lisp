@@ -281,8 +281,8 @@
         (unless (symbolp name)
           (fail "The local macro name ~S is not a symbol." name))
 	(when (fboundp name)
-	  (with-single-package-locked-error
-	      (:symbol name "binding ~A as a local macro")))
+	  (compiler-assert-symbol-home-package-unlocked
+           name "binding ~A as a local macro"))
         (unless (listp arglist)
           (fail "The local macro argument list ~S is not a list."
                 arglist))
@@ -332,8 +332,8 @@
         (unless (symbolp name)
           (fail "The local symbol macro name ~S is not a symbol." name))
 	(when (or (boundp name) (eq (info :variable :kind name) :macro))
-	  (with-single-package-locked-error
-	      (:symbol name "binding ~A as a local symbol-macro")))
+	  (compiler-assert-symbol-home-package-unlocked
+           name "binding ~A as a local symbol-macro"))
         (let ((kind (info :variable :kind name)))
           (when (member kind '(:special :constant))
             (fail "Attempt to bind a ~(~A~) variable with SYMBOL-MACROLET: ~S"
@@ -534,8 +534,8 @@
 		 (vals (second spec)))))))
     (dolist (name (names))
       (when (eq (info :variable :kind name) :macro)
-	(with-single-package-locked-error
-	    (:symbol name "lexically binding symbol-macro ~A"))))
+	(compiler-assert-symbol-home-package-unlocked
+         name "lexically binding symbol-macro ~A")))
     (values (vars) (vals))))
 
 (def-ir1-translator let ((bindings &body body) start next result)
@@ -620,8 +620,8 @@
       (let ((name (first def)))
 	(check-fun-name name)
 	(when (fboundp name)
-	  (with-single-package-locked-error
-	      (:symbol name "binding ~A as a local function")))
+	  (compiler-assert-symbol-home-package-unlocked
+           name "binding ~A as a local function"))
 	(names name)
 	(multiple-value-bind (forms decls) (parse-body (cddr def))
 	  (defs `(lambda ,(second def)

@@ -152,35 +152,35 @@ error if any of PACKAGES is not a valid package designator."
 
 (defun package-lock-violation (package &key (symbol nil symbol-p)
                                format-control format-arguments)
-  (let ((restart :continue)
-        (cl-violation-p (eq package (find-package :common-lisp))))
-    (flet ((error-arguments ()
-             (append (list (if symbol-p
-                               'symbol-package-locked-error
-                               'package-locked-error)
-                           :package package
-                           :format-control format-control
-                             :format-arguments format-arguments)
-                       (when symbol-p (list :symbol symbol))
-                       (list :references
-                             (append '((:sbcl :node "Package Locks"))
-                                     (when cl-violation-p
-                                       '((:ansi-cl :section (11 1 2 1 2)))))))))
-      (restart-case
-          (apply #'cerror "Ignore the package lock." (error-arguments))
-        (:ignore-all ()
-          :report "Ignore all package locks in the context of this operation."
-          (setf restart :ignore-all))
-        (:unlock-package ()
-          :report "Unlock the package."
-          (setf restart :unlock-package)))
-      (ecase restart
-        (:continue
-         (pushnew package *ignored-package-locks*))
-        (:ignore-all
-         (setf *ignored-package-locks* t))
-        (:unlock-package
-         (unlock-package package))))))
+  (let* ((restart :continue)
+         (cl-violation-p (eq package *cl-package*))
+         (error-arguments
+          (append (list (if symbol-p
+                            'symbol-package-locked-error
+                            'package-locked-error)
+                        :package package
+                        :format-control format-control
+                        :format-arguments format-arguments)
+                  (when symbol-p (list :symbol symbol))
+                  (list :references
+                        (append '((:sbcl :node "Package Locks"))
+                                (when cl-violation-p
+                                  '((:ansi-cl :section (11 1 2 1 2)))))))))
+    (restart-case
+        (apply #'cerror "Ignore the package lock." error-arguments)
+      (:ignore-all ()
+        :report "Ignore all package locks in the context of this operation."
+        (setf restart :ignore-all))
+      (:unlock-package ()
+        :report "Unlock the package."
+        (setf restart :unlock-package)))
+    (ecase restart
+      (:continue
+       (pushnew package *ignored-package-locks*))
+      (:ignore-all
+       (setf *ignored-package-locks* t))
+      (:unlock-package
+       (unlock-package package)))))
 
 (defun package-lock-violation-p (package &optional (symbol nil symbolp))
   ;; KLUDGE: (package-lock package) needs to be before

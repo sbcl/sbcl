@@ -162,10 +162,9 @@
   (declare (ignore kind thing format))
   `(progn ,@body))
 
-(defmacro with-deferred-package-lock-violations (&body body)
-  `(flet ((prepend-package-lock-violations (forms) forms)
-	  (package-lock-violations () nil))
-    ,@body))
+(defun compiler-assert-symbol-home-package-unlocked (symbol control)
+  (declare (ignore control))
+  symbol)
 
 (defun assert-package-unlocked (package &optional control &rest args)
   (declare (ignore control args))
@@ -174,11 +173,5 @@
 (defun assert-symbol-home-package-unlocked (name format &key continuablep)
   (declare (ignore format continuablep))
   name)
-
-(deftype package-lock-violation () nil)
-
-(deftype package-locked-error () nil)
-
-(deftype symbol-package-locked-error () nil)
 
 (declaim (declaration enable-package-locks disable-package-locks))

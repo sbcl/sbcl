@@ -1061,11 +1061,9 @@
   (catch 'process-toplevel-form-error-abort
     (let* ((path (or (gethash form *source-paths*) (cons form path)))
 	   (*compiler-error-bailout*
-	    (lambda ()
+	    (lambda (&optional condition)
 	      (convert-and-maybe-compile
-	       `(error 'simple-program-error
-		 :format-control "execution of a form compiled with errors:~% ~S"
-		 :format-arguments (list ',form))
+	       (make-compiler-error-form condition form)
 	       path)
 	      (throw 'process-toplevel-form-error-abort nil))))
 
@@ -1695,11 +1693,11 @@
 	(throw 'pending-init circular-ref)))
     (multiple-value-bind (creation-form init-form)
 	(handler-case
-	    (sb!xc:make-load-form constant (make-null-lexenv))
+            (sb!xc:make-load-form constant (make-null-lexenv))
 	  (error (condition)
-		 (compiler-error "(while making load form for ~S)~%~A"
-				 constant
-				 condition)))
+		 (compiler-error 'make-load-form-error
+				 :condition condition
+				 :object constant)))
       (case creation-form
 	(:sb-just-dump-it-normally
 	 (fasl-validate-structure constant *compile-object*)

@@ -53,6 +53,19 @@
 	   (when ,topmost
 	     (setf *ignored-package-locks* :invalid)))))))
 
+(defun compiler-assert-symbol-home-package-unlocked (symbol control)
+  #!-sb-package-locks
+  (declare (ignore symbol control))
+  #!+sb-package-locks
+  (flet ((resignal (condition)
+	   ;; Signal the condition to give user defined handlers a chance,
+	   ;; if they decline convert to compiler-error.
+           (signal condition)
+           (sb!c:compiler-error condition)))
+    (handler-bind ((package-lock-violation #'resignal))
+      (with-single-package-locked-error ()
+        (assert-symbol-home-package-unlocked symbol control)))))
+
 (defmacro without-package-locks (&body body)
   #!+sb-doc
   "Ignores all runtime package lock violations during the execution of

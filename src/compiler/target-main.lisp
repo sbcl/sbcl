@@ -49,7 +49,8 @@
 	     (*toplevel-lambdas* ())
 	     (*block-compile* nil)
 	     (*compiler-error-bailout*
-	      (lambda ()
+	      (lambda (&optional error)
+                (declare (ignore error))
 		(compiler-mumble
 		 "~2&fatal error, aborting compilation~%")
 		(return-from actually-compile (values nil t nil))))
