@@ -72,9 +72,6 @@ validate(void)
     ensure_space( (lispobj *)DYNAMIC_0_SPACE_START  , DYNAMIC_SPACE_SIZE);
     ensure_space( (lispobj *)DYNAMIC_1_SPACE_START  , DYNAMIC_SPACE_SIZE);
 #endif
-#ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
-    ensure_space( (lispobj *) ALTERNATE_SIGNAL_STACK_START, SIGSTKSZ);
-#endif
 
 #ifdef HOLES
     make_holes();

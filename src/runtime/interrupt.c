@@ -663,7 +663,7 @@ undoably_install_low_level_interrupt_handler (int signal,
     if(signal==SIG_MEMORY_FAULT) sa.sa_flags|= SA_ONSTACK;
 #endif
     
-	sigaction(signal, &sa, NULL);
+    sigaction(signal, &sa, NULL);
     data->interrupt_low_level_handlers[signal] =
 	(ARE_SAME_HANDLER(handler, SIG_DFL) ? 0 : handler);
 }

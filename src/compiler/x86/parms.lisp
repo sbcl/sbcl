@@ -142,9 +142,7 @@
   (def!constant static-space-end      #x07fff000)
 
   (def!constant dynamic-space-start   #x09000000)
-  (def!constant dynamic-space-end     #x29000000)
-
-  (def!constant alternate-signal-stack-start #x58000000))
+  (def!constant dynamic-space-end     #x29000000))
 
 #!+bsd
 (progn
@@ -160,14 +158,7 @@
   (def!constant dynamic-space-start
     #!+freebsd                             #x48000000
     #!+openbsd                             #x50000000)
-  (def!constant dynamic-space-end          #x88000000)
-  (def!constant alternate-signal-stack-start
-      #!+freebsd #x44000000
-      #!+openbsd #x4c000000))
-
-
-;;; don't need alternate-signal-stack-end : it's -start+SIGSTKSZ
-
+  (def!constant dynamic-space-end          #x88000000))
 
 ;;; Given that NIL is the first thing allocated in static space, we
 ;;; know its value at compile time:
