@@ -325,3 +325,10 @@
       (non-descriptor-stack (format nil "NS~D" offset))
       (constant (format nil "Const~D" offset))
       (immediate-constant "Immed"))))
+
+;;; The loader uses this to convert alien names to the form they
+;;; occur in the symbol table.  This is ELF, so do nothing
+
+(defun extern-alien-name (name)
+  (declare (type simple-base-string name))
+  name)

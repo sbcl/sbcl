@@ -162,11 +162,4 @@
 	       (values error-number (sc-offsets))))))
 
 
-
-;;; The loader uses this to convert alien names to the form they
-;;; occur in the symbol table.  This is ELF, so do nothing
-
-(defun extern-alien-name (name)
-  (declare (type simple-base-string name))
-  name)
 

@@ -170,12 +170,4 @@
                     (return))
                   (sc-offsets (sb!c::read-var-integer vector index)))
                  (values error-number (sc-offsets)))))))
-
-;;; The loader uses this to convert alien names to the form they
-;;; occure in the symbol table (for example, prepending an
-;;; underscore). 
-(defun extern-alien-name (name)
-  (declare (type simple-base-string name))
-  ;; On the Alpha we don't do anything.
-  name)
 
