@@ -726,33 +726,19 @@
 
 ;;; Convert PATHNAME into a string that can be used with UNIX system
 ;;; calls, or return NIL if no match is found. Wild-cards are expanded.
+;;; FIXME this should signal file-error if the pathname is wild, whether
+;;; or not it turns out to have only one match.  Fix post 0.7.2
 (defun unix-namestring (pathname-spec &optional (for-input t))
-  ;; The ordinary rules of converting Lispy paths to Unix paths break
-  ;; down for the current working directory, which Lisp thinks of as
-  ;; "" (more or less, and modulo ANSI's *DEFAULT-PATHNAME-DEFAULTS*,
-  ;; which unfortunately SBCL, as of sbcl-0.6.12.8, basically ignores)
-  ;; and Unix thinks of as ".". Since we're at the interface between
-  ;; Unix system calls and things like ENSURE-DIRECTORIES-EXIST which
-  ;; think the Lisp way, we perform the conversion.
-  ;;
-  ;; (FIXME: The *right* way to deal with this special case is to
-  ;; merge PATHNAME-SPEC with *DEFAULT-PATHNAME-DEFAULTS* here, after
-  ;; which it's not a relative pathname any more so the special case
-  ;; is no longer an issue. But until *DEFAULT-PATHNAME-DEFAULTS*
-  ;; works, we use this hack.)
-  (if (empty-relative-pathname-spec-p pathname-spec)
-      "."
-      ;; Otherwise, the ordinary rules apply.
-      (let* ((namestring (physicalize-pathname (pathname pathname-spec)))
-	     (matches nil)) ; an accumulator for actual matches
-	(!enumerate-matches (match namestring nil :verify-existence for-input)
-          (push match matches))
-	(case (length matches)
-	  (0 nil)
-	  (1 (first matches))
-	  (t (error 'simple-file-error
-		    :format-control "~S is ambiguous:~{~%  ~A~}"
-		    :format-arguments (list pathname-spec matches)))))))
+  (let* ((namestring (physicalize-pathname (merge-pathnames pathname-spec)))
+	 (matches nil)) ; an accumulator for actual matches
+    (!enumerate-matches (match namestring nil :verify-existence for-input)
+			(push match matches))
+    (case (length matches)
+      (0 nil)
+      (1 (first matches))
+      (t (error 'simple-file-error
+		:format-control "~S is ambiguous:~{~%  ~A~}"
+		:format-arguments (list pathname-spec matches))))))
 
 ;;;; TRUENAME and PROBE-FILE
 
