@@ -568,6 +568,14 @@
   (when (null source-end) (setq source-end (length source-sequence)))
   (mumble-replace-from-mumble))
 
+(defun simple-character-string-replace-from-simple-character-string*
+    (target-sequence source-sequence
+     target-start target-end source-start source-end)
+  (declare (type (simple-array character (*)) target-sequence source-sequence))
+  (when (null target-end) (setq target-end (length target-sequence)))
+  (when (null source-end) (setq source-end (length source-sequence)))
+  (mumble-replace-from-mumble))
+
 (define-sequence-traverser replace
     (sequence1 sequence2 &key start1 end1 start2 end2)
   #!+sb-doc
