@@ -1253,6 +1253,17 @@
     (cut-to-width index width)
     'sb!vm::%lea-mod32))
 
+#+sb-xc-host
+(defun sb!vm::%lea-mod32 (base index scale disp)
+  (ldb (byte 32 0) (%lea base index scale disp)))
+#-sb-xc-host
+(defun sb!vm::%lea-mod32 (base index scale disp)
+  (let ((base (logand base #xffffffff))
+	(index (logand index #xffffffff)))
+    ;; can't use modular version of %LEA, as we only have VOPs for
+    ;; constant SCALE and DISP.
+    (ldb (byte 32 0) (+ base (* index scale) disp))))
+
 (in-package "SB!VM")
 
 (define-vop (%lea-mod32/unsigned=>unsigned
