@@ -9,6 +9,7 @@
  * files for more information.
  */
 
+#include <stdlib.h>
 #include <stdio.h>
 #include <signal.h>
 #include <sys/file.h>

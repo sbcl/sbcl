@@ -11,6 +11,7 @@
 
 #include <stdio.h>
 #include <errno.h>
+#include <strings.h>
 
 #include "os.h"
 #include "interr.h"

@@ -13,8 +13,11 @@
  * files for more information.
  */
 
+#include <stdlib.h>
 #include <sys/file.h>
-#include <sys/fcntl.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 #include <sys/ioctl.h>
 #if defined(SVR4) || defined(__linux__)
 #include <unistd.h>

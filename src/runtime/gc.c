@@ -536,7 +536,7 @@ scavenge_interrupt_context(os_context_t *context)
 			}
 		}
 	}
-#endif reg_LIP
+#endif /* reg_LIP */
 
 	/* Compute the PC's offset from the start of the CODE */
 	/* register. */
@@ -575,7 +575,7 @@ scavenge_interrupt_context(os_context_t *context)
 	/* Fix the LIP */
 	*os_context_register_addr(context, reg_LIP) =
 	    *os_context_register_addr(context, lip_register_pair) + lip_offset;
-#endif reg_LIP
+#endif /* reg_LIP */
 	
 	/* Fix the PC if it was in from space */
 	if (from_space_p(*os_context_pc_addr(context)))

@@ -19,6 +19,7 @@
 #include "globals.h"
 #include "gc.h"
 #include <stdio.h>
+#include <string.h>
 
 #define GET_FREE_POINTER() dynamic_space_free_pointer
 #define SET_FREE_POINTER(new_value) \

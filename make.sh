@@ -50,7 +50,8 @@
 # require a second pass, just testing at build-the-cross-compiler time
 # whether the cross-compilation host returns suitable values from 
 # UPGRADED-ARRAY-ELEMENT-TYPE?)
-export SBCL_XC_HOST="${1:-sbcl --noprogrammer}"
+SBCL_XC_HOST="${1:-sbcl --noprogrammer}"
+export SBCL_XC_HOST
 echo //SBCL_XC_HOST=\"$SBCL_XC_HOST\"
 
 # If you're cross-compiling, you should probably just walk through the

@@ -14,12 +14,17 @@
  */
 
 #include <stdio.h>
+#include <string.h>
 #include <sys/types.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/file.h>
 #include <sys/param.h>
 #include <sys/stat.h>
+
+#if defined(SVR4) || defined(__linux__)
+#include <time.h>
+#endif
 
 #include "signal.h"
 
@@ -211,24 +216,24 @@ main(int argc, char *argv[], char *envp[])
 
     if (!noinform) {
 	printf(
-"This is SBCL " SBCL_VERSION_STRING ", an implementation of ANSI Common Lisp.
-
-SBCL is derived from the CMU CL system created at Carnegie Mellon University.
-Besides software and documentation originally created at Carnegie Mellon
-University, SBCL contains some software originally from the Massachusetts
-Institute of Technology, Symbolics Incorporated, and Xerox Corporation, and
-material contributed by volunteers since the release of CMU CL into the
-public domain. See the CREDITS file in the distribution for more information.
-
-SBCL is a free software system, provided as is, with absolutely no warranty.
-It is mostly in the public domain, but also includes some software copyrighted
-  Massachusetts Institute of Technology, 1986;
-  Symbolics, Inc., 1989, 1990, 1991, 1992; and
-  Xerox Corporation, 1985, 1986, 1987, 1988, 1989, 1990
-used under BSD-style licenses allowing copying only under certain conditions.
-See the COPYING file in the distribution for more information.
-
-More information on SBCL is available at <http://sbcl.sourceforge.net/>.
+"This is SBCL " SBCL_VERSION_STRING ", an implementation of ANSI Common Lisp.\n\
+\n\
+SBCL is derived from the CMU CL system created at Carnegie Mellon University.\n\
+Besides software and documentation originally created at Carnegie Mellon\n\
+University, SBCL contains some software originally from the Massachusetts\n\
+Institute of Technology, Symbolics Incorporated, and Xerox Corporation, and\n\
+material contributed by volunteers since the release of CMU CL into the\n\
+public domain. See the CREDITS file in the distribution for more information.\n\
+\n\
+SBCL is a free software system, provided as is, with absolutely no warranty.\n\
+It is mostly in the public domain, but also includes some software copyrighted\n\
+  Massachusetts Institute of Technology, 1986;\n\
+  Symbolics, Inc., 1989, 1990, 1991, 1992; and\n\
+  Xerox Corporation, 1985, 1986, 1987, 1988, 1989, 1990\n\
+used under BSD-style licenses allowing copying only under certain conditions.\n\
+See the COPYING file in the distribution for more information.\n\
+\n\
+More information on SBCL is available at <http://sbcl.sourceforge.net/>.\n\
 ");
 	fflush(stdout);
     }

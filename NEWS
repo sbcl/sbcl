@@ -1058,11 +1058,16 @@ changes in sbcl-0.7.2 relative to sbcl-0.7.1:
        encapsulation also seems closer to the spirit of the ANSI
        specification.)
 
-changes in sbcl-0.7.2 relative to sbcl-0.7.1:
-  * cleanups on SPARC, both Linux and Solaris, and for gcc>=3 (thanks
-    to Christophe Rhodes and Nathan Froyd)
+changes in sbcl-0.7.3 relative to sbcl-0.7.2:
+  * SBCL now runs on the PPC archtiecture under Linux. It actually did
+    this as of 0.7.1.45, but was left out of the previous news section
+    (thanks to Dan Barlow)
+  * SBCL now runs on the Solaris operating system on SPARC architectures
+    (thanks to Christophe Rhodes's port of the CMUCL runtime)
+  * cleanups to the runtime on SPARC, both Linux and Solaris, and for
+    gcc>=3 (thanks to Nathan Froyd and Ingvar Mattsson)
   * ANSI's DEFINE-SYMBOL-MACRO is now supported. (thanks to Nathan
-    Froyd porting CMU CL code)
+    Froyd porting CMU CL code originally by Douglas Thomas Crosher)
   * The fasl file format has changed again, to allow the compiler's
     INFO database to support symbol macros.
   * The user manual (in doc/) is formatted into HTML more nicely.

@@ -27,7 +27,7 @@
 #include <unistd.h>
 
 #define DEFTYPE(lispname,cname) { cname foo; \
-    printf("(define-alien-type "##lispname##" (%s %d))\n", (((foo=-1)<0) ? "sb!alien:signed" : "unsigned"), (8 * (sizeof foo))); }
+    printf("(define-alien-type " lispname " (%s %d))\n", (((foo=-1)<0) ? "sb!alien:signed" : "unsigned"), (8 * (sizeof foo))); }
 
 void
 defconstant(char* lisp_name, long unix_number)
@@ -47,9 +47,9 @@ main(int argc, char *argv[])
 
     /* don't need no steenking hand-editing */
     printf(
-";;;; This is an automatically generated file, please do not hand-edit it.
-;;;; See the program \"grovel_headers.c\".
-
+";;;; This is an automatically generated file, please do not hand-edit it.\n\
+;;;; See the program \"grovel_headers.c\".\n\
+\n\
 ");
 
     printf("(in-package \"SB!UNIX\")\n\n");

@@ -9,6 +9,8 @@
  * files for more information.
  */
 
+#include <string.h>
+
 #include "runtime.h"
 #include "sbcl.h"
 #include "os.h"
