@@ -62,5 +62,11 @@
 (assert (= (complex-double-float-ppc #c(0.0d0 1.0d0) #c(2.0d0 3.0d0))
            #c(2.0d0 4.0d0)))
 
+(defun single-float-ppc (x)
+  (declare (type (signed-byte 32) x) (optimize speed))
+  (float x 1f0))
+(compile 'single-float-ppc)
+(assert (= (single-float-ppc -30) -30f0))
+
 ;;; success
 (quit :unix-status 104)

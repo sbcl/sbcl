@@ -467,7 +467,7 @@
                          (temp-offset-low (* (1+ stack-offset) sb!vm:n-word-bytes)))
                     (inst lis rtemp #x4330)   ; High word of magic constant
                     (inst stw rtemp nfp-tn temp-offset-high)
-                    (inst lis rtemp #x8000)
+                    (inst lis rtemp #x-8000)
                     (inst stw rtemp nfp-tn temp-offset-low)
                     (inst lfd fmagic nfp-tn temp-offset-high)
                     (inst xor rtemp rtemp x)          ; invert sign bit of x : rtemp had #x80000000
