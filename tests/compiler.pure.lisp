@@ -193,3 +193,7 @@
                 (nthcdr (car (list 5)) '(1 2 . 3))))
   (assert (not (eval `(locally (declare (optimize (safety 3)))
                         (ignore-errors (progn ,form t)))))))
+
+;;; a bug in the MAP deftransform caused non-VECTOR array specifiers
+;;; to cause errors in the compiler.  Fixed by CSR in 0.7.8.10
+(assert (list (compile nil '(lambda (x) (map 'simple-array 'identity x)))))

@@ -87,7 +87,10 @@
 				result-type-arg-value)))))
     `(lambda (result-type-arg fun ,@seq-names)
        (truly-the ,result-type
-	 ,(cond ((policy node (> speed safety))
+	 ,(cond ((policy node (< safety 3))
+		 ;; ANSI requires the length-related type check only
+		 ;; when the SAFETY quality is 3... in other cases, we
+		 ;; skip it.
 		 bare)
 		((not constant-result-type-arg-p)
 		 `(sequence-of-checked-length-given-type ,bare
@@ -95,12 +98,21 @@
 		(t
 		 (let ((result-ctype (ir1-transform-specifier-type result-type)))
 		   (if (array-type-p result-ctype)
-		       (let* ((dims (array-type-dimensions result-ctype))
-			      (dim (first dims)))
-			 (if (eq dim '*)
-			     bare
-			     `(vector-of-checked-length-given-length ,bare
-								     ,dim)))
+		       (let ((dims (array-type-dimensions result-ctype)))
+			 (unless (and (listp dims) (= (length dims) 1))
+			   (give-up-ir1-transform "invalid sequence type"))
+			 (let ((dim (first dims)))
+			   (if (eq dim '*)
+			       bare
+			       `(vector-of-checked-length-given-length ,bare
+				                                       ,dim))))
+		       ;; FIXME: this is wrong, as not all subtypes of
+		       ;; VECTOR are ARRAY-TYPEs [consider, for
+		       ;; example, (OR (VECTOR T 3) (VECTOR T
+		       ;; 4))]. However, it's difficult to see what we
+		       ;; should put here... maybe we should
+		       ;; GIVE-UP-IR1-TRANSFORM if the type is a
+		       ;; subtype of VECTOR but not an ARRAY-TYPE?
 		       bare))))))))
 
 ;;; Try to compile %MAP efficiently when we can determine sequence

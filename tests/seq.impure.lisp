@@ -260,7 +260,15 @@
     (assert (string= (concatenate '(string 7) "foo" " " "bar") "foo bar"))
     (assert-type-error (concatenate '(string 6) "foo" " " "bar"))
     (assert (string= (concatenate '(string 6) "foo" #(#\b #\a #\r)) "foobar"))
-    (assert-type-error (concatenate '(string 7) "foo" #(#\b #\a #\r)))))
+    (assert-type-error (concatenate '(string 7) "foo" #(#\b #\a #\r))))
+  ;; SIMPLE-ARRAY isn't allowed as a vector type specifier
+  (locally
+      (declare (optimize safety))
+    (assert-type-error (concatenate 'simple-array "foo" "bar"))
+    (assert-type-error (map 'simple-array #'identity '(1 2 3)))
+    (assert-type-error (coerce '(1 2 3) 'simple-array))
+    ;; but COERCE has an exemption clause:
+    (assert (string= "foo" (coerce "foo" 'simple-array)))))
 
 ;;; success
 (quit :unix-status 104)
