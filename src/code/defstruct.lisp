@@ -657,11 +657,18 @@
           remove the ambiguity in your code.~@:>"
 	 accessor-name)
 	(setf (dd-predicate-name defstruct) nil))
-      #-sb-xc-host
-      (when (and (fboundp accessor-name)
-		 (not (accessor-inherited-data accessor-name defstruct)))
-	(style-warn "redefining ~S in DEFSTRUCT" accessor-name)))
-
+      ;; FIXME: It would be good to check for name collisions here, but
+      ;; the easy check,
+      ;;x#-sb-xc-host
+      ;;x(when (and (fboundp accessor-name)
+      ;;x           (not (accessor-inherited-data accessor-name defstruct)))
+      ;;x  (style-warn "redefining ~S in DEFSTRUCT" accessor-name)))
+      ;; which was done until sbcl-0.8.11.18 or so, is wrong: it causes
+      ;; a warning at MACROEXPAND time, when instead the warning should
+      ;; occur not just because the code was constructed, but because it
+      ;; is actually compiled or loaded.
+      )
+    
     (when default-p
       (setf (dsd-default slot) default))
     (when type-p
@@ -673,8 +680,8 @@
       (if read-only
 	  (setf (dsd-read-only slot) t)
 	  (when (dsd-read-only slot)
-	    (error "Slot ~S is :READ-ONLY in parent and must be :READ-ONLY in subtype ~S."
-		   name
+	    (error "~@<The slot ~S is :READ-ONLY in superclass, and so must ~
+                       be :READ-ONLY in subclass.~:@>"
 		   (dsd-name slot)))))
     slot))
 

@@ -542,6 +542,15 @@
 (assert (not (bug-332b-aux-p #(1 2 3 4 5 x 1 2 bug-332a-aux))))
 (assert (bug-332b-aux-p #(1 2 3 4 5 x 1 2 bug-332b-aux)))
 
+;;; In sbcl-0.8.11.8 FBOUNDPness potential collisions of structure
+;;; slot accessors signalled a condition at macroexpansion time, not
+;;; when the code was actually compiled or loaded.
+(let ((defstruct-form '(defstruct bug-in-0-8-11-8 x)))
+  (defun bug-in-0-8-11-8-x (z) (print "some unrelated thing"))
+  (handler-case (macroexpand defstruct-form)
+    (warning (c)
+      (error "shouldn't warn just from macroexpansion here"))))
+
 ;;; success
 (format t "~&/returning success~%")
 (quit :unix-status 104)

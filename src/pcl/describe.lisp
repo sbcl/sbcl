@@ -92,9 +92,11 @@
 (defmethod describe-object ((fun standard-generic-function) stream)
   (format stream "~&~A is a generic function." fun)
   (when (documentation fun t)
-    (format stream "~&  Function documentation: ~A" (documentation fun t)))
+    (format stream "~&Its documentation is: ~A" (documentation fun t)))
   (format stream "~&Its lambda-list is:~&  ~S"
 	  (generic-function-pretty-arglist fun))
+  (format stream "~&Its method-combination is:~&  ~S"
+	  (generic-function-method-combination fun))
   (let ((methods (generic-function-methods fun)))
     (if (null methods)
 	(format stream "~&It has no methods.~%")

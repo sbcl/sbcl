@@ -55,7 +55,7 @@ or
 
 @item
 the debugger is explicitly entered with the Lisp @code{break} or
-@code{debug} functions.
+@code{invoke-debugger} functions.
 
 @end itemize
 
@@ -77,6 +77,20 @@ the debugger.  In this case @code{car} was called on @code{3}.  After
 execution after this error.  In this case, both options return to
 top-level.  After printing its banner, the debugger prints the current
 frame and the debugger prompt.
+
+When the debugger is invoked by a condition, ANSI mandates that the
+value of @code{*debugger-hook*}, if any, be called with two arguments:
+the condition that caused the debugger to be invoked and the previous
+value of @code{*debugger-hook*}. When this happens,
+@code{*debugger-hook*} is bound to NIL to prevent recursive
+errors. However, ANSI also mandates that @code{*debugger-hook*} not be
+invoked when the debugger is to be entered by the @code{break}
+function. For users who wish to provide an alternate debugger
+interface (and thus catch @code{break} entries into the debugger),
+SBCL provides @code{sb-ext:*invoke-debugger-hook*}, which is invoked
+during any entry into the debugger.
+
+@include var-sb-ext-star-invoke-debugger-hook-star.texinfo
 
 
 @node  The Debugger Command Loop
@@ -125,7 +139,7 @@ current frame.  For more information on debugger variable access, see
 In the debugger, it is possible to override the printing behaviour of
 the REPL.
 
-@defvr {Variable} *debug-print-variable-alist*
+@defvr {Variable} sb-debug:*debug-print-variable-alist*
 
 An association list describing new bindings for special variables
 (typically *PRINT-FOO* variables) to be used within the debugger, e.g.
