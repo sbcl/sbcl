@@ -3,6 +3,7 @@
 #include <sched.h>
 #include <signal.h>
 #include <stddef.h>
+#include <errno.h>
 #ifndef CLONE_PARENT		/* lameass glibc 2.2  doesn't define this */
 #define CLONE_PARENT 0x00008000	/* even though the manpage documents it */
 #endif
@@ -282,7 +283,10 @@ void unblock_sigcont_and_sleep(void)
     sigset_t set;
     sigemptyset(&set);
     sigaddset(&set,SIGCONT);
-    sigwaitinfo(&set,0);
+    do {
+	errno=0;
+	sigwaitinfo(&set,0);
+    }while(errno==EINTR);
     sigprocmask(SIG_UNBLOCK,&set,0);
 }
 
@@ -309,8 +313,8 @@ void gc_stop_the_world()
 	     * for them on each time around */
 	    for(p=all_threads;p!=tail;p=p->next) {
 		if(p==th) continue;
-		countdown_to_gc++;
-		kill(p->pid,SIG_STOP_FOR_GC);
+               countdown_to_gc++;
+               kill(p->pid,SIG_STOP_FOR_GC);
 	    }
 	    tail=all_threads;
 	} else {

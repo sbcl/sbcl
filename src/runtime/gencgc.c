@@ -3687,10 +3687,12 @@ garbage_collect_generation(int generation, int raise)
      * handler, you will lose. */
     for_each_thread(th) {
 	void **ptr;
-	void **esp= (void **) &raise;
+	void **esp=(void **)-1;
 	int i,free;
 #ifdef LISP_FEATURE_SB_THREAD
-	if(th!=arch_os_get_current_thread()) {
+	if(th==arch_os_get_current_thread()) {
+	    esp = (void **) &raise;
+	} else {
 	    void **esp1;
 	    free=fixnum_value(SymbolValue(FREE_INTERRUPT_CONTEXT_INDEX,th));
 	    for(i=free-1;i>=0;i--) {
@@ -3704,6 +3706,8 @@ garbage_collect_generation(int generation, int raise)
 		}
 	    }
 	}
+#else
+	esp = (void **) &raise;
 #endif
 	for (ptr = (void **)th->control_stack_end; ptr > esp;  ptr--) {
 	    preserve_pointer(*ptr);
