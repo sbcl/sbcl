@@ -14,10 +14,10 @@
 (in-package "SB!C")
 
 ;;; This phase runs before IR2 conversion, initializing each XEP's
-;;; Entry-Info structure. We call the VM-supplied
-;;; Select-Component-Format function to make VM-dependent
-;;; initializations in the IR2-Component. This includes setting the
-;;; IR2-Component-Kind and allocating fixed implementation overhead in
+;;; ENTRY-INFO structure. We call the VM-supplied
+;;; SELECT-COMPONENT-FORMAT function to make VM-dependent
+;;; initializations in the IR2-COMPONENT. This includes setting the
+;;; IR2-COMPONENT-KIND and allocating fixed implementation overhead in
 ;;; the constant pool. If there was a forward reference to a function,
 ;;; then the ENTRY-INFO will already exist, but will be uninitialized.
 (defun entry-analyze (component)
@@ -50,7 +50,7 @@
 	      (*print-case* :downcase))
 	  (write-to-string args)))))
 
-;;; Initialize Info structure to correspond to the XEP lambda Fun.
+;;; Initialize INFO structure to correspond to the XEP LAMBDA FUN.
 (defun compute-entry-info (fun info)
   (declare (type clambda fun) (type entry-info info))
   (let ((bind (lambda-bind fun))
@@ -67,8 +67,8 @@
       (setf (entry-info-type info) (type-specifier (leaf-type internal-fun)))))
   (values))
 
-;;; Replace all references to Component's non-closure XEPs that appear
-;;; in top-level components, changing to :TOP-LEVEL-XEP functionals.
+;;; Replace all references to COMPONENT's non-closure XEPs that appear
+;;; in top-level components, changing to :TOP-LEVEL-XEP FUNCTIONALs.
 ;;; If the cross-component ref is not in a :TOP-LEVEL component, or is
 ;;; to a closure, then substitution is suppressed.
 ;;;

@@ -83,8 +83,20 @@
     (or env
 	(let ((res (make-environment :function fun)))
 	  (setf (lambda-environment fun) res)
-	  (dolist (lambda (lambda-lets fun))
-	    (setf (lambda-environment lambda) res))
+	  (dolist (letlambda (lambda-lets fun))
+	    ;; The first block of assertions here is more of an
+	    ;; experiment on the behavior of existing code than
+	    ;; something that I worked out as logically required: It's
+	    ;; easier to understand LAMBDA-ENVIRONMENTs of LET
+	    ;; variables if I know that they're always LETs and are
+	    ;; never rewritten. -- WHN 2001-09-27
+	    (aver (member (lambda-kind letlambda) '(:let :mv-let)))
+	    (aver (null (lambda-environment letlambda)))
+	    ;; Enforce some invariants described in the slot comments.
+	    (aver (eql (lambda-home letlambda) fun))
+	    (aver (null (lambda-return letlambda)))
+	    (aver (null (lambda-lets letlambda)))
+	    (setf (lambda-environment letlambda) res))
 	  res))))
 
 ;;; If FUN has no environment, assign one, otherwise clean up
@@ -335,7 +347,7 @@
   (values))
 
 ;;; Mark all tail-recursive uses of function result continuations with
-;;; the corresponding tail-set. Nodes whose type is NIL (i.e. don't
+;;; the corresponding TAIL-SET. Nodes whose type is NIL (i.e. don't
 ;;; return) such as calls to ERROR are never annotated as tail in
 ;;; order to preserve debugging information.
 (defun tail-annotate (component)

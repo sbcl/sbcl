@@ -328,25 +328,25 @@
   ;; of this function
   (type 'function :type (or list (member function))))
 
-;;; An IR2-ENVIRONMENT is used to annotate non-LET lambdas with their
-;;; passing locations. It is stored in the Environment-Info.
+;;; An IR2-ENVIRONMENT is used to annotate non-LET LAMBDAs with their
+;;; passing locations. It is stored in the ENVIRONMENT-INFO.
 (defstruct (ir2-environment (:copier nil))
   ;; the TNs that hold the passed environment within the function.
-  ;; This is an alist translating from the NLX-Info or lambda-var to
+  ;; This is an alist translating from the NLX-INFO or LAMBDA-VAR to
   ;; the TN that holds the corresponding value within this function.
   ;; This list is in the same order as the ENVIRONMENT-CLOSURE.
-  (environment nil :type list)
+  (environment (required-argument) :type list :read-only t)
   ;; the TNs that hold the OLD-FP and RETURN-PC within the function.
   ;; We always save these so that the debugger can do a backtrace,
   ;; even if the function has no return (and thus never uses them).
   ;; Null only temporarily.
   (old-fp nil :type (or tn null))
   (return-pc nil :type (or tn null))
-  ;; The passing location for the Return-PC. The return PC is treated
+  ;; The passing location for the RETURN-PC. The return PC is treated
   ;; differently from the other arguments, since in some
   ;; implementations we may use a call instruction that requires the
   ;; return PC to be passed in a particular place.
-  (return-pc-pass (required-argument) :type tn)
+  (return-pc-pass (required-argument) :type tn :read-only t)
   ;; True if this function has a frame on the number stack. This is
   ;; set by representation selection whenever it is possible that some
   ;; function in our tail set will make use of the number stack.
@@ -355,8 +355,8 @@
   (live-tns nil :type list)
   ;; a list of all the :DEBUG-ENVIRONMENT TNs live in this environment
   (debug-live-tns nil :type list)
-  ;; a label that marks the start of elsewhere code for this function.
-  ;; Null until this label is assigned by codegen. Used for
+  ;; a label that marks the start of elsewhere code for this function,
+  ;; or null until this label is assigned by codegen. Used for
   ;; maintaining the debug source map.
   (elsewhere-start nil :type (or label null))
   ;; a label that marks the first location in this function at which
@@ -837,10 +837,10 @@
   ;;
   ;;   :SAVE
   ;;   :SAVE-ONCE
-  ;;	A TN used for saving a :Normal TN across function calls. The
+  ;;	A TN used for saving a :NORMAL TN across function calls. The
   ;;	lifetime information slots are unitialized: get the original
-  ;;	TN our of the SAVE-TN slot and use it for conflicts. Save-Once
-  ;;	is like :Save, except that it is only save once at the single
+  ;;	TN our of the SAVE-TN slot and use it for conflicts. SAVE-ONCE
+  ;;	is like :SAVE, except that it is only save once at the single
   ;;	writer of the original TN.
   ;;
   ;;   :SPECIFIED-SAVE
@@ -855,11 +855,11 @@
   ;;	determination method.
   ;;
   ;;   :CONSTANT
-  ;;	Represents a constant, with TN-Leaf a Constant leaf. Lifetime
+  ;;	Represents a constant, with TN-LEAF a CONSTANT leaf. Lifetime
   ;;	information isn't computed, since the value isn't allocated by
   ;;	pack, but is instead generated as a load at each use. Since
-  ;;	lifetime analysis isn't done on :Constant TNs, they don't have
-  ;;	Local-Numbers and similar stuff.
+  ;;	lifetime analysis isn't done on :CONSTANT TNs, they don't have
+  ;;	LOCAL-NUMBERs and similar stuff.
   ;;
   ;;   :ALIAS
   ;;	A special kind of TN used to represent initialization of local
@@ -900,7 +900,7 @@
   (local-conflicts (make-array local-tn-limit :element-type 'bit
 			       :initial-element 0)
 		   :type local-tn-bit-vector)
-  ;; head of the list of Global-Conflicts structures for a global TN.
+  ;; head of the list of GLOBAL-CONFLICTS structures for a global TN.
   ;; This list is sorted by block number (i.e. reverse DFO), allowing
   ;; the intersection between the lifetimes for two global TNs to be
   ;; easily found. If null, then this TN is a local TN.

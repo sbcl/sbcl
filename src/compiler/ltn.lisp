@@ -300,7 +300,7 @@
 ;;; Annotate the result continuation for a function. We use the
 ;;; RETURN-INFO computed by GTN to determine how to represent the
 ;;; return values within the function:
-;;;  * If the tail-set has a fixed values count, then use that
+;;;  * If the TAIL-SET has a fixed values count, then use that
 ;;;    many values.
 ;;;  * If the actual uses of the result continuation in this function
 ;;;    have a fixed number of values (after intersection with the

@@ -1061,7 +1061,9 @@
 	(vop count-me node block *dynamic-counts-tn*
 	     (block-number (ir2-block-block block)))))
 
-    (emit-move node block (ir2-environment-return-pc-pass env)
+    (emit-move node
+	       block
+	       (ir2-environment-return-pc-pass env)
 	       (ir2-environment-return-pc env))
 
     (let ((lab (gen-label)))

@@ -55,30 +55,33 @@
 	(setf (leaf-info var) res))))
   (values))
 
-;;; Give an IR2-ENVIRONMENT structure to FUN. We make the TNs which
-;;; hold environment values and the old-FP/return-PC.
-(defun assign-ir2-environment (fun)
-  (declare (type clambda fun))
-  (let ((env (lambda-environment fun)))
-    (collect ((env))
-      (dolist (thing (environment-closure env))
-	(let ((ptype (etypecase thing
-		       (lambda-var
-			(if (lambda-var-indirect thing)
-			    *backend-t-primitive-type*
-			    (primitive-type (leaf-type thing))))
-		       (nlx-info *backend-t-primitive-type*))))
-	  (env (cons thing (make-normal-tn ptype)))))
+;;; Give CLAMBDA an IR2-ENVIRONMENT structure. (And in order to
+;;; properly initialize the new structure, we make the TNs which hold
+;;; environment values and the old-FP/return-PC.)
+(defun assign-ir2-environment (clambda)
+  (declare (type clambda clambda))
+  (let ((lambda-environment (lambda-environment clambda))
+	(reversed-ir2-environment-alist nil))
+    ;; FIXME: should be MAPCAR, not DOLIST
+    (dolist (thing (environment-closure lambda-environment))
+      (let ((ptype (etypecase thing
+		     (lambda-var
+		      (if (lambda-var-indirect thing)
+			  *backend-t-primitive-type*
+			  (primitive-type (leaf-type thing))))
+		     (nlx-info *backend-t-primitive-type*))))
+	(push (cons thing (make-normal-tn ptype))
+	      reversed-ir2-environment-alist)))
 
-      (let ((res (make-ir2-environment
-		  :environment (env)
-		  :return-pc-pass (make-return-pc-passing-location
-				   (external-entry-point-p fun)))))
-	(setf (environment-info env) res)
-	(setf (ir2-environment-old-fp res)
-	      (make-old-fp-save-location env))
-	(setf (ir2-environment-return-pc res)
-	      (make-return-pc-save-location env)))))
+    (let ((res (make-ir2-environment
+		:environment (nreverse reversed-ir2-environment-alist)
+		:return-pc-pass (make-return-pc-passing-location
+				 (external-entry-point-p clambda)))))
+      (setf (environment-info lambda-environment) res)
+      (setf (ir2-environment-old-fp res)
+	    (make-old-fp-save-location lambda-environment))
+      (setf (ir2-environment-return-pc res)
+	    (make-return-pc-save-location lambda-environment))))
 
   (values))
 
@@ -99,10 +102,10 @@
 	     (return t))))))
 
 ;;; Return true if we should use the standard (unknown) return
-;;; convention for a tail-set. We use the standard return convention
+;;; convention for a TAIL-SET. We use the standard return convention
 ;;; when:
 ;;; -- We must use the standard convention to preserve tail-recursion,
-;;;    since the tail-set contains both an XEP and a TR full call.
+;;;    since the TAIL-SET contains both an XEP and a TR full call.
 ;;; -- It appears to be more efficient to use the standard convention,
 ;;;    since there are no non-TR local calls that could benefit from
 ;;;    a non-standard convention.

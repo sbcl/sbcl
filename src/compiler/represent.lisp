@@ -305,8 +305,8 @@
 
 ;;; Prepare for the possibility of a TN being allocated on the number
 ;;; stack by setting NUMBER-STACK-P in all functions that TN is
-;;; referenced in and in all the functions in their tail sets. Refs is
-;;; a TN-Refs list of references to the TN.
+;;; referenced in and in all the functions in their tail sets. REFS is
+;;; a TN-REFS list of references to the TN.
 (defun note-number-stack-tn (refs)
   (declare (type (or tn-ref null) refs))
 

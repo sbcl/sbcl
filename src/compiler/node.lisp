@@ -435,16 +435,22 @@
   mess-up
   (nlx-info :test nlx-info))
 
-;;; An ENVIRONMENT structure represents the result of environment analysis.
+;;; An ENVIRONMENT structure represents the result of environment
+;;; analysis.
+;;;
+;;; As far as I can tell, this is the physical environment in which
+;;; the thing is executing, holding information like how many slots
+;;; are allocated on the stack and where. (So it has only a vague
+;;; connection with lexical environments.) -- WHN 2001-09-27
 (defstruct (environment (:copier nil))
   ;; the function that allocates this environment
   (function (required-argument) :type clambda)
   ;; a list of all the lambdas that allocate variables in this environment
   (lambdas nil :type list)
-  ;; a list of all the lambda-vars and NLX-Infos needed from enclosing
+  ;; a list of all the LAMBDA-VARs and NLX-INFOs needed from enclosing
   ;; environments by code in this environment
   (closure nil :type list)
-  ;; a list of NLX-Info structures describing all the non-local exits
+  ;; a list of NLX-INFO structures describing all the non-local exits
   ;; into this environment
   (nlx-info nil :type list)
   ;; some kind of info used by the back end
@@ -466,7 +472,7 @@
 ;;;
 ;;; The tail set is somewhat approximate, because it is too early to
 ;;; be sure which calls will be tail-recursive. Any call that *might*
-;;; end up tail-recursive causes tail-set merging.
+;;; end up tail-recursive causes TAIL-SET merging.
 (defstruct (tail-set)
   ;; a list of all the LAMBDAs in this tail set
   (functions nil :type list)
@@ -728,21 +734,21 @@
 		     (:predicate lambda-p)
 		     (:constructor make-lambda)
 		     (:copier copy-lambda))
-  ;; List of lambda-var descriptors for args.
+  ;; list of LAMBDA-VAR descriptors for args
   (vars nil :type list)
   ;; If this function was ever a :OPTIONAL function (an entry-point
   ;; for an OPTIONAL-DISPATCH), then this is that OPTIONAL-DISPATCH.
   ;; The optional dispatch will be :DELETED if this function is no
   ;; longer :OPTIONAL.
   (optional-dispatch nil :type (or optional-dispatch null))
-  ;; The BIND node for this LAMBDA. This node marks the beginning of
+  ;; the BIND node for this LAMBDA. This node marks the beginning of
   ;; the lambda, and serves to explicitly represent the lambda binding
   ;; semantics within the flow graph representation. This is null in
   ;; deleted functions, and also in LETs where we deleted the call and
   ;; bind (because there are no variables left), but have not yet
   ;; actually deleted the LAMBDA yet.
   (bind nil :type (or bind null))
-  ;; the Return node for this Lambda, or NIL if it has been deleted.
+  ;; the RETURN node for this LAMBDA, or NIL if it has been deleted.
   ;; This marks the end of the lambda, receiving the result of the
   ;; body. In a LET, the return node is deleted, and the body delivers
   ;; the value to the actual continuation. The return may also be
@@ -759,7 +765,7 @@
   ;; null in a LET
   (entries () :type list)
   ;; a list of all the functions directly called from this function
-  ;; (or one of its lets) using a non-let local call. May include
+  ;; (or one of its LETs) using a non-LET local call. This may include
   ;; deleted functions because nobody bothers to clear them out.
   (calls () :type list)
   ;; the TAIL-SET that this LAMBDA is in. This is null during creation.
@@ -778,7 +784,7 @@
   ;; environment.
   (environment nil :type (or environment null))
   ;; In a LET, this is the NODE-LEXENV of the combination node. We
-  ;; retain it so that if the let is deleted (due to a lack of vars),
+  ;; retain it so that if the LET is deleted (due to a lack of vars),
   ;; we will still have caller's lexenv to figure out which cleanup is
   ;; in effect.
   (call-lexenv nil :type (or lexenv null)))
