@@ -1226,3 +1226,22 @@ WORKAROUND:
 	strongly suspect that they would.)
     288b2: SINGLE-FLOAT is distinct from DOUBLE-FLOAT. (This is 
 	in a sense just one aspect of bug 288a.)
+
+289: "type checking and source-transforms"
+  a.
+    (block nil (let () (funcall #'+ (eval 'nil) (eval '1) (return :good))))
+  signals type error.
+
+  Our policy is to check argument types at the moment of a call. It
+  disagrees with ANSI, which says that type assertions are put
+  immediately onto argument expressions, but is easier to implement in
+  IR1 and is more compatible to type inference, inline expansion,
+  etc. IR1-transforms automatically keep this policy, but source
+  transforms for associative functions (such as +), being applied
+  during IR1-convertion, do not. It may be tolerable for direct calls
+  (+ x y z), but for (FUNCALL #'+ x y z) it is non-conformant.
+
+  b. Another aspect of this problem is efficiency. [x y + z +]
+  requires less registers than [x y z + +]. This transformation is
+  currently performed with source transforms, but it would be good to
+  also perform it in IR1 optimization phase.
