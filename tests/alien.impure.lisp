@@ -90,5 +90,9 @@
     (delete-file (compile-file-pathname fname))
     (delete-file fname)))
 
+;;; enumerations with only one enum resulted in division-by-zero
+;;; reported on sbcl-help 2004-11-16 by John Morrison
+(define-alien-type enum.1 (enum nil (:val0 0)))
+
 ;;; success
 (quit :unix-status 104)

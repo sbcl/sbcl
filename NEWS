@@ -46,6 +46,8 @@ changes in sbcl-0.8.17 relative to sbcl-0.8.16:
   * bug fix: EQUAL compiler optimizations is less aggressive on
     strings which can potentially compare true despite having distinct
     specialized array element types.
+  * bug fix: unit enumerations can be defined without dividing by
+    zero.  (thanks to Vincent Arkesteijn)
   * FORMAT compile-time argument count checking has been enhanced.
     (report from Bruno Haible for CMUCL)
   * a partial workaround for the bug 262: the compiler does not try to

@@ -672,7 +672,7 @@
        ;; If range is at least 20% dense, use vector mapping. Crossover
        ;; point solely on basis of space would be 25%. Vector mapping
        ;; is always faster, so give the benefit of the doubt.
-       ((< 0.2 (/ (float (length from-alist)) (float (- max min))))
+       ((< 0.2 (/ (float (length from-alist)) (float (1+ (- max min)))))
 	;; If offset is small and ignorable, ignore it to save time.
 	(when (< 0 min 10) (setq min 0))
 	(let ((to (make-array (1+ (- max min)))))
