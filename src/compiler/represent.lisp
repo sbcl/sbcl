@@ -346,7 +346,7 @@
 ;;; If policy indicates, give an efficiency note for doing the
 ;;; coercion VOP, where OP is the operand we are coercing for and
 ;;; DEST-TN is the distinct destination in a move.
-(defun do-coerce-efficiency-note (vop op dest-tn)
+(defun maybe-emit-coerce-efficiency-note (vop op dest-tn)
   (declare (type vop-info vop) (type tn-ref op) (type (or tn null) dest-tn))
   (let* ((note (or (template-note vop) (template-name vop)))
 	 (cost (template-cost vop))
@@ -453,7 +453,7 @@
 		 (when res
 		   (when (>= (vop-info-cost res)
 			     *efficiency-note-cost-threshold*)
-		     (do-coerce-efficiency-note res op dest-tn))
+		     (maybe-emit-coerce-efficiency-note res op dest-tn))
 		   (let ((temp (make-representation-tn ptype scn)))
 		     (change-tn-ref-tn op temp)
 		     (cond
@@ -599,7 +599,7 @@
 		(res
 		 (when (>= (vop-info-cost res)
 			   *efficiency-note-cost-threshold*)
-		   (do-coerce-efficiency-note res args y))
+		   (maybe-emit-coerce-efficiency-note res args y))
 		 (emit-move-template node block res x y vop)
 		 (delete-vop vop))
 		(t

@@ -117,7 +117,7 @@
 ;;; descriptor. Attempt to write the data again. If it worked, remove
 ;;; the data from the OUTPUT-LATER list. If it didn't work, something
 ;;; is wrong.
-(defun do-output-later (stream)
+(defun frob-output-later (stream)
   (let* ((stuff (pop (fd-stream-output-later stream)))
 	 (base (car stuff))
 	 (start (cadr stuff))
@@ -156,7 +156,7 @@
 				      :output
 				      (lambda (fd)
 					(declare (ignore fd))
-					(do-output-later stream)))))
+					(frob-output-later stream)))))
 	(t
 	 (nconc (fd-stream-output-later stream)
 		(list (list base start end reuse-sap)))))
@@ -168,7 +168,7 @@
 ;;; Output the given noise. Check to see whether there are any pending
 ;;; writes. If so, just queue this one. Otherwise, try to write it. If
 ;;; this would block, queue it.
-(defun do-output (stream base start end reuse-sap)
+(defun frob-output (stream base start end reuse-sap)
   (declare (type fd-stream stream)
 	   (type (or system-area-pointer (simple-array * (*))) base)
 	   (type index start end))
@@ -194,7 +194,7 @@
 (defun flush-output-buffer (stream)
   (let ((length (fd-stream-obuf-tail stream)))
     (unless (= length 0)
-      (do-output stream (fd-stream-obuf-sap stream) 0 length t)
+      (frob-output stream (fd-stream-obuf-sap stream) 0 length t)
       (setf (fd-stream-obuf-tail stream) 0))))
 
 ;;; Define output routines that output numbers SIZE bytes long for the
@@ -350,7 +350,7 @@
 	     (setf (fd-stream-obuf-tail fd-stream) bytes))
 	    (t
 	     (flush-output-buffer fd-stream)
-	     (do-output fd-stream thing start end nil))))))
+	     (frob-output fd-stream thing start end nil))))))
 
 ;;; the routine to use to output a string. If the stream is
 ;;; unbuffered, slam the string down the file descriptor, otherwise
@@ -381,7 +381,7 @@
 	     (when last-newline
 	       (flush-output-buffer stream)))
 	    (:none
-	     (do-output stream thing start end nil)))
+	     (frob-output stream thing start end nil)))
 	  (if last-newline
 	      (setf (fd-stream-char-pos stream)
 		    (- end last-newline 1))
@@ -391,7 +391,7 @@
 	  ((:line :full)
 	   (output-raw-bytes stream thing start end))
 	  (:none
-	   (do-output stream thing start end nil))))))
+	   (frob-output stream thing start end nil))))))
 
 ;;; Find an output routine to use given the type and buffering. Return
 ;;; as multiple values the routine, the real type transfered, and the
@@ -414,7 +414,7 @@
 ;;; Fill the input buffer, and return the first character. Throw to
 ;;; EOF-INPUT-CATCHER if the eof was reached. Drop into SYSTEM:SERVER
 ;;; if necessary.
-(defun do-input (stream)
+(defun frob-input (stream)
   (let ((fd (fd-stream-fd stream))
 	(ibuf-sap (fd-stream-ibuf-sap stream))
 	(buflen (fd-stream-ibuf-length stream))
@@ -475,7 +475,7 @@
 			   #!+mp (sb!mp:process-wait-until-fd-usable
 				 fd :input (fd-stream-timeout stream))
 		     (error 'io-timeout :stream stream :direction :read))
-		   (do-input stream))
+		   (frob-input stream))
 		 (simple-stream-perror "couldn't read from ~S" stream errno)))
 	    ((zerop count)
 	     (setf (fd-stream-listen stream) :eof)
@@ -485,7 +485,7 @@
 	     (incf (fd-stream-ibuf-tail stream) count))))))
 			
 ;;; Make sure there are at least BYTES number of bytes in the input
-;;; buffer. Keep calling DO-INPUT until that condition is met.
+;;; buffer. Keep calling FROB-INPUT until that condition is met.
 (defmacro input-at-least (stream bytes)
   (let ((stream-var (gensym))
 	(bytes-var (gensym)))
@@ -496,7 +496,7 @@
 		      (fd-stream-ibuf-head ,stream-var))
 		   ,bytes-var)
 	   (return))
-	 (do-input ,stream-var)))))
+	 (frob-input ,stream-var)))))
 
 ;;; a macro to wrap around all input routines to handle EOF-ERROR noise
 (defmacro input-wrapper ((stream bytes eof-error eof-value) &body read-forms)
@@ -833,7 +833,7 @@
 						 0
 						 0))))
 	  (cond ((eql count 1)
-		 (do-input fd-stream)
+		 (frob-input fd-stream)
 		 (setf (fd-stream-ibuf-head fd-stream) 0)
 		 (setf (fd-stream-ibuf-tail fd-stream) 0))
 		(t
@@ -1030,7 +1030,7 @@
 ;;; Rename NAMESTRING to ORIGINAL. First, check whether we have write
 ;;; access, since we don't want to trash unwritable files even if we
 ;;; technically can. We return true if we succeed in renaming.
-(defun do-old-rename (namestring original)
+(defun rename-the-old-one (namestring original)
   (unless (sb!unix:unix-access namestring sb!unix:w_ok)
     (error "~@<The file ~2I~_~S ~I~_is not writable.~:>" namestring))
   (multiple-value-bind (okay err) (sb!unix:unix-rename namestring original)
@@ -1157,7 +1157,7 @@
 					      namestring
 					      err/dev)))))))
 	    (unless (and exists
-			 (do-old-rename namestring original))
+			 (rename-the-old-one namestring original))
 	      (setf original nil)
 	      (setf delete-original nil)
 	      ;; In order to use :SUPERSEDE instead, we have to make

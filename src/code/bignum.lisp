@@ -1702,12 +1702,13 @@ IS LESS EFFICIENT BUT EASIER TO MAINTAIN. BILL SAYS THIS CODE CERTAINLY WORKS!
 (defvar *truncate-x*)
 (defvar *truncate-y*)
 
-;;; This divides x by y returning the quotient and remainder. In the general
-;;; case, we shift y to setup for the algorithm, and we use two buffers to save
-;;; consing intermediate values. X gets destructively modified to become the
-;;; remainder, and we have to shift it to account for the initial Y shift.
-;;; After we multiple bind q and r, we first fix up the signs and then return
-;;; the normalized results.
+;;; Divide X by Y returning the quotient and remainder. In the
+;;; general case, we shift Y to set up for the algorithm, and we use
+;;; two buffers to save consing intermediate values. X gets
+;;; destructively modified to become the remainder, and we have to
+;;; shift it to account for the initial Y shift. After we multiple
+;;; bind q and r, we first fix up the signs and then return the
+;;; normalized results.
 (defun bignum-truncate (x y)
   (declare (type bignum-type x y))
   (let* ((x-plusp (%bignum-0-or-plusp x (%bignum-length x)))
@@ -1730,8 +1731,10 @@ IS LESS EFFICIENT BUT EASIER TO MAINTAIN. BILL SAYS THIS CODE CERTAINLY WORKS!
 				       (*truncate-y* (1+ len-y)))
 		   (let ((y-shift (shift-y-for-truncate y)))
 		     (shift-and-store-truncate-buffers x len-x y len-y y-shift)
-		     (values (do-truncate len-x+1 len-y)
-			     ;; DO-TRUNCATE must execute first.
+		     (values (return-quotient-leaving-remainder len-x+1 len-y)
+			     ;; Now that RETURN-QUOTIENT-LEAVING-REMAINDER
+			     ;; has executed, we just tidy up the remainder
+			     ;; (in *TRUNCATE-X*) and return it.
 			     (cond
 			      ((zerop y-shift)
 			       (let ((res (%allocate-bignum len-y)))
@@ -1760,13 +1763,15 @@ IS LESS EFFICIENT BUT EASIER TO MAINTAIN. BILL SAYS THIS CODE CERTAINLY WORKS!
 		    rem
 		    (%normalize-bignum rem (%bignum-length rem))))))))
 
-;;; This divides x by y when y is a single bignum digit. BIGNUM-TRUNCATE fixes
-;;; up the quotient and remainder with respect to sign and normalization.
+;;; Divide X by Y when Y is a single bignum digit. BIGNUM-TRUNCATE
+;;; fixes up the quotient and remainder with respect to sign and
+;;; normalization.
 ;;;
-;;; We don't have to worry about shifting y to make its most significant digit
-;;; sufficiently large for %FLOOR to return 32-bit quantities for the q-digit
-;;; and r-digit. If y is a single digit bignum, it is already large enough
-;;; for %FLOOR. That is, it has some bits on pretty high in the digit.
+;;; We don't have to worry about shifting Y to make its most
+;;; significant digit sufficiently large for %FLOOR to return 32-bit
+;;; quantities for the q-digit and r-digit. If Y is a single digit
+;;; bignum, it is already large enough for %FLOOR. That is, it has
+;;; some bits on pretty high in the digit.
 (defun bignum-truncate-single-digit (x len-x y)
   (declare (type bignum-index len-x))
   (let ((q (%allocate-bignum len-x))
@@ -1783,14 +1788,18 @@ IS LESS EFFICIENT BUT EASIER TO MAINTAIN. BILL SAYS THIS CODE CERTAINLY WORKS!
       (setf (%bignum-ref rem 0) r)
       (values q rem))))
 
-;;; This divides *truncate-x* by *truncate-y*, and len-x and len-y tell us how
-;;; much of the buffers we care about. TRY-BIGNUM-TRUNCATE-GUESS modifies
-;;; *truncate-x* on each interation, and this buffer becomes our remainder.
+;;; a helper function for BIGNUM-TRUNCATE
 ;;;
-;;; *truncate-x* definitely has at least three digits, and it has one more than
-;;; *truncate-y*. This keeps i, i-1, i-2, and low-x-digit happy. Thanks to
-;;; SHIFT-AND-STORE-TRUNCATE-BUFFERS.
-(defun do-truncate (len-x len-y)
+;;; Divide *TRUNCATE-X* by *TRUNCATE-Y*, returning the quotient
+;;; and destructively modifying *TRUNCATE-X* so that it holds
+;;; the remainder.
+;;;
+;;; LEN-X and LEN-Y tell us how much of the buffers we care about.
+;;;
+;;; *TRUNCATE-X* definitely has at least three digits, and it has one
+;;; more than *TRUNCATE-Y*. This keeps i, i-1, i-2, and low-x-digit
+;;; happy. Thanks to SHIFT-AND-STORE-TRUNCATE-BUFFERS.
+(defun return-quotient-leaving-remainder (len-x len-y)
   (declare (type bignum-index len-x len-y))
   (let* ((len-q (- len-x len-y))
 	 ;; Add one for extra sign digit in case high bit is on.
@@ -1807,7 +1816,7 @@ IS LESS EFFICIENT BUT EASIER TO MAINTAIN. BILL SAYS THIS CODE CERTAINLY WORKS!
     (loop
       (setf (%bignum-ref q k)
 	    (try-bignum-truncate-guess
-	     ;; This modifies *truncate-x*. Must access elements each pass.
+	     ;; This modifies *TRUNCATE-X*. Must access elements each pass.
 	     (bignum-truncate-guess y1 y2
 				    (%bignum-ref *truncate-x* i)
 				    (%bignum-ref *truncate-x* i-1)
@@ -1819,15 +1828,17 @@ IS LESS EFFICIENT BUT EASIER TO MAINTAIN. BILL SAYS THIS CODE CERTAINLY WORKS!
 	       (shiftf i i-1 i-2 (1- i-2)))))
     q))
 
-;;; This takes a digit guess, multiplies it by *truncate-y* for a result one
-;;; greater in length than len-y, and subtracts this result from *truncate-x*.
-;;; Low-x-digit is the first digit of x to start the subtraction, and we know x
-;;; is long enough to subtract a len-y plus one length bignum from it. Next we
-;;; check the result of the subtraction, and if the high digit in x became
-;;; negative, then our guess was one too big. In this case, return one less
-;;; than guess passed in, and add one value of y back into x to account for
-;;; subtracting one too many. Knuth shows that the guess is wrong on the order
-;;; of 3/b, where b is the base (2 to the digit-size power) -- pretty rarely.
+;;; This takes a digit guess, multiplies it by *TRUNCATE-Y* for a
+;;; result one greater in length than LEN-Y, and subtracts this result
+;;; from *TRUNCATE-X*. LOW-X-DIGIT is the first digit of X to start
+;;; the subtraction, and we know X is long enough to subtract a LEN-Y
+;;; plus one length bignum from it. Next we check the result of the
+;;; subtraction, and if the high digit in X became negative, then our
+;;; guess was one too big. In this case, return one less than GUESS
+;;; passed in, and add one value of Y back into X to account for
+;;; subtracting one too many. Knuth shows that the guess is wrong on
+;;; the order of 3/b, where b is the base (2 to the digit-size power)
+;;; -- pretty rarely.
 (defun try-bignum-truncate-guess (guess len-y low-x-digit)
   (declare (type bignum-index low-x-digit len-y)
 	   (type bignum-element-type guess))

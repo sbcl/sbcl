@@ -46,9 +46,14 @@
 
 ;;; Allocate an indirect value cell. Maybe do some clever stack
 ;;; allocation someday.
-(defevent make-value-cell "Allocate heap value cell for lexical var.")
+;;;
+;;; FIXME: DO-MAKE-VALUE-CELL is a bad name, since it doesn't make
+;;; clear what's the distinction between it and the MAKE-VALUE-CELL
+;;; VOP, and since the DO- further connotes iteration, which has
+;;; nothing to do with this. Clearer, more systematic names, anyone?
+(defevent make-value-cell-event "Allocate heap value cell for lexical var.")
 (defun do-make-value-cell (node block value res)
-  (event make-value-cell node)
+  (event make-value-cell-event node)
   (vop make-value-cell node block value res))
 
 ;;;; leaf reference

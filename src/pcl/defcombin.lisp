@@ -92,7 +92,7 @@
 			(apply
 			 (lambda (gf type options)
 			   (declare (ignore gf))
-			   (do-short-method-combination
+			   (short-combine-methods
 			    type options operator ioa new-method doc))
 			 args))
 	    :definition-source `((define-method-combination ,type) ,truename)))
@@ -100,7 +100,7 @@
       (remove-method #'find-method-combination old-method))
     (add-method #'find-method-combination new-method)))
 
-(defun do-short-method-combination (type options operator ioa method doc)
+(defun short-combine-methods (type options operator ioa method doc)
   (cond ((null options) (setq options '(:most-specific-first)))
 	((equal options '(:most-specific-first)))
 	((equal options '(:most-specific-last)))

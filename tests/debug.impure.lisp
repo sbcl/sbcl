@@ -57,3 +57,6 @@
   (assert (symbolp control-sym))
   (assert (eql &rest-sym '&rest))
   (assert (symbolp format-args-sym)))
+
+;;; success
+(quit :unix-status 104)

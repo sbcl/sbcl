@@ -142,8 +142,8 @@
 
 ;;; CMU CL comment:
 ;;;   Magically converted by the compiler into a break instruction.
-(defun do-pending-interrupt ()
-  (do-pending-interrupt))
+(defun receive-pending-interrupt ()
+  (receive-pending-interrupt))
 
 ;;; stale code which I'm insufficiently motivated to test -- WHN 19990714
 #|

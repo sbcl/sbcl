@@ -720,7 +720,7 @@
 ;;; We make this work by getting USE-CONTINUATION to do the unioning
 ;;; across COND branches. We can't do it here, since we don't know how
 ;;; many branches there are going to be.
-(defun do-the-stuff (type cont lexenv name)
+(defun ir1ize-the-or-values (type cont lexenv name)
   (declare (type continuation cont) (type lexenv lexenv))
   (let* ((ctype (values-specifier-type type))
 	 (old-type (or (lexenv-find cont type-restrictions)
@@ -749,7 +749,7 @@
 ;;; this didn't seem to expand into an assertion, at least for ALIEN
 ;;; values. Check that SBCL doesn't have this problem.
 (def-ir1-translator the ((type value) start cont)
-  (let ((*lexenv* (do-the-stuff type cont *lexenv* 'the)))
+  (let ((*lexenv* (ir1ize-the-or-values type cont *lexenv* 'the)))
     (ir1-convert start cont value)))
 
 ;;; This is like the THE special form, except that it believes

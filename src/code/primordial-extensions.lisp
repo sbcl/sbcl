@@ -68,7 +68,7 @@
 ;;;; DO-related stuff which needs to be visible on the cross-compilation host
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  (defun do-do-body (varlist endlist decls-and-code bind step name block)
+  (defun frob-do-body (varlist endlist decls-and-code bind step name block)
     (let* ((r-inits nil) ; accumulator for reversed list
 	   (r-steps nil) ; accumulator for reversed list
 	   (label-1 (gensym))
@@ -129,7 +129,7 @@
 ;;; EXIT-FORMS are evaluated as a PROGN, with the result being the
 ;;; value of the DO.
 (defmacro do-anonymous (varlist endlist &rest body)
-  (do-do-body varlist endlist body 'let 'psetq 'do-anonymous (gensym)))
+  (frob-do-body varlist endlist body 'let 'psetq 'do-anonymous (gensym)))
 
 ;;;; miscellany
 

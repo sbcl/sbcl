@@ -30,10 +30,9 @@
       (write-string semicolons))
     (write-char #\space)))
 
-;;; If VERBOSE, output (to *STANDARD-OUTPUT*) a message about how we're
-;;; loading from STREAM-WE-ARE-LOADING-FROM.
-;;; FIXME: non-mnemonic name
-(defun do-load-verbose (stream-we-are-loading-from verbose)
+;;; If VERBOSE, output (to *STANDARD-OUTPUT*) a message about how
+;;; we're loading from STREAM-WE-ARE-LOADING-FROM.
+(defun maybe-announce-load (stream-we-are-loading-from verbose)
   (when verbose
     (load-fresh-line)
     (let ((name #-sb-xc-host (file-name stream-we-are-loading-from)
@@ -327,7 +326,7 @@
   (declare (ignore print))
   (when (zerop (file-length stream))
     (error "attempt to load an empty FASL file:~%  ~S" (namestring stream)))
-  (do-load-verbose stream verbose)
+  (maybe-announce-load stream verbose)
   (let* ((*fasl-input-stream* stream)
 	 (*current-fop-table* (or (pop *free-fop-tables*) (make-array 1000)))
 	 (*current-fop-table-size* (length *current-fop-table*))

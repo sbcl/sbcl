@@ -13,7 +13,7 @@
 (in-package "SB!C")
 
 ;;; If non-NIL, emit assembly code. If NIL, emit VOP templates.
-(defvar *do-assembly* nil)
+(defvar *emit-assembly-code-not-vops-p* nil)
 
 ;;; a list of (NAME . LABEL) for every entry point
 (defvar *entry-points* nil)
@@ -31,7 +31,7 @@
 		      (output-file (make-pathname :defaults name
 						  :type "assem")))
   ;; FIXME: Consider nuking the filename defaulting logic here.
-  (let* ((*do-assembly* t)
+  (let* ((*emit-assembly-code-not-vops-p* t)
 	 (name (pathname name))
 	 ;; the fasl file currently being output to
 	 (lap-fasl-output (open-fasl-output (pathname output-file) name))
@@ -191,6 +191,6 @@
 	(values (car name&options)
 		(cdr name&options)))
     (let ((regs (mapcar (lambda (var) (apply #'parse-reg-spec var)) vars)))
-      (if *do-assembly*
+      (if *emit-assembly-code-not-vops-p*
 	  (emit-assemble name options regs code)
 	  (emit-vop name options regs)))))

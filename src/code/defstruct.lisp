@@ -515,7 +515,7 @@
 	   (when offset (incf (dd-length dd) offset)))))
 
       (when (dd-include dd)
-	(do-dd-inclusion-stuff dd))
+	(frob-dd-inclusion-stuff dd))
 
       dd)))
 
@@ -676,7 +676,7 @@
 
 ;;; Process any included slots pretty much like they were specified.
 ;;; Also inherit various other attributes.
-(defun do-dd-inclusion-stuff (dd)
+(defun frob-dd-inclusion-stuff (dd)
   (destructuring-bind (included-name &rest modified-slots) (dd-include dd)
     (let* ((type (dd-type dd))
 	   (included-structure

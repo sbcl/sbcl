@@ -139,7 +139,7 @@
   (lambda () (slot-value object 'function)))
 ||#
 
-(defun do-tests ()
+(defun run-tests ()
   (dolist (doc+form (reverse *tests*))
     (format t "~&~%~A~%" (car doc+form))
     (pprint (cdr doc+form))

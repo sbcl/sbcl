@@ -128,12 +128,12 @@
 	   (optimize (speed 3) (safety 0) (inhibit-warnings 3)))
   (setf (sap-ref-32 sap (the index (ash offset 2))) value))
 
-;;;; DO-CONSTANT-BIT-BASH
+;;;; CONSTANT-BIT-BASH
 
 ;;; Fill DST with VALUE starting at DST-OFFSET and continuing for
 ;;; LENGTH bits.
-#!-sb-fluid (declaim (inline do-constant-bit-bash))
-(defun do-constant-bit-bash (dst dst-offset length value dst-ref-fn dst-set-fn)
+#!-sb-fluid (declaim (inline constant-bit-bash))
+(defun constant-bit-bash (dst dst-offset length value dst-ref-fn dst-set-fn)
   (declare (type offset dst-offset) (type unit value)
 	   (type function dst-ref-fn dst-set-fn))
   (multiple-value-bind (dst-word-offset dst-bit-offset)
@@ -181,11 +181,11 @@
 			   mask)))))))))
   (values))
 
-;;;; DO-UNARY-BIT-BASH
+;;;; UNARY-BIT-BASH
 
-#!-sb-fluid (declaim (inline do-unary-bit-bash))
-(defun do-unary-bit-bash (src src-offset dst dst-offset length
-			      dst-ref-fn dst-set-fn src-ref-fn)
+#!-sb-fluid (declaim (inline unary-bit-bash))
+(defun unary-bit-bash (src src-offset dst dst-offset length
+			   dst-ref-fn dst-set-fn src-ref-fn)
   ;; FIXME: Declaring these bit indices to be of type OFFSET, then
   ;; using the inline expansion in SPEED 3 SAFETY 0 functions, is not
   ;; a good thing. At the very least, we should make sure that the
@@ -448,24 +448,24 @@
   (declare (type unit value) (type offset dst-offset length))
   (locally
    (declare (optimize (speed 3) (safety 0)))
-   (do-constant-bit-bash dst dst-offset length value
-			 #'%raw-bits #'%set-raw-bits)))
+   (constant-bit-bash dst dst-offset length value
+		      #'%raw-bits #'%set-raw-bits)))
 
 (defun system-area-fill (value dst dst-offset length)
   (declare (type unit value) (type offset dst-offset length))
   (locally
    (declare (optimize (speed 3) (safety 0)))
    (multiple-value-bind (dst dst-offset) (fix-sap-and-offset dst dst-offset)
-     (do-constant-bit-bash dst dst-offset length value
-			   #'word-sap-ref #'%set-word-sap-ref))))
+     (constant-bit-bash dst dst-offset length value
+			#'word-sap-ref #'%set-word-sap-ref))))
 
 (defun bit-bash-copy (src src-offset dst dst-offset length)
   (declare (type offset src-offset dst-offset length))
   (locally
    (declare (optimize (speed 3) (safety 0))
-	    (inline do-unary-bit-bash))
-   (do-unary-bit-bash src src-offset dst dst-offset length
-		      #'%raw-bits #'%set-raw-bits #'%raw-bits)))
+	    (inline unary-bit-bash))
+   (unary-bit-bash src src-offset dst dst-offset length
+		   #'%raw-bits #'%set-raw-bits #'%raw-bits)))
 
 (defun system-area-copy (src src-offset dst dst-offset length)
   (declare (type offset src-offset dst-offset length))
@@ -475,25 +475,25 @@
      (declare (type system-area-pointer src))
      (multiple-value-bind (dst dst-offset) (fix-sap-and-offset dst dst-offset)
        (declare (type system-area-pointer dst))
-       (do-unary-bit-bash src src-offset dst dst-offset length
-			  #'word-sap-ref #'%set-word-sap-ref
-			  #'word-sap-ref)))))
+       (unary-bit-bash src src-offset dst dst-offset length
+		       #'word-sap-ref #'%set-word-sap-ref
+		       #'word-sap-ref)))))
 
 (defun copy-to-system-area (src src-offset dst dst-offset length)
   (declare (type offset src-offset dst-offset length))
   (locally
    (declare (optimize (speed 3) (safety 0)))
    (multiple-value-bind (dst dst-offset) (fix-sap-and-offset dst dst-offset)
-     (do-unary-bit-bash src src-offset dst dst-offset length
-			#'word-sap-ref #'%set-word-sap-ref #'%raw-bits))))
+     (unary-bit-bash src src-offset dst dst-offset length
+		     #'word-sap-ref #'%set-word-sap-ref #'%raw-bits))))
 
 (defun copy-from-system-area (src src-offset dst dst-offset length)
   (declare (type offset src-offset dst-offset length))
   (locally
    (declare (optimize (speed 3) (safety 0)))
    (multiple-value-bind (src src-offset) (fix-sap-and-offset src src-offset)
-     (do-unary-bit-bash src src-offset dst dst-offset length
-			#'%raw-bits #'%set-raw-bits #'word-sap-ref))))
+     (unary-bit-bash src src-offset dst dst-offset length
+		     #'%raw-bits #'%set-raw-bits #'word-sap-ref))))
 
 ;;; a common idiom for calling COPY-TO-SYSTEM-AREA
 ;;;

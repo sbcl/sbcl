@@ -113,7 +113,7 @@
   (sout #'ill-out :type function)		; string output function
 
   ;; other, less-used methods
-  (misc #'do-nothing :type function))
+  (misc #'no-op-placeholder :type function))
 
 (def!method print-object ((x ansi-stream) stream)
   (print-unreadable-object (x stream :type t :identity t)))

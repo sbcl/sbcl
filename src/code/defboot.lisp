@@ -283,11 +283,11 @@
 
 ;;;; iteration constructs
 
-;;; (These macros are defined in terms of a function DO-DO-BODY which
+;;; (These macros are defined in terms of a function FROB-DO-BODY which
 ;;; is also used by SB!INT:DO-ANONYMOUS. Since these macros should not
 ;;; be loaded on the cross-compilation host, but SB!INT:DO-ANONYMOUS
-;;; and DO-DO-BODY should be, these macros can't conveniently be in
-;;; the same file as DO-DO-BODY.)
+;;; and FROB-DO-BODY should be, these macros can't conveniently be in
+;;; the same file as FROB-DO-BODY.)
 (defmacro-mundanely do (varlist endlist &body body)
   #!+sb-doc
   "DO ({(Var [Init] [Step])}*) (Test Exit-Form*) Declaration* Form*
@@ -298,7 +298,7 @@
   are evaluated as a PROGN, with the result being the value of the DO. A block
   named NIL is established around the entire expansion, allowing RETURN to be
   used as an alternate exit mechanism."
-  (do-do-body varlist endlist body 'let 'psetq 'do nil))
+  (frob-do-body varlist endlist body 'let 'psetq 'do nil))
 (defmacro-mundanely do* (varlist endlist &body body)
   #!+sb-doc
   "DO* ({(Var [Init] [Step])}*) (Test Exit-Form*) Declaration* Form*
@@ -309,7 +309,7 @@
   the Exit-Forms are evaluated as a PROGN, with the result being the value
   of the DO. A block named NIL is established around the entire expansion,
   allowing RETURN to be used as an laternate exit mechanism."
-  (do-do-body varlist endlist body 'let* 'setq 'do* nil))
+  (frob-do-body varlist endlist body 'let* 'setq 'do* nil))
 
 ;;; DOTIMES and DOLIST could be defined more concisely using
 ;;; destructuring macro lambda lists or DESTRUCTURING-BIND, but then

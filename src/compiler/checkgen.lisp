@@ -404,7 +404,7 @@
 ;;; context. If the value is a constant, we print it specially. We
 ;;; ignore nodes whose type is NIL, since they are supposed to never
 ;;; return.
-(defun do-type-warning (node)
+(defun emit-type-warning (node)
   (declare (type node node))
   (let* ((*compiler-error-context* node)
 	 (cont (node-cont node))
@@ -491,7 +491,7 @@
 			   (node-derived-type use) atype)
 		    (mark-error-continuation cont)
 		    (unless (policy node (= inhibit-warnings 3))
-		      (do-type-warning use))))))
+		      (emit-type-warning use))))))
 	    (when (eq type-check t)
 	      (cond ((probable-type-check-p cont)
 		     (conts cont))

@@ -178,10 +178,10 @@
 		   (svref *!load-time-values* (third toplevel-thing)))))
 	   #!+(and x86 gencgc)
 	   (:load-time-code-fixup
-	    (sb!vm::!do-load-time-code-fixup (second toplevel-thing)
-					     (third  toplevel-thing)
-					     (fourth toplevel-thing)
-					     (fifth  toplevel-thing)))
+	    (sb!vm::!envector-load-time-code-fixup (second toplevel-thing)
+						   (third  toplevel-thing)
+						   (fourth toplevel-thing)
+						   (fifth  toplevel-thing)))
 	   (t
 	    (!cold-lose "bogus fixup code in *!REVERSED-COLD-TOPLEVELS*"))))
 	(t (!cold-lose "bogus function in *!REVERSED-COLD-TOPLEVELS*")))))

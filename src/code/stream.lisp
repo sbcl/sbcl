@@ -58,7 +58,7 @@
 (defun closed-flame (stream &rest ignore)
   (declare (ignore ignore))
   (error "~S is closed." stream))
-(defun do-nothing (&rest ignore)
+(defun no-op-placeholder (&rest ignore)
   (declare (ignore ignore)))
 
 ;;; stream manipulation functions

@@ -506,7 +506,7 @@
   (setf (dstate-cur-offs dstate) 0)
   (setf (dstate-cur-labels dstate) (dstate-labels dstate)))
 
-(defun do-offs-hooks (before-address stream dstate)
+(defun call-offs-hooks (before-address stream dstate)
   (declare (type (or null stream) stream)
 	   (type disassem-state dstate))
   (let ((cur-offs (dstate-cur-offs dstate)))
@@ -527,7 +527,7 @@
 	  (unless (= (dstate-next-offs dstate) cur-offs)
 	    (return)))))))
 
-(defun do-fun-hooks (chunk stream dstate)
+(defun call-fun-hooks (chunk stream dstate)
   (let ((hooks (dstate-fun-hooks dstate))
 	(cur-offs (dstate-cur-offs dstate)))
     (setf (dstate-next-offs dstate) cur-offs)
@@ -568,10 +568,10 @@
 
       (setf (dstate-next-offs dstate) (dstate-cur-offs dstate))
 
-      (do-offs-hooks t stream dstate)
+      (call-offs-hooks t stream dstate)
       (unless (or prefix-p (null stream))
 	(print-current-address stream dstate))
-      (do-offs-hooks nil stream dstate)
+      (call-offs-hooks nil stream dstate)
 
       (unless (> (dstate-next-offs dstate) (dstate-cur-offs dstate))
 	(sb!sys:without-gcing
@@ -581,7 +581,7 @@
 		(sap-ref-dchunk (dstate-segment-sap dstate)
 				(dstate-cur-offs dstate)
 				(dstate-byte-order dstate))))
-	   (let ((fun-prefix-p (do-fun-hooks chunk stream dstate)))
+	   (let ((fun-prefix-p (call-fun-hooks chunk stream dstate)))
 	     (if (> (dstate-next-offs dstate) (dstate-cur-offs dstate))
 		 (setf prefix-p fun-prefix-p)
 		 (let ((inst (find-inst chunk ispace)))

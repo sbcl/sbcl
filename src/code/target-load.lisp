@@ -29,7 +29,7 @@
 
 ;;; Load a text file.
 (defun load-as-source (stream verbose print)
-  (do-load-verbose stream verbose)
+  (maybe-announce-load stream verbose)
   (do ((sexpr (read stream nil *eof-object*)
 	      (read stream nil *eof-object*)))
       ((eq sexpr *eof-object*)

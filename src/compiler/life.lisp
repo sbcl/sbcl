@@ -655,10 +655,10 @@
 
     (make-debug-environment-tns-live block live-bits live-list)))
 
-;;; A function called in Conflict-Analyze-1-Block when we have a VOP with
-;;; SAVE-P true. We compute the save-set, and if :FORCE-TO-STACK, force all
-;;; the live TNs to be stack environment TNs.
-(defun do-save-p-stuff (vop block live-bits)
+;;; A function called in CONFLICT-ANALYZE-1-BLOCK when we have a VOP
+;;; with SAVE-P true. We compute the save-set, and if :FORCE-TO-STACK,
+;;; force all the live TNs to be stack environment TNs.
+(defun conflictize-save-p-vop (vop block live-bits)
   (declare (type vop vop) (type ir2-block block)
 	   (type local-tn-bit-vector live-bits))
   (let ((ss (compute-save-set vop live-bits)))
@@ -749,7 +749,7 @@
 		(vop-prev vop)))
 	  ((null vop))
 	(when (vop-info-save-p (vop-info vop))
-	  (do-save-p-stuff vop block live-bits))
+	  (conflictize-save-p-vop vop block live-bits))
 	(ensure-results-live)
 	(scan-vop-refs)))))
 

@@ -1062,10 +1062,12 @@
        (if *suppress-values-declaration*
 	   res
 	   (let ((types (cdr spec)))
-	     (do-the-stuff (if (eql (length types) 1)
-			       (car types)
-			       `(values ,@types))
-			   cont res 'values))))
+	     (ir1ize-the-or-values (if (eql (length types) 1)
+				       (car types)
+				       `(values ,@types))
+				   cont
+				   res
+				   'values))))
       (dynamic-extent
        (when (policy *lexenv* (> speed inhibit-warnings))
 	 (compiler-note

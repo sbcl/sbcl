@@ -276,7 +276,7 @@ gives this error:
   (DO ((CURRENT L #) (# NIL)) (WHEN (EQ # E) (RETURN CURRENT)) )
 caught ERROR: (during macroexpansion)
 
-error in function LISP::DO-DO-BODY:
+error in function LISP::FROB-DO-BODY:
    DO step variable is not a symbol: (ATOM CURRENT)</screen>
 </para>
 

@@ -23,8 +23,8 @@
 ;;; sets *interrupt-pending* and returns without handling the signal.
 ;;;
 ;;; When we drop out the without interrupts, we check to see whether
-;;; *interrupt-pending* has been set. If so, we call
-;;; do-pending-interrupt, which generates a SIGTRAP. The C code
+;;; *INTERRUPT-PENDING* has been set. If so, we call
+;;; RECEIVE-PENDING-INTERRUPT, which generates a SIGTRAP. The C code
 ;;; invokes the handler for the saved signal instead of the SIGTRAP
 ;;; after replacing the signal mask in the signal context with the
 ;;; saved value. When that hander returns, the original signal mask is
@@ -55,7 +55,7 @@
 	     ;; whether interrupts are pending before executing themselves
 	     ;; immediately?
 	     (when *interrupt-pending*
-	       (do-pending-interrupt)))
+	       (receive-pending-interrupt)))
 	   (,name)))))
 
 (sb!xc:defmacro with-interrupts (&body body)
@@ -68,7 +68,7 @@
 	   (,name)
 	   (let ((*interrupts-enabled* t))
 	     (when *interrupt-pending*
-	       (do-pending-interrupt))
+	       (receive-pending-interrupt))
 	     (,name))))))
 
 ;;;; utilities for dealing with signal names and numbers
