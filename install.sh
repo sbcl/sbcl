@@ -41,7 +41,7 @@ export SBCL SBCL_BUILDING_CONTRIB
 
 gnumake=${GNUMAKE:-gmake}
 for i in contrib/*; do
-    test -d $i && test -e $i/Makefile || continue;
+    test -d $i && test -f $i/test-passed || continue;
     export INSTALL_DIR=$SBCL_HOME/`basename $i `
-    $gnumake -C $i test && ensure_dirs $INSTALL_DIR && $gnumake -C $i install
+    ensure_dirs $INSTALL_DIR && $gnumake -C $i install
 done

@@ -18,7 +18,7 @@ tar -cf $b-binary.tar \
     $b/pubring.pgp \
     $b/contrib/vanilla-module.mk \
     `for dir in $b/contrib/*; do 
-         if test -d $dir && test -e $dir/Makefile; then 
+         if test -d $dir && test -f $dir/test-passed; then 
              echo $dir
          fi
      done`

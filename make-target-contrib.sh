@@ -1,9 +1,8 @@
 #!/bin/sh
 
 # This is a script to be run as part of make.sh. The only time you'd
-# probably want to run it by itself is if you're trying to
-# cross-compile the system or if you're doing some kind of
-# troubleshooting.
+# probably want to run it by itself is if you're cross-compiling the
+# system or doing some kind of troubleshooting.
 
 # This software is part of the SBCL system. See the README file for
 # more information.
@@ -27,7 +26,8 @@ export SBCL SBCL_BUILDING_CONTRIB
 gnumake=${GNUMAKE:-gmake}
 
 for i in contrib/*; do
-    test -d $i && test -e $i/Makefile || continue;
+    test -d $i && test -f $i/Makefile || continue;
     # export INSTALL_DIR=$SBCL_HOME/`basename $i `
-    $gnumake -C $i test 
+    test -f $i/test-passed && rm $i/test-passed 
+    $gnumake -C $i test && touch $i/test-passed
 done

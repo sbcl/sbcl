@@ -1,4 +1,6 @@
 SYSTEM=sb-bsd-sockets
+CC=gcc
+export CC
 
 all: 
 	$(MAKE) -C ../asdf

@@ -28,8 +28,7 @@
 		     (find-package "SB-BSD-SOCKETS-SYSTEM"))
 	     filename tmp-c-source :sb-bsd-sockets-internal)
     (and
-     (= (run-shell-command
-	 "/usr/bin/gcc -o ~S ~S" (namestring tmp-a-dot-out)
+     (= (run-shell-command "gcc -o ~S ~S" (namestring tmp-a-dot-out)
 	 (namestring tmp-c-source)) 0)
      (= (run-shell-command "~A >~A"
 			   (namestring tmp-a-dot-out)
@@ -78,7 +77,7 @@
 		  (component-pathname c))))
 (defmethod perform ((op compile-op) (c c-source-file))
   (unless
-      (= 0 (run-shell-command "/usr/bin/gcc -fPIC -o ~S -c ~S"
+      (= 0 (run-shell-command "gcc -fPIC -o ~S -c ~S"
 			      (unix-name (car (output-files op c)))
 			      (unix-name (component-pathname c))))
     (error 'operation-error :operation op :component c)))
@@ -111,7 +110,7 @@
 		 
 		 (:file "sockopt" :depends-on ("sockets"))
 		 (:file "inet" :depends-on ("sockets" "split"  "constants" ))
-		 (:file "unix" :depends-on ("sockets" "split" "constants" ))
+		 (:file "local" :depends-on ("sockets" "split" "constants" ))
 		 (:file "name-service" :depends-on ("sockets" "constants" "alien"))
 		 (:file "misc" :depends-on ("sockets" "constants"))
 
