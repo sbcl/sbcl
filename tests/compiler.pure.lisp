@@ -734,3 +734,59 @@
                                   (if (logbitp 1 a) b (setq a -1522022182249))))))))
               -1802767029877 -12374959963)
              -80))
+
+;;; various MISC.*, related to NODEs/LVARs with derived type NIL
+(assert (eql (funcall (compile nil '(lambda (c)
+                                     (declare (type (integer -3924 1001809828) c))
+                                     (declare (optimize (speed 3)))
+                                     (min 47 (if (ldb-test (byte 2 14) c)
+                                                 -570344431
+                                                 (ignore-errors -732893970)))))
+                      705347625)
+             -570344431))
+(assert (eql (funcall
+              (compile nil '(lambda (b)
+                             (declare (type (integer -1598566306 2941) b))
+                             (declare (optimize (speed 3)))
+                             (max -148949 (ignore-errors b))))
+              0)
+             0))
+(assert (eql (funcall
+              (compile nil '(lambda (b c)
+                             (declare (type (integer -4 -3) c))
+                             (block b7
+                               (flet ((%f1 (f1-1 f1-2 f1-3)
+                                        (if (logbitp 0 (return-from b7
+                                                         (- -815145138 f1-2)))
+                                            (return-from b7 -2611670)
+                                            99345)))
+                                 (let ((v2 (%f1 -2464 (%f1 -1146 c c) -2)))
+                                   b)))))
+              2950453607 -4)
+             -815145134))
+(assert (eql (funcall
+              (compile nil
+                       '(lambda (b c)
+                         (declare (type (integer -29742055786 23602182204) b))
+                         (declare (type (integer -7409 -2075) c))
+                         (declare (optimize (speed 3)))
+                         (floor
+                          (labels ((%f2 ()
+                                     (block b6
+                                       (ignore-errors (return-from b6
+                                                        (if (= c 8) b 82674))))))
+                            (%f2)))))
+              22992834060 -5833)
+             82674))
+(assert (equal (multiple-value-list
+                (funcall
+                 (compile nil '(lambda (a)
+                                (declare (type (integer -944 -472) a))
+                                (declare (optimize (speed 3)))
+                                (round
+                                 (block b3
+                                   (return-from b3
+                                     (if (= 55957 a) -117 (ignore-errors
+                                                            (return-from b3 a))))))))
+                 -589))
+               '(-589 0)))

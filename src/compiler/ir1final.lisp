@@ -123,7 +123,14 @@
         (cond ((and (cast-p dest)
                     (not (cast-type-check dest))
                     (immediately-used-p lvar node))
-               (derive-node-type node (cast-asserted-type dest)))
+               (when (values-types-equal-or-intersect
+                      (node-derived-type node)
+                      (cast-asserted-type dest))
+                 ;; FIXME: We do not perform pathwise CAST->type-error
+                 ;; conversion, and type errors can later cause
+                 ;; backend failures. On the other hand, this version
+                 ;; produces less efficient code.
+                 (derive-node-type node (cast-asserted-type dest))))
               ((and (cast-p node)
                     (eq (cast-type-check node) :external))
                (aver (basic-combination-p dest))

@@ -376,7 +376,7 @@
 (defun flush-dead-code (block)
   (declare (type cblock block))
   (setf (block-flush-p block) nil)
-  (do-nodes-backwards (node lvar block)
+  (do-nodes-backwards (node lvar block :restart-p t)
     (unless lvar
       (typecase node
 	(ref
@@ -625,7 +625,8 @@
 (declaim (ftype (function (combination) (values)) ir1-optimize-combination))
 (defun ir1-optimize-combination (node)
   (when (lvar-reoptimize (basic-combination-fun node))
-    (propagate-fun-change node))
+    (propagate-fun-change node)
+    (maybe-terminate-block node nil))
   (let ((args (basic-combination-args node))
 	(kind (basic-combination-kind node)))
     (case kind
@@ -1679,41 +1680,12 @@
 ;;; - CAST chains;
 (defun ir1-optimize-cast (cast &optional do-not-optimize)
   (declare (type cast cast))
-  (let* ((value (cast-value cast))
-         (value-type (lvar-derived-type value))
-         (atype (cast-asserted-type cast))
-         (int (values-type-intersection value-type atype)))
-    (derive-node-type cast int)
-    (when (eq int *empty-type*)
-      (unless (eq value-type *empty-type*)
-
-        ;; FIXME: Do it in one step.
-        (filter-lvar
-         value
-         `(multiple-value-call #'list 'dummy))
-        (filter-lvar
-         (cast-value cast)
-         ;; FIXME: Derived type.
-         `(%compile-time-type-error 'dummy
-                                    ',(type-specifier atype)
-                                    ',(type-specifier value-type)))
-        ;; KLUDGE: FILTER-LVAR does not work for non-returning
-        ;; functions, so we declare the return type of
-        ;; %COMPILE-TIME-TYPE-ERROR to be * and derive the real type
-        ;; here.
-        (setq value (cast-value cast))
-        (derive-node-type (lvar-uses value) *empty-type*)
-        (maybe-terminate-block (lvar-uses value) nil)
-        ;; FIXME: Is it necessary?
-        (aver (null (block-pred (node-block cast))))
-        (setf (block-delete-p (node-block cast)) t)
-        (return-from ir1-optimize-cast)))
-    (when (eq (node-derived-type cast) *empty-type*)
-      (maybe-terminate-block cast nil))
-
+  (let ((value (cast-value cast))
+        (atype (cast-asserted-type cast)))
     (when (not do-not-optimize)
       (let ((lvar (node-lvar cast)))
-        (when (values-subtypep value-type (cast-asserted-type cast))
+        (when (values-subtypep (lvar-derived-type value)
+                               (cast-asserted-type cast))
           (delete-filter cast lvar value)
           (when lvar
             (reoptimize-lvar lvar)
@@ -1745,10 +1717,40 @@
               (dolist (use (merges))
                 (merge-tail-sets use)))))))
 
-    (when (and (cast-%type-check cast)
-               (values-subtypep value-type
-                                (cast-type-to-check cast)))
-      (setf (cast-%type-check cast) nil)))
+    (let* ((value-type (lvar-derived-type value))
+           (int (values-type-intersection value-type atype)))
+      (derive-node-type cast int)
+      (when (eq int *empty-type*)
+        (unless (eq value-type *empty-type*)
+
+          ;; FIXME: Do it in one step.
+          (filter-lvar
+           value
+           `(multiple-value-call #'list 'dummy))
+          (filter-lvar
+           (cast-value cast)
+           ;; FIXME: Derived type.
+           `(%compile-time-type-error 'dummy
+                                      ',(type-specifier atype)
+                                      ',(type-specifier value-type)))
+          ;; KLUDGE: FILTER-LVAR does not work for non-returning
+          ;; functions, so we declare the return type of
+          ;; %COMPILE-TIME-TYPE-ERROR to be * and derive the real type
+          ;; here.
+          (setq value (cast-value cast))
+          (derive-node-type (lvar-uses value) *empty-type*)
+          (maybe-terminate-block (lvar-uses value) nil)
+          ;; FIXME: Is it necessary?
+          (aver (null (block-pred (node-block cast))))
+          (setf (block-delete-p (node-block cast)) t)
+          (return-from ir1-optimize-cast)))
+      (when (eq (node-derived-type cast) *empty-type*)
+        (maybe-terminate-block cast nil))
+
+      (when (and (cast-%type-check cast)
+                 (values-subtypep value-type
+                                  (cast-type-to-check cast)))
+        (setf (cast-%type-check cast) nil))))
 
   (unless do-not-optimize
     (setf (node-reoptimize cast) nil)))

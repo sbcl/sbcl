@@ -631,11 +631,16 @@
 
 ;;; Like DO-NODES, only iterating in reverse order. Should be careful
 ;;; with block being split under us.
-(defmacro do-nodes-backwards ((node-var lvar block) &body body)
+(defmacro do-nodes-backwards ((node-var lvar block &key restart-p) &body body)
   (let ((n-block (gensym))
 	(n-prev (gensym)))
     `(loop with ,n-block = ,block
-           for ,node-var = (block-last ,n-block) then (ctran-use ,n-prev)
+           for ,node-var = (block-last ,n-block) then
+                           ,(if restart-p
+                                `(if (eq ,n-block (ctran-block ,n-prev))
+                                     (ctran-use ,n-prev)
+                                     (block-last ,n-block))
+                                `(ctran-use ,n-prev))
            for ,n-prev = (when ,node-var (node-prev ,node-var))
            and ,lvar = (when (and ,node-var (valued-node-p ,node-var))
 			 (node-lvar ,node-var))

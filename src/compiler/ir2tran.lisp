@@ -1341,25 +1341,25 @@
    start next result
    (with-unique-names (bind unbind)
      (once-only ((n-save-bs '(%primitive current-binding-pointer)))
-                `(unwind-protect
-                      (progn
-                        (labels ((,unbind (vars)
-                                   (declare (optimize (speed 2) (debug 0)))
-                                   (dolist (var vars)
-                                     (%primitive bind nil var)
-                                     (makunbound var)))
-                                 (,bind (vars vals)
-                                   (declare (optimize (speed 2) (debug 0)))
-                                   (cond ((null vars))
-                                         ((null vals) (,unbind vars))
-                                         (t (%primitive bind
-							(car vals)
-							(car vars))
-                                            (,bind (cdr vars) (cdr vals))))))
-                          (,bind ,vars ,vals))
-                        nil
-                        ,@body)
-                   (%primitive unbind-to-here ,n-save-bs))))))
+       `(unwind-protect
+             (progn
+               (labels ((,unbind (vars)
+                          (declare (optimize (speed 2) (debug 0)))
+                          (dolist (var vars)
+                            (%primitive bind nil var)
+                            (makunbound var)))
+                        (,bind (vars vals)
+                          (declare (optimize (speed 2) (debug 0)))
+                          (cond ((null vars))
+                                ((null vals) (,unbind vars))
+                                (t (%primitive bind
+                                               (car vals)
+                                               (car vars))
+                                   (,bind (cdr vars) (cdr vals))))))
+                 (,bind ,vars ,vals))
+               nil
+               ,@body)
+          (%primitive unbind-to-here ,n-save-bs))))))
 
 ;;;; non-local exit
 
