@@ -37,8 +37,7 @@
 			  :environment environment)
 	(let ((def `(lambda (,whole ,environment)
 		      ,@local-decs
-		      (block ,name 
-			,new-body)))
+                      ,new-body))
 	      ;; If we want to move over to list-style names
 	      ;; [e.g. (DEFMACRO FOO), maybe to support some XREF-like
 	      ;; functionality] here might be a good place to start.

@@ -409,3 +409,13 @@
                     (list (the fixnum (the (real 0) (eval v))))))))
   (assert (raises-error? (funcall f 0.1) type-error))
   (assert (raises-error? (funcall f -1) type-error)))
+
+;;; the implicit block does not enclose lambda list
+(let ((forms '((defmacro #1=#:foo (&optional (x (return-from #1#))))
+               #+nil(macrolet ((#2=#:foo (&optional (x (return-from #2#))))))
+               (define-compiler-macro #3=#:foo (&optional (x (return-from #3#))))
+               (deftype #4=#:foo (&optional (x (return-from #4#))))
+               (define-setf-expander #5=#:foo (&optional (x (return-from #5#))))
+               (defsetf #6=#:foo (&optional (x (return-from #6#))) ()))))
+  (dolist (form forms)
+    (assert (nth-value 2 (compile nil `(lambda () ,form))))))

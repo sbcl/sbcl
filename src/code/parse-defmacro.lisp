@@ -37,7 +37,8 @@
 				   (doc-string-allowed t)
 				   ((:environment env-arg-name))
 				   ((:default-default *default-default*))
-				   (error-fun 'error))
+				   (error-fun 'error)
+                                   (wrap-block t))
   (multiple-value-bind (forms declarations documentation)
       (parse-body body doc-string-allowed)
     (let ((*arg-tests* ())
@@ -57,7 +58,10 @@
 		   ,@*arg-tests*
 		   (let* ,(nreverse *user-lets*)
 		     ,@declarations
-		     ,@forms))
+                     ,@(if wrap-block
+                           `((block ,(fun-name-block-name name)
+                               ,@forms))
+                           forms)))
 		`(,@(when (and env-arg-name (not env-arg-used))
                       `((declare (ignore ,env-arg-name)))))
 		documentation

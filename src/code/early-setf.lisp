@@ -372,8 +372,7 @@ GET-SETF-EXPANSION directly."
 		     (%defsetf ,access-form-var ,(length store-variables)
 			       (lambda (,arglist-var)
 				 ,@local-decs
-				 (block ,access-fn
-				   ,body))))
+                                 ,body)))
 		   nil
 		   ',doc))))))
 	(t
@@ -423,7 +422,7 @@ GET-SETF-EXPANSION directly."
 	 (assign-setf-macro ',access-fn
 			    (lambda (,whole ,environment)
 			      ,@local-decs
-			      (block ,access-fn ,body))
+			      ,body)
 			    nil
 			    ',doc)))))
 

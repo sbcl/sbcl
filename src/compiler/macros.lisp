@@ -54,7 +54,8 @@
     (multiple-value-bind (body decls doc)
 	(parse-defmacro lambda-list n-form body name "special form"
 			:environment n-env
-			:error-fun 'convert-condition-into-compiler-error)
+			:error-fun 'convert-condition-into-compiler-error
+                        :wrap-block nil)
       `(progn
 	 (declaim (ftype (function (continuation continuation t) (values))
 			 ,fn-name))
@@ -110,7 +111,8 @@
 			:error-fun `(lambda (&rest stuff)
 				      (declare (ignore stuff))
 				      (return-from ,name
-					(values nil t))))
+					(values nil t)))
+                        :wrap-block nil)
       `(lambda (,n-form &aux (,n-env *lexenv*))
          ,@decls
          (block ,name

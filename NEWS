@@ -1813,6 +1813,8 @@ changes in sbcl-0.8.1 relative to sbcl-0.8.0:
     is better at handling symbol macros.
   * bug fix: there is no longer a type named LENGTH.  (reported by
     Raymond Toy)
+  * bug fix: in macro-like defining macros/special operators the
+    implicit block does not enclose lambda list.
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** NIL is now allowed as a structure slot name.
     ** arbitrary numbers, not just reals, are allowed in certain

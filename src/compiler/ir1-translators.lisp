@@ -289,7 +289,7 @@
 		nil
 		`(lambda (,whole ,environment)
 		  ,@local-decls
-		  (block ,name ,body))
+                  ,body)
 		,lexenv))))))))
 
 (defun funcall-in-macrolet-lexenv (definitions fun)

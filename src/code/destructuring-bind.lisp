@@ -16,7 +16,8 @@
     (multiple-value-bind (body local-decls)
 	(parse-defmacro lambda-list arg-list-name body nil 'destructuring-bind
 			:anonymousp t
-			:doc-string-allowed nil)
+			:doc-string-allowed nil
+                        :wrap-block nil)
       `(let ((,arg-list-name ,arg-list))
 	 ,@local-decls
 	 ,body))))

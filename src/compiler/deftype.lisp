@@ -21,5 +21,5 @@
 	 (%compiler-deftype ',name
 			    (lambda (,whole)
 			      ,@local-decs
-			      (block ,name ,body))
+			      ,body)
 			    ,@(when doc `(,doc)))))))
