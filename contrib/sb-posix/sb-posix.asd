@@ -97,5 +97,21 @@
   (operate 'test-op 'sb-posix-tests))
 
 (defmethod perform ((o test-op) (c (eql (find-system :sb-posix-tests))))
-  (or (funcall (intern "DO-TESTS" (find-package "SB-RT")))
-      (error "test-op failed")))
+  (funcall (intern "DO-TESTS" (find-package "SB-RT")))
+  (let ((failures (funcall (intern "PENDING-TESTS" "SB-RT")))
+	(ignored-failures (loop for sym being the symbols of :sb-posix-tests
+			        if (search ".ERROR" (symbol-name sym))
+			        collect sym)))
+    (cond
+      ((null failures)
+       t)	     
+      ((null (set-difference failures ignored-failures))
+       (warn "~@<some POSIX implementations return incorrect error values for ~
+              failing calls, but there is legitimate variation between ~
+              implementations too.  If you think the errno ~
+              from your platform is valid, please contact the sbcl ~
+              developers; otherwise, please submit a bug report to your ~
+              kernel distributor~@:>")
+       t)
+      (t
+       (error "non-errno tests failed!")))))

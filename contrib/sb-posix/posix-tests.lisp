@@ -81,8 +81,7 @@
       (sb-posix:mkdir "/" 0)
     (sb-posix:syscall-error (c)
       (sb-posix:syscall-errno c)))
-  #-bsd #.sb-posix::eexist
-  #+bsd #.sb-posix::eisdir)
+  #.sb-posix::eexist)
 
 (deftest mkdir.error.3
   (handler-case
@@ -124,8 +123,7 @@
       (sb-posix:rmdir "/")
     (sb-posix:syscall-error (c)
       (sb-posix:syscall-errno c)))
-  #-bsd #.sb-posix::ebusy
-  #+bsd #.sb-posix::eisdir)
+  #.sb-posix::ebusy)
 
 (deftest rmdir.error.4
   (let* ((dir (ensure-directories-exist
