@@ -13,8 +13,8 @@
 
 ;;; TODO:
 ;;;
-;;; -- remove cut-and-pasting
 ;;; -- documentation
+;;; -- MV-BIND, :ASSIGNMENT
 
 (in-package "SB!C")
 
@@ -99,6 +99,8 @@
   (let ((use (continuation-use cont)))
     (when (ref-p use)
       (ok-ref-lambda-var use))))
+
+;;;; Searching constraints
 
 ;;; Add the indicated test constraint to BLOCK, marking the block as
 ;;; having a new assertion when the constriant was not already
@@ -196,6 +198,8 @@
 
   (setf (block-test-modified block) nil)
   (values))
+
+;;;; Applying constraints
 
 ;;; Return true if X is an integer NUMERIC-TYPE.
 (defun integer-type-p (x)
@@ -351,52 +355,58 @@
 
   (values))
 
-;;; Deliver the results of constraint propagation to REFs in BLOCK.
-;;; During this pass, we also do local constraint propagation by
-;;; adding in constraints as we seem them during the pass through the
-;;; block.
-;;;
-;;; FIXME: it is very similar to FIND-BLOCK-TYPE-CONSTRAINTS.
-(defun use-result-constraints (block)
-  (declare (type cblock block))
-  (let ((in (block-in block)))
-
-    (let ((test (block-test-constraint block)))
-      (when test
-	(sset-union in test)))
-
-    (do-nodes (node cont block)
-      (typecase node
-	(ref
-	 (let ((var (ref-leaf node)))
-	   (when (lambda-var-p var)
-	     (let ((con (lambda-var-constraints var)))
-	       (when con
-		 (constrain-ref-type node con in))))))
-	(cset
-	 (let ((var (set-var node)))
-	   (when (lambda-var-p var)
-	     (let ((cons (lambda-var-constraints var)))
-	       (when cons
-		 (sset-difference in cons)
-                 (let* ((type (node-derived-type node))
-                        (con (find-constraint 'typep var type nil)))
-                   (sset-adjoin con in)))))))))))
-
-;;; Return true if VAR would have to be closed over if environment
-;;; analysis ran now (i.e. if there are any uses that have a different
-;;; home lambda than VAR's home.)
-(defun closure-var-p (var)
-  (declare (type lambda-var var))
-  (let ((home (lambda-home (lambda-var-home var))))
-    (flet ((frob (l)
-	     (dolist (node l nil)
-	       (unless (eq (node-home-lambda node) home)
-		 (return t)))))
-      (or (frob (leaf-refs var))
-	  (frob (basic-var-sets var))))))
-
 ;;;; Flow analysis
+
+;;; Local propagation
+;;; -- [TODO: For any LAMBDA-VAR ref with a type check, add that
+;;;    constraint.]
+;;; -- For any LAMBDA-VAR set, delete all constraints on that var; add
+;;;    a type constraint based on the new value type.
+(declaim (ftype (function (cblock sset
+                           &key (:ref-preprocessor function)
+                                (:set-preprocessor function))
+                          sset)
+                constraint-propagate-in-block))
+(defun constraint-propagate-in-block
+    (block gen &key ref-preprocessor set-preprocessor)
+
+  (let ((test (block-test-constraint block)))
+    (when test
+      (sset-union gen test)))
+
+  (do-nodes (node cont block)
+    (typecase node
+      (bind
+       (let ((fun (bind-lambda node)))
+         (when (eq (functional-kind fun) :let)
+           (loop with call = (continuation-dest
+                              (node-cont (first (lambda-refs fun))))
+              for var in (lambda-vars fun)
+              and val in (combination-args call)
+              when (and val
+                        (lambda-var-constraints var)
+                        ;; if VAR has no SETs, type inference is
+                        ;; fully performed by IR1 optimizer
+                        (lambda-var-sets var))
+              do (let* ((type (continuation-type val))
+                        (con (find-constraint 'typep var type nil)))
+                   (sset-adjoin con gen))))))
+      (ref
+       (when ref-preprocessor
+         (funcall ref-preprocessor node gen)))
+      (cset
+       (let ((var (set-var node)))
+         (when (lambda-var-p var)
+           (when set-preprocessor
+             (funcall set-preprocessor var))
+           (let ((cons (lambda-var-constraints var)))
+             (when cons
+               (sset-difference gen cons)
+               (let* ((type (node-derived-type node))
+                      (con (find-constraint 'typep var type nil)))
+                 (sset-adjoin con gen)))))))))
+
+  gen)
 
 ;;; BLOCK-KILL is just a list of the LAMBDA-VARs killed, so we must
 ;;; compute the kill set when there are any vars killed. We bum this a
@@ -426,11 +436,6 @@
     out))
 
 ;;; Compute the initial flow analysis sets for BLOCK:
-;;; -- [TODO: For any LAMBDA-VAR ref with a type check, add that
-;;;    constraint.]
-;;; -- For any LAMBDA-VAR set, delete all constraints on that var, and
-;;;    add those constraints to the set nuked by this block; add a type
-;;;    constraint based on the new value type.
 ;;; -- Compute IN/OUT sets; if OUT of a predecessor is not yet
 ;;;    computed, assume it to be a universal set (this is only
 ;;;    possible in a loop)
@@ -438,26 +443,11 @@
 ;;; Return T if we have found a loop.
 (defun find-block-type-constraints (block)
   (declare (type cblock block))
-  (let ((gen (make-sset)))
-    (collect ((kill nil adjoin))
-
-      (let ((test (block-test-constraint block)))
-	(when test
-	  (sset-union gen test)))
-
-      (do-nodes (node cont block)
-	(typecase node
-	  (cset
-	   (let ((var (set-var node)))
-	     (when (lambda-var-p var)
-	       (kill var)
-	       (let ((cons (lambda-var-constraints var)))
-		 (when cons
-		   (sset-difference gen cons)
-                   (let* ((type (node-derived-type node))
-                          (con (find-constraint 'typep var type nil)))
-                     (sset-adjoin con gen)))))))))
-
+  (collect ((kill nil adjoin))
+    (let ((gen (constraint-propagate-in-block
+                block (make-sset)
+                :set-preprocessor (lambda (var)
+                                    (kill var)))))
       (setf (block-gen block) gen)
       (setf (block-kill block) (kill))
       (setf (block-type-asserted block) nil)
@@ -478,6 +468,52 @@
         (setf (block-out block) (compute-block-out block))
         loop-p))))
 
+;;; BLOCK-IN becomes the intersection of the OUT of the predecessors.
+;;; Our OUT is:
+;;;     gen U (in - kill)
+;;;
+;;; Return True if we have done something.
+(defun flow-propagate-constraints (block)
+  (let* ((pred (block-pred block))
+	 (in (progn (aver pred)
+                    (let ((res (copy-sset (block-out (first pred)))))
+                      (dolist (b (rest pred))
+                        (sset-intersection res (block-out b)))
+                      res))))
+    (setf (block-in block) in)
+    (let ((out (compute-block-out block)))
+      (if (sset= out (block-out block))
+          nil
+          (setf (block-out block) out)))))
+
+;;; Deliver the results of constraint propagation to REFs in BLOCK.
+;;; During this pass, we also do local constraint propagation by
+;;; adding in constraints as we seem them during the pass through the
+;;; block.
+(defun use-result-constraints (block)
+  (declare (type cblock block))
+  (constraint-propagate-in-block
+   block (block-in block)
+   :ref-preprocessor (lambda (node cons)
+                       (let ((var (ref-leaf node)))
+                         (when (lambda-var-p var)
+                           (let ((con (lambda-var-constraints var)))
+                             (when con
+                               (constrain-ref-type node con cons))))))))
+
+;;; Return true if VAR would have to be closed over if environment
+;;; analysis ran now (i.e. if there are any uses that have a different
+;;; home lambda than VAR's home.)
+(defun closure-var-p (var)
+  (declare (type lambda-var var))
+  (let ((home (lambda-home (lambda-var-home var))))
+    (flet ((frob (l)
+	     (dolist (node l nil)
+	       (unless (eq (node-home-lambda node) home)
+		 (return t)))))
+      (or (frob (leaf-refs var))
+	  (frob (basic-var-sets var))))))
+
 ;;; Give an empty constraints set to any var that doesn't have one and
 ;;; isn't a set closure var. Since a var that we previously rejected
 ;;; looks identical to one that is new, so we optimistically keep
@@ -494,24 +530,6 @@
       (frob fun)
       (dolist (let (lambda-lets fun))
 	(frob let)))))
-
-;;; BLOCK-IN becomes the intersection of the OUT of the predecessors.
-;;; Our OUT is:
-;;;     gen U (in - kill)
-;;;
-;;; Return True if we have done something
-(defun flow-propagate-constraints (block)
-  (let* ((pred (block-pred block))
-	 (in (progn (aver pred)
-                    (let ((res (copy-sset (block-out (first pred)))))
-                      (dolist (b (rest pred))
-                        (sset-intersection res (block-out b)))
-                      res))))
-    (setf (block-in block) in)
-    (let ((out (compute-block-out block)))
-      (if (sset= out (block-out block))
-          nil
-          (setf (block-out block) out)))))
 
 ;;; How many blocks does COMPONENT have?
 (defun component-n-blocks (component)
