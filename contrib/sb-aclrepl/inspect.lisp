@@ -72,7 +72,7 @@ i set <name> <form>  set named component to evalated form
     (setf (inspect-object-stack *current-inspect*) (list object))
     (setf (inspect-select-stack *current-inspect*)
 	  (list (format nil "(inspect ~S)" object)))
-    (%inspect output-stream))
+    (redisplay output-stream))
 
   (setq sb-impl::*inspect-fun* #'inspector)
   
@@ -132,7 +132,7 @@ i set <name> <form>  set named component to evalated form
      (inspect-object-stack *current-inspect*))
 
   (defun redisplay (stream)
-    (%inspect stream))
+    (display-current stream))
 
   ;;;
   ;;; istep command processing
@@ -152,7 +152,7 @@ i set <name> <form>  set named component to evalated form
       ((stack)
        (output-inspect-note stream "Object has no parent"))
       (t
-       (redisplay stream))))
+       (no-object-msg stream))))
   
   (defun istep-cmd-inspect-* (stream)
     (reset-stack) 
@@ -171,7 +171,7 @@ i set <name> <form>  set named component to evalated form
 	    (let ((parent (second (stack)))
 		  (id (car (inspect-select-stack *current-inspect*))))
 	      (multiple-value-bind (position parts)
-		  (find-object-part-with-id parent id)
+		  (find-part-id parent id)
 		(let ((new-position (if (string= ">" option)
 					(1+ position)
 					(1- position))))
@@ -180,17 +180,12 @@ i set <name> <form>  set named component to evalated form
 			(setf (car (inspect-object-stack *current-inspect*))
 			      value)
 			(setf (car (inspect-select-stack *current-inspect*))
-			      (if (integerp id)
-				  new-position
-				  (let ((label (label-at parts new-position)))
-				    (if (stringp label)
-					(read-from-string label)
-					label))))
+			      (id-at parts new-position))
 			(redisplay stream))
 		      (output-inspect-note stream
 					   "Parent has no selectable component indexed by ~d"
 					   new-position))))))
-	(redisplay stream)))
+	(no-object-msg stream)))
 
   (defun istep-cmd-set-raw (option-string stream)
     (when (inspect-object-stack *current-inspect*)
@@ -234,7 +229,7 @@ i set <name> <form>  set named component to evalated form
       (symbol
        (format nil "which is the ~a component of" select))
       (string
-       (format nil "which was selected by ~S" select))
+       (format nil "which was selected by ~A" select))
       (t
        (write-to-string select))))
   
@@ -245,17 +240,17 @@ i set <name> <form>  set named component to evalated form
 	    (output-inspect-note stream "The current object is:")
 	    (dotimes (i (length stack))
 	      (output-inspect-note
-	       stream "~A, ~A~%"
+	       stream "~A, ~A"
 	       (inspected-description (nth i stack))
 	       (select-description
 		(nth i (inspect-select-stack *current-inspect*))))))
-	  (%inspect stream))))
+	  (no-object-msg stream))))
 
   (defun istep-cmd-set (id-string value-string stream)
     (if (stack)
 	(let ((id (when id-string (read-from-string id-string))))
 	  (multiple-value-bind (position parts)
-	      (find-object-part-with-id (car (stack)) id)
+	      (find-part-id (car (stack)) id)
 	    (if parts
 		(if position
 		    (when value-string
@@ -269,18 +264,18 @@ i set <name> <form>  set named component to evalated form
 			    (string
 			     (output-inspect-note stream result))
 			    (t
-			     (%inspect stream))))))
+			     (redisplay stream))))))
 		    (output-inspect-note
 		     stream
 		     "Object has no selectable component named by ~A" id))
 		(output-inspect-note stream
 				     "Object has no selectable components"))))
-	(%inspect stream)))
+	(no-object-msg stream)))
 
   (defun istep-cmd-select-component (id stream)
     (if (stack)
 	(multiple-value-bind (position parts)
-	    (find-object-part-with-id (car (stack)) id)
+	    (find-part-id (car (stack)) id)
 	  (cond
 	    ((integerp position)
 	     (let* ((value (element-at parts position)))
@@ -306,7 +301,7 @@ i set <name> <form>  set named component to evalated form
 		 stream "Enter a valid index (~:[0-~W~;0~])"
 		 (= (parts-count parts) 1)
 		 (1- (parts-count parts))))))))
-	(%inspect stream)))
+	(no-object-msg stream)))
 
   (defun istep-cmd-set-stack (form stream)
     (reset-stack)
@@ -320,17 +315,21 @@ i set <name> <form>  set named component to evalated form
   ;;;
   ;;; aclrepl-specific inspection display
   ;;;
+
+  (defun no-object-msg (s)
+    (output-inspect-note s "No object is being inspected"))
   
-  (defun %inspect (s)
-    (if (inspect-object-stack *current-inspect*)
-	(let ((inspected))
-	  (setq cl:*  (car (inspect-object-stack *current-inspect*)))
-	  (display-inspected-parts inspected s *inspect-length* *inspect-skip*))
-	(output-inspect-note s "No object is being inspected")))
+  (defun display-current (s)
+    (if (stack)
+	(let ((inspected (car (stack))))
+	  (setq cl:* inspected)
+	  (display-inspect inspected s *inspect-length* *inspect-skip*))
+	(no-object-msg)))
+  
   ) ;; end binding for multithreading
 
 
-(defun display-inspected-parts (object stream &optional length skip)
+(defun display-inspect (object stream &optional length skip)
   (multiple-value-bind (elements labels count)
       (inspected-elements object length skip)
     (format stream "~&~A" (inspected-description object))
@@ -339,7 +338,7 @@ i set <name> <form>  set named component to evalated form
     (princ #\newline stream)
     (dotimes (i count)
       (fresh-line stream)
-      (display-labelled-element (elt elements i) (elt labels i) stream))))
+      (display-labeled-element (elt elements i) (elt labels i) stream))))
   
 (defun array-label-p (label)
   (and (stringp (cdr label)) (char= (char (cdr label) 0) #\[)))
@@ -347,7 +346,7 @@ i set <name> <form>  set named component to evalated form
 (defun named-or-array-label-p (label)
   (consp label))
 
-(defun display-labelled-element (element label stream)
+(defun display-labeled-element (element label stream)
   (cond
     ((eq label :ellipses)
      (format stream "   ..."))
@@ -369,9 +368,9 @@ i set <name> <form>  set named component to evalated form
 ;;; process print length and skip selectors
 ;;;
 ;;; FUNCTIONS TO CONSIDER FOR EXPORT
-;;;   FIND-OBJECT-PART-WITH-ID
+;;;   FIND-PART-ID
 ;;;   ELEMENT-AT
-;;;   LABEL-AT
+;;;   ID-AT
 ;;;   INSPECTED-ELEMENTS
 ;;;   INSPECTED-DESCRIPTION
 ;;;
@@ -388,32 +387,23 @@ i set <name> <form>  set named component to evalated form
 ;;; *inspect-read-cmd* will return an impl-dependent cmd that sbcl will
 ;;; send to the contributed inspector for processing and display.
 
-(defun find-object-part-with-id (object id)
+(defun find-part-id (object id)
   "COMPONENT-ID can be an integer or a name of a id.
 Returns (VALUES POSITION PARTS).
 POSITION is NIL if the id is invalid or not found."
-  (if object
-      (let* ((parts (inspected-parts object))
-	     (seq-type (parts-seq-type parts))
-	     (count (parts-count parts))
-	     (components (parts-components parts)))
-	(when (symbolp id)
-	  (setq id (symbol-name id)))
-	(let ((position
-	       (cond ((and (eq seq-type :named)
-			   (stringp id))
-		      (position id (the list components) :key #'car
-				:test #'string-equal))
-		     ((and (eq seq-type :improper-list)
-			   (stringp id)
-			   (string-equal id "tail"))
-		      (1- count))
-		     ((numberp id)
-		      (when (< -1 id count)
-			id)))))
-	  (values position parts)))
-      (values nil nil)))
-
+  (let* ((parts (inspected-parts object))
+	 (name (when (symbolp id) (symbol-name id) id)))
+    (values
+     (if (numberp id)
+	 (when (< -1 id (parts-count parts)) id)
+	 (case (parts-seq-type parts)
+	   (:named
+	    (position name (the list (parts-components parts))
+		      :key #'car :test #'string-equal))
+	   (:improper-list
+	    (when (string-equal name "tail")
+	      (1- (parts-count parts))))))
+     parts)))
 
 (defun element-at (parts position)
   (let ((count (parts-count parts))
@@ -431,7 +421,7 @@ POSITION is NIL if the id is invalid or not found."
 	(t
 	 (elt components position))))))
 
-(defun label-at (parts position)
+(defun id-at (parts position)
   (let ((count (parts-count parts)))
     (when (< -1 position count)
       (case (parts-seq-type parts)
@@ -446,14 +436,76 @@ POSITION is NIL if the id is invalid or not found."
 	(t
 	 position)))))
 
-(defun label-at-maybe-with-index (parts position)
+(defun inspected-elements (object &optional length (skip 0))
+  "Returns elements of an object that have been trimmed and labeled based on
+length and skip. Returns (VALUES ELEMENTS LABELS ELEMENT-COUNT)
+where ELEMENTS and LABELS are vectors containing ELEMENT-COUNT items.
+LABELS may be a string, number, cons pair, :tail, or :ellipses.
+This function may return an ELEMENT-COUNT of up to (+ 3 length) which would
+include an :ellipses at the beginning, :ellipses at the end,
+and the last element."
+  (let* ((parts (inspected-parts object))
+	 (print-length (if length length (parts-count parts)))
+	 (last-part (last-part parts))
+	 (last-requested (last-requested parts print-length skip))
+	 (element-count (compute-elements-count parts print-length skip))
+	 (first-to (if (first-element-ellipses-p parts skip) 1 0))
+	 (elements (when (plusp element-count) (make-array element-count)))
+	 (labels (when (plusp element-count) (make-array element-count))))
+    ;; possible first ellipses
+    (when (first-element-ellipses-p parts skip)
+      (set-element-values elements labels 0 nil :ellipses))
+    ;; main elements
+    (do ((i 0 (1+ i)))
+	((> i (- last-requested skip)))
+      (set-element elements labels parts (+ i first-to) (+ i skip)))
+    ;; last parts value if needed
+    (when (< last-requested last-part) 
+      (set-element elements labels parts (- element-count 1) last-part))
+    ;; ending ellipses or next to last parts value if needed
+    (when (< last-requested (1- last-part)) 
+      (if (= last-requested (- last-part 2))
+	  (set-element elements labels parts (- element-count 2) (1- last-part)) 
+	  (set-element-values elements labels (- element-count 2) nil :ellipses)))
+    (values elements labels element-count)))
+
+(defun last-requested (parts print skip)
+  (min (1- (parts-count parts)) (+ skip print -1)))
+
+(defun last-part (parts)
+  (1- (parts-count parts)))
+
+(defun compute-elements-count (parts length skip)
+  "Compute the number of elements in parts given the print length and skip." 
+  (let ((element-count (min length (max 0 (- (parts-count parts) skip)))))
+    (when (plusp skip) ; starting ellipses
+      (incf element-count))
+    (when (< (last-requested parts length skip)
+	     (last-part parts)) ; last value
+      (incf element-count) 
+      (when (< (last-requested parts length skip)
+	       (1- (last-part parts))) ; ending ellipses
+	(incf element-count)))
+    element-count))
+
+(defun set-element (elements labels parts to-index from-index)
+  (set-element-values elements labels to-index (element-at parts from-index)
+		      (label-at parts from-index)))
+
+(defun set-element-values (elements labels index element label)
+  (setf (aref elements index) element)
+  (setf (aref labels index) label))
+
+(defun first-element-ellipses-p (parts skip)
+  (and (parts-count parts) (plusp skip)))
+
+(defun label-at (parts position)
   "Helper function for inspected-elements. Conses the
-position with the label is the label is a string."
-  (let ((label (label-at parts position)))
-    (if (or (stringp label)
-	    (and (symbolp label) (not (eq label :tail))))
-	(cons position label)
-	label)))
+position with the label if the label is a string."
+  (let ((id (id-at parts position)))
+    (if (stringp id)
+	(cons position id)
+	id)))
 
 (defun array-index-string (index parts)
   "Formats an array index in row major format."
@@ -466,57 +518,6 @@ position with the label is the label is a string."
 	      (setq index q)
 	      (push r list)))
 	  (format nil "[~W~{,~W~}]" (car list) (cdr list))))))
-
-(defun inspected-elements (object &optional length skip)
-  "Returns elements of an object that have been trimmed and labeled based on
-length and skip. Returns (VALUES ELEMENTS LABELS ELEMENT-COUNT)
-where ELEMENTS and LABELS are vectors containing ELEMENT-COUNT items.
-LABELS may be a string, number, cons pair, :tail, or :ellipses.
-This function may return an ELEMENT-COUNT of up to (+ 3 length) which would
-include an :ellipses at the beginning, :ellipses at the end,
-and the last element."
-  (let* ((parts (inspected-parts object))
-	 (count (parts-count parts)))
-    (unless skip (setq skip 0))
-    (unless length (setq length count))
-    (let* ((last (1- count))
-	   (last-req (min last (+ skip length -1))) ;; last requested element
-	   (total (min (- count skip) length)))
-      (when (and (plusp total) (plusp skip)) ; starting ellipses
-	(incf total))
-      (when (< last-req last) ; last value
-	(incf total) 
-	(when (< last-req (1- last)) ; ending ellipses
-	  (incf total)))
-      (let ((index 0)
-	    (elements nil)
-	    (labels nil))
-	(declare (type (or simple-vector null) elements labels))
-	(when (plusp total) 
-	  (setq elements (make-array total :adjustable nil :fill-pointer nil :initial-element nil))
-	  (setq labels (make-array total :adjustable nil :fill-pointer nil))
-	  (when (plusp skip)
-	    (setf (aref labels 0) :ellipses)
-	    (incf index))
-	  (do ((i 0 (1+ i)))
-	      ((> i (- last-req skip)))
-	    (setf (aref elements (+ i index)) (element-at parts (+ i skip)))
-	    (setf (aref labels (+ i index)) (label-at-maybe-with-index parts
-					     (+ i skip))))
-	  
-	  (when (< last-req last) ; last value
-	    (setf (aref elements (- total 1)) (element-at parts last))
-	    (setf (aref labels (- total 1)) (label-at-maybe-with-index parts
-								       last))
-	    (when (< last-req (1- last)) ; ending ellipses or 2nd to last value
-	      (if (= last-req (- last 2))
-		  (progn
-		    (setf (aref elements (- total 2)) (element-at parts (1- last)))
-		    (setf (aref labels (- total 2)) (label-at-maybe-with-index
-						      parts (1- last))))
-		  (setf (aref labels (- total 2)) :ellipses)))))
-	(values elements labels total)))))
-
 
 
 ;;; INSPECTED-DESCRIPTION
@@ -669,15 +670,15 @@ and the last element."
 
 (defmethod inspected-parts ((object symbol))
   (let ((components
-	 (list (cons "name" (symbol-name object))
-	       (cons "package" (symbol-package object))
-	       (cons "value" (if (boundp object)
+	 (list (cons "NAME" (symbol-name object))
+	       (cons "PACKAGE" (symbol-package object))
+	       (cons "VALUE" (if (boundp object)
 				 (symbol-value object)
 				 *inspect-unbound-object-marker*))
-	       (cons "function" (if (fboundp object)
+	       (cons "FUNCTION" (if (fboundp object)
 				    (symbol-function object)
 				    *inspect-unbound-object-marker*))
-	       (cons "plist" (symbol-plist object)))))
+	       (cons "PLIST" (symbol-plist object)))))
     (list components (length components) :named nil)))
 
 (defun inspected-structure-parts (object)
@@ -694,14 +695,14 @@ and the last element."
     (list components (length components) :named nil)))
 
 (defun inspected-standard-object-parts (object)
-  (let ((reversed-components nil)
+  (let ((components nil)
 	(class-slots (sb-pcl::class-slots (class-of object))))
-    (dolist (class-slot class-slots reversed-components)
+    (dolist (class-slot class-slots components)
       (let* ((slot-name (slot-value class-slot 'sb-pcl::name))
 	     (slot-value (if (slot-boundp object slot-name)
-			       (slot-value object slot-name)
-			       *inspect-unbound-object-marker*)))
-	(push (cons slot-name slot-value) reversed-components)))))
+			     (slot-value object slot-name)
+			     *inspect-unbound-object-marker*)))
+	(push (cons (symbol-name slot-name) slot-value) components)))))
 
 
 (defmethod inspected-parts ((object standard-object))
