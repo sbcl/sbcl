@@ -106,6 +106,16 @@
 			      ;; This seems silly, is there something better?
 			      '(integer (0) (0))))))
 
+(defun signal-end-too-large-error (sequence end)
+  (let* ((length (length sequence))
+	 (max-end (and (not (minusp length) length))))
+    (error 'end-too-large-error
+	   :datum end
+	   :expected-type (if max-index
+			      `(integer 0 ,max-end)
+			      ;; This seems silly, is there something better?
+			      '(integer (0) 0)))))
+
 (defun make-sequence-of-type (type length)
   #!+sb-doc "Return a sequence of the given TYPE and LENGTH."
   (declare (fixnum length))
@@ -207,21 +217,25 @@
 
 ;;;; SUBSEQ
 ;;;;
-;;;; The support routines for SUBSEQ are used by compiler transforms, so we
-;;;; worry about dealing with END being supplied or defaulting to NIL
-;;;; at this level.
+;;;; The support routines for SUBSEQ are used by compiler transforms,
+;;;; so we worry about dealing with END being supplied or defaulting
+;;;; to NIL at this level.
 
 (defun vector-subseq* (sequence start &optional end)
   (declare (type vector sequence))
   (declare (type fixnum start))
   (declare (type (or null fixnum) end))
-  (when (null end) (setf end (length sequence)))
+  (if (null end)
+      (setf end (length sequence))
+      (unless (<= end (length sequence))
+	(signal-index-too-large-error sequence end)))
   (do ((old-index start (1+ old-index))
        (new-index 0 (1+ new-index))
        (copy (make-sequence-like sequence (- end start))))
       ((= old-index end) copy)
     (declare (fixnum old-index new-index))
-    (setf (aref copy new-index) (aref sequence old-index))))
+    (setf (aref copy new-index)
+	  (aref sequence old-index))))
 
 (defun list-subseq* (sequence start &optional end)
   (declare (type list sequence))
@@ -240,10 +254,10 @@
 	      (declare (fixnum index)))
 	    ()))))
 
-;;; SUBSEQ cannot default end to the length of sequence since it is not
-;;; an error to supply nil for its value. We must test for end being nil
-;;; in the body of the function, and this is actually done in the support
-;;; routines for other reasons (see above).
+;;; SUBSEQ cannot default END to the length of sequence since it is
+;;; not an error to supply NIL for its value. We must test for END
+;;; being NIL in the body of the function, and this is actually done
+;;; in the support routines for other reasons. (See above.)
 (defun subseq (sequence start &optional end)
   #!+sb-doc
   "Return a copy of a subsequence of SEQUENCE starting with element number

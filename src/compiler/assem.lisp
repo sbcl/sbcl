@@ -59,7 +59,7 @@
   (sync-posn 0 :type index)
   ;; The posn and index everything ends at. This is not maintained
   ;; while the data is being generated, but is filled in after.
-  ;; Basically, we copy current-posn and current-index so that we can
+  ;; Basically, we copy CURRENT-POSN and CURRENT-INDEX so that we can
   ;; trash them while processing choosers and back-patches.
   (final-posn 0 :type index)
   (final-index 0 :type index)
@@ -113,6 +113,14 @@
 (defun segment-current-index (segment)
   (fill-pointer (segment-buffer segment)))
 (defun (setf segment-current-index) (new-value segment)
+  ;; FIXME: It would be lovely to enforce this, but first FILL-IN will
+  ;; need to be convinced to stop rolling SEGMENT-CURRENT-INDEX
+  ;; backwards.
+  ;;
+  ;; Enforce an observed regularity which makes it easier to think
+  ;; about what's going on in the (legacy) code: The segment never
+  ;; shrinks. -- WHN the reverse engineer
+  #+nil (aver (>= new-value (segment-current-index segment)))
   (let ((buffer (segment-buffer segment)))
     ;; Make sure that the array is big enough.
     (do ()
@@ -125,6 +133,42 @@
       (adjust-array buffer (max 1 (* 2 (array-dimension buffer 0)))))
     ;; Now that the array has the intended next free byte, we can point to it.
     (setf (fill-pointer buffer) new-value)))
+
+
+;;; Various functions (like BACK-PATCH-FUN or CHOOSER-WORST-CASE-FUN)
+;;; aren't cleanly parameterized, but instead use
+;;; SEGMENT-CURRENT-INDEX and/or SEGMENT-CURRENT-POSN as global
+;;; variables. So code which calls such functions needs to modify
+;;; SEGMENT-CURRENT-INDEX and SEGMENT-CURRENT-POSN. This is left over
+;;; from the old new-assem.lisp C-style code, and so all the
+;;; destruction happens to be done after other uses of these slots are
+;;; done and things basically work. However, (1) it's fundamentally
+;;; nasty, and (2) at least one thing doesn't work right: OpenMCL
+;;; properly points out that SUBSEQ's indices aren't supposed to
+;;; exceed its logical LENGTH, i.e. its FILL-POINTER, i.e.
+;;; SEGMENT-CURRENT-INDEX.
+;;;
+;;; As a quick fix involving minimal modification of legacy code,
+;;; we do such sets of SEGMENT-CURRENT-INDEX and SEGMENT-CURRENT-POSN
+;;; using this macro, which restores 'em afterwards.
+;;;
+;;; FIXME: It'd probably be better to cleanly parameterize things like
+;;; BACK-PATCH-FUN so we can avoid this nastiness altogether.
+(defmacro with-modified-segment-index-and-posn ((segment index posn)
+						&body body)
+  (let ((n-segment (gensym "SEGMENT"))
+	(old-index (gensym "OLD-INDEX-"))
+	(old-posn (gensym "OLD-POSN-")))
+    `(let* ((,n-segment ,segment)
+	    (,old-index (segment-current-index ,n-segment))
+	    (,old-posn (segment-current-posn ,n-segment)))
+       (unwind-protect
+	   (progn
+	     (setf (segment-current-index ,n-segment) ,index
+		   (segment-current-posn ,n-segment) ,posn)
+	     ,@body)
+	 (setf (segment-current-index ,n-segment) ,old-index
+	       (segment-current-posn ,n-segment) ,old-posn)))))
 
 ;;;; structures/types used by the scheduler
 
@@ -630,9 +674,9 @@ p	    ;; the branch has two dependents and one of them dpends on
 ;;; common supertype for all the different kinds of annotations
 (defstruct (annotation (:constructor nil)
 		       (:copier nil))
-  ;; Where in the raw output stream was this annotation emitted.
+  ;; Where in the raw output stream was this annotation emitted?
   (index 0 :type index)
-  ;; What position does that correspond to.
+  ;; What position does that correspond to?
   (posn nil :type (or index null)))
 
 (defstruct (label (:include annotation)
@@ -648,12 +692,11 @@ p	    ;; the branch has two dependents and one of them dpends on
       (format stream "L~D" (sb!c:label-id label))))
 
 ;;; a constraint on how the output stream must be aligned
-(defstruct (alignment-note
-	    (:include annotation)
-	    (:conc-name alignment-)
-	    (:predicate alignment-p)
-	    (:constructor make-alignment (bits size fill-byte))
-	    (:copier nil))
+(defstruct (alignment-note (:include annotation)
+			   (:conc-name alignment-)
+			   (:predicate alignment-p)
+			   (:constructor make-alignment (bits size fill-byte))
+			   (:copier nil))
   ;; the minimum number of low-order bits that must be zero
   (bits 0 :type alignment)
   ;; the amount of filler we are assuming this alignment op will take
@@ -663,43 +706,40 @@ p	    ;; the branch has two dependents and one of them dpends on
 
 ;;; a reference to someplace that needs to be back-patched when
 ;;; we actually know what label positions, etc. are
-(defstruct (back-patch
-	    (:include annotation)
-	    (:constructor make-back-patch (size function))
-	    (:copier nil))
-  ;; the area effected by this back-patch
-  (size 0 :type index)
+(defstruct (back-patch (:include annotation)
+		       (:constructor make-back-patch (size fun))
+		       (:copier nil))
+  ;; the area affected by this back-patch
+  (size 0 :type index :read-only t)
   ;; the function to use to generate the real data
-  (function nil :type function))
+  (fun nil :type function :read-only t))
 
 ;;; This is similar to a BACK-PATCH, but also an indication that the
-;;; amount of stuff output depends on label-positions, etc.
-;;; Back-patches can't change their mind about how much stuff to emit,
-;;; but choosers can.
-(defstruct (chooser
-	    (:include annotation)
-	    (:constructor make-chooser
-			  (size alignment maybe-shrink worst-case-fun))
-	    (:copier nil))
+;;; amount of stuff output depends on label positions, etc.
+;;; BACK-PATCHes can't change their mind about how much stuff to emit,
+;;; but CHOOSERs can.
+(defstruct (chooser (:include annotation)
+		    (:constructor make-chooser
+				  (size alignment maybe-shrink worst-case-fun))
+		    (:copier nil))
   ;; the worst case size for this chooser. There is this much space
   ;; allocated in the output buffer.
-  (size 0 :type index)
+  (size 0 :type index :read-only t)
   ;; the worst case alignment this chooser is guaranteed to preserve
-  (alignment 0 :type alignment)
-  ;; the function to call to determine of we can use a shorter
+  (alignment 0 :type alignment :read-only t)
+  ;; the function to call to determine if we can use a shorter
   ;; sequence. It returns NIL if nothing shorter can be used, or emits
   ;; that sequence and returns T.
-  (maybe-shrink nil :type function)
+  (maybe-shrink nil :type function :read-only t)
   ;; the function to call to generate the worst case sequence. This is
   ;; used when nothing else can be condensed.
-  (worst-case-fun nil :type function))
+  (worst-case-fun nil :type function :read-only t))
 
 ;;; This is used internally when we figure out a chooser or alignment
 ;;; doesn't really need as much space as we initially gave it.
-(defstruct (filler
-	    (:include annotation)
-	    (:constructor make-filler (bytes))
-	    (:copier nil))
+(defstruct (filler (:include annotation)
+		   (:constructor make-filler (bytes))
+		   (:copier nil))
   ;; the number of bytes of filler here
   (bytes 0 :type index))
 
@@ -723,9 +763,9 @@ p	    ;; the branch has two dependents and one of them dpends on
     (emit-byte segment fill-byte))
   (values))
 
-;;; Used to handle the common parts of annotation emision. We just
-;;; assign the posn and index of the note and tack it on to the end of
-;;; the segment's annotations list.
+;;; This is used to handle the common parts of annotation emission. We
+;;; just assign the POSN and INDEX of NOTE and tack it on to the end
+;;; of SEGMENT's annotations list.
 (defun emit-annotation (segment note)
   (declare (type segment segment)
 	   (type annotation note))
@@ -741,32 +781,32 @@ p	    ;; the branch has two dependents and one of them dpends on
 	      (setf (segment-annotations segment) new))))
   (values))
 
+;;; Note that the instruction stream has to be back-patched when label
+;;; positions are finally known. SIZE bytes are reserved in SEGMENT,
+;;; and function will be called with two arguments: the segment and
+;;; the position. The function should look at the position and the
+;;; position of any labels it wants to and emit the correct sequence.
+;;; (And it better be the same size as SIZE). SIZE can be zero, which
+;;; is useful if you just want to find out where things ended up.
 (defun emit-back-patch (segment size function)
-  #!+sb-doc
-  "Note that the instruction stream has to be back-patched when label positions
-   are finally known. SIZE bytes are reserved in SEGMENT, and function will
-   be called with two arguments: the segment and the position. The function
-   should look at the position and the position of any labels it wants to
-   and emit the correct sequence. (And it better be the same size as SIZE).
-   SIZE can be zero, which is useful if you just want to find out where things
-   ended up."
   (emit-annotation segment (make-back-patch size function))
   (emit-skip segment size))
 
+;;; Note that the instruction stream here depends on the actual
+;;; positions of various labels, so can't be output until label
+;;; positions are known. Space is made in SEGMENT for at least SIZE
+;;; bytes. When all output has been generated, the MAYBE-SHRINK
+;;; functions for all choosers are called with three arguments: the
+;;; segment, the position, and a magic value. The MAYBE- SHRINK
+;;; decides if it can use a shorter sequence, and if so, emits that
+;;; sequence to the segment and returns T. If it can't do better than
+;;; the worst case, it should return NIL (without emitting anything).
+;;; When calling LABEL-POSITION, it should pass it the position and
+;;; the magic-value it was passed so that LABEL-POSITION can return
+;;; the correct result. If the chooser never decides to use a shorter
+;;; sequence, the WORST-CASE-FUN will be called, just like a
+;;; BACK-PATCH. (See EMIT-BACK-PATCH.)
 (defun emit-chooser (segment size alignment maybe-shrink worst-case-fun)
-  #!+sb-doc
-  "Note that the instruction stream here depends on the actual positions of
-   various labels, so can't be output until label positions are known. Space
-   is made in SEGMENT for at least SIZE bytes. When all output has been
-   generated, the MAYBE-SHRINK functions for all choosers are called with
-   three arguments: the segment, the position, and a magic value. The MAYBE-
-   SHRINK decides if it can use a shorter sequence, and if so, emits that
-   sequence to the segment and returns T. If it can't do better than the
-   worst case, it should return NIL (without emitting anything). When calling
-   LABEL-POSITION, it should pass it the position and the magic-value it was
-   passed so that LABEL-POSITION can return the correct result. If the chooser
-   never decides to use a shorter sequence, the WORST-CASE-FUN will be called,
-   just like a BACK-PATCH. (See EMIT-BACK-PATCH.)"
   (declare (type segment segment) (type index size) (type alignment alignment)
 	   (type function maybe-shrink worst-case-fun))
   (let ((chooser (make-chooser size alignment maybe-shrink worst-case-fun)))
@@ -774,14 +814,14 @@ p	    ;; the branch has two dependents and one of them dpends on
     (emit-skip segment size)
     (adjust-alignment-after-chooser segment chooser)))
 
-;;; Called in EMIT-CHOOSER and COMPRESS-SEGMENT in order to recompute
-;;; the current alignment information in light of this chooser. If the
-;;; alignment guaranteed byte the chooser is less then the segments
-;;; current alignment, we have to adjust the segments notion of the
-;;; current alignment.
+;;; This is called in EMIT-CHOOSER and COMPRESS-SEGMENT in order to
+;;; recompute the current alignment information in light of this
+;;; chooser. If the alignment guaranteed byte the chooser is less then
+;;; the segments current alignment, we have to adjust the segments
+;;; notion of the current alignment.
 ;;;
 ;;; The hard part is recomputing the sync posn, because it's not just
-;;; the choosers posn. Consider a chooser that emits either one or
+;;; the chooser's posn. Consider a chooser that emits either one or
 ;;; three words. It preserves 8-byte (3 bit) alignments, because the
 ;;; difference between the two choices is 8 bytes.
 (defun adjust-alignment-after-chooser (segment chooser)
@@ -799,19 +839,20 @@ p	    ;; the branch has two dependents and one of them dpends on
 	(setf (segment-sync-posn segment) (- posn delta)))))
   (values))
 
-;;; Used internally whenever a chooser or alignment decides it doesn't
-;;; need as much space as it originally thought.
-(defun emit-filler (segment bytes)
+;;; This is used internally whenever a chooser or alignment decides it
+;;; doesn't need as much space as it originally thought.
+(defun emit-filler (segment n-bytes)
+  (declare (type index n-bytes))
   (let ((last (segment-last-annotation segment)))
     (cond ((and last (filler-p (car last)))
-	   (incf (filler-bytes (car last)) bytes))
+	   (incf (filler-bytes (car last)) n-bytes))
 	  (t
-	   (emit-annotation segment (make-filler bytes)))))
-  (incf (segment-current-index segment) bytes)
+	   (emit-annotation segment (make-filler n-bytes)))))
+  (incf (segment-current-index segment) n-bytes)
   (values))
 
 ;;; EMIT-LABEL (the interface) basically just expands into this,
-;;; supplying the segment and vop.
+;;; supplying the SEGMENT and VOP.
 (defun %emit-label (segment vop label)
   (when (segment-run-scheduler segment)
     (schedule-pending-instructions segment))
@@ -863,8 +904,8 @@ p	    ;; the branch has two dependents and one of them dpends on
 	   (emit-annotation segment (make-alignment bits 0 fill-byte)))))
   (values))
 
-;;; Used to find how ``aligned'' different offsets are. Returns the
-;;; number of low-order 0 bits, up to MAX-ALIGNMENT.
+;;; This is used to find how ``aligned'' different offsets are.
+;;; Returns the number of low-order 0 bits, up to MAX-ALIGNMENT.
 (defun find-alignment (offset)
   (dotimes (i max-alignment max-alignment)
     (when (logbitp i offset)
@@ -898,74 +939,74 @@ p	    ;; the branch has two dependents and one of them dpends on
 	    (setf (annotation-posn note) posn))
 	  (cond
 	   ((chooser-p note)
-	    (setf (segment-current-index segment) (chooser-index note))
-	    (setf (segment-current-posn segment) posn)
-	    (setf (segment-last-annotation segment) prev)
-	    (cond
-	     ((funcall (chooser-maybe-shrink note) segment posn delta)
-	      ;; It emitted some replacement.
-	      (let ((new-size (- (segment-current-index segment)
-				 (chooser-index note)))
-		    (old-size (chooser-size note)))
-		(when (> new-size old-size)
-		  (error "~S emitted ~W bytes, but claimed its max was ~W."
-			 note new-size old-size))
-		(let ((additional-delta (- old-size new-size)))
-		  (when (< (find-alignment additional-delta)
-			   (chooser-alignment note))
-		    (error "~S shrunk by ~W bytes, but claimed that it ~
-			    preserves ~W bits of alignment."
-			   note additional-delta (chooser-alignment note)))
-		  (incf delta additional-delta)
-		  (emit-filler segment additional-delta))
-		(setf prev (segment-last-annotation segment))
-		(if prev
-		    (setf (cdr prev) (cdr remaining))
-		    (setf (segment-annotations segment)
-			  (cdr remaining)))))
-	     (t
-	      ;; The chooser passed on shrinking. Make sure it didn't emit
-	      ;; anything.
-	      (unless (= (segment-current-index segment) (chooser-index note))
-		(error "Chooser ~S passed, but not before emitting ~W bytes."
-		       note
-		       (- (segment-current-index segment)
-			  (chooser-index note))))
-	      ;; Act like we just emitted this chooser.
-	      (let ((size (chooser-size note)))
-		(incf (segment-current-index segment) size)
-		(incf (segment-current-posn segment) size))
-	      ;; Adjust the alignment accordingly.
-	      (adjust-alignment-after-chooser segment note)
-	      ;; And keep this chooser for next time around.
-	      (setf prev remaining))))
+	    (with-modified-segment-index-and-posn (segment (chooser-index note)
+							   posn)
+	      (setf (segment-last-annotation segment) prev)
+	      (cond
+	       ((funcall (chooser-maybe-shrink note) segment posn delta)
+		;; It emitted some replacement.
+		(let ((new-size (- (segment-current-index segment)
+				   (chooser-index note)))
+		      (old-size (chooser-size note)))
+		  (when (> new-size old-size)
+		    (error "~S emitted ~W bytes, but claimed its max was ~W."
+			   note new-size old-size))
+		  (let ((additional-delta (- old-size new-size)))
+		    (when (< (find-alignment additional-delta)
+			     (chooser-alignment note))
+		      (error "~S shrunk by ~W bytes, but claimed that it ~
+			      preserves ~W bits of alignment."
+			     note additional-delta (chooser-alignment note)))
+		    (incf delta additional-delta)
+		    (emit-filler segment additional-delta))
+		  (setf prev (segment-last-annotation segment))
+		  (if prev
+		      (setf (cdr prev) (cdr remaining))
+		      (setf (segment-annotations segment)
+			    (cdr remaining)))))
+	       (t
+		;; The chooser passed on shrinking. Make sure it didn't
+		;; emit anything.
+		(unless (= (segment-current-index segment)
+			   (chooser-index note))
+		  (error "Chooser ~S passed, but not before emitting ~W bytes."
+			 note
+			 (- (segment-current-index segment)
+			    (chooser-index note))))
+		;; Act like we just emitted this chooser.
+		(let ((size (chooser-size note)))
+		  (incf (segment-current-index segment) size)
+		  (incf (segment-current-posn segment) size))
+		;; Adjust the alignment accordingly.
+		(adjust-alignment-after-chooser segment note)
+		;; And keep this chooser for next time around.
+		(setf prev remaining)))))
 	   ((alignment-p note)
 	    (unless (zerop (alignment-size note))
 	      ;; Re-emit the alignment, letting it collapse if we know
 	      ;; anything more about the alignment guarantees of the
 	      ;; segment.
 	      (let ((index (alignment-index note)))
-		(setf (segment-current-index segment) index)
-		(setf (segment-current-posn segment) posn)
-		(setf (segment-last-annotation segment) prev)
-		(emit-alignment segment nil (alignment-bits note)
-				(alignment-fill-byte note))
-		(let* ((new-index (segment-current-index segment))
-		       (size (- new-index index))
-		       (old-size (alignment-size note))
-		       (additional-delta (- old-size size)))
-		  (when (minusp additional-delta)
-		    (error "Alignment ~S needs more space now?  It was ~W, ~
+		(with-modified-segment-index-and-posn (segment index posn)
+	 	  (setf (segment-last-annotation segment) prev)
+		  (emit-alignment segment nil (alignment-bits note)
+				  (alignment-fill-byte note))
+		  (let* ((new-index (segment-current-index segment))
+			 (size (- new-index index))
+			 (old-size (alignment-size note))
+			 (additional-delta (- old-size size)))
+		    (when (minusp additional-delta)
+		      (error "Alignment ~S needs more space now?  It was ~W, ~
 			    and is ~W now."
-			   note old-size size))
-		  (when (plusp additional-delta)
-		    (emit-filler segment additional-delta)
-		    (incf delta additional-delta)))
-		(setf prev (segment-last-annotation segment))
-		(if prev
-		    (setf (cdr prev) (cdr remaining))
-		    (setf (segment-annotations segment)
-			  (cdr remaining))))))
+			     note old-size size))
+		    (when (plusp additional-delta)
+		      (emit-filler segment additional-delta)
+		      (incf delta additional-delta)))
+		  (setf prev (segment-last-annotation segment))
+		  (if prev
+		      (setf (cdr prev) (cdr remaining))
+		      (setf (segment-annotations segment)
+			    (cdr remaining)))))))
 	   (t
 	    (setf prev remaining)))))
       (when (zerop delta)
@@ -973,8 +1014,8 @@ p	    ;; the branch has two dependents and one of them dpends on
       (decf (segment-final-posn segment) delta)))
   (values))
 
-;;; We have run all the choosers we can, so now we have to figure out exactly
-;;; how much space each alignment note needs.
+;;; We have run all the choosers we can, so now we have to figure out
+;;; exactly how much space each alignment note needs.
 (defun finalize-positions (segment)
   (let ((delta 0))
     (do* ((prev nil)
@@ -995,13 +1036,14 @@ p	    ;; the branch has two dependents and one of them dpends on
 	    (unless (zerop additional-delta)
 	      (setf (segment-last-annotation segment) prev)
 	      (incf delta additional-delta)
-	      (setf (segment-current-index segment) (alignment-index note))
-	      (setf (segment-current-posn segment) posn)
-	      (emit-filler segment additional-delta)
-	      (setf prev (segment-last-annotation segment)))
-	    (if prev
-		(setf (cdr prev) next)
-		(setf (segment-annotations segment) next))))
+	      (with-modified-segment-index-and-posn (segment
+						     (alignment-index note)
+						     posn)
+	        (emit-filler segment additional-delta)
+	        (setf prev (segment-last-annotation segment))
+		(if prev
+		    (setf (cdr prev) next)
+		    (setf (segment-annotations segment) next))))))
 	 (t
 	  (setf (annotation-posn note) posn)
 	  (setf prev remaining)
@@ -1021,21 +1063,20 @@ p	    ;; the branch has two dependents and one of them dpends on
       (flet ((fill-in (function old-size)
 	       (let ((index (annotation-index note))
 		     (posn (annotation-posn note)))
-		 (setf (segment-current-index segment) index)
-		 (setf (segment-current-posn segment) posn)
-		 (setf (segment-last-annotation segment) prev)
-		 (funcall function segment posn)
-		 (let ((new-size (- (segment-current-index segment) index)))
-		   (unless (= new-size old-size)
-		     (error "~S emitted ~W bytes, but claimed it was ~W."
-			    note new-size old-size)))
-		 (let ((tail (segment-last-annotation segment)))
-		   (if tail
-		       (setf (cdr tail) next)
-		       (setf (segment-annotations segment) next)))
-		 (setf next (cdr prev)))))
+		 (with-modified-segment-index-and-posn (segment index posn)
+	           (setf (segment-last-annotation segment) prev)
+		   (funcall function segment posn)
+		   (let ((new-size (- (segment-current-index segment) index)))
+		     (unless (= new-size old-size)
+		       (error "~S emitted ~W bytes, but claimed it was ~W."
+			      note new-size old-size)))
+		   (let ((tail (segment-last-annotation segment)))
+		     (if tail
+			 (setf (cdr tail) next)
+			 (setf (segment-annotations segment) next)))
+		   (setf next (cdr prev))))))
 	(cond ((back-patch-p note)
-	       (fill-in (back-patch-function note)
+	       (fill-in (back-patch-fun note)
 			(back-patch-size note)))
 	      ((chooser-p note)
 	       (fill-in (chooser-worst-case-fun note)
@@ -1065,7 +1106,7 @@ p	    ;; the branch has two dependents and one of them dpends on
 (defvar **current-segment**)
 
 ;;; Just like %%CURRENT-SEGMENT%%, except this holds the current vop.
-;;; Used only to keep track of which vops emit which insts.
+;;; This is used only to keep track of which vops emit which insts.
 ;;;
 ;;; The double asterisks in the name are intended to suggest that this
 ;;; isn't just any old special variable, it's an extra-special

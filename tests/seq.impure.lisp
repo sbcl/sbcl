@@ -175,5 +175,28 @@
     (find-if (lambda (c) (typep c 'base-char)) seq :from-end t)
     (null (find-if 'upper-case-p seq))))
 	 
+;;; SUBSEQ
+(let ((avec (make-array 10
+			:fill-pointer 4
+			:initial-contents '(0 1 2 3 iv v vi vii iix ix))))
+  ;; These first five always worked AFAIK.
+  (assert (equalp (subseq avec 0 3) #(0 1 2)))
+  (assert (equalp (subseq avec 3 3) #()))
+  (assert (equalp (subseq avec 1 3) #(1 2)))
+  (assert (equalp (subseq avec 1) #(1 2 3)))
+  (assert (equalp (subseq avec 1 4) #(1 2 3)))
+  ;; SBCL bug found ca. 2002-05-01 by OpenMCL's correct handling of
+  ;; SUBSEQ, CSR's driving portable cross-compilation far enough to
+  ;; reach the SUBSEQ calls in assem.lisp, and WHN's sleazy
+  ;; translation of old CMU CL new-assem.lisp into sufficiently grotty
+  ;; portable Lisp that it passed suitable illegal values to SUBSEQ to
+  ;; exercise the bug:-|
+  ;;
+  ;; SUBSEQ should check its END value against logical LENGTH, not
+  ;; physical ARRAY-DIMENSION 0.
+  ;;
+  ;; fixed in sbcl-0.7.4.22 by WHN
+  (assert (null (ignore-errors (subseq avec 1 5)))))
+
 ;;; success
 (quit :unix-status 104)

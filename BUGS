@@ -1257,8 +1257,25 @@ WORKAROUND:
   on various operating systems. (reported by Harald Hanche-Olsen on
   cmucl-help 2002-05-31)
 
-175:
-  (fixed in sbcl-0.7.4.14)
+176:
+  reported by Alexey Dejneka 08 Jun 2002 in sbcl-devel:
+    Playing with McCLIM, I've received an error "Unbound variable WRAPPER
+    in SB-PCL::CHECK-WRAPPER-VALIDITY".
+      (defun check-wrapper-validity (instance)
+        (let* ((owrapper (wrapper-of instance)))
+          (if (not (invalid-wrapper-p owrapper))
+              owrapper
+              (let* ((state (wrapper-state wrapper)) ; !!!
+        ...
+    I've tried to replace it with OWRAPPER, but now OBSOLETE-INSTANCE-TRAP
+    breaks with "NIL is not of type SB-KERNEL:LAYOUT".
+    SBCL 0.7.4.13.
+  partial fix: The undefined variable WRAPPER resulted from an error
+  in recent refactoring, as can be seen by comparing to the code in e.g. 
+  sbcl-0.7.2. Replacing WRAPPER with OWRAPPER (done by WHN in sbcl-0.7.4.22)
+  should bring the code back to its behavior as of sbcl-0.7.2, but
+  that still leaves the OBSOLETE-INSTANCE-TRAP bug.
+
 
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:

@@ -701,6 +701,16 @@
 	     "The index ~S is too large."
 	     (type-error-datum condition)))))
 
+;;; Out-of-range &KEY END arguments are similar to, but off by one
+;;; from out-of-range indices into the sequence.
+(define-condition index-too-large-error (type-error)
+  ()
+  (:report
+   (lambda (condition stream)
+     (format stream
+	     "The end-of-sequence specifier ~S is too large."
+	     (type-error-datum condition)))))
+
 (define-condition io-timeout (stream-error)
   ((direction :reader io-timeout-direction :initarg :direction))
   (:report

@@ -446,7 +446,7 @@
   (let* ((owrapper (wrapper-of instance)))
     (if (not (invalid-wrapper-p owrapper))
 	owrapper
-	(let* ((state (wrapper-state wrapper))
+	(let* ((state (wrapper-state owrapper))
 	       (nwrapper
 		(ecase (car state)
 		  (:flush
