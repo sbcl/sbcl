@@ -115,7 +115,13 @@
 
 ;;; an IR1 transform
 (defstruct (transform (:copier nil))
-  ;; the function-type which enables this transform
+  ;; the function type which enables this transform.
+  ;;
+  ;; (Note that declaring this :TYPE FUN-TYPE probably wouldn't
+  ;; work because some function types, like (SPECIFIER-TYPE 'FUNCTION0
+  ;; itself, are represented as BUILT-IN-TYPE, and at least as of
+  ;; sbcl-0.pre7.54 or so, that's inconsistent with being a
+  ;; FUN-TYPE.)
   (type (required-argument) :type ctype)
   ;; the transformation function. Takes the COMBINATION node and returns a
   ;; lambda, or throws out.

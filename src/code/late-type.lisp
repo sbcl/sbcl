@@ -192,18 +192,18 @@
 ;;; a flag that we can bind to cause complex function types to be
 ;;; unparsed as FUNCTION. This is useful when we want a type that we
 ;;; can pass to TYPEP.
-(defvar *unparse-function-type-simplify*)
-(!cold-init-forms (setq *unparse-function-type-simplify* nil))
+(defvar *unparse-fun-type-simplify*)
+(!cold-init-forms (setq *unparse-fun-type-simplify* nil))
 
 (!define-type-method (function :unparse) (type)
-  (if *unparse-function-type-simplify*
+  (if *unparse-fun-type-simplify*
       'function
       (list 'function
-	    (if (function-type-wild-args type)
+	    (if (fun-type-wild-args type)
 		'*
 		(unparse-args-types type))
 	    (type-specifier
-	     (function-type-returns type)))))
+	     (fun-type-returns type)))))
 
 ;;; Since all function types are equivalent to FUNCTION, they are all
 ;;; subtypes of each other.
@@ -294,10 +294,9 @@
     (result)))
 
 (!def-type-translator function (&optional (args '*) (result '*))
-  (let ((res (make-function-type
-	      :returns (values-specifier-type result))))
+  (let ((res (make-fun-type :returns (values-specifier-type result))))
     (if (eq args '*)
-	(setf (function-type-wild-args res) t)
+	(setf (fun-type-wild-args res) t)
 	(parse-args-types args res))
     res))
 
@@ -332,9 +331,9 @@
 ;;; Return the minimum number of arguments that a function can be
 ;;; called with, and the maximum number or NIL. If not a function
 ;;; type, return NIL, NIL.
-(defun function-type-nargs (type)
+(defun fun-type-nargs (type)
   (declare (type ctype type))
-  (if (function-type-p type)
+  (if (fun-type-p type)
       (let ((fixed (length (args-type-required type))))
 	(if (or (args-type-rest type)
 		(args-type-keyp type)
@@ -875,7 +874,7 @@
 (defvar *wild-type*)
 (defvar *empty-type*)
 (defvar *universal-type*)
-(defvar *universal-function-type*)
+(defvar *universal-fun-type*)
 (!cold-init-forms
  (macrolet ((frob (name var)
 	      `(progn
@@ -891,8 +890,8 @@
    (frob * *wild-type*)
    (frob nil *empty-type*)
    (frob t *universal-type*))
- (setf *universal-function-type*
-       (make-function-type :wild-args t
+ (setf *universal-fun-type*
+       (make-fun-type :wild-args t
 			   :returns *wild-type*)))
 
 (!define-type-method (named :simple-=) (type1 type2)
@@ -2156,7 +2155,7 @@
 	   ;; that an object of type FUNCTION doesn't satisfy it, so
 	   ;; we return success no matter what.
 	   t)
-	  (;; Otherwise both of them must be FUNCTION-TYPE objects.
+	  (;; Otherwise both of them must be FUN-TYPE objects.
 	   t
 	   ;; FIXME: For now we only check compatibility of the return
 	   ;; type, not argument types, and we don't even check the
@@ -2165,11 +2164,11 @@
 	   ;; compatibility of the arguments, we should (1) redo
 	   ;; VALUES-TYPES-EQUAL-OR-INTERSECT as
 	   ;; ARGS-TYPES-EQUAL-OR-INTERSECT, and then (2) apply it to
-	   ;; the ARGS-TYPE slices of the FUNCTION-TYPEs. (ARGS-TYPE
-	   ;; is a base class both of VALUES-TYPE and of FUNCTION-TYPE.)
+	   ;; the ARGS-TYPE slices of the FUN-TYPEs. (ARGS-TYPE
+	   ;; is a base class both of VALUES-TYPE and of FUN-TYPE.)
 	   (values-types-equal-or-intersect
-	    (function-type-returns defined-ftype)
-	    (function-type-returns declared-ftype))))))
+	    (fun-type-returns defined-ftype)
+	    (fun-type-returns declared-ftype))))))
 	   
 ;;; This messy case of CTYPE for NUMBER is shared between the
 ;;; cross-compiler and the target system.

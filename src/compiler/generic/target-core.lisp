@@ -29,7 +29,7 @@
       (setf (%code-entry-points code-obj) res)
       (setf (%function-name res) (entry-info-name entry))
       (setf (%function-arglist res) (entry-info-arguments entry))
-      (setf (%function-type res) (entry-info-type entry))
+      (setf (%fun-type res) (entry-info-type entry))
 
       (note-function entry res object))))
 

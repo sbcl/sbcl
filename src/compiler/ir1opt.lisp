@@ -189,24 +189,24 @@
 ;;; assumed that the call is legal and has only constants in the
 ;;; keyword positions.
 (defun assert-call-type (call type)
-  (declare (type combination call) (type function-type type))
-  (derive-node-type call (function-type-returns type))
+  (declare (type combination call) (type fun-type type))
+  (derive-node-type call (fun-type-returns type))
   (let ((args (combination-args call)))
-    (dolist (req (function-type-required type))
+    (dolist (req (fun-type-required type))
       (when (null args) (return-from assert-call-type))
       (let ((arg (pop args)))
 	(assert-continuation-type arg req)))
-    (dolist (opt (function-type-optional type))
+    (dolist (opt (fun-type-optional type))
       (when (null args) (return-from assert-call-type))
       (let ((arg (pop args)))
 	(assert-continuation-type arg opt)))
 
-    (let ((rest (function-type-rest type)))
+    (let ((rest (fun-type-rest type)))
       (when rest
 	(dolist (arg args)
 	  (assert-continuation-type arg rest))))
 
-    (dolist (key (function-type-keywords type))
+    (dolist (key (fun-type-keywords type))
       (let ((name (key-info-name key)))
 	(do ((arg args (cddr arg)))
 	    ((null arg))
@@ -841,7 +841,7 @@
 ;;; and that checking is done by local call analysis.
 (defun validate-call-type (call type ir1-p)
   (declare (type combination call) (type ctype type))
-  (cond ((not (function-type-p type))
+  (cond ((not (fun-type-p type))
 	 (aver (multiple-value-bind (val win)
 		   (csubtypep type (specifier-type 'function))
 		 (or val (not win))))
@@ -922,7 +922,7 @@
 ;;; replace it, otherwise add a new one.
 (defun record-optimization-failure (node transform args)
   (declare (type combination node) (type transform transform)
-	   (type (or function-type list) args))
+	   (type (or fun-type list) args))
   (let* ((table (component-failed-optimizations *component-being-compiled*))
 	 (found (assoc transform (gethash node table))))
     (if found
@@ -941,7 +941,7 @@
   (declare (type combination node) (type transform transform))
   (let* ((type (transform-type transform))
 	 (fun (transform-function transform))
-	 (constrained (function-type-p type))
+	 (constrained (fun-type-p type))
 	 (table (component-failed-optimizations *component-being-compiled*))
 	 (flame (if (transform-important transform)
 		    (policy node (>= speed inhibit-warnings))
@@ -1114,7 +1114,7 @@
 (defun propagate-to-refs (leaf type)
   (declare (type leaf leaf) (type ctype type))
   (let ((var-type (leaf-type leaf)))
-    (unless (function-type-p var-type)
+    (unless (fun-type-p var-type)
       (let ((int (type-approx-intersection2 var-type type)))
 	(when (type/= int var-type)
 	  (setf (leaf-type leaf) int)
@@ -1363,8 +1363,8 @@
        (when fun-changed
 	 (setf (continuation-reoptimize fun) nil)
 	 (let ((type (continuation-type fun)))
-	   (when (function-type-p type)
-	     (derive-node-type node (function-type-returns type))))
+	   (when (fun-type-p type)
+	     (derive-node-type node (fun-type-returns type))))
 	 (maybe-terminate-block node nil)
 	 (let ((use (continuation-use fun)))
 	   (when (and (ref-p use) (functional-p (ref-leaf use)))
@@ -1437,7 +1437,7 @@
       (return-from ir1-optimize-mv-call))
 
     (multiple-value-bind (min max)
-	(function-type-nargs (continuation-type fun))
+	(fun-type-nargs (continuation-type fun))
       (let ((total-nvals
 	     (multiple-value-bind (types nvals)
 		 (values-types (continuation-derived-type (first args)))

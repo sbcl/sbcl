@@ -171,9 +171,9 @@
 	   :set-known (unsafe)
 	   :set-trans (setf %function-arglist))
   (type :ref-known (flushable)
-	:ref-trans %function-type
+	:ref-trans %fun-type
 	:set-known (unsafe)
-	:set-trans (setf %function-type))
+	:set-trans (setf %fun-type))
   (code :rest-p t :c-type "unsigned char"))
 
 (define-primitive-object (return-pc :lowtag other-pointer-type :header t)

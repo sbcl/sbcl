@@ -20,7 +20,7 @@ extern void breakpoint_do_displaced_inst(os_context_t *context,
 					 unsigned long orig_inst);
 extern void handle_breakpoint(int signal, siginfo_t *info,
 			      os_context_t *context);
-extern void *handle_function_end_breakpoint(int signal, siginfo_t *info,
-					    os_context_t *context);
+extern void *handle_fun_end_breakpoint(int signal, siginfo_t *info,
+				       os_context_t *context);
 
 #endif

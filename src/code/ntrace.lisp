@@ -81,7 +81,7 @@
   ;; list of null environment forms
   (print-after () :type list))
 
-;;; This is a list of conses (function-end-cookie . condition-satisfied),
+;;; This is a list of conses (fun-end-cookie . condition-satisfied),
 ;;; which we use to note distinct dynamic entries into functions. When
 ;;; we enter a traced function, we add a entry to this list holding
 ;;; the new end-cookie and whether the trace condition was satisfied.
@@ -91,8 +91,8 @@
 ;;;
 ;;; This list also helps us synchronize the TRACE facility dynamically
 ;;; for detecting non-local flow of control. Whenever execution hits a
-;;; :FUNCTION-END breakpoint used for TRACE'ing, we look for the
-;;; FUNCTION-END-COOKIE at the top of *TRACED-ENTRIES*. If it is not
+;;; :FUN-END breakpoint used for TRACE'ing, we look for the
+;;; FUN-END-COOKIE at the top of *TRACED-ENTRIES*. If it is not
 ;;; there, we discard any entries that come before our cookie.
 ;;;
 ;;; When we trace using encapsulation, we bind this variable and add
@@ -221,7 +221,7 @@
     (when (or (null *traced-entries*)
 	      (let ((cookie (caar *traced-entries*)))
 		(or (not cookie)
-		    (sb-di:function-end-cookie-valid-p frame cookie))))
+		    (sb-di:fun-end-cookie-valid-p frame cookie))))
       (return))
     (pop *traced-entries*)))
 
@@ -229,7 +229,7 @@
 
 ;;; Return a closure that can be used for a function start breakpoint
 ;;; hook function and a closure that can be used as the
-;;; FUNCTION-END-COOKIE function. The first communicates the sense of
+;;; FUN-END-COOKIE function. The first communicates the sense of
 ;;; the Condition to the second via a closure variable.
 (defun trace-start-breakpoint-fun (info)
   (let (conditionp)
@@ -380,16 +380,16 @@
 	(multiple-value-bind (start-fun cookie-fun)
 	    (trace-start-breakpoint-fun info)
 	  (let ((start (sb-di:make-breakpoint start-fun debug-fun
-					      :kind :function-start))
+					      :kind :fun-start))
 		(end (sb-di:make-breakpoint
 		      (trace-end-breakpoint-fun info)
-		      debug-fun :kind :function-end
-		      :function-end-cookie cookie-fun)))
+		      debug-fun :kind :fun-end
+		      :fun-end-cookie cookie-fun)))
 	    (setf (trace-info-start-breakpoint info) start)
 	    (setf (trace-info-end-breakpoint info) end)
 	    ;; The next two forms must be in the order in which they
 	    ;; appear, since the start breakpoint must run before the
-	    ;; function-end breakpoint's start helper (which calls the
+	    ;; fun-end breakpoint's start helper (which calls the
 	    ;; cookie function.) One reason is that cookie function
 	    ;; requires that the CONDITIONP shared closure variable be
 	    ;; initialized.

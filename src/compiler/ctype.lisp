@@ -116,21 +116,21 @@
 				((:error-function *error-function*))
 				((:warning-function *warning-function*)))
   (declare (type function result-test) (type combination call)
-	   (type function-type type))
+	   (type fun-type type))
   (let* ((*lossage-detected* nil)
 	 (*slime-detected* nil)
 	 (*compiler-error-context* call)
 	 (args (combination-args call))
 	 (nargs (length args))
-	 (required (function-type-required type))
+	 (required (fun-type-required type))
 	 (min-args (length required))
-	 (optional (function-type-optional type))
+	 (optional (fun-type-optional type))
 	 (max-args (+ min-args (length optional)))
-	 (rest (function-type-rest type))
-	 (keyp (function-type-keyp type)))
+	 (rest (fun-type-rest type))
+	 (keyp (fun-type-keyp type)))
 
     (cond
-     ((function-type-wild-args type)
+     ((fun-type-wild-args type)
       (do ((i 1 (1+ i))
 	   (arg args (cdr arg)))
 	  ((null arg))
@@ -160,7 +160,7 @@
 	(check-key-args args max-args type))))
 
     (let* ((dtype (node-derived-type call))
-	   (return-type (function-type-returns type))
+	   (return-type (fun-type-returns type))
 	   (cont (node-cont call))
 	   (out-type
 	    (if (or (not (continuation-type-check cont))
@@ -245,7 +245,7 @@
 ;;; be known and the corresponding argument should be of the correct
 ;;; type. If the key isn't a constant, then we can't tell, so we note
 ;;; slime.
-(declaim (ftype (function (list fixnum function-type) (values)) check-key-args))
+(declaim (ftype (function (list fixnum fun-type) (values)) check-key-args))
 (defun check-key-args (args pre-key type)
   (do ((key (nthcdr pre-key args) (cddr key))
        (n (1+ pre-key) (+ n 2)))
@@ -259,10 +259,10 @@
 		    n))
        (t
 	(let* ((name (continuation-value k))
-	       (info (find name (function-type-keywords type)
+	       (info (find name (fun-type-keywords type)
 			   :key #'key-info-name)))
 	  (cond ((not info)
-		 (unless (function-type-allowp type)
+		 (unless (fun-type-allowp type)
 		   (note-lossage "~S is not a known argument keyword."
 				 name)))
 		(t
@@ -274,10 +274,10 @@
 ;;;
 ;;; Due to the lack of a (LIST X) type specifier, we can't reconstruct
 ;;; the &REST type.
-(declaim (ftype (function (functional) function-type) definition-type))
+(declaim (ftype (function (functional) fun-type) definition-type))
 (defun definition-type (functional)
   (if (lambda-p functional)
-      (make-function-type
+      (make-fun-type
        :required (mapcar #'leaf-type (lambda-vars functional))
        :returns (tail-set-type (lambda-tail-set functional)))
       (let ((rest nil))
@@ -299,7 +299,7 @@
 		    (:more-count))
 		  (req type))))
 
-	  (make-function-type
+	  (make-fun-type
 	   :required (req)
 	   :optional (opt)
 	   :rest rest
@@ -322,7 +322,7 @@
 ;;;; proclamation, we can check the actual type for compatibity with the
 ;;;; previous uses.
 
-(defstruct (approximate-function-type (:copier nil))
+(defstruct (approximate-fun-type (:copier nil))
   ;; the smallest and largest numbers of arguments that this function
   ;; has been called with.
   (min-args sb!xc:call-arguments-limit :type fixnum)
@@ -350,16 +350,16 @@
   ;; :ALLOW-OTHER-KEYS
   (allowp nil :type (member t nil)))
 
-;;; Return an APPROXIMATE-FUNCTION-TYPE representing the context of
+;;; Return an APPROXIMATE-FUN-TYPE representing the context of
 ;;; CALL. If TYPE is supplied and not null, then we merge the
 ;;; information into the information already accumulated in TYPE.
 (declaim (ftype (function (combination
-			   &optional (or approximate-function-type null))
-			  approximate-function-type)
+			   &optional (or approximate-fun-type null))
+			  approximate-fun-type)
 		note-function-use))
 (defun note-function-use (call &optional type)
-  (let* ((type (or type (make-approximate-function-type)))
-	 (types (approximate-function-type-types type))
+  (let* ((type (or type (make-approximate-fun-type)))
+	 (types (approximate-fun-type-types type))
 	 (args (combination-args call))
 	 (nargs (length args))
 	 (allowp (some #'(lambda (x)
@@ -367,15 +367,15 @@
 				(eq (continuation-value x) :allow-other-keys)))
 			  args)))
 
-    (setf (approximate-function-type-min-args type)
-	  (min (approximate-function-type-min-args type) nargs))
-    (setf (approximate-function-type-max-args type)
-	  (max (approximate-function-type-max-args type) nargs))
+    (setf (approximate-fun-type-min-args type)
+	  (min (approximate-fun-type-min-args type) nargs))
+    (setf (approximate-fun-type-max-args type)
+	  (max (approximate-fun-type-max-args type) nargs))
 
     (do ((old types (cdr old))
 	 (arg args (cdr arg)))
 	((null old)
-	 (setf (approximate-function-type-types type)
+	 (setf (approximate-fun-type-types type)
 	       (nconc types
 		      (mapcar #'(lambda (x)
 				  (list (continuation-type x)))
@@ -385,11 +385,11 @@
 	       (car old)
 	       :test #'type=))
 
-    (collect ((keys (approximate-function-type-keys type) cons))
+    (collect ((keys (approximate-fun-type-keys type) cons))
       (do ((arg args (cdr arg))
 	   (pos 0 (1+ pos)))
 	  ((or (null arg) (null (cdr arg)))
-	   (setf (approximate-function-type-keys type) (keys)))
+	   (setf (approximate-fun-type-keys type) (keys)))
 	(let ((key (first arg))
 	      (val (second arg)))
 	  (when (constant-continuation-p key)
@@ -417,8 +417,8 @@
     type))
 
 ;;; This is similar to VALID-FUNCTION-USE, but checks an
-;;; APPROXIMATE-FUNCTION-TYPE against a real function type.
-(declaim (ftype (function (approximate-function-type function-type
+;;; APPROXIMATE-FUN-TYPE against a real function type.
+(declaim (ftype (function (approximate-fun-type fun-type
 			   &optional function function function)
 			  (values boolean boolean))
 		valid-approximate-type))
@@ -430,24 +430,24 @@
 					 (*warning-function* #'compiler-note))
   (let* ((*lossage-detected* nil)
 	 (*slime-detected* nil)
-	 (required (function-type-required type))
+	 (required (fun-type-required type))
 	 (min-args (length required))
-	 (optional (function-type-optional type))
+	 (optional (fun-type-optional type))
 	 (max-args (+ min-args (length optional)))
-	 (rest (function-type-rest type))
-	 (keyp (function-type-keyp type)))
+	 (rest (fun-type-rest type))
+	 (keyp (fun-type-keyp type)))
 
-    (when (function-type-wild-args type)
+    (when (fun-type-wild-args type)
       (return-from valid-approximate-type (values t t)))
 
-    (let ((call-min (approximate-function-type-min-args call-type)))
+    (let ((call-min (approximate-fun-type-min-args call-type)))
       (when (< call-min min-args)
 	(note-lossage
 	 "~:@<The function was previously called with ~R argument~:P, ~
           but wants at least ~R.~:>"
 	 call-min min-args)))
 
-    (let ((call-max (approximate-function-type-max-args call-type)))
+    (let ((call-max (approximate-fun-type-max-args call-type)))
       (cond ((<= call-max max-args))
 	    ((not (or keyp rest))
 	     (note-lossage
@@ -471,11 +471,11 @@
 
 ;;; Check that each of the types used at each arg position is
 ;;; compatible with the actual type.
-(declaim (ftype (function (approximate-function-type list (or ctype null))
+(declaim (ftype (function (approximate-fun-type list (or ctype null))
 			  (values))
 		check-approximate-fixed-and-rest))
 (defun check-approximate-fixed-and-rest (call-type fixed rest)
-  (do ((types (approximate-function-type-types call-type) (cdr types))
+  (do ((types (approximate-fun-type-types call-type) (cdr types))
        (n 1 (1+ n))
        (arg fixed (cdr arg)))
       ((null types))
@@ -508,12 +508,12 @@
 ;;; argument position. Check the validity of all keys that appeared in
 ;;; valid keyword positions.
 ;;;
-;;; ### We could check the APPROXIMATE-FUNCTION-TYPE-TYPES to make
+;;; ### We could check the APPROXIMATE-FUN-TYPE-TYPES to make
 ;;; sure that all arguments in keyword positions were manifest
 ;;; keywords.
 (defun check-approximate-keywords (call-type max-args type)
-  (let ((call-keys (approximate-function-type-keys call-type))
-	(keys (function-type-keywords type)))
+  (let ((call-keys (approximate-fun-type-keys call-type))
+	(keys (fun-type-keywords type)))
     (dolist (key keys)
       (let ((name (key-info-name key)))
 	(collect ((types nil append))
@@ -524,7 +524,7 @@
 		(types (approximate-key-info-types call-key)))))
 	  (check-approximate-arg-type (types) (key-info-type key) "~S" name))))
 
-    (unless (function-type-allowp type)
+    (unless (fun-type-allowp type)
       (collect ((names () adjoin))
 	(dolist (call-key call-keys)
 	  (let ((pos (approximate-key-info-position call-key)))
@@ -587,11 +587,12 @@
 ;;; unioning in NULL, and not totally blow off doing any type
 ;;; assertion.
 (defun find-optional-dispatch-types (od type where)
-  (declare (type optional-dispatch od) (type function-type type)
+  (declare (type optional-dispatch od)
+	   (type fun-type type)
 	   (string where))
   (let* ((min (optional-dispatch-min-args od))
-	 (req (function-type-required type))
-	 (opt (function-type-optional type)))
+	 (req (fun-type-required type))
+	 (opt (fun-type-optional type)))
     (flet ((frob (x y what)
 	     (unless (= x y)
 	       (note-lossage
@@ -605,13 +606,13 @@
 		"The definition ~:[doesn't have~;has~] ~A, but ~
 		~A ~:[doesn't~;does~]."
 		x what where y))))
-      (frob (optional-dispatch-keyp od) (function-type-keyp type)
+      (frob (optional-dispatch-keyp od) (fun-type-keyp type)
 	    "&KEY arguments")
       (unless (optional-dispatch-keyp od)
 	(frob (not (null (optional-dispatch-more-entry od)))
-	      (not (null (function-type-rest type)))
+	      (not (null (fun-type-rest type)))
 	      "&REST arguments"))
-      (frob (optional-dispatch-allowp od) (function-type-allowp type)
+      (frob (optional-dispatch-allowp od) (fun-type-allowp type)
 	    "&ALLOW-OTHER-KEYS"))
 
     (when *lossage-detected*
@@ -619,7 +620,7 @@
 
     (collect ((res)
 	      (vars))
-      (let ((keys (function-type-keywords type))
+      (let ((keys (fun-type-keywords type))
 	    (arglist (optional-dispatch-arglist od)))
 	(dolist (arg arglist)
 	  (cond
@@ -645,13 +646,13 @@
 		(:optional
 		 (res (type-union (pop opt) (or def-type *universal-type*))))
 		(:rest
-		 (when (function-type-rest type)
+		 (when (fun-type-rest type)
 		   (res (specifier-type 'list))))
 		(:more-context
-		 (when (function-type-rest type)
+		 (when (fun-type-rest type)
 		   (res *universal-type*)))
 		(:more-count
-		 (when (function-type-rest type)
+		 (when (fun-type-rest type)
 		   (res (specifier-type 'fixnum)))))
 	      (vars arg)
 	      (when (arg-info-supplied-p info)
@@ -676,18 +677,18 @@
 ;;; Check that Type doesn't specify any funny args, and do the
 ;;; intersection.
 (defun find-lambda-types (lambda type where)
-  (declare (type clambda lambda) (type function-type type) (string where))
+  (declare (type clambda lambda) (type fun-type type) (string where))
   (flet ((frob (x what)
 	   (when x
 	     (note-lossage
 	      "The definition has no ~A, but the ~A did."
 	      what where))))
-    (frob (function-type-optional type) "&OPTIONAL arguments")
-    (frob (function-type-keyp type) "&KEY arguments")
-    (frob (function-type-rest type) "&REST argument"))
+    (frob (fun-type-optional type) "&OPTIONAL arguments")
+    (frob (fun-type-keyp type) "&KEY arguments")
+    (frob (fun-type-rest type) "&REST argument"))
   (let* ((vars (lambda-vars lambda))
 	 (nvars (length vars))
-	 (req (function-type-required type))
+	 (req (fun-type-required type))
 	 (nreq (length req)))
     (unless (= nvars nreq)
       (note-lossage "The definition has ~R arg~:P, but the ~A has ~R."
@@ -697,13 +698,13 @@
 	(try-type-intersections vars req where))))
 
 ;;; Check for syntactic and type conformance between the definition
-;;; FUNCTIONAL and the specified FUNCTION-TYPE. If they are compatible
+;;; FUNCTIONAL and the specified FUN-TYPE. If they are compatible
 ;;; and REALLY-ASSERT is T, then add type assertions to the definition
-;;; from the FUNCTION-TYPE.
+;;; from the FUN-TYPE.
 ;;;
 ;;; If there is a syntactic or type problem, then we call
 ;;; ERROR-FUNCTION with an error message using WHERE as context
-;;; describing where FUNCTION-TYPE came from.
+;;; describing where FUN-TYPE came from.
 ;;;
 ;;; If there is no problem, we return T (even if REALLY-ASSERT was
 ;;; false). If there was a problem, we return NIL.
@@ -716,17 +717,18 @@
   (declare (type functional functional)
 	   (type function *error-function*)
 	   (string where))
-  (unless (function-type-p type) (return-from assert-definition-type t))
+  (unless (fun-type-p type)
+    (return-from assert-definition-type t))
   (let ((*lossage-detected* nil))
     (multiple-value-bind (vars types)
-	(if (function-type-wild-args type)
+	(if (fun-type-wild-args type)
 	    (values nil nil)
 	    (etypecase functional
 	      (optional-dispatch
 	       (find-optional-dispatch-types functional type where))
 	      (clambda
 	       (find-lambda-types functional type where))))
-      (let* ((type-returns (function-type-returns type))
+      (let* ((type-returns (fun-type-returns type))
 	     (return (lambda-return (main-entry functional)))
 	     (atype (when return
 		      (continuation-asserted-type (return-result return)))))

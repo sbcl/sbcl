@@ -344,10 +344,10 @@ sigtrap_handler(int signal, siginfo_t *siginfo, os_context_t *context)
 	handle_breakpoint(signal, siginfo, context);
 	break;
 
-      case trap_FunctionEndBreakpoint:
+      case trap_FunEndBreakpoint:
         *os_context_pc_addr(context) -=4;
 	*os_context_pc_addr(context) =
-	    (int)handle_function_end_breakpoint(signal, siginfo, context);
+	    (int)handle_fun_end_breakpoint(signal, siginfo, context);
 	break;
 
       default:

@@ -64,8 +64,10 @@
       (make-effective-method-function-internal generic-function form
 					       method-alist-p wrappers-p)))
 
-(defun make-effective-method-function-type (generic-function form
-					    method-alist-p wrappers-p)
+(defun make-effective-method-fun-type (generic-function
+				       form
+				       method-alist-p
+				       wrappers-p)
   (if (and (listp form)
 	   (eq (car form) 'call-method))
       (let* ((cm-args (cdr form))
@@ -86,7 +88,7 @@
 			  'fast-method-call
 			  'method-call))))
 	      (if (and (consp method) (eq (car method) 'make-method))
-		  (make-effective-method-function-type
+		  (make-effective-method-fun-type
 		   generic-function (cadr method) method-alist-p wrappers-p)
 		  (type-of method)))))
       'fast-method-call))
@@ -186,7 +188,7 @@
 
 (defun memf-test-converter (form generic-function method-alist-p wrappers-p)
   (cond ((and (consp form) (eq (car form) 'call-method))
-	 (case (make-effective-method-function-type
+	 (case (make-effective-method-fun-type
 		generic-function form method-alist-p wrappers-p)
 	   (fast-method-call
 	    '.fast-call-method.)
@@ -195,7 +197,7 @@
 	((and (consp form) (eq (car form) 'call-method-list))
 	 (case (if (every #'(lambda (form)
 			      (eq 'fast-method-call
-				  (make-effective-method-function-type
+				  (make-effective-method-fun-type
 				   generic-function form
 				   method-alist-p wrappers-p)))
 			  (cdr form))
@@ -213,14 +215,14 @@
   (cond ((and (consp form) (eq (car form) 'call-method))
 	 (let ((gensym (get-effective-method-gensym)))
 	   (values (make-emf-call metatypes applyp gensym
-				  (make-effective-method-function-type
+				  (make-effective-method-fun-type
 				   generic-function form method-alist-p wrappers-p))
 		   (list gensym))))
 	((and (consp form) (eq (car form) 'call-method-list))
 	 (let ((gensym (get-effective-method-gensym))
 	       (type (if (every #'(lambda (form)
 				    (eq 'fast-method-call
-					(make-effective-method-function-type
+					(make-effective-method-fun-type
 					 generic-function form
 					 method-alist-p wrappers-p)))
 				(cdr form))

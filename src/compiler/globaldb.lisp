@@ -1022,7 +1022,7 @@
   :default
   #+sb-xc-host (specifier-type 'function)
   #-sb-xc-host (if (fboundp name)
-		   (extract-function-type (fdefinition name))
+		   (extract-fun-type (fdefinition name))
 		   (specifier-type 'function)))
 
 ;;; the ASSUMED-TYPE for this function, if we have to infer the type
@@ -1031,7 +1031,7 @@
   :class :function
   :type :assumed-type
   ;; FIXME: The type-spec really should be
-  ;;   (or approximate-function-type null)).
+  ;;   (or approximate-fun-type null)).
   ;; It was changed to T as a hopefully-temporary hack while getting
   ;; cold init problems untangled.
   :type-spec t) 

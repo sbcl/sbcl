@@ -71,7 +71,7 @@
 	(ecase where
 	  (:assumed
 	   (let ((approx-type (info :function :assumed-type name)))
-	     (when (and approx-type (function-type-p defined-ftype))
+	     (when (and approx-type (fun-type-p defined-ftype))
 	       (valid-approximate-type approx-type defined-ftype))
 	     (setf (info :function :type name) defined-ftype)
 	     (setf (info :function :assumed-type name) nil))

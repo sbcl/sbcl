@@ -85,7 +85,7 @@ void arch_skip_instruction(os_context_t *context)
 	    break;
 
 	case trap_Breakpoint:		/* not tested */
-	case trap_FunctionEndBreakpoint: /* not tested */
+	case trap_FunEndBreakpoint: /* not tested */
 	    break;
 
 	case trap_PendingInterrupt:
@@ -249,10 +249,10 @@ sigtrap_handler(int signal, siginfo_t *info, void *void_context)
 	handle_breakpoint(signal, info, context);
 	break;
 
-    case trap_FunctionEndBreakpoint:
+    case trap_FunEndBreakpoint:
 	(char*)(*os_context_pc_addr(context)) -= 1;
 	*os_context_pc_addr(context) =
-	    (int)handle_function_end_breakpoint(signal, info, context);
+	    (int)handle_fun_end_breakpoint(signal, info, context);
 	break;
 
     default:

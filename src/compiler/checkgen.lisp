@@ -114,7 +114,7 @@
   (declare (type ctype type))
   (multiple-value-bind (res count) (values-types type)
     (values (mapcar #'(lambda (type)
-			(if (function-type-p type)
+			(if (fun-type-p type)
 			    (specifier-type 'function)
 			    type))
 		    res)
@@ -301,7 +301,7 @@
     `(multiple-value-bind ,temps 'dummy
        ,@(mapcar #'(lambda (temp type)
 		     (let* ((spec
-			     (let ((*unparse-function-type-simplify* t))
+			     (let ((*unparse-fun-type-simplify* t))
 			       (type-specifier (second type))))
 			    (test (if (first type) `(not ,spec) spec)))
 		       `(unless (typep ,temp ',test)

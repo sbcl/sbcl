@@ -62,7 +62,7 @@
 ;;; against DECLAIMed FTYPEs blew up when an FTYPE was DECLAIMed
 ;;; to be pure FUNCTION, because the internal representation of
 ;;; FUNCTION itself (as opposed to subtypes of FUNCTION, such as
-;;; (FUNCTION () T)) is a BUILT-IN-CLASS object, not a FUNCTION-TYPE
+;;; (FUNCTION () T)) is a BUILT-IN-CLASS object, not a FUN-TYPE
 ;;; object.
 (declaim (ftype function i-am-just-a-function))
 (defun i-am-just-a-function (x y) (+ x y 1))

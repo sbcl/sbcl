@@ -1114,8 +1114,8 @@
     (values
      (fasl-dump-load-time-value-lambda lambda *compile-object*)
      (let ((type (leaf-type lambda)))
-       (if (function-type-p type)
-	   (single-value-type (function-type-returns type))
+       (if (fun-type-p type)
+	   (single-value-type (fun-type-returns type))
 	   *wild-type*)))))
 
 ;;; Compile the FORMS and arrange for them to be called (for effect,

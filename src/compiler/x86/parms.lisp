@@ -190,7 +190,7 @@
   error
   cerror
   breakpoint
-  function-end-breakpoint
+  fun-end-breakpoint
   single-step-breakpoint)
 ;;; FIXME: It'd be nice to replace all the DEFENUMs with something like
 ;;;   (WITH-DEF-ENUM (:START 8)

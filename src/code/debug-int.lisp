@@ -302,7 +302,7 @@
   (compiler-debug-fun nil :type sb!c::compiled-debug-fun)
   ;; code object (unexported).
   component
-  ;; the :FUNCTION-START breakpoint (if any) used to facilitate
+  ;; the :FUN-START breakpoint (if any) used to facilitate
   ;; function end breakpoints
   (end-starter nil :type (or null breakpoint)))
 
@@ -395,17 +395,17 @@
 		       (:copier nil))
   ;; This is the function invoked when execution encounters the
   ;; breakpoint. It takes a frame, the breakpoint, and optionally a
-  ;; list of values. Values are supplied for :FUNCTION-END breakpoints
+  ;; list of values. Values are supplied for :FUN-END breakpoints
   ;; as values to return for the function containing the breakpoint.
-  ;; :FUNCTION-END breakpoint hook-functions also take a cookie
+  ;; :FUN-END breakpoint hook-functions also take a cookie
   ;; argument. See COOKIE-FUN slot.
   (hook-function nil :type function)
   ;; CODE-LOCATION or DEBUG-FUN
   (what nil :type (or code-location debug-fun))
-  ;; :CODE-LOCATION, :FUNCTION-START, or :FUNCTION-END for that kind
+  ;; :CODE-LOCATION, :FUN-START, or :FUN-END for that kind
   ;; of breakpoint. :UNKNOWN-RETURN-PARTNER if this is the partner of
   ;; a :code-location breakpoint at an :UNKNOWN-RETURN code-location.
-  (kind nil :type (member :code-location :function-start :function-end
+  (kind nil :type (member :code-location :fun-start :fun-end
 			  :unknown-return-partner))
   ;; Status helps the user and the implementation.
   (status :inactive :type (member :active :inactive :deleted))
@@ -417,7 +417,7 @@
   ;; breakpoint for the other one, or NIL if this isn't at an
   ;; :UNKNOWN-RETURN code location.
   (unknown-return-partner nil :type (or null breakpoint))
-  ;; :FUNCTION-END breakpoints use a breakpoint at the :FUNCTION-START
+  ;; :FUN-END breakpoints use a breakpoint at the :FUN-START
   ;; to establish the end breakpoint upon function entry. We do this
   ;; by frobbing the LRA to jump to a special piece of code that
   ;; breaks and provides the return values for the returnee. This slot
@@ -425,8 +425,8 @@
   ;; and delete it.
   (start-helper nil :type (or null breakpoint))
   ;; This is a hook users supply to get a dynamically unique cookie
-  ;; for identifying :FUNCTION-END breakpoint executions. That is, if
-  ;; there is one :FUNCTION-END breakpoint, but there may be multiple
+  ;; for identifying :FUN-END breakpoint executions. That is, if
+  ;; there is one :FUN-END breakpoint, but there may be multiple
   ;; pending calls of its function on the stack. This function takes
   ;; the cookie, and the hook-function takes the cookie too.
   (cookie-fun nil :type (or null function))
@@ -504,8 +504,8 @@
 ;;;; frames
 
 ;;; This is used in FIND-ESCAPED-FRAME and with the bogus components
-;;; and LRAs used for :function-end breakpoints. When a components
-;;; debug-info slot is :bogus-lra, then the real-lra-slot contains the
+;;; and LRAs used for :FUN-END breakpoints. When a components
+;;; debug-info slot is :BOGUS-LRA, then the REAL-LRA-SLOT contains the
 ;;; real component to continue executing, as opposed to the bogus
 ;;; component which appeared in some frame's LRA location.
 (defconstant real-lra-slot sb!vm:code-constants-offset)
@@ -2752,30 +2752,30 @@
 ;;;
 ;;; WHAT and KIND determine where in a function the system invokes
 ;;; HOOK-FUNCTION. WHAT is either a code-location or a DEBUG-FUN.
-;;; KIND is one of :CODE-LOCATION, :FUNCTION-START, or :FUNCTION-END.
+;;; KIND is one of :CODE-LOCATION, :FUN-START, or :FUN-END.
 ;;; Since the starts and ends of functions may not have code-locations
 ;;; representing them, designate these places by supplying WHAT as a
-;;; DEBUG-FUN and KIND indicating the :FUNCTION-START or
-;;; :FUNCTION-END. When WHAT is a DEBUG-FUN and kind is
-;;; :FUNCTION-END, then hook-function must take two additional
+;;; DEBUG-FUN and KIND indicating the :FUN-START or
+;;; :FUN-END. When WHAT is a DEBUG-FUN and kind is
+;;; :FUN-END, then hook-function must take two additional
 ;;; arguments, a list of values returned by the function and a
-;;; FUNCTION-END-COOKIE.
+;;; FUN-END-COOKIE.
 ;;;
 ;;; INFO is information supplied by and used by the user.
 ;;;
-;;; FUNCTION-END-COOKIE is a function. To implement :FUNCTION-END
+;;; FUN-END-COOKIE is a function. To implement :FUN-END
 ;;; breakpoints, the system uses starter breakpoints to establish the
-;;; :FUNCTION-END breakpoint for each invocation of the function. Upon
+;;; :FUN-END breakpoint for each invocation of the function. Upon
 ;;; each entry, the system creates a unique cookie to identify the
 ;;; invocation, and when the user supplies a function for this
 ;;; argument, the system invokes it on the frame and the cookie. The
-;;; system later invokes the :FUNCTION-END breakpoint hook on the same
+;;; system later invokes the :FUN-END breakpoint hook on the same
 ;;; cookie. The user may save the cookie for comparison in the hook
 ;;; function.
 ;;;
 ;;; Signal an error if WHAT is an unknown code-location.
 (defun make-breakpoint (hook-function what
-			&key (kind :code-location) info function-end-cookie)
+			&key (kind :code-location) info fun-end-cookie)
   (etypecase what
     (code-location
      (when (code-location-unknown-p what)
@@ -2799,55 +2799,55 @@
        bpt))
     (compiled-debug-fun
      (ecase kind
-       (:function-start
+       (:fun-start
 	(%make-breakpoint hook-function what kind info))
-       (:function-end
+       (:fun-end
 	(unless (eq (sb!c::compiled-debug-fun-returns
 		     (compiled-debug-fun-compiler-debug-fun what))
 		    :standard)
-	  (error ":FUNCTION-END breakpoints are currently unsupported ~
+	  (error ":FUN-END breakpoints are currently unsupported ~
 		  for the known return convention."))
 
 	(let* ((bpt (%make-breakpoint hook-function what kind info))
 	       (starter (compiled-debug-fun-end-starter what)))
 	  (unless starter
-	    (setf starter (%make-breakpoint #'list what :function-start nil))
+	    (setf starter (%make-breakpoint #'list what :fun-start nil))
 	    (setf (breakpoint-hook-function starter)
-		  (function-end-starter-hook starter what))
+		  (fun-end-starter-hook starter what))
 	    (setf (compiled-debug-fun-end-starter what) starter))
 	  (setf (breakpoint-start-helper bpt) starter)
 	  (push bpt (breakpoint-%info starter))
-	  (setf (breakpoint-cookie-fun bpt) function-end-cookie)
+	  (setf (breakpoint-cookie-fun bpt) fun-end-cookie)
 	  bpt))))))
 
 ;;; These are unique objects created upon entry into a function by a
-;;; :FUNCTION-END breakpoint's starter hook. These are only created
-;;; when users supply :FUNCTION-END-COOKIE to MAKE-BREAKPOINT. Also,
-;;; the :FUNCTION-END breakpoint's hook is called on the same cookie
+;;; :FUN-END breakpoint's starter hook. These are only created
+;;; when users supply :FUN-END-COOKIE to MAKE-BREAKPOINT. Also,
+;;; the :FUN-END breakpoint's hook is called on the same cookie
 ;;; when it is created.
-(defstruct (function-end-cookie
+(defstruct (fun-end-cookie
 	    (:print-object (lambda (obj str)
 			     (print-unreadable-object (obj str :type t))))
-	    (:constructor make-function-end-cookie (bogus-lra debug-fun))
+	    (:constructor make-fun-end-cookie (bogus-lra debug-fun))
 	    (:copier nil))
-  ;; a pointer to the bogus-lra created for :FUNCTION-END breakpoints
+  ;; a pointer to the bogus-lra created for :FUN-END breakpoints
   bogus-lra
   ;; the DEBUG-FUN associated with this cookie
   debug-fun)
 
 ;;; This maps bogus-lra-components to cookies, so that
-;;; HANDLE-FUNCTION-END-BREAKPOINT can find the appropriate cookie for the
+;;; HANDLE-FUN-END-BREAKPOINT can find the appropriate cookie for the
 ;;; breakpoint hook.
-(defvar *function-end-cookies* (make-hash-table :test 'eq))
+(defvar *fun-end-cookies* (make-hash-table :test 'eq))
 
 ;;; This returns a hook function for the start helper breakpoint
-;;; associated with a :FUNCTION-END breakpoint. The returned function
+;;; associated with a :FUN-END breakpoint. The returned function
 ;;; makes a fake LRA that all returns go through, and this piece of
 ;;; fake code actually breaks. Upon return from the break, the code
 ;;; provides the returnee with any values. Since the returned function
 ;;; effectively activates FUN-END-BPT on each entry to DEBUG-FUN's
 ;;; function, we must establish breakpoint-data about FUN-END-BPT.
-(defun function-end-starter-hook (starter-bpt debug-fun)
+(defun fun-end-starter-hook (starter-bpt debug-fun)
   (declare (type breakpoint starter-bpt)
 	   (type compiled-debug-fun debug-fun))
   #'(lambda (frame breakpoint)
@@ -2870,27 +2870,27 @@
 	      (setf (breakpoint-data-breakpoints data) end-bpts)
 	      (dolist (bpt end-bpts)
 		(setf (breakpoint-internal-data bpt) data)))
-	    (let ((cookie (make-function-end-cookie lra debug-fun)))
-	      (setf (gethash component *function-end-cookies*) cookie)
+	    (let ((cookie (make-fun-end-cookie lra debug-fun)))
+	      (setf (gethash component *fun-end-cookies*) cookie)
 	      (dolist (bpt end-bpts)
 		(let ((fun (breakpoint-cookie-fun bpt)))
 		  (when fun (funcall fun frame cookie))))))))))
 
-;;; This takes a FUNCTION-END-COOKIE and a frame, and it returns
+;;; This takes a FUN-END-COOKIE and a frame, and it returns
 ;;; whether the cookie is still valid. A cookie becomes invalid when
 ;;; the frame that established the cookie has exited. Sometimes cookie
 ;;; holders are unaware of cookie invalidation because their
-;;; :FUNCTION-END breakpoint hooks didn't run due to THROW'ing.
+;;; :FUN-END breakpoint hooks didn't run due to THROW'ing.
 ;;;
 ;;; This takes a frame as an efficiency hack since the user probably
 ;;; has a frame object in hand when using this routine, and it saves
 ;;; repeated parsing of the stack and consing when asking whether a
 ;;; series of cookies is valid.
-(defun function-end-cookie-valid-p (frame cookie)
-  (let ((lra (function-end-cookie-bogus-lra cookie))
+(defun fun-end-cookie-valid-p (frame cookie)
+  (let ((lra (fun-end-cookie-bogus-lra cookie))
 	(lra-sc-offset (sb!c::compiled-debug-fun-return-pc
 			(compiled-debug-fun-compiler-debug-fun
-			 (function-end-cookie-debug-fun cookie)))))
+			 (fun-end-cookie-debug-fun cookie)))))
     (do ((frame frame (frame-down frame)))
 	((not frame) nil)
       (when (and (compiled-frame-p frame)
@@ -2922,20 +2922,20 @@
 	   ;; (There used to be more cases back before sbcl-0.7.0, when
 	   ;; we did special tricks to debug the IR1 interpreter.)
 	   )))
-      (:function-start
+      (:fun-start
        (etypecase (breakpoint-what breakpoint)
 	 (compiled-debug-fun
-	  (activate-compiled-function-start-breakpoint breakpoint))
+	  (activate-compiled-fun-start-breakpoint breakpoint))
 	 ;; (There used to be more cases back before sbcl-0.7.0, when
 	 ;; we did special tricks to debug the IR1 interpreter.)
 	 ))
-      (:function-end
+      (:fun-end
        (etypecase (breakpoint-what breakpoint)
 	 (compiled-debug-fun
 	  (let ((starter (breakpoint-start-helper breakpoint)))
 	    (unless (eq (breakpoint-status starter) :active)
-	      ;; may already be active by some other :FUNCTION-END breakpoint
-	      (activate-compiled-function-start-breakpoint starter)))
+	      ;; may already be active by some other :FUN-END breakpoint
+	      (activate-compiled-fun-start-breakpoint starter)))
 	  (setf (breakpoint-status breakpoint) :active))
 	 ;; (There used to be more cases back before sbcl-0.7.0, when
 	 ;; we did special tricks to debug the IR1 interpreter.)
@@ -2958,7 +2958,7 @@
 			     sb!vm:single-value-return-byte-offset
 			     0))))))
 
-(defun activate-compiled-function-start-breakpoint (breakpoint)
+(defun activate-compiled-fun-start-breakpoint (breakpoint)
   (declare (type breakpoint breakpoint))
   (let ((debug-fun (breakpoint-what breakpoint)))
     (sub-activate-breakpoint
@@ -3002,7 +3002,7 @@
   breakpoint)
 
 (defun deactivate-compiled-breakpoint (breakpoint)
-  (if (eq (breakpoint-kind breakpoint) :function-end)
+  (if (eq (breakpoint-kind breakpoint) :fun-end)
       (let ((starter (breakpoint-start-helper breakpoint)))
 	(unless (find-if #'(lambda (bpt)
 			     (and (not (eq bpt breakpoint))
@@ -3054,7 +3054,7 @@
       (let ((other (breakpoint-unknown-return-partner breakpoint)))
 	(when other
 	  (setf (breakpoint-status other) :deleted)))
-      (when (eq (breakpoint-kind breakpoint) :function-end)
+      (when (eq (breakpoint-kind breakpoint) :fun-end)
 	(let* ((starter (breakpoint-start-helper breakpoint))
 	       (breakpoints (delete breakpoint
 				    (the list (breakpoint-info starter)))))
@@ -3134,20 +3134,20 @@
 	      offset))
     (let ((breakpoints (breakpoint-data-breakpoints data)))
       (if (or (null breakpoints)
-	      (eq (breakpoint-kind (car breakpoints)) :function-end))
-	  (handle-function-end-breakpoint-aux breakpoints data signal-context)
+	      (eq (breakpoint-kind (car breakpoints)) :fun-end))
+	  (handle-fun-end-breakpoint-aux breakpoints data signal-context)
 	  (handle-breakpoint-aux breakpoints data
 				 offset component signal-context)))))
 
 ;;; This holds breakpoint-datas while invoking the breakpoint hooks
 ;;; associated with that particular component and location. While they
 ;;; are executing, if we hit the location again, we ignore the
-;;; breakpoint to avoid infinite recursion. Function-end breakpoints
+;;; breakpoint to avoid infinite recursion. fun-end breakpoints
 ;;; must work differently since the breakpoint-data is unique for each
 ;;; invocation.
 (defvar *executing-breakpoint-hooks* nil)
 
-;;; This handles code-location and DEBUG-FUN :FUNCTION-START
+;;; This handles code-location and DEBUG-FUN :FUN-START
 ;;; breakpoints.
 (defun handle-breakpoint-aux (breakpoints data offset component signal-context)
   (/show0 "entering HANDLE-BREAKPOINT-AUX")
@@ -3194,8 +3194,8 @@
 		   (breakpoint-unknown-return-partner bpt)
 		   bpt)))))
 
-(defun handle-function-end-breakpoint (offset component context)
-  (/show0 "entering HANDLE-FUNCTION-END-BREAKPOINT")
+(defun handle-fun-end-breakpoint (offset component context)
+  (/show0 "entering HANDLE-FUN-END-BREAKPOINT")
   (let ((data (breakpoint-data component offset nil)))
     (unless data
       (error "unknown breakpoint in ~S at offset ~S"
@@ -3203,14 +3203,14 @@
 	      offset))
     (let ((breakpoints (breakpoint-data-breakpoints data)))
       (when breakpoints
-	(aver (eq (breakpoint-kind (car breakpoints)) :function-end))
-	(handle-function-end-breakpoint-aux breakpoints data context)))))
+	(aver (eq (breakpoint-kind (car breakpoints)) :fun-end))
+	(handle-fun-end-breakpoint-aux breakpoints data context)))))
 
-;;; Either HANDLE-BREAKPOINT calls this for :FUNCTION-END breakpoints
-;;; [old C code] or HANDLE-FUNCTION-END-BREAKPOINT calls this directly
+;;; Either HANDLE-BREAKPOINT calls this for :FUN-END breakpoints
+;;; [old C code] or HANDLE-FUN-END-BREAKPOINT calls this directly
 ;;; [new C code].
-(defun handle-function-end-breakpoint-aux (breakpoints data signal-context)
-  (/show0 "entering HANDLE-FUNCTION-END-BREAKPOINT-AUX")
+(defun handle-fun-end-breakpoint-aux (breakpoints data signal-context)
+  (/show0 "entering HANDLE-FUN-END-BREAKPOINT-AUX")
   (delete-breakpoint-data data)
   (let* ((scp
 	  (locally
@@ -3221,15 +3221,15 @@
 		    ((= cfp (sap-int (frame-pointer f))) f)
 		  (declare (type (unsigned-byte #.sb!vm:word-bits) cfp))))
 	 (component (breakpoint-data-component data))
-	 (cookie (gethash component *function-end-cookies*)))
-    (remhash component *function-end-cookies*)
+	 (cookie (gethash component *fun-end-cookies*)))
+    (remhash component *fun-end-cookies*)
     (dolist (bpt breakpoints)
       (funcall (breakpoint-hook-function bpt)
 	       frame bpt
-	       (get-function-end-breakpoint-values scp)
+	       (get-fun-end-breakpoint-values scp)
 	       cookie))))
 
-(defun get-function-end-breakpoint-values (scp)
+(defun get-fun-end-breakpoint-values (scp)
   (let ((ocfp (int-sap (sb!vm:context-register
 			scp
 			#!-x86 sb!vm::ocfp-offset
@@ -3247,7 +3247,7 @@
 	     results)))
     (nreverse results)))
 
-;;;; MAKE-BOGUS-LRA (used for :FUNCTION-END breakpoints)
+;;;; MAKE-BOGUS-LRA (used for :FUN-END breakpoints)
 
 (defconstant bogus-lra-constants
   #!-x86 2 #!+x86 3)
@@ -3261,9 +3261,9 @@
 ;;; instruction.
 (defun make-bogus-lra (real-lra &optional known-return-p)
   (without-gcing
-   (let* ((src-start (foreign-symbol-address "function_end_breakpoint_guts"))
-	  (src-end (foreign-symbol-address "function_end_breakpoint_end"))
-	  (trap-loc (foreign-symbol-address "function_end_breakpoint_trap"))
+   (let* ((src-start (foreign-symbol-address "fun_end_breakpoint_guts"))
+	  (src-end (foreign-symbol-address "fun_end_breakpoint_end"))
+	  (trap-loc (foreign-symbol-address "fun_end_breakpoint_trap"))
 	  (length (sap- src-end src-start))
 	  (code-object
 	   (%primitive

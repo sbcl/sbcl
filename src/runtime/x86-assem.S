@@ -290,12 +290,12 @@ GNAME(closure_tramp):
 	.size	GNAME(closure_tramp), .-GNAME(closure_tramp)
 
 /*
- * function-end breakpoint magic
+ * fun-end breakpoint magic
  */
 	.text
-	.global	GNAME(function_end_breakpoint_guts)
+	.global	GNAME(fun_end_breakpoint_guts)
 	.align	align_4byte
-GNAME(function_end_breakpoint_guts):
+GNAME(fun_end_breakpoint_guts):
 	/* Multiple Value return */
 	jmp	multiple_value_return
 	/* Single value return: The eventual return will now use the
@@ -309,14 +309,14 @@ GNAME(function_end_breakpoint_guts):
 		
 multiple_value_return:
 	
-	.global GNAME(function_end_breakpoint_trap)
-GNAME(function_end_breakpoint_trap):
+	.global GNAME(fun_end_breakpoint_trap)
+GNAME(fun_end_breakpoint_trap):
 	int3
-	.byte 	trap_FunctionEndBreakpoint
+	.byte 	trap_FunEndBreakpoint
 	hlt			# We should never return here.
 
-	.global GNAME(function_end_breakpoint_end)
-GNAME(function_end_breakpoint_end):
+	.global GNAME(fun_end_breakpoint_end)
+GNAME(fun_end_breakpoint_end):
 
 
 	.global	GNAME(do_pending_interrupt)

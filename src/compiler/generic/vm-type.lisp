@@ -176,7 +176,7 @@
 	   ((type= type (specifier-type '(unsigned-byte 32)))
 	    'sb!c:check-unsigned-byte-32)
 	   (t nil)))
-    (function-type
+    (fun-type
      'sb!c:check-function)
     (t
      nil)))

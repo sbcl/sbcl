@@ -173,8 +173,8 @@ void handle_breakpoint(int signal, siginfo_t* info, os_context_t *context)
 #endif
 
 #ifndef __i386__
-void *handle_function_end_breakpoint(int signal, siginfo_t *info,
-				     os_context_t *context)
+void *handle_fun_end_breakpoint(int signal, siginfo_t *info,
+				os_context_t *context)
 {
     lispobj code, lra;
     struct code *codeptr;
@@ -199,8 +199,8 @@ void *handle_function_end_breakpoint(int signal, siginfo_t *info,
     return (void *)(lra-type_OtherPointer+sizeof(lispobj));
 }
 #else
-void *handle_function_end_breakpoint(int signal, siginfo_t *info,
-				     os_context_t *context)
+void *handle_fun_end_breakpoint(int signal, siginfo_t *info,
+				os_context_t *context)
 {
     lispobj code, context_sap = alloc_sap(context);
     struct code *codeptr;

@@ -376,7 +376,7 @@
 	    (part-of list))
 	   (t
 	    (any))))
-	(function-type
+	(fun-type
 	 (exactly function))
 	(sb!xc:class
 	 (if (csubtypep type (specifier-type 'function))

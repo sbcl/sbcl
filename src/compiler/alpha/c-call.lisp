@@ -100,13 +100,13 @@
 (!def-vm-support-routine make-call-out-tns (type)
   (let ((arg-state (make-arg-state)))
     (collect ((arg-tns))
-      (dolist (arg-type (alien-function-type-arg-types type))
+      (dolist (arg-type (alien-fun-type-arg-types type))
 	(arg-tns (invoke-alien-type-method :arg-tn arg-type arg-state)))
       (values (my-make-wired-tn 'positive-fixnum 'any-reg nsp-offset)
 	      (* (max (arg-state-stack-frame-size arg-state) 4) word-bytes)
 	      (arg-tns)
 	      (invoke-alien-type-method :result-tn
-					(alien-function-type-result-type type)
+					(alien-fun-type-result-type type)
 					nil)))))
 
 (define-vop (foreign-symbol-address)

@@ -70,8 +70,8 @@
   (%function-name func))
 
 ;;; Extract the type from the function header FUNC.
-(defun %function-type (func)
-  (%function-type func))
+(defun %fun-type (func)
+  (%fun-type func))
 
 ;;; Extract the function from CLOSURE.
 (defun %closure-function (closure)

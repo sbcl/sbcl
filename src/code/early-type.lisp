@@ -134,12 +134,12 @@
 
 (!define-type-class values)
 
-(defstruct (function-type
-	    (:include args-type
-		      (class-info (type-class-or-lose 'function))))
-  ;; True if the arguments are unrestrictive, i.e. *.
+;;; (SPECIFIER-TYPE 'FUNCTION) and its subtypes
+(defstruct (fun-type (:include args-type
+			       (class-info (type-class-or-lose 'function))))
+  ;; true if the arguments are unrestrictive, i.e. *
   (wild-args nil :type boolean)
-  ;; Type describing the return values. This is a values type
+  ;; type describing the return values. This is a values type
   ;; when multiple values were specified for the return.
   (returns (required-argument) :type ctype))
 

@@ -1063,36 +1063,36 @@
        (record-fields-match (alien-record-type-fields type1)
 			    (alien-record-type-fields type2) 0)))
 
-;;;; the FUNCTION and VALUES types
+;;;; the FUNCTION and VALUES alien types
 
 (defvar *values-type-okay* nil)
 
-(def-alien-type-class (function :include mem-block)
+(def-alien-type-class (fun :include mem-block)
   (result-type (required-argument) :type alien-type)
   (arg-types (required-argument) :type list)
   (stub nil :type (or null function)))
 
 (def-alien-type-translator function (result-type &rest arg-types
 						 &environment env)
-  (make-alien-function-type
+  (make-alien-fun-type
    :result-type (let ((*values-type-okay* t))
 		  (parse-alien-type result-type env))
    :arg-types (mapcar (lambda (arg-type) (parse-alien-type arg-type env))
 		      arg-types)))
 
-(def-alien-type-method (function :unparse) (type)
-  `(function ,(%unparse-alien-type (alien-function-type-result-type type))
+(def-alien-type-method (fun :unparse) (type)
+  `(function ,(%unparse-alien-type (alien-fun-type-result-type type))
 	     ,@(mapcar #'%unparse-alien-type
-		       (alien-function-type-arg-types type))))
+		       (alien-fun-type-arg-types type))))
 
-(def-alien-type-method (function :type=) (type1 type2)
-  (and (alien-type-= (alien-function-type-result-type type1)
-		     (alien-function-type-result-type type2))
-       (= (length (alien-function-type-arg-types type1))
-	  (length (alien-function-type-arg-types type2)))
+(def-alien-type-method (fun :type=) (type1 type2)
+  (and (alien-type-= (alien-fun-type-result-type type1)
+		     (alien-fun-type-result-type type2))
+       (= (length (alien-fun-type-arg-types type1))
+	  (length (alien-fun-type-arg-types type2)))
        (every #'alien-type-=
-	      (alien-function-type-arg-types type1)
-	      (alien-function-type-arg-types type2))))
+	      (alien-fun-type-arg-types type1)
+	      (alien-fun-type-arg-types type2))))
 
 (def-alien-type-class (values)
   (values (required-argument) :type list))

@@ -1140,7 +1140,7 @@
   ;; section at all? Is it because all the FDEFINITION stuff gets in
   ;; the way of reading function values and is too hairy to rely on at
   ;; cold boot? FIXME: Most of these are in *STATIC-SYMBOLS* in
-  ;; parms.lisp, but %HANDLE-FUNCTION-END-BREAKPOINT is not. Why?
+  ;; parms.lisp, but %HANDLE-FUN-END-BREAKPOINT is not. Why?
   ;; Explain.
   (macrolet ((frob (symbol)
 	       `(cold-set ',symbol
@@ -1148,7 +1148,7 @@
     (frob maybe-gc)
     (frob internal-error)
     (frob sb!di::handle-breakpoint)
-    (frob sb!di::handle-function-end-breakpoint))
+    (frob sb!di::handle-fun-end-breakpoint))
 
   (cold-set '*current-catch-block*          (make-fixnum-descriptor 0))
   (cold-set '*current-unwind-protect-block* (make-fixnum-descriptor 0))

@@ -495,11 +495,11 @@
 	   (optimize (inhibit-warnings 3)))
   (if (or (alien-pointer-type-p target-type)
 	  (alien-array-type-p target-type)
-	  (alien-function-type-p target-type))
+	  (alien-fun-type-p target-type))
       (let ((alien-type (alien-value-type alien)))
 	(if (or (alien-pointer-type-p alien-type)
 		(alien-array-type-p alien-type)
-		(alien-function-type-p alien-type))
+		(alien-fun-type-p alien-type))
 	    (naturalize (alien-value-sap alien) target-type)
 	    (error "~S cannot be casted." alien)))
       (error "cannot cast to alien type ~S" (unparse-alien-type target-type))))
@@ -558,14 +558,14 @@
     (typecase type
       (alien-pointer-type
        (apply #'alien-funcall (deref alien) args))
-      (alien-function-type
-       (unless (= (length (alien-function-type-arg-types type))
+      (alien-fun-type
+       (unless (= (length (alien-fun-type-arg-types type))
 		  (length args))
 	 (error "wrong number of arguments for ~S~%expected ~D, got ~D"
 		type
-		(length (alien-function-type-arg-types type))
+		(length (alien-fun-type-arg-types type))
 		(length args)))
-       (let ((stub (alien-function-type-stub type)))
+       (let ((stub (alien-fun-type-stub type)))
 	 (unless stub
 	   (setf stub
 		 (let ((fun (gensym))
@@ -574,7 +574,7 @@
 			    `(lambda (,fun ,@parms)
 			       (declare (type (alien ,type) ,fun))
 			       (alien-funcall ,fun ,@parms)))))
-	   (setf (alien-function-type-stub type) stub))
+	   (setf (alien-fun-type-stub type) stub))
 	 (apply stub alien args)))
       (t
        (error "~S is not an alien function." alien)))))

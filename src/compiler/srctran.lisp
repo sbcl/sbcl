@@ -43,7 +43,7 @@
 (deftransform complement ((fun) * * :node node :when :both)
   "open code"
   (multiple-value-bind (min max)
-      (function-type-nargs (continuation-type fun))
+      (fun-type-nargs (continuation-type fun))
     (cond
      ((and min (eql min max))
       (let ((dums (make-gensym-list min)))

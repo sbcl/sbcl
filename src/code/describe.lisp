@@ -179,7 +179,7 @@
   (let ((name (or name (%function-name x))))
     (%describe-doc name s 'function kind)
     (unless (eq kind :macro)
-      (%describe-function-name name s (%function-type x))))
+      (%describe-function-name name s (%fun-type x))))
   (%describe-compiled-from (sb-kernel:function-code-header x) s))
 
 ;;; Describe a function with the specified kind and name. The latter

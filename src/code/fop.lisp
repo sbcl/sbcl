@@ -651,7 +651,7 @@ bug.~:@>")
       (setf (%code-entry-points code-object) fun)
       (setf (%function-name fun) name)
       (setf (%function-arglist fun) arglist)
-      (setf (%function-type fun) type)
+      (setf (%fun-type fun) type)
       ;; FIXME: See the comment about *LOAD-PRINT* in FOP-EVAL.
       #+nil (when *load-print*
 	      (load-fresh-line)

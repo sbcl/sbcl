@@ -158,7 +158,7 @@
 	  (values (funcall (symbol-function (cadr hairy-spec)) object))))))
     (alien-type-type
      (sb!alien-internals:alien-typep object (alien-type-type-alien-type type)))
-    (function-type
+    (fun-type
      (error "Function types are not a legal argument to TYPEP:~%  ~S"
 	    (type-specifier type)))))
 

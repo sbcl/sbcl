@@ -1119,7 +1119,7 @@
     (delete-ref ref)
     (setf (ref-leaf ref) leaf)
     (let ((ltype (leaf-type leaf)))
-      (if (function-type-p ltype)
+      (if (fun-type-p ltype)
 	  (setf (node-derived-type ref) ltype)
 	  (derive-node-type ref ltype)))
     (reoptimize-continuation (node-cont ref)))

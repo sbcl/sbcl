@@ -1339,15 +1339,15 @@ bootstrapping.
       (analyze-lambda-list lambda-list)
     (declare (ignore keyword-parameters))
     (let* ((old (info :function :type name)) ;FIXME:FDOCUMENTATION instead?
-	   (old-ftype (if (sb-kernel:function-type-p old) old nil))
-	   (old-restp (and old-ftype (sb-kernel:function-type-rest old-ftype)))
+	   (old-ftype (if (sb-kernel:fun-type-p old) old nil))
+	   (old-restp (and old-ftype (sb-kernel:fun-type-rest old-ftype)))
 	   (old-keys (and old-ftype
 			  (mapcar #'sb-kernel:key-info-name
-				  (sb-kernel:function-type-keywords
+				  (sb-kernel:fun-type-keywords
 				   old-ftype))))
-	   (old-keysp (and old-ftype (sb-kernel:function-type-keyp old-ftype)))
+	   (old-keysp (and old-ftype (sb-kernel:fun-type-keyp old-ftype)))
 	   (old-allowp (and old-ftype
-			    (sb-kernel:function-type-allowp old-ftype)))
+			    (sb-kernel:fun-type-allowp old-ftype)))
 	   (keywords (union old-keys (mapcar #'keyword-spec-name keywords))))
       `(function ,(append (make-list nrequired :initial-element t)
 			  (when (plusp noptional)

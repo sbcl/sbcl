@@ -63,7 +63,7 @@
 	      #'ctypep
 	      obj
 	      (compound-type-types type)))
-    (function-type
+    (fun-type
      (values (functionp obj) t))
     (unknown-type
      (values nil nil))
@@ -127,8 +127,8 @@
   (layout-class (layout-of object)))
 
 ;;; Pull the type specifier out of a function object.
-(defun extract-function-type (fun)
-  (specifier-type (%function-type (%closure-function fun))))
+(defun extract-fun-type (fun)
+  (specifier-type (%fun-type (%closure-function fun))))
 
 ;;;; miscellaneous interfaces
 
@@ -160,7 +160,7 @@
     (function
      (if (funcallable-instance-p x)
 	 (sb!xc:class-of x)
-	 (extract-function-type x)))
+	 (extract-fun-type x)))
     (symbol
      (make-member-type :members (list x)))
     (number

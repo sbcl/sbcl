@@ -33,13 +33,13 @@
 (declaim (ftype (function ((or symbol cons)) (values fixnum t)) fun-signature))
 (defun fun-signature (name)
   (let ((type (info :function :type name)))
-    (cond ((not (function-type-p type))
+    (cond ((not (fun-type-p type))
 	   (values 0 t))
 	  (t
-	   (values (length (function-type-required type))
-		   (or (function-type-optional type)
-		       (function-type-keyp type)
-		       (function-type-rest type)))))))
+	   (values (length (fun-type-required type))
+		   (or (fun-type-optional type)
+		       (fun-type-keyp type)
+		       (fun-type-rest type)))))))
 |#
 
 ;;;; global data structures

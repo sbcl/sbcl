@@ -308,11 +308,11 @@ Function and macro commands:
 	       loc-number
 	       (sb!di:debug-fun-name (sb!di:code-location-debug-fun
 				      place))))
-      (:function-start
-       (format t "~&~S: FUNCTION-START in ~S" bp-number
+      (:fun-start
+       (format t "~&~S: FUN-START in ~S" bp-number
 	       (sb!di:debug-fun-name place)))
-      (:function-end
-       (format t "~&~S: FUNCTION-END in ~S" bp-number
+      (:fun-end
+       (format t "~&~S: FUN-END in ~S" bp-number
 	       (sb!di:debug-fun-name place))))))
 
 ;;;; MAIN-HOOK-FUNCTION for steps and breakpoints
@@ -320,7 +320,7 @@ Function and macro commands:
 ;;; This must be passed as the hook function. It keeps track of where
 ;;; STEP breakpoints are.
 (defun main-hook-function (current-frame breakpoint &optional return-vals
-					 function-end-cookie)
+					 fun-end-cookie)
   (setf *default-breakpoint-debug-fun*
 	(sb!di:frame-debug-fun current-frame))
   (dolist (step-info *step-breakpoints*)
@@ -346,7 +346,7 @@ Function and macro commands:
 	     (print-common-info ()
 	       (build-string
 		(with-output-to-string (*standard-output*)
-		  (when function-end-cookie
+		  (when fun-end-cookie
 		    (format t "~%Return values: ~S" return-vals))
 		  (when condition
 		    (when (breakpoint-info-print bp-hit-info)
@@ -417,7 +417,7 @@ Function and macro commands:
        (t
 	(let* ((debug-fun (sb!di:frame-debug-fun *current-frame*))
 	       (bp (sb!di:make-breakpoint #'main-hook-function debug-fun
-					  :kind :function-end)))
+					  :kind :fun-end)))
 	  (sb!di:activate-breakpoint bp)
 	  (push (create-breakpoint-info debug-fun bp 0)
 		*step-breakpoints*))))))))
@@ -1386,12 +1386,12 @@ argument")
     (setf *possible-breakpoints* (possible-breakpoints df)))
   (let ((continue-at (sb!di:frame-code-location *current-frame*)))
     (let ((active (location-in-list *default-breakpoint-debug-fun*
-				    *breakpoints* :function-start))
+				    *breakpoints* :fun-start))
 	  (here (sb!di:code-location=
 		 (sb!di:debug-fun-start-location
 		  *default-breakpoint-debug-fun*) continue-at)))
       (when (or active here)
-	(format t "::FUNCTION-START ")
+	(format t "::FUN-START ")
 	(when active (format t " *Active*"))
 	(when here (format t " *Continue here*"))))
 
@@ -1432,8 +1432,8 @@ argument")
 
     (when (location-in-list *default-breakpoint-debug-fun*
 			    *breakpoints*
-			    :function-end)
-      (format t "~&::FUNCTION-END *Active* "))))
+			    :fun-end)
+      (format t "~&::FUN-END *Active* "))))
 
 (!def-debug-command-alias "LL" "LIST-LOCATIONS")
 
@@ -1470,21 +1470,21 @@ argument")
 		  (setf *possible-breakpoints*
 			(possible-breakpoints
 			 *default-breakpoint-debug-fun*))))))
-	   (setup-function-start ()
+	   (setup-fun-start ()
 	     (let ((code-loc (sb!di:debug-fun-start-location place)))
 	       (setf bp (sb!di:make-breakpoint #'main-hook-function
 					       place
-					       :kind :function-start))
+					       :kind :fun-start))
 	       (setf break (sb!di:preprocess-for-eval break code-loc))
 	       (setf condition (sb!di:preprocess-for-eval condition code-loc))
 	       (dolist (form print)
 		 (push (cons (sb!di:preprocess-for-eval form code-loc) form)
 		       print-functions))))
-	   (setup-function-end ()
+	   (setup-fun-end ()
 	     (setf bp
 		   (sb!di:make-breakpoint #'main-hook-function
 					  place
-					  :kind :function-end))
+					  :kind :fun-end))
 	     (setf break
 		   ;; FIXME: These and any other old (COERCE `(LAMBDA ..) ..)
 		   ;; forms should be converted to shiny new (LAMBDA ..) forms.
@@ -1516,9 +1516,9 @@ argument")
       (set-vars-from-command-line (get-command-line))
       (cond
        ((or (eq index :start) (eq index :s))
-	(setup-function-start))
+	(setup-fun-start))
        ((or (eq index :end) (eq index :e))
-	(setup-function-end))
+	(setup-fun-end))
        (t
 	(setup-code-location)))
       (sb!di:activate-breakpoint bp)

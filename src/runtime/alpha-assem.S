@@ -288,16 +288,16 @@ end_of_tramps:
 
 
 /*
- * Function-end breakpoint magic.
+ * fun-end breakpoint magic.
  */
 
 	.text
 	.align	2
 	.set	noreorder
-	.globl	function_end_breakpoint_guts
-function_end_breakpoint_guts:
+	.globl	fun_end_breakpoint_guts
+fun_end_breakpoint_guts:
 	.long	type_ReturnPcHeader
-	br	zero, function_end_breakpoint_trap
+	br	zero, fun_end_breakpoint_trap
 	nop
 	mov	reg_CSP, reg_OCFP
 	addl	reg_CSP, 4, reg_CSP
@@ -309,13 +309,13 @@ function_end_breakpoint_guts:
 	mov	reg_NULL, reg_A5
 1:
 
-	.globl	function_end_breakpoint_trap
-function_end_breakpoint_trap:
+	.globl	fun_end_breakpoint_trap
+fun_end_breakpoint_trap:
 	call_pal PAL_bugchk
-	.long	trap_FunctionEndBreakpoint
-	br	zero, function_end_breakpoint_trap
+	.long	trap_FunEndBreakpoint
+	br	zero, fun_end_breakpoint_trap
 
-	.globl	function_end_breakpoint_end
-function_end_breakpoint_end:
+	.globl	fun_end_breakpoint_end
+fun_end_breakpoint_end:
 
 

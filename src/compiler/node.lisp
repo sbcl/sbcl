@@ -405,7 +405,7 @@
   ;; optimization of the node failed. The description is an alist
   ;; (TRANSFORM . ARGS), where TRANSFORM is the structure describing
   ;; the transform that failed, and ARGS is either a list of format
-  ;; arguments for the note, or the FUNCTION-TYPE that would have
+  ;; arguments for the note, or the FUN-TYPE that would have
   ;; enabled the transformation but failed to match.
   (failed-optimizations (make-hash-table :test 'eq) :type hash-table)
   ;; This is similar to NEW-FUNCTIONS, but is used when a function has

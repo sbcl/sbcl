@@ -140,7 +140,7 @@
   error
   cerror
   breakpoint
-  function-end-breakpoint
+  fun-end-breakpoint
   single-step-breakpoint)
 
 (defenum (:prefix trace-table-)
@@ -172,7 +172,7 @@
     maybe-gc
     sb!kernel::internal-error
     sb!di::handle-breakpoint
-    sb!di::handle-function-end-breakpoint
+    sb!di::handle-fun-end-breakpoint
 
     ;; free Pointers
     *read-only-space-free-pointer*

@@ -459,7 +459,7 @@
   (let ((target-type (continuation-value target-type)))
     (cond ((or (alien-pointer-type-p target-type)
 	       (alien-array-type-p target-type)
-	       (alien-function-type-p target-type))
+	       (alien-fun-type-p target-type))
 	   `(naturalize (alien-sap alien) ',target-type))
 	  (t
 	   (abort-ir1-transform "cannot cast to alien type ~S" target-type)))))
@@ -602,9 +602,9 @@
       (give-up-ir1-transform "can't tell function type at compile time"))
     (/noshow "entering second DEFTRANSFORM ALIEN-FUNCALL" function)
     (let ((alien-type (alien-type-type-alien-type type)))
-      (unless (alien-function-type-p alien-type)
+      (unless (alien-fun-type-p alien-type)
 	(give-up-ir1-transform))
-      (let ((arg-types (alien-function-type-arg-types alien-type)))
+      (let ((arg-types (alien-fun-type-arg-types alien-type)))
 	(unless (= (length args) (length arg-types))
 	  (abort-ir1-transform
 	   "wrong number of arguments; expected ~D, got ~D"
@@ -615,7 +615,7 @@
 	    (let ((param (gensym)))
 	      (params param)
 	      (deports `(deport ,param ',arg-type))))
-	  (let ((return-type (alien-function-type-result-type alien-type))
+	  (let ((return-type (alien-fun-type-result-type alien-type))
 		(body `(%alien-funcall (deport function ',alien-type)
 				       ',alien-type
 				       ,@(deports))))
@@ -638,11 +638,11 @@
   (unless (constant-continuation-p type)
     (error "Something is broken."))
   (let ((type (continuation-value type)))
-    (unless (alien-function-type-p type)
+    (unless (alien-fun-type-p type)
       (error "Something is broken."))
     (specifier-type
      (compute-alien-rep-type
-      (alien-function-type-result-type type)))))
+      (alien-fun-type-result-type type)))))
 
 (defoptimizer (%alien-funcall ltn-annotate)
 	      ((function type &rest args) node ltn-policy)

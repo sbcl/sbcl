@@ -1838,7 +1838,7 @@
        (nt "pending interrupt trap"))
       (#.sb!vm:halt-trap
        (nt "halt trap"))
-      (#.sb!vm:function-end-breakpoint-trap
+      (#.sb!vm:fun-end-breakpoint-trap
        (nt "function end breakpoint trap")))))
 
 (define-instruction break (segment code)

@@ -349,7 +349,7 @@
 	 ;; There's no ANSI way to find out what the function is
 	 ;; declared to be, so we just return the CTYPE for the
 	 ;; most-general function.
-	 *universal-function-type*))
+	 *universal-fun-type*))
     (symbol
      (make-member-type :members (list x)))
     (number
