@@ -1059,6 +1059,23 @@ WORKAROUND:
   All forms of GC hooks (including notifiers and finalisers) are currently
   (since 0.8.0) broken for gencgc (i.e. x86) users 
 
+273:
+  Compilation of the following two forms causes "X is unbound" error:
+
+    (symbol-macrolet ((x pi))
+      (macrolet ((foo (y) (+ x y)))
+        (declaim (inline bar))
+        (defun bar (z)
+          (* z (foo 4)))))
+    (defun quux (z)
+      (bar z))
+
+  (See (COERCE (CDR X) 'FUNCTION) in IR1-CONVERT-INLINE-LAMBDA.)
+
+274:
+  CLHS says that type declaration of a symbol macro should not affect
+  its expansion, but in SBCL it does.
+
 
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:
