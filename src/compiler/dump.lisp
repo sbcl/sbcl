@@ -709,7 +709,9 @@
 ;;; tables.
 (defun dump-vector (x file)
   (let ((simple-version (if (array-header-p x)
-			    (coerce x 'simple-array)
+			    (coerce x `(simple-array
+					,(array-element-type x)
+					(*)))
 			    x)))
     (typecase simple-version
       (simple-base-string

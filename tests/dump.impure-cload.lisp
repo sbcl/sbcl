@@ -59,4 +59,11 @@
 
 (defparameter *path* #p"MY-LOGICAL-HOST:FOO;BAR.LISP")
 
+;;; Non-SIMPLE-ARRAY VECTORs should be dumpable, though they can lose
+;;; their complex attributes.
+
+(defparameter *string* #.(make-array 3 :initial-element #\a
+				       :fill-pointer 2
+				       :element-type 'character))
+
 (sb-ext:quit :unix-status 104) ; success
