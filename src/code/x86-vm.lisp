@@ -206,16 +206,17 @@
   (context (* os-context-t))
   (index int))
 
-;;; FIXME: Should this and CONTEXT-PC be INLINE to reduce consing?
-;;; (Are they used in anything time-critical, or just the debugger?)
 (defun context-register (context index)
   (declare (type (alien (* os-context-t)) context))
-  (deref (context-register-addr context index)))
+  (let ((addr (context-register-addr context index)))
+    (declare (type (alien (* unsigned-int)) addr))
+    (deref addr)))
 
 (defun %set-context-register (context index new)
-(declare (type (alien (* os-context-t)) context))
-(setf (deref (context-register-addr context index))
-      new))
+  (declare (type (alien (* os-context-t)) context))
+  (let ((addr (context-register-addr context index)))
+    (declare (type (alien (* unsigned-int)) addr))
+    (setf (deref addr) new)))
 
 ;;; This is like CONTEXT-REGISTER, but returns the value of a float
 ;;; register. FORMAT is the type of float to return.
@@ -268,7 +269,6 @@
     (/show0 "got PC")
     ;; using INT3 the pc is .. INT3 <here> code length bytes...
     (let* ((length (sap-ref-8 pc 1))
-	   (removeme (/show0 "got LENGTH")) ; REMOVEME
 	   (vector (make-array length :element-type '(unsigned-byte 8))))
       (declare (type (unsigned-byte 8) length)
 	       (type (simple-array (unsigned-byte 8) (*)) vector))

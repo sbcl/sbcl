@@ -87,12 +87,14 @@
 ;;; (Are they used in anything time-critical, or just the debugger?)
 (defun context-register (context index)
   (declare (type (alien (* os-context-t)) context))
-  (deref (context-register-addr context index)))
+  (deref (the (alien (* unsigned-long))
+	   (context-register-addr context index))))
 
 (defun %set-context-register (context index new)
-(declare (type (alien (* os-context-t)) context))
-(setf (deref (context-register-addr context index))
-      new))
+  (declare (type (alien (* os-context-t)) context))
+  (setf (deref (the (alien (* unsigned-long))
+		 (context-register-addr context index)))
+	new))
 
 ;;; This is like CONTEXT-REGISTER, but returns the value of a float
 ;;; register. FORMAT is the type of float to return.
