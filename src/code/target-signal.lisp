@@ -118,8 +118,7 @@
 (defun sigalrm-handler (signal info context)
   (declare (ignore signal info context))
   (declare (type system-area-pointer context))
-  (cerror "Continue" 'sb!kernel::timeout))
-
+  (cerror "Continue" 'sb!ext::timeout))
 
 (defun sigquit-handler (signal code context)
   (declare (ignore signal code context))

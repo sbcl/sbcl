@@ -40,6 +40,7 @@
 #include <sys/time.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <linux/version.h>
 
 #include "validate.h"
 #include "thread.h"
@@ -47,33 +48,35 @@ size_t os_vm_page_size;
 
 #include "gc.h"
 
+int linux_sparc_siginfo_bug = 0;
 
-#ifdef sparc
-int early_kernel = 0;
-#endif
 void os_init(void)
 {
-    /* Early versions of Linux don't support the mmap(..) functionality
-     * that we need. */
+    /* Conduct various version checks: do we have enough mmap(), is
+     * this a sparc running 2.2, can we do threads? */
     {
         struct utsname name;
 	int major_version;
-#ifdef sparc
 	int minor_version;
-#endif
+	char *p;
 	uname(&name);
-	major_version = atoi(name.release);
-	if (major_version < 2) {
-	    lose("linux major version=%d (can't run in version < 2.0.0)",
+	p=name.release;  
+	major_version = atoi(p);
+	p=strchr(p,'.')+1;
+	minor_version = atoi(p);
+	if (major_version<2) {
+	    lose("linux kernel version too old: major version=%d (can't run in version < 2.0.0)",
 		 major_version);
 	}
-#ifdef sparc
-	/* KLUDGE: This will break if Linux moves to a uname() version number
-	 * that has more than one digit initially -- CSR, 2002-02-12 */
-	minor_version = atoi(name.release+2);
-	if (minor_version < 4) {
-	    FSHOW((stderr,"linux minor version=%d;\n enabling workarounds for SPARC kernel bugs in signal handling.\n", minor_version));
-	    early_kernel = 1;
+#ifdef LISP_FEATURE_SB_THREAD
+	if ((major_version <2) || (major_version==2 && minor_version < 4)) {
+	    lose("linux kernel 2.4 required for thread-enabled SBCL");
+	}
+#endif
+#ifdef LISP_FEATURE_SPARC
+	if ((major_version <2) || (major_version==2 && minor_version < 4)) {
+	    FSHOW((stderr,"linux kernel %d.%d predates 2.4;\n enabling workarounds for SPARC kernel bugs in signal handling.\n", minor_version));
+	    linux_sparc_siginfo_bug = 1;
 	}
 #endif
     }

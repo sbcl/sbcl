@@ -25,7 +25,7 @@
 #include "monitor.h"
 
 #ifdef LISP_FEATURE_LINUX
-extern int early_kernel;
+extern int linux_sparc_siginfo_bug;
 #endif
 
 void arch_init(void)
@@ -192,7 +192,7 @@ static void sigill_handler(int signal, siginfo_t *siginfo, void *void_context)
     
     if ((siginfo->si_code) == ILL_ILLOPC
 #ifdef LISP_FEATURE_LINUX
-	|| (early_kernel && (siginfo->si_code == 2))
+	|| (linux_sparc_siginfo_bug && (siginfo->si_code == 2))
 #endif
 	) {
 	int trap;
@@ -241,7 +241,7 @@ static void sigill_handler(int signal, siginfo_t *siginfo, void *void_context)
     }
     else if ((siginfo->si_code) == ILL_ILLTRP
 #ifdef LISP_FEATURE_LINUX
-	     || (early_kernel && (siginfo->si_code) == 192)
+	     || (linux_sparc_siginfo_bug && (siginfo->si_code) == 192)
 #endif
 	     ) {
 	if (pseudo_atomic_trap_p(context)) {

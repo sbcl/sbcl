@@ -767,8 +767,7 @@
 	       (reader-error-format-arguments condition)
 	       (reader-impossible-number-error-error condition))))))
 
-;;; should this inherit from error?  good question
-(define-condition timeout (error) ())
+(define-condition sb!ext::timeout (serious-condition) ())
 
 
 

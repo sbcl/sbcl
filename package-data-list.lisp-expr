@@ -517,7 +517,7 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
     :export (;; Information about how the program was invoked is
              ;; nonstandard but very useful.
              "*POSIX-ARGV*" "POSIX-GETENV" "POSIX-ENVIRON"
-
+			    
              ;; People have various good reasons to mess with the GC.
              "*AFTER-GC-HOOKS*" "*BEFORE-GC-HOOKS*"
              "*GC-NOTIFY-AFTER*" "*GC-NOTIFY-BEFORE*" "*GC-NOTIFY-STREAM*"
@@ -617,6 +617,7 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
              ;; miscellaneous useful supported extensions
              "QUIT"
 	     "*MODULE-PROVIDER-FUNCTIONS*"
+	     "WITH-TIMEOUT" "TIMEOUT"
 	     
              ;; RUN-PROGRAM is not only useful for users, but also
              ;; useful to implement parts of SBCL itself, so we're
