@@ -858,12 +858,6 @@
     (:charpos
      (fd-stream-char-pos fd-stream))
     (:file-length
-     ;; FIXME: This is broken on OpenBSD until the FFI, or at least
-     ;; UNIX-FSTAT, learns to extract 64-bit values. (As of sbcl-0.6.12.8,
-     ;; UNIX-FSTAT returns a 0 placeholder instead.)
-     #!+openbsd
-     (error "FIXME: internal error, FILE-LENGTH is broken on OpenBSD")
-     #!-openbsd
      (multiple-value-bind (okay dev ino mode nlink uid gid rdev size
 			   atime mtime ctime blksize blocks)
 	 (sb!unix:unix-fstat (fd-stream-fd fd-stream))
@@ -882,8 +876,7 @@
 	   (type (or index (member nil :start :end)) newpos))
   (if (null newpos)
       (sb!sys:without-interrupts
-	;; First, find the position of the UNIX file descriptor in the
-	;; file.
+	;; First, find the position of the UNIX file descriptor in the file.
 	(multiple-value-bind (posn errno)
 	    (sb!unix:unix-lseek (fd-stream-fd stream) 0 sb!unix:l_incr)
 	  (declare (type (or index null) posn))

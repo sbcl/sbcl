@@ -186,28 +186,37 @@
 			'(unsigned-byte 8)))
 	     (load-as-fasl filespec verbose print)
 	     (load-as-source filespec verbose print))
-	 (let ((pn (merge-pathnames (pathname filespec)
-				    *default-pathname-defaults*)))
-	   (if (wild-pathname-p pn)
-	       (let ((files (directory pn)))
+	 (let (;; FIXME: MERGE-PATHNAMES doesn't work here for
+	       ;; FILESPEC="TEST:Load-Test" and
+	       ;; (LOGICAL-PATHNAME-TRANSLATIONS "TEST")
+	       ;;   = (("**;*.*.*" "/foo/bar/**/*.*")).
+	       ;; Physicalizing the pathname before merging 
+	       ;; is a workaround, but the ANSI spec talks about
+	       ;; MERGE-PATHNAMES accepting (and returning)
+	       ;; logical pathnames, so a true fix would probably
+	       ;; include fixing MERGE-PATHNAMES, then probably
+	       ;; revisiting this code.
+	       (ppn (physicalize-pathname (pathname filespec))))
+	   (if (wild-pathname-p ppn)
+	       (let ((files (directory ppn)))
 		 #!+high-security
 		 (when (null files)
 		   (error 'file-error :pathname filespec))
 		 (dolist (file files t)
-		   (internal-load pn
+		   (internal-load ppn
 				  file
 				  internal-if-does-not-exist
 				  verbose
 				  print)))
-	       (let ((tn (probe-file pn)))
-		 (if (or tn (pathname-type pn))
-		     (internal-load pn
+	       (let ((tn (probe-file ppn)))
+		 (if (or tn (pathname-type ppn))
+		     (internal-load ppn
 				    tn
 				    internal-if-does-not-exist
 				    verbose
 				    print)
 		     (internal-load-default-type
-		      pn
+		      ppn
 		      internal-if-does-not-exist
 		      verbose
 		      print)))))))))

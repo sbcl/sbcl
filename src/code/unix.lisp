@@ -562,24 +562,16 @@
 	  (slot wrapped-stat 'st-uid)
 	  (slot wrapped-stat 'st-gid)
 	  (slot wrapped-stat 'st-rdev)
-	  ;; FIXME: OpenBSD has a 64-bit st_size slot, which is
-	  ;; basically a good thing, except that it is too
-	  ;; 21st-century for sbcl-0.6.12.8's FFI to handle. As a
-	  ;; quick kludgy workaround, we return a 0 placeholder from
-	  ;; this function, and downstream we stub out the FILE-LENGTH
-	  ;; operation (which is the only place that SBCL actually
-	  ;; uses the SIZE value returned from any UNIX-STAT-ish call).
-	  #!+openbsd 0
-	  #!-openbsd (slot wrapped-stat 'st-size)
+	  (slot wrapped-stat 'st-size)
 	  (slot wrapped-stat 'st-atime)
 	  (slot wrapped-stat 'st-mtime)
 	  (slot wrapped-stat 'st-ctime)
 	  (slot wrapped-stat 'st-blksize)
 	  (slot wrapped-stat 'st-blocks)))
 
-;;; Unix system calls in the stat(2) family are implemented as calls
-;;; to C-level wrapper functions which copy all the raw "struct
-;;; stat" slots into the system-independent wrapped_stat format.
+;;; Unix system calls in the stat(2) family are handled by calls to
+;;; C-level wrapper functions which copy all the raw "struct stat"
+;;; slots into the system-independent wrapped_stat format.
 ;;;    stat(2) <->  stat_wrapper()
 ;;;   fstat(2) <-> fstat_wrapper()
 ;;;   lstat(2) <-> lstat_wrapper()
@@ -604,8 +596,8 @@
 
 ;;;; time.h
 
-;; the POSIX.4 structure for a time value. This is like a `struct
-;; timeval' but has nanoseconds instead of microseconds.
+;; the POSIX.4 structure for a time value. This is like a "struct
+;; timeval" but has nanoseconds instead of microseconds.
 (def-alien-type nil
     (struct timespec
 	    (tv-sec long)   ; seconds
@@ -617,14 +609,14 @@
 	    (tm-sec int)   ; Seconds.	[0-60] (1 leap second)
 	    (tm-min int)   ; Minutes.	[0-59]
 	    (tm-hour int)  ; Hours.	[0-23]
-	    (tm-mday int)  ; Day.		[1-31]
-	    (tm-mon int)   ;  Month.	[0-11]
-	    (tm-year int)  ; Year	- 1900.
-	    (tm-wday int)  ; Day of week.	[0-6]
-	    (tm-yday int)  ; Days in year.[0-365]
-	    (tm-isdst int) ;  DST.		[-1/0/1]
-	    (tm-gmtoff long)	;  Seconds east of UTC.
-	    (tm-zone c-string)))	; Timezone abbreviation.
+	    (tm-mday int)  ; Day.       [1-31]
+	    (tm-mon int)   ; Month.	[0-11]
+	    (tm-year int)  ; Year - 1900.
+	    (tm-wday int)  ; Day of week. [0-6]
+	    (tm-yday int)  ; Days in year. [0-365]
+	    (tm-isdst int) ; DST.       [-1/0/1]
+	    (tm-gmtoff long) ;  Seconds east of UTC.
+	    (tm-zone c-string))) ; Timezone abbreviation.
 
 (def-alien-routine get-timezone sb!c-call:void
   (when sb!c-call:long :in)

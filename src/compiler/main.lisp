@@ -1605,7 +1605,17 @@
 ;;; default to the appropriate implementation-defined default type for
 ;;; compiled files.
 (defun cfp-output-file-default (input-file)
-  (let* ((defaults (merge-pathnames input-file
+  (let* (;; FIXME: I think the PHYSICALIZE-PATHNAME wrapper here
+	 ;; shouldn't really be necessary. Unfortunately
+	 ;; sbcl-0.6.12.18's MERGE-PATHNAMES doesn't like logical
+	 ;; pathnames very much, and doesn't get good results in
+	 ;; tests/side-effectful-pathnames.sh for (COMPILE-FILE
+	 ;; "TEST:$StudlyCapsStem"), unless I do this. It would be
+	 ;; good to straighten out how MERGE-PATHNAMES is really
+	 ;; supposed to work for logical pathnames, and add a bunch of
+	 ;; test cases to check it, then get rid of this cruft.
+	 (defaults (merge-pathnames (physicalize-pathname (pathname
+							   input-file))
 				    *default-pathname-defaults*))
 	 (retyped (make-pathname :type *backend-fasl-file-type*
 				 :defaults defaults)))

@@ -746,15 +746,9 @@
   (if (empty-relative-pathname-spec-p pathname-spec)
       "."
       ;; Otherwise, the ordinary rules apply.
-      (let* ((possibly-logical-pathname (pathname pathname-spec))
-	     (physical-pathname (if (typep possibly-logical-pathname
-					   'logical-pathname)
-				    (namestring (translate-logical-pathname
-						 possibly-logical-pathname))
-				    possibly-logical-pathname))
+      (let* ((namestring (physicalize-pathname (pathname pathname-spec)))
 	     (matches nil)) ; an accumulator for actual matches
-	(enumerate-matches (match physical-pathname nil
-				  :verify-existence for-input)
+	(enumerate-matches (match namestring nil :verify-existence for-input)
           (push match matches))
 	(case (length matches)
 	  (0 nil)
@@ -1066,11 +1060,8 @@
   actually exist, and attempt to create them if they do not.
   The MODE argument is a CMUCL/SBCL-specific extension to control
   the Unix permission bits."
-  (let* ((pathname (pathname pathspec))
-	 (pathname (if (typep pathname 'logical-pathname)
-		       (translate-logical-pathname pathname)
-		       pathname))
-	 (created-p nil))
+  (let ((pathname (physicalize-pathname (pathname pathspec)))
+	(created-p nil))
     (when (wild-pathname-p pathname)
       (error 'simple-file-error
 	     :format-control "bad place for a wild pathname"

@@ -854,6 +854,14 @@
 	 (print-unreadable-object (structure ,stream :type t)
 	   ,@(nreverse reversed-prints))))))
 
+;;;; etc.
+
+;;; Given a pathname, return a corresponding physical pathname.
+(defun physicalize-pathname (possibly-logical-pathname)
+  (if (typep possibly-logical-pathname 'logical-pathname)
+      (translate-logical-pathname possibly-logical-pathname)
+      possibly-logical-pathname))
+
 #|
 ;;; REMOVEME when done testing byte cross-compiler
 (defun byte-compiled-foo (x y)

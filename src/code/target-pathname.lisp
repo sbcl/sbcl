@@ -1198,9 +1198,7 @@ a host-structure or string."
   values)
 
 (defun %enumerate-search-list (pathname function)
-  (let* ((pathname (if (typep pathname 'logical-pathname)
-		       (translate-logical-pathname pathname)
-		       pathname))
+  (let* ((pathname (physicalize-pathname pathname))
 	 (search-list (extract-search-list pathname nil)))
     (cond
      ((not search-list)

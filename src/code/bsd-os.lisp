@@ -31,12 +31,10 @@
 			   (sb!ext:run-program "/usr/bin/uname" `("-r")
 					       :output stream))))))
 
-;;; OS-COLD-INIT-OR-REINIT initializes our operating-system interface.
-;;; It sets the values of the global port variables to what they
-;;; should be and calls the functions that set up the argument blocks
-;;; for the server interfaces.
 (defun os-cold-init-or-reinit ()
-  (setf *software-version* nil))
+  (setf *software-version* nil)
+  (setf *default-pathname-defaults*
+	(pathname (sb!ext::default-directory))))
 
 ;;; Return system time, user time and number of page faults.
 (defun get-system-info ()

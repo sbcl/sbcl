@@ -49,27 +49,31 @@
   out early because of some argument error or something).
 
   The following &KEY args are defined:
+    :TOPLEVEL
+       The function to run when the created core file is resumed.
+       The default function handles command line toplevel option
+       processing and runs the top level read-eval-print loop. This
+       function should not return.
+    :PURIFY
+       If true (the default), do a purifying GC which moves all dynamically
+       allocated objects into static space so that they stay pure. This takes
+       somewhat longer than the normal GC which is otherwise done, but it's
+       only done once, and subsequent GC's will be done less often and will
+       take less time in the resulting core file. See PURIFY.
+    :ROOT-STRUCTURES
+       This should be a list of the main entry points in any newly loaded
+       systems. This need not be supplied, but locality and/or GC performance
+       may be better if they are. Meaningless if :PURIFY is NIL. See PURIFY.
+    :ENVIRONMENT-NAME
+       This is also passed to PURIFY when :PURIFY is T. (rarely used)
 
-  :TOPLEVEL
-      The function to run when the created core file is resumed.
-  The default function handles command line toplevel option
-  processing and runs the top level read-eval-print loop. This
-  function should not return.
-
-  :PURIFY
-      If true (the default), do a purifying GC which moves all dynamically
-  allocated objects into static space so that they stay pure. This takes
-  somewhat longer than the normal GC which is otherwise done, but it's only
-  done once, and subsequent GC's will be done less often and will take less
-  time in the resulting core file. See PURIFY.
-
-  :ROOT-STRUCTURES
-      This should be a list of the main entry points in any newly loaded
-  systems. This need not be supplied, but locality and/or GC performance
-  may be better if they are. Meaningless if :PURIFY is NIL. See PURIFY.
-
-  :ENVIRONMENT-NAME
-      This is also passed to PURIFY when :PURIFY is T. (rarely used)"
+  The save/load process changes the values of some global variables:
+    *STANDARD-OUTPUT*, *DEBUG-IO*, etc.
+      Everything related to open streams is necessarily changed, since
+      the OS won't let us preserve a stream across save and load.
+    *DEFAULT-PATHNAME-DEFAULTS*
+      This is reinitialized to reflect the working directory where the
+      saved core is loaded."
 
   #!+mp (sb!mp::shutdown-multi-processing)
   (when (fboundp 'sb!eval:flush-interpreted-function-cache)

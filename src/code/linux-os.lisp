@@ -33,13 +33,12 @@
 			   (sb!ext:run-program "/bin/uname" `("-r")
 					       :output stream))))))
 
-;;; OS-COLD-INIT-OR-REINIT initializes our operating-system interface.
-;;; It sets the values of the global port variables to what they
-;;; should be and calls the functions that set up the argument blocks
-;;; for the server interfaces.
 (defun os-cold-init-or-reinit () ; KLUDGE: don't know what to do here
   #!+sparc ;; Can't use #x20000000 thru #xDFFFFFFF, but mach tries to let us.
-  (sb!sys:allocate-system-memory-at (sb!sys:int-sap #x20000000) #xc0000000))
+  (sb!sys:allocate-system-memory-at (sb!sys:int-sap #x20000000) #xc0000000)
+  (setf *software-version* nil)
+  (setf *default-pathname-defaults*
+	(pathname (sb!ext::default-directory))))
 
 ;;; Return system time, user time and number of page faults.
 (defun get-system-info ()

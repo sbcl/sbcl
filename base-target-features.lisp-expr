@@ -3,9 +3,20 @@
 ;;;; CL:*FEATURES* tags which have special meaning to SBCL or which
 ;;;; have a special conventional meaning
 ;;;;
-;;;; Note that the preferred way to customize the features of a local
-;;;; build of SBCL is not to edit this file, but to tweak
-;;;; customize-target-features.lisp.
+;;;; Note that the recommended way to customize the features of a
+;;;; local build of SBCL is not to edit this file, but instead to
+;;;; tweak customize-target-features.lisp. E.g. you can use code like
+;;;; this:
+;;;;    (lambda (list)
+;;;;      (flet ((enable (x) (pushnew x list))
+;;;;    	 (disable (x) (setf list (remove x list))))
+;;;;        #+nil (enable :sb-show)
+;;;;        (enable :sb-after-xc-core)
+;;;;        #+nil (disable :sb-doc)
+;;;;        list))
+;;;; That way, because customize-target-features.lisp is in
+;;;; .cvsignore, your local changes will remain local even if you use
+;;;; "cvs diff" to submit patches to SBCL.
 
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
@@ -29,7 +40,7 @@
  :sbcl
 
  ;; Douglas Thomas Crosher's conservative generational GC (the only one
- ;; we currently support)
+ ;; we currently support for X86)
  :gencgc
 
  ;; We're running under a UNIX. This is sort of redundant, and it was also
@@ -257,14 +268,18 @@
  ;; really, really know what you're doing):
  ;; 
  ;; machine architecture features:
- ;;   :x86 ; any Intel 386 or better, or compatibles like the AMD K6 or K7
- ;;   (No others are supported by SBCL as of 0.6.7, but :alpha or 
- ;;   :sparc support could be ported from CMU CL if anyone is
- ;;   sufficiently motivated to do so.)
- ;;   (CMU CL also had a :pentium feature, which affected the definition 
- ;;   of some floating point vops. It was present but not enabled in the
- ;;   CMU CL code that SBCL is derived from, and is present but stale
- ;;   in SBCL as of 0.6.7.)
+ ;;   :x86
+ ;;      any Intel 386 or better, or compatibles like the AMD K6 or K7
+ ;;   :alpha
+ ;;      DEC/Compaq Alpha CPU
+ ;; (No other CPUs are supported by SBCL as of 0.6.12.15, but SPARC or
+ ;; PowerPC support could be ported from CMU CL if anyone is
+ ;; sufficiently motivated to do so, or if you're *really* motivated,
+ ;; you could write a port from scratch for a new CPU architecture.)
+ ;; (CMU CL also had a :pentium feature, which affected the definition
+ ;; of some floating point vops. It was present but not enabled or 
+ ;; documented in the CMU CL code that SBCL is derived from, and is
+ ;; present but stale in SBCL as of 0.6.12.)
  ;;
  ;; operating system features:
  ;;   :linux   = We're intended to run under some version of Linux.
@@ -275,5 +290,6 @@
  ;;   :openbsd = We're intended to run under FreeBSD.
  ;; (No others are supported by SBCL as of 0.6.7, but :hpux or
  ;; :solaris support could be ported from CMU CL if anyone is
- ;; sufficiently motivated to do so.)
+ ;; sufficiently motivated to do so, and it'd even be possible,
+ ;; though harder, to port the system to Microsoft Windows.)
  )

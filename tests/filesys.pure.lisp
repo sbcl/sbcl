@@ -12,16 +12,17 @@
 (in-package "CL-USER")
 
 ;;; In sbcl-0.6.9 FOO-NAMESTRING functions  returned "" instead of NIL.
-(let ((pathname0  (make-pathname :host nil 
-				 :directory 
-				 (pathname-directory
-				  *default-pathname-defaults*)
-				 :name "getty"))
+(let ((pathname0 (make-pathname :host nil 
+				:directory
+				(pathname-directory
+				 *default-pathname-defaults*)
+				:name "getty"))
       (pathname1 (make-pathname :host nil 
 				:directory nil
 				:name nil)))
   (assert (equal (file-namestring pathname0) "getty"))
-  (assert (equal (directory-namestring pathname0) ""))
+  (assert (equal (directory-namestring pathname0)
+		 (directory-namestring *default-pathname-defaults*)))
   (assert (equal (file-namestring pathname1) ""))
   (assert (equal (directory-namestring pathname1) "")))
 

@@ -35,6 +35,7 @@ $SBCL <<EOF
     (format t "translation=~S~%" translation)
     (format t "expected-translation=~S~%" expected-translation)
     (assert (string= translation expected-translation)))
+  (format t "about to LOAD ~S~%" "TEST:$StudlyCapsStem")
   (load "TEST:$StudlyCapsStem")
   (assert (eq *loaded* :yes))
   (let ((compiled-file-name (namestring (compile-file "TEST:$StudlyCapsStem")))
