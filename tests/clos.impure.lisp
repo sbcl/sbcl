@@ -191,6 +191,7 @@
   ((a-slot :initarg :a-slot :accessor a-slot)
    (b-slot :initarg :b-slot :accessor b-slot)
    (c-slot :initarg :c-slot :accessor c-slot)))
+
 (let ((foo (make-instance 'class-with-slots
 			  :a-slot 1
 			  :b-slot 2
@@ -292,8 +293,8 @@
 (macrolet ((assert-program-error (form)
 	     `(multiple-value-bind (value error)
 	          (ignore-errors ,form)
-	        (assert (null value))
-	        (assert (typep error 'program-error)))))
+	        (unless (and (null value) (typep error 'program-error))
+                  (error "~S failed: ~S, ~S" ',form value error)))))
   (assert-program-error (defclass foo001 () (a b a)))
   (assert-program-error (defclass foo002 () 
 			  (a b) 
@@ -858,7 +859,11 @@
                                           (:method () t))))))
         'generic-function))
 
-
+;;; bug reported by Bruno Haible: (setf find-class) using a
+;;; forward-referenced class
+(defclass fr-sub (fr-super) ())
+(setf (find-class 'fr-alt) (find-class 'fr-super))
+(assert (eq (find-class 'fr-alt) (find-class 'fr-super)))
 
 ;;;; success
 (sb-ext:quit :unix-status 104)

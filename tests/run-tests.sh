@@ -20,7 +20,7 @@
 # generated relative to `pwd` in the tests/ directory) so that tests
 # can chdir before invoking SBCL and still work.
 sbclstem=`pwd`/../src/runtime/sbcl
-SBCL="${1:-$sbclstem --core `pwd`/../output/sbcl.core --noinform --sysinit /dev/null --userinit /dev/null --noprint --disable-debugger}"
+SBCL="${1:-$sbclstem --core `pwd`/../output/sbcl.core --noinform --sysinit /dev/null --userinit /dev/null --noprint}"
 export SBCL
 echo /running tests on SBCL=\'$SBCL\'
 # more or less like SBCL, but without enough grot removed that appending

@@ -330,6 +330,45 @@
 (let ((inst (make-instance 'testclass15 :x 12)))
   (assert (equal (list (testclass15-x inst) (setf (testclass15-y inst) 13))
 		 '(12 13))))
+
+;;; bug reported by Bruno Haible on sbcl-devel 2004-11-17: incorrect
+;;; handling of multiple values for non-standard slot-options
+(progn
+  (defclass option-slot-definition (sb-mop:standard-direct-slot-definition)
+    ((option :accessor sl-option :initarg :my-option)))
+  (defclass option-slot-class (standard-class)
+    ())
+  (defmethod sb-mop:direct-slot-definition-class 
+      ((c option-slot-class) &rest args)
+    (declare (ignore args))
+    (find-class 'option-slot-definition))
+  (defmethod sb-mop:validate-superclass 
+      ((c1 option-slot-class) (c2 standard-class))
+    t)
+  (eval '(defclass test-multiple-slot-option-bug ()
+          ((x :my-option bar :my-option baz))
+          (:metaclass option-slot-class)))
+  (assert (null (set-difference 
+                 '(bar baz)
+                 (sl-option (first (sb-mop:class-direct-slots 
+                                    (find-class 'test-multiple-slot-option-bug))))))))
+
+;;; bug reported by Bruno Haibel on sbcl-devel 2004-11-19: AMOP requires
+;;; that CLASS-PROTOYPE signals an error if the class is not yet finalized
+(defclass prototype-not-finalized-sub (prototype-not-finalized-super) ())
+(multiple-value-bind (val err)
+    (ignore-errors (sb-mop:class-prototype (find-class 'prototype-not-finalized-super)))
+  (assert (null val))
+  (assert (typep err 'error)))
+
+;;; AMOP says so
+(find-method (fdefinition 'sb-mop:allocate-instance) () '(built-in-class))
+(dolist (class-name '(fixnum bignum symbol))
+  (let ((class (find-class class-name)))
+    (multiple-value-bind (value error) (ignore-errors (allocate-instance class))
+      (assert (null value))
+      (assert (typep error 'error)))))
+
 
 ;;;; success
 (sb-ext:quit :unix-status 104)

@@ -25,6 +25,14 @@ changes in sbcl-0.8.17 relative to sbcl-0.8.16:
     types.
   * fixed bug #308: non-graphic characters now all have names, as
     required.  (reported by Bruno Haible)
+  * bug fix: (SETF FIND-CLASS) using a FORWARD-REFERENCED-CLASS as the
+    new value now works. (reported by Bruno Haible)
+  * bug fix: correct canonicalization of multiple non-standard slot
+    options in DEFCLASS as per AMOP 5.4.2. (reported by Bruno Haible)
+  * bug fix: SB-MOP:CLASS-PROTOTYPE now signals an error if the class
+    is not yet finalized, as required by AMOP. (reported by Bruno Haible)
+  * bug fix: SB-MOP:ALLOCATE-INSTANCE method for instances of BUILT-IN-CLASS
+    now exists, an signals an error.
   * bug fix: duplicate LOOP variable bindings now signal PROGRAM-ERROR
     during macroexpansion for non-iteration variables as well. (reported 
     by Bruno Haible for CMUCL)

@@ -1579,5 +1579,15 @@ WORKAROUND:
   pprinter and only truncated at output?  (So that indenting by 1/2
   then 3/2 would indent by two spaces, not one?)
 
-351: suboptimal error handling/reporting when compiling (PUSH (LET ...)) 
-  (fixed in 0.8.16.37)
+352: forward-referenced-class trouble
+ reported by Bruno Haible on sbcl-devel
+   (defclass c (a) ())
+   (setf (class-name (find-class 'a)) 'b)
+   (defclass a () (x))
+   (defclass b () (y))
+   (make-instance 'c)
+ Expected: an instance of c, with a slot named x
+ Got: debugger invoked on a SIMPLE-ERROR in thread 78906:
+        While computing the class precedence list of the class named C.
+        The class named B is a forward referenced class.
+        The class named B is a direct superclass of the class named C.

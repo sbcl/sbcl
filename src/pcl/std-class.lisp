@@ -121,21 +121,21 @@
 ;;;; various class accessors that are a little more complicated than can be
 ;;;; done with automatically generated reader methods
 
-(defmethod class-prototype ((class std-class))
-  (with-slots (prototype) class
-    (or prototype (setq prototype (allocate-instance class)))))
+(defmethod class-prototype :before (class)
+  (unless (class-finalized-p class)
+    (error "~S not yet finalized, cannot allocate a prototype." class)))
 
-(defmethod class-prototype ((class structure-class))
-  (with-slots (prototype wrapper defstruct-constructor) class
-    (or prototype
-	(setq prototype
-	      (if defstruct-constructor
-		  (allocate-instance class)
-		  (allocate-standard-instance wrapper))))))
-
-(defmethod class-prototype ((class condition-class))
-  (with-slots (prototype) class
-    (or prototype (setf prototype (allocate-instance class)))))
+;;; KLUDGE: For some reason factoring the common body into a function
+;;; breaks PCL bootstrapping, so just generate it with a macrolet for
+;;; all.
+(macrolet ((def (class)
+             `(defmethod class-prototype ((class ,class))
+                (with-slots (prototype) class
+                  (or prototype 
+                      (setf prototype (allocate-instance class)))))))
+  (def std-class)
+  (def condition-class)
+  (def structure-class))
 
 (defmethod class-direct-default-initargs ((class slot-class))
   (plist-value class 'direct-default-initargs))
@@ -290,7 +290,6 @@
   (setf (info :type :translator specl)
         (constantly (make-member-type :members (list (specializer-object specl))))))
 
-
 (defun real-load-defclass (name metaclass-name supers slots other
                            readers writers slot-names)
   (with-single-package-locked-error (:symbol name "defining ~S as a class")
@@ -347,97 +346,24 @@
 	     (make-instance 'forward-referenced-class
 			    :name s)))))
 
-(defun ensure-class-values (class args)
-  (let* ((initargs (copy-list args))
-	 (unsupplied (list 1))
-	 (supplied-meta   (getf initargs :metaclass unsupplied))
-	 (supplied-supers (getf initargs :direct-superclasses unsupplied))
-	 (supplied-slots  (getf initargs :direct-slots unsupplied))
-	 (meta
-	   (cond ((neq supplied-meta unsupplied)
-		  (find-class supplied-meta))
-		 ((or (null class)
-		      (forward-referenced-class-p class))
-		  *the-class-standard-class*)
-		 (t
-		  (class-of class)))))
-    ;; KLUDGE: It seemed to me initially that there ought to be a way
-    ;; of collecting all the erroneous problems in one go, rather than
-    ;; this way of solving the problem of signalling the errors that
-    ;; we are required to, which stops at the first bogus input.
-    ;; However, after playing around a little, I couldn't find that
-    ;; way, so I've left it as is, but if someone does come up with a
-    ;; better way... -- CSR, 2002-09-08
-    (do ((direct-slots (getf initargs :direct-slots) (cdr direct-slots)))
-	((endp direct-slots) nil)
-      (destructuring-bind (slot &rest more) direct-slots
-	(let ((slot-name (getf slot :name)))
-	  (when (some (lambda (s) (eq slot-name (getf s :name))) more)
-	    ;; FIXME: It's quite possible that we ought to define an
-	    ;; SB-INT:PROGRAM-ERROR function to signal these and other
-	    ;; errors throughout the codebase that are required to be
-	    ;; of type PROGRAM-ERROR.
-	    (error 'simple-program-error
-		   :format-control "~@<There is more than one direct slot ~
-                                   with name ~S.~:>"
-		   :format-arguments (list slot-name)))
-	  (do ((stuff slot (cddr stuff)))
-	      ((endp stuff) nil)
-	    (destructuring-bind (option value &rest more) stuff
-	      (cond
-		((and (member option '(:allocation :type
-				       :initform :documentation))
-		      (not (eq unsupplied
-			       (getf more option unsupplied))))
-		 (error 'simple-program-error
-			:format-control "~@<Duplicate slot option ~S for ~
-                                        slot named ~S.~:>"
-			:format-arguments (list option slot-name)))
-		((and (eq option :readers)
-		      (notevery #'symbolp value))
-		 (error 'simple-program-error
-			:format-control "~@<Slot reader names for slot ~
-                                        named ~S must be symbols.~:>"
-			:format-arguments (list slot-name)))
-		((and (eq option :initargs)
-		      (notevery #'symbolp value))
-		 (error 'simple-program-error
-			:format-control "~@<Slot initarg names for slot ~
-                                        named ~S must be symbols.~:>"
-			:format-arguments (list slot-name)))))))))
-    (loop for (initarg . more) on (getf initargs :direct-default-initargs)
-	  for name = (car initarg) 
-	  when (some (lambda (a) (eq (car a) name)) more) 
-	  do (error 'simple-program-error 
-		    :format-control "~@<Duplicate initialization argument ~
-                                    name ~S in :DEFAULT-INITARGS.~:>"
-		    :format-arguments (list name class)))
-    (let ((metaclass 0)
-	  (default-initargs 0))
-      (do ((args initargs (cddr args)))
-	  ((endp args) nil)
-	(case (car args)
-	  (:metaclass
-	   (when (> (incf metaclass) 1)
-	     (error 'simple-program-error
-		    :format-control "~@<More than one :METACLASS ~
-                                    option specified.~:>")))
-	  (:direct-default-initargs
-	   (when (> (incf default-initargs) 1)
-	     (error 'simple-program-error
-		    :format-control "~@<More than one :DEFAULT-INITARGS ~
-                                    option specified.~:>"))))))
-    (remf initargs :metaclass)
-    (loop (unless (remf initargs :direct-superclasses) (return)))
-    (loop (unless (remf initargs :direct-slots) (return)))
-    (values
-     meta
-     (nconc
-      (when (neq supplied-supers unsupplied)
-	(list :direct-superclasses (mapcar #'fix-super supplied-supers)))
-      (when (neq supplied-slots unsupplied)
-	(list :direct-slots supplied-slots))
-      initargs))))
+(defun ensure-class-values (class initargs)
+  (let (metaclass metaclassp reversed-plist)
+    (doplist (key val) initargs
+        (cond ((eq key :metaclass)
+               (setf metaclass val
+                     metaclassp key))
+              (t
+               (when (eq key :direct-superclasses)
+                 (setf val (mapcar #'fix-super val)))
+               (setf reversed-plist (list* val key reversed-plist)))))
+    (values (cond (metaclassp
+                   (find-class metaclass))
+                  ((or (null class) (forward-referenced-class-p class))
+                   *the-class-standard-class*)
+                  (t
+                   (class-of class)))
+            (nreverse reversed-plist))))
+
 
 (defmethod shared-initialize :after
 	   ((class std-class)
