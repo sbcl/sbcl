@@ -67,6 +67,7 @@
 	       (not (or (location= x y)
 			(and (sc-is x any-reg descriptor-reg immediate)
 			     (sc-is y control-stack))))))
+  (:temporary (:sc unsigned-reg) temp)
   (:effects)
   (:affected)
   (:generator 0
@@ -77,13 +78,13 @@
 	    (integer
 	     (if (and (zerop val) (sc-is y any-reg descriptor-reg))
 		 (inst xor y y)
-		 (move-immediate y (fixnumize val))))
+		 (move-immediate y (fixnumize val) temp)))
 	    (symbol
 	     (inst mov y (+ nil-value (static-symbol-offset val))))
 	    (character
 	     (inst mov y (logior (ash (char-code val) n-widetag-bits)
 				 base-char-widetag)))))
-      (move y x))))
+	(move y x))))
 
 (define-move-vop move :move
   (any-reg descriptor-reg immediate)
@@ -94,32 +95,21 @@
 ;;; few of the values in a continuation to fall out.
 (primitive-type-vop move (:check) t)
 
-(defun move-immediate (target val)
-  (multiple-value-bind (lo hi)
-      (dwords-for-quad val)
-    (cond ((and (zerop hi) (typep lo '(signed-byte 31)))
-	   (inst mov target lo))
-	  ((typep lo '(signed-byte 31))
-	   (inst mov target hi)
-	   (inst shl target 32)
-	   (inst or target lo))
-	  ;; High bit set in lower dword, need to set the high and low
-	  ;; words of the low dword separately due to sign extension
-	  ;; of immediate arguments.
-	  ((zerop hi)
-	   (multiple-value-bind (lo-lo lo-hi)
-	       (words-for-dword lo)
-	     (inst mov target lo-hi)
-	     (inst shl target 16)
-	     (inst or target lo-lo)))
-	  (t
-	   (multiple-value-bind (lo-lo lo-hi)
-	       (words-for-dword lo)
-	     (inst mov target hi)
-	     (inst shl target 16)
-	     (inst or target lo-hi)
-	     (inst shl target 16)
-	     (inst or target lo-lo))))))
+(defun move-immediate (target val &optional tmp-tn)
+  (cond
+    ;; If target is a register, we can just mov it there directly
+    ((and (tn-p target)
+	  (sc-is target signed-reg unsigned-reg descriptor-reg any-reg))
+     (inst mov target val))
+    ;; Likewise if the value is small enough.
+    ((typep val '(signed-byte 31))
+     (inst mov target val))
+    ;; Otherwise go through the temporary register
+    (tmp-tn
+     (inst mov tmp-tn val)
+     (inst mov target tmp-tn))
+    (t
+     (error "~A is not a register, no temporary given, and immediate ~A too large" target val))))
 
 ;;; The MOVE-ARG VOP is used for moving descriptor values into
 ;;; another frame for argument or known value passing.
