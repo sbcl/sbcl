@@ -415,33 +415,52 @@
 			      format-args)))
   (values))
 
-;;; COMPILER-NOTE is vaguely like COMPILER-ERROR and the other
-;;; condition-signalling functions, but it just writes some output
-;;; instead of signalling. (In CMU CL, it did signal a condition, but
-;;; this didn't seem to work all that well; it was weird to have
-;;; COMPILE-FILE return with WARNINGS-P set when the only problem was
-;;; that the compiler couldn't figure out how to compile something as
-;;; efficiently as it liked.)
-(defun compiler-note (format-string &rest format-args)
+;;; The act of signalling one of these beasts must not cause WARNINGSP
+;;; (or FAILUREP) to be set from COMPILE or COMPILE-FILE, so we can't
+;;; inherit from WARNING or STYLE-WARNING.
+;;;
+;;; FIXME: the handling of compiler-notes could be unified with
+;;; warnings and style-warnings (see the various handler functions
+;;; below).
+(define-condition compiler-note (condition) ())
+(define-condition simple-compiler-note (simple-condition compiler-note) ())
+
+(defun compiler-notify (format-string &rest format-args)
+  ;; FORMAT-STRING and FORMAT-ARGS might well end up turning into
+  ;; DATUM and REST, and COERCE-TO-CONDITION will be used.
   (unless (if *compiler-error-context*
 	      (policy *compiler-error-context* (= inhibit-warnings 3))
 	      (policy *lexenv* (= inhibit-warnings 3)))
+    (restart-case
+	(signal (make-condition 'simple-compiler-note
+				:format-string format-string
+				:format-arguments format-args))
+      (muffle-warning ()
+	(return-from compiler-notify (values))))
     (incf *compiler-note-count*)
     (print-compiler-message (format nil "note: ~A" format-string)
 			    format-args))
   (values))
 
 ;;; Issue a note when we might or might not be in the compiler.
-(defun maybe-compiler-note (&rest rest)
+(defun maybe-compiler-notify (&rest rest)
   (if (boundp '*lexenv*) ; if we're in the compiler
-      (apply #'compiler-note rest)
-      (let ((stream *error-output*))
-	(pprint-logical-block (stream nil :per-line-prefix ";")
-	  
-	  (format stream " note: ~3I~_")
-	  (pprint-logical-block (stream nil)
-	    (apply #'format stream rest)))
-	(fresh-line stream)))) ; (outside logical block, no per-line-prefix)
+      (apply #'compiler-notify rest)
+      (progn
+	(restart-case
+	    (signal (make-condition 'simple-compiler-note
+				    :format-string (car rest)
+				    :format-arguments (cdr rest)))
+	  (muffle-warning ()
+	    (return-from maybe-compiler-notify (values))))
+	(let ((stream *error-output*))
+	  (pprint-logical-block (stream nil :per-line-prefix ";")
+	    (format stream " note: ~3I~_")
+	    (pprint-logical-block (stream nil)
+	      (apply #'format stream rest)))
+	  ;; (outside logical block, no per-line-prefix)
+	  (fresh-line stream))
+	(values))))
 
 ;;; The politically correct way to print out progress messages and
 ;;; such like. We clear the current error context so that we know that

@@ -27,8 +27,8 @@
 	      (note (transform-note (car failure))))
 	  (cond
 	   ((consp what)
-	    (compiler-note "~@<unable to ~2I~_~A ~I~_because: ~2I~_~?~:>"
-			   note (first what) (rest what)))
+	    (compiler-notify "~@<unable to ~2I~_~A ~I~_because: ~2I~_~?~:>"
+			     note (first what) (rest what)))
 	   ((valid-fun-use node what
 			   :argument-test #'types-equal-or-intersect
 			   :result-test #'values-types-equal-or-intersect)
@@ -39,10 +39,10 @@
 		(valid-fun-use node what
 			       :unwinnage-fun #'give-grief
 			       :lossage-fun #'give-grief))
-	      (compiler-note "~@<unable to ~
-                              ~2I~_~A ~
-                              ~I~_due to type uncertainty: ~
-			      ~2I~_~{~?~^~@:_~}~:>"
+	      (compiler-notify "~@<unable to ~
+                                ~2I~_~A ~
+                                ~I~_due to type uncertainty: ~
+			        ~2I~_~{~?~^~@:_~}~:>"
 			     note (messages))))
 	   ;; As best I can guess, it's OK to fall off the end here
 	   ;; because if it's not a VALID-FUNCTION-USE, the user

@@ -169,7 +169,7 @@
 	      (or (sb!c:maybe-inline-syntactic-closure lambda env)
 		  (progn
 		    (#+sb-xc-host warn
-		     #-sb-xc-host sb!c:maybe-compiler-note
+		     #-sb-xc-host sb!c:maybe-compiler-notify
 		     "lexical environment too hairy, can't inline DEFUN ~S"
 		     name)
 		    nil)))))

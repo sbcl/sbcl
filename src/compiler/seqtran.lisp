@@ -569,7 +569,7 @@
 				(specifier-type 'function)))
 		(when (policy *compiler-error-context*
 			      (> speed inhibit-warnings))
-		  (compiler-note
+		  (compiler-notify
 		   "~S may not be a function, so must coerce at run-time."
 		   n-fun))
 		(once-only ((n-fun `(if (functionp ,n-fun)

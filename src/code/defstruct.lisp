@@ -49,7 +49,7 @@
 	   ;; slow, so if anyone cares about performance of
 	   ;; non-toplevel DEFSTRUCTs, it should be rewritten to be
 	   ;; cleverer. -- WHN 2002-10-23
-	   (sb!c::compiler-note
+	   (sb!c:compiler-notify
 	    "implementation limitation: ~
              Non-toplevel DEFSTRUCT constructors are slow.")
 	   (with-unique-names (layout)

@@ -862,8 +862,8 @@
                (return-block (and return (node-block return))))
 	  (unless (leaf-ever-used clambda)
 	    (let ((*compiler-error-context* bind))
-	      (compiler-note "deleting unused function~:[.~;~:*~%  ~S~]"
-			     (leaf-debug-name clambda))))
+	      (compiler-notify "deleting unused function~:[.~;~:*~%  ~S~]"
+			       (leaf-debug-name clambda))))
           (unless (block-delete-p bind-block)
             (unlink-blocks (component-head component) bind-block))
 	  (when (and return-block (not (block-delete-p return-block)))
@@ -1240,7 +1240,7 @@
 					  0)))
 	    (unless (return-p node)
 	      (let ((*compiler-error-context* node))
-		(compiler-note "deleting unreachable code")))
+		(compiler-notify "deleting unreachable code")))
 	    (return))))))
   (values))
 
@@ -1594,10 +1594,10 @@
 	   ;; compiler to be able to use WITH-COMPILATION-UNIT on
 	   ;; arbitrarily huge blocks of code. -- WHN)
 	   (let ((*compiler-error-context* node))
-	     (compiler-note "*INLINE-EXPANSION-LIMIT* (~W) was exceeded, ~
-			     probably trying to~%  ~
-			     inline a recursive function."
-			    *inline-expansion-limit*))
+	     (compiler-notify "*INLINE-EXPANSION-LIMIT* (~W) was exceeded, ~
+			       probably trying to~%  ~
+			       inline a recursive function."
+			      *inline-expansion-limit*))
 	   nil)
 	  (t t))))
 
@@ -1695,7 +1695,7 @@
 	     (policy (or node *lexenv*)
 		     (= inhibit-warnings 0)))
     (let ((*compiler-error-context* node))
-      (compiler-note (event-info-description info))))
+      (compiler-notify (event-info-description info))))
 
   (let ((action (event-info-action info)))
     (when action (funcall action node))))

@@ -426,7 +426,7 @@
                                 `(coerce (,',prim-quick (coerce x 'double-float))
                                   'single-float))
                                (t
-                                (compiler-note
+                                (compiler-notify
                                  "unable to avoid inline argument range check~@
                                   because the argument range (~S) was not within 2^64"
                                  (type-specifier (continuation-type x)))
@@ -439,7 +439,7 @@
                                                             (#.(expt 2d0 64)))))
                                `(,',prim-quick x))
                               (t
-                               (compiler-note
+                               (compiler-notify
                                 "unable to avoid inline argument range check~@
                                  because the argument range (~S) was not within 2^64"
                                 (type-specifier (continuation-type x)))
@@ -560,11 +560,11 @@
     ;; Check that the ARG bounds are correctly canonicalized.
     (when (and arg-lo (floatp arg-lo-val) (zerop arg-lo-val) (consp arg-lo)
 	       (minusp (float-sign arg-lo-val)))
-      (compiler-note "float zero bound ~S not correctly canonicalized?" arg-lo)
+      (compiler-notify "float zero bound ~S not correctly canonicalized?" arg-lo)
       (setq arg-lo '(0e0) arg-lo-val 0e0))
     (when (and arg-hi (zerop arg-hi-val) (floatp arg-hi-val) (consp arg-hi)
 	       (plusp (float-sign arg-hi-val)))
-      (compiler-note "float zero bound ~S not correctly canonicalized?" arg-hi)
+      (compiler-notify "float zero bound ~S not correctly canonicalized?" arg-hi)
       (setq arg-hi `(,(ecase *read-default-float-format*
 			(double-float (load-time-value (make-unportable-float :double-float-negative-zero)))
 			#!+long-float

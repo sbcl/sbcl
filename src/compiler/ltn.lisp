@@ -669,7 +669,7 @@
 ;;; known type.
 ;;;
 ;;; We go to some trouble to make the whole multi-line output into a
-;;; single call to COMPILER-NOTE so that repeat messages are
+;;; single call to COMPILER-NOTIFY so that repeat messages are
 ;;; suppressed, etc.
 (defun note-rejected-templates (call ltn-policy template)
   (declare (type combination call) (type ltn-policy ltn-policy)
@@ -727,16 +727,16 @@
 	      (count 1))))
 
 	(let ((*compiler-error-context* call))
-	  (compiler-note "~{~?~^~&~6T~}"
-			 (if template
-			     `("forced to do ~A (cost ~W)"
-			       (,(or (template-note template)
-				     (template-name template))
-				,(template-cost template))
-			       . ,(messages))
-			     `("forced to do full call"
-			       nil
-			       . ,(messages))))))))
+	  (compiler-notify "~{~?~^~&~6T~}"
+			   (if template
+			       `("forced to do ~A (cost ~W)"
+				 (,(or (template-note template)
+				       (template-name template))
+				  ,(template-cost template))
+				 . ,(messages))
+			       `("forced to do full call"
+				 nil
+				 . ,(messages))))))))
   (values))
 
 ;;; If a function has a special-case annotation method use that,

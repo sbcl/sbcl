@@ -995,7 +995,7 @@
      ;; compilation unit, so we can't do that. -- WHN 2001-02-11
      :lossage-fun #'compiler-style-warn
      :unwinnage-fun (cond (info #'compiler-style-warn)
-			  (for-real #'compiler-note)
+			  (for-real #'compiler-notify)
 			  (t nil))
      :really-assert
      (and for-real

@@ -220,8 +220,8 @@
   (let ((spec (hairy-type-specifier type)))
     (cond ((unknown-type-p type)
 	   (when (policy *lexenv* (> speed inhibit-warnings))
-	     (compiler-note "can't open-code test of unknown type ~S"
-			    (type-specifier type)))
+	     (compiler-notify "can't open-code test of unknown type ~S"
+			      (type-specifier type)))
 	   `(%typep ,object ',spec))
 	  (t
 	   (ecase (first spec)

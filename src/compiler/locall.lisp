@@ -347,9 +347,9 @@
 				       original-functional)))))))
 	(cond (losing-local-functional
 	       (let ((*compiler-error-context* call))
-		 (compiler-note "couldn't inline expand because expansion ~
-		                 calls this LET-converted local function:~
-		                 ~%  ~S"
+		 (compiler-notify "couldn't inline expand because expansion ~
+		                   calls this LET-converted local function:~
+		                   ~%  ~S"
 				(leaf-debug-name losing-local-functional)))
 	       original-functional)
 	      (t
@@ -602,7 +602,7 @@
 	  (let ((cont (first key)))
 	    (unless (constant-continuation-p cont)
 	      (when flame
-		(compiler-note "non-constant keyword in keyword call"))
+		(compiler-notify "non-constant keyword in keyword call"))
 	      (setf (basic-combination-kind call) :error)
 	      (return-from convert-more-call))
 
@@ -616,7 +616,7 @@
                          (setq allow-found t
                                allowp (continuation-value val)))
                         (t (when flame
-                             (compiler-note "non-constant :ALLOW-OTHER-KEYS value"))
+                             (compiler-notify "non-constant :ALLOW-OTHER-KEYS value"))
                            (setf (basic-combination-kind call) :error)
                            (return-from convert-more-call)))))
 	      (dolist (var (key-vars)

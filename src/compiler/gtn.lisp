@@ -137,7 +137,7 @@
 		     inhibit-warnings))
       (dolist (fun funs
 		   (let ((*compiler-error-context* (lambda-bind (first funs))))
-		     (compiler-note
+		     (compiler-notify
 		      "Return value count mismatch prevents known return ~
 		       from these functions:~
 		       ~{~%  ~A~}"
@@ -150,7 +150,7 @@
 		(declare (ignore ignore))
 		(when (eq count :unknown)
 		  (let ((*compiler-error-context* (lambda-bind fun)))
-		    (compiler-note
+		    (compiler-notify
 		     "Return type not fixed values, so can't use known return ~
 		      convention:~%  ~S"
 		     (type-specifier rtype)))

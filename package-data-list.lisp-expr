@@ -213,6 +213,8 @@ of SBCL which maintained the CMU-CL-style split into two packages.)"
               "COMPILE-IN-LEXENV"
 	      "COMPILE-LAMBDA-FOR-DEFUN"
               "%COMPILER-DEFUN" "COMPILER-ERROR"
+	      "COMPILER-NOTIFY"
+	      "COMPILER-STYLE-WARN" "COMPILER-WARN"
               "COMPONENT" "COMPONENT-HEADER-LENGTH"
               "COMPONENT-INFO" "COMPONENT-LIVE-TN" "COMPUTE-FUN"
               "COMPUTE-OLD-NFP" "COPY-MORE-ARG"
@@ -248,7 +250,7 @@ of SBCL which maintained the CMU-CL-style split into two packages.)"
               "MAKE-OTHER-IMMEDIATE-TYPE" "MAKE-RANDOM-TN"
               "MAKE-REPRESENTATION-TN" "MAKE-RESTRICTED-TN" "MAKE-SC-OFFSET"
               "MAKE-STACK-POINTER-TN" "MAKE-TN-REF" "MAKE-UNWIND-BLOCK"
-	      "MAKE-WIRED-TN" "MAYBE-COMPILER-NOTE"
+	      "MAKE-WIRED-TN" "MAYBE-COMPILER-NOTIFY"
 	      "MAYBE-INLINE-SYNTACTIC-CLOSURE"
               "META-PRIMITIVE-TYPE-OR-LOSE"
               "META-SB-OR-LOSE" "META-SC-NUMBER-OR-LOSE" "META-SC-OR-LOSE"
@@ -548,6 +550,10 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
 	     "DEFCONSTANT-UNEQL" "DEFCONSTANT-UNEQL-NAME"
 	     "DEFCONSTANT-UNEQL-NEW-VALUE" "DEFCONSTANT-UNEQL-OLD-VALUE"
 
+	     ;; conditions that can be handled to reduce compiler
+	     ;; verbosity
+	     "COMPILER-NOTE"
+
 	     ;; FIXME: This name doesn't match the DEFFOO - vs. -
 	     ;; DEFINE-FOO convention used in the ANSI spec, and so
 	     ;; was deprecated in sbcl-0.pre7, ca. 2001-12-12. After
@@ -704,7 +710,7 @@ retained, possibly temporariliy, because it might be used internally."
              "SIMPLE-PROGRAM-ERROR" "SIMPLE-STREAM-ERROR"
              "SIMPLE-STYLE-WARNING"
 	     "SPECIAL-FORM-FUNCTION"
-             "STYLE-WARN"
+             "STYLE-WARN" "SIMPLE-COMPILER-NOTE"
 	     
              ;; bootstrapping magic, to make things happen both in
              ;; the cross-compilation host compiler's environment and

@@ -1781,6 +1781,14 @@ changes in sbcl-0.8.1 relative to sbcl-0.8.0:
     functions defined in the same file. This also permits the system
     to warn on static type mismatches and function
     redefinition.  (Currently it does not work with high DEBUG level.)
+  * when issuing notes, the compiler now signals a condition of type
+    SB-EXT:COMPILER-NOTE, and provides an associated MUFFLE-WARNING
+    restart for use in user handlers.  It is expected that the
+    COMPILER-NOTE condition will eventually become a condition
+    supertype to a hierarchy of note types, which will then be
+    handleable in a similar fashion; other than
+    SB-INT:SIMPLE-COMPILER-NOTE, an implementation detail, no such
+    note subtypes yet exist.
   * changes in type checking closed the following bugs:
     ** type checking of unused values (192b, 194d, 203);
     ** template selection based on unsafe type assertions (192c, 236);

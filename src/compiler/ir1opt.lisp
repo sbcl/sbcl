@@ -935,7 +935,7 @@
 			;; issue a full WARNING if the call
 			;; violates a DECLAIM FTYPE.
 			:lossage-fun #'compiler-style-warn
-			:unwinnage-fun #'compiler-note)
+			:unwinnage-fun #'compiler-notify)
 	 (assert-call-type call type)
 	 (maybe-terminate-block call ir1-converting-not-optimizing-p)
 	 (recognize-known-call call ir1-converting-not-optimizing-p))

@@ -418,7 +418,7 @@
 					  #'types-equal-or-intersect)
 					 (*lossage-fun*
 					  #'compiler-style-warn)
-					 (*unwinnage-fun* #'compiler-note))
+					 (*unwinnage-fun* #'compiler-notify))
   (let* ((*lossage-detected* nil)
 	 (*unwinnage-detected* nil)
 	 (required (fun-type-required type))
@@ -766,7 +766,7 @@
     (when (eq where :declared)
       (setf (leaf-type fun) type)
       (assert-definition-type fun type
-                              :unwinnage-fun #'compiler-note
+                              :unwinnage-fun #'compiler-notify
                               :where "proclamation"))))
 
 ;;;; FIXME: Move to some other file.

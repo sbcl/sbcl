@@ -431,6 +431,8 @@
 
 ;;;; IR1-CONVERT, macroexpansion and special form dispatching
 
+(declaim (ftype (sfunction (continuation continuation t) (values))
+		ir1-convert))
 (macrolet (;; Bind *COMPILER-ERROR-BAILOUT* to a function that throws
 	   ;; out of the body and converts a proxy form instead.
 	   (ir1-error-bailout ((start
@@ -461,7 +463,6 @@
   ;; the creation using backquote of forms that contain leaf
   ;; references, without having to introduce dummy names into the
   ;; namespace.
-  (declaim (ftype (sfunction (continuation continuation t) (values)) ir1-convert))
   (defun ir1-convert (start cont form)
     (ir1-error-bailout (start cont form)
       (let ((*current-path* (or (gethash form *source-paths*)
@@ -701,7 +702,7 @@
                      ;; WHN 19990412
                      #+(and cmu sb-xc-host)
                      (warning (lambda (c)
-                                (compiler-note
+                                (compiler-notify
                                  "~@<~A~:@_~
                                   ~A~:@_~
                                   ~@<(KLUDGE: That was a non-STYLE WARNING. ~
@@ -794,12 +795,12 @@
 	(let ((transform (info :function
 			       :source-transform
 			       (leaf-source-name var))))
-	  (if transform
-	      (multiple-value-bind (result pass) (funcall transform form)
-		(if pass
-		    (ir1-convert-maybe-predicate start cont form var)
+          (if transform
+              (multiple-value-bind (result pass) (funcall transform form)
+                (if pass
+                    (ir1-convert-maybe-predicate start cont form var)
 		    (ir1-convert start cont result)))
-	      (ir1-convert-maybe-predicate start cont form var))))))
+              (ir1-convert-maybe-predicate start cont form var))))))
 
 ;;; If the function has the PREDICATE attribute, and the CONT's DEST
 ;;; isn't an IF, then we convert (IF <form> T NIL), ensuring that a
@@ -970,7 +971,7 @@
 	   (found
 	    (setf (leaf-type found) type)
 	    (assert-definition-type found type
-				    :unwinnage-fun #'compiler-note
+				    :unwinnage-fun #'compiler-notify
 				    :where "FTYPE declaration"))
 	   (t
 	    (res (cons (find-lexically-apparent-fun
@@ -1046,9 +1047,9 @@
 	      (etypecase found
 		(functional
 		 (when (policy *lexenv* (>= speed inhibit-warnings))
-		   (compiler-note "ignoring ~A declaration not at ~
-				   definition of local function:~%  ~S"
-				  sense name)))
+		   (compiler-notify "ignoring ~A declaration not at ~
+				     definition of local function:~%  ~S"
+				    sense name)))
 		(global-var
 		 (push (cons name (make-new-inlinep found sense))
 		       new-fenv)))))))
@@ -1140,7 +1141,7 @@
 				   "in VALUES declaration"))))
       (dynamic-extent
        (when (policy *lexenv* (> speed inhibit-warnings))
-	 (compiler-note
+	 (compiler-notify
 	  "compiler limitation: ~
         ~%  There's no special support for DYNAMIC-EXTENT (so it's ignored)."))
        res)
