@@ -6,6 +6,7 @@ all: $(EXTRA_ALL_TARGETS)
 	$(SBCL) --eval '(load "../asdf/asdf")' \
 	  --eval "(setf asdf::*central-registry* '((MERGE-PATHNAMES \"systems/\" (TRUENAME (SB-EXT:POSIX-GETENV \"SBCL_HOME\")))))" \
 	  --eval "(asdf:operate 'asdf:load-op :$(SYSTEM))" \
+	  --eval "(progn (when (probe-file \"$(SYSTEM).fasl\") (error \"fasl file exists\")) (with-open-file (s \"$(SYSTEM).lisp\" :direction :output :if-exists :error) (print (quote (require :asdf)) s) (print (quote (require :$(SYSTEM))) s)) (compile-file \"$(SYSTEM).lisp\") (delete-file \"$(SYSTEM).lisp\"))" \
 	  --eval "(quit)"
 
 test: all
