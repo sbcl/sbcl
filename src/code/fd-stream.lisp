@@ -115,6 +115,17 @@
 	 :format-arguments
 	 (list note-format (list pathname) (strerror errno))))
 
+(defun stream-decoding-error (stream &rest octets)
+  (error 'stream-decoding-error
+	 :stream stream
+         ;; FIXME: dunno how to get at OCTETS currently, or even if
+         ;; that's the right thing to report.
+         :octets octets))
+(defun stream-encoding-error (stream character)
+  (error 'stream-encoding-error
+	 :stream stream
+         :character character))
+
 ;;; This is called by the server when we can write to the given file
 ;;; descriptor. Attempt to write the data again. If it worked, remove
 ;;; the data from the OUTPUT-LATER list. If it didn't work, something
@@ -213,8 +224,9 @@
 	 `(when (> (fd-stream-ibuf-tail ,stream-var)
 		   (fd-stream-ibuf-head ,stream-var))
             (file-position ,stream-var (file-position ,stream-var))))
-    
-      ,@body
+      (with-simple-restart (output-nothing
+			    "~@<Skip output of this character.~@:>")
+	,@body)
       (incf (fd-stream-obuf-tail ,stream-var) size)
       ,(ecase (car buffering)
 	 (:none
@@ -237,8 +249,9 @@
 	 `(when (> (fd-stream-ibuf-tail ,stream-var)
 		   (fd-stream-ibuf-head ,stream-var))
             (file-position ,stream-var (file-position ,stream-var))))
-    
-      ,@body
+       (with-simple-restart (output-nothing
+			    "~@<Skip output of this character.~@:>")
+	 ,@body)
       (incf (fd-stream-obuf-tail ,stream-var) ,size)
       ,(ecase (car buffering)
 	 (:none
@@ -646,9 +659,11 @@
 	   (return))
 	 (frob-input ,stream-var)))))
 
-(defmacro input-wrapper/variable-width ((stream bytes eof-error eof-value)
+(defmacro input-wrapper/variable-width ((stream bytes eof-error eof-value
+						resync-function)
 					&body read-forms)
   (let ((stream-var (gensym))
+	(retry-var (gensym))
 	(element-var (gensym)))
     `(let ((,stream-var ,stream)
 	   (size nil))
@@ -657,14 +672,35 @@
 	       (fd-stream-unread ,stream-var)
 	     (setf (fd-stream-unread ,stream-var) nil)
 	     (setf (fd-stream-listen ,stream-var) nil))
-	   (let ((,element-var
-		  (catch 'eof-input-catcher
-		    (input-at-least ,stream-var 1)
-		    (let* ((byte (sap-ref-8 (fd-stream-ibuf-sap ,stream-var)
-					   (fd-stream-ibuf-head ,stream-var))))
-		      (setq size ,bytes)
-		      (input-at-least ,stream-var size)
-		      (locally ,@read-forms)))))
+	   (let ((,element-var nil))
+	     (do ((,retry-var t))
+		 ((not ,retry-var))
+	       (setq ,retry-var nil)
+	       (restart-case
+		   (catch 'eof-input-catcher
+		     (unless
+			 (block character-decode
+			   (input-at-least ,stream-var 1)
+			   (let* ((byte (sap-ref-8 (fd-stream-ibuf-sap
+						    ,stream-var)
+						   (fd-stream-ibuf-head
+						    ,stream-var))))
+			     (setq size ,bytes)
+			     (input-at-least ,stream-var size)
+			     (setq ,element-var (locally ,@read-forms))))
+		       (stream-decoding-error ,stream-var)))
+		 (attempt-resync ()
+		   :report (lambda (stream)
+			     (format stream
+				     "~@<Attempt to resync the stream at a ~
+                                     character boundary and continue.~@:>"))
+		   (,resync-function ,stream-var)
+		   (setq ,retry-var t))
+		 (end-of-file ()
+		   :report (lambda (stream)
+			     (format stream
+				     "~@<Force an end of file.~@:>"))
+		   nil)))
 	     (cond (,element-var
 		    (incf (fd-stream-ibuf-head ,stream-var) size)
 		    ,element-var)
@@ -692,11 +728,13 @@
 		    (eof-or-lose ,stream-var ,eof-error ,eof-value))))))))
 
 (defmacro def-input-routine/variable-width (name
-					    (type external-format size sap head)
+					    (type external-format size sap head
+						  resync-function)
 					    &rest body)
   `(progn
      (defun ,name (stream eof-error eof-value)
-       (input-wrapper/variable-width (stream ,size eof-error eof-value)
+       (input-wrapper/variable-width (stream ,size eof-error eof-value
+					     ,resync-function)
 	 (let ((,sap (fd-stream-ibuf-sap stream))
 	       (,head (fd-stream-ibuf-head stream)))
 	   ,@body)))
@@ -914,31 +952,33 @@
          (in-char-function (intern (let ((*print-case* :upcase))
                                      (format nil "INPUT-CHAR/~A" name)))))
     `(progn
-      (defun ,out-function (fd-stream string flush-p start end)
+      (defun ,out-function (stream string flush-p start end)
 	(let ((start (or start 0))
 	      (end (or end (length string))))
 	  (declare (type index start end))
-	  (when (> (fd-stream-ibuf-tail fd-stream)
-		   (fd-stream-ibuf-head fd-stream))
-	    (file-position fd-stream (file-position fd-stream)))
+	  (when (> (fd-stream-ibuf-tail stream)
+		   (fd-stream-ibuf-head stream))
+	    (file-position stream (file-position stream)))
 	  (when (< end start)
 	    (error ":END before :START!"))
 	  (do ()
 	      ((= end start))
-	    (setf (fd-stream-obuf-tail fd-stream)
-		  (do* ((len (fd-stream-obuf-length fd-stream))
-			(sap (fd-stream-obuf-sap fd-stream))
-			(tail (fd-stream-obuf-tail fd-stream)))
+	    (setf (fd-stream-obuf-tail stream)
+		  (do* ((len (fd-stream-obuf-length stream))
+			(sap (fd-stream-obuf-sap stream))
+			(tail (fd-stream-obuf-tail stream)))
 		       ((or (= start end) (< (- len tail) 4)) tail)
-		    (let* ((byte (aref string start))
-			   (bits (char-code byte)))
-		      ,out-expr
-		      (incf tail ,size)
-		      (incf start))))
+		    (with-simple-restart (output-nothing
+					  "~@<Skip output of this character.~@:>")
+		      (let* ((byte (aref string start))
+			     (bits (char-code byte)))
+			,out-expr
+			(incf tail ,size)))
+		    (incf start)))
 	    (when (< start end)
-	      (flush-output-buffer fd-stream)))
+	      (flush-output-buffer stream)))
 	  (when flush-p
-	    (flush-output-buffer fd-stream))))
+	    (flush-output-buffer stream))))
       (def-output-routines (,format
 			    ,size
 			    (:none character)
@@ -1001,7 +1041,8 @@
 	*external-formats*)))))
 
 (defmacro define-external-format/variable-width (external-format out-size-expr
-						 out-expr in-size-expr in-expr)
+						 out-expr in-size-expr in-expr
+						 resync-expr)
   (let* ((name (first external-format))
 	 (out-function (intern (let ((*print-case* :upcase))
 				 (format nil "OUTPUT-BYTES/~A" name))))
@@ -1010,7 +1051,9 @@
 				(format nil "FD-STREAM-READ-N-CHARACTERS/~A"
 					name))))
 	 (in-char-function (intern (let ((*print-case* :upcase))
-				     (format nil "INPUT-CHAR/~A" name)))))
+				     (format nil "INPUT-CHAR/~A" name))))
+	 (resync-function (intern (let ((*print-case* :upcase))
+				    (format nil "RESYNC/~A" name)))))
     `(progn
       (defun ,out-function (fd-stream string flush-p start end)
 	(let ((start (or start 0))
@@ -1070,13 +1113,33 @@
 	    ;; Copy data from stream buffer into user's buffer.
 	    (do ()
 		((or (= tail head) (= requested total-copied)))
-	      (let* ((byte (sap-ref-8 sap head))
-		     (size ,in-size-expr))
-		(when (> size (- tail head))
-		  (return))
-		(setf (aref buffer (+ start total-copied)) ,in-expr)
-		(incf total-copied)
-		(incf head size)))
+	      (restart-case
+		  (unless (block character-decode
+			    (let* ((byte (sap-ref-8 sap head))
+				   (size ,in-size-expr))
+			      (when (> size (- tail head))
+				(return))
+			      (setf (aref buffer (+ start total-copied))
+				    ,in-expr)
+			      (incf total-copied)
+			      (incf head size)))
+		    (setf (fd-stream-ibuf-head stream) head)
+		    (if (plusp total-copied)
+			(return-from ,in-function total-copied)
+			(stream-decoding-error stream)))
+		(attempt-resync ()
+		  :report (lambda (stream)
+			    (format stream
+				    "~@<Attempt to resync the stream at a ~
+                                    character boundary and continue.~@:>"))
+		  (,resync-function stream)
+		  (setf head (fd-stream-ibuf-head stream)))
+		(end-of-file ()
+		  :report (lambda (stream)
+			    (format stream "~@<Force an end of file.~@:>"))
+		  (if eof-error-p
+		      (error 'end-of-file :stream stream)
+		      (return-from ,in-function total-copied)))))
 	    (setf (fd-stream-ibuf-head stream) head)
 	    ;; Maybe we need to refill the stream buffer.
 	    (cond ( ;; If there were enough data in the stream buffer, we're done.
@@ -1093,23 +1156,33 @@
       (def-input-routine/variable-width ,in-char-function (character
 							   ,external-format
 							   ,in-size-expr
-							   sap head)
+							   sap head
+							   ,resync-function)
 	(let ((byte (sap-ref-8 sap head)))
 	  ,in-expr))
+      (defun ,resync-function (stream)
+	,resync-expr)
       (setf *external-formats*
        (cons '(,external-format ,in-function ,in-char-function ,out-function
 	       ,@(mapcar #'(lambda (buffering)
 			     (intern (let ((*print-case* :upcase))
 				       (format nil format buffering))))
-			 '(:none :line :full)))
+			 '(:none :line :full))
+	       ,resync-function)
 	*external-formats*)))))
 
-(define-external-format (:latin-1 :latin1 :iso-8859-1
-                         ;; FIXME: shouldn't ASCII-like things have an
-                         ;; extra typecheck for 7-bitness?
-                         :ascii :us-ascii :ansi_x3.4-1968)
+(define-external-format (:latin-1 :latin1 :iso-8859-1)
     1
-  (setf (sap-ref-8 sap tail) bits)
+  (if (>= bits 256)
+      (stream-encoding-error stream byte)
+      (setf (sap-ref-8 sap tail) bits))
+  (code-char byte))
+
+(define-external-format (:ascii :us-ascii :ansi_x3.4-1968)
+    1
+  (if (>= bits 128)
+      (stream-encoding-error stream byte)
+      (setf (sap-ref-8 sap tail) bits))
   (code-char byte))
 
 #!+sb-unicode
@@ -1138,10 +1211,10 @@
           (if (< bits 256)
               (if (= bits (char-code (aref latin-9-table bits)))
                   bits
-                  (error "cannot encode ~A in latin-9" bits))
+                  (stream-encoding-error stream byte))
               (if (= (aref latin-9-reverse-1 (logand bits 15)) bits)
                   (aref latin-9-reverse-2 (logand bits 15))
-                  (error "cannot encode ~A in latin-9" bits))))
+                  (stream-encoding-error stream byte))))
     (aref latin-9-table byte)))
 
 (define-external-format/variable-width (:utf-8 :utf8)
@@ -1162,19 +1235,38 @@
 	     (sap-ref-8 sap (+ 2 tail)) (logior #x80 (ldb (byte 6 6) bits))
 	     (sap-ref-8 sap (+ 3 tail)) (logior #x80 (ldb (byte 6 0) bits)))))
   (cond ((< byte #x80) 1)
+	((< byte #xc2) (return-from character-decode))
 	((< byte #xe0) 2)
 	((< byte #xf0) 3)
 	(t 4))
   (code-char (ecase size
 	       (1 byte)
-	       (2 (dpb byte (byte 5 6) (sap-ref-8 sap (1+ head))))
-	       (3 (dpb byte (byte 4 12)
-		       (dpb (sap-ref-8 sap (1+ head)) (byte 6 6)
-			    (sap-ref-8 sap (+ 2 head)))))
-	       (4 (dpb byte (byte 3 18)
-		       (dpb (sap-ref-8 sap (1+ head)) (byte 6 12)
-			    (dpb (sap-ref-8 sap (+ 2 head)) (byte 6 6)
-				 (sap-ref-8 sap (+ 3 head)))))))))
+	       (2 (let ((byte2 (sap-ref-8 sap (1+ head))))
+		    (unless (<= #x80 byte2 #xbf)
+		      (return-from character-decode))
+		    (dpb byte (byte 5 6) byte2)))
+	       (3 (let ((byte2 (sap-ref-8 sap (1+ head)))
+			(byte3 (sap-ref-8 sap (+ 2 head))))
+		    (unless (and (<= #x80 byte2 #xbf)
+				 (<= #x80 byte3 #xbf))
+		      (return-from character-decode))
+		    (dpb byte (byte 4 12) (dpb byte2 (byte 6 6) byte3))))
+	       (4 (let ((byte2 (sap-ref-8 sap (1+ head)))
+			(byte3 (sap-ref-8 sap (+ 2 head)))
+			(byte4 (sap-ref-8 sap (+ 3 head))))
+		    (unless (and (<= #x80 byte2 #xbf)
+				 (<= #x80 byte3 #xbf)
+				 (<= #x80 byte4 #xbf))
+		      (return-from character-decode))
+		    (dpb byte (byte 3 18)
+			 (dpb byte2 (byte 6 12)
+			      (dpb byte3 (byte 6 6) byte4)))))))
+  (loop (input-at-least stream 1)
+	(let ((byte (sap-ref-8 (fd-stream-ibuf-sap stream)
+			       (fd-stream-ibuf-head stream))))
+	  (unless (<= #x80 byte #xc1)
+	    (return)))
+	(incf (fd-stream-ibuf-head stream))))
 
 ;;;; utility functions (misc routines, etc)
 
