@@ -1338,6 +1338,8 @@ changes in sbcl-0.7.9 relative to sbcl-0.7.8:
     symbol macro only once
   * fixed printing of call frame when argument list is unavailable
   * fixed bug: :ALLOW-OTHER-KEYS is an allowed keyword name
+  * compiler no longer signals WARNING on unknown keyword
+    :ALLOW-OTHER-KEYS
 
 planned incompatible changes in 0.7.x:
 * When the profiling interface settles down, maybe in 0.7.x, maybe

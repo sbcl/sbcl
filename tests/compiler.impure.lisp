@@ -516,6 +516,45 @@ BUG 48c, not yet fixed:
                '(:x nil t t)))
 (assert (raises-error? (bug211d :y 2 :allow-other-keys nil) program-error))
 
+(let ((failure-p
+       (nth-value
+        3
+        (compile 'bug211b
+                 '(lambda ()
+                   (flet ((test (&key (x :x x-p) ((:allow-other-keys y) :y y-p))
+                            (list x x-p y y-p)))
+                     (assert (equal (test) '(:x nil :y nil)))
+                     (assert (equal (test :x 1) '(1 t :y nil)))
+                     (assert (equal (test :y 2 :allow-other-keys 11 :allow-other-keys nil)
+                                    '(:x nil 11 t)))))))))
+  (assert (not failure-p))
+  (bug211b))
+
+(let ((failure-p
+       (nth-value
+        3
+        (compile 'bug211c
+                 '(lambda ()
+                   (flet ((test (&key (x :x x-p))
+                            (list x x-p)))
+                     (assert (equal (test) '(:x nil)))
+                     (assert (equal (test :x 1) '(1 t)))
+                     (assert (equal (test :y 2 :allow-other-keys 11 :allow-other-keys nil)
+                                    '(:x nil)))))))))
+  (assert (not failure-p))
+  (bug211c))
+
+(dolist (form '((test :y 2)
+                (test :y 2 :allow-other-keys nil)
+                (test :y 2 :allow-other-keys nil :allow-other-keys t)))
+  (multiple-value-bind (result warnings-p failure-p)
+      (compile nil `(lambda ()
+                     (flet ((test (&key (x :x x-p) ((:allow-other-keys y) :y y-p))
+                              (list x x-p y y-p)))
+                       ,form)))
+    (assert failure-p)
+    (assert (raises-error? (funcall result) program-error))))
+
 
 ;;;; tests not in the problem domain, but of the consistency of the
 ;;;; compiler machinery itself

@@ -1271,9 +1271,6 @@ WORKAROUND:
 211: "keywords processing"
   a. :ALLOW-OTHER-KEYS T should allow a function to receive an odd
      number of keyword arguments.
-  b. Compiling of a local call with an unknown key and
-     :ALLOW-OTHER-KEYS T should not cause a WARNING.
-  c. Compiler should not warn on an unknown key :ALLOW-OTHER-KEYS.
 
 212: "Sequence functions and circular arguments"
   COERCE, MERGE and CONCATENATE go into an infinite loop when given

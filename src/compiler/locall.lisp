@@ -578,6 +578,8 @@
 	 (flame (policy call (or (> speed inhibit-warnings)
 				 (> space inhibit-warnings))))
 	 (loser nil)
+         (allowp nil)
+         (allow-found nil)
 	 (temps (make-gensym-list max))
 	 (more-temps (make-gensym-list (length more))))
     (collect ((ignores)
@@ -617,17 +619,28 @@
 	    (let ((name (continuation-value cont))
 		  (dummy (first temp))
 		  (val (second temp)))
+              ;; FIXME: check whether KEY was supplied earlier
+              (when (and (eq name :allow-other-keys) (not allow-found))
+                (let ((val (second key)))
+                  (cond ((constant-continuation-p val)
+                         (setq allow-found t
+                               allowp (continuation-value val)))
+                        (t (when flame
+                             (compiler-note "non-constant :ALLOW-OTHER-KEYS value"))
+                           (setf (basic-combination-kind call) :error)
+                           (return-from convert-more-call)))))
 	      (dolist (var (key-vars)
 			   (progn
 			     (ignores dummy val)
-			     (setq loser name)))
+                             (unless (eq name :allow-other-keys)
+                               (setq loser name))))
 		(let ((info (lambda-var-arg-info var)))
 		  (when (eq (arg-info-key info) name)
 		    (ignores dummy)
 		    (supplied (cons var val))
 		    (return)))))))
 
-	(when (and loser (not (optional-dispatch-allowp fun)))
+	(when (and loser (not (optional-dispatch-allowp fun)) (not allowp))
 	  (compiler-warn "function called with unknown argument keyword ~S"
 			 loser)
 	  (setf (basic-combination-kind call) :error)
