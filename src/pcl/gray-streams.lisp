@@ -99,7 +99,10 @@
   
   (defmethod input-stream-p ((stream ansi-stream))
     (ansi-stream-input-stream-p stream))
-  
+
+  (defmethod input-stream-p ((stream fundamental-stream))
+    nil)
+
   (defmethod input-stream-p ((stream fundamental-input-stream))
     t)
 
@@ -119,6 +122,9 @@
   (defmethod output-stream-p ((stream ansi-stream))
     (ansi-stream-output-stream-p stream))
 
+  (defmethod output-stream-p ((stream fundamental-stream))
+    nil)
+  
   (defmethod output-stream-p ((stream fundamental-output-stream))
     t)
 
