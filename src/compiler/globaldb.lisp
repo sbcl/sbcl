@@ -372,7 +372,8 @@
 			     (declare (ignorable ,type-var ,class-var
 						 ,value-var))
 			     ,@body
-			     (unless (zerop (logand ,n-info compact-info-entry-last))
+			     (unless (zerop (logand ,n-info
+						    compact-info-entry-last))
 			       (return-from ,PUNT))))))))))))))
 
 ;;; Return code to iterate over a volatile info environment.

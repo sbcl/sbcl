@@ -33,7 +33,7 @@
 	      (let ((*current-level* (1+ *current-level*)))
 		(,flet-name)))))))
 
-(defmacro punt-if-too-long (index stream)
+(defmacro punt-print-if-too-long (index stream)
   #!+sb-doc
   "Punt if INDEX is equal or larger then *PRINT-LENGTH* (and *PRINT-READABLY*
    is NIL) by outputting \"...\" and returning from the block named NIL."

@@ -84,8 +84,9 @@
         form)))
 
 ;;; A HAIRY-TYPE represents anything too weird to be described
-;;; reasonably or to be useful, such as AND, NOT and SATISFIES and
-;;; unknown types. We just remember the original type spec.
+;;; reasonably or to be useful, such as NOT, SATISFIES, unknown types,
+;;; and unreasonably complicated types involving AND. We just remember
+;;; the original type spec.
 (defstruct (hairy-type (:include ctype
 				 (class-info (type-class-or-lose 'hairy))
 				 (enumerable t))

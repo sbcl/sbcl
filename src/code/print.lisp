@@ -925,7 +925,7 @@
     (let ((length 0)
 	  (list list))
       (loop
-	(punt-if-too-long length stream)
+	(punt-print-if-too-long length stream)
 	(output-object (pop list) stream)
 	(unless list
 	  (return))
@@ -958,7 +958,7 @@
 	   (dotimes (i (length vector))
 	     (unless (zerop i)
 	       (write-char #\space stream))
-	     (punt-if-too-long i stream)
+	     (punt-print-if-too-long i stream)
 	     (output-object (aref vector i) stream))
 	   (write-string ")" stream)))))
 
@@ -1020,13 +1020,13 @@
 	     (dotimes (i dimension)
 	       (unless (zerop i)
 		 (write-char #\space stream))
-	       (punt-if-too-long i stream)
+	       (punt-print-if-too-long i stream)
 	       (sub-output-array-guts array dimensions stream index)
 	       (incf index count)))
 	   (write-char #\) stream)))))
 
-;;; a trivial non-generic-function placeholder for PRINT-OBJECT, for use
-;;; until CLOS is set up (at which time it will be replaced with
+;;; a trivial non-generic-function placeholder for PRINT-OBJECT, for
+;;; use until CLOS is set up (at which time it will be replaced with
 ;;; the real generic function implementation)
 (defun print-object (instance stream)
   (default-structure-print instance stream *current-level*))

@@ -1503,7 +1503,7 @@
 	  t))
 
 (!define-type-method (member :complex-subtypep-arg1) (type1 type2)
-  (block PUNT
+  (block punt-type-method
     (values (every-type-op ctypep type2 (member-type-members type1)
 			   :list-first t)
 	    t)))
@@ -1530,13 +1530,13 @@
 	    t)))
 
 (!define-type-method (member :complex-intersection) (type1 type2)
-  (block PUNT
+  (block punt-type-method
     (collect ((members))
       (let ((mem2 (member-type-members type2)))
 	(dolist (member mem2)
 	  (multiple-value-bind (val win) (ctypep member type1)
 	    (unless win
-	      (return-from PUNT (values type2 nil)))
+	      (return-from punt-type-method (values type2 nil)))
 	    (when val (members member))))
 
 	(values (cond ((subsetp mem2 (members)) type2)
@@ -1575,6 +1575,42 @@
     (make-member-type :members (remove-duplicates members))
     *empty-type*))
 
+;;;; intersection types
+;;;;
+;;;; Until version 0.6.10.6, SBCL followed the original CMU CL approach
+;;;; of punting on all AND types, not just the unreasonably complicated
+;;;; ones. The change was motivated by trying to get the KEYWORD type
+;;;; to behave sensibly:
+;;;;    ;; reasonable definition
+;;;;    (DEFTYPE KEYWORD () '(AND SYMBOL (SATISFIES KEYWORDP)))
+;;;;    ;; reasonable behavior
+;;;;    (ASSERT (SUBTYPEP 'KEYWORD 'SYMBOL))
+;;;; Without understanding a little about the semantics of AND, we'd
+;;;; get (SUBTYPEP 'KEYWORD 'SYMBOL)=>NIL,NIL, which is unreasonable.)
+;;;;
+;;;; We still follow the example of CMU CL to some extent, by punting
+;;;; (to the opaque HAIRY-TYPE) on sufficiently complicated types
+;;;; involving AND.
+
+;;; Make a union type from the specifier types; or punt (to opaque
+;;; HAIRY-TYPE) if the class looks as though it might get too hairy. 
+(defun make-intersection-type (types)
+  (declare (list types))
+  ;; "If potentially too hairy.."
+  ;;
+  ;; (CMU CL punted for all AND-based types, and we'd like to avoid
+  ;; any really unreasonable cases which might have motivated them to
+  ;; do this, while still being reasonably effective on simple
+  ;; intersection types like KEYWORD.)
+  (if (any (lambda (type)
+	     (or (union-type-p type)
+		 (hairy-type-p type)))
+	   types)
+      (make-hairy-type :specifier (mapcar #'type-specifier types))
+      (%make-intersection-type (some #'type-enumerable types) types)))
+
+(!define-type-class intersection)
+
 ;;;; union types
 
 ;;; Make a union type from the specifier types, setting ENUMERABLE in
@@ -1595,7 +1631,7 @@
 ;;; Two union types are equal if every type in one is equal to some
 ;;; type in the other.
 (!define-type-method (union :simple-=) (type1 type2)
-  (block PUNT
+  (block punt-type-method
     (let ((types1 (union-type-types type1))
 	  (types2 (union-type-types type2)))
       (values (and (dolist (type1 types1 t)
@@ -1609,7 +1645,7 @@
 ;;; Similarly, a union type is a subtype of another if every element
 ;;; of TYPE1 is a subtype of some element of TYPE2.
 (!define-type-method (union :simple-subtypep) (type1 type2)
-  (block PUNT
+  (block punt-type-method
     (let ((types2 (union-type-types type2)))
       (values (dolist (type1 (union-type-types type1) t)
 		(unless (any-type-op csubtypep type1 types2)
@@ -1617,13 +1653,13 @@
 	      t))))
 
 (!define-type-method (union :complex-subtypep-arg1) (type1 type2)
-  (block PUNT
+  (block punt-type-method
     (values (every-type-op csubtypep type2 (union-type-types type1)
 			   :list-first t)
 	    t)))
 
 (!define-type-method (union :complex-subtypep-arg2) (type1 type2)
-  (block PUNT
+  (block punt-type-method
     (values (any-type-op csubtypep type1 (union-type-types type2)) t)))
 
 (!define-type-method (union :complex-union) (type1 type2)

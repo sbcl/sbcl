@@ -106,7 +106,7 @@
 	   (,n-uncertain nil))
        (dolist (,n-this ,list
 			(if ,n-uncertain
-			    (return-from PUNT ,default)
+			    (return-from punt-type-method ,default)
 			    nil))
 	 (multiple-value-bind (,n-val ,n-win)
 	     ,(if list-first
@@ -126,7 +126,7 @@
 	     ,(if list-first
 		  `(,op ,n-this ,n-thing)
 		`(,op ,n-thing ,n-this))
-	   (unless ,n-win (return-from PUNT ,default))
+	   (unless ,n-win (return-from punt-type-method ,default))
 	   (unless ,n-val (return nil)))))))
 
 ;;; Compute the intersection for types that intersect only when one is a
