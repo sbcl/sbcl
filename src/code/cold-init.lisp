@@ -205,15 +205,9 @@
 
   ;; FIXME: This list of modes should be defined in one place and
   ;; explicitly shared between here and REINIT.
-  ;;
-  ;; FIXME: In CMU CL, this is done "here" (i.e. in the analogous
-  ;; lispinit.lisp code) for every processor architecture. But Daniel
-  ;; Barlow's Alpha patches suppress it for Alpha. Why the difference?
-  #!+alpha
-  (set-floating-point-modes :traps '(:overflow
-				     #!+alpha :underflow
-				     :invalid
-				     :divide-by-zero))
+
+  ;; Why was this marked #!+alpha?  CMUCL does it here on all architectures
+  (set-floating-point-modes :traps '(:overflow :invalid :divide-by-zero))
 
   (show-and-call !class-finalize)
 
@@ -279,18 +273,12 @@ instead (which is another name for the same thing)."))
       (signal-cold-init-or-reinit)
       (gc-reinit)
       (setf (sb!alien:extern-alien "internal_errors_enabled" boolean) t)
-      (set-floating-point-modes :traps
-				'(:overflow
-				  :invalid
-				  :divide-by-zero
-				  ;; PRINT seems not to like x86 NPX
-				  ;; denormal floats like
-				  ;; LEAST-NEGATIVE-SINGLE-FLOAT, so
-				  ;; the :UNDERFLOW exceptions are
-				  ;; disabled by default. Joe User can
-				  ;; explicitly enable them if
-				  ;; desired.
-				  #!+alpha :underflow))
+      ;; PRINT seems not to like x86 NPX denormal floats like
+      ;; LEAST-NEGATIVE-SINGLE-FLOAT, so the :UNDERFLOW exceptions are
+      ;; disabled by default. Joe User can explicitly enable them if
+      ;; desired.
+      (set-floating-point-modes :traps '(:overflow :invalid :divide-by-zero))
+
       ;; Clear pseudo atomic in case this core wasn't compiled with
       ;; support.
       ;;

@@ -180,3 +180,7 @@ ldso_stub__ ## fct: ;                           \
  LDSO_STUBIFY(log10) 
  LDSO_STUBIFY(sqrt) 
 #endif
+#if defined alpha
+ LDSO_STUBIFY(ieee_get_fp_control)
+ LDSO_STUBIFY(ieee_set_fp_control)
+#endif

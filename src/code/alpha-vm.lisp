@@ -115,27 +115,29 @@
   (setf (deref (context-float-register-addr context index))
         (coerce new format)))
 
+;;; This sets the software fp_control word, which is not the same
+;;; thing as the hardware fpcr.  We have to do this so that OS FPU
+;;; completion works properly
+
+;;; Note that this means we can't set rounding modes; we'd have to do
+;;; that separately.  That said, almost everybody seems to agree that
+;;; changing the rounding mode is rarely a good idea, because it upsets
+;;; libm functions.  So adding that is not a priority.  Sorry.
+;;; -dan 2001.02.06
+
+(define-alien-routine
+    ("arch_get_fp_control" floating-point-modes) (sb!alien:unsigned 64))
+
+(define-alien-routine
+    ("arch_set_fp_control" %floating-point-modes-setter) void (fp (sb!alien:unsigned 64)))
+
+(defun (setf floating-point-modes) (val) (%floating-point-modes-setter val))
+
 ;;; Given a signal context, return the floating point modes word in
 ;;; the same format as returned by FLOATING-POINT-MODES.
-(defun context-floating-point-modes (context)
-  ;; FIXME: As of sbcl-0.6.7 and the big rewrite of signal handling for
-  ;; POSIXness and (at the Lisp level) opaque signal contexts,
-  ;; this is stubified. It needs to be rewritten as an
-  ;; alien function.
-  (warn "stub CONTEXT-FLOATING-POINT-MODES")
+(define-alien-routine ("os_context_fp_control" context-floating-point-modes)
+    (sb!alien:unsigned 64) (context (* os-context-t)))
 
-  ;; old code for Linux:
-  #+nil
-  (let ((cw (slot (deref (slot context 'fpstate) 0) 'cw))
-	(sw (slot (deref (slot context 'fpstate) 0) 'sw)))
-    ;;(format t "cw = ~4X~%sw = ~4X~%" cw sw)
-    ;; NOT TESTED -- Clear sticky bits to clear interrupt condition.
-    (setf (slot (deref (slot context 'fpstate) 0) 'sw) (logandc2 sw #x3f))
-    ;;(format t "new sw = ~X~%" (slot (deref (slot context 'fpstate) 0) 'sw))
-    ;; Simulate floating-point-modes VOP.
-    (logior (ash (logand sw #xffff) 16) (logxor (logand cw #xffff) #x3f)))
-
-  0)
 
 ;;;; INTERNAL-ERROR-ARGS
 

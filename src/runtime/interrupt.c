@@ -40,6 +40,7 @@ void sigaddset_blockable(sigset_t *s)
     sigaddset(s, SIGPIPE);
     sigaddset(s, SIGALRM);
     sigaddset(s, SIGURG);
+    sigaddset(s, SIGFPE);
     sigaddset(s, SIGTSTP);
     sigaddset(s, SIGCHLD);
     sigaddset(s, SIGIO);
@@ -290,7 +291,6 @@ interrupt_handle_pending(os_context_t *context)
 	{
 	    undo_fake_foreign_function_call(context);
         }
-	fprintf(stderr,"interrupt-handle-pending: back from MAYBE_GC\n");
     }
 
     /* FIXME: This isn't very clear. It would be good to reverse

@@ -34,6 +34,7 @@
 #include <sys/time.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <asm/fpu.h>
 
 #include "validate.h"
 size_t os_vm_page_size;
@@ -66,6 +67,13 @@ os_context_sigmask_addr(os_context_t *context)
 {
     return &context->uc_sigmask;
 }
+
+unsigned long
+os_context_fp_control(os_context_t *context)
+{
+    return ieee_fpcr_to_swcr((context->uc_mcontext).sc_fpcr);
+}
+
 
 void os_flush_icache(os_vm_address_t address, os_vm_size_t length)
 {

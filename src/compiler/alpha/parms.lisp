@@ -51,30 +51,57 @@
 (defconstant double-float-digits
   (+ (byte-size double-float-significand-byte) n-word-bits 1))
 
-;; Values in 17f code seem to be same as HPPA. These values are from
-;; DEC Assembly Language Programmers guide. The active bits are
-;; actually in (byte 12 52) of the fpcr. (byte 6 52) contain the
-;; exception flags. Bit 63 is the bitwise logor of all exceptions.
-;; The enable and exception bytes are in a software control word
-;; manipulated via OS functions and the bits in the SCP match those
-;; defs. This mapping follows <machine/fpu.h>
+;;; These values are originally from the DEC Assembly Language
+;;; Programmers guide.  Where possible we read/write the software
+;;; fp_control word, which apparently is necessary for the OS FPU
+;;; completion (OS handler which fixes up non-IEEE answers that the
+;;; hardware occasionally gives us) to work properly.  The rounding
+;;; mode, however, can't be set that way, so we have to deal with that
+;;; directly.  (FIXME: we actually don't suport setting the rounding mode
+;;; at the moment anyway)
+
+;;; Short guide to floating point trap terminology: an "exception" is
+;;; cheap and can happen at almost any time.  An exception will only
+;;; generate a trap if that trap is enabled, otherwise a default value
+;;; will be substituted.  A "trap" will end up somewhere in the
+;;; kernel, which may play by its own rules,  (on Alpha it allegedly
+;;; actually fixes up some non-IEEE compliant results to get the
+;;; _right_ answer) but if something is really wrong will eventually
+;;; signal SIGFPE and let us sort it out.
+
+;;; Old comment follows: The active bits are actually in (byte 12 52)
+;;; of the fpcr. (byte 6 52) contain the exception flags. Bit 63 is the
+;;; bitwise logor of all exceptions.  The enable and exception bytes
+;;; are in a software control word manipulated via OS functions and the
+;;; bits in the SCP match those defs. This mapping follows
+;;; <machine/fpu.h>
+
+;;; trap enables are set in software (fp_control)
 (defconstant float-inexact-trap-bit        (ash 1 4)) ; rw
 (defconstant float-underflow-trap-bit      (ash 1 3)) ; rw
 (defconstant float-overflow-trap-bit       (ash 1 2)) ; ro
 (defconstant float-divide-by-zero-trap-bit (ash 1 1)) ; ro
 (defconstant float-invalid-trap-bit        (ash 1 0)) ; ro
+(defconstant-eqx float-traps-byte          (byte 6  1) #'equalp)  
 
+;;; exceptions are also read/written in software (by syscalls, no less).
+;;; This is kind of dumb, but has to be done
+(defconstant-eqx float-sticky-bits     (byte 6 17) #'equalp)	; fp_control
+
+;;; (We don't actually _have_ "current exceptions" on Alpha; the
+;;; hardware only ever sets bits.  So, set this the same as accrued
+;;; exceptions)
+(defconstant-eqx float-exceptions-byte (byte 6 17)  #'equalp)
+
+;;; Rounding modes can only be set by frobbing the hardware fpcr directly
 (defconstant float-round-to-zero     0)
 (defconstant float-round-to-negative 1)
 (defconstant float-round-to-nearest  2)
 (defconstant float-round-to-positive 3)
+(defconstant-eqx float-rounding-mode   (byte 2 58) #'equalp) 
 
-;; These aren't quite correct yet. Work in progress.
-(defconstant-eqx float-rounding-mode   (byte 2 58) #'equalp)	; hardware fpcr
-(defconstant-eqx float-exceptions-byte (byte 6 52)  #'equalp)	; hardware fpcr
-(defconstant-eqx float-sticky-bits     (byte 6 17) #'equalp)	; software (clear only)
-(defconstant-eqx float-traps-byte      (byte 6  1) #'equalp)	; software fp control word
-(defconstant float-condition-bit   (ash  1 63))	; summary - not used?? XXX
+;;; Miscellaneous stuff - I think it's far to say that you deserve
+;;; what you get if you ask for fast mode.
 (defconstant float-fast-bit 0)
 
 ); eval-when

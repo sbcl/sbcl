@@ -478,13 +478,15 @@
 ;;;; float conversion
 
 (macrolet
-    ((frob (name translate inst ld-inst to-sc to-type &optional single)
-           (declare (ignorable single))
+    ((frob (name translate inst ld-inst to-sc to-type)
            `(define-vop (,name)
               (:args (x :scs (signed-reg) :target temp
                         :load-if (not (sc-is x signed-stack))))
-              (:temporary (:scs (single-stack)) temp)
-              (:results (y :scs (,to-sc)))
+	     (:temporary (:scs (,to-sc)) freg1)
+	     (:temporary (:scs (,to-sc)) freg2)
+	     (:temporary (:scs (single-stack)) temp)
+	     
+	     (:results (y :scs (,to-sc)))
               (:arg-types signed-num)
               (:result-types ,to-type)
               (:policy :fast-safe)
@@ -503,71 +505,78 @@
                                            temp)
                                           (signed-stack
                                            x))))
-                            (inst ,ld-inst y
+                            (inst ,ld-inst freg1
                                   (* (tn-offset stack-tn) n-word-bytes)
                                   (current-nfp-tn vop))
                             (note-this-location vop :internal-error)
-                            ,@(when single
-                                `((inst cvtlq y y)))
-                            (inst ,inst y y))))))
-  (frob %single-float/signed %single-float cvtqs lds single-reg single-float t)
-  (frob %double-float/signed %double-float cvtqt lds double-reg double-float t))
+			    (inst cvtlq freg1 freg2)
+			    (inst ,inst freg2 y)
+			    (inst excb)
+			    )))))
+  (frob %single-float/signed %single-float cvtqs_sui lds single-reg single-float)
+  (frob %double-float/signed %double-float cvtqt_sui lds double-reg double-float))
 
+;;; see previous comment about software trap handlers: also applies here
 (macrolet ((frob (name translate inst from-sc from-type to-sc to-type)
              `(define-vop (,name)
-                (:args (x :scs (,from-sc)))
-                (:results (y :scs (,to-sc)))
-                (:arg-types ,from-type)
-                (:result-types ,to-type)
-                (:policy :fast-safe)
-                (:note "inline float coercion")
-                (:translate ,translate)
-                (:vop-var vop)
-                (:save-p :compute-only)
-                (:generator 2
-                  (note-this-location vop :internal-error)
-		  (inst ,inst x y)))))
-  (frob %single-float/double-float %single-float cvtts
-    double-reg double-float single-reg single-float)
+	       (:args (x :scs (,from-sc)))
+	       (:results (y :scs (,to-sc) :from :load))
+	       (:arg-types ,from-type)
+	       (:result-types ,to-type)
+	       (:policy :fast-safe)
+	       (:note "inline float coercion")
+	       (:translate ,translate)
+	       (:vop-var vop)
+	       (:save-p :compute-only)
+	       (:generator 2
+		(note-this-location vop :internal-error)
+		(inst ,inst x y)
+		(inst excb)
+		))))
+  (frob %single-float/double-float %single-float cvtts_su
+	double-reg double-float single-reg single-float)
   (frob %double-float/single-float %double-float fmove
-    single-reg single-float double-reg double-float))
+	single-reg single-float double-reg double-float))
 
 (macrolet
     ((frob (trans from-sc from-type inst &optional single)
-           (declare (ignorable single))
-           `(define-vop (,(symbolicate trans "/" from-type))
-              (:args (x :scs (,from-sc) :target temp))
-              (:temporary (:from (:argument 0) :sc single-reg) temp)
-              (:temporary (:scs (signed-stack)) stack-temp)
-              (:results (y :scs (signed-reg)
-                           :load-if (not (sc-is y signed-stack))))
-              (:arg-types ,from-type)
-              (:result-types signed-num)
-              (:translate ,trans)
-              (:policy :fast-safe)
-              (:note "inline float truncate")
-              (:vop-var vop)
-              (:save-p :compute-only)
-              (:generator 5
-                          (note-this-location vop :internal-error)
-                          (inst ,inst x temp)
-                          (sc-case y
-                                   (signed-stack
-                                    (inst stt temp
-                                          (* (tn-offset y) n-word-bytes)
-                                          (current-nfp-tn vop)))
-                                   (signed-reg
-                                    (inst stt temp
-                                          (* (tn-offset stack-temp)
-                                             n-word-bytes)
-                                          (current-nfp-tn vop))
-                                    (inst ldq y
-			   (* (tn-offset stack-temp) n-word-bytes)
-			   (current-nfp-tn vop))))))))
-  (frob %unary-truncate single-reg single-float cvttq/c t)
-  (frob %unary-truncate double-reg double-float cvttq/c)
-  (frob %unary-round single-reg single-float cvttq t)
-  (frob %unary-round double-reg double-float cvttq))
+       (declare (ignorable single))
+       `(define-vop (,(symbolicate trans "/" from-type))
+	 (:args (x :scs (,from-sc) :target temp))
+	 (:temporary (:from :load ;(:argument 0)
+		      :sc single-reg) temp)
+	 (:temporary (:scs (signed-stack)) stack-temp)
+	 (:results (y :scs (signed-reg)
+		    :load-if (not (sc-is y signed-stack))))
+	 (:arg-types ,from-type)
+	 (:result-types signed-num)
+	 (:translate ,trans)
+	 (:policy :fast-safe)
+	 (:note "inline float truncate")
+	 (:vop-var vop)
+	 (:save-p :compute-only)
+	 (:generator 5
+	  (note-this-location vop :internal-error)
+	  (inst ,inst x temp)
+	  (sc-case y
+	   (signed-stack
+	    (inst stt temp
+		  (* (tn-offset y) n-word-bytes)
+		  (current-nfp-tn vop)))
+	   (signed-reg
+	    (inst stt temp
+		  (* (tn-offset stack-temp)
+		     n-word-bytes)
+		  (current-nfp-tn vop))
+	    (inst ldq y
+		  (* (tn-offset stack-temp) n-word-bytes)
+		  (current-nfp-tn vop))))
+	  (inst excb)
+	  ))))
+  (frob %unary-truncate single-reg single-float cvttq/c_sv t)
+  (frob %unary-truncate double-reg double-float cvttq/c_sv)
+  (frob %unary-round single-reg single-float cvttq_sv t)
+  (frob %unary-round double-reg double-float cvttq_sv))
 
 (define-vop (make-single-float)
   (:args (bits :scs (signed-reg) :target res
@@ -730,51 +739,7 @@
     (inst mskll lo-bits 4 lo-bits)))
 
 
-;;;; float mode hackery
-
-(sb!xc:deftype float-modes () '(unsigned-byte 32)) ;actually 24 -dan
-(defknown floating-point-modes () float-modes (flushable))
-(defknown ((setf floating-point-modes)) (float-modes)
-  float-modes)
-
-;;; Modes bits are (byte 12 52) of fpcr. Grab and return in low bits.
-(define-vop (floating-point-modes)
-  (:results (res :scs (unsigned-reg)))
-  (:result-types unsigned-num)
-  (:translate floating-point-modes)
-  (:policy :fast-safe)
-  (:vop-var vop)
-  (:temporary (:sc double-stack) temp)
-  (:temporary (:sc double-reg) temp1)
-  (:generator 5
-    (let ((nfp (current-nfp-tn vop)))
-      (inst excb)
-      (inst mf_fpcr temp1 temp1 temp1)
-      (inst excb)
-      (inst stt temp1 (* n-word-bytes (tn-offset temp)) nfp)
-      (inst ldl res   (* (1+ (tn-offset temp)) n-word-bytes) nfp)
-      (inst srl res 49 res))))
-
-(define-vop (set-floating-point-modes)
-  (:args (new :scs (unsigned-reg) :target res))
-  (:results (res :scs (unsigned-reg)))
-  (:arg-types unsigned-num)
-  (:result-types unsigned-num)
-  (:translate (setf floating-point-modes))
-  (:policy :fast-safe)
-  (:temporary (:sc double-stack) temp)
-  (:temporary (:sc double-reg) temp1)
-  (:vop-var vop)
-  (:generator 8
-    (let ((nfp (current-nfp-tn vop)))
-      (inst sll new  49 res)
-      (inst stl zero-tn  (* (tn-offset temp) n-word-bytes) nfp)
-      (inst stl res   (* (1+ (tn-offset temp)) n-word-bytes) nfp)
-      (inst ldt temp1 (* (tn-offset temp) n-word-bytes) nfp)
-      (inst excb)
-      (inst mt_fpcr temp1 temp1 temp1)
-      (inst excb)
-      (move res new))))
+;;;; float mode hackery has moved to alpha-vm.lisp
 
 
 ;;;; complex float VOPs
@@ -894,3 +859,4 @@
   (:translate imagpart)
   (:note "complex double float imagpart")
   (:variant :imag))
+

@@ -39,9 +39,15 @@
 		  names)))
 ) ; EVAL-WHEN
 
-;;; interpreter stubs
-(defun floating-point-modes () (floating-point-modes))
-(defun (setf floating-point-modes) (new) (setf (floating-point-modes) new))
+;;; interpreter stubs for floating point modes get/setters for the
+;;; alpha have been removed to alpha-vm.lisp, as they are implemented
+;;; in C rather than as VOPs.
+#!-alpha
+(progn
+  (defun floating-point-modes () 
+    (floating-point-modes))
+  (defun (setf floating-point-modes) (new) 
+    (setf (floating-point-modes) new)))
 
 ;;; This function sets options controlling the floating-point
 ;;; hardware. If a keyword is not supplied, then the current value is
@@ -49,13 +55,13 @@
 ;;; :TRAPS
 ;;;    A list of the exception conditions that should cause traps.
 ;;;    Possible exceptions are :UNDERFLOW, :OVERFLOW, :INEXACT, :INVALID,
-;;;    :DIVIDE-BY-ZERO, and on the X86 :DENORMALIZED-OPERAND. Initially
-;;;    all traps except :INEXACT are enabled.
+;;;    :DIVIDE-BY-ZERO, and on the X86 :DENORMALIZED-OPERAND.
 ;;;
 ;;;:ROUNDING-MODE
 ;;;    The rounding mode to use when the result is not exact. Possible
 ;;;    values are :NEAREST, :POSITIVE-INFINITY, :NEGATIVE-INFINITY and
-;;;    :ZERO. Initially, the rounding mode is :NEAREST.
+;;;    :ZERO.  Setting this away from :NEAREST is liable to upset SBCL's
+;;;    maths routines which depend on it.
 ;;;
 ;;;:CURRENT-EXCEPTIONS
 ;;;:ACCRUED-EXCEPTIONS
@@ -64,11 +70,14 @@
 ;;;
 ;;;:FAST-MODE
 ;;;    Set the hardware's \"fast mode\" flag, if any. When set, IEEE
-;;;    conformance or debuggability may be impaired. Some machines may not
-;;;    have this feature, in which case the value is always NIL.
+;;;    conformance or debuggability may be impaired. Some machines don't
+;;;    have this feature, and some SBCL ports don't implement it anyway
+;;;    -- in such cases the value is always NIL.
 ;;;
 ;;; GET-FLOATING-POINT-MODES may be used to find the floating point modes
-;;; currently in effect.
+;;; currently in effect.    See cold-init.lisp for the list of initially
+;;; enabled traps
+
 (defun set-floating-point-modes (&key (traps nil traps-p)
 				      (rounding-mode nil round-p)
 				      (current-exceptions nil current-x-p)
@@ -129,15 +138,6 @@
 (defun sigfpe-handler (signal info context)
   (declare (ignore signal info context))
   (declare (type system-area-pointer context))
-  ;; FIXME: The find-the-detailed-problem code below went stale with
-  ;; the big switchover to POSIX signal handling and signal contexts
-  ;; which are opaque at the Lisp level ca. sbcl-0.6.7. It needs to be
-  ;; revived, which will require writing a C-level os-dependent
-  ;; function to extract floating point modes, and a Lisp-level
-  ;; DEFINE-ALIEN-ROUTINE to get to the C-level os-dependent function.
-  ;; Meanwhile we just say "something went wrong".
-  (error 'floating-point-exception)
-  #|
   (let* ((modes (context-floating-point-modes
 		 (sb!alien:sap-alien context (* os-context-t))))
 	 (traps (logand (ldb float-exceptions-byte modes)
@@ -158,9 +158,7 @@
 	   (error 'floating-point-exception
 		  :traps (getf (get-floating-point-modes) :traps)))
 	  (t
-	   (error "SIGFPE with no exceptions currently enabled?"))))
-  |#
-  )
+	   (error 'floating-point-exception)))))
 
 ;;; Execute BODY with the floating point exceptions listed in TRAPS
 ;;; masked (disabled). TRAPS should be a list of possible exceptions

@@ -419,9 +419,14 @@
   (defconstant +suid+ #x7c0)
 
   (define-fp-operate cvtqs_su #x16 (logior +su+ #x0bc) 2)
+  (define-fp-operate cvtqs_sui #x16 (logior +sui+ #x0bc) 2)
   (define-fp-operate cvtqt_su #x16 (logior +su+ #x0be) 2)
+  (define-fp-operate cvtqt_sui #x16 (logior +sui+ #x0be) 2)
   (define-fp-operate cvtts_su #x16 (logior +su+ #x0ac) 2)
 
+  (define-fp-operate cvttq_sv #x16 (logior +su+ #x0af) 2)
+  (define-fp-operate cvttq/c_sv #x16 (logior +su+ #x02f) 2)
+  
   (define-fp-operate adds_su #x16 (logior +su+ #x080))
   (define-fp-operate addt_su #x16 (logior +su+ #x0a0))
   (define-fp-operate divs_su #x16 (logior +su+ #x083))

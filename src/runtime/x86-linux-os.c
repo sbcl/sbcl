@@ -76,6 +76,23 @@ os_context_sp_addr(os_context_t *context)
     return &context->uc_mcontext.gregs[17];
 }
 
+unsigned long
+os_context_fp_control(os_context_t *context)
+{
+    /* probably the code snippet
+     * #ifdef __linux__
+     *    SET_FPU_CONTROL_WORD(context->__fpregs_mem.cw);
+     * #endif 
+     * is relevant to implementing this correctly */
+
+    /* Note that currently this is not called, as there is an analogous
+     * stub in lisp-land (x86-vm.lisp), also returning 0, with the old
+     * lisp fp-control code. This is here more as a signpost of a possible
+     * way of restoring functionality, and if it is the way to go would
+     * need to be included for other architectures as well. */
+    return 0;
+}
+
 sigset_t *
 os_context_sigmask_addr(os_context_t *context)
 {

@@ -363,17 +363,22 @@ sigtrap_handler(int signal, siginfo_t *siginfo, os_context_t *context)
     }
 }
 
-static void sigfpe_handler(int signal, int code, os_context_t *context)
+unsigned long
+arch_get_fp_control()
 {
-    /* what should this contain?  interesting question.  If it really
-     * is empty, why don't we just ignore the signal? -dan 2001.08.10
-     */
+    return ieee_get_fp_control();
 }
+
+void
+arch_set_fp_control(unsigned long fp)
+{
+    ieee_set_fp_control(fp);
+}
+
 
 void arch_install_interrupt_handlers()
 {
     undoably_install_low_level_interrupt_handler(SIGTRAP, sigtrap_handler);
-    undoably_install_low_level_interrupt_handler(SIGFPE,  sigfpe_handler);
 }
 
 extern lispobj call_into_lisp(lispobj fun, lispobj *args, int nargs);
