@@ -667,6 +667,17 @@
 
 (defmethod finalize-inheritance ((class std-class))
   (update-class class t))
+
+(defmethod finalize-inheritance ((class forward-referenced-class))
+  ;; FIXME: should we not be thinking a bit about what kinds of error
+  ;; we're throwing?  Maybe we need a clos-error type to mix in?  Or
+  ;; possibly a forward-referenced-class-error, though that's
+  ;; difficult given e.g. class precedence list calculations...
+  (error
+   "~@<FINALIZE-INHERITANCE was called on a forward referenced class:~
+       ~2I~_~S~:>"
+   class))
+
 
 (defun class-has-a-forward-referenced-superclass-p (class)
   (or (forward-referenced-class-p class)

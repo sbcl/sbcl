@@ -416,6 +416,18 @@
 (assert (equal (incompatible-ll-test-2 t 1 2) '(1 2)))
 (assert (eq (incompatible-ll-test-2 1 :bar 'yes) 'yes))
 
+;;; Attempting to instantiate classes with forward references in their
+;;; CPL should signal errors (FIXME: of what type?)
+(defclass never-finished-class (this-one-unfinished-too) ())
+(multiple-value-bind (result error)
+    (ignore-errors (make-instance 'never-finished-class))
+  (assert (null result))
+  (assert (typep error 'error)))
+(multiple-value-bind (result error)
+    (ignore-errors (make-instance 'this-one-unfinished-too))
+  (assert (null result))
+  (assert (typep error 'error)))
+
 ;;;; success
 
 (sb-ext:quit :unix-status 104)

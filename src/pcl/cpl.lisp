@@ -74,7 +74,7 @@
 ;;;    any point. If there is more than one, the specified tiebreaker
 ;;;    rule is used to choose among them.
 
-(defmethod compute-class-precedence-list ((root slot-class))
+(defmethod compute-class-precedence-list ((root class))
   (compute-std-cpl root (class-direct-superclasses root)))
 
 (defstruct (class-precedence-description
@@ -90,17 +90,22 @@
   (cpd-count  0))
 
 (defun compute-std-cpl (class supers)
-  (cond ((null supers)				;First two branches of COND
-	 (list class))				;are implementing the single
-	((null (cdr supers))			;inheritance optimization.
-	 (cons class
-	       (compute-std-cpl (car supers)
-				(class-direct-superclasses (car supers)))))
-	(t
-	 (multiple-value-bind (all-cpds nclasses)
-	     (compute-std-cpl-phase-1 class supers)
-	   (compute-std-cpl-phase-2 all-cpds)
-	   (compute-std-cpl-phase-3 class all-cpds nclasses)))))
+  (cond
+    ;; the first two branches of this COND are implementing an
+    ;; optimization for single inheritance.
+    ((and (null supers)
+	  (not (forward-referenced-class-p class)))
+     (list class))
+    ((and (null (cdr supers))
+	  (not (forward-referenced-class-p (car supers))))
+     (cons class
+	   (compute-std-cpl (car supers)
+			    (class-direct-superclasses (car supers)))))
+    (t
+     (multiple-value-bind (all-cpds nclasses)
+	 (compute-std-cpl-phase-1 class supers)
+       (compute-std-cpl-phase-2 all-cpds)
+       (compute-std-cpl-phase-3 class all-cpds nclasses)))))
 
 (defvar *compute-std-cpl-class->entry-table-size* 60)
 
@@ -201,26 +206,30 @@
 	   (if (class-name class)
 	       (format nil "named ~S" (class-name class))
 	       class)))
-    (let ((names (mapcar #'class-or-name
-			 (cdr (find-superclass-chain class forward-class)))))
-      (cpl-error class
-		 "The class ~A is a forward referenced class.~@
-		  The class ~A is ~A."
-		 (class-or-name forward-class)
-		 (class-or-name forward-class)
-		 (if (null (cdr names))
-		     (format nil
-			     "a direct superclass of the class ~A"
-			     (class-or-name class))
-		     (format nil
-			     "reached from the class ~A by following~@
+    (if (eq class forward-class)
+	(cpl-error class
+		   "The class ~A is a forward referenced class."
+		   (class-or-name class))
+	(let ((names (mapcar #'class-or-name
+			     (cdr (find-superclass-chain class forward-class)))))
+	  (cpl-error class
+		     "The class ~A is a forward referenced class.~@
+                      The class ~A is ~A."
+		     (class-or-name forward-class)
+		     (class-or-name forward-class)
+		     (if (null (cdr names))
+			 (format nil
+				 "a direct superclass of the class ~A"
+				 (class-or-name class))
+			 (format nil
+				 "reached from the class ~A by following~@
 			      the direct superclass chain through: ~A~
 			      ~%  ending at the class ~A"
-			     (class-or-name class)
-			     (format nil
-				     "~{~%  the class ~A,~}"
-				     (butlast names))
-			     (car (last names))))))))
+				 (class-or-name class)
+				 (format nil
+					 "~{~%  the class ~A,~}"
+					 (butlast names))
+				 (car (last names)))))))))
 
 (defun find-superclass-chain (bottom top)
   (labels ((walk (c chain)
