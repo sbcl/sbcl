@@ -131,10 +131,10 @@ alloc_number(long n)
 }
 
 lispobj
-alloc_string(char *str)
+alloc_base_string(char *str)
 {
     int len = strlen(str);
-    lispobj result = alloc_vector(SIMPLE_STRING_WIDETAG, len+1, 8);
+    lispobj result = alloc_vector(SIMPLE_BASE_STRING_WIDETAG, len+1, 8);
     struct vector *vec = (struct vector *)native_pointer(result);
 
     vec->length = make_fixnum(len);

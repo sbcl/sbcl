@@ -2128,25 +2128,21 @@
 		   (case eltype
 		     (bit 'bit-vector)
 		     (base-char 'base-string)
-		     (character 'string)
 		     (* 'vector)
 		     (t `(vector ,eltype)))
 		   (case eltype
 		     (bit `(bit-vector ,(car dims)))
 		     (base-char `(base-string ,(car dims)))
-		     (character `(string ,(car dims)))
 		     (t `(vector ,eltype ,(car dims)))))
 	       (if (eq (car dims) '*)
 		   (case eltype
 		     (bit 'simple-bit-vector)
 		     (base-char 'simple-base-string)
-		     (character 'simple-string)
 		     ((t) 'simple-vector)
 		     (t `(simple-array ,eltype (*))))
 		   (case eltype
 		     (bit `(simple-bit-vector ,(car dims)))
 		     (base-char `(simple-base-string ,(car dims)))
-		     (character `(simple-string ,(car dims)))
 		     ((t) `(simple-vector ,(car dims)))
 		     (t `(simple-array ,eltype ,dims))))))
 	  (t
@@ -2195,7 +2191,7 @@
 		   t)))))
 
 (!define-superclasses array
-  ((string string)
+  ((base-string base-string)
    (vector vector)
    (array))
   !cold-init-forms)
@@ -2546,6 +2542,8 @@
     ((type= type (specifier-type 'real)) 'real)
     ((type= type (specifier-type 'sequence)) 'sequence)
     ((type= type (specifier-type 'bignum)) 'bignum)
+    ((type= type (specifier-type 'simple-string)) 'simple-string)
+    ((type= type (specifier-type 'string)) 'string)
     (t `(or ,@(mapcar #'type-specifier (union-type-types type))))))
 
 ;;; Two union types are equal if they are each subtypes of each

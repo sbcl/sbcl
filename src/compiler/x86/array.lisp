@@ -1243,12 +1243,12 @@
 
 ;;; simple-string
 
-(define-vop (data-vector-ref/simple-string)
+(define-vop (data-vector-ref/simple-base-string)
   (:translate data-vector-ref)
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg))
 	 (index :scs (unsigned-reg)))
-  (:arg-types simple-string positive-fixnum)
+  (:arg-types simple-base-string positive-fixnum)
   (:temporary (:sc unsigned-reg ; byte-reg
 		   :offset eax-offset ; al-offset
 		   :target value
@@ -1264,12 +1264,12 @@
 			    other-pointer-lowtag)))
     (move value al-tn)))
 
-(define-vop (data-vector-ref-c/simple-string)
+(define-vop (data-vector-ref-c/simple-base-string)
   (:translate data-vector-ref)
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg)))
   (:info index)
-  (:arg-types simple-string (:constant (signed-byte 30)))
+  (:arg-types simple-base-string (:constant (signed-byte 30)))
   (:temporary (:sc unsigned-reg :offset eax-offset :target value
 		   :from (:eval 0) :to (:result 0))
 	      eax)
@@ -1283,13 +1283,13 @@
 			    other-pointer-lowtag)))
     (move value al-tn)))
 
-(define-vop (data-vector-set/simple-string)
+(define-vop (data-vector-set/simple-base-string)
   (:translate data-vector-set)
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg) :to (:eval 0))
 	 (index :scs (unsigned-reg) :to (:eval 0))
 	 (value :scs (base-char-reg)))
-  (:arg-types simple-string positive-fixnum base-char)
+  (:arg-types simple-base-string positive-fixnum base-char)
   (:results (result :scs (base-char-reg)))
   (:result-types base-char)
   (:generator 5
@@ -1299,13 +1299,13 @@
 	  value)
     (move result value)))
 
-(define-vop (data-vector-set/simple-string-c)
+(define-vop (data-vector-set/simple-base-string-c)
   (:translate data-vector-set)
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg) :to (:eval 0))
 	 (value :scs (base-char-reg)))
   (:info index)
-  (:arg-types simple-string (:constant (signed-byte 30)) base-char)
+  (:arg-types simple-base-string (:constant (signed-byte 30)) base-char)
   (:results (result :scs (base-char-reg)))
   (:result-types base-char)
   (:generator 4

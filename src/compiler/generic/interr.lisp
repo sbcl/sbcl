@@ -59,6 +59,8 @@
    "Object is not of type LONG-FLOAT.")
   (object-not-simple-string
    "Object is not of type SIMPLE-STRING.")
+  (object-not-simple-base-string
+   "Object is not of type SIMPLE-BASE-STRING.")
   (object-not-simple-bit-vector
    "Object is not of type SIMPLE-BIT-VECTOR.")
   (object-not-simple-vector
@@ -69,6 +71,8 @@
    "Object is not of type VECTOR.")
   (object-not-string
    "Object is not of type STRING.")
+  (object-not-base-string
+   "Object is not of type BASE-STRING.")
   (object-not-bit-vector
    "Object is not of type BIT-VECTOR.")
   (object-not-array

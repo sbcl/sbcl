@@ -769,7 +769,7 @@ static int
 
 #define NWORDS(x,y) (CEILING((x),(y)) / (y))
 
-scav_string(lispobj *where, lispobj object)
+scav_base_string(lispobj *where, lispobj object)
 {
     struct vector *vector;
     int length, nwords;
@@ -784,7 +784,7 @@ scav_string(lispobj *where, lispobj object)
     return nwords;
 }
 static lispobj
-trans_string(lispobj object)
+trans_base_string(lispobj object)
 {
     struct vector *vector;
     int length, nwords;
@@ -803,7 +803,7 @@ trans_string(lispobj object)
 }
 
 static int
-size_string(lispobj *where)
+size_base_string(lispobj *where)
 {
     struct vector *vector;
     int length, nwords;
@@ -1529,7 +1529,7 @@ gc_init_tables(void)
     scavtab[COMPLEX_LONG_FLOAT_WIDETAG] = scav_unboxed;
 #endif
     scavtab[SIMPLE_ARRAY_WIDETAG] = scav_boxed;
-    scavtab[SIMPLE_STRING_WIDETAG] = scav_string;
+    scavtab[SIMPLE_BASE_STRING_WIDETAG] = scav_base_string;
     scavtab[SIMPLE_BIT_VECTOR_WIDETAG] = scav_vector_bit;
     scavtab[SIMPLE_ARRAY_NIL_WIDETAG] = scav_vector_nil;
     scavtab[SIMPLE_ARRAY_UNSIGNED_BYTE_2_WIDETAG] =
@@ -1574,7 +1574,8 @@ gc_init_tables(void)
     scavtab[SIMPLE_ARRAY_COMPLEX_LONG_FLOAT_WIDETAG] =
 	scav_vector_complex_long_float;
 #endif
-    scavtab[COMPLEX_STRING_WIDETAG] = scav_boxed;
+    scavtab[COMPLEX_BASE_STRING_WIDETAG] = scav_boxed;
+    scavtab[COMPLEX_VECTOR_NIL_WIDETAG] = scav_boxed;
     scavtab[COMPLEX_BIT_VECTOR_WIDETAG] = scav_boxed;
     scavtab[COMPLEX_VECTOR_WIDETAG] = scav_boxed;
     scavtab[COMPLEX_ARRAY_WIDETAG] = scav_boxed;
@@ -1624,7 +1625,7 @@ gc_init_tables(void)
     transother[COMPLEX_LONG_FLOAT_WIDETAG] = trans_unboxed;
 #endif
     transother[SIMPLE_ARRAY_WIDETAG] = trans_boxed; /* but not GENCGC */
-    transother[SIMPLE_STRING_WIDETAG] = trans_string;
+    transother[SIMPLE_BASE_STRING_WIDETAG] = trans_base_string;
     transother[SIMPLE_BIT_VECTOR_WIDETAG] = trans_vector_bit;
     transother[SIMPLE_VECTOR_WIDETAG] = trans_vector;
     transother[SIMPLE_ARRAY_NIL_WIDETAG] = trans_vector_nil;
@@ -1674,8 +1675,9 @@ gc_init_tables(void)
     transother[SIMPLE_ARRAY_COMPLEX_LONG_FLOAT_WIDETAG] =
 	trans_vector_complex_long_float;
 #endif
-    transother[COMPLEX_STRING_WIDETAG] = trans_boxed;
+    transother[COMPLEX_BASE_STRING_WIDETAG] = trans_boxed;
     transother[COMPLEX_BIT_VECTOR_WIDETAG] = trans_boxed;
+    transother[COMPLEX_VECTOR_NIL_WIDETAG] = trans_boxed;
     transother[COMPLEX_VECTOR_WIDETAG] = trans_boxed;
     transother[COMPLEX_ARRAY_WIDETAG] = trans_boxed;
     transother[CODE_HEADER_WIDETAG] = trans_code_header;
@@ -1724,7 +1726,7 @@ gc_init_tables(void)
     sizetab[COMPLEX_LONG_FLOAT_WIDETAG] = size_unboxed;
 #endif
     sizetab[SIMPLE_ARRAY_WIDETAG] = size_boxed;
-    sizetab[SIMPLE_STRING_WIDETAG] = size_string;
+    sizetab[SIMPLE_BASE_STRING_WIDETAG] = size_base_string;
     sizetab[SIMPLE_BIT_VECTOR_WIDETAG] = size_vector_bit;
     sizetab[SIMPLE_VECTOR_WIDETAG] = size_vector;
     sizetab[SIMPLE_ARRAY_NIL_WIDETAG] = size_vector_nil;
@@ -1770,7 +1772,8 @@ gc_init_tables(void)
     sizetab[SIMPLE_ARRAY_COMPLEX_LONG_FLOAT_WIDETAG] =
 	size_vector_complex_long_float;
 #endif
-    sizetab[COMPLEX_STRING_WIDETAG] = size_boxed;
+    sizetab[COMPLEX_BASE_STRING_WIDETAG] = size_boxed;
+    sizetab[COMPLEX_VECTOR_NIL_WIDETAG] = size_boxed;
     sizetab[COMPLEX_BIT_VECTOR_WIDETAG] = size_boxed;
     sizetab[COMPLEX_VECTOR_WIDETAG] = size_boxed;
     sizetab[COMPLEX_ARRAY_WIDETAG] = size_boxed;

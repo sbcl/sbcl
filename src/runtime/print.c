@@ -385,7 +385,7 @@ static void brief_otherptr(lispobj obj)
             }
             break;
 
-        case SIMPLE_STRING_WIDETAG:
+        case SIMPLE_BASE_STRING_WIDETAG:
             vector = (struct vector *)ptr;
             putchar('"');
             for (charptr = (char *)vector->data; *charptr != '\0'; charptr++) {
@@ -535,7 +535,7 @@ static void print_otherptr(lispobj obj)
                 break;
 #endif
 
-            case SIMPLE_STRING_WIDETAG:
+            case SIMPLE_BASE_STRING_WIDETAG:
                 NEWLINE_OR_RETURN;
                 cptr = (char *)(ptr+1);
                 putchar('"');
@@ -598,7 +598,8 @@ static void print_otherptr(lispobj obj)
 #ifdef SIMPLE_ARRAY_COMPLEX_LONG_FLOAT_WIDETAG
 	    case SIMPLE_ARRAY_COMPLEX_LONG_FLOAT_WIDETAG:
 #endif
-            case COMPLEX_STRING_WIDETAG:
+            case COMPLEX_BASE_STRING_WIDETAG:
+            case COMPLEX_VECTOR_NIL_WIDETAG:
             case COMPLEX_BIT_VECTOR_WIDETAG:
             case COMPLEX_VECTOR_WIDETAG:
             case COMPLEX_ARRAY_WIDETAG:

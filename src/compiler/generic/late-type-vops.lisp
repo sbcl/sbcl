@@ -75,9 +75,13 @@
     object-not-long-float-error
   (long-float-widetag))
 
-(!define-type-vops simple-string-p check-simple-string simple-string
+(!define-type-vops simple-string-p check-simple-string nil
     object-not-simple-string-error
-  (simple-string-widetag))
+  (simple-base-string-widetag simple-array-nil-widetag))
+
+(!define-type-vops simple-base-string-p check-simple-base-string simple-base-string
+    object-not-simple-base-string-error
+  (simple-base-string-widetag))
 
 (!define-type-vops simple-bit-vector-p check-simple-bit-vector simple-bit-vector
     object-not-simple-bit-vector-error
@@ -208,18 +212,26 @@
   (funcallable-instance-header-widetag))
 
 (!define-type-vops array-header-p nil nil nil
-  (simple-array-widetag complex-string-widetag complex-bit-vector-widetag
-			complex-vector-widetag complex-array-widetag))
+  (simple-array-widetag complex-base-string-widetag complex-bit-vector-widetag
+   complex-vector-widetag complex-array-widetag complex-vector-nil-widetag))
 
 (!define-type-vops stringp check-string nil object-not-string-error
-  (simple-string-widetag complex-string-widetag))
+  (simple-base-string-widetag complex-base-string-widetag
+   simple-array-nil-widetag complex-vector-nil-widetag))
+
+(!define-type-vops base-string-p check-base-string nil object-not-base-string-error
+  (simple-base-string-widetag complex-base-string-widetag))
 
 (!define-type-vops bit-vector-p check-bit-vector nil
     object-not-bit-vector-error
   (simple-bit-vector-widetag complex-bit-vector-widetag))
 
+(!define-type-vops vector-nil-p check-vector-nil nil
+    object-not-vector-nil-error
+  (simple-array-nil-widetag complex-vector-nil-widetag))
+
 (!define-type-vops vectorp check-vector nil object-not-vector-error
-  (simple-string-widetag
+  (simple-base-string-widetag
    simple-array-nil-widetag
    simple-bit-vector-widetag
    simple-vector-widetag
@@ -238,7 +250,8 @@
    simple-array-complex-single-float-widetag
    simple-array-complex-double-float-widetag
    #!+long-float simple-array-complex-long-float-widetag
-   complex-string-widetag
+   complex-base-string-widetag
+   complex-vector-nil-widetag
    complex-bit-vector-widetag
    complex-vector-widetag))
 
@@ -259,7 +272,7 @@
 (!define-type-vops simple-array-p check-simple-array nil
     object-not-simple-array-error
   (simple-array-widetag
-   simple-string-widetag
+   simple-base-string-widetag
    simple-array-nil-widetag
    simple-bit-vector-widetag
    simple-vector-widetag
@@ -281,7 +294,7 @@
 
 (!define-type-vops arrayp check-array nil object-not-array-error
   (simple-array-widetag
-   simple-string-widetag
+   simple-base-string-widetag
    simple-array-nil-widetag
    simple-bit-vector-widetag
    simple-vector-widetag
@@ -300,7 +313,8 @@
    simple-array-complex-single-float-widetag
    simple-array-complex-double-float-widetag
    #!+long-float simple-array-complex-long-float-widetag
-   complex-string-widetag
+   complex-base-string-widetag
+   complex-vector-nil-widetag
    complex-bit-vector-widetag
    complex-vector-widetag
    complex-array-widetag))

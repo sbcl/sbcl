@@ -73,7 +73,7 @@
   #!+sb-doc
   "the standard structure for the description of a package"
   ;; the name of the package, or NIL for a deleted package
-  (%name nil :type (or simple-string null))
+  (%name nil :type (or simple-base-string null))
   ;; nickname strings
   (%nicknames () :type list)
   ;; packages used by this package
@@ -99,7 +99,7 @@
   ;; shadowing symbols
   (%shadowing-symbols () :type list)
   ;; documentation string for this package
-  (doc-string nil :type (or simple-string null)))
+  (doc-string nil :type (or simple-base-string null)))
 
 ;;;; iteration macros
 

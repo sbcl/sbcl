@@ -102,7 +102,7 @@
 (/show0 "primtype.lisp 96")
 (!def-primitive-type simple-array-nil (descriptor-reg)
   :type (simple-array nil (*)))
-(!def-primitive-type simple-string (descriptor-reg)
+(!def-primitive-type simple-base-string (descriptor-reg)
   :type simple-base-string)
 (!def-primitive-type simple-bit-vector (descriptor-reg))
 (!def-primitive-type simple-vector (descriptor-reg))
@@ -163,7 +163,7 @@
 
 (defvar *simple-array-primitive-types*
   '((nil . simple-array-nil)
-    (base-char . simple-string)
+    (base-char . simple-base-string)
     (bit . simple-bit-vector)
     ((unsigned-byte 2) . simple-array-unsigned-byte-2)
     ((unsigned-byte 4) . simple-array-unsigned-byte-4)

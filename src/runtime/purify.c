@@ -269,7 +269,8 @@ valid_dynamic_space_pointer(lispobj *pointer, lispobj *start_addr)
 	case COMPLEX_LONG_FLOAT_WIDETAG:
 #endif
 	case SIMPLE_ARRAY_WIDETAG:
-	case COMPLEX_STRING_WIDETAG:
+	case COMPLEX_BASE_STRING_WIDETAG:
+	case COMPLEX_VECTOR_NIL_WIDETAG:
 	case COMPLEX_BIT_VECTOR_WIDETAG:
 	case COMPLEX_VECTOR_WIDETAG:
 	case COMPLEX_ARRAY_WIDETAG:
@@ -283,7 +284,7 @@ valid_dynamic_space_pointer(lispobj *pointer, lispobj *start_addr)
 #ifdef LONG_FLOAT_WIDETAG
 	case LONG_FLOAT_WIDETAG:
 #endif
-	case SIMPLE_STRING_WIDETAG:
+	case SIMPLE_BASE_STRING_WIDETAG:
 	case SIMPLE_BIT_VECTOR_WIDETAG:
 	case SIMPLE_ARRAY_UNSIGNED_BYTE_2_WIDETAG:
 	case SIMPLE_ARRAY_UNSIGNED_BYTE_4_WIDETAG:
@@ -900,6 +901,7 @@ static lispobj
 ptrans_otherptr(lispobj thing, lispobj header, boolean constant)
 {
     switch (widetag_of(header)) {
+	/* FIXME: this needs a reindent */
       case BIGNUM_WIDETAG:
       case SINGLE_FLOAT_WIDETAG:
       case DOUBLE_FLOAT_WIDETAG:
@@ -916,12 +918,13 @@ ptrans_otherptr(lispobj thing, lispobj header, boolean constant)
       case COMPLEX_LONG_FLOAT_WIDETAG:
 #endif
       case SAP_WIDETAG:
-        return ptrans_unboxed(thing, header);
+	  return ptrans_unboxed(thing, header);
 
       case RATIO_WIDETAG:
       case COMPLEX_WIDETAG:
       case SIMPLE_ARRAY_WIDETAG:
-      case COMPLEX_STRING_WIDETAG:
+      case COMPLEX_BASE_STRING_WIDETAG:
+      case COMPLEX_VECTOR_NIL_WIDETAG:
       case COMPLEX_VECTOR_WIDETAG:
       case COMPLEX_ARRAY_WIDETAG:
         return ptrans_boxed(thing, header, constant);
@@ -933,7 +936,7 @@ ptrans_otherptr(lispobj thing, lispobj header, boolean constant)
       case SYMBOL_HEADER_WIDETAG:
         return ptrans_boxed(thing, header, 0);
 
-      case SIMPLE_STRING_WIDETAG:
+      case SIMPLE_BASE_STRING_WIDETAG:
         return ptrans_vector(thing, 8, 1, 0, constant);
 
       case SIMPLE_BIT_VECTOR_WIDETAG:
@@ -1144,7 +1147,7 @@ pscav(lispobj *addr, int nwords, boolean constant)
                 count = 1;
                 break;
 
-              case SIMPLE_STRING_WIDETAG:
+              case SIMPLE_BASE_STRING_WIDETAG:
                 vector = (struct vector *)addr;
                 count = CEILING(NWORDS(fixnum_value(vector->length)+1,4)+2,2);
                 break;

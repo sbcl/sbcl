@@ -21,8 +21,9 @@
 	   complex-double-float-p #!+long-float complex-long-float-p
 	   complex-vector-p
 	   base-char-p %standard-char-p %instancep
+	   base-string-p simple-base-string-p
 	   array-header-p
-	   simple-array-p simple-array-nil-p
+	   simple-array-p simple-array-nil-p vector-nil-p
 	   simple-array-unsigned-byte-2-p
 	   simple-array-unsigned-byte-4-p simple-array-unsigned-byte-8-p
 	   simple-array-unsigned-byte-16-p simple-array-unsigned-byte-32-p

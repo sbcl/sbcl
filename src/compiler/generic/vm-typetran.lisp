@@ -18,6 +18,7 @@
 ;;; These type predicates are used to implement simple cases of TYPEP.
 ;;; They shouldn't be used explicitly.
 (define-type-predicate base-char-p base-char)
+(define-type-predicate base-string-p base-string)
 (define-type-predicate bignump bignum)
 (define-type-predicate complex-double-float-p (complex double-float))
 (define-type-predicate complex-single-float-p (complex single-float))
@@ -66,10 +67,12 @@
 #!+long-float
 (define-type-predicate simple-array-complex-long-float-p
 		       (simple-array (complex long-float) (*)))
+(define-type-predicate simple-base-string-p simple-base-string)
 (define-type-predicate system-area-pointer-p system-area-pointer)
 (define-type-predicate unsigned-byte-32-p (unsigned-byte 32))
 (define-type-predicate signed-byte-32-p (signed-byte 32))
 (define-type-predicate vector-t-p (vector t))
+(define-type-predicate vector-nil-p (vector nil))
 (define-type-predicate weak-pointer-p weak-pointer)
 (define-type-predicate code-component-p code-component)
 (define-type-predicate lra-p lra)

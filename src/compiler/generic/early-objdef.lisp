@@ -72,10 +72,10 @@
   #!+long-float complex-long-float
 
   simple-array
-  simple-string
+  simple-array-nil
+  simple-base-string
   simple-bit-vector
   simple-vector
-  simple-array-nil
   simple-array-unsigned-byte-2
   simple-array-unsigned-byte-4
   simple-array-unsigned-byte-8
@@ -91,7 +91,8 @@
   simple-array-complex-single-float
   simple-array-complex-double-float
   #!+long-float simple-array-complex-long-float
-  complex-string
+  complex-base-string
+  complex-vector-nil
   complex-bit-vector
   complex-vector
   complex-array

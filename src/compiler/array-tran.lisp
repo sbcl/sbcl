@@ -231,7 +231,7 @@
        `(;; Erm.  Yeah.  There aren't a lot of things that make sense
 	 ;; for an initial element for (ARRAY NIL). -- CSR, 2002-03-07
 	 (nil '#:mu 0 ,sb!vm:simple-array-nil-widetag)
-	 (base-char ,(code-char 0) 8 ,sb!vm:simple-string-widetag
+	 (base-char ,(code-char 0) 8 ,sb!vm:simple-base-string-widetag
 		    ;; (SIMPLE-STRINGs are stored with an extra trailing
 		    ;; #\NULL for convenience in calling out to C.)
 		    :n-pad-elements 1)

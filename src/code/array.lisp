@@ -100,8 +100,8 @@
     ;; and for all in any reasonable user programs.)
     ((t)
      (values #.sb!vm:simple-vector-widetag #.sb!vm:n-word-bits))
-    ((character base-char standard-char)
-     (values #.sb!vm:simple-string-widetag #.sb!vm:n-byte-bits))
+    ((base-char standard-char)
+     (values #.sb!vm:simple-base-string-widetag #.sb!vm:n-byte-bits))
     ((bit)
      (values #.sb!vm:simple-bit-vector-widetag 1))
     ;; OK, we have to wade into SUBTYPEPing after all.
@@ -110,7 +110,7 @@
      ;; *SPECIALIZED-ARRAY-ELEMENT-TYPE-PROPERTIES*.
      (pick-vector-type type
        (nil (values #.sb!vm:simple-array-nil-widetag 0))
-       (base-char (values #.sb!vm:simple-string-widetag #.sb!vm:n-byte-bits))
+       (base-char (values #.sb!vm:simple-base-string-widetag #.sb!vm:n-byte-bits))
        (bit (values #.sb!vm:simple-bit-vector-widetag 1))
        ((unsigned-byte 2)
 	(values #.sb!vm:simple-array-unsigned-byte-2-widetag 2))
@@ -151,14 +151,17 @@
     ;; Pick off some easy common cases.
     ((t)
      #.sb!vm:complex-vector-widetag)
-    ((character base-char)
-     #.sb!vm:complex-string-widetag) 
+    ((base-char)
+     #.sb!vm:complex-base-string-widetag)
+    ((nil)
+     #.sb!vm:complex-vector-nil-widetag)
     ((bit)
      #.sb!vm:complex-bit-vector-widetag)
     ;; OK, we have to wade into SUBTYPEPing after all.
     (t
      (pick-vector-type type
-       (base-char #.sb!vm:complex-string-widetag)
+       (nil #.sb!vm:complex-vector-nil-widetag)
+       (base-char #.sb!vm:complex-base-string-widetag)
        (bit #.sb!vm:complex-bit-vector-widetag)
        (t #.sb!vm:complex-vector-widetag)))))
 
@@ -185,7 +188,7 @@
 		 (array (allocate-vector
 			 type
 			 length
-			 (ceiling (* (if (= type sb!vm:simple-string-widetag)
+			 (ceiling (* (if (= type sb!vm:simple-base-string-widetag)
 					 (1+ length)
 					 length)
 				     n-bits)
@@ -311,7 +314,6 @@
   (coerce (the list objects) 'simple-vector))
 
 ;;;; accessor/setter functions
-
 (eval-when (:compile-toplevel :execute)
   (defparameter *specialized-array-element-types*
     '(t
@@ -333,7 +335,7 @@
       (complex double-float)
       #!+long-float (complex long-float)
       nil)))
-    
+
 (defun hairy-data-vector-ref (array index)
   (with-array-data ((vector array) (index index) (end))
     (declare (ignore end))
@@ -556,8 +558,8 @@
       ;; FIXME: The data here are redundant with
       ;; *SPECIALIZED-ARRAY-ELEMENT-TYPE-PROPERTIES*.
       (pick-element-type
-       (sb!vm:simple-array-nil-widetag nil)
-       ((sb!vm:simple-string-widetag sb!vm:complex-string-widetag) 'base-char)
+       ((sb!vm:simple-array-nil-widetag sb!vm:complex-vector-nil-widetag) nil)
+       ((sb!vm:simple-base-string-widetag sb!vm:complex-base-string-widetag) 'base-char)
        ((sb!vm:simple-bit-vector-widetag
 	 sb!vm:complex-bit-vector-widetag) 'bit)
        (sb!vm:simple-vector-widetag t)

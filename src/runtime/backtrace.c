@@ -239,7 +239,7 @@ backtrace(int nframes)
                         symbol = (struct symbol *) object;
                         object = (lispobj *) native_pointer(symbol->name);
                     }
-                    if (widetag_of(*object) == SIMPLE_STRING_WIDETAG) {
+                    if (widetag_of(*object) == SIMPLE_BASE_STRING_WIDETAG) {
                         struct vector *string;
 
                         string = (struct vector *) object;

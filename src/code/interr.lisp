@@ -103,6 +103,11 @@
 	 :datum object
 	 :expected-type 'simple-string))
 
+(deferr object-not-simple-base-string-error (object)
+  (error 'type-error
+	 :datum object
+	 :expected-type 'simple-base-string))
+
 (deferr object-not-simple-bit-vector-error (object)
   (error 'type-error
 	 :datum object
@@ -127,6 +132,11 @@
   (error 'type-error
 	 :datum object
 	 :expected-type 'string))
+
+(deferr object-not-base-string-error (object)
+  (error 'type-error
+	 :datum object
+	 :expected-type 'base-string))
 
 (deferr object-not-bit-vector-error (object)
   (error 'type-error

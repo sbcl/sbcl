@@ -1058,14 +1058,31 @@
      :inherits (vector simple-array array sequence))
     (string
      :translation string
-     :codes (#.sb!vm:complex-string-widetag)
-     :direct-superclasses (vector)
      :inherits (vector array sequence))
     (simple-string
      :translation simple-string
-     :codes (#.sb!vm:simple-string-widetag)
-     :direct-superclasses (string simple-array)
-     :inherits (string vector simple-array
+     :inherits (string simple-array))
+    (vector-nil
+     ;; FIXME: Should this be (AND (VECTOR NIL) (NOT (SIMPLE-ARRAY NIL (*))))?
+     :translation (vector nil)
+     :codes (#.sb!vm:complex-vector-nil-widetag)
+     :direct-superclasses (string)
+     :inherits (string vector array sequence))
+    (simple-array-nil
+     :translation (simple-array nil (*))
+     :codes (#.sb!vm:simple-array-nil-widetag)
+     :direct-superclasses (vector-nil simple-string)
+     :inherits (vector-nil simple-string string vector simple-array array sequence))
+    (base-string
+     :translation base-string
+     :codes (#.sb!vm:complex-base-string-widetag)
+     :direct-superclasses (string)
+     :inherits (string vector array sequence))
+    (simple-base-string
+     :translation simple-base-string
+     :codes (#.sb!vm:simple-base-string-widetag)
+     :direct-superclasses (base-string simple-string)
+     :inherits (base-string simple-string string vector simple-array
 		array sequence))
     (list
      :translation (or cons (member nil))
