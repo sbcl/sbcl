@@ -1,7 +1,7 @@
 <chapter id="compiler"><title>The Compiler</>
 
 <para>This chapter will discuss most compiler issues other than
-efficiency, including compiler error messages, the &SBCL compiler's
+efficiency, including compiler error messages, the &SBCL; compiler's
 unusual approach to type safety in the presence of type declarations,
 the effects of various compiler optimization policies, and the way
 that inlining and open coding may cause optimized code to differ from
@@ -344,7 +344,7 @@ _ -->
 <sect1><title>The Compiler's Handling of Types</>
 
 <para>The most unusual features of the &SBCL; compiler (which is
-very similar to the original &CMUCL compiler, also known as
+very similar to the original &CMUCL; compiler, also known as
 &Python;) is its unusually sophisticated understanding of the
 &CommonLisp; type system and its unusually conservative approach to
 the implementation of type declarations. These two features reward the

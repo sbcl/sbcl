@@ -16,9 +16,6 @@
  <!ENTITY CommonLisp "Common Lisp">
  <!ENTITY Lisp       "Lisp">
 
- <!-- common expressions I haven't figured out how to express -->
- <!ENTITY mdash "-">
-
  <!-- document components -->
  <!ENTITY ch-intro       SYSTEM "intro.sgml">
  <!ENTITY ch-compiler    SYSTEM "compiler.sgml">

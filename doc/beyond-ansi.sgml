@@ -155,13 +155,16 @@ system's concept of threads or lightweight processes.  </para>
 can be found in the <literal>sb-thread</literal> package.  This is
 intended for public consumption, so look at the exported symbols and
 their documentation strings.  
+</para>
 
 <para>Dynamic bindings to symbols are per-thread.   Signal handlers
 are per-thread.
+</para>
 
 <para><function>sb-ext:quit</function> exits the current thread, not
 necessarily the whole environment.  The environment will be shut down
 when the last thread exits.  
+</para>
 
 <para>Threads arbitrate between themselves for the user's attention.
 A thread may be in one of three notional states: foreground,
@@ -171,6 +174,7 @@ saying that it has stopped.  The user at his leisure may switch to
 that thread to find out what it needs.  If a background thread enters
 the debugger, selecting any restart will put it back into the
 background before it resumes.
+</para>
 
 <para>If the user has multiple views onto the same Lisp image (for
 example, using multiple terminals, or a windowing system, or network
@@ -178,21 +182,23 @@ access) they are typically set up as multiple `sessions' such that each
 view has its own collection of foreground/background/stopped threads.
 <function>sb-thread:make-listener-thread</function> can be used to
 start a new thread in its own `session'.
+</para>
 
 <para>Mutexes and condition variables are available for 
 managing access to shared data: see 
-
 <itemizedlist>
 <listitem>
 <programlisting>(apropos "mutex" :sb-thread)</programlisting> 
+</listitem>
 <listitem>
 <programlisting>(apropos "condition" :sb-thread)</programlisting> 
+</listitem>
 <listitem> <para>and the <structname>waitqueue</structname> structure
 </para>
 </listitem>
 </itemizedlist>
-
-and poke around in their documentation strings.
+and poke around in their documentation strings.</para>
+</sect3>
 
 <sect3><title>Implementation (Linux x86)</title>
 
@@ -203,16 +209,19 @@ se</emphasis>, but there is plenty wrong (from our perspective) with
 LinuxThreads.  &SBCL; threads are mapped 1:1 onto Linux tasks which
 share a VM but nothing else - each has its own process id and can be
 seen in e.g. <command>ps</command> output.
+</para>
 
 <para>Per-thread local bindings for special variables is achieved
 using the %fs segment register to point to a per-thread storage area.
 This may cause interesting results if you link to foreign code that
 expects threading or creates new threads, and the thread library in
 question uses %fs in an incompatible way.
+</para>
 
 <para>Threads waiting on queues (e.g. for locks or condition
 variables) are put to sleep using <function>sigtimedwait()</function>
 and woken with SIGCONT.
+</para>
 
 <para>&SBCL; at present will alway have at least two tasks running as
 seen from Linux: when the first process has done startup
@@ -220,6 +229,7 @@ initialization (mapping files in place, installing signal handlers
 etc) it creates a new thread to run the Lisp startup and initial
 listener.  The original thread stays around to reap dead subthreads
 and deallocate their resources (e.g. stacks) when they exit.
+</para>
 
 <para>Garbage collection is done with the existing Conservative
 Generational GC.  Allocation is done in small (typically 8k) regions :
@@ -231,11 +241,13 @@ interesting behaviour if they are interrupted in system calls.  The
 streams interface is believed to handle the required system call
 restarting correctly, but this may be a consideration when making
 other blocking calls e.g. from foreign library code.
+</para>
 
 <para>Large amounts of the &SBCL; library have not been inspected for
 thread-safety.  Some of the obviously unsafe areas have large locks
 around them, so compilation and fasl loading, for example, cannot be
 parallelized.  Work is ongoing in this area.
+</para>
 
 <para>A new thread by default is created in the same POSIX process
 group and session as the thread it was created by.  This has an impact
@@ -245,12 +257,18 @@ process group, including Lisp threads that &SBCL; considers to be
 notionally `background'.  This is undesirable, so background threads
 are set to ignore the SIGINT signal.  Arbitration for the input stream
 is managed by locking on <varname>sb-thread::*session-lock*</varname>
+</para>
 
 <para>A thread can be created in a new Lisp 'session' (new terminal or
 window) using <function>sb-thread:make-listener-thread</function>.
 These sessions map directly onto POSIX sessions, so that pressing
 Control-C in the wrong window will not interrupt them - this has been
 found to be embarrassing.
+</para>
+
+</sect3>
+
+</sect2>
 
 <sect2><title>Support For Unix</>
 
@@ -271,10 +289,14 @@ is also supported.</para>
 one argument is implementation-defined.  In &SBCL; it calls functions
 on the user-settable list <varname>sb-ext:*module-provider-functions*</varname>
 - see the <function>require</function> documentation string for details.
+</para>
 
 <para>The toplevel repl prompt may be customized, and the function
 that reads user input may be replaced completely.  <!-- FIXME but I 
 don't currently remember how -->
+</para>
+
+</sect2>
 
 <sect2><title>Tools To Help Developers</title>
 

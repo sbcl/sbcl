@@ -43,7 +43,6 @@ but need to learn about Lisp, three books stand out.
     you'll see in most OO systems, and there are a number of lesser
     differences as well. This book tends to help with the culture shock.
   </para></listitem>
-  <listitem><para></para></listitem>
 </itemizedlist>
 </para>
 
@@ -82,7 +81,7 @@ other &SBCL;-specific information is available:
     at their command prompts. The extensions for functions which
     don't have their own command prompt (like <function>trace</>
     does) are described in their documentation strings,
-    unless your &SBCL was compiled with an option not
+    unless your &SBCL; was compiled with an option not
     to include documentation strings, in which case the doc strings
     are only readable in the source code.</para></listitem>
   <listitem><para>Some low-level information describing the 

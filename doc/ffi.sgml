@@ -41,6 +41,7 @@ are three common approaches to establishing communication:
     objects through the use of extensions to the Lisp language.
     </para></listitem>
 </itemizedlist>
+</para>
 
 <para>&SBCL;, like &CMUCL; before it, relies primarily on the
 automatic conversion and direct manipulation approaches. The SB-ALIEN
@@ -207,7 +208,7 @@ These are the basic foreign type specifiers:
       <varname>value</> is an integer. If <varname>value</> is not
       supplied, then it defaults to one greater than the value for
       the preceding spec (or to zero if it is the first spec.)
-    <para>
+    </para>
   </listitem>
   <listitem>
     <para>
@@ -332,6 +333,10 @@ These are the basic foreign type specifiers:
   </listitem>
 
 </itemizedlist>
+
+</para>
+
+</sect2>
 
 </sect1>
 
@@ -498,6 +503,8 @@ or C <function>malloc</>.</para>
 <para>See also the <function>sb-alien:with-alien</> macro, which
 allocates foreign values on the stack.</para>
 
+</sect2>
+
 </sect1>
 
 <sect1><title>Foreign Variables</>
@@ -561,6 +568,7 @@ macros <function>extern-alien</>, <function>define-alien-variable</> and
     separately specified by using a list of the form
     <programlisting>(alien-string lisp-symbol)</></para></listitem>
 </itemizedlist>
+</para>
 
 <synopsis>(sb-alien:define-alien-variable name type)</>
 
@@ -611,6 +619,8 @@ points to an externally defined value. <varname>name</> is not evaluated,
 and may be either a string or a symbol. <type>type</> is
 an unevaluated alien type specifier.
 </para>
+
+</sect2>
 
 </sect1>
 
@@ -765,6 +775,7 @@ known-type calls are efficiently compiled.  Limitations:
   <listitem><para>Structure type return values are not implemented.</></>
   <listitem><para>Passing of structures by value is not implemented.</></>
 </itemizedlist>
+</para>
 
 <para>
 Here is an example which allocates a <type>(struct foo)</>, calls a foreign
@@ -888,6 +899,7 @@ This can be described by the following call to
 The Lisp function <function>cfoo</> will have
 two arguments (<varname>str</> and <varname>a</>)
 and two return values (<varname>a</> and <varname>i</>).
+</para>
 
 </sect2>
 
@@ -925,6 +937,8 @@ whole-world granularity).  </para></listitem>
 <listitem><para>Disable GC, using the <function>without-gcing</function>
 macro or <function>gc-off</function> call.</para></listitem>
 </orderedlist>
+
+</para>
 
 <!-- FIXME: This is a "changebar" section from the CMU CL manual.
      I (WHN 2002-07-14) am not very familiar with this content, so 
@@ -1067,6 +1081,8 @@ LaTeX \code{dotprod} is made.
 LaTeX 
 -->
 
+</sect2>
+
 </sect1>
 
 <sect1><title>Step-By-Step Example of the Foreign Function Interface</>
@@ -1099,7 +1115,7 @@ struct c_struct *c_function (i, s, r, a)
   printf("s = %s\n", s);
   printf("r->x = %d\n", r->x);
   printf("r->s = %s\n", r->s);
-  for (j = 0; j < 10; j++) printf("a[%d] = %d.\n", j, a[j]);
+  for (j = 0; j &lt; 10; j++) printf("a[%d] = %d.\n", j, a[j]);
   r2 = (struct c_struct *) malloc (sizeof(struct c_struct));
   r2->x = i + 5;
   r2->s = "a C string";
@@ -1176,6 +1192,7 @@ Within Lisp,
 compile the Lisp file. (This step can be done separately. You don't
 have to recompile every time.)
 <userinput>(compile-file "test.lisp")</>
+</para>
 
 <para>
 Within Lisp, load the foreign object file to define the necessary
@@ -1183,7 +1200,7 @@ symbols:
 <userinput>(load-foreign "test.o")</>.
 This must be done before loading any code that refers
 to these symbols.
-<para>
+</para>
 
 <para>
 Now you can load the compiled Lisp ("fasl") file into Lisp:
