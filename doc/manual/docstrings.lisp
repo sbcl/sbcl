@@ -1,4 +1,4 @@
-;;;; -*- lisp -*-
+;;; -*- lisp -*-
 
 ;;;; A docstring extractor for the sbcl manual.  Creates
 ;;;; @include-ready documentation from the docstrings of exported
@@ -55,16 +55,74 @@
 (defvar *texinfo-escaped-chars* "@{}"
   "Characters that must be escaped with #\@ for Texinfo.")
 
-(defun texinfoify (string-designator)
+(defun texinfoify (string-designator &optional (downcase-p t))
   "Return 'string-designator' with characters in
-  *texinfo-escaped-chars* escaped with #\@"
-  (let ((name (string string-designator)))
-    (nstring-downcase
-     (with-output-to-string (s)
-       (loop for char across name
+  *texinfo-escaped-chars* escaped with #\@.  Optionally downcase
+  the result."
+  (let ((result (with-output-to-string (s)
+       (loop for char across (string string-designator)
           when (find char *texinfo-escaped-chars*)
           do (write-char #\@ s)
-          do (write-char char s))))))
+          do (write-char char s)))))
+    (if downcase-p (nstring-downcase result) result)))
+
+(defvar *symbol-characters* "ABCDEFGHIJKLMNOPQRSTUVWXYZ*:-+"
+  "List of characters that make up symbols in a docstring.")
+
+(defvar *symbol-delimiters* " ,.!?")
+
+(defun locate-symbols (line)
+  "Return a list of index pairs of symbol-like parts of LINE."
+  (do ((result nil)
+       (begin nil)
+       (maybe-begin t)
+       (i 0 (1+ i)))
+      ((= i (length line))
+       (when begin (push (list begin i) result))
+       (nreverse result))
+    (cond
+      ((and begin (find (char line i) *symbol-delimiters*))
+       ;; symbol end; remember it if it's not "A" or "I"
+       (when (or (> i (1+ begin)) (not (member (char line begin) '(#\A #\I))))
+         (push (list begin i) result))
+       (setf begin nil
+             maybe-begin t))
+      ((and begin (not (find (char line i) *symbol-characters*)))
+       ;; Not a symbol: abort
+       (setf begin nil))
+      ((and maybe-begin (not begin) (find (char line i) *symbol-characters*))
+       ;; potential symbol begin at this position
+       (setf begin i
+             maybe-begin nil))
+      ((find (char line i) *symbol-delimiters*)
+       ;; potential symbol begin after this position
+       (setf maybe-begin t)))))
+
+(defun all-symbols (list)
+  (cond ((or (null list) (numberp list)) nil)
+        ((atom list) (list list))
+        (t (append (all-symbols (car list)) (all-symbols (cdr list))))))
+
+(defun frob-docstring (docstring symbol-arglist)
+  "Try to guess as much formatting for a raw docstring as possible."
+  ;; Per-line processing is not necessary now, but it will be when we
+  ;; attempt itemize / table auto-detection in docstrings
+  (with-output-to-string (result)
+    (let ((arglist-symbols (all-symbols symbol-arglist)))
+      (with-input-from-string (s (texinfoify docstring nil))
+        (loop for line = (read-line s nil nil)
+           while line
+           do (let ((last 0))
+                (dolist (symbol-index (locate-symbols line))
+                  (write-string (subseq line last (first symbol-index)) result)
+                  (let ((symbol-name (apply #'subseq line symbol-index)))
+                    (format result (if (member symbol-name arglist-symbols
+                                               :test #'string=)
+                                       "@var{~A}"
+                                       "@code{~A}")
+                            (string-downcase symbol-name)))
+                  (setf last (second symbol-index)))
+                (write-line (subseq line last) result)))))))
 
 ;;; Begin, rest and end of definition.
 
@@ -116,7 +174,7 @@
              (package "package")
              (setf "setf-expander")
              (structure "struct")
-             (type (let ((class (find-class symbol nil))))
+             (type (let ((class (find-class symbol nil)))
 		     (etypecase class
 		       (structure-class "struct")
 		       (standard-class "class")
@@ -139,12 +197,12 @@
     (package "@defvr Package")
     (setf "@deffn {Setf Expander}")
     (structure "@deftp Structure")
-    (type (let ((class (find-class symbol nil))))
-	    (etypecase class
-	      (structure-class "@deftp Structure")
-	      (standard-class "@deftp Class")
-	      (sb-pcl::condition-class "@deftp Condition")
-	      ((or built-in-class null) "@deftp Type"))))
+    (type (let ((class (find-class symbol nil)))
+            (etypecase class
+              (structure-class "@deftp Structure")
+              (standard-class "@deftp Class")
+              (sb-pcl::condition-class "@deftp Condition")
+              ((or built-in-class null) "@deftp Type"))))
     (variable (if (constantp symbol)
                   "@defvr Constant"
                   "@defvr Variable"))))
@@ -164,7 +222,7 @@
 (defun texinfoify-arglist-part (part)
   (with-output-to-string (s)
     (etypecase part
-      (string (prin1 (texinfoify part) s))
+      (string (prin1 (texinfoify part nil) s))
       (number (prin1 part s))
       (symbol
        (if (member part *arglist-keywords*)
@@ -176,16 +234,15 @@
 (defun def-arglist (symbol kind)
   (case kind
     (function
-     (format nil "~{~A~^ ~}" (mapcar #'texinfoify-arglist-part
-                                     (argument-list symbol))))))
+     (format nil "~{~A~^ ~}" 
+             (mapcar #'texinfoify-arglist-part (argument-list symbol))))))
 
 (defun def-end (symbol kind)
   (declare (ignore symbol))
   (ecase kind
     ((compiler-macro function method-combination setf) "@end deffn")
     ((package variable) "@end defvr")
-    ((structure type) "@end deftp"))
-  )
+    ((structure type) "@end deftp")))
 
 (defun make-info-file (package &optional filename)
   "Create a file containing all available documentation for the
@@ -211,7 +268,7 @@
                       (texinfoify symbol)
                       (def-arglist symbol kind)
                       (def-index symbol kind)
-                      (texinfoify docstring)
+                      (frob-docstring docstring (argument-list symbol))
                       (def-end symbol kind))))
     filename))
 
@@ -244,6 +301,6 @@
                       (texinfoify symbol)
                       (def-arglist symbol kind)
                       (def-index symbol kind)
-                      (texinfoify docstring)
+                      (frob-docstring docstring (ignore-errors (argument-list symbol)))
                       (def-end symbol kind)))))
     directory))

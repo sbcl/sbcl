@@ -15,4 +15,4 @@ Bitwise rotation is a component of various cryptographic or hashing
 algorithms: MD5, SHA-1, etc.; often these algorithms are specified on
 32-bit rings.  [cite cite cite].
 
-@comment would like to include ROTATE-BYTE's docstring
+@include fun-sb-rotate-byte-rotate-byte.texinfo

@@ -5,7 +5,11 @@
 The @code{sb-md5} module implements the RFC1321 MD5 Message Digest
 Algorithm.
 
-@comment entry points / docstrings
+@include fun-sb-md5-md5sum-file.texinfo
+
+@include fun-sb-md5-md5sum-sequence.texinfo
+
+@include fun-sb-md5-md5sum-stream.texinfo
 
 @subsection Credits
 

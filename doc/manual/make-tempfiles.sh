@@ -28,12 +28,16 @@ fi
 # Makefile.
 DOCSTRINGDIR="${DOCSTRINGDIR:-docstrings/}"
 
+# List of contrib modules that docstring docs will be created for.
+# This is normally set from Makefile.
+#MODULES="${MODULES:-sb-md5 :sb-rotate-byte}"
+
 # List of package names that documentation will be created for.  This
 # is normally set from Makefile.
-PACKAGES="${PACKAGES:-:COMMON-LISP :SB-ALIEN :SB-DEBUG :SB-EXT :SB-GRAY :SB-MOP :SB-PROFILE :SB-THREAD}"
+#PACKAGES="${PACKAGES:-:COMMON-LISP :SB-ALIEN :SB-DEBUG :SB-EXT :SB-GRAY :SB-MOP :SB-PROFILE :SB-THREAD}"
 
 echo /creating docstring snippets from SBCL=\'$SBCL\' for packages \'$PACKAGES\'
-echo "(progn (load \"docstrings.lisp\") (docstrings-to-texinfo \"$DOCSTRINGDIR\" $PACKAGES) (sb-ext:quit))" | $SBCL --noinform --sysinit /dev/null --userinit /dev/null --noprint --disable-debugger
+echo "(progn (load \"docstrings.lisp\") (dolist (module (quote ($MODULES))) (require module)) (docstrings-to-texinfo \"$DOCSTRINGDIR\" $PACKAGES) (sb-ext:quit))" | $SBCL --noinform --sysinit /dev/null --userinit /dev/null --noprint --disable-debugger
 
 echo /creating contrib-docs.texi-temp
 echo "(load \"create-contrib-doc-list.lisp\")" | $SBCL --noinform --sysinit /dev/null --userinit /dev/null --noprint --disable-debugger

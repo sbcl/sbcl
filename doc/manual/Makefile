@@ -12,8 +12,11 @@ HTMLDIR=$(basename $(ROOTFILE))
 # DOCSTRINGDIR has to end with a slash or you lose (it's passed to
 # Lisp's `pathname' function).
 DOCSTRINGDIR="docstrings/"
-# List of package names that documentation will be created for.
-PACKAGES=":COMMON-LISP :SB-ALIEN :SB-DEBUG :SB-EXT :SB-GRAY :SB-MOP :SB-PROFILE :SB-THREAD"
+# List of contrib modules that docstring docs will be created for.
+# FIXME: should check test-passed and not load them.
+MODULES=':sb-md5 :sb-rotate-byte'
+# List of package names that docstring docs will be created for.
+PACKAGES=":COMMON-LISP :SB-ALIEN :SB-DEBUG :SB-EXT :SB-GRAY :SB-MOP :SB-PROFILE :SB-THREAD :SB-MD5 :SB-ROTATE-BYTE"
 
 
 ifeq ($(MAKEINFO),)
@@ -77,7 +80,7 @@ contrib-modules.texinfo: tempfiles-stamp
 docstrings: tempfiles-stamp
 
 tempfiles-stamp:
-	DOCSTRINGDIR=$(DOCSTRINGDIR) sh make-tempfiles.sh
+	DOCSTRINGDIR=$(DOCSTRINGDIR) PACKAGES=$(PACKAGES) MODULES=$(MODULES) sh make-tempfiles.sh
 	touch tempfiles-stamp
 
 

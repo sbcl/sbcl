@@ -7,11 +7,6 @@ The @code{sb-aclrepl} module offers an AllegroCL style Read-Eval-Print
 Loop for SBCL. An AllegroCL style inspector is integrated. Adding an
 AllegroCL style debugger is planned.
 
-@menu
-* Usage::                       
-@end menu
-
-@node Usage
 @subsection Usage
 
 To start @code{sb-aclrepl} as your read-eval-print loop, put the form
@@ -20,6 +15,8 @@ To start @code{sb-aclrepl} as your read-eval-print loop, put the form
 @end lisp
 
 in your @file{~/.sbclrc} initialization file.
+
+@subsection Example Initialization
 
 Here's a longer example of a @file{~/.sbclrc} file that shows off
 some of the features of @code{sb-aclrepl}:

@@ -123,6 +123,7 @@ it still has quite a few.
 * Customization Hooks for Users::  
 * Tools To Help Developers::    
 * Interface To Low-Level SBCL Implementation::  
+* Stale Extensions::            
 * Efficiency Hacks::            
 @end menu
 
@@ -342,20 +343,28 @@ the @code{inspect} prompt.
 
 SBCL has the ability to save its state as a file for later
 execution. This functionality is important for its bootstrapping
-process, and is also provided as an extension to the user. See the
-documentation string for @code{sb-ext:save-lisp-and-die} for more
-information.
+process, and is also provided as an extension to the user.  Note that
+foreign libraries loaded via @code{load-1-foreign} don't survive this
+process; a core should not be saved in this case.
 
-@quotation
-Note: SBCL has inherited from CMUCL various hooks to allow the user to
+@emph{FIXME: what should be done for foreign libraries?}
+
+@emph{FIXME: document load-1-foreign somewhere}
+
+@include fun-sb-ext-save-lisp-and-die.texinfo
+
+
+@node Stale Extensions
+@comment  node-name,  next,  previous,  up
+@subsection Stale Extensions
+
+SBCL has inherited from CMUCL various hooks to allow the user to
 tweak and monitor the garbage collection process. These are somewhat
 stale code, and their interface might need to be cleaned up. If you
 have urgent need of them, look at the code in @file{src/code/gc.lisp}
 and bring it up on the developers' mailing list.
-@end quotation
 
-@quotation
-Note: SBCL has various hooks inherited from CMUCL, like
+SBCL has various hooks inherited from CMUCL, like
 @code{sb-ext:float-denormalized-p}, to allow a program to take
 advantage of IEEE floating point arithmetic properties which aren't
 conveniently or efficiently expressible using the ANSI standard. These
@@ -365,7 +374,6 @@ infinities (because it wasn't in the ANSI spec and it didn't occur to
 me that it was in the IEEE spec). If you need this stuff, take a look
 at the code and bring it up on the developers' mailing
 list.
-@end quotation
 
 
 @node  Efficiency Hacks
