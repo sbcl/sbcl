@@ -628,3 +628,79 @@
 	(sb!impl::%sp-string-compare
 	 string1 start1 (or end1 (length string1))
 	 string2 start2 (or end2 (length string2)))))))
+
+;;;; string-only transforms for sequence functions
+;;;;
+;;;; Note: CMU CL had more of these, including transforms for
+;;;; functions which cons. In SBCL, we've gotten rid of most of the
+;;;; transforms for functions which cons, since our GC overhead is
+;;;; sufficiently large that it doesn't seem worth it to try to
+;;;; economize on function call overhead or on the overhead of runtime
+;;;; type dispatch in AREF. The exception is CONCATENATE, since
+;;;; a full call to CONCATENATE would have to look up the sequence
+;;;; type, which can be really slow.
+;;;;
+;;;; FIXME: It would be nicer for these transforms to work for any
+;;;; calls when all arguments are vectors with the same element type,
+;;;; rather than restricting them to STRINGs only.
+
+;;; FIXME: Shouldn't we be testing for legality of
+;;;   * START1, START2, END1, and END2 indices?
+;;;   * size of copied string relative to destination string?
+;;; (Either there should be tests conditional on SAFETY>=SPEED, or
+;;; the transform should be conditional on SPEED>SAFETY.)
+;;;
+;;; FIXME: Also, the transform should probably be dependent on
+;;; SPEED>SPACE.
+(deftransform replace ((string1 string2 &key (start1 0) (start2 0)
+				end1 end2)
+		       (simple-string simple-string &rest t))
+  `(locally
+     (declare (optimize (safety 0)))
+     (bit-bash-copy string2
+		    (the index
+			 (+ (the index (* start2 sb!vm:byte-bits))
+			    ,vector-data-bit-offset))
+		    string1
+		    (the index
+			 (+ (the index (* start1 sb!vm:byte-bits))
+			    ,vector-data-bit-offset))
+		    (the index
+			 (* (min (the index (- (or end1 (length string1))
+					       start1))
+				 (the index (- (or end2 (length string2))
+					       start2)))
+			    sb!vm:byte-bits)))
+     string1))
+
+;;; FIXME: It seems as though it should be possible to make a DEFUN
+;;; %CONCATENATE (with a DEFTRANSFORM to translate constant RTYPE to
+;;; CTYPE before calling %CONCATENATE) which is comparably efficient,
+;;; at least once DYNAMIC-EXTENT works.
+(deftransform concatenate ((rtype &rest sequences)
+			   (t &rest simple-string)
+			   simple-string)
+  (collect ((lets)
+	    (forms)
+	    (all-lengths)
+	    (args))
+    (dolist (seq sequences)
+      (declare (ignore seq))
+      (let ((n-seq (gensym))
+	    (n-length (gensym)))
+	(args n-seq)
+	(lets `(,n-length (the index (* (length ,n-seq) sb!vm:byte-bits))))
+	(all-lengths n-length)
+	(forms `(bit-bash-copy ,n-seq ,vector-data-bit-offset
+			       res start
+			       ,n-length))
+	(forms `(setq start (+ start ,n-length)))))
+    `(lambda (rtype ,@(args))
+       (declare (ignore rtype))
+       (let* (,@(lets)
+	      (res (make-string (truncate (the index (+ ,@(all-lengths)))
+					  sb!vm:byte-bits)))
+	      (start ,vector-data-bit-offset))
+	 (declare (type index start ,@(all-lengths)))
+	 ,@(forms)
+	 res))))

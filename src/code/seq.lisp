@@ -93,7 +93,7 @@
 	      :datum type
 	      :expected-type 'sequence
 	      :format-control
-	      "~S is a bad type specifier for sequence functions."
+	      "~S is not a legal type specifier for sequence functions."
 	      :format-arguments (list type))))))
 
 (defun signal-index-too-large-error (sequence index)

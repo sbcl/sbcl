@@ -179,44 +179,6 @@
   (frob (simple-array (unsigned-byte 2) (*)) 2)
   (frob (simple-array (unsigned-byte 4) (*)) 4))
 
-;;;; simple string transforms
-;;;;
-;;;; Note: CMU CL had more of these, including transforms for
-;;;; functions which cons. In SBCL, we've gotten rid of the transforms
-;;;; for functions which cons, since our GC overhead is sufficiently
-;;;; large that it doesn't seem worth it to try to economize on
-;;;; function call overhead or on the overhead of runtime type
-;;;; dispatch in AREF.
-
-;;; FIXME: Shouldn't we be testing for legality of
-;;;   * START1, START2, END1, and END2 indices?
-;;;   * size of copied string relative to destination string?
-;;; (Either there should be tests conditional on SAFETY>=SPEED, or
-;;; the transform should be conditional on SPEED>SAFETY.)
-;;;
-;;; FIXME: Also, the transform should probably be dependent on
-;;; SPEED>SPACE.
-(deftransform replace ((string1 string2 &key (start1 0) (start2 0)
-				end1 end2)
-		       (simple-string simple-string &rest t))
-  `(locally
-     (declare (optimize (safety 0)))
-     (bit-bash-copy string2
-		    (the index
-			 (+ (the index (* start2 sb!vm:byte-bits))
-			    ,vector-data-bit-offset))
-		    string1
-		    (the index
-			 (+ (the index (* start1 sb!vm:byte-bits))
-			    ,vector-data-bit-offset))
-		    (the index
-			 (* (min (the index (- (or end1 (length string1))
-					       start1))
-				 (the index (- (or end2 (length string2))
-					       start2)))
-			    sb!vm:byte-bits)))
-     string1))
-
 ;;;; bit vector hackery
 
 ;;; SIMPLE-BIT-VECTOR bit-array operations are transformed to a word loop that
