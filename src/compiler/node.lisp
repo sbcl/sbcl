@@ -709,21 +709,6 @@
   (where-from :test (not (eq where-from :assumed)))
   kind)
 
-;;; The SLOT-ACCESSOR structure represents slot accessor functions. It
-;;; is a subtype of GLOBAL-VAR to make it look more like a normal
-;;; function.
-(def!struct (slot-accessor (:include global-var
-				     (where-from :defined)
-				     (kind :global-function)))
-  ;; The description of the structure that this is an accessor for.
-  (for (missing-arg) :type sb!xc:class)
-  ;; The slot description of the slot.
-  (slot (missing-arg)))
-(defprinter (slot-accessor :identity t)
-  %source-name
-  for
-  slot)
-
 ;;; A DEFINED-FUN represents a function that is defined in the same
 ;;; compilation block, or that has an inline expansion, or that has a
 ;;; non-NIL INLINEP value. Whenever we change the INLINEP state (i.e.

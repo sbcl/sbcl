@@ -1506,38 +1506,6 @@
   (def-frob list)
   (def-frob list*))
 
-;;;; structure accessors
-;;;;
-;;;; These guys have to bizarrely determine the slot offset by looking
-;;;; at the called function.
-
-(defoptimizer (%slot-accessor ir2-convert) ((str) node block)
-  (let* ((cont (node-cont node))
-	 (res (continuation-result-tns cont
-				       (list *backend-t-primitive-type*))))
-    (vop instance-ref node block
-	 (continuation-tn node block str)
-	 (dsd-index
-	  (slot-accessor-slot
-	   (ref-leaf
-	    (continuation-use
-	     (combination-fun node)))))
-	 (first res))
-    (move-continuation-result node block res cont)))
-
-(defoptimizer (%slot-setter ir2-convert) ((value str) node block)
-  (let ((val (continuation-tn node block value)))
-    (vop instance-set node block
-	 (continuation-tn node block str)
-	 val
-	 (dsd-index
-	  (slot-accessor-slot
-	   (ref-leaf
-	    (continuation-use
-	     (combination-fun node))))))
-
-    (move-continuation-result node block (list val) (node-cont node))))
-
 ;;; Convert the code in a component into VOPs.
 (defun ir2-convert (component)
   (declare (type component component))

@@ -533,7 +533,7 @@ Alexey Dejneka:
   archived in the BUGS file.
 
 Nathan Froyd:
-  He has reported bugs and ported fixes from CMU CL.
+  He has reported bugs and ported fixes from CMU CL. He has fixed
 
 Robert MacLachlan:
   He has continued to answer questions about, and contribute fixes to, 
@@ -548,6 +548,12 @@ Bill Newman:
   some areas (especially sequence functions and non-simple vectors),
   updating documentation, and even, for better or worse, getting
   rid of various functionality (e.g. the byte interpreter).
+
+Christopher Rhodes:
+  He has done various low-level work on SBCL, especially for the
+  SPARC port (and for CPU-architecture-neutral things motivated by
+  it, like *BACKEND-FEATURES*). He's also contributed miscellaneous
+  bug fixes.
 
 Raymond Toy:
   He continued to work on CMU CL after the SBCL fork, especially on

@@ -1309,15 +1309,6 @@
   (values t (or index null))
   (call))
 
-;;; Structure slot accessors or setters are magically "known" to be
-;;; these functions, although the var remains the Slot-Accessor
-;;; describing the actual function called.
-;;;
-;;; FIXME: It would be nice to make structure slot accessors be
-;;; ordinary functions.
-(defknown %slot-accessor (t) t (flushable))
-(defknown %slot-setter (t t) t (unsafe))
-
 (defknown sb!kernel::arg-count-error (t t t t t t) nil (unsafe))
 
 ;;;; SETF inverses

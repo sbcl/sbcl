@@ -75,29 +75,6 @@
 			       (specifier-type 'function))
 		     :where-from where)))
 
-;;; Return a SLOT-ACCESSOR structure usable for referencing the slot
-;;; accessor NAME. CLASS is the structure class.
-(defun find-structure-slot-accessor (class name)
-  (declare (type sb!xc:class class))
-  (let* ((info (layout-info
-		(or (info :type :compiler-layout (sb!xc:class-name class))
-		    (class-layout class))))
-	 (accessor-name (if (listp name) (cadr name) name))
-	 (slot (find accessor-name (dd-slots info)
-		     :key #'sb!kernel:dsd-accessor-name))
-	 (type (dd-name info))
-	 (slot-type (dsd-type slot)))
-    (unless slot
-      (error "can't find slot ~S" type))
-    (make-slot-accessor
-     :%source-name name
-     :type (specifier-type
-	    (if (listp name)
-		`(function (,slot-type ,type) ,slot-type)
-		`(function (,type) ,slot-type)))
-     :for class
-     :slot slot)))
-
 ;;; Has the *FREE-FUNS* entry FREE-FUN become invalid?
 ;;;
 ;;; In CMU CL, the answer was implicitly always true, so this 

@@ -476,26 +476,6 @@
   ltn-policy ; a hack to effectively (DECLARE (IGNORE LTN-POLICY))
   (setf (basic-combination-info node) :funny)
   (setf (node-tail-p node) nil))
-
-;;; Both of these functions need special LTN-annotate methods, since
-;;; we only want to clear the TYPE-CHECK in unsafe policies. If we
-;;; allowed the call to be annotated as a full call, then no type
-;;; checking would be done.
-;;;
-;;; We also need a special LTN annotate method for %SLOT-SETTER so
-;;; that the function is ignored. This is because the reference to a
-;;; SETF function can't be delayed, so IR2 conversion would have
-;;; already emitted a call to FDEFINITION by the time the IR2 convert
-;;; method got control.
-(defoptimizer (%slot-accessor ltn-annotate) ((struct) node ltn-policy)
-  (setf (basic-combination-info node) :funny)
-  (setf (node-tail-p node) nil)
-  (annotate-ordinary-continuation struct ltn-policy))
-(defoptimizer (%slot-setter ltn-annotate) ((struct value) node ltn-policy)
-  (setf (basic-combination-info node) :funny)
-  (setf (node-tail-p node) nil)
-  (annotate-ordinary-continuation struct ltn-policy)
-  (annotate-ordinary-continuation value ltn-policy))
 
 ;;;; known call annotation
 

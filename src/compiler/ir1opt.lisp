@@ -778,11 +778,6 @@
 ;;;    if necessary. We claim that the parent form is LABELS for
 ;;;    context declarations, since we don't want it to be considered
 ;;;    a real global function.
-;;; -- In addition to a direct check for the function name in the
-;;;    table, we also must check for slot accessors. If the function
-;;;    is a slot accessor, then we set the combination kind to the
-;;;    function info of %SLOT-SETTER or %SLOT-ACCESSOR, as
-;;;    appropriate.
 ;;; -- If it is a known function, mark it as such by setting the KIND.
 ;;;
 ;;; We return the leaf referenced (NIL if not a leaf) and the
@@ -836,13 +831,7 @@
       (values (ref-leaf (continuation-use (basic-combination-fun call)))
 	      nil))
      (t
-      (let* ((name (leaf-source-name leaf))
-	     (info (info :function :info
-			 (if (slot-accessor-p leaf)
-			     (if (consp source-name) ; i.e. if SETF function
-				 '%slot-setter
-				 '%slot-accessor)
-			     name))))
+      (let ((info (info :function :info (leaf-source-name leaf))))
 	(if info
 	    (values leaf (setf (basic-combination-kind call) info))
 	    (values leaf nil)))))))
