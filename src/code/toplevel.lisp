@@ -542,27 +542,26 @@
 
 (defun repl (noprint)
   (/show0 "entering REPL")
-  (let ((eof-marker (cons :eof nil)))
-    (loop
-     ;; (See comment preceding the definition of SCRUB-CONTROL-STACK.)
-     (scrub-control-stack)
+  (loop
+   ;; (See comment preceding the definition of SCRUB-CONTROL-STACK.)
+   (scrub-control-stack)
+   (unless noprint
+     (funcall *repl-prompt-fun* *standard-output*)
+     ;; (Should *REPL-PROMPT-FUN* be responsible for doing its own
+     ;; FORCE-OUTPUT? I can't imagine a valid reason for it not to
+     ;; be done here, so leaving it up to *REPL-PROMPT-FUN* seems
+     ;; odd. But maybe there *is* a valid reason in some
+     ;; circumstances? perhaps some deadlock issue when being driven
+     ;; by another process or something...)
+     (force-output *standard-output*))
+   (let* ((form (funcall *repl-read-form-fun*
+			 *standard-input*
+			 *standard-output*))
+	  (results (multiple-value-list (interactive-eval form))))
      (unless noprint
-       (funcall *repl-prompt-fun* *standard-output*)
-       ;; (Should *REPL-PROMPT-FUN* be responsible for doing its own
-       ;; FORCE-OUTPUT? I can't imagine a valid reason for it not to
-       ;; be done here, so leaving it up to *REPL-PROMPT-FUN* seems
-       ;; odd. But maybe there *is* a valid reason in some
-       ;; circumstances? perhaps some deadlock issue when being driven
-       ;; by another process or something...)
-       (force-output *standard-output*))
-     (let* ((form (funcall *repl-read-form-fun*
-			   *standard-input*
-			   *standard-output*))
-	    (results (multiple-value-list (interactive-eval form))))
-       (unless noprint
-	 (dolist (result results)
-	   (fresh-line)
-	   (prin1 result)))))))
+       (dolist (result results)
+	 (fresh-line)
+	 (prin1 result))))))
 
 ;;; suitable value for *DEBUGGER-HOOK* for a noninteractive Unix-y program
 (defun noprogrammer-debugger-hook-fun (condition old-debugger-hook)

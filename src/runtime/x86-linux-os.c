@@ -56,7 +56,7 @@ u32 local_ldt_copy[LDT_ENTRIES*LDT_ENTRY_SIZE/sizeof(u32)];
 
 void debug_get_ldt()
 { 
-    int n=__modify_ldt (0, local_ldt_copy, sizeof local_ldt_copy);
+    int n=modify_ldt (0, local_ldt_copy, sizeof local_ldt_copy);
     printf("%d bytes in ldt: print/x local_ldt_copy\n", n);
 }
 
@@ -71,7 +71,7 @@ int arch_os_thread_init(struct thread *thread) {
 	1, MODIFY_LDT_CONTENTS_DATA, 0, 0, 0, 1
     }; 
     /* get next free ldt entry */
-    int n=__modify_ldt(0,local_ldt_copy,sizeof local_ldt_copy);
+    int n=modify_ldt(0,local_ldt_copy,sizeof local_ldt_copy);
     if(n) {
 	u32 *p;
 	for(n=0,p=local_ldt_copy;*p;p+=LDT_ENTRY_SIZE/sizeof(u32))
@@ -81,7 +81,7 @@ int arch_os_thread_init(struct thread *thread) {
     ldt_entry.base_addr=(unsigned long) thread;
     ldt_entry.limit=dynamic_values_bytes;
     ldt_entry.limit_in_pages=0;
-    if (__modify_ldt (1, &ldt_entry, sizeof (ldt_entry)) != 0) 
+    if (modify_ldt (1, &ldt_entry, sizeof (ldt_entry)) != 0) 
 	/* modify_ldt call failed: something magical is not happening */
 	return -1;
     __asm__ __volatile__ ("movw %w0, %%fs" : : "q" 
@@ -130,7 +130,7 @@ int arch_os_thread_cleanup(struct thread *thread) {
     }; 
 
     ldt_entry.entry_number=thread->tls_cookie;
-    if (__modify_ldt (1, &ldt_entry, sizeof (ldt_entry)) != 0) 
+    if (modify_ldt (1, &ldt_entry, sizeof (ldt_entry)) != 0) 
 	/* modify_ldt call failed: something magical is not happening */
 	return 0;
     return 1;

@@ -6,7 +6,9 @@
 (defsystem sb-grovel
     :version "0.01"
     :components ((:file "defpackage")
-		 (:file "def-to-lisp" :depends-on ("defpackage"))))
+		 (:file "def-to-lisp" :depends-on ("defpackage"))
+		 (:file "foreign-glue" :depends-on ("defpackage"))
+		 (:file "array-data" :depends-on ("defpackage"))))
 
 (defmethod perform ((o test-op) (c (eql (find-system :sb-grovel))))
   t)

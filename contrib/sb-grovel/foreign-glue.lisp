@@ -61,7 +61,18 @@
       (defun ,(p "ALLOCATE-") () (make-array ,size :initial-element 0
 					     :element-type '(unsigned-byte 8)))
       (defconstant ,(p "SIZE-OF-") ,size)
-      (defun ,(p "FREE-" ) (p) (declare (ignore p))))))
+      (defun ,(p "FREE-" ) (p) (declare (ignore p)))
+      (defmacro ,(p "WITH-") (var (&rest field-values) &body body)
+	(labels ((field-name (x)
+			     (intern (concatenate 'string
+						  (symbol-name ',name) "-"
+						  (symbol-name x))
+				     ,(symbol-package name))))
+	  (append `(let ((,var ,'(,(p "ALLOCATE-")))))
+		  (mapcar (lambda (pair)
+			    `(setf (,(field-name (car pair)) ,var) ,(cadr pair)))
+			  field-values)
+		  body))))))
 
 (defun foreign-nullp (c)
   "C is a pointer to 0?"

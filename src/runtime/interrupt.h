@@ -18,8 +18,10 @@
  *
  * Note: In CMU CL, this was 4096, but there was no explanation given,
  * and it's hard to see why we'd need that many nested interrupts, so
- * I've scaled it back to see what happens. -- WHN 20000730 */
-#define MAX_INTERRUPTS 8
+ * I've scaled it back (to 256) to see what happens. -- WHN 20000730 
+
+ * Nothing happened, so let's creep it back a bit further -- dan 20030411 */
+#define MAX_INTERRUPTS 32
 
 union interrupt_handler {
     lispobj lisp;
