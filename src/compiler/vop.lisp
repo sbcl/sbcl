@@ -421,6 +421,47 @@
   home
   save-sp
   dynamic-state)
+
+(defstruct (cloop (:print-function print-cloop)
+		  (:conc-name loop-)
+		  (:predicate loop-p)
+		  (:constructor make-loop)
+		  (:copier copy-loop))
+  ;; The kind of loop that this is.  These values are legal:
+  ;;
+  ;;    :OUTER
+  ;;        This is the outermost loop structure, and represents all the
+  ;;        code in a component.
+  ;;
+  ;;    :NATURAL
+  ;;        A normal loop with only one entry.
+  ;;
+  ;;    :STRANGE
+  ;;        A segment of a "strange loop" in a non-reducible flow graph.
+  (kind (required-argument) :type (member :outer :natural :strange))
+  ;; The first and last blocks in the loop.  There may be more than one tail,
+  ;; since there may be multiple back branches to the same head.
+  (head nil :type (or cblock null))
+  (tail nil :type list)
+  ;; A list of all the blocks in this loop or its inferiors that have a
+  ;; successor outside of the loop.
+  (exits nil :type list)
+  ;; The loop that this loop is nested within.  This is null in the outermost
+  ;; loop structure.
+  (superior nil :type (or cloop null))
+  ;; A list of the loops nested directly within this one.
+  (inferiors nil :type list)
+  (depth 0 :type fixnum)
+  ;; The head of the list of blocks directly within this loop.  We must recurse
+  ;; on INFERIORS to find all the blocks.
+  (blocks nil :type (or null cblock)))
+
+(defprinter (cloop :conc-name LOOP-)
+  kind
+  head
+  tail
+  exits
+  depth)
 
 ;;;; VOPs and templates
 
@@ -738,6 +779,7 @@
   ;; is set, then the location is in use somewhere in the block, and
   ;; thus has a conflict for always-live TNs.
   (always-live '#() :type simple-vector)
+  (always-live-count '#() :type simple-vector)
   ;; a vector containing the TN currently live in each location in the
   ;; SB, or NIL if the location is unused. This is used during load-tn pack.
   (live-tns '#() :type simple-vector)
@@ -933,7 +975,9 @@
   (cost 0 :type fixnum)
   ;; If a :ENVIRONMENT or :DEBUG-ENVIRONMENT TN, this is the
   ;; physical environment that the TN is live throughout.
-  (physenv nil :type (or physenv null)))
+  (physenv nil :type (or physenv null))
+  ;; The depth of the deepest loop that this TN is used in.
+  (loop-depth 0 :type fixnum))
 (def!method print-object ((tn tn) stream)
   (print-unreadable-object (tn stream :type t)
     ;; KLUDGE: The distinction between PRINT-TN and PRINT-OBJECT on TN is

@@ -11,6 +11,7 @@ changes in sbcl-0.8.16 relative to sbcl-0.8.15:
     Beane)
   * fixed compiler failure, caused by instrumenting code during
     IR1-optimization.  (Debian bug report #273606 by Gabor Melis)
+  * optimization: added loop analysis and improved register allocation
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** POSITION on displaced vectors with non-zero displacement
        returns the right answer.

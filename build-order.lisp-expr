@@ -480,6 +480,7 @@
  ("src/compiler/ir1util")
  ("src/compiler/ir1report")
  ("src/compiler/ir1opt")
+ ("src/compiler/loop")
 
  ("src/compiler/ir1final")
  ("src/compiler/array-tran")

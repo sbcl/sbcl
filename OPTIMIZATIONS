@@ -62,34 +62,6 @@ VOP DATA-VECTOR-SET/SIMPLE-STRING V2!14[EDI] t32[EAX] t30[S2]>t33[CL]
 
 * And why two moves?
 --------------------------------------------------------------------------------
-#6
-09:49:05 <jtra> I have found a case in those where suboptimal code is
-  generate with nested loops, it might be moderately easy to fix that
-09:49:28 <jtra> see
-  http://www.bagley.org/~doug/shootout/bench/nestedloop/nestedloop.cmucl
-09:50:30 <jtra> if you add declarations to dotimes, generated code is
-  almost optimal, but most inner loops run out of registers and use
-  memory location for iteration variable
-
-;;; -*- mode: lisp -*-
-;;; http://www.bagley.org/~doug/shootout/
-;;; from Friedrich Dominicus
-
-(defun main ()
-  (let ((n (parse-integer (or (car (last extensions:*command-line-strings*)) "1")))
-        (x 0))
-    (declare (fixnum n)
-             (fixnum x)
-             (optimize (speed 3) (debug 0) (safety 0)))
-    (dotimes (a n)
-      (dotimes (b n)
-        (dotimes (c n)
-          (dotimes (d n)
-            (dotimes (e n)
-              (dotimes (f n)
-                (incf x)))))))
-   (format t "~A~%" x)))
---------------------------------------------------------------------------------
 #8
 (defun foo (d)
   (declare (optimize (speed 3) (safety 0) (debug 0)))

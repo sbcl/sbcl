@@ -227,6 +227,13 @@
   (gen nil)
   (in nil)
   (out nil)
+  ;; Set of all blocks that dominate this block. NIL is interpreted
+  ;; as "all blocks in component". 
+  (dominators nil :type (or null sset))
+  ;; the LOOP that this block belongs to
+  (loop nil :type (or null cloop))
+  ;; next block in the loop.
+  (loop-next nil :type (or null cblock))
   ;; the component this block is in, or NIL temporarily during IR1
   ;; conversion and in deleted blocks
   (component (progn
@@ -378,7 +385,9 @@
   (delete-blocks nil :type list)
   (nlx-info-generated-p nil :type boolean)
   ;; this is filled by physical environment analysis
-  (dx-lvars nil :type list))
+  (dx-lvars nil :type list)
+  ;; The default LOOP in the component.
+  (outer-loop (make-loop :kind :outer :head head) :type cloop))
 (defprinter (component :identity t)
   name
   #!+sb-show id

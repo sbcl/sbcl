@@ -72,7 +72,10 @@
 	       (/show0 "doing third SETF")
 	       (setf (finite-sb-live-tns res)
 		     (make-array ',size :initial-element nil))
-	       (/show0 "doing fourth and final SETF")
+	       (/show0 "doing fourth SETF")
+	       (setf (finite-sb-always-live-count res)
+		     (make-array ',size :initial-element 0))
+	       (/show0 "doing fifth and final SETF")
 	       (setf (gethash ',name *backend-sb-names*)
 		     res)))
 

@@ -38,6 +38,9 @@
 (defvar *check-consistency* nil)
 (defvar *all-components*)
 
+;;; Set to NIL to disable loop analysis for register allocation. 
+(defvar *loop-analyze* t)
+
 ;;; Bind this to a stream to capture various internal debugging output.
 (defvar *compiler-trace-output* nil)
 
@@ -523,6 +526,24 @@
 
     (ir1-phases component)
 
+    (when *loop-analyze* 
+      (find-dominators component)
+      (loop-analyze component))
+
+    #|
+    (when (and *loop-analyze* *compiler-trace-output*)
+      (labels ((print-blocks (block)
+		 (format *compiler-trace-output* "    ~A~%" block)
+		 (when (block-loop-next block)
+		   (print-blocks (block-loop-next block))))
+	       (print-loop (loop)
+		 (format *compiler-trace-output* "loop=~A~%" loop)
+		 (print-blocks (loop-blocks loop))
+		 (dolist (l (loop-inferiors loop))
+		   (print-loop l))))
+	(print-loop (component-outer-loop component))))
+    |#
+    
     ;; FIXME: What is MAYBE-MUMBLE for? Do we need it any more?
     (maybe-mumble "env ")
     (physenv-analyze component)

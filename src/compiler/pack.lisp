@@ -92,7 +92,7 @@
 ;;;    the bits, otherwise we OR in the local conflict bits.
 ;;; -- If the TN is local, then we just do the block it is local to,
 ;;;    setting always-live and OR'ing in the local conflicts.
-(defun add-location-conflicts (tn sc offset)
+(defun add-location-conflicts (tn sc offset optimize)
   (declare (type tn tn) (type sc sc) (type index offset))
   (let ((confs (tn-global-conflicts tn))
 	(sb (sc-sb sc))
@@ -123,7 +123,24 @@
 	  (let ((num (ir2-block-number (tn-local tn))))
 	    (setf (sbit loc-live num) 1)
 	    (bit-ior (the local-tn-bit-vector (svref loc-confs num))
-		     (tn-local-conflicts tn) t))))))))
+		     (tn-local-conflicts tn) t))))
+	;; Calculating ALWAYS-LIVE-COUNT is moderately expensive, and
+	;; currently the information isn't used unless (> SPEED
+	;; COMPILE-SPEED).
+	(when optimize
+	  (setf (svref (finite-sb-always-live-count sb) this-offset)
+		(find-location-usage sb this-offset))))))
+  (values))
+
+;; A rought measure of how much a given OFFSET in SB is currently
+;; used. Current implementation counts the amount of blocks where the
+;; offset has been marked as ALWAYS-LIVE.
+(defun find-location-usage (sb offset)
+  (declare (optimize speed))
+  (declare (type sb sb) (type index offset))
+  (let* ((always-live (svref (finite-sb-always-live sb) offset)))
+    (declare (simple-bit-vector always-live))
+    (count 1 always-live)))
 
 ;;; Return the total number of IR2-BLOCKs in COMPONENT.
 (defun ir2-block-count (component)
@@ -144,6 +161,7 @@
       (unless (eq (sb-kind sb) :non-packed)
 	(let* ((conflicts (finite-sb-conflicts sb))
 	       (always-live (finite-sb-always-live sb))
+	       (always-live-count (finite-sb-always-live-count sb))
 	       (max-locs (length conflicts))
 	       (last-count (finite-sb-last-block-count sb)))
 	  (unless (zerop max-locs)
@@ -172,7 +190,8 @@
 		      (setf (svref conflicts i) new-vec))
 		    (setf (svref always-live i)
 			  (make-array new-size :element-type 'bit
-				      :initial-element 0)))))
+				      :initial-element 0))
+		    (setf (svref always-live-count i) 0))))
 	       (t
 		(dotimes (i (finite-sb-current-size sb))
 		  (declare (type index i))
@@ -181,7 +200,8 @@
 		    (dotimes (j last-count)
 		      (declare (type index j))
 		      (clear-bit-vector (svref conf j))))
-		  (clear-bit-vector (svref always-live i)))))))
+		  (clear-bit-vector (svref always-live i))
+		  (setf (svref always-live-count i) 0))))))
 
 	  (setf (finite-sb-last-block-count sb) nblocks)
 	  (setf (finite-sb-current-size sb) (sb-size sb))
@@ -233,6 +253,12 @@
 			    :element-type 'bit)))
 	(setf (finite-sb-always-live sb) new-live))
 
+      (let ((new-live-count (make-array new-size)))
+	(declare (optimize speed)) ;; FILL deftransform
+	(replace new-live-count (finite-sb-always-live-count sb))
+	(fill new-live-count 0 :start size)
+	(setf (finite-sb-always-live-count sb) new-live-count))
+	
       (let ((new-tns (make-array new-size :initial-element nil)))
 	(replace new-tns (finite-sb-live-tns sb))
 	(fill (finite-sb-live-tns sb) nil)
@@ -421,7 +447,7 @@
 	(setf (tn-save-tn tn) res)
 	(setf (tn-save-tn res) tn)
 	(setf (tn-sc res) alt)
-	(pack-tn res t)
+	(pack-tn res t nil)
 	(return res)))))
 
 ;;; Find the load function for moving from SRC to DEST and emit a
@@ -756,6 +782,40 @@
 	  ((null ref))
 	(incf cost))
       (setf (tn-cost tn) cost))))
+
+;;; Iterate over the normal TNs, storing the depth of the deepest loop
+;;; that the TN is used in TN-LOOP-DEPTH.
+(defun assign-tn-depths (component)
+  (when *loop-analyze* 
+    (do-ir2-blocks (block component)
+      (do ((vop (ir2-block-start-vop block)
+		(vop-next vop)))
+	  ((null vop))
+	(flet ((find-all-tns (head-fun)
+		 (collect ((tns))
+		   (do ((ref (funcall head-fun vop) (tn-ref-across ref)))
+		       ((null ref))
+		     (tns (tn-ref-tn ref)))
+		   (tns))))
+	  (dolist (tn (nconc (find-all-tns #'vop-args)
+			     (find-all-tns #'vop-results)
+			     (find-all-tns #'vop-temps)
+			     ;; What does "references in this VOP
+			     ;; mean"? Probably something that isn't
+			     ;; useful in this context, since these
+			     ;; TN-REFs are linked with TN-REF-NEXT
+			     ;; instead of TN-REF-ACROSS. --JES
+			     ;; 2004-09-11
+			     ;; (find-all-tns #'vop-refs)
+			     ))
+	    (setf (tn-loop-depth tn)
+		  (max (tn-loop-depth tn)
+		       (let* ((ir1-block (ir2-block-block (vop-block vop)))
+			      (loop (block-loop ir1-block)))
+			 (if loop
+			     (loop-depth loop)
+			     0))))))))))
+
 
 ;;;; load TN packing
 
@@ -1229,68 +1289,52 @@
 ;;;; location selection
 
 ;;; Select some location for TN in SC, returning the offset if we
-;;; succeed, and NIL if we fail. We start scanning at the Last-Offset
-;;; in an attempt to distribute the TNs across all storage.
+;;; succeed, and NIL if we fail.
 ;;;
-;;; We call OFFSET-CONFLICTS-IN-SB directly, rather than using
-;;; CONFLICTS-IN-SC. This allows us to more efficient in packing
-;;; multi-location TNs: we don't have to multiply the number of tests
-;;; by the TN size. This falls out naturally, since we have to be
-;;; aware of TN size anyway so that we don't call CONFLICTS-IN-SC on a
-;;; bogus offset.
+;;; For :UNBOUNDED SCs just find the smallest correctly aligned offset
+;;; where the TN doesn't conflict with the TNs that have already been
+;;; packed. For :FINITE SCs try to pack the TN into the most heavily
+;;; used locations first (as estimated in FIND-LOCATION-USAGE).
 ;;;
-;;; We give up on finding a location after our current pointer has
-;;; wrapped twice. This will result in testing some locations twice in
-;;; the case that we fail, but is simpler than trying to figure out
-;;; the soonest failure point.
-;;;
-;;; We also give up without bothering to wrap if the current size
-;;; isn't large enough to hold a single element of element-size
-;;; without bothering to wrap. If it doesn't fit this iteration, it
-;;; won't fit next.
-;;;
-;;; ### Note that we actually try to pack as many consecutive TNs as
-;;; possible in the same location, since we start scanning at the same
-;;; offset that the last TN was successfully packed in. This is a
-;;; weakening of the scattering hueristic that was put in to prevent
-;;; restricted VOP temps from hogging all of the registers. This way,
-;;; all of these temps probably end up in one register.
-(defun select-location (tn sc &optional use-reserved-locs)
+;;; Historically SELECT-LOCATION tried did the opposite and tried to
+;;; distribute the TNs evenly across the available locations. At least
+;;; on register-starved architectures (x86) this seems to be a bad
+;;; strategy. -- JES 2004-09-11
+(defun select-location (tn sc &key use-reserved-locs optimize)
   (declare (type tn tn) (type sc sc) (inline member))
   (let* ((sb (sc-sb sc))
 	 (element-size (sc-element-size sc))
 	 (alignment (sc-alignment sc))
 	 (align-mask (1- alignment))
-	 (size (finite-sb-current-size sb))
-	 (start-offset (finite-sb-last-offset sb)))
-    (let ((current-start
-	   (logandc2 (the index (+ start-offset align-mask)) align-mask))
-	  (wrap-p nil))
-      (declare (type index current-start))
-      (loop
-	(when (> (+ current-start element-size) size)
-	  (cond ((or wrap-p (> element-size size))
-		 (return nil))
-		(t
-		 (setq current-start 0)
-		 (setq wrap-p t))))
-
-	(if (or (eq (sb-kind sb) :unbounded)
-		(and (member current-start (sc-locations sc))
-		     (or use-reserved-locs
-			 (not (member current-start
-				      (sc-reserve-locations sc))))))
-	    (dotimes (i element-size
-			(return-from select-location current-start))
-	      (declare (type index i))
-	      (let ((offset (+ current-start i)))
-		(when (offset-conflicts-in-sb tn sb offset)
-		  (setq current-start
-			(logandc2 (the index (+ (the index (1+ offset))
-						align-mask))
-				  align-mask))
-		  (return))))
-	    (incf current-start alignment))))))
+	 (size (finite-sb-current-size sb)))
+    (flet ((attempt-location (start-offset)
+	     (dotimes (i element-size
+		       (return-from select-location start-offset))
+	       (declare (type index i))
+	       (let ((offset (+ start-offset i)))
+		 (when (offset-conflicts-in-sb tn sb offset)
+		   (return (logandc2 (the index (+ (the index (1+ offset))
+						   align-mask))
+				     align-mask)))))))
+      (if (eq (sb-kind sb) :unbounded)
+	  (loop with offset = 0
+		until (> (+ offset element-size) size) do
+		(setf offset (attempt-location offset)))	
+	  (let ((locations (sc-locations sc)))
+	    (when optimize
+	      (setf locations
+		    (stable-sort (copy-list locations) #'>
+				 :key (lambda (location-offset)
+					(loop for offset from location-offset
+					      repeat element-size
+					      maximize (svref
+							(finite-sb-always-live-count sb)
+							offset))))))
+	    (dolist (offset locations)
+	      (when (or use-reserved-locs
+			(not (member offset
+				     (sc-reserve-locations sc))))
+		(attempt-location offset))))))))
 
 ;;; If a save TN, return the saved TN, otherwise return TN. This is
 ;;; useful for getting the conflicts of a TN that might be a save TN.
@@ -1312,7 +1356,7 @@
 ;;; If we are attempting to pack in the SC of the save TN for a TN
 ;;; with a :SPECIFIED-SAVE TN, then we pack in that location, instead
 ;;; of allocating a new stack location.
-(defun pack-tn (tn restricted)
+(defun pack-tn (tn restricted optimize)
   (declare (type tn tn))
   (let* ((original (original-tn tn))
 	 (fsc (tn-sc tn))
@@ -1322,13 +1366,12 @@
 	  (when (and save
 		     (eq (tn-kind save) :specified-save))
 	    (tn-sc save))))
-
     (do ((sc fsc (pop alternates)))
 	((null sc)
 	 (failed-to-pack-error tn restricted))
       (when (eq sc specified-save-sc)
 	(unless (tn-offset save)
-	  (pack-tn save nil))
+	  (pack-tn save nil optimize))
 	(setf (tn-offset tn) (tn-offset save))
 	(setf (tn-sc tn) (tn-sc save))
 	(return))
@@ -1337,17 +1380,16 @@
 	(let ((loc (or (find-ok-target-offset original sc)
 		       (select-location original sc)
 		       (and restricted
-			    (select-location original sc t))
+			    (select-location original sc :use-reserved-locs t))
 		       (when (eq (sb-kind (sc-sb sc)) :unbounded)
 			 (grow-sc sc)
 			 (or (select-location original sc)
 			     (error "failed to pack after growing SC?"))))))
 	  (when loc
-	    (add-location-conflicts original sc loc)
+	    (add-location-conflicts original sc loc optimize)
 	    (setf (tn-sc tn) sc)
 	    (setf (tn-offset tn) loc)
 	    (return))))))
-
   (values))
 
 ;;; Pack a wired TN, checking that the offset is in bounds for the SB,
@@ -1360,7 +1402,7 @@
 ;;; locations for local call arguments (such as OLD-FP) work, since
 ;;; the caller and callee OLD-FP save locations may conflict when the
 ;;; save locations don't really (due to being in different frames.)
-(defun pack-wired-tn (tn)
+(defun pack-wired-tn (tn optimize)
   (declare (type tn tn))
   (let* ((sc (tn-sc tn))
 	 (sb (sc-sb sc))
@@ -1410,7 +1452,7 @@
 	       (conflicts-in-sc original sc offset))
       (error "~S is wired to a location that it conflicts with." tn))
 
-    (add-location-conflicts original sc offset)))
+    (add-location-conflicts original sc offset optimize)))
 
 (defevent repack-block "Repacked a block due to TN unpacking.")
 
@@ -1444,6 +1486,12 @@
 			  ;; construction of this SIMPLE-BIT-VECTOR
 			  ;; until runtime.
 			  #+sb-xc (make-array 0 :element-type 'bit)))
+	(setf (finite-sb-always-live-count sb)
+	      (make-array size
+			  :initial-element    
+			  #-sb-xc #*
+			  ;; Ibid
+			  #+sb-xc (make-array 0 :element-type 'fixnum)))
 	
 	(fill (finite-sb-conflicts sb) nil)
 	(setf (finite-sb-conflicts sb)
@@ -1455,11 +1503,26 @@
 
 (defun pack (component)
   (unwind-protect
-       (let ((optimize (policy *lexenv*
-			       (or (>= speed compilation-speed)
-				   (>= space compilation-speed))))
+       (let ((optimize nil)
 	     (2comp (component-info component)))
 	 (init-sb-vectors component)
+
+	 ;; Determine whether we want to do more expensive packing by
+	 ;; checking whether any blocks in the component have (> SPEED
+	 ;; COMPILE-SPEED).
+	 ;; 
+	 ;; FIXME: This means that a declaration can have a minor
+	 ;; effect even outside its scope, and as the packing is done
+	 ;; component-globally it'd be tricky to use strict scoping. I
+	 ;; think this is still acceptable since it's just a tradeoff
+	 ;; between compilation speed and allocation quality and
+	 ;; doesn't affect the semantics of the generated code in any
+	 ;; way. -- JES 2004-10-06
+	 (do-ir2-blocks (block component)
+	   (when (policy (block-last (ir2-block-block block))
+			 (> speed compilation-speed))
+	     (setf optimize t)
+	     (return)))
 	 
 	 ;; Call the target functions.
 	 (do-ir2-blocks (block component)
@@ -1469,49 +1532,66 @@
 	       (when target-fun
 		 (funcall target-fun vop)))))
 	 
-	 
 	 ;; Pack wired TNs first.
 	 (do ((tn (ir2-component-wired-tns 2comp) (tn-next tn)))
 	     ((null tn))
-	   (pack-wired-tn tn))
+	   (pack-wired-tn tn optimize))
 	 
 	 ;; Pack restricted component TNs.
 	 (do ((tn (ir2-component-restricted-tns 2comp) (tn-next tn)))
 	     ((null tn))
 	   (when (eq (tn-kind tn) :component)
-	     (pack-tn tn t)))
+	     (pack-tn tn t optimize)))
 	 
 	 ;; Pack other restricted TNs.
 	 (do ((tn (ir2-component-restricted-tns 2comp) (tn-next tn)))
 	     ((null tn))
 	   (unless (tn-offset tn)
-	     (pack-tn tn t)))
+	     (pack-tn tn t optimize)))
 	 
-	 ;; Assign costs to normal TNs so we know which ones should always
-	 ;; be packed on the stack.
-	 (when (and optimize *pack-assign-costs*)
-	   (assign-tn-costs component))
-	 
-	 ;; Pack normal TNs in the order that they appear in the code. This
-	 ;; should have some tendency to pack important TNs first, since
-	 ;; control analysis favors the drop-through. This should also help
-	 ;; targeting, since we will pack the target TN soon after we
-	 ;; determine the location of the targeting TN.
-	 (do-ir2-blocks (block component)
-	   (let ((ltns (ir2-block-local-tns block)))
-	     (do ((i (1- (ir2-block-local-tn-count block)) (1- i)))
-		 ((minusp i))
-	       (declare (fixnum i))
-	       (let ((tn (svref ltns i)))
-		 (unless (or (null tn) (eq tn :more) (tn-offset tn))
-		   (pack-tn tn nil))))))
-	 
+	 ;; Assign costs to normal TNs so we know which ones should
+	 ;; always be packed on the stack.
+	 (when *pack-assign-costs*
+	   (assign-tn-costs component)
+	   (assign-tn-depths component))
+
+	 ;; Allocate normal TNs, starting with the TNs that are used
+	 ;; in deep loops.
+	 (collect ((tns))
+	   (do-ir2-blocks (block component)
+	     (let ((ltns (ir2-block-local-tns block)))
+	       (do ((i (1- (ir2-block-local-tn-count block)) (1- i)))
+		   ((minusp i))
+		 (declare (fixnum i))
+		 (let ((tn (svref ltns i)))
+		   (unless (or (null tn)
+			       (eq tn :more)
+			       (tn-offset tn))
+		     ;; If loop analysis has been disabled we might as
+		     ;; well revert to the old behaviour of just
+		     ;; packing TNs linearly as they appear.
+		     (unless *loop-analyze*
+		       (pack-tn tn nil optimize))
+		     (tns tn))))))
+	   (dolist (tn (stable-sort (tns)
+				    (lambda (a b)
+				      (cond
+					((> (tn-loop-depth a)
+					    (tn-loop-depth b))
+					 t)
+					((= (tn-loop-depth a)
+					    (tn-loop-depth b))
+					 (> (tn-cost a) (tn-cost b)))
+    					(t nil)))))
+	     (unless (tn-offset tn)
+	       (pack-tn tn nil optimize))))
+	   
 	 ;; Pack any leftover normal TNs. This is to deal with :MORE TNs,
 	 ;; which could possibly not appear in any local TN map.
 	 (do ((tn (ir2-component-normal-tns 2comp) (tn-next tn)))
 	     ((null tn))
 	   (unless (tn-offset tn)
-	     (pack-tn tn nil)))
+	     (pack-tn tn nil optimize)))
 	 
 	 ;; Do load TN packing and emit saves.
 	 (let ((*repack-blocks* nil))
@@ -1525,13 +1605,13 @@
 		    (pack-load-tns block))))
 	   (when *repack-blocks*
 	     (loop
-	      (when (zerop (hash-table-count *repack-blocks*)) (return))
-	      (maphash (lambda (block v)
-			 (declare (ignore v))
-			 (remhash block *repack-blocks*)
-			 (event repack-block)
-			 (pack-load-tns block))
-		       *repack-blocks*))))
+		 (when (zerop (hash-table-count *repack-blocks*)) (return))
+		 (maphash (lambda (block v)
+			    (declare (ignore v))
+			    (remhash block *repack-blocks*)
+			    (event repack-block)
+			    (pack-load-tns block))
+			  *repack-blocks*))))
 	 
 	 (values))
     (clean-up-pack-structures)))
