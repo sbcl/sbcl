@@ -2664,6 +2664,18 @@
                   i)))))
   (terpri)
 
+  ;; FIXME: The SPARC has a PSEUDO-ATOMIC-TRAP that differs between
+  ;; platforms. If we export this from the SB!VM package, it gets
+  ;; written out as #define trap_PseudoAtomic, which is confusing as
+  ;; the runtime treats trap_ as the prefix for illegal instruction
+  ;; type things. We therefore don't export it, but instead do
+  (when (boundp 'sb!vm::pseudo-atomic-trap)
+    (format t "#define PSEUDO_ATOMIC_TRAP ~D /* 0x~:*~X */~%" sb!vm::pseudo-atomic-trap)
+    (terpri))
+  ;; possibly this is another candidate for a rename (to
+  ;; pseudo-atomic-trap-number or pseudo-atomic-magic-constant
+  ;; [possibly applicable to other platforms])
+
   ;; writing primitive object layouts
   (let ((structs (sort (copy-list sb!vm:*primitive-objects*) #'string<
 		       :key (lambda (obj)

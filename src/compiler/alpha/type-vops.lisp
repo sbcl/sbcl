@@ -369,14 +369,14 @@
 ;;; XXX
 #|
 (def-type-vops scavenger-hook-p nil nil nil
-  #-gengc 0 #+gengc scavenger-hook-type)
+  #!-gengc 0 #!+gengc scavenger-hook-type)
 |#
 
 (def-type-vops code-component-p nil nil nil
   code-header-widetag)
 
 (def-type-vops lra-p nil nil nil
-  #-gengc return-pc-header-widetag #+gengc 0)
+  #!-gengc return-pc-header-widetag #!+gengc 0)
 
 (def-type-vops fdefn-p nil nil nil
   fdefn-widetag)

@@ -73,7 +73,7 @@ void os_init(void)
 	 * that has more than one digit initially -- CSR, 2002-02-12 */
 	minor_version = atoi(name.release+2);
 	if (minor_version < 4) {
-	    fprintf(stderr,"linux minor version=%d;\n enabling workarounds for SPARC kernel bugs in signal handling.\n", minor_version);
+	    FSHOW((stderr,"linux minor version=%d;\n enabling workarounds for SPARC kernel bugs in signal handling.\n", minor_version));
 	    early_kernel = 1;
 	}
 #endif

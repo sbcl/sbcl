@@ -52,7 +52,7 @@
 
 (define-full-setter %set-array-dimension *
   array-dimensions-offset other-pointer-lowtag
-  (any-reg) positive-fixnum sb!impl::%set-array-dimension #+gengc nil)
+  (any-reg) positive-fixnum sb!impl::%set-array-dimension #!+gengc nil)
 
 
 (defknown sb!impl::%array-rank (t) index (flushable))

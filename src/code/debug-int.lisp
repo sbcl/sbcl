@@ -624,11 +624,11 @@
                                (format t
 				       "debug: both still valid ~S ~S ~S ~S~%"
                                        lisp-ocfp lisp-ra c-ocfp c-ra))
-		      #+freebsd
+		      #!+freebsd
 		      (if (sap> lisp-ocfp c-ocfp)
                         (values lisp-ra lisp-ocfp)
 			(values c-ra c-ocfp))
-                       #-freebsd
+                       #!-freebsd
                        (values lisp-ra lisp-ocfp))
 		     (lisp-path-fp
 		      ;; The lisp convention is looking good.
@@ -2051,7 +2051,7 @@
             (sb!vm:context-float-register
              escaped (sb!c:sc-offset-offset sc-offset) 'double-float)
             (sb!vm:context-float-register
-             escaped (+ (sb!c:sc-offset-offset sc-offset) #!+sparc 2 #-sparc 1)
+             escaped (+ (sb!c:sc-offset-offset sc-offset) #!+sparc 2 #!-sparc 1)
              'double-float))
            :invalid-value-for-unescaped-register-storage))
       #!+long-float
@@ -2861,7 +2861,7 @@
     (do ((frame frame (frame-down frame)))
 	((not frame) nil)
       (when (and (compiled-frame-p frame)
-                 (#-x86 eq #+x86 sap=
+                 (#!-x86 eq #!+x86 sap=
 		  lra
 		  (get-context-value frame lra-save-offset lra-sc-offset)))
 	(return t)))))

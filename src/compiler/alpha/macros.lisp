@@ -306,7 +306,7 @@
 	     '((inst mskll value 4 value)))))))
 
 (defmacro define-full-setter (name type offset lowtag scs el-type
-				   &optional translate #+gengc (remember t))
+				   &optional translate #!+gengc (remember t))
   `(progn
      (define-vop (,name)
        ,@(when translate

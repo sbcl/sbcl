@@ -16,7 +16,6 @@
 /* FIXME */
 #define FRAMESIZE 0x48
 #define ST_FLUSH_WINDOWS 0x03
-#define PSEUDO_ATOMIC_TRAP_NUMBER 64
 	.seg    "text"
         .global call_into_lisp
 	FUNCDEF(call_into_lisp)
@@ -61,11 +60,7 @@ call_into_lisp:
 	sub	reg_ALLOC, 4, reg_ALLOC
 	andcc	reg_ALLOC, 3, reg_ZERO
 	
-	/* OK, this is ridiculous. We badly urgently need this to be
-	centralized, because that's now _three_ places where this
-	number is used. CSR, 2002-02-09 */
-
-	tne	64
+	tne	PSEUDO_ATOMIC_TRAP
         /* Pass in the args. */
         sll     %i2, 2, reg_NARGS
         mov     %i1, reg_CFP
@@ -113,7 +108,7 @@ lra:
         /* Were we interrupted? */
 	sub	reg_ALLOC, 4, reg_ALLOC
 	andcc	reg_ALLOC, 3, reg_ZERO
-	tne	PSEUDO_ATOMIC_TRAP_NUMBER
+	tne	PSEUDO_ATOMIC_TRAP
 
         /* Back to C we go. */
 	ld	[%sp+FRAMESIZE-4], %i7
@@ -153,7 +148,7 @@ call_into_c:
         /* Were we interrupted? */
 	sub	reg_ALLOC, 4, reg_ALLOC
 	andcc	reg_ALLOC, 3, reg_ZERO
-	tne	PSEUDO_ATOMIC_TRAP_NUMBER
+	tne	PSEUDO_ATOMIC_TRAP
 
         /* Into C we go. */
         call    reg_CFUNC
@@ -191,7 +186,7 @@ call_into_c:
         /* No longer atomic. */
 	sub	reg_ALLOC, 4, reg_ALLOC
 	andcc	reg_ALLOC, 3, reg_ZERO
-	tne	PSEUDO_ATOMIC_TRAP_NUMBER
+	tne	PSEUDO_ATOMIC_TRAP
 
         /* Reset the lisp stack. */
         /* Note: OCFP is in one of the locals, it gets preserved across C. */

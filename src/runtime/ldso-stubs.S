@@ -59,6 +59,20 @@ ldso_stub__ ## fct: ;                           \
 .L ## fct ## e1: ;                              \
         .size    ldso_stub__ ## fct,.L ## fct ## e1-ldso_stub__ ## fct ;
 	
+#elif defined sparc
+	
+	/* This is an attempt to follow DB's hint of sbcl-devel
+	 * 2001-09-18. -- CSR */
+#define LDSO_STUBIFY(fct)                       \
+.globl ldso_stub__ ## fct ;                     \
+	.type	 ldso_stub__ ## fct,@function ; \
+ldso_stub__ ## fct: ;                           \
+	sethi %hi(fct),%g1	;		\
+	jmpl %g1+%lo(fct),%g0	;		\
+	nop /* delay slot*/	;		\
+.L ## fct ## e1: ;                              \
+	.size	 ldso_stub__ ## fct,.L ## fct ## e1-ldso_stub__ ## fct ;
+	
 #else
 #error unsupported CPU architecture
 #endif

@@ -157,15 +157,9 @@ static int pseudo_atomic_trap_p(os_context_t *context)
   badinst = *pc;
   result = 0;
 
-  /* Check to see if the current instruction is a trap #x40 */
-  /* FIXME: As written, this will not work when someone comes to port
-     this to Solaris. We have chosen trap 0x40 on SPARC Linux because
-     trap 0x10, used in CMUCL/Solaris, generates a sigtrap rather than
-     a sigill. This number should not be hardcoded, but should come,
-     if possible, from src/compiler/target/parms.lisp via sbcl.h --
-     CSR */
+  /* Check to see if the current instruction is a pseudo-atomic-trap */
   if (((badinst >> 30) == 2) && (((badinst >> 19) & 0x3f) == 0x3a)
-      && (((badinst >> 13) & 1) == 1) && ((badinst & 0x7f) == 0x40))
+      && (((badinst >> 13) & 1) == 1) && ((badinst & 0x7f) == PSEUDO_ATOMIC_TRAP))
     {
       unsigned int previnst;
       previnst = pc[-1];
@@ -183,9 +177,7 @@ static int pseudo_atomic_trap_p(os_context_t *context)
         }
       else
         {
-	  /* FIXME: in the light of the comment above, this fprintf is
-             bogus. CSR */
-          fprintf(stderr, "Oops!  Got a trap 16 without a preceeding andcc!\n");
+          fprintf(stderr, "Oops!  Got a PSEUDO-ATOMIC-TRAP without a preceeding andcc!\n");
         }
     }
   return result;
