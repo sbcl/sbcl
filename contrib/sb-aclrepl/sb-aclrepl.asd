@@ -8,3 +8,8 @@
     :components ((:file "repl")
 		 (:file "inspect" :depends-on ("repl"))))
 
+
+;; FIXME - test for successful compilation of sb-aclrepl
+
+(defmethod perform ((o test-op) (c (eql (find-system :sb-aclrepl))))
+  t)
