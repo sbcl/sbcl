@@ -130,7 +130,7 @@ GET-NAME-SERVICE-ERRNO")
 	(sb-alien:alien-funcall
 	 (sb-alien:extern-alien "get_h_errno" (function integer)))))
 
-#-solaris
+#-(and cmu solaris)
 (progn
   #+sbcl
   (sb-alien:define-alien-routine "hstrerror"

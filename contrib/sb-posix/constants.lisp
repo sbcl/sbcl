@@ -107,5 +107,5 @@
  (:structure dirent
 	     ("struct dirent"
 	      (:c-string name "char *" "d_name"
-			 :distrust-length #+solaris t #-solaris nil)))
+			 :distrust-length #+sunos t #-sunos nil)))
  )

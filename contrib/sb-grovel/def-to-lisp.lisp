@@ -19,7 +19,7 @@
                 c-name c-el-name)
         ;; length
 	(if distrust-length
-	    (format stream "printf(\"nil\");")
+	    (format stream "printf(\"|CL|:|NIL|\");")
 	    (format stream "{ ~A t;printf(\"%d\",(sizeof t.~A));}~%"
 		    c-name c-el-name))
         (format stream "printf(\")\\n\");~%")))))
