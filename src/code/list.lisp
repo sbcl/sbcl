@@ -16,11 +16,10 @@
 ;;;; -- WHN 20000127
 
 (declaim (maybe-inline
-	  tree-equal list-length nth %setnth nthcdr last make-list append
-	  copy-list copy-alist copy-tree revappend nconc nreconc butlast
-	  nbutlast ldiff member member-if member-if-not tailp adjoin union
+	  tree-equal nth %setnth nthcdr last make-list append
+	  nconc member member-if member-if-not tailp adjoin union
 	  nunion intersection nintersection set-difference nset-difference
-	  set-exclusive-or nset-exclusive-or subsetp acons pairlis assoc
+	  set-exclusive-or nset-exclusive-or subsetp acons assoc
 	  assoc-if assoc-if-not rassoc rassoc-if rassoc-if-not subst subst-if
 	  subst-if-not nsubst nsubst-if nsubst-if-not sublis nsublis))
 
