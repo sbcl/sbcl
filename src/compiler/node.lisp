@@ -76,9 +76,10 @@
   ;; Cached type which is checked by DEST. If NIL, then this must be
   ;; recomputed: see LVAR-EXTERNALLY-CHECKABLE-TYPE.
   (%externally-checkable-type nil :type (or null ctype))
+  ;; if the LVAR value is DYNAMIC-EXTENT, CLEANUP protecting it.
+  (dynamic-extent nil :type (or null cleanup))
   ;; something or other that the back end annotates this lvar with
-  (info nil)
-  (dynamic-extent nil :type boolean))
+  (info nil))
 
 (def!method print-object ((x lvar) stream)
   (print-unreadable-object (x stream :type t :identity t)

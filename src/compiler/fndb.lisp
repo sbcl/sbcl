@@ -1365,7 +1365,7 @@
 (defknown %special-unbind (t) t)
 (defknown %dynamic-extent-start () t)
 (defknown %dynamic-extent-end () t)
-(defknown %listify-rest-args (t index t) list (flushable))
+(defknown %listify-rest-args (t index) list (flushable))
 (defknown %more-arg-context (t t) (values t index) (flushable))
 (defknown %more-arg (t index) t)
 (defknown %more-arg-values (t index index) * (flushable))

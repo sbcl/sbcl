@@ -37,7 +37,7 @@
 (assert (= (dxcaller 1 2 3 4 5 6 7) 22))
 
 ;;; %NIP-VALUES
-(defun-with-dx foo ()
+(defun-with-dx test-nip-values ()
   (flet ((bar (x &rest y)
            (declare (dynamic-extent y))
            (if (> x 0)
@@ -47,6 +47,41 @@
       (bar 1 2 3 4 5 6)
       (bar -1 'a 'b))))
 
-(assert (equal (foo) '(1 5 a)))
+(assert (equal (test-nip-values) '(1 5 a)))
+
+;;; LET-variable substitution
+(defun-with-dx test-let-var-subst1 (x)
+  (let ((y (list x (1- x))))
+    (print :foo)
+    (let ((z (the list y)))
+      (declare (dynamic-extent z))
+      (length z))))
+(assert (eql (test-let-var-subst1 17) 2))
+
+(defun-with-dx test-let-var-subst2 (x)
+  (let ((y (list x (1- x))))
+    (declare (dynamic-extent y))
+    (print :foo)
+    (let ((z (the list y)))
+      (length z))))
+(assert (eql (test-let-var-subst2 17) 2))
+
+;;; DX propagation through LET-return.
+(defun-with-dx test-lvar-subst (x)
+  (let ((y (list x (1- x))))
+    (declare (dynamic-extent y))
+    (second (let ((z (the list y)))
+              (print :foo)
+              z))))
+(assert (eql (test-lvar-subst 11) 10))
+
+;;; this code is incorrect, but the compiler should not fail
+(defun-with-dx test-let-var-subst-incorrect (x)
+  (let ((y (list x (1- x))))
+    (print :foo)
+    (let ((z (the list y)))
+      (declare (dynamic-extent z))
+      (print :bar)
+      z)))
 
 (sb-ext:quit :unix-status 104)

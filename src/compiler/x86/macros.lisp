@@ -135,7 +135,7 @@
 ;;; eventually invoke the C alloc() function.  Once upon a time
 ;;; (before threads) allocation within an alloc_region could also be
 ;;; done inline, with the aid of two C symbols storing the current
-;;; allocation region boundaries; however, C symbols are global.
+;;; allocation region boundaries; however, C cymbols are global.
 
 ;;; C calls for allocation don't /seem/ to make an awful lot of
 ;;; difference to speed.  Guessing from historical context, it looks
@@ -143,7 +143,14 @@
 ;;; which time all calls to alloc() would have needed a syscall to
 ;;; mask signals for the duration.  Now we have pseudoatomic there's
 ;;; no need for that overhead.  Still, inline alloc would be a neat
-;;; addition someday (except see below).
+;;; addition someday
+
+(defvar *maybe-use-inline-allocation* t) ; FIXME unused
+
+;;; Emit code to allocate an object with a size in bytes given by
+;;; SIZE. The size may be an integer of a TN. If Inline is a VOP
+;;; node-var then it is used to make an appropriate speed vs size
+;;; decision.
 
 (defun allocation-dynamic-extent (alloc-tn size)
   (inst sub esp-tn size)
@@ -159,83 +166,84 @@
   (values))
 
 (defun allocation-notinline (alloc-tn size)
-  (let* ((alloc-tn-offset (tn-offset alloc-tn))
-	 ;; C call to allocate via dispatch routines. Each
-	 ;; destination has a special entry point. The size may be a
-	 ;; register or a constant.
-	 (tn-text (ecase alloc-tn-offset
-		    (#.eax-offset "eax")
-		    (#.ecx-offset "ecx")
-		    (#.edx-offset "edx")
-		    (#.ebx-offset "ebx")
-		    (#.esi-offset "esi")
-		    (#.edi-offset "edi")))
-	 (size-text (case size (8 "8_") (16 "16_") (t ""))))
-    (unless (or (eql size 8) (eql size 16))
-      (unless (and (tn-p size) (location= alloc-tn size))
-	(inst mov alloc-tn size)))
-    (inst call (make-fixup (extern-alien-name 
-			    (concatenate 'string
-					 "alloc_" size-text
-					 "to_" tn-text))
-			   :foreign))))
-
-(defun allocation-inline (alloc-tn size)
-  (let ((ok (gen-label))
-	(free-pointer
-	 (make-ea :dword :disp 
-		  #!+sb-thread (* n-word-bytes thread-alloc-region-slot)
-		  #!-sb-thread (make-fixup (extern-alien-name "boxed_region")
-					    :foreign)
-		  :scale 1)) ; thread->alloc_region.free_pointer
-	(end-addr 
-	 (make-ea :dword :disp
-		  #!+sb-thread (* n-word-bytes (1+ thread-alloc-region-slot))
-		  #!-sb-thread (make-fixup (extern-alien-name "boxed_region")
-					   :foreign 4)
-		  :scale 1)))	; thread->alloc_region.end_addr
-    (unless (and (tn-p size) (location= alloc-tn size))
-      (inst mov alloc-tn size))
-    #!+sb-thread (inst fs-segment-prefix)
-    (inst add alloc-tn free-pointer)
-    #!+sb-thread (inst fs-segment-prefix)
-    (inst cmp alloc-tn end-addr)
-    (inst jmp :be OK)
-    (let ((dst (ecase (tn-offset alloc-tn)
-		 (#.eax-offset "alloc_overflow_eax")
-		 (#.ecx-offset "alloc_overflow_ecx")
-		 (#.edx-offset "alloc_overflow_edx")
-		 (#.ebx-offset "alloc_overflow_ebx")
-		 (#.esi-offset "alloc_overflow_esi")
-		 (#.edi-offset "alloc_overflow_edi"))))
-      (inst call (make-fixup (extern-alien-name dst) :foreign)))
-    (emit-label ok)
-    #!+sb-thread (inst fs-segment-prefix)
-    (inst xchg free-pointer alloc-tn))
-  (values))
-
-
-;;; Emit code to allocate an object with a size in bytes given by
-;;; SIZE.  The size may be an integer or a TN. If Inline is a VOP
-;;; node-var then it is used to make an appropriate speed vs size
-;;; decision.
-
-;;; Allocation should only be used inside a pseudo-atomic section, which
-;;; should also cover subsequent initialization of the object.
-
+  (flet ((load-size (dst-tn size)
+	   (unless (and (tn-p size) (location= alloc-tn size))
+	     (inst mov dst-tn size))))
+    (let ((alloc-tn-offset (tn-offset alloc-tn)))
+	  ;; C call to allocate via dispatch routines. Each
+	  ;; destination has a special entry point. The size may be a
+	  ;; register or a constant.
+	  (ecase alloc-tn-offset
+	    (#.eax-offset
+	     (case size
+	       (8 (inst call (make-fixup (extern-alien-name "alloc_8_to_eax")
+					 :foreign)))
+	       (16 (inst call (make-fixup (extern-alien-name "alloc_16_to_eax")
+					  :foreign)))
+	       (t
+		(load-size eax-tn size)
+		(inst call (make-fixup (extern-alien-name "alloc_to_eax")
+				       :foreign)))))
+	    (#.ecx-offset
+	     (case size
+	       (8 (inst call (make-fixup (extern-alien-name "alloc_8_to_ecx")
+					 :foreign)))
+	       (16 (inst call (make-fixup (extern-alien-name "alloc_16_to_ecx")
+					  :foreign)))
+	       (t
+		(load-size ecx-tn size)
+		(inst call (make-fixup (extern-alien-name "alloc_to_ecx")
+				       :foreign)))))
+	    (#.edx-offset
+	     (case size
+	       (8 (inst call (make-fixup (extern-alien-name "alloc_8_to_edx")
+					 :foreign)))
+	       (16 (inst call (make-fixup (extern-alien-name "alloc_16_to_edx")
+					  :foreign)))
+	       (t
+		(load-size edx-tn size)
+		(inst call (make-fixup (extern-alien-name "alloc_to_edx")
+				       :foreign)))))
+	    (#.ebx-offset
+	     (case size
+	       (8 (inst call (make-fixup (extern-alien-name "alloc_8_to_ebx")
+					 :foreign)))
+	       (16 (inst call (make-fixup (extern-alien-name "alloc_16_to_ebx")
+					  :foreign)))
+	       (t
+		(load-size ebx-tn size)
+		(inst call (make-fixup (extern-alien-name "alloc_to_ebx")
+				       :foreign)))))
+	    (#.esi-offset
+	     (case size
+	       (8 (inst call (make-fixup (extern-alien-name "alloc_8_to_esi")
+					 :foreign)))
+	       (16 (inst call (make-fixup (extern-alien-name "alloc_16_to_esi")
+					  :foreign)))
+	       (t
+		(load-size esi-tn size)
+		(inst call (make-fixup (extern-alien-name "alloc_to_esi")
+				       :foreign)))))
+	    (#.edi-offset
+	     (case size
+	       (8 (inst call (make-fixup (extern-alien-name "alloc_8_to_edi")
+					 :foreign)))
+	       (16 (inst call (make-fixup (extern-alien-name "alloc_16_to_edi")
+					  :foreign)))
+	       (t
+		(load-size edi-tn size)
+		(inst call (make-fixup (extern-alien-name "alloc_to_edi")
+				   :foreign)))))))))
+  
+;;; This macro should only be used inside a pseudo-atomic section,
+;;; which should also cover subsequent initialization of the object.
 ;;; (FIXME: so why aren't we asserting this?)
-
 (defun allocation (alloc-tn size &optional inline dynamic-extent)
+  ;; FIXME: since it appears that inline allocation is gone, we should
+  ;; remove the INLINE parameter and *MAYBE-USE-INLINE-ALLOCATION*
+  (declare (ignore inline))  
   (cond
     (dynamic-extent (allocation-dynamic-extent alloc-tn size))
-    ;; FIXME: for reasons unknown, inline allocation is a speed win on
-    ;; non-P4s, and a speed loss on P4s (and probably other such
-    ;; high-spec high-cache machines).  :INLINE-ALLOCATION-IS-GOOD is
-    ;; a bit of a KLUDGE, really.  -- CSR, 2004-08-05 (following
-    ;; observations made by ASF and Juho Snellman)
-    ((and (member :inline-allocation-is-good *backend-subfeatures*)
-	  (or (null inline) (policy inline (>= speed space))))
-     (allocation-inline alloc-tn size))
     (t (allocation-notinline alloc-tn size)))
   (values))
 
@@ -313,79 +321,78 @@
 ;;; does not matter whether a signal occurs during construction of a
 ;;; dynamic-extent object, as the half-finished construction of the
 ;;; object will not cause any difficulty.  We can therefore elide 
-(defvar *dynamic-extent* nil)
+(defmacro maybe-pseudo-atomic (really-p &body forms)
+  `(if ,really-p
+       (progn ,@forms)
+       (pseudo-atomic ,@forms)))
 
 #!+sb-thread
 (defmacro pseudo-atomic (&rest forms)
   (with-unique-names (label)
-    `(if *dynamic-extent* ; I will burn in hell
-         (progn ,@forms)
-         (let ((,label (gen-label)))
-	   (inst fs-segment-prefix)
-	   (inst mov (make-ea :byte 
-			      :disp (* 4 thread-pseudo-atomic-interrupted-slot)) 0)
-	   (inst fs-segment-prefix)
-	   (inst mov (make-ea :byte :disp (* 4 thread-pseudo-atomic-atomic-slot)) 1)
-	   ,@forms
-	   (inst fs-segment-prefix)
-	   (inst mov (make-ea :byte :disp (* 4 thread-pseudo-atomic-atomic-slot)) 0)
-	   (inst fs-segment-prefix)
-	   (inst cmp (make-ea :byte
-			      :disp (* 4 thread-pseudo-atomic-interrupted-slot)) 0)
-	   (inst jmp :eq ,label)
-	   ;; if PAI was set, interrupts were disabled at the same
-	   ;; time using the process signal mask.
-	   (inst break pending-interrupt-trap)
-	   (emit-label ,label)))))
+    `(let ((,label (gen-label)))
+       (inst fs-segment-prefix)
+       (inst mov (make-ea :byte
+                          :disp (* 4 thread-pseudo-atomic-interrupted-slot)) 0)
+       (inst fs-segment-prefix)
+       (inst mov (make-ea :byte :disp (* 4 thread-pseudo-atomic-atomic-slot)) 1)
+       ,@forms
+       (inst fs-segment-prefix)
+       (inst mov (make-ea :byte :disp (* 4 thread-pseudo-atomic-atomic-slot)) 0)
+       (inst fs-segment-prefix)
+       (inst cmp (make-ea :byte
+                          :disp (* 4 thread-pseudo-atomic-interrupted-slot)) 0)
+       (inst jmp :eq ,label)
+       ;; if PAI was set, interrupts were disabled at the same
+       ;; time using the process signal mask.
+       (inst break pending-interrupt-trap)
+       (emit-label ,label))))
 
 #!-sb-thread
 (defmacro pseudo-atomic (&rest forms)
   (with-unique-names (label)
-    `(if *dynamic-extent*
-         (progn ,@forms)
-         (let ((,label (gen-label)))
-	   ;; FIXME: The MAKE-EA noise should become a MACROLET macro
-	   ;; or something. (perhaps SVLB, for static variable low
-	   ;; byte)
-	   (inst mov (make-ea :byte :disp (+ nil-value
-					     (static-symbol-offset
-					      '*pseudo-atomic-interrupted*)
-					     (ash symbol-value-slot word-shift)
-					     ;; FIXME: Use mask, not minus, to
-					     ;; take out type bits.
-					     (- other-pointer-lowtag)))
-		 0)
-	   (inst mov (make-ea :byte :disp (+ nil-value
-					     (static-symbol-offset
-					      '*pseudo-atomic-atomic*)
-					     (ash symbol-value-slot word-shift)
-					     (- other-pointer-lowtag)))
-		 (fixnumize 1))
-	   ,@forms
-	   (inst mov (make-ea :byte :disp (+ nil-value
-					     (static-symbol-offset
-					      '*pseudo-atomic-atomic*)
-					     (ash symbol-value-slot word-shift)
-					     (- other-pointer-lowtag)))
-		 0)
-	   ;; KLUDGE: Is there any requirement for interrupts to be
-	   ;; handled in order? It seems as though an interrupt coming
-	   ;; in at this point will be executed before any pending
-	   ;; interrupts.  Or do incoming interrupts check to see
-	   ;; whether any interrupts are pending? I wish I could find
-	   ;; the documentation for pseudo-atomics.. -- WHN 19991130
-	   (inst cmp (make-ea :byte
-			      :disp (+ nil-value
-				       (static-symbol-offset
-					'*pseudo-atomic-interrupted*)
-				       (ash symbol-value-slot word-shift)
-				       (- other-pointer-lowtag)))
-		 0)
-	   (inst jmp :eq ,label)
-	   ;; if PAI was set, interrupts were disabled at the same
-	   ;; time using the process signal mask.
-	   (inst break pending-interrupt-trap)
-	   (emit-label ,label)))))
+    `(let ((,label (gen-label)))
+       ;; FIXME: The MAKE-EA noise should become a MACROLET macro
+       ;; or something. (perhaps SVLB, for static variable low
+       ;; byte)
+       (inst mov (make-ea :byte :disp (+ nil-value
+                                         (static-symbol-offset
+                                          '*pseudo-atomic-interrupted*)
+                                         (ash symbol-value-slot word-shift)
+                                         ;; FIXME: Use mask, not minus, to
+                                         ;; take out type bits.
+                                         (- other-pointer-lowtag)))
+             0)
+       (inst mov (make-ea :byte :disp (+ nil-value
+                                         (static-symbol-offset
+                                          '*pseudo-atomic-atomic*)
+                                         (ash symbol-value-slot word-shift)
+                                         (- other-pointer-lowtag)))
+             (fixnumize 1))
+       ,@forms
+       (inst mov (make-ea :byte :disp (+ nil-value
+                                         (static-symbol-offset
+                                          '*pseudo-atomic-atomic*)
+                                         (ash symbol-value-slot word-shift)
+                                         (- other-pointer-lowtag)))
+             0)
+       ;; KLUDGE: Is there any requirement for interrupts to be
+       ;; handled in order? It seems as though an interrupt coming
+       ;; in at this point will be executed before any pending
+       ;; interrupts.  Or do incoming interrupts check to see
+       ;; whether any interrupts are pending? I wish I could find
+       ;; the documentation for pseudo-atomics.. -- WHN 19991130
+       (inst cmp (make-ea :byte
+                          :disp (+ nil-value
+                                   (static-symbol-offset
+                                    '*pseudo-atomic-interrupted*)
+                                   (ash symbol-value-slot word-shift)
+                                   (- other-pointer-lowtag)))
+             0)
+       (inst jmp :eq ,label)
+       ;; if PAI was set, interrupts were disabled at the same
+       ;; time using the process signal mask.
+       (inst break pending-interrupt-trap)
+       (emit-label ,label))))
 
 ;;;; indexed references
 

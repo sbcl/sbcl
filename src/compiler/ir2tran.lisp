@@ -1611,14 +1611,7 @@
 		  (move-lvar-result node block res lvar)))))
   (def list)
   (def list*))
-(setf (fun-info-stack-allocate-result (info :function :info 'list))
-      (lambda (call)
-        (declare (type combination call))
-        (not (null (combination-args call)))))
-(setf (fun-info-stack-allocate-result (info :function :info 'list*))
-      (lambda (call)
-        (declare (type combination call))
-        (not (null (rest (combination-args call))))))
+
 
 ;;; Convert the code in a component into VOPs.
 (defun ir2-convert (component)

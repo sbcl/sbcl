@@ -1314,7 +1314,8 @@
              (dest (lvar-dest lvar)))
     (when (and
            ;; Think about (LET ((A ...)) (IF ... A ...)): two
-           ;; LVAR-USEs should not be met on one path.
+           ;; LVAR-USEs should not be met on one path. Another problem
+           ;; is with dynamic-extent.
            (eq (lvar-uses lvar) ref)
            (typecase dest
              ;; we should not change lifetime of unknown values lvars
@@ -1339,7 +1340,9 @@
            (eq (node-home-lambda ref)
                (lambda-home (lambda-var-home var))))
       (setf (node-derived-type ref) *wild-type*)
-      (substitute-lvar-uses lvar arg)
+      (substitute-lvar-uses lvar arg
+                            ;; Really it is (EQ (LVAR-USES LVAR) REF):
+                            t)
       (delete-lvar-use ref)
       (change-ref-leaf ref (find-constant nil))
       (delete-ref ref)

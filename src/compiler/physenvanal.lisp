@@ -391,7 +391,8 @@
 	     (dolist (nlx (cleanup-nlx-info cleanup))
 	       (code `(%lexical-exit-breakup ',nlx))))
 	    (:dynamic-extent
-	     (code `(%dynamic-extent-end))))))
+	     (when (not (null (cleanup-info cleanup)))
+               (code `(%dynamic-extent-end)))))))
 
       (when (code)
 	(aver (not (node-tail-p (block-last block1))))

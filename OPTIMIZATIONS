@@ -190,3 +190,36 @@ through TYPEP UNBOXED-ARRAY, within the compiler itself.
 rather than either constant-folding or manipulating NIL-VALUE or
 NULL-TN directly.
 --------------------------------------------------------------------------------
+#19
+  (let ((dx (if (foo)
+                (list x)
+                (list y z))))
+    (declare (dynamic-extent dx))
+    ...)
+
+DX is not allocated on stack.
+--------------------------------------------------------------------------------
+#20
+(defun-with-dx foo (x)
+  (flet ((make (x)
+           (let ((l (list nil nil)))
+             (setf (first l) x)
+             (setf (second l) (1- x))
+             l)))
+    (let ((l (make x)))
+      (declare (dynamic-extent l))
+      (mapc #'print l))))
+
+Result of MAKE is not stack allocated, which means that
+stack-allocation of structures is impossible.
+--------------------------------------------------------------------------------
+#21
+(defun-with-dx foo ()
+  (let ((dx (list (list 1 2) (list 3 4)
+    (declare (dynamic-extent dx))
+    ...)))))
+
+External list in DX is allocated on stack, but internal are not.
+--------------------------------------------------------------------------------
+#22
+IR2 does not perform unused code flushing.

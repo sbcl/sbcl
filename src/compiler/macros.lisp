@@ -508,7 +508,8 @@
 	    ,(parse-deftransform lambda-list body n-args
 				 `(return-from ,name nil))))
 	,@(when (consp what)
-	    `((setf (,(symbolicate "FUN-INFO-" (second what))
+	    `((setf (,(let ((*package* (symbol-package 'sb!c::fun-info)))
+                        (symbolicate "FUN-INFO-" (second what)))
 		     (fun-info-or-lose ',(first what)))
 		    #',name)))))))
 

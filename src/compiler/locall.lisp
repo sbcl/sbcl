@@ -47,16 +47,16 @@
   (declare (type combination call) (type clambda fun))
   (loop for arg in (basic-combination-args call)
         and var in (lambda-vars fun)
-        when (lambda-var-dynamic-extent var)
+        when (and (lambda-var-dynamic-extent var)
+                  (not (lvar-dynamic-extent arg)))
         collect arg into dx-lvars
-        and do (progn (setf (lvar-dynamic-extent arg) t)
-                      ;; Stack analysis wants DX value generators to
-                      ;; end their blocks. Uses of mupltiple used
-                      ;; LVARs already end their blocks, so we just
-                      ;; need to process used-once LVARs.
-                      (let ((use (lvar-uses arg)))
-                        (when (node-p use)
-                          (node-ends-block use))))
+        and do (let ((use (lvar-uses arg)))
+                 ;; Stack analysis wants DX value generators to end
+                 ;; their blocks. Uses of mupltiple used LVARs already
+                 ;; end their blocks, so we just need to process
+                 ;; used-once LVARs.
+                 (when (node-p use)
+                   (node-ends-block use)))
         finally (when dx-lvars
                   (binding* ((before-ctran (node-prev call))
                              (nil (ensure-block-start before-ctran))
@@ -77,7 +77,9 @@
                     (setf (node-lexenv call)
                           (make-lexenv :default (node-lexenv call)
                                        :cleanup cleanup))
-                    (push entry (lambda-entries (node-home-lambda entry))))))
+                    (push entry (lambda-entries (node-home-lambda entry)))
+                    (dolist (lvar dx-lvars)
+                      (setf (lvar-dynamic-extent lvar) cleanup)))))
   (values))
 
 ;;; This function handles merging the tail sets if CALL is potentially
@@ -884,7 +886,8 @@
         ;; FIXME: Replace the call with unsafe CAST. -- APD, 2003-01-26
         (do-uses (use result)
           (derive-node-type use call-type)))
-      (substitute-lvar-uses lvar result)))
+      (substitute-lvar-uses lvar result
+                            (and lvar (eq (lvar-uses lvar) call)))))
   (values))
 
 ;;; We are converting FUN to be a LET when the call is in a non-tail
