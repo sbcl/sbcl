@@ -180,24 +180,6 @@ and submit it as a patch."
    GET-INTERNAL-RUN-TIME)")
 (declaim (type index *gc-run-time*))
 
-;;; a limit to help catch programs which allocate too much memory,
-;;; since a hard heap overflow is so hard to recover from
-;;;
-;;; FIXME: Like *GC-TRIGGER*, this variable (1) should probably be
-;;; denominated in a larger unit than bytes and (2) should probably be
-;;; renamed so that it's clear from the name what unit it's
-;;; denominated in.
-(declaim (type (or unsigned-byte null) *soft-heap-limit*))
-(defvar *soft-heap-limit*
-  ;; As long as *GC-TRIGGER* is DECLAIMed as INDEX, we know that
-  ;; MOST-POSITIVE-FIXNUM is a hard limit on how much memory can be
-  ;; allocated. (Not necessarily *the* hard limit, which is fairly
-  ;; likely something like a Unix per-process limit that we don't know
-  ;; about, but a hard limit anyway.) And this gives us a reasonable
-  ;; conservative default for the soft limit...
-  (- most-positive-fixnum
-     *bytes-consed-between-gcs*))
-
 ;;;; The following specials are used to control when garbage
 ;;;; collection occurs.
 
@@ -326,21 +308,7 @@ function should notify the user that the system has finished GC'ing.")
   (unless *already-maybe-gcing*
     (let* ((*already-maybe-gcing* t)
 	   (start-time (get-internal-run-time))
-	   (pre-gc-dynamic-usage (dynamic-usage))
-	   ;; Currently we only check *SOFT-HEAP-LIMIT* at GC time,
-	   ;; not for every allocation. That makes it cheap to do,
-	   ;; even if it is a little ugly.
-	   (soft-heap-limit-exceeded? (and *soft-heap-limit*
-					   (> pre-gc-dynamic-usage
-					      *soft-heap-limit*)))
-	   (*soft-heap-limit* (if soft-heap-limit-exceeded?
-				  (+ pre-gc-dynamic-usage
-				     *bytes-consed-between-gcs*)
-				  *soft-heap-limit*)))
-      (when soft-heap-limit-exceeded?
-	(cerror "Continue with GC."
-		"soft heap limit exceeded (temporary new limit=~W)"
-		*soft-heap-limit*))
+	   (pre-gc-dynamic-usage (dynamic-usage)))      
       (when (and *gc-trigger* (> pre-gc-dynamic-usage *gc-trigger*))
 	(setf *need-to-collect-garbage* t))
       (when (or force-p
