@@ -65,9 +65,6 @@ for early 0.7.x:
 * Either get rid of or at least rework the fdefinition/encapsulation
 	system so that (SYMBOL-FUNCTION 'FOO) is identically equal to
 	(FDEFINITION 'FOO).
-* building using CLISP (since building under OpenMCL works, this is
-	reduced to "it would be nice" rather than "as proof of concept")
-
 =======================================================================
 for 0.9:
 

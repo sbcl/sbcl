@@ -149,12 +149,12 @@
 				     sb!vm:vector-data-offset)
 			   (* length sb!vm:n-byte-bits))
     (let* ((index 0)
-	   (error-number (sb!c::read-var-integer vector index)))
+	   (error-number (sb!c:read-var-integer vector index)))
       (collect ((sc-offsets))
 	       (loop
 		(when (>= index length)
 		  (return))
-		(sc-offsets (sb!c::read-var-integer vector index)))
+		(sc-offsets (sb!c:read-var-integer vector index)))
 	       (values error-number (sc-offsets))))))
 
 

@@ -1183,68 +1183,29 @@
 
 ;;;; COMPILE-FILE
 
-;;; We build a list of top level lambdas, and then periodically smash
-;;; them together into a single component and compile it.
-(defvar *pending-toplevel-lambdas*)
-
-;;; The maximum number of top level lambdas we put in a single
-;;; top level component.
-;;;
-;;; CMU CL 18b used this nontrivially by default (setting it to 10)
-;;; but consequently suffered from the inability to execute some
-;;; troublesome constructs correctly, e.g. inability to load a fasl
-;;; file compiled from the source file
-;;;   (defpackage "FOO" (:use "CL"))
-;;;   (print 'foo::bar)
-;;; because it would dump data-setup fops (including a FOP-PACKAGE for
-;;; "FOO") for the second form before dumping the the code in the
-;;; first form, or the fop to execute the code in the first form. By
-;;; setting this value to 0 by default, we avoid this badness. This
-;;; increases the number of toplevel form functions, and so increases
-;;; the size of object files.
-;;;
-;;; The variable is still supported because when we are compiling the
-;;; SBCL system itself, which is known not contain any troublesome
-;;; constructs, we can set it to a nonzero value, which reduces the
-;;; number of toplevel form objects, reducing the peak memory usage in
-;;; GENESIS, which is desirable, since at least for SBCL version
-;;; 0.6.7, this is the high water mark for memory usage during system
-;;; construction.
-(defparameter *toplevel-lambda-max* 0)
-
 (defun object-call-toplevel-lambda (tll)
   (declare (type functional tll))
   (let ((object *compile-object*))
     (etypecase object
-      (fasl-output
-       (fasl-dump-toplevel-lambda-call tll object))
-      (core-object
-       (core-call-toplevel-lambda tll object))
+      (fasl-output (fasl-dump-toplevel-lambda-call tll object))
+      (core-object (core-call-toplevel-lambda      tll object))
       (null))))
 
-;;; Add LAMBDAS to the pending lambdas. If this leaves more than
-;;; *TOPLEVEL-LAMBDA-MAX* lambdas in the list, or if FORCE-P is true,
-;;; then smash the lambdas into a single component, compile it, and
-;;; call the resulting function.
-(defun sub-compile-toplevel-lambdas (lambdas force-p)
+;;; Smash LAMBDAS into a single component, compile it, and arrange for
+;;; the resulting function to be called.
+(defun sub-compile-toplevel-lambdas (lambdas)
   (declare (list lambdas))
-  (setq *pending-toplevel-lambdas*
-	(append *pending-toplevel-lambdas* lambdas))
-  (let ((pending *pending-toplevel-lambdas*))
-    (when (and pending
-	       (or (> (length pending) *toplevel-lambda-max*)
-		   force-p))
-      (multiple-value-bind (component tll) (merge-toplevel-lambdas pending)
-	(setq *pending-toplevel-lambdas* ())
-	(compile-component component)
-	(clear-ir1-info component)
-	(object-call-toplevel-lambda tll))))
+  (when lambdas
+    (multiple-value-bind (component tll) (merge-toplevel-lambdas lambdas)
+      (compile-component component)
+      (clear-ir1-info component)
+      (object-call-toplevel-lambda tll)))
   (values))
 
 ;;; Compile top level code and call the top level lambdas. We pick off
 ;;; top level lambdas in non-top-level components here, calling
 ;;; SUB-c-t-l-l on each subsequence of normal top level lambdas.
-(defun compile-toplevel-lambdas (lambdas force-p)
+(defun compile-toplevel-lambdas (lambdas)
   (declare (list lambdas))
   (let ((len (length lambdas)))
     (flet ((loser (start)
@@ -1261,11 +1222,8 @@
 		 len)))
       (do* ((start 0 (1+ loser))
 	    (loser (loser start) (loser start)))
-	   ((>= start len)
-	    (when force-p
-	      (sub-compile-toplevel-lambdas nil t)))
-	(sub-compile-toplevel-lambdas (subseq lambdas start loser)
-				      (or force-p (/= loser len)))
+	   ((>= start len))
+	(sub-compile-toplevel-lambdas (subseq lambdas start loser))
 	(unless (= loser len)
 	  (object-call-toplevel-lambda (elt lambdas loser))))))
   (values))
@@ -1284,20 +1242,17 @@
   (maybe-mumble "IDFO ")
   (multiple-value-bind (components top-components hairy-top)
       (find-initial-dfo lambdas)
-    (let ((*all-components* (append components top-components))
-	  (toplevel-closure nil))
+    (let ((*all-components* (append components top-components)))
       (when *check-consistency*
 	(maybe-mumble "[check]~%")
 	(check-ir1-consistency *all-components*))
 
       (dolist (component (append hairy-top top-components))
-	(when (pre-physenv-analyze-toplevel component)
-	  (setq toplevel-closure t)))
+	(pre-physenv-analyze-toplevel component))
 
       (dolist (component components)
 	(compile-component component)
-	(when (replace-toplevel-xeps component)
-	  (setq toplevel-closure t)))
+	(replace-toplevel-xeps component))
 	
       (when *check-consistency*
 	(maybe-mumble "[check]~%")
@@ -1305,7 +1260,7 @@
 	
       (if load-time-value-p
 	  (compile-load-time-value-lambda lambdas)
-	  (compile-toplevel-lambdas lambdas toplevel-closure))
+	  (compile-toplevel-lambdas lambdas))
 
       (mapc #'clear-ir1-info components)
       (clear-stuff)))
@@ -1333,7 +1288,6 @@
 	 (sb!xc:*compile-file-pathname* nil)
 	 (sb!xc:*compile-file-truename* nil)
 	 (*toplevel-lambdas* ())
-	 (*pending-toplevel-lambdas* ())
 	 (*compiler-error-bailout*
 	  (lambda ()
 	    (compiler-mumble "~2&; fatal error, aborting compilation~%")
@@ -1360,7 +1314,6 @@
 	   (sub-sub-compile-file info)
 
 	   (finish-block-compilation)
-	   (compile-toplevel-lambdas () t)
 	   (let ((object *compile-object*))
 	     (etypecase object
 	       (fasl-output (fasl-dump-source-info info object))
@@ -1637,7 +1590,6 @@
 	(:ignore-it
 	 nil)
 	(t
-	 (compile-toplevel-lambdas () t)
 	 (when (fasl-constant-already-dumped-p constant *compile-object*)
 	   (return-from emit-make-load-form nil))
 	 (let* ((name (let ((*print-level* 1) (*print-length* 2))

@@ -76,8 +76,6 @@ $SBCL_XC_HOST <<-'EOF' || exit 1
 		;; redefine our functions anyway; and developers can
 		;; fend for themselves.)
 		#!-sb-fluid (sb!ext:*derive-function-types* t)
-		;; FIXME: *TOPLEVEL-LAMBDA-MAX* should go away altogether.
-		(sb!c::*toplevel-lambda-max* 1)
 		;; Let the target know that we're the cross-compiler.
 		(*features* (cons :sb-xc *features*))
 		;; We need to tweak the readtable..

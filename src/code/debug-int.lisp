@@ -1513,19 +1513,18 @@
 		       (list successors))
 	      (dotimes (k (ldb sb!c::compiled-debug-block-nsucc-byte
 			       succ-and-flags))
-		(push (sb!c::read-var-integer blocks i) successors))
+		(push (sb!c:read-var-integer blocks i) successors))
 	      (let* ((locations
-		      (dotimes (k (sb!c::read-var-integer blocks i)
+		      (dotimes (k (sb!c:read-var-integer blocks i)
 				  (result locations-buffer))
 			(let ((kind (svref sb!c::*compiled-code-location-kinds*
 					   (aref+ blocks i)))
 			      (pc (+ last-pc
-				     (sb!c::read-var-integer blocks i)))
+				     (sb!c:read-var-integer blocks i)))
 			      (tlf-offset (or tlf-number
-					      (sb!c::read-var-integer blocks
-								      i)))
-			      (form-number (sb!c::read-var-integer blocks i))
-			      (live-set (sb!c::read-packed-bit-vector
+					      (sb!c:read-var-integer blocks i)))
+			      (form-number (sb!c:read-var-integer blocks i))
+			      (live-set (sb!c:read-packed-bit-vector
 					 live-set-len blocks i)))
 			  (vector-push-extend (make-known-code-location
 					       pc debug-fun tlf-offset

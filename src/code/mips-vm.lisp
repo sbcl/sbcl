@@ -123,7 +123,7 @@
 				       vector-data-offset)
 			     (* length n-byte-bits))
       (let* ((index 0)
-	     (error-number (sb!c::read-var-integer vector index)))
+	     (error-number (sb!c:read-var-integer vector index)))
 	(/hexstr error-number)
 	(collect ((sc-offsets))
 	 (loop
@@ -131,7 +131,7 @@
 	  (/hexstr index)
 	  (when (>= index length)
 	    (return))
-	  (sc-offsets (sb!c::read-var-integer vector index)))
+	  (sc-offsets (sb!c:read-var-integer vector index)))
 	 (values error-number (sc-offsets)))))))
 
 

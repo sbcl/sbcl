@@ -1190,10 +1190,15 @@
 		      (out #'fill-pointer-ouch)
 		      (sout #'fill-pointer-sout)
 		      (misc #'fill-pointer-misc))
-	    (:constructor make-fill-pointer-output-stream (string))
+	    (:constructor %make-fill-pointer-output-stream (string))
 	    (:copier nil))
-  ;; the string we throw stuff in
-  string)
+  ;; a string with a fill pointer where we stuff the stuff we write
+  (string (error "missing argument") :type string :read-only t))
+
+(defun make-fill-pointer-output-stream (string)
+  (declare (type string string))
+  (fill-pointer string) ; called for side effect of checking has-fill-pointer
+  (%make-fill-pointer-output-stream string))
 
 (defun fill-pointer-ouch (stream character)
   (let* ((buffer (fill-pointer-output-stream-string stream))

@@ -90,13 +90,14 @@
 	 ,(cond ((policy node (< safety 3))
 		 ;; ANSI requires the length-related type check only
 		 ;; when the SAFETY quality is 3... in other cases, we
-		 ;; skip it.
+		 ;; skip it, because it could be expensive.
 		 bare)
 		((not constant-result-type-arg-p)
 		 `(sequence-of-checked-length-given-type ,bare
 							 result-type-arg))
 		(t
-		 (let ((result-ctype (ir1-transform-specifier-type result-type)))
+		 (let ((result-ctype (ir1-transform-specifier-type
+				      result-type)))
 		   (if (array-type-p result-ctype)
 		       (let ((dims (array-type-dimensions result-ctype)))
 			 (unless (and (listp dims) (= (length dims) 1))

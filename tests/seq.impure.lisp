@@ -261,13 +261,19 @@
     (assert-type-error (concatenate '(string 6) "foo" " " "bar"))
     (assert (string= (concatenate '(string 6) "foo" #(#\b #\a #\r)) "foobar"))
     (assert-type-error (concatenate '(string 7) "foo" #(#\b #\a #\r))))
-  ;; SIMPLE-ARRAY isn't allowed as a vector type specifier
+  ;; Non-VECTOR ARRAY types aren't allowed as vector type specifiers.
   (locally
-      (declare (optimize safety))
+    (declare (optimize safety))
     (assert-type-error (concatenate 'simple-array "foo" "bar"))
     (assert-type-error (map 'simple-array #'identity '(1 2 3)))
+    (assert (equalp #(11 13)
+		    (map '(simple-array fixnum (*)) #'+ '(1 2 3) '(10 11))))
     (assert-type-error (coerce '(1 2 3) 'simple-array))
     (assert-type-error (merge 'simple-array '(1 3) '(2 4) '<))
+    (assert (equalp #(3 2 1) (coerce '(3 2 1) '(vector fixnum))))
+    (assert-type-error (map 'array #'identity '(1 2 3)))
+    (assert-type-error (map '(array fixnum) #'identity '(1 2 3)))
+    (assert (equalp #(1 2 3) (coerce '(1 2 3) '(vector fixnum))))
     ;; but COERCE has an exemption clause:
     (assert (string= "foo" (coerce "foo" 'simple-array)))
     ;; ... though not in all cases.
