@@ -79,3 +79,11 @@
 				  (aref rmdr ,i)))
 		       vector)
 		      0))))
+
+;;; Following refactoring of sequence functions to detect bad type
+;;; specifiers, REVERSE was left broken on vectors with fill pointers.
+(let ((a (make-array 10
+		     :fill-pointer 5
+		     :element-type 'character
+		     :initial-contents "abcdefghij")))
+  (assert (string= (reverse a) "edcba")))

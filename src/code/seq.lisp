@@ -500,12 +500,12 @@
 
 (eval-when (:compile-toplevel :execute)
 
-(sb!xc:defmacro vector-reverse (sequence type)
+(sb!xc:defmacro vector-reverse (sequence)
   `(let ((length (length ,sequence)))
      (declare (fixnum length))
      (do ((forward-index 0 (1+ forward-index))
 	  (backward-index (1- length) (1- backward-index))
-	  (new-sequence (make-sequence ,type length)))
+	  (new-sequence (make-sequence-like sequence length)))
 	 ((= forward-index length) new-sequence)
        (declare (fixnum forward-index backward-index))
        (setf (aref new-sequence forward-index)
@@ -531,7 +531,7 @@
   (list-reverse-macro sequence))
 
 (defun vector-reverse* (sequence)
-  (vector-reverse sequence (type-of sequence)))
+  (vector-reverse sequence))
 
 ;;;; NREVERSE
 
