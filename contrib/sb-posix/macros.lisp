@@ -1,7 +1,14 @@
 (in-package :sb-posix-internal)
 
+;;; some explanation may be necessary.  The namestring "[foo]" 
+;;; denotes a wild pathname.  When there's a file on the disk whose
+;;; Unix name is "[foo]", the appropriate CL namestring for it is
+;;; "\\[foo]".  So, don't call NAMESTRING, instead call a function
+;;; that gets us the Unix name
+
 (define-designator filename c-string
-  (pathname  (namestring (translate-logical-pathname filename)))
+  (pathname 
+   (sb-impl::unix-namestring (translate-logical-pathname filename) nil))
   (string filename))
 
 (define-designator file-descriptor (integer 32)

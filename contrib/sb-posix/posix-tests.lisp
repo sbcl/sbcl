@@ -205,3 +205,20 @@
 	(sb-posix:rmdir dir)
 	(sb-posix:syscall-errno c))))
   #.sb-posix::eacces)
+
+;;; see comment in filename's designator definition, in macros.lisp
+(deftest filename-designator.1
+    (progn
+      ;; we use run-program to bypass the wildcard quoting in the 
+      ;; highlevel CL functions like OPEN
+      (sb-ext:run-program "touch"
+			  (list
+			   (format nil "~A/[foo].txt"
+				   (namestring *test-directory*)))
+			  :search t :wait t )
+      ;; if this test fails, it will probably be with
+      ;; "System call error 2 (No such file or directory)"
+      (let ((*default-pathname-defaults* *test-directory*))
+	(sb-posix:unlink (car (directory "*.txt")))))
+  0)
+			 
