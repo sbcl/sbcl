@@ -2,4 +2,8 @@ contrib-doc-list.texi-temp
 docstrings
 *-stamp
 sbcl
-
+sbcl.cp
+*.dvi
+sbcl.fn
+sbcl.tp
+sbcl.vr
