@@ -1388,6 +1388,16 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
              "%ARRAY-TYPEP" "%SET-SAP-REF-DESCRIPTOR"))
 
  #s(sb-cold:package-data
+    :name "SB!THREAD"
+    :use ("CL" "SB!ALIEN")
+    :doc "public (but low-level): native thread support"
+    :export ("MAKE-THREAD"
+	     "MAKE-LISTENER-THREAD" "DESTROY-THREAD" "WITH-RECURSIVE-LOCK"
+	     "MUTEX" "MAKE-MUTEX" "GET-MUTEX" "RELEASE-MUTEX" "WITH-MUTEX"
+	     "WAITQUEUE" "MAKE-WAITQUEUE" "CONDITION-WAIT" "CONDITION-NOTIFY"
+	     "WITH-RECURSIVE-LOCK" "RELEASE-FOREGROUND" "CURRENT-THREAD-ID"))
+ 
+ #s(sb-cold:package-data
     :name "SB!LOOP"
     :doc "private: implementation details of LOOP"
     :use ("CL")

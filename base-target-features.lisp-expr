@@ -152,21 +152,14 @@
  ; :high-security
  ; :high-security-support
 
- ;; multiprocessing support
+ ;; low-level thread primitives support
  ;;
- ;; This is not maintained or tested in current SBCL. I haven't gone out
- ;; of my way to break it, but since it's derived from an old version of 
- ;; CMU CL where multiprocessing was pretty shaky, it's likely to be very
- ;; flaky now.
- ;;   :MP enables multiprocessing
- ;;   :MP-I486 is used, only within the multiprocessing code, to control
- ;;            what seems to control processor-version-specific code. It's
- ;;            probably for 486 or later, i.e. could be set as long as
- ;;            you know you're not running on a 386, but it doesn't seem
- ;;            to be documented anywhere, so that's just a guess.
- ; :mp
- ; :mp-i486
-
+ ;; As of SBCL 0.8,  this is only supposed to work in x86 Linux, on which
+ ;; system it's implemented using clone(2) and the %fs segment register.
+ ;; Note that no consistent effort to audit the SBCL library code for
+ ;; thread safety has been performed, so caveat executor
+ ; :sb-thread
+ 
  ;; This affects the definition of a lot of things in bignum.lisp. It
  ;; doesn't seem to be documented anywhere what systems it might apply
  ;; to. It doesn't seem to be needed for X86 systems anyway.

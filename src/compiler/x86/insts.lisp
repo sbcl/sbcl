@@ -1036,6 +1036,11 @@
      (emit-ea segment dst (reg-tn-encoding src)))))
 
 
+
+(define-instruction fs-segment-prefix (segment)
+  (:emitter
+   (emit-byte segment #x64)))
+
 ;;;; flag control instructions
 
 ;;; CLC -- Clear Carry Flag.
