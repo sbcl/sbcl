@@ -54,27 +54,54 @@
 	  until (sb!sys:sap= thread (sb!sys:int-sap 0))
 	  collect (funcall function thread))))
 
-;;;; mutex and read/write locks
-
-;;; in true OOAOM style, this is also defined in C.  Don't change this
-;;; defn without referring also to add_thread_to_queue
-(defstruct mutex
-  (name nil :type (or null simple-base-string))
-  (value nil)
-  (queuelock 0)
-  (queue nil))
-
-;;; add_thread_to_queue needs to do lots of sigmask manipulation 
-;;; which we don't have the right alien gubbins to do in lisp
-(sb!alien:define-alien-routine
-    ("add_thread_to_queue" add-thread-to-queue) void
-  (pid int) (mutex system-area-pointer))
+;;;; queues, locks 
 
 ;; spinlocks use 0 as "free" value: higher-level locks use NIL
 (defun get-spinlock (lock offset new-value)
   (declare (optimize (speed 3) (safety 0)))
   (loop until
 	(eql (sb!vm::%instance-set-conditional lock offset 0 new-value) 0)))
+
+;;;; the higher-level locking operations are based on waitqueues
+
+(defstruct waitqueue
+  (name nil :type (or null simple-base-string))
+  (lock 0)
+  (data nil))
+
+(defstruct (mutex (:include waitqueue))
+  (value nil))
+
+(sb!alien:define-alien-routine "block_sigcont"  void)
+(sb!alien:define-alien-routine "unblock_sigcont_and_sleep"  void)
+
+(defun wait-on-queue (queue &optional lock)
+  (let ((pid (current-thread-id)))
+    ;; FIXME what should happen if we get interrupted when we've blocked
+    ;; the sigcont?  For that matter, can we get interrupted?
+    (block-sigcont)
+    (when lock (release-mutex lock))
+    (get-spinlock queue 2 pid)
+    (pushnew pid (waitqueue-data queue))
+    (setf (waitqueue-lock queue) 0)
+    (unblock-sigcont-and-sleep)))
+
+(defun dequeue (queue)
+  (let ((pid (current-thread-id)))
+    (get-spinlock queue 2 pid)
+    (setf (waitqueue-data queue)
+	  (delete pid (waitqueue-data queue)))
+    (setf (waitqueue-lock queue) 0)))
+
+(defun signal-queue-head (queue)
+  (let ((pid (current-thread-id)))
+    (get-spinlock queue 2 pid)
+    (let ((h (car (waitqueue-data queue))))
+      (setf (waitqueue-lock queue) 0)
+      (when h
+	(sb!unix:unix-kill h :sigcont)))))
+
+;;;; mutex
 
 (defun get-mutex (lock &optional new-value (wait-p t))
   (declare (type mutex lock))
@@ -83,33 +110,23 @@
     (loop
      (unless
 	 ;; args are object slot-num old-value new-value
-	 (sb!vm::%instance-set-conditional lock 2 nil new-value)
-       ;; success, remove us from the wait queue 
-       (get-spinlock lock 3 pid)
-       (when (eql (car (mutex-queue lock)) pid)
-	 ;; ... if we were there
-	 (setf (mutex-queue lock) (cdr (mutex-queue lock))))
-       (setf (mutex-queuelock lock) 0)
+	 (sb!vm::%instance-set-conditional lock 4 nil new-value)
+       (dequeue lock)
        (return t))
      (unless wait-p (return nil))
-     (add-thread-to-queue
-      pid (sb!sys:int-sap (sb!kernel:get-lisp-obj-address lock))))))
+     (wait-on-queue lock nil))))
 
 (defun release-mutex (lock &optional (new-value nil))
   (declare (type mutex lock))
   (let ((old-value (mutex-value lock))
-	(pid (current-thread-id))
 	(t1 nil))
     (loop
      (unless
 	 ;; args are object slot-num old-value new-value
 	 (eql old-value
 	      (setf t1
-		    (sb!vm::%instance-set-conditional lock 2 old-value new-value)))       
-       (get-spinlock lock 3 pid)
-       (when (mutex-queue lock)
-	 (sb!unix:unix-kill (car (mutex-queue lock)) :sigcont))
-       (setf (mutex-queuelock lock) 0)
+		    (sb!vm::%instance-set-conditional lock 4 old-value new-value)))       
+       (signal-queue-head lock)
        (return t))
      (setf old-value t1))))
 
@@ -120,6 +137,23 @@
 	(unless (get-mutex ,mutex ,value ,wait-p) (return-from ,block nil))
 	,@body)
       (release-mutex ,mutex))))
+
+
+;;;; condition variables
+
+(defun condition-wait (queue lock)
+  "Atomically release LOCK and enqueue ourselves on QUEUE.  Another
+thread may subsequently notify us using CONDITION-NOTIFY, at which
+time we reacquire LOCK and return to the caller."
+  (wait-on-queue queue lock)
+  (dequeue queue )
+  ;; FIXME not sure this is safe: some people say we should do this
+  ;; atomically
+  (get-mutex lock))
+
+(defun condition-notify (queue)
+  "Notify one of the processes waiting on QUEUE"
+  (signal-queue-head queue))
 
 
 ;;;; multiple independent listeners
@@ -181,7 +215,7 @@ restart if *BACKGROUND-THREADS-WAIT-FOR-DEBUGGER* says to do that instead"
 (defun thread-repl-prompt-fun (in-stream out-stream)
   (let ((lock *session-lock*))
     (get-foreground)
-    (let ((stopped-threads (mutex-queue lock)))
+    (let ((stopped-threads (waitqueue-data lock)))
       (when stopped-threads
 	(format out-stream "~{~&Thread ~A suspended~}~%" stopped-threads))
       (sb!impl::repl-prompt-fun in-stream out-stream))))

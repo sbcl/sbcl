@@ -145,7 +145,7 @@ are per-thread.
 
 <para><function>sb-ext:quit</function> exits the current thread, not
 necessarily the whole environment.  The environment will be shut down
-when the last thread exits.
+when the last thread exits.  
 
 <para>Threads arbitrate between themselves for the user's attention.
 A thread may be in one of three notional states: foreground,
@@ -163,10 +163,20 @@ view has its own collection of foreground/background/stopped threads.
 <function>sb-thread:make-listener-thread</function> can be used to
 start a new thread in its own `session'.
 
-<para>A small selection of locking primitives are available for
-managing access to shared data: see <programlisting>(apropos "mutex"
-:sb-thread)</programlisting> and the documentation strings for the
-functions it lists.
+<para>Mutexes and condition variables are available for 
+managing access to shared data: see 
+
+<itemizedlist>
+<listitem>
+<programlisting>(apropos "mutex" :sb-thread)</programlisting> 
+<listitem>
+<programlisting>(apropos "condition" :sb-thread)</programlisting> 
+<listitem> <para>and the <structname>waitqueue</structname> structure
+</para>
+</listitem>
+</itemizedlist>
+
+and poke around in their documentation strings.
 
 <sect3><title>Implementation (Linux x86)</title>
 
@@ -184,8 +194,9 @@ This may cause interesting results if you link to foreign code that
 expects threading or creates new threads, and the thread library in
 question uses %gs in an incompatible way.
 
-<para>Threads waiting for locks are put to sleep using
-<function>sigtimedwait()</function> and woken with SIGALRM.  
+<para>Threads waiting on queues (e.g. for locks or condition
+variables) are put to sleep using <function>sigtimedwait()</function>
+and woken with SIGCONT.
 
 <para>&SBCL; at present will alway have at least two tasks running as
 seen from Linux: when the first process has done startup
@@ -223,7 +234,7 @@ is managed by locking on sb-thread::*session-lock*
 window) using <function>sb-thread:make-listener-thread</function>.
 These sessions map directly onto POSIX sessions, so that pressing
 Control-C in the wrong window will not interrupt them - this has been
-found to often be embarrassing.
+found to be embarrassing.
 
 <sect2><title>Support For Unix</>
 

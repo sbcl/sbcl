@@ -209,10 +209,6 @@ struct thread *find_thread_by_pid(pid_t pid)
 }
 
 
-struct mutex {
-    lispobj header,type,*name,*value,queuelock, *queue;
-};
-
 void get_spinlock(lispobj *word,int value)
 {
     u32 eax=0;
@@ -224,37 +220,23 @@ void get_spinlock(lispobj *word,int value)
     } while(eax!=0);
 }
 
-void add_thread_to_queue(int pid, lispobj mutex_p)
+void block_sigcont(void)
 {
-    sigset_t oldset,newset;
-    struct mutex *mutex=(struct mutex *)native_pointer(mutex_p);
-    struct cons *cons;
-    sigemptyset(&newset);
-    sigaddset(&newset,SIGCONT);
     /* don't allow ourselves to receive SIGCONT while we're in the
      * "ambiguous" state of being on the queue but not actually stopped.
      */
-    sigprocmask(SIG_BLOCK, &newset, &oldset); 
-    
-    get_spinlock(&(mutex->queuelock),pid);
-    /* we may get woken from our sleep by the garbage collector and
-     * therefore be in a state where we are both running and queued.
-     * Don't put ourselves on the queue more than once */
+    sigset_t newset;
+    sigemptyset(&newset);
+    sigaddset(&newset,SIGCONT);
+    sigprocmask(SIG_BLOCK, &newset, 0); 
+}
 
-#define CAR(cons) (((struct cons *)(native_pointer(cons)))->car)
-#define CDR(cons) (((struct cons *)(native_pointer(cons)))->cdr)
-
-    for(cons=mutex->queue;cons != NIL; cons=CDR(cons))
-	if(CAR(cons)==make_fixnum(pid)) 
-	    goto end;
-	
-    cons=alloc_cons(make_fixnum(pid),mutex->queue);
-    mutex->queue=cons;
- end:
-    mutex->queuelock=0;
-    sigwaitinfo(&newset,0);
-    sigprocmask(SIG_SETMASK,&oldset,0);
-#undef CAR
-#undef CDR
+void unblock_sigcont_and_sleep(void)
+{
+    sigset_t set;
+    sigemptyset(&set);
+    sigaddset(&set,SIGCONT);
+    sigwaitinfo(&set,0);
+    sigprocmask(SIG_UNBLOCK,&set,0);
 }
 
