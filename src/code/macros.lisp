@@ -181,8 +181,9 @@
 ;;; When MULTI-P, TEST is applied to the value of KEYFORM and each key
 ;;; for a given branch; otherwise, TEST is applied to the value of
 ;;; KEYFORM and the entire first element, instead of each part, of the
-;;; case branch. When ERRORP, no T or OTHERWISE branch is permitted,
-;;; and an ERROR form is generated. When PROCEEDP, it is an error to
+;;; case branch. When ERRORP, no OTHERWISE-CLAUSEs are recognized,
+;;; and an ERROR form is generated where control falls off the end
+;;; of the ordinary clauses. When PROCEEDP, it is an error to
 ;;; omit ERRORP, and the ERROR form generated is executed within a
 ;;; RESTART-CASE allowing KEYFORM to be set and retested.
 (defun case-body (name keyform cases multi-p test errorp proceedp needcasesp)
@@ -197,17 +198,33 @@
       (unless (list-of-length-at-least-p case 1)
 	(error "~S -- bad clause in ~S" case name))
       (destructuring-bind (keyoid &rest forms) case
-	(cond ((and (memq keyoid '(t otherwise))
+	(cond (;; an OTHERWISE-CLAUSE 
+	       ;;
+	       ;; By the way... The old code here tried gave
+	       ;; STYLE-WARNINGs for normal-clauses which looked as
+	       ;; though they might've been intended to be
+	       ;; otherwise-clauses. As Tony Martinez reported on
+	       ;; sbcl-devel 2004-11-09 there are sometimes good
+	       ;; reasons to write clauses like that; and as I noticed
+	       ;; when trying to understand the old code so I could
+	       ;; understand his patch, trying to guess which clauses
+	       ;; don't have good reasons is fundamentally kind of a
+	       ;; mess. SBCL does issue style warnings rather
+	       ;; enthusiastically, and I have often justified that by
+	       ;; arguing that we're doing that to detect issues which
+	       ;; are tedious for programmers to detect for by
+	       ;; proofreading (like small typoes in long symbol
+	       ;; names, or duplicate function definitions in large
+	       ;; files). This doesn't seem to be an issue like that,
+	       ;; and I can't think of a comparably good justification
+	       ;; for giving STYLE-WARNINGs for legal code here, so
+	       ;; now we just hope the programmer knows what he's
+	       ;; doing. -- WHN 2004-11-20
+	       (and (not errorp) ; possible only in CASE or TYPECASE,
+		                 ; not in [EC]CASE or [EC]TYPECASE
+		    (memq keyoid '(t otherwise))
 		    (null (cdr cases)))
-	       (if errorp
-		   (progn
-		     (style-warn "~@<Treating bare ~A in ~A as introducing a ~
-                                  normal-clause, not an otherwise-clause~@:>"
-				 keyoid name)
-		     (push keyoid keys)
-		     (push `((,test ,keyform-value ',keyoid) nil ,@forms)
-			   clauses))
-		   (push `(t nil ,@forms) clauses)))
+	       (push `(t nil ,@forms) clauses))
 	      ((and multi-p (listp keyoid))
 	       (setf keys (append keyoid keys))
 	       (push `((or ,@(mapcar (lambda (key)
