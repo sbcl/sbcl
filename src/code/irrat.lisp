@@ -701,9 +701,11 @@
 (defun coerce-to-complex-type (x y z)
   (declare (double-float x y)
 	   (number z))
-  (if (subtypep (type-of (realpart z)) 'double-float)
+  (if (typep (realpart z) 'double-float)
       (complex x y)
-      ;; Convert anything that's not a DOUBLE-FLOAT to a SINGLE-FLOAT.
+      ;; Convert anything that's not already a DOUBLE-FLOAT (because
+      ;; the initial argument was a (COMPLEX DOUBLE-FLOAT) and we
+      ;; haven't done anything to lose precision) to a SINGLE-FLOAT.
       (complex (float x 1f0)
 	       (float y 1f0))))
 
