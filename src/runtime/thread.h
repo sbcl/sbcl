@@ -46,7 +46,7 @@ static inline void SetSymbolValue(u32 tagged_symbol_pointer,lispobj val, void *t
 	lispobj *pr=&(((struct thread *)thread)
 		      ->dynamic_values_start[fixnum_value(sym->tls_index)]);
 	if(*pr!= UNBOUND_MARKER_WIDETAG) {
-	    *pr==val;
+	    *pr=val;
 	    return;
 	}
     }

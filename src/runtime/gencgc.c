@@ -3760,6 +3760,9 @@ garbage_collect_generation(int generation, int raise)
 		  (lispobj *)SymbolValue(BINDING_STACK_POINTER,th) -
 		  th->binding_stack_start);
 	 
+	 /* do the tls as well */
+         scavenge((lispobj *) th->dynamic_values_start,
+                  fixnum_value(SymbolValue(FREE_TLS_INDEX,0)));
      }
  }
 
@@ -3935,7 +3938,7 @@ collect_garbage(unsigned last_gen)
 
     /* Verify the new objects created by Lisp code. */
     if (pre_verify_gen_0) {
-	SHOW((stderr, "pre-checking generation 0\n"));
+	FSHOW((stderr, "pre-checking generation 0\n"));
 	verify_generation(0);
     }
 

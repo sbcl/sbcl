@@ -149,11 +149,27 @@
   (:args (object :scs (descriptor-reg)))
   (:conditional)
   (:info target not-p)
-  (:temporary (:sc descriptor-reg :from (:argument 0)) value)
+  (:temporary (:sc descriptor-reg #+nil(:from (:argument 0))) value)
   (:generator 9
-    (loadw value object symbol-value-slot other-pointer-lowtag)
-    (inst cmp value unbound-marker-widetag)
-    (inst jmp (if not-p :e :ne) target)))
+    (if not-p
+	(let ((not-target (gen-label)))
+	  (loadw value object symbol-value-slot other-pointer-lowtag)
+	  (inst cmp value unbound-marker-widetag)
+	  (inst jmp :ne not-target)
+	  (loadw value object symbol-tls-index-slot other-pointer-lowtag)
+	  (inst gs-segment-prefix)
+	  (inst cmp (make-ea :dword :index value :scale 1) unbound-marker-widetag)
+	  (inst jmp  :e  target)
+	  (emit-label not-target))
+	(progn
+	  (loadw value object symbol-value-slot other-pointer-lowtag)
+	  (inst cmp value unbound-marker-widetag)
+	  (inst jmp :ne target)
+	  (loadw value object symbol-tls-index-slot other-pointer-lowtag)
+	  (inst gs-segment-prefix)
+	  (inst cmp (make-ea :dword :index value :scale 1) unbound-marker-widetag)
+	  (inst jmp  :ne  target)))))
+
 
 (define-vop (symbol-hash)
   (:policy :fast-safe)
