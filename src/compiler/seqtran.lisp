@@ -652,6 +652,7 @@
 ;;; %CONCATENATE (with a DEFTRANSFORM to translate constant RTYPE to
 ;;; CTYPE before calling %CONCATENATE) which is comparably efficient,
 ;;; at least once DYNAMIC-EXTENT works.
+#+nil ; FIXME: currently commented out because of bug 188
 (deftransform concatenate ((rtype &rest sequences)
 			   (t &rest simple-string)
 			   simple-string)

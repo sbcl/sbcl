@@ -1409,7 +1409,9 @@ WORKAROUND:
       (sb-c::%dvai v i))
 
 188: "compiler performance fiasco involving type inference and UNION-TYPE"
-  In sbcl-0.7.5.11 on a 700 MHz Pentium III, 
+  (In sbcl-0.7.6.10, DEFTRANSFORM CONCATENATE was commented out until this
+  bug could be fixed properly, so you won't see the bug unless you restore
+  the DEFTRANSFORM by hand.) In sbcl-0.7.5.11 on a 700 MHz Pentium III, 
     (time (compile
            nil
            '(lambda ()
