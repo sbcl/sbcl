@@ -1369,6 +1369,8 @@ changes in sbcl-0.7.10 relative to sbcl-0.7.9:
        instance to return different numbers on distinct instances,
        while preserving the same return value through invocations of
        CHANGE-CLASS;
+    ** DEFMETHOD signals errors when methods with longer incongruent
+       lambda lists are added to generic functions;
   * fixed some bugs shown by Paul Dietz' test suite:
     ** DOLIST puts its body in TAGBODY
     ** SET-EXCLUSIVE-OR sends arguments to :TEST function in the

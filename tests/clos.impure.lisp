@@ -387,6 +387,35 @@
 		    form)))
 	    'dmc-test-return))
 
+;;; DEFMETHOD should signal a PROGRAM-ERROR if an incompatible lambda
+;;; list is given:
+(defmethod incompatible-ll-test-1 (x) x)
+(multiple-value-bind (result error)
+    (ignore-errors (defmethod incompatible-ll-test-1 (x y) y))
+  (assert (null result))
+  (assert (typep error 'program-error)))
+(multiple-value-bind (result error)
+    (ignore-errors (defmethod incompatible-ll-test-1 (x &rest y) y))
+  (assert (null result))
+  (assert (typep error 'program-error)))
+;;; Sneakily using a bit of MOPness to check some consistency
+(assert (= (length
+	    (sb-pcl:generic-function-methods #'incompatible-ll-test-1)) 1))
+
+(defmethod incompatible-ll-test-2 (x &key bar) bar)
+(multiple-value-bind (result error)
+    (ignore-errors (defmethod incompatible-ll-test-2 (x) x))
+  (assert (null result))
+  (assert (typep error 'program-error)))
+(defmethod incompatible-ll-test-2 (x &rest y) y)
+(assert (= (length
+	    (sb-pcl:generic-function-methods #'incompatible-ll-test-2)) 1))
+(defmethod incompatible-ll-test-2 ((x integer) &key bar) bar)
+(assert (= (length
+	    (sb-pcl:generic-function-methods #'incompatible-ll-test-2)) 2))
+(assert (equal (incompatible-ll-test-2 t 1 2) '(1 2)))
+(assert (eq (incompatible-ll-test-2 1 :bar 'yes) 'yes))
+
 ;;;; success
 
 (sb-ext:quit :unix-status 104)

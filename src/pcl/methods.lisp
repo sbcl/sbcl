@@ -317,10 +317,12 @@
 					 &optional (errorp t))
   (let ((hit 
 	  (dolist (method (generic-function-methods generic-function))
-	    (when (and (equal qualifiers (method-qualifiers method))
-		       (every #'same-specializer-p specializers
-			      (method-specializers method)))
-	      (return method)))))
+	    (let ((mspecializers (method-specializers method)))
+	      (when (and (equal qualifiers (method-qualifiers method))
+			 (= (length specializers) (length mspecializers))
+			 (every #'same-specializer-p specializers
+				(method-specializers method)))
+		(return method))))))
     (cond (hit hit)
 	  ((null errorp) nil)
 	  (t
@@ -458,12 +460,20 @@
 	(real-add-method gf (pop methods) methods)))
 
 (defun real-add-method (generic-function method &optional skip-dfun-update-p)
-  (if (method-generic-function method)
-      (error "The method ~S is already part of the generic~@
-	      function ~S. It can't be added to another generic~@
-	      function until it is removed from the first one."
-	     method (method-generic-function method))
-
+  (when (method-generic-function method)
+    (error "The method ~S is already part of the generic~@
+	    function ~S. It can't be added to another generic~@
+	    function until it is removed from the first one."
+	   method (method-generic-function method)))
+  (flet ((similar-lambda-lists-p (method-a method-b)
+	   (multiple-value-bind (a-nreq a-nopt a-keyp a-restp)
+	       (analyze-lambda-list (method-lambda-list method-a))
+	     (multiple-value-bind (b-nreq b-nopt b-keyp b-restp)
+		 (analyze-lambda-list (method-lambda-list method-b))
+	       (and (= a-nreq b-nreq)
+		    (= a-nopt b-nopt)
+		    (eq (or a-keyp a-restp)
+			(or b-keyp b-restp)))))))
       (let* ((name (generic-function-name generic-function))
 	     (qualifiers (method-qualifiers method))
 	     (specializers (method-specializers method))
@@ -472,17 +482,31 @@
 				   specializers
 				   nil)))
 
-	;; If there is already a method like this one then we must
-	;; get rid of it before proceeding. Note that we call the
-	;; generic function remove-method to remove it rather than
-	;; doing it in some internal way.
-	(when existing (remove-method generic-function existing))
+	;; If there is already a method like this one then we must get
+	;; rid of it before proceeding.  Note that we call the generic
+	;; function REMOVE-METHOD to remove it rather than doing it in
+	;; some internal way.
+	(when (and existing (similar-lambda-lists-p existing method))
+	  (remove-method generic-function existing))
 
 	(setf (method-generic-function method) generic-function)
 	(pushnew method (generic-function-methods generic-function))
 	(dolist (specializer specializers)
 	  (add-direct-method specializer method))
-	(set-arg-info generic-function :new-method method)
+
+	;; KLUDGE: SET-ARG-INFO contains the error-detecting logic for
+	;; detecting attempts to add methods with incongruent lambda
+	;; lists.  However, according to Gerd Moellmann on cmucl-imp,
+	;; it also depends on the new method already having been added
+	;; to the generic function.  Therefore, we need to remove it
+	;; again on error:
+	(let ((remove-again-p t))
+	  (unwind-protect
+	       (progn
+		 (set-arg-info generic-function :new-method method)
+		 (setq remove-again-p nil))
+	    (when remove-again-p
+	      (remove-method generic-function method))))
 	(unless skip-dfun-update-p
 	  (when (member name
 			'(make-instance default-initargs

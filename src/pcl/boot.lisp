@@ -1658,11 +1658,10 @@ bootstrapping.
 			       (method-lambda-list method)))
     (flet ((lose (string &rest args)
 	     (error 'simple-program-error
-		    :format-control "attempt to add the method ~S ~
-                                     to the generic function ~S.~%~
-                                     But ~A"
-		    :format-arguments (list method gf
-					    (apply #'format nil string args))))
+		    :format-control "~@<attempt to add the method~2I~_~S~I~_~
+                                     to the generic function~2I~_~S;~I~_~
+                                     but ~?~:>"
+		    :format-arguments (list method gf string args)))
 	   (comparison-description (x y)
 	     (if (> x y) "more" "fewer")))
       (let ((gf-nreq (arg-info-number-required arg-info))
@@ -1679,13 +1678,13 @@ bootstrapping.
 	   (comparison-description nopt gf-nopt)))
 	(unless (eq (or keysp restp) gf-key/rest-p)
 	  (lose
-	   "the method and generic function differ in whether they accept~%~
+	   "the method and generic function differ in whether they accept~_~
 	    &REST or &KEY arguments."))
 	(when (consp gf-keywords)
 	  (unless (or (and restp (not keysp))
 		      allow-other-keys-p
 		      (every (lambda (k) (memq k keywords)) gf-keywords))
-	    (lose "the method does not accept each of the &KEY arguments~%~
+	    (lose "the method does not accept each of the &KEY arguments~2I~_~
 		   ~S."
 		  gf-keywords)))))))
 
