@@ -5,6 +5,9 @@ changes in sbcl-0.8.18 relative to sbcl-0.8.17:
     DEFSTRUCT forms are now created eagerly.
   * bug fix: lambda-list parsing is now stricter vrt. order and number
     of lambda-list keywords.
+  * fixed some bugs revealed by Paul Dietz' test suite:
+    ** INCF, DECF and REMF evaluate their place form as specified in
+       CLtS 5.1.3.
 
 changes in sbcl-0.8.17 relative to sbcl-0.8.16:
   * new feature: a build-time option (controlled by the :SB-UNICODE

@@ -257,8 +257,9 @@ GET-SETF-EXPANSION directly."
 	  (local1 (gensym))
 	  (local2 (gensym)))
 	 ((null d)
-	  (push (list (car newval) getter) let-list)
+          ;; See ANSI 5.1.3 for why we do out-of-order evaluation
 	  (push (list ind-temp indicator) let-list)
+	  (push (list (car newval) getter) let-list)
 	  `(let* ,(nreverse let-list)
 	     (do ((,local1 ,(car newval) (cddr ,local1))
 		  (,local2 nil ,local1))
@@ -273,6 +274,31 @@ GET-SETF-EXPANSION directly."
 			       ,setter
 			       (return t))))))))
       (push (list (car d) (car v)) let-list))))
+
+;;; we can't use DEFINE-MODIFY-MACRO because of ANSI 5.1.3
+(defmacro-mundanely incf (place &optional (delta 1) &environment env)
+  #!+sb-doc
+  "The first argument is some location holding a number. This number is
+  incremented by the second argument, DELTA, which defaults to 1."
+  (multiple-value-bind (dummies vals newval setter getter)
+      (get-setf-method place env)
+    (let ((d (gensym)))
+      `(let* (,@(mapcar #'list dummies vals)
+              (,d ,delta)
+              (,(car newval) (+ ,getter ,d)))
+         ,setter))))
+
+(defmacro-mundanely decf (place &optional (delta 1) &environment env)
+  #!+sb-doc
+  "The first argument is some location holding a number. This number is
+  decremented by the second argument, DELTA, which defaults to 1."
+  (multiple-value-bind (dummies vals newval setter getter)
+      (get-setf-method place env)
+    (let ((d (gensym)))
+      `(let* (,@(mapcar #'list dummies vals)
+              (,d ,delta)
+              (,(car newval) (- ,getter ,d)))
+         ,setter))))
 
 ;;;; DEFINE-MODIFY-MACRO stuff
 
@@ -321,16 +347,6 @@ GET-SETF-EXPANSION directly."
 		    let-list)
 	      `(let* ,(nreverse let-list)
 		 ,setter)))))))
-
-(sb!xc:define-modify-macro incf (&optional (delta 1)) +
-  #!+sb-doc
-  "The first argument is some location holding a number. This number is
-  incremented by the second argument, DELTA, which defaults to 1.")
-
-(sb!xc:define-modify-macro decf (&optional (delta 1)) -
-  #!+sb-doc
-  "The first argument is some location holding a number. This number is
-  decremented by the second argument, DELTA, which defaults to 1.")
 
 ;;;; DEFSETF
 
