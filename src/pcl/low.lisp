@@ -97,7 +97,7 @@
 
 (import 'sb-kernel:funcallable-instance-p)
 
-(defun set-funcallable-instance-fun (fin new-value)
+(defun set-funcallable-instance-function (fin new-value)
   (declare (type function new-value))
   (aver (funcallable-instance-p fin))
   (setf (funcallable-instance-fun fin) new-value))

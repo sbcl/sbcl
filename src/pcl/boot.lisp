@@ -1773,7 +1773,7 @@ bootstrapping.
 (defun make-early-gf (spec &optional lambda-list lambda-list-p
 		      function argument-precedence-order)
   (let ((fin (allocate-funcallable-instance *sgf-wrapper* *sgf-slots-init*)))
-    (set-funcallable-instance-fun
+    (set-funcallable-instance-function
      fin
      (or function
 	 (if (eq spec 'print-object)

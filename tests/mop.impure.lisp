@@ -111,5 +111,20 @@
 ;;; of all built-in-classes is of the relevant type)
 (assert (null (sb-pcl:class-prototype (find-class 'null))))
 
+;;; simple consistency checks for the SB-PCL (perhaps AKA SB-MOP)
+;;; package: all of the functionality specified in AMOP is in
+;;; functions:
+(assert (null (loop for x being each external-symbol in "SB-PCL"
+		    unless (fboundp x) collect x)))
+;;; and all generic functions in SB-PCL have at least one specified
+;;; method, except for UPDATE-DEPENDENT
+(assert (null (loop for x being each external-symbol in "SB-PCL"
+		    unless (or (eq x 'sb-pcl:update-dependent)
+			       (not (typep (fdefinition x) 'generic-function))
+			       (> (length (sb-pcl:generic-function-methods
+					   (fdefinition x)))
+				  0))
+		    collect x)))
+
 ;;;; success
 (sb-ext:quit :unix-status 104)

@@ -65,7 +65,7 @@
 					      (slots-init nil slots-init-p))
   (let ((fin (%make-pcl-funcallable-instance nil nil
 					     (get-instance-hash-code))))
-    (set-funcallable-instance-fun
+    (set-funcallable-instance-function
      fin
      #'(instance-lambda (&rest args)
 	 (declare (ignore args))
