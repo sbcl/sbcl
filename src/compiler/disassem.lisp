@@ -1562,7 +1562,7 @@
   (write value :stream stream :radix t :base 16 :escape nil))
 
 (defun read-signed-suffix (length dstate)
-  (declare (type (member 8 16 32) length)
+  (declare (type (member 8 16 32 64) length)
            (type disassem-state dstate)
            (optimize (speed 3) (safety 0)))
   (sign-extend (read-suffix length dstate) length))
@@ -1587,6 +1587,9 @@
 	      :type (member :big-endian :little-endian))
   ;; for user code to hang stuff off of
   (properties nil :type list)
+  ;; for user code to hang stuff off of, cleared each time before an
+  ;; instruction is processed
+  (inst-properties nil :type list)
   (filtered-values (make-array max-filtered-value-index)
 		   :type filtered-value-vector)
   ;; used for prettifying printing
@@ -1639,3 +1642,12 @@
 ;;; it's defined before it's used. -- WHN ca. 19990701
 (defmacro dstate-get-prop (dstate name)
   `(getf (dstate-properties ,dstate) ,name))
+
+;;; Push NAME on the list of instruction properties in DSTATE.
+(defun dstate-put-inst-prop (dstate name)
+  (push name (dstate-inst-properties dstate)))
+
+;;; Return non-NIL if NAME is on the list of instruction properties in
+;;; DSTATE.
+(defun dstate-get-inst-prop (dstate name)
+  (member name (dstate-inst-properties dstate) :test #'eq))

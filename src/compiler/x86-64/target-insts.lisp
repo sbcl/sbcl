@@ -15,13 +15,20 @@
 
 (in-package "SB!VM")
 
-(defun print-mem-access (value stream print-size-p dstate)
+;;; Prints a memory reference to STREAM. VALUE is a list of
+;;; (BASE-REG OFFSET INDEX-REG INDEX-SCALE), where any component may be
+;;; missing or nil to indicate that it's not used or has the obvious
+;;; default value (e.g., 1 for the index-scale). BASE-REG can be the
+;;; symbol RIP or a full register, INDEX-REG a full register. If WIDTH
+;;; is non-nil it should be one of the symbols :BYTE, :WORD, :DWORD or
+;;; :QWORD and a corresponding size indicator is printed first.
+(defun print-mem-access (value width stream dstate)
   (declare (type list value)
+	   (type (member nil :byte :word :dword :qword) width)
 	   (type stream stream)
-	   (type (member t nil) print-size-p)
 	   (type sb!disassem:disassem-state dstate))
-  (when print-size-p
-    (princ (sb!disassem:dstate-get-prop dstate 'width) stream)
+  (when width
+    (princ width stream)
     (princ '| PTR | stream))
   (write-char #\[ stream)
   (let ((firstp t) (rip-p nil))
@@ -69,6 +76,6 @@
 		   (sb!disassem:maybe-note-assembler-routine offset
 							     nil
 							     dstate))))
-	     (t
-	      (princ offset stream)))))))
+            (t
+             (princ offset stream)))))))
   (write-char #\] stream))

@@ -530,6 +530,7 @@
 		 (cond ((null inst)
 			(handle-bogus-instruction stream dstate))
 		       (t
+                        (setf (dstate-inst-properties dstate) nil)
 			(setf (dstate-next-offs dstate)
 			      (+ (dstate-cur-offs dstate)
 				 (inst-length inst)))

@@ -18,16 +18,21 @@
 ;;; Note: In CMU CL, this used to be a call to SET-DISASSEM-PARAMS.
 (setf sb!disassem:*disassem-inst-alignment-bytes* 1)
 
-;;; this type is used mostly in disassembly and represents legacy
-;;; registers only.  r8-15 are handled separately
+;;; This type is used mostly in disassembly and represents legacy
+;;; registers only. R8-R15 are handled separately.
 (deftype reg () '(unsigned-byte 3))
 
-;; This includes legacy records and r8-16
+;;; This includes legacy registers and R8-R15.
 (deftype full-reg () '(unsigned-byte 4))
 
-;;; default word size for the chip: if the operand size !=:dword
+;;; Default word size for the chip: if the operand size /= :dword
 ;;; we need to output #x66 (or REX) prefix
 (def!constant +default-operand-size+ :dword)
+
+;;; The default address size for the chip. It could be overwritten
+;;; to :dword with a #x67 prefix, but this is never needed by SBCL
+;;; and thus not supported by this assembler/disassembler.
+(def!constant +default-address-size+ :qword)
 
 (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
 
@@ -36,24 +41,57 @@
 	   (type sb!disassem:disassem-state dstate))
   (+ (sb!disassem:dstate-next-addr dstate) value))
 
-(defparameter *default-address-size*
-  ;; Again, this is the chip default, not the SBCL backend preference
-  ;; which must be set with prefixes if it's different.  It's :dword;
-  ;; this is not negotiable
-  :dword)
-
 (defparameter *byte-reg-names*
-  #(al cl dl bl sil dil r8b r9b r10b r11b r14b r15b))
+  #(al cl dl bl spl bpl sil dil r8b r9b r10b r11b r12b r13b r14b r15b))
 (defparameter *word-reg-names*
-  #(ax cx dx bx sp bp si di))
+  #(ax cx dx bx sp bp si di r8w r9w r10w r11w r12w r13w r14w r15w))
 (defparameter *dword-reg-names*
-  #(eax ecx edx ebx esp ebp esi edi))
+  #(eax ecx edx ebx esp ebp esi edi r8d r9d r10d r11d r12d r13d r14d r15d))
 (defparameter *qword-reg-names*
   #(rax rcx rdx rbx rsp rbp rsi rdi r8 r9 r10 r11 r12 r13 r14 r15))
 
+;;; The printers for registers, memory references and immediates need to
+;;; take into account the width bit in the instruction, whether a #x66
+;;; or a REX prefix was issued, and the contents of the REX prefix.
+;;; This is implemented using prefilters to put flags into the slot
+;;; INST-PROPERTIES of the DSTATE.  These flags are the following
+;;; symbols:
+;;;
+;;; OPERAND-SIZE-8   The width bit was zero
+;;; OPERAND-SIZE-16  The "operand size override" prefix (#x66) was found
+;;; REX              A REX prefix was found
+;;; REX-W            A REX prefix with the "operand width" bit set was
+;;;                  found
+;;; REX-R            A REX prefix with the "register" bit set was found
+;;; REX-X            A REX prefix with the "index" bit set was found
+;;; REX-B            A REX prefix with the "base" bit set was found
+
+;;; Return the operand size depending on the prefixes and width bit as
+;;; stored in DSTATE.
+(defun inst-operand-size (dstate)
+  (declare (type sb!disassem:disassem-state dstate))
+  (cond ((sb!disassem:dstate-get-inst-prop dstate 'operand-size-8)
+         :byte)
+        ((sb!disassem:dstate-get-inst-prop dstate 'rex-w)
+         :qword)
+        ((sb!disassem:dstate-get-inst-prop dstate 'operand-size-16)
+         :word)
+        (t
+         +default-operand-size+)))
+
+;;; The same as INST-OPERAND-SIZE, but for those instructions (e.g.
+;;; PUSH, JMP) that have a default operand size of :qword. It can only
+;;; be overwritten to :word.
+(defun inst-operand-size-default-qword (dstate)
+  (declare (type sb!disassem:disassem-state dstate))
+  (if (sb!disassem:dstate-get-inst-prop dstate 'operand-size-16)
+      :word
+      :qword))
+
 (defun print-reg-with-width (value width stream dstate)
-  (declare (ignore dstate)
-	   (type full-reg value))
+  (declare (type full-reg value)
+	   (type stream stream)
+           (ignore dstate))
   (princ (aref (ecase width
 		 (:byte *byte-reg-names*)
 		 (:word *word-reg-names*)
@@ -69,21 +107,18 @@
 	   (type stream stream)
 	   (type sb!disassem:disassem-state dstate))
   (print-reg-with-width value
-			(or (sb!disassem:dstate-get-prop dstate 'reg-width)
-			    *default-address-size*)
+                        (inst-operand-size dstate)
 			stream
 			dstate))
 
-(defun print-word-reg (value stream dstate)
-  (declare (type (or full-reg list) value)
+(defun print-reg-default-qword (value stream dstate)
+  (declare (type full-reg value)
 	   (type stream stream)
 	   (type sb!disassem:disassem-state dstate))
-  (print-reg-with-width
-   (if (consp value) (car value) value)
-   (or (sb!disassem:dstate-get-prop dstate 'reg-width)
-       +default-operand-size+)
-   stream
-   dstate))
+  (print-reg-with-width value
+                        (inst-operand-size-default-qword dstate)
+			stream
+			dstate))
 
 (defun print-byte-reg (value stream dstate)
   (declare (type full-reg value)
@@ -95,26 +130,29 @@
   (declare (type full-reg value)
 	   (type stream stream)
 	   (type sb!disassem:disassem-state dstate))
-  (print-reg-with-width value 
-			(or (sb!disassem:dstate-get-prop dstate 'reg-width)
-			    *default-address-size*)
-			stream dstate))
+  (print-reg-with-width value +default-address-size+ stream dstate))
 
-(defun print-rex-reg/mem (value stream dstate)
+;;; Print a register or a memory reference of the given WIDTH.
+;;; If SIZED-P is true, add an explicit size indicator for memory
+;;; references.
+(defun print-reg/mem-with-width (value width sized-p stream dstate)
   (declare (type (or list full-reg) value)
+           (type (member :byte :word :dword :qword) width)
+           (type boolean sized-p)
 	   (type stream stream)
 	   (type sb!disassem:disassem-state dstate))
   (if (typep value 'full-reg)
-      (print-reg value stream dstate)
-    (print-mem-access value stream nil dstate)))
+      (print-reg-with-width value width stream dstate)
+    (print-mem-access value (and sized-p width) stream dstate)))
 
+;;; Print a register or a memory reference. The width is determined by
+;;; calling INST-OPERAND-SIZE.
 (defun print-reg/mem (value stream dstate)
   (declare (type (or list full-reg) value)
 	   (type stream stream)
 	   (type sb!disassem:disassem-state dstate))
-  (if (typep value 'full-reg)
-      (print-reg value stream dstate)
-      (print-mem-access value stream nil dstate)))
+  (print-reg/mem-with-width
+   value (inst-operand-size dstate) nil stream dstate))
 
 ;; Same as print-reg/mem, but prints an explicit size indicator for
 ;; memory references.
@@ -122,71 +160,101 @@
   (declare (type (or list full-reg) value)
 	   (type stream stream)
 	   (type sb!disassem:disassem-state dstate))
-  (if (typep value 'full-reg)
-      (print-reg value stream dstate)
-    (print-mem-access value stream t dstate)))
+  (print-reg/mem-with-width
+   value (inst-operand-size dstate) t stream dstate))
 
-(defun print-byte-reg/mem (value stream dstate)
+;;; Same as print-sized-reg/mem, but with a default operand size of
+;;; :qword.
+(defun print-sized-reg/mem-default-qword (value stream dstate)
   (declare (type (or list full-reg) value)
 	   (type stream stream)
 	   (type sb!disassem:disassem-state dstate))
-  (if (typep value 'full-reg)
-      (print-byte-reg value stream dstate)
-      (print-mem-access value stream t dstate)))
+  (print-reg/mem-with-width
+   value (inst-operand-size-default-qword dstate) t stream dstate))
 
-(defun print-word-reg/mem (value stream dstate)
+(defun print-sized-byte-reg/mem (value stream dstate)
   (declare (type (or list full-reg) value)
 	   (type stream stream)
 	   (type sb!disassem:disassem-state dstate))
-  (if (typep value 'full-reg)
-      (print-word-reg value stream dstate)
-      (print-mem-access value stream nil dstate)))
+  (print-reg/mem-with-width value :byte t stream dstate))
+
+(defun print-sized-word-reg/mem (value stream dstate)
+  (declare (type (or list full-reg) value)
+	   (type stream stream)
+	   (type sb!disassem:disassem-state dstate))
+  (print-reg/mem-with-width value :word t stream dstate))
+
+(defun print-sized-dword-reg/mem (value stream dstate)
+  (declare (type (or list full-reg) value)
+	   (type stream stream)
+	   (type sb!disassem:disassem-state dstate))
+  (print-reg/mem-with-width value :dword t stream dstate))
 
 (defun print-label (value stream dstate)
   (declare (ignore dstate))
   (sb!disassem:princ16 value stream))
 
-(defun prefilter-word-reg (value dstate)
-  (declare (type (or full-reg list) value))
-  (if (atom value)
-      value
-    (let ((reg (first value))
-	  (rex.wrxb (second value)))
-      (declare (type (or null (unsigned-byte 4)) rex.wrxb)
-	       (type (unsigned-byte 3) reg))
-	(setf (sb!disassem:dstate-get-prop dstate 'reg-width)
-	      (if (and rex.wrxb (plusp (logand rex.wrxb #b1000)))
-		  :qword
-		+default-operand-size+))
-	(if (plusp (logand rex.wrxb #b0100))
-	    (+ 8 reg)
-	  reg))))
-  
+;;; This prefilter is used solely for its side effects, namely to put
+;;; the bits found in the REX prefix into the DSTATE for use by other
+;;; prefilters and by printers.
+(defun prefilter-wrxb (value dstate)
+  (declare (type (unsigned-byte 4) value)
+	   (type sb!disassem:disassem-state dstate))
+  (sb!disassem:dstate-put-inst-prop dstate 'rex)
+  (when (plusp (logand value #b1000))
+    (sb!disassem:dstate-put-inst-prop dstate 'rex-w))
+  (when (plusp (logand value #b0100))
+    (sb!disassem:dstate-put-inst-prop dstate 'rex-r))
+  (when (plusp (logand value #b0010))
+    (sb!disassem:dstate-put-inst-prop dstate 'rex-x))
+  (when (plusp (logand value #b0001))
+    (sb!disassem:dstate-put-inst-prop dstate 'rex-b))
+  value)
+
+;;; This prefilter is used solely for its side effect, namely to put
+;;; the property OPERAND-SIZE-8 into the DSTATE if VALUE is 0.
+(defun prefilter-width (value dstate)
+  (declare (type bit value)
+	   (type sb!disassem:disassem-state dstate))
+  (when (zerop value)
+    (sb!disassem:dstate-put-inst-prop dstate 'operand-size-8))
+  value)
+
+;;; A register field that can be extended by REX.R.
+(defun prefilter-reg-r (value dstate)
+  (declare (type reg value)
+	   (type sb!disassem:disassem-state dstate))
+  (if (sb!disassem::dstate-get-inst-prop dstate 'rex-r)
+      (+ value 8)
+      value))
+
+;;; A register field that can be extended by REX.B.
+(defun prefilter-reg-b (value dstate)
+  (declare (type reg value)
+	   (type sb!disassem:disassem-state dstate))
+  (if (sb!disassem::dstate-get-inst-prop dstate 'rex-b)
+      (+ value 8)
+      value))
+
 ;;; Returns either an integer, meaning a register, or a list of
 ;;; (BASE-REG OFFSET INDEX-REG INDEX-SCALE), where any component
 ;;; may be missing or nil to indicate that it's not used or has the
-;;; obvious default value (e.g., 1 for the index-scale).
+;;; obvious default value (e.g., 1 for the index-scale). VALUE is a list
+;;; of the mod and r/m field of the ModRM byte of the instruction.
+;;; Depending on VALUE a SIB byte and/or an offset may be read. The
+;;; REX.B bit from DSTATE is used to extend the sole register or the
+;;; BASE-REG to a full register, the REX.X bit does the same for the
+;;; INDEX-REG.
 (defun prefilter-reg/mem (value dstate)
   (declare (type list value)
 	   (type sb!disassem:disassem-state dstate))
   (let ((mod (first value))
-	(r/m (second value))
-	(rex.wrxb (third value)))
+	(r/m (second value)))
     (declare (type (unsigned-byte 2) mod)
-	     (type (unsigned-byte 3) r/m)
-	     (type (or null (unsigned-byte 4)) rex.wrxb))
-    
-    (setf (sb!disassem:dstate-get-prop dstate 'reg-width)
-	  (if (and rex.wrxb (plusp (logand rex.wrxb #b1000)))
-	      :qword
-	    +default-operand-size+))
-
-    (let ((full-reg (if (and rex.wrxb (plusp (logand rex.wrxb #b0001)))
-			(progn
-			  (setf (sb!disassem:dstate-get-prop dstate 'reg-width)
-				:qword)
-			  (+ 8 r/m) )
-		      r/m)))
+	     (type (unsigned-byte 3) r/m))
+    (let ((full-reg (if (sb!disassem:dstate-get-inst-prop dstate 'rex-b)
+                        (+ r/m 8)
+                        r/m)))
       (declare (type full-reg full-reg))
       (cond ((= mod #b11)
 	     ;; registers
@@ -210,9 +278,15 @@
 				(sb!disassem:read-signed-suffix 8 dstate))
 			       (#b10
 				(sb!disassem:read-signed-suffix 32 dstate)))))
-		   (list (if (and (= mod #b00) (= base-reg #b101)) nil base-reg)
+		   (list (unless (and (= mod #b00) (= base-reg #b101))
+                           (if (sb!disassem:dstate-get-inst-prop dstate 'rex-b)
+                               (+ base-reg 8)
+                               base-reg))
 			 offset
-			 (if (= index-reg #b100) nil index-reg)
+			 (unless (= index-reg #b100)
+                           (if (sb!disassem:dstate-get-inst-prop dstate 'rex-x)
+                               (+ index-reg 8)
+                               index-reg))
 			 (ash 1 index-scale))))))
 	    ((and (= mod #b00) (= r/m #b101))
 	     (list 'rip (sb!disassem:read-signed-suffix 32 dstate)) )
@@ -223,27 +297,9 @@
 	  (t				; (= mod #b10)
 	   (list full-reg (sb!disassem:read-signed-suffix 32 dstate)))))))
 
-
-;;; This is a sort of bogus prefilter that just stores the info globally for
-;;; other people to use; it probably never gets printed.
-(defun prefilter-width (value dstate)
-  (setf (sb!disassem:dstate-get-prop dstate 'width)
-	(if (zerop value)
-	    (setf (sb!disassem:dstate-get-prop dstate 'reg-width)
-		  :byte)
-	    (let ((reg-width
-		   ;; set by a prefix instruction
-		   (or (sb!disassem:dstate-get-prop dstate 'reg-width)
-		       +default-operand-size+)))
-	      (when (not (eql reg-width +default-operand-size+))
-		;; Reset it.
-		(setf (sb!disassem:dstate-get-prop dstate 'reg-width)
-		      +default-operand-size+))
-	      reg-width))))
-
 (defun read-address (value dstate)
   (declare (ignore value))		; always nil anyway
-  (sb!disassem:read-suffix (width-bits *default-address-size*) dstate))
+  (sb!disassem:read-suffix (width-bits (inst-operand-size dstate)) dstate))
 
 (defun width-bits (width)
   (ecase width
@@ -257,6 +313,17 @@
 ) ; EVAL-WHEN
 
 ;;;; disassembler argument types
+
+;;; Used to capture the lower four bits of the REX prefix.
+(sb!disassem:define-arg-type wrxb
+  :prefilter #'prefilter-wrxb)
+
+(sb!disassem:define-arg-type width
+  :prefilter #'prefilter-width
+  :printer (lambda (value stream dstate)
+             (declare (ignore value))
+             (princ (schar (symbol-name (inst-operand-size dstate)) 0)
+                    stream)))
 
 (sb!disassem:define-arg-type displacement
   :sign-extend t
@@ -272,72 +339,65 @@
 		      (type sb!disassem:disassem-state dstate))
 	     (print-reg 0 stream dstate)))
 
-(sb!disassem:define-arg-type word-accum
-  :printer (lambda (value stream dstate)
-	     (declare (ignore value)
-		      (type stream stream)
-		      (type sb!disassem:disassem-state dstate))
-	     (print-word-reg 0 stream dstate)))
-
 (sb!disassem:define-arg-type reg
+  :prefilter #'prefilter-reg-r
   :printer #'print-reg)
 
-(sb!disassem:define-arg-type addr-reg
-  :printer #'print-addr-reg)
+(sb!disassem:define-arg-type reg-b
+  :prefilter #'prefilter-reg-b
+  :printer #'print-reg)
 
-(sb!disassem:define-arg-type word-reg
-  :prefilter #'prefilter-word-reg
-  :printer (lambda (value stream dstate)
-	     (print-word-reg value stream dstate)))
-
+(sb!disassem:define-arg-type reg-b-default-qword
+  :prefilter #'prefilter-reg-b
+  :printer #'print-reg-default-qword)
 
 (sb!disassem:define-arg-type imm-addr
   :prefilter #'read-address
   :printer #'print-label)
 
-(sb!disassem:define-arg-type imm-data
-  :prefilter (lambda (value dstate)
-	       (declare (ignore value)) ; always nil anyway
-	       (sb!disassem:read-suffix
-		(width-bits
-		 (or (sb!disassem:dstate-get-prop dstate 'width)
-		     *default-address-size*))
-		dstate)))
-
-(sb!disassem:define-arg-type imm-data-upto-dword
-  :prefilter (lambda (value dstate)
-	       (declare (ignore value)) ; always nil anyway
-	       (let ((width (width-bits
-			     (or (sb!disassem:dstate-get-prop dstate 'width)
-				 *default-address-size*))))
-		 (if (= width 64)
-		     (sb!disassem:read-signed-suffix 32 dstate)
-		   (sb!disassem:read-suffix width dstate)))))
-
+;;; Normally, immediate values for an operand size of :qword are of size
+;;; :dword and are sign-extended to 64 bits. For an exception, see the
+;;; argument type definition following this one.
 (sb!disassem:define-arg-type signed-imm-data
   :prefilter (lambda (value dstate)
 	       (declare (ignore value)) ; always nil anyway
-	       (let ((width (or (sb!disassem:dstate-get-prop dstate 'width)
-				*default-address-size*)))
-		 (sb!disassem:read-signed-suffix (width-bits width) dstate))))
+               (let ((width (width-bits (inst-operand-size dstate))))
+                 (when (= width 64)
+                   (setf width 32))
+                 (sb!disassem:read-signed-suffix width dstate))))
+
+;;; Used by the variant of the MOV instruction with opcode B8 which can
+;;; move immediates of all sizes (i.e. including :qword) into a
+;;; register.
+(sb!disassem:define-arg-type signed-imm-data-upto-qword
+  :prefilter (lambda (value dstate)
+	       (declare (ignore value)) ; always nil anyway
+               (sb!disassem:read-signed-suffix
+                (width-bits (inst-operand-size dstate))
+                dstate)))
+
+;;; Used by those instructions that have a default operand size of
+;;; :qword. Nevertheless the immediate is at most of size :dword.
+;;; The only instruction of this kind having a variant with an immediate
+;;; argument is PUSH.
+(sb!disassem:define-arg-type signed-imm-data-default-qword
+  :prefilter (lambda (value dstate)
+	       (declare (ignore value)) ; always nil anyway
+               (let ((width (width-bits
+                             (inst-operand-size-default-qword dstate))))
+                 (when (= width 64)
+                   (setf width 32))
+                 (sb!disassem:read-signed-suffix width dstate))))
 
 (sb!disassem:define-arg-type signed-imm-byte
   :prefilter (lambda (value dstate)
 	       (declare (ignore value)) ; always nil anyway
 	       (sb!disassem:read-signed-suffix 8 dstate)))
 
-(sb!disassem:define-arg-type signed-imm-dword
-  :prefilter (lambda (value dstate)
-	       (declare (ignore value))	; always nil anyway
-	       (sb!disassem:read-signed-suffix 32 dstate)))
-
-(sb!disassem:define-arg-type imm-word
+(sb!disassem:define-arg-type imm-byte
   :prefilter (lambda (value dstate)
 	       (declare (ignore value)) ; always nil anyway
-	       (let ((width
-		      (or (sb!disassem:dstate-get-prop dstate 'reg-width)
-			  +default-operand-size+)))
-		 (sb!disassem:read-suffix (width-bits width) dstate))))
+	       (sb!disassem:read-suffix 8 dstate)))
 
 ;;; needed for the ret imm16 instruction
 (sb!disassem:define-arg-type imm-word-16
@@ -353,21 +413,22 @@
   ;; memory references.
   :prefilter #'prefilter-reg/mem
   :printer #'print-sized-reg/mem)
-(sb!disassem:define-arg-type byte-reg/mem
-  :prefilter #'prefilter-reg/mem
-  :printer #'print-byte-reg/mem)
-(sb!disassem:define-arg-type word-reg/mem
-  :prefilter #'prefilter-reg/mem
-  :printer #'print-word-reg/mem)
 
-(sb!disassem:define-arg-type rex-reg/mem
+;;; Arguments of type reg/mem with a fixed size.
+(sb!disassem:define-arg-type sized-byte-reg/mem
   :prefilter #'prefilter-reg/mem
-  :printer #'print-rex-reg/mem)
-(sb!disassem:define-arg-type sized-rex-reg/mem
-  ;; Same as reg/mem, but prints an explicit size indicator for
-  ;; memory references.
+  :printer #'print-sized-byte-reg/mem)
+(sb!disassem:define-arg-type sized-word-reg/mem
   :prefilter #'prefilter-reg/mem
-  :printer #'print-sized-reg/mem)
+  :printer #'print-sized-word-reg/mem)
+(sb!disassem:define-arg-type sized-dword-reg/mem
+  :prefilter #'prefilter-reg/mem
+  :printer #'print-sized-dword-reg/mem)
+
+;;; Same as sized-reg/mem, but with a default operand size of :qword.
+(sb!disassem:define-arg-type sized-reg/mem-default-qword
+  :prefilter #'prefilter-reg/mem
+  :printer #'print-sized-reg/mem-default-qword)
 
 ;;; added by jrd
 (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
@@ -382,19 +443,6 @@
 (sb!disassem:define-arg-type fp-reg
 			     :prefilter #'prefilter-fp-reg
 			     :printer #'print-fp-reg)
-
-(sb!disassem:define-arg-type width
-  :prefilter #'prefilter-width
-  :printer (lambda (value stream dstate)
-	     (if;; (zerop value)
-		 (or (null value)
-		     (and (numberp value) (zerop value))) ; zzz jrd
-		 (princ 'b stream)
-		 (let ((reg-width
-			;; set by a prefix instruction
-			(or (sb!disassem:dstate-get-prop dstate 'reg-width)
-			    +default-operand-size+)))
-		   (princ (schar (symbol-name reg-width) 0) stream)))))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
 (defparameter *conditions*
@@ -455,8 +503,8 @@
   (imm))
 
 (sb!disassem:define-instruction-format (rex-simple 16)
-  (rex  :field (byte 4 4) :value #b0100)
-  (wrxb  :field (byte 4 0))
+  (rex     :field (byte 4 4)    :value #b0100)
+  (wrxb    :field (byte 4 0)    :type 'wrxb)
   (op    :field (byte 7 9))
   (width :field (byte 1 8) :type 'width)
   ;; optional fields
@@ -474,67 +522,79 @@
 				     :include 'simple
 				     :default-printer '(:name
 							:tab accum ", " imm))
-  (imm :type 'imm-data))
+  (imm :type 'signed-imm-data))
 
 (sb!disassem:define-instruction-format (rex-accum-imm 16
 				     :include 'rex-simple
 				     :default-printer '(:name
 							:tab accum ", " imm))
-  (imm :type 'imm-data-upto-dword))
+  (imm :type 'signed-imm-data))
 
 (sb!disassem:define-instruction-format (reg-no-width 8
 				     :default-printer '(:name :tab reg))
   (op	 :field (byte 5 3))
-  (reg   :field (byte 3 0) :type 'word-reg)
+  (reg   :field (byte 3 0) :type 'reg-b)
   ;; optional fields
-  (accum :type 'word-accum)
+  (accum :type 'accum)
   (imm))
 
 (sb!disassem:define-instruction-format (rex-reg-no-width 16
 				     :default-printer '(:name :tab reg))
-  (rex   :field (byte 4 4)  :value #b0100)
-  (op	 :field (byte 5 11))
-  (reg   :fields (list (byte 3 8) (byte 4 0)) :type 'word-reg)
+  (rex     :field (byte 4 4)    :value #b0100)
+  (wrxb    :field (byte 4 0)    :type 'wrxb)
+  (op	   :field (byte 5 11))
+  (reg     :field (byte 3 8)    :type 'reg-b)
   ;; optional fields
-  (accum :type 'word-accum)
+  (accum :type 'accum)
   (imm))
+
+;;; Same as reg-no-width, but with a default operand size of :qword.
+(sb!disassem:define-instruction-format (reg-no-width-default-qword 8
+				        :include 'reg-no-width
+                                        :default-printer '(:name :tab reg))
+  (reg   :type 'reg-b-default-qword))
+
+;;; Same as rex-reg-no-width, but with a default operand size of :qword.
+(sb!disassem:define-instruction-format (rex-reg-no-width-default-qword 16
+				        :include 'rex-reg-no-width
+                                        :default-printer '(:name :tab reg))
+  (reg     :type 'reg-b-default-qword))
 
 (sb!disassem:define-instruction-format (modrm-reg-no-width 24
 				     :default-printer '(:name :tab reg))
-  (rex   :field (byte 4 4)  :value #b0100)
+  (rex     :field (byte 4 4)    :value #b0100)
+  (wrxb    :field (byte 4 0)    :type 'wrxb)
   (ff   :field (byte 8 8)  :value #b11111111)
   (mod	 :field (byte 2 22))
   (modrm-reg :field (byte 3 19))
-  (reg   :fields (list (byte 3 16) (byte 4 0)) :type 'word-reg)
+  (reg     :field (byte 3 16)   :type 'reg-b)
   ;; optional fields
-  (accum :type 'word-accum)
+  (accum :type 'accum)
   (imm))
 
-;;; adds a width field to reg-no-width
+;;; Adds a width field to reg-no-width. Note that we can't use
+;;; :INCLUDE 'REG-NO-WIDTH here to save typing because that would put
+;;; the WIDTH field last, but the prefilter for WIDTH must run before
+;;; the one for IMM to be able to determine the correct size of IMM.
 (sb!disassem:define-instruction-format (reg 8
 					:default-printer '(:name :tab reg))
   (op    :field (byte 4 4))
   (width :field (byte 1 3) :type 'width)
-  (reg   :field (byte 3 0) :type 'reg)
+  (reg   :field (byte 3 0) :type 'reg-b)
   ;; optional fields
   (accum :type 'accum)
-  (imm)
-  )
+  (imm))
 
 (sb!disassem:define-instruction-format (rex-reg 16
 					:default-printer '(:name :tab reg))
-  (rex   :field (byte 4 4)  :value #b0100)
-  (op    :field (byte 5 11))
-  (reg   :field (byte 3 8) :type 'reg)
+  (rex     :field (byte 4 4)    :value #b0100)
+  (wrxb    :field (byte 4 0)    :type 'wrxb)
+  (width   :field (byte 1 11)   :type 'width)
+  (op      :field (byte 4 12))
+  (reg     :field (byte 3 8)    :type 'reg-b)
   ;; optional fields
-  (accum :type 'accum)
-  (imm)
-  )
-
-;;; Same as reg, but with direction bit
-(sb!disassem:define-instruction-format (reg-dir 8 :include 'reg)
-  (op  :field (byte 3 5))
-  (dir :field (byte 1 4)))
+  (accum   :type 'accum)
+  (imm))
 
 (sb!disassem:define-instruction-format (two-bytes 16
 					:default-printer '(:name))
@@ -554,10 +614,12 @@
 (sb!disassem:define-instruction-format (rex-reg-reg/mem 24
 					:default-printer
 					`(:name :tab reg ", " reg/mem))
-  (rex    :field (byte 4 4)  :value #b0100)
-  (op      :field (byte 8 8))
-  (reg/mem :fields (list (byte 2 22) (byte 3 16) (byte 4 0))
-	   :type 'rex-reg/mem)
+  (rex     :field (byte 4 4)    :value #b0100)
+  (wrxb    :field (byte 4 0)    :type 'wrxb)
+  (width   :field (byte 1 8)	:type 'width)
+  (op      :field (byte 7 9))
+  (reg/mem :fields (list (byte 2 22) (byte 3 16))
+	                        :type 'reg/mem)
   (reg     :field (byte 3 19)	:type 'reg)
   ;; optional fields
   (imm))
@@ -578,11 +640,12 @@
 					`(:name
 					  :tab
 					  ,(swap-if 'dir 'reg/mem ", " 'reg)))
-  (rex    :field (byte 4 4)  :value #b0100)
+  (rex     :field (byte 4 4)    :value #b0100)
+  (wrxb    :field (byte 4 0)    :type 'wrxb)
   (op  :field (byte 6 10))
   (dir :field (byte 1 9)))
 
-;;; Same as reg-rem/mem, but uses the reg field as a second op code.
+;;; Same as reg-reg/mem, but uses the reg field as a second op code.
 (sb!disassem:define-instruction-format (reg/mem 16
 					:default-printer '(:name :tab reg/mem))
   (op      :fields (list (byte 7 1) (byte 3 11)))
@@ -594,11 +657,30 @@
 
 (sb!disassem:define-instruction-format (rex-reg/mem 24
 					:default-printer '(:name :tab reg/mem))
-  (rex    :field (byte 4 4)  :value #b0100)
-  (op     :fields (list (byte 8 8) (byte 3 19)))
-  (reg/mem :fields (list (byte 2 22) (byte 3 16) (byte 4 0)) :type 'sized-rex-reg/mem)
+  (rex     :field (byte 4 4)    :value #b0100)
+  (wrxb    :field (byte 4 0)    :type 'wrxb)
+  (op      :fields (list (byte 7 9) (byte 3 19)))
+  (width   :field (byte 1 8)	:type 'width)
+  (reg/mem :fields (list (byte 2 22) (byte 3 16))
+                                :type 'sized-reg/mem)
   ;; optional fields
   (imm))
+
+;;; Same as reg/mem, but without a width field and with a default
+;;; operand size of :qword.
+(sb!disassem:define-instruction-format (reg/mem-default-qword 16
+                                        :default-printer '(:name :tab reg/mem))
+  (op      :fields (list (byte 8 0) (byte 3 11)))
+  (reg/mem :fields (list (byte 2 14) (byte 3 8))
+	   			:type 'sized-reg/mem-default-qword))
+
+(sb!disassem:define-instruction-format (rex-reg/mem-default-qword 24
+                                        :default-printer '(:name :tab reg/mem))
+  (rex     :field (byte 4 4)    :value #b0100)
+  (wrxb    :field (byte 4 0)    :type 'wrxb)
+  (op      :fields (list (byte 8 8) (byte 3 19)))
+  (reg/mem :fields (list (byte 2 22) (byte 3 16))
+                                :type 'sized-reg/mem-default-qword))
 
 ;;; Same as reg/mem, but with the immediate value occurring by default,
 ;;; and with an appropiate printer.
@@ -607,14 +689,14 @@
 					:default-printer
 					'(:name :tab reg/mem ", " imm))
   (reg/mem :type 'sized-reg/mem)
-  (imm     :type 'imm-data))
+  (imm     :type 'signed-imm-data))
 
 (sb!disassem:define-instruction-format (rex-reg/mem-imm 24
 					:include 'rex-reg/mem
 					:default-printer
 					'(:name :tab reg/mem ", " imm))
-  (reg/mem :type 'sized-rex-reg/mem)
-  (imm     :type 'imm-data-upto-dword))
+  (reg/mem :type 'sized-reg/mem)
+  (imm     :type 'signed-imm-data))
 
 ;;; Same as reg/mem, but with using the accumulator in the default printer
 (sb!disassem:define-instruction-format
@@ -636,6 +718,26 @@
   ;; optional fields
   (imm))
 
+(sb!disassem:define-instruction-format (ext-reg-reg/mem-no-width 24
+					:default-printer
+					`(:name :tab reg ", " reg/mem))
+  (prefix  :field (byte 8 0)	:value #b00001111)
+  (op      :field (byte 8 8))
+  (reg/mem :fields (list (byte 2 22) (byte 3 16))
+	   			:type 'reg/mem)
+  (reg     :field (byte 3 19)	:type 'reg))
+
+(sb!disassem:define-instruction-format (rex-ext-reg-reg/mem-no-width 32
+					:default-printer
+					`(:name :tab reg ", " reg/mem))
+  (rex     :field (byte 4 4)    :value #b0100)
+  (wrxb    :field (byte 4 0)    :type 'wrxb)
+  (prefix  :field (byte 8 8)	:value #b00001111)
+  (op      :field (byte 8 16))
+  (reg/mem :fields (list (byte 2 30) (byte 3 24))
+	   			:type 'reg/mem)
+  (reg     :field (byte 3 27)	:type 'reg))
+
 ;;; Same as reg-reg/mem, but with a prefix of #xf2 0f
 (sb!disassem:define-instruction-format (xmm-ext-reg-reg/mem 32
 					:default-printer
@@ -655,7 +757,7 @@
 				        :default-printer '(:name :tab reg))
   (prefix  :field (byte 8 0)	:value #b00001111)
   (op	 :field (byte 5 11))
-  (reg   :field (byte 3 8) :type 'word-reg))
+  (reg   :field (byte 3 8) :type 'reg-b))
 
 ;;; Same as reg/mem, but with a prefix of #b00001111
 (sb!disassem:define-instruction-format (ext-reg/mem 24
@@ -672,7 +774,7 @@
                                         :include 'ext-reg/mem
 					:default-printer
                                         '(:name :tab reg/mem ", " imm))
-  (imm :type 'imm-data))
+  (imm :type 'signed-imm-data))
 
 ;;;; This section was added by jrd, for fp instructions.
 
@@ -775,7 +877,7 @@
   (op    :field (byte 4 12) :value #b1001)
   (cc	 :field (byte 4 8) :type 'condition-code)
   (reg/mem :fields (list (byte 2 22) (byte 3 16))
-	   :type 'byte-reg/mem)
+	   :type 'sized-byte-reg/mem)
   (reg     :field (byte 3 19)	:value #b000))
 
 (sb!disassem:define-instruction-format (cond-move 24
@@ -1197,9 +1299,9 @@
 
 (define-instruction mov (segment dst src)
   ;; immediate to register
-  (:printer reg ((op #b1011) (imm nil :type 'imm-data))
+  (:printer reg ((op #b1011) (imm nil :type 'signed-imm-data))
 	    '(:name :tab reg ", " imm))
-  (:printer rex-reg ((op #b10111) (imm nil :type 'imm-data))
+  (:printer rex-reg ((op #b1011) (imm nil :type 'signed-imm-data-upto-qword))
 	    '(:name :tab reg ", " imm))
   ;; absolute mem to/from accumulator
   (:printer simple-dir ((op #b101000) (imm nil :type 'imm-addr))
@@ -1209,8 +1311,7 @@
   (:printer rex-reg-reg/mem-dir ((op #b100010)))
   ;; immediate to register/memory
   (:printer reg/mem-imm ((op '(#b1100011 #b000))))
-  ;; doesn't work for 8-bit register yet
-  (:printer rex-reg/mem-imm ((op '(#b11000111 #b000))))
+  (:printer rex-reg/mem-imm ((op '(#b1100011 #b000))))
 
   (:emitter
    (let ((size (matching-operand-size dst src)))
@@ -1306,33 +1407,49 @@
 	    (emit-ea segment src (reg-tn-encoding dst)))))))))
 
 (define-instruction movsx (segment dst src)
-  (:printer ext-reg-reg/mem ((op #b1011111) (reg nil :type 'word-reg)))
+  (:printer ext-reg-reg/mem-no-width
+            ((op #b10111110) (reg/mem nil :type 'sized-byte-reg/mem)))
+  (:printer rex-ext-reg-reg/mem-no-width
+            ((op #b10111110) (reg/mem nil :type 'sized-byte-reg/mem)))
+  (:printer ext-reg-reg/mem-no-width
+            ((op #b10111111) (reg/mem nil :type 'sized-word-reg/mem)))
+  (:printer rex-ext-reg-reg/mem-no-width
+            ((op #b10111111) (reg/mem nil :type 'sized-word-reg/mem)))
   (:emitter (emit-move-with-extension segment dst src :signed)))
 
 (define-instruction movzx (segment dst src)
-  (:printer ext-reg-reg/mem ((op #b1011011) (reg nil :type 'word-reg)))
+  (:printer ext-reg-reg/mem-no-width
+            ((op #b10110110) (reg/mem nil :type 'sized-byte-reg/mem)))
+  (:printer rex-ext-reg-reg/mem-no-width
+            ((op #b10110110) (reg/mem nil :type 'sized-byte-reg/mem)))
+  (:printer ext-reg-reg/mem-no-width
+            ((op #b10110111) (reg/mem nil :type 'sized-word-reg/mem)))
+  (:printer rex-ext-reg-reg/mem-no-width
+            ((op #b10110111) (reg/mem nil :type 'sized-word-reg/mem)))
   (:emitter (emit-move-with-extension segment dst src nil)))
 
 (define-instruction movsxd (segment dst src)
-  (:printer reg-reg/mem ((op #x63) (reg nil :type 'word-reg)))
+  (:printer rex-reg-reg/mem ((op #b0110001) (width 1)
+                             (reg/mem nil :type 'sized-dword-reg/mem)))
   (:emitter (emit-move-with-extension segment dst src :signed)))
 
 ;;; this is not a real amd64 instruction, of course
 (define-instruction movzxd (segment dst src)
-  ; (:printer reg-reg/mem ((op #x63) (reg nil :type 'word-reg)))
+  ; (:printer reg-reg/mem ((op #x63) (reg nil :type 'reg)))
   (:emitter (emit-move-with-extension segment dst src nil)))
 
 (define-instruction push (segment src)
   ;; register
-  (:printer reg-no-width ((op #b01010)))
-  (:printer rex-reg-no-width ((op #b01010)))
+  (:printer reg-no-width-default-qword ((op #b01010)))
+  (:printer rex-reg-no-width-default-qword ((op #b01010)))
   ;; register/memory
-  (:printer reg/mem ((op '(#b1111111 #b110)) (width 1)))
-  (:printer rex-reg/mem ((op '(#b11111111 #b110))))
+  (:printer reg/mem-default-qword ((op '(#b11111111 #b110))))
+  (:printer rex-reg/mem-default-qword ((op '(#b11111111 #b110))))
   ;; immediate
   (:printer byte ((op #b01101010) (imm nil :type 'signed-imm-byte))
 	    '(:name :tab imm))
-  (:printer byte ((op #b01101000) (imm nil :type 'imm-word))
+  (:printer byte ((op #b01101000)
+                  (imm nil :type 'signed-imm-data-default-qword))
 	    '(:name :tab imm))
   ;; ### segment registers?
 
@@ -1363,10 +1480,10 @@
    (emit-byte segment #b01100000)))
 
 (define-instruction pop (segment dst)
-  (:printer reg-no-width ((op #b01011)))
-  (:printer rex-reg-no-width ((op #b01011)))
-  (:printer reg/mem ((op '(#b1000111 #b000)) (width 1)))
-  (:printer rex-reg/mem ((op '(#b10001111 #b000))))
+  (:printer reg-no-width-default-qword ((op #b01011)))
+  (:printer rex-reg-no-width-default-qword ((op #b01011)))
+  (:printer reg/mem-default-qword ((op '(#b10001111 #b000))))
+  (:printer rex-reg/mem-default-qword ((op '(#b10001111 #b000))))
   (:emitter
    (let ((size (operand-size dst)))
      (aver (not (eq size :byte)))
@@ -1388,8 +1505,7 @@
   (:printer reg-no-width ((op #b10010)) '(:name :tab accum ", " reg))
   ;; Register/Memory with Register.
   (:printer reg-reg/mem ((op #b1000011)))
-  ;; doesn't work for 8-bit register yet
-  (:printer rex-reg-reg/mem ((op #b10000111)))
+  (:printer rex-reg-reg/mem ((op #b1000011)))
   (:emitter
    (let ((size (matching-operand-size operand1 operand2)))
      (maybe-emit-operand-size-prefix segment size)
@@ -1417,7 +1533,7 @@
 	      (error "bogus args to XCHG: ~S ~S" operand1 operand2)))))))
 
 (define-instruction lea (segment dst src)
-  (:printer rex-reg-reg/mem ((op #b10001101)))
+  (:printer rex-reg-reg/mem ((op #b1000110)))
   (:printer reg-reg/mem ((op #b1000110) (width 1)))
   (:emitter
    (aver (or (dword-reg-p dst) (qword-reg-p dst)))
@@ -1561,10 +1677,12 @@
     `((accum-imm ((op ,(dpb subop (byte 3 2) #b0000010))))
       (rex-accum-imm ((op ,(dpb subop (byte 3 2) #b0000010))))
       (reg/mem-imm ((op (#b1000000 ,subop))))
-      (rex-reg/mem-imm ((op (#b10000001 ,subop))))
-      (reg/mem-imm ((op (#b1000001 ,subop))
+      (rex-reg/mem-imm ((op (#b1000000 ,subop))))
+      ;; The redundant encoding #x82 is invalid in 64-bit mode,
+      ;; therefore we force WIDTH to 1.
+      (reg/mem-imm ((op (#b1000001 ,subop)) (width 1)
 		    (imm nil :type signed-imm-byte)))
-      (rex-reg/mem-imm ((op (#b10000011 ,subop))
+      (rex-reg/mem-imm ((op (#b1000001 ,subop))
 		    (imm nil :type signed-imm-byte)))
       (reg-reg/mem-dir ((op ,(dpb subop (byte 3 1) #b000000))))
       (rex-reg-reg/mem-dir ((op ,(dpb subop (byte 3 1) #b000000))))))
@@ -1644,11 +1762,19 @@
 
 (define-instruction imul (segment dst &optional src1 src2)
   (:printer accum-reg/mem ((op '(#b1111011 #b101))))
-  (:printer ext-reg-reg/mem ((op #b1010111)))
-  (:printer reg-reg/mem ((op #b0110100) (width 1) (imm nil :type 'imm-word))
+  (:printer ext-reg-reg/mem-no-width ((op #b10101111)))
+  (:printer rex-ext-reg-reg/mem-no-width ((op #b10101111)))
+  (:printer reg-reg/mem ((op #b0110100) (width 1)
+                         (imm nil :type 'signed-imm-data))
+	    '(:name :tab reg ", " reg/mem ", " imm))
+  (:printer rex-reg-reg/mem ((op #b0110100) (width 1)
+                             (imm nil :type 'signed-imm-data))
 	    '(:name :tab reg ", " reg/mem ", " imm))
   (:printer reg-reg/mem ((op #b0110101) (width 1)
 			 (imm nil :type 'signed-imm-byte))
+	    '(:name :tab reg ", " reg/mem ", " imm))
+  (:printer rex-reg-reg/mem ((op #b0110101) (width 1)
+                             (imm nil :type 'signed-imm-byte))
 	    '(:name :tab reg ", " reg/mem ", " imm))
   (:emitter
    (flet ((r/m-with-immed-to-reg (reg r/m immed)
@@ -1779,9 +1905,9 @@
       (rex-reg/mem ((op (#b1101001 ,subop)))
 	       (:name :tab reg/mem ", " 'cl))
       (reg/mem-imm ((op (#b1100000 ,subop))
-		    (imm nil :type signed-imm-byte)))
-      (rex-reg/mem-imm ((op (#b11000001 ,subop))
-		    (imm nil :type signed-imm-byte))))))
+		    (imm nil :type imm-byte)))
+      (rex-reg/mem-imm ((op (#b1100000 ,subop))
+		    (imm nil :type imm-byte))))))
 
 (define-instruction rol (segment dst amount)
   (:printer-list
@@ -1868,9 +1994,9 @@
   (:printer accum-imm ((op #b1010100)))
   (:printer rex-accum-imm ((op #b1010100)))
   (:printer reg/mem-imm ((op '(#b1111011 #b000))))
-  (:printer rex-reg/mem-imm ((op '(#b11110111 #b000))))
+  (:printer rex-reg/mem-imm ((op '(#b1111011 #b000))))
   (:printer reg-reg/mem ((op #b1000010)))
-  (:printer rex-reg-reg/mem ((op #b10000101)))
+  (:printer rex-reg-reg/mem ((op #b1000010)))
   (:emitter
    (let ((size (matching-operand-size this that)))
      (maybe-emit-operand-size-prefix segment size)
@@ -2056,8 +2182,8 @@
 (eval-when (:compile-toplevel :execute)
   (defun bit-test-inst-printer-list (subop)
     `((ext-reg/mem-imm ((op (#b1011101 ,subop))
-                        (reg/mem nil :type word-reg/mem)
-                        (imm nil :type imm-data)
+                        (reg/mem nil :type reg/mem)
+                        (imm nil :type imm-byte)
                         (width 0)))
       (ext-reg-reg/mem ((op ,(dpb subop (byte 3 2) #b1000001))
                         (width 1))
@@ -2088,8 +2214,8 @@
 
 (define-instruction call (segment where)
   (:printer near-jump ((op #b11101000)))
-  (:printer rex-reg/mem ((op '(#b11111111 #b010))))
-  (:printer reg/mem ((op '(#b1111111 #b010)) (width 1)))
+  (:printer reg/mem-default-qword ((op '(#b11111111 #b010))))
+  (:printer rex-reg/mem-default-qword ((op '(#b11111111 #b010))))
   (:emitter
    (typecase where
      (label
@@ -2125,7 +2251,8 @@
   ;; unconditional jumps
   (:printer short-jump ((op #b1011)))
   (:printer near-jump ((op #b11101001)) )
-  (:printer reg/mem ((op '(#b1111111 #b100)) (width 1)))
+  (:printer reg/mem-default-qword ((op '(#b11111111 #b100))))
+  (:printer rex-reg/mem-default-qword ((op '(#b11111111 #b100))))
   (:emitter
    (cond (where
 	  (emit-chooser
