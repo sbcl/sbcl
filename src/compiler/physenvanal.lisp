@@ -123,9 +123,8 @@
 ;;; If FUN has no physical environment, assign one, otherwise clean up
 ;;; the old physical environment, removing/flagging variables that
 ;;; have no sets or refs. If a var has no references, we remove it
-;;; from the closure. If it has no sets, we clear the INDIRECT flag.
-;;; This is necessary because pre-analysis is done before
-;;; optimization.
+;;; from the closure. We always clear the INDIRECT flag. This is
+;;; necessary because pre-analysis is done before optimization.
 (defun reinit-lambda-physenv (fun)
   (let ((old (lambda-physenv (lambda-home fun))))
     (cond (old
@@ -136,8 +135,7 @@
 			    (physenv-closure old)))
 	   (flet ((clear (fun)
 		    (dolist (var (lambda-vars fun))
-		      (unless (lambda-var-sets var)
-			(setf (lambda-var-indirect var) nil)))))
+		      (setf (lambda-var-indirect var) nil))))
 	     (clear fun)
 	     (map nil #'clear (lambda-lets fun))))
 	  (t
@@ -184,7 +182,7 @@
 
 	  (let ((set-physenv (get-node-physenv set)))
 	    (unless (eq set-physenv physenv)
-	      (setf did-something t
+              (setf did-something t
 		    (lambda-var-indirect var) t)
 	      (close-over var set-physenv physenv))))))
     did-something))
