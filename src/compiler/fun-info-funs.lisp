@@ -23,10 +23,10 @@
 		(ir2-convert-setter node block name offset lowtag)))))
   name)
 
-(defun %def-alloc (name words var-length header lowtag inits)
+(defun %def-alloc (name words variable-length-p header lowtag inits)
   (let ((info (fun-info-or-lose name)))
     (setf (fun-info-ir2-convert info)
-	  (if var-length
+	  (if variable-length-p
 	      (lambda (node block)
 		(ir2-convert-variable-allocation node block name words header
 						 lowtag inits))

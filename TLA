@@ -27,7 +27,8 @@ making them more consistent.
 	SB	storage base (in compiler IR2)
 	SC	storage class (in compiler IR2)
 	TN	temporary name (?) (in compiler IR2)
-	VAR	variable
+	VAR	variable (in the lisp entity "noun" sense, not in the 
+			adjectival sense)
 	XEP	external entry point
 Making them even more consistent (within the limits of ANSI and 
 MOP compatibility) would probably be good.

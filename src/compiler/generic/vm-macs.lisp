@@ -50,7 +50,7 @@
   (options nil :type list)
   (slots nil :type list)
   (size 0 :type fixnum)
-  (var-length nil :type (member t nil)))
+  (variable-length-p nil :type (member t nil)))
 
 (defvar *primitive-objects* nil)
 
@@ -67,9 +67,9 @@
 	   &rest slot-specs)
   (collect ((slots) (exports) (constants) (forms) (inits))
     (let ((offset (if widetag 1 0))
-	  (var-length nil))
+	  (variable-length-p nil))
       (dolist (spec slot-specs)
-	(when var-length
+	(when variable-length-p
 	  (error "No more slots can follow a :rest-p slot."))
 	(destructuring-bind
 	    (slot-name &rest options
@@ -103,14 +103,14 @@
 	  (when init
 	    (inits (cons init offset)))
 	  (when rest-p
-	    (setf var-length t))
+	    (setf variable-length-p t))
 	  (incf offset length)))
-      (unless var-length
+      (unless variable-length-p
 	(let ((size (symbolicate name "-SIZE")))
 	  (constants `(def!constant ,size ,offset))
 	  (exports size)))
       (when alloc-trans
-	(forms `(def-alloc ,alloc-trans ,offset ,var-length ,widetag
+	(forms `(def-alloc ,alloc-trans ,offset ,variable-length-p ,widetag
 			   ,lowtag ',(inits))))
       `(progn
 	 (eval-when (:compile-toplevel :load-toplevel :execute)
@@ -120,7 +120,7 @@
 				     :lowtag lowtag
 				     :slots (slots)
 				     :size offset
-				     :var-length var-length))
+				     :variable-length-p variable-length-p))
 	   ,@(constants))
 	 ,@(forms)))))
 
@@ -132,8 +132,8 @@
   `(%def-reffer ',name ,offset ,lowtag))
 (defmacro def-setter (name offset lowtag)
   `(%def-setter ',name ,offset ,lowtag))
-(defmacro def-alloc (name words var-length header lowtag inits)
-  `(%def-alloc ',name ,words ,var-length ,header ,lowtag ,inits))
+(defmacro def-alloc (name words variable-length-p header lowtag inits)
+  `(%def-alloc ',name ,words ,variable-length-p ,header ,lowtag ,inits))
 ;;; KLUDGE: The %DEF-FOO functions used to implement the macros here
 ;;; are defined later in another file, since they use structure slot
 ;;; setters defined later, and we can't have physical forward

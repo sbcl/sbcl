@@ -32,7 +32,7 @@
   (let ((widetag (primitive-object-widetag obj))
 	(lowtag (primitive-object-lowtag obj))
 	(name (primitive-object-name obj))
-	(variable (primitive-object-var-length obj))
+	(variable (primitive-object-variable-length-p obj))
 	(size (primitive-object-size obj)))
     (cond
      ((not lowtag))

@@ -15,6 +15,9 @@
 ;;;(def-assembler-params
 ;;;    :scheduler-p t
 ;;;  :max-locations 100)
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (setf sb!assem:*assem-scheduler-p* t)
+  (setf sb!assem:*assem-max-locations* 100))
 
 ;;; Constants, types, conversion functions, some disassembler stuff.
 (defun reg-tn-encoding (tn)
