@@ -137,7 +137,7 @@
     (let ((entry (assoc macro (sb-c::lexenv-functions env) :test #'eq)))
       (and entry
 	   (eq (cadr entry) 'sb-c::macro)
-	   (function-lambda-expression (cddr entry))))))
+	   (values (function-lambda-expression (cddr entry)))))))
 
 (defmacro with-new-definition-in-environment
 	  ((new-env old-env macrolet/flet/labels-form) &body body)

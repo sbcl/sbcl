@@ -849,7 +849,7 @@ a host-structure or string."
 (defun substitute-into (pattern subs diddle-case)
   (declare (type pattern pattern)
 	   (type list subs)
-	   (values (or simple-base-string pattern)))
+	   (values (or simple-base-string pattern) list))
   (let ((in-wildcard nil)
 	(pieces nil)
 	(strings nil))

@@ -579,7 +579,7 @@
 	(values (logxor (the fixnum (1- cache-size)) (the fixnum (1- line-size)))
 		cache-size
 		line-size
-		(the fixnum (floor cache-size line-size))))
+		(the (values fixnum t) (floor cache-size line-size))))
       (let* ((line-size (power-of-two-ceiling (if valuep (1+ nkeys) nkeys)))
 	     (cache-size (if (typep nlines-or-cache-vector 'fixnum)
 			     (the fixnum
@@ -592,7 +592,7 @@
 	(values (logxor (the fixnum (1- cache-size)) (the fixnum (1- line-size)))
 		(the fixnum (1+ cache-size))
 		line-size
-		(the fixnum (floor cache-size line-size))))))
+		(the (values fixnum t) (floor cache-size line-size))))))
 
 ;;; the various implementations of computing a primary cache location from
 ;;; wrappers. Because some implementations of this must run fast there are

@@ -21,7 +21,7 @@
     (kind (required-argument)
 	  :type (member :lowtag :fixed :header :vector
 			:string :code :closure :instance))
-    ;; Length if fixed-length, shift amount for element size if :vector.
+    ;; Length if fixed-length, shift amount for element size if :VECTOR.
     (length nil :type (or fixnum null))))
 
 (eval-when (:compile-toplevel :execute)
@@ -352,16 +352,16 @@
     (format t "  ~10:D bytes for ~9:D ~(~A~) object~2:*~P (space total.)~%"
 	    total-bytes total-objects (car space-total))))
 
+;;; Print information about the heap memory in use. PRINT-SPACES is a
+;;; list of the spaces to print detailed information for.
+;;; COUNT-SPACES is a list of the spaces to scan. For either one, T
+;;; means all spaces (i.e. :STATIC, :DYNAMIC and :READ-ONLY.) If
+;;; PRINT-SUMMARY is true, then summary information will be printed.
+;;; The defaults print only summary information for dynamic space. If
+;;; true, CUTOFF is a fraction of the usage in a report below which
+;;; types will be combined as OTHER.
 (defun memory-usage (&key print-spaces (count-spaces '(:dynamic))
 			  (print-summary t) cutoff)
-  #!+sb-doc
-  "Print out information about the heap memory in use. :Print-Spaces is a list
-  of the spaces to print detailed information for. :Count-Spaces is a list of
-  the spaces to scan. For either one, T means all spaces (:Static, :Dyanmic
-  and :Read-Only.)  If :Print-Summary is true, then summary information will be
-  printed. The defaults print only summary information for dynamic space.
-  If true, Cutoff is a fraction of the usage in a report below which types will
-  be combined as OTHER."
   (declare (type (or single-float null) cutoff))
   (let* ((spaces (if (eq count-spaces t)
 		     '(:static :dynamic :read-only)
@@ -379,9 +379,8 @@
 
   (values))
 
+;;; Print info about how much code and no-ops there are in SPACE.
 (defun count-no-ops (space)
-  #!+sb-doc
-  "Print info about how much code and no-ops there are in Space."
   (declare (type spaces space))
   (let ((code-words 0)
 	(no-ops 0)
@@ -474,12 +473,11 @@
 	    non-descriptor-bytes non-descriptor-headers)
     (values)))
 
+;;; Print a breakdown by instance type of all the instances allocated
+;;; in SPACE. If TOP-N is true, print only information for the the
+;;; TOP-N types with largest usage.
 (defun instance-usage (space &key (top-n 15))
   (declare (type spaces space) (type (or fixnum null) top-n))
-  #!+sb-doc
-  "Print a breakdown by instance type of all the instances allocated in
-  Space. If TOP-N is true, print only information for the the TOP-N types with
-  largest usage."
   (format t "~2&~@[Top ~D ~]~(~A~) instance types:~%" top-n space)
   (let ((totals (make-hash-table :test 'eq))
 	(total-objects 0)
@@ -593,12 +591,15 @@
 		   (return-from print-allocated-objects (values)))
 
 		 (unless count
-		   (let ((this-page (* (the (unsigned-byte 32)
-					    (truncate addr pagesize))
+		   (let ((this-page (* (the (values (unsigned-byte 32) t)
+                                         (truncate addr pagesize))
 				       pagesize)))
 		     (declare (type (unsigned-byte 32) this-page))
 		     (when (/= this-page last-page)
 		       (when (< pages-so-far pages)
+			 ;; FIXME: What is this? (ERROR "Argh..")? or
+			 ;; a warning? or code that can be removed
+			 ;; once the system is stable? or what?
 			 (format stream "~2&**** Page ~D, address ~X:~%"
 				 pages-so-far addr))
 		       (setq last-page this-page)

@@ -155,7 +155,7 @@
     (real
      (multiple-value-bind (q r) (truncate (coerce timeout 'single-float))
        (declare (type index q) (single-float r))
-       (values q (the index (truncate (* r 1f6))))))
+       (values q (the (values index t) (truncate (* r 1f6))))))
     (t
      (error "Timeout is not a real number or NIL: ~S" timeout))))
 
