@@ -43,9 +43,10 @@
 	  method-name
 	  method-lambda-list))
 
-;;; These are age-old functions which CommonLisp cleaned-up away. They probably
-;;; exist in other packages in all CommonLisp implementations, but I will leave
-;;; it to the compiler to optimize into calls to them.
+;;; These are age-old functions which CommonLisp cleaned-up away. They
+;;; probably exist in other packages in all CommonLisp
+;;; implementations, but I will leave it to the compiler to optimize
+;;; into calls to them.
 ;;;
 ;;; FIXME: MEMQ, ASSQ, and DELQ are already defined in SBCL, and we should
 ;;; use those. POSQ and NEQ aren't defined in SBCL, and are used too often
@@ -58,20 +59,19 @@
 (defmacro posq (item list) `(position ,item ,list :test #'eq))
 (defmacro neq (x y) `(not (eq ,x ,y)))
 
-;;; Rename these to CONSTANTLY-T, CONSTANTLY-NIL, and CONSTANTLY-0
+;;; FIXME: Rename these to CONSTANTLY-T, CONSTANTLY-NIL, and CONSTANTLY-0
 ;;; and boost them up to SB-INT.
 (defun true (&rest ignore) (declare (ignore ignore)) t)
 (defun false (&rest ignore) (declare (ignore ignore)) nil)
 (defun zero (&rest ignore) (declare (ignore ignore)) 0)
 
-;;; ONCE-ONLY does the same thing as it does in zetalisp. I should have just
-;;; lifted it from there but I am honest. Not only that but this one is
-;;; written in Common Lisp. I feel a lot like bootstrapping, or maybe more
-;;; like rebuilding Rome.
+;;; ONCE-ONLY does the same thing as it does in zetalisp. I should
+;;; have just lifted it from there but I am honest. Not only that but
+;;; this one is written in Common Lisp. I feel a lot like
+;;; bootstrapping, or maybe more like rebuilding Rome.
 ;;;
-;;; FIXME: We should only need one ONCE-ONLY in CMU CL, and there's one
-;;; in SB-EXT already (presently to go in SB-INT). Can we use
-;;; only one of these in both places?
+;;; FIXME: We should only need one ONCE-ONLY in SBCL, and there's one
+;;; in SB-INT already. Can we use only one of these in both places?
 (defmacro once-only (vars &body body)
   (let ((gensym-var (gensym))
 	(run-time-vars (gensym))

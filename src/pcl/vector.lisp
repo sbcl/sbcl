@@ -929,9 +929,10 @@
      ,@forms))
 
 (defvar *non-variable-declarations*
-  ;; FIXME: VALUES was in this list, conditionalized with #+CMU, but
-  ;; I don't *think* CMU CL had, or SBCL has, VALUES declarations. If
-  ;; SBCL doesn't have 'em, VALUES should probably be removed from this list.
+  ;; FIXME: VALUES was in this list, conditionalized with #+CMU, but I
+  ;; don't *think* CMU CL had, or SBCL has, VALUES declarations. If
+  ;; SBCL doesn't have 'em, VALUES should probably be removed from
+  ;; this list.
   '(values method-name method-lambda-list
     optimize ftype inline notinline))
 
@@ -940,7 +941,13 @@
     type))
 
 (defvar *variable-declarations-without-argument*
-  '(ignore ignorable special dynamic-extent
+  '(ignore
+    ignorable special dynamic-extent
+    ;; FIXME: Possibly this entire list and variable should go away.
+    ;; If not, certainly we should remove all these built-in typenames
+    ;; from the list, and replace them with a test for "is it a type
+    ;; name?" (CLTL1 allowed only built-in type names as declarations,
+    ;; but ANSI CL allows any type name as a declaration.)
     array atom base-char bignum bit bit-vector character compiled-function
     complex cons double-float extended-char
     fixnum float function hash-table integer
@@ -950,7 +957,9 @@
     stream string symbol t unsigned-byte vector))
 
 (defun split-declarations (body args calls-next-method-p)
-  (let ((inner-decls nil) (outer-decls nil) decl)
+  (let ((inner-decls nil)
+	(outer-decls nil)
+	decl)
     (loop (when (null body) (return nil))
 	  (setq decl (car body))
 	  (unless (and (consp decl)
@@ -970,9 +979,12 @@
 			  (dname (list (pop form)))
 			  (inners nil) (outers nil))
 		      (unless (or arg-p non-arg-p)
-			;; FIXME: This warning should probably go away now
-			;; that we're not trying to be portable between
-			;; different CLTL1 hosts the way PCL was.
+			;; FIXME: This warning, and perhaps the
+			;; various *VARIABLE-DECLARATIONS-FOO* and/or
+			;; *NON-VARIABLE-DECLARATIONS* variables,
+			;; should probably go away now that we're not
+			;; trying to be portable between different
+			;; CLTL1 hosts the way PCL was.
 			(warn "The declaration ~S is not understood by ~S.~@
 			       Please put ~S on one of the lists ~S,~%~S, or~%~S.~@
 			(Assuming it is a variable declaration without argument)."
@@ -987,11 +999,12 @@
 			(setq dname (append dname (list (pop form)))))
 		      (dolist (var form)
 			(if (member var args)
-			    ;; Quietly remove IGNORE declarations on args when
-			    ;; a next-method is involved, to prevent compiler
-			    ;; warns about ignored args being read.
-			    (unless (and  calls-next-method-p
-					  (eq (car dname) 'ignore))
+			    ;; Quietly remove IGNORE declarations on
+			    ;; args when a next-method is involved, to
+			    ;; prevent compiler warns about ignored
+			    ;; args being read.
+			    (unless (and calls-next-method-p
+					 (eq (car dname) 'ignore))
 				(push var outers))
 			    (push var inners)))
 		      (when outers
@@ -1036,23 +1049,23 @@
 			      (append req-args (list rest-arg))
 			      req-args)))
       `(list* :fast-function
-	#'(lambda (.pv-cell. .next-method-call. ,@args+rest-arg)
-	    ,@outer-decls
-	    .pv-cell. .next-method-call.
-	    (macrolet ((pv-env ((pv calls pv-table-symbol pv-parameters)
-				&rest forms)
-			 (declare (ignore pv-table-symbol pv-parameters))
-			 `(let ((,pv (car .pv-cell.))
-				(,calls (cdr .pv-cell.)))
-			   (declare ,(make-pv-type-declaration pv)
-			    ,(make-calls-type-declaration calls))
-			   ,pv ,calls
-			   ,@forms)))
-	      (fast-lexical-method-functions
-	       (,(car lmf-params) .next-method-call. ,req-args ,rest-arg
-		 ,@(cdddr lmf-params))
-	       ,@inner-decls
-	       ,@body)))
+	(lambda (.pv-cell. .next-method-call. ,@args+rest-arg)
+	  (declare (ignorable .pv-cell. .next-method-call.))
+	  ,@outer-decls
+	  (macrolet ((pv-env ((pv calls pv-table-symbol pv-parameters)
+			      &rest forms)
+		       (declare (ignore pv-table-symbol pv-parameters))
+		       `(let ((,pv (car .pv-cell.))
+			      (,calls (cdr .pv-cell.)))
+			  (declare ,(make-pv-type-declaration pv)
+				   ,(make-calls-type-declaration calls))
+			  ,pv ,calls
+			  ,@forms)))
+	    (fast-lexical-method-functions
+	     (,(car lmf-params) .next-method-call. ,req-args ,rest-arg
+	      ,@(cdddr lmf-params))
+	     ,@inner-decls
+	     ,@body)))
 	',initargs))))
 
 ;;; Use arrays and hash tables and the fngen stuff to make this much better. It

@@ -321,10 +321,10 @@
 	 (ecase operation
 	   (slot-value "read the slot's value (slot-value)")
 	   (setf (format nil
-			 "set the slot's value to ~S (setf of slot-value)"
+			 "set the slot's value to ~S (SETF of SLOT-VALUE)"
 			 new-value))
-	   (slot-boundp "test to see whether slot is bound (slot-boundp)")
-	   (slot-makunbound "make the slot unbound (slot-makunbound)"))
+	   (slot-boundp "test to see whether slot is bound (SLOT-BOUNDP)")
+	   (slot-makunbound "make the slot unbound (SLOT-MAKUNBOUND)"))
 	 slot-name
 	 instance))
 

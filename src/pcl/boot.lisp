@@ -472,7 +472,7 @@ bootstrapping.
 				       method-lambda initargs env)
   (declare (ignore proto-gf proto-method))
   (unless (and (consp method-lambda) (eq (car method-lambda) 'lambda))
-    (error "The METHOD-LAMBDA argument to MAKE-METHOD-FUNCTION, ~S,~
+    (error "The METHOD-LAMBDA argument to MAKE-METHOD-FUNCTION, ~S, ~
 	    is not a lambda form."
 	   method-lambda))
   (make-method-initargs-form-internal method-lambda initargs env))
@@ -487,7 +487,7 @@ bootstrapping.
 
 (defun make-method-lambda-internal (method-lambda &optional env)
   (unless (and (consp method-lambda) (eq (car method-lambda) 'lambda))
-    (error "The METHOD-LAMBDA argument to MAKE-METHOD-LAMBDA, ~S,~
+    (error "The METHOD-LAMBDA argument to MAKE-METHOD-LAMBDA, ~S, ~
 	    is not a lambda form."
 	   method-lambda))
   (multiple-value-bind (documentation declarations real-body)
@@ -500,17 +500,11 @@ bootstrapping.
       (multiple-value-bind (parameters lambda-list specializers)
 	  (parse-specialized-lambda-list specialized-lambda-list)
 	(let* ((required-parameters
-		(mapcar #'(lambda (r s) (declare (ignore s)) r)
+		(mapcar (lambda (r s) (declare (ignore s)) r)
 			parameters
 			specializers))
 	       (slots (mapcar #'list required-parameters))
 	       (calls (list nil))
-	       (parameters-to-reference
-		(make-parameter-references specialized-lambda-list
-					   required-parameters
-					   declarations
-					   method-name
-					   specializers))
 	       (class-declarations
 		`(declare
 		  ;; FIXME: Are these (DECLARE (SB-PCL::CLASS FOO BAR))
@@ -580,18 +574,27 @@ bootstrapping.
 		;; appropriate class declarations. The documentation
 		;; string is removed to make it easy for us to insert
 		;; new declarations later, they will just go after the
-		;; cadr of the method lambda. The class declarations
+		;; CADR of the method lambda. The class declarations
 		;; are inserted to communicate the class of the method's
 		;; arguments to the code walk.
 		`(lambda ,lambda-list
+		   ;; The default ignorability of method parameters
+		   ;; doesn't seem to be specified by ANSI. PCL had
+		   ;; them basically ignorable but was a little
+		   ;; inconsistent. E.g. even though the two
+		   ;; method definitions 
+		   ;;   (DEFMETHOD FOO ((X T) (Y T)) "Z")
+		   ;;   (DEFMETHOD FOO ((X T) Y) "Z")
+		   ;; are otherwise equivalent, PCL treated Y as
+		   ;; ignorable in the first definition but not in the
+		   ;; second definition. We make all required
+		   ;; parameters ignorable as a way of systematizing
+		   ;; the old PCL behavior. -- WHN 2000-11-24
+		   (declare (ignorable ,@required-parameters))
 		   ,class-declarations
 		   ,@declarations
-		   (declare (ignorable ,@parameters-to-reference))
-
-		   ;; FIXME: should become FUNCTION-NAME-BLOCK-NAME
-		   (block ,(if (listp generic-function-name)
-			       (cadr generic-function-name)
-			     generic-function-name)
+		   (block ,(sb-int:function-name-block-name
+			    generic-function-name)
 		     ,@real-body)))
 	       (constant-value-p (and (null (cdr real-body))
 				      (constantp (car real-body))))
@@ -990,10 +993,10 @@ bootstrapping.
 	     (if (memq var lambda-list-keywords)
 		 (progn
 		   (case var
-		     (&optional	 (setq state 'optional))
+		     (&optional	      (setq state 'optional))
 		     (&key	      (setq state 'key))
 		     (&allow-other-keys)
-		     (&rest	     (setq state 'rest))
+		     (&rest	      (setq state 'rest))
 		     (&aux	      (setq state 'aux))
 		     (otherwise
 		      (error
@@ -1137,30 +1140,6 @@ bootstrapping.
        (if (eq *boot-state* 'complete)
 	   (standard-generic-function-p (gdefinition name))
 	   (funcallable-instance-p (gdefinition name)))))
-
-(defun make-parameter-references (specialized-lambda-list
-				  required-parameters
-				  declarations
-				  method-name
-				  specializers)
-  (flet ((ignoredp (symbol)
-	   (dolist (decl (cdar declarations))
-	     (when (and (eq (car decl) 'ignore)
-			(memq symbol (cdr decl)))
-	       (return t)))))
-    (gathering ((references (collecting)))
-      (iterate ((s (list-elements specialized-lambda-list))
-		(p (list-elements required-parameters)))
-	(progn p)
-	(cond ((not (listp s)))
-	      ((ignoredp (car s))
-	       (warn "In DEFMETHOD ~S, there is a~%~
-		      redundant IGNORE declaration for the parameter ~S."
-		     method-name
-		     specializers
-		     (car s)))
-	      (t
-	       (gather (car s) references)))))))
 
 (defvar *method-function-plist* (make-hash-table :test 'eq))
 (defvar *mf1* nil)
