@@ -1201,12 +1201,23 @@
   (declare (ignore type1 type2))
   (values nil nil))
 
-(!define-type-method (hairy :simple-intersection2 :complex-intersection2)
+(!define-type-method (hairy :simple-intersection2) 
 		     (type1 type2)
   (if (type= type1 type2)
       type1
       nil))
 
+(!define-type-method (hairy :complex-intersection2)
+		     (type1 type2)
+  (aver (hairy-type-p type2))
+  (let ((hairy-type-spec (type-specifier type2)))
+    (if (and (consp hairy-type-spec)
+	     (eq (car hairy-type-spec) 'not))
+	(if (csubtypep type1 (specifier-type (cadr hairy-type-spec)))
+	    *empty-type*
+	    nil)
+	nil)))
+	
 (!define-type-method (hairy :simple-=) (type1 type2)
   (if (equal (hairy-type-specifier type1)
 	     (hairy-type-specifier type2))
@@ -2414,8 +2425,12 @@
 (!define-type-class cons)
 
 (!def-type-translator cons (&optional (car-type-spec '*) (cdr-type-spec '*))
-  (make-cons-type (specifier-type car-type-spec)
-		  (specifier-type cdr-type-spec)))
+  (let ((car-type (specifier-type car-type-spec))
+	(cdr-type (specifier-type cdr-type-spec)))
+    (if (or (eq car-type *empty-type*)
+	    (eq cdr-type *empty-type*))
+	*empty-type*
+	(make-cons-type car-type cdr-type))))
  
 (!define-type-method (cons :unparse) (type)
   (let ((car-eltype (type-specifier (cons-type-car-type type)))

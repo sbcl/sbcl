@@ -33,7 +33,8 @@
 ;;; SINGLE-FLOAT DOUBLE-FLOAT RATIONAL)".  We ideally want all of the
 ;;; defined-by-ANSI types to unparse as themselves or at least
 ;;; something similar (e.g. CHARACTER can unparse to BASE-CHAR, since
-;;; the types are equivalent in current SBCL).
+;;; the types are equivalent in current SBCL, and EXTENDED-CHAR can
+;;; unparse to NIL, since there are no EXTENDED-CHARs currently).
 (let ((standard-types '(;; from table 4-2 in section 4.2.3 in the
 			;; CLHS.
 			arithmetic-error
@@ -117,17 +118,7 @@
 			error
 			readtable
 			two-way-stream
-			;; This one's hard: (AND BASE-CHAR (NOT BASE-CHAR))
-			;;
-			;; This is because it looks like
-			;;   (AND CHARACTER (NOT BASE-CHAR))
-			;; but CHARACTER is equivalent to
-			;; BASE-CHAR. So if we fix intersection of
-			;; obviously disjoint types and then do (the
-			;; extended-char foo), we'll get back FOO is
-			;; not a NIL. -- CSR, 2002-09-16.
-			;;
-			;; extended-char
+			extended-char
 			real
 			type-error                 
 			file-error
