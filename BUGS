@@ -1201,3 +1201,15 @@ WORKAROUND:
   (0))).  However, an integral value of X should be legal, because
   successive adds of integers to double-floats produces double-floats,
   so none of the type restrictions in the code is violated.
+
+298: (aka PFD MISC.183)
+  Compiler fails on
+
+    (defun foo ()
+      (multiple-value-call #'bar
+        (ext)
+        (catch 'tag (return-from foo (int)))))
+
+  This program violates "unknown values LVAR stack discipline": if INT
+  returns, values returned by (EXT) must be removed from under that of
+  (INT).

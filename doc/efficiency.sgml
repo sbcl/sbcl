@@ -87,4 +87,46 @@ sources. Such code is often reasonably straightforward to write;
 search the sources for the string <quote><function>deftransform</></>
 to find many examples (some straightforward, some less so).</para>
 
+<sect1 id="modular-arithmetic"><title>Modular arithmetic</>
+<para>
+Some numeric functions have a property: <varname>N</> lower bits of
+the result depend only on <varname>N</> lower bits of (all or some)
+arguments. If the compiler sees an expression of form <literal>(logand
+exp mask)</>, where <varname>exp</> is a tree of such "good" functions
+and <varname>mask</> is known to be of type <type>(unsigned-byte
+w)</>, where <varname>w</> is a "good" width, all intermediate results
+will be cut to <varname>w</> bits (but it is not done for variables
+and constants!). This often results in an ability to use simple
+machine instructions for the functions.
+</para>
+
+<para>
+Consider an example.
+<programlisting>
+(defun i (x y)
+  (declare (type (unsigned-byte 32) x y))
+  (ldb (byte 32 0) (logxor x (lognot y))))
+</programlisting>
+The result of <literal>(lognot y)</> will be negative and of
+type <type>(signed-byte 33)</>, so a naive implementation on a 32-bit
+platform is unable to use 32-bit arithmetic here. But modular
+arithmetic optimizer is able to do it: because the result is cut down
+to 32 bits, the compiler will replace <function>logxor</>
+and <function>lognot</> with versions cutting results to 32 bits, and
+because terminals (here---expressions <literal>x</> and <literal>y</>)
+are also of type <type>(unsigned-byte 32)</>, 32-bit machine
+arithmetic can be used.
+</para>
+
+<note><para> As of &SBCL; 0.8.5 "good" functions
+are <function>+</>, <function>-</>; <function>logand</>, <function>logior</>,
+<function>logxor</>, <function>lognot</> and their combinations;
+and <function>ash</> with the positive second argument. "Good" widths
+are 32 on HPPA, MIPS, PPC, Sparc and X86 and 64 on Alpha. While it is
+possible to support smaller widths as well, currently it is not
+implemented.
+</para></note>
+
+</sect1>
+
 </chapter>
