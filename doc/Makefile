@@ -6,23 +6,29 @@ DOCFILE_EXT_DEFAULT:=xml
 # Standard docfile processing as copied from UFFI
 # Placed into public domain by author Kevin Rosenberg
 
-DEBIAN=$(shell expr "`cat /etc/issue`" : '.*Debian.*')
-SUSE=$(shell expr "`cat /etc/issue`" : '.*SuSE.*')
-REDHAT=$(shell expr "`cat /etc/issue`" : '.*RedHat.*')
+SYSTEM:=$(shell uname)
 
+ifeq ($(SYSTEM),Linux) 
+  DEBIAN=$()
+  SUSE=
+  REDHAT=
 
-ifneq (${DEBIAN},0)
-OS:=debian
-else
-  ifneq (${SUSE},0)
-    OS=suse
-  else   
-    ifneq (${REDHAT},0)
-      OS=redhat
+  ifneq ($(shell expr "`cat /etc/issue`" : '.*Debian.*'),0)
+    OS:=debian
+    else
+    ifneq ($(shell expr "`cat /etc/issue`" : '.*SuSE.*'),0)
+      OS=suse
+    else   
+      ifneq ($(shell expr "`cat /etc/issue`" : '.*RedHat.*'),0)
+        OS=redhat
+      endif
     endif
   endif
 endif
 
+ifeq ($(SYSTEM),Darwin)
+  OS:=fink
+endif
 
 ifndef DOCFILE_BASE
 DOCFILE_BASE=${DOCFILE_BASE_DEFAULT}
