@@ -1598,6 +1598,7 @@ changes in sbcl-0.7.14 relative to sbcl-0.7.13:
     variable.  (found by Rolf Wester)
   * SBCL does not ignore type declarations for special
     variables.  (reported by rif on c.l.l 2003-03-05)
+  * some bug fixes in contrib/sb-aclrepl/
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** a bug in the CONS type specifier, whereby the CAR and CDR
        types got intertwined, has been fixed;
