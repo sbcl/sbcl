@@ -527,14 +527,15 @@
 #!-sb-fluid (declaim (inline control-stack-pointer-valid-p))
 (defun control-stack-pointer-valid-p (x)
   (declare (type system-area-pointer x))
-  (let* ((control-stack-start
-	  (descriptor-sap sb!vm::*control-stack-start*))
+  (let* (#!-stack-grows-downward-not-upward
+	 (control-stack-start
+	  (descriptor-sap *control-stack-start*))
+	 #!+stack-grows-downward-not-upward
 	 (control-stack-end
-	  (descriptor-sap sb!vm::*control-stack-end*)))
+	  (descriptor-sap *control-stack-end*)))
     #!-stack-grows-downward-not-upward
     (and (sap< x (current-sp))
-	 (sap<= control-stack-start
-		x)
+	 (sap<= control-stack-start x)
 	 (zerop (logand (sap-int x) #b11)))
     #!+stack-grows-downward-not-upward
     (and (sap>= x (current-sp))
