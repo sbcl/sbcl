@@ -695,7 +695,7 @@
 (defvar *note-iis-entry-p* nil)
 
 (defvar *compiled-initialize-instance-simple-functions*
-  (make-hash-table :test #'equal))
+  (make-hash-table :test 'equal))
 
 (defun initialize-instance-simple-function (use info class form-list)
   (let* ((pv-cell (get-pv-cell-for-class class))

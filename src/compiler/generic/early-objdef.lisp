@@ -21,6 +21,9 @@
 ;;; the main types. These types are represented by the low three bits
 ;;; of the pointer or immediate object.
 (eval-when (:compile-toplevel :load-toplevel :execute)
+  ;; The EVAL-WHEN is necessary (at least for Lispworks), because the
+  ;; second DEFENUM uses the value of OTHER-IMMEDIATE-0-TYPE, which is
+  ;; defined in the first DEFENUM. -- AL 20000216
   (defenum (:suffix -type)
     even-fixnum
     function-pointer

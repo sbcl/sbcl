@@ -260,7 +260,7 @@
     (cond ((print-pretty-on-stream-p stream)
 	   ;; Since we're printing prettily on STREAM, format the
 	   ;; object within a logical block. PPRINT-LOGICAL-BLOCK does
-	   ;; not rebind the stream when it is already a pretty stream
+	   ;; not rebind the stream when it is already a pretty stream,
 	   ;; so output from the body will go to the same stream.
 	   (pprint-logical-block (stream nil :prefix "#<" :suffix ">")
 	     (print-description)))
@@ -954,34 +954,34 @@
 (defun output-vector (vector stream)
   (declare (vector vector))
   (cond ((stringp vector)
-          (cond ((or *print-escape* *print-readably*)
-                  (write-char #\" stream)
-                  (quote-string vector stream)
-                  (write-char #\" stream))
-                (t
-                  (write-string vector stream))))
+	 (cond ((or *print-escape* *print-readably*)
+		(write-char #\" stream)
+		(quote-string vector stream)
+		(write-char #\" stream))
+	       (t
+		(write-string vector stream))))
 	((not (or *print-array* *print-readably*))
-          (output-terse-array vector stream))
+	 (output-terse-array vector stream))
 	((bit-vector-p vector)
-          (write-string "#*" stream)
-          (dotimes (i (length vector))
-            (output-object (aref vector i) stream)))
+	 (write-string "#*" stream)
+	 (dotimes (i (length vector))
+	   (output-object (aref vector i) stream)))
 	(t
-          (when (and *print-readably*
-                     (not (eq (array-element-type vector) 't)))
-            (error 'print-not-readable :object vector))
-          (descend-into (stream)
-                        (write-string "#(" stream)
-                        (dotimes (i (length vector))
-                          (unless (zerop i)
-                            (write-char #\space stream))
-                          (punt-print-if-too-long i stream)
-                          (output-object (aref vector i) stream))
-                        (write-string ")" stream)))))
+	 (when (and *print-readably*
+		    (not (eq (array-element-type vector) 't)))
+	   (error 'print-not-readable :object vector))
+	 (descend-into (stream)
+		       (write-string "#(" stream)
+		       (dotimes (i (length vector))
+			 (unless (zerop i)
+			   (write-char #\space stream))
+			 (punt-print-if-too-long i stream)
+			 (output-object (aref vector i) stream))
+		       (write-string ")" stream)))))
 
-;;; This function outputs a string quoting characters sufficiently that so
-;;; someone can read it in again. Basically, put a slash in front of an
-;;; character satisfying NEEDS-SLASH-P
+;;; This function outputs a string quoting characters sufficiently
+;;; that so someone can read it in again. Basically, put a slash in
+;;; front of an character satisfying NEEDS-SLASH-P.
 (defun quote-string (string stream)
   (macrolet ((needs-slash-p (char)
 	       ;; KLUDGE: We probably should look at the readtable, but just do

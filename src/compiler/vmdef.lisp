@@ -97,6 +97,9 @@
 ;;;; generation of emit functions
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
+  ;; We need the EVAL-WHEN because %EMIT-GENERIC-VOP (below)
+  ;; uses #.MAX-VOP-TN-REFS, not just MAX-VOP-TN-REFS.
+  ;; -- AL 20010218
   (defconstant max-vop-tn-refs 256))
 
 (defvar *vop-tn-refs* (make-array max-vop-tn-refs :initial-element nil))

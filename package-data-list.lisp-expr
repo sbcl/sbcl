@@ -795,6 +795,9 @@ retained, possibly temporariliy, because it might be used internally."
              "UNIX-ENVIRONMENT-CMUCL-FROM-SBCL"
              "UNIX-ENVIRONMENT-SBCL-FROM-CMUCL"
 
+             ;; a sort of quasi unbound tag for use in hash tables
+             "+EMPTY-HT-SLOT+"
+
              ;; not used any more, I think -- WHN 19991206
 	     #+nil
              ("SERVE-BUTTON-PRESS"

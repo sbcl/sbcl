@@ -2925,12 +2925,12 @@ scav_vector(lispobj *where, lispobj object)
      * the hash table code reserves for marking empty slots. */
     scavenge(where+3, 1);
     if (!Pointerp(where[3])) {
-	lose("not #:%EMPTY-HT-SLOT% symbol pointer: %x", where[3]);
+	lose("not empty-hash-table-slot symbol pointer: %x", where[3]);
     }
     empty_symbol = where[3];
     /* fprintf(stderr,"* empty_symbol = %x\n", empty_symbol);*/
     if (TypeOf(*(lispobj *)PTR(empty_symbol)) != type_SymbolHeader) {
-	lose("not a symbol where #:%EMPTY-HT-SLOT% expected: %x",
+	lose("not a symbol where empty-hash-table-slot symbol expected: %x",
 	     *(lispobj *)PTR(empty_symbol));
     }
 

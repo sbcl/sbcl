@@ -767,7 +767,8 @@
 	       (cond ((and lisp-path-fp c-path-fp)
                        ;; Both still seem valid - choose the lisp frame.
                        #+nil (when (zerop depth)
-                               (format t "debug: both still valid ~S ~S ~S ~S~%"
+                               (format t
+				       "debug: both still valid ~S ~S ~S ~S~%"
                                        lisp-ocfp lisp-ra c-ocfp c-ra))
 		      #+freebsd
 		      (if (sap> lisp-ocfp c-ocfp)

@@ -1266,9 +1266,6 @@
 	 (values (if info
 		     (byte-continuation-info-results info)
 		     0)))
-    (unless (eql values 0)
-      ;; Someone wants the value, so copy it.
-      (output-do-xop segment 'dup))
     (etypecase leaf
       (global-var
        (ecase (global-var-kind leaf)
@@ -1280,15 +1277,15 @@
        ;; references to the variable before we actually try to set it.
        ;; (Setting a lexical variable with no refs caused bugs ca. CMU
        ;; CL 18c, because the compiler deletes such variables.)
-        (cond ((leaf-refs leaf)
-	       (unless (eql values 0)
-		 ;; Someone wants the value, so copy it.
-		 (output-do-xop segment 'dup))
-	       (output-set-lambda-var segment leaf (node-environment set)))
-	      ;; If no one wants the value, then pop it, else leave it
-	      ;; for them.
-	      ((eql values 0)
-	       (output-byte-with-operand segment byte-pop-n 1)))))
+       (cond ((leaf-refs leaf)
+	      (unless (eql values 0)
+		;; Someone wants the value, so copy it.
+		(output-do-xop segment 'dup))
+	      (output-set-lambda-var segment leaf (node-environment set)))
+	     ;; If no one wants the value, then pop it, else leave it
+	     ;; for them.
+	     ((eql values 0)
+	      (output-byte-with-operand segment byte-pop-n 1)))))
     (unless (eql values 0)
       (checked-canonicalize-values segment cont 1)))
   (values))

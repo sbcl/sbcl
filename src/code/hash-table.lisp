@@ -12,35 +12,6 @@
 
 (in-package "SB!IMPL")
 
-;;; an internal tag for marking empty slots
-;;;
-;;; CMU CL 18b used :EMPTY for this purpose, which was somewhat nasty
-;;; since it's easily accessible to the user, so that e.g.
-;;;	(DEFVAR *HT* (MAKE-HASH-TABLE))
-;;;	(SETF (GETHASH :EMPTY *HT*) :EMPTY)
-;;;	(MAPHASH (LAMBDA (K V) (FORMAT T "~&~S ~S~%" K V)))
-;;; gives no output -- oops!
-;;;
-;;; Note that as of version 0.6.6 there's a dependence in the gencgc.c
-;;; code on this value being a symbol. (This is only one of many nasty
-;;; dependencies between that code and this, alas.)
-(defconstant +empty-ht-slot+ '%empty-ht-slot%)
-;;; KLUDGE: Using a private symbol still leaves us vulnerable to users
-;;; getting nonconforming behavior by messing around with
-;;; DO-ALL-SYMBOLS. That seems like a fairly obscure problem, so for
-;;; now we just don't worry about it. If for some reason it becomes
-;;; worrisome and the magic value needs replacement:
-;;;   * The replacement value needs to be LOADable with EQL preserved,
-;;;     so that macroexpansion for WITH-HASH-TABLE-ITERATOR will work
-;;;     when compiled into a file and loaded back into SBCL.
-;;;     (Thus, just uninterning %EMPTY-HT-SLOT% doesn't work.)
-;;;   * The replacement value needs to be acceptable to the
-;;;     low-level gencgc.lisp hash table scavenging code. 
-;;;   * The change will break binary compatibility, since comparisons
-;;;     against the value used at the time of compilation are wired
-;;;     into FASL files.
-;;; -- WHN 20000622
-
 ;;; HASH-TABLE is implemented as a STRUCTURE-OBJECT.
 (sb!xc:defstruct (hash-table (:constructor %make-hash-table))
   ;; The type of hash table this is. Only used for printing and as
@@ -93,7 +64,7 @@
   ;; hash associated with the key, saving recalculation. Could be
   ;; useful for EQL, and EQUAL hash tables. This table is not needed
   ;; for EQ hash tables, and when present the value of #x8000000
-  ;; represents EQ-based hashing on the respective Key.
+  ;; represents EQ-based hashing on the respective key.
   (hash-vector nil :type (or null (simple-array (unsigned-byte 32) (*)))))
 
 (defmacro-mundanely with-hash-table-iterator ((function hash-table) &body body)
@@ -120,8 +91,8 @@
 			 (let ((key (aref kv-vector (* 2 index)))
 			       (value (aref kv-vector (1+ (* 2 index)))))
 			   (incf index)
-			   (unless (and (eq key '#.+empty-ht-slot+)
-					(eq value '#.+empty-ht-slot+))
+			   (unless (and (eq key +empty-ht-slot+)
+					(eq value +empty-ht-slot+))
 			     (return (values t key value))))))))
 		#',function))))
       (macrolet ((,function () '(funcall ,n-function)))

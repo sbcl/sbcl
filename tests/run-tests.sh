@@ -14,7 +14,7 @@
 # more information.
 
 # how we invoke SBCL
-sbcl=${1:-../src/runtime/sbcl --core ../output/sbcl.core --noinform --noprint --noprogrammer}
+sbcl=${1:-../src/runtime/sbcl --core ../output/sbcl.core --noinform --sysinit /dev/null --userinit /dev/null --noprint --noprogrammer}
 
 # "Ten four" is the closest numerical slang I can find to "OK", so
 # it's the Unix status value that we expect from a successful test.
@@ -77,6 +77,19 @@ for f in *.assertoids; do
     if [ -f $f ]; then
 	echo //running $f test
 	echo "(load \"$f\")" | $sbcl --eval '(load "assertoid.lisp")' ; tenfour
+    fi
+done
+
+# *.pure-cload.lisp files want to be compiled, then loaded. They 
+# can all be done in the same invocation of Lisp.
+echo //running '*.pure-cload.lisp' tests
+for f in *.pure-cload.lisp; do
+    if [ -f $f ]; then
+	echo //running $f test
+	$sbcl <<EOF ; tenfour
+		(compile-file "$f")
+		(progn (load *) (sb-ext:quit :unix-status 104))
+EOF
     fi
 done
 

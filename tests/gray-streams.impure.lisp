@@ -183,6 +183,19 @@
        (assert (null (fresh-line our-char-output)))
        (write-char #\c our-char-output)))
    (format nil "a ~%b~%c")))
+
+;;; Patches introduced in sbcl-0.6.11.5 made the pretty-print logic
+;;; test not only *PRINT-PRETTY* but also PRETTY-STREAM-P in some
+;;; cases. Try to verify that we don't end up doing tests like that on
+;;; bare Gray streams and thus bogusly omitting pretty-printing
+;;; operations.
+(flet ((frob ()
+	 (with-output-to-string (string)
+	   (let ((gray-output-stream (make-character-output-stream string)))
+	     (format gray-output-stream
+		     "~@<testing: ~@:_pretty Gray line breaks~:>~%")))))
+  (assert (= 1 (count #\newline (let ((*print-pretty* nil)) (frob)))))
+  (assert (= 2 (count #\newline (let ((*print-pretty* t)) (frob))))))
 
 ;;;; example classes for binary output
 

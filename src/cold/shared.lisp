@@ -274,7 +274,7 @@
 	 ,@body))))
 
 ;;; Check for stupid typos in FLAGS list keywords.
-(let ((stems (make-hash-table :test #'equal)))
+(let ((stems (make-hash-table :test 'equal)))
   (for-stems-and-flags (stem flags)
     (if (gethash stem stems)
       (error "duplicate stem ~S in stems-and-flags data" stem)

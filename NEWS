@@ -706,3 +706,4 @@ planned incompatible changes in 0.7.x:
   e.g. UNPROFILE will interact with TRACE and UNTRACE. (This shouldn't
   matter, though, unless you are using profiling. If you never 
   profile anything, TRACE should continue to behave as before.)
+* The fasl file extension may change, perhaps to ".fasl".

@@ -829,12 +829,13 @@
 (defun reference-this-var-to-keep-it-alive (node)
   node)
 
-;;; This sets a sb!c::cset node's var to value, returning value. When var is
-;;; local, we have to compare its home environment to the current one, node's
-;;; environment. If they're the same, we check to see whether the var is
-;;; indirect, and store the value on the stack or in the value cell as
-;;; appropriate. Otherwise, var is a closure variable, and since we're
-;;; setting it, we know its location contains an indirect value object.
+;;; This sets a SB!C::CSET node's var to value, returning value. When
+;;; var is local, we have to compare its home environment to the
+;;; current one, node's environment. If they're the same, we check to
+;;; see whether the var is indirect, and store the value on the stack
+;;; or in the value cell as appropriate. Otherwise, var is a closure
+;;; variable, and since we're setting it, we know its location
+;;; contains an indirect value object.
 (defun set-leaf-value (node frame-ptr closure value)
   (let ((var (sb!c::set-var node)))
     (etypecase var
@@ -844,7 +845,7 @@
        (setf (symbol-value (sb!c::global-var-name var)) value)))))
 
 ;;; This does SET-LEAF-VALUE for a LAMBDA-VAR leaf. The debugger tools'
-;;; internals uses this also to set interpreted local variables.
+;;; internals use this also to set interpreted local variables.
 (defun set-leaf-value-lambda-var (node var frame-ptr closure value)
   ;; Note: We avoid trying to set a lexical variable with no refs
   ;; because the compiler deletes such variables.
@@ -852,22 +853,22 @@
     (let ((env (sb!c::node-environment node)))
       (cond ((not (eq (sb!c::lambda-environment (sb!c::lambda-var-home var))
                       env))
-              (setf (indirect-value
-                     (svref closure
-                            (position var (sb!c::environment-closure env)
-                                      :test #'eq)))
-                      value))
+	     (setf (indirect-value
+		    (svref closure
+			   (position var (sb!c::environment-closure env)
+				     :test #'eq)))
+		   value))
             ((sb!c::lambda-var-indirect var)
-              (setf (indirect-value
-                     (eval-stack-local frame-ptr (sb!c::lambda-var-info var)))
-                      value))
+	     (setf (indirect-value
+		    (eval-stack-local frame-ptr (sb!c::lambda-var-info var)))
+		   value))
             (t
-              (setf (eval-stack-local frame-ptr (sb!c::lambda-var-info var))
-                      value))))))
+	     (setf (eval-stack-local frame-ptr (sb!c::lambda-var-info var))
+		   value))))))
 
-;;; This figures out how to return a value for a ref node. Leaf is the ref's
-;;; structure that tells us about the value, and it is one of the following
-;;; types:
+;;; This figures out how to return a value for a ref node. LEAF is the
+;;; ref's structure that tells us about the value, and it is one of
+;;; the following types:
 ;;;    constant   -- It knows its own value.
 ;;;    global-var -- It's either a value or function reference. Get it right.
 ;;;    local-var  -- This may on the stack or in the current closure, the
@@ -955,35 +956,39 @@
 	(indirect-value temp)
 	temp)))
 
-;;; This computes a closure for a local call and for returned call'able closure
-;;; objects. Sometimes the closure is a simple-vector of no elements. Node
-;;; is either a reference node or a combination node. Leaf is either the leaf
-;;; of the reference node or the lambda to internally apply for the combination
-;;; node. Frame-ptr is the current frame pointer for fetching current values
-;;; to store in the closure. Closure is the current closure, the currently
-;;; interpreting lambda's closed over environment.
+;;; Compute a closure for a local call and for returned call'able
+;;; closure objects. Sometimes the closure is a SIMPLE-VECTOR of no
+;;; elements. NODE is either a reference node or a combination node.
+;;; LEAF is either the leaf of the reference node or the lambda to
+;;; internally apply for the combination node. FRAME-PTR is the
+;;; current frame pointer for fetching current values to store in the
+;;; closure. CLOSURE is the current closure, the closed-over
+;;; environment of the currently interpreting LAMBDA.
 ;;;
-;;; A computed closure is a vector corresponding to the list of closure
-;;; variables described in an environment. The position of a lambda-var in
-;;; this closure list is the index into the closure vector of values.
-;;;
-;;; Functional-env is the environment description for leaf, the lambda for
-;;; which we're computing a closure. This environment describes which of
-;;; lambda's vars we find in lambda's closure when it's running, versus finding
-;;; them on the stack. For each lambda-var in the functional environment's
-;;; closure list, if the lambda-var's home environment is the current
-;;; environment, then get a value off the stack and store it in the closure
-;;; we're computing. Otherwise that lambda-var's value comes from somewhere
-;;; else, but we have it in our current closure, the environment we're running
-;;; in as we compute this new closure. Find this value the same way we do in
-;;; LEAF-VALUE, by finding the lambda-var's position in the current
-;;; environment's description of the current closure.
+;;; A computed closure is a vector corresponding to the list of
+;;; closure variables described in an environment. The position of a
+;;; lambda-var in this closure list is the index into the closure
+;;; vector of values.
 (defun compute-closure (node leaf frame-ptr closure)
   (let* ((current-env (sb!c::node-environment node))
 	 (current-closure-vars (sb!c::environment-closure current-env))
+	 ;; FUNCTIONAL-ENV is the environment description for leaf,
+	 ;; the lambda for which we're computing a closure. This
+	 ;; environment describes which of lambda's vars we find in
+	 ;; lambda's closure when it's running, versus finding them on
+	 ;; the stack.
 	 (functional-env (sb!c::lambda-environment leaf))
 	 (functional-closure-vars (sb!c::environment-closure functional-env))
 	 (functional-closure (make-array (length functional-closure-vars))))
+    ;; For each lambda-var VAR in the functional environment's closure
+    ;; list, if the VAR's home environment is the current environment,
+    ;; then get a value off the stack and store it in the closure
+    ;; we're computing. Otherwise VAR's value comes from somewhere
+    ;; else, but we have it in our current closure, the environment
+    ;; we're running in as we compute this new closure. Find this
+    ;; value the same way we do in LEAF-VALUE, by finding VAR's
+    ;; position in the current environment's description of the
+    ;; current closure.
     (do ((vars functional-closure-vars (cdr vars))
 	 (i 0 (1+ i)))
 	((null vars))
@@ -1008,7 +1013,7 @@
 			      (sb!c::nlx-info-cleanup ele))
 			     (sb!c::lambda-eval-info-entries
 			      (sb!c::lambda-info
-			       ;; lambda INTERNAL-APPLY-LOOP tosses around.
+			       ;; the lambda INTERNAL-APPLY-LOOP tosses around
 			       (sb!c::environment-function
 				(sb!c::node-environment node))))))))
 		     (svref closure
@@ -1016,11 +1021,11 @@
 				      :test #'eq))))))))
     functional-closure))
 
-;;; INTERNAL-APPLY uses this to invoke a function from the interpreter's stack
-;;; on some arguments also taken from the stack. When tail-p is non-nil,
-;;; control does not return to INTERNAL-APPLY to further interpret the current
-;;; IR1 lambda, so INTERNAL-INVOKE must clean up the current interpreter's
-;;; stack frame.
+;;; INTERNAL-APPLY uses this to invoke a function from the
+;;; interpreter's stack on some arguments also taken from the stack.
+;;; When tail-p is non-nil, control does not return to INTERNAL-APPLY
+;;; to further interpret the current IR1 lambda, so INTERNAL-INVOKE
+;;; must clean up the current interpreter's stack frame.
 (defun internal-invoke (arg-count &optional tailp)
   (let ((args (eval-stack-args arg-count)) ;LET says this init form runs first.
 	(fun (eval-stack-pop)))
@@ -1029,8 +1034,9 @@
       (format t "(~S~{ ~S~})~%" fun args))
     (apply fun args)))
 
-;;; Almost just like INTERNAL-INVOKE. We call MV-EVAL-STACK-ARGS, and our
-;;; function is in a list on the stack instead of simply on the stack.
+;;; This is almost just like INTERNAL-INVOKE. We call
+;;; MV-EVAL-STACK-ARGS, and our function is in a list on the stack
+;;; instead of simply on the stack.
 (defun mv-internal-invoke (arg-count &optional tailp)
   (let ((args (mv-eval-stack-args arg-count)) ;LET runs this init form first.
 	(fun (car (eval-stack-pop))))
@@ -1039,15 +1045,16 @@
       (format t "(~S~{ ~S~})~%" fun args))
     (apply fun args)))
 
-;;; This returns a list of the top arg-count elements on the interpreter's
+;;; Return a list of the top arg-count elements on the interpreter's
 ;;; stack. This removes them from the stack.
 (defun eval-stack-args (arg-count)
   (let ((args nil))
     (dotimes (i arg-count args)
       (push (eval-stack-pop) args))))
 
-;;; This assumes the top count elements on interpreter's stack are lists. This
-;;; returns a single list with all the elements from these lists.
+;;; This assumes the top count elements on interpreter's stack are
+;;; lists. This returns a single list with all the elements from these
+;;; lists.
 (defun mv-eval-stack-args (count)
   (if (= count 1)
       (eval-stack-pop)

@@ -30,7 +30,11 @@
 	     (let ((offset-sym (symbolicate name "-OFFSET"))
 		   (names-vector (symbolicate "*" size "-REGISTER-NAMES*")))
 	       `(progn
-		  (defconstant ,offset-sym ,offset)
+		  (eval-when (:compile-toplevel :load-toplevel :execute)
+                    ;; EVAL-WHEN is necessary because stuff like #.EAX-OFFSET
+                    ;; (in the same file) depends on compile-time evaluation
+                    ;; of the DEFCONSTANT. -- AL 20010224
+		    (defconstant ,offset-sym ,offset))
 		  (setf (svref ,names-vector ,offset-sym)
 			,(symbol-name name)))))
 	   ;; FIXME: It looks to me as though DEFREGSET should also
