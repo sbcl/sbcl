@@ -612,9 +612,16 @@ bootstrapping.
 	 '(ignorable))
 	(t
 	 ;; Otherwise, we can usually make Python very happy.
-	 (let ((type (info :type :kind specializer)))
-	   (ecase type
+	 (let ((kind (info :type :kind specializer)))
+	   (ecase kind
 	     ((:primitive) `(type ,specializer ,parameter))
+	     ((:defined) 
+	      ;; some BUILT-IN-CLASSes (e.g. REAL) are also :DEFINED
+	      ;; types.  Nothing else should be.
+	      (let ((class (find-class specializer nil)))
+		(aver class)
+		(aver (typep class 'built-in-class)))
+	      `(type ,specializer ,parameter))
 	     ((:instance nil)
 	      (let ((class (find-class specializer nil)))
 		(cond

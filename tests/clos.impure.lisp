@@ -865,5 +865,42 @@
 (setf (find-class 'fr-alt) (find-class 'fr-super))
 (assert (eq (find-class 'fr-alt) (find-class 'fr-super)))
 
+
+;;; ANSI Figure 4-8: all defined classes.  Check that we can define
+;;; methods on all of these.
+(progn
+  (defgeneric method-for-defined-classes (x))
+  (dolist (c '(arithmetic-error 
+	       generic-function simple-error array hash-table 
+	       simple-type-error 
+	       bit-vector integer simple-warning             
+	       broadcast-stream list standard-class             
+	       built-in-class logical-pathname standard-generic-function  
+	       cell-error method standard-method            
+	       character method-combination standard-object            
+	       class null storage-condition          
+	       complex number stream                     
+	       concatenated-stream package stream-error               
+	       condition package-error string                     
+	       cons parse-error string-stream              
+	       control-error pathname structure-class            
+	       division-by-zero print-not-readable structure-object           
+	       echo-stream program-error style-warning              
+	       end-of-file random-state symbol                     
+	       error ratio synonym-stream             
+	       file-error rational t                          
+	       file-stream reader-error two-way-stream             
+	       float readtable type-error                 
+	       floating-point-inexact real unbound-slot               
+	       floating-point-invalid-operation restart unbound-variable
+	       floating-point-overflow sequence undefined-function 
+	       floating-point-underflow serious-condition vector 
+	       function simple-condition warning))
+    (eval `(defmethod method-for-defined-classes ((x ,c)) (princ x))))
+  (assert (string= (with-output-to-string (*standard-output*)
+		     (method-for-defined-classes #\3))
+		   "3")))
+	     
+
 ;;;; success
 (sb-ext:quit :unix-status 104)
