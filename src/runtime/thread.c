@@ -19,10 +19,27 @@
 int dynamic_values_bytes=4096*sizeof(lispobj);	/* same for all threads */
 struct thread *all_threads;
 volatile lispobj all_threads_lock;
-volatile int countdown_to_gc;
 extern struct interrupt_data * global_interrupt_data;
 
 void get_spinlock(lispobj *word,int value);
+
+int
+initial_thread_trampoline(struct thread *th)
+{
+    lispobj function;
+    lispobj *args = NULL;
+    function = th->unbound_marker;
+    th->unbound_marker = UNBOUND_MARKER_WIDETAG;
+    if(arch_os_thread_init(th)==0) return 1;
+
+    if(th->pid < 1) lose("th->pid not set up right");
+    th->state=STATE_RUNNING;
+#if defined(LISP_FEATURE_X86)
+    return call_into_lisp_first_time(function,args,0);
+#else
+    return funcall0(function);
+#endif
+}
 
 /* this is the first thing that clone() runs in the child (which is
  * why the silly calling convention).  Basically it calls the user's
@@ -30,39 +47,19 @@ void get_spinlock(lispobj *word,int value);
  * whatever other bookkeeping needs to be done
  */
 
-/* set go to 0 to stop the thread before it starts.  Convenient if you
-* want to attach a debugger to it before it does anything */
-volatile int go=1;		
-
 int
 new_thread_trampoline(struct thread *th)
 {
     lispobj function;
-    lispobj *args = NULL;
     function = th->unbound_marker;
-    if(go==0) {
-	fprintf(stderr, "/pausing 0x%lx(%d,%d) before new_thread_trampoline(0x%lx)\n",
-		(unsigned long)th,th->pid,getpid(),(unsigned long)function);
-	while(go==0) ;
-	fprintf(stderr, "/continue\n");
-    }
     th->unbound_marker = UNBOUND_MARKER_WIDETAG;
-    if(arch_os_thread_init(th)==0) 
-	return 1;		/* failure.  no, really */
-#ifdef LISP_FEATURE_SB_THREAD
+    if(arch_os_thread_init(th)==0) return 1;	
+
     /* wait here until our thread is linked into all_threads: see below */
     while(th->pid<1) sched_yield();
-#else
-    if(th->pid < 1)
-	lose("th->pid not set up right");
-#endif
 
     th->state=STATE_RUNNING;
-#if !defined(LISP_FEATURE_SB_THREAD) && defined(LISP_FEATURE_X86)
-    return call_into_lisp_first_time(function,args,0);
-#else
     return funcall0(function);
-#endif
 }
 
 /* this is called from any other thread to create the new one, and
@@ -70,11 +67,10 @@ new_thread_trampoline(struct thread *th)
  * thread 
  */
 
-pid_t create_thread(lispobj initial_function) {
+struct thread * create_thread_struct(lispobj initial_function) {
     union per_thread_data *per_thread;
     struct thread *th=0;	/*  subdue gcc */
     void *spaces=0;
-    pid_t kid_pid;
 
     /* may as well allocate all the spaces at once: it saves us from
      * having to decide what to do if only some of the allocations
@@ -185,20 +181,17 @@ pid_t create_thread(lispobj initial_function) {
 	       sizeof (struct interrupt_data));
 
     th->unbound_marker=initial_function;
-#ifdef LISP_FEATURE_SB_THREAD
-#if defined(LISP_FEATURE_X86) && defined (LISP_FEATURE_LINUX)
-    kid_pid=
-	clone(new_thread_trampoline,
-	      (((void*)th->control_stack_start)+THREAD_CONTROL_STACK_SIZE-4),
-	      CLONE_FILES|SIG_THREAD_EXIT|CLONE_VM,th);
-    if(kid_pid<=0) 
-	goto cleanup;
-#else
-#error this stuff presently only works on x86 Linux
-#endif
-#else
-    kid_pid=getpid();
-#endif
+    return th;
+ cleanup:
+    /* if(th && th->tls_cookie>=0) os_free_tls_pointer(th); */
+    if(spaces) os_invalidate(spaces,
+			     THREAD_CONTROL_STACK_SIZE+BINDING_STACK_SIZE+
+			     ALIEN_STACK_SIZE+dynamic_values_bytes);
+    return 0;
+}
+
+void link_thread(struct thread *th,pid_t kid_pid)
+{
     get_spinlock(&all_threads_lock,kid_pid);
     th->next=all_threads;
     all_threads=th;
@@ -208,19 +201,34 @@ pid_t create_thread(lispobj initial_function) {
     protect_control_stack_guard_page(th->pid,1);
     release_spinlock(&all_threads_lock);
     th->pid=kid_pid;		/* child will not start until this is set */
-#ifndef LISP_FEATURE_SB_THREAD
-    new_thread_trampoline(all_threads);	/*  call_into_lisp */
-    lose("Clever child?  Idiot savant, verging on the.");
-#endif
-
-    return th->pid;
- cleanup:
-    /* if(th && th->tls_cookie>=0) os_free_tls_pointer(th); */
-    if(spaces) os_invalidate(spaces,
-			     THREAD_CONTROL_STACK_SIZE+BINDING_STACK_SIZE+
-			     ALIEN_STACK_SIZE+dynamic_values_bytes);
-    return 0;
 }
+
+pid_t create_initial_thread(lispobj initial_function) {
+    struct thread *th=create_thread_struct(initial_function);
+    pid_t kid_pid=getpid();
+    if(th && kid_pid>0) {
+	link_thread(th,kid_pid);
+	initial_thread_trampoline(all_threads); /* no return */
+    } else lose("can't create initial thread");
+}
+
+#ifdef LISP_FEATURE_LINUX
+pid_t create_thread(lispobj initial_function) {
+    struct thread *th=create_thread_struct(initial_function);
+    pid_t kid_pid=clone(new_thread_trampoline,
+			(((void*)th->control_stack_start)+
+			 THREAD_CONTROL_STACK_SIZE-4),
+			CLONE_FILES|SIG_THREAD_EXIT|CLONE_VM,th);
+
+    if(th && kid_pid>0) {
+	link_thread(th,kid_pid);
+	return th->pid;
+    } else {
+	destroy_thread(th);
+	return 0;
+    }
+}
+#endif
 
 void destroy_thread (struct thread *th)
 {
@@ -230,14 +238,13 @@ void destroy_thread (struct thread *th)
     gc_alloc_update_page_tables(0, &th->alloc_region);
 #endif
     get_spinlock(&all_threads_lock,th->pid);
-    if(countdown_to_gc>0) countdown_to_gc--;
     th->state=STATE_STOPPED;
     if(th==all_threads) 
 	all_threads=th->next;
     else {
 	struct thread *th1=all_threads;
-	while(th1->next!=th) th1=th1->next;
-	th1->next=th->next;	/* unlink */
+	while(th1 && th1->next!=th) th1=th1->next;
+	if(th1)	th1->next=th->next;	/* unlink */
     }
     release_spinlock(&all_threads_lock);
     if(th && th->tls_cookie>=0) arch_os_thread_cleanup(th); 
@@ -302,8 +309,6 @@ int signal_thread_to_dequeue (pid_t pid)
  * all the others with SIG_STOP_FOR_GC.  The handler for this thread does
  * the usual pseudo-atomic checks (we don't want to stop a thread while 
  * it's in the middle of allocation) then kills _itself_ with SIGSTOP.
- * At any given time, countdown_to_gc should reflect the number of threads
- * signalled but which haven't yet come to rest
  */
 
 void gc_stop_the_world()
@@ -317,15 +322,7 @@ void gc_stop_the_world()
 	for(p=all_threads,old_pid=p->pid; p; p=p->next) {
 	    if(p==th) continue;
 	    if(p->state!=STATE_RUNNING) continue;
-	    countdown_to_gc++;
 	    p->state=STATE_STOPPING;
-	    /* Note no return value check from kill().  If the
-	     * thread had been reaped already, we kill it and
-	     * increment countdown_to_gc anyway.  This is to avoid
-	     * complicating the logic in destroy_thread, which would 
-	     * otherwise have to know whether the thread died before or
-	     * after it was killed
-	     */
 	    kill(p->pid,SIG_STOP_FOR_GC);
 	}
 	release_spinlock(&all_threads_lock);

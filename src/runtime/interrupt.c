@@ -74,7 +74,6 @@ static void store_signal_data_for_later (struct interrupt_data *data,
 boolean interrupt_maybe_gc_int(int signal, siginfo_t *info, void *v_context);
 
 extern volatile lispobj all_threads_lock;
-extern volatile int countdown_to_gc;
 
 /*
  * This is a workaround for some slightly silly Linux/GNU Libc
@@ -555,7 +554,6 @@ sig_stop_for_gc_handler(int signal, siginfo_t *info, void *void_context)
     fake_foreign_function_call(context); 
 
     get_spinlock(&all_threads_lock,thread->pid);
-    countdown_to_gc--;
     thread->state=STATE_STOPPED;
     release_spinlock(&all_threads_lock);
     kill(thread->pid,SIGSTOP);

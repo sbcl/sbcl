@@ -335,51 +335,7 @@ main(int argc, char *argv[], char *envp[])
     sigint_init();
 
     FSHOW((stderr, "/funcalling initial_function=0x%lx\n", initial_function));
-    create_thread(initial_function);
-    /* in a unithread build, create_thread never returns */
-#ifdef LISP_FEATURE_SB_THREAD
-    parent_loop();
-#endif
+    create_initial_thread(initial_function);
+    lose("CATS.  CATS ARE NICE.");
 }
 
-#ifdef LISP_FEATURE_SB_THREAD
-
-/* this is being pared down as time goes on; eventually we want to get
- * to the point that we have no parent loop at all and the parent
- * thread runs Lisp just like any other */
-
-static void /* noreturn */ parent_loop(void)
-{
-    struct sigaction sa;
-    sigset_t sigset;
-    int status;
-    pid_t pid=0;
-
-    sigemptyset(&sigset);
-    sa.sa_handler=SIG_IGN;
-    sa.sa_mask=sigset;
-    sa.sa_flags=0;
-    sigaction(SIGINT, &sa, 0); 	/* ^c should go to the lisp thread instead */
-    sigaction(SIG_THREAD_EXIT, &sa, 0);
-    sigaction(SIGCHLD, &sa, 0);
-
-    while(!all_threads) {
-	sched_yield();
-    }
-    while(all_threads && (pid=waitpid(-1,&status,__WALL))) {
-	struct thread *th;
-	if(pid==-1) {
-	    if(errno == EINTR) continue;
-	    fprintf(stderr,"waitpid: %s\n",strerror(errno));
-	}
-	else if(WIFEXITED(status) || WIFSIGNALED(status)) {
-	    th=find_thread_by_pid(pid);
-	    if(!th) continue;
-	    destroy_thread(th);
-	    if(!all_threads) break;
-	}
-    }
-    exit(WEXITSTATUS(status));
-}
-
-#endif
