@@ -86,6 +86,107 @@
 
 (defun read-cmd (input-stream)
   ;; Reads a command from the user and returns a user-cmd object
+  (let ((next-char (peek-char-non-whitespace input-stream)))
+    (cond
+      ((eql *command-char* next-char)
+       (dispatch-command-line input-stream))
+      ((eql #\newline next-char)
+       (read-char input-stream)
+       *null-cmd*)
+      ((eql :eof next-char)
+       *eof-cmd*)
+      (t
+       (let* ((eof (cons nil *eof-marker*))
+	      (form (read input-stream nil eof)))
+	 (if (eq form eof)
+	     *eof-cmd*
+	     (make-user-cmd :input form :func nil :hnum *cmd-number*)))))))
+
+(defun dispatch-command-line (input-stream)
+  "Processes an input line that starts with *command-char*"
+  (let* ((line (string-trim-whitespace (read-line input-stream)))
+	 (first-space-pos (position #\space line))
+	 (cmd-string (subseq line 1 first-space-pos))
+	 (cmd-args-string
+	  (if first-space-pos
+	      (string-trim-whitespace (subseq line first-space-pos))
+	      "")))
+    (declare (simple-string line))
+    (cond
+      ((or (zerop (length cmd-string))
+	   (whitespace-char-p (char cmd-string 0)))
+       *null-cmd*)
+      ((or (numberp (read-from-string cmd-string))
+	   (char= (char cmd-string 0) #\+)
+	   (char= (char cmd-string 0) #\-))
+       (process-cmd-numeric cmd-string cmd-args-string))
+      ((char= (char cmd-string 0) *command-char*)
+       (process-history-search (subseq cmd-string 1) cmd-args-string))
+      (t
+       (process-cmd-text cmd-string line cmd-args-string)))))
+
+(defun process-cmd-numeric (cmd-string cmd-args-string)
+  "Process a numeric cmd, such as ':123'"
+  (let* ((first-char (char cmd-string 0))
+	 (number-string (if (digit-char-p first-char)
+			    cmd-string
+			    (subseq cmd-string 1)))
+	 (is-minus (char= first-char #\-))
+	 (raw-number (read-from-string number-string))
+	 (number (if is-minus
+		     (- *cmd-number* raw-number)
+		     raw-number))
+	 (cmd (get-history number)))
+    (when (eq cmd *null-cmd*)
+      (return-from process-cmd-numeric
+	(make-user-cmd :func :history-error :input (read-from-string
+						    cmd-string))))
+    (maybe-return-history-cmd cmd cmd-args-string)))
+
+(defun maybe-return-history-cmd (cmd cmd-args-string)
+  (format *output* "~&~A" (user-cmd-input cmd))
+  (let ((dont-redo
+	 (when (and (stringp cmd-args-string)
+		    (plusp (length cmd-args-string))
+		    (char= #\? (char cmd-args-string 0)))
+	   (do ((line nil (read-line *input*)))
+	       ((and line (or (zerop (length line))
+			      (string-equal line "Y")
+			      (string-equal line "N")))
+		(when (string-equal line "N")
+		  t))
+	     (when line
+	       (format *output* "~&Type \"y\" for yes or \"n\" for no."))
+	     (format *output* "~&redo? [y] ")
+	     (force-output *output*)))))
+    (if dont-redo
+	*null-cmd*
+	(make-user-cmd :func (user-cmd-func cmd)
+		       :input (user-cmd-input cmd)
+		       :args (user-cmd-args cmd)
+		       :hnum *cmd-number*))))
+
+
+(defun find-history-matching-pattern (cmd-string)
+  "Return history item matching cmd-string or NIL if not found"
+  (dolist (his *history* nil)
+    (let* ((input (user-cmd-input his))
+	   (string-input (if (stringp input)
+			     input
+			     (write-to-string input))))
+      (when (search cmd-string string-input :test #'string-equal)
+	(return-from find-history-matching-pattern his)))))
+
+(defun process-history-search (pattern cmd-args-string)
+  (let ((cmd (find-history-matching-pattern pattern)))
+    (unless cmd
+      (format *output* "No match on history list with pattern ~S" pattern)
+      (return-from process-history-search *null-cmd*))
+    (maybe-return-history-cmd cmd cmd-args-string)))
+
+
+(defun process-cmd-text (cmd-string line cmd-args-string)
+  "Process a text cmd, such as ':ld a b c'"
   (flet ((parse-args (parsing args-string)
 	   (case parsing
 	     (:string
@@ -98,53 +199,16 @@
 		(loop as arg = (read string-stream nil eof)
 		      until (eq arg eof)
 		      collect arg))))))
-    (let ((next-char (peek-char-non-whitespace input-stream)))
-      (cond
-	((eql next-char *command-char*)
-	 (let* ((line (string-trim-whitespace (read-line input-stream)))
-		(first-space-pos (position #\space line))
-		(cmd-string (subseq line 1 first-space-pos))
-		(cmd-args-string
-		 (if first-space-pos
-		     (string-trim-whitespace (subseq line first-space-pos))
-		     "")))
-	   (declare (string line))
-	   (cond
-	     ((numberp (read-from-string cmd-string))
-	      (let ((cmd (get-history (read-from-string cmd-string))))
-		(if (eq cmd *null-cmd*)
-		    (make-user-cmd :func :history-error
-				   :input (read-from-string cmd-string))
-		    (make-user-cmd :func (user-cmd-func cmd)
-				    :input (user-cmd-input cmd)
-				    :args (user-cmd-args cmd)
-				    :hnum *cmd-number*))))
-	     ((or (zerop (length cmd-string))
-		  (whitespace-char-p (char cmd-string 0)))
-	      *null-cmd*)
-	     (t
-	      (let ((cmd-entry (find-cmd cmd-string)))
-		(if cmd-entry
-		    (make-user-cmd :func (cmd-table-entry-func cmd-entry)
-				   :input line
-				   :args (parse-args
-					  (cmd-table-entry-parsing cmd-entry)
-					   cmd-args-string)
-				   :hnum *cmd-number*)
-		    (make-user-cmd :func :cmd-error
-				   :input cmd-string)))))))
-	((eql next-char #\newline)
-	 (read-char input-stream)
-	 *null-cmd*)
-	((eql next-char :eof)
-	 *eof-cmd*)
-	(t
-	 (let* ((eof (cons nil *eof-marker*))
-		(form (read input-stream nil eof)))
-	   (if (eq form eof)
-	       *eof-cmd*
-	       (make-user-cmd :input form :func nil :hnum *cmd-number*))))))))
-
+    (let ((cmd-entry (find-cmd cmd-string)))
+      (unless cmd-entry
+	(return-from process-cmd-text
+	  (make-user-cmd :func :cmd-error :input cmd-string)))
+      (make-user-cmd :func (cmd-table-entry-func cmd-entry)
+		     :input line
+		     :args (parse-args (cmd-table-entry-parsing cmd-entry)
+				       cmd-args-string)
+		     :hnum *cmd-number*))))
+  
 (defun make-cte (name-param func desc parsing group abbr-len)
   (let ((name (etypecase name-param
 		(string
