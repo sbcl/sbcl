@@ -179,11 +179,11 @@
 						(type-of maybe-package))
 					    '*package* really-package)))))))
 
-;;; Access *DEFAULT-PATHNAME-DEFAULTS*, warning if it's silly. (Unlike
-;;; the vaguely-analogous SANE-PACKAGE, we don't actually need to
-;;; reset the variable when it's silly, since even crazy values of
-;;; *DEFAULT-PATHNAME-DEFAULTS* don't leave the system in a state where
-;;; it's hard to recover interactively.)
+;;; Access *DEFAULT-PATHNAME-DEFAULTS*, issuing a warning if its value
+;;; is silly. (Unlike the vaguely-analogous SANE-PACKAGE, we don't
+;;; actually need to reset the variable when it's silly, since even
+;;; crazy values of *DEFAULT-PATHNAME-DEFAULTS* don't leave the system
+;;; in a state where it's hard to recover interactively.)
 (defun sane-default-pathname-defaults ()
   (let* ((dfd *default-pathname-defaults*)
 	 (dfd-dir (pathname-directory dfd)))
@@ -196,7 +196,7 @@
       (warn
        "~@<~S is a relative pathname. (But we'll try using it anyway.)~@:>"
        '*default-pathname-defaults*))
-    *default-pathname-defaults*))
+    dfd))
 
 ;;; Give names to elements of a numeric sequence.
 (defmacro defenum ((&key (prefix "") (suffix "") (start 0) (step 1))

@@ -179,6 +179,6 @@
   (nil-function-returned
    "A function with declared result type NIL returned.")
   (layout-invalid
-   "invalid layout (indicates obsolete instance)")
+   "Object layout is invalid. (indicates obsolete instance)")
   (object-not-complex-vector
    "Object is not a complex (non-SIMPLE-ARRAY) vector."))

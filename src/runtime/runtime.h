@@ -30,7 +30,7 @@
  * signal handling.)
  *
  * Note: It may be that doing this is fundamentally unsound, since it
- * causes output from signal handlers, the i/o libraries aren't
+ * causes output from signal handlers, and the i/o libraries aren't
  * necessarily reentrant. But it can still be very convenient for
  * figuring out what's going on when you have a signal handling
  * problem.. */

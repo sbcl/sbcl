@@ -158,7 +158,7 @@
 (assert (equal (namestring (translate-logical-pathname
                             "test0:foo;bar;baz;mum.quux.3"))
                "/library/foo/foo/bar/baz/mum.quux"))
-
+
 ;;;; MERGE-PATHNAME tests
 ;;;;
 ;;;; There are some things we don't bother testing, just because they're
@@ -173,7 +173,7 @@
 ;;;; other implementations, they depend quite heavily on the rules for
 ;;;; namestring parsing, which are implementation-specific. So, success
 ;;;; or failure in these tests doesn't tell you anything about
-;;;; ansi-compliance unless your PARSE-NAMESTRING works like ours.
+;;;; ANSI-compliance unless your PARSE-NAMESTRING works like ours.
 
 (setf (logical-pathname-translations "scratch")
       '(("**;*.*.*" "/usr/local/doc/**/*")))
@@ -214,7 +214,7 @@
         ;; === logical pathnames ===
         ;; recognizes a logical pathname namestring when
         ;; default-pathname is a logical pathname
-	;; FIXME: 0.6.12.20 fails this one.
+	;; FIXME: 0.6.12.23 fails this one.
         #+nil (#P"scratch:foo;name1" #p"name1" #p"scratch:foo;")
         ;; or when the namestring begins with the name of a defined
         ;; logical host followed by a colon [I assume that refers to pathname
@@ -244,7 +244,7 @@
         (#p"SCRATCH:ABSOLUTE;PATH;NAME.TYPE"
          #p"scratch:absolute;path;name" #p"/dir/default-name.type")
 
-        ;; TODO: test version handling in LPNs
+        ;; FIXME: test version handling in LPNs
         )
       do (assert (string= (namestring (apply #'merge-pathnames params))
                           (namestring expected-result))))

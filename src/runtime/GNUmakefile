@@ -14,8 +14,6 @@ all: sbcl sbcl.nm
 
 # defaults which might be overridden or modified by values in the
 # Config file
-#
-# 
 CFLAGS =  -g -Wall -O3
 ASFLAGS = $(CFLAGS)
 DEPEND_FLAGS =

@@ -386,8 +386,6 @@ struct timeval start_tv, stop_tv;
 
 /* scavenging */
 
-#define DIRECT_SCAV 0
-
 static void
 scavenge(lispobj *start, u32 nwords)
 {
@@ -403,9 +401,6 @@ scavenge(lispobj *start, u32 nwords)
 		       (unsigned long) start, (unsigned long) object, type);
 #endif
 
-#if DIRECT_SCAV
-		words_scavenged = (scavtab[type])(start, object);
-#else
                 if (Pointerp(object)) {
 		    /* It be a pointer. */
 		    if (from_space_p(object)) {
@@ -456,7 +451,7 @@ scavenge(lispobj *start, u32 nwords)
                     words_scavenged = (scavtab[type])(start, object);
 
                 }
-#endif
+
 		start += words_scavenged;
 		nwords -= words_scavenged;
 	}
@@ -642,50 +637,6 @@ print_garbage(lispobj *from_space, lispobj *from_space_free_pointer)
 static lispobj trans_function_header(lispobj object);
 static lispobj trans_boxed(lispobj object);
 
-#if DIRECT_SCAV
-static int
-scav_function_pointer(lispobj *where, lispobj object)
-{
-	gc_assert(Pointerp(object));
-
-	if (from_space_p(object)) {
-		lispobj first, *first_pointer;
-
-		/* object is a pointer into from space.  check to see */
-		/* if it has been forwarded */
-		first_pointer = (lispobj *) PTR(object);
-		first = *first_pointer;
-		
-		if (!(Pointerp(first) && new_space_p(first))) {
-			int type;
-			lispobj copy;
-
-			/* must transport object -- object may point */
-			/* to either a function header, a closure */
-			/* function header, or to a closure header. */
-			
-			type = TypeOf(first);
-			switch (type) {
-			  case type_FunctionHeader:
-			  case type_ClosureFunctionHeader:
-			    copy = trans_function_header(object);
-			    break;
-			  default:
-			    copy = trans_boxed(object);
-			    break;
-			}
-
-			first = *first_pointer = copy;
-		}
-
-		gc_assert(Pointerp(first));
-		gc_assert(!from_space_p(first));
-
-		*where = first;
-	}
-	return 1;
-}
-#else
 static int
 scav_function_pointer(lispobj *where, lispobj object)
 {
@@ -723,7 +674,6 @@ scav_function_pointer(lispobj *where, lispobj object)
   *where = first;
   return 1;
 }
-#endif
 
 static struct code *
 trans_code(struct code *code)
@@ -974,25 +924,6 @@ trans_function_header(lispobj object)
 
 /* instances */
 
-#if DIRECT_SCAV
-static int
-scav_instance_pointer(lispobj *where, lispobj object)
-{
-    if (from_space_p(object)) {
-	lispobj first, *first_pointer;
-
-	/* object is a pointer into from space.  check to see */
-	/* if it has been forwarded */
-	first_pointer = (lispobj *) PTR(object);
-	first = *first_pointer;
-		
-	if (!(Pointerp(first) && new_space_p(first)))
-	    first = *first_pointer = trans_boxed(object);
-	*where = first;
-    }
-    return 1;
-}
-#else
 static int
 scav_instance_pointer(lispobj *where, lispobj object)
 {
@@ -1004,38 +935,12 @@ scav_instance_pointer(lispobj *where, lispobj object)
   *where = *first_pointer = trans_boxed(object);
   return 1;
 }
-#endif
 
 
 /* lists and conses */
 
 static lispobj trans_list(lispobj object);
 
-#if DIRECT_SCAV
-static int
-scav_list_pointer(lispobj *where, lispobj object)
-{
-	gc_assert(Pointerp(object));
-
-	if (from_space_p(object)) {
-		lispobj first, *first_pointer;
-
-		/* object is a pointer into from space.  check to see */
-		/* if it has been forwarded */
-		first_pointer = (lispobj *) PTR(object);
-		first = *first_pointer;
-		
-		if (!(Pointerp(first) && new_space_p(first)))
-			first = *first_pointer = trans_list(object);
-
-		gc_assert(Pointerp(first));
-		gc_assert(!from_space_p(first));
-	
-		*where = first;
-	}
-	return 1;
-}
-#else
 static int
 scav_list_pointer(lispobj *where, lispobj object)
 {
@@ -1054,7 +959,6 @@ scav_list_pointer(lispobj *where, lispobj object)
   *where = first;
   return 1;
 }
-#endif
 
 static lispobj
 trans_list(lispobj object)
@@ -1110,32 +1014,6 @@ trans_list(lispobj object)
 
 /* scavenging and transporting other pointers */
 
-#if DIRECT_SCAV
-static int
-scav_other_pointer(lispobj *where, lispobj object)
-{
-	gc_assert(Pointerp(object));
-
-	if (from_space_p(object)) {
-		lispobj first, *first_pointer;
-
-		/* object is a pointer into from space.  check to see */
-		/* if it has been forwarded */
-		first_pointer = (lispobj *) PTR(object);
-		first = *first_pointer;
-		
-		if (!(Pointerp(first) && new_space_p(first)))
-			first = *first_pointer = 
-				(transother[TypeOf(first)])(object);
-
-		gc_assert(Pointerp(first));
-		gc_assert(!from_space_p(first));
-
-		*where = first;
-	}
-	return 1;
-}
-#else
 static int
 scav_other_pointer(lispobj *where, lispobj object)
 {
@@ -1153,7 +1031,6 @@ scav_other_pointer(lispobj *where, lispobj object)
   *where = first;
   return 1;
 }
-#endif
 
 
 /* immediate, boxed, and unboxed objects */

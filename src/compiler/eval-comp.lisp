@@ -109,54 +109,59 @@
 (def!method print-object ((obj entry-node-info) str)
   (print-unreadable-object (obj str :type t)))
 
-;;; Some compiler funny functions have definitions, so the interpreter can
-;;; call them. These require special action to coordinate the interpreter,
-;;; system call stack, and the environment. The annotation prepass marks the
-;;; references to these as :unused, so the interpreter doesn't try to fetch
-;;; functions through these undefined symbols.
+;;; Some compiler funny functions have definitions, so the interpreter
+;;; can call them. These require special action to coordinate the
+;;; interpreter, system call stack, and the environment. The
+;;; annotation prepass marks the references to these as :UNUSED, so
+;;; the interpreter doesn't try to fetch functions through these
+;;; undefined symbols.
 (defconstant undefined-funny-funs
   '(%special-bind %special-unbind %more-arg-context %unknown-values %catch
     %unwind-protect %catch-breakup %unwind-protect-breakup
     %lexical-exit-breakup %continue-unwind %nlx-entry))
 
-;;; Some kinds of functions are only passed as arguments to funny functions,
-;;; and are never actually evaluated at run time.
+;;; Some kinds of functions are only passed as arguments to funny
+;;; functions, and are never actually evaluated at run time.
 (defconstant non-closed-function-kinds '(:cleanup :escape))
 
 ;;; This annotates continuations, lambda-vars, and lambdas. For each
-;;; continuation, we cache how its destination uses its value. This only buys
-;;; efficiency when the code executes more than once, but the overhead of this
-;;; part of the prepass for code executed only once should be negligible.
+;;; continuation, we cache how its destination uses its value. This
+;;; only buys efficiency when the code executes more than once, but
+;;; the overhead of this part of the prepass for code executed only
+;;; once should be negligible.
 ;;;
-;;; As a special case to aid interpreting local function calls, we sometimes
-;;; note the continuation as :unused. This occurs when there is a local call,
-;;; and there is no actual function object to call; we mark the continuation as
-;;; :unused since there is nothing to push on the interpreter's stack.
-;;; Normally we would see a reference to a function that we would push on the
-;;; stack to later pop and apply to the arguments on the stack. To determine
-;;; when we have a local call with no real function object, we look at the node
-;;; to see whether it is a reference with a destination that is a :local
-;;; combination whose function is the reference node's continuation.
+;;; As a special case to aid interpreting local function calls, we
+;;; sometimes note the continuation as :unused. This occurs when there
+;;; is a local call, and there is no actual function object to call;
+;;; we mark the continuation as :unused since there is nothing to push
+;;; on the interpreter's stack. Normally we would see a reference to a
+;;; function that we would push on the stack to later pop and apply to
+;;; the arguments on the stack. To determine when we have a local call
+;;; with no real function object, we look at the node to see whether
+;;; it is a reference with a destination that is a :local combination
+;;; whose function is the reference node's continuation.
 ;;;
-;;; After checking for virtual local calls, we check for funny functions the
-;;; compiler refers to for calling to note certain operations. These functions
-;;; are undefined, and if the interpreter tried to reference the function cells
-;;; of these symbols, it would get an error. We mark the continuations
-;;; delivering the values of these references as :unused, so the reference
-;;; never takes place.
+;;; After checking for virtual local calls, we check for funny
+;;; functions the compiler refers to for calling to note certain
+;;; operations. These functions are undefined, and if the interpreter
+;;; tried to reference the function cells of these symbols, it would
+;;; get an error. We mark the continuations delivering the values of
+;;; these references as :unused, so the reference never takes place.
 ;;;
-;;; For each lambda-var, including a lambda's vars and its let's vars, we note
-;;; the stack offset used to access and store that variable. Then we note the
-;;; lambda with the total number of variables, so we know how big its stack
-;;; frame is. Also in the lambda's info is the number of its arguments that it
-;;; actually references; the interpreter never pushes or pops an unreferenced
-;;; argument, so we can't just use LENGTH on LAMBDA-VARS to know how many args
-;;; the caller passed.
+;;; For each lambda-var, including a LAMBDA's vars and its LET's vars,
+;;; we note the stack offset used to access and store that variable.
+;;; Then we note the lambda with the total number of variables, so we
+;;; know how big its stack frame is. Also in the lambda's info is the
+;;; number of its arguments that it actually references; the
+;;; interpreter never pushes or pops an unreferenced argument, so we
+;;; can't just use LENGTH on LAMBDA-VARS to know how many args the
+;;; caller passed.
 ;;;
-;;; For each entry node in a lambda, we associate in the lambda-eval-info the
-;;; entry node with a stack offset. Evaluation code stores the frame pointer
-;;; in this slot upon processing the entry node to aid stack cleanup and
-;;; correct frame manipulation when processing exit nodes.
+;;; For each entry node in a lambda, we associate in the
+;;; lambda-eval-info the entry node with a stack offset. Evaluation
+;;; code stores the frame pointer in this slot upon processing the
+;;; entry node to aid stack cleanup and correct frame manipulation
+;;; when processing exit nodes.
 (defun annotate-component-for-eval (component)
   (do-blocks (b component)
     (do-nodes (node cont b)
@@ -228,8 +233,8 @@
 	    ((:catch :unwind-protect)
 	     (return :blow-it-off))))))))
 
-;;; Sometime consider annotations to exclude processing of exit nodes when
-;;; we want to do a tail-p thing.
+;;; Sometime consider annotations to exclude processing of exit nodes
+;;; when we want to do a tail-p thing.
 
 ;;;; defining funny functions for interpreter
 

@@ -33,7 +33,7 @@
   (declare (ignore standard))
   (make-wired-tn (primitive-type-or-lose 'system-area-pointer)
 		 sap-stack-sc-number return-pc-save-offset))
-;;; If standard is true, then use the standard (full call) location,
+;;; If STANDARD is true, then use the standard (full call) location,
 ;;; otherwise use any legal location.
 ;;;
 ;;; No problems.

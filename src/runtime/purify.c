@@ -62,7 +62,8 @@ static lispobj *pscav(lispobj *addr, int nwords, boolean constant);
 #define LATERBLOCKSIZE 1020
 #define LATERMAXCOUNT 10
 
-static struct later {
+static struct
+later {
     struct later *next;
     union {
         lispobj *ptr;
@@ -117,77 +118,79 @@ dynamic_pointer_p(lispobj ptr)
 static int
 maybe_can_move_p(lispobj thing)
 {
-  lispobj *thingp,header;
-  if (dynamic_pointer_p(thing)) { /* in dynamic space */
-    thingp = (lispobj*)PTR(thing);
-    header = *thingp;
-    if(Pointerp(header) && forwarding_pointer_p(header))
-      return -1;		/* must change it */
-    if(LowtagOf(thing) == type_ListPointer)
-      return type_ListPointer;	/* can we check this somehow */
-    else if (thing & 3) {	/* not fixnum */
-      int kind = TypeOf(header);
-      /* printf(" %x %x",header,kind); */
-      switch (kind) {		/* something with a header */
-      case type_Bignum:
-      case type_SingleFloat:
-      case type_DoubleFloat:
+    lispobj *thingp,header;
+    if (dynamic_pointer_p(thing)) { /* in dynamic space */
+	thingp = (lispobj*)PTR(thing);
+	header = *thingp;
+	if (Pointerp(header) && forwarding_pointer_p(header)) {
+	    return -1;		/* must change it */
+	} else if (LowtagOf(thing) == type_ListPointer) {
+	    return type_ListPointer;	/* can we check this somehow */
+	} else if (thing & 3) {	/* not fixnum */
+	    int kind = TypeOf(header);
+	    /* printf(" %x %x",header,kind); */
+	    switch (kind) {		/* something with a header */
+	    case type_Bignum:
+	    case type_SingleFloat:
+	    case type_DoubleFloat:
 #ifdef type_LongFloat
-      case type_LongFloat:
+	    case type_LongFloat:
 #endif
-      case type_Sap:
-      case type_SimpleVector:
-      case type_SimpleString:
-      case type_SimpleBitVector:
-      case type_SimpleArrayUnsignedByte2:
-      case type_SimpleArrayUnsignedByte4:
-      case type_SimpleArrayUnsignedByte8:
-      case type_SimpleArrayUnsignedByte16:
-      case type_SimpleArrayUnsignedByte32:
+	    case type_Sap:
+	    case type_SimpleVector:
+	    case type_SimpleString:
+	    case type_SimpleBitVector:
+	    case type_SimpleArrayUnsignedByte2:
+	    case type_SimpleArrayUnsignedByte4:
+	    case type_SimpleArrayUnsignedByte8:
+	    case type_SimpleArrayUnsignedByte16:
+	    case type_SimpleArrayUnsignedByte32:
 #ifdef type_SimpleArraySignedByte8
-      case type_SimpleArraySignedByte8:
+	    case type_SimpleArraySignedByte8:
 #endif
 #ifdef type_SimpleArraySignedByte16
-      case type_SimpleArraySignedByte16:
+	    case type_SimpleArraySignedByte16:
 #endif
 #ifdef type_SimpleArraySignedByte30
-      case type_SimpleArraySignedByte30:
+	    case type_SimpleArraySignedByte30:
 #endif
 #ifdef type_SimpleArraySignedByte32
-      case type_SimpleArraySignedByte32:
+	    case type_SimpleArraySignedByte32:
 #endif
-      case type_SimpleArraySingleFloat:
-      case type_SimpleArrayDoubleFloat:
+	    case type_SimpleArraySingleFloat:
+	    case type_SimpleArrayDoubleFloat:
 #ifdef type_SimpleArrayLongFloat
-      case type_SimpleArrayLongFloat:
+	    case type_SimpleArrayLongFloat:
 #endif
 #ifdef type_SimpleArrayComplexSingleFloat
-      case type_SimpleArrayComplexSingleFloat:
+	    case type_SimpleArrayComplexSingleFloat:
 #endif
 #ifdef type_SimpleArrayComplexDoubleFloat
-      case type_SimpleArrayComplexDoubleFloat:
+	    case type_SimpleArrayComplexDoubleFloat:
 #endif
 #ifdef type_SimpleArrayComplexLongFloat
-      case type_SimpleArrayComplexLongFloat:
+	    case type_SimpleArrayComplexLongFloat:
 #endif
-      case type_CodeHeader:
-      case type_FunctionHeader:
-      case type_ClosureFunctionHeader:
-      case type_ReturnPcHeader:
-      case type_ClosureHeader:
-      case type_FuncallableInstanceHeader:
-      case type_InstanceHeader:
-      case type_ValueCellHeader:
-      case type_ByteCodeFunction:
-      case type_ByteCodeClosure:
-      case type_WeakPointer:
-      case type_Fdefn:
-	return kind;
-	break;
-      default:
-	return 0;
-      }}}
-  return 0;
+	    case type_CodeHeader:
+	    case type_FunctionHeader:
+	    case type_ClosureFunctionHeader:
+	    case type_ReturnPcHeader:
+	    case type_ClosureHeader:
+	    case type_FuncallableInstanceHeader:
+	    case type_InstanceHeader:
+	    case type_ValueCellHeader:
+	    case type_ByteCodeFunction:
+	    case type_ByteCodeClosure:
+	    case type_WeakPointer:
+	    case type_Fdefn:
+		return kind;
+		break;
+	    default:
+		return 0;
+	    }
+	}
+    }
+    return 0;
 }
 
 static int pverbose=0;
@@ -195,26 +198,25 @@ static int pverbose=0;
 static void
 carefully_pscav_stack(lispobj*lowaddr, lispobj*base)
 {
-  lispobj*sp = lowaddr;
-  while (sp < base)
-    { int k;
-      lispobj thing = *sp;
-      if((unsigned)thing & 0x3)	/* may be pointer */
-	{
-	  /* need to check for valid float/double? */
-	  k = maybe_can_move_p(thing);
-	  if(PVERBOSE)printf("%8x %8x %d\n",sp, thing, k);
-	  if(k)
-	    pscav(sp, 1, 0);
+    lispobj *sp = lowaddr;
+    while (sp < base) {
+	int k;
+	lispobj thing = *sp;
+	if ((unsigned)thing & 0x3) {	/* may be pointer */
+	    /* need to check for valid float/double? */
+	    k = maybe_can_move_p(thing);
+	    if(PVERBOSE)printf("%8x %8x %d\n",sp, thing, k);
+	    if(k)
+		pscav(sp, 1, 0);
 	}
-      sp++;
+	sp++;
     }
 }
 #endif
 
 #ifdef GENCGC
 /*
- * Enhanced x86/GENCGC stack scavenging by Douglas Crosher.
+ * enhanced x86/GENCGC stack scavenging by Douglas Crosher
  *
  * Scavenging the stack on the i386 is problematic due to conservative
  * roots and raw return addresses. Here it is handled in two passes:
@@ -228,207 +230,207 @@ static unsigned pointer_filter_verbose = 0;
 static int
 valid_dynamic_space_pointer(lispobj *pointer, lispobj *start_addr)
 {
-  /* If it's not a return address then it needs to be a valid Lisp
-   * pointer. */
-  if (!Pointerp((lispobj)pointer))
-    return 0;
-
-  /* Check that the object pointed to is consistent with the pointer
-   * low tag. */
-  switch (LowtagOf((lispobj)pointer)) {
-  case type_FunctionPointer:
-    /* Start_addr should be the enclosing code object, or a closure
-     * header. */
-    switch (TypeOf(*start_addr)) {
-    case type_CodeHeader:
-      /* This case is probably caught above. */
-      break;
-    case type_ClosureHeader:
-    case type_FuncallableInstanceHeader:
-    case type_ByteCodeFunction:
-    case type_ByteCodeClosure:
-      if ((int)pointer != ((int)start_addr+type_FunctionPointer)) {
-	if (pointer_filter_verbose) {
-	  fprintf(stderr,"*Wf2: %x %x %x\n", (unsigned int) pointer, 
-		  (unsigned int) start_addr, *start_addr);
-	}
+    /* If it's not a return address then it needs to be a valid Lisp
+     * pointer. */
+    if (!Pointerp((lispobj)pointer))
 	return 0;
-      }
-      break;
-    default:
-      if (pointer_filter_verbose) {
-	fprintf(stderr,"*Wf3: %x %x %x\n", (unsigned int) pointer, 
-		(unsigned int) start_addr, *start_addr);
-      }
-      return 0;
-    }
-    break;
-  case type_ListPointer:
-    if ((int)pointer != ((int)start_addr+type_ListPointer)) {
-      if (pointer_filter_verbose)
-	fprintf(stderr,"*Wl1: %x %x %x\n", (unsigned int) pointer, 
-		(unsigned int) start_addr, *start_addr);
-      return 0;
-    }
-    /* Is it plausible cons? */
-    if((Pointerp(start_addr[0])
-	|| ((start_addr[0] & 3) == 0) /* fixnum */
-	|| (TypeOf(start_addr[0]) == type_BaseChar)
-	|| (TypeOf(start_addr[0]) == type_UnboundMarker))
-       && (Pointerp(start_addr[1])
-	   || ((start_addr[1] & 3) == 0) /* fixnum */
-	   || (TypeOf(start_addr[1]) == type_BaseChar)
-	   || (TypeOf(start_addr[1]) == type_UnboundMarker))) {
-      break;
-    } else {
-      if (pointer_filter_verbose) {
-	fprintf(stderr,"*Wl2: %x %x %x\n", (unsigned int) pointer, 
-		(unsigned int) start_addr, *start_addr);
-      }
-      return 0;
-    }
-  case type_InstancePointer:
-    if ((int)pointer != ((int)start_addr+type_InstancePointer)) {
-      if (pointer_filter_verbose) {
-	fprintf(stderr,"*Wi1: %x %x %x\n", (unsigned int) pointer, 
-		(unsigned int) start_addr, *start_addr);
-      }
-      return 0;
-    }
-    if (TypeOf(start_addr[0]) != type_InstanceHeader) {
-      if (pointer_filter_verbose) {
-	fprintf(stderr,"*Wi2: %x %x %x\n", (unsigned int) pointer, 
-		(unsigned int) start_addr, *start_addr);
-      }
-      return 0;
-    }
-    break;
-  case type_OtherPointer:
-    if ((int)pointer != ((int)start_addr+type_OtherPointer)) {
-      if (pointer_filter_verbose) {
-	fprintf(stderr,"*Wo1: %x %x %x\n", (unsigned int) pointer, 
-		(unsigned int) start_addr, *start_addr);
-      }
-      return 0;
-    }
-    /* Is it plausible?  Not a cons. X should check the headers. */
-    if(Pointerp(start_addr[0]) || ((start_addr[0] & 3) == 0)) {
-      if (pointer_filter_verbose) {
-	fprintf(stderr,"*Wo2: %x %x %x\n", (unsigned int) pointer, 
-		(unsigned int) start_addr, *start_addr);
-      }
-      return 0;
-    }
-    switch (TypeOf(start_addr[0])) {
-    case type_UnboundMarker:
-    case type_BaseChar:
-      if (pointer_filter_verbose) {
-	fprintf(stderr,"*Wo3: %x %x %x\n", (unsigned int) pointer, 
-		(unsigned int) start_addr, *start_addr);
-      }
-      return 0;
 
-      /* only pointed to by function pointers? */
-    case type_ClosureHeader:
-    case type_FuncallableInstanceHeader:
-    case type_ByteCodeFunction:
-    case type_ByteCodeClosure:
-      if (pointer_filter_verbose) {
-	fprintf(stderr,"*Wo4: %x %x %x\n", (unsigned int) pointer, 
-		(unsigned int) start_addr, *start_addr);
-      }
-      return 0;
+    /* Check that the object pointed to is consistent with the pointer
+     * low tag. */
+    switch (LowtagOf((lispobj)pointer)) {
+    case type_FunctionPointer:
+	/* Start_addr should be the enclosing code object, or a closure
+	 * header. */
+	switch (TypeOf(*start_addr)) {
+	case type_CodeHeader:
+	    /* This case is probably caught above. */
+	    break;
+	case type_ClosureHeader:
+	case type_FuncallableInstanceHeader:
+	case type_ByteCodeFunction:
+	case type_ByteCodeClosure:
+	    if ((int)pointer != ((int)start_addr+type_FunctionPointer)) {
+		if (pointer_filter_verbose) {
+		    fprintf(stderr,"*Wf2: %x %x %x\n", (unsigned int) pointer, 
+			    (unsigned int) start_addr, *start_addr);
+		}
+		return 0;
+	    }
+	    break;
+	default:
+	    if (pointer_filter_verbose) {
+		fprintf(stderr,"*Wf3: %x %x %x\n", (unsigned int) pointer, 
+			(unsigned int) start_addr, *start_addr);
+	    }
+	    return 0;
+	}
+	break;
+    case type_ListPointer:
+	if ((int)pointer != ((int)start_addr+type_ListPointer)) {
+	    if (pointer_filter_verbose)
+		fprintf(stderr,"*Wl1: %x %x %x\n", (unsigned int) pointer, 
+			(unsigned int) start_addr, *start_addr);
+	    return 0;
+	}
+	/* Is it plausible cons? */
+	if((Pointerp(start_addr[0])
+	    || ((start_addr[0] & 3) == 0) /* fixnum */
+	    || (TypeOf(start_addr[0]) == type_BaseChar)
+	    || (TypeOf(start_addr[0]) == type_UnboundMarker))
+	   && (Pointerp(start_addr[1])
+	       || ((start_addr[1] & 3) == 0) /* fixnum */
+	       || (TypeOf(start_addr[1]) == type_BaseChar)
+	       || (TypeOf(start_addr[1]) == type_UnboundMarker))) {
+	    break;
+	} else {
+	    if (pointer_filter_verbose) {
+		fprintf(stderr,"*Wl2: %x %x %x\n", (unsigned int) pointer, 
+			(unsigned int) start_addr, *start_addr);
+	    }
+	    return 0;
+	}
+    case type_InstancePointer:
+	if ((int)pointer != ((int)start_addr+type_InstancePointer)) {
+	    if (pointer_filter_verbose) {
+		fprintf(stderr,"*Wi1: %x %x %x\n", (unsigned int) pointer, 
+			(unsigned int) start_addr, *start_addr);
+	    }
+	    return 0;
+	}
+	if (TypeOf(start_addr[0]) != type_InstanceHeader) {
+	    if (pointer_filter_verbose) {
+		fprintf(stderr,"*Wi2: %x %x %x\n", (unsigned int) pointer, 
+			(unsigned int) start_addr, *start_addr);
+	    }
+	    return 0;
+	}
+	break;
+    case type_OtherPointer:
+	if ((int)pointer != ((int)start_addr+type_OtherPointer)) {
+	    if (pointer_filter_verbose) {
+		fprintf(stderr,"*Wo1: %x %x %x\n", (unsigned int) pointer, 
+			(unsigned int) start_addr, *start_addr);
+	    }
+	    return 0;
+	}
+	/* Is it plausible?  Not a cons. X should check the headers. */
+	if(Pointerp(start_addr[0]) || ((start_addr[0] & 3) == 0)) {
+	    if (pointer_filter_verbose) {
+		fprintf(stderr,"*Wo2: %x %x %x\n", (unsigned int) pointer, 
+			(unsigned int) start_addr, *start_addr);
+	    }
+	    return 0;
+	}
+	switch (TypeOf(start_addr[0])) {
+	case type_UnboundMarker:
+	case type_BaseChar:
+	    if (pointer_filter_verbose) {
+		fprintf(stderr,"*Wo3: %x %x %x\n", (unsigned int) pointer, 
+			(unsigned int) start_addr, *start_addr);
+	    }
+	    return 0;
 
-    case type_InstanceHeader:
-      if (pointer_filter_verbose) {
-	fprintf(stderr,"*Wo5: %x %x %x\n", (unsigned int) pointer, 
-		(unsigned int) start_addr, *start_addr);
-      }
-      return 0;
+	    /* only pointed to by function pointers? */
+	case type_ClosureHeader:
+	case type_FuncallableInstanceHeader:
+	case type_ByteCodeFunction:
+	case type_ByteCodeClosure:
+	    if (pointer_filter_verbose) {
+		fprintf(stderr,"*Wo4: %x %x %x\n", (unsigned int) pointer, 
+			(unsigned int) start_addr, *start_addr);
+	    }
+	    return 0;
 
-      /* the valid other immediate pointer objects */
-    case type_SimpleVector:
-    case type_Ratio:
-    case type_Complex:
+	case type_InstanceHeader:
+	    if (pointer_filter_verbose) {
+		fprintf(stderr,"*Wo5: %x %x %x\n", (unsigned int) pointer, 
+			(unsigned int) start_addr, *start_addr);
+	    }
+	    return 0;
+
+	    /* the valid other immediate pointer objects */
+	case type_SimpleVector:
+	case type_Ratio:
+	case type_Complex:
 #ifdef type_ComplexSingleFloat
-    case type_ComplexSingleFloat:
+	case type_ComplexSingleFloat:
 #endif
 #ifdef type_ComplexDoubleFloat
-    case type_ComplexDoubleFloat:
+	case type_ComplexDoubleFloat:
 #endif
 #ifdef type_ComplexLongFloat
-    case type_ComplexLongFloat:
+	case type_ComplexLongFloat:
 #endif
-    case type_SimpleArray:
-    case type_ComplexString:
-    case type_ComplexBitVector:
-    case type_ComplexVector:
-    case type_ComplexArray:
-    case type_ValueCellHeader:
-    case type_SymbolHeader:
-    case type_Fdefn:
-    case type_CodeHeader:
-    case type_Bignum:
-    case type_SingleFloat:
-    case type_DoubleFloat:
+	case type_SimpleArray:
+	case type_ComplexString:
+	case type_ComplexBitVector:
+	case type_ComplexVector:
+	case type_ComplexArray:
+	case type_ValueCellHeader:
+	case type_SymbolHeader:
+	case type_Fdefn:
+	case type_CodeHeader:
+	case type_Bignum:
+	case type_SingleFloat:
+	case type_DoubleFloat:
 #ifdef type_LongFloat
-    case type_LongFloat:
+	case type_LongFloat:
 #endif
-    case type_SimpleString:
-    case type_SimpleBitVector:
-    case type_SimpleArrayUnsignedByte2:
-    case type_SimpleArrayUnsignedByte4:
-    case type_SimpleArrayUnsignedByte8:
-    case type_SimpleArrayUnsignedByte16:
-    case type_SimpleArrayUnsignedByte32:
+	case type_SimpleString:
+	case type_SimpleBitVector:
+	case type_SimpleArrayUnsignedByte2:
+	case type_SimpleArrayUnsignedByte4:
+	case type_SimpleArrayUnsignedByte8:
+	case type_SimpleArrayUnsignedByte16:
+	case type_SimpleArrayUnsignedByte32:
 #ifdef type_SimpleArraySignedByte8
-    case type_SimpleArraySignedByte8:
+	case type_SimpleArraySignedByte8:
 #endif
 #ifdef type_SimpleArraySignedByte16
-    case type_SimpleArraySignedByte16:
+	case type_SimpleArraySignedByte16:
 #endif
 #ifdef type_SimpleArraySignedByte30
-    case type_SimpleArraySignedByte30:
+	case type_SimpleArraySignedByte30:
 #endif
 #ifdef type_SimpleArraySignedByte32
-    case type_SimpleArraySignedByte32:
+	case type_SimpleArraySignedByte32:
 #endif
-    case type_SimpleArraySingleFloat:
-    case type_SimpleArrayDoubleFloat:
+	case type_SimpleArraySingleFloat:
+	case type_SimpleArrayDoubleFloat:
 #ifdef type_SimpleArrayLongFloat
-    case type_SimpleArrayLongFloat:
+	case type_SimpleArrayLongFloat:
 #endif
 #ifdef type_SimpleArrayComplexSingleFloat
-    case type_SimpleArrayComplexSingleFloat:
+	case type_SimpleArrayComplexSingleFloat:
 #endif
 #ifdef type_SimpleArrayComplexDoubleFloat
-    case type_SimpleArrayComplexDoubleFloat:
+	case type_SimpleArrayComplexDoubleFloat:
 #endif
 #ifdef type_SimpleArrayComplexLongFloat
-    case type_SimpleArrayComplexLongFloat:
+	case type_SimpleArrayComplexLongFloat:
 #endif
-    case type_Sap:
-    case type_WeakPointer:
-      break;
+	case type_Sap:
+	case type_WeakPointer:
+	    break;
 
+	default:
+	    if (pointer_filter_verbose) {
+		fprintf(stderr,"*Wo6: %x %x %x\n", (unsigned int) pointer, 
+			(unsigned int) start_addr, *start_addr);
+	    }
+	    return 0;
+	}
+	break;
     default:
-      if (pointer_filter_verbose) {
-	fprintf(stderr,"*Wo6: %x %x %x\n", (unsigned int) pointer, 
-		(unsigned int) start_addr, *start_addr);
-      }
-      return 0;
+	if (pointer_filter_verbose) {
+	    fprintf(stderr,"*W?: %x %x %x\n", (unsigned int) pointer, 
+		    (unsigned int) start_addr, *start_addr);
+	}
+	return 0;
     }
-    break;
-  default:
-    if (pointer_filter_verbose) {
-      fprintf(stderr,"*W?: %x %x %x\n", (unsigned int) pointer, 
-	      (unsigned int) start_addr, *start_addr);
-    }
-    return 0;
-  }
 
-  /* looks good */
-  return 1;
+    /* looks good */
+    return 1;
 }
 
 #define MAX_STACK_POINTERS 256
@@ -444,60 +446,61 @@ unsigned int num_valid_stack_ra_locations;
 static void
 setup_i386_stack_scav(lispobj *lowaddr, lispobj *base)
 {
-  lispobj *sp = lowaddr;
-  num_valid_stack_locations = 0;
-  num_valid_stack_ra_locations = 0;
-  for (sp = lowaddr; sp < base; sp++) {
-    lispobj thing = *sp;
-    /* Find the object start address */
-    lispobj *start_addr = search_dynamic_space((void *)thing);
-    if (start_addr) {
-      /* We need to allow raw pointers into Code objects for return
-       * addresses. This will also pick up pointers to functions in code
-       * objects. */
-      if (TypeOf(*start_addr) == type_CodeHeader) {
-	gc_assert(num_valid_stack_ra_locations < MAX_STACK_RETURN_ADDRESSES);
-	valid_stack_ra_locations[num_valid_stack_ra_locations] = sp;
-	valid_stack_ra_code_objects[num_valid_stack_ra_locations++] =
-	  (lispobj *)((int)start_addr + type_OtherPointer);
-      } else {
-	if (valid_dynamic_space_pointer((void *)thing, start_addr)) {
-	  gc_assert(num_valid_stack_locations < MAX_STACK_POINTERS);
-	  valid_stack_locations[num_valid_stack_locations++] = sp;
+    lispobj *sp = lowaddr;
+    num_valid_stack_locations = 0;
+    num_valid_stack_ra_locations = 0;
+    for (sp = lowaddr; sp < base; sp++) {
+	lispobj thing = *sp;
+	/* Find the object start address */
+	lispobj *start_addr = search_dynamic_space((void *)thing);
+	if (start_addr) {
+	    /* We need to allow raw pointers into Code objects for
+	     * return addresses. This will also pick up pointers to
+	     * functions in code objects. */
+	    if (TypeOf(*start_addr) == type_CodeHeader) {
+		gc_assert(num_valid_stack_ra_locations <
+			  MAX_STACK_RETURN_ADDRESSES);
+		valid_stack_ra_locations[num_valid_stack_ra_locations] = sp;
+		valid_stack_ra_code_objects[num_valid_stack_ra_locations++] =
+		    (lispobj *)((int)start_addr + type_OtherPointer);
+	    } else {
+		if (valid_dynamic_space_pointer((void *)thing, start_addr)) {
+		    gc_assert(num_valid_stack_locations < MAX_STACK_POINTERS);
+		    valid_stack_locations[num_valid_stack_locations++] = sp;
+		}
+	    }
 	}
-      }
     }
-  }
-  if (pointer_filter_verbose) {
-    fprintf(stderr, "number of valid stack pointers = %d\n",
-	    num_valid_stack_locations);
-    fprintf(stderr, "number of stack return addresses = %d\n",
-	    num_valid_stack_ra_locations);
-  }
+    if (pointer_filter_verbose) {
+	fprintf(stderr, "number of valid stack pointers = %d\n",
+		num_valid_stack_locations);
+	fprintf(stderr, "number of stack return addresses = %d\n",
+		num_valid_stack_ra_locations);
+    }
 }
 
 static void
 pscav_i386_stack(void)
 {
-  int i;
+    int i;
 
-  for (i = 0; i < num_valid_stack_locations; i++)
-    pscav(valid_stack_locations[i], 1, 0);
+    for (i = 0; i < num_valid_stack_locations; i++)
+	pscav(valid_stack_locations[i], 1, 0);
 
-  for (i = 0; i < num_valid_stack_ra_locations; i++) {
-    lispobj code_obj = (lispobj)valid_stack_ra_code_objects[i];
-    pscav(&code_obj, 1, 0);
-    if (pointer_filter_verbose) {
-      fprintf(stderr,"*C moved RA %x to %x; for code object %x to %x\n",
-	      *valid_stack_ra_locations[i],
-	      (int)(*valid_stack_ra_locations[i])
-	      - ((int)valid_stack_ra_code_objects[i] - (int)code_obj),
-	      (unsigned int) valid_stack_ra_code_objects[i], code_obj);
+    for (i = 0; i < num_valid_stack_ra_locations; i++) {
+	lispobj code_obj = (lispobj)valid_stack_ra_code_objects[i];
+	pscav(&code_obj, 1, 0);
+	if (pointer_filter_verbose) {
+	    fprintf(stderr,"*C moved RA %x to %x; for code object %x to %x\n",
+		    *valid_stack_ra_locations[i],
+		    (int)(*valid_stack_ra_locations[i])
+		    - ((int)valid_stack_ra_code_objects[i] - (int)code_obj),
+		    (unsigned int) valid_stack_ra_code_objects[i], code_obj);
+	}
+	*valid_stack_ra_locations[i] =
+	    ((int)(*valid_stack_ra_locations[i])
+	     - ((int)valid_stack_ra_code_objects[i] - (int)code_obj));
     }
-    *valid_stack_ra_locations[i] =
-      ((int)(*valid_stack_ra_locations[i])
-       - ((int)valid_stack_ra_code_objects[i] - (int)code_obj));
-  }
 }
 #endif
 #endif
@@ -532,7 +535,8 @@ pscav_later(lispobj *where, int count)
     }
 }
 
-static lispobj ptrans_boxed(lispobj thing, lispobj header, boolean constant)
+static lispobj
+ptrans_boxed(lispobj thing, lispobj header, boolean constant)
 {
     int nwords;
     lispobj result, *new, *old;
@@ -564,9 +568,10 @@ static lispobj ptrans_boxed(lispobj thing, lispobj header, boolean constant)
 }
 
 /* We need to look at the layout to see whether it is a pure structure
- * class, and only then can we transport as constant. If it is pure, we can
- * ALWAYS transport as a constant. */
-static lispobj ptrans_instance(lispobj thing, lispobj header, boolean constant)
+ * class, and only then can we transport as constant. If it is pure,
+ * we can ALWAYS transport as a constant. */
+static lispobj
+ptrans_instance(lispobj thing, lispobj header, boolean constant)
 {
     lispobj layout = ((struct instance *)PTR(thing))->slots[0];
     lispobj pure = ((struct instance *)PTR(layout))->slots[15];
@@ -578,10 +583,11 @@ static lispobj ptrans_instance(lispobj thing, lispobj header, boolean constant)
 	return (ptrans_boxed(thing, header, 0));
     case 0:
 	{
-	    /* Substructure: special case for the COMPACT-INFO-ENVs, where
-	     * the instance may have a point to the dynamic space placed
-	     * into it (e.g. the cache-name slot), but the lists and arrays
-	     * at the time of a purify can be moved to the RO space. */
+	    /* Substructure: special case for the COMPACT-INFO-ENVs,
+	     * where the instance may have a point to the dynamic
+	     * space placed into it (e.g. the cache-name slot), but
+	     * the lists and arrays at the time of a purify can be
+	     * moved to the RO space. */
 	    int nwords;
 	    lispobj result, *new, *old;
 
@@ -610,7 +616,8 @@ static lispobj ptrans_instance(lispobj thing, lispobj header, boolean constant)
     }
 }
 
-static lispobj ptrans_fdefn(lispobj thing, lispobj header)
+static lispobj
+ptrans_fdefn(lispobj thing, lispobj header)
 {
     int nwords;
     lispobj result, *new, *old, oldfn;
@@ -640,7 +647,8 @@ static lispobj ptrans_fdefn(lispobj thing, lispobj header)
     return result;
 }
 
-static lispobj ptrans_unboxed(lispobj thing, lispobj header)
+static lispobj
+ptrans_unboxed(lispobj thing, lispobj header)
 {
     int nwords;
     lispobj result, *new, *old;
@@ -662,8 +670,9 @@ static lispobj ptrans_unboxed(lispobj thing, lispobj header)
     return result;
 }
 
-static lispobj ptrans_vector(lispobj thing, int bits, int extra,
-			     boolean boxed, boolean constant)
+static lispobj
+ptrans_vector(lispobj thing, int bits, int extra,
+	      boolean boxed, boolean constant)
 {
     struct vector *vector;
     int nwords;
@@ -777,7 +786,8 @@ apply_code_fixups_during_purify(struct code *old_code, struct code *new_code)
 }
 #endif
 
-static lispobj ptrans_code(lispobj thing)
+static lispobj
+ptrans_code(lispobj thing)
 {
     struct code *code, *new;
     int nwords;
@@ -846,7 +856,8 @@ static lispobj ptrans_code(lispobj thing)
     return result;
 }
 
-static lispobj ptrans_func(lispobj thing, lispobj header)
+static lispobj
+ptrans_func(lispobj thing, lispobj header)
 {
     int nwords;
     lispobj code, *new, *old, result;
@@ -908,7 +919,8 @@ static lispobj ptrans_func(lispobj thing, lispobj header)
     }
 }
 
-static lispobj ptrans_returnpc(lispobj thing, lispobj header)
+static lispobj
+ptrans_returnpc(lispobj thing, lispobj header)
 {
     lispobj code, new;
 
@@ -926,7 +938,8 @@ static lispobj ptrans_returnpc(lispobj thing, lispobj header)
 
 #define WORDS_PER_CONS CEILING(sizeof(struct cons) / sizeof(lispobj), 2)
 
-static lispobj ptrans_list(lispobj thing, boolean constant)
+static lispobj
+ptrans_list(lispobj thing, boolean constant)
 {
     struct cons *old, *new, *orig;
     int length;
@@ -968,7 +981,8 @@ static lispobj ptrans_list(lispobj thing, boolean constant)
     return ((lispobj)orig) | type_ListPointer;
 }
 
-static lispobj ptrans_otherptr(lispobj thing, lispobj header, boolean constant)
+static lispobj
+ptrans_otherptr(lispobj thing, lispobj header, boolean constant)
 {
     switch (TypeOf(header)) {
       case type_Bignum:
@@ -1092,7 +1106,8 @@ static lispobj ptrans_otherptr(lispobj thing, lispobj header, boolean constant)
     }
 }
 
-static int pscav_fdefn(struct fdefn *fdefn)
+static int
+pscav_fdefn(struct fdefn *fdefn)
 {
     boolean fix_func;
 
@@ -1156,7 +1171,8 @@ pscav_code(struct code*code)
 }
 #endif
 
-static lispobj *pscav(lispobj *addr, int nwords, boolean constant)
+static lispobj *
+pscav(lispobj *addr, int nwords, boolean constant)
 {
     lispobj thing, *thingp, header;
     int count = 0; /* (0 = dummy init value to stop GCC warning) */
@@ -1377,7 +1393,8 @@ static lispobj *pscav(lispobj *addr, int nwords, boolean constant)
     return addr;
 }
 
-int purify(lispobj static_roots, lispobj read_only_roots)
+int
+purify(lispobj static_roots, lispobj read_only_roots)
 {
     lispobj *clean;
     int count, i;

@@ -1745,68 +1745,55 @@ copy_large_unboxed_object(lispobj object, int nwords)
  * scavenging
  */
 
-#define DIRECT_SCAV 0
-
-/* FIXME: Most calls end up going to a little trouble to compute an
- * 'nwords' value. The system might be a little simpler if this
- * function used an 'end' parameter instead. */
+/* FIXME: Most calls end up going to some trouble to compute an
+ * 'n_words' value for this function. The system might be a little
+ * simpler if this function used an 'end' parameter instead. */
 static void
-scavenge(lispobj *start, long nwords)
+scavenge(lispobj *start, long n_words)
 {
-    while (nwords > 0) {
-	lispobj object;
-#if DIRECT_SCAV
-	int type;
-#endif
-	int words_scavenged;
+    lispobj *end = start + n_words;
+    lispobj *object_ptr;
+    int n_words_scavenged;
+    
+    for (object_ptr = start;
+	 object_ptr < end;
+	 object_ptr += n_words_scavenged) {
 
-	object = *start;
+	lispobj object = *object_ptr;
 	
-/* 	FSHOW((stderr, "Scavenge: %p, %ld\n", start, nwords)); */
-
 	gc_assert(object != 0x01); /* not a forwarding pointer */
 
-#if DIRECT_SCAV
-	type = TypeOf(object);
-	words_scavenged = (scavtab[type])(start, object);
-#else
 	if (Pointerp(object)) {
-	    /* It's a pointer. */
 	    if (from_space_p(object)) {
-		/* It currently points to old space. Check for a forwarding
-		 * pointer. */
+		/* It currently points to old space. Check for a
+		 * forwarding pointer. */
 		lispobj *ptr = (lispobj *)PTR(object);
 		lispobj first_word = *ptr;
-	
 		if (first_word == 0x01) {
 		    /* Yes, there's a forwarding pointer. */
-		    *start = ptr[1];
-		    words_scavenged = 1;
-		}
-		else
+		    *object_ptr = ptr[1];
+		    n_words_scavenged = 1;
+		} else {
 		    /* Scavenge that pointer. */
-		    words_scavenged = (scavtab[TypeOf(object)])(start, object);
+		    n_words_scavenged =
+			(scavtab[TypeOf(object)])(object_ptr, object);
+		}
 	    } else {
-		/* It points somewhere other than oldspace. Leave it alone. */
-		words_scavenged = 1;
+		/* It points somewhere other than oldspace. Leave it
+		 * alone. */
+		n_words_scavenged = 1;
 	    }
+	} else if ((object & 3) == 0) {
+	    /* It's a fixnum: really easy.. */
+	    n_words_scavenged = 1;
 	} else {
-	    if ((object & 3) == 0) {
-		/* It's a fixnum: really easy.. */
-		words_scavenged = 1;
-	    } else {
-		/* It's some sort of header object or another. */
-		words_scavenged = (scavtab[TypeOf(object)])(start, object);
-	    }
+	    /* It's some sort of header object or another. */
+	    n_words_scavenged =
+		(scavtab[TypeOf(object)])(object_ptr, object);
 	}
-#endif
-
-	start += words_scavenged;
-	nwords -= words_scavenged;
     }
-    gc_assert(nwords == 0);
+    gc_assert(object_ptr == end);
 }
-
 
 /*
  * code and code-related objects
@@ -1817,61 +1804,6 @@ scavenge(lispobj *start, long nwords)
 static lispobj trans_function_header(lispobj object);
 static lispobj trans_boxed(lispobj object);
 
-#if DIRECT_SCAV
-static int
-scav_function_pointer(lispobj *where, lispobj object)
-{
-    gc_assert(Pointerp(object));
-
-    if (from_space_p(object)) {
-	lispobj first, *first_pointer;
-
-	/* object is a pointer into from space. Check to see whether
-	 * it has been forwarded. */
-	first_pointer = (lispobj *) PTR(object);
-	first = *first_pointer;
-
-	if (first == 0x01) {
-	    /* Forwarded */
-	    *where = first_pointer[1];
-	    return 1;
-	}
-	else {
-	    int type;
-	    lispobj copy;
-
-	    /* must transport object -- object may point to either a
-	     * function header, a closure function header, or to a
-	     * closure header. */
-
-	    type = TypeOf(first);
-	    switch (type) {
-	    case type_FunctionHeader:
-	    case type_ClosureFunctionHeader:
-		copy = trans_function_header(object);
-		break;
-	    default:
-		copy = trans_boxed(object);
-		break;
-	    }
-
-	    if (copy != object) {
-		/* Set forwarding pointer. */
-		first_pointer[0] = 0x01;
-		first_pointer[1] = copy;
-	    }
-
-	    first = copy;
-	}
-
-	gc_assert(Pointerp(first));
-	gc_assert(!from_space_p(first));
-
-	*where = first;
-    }
-    return 1;
-}
-#else
 static int
 scav_function_pointer(lispobj *where, lispobj object)
 {
@@ -1909,7 +1841,6 @@ scav_function_pointer(lispobj *where, lispobj object)
 
     return 1;
 }
-#endif
 
 /* Scan a x86 compiled code object, looking for possible fixups that
  * have been missed after a move.
@@ -2288,34 +2219,36 @@ static int
 scav_code_header(lispobj *where, lispobj object)
 {
     struct code *code;
-    int nheader_words, ncode_words, nwords;
-    lispobj fheaderl;
-    struct function *fheaderp;
+    int n_header_words, n_code_words, n_words;
+    lispobj entry_point;	/* tagged pointer to entry point */
+    struct function *function_ptr; /* untagged pointer to entry point */
 
     code = (struct code *) where;
-    ncode_words = fixnum_value(code->code_size);
-    nheader_words = HeaderValue(object);
-    nwords = ncode_words + nheader_words;
-    nwords = CEILING(nwords, 2);
+    n_code_words = fixnum_value(code->code_size);
+    n_header_words = HeaderValue(object);
+    n_words = n_code_words + n_header_words;
+    n_words = CEILING(n_words, 2);
 
     /* Scavenge the boxed section of the code data block. */
-    scavenge(where + 1, nheader_words - 1);
+    scavenge(where + 1, n_header_words - 1);
 
     /* Scavenge the boxed section of each function object in the */
     /* code data block. */
-    fheaderl = code->entry_points;
-    while (fheaderl != NIL) {
-	fheaderp = (struct function *) PTR(fheaderl);
-	gc_assert(TypeOf(fheaderp->header) == type_FunctionHeader);
+    for (entry_point = code->entry_points;
+	 entry_point != NIL;
+	 entry_point = function_ptr->next) {
 
-	scavenge(&fheaderp->name, 1);
-	scavenge(&fheaderp->arglist, 1);
-	scavenge(&fheaderp->type, 1);
-		
-	fheaderl = fheaderp->next;
+	gc_assert(Pointerp(entry_point));
+
+	function_ptr = (struct function *) PTR(entry_point);
+	gc_assert(TypeOf(function_ptr->header) == type_FunctionHeader);
+
+	scavenge(&function_ptr->name, 1);
+	scavenge(&function_ptr->arglist, 1);
+	scavenge(&function_ptr->type, 1);
     }
 	
-    return nwords;
+    return n_words;
 }
 
 static lispobj
@@ -2422,33 +2355,6 @@ trans_function_header(lispobj object)
  * instances
  */
 
-#if DIRECT_SCAV
-static int
-scav_instance_pointer(lispobj *where, lispobj object)
-{
-    if (from_space_p(object)) {
-	lispobj first, *first_pointer;
-
-	/* Object is a pointer into from space. Check to see */
-	/* whether it has been forwarded. */
-	first_pointer = (lispobj *) PTR(object);
-	first = *first_pointer;
-
-	if (first == 0x01) {
-	    /* forwarded */
-	    first = first_pointer[1];
-	} else {
-	    first = trans_boxed(object);
-	    gc_assert(first != object);
-	    /* Set forwarding pointer. */
-	    first_pointer[0] = 0x01;
-	    first_pointer[1] = first;
-	}
-	*where = first;
-    }
-    return 1;
-}
-#else
 static int
 scav_instance_pointer(lispobj *where, lispobj object)
 {
@@ -2468,7 +2374,6 @@ scav_instance_pointer(lispobj *where, lispobj object)
 
     return 1;
 }
-#endif
 
 /*
  * lists and conses
@@ -2476,42 +2381,6 @@ scav_instance_pointer(lispobj *where, lispobj object)
 
 static lispobj trans_list(lispobj object);
 
-#if DIRECT_SCAV
-static int
-scav_list_pointer(lispobj *where, lispobj object)
-{
-    /* KLUDGE: There's lots of cut-and-paste duplication between this
-     * and scav_instance_pointer(..), scav_other_pointer(..), and
-     * perhaps other functions too. -- WHN 20000620 */
-
-    gc_assert(Pointerp(object));
-
-    if (from_space_p(object)) {
-	lispobj first, *first_pointer;
-
-	/* Object is a pointer into from space. Check to see whether it has
-	 * been forwarded. */
-	first_pointer = (lispobj *) PTR(object);
-	first = *first_pointer;
-
-	if (first == 0x01) {
-	    /* forwarded */
-	    first = first_pointer[1];
-	} else {
-	    first = trans_list(object);
-
-	    /* Set forwarding pointer */
-	    first_pointer[0] = 0x01;
-	    first_pointer[1] = first;
-	}
-
-	gc_assert(Pointerp(first));
-	gc_assert(!from_space_p(first));
-	*where = first;
-    }
-    return 1;
-}
-#else
 static int
 scav_list_pointer(lispobj *where, lispobj object)
 {
@@ -2535,7 +2404,6 @@ scav_list_pointer(lispobj *where, lispobj object)
     *where = first;
     return 1;
 }
-#endif
 
 static lispobj
 trans_list(lispobj object)
@@ -2601,41 +2469,6 @@ trans_list(lispobj object)
  * scavenging and transporting other pointers
  */
 
-#if DIRECT_SCAV
-static int
-scav_other_pointer(lispobj *where, lispobj object)
-{
-    gc_assert(Pointerp(object));
-
-    if (from_space_p(object)) {
-	lispobj first, *first_pointer;
-
-	/* Object is a pointer into from space. Check to see */
-	/* whether it has been forwarded. */
-	first_pointer = (lispobj *) PTR(object);
-	first = *first_pointer;
-
-	if (first == 0x01) {
-	    /* Forwarded. */
-	    first = first_pointer[1];
-	    *where = first;
-	} else {
-	    first = (transother[TypeOf(first)])(object);
-
-	    if (first != object) {
-		/* Set forwarding pointer */
-		first_pointer[0] = 0x01;
-		first_pointer[1] = first;
-		*where = first;
-	    }
-	}
-
-	gc_assert(Pointerp(first));
-	gc_assert(!from_space_p(first));
-    }
-    return 1;
-}
-#else
 static int
 scav_other_pointer(lispobj *where, lispobj object)
 {
@@ -2660,8 +2493,6 @@ scav_other_pointer(lispobj *where, lispobj object)
 
     return 1;
 }
-#endif
-
 
 /*
  * immediate, boxed, and unboxed objects
@@ -4888,15 +4719,15 @@ scavenge_newspace_generation_one_scan(int generation)
 
 	    /* The scavenge will start at the first_object_offset of page i.
 	     *
-	     * We need to find the full extent of this contiguous block in case
-	     * objects span pages.
+	     * We need to find the full extent of this contiguous
+	     * block in case objects span pages.
 	     *
-	     * Now work forward until the end of this contiguous area is
-	     * found. A small area is preferred as there is a better chance
-	     * of its pages being write-protected. */
+	     * Now work forward until the end of this contiguous area
+	     * is found. A small area is preferred as there is a
+	     * better chance of its pages being write-protected. */
 	    for (last_page = i; ;last_page++) {
-		/* Check whether this is the last page in this contiguous
-		 * block */
+		/* Check whether this is the last page in this
+		 * contiguous block */
 		if ((page_table[last_page].bytes_used < 4096)
 		    /* Or it is 4096 and is the last in the block */
 		    || (page_table[last_page+1].allocated != BOXED_PAGE)
@@ -4906,9 +4737,9 @@ scavenge_newspace_generation_one_scan(int generation)
 		    break;
 	    }
 
-	    /* Do a limited check for write_protected pages. If all pages
-	     * are write_protected then no need to scavenge. Except if the
-	     * pages are marked dont_move. */
+	    /* Do a limited check for write-protected pages. If all
+	     * pages are write-protected then no need to scavenge,
+	     * except if the pages are marked dont_move. */
 	    {
 		int j, all_wp = 1;
 		for (j = i; j <= last_page; j++)
@@ -4917,60 +4748,36 @@ scavenge_newspace_generation_one_scan(int generation)
 			all_wp = 0;
 			break;
 		    }
-#if !SC_NS_GEN_CK
-		if (all_wp == 0)
-#endif
+
+		if (!all_wp) {
+		    int size;
+
+		    /* Calculate the size. */
+		    if (last_page == i)
+			size = (page_table[last_page].bytes_used
+				- page_table[i].first_object_offset)/4;
+		    else
+			size = (page_table[last_page].bytes_used
+				+ (last_page-i)*4096
+				- page_table[i].first_object_offset)/4;
+		    
 		    {
-			int size;
+			new_areas_ignore_page = last_page;
+			
+			scavenge(page_address(i) +
+				 page_table[i].first_object_offset,
+				 size);
 
-			/* Calculate the size. */
-			if (last_page == i)
-			    size = (page_table[last_page].bytes_used
-				    - page_table[i].first_object_offset)/4;
-			else
-			    size = (page_table[last_page].bytes_used
-				    + (last_page-i)*4096
-				    - page_table[i].first_object_offset)/4;
-
-			{
-#if SC_NS_GEN_CK
-			    int a1 = bytes_allocated;
-#endif
-			    /* FSHOW((stderr,
-				   "/scavenge(%x,%d)\n",
-				   page_address(i)
-				   + page_table[i].first_object_offset,
-				   size)); */
-
-			    new_areas_ignore_page = last_page;
-
-			    scavenge(page_address(i)+page_table[i].first_object_offset,size);
-
-#if SC_NS_GEN_CK
-			    /* Flush the alloc regions updating the tables. */
-			    gc_alloc_update_page_tables(0, &boxed_region);
-			    gc_alloc_update_page_tables(1, &unboxed_region);
-
-			    if ((all_wp != 0)  && (a1 != bytes_allocated)) {
-				FSHOW((stderr,
-				       "alloc'ed over %d to %d\n",
-				       i, last_page));
-				FSHOW((stderr,
-				       "/page: bytes_used=%d first_object_offset=%d dont_move=%d wp=%d wpc=%d\n",
-					page_table[i].bytes_used,
-					page_table[i].first_object_offset,
-					page_table[i].dont_move,
-					page_table[i].write_protected,
-					page_table[i].write_protected_cleared));
-			    }
-#endif
-			}
 		    }
+		}
 	    }
 
 	    i = last_page;
 	}
     }
+    FSHOW((stderr,
+	   "/done with one full scan of newspace generation %d\n",
+	   generation));
 }
 
 /* Do a complete scavenge of the newspace generation. */
@@ -4980,19 +4787,12 @@ scavenge_newspace_generation(int generation)
     int i;
 
     /* the new_areas array currently being written to by gc_alloc */
-    struct new_area  (*current_new_areas)[] = &new_areas_1;
+    struct new_area (*current_new_areas)[] = &new_areas_1;
     int current_new_areas_index;
 
     /* the new_areas created but the previous scavenge cycle */
-    struct new_area  (*previous_new_areas)[] = NULL;
+    struct new_area (*previous_new_areas)[] = NULL;
     int previous_new_areas_index;
-
-#define SC_NS_GEN_CK 0
-#if SC_NS_GEN_CK
-    /* Clear the write_protected_cleared flags on all pages. */
-    for (i = 0; i < NUM_PAGES; i++)
-	page_table[i].write_protected_cleared = 0;
-#endif
 
     /* Flush the current regions updating the tables. */
     gc_alloc_update_page_tables(0, &boxed_region);
@@ -5044,6 +4844,7 @@ scavenge_newspace_generation(int generation)
 
 	/* Check whether previous_new_areas had overflowed. */
 	if (previous_new_areas_index >= NUM_NEW_AREAS) {
+
 	    /* New areas of objects allocated have been lost so need to do a
 	     * full scan to be sure! If this becomes a problem try
 	     * increasing NUM_NEW_AREAS. */
@@ -5062,20 +4863,18 @@ scavenge_newspace_generation(int generation)
 	    /* Flush the current regions updating the tables. */
 	    gc_alloc_update_page_tables(0, &boxed_region);
 	    gc_alloc_update_page_tables(1, &unboxed_region);
+
 	} else {
+
 	    /* Work through previous_new_areas. */
 	    for (i = 0; i < previous_new_areas_index; i++) {
+		/* FIXME: All these bare *4 and /4 should be something
+		 * like BYTES_PER_WORD or WBYTES. */
 		int page = (*previous_new_areas)[i].page;
 		int offset = (*previous_new_areas)[i].offset;
 		int size = (*previous_new_areas)[i].size / 4;
 		gc_assert((*previous_new_areas)[i].size % 4 == 0);
-	
-		/* FIXME: All these bare *4 and /4 should be something
-		 * like BYTES_PER_WORD or WBYTES. */
 
-		/*FSHOW((stderr,
-		         "/S page %d offset %d size %d\n",
-		         page, offset, size*4));*/
 		scavenge(page_address(page)+offset, size);
 	    }
 
@@ -5868,7 +5667,7 @@ collect_garbage(unsigned last_gen)
 
 	if (gencgc_verbose > 1) {
 	    FSHOW((stderr,
-		   "Starting GC of generation %d with raise=%d alloc=%d trig=%d GCs=%d\n",
+		   "starting GC of generation %d with raise=%d alloc=%d trig=%d GCs=%d\n",
 		   gen,
 		   raise,
 		   generations[gen].bytes_allocated,
@@ -5876,8 +5675,8 @@ collect_garbage(unsigned last_gen)
 		   generations[gen].num_gc));
 	}
 
-	/* If an older generation is being filled then update its memory
-	 * age. */
+	/* If an older generation is being filled, then update its
+	 * memory age. */
 	if (raise == 1) {
 	    generations[gen+1].cum_sum_bytes_allocated +=
 		generations[gen+1].bytes_allocated;
@@ -6339,6 +6138,8 @@ component_ptr_from_pc(lispobj *pc)
  * catch GENCGC-related write-protect violations
  */
 
+void unhandled_sigmemoryfault(void);
+
 /* Depending on which OS we're running under, different signals might
  * be raised for a violation of write protection in the heap. This
  * function factors out the common generational GC magic which needs
@@ -6361,6 +6162,10 @@ gencgc_handle_wp_violation(void* fault_addr)
     /* Check whether the fault is within the dynamic space. */
     if (page_index == (-1)) {
 
+	/* It can be helpful to be able to put a breakpoint on this
+	 * case to help diagnose low-level problems. */
+	unhandled_sigmemoryfault();
+
 	/* not within the dynamic space -- not our responsibility */
 	return 0;
 
@@ -6381,3 +6186,11 @@ gencgc_handle_wp_violation(void* fault_addr)
 	return 1;
     }
 }
+
+/* This is to be called when we catch a SIGSEGV/SIGBUS, determine that
+ * it's not just a case of the program hitting the write barrier, and
+ * are about to let Lisp deal with it. It's basically just a
+ * convenient place to set a gdb breakpoint. */
+void
+unhandled_sigmemoryfault()
+{}
