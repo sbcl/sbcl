@@ -1182,15 +1182,19 @@
 
 (defmacro mlookup (key info default &optional eq-p type)
   (unless (or (eq eq-p t) (null eq-p))
-    (error "Invalid eq-p argument"))
+    (bug "Invalid eq-p argument: ~S" eq-p))
   (ecase type
     (:simple
-     `(if (,(if eq-p 'eq 'eql) ,key (car ,info))
+     `(if (locally
+	    (declare (optimize (inhibit-warnings 3)))
+	    (,(if eq-p 'eq 'eql) ,key (car ,info)))
 	  (cdr ,info)
 	  ,default))
     (:assoc
      `(dolist (e ,info ,default)
-	(when (,(if eq-p 'eq 'eql) (car e) ,key)
+	(when (locally
+		(declare (optimize (inhibit-warnings 3)))
+		(,(if eq-p 'eq 'eql) (car e) ,key))
 	  (return (cdr e)))))
     (:hash-table
      `(gethash ,key ,info ,default))))
