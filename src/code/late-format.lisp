@@ -493,21 +493,23 @@
   (expand-format-integer 16 colonp atsignp params))
 
 (def-format-directive #\R (colonp atsignp params)
-  (if params
-      (expand-bind-defaults
-	  ((base 10) (mincol 0) (padchar #\space) (commachar #\,)
-	   (commainterval 3))
-	  params
-	`(format-print-integer stream ,(expand-next-arg) ,colonp ,atsignp
-			       ,base ,mincol
-			       ,padchar ,commachar ,commainterval))
-      (if atsignp
-	  (if colonp
-	      `(format-print-old-roman stream ,(expand-next-arg))
-	      `(format-print-roman stream ,(expand-next-arg)))
-	  (if colonp
-	      `(format-print-ordinal stream ,(expand-next-arg))
-	      `(format-print-cardinal stream ,(expand-next-arg))))))
+  (expand-bind-defaults
+      ((base nil) (mincol 0) (padchar #\space) (commachar #\,)
+       (commainterval 3))
+      params
+    (let ((n-arg (gensym))) 
+      `(let ((,n-arg ,(expand-next-arg)))
+         (if ,base
+             (format-print-integer stream ,n-arg ,colonp ,atsignp
+      	   	                   ,base ,mincol
+      		                   ,padchar ,commachar ,commainterval)
+             ,(if atsignp
+                  (if colonp
+                      `(format-print-old-roman stream ,n-arg)
+                      `(format-print-roman stream ,n-arg))
+                  (if colonp
+                      `(format-print-ordinal stream ,n-arg)
+	              `(format-print-cardinal stream ,n-arg))))))))
 
 ;;;; format directive for pluralization
 

@@ -309,5 +309,9 @@
                             (funcall (eval `(formatter ,format)) s arg))
                           result)))
 
+;;; NIL first parameter for ~R is equivalent to no parameter.
+(assert (string= (format nil "~VR" nil 5) "five"))
+(assert (string= (format nil (formatter "~VR") nil 6) "six"))
+
 ;;; success
 (quit :unix-status 104)

@@ -302,20 +302,21 @@
   (interpret-format-integer 16))
 
 (def-format-interpreter #\R (colonp atsignp params)
-  (if params
-      (interpret-bind-defaults
-	  ((base 10) (mincol 0) (padchar #\space) (commachar #\,)
-	   (commainterval 3))
-	  params
-	(format-print-integer stream (next-arg) colonp atsignp base mincol
-			      padchar commachar commainterval))
-      (if atsignp
-	  (if colonp
-	      (format-print-old-roman stream (next-arg))
-	      (format-print-roman stream (next-arg)))
-	  (if colonp
-	      (format-print-ordinal stream (next-arg))
-	      (format-print-cardinal stream (next-arg))))))
+  (interpret-bind-defaults
+      ((base nil) (mincol 0) (padchar #\space) (commachar #\,)
+       (commainterval 3))
+      params
+    (let ((arg (next-arg)))
+      (if base
+          (format-print-integer stream arg colonp atsignp base mincol
+                                padchar commachar commainterval)
+          (if atsignp
+              (if colonp
+                  (format-print-old-roman stream arg)
+                  (format-print-roman stream arg))
+              (if colonp
+                  (format-print-ordinal stream arg)
+                  (format-print-cardinal stream arg)))))))
 
 (defparameter *cardinal-ones*
   #(nil "one" "two" "three" "four" "five" "six" "seven" "eight" "nine"))

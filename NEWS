@@ -65,6 +65,7 @@ changes in sbcl-0.8.17 relative to sbcl-0.8.16:
        references to global functions.
     ** NIL parameter to the FORMAT directive ~^ means `unsupplied
        parameter'.
+    ** FORMAT ~R treats a nil value for its first parameter correctly.
 
 changes in sbcl-0.8.16 relative to sbcl-0.8.15:
   * enhancement: saving cores with foreign code loaded is now
