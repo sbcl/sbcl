@@ -46,8 +46,10 @@
 (defun lisp-for-c-symbol (s)
   (intern (substitute #\- #\_ (string-upcase s)) :sb-posix))
 
-(defmacro define-call-internally (lisp-name c-name return-type error-predicate &rest arguments)
-  (if (sb-sys:foreign-symbol-address-as-integer-or-nil c-name)
+(defmacro define-call-internally (lisp-name c-name return-type error-predicate
+				  &rest arguments)
+  (if (sb-sys:foreign-symbol-address-as-integer-or-nil
+       (sb-vm:extern-alien-name c-name))
       `(progn
 	(declaim (inline ,lisp-name))
 	(defun ,lisp-name ,(mapcar #'car arguments)
@@ -57,11 +59,16 @@
 		     (function ,return-type
 			       ,@(mapcar
 				  (lambda (x)
-				    (gethash (cadr x) *designator-types* (cadr x)))
+				    (gethash (cadr x)
+					     *designator-types*
+					     (cadr x)))
 				  arguments)))
 		    ,@(mapcar (lambda (x)
-				(if (nth-value 1 (gethash (cadr x) *designator-types*))
-				    `(,(intern (symbol-name (cadr x)) :sb-posix)
+				(if (nth-value 1
+					       (gethash (cadr x)
+							*designator-types*))
+				    `(,(intern (symbol-name (cadr x))
+					       :sb-posix)
 				      ,(car x))
 				    (car x)))
 			      arguments))))
@@ -72,7 +79,11 @@
   (let ((lisp-name (lisp-for-c-symbol name)))
     `(progn
        (export ',lisp-name :sb-posix)
-       (define-call-internally ,lisp-name ,name ,return-type ,error-predicate ,@arguments))))
+       (define-call-internally ,lisp-name
+	   ,name
+	 ,return-type
+	 ,error-predicate
+	 ,@arguments))))
 
 (defmacro define-entry-point (name arglist &body body)
   (let ((lisp-name (lisp-for-c-symbol name)))
