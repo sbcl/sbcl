@@ -4,6 +4,7 @@
 
 #include <sys/types.h>
 #include <unistd.h>
+#include <stddef.h>
 #include "runtime.h"
 #include "sbcl.h"
 #include "os.h"
@@ -92,6 +93,23 @@ static inline os_context_t *get_interrupt_context_for_thread(struct thread *th)
 {
     return th->interrupt_contexts
 	[fixnum_value(SymbolValue(FREE_INTERRUPT_CONTEXT_INDEX,th)-1)];
+}
+
+/* This is clearly per-arch and possibly even per-OS code, but we can't 
+ * put it somewhere sensible like x86-linux-os.c because it needs too
+ * much stuff like struct thread and all_threads to be defined, which
+ * usually aren't by that time.  So, it's here instead.  Sorry */
+
+inline static struct thread *arch_os_get_current_thread() {
+#if defined(LISP_FEATURE_SB_THREAD) && defined (LISP_FEATURE_X86)
+    register struct thread *me=0;
+    if(all_threads)
+	__asm__ __volatile__ ("movl %%fs:%c1,%0" : "=r" (me)
+		 : "i" (offsetof (struct thread,this)));
+    return me;
+#else
+    return all_threads;
+#endif
 }
 
 
