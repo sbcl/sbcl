@@ -40,10 +40,12 @@
 #include "runtime.h"
 #include "sbcl.h"
 #include "os.h"
+#include "interr.h"
 #include "globals.h"
 #include "interrupt.h"
 #include "validate.h"
 #include "lispregs.h"
+#include "arch.h"
 #include "gc.h"
 #include "gencgc.h"
 
@@ -365,21 +367,24 @@ print_generation_stats(int verbose) /* FIXME: should take FILE argument */
 
 	for (j = 0; j < last_free_page; j++)
 	    if (page_table[j].gen == i) {
+
 		/* Count the number of boxed pages within the given
-		 * generation */
-		if (page_table[j].allocated == BOXED_PAGE)
+		 * generation. */
+		if (page_table[j].allocated == BOXED_PAGE) {
 		    if (page_table[j].large_object)
 			large_boxed_cnt++;
 		    else
 			boxed_cnt++;
-	
+		}
+
 		/* Count the number of unboxed pages within the given
-		 * generation */
-		if (page_table[j].allocated == UNBOXED_PAGE)
+		 * generation. */
+		if (page_table[j].allocated == UNBOXED_PAGE) {
 		    if (page_table[j].large_object)
 			large_unboxed_cnt++;
 		    else
 			unboxed_cnt++;
+		}
 	    }
 
 	gc_assert(generations[i].bytes_allocated
@@ -1741,6 +1746,9 @@ copy_large_unboxed_object(lispobj object, int nwords)
 
 #define DIRECT_SCAV 0
 
+/* FIXME: Most calls end up going to a little trouble to compute an
+ * 'nwords' value. The system might be a little simpler if this
+ * function used an 'end' parameter instead. */
 static void
 scavenge(lispobj *start, long nwords)
 {
@@ -4050,7 +4058,7 @@ search_read_only_space(lispobj *pointer)
 static lispobj *
 search_static_space(lispobj *pointer)
 {
-    lispobj* start = (lispobj*)static_space;
+    lispobj* start = (lispobj*)STATIC_SPACE_START;
     lispobj* end = (lispobj*)SymbolValue(STATIC_SPACE_FREE_POINTER);
     if ((pointer < start) || (pointer >= end))
 	return NULL;
@@ -4114,7 +4122,8 @@ valid_dynamic_space_pointer(lispobj *pointer)
 	case type_FuncallableInstanceHeader:
 	case type_ByteCodeFunction:
 	case type_ByteCodeClosure:
-	    if ((int)pointer != ((int)start_addr+type_FunctionPointer)) {
+	    if ((unsigned)pointer !=
+		((unsigned)start_addr+type_FunctionPointer)) {
 		if (gencgc_verbose)
 		    FSHOW((stderr,
 			   "/Wf2: %x %x %x\n",
@@ -4131,7 +4140,8 @@ valid_dynamic_space_pointer(lispobj *pointer)
 	}
 	break;
     case type_ListPointer:
-	if ((int)pointer != ((int)start_addr+type_ListPointer)) {
+	if ((unsigned)pointer !=
+	    ((unsigned)start_addr+type_ListPointer)) {
 	    if (gencgc_verbose)
 		FSHOW((stderr,
 		       "/Wl1: %x %x %x\n",
@@ -4156,7 +4166,8 @@ valid_dynamic_space_pointer(lispobj *pointer)
 	    return 0;
 	}
     case type_InstancePointer:
-	if ((int)pointer != ((int)start_addr+type_InstancePointer)) {
+	if ((unsigned)pointer !=
+	    ((unsigned)start_addr+type_InstancePointer)) {
 	    if (gencgc_verbose)
 		FSHOW((stderr,
 		       "/Wi1: %x %x %x\n",
@@ -4172,7 +4183,8 @@ valid_dynamic_space_pointer(lispobj *pointer)
 	}
 	break;
     case type_OtherPointer:
-	if ((int)pointer != ((int)start_addr+type_OtherPointer)) {
+	if ((unsigned)pointer !=
+	    ((int)start_addr+type_OtherPointer)) {
 	    if (gencgc_verbose)
 		FSHOW((stderr,
 		       "/Wo1: %x %x %x\n",
@@ -4481,8 +4493,12 @@ preserve_pointer(void *addr)
 
     region_allocation = page_table[addr_page_index].allocated;
 
-    /* Check the offset within the page */
-    if (((int)addr & 0xfff) > page_table[addr_page_index].bytes_used)
+    /* Check the offset within the page.
+     *
+     * FIXME: The mask should have a symbolic name, and ideally should
+     * be derived from page size instead of hardwired to 0xfff.
+     * (Also fix other uses of 0xfff, elsewhere.) */
+    if (((unsigned)addr & 0xfff) > page_table[addr_page_index].bytes_used)
 	return;
 
     if (enable_pointer_filter && !valid_dynamic_space_pointer(addr))
@@ -4510,7 +4526,7 @@ preserve_pointer(void *addr)
 	if ((page_table[addr_page_index].allocated == FREE_PAGE)
 	    || (page_table[addr_page_index].bytes_used == 0)
 	    /* Check the offset within the page. */
-	    || (((int)addr & 0xfff)
+	    || (((unsigned)addr & 0xfff)
 		> page_table[addr_page_index].bytes_used)) {
 	    FSHOW((stderr,
 		   "weird? ignore ptr 0x%x to freed area of large object\n",
@@ -4594,8 +4610,14 @@ scavenge_thread_stacks(void)
 			     (unsigned)stack_pointer);
 		    if ((stack_pointer > control_stack) &&
 			(stack_pointer < control_stack_end)) {
-			unsigned int length = ((int)control_stack_end -
-					       (int)stack_pointer) / 4;
+			/* FIXME: Ick!
+			 *   (1) hardwired word length = 4; and as usual,
+			 *       when fixing this, check for other places
+			 *       with the same problem
+			 *   (2) calling it 'length' suggests bytes;
+			 *       perhaps 'size' instead? */
+			unsigned int length = ((unsigned)control_stack_end -
+					       (unsigned)stack_pointer) / 4;
 			int j;
 			if (length >= vector_length) {
 			    lose("invalid stack size %d >= vector length %d",
@@ -5243,12 +5265,12 @@ print_ptr(lispobj *addr)
 extern int undefined_tramp;
 
 static void
-verify_space(lispobj*start, size_t words)
+verify_space(lispobj *start, size_t words)
 {
-    int dynamic_space = (find_page_index((void*)start) != -1);
-    int readonly_space =
-	(READ_ONLY_SPACE_START <= (int)start &&
-	 (int)start < SymbolValue(READ_ONLY_SPACE_FREE_POINTER));
+    int is_in_dynamic_space = (find_page_index((void*)start) != -1);
+    int is_in_readonly_space =
+	(READ_ONLY_SPACE_START <= (unsigned)start &&
+	 (unsigned)start < SymbolValue(READ_ONLY_SPACE_FREE_POINTER));
 
     while (words > 0) {
 	size_t count = 1;
@@ -5260,7 +5282,7 @@ verify_space(lispobj*start, size_t words)
 		(READ_ONLY_SPACE_START <= thing &&
 		 thing < SymbolValue(READ_ONLY_SPACE_FREE_POINTER));
 	    int to_static_space =
-		((int)static_space <= thing &&
+		(STATIC_SPACE_START <= thing &&
 		 thing < SymbolValue(STATIC_SPACE_FREE_POINTER));
 
 	    /* Does it point to the dynamic space? */
@@ -5276,7 +5298,7 @@ verify_space(lispobj*start, size_t words)
 		}
 		/* Check that its not in the RO space as it would then be a
 		 * pointer from the RO to the dynamic space. */
-		if (readonly_space) {
+		if (is_in_readonly_space) {
 		    lose("ptr to dynamic space %x from RO space %x",
 			 thing, start);
 		}
@@ -5289,7 +5311,7 @@ verify_space(lispobj*start, size_t words)
 	    } else {
 		/* Verify that it points to another valid space. */
 		if (!to_readonly_space && !to_static_space
-		    && (thing != (int)&undefined_tramp)) {
+		    && (thing != (unsigned)&undefined_tramp)) {
 		    lose("Ptr %x @ %x sees junk.", thing, start);
 		}
 	    }
@@ -5334,7 +5356,7 @@ verify_space(lispobj*start, size_t words)
 			/* Check that it's not in the dynamic space.
 			 * FIXME: Isn't is supposed to be OK for code
 			 * objects to be in the dynamic space these days? */
-			if (dynamic_space
+			if (is_in_dynamic_space
 			    /* It's ok if it's byte compiled code. The trace
 			     * table offset will be a fixnum if it's x86
 			     * compiled code - check. */
@@ -5435,19 +5457,25 @@ verify_space(lispobj*start, size_t words)
 static void
 verify_gc(void)
 {
+    /* FIXME: It would be nice to make names consistent so that
+     * foo_size meant size *in* *bytes* instead of size in some
+     * arbitrary units. (Yes, this caused a bug, how did you guess?:-)
+     * Some counts of lispobjs are called foo_count; it might be good
+     * to grep for all foo_size and rename the appropriate ones to
+     * foo_count. */
     int read_only_space_size =
 	(lispobj*)SymbolValue(READ_ONLY_SPACE_FREE_POINTER)
 	- (lispobj*)READ_ONLY_SPACE_START;
     int static_space_size =
 	(lispobj*)SymbolValue(STATIC_SPACE_FREE_POINTER)
-	- (lispobj*)static_space;
+	- (lispobj*)STATIC_SPACE_START;
     int binding_stack_size =
 	(lispobj*)SymbolValue(BINDING_STACK_POINTER)
 	- (lispobj*)BINDING_STACK_START;
 
     verify_space((lispobj*)READ_ONLY_SPACE_START, read_only_space_size);
-    verify_space((lispobj*)static_space, static_space_size);
-    verify_space((lispobj*)BINDING_STACK_START, binding_stack_size);
+    verify_space((lispobj*)STATIC_SPACE_START   , static_space_size);
+    verify_space((lispobj*)BINDING_STACK_START  , binding_stack_size);
 }
 
 static void
@@ -5508,7 +5536,7 @@ verify_zero_fill(void)
 	} else {
 	    int free_bytes = 4096 - page_table[page].bytes_used;
 	    if (free_bytes > 0) {
-		int *start_addr = (int *)((int)page_address(page)
+		int *start_addr = (int *)((unsigned)page_address(page)
 					  + page_table[page].bytes_used);
 		int size = free_bytes / 4;
 		int i;
@@ -5666,26 +5694,28 @@ garbage_collect_generation(int generation, int raise)
     }
 
     /* Scavenge the binding stack. */
-    scavenge(binding_stack,
-	     (lispobj *)SymbolValue(BINDING_STACK_POINTER) - binding_stack);
+    scavenge(BINDING_STACK_START,
+	     (lispobj *)SymbolValue(BINDING_STACK_POINTER) -
+	     (lispobj *)BINDING_STACK_START);
 
     if (SymbolValue(SCAVENGE_READ_ONLY_SPACE) != NIL) {
 	read_only_space_size =
-	    (lispobj *)SymbolValue(READ_ONLY_SPACE_FREE_POINTER)
-	    - read_only_space;
+	    (lispobj*)SymbolValue(READ_ONLY_SPACE_FREE_POINTER) -
+	    (lispobj*)READ_ONLY_SPACE_START;
 	FSHOW((stderr,
 	       "/scavenge read only space: %d bytes\n",
 	       read_only_space_size * sizeof(lispobj)));
-	scavenge(read_only_space, read_only_space_size);
+	scavenge(READ_ONLY_SPACE_START, read_only_space_size);
     }
 
-    static_space_size = (lispobj *)SymbolValue(STATIC_SPACE_FREE_POINTER)
-	- static_space;
+    static_space_size =
+	(lispobj *)SymbolValue(STATIC_SPACE_FREE_POINTER) -
+	(lispobj *)STATIC_SPACE_START;
     if (gencgc_verbose > 1)
 	FSHOW((stderr,
 	       "/scavenge static space: %d bytes\n",
 	       static_space_size * sizeof(lispobj)));
-    scavenge(static_space, static_space_size);
+    scavenge(STATIC_SPACE_START, static_space_size);
 
     /* All generations but the generation being GCed need to be
      * scavenged. The new_space generation needs special handling as

@@ -66,7 +66,7 @@ static void process_directory(int fd, long *ptr, int count)
 	switch (id) {
 	case DYNAMIC_SPACE_ID:
 	    if (addr != (os_vm_address_t)DYNAMIC_SPACE_START) {
-		lose("incorrect dynamic space");
+		lose("core/runtime address mismatch: DYNAMIC_SPACE_START");
 	    }
 #if defined(ibmrt) || defined(__i386__)
 	    SetSymbolValue(ALLOCATION_POINTER, (lispobj)free_pointer);
@@ -75,10 +75,14 @@ static void process_directory(int fd, long *ptr, int count)
 #endif
 	    break;
 	case STATIC_SPACE_ID:
-	    static_space = (lispobj *) addr;
+	    if (addr != (os_vm_address_t)STATIC_SPACE_START) {
+		lose("core/runtime address mismatch: STATIC_SPACE_START");
+	    }
 	    break;
 	case READ_ONLY_SPACE_ID:
-	    /* We don't care about read-only space. */
+	    if (addr != (os_vm_address_t)READ_ONLY_SPACE_START) {
+		lose("core/runtime address mismatch: READ_ONLY_SPACE_START");
+	    }
 	    break;
 	default:
 	    lose("unknown space ID %ld", id);

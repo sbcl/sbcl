@@ -28,7 +28,6 @@
 
 (def-c-var-frob sb!vm:control-stack-start	    "control_stack")
 #!+x86 (def-c-var-frob control-stack-end            "control_stack_end")
-(def-c-var-frob sb!vm:binding-stack-start	    "binding_stack")
 
 #!-sb-fluid (declaim (inline dynamic-usage))
 (def-c-var-frob dynamic-usage "bytes_allocated")

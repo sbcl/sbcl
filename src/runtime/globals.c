@@ -31,13 +31,10 @@ lispobj *current_control_frame_pointer;
 lispobj *current_binding_stack_pointer;
 #endif
 
-lispobj *read_only_space;
-lispobj *static_space;
 lispobj *control_stack;
 #ifdef __i386__
 lispobj *control_stack_end;
 #endif
-lispobj *binding_stack;
 
 #ifndef ALLOCATION_POINTER
 lispobj *dynamic_space_free_pointer;
@@ -68,6 +65,6 @@ void globals_init(void)
 
     current_control_frame_pointer = (lispobj *)0;
 #ifndef BINDING_STACK_POINTER
-    current_binding_stack_pointer = binding_stack;
+    current_binding_stack_pointer = BINDING_STACK_START;
 #endif
 }

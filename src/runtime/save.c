@@ -23,6 +23,7 @@
 #include "core.h"
 #include "globals.h"
 #include "save.h"
+#include "dynbind.h"
 #include "lispregs.h"
 #include "validate.h"
 
@@ -71,7 +72,7 @@ output_space(FILE *file, int id, lispobj *addr, lispobj *end)
 
     bytes = words * sizeof(lispobj);
 
-    printf("writing %d bytes from the %s space at 0x%08X\n",
+    printf("writing %d bytes from the %s space at 0x%08lx\n",
            bytes, names[id], (unsigned long)addr);
 
     data = write_bytes(file, (char *)addr, bytes);
@@ -133,12 +134,12 @@ save(char *filename, lispobj init_function)
     putw(CORE_NDIRECTORY, file);
     putw((5*3)+2, file);
 
-    output_space(file, READ_ONLY_SPACE_ID, read_only_space,
+    output_space(file, READ_ONLY_SPACE_ID, (lispobj *)READ_ONLY_SPACE_START,
 		 (lispobj *)SymbolValue(READ_ONLY_SPACE_FREE_POINTER));
-    output_space(file, STATIC_SPACE_ID, static_space,
+    output_space(file, STATIC_SPACE_ID, (lispobj *)STATIC_SPACE_START,
 		 (lispobj *)SymbolValue(STATIC_SPACE_FREE_POINTER));
 #ifdef reg_ALLOC
-    output_space(file, DYNAMIC_SPACE_ID, DYNAMIC_SPACE_START,
+    output_space(file, DYNAMIC_SPACE_ID, (lispobj *)DYNAMIC_SPACE_START,
 		 dynamic_space_free_pointer);
 #else
 #ifdef GENCGC

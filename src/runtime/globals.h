@@ -28,10 +28,7 @@ extern lispobj *current_control_frame_pointer;
 extern lispobj *current_binding_stack_pointer;
 #endif
 
-extern lispobj *read_only_space;
-extern lispobj *static_space;
 extern lispobj *control_stack;
-extern lispobj *binding_stack;
 #ifdef __i386__
 extern lispobj *control_stack_end;
 #endif

@@ -2500,6 +2500,7 @@
 
 (defun write-c-header ()
 
+  ;; writing beginning boilerplate
   (format t "/*~%")
   (dolist (line
 	   '("This is a machine-generated file. Do not edit it by hand."
@@ -2514,17 +2515,16 @@
     (format t " * ~A~%" line))
   (format t " */~%")
   (terpri)
-
   (format t "#ifndef _SBCL_H_~%#define _SBCL_H_~%")
   (terpri)
 
+  ;; writing miscellaneous constants
   (format t "#define SBCL_CORE_VERSION_INTEGER ~D~%" sbcl-core-version-integer)
   (format t
 	  "#define SBCL_VERSION_STRING ~S~%"
 	  (sb!xc:lisp-implementation-version))
   (format t "#define CORE_MAGIC 0x~X~%" core-magic)
   (terpri)
-
   ;; FIXME: Other things from core.h should be defined here too:
   ;; #define CORE_END 3840
   ;; #define CORE_NDIRECTORY 3861
@@ -2537,6 +2537,7 @@
   ;; #define STATIC_SPACE_ID (2)
   ;; #define READ_ONLY_SPACE_ID (3)
 
+  ;; writing entire families of named constants from SB!VM
   (let ((constants nil))
     (do-external-symbols (symbol (find-package "SB!VM"))
       (when (constantp symbol)
@@ -2579,7 +2580,7 @@
 	    (test-tail "-SUBTYPE" "subtype_" 3)
 	    (test-head "TRACE-TABLE-" "tracetab_" 4)
 	    (test-tail "-SC-NUMBER" "sc_" 5)
-	    ;; This simpler style of munging of names seems less
+	    ;; This simpler style of translation of names seems less
 	    ;; confusing, and is used for newer code.
 	    (when (some (lambda (suffix) (tail-comp name suffix))
 			#("-START" "-END"))
@@ -2592,23 +2593,50 @@
 		      (< (second const1) (second const2))))))
     (let ((prev-priority (second (car constants))))
       (dolist (const constants)
-	(unless (= prev-priority (second const))
-	  (terpri)
-	  (setf prev-priority (second const)))
-	(format t
-		"#define ~A ~D /* 0x~X */~@[  /* ~A */~]~%"
-		(first const)
-		(third const)
-		(third const)
-		(fourth const))))
-    (terpri)
-    (format t "#define ERRORS { \\~%")
-    ;; FIXME: Is this just DO-VECTOR?
-    (let ((internal-errors sb!c:*backend-internal-errors*))
-      (dotimes (i (length internal-errors))
-	(format t "    ~S, /*~D*/ \\~%" (cdr (aref internal-errors i)) i)))
-    (format t "    NULL \\~%}~%")
+	(destructuring-bind (name priority value doc) const
+	  (unless (= prev-priority priority)
+	    (terpri)
+	    (setf prev-priority priority))
+	  (format t "#define ~A " name)
+	  (format t 
+		  ;; KLUDGE: As of sbcl-0.6.7.14, we're dumping two
+		  ;; different kinds of values here, (1) small codes
+		  ;; and (2) machine addresses. The small codes can be
+		  ;; dumped as bare integer values. The large machine
+		  ;; addresses might cause problems if they're large
+		  ;; and represented as (signed) C integers, so we
+		  ;; want to force them to be unsigned. We do that by
+		  ;; wrapping them in the LISPOBJ macro. (We could do
+		  ;; it with a bare "(unsigned)" cast, except that
+		  ;; this header file is used not only in C files, but
+		  ;; also in assembly files, which don't understand
+		  ;; the cast syntax. The LISPOBJ macro goes away in
+		  ;; assembly files, but that shouldn't matter because
+		  ;; we don't do arithmetic on address constants in
+		  ;; assembly files. See? It really is a kludge..) --
+		  ;; WHN 2000-10-18
+		  (let (;; cutoff for treatment as a small code
+			(cutoff (expt 2 16)))
+		    (cond ((minusp value)
+			   (error "stub: negative values unsupported"))
+			  ((< value cutoff)
+			   "~D")
+			  (t
+			   "LISPOBJ(~D)")))
+		  value)
+	  (format t " /* 0x~X */~@[  /* ~A */~]~%" value doc))))
     (terpri))
+
+  ;; writing codes/strings for internal errors
+  (format t "#define ERRORS { \\~%")
+  ;; FIXME: Is this just DO-VECTOR?
+  (let ((internal-errors sb!c:*backend-internal-errors*))
+    (dotimes (i (length internal-errors))
+      (format t "    ~S, /*~D*/ \\~%" (cdr (aref internal-errors i)) i)))
+  (format t "    NULL \\~%}~%")
+  (terpri)
+
+  ;; writing primitive object layouts
   (let ((structs (sort (copy-list sb!vm:*primitive-objects*) #'string<
 		       :key #'(lambda (obj)
 				(symbol-name
@@ -2642,6 +2670,8 @@
 		  (- (* (sb!vm:slot-offset slot) sb!vm:word-bytes) lowtag)))
 	(terpri))))
     (format t "#endif /* LANGUAGE_ASSEMBLY */~2%"))
+
+  ;; writing static symbol offsets
   (dolist (symbol (cons nil sb!vm:*static-symbols*))
     ;; FIXME: It would be nice to use longer names NIL and (particularly) T
     ;; in #define statements.
@@ -2658,6 +2688,8 @@
 		 sb!vm:word-bytes
 		 sb!vm:other-pointer-type
 		 (if symbol (sb!vm:static-symbol-offset symbol) 0)))))
+
+  ;; Voila.
   (format t "~%#endif~%"))
 
 ;;;; writing map file

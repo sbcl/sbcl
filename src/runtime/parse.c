@@ -240,20 +240,25 @@ static boolean lookup_symbol(char *name, lispobj *result)
     lispobj *headerptr;
 
     /* Search static space. */
-    headerptr = static_space;
-    count = ((lispobj *) SymbolValue(STATIC_SPACE_FREE_POINTER) -
-	     static_space);
+    headerptr = (lispobj *)STATIC_SPACE_START;
+    count =
+	(lispobj *)SymbolValue(STATIC_SPACE_FREE_POINTER) -
+	(lispobj *)STATIC_SPACE_START;
     if (search_for_symbol(name, &headerptr, &count)) {
         *result = (lispobj)headerptr | type_OtherPointer;
         return 1;
     }
 
     /* Search dynamic space. */
-    headerptr = DYNAMIC_SPACE_START;
+    headerptr = (lispobj *)DYNAMIC_SPACE_START;
 #if !defined(ibmrt) && !defined(__i386__)
-    count = dynamic_space_free_pointer - DYNAMIC_SPACE_START;
+    count =
+	dynamic_space_free_pointer -
+	(lispobj *)DYNAMIC_SPACE_START;
 #else
-    count = (lispobj *)SymbolValue(ALLOCATION_POINTER) - DYNAMIC_SPACE_START;
+    count =
+	(lispobj *)SymbolValue(ALLOCATION_POINTER) -
+	(lispobj *)DYNAMIC_SPACE_START;
 #endif
     if (search_for_symbol(name, &headerptr, &count)) {
         *result = (lispobj)headerptr | type_OtherPointer;

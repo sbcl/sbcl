@@ -1437,20 +1437,26 @@ int purify(lispobj static_roots, lispobj read_only_roots)
     fflush(stdout);
 #endif
 #if !defined(ibmrt) && !defined(__i386__)
-    pscav(binding_stack, current_binding_stack_pointer - binding_stack, 0);
+    pscav(BINDING_STACK_START,
+	  current_binding_stack_pointer - (lispobj *)BINDING_STACK_START,
+	  0);
 #else
-    pscav(binding_stack, (lispobj *)SymbolValue(BINDING_STACK_POINTER) - binding_stack, 0);
+    pscav(BINDING_STACK_START,
+	  (lispobj *)SymbolValue(BINDING_STACK_POINTER) -
+	  (lispobj *)BINDING_STACK_START,
+	  0);
 #endif
 
 #ifdef SCAVENGE_READ_ONLY_SPACE
     if (SymbolValue(SCAVENGE_READ_ONLY_SPACE) != type_UnboundMarker
 	&& SymbolValue(SCAVENGE_READ_ONLY_SPACE) != NIL) {
       unsigned  read_only_space_size =
-	(lispobj *)SymbolValue(READ_ONLY_SPACE_FREE_POINTER) - read_only_space;
+	  (lispobj *)SymbolValue(READ_ONLY_SPACE_FREE_POINTER) -
+	  (lispobj *)READ_ONLY_SPACE_START;
       fprintf(stderr,
 	      "scavenging read only space: %d bytes\n",
 	      read_only_space_size * sizeof(lispobj));
-      pscav(read_only_space, read_only_space_size, 0);
+      pscav(READ_ONLY_SPACE_START, read_only_space_size, 0);
     }
 #endif
 
@@ -1458,7 +1464,7 @@ int purify(lispobj static_roots, lispobj read_only_roots)
     printf(" static");
     fflush(stdout);
 #endif
-    clean = static_space;
+    clean = (lispobj *)STATIC_SPACE_START;
     do {
         while (clean != static_free)
             clean = pscav(clean, static_free - clean, 0);

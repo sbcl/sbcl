@@ -63,18 +63,12 @@ void validate(void)
 	fflush(stdout);
 #endif
 
-	/* Read-Only Space */
-	read_only_space = (lispobj *) READ_ONLY_SPACE_START;
-	ensure_space(read_only_space, READ_ONLY_SPACE_SIZE);
+	ensure_space(READ_ONLY_SPACE_START, READ_ONLY_SPACE_SIZE);
 
-	/* Static Space */
-	static_space = (lispobj *) STATIC_SPACE_START;
-	ensure_space(static_space, STATIC_SPACE_SIZE);
+	ensure_space(STATIC_SPACE_START, STATIC_SPACE_SIZE);
 
-	/* Dynamic-0 Space */
 	ensure_space(DYNAMIC_SPACE_START, DYNAMIC_SPACE_SIZE);
 
-	/* Control Stack */
 	control_stack = (lispobj *) CONTROL_STACK_START;
 #ifdef __i386__
 	control_stack_end = (lispobj *) (CONTROL_STACK_START
@@ -82,9 +76,7 @@ void validate(void)
 #endif
 	ensure_space(control_stack, CONTROL_STACK_SIZE);
 
-	/* Binding Stack */
-	binding_stack = (lispobj *) BINDING_STACK_START;
-	ensure_space(binding_stack, BINDING_STACK_SIZE);
+	ensure_space(BINDING_STACK_START, BINDING_STACK_SIZE);
 
 #ifdef HOLES
 	make_holes();
