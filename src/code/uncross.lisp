@@ -59,11 +59,11 @@
 ;;; (:COMPILE-TOPLEVEL)) do we call UNCROSS on them to obliterate the
 ;;; distinction.
 #+sb-xc-host
-(defun uncross (form)
-  (let ((;; KLUDGE: We don't currently try to handle circular program
-	 ;; structure, but we do at least detect it and complain about
-	 ;; it..
-	 inside? (make-hash-table)))
+(let ((;; KLUDGE: We don't currently try to handle circular program
+       ;; structure, but we do at least detect it and complain about
+       ;; it..
+       inside? (make-hash-table)))
+  (defun uncross (form)
     (labels ((uncross-symbol (symbol)
                (let ((old-symbol-package (symbol-package symbol)))
 		 (if (and old-symbol-package
@@ -119,4 +119,5 @@
 		 (if (and (eq rcr-car car) (eq rcr-cdr cdr))
 		   form
 		   (cons rcr-car rcr-cdr)))))
+      (clrhash inside?)
       (rcr form))))

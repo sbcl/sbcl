@@ -79,12 +79,3 @@
 				  (aref rmdr ,i)))
 		       vector)
 		      0))))
-#|
-(assert (= (funcall 
-            (lambda (rmdr) 
-              (declare (type (simple-array bit (*)) rmdr)
-                       (optimize (speed 3) (safety 0)))
-              (aref rmdr 0))
-            #*00000000000000000000000000000001000000000)
-           0))
-|#
