@@ -283,7 +283,11 @@
 ;;;   component.
 (def!struct (component (:copier nil)
 		       (:constructor
-			make-component (head tail &aux (last-block tail))))
+			make-component
+                        (head
+                         tail &aux
+                         (last-block tail)
+                         (outer-loop (make-loop :kind :outer :head head)))))
   ;; unique ID for debugging
   #!+sb-show (id (new-object-id) :read-only t)
   ;; the kind of component
@@ -388,7 +392,7 @@
   ;; this is filled by physical environment analysis
   (dx-lvars nil :type list)
   ;; The default LOOP in the component.
-  (outer-loop (make-loop :kind :outer :head head) :type cloop))
+  (outer-loop (missing-arg) :type cloop))
 (defprinter (component :identity t)
   name
   #!+sb-show id
