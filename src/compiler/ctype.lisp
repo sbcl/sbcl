@@ -109,67 +109,73 @@
 			   ((:lossage-fun *lossage-fun*))
 			   ((:unwinnage-fun *unwinnage-fun*)))
   (declare (type function result-test) (type combination call)
-	   (type fun-type type))
+	   ;; FIXME: Could FUN-TYPE here actually be something like
+	   ;; (AND GENERIC-FUNCTION (FUNCTION (T) T))?  How
+	   ;; horrible...  -- CSR, 2003-05-03
+	   (type (or fun-type classoid) type))
   (let* ((*lossage-detected* nil)
 	 (*unwinnage-detected* nil)
 	 (*compiler-error-context* call)
 	 (args (combination-args call))
-	 (nargs (length args))
-	 (required (fun-type-required type))
-	 (min-args (length required))
-	 (optional (fun-type-optional type))
-	 (max-args (+ min-args (length optional)))
-	 (rest (fun-type-rest type))
-	 (keyp (fun-type-keyp type)))
-
-    (cond
-     ((fun-type-wild-args type)
-      (do ((i 1 (1+ i))
-	   (arg args (cdr arg)))
-	  ((null arg))
-	(check-arg-type (car arg) *wild-type* i)))
-     ((not (or optional keyp rest))
-      (if (/= nargs min-args)
-	  (note-lossage
-	   "The function was called with ~R argument~:P, but wants exactly ~R."
-	   nargs min-args)
-	  (check-fixed-and-rest args required nil)))
-     ((< nargs min-args)
-      (note-lossage
-       "The function was called with ~R argument~:P, but wants at least ~R."
-       nargs min-args))
-     ((<= nargs max-args)
-      (check-fixed-and-rest args (append required optional) rest))
-     ((not (or keyp rest))
-      (note-lossage
-       "The function was called with ~R argument~:P, but wants at most ~R."
-       nargs max-args))
-     ((and keyp (oddp (- nargs max-args)))
-      (note-lossage
-       "The function has an odd number of arguments in the keyword portion."))
-     (t
-      (check-fixed-and-rest args (append required optional) rest)
-      (when keyp
-	(check-key-args args max-args type))))
-
-    (let* ((dtype (node-derived-type call))
-	   (return-type (fun-type-returns type))
-	   (cont (node-cont call))
-	   (out-type
-	    (if (or (not (continuation-type-check cont))
-		    (and strict-result (policy call (/= safety 0))))
-		dtype
-		(values-type-intersection (continuation-asserted-type cont)
-					  dtype))))
-      (multiple-value-bind (int win) (funcall result-test out-type return-type)
-	(cond ((not win)
-	       (note-unwinnage "can't tell whether the result is a ~S"
-			       (type-specifier return-type)))
-	      ((not int)
-	       (note-lossage "The result is a ~S, not a ~S."
-			     (type-specifier out-type)
-			     (type-specifier return-type))))))
-
+	 (nargs (length args)))
+    (if (typep type 'classoid)
+	(do ((i 1 (1+ i))
+	     (arg args (cdr arg)))
+	    ((null arg))
+	  (check-arg-type (car arg) *wild-type* i))
+	(let* ((required (fun-type-required type))
+	       (min-args (length required))
+	       (optional (fun-type-optional type))
+	       (max-args (+ min-args (length optional)))
+	       (rest (fun-type-rest type))
+	       (keyp (fun-type-keyp type)))
+	  (cond
+	    ((fun-type-wild-args type)
+	     (do ((i 1 (1+ i))
+		  (arg args (cdr arg)))
+		 ((null arg))
+	       (check-arg-type (car arg) *wild-type* i)))
+	    ((not (or optional keyp rest))
+	     (if (/= nargs min-args)
+		 (note-lossage
+		  "The function was called with ~R argument~:P, but wants exactly ~R."
+		  nargs min-args)
+		 (check-fixed-and-rest args required nil)))
+	    ((< nargs min-args)
+	     (note-lossage
+	      "The function was called with ~R argument~:P, but wants at least ~R."
+	      nargs min-args))
+	    ((<= nargs max-args)
+	     (check-fixed-and-rest args (append required optional) rest))
+	    ((not (or keyp rest))
+	     (note-lossage
+	      "The function was called with ~R argument~:P, but wants at most ~R."
+	      nargs max-args))
+	    ((and keyp (oddp (- nargs max-args)))
+	     (note-lossage
+	      "The function has an odd number of arguments in the keyword portion."))
+	    (t
+	     (check-fixed-and-rest args (append required optional) rest)
+	     (when keyp
+	       (check-key-args args max-args type))))
+	  
+	  (let* ((dtype (node-derived-type call))
+		 (return-type (fun-type-returns type))
+		 (cont (node-cont call))
+		 (out-type
+		  (if (or (not (continuation-type-check cont))
+			  (and strict-result (policy call (/= safety 0))))
+		      dtype
+		      (values-type-intersection (continuation-asserted-type cont)
+						dtype))))
+	    (multiple-value-bind (int win) (funcall result-test out-type return-type)
+	      (cond ((not win)
+		     (note-unwinnage "can't tell whether the result is a ~S"
+				     (type-specifier return-type)))
+		    ((not int)
+		     (note-lossage "The result is a ~S, not a ~S."
+				   (type-specifier out-type)
+				   (type-specifier return-type))))))))
     (cond (*lossage-detected* (values nil t))
 	  (*unwinnage-detected* (values nil nil))
 	  (t (values t t)))))
