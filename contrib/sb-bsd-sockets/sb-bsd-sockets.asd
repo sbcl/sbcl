@@ -34,7 +34,7 @@
 		  (sb-ext:posix-getenv "LDFLAGS")
 		#+sunos "-shared -lresolv -lsocket -lnsl"
 		#+darwin "-bundle"
-		#-(or darwin sunos) "-shared!")
+		#-(or darwin sunos) "-shared")
 	      dso-name
 	      (mapcar #'unix-name
 		      (mapcan (lambda (c)
@@ -53,7 +53,7 @@
       (= 0 (run-shell-command "gcc ~A -o ~S -c ~S"
 			      (if (sb-ext:posix-getenv "CFLAGS")
 				  (sb-ext:posix-getenv "CFLAGS")
-				"-fPIC!")
+				"-fPIC")
 			      (unix-name (car (output-files op c)))
 			      (unix-name (component-pathname c))))
     (error 'operation-error :operation op :component c)))
