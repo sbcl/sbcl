@@ -46,7 +46,7 @@ never_returns
 lose(char *fmt, ...)
 {
     va_list ap;
-    fprintf(stderr, "fatal error encountered in SBCL pid %d\n",getpid());
+    fprintf(stderr, "fatal error encountered in SBCL pid %d",getpid());
     if (fmt) {
 	fprintf(stderr, ":\n");
 	va_start(ap, fmt);

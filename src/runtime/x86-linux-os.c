@@ -20,6 +20,7 @@
 #include <sys/file.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <errno.h>
 
 #include "./signal.h"
 #include "os.h"
@@ -126,6 +127,11 @@ struct thread *arch_os_get_current_thread() {
 #else
     return all_threads;
 #endif
+}
+struct thread *debug_get_fs() {
+    register u32 fs;
+    __asm__("movl %%fs,%0" : "=r" (fs)  : );
+    return fs;
 }
 
 /* free any arch/os-specific resources used by thread, which is now

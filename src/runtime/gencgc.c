@@ -4194,8 +4194,20 @@ alloc(int nbytes)
 	/* there are a few places in the C code that allocate data in the
 	 * heap before Lisp starts.  This is before interrupts are enabled,
 	 * so we don't need to check for pseudo-atomic */
-	gc_assert(SymbolValue(PSEUDO_ATOMIC_ATOMIC,th));
-
+#ifdef LISP_FEATURE_SB_THREAD
+	if(!SymbolValue(PSEUDO_ATOMIC_ATOMIC,th)) {
+	    register u32 fs;
+	    fprintf(stderr, "fatal error in thread 0x%x, pid=%d\n",
+		    th,getpid());
+	    __asm__("movl %fs,%0" : "=r" (fs)  : );
+	    fprintf(stderr, "fs is %x, th->tls_cookie=%x (should be identical)\n",
+		    debug_get_fs(),th->tls_cookie);
+	    lose("If you see this message before 2003.05.01, mail details to sbcl-devel\n");
+	}
+#else
+    gc_assert(SymbolValue(PSEUDO_ATOMIC_ATOMIC,th));
+#endif
+    
     /* maybe we can do this quickly ... */
     new_free_pointer = region->free_pointer + nbytes;
     if (new_free_pointer <= region->end_addr) {
