@@ -11,6 +11,8 @@
 ;;;; files for more information.
 
 (in-package "SB!ALIEN")
+
+(/show0 "target-alieneval.lisp 15")
 
 ;;;; alien variables
 

@@ -294,8 +294,8 @@
 	(flet ((check-version (variant possible-implementation needed-version)
 		 (when (string= possible-implementation implementation)
 		   (unless (= version needed-version)
-		     (error "~S was compiled for ~A fasl file format version ~
-			     ~S, but we need version ~S."
+		     (error "~@<~S was compiled for ~A fasl file format ~
+			     version ~D, but we need version ~D.~:@>"
 			    stream
 			    variant
 			    version

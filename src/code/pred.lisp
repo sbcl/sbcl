@@ -255,6 +255,8 @@
 			      (equalp x-el y-el))
 		    (return nil))))))
 	(t nil)))
+
+(/show0 "about to do test cases in pred.lisp")
 #!+sb-test
 (let ((test-cases '((0.0 -0.0 t)
 		    (0.0 1.0 nil)
@@ -263,10 +265,14 @@
 		    ("Hello" "hello" t)
 		    ("Hello" #(#\h #\E #\l #\l #\o) t)
 		    ("Hello" "goodbye" nil))))
+  (/show0 "TEST-CASES bound in pred.lisp")
   (dolist (test-case test-cases)
+    (/show0 "about to do a TEST-CASE in pred.lisp")
     (destructuring-bind (x y expected-result) test-case
       (let* ((result (equalp x y))
 	     (bresult (if result 1 0))
 	     (expected-bresult (if expected-result 1 0)))
 	(unless (= bresult expected-bresult)
+	  (/show0 "failing test in pred.lisp")
 	  (error "failed test (EQUALP ~S ~S)" x y))))))
+(/show0 "done with test cases in pred.lisp")

@@ -406,20 +406,6 @@ returning an array as first value always.
   accepting &REST even when it's not followed by an argument name:
 	(DEFMETHOD FOO ((X T) &REST) NIL)
 
-39:
-  On the CMU CL mailing list 26 June 2000, Douglas Crosher wrote
-
-  Hannu Rummukainen wrote:
-  ...
-  > There's something weird going on with the compilation of the attached
-  > code.  Compiling and loading the file in a fresh lisp, then invoking
-  > (test-it) gives
-  Thanks for the bug report, nice to have this one fixed. It was a bug
-  in the x86 backend, the < VOP. A fix has been committed to the main
-  source, see the file compiler/x86/float.lisp.
-
-  Probably the same bug exists in SBCL.
-
 40:
   TYPEP treats the result of UPGRADED-ARRAY-ELEMENT-TYPE as gospel,
   so that (TYPEP (MAKE-ARRAY 3) '(VECTOR SOMETHING-NOT-DEFINED-YET))

@@ -1377,7 +1377,7 @@ definitely not guaranteed to be present in later versions of SBCL."
 necessary for system interfacing\" (said cmu-user.tex at the time
 of the SBCL code fork). That probably was and is a good idea, but in
 practice, the distinctions between this package and SB-KERNEL
-and even SB-VM have become somewhat blurred over the years."
+and even SB-VM seem to have become somewhat blurred over the years."
     :use ("CL" "SB!EXT" "SB!INT")
     :export ("%ASSEMBLER-CODE-TYPE" "%BIND-ALIGNED-SAP"
              ;; FIXME: %PRIMITIVE shouldn't be here. (I now know that %SYS

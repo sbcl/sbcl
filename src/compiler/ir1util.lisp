@@ -1272,8 +1272,13 @@
 
 (declaim (special *current-path*))
 
-;;; We bind print level and length when printing out messages so that we don't
-;;; dump huge amounts of garbage.
+;;; We bind print level and length when printing out messages so that
+;;; we don't dump huge amounts of garbage.
+;;;
+;;; FIXME: It's not possible to get the defaults right for everyone.
+;;; So: Should these variables be in the SB-EXT package? Or should we
+;;; just get rid of them completely and just use the bare
+;;; CL:*PRINT-FOO* variables instead?
 (declaim (type (or unsigned-byte null)
 	       *compiler-error-print-level*
 	       *compiler-error-print-length*
@@ -1512,10 +1517,10 @@
   (setq *last-message-count* 0))
 
 ;;; Print out the message, with appropriate context if we can find it.
-;;; If If the context is different from the context of the last
-;;; message we printed, then we print the context. If the original
-;;; source is different from the source we are working on, then we
-;;; print the current source in addition to the original source.
+;;; If the context is different from the context of the last message
+;;; we printed, then we print the context. If the original source is
+;;; different from the source we are working on, then we print the
+;;; current source in addition to the original source.
 ;;;
 ;;; We suppress printing of messages identical to the previous, but
 ;;; record the number of times that the message is repeated.
@@ -1607,9 +1612,10 @@
 
 (defun print-compiler-condition (condition)
   (declare (type condition condition))
-  (let (;; These different classes of conditions have different effects
-	;; on the return codes of COMPILE-FILE, so it's nice for users to be
-	;; able to pick them out by lexical search through the output.
+  (let (;; These different classes of conditions have different
+	;; effects on the return codes of COMPILE-FILE, so it's nice
+	;; for users to be able to pick them out by lexical search
+	;; through the output.
 	(what (etypecase condition
 		(style-warning 'style-warning)
 		(warning 'warning)
@@ -1696,8 +1702,8 @@
 (defvar *warnings-p*)
 
 ;;; condition handlers established by the compiler. We re-signal the
-;;; condition, if it is not handled, we increment our warning counter
-;;; and print the error message.
+;;; condition, then if it isn't handled, we increment our warning
+;;; counter and print the error message.
 (defun compiler-error-handler (condition)
   (signal condition)
   (incf *compiler-error-count*)

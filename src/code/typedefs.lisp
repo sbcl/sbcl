@@ -91,10 +91,17 @@
 
 ;;;; utilities
 
-;;; Like ANY and EVERY, except that we handle two-arg uncertain predicates.
-;;; If the result is uncertain, then we return Default from the block PUNT.
-;;; If LIST-FIRST is true, then the list element is the first arg, otherwise
-;;; the second.
+;;; Like ANY and EVERY, except that we handle two-arg uncertain
+;;; predicates. If the result is uncertain, then we return DEFAULT
+;;; from the block PUNT-TYPE-METHOD. If LIST-FIRST is true, then the
+;;; list element is the first arg, otherwise the second.
+;;;
+;;; FIXME: The way that we return from PUNT-TYPE-METHOD rather ruins
+;;; the analogy with SOME and EVERY, and completely surprised me (WHN)
+;;; when I was trying to maintain code which uses these macros. I
+;;; think it would be a good idea to redo these so that they really
+;;; are analogous to EVERY and SOME. And then, while we're at it, we
+;;; could also make them functions (perhaps inline) instead of macros.
 (defmacro any-type-op (op thing list &key (default '(values nil nil))
 			  list-first)
   (let ((n-this (gensym))

@@ -242,7 +242,7 @@
   (multiple-value-bind (required optional restp rest keyp keys allowp aux)
       (parse-lambda-list lambda-list)
     (when aux
-      (error "&Aux in a FUNCTION or VALUES type: ~S." lambda-list))
+      (error "&AUX in a FUNCTION or VALUES type: ~S." lambda-list))
     (setf (args-type-required result) (mapcar #'specifier-type required))
     (setf (args-type-optional result) (mapcar #'specifier-type optional))
     (setf (args-type-rest result) (if restp (specifier-type rest) nil))
@@ -253,7 +253,8 @@
 	  (error "Keyword type description is not a two-list: ~S." key))
 	(let ((kwd (first key)))
 	  (when (find kwd (key-info) :key #'key-info-name)
-	    (error "Repeated keyword ~S in lambda list: ~S." kwd lambda-list))
+	    (error "~@<repeated keyword ~S in lambda list: ~2I~_~S~:>"
+		   kwd lambda-list))
 	  (key-info (make-key-info :name kwd
 				   :type (specifier-type (second key))))))
       (setf (args-type-keywords result) (key-info)))
@@ -1545,9 +1546,9 @@
 		     (make-member-type :members (members))))
 	      t))))
 
-;;; We don't need a :COMPLEX-UNION, since the only interesting case is a union
-;;; type, and the member/union interaction is handled by the union type
-;;; method.
+;;; We don't need a :COMPLEX-UNION, since the only interesting case is
+;;; a union type, and the member/union interaction is handled by the
+;;; union type method.
 (!define-type-method (member :simple-union) (type1 type2)
   (let ((mem1 (member-type-members type1))
 	(mem2 (member-type-members type2)))
@@ -1559,7 +1560,8 @@
 (!define-type-method (member :simple-=) (type1 type2)
   (let ((mem1 (member-type-members type1))
 	(mem2 (member-type-members type2)))
-    (values (and (subsetp mem1 mem2) (subsetp mem2 mem1))
+    (values (and (subsetp mem1 mem2)
+		 (subsetp mem2 mem1))
 	    t)))
 
 (!define-type-method (member :complex-=) (type1 type2)
@@ -1586,7 +1588,9 @@
 ;;;;    ;; reasonable behavior
 ;;;;    (ASSERT (SUBTYPEP 'KEYWORD 'SYMBOL))
 ;;;; Without understanding a little about the semantics of AND, we'd
-;;;; get (SUBTYPEP 'KEYWORD 'SYMBOL)=>NIL,NIL, which is unreasonable.)
+;;;; get (SUBTYPEP 'KEYWORD 'SYMBOL)=>NIL,NIL and, for entirely
+;;;; parallel reasons, (SUBTYPEP 'RATIO 'NUMBER)=>NIL,NIL. That's
+;;;; not so good..)
 ;;;;
 ;;;; We still follow the example of CMU CL to some extent, by punting
 ;;;; (to the opaque HAIRY-TYPE) on sufficiently complicated types
@@ -1597,6 +1601,7 @@
 ;;; the intersection type in some other way.
 (defun make-intersection-type-or-something (types)
   (declare (list types))
+  (/show0 "entering MAKE-INTERSECTION-TYPE-OR-SOMETHING")
   (cond ((null types)
 	 *universal-type*)
 	((null (cdr types))
@@ -1617,6 +1622,118 @@
 	 (%make-intersection-type (some #'type-enumerable types) types))))
 
 (!define-type-class intersection)
+
+;;; A few intersection types have special names. The others just get
+;;; mechanically unparsed.
+(!define-type-method (intersection :unparse) (type)
+  (declare (type ctype type))
+  (/show0 "entering INTERSECTION :UNPARSE")
+  (or (find type '(ratio bignum keyword) :key #'specifier-type :test #'type=)
+      `(and ,@(mapcar #'type-specifier (intersection-type-types type)))))
+
+;;; shared machinery for type equality: true if every type in the set
+;;; TYPES1 matches a type in the set TYPES2 and vice versa
+(defun type=-set (types1 types2)
+  (/show0 "entering TYPE=-SET")
+  (flet (;; true if every type in the set X matches a type in the set Y
+	 (type<=-set (x y)
+	   (declare (type list x y))
+	   (every (lambda (xelement)
+		    (position xelement y :test #'type=))
+		  x)))
+    (values (and (type<=-set types1 types2)
+		 (type<=-set types2 types1))
+	    t)))
+
+;;; Two intersection types are equal if their subtypes are equal sets.
+;;;
+;;; FIXME: Might it be better to use
+;;;   (AND (SUBTYPEP X Y) (SUBTYPEP Y X))
+;;; instead, since SUBTYPEP is the usual relationship that we care
+;;; most about, so it would be good to leverage any ingenuity there
+;;; in this more obscure method?
+(!define-type-method (intersection :simple-=) (type1 type2)
+  (/show0 "entering INTERSECTION :SIMPLE-=")
+  (type=-set (intersection-type-types type1)
+	     (intersection-type-types type2)))
+
+(!define-type-method (intersection :simple-subtypep) (type1 type2)
+  (declare (type list type1 type2))
+  (/show0 "entering INTERSECTION :SIMPLE-SUBTYPEP")
+  (some (lambda (t1)
+	  (every (lambda (t2)
+		   (csubtypep t1 t2))
+		 type2))
+	type1))
+
+(!define-type-method (intersection :complex-subtypep-arg1) (type1 type2)
+  (/show0 "entering INTERSECTION :COMPLEX-SUBTYPEP-ARG1")
+  (values (any-type-op csubtypep
+		       type2
+		       (intersection-type-types type1)
+		       :list-first t)
+	  t))
+
+(!define-type-method (intersection :complex-subtypep-arg2) (type1 type2)
+  (/show0 "entering INTERSECTION :COMPLEX-SUBTYPEP-ARG2")
+  (values (every-type-op csubtypep type1 (intersection-type-types type2))
+	  t))
+
+;;; Return a new type list where pairs of types whose intersections
+;;; can be represented simply have been replaced by the simple
+;;; representation.
+(defun simplify-intersection-type-types (%types)
+  (/show0 "entering SIMPLE-INTERSECTION-TYPE-TYPES")
+  (do* ((types (copy-list %types)) ; (to undestructivize the algorithm below)
+	(i-types types (cdr i-types))
+	(i-type (car i-types) (car i-types))) 
+      ((null i-types))
+    (do* ((pre-j-types i-types (cdr pre-j-types))
+	  (j-types (cdr pre-j-types) (cdr pre-j-types))
+	  (j-type (car j-types) (car j-types)))
+	((null j-types))
+      (multiple-value-bind (isect win) (type-intersection i-type j-type)
+	(when win
+	  ;; Overwrite I-TYPES with the intersection, and delete
+	  ;; J-TYPES from the list.
+	  (setf (car i-types) isect
+		(cdr pre-j-types) (cdr j-types)))))
+    (/show0 "leaving SIMPLE-INTERSECTION-TYPE-TYPES")
+    types))
+    
+(!define-type-method (intersection :simple-intersection :complex-intersection)
+		     (type1 type2)
+  (/show0 "entering INTERSECTION :SIMPLE-INTERSECTION :COMPLEX-INTERSECTION")
+  (let ((type1types (intersection-type-types type1))
+	(type2types (if (intersection-type-p type2)
+			(intersection-type-types type2)
+			(list type2))))
+    (make-intersection-type-or-something
+     (simplify-intersection-type-types
+      (append type1types type2types)))))
+
+#|
+(!def-type-translator and (&rest type-specifiers)
+  ;; Note: Between the behavior of SIMPLIFY-INTERSECTION-TYPE (which
+  ;; will reduce to a 1-element list any list of types which CMU CL
+  ;; could've represented) and MAKE-INTERSECTION-TYPE-OR-SOMETHING
+  ;; (which knows to treat a 1-element intersection as the element
+  ;; itself) we should recover CMU CL's behavior for anything which it
+  ;; could handle usefully (i.e. could without punting to HAIRY-TYPE).
+  (/show0 "entering type translator for AND")
+  (make-intersection-type-or-something
+   (simplify-intersection-type-types
+    (mapcar #'specifier-type type-specifiers))))
+|#
+;;; (REMOVEME once INTERSECTION-TYPE works.)
+(!def-type-translator and (&whole spec &rest types)
+  (let ((res *wild-type*))
+    (dolist (type types res)
+      (let ((ctype (specifier-type type)))
+        (multiple-value-bind (int win) (type-intersection res ctype)
+          (unless win
+            (return (make-hairy-type :specifier spec)))
+          (setq res int))))))
 
 ;;;; union types
 
@@ -1628,28 +1745,30 @@
 
 (!define-type-class union)
 
-;;; If LIST, then return that, otherwise the OR of the component types.
+;;; The LIST type has a special name. Other union types
+;;; just get mechanically unparsed.
 (!define-type-method (union :unparse) (type)
   (declare (type ctype type))
   (if (type= type (specifier-type 'list))
       'list
       `(or ,@(mapcar #'type-specifier (union-type-types type)))))
 
-;;; Two union types are equal if every type in one is equal to some
-;;; type in the other.
+;;; Two union types are equal if their subtypes are equal sets.
 (!define-type-method (union :simple-=) (type1 type2)
-  (let ((types1 (union-type-types type1))
-	(types2 (union-type-types type2)))
-    (values (and (dolist (type1 types1 t)
-		   (unless (any-type-op type= type1 types2)
-		     (return nil)))
-		 (dolist (type2 types2 t)
-		   (unless (any-type-op type= type2 types1)
-		     (return nil))))
-	    t)))
+  (type=-set (union-type-types type1)
+	     (union-type-types type2)))
 
 ;;; Similarly, a union type is a subtype of another if every element
 ;;; of TYPE1 is a subtype of some element of TYPE2.
+;;;
+;;; KLUDGE: This definition seems redundant, here in UNION-TYPE and
+;;; similarly in INTERSECTION-TYPE, with the logic in the
+;;; corresponding :COMPLEX-SUBTYPEP-ARG1 and :COMPLEX-SUBTYPEP-ARG2
+;;; methods. Ideally there's probably some way to make the
+;;; :SIMPLE-SUBTYPEP method default to the :COMPLEX-SUBTYPEP-FOO
+;;; methods in such a way that this definition could go away, but I
+;;; don't grok the system well enough to tell whether it's simple to
+;;; arrange this. -- WHN 2000-02-03
 (!define-type-method (union :simple-subtypep) (type1 type2)
   (let ((types2 (union-type-types type2)))
     (values (dolist (type1 (union-type-types type1) t)
@@ -1695,7 +1814,7 @@
       (setq res (type-union res t2)))))
 
 (!define-type-method (union :simple-intersection :complex-intersection)
-		    (type1 type2)
+		     (type1 type2)
   (let ((res *empty-type*)
 	(win t))
     (dolist (type (union-type-types type2) (values res win))
@@ -1707,35 +1826,6 @@
   (reduce #'type-union
 	  (mapcar #'specifier-type type-specifiers)
 	  :initial-value *empty-type*))
-
-;;; (Destructively) replace pairs of types which have simple
-;;; intersections with their simple intersection.
-(defun simplify-intersection-type-types (types)
-  (do* ((i-types types (cdr i-types))
-	(i-type (car i-types) (car i-types))) 
-      ((null i-types))
-    (do* ((pre-j-types i-types (cdr pre-j-types))
-	  (j-types (cdr pre-j-types) (cdr pre-j-types))
-	  (j-type (car j-types) (car j-types)))
-	((null j-types))
-      (multiple-value-bind (isect win) (type-intersection i-type j-type)
-	(when win
-	  ;; Overwrite I-TYPES with the intersection, and delete
-	  ;; J-TYPES from the list.
-	  (setf (car i-types) isect
-		(cdr pre-j-types) (cdr j-types))))))
-  types)
-    
-(!def-type-translator and (&rest type-specifiers)
-  ;; Note: Between the behavior of SIMPLIFY-INTERSECTION-TYPE (which
-  ;; will reduce to a 1-element list any list of types which CMU CL
-  ;; could've represented) and MAKE-INTERSECTION-TYPE-OR-SOMETHING
-  ;; (which knows to treat a 1-element intersection as the element
-  ;; itself) we should recover CMU CL's behavior for anything which it
-  ;; could handle usefully (i.e. could without punting to HAIRY-TYPE).
-  (make-intersection-type-or-something
-   (simplify-intersection-type-types
-    (mapcar #'specifier-type type-specifiers))))
 
 ;;;; CONS types
 

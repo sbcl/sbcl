@@ -23,6 +23,7 @@
       (error "~S is not a defined type class." name)))
 
 (defun must-supply-this (&rest foo)
+  (/show0 "failing in MUST-SUPPLY-THIS")
   (error "missing type method for ~S" foo))
 
 ;;; A TYPE-CLASS object represents the "kind" of a type. It mainly contains

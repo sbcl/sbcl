@@ -903,8 +903,8 @@
 			      (ir1-attributep (function-info-attributes info)
 					      recursive)))))
 	  (let ((*compiler-error-context* call))
-	    (compiler-warning "recursion in known function definition~2I ~
-                               ~_policy=~S ~_arg types=~S"
+	    (compiler-warning "~@<recursion in known function definition~2I ~
+                               ~_policy=~S ~_arg types=~S~:>"
 			      (lexenv-policy (node-lexenv call))
 			      (mapcar (lambda (arg)
 					(type-specifier (continuation-type
