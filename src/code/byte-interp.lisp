@@ -382,12 +382,6 @@
 (defun %byte-special-unbind ()
   (sb!sys:%primitive unbind)
   (values))
-
-;;; obsolete...
-#!-sb-fluid (declaim (inline cons-unique-tag))
-(defun cons-unique-tag ()
-  (list '#:%unique-tag%))
-;;; FIXME: Delete this once the system is working.
 
 ;;;; two-arg function stubs
 ;;;;

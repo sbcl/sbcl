@@ -682,18 +682,22 @@ changes in sbcl-0.6.11 relative to sbcl-0.6.10:
   as per Daniel Barlow's suggestion and Martin Atzmueller's patch
 
 changes in sbcl-0.6.12 relative to sbcl-0.6.11:
-?? many patches ported from CMU CL by Martin Atzmueller, notably
-  ??
-  ??
-?? new fasl file format version number (because a disused byte code
-  opcode was removed, causing the other opcodes to change)
-* various tweaks to make the system easier to build under other
+* many patches ported from CMU CL by Martin Atzmueller, with 
+  half a dozen bug fixes in pretty-printing and the debugger, and
+  half a dozen others elsewhere
+?? The :PROPAGATE-FLOAT-TYPE and :PROPAGATE-FUN-TYPE target features
+  are now supported, and enabled by default. Thus, the compiler can
+  handle many floating point and complex operations much less
+  inefficiently. (Thus e.g. you can implement a complex FFT
+  without consing!)
+* various fixes to make the cross-compiler more portable to
   ANSI-conforming-but-different cross-compilation hosts (notably
   Lispworks for Windows, following bug reports from Arthur Lemmens)
-?? The :PROPAGATE-FLOAT-TYPE and :PROPAGATE-FUN-TYPE target features
-  are now enabled by default. Now the compiler can handle many
-  floating point and complex operations much less inefficiently.
-  (Thus e.g. you can implement a complex FFT without consing!)
+* a new workaround to make the cross-compiler portable to CMU CL
+  again despite its non-ANSI EVAL-WHEN, thanks to Martin Atzmueller
+* new fasl file format version number (because a disused value was
+  removed from the sequence of byte code opcodes, causing the other
+  opcodes to change)
 
 planned incompatible changes in 0.7.x:
 * The debugger prompt sequence now goes "5]", "5[2]", "5[3]", etc.

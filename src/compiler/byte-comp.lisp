@@ -13,9 +13,10 @@
 (in-package "SB!C")
 
 ;;;; the fasl file format that we use
-(defconstant byte-fasl-file-version 2)
+(defconstant byte-fasl-file-version 3)
 ;;; 1 = before about sbcl-0.6.9.8
 ;;; 2 = merged package SB-CONDITIONS into SB-KERNEL around sbcl-0.6.9.8
+;;; 3 = deleted obsolete CONS-UNIQUE-TAG bytecode in sbcl-0.6.11.8
 
 ;;; ### remaining work:
 ;;;
@@ -222,7 +223,6 @@
 	       (setf-symbol-value (t symbol) (values))
 	       (%byte-special-bind (t symbol) (values))
 	       (%byte-special-unbind () (values))
-	       (cons-unique-tag () t)   ; obsolete...
 	       (%negate (fixnum) fixnum)
 	       (< (fixnum fixnum) t)
 	       (> (fixnum fixnum) t)
