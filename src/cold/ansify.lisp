@@ -78,6 +78,11 @@
 #+(and cmu alpha)
 (unless (ignore-errors (read-from-string "1.0l0"))
   (error "CMUCL on Alpha can't read floats in the format \"1.0l0\".  Patch your core file~%~%"))
+
+#+openmcl 
+(unless (ignore-errors (funcall (constantly t) 1 2 3)) 
+  (error "please find a binary that understands CONSTANTLY to build from"))
+
 
 ;;;; general non-ANSI-ness
 
