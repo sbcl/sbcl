@@ -57,8 +57,8 @@
       (dolist (result results)
 	;; Don't fresh-line before a result, since newline was entered by user
 	;; in *repl-read-form-fun*
-	(prin1 result)
-	(fresh-line)))))
+	(fresh-line *standard-output*)
+	(prin1 result *standard-output*)))))
 
 (defun repl-fun (noprint)
   (repl :noprint noprint :break-level 0))

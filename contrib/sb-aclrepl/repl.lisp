@@ -798,6 +798,7 @@
       (let ((stopped-threads (sb-thread::waitqueue-data lock)))
 	(when stopped-threads
 	  (format stream "~{~&Thread ~A suspended~}~%" stopped-threads))))
+    (fresh-line stream)
     (if (functionp *prompt*)
 	(write-string (funcall *prompt*
 			       break-level
