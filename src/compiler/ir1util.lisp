@@ -772,12 +772,12 @@
     (clambda (delete-lambda fun)))
   (values))
 
-;;; Deal with deleting the last reference to a CLAMBDA. Since there is
-;;; only one way into a CLAMBDA, deleting the last reference to a
-;;; CLAMBDA ensures that there is no way to reach any of the code in
-;;; it. So we just set the FUNCTIONAL-KIND for FUN and its LETs to
-;;; :DELETED, causing IR1 optimization to delete blocks in that
-;;; CLAMBDA.
+;;; Deal with deleting the last reference to a CLAMBDA. It is called
+;;; in two situations: when the lambda is unreachable (so that its
+;;; body mey be deleted), and when it is an effectless LET (in this
+;;; case its body is reachable and is not completely "its"). We set
+;;; FUNCTIONAL-KIND to :DELETED and rely on IR1-OPTIMIZE to delete its
+;;; blocks.
 (defun delete-lambda (clambda)
   (declare (type clambda clambda))
   (let ((original-kind (functional-kind clambda))
@@ -786,6 +786,16 @@
     (aver (not (functional-has-external-references-p clambda)))
     (setf (functional-kind clambda) :deleted)
     (setf (lambda-bind clambda) nil)
+
+    (when bind ; CLAMBDA is deleted due to unreachability
+      (labels ((delete-children (lambda)
+                 (dolist (child (lambda-children lambda))
+                   (if (eq (functional-kind child) :deleted)
+                       (delete-children child)
+                       (delete-lambda child))
+                   (setf (lambda-children lambda) nil))
+                 (setf (lambda-parent lambda) nil)))
+      (delete-children clambda)))
     (dolist (let (lambda-lets clambda))
       (setf (lambda-bind let) nil)
       (setf (functional-kind let) :deleted))

@@ -1256,36 +1256,14 @@ WORKAROUND:
   the control word; however, this clobbers any change the user might
   have made.
 
-291: "bugs in deletion of embedded functions"
-
-  Python fails to compile (simplified version of the problem reported
-  by Nikodemus Siivola)
-
-    (defstruct (line)
-      (%chars ""))
-
-    (defun update-window-imag (line)
-      (tagbody
-       TOP
-         (if (null line)
-             (go DONE)
-             (go TOP))
-       DONE
-         (unless (eq current the-sentinel)
-           (let* ((cc (car current))
-                  (old-line (dis-line-line cc)))
-             (if (eq old-line line)
-                 (do ((chars (line-%chars line) nil)) ; <LET>
-                     (())
-                   (let* ()
-                     (multiple-value-call
-                         #'(lambda (&optional g2740 g2741 &rest g2742)
-                             (declare (ignore g2742))
-                             (catch 'foo ; <CLEANUP>
-                               (values (setq string g2740) (setq underhang g2741))))
-                       (foo)))
-                   (setf (dis-line-old-chars cc) chars)))))))
-
-  Compiler deletes unreachable BIND node of <LET>, but its body,
-  including reference to the variable CHARS, remains reachable through
-  NLX from <CLEANUP>.
+292:
+  (COMPILE NIL
+           `(LAMBDA (C)
+              (DECLARE (TYPE (INTEGER -5945502333 12668542) C)
+                       (OPTIMIZE (SPEED 3)))
+              (LET ((V2 (* C 12)))
+                (- (MAX (IF (/= 109335113 V2) -26479 V2)
+                        (DEPOSIT-FIELD 311
+                                       (BYTE 14 28)
+                                       (MIN (MAX 521326 C) -51)))))))
+  causes compiler failure (reported by Paul Dietz).

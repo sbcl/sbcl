@@ -187,5 +187,52 @@
   (progn (truly-the integer x)
          (1+ x)))
 
+;;; bug 291 reported by Nikodemus Siivola (modified version)
+(defstruct line
+  (%chars ""))
+(defun update-window-imag (line)
+  (tagbody
+   TOP
+     (if (null line)
+         (go DONE)
+         (go TOP))
+   DONE
+     (unless (eq current the-sentinel)
+       (let* ((cc (car current))
+              (old-line (dis-line-line cc)))
+         (if (eq old-line line)
+             (do ((chars (line-%chars line) nil))
+                 (())
+               (let* ()
+                 (multiple-value-call
+                     #'(lambda (&optional g2740 g2741 &rest g2742)
+                         (declare (ignore g2742))
+                         (catch 'foo
+                           (values (setq string g2740) (setq underhang g2741))))
+                   (foo)))
+               (setf (dis-line-old-chars cc) chars)))))))
+
+;;; and similar cases found by Paul Dietz
+(defun #:foo (a b c)
+  (declare (optimize (speed 0) (safety 3) (debug 3)))
+  (FLET ((%F11 ()
+           (BLOCK B6
+             (LET ((V2 B))
+               (IF (LDB-TEST (BYTE 27 14) V2)
+                   (LET ((V6
+                          (FLET ((%F7 ()
+                                   B))
+                            -1)))
+                     (RETURN-FROM B6 V2))
+                   C)))))
+    A))
+(defun #:foo (a b c)
+  (declare (optimize (speed 0) (safety 3) (debug 3)))
+  (FLET ((%F15 ()
+           (BLOCK B8
+             (LET ((V5 B))
+               (MIN A (RETURN-FROM B8 C))))))
+    C))
+
 
 (sb-ext:quit :unix-status 104)

@@ -918,7 +918,10 @@
   ;; retain it so that if the LET is deleted (due to a lack of vars),
   ;; we will still have caller's lexenv to figure out which cleanup is
   ;; in effect.
-  (call-lexenv nil :type (or lexenv null)))
+  (call-lexenv nil :type (or lexenv null))
+  ;; list of embedded lambdas
+  (children nil :type list)
+  (parent nil :type (or clambda null)))
 (defprinter (clambda :conc-name lambda- :identity t)
   %source-name
   %debug-name
