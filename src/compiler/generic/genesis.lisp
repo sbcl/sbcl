@@ -1176,7 +1176,6 @@
 
   (cold-set '*current-catch-block*          (make-fixnum-descriptor 0))
   (cold-set '*current-unwind-protect-block* (make-fixnum-descriptor 0))
-  (cold-set '*eval-stack-top*               (make-fixnum-descriptor 0))
 
   (cold-set '*free-interrupt-context-index* (make-fixnum-descriptor 0))
 

@@ -28,15 +28,15 @@
 ;;;;
 ;;;; These VOPs are used in the reentered function to restore the
 ;;;; appropriate dynamic environment. Currently we only save the
-;;;; Current-Catch and binding stack pointer. We don't need to
-;;;; save/restore the current unwind-protect, since unwind-protects
+;;;; CURRENT-CATCH and binding stack pointer. We don't need to
+;;;; save/restore the current UNWIND-PROTECT, since UNWIND-PROTECTS
 ;;;; are implicitly processed during unwinding. If there were any
-;;;; additional stacks, then this would be the place to restore the
+;;;; additional stacks (as e.g. there was an interpreter "eval stack"
+;;;; before sbcl-0.7.0), then this would be the place to restore the
 ;;;; top pointers.
 
-
-;;; Return a list of TNs that can be used to snapshot the dynamic state for
-;;; use with the Save/Restore-Dynamic-Environment VOPs.
+;;; Return a list of TNs that can be used to snapshot the dynamic
+;;; state for use with the SAVE- and RESTORE-DYNAMIC-ENVIRONMENT VOPs.
 (!def-vm-support-routine make-dynamic-state-tns ()
   (list (make-normal-tn *backend-t-primitive-type*)
 	(make-normal-tn *backend-t-primitive-type*)
@@ -54,8 +54,7 @@
     (let ((cur-nfp (current-nfp-tn vop)))
       (when cur-nfp
 	(inst mskll cur-nfp 4 nfp)))
-    (inst mskll nsp-tn 4 nsp)
-    (load-symbol-value eval *eval-stack-top*)))
+    (inst mskll nsp-tn 4 nsp)))
 
 (define-vop (restore-dynamic-state)
   (:args (catch :scs (descriptor-reg))
@@ -66,7 +65,6 @@
   (:temporary (:sc any-reg) temp)
   (:generator 10
     (store-symbol-value catch *current-catch-block*)
-    (store-symbol-value eval *eval-stack-top*)
     (inst mskll nsp-tn 0 temp)
     (let ((cur-nfp (current-nfp-tn vop)))
       (when cur-nfp

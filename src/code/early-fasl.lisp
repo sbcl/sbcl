@@ -36,9 +36,13 @@
 ;;; the code for a character which terminates a fasl file header
 (defconstant +fasl-header-string-stop-char-code+ 255)
 
-;;; This value should be incremented when the system changes in such
-;;; a way that it will no longer work reliably with old fasl files.
-(defconstant +fasl-file-version+ 22)
+;;; This value should be incremented when the system changes in such a
+;;; way that it will no longer work reliably with old fasl files. In
+;;; practice, I (WHN) fairly often neglect to increment it for CVS
+;;; versions which break binary compatibility. But it certainly should
+;;; be incremented for release versions which break binary
+;;; compatibility.
+(defconstant +fasl-file-version+ 23)
 ;;; 2 = sbcl-0.6.4 uses COMPILE-OR-LOAD-DEFGENERIC.
 ;;; 3 = sbcl-0.6.6 uses private symbol, not :EMPTY, for empty HASH-TABLE slot.
 ;;; 4 = sbcl-0.6.7 uses HAIRY-DATA-VECTOR-REF and HAIRY-DATA-VECTOR-SET
@@ -89,6 +93,8 @@
 ;;; 22 = about a zillion changes between sbcl-0.pre7.62 and
 ;;;      sbcl-0.pre7.133, during which time it seemed too much
 ;;;      trouble to increment the counter
+;;; 23 = sbcl-0.7.0.1 deleted no-longer-used EVAL-STACK stuff,
+;;;      causing changes in *STATIC-SYMBOLS*.
 
 ;;; the conventional file extension for our fasl files
 (declaim (type simple-string *fasl-file-type*))
@@ -100,11 +106,11 @@
 ;;;   Assembler routines are named by full Lisp symbols: they
 ;;;     have packages and that sort of native Lisp stuff associated
 ;;;     with them. We can compare them with EQ.
-;;;   Foreign symbols are named by Lisp strings: the Lisp package
+;;;   Foreign symbols are named by Lisp STRINGs: the Lisp package
 ;;;     system doesn't extend out to symbols in languages like C.
 ;;;     We want to use EQUAL to compare them.
 ;;;   *STATIC-FOREIGN-SYMBOLS* are static as opposed to "dynamic" (not
-;;;     as opposed to "extern"). The table contains symbols known at 
+;;;     as opposed to C's "extern"). The table contains symbols known at 
 ;;;     the time that the program was built, but not symbols defined
 ;;;     in object files which have been loaded dynamically since then.
 (declaim (type hash-table *assembler-routines* *static-foreign-symbols*))

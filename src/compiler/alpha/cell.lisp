@@ -369,8 +369,6 @@
   (define-mutator-accessors binding-stack-end :sap nil)
   (define-mutator-accessors number-stack-base :sap nil)
   (define-mutator-accessors number-stack-end :sap nil)
-  (define-mutator-accessors eval-stack :des t)
-  (define-mutator-accessors eval-stack-top :ub32 t)
   (define-mutator-accessors nursery-start :sap nil)
   (define-mutator-accessors nursery-end :sap nil)
   (define-mutator-accessors storebuf-start :sap nil)

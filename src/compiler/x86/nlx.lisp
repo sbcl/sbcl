@@ -31,16 +31,17 @@
 ;;;;
 ;;;; These VOPs are used in the reentered function to restore the
 ;;;; appropriate dynamic environment. Currently we only save the
-;;;; Current-Catch, the eval stack pointer, and the alien stack
-;;;; pointer.
+;;;; Current-Catch and the alien stack pointer. (Before sbcl-0.7.0,
+;;;; when there were IR1 and byte interpreters, we had to save
+;;;; the interpreter "eval stack" too.)
 ;;;;
-;;;; We don't need to save/restore the current unwind-protect, since
-;;;; unwind-protects are implicitly processed during unwinding.
+;;;; We don't need to save/restore the current UNWIND-PROTECT, since
+;;;; UNWIND-PROTECTs are implicitly processed during unwinding.
 ;;;;
 ;;;; We don't need to save the BSP, because that is handled automatically.
 
-;;; Return a list of TNs that can be used to snapshot the dynamic state for
-;;; use with the Save/Restore-Dynamic-Environment VOPs.
+;;; Return a list of TNs that can be used to snapshot the dynamic
+;;; state for use with the SAVE- and RESTORE-DYNAMIC-ENVIRONMENT VOPs.
 (!def-vm-support-routine make-dynamic-state-tns ()
   (make-n-tns 3 *backend-t-primitive-type*))
 
@@ -50,7 +51,6 @@
 	    (alien-stack :scs (descriptor-reg)))
   (:generator 13
     (load-symbol-value catch *current-catch-block*)
-    (load-symbol-value eval *eval-stack-top*)
     (load-symbol-value alien-stack *alien-stack*)))
 
 (define-vop (restore-dynamic-state)
@@ -59,7 +59,6 @@
 	 (alien-stack :scs (descriptor-reg)))
   (:generator 10
     (store-symbol-value catch *current-catch-block*)
-    (store-symbol-value eval *eval-stack-top*)
     (store-symbol-value alien-stack *alien-stack*)))
 
 (define-vop (current-stack-pointer)

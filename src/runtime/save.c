@@ -82,21 +82,33 @@ boolean
 save(char *filename, lispobj init_function)
 {
     FILE *file;
-    /* Open the file: */
+
+    /* Open the output file. We don't actually need the file yet, but
+     * the fopen() might fail for some reason, and we want to detect
+     * that and back out before we do anything irreversible. */
     unlink(filename);
     file = fopen(filename, "w");
-    if (file == NULL) {
+    if (!file) {
         perror(filename);
         return 1;
     }
-    printf("[undoing binding stack... ");
+
+    /* Smash the enclosing state. (Once we do this, there's no good
+     * way to go back, which is a sufficient reason that this ends up
+     * being SAVE-LISP-AND-DIE instead of SAVE-LISP-AND-GO-ON). */
+    printf("[undoing binding stack and other enclosing state... ");
     fflush(stdout);
     unbind_to_here((lispobj *)BINDING_STACK_START);
     SetSymbolValue(CURRENT_CATCH_BLOCK, 0);
     SetSymbolValue(CURRENT_UNWIND_PROTECT_BLOCK, 0);
-    SetSymbolValue(EVAL_STACK_TOP, 0);
     printf("done]\n");
+    fflush(stdout);
+    
+    /* (Now we can actually start copying ourselves into the
+     * output file.) */
+
     printf("[saving current Lisp image into %s:\n", filename);
+    fflush(stdout);
 
     putw(CORE_MAGIC, file);
 
@@ -107,21 +119,29 @@ save(char *filename, lispobj init_function)
     putw(CORE_NDIRECTORY, file);
     putw((5*3)+2, file);
 
-    output_space(file, READ_ONLY_SPACE_ID, (lispobj *)READ_ONLY_SPACE_START,
+    output_space(file,
+		 READ_ONLY_SPACE_ID,
+		 (lispobj *)READ_ONLY_SPACE_START,
 		 (lispobj *)SymbolValue(READ_ONLY_SPACE_FREE_POINTER));
-    output_space(file, STATIC_SPACE_ID, (lispobj *)STATIC_SPACE_START,
+    output_space(file,
+		 STATIC_SPACE_ID,
+		 (lispobj *)STATIC_SPACE_START,
 		 (lispobj *)SymbolValue(STATIC_SPACE_FREE_POINTER));
 #ifdef reg_ALLOC
-    output_space(file, DYNAMIC_SPACE_ID, (lispobj *)current_dynamic_space,
+    output_space(file,
+		 DYNAMIC_SPACE_ID,
+		 (lispobj *)current_dynamic_space,
 		 dynamic_space_free_pointer);
 #else
 #ifdef GENCGC
-    /* Flush the current_region updating the tables. */
+    /* Flush the current_region, updating the tables. */
     gc_alloc_update_page_tables(0,&boxed_region);
     gc_alloc_update_page_tables(1,&unboxed_region);
     update_x86_dynamic_space_free_pointer();
 #endif
-    output_space(file, DYNAMIC_SPACE_ID, (lispobj *)DYNAMIC_SPACE_START,
+    output_space(file,
+		 DYNAMIC_SPACE_ID,
+		 (lispobj *)DYNAMIC_SPACE_START,
 		 (lispobj *)SymbolValue(ALLOCATION_POINTER));
 #endif
 
@@ -130,8 +150,8 @@ save(char *filename, lispobj init_function)
     putw(init_function, file);
 
     putw(CORE_END, file);
-    fclose(file);
 
+    fclose(file);
     printf("done]\n");
 
     exit(0);

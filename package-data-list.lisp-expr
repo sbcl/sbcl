@@ -878,7 +878,22 @@ retained, possibly temporariliy, because it might be used internally."
  ;; implementation of the Lisp type system (e.g. TYPE-INTERSECTION and
  ;; SPECIFIER-TYPE) could move to a separate package SB!TYPE. (There's
  ;; lots of stuff which currently uses the SB!KERNEL package which
- ;; doesn't actually use the type system stuff.)
+ ;; doesn't actually use the type system stuff.) And maybe other
+ ;; possible splits too:
+ ;;   * Pull GC stuff (*GC-INHIBIT*, *NEED-TO-COLLECT-GARBAGE*, etc.)
+ ;;     out into SB-GC.
+ ;;   * Pull special case implementations of sequence functions (e.g.
+ ;;     %MAP-TO-LIST-ARITY-1 and %FIND-POSITION-IF-NOT) and 
+ ;;     other sequence function implementation grot into SB-SEQ.
+ ;;   * Pull all the math stuff (%ACOS, %COSH, 32BIT-LOGICAL-AND...)
+ ;;     into SB-MATH.
+ ;;   * Pull all the array stuff (%ARRAY-DATA-VECTOR, %RAW-REF-LONG,
+ ;;     WITH-ARRAY-DATA, ALLOCATE-VECTOR, HAIRY-DATA-VECTOR-REF...)
+ ;;     into SB-ARRAY.
+ ;;   * Pull all the streams stuff out into SB-STREAM.
+ ;;   * Pull all the OBJECT-NOT-FOO symbols out. Maybe we could even
+ ;;     figure out a way to stop exporting them? Failing that,
+ ;;     they could be in SB-INTERR.
  #s(sb-cold:package-data
     :name "SB!KERNEL"
     :doc
@@ -924,15 +939,14 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
              "%SET-SIGNED-SAP-REF-16" "%SET-SIGNED-SAP-REF-32"
              "%SET-SIGNED-SAP-REF-64" "%SET-SIGNED-SAP-REF-8"
              "%SET-STACK-REF" "%SIN" "%SIN-QUICK"
-             "%SINGLE-FLOAT" "%SINH" "%SP-SET-DEFINITION"
-             "%SP-SET-PLIST"
+             "%SINGLE-FLOAT" "%SINH" 
              "%SQRT" "%SXHASH-SIMPLE-STRING"
              "%SXHASH-SIMPLE-SUBSTRING" "%TAN" "%TAN-QUICK"
              "%TANH" "%UNARY-ROUND" "%UNARY-TRUNCATE"
              "%WITH-ARRAY-DATA" "%WITH-ARRAY-DATA-MACRO" 
              "*ALREADY-MAYBE-GCING*"
              "*CURRENT-LEVEL*" "*EMPTY-TYPE*"
-             "*EVAL-STACK*" "*EVAL-STACK-TOP*" "*GC-INHIBIT*"
+             "*GC-INHIBIT*"
              "*NEED-TO-COLLECT-GARBAGE*"
              "*PRETTY-PRINTER*" "*UNIVERSAL-TYPE*"
              "*UNIVERSAL-FUN-TYPE*"
