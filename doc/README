@@ -1,8 +1,12 @@
-SBCL is -- ahem! -- not particularly well documented at this point.
+SBCL is -- ahem! -- not completely documented at this point.
 What can I say? Help with documentation might not be refused.:-)
 
-The old CMUCL documentation, in the cmucl/ subdirectory, is still
-somewhat useful. The old user's manual is very useful. Most of the
-CMUCL extensions to Common Lisp have gone away, but the general
-information about how to use the Python compiler is still very
-relevant.
+There is a user manual in DocBook format, in user-manual.sgml.
+It's based on the CMU CL user manual, and some of its chapters
+aren't done, just notes that "this is similar to chapter such-and-such
+of the CMU CL user manual".
+
+The old CMU CL documentation can still be useful both for
+missing chapters of the user manual and for documentation of
+the internals of the system. It's available from SourceForge
+by anonymous ftp.
