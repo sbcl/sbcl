@@ -1079,8 +1079,7 @@
 			       ref)
   `(do ((index ,start (1+ index))
 	(value ,initial-value))
-       ((= index (the fixnum ,end)) value)
-     (declare (fixnum index))
+       ((>= index ,end) value)
      (setq value (funcall ,function value
 			  (apply-key ,key (,ref ,sequence index))))))
 
@@ -1094,8 +1093,7 @@
   `(do ((index (1- ,end) (1- index))
 	(value ,initial-value)
 	(terminus (1- ,start)))
-       ((= index terminus) value)
-     (declare (fixnum index terminus))
+       ((<= index terminus) value)
      (setq value (funcall ,function
 			  (apply-key ,key (,ref ,sequence index))
 			  value))))
@@ -1108,14 +1106,13 @@
 			     initial-value
 			     ivp)
   `(let ((sequence (nthcdr ,start ,sequence)))
-     (do ((count (if ,ivp ,start (1+ (the fixnum ,start)))
+     (do ((count (if ,ivp ,start (1+ ,start))
 		 (1+ count))
 	  (sequence (if ,ivp sequence (cdr sequence))
 		    (cdr sequence))
 	  (value (if ,ivp ,initial-value (apply-key ,key (car sequence)))
 		 (funcall ,function value (apply-key ,key (car sequence)))))
-	 ((= count (the fixnum ,end)) value)
-       (declare (fixnum count)))))
+	 ((>= count ,end) value))))
 
 (sb!xc:defmacro list-reduce-from-end (function
 				      sequence
@@ -1124,17 +1121,15 @@
 				      end
 				      initial-value
 				      ivp)
-  `(let ((sequence (nthcdr (- (the fixnum (length ,sequence))
-			      (the fixnum ,end))
+  `(let ((sequence (nthcdr (- (length ,sequence) ,end)
 			   (reverse ,sequence))))
-     (do ((count (if ,ivp ,start (1+ (the fixnum ,start)))
+     (do ((count (if ,ivp ,start (1+ ,start))
 		 (1+ count))
 	  (sequence (if ,ivp sequence (cdr sequence))
 		    (cdr sequence))
 	  (value (if ,ivp ,initial-value (apply-key ,key (car sequence)))
 		 (funcall ,function (apply-key ,key (car sequence)) value)))
-	 ((= count (the fixnum ,end)) value)
-       (declare (fixnum count)))))
+	 ((>= count ,end) value))))
 
 ) ; EVAL-WHEN
 
@@ -1142,7 +1137,8 @@
     (function sequence &key key from-end start end (initial-value nil ivp))
   (declare (type index start))
   (let ((start start)
-	(end (or end length)))
+	(end (or end length))
+        (function (%coerce-callable-to-fun function)))
     (declare (type index start end))
     (cond ((= end start)
 	   (if ivp initial-value (funcall function)))

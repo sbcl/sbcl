@@ -207,6 +207,7 @@
 	       ;; whether there's still an optimizer bug, and fix it if so, and
 	       ;; then make these INLINE.
 	       `(defun ,b-name (&rest ,args)
+                  (declare (dynamic-extent ,args))
 		  (apply #',name ,args)))))
   (def backq-list list)
   (def backq-list* list*)
