@@ -105,8 +105,8 @@ the usual naming convention (names like *FOO*) for special variables"
        ;; want bindings which are constant in some sense other than
        ;; EQL, I suggest either just using DEFVAR (which is usually
        ;; appropriate, despite the un-mnemonic name), or defining
-       ;; something like SB-INT:DEFCONSTANT-EQX (which is occasionally
-       ;; more appropriate). -- WHN 2000-11-03
+       ;; something like the DEFCONSTANT-EQX macro used in SBCL (which
+       ;; is occasionally more appropriate). -- WHN 2001-12-21
        (unless (eql value
 		    (info :variable :constant-value name))
 	 (cerror "Go ahead and change the value."

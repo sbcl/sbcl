@@ -47,7 +47,8 @@
 ;;; interpreter to go away, which is waiting for sbcl-0.7.x..
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defconstant +empty-ht-slot+ '%empty-ht-slot%))
-(defconstant +empty-ht-slot+ '#.+empty-ht-slot+) ; egads.. See FIXME above.
+;;; We shouldn't need this mess now that EVAL-WHEN works.
+#+nil (defconstant +empty-ht-slot+ '#.+empty-ht-slot+) ; egads.. See FIXME above.
 ;;; KLUDGE: Using a private symbol still leaves us vulnerable to users
 ;;; getting nonconforming behavior by messing around with
 ;;; DO-ALL-SYMBOLS. That seems like a fairly obscure problem, so for

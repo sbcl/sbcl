@@ -61,11 +61,11 @@
 
 (eval-when (:compile-toplevel :execute)
   (sb!xc:defmacro pick-vector-type (type &rest specs)
-    `(cond ,@(mapcar #'(lambda (spec)
-			 `(,(if (eq (car spec) t)
-				t
-				`(subtypep ,type ',(car spec)))
-			   ,@(cdr spec)))
+    `(cond ,@(mapcar (lambda (spec)
+		       `(,(if (eq (car spec) t)
+			      t
+			      `(subtypep ,type ',(car spec)))
+			 ,@(cdr spec)))
 		     specs))))
 
 ;;; These functions are used in the implementation of MAKE-ARRAY for
