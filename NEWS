@@ -2385,6 +2385,8 @@ changes in sbcl-0.8.10 relative to sbcl-0.8.9:
     greater than 32 handle EOF correctly.
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** READ-SEQUENCE now works on ECHO-STREAMs.
+    ** RATIONALIZE works more according to its specification.  (thanks
+       to Bruno Haible)
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles

@@ -553,7 +553,7 @@ Brian Downing:
 
 Miles Egan:
   He creates binary packages of SBCL releases for Red Hat and other
-  (which?) platforms
+  (which?) platforms.
 
 Nathan Froyd:
   He has fixed various bugs, and also done a lot of internal
@@ -563,6 +563,11 @@ Nathan Froyd:
   read without being an expert in ancient languages and so that we
   can delete a thousand lines of implement-ITERATE macrology from
   the codebase.)
+
+Bruno Haible:
+  He devised an accurate continued-fraction-based implementation of
+  RATIONALIZE, replacing a less-accurate version inherited from
+  primordial CMUCL.
 
 Matthias Hoelzl:
   He reported and fixed COMPILE's misbehavior on macros.
