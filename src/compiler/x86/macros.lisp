@@ -93,7 +93,7 @@
 	       (ash symbol-tls-index-slot word-shift)
 	       (- other-pointer-lowtag))))
     (inst gs-segment-prefix)
-    (inst mov ,reg (make-ea :dword :scale 4 :index ,reg))))
+    (inst mov ,reg (make-ea :dword :scale 1 :index ,reg))))
 
 (defmacro store-tl-symbol-value (reg symbol temp)
   `(progn
@@ -104,7 +104,7 @@
 	       (ash symbol-tls-index-slot word-shift)
 	       (- other-pointer-lowtag))))
     (inst gs-segment-prefix)
-    (inst mov (make-ea :dword :scale 4 :index ,temp) ,reg)))
+    (inst mov (make-ea :dword :scale 1 :index ,temp) ,reg)))
 
 (defmacro load-type (target source &optional (offset 0))
   #!+sb-doc

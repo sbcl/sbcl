@@ -3752,10 +3752,15 @@ garbage_collect_generation(int generation, int raise)
     /* Scavenge the binding stacks. */
  {
      struct thread *th;
-     for(th=all_threads;th;th=th->next)
+     for(th=all_threads;th;th=th->next) {
+	 long len= (lispobj *)SymbolValue(BINDING_STACK_POINTER,th) -
+	     th->binding_stack_start;
+	 printf("--- len=%ld\n",len);
 	 scavenge((lispobj *) th->binding_stack_start,
 		  (lispobj *)SymbolValue(BINDING_STACK_POINTER,th) -
-		  (lispobj *)th->binding_stack_start);
+		  th->binding_stack_start);
+	 
+     }
  }
 
     /* The original CMU CL code had scavenge-read-only-space code

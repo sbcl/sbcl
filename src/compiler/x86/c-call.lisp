@@ -222,7 +222,7 @@
 				(ash symbol-tls-index-slot word-shift)
 				(- other-pointer-lowtag))))
 	(inst gs-segment-prefix)
-	(inst sub (make-ea :dword :scale 4 :index temp) delta)))
+	(inst sub (make-ea :dword :scale 1 :index temp) delta)))
     (load-tl-symbol-value result *alien-stack*)))
 
 (define-vop (dealloc-alien-stack-space)
@@ -238,4 +238,4 @@
 				(ash symbol-tls-index-slot word-shift)
 				(- other-pointer-lowtag))))
 	(inst gs-segment-prefix)
-	(inst add (make-ea :dword :scale 4 :index temp) delta)))))
+	(inst add (make-ea :dword :scale 1 :index temp) delta)))))

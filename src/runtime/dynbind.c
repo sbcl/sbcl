@@ -37,7 +37,8 @@ void bind_variable(lispobj symbol, lispobj value, void *th)
     SetBSP(binding+1);
     if(!sym->tls_index) {
 	sym->tls_index=SymbolValue(FREE_TLS_INDEX,0);
-	SetSymbolValue(FREE_TLS_INDEX,1+sym->tls_index,0);
+	SetSymbolValue(FREE_TLS_INDEX,
+		       make_fixnum(fixnum_value(sym->tls_index)+1),0);
     }
     old_tl_value=SymbolTlValue(symbol,thread);
     binding->value = old_tl_value;

@@ -46,16 +46,15 @@ struct thread *init_thread(lispobj initial_function) {
 	int i;
 	for(i=0;i<(dynamic_values_bytes/sizeof(lispobj));i++)
 	    th->dynamic_values_start[i]=UNBOUND_MARKER_WIDETAG;
-	SetSymbolValue(FREE_TLS_INDEX,3,0);
+	SetSymbolValue(FREE_TLS_INDEX,make_fixnum(3),0);
+	((struct symbol *)(CURRENT_THREAD_STRUCT-OTHER_POINTER_LOWTAG))
+	    ->tls_index=make_fixnum(1);
+	((struct symbol *)(BINDING_STACK_POINTER-OTHER_POINTER_LOWTAG))
+	    ->tls_index=make_fixnum(2);
     }
-    ((struct symbol *)(CURRENT_THREAD_STRUCT-OTHER_POINTER_LOWTAG))
-	->tls_index=1;
+
     SetTlSymbolValue(CURRENT_THREAD_STRUCT,th,th);
-
-    ((struct symbol *)(BINDING_STACK_POINTER-OTHER_POINTER_LOWTAG))
-	->tls_index=2;
     SetTlSymbolValue(BINDING_STACK_POINTER,LOW_WORD(th->binding_stack_start),th);
-
     bind_variable(CURRENT_CATCH_BLOCK,make_fixnum(0),th);
     bind_variable(CURRENT_UNWIND_PROTECT_BLOCK,make_fixnum(0),th); 
     bind_variable(PSEUDO_ATOMIC_ATOMIC,make_fixnum(0),th);

@@ -26,7 +26,8 @@ static inline lispobj SymbolValue(u32 tagged_symbol_pointer, void *thread) {
 	(tagged_symbol_pointer-OTHER_POINTER_LOWTAG);
     if(thread && sym->tls_index) {
 	lispobj r=
-	    ((struct thread *)thread)->dynamic_values_start[sym->tls_index];
+	    ((struct thread *)thread)
+	    -> dynamic_values_start[fixnum_value(sym->tls_index)];
 	if(r!=UNBOUND_MARKER_WIDETAG) return r;
     }
     return sym->value;
@@ -34,14 +35,16 @@ static inline lispobj SymbolValue(u32 tagged_symbol_pointer, void *thread) {
 static inline lispobj SymbolTlValue(u32 tagged_symbol_pointer, void *thread) {
     struct symbol *sym= (struct symbol *)
 	(tagged_symbol_pointer-OTHER_POINTER_LOWTAG);
-    return ((struct thread *)thread)->dynamic_values_start[sym->tls_index];
+    return ((struct thread *)thread)
+	->dynamic_values_start[fixnum_value(sym->tls_index)];
 }
 
 static inline void SetSymbolValue(u32 tagged_symbol_pointer,lispobj val, void *thread) {
     struct symbol *sym=	(struct symbol *)
 	(tagged_symbol_pointer-OTHER_POINTER_LOWTAG);
     if(thread && sym->tls_index) {
-	lispobj *pr=&(((struct thread *)thread)->dynamic_values_start[sym->tls_index]);
+	lispobj *pr=&(((struct thread *)thread)
+		      ->dynamic_values_start[fixnum_value(sym->tls_index)]);
 	if(*pr!= UNBOUND_MARKER_WIDETAG) {
 	    *pr==val;
 	    return;
@@ -52,7 +55,8 @@ static inline void SetSymbolValue(u32 tagged_symbol_pointer,lispobj val, void *t
 static inline void SetTlSymbolValue(u32 tagged_symbol_pointer,lispobj val, void *thread) {
     struct symbol *sym=	(struct symbol *)
 	(tagged_symbol_pointer-OTHER_POINTER_LOWTAG);
-    (((struct thread *)thread)->dynamic_values_start[sym->tls_index])
+    (((struct thread *)thread)
+     ->dynamic_values_start[fixnum_value(sym->tls_index)])
 	=val;
 }
 
