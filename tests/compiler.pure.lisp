@@ -1373,15 +1373,24 @@
         0 0))))
    391833530 -32785211)))
 
-;;; Efficiency notes for FUNCALL
-(handler-case
-    (compile nil '(lambda (x) (funcall x)))
-  (sb-ext:compiler-note (e)
-    (error "bogus compiler note: ~S." e)))
-
-(catch :got-note
-  (handler-case
-      (compile nil '(lambda (x) (declare (optimize speed)) (funcall x)))
-    (sb-ext:compiler-note (e)
-      (throw :got-note nil)))
-  (error "missing compiler note for FUNCALL"))
+;;; efficiency notes for ordinary code
+(macrolet ((frob (arglist &body body)
+	     `(progn
+	       (handler-case
+		   (compile nil '(lambda ,arglist ,@body))
+		 (sb-ext:compiler-note (e)
+		   (error "bad compiler note for ~S:~%  ~A" ',body e)))
+	       (catch :got-note
+		 (handler-case
+		     (compile nil '(lambda ,arglist (declare (optimize speed))
+				    ,@body))
+		   (sb-ext:compiler-note (e) (throw :got-note nil)))
+		 (error "missing compiler note for ~S" ',body)))))
+  (frob (x) (funcall x))
+  (frob (x y) (find x y))
+  (frob (x y) (find-if x y))
+  (frob (x y) (find-if-not x y))
+  (frob (x y) (position x y))
+  (frob (x y) (position-if x y))
+  (frob (x y) (position-if-not x y))
+  (frob (x) (aref x 0)))

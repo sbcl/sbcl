@@ -2519,6 +2519,11 @@ changes in sbcl-0.8.11 relative to sbcl-0.8.10:
        print using #P"..." syntax.
 
 changes in sbcl-0.8.12 relative to sbcl-0.8.11:
+  * minor incompatible change: the system no longer provides
+    optimization hints (conditions which are TYPEP
+    SB-EXT:COMPILER-NOTE) for conforming code in default compilation
+    mode; these hints are emitted when higher SPEED optimization is
+    requested, as before.
   * the behaviour of the standard function ED is now customizeable by
     third parties through a hook variable: see ED's documentation
     string for information on the protocol.

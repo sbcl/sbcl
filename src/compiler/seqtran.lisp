@@ -822,8 +822,7 @@
 	     `(deftransform ,name ((predicate sequence from-end start end key)
 				   (function list t t t function)
 				   *
-				   :policy (> speed space)
-				   :important t)
+				   :policy (> speed space))
 		"expand inline"
 		`(let ((index 0)
 		       (find nil)
@@ -869,8 +868,7 @@
 (deftransform %find-position ((item sequence from-end start end key test)
 			      (t list t t t t t)
 			      *
-			      :policy (> speed space)
-			      :important t)
+			      :policy (> speed space))
   "expand inline"
   '(%find-position-if (let ((test-fun (%coerce-callable-to-fun test)))
 			;; The order of arguments for asymmetric tests
@@ -963,8 +961,7 @@
 (deftransform %find-position-if ((predicate sequence from-end start end key)
 				 (function vector t t t function)
 				 *
-				 :policy (> speed space)
-				 :important t)
+				 :policy (> speed space))
   "expand inline"
   (check-inlineability-of-find-position-if sequence from-end)
   '(%find-position-if-vector-macro predicate sequence
@@ -973,8 +970,7 @@
 (deftransform %find-position-if-not ((predicate sequence from-end start end key)
 				     (function vector t t t function)
 				     *
-				     :policy (> speed space)
-				     :important t)
+				     :policy (> speed space))
   "expand inline"
   (check-inlineability-of-find-position-if sequence from-end)
   '(%find-position-if-not-vector-macro predicate sequence
@@ -983,8 +979,7 @@
 (deftransform %find-position ((item sequence from-end start end key test)
 			      (t vector t t t function function)
 			      *
-			      :policy (> speed space)
-			      :important t)
+			      :policy (> speed space))
   "expand inline"
   (check-inlineability-of-find-position-if sequence from-end)
   '(%find-position-vector-macro item sequence

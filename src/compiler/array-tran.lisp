@@ -638,7 +638,6 @@
 				;; WHN, and also CSR 2002-05-26
 				((or vector simple-array) index (or index null))
 				*
-				:important t
 				:node node
 				:policy (> speed space))
   "inline non-SIMPLE-vector-handling logic"

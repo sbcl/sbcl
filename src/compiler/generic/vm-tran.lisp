@@ -50,7 +50,7 @@
 	  ((simple-array character (*)) (data-vector-ref string index))
 	  ((simple-array nil (*)) (data-vector-ref string index))))))
 
-(deftransform hairy-data-vector-ref ((array index) (array t) * :important t)
+(deftransform hairy-data-vector-ref ((array index) (array t) *)
   "avoid runtime dispatch on array element type"
   (let ((element-ctype (extract-upgraded-element-type array))
 	(declared-element-ctype (extract-declared-element-type array)))
@@ -103,8 +103,7 @@
 
 (deftransform hairy-data-vector-set ((array index new-value)
 				     (array t t)
-				     *
-				     :important t)
+				     *)
   "avoid runtime dispatch on array element type"
   (let ((element-ctype (extract-upgraded-element-type array))
 	(declared-element-ctype (extract-declared-element-type array)))
@@ -153,8 +152,7 @@
 
 (deftransform %data-vector-and-index ((%array %index)
 				      (simple-array t)
-				      *
-				      :important t)
+				      *)
   ;; KLUDGE: why the percent signs?  Well, ARRAY and INDEX are
   ;; respectively exported from the CL and SB!INT packages, which
   ;; means that they're visible to all sorts of things.  If the
