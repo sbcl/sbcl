@@ -1611,17 +1611,21 @@ changes in sbcl-0.7.14 relative to sbcl-0.7.13:
     ** GETF and GET-PROPERTIES throw a TYPE-ERROR, not a SIMPLE-ERROR,
        on malformed property lists;
 
-changes in sbcl-0.8.0 relative to sbcl-0.7.14
-  * The old distinction between CL:CLASS objects and SB-PCL:CLASS
-    objects has been eliminated.  The return value from CL:FIND-CLASS
-    is now a CLOS class, and likewise that of CL:CLASS-OF;
-    CL:BUILT-IN-CLASS, CL:STRUCTURE-CLASS and CL:STANDARD-CLASS name
-    CLOS classes.
+changes in sbcl-0.8alpha.0 relative to sbcl-0.7.14
+  * experimental native threads support (on x86 Linux >=2.4 only).
+    This is not compiled in by default: you need to add :SB-THREAD to
+    the target features.  See the "Beyond ANSI" chapter of the manual
+    for details.
+  * fix for longstanding nonANSIism: The old distinction between
+    CL:CLASS objects and SB-PCL:CLASS objects has been eliminated.
+    The return value from CL:FIND-CLASS is now a CLOS class, and
+    likewise that of CL:CLASS-OF; CL:BUILT-IN-CLASS,
+    CL:STRUCTURE-CLASS and CL:STANDARD-CLASS name CLOS classes.
   * An interface to the MetaObject Protocol, as described in Kiczales,
     des Rivieres and Bobrow's "The Art of the Metaobject Protocol",
     MIT Press, 1991, is available from the SB-MOP package.
-  * incompatible change: the SB-PCL package should now be considered a
-    private implementation detail, and no longer a semi-private MOP
+  * incompatible change: the SB-PCL package should now be considered
+    a private implementation detail, and no longer a semi-private MOP
     interface.
   * minor incompatible change: due to rearrangement for threads, the
     control stack and binding stack are now allocated at arbitrary
@@ -1632,21 +1636,23 @@ changes in sbcl-0.8.0 relative to sbcl-0.7.14
     processed with READ before any of them were processed with EVAL.
     Now each --eval form is processed with both READ and EVAL before
     the next --eval form is processed. (Thus package operations like
-    sbcl --eval "(defpackage :foo)" --eval "(print 'foo::bar)" now work
-    as the user might reasonably expect.)
+    sbcl --eval "(defpackage :foo)" --eval "(print 'foo::bar)" now
+    work as the user might reasonably expect.)
   * minor incompatible change: *STANDARD-INPUT* is now only an
     INPUT-STREAM, not a BIDIRECTIONAL-STREAM.  (thanks to Antonio
     Martinez)
-  * minor incompatible change: Y-OR-N-P is now character-oriented, not
-    line oriented.  Also, YES-OR-NO-P now works without errors.
+  * minor incompatible change: Y-OR-N-P is now character-oriented,
+    not line oriented.  Also, YES-OR-NO-P now works without errors.
     (thanks to Antonio Martinez)
-  * known functions, which cannot be open coded by backend, are
-    considered to be able to check types of their arguments.
-    (reported by Nathan J. Froyd)
-  * fixed a bug in computing method discriminating functions: it is
+  * sb-aclrepl module improvements: an integrated inspector, added
+    repl features, and a bug fix to :trace command.
+  * Known functions, which cannot be open coded by the backend, are
+    considered to be able to check types of their arguments. (fixing
+    a bug report by Nathan J. Froyd)
+  * fixed a bug in computing method discriminating functions: It is
     now possible to define methods specialized on classes which have
-    forward-referenced superclasses.  (thanks to Gerd Moellmann)
-  * fixed evaluation order in optional entries.  (reported by Gilbert
+    forward-referenced superclasses. (thanks to Gerd Moellmann)
+  * fixed evaluation order in optional entries (reported by Gilbert
     Baumann)
   * SB-MOP:ENSURE-CLASS-USING-CLASS now takes its arguments in the
     specified-by-AMOP order of (CLASS NAME &REST ARGS &KEY).
@@ -1658,55 +1664,49 @@ changes in sbcl-0.8.0 relative to sbcl-0.7.14
   * bug fix: INTERACTIVE-STREAM-P now works on streams associated with
     Unix file descriptors, instead of blowing up. (thanks to Antonio
     Martinez)
-  * Experimental native threads support, on x86 Linux.  This is not
-    compiled in by default: you need to add :SB-THREAD to the target
-    features.  See the "Beyond ANSI" chapter of the manual for
-    details.
   * Garbage collection refactoring: user-visible change is that a
     call to the GC function during WITHOUT-GCING will not do garbage
     collection until the end of the WITHOUT-GCING.  If you were doing
     this you were probably losing anyway.
-  * sb-aclrepl module improvements: an integrated inspector, added
-    repl features, and a bug fix to :trace command.
   * fixed bug in MEMBER type: (MEMBER 0.0) is not the same as
     (SINGLE-FLOAT 0.0 0.0), because of the existence of -0.0 which is
     TYPEP the latter but not the former.
-  * compiler issues a full WARNING on calling of an undefined function
-    with a name from the CL package.
+  * The compiler issues a full WARNING for calls to undefined functions
+    with names from the CL package.
   * MAP-INTO for a vector destination is open coded.  (reported by
     Brian Downing on c.l.l)
   * bug fix: the long form of DEFINE-METHOD-COMBINATION now accepts a
     documentation string.
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** COPY-ALIST now signals an error if its argument is a dotted
-       list;
-    ** condition slots are now accessed more correctly in the presence
-       of multiple initargs for a given slot;
-    ** the USE-VALUE, CONTINUE and STORE-VALUE functions now correctly
+       list.
+    ** Condition slots are now accessed more correctly in the presence
+       of multiple initargs for a given slot.
+    ** The USE-VALUE, CONTINUE and STORE-VALUE functions now correctly
        exclude restarts of the same name associated with a different
-       condition;
+       condition.
     ** DEFCLASS of forward-referenced classes with another
        forward-referenced class in the superclasses list no longer
-       causes an error;
-    ** condition slots are now initialized once each, not multiple
-       times;  (thanks to Gerd Moellmann)
-    ** CONVERT-MORE-CALL failed on a lambda list (&KEY);  (thanks to
+       causes an error.
+    ** Condition slots are now initialized once each, not multiple
+       times. (thanks to Gerd Moellmann)
+    ** CONVERT-MORE-CALL failed on a lambda list (&KEY). (thanks to
        Gerd Moellmann)
-    ** &WHOLE and &REST arguments in macro lambda lists are patterns;
+    ** &WHOLE and &REST arguments in macro lambda lists are patterns.
     ** NSET-EXCLUSIVE-OR does not return extra elements when its
-       arguments contain duplicated elements;
-    ** RESTART-CASE understands local macros;
-    ** ... and associates exactly its own restarts with a condition;
-    ** ENDP in safe mode checks its argument to be of type LIST;
+       arguments contain duplicated elements.
+    ** RESTART-CASE understands local macros.
+    ** RESTART-CASE associates exactly its own restarts with a condition.
+    ** ENDP in safe mode checks its argument to be of type LIST.
     ** COPY-SYMBOL in a threaded build no longer fails when the symbol
-       in question is unbound;
-    ** optimized MAKE-INSTANCE functions no longer cause internal
-       assertion failures in the presence of duplicate initargs;
-    ** SLOT-MAKUNBOUND returns the instance acted upon, not NIL;
-    ** side-effectful :DEFAULT-INITARGS have their side-effects
+       in question is unbound.
+    ** Optimized MAKE-INSTANCE functions no longer cause internal
+       assertion failures in the presence of duplicate initargs.
+    ** SLOT-MAKUNBOUND returns the instance acted upon, not NIL.
+    ** Side-effectful :DEFAULT-INITARGS have their side-effects
        propagated even in the ctor optimized implementation of
-       MAKE-INSTANCE;
-    ** :ALLOW-OTHER-KEYS NIL is now accepted in an initarg list;
+       MAKE-INSTANCE.
+    ** :ALLOW-OTHER-KEYS NIL is now accepted in an initarg list.
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles
