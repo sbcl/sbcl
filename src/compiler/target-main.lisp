@@ -13,7 +13,7 @@
 
 (in-package "SB!C")
 
-;;;; COMPILE and UNCOMPILE
+;;;; CL:COMPILE
 
 (defun get-lambda-to-compile (definition)
   (if (consp definition)
@@ -43,16 +43,16 @@
 	(when old (substitute-leaf fun old)))
       name)))
 
-(defun compile (name &optional (definition (fdefinition name)))
-  #!+sb-doc
-  "Compiles the function whose name is Name. If Definition is supplied,
-  it should be a lambda expression that is compiled and then placed in the
-  function cell of Name. If Name is Nil, the compiled code object is
-  returned."
+;;; Handle the nontrivial case of CL:COMPILE.
+(defun actually-compile (name definition)
   (with-compilation-values
     (sb!xc:with-compilation-unit ()
-      (let* ((*info-environment* (or *backend-info-environment*
-				     *info-environment*))
+      (let* (;; FIXME: Do we need this rebinding here? It's a literal
+	     ;; translation of the old CMU CL rebinding to
+	     ;; (OR *BACKEND-INFO-ENVIRONMENT* *INFO-ENVIRONMENT*),
+	     ;; and it's not obvious whether the rebinding to itself is
+	     ;; needed that SBCL doesn't need *BACKEND-INFO-ENVIRONMENT*.
+	     (*info-environment* *info-environment*)
 	     (*lexenv* (make-null-lexenv))
 	     (form `#',(get-lambda-to-compile definition))
 	     (*source-info* (make-lisp-source-info form))
@@ -63,7 +63,7 @@
 	      #'(lambda ()
 		  (compiler-mumble
 		   "~2&fatal error, aborting compilation~%")
-		  (return-from compile (values nil t nil))))
+		  (return-from actually-compile (values nil t nil))))
 	     (*current-path* nil)
 	     (*last-source-context* nil)
 	     (*last-original-source* nil)
@@ -97,9 +97,27 @@
 	      (dolist (component *all-components*)
 		(compile-component component))))
 
-	  (let* ((res1 (core-call-top-level-lambda lambda *compile-object*))
-		 (result (or name res1)))
-	    (fix-core-source-info *source-info* *compile-object* res1)
-	    (when name
-	      (setf (fdefinition name) res1))
-	    result))))))
+	  (let ((compiled-fun (core-call-top-level-lambda lambda
+							  *compile-object*)))
+	    (fix-core-source-info *source-info* *compile-object* compiled-fun)
+	    compiled-fun))))))
+
+(defun compile (name &optional (definition (fdefinition name)))
+  #!+sb-doc
+  "Coerce DEFINITION (by default, the function whose name is NAME)
+  to a compiled function, returning (VALUES THING WARNINGS-P FAILURE-P),
+  where if NAME is NIL, THING is the result of compilation, and
+  otherwise THING is NAME. When NAME is not NIL, the compiled function
+  is also set into (FDEFINITION NAME)."
+  ;;(format t "~&/in COMPILE NAME=~S DEFINITION=~S" name definition) ; REMOVEME
+  (multiple-value-bind (compiled-definition warnings-p failure-p)
+      (if (compiled-function-p definition)
+	  (values definition nil nil)
+	  (actually-compile name definition))
+    ;;(format t "~&/COMPILED-DEFINITION=~S~%" compiled-definition) ; REMOVEME
+    (cond (name
+	   (unless failure-p
+	     (setf (fdefinition name) compiled-definition))
+	   (values name warnings-p failure-p))
+	  (t
+	   (values compiled-definition warnings-p failure-p)))))

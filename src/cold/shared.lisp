@@ -95,12 +95,12 @@
 ;;; COMPILE-STEM function above. -- WHN 19990321
 (defun rename-file-a-la-unix (x y)
   (rename-file x
-	       ;; (Note that the TRUENAME expression here is lifted from an
-	       ;; example in the ANSI spec for TRUENAME.)
+	       ;; (Note that the TRUENAME expression here is lifted
+	       ;; from an example in the ANSI spec for TRUENAME.)
 	       (with-open-file (stream y :direction :output)
 		 (close stream)
-		 ;; From the ANSI spec: "In this case, the file is closed
-		 ;; when the truename is tried, so the truename
+		 ;; From the ANSI spec: "In this case, the file is
+		 ;; closed when the truename is tried, so the truename
 		 ;; information is reliable."
 		 (truename stream))))
 (compile 'rename-file-a-la-unix)

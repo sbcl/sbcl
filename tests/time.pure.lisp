@@ -12,23 +12,19 @@
 (in-package "CL-USER")
 
 ;;; Test for monotonicity of GET-INTERNAL-RUN-TIME.
-#+nil ; FIXME: This test can't work as long as
-      ;    (FUNCALL (COMPILE NIL (LAMBDA (X) (+ X 12))) 44)
-      ; fails with
-      ;    #<FUNCTION {5009BF31}> was defined in a non-null environment.
 (funcall (compile nil
-		  (lambda (n-seconds)
-		    (declare (type fixnum n-seconds))
-		    (let* ((n-internal-time-units
-			    (* n-seconds
-			       internal-time-units-per-second))
-			   (time0 (get-internal-run-time))
-			   (time1 (+ time0 n-internal-time-units)))
-		      (loop
-		       (let ((time (get-internal-run-time)))
-			 (assert (>= time time0))
-			 (when (>= time time1)
-			   (return)))))))
+		  '(lambda (n-seconds)
+		     (declare (type fixnum n-seconds))
+		     (let* ((n-internal-time-units
+			     (* n-seconds
+				internal-time-units-per-second))
+			    (time0 (get-internal-run-time))
+			    (time1 (+ time0 n-internal-time-units)))
+		       (loop
+			(let ((time (get-internal-run-time)))
+			  (assert (>= time time0))
+			  (when (>= time time1)
+			    (return)))))))
 	 3)
 
 (locally

@@ -137,111 +137,112 @@
 (define-condition condition-foo3 (condition-foo2) ())
 (define-condition condition-foo4 (condition-foo3) ())
 
-(format t "~&/before DEFUN TEST-INLINE-TYPE-TESTS~%")
+;;; inline type tests
+(format t "~&/setting up *TESTS-OF-INLINE-TYPE-TESTS*~%")
+(defparameter *tests-of-inline-type-tests*
+  '(progn
 
-(fmakunbound 'test-inline-type-tests)
-(defun test-inline-type-tests ()
-  ;; structure type tests
-  (assert (typep (make-structure-foo3) 'structure-foo2))
-  (assert (not (typep (make-structure-foo1) 'structure-foo4)))
-  (assert (null (ignore-errors
-                  (setf (structure-foo2-x (make-structure-foo1)) 11))))
+     ;; structure type tests
+     (assert (typep (make-structure-foo3) 'structure-foo2))
+     (assert (not (typep (make-structure-foo1) 'structure-foo4)))
+     (assert (null (ignore-errors
+		     (setf (structure-foo2-x (make-structure-foo1)) 11))))
 
-  ;; structure-class tests
-  (assert (typep (make-instance 'structure-class-foo3)
-                 'structure-class-foo2))
-  (assert (not (typep (make-instance 'structure-class-foo1)
-                      'structure-class-foo4)))
-  (assert (null (ignore-errors
-                  (setf (slot-value (make-instance 'structure-class-foo1) 'x)
-			11))))
+     ;; structure-class tests
+     (assert (typep (make-instance 'structure-class-foo3)
+		    'structure-class-foo2))
+     (assert (not (typep (make-instance 'structure-class-foo1)
+			 'structure-class-foo4)))
+     (assert (null (ignore-errors
+		     (setf (slot-value (make-instance 'structure-class-foo1)
+				       'x)
+			   11))))
 
-  ;; standard-class tests
-  (assert (typep (make-instance 'standard-class-foo3)
-                 'standard-class-foo2))
-  (assert (not (typep (make-instance 'standard-class-foo1)
-                      'standard-class-foo4)))
-  (assert (null (ignore-errors
-                  (setf (slot-value (make-instance 'standard-class-foo1) 'x)
-                          11))))
+     ;; standard-class tests
+     (assert (typep (make-instance 'standard-class-foo3)
+		    'standard-class-foo2))
+     (assert (not (typep (make-instance 'standard-class-foo1)
+			 'standard-class-foo4)))
+     (assert (null (ignore-errors
+		     (setf (slot-value (make-instance 'standard-class-foo1) 'x)
+			   11))))
 
-  ;; condition tests
-  (assert (typep (make-condition 'condition-foo3)
-                 'condition-foo2))
-  (assert (not (typep (make-condition 'condition-foo1)
-                      'condition-foo4)))
-  (assert (null (ignore-errors
-                  (setf (slot-value (make-condition 'condition-foo1) 'x)
-                          11))))
-  (assert (subtypep 'error 't))
-  (assert (subtypep 'simple-condition 'condition))
-  (assert (subtypep 'simple-error 'simple-condition))
-  (assert (subtypep 'simple-error 'error))
-  (assert (not (subtypep 'condition 'simple-condition)))
-  (assert (not (subtypep 'error 'simple-error)))
-  (assert (eq (car (sb-kernel:class-direct-superclasses (find-class
-                                                         'simple-condition)))
-              (find-class 'condition)))
+     ;; condition tests
+     (assert (typep (make-condition 'condition-foo3)
+		    'condition-foo2))
+     (assert (not (typep (make-condition 'condition-foo1)
+			 'condition-foo4)))
+     (assert (null (ignore-errors
+		     (setf (slot-value (make-condition 'condition-foo1) 'x)
+			   11))))
+     (assert (subtypep 'error 't))
+     (assert (subtypep 'simple-condition 'condition))
+     (assert (subtypep 'simple-error 'simple-condition))
+     (assert (subtypep 'simple-error 'error))
+     (assert (not (subtypep 'condition 'simple-condition)))
+     (assert (not (subtypep 'error 'simple-error)))
+     (assert (eq (car (sb-kernel:class-direct-superclasses
+		       (find-class 'simple-condition)))
+		 (find-class 'condition)))
 
-  (assert (eq (car (sb-pcl:class-direct-superclasses (sb-pcl:find-class
-                                                      'simple-condition)))
-              (sb-pcl:find-class 'condition)))
-  (assert (null (set-difference
-                 (sb-pcl:class-direct-subclasses (sb-pcl:find-class
-                                                  'simple-condition))
-                 (mapcar #'sb-pcl:find-class '(simple-type-error simple-error
-                                               sb-int:simple-style-warning)))))
+     (assert (eq (car (sb-pcl:class-direct-superclasses (sb-pcl:find-class
+							 'simple-condition)))
+		 (sb-pcl:find-class 'condition)))
+     (assert (null (set-difference
+		    (sb-pcl:class-direct-subclasses (sb-pcl:find-class
+						     'simple-condition))
+		    (mapcar #'sb-pcl:find-class
+			    '(simple-type-error simple-error
+						sb-int:simple-style-warning)))))
 
-  ;; precedence lists
-  (assert (equal (sb-pcl:class-precedence-list
-                  (sb-pcl:find-class 'simple-condition))
-                 (mapcar #'sb-pcl:find-class '(simple-condition condition
-                                               sb-kernel:instance t))))
+     ;; precedence lists
+     (assert (equal (sb-pcl:class-precedence-list
+		     (sb-pcl:find-class 'simple-condition))
+		    (mapcar #'sb-pcl:find-class '(simple-condition
+						  condition
+						  sb-kernel:instance
+						  t))))
 
-  ;; stream classes
-  (assert (null (sb-kernel:class-direct-superclasses (find-class
-                                                      'fundamental-stream))))
-  (assert (equal (sb-pcl:class-direct-superclasses (sb-pcl:find-class
-                                                    'fundamental-stream))
-                 (mapcar #'sb-pcl:find-class '(standard-object stream))))
-  (assert (null (set-difference
-                 (sb-pcl:class-direct-subclasses (sb-pcl:find-class
-                                                  'fundamental-stream))
-                 (mapcar #'sb-pcl:find-class '(fundamental-binary-stream
-                                               fundamental-character-stream
-                                               fundamental-output-stream
-                                               fundamental-input-stream)))))
-  (assert (equal (sb-pcl:class-precedence-list (sb-pcl:find-class
-                                                'fundamental-stream))
-                 (mapcar #'sb-pcl:find-class '(fundamental-stream
-                                               standard-object
-                                               sb-pcl::std-object
-                                               sb-pcl::slot-object
-                                               stream
-                                               sb-kernel:instance
-                                               t))))
-  (assert (equal (sb-pcl:class-precedence-list (sb-pcl:find-class
-                                                'fundamental-stream))
-                 (mapcar #'sb-pcl:find-class '(fundamental-stream
-					       standard-object
-                                               sb-pcl::std-object
-                                               sb-pcl::slot-object stream
-                                               sb-kernel:instance t))))
-  (assert (subtypep (find-class 'stream) (find-class t)))
-  (assert (subtypep (find-class 'fundamental-stream) 'stream))
-  (assert (not (subtypep 'stream 'fundamental-stream))))
-
-(format t "~&/done with DEFUN TEST-INLINE-TYPE-TESTS~%")
-
-;;; inline-type tests:
-;;; Test the interpreted version.
-(test-inline-type-tests)
-(format t "~&/done with interpreted (TEST-INLINE-TYPE-TESTS)~%")
-;;; Test the compiled version.
-#| ; FIXME: fails 'cause FUNCALL of COMPILEd function broken ca. 0.pre7.15
-(compile nil #'test-inline-type-tests)
-(test-inline-type-tests)
-|# 
+     ;; stream classes
+     (assert (null (sb-kernel:class-direct-superclasses
+		    (find-class 'fundamental-stream))))
+     (assert (equal (sb-pcl:class-direct-superclasses (sb-pcl:find-class
+						       'fundamental-stream))
+		    (mapcar #'sb-pcl:find-class '(standard-object stream))))
+     (assert (null (set-difference
+		    (sb-pcl:class-direct-subclasses (sb-pcl:find-class
+						     'fundamental-stream))
+		    (mapcar #'sb-pcl:find-class '(fundamental-binary-stream
+						  fundamental-character-stream
+						  fundamental-output-stream
+						  fundamental-input-stream)))))
+     (assert (equal (sb-pcl:class-precedence-list (sb-pcl:find-class
+						   'fundamental-stream))
+		    (mapcar #'sb-pcl:find-class '(fundamental-stream
+						  standard-object
+						  sb-pcl::std-object
+						  sb-pcl::slot-object
+						  stream
+						  sb-kernel:instance
+						  t))))
+     (assert (equal (sb-pcl:class-precedence-list (sb-pcl:find-class
+						   'fundamental-stream))
+		    (mapcar #'sb-pcl:find-class '(fundamental-stream
+						  standard-object
+						  sb-pcl::std-object
+						  sb-pcl::slot-object stream
+						  sb-kernel:instance t))))
+     (assert (subtypep (find-class 'stream) (find-class t)))
+     (assert (subtypep (find-class 'fundamental-stream) 'stream))
+     (assert (not (subtypep 'stream 'fundamental-stream)))))
+;;; Test under the interpreter.
+(eval *tests-of-inline-type-tests*)
+(format t "~&/done with interpreted *TESTS-OF-INLINE-TYPE-TESTS*~%")
+;;; Test under the compiler.
+(defun tests-of-inline-type-tests ()
+  #.*tests-of-inline-type-tests*)
+(tests-of-inline-type-tests)
+(format t "~&/done with compiled (TESTS-OF-INLINE-TYPE-TESTS)~%")
 
 ;;; success
 (quit :unix-status 104)
