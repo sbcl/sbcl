@@ -59,7 +59,7 @@
       (unless (eq old-next old-tail)
 	(setf (block-next head) old-next)
 	(setf (block-prev old-next) head)
-	
+
 	(setf (block-prev next) old-last)
 	(setf (block-next old-last) next))
 

@@ -279,6 +279,7 @@
 
  ("src/compiler/early-c")
  ("src/compiler/policy")
+ ("src/compiler/policies")
  ("src/code/typedefs")
 
  ;; ("src/code/defbangmacro" was here until sbcl-0.6.7.3.)

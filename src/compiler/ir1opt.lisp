@@ -1340,7 +1340,7 @@
 ;;; -- either continuation has a funky TYPE-CHECK annotation.
 ;;; -- the continuations have incompatible assertions, so the new asserted type
 ;;;    would be NIL.
-;;; -- the var's DEST has a different policy than the ARG's (think safety).
+;;; -- the VAR's DEST has a different policy than the ARG's (think safety).
 ;;;
 ;;; We change the REF to be a reference to NIL with unused value, and
 ;;; let it be flushed as dead code. A side effect of this substitution
@@ -1354,7 +1354,7 @@
 	 (dest (continuation-dest cont)))
     (when (and (eq (continuation-use cont) ref)
 	       dest
-	       (not (typep dest '(or creturn exit mv-combination)))
+	       (continuation-single-value-p cont)
 	       (eq (node-home-lambda ref)
 		   (lambda-home (lambda-var-home var)))
 	       (member (continuation-type-check arg) '(t nil))
@@ -1455,9 +1455,9 @@
 ;;; If the function has an XEP, then we don't do anything, since we
 ;;; won't discover anything.
 ;;;
-;;; We can clear the Continuation-Reoptimize flags for arguments in
-;;; all calls corresponding to changed arguments in Call, since the
-;;; only use in IR1 optimization of the Reoptimize flag for local call
+;;; We can clear the CONTINUATION-REOPTIMIZE flags for arguments in
+;;; all calls corresponding to changed arguments in CALL, since the
+;;; only use in IR1 optimization of the REOPTIMIZE flag for local call
 ;;; args is right here.
 (defun propagate-local-call-args (call fun)
   (declare (type combination call) (type clambda fun))
@@ -1713,6 +1713,8 @@
 ;;; CONVERT-MV-BIND-TO-LET. We grab the args of LIST and make them
 ;;; args of the VALUES-LIST call, flushing the old argument
 ;;; continuation (allowing the LIST to be flushed.)
+;;;
+;;; FIXME: Thus we lose possible type assertions on (LIST ...).
 (defoptimizer (values-list optimizer) ((list) node)
   (let ((use (continuation-use list)))
     (when (and (combination-p use)
@@ -1734,8 +1736,7 @@
 ;;; to a PROG1. This allows the computation of the additional values
 ;;; to become dead code.
 (deftransform values ((&rest vals) * * :node node)
-  (when (typep (continuation-dest (node-cont node))
-	       '(or creturn exit mv-combination))
+  (unless (continuation-single-value-p (node-cont node))
     (give-up-ir1-transform))
   (setf (node-derived-type node) *wild-type*)
   (if vals

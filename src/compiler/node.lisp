@@ -37,7 +37,7 @@
   ;;	until it is assigned a block, and may be also be temporarily
   ;;	unused during later manipulations of IR1. In a consistent
   ;;	state there should never be any mention of :UNUSED
-  ;;	continuations. Next can have a non-null value if the next node
+  ;;	continuations. NEXT can have a non-null value if the next node
   ;;	has already been determined.
   ;;
   ;; :DELETED
@@ -87,7 +87,7 @@
   ;; the node where this continuation is used, if unique. This is always
   ;; null in :DELETED and :UNUSED continuations, and is never null in
   ;; :INSIDE-BLOCK continuations. In a :BLOCK-START continuation, the
-  ;; Block's START-USES indicate whether NIL means no uses or more
+  ;; BLOCK's START-USES indicate whether NIL means no uses or more
   ;; than one use.
   (use nil :type (or node null))
   ;; the basic block this continuation is in. This is null only in

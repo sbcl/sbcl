@@ -138,7 +138,7 @@
 	       `(declare (ignore ,n-supplied))
 	       `(%verify-arg-count ,n-supplied ,nargs))
 	  (locally
-	    (declare (optimize (let-convertion 3)))
+	    (declare (optimize (merge-tail-calls 3)))
 	    (%funcall ,fun ,@temps)))))
     (optional-dispatch
      (let* ((min (optional-dispatch-min-args fun))
@@ -166,11 +166,7 @@
 		       `(multiple-value-bind (,n-context ,n-count)
 			    (%more-arg-context ,n-supplied ,max)
 			  (locally
-			    ;; KLUDGE: As above, we're trying to
-			    ;; enable tail recursion optimization and
-			    ;; any other effects of this declaration
-			    ;; are accidental. -- WHN 2002-07-08
-			    (declare (optimize (speed 2) (debug 1)))
+			    (declare (optimize (merge-tail-calls 3)))
 			    (%funcall ,more ,@temps ,n-context ,n-count)))))))
 	     (t
 	      (%arg-count-error ,n-supplied)))))))))
@@ -982,9 +978,6 @@
 
 ;;; Are there any declarations in force to say CLAMBDA shouldn't be
 ;;; LET converted?
-(define-optimization-quality let-convertion
-    (if (<= debug speed) 3 0)
-  ("off" "maybe" "on" "on"))
 (defun declarations-suppress-let-conversion-p (clambda)
   ;; From the user's point of view, LET-converting something that
   ;; has a name is inlining it. (The user can't see what we're doing

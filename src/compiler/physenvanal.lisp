@@ -419,9 +419,7 @@
       (when ret
 	(let ((result (return-result ret)))
 	  (do-uses (use result)
-	    (when (and (policy use
-			       (or (> space debug)
-				   (> speed debug)))
+	    (when (and (policy use merge-tail-calls)
 		       (immediately-used-p result use)
 		       (or (not (eq (node-derived-type use) *empty-type*))
 			   (not (basic-combination-p use))

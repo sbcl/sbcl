@@ -116,18 +116,6 @@
 
 ;;;; checking strategy determination
 
-(define-optimization-quality type-check
-    (cond ((= safety 0) 0)
-          ;; FIXME: It is duplicated in PROBABLE-TYPE-CHECK-P and in
-          ;; some other places.
-
-          ((and (<= speed safety)
-                (<= space safety)
-                (<= compilation-speed safety))
-           3)
-          (t 2))
-  ("no" "maybe" "fast" "full"))
-
 ;;; Return the type we should test for when we really want to check
 ;;; for TYPE. If type checking policy is "fast", then we return a
 ;;; weaker type if it is easier to check. First we try the defined

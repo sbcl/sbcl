@@ -382,6 +382,11 @@
 (defun continuation-home-lambda (cont)
   (the clambda
     (continuation-home-lambda-or-null cont)))
+
+#!-sb-fluid (declaim (inline continuation-single-value-p))
+(defun continuation-single-value-p (cont)
+  (not (typep (continuation-dest cont)
+              '(or creturn exit mv-combination))))
 
 ;;; Return a new LEXENV just like DEFAULT except for the specified
 ;;; slot values. Values for the alist slots are NCONCed to the
@@ -1506,8 +1511,3 @@
 
   (let ((action (event-info-action info)))
     (when action (funcall action node))))
-
-;;; It should be in locall.lisp, but is used before in ir1opt.lisp.
-(define-optimization-quality verify-arg-count
-    (if (zerop safety) 0 3)
-  ("no" "maybe" "yes" "yes"))
