@@ -1256,18 +1256,7 @@ Error in function C::GET-LAMBDA-TO-COMPILE:
    much that it forgets that it's also an object.
 
 126:
-  (reported by Dan Barlow sbcl-devel 2001-09-26)
-     * (defun s () (make-string 10 :initial-element #\Space))
-     S
-     * (s)
-     "          "
-     * (compile 's)
-     S
-     NIL
-     NIL
-     * (s)
-     ""                <- ten ASCII NULs
-  But other, non-#\Space values of INITIAL-ELEMENT work OK.
+  (fixed in 0.pre7.41)
 
 
 KNOWN BUGS RELATED TO THE IR1 INTERPRETER

@@ -776,7 +776,7 @@ retained, possibly temporariliy, because it might be used internally."
 
              ;; various internal defaults
              "*DEFAULT-PACKAGE-USE-LIST*"
-             "DEFAULT-INIT-CHAR"
+             "DEFAULT-INIT-CHAR" "*DEFAULT-INIT-CHAR-FORM*"
              "*LOAD-SOURCE-DEFAULT-TYPE*"
 
              ;; hash caches

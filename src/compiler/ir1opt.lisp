@@ -18,12 +18,13 @@
 
 ;;;; interface for obtaining results of constant folding
 
-;;; Return true if the sole use of Cont is a reference to a constant leaf.
-(declaim (ftype (function (continuation) boolean) constant-continuation-p))
-(defun constant-continuation-p (cont)
-  (let ((use (continuation-use cont)))
-    (and (ref-p use)
-	 (constant-p (ref-leaf use)))))
+;;; Return true for a CONTINUATION whose sole use is a reference to a
+;;; constant leaf.
+(defun constant-continuation-p (thing)
+  (and (continuation-p thing)
+       (let ((use (continuation-use thing)))
+	 (and (ref-p use)
+	      (constant-p (ref-leaf use))))))
 
 ;;; Return the constant value for a continuation whose only use is a
 ;;; constant node.

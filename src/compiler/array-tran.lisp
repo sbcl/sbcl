@@ -159,7 +159,8 @@
 ;;; Just convert it into a MAKE-ARRAY.
 (def-source-transform make-string (length &key
 					  (element-type ''base-char)
-					  (initial-element default-init-char))
+					  (initial-element
+					   '#.*default-init-char-form*))
   (if (byte-compiling)
       (values nil t)
       `(make-array (the index ,length)
@@ -169,26 +170,19 @@
 (defstruct (specialized-array-element-type-properties
 	    (:conc-name saetp-)
 	    (:constructor !make-saetp (ctype
-				       low-level-initial-element-default
+				       initial-element-default
 				       n-bits
 				       typecode
 				       &key
-				       (n-pad-elements 0)
-				       (high-level-initial-element-default
-					low-level-initial-element-default)))
+				       (n-pad-elements 0)))
 	    (:copier nil))
   ;; the element type, e.g. #<BUILT-IN-CLASS BASE-CHAR (sealed)> or
   ;; #<SB-KERNEL:NUMERIC-TYPE (UNSIGNED-BYTE 4)>
   (ctype (required-argument) :type ctype :read-only t)
-  ;; what we get when the low-level vector-creation logic zeroes all the bits
-  (low-level-initial-element-default (required-argument) :read-only t)
-  ;; the high level default value. The distinction between this and
-  ;; the low-level default can be illustrated for strings of ASCII
-  ;; characters. The low-level default is #\NULL (i.e. CHAR-CODE = 0)
-  ;; because the array, like other arrays, is born zeroed. However, we
-  ;; don't like that as a high level default because it's not a
-  ;; STANDARD-CHAR, so we use something else (e.g. #\SPACE) instead.
-  (high-level-initial-element-default (required-argument) :read-only t)
+  ;; what we get when the low-level vector-creation logic zeroes all
+  ;; the bits (which also serves as the default value of MAKE-ARRAY's
+  ;; :INITIAL-ELEMENT keyword)
+  (initial-element-default (required-argument) :read-only t)
   ;; how many bits per element
   (n-bits (required-argument) :type index :read-only t)
   ;; the low-level type code
@@ -208,12 +202,7 @@
        `((base-char ,(code-char 0) 8 ,sb!vm:simple-string-type
 		    ;; (SIMPLE-STRINGs are stored with an extra trailing
 		    ;; #\NULL for convenience in calling out to C.)
-		    :n-pad-elements 1
-		    ;; #\NULL is set automatically by the low-level
-		    ;; logic, but that's a little distasteful as a
-		    ;; high-level default because it's not a
-		    ;; STANDARD-CHAR, so use #\SPACE instead.
-		    :high-level-initial-element-default #\space)
+		    :n-pad-elements 1)
 	 (single-float 0.0s0 32 ,sb!vm:simple-array-single-float-type)
 	 (double-float 0.0d0 64 ,sb!vm:simple-array-double-float-type)
 	 #!+long-float (long-float 0.0L0 #!+x86 96 #!+sparc 128
@@ -235,12 +224,11 @@
 	 #!+long-float ((complex long-float) #C(0.0L0 0.0L0)
 			#!+x86 192 #!+sparc 256
 			,sb!vm:simple-array-complex-long-float-type)
-	 (t 0 32 ,sb!vm:simple-vector-type
-	    :high-level-initial-element-default nil))))
+	 (t 0 32 ,sb!vm:simple-vector-type))))
 
 ;;; The integer type restriction on the length ensures that it will be
-;;; a vector. The lack of adjustable, fill-pointer, and displaced-to
-;;; keywords ensures that it will be simple.
+;;; a vector. The lack of :ADJUSTABLE, :FILL-POINTER, and
+;;; :DISPLACED-TO keywords ensures that it will be simple.
 (deftransform make-array ((length &key initial-element element-type)
 			  (integer &rest *))
   (let* ((eltype (cond ((not element-type) t)
@@ -252,7 +240,7 @@
 	 (len (if (constant-continuation-p length)
 		  (continuation-value length)
 		  '*))
-	 (spec `(simple-array ,eltype (,len)))
+	 (result-type-spec `(simple-array ,eltype (,len)))
 	 (eltype-type (specifier-type eltype))
 	 (saetp (find-if (lambda (saetp)
 			   (csubtypep eltype-type (saetp-ctype saetp)))
@@ -261,13 +249,7 @@
       (give-up-ir1-transform
        "cannot open-code creation of ~S" spec))
 
-    (let* (;; FIXME: This is basically a literal translation of the
-	   ;; old CMU CL code, which made no distinction between low-
-	   ;; and high-level default initial elements (hence bug 126),
-	   ;; so we just drop the high-level default initial element
-	   ;; on the floor here (hence bug 126 remains).
-	   (default-initial-element
-	     (saetp-low-level-initial-element-default saetp))
+    (let* ((initial-element-default (saetp-initial-element-default saetp))
 	   (n-bits-per-element (saetp-n-bits saetp))
 	   (typecode (saetp-typecode saetp))
 	   (n-pad-elements (saetp-n-pad-elements saetp))
@@ -283,37 +265,41 @@
 					      n-bits-per-element)))
 		  (declare (type index n-elements-per-word)) ; i.e., not RATIO
 		  `(ceiling ,padded-length-form ,n-elements-per-word))))
-	   (constructor
-	    `(truly-the ,spec
-			(allocate-vector ,typecode length ,n-words-form))))
-	(values
-	 (cond ((and default-initial-element
-		     (or (null initial-element)
-			 (and (constant-continuation-p initial-element)
-			      (eql (continuation-value initial-element)
-				   default-initial-element))))
-		(unless (csubtypep (ctype-of default-initial-element)
-				   eltype-type)
-		  ;; This situation arises e.g. in
-		  ;;   (MAKE-ARRAY 4 :ELEMENT-TYPE '(INTEGER 1 5))
-		  ;; ANSI's definition of MAKE-ARRAY says "If
-		  ;; INITIAL-ELEMENT is not supplied, the consequences
-		  ;; of later reading an uninitialized element of
-		  ;; new-array are undefined," so this could be legal
-		  ;; code as long as the user plans to write before he
-		  ;; reads, and if he doesn't we're free to do
-		  ;; anything we like. But in case the user doesn't
-		  ;; know to write before he reads, we'll signal a
-		  ;; STYLE-WARNING in case he didn't realize this.
-		  ;;
-		  ;; FIXME: should be STYLE-WARNING, not note
-		  (compiler-note "The default initial element ~S is not a ~S."
-				 default-initial-element
-				 eltype))
-		constructor)
-	       (t
-		`(truly-the ,spec (fill ,constructor initial-element))))
-	 '((declare (type index length)))))))
+	   (bare-constructor-form
+	    `(truly-the ,result-type-spec
+			(allocate-vector ,typecode length ,n-words-form)))
+	   (initial-element-form (if initial-element
+				     'initial-element
+				     initial-element-default)))
+      (values
+       (cond (;; Can we skip the FILL step?
+	      (or (null initial-element)
+		  (and (constant-continuation-p initial-element)
+		       (eql (continuation-value initial-element)
+			    initial-element-default)))
+	      (unless (csubtypep (ctype-of initial-element-default)
+				 eltype-type)
+		;; This situation arises e.g. in
+		;;   (MAKE-ARRAY 4 :ELEMENT-TYPE '(INTEGER 1 5))
+		;; ANSI's definition of MAKE-ARRAY says "If
+		;; INITIAL-ELEMENT is not supplied, the consequences
+		;; of later reading an uninitialized element of
+		;; new-array are undefined," so this could be legal
+		;; code as long as the user plans to write before he
+		;; reads, and if he doesn't we're free to do anything
+		;; we like. But in case the user doesn't know to write
+		;; elements before he reads elements (or to read
+		;; manuals before he writes code:-), we'll signal a
+		;; STYLE-WARNING in case he didn't realize this.
+		(compiler-note "The default initial element ~S is not a ~S."
+			       initial-element-default
+			       eltype))
+	      bare-constructor-form)
+	     (t
+	      `(truly-the ,result-type-spec
+			  (fill ,bare-constructor-form
+				,initial-element-form))))
+       '((declare (type index length)))))))
 
 ;;; The list type restriction does not ensure that the result will be a
 ;;; multi-dimensional array. But the lack of adjustable, fill-pointer,

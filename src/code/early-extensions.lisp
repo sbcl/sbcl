@@ -49,9 +49,23 @@
 (def!type index-or-minus-1 () `(integer -1 (,sb!xc:array-dimension-limit)))
 
 ;;; the default value used for initializing character data. The ANSI
-;;; spec says this is arbitrary. CMU CL used #\NULL, which we avoid
-;;; because it's not in the ANSI table of portable characters.
-(defconstant default-init-char #\space)
+;;; spec says this is arbitrary, so we use the value that falls
+;;; through when we just let the low-level consing code initialize
+;;; all newly-allocated memory to zero.
+;;;
+;;; KLUDGE: It might be nice to use something which is a
+;;; STANDARD-CHAR, both to reduce user surprise a little and, probably
+;;; more significantly, to help SBCL's cross-compiler (which knows how
+;;; to dump STANDARD-CHARs). Unfortunately, the old CMU CL code is
+;;; shot through with implicit assumptions that it's #\NULL, and code
+;;; in several places (notably both DEFUN MAKE-ARRAY and DEFTRANSFORM
+;;; MAKE-ARRAY) would have to be rewritten. -- WHN 2001-10-04
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  ;; an expression we can use to construct a DEFAULT-INIT-CHAR value
+  ;; at load time (so that we don't need to teach the cross-compiler
+  ;; how to represent and dump non-STANDARD-CHARs like #\NULL)
+  (defparameter *default-init-char-form* '(code-char 0)))
+(defconstant default-init-char #.*default-init-char-form*)
 
 ;;; CHAR-CODE values for ASCII characters which we care about but
 ;;; which aren't defined in section "2.1.3 Standard Characters" of the

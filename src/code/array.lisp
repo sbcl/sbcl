@@ -60,7 +60,7 @@
 ;;;; MAKE-ARRAY
 
 (eval-when (:compile-toplevel :execute)
-  (sb!xc:defmacro pick-type (type &rest specs)
+  (sb!xc:defmacro pick-vector-type (type &rest specs)
     `(cond ,@(mapcar #'(lambda (spec)
 			 `(,(if (eq (car spec) t)
 			      t
@@ -85,13 +85,15 @@
     ;; and for all in any reasonable user programs.)
     ((t)
      (values #.sb!vm:simple-vector-type #.sb!vm:word-bits))
-    ((character base-char)
+    ((character base-char standard-char)
      (values #.sb!vm:simple-string-type #.sb!vm:byte-bits))
     ((bit)
      (values #.sb!vm:simple-bit-vector-type 1))
     ;; OK, we have to wade into SUBTYPEPing after all.
     (t
-     (pick-type type
+     ;; FIXME: The data here are redundant with
+     ;; *SPECIALIZED-ARRAY-ELEMENT-TYPE-PROPERTIES*.
+     (pick-vector-type type
        (base-char (values #.sb!vm:simple-string-type #.sb!vm:byte-bits))
        (bit (values #.sb!vm:simple-bit-vector-type 1))
        ((unsigned-byte 2)
@@ -138,7 +140,7 @@
      #.sb!vm:complex-bit-vector-type)
     ;; OK, we have to wade into SUBTYPEPing after all.
     (t
-     (pick-type type
+     (pick-vector-type type
        (base-char #.sb!vm:complex-string-type)
        (bit #.sb!vm:complex-bit-vector-type)
        (t #.sb!vm:complex-vector-type)))))
@@ -501,6 +503,8 @@
 						`(= type ,item))))
 				       (cdr stuff)))
 						   stuff))))
+      ;; FIXME: The data here are redundant with
+      ;; *SPECIALIZED-ARRAY-ELEMENT-TYPE-PROPERTIES*.
       (pick-element-type
        ((sb!vm:simple-string-type sb!vm:complex-string-type) 'base-char)
        ((sb!vm:simple-bit-vector-type sb!vm:complex-bit-vector-type) 'bit)
@@ -816,15 +820,20 @@
   (unless (array-header-p vector)
     (macrolet ((frob (name &rest things)
 		 `(etypecase ,name
-		    ,@(mapcar #'(lambda (thing)
-				  `(,(car thing)
-				    (fill (truly-the ,(car thing) ,name)
-					  ,(cadr thing)
-					  :start new-length)))
+		    ,@(mapcar (lambda (thing)
+				(destructuring-bind (type-spec fill-value)
+				    thing
+				  `(,type-spec
+				    (fill (truly-the ,type-spec ,name)
+					  ,fill-value
+					  :start new-length))))
 			      things))))
+      ;; FIXME: The associations between vector types and initial
+      ;; values here are redundant with
+      ;; *SPECIALIZED-ARRAY-ELEMENT-TYPE-PROPERTIES*.
       (frob vector
 	(simple-vector 0)
-	(simple-base-string #.default-init-char)
+	(simple-base-string #.*default-init-char-form*)
 	(simple-bit-vector 0)
 	((simple-array (unsigned-byte 2) (*)) 0)
 	((simple-array (unsigned-byte 4) (*)) 0)
