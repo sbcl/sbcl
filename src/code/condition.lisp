@@ -326,7 +326,8 @@
   (collect ((res (copy-list (condition-classoid-slots class))))
     (dolist (sclass (cdr (condition-classoid-cpl class)))
       (dolist (sslot (condition-classoid-slots sclass))
-	(let ((found (find (condition-slot-name sslot) (res))))
+	(let ((found (find (condition-slot-name sslot) (res)
+                           :key #'condition-slot-name)))
 	  (cond (found
 		 (setf (condition-slot-initargs found)
 		       (union (condition-slot-initargs found)
