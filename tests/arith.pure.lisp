@@ -258,3 +258,9 @@
   (test 32 double-float positive)
   (test 32 single-float negative)
   (test 32 single-float positive))
+
+;; x86-64 sign-extension bug found using pfdietz's random tester.
+(assert (= 286142502
+	   (funcall (lambda () 
+		      (declare (notinline logxor)) 
+		      (min (logxor 0 0 0 286142502))))))

@@ -941,7 +941,7 @@
   (assert wrappers)
 
   (or (fill-cache-p nil cache wrappers value)
-      (and (< (ceiling (* (cache-count cache) 1.25))
+      (and (< (ceiling (* (cache-count cache) *cache-expand-threshold*))
 	      (if (= (cache-nkeys cache) 1)
 		  (1- (cache-nlines cache))
 		  (cache-nlines cache)))

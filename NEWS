@@ -51,6 +51,9 @@ changes in sbcl-0.8.21 (0.9alpha.1?) relative to sbcl-0.8.20:
     ** MISC.564: defined out-of-line version of %ATAN2 on x86.
     ** attempting to create a package with a colliding nickname causes
        correctable errors to be signalled.
+    ** MISC.572-574: :START1 and :START2 broken for simple-base-strings.
+    ** several x86-64 backend bugs related to sign-extension of immediate
+       operands.
 
 changes in sbcl-0.8.20 (0.9alpha.0?) relative to sbcl-0.8.19:
   * fixed inspection of specialized arrays. (thanks to Simon Alexander)

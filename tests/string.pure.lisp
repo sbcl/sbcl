@@ -76,3 +76,14 @@
 
 (assert (raises-error? (make-string 5 :element-type t)))
 (assert (raises-error? (let () (make-string 5 :element-type t))))
+
+;; MISC.574
+(assert (= (funcall (lambda (a)
+		      (declare (optimize (speed 3) (safety 1)
+					 (debug 1) (space 2))
+			       (fixnum a))
+		      (string<= (coerce "e99mo7yAJ6oU4" 'base-string)
+				(coerce "aaABAAbaa" 'base-string)
+				:start1 a))
+		    9)
+	   9))

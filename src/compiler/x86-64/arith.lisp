@@ -128,7 +128,6 @@
   (:result-types unsigned-num)
   (:note "inline (unsigned-byte 32) arithmetic"))
 
-;; 32 not 64 because it's hard work loading 64 bit constants
 (define-vop (fast-signed-binop-c fast-safe-arith-op)
   (:args (x :target r :scs (signed-reg signed-stack)))
   (:info y)
@@ -268,7 +267,7 @@
 (define-vop (fast-logand-c/signed-unsigned=>unsigned
 	     fast-logand-c/unsigned=>unsigned)
   (:args (x :target r :scs (signed-reg signed-stack)))
-  (:arg-types signed-num (:constant (unsigned-byte 32))))
+  (:arg-types signed-num (:constant (unsigned-byte 31))))
 
 (define-vop (fast-logand/unsigned-signed=>unsigned
 	     fast-logand/unsigned=>unsigned)
@@ -328,7 +327,7 @@
   (:translate +)
   (:args (x :target r :scs (unsigned-reg unsigned-stack)))
   (:info y)
-  (:arg-types unsigned-num (:constant (unsigned-byte 32)))
+  (:arg-types unsigned-num (:constant (unsigned-byte 31)))
   (:results (r :scs (unsigned-reg)
 	       :load-if (not (location= x r))))
   (:result-types unsigned-num)
@@ -503,7 +502,7 @@
   (:translate truncate)
   (:args (x :scs (unsigned-reg) :target eax))
   (:info y)
-  (:arg-types unsigned-num (:constant (unsigned-byte 32)))
+  (:arg-types unsigned-num (:constant (unsigned-byte 31)))
   (:temporary (:sc unsigned-reg :offset eax-offset :target quo
 		   :from :argument :to (:result 0)) eax)
   (:temporary (:sc unsigned-reg :offset edx-offset :target rem

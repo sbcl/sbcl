@@ -57,8 +57,7 @@
 (defmacro storew (value ptr &optional (slot 0) (lowtag 0))
   (once-only ((value value))
     `(cond ((and (integerp ,value) 
-		 (not (typep ,value 
-			     '(or (signed-byte 32) (unsigned-byte 32)))))
+		 (not (typep ,value '(signed-byte 32))))
 	    (multiple-value-bind (lo hi) (dwords-for-quad ,value)
 	      (inst mov (make-ea-for-object-slot-half
 			 ,ptr ,slot ,lowtag) lo)

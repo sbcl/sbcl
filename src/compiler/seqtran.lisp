@@ -624,14 +624,16 @@
 ;;; must be SIMPLE-BASE-STRINGs.
 (macrolet ((def (name lessp equalp)
              `(deftransform ,name ((string1 string2 start1 end1 start2 end2)
-                                    (simple-base-string simple-base-string t t t t) *)
+                                   (simple-base-string simple-base-string t t t t) *)
                 `(let* ((end1 (if (not end1) (length string1) end1))
                         (end2 (if (not end2) (length string2) end2))
                         (index (sb!impl::%sp-string-compare
                                 string1 start1 end1 string2 start2 end2)))
                   (if index
-                      (cond ((= index ,(if ',lessp 'end1 'end2)) index)
-                            ((= index ,(if ',lessp 'end2 'end1)) nil)
+                      (cond ((= index end1)
+                             ,(if ',lessp 'index nil))
+                            ((= (+ index (- start2 start1)) end2)
+                             ,(if ',lessp nil 'index))
                             ((,(if ',lessp 'char< 'char>)
                                (schar string1 index)
                                (schar string2
@@ -639,9 +641,9 @@
                                                  (+ index
                                                     (truly-the fixnum
                                                                (- start2
-								  start1))))))
+                                                                  start1))))))
                              index)
-                            (t nil))
+                	    (t nil))
                       ,(if ',equalp 'end1 nil))))))
   (def string<* t nil)
   (def string<=* t t)
