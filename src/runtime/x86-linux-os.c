@@ -76,8 +76,6 @@ int arch_os_thread_init(struct thread *thread) {
 	for(n=0,p=local_ldt_copy;*p;p+=LDT_ENTRY_SIZE/sizeof(u32))
 	    n++;
     }
-    fprintf(stderr,"ldt entry %d\n",n);
-
     ldt_entry.entry_number=n;
     ldt_entry.base_addr=(unsigned long) thread;
     ldt_entry.limit=dynamic_values_bytes;
@@ -114,6 +112,24 @@ struct thread *arch_os_get_current_thread() {
 		 : "i" (offsetof (struct thread,this)));
     return me;
 }
+
+/* free any arch/os-specific resources used by thread, which is now
+ * defunct.  Not called on live threads
+ */
+
+int arch_os_thread_cleanup(struct thread *thread) {
+    struct modify_ldt_ldt_s ldt_entry = {
+	0, 0, 0, 
+	0, MODIFY_LDT_CONTENTS_DATA, 0, 0, 0, 0
+    }; 
+
+    ldt_entry.entry_number=thread->tls_cookie;
+    if (__modify_ldt (1, &ldt_entry, sizeof (ldt_entry)) != 0) 
+	/* modify_ldt call failed: something magical is not happening */
+	return 0;
+    return 1;
+}
+
 
 
 /* KLUDGE: As of kernel 2.2.14 on Red Hat 6.2, there's code in the
