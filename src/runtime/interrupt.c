@@ -31,6 +31,8 @@
 #include "alloc.h"
 #include "dynbind.h"
 #include "interr.h"
+#include "genesis/fdefn.h"
+#include "genesis/simple-fun.h"
 
 void sigaddset_blockable(sigset_t *s)
 {

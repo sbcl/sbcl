@@ -287,7 +287,7 @@ More information about SBCL is available at <http://sbcl.sourceforge.net/>.\n\
 
     FSHOW((stderr, "/funcalling initial_function=0x%lx\n", initial_function));
     create_thread(initial_function);
-    fprintf(stderr,"started lisp thread\n");
+    /* fprintf(stderr,"started lisp thread\n"); */
     gc_thread_pid=getpid();
     sigemptyset(&sigset);
     sigaddset(&sigset, SIGCHLD);
@@ -297,15 +297,18 @@ More information about SBCL is available at <http://sbcl.sourceforge.net/>.\n\
     while(all_threads) {
 	int signal;
 	siginfo_t info;
-	fprintf(stderr,"parent thread waiting for a signal\n");
+	/* fprintf(stderr,"parent thread waiting for a signal\n"); */
 	sigwaitinfo(&sigset,&info);
+	/*
 	fprintf(stderr,"parent thread got signal %d %x, maybe_gc_pending=%d\n",info.si_signo ,info.si_code , maybe_gc_pending);
+	*/
 	if((info.si_signo==SIGTERM) && 
 	   ((info.si_code==CLD_EXITED) ||
 	    (info.si_code==CLD_KILLED) ||
 	    (info.si_code==CLD_DUMPED))) {
 	    struct thread *th=find_thread_by_pid(info.si_pid);
-	    fprintf(stderr,"need to reap child %d %x\n",info.si_pid,th);
+	    /* fprintf(stderr,"need to reap child %d %x\n",info.si_pid,th); */
+
 	    if(th) destroy_thread(th);
 	}
 	if(maybe_gc_pending) {
@@ -324,15 +327,15 @@ More information about SBCL is available at <http://sbcl.sourceforge.net/>.\n\
 
 		    } else {
 			int status;
-			fprintf(stderr,"attaching to %d ...",th->pid);
+			/* fprintf(stderr,"attaching to %d ...",th->pid); */
 			if(ptrace(PTRACE_ATTACH,th->pid,0,0))
 			    perror("PTRACE_ATTACH");
 			sched_yield();
 			do {
 			    waitpid(th->pid,&status,__WALL);
-			    fprintf(stderr,"%d %d %d\n", 
+			    /* fprintf(stderr,"%d %d %d\n", 
 				    status,WIFSTOPPED(status),
-				    WSTOPSIG(status));
+				    WSTOPSIG(status)); */
 			}while (WIFSTOPPED(status)==0);
 		    }
 		}

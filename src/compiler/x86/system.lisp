@@ -173,10 +173,11 @@
   (:arg-types system-area-pointer)
   (:results (int :scs (sap-reg)))
   (:result-types system-area-pointer)
+  (:temporary (:sc any-reg) temp)
   (:translate (setf binding-stack-pointer-sap))
   (:policy :fast-safe)
   (:generator 1
-    (store-tl-symbol-value new-value *binding-stack-pointer*)
+    (store-tl-symbol-value new-value *binding-stack-pointer* temp)
     (move int new-value)))
 
 (define-vop (control-stack-pointer-sap)
