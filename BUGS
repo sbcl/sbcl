@@ -626,13 +626,17 @@ WORKAROUND:
   forever, even when it is uninterned and all other references to it
   are lost.
 
-141: 
-  Pretty-printing nested backquotes doesn't work right, as 
-  reported by Alexey Dejneka sbcl-devel 2002-01-13:
-  * '``(FOO ,@',@S)
-  ``(FOO SB-IMPL::BACKQ-COMMA-AT S)
-  * (lisp-implementation-version)
-  "0.pre7.129"
+141: "pretty printing and backquote"
+  a.
+    * '``(FOO ,@',@S)
+    ``(FOO SB-IMPL::BACKQ-COMMA-AT S)
+
+  b.
+    * (write '`(, .ala.) :readably t :pretty t)
+    `(,.ALA.)
+
+  (note the space between the comma and the point)
+
 
 143:
   (reported by Jesse Bouwman 2001-10-24 through the unfortunately
@@ -777,19 +781,6 @@ WORKAROUND:
   COMPILE and COMPILE-FILE returned FAILURE-P=T for perfectly legal
   code. Since then the warning has been downgraded to STYLE-WARNING, 
   so it's still a bug but at least it's a little less annoying.
-
-178: "AVER failure compiling confused THEs in FUNCALL"
-  In sbcl-0.7.4.24, compiling
-    (defun bug178 (x)
-      (funcall (the function (the standard-object x))))
-  gives
-    failed AVER:
-      "(AND (EQ (IR2-CONTINUATION-PRIMITIVE-TYPE 2CONT) FUNCTION-PTYPE) (EQ CHECK T))"
-  This variant compiles OK, though:
-    (defun bug178alternative (x)
-      (funcall (the nil x)))
-
-  (since 0.7.8.9 it does not signal an error; see also bug 199)
 
 183: "IEEE floating point issues"
   Even where floating point handling is being dealt with relatively
@@ -989,27 +980,9 @@ WORKAROUND:
 	inaccurate transformations.
     * Alexey Dejneka pointed out that
 	(IGNORE-ERRORS (IDENTITY (THE REAL '(1 2 3))))
-      works as it should. Also
+      and
 	(IGNORE-ERRORS (VALUES (THE REAL '(1 2 3))))
-      works as it should. Perhaps this is another case of VALUES type
-      intersections behaving in non-useful ways?
-
-199: "hairy FUNCTION types confuse the compiler"
-  (reported by APD sbcl-devel 2002-09-15)
-    (DEFUN MUR (F)
-      (EQ NIL (FUNCALL F)))
-
-    (DEFUN FOO (F X)
-      (DECLARE (TYPE (AND FUNCTION (SATISFIES MUR)) F))
-      (FUNCALL F X))
-
-  fails to compile, printing
-    failed AVER:
-      "(AND (EQ (IR2-CONTINUATION-PRIMITIVE-TYPE 2CONT) FUNCTION-PTYPE) (EQ CHECK T))"
-
-  APD further reports that this bug is not present in CMUCL.
-
-  (this case was fixed in 0.7.8.9; see also bug 178)
+      work as they should.
 
 201: "Incautious type inference from compound CONS types"
   (reported by APD sbcl-devel 2002-09-17)
@@ -1198,13 +1171,12 @@ WORKAROUND:
     (the integer (helper))
     nil)
 
-  Type check for INTEGER is inserted, the result of which serves as
-  the first argument of M-V-C, is inserted after evaluation of NIL. So
-  arguments of M-V-C are pushed in the wrong order. As a temporary
-  workaround type checking was disabled for M-V-Cs in 0.7.9.13. A
-  better solution would be to put a check between evaluation of
-  arguments, but it could be tricky to check result types of PROG1, IF
-  etc.
+  Type check for INTEGER, the result of which serves as the first
+  argument of M-V-C, is inserted after evaluation of NIL. So arguments
+  of M-V-C are pushed in the wrong order. As a temporary workaround
+  type checking was disabled for M-V-Cs in 0.7.9.13. A better solution
+  would be to put the check between evaluation of arguments, but it
+  could be tricky to check result types of PROG1, IF etc.
 
 228: "function-lambda-expression problems"
   in sbcl-0.7.9.6x, from the REPL:
