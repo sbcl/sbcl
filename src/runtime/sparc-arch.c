@@ -394,3 +394,93 @@ lispobj funcall3(lispobj function, lispobj arg0, lispobj arg1, lispobj arg2)
     return call_into_lisp(function, args, 3);
 }
 
+#ifdef LISP_FEATURE_LINKAGE_TABLE
+
+/* This a naive port from CMUCL/sparc, which was mostly stolen from the
+ * CMUCL/x86 version, with adjustments for sparc
+ *
+ * Linkage entry size is 16, because we need at least 3 instruction to
+ * implement a jump:
+ *
+ *      sethi %hi(addr), %g4
+ *      jmpl  [%g4 + %lo(addr)], %g5
+ *      nop
+ *
+ * The Sparc V9 ABI seems to use 8 words for its jump tables.  Maybe
+ * we should do the same?
+ */
+
+/*
+ * Define the registers to use in the linkage jump table. Can be the
+ * same. Some care must be exercised when choosing these. It has to be
+ * a register that is not otherwise being used. reg_L0 is a good
+ * choice. call_into_c trashes reg_L0 without preserving it, so we can
+ * trash it in the linkage jump table.
+ */
+#define LINKAGE_TEMP_REG        reg_L0
+#define LINKAGE_ADDR_REG        reg_L0
+
+/*
+ * Insert the necessary jump instructions at the given address.
+ */
+void
+arch_write_linkage_table_jmp(void* reloc_addr, void *target_addr)
+{
+  /*
+   * Make JMP to function entry.
+   *
+   * The instruction sequence is:
+   *
+   *        sethi %hi(addr), temp_reg
+   *        jmp   %temp_reg + %lo(addr), %addr_reg
+   *        nop
+   *        nop
+   *        
+   */
+  int* inst_ptr;
+  unsigned long hi;                   /* Top 22 bits of address */
+  unsigned long lo;                   /* Low 10 bits of address */
+  unsigned int inst;
+
+  inst_ptr = (int*) reloc_addr;
+
+  /*
+   * Split the target address into hi and lo parts for the sethi
+   * instruction.  hi is the top 22 bits.  lo is the low 10 bits.
+   */
+  hi = (unsigned long) target_addr;
+  lo = hi & 0x3ff;
+  hi >>= 10;
+
+  /*
+   * sethi %hi(addr), temp_reg
+   */
+      
+  inst = (0 << 30) | (LINKAGE_TEMP_REG << 25) | (4 << 22) | hi;
+  *inst_ptr++ = inst;
+
+  /*
+   * jmpl [temp_reg + %lo(addr)], addr_reg
+   */
+
+  inst = (2U << 30) | (LINKAGE_ADDR_REG << 25) | (0x38 << 19)
+    | (LINKAGE_TEMP_REG << 14) | (1 << 13) | lo;
+  *inst_ptr++ = inst;
+
+  /* nop (really sethi 0, %g0) */
+
+  inst = (0 << 30) | (0 << 25) | (4 << 22) | 0;
+      
+  *inst_ptr++ = inst;
+  *inst_ptr++ = inst;
+  
+  os_flush_icache((os_vm_address_t) reloc_addr, (char*) inst_ptr - (char*) reloc_addr);
+}
+
+void 
+arch_write_linkage_table_ref(void * reloc_addr, void *target_addr)
+{
+    *(unsigned long *)reloc_addr = (unsigned long)target_addr;
+}
+
+#endif

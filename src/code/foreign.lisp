@@ -1,5 +1,4 @@
-;;;; support for dynamically loading foreign object files and
-;;;; resolving symbols therein
+;;;; Foreign symbol linkage
 
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
@@ -10,152 +9,116 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB-ALIEN") ; (SB-ALIEN, not SB!ALIEN, since we're in warm load.)
+(in-package "SB!IMPL")
 
-;;; On any OS where we don't support foreign object file loading, any
-;;; query of a foreign symbol value is answered with "no definition
-;;; known", i.e. NIL.
-#-(or linux sunos FreeBSD OpenBSD NetBSD darwin)
-(defun get-dynamic-foreign-symbol-address (symbol)
-  (declare (type simple-string symbol) (ignore symbol))
-  nil)
+;;; *STATIC-FOREIGN-SYMBOLS* are static as opposed to "dynamic" (not
+;;; as opposed to C's "extern"). The table contains symbols known at
+;;; the time that the program was built, but not symbols defined in
+;;; object files which have been loaded dynamically since then.
+(declaim (type hash-table *static-foreign-symbols*))
+(defvar *static-foreign-symbols* (make-hash-table :test 'equal))
 
-;;; dlsym()-based implementation of GET-DYNAMIC-FOREIGN-SYMBOL-ADDRESS
-;;; and functions (e.g. LOAD-FOREIGN) which affect it.  This should 
-;;; work on any ELF system with dlopen(3) and dlsym(3)
-;;; It also works on OpenBSD, which isn't ELF, but is otherwise modern
-;;; enough to have a fairly well working dlopen/dlsym implementation.
-(macrolet ((define-unsupported-fun (fun-name &optional (error-message "unsupported on this system"))
-	       `(defun ,fun-name (&rest rest)
-		 ,error-message
-		 (declare (ignore rest))
-		 (error 'unsupported-operator :name ',fun-name))))
-  #-(or linux sunos FreeBSD OpenBSD NetBSD darwin)
-  (define-unsupported-fun load-shared-object)
-  #+(or linux sunos FreeBSD OpenBSD NetBSD darwin)
-  (progn
+(defun find-foreign-symbol-in-table (name table)
+  (some (lambda (prefix)
+	  (gethash (concatenate 'string prefix name) table))
+	#("" "ldso_stub__")))
 
-    (define-unsupported-fun load-foreign "Unsupported as of SBCL 0.8.13.")
-    (define-unsupported-fun load-1-foreign "Unsupported as of SBCL 0.8.13. Please use LOAD-SHARED-OBJECT.")
+(defun foreign-symbol-address-as-integer-or-nil (name &optional datap)
+  (declare (ignorable datap))
+  (or (find-foreign-symbol-in-table name  *static-foreign-symbols*)
+      #!+os-provides-dlopen
+      (progn
+        #-sb-xc-host
+        (values #!-linkage-table
+                (get-dynamic-foreign-symbol-address name)
+                #!+linkage-table
+                (ensure-foreign-symbol-linkage name datap)
+                t))))
 
-;;; a list of handles returned from dlopen(3) (or possibly some
-;;; bogus value temporarily during initialization)
-    (defvar *handles-from-dlopen* nil)
+(defun foreign-symbol-address-as-integer (name &optional datap)
+  (or (foreign-symbol-address-as-integer-or-nil name datap)
+      (error "Unknown foreign symbol: ~S" name)))
 
-;;; Dynamically loaded stuff isn't there upon restoring from a save.
-;;; Clearing the variable this way was originally done primarily for
-;;; Irix, which resolves tzname at runtime, resulting in
-;;; *HANDLES-FROM-DLOPEN* (which was then called *TABLES-FROM-DLOPEN*)
-;;; being set in the saved core image, resulting in havoc upon
-;;; restart; but it seems harmless and tidy for other OSes too.
-;;;
-;;; Of course, it can be inconvenient that dynamically loaded stuff
-;;; goes away when we save and restore. However,
-;;;  (1) trying to avoid it by system programming here could open a
-;;;      huge can of worms, since e.g. now we would need to worry about
-;;;      libraries possibly being in different locations (file locations
-;;;      or memory locations) at restore time than at save time; and
-;;;  (2) by the time the application programmer is so deep into the
-;;;      the use of hard core extension features as to be doing
-;;;      dynamic loading of foreign files and saving/restoring cores,
-;;;      he probably has the sophistication to write his own after-save
-;;;      code to reload the libraries without much difficulty.
+(defun foreign-symbol-address (symbol &optional datap)
+  (declare (ignorable datap))
+  (let ((name (sb!vm:extern-alien-name symbol)))
+    #!-linkage-table
+    (int-sap (foreign-symbol-address-as-integer name))
+    #!+linkage-table
+    (multiple-value-bind (addr sharedp)
+        (foreign-symbol-address-as-integer name datap)
+      #+sb-xc-host
+      (aver (not sharedp))
+      ;; If the address is from linkage-table and refers to data
+      ;; we need to do a bit of juggling.
+      (if (and sharedp datap)
+          ;; FIXME: 64bit badness here
+          (int-sap (sap-ref-32 (int-sap addr) 0))
+          (int-sap addr)))))
 
-;;; dan 2001.05.10 suspects that objection (1) is bogus for
-;;; dlsym()-enabled systems
+(defun foreign-reinit ()
+  #!+os-provides-dlopen
+  (reopen-shared-objects)
+  #!+linkage-table
+  (linkage-table-reinit))
 
-    (push (lambda () (setq *handles-from-dlopen* nil))
-	  *after-save-initializations*)
+;;; Cleanups before saving a core
+(defun foreign-deinit ()
+  #!+(and os-provides-dlopen (not linkage-table))
+  (let ((shared (remove-if #'null (mapcar #'sb!alien::shared-object-file
+					  *shared-objects*))))
+    (when shared
+      (warn "~@<Saving cores with shared objects loaded is unsupported on ~
+            this platform: calls to foreign functions in shared objects ~
+            from the restarted core will not work. You may be able to ~
+            work around this limitation by reloading all foreign definitions ~
+            and code using them in the restarted core, but no guarantees.~%~%~
+            Shared objects in this image:~% ~{~A~^, ~}~:@>"
+	    shared)))
+  #!+os-provides-dlopen
+  (close-shared-objects))
 
-    (define-alien-routine dlopen system-area-pointer
-      (file c-string) (mode int))
-    
-    (define-alien-routine dlsym system-area-pointer
-      (lib system-area-pointer) (name c-string))
-    
-    (define-alien-routine dlerror c-string)
-    
-;;; Ensure that we've opened our own binary so we can dynamically resolve 
-;;; symbols in the C runtime.  
-;;;
-;;; Old comment: This used to happen only in
-;;; GET-DYNAMIC-FOREIGN-SYMBOL-ADDRESS, and only if no libraries were
-;;; dlopen()ed already, but that didn't work if something was
-;;; dlopen()ed before any problem global vars were used.  So now we do
-;;; this in any function that can add to the *HANDLES-FROM-DLOPEN*, as
-;;; well as in GET-DYNAMIC-FOREIGN-SYMBOL-ADDRESS.
-;;;
-;;; FIXME: It would work just as well to do it once at startup, actually.
-;;; Then at least we know it's done.    -dan 2001.05.10
-    (defun ensure-runtime-symbol-table-opened ()
-      (unless *handles-from-dlopen*
-	;; Prevent recursive call if dlopen() isn't defined.
-	(setf *handles-from-dlopen* (int-sap 0))
-	(setf *handles-from-dlopen* (list (dlopen nil rtld-lazy)))
-	(when (zerop (sb-sys:sap-int (first *handles-from-dlopen*)))
-	  (error "can't open our own binary's symbol table: ~S" (dlerror)))))
+(defun foreign-symbol-in-address (sap)
+  (declare (ignorable sap))
+  #-sb-xc-host
+  (let ((addr (sap-int sap)))
+    (declare (ignorable addr))
+    #!+linkage-table
+    (when (<= sb!vm:linkage-table-space-start
+	      addr
+	      sb!vm:linkage-table-space-end)
+      (maphash (lambda (name info)
+		 (let ((table-addr (linkage-info-address info)))
+		   (when (<= table-addr
+			     addr
+			     (+ table-addr sb!vm:linkage-table-entry-size))
+		     (return-from foreign-symbol-in-address name))))
+	       *linkage-info*))
+    #!+os-provides-dladdr
+    (with-alien ((info (struct dl-info
+			       (filename c-string)
+			       (base unsigned)
+			       (symbol c-string)
+			       (symbol-address unsigned)))
+		 (dladdr (function unsigned unsigned (* (struct dl-info)))
+			 :extern "dladdr"))
+      (let ((err (alien-funcall dladdr addr (addr info))))
+	(if (zerop err)
+	    nil
+	    (slot info 'symbol))))
+    ;; FIXME: Even in the absence of dladdr we could search the
+    ;; static foreign symbols (and *linkage-info*, for that matter).
+    ))
 
-    (defun load-shared-object (file)
-      "Load a shared library/dynamic shared object file/general
-  dlopenable alien container.
+;;; How we learn about foreign symbols and dlhandles initially
+(defvar *!initial-foreign-symbols*)
 
-  To use LOAD-SHARED-OBJECT, at the Unix command line do this:
-    echo 'int summish(int x, int y) { return 1 + x + y; }' > /tmp/ffi-test.c
-    make /tmp/ffi-test.o # i.e. cc -c -o /tmp/ffi-test.o /tmp/ffi-test.c
-    ld -shared -o /tmp/ffi-test.so /tmp/ffi-test.o
-  then in SBCL do this:
-    (LOAD-SHARED-OBJECT \"/tmp/ffi-test.so\")
-    (DEFINE-ALIEN-ROUTINE SUMMISH INT (X INT) (Y INT))
-  Now running (SUMMISH 10 20) should return 31.
-"
-      (ensure-runtime-symbol-table-opened)
-      ;; Note: We use RTLD-GLOBAL so that it can find all the symbols
-      ;; previously loaded. We use RTLD-NOW so that dlopen() will fail if
-      ;; not all symbols are defined.
-      (let* ((real-file (or (unix-namestring file) file))
-	     (sap (dlopen real-file (logior rtld-now rtld-global))))
-	(if (zerop (sap-int sap))
-	    (error "can't open object ~S: ~S" real-file (dlerror))
-	    (pushnew sap *handles-from-dlopen* :test #'sap=)))
-      (values))
+(defun !foreign-cold-init ()
+  (dolist (symbol *!initial-foreign-symbols*)
+    (setf (gethash (car symbol) *static-foreign-symbols*) (cdr symbol)))
+  #!+os-provides-dlopen
+  (setf *runtime-dlhandle* (dlopen-or-lose nil)
+        *shared-objects* nil))
 
-    (defun get-dynamic-foreign-symbol-address (symbol)
-      (ensure-runtime-symbol-table-opened)
-      ;; Find the symbol in any of the loaded object files. Search in
-      ;; reverse order of loading, so that later loadings take precedence.
-      ;;
-      ;; FIXME: The way that we use PUSHNEW SAP in LOAD-SHARED-OBJECT means
-      ;; that the list isn't guaranteed to be in reverse order of loading,
-      ;; at least not if a file is loaded more than once. Is this the
-      ;; right thing? (In what cases does it matter?)
-      (dolist (handle (reverse *handles-from-dlopen*))
-	;; KLUDGE: We implicitly exclude the possibility that the variable
-	;; could actually be NULL, but the man page for dlsym(3) 
-	;; recommends doing a more careful test. -- WHN 20000825
-	(let ((possible-result (sap-int (dlsym handle symbol))))
-	  (unless (zerop possible-result)
-	    (return possible-result)))))
-
-    #+os-provides-dladdr
-    ;;; Override the early definition in target-load.lisp
-    (defun foreign-symbol-in-address (sap)
-      (let ((addr (sap-int sap)))
-	(with-alien ((info
-		      (struct dl-info
-			      (filename c-string)
-			      (base unsigned)
-			      (symbol c-string)
-			      (symbol-address unsigned)))
-		     (dladdr
-		      (function unsigned
-				unsigned (* (struct dl-info)))
-		      :extern "dladdr"))
-	  (let ((err (alien-funcall dladdr addr (addr info))))
-	    (if (zerop err)
-		nil
-		(values (slot info 'symbol)
-			(slot info 'filename)
-			addr
-			(- addr (slot info 'symbol-address))))))))
-    
-    ))					; PROGN, MACROLET
+#!-os-provides-dlopen
+(define-unsupported-fun load-shared-object)

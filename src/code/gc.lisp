@@ -120,15 +120,10 @@
 ;;; allocated and never freed.)
 (declaim (type unsigned-byte *n-bytes-freed-or-purified*))
 (defvar *n-bytes-freed-or-purified* 0)
-(push (lambda ()
-	(setf *n-bytes-freed-or-purified* 0))
-      ;; KLUDGE: It's probably not quite safely right either to do
-      ;; this in *BEFORE-SAVE-INITIALIZATIONS* (since consing, or even
-      ;; worse, something which depended on (GET-BYTES-CONSED), might
-      ;; happen after that) or in *AFTER-SAVE-INITIALIZATIONS*. But
-      ;; it's probably not a big problem, and there seems to be no
-      ;; other obvious time to do it. -- WHN 2001-07-30
-      *after-save-initializations*)
+(defun gc-reinit ()
+  (gc-on)
+  (gc)
+  (setf *n-bytes-freed-or-purified* 0))
 
 (declaim (ftype (function () unsigned-byte) get-bytes-consed))
 (defun get-bytes-consed ()

@@ -333,3 +333,19 @@
 					   0)
 				       (1- max))))
 	(t nil)))
+
+;;; Helpers for defining error-signalling NOP's for "not supported 
+;;; here" operations.
+(defmacro define-unsupported-fun (name &optional 
+                                  (doc "Unsupported on this platform.")
+                                  (control 
+                                   "~S is unsupported on this platform ~
+                                    (OS, CPU, whatever)."
+                                   controlp)
+                                  arguments)
+  `(defun ,name (&rest args)
+    ,doc
+    (declare (ignore args))
+    (error 'unsupported-operator 
+     :format-control ,control
+     :format-arguments (if ,controlp ',arguments (list ',name)))))

@@ -1003,9 +1003,14 @@
 	   (dump-object name fasl-output))
 	 (dump-fop 'fop-maybe-cold-load fasl-output)
 	 (dump-fop 'fop-assembler-fixup fasl-output))
-	(:foreign
+	((:foreign :foreign-dataref)
 	 (aver (stringp name))
-	 (dump-fop 'fop-foreign-fixup fasl-output)
+	 (ecase flavor
+	   (:foreign
+	    (dump-fop 'fop-foreign-fixup fasl-output))
+	   #!+linkage-table
+	   (:foreign-dataref
+	    (dump-fop 'fop-foreign-dataref-fixup fasl-output)))
 	 (let ((len (length name)))
 	   (aver (< len 256)) ; (limit imposed by fop definition)
 	   (dump-byte len fasl-output)

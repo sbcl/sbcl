@@ -283,33 +283,10 @@
 
 ;;;; linkage fixups
 
-;;; how we learn about assembler routines and foreign symbols at startup
+;;; how we learn about assembler routines at startup
 (defvar *!initial-assembler-routines*)
-(defvar *!initial-foreign-symbols*)
+
 (defun !loader-cold-init ()
+  (/show0 "/!loader-cold-init")
   (dolist (routine *!initial-assembler-routines*)
-    (setf (gethash (car routine) *assembler-routines*) (cdr routine)))
-  (dolist (symbol *!initial-foreign-symbols*)
-    (setf (gethash (car symbol) *static-foreign-symbols*) (cdr symbol))))
-
-(declaim (ftype (function (string) (unsigned-byte #.sb!vm:n-machine-word-bits))
-		foreign-symbol-address-as-integer))
-
-
-;;; SB!SYS:GET-DYNAMIC-FOREIGN-SYMBOL-ADDRESS is in foreign.lisp, on
-;;; platforms that have dynamic loading
-(defun foreign-symbol-address-as-integer-or-nil (foreign-symbol)
-  (or (find-foreign-symbol-in-table foreign-symbol *static-foreign-symbols*)
-      (sb!sys:get-dynamic-foreign-symbol-address foreign-symbol)))
-    
-(defun foreign-symbol-address-as-integer (foreign-symbol)
-  (or (foreign-symbol-address-as-integer-or-nil foreign-symbol)
-      (error "unknown foreign symbol: ~S" foreign-symbol)))
-
-(defun foreign-symbol-address (symbol)
-  (int-sap (foreign-symbol-address-as-integer
-	    (sb!vm:extern-alien-name symbol))))
-
-;;; Overridden in foreign.lisp once we're running on target
-(defun foreign-symbol-in-address (sap)
-  (declare (ignore sap)))
+    (setf (gethash (car routine) *assembler-routines*) (cdr routine))))

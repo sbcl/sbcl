@@ -149,52 +149,65 @@
 
 #!+linux
 (progn
+  (def!constant read-only-space-start     #x01000000)
+  (def!constant read-only-space-end       #x037ff000)
 
-  (def!constant read-only-space-start #x01000000)
-  (def!constant read-only-space-end   #x037ff000)
+  (def!constant static-space-start        #x05000000)
+  (def!constant static-space-end          #x07fff000)
 
-  (def!constant static-space-start    #x05000000)
-  (def!constant static-space-end      #x07fff000)
+  (def!constant dynamic-space-start       #x09000000)
+  (def!constant dynamic-space-end         #x29000000)
 
-  (def!constant dynamic-space-start   #x09000000)
-  (def!constant dynamic-space-end     #x29000000))
+  (def!constant linkage-table-space-start #x70000000)
+  (def!constant linkage-table-space-end   #x7ffff000))
 
-#!+(or freebsd openbsd)
+#!+freebsd
 (progn
+  (def!constant read-only-space-start     #x10000000)
+  (def!constant read-only-space-end       #x1ffff000)
 
-  (def!constant read-only-space-start
-    #!+freebsd #x10000000
-    #!+openbsd #x40000000)
-  (def!constant read-only-space-end
-    #!+freebsd #x1ffff000
-    #!+openbsd #x47fff000)
+  (def!constant static-space-start        #x30000000)
+  (def!constant static-space-end          #x37fff000)
 
-  (def!constant static-space-start
-    #!+freebsd #x30000000
-    #!+openbsd #x50000000)
-  (def!constant static-space-end
-    #!+freebsd #x37fff000
-    #!+openbsd #x5ffff000)
+  (def!constant dynamic-space-start       #x48000000)
+  (def!constant dynamic-space-end         #x88000000)
 
-  (def!constant dynamic-space-start
-    #!+freebsd  #x48000000
-    #!+openbsd  #x80000000)
-  (def!constant dynamic-space-end
-    #!+freebsd #x88000000
-    #!+openbsd #xA0000000))
+  ;; In CMUCL:  0xB0000000->0xB1000000
+  (def!constant linkage-table-space-start #x90000000)
+  (def!constant linkage-table-space-end   #x91000000))
+
+#!+openbsd
+(progn
+  (def!constant read-only-space-start     #x40000000)
+  (def!constant read-only-space-end       #x47fff000)
+
+  (def!constant static-space-start        #x50000000)
+  (def!constant static-space-end          #x5ffff000)
+
+  (def!constant dynamic-space-start       #x80000000)
+  (def!constant dynamic-space-end         #xA0000000)
+
+  ;; In CMUCL: 0xB0000000->0xB1000000
+  (def!constant linkage-table-space-start #xA0000000)
+  (def!constant linkage-table-space-end   #xA1000000))
 
 #!+netbsd
 (progn
+  (def!constant read-only-space-start     #x20000000)
+  (def!constant read-only-space-end       #x2ffff000)
 
-  (def!constant read-only-space-start #x20000000)
-  (def!constant read-only-space-end   #x2ffff000)
+  (def!constant static-space-start        #x30000000)
+  (def!constant static-space-end          #x37fff000)
 
-  (def!constant static-space-start    #x30000000)
-  (def!constant static-space-end      #x37fff000)
+  (def!constant dynamic-space-start       #x60000000)
+  (def!constant dynamic-space-end         #x98000000)
 
-  (def!constant dynamic-space-start   #x60000000)
-  (def!constant dynamic-space-end     #x98000000))
+  ;; In CMUCL: 0xB0000000->0xB1000000
+  (def!constant linkage-table-space-start #xA0000000)
+  (def!constant linkage-table-space-end   #xA1000000))
 
+;;; Size of one linkage-table entry in bytes.
+(def!constant linkage-table-entry-size 8)
 
 ;;; Given that NIL is the first thing allocated in static space, we
 ;;; know its value at compile time:
@@ -310,7 +323,8 @@
     ;; FIXME: In SBCL, the CLOS code has become sufficiently tightly
     ;; integrated into the system that it'd probably make sense to use
     ;; the ordinary unbound marker for this.
-    sb!pcl::..slot-unbound..))
+    sb!pcl::..slot-unbound..
+    ))
 
 (defparameter *static-funs*
   '(length

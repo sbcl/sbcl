@@ -47,8 +47,7 @@
   (intern (substitute #\- #\_ (string-upcase s)) :sb-posix))
 
 (defmacro define-call-internally (lisp-name c-name return-type error-predicate &rest arguments)
-  (if (sb-fasl::foreign-symbol-address-as-integer-or-nil
-       (sb-vm:extern-alien-name c-name))
+  (if (sb-sys:foreign-symbol-address-as-integer-or-nil c-name)
       `(progn
 	(declaim (inline ,lisp-name))
 	(defun ,lisp-name ,(mapcar #'car arguments)

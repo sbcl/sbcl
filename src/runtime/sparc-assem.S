@@ -200,6 +200,8 @@ call_into_c:
         ret
         nop
 
+/* Lisp calling convention. notice the first .byte line.
+ */		
         .global undefined_tramp
 	FUNCDEF(undefined_tramp)
         .align  8
@@ -222,6 +224,8 @@ undefined_tramp = . + 1
 	jmp	reg_CODE+SIMPLE_FUN_CODE_OFFSET
 	nop
 
+/* Lisp calling convention. Notice the first .byte line.
+ */		
 	.global	closure_tramp
 	FUNCDEF(closure_tramp)
 	.align	8
@@ -287,4 +291,3 @@ save_context:
 	ta	ST_FLUSH_WINDOWS	! flush register windows
 	retl				! return from leaf routine
 	nop 
-

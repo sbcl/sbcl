@@ -16,15 +16,22 @@
 
 echo //entering foreign.test.sh
 
+# simple way to make sure we're not punting by accident:
+# setting PUNT to anything other than 104 will make non-dlopen
+# and non-linkage-table platforms fail this
+PUNT=104
+
 testfilestem=${TMPDIR:-/tmp}/sbcl-foreign-test-$$
 
 # Make a little shared object file to test with.
 echo 'int summish(int x, int y) { return 1 + x + y; }' > $testfilestem.c
+echo 'int numberish = 42;' >> $testfilestem.c
+echo 'int nummish(int x) { return numberish + x; }' >> $testfilestem.c
 cc -c $testfilestem.c -o $testfilestem.o
 ld -shared -o $testfilestem.so $testfilestem.o
 
-# Test interaction with the shared object file.
-${SBCL:-sbcl} <<EOF
+# Foreign definitions & load
+cat > $testfilestem.deflisp <<EOF
   (define-alien-variable environ (* c-string))
   (defvar *environ* environ)
   (handler-case 
@@ -33,22 +40,56 @@ ${SBCL:-sbcl} <<EOF
      ;; At least as of sbcl-0.7.0.5, LOAD-SHARED-OBJECT isn't
      ;; supported on every OS. In that case, there's nothing to test,
      ;; and we can just fall through to success.
-     (sb-ext:quit :unix-status 52))) ; success convention for Lisp program
+     (sb-ext:quit :unix-status 22))) ; catch that
+  (define-alien-routine summish int (x int) (y int))
+  (define-alien-variable numberish int)
+  (define-alien-routine nummish int (x int))
+
   ;; Test that loading an object file didn't screw up our records
   ;; of variables visible in runtime. (This was a bug until 
   ;; Nikodemus Siivola's patch in sbcl-0.8.5.50.)
+  ;;
+  ;; This cannot be tested in a saved core, as there is no guarantee
+  ;; that the location will be the same.
   (assert (= (sb-sys:sap-int (alien-sap *environ*))
              (sb-sys:sap-int (alien-sap environ))))
-  (define-alien-routine summish int (x int) (y int))
+EOF
+
+# Test code
+cat > $testfilestem.testlisp <<EOF
   (assert (= (summish 10 20) 31))
+  (assert (= 42 numberish))
+  (setf numberish 13)
+  (assert (= 13 numberish))
+  (assert (= 14 (nummish 1)))
   (sb-ext:quit :unix-status 52) ; success convention for Lisp program
 EOF
-if [ $? != 52 ]; then
+
+${SBCL:-sbcl} --load $testfilestem.deflisp --load $testfilestem.testlisp
+if [ $? = 22 ]; then
+    rm $testfilestem.*
+    exit $PUNT # success -- load-shared-object not supported
+elif [ $? != 52]; then
+    rm $testfilestem.*
     echo test failed: $?
-    exit 1
+    exit 1 
 fi
 
-echo //cleanup: removing $testfilestem.*
+${SBCL:-sbcl} --load $testfilestem.deflisp --eval "(when (member :linkage-table *features*) (save-lisp-and-die \"$testfilestem.core\"))" <<EOF
+  (sb-ext:quit :unix-status 22) ; catch this
+EOF
+if [ $? = 22 ]; then
+    rm $testfilestem.*
+    exit $PUNT # success -- linkage-table not available
+fi
+
+$SBCL_ALLOWING_CORE --core $testfilestem.core --load $testfilestem.testlisp
+if [ $? != 52 ]; then
+    rm $testfilestem.*
+    echo test failed: $?
+    exit 1 # Failure
+fi
+
 rm $testfilestem.*
 
 # success convention for script

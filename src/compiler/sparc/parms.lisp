@@ -92,11 +92,14 @@
 ;;; Where to put the different spaces.  Must match the C code!
 #!+linux
 (progn
-  (def!constant read-only-space-start #x10000000)
-  (def!constant read-only-space-end #x15000000)
+  (def!constant linkage-table-space-start #x0f800000)
+  (def!constant linkage-table-space-end   #x10000000)
+  
+  (def!constant read-only-space-start     #x10000000)
+  (def!constant read-only-space-end       #x15000000)
 
-  (def!constant static-space-start    #x28000000)
-  (def!constant static-space-end #x2c000000)
+  (def!constant static-space-start        #x28000000)
+  (def!constant static-space-end          #x2c000000)
 
   ;; From alpha/parms.lisp:
   ;; this is used in PURIFY as part of a sloppy check to see if a pointer
@@ -105,28 +108,35 @@
   (def!constant dynamic-space-start   #x30000000)
   (def!constant dynamic-space-end     #x38000000)
 
-  (def!constant dynamic-0-space-start   #x30000000)
-  (def!constant dynamic-0-space-end     #x38000000)
+  (def!constant dynamic-0-space-start #x30000000)
+  (def!constant dynamic-0-space-end   #x38000000)
   
-  (def!constant dynamic-1-space-start   #x40000000)
-  (def!constant dynamic-1-space-end     #x48000000))
+  (def!constant dynamic-1-space-start #x40000000)
+  (def!constant dynamic-1-space-end   #x48000000))
 
 #!+sunos ; might as well start by trying the same numbers
 (progn
-  (def!constant read-only-space-start #x10000000)
-  (def!constant read-only-space-end #x15000000)
+  (def!constant linkage-table-space-start #x0f800000)
+  (def!constant linkage-table-space-end   #x10000000)
   
-  (def!constant static-space-start    #x28000000)
-  (def!constant static-space-end    #x2c000000)
-
-  (def!constant dynamic-space-start   #x30000000)
-  (def!constant dynamic-space-end     #x38000000)
-
-  (def!constant dynamic-0-space-start   #x30000000)
-  (def!constant dynamic-0-space-end     #x38000000)
+  (def!constant read-only-space-start     #x10000000)
+  (def!constant read-only-space-end       #x15000000)
   
-  (def!constant dynamic-1-space-start   #x40000000)
-  (def!constant dynamic-1-space-end     #x48000000))  
+  (def!constant static-space-start        #x28000000)
+  (def!constant static-space-end          #x2c000000)
+
+  (def!constant dynamic-space-start       #x30000000)
+  (def!constant dynamic-space-end         #x38000000)
+
+  (def!constant dynamic-0-space-start     #x30000000)
+  (def!constant dynamic-0-space-end       #x38000000)
+  
+  (def!constant dynamic-1-space-start     #x40000000)
+  (def!constant dynamic-1-space-end       #x48000000))
+
+;; Size of one linkage-table entry in bytes. See comment in
+;; src/runtime/sparc-arch.c
+(def!constant linkage-table-entry-size 16)
 
 
 ;;;; other random constants.

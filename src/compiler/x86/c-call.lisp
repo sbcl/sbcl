@@ -181,9 +181,6 @@
                                     ,@(new-args))))))
         (sb!c::give-up-ir1-transform))))
 
-
-
-
 (define-vop (foreign-symbol-address)
   (:translate foreign-symbol-address)
   (:policy :fast-safe)
@@ -194,6 +191,18 @@
   (:result-types system-area-pointer)
   (:generator 2
    (inst lea res (make-fixup (extern-alien-name foreign-symbol) :foreign))))
+
+#!+linkage-table
+(define-vop (foreign-symbol-dataref-address)
+  (:translate foreign-symbol-dataref-address)
+  (:policy :fast-safe)
+  (:args)
+  (:arg-types (:constant simple-string))
+  (:info foreign-symbol)
+  (:results (res :scs (sap-reg)))
+  (:result-types system-area-pointer)
+  (:generator 2
+   (inst mov res (make-fixup (extern-alien-name foreign-symbol) :foreign-dataref))))
 
 (define-vop (call-out)
   (:args (function :scs (sap-reg))

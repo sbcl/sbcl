@@ -17,23 +17,23 @@
 
 (in-package "SB!IMPL")
 
-;;;; variables related to saving core files
-;;;;
-;;;; (Most of the save-a-core functionality is defined later, in its
-;;;; own file, but we'd like to have these symbols declared special
-;;;; and initialized ASAP.)
+;;;; variables initialization and shutdown sequences
 
-(defvar *before-save-initializations* nil
+;; (Most of the save-a-core functionality is defined later, in its
+;; own file, but we'd like to have these symbols declared special
+;; and initialized ASAP.)
+(defvar *save-hooks* nil
   #!+sb-doc
-  "This is a list of functions which are called before creating a saved core
-  image. These functions are executed in the child process which has no ports,
-  so they cannot do anything that tries to talk to the outside world.")
+  "This is a list of functions which are called in an unspecified
+order before creating a saved core image. Unused by SBCL itself:
+reserved for user and applications.")
 
-(defvar *after-save-initializations* nil
+(defvar *init-hooks* nil
   #!+sb-doc
-  "This is a list of functions which are called when a saved core image starts
-  up. The system itself should be initialized at this point, but applications
-  might not be.")
+  "This is a list of functions which are called in an unspecified
+order when a saved core image starts up, after the system itself has
+been initialized. Unused by SBCL itself: reserved for user and
+applications.")
 
 ;;; like LISTEN, but any whitespace in the input stream will be flushed
 (defun listen-skip-whitespace (&optional (stream *standard-input*))

@@ -73,19 +73,20 @@
     (clear-info :variable :constant-value lisp-name)
     (setf (info :variable :alien-info lisp-name)
 	  (make-heap-alien-info :type type
-				:sap-form `(foreign-symbol-address
-					    ',alien-name)))))
+				:sap-form `(foreign-symbol-address ',alien-name t)))))
 
 (defmacro extern-alien (name type &environment env)
   #!+sb-doc
   "Access the alien variable named NAME, assuming it is of type TYPE. This
    is SETFable."
-  (let ((alien-name (etypecase name
-		      (symbol (guess-alien-name-from-lisp-name name))
-		      (string name))))
+  (let* ((alien-name (etypecase name
+		       (symbol (guess-alien-name-from-lisp-name name))
+		       (string name)))
+	 (alien-type (parse-alien-type type env))
+	 (datap (not (alien-fun-type-p alien-type))))
     `(%heap-alien ',(make-heap-alien-info
-		     :type (parse-alien-type type env)
-		     :sap-form `(foreign-symbol-address ',alien-name)))))
+		     :type alien-type
+		     :sap-form `(foreign-symbol-address ',alien-name ,datap)))))
 
 (defmacro with-alien (bindings &body body &environment env)
   #!+sb-doc
@@ -109,7 +110,8 @@
 	  (symbol type &optional (opt1 nil opt1p) (opt2 nil opt2p))
 	  binding
 	(/show symbol type opt1 opt2)
-	(let ((alien-type (parse-alien-type type env)))
+	(let* ((alien-type (parse-alien-type type env))
+	       (datap (not (alien-fun-type-p alien-type))))
 	  (/show alien-type)
 	  (multiple-value-bind (allocation initial-value)
 	      (if opt2p
@@ -141,7 +143,8 @@
 		     (let ((info (make-heap-alien-info
 				  :type alien-type
 				  :sap-form `(foreign-symbol-address
-					      ',initial-value))))
+					      ',initial-value
+					      ,datap))))
 		       `((symbol-macrolet
 			  ((,symbol (%heap-alien ',info)))
 			  ,@body))))

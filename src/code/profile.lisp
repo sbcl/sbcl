@@ -516,7 +516,6 @@ Lisp process."
 ;;; then load the old *OVERHEAD* value from the .core file into a
 ;;; different machine running at a different speed. We avoid this by
 ;;; erasing *CALL-OVERHEAD* whenever we save a .core file.
-(pushnew (lambda ()
-	   (without-package-locks
-	    (makunbound '*overhead*)))
-	 *before-save-initializations*)
+(defun profile-deinit ()
+  (without-package-locks
+    (makunbound '*overhead*)))

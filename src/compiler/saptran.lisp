@@ -13,8 +13,29 @@
 
 ;;;; DEFKNOWNs
 
-(defknown foreign-symbol-address (simple-string) system-area-pointer
-  (movable flushable))
+#!+linkage-table
+(deftransform foreign-symbol-address-as-integer ((symbol &optional datap)
+						 (simple-string boolean))
+  (if (and (constant-lvar-p symbol) (constant-lvar-p datap))
+      `(sap-int (foreign-symbol-address symbol datap))
+      (give-up-ir1-transform)))
+
+(deftransform foreign-symbol-address ((symbol &optional datap)
+				      (simple-string &optional boolean))
+    #!-linkage-table
+    (if (null datap)
+	(give-up-ir1-transform)
+	`(foreign-symbol-address symbol))
+    #!+linkage-table
+    (if (and (constant-lvar-p symbol) (constant-lvar-p datap))
+	(let ((name (lvar-value symbol))
+	      (datap (lvar-value datap)))
+	  (if (or #+sb-xc-host t ; only static symbols on host
+                  (not datap)
+		  (find-foreign-symbol-in-table name *static-foreign-symbols*))
+	      `(foreign-symbol-address ,name) ; VOP
+	      `(foreign-symbol-dataref-address ,name))) ; VOP
+	(give-up-ir1-transform)))
 
 (defknown (sap< sap<= sap= sap>= sap>)
 	  (system-area-pointer system-area-pointer) boolean

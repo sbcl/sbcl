@@ -56,7 +56,7 @@ of SBCL which maintained the CMU-CL-style split into two packages.)"
 	     "ENUM" "EXTERN-ALIEN"
 	     "FREE-ALIEN"
 	     "GET-ERRNO"
-	     "INT" 
+	     "INT"
 	     "LOAD-1-FOREIGN" "LOAD-FOREIGN" "LOAD-SHARED-OBJECT" "LONG"
 	     "MAKE-ALIEN"
 	     "NULL-ALIEN"
@@ -360,7 +360,7 @@ of SBCL which maintained the CMU-CL-style split into two packages.)"
 basic stuff like BACKTRACE and ARG. For now, the actual supported interface
 is still mixed indiscriminately with low-level internal implementation stuff
 like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
-      :use ("CL" "SB!EXT" "SB!INT" "SB!SYS")
+      :use ("CL" "SB!EXT" "SB!INT" "SB!SYS" "SB!KERNEL")
       :export ("*DEBUG-BEGINNER-HELP-P*"
 	       "*DEBUG-CONDITION*"
 	       "*DEBUG-PRINT-LENGTH*" "*DEBUG-PRINT-LEVEL*"
@@ -519,7 +519,6 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
 	       "READ-ONLY-CORE-SPACE-ID"
 	       "*!REVERSED-COLD-TOPLEVELS*"
 	       "STATIC-CORE-SPACE-ID"
-	       "*STATIC-FOREIGN-SYMBOLS*"
 	       "VERSION-CORE-ENTRY-TYPE-CODE"))
 
    ;; This package is a grab bag for things which used to be internal
@@ -551,6 +550,9 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
 	       "GC" "GC-OFF" "GC-ON" "GET-BYTES-CONSED"
 	       "*GC-RUN-TIME*"
 	       "PURIFY"
+
+               ;; Hooks into init & save sequences
+               "*INIT-HOOKS*" "*SAVE-HOOKS*"
 
 	       ;; There is no one right way to report progress on
 	       ;; hairy compiles.
@@ -735,10 +737,7 @@ Lisp extension proposal by David N. Gray"
 the stuff in here originated in CMU CL's EXTENSIONS package and is
 retained, possibly temporariliy, because it might be used internally."
       :use ("CL" "SB!ALIEN" "SB!GRAY" "SB!FASL" "SB!SYS")
-      :export ("*AFTER-SAVE-INITIALIZATIONS*"
-	       "*BEFORE-SAVE-INITIALIZATIONS*"
-
-	       ;; lambda list keyword extensions
+      :export (;; lambda list keyword extensions
 	       "&MORE"
 
 	       ;; INFO stuff doesn't belong in a user-visible package, we
@@ -785,6 +784,7 @@ retained, possibly temporariliy, because it might be used internally."
 	       ;; and cross-compiling
 	       "DEFMACRO-MUNDANELY"
 	       "DEFCONSTANT-EQX"
+               "DEFINE-UNSUPPORTED-FUN"
 
 	       ;; messing with PATHNAMEs
 	       "MAKE-TRIVIAL-DEFAULT-PATHNAME"
@@ -1439,21 +1439,25 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
 	     
                "!COLD-INIT" "!UNINTERN-INIT-ONLY-STUFF"
                "!GLOBALDB-COLD-INIT" "!FDEFN-COLD-INIT"
-               "!FUNCTION-NAMES-COLD-INIT"
+               "!FOREIGN-COLD-INIT" "!FUNCTION-NAMES-COLD-INIT"
                "!TYPE-CLASS-COLD-INIT" "!TYPEDEFS-COLD-INIT"
                "!ALIEN-TYPE-COLD-INIT" "!CLASSES-COLD-INIT"
                "!EARLY-TYPE-COLD-INIT" "!LATE-TYPE-COLD-INIT"
                "!FIXUP-TYPE-COLD-INIT" "!TARGET-TYPE-COLD-INIT"
                "!RANDOM-COLD-INIT" "!READER-COLD-INIT"
-               "!TYPECHECKFUNS-COLD-INIT"
-               "STREAM-COLD-INIT-OR-RESET" "!LOADER-COLD-INIT"
+               "!TYPECHECKFUNS-COLD-INIT" "!LOADER-COLD-INIT"
                "!EXHAUST-COLD-INIT" "!PACKAGE-COLD-INIT"
-               "SIGNAL-COLD-INIT-OR-REINIT"
                "!POLICY-COLD-INIT-OR-RESANIFY"
                "!VM-TYPE-COLD-INIT" "!BACKQ-COLD-INIT"
                "!SHARPM-COLD-INIT" "!EARLY-PROCLAIM-COLD-INIT"
                "!LATE-PROCLAIM-COLD-INIT" "!CLASS-FINALIZE"
+
                "GC-REINIT"
+               "SIGNAL-COLD-INIT-OR-REINIT"
+               "STREAM-COLD-INIT-OR-RESET" 
+
+               ;; Cleanups to run before saving a core
+               "DEBUG-DEINIT" "FOREIGN-DEINIT" "PROFILE-DEINIT"
 
                ;; Note: These are out of lexicographical order
                ;; because in CMU CL they were defined as
@@ -1733,7 +1737,11 @@ SB-KERNEL) have been undone, but probably more remain."
 	       ;; SB!KERNEL.)
 	       "%PRIMITIVE"
 	       "%STANDARD-CHAR-P"
+               "*LINKAGE-INFO*"
 	       "*LONG-SITE-NAME*" "*SHORT-SITE-NAME*"
+               "*RUNTIME-DLHANDLE*"
+               "*SHARED-OBJECTS*"
+               "*STATIC-FOREIGN-SYMBOLS*"
 	       "*STDERR*" "*STDIN*"
 	       "*STDOUT*" "*TASK-DATA*"
 	       "*TASK-NOTIFY*" "*TASK-SELF*" "*TTY*" "*TYPESCRIPTPORT*"
@@ -1741,14 +1749,20 @@ SB-KERNEL) have been undone, but probably more remain."
 	       "ALLOCATE-SYSTEM-MEMORY"
 	       "BEEP" "BITS" 
 	       "BYTES" "C-PROCEDURE"
+               "CLOSE-SHARED-OBJECTS"
 	       "COMPILER-VERSION"
 	       "DEALLOCATE-SYSTEM-MEMORY"
 	       "DEFAULT-INTERRUPT"
 	       "DEPORT-BOOLEAN" "DEPORT-INTEGER"
+               "DLOPEN-OR-LOSE"
 	       "FROB-DO-BODY"
 	       "ENABLE-INTERRUPT" "ENUMERATION"
 	       "FD-STREAM-FD" "FD-STREAM-P" 
-	       "FOREIGN-SYMBOL-ADDRESS" "FOREIGN-SYMBOL-ADDRESS-AS-INTEGER"
+               "FIND-FOREIGN-SYMBOL-IN-TABLE"
+	       "FOREIGN-SYMBOL-ADDRESS" 
+               "FOREIGN-SYMBOL-ADDRESS-AS-INTEGER"
+               "FOREIGN-SYMBOL-ADDRESS-AS-INTEGER-OR-NIL"
+               "FOREIGN-SYMBOL-DATAREF-ADDRESS"
 	       "FOREIGN-SYMBOL-IN-ADDRESS"
 	       "GET-PAGE-SIZE" "GET-SYSTEM-INFO"
 	       "IGNORE-INTERRUPT"
@@ -1760,6 +1774,7 @@ SB-KERNEL) have been undone, but probably more remain."
 	       "POINTER" "POINTER<" "POINTER>"
 	       "READ-N-BYTES" "REALLOCATE-SYSTEM-MEMORY" "RECORD-SIZE"
 	       "REMOVE-FD-HANDLER"
+               "REOPEN-SHARED-OBJECTS"
 	       "RESOLVE-LOADED-ASSEMBLER-REFERENCES"
 	       "SAP+" "SAP-" "SAP-INT"
 	       "SAP-REF-16" "SAP-REF-32" "SAP-REF-64" "SAP-REF-8"
@@ -2124,6 +2139,9 @@ structure representations"
 	       "READ-ONLY-SPACE-START" "READ-ONLY-SPACE-END"
 	       "TARGET-BYTE-ORDER" "TARGET-HEAP-ADDRESS-SPACE"
 	       "STATIC-SPACE-START" "STATIC-SPACE-END"
+               #!+linkage-table "LINKAGE-TABLE-SPACE-START"
+               #!+linkage-table "LINKAGE-TABLE-SPACE-END"
+               #!+linkage-table "LINKAGE-TABLE-ENTRY-SIZE"
 	       "TRACE-TABLE-CALL-SITE"
 	       "TRACE-TABLE-FUN-EPILOGUE" "TRACE-TABLE-FUN-PROLOGUE"
 	       "TRACE-TABLE-NORMAL" "N-WIDETAG-BITS" "WIDETAG-MASK"

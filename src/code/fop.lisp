@@ -629,6 +629,12 @@ bug.~:@>")
 
 ;;;; assemblerish fops
 
+(define-fop (fop-assembler-code 144)
+  (error "cannot load assembler code except at cold load"))
+
+(define-fop (fop-assembler-routine 145)
+  (error "cannot load assembler code except at cold load"))
+
 (define-fop (fop-foreign-fixup 147)
   (let* ((kind (pop-stack))
 	 (code-object (pop-stack))
@@ -640,12 +646,6 @@ bug.~:@>")
 			     (foreign-symbol-address-as-integer sym)
 			     kind)
     code-object))
-
-(define-fop (fop-assembler-code 144)
-  (error "cannot load assembler code except at cold load"))
-
-(define-fop (fop-assembler-routine 145)
-  (error "cannot load assembler code except at cold load"))
 
 (define-fop (fop-assembler-fixup 148)
   (let ((routine (pop-stack))
@@ -665,4 +665,17 @@ bug.~:@>")
     ;; we can only use code-object fixups when code-objects don't move.
     (sb!vm:fixup-code-object code-object (read-word-arg)
 			     (get-lisp-obj-address code-object) kind)
+    code-object))
+
+#!+linkage-table
+(define-fop (fop-foreign-dataref-fixup 150)
+  (let* ((kind (pop-stack))
+	 (code-object (pop-stack))
+	 (len (read-byte-arg))
+	 (sym (make-string len)))
+    (read-n-bytes *fasl-input-stream* sym 0 len)
+    (sb!vm:fixup-code-object code-object
+			     (read-word-arg)
+			     (foreign-symbol-address-as-integer sym t)
+			     kind)
     code-object))

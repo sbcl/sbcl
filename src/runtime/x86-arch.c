@@ -356,3 +356,35 @@ funcall3(lispobj function, lispobj arg0, lispobj arg1, lispobj arg2)
     args[2] = arg2;
     return call_into_lisp(function, args, 3);
 }
+
+#ifdef LISP_FEATURE_LINKAGE_TABLE
+/* FIXME: It might be cleaner to generate these from the lisp side of
+ * things.
+ */
+
+void 
+arch_write_linkage_table_jmp(char * reloc, void * fun)
+{
+    /* Make JMP to function entry. JMP offset is calculated from next
+     * instruction.
+     */
+    long offset = (char *)fun - (reloc + 5);
+    int i;
+
+    *reloc++ = 0xe9;		/* opcode for JMP rel32 */
+    for (i = 0; i < 4; i++) {
+	*reloc++ = offset & 0xff;
+	offset >>= 8;
+    }
+
+    /* write a nop for good measure. */
+    *reloc = 0x90;
+}
+
+void
+arch_write_linkage_table_ref(void * reloc, void * data)
+{
+    *(unsigned long *)reloc = (unsigned long)data;
+}
+
+#endif

@@ -1468,6 +1468,7 @@
 
 (defun cold-fdefinition-object (cold-name &optional leave-fn-raw)
   (declare (type descriptor cold-name))
+  (/show0 "/cold-fdefinition-object")
   (let ((warm-name (warm-fun-name cold-name)))
     (or (gethash warm-name *cold-fdefn-objects*)
 	(let ((fdefn (allocate-boxed-object (or *cold-fdefn-gspace* *dynamic*)
@@ -1499,6 +1500,7 @@
 		       sb!vm:fdefn-raw-addr-slot
 		       (ecase type
 			 (#.sb!vm:simple-fun-header-widetag
+			  (/show0 "static-fset (simple-fun)")
 			  #!+sparc
 			  defn
 			  #!-sparc
@@ -1508,6 +1510,7 @@
 			      (ash sb!vm:simple-fun-code-offset
 				   sb!vm:word-shift))))
 			 (#.sb!vm:closure-header-widetag
+			  (/show0 "/static-fset (closure)")
 			  (make-random-descriptor
 			   (cold-foreign-symbol-address-as-integer
 			    (sb!vm:extern-alien-name "closure_tramp"))))))
@@ -1524,8 +1527,8 @@
 	     (desired (sb!vm:static-fun-offset sym)))
 	(unless (= offset desired)
 	  ;; FIXME: should be fatal
-	  (warn "Offset from FDEFN ~S to ~S is ~W, not ~W."
-		sym nil offset desired))))))
+	  (error "Offset from FDEFN ~S to ~S is ~W, not ~W."
+		 sym nil offset desired))))))
 
 (defun list-all-fdefn-objects ()
   (let ((result *nil-descriptor*))
@@ -1541,55 +1544,55 @@
 (defvar *cold-foreign-symbol-table*)
 (declaim (type hash-table *cold-foreign-symbol-table*))
 
-;;; Read the sbcl.nm file to find the addresses for foreign-symbols in
-;;; the C runtime.  
+;; Read the sbcl.nm file to find the addresses for foreign-symbols in
+;; the C runtime.
 (defun load-cold-foreign-symbol-table (filename)
+  (/show "load-cold-foreign-symbol-table" filename)
   (with-open-file (file filename)
-    (loop
-      (let ((line (read-line file nil nil)))
-	(unless line
-	  (return))
-	;; UNIX symbol tables might have tabs in them, and tabs are
-	;; not in Common Lisp STANDARD-CHAR, so there seems to be no
-	;; nice portable way to deal with them within Lisp, alas.
-	;; Fortunately, it's easy to use UNIX command line tools like
-	;; sed to remove the problem, so it's not too painful for us
-	;; to push responsibility for converting tabs to spaces out to
-	;; the caller.
-	;;
-	;; Other non-STANDARD-CHARs are problematic for the same reason.
-	;; Make sure that there aren't any..
-	(let ((ch (find-if (lambda (char)
-			     (not (typep char 'standard-char)))
-			  line)))
-	  (when ch
-	    (error "non-STANDARD-CHAR ~S found in foreign symbol table:~%~S"
-		   ch
-		   line)))
-	(setf line (string-trim '(#\space) line))
-	(let ((p1 (position #\space line :from-end nil))
-	      (p2 (position #\space line :from-end t)))
-	  (if (not (and p1 p2 (< p1 p2)))
-	      ;; KLUDGE: It's too messy to try to understand all
-	      ;; possible output from nm, so we just punt the lines we
-	      ;; don't recognize. We realize that there's some chance
-	      ;; that might get us in trouble someday, so we warn
-	      ;; about it.
-	      (warn "ignoring unrecognized line ~S in ~A" line filename)
-	      (multiple-value-bind (value name)
-		  (if (string= "0x" line :end2 2)
-		      (values (parse-integer line :start 2 :end p1 :radix 16)
-			      (subseq line (1+ p2)))
-		      (values (parse-integer line :end p1 :radix 16)
-			      (subseq line (1+ p2))))
-		(multiple-value-bind (old-value found)
-		    (gethash name *cold-foreign-symbol-table*)
-		  (when (and found
-			     (not (= old-value value)))
-		    (warn "redefining ~S from #X~X to #X~X"
-			  name old-value value)))
-		(setf (gethash name *cold-foreign-symbol-table*) value))))))
-    (values)))
+    (loop for line = (read-line file nil nil)
+	  while line do	  
+	  ;; UNIX symbol tables might have tabs in them, and tabs are
+	  ;; not in Common Lisp STANDARD-CHAR, so there seems to be no
+	  ;; nice portable way to deal with them within Lisp, alas.
+	  ;; Fortunately, it's easy to use UNIX command line tools like
+	  ;; sed to remove the problem, so it's not too painful for us
+	  ;; to push responsibility for converting tabs to spaces out to
+	  ;; the caller.
+	  ;;
+	  ;; Other non-STANDARD-CHARs are problematic for the same reason.
+	  ;; Make sure that there aren't any..
+	  (let ((ch (find-if (lambda (char)
+			       (not (typep char 'standard-char)))
+			     line)))
+	    (when ch
+	      (error "non-STANDARD-CHAR ~S found in foreign symbol table:~%~S"
+		     ch
+		     line)))
+	  (setf line (string-trim '(#\space) line))
+	  (let ((p1 (position #\space line :from-end nil))
+		(p2 (position #\space line :from-end t)))
+	    (if (not (and p1 p2 (< p1 p2)))
+		;; KLUDGE: It's too messy to try to understand all
+		;; possible output from nm, so we just punt the lines we
+		;; don't recognize. We realize that there's some chance
+		;; that might get us in trouble someday, so we warn
+		;; about it.
+		(warn "ignoring unrecognized line ~S in ~A" line filename)
+		(multiple-value-bind (value name)
+		    (if (string= "0x" line :end2 2)
+			(values (parse-integer line :start 2 :end p1 :radix 16)
+				(subseq line (1+ p2)))
+			(values (parse-integer line :end p1 :radix 16)
+				(subseq line (1+ p2))))
+		  (multiple-value-bind (old-value found)
+		      (gethash name *cold-foreign-symbol-table*)
+		    (when (and found
+			       (not (= old-value value)))
+		      (warn "redefining ~S from #X~X to #X~X"
+			    name old-value value)))
+		  (/show "adding to *cold-foreign-symbol-table*:" name value)
+		  (setf (gethash name *cold-foreign-symbol-table*) value))))))
+  (values))	;; PROGN
 
 (defun cold-foreign-symbol-address-as-integer (name)
   (or (find-foreign-symbol-in-table name *cold-foreign-symbol-table*)
@@ -1851,20 +1854,21 @@
 ;;; the core. When the core is loaded, !LOADER-COLD-INIT uses this to
 ;;; create *STATIC-FOREIGN-SYMBOLS*, which the code in
 ;;; target-load.lisp refers to.
-(defun linkage-info-to-core ()
+(defun foreign-symbols-to-core ()
   (let ((result *nil-descriptor*))
     (maphash (lambda (symbol value)
 	       (cold-push (cold-cons (string-to-core symbol)
 				     (number-to-core value))
 			  result))
 	     *cold-foreign-symbol-table*)
-    (cold-set (cold-intern '*!initial-foreign-symbols*) result))
+    (cold-set (cold-intern 'sb!kernel:*!initial-foreign-symbols*) result))
   (let ((result *nil-descriptor*))
     (dolist (rtn *cold-assembler-routines*)
       (cold-push (cold-cons (cold-intern (car rtn))
 			    (number-to-core (cdr rtn)))
 		 result))
     (cold-set (cold-intern '*!initial-assembler-routines*) result)))
+
 
 ;;;; general machinery for cold-loading FASL files
 
@@ -2213,6 +2217,7 @@
 			 sb!vm:array-elements-slot
 			 (make-fixnum-descriptor total-elements)))
     result))
+
 
 ;;;; cold fops for loading numbers
 
@@ -2482,7 +2487,18 @@
     (let ((offset (read-word-arg))
 	  (value (cold-foreign-symbol-address-as-integer sym)))
       (do-cold-fixup code-object offset value kind))
-    code-object))
+   code-object))
+
+(define-cold-fop (fop-foreign-dataref-fixup)
+  (let* ((kind (pop-stack))
+	 (code-object (pop-stack))
+	 (len (read-byte-arg))
+	 (sym (make-string len)))
+    (read-string-as-bytes *fasl-input-stream* sym)
+    (maphash (lambda (k v)
+               (format *error-output* "~&~S = #X~8X~%" k v))
+             *cold-foreign-symbol-table*)
+    (error "shared foreign symbol in cold load: ~S (~S)" sym kind)))
 
 (define-cold-fop (fop-assembler-code)
   (let* ((length (read-word-arg))
@@ -2637,7 +2653,7 @@
               (maybe-record-with-munged-name "-TRAP" "trap_" 3)
               (maybe-record-with-munged-name "-SUBTYPE" "subtype_" 4)
               (maybe-record-with-munged-name "-SC-NUMBER" "sc_" 5)
-              (maybe-record-with-translated-name '("-START" "-END") 6)
+              (maybe-record-with-translated-name '("-START" "-END" "-SIZE") 6)
               (maybe-record-with-translated-name '("-CORE-ENTRY-TYPE-CODE") 7)
               (maybe-record-with-translated-name '("-CORE-SPACE-ID") 8))))))
     ;; KLUDGE: these constants are sort of important, but there's no
@@ -3032,10 +3048,6 @@ initially undefined function references:~2%")
 		      map-file-name
 		      c-header-dir-name)
 
-  (when (and core-file-name
-	     (not symbol-table-file-name))
-    (error "can't output a core file without symbol table file input"))
-
   (format t
 	  "~&beginning GENESIS, ~A~%"
 	  (if core-file-name
@@ -3045,11 +3057,13 @@ initially undefined function references:~2%")
 	    ;; create a core.
 	    (format nil "creating core ~S" core-file-name)
 	    (format nil "creating headers in ~S" c-header-dir-name)))
-  (let* ((*cold-foreign-symbol-table* (make-hash-table :test 'equal)))
+  
+  (let ((*cold-foreign-symbol-table* (make-hash-table :test 'equal)))
 
-    ;; Read symbol table, if any.
-    (when symbol-table-file-name
-      (load-cold-foreign-symbol-table symbol-table-file-name))
+    (when core-file-name
+      (if symbol-table-file-name
+	  (load-cold-foreign-symbol-table symbol-table-file-name)
+	  (error "can't output a core file without symbol table file input")))
 
     ;; Now that we've successfully read our only input file (by
     ;; loading the symbol table, if any), it's a good time to ensure
@@ -3159,7 +3173,7 @@ initially undefined function references:~2%")
       ;; Tidy up loose ends left by cold loading. ("Postpare from cold load?")
       (resolve-assembler-fixups)
       #!+x86 (output-load-time-code-fixups)
-      (linkage-info-to-core)
+      (foreign-symbols-to-core)
       (finish-symbols)
       (/show "back from FINISH-SYMBOLS")
       (finalize-load-time-value-noise)

@@ -413,20 +413,6 @@
 	;; that this would go away?
 	(fill *current-fop-table* nil))))
   t)
-
-;;; This is used in in target-load and also genesis, using
-;;; *COLD-FOREIGN-SYMBOL-TABLE*. All the speculative prefix-adding
-;;; code for foreign symbol lookup should be here.
-(defun find-foreign-symbol-in-table (name table)
-  (let ((prefixes
-         #!+(or osf1 sunos linux freebsd netbsd darwin) #("" "ldso_stub__")
-	 #!+openbsd #("")))
-    (declare (notinline some)) ; to suppress bug 117 bogowarning
-    (some (lambda (prefix)
-	    (gethash (concatenate 'string prefix name)
-		     table
-		     nil))
-	  prefixes)))
 
 ;;;; stuff for debugging/tuning by collecting statistics on FOPs (?)
 

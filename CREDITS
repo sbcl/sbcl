@@ -627,6 +627,10 @@ Gerd Moellman:
   faster in the typical case than the old optimizations in PCL and
   less buggy.
 
+Timothy Moore:
+  He designed and implemented the original CMUCL linkage-table, on
+  which the SBCL implementation thereof is based.
+
 William ("Bill") Newman:
   He continued to maintain SBCL after the fork, increasing ANSI
   compliance, fixing bugs, regularizing the internals of the
@@ -670,8 +674,8 @@ Rudi Schlatte:
 
 Nikodemus Siivola:
   He provided build fixes, in particular to tame the SunOS toolchain,
-  implemented package locks, and has fixed many (stream-related and 
-  other) bugs besides.
+  implemented package locks, ported the linkage-table code from CMUCL,
+  and has fixed many (stream-related and other) bugs besides.
 
 Juho Snellman:
   He provided several performance enhancements, including a better hash
@@ -687,7 +691,7 @@ Brian Spilsbury:
 Raymond Toy:
   He continued to work on CMU CL after the SBCL fork, especially on
   floating point stuff. Various patches and fixes of his have been
-  ported to SBCL.
+  ported to SBCL, including his Sparc port of linkage-table.
 
 Peter Van Eynde:
   He wrestled the CLISP test suite into a mostly portable test suite

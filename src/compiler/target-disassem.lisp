@@ -1774,7 +1774,7 @@
     (setf *assembler-routines-by-addr*
 	  (invert-address-hash sb!fasl:*assembler-routines*))
     (setf *assembler-routines-by-addr*
-	  (invert-address-hash sb!fasl:*static-foreign-symbols*
+	  (invert-address-hash sb!sys:*static-foreign-symbols*
 			       *assembler-routines-by-addr*)))
   (gethash address *assembler-routines-by-addr*))
 
@@ -1907,7 +1907,10 @@
   (declare (type disassem-state dstate))
   (unless (typep address 'address)
     (return-from maybe-note-assembler-routine nil))
-  (let ((name (find-assembler-routine address)))
+  (let ((name (or
+	       #!+linkage-table
+	       (sb!sys:foreign-symbol-in-address (sb!sys:int-sap address))
+	       (find-assembler-routine address))))
     (unless (null name)
       (note (lambda (stream)
 	      (if note-address-p

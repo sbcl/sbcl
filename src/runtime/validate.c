@@ -53,6 +53,10 @@ validate(void)
     ensure_space( (lispobj *)DYNAMIC_1_SPACE_START  , DYNAMIC_SPACE_SIZE);
 #endif
 
+#ifdef LISP_FEATURE_LINKAGE_TABLE
+    ensure_space( (lispobj *)LINKAGE_TABLE_SPACE_START, LINKAGE_TABLE_SPACE_SIZE);
+#endif
+ 
 #ifdef PRINTNOISE
     printf(" done.\n");
 #endif

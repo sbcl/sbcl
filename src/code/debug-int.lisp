@@ -780,10 +780,10 @@
 	  (#.lra-save-offset
 	   (setf (sap-ref-sap pointer (- (* (1+ stack-slot) 4))) value))))))
 
-(defun foreign-function-debug-name (sap)
-  (multiple-value-bind (name file base offset) (foreign-symbol-in-address sap)
+(defun foreign-function-backtrace-name (sap)
+  (let ((name (foreign-symbol-in-address sap)))
     (if name
-	(format nil "foreign function: ~A [~A: #x~X + #x~X]" name file base offset)
+	(format nil "foreign function: ~A" name)
 	(format nil "foreign function: #x~X" (sap-int sap)))))
 
 ;;; This returns a frame for the one existing in time immediately
@@ -832,7 +832,8 @@
 			   "undefined function"))
 			 (:foreign-function
 			  (make-bogus-debug-fun
-			   (foreign-function-debug-name (int-sap (get-lisp-obj-address lra)))))
+			   (foreign-function-backtrace-name
+			    (int-sap (get-lisp-obj-address lra)))))
 			 ((nil)
 			  (make-bogus-debug-fun
 			   "bogus stack frame"))
@@ -877,7 +878,8 @@
 		      (make-bogus-debug-fun
 		       "undefined function"))
 		     (:foreign-function
-		      (make-bogus-debug-fun (foreign-function-debug-name ra)))
+		      (make-bogus-debug-fun
+		       (foreign-function-backtrace-name ra)))
 		     ((nil)
 		      (make-bogus-debug-fun
 		       "bogus stack frame"))
@@ -3265,6 +3267,8 @@ register."
 ;;; instruction.
 (defun make-bogus-lra (real-lra &optional known-return-p)
   (without-gcing
+   ;; These are really code labels, not variables: but this way we get
+   ;; their addresses.
    (let* ((src-start (foreign-symbol-address "fun_end_breakpoint_guts"))
 	  (src-end (foreign-symbol-address "fun_end_breakpoint_end"))
 	  (trap-loc (foreign-symbol-address "fun_end_breakpoint_trap"))

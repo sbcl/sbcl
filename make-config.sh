@@ -161,6 +161,20 @@ case `uname` in
 esac
 cd $original_dir
 
+# FIXME: Things like :c-stack-grows-..., etc, should be
+# *derived-target-features* or equivalent, so that there was a nicer
+# way to specify them then sprinkling them in this file. They should
+# still be tweakable by advanced users, though, but probably not
+# appear in *features* of target. #!+/- should be adjusted to take
+# them in account as well. At minimum the nicer specification stuff,
+# though:
+#
+# (define-feature :dlopen (features)
+#   (union '(:bsd :linux :darwin :sunos) features))
+#
+# (define-feature :c-stack-grows-downwards-not-upwards (features)
+#   (member :x86 features))
+
 # KLUDGE: currently the x86 only works with the generational garbage
 # collector (indicated by the presence of :GENCGC in *FEATURES*) and
 # alpha, sparc and ppc with the stop'n'copy collector (indicated by
@@ -169,20 +183,29 @@ cd $original_dir
 # base-target-features.lisp-expr, we add it into local-target-features
 # if we're building for x86. -- CSR, 2002-02-21 Then we do something
 # similar with :STACK-GROWS-FOOWARD, too. -- WHN 2002-03-03
-if [ "$sbcl_arch" = "x86" ] ; then
+if [ "$sbcl_arch" = "x86" ]; then
     printf ' :gencgc :stack-grows-downward-not-upward :c-stack-is-control-stack' >> $ltf
-elif [ "$sbcl_arch" = "mips" ] ; then
+    if [ "$sbcl_os" = "linux" ] || [ "$sbcl_os" = "freebsd" ]; then
+	printf ' :linkage-table' >> $ltf
+    fi
+elif [ "$sbcl_arch" = "mips" ]; then
     # Use a little C program to try to guess the endianness.  Ware
     # cross-compilers!
-    $GNUMAKE -C tools-for-build determine-endianness
+    #
+    # FIXME: integrate to grovel-features, mayhaps
+    $GNUMAKE -C tools-for-build determine-endianness -I src/runtime
     tools-for-build/determine-endianness >> $ltf
 elif [ "$sbcl_arch" = "ppc" -a "$sbcl_os" = "linux" ]; then
     # Use a C program to detect which kind of glibc we're building on,
     # to bandage across the break in source compatibility between
     # versions 2.3.1 and 2.3.2
-    $GNUMAKE -C tools-for-build where-is-mcontext
+    #
+    # FIXME: integrate to grovel-features., maypahps
+    $GNUMAKE -C tools-for-build where-is-mcontext -I src/runtime
     tools-for-build/where-is-mcontext > src/runtime/ppc-linux-mcontext.h
 elif [ "$sbcl_arch" = "ppc" -a "$sbcl_os" = "darwin" ]; then
+    # We provide a dlopen shim, so a little lie won't hurt
+    printf " :os-provides-dlopen" >> $ltf
     # The default stack ulimit under darwin is too small to run PURIFY.
     # Best we can do is complain and exit at this stage
     if [ "`ulimit -s`" = "512" ]; then
@@ -196,11 +219,15 @@ elif [ "$sbcl_arch" = "sparc" ]; then
     # FUNCDEF macro for assembler. No harm in running this on sparc-linux 
     # as well.
     sh tools-for-build/sparc-funcdef.sh > src/runtime/sparc-funcdef.h
+    if [ "$sbcl_os" = "sunos" ]; then
+	printf ' :linkage-table' >> $ltf
+    fi
 else
     # Nothing need be done in this case, but sh syntax wants a placeholder.
     echo > /dev/null
 fi
 
+export sbcl_os sbcl_arch
 sh tools-for-build/grovel-features.sh >> $ltf
 
 echo //finishing $ltf

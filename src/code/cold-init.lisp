@@ -214,7 +214,9 @@
 
   (show-and-call stream-cold-init-or-reset)
   (show-and-call !loader-cold-init)
+  (show-and-call !foreign-cold-init)
   (show-and-call signal-cold-init-or-reinit)
+  (/show0 "enabling internal errors")
   (setf (sb!alien:extern-alien "internal_errors_enabled" boolean) t)
 
   ;; FIXME: This list of modes should be defined in one place and
@@ -263,9 +265,9 @@
 		  (unix-code 0 unix-code-p)
 		  (unix-status unix-code))
   #!+sb-doc
-  "Terminate the current Lisp. Things are cleaned up (with UNWIND-PROTECT
-  and so forth) unless RECKLESSLY-P is non-NIL. On UNIX-like systems,
-  UNIX-STATUS is used as the status code."
+  "Terminate the current Lisp. Things are cleaned up (with
+UNWIND-PROTECT and so forth) unless RECKLESSLY-P is non-NIL. On
+UNIX-like systems, UNIX-STATUS is used as the status code."
   (declare (type (signed-byte 32) unix-status unix-code))
   (/show0 "entering QUIT")
   ;; FIXME: UNIX-CODE was deprecated in sbcl-0.6.8, after having been
@@ -298,8 +300,9 @@ instead (which is another name for the same thing)."))
       (set-floating-point-modes
        :traps '(:overflow #!-netbsd :invalid :divide-by-zero))
       (sb!thread::maybe-install-futex-functions)))
-  (gc-on)
-  (gc))
+  (foreign-reinit)
+  (gc-reinit)
+  (mapc #'funcall *init-hooks*))
 
 ;;;; some support for any hapless wretches who end up debugging cold
 ;;;; init code

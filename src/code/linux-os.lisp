@@ -22,6 +22,8 @@
 
 (defvar *software-version* nil)
 
+;;; FIXME: More duplicated logic here vrt. other oses. Abstract into
+;;; uname-software-version?
 (defun software-version ()
   #!+sb-doc
   "Return a string describing version of the supporting software, or NIL
@@ -33,6 +35,8 @@
 			   (sb!ext:run-program "/bin/uname" `("-r")
 					       :output stream))))))
 
+;;; FIXME: This logic is duplicated in other backends:
+;;; abstract, abstract. OS-COMMON-COLD-INIT-OR-REINIT, mayhaps?
 (defun os-cold-init-or-reinit () ; KLUDGE: don't know what to do here
   (/show0 "entering linux-os.lisp OS-COLD-INIT-OR-REINIT")
   (setf *software-version* nil)

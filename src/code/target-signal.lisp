@@ -55,6 +55,7 @@
 
 (defun enable-interrupt (signal handler)
   (declare (type (or function fixnum (member :default :ignore)) handler))
+  (/show0 "enable-interrupt")
   (without-gcing
    (let ((result (install-handler signal
 				  (case handler

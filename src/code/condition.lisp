@@ -775,12 +775,8 @@
 ;;; regression tests cheerfully passed because they assumed that
 ;;; unFBOUNDPness meant they were running on an system which didn't
 ;;; support the extension.)
-(define-condition unsupported-operator (cell-error) ()
-  (:report
-   (lambda (condition stream)
-     (format stream
-	     "unsupported on this platform (OS, CPU, whatever): ~S"
-	     (cell-error-name condition)))))
+(define-condition unsupported-operator (simple-error) ())
+
 
 ;;; (:ansi-cl :function remove)
 ;;; (:ansi-cl :section (a b c))

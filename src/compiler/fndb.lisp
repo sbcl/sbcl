@@ -1468,6 +1468,19 @@
 (defknown sb!vm::push-word-on-c-stack (system-area-pointer) (values) (unsafe))
 (defknown sb!vm::pop-words-from-c-stack (index) (values) ())
 
+#!+linkage-table
+(defknown foreign-symbol-dataref-address (simple-string)
+  system-area-pointer
+  (movable flushable))
+
+(defknown foreign-symbol-address (simple-string &optional boolean)
+  system-area-pointer
+  (movable flushable))
+
+(defknown foreign-symbol-address-as-integer (simple-string &optional boolean)
+  integer
+  (movable flushable))
+
 ;;;; miscellaneous internal utilities
 
 (defknown %fun-name (function) t (flushable))

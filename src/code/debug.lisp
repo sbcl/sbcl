@@ -1502,10 +1502,11 @@ reset to ~S."
 (defvar *cached-readtable* nil)
 (declaim (type (or readtable null) *cached-readtable*))
 
-(pushnew (lambda ()
-	   (setq *cached-debug-source* nil *cached-source-stream* nil
-		 *cached-readtable* nil))
-	 *before-save-initializations*)
+;;; Stuff to clean up before saving a core
+(defun debug-deinit ()
+  (setf *cached-debug-source* nil
+	*cached-source-stream* nil
+	*cached-readtable* nil))
 
 ;;; We also cache the last toplevel form that we printed a source for
 ;;; so that we don't have to do repeated reads and calls to

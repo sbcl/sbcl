@@ -112,9 +112,12 @@ the @code{inspect} prompt.
 
 SBCL has the ability to save its state as a file for later
 execution. This functionality is important for its bootstrapping
-process, and is also provided as an extension to the user.  Note that
-foreign libraries loaded via @code{load-shared-object} don't survive
-this process; a core should not be saved in this case.
+process, and is also provided as an extension to the user.  
+
+Note that foreign libraries loaded via @code{load-shared-object} don't
+survive this process on all platforms; a core should not be saved in
+this case. Platforms where this is supported as of SBCL 0.8.14.5 are
+x86/Linux, x86/FreeBSD and sparc/SunOS.
 
 @emph{FIXME: what should be done for foreign libraries?}
 

@@ -1,4 +1,11 @@
 changes in sbcl-0.8.15 relative to sbcl-0.8.14:
+  * incompatible change: SB-INT:*BEFORE-SAVE-INITIALIZATIONS* and
+    SB-INT:*AFTER-SAVE-INITIALIZATIONS* have been renamed
+    SB-EXT:*SAVE-HOOKS* and SB-EXT:*INIT-HOOKS*, and are now
+    part of the supported interface.
+  * new feature: saving cores with foreign code loaded is now
+    supported on x86/FreeBSD, x86/Linux, and sparc/SunOS. (based
+    on Timothy Moore's work for CMUCL)
   * bug fix: incorrect expansion of defgeneric that caused
     a style warning. (thanks for Zach Beane)
 

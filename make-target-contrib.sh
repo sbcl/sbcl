@@ -13,6 +13,9 @@
 # provided with absolutely no warranty. See the COPYING and CREDITS
 # files for more information.
 
+. ./find-gnumake.sh
+find_gnumake
+
 # usually SBCL_HOME refers to the installed root of SBCL, not the
 # build directory.  Right now, however, where there are dependencies
 # between contrib packages, we want the _uninstalled_ versions to be

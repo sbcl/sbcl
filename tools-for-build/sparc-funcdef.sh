@@ -2,7 +2,7 @@ cd tools-for-build
 
 TMP=sparc-funcdef.S
 
-SUN_FUNCDEF="#define FUNCDEF(x)	.type x,#function"
+SUN_FUNCDEF="#define FUNCDEF(x)	.type x, #function"
 GNU_FUNCDEF="#define FUNCDEF(x)	.type x,@function"
 
 echo $SUN_FUNCDEF > $TMP

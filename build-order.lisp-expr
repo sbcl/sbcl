@@ -455,6 +455,10 @@
  ("src/code/thread")
  ("src/code/load")
 
+ #!+linkage-table ("src/code/linkage-table" :not-host)
+ #!+os-provides-dlopen ("src/code/foreign-load" :not-host)
+ ("src/code/foreign")
+
  ("src/code/fop") ; needs macros from code/load.lisp
 
  ("src/compiler/ctype")

@@ -121,16 +121,9 @@
 ;;;   Assembler routines are named by full Lisp symbols: they
 ;;;     have packages and that sort of native Lisp stuff associated
 ;;;     with them. We can compare them with EQ.
-;;;   Foreign symbols are named by Lisp STRINGs: the Lisp package
-;;;     system doesn't extend out to symbols in languages like C.
-;;;     We want to use EQUAL to compare them.
-;;;   *STATIC-FOREIGN-SYMBOLS* are static as opposed to "dynamic" (not
-;;;     as opposed to C's "extern"). The table contains symbols known at 
-;;;     the time that the program was built, but not symbols defined
-;;;     in object files which have been loaded dynamically since then.
-(declaim (type hash-table *assembler-routines* *static-foreign-symbols*))
+(declaim (type hash-table *assembler-routines*))
 (defvar *assembler-routines* (make-hash-table :test 'eq))
-(defvar *static-foreign-symbols* (make-hash-table :test 'equal))
+
 
 ;;;; the FOP database
 

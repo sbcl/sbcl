@@ -7,9 +7,10 @@
 # provided with absolutely no warranty. See the COPYING and CREDITS
 # files for more information.
 
--include ../src/runtime/Config
+-include Config
 
-CPPFLAGS=-I../src/runtime
+CPPFLAGS:=-I../src/runtime
+LDFLAGS:=$(LDFLAGS) $(OS_LIBS)
 
 all: grovel-headers determine-endianness where-is-mcontext modify-ldt-struct-name 
 

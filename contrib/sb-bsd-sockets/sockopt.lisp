@@ -58,7 +58,9 @@ Code for options that not every system has should be conditionalised:
 						 (sb-alien:addr size)))
 		      (socket-error "getsockopt")
 		      (,mangle-return buffer size)))
-	     `(error 'unsupported-operator :name ',lisp-name)))
+	     `(error 'unsupported-operator 
+               :format-control "Socket option ~S is not supported in this platform." 
+               :format-arguments (list ',lisp-name))))
       (defun (setf ,lisp-name) (new-val socket)
 	,(if supportedp
 	     `(sb-alien:with-alien ((buffer ,buffer-type))
@@ -72,7 +74,9 @@ Code for options that not every system has should be conditionalised:
 							`(length new-val)
 							`(sb-alien:alien-size ,buffer-type :bytes))))
 		    (socket-error "setsockopt")))
-	     `(error 'unsupported-operator :name `(setf ,lisp-name)))))))
+	     `(error 'unsupported-operator 
+               :format-control "Socket option ~S is not supported on this platform."
+               :format-arguments (list ',lisp-name)))))))
 
 ;;; sockopts that have integer arguments
 
