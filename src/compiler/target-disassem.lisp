@@ -381,8 +381,7 @@
 					 (1- lra-size))))
 		sb!vm:return-pc-header-widetag))
     (unless (null stream)
-      (princ '.lra stream))
-    (incf (dstate-next-offs dstate) lra-size))
+      (note "possible LRA header" dstate)))
   nil)
 
 ;;; Print the fun-header (entry-point) pseudo-instruction at the

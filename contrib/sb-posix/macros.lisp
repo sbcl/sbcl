@@ -5,10 +5,29 @@
 ;;; Unix name is "[foo]", the appropriate CL namestring for it is
 ;;; "\\[foo]".  So, don't call NAMESTRING, instead call a function
 ;;; that gets us the Unix name
+(defun native-filename (pathname)
+  (let ((directory (pathname-directory pathname))
+	(name (pathname-name pathname))
+	(type (pathname-type pathname)))
+    (with-output-to-string (s nil :element-type 'base-char)
+      (etypecase directory
+	(string (write-string directory s))
+	(list
+	 (when (eq (car directory) :absolute)
+	   (write-char #\/ s))
+	 (dolist (piece (cdr directory))
+	   (etypecase piece
+	     (string (write-string piece s) (write-char #\/ s))))))
+      (etypecase name
+	(null)
+        (string (write-string name s)))
+      (etypecase type
+	(null)
+	(string (write-char #\. s) (write-string type s))))))
 
 (define-designator filename c-string
   (pathname 
-   (sb-impl::unix-namestring (translate-logical-pathname filename) nil))
+   (native-filename (translate-logical-pathname filename)))
   (string filename))
 
 (define-designator file-descriptor (integer 32)
