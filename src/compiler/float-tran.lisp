@@ -56,35 +56,41 @@
   ;; to let me scan for places that I made this mistake and didn't
   ;; catch myself.
   "use inline (UNSIGNED-BYTE 32) operations"
-  (let ((num-high (numeric-type-high (lvar-type num))))
-    (when (null num-high)
-      (give-up-ir1-transform))
-    (cond ((constant-lvar-p num)
-	   ;; Check the worst case sum absolute error for the random number
-	   ;; expectations.
-	   (let ((rem (rem (expt 2 32) num-high)))
-	     (unless (< (/ (* 2 rem (- num-high rem)) num-high (expt 2 32))
-			(expt 2 (- sb!kernel::random-integer-extra-bits)))
-	       (give-up-ir1-transform
-		"The random number expectations are inaccurate."))
-	     (if (= num-high (expt 2 32))
-		 '(random-chunk (or state *random-state*))
-		 #!-x86 '(rem (random-chunk (or state *random-state*)) num)
-		 #!+x86
-		 ;; Use multiplication, which is faster.
-		 '(values (sb!bignum::%multiply
-			   (random-chunk (or state *random-state*))
-			   num)))))
-	  ((> num-high random-fixnum-max)
-	   (give-up-ir1-transform
-	    "The range is too large to ensure an accurate result."))
-	  #!+x86
-	  ((< num-high (expt 2 32))
-	   '(values (sb!bignum::%multiply (random-chunk (or state
-							    *random-state*))
-		     num)))
-	  (t
-	   '(rem (random-chunk (or state *random-state*)) num)))))
+  (let ((type (lvar-type num)))
+    (if (numeric-type-p type)
+        (let ((num-high (numeric-type-high (lvar-type num))))
+          (aver num-high)
+          (cond ((constant-lvar-p num)
+                 ;; Check the worst case sum absolute error for the
+                 ;; random number expectations.
+                 (let ((rem (rem (expt 2 32) num-high)))
+                   (unless (< (/ (* 2 rem (- num-high rem))
+                                 num-high (expt 2 32))
+                              (expt 2 (- sb!kernel::random-integer-extra-bits)))
+                     (give-up-ir1-transform
+                      "The random number expectations are inaccurate."))
+                   (if (= num-high (expt 2 32))
+                       '(random-chunk (or state *random-state*))
+                       #!-x86 '(rem (random-chunk (or state *random-state*)) num)
+                       #!+x86
+                       ;; Use multiplication, which is faster.
+                       '(values (sb!bignum::%multiply
+                                 (random-chunk (or state *random-state*))
+                                 num)))))
+                ((> num-high random-fixnum-max)
+                 (give-up-ir1-transform
+                  "The range is too large to ensure an accurate result."))
+                #!+x86
+                ((< num-high (expt 2 32))
+                 '(values (sb!bignum::%multiply
+                           (random-chunk (or state *random-state*))
+                           num)))
+                (t
+                 '(rem (random-chunk (or state *random-state*)) num))))
+        ;; KLUDGE: a relatively conservative treatment, but better
+        ;; than a bug (reported by PFD sbcl-devel towards the end of
+        ;; 2004-11.
+        '(rem (random-chunk (or state *random-state*)) num))))
 
 ;;;; float accessors
 

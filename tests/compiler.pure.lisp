@@ -1648,3 +1648,11 @@
   (multiple-value-bind (res err) (ignore-errors (funcall fun))
     (assert (not res))
     (assert (typep err 'program-error))))
+
+(let ((fun (compile nil '(lambda (x) (random (if x 10 20))))))
+  (dotimes (i 100 (error "bad RANDOM distribution"))
+    (when (> (funcall fun nil) 9)
+      (return t)))
+  (dotimes (i 100)
+    (when (> (funcall fun t) 9)
+      (error "bad RANDOM event"))))
