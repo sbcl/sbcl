@@ -13,6 +13,8 @@
 
 (cl:in-package :cl-user)
 
+(load "assertoid.lisp")
+
 ;;; ANSI's specification of #'CHAR-NAME imposes these constraints.
 ;;;
 ;;; (Obviously, the numeric values in this test implicitly assume
@@ -35,3 +37,22 @@
       (assert (characterp named-char))
       (let ((coded-char-name (char-name coded-char)))
 	(assert (string= name coded-char-name))))))
+
+;;; bug 230: CHAR= didn't check types of &REST arguments
+(dolist (form '((code-char char-code-limit)
+                (standard-char-p "a")
+                (graphic-char-p "a")
+                (alpha-char-p "a")
+                (upper-case-p "a")
+                (lower-case-p "a")
+                (both-case-p "a")
+                (digit-char-p "a")
+                (alphanumericp "a")
+                (char= #\a "a")
+                (char/= #\a "a")
+                (char< #\a #\b "c")
+                (char-equal #\a #\a "b")
+                (digit-char -1)
+                (digit-char 4 1)
+                (digit-char 4 37)))
+  (assert (raises-error? (apply (car form) (mapcar 'eval (cdr form))) type-error)))

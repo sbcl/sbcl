@@ -388,7 +388,7 @@
 			   upper-case-p lower-case-p both-case-p alphanumericp)
   (character) boolean (movable foldable flushable))
 
-(defknown digit-char-p (character &optional unsigned-byte)
+(defknown digit-char-p (character &optional (integer 2 36))
   (or (integer 0 35) null) (movable foldable flushable))
 
 (defknown (char= char/= char< char> char<= char>= char-equal char-not-equal
@@ -399,7 +399,7 @@
 (defknown char-code (character) char-code (movable foldable flushable))
 (defknown (char-upcase char-downcase) (character) character
   (movable foldable flushable))
-(defknown digit-char (integer &optional integer)
+(defknown digit-char (unsigned-byte &optional (integer 2 36))
   (or character null) (movable foldable flushable))
 (defknown char-int (character) char-code (movable foldable flushable))
 (defknown char-name (character) (or simple-string null)

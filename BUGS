@@ -1285,10 +1285,7 @@ WORKAROUND:
   (subtypep 'function '(function)) => nil, t.
 
 230:
-  (char= #\a "a") => nil.
-
-  DAA requires it to signal a type error.
-
+  (fixed in 0.7.10.5)
 
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:

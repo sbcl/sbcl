@@ -97,7 +97,6 @@
 (defun code-char (code)
   #!+sb-doc
   "Return the character with the code CODE."
-  (declare (type char-code code))
   (code-char code))
 
 (defun character (object)
@@ -138,10 +137,9 @@
 
 (defun standard-char-p (char)
   #!+sb-doc
-  "The argument must be a character object. Standard-char-p returns T if the
+  "The argument must be a character object. STANDARD-CHAR-P returns T if the
    argument is a standard character -- one of the 95 ASCII printing characters
    or <return>."
-  (declare (character char))
   (and (typep char 'base-char)
        (let ((n (char-code (the base-char char))))
 	 (or (< 31 n 127)
@@ -150,15 +148,14 @@
 (defun %standard-char-p (thing)
   #!+sb-doc
   "Return T if and only if THING is a standard-char. Differs from
-  standard-char-p in that THING doesn't have to be a character."
+  STANDARD-CHAR-P in that THING doesn't have to be a character."
   (and (characterp thing) (standard-char-p thing)))
 
 (defun graphic-char-p (char)
   #!+sb-doc
-  "The argument must be a character object. Graphic-char-p returns T if the
+  "The argument must be a character object. GRAPHIC-CHAR-P returns T if the
   argument is a printing character (space through ~ in ASCII), otherwise
-  returns ()."
-  (declare (character char))
+  returns NIL."
   (and (typep char 'base-char)
        (< 31
 	  (char-code (the base-char char))
@@ -166,45 +163,39 @@
 
 (defun alpha-char-p (char)
   #!+sb-doc
-  "The argument must be a character object. Alpha-char-p returns T if the
-   argument is an alphabetic character, A-Z or a-z; otherwise ()."
-  (declare (character char))
+  "The argument must be a character object. ALPHA-CHAR-P returns T if the
+   argument is an alphabetic character, A-Z or a-z; otherwise NIL."
   (let ((m (char-code char)))
     (or (< 64 m 91) (< 96 m 123))))
 
 (defun upper-case-p (char)
   #!+sb-doc
-  "The argument must be a character object; upper-case-p returns T if the
-   argument is an upper-case character, () otherwise."
-  (declare (character char))
+  "The argument must be a character object; UPPER-CASE-P returns T if the
+   argument is an upper-case character, NIL otherwise."
   (< 64
      (char-code char)
      91))
 
 (defun lower-case-p (char)
   #!+sb-doc
-  "The argument must be a character object; lower-case-p returns T if the
-   argument is a lower-case character, () otherwise."
-  (declare (character char))
+  "The argument must be a character object; LOWER-CASE-P returns T if the
+   argument is a lower-case character, NIL otherwise."
   (< 96
      (char-code char)
      123))
 
 (defun both-case-p (char)
   #!+sb-doc
-  "The argument must be a character object. Both-case-p returns T if the
+  "The argument must be a character object. BOTH-CASE-P returns T if the
   argument is an alphabetic character and if the character exists in
-  both upper and lower case. For ASCII, this is the same as Alpha-char-p."
-  (declare (character char))
+  both upper and lower case. For ASCII, this is the same as ALPHA-CHAR-P."
   (let ((m (char-code char)))
     (or (< 64 m 91) (< 96 m 123))))
 
 (defun digit-char-p (char &optional (radix 10.))
   #!+sb-doc
   "If char is a digit in the specified radix, returns the fixnum for
-  which that digit stands, else returns NIL. Radix defaults to 10
-  (decimal)."
-  (declare (character char) (type (integer 2 36) radix))
+  which that digit stands, else returns NIL."
   (let ((m (- (char-code char) 48)))
     (declare (fixnum m))
     (cond ((<= radix 10.)
@@ -228,36 +219,35 @@
 
 (defun alphanumericp (char)
   #!+sb-doc
-  "Given a character-object argument, alphanumericp returns T if the
+  "Given a character-object argument, ALPHANUMERICP returns T if the
    argument is either numeric or alphabetic."
-  (declare (character char))
   (let ((m (char-code char)))
     (or (< 47 m 58) (< 64 m 91) (< 96 m 123))))
 
 (defun char= (character &rest more-characters)
   #!+sb-doc
   "Return T if all of the arguments are the same character."
-  (do ((clist more-characters (cdr clist)))
-      ((atom clist) T)
-    (unless (eq (car clist) character) (return nil))))
+  (dolist (c more-characters t)
+    (declare (type character c))
+    (unless (eq c character) (return nil))))
 
 (defun char/= (character &rest more-characters)
   #!+sb-doc
   "Return T if no two of the arguments are the same character."
   (do* ((head character (car list))
 	(list more-characters (cdr list)))
-       ((atom list) T)
-    (unless (do* ((l list (cdr l)))		  ;inner loop returns T
-		 ((atom l) T)			     ; iff head /= rest.
-	      (if (eq head (car l)) (return nil)))
-      (return nil))))
+       ((null list) t)
+    (declare (type character head))
+    (dolist (c list)
+      (declare (type character c))
+      (when (eq head c) (return-from char/= nil)))))
 
 (defun char< (character &rest more-characters)
   #!+sb-doc
   "Return T if the arguments are in strictly increasing alphabetic order."
   (do* ((c character (car list))
 	(list more-characters (cdr list)))
-       ((atom list) T)
+       ((null list) t)
     (unless (< (char-int c)
 	       (char-int (car list)))
       (return nil))))
@@ -267,7 +257,7 @@
   "Return T if the arguments are in strictly decreasing alphabetic order."
   (do* ((c character (car list))
 	(list more-characters (cdr list)))
-       ((atom list) T)
+       ((null list) t)
     (unless (> (char-int c)
 	       (char-int (car list)))
       (return nil))))
@@ -277,7 +267,7 @@
   "Return T if the arguments are in strictly non-decreasing alphabetic order."
   (do* ((c character (car list))
 	(list more-characters (cdr list)))
-       ((atom list) T)
+       ((null list) t)
     (unless (<= (char-int c)
 		(char-int (car list)))
       (return nil))))
@@ -287,12 +277,12 @@
   "Return T if the arguments are in strictly non-increasing alphabetic order."
   (do* ((c character (car list))
 	(list more-characters (cdr list)))
-       ((atom list) T)
+       ((null list) t)
     (unless (>= (char-int c)
 		(char-int (car list)))
       (return nil))))
 
-;;; Equal-Char-Code is used by the following functions as a version of char-int
+;;; EQUAL-CHAR-CODE is used by the following functions as a version of CHAR-INT
 ;;;  which loses font, bits, and case info.
 
 (defmacro equal-char-code (character)
@@ -304,7 +294,7 @@
   "Return T if all of the arguments are the same character.
   Font, bits, and case are ignored."
   (do ((clist more-characters (cdr clist)))
-      ((atom clist) T)
+      ((null clist) t)
     (unless (= (equal-char-code (car clist))
 	       (equal-char-code character))
       (return nil))))
@@ -315,9 +305,9 @@
    Font, bits, and case are ignored."
   (do* ((head character (car list))
 	(list more-characters (cdr list)))
-       ((atom list) T)
+       ((null list) t)
     (unless (do* ((l list (cdr l)))
-		 ((atom l) T)
+		 ((null l) t)
 	      (if (= (equal-char-code head)
 		     (equal-char-code (car l)))
 		  (return nil)))
@@ -329,7 +319,7 @@
    Font, bits, and case are ignored."
   (do* ((c character (car list))
 	(list more-characters (cdr list)))
-       ((atom list) T)
+       ((null list) t)
     (unless (< (equal-char-code c)
 	       (equal-char-code (car list)))
       (return nil))))
@@ -340,7 +330,7 @@
    Font, bits, and case are ignored."
   (do* ((c character (car list))
 	(list more-characters (cdr list)))
-       ((atom list) T)
+       ((null list) t)
     (unless (> (equal-char-code c)
 	       (equal-char-code (car list)))
       (return nil))))
@@ -351,7 +341,7 @@
    Font, bits, and case are ignored."
   (do* ((c character (car list))
 	(list more-characters (cdr list)))
-       ((atom list) T)
+       ((null list) t)
     (unless (<= (equal-char-code c)
 		(equal-char-code (car list)))
       (return nil))))
@@ -362,7 +352,7 @@
    Font, bits, and case are ignored."
   (do* ((c character (car list))
 	(list more-characters (cdr list)))
-       ((atom list) T)
+       ((null list) t)
     (unless (>= (equal-char-code c)
 		(equal-char-code (car list)))
       (return nil))))
@@ -372,7 +362,6 @@
 (defun char-upcase (char)
   #!+sb-doc
   "Return CHAR converted to upper-case if that is possible."
-  (declare (character char))
   (if (lower-case-p char)
       (code-char (- (char-code char) 32))
       char))
@@ -380,7 +369,6 @@
 (defun char-downcase (char)
   #!+sb-doc
   "Return CHAR converted to lower-case if that is possible."
-  (declare (character char))
   (if (upper-case-p char)
       (code-char (+ (char-code char) 32))
       char))
@@ -389,9 +377,7 @@
   #!+sb-doc
   "All arguments must be integers. Returns a character object that
   represents a digit of the given weight in the specified radix. Returns
-  NIL if no such character exists. The character will have the specified
-  font attributes."
-  (declare (type (integer 2 36) radix) (type unsigned-byte weight))
+  NIL if no such character exists."
   (and (typep weight 'fixnum)
        (>= weight 0) (< weight radix) (< weight 36)
        (code-char (if (< weight 10) (+ 48 weight) (+ 55 weight)))))
