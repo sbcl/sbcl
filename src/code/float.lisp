@@ -15,6 +15,154 @@
 
 (in-package "SB!KERNEL")
 
+;;;; utilities
+
+(eval-when (:compile-toplevel :load-toplevel :execute)
+
+;;; These functions let us create floats from bits with the
+;;; significand uniformly represented as an integer. This is less
+;;; efficient for double floats, but is more convenient when making
+;;; special values, etc.
+(defun single-from-bits (sign exp sig)
+  (declare (type bit sign) (type (unsigned-byte 24) sig)
+	   (type (unsigned-byte 8) exp))
+  (make-single-float
+   (dpb exp sb!vm:single-float-exponent-byte
+	(dpb sig sb!vm:single-float-significand-byte
+	     (if (zerop sign) 0 -1)))))
+(defun double-from-bits (sign exp sig)
+  (declare (type bit sign) (type (unsigned-byte 53) sig)
+	   (type (unsigned-byte 11) exp))
+  (make-double-float (dpb exp sb!vm:double-float-exponent-byte
+			  (dpb (ash sig -32)
+			       sb!vm:double-float-significand-byte
+			       (if (zerop sign) 0 -1)))
+		     (ldb (byte 32 0) sig)))
+#!+(and long-float x86)
+(defun long-from-bits (sign exp sig)
+  (declare (type bit sign) (type (unsigned-byte 64) sig)
+	   (type (unsigned-byte 15) exp))
+  (make-long-float (logior (ash sign 15) exp)
+		   (ldb (byte 32 32) sig)
+		   (ldb (byte 32 0) sig)))
+
+) ; EVAL-WHEN
+
+;;;; float parameters
+
+(defconstant least-positive-single-float (single-from-bits 0 0 1))
+(defconstant least-positive-short-float (single-from-bits 0 0 1))
+(defconstant least-negative-single-float (single-from-bits 1 0 1))
+(defconstant least-negative-short-float (single-from-bits 1 0 1))
+(defconstant least-positive-double-float (double-from-bits 0 0 1))
+#!-long-float
+(defconstant least-positive-long-float (double-from-bits 0 0 1))
+#!+(and long-float x86)
+(defconstant least-positive-long-float (long-from-bits 0 0 1))
+(defconstant least-negative-double-float (double-from-bits 1 0 1))
+#!-long-float
+(defconstant least-negative-long-float (double-from-bits 1 0 1))
+#!+(and long-float x86)
+(defconstant least-negative-long-float (long-from-bits 1 0 1))
+
+(defconstant least-positive-normalized-single-float
+  (single-from-bits 0 sb!vm:single-float-normal-exponent-min 0))
+(defconstant least-positive-normalized-short-float
+  least-positive-normalized-single-float)
+(defconstant least-negative-normalized-single-float
+  (single-from-bits 1 sb!vm:single-float-normal-exponent-min 0))
+(defconstant least-negative-normalized-short-float
+  least-negative-normalized-single-float)
+(defconstant least-positive-normalized-double-float
+  (double-from-bits 0 sb!vm:double-float-normal-exponent-min 0))
+#!-long-float
+(defconstant least-positive-normalized-long-float
+  least-positive-normalized-double-float)
+#!+(and long-float x86)
+(defconstant least-positive-normalized-long-float
+  (long-from-bits 0 sb!vm:long-float-normal-exponent-min
+		  (ash sb!vm:long-float-hidden-bit 32)))
+(defconstant least-negative-normalized-double-float
+  (double-from-bits 1 sb!vm:double-float-normal-exponent-min 0))
+#!-long-float
+(defconstant least-negative-normalized-long-float
+  least-negative-normalized-double-float)
+#!+(and long-float x86)
+(defconstant least-negative-normalized-long-float
+  (long-from-bits 1 sb!vm:long-float-normal-exponent-min
+		  (ash sb!vm:long-float-hidden-bit 32)))
+
+(defconstant most-positive-single-float
+  (single-from-bits 0 sb!vm:single-float-normal-exponent-max
+		    (ldb sb!vm:single-float-significand-byte -1)))
+(defconstant most-positive-short-float most-positive-single-float)
+(defconstant most-negative-single-float
+  (single-from-bits 1 sb!vm:single-float-normal-exponent-max
+		    (ldb sb!vm:single-float-significand-byte -1)))
+(defconstant most-negative-short-float most-negative-single-float)
+(defconstant most-positive-double-float
+  (double-from-bits 0 sb!vm:double-float-normal-exponent-max
+		    (ldb (byte sb!vm:double-float-digits 0) -1)))
+(defconstant most-negative-double-float
+  (double-from-bits 1 sb!vm:double-float-normal-exponent-max
+		    (ldb (byte sb!vm:double-float-digits 0) -1)))
+
+
+;;; We don't want to do these DEFCONSTANTs at cross-compilation time,
+;;; because the cross-compilation host might not support floating
+;;; point infinities. Putting them inside a LET removes
+;;; toplevel-formness, so that any EVAL-WHEN trickiness in the
+;;; DEFCONSTANT forms is suppressed.
+(let ()
+(defconstant single-float-positive-infinity
+  (single-from-bits 0 (1+ sb!vm:single-float-normal-exponent-max) 0))
+(defconstant short-float-positive-infinity single-float-positive-infinity)
+(defconstant single-float-negative-infinity
+  (single-from-bits 1 (1+ sb!vm:single-float-normal-exponent-max) 0))
+(defconstant short-float-negative-infinity single-float-negative-infinity)
+(defconstant double-float-positive-infinity
+  (double-from-bits 0 (1+ sb!vm:double-float-normal-exponent-max) 0))
+#!+(not long-float)
+(defconstant long-float-positive-infinity double-float-positive-infinity)
+#!+(and long-float x86)
+(defconstant long-float-positive-infinity
+  (long-from-bits 0 (1+ sb!vm:long-float-normal-exponent-max)
+		  (ash sb!vm:long-float-hidden-bit 32)))
+(defconstant double-float-negative-infinity
+  (double-from-bits 1 (1+ sb!vm:double-float-normal-exponent-max) 0))
+#!+(not long-float)
+(defconstant long-float-negative-infinity double-float-negative-infinity)
+#!+(and long-float x86)
+(defconstant long-float-negative-infinity
+  (long-from-bits 1 (1+ sb!vm:long-float-normal-exponent-max)
+		  (ash sb!vm:long-float-hidden-bit 32)))
+) ; LET-to-suppress-possible-EVAL-WHENs
+
+(defconstant single-float-epsilon
+  (single-from-bits 0 (- sb!vm:single-float-bias
+			 (1- sb!vm:single-float-digits)) 1))
+(defconstant short-float-epsilon single-float-epsilon)
+(defconstant single-float-negative-epsilon
+  (single-from-bits 0 (- sb!vm:single-float-bias sb!vm:single-float-digits) 1))
+(defconstant short-float-negative-epsilon single-float-negative-epsilon)
+(defconstant double-float-epsilon
+  (double-from-bits 0 (- sb!vm:double-float-bias
+			 (1- sb!vm:double-float-digits)) 1))
+#!-long-float
+(defconstant long-float-epsilon double-float-epsilon)
+#!+(and long-float x86)
+(defconstant long-float-epsilon
+  (long-from-bits 0 (- sb!vm:long-float-bias (1- sb!vm:long-float-digits))
+		  (+ 1 (ash sb!vm:long-float-hidden-bit 32))))
+(defconstant double-float-negative-epsilon
+  (double-from-bits 0 (- sb!vm:double-float-bias sb!vm:double-float-digits) 1))
+#!-long-float
+(defconstant long-float-negative-epsilon double-float-negative-epsilon)
+#!+(and long-float x86)
+(defconstant long-float-negative-epsilon
+  (long-from-bits 0 (- sb!vm:long-float-bias sb!vm:long-float-digits)
+		  (+ 1 (ash sb!vm:long-float-hidden-bit 32))))
+
 ;;;; float predicates and environment query
 
 #!-sb-fluid
@@ -512,12 +660,8 @@
 	     :operands (list x exp)))
     (* (float-sign x)
        (etypecase x
-	 (single-float
-	  ;; SINGLE-FLOAT-POSITIVE-INFINITY
-	  (single-from-bits 0 (1+ sb!vm:single-float-normal-exponent-max) 0))
-	 (double-float
-	  ;; DOUBLE-FLOAT-POSITIVE-INFINITY
-	  (double-from-bits 0 (1+ sb!vm:double-float-normal-exponent-max) 0)))))))
+	 (single-float single-float-positive-infinity)
+	 (double-float double-float-positive-infinity))))))
 
 ;;; Scale a single or double float, calling the correct over/underflow
 ;;; functions.
@@ -779,13 +923,6 @@ uninterruptibly frob the rounding modes & do ieee round-to-integer.
 		 (- rounded)
 		 rounded)))))))
 
-(defun %unary-ftruncate (number)
-  (number-dispatch ((number real))
-    ((integer) (float number))
-    ((ratio) (float (truncate (numerator number) (denominator number))))
-    (((foreach single-float double-float #!+long-float long-float))
-     (%unary-ftruncate number))))
-
 (defun rational (x)
   #!+sb-doc
   "RATIONAL produces a rational number for any real numeric argument. This is
@@ -804,108 +941,41 @@ uninterruptibly frob the rounding modes & do ieee round-to-integer.
 		 (integer-/-integer (ash int ex) (ash 1 digits)))))))
     ((rational) x)))
 
-;;; This algorithm for RATIONALIZE, due to Bruno Haible, is included
-;;; with permission.
-;;;
-;;; Algorithm (recursively presented):
-;;;   If x is a rational number, return x.
-;;;   If x = 0.0, return 0.
-;;;   If x < 0.0, return (- (rationalize (- x))).
-;;;   If x > 0.0:
-;;;     Call (integer-decode-float x). It returns a m,e,s=1 (mantissa,
-;;;     exponent, sign).
-;;;     If m = 0 or e >= 0: return x = m*2^e.
-;;;     Search a rational number between a = (m-1/2)*2^e and b = (m+1/2)*2^e
-;;;     with smallest possible numerator and denominator.
-;;;     Note 1: If m is a power of 2, we ought to take a = (m-1/4)*2^e.
-;;;       But in this case the result will be x itself anyway, regardless of
-;;;       the choice of a. Therefore we can simply ignore this case.
-;;;     Note 2: At first, we need to consider the closed interval [a,b].
-;;;       but since a and b have the denominator 2^(|e|+1) whereas x itself
-;;;       has a denominator <= 2^|e|, we can restrict the seach to the open
-;;;       interval (a,b).
-;;;     So, for given a and b (0 < a < b) we are searching a rational number
-;;;     y with a <= y <= b.
-;;;     Recursive algorithm fraction_between(a,b):
-;;;       c := (ceiling a)
-;;;       if c < b
-;;;         then return c       ; because a <= c < b, c integer
-;;;         else
-;;;           ; a is not integer (otherwise we would have had c = a < b)
-;;;           k := c-1          ; k = floor(a), k < a < b <= k+1
-;;;           return y = k + 1/fraction_between(1/(b-k), 1/(a-k))
-;;;                             ; note 1 <= 1/(b-k) < 1/(a-k)
-;;;
-;;; You can see that we are actually computing a continued fraction expansion.
-;;;
-;;; Algorithm (iterative):
-;;;   If x is rational, return x.
-;;;   Call (integer-decode-float x). It returns a m,e,s (mantissa,
-;;;     exponent, sign).
-;;;   If m = 0 or e >= 0, return m*2^e*s. (This includes the case x = 0.0.)
-;;;   Create rational numbers a := (2*m-1)*2^(e-1) and b := (2*m+1)*2^(e-1)
-;;;   (positive and already in lowest terms because the denominator is a
-;;;   power of two and the numerator is odd).
-;;;   Start a continued fraction expansion
-;;;     p[-1] := 0, p[0] := 1, q[-1] := 1, q[0] := 0, i := 0.
-;;;   Loop
-;;;     c := (ceiling a)
-;;;     if c >= b
-;;;       then k := c-1, partial_quotient(k), (a,b) := (1/(b-k),1/(a-k)),
-;;;            goto Loop
-;;;   finally partial_quotient(c).
-;;;   Here partial_quotient(c) denotes the iteration
-;;;     i := i+1, p[i] := c*p[i-1]+p[i-2], q[i] := c*q[i-1]+q[i-2].
-;;;   At the end, return s * (p[i]/q[i]).
-;;;   This rational number is already in lowest terms because
-;;;   p[i]*q[i-1]-p[i-1]*q[i] = (-1)^i.
-;;;
-;;; See also
-;;;   Hardy, Wright: An introduction to number theory
-;;; and/or
-;;;   <http://modular.fas.harvard.edu/edu/Fall2001/124/lectures/lecture17/lecture17/>
-;;;   <http://modular.fas.harvard.edu/edu/Fall2001/124/lectures/lecture17/lecture18/>
-
 (defun rationalize (x)
-  "Converts any REAL to a RATIONAL.  Floats are converted to a simple rational
+  #!+sb-doc
+  "Converts any REAL to a RATIONAL. Floats are converted to a simple rational
   representation exploiting the assumption that floats are only accurate to
-  their precision.  RATIONALIZE (and also RATIONAL) preserve the invariant:
+  their precision. RATIONALIZE (and also RATIONAL) preserve the invariant:
       (= x (float (rationalize x) x))"
   (number-dispatch ((x real))
     (((foreach single-float double-float #!+long-float long-float))
-     ;; This is a fairly straigtforward implementation of the
-     ;; iterative algorithm above.
-     (multiple-value-bind (frac expo sign)
-	 (integer-decode-float x)
-       (cond ((or (zerop frac) (>= expo 0))
-	      (if (minusp sign)
-		  (- (ash frac expo))
-		  (ash frac expo)))
-	     (t
-	      ;; expo < 0 and (2*m-1) and (2*m+1) are coprime to 2^(1-e),
-	      ;; so build the fraction up immediately, without having to do
-	      ;; a gcd.
-	      (let ((a (build-ratio (- (* 2 frac) 1) (ash 1 (- 1 expo))))
-		    (b (build-ratio (+ (* 2 frac) 1) (ash 1 (- 1 expo))))
-		    (p0 0)
-		    (q0 1)
-		    (p1 1)
-		    (q1 0))
-		(do ((c (ceiling a) (ceiling a)))
-		    ((< c b)
-		     (let ((top (+ (* c p1) p0))
-			   (bot (+ (* c q1) q0)))
-		       (build-ratio (if (minusp sign)
-					(- top)
-					top)
-				    bot)))
-		  (let* ((k (- c 1))
-			 (p2 (+ (* k p1) p0))
-			 (q2 (+ (* k q1) q0)))
-		    (psetf a (/ (- b k))
-			   b (/ (- a k)))
-		    (setf p0 p1
-			  q0 q1
-			  p1 p2
-			  q1 q2))))))))
+     ;; Thanks to Kim Fateman, who stole this function rationalize-float from
+     ;; macsyma's rational. Macsyma'a rationalize was written by the legendary
+     ;; Gosper (rwg). Guy Steele said about Gosper, "He has been called the
+     ;; only living 17th century mathematician and is also the best pdp-10
+     ;; hacker I know." So, if you can understand or debug this code you win
+     ;; big.
+     (cond ((minusp x) (- (rationalize (- x))))
+	   ((zerop x) 0)
+	   (t
+	    (let ((eps (etypecase x
+			   (single-float single-float-epsilon)
+			   (double-float double-float-epsilon)
+			   #!+long-float
+			   (long-float long-float-epsilon)))
+		  (y ())
+		  (a ()))
+	      (do ((xx x (setq y (/ (float 1.0 x) (- xx (float a x)))))
+		   (num (setq a (truncate x))
+			(+ (* (setq a (truncate y)) num) onum))
+		   (den 1 (+ (* a den) oden))
+		   (onum 1 num)
+		   (oden 0 den))
+		  ((and (not (zerop den))
+			(not (> (abs (/ (- x (/ (float num x)
+						(float den x)))
+					x))
+				eps)))
+		   (integer-/-integer num den))
+		(declare ((dispatch-type x) xx)))))))
     ((rational) x)))

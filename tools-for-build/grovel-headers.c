@@ -76,7 +76,7 @@ main(int argc, char *argv[])
     DEFTYPE("uid-t",   uid_t);
     printf("\n");
 
-    printf(";;; fcntl.h (or unistd.h on OpenBSD and NetBSD)\n");
+    printf(";;; fcntl.h (or unistd.h on OpenBSD)\n");
     defconstant("r_ok", R_OK);
     defconstant("w_ok", W_OK);
     defconstant("x_ok", X_OK);

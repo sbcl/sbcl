@@ -49,7 +49,7 @@
 
 ;;;; putting ourselves out of our misery when things become too much to bear
 
-(declaim (ftype (function (simple-string) nil) !cold-lose))
+(declaim (ftype (function (simple-string) nil) critically-unreachable))
 (defun !cold-lose (msg)
   (%primitive print msg)
   (%primitive print "too early in cold init to recover from errors")
@@ -219,11 +219,8 @@
   ;; FIXME: This list of modes should be defined in one place and
   ;; explicitly shared between here and REINIT.
 
-  ;; FIXME: For some unknown reason, NetBSD/x86 won't run with the
-  ;; :invalid trap enabled. That should be fixed, but not today...
-  ;; PEM -- April 5, 2004
-  (set-floating-point-modes
-   :traps '(:overflow #!-netbsd :invalid :divide-by-zero))
+  ;; Why was this marked #!+alpha?  CMUCL does it here on all architectures
+  (set-floating-point-modes :traps '(:overflow :invalid :divide-by-zero))
 
   (show-and-call !class-finalize)
 
@@ -291,11 +288,7 @@ instead (which is another name for the same thing)."))
       ;; LEAST-NEGATIVE-SINGLE-FLOAT, so the :UNDERFLOW exceptions are
       ;; disabled by default. Joe User can explicitly enable them if
       ;; desired.
-      ;;
-      ;; see also comment at the previous SET-FLOATING-POINT-MODES
-      ;; call site.
-      (set-floating-point-modes
-       :traps '(:overflow #!-netbsd :invalid :divide-by-zero))
+      (set-floating-point-modes :traps '(:overflow :invalid :divide-by-zero))
       (sb!thread::maybe-install-futex-functions)))
   (gc-on)
   (gc))

@@ -5,8 +5,8 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <stddef.h>
-#include "sbcl.h"
 #include "runtime.h"
+#include "sbcl.h"
 #include "os.h"
 #include "interrupt.h"
 #ifdef LISP_FEATURE_GENCGC
@@ -42,7 +42,7 @@ extern struct thread *find_thread_by_pid(pid_t pid);
 #define for_each_thread(th) for(th=all_threads;th;th=0)
 #endif
 
-static inline lispobj SymbolValue(u32 tagged_symbol_pointer, void *thread) {
+static inline lispobj SymbolValue(u64 tagged_symbol_pointer, void *thread) {
     struct symbol *sym= (struct symbol *)
 	(pointer_sized_uint_t)(tagged_symbol_pointer-OTHER_POINTER_LOWTAG);
 #ifdef LISP_FEATURE_SB_THREAD
@@ -55,7 +55,7 @@ static inline lispobj SymbolValue(u32 tagged_symbol_pointer, void *thread) {
 #endif
     return sym->value;
 }
-static inline lispobj SymbolTlValue(u32 tagged_symbol_pointer, void *thread) {
+static inline lispobj SymbolTlValue(u64 tagged_symbol_pointer, void *thread) {
     struct symbol *sym= (struct symbol *)
 	(pointer_sized_uint_t)(tagged_symbol_pointer-OTHER_POINTER_LOWTAG);
 #ifdef LISP_FEATURE_SB_THREAD
@@ -66,7 +66,7 @@ static inline lispobj SymbolTlValue(u32 tagged_symbol_pointer, void *thread) {
 #endif
 }
 
-static inline void SetSymbolValue(u32 tagged_symbol_pointer,lispobj val, void *thread) {
+static inline void SetSymbolValue(u64 tagged_symbol_pointer,lispobj val, void *thread) {
     struct symbol *sym=	(struct symbol *)
 	(pointer_sized_uint_t)(tagged_symbol_pointer-OTHER_POINTER_LOWTAG);
 #ifdef LISP_FEATURE_SB_THREAD
@@ -81,7 +81,7 @@ static inline void SetSymbolValue(u32 tagged_symbol_pointer,lispobj val, void *t
 #endif
     sym->value = val;
 }
-static inline void SetTlSymbolValue(u32 tagged_symbol_pointer,lispobj val, void *thread) {
+static inline void SetTlSymbolValue(u64 tagged_symbol_pointer,lispobj val, void *thread) {
 #ifdef LISP_FEATURE_SB_THREAD
     struct symbol *sym=	(struct symbol *)
 	(pointer_sized_uint_t)(tagged_symbol_pointer-OTHER_POINTER_LOWTAG);
@@ -104,7 +104,7 @@ static inline os_context_t *get_interrupt_context_for_thread(struct thread *th)
  * much stuff like struct thread and all_threads to be defined, which
  * usually aren't by that time.  So, it's here instead.  Sorry */
 
-static inline struct thread *arch_os_get_current_thread() {
+inline static struct thread *arch_os_get_current_thread() {
 #if defined(LISP_FEATURE_SB_THREAD) && defined (LISP_FEATURE_X86)
     register struct thread *me=0;
     if(all_threads)

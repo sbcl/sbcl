@@ -15,7 +15,8 @@
   ;; we can save a register on the x86.
   :variant simple
   ;; we can save a couple of instructions and a branch on the ppc.
-  :mask fixnum-tag-mask)
+  ;; FIXME: make this be FIXNUM-MASK
+  :mask  (ash lowtag-mask -1))
 
 (!define-type-vops functionp check-fun function object-not-fun-error
   (fun-pointer-lowtag)

@@ -25,9 +25,12 @@
 (defknown sap- (system-area-pointer system-area-pointer) (signed-byte 32)
   (movable flushable))
 
-(defknown sap-int (system-area-pointer) (unsigned-byte #!-alpha 32 #!+alpha 64)
-  (movable flushable))
-(defknown int-sap ((unsigned-byte #!-alpha 32 #!+alpha 64))
+(defknown sap-int (system-area-pointer) (unsigned-byte 
+					 #!-(or alpha x86-64) 32
+					 #!+(or alpha x86-64) 64)
+	  (movable flushable))
+(defknown int-sap ((unsigned-byte #!-(or alpha x86-64) 32
+				  #!+(or alpha x86-64) 64))
   system-area-pointer (movable))
 
 (defknown sap-ref-8 (system-area-pointer fixnum) (unsigned-byte 8)
@@ -91,9 +94,6 @@
   (flushable))
 (defknown sap-ref-double (system-area-pointer fixnum) double-float
   (flushable))
-#!+(or x86 long-float)
-(defknown sap-ref-long (system-area-pointer fixnum) long-float
-  (flushable))
 
 (defknown %set-sap-ref-single
 	  (system-area-pointer fixnum single-float) single-float
@@ -101,10 +101,7 @@
 (defknown %set-sap-ref-double
 	  (system-area-pointer fixnum double-float) double-float
   ())
-#!+long-float
-(defknown %set-sap-ref-long
-	  (system-area-pointer fixnum long-float) long-float
-  ())
+
 
 ;;;; transforms for converting sap relation operators
 

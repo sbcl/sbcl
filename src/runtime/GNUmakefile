@@ -14,8 +14,9 @@ all: sbcl sbcl.nm
 
 # defaults which might be overridden or modified by values in the
 # Config file
-CFLAGS =  -g -Wall -O3
+CFLAGS =  -g -Wall#  -O3
 ASFLAGS = $(CFLAGS)
+DEPEND_FLAGS =
 CPPFLAGS = -I.
 
 # Some of these things might be Config-dependent in future versions,
@@ -54,7 +55,7 @@ sbcl: ${OBJS}
 
 .PHONY: clean all
 clean:
-	-rm -f depend *.o sbcl sbcl.nm core *.tmp $(CLEAN_FILES)
+	-rm -f depend *.o sbcl sbcl.nm core *.tmp
 
 TAGS: $(SRCS)
 	etags $(SRCS)

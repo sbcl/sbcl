@@ -48,9 +48,9 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 
-#include "sbcl.h"
 #include "runtime.h"
 #include "arch.h"
+#include "sbcl.h"
 #include "os.h"
 #include "interrupt.h"
 #include "globals.h"
@@ -162,7 +162,7 @@ void reset_signal_mask ()
 void 
 build_fake_control_stack_frames(struct thread *th,os_context_t *context)
 {
-#ifndef LISP_FEATURE_X86
+#ifndef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
     
     lispobj oldcont;
 
@@ -298,7 +298,7 @@ interrupt_internal_error(int signal, siginfo_t *info, os_context_t *context,
 
     if (internal_errors_enabled) {
         SHOW("in interrupt_internal_error");
-#ifdef QSHOW
+#if QSHOW
 	/* Display some rudimentary debugging information about the
 	 * error, so that even if the Lisp error handler gets badly
 	 * confused, we have a chance to determine what's going on. */
@@ -482,7 +482,7 @@ maybe_defer_handler(void *handler, struct interrupt_data *data,
      * actually use its argument for anything on x86, so this branch
      * may succeed even when context is null (gencgc alloc()) */
     if (
-#ifndef LISP_FEATURE_X86
+#if !defined(LISP_FEATURE_X86) && !defined(LISP_FEATURE_X86_64)
 	(!foreign_function_call_active) &&
 #endif
 	arch_pseudo_atomic_atomic(context)) {
@@ -536,52 +536,36 @@ maybe_now_maybe_later(int signal, siginfo_t *info, void *void_context)
 			   signal,info,context))
 	return;
     interrupt_handle_now(signal, info, context);
-#ifdef LISP_FEATURE_DARWIN
-    /* Work around G5 bug */
-    sigreturn(void_context);
-#endif
 }
 
-#ifdef LISP_FEATURE_SB_THREAD
 void
 sig_stop_for_gc_handler(int signal, siginfo_t *info, void *void_context)
 {
     os_context_t *context = arch_os_get_context(&void_context);
     struct thread *thread=arch_os_get_current_thread();
     struct interrupt_data *data=thread->interrupt_data;
-    sigset_t ss;
-    int i;
+
     
     if(maybe_defer_handler(sig_stop_for_gc_handler,data,
-			   signal,info,context)) {
+			   signal,info,context)){
 	return;
     }
     /* need the context stored so it can have registers scavenged */
     fake_foreign_function_call(context); 
 
-    sigemptyset(&ss);
-    for(i=1;i<NSIG;i++) sigaddset(&ss,i); /* Block everything. */
-    sigprocmask(SIG_BLOCK,&ss,0);
-
     get_spinlock(&all_threads_lock,thread->pid);
     thread->state=STATE_STOPPED;
     release_spinlock(&all_threads_lock);
-
-    sigemptyset(&ss); sigaddset(&ss,SIG_STOP_FOR_GC);
-    sigwaitinfo(&ss,0);
+    kill(thread->pid,SIGSTOP);
 
     undo_fake_foreign_function_call(context);
 }
-#endif
 
 void
 interrupt_handle_now_handler(int signal, siginfo_t *info, void *void_context)
 {
     os_context_t *context = arch_os_get_context(&void_context);
     interrupt_handle_now(signal, info, context);
-#ifdef LISP_FEATURE_DARWIN
-    sigreturn(void_context);
-#endif
 }
 
 /*
@@ -612,11 +596,9 @@ extern lispobj call_into_lisp(lispobj fun, lispobj *args, int nargs);
 extern void post_signal_tramp(void);
 void arrange_return_to_lisp_function(os_context_t *context, lispobj function)
 {
-#ifndef LISP_FEATURE_X86
     void * fun=native_pointer(function);
-    void *code = &(((struct simple_fun *) fun)->code);
-#endif    
-
+    char *code = &(((struct simple_fun *) fun)->code);
+    
     /* Build a stack frame showing `interrupted' so that the
      * user's backtrace makes (as much) sense (as usual) */
 #ifdef LISP_FEATURE_X86
@@ -656,6 +638,8 @@ void arrange_return_to_lisp_function(os_context_t *context, lispobj function)
     *os_context_register_addr(context,reg_ECX) = 0; 
     *os_context_register_addr(context,reg_EBP) = sp-2;
     *os_context_register_addr(context,reg_ESP) = sp-14;
+#elif defined(LISP_FEATURE_X86_64)
+    lose("deferred gubbins still needs to be written");
 #else
     /* this much of the calling convention is common to all
        non-x86 ports */
@@ -730,7 +714,7 @@ boolean handle_control_stack_guard_triggered(os_context_t *context,void *addr){
 }
 
 #ifndef LISP_FEATURE_GENCGC
-/* This function gets called from the SIGSEGV (for e.g. Linux, NetBSD, &
+/* This function gets called from the SIGSEGV (for e.g. Linux or
  * OpenBSD) or SIGBUS (for e.g. FreeBSD) handler. Here we check
  * whether the signal was due to treading on the mprotect()ed zone -
  * and if so, arrange for a GC to happen. */

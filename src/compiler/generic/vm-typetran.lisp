@@ -47,34 +47,48 @@
                        (simple-array (unsigned-byte 15) (*)))
 (define-type-predicate simple-array-unsigned-byte-16-p
 		       (simple-array (unsigned-byte 16) (*)))
+#!-x86-64
 (define-type-predicate simple-array-unsigned-byte-29-p
                        (simple-array (unsigned-byte 29) (*)))
 (define-type-predicate simple-array-unsigned-byte-31-p
                        (simple-array (unsigned-byte 31) (*)))
 (define-type-predicate simple-array-unsigned-byte-32-p
 		       (simple-array (unsigned-byte 32) (*)))
+#!+x86-64
+(define-type-predicate simple-array-unsigned-byte-60-p
+		       (simple-array (unsigned-byte 60) (*)))
+#!+x86-64
+(define-type-predicate simple-array-unsigned-byte-63-p
+		       (simple-array (unsigned-byte 63) (*)))
+#!+x86-64
+(define-type-predicate simple-array-unsigned-byte-64-p
+		       (simple-array (unsigned-byte 64) (*)))
+
 (define-type-predicate simple-array-signed-byte-8-p
 		       (simple-array (signed-byte 8) (*)))
 (define-type-predicate simple-array-signed-byte-16-p
 		       (simple-array (signed-byte 16) (*)))
+#!-x86-64
 (define-type-predicate simple-array-signed-byte-30-p
 		       (simple-array (signed-byte 30) (*)))
 (define-type-predicate simple-array-signed-byte-32-p
 		       (simple-array (signed-byte 32) (*)))
+#!+x86-64
+(define-type-predicate simple-array-signed-byte-61-p
+		       (simple-array (signed-byte 61) (*)))
+#!+x86-64
+(define-type-predicate simple-array-signed-byte-64-p
+		       (simple-array (signed-byte 64) (*)))
 (define-type-predicate simple-array-single-float-p
 		       (simple-array single-float (*)))
 (define-type-predicate simple-array-double-float-p
 		       (simple-array double-float (*)))
-#!+long-float
-(define-type-predicate simple-array-long-float-p
-		       (simple-array long-float (*)))
+
 (define-type-predicate simple-array-complex-single-float-p
 		       (simple-array (complex single-float) (*)))
 (define-type-predicate simple-array-complex-double-float-p
 		       (simple-array (complex double-float) (*)))
-#!+long-float
-(define-type-predicate simple-array-complex-long-float-p
-		       (simple-array (complex long-float) (*)))
+
 (define-type-predicate simple-base-string-p simple-base-string)
 (define-type-predicate system-area-pointer-p system-area-pointer)
 (define-type-predicate unsigned-byte-32-p (unsigned-byte 32))

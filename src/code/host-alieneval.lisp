@@ -22,7 +22,7 @@
 
 (defun guess-alignment (bits)
   (cond ((null bits) nil)
-	#!-(or x86 (and ppc darwin)) ((> bits 32) 64)
+	#!-x86 ((> bits 32) 64)
 	((> bits 16) 32)
 	((> bits 8) 16)
 	((> bits 1) 8)

@@ -37,7 +37,7 @@
 
 ;;; Define a pair of fops which are identical except that one reads
 ;;; a four-byte argument while the other reads a one-byte argument. The
-;;; argument can be accessed by using the CLONE-ARG macro.
+;;; argument can be accessed by using the Clone-Arg macro.
 ;;;
 ;;; KLUDGE: It would be nice if the definition here encapsulated which
 ;;; value ranges went with which fop variant, and chose the correct
@@ -161,7 +161,7 @@
     (unless (= *current-fop-table-index* expected-index)
       (bug "fasl table of improper size"))))
 (define-fop (fop-verify-empty-stack 63 :stackp nil)
-  (unless (zerop (length *fop-stack*))
+  (unless (= *fop-stack-pointer* *fop-stack-pointer-on-entry*)
     (bug "fasl stack not empty when it should be")))
 
 ;;;; fops for loading symbols
@@ -333,7 +333,7 @@
 
 (macrolet ((frob (name op fun n)
 	     `(define-fop (,name ,op)
-		(call-with-popped-args ,fun ,n))))
+		(call-with-popped-things ,fun ,n))))
 
   (frob fop-list-1 17 list 1)
   (frob fop-list-2 18 list 2)
@@ -377,7 +377,7 @@
 	 (res (make-array-header sb!vm:simple-array-widetag rank)))
     (declare (simple-array vec)
 	     (type (unsigned-byte 24) rank))
-    (set-array-header res vec length nil 0
+    (set-array-header res vec length length 0
 		      (do ((i rank (1- i))
 			   (dimensions () (cons (pop-stack) dimensions)))
 			  ((zerop i) dimensions)

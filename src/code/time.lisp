@@ -140,6 +140,8 @@
 
 (defun years-since-mar-2000 (utime)
   "Returns number of complete years since March 1st 2000, and remainder in seconds" 
+;  (values 4 0)
+;  #+nil
   (let* ((days-in-year (* 86400 365))
 	 (days-in-4year (+ (* 4 days-in-year) 86400))
 	 (days-in-100year (- (* 25 days-in-4year) 86400))
@@ -162,7 +164,6 @@
     (if (< unix-time (ash 1 31))
 	unix-time
 	(multiple-value-bind (year offset) (years-since-mar-2000 utime)
-	  (declare (ignore year))
 	  (+  +mar-1-2035+  (- unix-to-universal-time)  offset)))))
   
 (defun decode-universal-time (universal-time &optional time-zone)
@@ -287,12 +288,6 @@
 
 ;;;; TIME
 
-(defvar *gc-run-time* 0
-  #!+sb-doc
-  "the total CPU time spent doing garbage collection (as reported by
-   GET-INTERNAL-RUN-TIME)")
-(declaim (type index *gc-run-time*))
-
 (defmacro time (form)
   #!+sb-doc
   "Execute FORM and print timing information on *TRACE-OUTPUT*."
@@ -362,7 +357,7 @@
 		 ~S second~:P of system run time~%  ~
 ~@[                 [Run times include ~S second~:P GC run time.]~%  ~]~
 		 ~S page fault~:P and~%  ~
-		 ~:D bytes consed.~%"
+		 ~S bytes consed.~%"
 		(max (/ (- new-real-time old-real-time)
 			(float sb!xc:internal-time-units-per-second))
 		     0.0)

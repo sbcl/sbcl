@@ -48,8 +48,21 @@
   symbol)
 
 ;;; Return the built-in hash value for SYMBOL.
+
+;;; only backends for which a SYMBOL-HASH vop exists.  In the past,
+;;; when the MIPS backend supported (or nearly did) a generational
+;;; (non-conservative) garbage collector, this read (OR X86 MIPS).
+;;; Having excised the vestigial support for GENGC, this now only
+;;; applies for the x86 port, but if someone were to rework the GENGC
+;;; support, this might change again.  -- CSR, 2002-08-26
+#!+(or x86 x86-64)
 (defun symbol-hash (symbol)
   (symbol-hash symbol))
+
+;;; Compute the hash value for SYMBOL.
+#!-(or x86 x86-64)
+(defun symbol-hash (symbol)
+  (%sxhash-simple-string (symbol-name symbol)))
 
 (defun symbol-function (symbol)
   #!+sb-doc

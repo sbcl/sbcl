@@ -79,15 +79,12 @@
  ("src/code/cross-float" :not-target)
  ("src/code/cross-io"    :not-target)
  ("src/code/cross-sap"   :not-target)
- ("src/code/cross-thread" :not-target)
  ("src/code/cross-make-load-form" :not-target)
- ("src/code/cross-condition" :not-target)
 
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;;; stuff needed early both in cross-compilation host and in target Lisp
 
  ("src/code/uncross")
- ("src/code/primordial-type")
  ("src/code/early-defbangmethod")
 
  ("src/code/defbangtype")
@@ -162,7 +159,6 @@
 
  ("src/code/target-error" :not-host)
 
- ("src/compiler/early-backend")
  ;; a comment from classic CMU CL:
  ;;   "These guys can supposedly come in any order, but not really.
  ;;    Some are put at the end so that macros don't run interpreted
@@ -192,8 +188,7 @@
  ("src/code/misc-aliens" :not-host)
 
  ("src/code/array"         :not-host)
- ("src/code/early-float"   :not-host)
- ("src/code/target-sxhash" :not-host) ; needs most-fooative-foo-float constants
+ ("src/code/target-sxhash" :not-host)
 
  ("src/code/list"   :not-host)
  ("src/code/seq"    :not-host) ; "code/seq" should come after "code/list".
@@ -315,7 +310,7 @@
  ("src/compiler/target/backend-parms")
 
  ;; for INFO and SB!XC:MACRO-FUNCTION, needed by defmacro.lisp
- ("src/compiler/globaldb")
+ ("src/compiler/globaldb" :trace-file )
  ("src/compiler/info-functions")
 
  ("src/code/force-delayed-defbangconstants")
@@ -419,7 +414,6 @@
  ("src/code/hash-table")
  ("src/code/readtable")
  ("src/code/pathname")
- ("src/code/host-pprint")
  ("src/compiler/lexenv")
 
  ;; KLUDGE: Much stuff above here is the type system and/or the INFO
@@ -449,6 +443,7 @@
  ;; (and so that they don't cause lots of annoying compiler warnings
  ;; about undefined types). 
  ("src/compiler/generic/core")
+ ("src/code/cross-thread" :not-target)
  ("src/code/thread")
  ("src/code/load")
 
@@ -617,7 +612,7 @@
  ("src/code/target-sap"        :not-host) ; uses SAP-INT type
  ("src/code/target-package"    :not-host) ; needs "code/package"
  ("src/code/target-random"     :not-host) ; needs "code/random"
- ("src/code/target-hash-table" :not-host) ; needs "code/hash-table"
+ ("src/code/target-hash-table" :trace-file :not-host) ; needs "code/hash-table"
  ("src/code/reader"            :not-host) ; needs "code/readtable"
  ("src/code/target-stream"     :not-host) ; needs WHITESPACEP from "code/reader"
  ("src/code/target-pathname"   :not-host) ; needs "code/pathname"

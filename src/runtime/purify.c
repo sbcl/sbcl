@@ -19,9 +19,9 @@
 #include <strings.h>
 #include <errno.h>
 
-#include "sbcl.h"
 #include "runtime.h"
 #include "os.h"
+#include "sbcl.h"
 #include "globals.h"
 #include "validate.h"
 #include "interrupt.h"
@@ -116,8 +116,7 @@ dynamic_pointer_p(lispobj ptr)
 #endif
 }
 
-static inline lispobj *
-newspace_alloc(int nwords, int constantp) 
+static inline newspace_alloc(int nwords, int constantp) 
 {
     lispobj *ret;
     nwords=CEILING(nwords,2);
@@ -310,7 +309,9 @@ valid_dynamic_space_pointer(lispobj *pointer, lispobj *start_addr)
 	case SIMPLE_ARRAY_UNSIGNED_BYTE_8_WIDETAG:
 	case SIMPLE_ARRAY_UNSIGNED_BYTE_15_WIDETAG:
 	case SIMPLE_ARRAY_UNSIGNED_BYTE_16_WIDETAG:
+#ifdef SIMPLE_ARRAY_UNSIGNED_BYTE_29_WIDETAG
 	case SIMPLE_ARRAY_UNSIGNED_BYTE_29_WIDETAG:
+#endif
 	case SIMPLE_ARRAY_UNSIGNED_BYTE_31_WIDETAG:
 	case SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG:
 #ifdef SIMPLE_ARRAY_SIGNED_BYTE_8_WIDETAG
@@ -860,7 +861,7 @@ ptrans_list(lispobj thing, boolean constant)
     struct cons *old, *new, *orig;
     int length;
 
-    orig = (struct cons *) newspace_alloc(0,constant);
+    orig = newspace_alloc(0,constant);
     length = 0;
 
     do {
@@ -962,6 +963,8 @@ ptrans_otherptr(lispobj thing, lispobj header, boolean constant)
       case SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG:
 #ifdef SIMPLE_ARRAY_SIGNED_BYTE_30_WIDETAG
       case SIMPLE_ARRAY_SIGNED_BYTE_30_WIDETAG:
+#endif
+#ifdef SIMPLE_ARRAY_UNSIGNED_BYTE_29_WIDETAG
       case SIMPLE_ARRAY_UNSIGNED_BYTE_29_WIDETAG:
 #endif
 #ifdef SIMPLE_ARRAY_SIGNED_BYTE_32_WIDETAG
@@ -1190,6 +1193,8 @@ pscav(lispobj *addr, int nwords, boolean constant)
               case SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG:
 #ifdef SIMPLE_ARRAY_SIGNED_BYTE_30_WIDETAG
               case SIMPLE_ARRAY_SIGNED_BYTE_30_WIDETAG:
+#endif
+#ifdef SIMPLE_ARRAY_UNSIGNED_BYTE_29_WIDETAG
   	      case SIMPLE_ARRAY_UNSIGNED_BYTE_29_WIDETAG:
 #endif
 #ifdef SIMPLE_ARRAY_SIGNED_BYTE_32_WIDETAG
@@ -1391,7 +1396,7 @@ purify(lispobj static_roots, lispobj read_only_roots)
     printf(" bindings");
     fflush(stdout);
 #endif
-#if !defined(LISP_FEATURE_X86)
+#if !defined(LISP_FEATURE_X86) && !defined(LISP_FEATURE_X86_64)
     pscav( (lispobj *)all_threads->binding_stack_start,
 	  (lispobj *)current_binding_stack_pointer -
 	   all_threads->binding_stack_start,

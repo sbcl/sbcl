@@ -30,7 +30,8 @@ printf '(' >> $ltf
 
 echo //guessing default target CPU architecture from host architecture
 case `uname -m` in 
-    *86|x86_64) guessed_sbcl_arch=x86 ;; 
+    *86) guessed_sbcl_arch=x86 ;; 
+    *x86_64) guessed_sbcl_arch=x86-64 ;; 
     [Aa]lpha) guessed_sbcl_arch=alpha ;;
     sparc*) guessed_sbcl_arch=sparc ;;
     sun*) guessed_sbcl_arch=sparc ;;
@@ -96,11 +97,7 @@ case `uname` in
     Linux)
 	printf ' :linux' >> $ltf
 	sbcl_os="linux"
-	if [ "`uname -m`" = "x86_64" ]; then
-	    ln -s Config.x86_64-linux Config
-	else
-	    ln -s Config.$sbcl_arch-linux Config
-	fi
+	ln -s Config.$sbcl_arch-linux Config
 	ln -s $sbcl_arch-linux-os.h target-arch-os.h
 	ln -s linux-os.h target-os.h
 	;;
@@ -128,10 +125,6 @@ case `uname` in
 		printf ' :openbsd' >> $ltf
 		sbcl_os="openbsd"
 		ln -s Config.$sbcl_arch-openbsd Config
-		;;
-	    NetBSD)
-                printf ' :netbsd' >> $ltf
-		ln -s Config.$sbcl_arch-netbsd Config
 		;;
 	    *)
 		echo unsupported BSD variant: `uname`
@@ -169,38 +162,35 @@ cd $original_dir
 # base-target-features.lisp-expr, we add it into local-target-features
 # if we're building for x86. -- CSR, 2002-02-21 Then we do something
 # similar with :STACK-GROWS-FOOWARD, too. -- WHN 2002-03-03
-if [ "$sbcl_arch" = "x86" ] ; then
-    printf ' :gencgc :stack-grows-downward-not-upward :c-stack-is-control-stack' >> $ltf
-elif [ "$sbcl_arch" = "mips" ] ; then
-    # Use a little C program to try to guess the endianness.  Ware
-    # cross-compilers!
-    $GNUMAKE -C tools-for-build determine-endianness
-    tools-for-build/determine-endianness >> $ltf
-elif [ "$sbcl_arch" = "ppc" -a "$sbcl_os" = "linux" ]; then
-    # Use a C program to detect which kind of glibc we're building on,
-    # to bandage across the break in source compatibility between
-    # versions 2.3.1 and 2.3.2
-    $GNUMAKE -C tools-for-build where-is-mcontext
-    tools-for-build/where-is-mcontext > src/runtime/ppc-linux-mcontext.h
-elif [ "$sbcl_arch" = "ppc" -a "$sbcl_os" = "darwin" ]; then
-    # The default stack ulimit under darwin is too small to run PURIFY.
-    # Best we can do is complain and exit at this stage
-    if [ "`ulimit -s`" = "512" ]; then
-        echo "Your stack size limit is too small to build SBCL."
-        echo "See the limit(1) or ulimit(1) commands and the README file."
-        exit 1
-    fi
-elif [ "$sbcl_arch" = "sparc" ]; then
-    # Test the compiler in order to see if we are building on Sun 
-    # toolchain as opposed to GNU binutils, and write the appropriate
-    # FUNCDEF macro for assembler. No harm in running this on sparc-linux 
-    # as well.
-    sh tools-for-build/sparc-funcdef.sh > src/runtime/sparc-funcdef.h
-else
-    # Nothing need be done in this case, but sh syntax wants a placeholder.
-    echo > /dev/null
-fi
-
+case "$sbcl_arch" in
+    x86*)
+	printf ' :gencgc :stack-grows-downward-not-upward :c-stack-is-control-stack' >> $ltf
+	;;
+    mips)
+        # Use a little C program to try to guess the endianness.  Ware
+        # cross-compilers!
+	$GNUMAKE -C tools-for-build determine-endianness
+	tools-for-build/determine-endianness >> $ltf
+	;;
+    ppc)
+	if [ "$sbcl_os" = "linux" ]; then
+        # Use a C program to detect which kind of glibc we're building on,
+        # to bandage across the break in source compatibility between
+        # versions 2.3.1 and 2.3.2
+	    $GNUMAKE -C tools-for-build where-is-mcontext
+	    tools-for-build/where-is-mcontext > src/runtime/ppc-linux-mcontext.h
+	elif [ "$sbcl_os" = "darwin" ]; then
+           # The default stack ulimit under darwin is too small to run PURIFY.
+           # Best we can do is complain and exit at this stage
+	    if [ "`ulimit -s`" = "512" ]; then
+		echo "Your stack size limit is too small to build SBCL."
+		echo "See the limit(1) or ulimit(1) commands and the README file."
+		exit 1
+	    fi
+	fi;
+	;;
+esac
+			    
 echo //finishing $ltf
 echo ')' >> $ltf
 

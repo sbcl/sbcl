@@ -100,7 +100,7 @@
   (def-type-predicate-wrapper simple-array-unsigned-byte-32-p)
   (def-type-predicate-wrapper simple-array-signed-byte-8-p)
   (def-type-predicate-wrapper simple-array-signed-byte-16-p)
-  (def-type-predicate-wrapper simple-array-signed-byte-30-p)
+;;  (def-type-predicate-wrapper simple-array-signed-byte-30-p)
   (def-type-predicate-wrapper simple-array-signed-byte-32-p)
   (def-type-predicate-wrapper simple-array-single-float-p)
   (def-type-predicate-wrapper simple-array-double-float-p)

@@ -59,7 +59,7 @@
 		     (aver (stringp name))
 		     (or (foreign-symbol-address-as-integer name)
 			 (error "unknown foreign symbol: ~S" name)))
-		    #!+x86
+		    #!+(or x86 x86-64)
 		    (:code-object
 		     (aver (null name))
 		     (values (get-lisp-obj-address code) t)))))

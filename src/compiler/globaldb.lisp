@@ -32,7 +32,11 @@
 (declaim (special *universal-type*))
 
 ;;; This is sorta semantically equivalent to SXHASH, but optimized for
-;;; legal function names.
+;;; legal function names. Note: semantically equivalent does *not*
+;;; mean that it always returns the same value as SXHASH, just that it
+;;; satisfies the formal definition of SXHASH. The ``sorta'' is
+;;; because SYMBOL-HASH will not necessarily return the same value in
+;;; different lisp images.
 ;;;
 ;;; Why optimize? We want to avoid the fully-general TYPECASE in ordinary
 ;;; SXHASH, because
@@ -54,17 +58,18 @@
 ;;; aren't used too early in cold boot for SXHASH to run).
 #!-sb-fluid (declaim (inline globaldb-sxhashoid))
 (defun globaldb-sxhashoid (x)
-  (cond	((symbolp x) (sxhash x))
+  (cond #-sb-xc-host ; (SYMBOL-HASH doesn't exist on cross-compilation host.)
+	((symbolp x)
+	 (symbol-hash x))
+	#-sb-xc-host ; (SYMBOL-HASH doesn't exist on cross-compilation host.)
 	((and (listp x)
 	      (eq (first x) 'setf)
 	      (let ((rest (rest x)))
 		(and (symbolp (car rest))
 		     (null (cdr rest)))))
-	 ;; We need to declare the type of the value we're feeding to
-	 ;; SXHASH so that the DEFTRANSFORM on symbols kicks in.
-	 (let ((symbol (second x)))
-	   (declare (symbol symbol))
-	   (logxor (sxhash symbol) 110680597)))
+	 (logand 536870911
+		 (logxor (symbol-hash (second x))
+			 110680597)))
 	(t (sxhash x))))
 
 ;;; Given any non-negative integer, return a prime number >= to it.
@@ -259,7 +264,7 @@
 ;;; order in which the TYPE-INFO-creation forms are generated doesn't
 ;;; match the relative order in which the forms need to be executed at
 ;;; cold load time.
-(defparameter *!reversed-type-info-init-forms* nil)
+(defparameter *reversed-type-info-init-forms* nil)
 
 ;;; Define a new type of global information for CLASS. TYPE is the
 ;;; name of the type, DEFAULT is the value for that type when it
@@ -316,7 +321,7 @@
 			 (declare (ignorable name))
 			 ,',default))
 		(setf (type-info-type type-info) ',',type-spec))
-	     *!reversed-type-info-init-forms*))
+	     *reversed-type-info-init-forms*))
      ',type))
 
 ) ; EVAL-WHEN
@@ -906,6 +911,7 @@
 ;;; the current environment, allowing any inherited info to become
 ;;; visible. We return true if there was any info.
 (defun clear-info (class type name)
+  #!+sb-doc
   (let ((info (type-info-or-lose class type)))
     (clear-info-value name (type-info-number info))))
 #!-sb-fluid
@@ -1395,7 +1401,7 @@
 ;;; we can set their DEFAULT and TYPE slots.
 (macrolet ((frob ()
 	     `(!cold-init-forms
-		,@(reverse *!reversed-type-info-init-forms*))))
+		,@(reverse *reversed-type-info-init-forms*))))
   (frob))
 
 ;;;; a hack for detecting

@@ -28,7 +28,7 @@
 #!-sb-fluid (declaim (inline pointer-hash))
 (defun pointer-hash (key)
   (declare (values hash))
-  (truly-the hash (%primitive sb!c:make-fixnum key)))
+  (truly-the hash  (logand 536870911 (%primitive sb!c:make-fixnum key))))
 
 #!-sb-fluid (declaim (inline eq-hash))
 (defun eq-hash (key)
@@ -82,10 +82,6 @@
 
 (defconstant +min-hash-table-size+ 16)
 (defconstant +min-hash-table-rehash-threshold+ (float 1/16 1.0))
-;; as explained by pmai on openprojects #lisp IRC 2002-07-30: #x80000000
-;; is bigger than any possible nonEQ hash value, and thus indicates an
-;; empty slot; and EQ hash tables don't use HASH-TABLE-HASH-VECTOR
-(defconstant +magic-hash-vector-value+ #x80000000)
 
 (defun make-hash-table (&key (test 'eql)
 			     (size +min-hash-table-size+)
@@ -164,7 +160,6 @@
 				     :element-type '(unsigned-byte 32)
 				     :initial-element 0))
 	   ;; needs to be the same length as the KV vector
-           ;; (FIXME: really?  why doesn't the code agree?)
 	   (next-vector (make-array size+1
 				    :element-type '(unsigned-byte 32)))
 	   (kv-vector (make-array (* 2 size+1)
@@ -183,7 +178,15 @@
 		   :hash-vector (unless (eq test 'eq)
 				  (make-array size+1
 					      :element-type '(unsigned-byte 32)
-					      :initial-element +magic-hash-vector-value+)))))
+					      ;; as explained by pmai on
+					      ;; openprojects #lisp IRC
+					      ;; 2002-07-30: #x80000000 is
+					      ;; bigger than any possible nonEQ
+					      ;; hash value, and thus indicates
+					      ;; an empty slot; and EQ hash
+					      ;; tables don't use
+					      ;; HASH-TABLE-HASH-VECTOR
+					      :initial-element #x80000000)))))
       (declare (type index size+1 scaled-size length))
       ;; Set up the free list, all free. These lists are 0 terminated.
       (do ((i 1 (1+ i)))
@@ -251,7 +254,7 @@
 	 (new-hash-vector (when old-hash-vector
 			    (make-array new-size
 					:element-type '(unsigned-byte 32)
-					:initial-element +magic-hash-vector-value+)))
+					:initial-element #x80000000)))
 	 (old-index-vector (hash-table-index-vector table))
 	 (new-length (almost-primify
 		      (truncate (/ (float new-size)
@@ -263,11 +266,6 @@
 
     ;; Disable GC tricks on the OLD-KV-VECTOR.
     (set-header-data old-kv-vector sb!vm:vector-normal-subtype)
-
-    ;; FIXME: here and in several other places in the hash table code,
-    ;; loops like this one are used when FILL or REPLACE would be
-    ;; appropriate.  why are standard CL functions not used?
-    ;; Performance issues?  General laziness?  -- NJF, 2004-03-10
 
     ;; Copy over the kv-vector. The element positions should not move
     ;; in case there are active scans.
@@ -295,7 +293,7 @@
 		     (hash-table-next-free-kv table))
 	       (setf (hash-table-next-free-kv table) i))
 	      ((and new-hash-vector
-		    (not (= (aref new-hash-vector i) +magic-hash-vector-value+)))
+		    (not (= (aref new-hash-vector i) #x80000000)))
 	       ;; Can use the existing hash value (not EQ based)
 	       (let* ((hashing (aref new-hash-vector i))
 		      (index (rem hashing new-length))
@@ -340,7 +338,8 @@
 	 (size (length next-vector))
 	 (index-vector (hash-table-index-vector table))
 	 (length (length index-vector)))
-    (declare (type index size length))
+    (declare (type index size length)
+	     (type (simple-array (unsigned-byte 32) (*))))
 
     ;; Disable GC tricks, they will be re-enabled during the re-hash
     ;; if necesary.
@@ -362,7 +361,7 @@
 	       ;; Slot is empty, push it onto free list.
 	       (setf (aref next-vector i) (hash-table-next-free-kv table))
 	       (setf (hash-table-next-free-kv table) i))
-	      ((and hash-vector (not (= (aref hash-vector i) +magic-hash-vector-value+)))
+	      ((and hash-vector (not (= (aref hash-vector i) #x80000000)))
 	       ;; Can use the existing hash value (not EQ based)
 	       (let* ((hashing (aref hash-vector i))
 		      (index (rem hashing length))
@@ -517,7 +516,7 @@
 	 (when hash-vector
 	   (if (not eq-based)
 	       (setf (aref hash-vector free-kv-slot) hashing)
-	       (aver (= (aref hash-vector free-kv-slot) +magic-hash-vector-value+))))
+	       (aver (= (aref hash-vector free-kv-slot) #x80000000))))
 
 	 ;; Push this slot into the next chain.
 	 (setf (aref next-vector free-kv-slot) next)
@@ -552,63 +551,94 @@
 	    (hash-vector (hash-table-hash-vector hash-table))
 	    (test-fun (hash-table-test-fun hash-table)))
        (declare (type index index next))
-       (flet ((clear-slot (chain-vector prior-slot-location slot-location)
-                ;; Mark slot as empty.
-                (setf (aref table (* 2 slot-location)) +empty-ht-slot+
-                      (aref table (1+ (* 2 slot-location))) +empty-ht-slot+)
-                ;; Update the prior pointer in the chain to skip this.
-                (setf (aref chain-vector prior-slot-location)
-                      (aref next-vector slot-location))
-                ;; Push KV slot onto free chain.
-                (setf (aref next-vector slot-location)
-                      (hash-table-next-free-kv hash-table))
-                (setf (hash-table-next-free-kv hash-table) slot-location)
-                (when hash-vector
-                  (setf (aref hash-vector slot-location) +magic-hash-vector-value+))
-                (decf (hash-table-number-entries hash-table))
-                t))
-         (cond ((zerop next)
-                nil)
-               ((if (or eq-based (not hash-vector))
-                    (eq key (aref table (* 2 next)))
-                    (and (= hashing (aref hash-vector next))
-                         (funcall test-fun key (aref table (* 2 next)))))
-                (clear-slot index-vector index next))
-               ;; Search next-vector chain for a matching key.
-               ((or eq-based (not hash-vector))
-                ;; EQ based
-                (do ((prior next next)
-                     (next (aref next-vector next) (aref next-vector next)))
-                    ((zerop next) nil)
-                  (declare (type index next))
-                  (when (eq key (aref table (* 2 next)))
-                    (return-from remhash (clear-slot next-vector prior next)))))
-               (t
-                ;; not EQ based
-                (do ((prior next next)
-                     (next (aref next-vector next) (aref next-vector next)))
-                    ((zerop next) nil)
-                  (declare (type index next))
-                  (when (and (= hashing (aref hash-vector next))
-                             (funcall test-fun key (aref table (* 2 next))))
-                    (return-from remhash (clear-slot next-vector prior next)))))))))))
+       (cond ((zerop next)
+	      nil)
+	     ((if (or eq-based (not hash-vector))
+		  (eq key (aref table (* 2 next)))
+		  (and (= hashing (aref hash-vector next))
+		       (funcall test-fun key (aref table (* 2 next)))))
+
+	      ;; FIXME: Substantially the same block of code seems to
+	      ;; appear in all three cases. (In the first case, it
+	      ;; appear bare; in the other two cases, it's wrapped in
+	      ;; DO.) It should be defined in a separate (possibly
+	      ;; inline) DEFUN or FLET.
+	      
+	      ;; Mark slot as empty.
+	      (setf (aref table (* 2 next)) +empty-ht-slot+
+		    (aref table (1+ (* 2 next))) +empty-ht-slot+)
+	      ;; Update the index-vector pointer.
+	      (setf (aref index-vector index) (aref next-vector next))
+	      ;; Push KV slot onto free chain.
+	      (setf (aref next-vector next)
+		    (hash-table-next-free-kv hash-table))
+	      (setf (hash-table-next-free-kv hash-table) next)
+	      (when hash-vector
+		(setf (aref hash-vector next) #x80000000))
+	      (decf (hash-table-number-entries hash-table))
+	      t)
+	     ;; Search next-vector chain for a matching key.
+	     ((or eq-based (not hash-vector))
+	      ;; EQ based
+	      (do ((prior next next)
+		   (next (aref next-vector next) (aref next-vector next)))
+		  ((zerop next) nil)
+		(declare (type index next))
+		(when (eq key (aref table (* 2 next)))
+		  ;; Mark slot as empty.
+		  (setf (aref table (* 2 next)) +empty-ht-slot+
+			(aref table (1+ (* 2 next))) +empty-ht-slot+)
+		  ;; Update the prior pointer in the chain to skip this.
+		  (setf (aref next-vector prior) (aref next-vector next))
+		  ;; Push KV slot onto free chain.
+		  (setf (aref next-vector next)
+			(hash-table-next-free-kv hash-table))
+		  (setf (hash-table-next-free-kv hash-table) next)
+		  (when hash-vector
+		    (setf (aref hash-vector next) #x80000000))
+		  (decf (hash-table-number-entries hash-table))
+		  (return t))))
+	     (t
+	      ;; not EQ based
+	      (do ((prior next next)
+		   (next (aref next-vector next) (aref next-vector next)))
+		  ((zerop next) nil)
+		(declare (type index next))
+		(when (and (= hashing (aref hash-vector next))
+			   (funcall test-fun key (aref table (* 2 next))))
+		  ;; Mark slot as empty.
+		  (setf (aref table (* 2 next)) +empty-ht-slot+)
+		  (setf (aref table (1+ (* 2 next))) +empty-ht-slot+)
+		  ;; Update the prior pointer in the chain to skip this.
+		  (setf (aref next-vector prior) (aref next-vector next))
+		  ;; Push KV slot onto free chain.
+		  (setf (aref next-vector next)
+			(hash-table-next-free-kv hash-table))
+		  (setf (hash-table-next-free-kv hash-table) next)
+		  (when hash-vector
+		    (setf (aref hash-vector next) #x80000000))
+		  (decf (hash-table-number-entries hash-table))
+		  (return t)))))))))
 
 (defun clrhash (hash-table)
   #!+sb-doc
   "This removes all the entries from HASH-TABLE and returns the hash table
    itself."
-  (declare (optimize speed))
   (let* ((kv-vector (hash-table-table hash-table))
+	 (kv-length (length kv-vector))
 	 (next-vector (hash-table-next-vector hash-table))
 	 (hash-vector (hash-table-hash-vector hash-table))
 	 (size (length next-vector))
-	 (index-vector (hash-table-index-vector hash-table)))
+	 (index-vector (hash-table-index-vector hash-table))
+	 (length (length index-vector)))
     ;; Disable GC tricks.
     (set-header-data kv-vector sb!vm:vector-normal-subtype)
     ;; Mark all slots as empty by setting all keys and values to magic
     ;; tag.
+    (do ((i 2 (1+ i)))
+	((>= i kv-length))
+      (setf (aref kv-vector i) +empty-ht-slot+))
     (aver (eq (aref kv-vector 0) hash-table))
-    (fill kv-vector +empty-ht-slot+ :start 2)
     ;; Set up the free list, all free.
     (do ((i 1 (1+ i)))
 	((>= i (1- size)))
@@ -617,10 +647,12 @@
     (setf (hash-table-next-free-kv hash-table) 1)
     (setf (hash-table-needing-rehash hash-table) 0)
     ;; Clear the index-vector.
-    (fill index-vector 0)
+    (dotimes (i length)
+      (setf (aref index-vector i) 0))
     ;; Clear the hash-vector.
     (when hash-vector
-      (fill hash-vector +magic-hash-vector-value+)))
+      (dotimes (i size)
+	(setf (aref hash-vector i) #x80000000))))
   (setf (hash-table-number-entries hash-table) 0)
   hash-table)
 

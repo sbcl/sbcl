@@ -72,14 +72,8 @@
 
 (define-primitive-object (double-float :lowtag other-pointer-lowtag
 				       :widetag double-float-widetag)
-  (filler)
-  (value :c-type "double" :length 2))
-
-#!+long-float
-(define-primitive-object (long-float :lowtag other-pointer-lowtag
-				     :widetag long-float-widetag)
-  #!+sparc (filler)
-  (value :c-type "long double" :length #!+x86 3 #!+sparc 4))
+    #!-x86-64  (filler)
+    (value :c-type "double" :length #!+x96-64 1 #!-x86-64 2))
 
 (define-primitive-object (complex :type complex
 				  :lowtag other-pointer-lowtag
@@ -170,9 +164,10 @@
 (define-primitive-object (simple-fun :type function
 				     :lowtag fun-pointer-lowtag
 				     :widetag simple-fun-header-widetag)
-  #!-x86 (self :ref-trans %simple-fun-self
-	       :set-trans (setf %simple-fun-self))
-  #!+x86 (self
+  #!-(or x86 x86-64) (self :ref-trans %simple-fun-self
+			   :set-trans (setf %simple-fun-self))
+  #!+(or x86 x86-64)
+  (self
 	  ;; KLUDGE: There's no :SET-KNOWN, :SET-TRANS, :REF-KNOWN, or
 	  ;; :REF-TRANS here in this case. Instead, there's separate
 	  ;; DEFKNOWN/DEFINE-VOP/DEFTRANSFORM stuff in
@@ -226,11 +221,11 @@
 			  :lowtag fun-pointer-lowtag
 			  :widetag funcallable-instance-header-widetag
 			  :alloc-trans %make-funcallable-instance)
-  #!-x86
+  #!-(or x86 x86-64)
   (fun
    :ref-known (flushable) :ref-trans %funcallable-instance-fun
    :set-known (unsafe) :set-trans (setf %funcallable-instance-fun))
-  #!+x86
+  #!+(or x86 x86-64)
   (fun
    :ref-known (flushable) :ref-trans %funcallable-instance-fun
    ;; KLUDGE: There's no :SET-KNOWN or :SET-TRANS in this case.
@@ -295,13 +290,13 @@
 (define-primitive-object (unwind-block)
   (current-uwp :c-type #!-alpha "struct unwind_block *" #!+alpha "u32")
   (current-cont :c-type #!-alpha "lispobj *" #!+alpha "u32")
-  #!-x86 current-code
+  #!-(or x86 x86-64) current-code
   entry-pc)
 
 (define-primitive-object (catch-block)
   (current-uwp :c-type #!-alpha "struct unwind_block *" #!+alpha "u32")
   (current-cont :c-type #!-alpha "lispobj *" #!+alpha "u32")
-  #!-x86 current-code
+  #!-(or x86 x86-64) current-code
   entry-pc
   tag
   (previous-catch :c-type #!-alpha "struct catch_block *" #!+alpha "u32")
@@ -313,9 +308,14 @@
 
 ;;;; symbols
 
+#!+(or x86 x86-64)
+(defknown symbol-hash (symbol) (integer 0 #.sb!xc:most-positive-fixnum)
+  (flushable movable))
+
 (define-primitive-object (symbol :lowtag other-pointer-lowtag
 				 :widetag symbol-header-widetag
-				 :alloc-trans make-symbol)
+				 #!-(or x86 x86-64) :alloc-trans
+				 #!-(or x86 x86-64) make-symbol)
 
   ;; Beware when changing this definition.  NIL-the-symbol is defined
   ;; using this layout, and NIL-the-end-of-list-marker is the cons 
@@ -323,14 +323,11 @@
   ;; (conses have no header).  Careful selection of lowtags ensures
   ;; that the same pointer can be used for both purposes:
   ;; OTHER-POINTER-LOWTAG is 7, LIST-POINTER-LOWTAG is 3, so if you
-  ;; subtract 3 from (SB-KERNEL:GET-LISP-OBJ-ADDRESS 'NIL) you get the
+  ;; subtract 3 from (sb-kernel:get-lisp-obj-address 'NIL) you get the
   ;; first data slot, and if you subtract 7 you get a symbol header.
 
-  ;; also the CAR of NIL-as-end-of-list
-  (value :init :unbound)		
-  ;; also the CDR of NIL-as-end-of-list.  Its reffer needs special
-  ;; care for this reason, as hash values must be fixnums.
-  (hash :set-trans %set-symbol-hash)
+  (value :init :unbound)		;also the CAR of NIL-as-end-of-list
+  (hash)				;the CDR of NIL-as-end-of-list
 
   (plist :ref-trans symbol-plist
 	 :set-trans %set-symbol-plist
@@ -350,9 +347,9 @@
 (define-primitive-object (complex-double-float
 			  :lowtag other-pointer-lowtag
 			  :widetag complex-double-float-widetag)
-  (filler)
-  (real :c-type "double" :length 2)
-  (imag :c-type "double" :length 2))
+    #!-x86-64 (filler)
+  (real :c-type "double" :length #!+x86-64 1 #!-x86-64 2)
+  (imag :c-type "double" :length #!+x86-64 1 #!-x86-64 2))
 
 ;;; this isn't actually a lisp object at all, it's a c structure that lives
 ;;; in c-land.  However, we need sight of so many parts of it from Lisp that
@@ -376,8 +373,8 @@
   (this :c-type "struct thread *" :length #!+alpha 2 #!-alpha 1)
   (next :c-type "struct thread *" :length #!+alpha 2 #!-alpha 1)
   (state)				; running, stopping, stopped
-  #!+x86 (pseudo-atomic-atomic)
-  #!+x86 (pseudo-atomic-interrupted)
+  #!+(or x86 x86-64) (pseudo-atomic-atomic)
+  #!+(or x86 x86-64) (pseudo-atomic-interrupted)
   (interrupt-data :c-type "struct interrupt_data *" 
 		  :length #!+alpha 2 #!-alpha 1)
   (interrupt-contexts :c-type "os_context_t *" :rest-p t))

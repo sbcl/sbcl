@@ -99,12 +99,22 @@
 	  :importance 12)
 	 ((unsigned-byte 16) 0 16 simple-array-unsigned-byte-16
 	  :importance 12)
+	 #!-x86-64
 	 ((unsigned-byte 29) 0 32 simple-array-unsigned-byte-29
 	  :importance 8)
 	 ((unsigned-byte 31) 0 32 simple-array-unsigned-byte-31
 	  :importance 11)
 	 ((unsigned-byte 32) 0 32 simple-array-unsigned-byte-32
 	  :importance 11)
+	 #!+x86-64
+	 ((unsigned-byte 60) 0 64 simple-array-unsigned-byte-60
+	  :importance 8)
+	 #!+x86-64
+	 ((unsigned-byte 63) 0 64 simple-array-unsigned-byte-63
+	  :importance 9)
+	 #!+x86-64
+	 ((unsigned-byte 64) 0 64 simple-array-unsigned-byte-64
+	  :importance 9)
 	 ((signed-byte 8) 0 8 simple-array-signed-byte-8
 	  :importance 10)
 	 ((signed-byte 16) 0 16 simple-array-signed-byte-16
@@ -112,9 +122,16 @@
 	 ;; KLUDGE: See the comment in PRIMITIVE-TYPE-AUX,
 	 ;; compiler/generic/primtype.lisp, for why this is FIXNUM and
 	 ;; not (SIGNED-BYTE 30)
+	 #!-x86-64
 	 (fixnum 0 32 simple-array-signed-byte-30
 	  :importance 8)
 	 ((signed-byte 32) 0 32 simple-array-signed-byte-32
+	  :importance 7)
+	 #!+x86-64
+	 (fixnum 0 64 simple-array-signed-byte-61
+	  :importance 8)
+	 #!+x86-64
+	 ((signed-byte 64) 0 64 simple-array-signed-byte-64
 	  :importance 7)
 	 ((complex single-float) #C(0.0f0 0.0f0) 64
 	  simple-array-complex-single-float
@@ -122,11 +139,7 @@
 	 ((complex double-float) #C(0.0d0 0.0d0) 128
 	  simple-array-complex-double-float
 	  :importance 2)
-	 #!+long-float
-	 ((complex long-float) #C(0.0l0 0.0l0) #!+x86 192 #!+sparc 256
-	  simple-array-complex-long-float
-	  :importance 1)
-	 (t 0 32 simple-vector :importance 18))))
+	 (t 0 #.sb!vm:n-word-bits simple-vector :importance 18))))
 
 (defvar sb!kernel::*specialized-array-element-types*
   (map 'list

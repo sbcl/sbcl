@@ -21,47 +21,38 @@
 (setf *backend-t-primitive-type* (primitive-type-or-lose t))
 
 ;;; primitive integer types that fit in registers
-(/show0 "primtype.lisp 24")
 (!def-primitive-type positive-fixnum (any-reg signed-reg unsigned-reg)
-  :type (unsigned-byte 29))
-(/show0 "primtype.lisp 27")
-#!-alpha
-(!def-primitive-type unsigned-byte-31 (signed-reg unsigned-reg descriptor-reg)
-  :type (unsigned-byte 31))
-(/show0 "primtype.lisp 31")
-#!-alpha
-(!def-primitive-type unsigned-byte-32 (unsigned-reg descriptor-reg)
-  :type (unsigned-byte 32))
-(/show0 "primtype.lisp 35")
-#!+alpha
+  :type (unsigned-byte 60))
 (!def-primitive-type unsigned-byte-63 (signed-reg unsigned-reg descriptor-reg)
   :type (unsigned-byte 63))
-#!+alpha
 (!def-primitive-type unsigned-byte-64 (unsigned-reg descriptor-reg)
   :type (unsigned-byte 64))
 (!def-primitive-type fixnum (any-reg signed-reg)
-  :type (signed-byte 30))
-#!-alpha
-(!def-primitive-type signed-byte-32 (signed-reg descriptor-reg)
-  :type (signed-byte 32))
-#!+alpha
+  :type (signed-byte 61))
 (!def-primitive-type signed-byte-64 (signed-reg descriptor-reg)
   :type (signed-byte 64))
+
+;;; registers are 64 bits, but most immediates are 32 bits max, so
+;;; these are useful too
+(!def-primitive-type unsigned-byte-32 (unsigned-reg descriptor-reg)
+  :type (unsigned-byte 32))
+(!def-primitive-type signed-byte-32 (signed-reg unsigned-reg descriptor-reg)
+  :type (signed-byte 32))
 
 (defvar *fixnum-primitive-type* (primitive-type-or-lose 'fixnum))
 
 (/show0 "primtype.lisp 53")
 (!def-primitive-type-alias tagged-num (:or positive-fixnum fixnum))
-(!def-primitive-type-alias unsigned-num (:or #!-alpha unsigned-byte-32
-					     #!-alpha unsigned-byte-31
-					     #!+alpha unsigned-byte-64
-					     #!+alpha unsigned-byte-63
+(!def-primitive-type-alias unsigned-num (:or #!-(or alpha x86-64) unsigned-byte-32
+					     #!-(or alpha x86-64) unsigned-byte-31
+					     #!+(or alpha x86-64) unsigned-byte-64
+					     #!+(or alpha x86-64) unsigned-byte-63
 					     positive-fixnum))
-(!def-primitive-type-alias signed-num (:or #!-alpha signed-byte-32
-					   #!+alpha signed-byte-64
+(!def-primitive-type-alias signed-num (:or #!-(or alpha x86-64) signed-byte-32
+					   #!+(or alpha x86-64) signed-byte-64
 					   fixnum
-					   #!-alpha unsigned-byte-31
-					   #!+alpha unsigned-byte-63
+					   #!-(or alpha x86-64) unsigned-byte-31
+					   #!+(or alpha x86-64) unsigned-byte-63
 					   positive-fixnum))
 
 ;;; other primitive immediate types
@@ -161,31 +152,31 @@
 	       (case t1-name
 		 (positive-fixnum
 		  (if (or (eq t2-name 'fixnum)
-			  (eq t2-name #!-alpha 'signed-byte-32
-				      #!+alpha 'signed-byte-64)
-			  (eq t2-name #!-alpha 'unsigned-byte-31
-				      #!+alpha 'unsigned-byte-63)
-			  (eq t2-name #!-alpha 'unsigned-byte-32
-				      #!+alpha 'unsigned-byte-64))
+			  (eq t2-name #!-(or alpha x86-64) 'signed-byte-32
+				      #!+(or alpha x86-64) 'signed-byte-64)
+			  (eq t2-name #!-(or alpha x86-64) 'unsigned-byte-31
+				      #!+(or alpha x86-64) 'unsigned-byte-63)
+			  (eq t2-name #!-(or alpha x86-64) 'unsigned-byte-32
+				      #!+(or alpha x86-64) 'unsigned-byte-64))
 		      t2))
 		 (fixnum
 		  (case t2-name
-		    (#!-alpha signed-byte-32
-		     #!+alpha signed-byte-64 t2)
-		    (#!-alpha unsigned-byte-31
-		     #!+alpha unsigned-byte-63
+		    (#!-(or alpha x86-64) signed-byte-32
+		     #!+(or alpha x86-64) signed-byte-64 t2)
+		    (#!-(or alpha x86-64) unsigned-byte-31
+		     #!+(or alpha x86-64) unsigned-byte-63
 		     (primitive-type-or-lose
-		      #!-alpha 'signed-byte-32
-		      #!+alpha 'signed-byte-64))))
-		 (#!-alpha signed-byte-32
-		  #!+alpha signed-byte-64
-		  (if (eq t2-name #!-alpha 'unsigned-byte-31
-				  #!+alpha 'unsigned-byte-63)
+		      #!-(or alpha x86-64) 'signed-byte-32
+		      #!+(or alpha x86-64) 'signed-byte-64))))
+		 (#!-(or alpha x86-64) signed-byte-32
+		  #!+(or alpha x86-64) signed-byte-64
+		  (if (eq t2-name #!-(or alpha x86-64) 'unsigned-byte-31
+				  #!+(or alpha x86-64) 'unsigned-byte-63)
 		      t1))
-		 (#!-alpha unsigned-byte-31
-		  #!+alpha unsigned-byte-63
-		  (if (eq t2-name #!-alpha 'unsigned-byte-32
-				  #!+alpha 'unsigned-byte-64)
+		 (#!-(or alpha x86-64) unsigned-byte-31
+		  #!+(or alpha x86-64) unsigned-byte-63
+		  (if (eq t2-name #!-(or alpha x86-64) 'unsigned-byte-32
+				  #!+(or alpha x86-64) 'unsigned-byte-64)
 		      t2))))))
       (etypecase type
 	(numeric-type
@@ -197,25 +188,27 @@
 		(integer
 		 (cond ((and hi lo)
 			(dolist (spec
-				  `((positive-fixnum 0 ,(1- (ash 1 29)))
-				    #!-alpha
+				  `((positive-fixnum 
+				     0 ,sb!xc:most-positive-fixnum)
+				    #!-(or alpha x86-64)
 				    (unsigned-byte-31 0 ,(1- (ash 1 31)))
-				    #!-alpha
+				    #!-(or alpha x86-64)
 				    (unsigned-byte-32 0 ,(1- (ash 1 32)))
-				    #!+alpha
+				    #!+(or alpha x86-64)
 				    (unsigned-byte-63 0 ,(1- (ash 1 63)))
-				    #!+alpha
+				    #!+(or alpha x86-64)
 				    (unsigned-byte-64 0 ,(1- (ash 1 64)))
-				    (fixnum ,(ash -1 29)
-					    ,(1- (ash 1 29)))
-				    #!-alpha
+
+				    (fixnum ,sb!xc:most-negative-fixnum
+					    ,sb!xc:most-positive-fixnum)
+				    #!-(or alpha x86-64)
 				    (signed-byte-32 ,(ash -1 31)
 							  ,(1- (ash 1 31)))
-				    #!+alpha
+				    #!+(or alpha x86-64)
 				    (signed-byte-64 ,(ash -1 63)
 						    ,(1- (ash 1 63))))
-				 (if (or (< hi (ash -1 29))
-					 (> lo (1- (ash 1 29))))
+				 (if (or (< hi sb!xc:most-negative-fixnum)
+					 (> lo sb!xc:most-positive-fixnum))
 				     (part-of bignum)
 				     (any)))
 			  (let ((type (car spec))

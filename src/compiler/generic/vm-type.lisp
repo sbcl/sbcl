@@ -137,27 +137,6 @@
       (type-specifier (array-type-specialized-element-type
 		       (specifier-type `(array ,spec))))))
 
-(defun sb!xc:upgraded-complex-part-type (spec &optional environment)
-  #!+sb-doc
-  "Return the element type of the most specialized COMPLEX number type that
-   can hold parts of type SPEC."
-  (declare (ignore environment))
-  (if (unknown-type-p (specifier-type spec))
-      (error "undefined type: ~S" spec)
-      (let ((ctype (specifier-type `(complex ,spec))))
-	(cond
-	  ((eq ctype *empty-type*) '(eql 0))
-	  ((csubtypep ctype (specifier-type '(complex single-float)))
-	   'single-float)
-	  ((csubtypep ctype (specifier-type '(complex double-float)))
-	   'double-float)
-	  #!+long-float
-	  ((csubtypep ctype (specifier-type '(complex long-float)))
-	   'long-float)
-	  ((csubtypep ctype (specifier-type '(complex rational)))
-	   'rational)
-	  (t 'real)))))
-
 ;;; Return the most specific integer type that can be quickly checked that
 ;;; includes the given type.
 (defun containing-integer-type (subtype)

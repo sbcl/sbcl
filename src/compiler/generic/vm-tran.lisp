@@ -50,7 +50,7 @@
 	  ((simple-array character (*)) (data-vector-ref string index))
 	  ((simple-array nil (*)) (data-vector-ref string index))))))
 
-(deftransform hairy-data-vector-ref ((array index) (array t) *)
+(deftransform hairy-data-vector-ref ((array index) (array t) * :important t)
   "avoid runtime dispatch on array element type"
   (let ((element-ctype (extract-upgraded-element-type array))
 	(declared-element-ctype (extract-declared-element-type array)))
@@ -103,7 +103,8 @@
 
 (deftransform hairy-data-vector-set ((array index new-value)
 				     (array t t)
-				     *)
+				     *
+				     :important t)
   "avoid runtime dispatch on array element type"
   (let ((element-ctype (extract-upgraded-element-type array))
 	(declared-element-ctype (extract-declared-element-type array)))
@@ -152,7 +153,8 @@
 
 (deftransform %data-vector-and-index ((%array %index)
 				      (simple-array t)
-				      *)
+				      *
+				      :important t)
   ;; KLUDGE: why the percent signs?  Well, ARRAY and INDEX are
   ;; respectively exported from the CL and SB!INT packages, which
   ;; means that they're visible to all sorts of things.  If the
@@ -258,16 +260,16 @@
 			  (setf (%raw-bits result-bit-array index)
 				(,',wordfun (%raw-bits bit-array-1 index)
 					    (%raw-bits bit-array-2 index))))))))))
- (def bit-and 32bit-logical-and)
- (def bit-ior 32bit-logical-or)
- (def bit-xor 32bit-logical-xor)
- (def bit-eqv 32bit-logical-eqv)
- (def bit-nand 32bit-logical-nand)
- (def bit-nor 32bit-logical-nor)
- (def bit-andc1 32bit-logical-andc1)
- (def bit-andc2 32bit-logical-andc2)
- (def bit-orc1 32bit-logical-orc1)
- (def bit-orc2 32bit-logical-orc2))
+ (def bit-and 64bit-logical-and)
+ (def bit-ior 64bit-logical-or)
+ (def bit-xor 64bit-logical-xor)
+ (def bit-eqv 64bit-logical-eqv)
+ (def bit-nand 64bit-logical-nand)
+ (def bit-nor 64bit-logical-nor)
+ (def bit-andc1 64bit-logical-andc1)
+ (def bit-andc2 64bit-logical-andc2)
+ (def bit-orc1 64bit-logical-orc1)
+ (def bit-orc2 64bit-logical-orc2))
 
 (deftransform bit-not
 	      ((bit-array result-bit-array)
@@ -296,12 +298,12 @@
 				   sb!vm:n-word-bits))))
 	      ((= index end-1)
 	       (setf (%raw-bits result-bit-array index)
-		     (32bit-logical-not (%raw-bits bit-array index)))
+		     (64bit-logical-not (%raw-bits bit-array index)))
 	       result-bit-array)
 	    (declare (optimize (speed 3) (safety 0))
 		     (type index index end-1))
 	    (setf (%raw-bits result-bit-array index)
-		  (32bit-logical-not (%raw-bits bit-array index))))))))
+		  (64bit-logical-not (%raw-bits bit-array index))))))))
 
 (deftransform bit-vector-= ((x y) (simple-bit-vector simple-bit-vector))
   `(and (= (length x) (length y))
@@ -442,20 +444,27 @@
 (define-good-modular-fun logior)
 ;;; FIXME: XOR? ANDC1, ANDC2?  -- CSR, 2003-09-16
 
-(macrolet
-    ((def (name width)
-	 `(progn
-	    (defknown ,name (integer (integer 0)) (unsigned-byte ,width)
-		      (foldable flushable movable))
-	    (define-modular-fun-optimizer ash ((integer count) :width width)
-	      (when (and (<= width 32)
-			 (constant-lvar-p count) ;?
-			 (plusp (lvar-value count)))
-		(cut-to-width integer width)
-		',name))
-	    (setf (gethash ',name *modular-versions*) `(ash ,',width)))))
-  #!-alpha (def sb!vm::ash-left-mod32 32)
-  #!+alpha (def sb!vm::ash-left-mod64 64))
+#!-(or alpha x86-64)
+(progn
+  (defknown sb!vm::ash-left-mod32 (integer (integer 0)) (unsigned-byte 32)
+            (foldable flushable movable))
+  (define-modular-fun-optimizer ash ((integer count) :width width)
+    (when (and (<= width 32)
+               (constant-lvar-p count)  ; ?
+               (plusp (lvar-value count)))
+      (cut-to-width integer width)
+      'sb!vm::ash-left-mod32)))
+#!+(or alpha x86-64)
+(progn
+  (defknown sb!vm::ash-left-mod64 (integer (integer 0)) (unsigned-byte 64)
+            (foldable flushable movable))
+  (define-modular-fun-optimizer ash ((integer count) :width width)
+    (when (and (<= width 64)
+               (constant-lvar-p count)  ; ?
+               (plusp (lvar-value count)))
+      (cut-to-width integer width)
+      'sb!vm::ash-left-mod64)))
+
 
 ;;; There are two different ways the multiplier can be recoded. The
 ;;; more obvious is to shift X by the correct amount for each bit set

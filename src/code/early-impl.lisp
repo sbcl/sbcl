@@ -19,8 +19,8 @@
 		  *read-only-space-free-pointer*
 		  sb!vm:*static-space-free-pointer*
 		  sb!vm:*initial-dynamic-space-free-pointer*
-		  sb!vm::*current-catch-block*
-		  sb!vm::*current-unwind-protect-block*
+		  *current-catch-block*
+		  *current-unwind-protect-block*
 		  sb!vm::*alien-stack*
 		  #!+sb-thread sb!thread::*foreground-thread-stack*
 		  sb!vm::*control-stack-start*
@@ -33,8 +33,8 @@
 		  ;; :X86. (Note that non-X86 ports mention
 		  ;; pseudo-atomicity too, but they handle it without
 		  ;; messing with special variables.)
-		  #!+x86 *pseudo-atomic-atomic*
-		  #!+x86 *pseudo-atomic-interrupted*
+		  #!+(or x86 x86-64) *pseudo-atomic-atomic*
+		  #!+(or x86 x86-64) *pseudo-atomic-interrupted*
 		  sb!unix::*interrupts-enabled*
 		  sb!unix::*interrupt-pending*
 		  *free-interrupt-context-index*

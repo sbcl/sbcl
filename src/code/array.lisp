@@ -288,6 +288,10 @@
 		      (sort
 		       (copy-seq
 			sb!vm:*specialized-array-element-type-properties*)
+		       #+nil 
+		       (subseq 
+			sb!vm:*specialized-array-element-type-properties*
+			0 12)
 		       #'> :key #'sb!vm:saetp-importance)))))
 
 ;;; (Ordinary DATA-VECTOR-REF usage compiles into a vop, but
@@ -538,25 +542,7 @@
 	 (error "Axis number ~W is too big; ~S only has ~D dimension~:P."
 		axis-number array (%array-rank array)))
 	(t
-	 ;; ANSI sayeth (ADJUST-ARRAY dictionary entry): 
-	 ;; 
-	 ;;   "If A is displaced to B, the consequences are
-	 ;;   unspecified if B is adjusted in such a way that it no
-	 ;;   longer has enough elements to satisfy A.
-	 ;;
-	 ;; In situations where this matters we should be doing a
-	 ;; bounds-check, which in turn uses ARRAY-DIMENSION -- so
-	 ;; this seems like a good place to signal an error.
-	 (multiple-value-bind (target offset) (array-displacement array)
-	   (when (and target 
-		      (> (array-total-size array)
-			 (- (array-total-size target) offset)))
-	       (error 'displaced-to-array-too-small-error
-		      :format-control "~@<The displaced-to array is too small. ~S ~
-                                      elements after offset required, ~S available.~:@>"
-		      :format-arguments (list (array-total-size array) 
-					      (- (array-total-size target) offset))))
-	   (%array-dimension array axis-number)))))
+	 (%array-dimension array axis-number))))
 
 (defun array-dimensions (array)
   #!+sb-doc
@@ -591,10 +577,6 @@
   "Return T if (ADJUST-ARRAY ARRAY...) would return an array identical
    to the argument, this happens for complex arrays."
   (declare (array array))
-  ;; Note that this appears not to be a fundamental limitation.
-  ;; non-vector SIMPLE-ARRAYs are in fact capable of being adjusted,
-  ;; but in practice we test using ADJUSTABLE-ARRAY-P in ADJUST-ARRAY.
-  ;; -- CSR, 2004-03-01.
   (not (typep array 'simple-array)))
 
 ;;;; fill pointer frobbing stuff
@@ -661,9 +643,7 @@
     (declare (fixnum fill-pointer))
     (when (= fill-pointer (%array-available-elements vector))
       (adjust-array vector (+ fill-pointer extension)))
-    ;; disable bounds checking
-    (locally (declare (optimize (safety 0)))
-      (setf (aref vector fill-pointer) new-element))
+    (setf (aref vector fill-pointer) new-element)
     (setf (%array-fill-pointer vector) (1+ fill-pointer))
     fill-pointer))
 
@@ -676,12 +656,9 @@
     (declare (fixnum fill-pointer))
     (if (zerop fill-pointer)
 	(error "There is nothing left to pop.")
-	;; disable bounds checking (and any fixnum test)
-	(locally (declare (optimize (safety 0)))
-	  (aref array
-		(setf (%array-fill-pointer array)
-		      (1- fill-pointer)))))))
-
+	(aref array
+	      (setf (%array-fill-pointer array)
+		    (1- fill-pointer))))))
 
 ;;;; ADJUST-ARRAY
 
@@ -702,9 +679,8 @@
 		  element-type)))
     (let ((array-rank (length (the list dimensions))))
       (declare (fixnum array-rank))
-      (unless (= array-rank 1)
-	(when fill-pointer
-	  (error "Only vectors can have fill pointers.")))
+      (when (and fill-pointer (> array-rank 1))
+	(error "Multidimensional arrays can't have fill pointers."))
       (cond (initial-contents-p
 	     ;; array former contents replaced by INITIAL-CONTENTS
 	     (if (or initial-element-p displaced-to)
@@ -798,15 +774,8 @@
 				       new-data dimensions new-length
 				       element-type initial-element
 				       initial-element-p))
-		   (if (adjustable-array-p array)
-		       (set-array-header array new-data new-length
-					 new-length 0 dimensions nil)
-		       (let ((new-array
-			      (make-array-header
-			       sb!vm:simple-array-widetag array-rank)))
-			 (set-array-header new-array new-data new-length
-					   new-length 0 dimensions nil)))))))))))
-  
+		   (set-array-header array new-data new-length
+				     new-length 0 dimensions nil)))))))))
 
 (defun get-new-fill-pointer (old-array new-array-size fill-pointer)
   (cond ((not fill-pointer)
@@ -935,7 +904,7 @@
     (macrolet ((bump-index-list (index limits)
 		 `(do ((subscripts ,index (cdr subscripts))
 		       (limits ,limits (cdr limits)))
-		      ((null subscripts) :eof)
+		      ((null subscripts) nil)
 		    (cond ((< (the fixnum (car subscripts))
 			      (the fixnum (car limits)))
 			   (rplaca subscripts
@@ -944,7 +913,7 @@
 			  (t (rplaca subscripts 0))))))
       (do ((index (make-list (length old-dims) :initial-element 0)
 		  (bump-index-list index limits)))
-	  ((eq index :eof))
+	  ((null index))
 	(setf (aref new-data (row-major-index-from-dims index new-dims))
 	      (aref old-data
 		    (+ (the fixnum (row-major-index-from-dims index old-dims))
@@ -992,7 +961,6 @@
 
 (defmacro def-bit-array-op (name function)
   `(defun ,name (bit-array-1 bit-array-2 &optional result-bit-array)
-     #!+sb-doc
      ,(format nil
 	      "Perform a bit-wise ~A on the elements of BIT-ARRAY-1 and ~
 	      BIT-ARRAY-2,~%  putting the results in RESULT-BIT-ARRAY. ~

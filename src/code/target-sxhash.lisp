@@ -36,10 +36,9 @@
 ;;;   * We'd like this to be simple and fast, too.
 ;;;
 ;;; FIXME: Should this be INLINE?
-(declaim (ftype (sfunction ((and fixnum unsigned-byte)
-                            (and fixnum unsigned-byte))
-                           (and fixnum unsigned-byte))
-                mix))
+(declaim (ftype (function ((and fixnum unsigned-byte)
+			   (and fixnum unsigned-byte))
+			  (and fixnum unsigned-byte)) mix))
 (defun mix (x y)
   ;; FIXME: We wouldn't need the nasty (SAFETY 0) here if the compiler
   ;; were smarter about optimizing ASH. (Without the THE FIXNUM below,
@@ -64,53 +63,32 @@
   ;; algorithms, but we're not pushing them hard enough here for them
   ;; to be cryptographically strong.)
   (let* ((xy (+ (* x 3) y)))
-    (logand most-positive-fixnum
+    (logand 536870911 ; FIXME was most-positive-fixnum
             (logxor 441516657
                     xy
                     (ash xy -5)))))
 
 ;;;; hashing strings
 ;;;;
-;;;; Note that this operation is used in compiler symbol table
-;;;; lookups, so we'd like it to be fast.
-;;;;
-;;;; As of 2004-03-10, we implement the one-at-a-time algorithm
-;;;; designed by Bob Jenkins (see
-;;;; <http://burtleburtle.net/bob/hash/doobs.html> for some more
-;;;; information).
+;;;; Note that this operation is used in compiler symbol table lookups, so we'd
+;;;; like it to be fast.
 
 #!-sb-fluid (declaim (inline %sxhash-substring))
 (defun %sxhash-substring (string &optional (count (length string)))
   ;; FIXME: As in MIX above, we wouldn't need (SAFETY 0) here if the
-  ;; cross-compiler were smarter about ASH, but we need it for
-  ;; sbcl-0.5.0m.  (probably no longer true?  We might need SAFETY 0
-  ;; to elide some type checks, but then again if this is inlined in
-  ;; all the critical places, we might not -- CSR, 2004-03-10)
+  ;; cross-compiler were smarter about ASH, but we need it for sbcl-0.5.0m.
   (declare (optimize (speed 3) (safety 0)))
   (declare (type string string))
   (declare (type index count))
-  (let ((result 0))
-    (declare (type (unsigned-byte 32) result))
+  (let ((result 408967240))
+    (declare (type fixnum result))
     (unless (typep string '(vector nil))
       (dotimes (i count)
 	(declare (type index i))
-	(setf result
-	      (ldb (byte 32 0)
-		   (+ result (char-code (aref string i)))))
-	(setf result
-	      (ldb (byte 32 0)
-		   (+ result (ash result 10))))
-	(setf result
-	      (logxor result (ash result -6)))))
-    (setf result
-	  (ldb (byte 32 0)
-	       (+ result (ash result 3))))
-    (setf result
-	  (logxor result (ash result -11)))
-    (setf result
-	  (ldb (byte 32 0)
-	       (logxor result (ash result 15))))
-    (logand result most-positive-fixnum)))
+	(mixf result
+	      (the fixnum
+		(ash (char-code (aref string i)) 5)))))
+    result))
 ;;; test:
 ;;;   (let ((ht (make-hash-table :test 'equal)))
 ;;;     (do-all-symbols (symbol)
@@ -125,31 +103,15 @@
 (defun %sxhash-simple-string (x)
   (declare (optimize speed))
   (declare (type simple-string x))
-  ;; KLUDGE: this FLET is a workaround (suggested by APD) for presence
-  ;; of let conversion in the cross compiler, which otherwise causes
-  ;; strongly suboptimal register allocation.
-  (flet ((trick (x)
-           (%sxhash-substring x)))
-    (declare (notinline trick))
-    (trick x)))
+  (%sxhash-substring x))
 
 (defun %sxhash-simple-substring (x count)
   (declare (optimize speed))
   (declare (type simple-string x))
   (declare (type index count))
-  ;; see comment in %SXHASH-SIMPLE-STRING
-  (flet ((trick (x count)
-	   (%sxhash-substring x count)))
-    (declare (notinline trick))
-    (trick x count)))
+  (%sxhash-substring x count))
 
 ;;;; the SXHASH function
-
-;; simple cases
-(declaim (ftype (sfunction (integer) (integer 0 #.sb!xc:most-positive-fixnum))
-                sxhash-bignum))
-(declaim (ftype (sfunction (t) (integer 0 #.sb!xc:most-positive-fixnum))
-                sxhash-instance))
 
 (defun sxhash (x)
   ;; profiling SXHASH is hard, but we might as well try to make it go

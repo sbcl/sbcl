@@ -27,16 +27,21 @@
 	   simple-array-unsigned-byte-2-p
 	   simple-array-unsigned-byte-4-p simple-array-unsigned-byte-7-p
 	   simple-array-unsigned-byte-8-p simple-array-unsigned-byte-15-p
-	   simple-array-unsigned-byte-16-p simple-array-unsigned-byte-29-p
+	   simple-array-unsigned-byte-16-p 
+	   #!-x86-64 simple-array-unsigned-byte-29-p
 	   simple-array-unsigned-byte-31-p
 	   simple-array-unsigned-byte-32-p
+	   #!+x86-64 simple-array-unsigned-byte-60-p
+	   #!+x86-64 simple-array-unsigned-byte-63-p
+	   #!+x86-64 simple-array-unsigned-byte-64-p
 	   simple-array-signed-byte-8-p simple-array-signed-byte-16-p
-	   simple-array-signed-byte-30-p simple-array-signed-byte-32-p
+	   #!-x86-64 simple-array-signed-byte-30-p 
+	   simple-array-signed-byte-32-p
+	   #!+x86-64 simple-array-signed-byte-61-p
+	   #!+x86-64 simple-array-signed-byte-64-p
 	   simple-array-single-float-p simple-array-double-float-p
-	   #!+long-float simple-array-long-float-p
 	   simple-array-complex-single-float-p
 	   simple-array-complex-double-float-p
-	   #!+long-float simple-array-complex-long-float-p
 	   system-area-pointer-p realp unsigned-byte-32-p signed-byte-32-p
 	   vector-t-p weak-pointer-p code-component-p lra-p
 	   funcallable-instance-p)
@@ -54,12 +59,6 @@
 
 (defknown %sxhash-simple-substring (simple-string index) index
   (foldable flushable))
-
-(defknown symbol-hash (symbol) (integer 0 #.sb!xc:most-positive-fixnum)
-  (flushable movable))
-
-(defknown %set-symbol-hash (symbol (integer 0 #.sb!xc:most-positive-fixnum))
-  t (unsafe))
 
 (defknown vector-length (vector) index (flushable))
 
@@ -128,9 +127,9 @@
   (unsafe))
 
 
-(defknown %raw-bits (t fixnum) (unsigned-byte 32)
+(defknown %raw-bits (t fixnum) (unsigned-byte 64)
   (foldable flushable))
-(defknown (%set-raw-bits) (t fixnum (unsigned-byte 32)) (unsigned-byte 32)
+(defknown (%set-raw-bits) (t fixnum (unsigned-byte 64)) (unsigned-byte 64)
   (unsafe))
 
 
@@ -164,8 +163,8 @@
 (defknown %set-stack-ref (system-area-pointer index t) t (unsafe))
 (defknown lra-code-header (t) t (movable flushable))
 (defknown fun-code-header (t) t (movable flushable))
-(defknown make-lisp-obj ((unsigned-byte 32)) t (movable flushable))
-(defknown get-lisp-obj-address (t) (unsigned-byte 32) (movable flushable))
+(defknown make-lisp-obj ((unsigned-byte 64)) t (movable flushable))
+(defknown get-lisp-obj-address (t) (unsigned-byte 64) (movable flushable))
 (defknown fun-word-offset (function) index (movable flushable))
 
 ;;;; 32-bit logical operations
@@ -174,19 +173,19 @@
   (unsigned-byte 32)
   (foldable flushable movable))
 
-(defknown 32bit-logical-not ((unsigned-byte 32)) (unsigned-byte 32)
+(defknown 64bit-logical-not ((unsigned-byte 64)) (unsigned-byte 64)
   (foldable flushable movable))
 
-(defknown (32bit-logical-and 32bit-logical-nand
-	   32bit-logical-or 32bit-logical-nor
-	   32bit-logical-xor 32bit-logical-eqv
-	   32bit-logical-andc1 32bit-logical-andc2
-	   32bit-logical-orc1 32bit-logical-orc2)
-	  ((unsigned-byte 32) (unsigned-byte 32)) (unsigned-byte 32)
+(defknown (64bit-logical-and 64bit-logical-nand
+	   64bit-logical-or 64bit-logical-nor
+	   64bit-logical-xor 64bit-logical-eqv
+	   64bit-logical-andc1 64bit-logical-andc2
+	   64bit-logical-orc1 64bit-logical-orc2)
+	  ((unsigned-byte 64) (unsigned-byte 64)) (unsigned-byte 64)
   (foldable flushable movable))
 
-(defknown (shift-towards-start shift-towards-end) ((unsigned-byte 32) fixnum)
-  (unsigned-byte 32)
+(defknown (shift-towards-start shift-towards-end) ((unsigned-byte 64) fixnum)
+  (unsigned-byte 64)
   (foldable flushable movable))
 
 ;;;; bignum operations

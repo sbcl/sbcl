@@ -61,9 +61,9 @@
   (flushable movable))
 (defknown deport (alien alien-type) t
   (flushable movable))
-(defknown extract-alien-value (system-area-pointer unsigned-byte alien-type) t
+(defknown extract-alien-value (system-area-pointer index alien-type) t
   (flushable))
-(defknown deposit-alien-value (system-area-pointer unsigned-byte alien-type t) t
+(defknown deposit-alien-value (system-area-pointer index alien-type t) t
   ())
 
 (defknown alien-funcall (alien-value &rest *) *
@@ -346,14 +346,16 @@
     (/noshow (local-alien-info-force-to-memory-p info))
     (/noshow alien-type (unparse-alien-type alien-type) (alien-type-bits alien-type))
     (if (local-alien-info-force-to-memory-p info)
-      #!+x86 `(truly-the system-area-pointer
-			 (%primitive alloc-alien-stack-space
-				     ,(ceiling (alien-type-bits alien-type)
-					       sb!vm:n-byte-bits)))
-      #!-x86 `(truly-the system-area-pointer
-			 (%primitive alloc-number-stack-space
-				     ,(ceiling (alien-type-bits alien-type)
-					       sb!vm:n-byte-bits)))
+      #!+(or x86 x86-64)
+      `(truly-the system-area-pointer
+		  (%primitive alloc-alien-stack-space
+			      ,(ceiling (alien-type-bits alien-type)
+					sb!vm:n-byte-bits)))
+      #!-(or x86 x86-64)
+      `(truly-the system-area-pointer
+		  (%primitive alloc-number-stack-space
+			      ,(ceiling (alien-type-bits alien-type)
+					sb!vm:n-byte-bits)))
       (let* ((alien-rep-type-spec (compute-alien-rep-type alien-type))
 	     (alien-rep-type (specifier-type alien-rep-type-spec)))
 	(cond ((csubtypep (specifier-type 'system-area-pointer)
@@ -434,12 +436,14 @@
   (let* ((info (lvar-value info))
 	 (alien-type (local-alien-info-type info)))
     (if (local-alien-info-force-to-memory-p info)
-      #!+x86 `(%primitive dealloc-alien-stack-space
-			  ,(ceiling (alien-type-bits alien-type)
-				    sb!vm:n-byte-bits))
-      #!-x86 `(%primitive dealloc-number-stack-space
-			  ,(ceiling (alien-type-bits alien-type)
-				    sb!vm:n-byte-bits))
+      #!+(or x86 x86-64)
+      `(%primitive dealloc-alien-stack-space
+		   ,(ceiling (alien-type-bits alien-type)
+			     sb!vm:n-byte-bits))
+      #!-(or x86 x86-64)
+      `(%primitive dealloc-number-stack-space
+		   ,(ceiling (alien-type-bits alien-type)
+			     sb!vm:n-byte-bits))
       nil)))
 
 ;;;; %CAST
@@ -520,8 +524,7 @@
 	 (count-low-order-zeros (lvar-value thing))
 	 (count-low-order-zeros (lvar-uses thing))))
     (combination
-     (case (let ((name (lvar-fun-name (combination-fun thing))))
-             (or (modular-version-info name) name))
+     (case (lvar-fun-name (combination-fun thing))
        ((+ -)
 	(let ((min most-positive-fixnum)
 	      (itype (specifier-type 'integer)))
@@ -554,13 +557,10 @@
 	 (do ((result 0 (1+ result))
 	      (num thing (ash num -1)))
 	     ((logbitp 0 num) result))))
-    (cast
-     (count-low-order-zeros (cast-value thing)))
     (t
      0)))
 
 (deftransform / ((numerator denominator) (integer integer))
-  "convert x/2^k to shift"
   (unless (constant-lvar-p denominator)
     (give-up-ir1-transform))
   (let* ((denominator (lvar-value denominator))
@@ -574,29 +574,20 @@
 
 (deftransform ash ((value amount))
   (let ((value-node (lvar-uses value)))
-    (unless (combination-p value-node)
+    (unless (and (combination-p value-node)
+		 (eq (lvar-fun-name (combination-fun value-node))
+		     'ash))
       (give-up-ir1-transform))
-    (let ((inside-fun-name (lvar-fun-name (combination-fun value-node))))
-      (multiple-value-bind (prototype width)
-          (modular-version-info inside-fun-name)
-        (unless (eq (or prototype inside-fun-name) 'ash)
-          (give-up-ir1-transform))
-        (when (and width (not (constant-lvar-p amount)))
-          (give-up-ir1-transform))
-        (let ((inside-args (combination-args value-node)))
-          (unless (= (length inside-args) 2)
-            (give-up-ir1-transform))
-          (let ((inside-amount (second inside-args)))
-            (unless (and (constant-lvar-p inside-amount)
-                         (not (minusp (lvar-value inside-amount))))
-              (give-up-ir1-transform)))
-          (extract-fun-args value inside-fun-name 2)
-          (if width
-              `(lambda (value amount1 amount2)
-                 (logand (ash value (+ amount1 amount2))
-                         ,(1- (ash 1 (+ width (lvar-value amount))))))
-              `(lambda (value amount1 amount2)
-                 (ash value (+ amount1 amount2)))))))))
+    (let ((inside-args (combination-args value-node)))
+      (unless (= (length inside-args) 2)
+	(give-up-ir1-transform))
+      (let ((inside-amount (second inside-args)))
+	(unless (and (constant-lvar-p inside-amount)
+		     (not (minusp (lvar-value inside-amount))))
+	  (give-up-ir1-transform)))))
+  (extract-fun-args value 'ash 2)
+  '(lambda (value amount1 amount2)
+     (ash value (+ amount1 amount2))))
 
 ;;;; ALIEN-FUNCALL support
 
@@ -678,29 +669,32 @@
 	(let* ((arg (pop args))
 	       (sc (tn-sc tn))
 	       (scn (sc-number sc))
-	       #!-x86 (temp-tn (make-representation-tn (tn-primitive-type tn)
-						       scn))
+	       #!-(or x86 x86-64)
+	       (temp-tn (make-representation-tn (tn-primitive-type tn)
+						scn))
 	       (move-arg-vops (svref (sc-move-arg-vops sc) scn)))
 	  (aver arg)
 	  (unless (= (length move-arg-vops) 1)
 	    (error "no unique move-arg-vop for moves in SC ~S" (sc-name sc)))
-	  #!+x86 (emit-move-arg-template call
-					 block
-					 (first move-arg-vops)
-					 (lvar-tn call block arg)
-					 nsp
-					 tn)
-	  #!-x86 (progn
-		   (emit-move call
-			      block
-			      (lvar-tn call block arg)
-			      temp-tn)
-		   (emit-move-arg-template call
-					   block
-					   (first move-arg-vops)
-					   temp-tn
-					   nsp
-					   tn))))
+	  #!+(or x86 x86-64)
+	  (emit-move-arg-template call
+				  block
+				  (first move-arg-vops)
+				  (lvar-tn call block arg)
+				  nsp
+				  tn)
+	  #!-(or x86 x86-64)
+	  (progn
+	    (emit-move call
+		       block
+		       (lvar-tn call block arg)
+		       temp-tn)
+	    (emit-move-arg-template call
+				    block
+				    (first move-arg-vops)
+				    temp-tn
+				    nsp
+				    tn))))
       (aver (null args))
       (unless (listp result-tns)
 	(setf result-tns (list result-tns)))

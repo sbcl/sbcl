@@ -1,6 +1,5 @@
 #include <stdlib.h>
 #include <stdio.h>
-#include <string.h>
 #include <sched.h>
 #include <signal.h>
 #include <stddef.h>
@@ -48,7 +47,6 @@ initial_thread_trampoline(struct thread *th)
  * whatever other bookkeeping needs to be done
  */
 
-#ifdef LISP_FEATURE_SB_THREAD
 int
 new_thread_trampoline(struct thread *th)
 {
@@ -63,7 +61,6 @@ new_thread_trampoline(struct thread *th)
     th->state=STATE_RUNNING;
     return funcall0(function);
 }
-#endif /* LISP_FEATURE_SB_THREAD */
 
 /* this is called from any other thread to create the new one, and
  * initialize all parts of it that can be initialized from another 
@@ -158,7 +155,7 @@ struct thread * create_thread_struct(lispobj initial_function) {
     SetSymbolValue(BINDING_STACK_START,th->binding_stack_start,th);
     SetSymbolValue(CONTROL_STACK_START,th->control_stack_start,th);
     SetSymbolValue(CONTROL_STACK_END,th->control_stack_end,th);
-#ifdef LISP_FEATURE_X86
+#if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
     SetSymbolValue(BINDING_STACK_POINTER,th->binding_stack_pointer,th);
     SetSymbolValue(ALIEN_STACK,th->alien_stack_pointer,th);
     SetSymbolValue(PSEUDO_ATOMIC_ATOMIC,th->pseudo_atomic_atomic,th);
@@ -206,7 +203,7 @@ void link_thread(struct thread *th,pid_t kid_pid)
     th->pid=kid_pid;		/* child will not start until this is set */
 }
 
-void create_initial_thread(lispobj initial_function) {
+pid_t create_initial_thread(lispobj initial_function) {
     struct thread *th=create_thread_struct(initial_function);
     pid_t kid_pid=getpid();
     if(th && kid_pid>0) {
@@ -215,7 +212,7 @@ void create_initial_thread(lispobj initial_function) {
     } else lose("can't create initial thread");
 }
 
-#ifdef LISP_FEATURE_SB_THREAD
+#ifdef LISP_FEATURE_LINUX
 pid_t create_thread(lispobj initial_function) {
     struct thread *th=create_thread_struct(initial_function);
     pid_t kid_pid=clone(new_thread_trampoline,
@@ -350,7 +347,7 @@ void gc_start_the_world()
     for(p=all_threads;p;p=p->next) {
 	if(p==th) continue;
 	p->state=STATE_RUNNING;
-	kill(p->pid,SIG_STOP_FOR_GC);
+	kill(p->pid,SIGCONT);
     }
     release_spinlock(&all_threads_lock);
 }

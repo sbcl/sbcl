@@ -35,9 +35,7 @@ void bind_variable(lispobj symbol, lispobj value, void *th)
     lispobj old_tl_value;
     struct binding *binding;
     struct thread *thread=(struct thread *)th;
-#ifdef LISP_FEATURE_SB_THREAD
     struct symbol *sym=(struct symbol *)native_pointer(symbol);
-#endif
     binding = GetBSP();
     SetBSP(binding+1);
 #ifdef LISP_FEATURE_SB_THREAD

@@ -1091,12 +1091,34 @@
       :direct-superclasses (vector simple-array)
       :inherits (vector simple-array array sequence)
       :prototype-form (make-array 0 :element-type '(unsigned-byte 16)))
+     #!-x86-64
      (simple-array-unsigned-byte-29
       :translation (simple-array (unsigned-byte 29) (*))
       :codes (#.sb!vm:simple-array-unsigned-byte-29-widetag)
       :direct-superclasses (vector simple-array)
       :inherits (vector simple-array array sequence)
       :prototype-form (make-array 0 :element-type '(unsigned-byte 29)))
+     #!+x86-64
+     (simple-array-unsigned-byte-60
+      :translation (simple-array (unsigned-byte 60) (*))
+      :codes (#.sb!vm:simple-array-unsigned-byte-60-widetag)
+      :direct-superclasses (vector simple-array)
+      :inherits (vector simple-array array sequence)
+      :prototype-form (make-array 0 :element-type '(unsigned-byte 60)))
+     #!+x86-64
+     (simple-array-unsigned-byte-63
+      :translation (simple-array (unsigned-byte 63) (*))
+      :codes (#.sb!vm:simple-array-unsigned-byte-63-widetag)
+      :direct-superclasses (vector simple-array)
+      :inherits (vector simple-array array sequence)
+      :prototype-form (make-array 0 :element-type '(unsigned-byte 63)))
+     #!+x86-64
+     (simple-array-unsigned-byte-64
+      :translation (simple-array (unsigned-byte 64) (*))
+      :codes (#.sb!vm:simple-array-unsigned-byte-64-widetag)
+      :direct-superclasses (vector simple-array)
+      :inherits (vector simple-array array sequence)
+      :prototype-form (make-array 0 :element-type '(unsigned-byte 64)))
      (simple-array-unsigned-byte-31
       :translation (simple-array (unsigned-byte 31) (*))
       :codes (#.sb!vm:simple-array-unsigned-byte-31-widetag)
@@ -1121,6 +1143,7 @@
       :direct-superclasses (vector simple-array)
       :inherits (vector simple-array array sequence)
       :prototype-form (make-array 0 :element-type '(signed-byte 16)))
+     #!-x86-64
      (simple-array-signed-byte-30
       :translation (simple-array (signed-byte 30) (*))
       :codes (#.sb!vm:simple-array-signed-byte-30-widetag)
@@ -1133,6 +1156,21 @@
       :direct-superclasses (vector simple-array)
       :inherits (vector simple-array array sequence)
       :prototype-form (make-array 0 :element-type '(signed-byte 32)))
+     #!+x86-64
+     (simple-array-signed-byte-61
+      :translation (simple-array (signed-byte 61) (*))
+      :codes (#.sb!vm:simple-array-signed-byte-61-widetag)
+      :direct-superclasses (vector simple-array)
+      :inherits (vector simple-array array sequence)
+      :prototype-form (make-array 0 :element-type '(signed-byte 61)))
+     #!+x86-64
+     (simple-array-signed-byte-64
+      :translation (simple-array (signed-byte 64) (*))
+      :codes (#.sb!vm:simple-array-signed-byte-64-widetag)
+      :direct-superclasses (vector simple-array)
+      :inherits (vector simple-array array sequence)
+      :prototype-form (make-array 0 :element-type '(signed-byte 64)))
+
      (simple-array-single-float
       :translation (simple-array single-float (*))
       :codes (#.sb!vm:simple-array-single-float-widetag)
@@ -1379,6 +1417,11 @@
 	     (warn "something strange with forward layout for ~S:~%  ~S"
 		   name
 		   layout))))))
+
+;;; a vector that maps type codes to layouts, used for quickly finding
+;;; the layouts of built-in classes
+(defvar *built-in-class-codes*) ; initialized in cold load
+(declaim (type simple-vector *built-in-class-codes*))
 
 (!cold-init-forms
   #-sb-xc-host (/show0 "about to set *BUILT-IN-CLASS-CODES*")

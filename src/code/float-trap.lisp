@@ -22,19 +22,14 @@
 	(cons :inexact float-inexact-trap-bit)
 	(cons :invalid float-invalid-trap-bit)
 	(cons :divide-by-zero float-divide-by-zero-trap-bit)
-	#!+x86 (cons :denormalized-operand float-denormal-trap-bit)))
+	#!+(or x86 x86-64)
+	(cons :denormalized-operand float-denormal-trap-bit)))
 
 (defparameter *rounding-mode-alist*
   (list (cons :nearest float-round-to-nearest)
 	(cons :zero float-round-to-zero)
 	(cons :positive-infinity float-round-to-positive)
 	(cons :negative-infinity float-round-to-negative)))
-
-#!+x86
-(defparameter *precision-mode-alist*
-  (list (cons :24-bit float-precision-24-bit)
-	(cons :53-bit float-precision-53-bit)
-	(cons :64-bit float-precision-64-bit)))
 
 ;;; Return a mask with all the specified float trap bits set.
 (defun float-trap-mask (names)
@@ -80,9 +75,6 @@
 ;;;    have this feature, and some SBCL ports don't implement it anyway
 ;;;    -- in such cases the value is always NIL.
 ;;;
-;;;:PRECISION (x86 only) :24-bit, :53-bit and :64-bit, for the
-;;;internal precision of the mantissa.
-;;;
 ;;; GET-FLOATING-POINT-MODES may be used to find the floating point modes
 ;;; currently in effect.    See cold-init.lisp for the list of initially
 ;;; enabled traps
@@ -91,8 +83,7 @@
 				      (rounding-mode nil round-p)
 				      (current-exceptions nil current-x-p)
 				      (accrued-exceptions nil accrued-x-p)
-				      (fast-mode nil fast-mode-p)
-				 #!+x86 (precision nil precisionp))
+				      (fast-mode nil fast-mode-p))
   (let ((modes (floating-point-modes)))
     (when traps-p
       (setf (ldb float-traps-byte modes) (float-trap-mask traps)))
@@ -110,11 +101,6 @@
       (if fast-mode
 	  (setq modes (logior float-fast-bit modes))
 	  (setq modes (logand (lognot float-fast-bit) modes))))
-    #!+x86
-    (when precisionp
-      (setf (ldb float-precision-control modes)
-	    (or (cdr (assoc precision *precision-mode-alist*))
-		(error "unknown precision mode: ~S" precision))))
     ;; FIXME: This apparently doesn't work on Darwin
     #!-darwin (setf (floating-point-modes) modes))
 
@@ -142,10 +128,7 @@
 				     *rounding-mode-alist*))
 	:current-exceptions ,(exc-keys (ldb float-exceptions-byte modes))
 	:accrued-exceptions ,(exc-keys (ldb float-sticky-bits modes))
-	:fast-mode ,(logtest float-fast-bit modes)
-	#!+x86 :precision
-	#!+x86 ,(car (rassoc (ldb float-precision-control modes)
-			     *precision-mode-alist*))))))
+	:fast-mode ,(logtest float-fast-bit modes)))))
 
 ;;; Return true if any of the named traps are currently trapped, false
 ;;; otherwise.
@@ -155,7 +138,7 @@
 
 ;;; Signal the appropriate condition when we get a floating-point error.
 (defun sigfpe-handler (signal info context)
-  (declare (ignore signal info))
+  (declare (ignore signal info context))
   (declare (type system-area-pointer context))
   (let* ((modes (context-floating-point-modes
 		 (sb!alien:sap-alien context (* os-context-t))))

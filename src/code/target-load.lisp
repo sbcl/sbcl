@@ -165,7 +165,7 @@
   #!+sb-doc
   "Load the file given by FILESPEC into the Lisp environment, returning
    T on success."
-  (declare (ignore external-format))
+
   (let ((*load-depth* (1+ *load-depth*))
 	;; KLUDGE: I can't find in the ANSI spec where it says that
 	;; DECLAIM/PROCLAIM of optimization policy should have file
@@ -211,7 +211,7 @@
 
 ;;; Load a code object. BOX-NUM objects are popped off the stack for
 ;;; the boxed storage section, then SIZE bytes of code are read in.
-#!-x86
+#!-(or x86 x86-64)
 (defun load-code (box-num code-length)
   (declare (fixnum box-num code-length))
   (with-fop-stack t
@@ -237,7 +237,7 @@
 ;;; all these code objects. After a purify these fixups can be
 ;;; dropped. In CMU CL, this policy was enabled with
 ;;; *ENABLE-DYNAMIC-SPACE-CODE*; in SBCL it's always used.
-#!+x86
+#!+(or x86 x86-64)
 (defun load-code (box-num code-length)
   (declare (fixnum box-num code-length))
   (with-fop-stack t

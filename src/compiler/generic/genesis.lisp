@@ -300,7 +300,9 @@
 			   (- unsigned #x40000000)
 			   unsigned))))
 	    ((or (= lowtag sb!vm:other-immediate-0-lowtag)
-		 (= lowtag sb!vm:other-immediate-1-lowtag))
+		 (= lowtag sb!vm:other-immediate-1-lowtag)
+		 (= lowtag sb!vm:other-immediate-2-lowtag)
+		 (= lowtag sb!vm:other-immediate-3-lowtag))
 	     (format stream
 		     "for other immediate: #X~X, type #b~8,'0B"
 		     (ash (descriptor-bits des) (- sb!vm:n-widetag-bits))
@@ -798,9 +800,11 @@
 					 (1- sb!vm:symbol-size)
 					 sb!vm:symbol-header-widetag)))
     (write-wordindexed symbol sb!vm:symbol-value-slot *unbound-marker*)
+    #!+(or x86 x86-64)
     (write-wordindexed symbol
 		       sb!vm:symbol-hash-slot
-		       (make-fixnum-descriptor 0))
+		       (make-fixnum-descriptor
+			(1+ (random sb!xc:most-positive-fixnum))))
     (write-wordindexed symbol sb!vm:symbol-plist-slot *nil-descriptor*)
     (write-wordindexed symbol sb!vm:symbol-name-slot
 		       (string-to-core name *dynamic*))
@@ -1261,8 +1265,8 @@
     (frob sb!di::handle-fun-end-breakpoint)
     (frob sb!thread::handle-thread-exit))
 
-  (cold-set 'sb!vm::*current-catch-block*          (make-fixnum-descriptor 0))
-  (cold-set 'sb!vm::*current-unwind-protect-block* (make-fixnum-descriptor 0))
+  (cold-set '*current-catch-block*          (make-fixnum-descriptor 0))
+  (cold-set '*current-unwind-protect-block* (make-fixnum-descriptor 0))
 
   (cold-set '*free-interrupt-context-index* (make-fixnum-descriptor 0))
 
@@ -1793,19 +1797,25 @@
 		  (+ gspace-byte-address
 		     (descriptor-byte-offset code-object))))
 	 (ecase kind
+	   (:absolute64
+	    (let ((fixed-up (+ value un-fixed-up)))
+	      (setf (bvref-word gspace-bytes gspace-byte-offset)
+		    fixed-up)
+	      ;; Note absolute fixups that point within the object.
+	      ;; XXX we could sensibly use RIP-relative addressing
+	      ;; for this and bypass the necessity for fixups here
+	      (unless (< fixed-up code-object-start-addr)
+		(multiple-value-bind (lo hi) (sb!vm::dwords-for-quad value)
+		  (note-load-time-code-fixup code-object
+					     after-header
+					     lo kind)
+		  (note-load-time-code-fixup 
+		   code-object (+ after-header sb!vm:n-word-bytes) 
+		   hi :absolute-high)))))
 	   (:absolute
 	    (let ((fixed-up (+ value un-fixed-up)))
 	      (setf (bvref-32 gspace-bytes gspace-byte-offset)
 		    fixed-up)
-	      ;; comment from CMU CL sources:
-	      ;;
-	      ;; Note absolute fixups that point within the object.
-	      ;; KLUDGE: There seems to be an implicit assumption in
-	      ;; the old CMU CL code here, that if it doesn't point
-	      ;; before the object, it must point within the object
-	      ;; (not beyond it). It would be good to add an
-	      ;; explanation of why that's true, or an assertion that
-	      ;; it's really true, or both.
 	      (unless (< fixed-up code-object-start-addr)
 		(note-load-time-code-fixup code-object
 					   after-header
@@ -2433,12 +2443,12 @@
 		       ;; itself.) Ask on the mailing list whether
 		       ;; this is documented somewhere, and if not,
 		       ;; try to reverse engineer some documentation.
-		       #!-x86
+		       #!-(or x86 x86-64)
 		       ;; a pointer back to the function object, as
 		       ;; described in CMU CL
 		       ;; src/docs/internals/object.tex
 		       fn
-		       #!+x86
+		       #!+(or x86 x86-64)
 		       ;; KLUDGE: a pointer to the actual code of the
 		       ;; object, as described nowhere that I can find
 		       ;; -- WHN 19990907
@@ -3057,7 +3067,7 @@ initially undefined function references:~2%")
 			      sb!vm:unbound-marker-widetag))
 	   *cold-assembler-fixups*
 	   *cold-assembler-routines*
-	   #!+x86 *load-time-code-fixups*)
+	   #!+(or x86 x86-64) *load-time-code-fixups*)
 
       ;; Prepare for cold load.
       (initialize-non-nil-symbols)
@@ -3125,7 +3135,7 @@ initially undefined function references:~2%")
 
       ;; Tidy up loose ends left by cold loading. ("Postpare from cold load?")
       (resolve-assembler-fixups)
-      #!+x86 (output-load-time-code-fixups)
+      #!+(or x86 x86-64) (output-load-time-code-fixups)
       (linkage-info-to-core)
       (finish-symbols)
       (/show "back from FINISH-SYMBOLS")

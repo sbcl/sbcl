@@ -395,7 +395,6 @@ size_code_header(lispobj *where)
     return nwords;
 }
 
-#ifndef LISP_FEATURE_X86
 static int
 scav_return_pc_header(lispobj *where, lispobj object)
 {
@@ -404,7 +403,6 @@ scav_return_pc_header(lispobj *where, lispobj object)
 	 (unsigned long) object);
     return 0; /* bogus return value to satisfy static type checking */
 }
-#endif /* LISP_FEATURE_X86 */
 
 static lispobj
 trans_return_pc_header(lispobj object)
@@ -449,7 +447,6 @@ scav_closure_header(lispobj *where, lispobj object)
 }
 #endif
 
-#ifndef LISP_FEATURE_X86
 static int
 scav_fun_header(lispobj *where, lispobj object)
 {
@@ -458,7 +455,6 @@ scav_fun_header(lispobj *where, lispobj object)
 	 (unsigned long) object);
     return 0; /* bogus return value to satisfy static type checking */
 }
-#endif /* LISP_FEATURE_X86 */
 
 static lispobj
 trans_fun_header(lispobj object)
@@ -1535,8 +1531,10 @@ gc_init_tables(void)
 	scav_vector_unsigned_byte_16;
     scavtab[SIMPLE_ARRAY_UNSIGNED_BYTE_16_WIDETAG] =
 	scav_vector_unsigned_byte_16;
+#ifdef SIMPLE_ARRAY_UNSIGNED_BYTE_29_WIDETAG
     scavtab[SIMPLE_ARRAY_UNSIGNED_BYTE_29_WIDETAG] =
 	scav_vector_unsigned_byte_32;
+#endif
     scavtab[SIMPLE_ARRAY_UNSIGNED_BYTE_31_WIDETAG] =
 	scav_vector_unsigned_byte_32;
     scavtab[SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG] =
@@ -1639,8 +1637,10 @@ gc_init_tables(void)
 	trans_vector_unsigned_byte_16;
     transother[SIMPLE_ARRAY_UNSIGNED_BYTE_16_WIDETAG] =
 	trans_vector_unsigned_byte_16;
+#ifdef SIMPLE_ARRAY_UNSIGNED_BYTE_29_WIDETAG
     transother[SIMPLE_ARRAY_UNSIGNED_BYTE_29_WIDETAG] =
 	trans_vector_unsigned_byte_32;
+#endif
     transother[SIMPLE_ARRAY_UNSIGNED_BYTE_31_WIDETAG] =
 	trans_vector_unsigned_byte_32;
     transother[SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG] =
@@ -1747,8 +1747,10 @@ gc_init_tables(void)
 	size_vector_unsigned_byte_16;
     sizetab[SIMPLE_ARRAY_UNSIGNED_BYTE_16_WIDETAG] =
 	size_vector_unsigned_byte_16;
+#ifdef SIMPLE_ARRAY_UNSIGNED_BYTE_29_WIDETAG
     sizetab[SIMPLE_ARRAY_UNSIGNED_BYTE_29_WIDETAG] =
 	size_vector_unsigned_byte_32;
+#endif
     sizetab[SIMPLE_ARRAY_UNSIGNED_BYTE_31_WIDETAG] =
 	size_vector_unsigned_byte_32;
     sizetab[SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG] =

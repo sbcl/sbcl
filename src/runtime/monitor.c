@@ -176,17 +176,17 @@ regs_cmd(char **ptr)
 {
     printf("CSP\t=\t0x%08lX\n", (unsigned long)current_control_stack_pointer);
     printf("FP\t=\t0x%08lX\n", (unsigned long)current_control_frame_pointer);
-#if !defined(LISP_FEATURE_X86)
+#if !(defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64))
     printf("BSP\t=\t0x%08X\n", (unsigned long)current_binding_stack_pointer);
 #endif
 #if 0
-#ifdef LISP_FEATURE_X86
+#if (defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64))
     printf("BSP\t=\t0x%08lx\n",
 	   (unsigned long)SymbolValue(BINDING_STACK_POINTER));
 #endif
 
     printf("DYNAMIC\t=\t0x%08lx\n", (unsigned long)DYNAMIC_SPACE_START);
-#if defined(LISP_FEATURE_X86)
+#if (defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64))
     printf("ALLOC\t=\t0x%08lx\n",
 	   (unsigned long)SymbolValue(ALLOCATION_POINTER));
 #else
@@ -326,7 +326,7 @@ print_context(os_context_t *context)
 	brief_print((lispobj)(*os_context_register_addr(context,i)));
 #endif
     }
-#ifdef LISP_FEATURE_DARWIN
+#ifdef DARWIN
     printf("DAR:\t\t 0x%08lx\n", (unsigned long)(*os_context_register_addr(context, 41)));
     printf("DSISR:\t\t 0x%08lx\n", (unsigned long)(*os_context_register_addr(context, 42)));
 #endif
@@ -393,7 +393,7 @@ catchers_cmd(char **ptr)
         printf("There are no active catchers!\n");
     else {
         while (catch != NULL) {
-#ifndef LISP_FEATURE_X86
+#if !(defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64))
             printf("0x%08lX:\n\tuwp: 0x%08lX\n\tfp: 0x%08lX\n\tcode: 0x%08lx\n\tentry: 0x%08lx\n\ttag: ",
 		   (unsigned long)catch, (unsigned long)(catch->current_uwp),
 		   (unsigned long)(catch->current_cont),
@@ -511,11 +511,7 @@ monitor_or_something()
 #if defined(LISP_FEATURE_SB_LDB)
     ldb_monitor();
 #else
-     fprintf(stderr,
-"The system is too badly corrupted or confused to continue at the Lisp\n\
-level. If the system had been compiled with the SB-LDB feature, we'd drop\n\
-into the LDB low-level debugger now. But there's no LDB in this build, so\n\
-we can't really do anything but just exit, sorry.\n");
+    fprintf(stderr, "There's no LDB in this build; exiting.\n");
     exit(1);
 #endif
 }

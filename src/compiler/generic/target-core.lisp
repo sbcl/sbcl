@@ -51,6 +51,13 @@
 			    (ceiling trace-table-bits sb!vm:n-byte-bits)))
 	   (box-num (- (length constants) sb!vm:code-trace-table-offset-slot))
 	   (code-obj
+	    ;; FIXME: In CMU CL the X86 behavior here depended on
+	    ;; *ENABLE-DYNAMIC-SPACE-CODE*, but in SBCL we always use
+	    ;; dynamic space code, so we shoudl just rename the
+	    ;; allocate-dynamic-code-object vop and lose this #+ stuff
+	    #!+x86
+	    (%primitive allocate-dynamic-code-object box-num total-length)
+	    #!-x86
 	    (%primitive allocate-code-object box-num total-length))
 	   (fill-ptr (code-instructions code-obj)))
       (declare (type index box-num total-length))

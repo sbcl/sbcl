@@ -16,7 +16,6 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include <sys/file.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -27,13 +26,13 @@
 #include <fcntl.h>
 #endif
 
-#include "sbcl.h"
 #include "os.h"
 #include "runtime.h"
 #include "globals.h"
 #include "core.h"
 #include "arch.h"
 #include "interr.h"
+#include "sbcl.h"
 #include "thread.h"
 
 unsigned char build_id[] =

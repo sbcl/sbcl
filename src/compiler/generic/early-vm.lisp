@@ -11,19 +11,12 @@
 
 ;;; the number of bits at the low end of a pointer used for type
 ;;; information
-(def!constant n-lowtag-bits
-  (integer-length (1- (/ (* 2 n-word-bits) n-byte-bits))))
+(def!constant n-lowtag-bits #!+x86-64 4 #!-x86-64 3)
 ;;; a mask to extract the low tag bits from a pointer
 (def!constant lowtag-mask (1- (ash 1 n-lowtag-bits)))
 ;;; the exclusive upper bound on the value of the low tag bits from a
 ;;; pointer
 (def!constant lowtag-limit (ash 1 n-lowtag-bits))
-;;; the number of tag bits used for a fixnum
-(def!constant n-fixnum-tag-bits (1- n-lowtag-bits))
-;;; the fixnum tag mask
-(def!constant fixnum-tag-mask (1- (ash 1 n-fixnum-tag-bits)))
-;;; the bit width of positive fixnums
-(def!constant n-positive-fixnum-bits (- n-word-bits n-fixnum-tag-bits 1))
 
 ;;; the number of bits used in the header word of a data block to store
 ;;; the type

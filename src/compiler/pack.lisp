@@ -241,6 +241,40 @@
     (setf (finite-sb-current-size sb) new-size))
   (values))
 
+;;; This variable is true whenever we are in pack (and thus the per-SB
+;;; conflicts information is in use.)
+(defvar *in-pack* nil)
+
+;;; In order to prevent the conflict data structures from growing
+;;; arbitrarily large, we clear them whenever a GC happens and we
+;;; aren't currently in pack. We revert to the initial number of
+;;; locations and 0 blocks.
+(defun pack-before-gc-hook ()
+  (unless *in-pack*
+    (dolist (sb *backend-sb-list*)
+      (unless (eq (sb-kind sb) :non-packed)
+	(let ((size (sb-size sb)))
+	  (fill (finite-sb-always-live sb) nil)
+	  (setf (finite-sb-always-live sb)
+		(make-array size
+			    :initial-element
+			    #-sb-xc #*
+			    ;; The cross-compiler isn't very good at
+			    ;; dumping specialized arrays, so we delay
+			    ;; construction of this SIMPLE-BIT-VECTOR
+			    ;; until runtime.
+			    #+sb-xc (make-array 0 :element-type 'bit)))
+
+	  (fill (finite-sb-conflicts sb) nil)
+	  (setf (finite-sb-conflicts sb)
+		(make-array size :initial-element '#()))
+
+	  (fill (finite-sb-live-tns sb) nil)
+	  (setf (finite-sb-live-tns sb)
+		(make-array size :initial-element nil))))))
+  (values))
+
+(pushnew 'pack-before-gc-hook sb!ext:*before-gc-hooks*)
 
 ;;;; internal errors
 
@@ -1375,7 +1409,7 @@
     ;; For non-x86 ports the presence of a save-tn associated with a
     ;; tn is used to identify the old-fp and return-pc tns. It depends
     ;; on the old-fp and return-pc being passed in registers.
-    #!-x86
+    #!-(or x86 x86-64)
     (when (and (not (eq (tn-kind tn) :specified-save))
 	       (conflicts-in-sc original sc offset))
       (error "~S is wired to a location that it conflicts with." tn))
@@ -1414,124 +1448,85 @@
 
 (defevent repack-block "Repacked a block due to TN unpacking.")
 
-;;; KLUDGE: Prior to SBCL version 0.8.9.xx, this function was known as
-;;; PACK-BEFORE-GC-HOOK, but was non-functional since approximately
-;;; version 0.8.3.xx since the removal of GC hooks from the system.
-;;; This currently (as of 2004-04-12) runs now after every call to
-;;; PACK, rather than -- as was originally intended -- once per GC
-;;; cycle; this is probably non-optimal, and might require tuning,
-;;; maybe to be called when the data structures exceed a certain size,
-;;; or maybe once every N times.  The KLUDGE is that this rewrite has
-;;; done nothing to improve the reentrance or threadsafety of the
-;;; compiler; it still fails to be callable from several threads at
-;;; the same time.
-;;;
-;;; Brief experiments indicate that during a compilation cycle this
-;;; causes about 10% more consing, and takes about 1%-2% more time.
-;;;
-;;; -- CSR, 2004-04-12
-(defun clean-up-pack-structures ()
-  (dolist (sb *backend-sb-list*)
-    (unless (eq (sb-kind sb) :non-packed)
-      (let ((size (sb-size sb)))
-	(fill (finite-sb-always-live sb) nil)
-	(setf (finite-sb-always-live sb)
-	      (make-array size
-			  :initial-element
-			  #-sb-xc #*
-			  ;; The cross-compiler isn't very good at
-			  ;; dumping specialized arrays, so we delay
-			  ;; construction of this SIMPLE-BIT-VECTOR
-			  ;; until runtime.
-			  #+sb-xc (make-array 0 :element-type 'bit)))
-	
-	(fill (finite-sb-conflicts sb) nil)
-	(setf (finite-sb-conflicts sb)
-	      (make-array size :initial-element '#()))
-	
-	(fill (finite-sb-live-tns sb) nil)
-	(setf (finite-sb-live-tns sb)
-	      (make-array size :initial-element nil))))))
-
 (defun pack (component)
-  (unwind-protect
-       (let ((optimize (policy *lexenv*
-			       (or (>= speed compilation-speed)
-				   (>= space compilation-speed))))
-	     (2comp (component-info component)))
-	 (init-sb-vectors component)
-	 
-	 ;; Call the target functions.
-	 (do-ir2-blocks (block component)
-	   (do ((vop (ir2-block-start-vop block) (vop-next vop)))
-	       ((null vop))
-	     (let ((target-fun (vop-info-target-fun (vop-info vop))))
-	       (when target-fun
-		 (funcall target-fun vop)))))
-	 
-	 
-	 ;; Pack wired TNs first.
-	 (do ((tn (ir2-component-wired-tns 2comp) (tn-next tn)))
-	     ((null tn))
-	   (pack-wired-tn tn))
-	 
-	 ;; Pack restricted component TNs.
-	 (do ((tn (ir2-component-restricted-tns 2comp) (tn-next tn)))
-	     ((null tn))
-	   (when (eq (tn-kind tn) :component)
-	     (pack-tn tn t)))
-	 
-	 ;; Pack other restricted TNs.
-	 (do ((tn (ir2-component-restricted-tns 2comp) (tn-next tn)))
-	     ((null tn))
-	   (unless (tn-offset tn)
-	     (pack-tn tn t)))
-	 
-	 ;; Assign costs to normal TNs so we know which ones should always
-	 ;; be packed on the stack.
-	 (when (and optimize *pack-assign-costs*)
-	   (assign-tn-costs component))
-	 
-	 ;; Pack normal TNs in the order that they appear in the code. This
-	 ;; should have some tendency to pack important TNs first, since
-	 ;; control analysis favors the drop-through. This should also help
-	 ;; targeting, since we will pack the target TN soon after we
-	 ;; determine the location of the targeting TN.
-	 (do-ir2-blocks (block component)
-	   (let ((ltns (ir2-block-local-tns block)))
-	     (do ((i (1- (ir2-block-local-tn-count block)) (1- i)))
-		 ((minusp i))
-	       (declare (fixnum i))
-	       (let ((tn (svref ltns i)))
-		 (unless (or (null tn) (eq tn :more) (tn-offset tn))
-		   (pack-tn tn nil))))))
-	 
-	 ;; Pack any leftover normal TNs. This is to deal with :MORE TNs,
-	 ;; which could possibly not appear in any local TN map.
-	 (do ((tn (ir2-component-normal-tns 2comp) (tn-next tn)))
-	     ((null tn))
-	   (unless (tn-offset tn)
-	     (pack-tn tn nil)))
-	 
-	 ;; Do load TN packing and emit saves.
-	 (let ((*repack-blocks* nil))
-	   (cond ((and optimize *pack-optimize-saves*)
-		  (optimized-emit-saves component)
-		  (do-ir2-blocks (block component)
-		    (pack-load-tns block)))
-		 (t
-		  (do-ir2-blocks (block component)
-		    (emit-saves block)
-		    (pack-load-tns block))))
-	   (when *repack-blocks*
-	     (loop
-	      (when (zerop (hash-table-count *repack-blocks*)) (return))
-	      (maphash (lambda (block v)
-			 (declare (ignore v))
-			 (remhash block *repack-blocks*)
-			 (event repack-block)
-			 (pack-load-tns block))
-		       *repack-blocks*))))
-	 
-	 (values))
-    (clean-up-pack-structures)))
+  (aver (not *in-pack*))
+  (let ((*in-pack* t)
+	(optimize (policy *lexenv*
+			  (or (>= speed compilation-speed)
+			      (>= space compilation-speed))))
+	(2comp (component-info component)))
+    (init-sb-vectors component)
+
+    ;; Call the target functions.
+    (do-ir2-blocks (block component)
+      (do ((vop (ir2-block-start-vop block) (vop-next vop)))
+	  ((null vop))
+	(let ((target-fun (vop-info-target-fun (vop-info vop))))
+	  (when target-fun
+	    (funcall target-fun vop)))))
+
+
+    ;; Pack wired TNs first.
+    (do ((tn (ir2-component-wired-tns 2comp) (tn-next tn)))
+	((null tn))
+      (pack-wired-tn tn))
+
+    ;; Pack restricted component TNs.
+    (do ((tn (ir2-component-restricted-tns 2comp) (tn-next tn)))
+	((null tn))
+      (when (eq (tn-kind tn) :component)
+	(pack-tn tn t)))
+
+    ;; Pack other restricted TNs.
+    (do ((tn (ir2-component-restricted-tns 2comp) (tn-next tn)))
+	((null tn))
+      (unless (tn-offset tn)
+	(pack-tn tn t)))
+
+    ;; Assign costs to normal TNs so we know which ones should always
+    ;; be packed on the stack.
+    (when (and optimize *pack-assign-costs*)
+      (assign-tn-costs component))
+
+    ;; Pack normal TNs in the order that they appear in the code. This
+    ;; should have some tendency to pack important TNs first, since
+    ;; control analysis favors the drop-through. This should also help
+    ;; targeting, since we will pack the target TN soon after we
+    ;; determine the location of the targeting TN.
+    (do-ir2-blocks (block component)
+      (let ((ltns (ir2-block-local-tns block)))
+	(do ((i (1- (ir2-block-local-tn-count block)) (1- i)))
+	    ((minusp i))
+	  (declare (fixnum i))
+	  (let ((tn (svref ltns i)))
+	    (unless (or (null tn) (eq tn :more) (tn-offset tn))
+	      (pack-tn tn nil))))))
+
+    ;; Pack any leftover normal TNs. This is to deal with :MORE TNs,
+    ;; which could possibly not appear in any local TN map.
+    (do ((tn (ir2-component-normal-tns 2comp) (tn-next tn)))
+	((null tn))
+      (unless (tn-offset tn)
+	(pack-tn tn nil)))
+
+    ;; Do load TN packing and emit saves.
+    (let ((*repack-blocks* nil))
+      (cond ((and optimize *pack-optimize-saves*)
+	     (optimized-emit-saves component)
+	     (do-ir2-blocks (block component)
+	       (pack-load-tns block)))
+	    (t
+	     (do-ir2-blocks (block component)
+	       (emit-saves block)
+	       (pack-load-tns block))))
+      (when *repack-blocks*
+	(loop
+	  (when (zerop (hash-table-count *repack-blocks*)) (return))
+	  (maphash (lambda (block v)
+		     (declare (ignore v))
+		     (remhash block *repack-blocks*)
+		     (event repack-block)
+		     (pack-load-tns block))
+		   *repack-blocks*)))))
+
+  (values))

@@ -258,7 +258,7 @@ static boolean lookup_symbol(char *name, lispobj *result)
 
     /* Search dynamic space. */
     headerptr = (lispobj *)DYNAMIC_SPACE_START;
-#if !defined(LISP_FEATURE_X86)
+#if !(defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64))
     count =
 	dynamic_space_free_pointer -
 	(lispobj *)DYNAMIC_SPACE_START;

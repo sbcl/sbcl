@@ -145,9 +145,9 @@
   (assert (typep array '(simple-array * (*))))
   (values array start end 0))
 
-#!-alpha
+#!-(or alpha x86-64)
 (defun sb!vm::ash-left-mod32 (integer amount)
   (ldb (byte 32 0) (ash integer amount)))
-#!+alpha
+#!+(or alpha x86-64)
 (defun sb!vm::ash-left-mod64 (integer amount)
   (ldb (byte 64 0) (ash integer amount)))
