@@ -15,6 +15,7 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <libgen.h>
 #include <sys/types.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -281,6 +282,22 @@ main(int argc, char *argv[], char *envp[])
 	}
 	if (!core) {
 	    lose("can't find core file");
+	}
+    } else {
+	/* If a core was specified and SBCL_HOME is unset, set it */
+	char *sbcl_home = getenv("SBCL_HOME");
+	if (!sbcl_home) {
+	    char *envstring, *copied_core, *dir;
+	    char *stem = "SBCL_HOME=";
+	    copied_core = copied_string(core);
+	    dir = dirname(copied_core);
+	    envstring = (char *) calloc(strlen(stem) +
+					strlen(dir) + 
+					1,
+					sizeof(char));
+	    sprintf(envstring, "%s%s", stem, dir);
+	    putenv(envstring);
+	    free(copied_core);
 	}
     }
 
