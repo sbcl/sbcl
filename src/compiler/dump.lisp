@@ -1102,7 +1102,7 @@
 	(cond ((and (< num-consts #x100) (< total-length #x10000))
 	       (dump-fop 'fop-small-code fasl-output)
 	       (dump-byte num-consts fasl-output)
-	       (dump-integer-as-n-bytes total-length 2 fasl-output))
+	       (dump-integer-as-n-bytes total-length (/ sb!vm:n-word-bytes 2) fasl-output))
 	      (t
 	       (dump-fop 'fop-code fasl-output)
 	       (dump-word num-consts fasl-output)
