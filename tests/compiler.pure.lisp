@@ -423,3 +423,14 @@
 (assert (nth-value 2 (compile nil
                               '(lambda ()
                                 (svref (make-array '(8 9) :adjustable t) 1)))))
+
+;;; CHAR= did not check types of its arguments (reported by Adam Warner)
+(raises-error? (funcall (compile nil '(lambda (x y z) (char= x y z)))
+                        #\a #\b nil)
+               type-error)
+(raises-error? (funcall (compile nil
+                                 '(lambda (x y z)
+                                   (declare (optimize (speed 3) (safety 3)))
+                                   (char/= x y z)))
+                        nil #\a #\a)
+               type-error)

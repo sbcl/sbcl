@@ -2972,11 +2972,11 @@
 ;;; negated test as appropriate. If it is a degenerate one-arg call,
 ;;; then we transform to code that returns true. Otherwise, we bind
 ;;; all the arguments and expand into a bunch of IFs.
-(declaim (ftype (function (symbol list boolean) *) multi-compare))
-(defun multi-compare (predicate args not-p)
+(declaim (ftype (function (symbol list boolean t) *) multi-compare))
+(defun multi-compare (predicate args not-p type)
   (let ((nargs (length args)))
     (cond ((< nargs 1) (values nil t))
-	  ((= nargs 1) `(progn ,@args t))
+	  ((= nargs 1) `(progn (the ,type ,@args) t))
 	  ((= nargs 2)
 	   (if not-p
 	       `(if (,predicate ,(first args) ,(second args)) nil t)
@@ -2992,40 +2992,46 @@
 			       `(if (,predicate ,current ,last)
 				    ,result nil))))
 	       ((zerop i)
-		`((lambda ,vars ,result) . ,args)))))))
+		`((lambda ,vars (declare (type ,type ,@vars)) ,result)
+                  ,@args)))))))
 
-(define-source-transform = (&rest args) (multi-compare '= args nil))
-(define-source-transform < (&rest args) (multi-compare '< args nil))
-(define-source-transform > (&rest args) (multi-compare '> args nil))
-(define-source-transform <= (&rest args) (multi-compare '> args t))
-(define-source-transform >= (&rest args) (multi-compare '< args t))
+(define-source-transform = (&rest args) (multi-compare '= args nil 'number))
+(define-source-transform < (&rest args) (multi-compare '< args nil 'real))
+(define-source-transform > (&rest args) (multi-compare '> args nil 'real))
+(define-source-transform <= (&rest args) (multi-compare '> args t 'real))
+(define-source-transform >= (&rest args) (multi-compare '< args t 'real))
 
-(define-source-transform char= (&rest args) (multi-compare 'char= args nil))
-(define-source-transform char< (&rest args) (multi-compare 'char< args nil))
-(define-source-transform char> (&rest args) (multi-compare 'char> args nil))
-(define-source-transform char<= (&rest args) (multi-compare 'char> args t))
-(define-source-transform char>= (&rest args) (multi-compare 'char< args t))
+(define-source-transform char= (&rest args) (multi-compare 'char= args nil
+                                                           'character))
+(define-source-transform char< (&rest args) (multi-compare 'char< args nil
+                                                           'character))
+(define-source-transform char> (&rest args) (multi-compare 'char> args nil
+                                                           'character))
+(define-source-transform char<= (&rest args) (multi-compare 'char> args t
+                                                            'character))
+(define-source-transform char>= (&rest args) (multi-compare 'char< args t
+                                                            'character))
 
 (define-source-transform char-equal (&rest args)
-  (multi-compare 'char-equal args nil))
+  (multi-compare 'char-equal args nil 'character))
 (define-source-transform char-lessp (&rest args)
-  (multi-compare 'char-lessp args nil))
+  (multi-compare 'char-lessp args nil 'character))
 (define-source-transform char-greaterp (&rest args)
-  (multi-compare 'char-greaterp args nil))
+  (multi-compare 'char-greaterp args nil 'character))
 (define-source-transform char-not-greaterp (&rest args)
-  (multi-compare 'char-greaterp args t))
+  (multi-compare 'char-greaterp args t 'character))
 (define-source-transform char-not-lessp (&rest args)
-  (multi-compare 'char-lessp args t))
+  (multi-compare 'char-lessp args t 'character))
 
 ;;; This function does source transformation of N-arg inequality
 ;;; functions such as /=. This is similar to MULTI-COMPARE in the <3
 ;;; arg cases. If there are more than two args, then we expand into
 ;;; the appropriate n^2 comparisons only when speed is important.
-(declaim (ftype (function (symbol list) *) multi-not-equal))
-(defun multi-not-equal (predicate args)
+(declaim (ftype (function (symbol list t) *) multi-not-equal))
+(defun multi-not-equal (predicate args type)
   (let ((nargs (length args)))
     (cond ((< nargs 1) (values nil t))
-	  ((= nargs 1) `(progn ,@args t))
+	  ((= nargs 1) `(progn (the ,type ,@args) t))
 	  ((= nargs 2)
 	   `(if (,predicate ,(first args) ,(second args)) nil t))
 	  ((not (policy *lexenv*
@@ -3038,24 +3044,18 @@
 		  (next (cdr vars) (cdr next))
 		  (result t))
 		 ((null next)
-		  `((lambda ,vars ,result) . ,args))
+		  `((lambda ,vars (declare (type ,type ,@vars)) ,result)
+                    ,@args))
 	       (let ((v1 (first var)))
 		 (dolist (v2 next)
 		   (setq result `(if (,predicate ,v1 ,v2) nil ,result))))))))))
 
-(define-source-transform /= (&rest args) (multi-not-equal '= args))
-(define-source-transform char/= (&rest args) (multi-not-equal 'char= args))
+(define-source-transform /= (&rest args)
+  (multi-not-equal '= args 'number))
+(define-source-transform char/= (&rest args)
+  (multi-not-equal 'char= args 'character))
 (define-source-transform char-not-equal (&rest args)
-  (multi-not-equal 'char-equal args))
-
-;;; FIXME: can go away once bug 194 is fixed and we can use (THE REAL X)
-;;; as God intended
-(defun error-not-a-real (x)
-  (error 'simple-type-error
-	 :datum x
-	 :expected-type 'real
-	 :format-control "not a REAL: ~S"
-	 :format-arguments (list x)))
+  (multi-not-equal 'char-equal args 'character))
 
 ;;; Expand MAX and MIN into the obvious comparisons.
 (define-source-transform max (arg0 &rest rest)
