@@ -341,12 +341,13 @@
 						  (car ,',packages)))
 					      :inherited)))))
 			      (setf ,',counter
-				    (position-if #',',inherited-symbol-p
-						 (the hash-vector
-						   ,',hash-vector)
-						 :start (if ,',counter
-							    (1+ ,',counter)
-							    0))))
+				    (when ,',hash-vector
+				      (position-if #',',inherited-symbol-p
+						   (the hash-vector
+						     ,',hash-vector)
+						   :start (if ,',counter
+							      (1+ ,',counter)
+							      0)))))
 			    (cond (,',counter
 				   (return-from
 				    ,',BLOCK
