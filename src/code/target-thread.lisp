@@ -1,8 +1,17 @@
 (in-package "SB!THREAD")
 
+;;; FIXME it would be good to define what a thread id is or isn't (our
+;;; current assumption is that it's a fixnum).  It so happens that on
+;;; Linux it's a pid, but it might not be on posix thread implementations
+
 (sb!alien::define-alien-routine ("create_thread" %create-thread)
      sb!alien:unsigned-long
   (lisp-fun-address sb!alien:unsigned-long))
+
+(sb!alien::define-alien-routine "signal_thread_to_dequeue"
+    sb!alien:unsigned-int
+  (thread-pid sb!alien:unsigned-long))
+
 
 (defun make-thread (function)
   (let ((real-function (coerce function 'function)))
@@ -106,17 +115,43 @@ SB-EXT:QUIT - the usual cleanup forms will be evaluated"
 
 ;;;; the higher-level locking operations are based on waitqueues
 
+(declaim (inline waitqueue-data-address mutex-value-address))
+
 (defstruct waitqueue
   (name nil :type (or null simple-base-string))
   (lock 0)
   (data nil))
 
+;;; The bare 4 here and 5 below are offsets of the slots in the struct.
+;;; There ought to be some better way to get these numbers
+(defun waitqueue-data-address (lock)
+  (declare (optimize (speed 3)))
+  (sb!ext:truly-the
+   (unsigned-byte 32)
+   (+ (sb!kernel:get-lisp-obj-address lock)
+      (- (* 4 sb!vm:n-word-bytes) sb!vm:instance-pointer-lowtag))))
+
 (defstruct (mutex (:include waitqueue))
   (value nil))
+
+(defun mutex-value-address (lock)
+  (declare (optimize (speed 3)))
+  (sb!ext:truly-the
+   (unsigned-byte 32)
+   (+ (sb!kernel:get-lisp-obj-address lock)
+      (- (* 5 sb!vm:n-word-bytes) sb!vm:instance-pointer-lowtag))))
 
 (sb!alien:define-alien-routine "block_sigcont"  void)
 (sb!alien:define-alien-routine "unblock_sigcont_and_sleep"  void)
 
+#!+sb-futex
+(declaim (inline futex-wait futex-wake))
+#!+sb-futex
+(sb!alien:define-alien-routine
+    "futex_wait" int (word unsigned-long) (old-value unsigned-long))
+#!+sb-futex
+(sb!alien:define-alien-routine
+    "futex_wake" int (word unsigned-long) (n unsigned-long))
 
 ;;; this should only be called while holding the queue spinlock.
 ;;; it releases the spinlock before sleeping
@@ -140,13 +175,14 @@ SB-EXT:QUIT - the usual cleanup forms will be evaluated"
 ;;; this should only be called while holding the queue spinlock.
 (defun signal-queue-head (queue)
   (let ((p (car (waitqueue-data queue))))
-    (when p (sb!unix:unix-kill p  sb!unix::sig-dequeue))))
+    (when p (signal-thread-to-dequeue p))))
 
 ;;;; mutex
 
+;;; i suspect there may be a race still in this: the futex version requires
+;;; the old mutex value before sleeping, so how do we get away without it
 (defun get-mutex (lock &optional new-value (wait-p t))
-  (declare (type mutex lock)
-	   (optimize (speed 3)))
+  (declare (type mutex lock) (optimize (speed 3)))
   (let ((pid (current-thread-id)))
     (unless new-value (setf new-value pid))
     (assert (not (eql new-value (mutex-value lock))))
@@ -163,12 +199,33 @@ SB-EXT:QUIT - the usual cleanup forms will be evaluated"
        (return nil))
      (wait-on-queue lock nil))))
 
+#!+sb-futex
+(defun get-mutex/futex (lock &optional new-value (wait-p t))
+  (declare (type mutex lock)  (optimize (speed 3)))
+  (let ((pid (current-thread-id))
+	old)
+    (unless new-value (setf new-value pid))
+    (assert (not (eql new-value (mutex-value lock))))
+    (loop
+     (unless
+	 (setf old (sb!vm::%instance-set-conditional lock 4 nil new-value))
+       (return t))
+     (unless wait-p (return nil))
+     (futex-wait (mutex-value-address lock)
+		 (sb!kernel:get-lisp-obj-address old)))))
+
 (defun release-mutex (lock &optional (new-value nil))
   (declare (type mutex lock))
   ;; we assume the lock is ours to release
   (with-spinlock (lock)
     (setf (mutex-value lock) new-value)
     (signal-queue-head lock)))
+
+#!+sb-futex
+(defun release-mutex/futex (lock)
+  (declare (type mutex lock))
+  (setf (mutex-value lock) nil)
+  (futex-wake (mutex-value-address lock) 1))
 
 
 (defmacro with-mutex ((mutex &key value (wait-p t))  &body body)
@@ -200,10 +257,68 @@ time we reacquire LOCK and return to the caller."
 	(dequeue queue))
       (get-mutex lock value))))
 
+#!+sb-futex
+(defun condition-wait/futex (queue lock)
+  (assert lock)
+  (let ((value (mutex-value lock)))
+    (unwind-protect
+	 (let ((me (current-thread-id)))
+	   ;; XXX we should do something to ensure that the result of this setf
+	   ;; is visible to all CPUs
+	   (setf (waitqueue-data queue) me)
+	   (release-mutex lock)
+	   ;; Now we go to sleep using futex-wait.  If anyone else
+	   ;; manages to grab LOCK and call CONDITION-NOTIFY during
+	   ;; this comment, it will change queue->data, and so
+	   ;; futex-wait returns immediately instead of sleeping.
+	   ;; Ergo, no lost wakeup
+	   (futex-wait (waitqueue-data-address queue)
+		       (sb!kernel:get-lisp-obj-address me)))
+      ;; If we are interrupted while waiting, we should do these things
+      ;; before returning.  Ideally, in the case of an unhandled signal,
+      ;; we should do them before entering the debugger, but this is
+      ;; better than nothing.
+      (get-mutex lock value))))
+
+
 (defun condition-notify (queue)
   "Notify one of the processes waiting on QUEUE"
   (with-spinlock (queue) (signal-queue-head queue)))
 
+#!+sb-futex
+(defun condition-notify/futex (queue)
+  "Notify one of the processes waiting on QUEUE."
+  (let ((me (current-thread-id)))
+    ;; no problem if >1 thread notifies during the comment in
+    ;; condition-wait: as long as the value in queue-data isn't the
+    ;; waiting thread's id, it matters not what it is
+    ;; XXX we should do something to ensure that the result of this setf
+    ;; is visible to all CPUs
+    (setf (waitqueue-data queue) me)
+    (futex-wake (waitqueue-data-address queue) 1)))
+
+#!+sb-futex
+(defun condition-broadcast/futex (queue)
+  (let ((me (current-thread-id)))
+    (setf (waitqueue-data queue) me)
+    (futex-wake (waitqueue-data-address queue) (ash 1 30))))
+
+(defun condition-broadcast (queue)
+  "Notify all of the processes waiting on QUEUE."
+  (with-spinlock (queue)
+    (map nil #'signal-thread-to-dequeue (waitqueue-data queue))))
+
+;;; Futexes may be available at compile time but not runtime, so we
+;;; default to not using them unless os_init says they're available
+(defun maybe-install-futex-functions ()
+  #!+sb-futex
+  (unless (zerop (extern-alien "linux_supports_futex" int))
+    (setf (fdefinition 'get-mutex) #'get-mutex/futex
+	  (fdefinition 'release-mutex) #'release-mutex/futex
+	  (fdefinition 'condition-wait) #'condition-wait/futex
+	  (fdefinition 'condition-broadcast) #'condition-broadcast/futex
+	  (fdefinition 'condition-notify) #'condition-notify/futex)
+    t))
 
 ;;;; multiple independent listeners
 
@@ -239,170 +354,52 @@ time we reacquire LOCK and return to the caller."
   
 ;;;; job control
 
-(defvar *background-threads-wait-for-debugger* t)
-;;; may be T, NIL, or a function called with a stream and thread id 
-;;; as its two arguments, returning NIl or T
+
+(defvar *interactive-threads-lock* 
+  (make-mutex :name "*interactive-threads* lock"))
+(defvar *interactive-threads* nil)
+(defvar *interactive-threads-queue*
+  (make-waitqueue :name "All threads that need the terminal.  First ID on this list is running, the others are waiting"))
+
+(defun init-job-control ()
+  (with-mutex (*interactive-threads-lock*)
+    (setf *interactive-threads* (list (current-thread-id)))
+    (return-from init-job-control t)))
 
 ;;; called from top of invoke-debugger
 (defun debugger-wait-until-foreground-thread (stream)
   "Returns T if thread had been running in background, NIL if it was
-already the foreground thread, or transfers control to the first applicable
-restart if *BACKGROUND-THREADS-WAIT-FOR-DEBUGGER* says to do that instead"
-  (let* ((wait-p *background-threads-wait-for-debugger*)
-	 (*background-threads-wait-for-debugger* nil)
-	 (lock *session-lock*))
-    (when (not (eql (mutex-value lock)   (CURRENT-THREAD-ID)))
-      (when (functionp wait-p) 
-	(setf wait-p 
-	      (funcall wait-p stream (CURRENT-THREAD-ID))))
-      (cond (wait-p (get-foreground))
-	    (t  (invoke-restart (car (compute-restarts))))))))
+interactive."
+  (prog1
+      (with-mutex (*interactive-threads-lock*)
+	(not (member (current-thread-id) *interactive-threads*)))
+    (get-foreground)))
 
-;;; install this with
-;;; (setf SB-INT:*REPL-PROMPT-FUN* #'sb-thread::thread-repl-prompt-fun)
-;;; One day it will be default
 (defun thread-repl-prompt-fun (out-stream)
-  (let ((lock *session-lock*))
-    (get-foreground)
-    (let ((stopped-threads (waitqueue-data lock)))
-      (when stopped-threads
-	(format out-stream "~{~&Thread ~A suspended~}~%" stopped-threads))
-      (sb!impl::repl-prompt-fun out-stream))))
+  (get-foreground)
+  (let ((stopped-threads (cdr *interactive-threads*)))
+    (when stopped-threads
+      (format out-stream "~{~&Thread ~A suspended~}~%" stopped-threads))
+    (sb!impl::repl-prompt-fun out-stream)))
 
-(defun resume-stopped-thread (id)
-  (let ((lock *session-lock*)) 
-    (with-spinlock (lock)
-      (setf (waitqueue-data lock)
-	    (cons id (delete id  (waitqueue-data lock)))))
-    (release-foreground)))
+(defun get-foreground ()
+  (loop
+   (with-mutex (*interactive-threads-lock*)
+     (let ((tid (current-thread-id)))
+       (when (eql (car *interactive-threads*) tid)
+	 (sb!sys:enable-interrupt sb!unix:sigint #'sb!unix::sigint-handler)
+	 (return-from get-foreground t))
+       (unless (member tid *interactive-threads*)
+	 (setf (cdr (last *interactive-threads*)) (list tid)))
+       (condition-wait
+	*interactive-threads-queue* *interactive-threads-lock* )))))
 
-(defstruct rwlock
-  (name nil :type (or null simple-base-string))
-  (value 0 :type fixnum)
-  (max-readers nil :type (or fixnum null))
-  (max-writers 1 :type fixnum))
-#+nil
-(macrolet
-    ((make-rwlocking-function (lock-fn unlock-fn increment limit test)
-       (let ((do-update '(when (eql old-value
-				(sb!vm::%instance-set-conditional
-				 lock 2 old-value new-value))
-			  (return (values t old-value))))
-	     (vars `((timeout (and timeout (+ (get-internal-real-time) timeout)))
-		     old-value
-		     new-value
-		     (limit ,limit))))
-	 (labels ((do-setfs (v) `(setf old-value (rwlock-value lock)
-				  new-value (,v old-value ,increment))))
-	   `(progn
-	     (defun ,lock-fn (lock timeout)
-	       (declare (type rwlock lock))
-	       (let ,vars
-		 (loop
-		  ,(do-setfs '+)
-		  (when ,test
-		    ,do-update)
-		  (when (sleep-a-bit timeout) (return nil)) ;expired
-		  )))
-	     ;; unlock doesn't need timeout or test-in-range
-	     (defun ,unlock-fn (lock)
-	       (declare (type rwlock lock))
-	       (declare (ignorable limit))
-	       (let ,(cdr vars)
-		 (loop
-		  ,(do-setfs '-)
-		  ,do-update))))))))
-    
-  (make-rwlocking-function %lock-for-reading %unlock-for-reading 1
-			   (rwlock-max-readers lock)
-			   (and (>= old-value 0)
-				(or (null limit) (<= new-value limit))))
-  (make-rwlocking-function %lock-for-writing %unlock-for-writing -1
-			   (- (rwlock-max-writers lock))
-			   (and (<= old-value 0)
-				(>= new-value limit))))
-#+nil  
-(defun get-rwlock (lock direction &optional timeout)
-  (ecase direction
-    (:read (%lock-for-reading lock timeout))
-    (:write (%lock-for-writing lock timeout))))
-#+nil
-(defun free-rwlock (lock direction)
-  (ecase direction
-    (:read (%unlock-for-reading lock))
-    (:write (%unlock-for-writing lock))))
-
-;;;; beyond this point all is commented.
-
-;;; Lock-Wait-With-Timeout  --  Internal
-;;;
-;;; Wait with a timeout for the lock to be free and acquire it for the
-;;; *current-process*.
-;;;
-#+nil
-(defun lock-wait-with-timeout (lock whostate timeout)
-  (declare (type lock lock))
-  (process-wait-with-timeout
-   whostate timeout
-   #'(lambda ()
-       (declare (optimize (speed 3)))
-       #-i486
-       (unless (lock-process lock)
-	 (setf (lock-process lock) *current-process*))
-       #+i486
-       (null (kernel:%instance-set-conditional
-	      lock 2 nil *current-process*)))))
-
-;;; With-Lock-Held  --  Public
-;;;
-#+nil
-(defmacro with-lock-held ((lock &optional (whostate "Lock Wait")
-				&key (wait t) timeout)
-			  &body body)
-  "Execute the body with the lock held. If the lock is held by another
-  process then the current process waits until the lock is released or
-  an optional timeout is reached. The optional wait timeout is a time in
-  seconds acceptable to process-wait-with-timeout.  The results of the
-  body are return upon success and NIL is return if the timeout is
-  reached. When the wait key is NIL and the lock is held by another
-  process then NIL is return immediately without processing the body."
-  (let ((have-lock (gensym)))
-    `(let ((,have-lock (eq (lock-process ,lock) *current-process*)))
-      (unwind-protect
-	   ,(cond ((and timeout wait)
-		   `(progn
-		      (when (and (error-check-lock-p ,lock) ,have-lock)
-			(error "Dead lock"))
-		      (when (or ,have-lock
-				 #+i486 (null (kernel:%instance-set-conditional
-					       ,lock 2 nil *current-process*))
-				 #-i486 (seize-lock ,lock)
-				 (if ,timeout
-				     (lock-wait-with-timeout
-				      ,lock ,whostate ,timeout)
-				     (lock-wait ,lock ,whostate)))
-			,@body)))
-		  (wait
-		   `(progn
-		      (when (and (error-check-lock-p ,lock) ,have-lock)
-		        (error "Dead lock"))
-		      (unless (or ,have-lock
-				 #+i486 (null (kernel:%instance-set-conditional
-					       ,lock 2 nil *current-process*))
-				 #-i486 (seize-lock ,lock))
-			(lock-wait ,lock ,whostate))
-		      ,@body))
-		  (t
-		   `(when (or (and (recursive-lock-p ,lock) ,have-lock)
-			      #+i486 (null (kernel:%instance-set-conditional
-					    ,lock 2 nil *current-process*))
-			      #-i486 (seize-lock ,lock))
-		      ,@body)))
-	(unless ,have-lock
-	  #+i486 (kernel:%instance-set-conditional
-		  ,lock 2 *current-process* nil)
-	  #-i486 (when (eq (lock-process ,lock) *current-process*)
-		   (setf (lock-process ,lock) nil)))))))
-
-
-
+(defun release-foreground (&optional next)
+  "Background this thread.  If NEXT is supplied, arrange for it to have the foreground next"
+  (with-mutex (*interactive-threads-lock*)
+    (let ((tid (current-thread-id)))
+      (setf *interactive-threads* (delete tid *interactive-threads*))
+      (sb!sys:enable-interrupt sb!unix:sigint :ignore)
+      (when next (setf *interactive-threads*
+		       (list* next (delete next *interactive-threads*))))
+      (condition-broadcast *interactive-threads-queue*))))

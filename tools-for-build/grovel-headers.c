@@ -55,7 +55,7 @@ main(int argc, char *argv[])
     /* don't need no steenking hand-editing */
     printf(
 ";;;; This is an automatically generated file, please do not hand-edit it.\n\
-;;;; See the program \"grovel_headers.c\".\n\
+;;;; See the program \"grovel-headers.c\".\n\
 \n\
 ");
 
@@ -187,10 +187,6 @@ main(int argc, char *argv[])
 #ifndef LISP_FEATURE_HPUX
     DEFSIGNAL(SIGXCPU);
     DEFSIGNAL(SIGXFSZ);
-#endif
-#ifdef LISP_FEATURE_SB_THREAD
-    /* FIXME OAOOM alert: this information is duplicated in linux-os.h */
-    defconstant("sig-dequeue",SIGRTMIN+2);
 #endif
     return 0;
 }

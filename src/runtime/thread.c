@@ -50,6 +50,8 @@ new_thread_trampoline(struct thread *th)
 	fprintf(stderr, "/continue\n");
     }
     th->unbound_marker = UNBOUND_MARKER_WIDETAG;
+    if(arch_os_thread_init(th)==0) 
+	return 1;		/* failure.  no, really */
 #ifdef LISP_FEATURE_SB_THREAD
     /* wait here until our thread is linked into all_threads: see below */
     while(th->pid<1) sched_yield();
@@ -58,8 +60,7 @@ new_thread_trampoline(struct thread *th)
 	lose("th->pid not set up right");
 #endif
 
-    if(arch_os_thread_init(th)==0) 
-	return 1;		/* failure.  no, really */
+    th->state=STATE_RUNNING;
 #if !defined(LISP_FEATURE_SB_THREAD) && defined(LISP_FEATURE_X86)
     return call_into_lisp_first_time(function,args,0);
 #else
@@ -136,7 +137,7 @@ pid_t create_thread(lispobj initial_function) {
     th->binding_stack_pointer=th->binding_stack_start;
     th->this=th;
     th->pid=0;
-    th->state=STATE_RUNNING;
+    th->state=STATE_STOPPED;
 #ifdef LISP_FEATURE_STACK_GROWS_DOWNWARD_NOT_UPWARD
     th->alien_stack_pointer=((void *)th->alien_stack_start
 			     + ALIEN_STACK_SIZE-4); /* naked 4.  FIXME */
@@ -145,9 +146,7 @@ pid_t create_thread(lispobj initial_function) {
 #endif
 #ifdef LISP_FEATURE_X86
     th->pseudo_atomic_interrupted=0;
-    /* runtime.c used to set PSEUDO_ATOMIC_ATOMIC =1 globally.  I'm not
-     * sure why, but it appears to help */
-    th->pseudo_atomic_atomic=make_fixnum(1);
+    th->pseudo_atomic_atomic=0;
 #endif
 #ifdef LISP_FEATURE_GENCGC
     gc_set_region_empty(&th->alloc_region);
@@ -297,6 +296,12 @@ int interrupt_thread(pid_t pid, lispobj function)
     return sigqueue(pid, SIG_INTERRUPT_THREAD, sigval);
 }
 
+int signal_thread_to_dequeue (pid_t pid)
+{
+    return kill (pid, SIG_DEQUEUE);
+}
+
+
 /* stopping the world is a two-stage process.  From this thread we signal 
  * all the others with SIG_STOP_FOR_GC.  The handler for this thread does
  * the usual pseudo-atomic checks (we don't want to stop a thread while 
@@ -309,39 +314,36 @@ void gc_stop_the_world()
 {
     /* stop all other threads by sending them SIG_STOP_FOR_GC */
     struct thread *p,*th=arch_os_get_current_thread();
-    struct thread *tail=0;
+    pid_t old_pid;
     int finished=0;
     do {
 	get_spinlock(&all_threads_lock,th->pid);
-	if(tail!=all_threads) {
-	    /* new threads always get consed onto the front of all_threads,
-	     * and may be created by any thread that we haven't signalled
-	     * yet or hasn't received our signal and stopped yet.  So, check
-	     * for them on each time around */
-	    for(p=all_threads;p!=tail;p=p->next) {
-		if(p==th) continue;
-		/* if the head of all_threads is removed during
-		 * gc_stop_the_world, we may take a second trip through the 
-		 * list and end up counting twice as many threads to wait for
-		 * as actually exist */
-		if(p->state!=STATE_RUNNING) continue;
-		countdown_to_gc++;
-		p->state=STATE_STOPPING;
-		/* Note no return value check from kill().  If the
-		 * thread had been reaped already, we kill it and
-		 * increment countdown_to_gc anyway.  This is to avoid
-		 * complicating the logic in destroy_thread, which would 
-		 * otherwise have to know whether the thread died before or
-		 * after it was killed
-		 */
-		kill(p->pid,SIG_STOP_FOR_GC);
-	    }
-	    tail=all_threads;
-	} else {
-	    finished=(countdown_to_gc==0);
+	for(p=all_threads,old_pid=p->pid; p; p=p->next) {
+	    if(p==th) continue;
+	    if(p->state!=STATE_RUNNING) continue;
+	    countdown_to_gc++;
+	    p->state=STATE_STOPPING;
+	    /* Note no return value check from kill().  If the
+	     * thread had been reaped already, we kill it and
+	     * increment countdown_to_gc anyway.  This is to avoid
+	     * complicating the logic in destroy_thread, which would 
+	     * otherwise have to know whether the thread died before or
+	     * after it was killed
+	     */
+	    kill(p->pid,SIG_STOP_FOR_GC);
 	}
 	release_spinlock(&all_threads_lock);
 	sched_yield();
+	/* if everything has stopped, and there is no possibility that
+	 * a new thread has been created, we're done.  Otherwise go
+	 * round again and signal anything that sprang up since last
+	 * time	 */
+	if(old_pid==all_threads->pid) {
+	    finished=1;
+	    for_each_thread(p) 
+		finished = finished &&
+		((p==th) || (p->state==STATE_STOPPED));
+	}
     } while(!finished);
 }
 

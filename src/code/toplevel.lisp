@@ -296,7 +296,7 @@
 (defun toplevel-init ()
 
   (/show0 "entering TOPLEVEL-INIT")
-  (setf sb!thread::*session-lock* (sb!thread:make-mutex :name "the terminal"))
+  (sb!thread::init-job-control)
   (sb!thread::get-foreground)
   (let (;; value of --sysinit option
 	(sysinit nil)

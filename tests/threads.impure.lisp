@@ -18,7 +18,6 @@
 ;;; For one of the interupt-thread tests, we want a foreign function
 ;;; that does not make syscalls
 
-(setf SB-INT:*REPL-PROMPT-FUN* #'sb-thread::thread-repl-prompt-fun)
 (with-open-file (o "threads-foreign.c" :direction :output)
   (format o "void loop_forever() { while(1) ; }~%"))
 (sb-ext:run-program	
@@ -33,14 +32,15 @@
 ;;; elementary "can we get a lock and release it again"
 (let ((l (make-mutex :name "foo"))
       (p (current-thread-id)))
-  (assert (eql (mutex-value l) nil))
-  (assert (eql (mutex-lock l) 0))
+  (assert (eql (mutex-value l) nil) nil "1")
+  (assert (eql (mutex-lock l) 0) nil "2")
   (sb-thread:get-mutex l)
-  (assert (eql (mutex-value l) p))
-  (assert (eql (mutex-lock l) 0))
+  (assert (eql (mutex-value l) p) nil "3")
+  (assert (eql (mutex-lock l) 0) nil "4")
   (sb-thread:release-mutex l)
-  (assert (eql (mutex-value l) nil))
-  (assert (eql (mutex-lock l) 0)))
+  (assert (eql (mutex-value l) nil) nil "5")
+  (assert (eql (mutex-lock l) 0)  nil "6")
+  (describe l))
 
 (let ((queue (make-waitqueue :name "queue"))
       (lock (make-mutex :name "lock")))
@@ -86,6 +86,18 @@
       (condition-notify queue))
     (sleep 1)))
 
+(let ((mutex (make-mutex :name "contended")))
+  (labels ((run ()
+	     (let ((me (current-thread-id)))
+	       (dotimes (i 100)
+		 (with-mutex (mutex)
+		   (sleep .1)
+		   (assert (eql (mutex-value mutex) me)))
+		 (assert (not (eql (mutex-value mutex) me))))
+	       (format t "done ~A~%" (current-thread-id)))))
+    (let ((kid1 (make-thread #'run))
+	  (kid2 (make-thread #'run)))
+      (format t "contention ~A ~A~%" kid1 kid2))))
 
 (defun test-interrupt (function-to-interrupt &optional quit-p)
   (let ((child  (make-thread function-to-interrupt)))
@@ -130,9 +142,11 @@
   (terminate-thread child))
 
 (defun alloc-stuff () (copy-list '(1 2 3 4 5)))
+
 (let ((c (test-interrupt (lambda () (loop (alloc-stuff))))))
   ;; NB this only works on x86: other ports don't have a symbol for
   ;; pseudo-atomic atomicity
+  (format t "new thread ~A~%" c)
   (dotimes (i 100)
     (sleep (random 1d0))
     (interrupt-thread c
@@ -141,14 +155,35 @@
 			(assert (zerop SB-KERNEL:*PSEUDO-ATOMIC-ATOMIC*)))))
   (terminate-thread c))
 
-;; I'm not sure that this one is always successful.  Note race potential:
-;; I haven't checked if decf is atomic here
-(let ((done 2))
-  (make-thread (lambda () (dotimes (i 100) (sb-ext:gc)) (decf done)))
-  (make-thread (lambda () (dotimes (i 25) (sb-ext:gc :full t)) (decf done)))
+(format t "~&interrupt test done~%")
+
+(let (a-done b-done)
+  (make-thread (lambda ()
+		 (dotimes (i 100) 
+		   (sb-ext:gc) (princ "\\") (force-output) )
+		 (setf a-done t)))
+  (make-thread (lambda ()
+		 (dotimes (i 25) 
+		   (sb-ext:gc :full t)
+		   (princ "/") (force-output))
+		 (setf b-done t)))
   (loop
-   (when (zerop done) (return))
+   (when (and a-done b-done) (return))
    (sleep 1)))
+(format t "~&gc test done~%")
+
+#|  ;; a cll post from eric marsden
+| (defun crash ()
+|   (setq *debugger-hook*
+|         (lambda (condition old-debugger-hook)
+|           (debug:backtrace 10)
+|           (unix:unix-exit 2)))
+|   #+live-dangerously
+|   (mp::start-sigalrm-yield)
+|   (flet ((roomy () (loop (with-output-to-string (*standard-output*) (room)))))
+|     (mp:make-process #'roomy)
+|     (mp:make-process #'roomy)))
+|#
 
 ;; give the other thread time to die before we leave, otherwise the
 ;; overall exit status is 0, not 104

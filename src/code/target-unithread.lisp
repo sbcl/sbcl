@@ -122,10 +122,9 @@ time we reacquire LOCK and return to the caller."
   (signal-queue-head queue))
 
 
-;;;; multiple independent listeners
-
-(defvar *session-lock* nil)
-
 ;;;; job control
 
 (defun debugger-wait-until-foreground-thread (stream) t)
+(defun get-foreground () t)
+(defun release-foreground (&optional next) t)
+
