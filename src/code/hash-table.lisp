@@ -53,17 +53,20 @@
   (next-free-kv 0 :type index)
   ;; The index vector. This may be larger than the hash size to help
   ;; reduce collisions.
-  (index-vector (missing-arg) :type (simple-array (unsigned-byte 32) (*)))
+  (index-vector (missing-arg)
+		:type (simple-array (unsigned-byte #.sb!vm:n-word-bits) (*)))
   ;; This table parallels the KV vector, and is used to chain together
   ;; the hash buckets, the free list, and the values needing rehash, a
   ;; slot will only ever be in one of these lists.
-  (next-vector (missing-arg) :type (simple-array (unsigned-byte 32) (*)))
+  (next-vector (missing-arg)
+	       :type (simple-array (unsigned-byte #.sb!vm:n-word-bits) (*)))
   ;; This table parallels the KV table, and can be used to store the
   ;; hash associated with the key, saving recalculation. Could be
   ;; useful for EQL, and EQUAL hash tables. This table is not needed
   ;; for EQ hash tables, and when present the value of #x80000000
   ;; represents EQ-based hashing on the respective key.
-  (hash-vector nil :type (or null (simple-array (unsigned-byte 32) (*)))))
+  (hash-vector nil :type (or null (simple-array (unsigned-byte
+						 #.sb!vm:n-word-bits) (*)))))
 
 (defmacro-mundanely with-hash-table-iterator ((function hash-table) &body body)
   #!+sb-doc
