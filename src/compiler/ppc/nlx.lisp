@@ -22,12 +22,6 @@
 ;;; additional stacks, then this would be the place to restore the top
 ;;; pointers.
 
-
-;;; Return a list of TNs that can be used to snapshot the dynamic state for
-;;; use with the Save/Restore-DYNAMIC-ENVIRONMENT VOPs.
-(!def-vm-support-routine make-dynamic-state-tns ()
-  (make-n-tns 4 *backend-t-primitive-type*))
-
 (define-vop (save-dynamic-state)
   (:results (catch :scs (descriptor-reg))
 	    (nfp :scs (descriptor-reg))

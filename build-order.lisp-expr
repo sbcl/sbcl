@@ -511,6 +511,7 @@
  ("src/compiler/target/alloc")
  ("src/compiler/target/call")
  ("src/compiler/target/nlx")
+ ("src/compiler/generic/late-nlx")
  ("src/compiler/target/show")
  ("src/compiler/target/array"
   ;; KLUDGE: Compiling this file for X86 raises alarming warnings of

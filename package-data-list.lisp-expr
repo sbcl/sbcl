@@ -2,10 +2,9 @@
 
 ;;;; the specifications of target packages, except for a few things
 ;;;; which are handled elsewhere by other mechanisms:
-;;;;   * the creation of the trivial SB-SLOT-ACCESSOR-NAME package
-;;;;   * any SHADOWing and nickname hackery
+;;;;   * any SHADOWing and nickname hackery;
 ;;;;   * the standard, non-SBCL-specific packages COMMON-LISP,
-;;;;     COMMON-LISP-USER, and KEYWORD
+;;;;     COMMON-LISP-USER, and KEYWORD.
 ;;;;
 ;;;; The packages are named SB!FOO here and elsewhere in
 ;;;; cross-compilation, in order to avoid collision with possible
