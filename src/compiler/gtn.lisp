@@ -110,7 +110,7 @@
 ;;;    a non-standard convention.
 (defun use-standard-returns (tails)
   (declare (type tail-set tails))
-  (let ((funs (tail-set-functions tails)))
+  (let ((funs (tail-set-funs tails)))
     (or (and (find-if #'external-entry-point-p funs)
 	     (find-if #'has-full-call-use funs))
 	(block punt
@@ -131,7 +131,7 @@
 ;;; there is no such function, then be more vague.
 (defun return-value-efficiency-note (tails)
   (declare (type tail-set tails))
-  (let ((funs (tail-set-functions tails)))
+  (let ((funs (tail-set-funs tails)))
     (when (policy (lambda-bind (first funs))
 		  (> (max speed space)
 		     inhibit-warnings))

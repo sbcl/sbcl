@@ -119,13 +119,12 @@
 ;;; reachable from a non-local exit.
 (defun walk-home-call-graph (block component)
   (declare (type cblock block) (type component component))
-  (let ((home (block-home-lambda block)))
-    (if (eq (functional-kind home) :deleted)
+  (let ((home-lambda (block-home-lambda block)))
+    (if (eq (functional-kind home-lambda) :deleted)
 	component
-	(let* ((bind-block (node-block (lambda-bind home)))
-	       (home-component (block-component bind-block)))
+	(let ((home-component (lambda-component home-lambda)))
 	  (cond ((eq (component-kind home-component) :initial)
-		 (dfo-scavenge-call-graph home component))
+		 (dfo-scavenge-call-graph home-lambda component))
 		((eq home-component component)
 		 component)
 		(t
@@ -354,7 +353,7 @@
     ;; are moved to the appropriate newc component tail.
     (dolist (toplevel-lambda toplevel-lambdas)
       (/show toplevel-lambda)
-      (let* ((block (node-block (lambda-bind toplevel-lambda)))
+      (let* ((block (lambda-block toplevel-lambda))
 	     (old-component (block-component block))
 	     (old-component-lambdas (component-lambdas old-component))
 	     (new-component nil))
@@ -418,8 +417,7 @@
   (let* ((bind (lambda-bind lambda))
 	 (bind-block (node-block bind))
 	 (component (block-component bind-block))
-	 (result-component
-	  (block-component (node-block (lambda-bind result-lambda))))
+	 (result-component (lambda-component result-lambda))
 	 (result-return-block (node-block (lambda-return result-lambda))))
 
     ;; Move blocks into the new COMPONENT, and move any nodes directly
@@ -503,10 +501,7 @@
 	(merge-1-tl-lambda result-lambda lambda)))
      (t
       (dolist (lambda (rest lambdas))
-	(setf (functional-entry-function lambda) nil)
-	(delete-component
-	 (block-component
-	  (node-block (lambda-bind lambda)))))))
+	(setf (functional-entry-fun lambda) nil)
+	(delete-component (lambda-component lambda)))))
 
-    (values (block-component (node-block (lambda-bind result-lambda)))
-	    result-lambda)))
+    (values (lambda-component result-lambda) result-lambda)))

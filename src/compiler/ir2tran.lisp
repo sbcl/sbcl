@@ -770,7 +770,7 @@
 	  ((node-tail-p node)
 	   (ir2-convert-tail-local-call node block fun))
 	  (t
-	   (let ((start (block-label (node-block (lambda-bind fun))))
+	   (let ((start (block-label (lambda-block fun)))
 		 (returns (tail-set-info (lambda-tail-set fun)))
 		 (cont (node-cont node)))
 	     (ecase (if returns
@@ -1015,7 +1015,7 @@
   (declare (type bind node) (type ir2-block block) (type clambda fun))
   (let ((start-label (entry-info-offset (leaf-info fun)))
 	(env (physenv-info (node-physenv node))))
-    (let ((ef (functional-entry-function fun)))
+    (let ((ef (functional-entry-fun fun)))
       (cond ((and (optional-dispatch-p ef) (optional-dispatch-more-entry ef))
 	     ;; Special case the xep-allocate-frame + copy-more-arg case.
 	     (vop xep-allocate-frame node block start-label t)

@@ -512,12 +512,14 @@
     (handler-case
 	(progn
 	  (format *error-output*
-		  "~@<unhandled condition (of type ~S): ~2I~_~A~:>~2%"
+		  "~&~@<unhandled condition (of type ~S): ~2I~_~A~:>~2%"
 		  (type-of condition)
 		  condition)
 	  ;; Flush *ERROR-OUTPUT* even before the BACKTRACE, so that
-	  ;; even if we hit an error within BACKTRACE we'll at least
-	  ;; have the CONDITION printed out before we die.
+	  ;; even if we hit an error within BACKTRACE (e.g. a bug in
+	  ;; the debugger's own frame-walking code, or a bug in a user
+	  ;; PRINT-OBJECT method) we'll at least have the CONDITION
+	  ;; printed out before we die.
 	  (finish-output *error-output*)
 	  ;; (Where to truncate the BACKTRACE is of course arbitrary, but
 	  ;; it seems as though we should at least truncate it somewhere.)

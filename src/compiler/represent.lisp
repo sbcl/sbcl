@@ -323,7 +323,7 @@
 		     t)))
 	(frob lambda)
 	(when tails
-	  (dolist (fun (tail-set-functions tails))
+	  (dolist (fun (tail-set-funs tails))
 	    (frob fun))))))
 
   (values))

@@ -254,8 +254,16 @@
   #!-sb-fluid (declare (inline node-home-lambda))
   (the physenv (lambda-physenv (node-home-lambda node))))
 
-;;; Return the enclosing cleanup for environment of the first or last node
-;;; in BLOCK.
+#!-sb-fluid (declaim (maybe-inline lambda-block))
+(defun lambda-block (clambda)
+  (declare (type clambda clambda))
+  (node-block (lambda-bind clambda)))
+(defun lambda-component (clambda)
+  (declare (inline lambda-block))
+  (block-component (lambda-block clambda)))
+
+;;; Return the enclosing cleanup for environment of the first or last
+;;; node in BLOCK.
 (defun block-start-cleanup (block)
   (declare (type cblock block))
   (node-enclosing-cleanup (continuation-next (block-start block))))
@@ -559,7 +567,7 @@
 ;;; DELETE-REF will handle the deletion.
 (defun delete-functional (fun)
   (aver (and (null (leaf-refs fun))
-	     (not (functional-entry-function fun))))
+	     (not (functional-entry-fun fun))))
   (etypecase fun
     (optional-dispatch (delete-optional-dispatch fun))
     (clambda (delete-lambda fun)))
@@ -578,8 +586,8 @@
 ;;; (it won't be there before local call analysis, but no matter.) If
 ;;; the lambda was never referenced, we give a note.
 ;;;
-;;; If the lambda is an XEP, then we null out the ENTRY-FUNCTION in its
-;;; ENTRY-FUNCTION so that people will know that it is not an entry point
+;;; If the lambda is an XEP, then we null out the ENTRY-FUN in its
+;;; ENTRY-FUN so that people will know that it is not an entry point
 ;;; anymore.
 (defun delete-lambda (leaf)
   (declare (type clambda leaf))
@@ -609,15 +617,15 @@
 	    (unlink-blocks (node-block return) (component-tail component)))
 	  (setf (component-reanalyze component) t)
 	  (let ((tails (lambda-tail-set leaf)))
-	    (setf (tail-set-functions tails)
-		  (delete leaf (tail-set-functions tails)))
+	    (setf (tail-set-funs tails)
+		  (delete leaf (tail-set-funs tails)))
 	    (setf (lambda-tail-set leaf) nil))
 	  (setf (component-lambdas component)
 		(delete leaf (component-lambdas component)))))
 
     (when (eq kind :external)
-      (let ((fun (functional-entry-function leaf)))
-	(setf (functional-entry-function fun) nil)
+      (let ((fun (functional-entry-fun leaf)))
+	(setf (functional-entry-fun fun) nil)
 	(when (optional-dispatch-p fun)
 	  (delete-optional-dispatch fun)))))
 
@@ -643,7 +651,7 @@
 ;;; or even converted to a let.
 (defun delete-optional-dispatch (leaf)
   (declare (type optional-dispatch leaf))
-  (let ((entry (functional-entry-function leaf)))
+  (let ((entry (functional-entry-fun leaf)))
     (unless (and entry (leaf-refs entry))
       (aver (or (not entry) (eq (functional-kind entry) :deleted)))
       (setf (functional-kind leaf) :deleted)
@@ -686,7 +694,7 @@
 	     (clambda
 	      (ecase (functional-kind leaf)
 		((nil :let :mv-let :assignment :escape :cleanup)
-		 (aver (not (functional-entry-function leaf)))
+		 (aver (not (functional-entry-fun leaf)))
 		 (delete-lambda leaf))
 		(:external
 		 (delete-lambda leaf))
@@ -1056,7 +1064,7 @@
     (setf (block-delete-p block) t))
   (dolist (fun (component-lambdas component))
     (setf (functional-kind fun) nil)
-    (setf (functional-entry-function fun) nil)
+    (setf (functional-entry-fun fun) nil)
     (setf (leaf-refs fun) nil)
     (delete-functional fun))
   (do-blocks (block component)

@@ -56,7 +56,7 @@
 ;;; also delete the FUNCTIONAL from *FREE-FUNCTIONS* to eliminate the
 ;;; possibility that new references might be converted to it.
 (defun finalize-xep-definition (fun)
-  (let* ((leaf (functional-entry-function fun))
+  (let* ((leaf (functional-entry-fun fun))
 	 (defined-ftype (definition-type leaf)))
     (setf (leaf-type leaf) defined-ftype)
     (when (leaf-has-source-name-p leaf)

@@ -424,7 +424,7 @@
     (node-ends-block call)
     (let ((block (node-block call)))
       (unlink-blocks block (first (block-succ block)))
-      (link-blocks block (node-block (lambda-bind callee)))))
+      (link-blocks block (lambda-block callee))))
   (values))
 
 ;;; Annotate the value continuation.

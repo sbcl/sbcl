@@ -918,7 +918,7 @@
 	    (when (funcall (pprint-dispatch-entry-test-fn entry) object)
 	      (return entry)))))
     (if entry
-	(values (pprint-dispatch-entry-function entry) t)
+	(values (pprint-dispatch-entry-fun entry) t)
 	(values #'(lambda (stream object)
 		    (output-ugly-object object stream))
 		nil))))

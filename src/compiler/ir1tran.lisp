@@ -346,7 +346,7 @@
 	   (res (ir1-convert-lambda-body
 		 forms ()
 		 :debug-name (debug-namify "top level form ~S" form))))
-      (setf (functional-entry-function res) res
+      (setf (functional-entry-fun res) res
 	    (functional-arg-documentation res) ()
 	    (functional-kind res) :toplevel)
       res)))
@@ -1354,8 +1354,8 @@
 			      :%debug-name debug-name))
 	 (result (or result (make-continuation))))
 
-    ;; This function should fail internal assertions if we didn't set
-    ;; up a valid debug name above.
+    ;; just to check: This function should fail internal assertions if
+    ;; we didn't set up a valid debug name above.
     ;;
     ;; (In SBCL we try to make everything have a debug name, since we
     ;; lack the omniscient perspective the original implementors used
@@ -1396,7 +1396,7 @@
 	(let ((block (continuation-block result)))
 	  (when block
 	    (let ((return (make-return :result result :lambda lambda))
-		  (tail-set (make-tail-set :functions (list lambda)))
+		  (tail-set (make-tail-set :funs (list lambda)))
 		  (dummy (make-continuation)))
 	      (setf (lambda-tail-set lambda) tail-set)
 	      (setf (lambda-return lambda) return)

@@ -170,15 +170,15 @@
 (defun check-function-stuff (functional)
   (ecase (functional-kind functional)
     (:external
-     (let ((fun (functional-entry-function functional)))
+     (let ((fun (functional-entry-fun functional)))
        (check-function-reached fun functional)
        (when (functional-kind fun)
 	 (barf "The function for XEP ~S has kind." functional))
-       (unless (eq (functional-entry-function fun) functional)
+       (unless (eq (functional-entry-fun fun) functional)
 	 (barf "bad back-pointer in function for XEP ~S" functional))))
     ((:let :mv-let :assignment)
      (check-function-reached (lambda-home functional) functional)
-     (when (functional-entry-function functional)
+     (when (functional-entry-fun functional)
        (barf "The LET ~S has entry function." functional))
      (unless (member functional (lambda-lets (lambda-home functional)))
        (barf "The LET ~S is not in LETs for HOME." functional))
@@ -188,8 +188,8 @@
      (when (lambda-lets functional)
        (barf "LETs in a LET: ~S" functional)))
     (:optional
-     (when (functional-entry-function functional)
-       (barf ":OPTIONAL ~S has an ENTRY-FUNCTION." functional))
+     (when (functional-entry-fun functional)
+       (barf ":OPTIONAL ~S has an ENTRY-FUN." functional))
      (let ((ef (lambda-optional-dispatch functional)))
        (check-function-reached ef functional)
        (unless (or (member functional (optional-dispatch-entry-points ef))
@@ -198,16 +198,14 @@
 	 (barf ":OPTIONAL ~S is not an e-p for its OPTIONAL-DISPATCH ~S."
 	       functional ef))))
     (:toplevel
-     (unless (eq (functional-entry-function functional) functional)
-       (barf "The ENTRY-FUNCTION in ~S isn't a self-pointer." functional)))
+     (unless (eq (functional-entry-fun functional) functional)
+       (barf "The ENTRY-FUN in ~S isn't a self-pointer." functional)))
     ((nil :escape :cleanup)
-     (let ((ef (functional-entry-function functional)))
+     (let ((ef (functional-entry-fun functional)))
        (when ef
 	 (check-function-reached ef functional)
 	 (unless (eq (functional-kind ef) :external)
-	   (barf "The ENTRY-FUNCTION in ~S isn't an XEP: ~S."
-		 functional
-		 ef)))))
+	   (barf "The ENTRY-FUN in ~S isn't an XEP: ~S." functional ef)))))
     (:deleted
      (return-from check-function-stuff)))
 
@@ -249,7 +247,7 @@
       (observe-functional new-fun))
     (dolist (fun (component-lambdas c))
       (when (eq (functional-kind fun) :external)
-	(let ((ef (functional-entry-function fun)))
+	(let ((ef (functional-entry-fun fun)))
 	  (when (optional-dispatch-p ef)
 	    (observe-functional ef))))
       (observe-functional fun)
@@ -928,7 +926,7 @@
     (component (component-head thing))
 #|    (cloop (loop-head thing))|#
     (integer (continuation-block (num-cont thing)))
-    (functional (node-block (lambda-bind (main-entry thing))))
+    (functional (lambda-block (main-entry thing)))
     (null (error "Bad thing: ~S." thing))
     (symbol (block-or-lose (gethash thing *free-functions*)))))
 

@@ -828,15 +828,13 @@
 
 
 ;;; utilities for extracting COMPONENTs of FUNCTIONALs
-(defun clambda-component (clambda)
-  (block-component (node-block (lambda-bind clambda))))
 (defun functional-components (f)
   (declare (type functional f))
   (etypecase f
-    (clambda (list (clambda-component f)))
+    (clambda (list (lambda-component f)))
     (optional-dispatch (let ((result nil))
 			 (labels ((frob (clambda)
-				    (pushnew (clambda-component clambda)
+				    (pushnew (lambda-component clambda)
 					     result))
 				  (maybe-frob (maybe-clambda)
 				    (when maybe-clambda
@@ -870,7 +868,7 @@
       (/show "in MAKE-FUNCTIONAL-FROM-TOP-LEVEL-LAMBDA" locall-fun fun component)
       (/show (component-lambdas component))
       (/show (lambda-calls fun))
-      (setf (functional-entry-function fun) locall-fun
+      (setf (functional-entry-fun fun) locall-fun
             (functional-kind fun) :external
             (functional-has-external-references-p fun) t)
       fun)))
@@ -903,8 +901,7 @@
 						    :name name
 						    :path path)))
     (/show "back in %COMPILE from M-F-FROM-TL-LAMBDA" fun)
-    (/show (block-component (node-block (lambda-bind fun))))
-    (/show (component-lambdas (block-component (node-block (lambda-bind fun)))))
+    (/show (lambda-component fun) (component-lambdas (lambda-component fun)))
 
     ;; FIXME: The compile-it code from here on is sort of a
     ;; twisted version of the code in COMPILE-TOPLEVEL. It'd be
@@ -914,6 +911,7 @@
     ;; the :LOCALL-ONLY option to IR1-FOR-LAMBDA. Then maybe the
     ;; whole FUNCTIONAL-KIND=:TOPLEVEL case could go away..)
 
+    #+nil (break "before LOCALL-ANALYZE-CLAMBDAS-UNTIL-DONE" fun)
     (locall-analyze-clambdas-until-done (list fun))
     (/show (lambda-calls fun))
     #+nil (break "back from LOCALL-ANALYZE-CLAMBDAS-UNTIL-DONE" fun)
@@ -1158,7 +1156,7 @@
 (defun compile-load-time-value-lambda (lambdas)
   (aver (null (cdr lambdas)))
   (let* ((lambda (car lambdas))
-	 (component (block-component (node-block (lambda-bind lambda)))))
+	 (component (lambda-component lambda)))
     (when (eql (component-kind component) :toplevel)
       (setf (component-name component) (leaf-debug-name lambda))
       (compile-component component)

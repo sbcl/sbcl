@@ -54,7 +54,7 @@
 (defun compute-entry-info (fun info)
   (declare (type clambda fun) (type entry-info info))
   (let ((bind (lambda-bind fun))
-	(internal-fun (functional-entry-function fun)))
+	(internal-fun (functional-entry-fun fun)))
     (setf (entry-info-closure-p info)
 	  (not (null (physenv-closure (lambda-physenv fun)))))
     (setf (entry-info-offset info) (gen-label))
@@ -87,7 +87,7 @@
       (case (functional-kind lambda)
 	(:external
 	 (unless (lambda-has-external-references-p lambda)
-	   (let* ((ef (functional-entry-function lambda))
+	   (let* ((ef (functional-entry-fun lambda))
 		  (new (make-functional
 			:kind :toplevel-xep
 			:info (leaf-info lambda)

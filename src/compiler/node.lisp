@@ -527,7 +527,7 @@
 ;;; end up tail-recursive causes TAIL-SET merging.
 (defstruct (tail-set)
   ;; a list of all the LAMBDAs in this tail set
-  (functions nil :type list)
+  (funs nil :type list)
   ;; our current best guess of the type returned by these functions.
   ;; This is the union across all the functions of the return node's
   ;; RESULT-TYPE, excluding local calls.
@@ -535,7 +535,7 @@
   ;; some info used by the back end
   (info nil))
 (defprinter (tail-set :identity t)
-  functions
+  funs
   type
   (info :test info))
 
@@ -788,13 +788,13 @@
   ;;
   ;;    :EXTERNAL
   ;;	an external entry point lambda. The function it is an entry
-  ;;	for is in the ENTRY-FUNCTION slot.
+  ;;	for is in the ENTRY-FUN slot.
   ;;
   ;;    :TOPLEVEL
   ;;	a top level lambda, holding a compiled top level form.
   ;;	Compiled very much like NIL, but provides an indication of
   ;;	top level context. A :TOPLEVEL lambda should have *no*
-  ;;	references. Its ENTRY-FUNCTION is a self-pointer.
+  ;;	references. Its ENTRY-FUN is a self-pointer.
   ;;
   ;;    :TOPLEVEL-XEP
   ;;	After a component is compiled, we clobber any top level code
@@ -838,7 +838,7 @@
   ;; :TOPLEVEL lambda (which is its own XEP) this is a self-pointer.
   ;;
   ;; With all other kinds, this is null.
-  (entry-function nil :type (or functional null))
+  (entry-fun nil :type (or functional null))
   ;; the value of any inline/notinline declaration for a local function
   (inlinep nil :type inlinep)
   ;; If we have a lambda that can be used as in inline expansion for

@@ -67,11 +67,11 @@
       (let ((call-set (lambda-tail-set (node-home-lambda call)))
 	    (fun-set (lambda-tail-set new-fun)))
 	(unless (eq call-set fun-set)
-	  (let ((funs (tail-set-functions fun-set)))
+	  (let ((funs (tail-set-funs fun-set)))
 	    (dolist (fun funs)
 	      (setf (lambda-tail-set fun) call-set))
-	    (setf (tail-set-functions call-set)
-		  (nconc (tail-set-functions call-set) funs)))
+	    (setf (tail-set-funs call-set)
+		  (nconc (tail-set-funs call-set) funs)))
 	  (reoptimize-continuation (return-result return))
 	  t)))))
 
@@ -177,7 +177,7 @@
 ;;; discover an XEP after the initial local call analyze pass.
 (defun make-external-entry-point (fun)
   (declare (type functional fun))
-  (aver (not (functional-entry-function fun)))
+  (aver (not (functional-entry-fun fun)))
   (with-ir1-environment (lambda-bind (main-entry fun))
     (let ((res (ir1-convert-lambda (make-xep-lambda-expression fun)
 				   :debug-name (debug-namify
@@ -185,8 +185,8 @@
 						(leaf-debug-name fun)))))
       (setf (functional-kind res) :external
 	    (leaf-ever-used res) t
-	    (functional-entry-function res) fun
-	    (functional-entry-function fun) res
+	    (functional-entry-fun res) fun
+	    (functional-entry-fun fun) res
 	    (component-reanalyze *current-component*) t
 	    (component-reoptimize *current-component*) t)
       (etypecase fun
@@ -209,7 +209,7 @@
   (let ((fun (ref-leaf ref)))
     (unless (or (external-entry-point-p fun)
 		(member (functional-kind fun) '(:escape :cleanup)))
-      (change-ref-leaf ref (or (functional-entry-function fun)
+      (change-ref-leaf ref (or (functional-entry-fun fun)
 			       (make-external-entry-point fun))))))
 
 ;;; Attempt to convert all references to FUN to local calls. The
@@ -272,22 +272,30 @@
       (let ((kind (functional-kind fun)))
 	(cond ((member kind '(:deleted :let :mv-let :assignment)))
 	      ((and (null (leaf-refs fun)) (eq kind nil)
-		    (not (functional-entry-function fun)))
+		    (not (functional-entry-fun fun)))
 	       (delete-functional fun))
 	      (t
-	       (when (and new-fun (lambda-p fun))
-		 (push fun (component-lambdas component)))
+	       ;; Fix/check FUN's relationship to COMPONENT-LAMDBAS.
+	       (cond ((not (lambda-p fun))
+		      ;; Since FUN's not a LAMBDA, this doesn't apply: no-op.
+		      (values))
+		     (new-fun ; FUN came from NEW-FUNS, hence is new.
+		      ;; FUN becomes part of COMPONENT-LAMBDAS now.
+		      (aver (not (member fun (component-lambdas component))))
+		      (push fun (component-lambdas component)))
+		     (t ; FUN's old.
+		      ;; FUN should be in COMPONENT-LAMBDAS already.
+		      (aver (member fun (component-lambdas component)))))
 	       (locall-analyze-fun-1 fun)
 	       (when (lambda-p fun)
 		 (maybe-let-convert fun)))))))
-
   (values))
 
 (defun locall-analyze-clambdas-until-done (clambdas)
   (loop
    (let ((did-something nil))
      (dolist (clambda clambdas)
-       (let* ((component (block-component (node-block (lambda-bind clambda))))
+       (let* ((component (lambda-component clambda))
 	      (*all-components* (list component)))
 	 ;; The original CMU CL code seemed to implicitly assume that
 	 ;; COMPONENT is the only one here. Let's make that explicit.
@@ -367,7 +375,7 @@
 			       (lambda-bind (main-entry original-fun))))
 			     component))))
       (let ((fun (if (external-entry-point-p original-fun)
-		     (functional-entry-function original-fun)
+		     (functional-entry-fun original-fun)
 		     original-fun))
 	    (*compiler-error-context* call))
 
@@ -404,7 +412,7 @@
 (defun convert-mv-call (ref call fun)
   (declare (type ref ref) (type mv-combination call) (type functional fun))
   (when (and (looks-like-an-mv-bind fun)
-	     (not (functional-entry-function fun))
+	     (not (functional-entry-fun fun))
 	     (= (length (leaf-refs fun)) 1)
 	     (= (length (basic-combination-args call)) 1))
     (let ((ep (car (last (optional-dispatch-entry-points fun)))))
@@ -631,11 +639,11 @@
 ;;;;    corresponding combination node, making the control transfer
 ;;;;    explicit and allowing LETs to be mashed together into a single
 ;;;;    block. The value of the LET is delivered directly to the
-;;;;    original continuation for the call,eliminating the need to
+;;;;    original continuation for the call, eliminating the need to
 ;;;;    propagate information from the dummy result continuation.
 ;;;; -- As far as IR1 optimization is concerned, it is interesting in
 ;;;;    that there is only one expression that the variable can be bound
-;;;;    to, and this is easily substitited for.
+;;;;    to, and this is easily substituted for.
 ;;;; -- LETs are interesting to environment analysis and to the back
 ;;;;    end because in most ways a LET can be considered to be "the
 ;;;;    same function" as its home function.
@@ -644,23 +652,23 @@
 ;;;;    control transfer, cleanup code must be emitted to remove
 ;;;;    dynamic bindings that are no longer in effect.
 
-;;; Set up the control transfer to the called lambda. We split the
-;;; call block immediately after the call, and link the head of FUN to
-;;; the call block. The successor block after splitting (where we
-;;; return to) is returned.
+;;; Set up the control transfer to the called CLAMBDA. We split the
+;;; call block immediately after the call, and link the head of
+;;; CLAMBDA to the call block. The successor block after splitting
+;;; (where we return to) is returned.
 ;;;
 ;;; If the lambda is is a different component than the call, then we
 ;;; call JOIN-COMPONENTS. This only happens in block compilation
 ;;; before FIND-INITIAL-DFO.
-(defun insert-let-body (fun call)
-  (declare (type clambda fun) (type basic-combination call))
+(defun insert-let-body (clambda call)
+  (declare (type clambda clambda) (type basic-combination call))
   (let* ((call-block (node-block call))
-	 (bind-block (node-block (lambda-bind fun)))
+	 (bind-block (node-block (lambda-bind clambda)))
 	 (component (block-component call-block)))
-    (let ((fun-component (block-component bind-block)))
-      (unless (eq fun-component component)
+    (let ((clambda-component (block-component bind-block)))
+      (unless (eq clambda-component component)
 	(aver (eq (component-kind component) :initial))
-	(join-components component fun-component)))
+	(join-components component clambda-component)))
 
     (let ((*current-component* component))
       (node-ends-block call))
@@ -673,18 +681,18 @@
       (link-blocks call-block bind-block)
       next-block)))
 
-;;; Remove FUN from the tail set of anything it used to be in the
-;;; same set as; but leave FUN with a valid tail set value of
+;;; Remove CLAMBDA from the tail set of anything it used to be in the
+;;; same set as; but leave CLAMBDA with a valid tail set value of
 ;;; its own, for the benefit of code which might try to pull
 ;;; something out of it (e.g. return type).
-(defun depart-from-tail-set (fun)
+(defun depart-from-tail-set (clambda)
   ;; Until sbcl-0.pre7.37.flaky5.2, we did
-  ;;   (LET ((TAILS (LAMBDA-TAIL-SET FUN)))
-  ;;     (SETF (TAIL-SET-FUNCTIONS TAILS)
-  ;;           (DELETE FUN (TAIL-SET-FUNCTIONS TAILS))))
-  ;;   (SETF (LAMBDA-TAIL-SET FUN) NIL)
+  ;;   (LET ((TAILS (LAMBDA-TAIL-SET CLAMBDA)))
+  ;;     (SETF (TAIL-SET-FUNS TAILS)
+  ;;           (DELETE CLAMBDA (TAIL-SET-FUNS TAILS))))
+  ;;   (SETF (LAMBDA-TAIL-SET CLAMBDA) NIL)
   ;; here. Apparently the idea behind the (SETF .. NIL) was that since
-  ;; TAIL-SET-FUNCTIONS no longer thinks we're in the tail set, it's
+  ;; TAIL-SET-FUNS no longer thinks we're in the tail set, it's
   ;; inconsistent, and perhaps unsafe, for us to think we're in the
   ;; tail set. Unfortunately..
   ;;
@@ -698,10 +706,10 @@
   ;; the now-NILed-out TAIL-SET. So..
   ;;
   ;; To deal with this problem, we no longer NIL out 
-  ;; (LAMBDA-TAIL-SET FUN) here. Instead:
-  ;;   * If we're the only function in TAIL-SET-FUNCTIONS, it should
+  ;; (LAMBDA-TAIL-SET CLAMBDA) here. Instead:
+  ;;   * If we're the only function in TAIL-SET-FUNS, it should
   ;;     be safe to leave ourself linked to it, and it to you.
-  ;;   * If there are other functions in TAIL-SET-FUNCTIONS, then we're
+  ;;   * If there are other functions in TAIL-SET-FUNS, then we're
   ;;     afraid of future optimizations on those functions causing
   ;;     the TAIL-SET object no longer to be valid to describe our
   ;;     return value. Thus, we delete ourselves from that object;
@@ -709,62 +717,75 @@
   ;;     one, for ourselves, for the use of later code (e.g.
   ;;     FINALIZE-XEP-DEFINITION) which might want to
   ;;     know about our return type.
-  (let* ((old-tail-set (lambda-tail-set fun))
-	 (old-tail-set-functions (tail-set-functions old-tail-set)))
-    (unless (= 1 (length old-tail-set-functions))
-      (setf (tail-set-functions old-tail-set)
-	    (delete fun old-tail-set-functions))
+  (let* ((old-tail-set (lambda-tail-set clambda))
+	 (old-tail-set-funs (tail-set-funs old-tail-set)))
+    (unless (= 1 (length old-tail-set-funs))
+      (setf (tail-set-funs old-tail-set)
+	    (delete clambda old-tail-set-funs))
       (let ((new-tail-set (copy-tail-set old-tail-set)))
-	(setf (lambda-tail-set fun) new-tail-set
-	      (tail-set-functions new-tail-set) (list fun)))))
+	(setf (lambda-tail-set clambda) new-tail-set
+	      (tail-set-funs new-tail-set) (list clambda)))))
   ;; The documentation on TAIL-SET-INFO doesn't tell whether it could
   ;; remain valid in this case, so we nuke it on the theory that
   ;; missing information tends to be less dangerous than incorrect
   ;; information.
-  (setf (tail-set-info (lambda-tail-set fun)) nil))
+  (setf (tail-set-info (lambda-tail-set clambda)) nil))
 
-;;; Handle the environment semantics of LET conversion. We add the
-;;; lambda and its LETs to LETs for the CALL's home function. We merge
-;;; the calls for FUN with the calls for the home function, removing
-;;; FUN in the process. We also merge the ENTRIES.
+;;; Handle the environment semantics of LET conversion. We add CLAMBDA
+;;; and its LETs to LETs for the CALL's home function. We merge the
+;;; calls for CLAMBDA with the calls for the home function, removing
+;;; CLAMBDA in the process. We also merge the ENTRIES.
 ;;;
 ;;; We also unlink the function head from the component head and set
 ;;; COMPONENT-REANALYZE to true to indicate that the DFO should be
 ;;; recomputed.
-(defun merge-lets (fun call)
+(defun merge-lets (clambda call)
 
-  (declare (type clambda fun) (type basic-combination call))
+  (declare (type clambda clambda) (type basic-combination call))
 
   (let ((component (block-component (node-block call))))
-    (unlink-blocks (component-head component) (node-block (lambda-bind fun)))
+    (unlink-blocks (component-head component) (lambda-block clambda))
     (setf (component-lambdas component)
-	  (delete fun (component-lambdas component)))
+	  (delete clambda (component-lambdas component)))
     (setf (component-reanalyze component) t))
-  (setf (lambda-call-lexenv fun) (node-lexenv call))
+  (setf (lambda-call-lexenv clambda) (node-lexenv call))
 
-  (depart-from-tail-set fun)
+  (depart-from-tail-set clambda)
 
   (let* ((home (node-home-lambda call))
 	 (home-env (lambda-physenv home)))
-    (push fun (lambda-lets home))
-    (setf (lambda-home fun) home)
-    (setf (lambda-physenv fun) home-env)
 
-    (let ((lets (lambda-lets fun)))
+    ;; CLAMBDA belongs to HOME now.
+    (push clambda (lambda-lets home))
+    (setf (lambda-home clambda) home)
+    (setf (lambda-physenv clambda) home-env)
+
+    (let ((lets (lambda-lets clambda)))
+      ;; All CLAMBDA's LETs belong to HOME now.
       (dolist (let lets)
 	(setf (lambda-home let) home)
 	(setf (lambda-physenv let) home-env))
-
       (setf (lambda-lets home) (nconc lets (lambda-lets home)))
-      (setf (lambda-lets fun) ()))
+      ;; CLAMBDA no longer has an independent existence as an entity
+      ;; which has LETs.
+      (setf (lambda-lets clambda) nil))
 
+    ;; HOME no longer calls CLAMBDA, and owns all of CLAMBDA's old
+    ;; calls.
     (setf (lambda-calls home)
-            (delete fun (nunion (lambda-calls fun) (lambda-calls home))))
-    (setf (lambda-calls fun) ())
+	  (delete clambda
+		  (nunion (lambda-calls clambda)
+			  (lambda-calls home))))
+    ;; CLAMBDA no longer has an independent existence as an entity
+    ;; which calls things.
+    (setf (lambda-calls clambda) nil)
 
+    ;; All CLAMBDA's ENTRIES belong to HOME now.
     (setf (lambda-entries home)
-	  (nconc (lambda-entries fun) (lambda-entries home)))
-    (setf (lambda-entries fun) ()))
+	  (nconc (lambda-entries clambda) (lambda-entries home)))
+    ;; CLAMBDA no longer has an independent existence as an entity
+    ;; with ENTRIES.
+    (setf (lambda-entries clambda) nil))
 
   (values))
 
@@ -889,11 +910,11 @@
   (values))
 
 ;;; Actually do LET conversion. We call subfunctions to do most of the
-;;; work. We change the CALL's cont to be the continuation heading the
+;;; work. We change the CALL's CONT to be the continuation heading the
 ;;; bind block, and also do REOPTIMIZE-CONTINUATION on the args and
-;;; Cont so that LET-specific IR1 optimizations get a chance. We blow
+;;; CONT so that LET-specific IR1 optimizations get a chance. We blow
 ;;; away any entry for the function in *FREE-FUNCTIONS* so that nobody
-;;; will create new reference to it.
+;;; will create new references to it.
 (defun let-convert (fun call)
   (declare (type clambda fun) (type basic-combination call))
   (let ((next-block (if (node-tail-p call)
@@ -902,7 +923,7 @@
     (move-return-stuff fun call next-block)
     (merge-lets fun call)))
 
-;;; Reoptimize all of Call's args and its result.
+;;; Reoptimize all of CALL's args and its result.
 (defun reoptimize-call (call)
   (declare (type basic-combination call))
   (dolist (arg (basic-combination-args call))
@@ -913,18 +934,16 @@
 
 ;;; We also don't convert calls to named functions which appear in the
 ;;; initial component, delaying this until optimization. This
-;;; minimizes the likelyhood that we well let-convert a function which
-;;; may have references added due to later local inline expansion
+;;; minimizes the likelihood that we will LET-convert a function which
+;;; may have references added due to later local inline expansion.
 (defun ok-initial-convert-p (fun)
   (not (and (leaf-has-source-name-p fun)
-	    (eq (component-kind
-		 (block-component
-		  (node-block (lambda-bind fun))))
+	    (eq (component-kind (lambda-component fun))
 		:initial))))
 
 ;;; This function is called when there is some reason to believe that
-;;; the lambda Fun might be converted into a let. This is done after
-;;; local call analysis, and also when a reference is deleted. We only
+;;; CLAMBDA might be converted into a LET. This is done after local
+;;; call analysis, and also when a reference is deleted. We only
 ;;; convert to a let when the function is a normal local function, has
 ;;; no XEP, and is referenced in exactly one local call. Conversion is
 ;;; also inhibited if the only reference is in a block about to be
@@ -941,13 +960,13 @@
 ;;; We don't attempt to convert calls to functions that have an XEP,
 ;;; since we might be embarrassed later when we want to convert a
 ;;; newly discovered local call. Also, see OK-INITIAL-CONVERT-P.
-(defun maybe-let-convert (fun)
-  (declare (type clambda fun))
-  (let ((refs (leaf-refs fun)))
+(defun maybe-let-convert (clambda)
+  (declare (type clambda clambda))
+  (let ((refs (leaf-refs clambda)))
     (when (and refs
 	       (null (rest refs))
-	       (member (functional-kind fun) '(nil :assignment))
-	       (not (functional-entry-function fun)))
+	       (member (functional-kind clambda) '(nil :assignment))
+	       (not (functional-entry-fun clambda)))
       (let* ((ref-cont (node-cont (first refs)))
 	     (dest (continuation-dest ref-cont)))
 	(when (and dest
@@ -955,14 +974,14 @@
 		   (eq (basic-combination-fun dest) ref-cont)
 		   (eq (basic-combination-kind dest) :local)
 		   (not (block-delete-p (node-block dest)))
-		   (cond ((ok-initial-convert-p fun) t)
+		   (cond ((ok-initial-convert-p clambda) t)
 			 (t
 			  (reoptimize-continuation ref-cont)
 			  nil)))
-	  (unless (eq (functional-kind fun) :assignment)
-	    (let-convert fun dest))
+	  (unless (eq (functional-kind clambda) :assignment)
+	    (let-convert clambda dest))
 	  (reoptimize-call dest)
-	  (setf (functional-kind fun)
+	  (setf (functional-kind clambda)
 		(if (mv-combination-p dest) :mv-let :let))))
       t)))
 
@@ -1011,7 +1030,7 @@
 	    (fun (combination-lambda call)))
 	(setf (node-tail-p call) t)
 	(unlink-blocks block (first (block-succ block)))
-	(link-blocks block (node-block (lambda-bind fun)))
+	(link-blocks block (lambda-block fun))
 	(values t (maybe-convert-to-assignment fun))))))
 
 ;;; This is called when we believe it might make sense to convert Fun
@@ -1037,7 +1056,7 @@
 (defun maybe-convert-to-assignment (fun)
   (declare (type clambda fun))
   (when (and (not (functional-kind fun))
-	     (not (functional-entry-function fun)))
+	     (not (functional-entry-fun fun)))
     (let ((non-tail nil)
 	  (call-fun nil))
       (when (and (dolist (ref (leaf-refs fun) t)

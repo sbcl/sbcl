@@ -554,8 +554,7 @@
 				     :adjustable t)))
       (dolist (fun (component-lambdas component))
 	(clrhash var-locs)
-	(dfuns (cons (label-position
-		      (block-label (node-block (lambda-bind fun))))
+	(dfuns (cons (label-position (block-label (lambda-block fun)))
 		     (compute-1-debug-fun fun var-locs))))
       (let* ((sorted (sort (dfuns) #'< :key #'car))
 	     (fun-map (compute-debug-fun-map sorted)))

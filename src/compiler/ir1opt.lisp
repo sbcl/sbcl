@@ -497,7 +497,7 @@
 (defun ir1-optimize-return (node)
   (declare (type creturn node))
   (let* ((tails (lambda-tail-set (return-lambda node)))
-	 (funs (tail-set-functions tails)))
+	 (funs (tail-set-funs tails)))
     (collect ((res *empty-type* values-type-union))
       (dolist (fun funs)
 	(let ((return (lambda-return fun)))
@@ -509,7 +509,7 @@
 
       (when (type/= (res) (tail-set-type tails))
 	(setf (tail-set-type tails) (res))
-	(dolist (fun (tail-set-functions tails))
+	(dolist (fun (tail-set-funs tails))
 	  (dolist (ref (leaf-refs fun))
 	    (reoptimize-continuation (node-cont ref)))))))
 
@@ -1313,7 +1313,7 @@
 (defun propagate-local-call-args (call fun)
   (declare (type combination call) (type clambda fun))
 
-  (unless (or (functional-entry-function fun)
+  (unless (or (functional-entry-fun fun)
 	      (lambda-optional-dispatch fun))
     (let* ((vars (lambda-vars fun))
 	   (union (mapcar #'(lambda (arg var)
