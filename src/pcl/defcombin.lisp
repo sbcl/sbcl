@@ -99,6 +99,7 @@
     (when old-method
       (remove-method #'find-method-combination old-method))
     (add-method #'find-method-combination new-method)
+    (setf (random-documentation type 'method-combination) doc)
     type))
 
 (defun short-combine-methods (type options operator ioa method doc)
@@ -256,6 +257,7 @@
     (setf (gethash type *long-method-combination-functions*) function)
     (when old-method (remove-method #'find-method-combination old-method))
     (add-method #'find-method-combination new-method)
+    (setf (random-documentation type 'method-combination) doc)
     type))
 
 (defmethod compute-effective-method ((generic-function generic-function)

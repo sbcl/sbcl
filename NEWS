@@ -2003,8 +2003,13 @@ changes in sbcl-0.8.3 relative to sbcl-0.8.2:
 
 changes in sbcl-0.8.4 relative to sbcl-0.8.3:
   * fixed compiler performance when processing loops with a step >1;
-  * optimization: restored some effective method precomputation
-    (turned off by an ANSI fix in sbcl-0.8.3); the amount of
+  * bug fix: DOCUMENTATION now retrieves generic function
+    documentation.  Also, DOCUMENTATION and (SETF DOCUMENTATION)
+    support has been systematized, and now supports the methods
+    specified by ANSI, along with a default method and a method for
+    slot documentation.  (reported by Nathan Froyd)
+  * optimization: restored some effective method precomputation in
+    CLOS (turned off by an ANSI fix in sbcl-0.8.3); the amount of
     precomputation is now tunable.
 
 planned incompatible changes in 0.8.x:

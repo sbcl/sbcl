@@ -418,10 +418,6 @@
     :accessor object-plist))
   (:metaclass std-class))
 
-(defclass documentation-mixin (plist-mixin)
-  ()
-  (:metaclass std-class))
-
 (defclass dependent-update-mixin (plist-mixin)
   ()
   (:metaclass std-class))
@@ -429,8 +425,7 @@
 ;;; The class CLASS is a specified basic class. It is the common
 ;;; superclass of any kind of class. That is, any class that can be a
 ;;; metaclass must have the class CLASS in its class precedence list.
-(defclass class (documentation-mixin
-		 dependent-update-mixin
+(defclass class (dependent-update-mixin
 		 definition-source-mixin
 		 specializer)
   ((name
@@ -454,6 +449,9 @@
    (predicate-name
     :initform nil
     :reader class-predicate-name)
+   (documentation
+    :initform nil
+    :initarg :documentation)
    (finalized-p
     :initform nil
     :reader class-finalized-p)))
@@ -581,7 +579,7 @@
     :initarg :type
     :accessor slot-definition-type)
    (documentation
-    :initform ""
+    :initform nil
     :initarg :documentation)
    (class
     :initform nil
@@ -686,11 +684,9 @@
     :initform nil
     :initarg :fast-function		;no writer
     :reader method-fast-function)
-;;;     (documentation
-;;;	:initform nil
-;;;	:initarg  :documentation
-;;;	:reader method-documentation)
-  ))
+   (documentation
+    :initform nil
+    :initarg :documentation)))
 
 (defclass standard-accessor-method (standard-method)
   ((slot-name :initform nil
@@ -708,9 +704,11 @@
 
 (defclass generic-function (dependent-update-mixin
 			    definition-source-mixin
-			    documentation-mixin
 			    funcallable-standard-object)
-  (;; We need to make a distinction between the methods initially set
+  ((documentation
+    :initform nil
+    :initarg :documentation)
+   ;; We need to make a distinction between the methods initially set
    ;; up by :METHOD options to DEFGENERIC and the ones set up later by
    ;; DEFMETHOD, because ANSI's specifies that executing DEFGENERIC on
    ;; an already-DEFGENERICed function clears the methods set by the
@@ -755,16 +753,17 @@
   (:default-initargs :method-class *the-class-standard-method*
 		     :method-combination *standard-method-combination*))
 
-(defclass method-combination (standard-object) ())
+(defclass method-combination (standard-object)
+  ((documentation
+    :reader method-combination-documentation
+    :initform nil
+    :initarg :documentation)))
 
 (defclass standard-method-combination (definition-source-mixin
-					method-combination)
+				       method-combination)
   ((type
     :reader method-combination-type
     :initarg :type)
-   (documentation
-    :reader method-combination-documentation
-    :initarg :documentation)
    (options
     :reader method-combination-options
     :initarg :options)))

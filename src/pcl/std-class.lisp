@@ -118,50 +118,6 @@
 (defmethod slot-definition-allocation ((slotd structure-slot-definition))
   :instance)
 
-(defmethod shared-initialize :after ((object documentation-mixin)
-				     slot-names
-				     &key (documentation nil documentation-p))
-  (declare (ignore slot-names))
-  (when documentation-p
-    (setf (plist-value object 'documentation) documentation)))
-
-;;; default if DOC-TYPE doesn't match one of the specified types
-(defmethod documentation (object doc-type)
-  (warn "unsupported DOCUMENTATION: type ~S for object ~S"
-	doc-type
-	(type-of object))
-  nil)
-
-;;; default if DOC-TYPE doesn't match one of the specified types
-(defmethod (setf documentation) (new-value object doc-type)
-  ;; CMU CL made this an error, but since ANSI says that even for supported
-  ;; doc types an implementation is permitted to discard docs at any time
-  ;; for any reason, this feels to me more like a warning. -- WHN 19991214
-  (warn "discarding unsupported DOCUMENTATION of type ~S for object ~S"
-	doc-type
-	(type-of object))
-  new-value)
-
-(defmethod documentation ((object documentation-mixin) doc-type)
-  (declare (ignore doc-type))
-  (plist-value object 'documentation))
-
-(defmethod (setf documentation) (new-value
-				 (object documentation-mixin)
-				 doc-type)
-  (declare (ignore doc-type))
-  (setf (plist-value object 'documentation) new-value))
-
-(defmethod documentation ((slotd standard-slot-definition) doc-type)
-  (declare (ignore doc-type))
-  (slot-value slotd 'documentation))
-
-(defmethod (setf documentation) (new-value
-				 (slotd standard-slot-definition)
-				 doc-type)
-  (declare (ignore doc-type))
-  (setf (slot-value slotd 'documentation) new-value))
-
 ;;;; various class accessors that are a little more complicated than can be
 ;;;; done with automatically generated reader methods
 
