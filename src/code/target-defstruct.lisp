@@ -418,6 +418,15 @@
 	(write-char #\space stream)
 	(write-string "(no LAYOUT-INFO)"))
       (return-from %default-structure-pretty-print nil))
+    ;; the structure type doesn't count as a component for
+    ;; *PRINT-LEVEL* processing.  We can likewise elide the logical
+    ;; block processing, since all we have to print is the type name.
+    ;; -- CSR, 2004-10-05
+    (when (and dd (null (dd-slots dd)))
+      (write-string "#S(" stream)
+      (prin1 name stream)
+      (write-char #\) stream)
+      (return-from %default-structure-pretty-print nil))
     (pprint-logical-block (stream nil :prefix "#S(" :suffix ")")
       (prin1 name stream)
       (let ((remaining-slots (dd-slots dd)))
@@ -444,6 +453,11 @@
   (let* ((layout (%instance-layout structure))
 	 (name (classoid-name (layout-classoid layout)))
 	 (dd (layout-info layout)))
+    (when (and dd (null (dd-slots dd)))
+      (write-string "#S(" stream)
+      (prin1 name stream)
+      (write-char #\) stream)
+      (return-from %default-structure-ugly-print nil))
     (descend-into (stream)
       (write-string "#S(" stream)
       (prin1 name stream)
