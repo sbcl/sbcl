@@ -473,7 +473,7 @@
     (pushnew 'unsafely-flushable attributes))
 
   `(%defknown ',(if (and (consp name)
-			 (not (eq (car name) 'setf)))
+			 (not (legal-fun-name-p name)))
 		    name
 		    (list name))
 	      '(function ,arg-types ,result-type)

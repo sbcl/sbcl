@@ -1202,9 +1202,10 @@
    (:block-compile t))
   (values (or pathname null) boolean boolean))
 
-(defknown disassemble (callable &key
-				(:stream stream)
-				(:use-labels t))
+;; FIXME: consider making (OR CALLABLE CONS) something like
+;; EXTENDED-FUNCTION-DESIGNATOR
+(defknown disassemble ((or callable cons) &key
+		       (:stream stream) (:use-labels t))
   null)
 
 (defknown fdocumentation (t symbol)

@@ -31,12 +31,9 @@
   (%fun-doc x))
 
 (defmethod documentation ((x list) (doc-type (eql 'function)))
-  ;; FIXME: could test harder to see whether it's a SETF function name,
-  ;; then call WARN
-  (when (eq (first x) 'setf)	; Give up if not a setf function name.
-    (or (values (info :setf :documentation (second x)))
-	;; Try the pcl function documentation.
-	(and (fboundp x) (documentation (fdefinition x) t)))))
+  (and (legal-fun-name-p x)
+       (fboundp x)
+       (documentation (fdefinition x) t)))
 
 (defmethod documentation ((x symbol) (doc-type (eql 'function)))
   (or (values (info :function :documentation x))
@@ -47,7 +44,7 @@
   (values (info :setf :documentation x)))
 
 (defmethod (setf documentation) (new-value (x list) (doc-type (eql 'function)))
-  (setf (info :setf :documentation (cadr x)) new-value))
+  (setf (info :function :documentation x) new-value))
 
 (defmethod (setf documentation) (new-value
 				 (x symbol)

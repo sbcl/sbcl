@@ -294,6 +294,22 @@
       (set-slot 'direct-slots direct-slots)
       (set-slot 'slots slots)
       (set-slot 'initialize-info nil))
+
+    ;; For all direct superclasses SUPER of CLASS, make sure CLASS is
+    ;; a direct subclass of SUPER.  Note that METACLASS-NAME doesn't
+    ;; matter here for the slot DIRECT-SUBCLASSES, since every class
+    ;; inherits the slot from class CLASS.
+    (dolist (super direct-supers)
+      (let* ((super (find-class super))
+	     (subclasses (!bootstrap-get-slot metaclass-name super
+					      'direct-subclasses)))
+	(cond ((eq +slot-unbound+ subclasses)
+	       (!bootstrap-set-slot metaclass-name super 'direct-subclasses
+				    (list class)))
+	      ((not (memq class subclasses))
+	       (!bootstrap-set-slot metaclass-name super 'direct-subclasses
+				    (cons class subclasses))))))
+
     (if (eq metaclass-name 'structure-class)
 	(let ((constructor-sym '|STRUCTURE-OBJECT class constructor|))
 	  (set-slot 'predicate-name (or (cadr (assoc name

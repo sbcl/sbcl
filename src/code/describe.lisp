@@ -110,7 +110,7 @@
 (defun %describe-fun-name (name s type-spec) 
   (when (and name (typep name '(or symbol cons)))
     (multiple-value-bind (type where)
-	(if (or (symbolp name) (and (listp name) (eq (car name) 'setf)))
+	(if (legal-fun-name-p name)
 	    (values (type-specifier (info :function :type name))
 		    (info :function :where-from name))
 	    (values type-spec :defined))

@@ -213,10 +213,7 @@
   #+nil (setf (%fun-name def) name)
 
   (when doc
-    ;; FIXME: This should use shared SETF-name-parsing logic.
-    (if (and (consp name) (eq (first name) 'setf))
-	(setf (fdocumentation (second name) 'setf) doc)
-	(setf (fdocumentation (the symbol name) 'function) doc)))
+    (setf (fdocumentation name 'function) doc))
   name)
 
 ;;;; DEFVAR and DEFPARAMETER

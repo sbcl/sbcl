@@ -1467,9 +1467,7 @@
     (compile nil lambda)))
 
 (defun compiled-fun-or-lose (thing &optional (name thing))
-  (cond ((or (symbolp thing)
-	     (and (listp thing)
-		  (eq (car thing) 'setf)))
+  (cond ((legal-fun-name-p thing)
 	 (compiled-fun-or-lose (fdefinition thing) thing))
 	((functionp thing)
 	 thing)
