@@ -559,10 +559,7 @@
     :accessor class-direct-slots)
    (slots
     :initform ()
-    :accessor class-slots)
-   (initialize-info
-    :initform nil
-    :accessor class-initialize-info)))
+    :accessor class-slots)))
 
 ;;; The class STD-CLASS is an implementation-specific common
 ;;; superclass of the classes STANDARD-CLASS and

@@ -72,8 +72,6 @@
 
 (defgeneric class-incompatible-superclass-list (pcl-class))
 
-(defgeneric class-initialize-info (slot-class))
-
 (defgeneric class-name (class))
 
 (defgeneric class-precedence-list (pcl-class))
@@ -167,8 +165,6 @@
 (defgeneric (setf class-direct-slots) (new-value slot-class))
 
 (defgeneric (setf class-incompatible-superclass-list) (new-value pcl-class))
-
-(defgeneric (setf class-initialize-info) (new-value slot-class))
 
 (defgeneric (setf class-name) (new-value class))
 

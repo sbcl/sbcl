@@ -88,7 +88,7 @@
 	 (error-error "Help! "
 		      *current-error-depth*
 		      " nested errors. "
-		      "KERNEL:*MAXIMUM-ERROR-DEPTH* exceeded.")
+		      "SB-KERNEL:*MAXIMUM-ERROR-DEPTH* exceeded.")
 	 t)
 	(t
 	 (/show0 "returning normally from INFINITE-ERROR-PROTECTOR")
@@ -115,7 +115,7 @@
 	  (error-error "Help! "
 		       *current-error-depth*
 		       " nested errors. "
-		       "KERNEL:*MAXIMUM-ERROR-DEPTH* exceeded.")
+		       "SB-KERNEL:*MAXIMUM-ERROR-DEPTH* exceeded.")
 	  (progn ,@forms)
 	  t)
 	 (t

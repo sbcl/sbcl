@@ -304,8 +304,7 @@
 				 structure-class condition-class
 				 slot-class std-class))
       (set-slot 'direct-slots direct-slots)
-      (set-slot 'slots slots)
-      (set-slot 'initialize-info nil))
+      (set-slot 'slots slots))
 
     ;; For all direct superclasses SUPER of CLASS, make sure CLASS is
     ;; a direct subclass of SUPER.  Note that METACLASS-NAME doesn't

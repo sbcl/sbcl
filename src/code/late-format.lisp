@@ -1117,7 +1117,8 @@
 	 (block nil
 	   ,@(let ((*expander-next-arg-macro* 'expander-pprint-next-arg)
 		   (*only-simple-args* nil)
-		   (*orig-args-available* t))
+		   (*orig-args-available*
+		    (if atsignp *orig-args-available* t)))
 	       (expand-directive-list insides)))))))
 
 (defun expand-format-justification (segments colonp atsignp first-semi params)

@@ -1826,6 +1826,11 @@ changes in sbcl-0.8.1 relative to sbcl-0.8.0:
     being compiled no longer causes an unhandled error at compile
     time, but signals a compile-time warning.
   * fixed simple vector readable printing.
+  * bug fix: DESCRIBE takes more care over whether the class
+    precedence list slot of a class is bound before accessing it.
+    (reported by Markus Krummenacker)
+  * bug fix: FORMATTER can successfully compile pretty-printer format
+    strings which use variants of the ~* directive inside.
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** NIL is now allowed as a structure slot name.
     ** arbitrary numbers, not just reals, are allowed in certain
@@ -1835,7 +1840,7 @@ changes in sbcl-0.8.1 relative to sbcl-0.8.0:
     ** (SETF FIND-CLASS) now accepts NIL as an argument to remove the
        association between the name and a class.
     ** generic functions with non-standard method-combination and over
-       six methods all of which return constants no longer return NIL
+       five methods all of which return constants no longer return NIL
        after the first few invocations.  (thanks to Gerd Moellmann)
     ** CALL-NEXT-METHOD with no arguments now passes the original
        values of the arguments, even in the presence of assignment.
@@ -1852,6 +1857,8 @@ changes in sbcl-0.8.1 relative to sbcl-0.8.0:
     ** DEFCLASS only redefines the class named by its class-name
        argument if that name is the proper name of the class;
        otherwise, it creates a new class.
+    ** SLOT-UNBOUND now correctly initalizes the CELL-ERROR-NAME slot
+       of the UNBOUND-SLOT condition to the name of the slot.
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles

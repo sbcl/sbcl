@@ -26,11 +26,10 @@
 ;;;; ANSI CL condition for unbound slots
 
 (define-condition unbound-slot (cell-error)
-  ((instance :reader unbound-slot-instance :initarg :instance)
-   (slot :reader unbound-slot-slot :initarg :slot))
+  ((instance :reader unbound-slot-instance :initarg :instance))
   (:report (lambda (condition stream)
 	     (format stream "The slot ~S is unbound in the object ~S."
-		     (unbound-slot-slot condition)
+		     (cell-error-name condition)
 		     (unbound-slot-instance condition)))))
 
 (defmethod wrapper-fetcher ((class standard-class))
@@ -344,7 +343,7 @@
 	 instance))
 
 (defmethod slot-unbound ((class t) instance slot-name)
-  (error 'unbound-slot :slot slot-name :instance instance))
+  (error 'unbound-slot :name slot-name :instance instance))
 
 (defun slot-unbound-internal (instance position)
   (slot-unbound (class-of instance) instance

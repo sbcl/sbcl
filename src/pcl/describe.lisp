@@ -110,20 +110,24 @@
 (defmethod describe-object ((class class) stream)
   (flet ((pretty-class (c) (or (class-name c) c)))
     (macrolet ((ft (string &rest args) `(format stream ,string ,@args)))
-      (ft "~&~S is a class. It is an instance of ~S."
+      (ft "~&~@<~S is a class. It is an instance of ~S.~:@>"
 	  class (pretty-class (class-of class)))
       (let ((name (class-name class)))
 	(if name
 	    (if (eq class (find-class name nil))
-		(ft "~&Its proper name is ~S." name)
-		(ft "~&Its name is ~S, but this is not a proper name." name))
-	    (ft "It has no name (the name is NIL).~%")))
-      (ft "~&~@<The direct superclasses are: ~:S, and the direct~%~
-	   subclasses are: ~:S. The class precedence list is:~2I~_~S~I~_~
-	   There are ~S methods specialized for this class.~:>~%"
+		(ft "~&~@<Its proper name is ~S.~@:>" name)
+		(ft "~&~@<Its name is ~S, but this is not a proper name.~@:>"
+		    name))
+	    (ft "~&~@<It has no name (the name is NIL).~@:>")))
+      (ft "~&~@<The direct superclasses are: ~:S, and the direct ~
+	   subclasses are: ~:S.~I~_The class is ~:[not ~;~]finalized~
+           ~:[. ~;; its class precedence list is:~2I~_~:*~S.~]~I~_~
+	   There ~[are~;is~:;are~] ~:*~S method~:P specialized for ~
+           this class.~:@>~%"
 	  (mapcar #'pretty-class (class-direct-superclasses class))
 	  (mapcar #'pretty-class (class-direct-subclasses class))
-	  (mapcar #'pretty-class (class-precedence-list class))
+	  (class-finalized-p class)
+	  (mapcar #'pretty-class (cpl-or-nil class))
 	  (length (specializer-direct-methods class))))))
 
 (defmethod describe-object ((package package) stream)

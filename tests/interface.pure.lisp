@@ -44,6 +44,7 @@
 
 ;;; support for DESCRIBE tests
 (defstruct to-be-described a b)
+(defclass forward-describe-class (forward-describe-ref) (a))
 
 ;;; DESCRIBE should run without signalling an error.
 (describe (make-to-be-described))
@@ -69,7 +70,8 @@
 		 #'car #'make-to-be-described (lambda (x) (+ x 11))
 		 (constantly 'foo) #'(setf to-be-described-a)
 		 #'describe-object (find-class 'to-be-described)
-		 (find-class 'cons)))
+		 (find-class 'forward-describe-class)
+		 (find-class 'forward-describe-ref) (find-class 'cons)))
   (let ((s (with-output-to-string (s)
 	     (write-char #\x s)
 	     (describe i s))))
@@ -96,4 +98,3 @@
 
 ;;; DECLARE should not be a special operator
 (assert (not (special-operator-p 'declare)))
-

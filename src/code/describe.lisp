@@ -328,7 +328,7 @@
   ;;   * NIL, in which case there's nothing to see here, move along.
   (when (eq (info :type :kind x) :defined)
     (format s "~&It names a type specifier."))
-  (let ((symbol-named-class (find-classoid x nil)))
+  (let ((symbol-named-class (find-class x nil)))
     (when symbol-named-class
       (format s "~&It names a class ~A." symbol-named-class)
       (describe symbol-named-class s)))

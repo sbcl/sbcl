@@ -125,5 +125,9 @@
 ;;; before 0.8.0.66 it signalled UNBOUND-VARIABLE
 (write #(1 2 3) :pretty nil :readably t)
 
+;;; another UNBOUND-VARIABLE, this time due to a bug in FORMATTER
+;;; expanders.
+(funcall (formatter "~@<~A~:*~A~:>") nil 3)
+
 ;;; success
 (quit :unix-status 104)
