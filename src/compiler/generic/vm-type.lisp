@@ -73,7 +73,10 @@
 
 (sb!xc:deftype bignum-element-type () `(unsigned-byte ,sb!vm:n-word-bits))
 (sb!xc:deftype bignum-type () 'bignum)
-(sb!xc:deftype bignum-index () 'index)
+;;; FIXME: see also DEFCONSTANT MAXIMUM-BIGNUM-LENGTH in
+;;; src/code/bignum.lisp.  -- CSR, 2004-07-19
+(sb!xc:deftype bignum-index ()
+  '(integer 0 #.(1- (ash 1 (- 32 sb!vm:n-widetag-bits)))))
 
 ;;;; hooks into the type system
 

@@ -519,6 +519,26 @@
 
 ;;;; GCD
 
+;;; I'm not sure why I need this FTYPE declaration.  Compiled by the
+;;; target compiler, it can deduce the return type fine, but without
+;;; it, we pay a heavy price in BIGNUM-GCD when compiled by the
+;;; cross-compiler. -- CSR, 2004-07-19
+(declaim (ftype (sfunction (bignum-type bignum-index bignum-type bignum-index)
+			   (unsigned-byte 29))
+		bignum-factors-of-two))
+(defun bignum-factors-of-two (a len-a b len-b)
+  (declare (type bignum-index len-a len-b) (type bignum-type a b))
+  (do ((i 0 (1+ i))
+       (end (min len-a len-b)))
+      ((= i end) (error "Unexpected zero bignums?"))
+    (declare (type bignum-index i end))
+    (let ((or-digits (%logior (%bignum-ref a i) (%bignum-ref b i))))
+      (unless (zerop or-digits)
+	(return (do ((j 0 (1+ j))
+		     (or-digits or-digits (%ashr or-digits 1)))
+		    ((oddp or-digits) (+ (* i digit-size) j))
+		  (declare (type (mod 32) j))))))))
+
 (defun bignum-gcd (a b)
   (declare (type bignum-type a b))
   (let* ((a (if (%bignum-0-or-plusp a (%bignum-length a))
@@ -605,19 +625,6 @@
 		     (bignum-buffer-ashift-right a len-a
 						 (+ (* index digit-size)
 						    increment)))))))
-
-(defun bignum-factors-of-two (a len-a b len-b)
-  (declare (type bignum-index len-a len-b) (type bignum-type a))
-  (do ((i 0 (1+ i))
-       (end (min len-a len-b)))
-      ((= i end) (error "Unexpected zero bignums?"))
-    (declare (type bignum-index i end))
-    (let ((or-digits (%logior (%bignum-ref a i) (%bignum-ref b i))))
-      (unless (zerop or-digits)
-	(return (do ((j 0 (1+ j))
-		     (or-digits or-digits (%ashr or-digits 1)))
-		    ((oddp or-digits) (+ (* i digit-size) j))
-		  (declare (type (mod 32) j))))))))
 
 ;;;; negation
 
