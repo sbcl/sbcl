@@ -172,10 +172,10 @@ comments from CMU CL:
     (without-gcing
       (dolist (space spaces)
 	(sb!vm::map-allocated-objects
-	 #'(lambda (object type-code size)
-	     (declare (ignore type-code size))
-	     (when (dyncount-info-p object)
-	       (clear-dyncount-info object)))
+	 (lambda (object type-code size)
+	   (declare (ignore type-code size))
+	   (when (dyncount-info-p object)
+	     (clear-dyncount-info object)))
 	 space)))))
 
 ;;; Call NOTE-DYNCOUNT-INFO on all DYNCOUNT-INFO structure allocated in the
@@ -193,12 +193,12 @@ comments from CMU CL:
     (without-gcing
       (dolist (space spaces)
 	(sb!vm::map-allocated-objects
-	 #'(lambda (object type-code size)
-	     (declare (ignore type-code size))
-	     (when (dyncount-info-p object)
-	       (note-dyncount-info object)
-	       (when clear
-		 (clear-dyncount-info object))))
+	 (lambda (object type-code size)
+	   (declare (ignore type-code size))
+	   (when (dyncount-info-p object)
+	     (note-dyncount-info object)
+	     (when clear
+	       (clear-dyncount-info object))))
 	 space))))
 
   (let ((counts (make-hash-table :test 'equal)))
@@ -232,8 +232,8 @@ comments from CMU CL:
   (clear-vop-counts spaces)
   (apply function args)
   (if by-space
-      (mapcar #'(lambda (space)
-		  (get-vop-counts (list space) :clear t))
+      (mapcar (lambda (space)
+		(get-vop-counts (list space) :clear t))
 	      spaces)
       (get-vop-counts spaces)))
 
@@ -403,10 +403,10 @@ comments from CMU CL:
 
 (defun sort-result (table by)
   (sort (hash-list table) #'>
-	:key #'(lambda (x)
-		 (abs (ecase by
-			(:count (vop-stats-count x))
-			(:cost (vop-stats-cost x)))))))
+	:key (lambda (x)
+	       (abs (ecase by
+		      (:count (vop-stats-count x))
+		      (:cost (vop-stats-cost x)))))))
 
 ;;; Report about VOPs in the list of stats structures.
 (defun entry-report (entries cut-off compensated compare total-cost)

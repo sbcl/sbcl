@@ -33,9 +33,9 @@
 ;;; Return a mask with all the specified float trap bits set.
 (defun float-trap-mask (names)
   (reduce #'logior
-	  (mapcar #'(lambda (x)
-		      (or (cdr (assoc x *float-trap-alist*))
-			  (error "unknown float trap kind: ~S" x)))
+	  (mapcar (lambda (x)
+		    (or (cdr (assoc x *float-trap-alist*))
+			(error "unknown float trap kind: ~S" x)))
 		  names)))
 ) ; EVAL-WHEN
 
@@ -105,9 +105,9 @@
   (flet ((exc-keys (bits)
 	   (macrolet ((frob ()
 			`(collect ((res))
-			   ,@(mapcar #'(lambda (x)
-					 `(when (logtest bits ,(cdr x))
-					    (res ',(car x))))
+			   ,@(mapcar (lambda (x)
+				       `(when (logtest bits ,(cdr x))
+					  (res ',(car x))))
 				     *float-trap-alist*)
 			   (res))))
 	     (frob))))

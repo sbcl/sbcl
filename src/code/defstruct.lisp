@@ -721,7 +721,7 @@
       (dolist (included-slot (dd-slots included-structure))
 	(let* ((included-name (dsd-name included-slot))
 	       (modified (or (find included-name modified-slots
-				   :key #'(lambda (x) (if (atom x) x (car x)))
+				   :key (lambda (x) (if (atom x) x (car x)))
 				   :test #'string=)
 			     `(,included-name))))
 	  (parse-1-dsd dd
@@ -1141,15 +1141,15 @@
   (let ((temp (gensym))
 	(etype (dd-element-type dd)))
     `(defun ,cons-name ,arglist
-       (declare ,@(mapcar #'(lambda (var type) `(type (and ,type ,etype) ,var))
+       (declare ,@(mapcar (lambda (var type) `(type (and ,type ,etype) ,var))
 			  vars types))
        (let ((,temp (make-array ,(dd-length dd)
 				:element-type ',(dd-element-type dd))))
-	 ,@(mapcar #'(lambda (x)
-		       `(setf (aref ,temp ,(cdr x))  ',(car x)))
+	 ,@(mapcar (lambda (x)
+		     `(setf (aref ,temp ,(cdr x))  ',(car x)))
 		   (find-name-indices dd))
-	 ,@(mapcar #'(lambda (dsd value)
-		       `(setf (aref ,temp ,(dsd-index dsd)) ,value))
+	 ,@(mapcar (lambda (dsd value)
+		     `(setf (aref ,temp ,(dsd-index dsd)) ,value))
 		   (dd-slots dd) values)
 	 ,temp))))
 (defun create-list-constructor (dd cons-name arglist vars types values)
@@ -1160,8 +1160,7 @@
       (setf (elt vals (dsd-index dsd)) val))
 
     `(defun ,cons-name ,arglist
-       (declare ,@(mapcar #'(lambda (var type) `(type ,type ,var))
-			  vars types))
+       (declare ,@(mapcar (lambda (var type) `(type ,type ,var)) vars types))
        (list ,@vals))))
 (defun create-structure-constructor (dd cons-name arglist vars types values)
   (let* ((instance (gensym "INSTANCE"))
@@ -1275,9 +1274,9 @@
 
       (funcall creator defstruct (first boa)
 	       (arglist) (vars) (types)
-	       (mapcar #'(lambda (slot)
-			   (or (find (dsd-name slot) (vars) :test #'string=)
-			       (dsd-default slot)))
+	       (mapcar (lambda (slot)
+			 (or (find (dsd-name slot) (vars) :test #'string=)
+			     (dsd-default slot)))
 		       (dd-slots defstruct))))))
 
 ;;; Grovel the constructor options, and decide what constructors (if

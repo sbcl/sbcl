@@ -58,8 +58,8 @@
 	((list-of-symbols-p vars)
 	 (let ((temps (make-gensym-list (length vars))))
 	   `(multiple-value-bind ,temps ,value-form
-	      ,@(mapcar #'(lambda (var temp)
-			    `(setq ,var ,temp))
+	      ,@(mapcar (lambda (var temp)
+			  `(setq ,var ,temp))
 			vars temps)
 	      ,(car temps))))
 	(t (error "Vars is not a list of symbols: ~S" vars))))

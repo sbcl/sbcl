@@ -128,8 +128,8 @@
      (error "bogus ~A name: ~S" kind name))))
 
 (defun stringify-names (names kind)
-  (mapcar #'(lambda (name)
-	      (stringify-name name kind))
+  (mapcar (lambda (name)
+	    (stringify-name name kind))
 	  names))
 
 (defun %defpackage (name nicknames size shadows shadowing-imports
@@ -190,7 +190,7 @@
 		  package))))
     ;; Handle exports.
     (let ((old-exports nil)
-	  (exports (mapcar #'(lambda (sym-name) (intern sym-name package))
+	  (exports (mapcar (lambda (sym-name) (intern sym-name package))
 			   exports)))
       (do-external-symbols (sym package)
 	(push sym old-exports))

@@ -210,19 +210,19 @@ Function and macro commands:
   (cond ((sb!di:code-location-p place)
 	 (find place info-list
 	       :key #'breakpoint-info-place
-	       :test #'(lambda (x y) (and (sb!di:code-location-p y)
-					  (sb!di:code-location= x y)))))
+	       :test (lambda (x y) (and (sb!di:code-location-p y)
+					(sb!di:code-location= x y)))))
 	(t
 	 (find place info-list
-	       :test #'(lambda (x-debug-fun y-info)
-			 (let ((y-place (breakpoint-info-place y-info))
-			       (y-breakpoint (breakpoint-info-breakpoint
-					      y-info)))
-			   (and (sb!di:debug-fun-p y-place)
-				(eq x-debug-fun y-place)
-				(or (not kind)
-				    (eq kind (sb!di:breakpoint-kind
-					      y-breakpoint))))))))))
+	       :test (lambda (x-debug-fun y-info)
+		       (let ((y-place (breakpoint-info-place y-info))
+			     (y-breakpoint (breakpoint-info-breakpoint
+					    y-info)))
+			 (and (sb!di:debug-fun-p y-place)
+			      (eq x-debug-fun y-place)
+			      (or (not kind)
+				  (eq kind (sb!di:breakpoint-kind
+					    y-breakpoint))))))))))
 
 ;;; If LOC is an unknown location, then try to find the block start
 ;;; location. Used by source printing to some information instead of
@@ -748,18 +748,18 @@ reset to ~S."
       (print-frame-call *current-frame* :verbosity 2)
       (loop
 	(catch 'debug-loop-catcher
-	  (handler-bind ((error #'(lambda (condition)
-				    (when *flush-debug-errors*
-				      (clear-input *debug-io*)
-				      (princ condition)
-				      ;; FIXME: Doing input on *DEBUG-IO*
-				      ;; and output on T seems broken.
-				      (format t
-					      "~&error flushed (because ~
-					       ~S is set)"
-					      '*flush-debug-errors*)
-				      (/show0 "throwing DEBUG-LOOP-CATCHER")
-				      (throw 'debug-loop-catcher nil)))))
+	  (handler-bind ((error (lambda (condition)
+				  (when *flush-debug-errors*
+				    (clear-input *debug-io*)
+				    (princ condition)
+				    ;; FIXME: Doing input on *DEBUG-IO*
+				    ;; and output on T seems broken.
+				    (format t
+					    "~&error flushed (because ~
+					     ~S is set)"
+					    '*flush-debug-errors*)
+				    (/show0 "throwing DEBUG-LOOP-CATCHER")
+				    (throw 'debug-loop-catcher nil)))))
 	    ;; We have to bind level for the restart function created by
 	    ;; WITH-SIMPLE-RESTART.
 	    (let ((level *debug-command-level*)
@@ -836,9 +836,9 @@ reset to ~S."
 				  name))))
 	  (location (sb!di:frame-code-location *current-frame*))
 	  ;; Let's only deal with valid variables.
-	  (vars (remove-if-not #'(lambda (v)
-				   (eq (sb!di:debug-var-validity v location)
-				       :valid))
+	  (vars (remove-if-not (lambda (v)
+				 (eq (sb!di:debug-var-validity v location)
+				     :valid))
 			       temp)))
      (declare (list vars))
      (cond ((null vars)
@@ -879,9 +879,9 @@ reset to ~S."
 	       ;; name.
 	       ((and (not exact)
 		     (find-if-not
-		      #'(lambda (v)
-			  (string= (sb!di:debug-var-symbol-name v)
-				   (sb!di:debug-var-symbol-name (car vars))))
+		      (lambda (v)
+			(string= (sb!di:debug-var-symbol-name v)
+				 (sb!di:debug-var-symbol-name (car vars))))
 		      (cdr vars)))
 		(error "specification ambiguous:~%~{   ~A~%~}"
 		       (mapcar #'sb!di:debug-var-symbol-name
@@ -1063,9 +1063,9 @@ argument")
     (dolist (restart restarts)
       (let ((name (string (restart-name restart))))
         (let ((restart-fun
-                #'(lambda ()
-		    (/show0 "in restart-command closure, about to i-r-i")
-		    (invoke-restart-interactively restart))))
+                (lambda ()
+		  (/show0 "in restart-command closure, about to i-r-i")
+		  (invoke-restart-interactively restart))))
           (push (cons (prin1-to-string num) restart-fun) commands)
           (unless (or (null (restart-name restart)) 
                       (find name commands :key #'car :test #'string=))
@@ -1166,9 +1166,9 @@ argument")
 		      (nth num *debug-restarts*))
 		     (symbol
 		      (find num *debug-restarts* :key #'restart-name
-			    :test #'(lambda (sym1 sym2)
-				      (string= (symbol-name sym1)
-					       (symbol-name sym2)))))
+			    :test (lambda (sym1 sym2)
+				    (string= (symbol-name sym1)
+					     (symbol-name sym2)))))
 		     (t
 		      (format t "~S is invalid as a restart name.~%" num)
 		      (return-from restart-debug-command nil)))))
@@ -1344,10 +1344,10 @@ argument")
       (setq *cached-readtable* (copy-readtable))
       (set-dispatch-macro-character
        #\# #\.
-       #'(lambda (stream sub-char &rest rest)
-	   (declare (ignore rest sub-char))
-	   (let ((token (read stream t nil t)))
-	     (format nil "#.~S" token)))
+       (lambda (stream sub-char &rest rest)
+	 (declare (ignore rest sub-char))
+	 (let ((token (read stream t nil t)))
+	   (format nil "#.~S" token)))
        *cached-readtable*))
     (let ((*readtable* *cached-readtable*))
       (read *cached-source-stream*))))

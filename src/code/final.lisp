@@ -34,19 +34,19 @@
     (sb!sys:without-gcing
      (setf *objects-pending-finalization*
 	   (delete object *objects-pending-finalization*
-		   :key #'(lambda (pair)
-			    (values (weak-pointer-value (car pair))))))))
+		   :key (lambda (pair)
+			  (values (weak-pointer-value (car pair))))))))
   nil)
 
 (defun finalize-corpses ()
   (setf *objects-pending-finalization*
-	(delete-if #'(lambda (pair)
-		       (multiple-value-bind (object valid)
-			   (weak-pointer-value (car pair))
-			 (declare (ignore object))
-			 (unless valid
-			   (funcall (cdr pair))
-			   t)))
+	(delete-if (lambda (pair)
+		     (multiple-value-bind (object valid)
+			 (weak-pointer-value (car pair))
+		       (declare (ignore object))
+		       (unless valid
+			 (funcall (cdr pair))
+			 t)))
 		   *objects-pending-finalization*))
   nil)
 

@@ -174,8 +174,8 @@ GET-SETF-EXPANSION directly."
 	 `(let* ,(nreverse bindlist) ,@(nreverse storelist) ,resultvar))
       (multiple-value-bind (sm1 sm2 sm3 sm4 sm5)
 	  (get-setf-method (first arglist) env)
-	(mapc #'(lambda (var val)
-		  (push `(,var ,val) bindlist))
+	(mapc (lambda (var val)
+		(push `(,var ,val) bindlist))
 	      sm1
 	      sm2)
 	(push `(,lastvar ,sm5) bindlist)
@@ -378,13 +378,13 @@ GET-SETF-EXPANSION directly."
 	       `(eval-when (:compile-toplevel :load-toplevel :execute)
 		  (assign-setf-macro
 		   ',access-fn
-		   #'(lambda (,access-form-var ,env-var)
-		       (declare (ignore ,env-var))
-		       (%defsetf ,access-form-var ,(length store-variables)
-				 #'(lambda (,arglist-var)
-				     ,@local-decs
-				     (block ,access-fn
-				       ,body))))
+		   (lambda (,access-form-var ,env-var)
+		     (declare (ignore ,env-var))
+		     (%defsetf ,access-form-var ,(length store-variables)
+			       (lambda (,arglist-var)
+				 ,@local-decs
+				 (block ,access-fn
+				   ,body))))
 		   nil
 		   ',doc))))))
 	(t
@@ -432,9 +432,9 @@ GET-SETF-EXPANSION directly."
 			:environment environment)
       `(eval-when (:compile-toplevel :load-toplevel :execute)
 	 (assign-setf-macro ',access-fn
-			    #'(lambda (,whole ,environment)
-				,@local-decs
-				(block ,access-fn ,body))
+			    (lambda (,whole ,environment)
+			      ,@local-decs
+			      (block ,access-fn ,body))
 			    nil
 			    ',doc)))))
 

@@ -144,6 +144,8 @@
 
 (defstruct (node (:constructor nil)
 		 (:copier nil))
+  ;; unique ID for debugging
+  #!+sb-show (id (new-object-id) :read-only t)
   ;; the bottom-up derived type for this node. This does not take into
   ;; consideration output type assertions on this node (actually on its CONT).
   (derived-type *wild-type* :type ctype)
@@ -337,6 +339,8 @@
 ;;;   structures to be reclaimed after the compilation of each
 ;;;   component.
 (defstruct (component (:copier nil))
+  ;; unique ID for debugging
+  #!+sb-show (id (new-object-id) :read-only t)
   ;; the kind of component
   ;;
   ;; (The terminology here is left over from before
@@ -433,6 +437,7 @@
   (reanalyze-funs nil :type list))
 (defprinter (component :identity t)
   name
+  #!+sb-show id
   (reanalyze :test reanalyze))
 
 ;;; Check that COMPONENT is suitable for roles which involve adding
@@ -610,6 +615,8 @@
 ;;; hacking the flow graph.
 (def!struct (leaf (:make-load-form-fun ignore-it)
 		  (:constructor nil))
+  ;; unique ID for debugging
+  #!+sb-show (id (new-object-id) :read-only t)
   ;; (For public access to this slot, use LEAF-SOURCE-NAME.)
   ;;
   ;; the name of LEAF as it appears in the source, e.g. 'FOO or '(SETF
@@ -697,6 +704,7 @@
 	:type (member :special :global-function :global)))
 (defprinter (global-var :identity t)
   %source-name
+  #!+sb-show id
   (type :test (not (eq type *universal-type*)))
   (where-from :test (not (eq where-from :assumed)))
   kind)
@@ -735,6 +743,7 @@
   (functional nil :type (or functional null)))
 (defprinter (defined-fun :identity t)
   %source-name
+  #!+sb-show id
   inlinep
   (functional :test functional))
 
@@ -883,7 +892,8 @@
   (plist () :type list))
 (defprinter (functional :identity t)
   %source-name
-  %debug-name)
+  %debug-name
+  #!+sb-show id)
 
 ;;; FUNCTIONAL name operations
 (defun functional-debug-name (functional)
@@ -964,6 +974,7 @@
 (defprinter (clambda :conc-name lambda- :identity t)
   %source-name
   %debug-name
+  #!+sb-show id
   (type :test (not (eq type *universal-type*)))
   (where-from :test (not (eq where-from :assumed)))
   (vars :prin1 (mapcar #'leaf-source-name vars)))
@@ -1024,6 +1035,7 @@
 (defprinter (optional-dispatch :identity t)
   %source-name
   %debug-name
+  #!+sb-show id
   (type :test (not (eq type *universal-type*)))
   (where-from :test (not (eq where-from :assumed)))
   arglist
@@ -1101,6 +1113,7 @@
   (constraints nil :type (or sset null)))
 (defprinter (lambda-var :identity t)
   %source-name
+  #!+sb-show id
   (type :test (not (eq type *universal-type*)))
   (where-from :test (not (eq where-from :assumed)))
   (ignorep :test ignorep)
@@ -1118,6 +1131,7 @@
   ;; The leaf referenced.
   (leaf nil :type leaf))
 (defprinter (ref :identity t)
+  #!+sb-show id
   leaf)
 
 ;;; Naturally, the IF node always appears at the end of a block.
@@ -1187,6 +1201,7 @@
 			(:constructor make-combination (fun))
 			(:copier nil)))
 (defprinter (combination :identity t)
+  #!+sb-show id
   (fun :prin1 (continuation-use fun))
   (args :prin1 (mapcar (lambda (x)
 			 (if x
@@ -1247,11 +1262,12 @@
 ;;; cleanup.
 (defstruct (entry (:include node)
 		  (:copier nil))
-  ;; All of the Exit nodes for potential non-local exits to this point.
+  ;; All of the EXIT nodes for potential non-local exits to this point.
   (exits nil :type list)
   ;; The cleanup for this entry. NULL only temporarily.
   (cleanup nil :type (or cleanup null)))
-(defprinter (entry :identity t))
+(defprinter (entry :identity t)
+  #!+sb-show id)
 
 ;;; The EXIT node marks the place at which exit code would be emitted,
 ;;; if necessary. This is interposed between the uses of the exit
@@ -1270,6 +1286,7 @@
   ;; then no value is desired (as in GO).
   (value nil :type (or continuation null)))
 (defprinter (exit :identity t)
+  #!+sb-show id
   (entry :test entry)
   (value :test value))
 

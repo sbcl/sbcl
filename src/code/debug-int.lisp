@@ -1278,12 +1278,12 @@
 	   (simple-string name))
   (let ((name-len (length name)))
     (position name variables
-	      :test #'(lambda (x y)
-			(let* ((y (debug-var-symbol-name y))
-			       (y-len (length y)))
-			  (declare (simple-string y))
-			  (and (>= y-len name-len)
-			       (string= x y :end1 name-len :end2 name-len))))
+	      :test (lambda (x y)
+		      (let* ((y (debug-var-symbol-name y))
+			     (y-len (length y)))
+			(declare (simple-string y))
+			(and (>= y-len name-len)
+			     (string= x y :end1 name-len :end2 name-len))))
 	      :end (or end (length variables)))))
 
 ;;; Return a list representing the lambda-list for DEBUG-FUN. The
@@ -2697,15 +2697,15 @@
 			    (declare (ignorable ,n-frame))
 			    (symbol-macrolet ,(specs) ,form))
 			 'function)))
-	#'(lambda (frame)
-	    ;; This prevents these functions from being used in any
-	    ;; location other than a function return location, so
-	    ;; maybe this should only check whether frame's
-	    ;; DEBUG-FUN is the same as loc's.
-	    (unless (code-location= (frame-code-location frame) loc)
-	      (debug-signal 'frame-fun-mismatch
-			    :code-location loc :form form :frame frame))
-	    (funcall res frame))))))
+	(lambda (frame)
+	  ;; This prevents these functions from being used in any
+	  ;; location other than a function return location, so maybe
+	  ;; this should only check whether FRAME's DEBUG-FUN is the
+	  ;; same as LOC's.
+	  (unless (code-location= (frame-code-location frame) loc)
+	    (debug-signal 'frame-fun-mismatch
+			  :code-location loc :form form :frame frame))
+	  (funcall res frame))))))
 
 ;;;; breakpoints
 
@@ -2816,31 +2816,31 @@
 (defun fun-end-starter-hook (starter-bpt debug-fun)
   (declare (type breakpoint starter-bpt)
 	   (type compiled-debug-fun debug-fun))
-  #'(lambda (frame breakpoint)
-      (declare (ignore breakpoint)
-	       (type frame frame))
-      (let ((lra-sc-offset
-	     (sb!c::compiled-debug-fun-return-pc
-	      (compiled-debug-fun-compiler-debug-fun debug-fun))))
-	(multiple-value-bind (lra component offset)
-	    (make-bogus-lra
-	     (get-context-value frame
-				lra-save-offset
-				lra-sc-offset))
-	  (setf (get-context-value frame
-				   lra-save-offset
-				   lra-sc-offset)
-		lra)
-	  (let ((end-bpts (breakpoint-%info starter-bpt)))
-	    (let ((data (breakpoint-data component offset)))
-	      (setf (breakpoint-data-breakpoints data) end-bpts)
-	      (dolist (bpt end-bpts)
-		(setf (breakpoint-internal-data bpt) data)))
-	    (let ((cookie (make-fun-end-cookie lra debug-fun)))
-	      (setf (gethash component *fun-end-cookies*) cookie)
-	      (dolist (bpt end-bpts)
-		(let ((fun (breakpoint-cookie-fun bpt)))
-		  (when fun (funcall fun frame cookie))))))))))
+  (lambda (frame breakpoint)
+    (declare (ignore breakpoint)
+	     (type frame frame))
+    (let ((lra-sc-offset
+	   (sb!c::compiled-debug-fun-return-pc
+	    (compiled-debug-fun-compiler-debug-fun debug-fun))))
+      (multiple-value-bind (lra component offset)
+	  (make-bogus-lra
+	   (get-context-value frame
+			      lra-save-offset
+			      lra-sc-offset))
+	(setf (get-context-value frame
+				 lra-save-offset
+				 lra-sc-offset)
+	      lra)
+	(let ((end-bpts (breakpoint-%info starter-bpt)))
+	  (let ((data (breakpoint-data component offset)))
+	    (setf (breakpoint-data-breakpoints data) end-bpts)
+	    (dolist (bpt end-bpts)
+	      (setf (breakpoint-internal-data bpt) data)))
+	  (let ((cookie (make-fun-end-cookie lra debug-fun)))
+	    (setf (gethash component *fun-end-cookies*) cookie)
+	    (dolist (bpt end-bpts)
+	      (let ((fun (breakpoint-cookie-fun bpt)))
+		(when fun (funcall fun frame cookie))))))))))
 
 ;;; This takes a FUN-END-COOKIE and a frame, and it returns
 ;;; whether the cookie is still valid. A cookie becomes invalid when
@@ -2969,9 +2969,9 @@
 (defun deactivate-compiled-breakpoint (breakpoint)
   (if (eq (breakpoint-kind breakpoint) :fun-end)
       (let ((starter (breakpoint-start-helper breakpoint)))
-	(unless (find-if #'(lambda (bpt)
-			     (and (not (eq bpt breakpoint))
-				  (eq (breakpoint-status bpt) :active)))
+	(unless (find-if (lambda (bpt)
+			   (and (not (eq bpt breakpoint))
+				(eq (breakpoint-status bpt) :active)))
 			 (breakpoint-%info starter))
 	  (deactivate-compiled-breakpoint starter)))
       (let* ((data (breakpoint-internal-data breakpoint))

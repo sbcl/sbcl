@@ -154,9 +154,9 @@
 	 (setf (fd-stream-handler stream)
 	       (sb!sys:add-fd-handler (fd-stream-fd stream)
 				      :output
-				      #'(lambda (fd)
-					  (declare (ignore fd))
-					  (do-output-later stream)))))
+				      (lambda (fd)
+					(declare (ignore fd))
+					(do-output-later stream)))))
 	(t
 	 (nconc (fd-stream-output-later stream)
 		(list (list base start end reuse-sap)))))
@@ -203,38 +203,38 @@
   (declare (optimize (speed 1)))
   (cons 'progn
 	(mapcar
-	    #'(lambda (buffering)
-		(let ((function
-		       (intern (let ((*print-case* :upcase))
-				 (format nil name-fmt (car buffering))))))
-		  `(progn
-		     (defun ,function (stream byte)
-		       ,(unless (eq (car buffering) :none)
-			  `(when (< (fd-stream-obuf-length stream)
-				    (+ (fd-stream-obuf-tail stream)
-				       ,size))
-			     (flush-output-buffer stream)))
-		       ,@body
-		       (incf (fd-stream-obuf-tail stream) ,size)
-		       ,(ecase (car buffering)
-			  (:none
-			   `(flush-output-buffer stream))
-			  (:line
-			   `(when (eq (char-code byte) (char-code #\Newline))
-			      (flush-output-buffer stream)))
-			  (:full
-			   ))
-		       (values))
-		     (setf *output-routines*
-			   (nconc *output-routines*
-				  ',(mapcar
-					#'(lambda (type)
-					    (list type
-						  (car buffering)
-						  function
-						  size))
-				      (cdr buffering)))))))
-	  bufferings)))
+	    (lambda (buffering)
+	      (let ((function
+		     (intern (let ((*print-case* :upcase))
+			       (format nil name-fmt (car buffering))))))
+		`(progn
+		   (defun ,function (stream byte)
+		     ,(unless (eq (car buffering) :none)
+			`(when (< (fd-stream-obuf-length stream)
+				  (+ (fd-stream-obuf-tail stream)
+				     ,size))
+			   (flush-output-buffer stream)))
+		     ,@body
+		     (incf (fd-stream-obuf-tail stream) ,size)
+		     ,(ecase (car buffering)
+			(:none
+			 `(flush-output-buffer stream))
+			(:line
+			 `(when (eq (char-code byte) (char-code #\Newline))
+			    (flush-output-buffer stream)))
+			(:full
+			 ))
+		     (values))
+		   (setf *output-routines*
+			 (nconc *output-routines*
+				',(mapcar
+				   (lambda (type)
+				     (list type
+					   (car buffering)
+					   function
+					   size))
+				   (cdr buffering)))))))
+	    bufferings)))
 
 (def-output-routines ("OUTPUT-CHAR-~A-BUFFERED"
 		      1

@@ -673,21 +673,21 @@
        (t
 	(make-alien-enum-type :name name :signed signed
 			      :from from-alist
-			      :to (mapcar #'(lambda (x) (cons (cdr x) (car x)))
+			      :to (mapcar (lambda (x) (cons (cdr x) (car x)))
 					  from-alist)
 			      :kind :alist))))))
 
 (define-alien-type-method (enum :unparse) (type)
   `(enum ,(alien-enum-type-name type)
 	 ,@(let ((prev -1))
-	     (mapcar #'(lambda (mapping)
-			 (let ((sym (car mapping))
-			       (value (cdr mapping)))
-			   (prog1
-			       (if (= (1+ prev) value)
-				   sym
-				   `(,sym ,value))
-			     (setf prev value))))
+	     (mapcar (lambda (mapping)
+		       (let ((sym (car mapping))
+			     (value (cdr mapping)))
+			 (prog1
+			     (if (= (1+ prev) value)
+				 sym
+				 `(,sym ,value))
+			   (setf prev value))))
 		     (alien-enum-type-from type)))))
 
 (define-alien-type-method (enum :type=) (type1 type2)
@@ -706,14 +706,14 @@
 	     (+ ,alien ,(alien-enum-type-offset type))))
     (:alist
      `(ecase ,alien
-	,@(mapcar #'(lambda (mapping)
-		      `(,(car mapping) ,(cdr mapping)))
+	,@(mapcar (lambda (mapping)
+		    `(,(car mapping) ,(cdr mapping)))
 		  (alien-enum-type-to type))))))
 
 (define-alien-type-method (enum :deport-gen) (type value)
   `(ecase ,value
-     ,@(mapcar #'(lambda (mapping)
-		   `(,(car mapping) ,(cdr mapping)))
+     ,@(mapcar (lambda (mapping)
+		 `(,(car mapping) ,(cdr mapping)))
 	       (alien-enum-type-from type))))
 
 ;;;; the FLOAT types
@@ -856,7 +856,7 @@
     (unless (typep (first dims) '(or index null))
       (error "The first dimension is not a non-negative fixnum or NIL: ~S"
 	     (first dims)))
-    (let ((loser (find-if-not #'(lambda (x) (typep x 'index))
+    (let ((loser (find-if-not (lambda (x) (typep x 'index))
 			      (rest dims))))
       (when loser
 	(error "A dimension is not a non-negative fixnum: ~S" loser))))
@@ -999,11 +999,11 @@
     ,(alien-record-type-name type)
     ,@(unless (member type *record-types-already-unparsed* :test #'eq)
 	(push type *record-types-already-unparsed*)
-	(mapcar #'(lambda (field)
-		    `(,(alien-record-field-name field)
-		      ,(%unparse-alien-type (alien-record-field-type field))
-		      ,@(if (alien-record-field-bits field)
-			    (list (alien-record-field-bits field)))))
+	(mapcar (lambda (field)
+		  `(,(alien-record-field-name field)
+		    ,(%unparse-alien-type (alien-record-field-type field))
+		    ,@(if (alien-record-field-bits field)
+			  (list (alien-record-field-bits field)))))
 		(alien-record-type-fields type)))))
 
 ;;; Test the record fields. The depth is limiting in case of cyclic

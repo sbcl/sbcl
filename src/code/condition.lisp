@@ -109,7 +109,7 @@
 				;; cold-loadable code. -- WHN 19990928
 				(declare (notinline sb!xc:find-class))
 				(find-class 'condition)))
-      #'(lambda (cond stream)
+      (lambda (cond stream)
 	(format stream "Condition ~S was signalled." (type-of cond))))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
@@ -361,11 +361,11 @@
       (let ((name (condition-slot-name slot)))
 	(dolist (reader (condition-slot-readers slot))
 	  (setf (fdefinition reader)
-		#'(lambda (condition)
+		(lambda (condition)
 		  (condition-reader-function condition name))))
 	(dolist (writer (condition-slot-writers slot))
 	  (setf (fdefinition writer)
-		#'(lambda (new-value condition)
+		(lambda (new-value condition)
 		  (condition-writer-function condition new-value name))))))
 
     ;; Compute effective slots and set up the class and hairy slots

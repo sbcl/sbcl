@@ -115,6 +115,18 @@
 (defvar *trace-table*)
 (defvar *undefined-warnings*)
 (defvar *warnings-p*)
+
+;;; unique ID for the next object created (to let us track object
+;;; identity even across GC, useful for understanding weird compiler
+;;; bugs where something is supposed to be unique but is instead
+;;; exists as duplicate objects)
+#!+sb-show
+(progn
+  (defvar *object-id-counter* 0)
+  (defun new-object-id ()
+    (prog1
+	*object-id-counter*
+      (incf *object-id-counter*))))
 
 ;;;; miscellaneous utilities
 

@@ -492,20 +492,20 @@
   "Return the type of the elements of the array"
   (let ((widetag (widetag-of array)))
     (macrolet ((pick-element-type (&rest stuff)
-		 `(cond ,@(mapcar #'(lambda (stuff)
-				      (cons
-				       (let ((item (car stuff)))
-					 (cond ((eq item t)
-						t)
-					       ((listp item)
-						(cons 'or
-						      (mapcar (lambda (x)
-								`(= widetag ,x))
-							      item)))
-					       (t
-						`(= widetag ,item))))
-				       (cdr stuff)))
-						   stuff))))
+		 `(cond ,@(mapcar (lambda (stuff)
+				    (cons
+				     (let ((item (car stuff)))
+				       (cond ((eq item t)
+					      t)
+					     ((listp item)
+					      (cons 'or
+						    (mapcar (lambda (x)
+							      `(= widetag ,x))
+							    item)))
+					     (t
+					      `(= widetag ,item))))
+				     (cdr stuff)))
+				  stuff))))
       ;; FIXME: The data here are redundant with
       ;; *SPECIALIZED-ARRAY-ELEMENT-TYPE-PROPERTIES*.
       (pick-element-type
@@ -930,9 +930,9 @@
 
 (defun zap-array-data-aux (old-data old-dims offset new-data new-dims)
   (declare (fixnum offset))
-  (let ((limits (mapcar #'(lambda (x y)
-			    (declare (fixnum x y))
-			    (1- (the fixnum (min x y))))
+  (let ((limits (mapcar (lambda (x y)
+			  (declare (fixnum x y))
+			  (1- (the fixnum (min x y))))
 			old-dims new-dims)))
     (macrolet ((bump-index-list (index limits)
 		 `(do ((subscripts ,index (cdr subscripts))

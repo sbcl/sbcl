@@ -218,11 +218,6 @@ WORKAROUND:
   (Also, verify that the compiler handles declared function
   return types as assertions.)
 
-38:
-  DEFMETHOD doesn't check the syntax of &REST argument lists properly,
-  accepting &REST even when it's not followed by an argument name:
-	(DEFMETHOD FOO ((X T) &REST) NIL)
-
 41:
   TYPEP of VALUES types is sometimes implemented very inefficiently, e.g. in 
 	(DEFTYPE INDEXOID () '(INTEGER 0 1000))
