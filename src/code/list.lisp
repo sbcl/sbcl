@@ -301,7 +301,7 @@
       (let ((result (list (car list))))
 	(do ((x (cdr list) (cdr x))
 	     (splice result
-		     (cdr (rplacd splice (cons (car x) '() ))) ))
+		     (cdr (rplacd splice (cons (car x) '())))))
 	    ((atom x)
 	     (unless (null x)
 	       (rplacd splice x))))
@@ -310,12 +310,12 @@
 (defun copy-alist (alist)
   #!+sb-doc
   "Return a new association list which is EQUAL to ALIST."
-  (if (atom alist)
+  (if (endp alist)
       alist
       (let ((result
 	     (cons (if (atom (car alist))
 		       (car alist)
-		       (cons (caar alist) (cdar alist)) )
+		       (cons (caar alist) (cdar alist)))
 		   nil)))
 	(do ((x (cdr alist) (cdr x))
 	     (splice result
@@ -325,10 +325,7 @@
 				       (car x)
 				       (cons (caar x) (cdar x)))
 				   nil)))))
-	    ;; Non-null terminated alist done here.
-	    ((atom x)
-	     (unless (null x)
-	       (rplacd splice x))))
+	    ((endp x)))
 	result)))
 
 (defun copy-tree (object)

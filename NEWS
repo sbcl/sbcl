@@ -1626,6 +1626,9 @@ changes in sbcl-0.8.0 relative to sbcl-0.7.14
   * known functions, which cannot be open coded by backend, are
     considered to be able to check types of their arguments. (reported
     by Nathan J. Froyd)
+  * fixed some bugs revealed by Paul Dietz' test suite:
+    ** COPY-ALIST now signals an error if its argument is a dotted
+       list;
 
 planned incompatible changes in 0.7.x:
   * (not done yet, but planned:) When the profiling interface settles
