@@ -23,8 +23,11 @@ export SBCL_HOME=`pwd`/contrib
 SBCL="`pwd`/src/runtime/sbcl --noinform --core `pwd`/output/sbcl.core --userinit /dev/null --sysinit /dev/null --disable-debugger"
 SBCL_BUILDING_CONTRIB=1
 export SBCL SBCL_BUILDING_CONTRIB
+
+gnumake=${GNUMAKE:-gmake}
+
 for i in contrib/*; do
     test -d $i || continue;
     # export INSTALL_DIR=$SBCL_HOME/`basename $i `
-    make -C $i test 
+    $gnumake -C $i test 
 done
