@@ -44,6 +44,10 @@
 (assert (= (coerce 1/2 '(complex float)) #c(0.5 0.0)))
 (assert (= (coerce 1.0d0 '(complex float)) #c(1.0d0 0.0d0)))
 
+;;; (COERCE #c(<RATIONAL> <RATIONAL>) '(complex float)) resulted in
+;;; an error up to 0.8.17.31
+(assert (= (coerce #c(1 2) '(complex float)) #c(1.0 2.0)))
+
 ;;; COERCE also sometimes failed to verify that a particular coercion
 ;;; was possible (in particular coercing rationals to bounded float
 ;;; types.

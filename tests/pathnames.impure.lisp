@@ -315,8 +315,8 @@
 	  (assert (equal (read-from-string (format nil "~S" p)) p)))
       (print-not-readable () nil))))
 
-;;; BUG 330: "PARSE-NAMESTRING should accept namestrings as the default argument"
-;;; ...and streams as well
+;;; BUG 330: "PARSE-NAMESTRING should accept namestrings as the
+;;; default argument" ...and streams as well
 (assert (equal (parse-namestring "foo" nil "/")
 	       (parse-namestring "foo" nil #P"/")))
 (let ((test "parse-namestring-test.tmp"))
@@ -335,6 +335,9 @@
 ;;; ENOUGH-NAMESTRING should probably not fail when the namestring in
 ;;; question has a :RELATIVE pathname.
 (assert (equal (enough-namestring #p"foo" #p"./") "foo"))
-
+
+;;; bug reported by Artem V. Andreev: :WILD not handled in unparsing
+;;; directory lists.
+(assert (equal (namestring #p"/tmp/*/") "/tmp/*/"))
 ;;;; success
 (quit :unix-status 104)

@@ -179,6 +179,9 @@
 		     ((csubtypep type (specifier-type '(complex long-float)))
 		      (complex (%long-float (realpart object))
 			       (%long-float (imagpart object))))
+                     ((csubtypep type (specifier-type '(complex float)))
+                      (complex (%single-float (realpart object))
+                               (%single-float (imagpart object))))
 		     ((and (typep object 'rational)
 			   (csubtypep type (specifier-type '(complex float))))
 		      ;; Perhaps somewhat surprisingly, ANSI specifies

@@ -318,7 +318,7 @@
 	   (error ":BACK cannot be represented in namestrings."))
 	  ((member :wild-inferiors)
 	   (pieces "**/"))
-	  ((or simple-string pattern)
+	  ((or simple-string pattern (member :wild))
 	   (pieces (unparse-unix-piece dir))
 	   (pieces "/"))
 	  (t
