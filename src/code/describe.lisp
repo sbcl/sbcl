@@ -135,6 +135,7 @@
 ;;; Interpreted function describing; handles both closure and
 ;;; non-closure functions. Instead of printing the compiled-from info,
 ;;; we print the definition.
+#+sb-interpreter
 (defun %describe-function-interpreted (x s kind name)
   (declare (type stream s))
   (multiple-value-bind (exp closure-p dname)
@@ -256,6 +257,7 @@
 	  (let ((data (byte-closure-data x)))
 	    (dotimes (i (length data))
 	      (format s "~@:_~S: ~S" i (svref data i))))))
+       #+sb-interpreter
        (sb-eval:interpreted-function
 	(%describe-function-interpreted x s kind name))
        (standard-generic-function

@@ -64,6 +64,7 @@
       saved core is loaded."
 
   #!+mp (sb!mp::shutdown-multi-processing)
+  #!+sb-interpreter
   (when (fboundp 'sb!eval:flush-interpreted-function-cache)
     (sb!eval:flush-interpreted-function-cache))
   ;; FIXME: What is this for? Explain.

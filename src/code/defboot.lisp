@@ -184,7 +184,7 @@
 ;;; ordinary function definition is only appropriate in the target Lisp.
 (defun sb!c::%defun (name def doc source)
   (declare (ignore source))
-  (setf (sb!eval:interpreted-function-name def) name)
+  #!+sb-interpreter (setf (sb!eval:interpreted-function-name def) name)
   (ecase (info :function :where-from name)
     (:assumed
       (setf (info :function :where-from name) :defined)

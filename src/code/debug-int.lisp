@@ -967,6 +967,7 @@
 ;;; to replace FRAME. The interpreted frame points to FRAME.
 (defun possibly-an-interpreted-frame (frame up-frame)
   (if (or (not frame)
+	  #!+sb-interpreter
 	  (not (eq (debug-function-name (frame-debug-function frame))
 		   'sb!eval::internal-apply-loop))
 	  *debugging-interpreter*
@@ -1449,7 +1450,8 @@
     (#.sb!vm:closure-header-type
      (function-debug-function (%closure-function fun)))
     (#.sb!vm:funcallable-instance-header-type
-     (cond ((sb!eval:interpreted-function-p fun)
+     (cond #!+sb-interpreter
+	   ((sb!eval:interpreted-function-p fun)
 	    (make-interpreted-debug-function
 	     (or (sb!eval::interpreted-function-definition fun)
 		 (sb!eval::convert-interpreted-fun fun))))
@@ -2471,6 +2473,7 @@
        (if (indirect-value-cell-p res)
 	   (sb!c:value-cell-ref res)
 	   res)))
+    #!+sb-interpreter
     (interpreted-debug-var
      (aver (typep frame 'interpreted-frame))
      (sb!eval::leaf-value-lambda-var
@@ -2814,6 +2817,7 @@
        (if (indirect-value-cell-p current-value)
 	   (sb!c:value-cell-set current-value value)
 	   (set-compiled-debug-var-slot debug-var frame value))))
+    #!+sb-interpreter
     (interpreted-debug-var
      (aver (typep frame 'interpreted-frame))
      (sb!eval::set-leaf-value-lambda-var

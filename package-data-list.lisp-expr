@@ -474,14 +474,19 @@ like *STACK-TOP-HINT*"
              "ADD-OFFS-NOTE-HOOK" "ADD-OFFS-COMMENT-HOOK"
              "DSTATE-CUR-ADDR" "DSTATE-NEXT-ADDR"))
 
- #!+sb-interpreter
  #s(sb-cold:package-data
     :name "SB!EVAL"
-    :doc "private: the implementation of the IR1 interpreter"
+    :doc "private: originally the implementation of the IR1 interpreter,
+and now that the IR1 interpreter is gone, home to some stuff which is still
+used by the bytecode interpreter"
     :use ("CL" "SB!KERNEL" "SB!INT")
-    :export (#!+sb-show "*EVAL-STACK-TRACE*"
+    :export #!-sb-interpreter
+            ("INTERNAL-EVAL")
+            #!+sb-interpreter
+            ("INTERNAL-EVAL"
+             #!+sb-show "*EVAL-STACK-TRACE*"
              #!+sb-show "*INTERNAL-APPLY-NODE-TRACE*"
-             "FLUSH-INTERPRETED-FUNCTION-CACHE" "INTERNAL-EVAL"
+             "FLUSH-INTERPRETED-FUNCTION-CACHE"
              "INTERPRETED-FUNCTION"
              "INTERPRETED-FUNCTION-ARGLIST"
              "INTERPRETED-FUNCTION-CLOSURE"

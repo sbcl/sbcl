@@ -128,13 +128,15 @@
 
 ;;; Pull the type specifier out of a function object.
 (defun extract-function-type (fun)
-  (if (sb!eval:interpreted-function-p fun)
-      (sb!eval:interpreted-function-type fun)
-      (typecase fun
-	(byte-function (byte-function-type fun))
-	(byte-closure (byte-function-type (byte-closure-function fun)))
+  (cond #!+sb-interpreter
+	((sb!eval:interpreted-function-p fun)
+	 (sb!eval:interpreted-function-type fun))
 	(t
-	 (specifier-type (%function-type (%closure-function fun)))))))
+	 (typecase fun
+	   (byte-function (byte-function-type fun))
+	   (byte-closure (byte-function-type (byte-closure-function fun)))
+	   (t
+	    (specifier-type (%function-type (%closure-function fun))))))))
 
 ;;;; miscellaneous interfaces
 

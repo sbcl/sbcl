@@ -37,8 +37,8 @@
 ;;; could be made less viciously brittle when SB-FLUID.)
 ;;; (Or perhaps just define a macro
 ;;;   (DEFMACRO PKG (NAME)
-;;;     #!-SB-FLUID (FIND-PACKAGE NAME)
-;;;     #!+SB-FLUID `(FIND-PACKAGE ,NAME))
+;;;     #-SB-FLUID (FIND-PACKAGE NAME)
+;;;     #+SB-FLUID `(FIND-PACKAGE ,NAME))
 ;;; and use that to replace all three variables.)
 (defvar *pcl-package*		     (find-package "SB-PCL"))
 (defvar *slot-accessor-name-package* (find-package "SB-SLOT-ACCESSOR-NAME"))

@@ -50,16 +50,13 @@
 	  ((nil)))
 	`(function ,(res) *))))))
 
-;;;; the evaluation stack
+;;;; the 'evaluation stack'
+;;;;
+;;;; (The name dates back to CMU CL, when it was used for the IR1
+;;;; interpreted implementation of EVAL. In SBCL >=0.7.0, it's just
+;;;; the byte interpreter stack.)
 
-;;; the interpreter's evaluation stack
 (defvar *eval-stack* (make-array 100)) ; will grow as needed
-;;; FIXME: This seems to be used by the ordinary (non-byte) interpreter
-;;; too, judging from a crash I had when I removed byte-interp.lisp from
-;;; the cold build sequence. It would probably be clearer to pull the
-;;; shared interpreter machinery out of the byte interpreter and ordinary
-;;; interpreter files and put them into their own file shared-interp.lisp
-;;; or something.
 
 ;;; the index of the next free element of the interpreter's evaluation stack
 (defvar *eval-stack-top* 0)

@@ -240,6 +240,7 @@
 ;;; Try to compile the closure arg to %TIME if it is interpreted.
 (defun massage-time-function (fun)
   (cond
+   #!+sb-interpreter
    ((sb!eval:interpreted-function-p fun)
     (multiple-value-bind (def env-p) (function-lambda-expression fun)
       (declare (ignore def))

@@ -638,7 +638,7 @@
 (defmacro enforce-type (value type)
   (once-only ((value value))
     `(unless (typep ,value ',type)
-       (%failed-aver-type ,value ',type))))
+       (%failed-enforce-type ,value ',type))))
 (defun %failed-enforce-type (value type)
   (error 'simple-type-error
 	 :value value

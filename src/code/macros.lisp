@@ -204,12 +204,10 @@ the usual naming convention (names like *FOO*) for special variables"
 		      ,body))))
 	`(sb!c::%define-compiler-macro ',name #',def ',lambda-list ,doc)))))
 (defun sb!c::%define-compiler-macro (name definition lambda-list doc)
-  ;; FIXME: Why does this have to be an interpreted function? Shouldn't
-  ;; it get compiled?
-  (aver (sb!eval:interpreted-function-p definition))
-  (setf (sb!eval:interpreted-function-name definition)
-	(format nil "DEFINE-COMPILER-MACRO ~S" name))
-  (setf (sb!eval:interpreted-function-arglist definition) lambda-list)
+  #!+sb-interpreter (setf (sb!eval:interpreted-function-name definition)
+			  (format nil "DEFINE-COMPILER-MACRO ~S" name))
+  #!+sb-interpreter (setf (sb!eval:interpreted-function-arglist definition)
+			  lambda-list)
   (sb!c::%%define-compiler-macro name definition doc))
 (defun sb!c::%%define-compiler-macro (name definition doc)
   (setf (sb!xc:compiler-macro-function name) definition)

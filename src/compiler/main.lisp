@@ -13,20 +13,6 @@
 
 (in-package "SB!C")
 
-(defconstant sb!xc:call-arguments-limit most-positive-fixnum
-  #!+sb-doc
-  "The exclusive upper bound on the number of arguments which may be passed
-  to a function, including &REST args.")
-(defconstant sb!xc:lambda-parameters-limit most-positive-fixnum
-  #!+sb-doc
-  "The exclusive upper bound on the number of parameters which may be specifed
-  in a given lambda list. This is actually the limit on required and &OPTIONAL
-  parameters. With &KEY and &AUX you can get more.")
-(defconstant sb!xc:multiple-values-limit most-positive-fixnum
-  #!+sb-doc
-  "The exclusive upper bound on the number of multiple VALUES that you can
-  return.")
-
 ;;; FIXME: Doesn't this belong somewhere else, like early-c.lisp?
 (declaim (special *constants* *free-variables* *component-being-compiled*
 		  *code-vector* *next-location* *result-fixups*

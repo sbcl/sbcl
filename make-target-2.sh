@@ -32,8 +32,8 @@ echo //doing warm init
         (sb!int:/show "hello, world!")
 
         ;; Do warm init.
-	(let ((*print-length* 5)
-	      (*print-level* 5))
+	(let ((*print-length* 10)
+	      (*print-level* 10))
           (sb!int:/show "about to LOAD warm.lisp")
 	  (load "src/cold/warm.lisp"))
 

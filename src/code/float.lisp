@@ -19,9 +19,10 @@
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
 
-;;; These functions let us create floats from bits with the significand
-;;; uniformly represented as an integer. This is less efficient for double
-;;; floats, but is more convenient when making special values, etc.
+;;; These functions let us create floats from bits with the
+;;; significand uniformly represented as an integer. This is less
+;;; efficient for double floats, but is more convenient when making
+;;; special values, etc.
 (defun single-from-bits (sign exp sig)
   (declare (type bit sign) (type (unsigned-byte 24) sig)
 	   (type (unsigned-byte 8) exp))

@@ -63,11 +63,10 @@
 ;;;; anyway). In that environment, a stub no-op version of this
 ;;;; function is used.
 (defun try-to-rename-interpreted-function-as-macro (f name lambda-list)
-  (aver (sb!eval:interpreted-function-p f))
-  (setf (sb!eval:interpreted-function-name f)
-	(format nil "DEFMACRO ~S" name)
-	(sb!eval:interpreted-function-arglist f)
-	lambda-list)
+  #!+sb-interpreter (setf (sb!eval:interpreted-function-name f)
+			  (format nil "DEFMACRO ~S" name)
+			  (sb!eval:interpreted-function-arglist f)
+			  lambda-list)
   (values))
 
 ;;;; EVAL and friends
@@ -107,7 +106,10 @@
 		      (and (consp name)
 			   (eq (car name) 'setf)))
 		  (fdefinition name)
-		  (sb!eval:make-interpreted-function name))))
+		  #!+sb-interpreter
+		  (sb!eval:make-interpreted-function name)
+		  #!-sb-interpreter
+		  (sb!eval:internal-eval original-exp))))
 	   (quote
 	    (unless (= args 1)
 	      (error "wrong number of args to QUOTE:~% ~S" exp))
@@ -150,6 +152,9 @@
 		(collect ((args))
 		  (dolist (arg (rest exp))
 		    (args (eval arg)))
+		  #!-sb-interpreter
+		  (apply (symbol-function name) (args))
+		  #!+sb-interpreter
 		  (if sb!eval::*already-evaled-this*
 		      (let ((sb!eval::*already-evaled-this* nil))
 			(apply (symbol-function name) (args)))
@@ -192,26 +197,28 @@
 ;;; inline expansion.
 (defun function-lambda-expression (fun)
   (declare (type function fun))
-  (if (sb!eval:interpreted-function-p fun)
-      (sb!eval:interpreted-function-lambda-expression fun)
-      (let* ((fun (%function-self fun))
-	     (name (%function-name fun))
-	     (code (sb!di::function-code-header fun))
-	     (info (sb!kernel:%code-debug-info code)))
-	(if info
-	    (let ((source (first (sb!c::compiled-debug-info-source info))))
-	      (cond ((and (eq (sb!c::debug-source-from source) :lisp)
-			  (eq (sb!c::debug-source-info source) fun))
-		     (values (second (svref (sb!c::debug-source-name source) 0))
-			     nil name))
-		    ((stringp name)
-		     (values nil t name))
-		    (t
-		     (let ((exp (info :function :inline-expansion name)))
-		       (if exp
-			   (values exp nil name)
-			   (values nil t name))))))
-	    (values nil t name)))))
+  (cond #!+sb-interpreter
+	((sb!eval:interpreted-function-p fun)
+	 (sb!eval:interpreted-function-lambda-expression fun))
+	(t
+	 (let* ((fun (%function-self fun))
+		(name (%function-name fun))
+		(code (sb!di::function-code-header fun))
+		(info (sb!kernel:%code-debug-info code)))
+	   (if info
+	       (let ((source (first (sb!c::compiled-debug-info-source info))))
+		 (cond ((and (eq (sb!c::debug-source-from source) :lisp)
+			     (eq (sb!c::debug-source-info source) fun))
+			(values (second (svref (sb!c::debug-source-name source) 0))
+				nil name))
+		       ((stringp name)
+			(values nil t name))
+		       (t
+			(let ((exp (info :function :inline-expansion name)))
+			  (if exp
+			      (values exp nil name)
+			      (values nil t name))))))
+	       (values nil t name))))))
 
 ;;; Like FIND-IF, only we do it on a compiled closure's environment.
 (defun find-if-in-closure (test fun)

@@ -2035,7 +2035,8 @@
 		  deprecated-names)))
 
   (let* ((do-eval (and (intersection '(compile :compile-toplevel) situations)
-		       (not sb!eval::*already-evaled-this*)))
+		       #!+sb-interpreter (not sb!eval::*already-evaled-this*)))
+	 #!+sb-interpreter
 	 (sb!eval::*already-evaled-this* t))
     (when do-eval
 

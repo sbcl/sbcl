@@ -32,9 +32,11 @@
 ;;; The list of INTERPRETED-FUNCTIONS that have translated definitions.
 (defvar *interpreted-function-cache* nil)
 (declaim (type list *interpreted-function-cache*))
+
+;;;; eval stack stuff
 
 ;;; Setting this causes the stack operations to dump a trace.
-#+!sb-show
+#!+sb-show
 (defvar *eval-stack-trace* nil)
 
 ;;; Push value on *EVAL-STACK*, growing the stack if necessary. This
@@ -47,13 +49,13 @@
 (defun eval-stack-push (value)
   (let ((len (length (the simple-vector *eval-stack*))))
     (when (= len *eval-stack-top*)
-      #+!sb-show (when *eval-stack-trace*
+      #!+sb-show (when *eval-stack-trace*
 		   (format t "[PUSH: growing stack.]~%"))
       (let ((new-stack (make-array (ash len 1))))
 	(replace new-stack *eval-stack* :end1 len :end2 len)
 	(setf *eval-stack* new-stack))))
   (let ((top *eval-stack-top*))
-    #+!sb-show (when *eval-stack-trace* (format t "pushing ~D.~%" top))
+    #!+sb-show (when *eval-stack-trace* (format t "pushing ~D.~%" top))
     (incf *eval-stack-top*)
     (setf (svref *eval-stack* top) value)))
 
@@ -69,7 +71,7 @@
     (error "attempt to pop empty eval stack"))
   (let* ((new-top (1- *eval-stack-top*))
 	 (value (svref *eval-stack* new-top)))
-    #+!sb-show (when *eval-stack-trace*
+    #!+sb-show (when *eval-stack-trace*
 		 (format t "popping ~D --> ~S.~%" new-top value))
     (setf *eval-stack-top* new-top)
     value))
@@ -81,13 +83,13 @@
 (defun eval-stack-extend (n)
   (let ((len (length (the simple-vector *eval-stack*))))
     (when (> (+ n *eval-stack-top*) len)
-      #+!sb-show (when *eval-stack-trace*
+      #!+sb-show (when *eval-stack-trace*
 		   (format t "[EXTEND: growing stack.]~%"))
       (let ((new-stack (make-array (+ n (ash len 1)))))
 	(replace new-stack *eval-stack* :end1 len :end2 len)
 	(setf *eval-stack* new-stack))))
   (let ((new-top (+ *eval-stack-top* n)))
-    #+!sb-show (when *eval-stack-trace*
+    #!+sb-show (when *eval-stack-trace*
 		 (format t "extending to ~D.~%" new-top))
     (do ((i *eval-stack-top* (1+ i)))
 	((= i new-top))
@@ -96,13 +98,13 @@
 
 ;;; the antithesis of EVAL-STACK-EXTEND
 (defun eval-stack-shrink (n)
-  #+!sb-show (when *eval-stack-trace*
+  #!+sb-show (when *eval-stack-trace*
 	       (format t "shrinking to ~D.~%" (- *eval-stack-top* n)))
   (decf *eval-stack-top* n))
 
 ;;; This is used to shrink the stack back to a previous frame pointer.
 (defun eval-stack-reset-top (ptr)
-  #+!sb-show (when *eval-stack-trace*
+  #!+sb-show (when *eval-stack-trace*
 	       (format t "setting top to ~D.~%" ptr))
   (setf *eval-stack-top* ptr))
 
