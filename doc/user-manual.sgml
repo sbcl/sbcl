@@ -1,6 +1,7 @@
 <!DOCTYPE book PUBLIC "-//OASIS//DTD DocBook V3.1//EN" [
 
  <!-- markup for common expressions -->
+ <!ENTITY AMOP       "<acronym>AMOP</>">
  <!ENTITY ANSI       "<acronym>ANSI</>">
  <!ENTITY CMUCL      "<application>CMU CL</>">
  <!ENTITY IEEE       "<acronym>IEEE</>">

@@ -33,7 +33,7 @@
 
 (defun allocate-standard-instance (wrapper
 				   &optional (slots-init nil slots-init-p))
-  (let ((instance (%make-standard-instance nil))
+  (let ((instance (%make-standard-instance nil (get-instance-hash-code)))
 	(no-of-slots (wrapper-no-of-instance-slots wrapper)))
     (setf (std-instance-wrapper instance) wrapper)
     (setf (std-instance-slots instance)
@@ -63,7 +63,8 @@
 
 (defun allocate-funcallable-instance (wrapper &optional
 					      (slots-init nil slots-init-p))
-  (let ((fin (%make-pcl-funcallable-instance nil nil)))
+  (let ((fin (%make-pcl-funcallable-instance nil nil
+					     (get-instance-hash-code))))
     (set-funcallable-instance-fun
      fin
      #'(sb-kernel:instance-lambda (&rest args)

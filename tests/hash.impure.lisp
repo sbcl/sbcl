@@ -51,7 +51,9 @@
 		 (complex 1.0 2.0) (complex 1.0d0 2.0)
 		 (complex 1.5 -3/2) (complex 1.5 -1.5d0)
 	       
-		 #\x #\X #\*))
+		 #\x #\X #\*
+
+		 #'allocate-instance #'no-applicable-method))
 	 (make-psxhash-extra-subtests ()
 	   (list (copy-seq "")
 		 (copy-seq #*)

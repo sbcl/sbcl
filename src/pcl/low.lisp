@@ -80,7 +80,7 @@
   ;; KLUDGE: Note that neither of these slots is ever accessed by its
   ;; accessor name as of sbcl-0.pre7.63. Presumably everything works
   ;; by puns based on absolute locations. Fun fun fun.. -- WHN 2001-10-30
-  :slot-names (clos-slots name)
+  :slot-names (clos-slots name hash-code)
   :boa-constructor %make-pcl-funcallable-instance
   :superclass-name sb-kernel:funcallable-instance
   :metaclass-name sb-kernel:random-pcl-class
@@ -105,8 +105,15 @@
   `(funcallable-instance-p ,fin))
 (defmacro fsc-instance-wrapper (fin)
   `(sb-kernel:%funcallable-instance-layout ,fin))
+;;; FIXME: This seems to bear no relation at all to the CLOS-SLOTS
+;;; slot in the FUNCALLABLE-INSTANCE structure, above, which
+;;; (bizarrely) seems to be set to the NAME of the
+;;; FUNCALLABLE-INSTANCE. At least, the index 1 seems to return the
+;;; NAME, and the index 2 NIL.  Weird.  -- CSR, 2002-11-07
 (defmacro fsc-instance-slots (fin)
   `(sb-kernel:%funcallable-instance-info ,fin 0))
+(defmacro fsc-instance-hash (fin)
+  `(sb-kernel:%funcallable-instance-info ,fin 3))
 
 (declaim (inline clos-slots-ref (setf clos-slots-ref)))
 (declaim (ftype (function (simple-vector index) t) clos-slots-ref))
@@ -250,7 +257,7 @@
   (slots nil))
 |#
 (sb-kernel:!defstruct-with-alternate-metaclass standard-instance
-  :slot-names (slots)
+  :slot-names (slots hash-code)
   :boa-constructor %make-standard-instance
   :superclass-name sb-kernel:instance
   :metaclass-name cl:standard-class
@@ -262,6 +269,9 @@
 ;;; weakening of STD-INSTANCE-P.
 (defmacro std-instance-slots (x) `(sb-kernel:%instance-ref ,x 1))
 (defmacro std-instance-wrapper (x) `(sb-kernel:%instance-layout ,x))
+;;; KLUDGE: This one doesn't "work" on structures.  However, we
+;;; ensure, in SXHASH and friends, never to call it on structures.
+(defmacro std-instance-hash (x) `(sb-kernel:%instance-ref ,x 2))
 
 ;;; FIXME: These functions are called every place we do a
 ;;; CALL-NEXT-METHOD, and probably other places too. It's likely worth
@@ -293,6 +303,20 @@
     `(if (typep ,wrapper 'wrapper)
 	 ,wrapper
 	 nil)))
+
+;;;; support for useful hashing of PCL instances
+(let ((hash-code 0))
+  (declare (fixnum hash-code))
+  (defun get-instance-hash-code ()
+    (if (< hash-code most-positive-fixnum)
+	(incf hash-code)
+	(setq hash-code 0))))
+
+(defun sb-impl::sxhash-instance (x)
+  (cond
+    ((std-instance-p x) (std-instance-hash x))
+    ((fsc-instance-p x) (fsc-instance-hash x))
+    (t (bug "SXHASH-INSTANCE called on some weird thing: ~S" x))))
 
 ;;;; structure-instance stuff
 ;;;;

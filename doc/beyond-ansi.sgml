@@ -116,6 +116,14 @@ GCed.</para> <!-- FIXME: Actually documenting these would be good.:-| -->
 whose instances can be used as Lisp streams (e.g. passed as the
 first argument to <function>format</>).</para>
 
+<para>&SBCL; supports a MetaObject Protocol which is intended to be
+compatible with &AMOP;; exceptions to this (as distinct from current
+bugs<!-- Such as the distinction between CL:FIND-CLASS and
+SB-PCL::FIND-CLASS :-( -->) are that
+<function>compute-effective-method</> only returns one value, not
+two<!-- FIXME: anything else? What about extensions? (e.g. COMPUTE-SLOTS
+behaviour) -->.</para>
+
 </sect2>
 
 <sect2><title>Support For Unix</>

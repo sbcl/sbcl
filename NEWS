@@ -1365,6 +1365,10 @@ changes in sbcl-0.7.10 relative to sbcl-0.7.9:
        FORWARD-REFERENCED-CLASSes; error reporting on
        CLASS-DEFAULT-INITARGS, CLASS-PRECEDENCE-LIST and CLASS-SLOTS
        has been improved;
+    ** SXHASH on CLOS instances now uses a slot internal to the
+       instance to return different numbers on distinct instances,
+       while preserving the same return value through invocations of
+       CHANGE-CLASS;
   * fixed some bugs shown by Paul Dietz' test suite:
     ** DOLIST puts its body in TAGBODY
     ** SET-EXCLUSIVE-OR sends arguments to :TEST function in the
