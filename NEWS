@@ -1,6 +1,11 @@
 changes in sbcl-0.8.16 relative to sbcl-0.8.15:
   * bug fix: read-write consistency on streams of element-type
     (SIGNED-BYTE N) for N > 32.  (reported by Bruno Haible for CMUCL)
+  * bug fix: redefiniton of the only method of a generic function with
+    no DEFGENERIC no longer emits a full WARNING.  In addition,
+    redefinition of generic functions with no DEFGENERIC to an
+    incompatible lambda list now signals an error.  (thanks to Zach
+    Beane)
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** POSITION on displaced vectors with non-zero displacement
        returns the right answer.

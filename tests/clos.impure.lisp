@@ -450,8 +450,19 @@
 (defmethod incompatible-ll-test-2 ((x integer) &key bar) bar)
 (assert (= (length
 	    (sb-pcl:generic-function-methods #'incompatible-ll-test-2)) 2))
-(assert (equal (incompatible-ll-test-2 t 1 2) '(1 2)))
+
+;;; Per Christophe, this is an illegal method call because of 7.6.5
+(assert (raises-error? (incompatible-ll-test-2 t 1 2)))
+
 (assert (eq (incompatible-ll-test-2 1 :bar 'yes) 'yes))
+
+(defmethod incompatible-ll-test-3 ((x integer)) x)
+(remove-method #'incompatible-ll-test-3
+               (find-method #'incompatible-ll-test-3
+                            nil
+                            (list (find-class 'integer))))
+(assert (raises-error? (defmethod incompatible-ll-test-3 (x y) (list x y))))
+
 
 ;;; Attempting to instantiate classes with forward references in their
 ;;; CPL should signal errors (FIXME: of what type?)

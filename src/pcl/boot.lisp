@@ -1644,6 +1644,12 @@ bootstrapping.
        (unless (equal ,pos ,valsym)
 	 (setf ,pos ,valsym)))))
 
+(defun create-gf-lambda-list (lambda-list)
+  ;;; Create a gf lambda list from a method lambda list
+  (loop for x in lambda-list
+        collect (if (consp x) (list (car x)) x)
+        if (eq x '&key) do (loop-finish)))
+
 (defun set-arg-info (gf &key new-method (lambda-list nil lambda-list-p)
 			argument-precedence-order)
   (let* ((arg-info (if (eq *boot-state* 'complete)
@@ -1671,8 +1677,10 @@ bootstrapping.
 	      (error "The lambda-list ~S is incompatible with ~
 		     existing methods of ~S."
 		     lambda-list gf))))
-	(when lambda-list-p
-	  (esetf (arg-info-lambda-list arg-info) lambda-list))
+        (esetf (arg-info-lambda-list arg-info)
+               (if lambda-list-p
+                   lambda-list
+                   (create-gf-lambda-list lambda-list)))
 	(when (or lambda-list-p argument-precedence-order
 		  (null (arg-info-precedence arg-info)))
 	  (esetf (arg-info-precedence arg-info)
@@ -1920,11 +1928,8 @@ bootstrapping.
 	      (let* ((method (car (last methods)))
 		     (ll (if (consp method)
 			     (early-method-lambda-list method)
-			     (method-lambda-list method)))
-		     (k (member '&key ll)))
-		(if k
-		    (ldiff ll (cdr k))
-		    ll))))
+			     (method-lambda-list method))))
+                (create-gf-lambda-list ll))))
 	(arg-info-lambda-list arg-info))))
 
 (defmacro real-ensure-gf-internal (gf-class all-keys env)
