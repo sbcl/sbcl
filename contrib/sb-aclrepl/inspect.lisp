@@ -1,4 +1,4 @@
-;;;; Inspector for sb-aclrepl
+/nick;;;; Inspector for sb-aclrepl
 ;;;;
 ;;;; The documentation, which may or may not apply in its entirety at
 ;;;; any given time, for this functionality is on the ACL website:
@@ -55,6 +55,7 @@ The commands are:
 ;;; indicates that that a slot is unbound.
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defvar *inspect-unbound-object-marker* (gensym "INSPECT-UNBOUND-OBJECT-")))
+
 
 (defun inspector-fun (object input-stream output-stream)
   (declare (ignore input-stream))
@@ -452,7 +453,7 @@ POSITION is NIL if the id is invalid or not found."
   "Returns elements of an object that have been trimmed and labeled based on
 length and skip. Returns (VALUES ELEMENTS LABELS ELEMENT-COUNT)
 where ELEMENTS and LABELS are vectors containing ELEMENT-COUNT items.
-LABELS may be a string, number, cons pair, :tail, or :ellipses.
+LABELS elements may be a string, number, cons pair, :tail, or :ellipses.
 This function may return an ELEMENT-COUNT of up to (+ 3 length) which would
 include an :ellipses at the beginning, :ellipses at the end,
 and the last element."
@@ -755,7 +756,7 @@ cons cells and LIST-TYPE is :normal, :dotted, or :cyclic"
 	(info (sb-kernel:layout-info (sb-kernel:layout-of object))))
     (when (sb-kernel::defstruct-description-p info)
       (dolist (dd-slot (sb-kernel:dd-slots info) (nreverse components-list))
-	(push (cons (sb-kernel:dsd-%name dd-slot)
+	(push (cons (string (sb-kernel:dsd-name dd-slot))
 		    (funcall (sb-kernel:dsd-accessor-name dd-slot) object))
 	      components-list)))))
 
