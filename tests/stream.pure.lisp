@@ -80,3 +80,13 @@
   (with-input-from-string (q "foo")
     (let* ((r (make-concatenated-stream p q)))
       (peek-char nil r))))
+
+;; 0.7.14 and previous SBCLs don't have a working INTERACTIVE-STREAM-P
+;; because it called UNIX-ISATTY, which wasn't defined.
+(with-input-from-string (s "a non-interactive stream")
+  (assert (not (interactive-stream-p s))))
+;;; KLUDGE: Unfortunately it's hard to find a reliably interactive
+;;; stream to test, since it's reasonable for these tests to be run
+;;; from a script, conceivably even as something like a cron job.
+;;; Ideas?
+#+nil (assert (eq (interactive-stream-p *terminal-io*) t))

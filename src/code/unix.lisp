@@ -204,6 +204,11 @@
 (defconstant l_incr 1) ; to increment the file pointer
 (defconstant l_xtnd 2) ; to extend the file size
 
+;;; Is a stream interactive?
+(defun unix-isatty (fd)
+  (declare (type unix-fd fd))
+  (int-syscall ("isatty" int) fd))
+
 ;;; Accept a file descriptor and move the file pointer ahead
 ;;; a certain offset for that file. WHENCE can be any of the following:
 ;;;  L_SET     Set the file pointer.

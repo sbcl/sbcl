@@ -139,8 +139,8 @@
 (!def-primitive-type simple-array-complex-long-float (descriptor-reg)
   :type (simple-array (complex long-float) (*)))
 
-;;; Note: The complex array types are not included, 'cause it is pointless to
-;;; restrict VOPs to them.
+;;; Note: The complex array types are not included, 'cause it is
+;;; pointless to restrict VOPs to them.
 
 ;;; other primitive other-pointer types
 (!def-primitive-type system-area-pointer (sap-reg descriptor-reg))
@@ -151,7 +151,7 @@
 
 ;;;; PRIMITIVE-TYPE-OF and friends
 
-;;; Return the most restrictive primitive type that contains Object.
+;;; Return the most restrictive primitive type that contains OBJECT.
 (/show0 "primtype.lisp 147")
 (!def-vm-support-routine primitive-type-of (object)
   (let ((type (ctype-of object)))

@@ -1636,6 +1636,7 @@ changes in sbcl-0.8.0 relative to sbcl-0.7.14
     forward-referenced superclasses.  (thanks to Gerd Moellmann)
   * fixed evaluation order in optional entries.  (reported by Gilbert
     Baumann)
+  * *STANDARD-INPUT* is now 
   * SB-MOP:ENSURE-CLASS-USING-CLASS now takes its arguments in the
     specified-by-AMOP order of (CLASS NAME &REST ARGS &KEY).
   * fixed bug 20: DEFMETHOD can define methods using names that are

@@ -848,7 +848,8 @@
      (fd-stream-element-type fd-stream))
     (:interactive-p
       ;; FIXME: sb!unix:unix-isatty is undefined.
-     (sb!unix:unix-isatty (fd-stream-fd fd-stream)))
+     (= 1 (the (member 0 1)
+            (sb!unix:unix-isatty (fd-stream-fd fd-stream)))))
     (:line-length
      80)
     (:charpos
@@ -1234,14 +1235,7 @@
   (stream-reinit)
   (setf *terminal-io* (make-synonym-stream '*tty*))
   (setf *standard-output* (make-synonym-stream '*stdout*))
-  (setf *standard-input*
-	(#!-high-security
-	 ;; FIXME: Why is *STANDARD-INPUT* a TWO-WAY-STREAM? ANSI says
-	 ;; it's an input stream.
-	 make-two-way-stream
-	 #!+high-security
-	 %make-two-way-stream (make-synonym-stream '*stdin*)
-			     *standard-output*))
+  (setf *standard-input* (make-synonym-stream '*stdin*))
   (setf *error-output* (make-synonym-stream '*stderr*))
   (setf *query-io* (make-synonym-stream '*terminal-io*))
   (setf *debug-io* *query-io*)
