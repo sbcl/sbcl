@@ -147,25 +147,5 @@ This code could be optimized to
 #10
 Reported by Robert E. Brown on sbcl-devel 2003-01-21:
 
-(defstruct trace-info
-  (foo nil :type (or null function)))
-
-(defun bad (x)
-  (declare (optimize (speed 3) (safety 0)))
-  (let ((wow (trace-info-foo x)))
-    (or (not wow) (funcall wow 1 2 3))))
-
-Python does not derive that FUNCALL is applied to FUNCTION.
-
-(OR ...) is equivalent to
-
-(LET ((G2407 (NOT WOW)))
-  (IF G2407 G2407 (FUNCALL WOW 1 2 3)))
-
-or to
-
-(LET ((G2407 (IF WOW NIL T)))
-  (IF G2407 G2407 (FUNCALL WOW 1 2 3)))
-
-so this is similar to #9.
+(this is really a bug, fixed in 0.pre8.26)
 --------------------------------------------------------------------------------

@@ -1132,7 +1132,10 @@
 		  (setf (continuation-next prev) nil))
 		 (t
 		  (setf (continuation-next prev) next)
-		  (setf (node-prev next) prev)))
+		  (setf (node-prev next) prev)
+                  (when (and (if-p next) ; AOP wanted
+                             (eq prev (if-test next)))
+                    (reoptimize-continuation prev))))
 	   (setf (node-prev node) nil)
 	   nil)
 	  (t

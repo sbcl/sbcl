@@ -214,6 +214,11 @@
 		~%  ~S~%*** possible internal error? Please report this."
 	       (type-specifier rtype) (type-specifier node-type))))
 	  (setf (node-derived-type node) int)
+          (when (and (ref-p node)
+                     (member-type-p int)
+                     (null (rest (member-type-members int)))
+                     (lambda-var-p (ref-leaf node)))
+            (change-ref-leaf node (find-constant (first (member-type-members int)))))
 	  (reoptimize-continuation (node-cont node))))))
   (values))
 

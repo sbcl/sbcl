@@ -684,7 +684,8 @@ WORKAROUND:
   expansion, leaving garbage consisting of infinished blocks of the
   partially converted function.)
 
-  (appears to be fixed in sbcl-0.pre8.21)
+  (due to reordering of the compiler this example is compiled
+  successfully by 0.7.14, but the bug probably remains)
 
 162:
   (reported by Robert E. Brown 2002-04-16) 
