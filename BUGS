@@ -567,39 +567,27 @@ WORKAROUND:
   See also bugs #45.c and #183
 
 148:
-  In sbcl-0.7.1.3 on x86, COMPILE-FILE on the file
-    (in-package :cl-user)
-    (defvar *thing*)
-    (defvar *zoom*)
-    (defstruct foo bar bletch)
-    (defun %zeep ()
-      (labels ((kidify1 (kid)
-	         )
-               (kid-frob (kid)
-                 (if *thing*
-                    (setf sweptm
-              	           (m+ (frobnicate kid)
-				     sweptm))
-		    (kidify1 kid))))
-      (declare (inline kid-frob))
-      (map nil
-	   #'kid-frob
-	   (the simple-vector (foo-bar perd)))))
+  COMPILE-FILE on the file
+    (defun u-b-sra (ad0)
+      (declare (special *foo* *bar*))
+      (declare (optimize (safety 3) (speed 2) (space 1)))
+      (labels ((c.frob ())
+               (ad.frob (ad)
+                   (if *foo*
+                       (mapc #'ad.frob *bar*)
+                       (dolist (b *bar*)
+                         (c.frob)))))
+        (declare (inline c.frob ad.frob))
+        (ad.frob ad0)))
   fails with
     debugger invoked on condition of type TYPE-ERROR:
       The value NIL is not of type SB-C::NODE.
-  The location of this failure has moved around as various related
-  issues were cleaned up. As of sbcl-0.7.1.9, it occurs in
-  NODE-BLOCK called by LAMBDA-COMPONENT called by IR2-CONVERT-CLOSURE.
 
-  (Python LET-converts KIDIFY1 into KID-FROB, then tries to inline
-  expand KID-FROB into %ZEEP. Having partially done it, it sees a call
-  of KIDIFY1, which already does not exist. So it gives up on
-  expansion, leaving garbage consisting of infinished blocks of the
-  partially converted function.)
-
-  (due to reordering of the compiler this example is compiled
-  successfully by 0.7.14, but the bug probably remains)
+  (Python LET-converts C.FROB into AD.FROB, then tries to inline
+  expand AD.FROB. Having partially done it, it sees a call of C.FROB,
+  which already does not exist. So it gives up on expansion, leaving
+  garbage consisting of infinished blocks of the partially converted
+  function.)
 
 162:
   (reported by Robert E. Brown 2002-04-16) 
@@ -1062,33 +1050,18 @@ WORKAROUND:
 
   This is a problem because the compiler emits optimization notes when
   you use a non-simple array, and without a type specifier for hairy
-  array types, there's no good way to tell it you're doing it 
+  array types, there's no good way to tell it you're doing it
   intentionally so that it should shut up and just compile the code.
 
-258: "TYPE-ERROR when recursive LABELS function is declared INLINE"
-  The compiler does emit a helpful 
-    ; note: couldn't inline expand because expansion calls this 
-    ;   LET-converted local function:
-    ;   "LABELS COMMON-LISP-USER::C.FROB"
-  but still shouldn't fail with a TYPE-ERROR 
-    The value NIL is not of type SB-C::NODE.
-  when compiling
-    (cl:in-package :cl-user)
-    (declaim (optimize (safety 3) (speed 2) (space 1)))
-    (defvar *foo*)
-    (defvar *bar*)
-    (defun u-b-sra (x r ad0 &optional ad1 &rest ad-list)
-        (labels ((c.frob (c0)
-                   (let ()
-                     (when *foo*
-                       (vector-push-extend c0 *bar*))))
-                 (ad.frob (ad)
-                   (if *foo*
-                       (map nil #'ad.frob (the (vector t) *bar*))
-                       (dolist (b *bar*)
-                         (c.frob b)))))
-          (declare (inline c.frob ad.frob)) ; 'til DYNAMIC-EXTENT
-          (ad.frob ad0)))
+  Another poblem is confusing error message "asserted type ARRAY
+  conflicts with derived type (VALUES SIMPLE-VECTOR &OPTIONAL)" during
+  compiling (LAMBDA (V) (VALUES (SVREF V 0) (VECTOR-POP V))).
+
+  The last problem is that when type assertions are converted to type
+  checks, types are represented with type specifiers, so we could lose
+  complex attribute. (Now this is probably not important, because
+  currently checks for complex arrays seem to be performed by
+  callees.)
 
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:
