@@ -137,3 +137,10 @@
 
 (defun sb!kernel:%ldb (size posn integer)
   (ldb (byte size posn) integer))
+
+(defun sb!kernel:%dpb (newbyte size posn integer)
+  (dpb newbyte (byte size posn) integer))
+
+(defun sb!kernel:%with-array-data (array start end)
+  (assert (typep array '(simple-array * (*))))
+  (values array start end 0))

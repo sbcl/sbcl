@@ -910,11 +910,16 @@
     ((named-lambda)
      (let ((name (cadr thing)))
        (if (legal-fun-name-p name)
-	   (let ((res (apply #'ir1-convert-lambda `(lambda ,@(cddr thing))
+	   (let ((defined-fun-res (get-defined-fun name))
+                 (res (apply #'ir1-convert-lambda `(lambda ,@(cddr thing))
 			     :source-name name
 			     :debug-name nil
 			     args)))
 	     (assert-global-function-definition-type name res)
+             (setf (defined-fun-functional defined-fun-res)
+                   res)
+             (unless (eq (defined-fun-inlinep defined-fun-res) :notinline)
+               (substitute-leaf res defined-fun-res))
 	     res)
 	   (apply #'ir1-convert-lambda `(lambda ,@(cddr thing))
 		  :debug-name name args))))

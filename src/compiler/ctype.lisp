@@ -759,15 +759,20 @@
                          (derive-node-type ref (make-single-value-type type))))))
            t))))))
 
+;;; FIXME: This is quite similar to ASSERT-NEW-DEFINITION.
 (defun assert-global-function-definition-type (name fun)
   (declare (type functional fun))
   (let ((type (info :function :type name))
         (where (info :function :where-from name)))
     (when (eq where :declared)
       (setf (leaf-type fun) type)
-      (assert-definition-type fun type
-                              :unwinnage-fun #'compiler-notify
-                              :where "proclamation"))))
+      (assert-definition-type
+       fun type
+       :unwinnage-fun #'compiler-notify
+       :where "proclamation"
+       :really-assert (not (awhen (info :function :info name)
+                             (ir1-attributep (fun-info-attributes it)
+                                             explicit-check)))))))
 
 ;;;; FIXME: Move to some other file.
 (defun check-catch-tag-type (tag)

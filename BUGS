@@ -1033,16 +1033,6 @@ WORKAROUND:
   be nice to understand why the first patch caused problems, and to
   fix the cause if possible.
 
-267:
-  In
-    (defun fact (x i)
-      (if (= x 0)
-          i
-          (fact (1- x) (* x i))))
-  sbcl does not convert the self-recursive call to a jump, though it
-  is allowed to by CLHS 3.2.2.3.  CMUCL, however, does perform this
-  optimization.
-
 268: "wrong free declaration scope"
   The following code must signal type error:
 

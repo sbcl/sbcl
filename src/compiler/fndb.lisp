@@ -344,7 +344,7 @@
 (defknown scale-float (float float-exponent) float
   (movable foldable unsafely-flushable explicit-check))
 (defknown float-radix (float) float-radix
-  (movable foldable flushable explicit-check))
+  (movable foldable flushable))
 (defknown float-sign (float &optional float) float
   (movable foldable flushable explicit-check))
 (defknown (float-digits float-precision) (float) float-digits
