@@ -11,8 +11,7 @@
 
 (in-package "SB-IMPL")
 
-;; byte-compile this file
-(declaim (optimize (speed 0) (safety 1)))
+(declaim #.*optimize-byte-compilation*)
 
 ;;; The inspector views LISP objects as being composed of parts. A
 ;;; list, for example, would be divided into its members, and a
@@ -45,9 +44,11 @@
       (nth (+ n parts-offset) parts)))
 
 (defun inspect (object)
+  (declare #.*optimize-external-despite-byte-compilation*)
   (unwind-protect
       (input-loop object (describe-parts object) *standard-output*)
-    (setf *inspect-object-stack* nil)))
+    (setf *inspect-object-stack* nil))
+  (values))
 
 ;;; When *ILLEGAL-OBJECT-MARKER* occurs in a parts list, it indicates
 ;;; that that slot is unbound.

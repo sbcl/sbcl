@@ -632,11 +632,11 @@
 
 (defvar *read-suppress* nil
   #!+sb-doc
-  "Suppresses most interpreting of the reader when T")
+  "Suppress most interpreting in the reader when T.")
 
 (defvar *read-base* 10
   #!+sb-doc
-  "The radix that Lisp reads numbers in.")
+  "the radix that Lisp reads numbers in")
 (declaim (type (integer 2 36) *read-base*))
 
 ;;; Modify the read buffer according to READTABLE-CASE, ignoring

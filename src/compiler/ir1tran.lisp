@@ -829,7 +829,7 @@
 			     type
 			     (type-approx-intersection2 old-type type))))
 	       (cond ((eq int *empty-type*)
-		      (unless (policy nil (= inhibit-warnings 3))
+		      (unless (policy *lexenv* (= inhibit-warnings 3))
 			(compiler-warning
 			 "The type declarations ~S and ~S for ~S conflict."
 			 (type-specifier old-type) (type-specifier type)
@@ -937,7 +937,7 @@
 		    name "in an inline or notinline declaration")))
 	      (etypecase found
 		(functional
-		 (when (policy nil (>= speed inhibit-warnings))
+		 (when (policy *lexenv* (>= speed inhibit-warnings))
 		   (compiler-note "ignoring ~A declaration not at ~
 				   definition of local function:~%  ~S"
 				  sense name)))
@@ -1029,7 +1029,7 @@
 			       `(values ,@types))
 			   cont res 'values))))
       (dynamic-extent
-       (when (policy nil (> speed inhibit-warnings))
+       (when (policy *lexenv* (> speed inhibit-warnings))
 	 (compiler-note
 	  "compiler limitation:~
            ~%  There's no special support for DYNAMIC-EXTENT (so it's ignored)."))
@@ -1510,7 +1510,7 @@
 	      (n-allowp (gensym "N-ALLOWP-"))
 	      (n-losep (gensym "N-LOSEP-"))
 	      (allowp (or (optional-dispatch-allowp res)
-			  (policy nil (zerop safety)))))
+			  (policy *lexenv* (zerop safety)))))
 
 	  (temps `(,n-index (1- ,n-count)) n-key n-value-temp)
 	  (body `(declare (fixnum ,n-index) (ignorable ,n-key ,n-value-temp)))
@@ -2572,7 +2572,8 @@
     (when (null (find-uses cont))
       (setf (continuation-asserted-type cont) new))
     (when (and (not intersects)
-	       (not (policy nil (= inhibit-warnings 3)))) ;FIXME: really OK to suppress?
+	       (not (policy *lexenv*
+			    (= inhibit-warnings 3)))) ;FIXME: really OK to suppress?
       (compiler-warning
        "The type ~S in ~S declaration conflicts with an enclosing assertion:~%   ~S"
        (type-specifier ctype)

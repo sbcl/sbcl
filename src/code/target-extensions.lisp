@@ -1,10 +1,10 @@
-;;;; This file contains things for the extensions package which can't
-;;;; be built at cross-compile time, and perhaps also some things
-;;;; which might as well not be built at cross-compile time because
-;;;; they're not needed then. Things which can't be built at
-;;;; cross-compile time (e.g. because they need machinery which only
-;;;; exists inside SBCL's implementation of the LISP package) do not
-;;;; belong in this file.
+;;;; This file contains things for the extensions packages (SB-EXT and
+;;;; also "internal extensions" SB-INT) which can't be built at
+;;;; cross-compile time, and perhaps also some things which might as
+;;;; well not be built at cross-compile time because they're not
+;;;; needed then. Things which can't be built at cross-compile time
+;;;; (e.g. because they need machinery which only exists inside SBCL's
+;;;; implementation of the LISP package) do not belong in this file.
 
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
@@ -63,3 +63,29 @@
 	 :format-control "~@<~A: ~2I~_~A~:>"
 	 :format-arguments (list prefix-string (strerror errno))
 	 other-condition-args))
+
+;;;; optimization idioms
+
+(eval-when (:compile-toplevel :load-toplevel :execute)
+
+  ;; Byte compile this thing if possible.
+  (defvar *optimize-byte-compilation*
+    '(optimize (speed 0) (safety 1)))
+
+  ;; This thing is externally visible, so compiling meta-information
+  ;; is more important than byte-compiling it; but it's otherwise
+  ;; suitable for byte-compilation.
+  ;;
+  ;; (As long as the byte compiler isn't capable of compiling
+  ;; meta-information such as the argument list required by functions
+  ;; (as in sbcl-0.6.12, anyway), it's not suitable for compiling
+  ;; externally visible things like CL:INSPECT even if their speed
+  ;; requirements are small enough that it'd otherwise be OK. If some
+  ;; later version of the byte compiler learns to compile such
+  ;; meta-information, we'll probably change the implementation of
+  ;; this idiom so that it causes byte compilation of the thing after
+  ;; all.)
+  (defvar *optimize-external-despite-byte-compilation*
+    '(optimize (speed 1)
+	       ;; still might as well be as small as possible..
+	       (space 3))))

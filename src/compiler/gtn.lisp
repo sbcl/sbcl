@@ -127,8 +127,9 @@
 (defun return-value-efficency-note (tails)
   (declare (type tail-set tails))
   (let ((funs (tail-set-functions tails)))
-    (when (policy (lambda-bind (first funs)) (> (max speed space)
-						inhibit-warnings))
+    (when (policy (lambda-bind (first funs))
+		  (> (max speed space)
+		     inhibit-warnings))
       (dolist (fun funs
 		   (let ((*compiler-error-context* (lambda-bind (first funs))))
 		     (compiler-note

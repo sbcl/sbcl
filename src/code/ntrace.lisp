@@ -146,7 +146,7 @@
       (when (and info (trace-info-named info))
 	(untrace-1 fname)
 	(trace-1 fname info new-value)))))
-(push #'trace-redefined-update sb-int:*setf-fdefinition-hook*)
+(push #'trace-redefined-update *setf-fdefinition-hook*)
 
 ;;; Annotate some forms to evaluate with pre-converted functions. Each
 ;;; form is really a cons (exp . function). Loc is the code location
@@ -334,8 +334,7 @@
 		  (nth-value 2 (trace-fdefinition definition)))
 	  (trace-fdefinition function-or-name))
     (when (gethash fun *traced-functions*)
-      ;; FIXME: should be STYLE-WARNING
-      (warn "Function ~S is already TRACE'd, retracing it." function-or-name)
+      (warn "~S is already TRACE'd, untracing it." function-or-name)
       (untrace-1 fun))
 
     (let* ((debug-fun (sb-di:function-debug-function fun))
@@ -380,7 +379,7 @@
 	(unless named
 	  (error "can't use encapsulation to trace anonymous function ~S"
 		 fun))
-	(sb-int:encapsulate function-or-name 'trace `(trace-call ',info)))
+	(encapsulate function-or-name 'trace `(trace-call ',info)))
        (t
 	(multiple-value-bind (start-fun cookie-fun)
 	    (trace-start-breakpoint-fun info)
@@ -577,7 +576,7 @@
      (t
       (cond
        ((trace-info-encapsulated info)
-	(sb-int:unencapsulate (trace-info-what info) 'trace))
+	(unencapsulate (trace-info-what info) 'trace))
        (t
 	(sb-di:delete-breakpoint (trace-info-start-breakpoint info))
 	(sb-di:delete-breakpoint (trace-info-end-breakpoint info))))

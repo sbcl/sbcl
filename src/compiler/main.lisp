@@ -295,24 +295,42 @@
 	(setf (component-reanalyze component) nil))
       (setf (component-reoptimize component) nil)
       (ir1-optimize component)
-      (unless (component-reoptimize component)
-	(maybe-mumble " ")
-	(return))
-      (incf count)
-      (when (= count *max-optimize-iterations*)
-	(event ir1-optimize-maxed-out)
-	(maybe-mumble "* ")
-	(setf (component-reoptimize component) nil)
-	(do-blocks (block component)
-	  (setf (block-reoptimize block) nil))
-	(return))
+      (cond ((component-reoptimize component)
+             (incf count)
+             (when (= count *max-optimize-iterations*)
+               (maybe-mumble "*")
+               (cond ((retry-delayed-ir1-transforms :optimize)
+		      (maybe-mumble "+")
+		      (setq count 0))
+                     (t
+		      (event ir1-optimize-maxed-out)
+		      (setf (component-reoptimize component) nil)
+		      (do-blocks (block component)
+			(setf (block-reoptimize block) nil))
+		      (return)))))
+            ((retry-delayed-ir1-transforms :optimize)
+	     (setf count 0)
+	     (maybe-mumble "+"))
+	    (t
+             (maybe-mumble " ")
+	     (return)))
       (maybe-mumble "."))
     (when cleared-reanalyze
       (setf (component-reanalyze component) t)))
   (values))
 
 (defparameter *constraint-propagate* t)
-(defparameter *reoptimize-after-type-check-max* 5)
+
+;;; KLUDGE: This was bumped from 5 to 10 in a DTC patch ported by MNA
+;;; from CMU CL into sbcl-0.6.11.44, the same one which allowed IR1
+;;; transforms to be delayed. Either DTC or MNA or both didn't explain
+;;; why, and I don't know what the rationale was. -- WHN 2001-04-28
+;;;
+;;; FIXME: It would be good to document why it's important to have a
+;;; large value here, and what the drawbacks of an excessively large
+;;; value are; and it might also be good to make it depend on
+;;; optimization policy.
+(defparameter *reoptimize-after-type-check-max* 10)
 
 (defevent reoptimize-maxed-out
   "*REOPTIMIZE-AFTER-TYPE-CHECK-MAX* exceeded.")
@@ -334,8 +352,9 @@
 (defun ir1-phases (component)
   (declare (type component component))
   (let ((*constraint-number* 0)
-	(loop-count 1))
-    (declare (special *constraint-number*))
+	(loop-count 1)
+        (*delayed-ir1-transforms* nil))
+    (declare (special *constraint-number* *delayed-ir1-transforms*))
     (loop
       (ir1-optimize-until-done component)
       (when (or (component-new-functions component)
@@ -346,7 +365,8 @@
       (when *constraint-propagate*
 	(maybe-mumble "constraint ")
 	(constraint-propagate component))
-      (maybe-mumble "type ")
+      (when (retry-delayed-ir1-transforms :constraint)
+        (maybe-mumble "Rtran "))
       ;; Delay the generation of type checks until the type
       ;; constraints have had time to propagate, else the compiler can
       ;; confuse itself.
@@ -354,7 +374,8 @@
 		       (component-reanalyze component)
 		       (component-new-functions component)
 		       (component-reanalyze-functions component))
-		   (< loop-count (- *reoptimize-after-type-check-max* 2)))
+		   (< loop-count (- *reoptimize-after-type-check-max* 4)))
+        (maybe-mumble "type ")
 	(generate-type-checks component)
 	(unless (or (component-reoptimize component)
 		    (component-reanalyze component)
@@ -396,7 +417,7 @@
 	  (entry-analyze component)
 	  (ir2-convert component)
 
-	  (when (policy nil (>= speed compilation-speed))
+	  (when (policy *lexenv* (>= speed compilation-speed))
 	    (maybe-mumble "copy ")
 	    (copy-propagate component))
 
@@ -461,10 +482,15 @@
 				    *compile-object*))
 	      (null))))))
 
-  ;; We are done, so don't bother keeping anything around.
+  ;; We're done, so don't bother keeping anything around.
   (setf (component-info component) nil)
 
   (values))
+
+(defun policy-byte-compile-p (thing)
+  (policy thing
+	  (and (zerop speed)
+	       (<= debug 1))))
 
 ;;; Return our best guess for whether we will byte compile code
 ;;; currently being IR1 converted. This is only a guess because the
@@ -475,11 +501,7 @@
 (defun byte-compiling ()
   (if (eq *byte-compiling* :maybe)
       (or (eq *byte-compile* t)
-	  ;; FIXME: It's bad to share this expression between this
-	  ;; function and LAMBDA-IS-BYTE-COMPILABLE-P (and who knows
-	  ;; where else?), it should be factored out into some
-	  ;; common function.
-	  (policy nil (and (zerop speed) (<= debug 1))))
+          (policy-byte-compile-p *lexenv*))
       (and *byte-compile* *byte-compiling*)))
 
 ;;; Delete components with no external entry points before we try to
@@ -501,22 +523,12 @@
 		      (leaf-refs fun))
 	 (return))))))
 
-(defun lambda-is-byte-compilable-p (lambda)
-  #|
-  (format t "~S SPEED=~S DEBUG=~S~%" ; REMOVEME
-          lambda
-          (policy (lambda-bind lambda) speed)
-          (policy (lambda-bind lambda) debug))
-  |#
-  (policy (lambda-bind lambda)
-	  (and (zerop speed) (<= debug 1))))  
-
 (defun byte-compile-this-component-p (component)
   (ecase *byte-compile*
     ((t) t)
     ((nil) nil)
     ((:maybe)
-     (every #'lambda-is-byte-compilable-p (component-lambdas component)))))
+     (every #'policy-byte-compile-p (component-lambdas component)))))
 
 (defun compile-component (component)
   (let* ((*component-being-compiled* component)

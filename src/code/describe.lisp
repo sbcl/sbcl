@@ -12,8 +12,7 @@
 
 (in-package "SB-IMPL")
 
-;; byte-compile this file
-(declaim (optimize (speed 0) (safety 1)))
+(declaim #.*optimize-byte-compilation*)
 
 
 (defvar *describe-indentation-step* 3
@@ -26,6 +25,7 @@
 (defun describe (x &optional (stream-designator *standard-output*))
   #+sb-doc
   "Print a description of the object X."
+  (declare #.*optimize-external-despite-byte-compilation*)
   (let ((stream (out-synonym-of stream-designator)))
     (pprint-logical-block (stream nil)
       (fresh-line stream)
@@ -181,8 +181,8 @@
 	      (ecase (sb-c::debug-source-from source)
 		(:file
 		 (format s "~@:_~A~@:_  Created: " (namestring name))
-		 (sb-int:format-universal-time s (sb-c::debug-source-created
-						  source)))
+		 (format-universal-time s (sb-c::debug-source-created
+					   source)))
 		(:lisp (format s "~@:_~S" name))))))))))
 
 ;;; Describe a compiled function. The closure case calls us to print

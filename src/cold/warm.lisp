@@ -205,8 +205,8 @@
 		;; other functionality not needed for cold init, moved
 		;; to warm init to reduce peak memory requirement in
 		;; cold init
-		"src/code/describe" ; FIXME: should be byte compiled
-		"src/code/inspect" ; FIXME: should be byte compiled
+		"src/code/describe"
+		"src/code/inspect"
 		"src/code/profile"
 		"src/code/ntrace"
 		"src/code/foreign"
@@ -216,7 +216,7 @@
 		;; facility is still used in our ANSI DESCRIBE
 		;; facility, and should be compiled and loaded after
 		;; our DESCRIBE facility is compiled and loaded.
-		"src/pcl/describe")) ; FIXME: should probably be byte compiled
+		"src/pcl/describe"))
 
   (let ((fullname (concatenate 'string stem ".lisp")))
     (sb-int:/show "about to compile" fullname)

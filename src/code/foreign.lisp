@@ -92,7 +92,7 @@
 ;;;      he probably has the sophistication to write his own after-save
 ;;;      code to reload the libraries without much difficulty.
 (push (lambda () (setq *tables-from-dlopen* nil))
-      sb-int:*after-save-initializations*)
+      *after-save-initializations*)
 
 (defvar *dso-linker* "/usr/bin/ld")
 (defvar *dso-linker-options* '("-G" "-o"))

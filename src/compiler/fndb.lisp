@@ -1058,7 +1058,7 @@
 		       (:start index)
 		       (:end sequence-end)
 		       (:junk-allowed t))
-  (values (or pathname null) index)
+  (values (or pathname null) sequence-end)
   ())
 
 (defknown merge-pathnames
@@ -1185,11 +1185,10 @@
 
 (defknown describe (t &optional (or stream (member t nil))) (values))
 (defknown inspect (t) (values))
-
 (defknown room (&optional (member t nil :default)) (values))
 (defknown ed (&optional (or symbol cons filename) &key (:init t) (:display t))
   t)
-(defknown dribble (&optional filename &key (:if-exists t)) t)
+(defknown dribble (&optional filename &key (:if-exists t)) (values))
 
 (defknown apropos      (stringable &optional package-designator t) (values))
 (defknown apropos-list (stringable &optional package-designator t) list

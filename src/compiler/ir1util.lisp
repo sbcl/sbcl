@@ -1630,7 +1630,7 @@
 (defun compiler-note (format-string &rest format-args)
   (unless (if *compiler-error-context*
 	      (policy *compiler-error-context* (= inhibit-warnings 3))
-	      (policy nil (= inhibit-warnings 3)))
+	      (policy *lexenv* (= inhibit-warnings 3)))
     (incf *compiler-note-count*)
     (print-compiler-message (format nil "note: ~A" format-string)
 			    format-args))
@@ -1731,9 +1731,8 @@
 ;;; the compiler, hence the BOUNDP check.
 (defun note-undefined-reference (name kind)
   (unless (and
-	   ;; (POLICY NIL ..) isn't well-defined except in IR1
-	   ;; conversion. This BOUNDP test seems to be a test for
-	   ;; whether IR1 conversion is going on.
+	   ;; Check for boundness so we don't blow up if we're called
+	   ;; when IR1 conversion isn't going on.
 	   (boundp '*lexenv*)
 	   ;; FIXME: I'm pretty sure the INHIBIT-WARNINGS test below
 	   ;; isn't a good idea; we should have INHIBIT-WARNINGS
@@ -1741,7 +1740,7 @@
 	   ;; sure what the BOUNDP '*LEXENV* test above is for; it's
 	   ;; likely a good idea, but it probably deserves an
 	   ;; explanatory comment.
-	   (policy nil (= inhibit-warnings 3)))
+	   (policy *lexenv* (= inhibit-warnings 3)))
     (let* ((found (dolist (warning *undefined-warnings* nil)
 		    (when (and (equal (undefined-warning-name warning) name)
 			       (eq (undefined-warning-kind warning) kind))
@@ -1822,9 +1821,8 @@
 (defun %event (info node)
   (incf (event-info-count info))
   (when (and (>= (event-info-level info) *event-note-threshold*)
-	     (if node
-		 (policy node (= inhibit-warnings 0))
-		 (policy nil (= inhibit-warnings 0))))
+	     (policy (or node *lexenv*)
+		     (= inhibit-warnings 0)))
     (let ((*compiler-error-context* node))
       (compiler-note (event-info-description info))))
 

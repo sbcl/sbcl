@@ -264,7 +264,7 @@
   (declare (type hairy-type type))
   (let ((spec (hairy-type-specifier type)))
     (cond ((unknown-type-p type)
-	   (when (policy nil (> speed inhibit-warnings))
+	   (when (policy *lexenv* (> speed inhibit-warnings))
 	     (compiler-note "can't open-code test of unknown type ~S"
 			    (type-specifier type)))
 	   `(%typep ,object ',spec))
@@ -397,7 +397,7 @@
 ;;; generated in byte compiled code. (As of sbcl-0.6.5, they could
 ;;; sometimes be generated when byte compiling inline functions, but
 ;;; it's quite uncommon.) -- WHN 20000523
-(deftransform %instance-typep ((object spec) * * :when :both)
+(deftransform %instance-typep ((object spec) (* *) * :node node :when :both)
   (aver (constant-continuation-p spec))
   (let* ((spec (continuation-value spec))
 	 (class (specifier-type spec))
@@ -419,6 +419,9 @@
 			class:~%  ~S"
 		       class))
       (t
+        ;; Delay the type transform to give type propagation a chance.
+        (delay-ir1-transform node :constraint)
+
        ;; Otherwise transform the type test.
        (multiple-value-bind (pred get-layout)
 	   (cond
@@ -435,7 +438,7 @@
 	    (let ((n-layout (gensym)))
 	      `(and (,pred object)
 		    (let ((,n-layout (,get-layout object)))
-		      ,@(when (policy nil (>= safety speed))
+		      ,@(when (policy *lexenv* (>= safety speed))
 			      `((when (layout-invalid ,n-layout)
 				  (%layout-invalid-error object ',layout))))
 		      (eq ,n-layout ',layout)))))
@@ -445,7 +448,7 @@
 		  (n-layout (gensym)))
 	      `(and (,pred object)
 		    (let ((,n-layout (,get-layout object)))
-		      ,@(when (policy nil (>= safety speed))
+		      ,@(when (policy *lexenv* (>= safety speed))
 			      `((when (layout-invalid ,n-layout)
 				  (%layout-invalid-error object ',layout))))
 		      (if (eq ,n-layout ',layout)

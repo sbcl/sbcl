@@ -250,6 +250,35 @@
 	   (move r x)
 	   (inst add r y)))))
 
+
+;;;; Special logand cases: (logand signed unsigned) => unsigned
+
+(define-vop (fast-logand/signed-unsigned=>unsigned
+	     fast-logand/unsigned=>unsigned)
+  (:args (x :target r :scs (signed-reg)
+	    :load-if (not (and (sc-is x signed-stack)
+			       (sc-is y unsigned-reg)
+			       (sc-is r unsigned-stack)
+			       (location= x r))))
+	 (y :scs (unsigned-reg unsigned-stack)))
+  (:arg-types signed-num unsigned-num))
+
+(define-vop (fast-logand-c/signed-unsigned=>unsigned
+	     fast-logand-c/unsigned=>unsigned)
+  (:args (x :target r :scs (signed-reg signed-stack)))
+  (:arg-types signed-num (:constant (unsigned-byte 32))))
+
+(define-vop (fast-logand/unsigned-signed=>unsigned
+	     fast-logand/unsigned=>unsigned)
+  (:args (x :target r :scs (unsigned-reg)
+	    :load-if (not (and (sc-is x unsigned-stack)
+			       (sc-is y signed-reg)
+			       (sc-is r unsigned-stack)
+			       (location= x r))))
+	 (y :scs (signed-reg signed-stack)))
+  (:arg-types unsigned-num signed-num))
+
+
 (define-vop (fast-+-c/signed=>signed fast-safe-arith-op)
   (:translate +)
   (:args (x :target r :scs (signed-reg signed-stack)))

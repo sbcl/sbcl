@@ -1434,8 +1434,9 @@
 (defun pack (component)
   (aver (not *in-pack*))
   (let ((*in-pack* t)
-	(optimize (policy nil (or (>= speed compilation-speed)
-				  (>= space compilation-speed))))
+	(optimize (policy *lexenv*
+			  (or (>= speed compilation-speed)
+			      (>= space compilation-speed))))
 	(2comp (component-info component)))
     (init-sb-vectors component)
 

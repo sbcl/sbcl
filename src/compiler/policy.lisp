@@ -86,6 +86,12 @@
 
 ;;; Return a list of symbols naming the optimization qualities which
 ;;; appear in EXPR.
+;;;
+;;; FIXME: Doing this is slightly flaky (since we can't do it right
+;;; without all the headaches of true code walking), and it shouldn't
+;;; be necessary with modern Python anyway, as long as POLICY-QUALITY
+;;; is properly DEFKNOWNed to have no side-effects so that it can be
+;;; optimized away if unused. So this should probably go away.
 (defun policy-qualities-used-by (expr)
   (let ((result nil))
     (labels ((recurse (x)
@@ -98,21 +104,15 @@
 
 ;;; syntactic sugar for querying optimization policy qualities
 ;;;
-;;; Evaluate EXPR in terms of the current optimization policy for
-;;; NODE, or if NODE is NIL, in terms of the current policy as defined
-;;; by *POLICY*. (Using NODE=NIL is only well-defined during
-;;; IR1 conversion.)
-;;;
-;;; EXPR is a form which accesses the policy values by referring to
-;;; them by name, e.g. (> SPEED SPACE).
-(defmacro policy (node expr)
-  (let* ((n-policy (gensym))
+;;; Evaluate EXPR in terms of the optimization policy associated with
+;;; THING. EXPR is a form which accesses optimization qualities by
+;;; referring to them by name, e.g. (> SPEED SPACE).
+(defmacro policy (thing expr)
+  (let* ((n-policy (gensym "N-POLICY-"))
 	 (used-qualities (policy-qualities-used-by expr))
 	 (binds (mapcar (lambda (name)
 			  `(,name (policy-quality ,n-policy ',name)))
 			used-qualities)))
-    `(let* ((,n-policy (lexenv-policy ,(if node
-					   `(node-lexenv ,node)
-					   '*lexenv*)))
+    `(let* ((,n-policy (%coerce-to-policy ,thing))
 	    ,@binds)
        ,expr)))

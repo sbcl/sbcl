@@ -637,6 +637,10 @@ retained, possibly temporariliy, because it might be used internally."
 
              ;; hash mixing operations
              "MIX" "MIXF"
+             
+             ;; optimization idioms
+             "*OPTIMIZE-BYTE-COMPILATION*"
+             "*OPTIMIZE-EXTERNAL-DESPITE-BYTE-COMPILATION*"
 
              ;; Arguably there's no one right value for the system
              ;; prompt. But Common Lisp makes it easy for you to write

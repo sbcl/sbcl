@@ -981,7 +981,10 @@
 		      (record-optimization-failure node transform args))
 		    (setf (gethash node table)
 			  (remove transform (gethash node table) :key #'car)))
-		t))))
+		t)
+               (:delayed
+                 (remhash node table)
+                 nil))))
 	  ((and flame
 		(valid-function-use node
 				    type
@@ -993,25 +996,74 @@
 	  (t
 	   t))))
 
-;;; Just throw the severity and args...
+;;; When we don't like an IR1 transform, we throw the severity/reason
+;;; and args. 
+;;;
+;;; GIVE-UP-IR1-TRANSFORM is used to throw out of an IR1 transform,
+;;; aborting this attempt to transform the call, but admitting the
+;;; possibility that this or some other transform will later succeed.
+;;; If arguments are supplied, they are format arguments for an
+;;; efficiency note.
+;;;
+;;; ABORT-IR1-TRANSFORM is used to throw out of an IR1 transform and
+;;; force a normal call to the function at run time. No further
+;;; optimizations will be attempted.
+;;;
+;;; DELAY-IR1-TRANSFORM is used to throw out of an IR1 transform, and
+;;; delay the transform on the node until later. REASONS specifies
+;;; when the transform will be later retried. The :OPTIMIZE reason
+;;; causes the transform to be delayed until after the current IR1
+;;; optimization pass. The :CONSTRAINT reason causes the transform to
+;;; be delayed until after constraint propagation.
+;;;
+;;; FIXME: Now (0.6.11.44) that there are 4 variants of this (GIVE-UP,
+;;; ABORT, DELAY/:OPTIMIZE, DELAY/:CONSTRAINT) and we're starting to
+;;; do CASE operations on the various REASON values, it might be a
+;;; good idea to go OO, representing the reasons by objects, using
+;;; CLOS methods on the objects instead of CASE, and (possibly) using
+;;; SIGNAL instead of THROW.
 (declaim (ftype (function (&rest t) nil) give-up-ir1-transform))
 (defun give-up-ir1-transform (&rest args)
-  #!+sb-doc
-  "This function is used to throw out of an IR1 transform, aborting this
-  attempt to transform the call, but admitting the possibility that this or
-  some other transform will later succeed. If arguments are supplied, they are
-  format arguments for an efficiency note."
   (throw 'give-up-ir1-transform (values :failure args)))
 (defun abort-ir1-transform (&rest args)
-  #!+sb-doc
-  "This function is used to throw out of an IR1 transform and force a normal
-  call to the function at run time. No further optimizations will be
-  attempted."
   (throw 'give-up-ir1-transform (values :aborted args)))
+(defun delay-ir1-transform (node &rest reasons)
+  (let ((assoc (assoc node *delayed-ir1-transforms*)))
+    (cond ((not assoc)
+            (setf *delayed-ir1-transforms*
+                    (acons node reasons *delayed-ir1-transforms*))
+            (throw 'give-up-ir1-transform :delayed))
+ 	  ((cdr assoc)
+            (dolist (reason reasons)
+              (pushnew reason (cdr assoc)))
+            (throw 'give-up-ir1-transform :delayed)))))
 
-;;; Take the lambda-expression Res, IR1 convert it in the proper
+;;; Clear any delayed transform with no reasons - these should have
+;;; been tried in the last pass. Then remove the reason from the
+;;; delayed transform reasons, and if any become empty then set
+;;; reoptimize flags for the node. Return true if any transforms are
+;;; to be retried.
+(defun retry-delayed-ir1-transforms (reason)
+  (setf *delayed-ir1-transforms*
+	(remove-if-not #'cdr *delayed-ir1-transforms*))
+  (let ((reoptimize nil))
+    (dolist (assoc *delayed-ir1-transforms*)
+      (let ((reasons (remove reason (cdr assoc))))
+ 	(setf (cdr assoc) reasons)
+ 	(unless reasons
+ 	  (let ((node (car assoc)))
+ 	    (unless (node-deleted node)
+ 	      (setf reoptimize t)
+ 	      (setf (node-reoptimize node) t)
+ 	      (let ((block (node-block node)))
+ 		(setf (block-reoptimize block) t)
+ 		(setf (component-reoptimize (block-component block)) t)))))))
+    reoptimize))
+
+
+;;; Take the lambda-expression RES, IR1 convert it in the proper
 ;;; environment, and then install it as the function for the call
-;;; Node. We do local call analysis so that the new function is
+;;; NODE. We do local call analysis so that the new function is
 ;;; integrated into the control flow.
 (defun transform-call (node res)
   (declare (type combination node) (list res))

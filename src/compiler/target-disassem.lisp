@@ -1599,11 +1599,11 @@
   (let ((fun (compiled-function-or-lose object)))
     (if (typep fun 'sb!kernel:byte-function)
 	(sb!c:disassem-byte-fun fun)
-	;; we can't detect closures, so be careful
+	;; We can't detect closures, so be careful.
 	(disassemble-function (fun-self fun)
 			      :stream stream
 			      :use-labels use-labels)))
-  (values)))
+  nil))
 
 (defun disassemble-memory (address
 			   length

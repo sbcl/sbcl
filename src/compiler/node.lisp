@@ -1070,6 +1070,22 @@
   ;; *UNDEFINED-WARNING-LIMIT* calls.
   (warnings () :type list))
 
+;;; a helper for the POLICY macro, defined late here so that the
+;;; various type tests can be inlined
+(declaim (ftype (function ((or list lexenv node functional)) list)
+		%coerce-to-policy))
+(defun %coerce-to-policy (thing)
+  (let ((result (etypecase thing
+		  (list thing)
+		  (lexenv (lexenv-policy thing))
+		  (node (lexenv-policy (node-lexenv thing)))
+		  (functional (lexenv-policy (functional-lexenv thing))))))
+    ;; Test the first element of the list as a rudimentary sanity
+    ;; that it really does look like a valid policy.
+    (aver (or (null result) (policy-quality-name-p (caar result))))
+    ;; Voila.
+    result))
+
 ;;;; Freeze some structure types to speed type testing.
 
 #!-sb-fluid

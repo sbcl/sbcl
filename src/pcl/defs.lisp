@@ -541,7 +541,7 @@
 (defclass sb-kernel:funcallable-instance (function) ()
   (:metaclass built-in-class))
 
-(defclass stream (t) ()
+(defclass stream (sb-kernel:instance) ()
   (:metaclass built-in-class))
 
 (defclass slot-object (t) ()
