@@ -1666,7 +1666,6 @@ changes in sbcl-0.8.0 relative to sbcl-0.7.14
     call to the GC function during WITHOUT-GCING will not do garbage
     collection until the end of the WITHOUT-GCING.  If you were doing 
     this you were probably losing anyway.
-
   * sb-aclrepl module improvements: an integrated inspector, added
     repl features, and a bug fix to :trace command.
   * fixed some bugs revealed by Paul Dietz' test suite:
@@ -1690,6 +1689,8 @@ changes in sbcl-0.8.0 relative to sbcl-0.7.14
     ** RESTART-CASE understands local macros;
     ** ... and associates exactly its own restarts with a condition;
     ** ENDP in safe mode checks its argument to be of type LIST;
+    ** COPY-SYMBOL in a threaded build no longer fails when the symbol
+       in question is unbound;
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles

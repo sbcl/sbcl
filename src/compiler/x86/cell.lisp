@@ -122,8 +122,22 @@
 
 #!+sb-thread
 (define-vop (fast-symbol-value symbol-value)
+  ;; KLUDGE: not really fast, in fact, because we're going to have to
+  ;; do a full lookup of the thread-local area anyway.  But half of
+  ;; the meaning of FAST-SYMBOL-VALUE is "do not signal an error if
+  ;; unbound", which is used in the implementation of COPY-SYMBOL.  --
+  ;; CSR, 2003-04-22
   (:policy :fast)
-  (:translate symbol-value))
+  (:translate symbol-value)
+  (:generator 8
+    (let ((ret-lab (gen-label)))
+      (loadw value object symbol-tls-index-slot other-pointer-lowtag)
+      (inst fs-segment-prefix)
+      (inst mov value (make-ea :dword :index value :scale 1))
+      (inst cmp value unbound-marker-widetag)
+      (inst jmp :ne ret-lab)
+      (loadw value object symbol-value-slot other-pointer-lowtag)
+      (emit-label ret-lab))))
 
 #!-sb-thread
 (define-vop (symbol-value)

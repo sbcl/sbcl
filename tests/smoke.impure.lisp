@@ -29,5 +29,12 @@
 (describe '(a list))
 (describe #(a vector))
 
+;;; COPY-SYMBOL should work without signalling an error, even if the
+;;; symbol is unbound.
+(copy-symbol 'foo)
+(copy-symbol 'bar t)
+(defvar *baz* nil)
+(copy-symbol '*baz* t)
+
 ;;; success
 (quit :unix-status 104)
