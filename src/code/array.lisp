@@ -106,46 +106,14 @@
      (values #.sb!vm:simple-bit-vector-widetag 1))
     ;; OK, we have to wade into SUBTYPEPing after all.
     (t
-     ;; FIXME: The data here are redundant with
-     ;; *SPECIALIZED-ARRAY-ELEMENT-TYPE-PROPERTIES*.
-     (pick-vector-type type
-       (nil (values #.sb!vm:simple-array-nil-widetag 0))
-       (base-char (values #.sb!vm:simple-base-string-widetag #.sb!vm:n-byte-bits))
-       (bit (values #.sb!vm:simple-bit-vector-widetag 1))
-       ((unsigned-byte 2)
-	(values #.sb!vm:simple-array-unsigned-byte-2-widetag 2))
-       ((unsigned-byte 4)
-	(values #.sb!vm:simple-array-unsigned-byte-4-widetag 4))
-       ((unsigned-byte 8)
-	(values #.sb!vm:simple-array-unsigned-byte-8-widetag 8))
-       ((unsigned-byte 16)
-	(values #.sb!vm:simple-array-unsigned-byte-16-widetag 16))
-       ((unsigned-byte 32)
-	(values #.sb!vm:simple-array-unsigned-byte-32-widetag 32))
-       ((signed-byte 8)
-	(values #.sb!vm:simple-array-signed-byte-8-widetag 8))
-       ((signed-byte 16)
-	(values #.sb!vm:simple-array-signed-byte-16-widetag 16))
-       ((signed-byte 30)
-	(values #.sb!vm:simple-array-signed-byte-30-widetag 32))
-       ((signed-byte 32)
-	(values #.sb!vm:simple-array-signed-byte-32-widetag 32))
-       (single-float (values #.sb!vm:simple-array-single-float-widetag 32))
-       (double-float (values #.sb!vm:simple-array-double-float-widetag 64))
-       #!+long-float
-       (long-float
-	(values #.sb!vm:simple-array-long-float-widetag
-		#!+x86 96 #!+sparc 128))
-       ((complex single-float)
-	(values #.sb!vm:simple-array-complex-single-float-widetag 64))
-       ((complex double-float)
-	(values #.sb!vm:simple-array-complex-double-float-widetag 128))
-       #!+long-float
-       ((complex long-float)
-	(values #.sb!vm:simple-array-complex-long-float-widetag
-		#!+x86 192
-		#!+sparc 256))
-       (t (values #.sb!vm:simple-vector-widetag #.sb!vm:n-word-bits))))))
+     #.`(pick-vector-type type
+	 ,@(map 'list
+		(lambda (saetp)
+		  `(,(sb!vm:saetp-specifier saetp)
+		    (values ,(sb!vm:saetp-typecode saetp)
+		            ,(sb!vm:saetp-n-bits saetp))))
+		sb!vm:*specialized-array-element-type-properties*)))))
+
 (defun %complex-vector-widetag (type)
   (case type
     ;; Pick off some easy common cases.
@@ -559,41 +527,23 @@
 					      `(= widetag ,item))))
 				     (cdr stuff)))
 				  stuff))))
-      ;; FIXME: The data here are redundant with
-      ;; *SPECIALIZED-ARRAY-ELEMENT-TYPE-PROPERTIES*.
-      (pick-element-type
-       ((sb!vm:simple-array-nil-widetag sb!vm:complex-vector-nil-widetag) nil)
-       ((sb!vm:simple-base-string-widetag sb!vm:complex-base-string-widetag) 'base-char)
-       ((sb!vm:simple-bit-vector-widetag
-	 sb!vm:complex-bit-vector-widetag) 'bit)
-       (sb!vm:simple-vector-widetag t)
-       (sb!vm:simple-array-unsigned-byte-2-widetag '(unsigned-byte 2))
-       (sb!vm:simple-array-unsigned-byte-4-widetag '(unsigned-byte 4))
-       (sb!vm:simple-array-unsigned-byte-8-widetag '(unsigned-byte 8))
-       (sb!vm:simple-array-unsigned-byte-16-widetag '(unsigned-byte 16))
-       (sb!vm:simple-array-unsigned-byte-32-widetag '(unsigned-byte 32))
-       (sb!vm:simple-array-signed-byte-8-widetag '(signed-byte 8))
-       (sb!vm:simple-array-signed-byte-16-widetag '(signed-byte 16))
-       (sb!vm:simple-array-signed-byte-30-widetag '(signed-byte 30))
-       (sb!vm:simple-array-signed-byte-32-widetag '(signed-byte 32))
-       (sb!vm:simple-array-single-float-widetag 'single-float)
-       (sb!vm:simple-array-double-float-widetag 'double-float)
-       #!+long-float
-       (sb!vm:simple-array-long-float-widetag 'long-float)
-       (sb!vm:simple-array-complex-single-float-widetag
-	'(complex single-float))
-       (sb!vm:simple-array-complex-double-float-widetag
-	'(complex double-float))
-       #!+long-float
-       (sb!vm:simple-array-complex-long-float-widetag '(complex long-float))
-       ((sb!vm:simple-array-widetag
-	 sb!vm:complex-vector-widetag
-	 sb!vm:complex-array-widetag)
-	(with-array-data ((array array) (start) (end))
-	  (declare (ignore start end))
-	  (array-element-type array)))
-       (t
-	(error 'type-error :datum array :expected-type 'array))))))
+      #.`(pick-element-type
+	  ,@(map 'list
+		 (lambda (saetp)
+		   `(,(if (sb!vm:saetp-complex-typecode saetp)
+			  (list (sb!vm:saetp-typecode saetp)
+				(sb!vm:saetp-complex-typecode saetp))
+			  (sb!vm:saetp-typecode saetp))
+		     ',(sb!vm:saetp-specifier saetp)))
+		 sb!vm:*specialized-array-element-type-properties*)
+	  ((sb!vm:simple-array-widetag
+	    sb!vm:complex-vector-widetag
+	    sb!vm:complex-array-widetag)
+	   (with-array-data ((array array) (start) (end))
+	     (declare (ignore start end))
+	     (array-element-type array)))
+	  (t
+	   (error 'type-error :datum array :expected-type 'array))))))
 
 (defun array-rank (array)
   #!+sb-doc
@@ -890,33 +840,16 @@
 					  ,fill-value
 					  :start new-length))))
 			      things))))
-      ;; FIXME: The associations between vector types and initial
-      ;; values here are redundant with
-      ;; *SPECIALIZED-ARRAY-ELEMENT-TYPE-PROPERTIES*.
-      (frob vector
-	(simple-vector 0)
-	(simple-base-string #.*default-init-char-form*)
-	(simple-bit-vector 0)
-	((simple-array (unsigned-byte 2) (*)) 0)
-	((simple-array (unsigned-byte 4) (*)) 0)
-	((simple-array (unsigned-byte 8) (*)) 0)
-	((simple-array (unsigned-byte 16) (*)) 0)
-	((simple-array (unsigned-byte 32) (*)) 0)
-	((simple-array (signed-byte 8) (*)) 0)
-	((simple-array (signed-byte 16) (*)) 0)
-	((simple-array (signed-byte 30) (*)) 0)
-	((simple-array (signed-byte 32) (*)) 0)
-	((simple-array single-float (*)) (coerce 0 'single-float))
-	((simple-array double-float (*)) (coerce 0 'double-float))
-	#!+long-float
-	((simple-array long-float (*)) (coerce 0 'long-float))
-	((simple-array (complex single-float) (*))
-	 (coerce 0 '(complex single-float)))
-	((simple-array (complex double-float) (*))
-	 (coerce 0 '(complex double-float)))
-	#!+long-float
-	((simple-array (complex long-float) (*))
-	 (coerce 0 '(complex long-float))))))
+      #.`(frob vector
+	  ,@(map 'list
+		 (lambda (saetp)
+		   `((simple-array ,(sb!vm:saetp-specifier saetp) (*))
+		     ,(if (eq (sb!vm:saetp-specifier saetp) 'base-char)
+			  *default-init-char-form*
+			  (sb!vm:saetp-initial-element-default saetp))))
+		 (remove-if-not
+		  #'sb!vm:saetp-specifier
+		  sb!vm:*specialized-array-element-type-properties*)))))
   ;; Only arrays have fill-pointers, but vectors have their length
   ;; parameter in the same place.
   (setf (%array-fill-pointer vector) new-length)

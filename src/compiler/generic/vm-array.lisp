@@ -21,7 +21,7 @@
 	      initial-element-default
 	      n-bits
 	      primitive-type-name
-	      &key (n-pad-elements 0)
+	      &key (n-pad-elements 0) complex-typecode
 	      &aux (typecode
 		    (eval (symbolicate primitive-type-name "-WIDETAG")))))
 	    (:copier nil))
@@ -38,6 +38,9 @@
   (n-bits (missing-arg) :type index :read-only t)
   ;; the low-level type code (aka "widetag")
   (typecode (missing-arg) :type index :read-only t)
+  ;; if an integer, a typecode corresponding to a complex vector
+  ;; specialized on this element type.
+  (complex-typecode nil :type (or index null) :read-only t)
   ;; the name of the primitive type of data vectors specialized on
   ;; this type
   (primitive-type-name (missing-arg) :type symbol :read-only t)
@@ -53,17 +56,20 @@
 	 (apply #'!make-saetp args))
        `(;; Erm.  Yeah.  There aren't a lot of things that make sense
 	 ;; for an initial element for (ARRAY NIL). -- CSR, 2002-03-07
-	 (nil #:mu 0 simple-array-nil)
+	 (nil #:mu 0 simple-array-nil
+	      :complex-typecode #.sb!vm:complex-vector-nil-widetag)
 	 (base-char ,(code-char 0) 8 simple-base-string
 		    ;; (SIMPLE-BASE-STRINGs are stored with an extra
 		    ;; trailing #\NULL for convenience in calling out
 		    ;; to C.)
-		    :n-pad-elements 1)
+		    :n-pad-elements 1
+	            :complex-typecode #.sb!vm:complex-base-string-widetag)
 	 (single-float 0.0f0 32 simple-array-single-float)
 	 (double-float 0.0d0 64 simple-array-double-float)
 	 #!+long-float
 	 (long-float 0.0l0 #!+x86 96 #!+sparc 128 simple-array-long-float)
-	 (bit 0 1 simple-bit-vector)
+	 (bit 0 1 simple-bit-vector
+	      :complex-typecode #.sb!vm:complex-bit-vector-widetag)
 	 ;; KLUDGE: The fact that these UNSIGNED-BYTE entries come
 	 ;; before their SIGNED-BYTE partners is significant in the
 	 ;; implementation of the compiler; some of the cross-compiler

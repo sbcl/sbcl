@@ -208,10 +208,7 @@
 		    (if (eq x '*)
 			t
 			(ecase (first x)
-			  (:or `(or ,@(mapcar (lambda (type)
-						(type-specifier
-						 (primitive-type-type
-						  type)))
+			  (:or `(or ,@(mapcar #'primitive-type-specifier
 					      (rest x))))
 			  (:constant `(constant-arg ,(third x)))))))
 	     `(,@(mapcar #'frob types)

@@ -119,6 +119,7 @@
 		;; them on the fly this way? (Call the new array
 		;; *SPECIALIZED-ARRAY-ELEMENT-SPECIFIER-TYPES* or something..)
 		(let ((stype (specifier-type stype-name)))
+		  (aver (not (unknown-type-p stype)))
 		  (when (csubtypep eltype stype)
 		    (return stype))))))
     type))

@@ -711,8 +711,6 @@
   "Return a new sequence of all the argument sequences concatenated together
   which shares no structure with the original argument sequences of the
   specified OUTPUT-TYPE-SPEC."
-  (/show0 "full call to CONCATENATE, OUTPUT-TYPE-SPEC=..")
-  (/hexstr output-type-spec)
   (let ((type (specifier-type output-type-spec)))
   (cond
     ((csubtypep type (specifier-type 'list))
