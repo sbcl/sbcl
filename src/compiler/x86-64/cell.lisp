@@ -24,6 +24,7 @@
 (define-vop (set-slot)
   (:args (object :scs (descriptor-reg))
 	 (value :scs (descriptor-reg any-reg immediate)))
+  (:temporary (:sc descriptor-reg) temp)
   (:info name offset lowtag)
   (:ignore name)
   (:results)
@@ -32,18 +33,27 @@
 	(let ((val (tn-value value)))
 	   (etypecase val
 	      (integer
-	       (inst mov
-		     (make-ea :dword :base object
-			      :disp (- (* offset n-word-bytes) lowtag))
-		     (fixnumize val)))
+	       (let ((fixnumized (fixnumize val)))
+		 (if (typep fixnumized
+			    '(or (signed-byte 32) (unsigned-byte 31)))
+		     ;; MOV here can only deal with 32 bit immediates
+		     (inst mov
+			   (make-ea :qword :base object
+				    :disp (- (* offset n-word-bytes) lowtag))
+			   fixnumized)
+		   (progn
+		     (inst mov temp fixnumized)
+		     (inst mov (make-ea :qword :base object
+					:disp (- (* offset n-word-bytes) lowtag))
+			   temp)))))
 	      (symbol
 	       (inst mov
-		     (make-ea :dword :base object
+		     (make-ea :qword :base object
 			      :disp (- (* offset n-word-bytes) lowtag))
 		     (+ nil-value (static-symbol-offset val))))
 	      (character
 	       (inst mov
-		     (make-ea :dword :base object
+		     (make-ea :qword :base object
 			      :disp (- (* offset n-word-bytes) lowtag))
 		     (logior (ash (char-code val) n-widetag-bits)
 			     base-char-widetag)))))

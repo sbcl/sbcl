@@ -97,11 +97,16 @@
 		 (simple-array-unsigned-byte-16-widetag . 1)
 		 (simple-array-unsigned-byte-31-widetag . 2)
 		 (simple-array-unsigned-byte-32-widetag . 2)
+		 (simple-array-unsigned-byte-60-widetag . 3)
+		 (simple-array-unsigned-byte-63-widetag . 3)
+		 (simple-array-unsigned-byte-64-widetag . 3)
 		 (simple-array-signed-byte-8-widetag . 0)
 		 (simple-array-signed-byte-16-widetag . 1)
-		 ;(simple-array-unsigned-byte-29-widetag . 2)
-		 ;(simple-array-signed-byte-30-widetag . 2)
+		 (simple-array-unsigned-byte-29-widetag . 2)
+		 (simple-array-signed-byte-30-widetag . 2)
 		 (simple-array-signed-byte-32-widetag . 2)
+		 (simple-array-signed-byte-61-widetag . 3)
+		 (simple-array-signed-byte-64-widetag . 3)
 		 (simple-array-single-float-widetag . 2)
 		 (simple-array-double-float-widetag . 3)
 		 (simple-array-complex-single-float-widetag . 3)
@@ -109,13 +114,14 @@
   (let* ((name (car stuff))
 	 (size (cdr stuff))
 	 (sname (string name)))
-    (setf (svref *meta-room-info* (symbol-value name))
-	  (make-room-info :name (intern (subseq sname
-						0
-						(mismatch sname "-WIDETAG"
-							  :from-end t)))
-			  :kind :vector
-			  :length size))))
+    (when (boundp name)
+      (setf (svref *meta-room-info* (symbol-value name))
+	    (make-room-info :name (intern (subseq sname
+						  0
+						  (mismatch sname "-WIDETAG"
+							    :from-end t)))
+			    :kind :vector
+			    :length size)))))
 
 (setf (svref *meta-room-info* simple-base-string-widetag)
       (make-room-info :name 'simple-base-string

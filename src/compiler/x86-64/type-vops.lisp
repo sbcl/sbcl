@@ -13,26 +13,24 @@
 
 ;;;; test generation utilities
 
-;;; Emit the most compact form of the test immediate instruction,
-;;; using an 8 bit test when the immediate is only 8 bits and the
-;;; value is one of the four low registers (eax, ebx, ecx, edx) or the
-;;; control stack.
+(defun make-byte-tn (tn)
+  (aver (sc-is tn any-reg descriptor-reg unsigned-reg signed-reg))
+  (make-random-tn :kind :normal
+		  :sc (sc-or-lose 'byte-reg)
+		  :offset (tn-offset tn)))
+
 (defun generate-fixnum-test (value)
   "zero flag set if VALUE is fixnum"
   (let ((offset (tn-offset value)))
-    (cond ((and (sc-is value any-reg descriptor-reg)
-		(or (= offset eax-offset) (= offset ebx-offset)
-		    (= offset ecx-offset) (= offset edx-offset)))
-	   (inst test (make-random-tn :kind :normal
-				      :sc (sc-or-lose 'byte-reg)
-				      :offset offset)
-		 7))
-	  ((sc-is value control-stack)
+    ;; The x86 backend uses a pun from E[A-D]X -> [A-D]L for these
+    ;; tests. The Athlon 64 optimization guide says that this is a 
+    ;; bad idea, so it's been removed.
+    (cond ((sc-is value control-stack)
 	   (inst test (make-ea :byte :base rbp-tn
 			       :disp (- (* (1+ offset) n-word-bytes)))
-		 7))
+		 sb!vm::fixnum-tag-mask))
 	  (t
-	   (inst test value 7)))))
+	   (inst test value sb!vm::fixnum-tag-mask)))))
 
 (defun %test-fixnum (value target not-p)
   (generate-fixnum-test value)
@@ -46,28 +44,21 @@
 
 (defun %test-immediate (value target not-p immediate)
   ;; Code a single instruction byte test if possible.
-  (let ((offset (tn-offset value)))
-    (cond ((and (sc-is value any-reg descriptor-reg)
-		(or (= offset rax-offset) (= offset rbx-offset)
-		    (= offset rcx-offset) (= offset rdx-offset)))
-	   (inst cmp (make-random-tn :kind :normal
-				     :sc (sc-or-lose 'byte-reg)
-				     :offset offset)
-		 immediate))
-	  (t
-	   (move rax-tn value)
-	   (inst cmp al-tn immediate))))
+  (cond ((sc-is value any-reg descriptor-reg)
+	 (inst cmp (make-byte-tn value) immediate))
+	(t
+	 (move rax-tn value)
+	 (inst cmp al-tn immediate)))
   (inst jmp (if not-p :ne :e) target))
 
-(defun %test-lowtag (value target not-p lowtag &optional al-loaded)
-  (unless al-loaded
-    (move rax-tn value)
-    (inst and al-tn lowtag-mask))
-  (inst cmp al-tn lowtag)
+(defun %test-lowtag (value target not-p lowtag)
+  (move rax-tn value)
+  (inst and rax-tn lowtag-mask)
+  (inst cmp rax-tn lowtag)
   (inst jmp (if not-p :ne :e) target))
 
 (defun %test-headers (value target not-p function-p headers
-			    &optional (drop-through (gen-label)) al-loaded)
+			    &optional (drop-through (gen-label)))
   (let ((lowtag (if function-p fun-pointer-lowtag other-pointer-lowtag)))
     (multiple-value-bind (equal less-or-equal when-true when-false)
 	;; EQUAL and LESS-OR-EQUAL are the conditions for branching to TARGET.
@@ -76,7 +67,7 @@
 	(if not-p
 	    (values :ne :a drop-through target)
 	    (values :e :na target drop-through))
-      (%test-lowtag value when-false t lowtag al-loaded)
+      (%test-lowtag value when-false t lowtag)
       (inst mov al-tn (make-ea :byte :base value :disp (- lowtag)))
       (do ((remaining headers (cdr remaining)))
 	  ((null remaining))
@@ -250,8 +241,8 @@
 	(inst jmp :e fixnum)
 
 	;; If not, is it an other pointer?
-	(inst and al-tn lowtag-mask)
-	(inst cmp al-tn other-pointer-lowtag)
+	(inst and eax-tn lowtag-mask)
+	(inst cmp eax-tn other-pointer-lowtag)
 	(inst jmp :ne nope)
 	;; Get the header.
 	(loadw eax-tn value 0 other-pointer-lowtag)
@@ -293,8 +284,8 @@
       (inst jmp :e fixnum)
 
       ;; If not, is it an other pointer?
-      (inst and al-tn lowtag-mask)
-      (inst cmp al-tn other-pointer-lowtag)
+      (inst and eax-tn lowtag-mask)
+      (inst cmp eax-tn other-pointer-lowtag)
       (inst jmp :ne nope)
       ;; Get the header.
       (loadw eax-tn value 0 other-pointer-lowtag)

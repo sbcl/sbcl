@@ -21,8 +21,7 @@
   (:generator 1
     (let ((y-wide-tn (make-random-tn
 		      :kind :normal
-		      :sc (gethash 'any-reg
-				   sb!c::*backend-meta-sc-names*)
+		      :sc (sc-or-lose 'any-reg)
 		      :offset (tn-offset y))))
       (move y-wide-tn x)
       (inst shr y-wide-tn 8)
@@ -36,8 +35,7 @@
   (:results (y :scs (any-reg descriptor-reg #+nil control-stack)))
   (:note "character tagging")
   (:generator 1
-    (move (make-random-tn :kind :normal :sc (gethash 'base-char-reg
-						     sb!c::*backend-meta-sc-names*)
+    (move (make-random-tn :kind :normal :sc (sc-or-lose 'base-char-reg)
 			  :offset (tn-offset y))
 	  x)
     (inst shl y n-widetag-bits)
