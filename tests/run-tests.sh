@@ -25,6 +25,12 @@ export SBCL
 echo /running tests on SBCL=\'$SBCL\'
 # more or less like SBCL, but without enough grot removed that appending
 # a --core command line argument works
+#
+# (KLUDGE: and also without any magic to suppress --userinit and
+# --sysinit, so if you use it in a test, you need to add those
+# yourself if you want things to be clean. If many tests start using
+# this, we can redo it as a shell function or something so that the
+# magic can be done once and only once.)
 SBCL_ALLOWING_CORE=${1:-$sbclstem}
 export SBCL_ALLOWING_CORE
 echo /with SBCL_ALLOWING_CORE=\'$SBCL_ALLOWING_CORE\'

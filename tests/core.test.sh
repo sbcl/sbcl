@@ -28,7 +28,8 @@ $SBCL <<EOF
   (defun foo (x) (+ x 11))
   (save-lisp-and-die "$tmpcore")
 EOF
-$SBCL_ALLOWING_CORE --core "$tmpcore" <<EOF
+$SBCL_ALLOWING_CORE --core "$tmpcore" \
+--userinit /dev/null --sysinit /dev/null <<EOF
   (quit :unix-status (foo 10))
 EOF
 if [ $? = 21 ]; then
