@@ -48,4 +48,4 @@
     DONE
     (move count result)))
        
-(define-static-function length (object) :translate length)
+(define-static-fun length (object) :translate length)

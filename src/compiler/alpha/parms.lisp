@@ -189,7 +189,7 @@
     sb!unix::*interrupts-enabled*
     sb!unix::*interrupt-pending*))
 
-(defparameter *static-functions*
+(defparameter *static-funs*
   '(length
     sb!kernel:two-arg-+
     sb!kernel:two-arg--

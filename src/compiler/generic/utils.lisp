@@ -11,9 +11,8 @@
 
 (in-package "SB!VM")
 
+;;; Make a fixnum out of NUM. (I.e. shift by two bits if it will fit.)
 (defun fixnumize (num)
-  #!+sb-doc
-  "Make a fixnum out of NUM. (i.e. shift by two bits if it will fit.)"
   (if (<= #x-20000000 num #x1fffffff)
       (ash num 2)
       (error "~D is too big for a fixnum." num)))
@@ -24,9 +23,8 @@
   (or (null symbol)
       (and (member symbol *static-symbols*) t)))
 
+;;; the byte offset of the static symbol SYMBOL
 (defun static-symbol-offset (symbol)
-  #!+sb-doc
-  "the byte offset of the static symbol SYMBOL"
   (if symbol
       (let ((posn (position symbol *static-symbols*)))
 	(unless posn (error "~S is not a static symbol." symbol))
@@ -36,9 +34,8 @@
 	   (- list-pointer-lowtag)))
       0))
 
+;;; Given a byte offset, OFFSET, return the appropriate static symbol.
 (defun offset-static-symbol (offset)
-  #!+sb-doc
-  "Given a byte offset, OFFSET, return the appropriate static symbol."
   (if (zerop offset)
       nil
       (multiple-value-bind (n rem)
@@ -49,16 +46,15 @@
 	  (error "The byte offset ~D is not valid." offset))
 	(elt *static-symbols* n))))
 
-(defun static-function-offset (name)
-  #!+sb-doc
-  "Return the (byte) offset from NIL to the start of the fdefn object
-   for the static function NAME."
+;;; Return the (byte) offset from NIL to the start of the fdefn object
+;;; for the static function NAME.
+(defun static-fun-offset (name)
   (let ((static-syms (length *static-symbols*))
-	(static-function-index (position name *static-functions*)))
-    (unless static-function-index
+	(static-fun-index (position name *static-funs*)))
+    (unless static-fun-index
       (error "~S isn't a static function." name))
     (+ (* static-syms (pad-data-block symbol-size))
        (pad-data-block (1- symbol-size))
        (- list-pointer-lowtag)
-       (* static-function-index (pad-data-block fdefn-size))
+       (* static-fun-index (pad-data-block fdefn-size))
        (* fdefn-raw-addr-slot n-word-bytes))))

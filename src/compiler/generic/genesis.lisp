@@ -1404,13 +1404,13 @@
 
 (defun initialize-static-fns ()
   (let ((*cold-fdefn-gspace* *static*))
-    (dolist (sym sb!vm:*static-functions*)
+    (dolist (sym sb!vm:*static-funs*)
       (let* ((fdefn (cold-fdefinition-object (cold-intern sym)))
 	     (offset (- (+ (- (descriptor-low fdefn)
 			      sb!vm:other-pointer-lowtag)
 			   (* sb!vm:fdefn-raw-addr-slot sb!vm:n-word-bytes))
 			(descriptor-low *nil-descriptor*)))
-	     (desired (sb!vm:static-function-offset sym)))
+	     (desired (sb!vm:static-fun-offset sym)))
 	(unless (= offset desired)
 	  ;; FIXME: should be fatal
 	  (warn "Offset from FDEFN ~S to ~S is ~D, not ~D."

@@ -1164,30 +1164,29 @@
 			  vars types))
        (list ,@vals))))
 (defun create-structure-constructor (dd cons-name arglist vars types values)
-  (let* ((temp (gensym))
-	 (raw-index (dd-raw-index dd))
-	 (n-raw-data (when raw-index (gensym))))
+  (let* ((instance (gensym "INSTANCE"))
+	 (raw-index (dd-raw-index dd)))
     `(defun ,cons-name ,arglist
-       (declare ,@(mapcar #'(lambda (var type) `(type ,type ,var))
+       (declare ,@(mapcar (lambda (var type) `(type ,type ,var))
 			  vars types))
-       (let ((,temp (truly-the ,(dd-name dd)
-			       (%make-instance ,(dd-length dd))))
-	     ,@(when n-raw-data
-		 `((,n-raw-data
-		    (make-array ,(dd-raw-length dd)
-				:element-type '(unsigned-byte 32))))))
-	 (setf (%instance-layout ,temp)
-	       (%delayed-get-compiler-layout ,(dd-name dd)))
-	 ,@(when n-raw-data
-	     `((setf (%instance-ref ,temp ,raw-index) ,n-raw-data)))
+       (let ((,instance (truly-the ,(dd-name dd)
+			  (%make-instance-with-layout
+			   (%delayed-get-compiler-layout ,(dd-name dd))))))
+	 (declare (optimize (safety 0))) ; Suppress redundant slot type checks.
+	 ,@(when raw-index
+	     `((setf (%instance-ref ,instance ,raw-index)
+		     (make-array ,(dd-raw-length dd)
+				 :element-type '(unsigned-byte 32)))))
 	 ,@(mapcar (lambda (dsd value)
-		     ;; (Note that we can't in general use the ordinary
-		     ;; slot accessor function here because the slot
-		     ;; might be :READ-ONLY.)
-		     `(,(slot-setter-lambda-form dd dsd) ,value ,temp))
+		     ;; (Note that we can't in general use the
+		     ;; ordinary named slot setter function here
+		     ;; because the slot might be :READ-ONLY, so we
+		     ;; whip up new LAMBDA representations of slot
+		     ;; setters for the occasion.)
+		     `(,(slot-setter-lambda-form dd dsd) ,value ,instance))
 		   (dd-slots dd)
 		   values)
-	 ,temp))))
+	 ,instance))))
 
 ;;; Create a default (non-BOA) keyword constructor.
 (defun create-keyword-constructor (defstruct creator)

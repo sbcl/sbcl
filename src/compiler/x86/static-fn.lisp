@@ -11,7 +11,7 @@
 
 (in-package "SB!VM")
 
-(define-vop (static-function-template)
+(define-vop (static-fun-template)
   (:save-p t)
   (:policy :safe)
   (:variant-vars function)
@@ -24,8 +24,8 @@
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
 
-(defun static-function-template-name (num-args num-results)
-  (intern (format nil "~:@(~R-arg-~R-result-static-function~)"
+(defun static-fun-template-name (num-args num-results)
+  (intern (format nil "~:@(~R-arg-~R-result-static-fun~)"
 		  num-args num-results)))
 
 (defun moves (dst src)
@@ -36,7 +36,7 @@
       (moves `(move ,(car dst) ,(car src))))
     (moves)))
 
-(defun static-function-template-vop (num-args num-results)
+(defun static-fun-template-vop (num-args num-results)
   (unless (and (<= num-args register-arg-count)
 	       (<= num-results register-arg-count))
     (error "either too many args (~D) or too many results (~D); max = ~D"
@@ -67,8 +67,8 @@
 	  (args `(,arg-name
 		  :scs (any-reg descriptor-reg)
 		  :target ,(nth i (temp-names))))))
-      `(define-vop (,(static-function-template-name num-args num-results)
-		    static-function-template)
+      `(define-vop (,(static-fun-template-name num-args num-results)
+		    static-fun-template)
 	(:args ,@(args))
 	,@(temps)
 	(:results ,@(results))
@@ -98,14 +98,22 @@
 	      `(inst mov ecx (fixnumize ,num-args)))
 
 	 (note-this-location vop :call-site)
-	 ;; Static-function-offset gives the offset from the start of
-	 ;; the nil object to the static function fdefn and has the
-	 ;; low tag of 1 added. When the nil symbol value with its
-	 ;; low tag of 3 is added the resulting value points to the
-	 ;; raw address slot of the fdefn (at +4).
+	 ;; Old CMU CL comment:
+	 ;;   STATIC-FUN-OFFSET gives the offset from the start of
+	 ;;   the NIL object to the static function FDEFN and has the
+	 ;;   low tag of 1 added. When the NIL symbol value with its
+	 ;;   low tag of 3 is added the resulting value points to the
+	 ;;   raw address slot of the fdefn (at +4).
+	 ;; FIXME: Since the fork from CMU CL, we've swapped
+	 ;; FUN-POINTER-LOWTAG and INSTANCE-POINTER-LOWTAG, so the
+	 ;; text above is no longer right. Mysteriously, things still
+	 ;; work. It would be good to explain why. (Is this code no
+	 ;; longer executed? Does it not depend on the
+	 ;; 1+3=4=fdefn_raw_address_offset relationship above?
+	 ;; Is something else going on?)
 	 (inst call (make-ea :dword
 			     :disp (+ nil-value
-				      (static-function-offset function))))
+				      (static-fun-offset function))))
 	 ,(collect ((bindings) (links))
 		   (do ((temp (temp-names) (cdr temp))
 			(name 'values (gensym))
@@ -127,19 +135,19 @@
 ) ; EVAL-WHEN
 
 (macrolet ((frob (num-args num-res)
-	     (static-function-template-vop (eval num-args) (eval num-res))))
+	     (static-fun-template-vop (eval num-args) (eval num-res))))
   (frob 0 1)
   (frob 1 1)
   (frob 2 1)
   (frob 3 1))
 
-(defmacro define-static-function (name args &key (results '(x)) translate
-				       policy cost arg-types result-types)
+(defmacro define-static-fun (name args &key (results '(x)) translate
+				  policy cost arg-types result-types)
   `(define-vop (,name
-		,(static-function-template-name (length args)
-						(length results)))
+		,(static-fun-template-name (length args)
+					   (length results)))
      (:variant ',name)
-     (:note ,(format nil "static-function ~@(~S~)" name))
+     (:note ,(format nil "static-fun ~@(~S~)" name))
      ,@(when translate
 	 `((:translate ,translate)))
      ,@(when policy

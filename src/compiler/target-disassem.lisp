@@ -218,7 +218,7 @@
 ;;;	<padding to dual-word boundary>
 ;;;	start of instructions
 ;;;	...
-;;;	function-headers and lra's buried in here randomly
+;;;	fun-headers and lra's buried in here randomly
 ;;;	...
 ;;;	start of trace-table
 ;;;	<padding to dual-word boundary>
@@ -440,7 +440,7 @@
     (incf (dstate-next-offs dstate) lra-size))
   nil)
 
-;;; Print the function-header (entry-point) pseudo-instruction at the
+;;; Print the fun-header (entry-point) pseudo-instruction at the
 ;;; current location in DSTATE to STREAM.
 (defun fun-header-hook (stream dstate)
   (declare (type (or null stream) stream)

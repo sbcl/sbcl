@@ -11,7 +11,7 @@
 
 (in-package "SB!VM")
 
-(define-vop (static-function-template)
+(define-vop (static-fun-template)
   (:save-p t)
   (:policy :safe)
   (:variant-vars symbol)
@@ -26,8 +26,8 @@
 
 (eval-when  (:compile-toplevel :load-toplevel :execute)
 
-(defun static-function-template-name (num-args num-results)
-  (intern (format nil "~:@(~R-arg-~R-result-static-function~)"
+(defun static-fun-template-name (num-args num-results)
+  (intern (format nil "~:@(~R-arg-~R-result-static-fun~)"
 		  num-args num-results)))
 
 (defun moves (src dst)
@@ -38,7 +38,7 @@
       (moves `(move ,(car src) ,(car dst))))
     (moves)))
 
-(defun static-function-template-vop (num-args num-results)
+(defun static-fun-template-vop (num-args num-results)
   (assert (and (<= num-args register-arg-count)
 	       (<= num-results register-arg-count))
 	  (num-args num-results)
@@ -67,8 +67,8 @@
 	  (args `(,arg-name
 		  :scs (any-reg descriptor-reg null zero)
 		  :target ,(nth i (temp-names))))))
-      `(define-vop (,(static-function-template-name num-args num-results)
-		    static-function-template)
+      `(define-vop (,(static-fun-template-name num-args num-results)
+		    static-fun-template)
 	 (:args ,@(args))
 	 ,@(temps)
 	 (:results ,@(results))
@@ -77,7 +77,7 @@
 		 (cur-nfp (current-nfp-tn vop)))
 	     ,@(moves (arg-names) (temp-names))
 	     (inst li (fixnumize ,num-args) nargs)
-	     (inst ldl entry-point (static-function-offset symbol) null-tn)
+	     (inst ldl entry-point (static-fun-offset symbol) null-tn)
 	     (when cur-nfp
 	       (store-stack-tn nfp-save cur-nfp))
 	     (inst move cfp-tn ocfp)
@@ -110,16 +110,16 @@
 (expand
  (collect ((templates (list 'progn)))
    (dotimes (i register-arg-count)
-     (templates (static-function-template-vop i 1)))
+     (templates (static-fun-template-vop i 1)))
    (templates)))
 
-(defmacro define-static-function (name args &key (results '(x)) translate
+(defmacro define-static-fun (name args &key (results '(x)) translate
 				       policy cost arg-types result-types)
   `(define-vop (,name
-		,(static-function-template-name (length args)
-						(length results)))
+		,(static-fun-template-name (length args)
+					   (length results)))
      (:variant ',name)
-     (:note ,(format nil "static-function ~@(~S~)" name))
+     (:note ,(format nil "static-fun ~@(~S~)" name))
      ,@(when translate
 	 `((:translate ,translate)))
      ,@(when policy

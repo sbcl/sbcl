@@ -61,7 +61,7 @@
   (lisp-return lra lip :offset 2)
 
   DO-STATIC-FUN
-  (inst ldl lip (static-function-offset 'two-arg-+) null-tn)
+  (inst ldl lip (static-fun-offset 'two-arg-+) null-tn)
   (inst li (fixnumize 2) nargs)
   (inst move cfp-tn ocfp)
   (inst move csp-tn cfp-tn)
@@ -118,7 +118,7 @@
   (lisp-return lra lip :offset 2)
 
   DO-STATIC-FUN
-  (inst ldl lip (static-function-offset 'two-arg--) null-tn)
+  (inst ldl lip (static-fun-offset 'two-arg--) null-tn)
   (inst li (fixnumize 2) nargs)
   (inst move cfp-tn ocfp)
   (inst move csp-tn cfp-tn)
@@ -196,7 +196,7 @@
   (lisp-return lra lip :offset 2)
 
   DO-STATIC-FUN
-  (inst ldl lip (static-function-offset 'two-arg-*) null-tn)
+  (inst ldl lip (static-fun-offset 'two-arg-*) null-tn)
   (inst li (fixnumize 2) nargs)
   (inst move cfp-tn ocfp)
   (inst move csp-tn cfp-tn)
@@ -292,7 +292,7 @@
 	  (inst beq temp DO-COMPARE)
 	  
 	  DO-STATIC-FN
-	  (inst ldl lip (static-function-offset ',static-fn) null-tn)
+	  (inst ldl lip (static-fun-offset ',static-fn) null-tn)
 	  (inst li (fixnumize 2) nargs)
 	  (inst move cfp-tn ocfp)
 	  (inst move csp-tn cfp-tn)
@@ -337,7 +337,7 @@
   (lisp-return lra lip :offset 2)
 
   DO-STATIC-FN
-  (inst ldl lip (static-function-offset 'eql) null-tn)
+  (inst ldl lip (static-fun-offset 'eql) null-tn)
   (inst li (fixnumize 2) nargs)
   (inst move cfp-tn ocfp)
   (inst move csp-tn cfp-tn)
@@ -373,7 +373,7 @@
   (lisp-return lra lip :offset 2)
 
   DO-STATIC-FN
-  (inst ldl lip (static-function-offset 'two-arg-=) null-tn)
+  (inst ldl lip (static-fun-offset 'two-arg-=) null-tn)
   (inst li (fixnumize 2) nargs)
   (inst move cfp-tn ocfp)
   (inst move csp-tn cfp-tn)
@@ -409,7 +409,7 @@
   (lisp-return lra lip :offset 2)
 
   DO-STATIC-FN
-  (inst ldl lip (static-function-offset 'two-arg-=) null-tn)
+  (inst ldl lip (static-fun-offset 'two-arg-=) null-tn)
   (inst li (fixnumize 2) nargs)
   (inst move cfp-tn ocfp)
   (inst move csp-tn cfp-tn)

@@ -287,7 +287,7 @@
     ;; the ordinary unbound marker for this.
     sb!pcl::..slot-unbound..))
 
-(defparameter *static-functions*
+(defparameter *static-funs*
   '(length
     sb!kernel:two-arg-+
     sb!kernel:two-arg--

@@ -133,6 +133,12 @@
 	(if (funcallable-instance-p new-value)
 	    (%funcallable-instance-lexenv new-value)
 	    new-value)))
+
+;;; service function for structure constructors
+(defun %make-instance-with-layout (layout)
+  (let ((result (%make-instance (layout-length layout))))
+    (setf (%instance-layout result) layout)
+    result))
 
 ;;;; target-only parts of the DEFSTRUCT top-level code
 
@@ -257,7 +263,7 @@
 			(dsd-raw-type (dsd-raw-type dsd)))
 		    #+sb-xc (/show0 "in %NATIVE-SLOT-ACCESSOR-FUNS macroexpanded code")
 		    ;; Map over all the possible RAW-TYPEs, compiling
-		    ;; a different closure-function for each one, so
+		    ;; a different closure function for each one, so
 		    ;; that once the COND over RAW-TYPEs happens (at
 		    ;; the time closure is allocated) there are no
 		    ;; more decisions to be made and things execute

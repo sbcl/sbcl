@@ -50,7 +50,7 @@
 		(inst jmp
 		      (make-ea :dword
 			       :disp (+ nil-value
-					(static-function-offset
+					(static-fun-offset
 					 ',(symbolicate "TWO-ARG-" fun)))))
 
 		DO-BODY
@@ -144,7 +144,7 @@
   (inst push eax)
   (inst mov ecx (fixnumize 1))	  ; arg count
   (inst jmp (make-ea :dword
-		     :disp (+ nil-value (static-function-offset '%negate))))
+		     :disp (+ nil-value (static-fun-offset '%negate))))
 
   FIXNUM
   (move res x)
@@ -198,8 +198,7 @@
 					; should be named parallelly.
 		(inst jmp (make-ea :dword
 				   :disp (+ nil-value
-					    (static-function-offset
-					     ',static-fn))))
+					    (static-fun-offset ',static-fn))))
 
 		INLINE-FIXNUM-COMPARE
 		(inst cmp x y)
@@ -255,7 +254,7 @@
   (inst push eax)
   (inst mov ecx (fixnumize 2))
   (inst jmp (make-ea :dword
-		     :disp (+ nil-value (static-function-offset 'eql))))
+		     :disp (+ nil-value (static-fun-offset 'eql))))
 
   RETURN-T
   (load-symbol res t)
@@ -296,7 +295,7 @@
   (inst push eax)
   (inst mov ecx (fixnumize 2))
   (inst jmp (make-ea :dword
-		     :disp (+ nil-value (static-function-offset 'two-arg-=))))
+		     :disp (+ nil-value (static-fun-offset 'two-arg-=))))
 
   RETURN-T
   (load-symbol res t))

@@ -79,4 +79,4 @@
     (inst jmp :ne loop)
     DONE))
 
-(define-static-function length (object) :translate length)
+(define-static-fun length (object) :translate length)
