@@ -34,7 +34,7 @@
   (string (missing-arg) :type simple-string)
   (start (missing-arg) :type (and unsigned-byte fixnum))
   (end (missing-arg) :type (and unsigned-byte fixnum))
-  (character (missing-arg) :type chararacter)
+  (character (missing-arg) :type character)
   (colonp nil :type (member t nil))
   (atsignp nil :type (member t nil))
   (params nil :type list))
