@@ -48,5 +48,20 @@
 ;;; some DWIM "functionality".
 (assert (raises-error? (format nil "~:2T")))
 
+;;; bug reported, with fix, by Robert Strandh, sbcl-devel 2002-03-09,
+;;; fixed in sbcl-0.7.1.36:
+(assert (string= (format nil "~2,3,8,'0$" 1234567.3d0) "1234567.30"))
+
+;;; checks that other FORMAT-DOLLAR output remains sane after the
+;;; 0.7.1.36 change
+(assert (string= (format nil "~$" 0) "0.00"))
+(assert (string= (format nil "~$" 4) "4.00"))
+(assert (string= (format nil "~$" -4.0) "-4.00"))
+(assert (string= (format nil "~2,7,11$" -4.0) "-0000004.00"))
+(assert (string= (format nil "~2,7,11,' $" 1.1) " 0000001.10"))
+(assert (string= (format nil "~1,7,11,' $" 1.1) "  0000001.1"))
+(assert (string= (format nil "~1,3,8,' $" 7.3) "   007.3"))
+(assert (string= (format nil "~2,3,8,'0$" 7.3) "00007.30"))
+
 ;;; success
 (quit :unix-status 104)

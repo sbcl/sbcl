@@ -1,6 +1,6 @@
-;;;; This file is not used cold load time. Instead, it can be loaded
-;;;; into an initialized SBCL to get it into a nostalgic frame of
-;;;; mind, remembering the way things were in cold init, so that it
+;;;; This file is not used at cold load time. Instead, it can be
+;;;; loaded into an initialized SBCL to get it into a nostalgic frame
+;;;; of mind, remembering the way things were in cold init, so that it
 ;;;; can READ code which is ordinarily read only when bootstrapping.
 ;;;; (This can be useful when debugging the system, since the debugger
 ;;;; likes to be able to read the source for the code. It can also be

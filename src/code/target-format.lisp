@@ -687,24 +687,32 @@
     (format-dollars stream (next-arg) d n w pad colonp atsignp)))
 
 (defun format-dollars (stream number d n w pad colon atsign)
-  (if (rationalp number) (setq number (coerce number 'single-float)))
+  (when (rationalp number)
+    ;; This coercion to SINGLE-FLOAT seems as though it gratuitously
+    ;; loses precision (why not LONG-FLOAT?) but it's the default
+    ;; behavior in the ANSI spec, so in some sense it's the right
+    ;; thing, and at least the user shouldn't be surprised.
+    (setq number (coerce number 'single-float)))
   (if (floatp number)
       (let* ((signstr (if (minusp number) "-" (if atsign "+" "")))
 	     (signlen (length signstr)))
 	(multiple-value-bind (str strlen ig2 ig3 pointplace)
-	    (sb!impl::flonum-to-string number nil d nil)
-	  (declare (ignore ig2 ig3))
-	  (when colon (write-string signstr stream))
-	  (dotimes (i (- w signlen (- n pointplace) strlen))
+            (sb!impl::flonum-to-string number nil d nil)
+	  (declare (ignore ig2 ig3 strlen))
+	  (when colon
+	    (write-string signstr stream))
+	  (dotimes (i (- w signlen (max n pointplace) 1 d))
 	    (write-char pad stream))
-	  (unless colon (write-string signstr stream))
-	  (dotimes (i (- n pointplace)) (write-char #\0 stream))
+	  (unless colon
+	    (write-string signstr stream))
+	  (dotimes (i (- n pointplace))
+	    (write-char #\0 stream))
 	  (write-string str stream)))
       (format-write-field stream
 			  (decimal-string number)
 			  w 1 0 #\space t)))
 
-;;;; format interpreters and support functions for line/page breaks etc.
+;;;; FORMAT interpreters and support functions for line/page breaks etc.
 
 (def-format-interpreter #\% (colonp atsignp params)
   (when (or colonp atsignp)

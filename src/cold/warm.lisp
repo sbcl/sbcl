@@ -64,17 +64,19 @@
 
 ;;;; package hacking
 
-;;; Our cross-compilation host is out of the picture now, so we no longer need
-;;; to worry about collisions between our package names and cross-compilation
-;;; host package names, so now is a good time to rename any package with a
-;;; bootstrap-only name SB!FOO to its permanent name SB-FOO.
+;;; Our cross-compilation host is out of the picture now, so we no
+;;; longer need to worry about collisions between our package names
+;;; and cross-compilation host package names, so now is a good time to
+;;; rename any package with a bootstrap-only name SB!FOO to its
+;;; permanent name SB-FOO.
 ;;;
-;;; (In principle it might be tidier to do this when dumping the cold image in
-;;; genesis, but in practice the logic might be a little messier because
-;;; genesis dumps both symbols and packages, and we'd need to make that dumped
-;;; symbols were renamed in the same way as dumped packages. Or we could do it
-;;; in cold init, but it's easier to experiment with and debug things here in
-;;; warm init than in cold init, so we do it here instead.)
+;;; (In principle it might be tidier to do this when dumping the cold
+;;; image in genesis, but in practice the logic might be a little
+;;; messier because genesis dumps both symbols and packages, and we'd
+;;; need to make sure that dumped symbols were renamed in the same way
+;;; as dumped packages. Or we could do it in cold init, but it's
+;;; easier to experiment with and debug things here in warm init than
+;;; in cold init, so we do it here instead.)
 (let ((boot-prefix "SB!")
       (perm-prefix "SB-"))
   (dolist (package (list-all-packages))
@@ -165,16 +167,14 @@
 (dolist (stem '(;; CLOS, derived from the PCL reference implementation
 		;;
 		;; This PCL build order is based on a particular
-		;; linearization of the declared build order
-		;; dependencies from the old PCL defsys.lisp
+		;; (arbitrary) linearization of the declared build
+		;; order dependencies from the old PCL defsys.lisp
 		;; dependency database.
 		"src/pcl/walk"
-                ;; "src/pcl/iterate" removed 2001-12-20 njf
 		"src/pcl/early-low"
 		"src/pcl/macros"
                 "src/pcl/compiler-support"
 		"src/pcl/low"
-		;; "src/pcl/fin" merged into "src/pcl/low" in 0.6.11.43
 		"src/pcl/defclass"
 		"src/pcl/defs"
 		"src/pcl/fngen"
