@@ -96,8 +96,6 @@
 
 (defgeneric gf-dfun-state (standard-generic-function))
 
-(defgeneric gf-pretty-arglist (standard-generic-function))
-
 (defgeneric long-method-combination-function (long-method-combination))
 
 (defgeneric method-combination-documentation (standard-method-combination))
@@ -182,8 +180,6 @@
 (defgeneric (setf generic-function-name) (new-value standard-generic-function))
 
 (defgeneric (setf gf-dfun-state) (new-value standard-generic-function))
-
-(defgeneric (setf gf-pretty-arglist) (new-value standard-generic-function))
 
 (defgeneric (setf method-generic-function) (new-value standard-method))
 

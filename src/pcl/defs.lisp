@@ -803,10 +803,7 @@
 	:reader gf-arg-info)
       (dfun-state
 	:initform ()
-	:accessor gf-dfun-state)
-      (pretty-arglist
-	:initform ()
-	:accessor gf-pretty-arglist))
+	:accessor gf-dfun-state))
   (:metaclass funcallable-standard-class)
   (:default-initargs :method-class *the-class-standard-method*
 		     :method-combination *standard-method-combination*))

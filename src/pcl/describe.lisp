@@ -88,17 +88,22 @@
 (defvar *describe-metaobjects-as-objects-p* nil)
 
 (defmethod describe-object ((fun standard-generic-function) stream)
-  (format stream "~A is a generic function.~%" fun)
+  (format stream "~&~A is a generic function.~%" fun)
   (format stream "Its arguments are:~%  ~S~%"
 	  (generic-function-pretty-arglist fun))
-  (format stream "Its methods are:")
-  (dolist (method (generic-function-methods fun))
-    (format stream "~2%    ~{~S ~}~:S =>~%"
-	    (method-qualifiers method)
-	    (unparse-specializers method))
-    (describe-object (or (method-fast-function method)
-			 (method-function method))
-		     stream))
+  (let ((methods (generic-function-methods fun)))
+    (if (null methods)
+	(format stream "It has no methods.~%")
+	(let ((gf-name (generic-function-name fun)))
+	  (format stream "Its methods are:")
+	  (dolist (method methods)
+	    (format stream "~2%    (~A ~{~S ~}~:S) =>~%"
+		    gf-name
+		    (method-qualifiers method)
+		    (unparse-specializers method))
+	    (describe-object (or (method-fast-function method)
+				 (method-function method))
+			     stream)))))
   (when *describe-metaobjects-as-objects-p*
     (call-next-method)))
 

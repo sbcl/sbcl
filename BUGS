@@ -751,18 +751,6 @@ Error in function C::GET-LAMBDA-TO-COMPILE:
       ;; no problem, can just use the ordinary expansion
       `(function (setf ,place-function-name))))
 
-99:
-  DESCRIBE interacts poorly with *PRINT-CIRCLE*, e.g. the output from 
-    (let ((*print-circle* t)) (describe (make-hash-table)))
-  is weird,
-    #<HASH-TABLE :TEST EQL :COUNT 0 {90BBFC5}> is an . (EQL)
-    Its SIZE is 16.
-    Its REHASH-SIZE is 1.5. Its REHASH-THRESHOLD is . (1.0)
-    It holds 0 key/value pairs.
-  where the ". (EQL)" and ". (1.0)" substrings are screwups.
-  (This is likely a pretty-printer problem which happens to
-  be exercised by DESCRIBE, not actually a DESCRIBE problem.)
-
 100:
   There's apparently a bug in CEILING optimization which caused 
   Douglas Crosher to patch the CMU CL version. Martin Atzmueller
@@ -792,9 +780,6 @@ Error in function C::GET-LAMBDA-TO-COMPILE:
 	  On Sat, May 26, 2001 09:45:57 AM CDT it was compiled from:
 	  /usr/stuff/sbcl/src/code/host-alieneval.lisp
 	    Created: Monday, March 12, 2001 07:47:43 AM CST
-
-105:
-  (DESCRIBE 'STREAM-READ-BYTE)
 
 106:
   (reported by Eric Marsden on cmucl-imp 2001-06-15)

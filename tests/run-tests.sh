@@ -99,7 +99,11 @@ for f in *.pure-cload.lisp; do
 	echo //running $f test
 	$SBCL <<EOF ; tenfour
 		(compile-file "$f")
-		(progn (load *) (sb-ext:quit :unix-status 104))
+                (progn
+                  (unwind-protect
+		  (load *)
+                   (ignore-errors (delete-file (compile-file-pathname "$f"))))
+                  (sb-ext:quit :unix-status 104))
 EOF
     fi
 done
@@ -113,7 +117,11 @@ for f in *.impure-cload.lisp; do
 	echo //running $f test
 	$SBCL <<EOF ; tenfour
 		(compile-file "$f")
-		(progn (load *) (sb-ext:quit :unix-status 104))
+                (progn
+                  (unwind-protect
+		  (load *)
+                   (ignore-errors (delete-file (compile-file-pathname "$f"))))
+                  (sb-ext:quit :unix-status 104))
 EOF
     fi
 done

@@ -45,7 +45,9 @@ EOF
     fi
 }
 
-tmpfilename="clos-test-$$-tmp.lisp"
+base_tmpfilename="clos-test-$$-tmp"
+tmpfilename="$base_tmpfilename.lisp"
+compiled_tmpfilename="$base_tmpfilename.fasl"
 
 # This should fail, but didn't until sbcl-0.6.12.7, with Martin
 # Atzmueller's port of Pierre Mai's fixes.
@@ -83,6 +85,7 @@ EOF
 expect_load_error $tmpfilename
 
 rm $tmpfilename
+rm $compiled_tmpfilename
 
 # success 
 exit 104

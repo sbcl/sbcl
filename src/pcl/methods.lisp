@@ -1462,31 +1462,37 @@
 ;;; into account at all yet.
 (defmethod generic-function-pretty-arglist
 	   ((generic-function standard-generic-function))
-  (let ((methods (generic-function-methods generic-function))
-	(arglist ()))
-    (when methods
-      (multiple-value-bind (required optional rest key allow-other-keys)
-	  (method-pretty-arglist (car methods))
-	(dolist (m (cdr methods))
-	  (multiple-value-bind (method-key-keywords
-				method-allow-other-keys
-				method-key)
-	      (function-keywords m)
-	    ;; we've modified function-keywords to return what we want as
-	    ;;  the third value, no other change here.
-	    (declare (ignore method-key-keywords))
-	    (setq key (union key method-key))
-	    (setq allow-other-keys (or allow-other-keys
-				       method-allow-other-keys))))
-	(when allow-other-keys
-	  (setq arglist '(&allow-other-keys)))
-	(when key
-	  (setq arglist (nconc (list '&key) key arglist)))
-	(when rest
-	  (setq arglist (nconc (list '&rest rest) arglist)))
-	(when optional
-	  (setq arglist (nconc (list '&optional) optional arglist)))
-	(nconc required arglist)))))
+  (let ((methods (generic-function-methods generic-function)))
+    (if methods
+      (let ((arglist ()))
+        ;; arglist is constructed from the GF's methods - maybe with
+        ;; keys and rest stuff added
+        (multiple-value-bind (required optional rest key allow-other-keys)
+            (method-pretty-arglist (car methods))
+          (dolist (m (cdr methods))
+            (multiple-value-bind (method-key-keywords
+                                  method-allow-other-keys
+                                  method-key)
+                (function-keywords m)
+              ;; we've modified function-keywords to return what we want as
+              ;;  the third value, no other change here.
+              (declare (ignore method-key-keywords))
+              (setq key (union key method-key))
+              (setq allow-other-keys (or allow-other-keys
+                                         method-allow-other-keys))))
+          (when allow-other-keys
+            (setq arglist '(&allow-other-keys)))
+          (when key
+            (setq arglist (nconc (list '&key) key arglist)))
+          (when rest
+            (setq arglist (nconc (list '&rest rest) arglist)))
+          (when optional
+            (setq arglist (nconc (list '&optional) optional arglist)))
+          (nconc required arglist)))
+      ;; otherwise we take the lambda-list from the GF directly, with no
+      ;; other 'keys' added ...
+      (let ((lambda-list (generic-function-lambda-list generic-function)))
+        lambda-list))))
 
 (defmethod method-pretty-arglist ((method standard-method))
   (let ((required ())
