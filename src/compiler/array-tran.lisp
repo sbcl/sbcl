@@ -174,20 +174,20 @@
 	    (:copier nil))
   ;; the element type, e.g. #<BUILT-IN-CLASS BASE-CHAR (sealed)> or
   ;; #<SB-KERNEL:NUMERIC-TYPE (UNSIGNED-BYTE 4)>
-  (ctype (required-argument) :type ctype :read-only t)
+  (ctype (missing-arg) :type ctype :read-only t)
   ;; what we get when the low-level vector-creation logic zeroes all
   ;; the bits (which also serves as the default value of MAKE-ARRAY's
   ;; :INITIAL-ELEMENT keyword)
-  (initial-element-default (required-argument) :read-only t)
+  (initial-element-default (missing-arg) :read-only t)
   ;; how many bits per element
-  (n-bits (required-argument) :type index :read-only t)
+  (n-bits (missing-arg) :type index :read-only t)
   ;; the low-level type code
-  (typecode (required-argument) :type index :read-only t)
+  (typecode (missing-arg) :type index :read-only t)
   ;; the number of extra elements we use at the end of the array for
   ;; low level hackery (e.g., one element for arrays of BASE-CHAR,
   ;; which is used for a fixed #\NULL so that when we call out to C
   ;; we don't need to cons a new copy)
-  (n-pad-elements (required-argument) :type index :read-only t))
+  (n-pad-elements (missing-arg) :type index :read-only t))
 
 (defparameter *specialized-array-element-type-properties*
   (map 'simple-vector

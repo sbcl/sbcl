@@ -97,7 +97,7 @@
   ;; a description of a DEF!STRUCT call to be stored until we get
   ;; enough of the system running to finish processing it
   (defstruct delayed-def!struct
-    (args (required-argument) :type cons)
+    (args (missing-arg) :type cons)
     (package (sane-package) :type package))
   ;; a list of DELAYED-DEF!STRUCTs stored until we get DEF!STRUCT
   ;; working fully so that we can apply it to them then. After

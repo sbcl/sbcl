@@ -36,7 +36,7 @@
 			      (print-unreadable-object (x stream :type t)
 				(prin1 (type-class-name x) stream)))))
   ;; the name of this type class (used to resolve references at load time)
-  (name nil :type symbol) ; FIXME: should perhaps be REQUIRED-ARGUMENT?
+  (name nil :type symbol) ; FIXME: should perhaps be REQUIRED-ARG?
   ;; Dyadic type methods. If the classes of the two types are EQ, then
   ;; we call the SIMPLE-xxx method. If the classes are not EQ, and
   ;; either type's class has a COMPLEX-xxx method, then we call it.

@@ -13,17 +13,6 @@
 
 (!begin-collecting-cold-init-forms)
 
-;;; Just call %TYPEP.
-;;;
-;;; Note that when cross-compiling, SB!XC:TYPEP is interpreted as
-;;; a test that the host Lisp object OBJECT translates to a target SBCL
-;;; type TYPE. (This behavior is needed e.g. to test for the validity of
-;;; numeric subtype bounds read when cross-compiling.)
-(defun typep (object type)
-  #!+sb-doc
-  "Return T iff OBJECT is of type TYPE."
-  (%typep object type))
-
 ;;; If TYPE is a type that we can do a compile-time test on, then
 ;;; return whether the object is of that type as the first value and
 ;;; second value true. Otherwise return NIL, NIL.
@@ -117,7 +106,7 @@
 	   ;; time), we need to suppress a DEFTRANSFORM.. -- WHN 19991004
 	   (declare (notinline sb!xc:find-class))
 	   (class-layout (sb!xc:find-class 'null))))
-	(t (svref *built-in-class-codes* (get-type x)))))
+	(t (svref *built-in-class-codes* (widetag-of x)))))
 
 #!-sb-fluid (declaim (inline sb!xc:class-of))
 (defun sb!xc:class-of (object)

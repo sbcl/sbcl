@@ -133,10 +133,13 @@
  ;; anyone who wants to collect such statistics in the future.
  ; :sb-dyncount
 
- ;; Peter Van Eynde's increase-bulletproofness code
+ ;; Peter Van Eynde's increase-bulletproofness code for CMU CL
  ;;
- ;; This is not maintained or tested in current SBCL, but I haven't
- ;; gone out of my way to remove or break it, either.
+ ;; Some of the code which was #+high-security before the fork has now
+ ;; been either made unconditional, deleted, or rewritten into
+ ;; unrecognizability, but some remains. What remains is not maintained
+ ;; or tested in current SBCL, but I haven't gone out of my way to
+ ;; break it, either. 
  ;;
  ; :high-security
  ; :high-security-support

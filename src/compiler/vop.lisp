@@ -47,7 +47,7 @@
   (scs nil :type list)
   ;; the Lisp type equivalent to this type. If this type could never be
   ;; returned by PRIMITIVE-TYPE, then this is the NIL (or empty) type
-  (type (required-argument) :type ctype)
+  (type (missing-arg) :type ctype)
   ;; the template used to check that an object is of this type. This is a
   ;; template of one argument and one result, both of primitive-type T. If
   ;; the argument is of the correct type, then it is delivered into the
@@ -338,7 +338,7 @@
   ;; The elements of this list correspond to the elements of the list
   ;; in the CLOSURE slot of the ENVIRONMENT object that links to us:
   ;; essentially this list is related to the CLOSURE list by MAPCAR.
-  (environment (required-argument) :type list :read-only t)
+  (environment (missing-arg) :type list :read-only t)
   ;; the TNs that hold the OLD-FP and RETURN-PC within the function.
   ;; We always save these so that the debugger can do a backtrace,
   ;; even if the function has no return (and thus never uses them).
@@ -349,7 +349,7 @@
   ;; differently from the other arguments, since in some
   ;; implementations we may use a call instruction that requires the
   ;; return PC to be passed in a particular place.
-  (return-pc-pass (required-argument) :type tn :read-only t)
+  (return-pc-pass (missing-arg) :type tn :read-only t)
   ;; True if this function has a frame on the number stack. This is
   ;; set by representation selection whenever it is possible that some
   ;; function in our tail set will make use of the number stack.
@@ -380,11 +380,11 @@
   ;; The return convention used:
   ;; -- If :UNKNOWN, we use the standard return convention.
   ;; -- If :FIXED, we use the known-values convention.
-  (kind (required-argument) :type (member :fixed :unknown))
+  (kind (missing-arg) :type (member :fixed :unknown))
   ;; the number of values returned, or :UNKNOWN if we don't know.
   ;; COUNT may be known when KIND is :UNKNOWN, since we may choose the
   ;; standard return convention for other reasons.
-  (count (required-argument) :type (or index (member :unknown)))
+  (count (missing-arg) :type (or index (member :unknown)))
   ;; If count isn't :UNKNOWN, then this is a list of the
   ;; primitive-types of each value.
   (types () :type list)
@@ -404,7 +404,7 @@
   ;; unwind-block, so we leave this slot null.
   (home nil :type (or tn null))
   ;; the saved control stack pointer
-  (save-sp (required-argument) :type tn)
+  (save-sp (missing-arg) :type tn)
   ;; the list of dynamic state save TNs
   (dynamic-state (list* (make-stack-pointer-tn)
 			(make-dynamic-state-tns))
@@ -425,7 +425,7 @@
   ;; VOP-Info structure containing static info about the operation
   (info nil :type (or vop-info null))
   ;; the IR2-Block this VOP is in
-  (block (required-argument) :type ir2-block)
+  (block (missing-arg) :type ir2-block)
   ;; VOPs evaluated after and before this one. Null at the
   ;; beginning/end of the block, and temporarily during IR2
   ;; translation.
@@ -463,7 +463,7 @@
 (defstruct (tn-ref (:constructor make-tn-ref (tn write-p))
 		   (:copier nil))
   ;; the TN referenced
-  (tn (required-argument) :type tn)
+  (tn (missing-arg) :type tn)
   ;; Is this is a write reference? (as opposed to a read reference)
   (write-p nil :type boolean)
   ;; the link for a list running through all TN-Refs for this TN of
@@ -500,7 +500,7 @@
   ;; the arg/result type restrictions. We compute this from the
   ;; PRIMITIVE-TYPE restrictions to make life easier for IR1 phases
   ;; that need to anticipate LTN's template selection.
-  (type (required-argument) :type fun-type)
+  (type (missing-arg) :type fun-type)
   ;; lists of restrictions on the argument and result types. A
   ;; restriction may take several forms:
   ;; -- The restriction * is no restriction at all.
@@ -534,10 +534,10 @@
   ;; the policy under which this template is the best translation.
   ;; Note that LTN might use this template under other policies if it
   ;; can't figure out anything better to do.
-  (ltn-policy (required-argument) :type ltn-policy)
+  (ltn-policy (missing-arg) :type ltn-policy)
   ;; the base cost for this template, given optimistic assumptions
   ;; such as no operand loading, etc.
-  (cost (required-argument) :type index)
+  (cost (missing-arg) :type index)
   ;; If true, then this is a short noun-like phrase describing what
   ;; this VOP "does", i.e. the implementation strategy. This is for
   ;; use in efficiency notes.
@@ -558,7 +558,7 @@
   ;; Two values are returned: the first and last VOP emitted. This vop
   ;; sequence must be linked into the VOP Next/Prev chain for the
   ;; block. At least one VOP is always emitted.
-  (emit-function (required-argument) :type function))
+  (emit-function (missing-arg) :type function))
 (defprinter (template)
   name
   arg-types
@@ -578,8 +578,8 @@
 	     (:make-load-form-fun ignore-it))
   ;; side-effects of this VOP and side-effects that affect the value
   ;; of this VOP
-  (effects (required-argument) :type attributes)
-  (affected (required-argument) :type attributes)
+  (effects (missing-arg) :type attributes)
+  (affected (missing-arg) :type attributes)
   ;; If true, causes special casing of TNs live after this VOP that
   ;; aren't results:
   ;; -- If T, all such TNs that are allocated in a SC with a defined
@@ -872,7 +872,7 @@
   ;;	as :NORMAL, but then at the end merges the conflict info into
   ;;	the original TN and replaces all uses of the alias with the
   ;;	original TN. SAVE-TN holds the aliased TN.
-  (kind (required-argument)
+  (kind (missing-arg)
 	:type (member :normal :environment :debug-environment
 		      :save :save-once :specified-save :load :constant
 		      :component :alias))
@@ -942,7 +942,7 @@
 	    (:constructor make-global-conflicts (kind tn block number))
 	    (:copier nil))
   ;; the IR2-Block that this structure represents the conflicts for
-  (block (required-argument) :type ir2-block)
+  (block (missing-arg) :type ir2-block)
   ;; thread running through all the Global-Conflict for Block. This
   ;; thread is sorted by TN number
   (next nil :type (or global-conflicts null))
@@ -974,7 +974,7 @@
 			 :initial-element 0)
 	     :type local-tn-bit-vector)
   ;; the TN we are recording conflicts for.
-  (tn (required-argument) :type tn)
+  (tn (missing-arg) :type tn)
   ;; thread through all the Global-Conflicts for TN
   (tn-next nil :type (or global-conflicts null))
   ;; TN's local TN number in Block. :Live TNs don't have local numbers.

@@ -255,10 +255,9 @@ Function and macro commands:
 ;;; info about a made breakpoint
 (defstruct (breakpoint-info (:copier nil))
   ;; where we are going to stop
-  (place (required-argument)
-	 :type (or sb!di:code-location sb!di:debug-fun))
+  (place (missing-arg)	 :type (or sb!di:code-location sb!di:debug-fun))
   ;; the breakpoint returned by sb!di:make-breakpoint
-  (breakpoint (required-argument) :type sb!di:breakpoint)
+  (breakpoint (missing-arg) :type sb!di:breakpoint)
   ;; the function returned from SB!DI:PREPROCESS-FOR-EVAL. If result is
   ;; non-NIL, drop into the debugger.
   (break #'identity :type function)
@@ -271,10 +270,10 @@ Function and macro commands:
   (print nil :type list)
   ;; the number used when listing the possible breakpoints within a
   ;; function. Could also be a symbol such as start or end.
-  (code-location-number (required-argument) :type (or symbol integer))
+  (code-location-number (missing-arg) :type (or symbol integer))
   ;; the number used when listing the breakpoints active and to delete
   ;; breakpoints
-  (breakpoint-number (required-argument) :type integer))
+  (breakpoint-number (missing-arg) :type integer))
 
 ;;; Return a new BREAKPOINT-INFO structure with the info passed.
 (defun create-breakpoint-info (place breakpoint code-location-number

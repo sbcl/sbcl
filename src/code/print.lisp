@@ -23,42 +23,43 @@
   *PRINT-ESCAPE*.")
 (defvar *print-escape* T
   #!+sb-doc
-  "Flag which indicates that slashification is on. See the manual")
+  "Should we print in a reasonably machine-readable way? (possibly
+  overridden by *PRINT-READABLY*)")
 (defvar *print-pretty* nil ; (set later when pretty-printer is initialized)
   #!+sb-doc
-  "Flag which indicates that pretty printing is to be used")
+  "Should pretty printing be used?")
 (defvar *print-base* 10.
   #!+sb-doc
-  "The output base for integers and rationals.")
+  "the output base for RATIONALs (including integers)")
 (defvar *print-radix* nil
   #!+sb-doc
-  "This flag requests to verify base when printing rationals.")
+  "Should base be verified when printing RATIONALs?")
 (defvar *print-level* nil
   #!+sb-doc
-  "How many levels deep to print. Unlimited if null.")
+  "How many levels should be printed before abbreviating with \"#\"?")
 (defvar *print-length* nil
   #!+sb-doc
-  "How many elements to print on each level. Unlimited if null.")
+  "How many elements at any level should be printed before abbreviating
+  with \"...\"?")
 (defvar *print-circle* nil
   #!+sb-doc
-  "Whether to worry about circular list structures. See the manual.")
+  "Should we use #n= and #n# notation to preserve uniqueness in general (and
+  circularity in particular) when printing?")
 (defvar *print-case* :upcase
   #!+sb-doc
-  "What kind of case the printer should use by default")
+  "What case should the printer should use default?")
 (defvar *print-array* t
   #!+sb-doc
-  "Whether the array should print its guts out")
+  "Should the contents of arrays be printed?")
 (defvar *print-gensym* t
   #!+sb-doc
-  "If true, symbols with no home package are printed with a #: prefix.
-  If false, no prefix is printed.")
+  "Should #: prefixes be used when printing symbols with null SYMBOL-PACKAGE?")
 (defvar *print-lines* nil
   #!+sb-doc
-  "The maximum number of lines to print. If NIL, unlimited.")
+  "the maximum number of lines to print per object")
 (defvar *print-right-margin* nil
   #!+sb-doc
-  "The position of the right margin in ems. If NIL, try to determine this
-   from the stream in use.")
+  "the position of the right margin in ems (for pretty-printing)")
 (defvar *print-miser-width* nil
   #!+sb-doc
   "If the remaining space between the current column and the right margin
@@ -67,8 +68,7 @@
    turned off. If NIL, never use miser mode.")
 (defvar *print-pprint-dispatch* nil
   #!+sb-doc
-  "The pprint-dispatch-table that controls how to pretty print objects. See
-   COPY-PPRINT-DISPATH, PPRINT-DISPATCH, and SET-PPRINT-DISPATCH.")
+  "the pprint-dispatch-table that controls how to pretty-print objects")
 
 (defmacro with-standard-io-syntax (&body body)
   #!+sb-doc
@@ -93,7 +93,7 @@
        *READ-DEFAULT-FLOAT-FORMAT* 	SINGLE-FLOAT
        *READ-EVAL*			T
        *READ-SUPPRESS*			NIL
-       *READTABLE*			the standard readtable."
+       *READTABLE*			the standard readtable"
   `(%with-standard-io-syntax #'(lambda () ,@body)))
 
 (defun %with-standard-io-syntax (function)
@@ -288,16 +288,17 @@
 ;;; marker, it is incremented.
 (defvar *circularity-counter* nil)
 
-;;; Check to see whether OBJECT is a circular reference, and return something
-;;; non-NIL if it is. If ASSIGN is T, then the number to use in the #n= and
-;;; #n# noise is assigned at this time. Note: CHECK-FOR-CIRCULARITY must
-;;; be called *EXACTLY* once with ASSIGN T, or the circularity detection noise
-;;; will get confused about when to use #n= and when to use #n#. If this
-;;; returns non-NIL when ASSIGN is T, then you must call HANDLE-CIRCULARITY
-;;; on it. If you are not using this inside a WITH-CIRCULARITY-DETECTION,
-;;; then you have to be prepared to handle a return value of :INITIATE which
-;;; means it needs to initiate the circularity detection noise. See the
-;;; source for info on how to do that.
+;;; Check to see whether OBJECT is a circular reference, and return
+;;; something non-NIL if it is. If ASSIGN is T, then the number to use
+;;; in the #n= and #n# noise is assigned at this time.
+;;;
+;;; Note: CHECK-FOR-CIRCULARITY must be called *exactly* once with
+;;; ASSIGN true, or the circularity detection noise will get confused
+;;; about when to use #n= and when to use #n#. If this returns non-NIL
+;;; when ASSIGN is true, then you must call HANDLE-CIRCULARITY on it.
+;;; If you are not using this inside a WITH-CIRCULARITY-DETECTION,
+;;; then you have to be prepared to handle a return value of :INITIATE
+;;; which means it needs to initiate the circularity detection noise.
 (defun check-for-circularity (object &optional assign)
   (cond ((null *print-circle*)
 	 ;; Don't bother, nobody cares.
@@ -307,12 +308,12 @@
 	((null *circularity-counter*)
 	 (ecase (gethash object *circularity-hash-table*)
 	   ((nil)
-	    ;; First encounter.
+	    ;; first encounter
 	    (setf (gethash object *circularity-hash-table*) t)
 	    ;; We need to keep looking.
 	    nil)
 	   ((t)
-	    ;; Second encounter.
+	    ;; second encounter
 	    (setf (gethash object *circularity-hash-table*) 0)
 	    ;; It's a circular reference.
 	    t)
@@ -323,24 +324,25 @@
 	 (let ((value (gethash object *circularity-hash-table*)))
 	   (case value
 	     ((nil t)
-	      ;; If NIL, we found an object that wasn't there the first time
-	      ;; around. If T, exactly one occurance of this object appears.
-	      ;; Either way, just print the thing without any special
-	      ;; processing. Note: you might argue that finding a new object
-	      ;; means that something is broken, but this can happen. If
-	      ;; someone uses the ~@<...~:> format directive, it conses a
-	      ;; new list each time though format (i.e. the &REST list), so
-	      ;; we will have different cdrs.
+	      ;; If NIL, we found an object that wasn't there the
+	      ;; first time around. If T, this object appears exactly
+	      ;; once. Either way, just print the thing without any
+	      ;; special processing. Note: you might argue that
+	      ;; finding a new object means that something is broken,
+	      ;; but this can happen. If someone uses the ~@<...~:>
+	      ;; format directive, it conses a new list each time
+	      ;; though format (i.e. the &REST list), so we will have
+	      ;; different cdrs.
 	      nil)
 	     (0
 	      (if assign
 		  (let ((value (incf *circularity-counter*)))
-		    ;; First occurance of this object. Set the counter.
+		    ;; first occurrence of this object: Set the counter.
 		    (setf (gethash object *circularity-hash-table*) value)
 		    value)
 		  t))
 	     (t
-	      ;; Second or later occurance.
+	      ;; second or later occurrence
 	      (- value)))))))
 
 ;;; Handle the results of CHECK-FOR-CIRCULARITY. If this returns T then
@@ -402,18 +404,19 @@
     (cond ((or (not *print-circle*)
 	       (numberp object)
 	       (characterp object)
-	       (and (symbolp object) (symbol-package object) t))
-	   ;; If it a number, character, or interned symbol, we do not
-	   ;; want to check for circularity/sharing.
+	       (and (symbolp object)
+		    (symbol-package object)))
+	   ;; If it's a number, character, or interned symbol, we
+	   ;; don't want to check for circularity/sharing.
 	   (print-it stream))
 	  ((or *circularity-hash-table*
 	       (consp object)
 	       (typep object 'instance)
 	       (typep object '(array t *)))
 	   ;; If we have already started circularity detection, this
-	   ;; object might be a sharded reference. If we have not,
-	   ;; then if it is a cons, a instance, or an array of element
-	   ;; type t it might contain a circular reference to itself
+	   ;; object might be a shared reference. If we have not, then
+	   ;; if it is a cons, an instance, or an array of element
+	   ;; type T it might contain a circular reference to itself
 	   ;; or multiple shared references.
 	   (check-it stream))
 	  (t
@@ -1572,30 +1575,32 @@
 
 (defun output-random (object stream)
   (print-unreadable-object (object stream :identity t)
-    (let ((lowtag (get-lowtag object)))
+    (let ((lowtag (lowtag-of object)))
       (case lowtag
 	(#.sb!vm:other-pointer-lowtag
-	  (let ((type (get-type object)))
-	    (case type
+	  (let ((widetag (widetag-of object)))
+	    (case widetag
 	      (#.sb!vm:value-cell-header-widetag
 	       (write-string "value cell " stream)
 	       (output-object (value-cell-ref object) stream))
 	      (t
-	       (write-string "unknown pointer object, type=" stream)
+	       (write-string "unknown pointer object, widetag=" stream)
 	       (let ((*print-base* 16) (*print-radix* t))
-		 (output-integer type stream))))))
+		 (output-integer widetag stream))))))
 	((#.sb!vm:fun-pointer-lowtag
 	  #.sb!vm:instance-pointer-lowtag
 	  #.sb!vm:list-pointer-lowtag)
-	 (write-string "unknown pointer object, type=" stream))
+	 (write-string "unknown pointer object, lowtag=" stream)
+	 (let ((*print-base* 16) (*print-radix* t))
+	   (output-integer lowtag stream)))
 	(t
-	 (case (get-type object)
+	 (case (widetag-of object)
 	   (#.sb!vm:unbound-marker-widetag
 	    (write-string "unbound marker" stream))
 	   (t
 	    (write-string "unknown immediate object, lowtag=" stream)
 	    (let ((*print-base* 2) (*print-radix* t))
 	      (output-integer lowtag stream))
-	    (write-string ", type=" stream)
+	    (write-string ", widetag=" stream)
 	    (let ((*print-base* 16) (*print-radix* t))
-	      (output-integer (get-type object) stream)))))))))
+	      (output-integer (widetag-of object) stream)))))))))

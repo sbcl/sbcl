@@ -66,7 +66,7 @@
 
 (defstruct (function-info #-sb-xc-host (:pure t))
   ;; Boolean attributes of this function.
-  (attributes (required-argument) :type attributes)
+  (attributes (missing-arg) :type attributes)
   ;; A list of Transform structures describing transforms for this function.
   (transforms () :type list)
   ;; A function which computes the derived type for a call to this function by
@@ -122,12 +122,12 @@
   ;; itself, are represented as BUILT-IN-TYPE, and at least as of
   ;; sbcl-0.pre7.54 or so, that's inconsistent with being a
   ;; FUN-TYPE.)
-  (type (required-argument) :type ctype)
+  (type (missing-arg) :type ctype)
   ;; the transformation function. Takes the COMBINATION node and returns a
   ;; lambda, or throws out.
-  (function (required-argument) :type function)
+  (function (missing-arg) :type function)
   ;; string used in efficiency notes
-  (note (required-argument) :type string)
+  (note (missing-arg) :type string)
   ;; T if we should emit a failure note even if SPEED=INHIBIT-WARNINGS.
   (important nil :type (member t nil))
   ;; usable for byte code, native code, or both?

@@ -577,63 +577,78 @@
 ;;; Expand FORM using the macro whose MACRO-FUNCTION is FUN, trapping
 ;;; errors which occur during the macroexpansion.
 (defun careful-expand-macro (fun form)
-  (handler-bind (;; When cross-compiling, we can get style warnings
-		 ;; about e.g. undefined functions. An unhandled
-		 ;; CL:STYLE-WARNING (as opposed to a
-		 ;; SB!C::COMPILER-NOTE) would cause FAILURE-P to be
-		 ;; set on the return from #'SB!XC:COMPILE-FILE, which
-		 ;; would falsely indicate an error sufficiently
-		 ;; serious that we should stop the build process. To
-		 ;; avoid this, we translate CL:STYLE-WARNING
-		 ;; conditions from the host Common Lisp into
-		 ;; cross-compiler SB!C::COMPILER-NOTE calls. (It
-		 ;; might be cleaner to just make Python use
-		 ;; CL:STYLE-WARNING internally, so that the
-		 ;; significance of any host Common Lisp
-		 ;; CL:STYLE-WARNINGs is understood automatically. But
-		 ;; for now I'm not motivated to do this. -- WHN
-		 ;; 19990412)
-		 (style-warning (lambda (c)
-				  (compiler-note "(during macroexpansion)~%~A"
-						 c)
-				  (muffle-warning-or-die)))
-		 ;; KLUDGE: CMU CL in its wisdom (version 2.4.6 for
-		 ;; Debian Linux, anyway) raises a CL:WARNING
-		 ;; condition (not a CL:STYLE-WARNING) for undefined
-		 ;; symbols when converting interpreted functions,
-		 ;; causing COMPILE-FILE to think the file has a real
-		 ;; problem, causing COMPILE-FILE to return FAILURE-P
-		 ;; set (not just WARNINGS-P set). Since undefined
-		 ;; symbol warnings are often harmless forward
-		 ;; references, and since it'd be inordinately painful
-		 ;; to try to eliminate all such forward references,
-		 ;; these warnings are basically unavoidable. Thus, we
-		 ;; need to coerce the system to work through them,
-		 ;; and this code does so, by crudely suppressing all
-		 ;; warnings in cross-compilation macroexpansion. --
-		 ;; WHN 19990412
-		 #+cmu
-		 (warning (lambda (c)
-			    (compiler-note
-			     "(during macroexpansion)~%~
-			      ~A~%~
-			      (KLUDGE: That was a non-STYLE WARNING.~%~
-			      Ordinarily that would cause compilation to~%~
-			      fail. However, since we're running under~%~
-			      CMU CL, and since CMU CL emits non-STYLE~%~
-			      warnings for safe, hard-to-fix things (e.g.~%~
-			      references to not-yet-defined functions)~%~
-			      we're going to have to ignore it and proceed~%~
-			      anyway. Hopefully we're not ignoring anything~%~
-			      horrible here..)~%"
-			     c)
-			    (muffle-warning-or-die)))
-		 (error (lambda (c)
-			  (compiler-error "(during macroexpansion)~%~A" c))))
-    (funcall sb!xc:*macroexpand-hook*
-	     fun
-	     form
-	     *lexenv*)))
+  (let (;; a hint I (WHN) wish I'd known earlier
+	(hint "(hint: For more precise location, try *BREAK-ON-SIGNALS*.)"))
+    (flet (;; Return a string to use as a prefix in error reporting,
+	   ;; telling something about which form caused the problem.
+	   (wherestring ()
+	     (let ((*print-pretty* nil)
+		   ;; We rely on the printer to abbreviate FORM. 
+		   (*print-length* 3)
+		   (*print-level* 1))
+	       (format
+		nil
+		#-sb-xc-host "(in macroexpansion of ~S)"
+		;; longer message to avoid ambiguity "Was it the xc host
+		;; or the cross-compiler which encountered the problem?"
+		#+sb-xc-host "(in cross-compiler macroexpansion of ~S)"
+		form))))
+      (handler-bind (;; When cross-compiling, we can get style warnings
+                     ;; about e.g. undefined functions. An unhandled
+                     ;; CL:STYLE-WARNING (as opposed to a
+                     ;; SB!C::COMPILER-NOTE) would cause FAILURE-P to be
+                     ;; set on the return from #'SB!XC:COMPILE-FILE, which
+                     ;; would falsely indicate an error sufficiently
+                     ;; serious that we should stop the build process. To
+                     ;; avoid this, we translate CL:STYLE-WARNING
+                     ;; conditions from the host Common Lisp into
+                     ;; cross-compiler SB!C::COMPILER-NOTE calls. (It
+                     ;; might be cleaner to just make Python use
+                     ;; CL:STYLE-WARNING internally, so that the
+                     ;; significance of any host Common Lisp
+                     ;; CL:STYLE-WARNINGs is understood automatically. But
+                     ;; for now I'm not motivated to do this. -- WHN
+                     ;; 19990412)
+                     (style-warning (lambda (c)
+                                      (compiler-note "~@<~A~:@_~A~:@_~A~:>"
+						     (wherestring) hint c)
+                                      (muffle-warning-or-die)))
+                     ;; KLUDGE: CMU CL in its wisdom (version 2.4.6 for
+                     ;; Debian Linux, anyway) raises a CL:WARNING
+                     ;; condition (not a CL:STYLE-WARNING) for undefined
+                     ;; symbols when converting interpreted functions,
+                     ;; causing COMPILE-FILE to think the file has a real
+                     ;; problem, causing COMPILE-FILE to return FAILURE-P
+                     ;; set (not just WARNINGS-P set). Since undefined
+                     ;; symbol warnings are often harmless forward
+                     ;; references, and since it'd be inordinately painful
+                     ;; to try to eliminate all such forward references,
+                     ;; these warnings are basically unavoidable. Thus, we
+                     ;; need to coerce the system to work through them,
+                     ;; and this code does so, by crudely suppressing all
+                     ;; warnings in cross-compilation macroexpansion. --
+                     ;; WHN 19990412
+                     #+cmu
+                     (warning (lambda (c)
+                                (compiler-note
+                                 "~@<~A~:@_~
+                                  ~A~:@_~
+                                  ~@<(KLUDGE: That was a non-STYLE WARNING. ~
+                                  Ordinarily that would cause compilation to ~
+                                  fail. However, since we're running under ~
+                                  CMU CL, and since CMU CL emits non-STYLE ~
+                                  warnings for safe, hard-to-fix things (e.g. ~
+                                  references to not-yet-defined functions) ~
+                                  we're going to have to ignore it and ~
+                                  proceed anyway. Hopefully we're not ~
+                                  ignoring anything  horrible here..)~:@>~:>"
+                                 (wherestring)
+                                 c)
+                                (muffle-warning-or-die)))
+                     (error (lambda (c)
+                              (compiler-error "~@<~A~:@_~A~@:_~A~:>"
+                                              (wherestring) hint c))))
+        (funcall sb!xc:*macroexpand-hook* fun form *lexenv*)))))
 
 ;;;; conversion utilities
 

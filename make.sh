@@ -1,4 +1,4 @@
-\#!/bin/sh
+#!/bin/sh
 
 # "When we build software, it's a good idea to have a reliable method
 # for getting an executable from it. We want any two reconstructions

@@ -121,14 +121,14 @@
 	   ((progn)
 	    (eval-progn-body (rest exp)))
 	   ((eval-when)
-	    ;; FIXME: DESTRUCTURING-BIND returns
-	    ;; DEFMACRO-LL-ARG-COUNT-ERROR instead of PROGRAM-ERROR
-	    ;; when there's something wrong with the syntax here (e.g.
-	    ;; missing SITUATIONS). This could be fixed by
-	    ;; hand-crafting clauses to catch and report each
-	    ;; possibility, but it would probably be cleaner to write
-	    ;; a new macro DESTRUCTURING-BIND-PROGRAM-SYNTAX which
-	    ;; does DESTRUCTURING-BIND and promotes any mismatch to
+	    ;; FIXME: DESTRUCTURING-BIND returns ARG-COUNT-ERROR
+	    ;; instead of PROGRAM-ERROR when there's something wrong
+	    ;; with the syntax here (e.g. missing SITUATIONS). This
+	    ;; could be fixed by hand-crafting clauses to catch and
+	    ;; report each possibility, but it would probably be
+	    ;; cleaner to write a new macro
+	    ;; DESTRUCTURING-BIND-PROGRAM-SYNTAX which does
+	    ;; DESTRUCTURING-BIND and promotes any mismatch to
 	    ;; PROGRAM-ERROR, then to use it here and in (probably
 	    ;; dozens of) other places where the same problem arises.
 	    (destructuring-bind (eval-when situations &rest body) exp

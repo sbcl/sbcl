@@ -274,7 +274,7 @@
 (defmacro !def-primitive-type (name scs &key (type name))
   (declare (type symbol name) (type list scs))
   (let ((scns (mapcar #'meta-sc-number-or-lose scs))
-	(get-type `(specifier-type ',type)))
+	(ctype-form `(specifier-type ',type)))
     `(progn
        (/show0 "doing !DEF-PRIMITIVE-TYPE, NAME=..")
        (/primitive-print ,(symbol-name name))
@@ -282,9 +282,9 @@
 	 (setf (gethash ',name *backend-meta-primitive-type-names*)
 	       (make-primitive-type :name ',name
 				    :scs ',scns
-				    :type ,get-type)))
+				    :type ,ctype-form)))
        ,(once-only ((n-old `(gethash ',name *backend-primitive-type-names*))
-		    (n-type get-type))
+		    (n-type ctype-form))
 	  `(progn
 	     ;; If the PRIMITIVE-TYPE structure already exists, we
 	     ;; destructively modify it so that existing references in
@@ -458,7 +458,7 @@
   ;; name of the operand (which we bind to the TN)
   (name nil :type symbol)
   ;; the way this operand is used:
-  (kind (required-argument)
+  (kind (missing-arg)
 	:type (member :argument :result :temporary
 		      :more-argument :more-result))
   ;; If true, the name of an operand that this operand is targeted to.

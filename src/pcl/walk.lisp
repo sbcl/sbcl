@@ -96,14 +96,16 @@
 ;;; a list, which was not really an interpreted function.
 ;;; Instead this list was COERCEd to a #<FUNCTION ...>!
 ;;;
-;;; Instead, we now use a special sort of "function"-type for that information,
-;;; because the functions slot in SB-C::LEXENV is supposed to have a list of
-;;; <Name MACRO . #<function> elements.
-;;; So, now we hide our bits of interest in the walker-info slot in our new
-;;; BOGO-FUNCTION.
+;;; Instead, we now use a special sort of "function"-type for that
+;;; information, because the functions slot in SB-C::LEXENV is
+;;; supposed to have a list of <Name MACRO . #<function> elements.
+;;; So, now we hide our bits of interest in the walker-info slot in
+;;; our new BOGO-FUNCTION.
 ;;;
 ;;; MACROEXPAND-1 is the only SBCL function that gets called with the
 ;;; constructed environment argument.
+
+(/show "walk.lisp 108")
 
 (defmacro with-augmented-environment
     ((new-env old-env &key functions macros) &body body)
@@ -112,19 +114,29 @@
 							,macros)))
      ,@body))
 
-(defstruct (bogo-function
-	    (:alternate-metaclass sb-kernel:funcallable-instance
-				  sb-kernel:funcallable-structure-class
-				  sb-kernel:make-funcallable-structure-class)
-	    (:type sb-kernel:funcallable-structure)
-	    (:copier nil))
-  (walker-info (required-argument) :type list))
+;;; a unique tag to show that we're the intended caller of BOGO-FUNCTION
+(defvar *bogo-function-magic-tag*
+  '(:bogo-function-magic-tag))
 
-(defun walker-info-to-bogo-function (x)
-  (make-bogo-function :walker-info x))
-
-(defun bogo-function-to-walker-info (x)
-  (bogo-function-walker-info x))
+;;; The interface of BOGO-FUNCTIONs (previously implemented as
+;;; FUNCALLABLE-INSTANCES) is just these two operations, so we can
+;;; do them with ordinary closures.
+;;;
+;;; KLUDGE: BOGO-FUNCTIONS are sorta weird, and MNA and I have both
+;;; hacked on this code without really figuring out what they're for.
+;;; (He changed them to work after some changes in the IR1 interpreter
+;;; made functions not be built lazily, and I changed them so that
+;;; they don't need FUNCALLABLE-INSTANCE stuff, so that the F-I stuff
+;;; can become less general.) There may be further simplifications or
+;;; clarifications which could be done. -- WHN 2001-10-19
+(defun walker-info-to-bogo-function (walker-info)
+  (lambda (magic-tag &rest rest)
+    (aver (not rest)) ; else someone is using me in an unexpected way
+    (aver (eql magic-tag *bogo-function-magic-tag*)) ; else ditto
+    walker-info))
+(defun bogo-function-to-walker-info (bogo-function)
+  (declare (type function bogo-function))
+  (funcall bogo-function *bogo-function-magic-tag*))
    
 (defun with-augmented-environment-internal (env functions macros)
   ;; Note: In order to record the correct function definition, we
@@ -145,8 +157,8 @@
 			(list* (car m)
 			       'sb-c::macro
                                (if (eq (car m) *key-to-walker-environment*)
-                                 (walker-info-to-bogo-function (cadr m))
-                                 (coerce (cadr m) 'function))))
+				   (walker-info-to-bogo-function (cadr m))
+				   (coerce (cadr m) 'function))))
                       macros)))))
 
 (defun environment-function (env fn)
@@ -162,8 +174,8 @@
       (and entry
 	   (eq (cadr entry) 'sb-c::macro)
            (if (eq macro *key-to-walker-environment*)
-             (values (bogo-function-to-walker-info (cddr entry)))
-             (values (function-lambda-expression (cddr entry))))))))
+	       (values (bogo-function-to-walker-info (cddr entry)))
+	       (values (function-lambda-expression (cddr entry))))))))
 
 ;;;; other environment hacking, not so SBCL-specific as the
 ;;;; environment hacking in the previous section

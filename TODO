@@ -1,106 +1,168 @@
-    Accumulation of half-understood design decisions eventually
-    chokes a program as a water weed chokes a canal. By refactoring
-    you can ensure that your full understanding of how the program
-    should be designed is always reflected in the program. As a
-    water weed quickly spreads its tendrils, partially understood
-    design decisions quickly spread their effects throughout your
-    program. No one or two or even ten individual actions will be
-    enough to eradicate the problem.
-       -- Martin Fowler, _Refactoring: Improving the Design
-          of Existing Code_, p. 360 
-===============================================================================
-some things that I'd like to do in 0.6.x, in no particular order:
--------------------------------------------------------------------------------
-PROBLEM:
-	    As long as I'm working on the batch-related command-line options,
-	it would be reasonable to add one more option to "do what I'd want",
-	testing standard input for non-TTY-ness and running in no-programmer
-	mode if so.
-FIX:
-	?? Do it.
--------------------------------------------------------------------------------
-PROBLEM:
-	    I used CMU CL for years, and dozens of times I cursed the
-	inadequate breakpoint-based TRACE facility which doesn't work on
-	some functions, and I never realized that there's a wrapper-based
-	facility too until I was wading through the source code for SBCL.
-	    Yes, I know I should have RTFM, but there is a lot of M..
-	    (By the way, it would also be nice to have tracing behave
-	better with generic functions. TRACEing a generic function probably
-	shouldn't prevent DEFMETHOD from being used to redefine its
-	methods, and should perhaps trace each of its methods as well
-	as the generic function itself.)
-FIX:
-	?? possibility 1: Add error-handling code in ntrace.lisp to
-	  catch failure to set breakpoints and retry using 
-	  wrapper-based tracing.
-	?? possibility 2: Add error-handling code in ntrace.lisp to
-	  catch failure to catch failure to set breakpoints and output
-	  a message suggesting retrying with wrapper-based breakpoints
-	?? possibility 3: Fix the breakpoint-based TRACE facility so that
-	  it always works.
--------------------------------------------------------------------------------
-PROBLEM:
-	    My system of parallel build directories seems to add
-	complexity without adding value.
-FIX:
-	?? Replace it with a system where fasl output files live in the 
-	  same directories as the sources and have names a la
-	  "foo.fasl-from-host and "foo.fasl-from-xc".
-	?? (Perhaps something else will be required in order to port
-	to Microsoft Windows, since its filesystem doesn't have
-	symbolic links.)
--------------------------------------------------------------------------------
-PROBLEM:
-	    It might be good to use the syntax (DEBUGGER-SPECIAL *PRINT-LEVEL*)
-	etc. to control the in-the-debug-context special variables. Then we 
-	wouldn't have to pick and choose which variables we shadow in the
-	debugger.
-	    The shadowing values could also be made persistent between
-	debugger invocations, so that entering the debugger, doing
-	(SETF *PRINT-LEVEL* 2), and exiting the debugger would leave
-	(DEBUGGER-SPECIAL *PRINT-LEVEL*) set to 2, and upon reentry to the
-	debugger, *PRINT-LEVEL* would be set back to 2.
-FIX:
-	??
--------------------------------------------------------------------------------
-PROBLEM:
-	    I still haven't cleaned up the cut-and-paste programming in 
-		* DEF-BOOLEAN-ATTRIBUTE, DELETEF-IN, and PUSH-IN
-		* SB!SYS:DEF!MACRO ASSEMBLE and SB!XC:DEFMACRO ASSEMBLE
-FIX:
-	??
--------------------------------------------------------------------------------
-PROBLEM:
-	    We be able to get rid of the IR1 interpreter, which would
-	not only get rid of all the code in *eval*.lisp, but also allow us to
-	reduce the number of special cases elsewhere in the system. (Try
-	grepping for 'interpret' sometime.:-) Making this usable might
-	require cleaning up %DEFSTRUCT, %DEFUN, etc. to use EVAL-WHEN
-	instead of IR1 transform magic, which would be a good
-	thing in itself, but might be a fair amount of work.)
-FIX:
-	?? Delete, delete, delete.
+for 0.7.0:
+
+* filed off the roughest edges (or, perhaps, at least hammered down the
+	protruding rusty nails and snipped off the trailing razor wire,
+	leaving some filing for later:-) from the monster
+	EVAL/EVAL-WHEN/%COMPILE/DEFUN/DEFSTRUCT cleanup:
+	** substantially rewrote DEFSTRUCT implementation to work
+		cleanly with EVAL-WHEN, not sleazily use DEFUN for 
+		structure functions, implement out-of-line structure
+		accessors as closures, reduce or eliminate non-ANSI
+		magicality of structure functions
+		*** made structure type tests work again
+		*** got rid of bogus warnings about "redefinition" of
+			structure accessors
+	** made inlining DEFUN inside MACROLET work again
+	** made %COMPILE set up debugging data more like the way the
+		debugger expects (and maybe even completely
+		correctly:-)
+* incompatible changes listed in NEWS:
+	** changed debugger prompt to "5]", "5[2]", "5[3]", etc.
+	** changed default output representation of *PRINT-ESCAPE*-ed
+		unprintable ASCII characters to #\Nul, #\Soh, etc.
+* some easy FIXMEs with high disruptive potential:
+	** Search lists go away.
+	** Grep for ~D and and change most of them to ~S.
+* more renaming in global external names:
+	** used DEFINE-THE-FOO-THING and DEFFOO style consistently (and 
+		deprecated supported extensions named in the DEF-FOO
+		style, e.g. SB-ALIEN:DEF-ALIEN-ROUTINE)
+	** reserved DO-FOO-style names for iteration macros
+	** finished s/FUNCTION/FUN/
+	** s/VARIABLE/VAR/
+	** s/TOPLEVEL/TOP-LEVEL/
+* global style systematization:
+	** s/#'(lambda/(lambda/
+	** four-space indentation in C
+=======================================================================
+for early 0.7.x:
+
+* building with CLISP (or explaining why not)
+* faster bootstrapping (both make.sh and slam.sh)
+	** added mechanisms for automatically finding dead code, and
+		used them to remove dead code
+	** moved stuff from warm init into cold init where possible
+		(so that slam.sh will run faster and also just because
+		ideally everything would be in cold init)
+	** profiled and tweaked
+* more EVAL/EVAL-WHEN/%COMPILE/DEFUN/DEFSTRUCT cleanup:
+	** made %COMPILE understand magicality of DEFUN FOO
+		w.r.t. e.g. preexisting inlineness of FOO
+	** used %COMPILE where COMPILE-TOP-LEVEL used to be used
+	** removed now-redundant COMPILE-TOP-LEVEL and 
+		FUNCTIONAL-KIND=:TOP-LEVEL stuff from the compiler
+	** made FUNCTION-NAME logic work on closures, so that
+		various public functions like CL:PACKAGEP which
+		are now implemented as closures (because
+		they're structure slot accessors) won't be so
+		nasty in the debugger
+* rewrote long-standing confusing error restarts for redefining
+	DEFSTRUCTs
+* outstanding embarrassments
+	** cut-and-pasted DEF-BOOLEAN-ATTRIBUTE (maybe easier to fix
+		now that EVAL-WHEN does what it should..)
+	** incomplete manual
+	** :IGNORE-ERRORS-P cruft in stems-and-flags.lisp-expr
+	** weird double-loading (first in GENESIS, then in warm init)
+		of src/assembly/target/*.lisp stuff, and the associated
+		weirdness of the half-baked state (compiler almost but
+		not quite ready for prime time..) of the system after
+		cold init
+* fixups now feasible because of pre7 changes
+	** ANSIfied DECLAIM INLINE stuff (deprecating MAYBE-INLINE)
+* miscellaneous simple refactoring
+	* belated renaming:
+		** renamed %PRIMITIVE to %VOP
+	* These days ANSI C has inline functions, so..
+		** redid many cpp macros as inline functions: 
+			HeaderValue, Pointerp, CEILING, ALIGNED_SIZE,
+			GET_FREE_POINTER, SET_FREE_POINTER,
+			GET_GC_TRIGGER, SET_GC_TRIGGER, GetBSP, SetBSP,
+			os_trunc_foo(), os_round_up_foo()
+		** removed various avoid-evaluating-C-macro-arg-twice
+			cruft
+* added mechanisms for automatically finding dead symbols is
+	package-data.lisp-expr (i.e. those symbols not bound,
+	fbound, defined as types, or whatever), and used them
+	to remove dead symbols
+* made system handle stack overflow safely unless SAFETY is dominated
+	by SPEED or SPACE
+=======================================================================
+for 1.0:
+
+* refactored in preparation for moving CLOS into cold init and merging
+	SB-PCL:FOO with CL:FOO (for FOO=CLASS, FOO=CLASS-OF, etc.)
+	** systematized support for MOP (new regression tests, maybe
+		new SB-MOP package..) to try to make sure things don't
+		get mislaid in the upcoming CLOS restructuring
+	** extracted type system from SB-KERNEL into new SB-TYPE
+		package
+	** reimplemented GENERIC-FUNCTION as a primitive object (or
+		maybe made SB-MOP:FUNCALLABLE-STANDARD-OBJECT the
+		primitive object, and then let GENERIC-FUNCTIONs
+		inherit from that) instead of structures with
+		:ALTERNATE-METACLASS and funcallableness. Now
+		FUNCALLABLE-INSTANCE can go away. (And now the new
+		funcallable primitive objects need to go into
+		collections like *FUN-HEADER-WIDETAGS* where
+		FUNCALLABLE-INSTANCE objects used to be.)
+	** reimplemented CONDITIONs as primitive objects instead of 
+		structures with :ALTERNATE-METACLASS. Now (between
+		this and the change to GENERIC-FUNCTIONs)
+		DEFSTRUCT :ALTERNATE-METACLASS can go away.
+	** (maybe) Now INSTANCE_POINTER_LOWTAG can become just
+		STRUCTURE_POINTER_LOWTAG, and the concept of
+		SB-KERNEL:INSTANCE (including INSTANCEP, 
+		(SPECIFIER-TYPE 'INSTANCE), etc.) can go away.
+* moved CLOS into cold init, in order to allow CLOS to be used in the
+	implementation of the core system (e.g. the type system and the
+	compiler) and in order to support merger of CL:CLASS with 
+	SB-PCL:CLASS
+* (maybe) eliminated warm init altogether in favor of cold init
+* (maybe, especially if warm init can be eliminated) rationalized
+	the build process, fixing miscellaneous pre-0.5.0 stuff that's
+	transparently not the right thing
+	** removed separate build directories, now just building in 
+		place with .sbclcoldfasl extensions
+* (maybe) more refactoring in preparation for merging SB-PCL:FOO
+	into CL:FOO: reimplemented type system OO dispatch
+	(!DEFINE-TYPE-METHOD, etc.) in terms of CLOS OO dispatch
+* merged SB-PCL:FOO into CL:FOO (and similarly CLASS-OF, etc.)
+* added some automatic tests for basic binary compatibility, in hopes
+	that it might be practical to maintain binary compatibility
+	between minor maintenance releases on the stable branch (but no
+	promises, sorry, since I've never tried to do this before, and 
+	have no idea how much of a pain this'll be)
+=======================================================================
+other priorities, no particular time:
+
+* bug fixes, especially really annoying bugs (ANSI or not) and any
+	ANSI bugs (i.e. not just bugs in extras like the debugger or
+	"declarations are assertions", but violations of the standard)
+* better communication with the outside world (scratching WHN's
+	personal itch): I don't want socket-level stuff so much as I
+	want RPC-level or higher (CORBA?) interfaces and (possibly
+	through RPC or CORBA) GUI support
+=======================================================================
+important but out of scope (for WHN, anyway: Patches from other people
+are still welcome!) until after 1.0:
+	* DYNAMIC-EXTENT
+	* sadly deteriorated support for ANSI-style block compilation
+		(static linking of DEFUNs within a single file or 
+		WITH-COMPILATION-UNIT)
+	* various GC issues (exuberant cut-and-paste coding,
+		possibly dangerously over-conservative handling
+		of neighbors of function objects, general GC efficiency)
+	* package issues other than SB!TYPE, SB!MOP, and dead exported
+		symbols
+	* Any systematic effort to fix compiler consistency checks is
+		out of scope. (However, it still might be possible to
+		determine that some or all of them are hopelessly stale
+		and delete them.)
 ===============================================================================
 other known issues with no particular target date:
 
 bugs listed on the man page
-
-more regression tests
-
-byte compilation of appropriate parts of the system, so that the
-system core isn't so big
-
-Search for unused external symbols (ones which are not bound, fbound,
-types, or whatever, and also have no other uses as e.g. flags) and
-delete them. This should make the system core a little smaller, but
-is mostly useful just to make the source code smaller and simpler.
-
-adding new FOPs to provide something like CMU CL's FOP-SYMBOL-SAVE and
-FOP-SMALL-SYMBOL-SAVE functionality, so that fasl files will be more
-compact. (FOP-SYMBOL-SAVE used *PACKAGE*, which was concise but allowed
-obscure bugs. Something like FOP-LAST-PACKAGE-SYMBOL-SAVE could have
-much of the same conciseness advantage without the bugs.)
 
 hundreds of FIXME notes in the sources from WHN
 
@@ -111,3 +173,24 @@ or probably also other codes that I haven't noticed or have forgotten.
 (Things marked as KLUDGE are in general things which are ugly or
 confusing, but that, for whatever reason, may stay that way
 indefinitely.)
+=======================================================================
+"There's nothing an agnostic can't do as long as he doesn't know
+whether he believes in anything or not."
+  -- Monty Python.
+
+"God grant me serenity to accept the code I cannot change, courage to
+change the code I can, and wisdom to know the difference."
+  -- Erik Naggum
+
+"Accumulation of half-understood design decisions eventually chokes a
+program as a water weed chokes a canal. By refactoring you can ensure
+that your full understanding of how the program should be designed is
+always reflected in the program. As a water weed quickly spreads its
+tendrils, partially understood design decisions quickly spread their
+effects throughout your program. No one or two or even ten individual
+actions will be enough to eradicate the problem."
+  -- Martin Fowler, in _Refactoring: Improving the Design of Existing
+     Code_, p. 360 
+
+"I wish I didn't know now what I didn't know then."
+  -- Bob Seger

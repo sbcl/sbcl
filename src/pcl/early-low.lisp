@@ -25,6 +25,8 @@
 ;;;; specification.
 
 (in-package "SB-PCL")
+
+(/show "starting early-low.lisp")
 
 ;;; FIXME: The PCL package is internal and is used by code in potential
 ;;; bottlenecks. Access to it might be faster through #.(find-package "SB-PCL")
@@ -56,3 +58,5 @@
 	 (and class
 	      (typep (sb-kernel:layout-info (sb-kernel:class-layout class))
 		     'sb-kernel:defstruct-description)))))
+
+(/show "finished with early-low.lisp")

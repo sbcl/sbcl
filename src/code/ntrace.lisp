@@ -125,7 +125,7 @@
 		(values (fdefinition x) t))))
 	(function x)
 	(t (values (fdefinition x) t)))
-    (case (sb-kernel:get-type res)
+    (case (sb-kernel:widetag-of res)
       (#.sb-vm:closure-header-widetag
        (values (sb-kernel:%closure-fun res)
 	       named-p

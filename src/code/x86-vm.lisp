@@ -75,7 +75,7 @@
 		      (setf (code-header-ref code code-constants-offset)
 			    new-fixups)))
 		   (t
-		    (unless (or (eq (get-type fixups)
+		    (unless (or (eq (widetag-of fixups)
 				    unbound-marker-widetag)
 				(zerop fixups))
 		      (format t "** Init. code FU = ~S~%" fixups)) ; FIXME
@@ -138,7 +138,7 @@
 		      (setf (code-header-ref code code-constants-offset)
 			    new-fixups)))
 		   (t
-		    (unless (or (eq (get-type fixups)
+		    (unless (or (eq (widetag-of fixups)
 				    unbound-marker-widetag)
 				(zerop fixups))
 		      (sb!impl::!cold-lose "Argh! can't process fixup"))

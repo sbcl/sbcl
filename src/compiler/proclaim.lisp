@@ -81,6 +81,8 @@
 	     decl-spec)))))
 
 (defun sb!xc:proclaim (raw-form)
+  #+sb-xc (/show0 "entering PROCLAIM, RAW-FORM=..")
+  #+sb-xc (/hexstr raw-form)
   (let* ((form (canonized-decl-spec raw-form))
 	 (kind (first form))
 	 (args (rest form)))
@@ -191,4 +193,5 @@
       (t
        (unless (info :declaration :recognized kind)
 	 (compiler-warning "unrecognized declaration ~S" raw-form)))))
+  #+sb-xc (/show0 "returning from PROCLAIM")
   (values))

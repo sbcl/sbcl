@@ -256,27 +256,6 @@
 (unless (boundp '*the-class-t*)
   (setq *the-class-t* nil))
 
-;;; Note that for SBCL, as for CMU CL, the WRAPPER of a built-in or
-;;; structure class will be some other kind of SB-KERNEL:LAYOUT, but
-;;; this shouldn't matter, since the only two slots that WRAPPER adds
-;;; are meaningless in those cases.
-(defstruct (wrapper
-	    (:include sb-kernel:layout
-		      ;; KLUDGE: In CMU CL, the initialization default
-		      ;; for LAYOUT-INVALID was NIL. In SBCL, that has
-		      ;; changed to :UNINITIALIZED, but PCL code might
-		      ;; still expect NIL for the initialization
-		      ;; default of WRAPPER-INVALID. Instead of trying
-		      ;; to find out, I just overrode the LAYOUT
-		      ;; default here. -- WHN 19991204
-		      (invalid nil))
-	    (:conc-name %wrapper-)
-	    (:constructor make-wrapper-internal)
-	    (:copier nil))
-  (instance-slots-layout nil :type list)
-  (class-slots nil :type list))
-#-sb-fluid (declaim (sb-ext:freeze-type wrapper))
-
 (defmacro wrapper-class (wrapper)
   `(sb-kernel:class-pcl-class (sb-kernel:layout-class ,wrapper)))
 (defmacro wrapper-no-of-instance-slots (wrapper)

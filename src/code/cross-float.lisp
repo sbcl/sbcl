@@ -199,9 +199,9 @@
 ;;; a problem, there are possible workarounds involving portable
 ;;; representations for target floating point numbers, like
 ;;;   (DEFSTRUCT TARGET-SINGLE-FLOAT
-;;;     (SIGN (REQUIRED-ARGUMENT) :TYPE BIT)
-;;;     (EXPONENT (REQUIRED-ARGUMENT) :TYPE UNSIGNED-BYTE)
-;;;     (MANTISSA (REQUIRED-ARGUMENT) :TYPE UNSIGNED-BYTE))
+;;;     (SIGN (MISSING-ARG) :TYPE BIT)
+;;;     (EXPONENT (MISSING-ARG) :TYPE UNSIGNED-BYTE)
+;;;     (MANTISSA (MISSING-ARG) :TYPE UNSIGNED-BYTE))
 ;;; with some sort of MAKE-LOAD-FORM-ish magic to cause them to be
 ;;; written out in the appropriate target format. (And yes, those
 ;;; workarounds *do* look messy to me, which is why I just went

@@ -351,7 +351,6 @@
   (values))
 
 (defun %compile-component (component)
-  (/show "entering %COMPILE-COMPONENT")
   (let ((*code-segment* nil)
 	(*elsewhere* nil))
     (maybe-mumble "GTN ")
@@ -443,7 +442,6 @@
   ;; We're done, so don't bother keeping anything around.
   (setf (component-info component) nil)
 
-  (/show "leaving %COMPILE-COMPONENT")
   (values))
 
 ;;; Delete components with no external entry points before we try to
@@ -619,7 +617,7 @@
 (defstruct (file-info (:copier nil))
   ;; If a file, the truename of the corresponding source file. If from
   ;; a Lisp form, :LISP. If from a stream, :STREAM.
-  (name (required-argument) :type (or pathname (member :lisp :stream)))
+  (name (missing-arg) :type (or pathname (member :lisp :stream)))
   ;; the defaulted, but not necessarily absolute file name (i.e. prior
   ;; to TRUENAME call.) Null if not a file. This is used to set
   ;; *COMPILE-FILE-PATHNAME*, and if absolute, is dumped in the
@@ -768,10 +766,14 @@
 ;;; Macroexpand FORM in the current environment with an error handler.
 ;;; We only expand one level, so that we retain all the intervening
 ;;; forms in the source path.
-(defun preprocessor-macroexpand (form)
+(defun preprocessor-macroexpand-1 (form)
   (handler-case (sb!xc:macroexpand-1 form *lexenv*)
     (error (condition)
-       (compiler-error "(during macroexpansion)~%~A" condition))))
+      (compiler-error "(during macroexpansion of ~A)~%~A"
+		      (let ((*print-level* 1)
+			    (*print-length* 2))
+			(format nil "~S" form))
+		      condition))))
 
 ;;; Process a PROGN-like portion of a top-level form. FORMS is a list of
 ;;; the forms, and PATH is the source path of the FORM they came out of.
@@ -850,7 +852,7 @@
 					       ;; I'd thought NIL should
 					       ;; work, but it doesn't.
 					       ;; -- WHN 2001-09-20
-					       (required-argument)))
+					       (missing-arg)))
   (let* ((*current-path* path)
          (component (make-empty-component))
          (*current-component* component))
@@ -885,15 +887,12 @@
 		  ;; nice default for things where we don't have a
 		  ;; real source path (as in e.g. inside CL:COMPILE).
 		  '(original-source-start 0 0)))
-  (/show "entering %COMPILE" name)
   (unless (or (null name) (legal-fun-name-p name))
     (error "not a legal function name: ~S" name))
   (let* ((*lexenv* (make-lexenv :policy *policy*))
          (fun (make-functional-from-top-level-lambda lambda-expression
                                                      :name name
 						     :path path)))
-
-    (/noshow fun)
 
     ;; FIXME: The compile-it code from here on is sort of a
     ;; twisted version of the code in COMPILE-TOP-LEVEL. It'd be
@@ -903,23 +902,18 @@
     ;; the :LOCALL-ONLY option to IR1-FOR-LAMBDA. Then maybe the
     ;; whole FUNCTIONAL-KIND=:TOP-LEVEL case could go away..)
 
-    (/show "about to LOCAL-CALL-ANALYZE-UNTIL-DONE")
     (local-call-analyze-until-done (list fun))
 
     (multiple-value-bind (components-from-dfo top-components hairy-top)
         (find-initial-dfo (list fun))
 
       (let ((*all-components* (append components-from-dfo top-components)))
-        (/noshow components-from-dfo top-components *all-components*)
 	(mapc #'preallocate-physenvs-for-top-levelish-lambdas
 	      (append hairy-top top-components))
         (dolist (component-from-dfo components-from-dfo)
-          (/show "compiling a COMPONENT-FROM-DFO")
           (compile-component component-from-dfo)
-	  (/show "about to REPLACE-TOP-LEVEL-XEPS")
           (replace-top-level-xeps component-from-dfo)))
 
-      (/show "about to go into PROG1")
       (prog1
           (let ((entry-table (etypecase *compile-object*
                                (fasl-output (fasl-output-entry-table
@@ -931,11 +925,9 @@
               (aver found-p)
               result))
         (mapc #'clear-ir1-info components-from-dfo)
-        (clear-stuff)
-	(/show "returning from %COMPILE")))))
+        (clear-stuff)))))
 
 (defun process-top-level-cold-fset (name lambda-expression path)
-  (/show "entering PROCESS-TOP-LEVEL-COLD-FSET" name)
   (unless (producing-fasl-file)
     (error "can't COLD-FSET except in a fasl file"))
   (unless (legal-fun-name-p name)
@@ -946,7 +938,6 @@
                                  :name name
 				 :path path)
                        *compile-object*)
-  (/show "finished with PROCESS-TOP-LEVEL-COLD-FSET" name)
   (values))
 
 ;;; Process a top-level FORM with the specified source PATH.
@@ -1061,7 +1052,7 @@
 		      ;; cross-compilation host.)
 		      (slightly-uncrossed (cons (uncross (first form))
 						(rest form)))
-		      (expanded (preprocessor-macroexpand slightly-uncrossed)))
+		      (expanded (preprocessor-macroexpand-1 slightly-uncrossed)))
 		 (if (eq expanded slightly-uncrossed)
 		     ;; (Now that we're no longer processing toplevel
 		     ;; forms, and hence no longer need to worry about
@@ -1079,7 +1070,7 @@
 	      ;; Top Level Forms".
 	      #-sb-xc-host
 	      (t
-	       (let ((expanded (preprocessor-macroexpand form)))
+	       (let ((expanded (preprocessor-macroexpand-1 form)))
 		 (cond ((eq expanded form)
 			(when compile-time-too
 			  (eval form))

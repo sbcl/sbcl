@@ -175,7 +175,7 @@
   (clos-hash-6 (random-layout-clos-hash) :type index)
   (clos-hash-7 (random-layout-clos-hash) :type index)
   ;; the class that this is a layout for
-  (class (required-argument)
+  (class (missing-arg)
 	 ;; FIXME: Do we really know this is a CL:CLASS? Mightn't it
 	 ;; be a SB-PCL:CLASS under some circumstances? What goes here
 	 ;; when the LAYOUT is in fact a PCL::WRAPPER?

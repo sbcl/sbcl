@@ -252,13 +252,13 @@
 
 (defstruct (offs-hook (:copier nil))
   (offset 0 :type offset)
-  (function (required-argument) :type function)
+  (function (missing-arg) :type function)
   (before-address nil :type (member t nil)))
 
 (defstruct (segment (:conc-name seg-)
 		    (:constructor %make-segment)
 		    (:copier nil))
-  (sap-maker (required-argument)
+  (sap-maker (missing-arg)
 	     :type (function () sb!sys:system-area-pointer))
   (length 0 :type length)
   (virtual-location 0 :type address)
@@ -286,7 +286,7 @@
   ;; offset of next position
   (next-offs 0 :type offset)		
   ;; a sap pointing to our segment
-  (segment-sap (required-argument) :type sb!sys:system-area-pointer)
+  (segment-sap (missing-arg) :type sb!sys:system-area-pointer)
   ;; the current segment					
   (segment nil :type (or null segment))	
   ;; what to align to in most cases

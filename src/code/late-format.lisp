@@ -32,10 +32,10 @@
 	  (format-error-offset condition)))
 
 (def!struct format-directive
-  (string (required-argument) :type simple-string)
-  (start (required-argument) :type (and unsigned-byte fixnum))
-  (end (required-argument) :type (and unsigned-byte fixnum))
-  (character (required-argument) :type base-char)
+  (string (missing-arg) :type simple-string)
+  (start (missing-arg) :type (and unsigned-byte fixnum))
+  (end (missing-arg) :type (and unsigned-byte fixnum))
+  (character (missing-arg) :type base-char)
   (colonp nil :type (member t nil))
   (atsignp nil :type (member t nil))
   (params nil :type list))

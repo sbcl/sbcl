@@ -55,9 +55,9 @@
 (defknown vector-sap ((simple-unboxed-array (*))) system-area-pointer
   (flushable))
 
-(defknown get-lowtag (t) (unsigned-byte #.sb!vm:n-lowtag-bits)
+(defknown lowtag-of (t) (unsigned-byte #.sb!vm:n-lowtag-bits)
   (flushable movable))
-(defknown get-type (t) (unsigned-byte #.sb!vm:n-widetag-bits)
+(defknown widetag-of (t) (unsigned-byte #.sb!vm:n-widetag-bits)
   (flushable movable))
 
 (defknown (get-header-data get-closure-length) (t) (unsigned-byte 24)

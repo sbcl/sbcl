@@ -17,6 +17,8 @@
 
 ;;; not sure this is the right place, but where else?
 (defun style-warn (format-control &rest format-arguments)
+  (/show0 "entering STYLE-WARN")
+  (/show format-control format-arguments)
   (warn 'simple-style-warning
 	:format-control format-control
 	:format-arguments format-arguments))

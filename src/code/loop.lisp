@@ -1785,7 +1785,7 @@ code to be loaded.
 ||#
 
 (defun loop-hash-table-iteration-path (variable data-type prep-phrases
-				       &key (which (required-argument)))
+				       &key (which (missing-arg)))
   (declare (type (member :hash-key :hash-value) which))
   (cond ((or (cdr prep-phrases) (not (member (caar prep-phrases) '(:in :of))))
 	 (loop-error "too many prepositions!"))

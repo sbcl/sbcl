@@ -32,9 +32,52 @@
 ;;; Set this to NIL to suppress output from /SHOW-related forms.
 #!+sb-show (defvar */show* t)
 
-;;; shorthand for a common idiom in output statements used in debugging:
-;;; (/SHOW "Case 2:" X Y) becomes a pretty-printed version of
-;;; (FORMAT .. "~&/Case 2: X=~S Y=~S~%" X Y).
+(defun cannot-/show (string)
+  #+sb-xc-host (error "can't /SHOW: ~A" string)
+  ;; We end up in this situation when we execute /SHOW too early in
+  ;; cold init. That happens to me often enough that it's really
+  ;; annoying for it to cause a hard failure -- which at that point is
+  ;; hard to recover from -- instead of just diagnostic output.
+  #-sb-xc-host (sb!sys:%primitive
+		print
+		(concatenate 'string "/can't /SHOW: " string))
+  (values))
+
+;;; Should /SHOW output be suppressed at this point?
+;;;
+;;; Note that despite the connoting-no-side-effects-pure-predicate
+;;; name, we emit some error output if we're called at a point where
+;;; /SHOW is inherently invalid.
+(defun suppress-/show-p ()
+  (cond (;; protection against /SHOW too early in cold init for
+	 ;; (FORMAT *TRACE-OUTPUT* ..) to work, part I: Obviously
+	 ;; we need *TRACE-OUTPUT* bound.
+	 (not (boundp '*trace-output*))
+	 (cannot-/show "*TRACE-OUTPUT* isn't bound. (Try /SHOW0.)")
+	 t)
+	(;; protection against /SHOW too early in cold init for
+	 ;; (FORMAT *TRACE-OUTPUT* ..) to work, part II: In a virtuoso
+	 ;; display of name mnemonicity, *READTABLE* is used by the
+	 ;; printer to decide which case convention to use when
+	 ;; writing symbols, so we need it bound.
+	 (not (boundp '*readtable*))
+	 (cannot-/show "*READTABLE* isn't bound. (Try /SHOW0.)")
+	 t)
+	(;; more protection against /SHOW too early in cold init, part III
+	 (not (boundp '*/show*))
+	 (cannot-/show "*/SHOW* isn't bound. (Try initializing it earlier.)")
+	 t)
+	(;; ordinary, healthy reason to suppress /SHOW, no error
+	 ;; output needed
+	 (not */show*)
+	 t)
+	(t
+	 ;; Let the /SHOW go on.
+	 nil)))
+
+;;; shorthand for a common idiom in output statements used in
+;;; debugging: (/SHOW "Case 2:" X Y) becomes a pretty-printed version
+;;; of (FORMAT .. "~&/Case 2: X=~S Y=~S~%" X Y), conditional on */SHOW*.
 (defmacro /show (&rest xlist)
   #!-sb-show (declare (ignore xlist))
   #!+sb-show
@@ -62,24 +105,11 @@
 	    (format-rest (reverse format-reverse-rest)))
 	`(locally
 	   (declare (optimize (speed 1) (space 2) (safety 3)))
-	   ;; For /SHOW to work, we need *TRACE-OUTPUT* of course, but
-	   ;; also *READTABLE* (used by the printer to decide what
-	   ;; case convention to use when outputting symbols).
-	   (if (every #'boundp '(*trace-output* *readtable*))
-	       (when */show*
-		 (format *trace-output*
-			 ,format-string
-			 #+ansi-cl (list ,@format-rest)
-			 #-ansi-cl ,@format-rest)) ; for CLISP (CLTL1-ish)
-	       #+sb-xc-host (error "can't /SHOW, unbound vars")
-	       ;; We end up in this situation when we execute /SHOW
-	       ;; too early in cold init. That happens often enough
-	       ;; that it's really annoying for it to cause a hard
-	       ;; failure -- which at that point is hard to recover
-	       ;; from -- instead of just diagnostic output.
-	       #-sb-xc-host (sb!sys:%primitive
-			     print
-			     "/(can't /SHOW, unbound vars)"))
+	   (unless (suppress-/show-p)
+	     (format *trace-output*
+		     ,format-string
+		     #+ansi-cl (list ,@format-rest)
+		     #-ansi-cl ,@format-rest)) ; for CLISP (CLTL1-ish)
 	   (values))))))
 
 ;;; a disabled-at-compile-time /SHOW, implemented as a macro instead

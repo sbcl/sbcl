@@ -1,4 +1,5 @@
-;;;; descriptions of DEFSTRUCTs which are to be handled before any others
+;;;; descriptions of ordinary (non-ALTERNATE-METACLASS) DEFSTRUCTs
+;;;; which are to be handled before any others
 
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
@@ -9,18 +10,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(;; Define the STRUCTURE-OBJECT class as a subclass of
- ;; INSTANCE. This has to be handled early because the design of the
- ;; DEFSTRUCT system, dating back to pre-1999 CMU CL, requires that
- ;; STRUCTURE-OBJECT be the first DEFSTRUCT executed.
- ;;
- ;; (The #|DEF|# here is to help find this definition with lexical search.)
- (#|def|# (structure-object (:alternate-metaclass sb!kernel:instance)
-			    (:copier nil))
-  ;; (There are no slots.)
-  )
-
- ;; The target ALIEN-VALUE class must be defined early in the cross-compiler
+(;; The target ALIEN-VALUE class must be defined early in the cross-compiler
  ;; build sequence in order to set up superclass relationships involving it.
  ;;
  ;; FIXME: Since this definition refers to SB!ALIEN:ALIEN-TYPE, which is also
@@ -31,5 +21,5 @@
  ;;
  ;; (The #|DEF|# here is to help find this definition with lexical search.)
  (#|def|# (sb!alien-internals:alien-value)
-  (sap (required-argument) :type sb!sys:system-area-pointer)
-  (type (required-argument) :type sb!alien::alien-type)))
+  (sap (missing-arg) :type sb!sys:system-area-pointer)
+  (type (missing-arg) :type sb!alien::alien-type)))

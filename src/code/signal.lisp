@@ -77,9 +77,9 @@
 	    (:constructor make-unix-signal (%name %number))
 	    (:copier nil))
   ;; signal keyword (e.g. :SIGINT for the Unix SIGINT signal)
-  (%name   (required-argument) :type keyword :read-only t)
+  (%name   (missing-arg) :type keyword :read-only t)
   ;; signal number
-  (%number (required-argument) :type integer :read-only t))
+  (%number (missing-arg) :type integer :read-only t))
 
 ;;; list of all defined UNIX-SIGNALs
 (defvar *unix-signals* nil)

@@ -194,7 +194,7 @@ evaluated expressions.
 	  (inspected-structure-elements object)))
 
 (defmethod inspected-parts ((object function))
-  (let* ((type (sb-kernel:get-type object))
+  (let* ((type (sb-kernel:widetag-of object))
 	 (object (if (= type sb-vm:closure-header-widetag)
 		     (sb-kernel:%closure-fun object)
 		     object)))

@@ -13,8 +13,8 @@
 
 ;;;; type frobbing VOPs
 
-(define-vop (get-lowtag)
-  (:translate get-lowtag)
+(define-vop (lowtag-of)
+  (:translate lowtag-of)
   (:policy :fast-safe)
   (:args (object :scs (any-reg descriptor-reg control-stack)
 		 :target result))
@@ -24,8 +24,8 @@
     (move result object)
     (inst and result lowtag-mask)))
 
-(define-vop (get-type)
-  (:translate get-type)
+(define-vop (widetag-of)
+  (:translate widetag-of)
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg)))
   (:temporary (:sc unsigned-reg :offset eax-offset :to (:result 0)) eax)

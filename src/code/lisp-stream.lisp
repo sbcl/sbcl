@@ -1,4 +1,4 @@
-;;;; the STREAM structure
+;;;; the abstract class LISP-STREAM
 
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
@@ -24,9 +24,11 @@
 (deftype in-buffer-type ()
   `(simple-array (unsigned-byte 8) (,+in-buffer-length+)))
 
+;;; base class for ANSI standard streams (as opposed to the Gray streams
+;;; extension)
 (defstruct (lisp-stream (:constructor nil)
 			(:copier nil))
-  ;; Buffered input.
+  ;; buffered input
   (in-buffer nil :type (or in-buffer-type null))
   (in-index +in-buffer-length+ :type index)	; index into IN-BUFFER
   (in #'ill-in :type function)			; READ-CHAR function

@@ -35,10 +35,10 @@
 (sb!xc:defstruct (package-hashtable (:constructor %make-package-hashtable ())
 				    (:copier nil))
   ;; The g-vector of symbols.
-  ;; FIXME: could just be type SIMPLE-VECTOR, with REQUIRED-ARGUMENT
+  ;; FIXME: could just be type SIMPLE-VECTOR, with REQUIRED-ARG
   (table nil :type (or simple-vector null))
   ;; The i-vector of pname hash values.
-  ;; FIXME: could just be type HASH-VECTOR, with REQUIRED-ARGUMENT
+  ;; FIXME: could just be type HASH-VECTOR, with REQUIRED-ARG
   (hash nil :type (or hash-vector null))
   ;; The total number of entries allowed before resizing.
   ;;
@@ -93,8 +93,8 @@
   ;; packages that use this package
   (%used-by-list () :type list)
   ;; PACKAGE-HASHTABLEs of internal & external symbols
-  (internal-symbols (required-argument) :type package-hashtable)
-  (external-symbols (required-argument) :type package-hashtable)
+  (internal-symbols (missing-arg) :type package-hashtable)
+  (external-symbols (missing-arg) :type package-hashtable)
   ;; shadowing symbols
   (%shadowing-symbols () :type list)
   ;; documentation string for this package

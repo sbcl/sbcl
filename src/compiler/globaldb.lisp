@@ -158,11 +158,11 @@
 				       (type-info-number x)))))
 	    (:copier nil))
   ;; the name of this type
-  (name (required-argument) :type keyword)
+  (name (missing-arg) :type keyword)
   ;; this type's class
-  (class (required-argument) :type class-info)
+  (class (missing-arg) :type class-info)
   ;; a number that uniquely identifies this type (and implicitly its class)
-  (number (required-argument) :type type-number)
+  (number (missing-arg) :type type-number)
   ;; a type specifier which info of this type must satisfy
   (type nil :type t)
   ;; a function called when there is no information of this type
@@ -276,9 +276,9 @@
 ;;; calls to %DEFINE-INFO-TYPE must use the same type number.
 (#+sb-xc-host defmacro
  #-sb-xc-host sb!xc:defmacro
-    define-info-type (&key (class (required-argument))
-			   (type (required-argument))
-			   (type-spec (required-argument))
+    define-info-type (&key (class (missing-arg))
+			   (type (missing-arg))
+			   (type-spec (missing-arg))
 			   default)
   (declare (type keyword class type))
   `(progn
@@ -335,7 +335,7 @@
 		     (:copier nil))
   ;; some string describing what is in this environment, for
   ;; printing/debugging purposes only
-  (name (required-argument) :type string))
+  (name (missing-arg) :type string))
 (def!method print-object ((x info-env) stream)
   (print-unreadable-object (x stream :type t)
     (prin1 (info-env-name x) stream)))
@@ -500,22 +500,20 @@
   (cache-index nil :type (or compact-info-entries-index null))
   ;; hashtable of the names in this environment. If a bucket is
   ;; unused, it is 0.
-  (table (required-argument) :type simple-vector)
+  (table (missing-arg) :type simple-vector)
   ;; an indirection vector parallel to TABLE, translating indices in
   ;; TABLE to the start of the ENTRIES for that name. Unused entries
   ;; are undefined.
-  (index (required-argument)
-	 :type (simple-array compact-info-entries-index (*)))
+  (index (missing-arg) :type (simple-array compact-info-entries-index (*)))
   ;; a vector contining in contiguous ranges the values of for all the
   ;; types of info for each name.
-  (entries (required-argument) :type simple-vector)
+  (entries (missing-arg) :type simple-vector)
   ;; a vector parallel to ENTRIES, indicating the type number for the
   ;; value stored in that location and whether this location is the
   ;; last type of info stored for this name. The type number is in the
   ;; low TYPE-NUMBER-BITS bits, and the next bit is set if this is the
   ;; last entry.
-  (entries-info (required-argument)
-		:type (simple-array compact-info-entry (*))))
+  (entries-info (missing-arg) :type (simple-array compact-info-entry (*))))
 
 (defconstant compact-info-entry-type-mask (ldb (byte type-number-bits 0) -1))
 (defconstant compact-info-entry-last (ash 1 type-number-bits))
@@ -687,7 +685,7 @@
   (cache-types nil :type list)
   ;; vector of alists of alists of the form:
   ;;    ((Name . ((Type-Number . Value) ...) ...)
-  (table (required-argument) :type simple-vector)
+  (table (missing-arg) :type simple-vector)
   ;; the number of distinct names currently in this table. Each name
   ;; may have multiple entries, since there can be many types of info.
   (count 0 :type index)

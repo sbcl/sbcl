@@ -736,15 +736,15 @@
 
 (defstruct (event-info (:copier nil))
   ;; The name of this event.
-  (name (required-argument) :type symbol)
+  (name (missing-arg) :type symbol)
   ;; The string rescribing this event.
-  (description (required-argument) :type string)
+  (description (missing-arg) :type string)
   ;; The name of the variable we stash this in.
-  (var (required-argument) :type symbol)
+  (var (missing-arg) :type symbol)
   ;; The number of times this event has happened.
   (count 0 :type fixnum)
   ;; The level of significance of this event.
-  (level (required-argument) :type unsigned-byte)
+  (level (missing-arg) :type unsigned-byte)
   ;; If true, a function that gets called with the node that the event
   ;; happened to.
   (action nil :type (or function null)))

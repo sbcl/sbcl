@@ -27,7 +27,7 @@
 (defun has-arglist-info-p (fun)
   (declare (type function fun))
   ;; The Lisp-level type FUNCTION can conceal a multitude of sins..
-  (case (sb-kernel:get-type fun)
+  (case (sb-kernel:widetag-of fun)
     ((#.sb-vm:simple-fun-header-widetag #.sb-vm:closure-fun-header-widetag)
       (sb-kernel:%simple-fun-arglist fun))
     (#.sb-vm:closure-header-widetag (has-arglist-info-p

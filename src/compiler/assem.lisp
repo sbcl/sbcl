@@ -150,7 +150,7 @@
 	    (:copier nil))
   ;; The function to envoke to actually emit this instruction. Gets called
   ;; with the segment as its one argument.
-  (emitter (required-argument) :type (or null function))
+  (emitter (missing-arg) :type (or null function))
   ;; The attributes of this instruction.
   (attributes (instruction-attributes) :type sb!c:attributes)
   ;; Number of instructions or cycles of delay before additional

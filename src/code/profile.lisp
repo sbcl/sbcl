@@ -49,11 +49,11 @@
 ;;; closure which implements the encapsulation.
 (defvar *profiled-fun-name->info* (make-hash-table))
 (defstruct (profile-info (:copier nil))
-  (name              (required-argument) :read-only t)
-  (encapsulated-fun  (required-argument) :type function :read-only t)
-  (encapsulation-fun (required-argument) :type function :read-only t)
-  (read-stats-fun    (required-argument) :type function :read-only t)
-  (clear-stats-fun   (required-argument) :type function :read-only t))
+  (name              (missing-arg) :read-only t)
+  (encapsulated-fun  (missing-arg) :type function :read-only t)
+  (encapsulation-fun (missing-arg) :type function :read-only t)
+  (read-stats-fun    (missing-arg) :type function :read-only t)
+  (clear-stats-fun   (missing-arg) :type function :read-only t))
 
 ;;; These variables are used to subtract out the time and consing for
 ;;; recursive and other dynamically nested profiled calls. The total
@@ -85,13 +85,13 @@
 (defstruct (overhead (:copier nil))
   ;; the number of ticks a bare function call takes. This is
   ;; factored into the other overheads, but not used for itself.
-  (call (required-argument) :type single-float :read-only t)
+  (call (missing-arg) :type single-float :read-only t)
   ;; the number of ticks that will be charged to a profiled
   ;; function due to the profiling code
-  (internal (required-argument) :type single-float :read-only t)
+  (internal (missing-arg) :type single-float :read-only t)
   ;; the number of ticks of overhead for profiling that a single
   ;; profiled call adds to the total runtime for the program
-  (total (required-argument) :type single-float :read-only t))
+  (total (missing-arg) :type single-float :read-only t))
 (defvar *overhead*)
 (declaim (type overhead *overhead*))
 (makunbound '*overhead*) ; in case we reload this file when tweaking

@@ -22,6 +22,7 @@
    ARGUMENTS. If the condition is not handled, NIL is returned. If
    (TYPEP condition *BREAK-ON-SIGNALS*) is true, the debugger is invoked
    before any signalling is done."
+  (/noshow0 "entering SIGNAL")
   (let ((condition (coerce-to-condition datum
 					arguments
 					'simple-condition
@@ -30,19 +31,28 @@
     (let ((old-bos *break-on-signals*)
 	  (*break-on-signals* nil))
       (when (typep condition old-bos)
+	(/noshow0 "doing BREAK in because of *BREAK-ON-SIGNALS*")
 	(break "~A~%BREAK was entered because of *BREAK-ON-SIGNALS* (now NIL)."
 	       condition)))
     (loop
-      (unless *handler-clusters* (return))
+      (unless *handler-clusters*
+	(/noshow0 "leaving LOOP because of unbound *HANDLER-CLUSTERS*")
+	(return))
       (let ((cluster (pop *handler-clusters*)))
+	(/noshow0 "got CLUSTER=..")
+	(/nohexstr cluster)
 	(dolist (handler cluster)
+	  (/noshow0 "looking at HANDLER=..")
+	  (/nohexstr handler)
 	  (when (typep condition (car handler))
 	    (funcall (cdr handler) condition)))))
+    
+    (/noshow0 "returning from SIGNAL")
     nil))
 
-;;; COERCE-TO-CONDITION is used in SIGNAL, ERROR, CERROR, WARN, and
-;;; INVOKE-DEBUGGER for parsing the hairy argument conventions into a
-;;; single argument that's directly usable by all the other routines.
+;;; a utility for SIGNAL, ERROR, CERROR, WARN, and INVOKE-DEBUGGER:
+;;; Parse the hairy argument conventions into a single argument that's
+;;; directly usable by all the other routines.
 (defun coerce-to-condition (datum arguments default-type fun-name)
   (cond ((typep datum 'condition)
 	 (if arguments
@@ -78,19 +88,25 @@
 
 (defun error (datum &rest arguments)
   #!+sb-doc
-  "Invoke the signal facility on a condition formed from datum and arguments.
-   If the condition is not handled, the debugger is invoked."
+  "Invoke the signal facility on a condition formed from DATUM and ARGUMENTS.
+  If the condition is not handled, the debugger is invoked."
   (/show0 "entering ERROR, argument list=..")
   (/hexstr arguments)
-  (/show0 "printing ERROR arguments one by one..")
+
+  (/show0 "cold-printing ERROR arguments one by one..")
   #!+sb-show (dolist (argument arguments)
 	       (sb!impl::cold-print argument))
+  (/show0 "done cold-printing ERROR arguments")
+
   (sb!kernel:infinite-error-protect
     (let ((condition (coerce-to-condition datum arguments
 					  'simple-error 'error))
 	  (sb!debug:*stack-top-hint* (maybe-find-stack-top-hint)))
+      (/show0 "done coercing DATUM to CONDITION")
       (let ((sb!debug:*stack-top-hint* nil))
+	(/show0 "signalling CONDITION from within ERROR")
 	(signal condition))
+      (/show0 "done signalling CONDITION within ERROR")
       (invoke-debugger condition))))
 
 (defun cerror (continue-string datum &rest arguments)
@@ -113,7 +129,8 @@
 ;;; like BREAK, but without rebinding *DEBUGGER-HOOK* to NIL, so that
 ;;; we can use it in system code (e.g. in SIGINT handling) without
 ;;; messing up --noprogrammer mode (which works by setting
-;;; *DEBUGGER-HOOK*)
+;;; *DEBUGGER-HOOK*); or for that matter, without messing up ordinary
+;;; applications which try to do similar things with *DEBUGGER-HOOK*
 (defun %break (what &optional (datum "break") &rest arguments)
   (sb!kernel:infinite-error-protect
     (with-simple-restart (continue "Return from ~S." what)
@@ -134,7 +151,7 @@
   "Warn about a situation by signalling a condition formed by DATUM and
    ARGUMENTS. While the condition is being signaled, a MUFFLE-WARNING restart
    exists that causes WARN to immediately return NIL."
-  (/noshow0 "entering WARN")
+  (/show0 "entering WARN")
   ;; KLUDGE: The current cold load initialization logic causes several calls
   ;; to WARN, so we need to be able to handle them without dying. (And calling
   ;; FORMAT or even PRINC in cold load is a good way to die.) Of course, the
@@ -146,18 +163,25 @@
 	#!+sb-show (dolist (argument arguments)
 		     (sb!impl::cold-print argument)))
       (sb!kernel:infinite-error-protect
+       (/show0 "doing COERCE-TO-CONDITION")
        (let ((condition (coerce-to-condition datum arguments
 					     'simple-warning 'warn)))
+	 (/show0 "back from COERCE-TO-CONDITION, doing ENFORCE-TYPE")
 	 (enforce-type condition warning)
+	 (/show0 "back from ENFORCE-TYPE, doing RESTART-CASE MUFFLE-WARNING")
 	 (restart-case (signal condition)
 	   (muffle-warning ()
 	     :report "Skip warning."
 	     (return-from warn nil)))
+	 (/show0 "back from RESTART-CASE MUFFLE-WARNING (i.e. normal return)")
+
 	 (let ((badness (etypecase condition
 			  (style-warning 'style-warning)
 			  (warning 'warning))))
+	   (/show0 "got BADNESS, calling FORMAT")
 	   (format *error-output*
 		   "~&~@<~S: ~3i~:_~A~:>~%"
 		   badness
-		   condition)))))
+		   condition)
+	   (/show0 "back from FORMAT, voila!")))))
   nil)

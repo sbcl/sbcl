@@ -381,10 +381,10 @@
 (def!struct (heap-alien-info
 	     (:make-load-form-fun sb!kernel:just-dump-it-normally))
   ;; The type of this alien.
-  (type (required-argument) :type alien-type)
+  (type (missing-arg) :type alien-type)
   ;; The form to evaluate to produce the SAP pointing to where in the heap
   ;; it is.
-  (sap-form (required-argument)))
+  (sap-form (missing-arg)))
 (def!method print-object ((info heap-alien-info) stream)
   (print-unreadable-object (info stream :type t)
     (funcall (formatter "~S ~S")
@@ -715,7 +715,7 @@
 ;;;; the FLOAT types
 
 (def-alien-type-class (float)
-  (type (required-argument) :type symbol))
+  (type (missing-arg) :type symbol))
 
 (def-alien-type-method (float :unparse) (type)
   (alien-float-type-type type))
@@ -843,8 +843,8 @@
 ;;;; the ARRAY type
 
 (def-alien-type-class (array :include mem-block)
-  (element-type (required-argument) :type alien-type)
-  (dimensions (required-argument) :type list))
+  (element-type (missing-arg) :type alien-type)
+  (dimensions (missing-arg) :type list))
 
 (def-alien-type-translator array (ele-type &rest dims &environment env)
 
@@ -894,8 +894,8 @@
 
 (def!struct (alien-record-field
 	     (:make-load-form-fun sb!kernel:just-dump-it-normally))
-  (name (required-argument) :type symbol)
-  (type (required-argument) :type alien-type)
+  (name (missing-arg) :type symbol)
+  (type (missing-arg) :type alien-type)
   (bits nil :type (or unsigned-byte null))
   (offset 0 :type unsigned-byte))
 (def!method print-object ((field alien-record-field) stream)
@@ -1069,8 +1069,8 @@
 (defvar *values-type-okay* nil)
 
 (def-alien-type-class (fun :include mem-block)
-  (result-type (required-argument) :type alien-type)
-  (arg-types (required-argument) :type list)
+  (result-type (missing-arg) :type alien-type)
+  (arg-types (missing-arg) :type list)
   (stub nil :type (or null function)))
 
 (def-alien-type-translator function (result-type &rest arg-types
@@ -1096,7 +1096,7 @@
 	      (alien-fun-type-arg-types type2))))
 
 (def-alien-type-class (values)
-  (values (required-argument) :type list))
+  (values (missing-arg) :type list))
 
 (def-alien-type-translator values (&rest values &environment env)
   (unless *values-type-okay*
@@ -1128,10 +1128,11 @@
 	     (:constructor make-local-alien-info
 			   (&key type force-to-memory-p)))
   ;; the type of the local alien
-  (type (required-argument) :type alien-type)
-  ;; T if this local alien must be forced into memory. Using the ADDR macro
+  (type (missing-arg) :type alien-type)
+  ;; Must this local alien be forced into memory? Using the ADDR macro
   ;; on a local alien will set this.
-  (force-to-memory-p (or (alien-array-type-p type) (alien-record-type-p type))
+  (force-to-memory-p (or (alien-array-type-p type)
+			 (alien-record-type-p type))
 		     :type (member t nil)))
 (def!method print-object ((info local-alien-info) stream)
   (print-unreadable-object (info stream :type t)

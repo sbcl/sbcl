@@ -9,6 +9,20 @@
 
 (in-package "SB!KERNEL")
 
+;;; (Note that when cross-compiling, SB!XC:TYPEP is interpreted as a
+;;; test that the host Lisp object OBJECT translates to a target SBCL
+;;; type TYPE. This behavior is needed e.g. to test for the validity
+;;; of numeric subtype bounds read when cross-compiling.)
+(defun typep (object type)
+  #!+sb-doc
+  "Is OBJECT of type TYPE?"
+  ;; Actually interpreting types at runtime is done by %TYPEP. The
+  ;; cost of the extra function call here should be negligible
+  ;; compared to the cost of interpreting types. (And the compiler
+  ;; tries hard to optimize away the interpretation of types at
+  ;; runtime, and when it succeeds, we never get here anyway.)
+  (%typep object type))
+
 ;;; the actual TYPEP engine. The compiler only generates calls to this
 ;;; function when it can't figure out anything more intelligent to do.
 (defun %typep (object specifier)
@@ -25,7 +39,14 @@
        ((nil) nil)))
     (numeric-type
      (and (numberp object)
-	  (let ((num (if (complexp object) (realpart object) object)))
+	  (let (;; I think this works because of an invariant of the
+		;; two components of a COMPLEX are always coerced to
+		;; be the same, e.g. (COMPLEX 1.0 3/2) => #C(1.0 1.5).
+		;; Dunno why that holds, though -- ANSI? Python
+		;; tradition? marsh faerie spirits? -- WHN 2001-10-27
+		(num (if (complexp object)
+			 (realpart object)
+			 object)))
 	    (ecase (numeric-type-class type)
 	      (integer (integerp num))
 	      (rational (rationalp num))

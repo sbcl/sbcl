@@ -16,30 +16,29 @@
 (sb!xc:defstruct (hash-table (:constructor %make-hash-table))
   ;; The type of hash table this is. Only used for printing and as
   ;; part of the exported interface.
-  (test (required-argument) :type symbol :read-only t)
+  (test (missing-arg) :type symbol :read-only t)
   ;; The function used to compare two keys. Returns T if they are the
   ;; same and NIL if not.
-  (test-fun (required-argument) :type function :read-only t)
+  (test-fun (missing-arg) :type function :read-only t)
   ;; The function used to compute the hashing of a key. Returns two
   ;; values: the index hashing and T if that might change with the
   ;; next GC.
-  (hash-fun (required-argument) :type function :read-only t)
+  (hash-fun (missing-arg) :type function :read-only t)
   ;; how much to grow the hash table by when it fills up. If an index,
   ;; then add that amount. If a floating point number, then multiply
   ;; it by that.
-  (rehash-size (required-argument) :type (or index (single-float (1.0)))
+  (rehash-size (missing-arg) :type (or index (single-float (1.0)))
 	       :read-only t)
   ;; how full the hash table has to get before we rehash
-  (rehash-threshold (required-argument) :type (single-float (0.0) 1.0)
-		    :read-only t)
+  (rehash-threshold (missing-arg) :type (single-float (0.0) 1.0) :read-only t)
   ;; The number of entries before a rehash, just one less than the
   ;; size of the next-vector, hash-vector, and half the size of the
   ;; kv-vector.
-  (rehash-trigger (required-argument) :type index)
+  (rehash-trigger (missing-arg) :type index)
   ;; The current number of entries in the table.
   (number-entries 0 :type index)
   ;; The Key-Value pair vector.
-  (table (required-argument) :type simple-vector)
+  (table (missing-arg) :type simple-vector)
   ;; True if this is a weak hash table, meaning that key->value
   ;; mappings will disappear if there are no other references to the
   ;; key. Note: this only matters if the hash function indicates that
@@ -54,12 +53,11 @@
   (next-free-kv 0 :type index)
   ;; The index vector. This may be larger than the hash size to help
   ;; reduce collisions.
-  (index-vector (required-argument)
-		:type (simple-array (unsigned-byte 32) (*)))
+  (index-vector (missing-arg) :type (simple-array (unsigned-byte 32) (*)))
   ;; This table parallels the KV vector, and is used to chain together
   ;; the hash buckets, the free list, and the values needing rehash, a
   ;; slot will only ever be in one of these lists.
-  (next-vector (required-argument) :type (simple-array (unsigned-byte 32) (*)))
+  (next-vector (missing-arg) :type (simple-array (unsigned-byte 32) (*)))
   ;; This table parallels the KV table, and can be used to store the
   ;; hash associated with the key, saving recalculation. Could be
   ;; useful for EQL, and EQUAL hash tables. This table is not needed

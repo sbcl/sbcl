@@ -28,7 +28,7 @@
 				      s))))
 	    (:copier nil))
   ;; the stream we dump to
-  (stream (required-argument) :type stream)
+  (stream (missing-arg) :type stream)
   ;; hashtables we use to keep track of dumped constants so that we
   ;; can get them from the table rather than dumping them again. The
   ;; EQUAL-TABLE is used for lists and strings, and the EQ-TABLE is
@@ -72,11 +72,11 @@
 ;;; This structure holds information about a circularity.
 (defstruct (circularity (:copier nil))
   ;; the kind of modification to make to create circularity
-  (type (required-argument) :type (member :rplaca :rplacd :svset :struct-set))
+  (type (missing-arg) :type (member :rplaca :rplacd :svset :struct-set))
   ;; the object containing circularity
   object
   ;; index in object for circularity
-  (index (required-argument) :type index)
+  (index (missing-arg) :type index)
   ;; the object to be stored at INDEX in OBJECT. This is that the key
   ;; that we were using when we discovered the circularity.
   value

@@ -236,7 +236,7 @@
   ;; disassembly functions
   (prefilter nil :type (or null function))
   (labeller nil :type (or null function))
-  (printer (required-argument) :type (or null function))
+  (printer (missing-arg) :type (or null function))
   (control nil :type (or null function))
 
   ;; instructions that are the same as this instruction but with more
@@ -259,7 +259,7 @@
 (defstruct (inst-space-choice (:conc-name ischoice-)
                               (:copier nil))
   (common-id dchunk-zero :type dchunk)  ; applies to *parent's* mask
-  (subspace (required-argument) :type (or inst-space instruction)))
+  (subspace (missing-arg) :type (or inst-space instruction)))
 
 ;;;; These are the kind of values we can compute for an argument, and
 ;;;; how to compute them. The :CHECKER functions make sure that a given
@@ -269,8 +269,8 @@
 
 (defstruct (arg-form-kind (:copier nil))
   (names nil :type list)
-  (producer (required-argument) :type function)
-  (checker (required-argument) :type function))
+  (producer (missing-arg) :type function)
+  (checker (missing-arg) :type function))
 
 (defun arg-form-kind-or-lose (kind)
   (or (getf *arg-form-kinds* kind)
@@ -1006,7 +1006,7 @@
 				  args
 				  &key
 				  constraint
-				  (stem (required-argument)))
+				  (stem (missing-arg)))
                                  &body defun-maker-forms)
   (let ((cache-var (gensym))
         (constraint-var (gensym)))

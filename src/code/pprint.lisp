@@ -14,10 +14,10 @@
 ;;;; pretty streams
 
 ;;; There are three different units for measuring character positions:
-;;;  COLUMN - offset (if characters) from the start of the current line.
-;;;  INDEX - index into the output buffer.
-;;;  POSN - some position in the stream of characters cycling through
-;;;	     the output buffer.
+;;;  COLUMN - offset (if characters) from the start of the current line
+;;;  INDEX  - index into the output buffer
+;;;  POSN   - some position in the stream of characters cycling through
+;;;	      the output buffer
 (deftype column ()
   '(and fixnum unsigned-byte))
 ;;; The INDEX type is picked up from the kernel package.
@@ -35,7 +35,7 @@
 			  (:constructor make-pretty-stream (target))
 			  (:copier nil))
   ;; Where the output is going to finally go.
-  (target (required-argument) :type stream)
+  (target (missing-arg) :type stream)
   ;; Line length we should format to. Cached here so we don't have to keep
   ;; extracting it from the target stream.
   (line-length (or *print-right-margin*
@@ -282,7 +282,7 @@
 
 (defstruct (newline (:include section-start)
 		    (:copier nil))
-  (kind (required-argument)
+  (kind (missing-arg)
 	:type (member :linear :fill :miser :literal :mandatory)))
 
 (defun enqueue-newline (stream kind)
@@ -298,7 +298,7 @@
 
 (defstruct (indentation (:include queued-op)
 			(:copier nil))
-  (kind (required-argument) :type (member :block :current))
+  (kind (missing-arg) :type (member :block :current))
   (amount 0 :type fixnum))
 
 (defun enqueue-indent (stream kind amount)
@@ -789,20 +789,20 @@
 (defvar *building-initial-table* nil)
 
 (defstruct (pprint-dispatch-entry (:copier nil))
-  ;; The type specifier for this entry.
-  (type (required-argument) :type t)
-  ;; A function to test to see whether an object is of this time. Pretty must
-  ;; just (lambda (obj) (typep object type)) except that we handle the
-  ;; CONS type specially so that (cons (member foo)) works. We don't
-  ;; bother computing this for entries in the CONS hash table, because
-  ;; we don't need it.
+  ;; the type specifier for this entry
+  (type (missing-arg) :type t)
+  ;; a function to test to see whether an object is of this time.
+  ;; Pretty must just (LAMBDA (OBJ) (TYPEP OBJECT TYPE)) except that
+  ;; we handle the CONS type specially so that (CONS (MEMBER FOO))
+  ;; works. We don't bother computing this for entries in the CONS
+  ;; hash table, because we don't need it.
   (test-fn nil :type (or function null))
-  ;; The priority for this guy.
+  ;; the priority for this guy
   (priority 0 :type real)
   ;; T iff one of the original entries.
   (initial-p *building-initial-table* :type (member t nil))
-  ;; And the associated function.
-  (function (required-argument) :type function))
+  ;; and the associated function
+  (function (missing-arg) :type function))
 (def!method print-object ((entry pprint-dispatch-entry) stream)
   (print-unreadable-object (entry stream :type t)
     (format stream "type=~S, priority=~S~@[ [initial]~]"

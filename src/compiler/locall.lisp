@@ -283,7 +283,6 @@
 
 (defun local-call-analyze-until-done (clambdas)
   (loop
-   (/show "at head of LOCAL-CALL-ANALYZE-UNTIL-DONE loop")
    (let ((did-something nil))
      (dolist (clambda clambdas)
        (let* ((component (block-component (node-block (lambda-bind clambda))))
