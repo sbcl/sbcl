@@ -896,7 +896,7 @@
 ;;; macro, we just wrap a THE around the expansion.
 (defun process-type-decl (decl res vars)
   (declare (list decl vars) (type lexenv res))
-  (let ((type (specifier-type (first decl))))
+  (let ((type (compiler-specifier-type (first decl))))
     (collect ((restr nil cons)
 	      (new-vars nil cons))
       (dolist (var-name (rest decl))
@@ -944,7 +944,7 @@
 ;;; functions.
 (defun process-ftype-decl (spec res names fvars)
   (declare (list spec names fvars) (type lexenv res))
-  (let ((type (specifier-type spec)))
+  (let ((type (compiler-specifier-type spec)))
     (collect ((res nil cons))
       (dolist (name names)
 	(let ((found (find name fvars

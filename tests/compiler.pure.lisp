@@ -168,3 +168,12 @@
 ;;; "(LEAF-HAS-SOURCE-NAME-P LEAF)")
 (assert (= (funcall (eval `(lambda (x) (funcall ,(lambda (y) (+ y 3)) x))) 14)
 	   17))
+
+;;; bug 181: bad type specifier dropped compiler into debugger
+(assert (list (compile nil '(lambda (x)
+                             (declare (type (0) x))
+                             x))))
+
+(let ((f (compile nil '(lambda (x)
+                        (make-array 1 :element-type '(0))))))
+  (assert (null (ignore-errors (funcall f)))))

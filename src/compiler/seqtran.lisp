@@ -93,7 +93,7 @@
 		 `(sequence-of-checked-length-given-type ,bare
 							 result-type-arg))
 		(t
-		 (let ((result-ctype (specifier-type result-type)))
+		 (let ((result-ctype (ir1-transform-specifier-type result-type)))
 		   (if (array-type-p result-ctype)
 		       (let* ((dims (array-type-dimensions result-ctype))
 			      (dim (first dims)))

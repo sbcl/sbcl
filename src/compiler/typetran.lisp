@@ -81,7 +81,7 @@
     (give-up-ir1-transform))
   (ir1-transform-type-predicate
    object
-   (specifier-type (continuation-value type))))
+   (ir1-transform-specifier-type (continuation-value type))))
 
 ;;; This is the IR1 transform for simple type predicates. It checks
 ;;; whether the single argument is known to (not) be of the
@@ -492,8 +492,12 @@
   ;; source transform another chance, so it all works out OK, in a
   ;; weird roundabout way. -- WHN 2001-03-18
   (if (and (consp spec) (eq (car spec) 'quote))
-      (let ((type (specifier-type (cadr spec))))
-	(or (let ((pred (cdr (assoc type *backend-type-predicates*
+      (let ((type (careful-specifier-type (cadr spec))))
+	(or (when (not type)
+              (compiler-warn "illegal type specifier for TYPEP: ~S"
+                             (cadr spec))
+              `(%typep ,object ,spec))
+            (let ((pred (cdr (assoc type *backend-type-predicates*
 				    :test #'type=))))
 	      (when pred `(,pred ,object)))
 	    (typecase type
@@ -528,7 +532,7 @@
 (deftransform coerce ((x type) (* *) *)
   (unless (constant-continuation-p type)
     (give-up-ir1-transform))
-  (let ((tspec (specifier-type (continuation-value type))))
+  (let ((tspec (ir1-transform-specifier-type (continuation-value type))))
     (if (csubtypep (continuation-type x) tspec)
 	'x
 	;; Note: The THE here makes sure that specifiers like
@@ -536,7 +540,7 @@
 	`(the ,(continuation-value type)
 	   ,(cond
 	     ((csubtypep tspec (specifier-type 'double-float))
-	      '(%double-float x))	
+	      '(%double-float x))
 	     ;; FIXME: #!+long-float (t ,(error "LONG-FLOAT case needed"))
 	     ((csubtypep tspec (specifier-type 'float))
 	      '(%single-float x))

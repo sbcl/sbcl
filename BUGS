@@ -999,18 +999,6 @@ WORKAROUND:
     (defun bug178alternative (x)
       (funcall (the nil x)))
 
-181: "bad type specifier drops compiler into debugger"
-  Compiling 
-    (in-package :cl-user)
-    (defun bar (x)
-      (declare (type 0 x))
-      (cons x x))
-  signals 
-    bad thing to be a type specifier: 0
-  which seems fine, but also enters the debugger (instead of having
-  the compiler handle the error, convert it into a COMPILER-ERROR, and
-  continue compiling) which seems wrong.
-
 183: "IEEE floating point issues"
   Even where floating point handling is being dealt with relatively
   well (as of sbcl-0.7.5, on sparc/sunos and alpha; see bug #146), the

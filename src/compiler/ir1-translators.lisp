@@ -720,7 +720,7 @@
 ;;; many branches there are going to be.
 (defun ir1ize-the-or-values (type cont lexenv place)
   (declare (type continuation cont) (type lexenv lexenv))
-  (let* ((ctype (if (typep type 'ctype) type (values-specifier-type type)))
+  (let* ((ctype (if (typep type 'ctype) type (compiler-values-specifier-type type)))
 	 (old-type (or (lexenv-find cont type-restrictions)
 		       *wild-type*))
 	 (intersects (values-types-equal-or-intersect old-type ctype))
@@ -747,7 +747,7 @@
 ;;; this didn't seem to expand into an assertion, at least for ALIEN
 ;;; values. Check that SBCL doesn't have this problem.
 (def-ir1-translator the ((type value) start cont)
-  (with-continuation-type-assertion (cont (values-specifier-type type)
+  (with-continuation-type-assertion (cont (compiler-values-specifier-type type)
                                           "in THE declaration")
     (ir1-convert start cont value)))
 
@@ -762,7 +762,7 @@
 (def-ir1-translator truly-the ((type value) start cont)
   #!+sb-doc
   (declare (inline member))
-  (let ((type (values-specifier-type type))
+  (let ((type (compiler-values-specifier-type type))
 	(old (find-uses cont)))
     (ir1-convert start cont value)
     (do-uses (use cont)

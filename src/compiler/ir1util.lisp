@@ -1378,6 +1378,29 @@
 	  (funcall warn-fun "Lisp error during ~A:~%~A" context condition)
 	  (return-from careful-call (values nil nil))))))
    t))
+
+;;; Variations of SPECIFIER-TYPE for parsing possibly wrong
+;;; specifiers.
+(macrolet
+    ((deffrob (basic careful compiler transform)
+       `(progn
+          (defun ,careful (specifier)
+            (handler-case (,basic specifier)
+              (simple-error (condition)
+                (values nil (list* (simple-condition-format-control condition)
+                                   (simple-condition-format-arguments condition))))))
+          (defun ,compiler (specifier)
+            (multiple-value-bind (type error-args) (,careful specifier)
+              (or type
+                  (apply #'compiler-error error-args))))
+          (defun ,transform (specifier)
+            (multiple-value-bind (type error-args) (,careful specifier)
+              (or type
+                  (apply #'give-up-ir1-transform
+                         error-args)))))))
+  (deffrob specifier-type careful-specifier-type compiler-specifier-type ir1-transform-specifier-type)
+  (deffrob values-specifier-type careful-values-specifier-type compiler-values-specifier-type ir1-transform-values-specifier-type))
+
 
 ;;;; utilities used at run-time for parsing &KEY args in IR1
 

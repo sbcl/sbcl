@@ -253,6 +253,6 @@
     (declare (type combination call))
     (let ((cont (nth (1- n) (combination-args call))))
       (when (and cont (constant-continuation-p cont))
-	(specifier-type (continuation-value cont))))))
+	(careful-specifier-type (continuation-value cont))))))
 
 (/show0 "knownfun.lisp end of file")

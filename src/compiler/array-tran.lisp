@@ -126,23 +126,24 @@
   (let ((simple (and (unsupplied-or-nil adjustable)
 		     (unsupplied-or-nil displaced-to)
 		     (unsupplied-or-nil fill-pointer))))
-    (specifier-type
-     `(,(if simple 'simple-array 'array)
-       ,(cond ((not element-type) t)
-	      ((constant-continuation-p element-type)
-	       (continuation-value element-type))
-	      (t
-	       '*))
-       ,(cond ((not simple)
-	       '*)
-	      ((constant-continuation-p dims)
-	       (let ((val (continuation-value dims)))
-		 (if (listp val) val (list val))))
-	      ((csubtypep (continuation-type dims)
-			  (specifier-type 'integer))
-	       '(*))
-	      (t
-	       '*))))))
+    (or (careful-specifier-type
+         `(,(if simple 'simple-array 'array)
+            ,(cond ((not element-type) t)
+                   ((constant-continuation-p element-type)
+                    (continuation-value element-type))
+                   (t
+                    '*))
+            ,(cond ((not simple)
+                    '*)
+                   ((constant-continuation-p dims)
+                    (let ((val (continuation-value dims)))
+                      (if (listp val) val (list val))))
+                   ((csubtypep (continuation-type dims)
+                               (specifier-type 'integer))
+                    '(*))
+                   (t
+                    '*))))
+        (specifier-type 'array))))
 
 ;;; Complex array operations should assert that their array argument
 ;;; is complex.  In SBCL, vectors with fill-pointers are complex.
@@ -267,7 +268,7 @@
 			 "ELEMENT-TYPE is not constant."))
 		       (t
 			(continuation-value element-type))))
-	 (eltype-type (specifier-type eltype))
+	 (eltype-type (ir1-transform-specifier-type eltype))
 	 (saetp (find-if (lambda (saetp)
 			   (csubtypep eltype-type (saetp-ctype saetp)))
 			 *specialized-array-element-type-properties*))
@@ -279,7 +280,7 @@
 
     (unless saetp
       (give-up-ir1-transform "ELEMENT-TYPE not found in *SAETP*: ~S" eltype))
-    
+
     (cond ((or (null initial-element)
 	       (and (constant-continuation-p initial-element)
 		    (eql (continuation-value initial-element)
@@ -307,7 +308,7 @@
 		 (%data-vector-and-index array 0)
 	       (fill vector initial-element))
 	     array)))))
-			 
+
 ;;; The integer type restriction on the length ensures that it will be
 ;;; a vector. The lack of :ADJUSTABLE, :FILL-POINTER, and
 ;;; :DISPLACED-TO keywords ensures that it will be simple; the lack of
@@ -325,7 +326,7 @@
 		  (continuation-value length)
 		  '*))
 	 (result-type-spec `(simple-array ,eltype (,len)))
-	 (eltype-type (specifier-type eltype))
+	 (eltype-type (ir1-transform-specifier-type eltype))
 	 (saetp (find-if (lambda (saetp)
 			   (csubtypep eltype-type (saetp-ctype saetp)))
 			 *specialized-array-element-type-properties*)))
