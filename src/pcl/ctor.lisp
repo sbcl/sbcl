@@ -462,13 +462,14 @@
 	finally
 	  (return (values around before (first primary) (reverse after)))))
 
-;;; Return a form initializing instance and class slots of an object
-;;; costructed by CTOR.  The variable .SLOTS. is assumed to bound to
-;;; the instance's slot vector.  BEFORE-METHOD-P T means
-;;; before-methods will be called, which means that 1) other code will
-;;; initialize instance slots to +SLOT-UNBOUND+ before the
-;;; before-methods are run, and that we have to check if these
-;;; before-methods have set slots.
+;;; Return as multiple values bindings for default initialization
+;;; arguments, variable names, defaulting initargs and a body for
+;;; initializing instance and class slots of an object costructed by
+;;; CTOR.  The variable .SLOTS. is assumed to bound to the instance's
+;;; slot vector.  BEFORE-METHOD-P T means before-methods will be
+;;; called, which means that 1) other code will initialize instance
+;;; slots to +SLOT-UNBOUND+ before the before-methods are run, and
+;;; that we have to check if these before-methods have set slots.
 (defun slot-init-forms (ctor before-method-p)
   (let* ((class (ctor-class ctor))
 	 (initargs (ctor-initargs ctor))
@@ -598,14 +599,9 @@
 		  collect var into vars
 		  collect `(,var (funcall ,initfn)) into bindings
 		  finally (return (values vars bindings)))
-          ;; FIXME: adjust comment above!
           (values bindings vars (nreverse defaulting-initargs)
                   `(,@(delete nil instance-init-forms)
                     ,@class-init-forms)))))))
-#|	  `(let ,bindings
-	     (declare (ignorable ,@vars))
-	     ,@(delete nil instance-init-forms)
-	     ,@class-init-forms))))))|#
 
 ;;; Return an alist of lists (KEY LOCATION ...) telling, for each
 ;;; key in INITKEYS, which locations the initarg initializes.
