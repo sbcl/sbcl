@@ -1,9 +1,8 @@
 #!/bin/sh
 
 # Create a binary distribution. (make.sh should be run first to create
-# the various binary files, and make-doc.sh, or possibly some other 
-# DocBook-to-HTML converter, should also be run to create the 
-# HTML version of the documentation.)
+# the various binary files, and make-doc.sh should also be run to
+# create the HTML version of the documentation.)
 
 # (Before sbcl-0.6.10, this was run in the sbcl/ directory and created
 # a tar file with no directory prefixes. Since sbcl-0.6.10, we've

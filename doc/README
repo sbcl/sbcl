@@ -3,11 +3,9 @@ I say? Help with documentation might not be refused.:-)
 
 There is a Unix man page, sbcl.1.
 
-There is a user manual in DocBook format, in user-manual.sgml. (In
+There is a user manual in texinfo format, in doc/manual/. (In
 binary distributions, the compiled-into-HTML translations are also
-included.) Several free software packages are available to compile
-DocBook into HTML or other formats. The commands to use 'jade' to
-translate the manual into HTML are in make-doc.sh.
+included.) 
 
 Much of the documentation for supported extensions is in their Lisp
 doc strings. For example, to find out how to use the SAVE-LISP-AND-DIE

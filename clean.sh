@@ -13,16 +13,9 @@
 # this script (including "gmake clean" in the src/runtime directory)
 # several times in a row without failure.. so we leave the output/
 # directory in place.)
-rm -rf obj/* output/* src/runtime/genesis/ doc/user-manual \
-  doc/user-manual.junk doc/DBTOHTML_OUTPUT_DIR*
-# (The doc/user-manual.junk and doc/DBTOHTML_OUTPUT_DIR* directories
-# are created by the Cygnus db2html script when it formats the the
-# user manual, and since this db2html script is the one which is
-# currently used to format the manual for the standard binary
-# distribution, we automatically clean up after it here in the 
-# standard clean.sh file.)
+rm -rf obj/* output/* src/runtime/genesis/
 
-# Ensure we know GNUMAKE
+# Ensure that we know GNUMAKE.
 . ./find-gnumake.sh
 find_gnumake
 
@@ -38,6 +31,7 @@ for d in tools-for-build; do
     $GNUMAKE -I ../src/runtime -s clean
     cd $original_pwd > /dev/null
 done
+( cd ./doc ; sh ./clean.sh )
 
 # Within all directories, remove things which don't look like source
 # files. Some explanations:
@@ -50,8 +44,6 @@ done
 #     created by running GENESIS
 #   Config, target
 #     architecture-dependent or OS-dependent symlinks
-#   *.htm, *.html
-#     probably machine-generated translation of DocBook (*.sgml) files
 #   core
 #     probably a Unix core dump -- not part of the sources anyway
 #   *.o, *.so, *.lib, *.nm, a.out
@@ -66,7 +58,8 @@ done
 #   .#*, *.orig, .*.orig, *.rej
 #     rubbish left behind by CVS updates
 #   *.htm, *.html
-#     The system doc sources are SGML, any HTML is
+#     The system doc sources are mostly texinfo, plus various odds 
+#     and ends like docstrings embedded in .lisp sources; any HTML is
 #     automatically-generated output.
 #   depend
 #     made by "make depend" (or "gmake depend" or some such thing)
@@ -110,5 +103,3 @@ find . \( \
 	-name 'tags' -o \
 	-name 'test-passed' -o \
 	-name 'local-target-features.lisp-expr' \) -print | xargs rm -f
-
-cd ./doc && sh ./clean.sh
