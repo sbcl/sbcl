@@ -62,6 +62,6 @@ depend: ${C_SRCS} sbcl.h
 	$(CC) ${DEPEND_FLAGS} ${CFLAGS} ${CPPFLAGS}  ${C_SRCS} > depend.tmp
 	mv -f depend.tmp depend
 
-# By including this file, we cause GNU to automatically make depend if
-# it can't find it or it is out of date
+# By including this file, we cause GNU make to automatically "make depend"
+# if it can't find it or it is out of date.
 include depend

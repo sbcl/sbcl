@@ -935,31 +935,31 @@
 		 (continuation-use (basic-combination-fun call))
 		 call))
 	       ((not leaf))
-	       ((or (info :function :source-transform (leaf-source-name leaf))
-		    (and info
-			 (ir1-attributep (fun-info-attributes info)
-					 predicate)
-			 (let ((dest (continuation-dest (node-cont call))))
-			   (and dest (not (if-p dest))))))
-		(when (and (leaf-has-source-name-p leaf)
-			   ;; FIXME: This SYMBOLP is part of a literal
-			   ;; translation of a test in the old CMU CL
-			   ;; source, and it's not quite clear what
-			   ;; the old source meant. Did it mean "has a
-			   ;; valid name"? Or did it mean "is an
-			   ;; ordinary function name, not a SETF
-			   ;; function"? Either way, the old CMU CL
-			   ;; code probably didn't deal with SETF
-			   ;; functions correctly, and neither does
-			   ;; this new SBCL code, and that should be fixed.
-			   (symbolp (leaf-source-name leaf)))
-		  (let ((dummies (make-gensym-list (length
-						    (combination-args call)))))
-		    (transform-call call
-				    `(lambda ,dummies
-				       (,(leaf-source-name leaf)
-					,@dummies))
-				    (leaf-source-name leaf))))))))))
+	       ((and (leaf-has-source-name-p leaf)
+                     (or (info :function :source-transform (leaf-source-name leaf))
+                         (and info
+                              (ir1-attributep (fun-info-attributes info)
+                                              predicate)
+                              (let ((dest (continuation-dest (node-cont call))))
+                                (and dest (not (if-p dest)))))))
+                ;; FIXME: This SYMBOLP is part of a literal
+                ;; translation of a test in the old CMU CL
+                ;; source, and it's not quite clear what
+                ;; the old source meant. Did it mean "has a
+                ;; valid name"? Or did it mean "is an
+                ;; ordinary function name, not a SETF
+                ;; function"? Either way, the old CMU CL
+                ;; code probably didn't deal with SETF
+                ;; functions correctly, and neither does
+                ;; this new SBCL code, and that should be fixed.
+		(when (symbolp (leaf-source-name leaf))
+                  (let ((dummies (make-gensym-list
+                                  (length (combination-args call)))))
+                    (transform-call call
+                                    `(lambda ,dummies
+                                      (,(leaf-source-name leaf)
+                                       ,@dummies))
+                                    (leaf-source-name leaf))))))))))
   (values))
 
 ;;;; known function optimization

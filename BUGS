@@ -1350,9 +1350,6 @@ WORKAROUND:
   and LONG-FLOAT left out of the union, this type is equal to REAL.
   So it'd be better just to say "This is not a REAL".
 
-196: "confusing error message for unREAL second arg to ATAN"
-  (fixed in sbcl-0.7.7.18)
-
 197: "failed AVER on compiling or evaluating function constants"
   (reported by Antonio Martinez sbcl-devel 2002-09-12)
     When compiling or evaluating function constants, such as in

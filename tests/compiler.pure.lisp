@@ -162,3 +162,9 @@
 (assert (ignore-errors (eval '(lambda (&key (c #\c)) "foo"))))
 (assert (null (ignore-errors (eval '(lambda (&key ((#\c #\c) #\c)) "foo")))))
 (assert (ignore-errors (eval '(lambda (&key ((:c cbyanyothername) #\c)) "foo"))))
+
+;;; As reported and fixed by Antonio Martinez-Shotton sbcl-devel
+;;; 2002-09-12, this failed in sbcl-0.7.7.23. (with failed AVER
+;;; "(LEAF-HAS-SOURCE-NAME-P LEAF)")
+(assert (= (funcall (eval `(lambda (x) (funcall ,(lambda (y) (+ y 3)) x))) 14)
+	   17))
