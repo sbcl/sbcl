@@ -77,9 +77,9 @@ values"))
   
 (defmethod socket-accept ((socket socket))
   (let ((sockaddr (make-sockaddr-for socket)))
-    (sb-ext::with-pointers-preserved (sockaddr)
+    (sb-sys:with-pinned-objects (sockaddr)
       (let ((fd (sockint::accept (socket-file-descriptor socket)
-				 (sockint::array-data-address sickint)
+				 (sockint::array-data-address sockaddr)
 				 (size-of-sockaddr socket))))
 	(apply #'values
 	       (if (= fd -1)

@@ -57,14 +57,14 @@ Code for options that not every system has should be conditionalised:
     `(progn
       (export ',lisp-name)
       (defun ,lisp-name (socket &aux (fd (socket-file-descriptor socket)))
-	(sb-sys:without-gcing
-	 (let ((buf (make-array sockint::size-of-int
-				:element-type '(unsigned-byte 8)
-				:initial-element 0)))
-	   (if (= -1 (sockint::getsockopt
-		      fd ,find-level ,number (sockint::array-data-address buf) ,size))
-	       (socket-error "getsockopt")
-	       (,mangle-return buf ,size)))))
+	(let ((buf (make-array sockint::size-of-int
+			       :element-type '(unsigned-byte 8)
+			       :initial-element 0)))
+	  (sb-sys:with-pinned-objects (buf)
+	    (if (= -1 (sockint::getsockopt
+		       fd ,find-level ,number (sockint::array-data-address buf) ,size))
+		(socket-error "getsockopt")
+		(,mangle-return buf ,size)))))
       (defun (setf ,lisp-name) (new-val socket
 				&aux (fd (socket-file-descriptor socket)))
 	(if (= -1
