@@ -143,7 +143,7 @@
 ;;; which time all calls to alloc() would have needed a syscall to
 ;;; mask signals for the duration.  Now we have pseudoatomic there's
 ;;; no need for that overhead.  Still, inline alloc would be a neat
-;;; addition someday
+;;; addition someday (except see below).
 
 (defun allocation-dynamic-extent (alloc-tn size)
   (inst sub esp-tn size)
@@ -228,7 +228,13 @@
 (defun allocation (alloc-tn size &optional inline dynamic-extent)
   (cond
     (dynamic-extent (allocation-dynamic-extent alloc-tn size))
-    ((or (null inline) (policy inline (>= speed space)))
+    ;; FIXME: for reasons unknown, inline allocation is a speed win on
+    ;; non-P4s, and a speed loss on P4s (and probably other such
+    ;; high-spec high-cache machines).  :INLINE-ALLOCATION-IS-GOOD is
+    ;; a bit of a KLUDGE, really.  -- CSR, 2004-08-05 (following
+    ;; observations made by ASF and Juho Snellman)
+    ((and (member :inline-allocation-is-good *backend-subfeatures*)
+	  (or (null inline) (policy inline (>= speed space))))
      (allocation-inline alloc-tn size))
     (t (allocation-notinline alloc-tn size)))
   (values))
