@@ -566,10 +566,10 @@
 ;;; function names), we make do with symbol frobbing.
 (defun %sf (kind name format &optional access)
   (flet ((find-strategy-function (&rest args)
-            (ignore-errors
-              (fdefinition (find-symbol (format nil "~{~A~^-~}"
-                                                (mapcar #'string args))
-                                        #.*package*)))))
+	   (let ((name
+		  (find-symbol (format nil "~{~A~^-~}" (mapcar #'string args))
+			       #.*package*)))
+	     (if (fboundp name) (fdefinition name) nil))))
     (or (find-strategy-function kind name format access)
         (find-strategy-function kind name format)
         (find-strategy-function kind name :ef access)
