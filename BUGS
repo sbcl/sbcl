@@ -956,6 +956,20 @@ Error in function C::GET-LAMBDA-TO-COMPILE:
   non-compound forms (like the bare symbol COUNT, in his example)
   here.
 
+104:
+  (DESCRIBE 'SB-ALIEN:DEF-ALIEN-TYPE) reports the macro argument list
+  incorrectly:
+	DEF-ALIEN-TYPE is
+	  an external symbol
+	  in #<PACKAGE "SB-ALIEN">.
+	Macro-function: #<FUNCTION "DEF!MACRO DEF-ALIEN-TYPE" {19F4A39}>
+	  Macro arguments:  (#:whole-470 #:environment-471)
+	  On Sat, May 26, 2001 09:45:57 AM CDT it was compiled from:
+	  /usr/stuff/sbcl/src/code/host-alieneval.lisp
+	    Created: Monday, March 12, 2001 07:47:43 AM CST
+
+105:
+  (DESCRIBE 'STREAM-READ-BYTE)
 
 KNOWN BUGS RELATED TO THE IR1 INTERPRETER
 

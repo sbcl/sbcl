@@ -565,15 +565,15 @@ scavenge_interrupt_context(os_context_t *context)
 
 void scavenge_interrupt_contexts(void)
 {
-	int i, index;
-	os_context_t *context;
+    int i, index;
+    os_context_t *context;
 
-	index = fixnum_value(SymbolValue(FREE_INTERRUPT_CONTEXT_INDEX));
+    index = fixnum_value(SymbolValue(FREE_INTERRUPT_CONTEXT_INDEX));
 
-	for (i = 0; i < index; i++) {
-		context = lisp_interrupt_contexts[i];
-		scavenge_interrupt_context(context); 
-	}
+    for (i = 0; i < index; i++) {
+	context = lisp_interrupt_contexts[i];
+	scavenge_interrupt_context(context); 
+    }
 }
 
 

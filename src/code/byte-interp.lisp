@@ -232,7 +232,7 @@
 	    (value (cdr x)))
 	(setf (svref res value)
 	      (if (and (consp key) (eq (car key) '%fdefinition-marker%))
-		  (sb!impl::fdefinition-object (cdr key) t)
+		  (fdefinition-object (cdr key) t)
 		  key))))
     res))
 

@@ -195,7 +195,7 @@
 
   (declare (ignore start count))
 
-  (load-symbol-value catch sb!impl::*current-catch-block*)
+  (load-symbol-value catch *current-catch-block*)
 
   LOOP
 
@@ -230,7 +230,7 @@
     (inst or block block)		; check for NULL pointer
     (inst jmp :z error))
 
-  (load-symbol-value uwp sb!impl::*current-unwind-protect-block*)
+  (load-symbol-value uwp *current-unwind-protect-block*)
 
   ;; Does *cuwpb* match value stored in argument cuwp slot?
   (inst cmp uwp
@@ -238,13 +238,13 @@
   ;; If a match, return to context in arg block.
   (inst jmp :e do-exit)
 
-  ;; Not a match - return to *current-unwind-protect-block* context.
+  ;; Not a match - return to *CURRENT-UNWIND-PROTECT-BLOCK* context.
   ;; Important! Must save (and return) the arg 'block' for later use!!
   (move edx-tn block)
   (move block uwp)
   ;; Set next unwind protect context.
   (loadw uwp uwp unwind-block-current-uwp-slot)
-  (store-symbol-value uwp sb!impl::*current-unwind-protect-block*)
+  (store-symbol-value uwp *current-unwind-protect-block*)
 
   DO-EXIT
 

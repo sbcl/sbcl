@@ -1272,6 +1272,8 @@
 
 ;;; This is kind of like FILE-POSITION, but is an internal hack used
 ;;; by the filesys stuff to get and set the file name.
+;;;
+;;; FIXME: misleading name, screwy interface
 (defun file-name (stream &optional new-name)
   (when (typep stream 'fd-stream)
       (cond (new-name

@@ -1,6 +1,6 @@
 ;;;; FOP definitions
 
-(in-package "SB!IMPL")
+(in-package "SB!FASL")
 
 ;;; Define NAME as a fasl operation, with op-code FOP-CODE. PUSHP
 ;;; describes what the body does to the fop stack:
@@ -192,7 +192,7 @@
 		   (n-size (gensym))
 		   (n-buffer (gensym)))
 	       `(define-fop (,name ,code)
-		  (prepare-for-fast-read-byte *fasl-file*
+		  (prepare-for-fast-read-byte *fasl-input-stream*
 		    (let ((,n-package ,package)
 			  (,n-size (fast-read-u-integer ,name-size)))
 		      (when (> ,n-size *load-symbol-buffer-size*)
@@ -201,7 +201,7 @@
 						 (* ,n-size 2)))))
 		      (done-with-fast-read-byte)
 		      (let ((,n-buffer *load-symbol-buffer*))
-			(read-string-as-bytes *fasl-file*
+			(read-string-as-bytes *fasl-input-stream*
 					      ,n-buffer
 					      ,n-size)
 			(push-fop-table (intern* ,n-buffer
@@ -249,7 +249,7 @@
 		    (fop-uninterned-small-symbol-save 13)
   (let* ((arg (clone-arg))
 	 (res (make-string arg)))
-    (read-string-as-bytes *fasl-file* res)
+    (read-string-as-bytes *fasl-input-stream* res)
     (push-fop-table (make-symbol res))))
 
 (define-fop (fop-package 14)
@@ -257,12 +257,12 @@
 
 ;;;; fops for loading numbers
 
-;;; Load a signed integer LENGTH bytes long from *FASL-FILE*.
+;;; Load a signed integer LENGTH bytes long from *FASL-INPUT-STREAM*.
 (defun load-s-integer (length)
   (declare (fixnum length))
   ;; #+cmu (declare (optimize (inhibit-warnings 2)))
   (do* ((index length (1- index))
-	(byte 0 (read-byte *fasl-file*))
+	(byte 0 (read-byte *fasl-input-stream*))
 	(result 0 (+ result (ash byte bits)))
 	(bits 0 (+ bits 8)))
        ((= index 0)
@@ -275,13 +275,13 @@
   (load-s-integer (clone-arg)))
 
 (define-fop (fop-word-integer 35)
-  (prepare-for-fast-read-byte *fasl-file*
+  (prepare-for-fast-read-byte *fasl-input-stream*
     (prog1
      (fast-read-s-integer 4)
      (done-with-fast-read-byte))))
 
 (define-fop (fop-byte-integer 36)
-  (prepare-for-fast-read-byte *fasl-file*
+  (prepare-for-fast-read-byte *fasl-input-stream*
     (prog1
      (fast-read-s-integer 1)
      (done-with-fast-read-byte))))
@@ -295,14 +295,14 @@
     (%make-complex (pop-stack) im)))
 
 (define-fop (fop-complex-single-float 72)
-  (prepare-for-fast-read-byte *fasl-file*
+  (prepare-for-fast-read-byte *fasl-input-stream*
     (prog1
 	(complex (make-single-float (fast-read-s-integer 4))
 		 (make-single-float (fast-read-s-integer 4)))
       (done-with-fast-read-byte))))
 
 (define-fop (fop-complex-double-float 73)
-  (prepare-for-fast-read-byte *fasl-file*
+  (prepare-for-fast-read-byte *fasl-input-stream*
     (prog1
 	(let* ((re-lo (fast-read-u-integer 4))
 	       (re-hi (fast-read-u-integer 4))
@@ -315,7 +315,7 @@
 
 #!+long-float
 (define-fop (fop-complex-long-float 67)
-  (prepare-for-fast-read-byte *fasl-file*
+  (prepare-for-fast-read-byte *fasl-input-stream*
     (prog1
 	(let* ((re-lo (fast-read-u-integer 4))
 	       #!+sparc (re-mid (fast-read-u-integer 4))
@@ -331,12 +331,12 @@
       (done-with-fast-read-byte))))
 
 (define-fop (fop-single-float 46)
-  (prepare-for-fast-read-byte *fasl-file*
+  (prepare-for-fast-read-byte *fasl-input-stream*
     (prog1 (make-single-float (fast-read-s-integer 4))
       (done-with-fast-read-byte))))
 
 (define-fop (fop-double-float 47)
-  (prepare-for-fast-read-byte *fasl-file*
+  (prepare-for-fast-read-byte *fasl-input-stream*
     (prog1
 	(let ((lo (fast-read-u-integer 4)))
 	  (make-double-float (fast-read-s-integer 4) lo))
@@ -344,7 +344,7 @@
 
 #!+long-float
 (define-fop (fop-long-float 52)
-  (prepare-for-fast-read-byte *fasl-file*
+  (prepare-for-fast-read-byte *fasl-input-stream*
     (prog1
 	(let ((lo (fast-read-u-integer 4))
 	      #!+sparc (mid (fast-read-u-integer 4))
@@ -394,7 +394,7 @@
 (define-cloned-fops (fop-string 37) (fop-small-string 38)
   (let* ((arg (clone-arg))
 	 (res (make-string arg)))
-    (read-string-as-bytes *fasl-file* res)
+    (read-string-as-bytes *fasl-input-stream* res)
     res))
 
 (define-cloned-fops (fop-vector 39) (fop-small-vector 40)
@@ -424,20 +424,20 @@
 (define-fop (fop-single-float-vector 84)
   (let* ((length (read-arg 4))
 	 (result (make-array length :element-type 'single-float)))
-    (read-n-bytes *fasl-file* result 0 (* length sb!vm:word-bytes))
+    (read-n-bytes *fasl-input-stream* result 0 (* length sb!vm:word-bytes))
     result))
 
 (define-fop (fop-double-float-vector 85)
   (let* ((length (read-arg 4))
 	 (result (make-array length :element-type 'double-float)))
-    (read-n-bytes *fasl-file* result 0 (* length sb!vm:word-bytes 2))
+    (read-n-bytes *fasl-input-stream* result 0 (* length sb!vm:word-bytes 2))
     result))
 
 #!+long-float
 (define-fop (fop-long-float-vector 88)
   (let* ((length (read-arg 4))
 	 (result (make-array length :element-type 'long-float)))
-    (read-n-bytes *fasl-file*
+    (read-n-bytes *fasl-input-stream*
 		  result
 		  0
 		  (* length sb!vm:word-bytes #!+x86 3 #!+sparc 4))
@@ -446,20 +446,20 @@
 (define-fop (fop-complex-single-float-vector 86)
   (let* ((length (read-arg 4))
 	 (result (make-array length :element-type '(complex single-float))))
-    (read-n-bytes *fasl-file* result 0 (* length sb!vm:word-bytes 2))
+    (read-n-bytes *fasl-input-stream* result 0 (* length sb!vm:word-bytes 2))
     result))
 
 (define-fop (fop-complex-double-float-vector 87)
   (let* ((length (read-arg 4))
 	 (result (make-array length :element-type '(complex double-float))))
-    (read-n-bytes *fasl-file* result 0 (* length sb!vm:word-bytes 2 2))
+    (read-n-bytes *fasl-input-stream* result 0 (* length sb!vm:word-bytes 2 2))
     result))
 
 #!+long-float
 (define-fop (fop-complex-long-float-vector 89)
   (let* ((length (read-arg 4))
 	 (result (make-array length :element-type '(complex long-float))))
-    (read-n-bytes *fasl-file* result 0
+    (read-n-bytes *fasl-input-stream* result 0
 		  (* length sb!vm:word-bytes #!+x86 3 #!+sparc 4 2))
     result))
 
@@ -468,7 +468,7 @@
 ;;; This must be packed according to the local byte-ordering, allowing us to
 ;;; directly read the bits.
 (define-fop (fop-int-vector 43)
-  (prepare-for-fast-read-byte *fasl-file*
+  (prepare-for-fast-read-byte *fasl-input-stream*
     (let* ((len (fast-read-u-integer 4))
 	   (size (fast-read-byte))
 	   (res (case size
@@ -482,7 +482,7 @@
 			    size)))))
       (declare (type index len))
       (done-with-fast-read-byte)
-      (read-n-bytes *fasl-file*
+      (read-n-bytes *fasl-input-stream*
 		    res
 		    0
 		    (ceiling (the index (* size len))
@@ -492,7 +492,7 @@
 ;;; This is the same as FOP-INT-VECTOR, except this is for signed
 ;;; SIMPLE-ARRAYs.
 (define-fop (fop-signed-int-vector 50)
-  (prepare-for-fast-read-byte *fasl-file*
+  (prepare-for-fast-read-byte *fasl-input-stream*
     (let* ((len (fast-read-u-integer 4))
 	   (size (fast-read-byte))
 	   (res (case size
@@ -504,7 +504,7 @@
 			    size)))))
       (declare (type index len))
       (done-with-fast-read-byte)
-      (read-n-bytes *fasl-file*
+      (read-n-bytes *fasl-input-stream*
 		    res
 		    0
  		    (ceiling (the index (* (if (= size 30)
@@ -661,9 +661,9 @@
 	    (format t "~S defined~%" res))
     res))
 
-;;;; Some Dylan fops used to live here. By 1 November 1998 the code was
-;;;; sufficiently stale that the functions it called were no longer defined,
-;;;; so I (William Harold Newman) deleted it.
+;;;; Some Dylan FOPs used to live here. By 1 November 1998 the code
+;;;; was sufficiently stale that the functions it called were no
+;;;; longer defined, so I (William Harold Newman) deleted it.
 ;;;;
 ;;;; In case someone in the future is trying to make sense of FOP layout,
 ;;;; it might be worth recording that the Dylan FOPs were
@@ -680,7 +680,7 @@
 	 (code-object (pop-stack))
 	 (len (read-arg 1))
 	 (sym (make-string len)))
-    (read-n-bytes *fasl-file* sym 0 len)
+    (read-n-bytes *fasl-input-stream* sym 0 len)
     (sb!vm:fixup-code-object code-object
 			     (read-arg 4)
 			     (foreign-symbol-address-as-integer sym)

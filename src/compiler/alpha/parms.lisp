@@ -169,12 +169,11 @@
     sb!impl::*!initial-fdefn-objects*
 
     ;; Functions that the C code needs to call
-    sb!impl::%initial-function
-    sb!impl::maybe-gc
+    maybe-gc
     sb!kernel::internal-error
     sb!di::handle-breakpoint
     sb!di::handle-function-end-breakpoint
-    sb!impl::fdefinition-object
+    fdefinition-object
 
     ;; free Pointers
     *read-only-space-free-pointer*
@@ -182,12 +181,12 @@
     *initial-dynamic-space-free-pointer*
 
     ;; things needed for non-local exit
-    sb!impl::*current-catch-block*
-    sb!impl::*current-unwind-protect-block*
-    sb!c::*eval-stack-top*
+    *current-catch-block*
+    *current-unwind-protect-block*
+    *eval-stack-top*
 
     ;; interrupt handling
-    sb!impl::*free-interrupt-context-index*
+    *free-interrupt-context-index*
     sb!unix::*interrupts-enabled*
     sb!unix::*interrupt-pending*))
 

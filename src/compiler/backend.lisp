@@ -23,19 +23,8 @@
 
 ;;;; miscellaneous backend properties
 
-;;; the conventional file extension for fasl files on this architecture,
-;;; e.g. "x86f"
-(defvar *backend-fasl-file-type* nil)
-(declaim (type (or simple-string null) *backend-fasl-file-type*))
-
-;;; implementation and version of fasl files used
-(defvar *backend-fasl-file-implementation* nil)
-(defvar *backend-fasl-file-version* nil)
-(declaim (type (or keyword null) *backend-fasl-file-implementation*))
-(declaim (type (or index null) *backend-fasl-file-version*))
-
-;;; the number of references that a TN must have to offset the overhead of
-;;; saving the TN across a call
+;;; the number of references that a TN must have to offset the
+;;; overhead of saving the TN across a call
 (defvar *backend-register-save-penalty* 0)
 (declaim (type index *backend-register-save-penalty*))
 
@@ -242,8 +231,3 @@
 ;;; the VM support routines
 (defvar *backend-support-routines* (make-vm-support-routines))
 (declaim (type vm-support-routines *backend-support-routines*))
-
-;;;; utilities
-
-(defun backend-byte-fasl-file-implementation ()
-  *backend-byte-order*)

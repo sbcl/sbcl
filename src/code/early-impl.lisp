@@ -11,6 +11,10 @@
 
 ;;; entries in STATIC-SYMBOLS table, references to which can be compiled
 ;;; as though they're special variables
+;;;
+;;; FIXME: These should be listed once and only once, instead of
+;;; listed here and then listed separately (and by now, 2001-06-06,
+;;; slightly differently) elsewhere.
 (declaim (special *posix-argv*
 		  *!initial-fdefn-objects*
 		  *read-only-space-free-pointer*
@@ -18,10 +22,15 @@
 		  sb!vm:*initial-dynamic-space-free-pointer*
 		  *current-catch-block*
 		  *current-unwind-protect-block*
-		  sb!c::*eval-stack-top*
+		  *eval-stack-top*
 		  sb!vm::*alien-stack*
-		  ;; KLUDGE: I happened to notice that these should be #!+X86.
-		  ;; There could easily be others in the list, too.
+		  ;; FIXME: The pseudo-atomic variable stuff should be
+		  ;; conditional on :SB-PSEUDO-ATOMIC-SYMBOLS, which
+		  ;; should be conditional on :X86, instead of the
+		  ;; pseudo-atomic stuff being directly conditional on
+		  ;; :X86. (Note that non-X86 ports mention
+		  ;; pseudo-atomicity too, but they handle it without
+		  ;; messing with special variables.)
 		  #!+x86 *pseudo-atomic-atomic*
 		  #!+x86 *pseudo-atomic-interrupted*
 		  sb!unix::*interrupts-enabled*

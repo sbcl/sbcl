@@ -1418,12 +1418,10 @@ a host-structure or string."
 			  :namestring namestr
 			  :offset (cdadr chunks)))))
 	(parse-host (logical-chunkify namestr start end)))
-      (values host :unspecific
-	      (and (not (equal (directory)'(:absolute)))
-		   (directory))
-	      name type version))))
+      (values host :unspecific (directory) name type version))))
 
-;;; We can't initialize this yet because not all host methods are loaded yet.
+;;; We can't initialize this yet because not all host methods are
+;;; loaded yet.
 (defvar *logical-pathname-defaults*)
 
 (defun logical-pathname (pathspec)

@@ -77,7 +77,7 @@
  #s(sb-cold:package-data
     :name "SB!ASSEM"
     :doc "private: the assembler, used by the compiler"
-    :use ("CL" "SB!INT" "SB!EXT")
+    :use ("CL" "SB!EXT" "SB!INT")
     :export ("ASSEMBLY-UNIT"
 
              "*ASSEM-SCHEDULER-P*"
@@ -142,17 +142,15 @@
     ;; package for this? But it seems like a fairly low priority.)
     ;; (Probably the same considerations also explain why BIGNUM is
     ;;in the USE list.)
-    :use ("CL" "SB!ALIEN-INTERNALS" "SB!ALIEN" "SB!BIGNUM"
-          #!+sb-dyncount "SB-DYNCOUNT"
-          "SB!EXT" "SB!INT" "SB!KERNEL" "SB!ASSEM" "SB!SYS")
+    :use ("CL" "SB!ALIEN-INTERNALS" "SB!ALIEN" "SB!ASSEM" "SB!BIGNUM"
+          #!+sb-dyncount "SB-DYNCOUNT" "SB!EXT" "SB!FASL" "SB!INT"
+          "SB!KERNEL" "SB!SYS")
     :reexport ("SLOT" "CODE-INSTRUCTIONS" "FLUSHABLE")
     :export ("%ALIEN-FUNCALL" "%CATCH-BREAKUP" "%CONTINUE-UNWIND" "&MORE"
               "%LISTIFY-REST-ARGS" "%MORE-ARG" "%MORE-ARG-VALUES"
               "%UNWIND-PROTECT-BREAKUP"
 
               "*BACKEND-BYTE-ORDER*" "*BACKEND-DISASSEM-PARAMS*"
-              "*BACKEND-FASL-FILE-IMPLEMENTATION*"
-              "*BACKEND-FASL-FILE-TYPE*" "*BACKEND-FASL-FILE-VERSION*"
               "*BACKEND-INFO-ENVIRONMENT*"
               "*BACKEND-INSTRUCTION-FLAVORS*" "*BACKEND-INSTRUCTION-FORMATS*"
               "*BACKEND-INTERNAL-ERRORS*" "*BACKEND-PAGE-SIZE*"
@@ -165,8 +163,6 @@
               "*CODE-SEGMENT*" 
               "*CONVERTING-FOR-INTERPRETER*"
               "*COUNT-VOP-USAGES*" "*ELSEWHERE*"
-              "*FASL-HEADER-STRING-START-STRING*"
-              "*FASL-HEADER-STRING-STOP-CHAR-CODE*"
               "*SETF-ASSUMED-FBOUNDP*"
               "*SUPPRESS-VALUES-DECLARATION*"
 
@@ -184,7 +180,8 @@
               "CHECK-SIGNED-BYTE-32" "CHECK-SYMBOL" "CHECK-UNSIGNED-BYTE-32"
               "CLOSURE-INIT" "CLOSURE-REF"
               "CODE-CONSTANT-REF" "CODE-CONSTANT-SET" 
-              "COMPILE-FOR-EVAL" "COMPONENT" "COMPONENT-HEADER-LENGTH"
+              "COMPILE-FOR-EVAL" "COMPILER-ERROR"
+              "COMPONENT" "COMPONENT-HEADER-LENGTH"
               "COMPONENT-INFO" "COMPONENT-LIVE-TN" "COMPUTE-FUNCTION"
               "COMPUTE-OLD-NFP" "COPY-MORE-ARG" 
               "CURRENT-BINDING-POINTER" "CURRENT-NFP-TN"
@@ -259,11 +256,9 @@
               "NOTE-NEXT-INSTRUCTION"
               "SET-SLOT"
               "LOCATION-NUMBER"
-              "BYTE-FASL-FILE-VERSION"
               "*COMPONENT-BEING-COMPILED*"
               "BLOCK-NUMBER"
               "BACKEND"
-              "BACKEND-BYTE-FASL-FILE-IMPLEMENTATION"
               "IR2-BLOCK-BLOCK"
               "DISASSEM-BYTE-COMPONENT"
               "FUNCALLABLE-INSTANCE-LEXENV"
@@ -318,13 +313,38 @@
              "IR2-COMPONENT-DYNCOUNT-INFO"
              "DYNCOUNT-INFO" "DYNCOUNT-INFO-P"))
 
+ #s(sb-cold:package-data
+    :name "SB!FASL"
+    :doc "private: stuff related to FASL load/dump logic (and GENESIS)"
+    :use ("CL" "SB!ALIEN" "SB!ASSEM" "SB!BIGNUM" "SB!C" "SB!C-CALL"
+          "SB!EXT" "SB!INT" "SB!KERNEL" "SB!SYS")
+    :export ("*ASSEMBLER-ROUTINES*"
+             "+BACKEND-FASL-FILE-IMPLEMENTATION+"
+             "*BACKEND-FASL-FILE-TYPE*"
+             "CLOSE-FASL-OUTPUT"
+             "DUMP-ASSEMBLER-ROUTINES"
+             "DUMP-OBJECT"
+             "FASL-CONSTANT-ALREADY-DUMPED-P"
+             "+FASL-FILE-VERSION+"
+             "FASL-DUMP-BYTE-COMPONENT"
+             "FASL-DUMP-COLD-LOAD-FORM" "FASL-DUMP-COMPONENT"
+             "FASL-DUMP-LOAD-TIME-VALUE" "FASL-DUMP-LOAD-TIME-VALUE-LAMBDA"
+             "FASL-DUMP-SOURCE-INFO" "FASL-DUMP-TOP-LEVEL-LAMBDA-CALL"
+             "FASL-NOTE-HANDLE-FOR-CONSTANT"
+             "FASL-OUTPUT" "FASL-OUTPUT-P" "FASL-OUTPUT-STREAM"
+             "FASL-VALIDATE-STRUCTURE"
+             "*!LOAD-TIME-VALUES*"
+             "LOAD-TYPE-PREDICATE"
+             "OPEN-FASL-OUTPUT"
+             "*!REVERSED-COLD-TOPLEVELS*"
+             "*STATIC-FOREIGN-SYMBOLS*"))
+
  ;; This package is a grab bag for things which used to be internal
  ;; symbols in package COMMON-LISP. Lots of these symbols are accessed
  ;; with explicit SB!IMPL:: prefixes in the code. It would be nice to
  ;; reduce the use of this practice, so if symbols from here which are
  ;; accessed that way are found to belong more appropriately in
- ;; an existing package (e.g. KERNEL or SYS or EXT) or a new package
- ;; (e.g. something to collect together all the FOP stuff), I
+ ;; an existing package (e.g. KERNEL or SYS or EXT or FASL), I
  ;; (WHN 19990223) encourage maintainers to move them there..
  ;;
  ;; ..except that it's getting so big and crowded that maybe it
@@ -333,7 +353,7 @@
     :name "SB!IMPL"
     :doc "private: a grab bag of implementation details"
     :use ("CL" "SB!ALIEN" "SB!BIGNUM" "SB!C-CALL" "SB!DEBUG" "SB!EXT"
-          "SB!GRAY" "SB!INT" "SB!KERNEL" "SB!SYS"))
+          "SB!FASL" "SB!GRAY" "SB!INT" "SB!KERNEL" "SB!SYS"))
 
  #s(sb-cold:package-data
     :name "SB!DEBUG"
@@ -588,14 +608,14 @@ like *STACK-TOP-HINT*"
  #s(sb-cold:package-data
     :name "SB!FORMAT"
     :doc "private: implementation of FORMAT and friends"
-    :use ("CL" "SB!KERNEL" "SB!EXT" "SB!INT"))
+    :use ("CL" "SB!EXT" "SB!INT" "SB!KERNEL"))
 
  #s(sb-cold:package-data
     :name "SB!GRAY"
     :doc
 "public: an implementation of the stream-definition-by-user
 Lisp extension proposal by David N. Gray"
-    :use ("CL" "SB!KERNEL" "SB!EXT" "SB!INT")
+    :use ("CL" "SB!EXT" "SB!INT" "SB!KERNEL")
     :export ("FUNDAMENTAL-BINARY-STREAM" "FUNDAMENTAL-BINARY-INPUT-STREAM"
              "FUNDAMENTAL-BINARY-OUTPUT-STREAM" "FUNDAMENTAL-CHARACTER-STREAM"
              "FUNDAMENTAL-CHARACTER-INPUT-STREAM"
@@ -616,7 +636,7 @@ Lisp extension proposal by David N. Gray"
 "private: miscellaneous unsupported extensions to the ANSI spec. Most of
 the stuff in here originated in CMU CL's EXTENSIONS package and is
 retained, possibly temporariliy, because it might be used internally."
-    :use ("CL" "SB!ALIEN" "SB!C-CALL" "SB!SYS" "SB!GRAY")
+    :use ("CL" "SB!ALIEN" "SB!C-CALL" "SB!GRAY" "SB!FASL" "SB!SYS")
     :export ("*AFTER-SAVE-INITIALIZATIONS*" "*BEFORE-SAVE-INITIALIZATIONS*"
 
              "*ALL-MODIFIER-NAMES*"
@@ -668,7 +688,7 @@ retained, possibly temporariliy, because it might be used internally."
              ;; miscellaneous non-standard but handy user-level functions..
              "ASSQ" "DELQ" "MEMQ" "POSQ" "NEQ"
              "%FIND-PACKAGE-OR-LOSE" "FIND-UNDELETED-PACKAGE-OR-LOSE"
-             "SANE-PACKAGE"
+             "SANE-PACKAGE" "SANE-DEFAULT-PATHNAME-DEFAULTS"
              "CIRCULAR-LIST-P"
              "SWAPPED-ARGS-FUN"
              "ANY/TYPE" "EVERY/TYPE"
@@ -807,6 +827,21 @@ retained, possibly temporariliy, because it might be used internally."
              ;; a sort of quasi unbound tag for use in hash tables
              "+EMPTY-HT-SLOT+"
 
+             ;; low-level i/o stuff
+             "DONE-WITH-FAST-READ-BYTE"
+             "DONE-WITH-FAST-READ-CHAR"
+             "FAST-READ-BYTE"
+             "FAST-READ-BYTE-REFILL"
+             "FAST-READ-CHAR"
+             "FAST-READ-CHAR-REFILL"
+             "FAST-READ-S-INTEGER"
+             "FAST-READ-U-INTEGER"
+             "FAST-READ-VARIABLE-U-INTEGER"
+             "FILE-NAME"
+             "INTERN*"
+             "PREPARE-FOR-FAST-READ-BYTE"
+             "PREPARE-FOR-FAST-READ-CHAR"
+
              ;; not used any more, I think -- WHN 19991206
              #+nil
              ("SERVE-BUTTON-PRESS"
@@ -842,7 +877,7 @@ retained, possibly temporariliy, because it might be used internally."
 integration' (said CMU CL architecture.tex) and that probably was and
 is a good idea, but see SB-SYS for blurring of boundaries."
     :use ("CL" "SB!ALIEN" "SB!ALIEN-INTERNALS" "SB!BIGNUM"
-          "SB!EXT" "SB!INT" "SB!SYS" "SB!GRAY")
+          "SB!EXT" "SB!FASL" "SB!INT" "SB!SYS" "SB!GRAY")
     :import-from (("SB!C-CALL" "VOID"))
     :reexport ("DEF!STRUCT" "DEF!MACRO" "VOID" "WEAK-POINTER-P")
     :export ("%ACOS" "%ACOSH" "%ARRAY-AVAILABLE-ELEMENTS"
@@ -955,11 +990,12 @@ is a good idea, but see SB-SYS for blurring of boundaries."
              "DOUBLE-FLOAT-P" "FLOAT-WAIT"
              "DYNAMIC-SPACE-FREE-POINTER"
              "!DEFUN-FROM-COLLECTED-COLD-INIT-FORMS"
-             "ERROR-NUMBER-OR-LOSE" "FDOCUMENTATION" "FILENAME"
+             "ERROR-NUMBER-OR-LOSE" "FDEFINITION-OBJECT"
+             "FDOCUMENTATION" "FILENAME"
              "FIND-AND-INIT-OR-CHECK-LAYOUT"
              "FLOAT-EXPONENT" "FLOAT-FORMAT-DIGITS" "FLOAT-FORMAT-NAME"
              "FLOAT-FORMAT-MAX" "FLOATING-POINT-EXCEPTION"
-             "FORM" "FUNCALLABLE-INSTANCE-P"
+             "FORM" "*FREE-INTERRUPT-CONTEXT-INDEX*" "FUNCALLABLE-INSTANCE-P"
              "FUNCTION-CODE-HEADER" "FUNCTION-DOC"
              "FUNCTION-TYPE"
              "FUNCTION-TYPE-ALLOWP"
@@ -976,7 +1012,11 @@ is a good idea, but see SB-SYS for blurring of boundaries."
              "HAIRY-TYPE-CHECK-TEMPLATE-NAME" "HAIRY-TYPE-SPECIFIER"
              "HANDLE-CIRCULARITY" "IGNORE-IT"
              "ILL-BIN" "ILL-BOUT" "ILL-IN" "ILL-OUT"
-             "INDEX-TOO-LARGE-ERROR" "INTEGER-DECODE-DOUBLE-FLOAT"
+             "INDEX-TOO-LARGE-ERROR"
+             "*!INITIAL-ASSEMBLER-ROUTINES*"
+             "*!INITIAL-FDEFN-OBJECTS*" "*!INITIAL-FOREIGN-SYMBOLS*"
+             "*!INITIAL-LAYOUTS*" "*!INITIAL-SYMBOLS*"
+             "INTEGER-DECODE-DOUBLE-FLOAT"
              "INTEGER-DECODE-LONG-FLOAT" "INTEGER-DECODE-SINGLE-FLOAT"
              "INTERNAL-ERROR" "INTERNAL-TIME"
              "INTERSECTION-TYPE" "INTERSECTION-TYPE-P"
@@ -1078,14 +1118,16 @@ is a good idea, but see SB-SYS for blurring of boundaries."
              "PACKAGE-HASHTABLE-SIZE" "PACKAGE-HASHTABLE-FREE"
              "PACKAGE-INTERNAL-SYMBOLS" "PACKAGE-EXTERNAL-SYMBOLS"
              "PARSE-DEFMACRO" "PARSE-LAMBDA-LIST" "PARSE-UNKNOWN-TYPE"
-             "PARSE-UNKNOWN-TYPE-SPECIFIER"
-             "PATHNAME-DESIGNATOR" "PUNT-PRINT-IF-TOO-LONG"
+             "PARSE-UNKNOWN-TYPE-SPECIFIER" "PATHNAME-DESIGNATOR"
+             #+x86 "*PSEUDO-ATOMIC-ATOMIC*"
+             #+x86 "*PSEUDO-ATOMIC-INTERRUPTED*"
+             "PUNT-PRINT-IF-TOO-LONG"
              "READER-PACKAGE-ERROR"
              #!+gengc "*SAVED-STATE-CHAIN*"
              "SCALE-DOUBLE-FLOAT" "SCALE-LONG-FLOAT"
              "SCALE-SINGLE-FLOAT"
              "SEQUENCE-END" "SEQUENCE-OF-CHECKED-LENGTH-GIVEN-TYPE"
-             "SET-HEADER-DATA" "SHIFT-TOWARDS-END"
+             "SET-ARRAY-HEADER" "SET-HEADER-DATA" "SHIFT-TOWARDS-END"
              "SHIFT-TOWARDS-START" "SHRINK-VECTOR" "SIGNED-BYTE-32-P"
              "SIMPLE-ARRAY-COMPLEX-DOUBLE-FLOAT-P"
              "SIMPLE-ARRAY-COMPLEX-LONG-FLOAT-P"
@@ -1236,9 +1278,6 @@ is a good idea, but see SB-SYS for blurring of boundaries."
              "!POLICY-COLD-INIT-OR-RESANIFY" "!VM-TYPE-COLD-INIT"
              "!BACKQ-COLD-INIT" "!SHARPM-COLD-INIT"
              "!CLASS-FINALIZE" "GC-COLD-INIT-OR-REINIT"
-
-             ;; These belong in an "SB!LOAD" package someday.
-             "*STATIC-FOREIGN-SYMBOLS*" "*ASSEMBLER-ROUTINES*"
 
              ;; Note: These are out of lexicographical order because in CMU CL
              ;; they were defined as internal symbols in package "CL"
@@ -1542,7 +1581,7 @@ no guarantees of interface stability."
              "EPROTONOSUPPORT" "UNIX-SIGBLOCK" "SIGIO" "ENOMEM" "SIGEMT"
              "EFAULT" "ENODEV" "EIO" "EVICEERR" "ETXTBSY" "EWOULDBLOCK"
              "EAGAIN" "EDESTADDRREQ" "ENOEXEC" "ENETUNREACH" "ENOTEMPTY"
-             "UNIX-MAYBE-PREPEND-CURRENT-DIRECTORY" "ENFILE"
+             "ENFILE"
              "SIGTTOU" "EEXIST" "SIGPROF" "SIGSTOP" "ENETRESET" "SIGURG"
              "ENOBUFS" "EPROCLIM" "EROFS" "ETOOMANYREFS" "UNIX-FILE-KIND"
              "ELOCAL" "UNIX-SIGSETMASK" "EREMOTE" "ESOCKTNOSUPPORT"
@@ -1601,8 +1640,9 @@ no guarantees of interface stability."
     :doc
 "internal: the default place to hide information about the hardware and data
 structure representations"
-    :use ("CL" "SB!ALIEN" "SB!ALIEN-INTERNALS" "SB!ASSEM"
-          "SB!C" "SB!C-CALL" "SB!EXT" "SB!INT" "SB!KERNEL" "SB!SYS" "SB!UNIX")
+    :use ("CL" "SB!ALIEN" "SB!ALIEN-INTERNALS" "SB!ASSEM" "SB!C"
+          "SB!C-CALL" "SB!EXT" "SB!FASL" "SB!INT" "SB!KERNEL"
+          "SB!SYS" "SB!UNIX")
     :export ("*ASSEMBLY-UNIT-LENGTH*" "*PRIMITIVE-OBJECTS*"
              "AFTER-BREAKPOINT-TRAP"
              "ANY-REG-SC-NUMBER" "ARRAY-DATA-SLOT" "ARRAY-DIMENSIONS-OFFSET"
@@ -1754,7 +1794,6 @@ structure representations"
 	     #!-gencgc "DYNAMIC-1-SPACE-END" 
              "READ-ONLY-SPACE-START" "READ-ONLY-SPACE-END"
              "TARGET-BYTE-ORDER"
-             "TARGET-FASL-CODE-FORMAT" "TARGET-FASL-FILE-TYPE"
              "TARGET-HEAP-ADDRESS-SPACE" "*TARGET-MOST-NEGATIVE-FIXNUM*"
              "*TARGET-MOST-POSITIVE-FIXNUM*" 
              "STATIC-SPACE-START" "STATIC-SPACE-END"

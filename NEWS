@@ -741,6 +741,8 @@ changes in sbcl-0.6.13 relative to sbcl-0.6.12:
   patch, so that DISASSEMBLE output is much nicer.
 * better error handling in CLOS method combination, thanks to 
   Martin Atzmueller and Pierre Mai
+* Logical pathnames work better, thanks to various fixes and 
+  tests from Dan Barlow.
 * Hash tables can be printed readably, as inspired by CMU CL code
   of Eric Marsden and SBCL code of Martin Atzmueller.
 * a new slam.sh hack to shorten the edit/compile/debug cycle for
@@ -756,6 +758,11 @@ changes in sbcl-0.6.13 relative to sbcl-0.6.12:
   COMPILE-FILE is no longer supported, so that now every function
   gets an entry point, so that block compilation looks a little
   more like the plain vanilla ANSI section 3.2.2.3 scheme.
+* Fasl file version numbers are now independent of the target CPU,
+  since historically most system changes which required version
+  number changes have affected all CPUs equally. Similarly, 
+  the byte fasl file version is now equal to the ordinary
+  fasl file version.
 
 planned incompatible changes in 0.7.x:
 * The debugger prompt sequence now goes "5]", "5[2]", "5[3]", etc.

@@ -239,10 +239,10 @@
 
     ;; functions that the C code needs to call
     sb!impl::!cold-init
-    sb!impl::maybe-gc
+    maybe-gc
     sb!kernel::internal-error
     sb!di::handle-breakpoint
-    sb!impl::fdefinition-object
+    fdefinition-object
 
     ;; free pointers
     ;; 
@@ -255,17 +255,17 @@
     *initial-dynamic-space-free-pointer*
 
     ;; things needed for non-local exit
-    sb!impl::*current-catch-block*
-    sb!impl::*current-unwind-protect-block*
-    sb!c::*eval-stack-top*
+    *current-catch-block*
+    *current-unwind-protect-block*
+    *eval-stack-top*
     sb!vm::*alien-stack*
 
     ;; interrupt handling
-    sb!impl::*pseudo-atomic-atomic*
-    sb!impl::*pseudo-atomic-interrupted*
+    *pseudo-atomic-atomic*
+    *pseudo-atomic-interrupted*
     sb!unix::*interrupts-enabled*
     sb!unix::*interrupt-pending*
-    sb!impl::*free-interrupt-context-index*
+    *free-interrupt-context-index*
 
     sb!vm::*allocation-pointer*
     sb!vm::*binding-stack-pointer*

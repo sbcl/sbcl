@@ -60,30 +60,30 @@
 (defun fixup-code-object (code offset fixup kind)
   (declare (type index offset))
   (flet ((add-fixup (code offset)
-	   ;; Although this could check for and ignore fixups for code
-	   ;; objects in the read-only and static spaces, this should
-	   ;; only be the case when *enable-dynamic-space-code* is
-	   ;; True.
-	   (when sb!impl::*enable-dynamic-space-code*
-	     (incf *num-fixups*)
-	     (let ((fixups (code-header-ref code code-constants-offset)))
-	       (cond ((typep fixups '(simple-array (unsigned-byte 32) (*)))
-		      (let ((new-fixups
-			     (adjust-array fixups (1+ (length fixups))
-					   :element-type '(unsigned-byte 32))))
-			(setf (aref new-fixups (length fixups)) offset)
-			(setf (code-header-ref code code-constants-offset)
-			      new-fixups)))
-		     (t
-		      (unless (or (eq (get-type fixups)
-				      sb!vm:unbound-marker-type)
-				  (zerop fixups))
-			(format t "** Init. code FU = ~S~%" fixups)) ; FIXME
+	   ;; (We check for and ignore fixups for code objects in the
+	   ;; read-only and static spaces. (In the old CMU CL code
+	   ;; this check was conditional on *ENABLE-DYNAMIC-SPACE-CODE*,
+	   ;; but in SBCL relocatable dynamic space code is always in
+	   ;; use, so we always do the check.)
+	   (incf *num-fixups*)
+	   (let ((fixups (code-header-ref code code-constants-offset)))
+	     (cond ((typep fixups '(simple-array (unsigned-byte 32) (*)))
+		    (let ((new-fixups
+			   (adjust-array fixups (1+ (length fixups))
+					 :element-type '(unsigned-byte 32))))
+		      (setf (aref new-fixups (length fixups)) offset)
 		      (setf (code-header-ref code code-constants-offset)
-			    (make-specializable-array
-			     1
-			     :element-type '(unsigned-byte 32)
-			     :initial-element offset))))))))
+			    new-fixups)))
+		   (t
+		    (unless (or (eq (get-type fixups)
+				    sb!vm:unbound-marker-type)
+				(zerop fixups))
+		      (format t "** Init. code FU = ~S~%" fixups)) ; FIXME
+		    (setf (code-header-ref code code-constants-offset)
+			  (make-specializable-array
+			   1
+			   :element-type '(unsigned-byte 32)
+			   :initial-element offset)))))))
     (sb!sys:without-gcing
      (let* ((sap (truly-the system-area-pointer
 			    (sb!kernel:code-instructions code)))

@@ -137,7 +137,7 @@
     (pprint-logical-block (*error-output* nil :per-line-prefix "; ")
        (apply #'compiler-mumble foo))))
 
-(deftype object () '(or fasl-file core-object null))
+(deftype object () '(or fasl-output core-object null))
 
 (defvar *compile-object* nil)
 (declaim (type object *compile-object*))
@@ -461,7 +461,7 @@
 						     *compiler-trace-output*))
 
 	    (etypecase *compile-object*
-	      (fasl-file
+	      (fasl-output
 	       (maybe-mumble "fasl")
 	       (fasl-dump-component component
 				    *code-segment*
@@ -972,7 +972,7 @@
 (defun process-cold-load-form (form path eval)
   (let ((object *compile-object*))
     (etypecase object
-      (fasl-file
+      (fasl-output
        (compile-top-level-lambdas () t)
        (fasl-dump-cold-load-form form object))
       ((or null core-object)
@@ -1048,11 +1048,11 @@
 ;;;;
 ;;;; (See EMIT-MAKE-LOAD-FORM.)
 
-;;; Returns T iff we are currently producing a fasl-file and hence
+;;; Returns T iff we are currently producing a fasl file and hence
 ;;; constants need to be dumped carefully.
 (defun producing-fasl-file ()
   (unless *converting-for-interpreter*
-    (fasl-file-p *compile-object*)))
+    (fasl-output-p *compile-object*)))
 
 ;;; Compile FORM and arrange for it to be called at load-time. Return
 ;;; the dumper handle and our best guess at the type of the object.
@@ -1101,125 +1101,6 @@
       (setf (component-name component) (leaf-name lambda))
       (compile-component component)
       (clear-ir1-info component))))
-
-;;; The entry point for MAKE-LOAD-FORM support. When IR1 conversion
-;;; finds a constant structure, it invokes this to arrange for proper
-;;; dumping. If it turns out that the constant has already been
-;;; dumped, then we don't need to do anything.
-;;;
-;;; If the constant hasn't been dumped, then we check to see whether
-;;; we are in the process of creating it. We detect this by
-;;; maintaining the special *CONSTANTS-BEING-CREATED* as a list of all
-;;; the constants we are in the process of creating. Actually, each
-;;; entry is a list of the constant and any init forms that need to be
-;;; processed on behalf of that constant.
-;;;
-;;; It's not necessarily an error for this to happen. If we are
-;;; processing the init form for some object that showed up *after*
-;;; the original reference to this constant, then we just need to
-;;; defer the processing of that init form. To detect this, we
-;;; maintain *CONSTANTS-CREATED-SINCE-LAST-INIT* as a list of the
-;;; constants created since the last time we started processing an
-;;; init form. If the constant passed to emit-make-load-form shows up
-;;; in this list, then there is a circular chain through creation
-;;; forms, which is an error.
-;;;
-;;; If there is some intervening init form, then we blow out of
-;;; processing it by throwing to the tag PENDING-INIT. The value we
-;;; throw is the entry from *CONSTANTS-BEING-CREATED*. This is so the
-;;; offending init form can be tacked onto the init forms for the
-;;; circular object.
-;;;
-;;; If the constant doesn't show up in *CONSTANTS-BEING-CREATED*, then
-;;; we have to create it. We call MAKE-LOAD-FORM and check to see
-;;; whether the creation form is the magic value
-;;; :JUST-DUMP-IT-NORMALLY. If it is, then we don't do anything. The
-;;; dumper will eventually get its hands on the object and use the
-;;; normal structure dumping noise on it.
-;;;
-;;; Otherwise, we bind *CONSTANTS-BEING-CREATED* and
-;;; *CONSTANTS-CREATED-SINCE- LAST-INIT* and compile the creation form
-;;; much the way LOAD-TIME-VALUE does. When this finishes, we tell the
-;;; dumper to use that result instead whenever it sees this constant.
-;;;
-;;; Now we try to compile the init form. We bind
-;;; *CONSTANTS-CREATED-SINCE- LAST-INIT* to NIL and compile the init
-;;; form (and any init forms that were added because of circularity
-;;; detection). If this works, great. If not, we add the init forms to
-;;; the init forms for the object that caused the problems and let it
-;;; deal with it.
-(defvar *constants-being-created* nil)
-(defvar *constants-created-since-last-init* nil)
-;;; FIXME: Shouldn't these^ variables be bound in LET forms?
-(defun emit-make-load-form (constant)
-  (aver (fasl-file-p *compile-object*))
-  (unless (or (fasl-constant-already-dumped constant *compile-object*)
-	      ;; KLUDGE: This special hack is because I was too lazy
-	      ;; to rework DEF!STRUCT so that the MAKE-LOAD-FORM
-	      ;; function of LAYOUT returns nontrivial forms when
-	      ;; building the cross-compiler but :IGNORE-IT when
-	      ;; cross-compiling or running under the target Lisp. --
-	      ;; WHN 19990914
-	      #+sb-xc-host (typep constant 'layout))
-    (let ((circular-ref (assoc constant *constants-being-created* :test #'eq)))
-      (when circular-ref
-	(when (find constant *constants-created-since-last-init* :test #'eq)
-	  (throw constant t))
-	(throw 'pending-init circular-ref)))
-    (multiple-value-bind (creation-form init-form)
-	(handler-case
-	    (sb!xc:make-load-form constant (make-null-lexenv))
-	  (error (condition)
-		 (compiler-error "(while making load form for ~S)~%~A"
-				 constant
-				 condition)))
-      (case creation-form
-	(:just-dump-it-normally
-	 (fasl-validate-structure constant *compile-object*)
-	 t)
-	(:ignore-it
-	 nil)
-	(t
-	 (compile-top-level-lambdas () t)
-	 (when (fasl-constant-already-dumped constant *compile-object*)
-	   (return-from emit-make-load-form nil))
-	 (let* ((name (let ((*print-level* 1) (*print-length* 2))
-			(with-output-to-string (stream)
-			  (write constant :stream stream))))
-		(info (if init-form
-			  (list constant name init-form)
-			  (list constant))))
-	   (let ((*constants-being-created*
-		  (cons info *constants-being-created*))
-		 (*constants-created-since-last-init*
-		  (cons constant *constants-created-since-last-init*)))
-	     (when
-		 (catch constant
-		   (fasl-note-handle-for-constant
-		    constant
-		    (compile-load-time-value
-		     creation-form
-		     (format nil "creation form for ~A" name))
-		    *compile-object*)
-		   nil)
-	       (compiler-error "circular references in creation form for ~S"
-			       constant)))
-	   (when (cdr info)
-	     (let* ((*constants-created-since-last-init* nil)
-		    (circular-ref
-		     (catch 'pending-init
-		       (loop for (name form) on (cdr info) by #'cddr
-			 collect name into names
-			 collect form into forms
-			 finally
-			 (compile-make-load-form-init-forms
-			  forms
-			  (format nil "init form~:[~;s~] for ~{~A~^, ~}"
-				  (cdr forms) names)))
-		       nil)))
-	       (when circular-ref
-		 (setf (cdr circular-ref)
-		       (append (cdr circular-ref) (cdr info))))))))))))
 
 ;;;; COMPILE-FILE
 
@@ -1256,7 +1137,7 @@
   (declare (type functional tll))
   (let ((object *compile-object*))
     (etypecase object
-      (fasl-file
+      (fasl-output
        (fasl-dump-top-level-lambda-call tll object))
       (core-object
        (core-call-top-level-lambda tll object))
@@ -1419,7 +1300,7 @@
 	(compile-top-level-lambdas () t)
 	(let ((object *compile-object*))
 	  (etypecase object
-	    (fasl-file (fasl-dump-source-info info object))
+	    (fasl-output (fasl-dump-source-info info object))
 	    (core-object (fix-core-source-info info object d-s-info))
 	    (null)))
 	nil))))
@@ -1528,7 +1409,7 @@
 
   (unless (eq external-format :default)
     (error "Non-:DEFAULT EXTERNAL-FORMAT values are not supported."))
-  (let* ((fasl-file nil)
+  (let* ((fasl-output nil)
 	 (output-file-name nil)
 	 (compile-won nil)
 	 (warnings-p nil)
@@ -1550,10 +1431,10 @@
 	    (setq output-file-name
 		  (sb!xc:compile-file-pathname input-file
 					       :output-file output-file))
-	    (setq fasl-file
-		  (open-fasl-file output-file-name
-				  (namestring input-pathname)
-				  (eq *byte-compile* t))))
+	    (setq fasl-output
+		  (open-fasl-output output-file-name
+				    (namestring input-pathname)
+				    (eq *byte-compile* t))))
 	  (when trace-file
 	    (let* ((default-trace-file-pathname
 		     (make-pathname :type "trace" :defaults input-pathname))
@@ -1569,7 +1450,7 @@
 
 	  (when sb!xc:*compile-verbose*
 	    (start-error-output source-info))
-	  (let ((*compile-object* fasl-file)
+	  (let ((*compile-object* fasl-output)
 		dummy)
 	    (multiple-value-setq (dummy warnings-p failure-p)
 	      (sub-compile-file source-info)))
@@ -1577,9 +1458,10 @@
 
       (close-source-info source-info)
 
-      (when fasl-file
-	(close-fasl-file fasl-file (not compile-won))
-	(setq output-file-name (pathname (fasl-file-stream fasl-file)))
+      (when fasl-output
+	(close-fasl-output fasl-output (not compile-won))
+	(setq output-file-name
+	      (pathname (fasl-output-stream fasl-output)))
 	(when (and compile-won sb!xc:*compile-verbose*)
 	  (compiler-mumble "~2&; ~A written~%" (namestring output-file-name))))
 
@@ -1605,18 +1487,7 @@
 ;;; default to the appropriate implementation-defined default type for
 ;;; compiled files.
 (defun cfp-output-file-default (input-file)
-  (let* (;; FIXME: I think the PHYSICALIZE-PATHNAME wrapper here
-	 ;; shouldn't really be necessary. Unfortunately
-	 ;; sbcl-0.6.12.18's MERGE-PATHNAMES doesn't like logical
-	 ;; pathnames very much, and doesn't get good results in
-	 ;; tests/side-effectful-pathnames.sh for (COMPILE-FILE
-	 ;; "TEST:$StudlyCapsStem"), unless I do this. It would be
-	 ;; good to straighten out how MERGE-PATHNAMES is really
-	 ;; supposed to work for logical pathnames, and add a bunch of
-	 ;; test cases to check it, then get rid of this cruft.
-	 (defaults (merge-pathnames (physicalize-pathname (pathname
-							   input-file))
-				    *default-pathname-defaults*))
+  (let* ((defaults (merge-pathnames input-file *default-pathname-defaults*))
 	 (retyped (make-pathname :type *backend-fasl-file-type*
 				 :defaults defaults)))
     retyped))
@@ -1639,3 +1510,124 @@
   "Return a pathname describing what file COMPILE-FILE would write to given
    these arguments."
   (pathname output-file))
+
+;;;; MAKE-LOAD-FORM stuff
+
+;;; The entry point for MAKE-LOAD-FORM support. When IR1 conversion
+;;; finds a constant structure, it invokes this to arrange for proper
+;;; dumping. If it turns out that the constant has already been
+;;; dumped, then we don't need to do anything.
+;;;
+;;; If the constant hasn't been dumped, then we check to see whether
+;;; we are in the process of creating it. We detect this by
+;;; maintaining the special *CONSTANTS-BEING-CREATED* as a list of all
+;;; the constants we are in the process of creating. Actually, each
+;;; entry is a list of the constant and any init forms that need to be
+;;; processed on behalf of that constant.
+;;;
+;;; It's not necessarily an error for this to happen. If we are
+;;; processing the init form for some object that showed up *after*
+;;; the original reference to this constant, then we just need to
+;;; defer the processing of that init form. To detect this, we
+;;; maintain *CONSTANTS-CREATED-SINCE-LAST-INIT* as a list of the
+;;; constants created since the last time we started processing an
+;;; init form. If the constant passed to emit-make-load-form shows up
+;;; in this list, then there is a circular chain through creation
+;;; forms, which is an error.
+;;;
+;;; If there is some intervening init form, then we blow out of
+;;; processing it by throwing to the tag PENDING-INIT. The value we
+;;; throw is the entry from *CONSTANTS-BEING-CREATED*. This is so the
+;;; offending init form can be tacked onto the init forms for the
+;;; circular object.
+;;;
+;;; If the constant doesn't show up in *CONSTANTS-BEING-CREATED*, then
+;;; we have to create it. We call MAKE-LOAD-FORM and check to see
+;;; whether the creation form is the magic value
+;;; :JUST-DUMP-IT-NORMALLY. If it is, then we don't do anything. The
+;;; dumper will eventually get its hands on the object and use the
+;;; normal structure dumping noise on it.
+;;;
+;;; Otherwise, we bind *CONSTANTS-BEING-CREATED* and
+;;; *CONSTANTS-CREATED-SINCE- LAST-INIT* and compile the creation form
+;;; much the way LOAD-TIME-VALUE does. When this finishes, we tell the
+;;; dumper to use that result instead whenever it sees this constant.
+;;;
+;;; Now we try to compile the init form. We bind
+;;; *CONSTANTS-CREATED-SINCE-LAST-INIT* to NIL and compile the init
+;;; form (and any init forms that were added because of circularity
+;;; detection). If this works, great. If not, we add the init forms to
+;;; the init forms for the object that caused the problems and let it
+;;; deal with it.
+(defvar *constants-being-created* nil)
+(defvar *constants-created-since-last-init* nil)
+;;; FIXME: Shouldn't these^ variables be bound in LET forms?
+(defun emit-make-load-form (constant)
+  (aver (fasl-output-p *compile-object*))
+  (unless (or (fasl-constant-already-dumped-p constant *compile-object*)
+	      ;; KLUDGE: This special hack is because I was too lazy
+	      ;; to rework DEF!STRUCT so that the MAKE-LOAD-FORM
+	      ;; function of LAYOUT returns nontrivial forms when
+	      ;; building the cross-compiler but :IGNORE-IT when
+	      ;; cross-compiling or running under the target Lisp. --
+	      ;; WHN 19990914
+	      #+sb-xc-host (typep constant 'layout))
+    (let ((circular-ref (assoc constant *constants-being-created* :test #'eq)))
+      (when circular-ref
+	(when (find constant *constants-created-since-last-init* :test #'eq)
+	  (throw constant t))
+	(throw 'pending-init circular-ref)))
+    (multiple-value-bind (creation-form init-form)
+	(handler-case
+	    (sb!xc:make-load-form constant (make-null-lexenv))
+	  (error (condition)
+		 (compiler-error "(while making load form for ~S)~%~A"
+				 constant
+				 condition)))
+      (case creation-form
+	(:just-dump-it-normally
+	 (fasl-validate-structure constant *compile-object*)
+	 t)
+	(:ignore-it
+	 nil)
+	(t
+	 (compile-top-level-lambdas () t)
+	 (when (fasl-constant-already-dumped-p constant *compile-object*)
+	   (return-from emit-make-load-form nil))
+	 (let* ((name (let ((*print-level* 1) (*print-length* 2))
+			(with-output-to-string (stream)
+			  (write constant :stream stream))))
+		(info (if init-form
+			  (list constant name init-form)
+			  (list constant))))
+	   (let ((*constants-being-created*
+		  (cons info *constants-being-created*))
+		 (*constants-created-since-last-init*
+		  (cons constant *constants-created-since-last-init*)))
+	     (when
+		 (catch constant
+		   (fasl-note-handle-for-constant
+		    constant
+		    (compile-load-time-value
+		     creation-form
+		     (format nil "creation form for ~A" name))
+		    *compile-object*)
+		   nil)
+	       (compiler-error "circular references in creation form for ~S"
+			       constant)))
+	   (when (cdr info)
+	     (let* ((*constants-created-since-last-init* nil)
+		    (circular-ref
+		     (catch 'pending-init
+		       (loop for (name form) on (cdr info) by #'cddr
+			 collect name into names
+			 collect form into forms
+			 finally
+			 (compile-make-load-form-init-forms
+			  forms
+			  (format nil "init form~:[~;s~] for ~{~A~^, ~}"
+				  (cdr forms) names)))
+		       nil)))
+	       (when circular-ref
+		 (setf (cdr circular-ref)
+		       (append (cdr circular-ref) (cdr info))))))))))))

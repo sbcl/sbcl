@@ -1,5 +1,9 @@
 ;;;; target-only code that knows how to load compiled code directly
 ;;;; into core
+;;;;
+;;;; FIXME: The filename here is confusing because "core" here means
+;;;; "main memory", while elsewhere in the system it connotes a
+;;;; ".core" file dumping the contents of main memory.
 
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
@@ -45,15 +49,16 @@
 	   (trace-table-bits (* trace-table-len tt-bits-per-entry))
 	   (total-length (+ length (ceiling trace-table-bits sb!vm:byte-bits)))
 	   (box-num (- (length constants) sb!vm:code-trace-table-offset-slot))
-	   #!+x86
 	   (code-obj
-	    ;; FIXME: What is this *ENABLE-DYNAMIC-SPACE-CODE* stuff?
-	    (if (and (boundp sb!impl::*enable-dynamic-space-code*)
-		     sb!impl::*enable-dynamic-space-code*)
-		(%primitive allocate-dynamic-code-object box-num total-length)
-	      (%primitive allocate-code-object box-num total-length)))
-	   #!-x86
-	   (code-obj
+	    ;; FIXME: In CMU CL the X86 behavior here depended on
+	    ;; *ENABLE-DYNAMIC-SPACE-CODE*, but in SBCL we always use
+	    ;; dynamic space code, so we could make
+	    ;; ALLOCATE-DYNAMIC-CODE-OBJECT more parallel with
+	    ;; ALLOCATE-CODE-OBJECT and remove this confusing
+	    ;; read-macro conditionalization.
+	    #!+x86
+	    (%primitive allocate-dynamic-code-object box-num total-length)
+	    #!-x86
 	    (%primitive allocate-code-object box-num total-length))
 	   (fill-ptr (code-instructions code-obj)))
       (declare (type index box-num total-length))
@@ -98,7 +103,7 @@
 					 (cdr const) object))
 	       (:fdefinition
 		(setf (code-header-ref code-obj index)
-		      (sb!impl::fdefinition-object (cdr const) t))))))))))
+		      (fdefinition-object (cdr const) t))))))))))
   (values))
 
 (defun make-core-byte-component (segment length constants xeps object)

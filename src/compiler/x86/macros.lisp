@@ -367,9 +367,6 @@
 ;;; something to compile with :SB-NO-PSEUDO-ATOMIC.
 (defvar *enable-pseudo-atomic* t)
 
-;;; FIXME: *PSEUDO-ATOMIC-ATOMIC* and *PSEUDO-ATOMIC-INTERRUPTED*
-;;; should be in package SB!VM or SB!KERNEL, not SB!IMPL.
-
 ;;; FIXME: *PSEUDO-ATOMIC-FOO* could be made into *PSEUDO-ATOMIC-BITS*,
 ;;; set with a single operation and cleared with SHR *PSEUDO-ATOMIC-BITS*,-2;
 ;;; the ATOMIC bit is bit 0, the INTERRUPTED bit is bit 1, and you check
@@ -385,7 +382,7 @@
 	 ;; something. (perhaps SVLB, for static variable low byte)
 	 (inst mov (make-ea :byte :disp (+ nil-value
 					   (static-symbol-offset
-					    'sb!impl::*pseudo-atomic-interrupted*)
+					    '*pseudo-atomic-interrupted*)
 					   (ash symbol-value-slot word-shift)
 					   ;; FIXME: Use mask, not minus, to
 					   ;; take out type bits.
@@ -393,7 +390,7 @@
 	       0)
 	 (inst mov (make-ea :byte :disp (+ nil-value
 					   (static-symbol-offset
-					    'sb!impl::*pseudo-atomic-atomic*)
+					    '*pseudo-atomic-atomic*)
 					   (ash symbol-value-slot word-shift)
 					   (- other-pointer-type)))
 	       (fixnumize 1)))
@@ -401,7 +398,7 @@
        (when *enable-pseudo-atomic*
 	 (inst mov (make-ea :byte :disp (+ nil-value
 					   (static-symbol-offset
-					    'sb!impl::*pseudo-atomic-atomic*)
+					    '*pseudo-atomic-atomic*)
 					   (ash symbol-value-slot word-shift)
 					   (- other-pointer-type)))
 	       0)
@@ -414,7 +411,7 @@
 	 (inst cmp (make-ea :byte
 			    :disp (+ nil-value
 				     (static-symbol-offset
-				      'sb!impl::*pseudo-atomic-interrupted*)
+				      '*pseudo-atomic-interrupted*)
 				     (ash symbol-value-slot word-shift)
 				     (- other-pointer-type)))
 	       0)

@@ -105,27 +105,3 @@
     (without-gcing
       (save (unix-namestring core-file-name nil)
 	    (get-lisp-obj-address #'restart-lisp)))))
-
-;;;; functions used by worldload.lisp in CMU CL bootstrapping
-
-;;; If NAME has been byte-compiled, and :RUNTIME is a feature, then
-;;; load the byte-compiled version, otherwise just do normal load.
-#+nil ; no longer needed in SBCL.. I think.. -- WHN 19990814
-(defun maybe-byte-load (name &optional (load-native t))
-  (let ((bname (make-pathname
-		:defaults name
-		:type #.(sb!c:backend-byte-fasl-file-type))))
-    (cond ((and (featurep :runtime)
-		(probe-file bname))
-	   (load bname))
-	  (load-native
-	   (load name)))))
-
-;;; Replace a cold-loaded native object file with a byte-compiled one, if it
-;;; exists.
-#+nil ; no longer needed in SBCL.. I think.. -- WHN 19990814
-(defun byte-load-over (name)
-  (load (make-pathname
-	 :defaults name
-	 :type #.(sb!c:backend-byte-fasl-file-type))
-	:if-does-not-exist nil))

@@ -487,7 +487,7 @@
     (values))
 
   ;; Generate a reference to a manifest constant, creating a new leaf
-  ;; if necessary. If we are producing a fasl-file, make sure that
+  ;; if necessary. If we are producing a fasl file, make sure that
   ;; MAKE-LOAD-FORM gets used on any parts of the constant that it
   ;; needs to be.
   (defun reference-constant (start cont value)

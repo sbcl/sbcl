@@ -40,32 +40,32 @@
   ;; assume that we are never called with nvals == 1 and that a0 has already
   ;; been loaded.
   (inst ble nvals default-a0-and-on)
-  (inst ldl a1 (* 1 sb!vm:word-bytes) vals)
+  (inst ldl a1 (* 1 word-bytes) vals)
   (inst subq nvals (fixnumize 2) count)
   (inst ble count default-a2-and-on)
-  (inst ldl a2 (* 2 sb!vm:word-bytes) vals)
+  (inst ldl a2 (* 2 word-bytes) vals)
   (inst subq nvals (fixnumize 3) count)
   (inst ble count default-a3-and-on)
-  (inst ldl a3 (* 3 sb!vm:word-bytes) vals)
+  (inst ldl a3 (* 3 word-bytes) vals)
   (inst subq nvals (fixnumize 4) count)
   (inst ble count default-a4-and-on)
-  (inst ldl a4 (* 4 sb!vm:word-bytes) vals)
+  (inst ldl a4 (* 4 word-bytes) vals)
   (inst subq nvals (fixnumize 5) count)
   (inst ble count default-a5-and-on)
-  (inst ldl a5 (* 5 sb!vm:word-bytes) vals)
+  (inst ldl a5 (* 5 word-bytes) vals)
   (inst subq nvals (fixnumize 6) count)
   (inst ble count done)
 
   ;; Copy the remaining args to the top of the stack.
-  (inst addq vals (* 6 sb!vm:word-bytes) vals)
-  (inst addq cfp-tn (* 6 sb!vm:word-bytes) dst)
+  (inst addq vals (* 6 word-bytes) vals)
+  (inst addq cfp-tn (* 6 word-bytes) dst)
 
   LOOP
   (inst ldl temp 0 vals)
-  (inst addq vals sb!vm:word-bytes vals)
+  (inst addq vals word-bytes vals)
   (inst stl temp 0 dst)
   (inst subq count (fixnumize 1) count)
-  (inst addq dst sb!vm:word-bytes dst)
+  (inst addq dst word-bytes dst)
   (inst bne count loop)
 		
   (inst br zero-tn done)
@@ -128,32 +128,32 @@
      
   ;; Load the argument regs (must do this now, 'cause the blt might
   ;; trash these locations)
-  (inst ldl a0 (* 0 sb!vm:word-bytes) args)
-  (inst ldl a1 (* 1 sb!vm:word-bytes) args)
-  (inst ldl a2 (* 2 sb!vm:word-bytes) args)
-  (inst ldl a3 (* 3 sb!vm:word-bytes) args)
-  (inst ldl a4 (* 4 sb!vm:word-bytes) args)
-  (inst ldl a5 (* 5 sb!vm:word-bytes) args)
+  (inst ldl a0 (* 0 word-bytes) args)
+  (inst ldl a1 (* 1 word-bytes) args)
+  (inst ldl a2 (* 2 word-bytes) args)
+  (inst ldl a3 (* 3 word-bytes) args)
+  (inst ldl a4 (* 4 word-bytes) args)
+  (inst ldl a5 (* 5 word-bytes) args)
 
   ;; Calc SRC, DST, and COUNT
   (inst subq nargs (fixnumize register-arg-count) count)
-  (inst addq args (* sb!vm:word-bytes register-arg-count) src)
+  (inst addq args (* word-bytes register-arg-count) src)
   (inst ble count done)
-  (inst addq cfp-tn (* sb!vm:word-bytes register-arg-count) dst)
+  (inst addq cfp-tn (* word-bytes register-arg-count) dst)
 	
   LOOP
   ;; Copy one arg.
   (inst ldl temp 0 src)
-  (inst addq src sb!vm:word-bytes src)
+  (inst addq src word-bytes src)
   (inst stl temp 0 dst)
   (inst subq count (fixnumize 1) count)
-  (inst addq dst sb!vm:word-bytes dst)
+  (inst addq dst word-bytes dst)
   (inst bgt count loop)
 	
   DONE
   ;; We are done.  Do the jump.
   (progn
-    (loadw temp lexenv sb!vm:closure-function-slot sb!vm:function-pointer-type)
+    (loadw temp lexenv closure-function-slot function-pointer-type)
     (lisp-jump temp lip)))
 
 
@@ -174,11 +174,11 @@
      (:temp temp1 non-descriptor-reg nl3-offset))
   (declare (ignore start count))
 
-  (load-symbol-value cur-uwp sb!impl::*current-unwind-protect-block*)
+  (load-symbol-value cur-uwp *current-unwind-protect-block*)
   (let ((error (generate-error-code nil invalid-unwind-error)))
     (inst beq block error))
   
-  (loadw target-uwp block sb!vm:unwind-block-current-uwp-slot)
+  (loadw target-uwp block unwind-block-current-uwp-slot)
   (inst cmpeq cur-uwp target-uwp temp1)
   (inst beq temp1 do-uwp)
       
@@ -186,16 +186,16 @@
 
   do-exit
       
-  (loadw cfp-tn cur-uwp sb!vm:unwind-block-current-cont-slot)
-  (loadw code-tn cur-uwp sb!vm:unwind-block-current-code-slot)
+  (loadw cfp-tn cur-uwp unwind-block-current-cont-slot)
+  (loadw code-tn cur-uwp unwind-block-current-code-slot)
   (progn
-    (loadw lra cur-uwp sb!vm:unwind-block-entry-pc-slot)
+    (loadw lra cur-uwp unwind-block-entry-pc-slot)
     (lisp-return lra lip :frob-code nil))
 
   do-uwp
 
-  (loadw next-uwp cur-uwp sb!vm:unwind-block-current-uwp-slot)
-  (store-symbol-value next-uwp sb!impl::*current-unwind-protect-block*)
+  (loadw next-uwp cur-uwp unwind-block-current-uwp-slot)
+  (store-symbol-value next-uwp *current-unwind-protect-block*)
   (inst br zero-tn do-exit))
 
 (define-assembly-routine
@@ -209,17 +209,17 @@
   
   (progn start count) ; We just need them in the registers.
 
-  (load-symbol-value catch sb!impl::*current-catch-block*)
+  (load-symbol-value catch *current-catch-block*)
   
   loop
   
   (let ((error (generate-error-code nil unseen-throw-tag-error target)))
     (inst beq catch error))
   
-  (loadw tag catch sb!vm:catch-block-tag-slot)
+  (loadw tag catch catch-block-tag-slot)
   (inst cmpeq tag target temp1)
   (inst bne temp1 exit)
-  (loadw catch catch sb!vm:catch-block-previous-catch-slot)
+  (loadw catch catch catch-block-previous-catch-slot)
   (inst br zero-tn loop)
   
   exit

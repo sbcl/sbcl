@@ -15,14 +15,16 @@
 
 (defconstant most-positive-fixnum #.sb!vm:*target-most-positive-fixnum*
   #!+sb-doc
-  "The fixnum closest in value to positive infinity.")
+  "the fixnum closest in value to positive infinity")
 
 (defconstant most-negative-fixnum #.sb!vm:*target-most-negative-fixnum*
   #!+sb-doc
-  "The fixnum closest in value to negative infinity.")
+  "the fixnum closest in value to negative infinity")
 
 ;;;; magic specials initialized by genesis
 
+;;; FIXME: The DEFVAR here is redundant with the (DECLAIM (SPECIAL ..))
+;;; of all static symbols in early-impl.lisp.
 #!-gengc
 (progn
   (defvar *current-catch-block*)

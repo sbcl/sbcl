@@ -18,10 +18,7 @@
 ;;;; compiler constants
 
 (setf *backend-fasl-file-type* "axpf")
-(setf *backend-fasl-file-implementation* :alpha)
-(setf *backend-fasl-file-version* 2)
-;;;(setf *backend-fasl-file-version* 8)
-;;; 8 = sbcl-0.6.10.4 revived Gray stream support, changing stream layouts
+(defconstant +backend-fasl-file-implementation+ :alpha)
 
 (setf *backend-register-save-penalty* 3)
 

@@ -14,59 +14,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!IMPL")
-
-;;;; variables
-
-;;; FIXME: It's awkward having LOAD stuff in SB!IMPL and dump stuff in
-;;; SB!C. Among other things, it makes it hard to figure out where
-;;; *FASL-HEADER-STRING-START-STRING* and
-;;; *FASL-HEADER-STRING-STOP-CHAR-CODE* should go. Perhaps we should
-;;; make a package called SB-DUMP or SB-LD which includes all
-;;; knowledge of both loading and dumping.
-
-;;; This value is used to identify fasl files. Even though this is not
-;;; declared as a constant (because ANSI Common Lisp has no facility
-;;; for declaring values which are constant under EQUAL but not EQL),
-;;; obviously you shouldn't mess with it lightly. If you do set a new
-;;; value for some reason, keep these things in mind:
-;;; * To avoid confusion with the similar but incompatible CMU CL
-;;;   fasl file format, the value should not be "FASL FILE", which
-;;;   is what CMU CL used for the same purpose.
-;;; * Since its presence at the head of a file is used by LOAD to
-;;;   decide whether a file is to be fasloaded or just loaded
-;;;   ordinarily (as source), the value should be something which
-;;;   can't legally appear at the head of a Lisp source file.
-;;; * The value should not contain any line-terminating characters,
-;;;   because they're hard to express portably and because the LOAD
-;;;   code might reasonably use READ-LINE to get the value to compare
-;;;   against.
-(defparameter sb!c:*fasl-header-string-start-string* "# FASL"
-  #!+sb-doc
-  "a string which appears at the start of a fasl file header")
-
-(defparameter sb!c:*fasl-header-string-stop-char-code* 255
-  #!+sb-doc
-  "the code for a character which terminates a fasl file header")
-
-(defvar *load-depth* 0
-  #!+sb-doc
-  "the current number of recursive loads")
-(declaim (type index *load-depth*))
-
-;;; the FASL file we're reading from
-(defvar *fasl-file*)
-(declaim (type lisp-stream *fasl-file*))
-
-(defvar *load-print* nil
-  #!+sb-doc
-  "the default for the :PRINT argument to LOAD")
-(defvar *load-verbose* nil
-  ;; Note that CMU CL's default for this was T, and ANSI says it's
-  ;; implementation-dependent. We choose NIL on the theory that it's
-  ;; a nicer default behavior for Unix programs.
-  #!+sb-doc
-  "the default for the :VERBOSE argument to LOAD")
+(in-package "SB!FASL")
 
 ;;;; miscellaneous load utilities
 
@@ -134,12 +82,12 @@
 	 (cnt 1 (1+ cnt)))
 	((>= cnt n) res))))
 
-;;; Read an N-byte unsigned integer from the *FASL-FILE*
+;;; Read an N-byte unsigned integer from the *FASL-INPUT-STREAM*
 (defmacro read-arg (n)
   (declare (optimize (speed 0)))
   (if (= n 1)
-      `(the (unsigned-byte 8) (read-byte *fasl-file*))
-      `(prepare-for-fast-read-byte *fasl-file*
+      `(the (unsigned-byte 8) (read-byte *fasl-input-stream*))
+      `(prepare-for-fast-read-byte *fasl-input-stream*
 	 (prog1
 	  (fast-read-u-integer ,n)
 	  (done-with-fast-read-byte)))))
@@ -270,13 +218,13 @@
     (when byte
 
       ;; Read the string part of the fasl header, or die.
-      (let* ((fhsss sb!c:*fasl-header-string-start-string*)
+      (let* ((fhsss *fasl-header-string-start-string*)
 	     (fhsss-length (length fhsss)))
 	(unless (= byte (char-code (schar fhsss 0)))
 	  (error "illegal first byte in fasl file header"))
 	(do ((byte (read-byte stream) (read-byte stream))
 	     (count 1 (1+ count)))
-	    ((= byte sb!c:*fasl-header-string-stop-char-code*)
+	    ((= byte +fasl-header-string-stop-char-code+)
 	     t)
 	  (declare (fixnum byte count))
 	  (when (and (< count fhsss-length)
@@ -305,15 +253,15 @@
 			    needed-version))
 		   t)))
 	  (or (check-version "native code"
-			     #.sb!c:*backend-fasl-file-implementation*
-			     #.sb!c:*backend-fasl-file-version*)
+			     +backend-fasl-file-implementation+
+			     +fasl-file-version+)
 	      (check-version "byte code"
-			     #.(sb!c:backend-byte-fasl-file-implementation)
-			     sb!c:byte-fasl-file-version)
+			     (backend-byte-fasl-file-implementation)
+			     +fasl-file-version+)
 	      (error "~S was compiled for implementation ~A, but this is a ~A."
 		     stream
 		     implementation
-		     sb!c:*backend-fasl-file-implementation*)))))))
+		     +backend-fasl-file-implementation+)))))))
 
 ;; Setting this variable gives you a trace of fops as they are loaded and
 ;; executed.
@@ -390,7 +338,7 @@
     (error "attempt to load an empty FASL file:~%  ~S" (namestring stream)))
 
   (do-load-verbose stream verbose)
-  (let* ((*fasl-file* stream)
+  (let* ((*fasl-input-stream* stream)
 	 (*current-fop-table* (or (pop *free-fop-tables*) (make-array 1000)))
 	 (*current-fop-table-size* (length *current-fop-table*))
 	 (*fop-stack-pointer-on-entry* *fop-stack-pointer*))

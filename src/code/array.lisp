@@ -831,10 +831,9 @@
 	 (error "bogus value for :FILL-POINTER in ADJUST-ARRAY: ~S"
 		fill-pointer))))
 
+;;; Destructively alter VECTOR, changing its length to NEW-LENGTH,
+;;; which must be less than or equal to its current length.
 (defun shrink-vector (vector new-length)
-  #!+sb-doc
-  "Destructively alter VECTOR, changing its length to NEW-LENGTH, which
-   must be less than or equal to its current length."
   (declare (vector vector))
   (unless (array-header-p vector)
     (macrolet ((frob (name &rest things)
@@ -874,10 +873,9 @@
   (setf (%array-fill-pointer vector) new-length)
   vector)
 
+;;; Fill in array header with the provided information, and return the array.
 (defun set-array-header (array data length fill-pointer displacement dimensions
 			 &optional displacedp)
-  #!+sb-doc
-  "Fills in array header with provided information. Returns array."
   (setf (%array-data-vector array) data)
   (setf (%array-available-elements array) length)
   (cond (fill-pointer

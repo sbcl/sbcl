@@ -12,24 +12,20 @@
 
 (in-package "SB!C")
 
-(defvar *do-assembly* nil
-  #!+sb-doc "If non-NIL, emit assembly code. If NIL, emit VOP templates.")
+;;; If non-NIL, emit assembly code. If NIL, emit VOP templates.
+(defvar *do-assembly* nil)
 
-(defvar *lap-output-file* nil
-  #!+sb-doc "the FASL file currently being output to")
+;;; a list of (NAME . LABEL) for every entry point
+(defvar *entry-points* nil)
 
-(defvar *entry-points* nil
-  #!+sb-doc "a list of (name . label) for every entry point")
+;;; Set this to NIL to inhibit assembly-level optimization. (For
+;;; compiler debugging, rather than policy control.)
+(defvar *assembly-optimize* t)
 
-(defvar *assembly-optimize* t
-  #!+sb-doc
-  "Set this to NIL to inhibit assembly-level optimization. For compiler
-  debugging, rather than policy control.")
-
-;;; Note: You might think from the name that this would act like COMPILE-FILE,
-;;; but in fact it's arguably more like LOAD, even down to the return
-;;; convention. It LOADs a file, then writes out any assembly code created
-;;; by the process.
+;;; Note: You might think from the name that this would act like
+;;; COMPILE-FILE, but in fact it's arguably more like LOAD, even down
+;;; to the return convention. It LOADs a file, then writes out any
+;;; assembly code created by the process.
 (defun assemble-file (name
 		      &key
 		      (output-file (make-pathname :defaults name
@@ -37,7 +33,8 @@
   ;; FIXME: Consider nuking the filename defaulting logic here.
   (let* ((*do-assembly* t)
 	 (name (pathname name))
-	 (*lap-output-file* (open-fasl-file (pathname output-file) name))
+	 ;; the fasl file currently being output to
+	 (lap-fasl-output (open-fasl-output (pathname output-file) name))
 	 (*entry-points* nil)
 	 (won nil)
 	 (*code-segment* nil)
@@ -50,7 +47,7 @@
 	  (load (merge-pathnames name (make-pathname :type "lisp")))
 	  (fasl-dump-cold-load-form `(in-package ,(package-name
 						   (sane-package)))
-				    *lap-output-file*)
+				    lap-fasl-output)
 	  (sb!assem:append-segment *code-segment* *elsewhere*)
 	  (setf *elsewhere* nil)
 	  (let ((length (sb!assem:finalize-segment *code-segment*)))
@@ -58,9 +55,9 @@
 				     length
 				     *fixups*
 				     *entry-points*
-				     *lap-output-file*))
+				     lap-fasl-output))
 	  (setq won t))
-      (close-fasl-file *lap-output-file* (not won)))
+      (close-fasl-output lap-fasl-output (not won)))
     won))
 
 (defstruct (reg-spec (:copier nil))

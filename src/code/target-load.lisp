@@ -11,21 +11,19 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!IMPL")
+(in-package "SB!FASL")
 
 (defvar *load-source-default-type* "lisp"
   #!+sb-doc
   "The source file types which LOAD looks for by default.")
 
+(declaim (type (or pathname null) *load-truename* *load-pathname*))
 (defvar *load-truename* nil
   #!+sb-doc
   "the TRUENAME of the file that LOAD is currently loading")
-
 (defvar *load-pathname* nil
   #!+sb-doc
   "the defaulted pathname that LOAD is currently loading")
-
-(declaim (type (or pathname null) *load-truename* *load-pathname*))
 
 ;;;; LOAD-AS-SOURCE
 
@@ -73,17 +71,16 @@
       (t
        (let ((first-line (with-open-file (stream truename :direction :input)
 			   (read-line stream nil)))
-	     (fhs sb!c:*fasl-header-string-start-string*))
+	     (fhsss *fasl-header-string-start-string*))
 	 (cond
 	  ((and first-line
 		(>= (length (the simple-string first-line))
-		    (length fhs))
-		(string= first-line fhs :end1 (length fhs)))
+		    (length fhsss))
+		(string= first-line fhsss :end1 (length fhsss)))
 	   (internal-load pathname truename if-does-not-exist verbose print
 			  :binary))
 	  (t
-	   (when (string= (pathname-type truename)
-			  sb!c:*backend-fasl-file-type*)
+	   (when (string= (pathname-type truename) *backend-fasl-file-type*)
 	     (error "File has a fasl file type, but no fasl file header:~%  ~S"
 		    (namestring truename)))
 	   (internal-load pathname truename if-does-not-exist verbose print
@@ -109,7 +106,7 @@
   (multiple-value-bind (src-pn src-tn)
       (try-default-type pathname *load-source-default-type*)
     (multiple-value-bind (obj-pn obj-tn)
-	(try-default-type pathname sb!c:*backend-fasl-file-type*)
+	(try-default-type pathname *backend-fasl-file-type*)
       (cond
        ((and obj-tn
 	     src-tn
@@ -237,13 +234,24 @@
 	(declare (fixnum i))
 	(setf (code-header-ref code (decf index)) (pop-stack)))
       (sb!sys:without-gcing
-	(read-n-bytes *fasl-file*
+	(read-n-bytes *fasl-input-stream*
 		      (code-instructions code)
 		      0
 		      #!-gengc code-length
 		      #!+gengc (* code-length sb!vm:word-bytes)))
       code)))
 
+;;; Moving native code during a GC or purify is not so trivial on the
+;;; x86 port.
+;;;
+;;; Our strategy for allowing the loading of x86 native code into the
+;;; dynamic heap requires that the addresses of fixups be saved for
+;;; all these code objects. After a purify these fixups can be
+;;; dropped. In CMU CL, this policy was enabled with
+;;; *ENABLE-DYNAMIC-SPACE-CODE*; in SBCL it's always used.
+;;;
+;;; A little analysis of the header information is used to determine
+;;; if a code object is byte compiled, or native code.
 #!+x86
 (defun load-code (box-num code-length)
   (declare (fixnum box-num code-length))
@@ -254,17 +262,12 @@
 	(push (pop-stack) stuff))
       (let* ((dbi (car (last stuff)))	; debug-info
 	     (tto (first stuff))	; trace-table-offset
-	     (load-to-dynamic-space
-	      (or *enable-dynamic-space-code*
-		  ;; definitely byte-compiled code?
-		  (and *load-byte-compiled-code-to-dynamic-space*
-		       (sb!c::debug-info-p dbi)
-		       (not (sb!c::compiled-debug-info-p dbi)))
-		  ;; or a x86 top level form?
-		  (and *load-x86-tlf-to-dynamic-space*
-		       (sb!c::compiled-debug-info-p dbi)
-		       (string= (sb!c::compiled-debug-info-name dbi)
-				"top-level form")))) )
+	     ;; Old CMU CL code had maybe-we-shouldn't-load-to-dyn-space
+	     ;; pussyfooting around here, apparently dating back to the
+	     ;; stone age of the X86 port, but in SBCL we always load
+	     ;; to dynamic space. FIXME: So now this "variable" could go
+	     ;; away entirely.
+	     (load-to-dynamic-space t))
 
 	(setq stuff (nreverse stuff))
 
@@ -309,7 +312,10 @@
 	    (declare (fixnum i))
 	    (setf (code-header-ref code (decf index)) (pop stuff)))
 	  (sb!sys:without-gcing
-	   (read-n-bytes *fasl-file* (code-instructions code) 0 code-length))
+	   (read-n-bytes *fasl-input-stream*
+			 (code-instructions code)
+			 0
+			 code-length))
 	  code)))))
 
 ;;;; linkage fixups

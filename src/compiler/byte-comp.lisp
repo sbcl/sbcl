@@ -12,12 +12,6 @@
 
 (in-package "SB!C")
 
-;;;; the fasl file format that we use
-(defconstant byte-fasl-file-version 3)
-;;; 1 = before about sbcl-0.6.9.8
-;;; 2 = merged package SB-CONDITIONS into SB-KERNEL around sbcl-0.6.9.8
-;;; 3 = deleted obsolete CONS-UNIQUE-TAG bytecode in sbcl-0.6.11.8
-
 ;;; ### remaining work:
 ;;;
 ;;; - add more inline operations.
@@ -1977,7 +1971,7 @@
 	      (describe-byte-component component xeps segment
 				       *compiler-trace-output*))
 	    (etypecase *compile-object*
-	      (fasl-file
+	      (fasl-output
 	       (maybe-mumble "FASL")
 	       (fasl-dump-byte-component segment code-length constants xeps
 					 *compile-object*))

@@ -1109,7 +1109,7 @@
 #!+x86
 (defun find-escaped-frame (frame-pointer)
   (declare (type system-area-pointer frame-pointer))
-  (dotimes (index sb!impl::*free-interrupt-context-index* (values nil 0 nil))
+  (dotimes (index *free-interrupt-context-index* (values nil 0 nil))
     (sb!alien:with-alien
 	((lisp-interrupt-contexts (array (* os-context-t) nil)
 				  :extern))
@@ -1145,7 +1145,7 @@
 #!-x86
 (defun find-escaped-frame (frame-pointer)
   (declare (type system-area-pointer frame-pointer))
-  (dotimes (index sb!impl::*free-interrupt-context-index* (values nil 0 nil))
+  (dotimes (index *free-interrupt-context-index* (values nil 0 nil))
     (sb!alien:with-alien
      ((lisp-interrupt-contexts (array (* os-context-t) nil) :extern))
      (let ((scp (sb!alien:deref lisp-interrupt-contexts index)))
@@ -1292,7 +1292,7 @@
    code-locations at which execution would continue with frame as the top
    frame if someone threw to the corresponding tag."
   (let ((catch
-	 #!-gengc (descriptor-sap sb!impl::*current-catch-block*)
+	 #!-gengc (descriptor-sap *current-catch-block*)
 	 #!+gengc (mutator-current-catch-block))
 	(res nil)
 	(fp (frame-pointer (frame-real-frame frame))))

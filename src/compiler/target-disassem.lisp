@@ -1825,9 +1825,9 @@
   (declare (type address address))
   (when (null *assembler-routines-by-addr*)
     (setf *assembler-routines-by-addr*
-	  (invert-address-hash sb!kernel::*assembler-routines*))
+	  (invert-address-hash sb!fasl:*assembler-routines*))
     (setf *assembler-routines-by-addr*
-	  (invert-address-hash sb!kernel::*static-foreign-symbols*
+	  (invert-address-hash sb!fasl:*static-foreign-symbols*
 			       *assembler-routines-by-addr*)))
   (gethash address *assembler-routines-by-addr*))
 

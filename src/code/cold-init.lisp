@@ -311,7 +311,7 @@ instead (which is another name for the same thing)."))
       ;; reason.. (Perhaps we should do it anyway in case someone
       ;; manages to save an image from within a pseudo-atomic-atomic
       ;; operation?)
-      #!+x86 (setf sb!impl::*pseudo-atomic-atomic* 0))
+      #!+x86 (setf *pseudo-atomic-atomic* 0))
     (gc-on)))
 
 ;;;; some support for any hapless wretches who end up debugging cold

@@ -97,7 +97,7 @@
  ("src/code/specializable-array")
 
  ("src/code/early-cl")
- ("src/code/early-load")
+ ("src/code/early-fasl")
 
  ;; mostly needed by stuff from comcom, but also used by "x86-vm"
  ("src/code/debug-var-io")
@@ -429,11 +429,11 @@
 
  ("src/compiler/trace-table") ; needs EMIT-LABEL macro from compiler/assem.lisp
 
- ;; Compiling this file requires fop definitions from code/fop.lisp
- ;; and trace table definitions from compiler/trace-table.lisp.
+ ;; Compiling this requires fop definitions from code/fop.lisp and
+ ;; trace table definitions from compiler/trace-table.lisp.
  ("src/compiler/dump")
 
- ("src/compiler/main") ; needs DEFSTRUCT FASL-FILE from compiler/dump.lisp
+ ("src/compiler/main") ; needs DEFSTRUCT FASL-OUTPUT from dump.lisp
  ("src/compiler/target-main" :not-host)
  ("src/compiler/ir1tran")
  ("src/compiler/ir1util")
@@ -542,7 +542,7 @@
  #!+sb-dyncount ("src/compiler/dyncount")
  #!+sb-dyncount ("src/code/dyncount")
 
- ;; needed by OPEN-FASL-FILE, which is called by COMPILE-FILE
+ ;; needed by OPEN-FASL-OUTPUT, which is called by COMPILE-FILE
  ("src/code/format-time")
 
  ;; needed by various unhappy-path cases in the cross-compiler

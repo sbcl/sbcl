@@ -30,7 +30,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!IMPL")
+(in-package "SB!FASL")
 
 ;;; a magic number used to identify our core files
 (defconstant core-magic
@@ -1140,11 +1140,11 @@
 	       `(cold-set ',symbol
 			  (cold-fdefinition-object (cold-intern ',symbol)))))
     (frob !cold-init)
-    (frob sb!impl::maybe-gc)
+    (frob maybe-gc)
     (frob internal-error)
     (frob sb!di::handle-breakpoint)
     (frob sb!di::handle-function-end-breakpoint)
-    (frob sb!impl::fdefinition-object))
+    (frob fdefinition-object))
 
   (cold-set '*current-catch-block*          (make-fixnum-descriptor 0))
   (cold-set '*current-unwind-protect-block* (make-fixnum-descriptor 0))
@@ -1152,9 +1152,7 @@
 
   (cold-set '*free-interrupt-context-index* (make-fixnum-descriptor 0))
 
-  ;; FIXME: *!INITIAL-LAYOUTS* should be exported from SB!KERNEL, or
-  ;; perhaps from SB-LD.
-  (cold-set 'sb!kernel::*!initial-layouts* (cold-list-all-layouts))
+  (cold-set '*!initial-layouts* (cold-list-all-layouts))
 
   (/show "dumping packages" (mapcar #'car *cold-package-symbols*))
   (let ((initial-symbols *nil-descriptor*))
@@ -1565,10 +1563,10 @@
 				offset-within-code-object))
 	 (gspace-byte-address (gspace-byte-address
 			       (descriptor-gspace code-object))))
-    (ecase sb!c:*backend-fasl-file-implementation*
-      ;; See CMUCL source for other formerly-supported architectures
-      ;; (and note that you have to rewrite them to use vector-ref unstead
-      ;; of sap-ref)
+    (ecase +backend-fasl-file-implementation+
+      ;; See CMU CL source for other formerly-supported architectures
+      ;; (and note that you have to rewrite them to use VECTOR-REF
+      ;; unstead of SAP-REF).
       (:alpha
 	 (ecase kind
          (:jmp-hint
@@ -1817,11 +1815,11 @@
 
 ;;;; cold fops for loading symbols
 
-;;; Load a symbol SIZE characters long from *FASL-FILE* and intern
+;;; Load a symbol SIZE characters long from *FASL-INPUT-STREAM* and intern
 ;;; that symbol in PACKAGE.
 (defun cold-load-symbol (size package)
   (let ((string (make-string size)))
-    (read-string-as-bytes *fasl-file* string)
+    (read-string-as-bytes *fasl-input-stream* string)
     (cold-intern (intern string package) package)))
 
 (macrolet ((frob (name pname-len package-len)
@@ -1847,7 +1845,7 @@
 		(fop-uninterned-small-symbol-save)
   (let* ((size (clone-arg))
 	 (name (make-string size)))
-    (read-string-as-bytes *fasl-file* name)
+    (read-string-as-bytes *fasl-input-stream* name)
     (let ((symbol (allocate-symbol name)))
       (push-fop-table symbol))))
 
@@ -1904,7 +1902,7 @@
 		(fop-small-string)
   (let* ((len (clone-arg))
 	 (string (make-string len)))
-    (read-string-as-bytes *fasl-file* string)
+    (read-string-as-bytes *fasl-input-stream* string)
     (string-to-core string)))
 
 (clone-cold-fop (fop-vector)
@@ -1940,7 +1938,7 @@
 		 (ceiling (* len sizebits)
 			  sb!vm:byte-bits))))
     (read-sequence-or-die (descriptor-bytes result)
-			  *fasl-file*
+			  *fasl-input-stream*
 			  :start start
 			  :end end)
     result))
@@ -1955,7 +1953,7 @@
 		   (ash sb!vm:vector-data-offset sb!vm:word-shift)))
 	 (end (+ start (* len sb!vm:word-bytes))))
     (read-sequence-or-die (descriptor-bytes result)
-			  *fasl-file*
+			  *fasl-input-stream*
 			  :start start
 			  :end end)
     result))
@@ -2023,9 +2021,9 @@
 
 #!+long-float
 (define-cold-fop (fop-long-float)
-  (ecase sb!c:*backend-fasl-file-implementation*
-    (:x86 ; 80 bit long-float format
-     (prepare-for-fast-read-byte *fasl-file*
+  (ecase +backend-fasl-file-implementation+
+    (:x86 ; (which has 80-bit long-float format)
+     (prepare-for-fast-read-byte *fasl-input-stream*
        (let* ((des (allocate-unboxed-object *dynamic* sb!vm:word-bits
 					    (1- sb!vm:long-float-size)
 					    sb!vm:long-float-type))
@@ -2041,7 +2039,7 @@
     ;; SBCL.
     #+nil
     (#.sb!c:sparc-fasl-file-implementation ; 128 bit long-float format
-     (prepare-for-fast-read-byte *fasl-file*
+     (prepare-for-fast-read-byte *fasl-input-stream*
        (let* ((des (allocate-unboxed-object *dynamic* sb!vm:word-bits
 					    (1- sb!vm:long-float-size)
 					    sb!vm:long-float-type))
@@ -2058,9 +2056,9 @@
 
 #!+long-float
 (define-cold-fop (fop-complex-long-float)
-  (ecase sb!c:*backend-fasl-file-implementation*
-    (:x86 ; 80 bit long-float format
-     (prepare-for-fast-read-byte *fasl-file*
+  (ecase +backend-fasl-file-implementation+
+    (:x86 ; (which has 80-bit long-float format)
+     (prepare-for-fast-read-byte *fasl-input-stream*
        (let* ((des (allocate-unboxed-object *dynamic* sb!vm:word-bits
 					    (1- sb!vm:complex-long-float-size)
 					    sb!vm:complex-long-float-type))
@@ -2093,7 +2091,7 @@
     ;; This was supported in CMU CL, but isn't currently supported in SBCL.
     #+nil
     (#.sb!c:sparc-fasl-file-implementation ; 128 bit long-float format
-     (prepare-for-fast-read-byte *fasl-file*
+     (prepare-for-fast-read-byte *fasl-input-stream*
        (let* ((des (allocate-unboxed-object *dynamic* sb!vm:word-bits
 					    (1- sb!vm:complex-long-float-size)
 					    sb!vm:complex-long-float-type))
@@ -2163,7 +2161,7 @@
     (make-descriptor 0 0 nil counter)))
 
 (defun finalize-load-time-value-noise ()
-  (cold-set (cold-intern 'sb!impl::*!load-time-values*)
+  (cold-set (cold-intern '*!load-time-values*)
 	    (allocate-vector-object *dynamic*
 				    sb!vm:word-bits
 				    *load-time-value-counter*
@@ -2272,7 +2270,7 @@
 			(ash header-n-words sb!vm:word-shift)))
 	      (end (+ start code-size)))
 	 (read-sequence-or-die (descriptor-bytes des)
-			       *fasl-file*
+			       *fasl-input-stream*
 			       :start start
 			       :end end)
 	 #!+sb-show
@@ -2366,7 +2364,7 @@
 	 (code-object (pop-stack))
 	 (len (read-arg 1))
 	 (sym (make-string len)))
-    (read-string-as-bytes *fasl-file* sym)
+    (read-string-as-bytes *fasl-input-stream* sym)
     (let ((offset (read-arg 4))
 	  (value (lookup-foreign-symbol sym)))
       (do-cold-fixup code-object offset value kind))
@@ -2397,7 +2395,7 @@
 		     (ash header-n-words sb!vm:word-shift)))
 	   (end (+ start length)))
       (read-sequence-or-die (descriptor-bytes des)
-			    *fasl-file*
+			    *fasl-input-stream*
 			    :start start
 			    :end end))
     des))

@@ -11,69 +11,72 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!C")
+(in-package "SB!FASL")
 
 ;;; Dump the first N bytes of VEC out to FILE. VEC is some sort of unboxed
 ;;; vector-like thing that we can BLT from.
-(defun dump-raw-bytes (vec n fasl-file)
-  (declare (type index n) (type fasl-file fasl-file))
-  (sb!sys:output-raw-bytes (fasl-file-stream fasl-file) vec 0 n)
+(defun dump-raw-bytes (vec n fasl-output)
+  (declare (type index n) (type fasl-output fasl-output))
+  (sb!sys:output-raw-bytes (fasl-output-stream fasl-output) vec 0 n)
   (values))
 
 ;;; Dump a multi-dimensional array. Note: any displacements are folded out.
 ;;;
 ;;; This isn't needed at cross-compilation time because SBCL doesn't
-;;; use multi-dimensional arrays internally. It's hard to implement
-;;; at cross-compilation time because it uses WITH-ARRAY-DATA. If it ever
-;;; becomes necessary to implement it at cross-compilation time, it might
-;;; possible to use ROW-MAJOR-AREF stuff to do it portably.
+;;; use multi-dimensional arrays internally. And it's hard to
+;;; implement at cross-compilation time because it uses
+;;; WITH-ARRAY-DATA. If it ever becomes necessary to implement it at
+;;; cross-compilation time, it might possible to use ROW-MAJOR-AREF
+;;; stuff to do it portably.
 (defun dump-multi-dim-array (array file)
   (let ((rank (array-rank array)))
     (dotimes (i rank)
       (dump-integer (array-dimension array i) file))
-    (sb!impl::with-array-data ((vector array) (start) (end))
+    (with-array-data ((vector array) (start) (end))
       (if (and (= start 0) (= end (length vector)))
 	  (sub-dump-object vector file)
 	  (sub-dump-object (subseq vector start end) file)))
-    (dump-fop 'sb!impl::fop-array file)
+    (dump-fop 'fop-array file)
     (dump-unsigned-32 rank file)
     (eq-save-object array file)))
 
+;;;; various dump-a-number operations
+
 (defun dump-single-float-vector (vec file)
   (let ((length (length vec)))
-    (dump-fop 'sb!impl::fop-single-float-vector file)
+    (dump-fop 'fop-single-float-vector file)
     (dump-unsigned-32 length file)
     (dump-raw-bytes vec (* length sb!vm:word-bytes) file)))
 
 (defun dump-double-float-vector (vec file)
   (let ((length (length vec)))
-    (dump-fop 'sb!impl::fop-double-float-vector file)
+    (dump-fop 'fop-double-float-vector file)
     (dump-unsigned-32 length file)
     (dump-raw-bytes vec (* length sb!vm:word-bytes 2) file)))
 
 #!+long-float
 (defun dump-long-float-vector (vec file)
   (let ((length (length vec)))
-    (dump-fop 'sb!impl::fop-long-float-vector file)
+    (dump-fop 'fop-long-float-vector file)
     (dump-unsigned-32 length file)
     (dump-raw-bytes vec (* length sb!vm:word-bytes #!+x86 3 #!+sparc 4) file)))
 
 (defun dump-complex-single-float-vector (vec file)
   (let ((length (length vec)))
-    (dump-fop 'sb!impl::fop-complex-single-float-vector file)
+    (dump-fop 'fop-complex-single-float-vector file)
     (dump-unsigned-32 length file)
     (dump-raw-bytes vec (* length sb!vm:word-bytes 2) file)))
 
 (defun dump-complex-double-float-vector (vec file)
   (let ((length (length vec)))
-    (dump-fop 'sb!impl::fop-complex-double-float-vector file)
+    (dump-fop 'fop-complex-double-float-vector file)
     (dump-unsigned-32 length file)
     (dump-raw-bytes vec (* length sb!vm:word-bytes 2 2) file)))
 
 #!+long-float
 (defun dump-complex-long-float-vector (vec file)
   (let ((length (length vec)))
-    (dump-fop 'sb!impl::fop-complex-long-float-vector file)
+    (dump-fop 'fop-complex-long-float-vector file)
     (dump-unsigned-32 length file)
     (dump-raw-bytes vec (* length sb!vm:word-bytes #!+x86 3 #!+sparc 4 2) file)))
 
@@ -99,16 +102,14 @@
     (dump-unsigned-32 high-bits file)
     (dump-integer-as-n-bytes exp-bits 4 file)))
 
-;;; Or a complex...
-
 (defun dump-complex (x file)
   (typecase x
     ((complex single-float)
-     (dump-fop 'sb!impl::fop-complex-single-float file)
+     (dump-fop 'fop-complex-single-float file)
      (dump-integer-as-n-bytes (single-float-bits (realpart x)) 4 file)
      (dump-integer-as-n-bytes (single-float-bits (imagpart x)) 4 file))
     ((complex double-float)
-     (dump-fop 'sb!impl::fop-complex-double-float file)
+     (dump-fop 'fop-complex-double-float file)
      (let ((re (realpart x)))
        (declare (double-float re))
        (dump-unsigned-32 (double-float-low-bits re) file)
@@ -119,11 +120,28 @@
        (dump-integer-as-n-bytes (double-float-high-bits im) 4 file)))
     #!+long-float
     ((complex long-float)
-     (dump-fop 'sb!impl::fop-complex-long-float file)
+     (dump-fop 'fop-complex-long-float file)
      (dump-long-float (realpart x) file)
      (dump-long-float (imagpart x) file))
     (t
      (sub-dump-object (realpart x) file)
      (sub-dump-object (imagpart x) file)
-     (dump-fop 'sb!impl::fop-complex file))))
+     (dump-fop 'fop-complex file))))
+
+;;;; dumping things which don't exist in portable ANSI Common Lisp
 
+;;; Dump a BYTE-FUNCTION object. We dump the layout and
+;;; funcallable-instance info, but rely on the loader setting up the
+;;; correct funcallable-instance-function.
+(defun dump-byte-function (xep code-handle file)
+  (let ((nslots (- (get-closure-length xep)
+		   ;; 1- for header
+		   (1- sb!vm:funcallable-instance-info-offset))))
+    (dotimes (i nslots)
+      (if (zerop i)
+	  (dump-push code-handle file)
+	  (dump-object (%funcallable-instance-info xep i) file)))
+    (dump-object (%funcallable-instance-layout xep) file)
+    (dump-fop 'fop-make-byte-compiled-function file)
+    (dump-byte nslots file))
+  (values))

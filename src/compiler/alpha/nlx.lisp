@@ -50,12 +50,12 @@
 	    (eval :scs (descriptor-reg)))
   (:vop-var vop)
   (:generator 13
-    (load-symbol-value catch sb!impl::*current-catch-block*)
+    (load-symbol-value catch *current-catch-block*)
     (let ((cur-nfp (current-nfp-tn vop)))
       (when cur-nfp
 	(inst mskll cur-nfp 4 nfp)))
     (inst mskll nsp-tn 4 nsp)
-    (load-symbol-value eval sb!impl::*eval-stack-top*)))
+    (load-symbol-value eval *eval-stack-top*)))
 
 (define-vop (restore-dynamic-state)
   (:args (catch :scs (descriptor-reg))
@@ -65,8 +65,8 @@
   (:vop-var vop)
   (:temporary (:sc any-reg) temp)
   (:generator 10
-    (store-symbol-value catch sb!impl::*current-catch-block*)
-    (store-symbol-value eval sb!impl::*eval-stack-top*)
+    (store-symbol-value catch *current-catch-block*)
+    (store-symbol-value eval *eval-stack-top*)
     (inst mskll nsp-tn 0 temp)
     (let ((cur-nfp (current-nfp-tn vop)))
       (when cur-nfp
@@ -95,7 +95,7 @@
   (:temporary (:scs (non-descriptor-reg)) ndescr)
   (:generator 22
     (inst lda block (* (tn-offset tn) sb!vm:word-bytes) cfp-tn)
-    (load-symbol-value temp sb!impl::*current-unwind-protect-block*)
+    (load-symbol-value temp *current-unwind-protect-block*)
     (storew temp block sb!vm:unwind-block-current-uwp-slot)
     (storew cfp-tn block sb!vm:unwind-block-current-cont-slot)
     (storew code-tn block sb!vm:unwind-block-current-code-slot)
@@ -115,7 +115,7 @@
   (:temporary (:scs (non-descriptor-reg)) ndescr)
   (:generator 44
     (inst lda result (* (tn-offset tn) sb!vm:word-bytes) cfp-tn)
-    (load-symbol-value temp sb!impl::*current-unwind-protect-block*)
+    (load-symbol-value temp *current-unwind-protect-block*)
     (storew temp result sb!vm:catch-block-current-uwp-slot)
     (storew cfp-tn result sb!vm:catch-block-current-cont-slot)
     (storew code-tn result sb!vm:catch-block-current-code-slot)
@@ -123,9 +123,9 @@
     (storew temp result sb!vm:catch-block-entry-pc-slot)
 
     (storew tag result sb!vm:catch-block-tag-slot)
-    (load-symbol-value temp sb!impl::*current-catch-block*)
+    (load-symbol-value temp *current-catch-block*)
     (storew temp result sb!vm:catch-block-previous-catch-slot)
-    (store-symbol-value result sb!impl::*current-catch-block*)
+    (store-symbol-value result *current-catch-block*)
 
     (move result block)))
 
@@ -136,26 +136,25 @@
   (:temporary (:scs (descriptor-reg)) new-uwp)
   (:generator 7
     (inst lda new-uwp (* (tn-offset tn) sb!vm:word-bytes) cfp-tn)
-    (store-symbol-value new-uwp sb!impl::*current-unwind-protect-block*)))
-
+    (store-symbol-value new-uwp *current-unwind-protect-block*)))
 
 (define-vop (unlink-catch-block)
   (:temporary (:scs (any-reg)) block)
   (:policy :fast-safe)
   (:translate %catch-breakup)
   (:generator 17
-    (load-symbol-value block sb!impl::*current-catch-block*)
+    (load-symbol-value block *current-catch-block*)
     (loadw block block sb!vm:catch-block-previous-catch-slot)
-    (store-symbol-value block sb!impl::*current-catch-block*)))
+    (store-symbol-value block *current-catch-block*)))
 
 (define-vop (unlink-unwind-protect)
   (:temporary (:scs (any-reg)) block)
   (:policy :fast-safe)
   (:translate %unwind-protect-breakup)
   (:generator 17
-    (load-symbol-value block sb!impl::*current-unwind-protect-block*)
+    (load-symbol-value block *current-unwind-protect-block*)
     (loadw block block sb!vm:unwind-block-current-uwp-slot)
-    (store-symbol-value block sb!impl::*current-unwind-protect-block*)))
+    (store-symbol-value block *current-unwind-protect-block*)))
 
 ;;;; NLX entry VOPs
 
