@@ -74,7 +74,7 @@
       This is reinitialized to reflect the working directory where the
       saved core is loaded."
 
-  #!+mp (sb!mp::shutdown-multi-processing)
+  ;; FIXME (sb!mp::shutdown-multi-processing)
   ;; FIXME: What is this for? Explain.
   (when (fboundp 'cancel-finalization)
     (cancel-finalization sb!sys:*tty*))

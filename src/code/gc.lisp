@@ -273,7 +273,7 @@ function should notify the user that the system has finished GC'ing.")
 ;;;; internal GC
 
 (sb!alien:define-alien-routine collect-garbage sb!alien:int
-  #!+gencgc (last-gen sb!alien:int))
+  (#!+gencgc last-gen #!-gencgc ignore sb!alien:int))
 
 (sb!alien:define-alien-routine set-auto-gc-trigger sb!alien:void
   (dynamic-usage sb!alien:unsigned-long))
@@ -349,17 +349,7 @@ function should notify the user that the system has finished GC'ing.")
 		   ;; triggered GC could've done a fair amount of
 		   ;; consing.)
 		   (pre-internal-gc-dynamic-usage (dynamic-usage))
-		   (ignore-me
-		    #!-gencgc (funcall *internal-gc*)
-		    ;; FIXME: This EQ test is pretty gross. Among its other
-		    ;; nastinesses, it looks as though it could break if we
-		    ;; recompile COLLECT-GARBAGE. We should probably just
-		    ;; straighten out the interface so that all *INTERNAL-GC*
-		    ;; functions accept a GEN argument (and then the
-		    ;; non-generational ones just ignore it).
-		    #!+gencgc (if (eq *internal-gc* #'collect-garbage)
-				  (funcall *internal-gc* gen)
-				  (funcall *internal-gc*)))
+		   (ignore-me (funcall *internal-gc* gen))
 		   (post-gc-dynamic-usage (dynamic-usage))
 		   (n-bytes-freed (- pre-internal-gc-dynamic-usage
 				     post-gc-dynamic-usage))

@@ -1502,6 +1502,19 @@ changes in sbcl-0.7.12 relative to sbcl-0.7.11:
     ** CONSTANTP now returns true for all self-evaluating objects.
 
 changes in sbcl-0.7.13 relative to sbcl-0.7.12:
+  * incompatible packaging change: in line with Unix convention, 
+    SBCL now looks for its core file in /usr/{local/,}lib/sbcl/sbcl.core 
+    if it's not in $SBCL_HOME.  It also sets SBCL_HOME to match.
+  * REQUIRE and PROVIDE are now optionally capable of doing something
+    useful. See the documentation string for REQUIRE.
+  * infrastructure for a managed SBCL contrib system: contributed 
+    modules in this release include:
+    ** the ASDF system definition facility;
+    ** an interface to the BSD Sockets API;
+    ** an ACL-like convenience interface to the repl; 
+       (thanks to Kevin Rosenberg)
+    ** an implementation of ROTATE-BYTE, with efficient implementation
+       on x86 hardware;
   * fixed a bug in LOG, so that LOG of a rational argument near 1 now
     gives a closer approximation to the right answer than previously.
     (thanks to Raymond Toy)
@@ -1535,6 +1548,18 @@ changes in sbcl-0.7.13 relative to sbcl-0.7.12:
     many list operations.  (thanks to Robert E. Brown)
   * fixed a bug in the reader: the #n# reader macro now works for
     objects of type STANDARD-OBJECT.  (reported by Tony Martinez)
+  * the compiler is now aware that SYMBOL-FUNCTION returns a FUNCTION
+    and that READ-DELIMITED-LIST returns a LIST.  (thanks to Robert
+    E. Brown and Tony Martinez respectively)
+  * PCL is now smarter about SLOT-VALUE, (SETF SLOT-VALUE) and
+    SLOT-BOUNDP: in particular, it is now able to optimize them much
+    better, and is now not vulnerable to having packages renamed.
+    Furthermore, a compliance bug has been fixed: SLOT-MISSING is now
+    always called when a slot is not present in an instance.  (thanks
+    to Gerd Moellmann)
+  * fixed a bug related to CONCATENATED-STREAMs: PEEK-CHAR will no
+    longer signal an error on unreading a character following EOF on
+    the previous constituent stream.  (thanks to Tony Martinez)
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** ARRAY-IN-BOUNDS-P now allows arbitrary integers as arguments,
        not just nonnegative fixnums;
@@ -1543,17 +1568,47 @@ changes in sbcl-0.7.13 relative to sbcl-0.7.12:
        freshly-consed result bit-array);
     ** ELT now signals an error on an invalid sequence index in safe
        code;
-  * incompatible packaging change: in line with Unix convention, 
-    SBCL now looks for its core file in /usr/{local/,}lib/sbcl/sbcl.core 
-    if it's not in $SBCL_HOME.  It also sets SBCL_HOME to match
-  * REQUIRE and PROVIDE are now optionally capable of doing something
-    useful: see the documentation string for REQUIRE
-  * infrastructure for a managed SBCL contrib system: contributed 
-    modules in this release include 
-	- the ASDF system definition facility
-	- an interface to the BSD Sockets API
-	- an ACL-like convenience interface to the repl 
-		(thanks to Kevin Rosenberg)
+    ** the type system is now cleverer about negations of numeric
+       types, and consequently understands the BIGNUM and RATIO types
+       better;
+    ** the type system is now cleverer about the interaction between
+       INTEGER and RATIO types: while bugs still remain, many more
+       cases are accurately computed;
+    ** in TYPECASE, OTHERWISE now only introduces an otherwise-clause
+       if it is in the last clause;
+    ** CONSTANTLY now correctly returns a side-effect-free function in
+       all cases;
+    ** DECLARE is no longer treated as a special-operator; in
+       particular, SPECIAL-OPERATOR-P no longer returns T for DECLARE;
+  * incremented fasl file version number due to the change in the
+    DEFSTRUCT-SLOT-DESCRIPTION structure.
+
+changes in sbcl-0.7.14 relative to sbcl-0.7.13:
+  * a better implementation of SXHASH on (simple) bit vectors,
+    measured both in execution speed and in distribution of results
+    over the positive fixnums, has been installed.  Likewise, a better
+    implementation of EQUAL for simple bit vectors is now available.
+  * fixed CEILING optimization for a divisor of form 2^k.
+  * fixed bug 240 (emitting extra style warnings "using the lexical
+    binding of the symbol *XXX*" for &OPTIONAL arguments).  (reported
+    by Antonio Martinez)
+  * fixed SXHASH, giving different results for NIL depending on type
+    declarations (SYMBOL or LIST). (thanks to Gerd Moellmann)
+  * fixed bug in DEFPARAMETER and DEFVAR: they could assign a lexical
+    variable. (found by Rolf Wester)
+  * SBCL does not ignore type declarations for special
+    variables. (reported by rif on c.l.l 2003-03-05)
+  * fixed some bugs revealed by Paul Dietz' test suite:
+    ** a bug in the CONS type specifier, whereby the CAR and CDR
+       types got intertwined, has been fixed;
+    ** the type system is now able to reason about the interaction
+       between INTEGER and RATIO types more completely;
+    ** APPEND, [N]REVERSE and NRECONC check that those their
+       arguments, which must be proper lists, are really so;
+    ** An array specialized to be unable to hold elements has been
+       implemented (as required -- yes, really) by ANSI;
+    ** GETF and GET-PROPERTIES throw a TYPE-ERROR, not a SIMPLE-ERROR,
+       on malformed property lists;
 
 planned incompatible changes in 0.7.x:
   * (not done yet, but planned:) When the profiling interface settles

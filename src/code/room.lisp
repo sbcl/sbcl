@@ -80,17 +80,26 @@
 		 (simple-array-double-float-widetag . 3)
 		 (simple-array-complex-single-float-widetag . 3)
 		 (simple-array-complex-double-float-widetag . 4)))
-  (let ((name (car stuff))
-	(size (cdr stuff)))
+  (let* ((name (car stuff))
+	 (size (cdr stuff))
+	 (sname (string name)))
     (setf (svref *meta-room-info* (symbol-value name))
-	  (make-room-info :name name
+	  (make-room-info :name (intern (subseq sname
+						0
+						(mismatch sname "-WIDETAG"
+							  :from-end t)))
 			  :kind :vector
 			  :length size))))
 
 (setf (svref *meta-room-info* simple-string-widetag)
-      (make-room-info :name 'simple-string-widetag
+      (make-room-info :name 'simple-string
 		      :kind :string
 		      :length 0))
+
+(setf (svref *meta-room-info* simple-array-nil-widetag)
+      (make-room-info :name 'simple-array-nil
+		      :kind :fixed
+		      :length 2))
 
 (setf (svref *meta-room-info* code-header-widetag)
       (make-room-info :name 'code
@@ -211,7 +220,8 @@
 			     (:fixed
 			      (aver (or (eql (room-info-length info)
 					       (1+ (get-header-data obj)))
-					  (floatp obj)))
+					(floatp obj)
+					(simple-array-nil-p obj)))
 			      (round-to-dualword
 			       (* (room-info-length info) n-word-bytes)))
 			     ((:vector :string)

@@ -33,6 +33,10 @@
 #include "globals.h"
 #include "lispregs.h"
 #include "interrupt.h"
+#include "genesis/static-symbols.h"
+#include "genesis/primitive-objects.h"
+
+
 
 /* When we need to do command input, we use this stream, which is not
  * in general stdin, so that things will "work" (as well as being
@@ -279,7 +283,7 @@ quit_cmd(char **ptr)
     fflush(stdout);
     fgets(buf, sizeof(buf), ldb_in);
     if (buf[0] == 'y' || buf[0] == 'Y' || buf[0] == '\n')
-        exit(0);
+        exit(1);
 }
 
 static void

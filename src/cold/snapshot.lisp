@@ -131,6 +131,10 @@
 			     cl::*current-unwind-protect-block*
 			     cl::*load-depth*
 			     cl::*free-fop-tables*
+			     cl::*load-symbol-buffer*
+			     cl::*load-symbol-buffer-size*
+			     cl::in-index
+			     cl::in-buffer
 			     ;; These two are changed by PURIFY.
 			     cl::*static-space-free-pointer*
 			     cl::*static-space-end-pointer*)

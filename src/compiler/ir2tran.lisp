@@ -472,14 +472,14 @@
          (2value (continuation-info value)))
     (cond ((not 2cont))
           ((eq (ir2-continuation-kind 2cont) :unused))
-          ((and (eq (ir2-continuation-kind 2cont) :unknown)
-                (eq (ir2-continuation-kind 2value) :unknown))
+          ((eq (ir2-continuation-kind 2cont) :unknown)
+           (aver (eq (ir2-continuation-kind 2value) :unknown))
            (aver (not (cast-type-check node)))
            (move-results-coerced node block
                                  (ir2-continuation-locs 2value)
                                  (ir2-continuation-locs 2cont)))
-          ((and (eq (ir2-continuation-kind 2cont) :fixed)
-                (eq (ir2-continuation-kind 2value) :fixed))
+          ((eq (ir2-continuation-kind 2cont) :fixed)
+           (aver (eq (ir2-continuation-kind 2value) :fixed))
            (if (cast-type-check node)
                (move-results-checked node block
                                      (ir2-continuation-locs 2value)
@@ -491,8 +491,7 @@
                (move-results-coerced node block
                                      (ir2-continuation-locs 2value)
                                      (ir2-continuation-locs 2cont))))
-          ;; FIXME: unknown values packing/unpacking -- APD, 2002-02-11
-          (t (bug "quux")))))
+          (t (bug "CAST cannot be :DELAYED.")))))
 
 ;;;; template conversion
 
@@ -1049,9 +1048,11 @@
 	(bug "full call to ~S" fname)))
 
     (when (consp fname)
-      (destructuring-bind (setf stem) fname
-	(aver (eq setf 'setf))
-	(setf (gethash stem *setf-assumed-fboundp*) t)))))
+      (destructuring-bind (setfoid &rest stem) fname
+	(aver (member setfoid
+		      '(setf sb!pcl::class-predicate sb!pcl::slot-accessor)))
+	(when (eq setfoid 'setf)
+	  (setf (gethash (car stem) *setf-assumed-fboundp*) t))))))
 
 ;;; If the call is in a tail recursive position and the return
 ;;; convention is standard, then do a tail full call. If one or fewer

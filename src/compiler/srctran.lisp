@@ -29,12 +29,14 @@
 (define-source-transform identity (x) `(prog1 ,x))
 (define-source-transform values (x) `(prog1 ,x))
 
-;;; Bind the values and make a closure that returns them.
+;;; Bind the value and make a closure that returns it.
 (define-source-transform constantly (value)
-  (let ((rest (gensym "CONSTANTLY-REST-")))
-    `(lambda (&rest ,rest)
-       (declare (ignore ,rest))
-       ,value)))
+  (let ((rest (gensym "CONSTANTLY-REST-"))
+	(n-value (gensym "CONSTANTLY-VALUE-")))
+    `(let ((,n-value ,value))
+      (lambda (&rest ,rest)
+	(declare (ignore ,rest))
+	,n-value))))
 
 ;;; If the function has a known number of arguments, then return a
 ;;; lambda with the appropriate fixed number of args. If the
@@ -1345,16 +1347,19 @@
 
 ) ; PROGN
 
-
-;;; KLUDGE: All this ASH optimization is suppressed under CMU CL
-;;; because as of version 2.4.6 for Debian, CMU CL blows up on (ASH
-;;; 1000000000 -100000000000) (i.e. ASH of two bignums yielding zero)
-;;; and it's hard to avoid that calculation in here.
-#-(and cmu sb-xc-host)
-(progn
-
 (defun ash-derive-type-aux (n-type shift same-arg)
   (declare (ignore same-arg))
+  ;; KLUDGE: All this ASH optimization is suppressed under CMU CL for
+  ;; some bignum cases because as of version 2.4.6 for Debian and 18d,
+  ;; CMU CL blows up on (ASH 1000000000 -100000000000) (i.e. ASH of
+  ;; two bignums yielding zero) and it's hard to avoid that
+  ;; calculation in here.
+  #+(and cmu sb-xc-host)
+  (when (and (or (typep (numeric-type-low n-type) 'bignum)
+		 (typep (numeric-type-high n-type) 'bignum))
+	     (or (typep (numeric-type-low shift) 'bignum)
+		 (typep (numeric-type-high shift) 'bignum)))
+    (return-from ash-derive-type-aux *universal-type*))
   (flet ((ash-outer (n s)
 	   (when (and (fixnump s)
 		      (<= s 64)
@@ -1387,7 +1392,6 @@
 
 (defoptimizer (ash derive-type) ((n shift))
   (two-arg-derive-type n shift #'ash-derive-type-aux #'ash))
-) ; PROGN
 
 #+sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
 (macrolet ((frob (fun)
@@ -2587,7 +2591,8 @@
     (or result 0)))
 
 ;;; If arg is a constant power of two, turn FLOOR into a shift and
-;;; mask. If CEILING, add in (1- (ABS Y)) and then do FLOOR.
+;;; mask. If CEILING, add in (1- (ABS Y)), do FLOOR and correct a
+;;; remainder.
 (flet ((frob (y ceil-p)
 	 (unless (constant-continuation-p y)
 	   (give-up-ir1-transform))
@@ -2597,13 +2602,14 @@
 	   (unless (= y-abs (ash 1 len))
 	     (give-up-ir1-transform))
 	   (let ((shift (- len))
-		 (mask (1- y-abs)))
-	     `(let ,(when ceil-p `((x (+ x ,(1- y-abs)))))
+		 (mask (1- y-abs))
+                 (delta (if ceil-p (* (signum y) (1- y-abs)) 0)))
+	     `(let ((x (+ x ,delta)))
 		,(if (minusp y)
 		     `(values (ash (- x) ,shift)
-			      (- (logand (- x) ,mask)))
+			      (- (- (logand (- x) ,mask)) ,delta))
 		     `(values (ash x ,shift)
-			      (logand x ,mask))))))))
+			      (- (logand x ,mask) ,delta))))))))
   (deftransform floor ((x y) (integer integer) *)
     "convert division by 2^k to shift"
     (frob y nil))

@@ -43,7 +43,6 @@
 ;;;     #+SB-FLUID `(FIND-PACKAGE ,NAME))
 ;;; and use that to replace all three variables.)
 (defvar *pcl-package*		     (find-package "SB-PCL"))
-(defvar *slot-accessor-name-package* (find-package "SB-SLOT-ACCESSOR-NAME"))
 
 ;;; This excludes structure types created with the :TYPE option to
 ;;; DEFSTRUCT. It also doesn't try to deal with types created by

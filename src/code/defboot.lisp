@@ -213,10 +213,7 @@
   #+nil (setf (%fun-name def) name)
 
   (when doc
-    ;; FIXME: This should use shared SETF-name-parsing logic.
-    (if (and (consp name) (eq (first name) 'setf))
-	(setf (fdocumentation (second name) 'setf) doc)
-	(setf (fdocumentation (the symbol name) 'function) doc)))
+    (setf (fdocumentation name 'function) doc))
   name)
 
 ;;;; DEFVAR and DEFPARAMETER
@@ -231,7 +228,7 @@
      (declaim (special ,var))
      ,@(when valp
 	 `((unless (boundp ',var)
-	     (setq ,var ,val))))
+	     (set ',var ,val))))
      ,@(when docp
 	 `((setf (fdocumentation ',var 'variable) ',doc )))
      ',var))
@@ -245,7 +242,7 @@
   string for the parameter."
   `(progn
      (declaim (special ,var))
-     (setq ,var ,val)
+     (set ',var ,val)
      ,@(when docp
 	 `((setf (fdocumentation ',var 'variable) ',doc)))
      ',var))

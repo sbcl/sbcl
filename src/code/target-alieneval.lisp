@@ -626,7 +626,17 @@
         return."
   (multiple-value-bind (lisp-name alien-name)
       (pick-lisp-and-alien-names name)
-    (collect ((docs) (lisp-args) (arg-types) (alien-vars)
+    (collect ((docs) (lisp-args) (lisp-arg-types)
+              (lisp-result-types
+               (cond ((eql result-type 'void)
+                      ;; What values does a function return, if it
+                      ;; returns no values? Exactly one - NIL. -- APD,
+                      ;; 2003-03-02
+                      (list 'null))
+                     (t
+                      ;; FIXME: Check for VALUES.
+                      (list `(alien ,result-type)))))
+              (arg-types) (alien-vars)
 	      (alien-args) (results))
       (dolist (arg args)
 	(if (stringp arg)
@@ -634,66 +644,67 @@
 	    (destructuring-bind (name type &optional (style :in)) arg
 	      (unless (member style '(:in :copy :out :in-out))
 		(error "bogus argument style ~S in ~S" style arg))
-	      (unless (eq style :out)
-		(lisp-args name))
 	      (when (and (member style '(:out :in-out))
 			 (typep (parse-alien-type type lexenv)
 				'alien-pointer-type))
 		(error "can't use :OUT or :IN-OUT on pointer-like type:~%  ~S"
 		       type))
-	      (cond ((eq style :in)
-		     (arg-types type)
-		     (alien-args name))
-		    (t
-		     (arg-types `(* ,type))
-		     (if (eq style :out)
-			 (alien-vars `(,name ,type))
-			 (alien-vars `(,name ,type ,name)))
-		     (alien-args `(addr ,name))))
+              (let (arg-type)
+                (cond ((eq style :in)
+                       (setq arg-type type)
+                       (alien-args name))
+                      (t
+                       (setq arg-type `(* ,type))
+                       (if (eq style :out)
+                           (alien-vars `(,name ,type))
+                           (alien-vars `(,name ,type ,name)))
+                       (alien-args `(addr ,name))))
+                (arg-types arg-type)
+                (unless (eq style :out)
+                  (lisp-args name)
+                  (lisp-arg-types t
+                                  ;; FIXME: It should be something
+                                  ;; like `(ALIEN ,ARG-TYPE), except
+                                  ;; for we also accept SAPs where
+                                  ;; pointers are required.
+                                  )))
 	      (when (or (eq style :out) (eq style :in-out))
-		(results name)))))
+		(results name)
+                (lisp-result-types `(alien ,type))))))
       `(progn
-
 	 ;; The theory behind this automatic DECLAIM is that (1) if
 	 ;; you're calling C, static typing is what you're doing
 	 ;; anyway, and (2) such a declamation can be (especially for
 	 ;; alien values) both messy to do by hand and very important
 	 ;; for performance of later code which uses the return value.
-	 ,(let (;; FIXME: Ideally, we'd actually declare useful types
-		;; here, so e.g. an alien function of "int" and "char"
-		;; arguments would get Lisp arg types WORD and CHARACTER
-		;; or something. Meanwhile, for now we just punt.
-		(lisp-arg-types (mapcar (constantly t) (lisp-args)))
-		;; KLUDGE: This is a quick hack to solve bug 133,
-		;; where PROCLAIM trying to translate alien void result
-		;; types would signal an error here ("cannot use values
-		;; types here"), and the kludgy SB!ALIEN::*VALUE-TYPE-OKAY*
-		;; flag to enable values types didn't fit into PROCLAIM
-		;; in any reasonable way. But there's likely a better
-		;; way to do this. (If there isn't a suitable utility
-		;; to systematically translate C return types into
-		;; Lisp return types, there should be.) -- WHN 2002-01-22
-		(lisp-result-type (if (eql result-type 'void)
-				      '(values)
-				      `(alien ,result-type))))
-	    `(declaim (ftype (function ,lisp-arg-types ,lisp-result-type)
-			     ,lisp-name)))
-
+	 (declaim (ftype (function ,(lisp-arg-types)
+                                   (values ,@(lisp-result-types)))
+                         ,lisp-name))
 	 (defun ,lisp-name ,(lisp-args)
 	   ,@(docs)
 	   (with-alien
 	    ((,lisp-name (function ,result-type ,@(arg-types))
 			 :extern ,alien-name)
 	     ,@(alien-vars))
-	    ,(if (alien-values-type-p result-type)
+             #-nil
+             (values (alien-funcall ,lisp-name ,@(alien-args))
+                     ,@(results))
+             #+nil
+             (if (alien-values-type-p result-type)
+                 ;; FIXME: RESULT-TYPE is a type specifier, so it
+                 ;; cannot be of type ALIEN-VALUES-TYPE. Also note,
+                 ;; that if RESULT-TYPE is VOID, then this code
+                 ;; disagrees with the computation of the return type
+                 ;; and with all usages of this macro. -- APD,
+                 ;; 2002-03-02
 		 (let ((temps (make-gensym-list
 			       (length
 				(alien-values-type-values result-type)))))
 		   `(multiple-value-bind ,temps
 			(alien-funcall ,lisp-name ,@(alien-args))
 		      (values ,@temps ,@(results))))
-		 `(values (alien-funcall ,lisp-name ,@(alien-args))
-			  ,@(results)))))))))
+		 (values (alien-funcall ,lisp-name ,@(alien-args))
+                         ,@(results)))))))))
 
 (defmacro def-alien-routine (&rest rest)
   (deprecation-warning 'def-alien-routine 'define-alien-routine)

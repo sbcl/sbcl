@@ -814,8 +814,7 @@ reset to ~S."
 	(*read-suppress* nil))
     (unless (typep *debug-condition* 'step-condition)
       (clear-input *debug-io*))
-    #!-mp (debug-loop)
-    #!+mp (sb!mp:without-scheduling (debug-loop))))
+    (debug-loop)))
 
 ;;;; DEBUG-LOOP
 

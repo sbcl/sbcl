@@ -108,3 +108,11 @@
 (let ((x (copy-seq #*0011))
       (y (copy-seq #*0101)))
   (assert (equalp (bit-and x y nil) #*0001)))
+
+;;; arrays of NIL should work, FSVO "work".
+(let ((a (make-array '(10 10) :element-type 'nil)))
+  (assert (= (array-total-size a) 100))
+  (assert (equal (array-dimensions a) '(10 10)))
+  (assert (eq (array-element-type a) 'nil)))
+
+(assert (eq (upgraded-array-element-type 'nil) 'nil))

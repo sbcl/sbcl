@@ -2643,9 +2643,7 @@
   (and (>= (length string) (length tail))
        (string= string tail :start1 (- (length string) (length tail)))))
 
-(defun write-c-header ()
-
-  ;; writing beginning boilerplate
+(defun write-boilerplate ()
   (format t "/*~%")
   (dolist (line
 	   '("This is a machine-generated file. Please do not edit it by hand."
@@ -2658,11 +2656,9 @@
 	     "load and run 'core' files, which are basically programs"
 	     "in SBCL's own format."))
     (format t " * ~A~%" line))
-  (format t " */~%")
-  (terpri)
-  (format t "#ifndef _SBCL_H_~%#define _SBCL_H_~%")
-  (terpri)
+  (format t " */~%"))
 
+(defun write-config-h ()
   ;; propagating *SHEBANG-FEATURES* into C-level #define's
   (dolist (shebang-feature-name (sort (mapcar #'symbol-name
 					      sb-cold:*shebang-features*)
@@ -2671,15 +2667,20 @@
 	    "#define LISP_FEATURE_~A~%"
 	    (substitute #\_ #\- shebang-feature-name)))
   (terpri)
-
-  ;; writing miscellaneous constants
+  ;; and miscellaneous constants
   (format t "#define SBCL_CORE_VERSION_INTEGER ~D~%" sbcl-core-version-integer)
   (format t
 	  "#define SBCL_VERSION_STRING ~S~%"
 	  (sb!xc:lisp-implementation-version))
   (format t "#define CORE_MAGIC 0x~X~%" core-magic)
-  (terpri)
+  (format t "#ifndef LANGUAGE_ASSEMBLY~2%")
+  (format t "#define LISPOBJ(x) ((lispobj)x)~2%")
+  (format t "#else /* LANGUAGE_ASSEMBLY */~2%")
+  (format t "#define LISPOBJ(thing) thing~2%")
+  (format t "#endif /* LANGUAGE_ASSEMBLY */~2%")
+  (terpri))
 
+(defun write-constants-h ()
   ;; writing entire families of named constants 
   (let ((constants nil))
     (dolist (package-name '(;; Even in CMU CL, constants from VM
@@ -2809,16 +2810,13 @@
 	    (sb!xc:byte-position (symbol-value symbol)))
     (format t "#define ~A_MASK 0x~X /* ~:*~A */~%"
 	    (substitute #\_ #\- (symbol-name symbol))
-	    (sb!xc:mask-field (symbol-value symbol) -1)))
+	    (sb!xc:mask-field (symbol-value symbol) -1))))
 
+
+
+(defun write-primitive-object (obj)  
   ;; writing primitive object layouts
-  (let ((structs (sort (copy-list sb!vm:*primitive-objects*) #'string<
-		       :key (lambda (obj)
-			      (symbol-name
-			       (sb!vm:primitive-object-name obj))))))
     (format t "#ifndef LANGUAGE_ASSEMBLY~2%")
-    (format t "#define LISPOBJ(x) ((lispobj)x)~2%")
-    (dolist (obj structs)
       (format t
 	      "struct ~A {~%"
 	      (substitute #\_ #\-
@@ -2831,10 +2829,8 @@
 	(substitute #\_ #\-
 		    (string-downcase (string (sb!vm:slot-name slot))))
 	(sb!vm:slot-rest-p slot)))
-      (format t "};~2%"))
+  (format t "};~2%")
     (format t "#else /* LANGUAGE_ASSEMBLY */~2%")
-    (format t "#define LISPOBJ(thing) thing~2%")
-    (dolist (obj structs)
       (let ((name (sb!vm:primitive-object-name obj))
       (lowtag (eval (sb!vm:primitive-object-lowtag obj))))
 	(when lowtag
@@ -2843,10 +2839,10 @@
 		  (substitute #\_ #\- (string name))
 		  (substitute #\_ #\- (string (sb!vm:slot-name slot)))
 		  (- (* (sb!vm:slot-offset slot) sb!vm:n-word-bytes) lowtag)))
-	(terpri))))
+      (terpri)))
     (format t "#endif /* LANGUAGE_ASSEMBLY */~2%"))
 
-  ;; writing static symbol offsets
+(defun write-static-symbols ()
   (dolist (symbol (cons nil sb!vm:*static-symbols*))
     ;; FIXME: It would be nice to use longer names than NIL and
     ;; (particularly) T in #define statements.
@@ -2862,10 +2858,8 @@
 	      (+ sb!vm:static-space-start
 		 sb!vm:n-word-bytes
 		 sb!vm:other-pointer-lowtag
-		 (if symbol (sb!vm:static-symbol-offset symbol) 0)))))
+		   (if symbol (sb!vm:static-symbol-offset symbol) 0))))))
 
-  ;; Voila.
-  (format t "~%#endif~%"))
 
 ;;;; writing map file
 
@@ -3111,7 +3105,7 @@ initially undefined function references:~2%")
 		      symbol-table-file-name
 		      core-file-name
 		      map-file-name
-		      c-header-file-name)
+		      c-header-dir-name)
 
   (when (and core-file-name
 	     (not symbol-table-file-name))
@@ -3125,8 +3119,7 @@ initially undefined function references:~2%")
 	    ;; we're not e.g. also creating a header file when we
 	    ;; create a core.
 	    (format nil "creating core ~S" core-file-name)
-	    (format nil "creating header ~S" c-header-file-name)))
-
+	    (format nil "creating headers in ~S" c-header-dir-name)))
   (let* ((*cold-foreign-symbol-table* (make-hash-table :test 'equal)))
 
     ;; Read symbol table, if any.
@@ -3141,8 +3134,7 @@ initially undefined function references:~2%")
 	     (when filename
 	       (ensure-directories-exist filename :verbose t))))
       (frob core-file-name)
-      (frob map-file-name)
-      (frob c-header-file-name))
+      (frob map-file-name))
 
     ;; (This shouldn't matter in normal use, since GENESIS normally
     ;; only runs once in any given Lisp image, but it could reduce
@@ -3269,15 +3261,42 @@ initially undefined function references:~2%")
       ;; lexical variable, and it's annoying to have WRITE-MAP (to
       ;; *STANDARD-OUTPUT*) not be parallel to WRITE-INITIAL-CORE-FILE
       ;; (to a stream explicitly passed as an argument).
+      (macrolet ((out-to (name &body body)
+		   `(let ((fn (format nil "~A/~A.h" c-header-dir-name ,name)))
+		     (ensure-directories-exist fn)
+		     (with-open-file (*standard-output* fn  
+				      :if-exists :supersede :direction :output)
+		       (write-boilerplate)
+		       (let ((n (substitute #\_ #\- (string-upcase ,name))))
+			 (format 
+			  t
+			  "#ifndef SBCL_GENESIS_~A~%#define SBCL_GENESIS_~A 1~%"
+			  n n))
+		       ,@body
+		       (format t
+			"#endif /* SBCL_GENESIS_~A */~%"
+			(string-upcase ,name))))))
       (when map-file-name
 	(with-open-file (*standard-output* map-file-name
 					   :direction :output
 					   :if-exists :supersede)
 	  (write-map)))
-      (when c-header-file-name
-	(with-open-file (*standard-output* c-header-file-name
-					   :direction :output
-					   :if-exists :supersede)
-	  (write-c-header)))
+	(out-to "config" (write-config-h))
+	(out-to "constants" (write-constants-h))
+	(let ((structs (sort (copy-list sb!vm:*primitive-objects*) #'string<
+			     :key (lambda (obj)
+				    (symbol-name
+				     (sb!vm:primitive-object-name obj))))))
+	  (dolist (obj structs)
+	    (out-to
+	     (string-downcase (string (sb!vm:primitive-object-name obj)))
+	     (write-primitive-object obj)))
+	  (out-to "primitive-objects"
+		  (dolist (obj structs)
+		    (format t "~&#include \"~A.h\"~%"
+			    (string-downcase 
+			     (string (sb!vm:primitive-object-name obj)))))))
+	(out-to "static-symbols" (write-static-symbols))
+	
       (when core-file-name
-	(write-initial-core-file core-file-name)))))
+	  (write-initial-core-file core-file-name))))))

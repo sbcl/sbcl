@@ -72,7 +72,7 @@ SBCL compiles Common Lisp to native code. (Even today, some 30 years
 after the MacLisp compiler, people will tell you that Lisp is an
 interpreted language. Ignore them.)
 
-SBCL aims for but has not yet reached compliance with the ANSI
+SBCL aims for but has not completely achieved compliance with the ANSI
 standard for Common Lisp. More information about this is available in
 the BUGS section below.
 
@@ -186,30 +186,30 @@ likely to be a priority.)
 
 .SH THE COMPILER
 
-SBCL is essentially a compiler-only implementation of Lisp. All
+SBCL is essentially a compiler-only implementation of Common Lisp. All
 nontrivial Lisp code is compiled to native machine code before being
 executed, even when the Lisp code is typed interactively at the
 "interpreter" prompt.
 
 SBCL inherits from CMU CL the "Python" native code compiler. (Though
-we've essentially dropped that name in order to avoid confusion with
-the scripting language also called Python.) This compiler is very
-clever about understanding the type system of Common Lisp and using it
-to optimize code, and about producing notes to let the user know when
-the compiler doesn't have enough type information to produce efficient
+we often avoid that name in order to avoid confusion with the
+scripting language also called Python.) This compiler is very clever
+about understanding the type system of Common Lisp and using it to
+optimize code, and about producing notes to let the user know when the
+compiler doesn't have enough type information to produce efficient
 code. It also tries (almost always successfully) to follow the unusual
 but very useful principle that "declarations are assertions", i.e.
 type declarations should be checked at runtime unless the user
 explicitly tells the system that speed is more important than safety.
 
-The CMU CL version of this compiler reportedly produces pretty good
-code for modern CPU architectures which have lots of registers, but
-its code for the X86 is marred by a lot of extra loads and stores to
-stack-based temporary variables. Because of this, and because of the
-extra levels of indirection in Common Lisp relative to C, the
-performance of SBCL isn't going to impress people who are impressed by
-small constant factors. However, even on the X86 it tends to be faster
-than byte interpreted languages (and can be a lot faster).
+The compiler reportedly produces pretty good code for modern CPU
+architectures which have lots of registers, but its code for the X86
+is marred by many extra loads and stores to stack-based temporary
+variables. Because of this, and because of the extra levels of
+indirection in Common Lisp relative to C, the performance of SBCL
+isn't going to impress people who are impressed by small constant
+factors. However, even on the X86 it tends to be faster than byte
+interpreted languages (and can be a lot faster).
 
 The compiled code uses garbage collection to automatically
 manage memory. The garbage collector implementation varies considerably
@@ -369,9 +369,8 @@ X86 (Linux, FreeBSD, and OpenBSD), Alpha (Linux, Tru64), PPC
 For information on other ongoing and possible ports, see the
 sbcl-devel mailing list, and/or the web site.
 
-SBCL requires on the order of 16Mb RAM to run on X86 systems, 
-though for all but the smallest programs would be happier with 32Mb
-or more.
+SBCL requires on the order of 16Mb RAM to run on X86 systems, though
+all but the smallest programs would be happier with 32Mb or more.
 
 .SH ENVIRONMENT
 
@@ -388,9 +387,9 @@ default.
 
 .SH FILES
 
-/usr/lib/sbcl.core and /usr/local/lib/sbcl.core are the standard
-locations for the standard SBCL core, unless overridden by the SBCL_HOME
-variable.
+/usr/lib/sbcl/sbcl.core and /usr/local/lib/sbcl/sbcl.core are the
+standard locations for the standard SBCL core, unless overridden by
+the SBCL_HOME variable.
 
 /etc/sbclrc and /usr/local/etc/sbclrc are the standard locations for
 system-wide SBCL initialization files, unless overridden by the
@@ -427,8 +426,8 @@ compiling a file containing
 (DECLAIM (FTYPE (FUNCTION (T) NULL) SOMETIMES))
 (DEFUN SOMETIMES (X) (ODDP X))
 (DEFUN FOO (X) (IF (SOMETIMES X) 'THIS-TIME 'NOT-THIS-TIME))
-then running (FOO 1) gives NOT-THIS-TIME, because the
-never compiled code to check the declaration.
+then running (FOO 1) gives NOT-THIS-TIME, because the compiler
+relied on the truth of the DECLAIM without checking it.
 
 Some things are implemented very inefficiently.
 .TP 3
@@ -501,7 +500,7 @@ handled specially by certain type expanders.)
 
 To report a bug, please send mail to the mailing lists sbcl-help or
 sbcl-devel. You can find the complete mailing list addresses on the
-web pages, <http://sbcl.sourceforge.net/>. (You may also find fancy
+web pages at <http://sbcl.sourceforge.net/>. (You may also find fancy
 SourceForge bug-tracking machinery there, but don't be fooled. As of
 2002-07-25 anyway, we don't actively monitor that machinery, and it
 exists only because we haven't been able to figure out how to turn
@@ -542,4 +541,4 @@ optional per-user customizable startup script (in user's home directory)
 
 Dozens of people have made substantial contributions to SBCL and its
 subsystems, and to the CMU CL system on which it was based, over the
-years. See the CREDITS file in the distribution.
+years. See the CREDITS file in the distribution for more information.

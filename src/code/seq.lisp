@@ -203,8 +203,6 @@
 			      ;; This seems silly, is there something better?
 			      '(integer 0 (0))))))
 
-(declaim (ftype (function (sequence index index) nil)
-		signal-bounding-indices-bad-error))
 (defun signal-bounding-indices-bad-error (sequence start end)
   (let ((length (length sequence)))
     (error 'bounding-indices-bad-error
@@ -581,7 +579,7 @@
 
 (sb!xc:defmacro list-reverse-macro (sequence)
   `(do ((new-list ()))
-       ((atom ,sequence) new-list)
+       ((endp ,sequence) new-list)
      (push (pop ,sequence) new-list)))
 
 ) ; EVAL-WHEN
@@ -617,7 +615,7 @@
 		(aref ,sequence right-index)))))
 
 (sb!xc:defmacro list-nreverse-macro (list)
-  `(do ((1st (cdr ,list) (if (atom 1st) 1st (cdr 1st)))
+  `(do ((1st (cdr ,list) (if (endp 1st) 1st (cdr 1st)))
 	(2nd ,list 1st)
 	(3rd '() 2nd))
        ((atom 2nd) 3rd)

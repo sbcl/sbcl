@@ -323,10 +323,19 @@
 (declaim (ftype (function (list index) t) nth-but-with-sane-arg-order))
 (defun nth-but-with-sane-arg-order (list index)
   (nth index list))
+
+(defun adjust-list (list length initial-element)
+  (let ((old-length (length list)))
+    (cond ((< old-length length)
+           (append list (make-list (- length old-length)
+                                   :initial-element initial-element)))
+          ((> old-length length)
+           (subseq list 0 length))
+          (t list))))
 
 ;;;; miscellaneous iteration extensions
 
-;;; "the ultimate iteration macro" 
+;;; "the ultimate iteration macro"
 ;;;
 ;;; note for Schemers: This seems to be identical to Scheme's "named LET".
 (defmacro named-let (name binds &body body)
@@ -626,11 +635,24 @@
 (defun legal-fun-name-p (name)
   (or (symbolp name)
       (and (consp name)
-           (or (eq (car name) 'setf)
-	       (eq (car name) 'sb!pcl::class-predicate))
-           (consp (cdr name))
-           (symbolp (cadr name))
-           (null (cddr name)))))
+	   ;; (SETF FOO)
+	   ;; (CLASS-PREDICATE FOO)
+           (or (and (or (eq (car name) 'setf)
+			(eq (car name) 'sb!pcl::class-predicate))
+		    (consp (cdr name))
+		    (symbolp (cadr name))
+		    (null (cddr name)))
+	       ;; (SLOT-ACCESSOR <CLASSNAME-OR-:GLOBAL>
+	       ;;  <SLOT-NAME> [READER|WRITER|BOUNDP])
+	       (and (eq (car name) 'sb!pcl::slot-accessor)
+		    (consp (cdr name))
+		    (symbolp (cadr name))
+		    (consp (cddr name))
+		    (symbolp (caddr name))
+		    (consp (cdddr name))
+		    (member
+		     (cadddr name)
+		     '(sb!pcl::reader sb!pcl::writer sb!pcl::boundp)))))))
 
 ;;; Signal an error unless NAME is a legal function name.
 (defun legal-fun-name-or-type-error (name)
@@ -655,7 +677,9 @@
 	 fun-name)
 	((and (consp fun-name)
 	      (legal-fun-name-p fun-name))
-	 (second fun-name))
+	 (case (car fun-name)
+	   ((setf sb!pcl::class-predicate) (second fun-name))
+	   ((sb!pcl::slot-accessor) (third fun-name))))
 	(t
 	 (error "not legal as a function name: ~S" fun-name))))
 

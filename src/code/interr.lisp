@@ -222,6 +222,10 @@
 	 "A function with declared result type NIL returned:~%  ~S"
 	 :format-arguments (list function)))
 
+(deferr nil-array-accessed-error (array)
+  (error 'nil-array-accessed-error
+	 :datum array :expected-type '(not (array nil))))
+
 (deferr division-by-zero-error (this that)
   (error 'division-by-zero
 	 :operation 'division
@@ -271,6 +275,11 @@
   (error 'type-error
 	 :datum object
 	 :expected-type '(unsigned-byte 32)))
+
+(deferr object-not-simple-array-nil-error (object)
+  (error 'type-error
+	 :datum object
+	 :expected-type '(simple-array nil (*))))
 
 (deferr object-not-simple-array-unsigned-byte-2-error (object)
   (error 'type-error

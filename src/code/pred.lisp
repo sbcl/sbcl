@@ -135,6 +135,19 @@
   "Return T if OBJ1 and OBJ2 are the same object, otherwise NIL."
   (eq obj1 obj2))
 
+(defun bit-vector-= (x y)
+  (declare (type bit-vector x y))
+  (if (and (simple-bit-vector-p x)
+	   (simple-bit-vector-p y))
+      (bit-vector-= x y) ; DEFTRANSFORM
+      (and (= (length x) (length y))
+	   (do ((i 0 (1+ i))
+		(length (length x)))
+	       ((= i length) t)
+	     (declare (fixnum i))
+	     (unless (= (bit x i) (bit y i))
+	       (return nil))))))
+
 (defun equal (x y)
   #!+sb-doc
   "Return T if X and Y are EQL or if they are structured components
@@ -152,15 +165,7 @@
 	 (and (pathnamep y) (pathname= x y)))
 	((bit-vector-p x)
 	 (and (bit-vector-p y)
-	      (= (the fixnum (length x))
-		 (the fixnum (length y)))
-	      (do ((i 0 (1+ i))
-		   (length (length x)))
-		  ((= i length) t)
-		(declare (fixnum i))
-		(or (= (the fixnum (bit x i))
-		       (the fixnum (bit y i)))
-		    (return nil)))))
+	      (bit-vector-= x y)))
 	(t nil)))
 
 ;;; EQUALP comparison of HASH-TABLE values

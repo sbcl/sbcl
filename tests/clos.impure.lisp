@@ -556,5 +556,20 @@
 ;;; we should be able to make classes with uninterned names:
 (defclass #:class-with-uninterned-name () ())
 
+;;; SLOT-MISSING should be called when there are missing slots.
+(defclass class-with-all-slots-missing () ())
+(defmethod slot-missing (class (o class-with-all-slots-missing)
+			 slot-name op
+			 &optional new-value)
+  op)
+(assert (eq (slot-value (make-instance 'class-with-all-slots-missing) 'foo)
+	    'slot-value))
+(assert (eq (funcall (lambda (x) (slot-value x 'bar))
+		     (make-instance 'class-with-all-slots-missing))
+	    'slot-value))
+(assert (eq (funcall (lambda (x) (setf (slot-value x 'baz) 'baz))
+		     (make-instance 'class-with-all-slots-missing))
+	    'setf))
+
 ;;;; success
 (sb-ext:quit :unix-status 104)

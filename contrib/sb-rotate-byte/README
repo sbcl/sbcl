@@ -1,0 +1,16 @@
+This module provides an implementation of ROTATE-BYTE, described at
+<http://www.cliki.net/ROTATE-BYTE">.  Its inclusion is hoped to
+achieve two aims:
+
+(1) to provide the necessary functionality for implementations of
+    cryptographic and hashing algorithms (e.g. MD5);
+
+(2) to provide an example of the things that can be achieved by using
+    the external but unsupported interfaces to the compiler.
+
+Included in the module as of 2003-02-11 is an efficient implementation
+of unsigned 32-bit rotation for the x86; when the compiler can prove
+that the rotation in question is of an (UNSIGNED-BYTE 32) over the
+byte specifier (BYTE 32 0), it will compile directly to machine
+rotation instructions.  Patches for similar functionality on other
+platforms are welcome.

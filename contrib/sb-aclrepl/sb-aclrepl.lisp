@@ -3,14 +3,16 @@
 ;;;; SBCL-specific hooks like SB-INT:*REPL-READ-FUN* and
 ;;;; SB-INT:*REPL-PROMPT-FUN*.
 ;;;;
-;;;; The documentation for this functionality is on the ACL website,
+;;;; The documentation, which may or may not apply in its entirety at
+;;;; any given time, for this functionality is on the ACL website:
 ;;;;   <http://www.franz.com/support/documentation/6.2/doc/top-level.htm>.
 
 (cl:defpackage :sb-aclrepl
   (:use :cl :sb-ext)
-  (:export :*prompt*)
-  ;; (what else should we be exporting?)
-  )
+  ;; FIXME: should we be exporting anything else?
+  (:export #:*prompt* #:*exit-on-eof* #:*max-history*
+	   #:*use-short-package-name* #:*command-char*
+	   #:alias))
 
 (cl:in-package :sb-aclrepl)
 
@@ -23,11 +25,11 @@
   "when T, use the shortnest package nickname in a prompt")
 (defparameter *dir-stack* nil
   "The top-level directory stack")
-(defparameter *cmd-char* #\:
+(defparameter *command-char* #\:
   "Prefix character for a top-level command")
 (defvar *max-history* 24
   "Maximum number of history commands to remember")
-(defvar *exit-on-eof*
+(defvar *exit-on-eof* t
   "If T, then exit when the EOF character is entered.")
 (defparameter *history* nil
   "History list")
@@ -66,7 +68,7 @@
 		      collect arg))))))
     (let ((next-char (peek-char-non-whitespace input-stream)))
       (cond
-	((eql next-char *cmd-char*)
+	((eql next-char *command-char*)
 	 (let* ((line (string-trim-whitespace (read-line input-stream)))
 		(first-space-pos (position #\space line))
 		(cmd-string (subseq line 1 first-space-pos))
@@ -482,6 +484,7 @@
 	 (fresh-line)
 	 t) ; Ayup.
 	(t
+	 (add-to-history user-cmd)
 	 nil))) ; nope, not in my job description
 
 (defun repl-read-form-fun (input-stream output-stream)

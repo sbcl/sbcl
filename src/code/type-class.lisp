@@ -280,11 +280,21 @@
 ;;; when no next method exists. -- WHN 2002-04-07
 ;;;
 ;;; (We miss CLOS! -- CSR and WHN)
-(defun invoke-complex-subtypep-arg1-method (type1 type2)
+(defun invoke-complex-subtypep-arg1-method (type1 type2 &optional subtypep win)
   (let* ((type-class (type-class-info type1))
 	 (method-fun (type-class-complex-subtypep-arg1 type-class)))
     (if method-fun
 	(funcall (the function method-fun) type1 type2)
-	(values nil nil))))
+	(values subtypep win))))
+
+;;; KLUDGE: This function is dangerous, as its overuse could easily
+;;; cause stack exhaustion through unbounded recursion.  We only use
+;;; it in one place; maybe it ought not to be a function at all?
+(defun invoke-complex-=-other-method (type1 type2)
+  (let* ((type-class (type-class-info type1))
+	 (method-fun (type-class-complex-= type-class)))
+    (if method-fun
+	(funcall (the function method-fun) type2 type1)
+	(values nil t))))
 
 (!defun-from-collected-cold-init-forms !type-class-cold-init)

@@ -1192,6 +1192,18 @@ WORKAROUND:
   compiler gets its hands on the code needing compilation from the REPL,
   it has been macroexpanded several times.
 
+241: "DEFCLASS mysteriously remembers uninterned accessor names."
+  (from tonyms on #lisp IRC 2003-02-25)
+  In sbcl-0.7.12.55, typing
+    (defclass foo () ((bar :accessor foo-bar)))
+    (profile foo-bar)
+    (unintern 'foo-bar)
+    (defclass foo () ((bar :accessor foo-bar)))
+  gives the error message
+    "#:FOO-BAR already names an ordinary function or a macro."
+  So it's somehow checking the uninterned old accessor name instead
+  of the new requested accessor name, which seems broken to me (WHN).
+
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:
     These labels were used for bugs related to the old IR1 interpreter.

@@ -346,15 +346,6 @@
    macrobindings
    (lambda (&key vars)
      (ir1-translate-locally body start cont :vars vars))))
-
-;;; not really a special form, but..
-(def-ir1-translator declare ((&rest stuff) start cont)
-  (declare (ignore stuff))
-  ;; We ignore START and CONT too, but we can't use DECLARE IGNORE to
-  ;; tell the compiler about it here, because the DEF-IR1-TRANSLATOR
-  ;; macro would put the DECLARE in the wrong place, so..
-  start cont
-  (compiler-error "misplaced declaration"))
 
 ;;;; %PRIMITIVE
 ;;;;
@@ -444,7 +435,7 @@
 			  thing
 			  :debug-name (debug-namify "#'~S" thing)
 			  :allow-debug-catch-tag t)))
-	((setf sb!pcl::class-predicate)
+	((setf sb!pcl::class-predicate sb!pcl::slot-accessor)
 	 (let ((var (find-lexically-apparent-fun
 		     thing "as the argument to FUNCTION")))
 	   (reference-leaf start cont var)))
@@ -680,12 +671,14 @@
 
 ;;; A logic shared among THE and TRULY-THE.
 (defun the-in-policy (type value policy start cont)
-  (let ((type (if (ctype-p type) type
-                  (compiler-values-specifier-type type))))
+  (let ((type (coerce-to-values
+               (if (ctype-p type) type
+                   (compiler-values-specifier-type type)))))
     (cond ((or (and (leaf-p value)
                     (values-subtypep (leaf-type value) type))
                (and (sb!xc:constantp value)
-                    (ctypep (constant-form-value value) type)))
+                    (ctypep (constant-form-value value)
+                            (single-value-type type))))
            (ir1-convert start cont value))
           (t (let ((value-cont (make-continuation)))
                (ir1-convert start value-cont value)

@@ -276,6 +276,11 @@
 					    `(typep ,n-obj ',x))
 					  (rest spec))))))))))
 
+(defun source-transform-negation-typep (object type)
+  (declare (type negation-type type))
+  (let ((spec (type-specifier (negation-type-type type))))
+    `(not (typep ,object ',spec))))
+
 ;;; Do source transformation for TYPEP of a known union type. If a
 ;;; union type contains LIST, then we pull that out and make it into a
 ;;; single LISTP call. Note that if SYMBOL is in the union, then LIST
@@ -505,6 +510,8 @@
 	    (typecase type
 	      (hairy-type
 	       (source-transform-hairy-typep object type))
+	      (negation-type
+	       (source-transform-negation-typep object type))
 	      (union-type
 	       (source-transform-union-typep object type))
 	      (intersection-type

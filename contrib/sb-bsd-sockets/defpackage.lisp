@@ -30,8 +30,8 @@
   (add-package-nickname "SYSTEM" "SB-SYS"))
 
 (defpackage "SB-BSD-SOCKETS"
-  (:export socket unix-socket inet-socket
-           make-unix-socket make-inet-socket
+  (:export socket local-socket inet-socket
+           make-local-socket make-inet-socket
            socket-bind socket-accept socket-connect
            socket-send socket-receive socket-recv
            socket-name socket-peername socket-listen
@@ -92,7 +92,7 @@ arguments to fit Lisp style more closely.
 <li> Methods applicable to a particular subclass
 <ol>
 <li> <a href="#internet">INET-SOCKET</a> - Internet Protocol (TCP, UDP, raw) sockets
-<li> Methods on <a href="#UNIX-SOCKET">UNIX-SOCKET</a> - Unix-domain sockets 
+<li> Methods on <a href="#LOCAL-SOCKET">LOCAL-SOCKET</a> - Local-domain sockets 
 </ol>
 <li> <a href="#name-service">Name resolution</a> (DNS, /etc/hosts, &amp;c)
 </ol>
@@ -105,11 +105,12 @@ available on a variety of systems, and documented.  There are some
 differences in approach where we have taken advantage of some of the more useful features of Common Lisp - briefly
 
 <ul>
-<li> Where the C API would typically return -1 and set errno, bsd-sockets
-signals an error.  All the errors are subclasses of SOCKET-CONDITION
+<li> Where the C API would typically return -1 and set errno, we
+signal an error.  All the errors are subclasses of SOCKET-CONDITION
 and generally correspond one for one with possible <tt>errno</tt> values
 
-<li> We use multiple return values in many places where the C API would use p[ass-by-reference values
+<li> We use multiple return values in many places where the C API would use
+pass-by-reference values
 
 <li> We can often avoid supplying an explicit <i>length</i> argument to
 functions because we already know how long the argument is.

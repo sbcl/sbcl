@@ -158,6 +158,8 @@
 	   (error "unknown type specifier: ~S"
 		  (unknown-type-specifier reparse))
 	   (%%typep object reparse))))
+    (negation-type
+     (not (%%typep object (negation-type-type type))))
     (hairy-type
      ;; Now the tricky stuff.
      (let* ((hairy-spec (hairy-type-specifier type))

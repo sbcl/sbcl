@@ -462,18 +462,30 @@
 ;;; keywords specify the initial values for various optimizers that
 ;;; the function might have.
 (defmacro defknown (name arg-types result-type &optional (attributes '(any))
-			 &rest keys)
+                    &rest keys)
   (when (and (intersection attributes '(any call unwind))
 	     (intersection attributes '(movable)))
     (error "function cannot have both good and bad attributes: ~S" attributes))
 
   (when (member 'any attributes)
-    (setf attributes (union '(call unsafe unwind) attributes)))
+    (setq attributes (union '(call unsafe unwind) attributes)))
   (when (member 'flushable attributes)
     (pushnew 'unsafely-flushable attributes))
 
+  ;; FIXME: We use non-ANSI "exact" interpretation of VALUES types
+  ;; here. It would be better to give such ability to the user too. --
+  ;; APD, 2003-03-18
+  (setq result-type
+        (cond ((eq result-type '*) '*)
+              ((or (atom result-type)
+                   (neq (car result-type) 'values))
+               `(values ,result-type &optional))
+              ((intersection (cdr result-type) lambda-list-keywords)
+               result-type)
+              (t `(values ,@(cdr result-type) &optional))))
+
   `(%defknown ',(if (and (consp name)
-			 (not (eq (car name) 'setf)))
+			 (not (legal-fun-name-p name)))
 		    name
 		    (list name))
 	      '(function ,arg-types ,result-type)
@@ -682,6 +694,19 @@
     `(if ,n-res
 	 (values (cdr ,n-res) t)
 	 (values nil nil))))
+
+(defmacro with-component-last-block ((component block) &body body)
+  (let ((old-last-block (gensym "OLD-LAST-BLOCK")))
+    (once-only ((component component)
+                (block block))
+      `(let ((,old-last-block (component-last-block ,component)))
+         (unwind-protect
+              (progn (setf (component-last-block ,component)
+                           ,block)
+                     ,@body)
+           (setf (component-last-block ,component)
+                 ,old-last-block))))))
+
 
 ;;;; the EVENT statistics/trace utility
 

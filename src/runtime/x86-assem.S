@@ -16,7 +16,12 @@
 #define LANGUAGE_ASSEMBLY
 #include "validate.h"
 #include "sbcl.h"
+#include "genesis/closure.h"
+#include "genesis/fdefn.h"
+#include "genesis/static-symbols.h"
+#include "genesis/symbol.h"	
 
+	
 /* Minimize conditionalization for different OS naming schemes. */
 #if defined __linux__  || defined __FreeBSD__ /* (but *not* OpenBSD) */
 #define GNAME(var) var
@@ -657,7 +662,7 @@ GNAME(alloc_16_to_edi):
 		
 
 
-#ifdef LISP_FEATURE_GENCGC
+#ifdef LISP_FEATURE_GENCGC_INLINE_ALLOC /* disabled at present */
 
 /* These routines are called from Lisp when an inline allocation 
  * overflows. Every register except the result needs to be preserved.

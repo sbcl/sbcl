@@ -709,12 +709,10 @@ code to be loaded.
 			(setq n (+ n (estimate-code-size-1 (cadr l) env) 1))))
 		     ((eq fn 'go) 1)
 		     ((eq fn 'function)
-		      ;; This skirts the issue of implementationally-defined
-		      ;; lambda macros by recognizing CL function names and
-		      ;; nothing else.
-		      (if (or (symbolp (cadr x))
-			      (and (consp (cadr x)) (eq (caadr x) 'setf)))
+		      (if (sb!int:legal-fun-name-p (cadr x))
 			  1
+			  ;; FIXME: This tag appears not to be present
+			  ;; anywhere.
 			  (throw 'duplicatable-code-p nil)))
 		     ((eq fn 'multiple-value-setq)
 		      (f (length (second x)) (cddr x)))

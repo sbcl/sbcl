@@ -721,7 +721,7 @@ interpretation, and setting <parameter>safety</> less than
 compiler's decision whether to inline operations, which tend to
 increase the size of programs. Use the value <literal>0</> with
 caution, since it can cause the compiler to inline operations so
-promiscuously that the net effect is to slow the program by causing
+indiscriminately that the net effect is to slow the program by causing
 cache misses or swapping.</para>
 
 <!-- FIXME: old CMU CL compiler policy, should perhaps be adapted
@@ -790,7 +790,7 @@ _
 _\item[\code{space}] \cindex{space optimization quality}How much space
 _  the compiled code should take up.  Inline expansion is mostly
 _  inhibited when \code{space} is greater than \code{speed}.  A value
-_  of \code{0} enables promiscuous inline expansion.  Wide use of a
+_  of \code{0} enables indiscriminate inline expansion.  Wide use of a
 _  \code{0} value is not recommended, as it may waste so much space
 _  that run time is slowed.  \xlref{inline-expansion} for a discussion
 _  of inline expansion.

@@ -312,3 +312,24 @@
                        (push node path))
                   (when (funcall equalp key (node-key node))
                     (return (values node path t))))))))
+
+;;; CONSTANTLY should return a side-effect-free function (bug caught
+;;; by Paul Dietz' test suite)
+(let ((i 0))
+  (let ((fn (constantly (progn (incf i) 1))))
+    (assert (= i 1))
+    (assert (= (funcall fn) 1))
+    (assert (= i 1))
+    (assert (= (funcall fn) 1))
+    (assert (= i 1))))
+
+;;; Bug 240 reported by tonyms on #lisp IRC 2003-02-25 (modified version)
+(loop for (fun warns-p) in
+     '(((lambda (&optional *x*) *x*) t)
+       ((lambda (&optional *x* &rest y) (values *x* y)) t)
+       ((lambda (&optional *print-base*) (values *print-base*)) nil)
+       ((lambda (&optional *print-base* &rest y) (values *print-base* y)) nil)
+       ((lambda (&optional *x*) (declare (special *x*)) (values *x*)) nil)
+       ((lambda (&optional *x* &rest y) (declare (special *x*)) (values *x* y)) nil))
+   for real-warns-p = (nth-value 1 (compile nil fun))
+   do (assert (eq warns-p real-warns-p)))

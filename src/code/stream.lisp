@@ -191,7 +191,10 @@
 
 ;;; like FILE-POSITION, only using :FILE-LENGTH
 (defun file-length (stream)
-  (declare (type (or file-stream synonym-stream) stream))
+  ;; FIXME: The following declaration uses yet undefined types, which
+  ;; cause cross-compiler hangup.
+  ;;
+  ;; (declare (type (or file-stream synonym-stream) stream))
   (stream-must-be-associated-with-file stream)
   (funcall (ansi-stream-misc stream) stream :file-length))
 
@@ -904,7 +907,7 @@
 		  (let* ((stream (car current))
 			 (result (,fun stream nil nil)))
 		    (when result (return result)))
-		  (setf (concatenated-stream-current stream) current)))))
+		  (pop (concatenated-stream-current stream))))))
   (in-fun concatenated-in read-char)
   (in-fun concatenated-bin read-byte))
 

@@ -553,18 +553,14 @@
                                     +slot-unbound+))
                                 direct-slots)))
          (reader-names (mapcar (lambda (slotd)
-                                 (intern (format nil
-                                                 "~A~A reader"
-                                                 conc-name
-                                                 (slot-definition-name
-                                                  slotd))))
+                                 (list 'slot-accessor name
+				       (slot-definition-name slotd)
+				       'reader))
                                direct-slots))
          (writer-names (mapcar (lambda (slotd)
-                                 (intern (format nil
-                                                 "~A~A writer"
-                                                 conc-name
-                                                 (slot-definition-name
-                                                  slotd))))
+                                 (list 'slot-accessor name
+				       (slot-definition-name slotd)
+				       'writer))
                                direct-slots))
          (readers-init
            (mapcar (lambda (slotd reader-name)

@@ -265,8 +265,6 @@
  ("src/code/weak"  :not-host)
  ("src/code/final" :not-host)
 
- #!+mp ("src/code/multi-proc" :not-host)
-
  ("src/code/setf-funs" :not-host)
 
  ("src/code/stubs" :not-host)
@@ -513,6 +511,7 @@
  ("src/compiler/target/alloc")
  ("src/compiler/target/call")
  ("src/compiler/target/nlx")
+ ("src/compiler/generic/late-nlx")
  ("src/compiler/target/show")
  ("src/compiler/target/array"
   ;; KLUDGE: Compiling this file for X86 raises alarming warnings of
@@ -529,6 +528,7 @@
   ;; what the problem is and fix it. (See the comments in
   ;; src/compiler/x86/array for a candidate patch.) -- WHN 19990323
   :ignore-failure-p)
+ ("src/compiler/generic/array")
  ("src/compiler/target/pred")
 
  ("src/compiler/target/type-vops")

@@ -457,10 +457,8 @@
       (case count
 	(1)
 	(0
-	 (unless #!-mp (sb!sys:wait-until-fd-usable
-		       fd :input (fd-stream-timeout stream))
-		 #!+mp (sb!mp:process-wait-until-fd-usable
-		       fd :input (fd-stream-timeout stream))
+	 (unless (sb!sys:wait-until-fd-usable
+		  fd :input (fd-stream-timeout stream))
 	   (error 'io-timeout :stream stream :direction :read)))
 	(t
 	 (simple-stream-perror "couldn't check whether ~S is readable"
@@ -473,10 +471,8 @@
       (cond ((null count)
 	     (if (eql errno sb!unix:ewouldblock)
 		 (progn
-		   (unless #!-mp (sb!sys:wait-until-fd-usable
-				 fd :input (fd-stream-timeout stream))
-			   #!+mp (sb!mp:process-wait-until-fd-usable
-				 fd :input (fd-stream-timeout stream))
+		   (unless (sb!sys:wait-until-fd-usable
+			    fd :input (fd-stream-timeout stream))
 		     (error 'io-timeout :stream stream :direction :read))
 		   (frob-input stream))
 		 (simple-stream-perror "couldn't read from ~S" stream errno)))

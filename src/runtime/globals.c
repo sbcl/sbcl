@@ -14,6 +14,8 @@
  */
 
 #include <stdio.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 #include "runtime.h"
 #include "sbcl.h"
@@ -28,9 +30,7 @@ lispobj *current_control_frame_pointer;
 lispobj *current_binding_stack_pointer;
 #endif
 
-/* ALLOCATION_POINTER is more or less synonymous with RT, it seems.
- * Anyone want to do an RT port of sbcl?  
- */
+/* ALLOCATION_POINTER is x86 or RT.  Anyone want to do an RT port?   */
 
 #ifndef ALLOCATION_POINTER
 /* The Object Formerly Known As current_dynamic_space_free_pointer */
@@ -50,6 +50,7 @@ void globals_init(void)
 {
     /* Space, stack, and free pointer vars are initialized by
      * validate() and coreparse(). */
+    current_control_frame_pointer = (lispobj *)0;
 
 #ifndef LISP_FEATURE_GENCGC 
     /* no GC trigger yet */

@@ -115,6 +115,9 @@
 ;;;; the SXHASH function
 
 (defun sxhash (x)
+  ;; profiling SXHASH is hard, but we might as well try to make it go
+  ;; fast, in case it is the bottleneck somwhere.  -- CSR, 2003-03-14
+  (declare (optimize speed))
   (labels ((sxhash-number (x)
 	     (etypecase x
 	       (fixnum (sxhash x))	; through DEFTRANSFORM
@@ -135,7 +138,7 @@
 	   (sxhash-recurse (x &optional (depthoid +max-hash-depthoid+))
 	     (declare (type index depthoid))
 	     (typecase x
-	       (list
+	       (cons
 		(if (plusp depthoid)
 		    (mix (sxhash-recurse (car x) (1- depthoid))
 			 (sxhash-recurse (cdr x) (1- depthoid)))
@@ -151,11 +154,15 @@
 		(typecase x
 		  (simple-string (sxhash x)) ; through DEFTRANSFORM
 		  (string (%sxhash-substring x))
-		  (bit-vector (let ((result 410823708))
-				(declare (type fixnum result))
-				(dotimes (i (min depthoid (length x)))
-				  (mixf result (aref x i)))
-				result))
+		  (simple-bit-vector (sxhash x)) ; through DEFTRANSFORM
+		  (bit-vector
+		   ;; FIXME: It must surely be possible to do better
+		   ;; than this.  The problem is that a non-SIMPLE
+		   ;; BIT-VECTOR could be displaced to another, with a
+		   ;; non-zero offset -- so that significantly more
+		   ;; work needs to be done using the %RAW-BITS
+		   ;; approach.  This will probably do for now.
+		   (sxhash-recurse (copy-seq x) depthoid))
 		  (t (logxor 191020317 (sxhash (array-rank x))))))
 	       (character
 		(logxor 72185131
@@ -187,7 +194,7 @@
     (array (array-psxhash key depthoid))
     (hash-table (hash-table-psxhash key))
     (structure-object (structure-object-psxhash key depthoid))
-    (list (list-psxhash key depthoid))
+    (cons (list-psxhash key depthoid))
     (number (number-psxhash key))
     (character (sxhash (char-upcase key)))
     (t (sxhash key))))

@@ -22,7 +22,8 @@
 	   complex-vector-p
 	   base-char-p %standard-char-p %instancep
 	   array-header-p
-	   simple-array-p simple-array-unsigned-byte-2-p
+	   simple-array-p simple-array-nil-p
+	   simple-array-unsigned-byte-2-p
 	   simple-array-unsigned-byte-4-p simple-array-unsigned-byte-8-p
 	   simple-array-unsigned-byte-16-p simple-array-unsigned-byte-32-p
 	   simple-array-signed-byte-8-p simple-array-signed-byte-16-p

@@ -117,10 +117,7 @@
 	 (character object))
 	((csubtypep type (specifier-type 'function))
 	 #!+high-security
-	 (when (and (or (symbolp object)
-			(and (listp object)
-			     (= (length object) 2)
-			     (eq (car object) 'setf)))
+	 (when (and (legal-fun-name-p object)
 		    (not (fboundp object)))
 	   (error 'simple-type-error
 		  :datum object

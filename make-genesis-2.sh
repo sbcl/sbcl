@@ -44,7 +44,7 @@ $SBCL_XC_HOST <<-'EOF' || exit 1
 	    (read s)))
 	(host-load-stem "src/compiler/generic/genesis")
 	(sb!vm:genesis :object-file-names *target-object-file-names*
-		       :c-header-file-name "output/sbcl2.h"
+		       :c-header-dir-name "output/genesis-2"
 		       :symbol-table-file-name "src/runtime/sbcl.nm"
 		       :core-file-name "output/cold-sbcl.core"
 		       ;; The map file is not needed by the system, but can
@@ -54,9 +54,9 @@ $SBCL_XC_HOST <<-'EOF' || exit 1
 	EOF
 
 echo //testing for consistency of first and second GENESIS passes
-if cmp src/runtime/sbcl.h output/sbcl2.h; then
-    echo //sbcl2.h matches sbcl.h -- good.
+if diff -qr src/runtime/genesis output/genesis-2; then
+    echo //header files match between first and second GENESIS -- good
 else
-    echo error: sbcl2.h does not match sbcl.h.
+    echo error: header files do not match between first and second GENESIS
     exit 1
 fi

@@ -28,6 +28,8 @@
 #include "interr.h"
 #include "gc.h"
 #include "gc-internal.h"
+#include "genesis/primitive-objects.h"
+#include "genesis/static-symbols.h"
 
 #define PRINTNOISE
 
@@ -362,6 +364,11 @@ setup_i386_stack_scav(lispobj *lowaddr, lispobj *base)
 	     * return addresses. This will also pick up pointers to
 	     * functions in code objects. */
 	    if (widetag_of(*start_addr) == CODE_HEADER_WIDETAG) {
+		/* FIXME asserting here is a really dumb thing to do.
+		 * If we've overflowed some arbitrary static limit, we
+		 * should just refuse to purify, instead of killing
+		 * the whole lisp session
+		 */
 		gc_assert(num_valid_stack_ra_locations <
 			  MAX_STACK_RETURN_ADDRESSES);
 		valid_stack_ra_locations[num_valid_stack_ra_locations] = sp;
@@ -1295,11 +1302,14 @@ purify(lispobj static_roots, lispobj read_only_roots)
     int count, i;
     struct later *laters, *next;
 
+
 #ifdef PRINTNOISE
     printf("[doing purification:");
     fflush(stdout);
 #endif
-
+#ifdef LISP_FEATURE_GENCGC
+    gc_alloc_update_all_page_tables();
+#endif
     if (fixnum_value(SymbolValue(FREE_INTERRUPT_CONTEXT_INDEX)) != 0) {
 	/* FIXME: 1. What does this mean? 2. It shouldn't be reporting
 	 * its error simply by a. printing a string b. to stdout instead
@@ -1324,7 +1334,7 @@ purify(lispobj static_roots, lispobj read_only_roots)
     fflush(stdout);
 #endif
 
-#ifdef LISP_FEATURE_GENCGC
+#if (defined(LISP_FEATURE_GENCGC) && defined(LISP_FEATURE_X86))
     gc_assert((lispobj *)CONTROL_STACK_END > ((&read_only_roots)+1));
     setup_i386_stack_scav(((&static_roots)-2), (lispobj *)CONTROL_STACK_END);
 #endif

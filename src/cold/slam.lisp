@@ -39,4 +39,6 @@
 				stem
 				*target-obj-suffix*)))
       (unless (output-up-to-date-wrt-input-p objname srcname)
-	(target-compile-stem stem)))))
+	(target-compile-stem stem
+			     :assem-p (find :assem flags)
+			     :ignore-failure-p (find :ignore-failure-p flags))))))

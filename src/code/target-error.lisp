@@ -120,39 +120,37 @@
                    (eq (restart-name x) name)))
              restarts)))
 
+(defun find-restart-or-lose (restart-designator)
+  (let ((real-restart (find-restart restart-designator)))
+    (unless real-restart
+      (error 'simple-control-error
+	     :format-control "Restart ~S is not active."
+	     :format-arguments (list restart-designator)))
+    real-restart))
+
 (defun invoke-restart (restart &rest values)
   #!+sb-doc
   "Calls the function associated with the given restart, passing any given
    arguments. If the argument restart is not a restart or a currently active
    non-nil restart name, then a control-error is signalled."
   (/show "entering INVOKE-RESTART" restart)
-  (let ((real-restart (find-restart restart)))
-    (unless real-restart
-      (error 'simple-control-error
-	     :format-control "Restart ~S is not active."
-	     :format-arguments (list restart)))
-    (/show (restart-name real-restart))
+  (let ((real-restart (find-restart-or-lose restart)))
     (apply (restart-function real-restart) values)))
+
+(defun interactive-restart-arguments (real-restart)
+  (let ((interactive-function (restart-interactive-function real-restart)))
+    (if interactive-function
+	(funcall interactive-function)
+	'())))
 
 (defun invoke-restart-interactively (restart)
   #!+sb-doc
   "Calls the function associated with the given restart, prompting for any
    necessary arguments. If the argument restart is not a restart or a
    currently active non-nil restart name, then a control-error is signalled."
-  (/show "entering INVOKE-RESTART-INTERACTIVELY" restart)
-  (let ((real-restart (find-restart restart)))
-    (unless real-restart
-      (error 'simple-control-error
-	     :format-control "Restart ~S is not active."
-	     :format-arguments (list restart)))
-    (/show (restart-name real-restart))
-    (/show0 "falling through to APPLY of RESTART-FUNCTION")
-    (apply (restart-function real-restart)
-	   (let ((interactive-function
-		  (restart-interactive-function real-restart)))
-	     (if interactive-function
-		 (funcall interactive-function)
-		 '())))))
+  (let* ((real-restart (find-restart-or-lose restart))
+	 (args (interactive-restart-arguments real-restart)))
+    (apply (restart-function real-restart) args)))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
 ;;; Wrap the RESTART-CASE expression in a WITH-CONDITION-RESTARTS if

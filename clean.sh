@@ -93,8 +93,9 @@ find . \( \
 	-name 'sbcl' -o \
 	-name 'sbcl.h' -o \
 	-name 'depend' -o \
-	-name '*.htm' -o \
-	-name '*.html' -o \
 	-name 'TAGS' -o \
 	-name 'tags' -o \
+	-name 'test-passed' -o \
 	-name 'local-target-features.lisp-expr' \) -print | xargs rm -f
+
+cd doc && sh ./clean.sh

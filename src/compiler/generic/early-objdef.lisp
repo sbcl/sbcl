@@ -75,6 +75,7 @@
   simple-string
   simple-bit-vector
   simple-vector
+  simple-array-nil
   simple-array-unsigned-byte-2
   simple-array-unsigned-byte-4
   simple-array-unsigned-byte-8

@@ -43,6 +43,6 @@ $SBCL_XC_HOST <<-'EOF' || exit 1
 	  (load "tests/type.before-xc.lisp")
 	  (load "tests/info.before-xc.lisp"))
         (host-cload-stem "src/compiler/generic/genesis")
-	(sb!vm:genesis :c-header-file-name "src/runtime/sbcl.h")
+	(sb!vm:genesis :c-header-dir-name "src/runtime/genesis")
         #+cmu (ext:quit)
 	EOF

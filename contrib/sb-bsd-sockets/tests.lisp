@@ -129,20 +129,20 @@ Tests are in the file <tt>tests.lisp</tt> and also make good examples.
   t)
 
 #||
-<h2>Unix-domain sockets</h2>
+<h2>Local-domain sockets</h2>
 
 A fairly rudimentary test that connects to the syslog socket and sends a 
 message.  Priority 7 is kern.debug; you'll probably want to look at
 /etc/syslog.conf or local equivalent to find out where the message ended up
 ||#
-
-(deftest simple-unix-client
-    (let ((s (make-instance 'unix-socket :type :datagram)))
+#-sunos
+(deftest simple-local-client
+    (let ((s (make-instance 'local-socket :type :stream)))
       (format t "~A~%" s)
       (socket-connect s "/dev/log")
       (let ((stream (socket-make-stream s :input t :output t :buffering :none)))
 	(format stream
-		"<7>bsd-sockets: Don't panic.  We're testing unix-domain client code; this message can safely be ignored")
+		"<7>bsd-sockets: Don't panic.  We're testing local-domain client code; this message can safely be ignored")
 	t))
   t)
 

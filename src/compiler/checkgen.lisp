@@ -109,9 +109,7 @@
                            :optional (mapcar #'weaken-type
                                              (values-type-optional type))
                            :rest (acond ((values-type-rest type)
-                                         (weaken-type it))
-                                        ((values-type-keyp type)
-                                         *universal-type*))))
+                                         (weaken-type it)))))
         (t (weaken-type type))))
 
 ;;;; checking strategy determination
@@ -221,32 +219,66 @@
 ;;; negation of this type instead.
 (defun cast-check-types (cast force-hairy)
   (declare (type cast cast))
-  (let* ((ctype (cast-type-to-check cast))
+  (let* ((cont (node-cont cast))
+         (ctype (cast-type-to-check cast))
          (atype (cast-asserted-type cast))
-         (value (cast-value cast)))
+         (value (cast-value cast))
+         (dest (continuation-dest cont)))
     (aver (not (eq ctype *wild-type*)))
     (multiple-value-bind (ctypes count) (no-fun-values-types ctype)
       (multiple-value-bind (atypes acount) (no-fun-values-types atype)
         (aver (eq count acount))
         (cond ((not (eq count :unknown))
-               (maybe-negate-check value ctypes atypes force-hairy)
-               #+nil
+               (let ((dtype (coerce-to-values (node-derived-type cast))))
+                 (setf (node-derived-type cast)
+                       (make-values-type
+                        :required (adjust-list (values-type-types dtype)
+                                               count
+                                               (or (values-type-rest dtype)
+                                                   *universal-type*)))))
                (if (or (exit-p dest)
                        (and (return-p dest)
                             (multiple-value-bind (ignore count)
                                 (values-types (return-result-type dest))
                               (declare (ignore ignore))
                               (eq count :unknown))))
-                   (maybe-negate-check cont ctypes atypes t)
-                   (maybe-negate-check cont ctypes atypes force-hairy)))
-              #+nil
-              ((and (mv-combination-p dest)
-                    (eq (basic-combination-kind dest) :local))
-               (aver (values-type-p ctype))
-               (maybe-negate-check cont
-                                   (args-type-optional ctype)
-                                   (args-type-optional atype)
+                   (maybe-negate-check value ctypes atypes t)
+                   (maybe-negate-check value ctypes atypes force-hairy)))
+              ((and (continuation-single-value-p cont)
+                    (or (not (values-type-p ctype))
+                        (not (args-type-rest ctype))
+                        (eq (args-type-rest ctype) *universal-type*)))
+               (when (values-type-p ctype)
+                 (let ((creq (car (args-type-required ctype))))
+                   (multiple-value-setq (ctype atype)
+                     (if creq
+                         (values creq (car (args-type-required atype)))
+                         (values (car (args-type-optional ctype))
+                                 (car (args-type-optional atype)))))
+                   (setf (cast-type-to-check cast)
+                         (make-values-type :required (list ctype)))
+                   (setf (cast-asserted-type cast)
+                         (make-values-type :required (list atype)))))
+               (setf (node-derived-type cast)
+                     (single-value-type (node-derived-type cast)))
+               (maybe-negate-check value
+                                   (list ctype) (list atype)
                                    force-hairy))
+              ((and (mv-combination-p dest)
+                    (eq (mv-combination-kind dest) :local))
+               (aver (values-type-p ctype))
+               (aver (null (args-type-required atype)))
+               (aver (null (args-type-required ctype)))
+               (let* ((fun-ref (continuation-use (mv-combination-fun dest)))
+                      (length (length (lambda-vars (ref-leaf fun-ref)))))
+                 (maybe-negate-check value
+                                     (adjust-list (args-type-optional ctype)
+                                                  length
+                                                  *universal-type*)
+                                     (adjust-list (args-type-optional atype)
+                                                  length
+                                                  *universal-type*)
+                                     force-hairy)))
               (t
                (values :too-hairy nil)))))))
 
@@ -282,18 +314,14 @@
 ;;;  -- the continuation is an argument to a known function that has
 ;;;     no IR2-CONVERT method or :FAST-SAFE templates that are
 ;;;     compatible with the call's type.
-;;;
-;;; We must only return NIL when it is *certain* that a check will not
-;;; be done, since if we pass up this chance to do the check, it will
-;;; be too late. The penalty for being too conservative is duplicated
-;;; type checks. The penalty for erring by being too speculative is
-;;; much nastier, e.g. falling through without ever being able to find
-;;; an appropriate VOP.
 (defun probable-type-check-p (cast)
   (declare (type cast cast))
-  t
-  #+nil
-  (let ((dest (continuation-dest cont)))
+  (let* ((cont (node-cont cast))
+         (dest (continuation-dest cont)))
+    (cond ((not dest) nil)
+          ((continuation-single-value-p cont) t)
+          (t nil))
+    #+nil
     (cond ((or (not dest)
 	       (policy dest (zerop safety)))
 	   nil)
@@ -508,9 +536,6 @@
           (when (cast-p node)
             (cond ((worth-type-check-p node)
                    (casts (cons node (not (probable-type-check-p node)))))
-                  #+nil
-                  ((probable-type-check-p cont)
-                   (setf (continuation-%type-check cont) :deleted))
                   (t
                    (aver (null (cast-%type-check node)))))))
 	(setf (block-type-check block) nil)))

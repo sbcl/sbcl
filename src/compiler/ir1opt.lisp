@@ -190,7 +190,8 @@
 ;;; moving uses behind a new CAST node. If we improve the assertion,
 ;;; we set TYPE-CHECK and TYPE-ASSERTED to guarantee that the new
 ;;; assertion will be checked.
-(defun assert-continuation-type (cont type policy)
+(defun assert-continuation-type (cont type policy
+                                 &aux (type (coerce-to-values type)))
   (declare (type continuation cont) (type ctype type))
   (when (values-subtypep (continuation-type cont) type)
     (return-from assert-continuation-type))
@@ -288,7 +289,7 @@
          (aver (not (block-delete-p block)))
          (ir1-optimize-block block))
 
-       (cond ((block-delete-p block)
+       (cond ((and (block-delete-p block) (block-component block))
               (delete-block block))
              ((and (block-flush-p block) (block-component block))
               (flush-dead-code block))))))
@@ -1130,21 +1131,24 @@
 ;;; possible to do this starting from debug names as well as source
 ;;; names, but as of sbcl-0.7.1.5, there was no need for this
 ;;; generality, since source names are always known to our callers.)
-(defun transform-call (node res source-name)
-  (declare (type combination node) (list res))
+(defun transform-call (call res source-name)
+  (declare (type combination call) (list res))
   (aver (and (legal-fun-name-p source-name)
 	     (not (eql source-name '.anonymous.))))
-  (with-ir1-environment-from-node node
+  (node-ends-block call)
+  (with-ir1-environment-from-node call
+    (with-component-last-block (*current-component*
+                                (block-next (node-block call)))
       (let ((new-fun (ir1-convert-inline-lambda
 		      res
 		      :debug-name (debug-namify "LAMBDA-inlined ~A"
 						(as-debug-name
 						 source-name
 						 "<unknown function>"))))
-	    (ref (continuation-use (combination-fun node))))
+	    (ref (continuation-use (combination-fun call))))
 	(change-ref-leaf ref new-fun)
-	(setf (combination-kind node) :full)
-	(locall-analyze-component *current-component*)))
+	(setf (combination-kind call) :full)
+	(locall-analyze-component *current-component*))))
   (values))
 
 ;;; Replace a call to a foldable function of constant arguments with
@@ -1725,7 +1729,8 @@
          (ensure-block-start value)
          (ensure-block-start cont)
          (substitute-continuation-uses cont value)
-         (unlink-node cast)))
+         (unlink-node cast)
+         (setf (continuation-dest value) nil)))
       ((values-subtypep value-type
                         (cast-type-to-check cast))
        (setf (cast-%type-check cast) nil))))

@@ -1,15 +1,18 @@
 important things:
 
 * unite VOPs with CASTs
-  ** (!) CAST on result - for VOP selection
-  ** (?) on argument - for type checking
+  ** (!) unsafe CAST on result - for VOP selection
+  ** (?) safe CAST on argument - for type checking
 * (!) MV type checking
-* preserve DFO during IR1 optimization
+* (!) errors in the number of return values
 * (?) flush unused CASTs
 * good type error diagnostics
 * VALUES declaration
+* do we always check types of unused values?
 
 =======================================================================
 for late cast branch or post-merge:
 
 * correct constraint propagation (add `(EQL var cont)' constraint kind)
+
+=======================================================================

@@ -715,6 +715,13 @@
 		  "The START and END parameters ~S and ~S are bad for an array of total size ~S."
 		  start end (array-total-size object))))))))
 
+(define-condition nil-array-accessed-error (type-error)
+  ()
+  (:report (lambda (condition stream)
+	     (format stream
+		     "An attempt to access an array of element-type ~
+                      NIL was made.  Congratulations!"))))
+
 (define-condition io-timeout (stream-error)
   ((direction :reader io-timeout-direction :initarg :direction))
   (:report

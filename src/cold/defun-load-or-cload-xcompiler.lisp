@@ -143,7 +143,6 @@
 			  "SB!INT"
 			  "SB!KERNEL"
 			  "SB!LOOP"
-			  #!+mp "SB!MP"
 			  "SB!PCL"
 			  "SB!PRETTY"
 			  "SB!PROFILE"

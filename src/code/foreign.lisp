@@ -68,7 +68,7 @@
 ;;; work on any ELF system with dlopen(3) and dlsym(3)
 ;;; It also works on OpenBSD, which isn't ELF, but is otherwise modern
 ;;; enough to have a fairly well working dlopen/dlsym implementation.
-#-(or linux FreeBSD OpenBSD)
+#-(or linux sunos FreeBSD OpenBSD)
 (macrolet ((define-unsupported-fun (fun-name)
 	     `(defun ,fun-name (&rest rest)
 		"unsupported on this system"
@@ -76,7 +76,7 @@
 		(error 'unsupported-operator :name ',fun-name))))
   (define-unsupported-fun load-1-foreign)
   (define-unsupported-fun load-foreign))
-#+(or linux FreeBSD OpenBSD)
+#+(or linux sunos FreeBSD OpenBSD)
 (progn
 
 ;;; flags for dlopen()

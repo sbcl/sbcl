@@ -798,8 +798,8 @@
 
 (defknown vector (&rest t) simple-vector (flushable unsafe))
 
-(defknown aref (array &rest index) t (foldable flushable))
-(defknown row-major-aref (array index) t (foldable flushable))
+(defknown aref (array &rest index) t (foldable))
+(defknown row-major-aref (array index) t (foldable))
 
 (defknown array-element-type (array)
   type-specifier
@@ -828,6 +828,9 @@
   (array bit)
   (foldable)
   #|:derive-type #'result-type-last-arg|#)
+
+(defknown bit-vector-= (bit-vector bit-vector) boolean
+  (movable foldable flushable))
 
 (defknown array-has-fill-pointer-p (array) boolean
   (movable foldable flushable))
@@ -1202,9 +1205,10 @@
    (:block-compile t))
   (values (or pathname null) boolean boolean))
 
-(defknown disassemble (callable &key
-				(:stream stream)
-				(:use-labels t))
+;; FIXME: consider making (OR CALLABLE CONS) something like
+;; EXTENDED-FUNCTION-DESIGNATOR
+(defknown disassemble ((or callable cons) &key
+		       (:stream stream) (:use-labels t))
   null)
 
 (defknown fdocumentation (t symbol)
@@ -1316,10 +1320,10 @@
 (defknown %negate (number) number (movable foldable flushable explicit-check))
 (defknown %check-bound (array index fixnum) index (movable foldable flushable))
 (defknown data-vector-ref (simple-array index) t
-  (foldable flushable explicit-check))
+  (foldable explicit-check))
 (defknown data-vector-set (array index t) t (unsafe explicit-check))
 (defknown hairy-data-vector-ref (array index) t
-  (foldable flushable explicit-check))
+  (foldable explicit-check))
 (defknown hairy-data-vector-set (array index t) t (unsafe explicit-check))
 (defknown %caller-frame-and-pc () (values t t) (flushable))
 (defknown %with-array-data (array index (or index null))
@@ -1351,7 +1355,8 @@
 ;;; get efficient compilation of the inline expansion of
 ;;; %FIND-POSITION-IF, so it should maybe be in a more
 ;;; compiler-friendly package (SB-INT?)
-(defknown sb!impl::signal-bounding-indices-bad-error (sequence index index)
+(defknown sb!impl::signal-bounding-indices-bad-error
+    (sequence index sequence-end)
   nil) ; never returns
   
 

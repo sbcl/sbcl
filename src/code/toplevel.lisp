@@ -126,7 +126,6 @@
 
 ;;;; miscellaneous external functions
 
-#!-mp ; The multi-processing version is defined in multi-proc.lisp.
 (defun sleep (n)
   #!+sb-doc
   "This function causes execution to be suspended for N seconds. N may

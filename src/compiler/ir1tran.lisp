@@ -886,7 +886,7 @@
   (declare (list decl vars) (type lexenv res))
   (let ((type (compiler-specifier-type (first decl))))
     (collect ((restr nil cons)
-	      (new-vars nil cons))
+             (new-vars nil cons))
       (dolist (var-name (rest decl))
 	(let* ((bound-var (find-in-bindings vars var-name))
 	       (var (or bound-var
@@ -894,26 +894,31 @@
 			(find-free-var var-name))))
 	  (etypecase var
 	    (leaf
-	     (let* ((old-type (or (lexenv-find var type-restrictions)
-				  (leaf-type var)))
-		    (int (if (or (fun-type-p type)
-				 (fun-type-p old-type))
-			     type
-			     (type-approx-intersection2 old-type type))))
-	       (cond ((eq int *empty-type*)
-		      (unless (policy *lexenv* (= inhibit-warnings 3))
-			(compiler-warn
-			 "The type declarations ~S and ~S for ~S conflict."
-			 (type-specifier old-type) (type-specifier type)
-			 var-name)))
-		     (bound-var (setf (leaf-type bound-var) int))
-		     (t
-		      (restr (cons var int))))))
+             (flet ((process-var (var bound-var)
+                      (let* ((old-type (or (lexenv-find var type-restrictions)
+                                           (leaf-type var)))
+                             (int (if (or (fun-type-p type)
+                                          (fun-type-p old-type))
+                                      type
+                                      (type-approx-intersection2 old-type type))))
+                        (cond ((eq int *empty-type*)
+                               (unless (policy *lexenv* (= inhibit-warnings 3))
+                                 (compiler-warn
+                                  "The type declarations ~S and ~S for ~S conflict."
+                                  (type-specifier old-type) (type-specifier type)
+                                  var-name)))
+                              (bound-var (setf (leaf-type bound-var) int))
+                              (t
+                               (restr (cons var int)))))))
+               (process-var var bound-var)
+               (awhen (and (lambda-var-p var)
+                           (lambda-var-specvar var))
+                      (process-var it nil))))
 	    (cons
 	     ;; FIXME: non-ANSI weirdness
 	     (aver (eq (car var) 'MACRO))
 	     (new-vars `(,var-name . (MACRO . (the ,(first decl)
-						   ,(cdr var))))))
+                                                ,(cdr var))))))
 	    (heap-alien-info
 	     (compiler-error
 	      "~S is an alien variable, so its type can't be declared."
@@ -1420,7 +1425,8 @@
 				aux-vals
 				result
 				(source-name '.anonymous.)
-				debug-name)
+				debug-name
+                                (note-lexical-bindings t))
   (declare (list body vars aux-vars aux-vals)
 	   (type (or continuation null) result))
 
@@ -1458,7 +1464,8 @@
 		 (svars var)
 		 (new-venv (cons (leaf-source-name specvar) specvar)))
 		(t
-		 (note-lexical-binding (leaf-source-name var))
+                 (when note-lexical-bindings
+                   (note-lexical-binding (leaf-source-name var)))
 		 (new-venv (cons (leaf-source-name var) var))))))
 
       (let ((*lexenv* (make-lexenv :vars (new-venv)
@@ -1507,8 +1514,6 @@
   (declare (type clambda fun) (list vars vals defaults))
   (let* ((fvars (reverse vars))
 	 (arg-vars (mapcar (lambda (var)
-			     (unless (lambda-var-specvar var)
-			       (note-lexical-binding (leaf-source-name var)))
 			     (make-lambda-var
 			      :%source-name (leaf-source-name var)
 			      :type (leaf-type var)
@@ -1519,7 +1524,8 @@
 						   ,@(reverse vals)
 						   ,@defaults))
 				       arg-vars
-				       :debug-name "&OPTIONAL processor")))
+				       :debug-name "&OPTIONAL processor"
+                                       :note-lexical-bindings nil)))
     (mapc (lambda (var arg-var)
 	    (when (cdr (leaf-refs arg-var))
 	      (setf (leaf-ever-used var) t)))
@@ -1690,7 +1696,8 @@
 		     (%funcall ,(optional-dispatch-main-entry res)
 			       ,@(arg-vals))))
 		 (arg-vars)
-		 :debug-name (debug-namify "~S processing" '&more))))
+		 :debug-name (debug-namify "~S processing" '&more)
+                 :note-lexical-bindings nil)))
 	(setf (optional-dispatch-more-entry res) ep))))
 
   (values))

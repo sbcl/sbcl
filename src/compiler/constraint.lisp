@@ -441,7 +441,7 @@
            (let ((cons (lambda-var-constraints var)))
              (when cons
                (sset-difference gen cons)
-               (let* ((type (node-derived-type node))
+               (let* ((type (single-value-type (node-derived-type node)))
                       (con (find-constraint 'typep var type nil)))
                  (sset-adjoin con gen)))))))))
 

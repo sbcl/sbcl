@@ -95,5 +95,14 @@
 (defgeneric g (a b c)
   (:generic-function-class gf-class))
 
+;;; until sbcl-0.7.12.47, PCL wasn't aware of some direct class
+;;; relationships.  These aren't necessarily true, but are probably
+;;; not going to change often.
+(dolist (x '(number array sequence character symbol))
+  (assert (eq (car (sb-pcl:class-direct-superclasses (sb-pcl:find-class x)))
+	      (sb-pcl:find-class t)))
+  (assert (member (sb-pcl:find-class x)
+		  (sb-pcl:class-direct-subclasses (sb-pcl:find-class t)))))
+
 ;;;; success
 (sb-ext:quit :unix-status 104)

@@ -82,7 +82,8 @@
 (defvar *specialized-array-element-types*)
 (!cold-init-forms
   (setf *specialized-array-element-types*
-	'(bit
+	'(nil
+	  bit
 	  (unsigned-byte 2)
 	  (unsigned-byte 4)
 	  (unsigned-byte 8)

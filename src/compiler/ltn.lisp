@@ -199,6 +199,18 @@
 ;;; IR2-COMPONENT-VALUES-FOO would get all messed up.
 (defun annotate-unknown-values-continuation (cont)
   (declare (type continuation cont))
+
+  (let ((2cont (make-ir2-continuation nil)))
+    (setf (ir2-continuation-kind 2cont) :unknown)
+    (setf (ir2-continuation-locs 2cont) (make-unknown-values-locations))
+    (setf (continuation-info cont) 2cont))
+
+  ;; The CAST chain with corresponding continuations constitute the
+  ;; same "principal continuation", so we must preserve only inner
+  ;; annotation order and the order of the whole p.c. with other
+  ;; continiations. -- APD, 2002-02-27
+  (ltn-annotate-casts cont)
+
   (let* ((block (node-block (continuation-dest cont)))
 	 (use (continuation-use cont))
 	 (2block (block-info block)))
@@ -206,12 +218,6 @@
       (setf (ir2-block-popped 2block)
 	    (nconc (ir2-block-popped 2block) (list cont)))))
 
-  (let ((2cont (make-ir2-continuation nil)))
-    (setf (ir2-continuation-kind 2cont) :unknown)
-    (setf (ir2-continuation-locs 2cont) (make-unknown-values-locations))
-    (setf (continuation-info cont) 2cont))
-
-  (ltn-annotate-casts cont)
   (values))
 
 ;;; Annotate CONT for a fixed, but arbitrary number of values, of the
@@ -879,14 +885,12 @@
   (declare (type component component))
   (let ((2comp (component-info component)))
     (do-blocks (block component)
-      ;; This assertion seems to protect us from compiling a component
-      ;; twice. As noted above, "this is where we allocate IR2-BLOCKS
-      ;; because it is the first place we need them", so if one is
-      ;; already allocated here, something is wrong. -- WHN 2001-09-14
       (aver (not (block-info block)))
       (let ((2block (make-ir2-block block)))
 	(setf (block-info block) 2block)
-	(ltn-analyze-block block)
+	(ltn-analyze-block block)))
+    (do-blocks (block component)
+      (let ((2block (block-info block)))
 	(let ((popped (ir2-block-popped 2block)))
 	  (when popped
 	    (push block (ir2-component-values-receivers 2comp)))))))

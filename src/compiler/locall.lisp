@@ -931,12 +931,21 @@
     (cond ((not return))
 	  ((or next-block call-return)
 	   (unless (block-delete-p (node-block return))
+             (when (and (node-tail-p call)
+                        call-return
+                        (not (eq (node-cont call)
+                                 (return-result call-return))))
+               ;; We do not care to give a meaningful continuation to
+               ;; a tail combination, but here we need it.
+               (delete-continuation-use call)
+               (add-continuation-use call (return-result call-return)))
 	     (move-return-uses fun call
 			       (or next-block (node-block call-return)))))
 	  (t
 	   (aver (node-tail-p call))
 	   (setf (lambda-return call-fun) return)
-	   (setf (return-lambda return) call-fun))))
+	   (setf (return-lambda return) call-fun)
+           (setf (lambda-return fun) nil))))
   (move-let-call-cont fun)
   (values))
 

@@ -187,13 +187,13 @@
 	 ,n-vec))))
 
 ;;; Just convert it into a MAKE-ARRAY.
-(define-source-transform make-string (length &key
-					     (element-type ''base-char)
-					     (initial-element
-					      '#.*default-init-char-form*))
-  `(make-array (the index ,length)
-	       :element-type ,element-type
-	       :initial-element ,initial-element))
+(deftransform make-string ((length &key
+				   (element-type 'base-char)
+				   (initial-element
+				    #.*default-init-char-form*)))
+  '(make-array (the index length)
+               :element-type element-type
+               :initial-element initial-element))
 
 (defstruct (specialized-array-element-type-properties
 	    (:conc-name saetp-)
@@ -227,7 +227,10 @@
 	 (destructuring-bind (type-spec &rest rest) args
 	   (let ((ctype (specifier-type type-spec)))
 	     (apply #'!make-saetp ctype rest))))
-       `((base-char ,(code-char 0) 8 ,sb!vm:simple-string-widetag
+       `(;; Erm.  Yeah.  There aren't a lot of things that make sense
+	 ;; for an initial element for (ARRAY NIL). -- CSR, 2002-03-07
+	 (nil '#:mu 0 ,sb!vm:simple-array-nil-widetag)
+	 (base-char ,(code-char 0) 8 ,sb!vm:simple-string-widetag
 		    ;; (SIMPLE-STRINGs are stored with an extra trailing
 		    ;; #\NULL for convenience in calling out to C.)
 		    :n-pad-elements 1)
@@ -366,14 +369,17 @@
 				   'length
 				   `(+ length ,n-pad-elements)))
 	   (n-words-form
-	    (if (>= n-bits-per-element sb!vm:n-word-bits)
-		`(* ,padded-length-form
-		    (the fixnum ; i.e., not RATIO
-		      ,(/ n-bits-per-element sb!vm:n-word-bits)))
-		(let ((n-elements-per-word (/ sb!vm:n-word-bits
-					      n-bits-per-element)))
-		  (declare (type index n-elements-per-word)) ; i.e., not RATIO
-		  `(ceiling ,padded-length-form ,n-elements-per-word)))))
+	    (cond
+	      ((= n-bits-per-element 0) 0)
+	      ((>= n-bits-per-element sb!vm:n-word-bits)
+	       `(* ,padded-length-form
+		 (the fixnum ; i.e., not RATIO
+		   ,(/ n-bits-per-element sb!vm:n-word-bits))))
+	      (t
+	       (let ((n-elements-per-word (/ sb!vm:n-word-bits
+					     n-bits-per-element)))
+		 (declare (type index n-elements-per-word)) ; i.e., not RATIO
+		 `(ceiling ,padded-length-form ,n-elements-per-word))))))
       (values
        `(truly-the ,result-type-spec
 	 (allocate-vector ,typecode length ,n-words-form))

@@ -34,14 +34,6 @@
 ;;;; before sbcl-0.7.0), then this would be the place to restore the
 ;;;; top pointers.
 
-;;; Return a list of TNs that can be used to snapshot the dynamic
-;;; state for use with the SAVE- and RESTORE-DYNAMIC-ENVIRONMENT VOPs.
-(!def-vm-support-routine make-dynamic-state-tns ()
-  (list (make-normal-tn *backend-t-primitive-type*)
-	(make-normal-tn *backend-t-primitive-type*)
-	(make-normal-tn *backend-t-primitive-type*)
-	(make-normal-tn *backend-t-primitive-type*)))
-
 (define-vop (save-dynamic-state)
   (:results (catch :scs (descriptor-reg))
 	    (nfp :scs (descriptor-reg))

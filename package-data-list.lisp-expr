@@ -2,10 +2,9 @@
 
 ;;;; the specifications of target packages, except for a few things
 ;;;; which are handled elsewhere by other mechanisms:
-;;;;   * the creation of the trivial SB-SLOT-ACCESSOR-NAME package
-;;;;   * any SHADOWing and nickname hackery
+;;;;   * any SHADOWing and nickname hackery;
 ;;;;   * the standard, non-SBCL-specific packages COMMON-LISP,
-;;;;     COMMON-LISP-USER, and KEYWORD
+;;;;     COMMON-LISP-USER, and KEYWORD.
 ;;;;
 ;;;; The packages are named SB!FOO here and elsewhere in
 ;;;; cross-compilation, in order to avoid collision with possible
@@ -232,6 +231,8 @@ of SBCL which maintained the CMU-CL-style split into two packages.)"
               "PHYSENV-DEBUG-LIVE-TN" "PHYSENV-LIVE-TN"
               "FAST-SYMBOL-VALUE" "FOLDABLE"
               "FORCE-TN-TO-STACK"
+	      "FUN-INFO-DERIVE-TYPE" "FUN-INFO-IR2-CONVERT"
+	      "FUN-INFO-LTN-ANNOTATE" "FUN-INFO-OPTIMIZER"
 	      "GET-VECTOR-SUBTYPE"
               "HALT"
 	      "IF-EQ" "INLINE-SYNTACTIC-CLOSURE-LAMBDA"
@@ -731,6 +732,7 @@ retained, possibly temporariliy, because it might be used internally."
 
              ;; miscellaneous non-standard but handy user-level functions..
              "ASSQ" "DELQ" "MEMQ" "POSQ" "NEQ"
+             "ADJUST-LIST"
              "%FIND-PACKAGE-OR-LOSE" "FIND-UNDELETED-PACKAGE-OR-LOSE"
              "SANE-PACKAGE"
              "CYCLIC-LIST-P"
@@ -744,6 +746,7 @@ retained, possibly temporariliy, because it might be used internally."
              "%BREAK"
 	     "NTH-BUT-WITH-SANE-ARG-ORDER"
 	     "DEPRECATION-WARNING"
+	     "BIT-VECTOR-="
 
              ;; ..and macros..
              "COLLECT"
@@ -1022,7 +1025,8 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
              "CODE-DEBUG-INFO" "CODE-HEADER-REF" "CODE-HEADER-SET"
              "CODE-INSTRUCTIONS"
              "COERCE-TO-FUN" "COERCE-TO-LEXENV"
-             "COERCE-TO-LIST" "COERCE-TO-VECTOR"
+             "COERCE-TO-LIST" "COERCE-TO-VALUES"
+             "COERCE-TO-VECTOR"
              "*COLD-INIT-COMPLETE-P*"
              "COMPLEX-DOUBLE-FLOAT-P"
              "COMPLEX-FLOAT-P"
@@ -1131,7 +1135,9 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
              "MUTATOR-SELF"
              "NAMED-TYPE" "NAMED-TYPE-NAME" "NAMED-TYPE-P"
              "NATIVE-BYTE-ORDER" "NEGATE"
-             "NEVER-SUBTYPEP" "NIL-FUN-RETURNED-ERROR"
+	     "NEGATION-TYPE" "NEGATION-TYPE-TYPE"
+             "NEVER-SUBTYPEP" "NIL-ARRAY-ACCESSED-ERROR"
+	     "NIL-FUN-RETURNED-ERROR"
              "NOT-<=-ERROR" "NOT-=-ERROR"
              "NOT-DUMPED-AT-ALL"
              "NUMERIC-CONTAGION" "NUMERIC-TYPE"
@@ -1168,6 +1174,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
              "OBJECT-NOT-SIMPLE-ARRAY-DOUBLE-FLOAT-ERROR"
              "OBJECT-NOT-SIMPLE-ARRAY-ERROR"
              #!+long-float "OBJECT-NOT-SIMPLE-ARRAY-LONG-FLOAT-ERROR"
+	     "OBJECT-NOT-SIMPLE-ARRAY-NIL-ERROR"
              "OBJECT-NOT-SIMPLE-ARRAY-SINGLE-FLOAT-ERROR"
              "OBJECT-NOT-SIMPLE-ARRAY-UNSIGNED-BYTE-16-ERROR"
              "OBJECT-NOT-SIMPLE-ARRAY-UNSIGNED-BYTE-2-ERROR"
@@ -1209,6 +1216,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
              "SIMPLE-ARRAY-COMPLEX-SINGLE-FLOAT-P"
              "SIMPLE-ARRAY-DOUBLE-FLOAT-P"
 	     #!+long-float "SIMPLE-ARRAY-LONG-FLOAT-P"
+	     "SIMPLE-ARRAY-NIL-P"
              "SIMPLE-ARRAY-P"
              "SIMPLE-ARRAY-SINGLE-FLOAT-P"
              "SIMPLE-ARRAY-UNSIGNED-BYTE-16-P"
@@ -1256,11 +1264,12 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
 	     "VALUES-SPECIFIER-TYPE"
              "VALUES-SPECIFIER-TYPE-CACHE-CLEAR" "VALUES-SUBTYPEP"
              "VALUES-TYPE"
-             "VALUES-TYPE-INTERSECTION" "VALUES-TYPE-KEYP"
-             "VALUES-TYPE-KEYWORDS" "VALUES-TYPE-OPTIONAL"
+             "VALUES-TYPE-INTERSECTION"
+             "VALUES-TYPE-OPTIONAL"
              "VALUES-TYPE-P" "VALUES-TYPE-REQUIRED"
              "VALUES-TYPE-REST" "VALUES-TYPE-UNION"
-             "VALUES-TYPES" "VALUES-TYPES-EQUAL-OR-INTERSECT" "VECTOR-T-P"
+             "VALUES-TYPE-TYPES" "VALUES-TYPES"
+             "VALUES-TYPES-EQUAL-OR-INTERSECT" "VECTOR-T-P"
              "VECTOR-TO-VECTOR*"
              "VECTOR-OF-CHECKED-LENGTH-GIVEN-LENGTH"
              "WITH-ARRAY-DATA"
@@ -1377,29 +1386,6 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
     :doc "private: implementation details of LOOP"
     :use ("CL")
     :export ())
-
- #!+mp
- #s(sb-cold:package-data
-    :name "SB!MP"
-    :doc "public (but unstable): multiprocessing support"
-    :export ("*ALL-PROCESSES*" "*CURRENT-PROCESS*"
-             "*CURRENT-STACK-GROUP*" "*INITIAL-STACK-GROUP*"
-             "*MULTI-PROCESSING*" "ALL-PROCESSES"
-             "ATOMIC-DECF" "ATOMIC-INCF" "ATOMIC-POP"
-             "ATOMIC-PUSH" "CURRENT-PROCESS"
-             "DESTROY-PROCESS" "DISABLE-PROCESS"
-             "ENABLE-PROCESS" "INIT-STACK-GROUPS"
-             "LOCK" "MAKE-STACK-GROUP" "MAKE-LOCK"
-             "MAKE-PROCESS" "PROCESS-ACTIVE-P" "PROCESS-ALIVE-P"
-             "PROCESS-IDLE-TIME" "PROCESS-INTERRUPT"
-             "PROCESS-NAME" "PROCESS-PRESET"
-             "PROCESS-REAL-TIME" "PROCESS-RUN-TIME"
-             "PROCESS-STATE" "PROCESS-WAIT-UNTIL-FD-USABLE"
-             "PROCESS-WAIT" "PROCESS-WAIT-WITH-TIMEOUT"
-             "PROCESS-WHOSTATE" "PROCESS-YIELD" "PROCESSP"
-             "RESTART-PROCESS" "SHOW-PROCESSES"
-             "STACK-GROUP-RESUME" "WITHOUT-SCHEDULING"
-             "WITH-LOCK-HELD"))
 
  #s(sb-cold:package-data
     :name "SB!PCL"
@@ -1853,6 +1839,7 @@ structure representations"
              "SIMPLE-ARRAY-COMPLEX-SINGLE-FLOAT-WIDETAG"
              "SIMPLE-ARRAY-DOUBLE-FLOAT-WIDETAG"
              #!+long-float "SIMPLE-ARRAY-LONG-FLOAT-WIDETAG"
+	     "SIMPLE-ARRAY-NIL-WIDETAG"
              "SIMPLE-ARRAY-SINGLE-FLOAT-WIDETAG"
              "SIMPLE-ARRAY-WIDETAG" "SIMPLE-ARRAY-UNSIGNED-BYTE-16-WIDETAG"
              "SIMPLE-ARRAY-UNSIGNED-BYTE-2-WIDETAG"

@@ -27,6 +27,8 @@
 #include "validate.h"
 #include "lispregs.h"
 #include "interr.h"
+#include "genesis/static-symbols.h"
+#include "genesis/primitive-objects.h"
 
 /* So you need to debug? */
 #if 0

@@ -107,6 +107,7 @@
      ;; FIXME: The data here are redundant with
      ;; *SPECIALIZED-ARRAY-ELEMENT-TYPE-PROPERTIES*.
      (pick-vector-type type
+       (nil (values #.sb!vm:simple-array-nil-widetag 0))
        (base-char (values #.sb!vm:simple-string-widetag #.sb!vm:n-byte-bits))
        (bit (values #.sb!vm:simple-bit-vector-widetag 1))
        ((unsigned-byte 2)
@@ -173,11 +174,11 @@
     (when (and displaced-index-offset (null displaced-to))
       (error "can't specify :DISPLACED-INDEX-OFFSET without :DISPLACED-TO"))
     (if (and simple (= array-rank 1))
-	;; Its a (simple-array * (*))
+	;; it's a (SIMPLE-ARRAY * (*))
 	(multiple-value-bind (type n-bits)
 	    (%vector-widetag-and-n-bits element-type)
 	  (declare (type (unsigned-byte 8) type)
-		   (type (integer 1 256) n-bits))
+		   (type (integer 0 256) n-bits))
 	  (let* ((length (car dimensions))
 		 (array (allocate-vector
 			 type
@@ -201,7 +202,7 @@
 		       length))
 	      (replace array initial-contents))
 	    array))
-	;; It's either a complex array or a multidimensional array.
+	;; it's either a complex array or a multidimensional array.
 	(let* ((total-size (reduce #'* dimensions))
 	       (data (or displaced-to
 			 (data-vector-from-inits
@@ -328,7 +329,8 @@
       #!+long-float long-float
       (complex single-float)
       (complex double-float)
-      #!+long-float (complex long-float))))
+      #!+long-float (complex long-float)
+      nil)))
     
 (defun hairy-data-vector-ref (array index)
   (with-array-data ((vector array) (index index) (end))
@@ -552,6 +554,7 @@
       ;; FIXME: The data here are redundant with
       ;; *SPECIALIZED-ARRAY-ELEMENT-TYPE-PROPERTIES*.
       (pick-element-type
+       (sb!vm:simple-array-nil-widetag nil)
        ((sb!vm:simple-string-widetag sb!vm:complex-string-widetag) 'base-char)
        ((sb!vm:simple-bit-vector-widetag
 	 sb!vm:complex-bit-vector-widetag) 'bit)
@@ -870,6 +873,8 @@
   (unless (array-header-p vector)
     (macrolet ((frob (name &rest things)
 		 `(etypecase ,name
+		    ((simple-array nil (*)) (error 'cell-error
+					     :name 'nil-array-element))
 		    ,@(mapcar (lambda (thing)
 				(destructuring-bind (type-spec fill-value)
 				    thing

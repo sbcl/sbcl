@@ -20,6 +20,7 @@ echo //entering make-host-2.sh
 # doesn't, it's confusing and basically useless to have any old copies
 # lying around, so delete:
 rm -f output/after-xc.core
+rm -Rf obj/from-xc/*
 
 # In a fresh host Lisp invocation, load and run the cross-compiler to
 # create the target object files describing the target SBCL.

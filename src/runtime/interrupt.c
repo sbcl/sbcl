@@ -31,6 +31,10 @@
 #include "alloc.h"
 #include "dynbind.h"
 #include "interr.h"
+#include "genesis/simple-fun.h"
+#include "genesis/fdefn.h"
+#include "genesis/symbol.h"
+#include "genesis/static-symbols.h"
 
 void sigaddset_blockable(sigset_t *s)
 {
@@ -99,7 +103,7 @@ static int pending_signal = 0;
 static siginfo_t pending_info;
 static sigset_t pending_mask;
 
-static boolean maybe_gc_pending = 0;
+boolean maybe_gc_pending = 0;
 
 /*
  * utility routines used by various signal handlers

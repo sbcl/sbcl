@@ -1,8 +1,10 @@
 SYSTEM=sb-bsd-sockets
+CC=gcc
+export CC
 
 all: 
 	$(MAKE) -C ../asdf
-	echo "(asdf:operate 'asdf:load-op :$(SYSTEM))" | \
+	echo "(asdf:operate 'asdf:load-op :$(SYSTEM) :force t)" | \
 	  $(SBCL) --eval '(load "../asdf/asdf")'
 
 test: all
@@ -11,6 +13,6 @@ test: all
 	  $(SBCL) --eval '(load "../asdf/asdf")'
 
 
-install: test
+install:
 	tar cf - . | ( cd $(INSTALL_DIR) && tar xpvf - )
 	( cd  $(SBCL_HOME)/systems && ln -fs ../$(SYSTEM)/$(SYSTEM).asd . )
