@@ -111,6 +111,8 @@
   ;; this to be initialized, so we initialize it right away.
   (show-and-call !random-cold-init)
 
+  (show-and-call !character-database-cold-init)
+
   (show-and-call !early-package-cold-init)
   (show-and-call !package-cold-init)
   

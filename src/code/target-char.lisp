@@ -32,6 +32,27 @@
 (deftype char-code ()
   `(integer 0 (,char-code-limit)))
 
+(defvar *character-database*)
+
+(macrolet ((frob ()
+             (with-open-file (stream (merge-pathnames
+                                      (make-pathname
+                                       :directory
+                                       '(:relative :up :up "output")
+                                       :name "ucd"
+                                       :type "dat")
+                                      sb!xc:*compile-file-pathname*)
+                                     :direction :input
+                                     :element-type '(unsigned-byte 8))
+               (let* ((length (file-length stream))
+                      (array (make-array length
+                                         :element-type '(unsigned-byte 8))))
+                 (read-sequence array stream)
+                 `(defun !character-database-cold-init ()
+		    (setq *character-database* ',array))))))
+  (frob))
+#+sb-xc-host (!character-database-cold-init)
+
 ;;; This is the alist of (character-name . character) for characters
 ;;; with long names. The first name in this list for a given character
 ;;; is used on typeout and is the preferred form for input.
@@ -40,8 +61,10 @@
 	       (dolist (code char-names-list)
 		 (destructuring-bind (ccode names) code
 		   (dolist (name names)
-		     (results (cons name (code-char ccode))))))
-	       `(defparameter *char-name-alist* ',(results)))))
+		     (results (cons name ccode)))))
+	       `(defparameter *char-name-alist*
+                 (mapcar (lambda (x) (cons (car x) (code-char (cdr x))))
+                         ',(results))))))
   ;; Note: The *** markers here indicate character names which are
   ;; required by the ANSI specification of #'CHAR-NAME. For the others,
   ;; we prefer the ASCII standard name.
@@ -78,15 +101,76 @@
 	 (#x1E ("Rs" "^^"))
 	 (#x1F ("Us" "^_"))
 	 (#x20 ("Space" "Sp")) ; *** See Note above.
-	 (#x7f ("Rubout" "Delete" "Del"))))) ; *** See Note above.
+	 (#x7f ("Rubout" "Delete" "Del"))
+	 (#x80 ("C80"))
+	 (#x81 ("C81"))
+	 (#x82 ("Break-Permitted"))
+	 (#x83 ("No-Break-Permitted"))
+	 (#x84 ("C84"))
+	 (#x85 ("Next-Line"))
+	 (#x86 ("Start-Selected-Area"))
+	 (#x87 ("End-Selected-Area"))
+	 (#x88 ("Character-Tabulation-Set"))
+	 (#x89 ("Character-Tabulation-With-Justification"))
+	 (#x8A ("Line-Tabulation-Set"))
+	 (#x8B ("Partial-Line-Forward"))
+	 (#x8C ("Partial-Line-Backward"))
+	 (#x8D ("Reverse-Linefeed"))
+	 (#x8E ("Single-Shift-Two"))
+	 (#x8F ("Single-Shift-Three"))
+	 (#x90 ("Device-Control-String"))
+	 (#x91 ("Private-Use-One"))
+	 (#x92 ("Private-Use-Two"))
+	 (#x93 ("Set-Transmit-State"))
+	 (#x94 ("Cancel-Character"))
+	 (#x95 ("Message-Waiting"))
+	 (#x96 ("Start-Guarded-Area"))
+	 (#x97 ("End-Guarded-Area"))
+	 (#x98 ("Start-String"))
+	 (#x99 ("C99"))
+	 (#x9A ("Single-Character-Introducer"))
+	 (#x9B ("Control-Sequence-Introducer"))
+	 (#x9C ("String-Terminator"))
+	 (#x9D ("Operating-System-Command"))
+	 (#x9E ("Privacy-Message"))
+	 (#x9F ("Application-Program-Command"))))) ; *** See Note above.
 
 ;;;; accessor functions
+
+;; (* 8 186) => 1488
+;; (+ 1488 (ash #x110000 -8)) => 5840
+(defun ucd-index (char)
+  (let* ((cp (char-code char))
+	 (cp-high (ash cp -8))
+	 (page (aref *character-database* (+ 1488 cp-high))))
+    (+ 5840 (ash page 10) (ash (ldb (byte 8 0) cp) 2))))
+
+(defun ucd-value-0 (char)
+  (aref *character-database* (ucd-index char)))
+
+(defun ucd-value-1 (char)
+  (let ((index (ucd-index char)))
+    (dpb (aref *character-database* (+ index 3))
+	 (byte 8 16)
+	 (dpb (aref *character-database* (+ index 2))
+	      (byte 8 8)
+	      (aref *character-database* (1+ index))))))
+
+(defun ucd-general-category (char)
+  (aref *character-database* (* 8 (ucd-value-0 char))))
+
+(defun ucd-decimal-digit (char)
+  (let ((decimal-digit (aref *character-database*
+			     (+ 3 (* 8 (ucd-value-0 char))))))
+    (when (< decimal-digit 10)
+      decimal-digit)))
 
 (defun char-code (char)
   #!+sb-doc
   "Return the integer code of CHAR."
+  ;; FIXME: do we actually need this?
   (etypecase char
-    (base-char (char-code (truly-the base-char char)))))
+    (character (char-code (truly-the character char)))))
 
 (defun char-int (char)
   #!+sb-doc
@@ -156,41 +240,34 @@
   "The argument must be a character object. GRAPHIC-CHAR-P returns T if the
   argument is a printing character (space through ~ in ASCII), otherwise
   returns NIL."
-  (and (typep char 'base-char)
-       (< 31
-	  (char-code (the base-char char))
-	  127)))
+  (let ((n (char-code char)))
+    (or (< 31 n 127)
+	(< 159 n))))
 
 (defun alpha-char-p (char)
   #!+sb-doc
   "The argument must be a character object. ALPHA-CHAR-P returns T if the
    argument is an alphabetic character, A-Z or a-z; otherwise NIL."
-  (let ((m (char-code char)))
-    (or (< 64 m 91) (< 96 m 123))))
+  (< (ucd-general-category char) 5))
 
 (defun upper-case-p (char)
   #!+sb-doc
   "The argument must be a character object; UPPER-CASE-P returns T if the
    argument is an upper-case character, NIL otherwise."
-  (< 64
-     (char-code char)
-     91))
+  (= (ucd-value-0 char) 0))
 
 (defun lower-case-p (char)
   #!+sb-doc
   "The argument must be a character object; LOWER-CASE-P returns T if the
    argument is a lower-case character, NIL otherwise."
-  (< 96
-     (char-code char)
-     123))
+  (= (ucd-value-0 char) 1))
 
 (defun both-case-p (char)
   #!+sb-doc
   "The argument must be a character object. BOTH-CASE-P returns T if the
   argument is an alphabetic character and if the character exists in
   both upper and lower case. For ASCII, this is the same as ALPHA-CHAR-P."
-  (let ((m (char-code char)))
-    (or (< 64 m 91) (< 96 m 123))))
+  (< (ucd-value-0 char) 2))
 
 (defun digit-char-p (char &optional (radix 10.))
   #!+sb-doc
@@ -208,14 +285,17 @@
 	  ;; Also check lower case a - z.
 	  ((and (>= (setq m (- m 32)) 10) (< m radix)) m)
 	  ;; Else, fail.
-	  (t nil))))
+	  (t (let ((number (ucd-decimal-digit char)))
+	       (when (and number (< number radix))
+		 number))))))
 
 (defun alphanumericp (char)
   #!+sb-doc
   "Given a character-object argument, ALPHANUMERICP returns T if the
    argument is either numeric or alphabetic."
-  (let ((m (char-code char)))
-    (or (< 47 m 58) (< 64 m 91) (< 96 m 123))))
+  (let ((gc (ucd-general-category char)))
+    (or (< gc 5)
+	(= gc 12))))
 
 (defun char= (character &rest more-characters)
   #!+sb-doc
@@ -279,8 +359,11 @@
 ;;;  which loses font, bits, and case info.
 
 (defmacro equal-char-code (character)
-  `(let ((ch (char-code ,character)))
-     (if (< 96 ch 123) (- ch 32) ch)))
+  (let ((ch (gensym)))
+    `(let ((,ch ,character))
+      (if (= (ucd-value-0 ,ch) 0)
+	  (ucd-value-1 ,ch)
+	  (char-code ,ch)))))
 
 (defun char-equal (character &rest more-characters)
   #!+sb-doc
@@ -354,16 +437,17 @@
 
 (defun char-upcase (char)
   #!+sb-doc
-  "Return CHAR converted to upper-case if that is possible."
-  (if (lower-case-p char)
-      (code-char (- (char-code char) 32))
+  "Return CHAR converted to upper-case if that is possible.  Don't convert
+   lowercase eszet (U+DF)."
+  (if (= (ucd-value-0 char) 1)
+      (code-char (ucd-value-1 char))
       char))
 
 (defun char-downcase (char)
   #!+sb-doc
   "Return CHAR converted to lower-case if that is possible."
-  (if (upper-case-p char)
-      (code-char (+ (char-code char) 32))
+  (if (= (ucd-value-0 char) 0)
+      (code-char (ucd-value-1 char))
       char))
 
 (defun digit-char (weight &optional (radix 10))

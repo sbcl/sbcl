@@ -239,6 +239,7 @@
 	       ;; can't contain other objects
 	       (unless (typep value
 			      '(or #-sb-xc-host unboxed-array
+				   #+sb-xc-host (simple-array (unsigned-byte 8) (*))
 				   symbol
 				   number
 				   character

@@ -1153,23 +1153,6 @@ WORKAROUND:
                collect `(array ,(sb-vm:saetp-specifier x)))))
     => NIL, T (when it should be T, T)
 
-308: "Characters without names"
-    (reported by Bruno Haible sbcl-devel "character names are missing"
-    2004-04-19)
-  (graphic-char-p (code-char 255))
-  => NIL
-  (char-name (code-char 255))
-  => NIL
-
-  SBCL is unsure of what to do about characters with codes in the
-  range 128-255.  Currently they are treated as non-graphic, but don't
-  have names, which is not compliant with the standard.  Various fixes
-  are possible, such as
-  * giving them names such as NON-ASCII-128;
-  * reducing CHAR-CODE-LIMIT to 127 (almost certainly unpopular);
-  * making the characters graphic (makes a certain amount of sense);
-  * biting the bullet and implementing Unicode (probably quite hard).
-
 309: "Dubious values for implementation limits"
     (reported by Bruno Haible sbcl-devel "Incorrect value of
     multiple-values-limit" 2004-04-19)

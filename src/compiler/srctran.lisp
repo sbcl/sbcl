@@ -2321,7 +2321,29 @@
         (specifier-type `(integer ,lo-res ,hi-res))))))
 
 (defoptimizer (code-char derive-type) ((code))
-  (specifier-type 'base-char))
+  (let ((type (lvar-type code)))
+    ;; FIXME: unions of integral ranges?  It ought to be easier to do
+    ;; this, given that CHARACTER-SET is basically an integral range
+    ;; type.  -- CSR, 2004-10-04
+    (when (numeric-type-p type)
+      (let* ((lo (numeric-type-low type))
+             (hi (numeric-type-high type))
+             (type (specifier-type `(character-set ((,lo . ,hi))))))
+        (cond
+          ;; KLUDGE: when running on the host, we lose a slight amount
+          ;; of precision so that we don't have to "unparse" types
+          ;; that formally we can't, such as (CHARACTER-SET ((0
+          ;; . 0))).  -- CSR, 2004-10-06
+          #+sb-xc-host
+          ((csubtypep type (specifier-type 'standard-char)) type)
+          #+sb-xc-host
+          ((csubtypep type (specifier-type 'base-char))
+           (specifier-type 'base-char))
+          #+sb-xc-host
+          ((csubtypep type (specifier-type 'extended-char))
+           (specifier-type 'extended-char))
+          (t #+sb-xc-host (specifier-type 'character)
+             #-sb-xc-host type))))))
 
 (defoptimizer (values derive-type) ((&rest values))
   (make-values-type :required (mapcar #'lvar-type values)))
@@ -2917,7 +2939,9 @@
 
 ;;;; character operations
 
-(deftransform char-equal ((a b) (base-char base-char))
+(deftransform char-equal ((a b)
+                          ((character-set ((0 . 255)))
+                           (character-set ((0 . 255)))))
   "open code"
   '(let* ((ac (char-code a))
 	  (bc (char-code b))
@@ -2925,21 +2949,31 @@
      (or (zerop sum)
 	 (when (eql sum #x20)
 	   (let ((sum (+ ac bc)))
-	     (and (> sum 161) (< sum 213)))))))
+             (or (and (> sum 161) (< sum 213))
+                 (and (> sum 415) (< sum 461))
+                 (and (> sum 463) (< sum 477))))))))
 
-(deftransform char-upcase ((x) (base-char))
+(deftransform char-upcase ((x) ((character-set ((0 . 255)))))
   "open code"
   '(let ((n-code (char-code x)))
-     (if (and (> n-code #o140)	; Octal 141 is #\a.
-	      (< n-code #o173))	; Octal 172 is #\z.
+     (if (or (and (> n-code #o140)	; Octal 141 is #\a.
+                  (< n-code #o173))	; Octal 172 is #\z.
+             (and (> n-code #o337)
+                  (< n-code #o367))
+             (and (> n-code #o367)
+                  (< n-code #o377)))
 	 (code-char (logxor #x20 n-code))
 	 x)))
 
-(deftransform char-downcase ((x) (base-char))
+(deftransform char-downcase ((x) ((character-set ((0 . 255)))))
   "open code"
   '(let ((n-code (char-code x)))
-     (if (and (> n-code 64)	; 65 is #\A.
-	      (< n-code 91))	; 90 is #\Z.
+     (if (or (and (> n-code 64)	        ; 65 is #\A.
+                  (< n-code 91))        ; 90 is #\Z.
+             (and (> n-code 191)
+                  (< n-code 215))
+             (and (> n-code 215)
+                  (< n-code 223)))
 	 (code-char (logxor #x20 n-code))
 	 x)))
 
