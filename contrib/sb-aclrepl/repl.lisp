@@ -86,21 +86,24 @@
 
 (defun read-cmd (input-stream)
   ;; Reads a command from the user and returns a user-cmd object
-  (let ((next-char (peek-char-non-whitespace input-stream)))
-    (cond
-      ((eql *command-char* next-char)
-       (dispatch-command-line input-stream))
-      ((eql #\newline next-char)
-       (read-char input-stream)
-       *null-cmd*)
-      ((eql :eof next-char)
-       *eof-cmd*)
-      (t
-       (let* ((eof (cons nil *eof-marker*))
-	      (form (read input-stream nil eof)))
-	 (if (eq form eof)
-	     *eof-cmd*
-	     (make-user-cmd :input form :func nil :hnum *cmd-number*)))))))
+  (let* ((next-char (peek-char-non-whitespace input-stream))
+	 (cmd (cond
+		((eql *command-char* next-char)
+		 (dispatch-command-line input-stream))
+		((eql #\newline next-char)
+		 (read-char input-stream)
+		 *null-cmd*)
+		((eql :eof next-char)
+		 *eof-cmd*)
+		(t
+		 (let* ((eof (cons nil *eof-marker*))
+			(form (read input-stream nil eof)))
+		   (if (eq form eof)
+		       *eof-cmd*
+		       (make-user-cmd :input form :func nil :hnum *cmd-number*)))))))
+    (if (and (eq cmd *eof-cmd*) (typep input-stream 'string-stream))
+	(throw 'repl-catcher cmd)
+	cmd)))
 
 (defun dispatch-command-line (input-stream)
   "Processes an input line that starts with *command-char*"

@@ -1,4 +1,4 @@
-/nick;;;; Inspector for sb-aclrepl
+;;;; Inspector for sb-aclrepl
 ;;;;
 ;;;; The documentation, which may or may not apply in its entirety at
 ;;;; any given time, for this functionality is on the ACL website:
@@ -599,7 +599,7 @@ position with the label if the label is a string."
 cons cells and LIST-TYPE is :normal, :dotted, or :cyclic"
     (do ((length 1 (1+ length))
 	 (lst (cdr object) (cdr lst)))
-	((or (not(consp lst))
+	((or (not (consp lst))
 	     (eq object lst))
 	 (cond
 	   ((null lst)
@@ -615,10 +615,9 @@ cons cells and LIST-TYPE is :normal, :dotted, or :cyclic"
   (multiple-value-bind (length list-type) (cons-safe-length object)
     (format nil "a ~A list with ~D element~:*~P~A"
 	    (string-downcase (symbol-name list-type)) length
-	    (case list-type
+	    (ecase list-type
 	      ((:dotted :cyclic) "+tail")
-	      (t "")))))
-
+	      (:normal "")))))
 
 (defun ref32-hexstr (obj &optional (offset 0))
   (format nil "~8,'0X" (ref32 obj offset)))
