@@ -87,7 +87,7 @@ for early 0.7.x:
 * Probably get rid of or at least rework the fdefinition/encapsulation
 	system so that (SYMBOL-FUNCTION 'FOO) = (FDEFINITION 'FOO).
 =======================================================================
-for 1.0:
+for 0.9:
 
 * refactored in preparation for moving CLOS into cold init and merging
 	SB-PCL:FOO with CL:FOO (for FOO=CLASS, FOO=CLASS-OF, etc.)
@@ -132,6 +132,10 @@ for 1.0:
 	between minor maintenance releases on the stable branch (but no
 	promises, sorry, since I've never tried to do this before, and 
 	have no idea how much of a pain this'll be)
+========================================================================
+for 1.0 (fixes of lower priority which I'd nonetheless be embarrassed
+to leave unfixed in 1.0):
+* all too many BUGS entries and FIXMEs
 =======================================================================
 other priorities, no particular time:
 

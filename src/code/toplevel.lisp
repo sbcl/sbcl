@@ -452,7 +452,9 @@
       (flush-standard-output-streams)
 
       (/show0 "falling into TOPLEVEL-REPL from TOPLEVEL-INIT")
-      (toplevel-repl noprint))))
+      (toplevel-repl noprint)
+      ;; (classic CMU CL error message: "You're certainly a clever child.":-)
+      (critically-unreachable "after TOPLEVEL-REPL"))))
 
 ;;; read-eval-print loop for the default system toplevel
 (defun toplevel-repl (noprint)
@@ -461,20 +463,30 @@
 	(- nil)
 	(+ nil) (++ nil) (+++ nil)
 	(/// nil) (// nil) (/ nil))
-    (/show0 "about to set up restarts in TOPLEVEL-REPL")
-    ;; There should only be one TOPLEVEL restart, and it's here, so
-    ;; restarting at TOPLEVEL always bounces you all the way out here.
-    (with-simple-restart (toplevel
-			  "Restart at toplevel READ/EVAL/PRINT loop.")
-      ;; We add a new ABORT restart for every debugger level, so 
-      ;; restarting at ABORT in a nested debugger gets you out to the
-      ;; innermost enclosing debugger, and only when you're in the
-      ;; outermost, unnested debugger level does restarting at ABORT 
-      ;; get you out to here.
-      (with-simple-restart (abort "Reduce debugger level (leaving debugger).")
-	(catch 'toplevel-catcher
-	  (sb!unix:unix-sigsetmask 0)	; FIXME: What is this for?
-	  (repl noprint))))))
+    ;; WITH-SIMPLE-RESTART doesn't actually restart its body as some
+    ;; (like WHN for an embarrassingly long time ca. 2001-12-07) might
+    ;; think, but instead drops control back out at the end. So when a
+    ;; TOPLEVEL or outermost-ABORT restart happens, we need this outer
+    ;; LOOP wrapper to grab control and start over again. (And it also
+    ;; wraps CATCH 'TOPLEVEL-CATCHER for similar reasons.)
+    (loop
+     (/show0 "about to set up restarts in TOPLEVEL-REPL")
+     ;; There should only be one TOPLEVEL restart, and it's here, so
+     ;; restarting at TOPLEVEL always bounces you all the way out here.
+     (with-simple-restart (toplevel
+			   "Restart at toplevel READ/EVAL/PRINT loop.")
+       ;; We add a new ABORT restart for every debugger level, so 
+       ;; restarting at ABORT in a nested debugger gets you out to the
+       ;; innermost enclosing debugger, and only when you're in the
+       ;; outermost, unnested debugger level does restarting at ABORT 
+       ;; get you out to here.
+       (with-simple-restart
+	   (abort
+	    "Reduce debugger level (leaving debugger, returning to toplevel).")
+	 (catch 'toplevel-catcher
+	   (sb!unix:unix-sigsetmask 0)	; FIXME: What is this for?
+	   (repl noprint)
+	   (critically-unreachable "after REPL")))))))
 
 (defun repl (noprint)
   (/show0 "entering REPL")

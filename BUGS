@@ -1325,6 +1325,16 @@ Error in function C::GET-LAMBDA-TO-COMPILE:
     Interior call of BACKQUOTIFY erroneously optimizes ,@': it immediately
     splices the temporal representation of ,@S.
     
+135:
+  Ideally, uninterning a symbol would allow it, and its associated
+  FDEFINITION and PROCLAIM data, to be reclaimed by the GC. However, 
+  at least as of sbcl-0.7.0, this isn't the case. Information about
+  FDEFINITIONs and PROCLAIMed properties is stored in globaldb.lisp
+  essentially in ordinary (non-weak) hash tables keyed by symbols.
+  Thus, once a system has an entry in this system, it tends to live
+  forever, even when it is uninterned and all other references to it
+  are lost. 
+
     
 KNOWN BUGS RELATED TO THE IR1 INTERPRETER
 

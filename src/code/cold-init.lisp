@@ -21,6 +21,9 @@
 ;;; which might be tedious to maintain, instead we use a hack:
 ;;; anything whose name matches a magic character pattern is
 ;;; uninterned.
+;;;
+;;; FIXME: should also go through globaldb (and perhaps other tables)
+;;; blowing away associated entries
 (defun !unintern-init-only-stuff ()
   (do ((any-changes? nil nil))
       (nil)
@@ -37,6 +40,23 @@
     (unless any-changes?
       (return))))
 
+;;;; putting ourselves out of our misery when things become too much to bear
+
+(declaim (ftype (function (simple-string) nil) critically-unreachable))
+(defun !cold-lose (msg)
+  (%primitive print msg)
+  (%primitive print "too early in cold init to recover from errors")
+  (%halt))
+
+;;; last-ditch error reporting for things which should never happen
+;;; and which, if they do happen, are sufficiently likely to torpedo
+;;; the normal error-handling system that we want to bypass it
+(declaim (ftype (function (simple-string) nil) critically-unreachable))
+(defun critically-unreachable (where)
+  (%primitive print "internal error: Control should never reach here, i.e.")
+  (%primitive print where)
+  (%halt))
+
 ;;;; !COLD-INIT
 
 ;;; a list of toplevel things set by GENESIS
@@ -44,11 +64,6 @@
 
 ;;; a SIMPLE-VECTOR set by GENESIS
 (defvar *!load-time-values*)
-
-(defun !cold-lose (msg)
-  (%primitive print msg)
-  (%primitive print "too early in cold init to recover from errors")
-  (%halt))
 
 (eval-when (:compile-toplevel :execute)
   ;; FIXME: Perhaps we should make SHOW-AND-CALL-AND-FMAKUNBOUND, too,
@@ -230,7 +245,8 @@
   (terpri)
   (/show0 "going into toplevel loop")
   (handling-end-of-the-world 
-    (toplevel-init)))
+    (toplevel-init)
+    (critically-unreachable "after TOPLEVEL-INIT")))
 
 (defun quit (&key recklessly-p
 		  (unix-code 0 unix-code-p)
@@ -249,7 +265,8 @@
 instead (which is another name for the same thing)."))
   (if recklessly-p
       (sb!unix:unix-exit unix-status)
-      (throw '%end-of-the-world unix-status)))
+      (throw '%end-of-the-world unix-status))
+  (critically-unreachable "after trying to die in QUIT"))
 
 ;;;; initialization functions
 
