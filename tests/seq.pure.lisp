@@ -156,3 +156,8 @@
 (assert (equal (stable-sort (list 1 2 3 -3 -2 -1) '< :key 'abs)
 	       '(1 -1 2 -2 3 -3)))
 
+;;; CSR broke FILL by not returning the sequence argument in a transform.
+(let* ((s1 (copy-seq "abcde"))
+       (s2 (fill s1 #\z)))
+  (assert s2)
+  (assert (string= s2 "zzzzz")))

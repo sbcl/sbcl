@@ -383,7 +383,7 @@
 	    ((= index end)
 	     (let ((place (* times 4)))
 	       (declare (fixnum place))
-	       (dotimes (j rem)
+	       (dotimes (j rem sequence)
 		 (declare (index j))
 		 (setf (schar sequence (the index (+ place j))) item))))
 	  (declare (optimize (speed 3) (safety 0))
