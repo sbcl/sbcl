@@ -24,6 +24,7 @@
 (in-package "SB-PCL")
 
 (!fix-early-generic-functions)
+(compute-standard-slot-locations)
 (setq *boot-state* 'complete)
 
 (defun print-std-instance (instance stream depth)

@@ -989,7 +989,8 @@
 	      wrapper nwrapper))
       (setf (slot-value class 'finalized-p) t)
       (unless (eq owrapper nwrapper)
-	(update-pv-table-cache-info class)))))
+	(update-pv-table-cache-info class)
+	(maybe-update-standard-class-locations class)))))
 
 (defun compute-class-slots (eslotds)
   (let (collect)

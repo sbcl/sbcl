@@ -75,6 +75,8 @@ have to do any method lookup to implement itself.
 
 And so, we are saved.
 
+Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
+
 |#
 
 ;;; an alist in which each entry is of the form
@@ -170,6 +172,62 @@ And so, we are saved.
                                  (car args-entry)))
                        collect))))
            (nreverse collect)))))
+
+;;; Standardized class slot access: when trying to break vicious
+;;; metacircles, we need a way to get at the values of slots of some
+;;; standard classes without going through the whole meta machinery,
+;;; because that would likely enter the vicious circle again.  The
+;;; following are helper functions that short-circuit the generic
+;;; lookup machinery.
+
+(defvar *standard-classes*
+  '(standard-method standard-generic-function standard-class
+    standard-effective-slot-definition))
+
+(defvar *standard-slot-locations* (make-hash-table :test 'equal))
+
+(defun compute-standard-slot-locations ()
+  (clrhash *standard-slot-locations*)
+  (dolist (class-name *standard-classes*)
+    (let ((class (find-class class-name)))
+      (dolist (slot (class-slots class))
+	(setf (gethash (cons class (slot-definition-name slot))
+		       *standard-slot-locations*)
+	      (slot-definition-location slot))))))
+
+;;; FIXME: harmonize the names between COMPUTE-STANDARD-SLOT-LOCATIONS
+;;; and MAYBE-UPDATE-STANDARD-CLASS-LOCATIONS.
+(defun maybe-update-standard-class-locations (class)
+  (when (and (eq *boot-state* 'complete)
+	     (memq (class-name class) *standard-classes*))
+    (compute-standard-slot-locations)))
+
+(defun standard-slot-value (object slot-name class)
+  (let ((location (gethash (cons class slot-name) *standard-slot-locations*)))
+    (if location
+	(let ((value (if (funcallable-instance-p object)
+			 (funcallable-standard-instance-access object location)
+			 (standard-instance-access object location))))
+	  (when (eq +slot-unbound+ value)
+	    (error "~@<slot ~s of class ~s is unbound in object ~s~@:>"
+		   slot-name class object))
+	  value)
+	(error "~@<cannot get standard value of slot ~s of class ~s ~
+                in object ~s~@:>"
+	       slot-name class object))))
+
+(defun standard-slot-value/gf (gf slot-name)
+  (standard-slot-value gf slot-name *the-class-standard-generic-function*))
+
+(defun standard-slot-value/method (method slot-name)
+  (standard-slot-value method slot-name *the-class-standard-method*))
+
+(defun standard-slot-value/eslotd (slotd slot-name)
+  (standard-slot-value slotd slot-name
+		       *the-class-standard-effective-slot-definition*))
+
+(defun standard-slot-value/class (class slot-name)
+  (standard-slot-value class slot-name *the-class-standard-class*))
 
 ;;; When all the methods of a generic function are automatically
 ;;; generated reader or writer methods a number of special
@@ -1020,6 +1078,8 @@ And so, we are saved.
 ;;;  <index>      If <type> is READER or WRITER, and the slot accessed is
 ;;;	       an :instance slot, this is the index number of that slot
 ;;;	       in the object argument.
+(defvar *cache-miss-values-stack* ())
+
 (defun cache-miss-values (gf args state)
   (multiple-value-bind (nreq applyp metatypes nkeys arg-info)
       (get-generic-fun-info gf)
@@ -1036,26 +1096,100 @@ And so, we are saved.
                 accessor-type index)))))
 
 (defun cache-miss-values-internal (gf arg-info wrappers classes types state)
+  (if (and classes (equal classes (cdr (assq gf *cache-miss-values-stack*))))
+      (break-vicious-metacircle gf classes arg-info)
+      (let ((*cache-miss-values-stack*
+	     (acons gf classes *cache-miss-values-stack*))
+	    (cam-std-p (or (null arg-info)
+			   (gf-info-c-a-m-emf-std-p arg-info))))
+	(multiple-value-bind (methods all-applicable-and-sorted-p)
+	    (if cam-std-p
+		(compute-applicable-methods-using-types gf types)
+		(compute-applicable-methods-using-classes gf classes))
+	  
   (let* ((for-accessor-p (eq state 'accessor))
 	 (for-cache-p (or (eq state 'caching) (eq state 'accessor)))
-	 (cam-std-p (or (null arg-info)
-			(gf-info-c-a-m-emf-std-p arg-info))))
-    (multiple-value-bind (methods all-applicable-and-sorted-p)
-	(if cam-std-p
-	    (compute-applicable-methods-using-types gf types)
-	    (compute-applicable-methods-using-classes gf classes))
-      (let ((emf (if (or cam-std-p all-applicable-and-sorted-p)
-		     (function-funcall (get-secondary-dispatch-function1
-					gf methods types nil (and for-cache-p
-								  wrappers)
-					all-applicable-and-sorted-p)
-				       nil (and for-cache-p wrappers))
-		     (default-secondary-dispatch-function gf))))
-	(multiple-value-bind (index accessor-type)
-	    (and for-accessor-p all-applicable-and-sorted-p methods
-		 (accessor-values gf arg-info classes methods))
-	  (values (if (integerp index) index emf)
-		  methods accessor-type index))))))
+	 (emf (if (or cam-std-p all-applicable-and-sorted-p)
+		  (function-funcall (get-secondary-dispatch-function1
+				     gf methods types nil (and for-cache-p
+							       wrappers)
+				     all-applicable-and-sorted-p)
+				    nil (and for-cache-p wrappers))
+		  (default-secondary-dispatch-function gf))))
+    (multiple-value-bind (index accessor-type)
+	(and for-accessor-p all-applicable-and-sorted-p methods
+	     (accessor-values gf arg-info classes methods))
+      (values (if (integerp index) index emf)
+	      methods accessor-type index)))))))
+
+;;; Try to break a vicious circle while computing a cache miss.
+;;; GF is the generic function, CLASSES are the classes of actual
+;;; arguments, and ARG-INFO is the generic functions' arg-info.
+;;;
+;;; A vicious circle can be entered when the computation of the cache
+;;; miss values itself depends on the values being computed.  For
+;;; instance, adding a method which is an instance of a subclass of
+;;; STANDARD-METHOD leads to cache misses for slot accessors of
+;;; STANDARD-METHOD like METHOD-SPECIALIZERS, and METHOD-SPECIALIZERS
+;;; is itself used while we compute cache miss values.
+(defun break-vicious-metacircle (gf classes arg-info)
+  (when (typep gf 'standard-generic-function)
+    (multiple-value-bind (class slotd accessor-type)
+	(accesses-standard-class-slot-p gf)
+      (when class
+	(let ((method (find-standard-class-accessor-method
+		       gf class accessor-type))
+	      (index (standard-slot-value/eslotd slotd 'location))
+	      (type (gf-info-simple-accessor-type arg-info)))
+	  (when (and method
+		     (subtypep (ecase accessor-type
+				 ((reader) (car classes))
+				 ((writer) (cadr classes)))
+			       class))
+	    (return-from break-vicious-metacircle
+	      (values index (list method) type index)))))))
+  (error "~@<vicious metacircle:  The computation of an ~
+	  effective method of ~s for arguments of types ~s uses ~
+	  the effective method being computed.~@:>"
+	 gf classes))
+
+;;; Return (CLASS SLOTD ACCESSOR-TYPE) if some method of generic
+;;; function GF accesses a slot of some class in *STANDARD-CLASSES*.
+;;; CLASS is the class accessed, SLOTD is the effective slot definition
+;;; object of the slot accessed, and ACCESSOR-TYPE is one of the symbols
+;;; READER or WRITER describing the slot access.
+(defun accesses-standard-class-slot-p (gf)
+  (flet ((standard-class-slot-access (gf class)
+	   (loop with gf-name = (standard-slot-value/gf gf 'name)
+		 for slotd in (standard-slot-value/class class 'slots)
+		 ;; FIXME: where does BOUNDP fit in here?  Is it
+		 ;; relevant?
+		 as readers = (standard-slot-value/eslotd slotd 'readers)
+		 as writers = (standard-slot-value/eslotd slotd 'writers)
+		 if (member gf-name readers :test #'equal)
+		   return (values slotd 'reader)
+		 else if (member gf-name writers :test #'equal)
+		   return (values slotd 'writer))))
+    (dolist (class-name *standard-classes*)
+      (let ((class (find-class class-name)))
+	(multiple-value-bind (slotd accessor-type)
+	    (standard-class-slot-access gf class)
+	  (when slotd
+	    (return (values class slotd accessor-type))))))))
+
+;;; Find a slot reader/writer method among the methods of generic
+;;; function GF which reads/writes instances of class CLASS.
+;;; TYPE is one of the symbols READER or WRITER.
+(defun find-standard-class-accessor-method (gf class type)
+  (dolist (method (standard-slot-value/gf gf 'methods))
+    (let ((specializers (standard-slot-value/method method 'specializers))
+	  (qualifiers (plist-value method 'qualifiers)))
+      (when (and (null qualifiers)
+		 (eq (ecase type
+		       (reader (car specializers))
+		       (writer (cadr specializers)))
+		     class))
+	(return method)))))
 
 (defun accessor-values (gf arg-info classes methods)
   (declare (ignore gf))

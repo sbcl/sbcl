@@ -161,5 +161,14 @@
 ;;; 2003-04-17
 (assert (> *compute-effective-slot-definition-count* 0))
 
+;;; this used to cause a nasty uncaught metacircularity in PCL.
+(defclass substandard-method (standard-method) ())
+(defgeneric substandard-defgeneric (x y)
+  (:method-class substandard-method)
+  (:method ((x number) (y number)) (+ x y))
+  (:method ((x string) (y string)) (concatenate 'string x y)))
+(assert (= (substandard-defgeneric 1 2) 3))
+(assert (string= (substandard-defgeneric "1" "2") "12"))
+
 ;;;; success
 (sb-ext:quit :unix-status 104)
