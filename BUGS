@@ -1291,6 +1291,16 @@ WORKAROUND:
 177:
   (fixed in sbcl-0.7.4.24)
 
+178: "AVER failure compiling confused THEs in FUNCALL"
+  In sbcl-0.7.4.24, compiling
+    (defun bug178 (x)
+      (funcall (the function (the standard-object x))))
+  gives 
+    failed AVER:
+      "(AND (EQ (IR2-CONTINUATION-PRIMITIVE-TYPE 2CONT) FUNCTION-PTYPE) (EQ CHECK T))"
+  This variant compiles OK, though:
+    (defun bug178alternative (x)
+      (funcall (the nil x)))
 
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:

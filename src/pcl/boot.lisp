@@ -702,10 +702,10 @@ bootstrapping.
 					  rest-arg
 					  &rest lmf-options)
 					 &body body)
- `(bind-fast-lexical-method-macros (,args ,rest-arg ,next-method-call)
-    (bind-lexical-method-functions (,@lmf-options)
-      (bind-args (,(nthcdr (length args) lambda-list) ,rest-arg)
-	,@body))))
+  `(bind-fast-lexical-method-macros (,args ,rest-arg ,next-method-call)
+     (bind-lexical-method-functions (,@lmf-options)
+       (bind-args (,(nthcdr (length args) lambda-list) ,rest-arg)
+	 ,@body))))
 
 (defmacro bind-simple-lexical-method-macros ((method-args next-methods)
 					     &body body)

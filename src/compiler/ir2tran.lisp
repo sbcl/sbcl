@@ -831,12 +831,14 @@
 
 ;;;; full call
 
-;;; Given a function continuation FUN, return as values a TN holding
-;;; the thing that we call and true if the thing is named (false if it
-;;; is a function). There are two interesting non-named cases:
-;;;   -- Known to be a function, no check needed: return the
-;;;      continuation loc.
-;;;   -- Not known what it is.
+;;; Given a function continuation FUN, return (VALUES TN-TO-CALL
+;;; NAMED-P), where TN-TO-CALL is a TN holding the thing that we call
+;;; NAMED-P is true if the thing is named (false if it is a function).
+;;;
+;;; There are two interesting non-named cases:
+;;;   -- We know it's a function. No check needed: return the
+;;;      continuation LOC.
+;;;   -- We don't know what it is.
 (defun fun-continuation-tn (node block cont)
   (declare (type continuation cont))
   (let ((2cont (continuation-info cont)))
@@ -862,7 +864,7 @@
 				    (specifier-type 'function))
 		   (values temp nil))))))))
 
-;;; Set up the args to Node in the current frame, and return a tn-ref
+;;; Set up the args to NODE in the current frame, and return a TN-REF
 ;;; list for the passing locations.
 (defun move-tail-full-call-args (node block)
   (declare (type combination node) (type ir2-block block))
