@@ -19,9 +19,15 @@
 # pathname, but now we take care to bind it to an absolute pathname (still
 # generated relative to `pwd` in the tests/ directory) so that tests
 # can chdir before invoking SBCL and still work.
-SBCL="${1:-`pwd`/../src/runtime/sbcl --core `pwd`/../output/sbcl.core --noinform --sysinit /dev/null --userinit /dev/null --noprint --disable-debugger}"
+sbclstem=`pwd`/../src/runtime/sbcl
+SBCL="${1:-$sbclstem --core `pwd`/../output/sbcl.core --noinform --sysinit /dev/null --userinit /dev/null --noprint --disable-debugger}"
 export SBCL
 echo /running tests on SBCL=\'$SBCL\'
+# more or less like SBCL, but without enough grot removed that appending
+# a --core command line argument works
+SBCL_ALLOWING_CORE=${1:-$sbclstem}
+export SBCL_ALLOWING_CORE
+echo /with SBCL_ALLOWING_CORE=\'$SBCL_ALLOWING_CORE\'
 
 # "Ten four" is the closest numerical slang I can find to "OK", so
 # it's the Unix status value that we expect from a successful test.

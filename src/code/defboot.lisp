@@ -72,21 +72,21 @@
 ;;; COND defined in terms of IF
 (defmacro-mundanely cond (&rest clauses)
   (if (endp clauses)
-    nil
-    (let ((clause (first clauses)))
-      (if (atom clause)
-	(error "Cond clause is not a list: ~S" clause)
-	(let ((test (first clause))
-	      (forms (rest clause)))
-	  (if (endp forms)
-	    (let ((n-result (gensym)))
-	      `(let ((,n-result ,test))
-		 (if ,n-result
-		   ,n-result
-		   (cond ,@(rest clauses)))))
-	    `(if ,test
-	       (progn ,@forms)
-	       (cond ,@(rest clauses)))))))))
+      nil
+      (let ((clause (first clauses)))
+	(if (atom clause)
+	    (error "COND clause is not a list: ~S" clause)
+	    (let ((test (first clause))
+		  (forms (rest clause)))
+	      (if (endp forms)
+		  (let ((n-result (gensym)))
+		    `(let ((,n-result ,test))
+		       (if ,n-result
+			   ,n-result
+			   (cond ,@(rest clauses)))))
+		  `(if ,test
+		       (progn ,@forms)
+		       (cond ,@(rest clauses)))))))))
 
 ;;; other things defined in terms of COND
 (defmacro-mundanely when (test &body forms)
