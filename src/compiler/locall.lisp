@@ -234,22 +234,21 @@
 ;;; do LET conversion here.
 (defun locall-analyze-fun-1 (fun)
   (declare (type functional fun))
-  (let ((refs (leaf-refs fun))
-	(first-time t))
+  (let ((refs (leaf-refs fun)))
     (dolist (ref refs)
       (let* ((lvar (node-lvar ref))
 	     (dest (when lvar (lvar-dest lvar))))
-	(cond ((and (basic-combination-p dest)
-		    (eq (basic-combination-fun dest) lvar)
-		    (eq (lvar-uses lvar) ref))
+        (unless (node-to-be-deleted-p ref)
+          (cond ((and (basic-combination-p dest)
+                      (eq (basic-combination-fun dest) lvar)
+                      (eq (lvar-uses lvar) ref))
 
-	       (convert-call-if-possible ref dest)
+                 (convert-call-if-possible ref dest)
 
-	       (unless (eq (basic-combination-kind dest) :local)
-		 (reference-entry-point ref)))
-	      (t
-	       (reference-entry-point ref))))
-      (setq first-time nil)))
+                 (unless (eq (basic-combination-kind dest) :local)
+                   (reference-entry-point ref)))
+                (t
+                 (reference-entry-point ref)))))))
 
   (values))
 
@@ -393,8 +392,7 @@
 	 (original-fun (ref-leaf ref)))
     (aver (functional-p original-fun))
     (unless (or (member (basic-combination-kind call) '(:local :error))
-		(block-delete-p block)
-		(eq (functional-kind (block-home-lambda block)) :deleted)
+                (node-to-be-deleted-p call)
 		(member (functional-kind original-fun)
 			'(:toplevel-xep :deleted))
 		(not (or (eq (component-kind component) :initial)
@@ -1032,9 +1030,7 @@
 	  (when (and (basic-combination-p dest)
 		     (eq (basic-combination-fun dest) ref-lvar)
 		     (eq (basic-combination-kind dest) :local)
-		     (not (block-delete-p (node-block dest)))
-                     (neq (functional-kind (node-home-lambda dest))
-                          :deleted)
+                     (not (node-to-be-deleted-p dest))
 		     (cond ((ok-initial-convert-p clambda) t)
 			   (t
 			    (reoptimize-lvar ref-lvar)

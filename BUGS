@@ -961,11 +961,6 @@ WORKAROUND:
 
   b. The same for CSUBTYPEP.
 
-261:
-    * (let () (list (the (values &optional fixnum) (eval '(values)))))
-    debugger invoked on condition of type TYPE-ERROR:
-      The value NIL is not of type FIXNUM.
-
 262: "yet another bug in inline expansion of local functions"
   Compiler fails on
 

@@ -324,6 +324,13 @@
 (defun node-dest (node)
   (awhen (node-lvar node) (lvar-dest it)))
 
+;;; Checks whether NODE is in a block to be deleted
+(declaim (inline node-to-be-deleted-p))
+(defun node-to-be-deleted-p (node)
+  (let ((block (node-block node)))
+    (or (block-delete-p block)
+        (eq (functional-kind (block-home-lambda block)) :deleted))))
+
 (declaim (ftype (sfunction (clambda) cblock) lambda-block))
 (defun lambda-block (clambda)
   (node-block (lambda-bind clambda)))

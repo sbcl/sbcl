@@ -143,3 +143,7 @@
                              (make-array 1 :element-type '(unsigned-byte 32)
                                          :initial-element n))
                     nil)))))))
+
+;;; bug 261
+(let ((x (list (the (values &optional fixnum) (eval '(values))))))
+  (assert (equal x '(nil))))

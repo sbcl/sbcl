@@ -713,7 +713,6 @@
 	     :format-arguments (list (namestring pathname))))
     result))
 
-;;; If PATHNAME exists, return its truename, otherwise NIL.
 (defun probe-file (pathname)
   #!+sb-doc
   "Return a pathname which is the truename of the file if it exists, or NIL

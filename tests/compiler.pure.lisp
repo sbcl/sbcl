@@ -643,3 +643,35 @@
 				(ash x -257)))
 		    1024)
 	   0))
+
+;;; bug found by WHN and pfdietz: compiler failure while referencing
+;;; an entry point inside a deleted lambda
+(compile nil '(lambda ()
+               (let (r3533)
+                 (flet ((bbfn ()
+                          (setf r3533
+                                (progn
+                                  (flet ((truly (fn bbd)
+                                           (let (r3534)
+                                             (let ((p3537 nil))
+                                               (unwind-protect
+                                                    (multiple-value-prog1
+                                                        (progn
+                                                          (setf r3534
+                                                                (progn
+                                                                  (bubf bbd t)
+                                                                  (flet ((c-3536 ()
+                                                                           (funcall fn)))
+                                                                    (cdec #'c-3536
+                                                                          (vector bbd))))))
+                                                      (setf p3537 t))
+                                                 (unless p3537
+                                                   (error "j"))))
+                                             r3534))
+                                         (c (pd) (pdc pd)))
+                                    (let ((a (smock a))
+                                          (b (smock b))
+                                          (b (smock c)))))))))
+                   (wum #'bbfn "hc3" (list)))
+                 r3533)))
+(compile nil '(lambda () (flet ((%f () (unwind-protect nil))) nil)))
