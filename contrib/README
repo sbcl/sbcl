@@ -8,15 +8,11 @@ There are two kinds of contrib module in this directory:
   * Newer contrib modules conform to the contrib standard (see 
     STANDARDS) and are automatically built and installed along with
     SBCL itself.  Each of these is in its own subdirectory with a
-    Makefile, and can be loaded with REQUIRE
+    Makefile, and can be loaded with REQUIRE.
 
-    Many of them use ASDF, so you have to require that first: e.g.
-
-        * (require 'asdf)
-        * (require 'sb-bsd-sockets)
-
-  * Older standalone files are effectively unpackaged and may or may 
-    not work with the current SBCL version.
+  * Older standalone files in the contrib directory itself are
+    effectively unpackaged and may or may not work with the current
+    SBCL version.
 
 Some good candidates for future extensions here are:
   * bindings to existing foreign libraries (e.g. to a regexp library

@@ -160,3 +160,4 @@ Returns a DEFINITION-SOURCE object"))
 	   (sb-int:info :type :classoid (class-name o))))))
     (find-definition-source constructor)))
 
+(provide 'sb-introspect)

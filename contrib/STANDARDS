@@ -1,4 +1,4 @@
-Proposed contrib standard, version $Revision$
+Proposed contrib standard, $Revision$
 
 The SBCL contrib mechanism provides a mechanism to
 manage code which does not form part of SBCL itself, but which is
@@ -49,17 +49,18 @@ A contrib package must contain a Makefile.  This is to have three targets
 
 all:     # do whatever compilation is necessary
 test:    # run the package tests
-install: # copy all necessary files into $(INSTALL_DIR)
+install: # copy all necessary files into $(BUILD_ROOT)$(INSTALL_DIR)
 
 If the contrib package involves more than one file, you are encouraged
 to use ASDF to build it and load it.  A version of asdf is bundled as
 an SBCL contrib, which knows to look in $SBCL_HOME/systems/ for asd
 files - your install target should create an appropriate symlink there
-to the installed location of the system file.  Look in sb-bsd-sockets/Makefile
-for an example of an asdf-using contrib
+to the installed location of the system file.  Look in
+sb-bsd-sockets/Makefile for an example of an asdf-using contrib.
 
-$(INSTALL_DIR) will have been created by the system before your
-install target is called.  You do not need to make it yourself.
+$(BUILD_ROOT)$(INSTALL_DIR) will have been created by the system
+before your install target is called.  You do not need to make it
+yourself.
 
 * Tests
 

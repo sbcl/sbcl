@@ -49,4 +49,4 @@ exec sbcl --noinform ~{~A ~}--eval \"(with-open-file (i \\\"$0\\\" :element-type
 				   (if (logand prot  #o40)  #o10)
 				   (if (logand prot   #o4)   #o1)))))
 			 
-  
+(provide 'sb-executable)

@@ -41,7 +41,9 @@
    is a designator for a list of pathnames to be loaded if the module
    needs to be. If PATHNAMES is not supplied, functions from the list
    *MODULE-PROVIDER-FUNCTIONS* are called in order with MODULE-NAME
-   as an argument, until one of them returns non-NIL."
+   as an argument, until one of them returns non-NIL.  User code is
+   responsible for calling PROVIDE to indicate a successful load of the
+   module."
   (let ((saved-modules (copy-list *modules*)))
     (unless (member (string module-name) *modules* :test #'string=)
       (cond (pathnames
@@ -49,12 +51,7 @@
 	     ;; ambiguity in standard: should we try all pathnames in the
 	     ;; list, or should we stop as soon as one of them calls PROVIDE?
 	     (dolist (ele pathnames t)
-	       (load ele))
-             ;; should we do this?  Probably can't hurt, while we're
-             ;; taking the above view of "load everything"...  though
-             ;; maybe having REQUIRE directly call PROVIDE is
-             ;; aesthetically suboptimal.
-	     (provide module-name))
+	       (load ele)))
 	    (t
 	     (unless (some (lambda (p) (funcall p module-name))
 			   sb!ext::*module-provider-functions*)
@@ -69,9 +66,8 @@
   (let ((filesys-name (string-downcase (string name))))
     (load
      (merge-pathnames (make-pathname :directory (list :relative filesys-name)
-				     :name filesys-name)
+				     :name filesys-name :type nil)
 		      (truename (posix-getenv "SBCL_HOME")))))
-  (provide name)
   t)
 
 
