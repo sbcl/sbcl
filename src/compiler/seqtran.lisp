@@ -712,12 +712,13 @@
 			    sb!vm:n-byte-bits)))
      string1))
 
-#+nil
+;;; FIXME: OAOO (should be shared with above, and probably
+;;; automatically generated from SAETP).
 (deftransform replace ((string1 string2 &key (start1 0) (start2 0)
 				end1 end2)
 		       ((simple-array character (*))
-			(simple-array character (*))
-			&rest t)
+                        (simple-array character (*))
+                        &rest t)
 		       *
 		       ;; FIXME: consider replacing this policy test
 		       ;; with some tests for the STARTx and ENDx
@@ -732,18 +733,19 @@
      (declare (optimize (safety 0)))
      (bit-bash-copy string2
 		    (the index
-			 (+ (the index (* start2 sb!vm:n-word-bits))
+                         ;; FIXME: literal 32s
+			 (+ (the index (* start2 32))
 			    ,vector-data-bit-offset))
 		    string1
 		    (the index
-			 (+ (the index (* start1 sb!vm:n-word-bits))
+			 (+ (the index (* start1 32))
 			    ,vector-data-bit-offset))
 		    (the index
 			 (* (min (the index (- (or end1 (length string1))
 					       start1))
 				 (the index (- (or end2 (length string2))
 					       start2)))
-			    sb!vm:n-word-bits)))
+			    32)))
      string1))
 
 ;;; FIXME: this would be a valid transform for certain excluded cases:
