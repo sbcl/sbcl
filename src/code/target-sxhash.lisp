@@ -84,7 +84,7 @@
   (declare (type index count))
   (let ((result 408967240))
     (declare (type fixnum result))
-    (when (typep string 'base-string)
+    (unless (typep string '(vector nil))
       (dotimes (i count)
 	(declare (type index i))
 	(mixf result

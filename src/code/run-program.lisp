@@ -63,7 +63,7 @@
 (defun unix-environment-cmucl-from-sbcl (sbcl)
   (mapcan
    (lambda (string)
-     (declare (type simple-string string))
+     (declare (type simple-base-string string))
      (let ((=-pos (position #\= string :test #'equal)))
        (if =-pos
 	   (list
@@ -86,8 +86,8 @@
   (mapcar
    (lambda (cons)
      (destructuring-bind (key . val) cons
-       (declare (type keyword key) (type simple-string val))
-       (concatenate 'simple-string (symbol-name key) "=" val)))
+       (declare (type keyword key) (type simple-base-string val))
+       (concatenate 'simple-base-string (symbol-name key) "=" val)))
    cmucl))
 
 ;;;; Import wait3(2) from Unix.
@@ -483,8 +483,8 @@
 
    The &KEY arguments have the following meanings:
      :ENVIRONMENT
-        a list of SIMPLE-STRINGs describing the new Unix environment (as
-        in \"man environ\"). The default is to copy the environment of
+        a list of SIMPLE-BASE-STRINGs describing the new Unix environment
+        (as in \"man environ\"). The default is to copy the environment of
         the current process.
      :ENV
         an alternative lossy representation of the new Unix environment,
