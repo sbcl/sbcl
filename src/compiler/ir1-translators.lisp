@@ -440,7 +440,8 @@
 			 cont
 			 (ir1-convert-lambda thing
 					     :debug-name (debug-namify
-							  "#'~S" thing))))
+							  "#'~S" thing)
+					     :allow-debug-catch-tag t)))
 	((setf)
 	 (let ((var (find-lexically-apparent-fun
 		     thing "as the argument to FUNCTION")))
@@ -448,7 +449,8 @@
 	((instance-lambda)
 	 (let ((res (ir1-convert-lambda `(lambda ,@(cdr thing))
 					:debug-name (debug-namify "#'~S"
-								  thing))))
+								  thing)
+					:allow-debug-catch-tag t)))
 	   (setf (getf (functional-plist res) :fin-function) t)
 	   (reference-leaf start cont res)))
 	(t
@@ -482,9 +484,11 @@
 (def-ir1-translator named-lambda ((name &rest rest) start cont)
   (let* ((fun (if (legal-fun-name-p name)
                   (ir1-convert-lambda `(lambda ,@rest)
-                                      :source-name name)
+                                      :source-name name
+				      :allow-debug-catch-tag t)
                   (ir1-convert-lambda `(lambda ,@rest)
-                                      :debug-name name)))
+                                      :debug-name name
+				      :allow-debug-catch-tag t)))
          (leaf (reference-leaf start cont fun)))
     (when (legal-fun-name-p name)
       (assert-global-function-definition-type name fun))
@@ -657,7 +661,8 @@
   			      (ir1-convert-lambda d
 						  :source-name n
 						  :debug-name (debug-namify
-							       "FLET ~S" n)))
+							       "FLET ~S" n)
+						  :allow-debug-catch-tag t))
 			    names defs))
 	     (*lexenv* (make-lexenv
 			:default (process-decls decls nil fvars cont)
@@ -692,7 +697,8 @@
 			  (ir1-convert-lambda def
 					      :source-name name
 					      :debug-name (debug-namify
-							   "LABELS ~S" name)))
+							   "LABELS ~S" name)
+					      :allow-debug-catch-tag t))
 			names defs))))
 
         ;; Modify all the references to the dummy function leaves so

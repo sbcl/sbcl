@@ -1484,6 +1484,13 @@ changes in sbcl-0.7.11 relative to sbcl-0.7.10:
     of the new implementation of DEFINE-COMPILER-MACRO.
 
 changes in sbcl-0.7.12 relative to sbcl-0.7.11:
+  * minor incompatible change: code processed by the "interpreter" or
+    EVAL now has a compilation optimization policy of (DEBUG 2)
+    (changed from (DEBUG 1)) to improve debuggability of interactive
+    development, and to allow the use of the debug RETURN command in
+    such code.
+  * an experimental implementation of the RETURN command for the
+    debugger has been included.  (thanks to Frederik Kuivinen)
   * fixed bug 62: constraints were not propagated into a loop.
   * fixed bug in embedded calls of SORT (reported and investigated by
     Wolfgang Jenkner).

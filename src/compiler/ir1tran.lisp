@@ -501,7 +501,8 @@
 					       opname
 					       :debug-name (debug-namify
 							    "LAMBDA CAR ~S"
-							    opname)))))))))
+							    opname)
+					       :allow-debug-catch-tag t))))))))
     (values))
 
   ;; Generate a reference to a manifest constant, creating a new leaf
@@ -1941,7 +1942,9 @@
     res))
 
 ;;; Convert a LAMBDA form into a LAMBDA leaf or an OPTIONAL-DISPATCH leaf.
-(defun ir1-convert-lambda (form &key (source-name '.anonymous.) debug-name)
+(defun ir1-convert-lambda (form &key (source-name '.anonymous.)
+			             debug-name
+			             allow-debug-catch-tag)
 
   (unless (consp form)
     (compiler-error "A ~S was found when expecting a lambda expression:~%  ~S"
@@ -1964,6 +1967,11 @@
 	     (*lexenv* (process-decls decls
 				      (append aux-vars vars)
 				      nil result-cont))
+	     (forms (if (and allow-debug-catch-tag
+			     (policy *lexenv* (> debug (max speed space))))
+			`((catch (make-symbol "SB-DEBUG-CATCH-TAG")
+			    ,@forms))
+			forms))
 	     (res (if (or (find-if #'lambda-var-arg-info vars) keyp)
 		      (ir1-convert-hairy-lambda forms vars keyp
 						allow-other-keys

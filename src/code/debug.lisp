@@ -122,17 +122,20 @@ Breakpoints and steps:
   STEP [n]                           Step to the next location or step n times.
 
 Function and macro commands:
- (SB-DEBUG:DEBUG-RETURN expression)
-    Exit the debugger, returning expression's values from the current frame.
  (SB-DEBUG:ARG n)
     Return the n'th argument in the current frame.
  (SB-DEBUG:VAR string-or-symbol [id])
     Returns the value of the specified variable in the current frame.
 
 Other commands:
-  SLURP   Discard all pending input on *STANDARD-INPUT*. (This can be
-          useful when the debugger was invoked to handle an error in
-          deeply nested input syntax, and now the reader is confused.)")
+  RETURN expr
+    [EXPERIMENTAL] Return the values resulting from evaluation of expr
+    from the current frame, if this frame was compiled with a sufficiently
+    high DEBUG optimization quality.
+  SLURP
+    Discard all pending input on *STANDARD-INPUT*. (This can be
+    useful when the debugger was invoked to handle an error in
+    deeply nested input syntax, and now the reader is confused.)")
 
 ;;; This is used to communicate to DEBUG-LOOP that we are at a step breakpoint.
 (define-condition step-condition (simple-condition) ())
@@ -1670,6 +1673,24 @@ reset to ~S."
 
 (!def-debug-command "SLURP" ()
   (loop while (read-char-no-hang *standard-input*)))
+
+(!def-debug-command "RETURN" (&optional
+			      (return (read-prompting-maybe
+				       "return: ")))
+  (let ((tag (find-if (lambda (x)
+			(and (typep (car x) 'symbol)
+			     (not (symbol-package (car x)))
+			     (string= (car x) "SB-DEBUG-CATCH-TAG")))
+		      (sb!di::frame-catches *current-frame*))))
+    (if tag
+	(throw (car tag)
+	  (funcall (sb!di:preprocess-for-eval
+		    return
+		    (sb!di:frame-code-location *current-frame*))
+		   *current-frame*))
+	(format t "~@<can't find a tag for this frame ~
+                   ~2I~_(hint: try increasing the DEBUG optimization quality ~
+                   and recompiling)~:@>"))))
 
 ;;;; debug loop command utilities
 

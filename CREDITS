@@ -551,6 +551,9 @@ Matthias Hoelzl:
 Espen S Johnsen:
   He provided an ANSI-compliant version of CHANGE-CLASS for PCL.
 
+Frederik Kuivinen:
+  He showed how to implement the DEBUG-RETURN functionality.
+
 Arthur Lemmens:
   He found and fixed a number of SBCL bugs while partially porting
   SBCL to bootstrap under Lispworks for Windows
