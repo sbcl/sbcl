@@ -17,7 +17,13 @@
 sbcl=${1:-../src/runtime/sbcl --core ../output/sbcl.core --noinform --noprint --noprogrammer}
 
 # "Ten four" is the closest numerical slang I can find to "OK", so
-# it's the return value that we expect from a successful test.
+# it's the Unix status value that we expect from a successful test.
+# (Of course, zero is the usual success value, but we don't want to
+# use that because SBCL returns that by default, so we might think
+# we passed a test when in fact some error caused us to exit SBCL
+# in a weird unexpected way. In contrast, 104 is unlikely to be
+# returned unless we exit through the intended explicit "test
+# successful" path.
 tenfour () {
     if [ $? = 104 ]; then
 	echo ok
@@ -31,13 +37,15 @@ tenfour () {
 # and we can run them all in a single Lisp process.
 echo //running '*.pure.lisp' tests
 echo //i.e. *.pure.lisp
-(for f in *.pure.lisp; do
-    echo "(progn"
+(
+echo "(progn"
+for f in *.pure.lisp; do
     if [ -f $f ]; then
         echo "  (progn (format t \"//running $f test~%\") (load \"$f\"))"
     fi
-    echo "  (sb-ext:quit :unix-status 104))"
-done) | $sbcl ; tenfour
+done
+echo "  (sb-ext:quit :unix-status 104)) ; Return status=success."
+) | $sbcl ; tenfour
 
 # *.impure.lisp files are Lisp code with side effects (e.g. doing DEFSTRUCT
 # or DEFTYPE or DEFVAR). Each one needs to be run as a separate

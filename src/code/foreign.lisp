@@ -138,9 +138,10 @@
   ;; Note: We use RTLD-GLOBAL so that it can find all the symbols
   ;; previously loaded. We use RTLD-NOW so that dlopen() will fail if
   ;; not all symbols are defined.
-  (let ((sap (dlopen file (logior rtld-now rtld-global))))
+  (let* ((real-file (or (unix-namestring file) file))
+         (sap (dlopen real-file (logior rtld-now rtld-global))))
        (if (zerop (sap-int sap))
-	   (error "can't open object ~S: ~S" file (dlerror))
+	   (error "can't open object ~S: ~S" real-file (dlerror))
 	   (pushnew sap *tables-from-dlopen* :test #'sap=)))
   (values))
 

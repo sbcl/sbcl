@@ -21,9 +21,9 @@
 				:directory nil
 				:name nil)))
   (assert (equal (file-namestring pathname0) "getty"))
-  (assert (null (directory-namestring pathname0)))
-  (assert (null (file-namestring pathname1)))
-  (assert (null (directory-namestring pathname1))))
+  (assert (equal (directory-namestring pathname0) ""))
+  (assert (equal (file-namestring pathname1) ""))
+  (assert (equal (directory-namestring pathname1) "")))
 
 ;;; In sbcl-0.6.9 DIRECTORY failed on paths with :WILD or
 ;;; :WILD-INFERIORS in their directory components.
@@ -33,4 +33,4 @@
   (assert (find-if (lambda (pathname)
 		     (search "tests/filesys.pure.lisp"
 			     (namestring pathname)))
-		   dir2)))
+		   dir)))

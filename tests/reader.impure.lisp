@@ -18,9 +18,8 @@
 ;;; Bug 30, involving mistakes in binding the read table, made this
 ;;; code fail.
 (defun read-vector (stream char)
+  (declare (ignorable char))
   (coerce (read-delimited-list #\] stream t) 'vector))
-(set-syntax-from-char #\[ #\() ; do I really need this? -- MNA 2001-01-05
-(set-syntax-from-char #\] #\)) ; do I really need this? -- MNA 2001-01-05
 (set-macro-character #\[ #'read-vector nil)
 (set-macro-character #\] (get-macro-character #\)) nil)
 (multiple-value-bind (res pos)

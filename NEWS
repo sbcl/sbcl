@@ -654,6 +654,8 @@ changes in sbcl-0.6.11 relative to sbcl-0.6.10:
   an :ENVIRONMENT keyword option which doesn't smash case or 
   do other bad things. The CMU-CL-style :ENV option is retained
   for porting convenience.
+* LOAD-FOREIGN (and LOAD-1-FOREIGN) now support logical pathnames,
+  as per Daniel Barlow's suggestion and Martin Atzmueller's patch
 * DESCRIBE now works on structure objects again.
 * Fasl file format version numbers have increased again, because
   support for the Gray streams extension changes the format of the

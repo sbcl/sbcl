@@ -167,6 +167,22 @@
                    (format our-char-output "~A~%" line))
                  (assert (null (peek-char nil our-char-input nil nil nil)))))
              test-string))))
+
+(assert
+  (equal
+   (with-output-to-string (foo)
+     (let ((our-char-output (make-character-output-stream foo)))
+       (write-char #\a our-char-output)
+       (finish-output our-char-output)
+       (write-char #\  our-char-output)
+       (force-output our-char-output)
+       (fresh-line our-char-output)
+       (write-char #\b our-char-output)
+       (clear-output our-char-output)
+       (terpri our-char-output)
+       (assert (null (fresh-line our-char-output)))
+       (write-char #\c our-char-output)))
+   (format nil "a ~%b~%c")))
 
 ;;;; example classes for binary output
 
