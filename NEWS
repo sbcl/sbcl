@@ -751,17 +751,36 @@ changes in sbcl-0.6.13 relative to sbcl-0.6.12:
   is now a supported extension again, since the consensus on
   sbcl-devel was that it can be useful for ordinary development
   work, not just for debugging SBCL itself.
+* The default for SB-EXT:*DERIVE-FUNCTION-TYPES* has changed to
+  NIL, i.e. ANSI behavior, i.e. the compiler now recognizes
+  that currently-defined functions might be redefined later with 
+  different return types. 
 * Hash tables can be printed readably, as inspired by CMU CL code
   of Eric Marsden and SBCL code of Martin Atzmueller.
 * better error handling in CLOS method combination, thanks to 
   Martin Atzmueller porting Pierre Mai's CMU CL patches
 * more overflow fixes for >16Mbyte I/O buffers
+* A bug in READ has been fixed, so that now a single Ctrl-D
+  character suffices to cause end-of-file on character streams.
+  In particular, now you only need one Ctrl-D at the command
+  line (not two) to exit SBCL.
+* fixed bug 26: ARRAY-DISPLACEMENT now returns (VALUES NIL 0) for 
+  undisplaced arrays.
 * fixed bug 107 (reported as a CMU CL bug by Erik Naggum on 
   comp.lang.lisp 2001-06-11): (WRITE #*101 :RADIX T :BASE 36) now
   does the right thing.
 * The implementation of some type tests, especially for CONDITION
   types, is now tidier and maybe faster, due to CMU CL code
   originally by Douglas Crosher, ported by Martin Atzmueller.
+* Some math functions have been fixed, and there are new
+  optimizers for deriving the types of COERCE and ARRAY-ELEMENT-TYPE,
+  thanks to Raymond Toy's work on CMU CL, ported by Martin Atzmueller.
+* A bug in COPY-READTABLE was fixed. (Joao Cachopo's patch to CMU
+  CL, ported to SBCL by Martin Atzmueller)
+* DESCRIBE now gives more information in some cases. (Pierre Mai's
+  patch to CMU CL, ported to SBCL by Martin Atzmueller)
+* The code in the SB-PROFILE package has been substantially 
+  improved, although it's still unstable.
 * There's a new slam.sh hack to shorten the edit/compile/debug
   cycle for low-level changes to SBCL itself, and a new
   :SB-AFTER-XC-CORE target feature to control the generation of

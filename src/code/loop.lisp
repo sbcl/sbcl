@@ -156,13 +156,13 @@
 
 ;;;; list collection macrology
 
-(sb!kernel:defmacro-mundanely with-loop-list-collection-head
+(sb!int:defmacro-mundanely with-loop-list-collection-head
     ((head-var tail-var &optional user-head-var) &body body)
   (let ((l (and user-head-var (list (list user-head-var nil)))))
     `(let* ((,head-var (list nil)) (,tail-var ,head-var) ,@l)
        ,@body)))
 
-(sb!kernel:defmacro-mundanely loop-collect-rplacd
+(sb!int:defmacro-mundanely loop-collect-rplacd
     (&environment env (head-var tail-var &optional user-head-var) form)
   (setq form (sb!xc:macroexpand form env))
   (flet ((cdr-wrap (form n)
@@ -208,7 +208,7 @@
 			(setq ,user-head-var (cdr ,head-var)))))
 	answer))))
 
-(sb!kernel:defmacro-mundanely loop-collect-answer (head-var
+(sb!int:defmacro-mundanely loop-collect-answer (head-var
 						   &optional user-head-var)
   (or user-head-var
       `(cdr ,head-var)))
@@ -266,7 +266,7 @@ constructed.
 	  (loop-gentemp 'loop-maxmin-flag-)))
   operation)
 
-(sb!kernel:defmacro-mundanely with-minimax-value (lm &body body)
+(sb!int:defmacro-mundanely with-minimax-value (lm &body body)
   (let ((init (loop-typed-init (loop-minimax-type lm)))
 	(which (car (loop-minimax-operations lm)))
 	(infinity-data (loop-minimax-infinity-data lm))
@@ -285,9 +285,7 @@ constructed.
 	   (declare (type ,type ,answer-var ,temp-var))
 	   ,@body))))
 
-(sb!kernel:defmacro-mundanely loop-accumulate-minimax-value (lm
-							     operation
-							     form)
+(sb!int:defmacro-mundanely loop-accumulate-minimax-value (lm operation form)
   (let* ((answer-var (loop-minimax-answer-variable lm))
 	 (temp-var (loop-minimax-temp-variable lm))
 	 (flag-var (loop-minimax-flag-variable lm))
@@ -335,7 +333,7 @@ code to be loaded.
   (and (symbolp loop-token)
        (values (gethash (symbol-name loop-token) table))))
 
-(sb!kernel:defmacro-mundanely loop-store-table-data (symbol table datum)
+(sb!int:defmacro-mundanely loop-store-table-data (symbol table datum)
   `(setf (gethash (symbol-name ,symbol) ,table) ,datum))
 
 (defstruct (loop-universe
@@ -419,7 +417,7 @@ a LET-like macro, and a SETQ-like macro, which perform LOOP-style destructuring.
 (defvar *loop-desetq-temporary*
 	(make-symbol "LOOP-DESETQ-TEMP"))
 
-(sb!kernel:defmacro-mundanely loop-really-desetq (&environment env
+(sb!int:defmacro-mundanely loop-really-desetq (&environment env
 						  &rest var-val-pairs)
   (labels ((find-non-null (var)
 	     ;; see whether there's any non-null thing here
@@ -618,7 +616,7 @@ a LET-like macro, and a SETQ-like macro, which perform LOOP-style destructuring.
 	(space 1))
     (+ 40 (* (- speed space) 10))))
 
-(sb!kernel:defmacro-mundanely loop-body (&environment env
+(sb!int:defmacro-mundanely loop-body (&environment env
 					 prologue
 					 before-loop
 					 main-body
@@ -2031,12 +2029,12 @@ a LET-like macro, and a SETQ-like macro, which perform LOOP-style destructuring.
     (let ((tag (gensym)))
       `(block nil (tagbody ,tag (progn ,@keywords-and-forms) (go ,tag))))))
 
-(sb!kernel:defmacro-mundanely loop (&environment env &rest keywords-and-forms)
+(sb!int:defmacro-mundanely loop (&environment env &rest keywords-and-forms)
   (loop-standard-expansion keywords-and-forms env *loop-ansi-universe*))
 
-(sb!kernel:defmacro-mundanely loop-finish ()
+(sb!int:defmacro-mundanely loop-finish ()
   #!+sb-doc
-  "Causes the iteration to terminate \"normally\", the same as implicit
+  "Cause the iteration to terminate \"normally\", the same as implicit
 termination by an iteration driving clause, or by use of WHILE or
 UNTIL -- the epilogue code (if any) will be run, and any implicitly
 collected result will be returned as the value of the LOOP."

@@ -94,6 +94,7 @@
   (total (required-argument) :type single-float :read-only t))
 (defvar *overhead*)
 (declaim (type overhead *overhead*))
+(makunbound '*overhead*) ; in case we reload this file when tweaking
 
 ;;;; profile encapsulations
 
@@ -176,26 +177,34 @@
 		    ;; that as long as we only cons small amounts,
 		    ;; we'll almost always just do fixnum arithmetic.
 		    ;; (And for encapsulated functions which cons
-		    ;; large amounts, then we don't much care about a
-		    ;; single extra consed bignum.)
-		    (start-consing-integer (pcounter-integer nbf-pcounter))
-		    (start-consing-fixnum (pcounter-fixnum nbf-pcounter)))
+		    ;; large amounts, then a single extra consed
+		    ;; bignum tends to be proportionally negligible.)
+		    (nbf0-integer (pcounter-integer nbf-pcounter))
+		    (nbf0-fixnum (pcounter-fixnum nbf-pcounter))
+		    (dynamic-usage-0 (sb-kernel:dynamic-usage)))
 	       (declare (inline pcounter-or-fixnum->integer))
 	       (multiple-value-prog1
 		   (multiple-value-call encapsulated-fun
 					(sb-c:%more-arg-values arg-context
 							       0
 							       arg-count))
-		 (let ((*computing-profiling-data-for* encapsulated-fun))
+		 (let ((*computing-profiling-data-for* encapsulated-fun)
+		       (dynamic-usage-1 (sb-kernel:dynamic-usage)))
 		   (setf dticks (fastbig- (get-internal-ticks) start-ticks))
 		   (setf dconsing
-			 (if (eq (pcounter-integer nbf-pcounter)
-				 start-consing-integer)
-			     (- (pcounter-fixnum nbf-pcounter)
-				start-consing-fixnum)
+			 (if (and (eq (pcounter-integer nbf-pcounter)
+				      nbf0-integer)
+				  (eq (pcounter-fixnum nbf-pcounter)
+				      nbf0-fixnum))
+			     ;; common special case where we can avoid
+			     ;; bignum arithmetic
+			     (- dynamic-usage-1
+				dynamic-usage-0)
+			     ;; general case
 			     (- (get-bytes-consed)
-				(+ (pcounter-integer nbf-pcounter)
-				   (pcounter-fixnum nbf-pcounter)))))
+				nbf0-integer
+				nbf0-fixnum
+				dynamic-usage-0)))
 		   (setf inner-enclosed-profiles
 			 (pcounter-or-fixnum->integer *enclosed-profiles*))
 		   (let ((net-dticks (fastbig- dticks *enclosed-ticks*)))
@@ -445,7 +454,7 @@ Lisp process."
 ;;; that I (WHN) use for my own experimentation, but it might
 ;;; become supported someday. Comments?)
 (declaim (type unsigned-byte *timer-overhead-iterations*))
-(defvar *timer-overhead-iterations*
+(defparameter *timer-overhead-iterations*
   500000)
 
 ;;; a dummy function that we profile to find profiling overhead

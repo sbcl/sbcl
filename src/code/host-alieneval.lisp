@@ -1148,7 +1148,7 @@
 
 ;;;; the ADDR macro
 
-(sb!kernel:defmacro-mundanely addr (expr &environment env)
+(defmacro-mundanely addr (expr &environment env)
   #!+sb-doc
   "Return an Alien pointer to the data addressed by Expr, which must be a call
    to SLOT or DEREF, or a reference to an Alien variable."

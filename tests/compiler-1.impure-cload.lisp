@@ -77,4 +77,27 @@
     (0 "GMT" . "GDT") (-2 "MET" . "MET DST"))
   "*The string representations of the time zones.")
 
+;;; The old CMU CL Python compiler assumed that it was safe to infer
+;;; function types (including return types) from function definitions
+;;; and then use them to optimize code later. This is of course bad
+;;; when functions are redefined. The problem was fixed in
+;;; sbcl-0.6.12.57.
+(defun foo (x)
+  (if (plusp x)
+      1.0
+      0))
+(defun bar (x)
+  (typecase (foo x)
+    (fixnum :fixnum)
+    (real :real)
+    (string :string)
+    (t :t)))
+(assert (eql (bar 11) :real))
+(assert (eql (bar -11) :fixnum))
+(setf (symbol-function 'foo) #'identity)
+(assert (eql (bar 11) :fixnum))
+(assert (eql (bar -11.0) :real))
+(assert (eql (bar "this is a test") :string))
+(assert (eql (bar (make-hash-table)) :t))
+
 (sb-ext:quit :unix-status 104) ; success

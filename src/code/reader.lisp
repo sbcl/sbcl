@@ -164,6 +164,8 @@
 	  (mapcar #'(lambda (pair) (cons (car pair)
 					 (copy-seq (cdr pair))))
 		  (dispatch-tables really-from-readtable)))
+    (setf (readtable-case to-readtable)
+	  (readtable-case from-readtable))
     to-readtable))
 
 (defun set-syntax-from-char (to-char from-char &optional
@@ -374,10 +376,9 @@
 					     (eof-value nil)
 					     (recursivep nil))
   #!+sb-doc
-  "Reads from stream and returns the object read, preserving the whitespace
+  "Read from STREAM and return the value read, preserving any whitespace
    that followed the object."
-  (cond
-   (recursivep
+  (if recursivep
     ;; a loop for repeating when a macro returns nothing
     (loop
       (let ((char (read-char stream eof-error-p *eof-object*)))
@@ -388,42 +389,46 @@
 		      (result (multiple-value-list
 			       (funcall macrofun stream char))))
 		 ;; Repeat if macro returned nothing.
-		 (if result (return (car result)))))))))
-   (t
+		  (if result (return (car result))))))))
     (let ((*sharp-equal-alist* nil))
-      (read-preserving-whitespace stream eof-error-p eof-value t)))))
+	(read-preserving-whitespace stream eof-error-p eof-value t))))
 
 ;;; Return NIL or a list with one thing, depending.
 ;;;
 ;;; for functions that want comments to return so that they can look
-;;; past them. Assumes char is not whitespace.
+;;; past them. We assume CHAR is not whitespace.
 (defun read-maybe-nothing (stream char)
   (let ((retval (multiple-value-list
 		 (funcall (get-cmt-entry char *readtable*) stream char))))
     (if retval (rplacd retval nil))))
 
-(defun read (&optional (stream *standard-input*) (eof-error-p t)
-		       (eof-value ()) (recursivep ()))
+(defun read (&optional (stream *standard-input*)
+		       (eof-error-p t)
+		       (eof-value ())
+		       (recursivep ()))
   #!+sb-doc
-  "Reads in the next object in the stream, which defaults to
-   *standard-input*. For details see the I/O chapter of
-   the manual."
-  (prog1
-      (read-preserving-whitespace stream eof-error-p eof-value recursivep)
-    (let ((whitechar (read-char stream nil *eof-object*)))
-      (if (and (not (eofp whitechar))
-	       (or (not (whitespacep whitechar))
-		   recursivep))
-	  (unread-char whitechar stream)))))
+  "Read the next Lisp value from STREAM, and return it."
+  (let ((result (read-preserving-whitespace stream
+					    eof-error-p
+					    eof-value
+					    recursivep)))
+    ;; (This function generally discards trailing whitespace. If you
+    ;; don't want to discard trailing whitespace, call
+    ;; CL:READ-PRESERVING-WHITESPACE instead.)
+    (unless (or (eql result eof-value) recursivep)
+      (let ((next-char (read-char stream nil nil)))
+	(unless (or (null next-char)
+		    (whitespacep next-char))
+	  (unread-char next-char stream))))
+    result))
 
 ;;; (This is a COMMON-LISP exported symbol.)
 (defun read-delimited-list (endchar &optional
 				    (input-stream *standard-input*)
 				    recursive-p)
   #!+sb-doc
-  "Reads objects from input-stream until the next character after an
-   object's representation is endchar. A list of those objects read
-   is returned."
+  "Read Lisp values from INPUT-STREAM until the next character after a
+   value's representation is ENDCHAR, and return the objects as a list."
   (declare (ignore recursive-p))
   (do ((char (flush-whitespace input-stream)
 	     (flush-whitespace input-stream))
@@ -433,8 +438,8 @@
 
 ;;;; basic readmacro definitions
 ;;;;
-;;;; Large, hairy subsets of readmacro definitions (backquotes and sharp
-;;;; macros) are not here, but in their own source files.
+;;;; Some large, hairy subsets of readmacro definitions (backquotes
+;;;; and sharp macros) are not here, but in their own source files.
 
 (defun read-quote (stream ignore)
   (declare (ignore ignore))

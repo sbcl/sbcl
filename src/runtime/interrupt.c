@@ -14,6 +14,7 @@
  */
 
 #include <stdio.h>
+#include <stdlib.h>
 
 #include <signal.h>
 #ifdef mach /* KLUDGE: #ifdef on lowercase symbols? Ick. -- WHN 19990904 */
@@ -624,12 +625,13 @@ undoably_install_low_level_interrupt_handler (int signal,
     sigaddset_blockable(&sa.sa_mask);
     sa.sa_flags = SA_SIGINFO | SA_RESTART;
 
-    /* In the case of interrupt handlers which are modified
-     * more than once, we only save the original unmodified
-     * copy. */
+    /* In the case of interrupt handlers which are modified more than
+     * once, we only save the original unmodified copy. */
     if (!old_low_level_signal_handler_state->was_modified) {
+	struct sigaction *old_handler =
+	    (struct sigaction*) &old_low_level_signal_handler_state->handler;
 	old_low_level_signal_handler_state->was_modified = 1;
-	sigaction(signal, &sa, &old_low_level_signal_handler_state->handler);
+	sigaction(signal, &sa, old_handler);
     } else {
 	sigaction(signal, &sa, NULL);
     }

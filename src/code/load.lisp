@@ -328,15 +328,8 @@
   ;; don't. (CMU CL did, but implemented it in a non-ANSI way, and I
   ;; just disabled that instead of rewriting it.) -- WHN 20000131
   (declare (ignore print))
-
-  ;; FIXME: In sbcl-0.6.12.8 the OpenBSD implementation of FILE-LENGTH
-  ;; broke because changed handling of Unix stat(2) stuff couldn't
-  ;; deal with OpenBSD's 64-bit size slot. Once that's fixed, this
-  ;; code can be restored.
-  #!-openbsd
   (when (zerop (file-length stream))
     (error "attempt to load an empty FASL file:~%  ~S" (namestring stream)))
-
   (do-load-verbose stream verbose)
   (let* ((*fasl-input-stream* stream)
 	 (*current-fop-table* (or (pop *free-fop-tables*) (make-array 1000)))

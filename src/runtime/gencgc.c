@@ -5369,7 +5369,7 @@ garbage_collect_generation(int generation, int raise)
 {
     unsigned long bytes_freed;
     unsigned long i;
-    unsigned long read_only_space_size, static_space_size;
+    unsigned long static_space_size;
 
     gc_assert(generation <= (NUM_GENERATIONS-1));
 
@@ -5460,7 +5460,7 @@ garbage_collect_generation(int generation, int raise)
      * please submit a patch. */
 #if 0
     if (SymbolValue(SCAVENGE_READ_ONLY_SPACE) != NIL) {
-	read_only_space_size =
+	unsigned long read_only_space_size =
 	    (lispobj*)SymbolValue(READ_ONLY_SPACE_FREE_POINTER) -
 	    (lispobj*)READ_ONLY_SPACE_START;
 	FSHOW((stderr,

@@ -15,12 +15,13 @@
  */
 
 #include <stdio.h>
-#include <sys/types.h>
+#include <stdlib.h>
 #include <sys/file.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 #ifdef irix
 #include <fcntl.h>
-#include <stdlib.h>
 #endif
 
 #include "os.h"
@@ -32,7 +33,7 @@
 #include "sbcl.h"
 
 static void
-process_directory(int fd, long *ptr, int count)
+process_directory(int fd, u32 *ptr, int count)
 {
     struct ndir_entry *entry;
 
@@ -67,16 +68,17 @@ process_directory(int fd, long *ptr, int count)
 	case DYNAMIC_SPACE_ID:
 #ifdef GENCGC	  
 	    if (addr != (os_vm_address_t)DYNAMIC_SPACE_START) {
-	        fprintf(stderr, "in core: 0x%x - in runtime: 0x%x \n",
-			addr, (os_vm_address_t)DYNAMIC_SPACE_START);
+	        fprintf(stderr, "in core: 0x%lx; in runtime: 0x%lx \n",
+			(long)addr, (long)DYNAMIC_SPACE_START);
 		lose("core/runtime address mismatch: DYNAMIC_SPACE_START");
 	    }
 #else
 	    if ((addr != (os_vm_address_t)DYNAMIC_0_SPACE_START) &&
 		(addr != (os_vm_address_t)DYNAMIC_1_SPACE_START)) {
-		fprintf(stderr, "in core: 0x%x - in runtime: 0x%x or 0x%x\n",
-			addr, (os_vm_address_t)DYNAMIC_0_SPACE_START,
-			(os_vm_address_t)DYNAMIC_1_SPACE_START);
+		fprintf(stderr, "in core: 0x%lx; in runtime: 0x%lx or 0x%lx\n",
+			(long)addr,
+			(long)DYNAMIC_0_SPACE_START,
+			(long)DYNAMIC_1_SPACE_START);
 		lose("warning: core/runtime address mismatch: DYNAMIC_SPACE_START");
 	    }
 #endif
@@ -96,15 +98,15 @@ process_directory(int fd, long *ptr, int count)
 	    break;
 	case STATIC_SPACE_ID:
 	    if (addr != (os_vm_address_t)STATIC_SPACE_START) {
-		fprintf(stderr, "in core: 0x%p - in runtime: 0x%x\n",
-			addr, (os_vm_address_t)STATIC_SPACE_START);
+		fprintf(stderr, "in core: 0x%lx - in runtime: 0x%lx\n",
+			(long)addr, (long)STATIC_SPACE_START);
 		lose("core/runtime address mismatch: STATIC_SPACE_START");
 	    }
 	    break;
 	case READ_ONLY_SPACE_ID:
 	    if (addr != (os_vm_address_t)READ_ONLY_SPACE_START) {
-		fprintf(stderr, "in core: 0x%x - in runtime: 0x%x\n",
-			addr, (os_vm_address_t)READ_ONLY_SPACE_START);
+		fprintf(stderr, "in core: 0x%lx - in runtime: 0x%lx\n",
+			(long)addr, (long)READ_ONLY_SPACE_START);
 		lose("core/runtime address mismatch: READ_ONLY_SPACE_START");
 	    }
 	    break;

@@ -48,19 +48,12 @@
 (defvar *converting-for-interpreter* nil)
 ;;; FIXME: Rename to *IR1-FOR-INTERPRETER-NOT-COMPILER-P*.
 
-;;; FIXME: This nastiness was one of my original motivations to start
-;;; hacking CMU CL. The non-ANSI behavior can be useful, but it should
-;;; be made not the default, and perhaps should be controlled by
-;;; DECLAIM instead of a variable like this. And whether or not this
-;;; kind of checking is on, declarations should be assertions to the
-;;; extent practical, and code which can't be compiled efficiently
-;;; while adhering to that principle should give warnings.
-(defvar *derive-function-types* t
-  #!+sb-doc
-  "(Caution: Soon, this might change its semantics somewhat, or even go away.)
-  If true, argument and result type information derived from compilation of
-  DEFUNs is used when compiling calls to that function. If false, only
-  information from FTYPE proclamations will be used.")
+(defvar *derive-function-types* nil
+  "Should the compiler assume that function types will never change,
+  so that it can use type information inferred from current definitions
+  to optimize code which uses those definitions? Setting this true
+  gives non-ANSI, early-CMU-CL behavior. It can be useful for improving
+  the efficiency of stable code.")
 
 ;;;; namespace management utilities
 

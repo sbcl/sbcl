@@ -26,6 +26,7 @@
 #include <sys/types.h>
 #include <dirent.h>
 #include <sys/stat.h>
+#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
@@ -50,17 +51,17 @@ is_lispy_filename(const char *filename)
 char**
 alloc_directory_lispy_filenames(const char *directory_name)
 {
-    DIR *dir_ptr;
+    DIR *dir_ptr = opendir(directory_name);
     char **result = 0;
 
-    if (dir_ptr = opendir(directory_name)) { /* if opendir success */
+    if (dir_ptr) { /* if opendir success */
 
 	struct voidacc va;
 
 	if (0 == voidacc_ctor(&va)) { /* if voidacc_ctor success */
 	    struct dirent *dirent_ptr;
 
-	    while (dirent_ptr = readdir(dir_ptr)) { /* until end of data */
+	    while ( (dirent_ptr = readdir(dir_ptr)) ) { /* until end of data */
 		char* original_name = dirent_ptr->d_name;
 		if (is_lispy_filename(original_name)) {
 		    /* strdup(3) is in Linux and *BSD. If you port
@@ -112,17 +113,16 @@ free_directory_lispy_filenames(char** directory_lispy_filenames)
 /* a wrapped version of readlink(2):
  *   -- If path isn't a symlink, or is a broken symlink, return 0.
  *   -- If path is a symlink, return a newly allocated string holding
- *      the thing it's linked to.
- */
+ *      the thing it's linked to. */
 char *
 wrapped_readlink(char *path)
 {
-    int strlen_path = strlen(path);
     int bufsiz = strlen(path) + 16;
     while (1) {
 	char *result = malloc(bufsiz);
 	int n_read = readlink(path, result, n_read);
 	if (n_read < 0) {
+	    free(result);
 	    return 0;
 	} else if (n_read < bufsiz) {
 	    result[n_read] = 0;

@@ -3435,6 +3435,112 @@
        (declare (ignore tee))
        (funcall control *standard-output* ,@arg-names)
        nil)))
+
+(defoptimizer (coerce derive-type) ((value type))
+  (let ((value-type (continuation-type value))
+        (type-type (continuation-type type)))
+    #!+sb-show (format t "~&coerce-derive-type value-type ~A type-type ~A~%"
+                       value-type type-type)
+    (labels
+        ((good-cons-type-p (cons-type)
+           ;; Make sure the cons-type we're looking at is something
+           ;; we're prepared to handle which is basically something
+           ;; that array-element-type can return.
+           (or (and (member-type-p cons-type)
+                    (null (rest (member-type-members cons-type)))
+                    (null (first (member-type-members cons-type))))
+               (let ((car-type (cons-type-car-type cons-type)))
+                 (and (member-type-p car-type)
+                      (null (rest (member-type-members car-type)))
+                      (or (symbolp (first (member-type-members car-type)))
+                          (numberp (first (member-type-members car-type)))
+                          (and (listp (first (member-type-members car-type)))
+                               (numberp (first (first (member-type-members
+                                                       car-type))))))
+                      (good-cons-type-p (cons-type-cdr-type cons-type))))))
+         (unconsify-type (good-cons-type)
+           ;; Convert the "printed" respresentation of a cons
+           ;; specifier into a type specifier.  That is, the specifier
+           ;; (cons (eql signed-byte) (cons (eql 16) null)) is
+           ;; converted to (signed-byte 16).
+           (cond ((or (null good-cons-type)
+                      (eq good-cons-type 'null))
+                   nil)
+                 ((and (eq (first good-cons-type) 'cons)
+                       (eq (first (second good-cons-type)) 'member))
+                   `(,(second (second good-cons-type))
+                     ,@(unconsify-type (caddr good-cons-type))))))
+         (coerceable-p (c-type)
+           ;; Can the value be coerced to the given type?  Coerce is
+           ;; complicated, so we don't handle every possible case
+           ;; here---just the most common and easiest cases:
+           ;;
+           ;; o Any real can be coerced to a float type.
+           ;; o Any number can be coerced to a complex single/double-float.
+           ;; o An integer can be coerced to an integer.
+           (let ((coerced-type c-type))
+             (or (and (subtypep coerced-type 'float)
+                      (csubtypep value-type (specifier-type 'real)))
+                 (and (subtypep coerced-type
+                                '(or (complex single-float)
+                                  (complex double-float)))
+                      (csubtypep value-type (specifier-type 'number)))
+                 (and (subtypep coerced-type 'integer)
+                      (csubtypep value-type (specifier-type 'integer))))))
+         (process-types (type)
+           ;; FIXME
+           ;; This needs some work because we should be able to derive
+           ;; the resulting type better than just the type arg of
+           ;; coerce.  That is, if x is (integer 10 20), the (coerce x
+           ;; 'double-float) should say (double-float 10d0 20d0)
+           ;; instead of just double-float.
+           (cond ((member-type-p type)
+                   (let ((members (member-type-members type)))
+                     (if (every #'coerceable-p members)
+                       (specifier-type `(or ,@members))
+                       *universal-type*)))
+                 ((and (cons-type-p type)
+                       (good-cons-type-p type))
+                   (let ((c-type (unconsify-type (type-specifier type))))
+                     (if (coerceable-p c-type)
+                       (specifier-type c-type)
+                       *universal-type*)))
+                 (t
+                   *universal-type*))))
+      (cond ((union-type-p type-type)
+              (apply #'type-union (mapcar #'process-types
+                                          (union-type-types type-type))))
+            ((or (member-type-p type-type)
+                 (cons-type-p type-type))
+              (process-types type-type))
+            (t
+              *universal-type*)))))
+
+(defoptimizer (array-element-type derive-type) ((array))
+  (let* ((array-type (continuation-type array)))
+    #!+sb-show
+    (format t "~& defoptimizer array-elt-derive-type - array-element-type ~~
+~A~%" array-type)
+    (labels ((consify (list)
+              (if (endp list)
+                  '(eql nil)
+                  `(cons (eql ,(car list)) ,(consify (rest list)))))
+            (get-element-type (a)
+              (let ((element-type (type-specifier
+                                   (array-type-specialized-element-type a))))
+                (cond ((symbolp element-type)
+                       (make-member-type :members (list element-type)))
+                      ((consp element-type)
+                       (specifier-type (consify element-type)))
+                      (t
+                       (error "Can't grok type ~A~%" element-type))))))
+      (cond ((array-type-p array-type)
+            (get-element-type array-type))
+           ((union-type-p array-type)             
+             (apply #'type-union
+                    (mapcar #'get-element-type (union-type-types array-type))))
+           (t
+            *universal-type*)))))
 
 ;;;; debuggers' little helpers
 

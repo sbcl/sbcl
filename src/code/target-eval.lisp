@@ -26,7 +26,7 @@
 	    (:print-object
 	     (lambda (x stream)
 	       (print-unreadable-object (x stream :identity t)
-		 (sb!impl::output-interpreted-function x stream)))))
+		 (interpreted-function-%name x)))))
   ;; The name of this interpreted function, or NIL if none specified.
   (%name nil)
   ;; This function's debug arglist.

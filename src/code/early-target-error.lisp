@@ -322,13 +322,12 @@
 ;;;; HANDLER-CASE and IGNORE-ERRORS
 
 (defmacro handler-case (form &rest cases)
-  #!+sb-doc
   "(HANDLER-CASE form
    { (type ([var]) body) }* )
-   Executes form in a context with handlers established for the condition
+   Execute FORM in a context with handlers established for the condition
    types. A peculiar property allows type to be :no-error. If such a clause
    occurs, and form returns normally, all its values are passed to this clause
-   as if by MULTIPLE-VALUE-CALL. The :no-error clause accepts more than one
+   as if by MULTIPLE-VALUE-CALL.  The :NO-ERROR clause accepts more than one
    var specification."
   (let ((no-error-clause (assoc ':no-error cases)))
     (if no-error-clause
@@ -340,52 +339,53 @@
 		 (return-from ,error-return
 		   (handler-case (return-from ,normal-return ,form)
 		     ,@(remove no-error-clause cases)))))))
-	(let ((var (gensym))
-	      (outer-tag (gensym))
-	      (inner-tag (gensym))
-	      (tag-var (gensym))
+	(let ((tag (gensym))
+	      (var (gensym))
 	      (annotated-cases (mapcar #'(lambda (case) (cons (gensym) case))
 				       cases)))
-	  `(let ((,outer-tag (cons nil nil))
-		 (,inner-tag (cons nil nil))
-		 ,var ,tag-var)
-	     ;; FIXME: should be (DECLARE (IGNORABLE ,VAR))
-	     ,var			;ignoreable
-	     (catch ,outer-tag
-	       (catch ,inner-tag
-		 (throw ,outer-tag
+	  `(block ,tag
+	     (let ((,var nil))
+	       (declare (ignorable ,var))
+	       (tagbody
 			(handler-bind
 			    ,(mapcar #'(lambda (annotated-case)
-					 `(,(cadr annotated-case)
-					   #'(lambda (temp)
+			       (list (cadr annotated-case)
+				     `#'(lambda (temp)
 					       ,(if (caddr annotated-case)
 						    `(setq ,var temp)
 						    '(declare (ignore temp)))
-					       (setf ,tag-var
-						     ',(car annotated-case))
-					       (throw ,inner-tag nil))))
+					  (go ,(car annotated-case)))))
 				     annotated-cases)
-			  ,form)))
-	       (case ,tag-var
-		 ,@(mapcar #'(lambda (annotated-case)
-			       (let ((body (cdddr annotated-case))
-				     (varp (caddr annotated-case)))
-				 `(,(car annotated-case)
-				   ,@(if varp
-					 `((let ((,(car varp) ,var))
+			       (return-from ,tag
+				 #-x86 ,form
+				 #+x86 (multiple-value-prog1 ,form
+					 ;; Need to catch FP errors here!
+					 (float-wait))))
+		 ,@(mapcan
+		    #'(lambda (annotated-case)
+			(list (car annotated-case)
+			      (let ((body (cdddr annotated-case)))
+				`(return-from
+				  ,tag
+				  ,(cond ((caddr annotated-case)
+					  `(let ((,(caaddr annotated-case)
+						  ,var))
 					     ,@body))
-					 body))))
+					 ((not (cdr body))
+					  (car body))
+					 (t
+					  `(progn ,@body)))))))
 			   annotated-cases))))))))
 
 (defmacro ignore-errors (&rest forms)
   #!+sb-doc
-  "Executes forms after establishing a handler for all error conditions that
-   returns from this form NIL and the condition signalled."
+  "Execute FORMS handling ERROR conditions, returning the result of the last
+  form, or (VALUES NIL the-ERROR-that-was-caught) if an ERROR was handled."
   `(handler-case (progn ,@forms)
      (error (condition) (values nil condition))))
 
-;;;; helper functions for restartable error handling which couldn't be defined
-;;;; 'til now 'cause they use the RESTART-CASE macro
+;;;; helper functions for restartable error handling which couldn't be
+;;;; defined 'til now 'cause they use the RESTART-CASE macro
 
 (defun assert-error (assertion places datum &rest arguments)
   (let ((cond (if datum

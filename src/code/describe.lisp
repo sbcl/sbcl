@@ -326,7 +326,7 @@
 	 (%describe-function (fdefinition x) s :function x)))
 
   ;; FIXME: Print out other stuff from the INFO database:
-  ;;   * Does it name a type or class?
+  ;;   * Does it name a type?
   ;;   * Is it a structure accessor? (This is important since those are 
   ;;     magical in some ways, e.g. blasting the structure if you 
   ;;     redefine them.)
@@ -335,8 +335,15 @@
   (%describe-doc x s 'structure "Structure")
   (%describe-doc x s 'type "Type")
   (%describe-doc x s 'setf "Setf macro")
+
   (dolist (assoc (info :random-documentation :stuff x))
     (format s
 	    "~@:_Documentation on the ~(~A~):~@:_~A"
 	    (car assoc)
-	    (cdr assoc))))
+	    (cdr assoc)))
+  
+  ;; Describe the associated class, if any.
+  (let ((symbol-named-class (cl:find-class x nil)))
+    (when symbol-named-class
+      (format t "~&It names a class ~A." symbol-named-class)
+      (describe symbol-named-class))))

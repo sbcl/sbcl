@@ -1295,7 +1295,7 @@
       (let ((offset-current (+ start current)))
 	(declare (fixnum offset-current))
 	(if (= offset-current end)
-	    (let* ((new-length (* current 2))
+	    (let* ((new-length (1+ (* current 2)))
 		   (new-workspace (make-string new-length)))
 	      (declare (simple-string new-workspace))
 	      (%byte-blt workspace start

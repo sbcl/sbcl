@@ -93,6 +93,10 @@
   (unless (symbolp name)
     (error "The constant name is not a symbol: ~S" name))
   (about-to-modify name)
+  (when (looks-like-name-of-special-var-p name)
+    (style-warn "defining ~S as a constant, even though the name follows~@
+the usual naming convention (names like *FOO*) for special variables"
+		name))
   (let ((kind (info :variable :kind name)))
     (case kind
       (:constant

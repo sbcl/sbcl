@@ -538,6 +538,13 @@
 	(t
 	 (error "not legal as a function name: ~S" function-name))))
 
+(defun looks-like-name-of-special-var-p (x)
+  (and (symbolp x)
+       (let ((name (symbol-name x)))
+	 (and (> (length name) 2) ; to exclude '* and '**
+	      (char= #\* (aref name 0))
+	      (char= #\* (aref name (1- (length name))))))))
+
 ;;; ANSI guarantees that some symbols are self-evaluating. This
 ;;; function is to be called just before a change which would affect
 ;;; that. (We don't absolutely have to call this function before such

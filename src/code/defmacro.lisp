@@ -77,23 +77,18 @@
 ;;; DEFMACRO-MUNDANELY is like SB!XC:DEFMACRO, except that it doesn't
 ;;; have any EVAL-WHEN or IR1 magic associated with it, so it only
 ;;; takes effect in :LOAD-TOPLEVEL or :EXECUTE situations.
-;;;
-;;; KLUDGE: Currently this is only used for various special
-;;; circumstances in bootstrapping, but it seems to me that it might
-;;; be a good basis for reimplementation of DEFMACRO in terms of
-;;; EVAL-WHEN, which might be easier to understand than the current
-;;; approach based on IR1 magic. -- WHN 19990811
 (def!macro defmacro-mundanely (name lambda-list &body body)
-  `(progn
-     (setf (sb!xc:macro-function ',name)
-	   ,(let ((whole (gensym "WHOLE-"))
+  (let ((whole (gensym "WHOLE-"))
 		  (environment (gensym "ENVIRONMENT-")))
 	      (multiple-value-bind (new-body local-decs doc)
 		  (parse-defmacro lambda-list whole body name 'defmacro
 				  :environment environment)
-		(declare (ignore doc))
-		`(lambda (,whole ,environment)
+      `(progn
+	 (setf (sb!xc:macro-function ',name)
+	       (lambda (,whole ,environment)
 		   ,@local-decs
 		   (block ,name
-		     ,new-body)))))
-     ',name))
+		   ,new-body)))
+	 (setf (fdocumentation ',name 'macro)
+	       ,doc)
+	 ',name))))

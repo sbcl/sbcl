@@ -66,5 +66,3 @@
 ;;; FIXME: It would probably be good to require here that every
 ;;; external symbol either has a doc string or has some good excuse
 ;;; (like being an accessor for a structure which has a doc string).
-
-(print "done with interface.pure.lisp")

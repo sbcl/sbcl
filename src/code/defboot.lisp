@@ -194,7 +194,11 @@
         (setf (info :function :assumed-type name) nil)))
     (:declared)
     (:defined
-        (setf (info :function :type name) (extract-function-type def))))
+     (setf (info :function :type name)
+	   (extract-function-type def))
+     ;; We shouldn't need to clear this here because it should be clear
+     ;; already (cleared when the last definition was processed).
+     (aver (null (info :function :assumed-type name)))))
   (sb!c::%%defun name def doc))
 
 ;;;; DEFVAR and DEFPARAMETER

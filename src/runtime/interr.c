@@ -160,7 +160,7 @@ lispobj debug_print(lispobj string)
        that %primitive print is used (it's only a debugging aid anyway)
        we just put guarantee our safety by putting an unused buffer on
        the stack before doing anything else here */
-    char untouched[32];
+    char untouched[32]; /* GCC warns about not using this, but that's the point.. */
     fprintf(stderr, "%s\n", 
 	    (char *)(((struct vector *)native_pointer(string))->data),untouched);
     return NIL;

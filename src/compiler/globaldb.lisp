@@ -1015,15 +1015,13 @@
   :type-spec t) 
 
 ;;; where this information came from:
-;;;  :DECLARED = from a declaration.
-;;;  :ASSUMED  = from uses of the object.
-;;;  :DEFINED  = from examination of the definition.
-;;; FIXME: The :DEFINED assumption that the definition won't change
-;;; isn't ANSI. KLUDGE: CMU CL uses function type information in a way
-;;; which violates its "type declarations are assertions" principle,
-;;; and SBCL has inherited that behavior. It would be really good to
-;;; fix the compiler so that it tests the return types of functions..
-;;; -- WHN ca. 19990801
+;;;    :ASSUMED  = from uses of the object
+;;;    :DEFINED  = from examination of the definition
+;;;    :DECLARED = from a declaration
+;;; :DEFINED trumps :ASSUMED, and :DECLARED trumps :DEFINED.
+;;; :DEFINED and :ASSUMED are useful for issuing compile-time warnings,
+;;; and :DECLARED is useful for ANSIly specializing code which
+;;; implements the function, or which uses the function's return values.
 (define-info-type
   :class :function
   :type :where-from
@@ -1117,7 +1115,7 @@
 
 (define-info-class :variable)
 
-;;; The kind of variable-like thing described.
+;;; the kind of variable-like thing described
 (define-info-type
   :class :variable
   :type :kind
@@ -1127,21 +1125,21 @@
 	     :constant
 	     :global))
 
-;;; The declared type for this variable.
+;;; the declared type for this variable
 (define-info-type
   :class :variable
   :type :type
   :type-spec ctype
   :default *universal-type*)
 
-;;; Where this type and kind information came from.
+;;; where this type and kind information came from
 (define-info-type
   :class :variable
   :type :where-from
   :type-spec (member :declared :assumed :defined)
   :default :assumed)
 
-;;; The lisp object which is the value of this constant, if known.
+;;; the Lisp object which is the value of this constant, if known
 (define-info-type
   :class :variable
   :type :constant-value
@@ -1164,15 +1162,15 @@
 
 (define-info-class :type)
 
-;;; The kind of type described. We return :INSTANCE for standard types that
-;;; are implemented as structures.
+;;; the kind of type described. We return :INSTANCE for standard types
+;;; that are implemented as structures.
 (define-info-type
   :class :type
   :type :kind
   :type-spec (member :primitive :defined :instance nil)
   :default nil)
 
-;;; Expander function for a defined type.
+;;; the expander function for a defined type
 (define-info-type
   :class :type
   :type :expander

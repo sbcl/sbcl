@@ -179,7 +179,7 @@
     (trace-table-entry trace-table-normal)))
 
 ;;; Allocate a partial frame for passing stack arguments in a full
-;;; call. Nargs is the number of arguments passed. If no stack
+;;; call. NARGS is the number of arguments passed. If no stack
 ;;; arguments are passed, then we don't have to do anything.
 (define-vop (allocate-full-call-frame)
   (:info nargs)
@@ -189,8 +189,6 @@
       (move csp-tn res)
       (inst lda csp-tn (* nargs word-bytes) csp-tn))))
 
-
-
 ;;; Emit code needed at the return-point from an unknown-values call
 ;;; for a fixed number of values. Values is the head of the TN-Ref
 ;;; list for the locations that the values are to be received into.
@@ -565,7 +563,7 @@ default-value-8
     (trace-table-entry trace-table-normal)))
 
 
-;;;; Full call:
+;;;; full call:
 ;;;;
 ;;;; There is something of a cross-product effect with full calls.
 ;;;; Different versions are used depending on whether we know the
@@ -1046,7 +1044,7 @@ default-value-8
     (move lexenv closure)))
 
 ;;; Copy a &MORE arg from the argument area to the end of the current
-;;; frame. FIXED is the number of non-more arguments.
+;;; frame. FIXED is the number of non-&MORE arguments.
 (define-vop (copy-more-arg)
   (:temporary (:sc any-reg :offset nl0-offset) result)
   (:temporary (:sc any-reg :offset nl1-offset) count)
@@ -1059,8 +1057,9 @@ default-value-8
 	  (do-regs (gen-label))
 	  (done (gen-label)))
       (when (< fixed register-arg-count)
-	;; Save a pointer to the results so we can fill in register args.
-	;; We don't need this if there are more fixed args than reg args.
+	;; Save a pointer to the results so we can fill in register
+	;; args. We don't need this if there are more fixed args than
+	;; reg args.
 	(move csp-tn result))
       ;; Allocate the space on the stack.
       (cond ((zerop fixed)
@@ -1071,14 +1070,14 @@ default-value-8
 	     (inst ble count done)
 	     (inst addq csp-tn count csp-tn)))
       (when (< fixed register-arg-count)
-	;; We must stop when we run out of stack args, not when we run out of
-	;; more args.
+	;; We must stop when we run out of stack args, not when we run
+	;; out of &MORE args.
 	(inst subq nargs-tn (fixnumize register-arg-count) count))
       ;; Initialize dst to be end of stack.
       (move csp-tn dst)
       ;; Everything of interest in registers.
       (inst ble count do-regs)
-      ;; Initialize src to be end of args.
+      ;; Initialize SRC to be end of args.
       (inst addq cfp-tn nargs-tn src)
 
       (emit-label loop)
@@ -1092,9 +1091,9 @@ default-value-8
 
       (emit-label do-regs)
       (when (< fixed register-arg-count)
-	;; Now we have to deposit any more args that showed up in registers.
-	;; We know there is at least one more arg, otherwise we would have
-	;; branched to done up at the top.
+	;; Now we have to deposit any more args that showed up in
+	;; registers. We know there is at least one &MORE arg,
+	;; otherwise we would have branched to DONE up at the top.
 	(inst subq nargs-tn (fixnumize (1+ fixed)) count)
 	(do ((i fixed (1+ i)))
 	    ((>= i register-arg-count))
@@ -1106,7 +1105,7 @@ default-value-8
 	  (inst subq count (fixnumize 1) count)))
       (emit-label done))))
 
-;;; &More args are stored consecutively on the stack, starting
+;;; &MORE args are stored consecutively on the stack, starting
 ;;; immediately at the context pointer. The context pointer is not
 ;;; typed, so the lowtag is 0.
 (define-full-reffer more-arg * 0 0 (descriptor-reg any-reg) * %more-arg)
@@ -1154,7 +1153,7 @@ default-value-8
 	;; Store the value in the car (in delay slot)
 	(storew temp dst 0 list-pointer-type)
 
-	;; Dec count, and if != zero, go back for more.
+	;; Decrement count, and if != zero, go back for more.
 	(inst subq count (fixnumize 1) count)
 	(inst bne count loop)
 
@@ -1163,11 +1162,11 @@ default-value-8
       (emit-label done))))
 
 ;;; Return the location and size of the &MORE arg glob created by
-;;; Copy-More-Arg. Supplied is the total number of arguments supplied
+;;; COPY-MORE-ARG. Supplied is the total number of arguments supplied
 ;;; (originally passed in NARGS.) Fixed is the number of non-&rest
 ;;; arguments.
 ;;;
-;;; We must duplicate some of the work done by Copy-More-Arg, since at
+;;; We must duplicate some of the work done by COPY-MORE-ARG, since at
 ;;; that time the environment is in a pretty brain-damaged state,
 ;;; preventing this info from being returned as values. What we do is
 ;;; compute supplied - fixed, and return a pointer that many words
@@ -1186,8 +1185,7 @@ default-value-8
     (inst subq supplied (fixnumize fixed) count)
     (inst subq csp-tn count context)))
 
-
-;;; Signal wrong argument count error if Nargs isn't equal to Count.
+;;; Signal wrong argument count error if NARGS isn't equal to COUNT.
 (define-vop (verify-argument-count)
   (:policy :fast-safe)
   (:translate sb!c::%verify-argument-count)

@@ -64,9 +64,18 @@ $SBCL_XC_HOST <<-'EOF' || exit 1
 	  (let (;; Life is simpler at genesis/cold-load time if we
 		;; needn't worry about byte-compiled code.
 		(sb!ext:*byte-compile-top-level* nil)
+		;; In order to increase microefficiency of the target Lisp, 
+		;; enable old CMU CL defined-function-types-never-change
+		;; optimizations. (ANSI says users aren't supposed to
+		;; redefine our functions anyway; and developers can
+		;; fend for themselves.)
+		#!-sb-fluid (sb!ext:*derive-function-types* t)
 		;; In order to reduce peak memory usage during GENESIS,
 		;; it helps to stuff several toplevel forms together 
-		;; into the same function.
+		;; into the same function. (This can't be the compiler
+		;; default in general since it's non-ANSI in the case
+		;; of e.g. some package-side-effecting forms, but it's
+		;; safe in all the code we cross-compile.)
 		(sb!c::*top-level-lambda-max* 10)
 		;; Let the target know that we're the cross-compiler.
 		(*features* (cons :sb-xc *features*))

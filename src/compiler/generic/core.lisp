@@ -89,7 +89,7 @@
 ;;; Backpatch all the DEBUG-INFOs dumped so far with the specified
 ;;; SOURCE-INFO list. We also check that there are no outstanding forward
 ;;; references to functions.
-(defun fix-core-source-info (info object source-info)
+(defun fix-core-source-info (info object &optional source-info)
   (declare (type source-info info) (type core-object object))
   (aver (zerop (hash-table-count (core-object-patch-table object))))
   (let ((res (debug-source-for-info info)))

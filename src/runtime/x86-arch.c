@@ -23,6 +23,7 @@
 #include "interrupt.h"
 #include "interr.h"
 #include "breakpoint.h"
+#include "monitor.h"
 
 #define BREAKPOINT_INST 0xcc	/* INT3 */
 

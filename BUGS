@@ -183,21 +183,6 @@ WORKAROUND:
 	munge12egnum
 	NIL
 
-23:
-  When too many files are opened, OPEN will fail with an
-  uninformative error message 
-	error in function OPEN: error opening #P"/tmp/foo.lisp": NIL
-  instead of saying that too many files are open.
-
-26:
-  reported by Sam Steingold on the cmucl-imp mailing list 12 May 2000:
-    Also, there is another bug: `array-displacement' should return an
-    array or nil as first value (as per ANSI CL), while CMUCL declares
-    it as returning an array as first value always.
-  (Actually, I think the old CMU CL version in SBCL never returns NIL,
-  i.e. it's not just a declaration problem, but the definition doesn't
-  behave ANSIly.)
-
 27:
   Sometimes (SB-EXT:QUIT) fails with 
 	Argh! maximum interrupt nesting depth (4096) exceeded, exiting
@@ -281,6 +266,8 @@ WORKAROUND:
   that arbitrary functions check their argument types. (It might
   make sense to add another flag (CHECKED?) to DEFKNOWN to 
   identify functions which *do* check their argument types.)
+  (Also, verify that the compiler handles declared function
+  return types as assertions.)
 
 38:
   DEFMETHOD doesn't check the syntax of &REST argument lists properly,
@@ -465,11 +452,6 @@ SBCL: (("blah") ("blah2"))
 54:
   The implementation of #'+ returns its single argument without
   type checking, e.g. (+ "illegal") => "illegal".
-
-55:
-  In sbcl-0.6.7, there is no doc string for CL:PUSH, probably 
-  because it's defined with the DEFMACRO-MUNDANELY macro and something
-  is wrong with doc string setting in that macro.
 
 56:
   Attempting to use COMPILE on something defined by DEFMACRO fails:
@@ -1088,6 +1070,12 @@ Error in function C::GET-LAMBDA-TO-COMPILE:
     internal error, failed AVER:
       "(COMMON-LISP:EQ (SB!C::TN-ENVIRONMENT SB!C:TN) SB!C::TN-ENV)"
 
+116:
+  The error message from compiling
+    (LAMBDA (X) (LET ((NIL 1)) X))
+  is
+
+
 KNOWN BUGS RELATED TO THE IR1 INTERPRETER
 
 (Note: At some point, the pure interpreter (actually a semi-pure
@@ -1160,3 +1148,15 @@ IR1-4:
   EVAL-WHEN is rewritten, which won't happen until after the IR1
   interpreter is gone, the system's notion of what's a top-level form
   and what's not will remain too confused to fix this problem.]
+
+IR1-5:
+  (not really a bug, just a wishlist thing which might be easy
+  when EVAL-WHEN is rewritten..) It might be good for the cross-compiler
+  to warn about nested EVAL-WHENs. (In ordinary compilation, they're
+  quite likely to be OK, but in cross-compiled code EVAL-WHENs
+  are a great source of confusion, so a style warning about anything
+  unusual could be helpful.)
+
+IR1-6:
+  (another wishlist thing..) Reimplement DEFMACRO to be basically
+  like DEFMACRO-MUNDANELY, just using EVAL-WHEN.

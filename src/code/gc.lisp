@@ -23,19 +23,23 @@
        (defun ,lisp-fun ()
 	 (sb!alien:extern-alien ,c-var-name (sb!alien:unsigned 32))))))
 
-#!+(or cgc gencgc) (progn
-#!-sb-fluid (declaim (inline dynamic-usage))
-(def-c-var-frob dynamic-usage "bytes_allocated"))
+#!-gencgc
+(progn
+  ;; This is called once per PROFILEd function call, so it's worth a
+  ;; little possible space cost to reduce its time cost.
+  #!-sb-fluid
+  (declaim (inline current-dynamic-space-start))
+  (def-c-var-frob current-dynamic-space-start "current_dynamic_space"))
 
+#!-sb-fluid
+(declaim (inline dynamic-usage)) ; to reduce PROFILEd call overhead
+#!+(or cgc gencgc)
+(def-c-var-frob dynamic-usage "bytes_allocated")
 #!-(or cgc gencgc)
 (defun dynamic-usage ()
   (the (unsigned-byte 32)
        (- (sb!sys:sap-int (sb!c::dynamic-space-free-pointer))
           (current-dynamic-space-start))))
-
-#!-gencgc (progn
-#!-sb-fluid (declaim (inline current-dynamic-space-start))
-(def-c-var-frob current-dynamic-space-start "current_dynamic_space"))
 
 (defun static-space-usage ()
   (- (* sb!vm:*static-space-free-pointer* sb!vm:word-bytes)
@@ -191,7 +195,7 @@ and submit it as a patch."
 (defun default-gc-notify-before (notify-stream bytes-in-use)
   (declare (type stream notify-stream))
   (format notify-stream
-	  "~&; GC is beginning with ~:D bytes in use at internal runtime ~D.~%"
+	  "~&; GC is beginning with ~:D bytes in use at internal runtime ~:D.~%"
 	  bytes-in-use
 	  (get-internal-run-time))
   (finish-output notify-stream))
@@ -209,7 +213,7 @@ and submit it as a patch."
   (declare (type stream notify-stream))
   (format notify-stream
 	  "~&; GC has finished with ~:D bytes in use (~:D bytes freed)~@
-           ; at internal runtime ~D. The new GC trigger is ~:D bytes.~%"
+           ; at internal runtime ~:D. The new GC trigger is ~:D bytes.~%"
 	  bytes-retained
 	  bytes-freed
 	  (get-internal-run-time)

@@ -116,7 +116,6 @@
 ;;; to be called when a variable is lexically bound
 (declaim (ftype (function (symbol) (values)) note-lexical-binding))
 (defun note-lexical-binding (symbol)
-  (let ((name (symbol-name symbol)))
     ;; This check is intended to protect us from getting silently
     ;; burned when we define
     ;;   foo.lisp:
@@ -127,10 +126,9 @@
     ;;       (LET ((*FOO* X))
     ;;         (FOO 14)))
     ;; and then we happen to compile bar.lisp before foo.lisp.
-    (when (and (char= #\* (aref name 0))
-	       (char= #\* (aref name (1- (length name)))))
+  (when (looks-like-name-of-special-var-p symbol)
       ;; FIXME: should be COMPILER-STYLE-WARNING?
       (style-warn "using the lexical binding of the symbol ~S, not the~@
 dynamic binding, even though the symbol name follows the usual naming~@
-convention (names like *FOO*) for special variables" symbol)))
+convention (names like *FOO*) for special variables" symbol))
   (values))

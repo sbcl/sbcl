@@ -514,7 +514,10 @@
   ;;  :DECLARED, from a declaration.
   ;;  :ASSUMED, from uses of the object.
   ;;  :DEFINED, from examination of the definition.
-  ;; FIXME: This should be a named type. (LEAF-WHERE-FROM?)
+  ;; FIXME: This should be a named type. (LEAF-WHERE-FROM? Or
+  ;; perhaps just WHERE-FROM, since it's not just used in LEAF,
+  ;; but also in various DEFINE-INFO-TYPEs in globaldb.lisp,
+  ;; and very likely elsewhere too.)
   (where-from :assumed :type (member :declared :assumed :defined))
   ;; list of the REF nodes for this leaf
   (refs () :type list)
@@ -573,7 +576,7 @@
 ;;; defined in the same compilation block, or that have inline
 ;;; expansions, or have a non-NIL INLINEP value. Whenever we change
 ;;; the INLINEP state (i.e. an inline proclamation) we copy the
-;;; structure so that former inlinep values are preserved.
+;;; structure so that former INLINEP values are preserved.
 (def!struct (defined-function (:include global-var
 					(where-from :defined)
 					(kind :global-function)))

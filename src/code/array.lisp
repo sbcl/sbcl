@@ -17,8 +17,8 @@
 
 ;;;; miscellaneous accessor functions
 
-;;; These functions are needed by the interpreter, 'cause the compiler
-;;; inlines them.
+;;; These functions are only needed by the interpreter, 'cause the
+;;; compiler inlines them.
 (macrolet ((def-frob (name)
 	     `(progn
 		(defun ,name (array)
@@ -558,14 +558,14 @@
 
 (defun array-rank (array)
   #!+sb-doc
-  "Returns the number of dimensions of the Array."
+  "Return the number of dimensions of ARRAY."
   (if (array-header-p array)
       (%array-rank array)
       1))
 
 (defun array-dimension (array axis-number)
   #!+sb-doc
-  "Returns length of dimension Axis-Number of the Array."
+  "Returns the length of dimension AXIS-NUMBER of ARRAY."
   (declare (array array) (type index axis-number))
   (cond ((not (array-header-p array))
 	 (unless (= axis-number 0)
@@ -579,7 +579,7 @@
 
 (defun array-dimensions (array)
   #!+sb-doc
-  "Returns a list whose elements are the dimensions of the array"
+  "Return a list whose elements are the dimensions of the array"
   (declare (array array))
   (if (array-header-p array)
       (do ((results nil (cons (array-dimension array index) results))
@@ -589,7 +589,7 @@
 
 (defun array-total-size (array)
   #!+sb-doc
-  "Returns the total number of elements in the Array."
+  "Return the total number of elements in the Array."
   (declare (array array))
   (if (array-header-p array)
       (%array-available-elements array)
@@ -597,14 +597,17 @@
 
 (defun array-displacement (array)
   #!+sb-doc
-  "Returns values of :displaced-to and :displaced-index-offset options to
-   make-array, or the defaults nil and 0 if not a displaced array."
-  (declare (array array))
-  (values (%array-data-vector array) (%array-displacement array)))
+  "Return the values of :DISPLACED-TO and :DISPLACED-INDEX-offset
+   options to MAKE-ARRAY, or NIL and 0 if not a displaced array."
+  (declare (type array array))
+  (if (and (array-header-p array) ; if unsimple and
+	   (%array-displaced-p array)) ; displaced
+      (values (%array-data-vector array) (%array-displacement array))
+      (values nil 0)))
 
 (defun adjustable-array-p (array)
   #!+sb-doc
-  "Returns T if (adjust-array array...) would return an array identical
+  "Return T if (ADJUST-ARRAY ARRAY...) would return an array identical
    to the argument, this happens for complex arrays."
   (declare (array array))
   (not (typep array 'simple-array)))
