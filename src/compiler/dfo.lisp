@@ -276,7 +276,9 @@
     (dolist (com components)
       (unless (eq (block-next (component-head com)) (component-tail com))
 	(let* ((funs (component-lambdas com))
-	       (has-top (find :top-level funs :key #'functional-kind)))
+	       (has-top (find :top-level funs :key #'functional-kind))
+	       (has-external-references
+		(some #'functional-has-external-references-p funs)))
 	  (cond (;; The FUNCTIONAL-HAS-EXTERNAL-REFERENCES-P concept
 		 ;; is newer than the rest of this function, and
 		 ;; doesn't really seem to fit into its mindset. Here
@@ -285,7 +287,7 @@
 		 ;; executed at run time, and since it's not valid to
 		 ;; delete them just because they don't have any
 		 ;; references from pure :TOP-LEVEL components. -- WHN
-		 (some #'functional-has-external-references-p funs)
+		 has-external-references
 		 (setf (component-kind com) :complex-top-level)
 		 (real com)
 		 (real-top com))

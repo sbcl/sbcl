@@ -68,14 +68,16 @@
   (values))
 
 ;;; Replace all references to COMPONENT's non-closure XEPs that appear
-;;; in top-level components, changing to :TOP-LEVEL-XEP FUNCTIONALs.
-;;; If the cross-component ref is not in a :TOP-LEVEL component, or is
-;;; to a closure, then substitution is suppressed.
+;;; in top-level or externally-referenced components, changing to
+;;; :TOP-LEVEL-XEP FUNCTIONALs. If the cross-component ref is not in a
+;;; :TOP-LEVEL/externally-referenced component, or is to a closure,
+;;; then substitution is suppressed.
 ;;;
 ;;; When a cross-component ref is not substituted, we return T to
 ;;; indicate that early deletion of this component's IR1 should not be
-;;; done. We also return T if this component contains :TOP-LEVEL
-;;; lambdas (though it is not a :TOP-LEVEL component.)
+;;; done. We also return T if this component contains
+;;; :TOP-LEVEL/externally-referenced lambdas (though it is not a
+;;; :TOP-LEVEL component.)
 ;;;
 ;;; We deliberately don't use the normal reference deletion, since we
 ;;; don't want to trigger deletion of the XEP (although it shouldn't
@@ -86,22 +88,24 @@
     (dolist (lambda (component-lambdas component))
       (case (functional-kind lambda)
 	(:external
-	 (let* ((ef (functional-entry-function lambda))
-		(new (make-functional :kind :top-level-xep
-				      :info (leaf-info lambda)
-				      :name (leaf-name ef)
-				      :lexenv (make-null-lexenv)))
-		(closure (environment-closure
-			  (lambda-environment (main-entry ef)))))
-	   (dolist (ref (leaf-refs lambda))
-	     (let ((ref-component (block-component (node-block ref))))
-	       (cond ((eq ref-component component))
-		     ((or (not (eq (component-kind ref-component) :top-level))
-			  closure)
-		      (setq res t))
-		     (t
-		      (setf (ref-leaf ref) new)
-		      (push ref (leaf-refs new))))))))
+	 (unless (lambda-has-external-references-p lambda)
+	   (let* ((ef (functional-entry-function lambda))
+		  (new (make-functional :kind :top-level-xep
+					:info (leaf-info lambda)
+					:name (leaf-name ef)
+					:lexenv (make-null-lexenv)))
+		  (closure (environment-closure
+			    (lambda-environment (main-entry ef)))))
+	     (dolist (ref (leaf-refs lambda))
+	       (let ((ref-component (block-component (node-block ref))))
+		 (cond ((eq ref-component component))
+		       ((or (not (member (component-kind ref-component)
+					 '(:top-level :complex-top-level)))
+			    closure)
+			(setq res t))
+		       (t
+			(setf (ref-leaf ref) new)
+			(push ref (leaf-refs new)))))))))
 	(:top-level
 	 (setq res t))))
     res))
