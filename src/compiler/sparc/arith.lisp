@@ -658,20 +658,26 @@
   (:generator 1
     (inst not res x)))
 
-(macrolet
-    ((define-modular-backend (fun &optional constantp)
-       (let ((mfun-name (symbolicate fun '-mod32))
-             (modvop (symbolicate 'fast- fun '-mod32/unsigned=>unsigned))
-             (modcvop (symbolicate 'fast- fun '-mod32-c/unsigned=>unsigned))
-             (vop (symbolicate 'fast- fun '/unsigned=>unsigned))
-             (cvop (symbolicate 'fast- fun '-c/unsigned=>unsigned)))
-         `(progn
-            (define-modular-fun ,mfun-name (x y) ,fun 32)
-            (define-vop (,modvop ,vop)
-              (:translate ,mfun-name))
-	    ,@(when constantp
-		`((define-vop (,modcvop ,cvop)
-		    (:translate ,mfun-name))))))))
+(macrolet ((define-modular-backend (fun &optional constantp)
+             (collect ((forms))
+               (dolist (info '((29 fixnum) (32 unsigned)))
+                 (destructuring-bind (width regtype) info
+                   (let ((mfun-name (intern (format nil "~A-MOD~A" fun width)))
+                         (mvop (intern (format nil "FAST-~A-MOD~A/~A=>~A"
+                                               fun width regtype regtype)))
+                         (mcvop (intern (format nil "FAST-~A-MOD~A-C/~A=>~A"
+                                                fun width regtype regtype)))
+                         (vop (intern (format nil "FAST-~A/~A=>~A"
+                                              fun regtype regtype)))
+                         (cvop (intern (format nil "FAST-~A-C/~A=>~A"
+                                               fun regtype regtype))))
+                     (forms `(define-modular-fun ,mfun-name (x y) ,fun ,width))
+                     (forms `(define-vop (,mvop ,vop)
+                              (:translate ,mfun-name)))
+                     (when constantp
+                       (forms `(define-vop (,mcvop ,cvop)
+                                (:translate ,mfun-name)))))))
+               `(progn ,@(forms)))))
   (define-modular-backend + t)
   (define-modular-backend - t)
   (define-modular-backend logxor t)

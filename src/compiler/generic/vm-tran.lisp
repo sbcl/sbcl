@@ -510,6 +510,13 @@
   ;; This should really be dependent on SB!VM:N-WORD-BITS, but since we
   ;; don't have a true Alpha64 port yet, we'll have to stick to
   ;; SB!VM:N-MACHINE-WORD-BITS for the time being.  --njf, 2004-08-14
+  ;;
+  ;; FIXME: I think we only want a single optimizer for ASH; this code
+  ;; currently defines two (the second one, AFAICS, overrides the first),
+  ;; but everything "works"--ASH with results of 29 bits or fewer use
+  ;; fixnum arithmetic.  -- njf, 2004-12-08
+  #!+#.(cl:if (cl:= 32 sb!vm:n-machine-word-bits) '(and) '(or))
+  (def sb!vm::ash-left-mod29 29)
   #!+#.(cl:if (cl:= 32 sb!vm:n-machine-word-bits) '(and) '(or))
   (def sb!vm::ash-left-mod32 32)
   #!+#.(cl:if (cl:= 64 sb!vm:n-machine-word-bits) '(and) '(or))

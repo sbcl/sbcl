@@ -1192,64 +1192,104 @@
 
 ;;;; Modular functions
 
-(define-modular-fun +-mod32 (x y) + 32)
-(define-vop (fast-+-mod32/unsigned=>unsigned fast-+/unsigned=>unsigned)
-  (:translate +-mod32))
-(define-vop (fast-+-mod32-c/unsigned=>unsigned fast-+-c/unsigned=>unsigned)
-  (:translate +-mod32))
-(define-modular-fun --mod32 (x y) - 32)
-(define-vop (fast---mod32/unsigned=>unsigned fast--/unsigned=>unsigned)
-  (:translate --mod32))
-(define-vop (fast---mod32-c/unsigned=>unsigned fast---c/unsigned=>unsigned)
-  (:translate --mod32))
+(macrolet ((define-modular-backend (fun &optional constantp)
+             (collect ((forms))
+               (dolist (info '((29 fixnum) (32 unsigned)))
+                 (destructuring-bind (width regtype) info
+                   (let ((mfun-name (intern (format nil "~A-MOD~A" fun width)))
+                         (mvop (intern (format nil "FAST-~A-MOD~A/~A=>~A"
+                                               fun width regtype regtype)))
+                         (mcvop (intern (format nil "FAST-~A-MOD~A-C/~A=>~A"
+                                                fun width regtype regtype)))
+                         (vop (intern (format nil "FAST-~A/~A=>~A"
+                                              fun regtype regtype)))
+                         (cvop (intern (format nil "FAST-~A-C/~A=>~A"
+                                               fun regtype regtype))))
+                     (forms `(define-modular-fun ,mfun-name (x y) ,fun ,width))
+                     (forms `(define-vop (,mvop ,vop)
+                              (:translate ,mfun-name)))
+                     (when constantp
+                       (forms `(define-vop (,mcvop ,cvop)
+                                (:translate ,mfun-name)))))))
+               `(progn ,@(forms)))))
+  (define-modular-backend + t)
+  (define-modular-backend - t)
+  (define-modular-backend *)            ; FIXME: there exists a
+                                        ; FAST-*-C/FIXNUM=>FIXNUM VOP which
+                                        ; should be used for the MOD29 case,
+                                        ; but the MOD32 case cannot accept
+                                        ; immediate arguments.
+  (define-modular-backend logxor t))
 
-(define-modular-fun *-mod32 (x y) * 32)
-(define-vop (fast-*-mod32/unsigned=>unsigned fast-*/unsigned=>unsigned)
-  (:translate *-mod32))
-;;; (no -C variant as x86 MUL instruction doesn't take an immediate)
-
-(define-vop (fast-ash-left-mod32-c/unsigned=>unsigned
-             fast-ash-c/unsigned=>unsigned)
-  (:translate ash-left-mod32))
-
-(define-vop (fast-ash-left-mod32/unsigned=>unsigned
-             fast-ash-left/unsigned=>unsigned))
-(deftransform ash-left-mod32 ((integer count)
-			      ((unsigned-byte 32) (unsigned-byte 5)))
-  (when (sb!c::constant-lvar-p count)
-    (sb!c::give-up-ir1-transform))
-  '(%primitive fast-ash-left-mod32/unsigned=>unsigned integer count))
+(macrolet ((define-modular-ash (width regtype)
+             (let ((mfun-name (intern (format nil "ASH-LEFT-MOD~A" width)))
+                   (modvop (intern (format nil "FAST-ASH-LEFT-MOD~A/~A=>~A"
+                                           width regtype regtype)))
+                   (modcvop (intern (format nil "FAST-ASH-LEFT-MOD~A-C/~A=>~A"
+                                            width regtype regtype)))
+                   (vop (intern (format nil "FAST-ASH-LEFT/~A=>~A"
+                                        regtype regtype)))
+                   (cvop (intern (format nil "FAST-ASH-C/~A=>~A"
+                                         regtype regtype))))
+               `(progn
+                 (define-vop (,modcvop ,cvop)
+                   (:translate ,mfun-name))
+                 (define-vop (,modvop ,vop))
+                 (deftransform ,mfun-name ((integer count)
+                                           ((unsigned-byte ,width) (unsigned-byte 5)))
+                   (when (sb!c::constant-lvar-p count)
+                     (sb!c::give-up-ir1-transform))
+                   '(%primitive ,modvop integer count))))))
+  (define-modular-ash 29 fixnum)
+  (define-modular-ash 32 unsigned))
 
 (in-package "SB!C")
 
 (defknown sb!vm::%lea-mod32 (integer integer (member 1 2 4 8) (signed-byte 32))
   (unsigned-byte 32)
   (foldable flushable movable))
-
+(defknown sb!vm::%lea-mod29 (integer integer (member 1 2 4 8) (signed-byte 29))
+  (unsigned-byte 29)
+  (foldable flushable movable))
 (define-modular-fun-optimizer %lea ((base index scale disp) :width width)
   (when (and (<= width 32)
 	     (constant-lvar-p scale)
 	     (constant-lvar-p disp))
     (cut-to-width base width)
     (cut-to-width index width)
-    'sb!vm::%lea-mod32))
+    (if (<= width 29)
+        'sb!vm::%lea-mod29
+        'sb!vm::%lea-mod32)))
 
 #+sb-xc-host
+(progn
+(defun sb!vm::%lea-mod29 (base index scale disp)
+  (ldb (byte 29 0) (%lea base index scale disp)))
 (defun sb!vm::%lea-mod32 (base index scale disp)
-  (ldb (byte 32 0) (%lea base index scale disp)))
+  (ldb (byte 32 0) (%lea base index scale disp))))
 #-sb-xc-host
+(progn
+(defun sb!vm::%lea-mod29 (base index scale disp)
+  (let ((base (logand base #x1fffffff))
+	(index (logand index #x1fffffff)))
+    ;; can't use modular version of %LEA, as we only have VOPs for
+    ;; constant SCALE and DISP.
+    (ldb (byte 29 0) (+ base (* index scale) disp))))
 (defun sb!vm::%lea-mod32 (base index scale disp)
   (let ((base (logand base #xffffffff))
 	(index (logand index #xffffffff)))
     ;; can't use modular version of %LEA, as we only have VOPs for
     ;; constant SCALE and DISP.
-    (ldb (byte 32 0) (+ base (* index scale) disp))))
+    (ldb (byte 32 0) (+ base (* index scale) disp)))))
 
 (in-package "SB!VM")
 
 (define-vop (%lea-mod32/unsigned=>unsigned
 	     %lea/unsigned=>unsigned)
   (:translate %lea-mod32))
+(define-vop (%lea-mod29/fixnum=>fixnum
+             %lea/fixnum=>fixnum)
+  (:translate %lea-mod29))
 
 ;;; logical operations
 (define-modular-fun lognot-mod32 (x) lognot 32)
@@ -1269,14 +1309,6 @@
   (:generator 1
     (move r x)
     (inst not r)))
-
-(define-modular-fun logxor-mod32 (x y) logxor 32)
-(define-vop (fast-logxor-mod32/unsigned=>unsigned
-             fast-logxor/unsigned=>unsigned)
-  (:translate logxor-mod32))
-(define-vop (fast-logxor-mod32-c/unsigned=>unsigned
-             fast-logxor-c/unsigned=>unsigned)
-  (:translate logxor-mod32))
 
 (define-source-transform logeqv (&rest args)
   (if (oddp (length args))
@@ -1602,37 +1634,37 @@
 ;;; This is essentially a straight implementation of the algorithm in
 ;;; "Strength Reduction of Multiplications by Integer Constants",
 ;;; Youfeng Wu, ACM SIGPLAN Notices, Vol. 30, No.2, February 1995.
-(defun basic-decompose-multiplication (arg num n-bits condensed)
+(defun basic-decompose-multiplication (arg num n-bits condensed mask)
   (case (aref condensed 0)
     (0
      (let ((tmp (min 3 (aref condensed 1))))
        (decf (aref condensed 1) tmp)
-       `(logand #xffffffff
-	 (%lea ,arg
-	       ,(decompose-multiplication
-		 arg (ash (1- num) (- tmp)) (1- n-bits) (subseq condensed 1))
-	       ,(ash 1 tmp) 0))))
+       `(logand ,mask (%lea ,arg
+                       ,(decompose-multiplication
+                         arg (ash (1- num) (- tmp)) (1- n-bits) (subseq condensed 1)
+                         mask)
+         ,(ash 1 tmp) 0))))
     ((1 2 3)
      (let ((r0 (aref condensed 0)))
        (incf (aref condensed 1) r0)
-       `(logand #xffffffff
-	 (%lea ,(decompose-multiplication
-		 arg (- num (ash 1 r0)) (1- n-bits) (subseq condensed 1))
-	       ,arg
-	       ,(ash 1 r0) 0))))
+       `(logand ,mask (%lea ,(decompose-multiplication
+                              arg (- num (ash 1 r0)) (1- n-bits) (subseq condensed 1)
+                              mask)
+                       ,arg
+                       ,(ash 1 r0) 0))))
     (t (let ((r0 (aref condensed 0)))
 	 (setf (aref condensed 0) 0)
-	 `(logand #xffffffff
-	   (ash ,(decompose-multiplication
-		  arg (ash num (- r0)) n-bits condensed)
-	        ,r0))))))
+	 `(logand ,mask (ash ,(decompose-multiplication
+                               arg (ash num (- r0)) n-bits condensed mask)
+           ,r0))))))
 
-(defun decompose-multiplication (arg num n-bits condensed)
+(defun decompose-multiplication (arg num n-bits condensed mask)
+                                     
   (cond
     ((= n-bits 0) 0)
     ((= num 1) arg)
     ((= n-bits 1)
-     `(logand #xffffffff (ash ,arg ,(1- (integer-length num)))))
+     `(logand ,mask (ash ,arg ,(1- (integer-length num)))))
     ((let ((max 0) (end 0))
        (loop for i from 2 to (length condensed)
 	     for j = (reduce #'+ (subseq condensed 0 i))
@@ -1641,25 +1673,24 @@
 			     (ash (ldb (byte (- 32 (1+ j)) (1+ j)) num)
 				  (1+ j)))
 			  (ash 1 32)))
-	       do (setq max (- (* 2 i) 3 j)
-			end i))
+             do (setq max (- (* 2 i) 3 j)
+                      end i))
        (when (> max 0)
 	 (let ((j (reduce #'+ (subseq condensed 0 end))))
 	   (let ((n2 (+ (ash 1 (1+ j))
 			(ash (ldb (byte (- 32 (1+ j)) (1+ j)) num) (1+ j))))
 		 (n1 (1+ (ldb (byte (1+ j) 0) (lognot num)))))
-	   `(logand #xffffffff
-	     (- ,(optimize-multiply arg n2) ,(optimize-multiply arg n1))))))))
+             `(logand ,mask (- ,(optimize-multiply arg n2 mask)
+                             ,(optimize-multiply arg n1 mask))))))))
     ((dolist (i '(9 5 3))
        (when (integerp (/ num i))
 	 (when (< (logcount (/ num i)) (logcount num))
 	   (let ((x (gensym)))
-	     (return `(let ((,x ,(optimize-multiply arg (/ num i))))
-		       (logand #xffffffff
-			(%lea ,x ,x (1- ,i) 0)))))))))
-    (t (basic-decompose-multiplication arg num n-bits condensed))))
+	     (return `(let ((,x ,(optimize-multiply arg (/ num i) mask)))
+		       (logand ,mask (%lea ,x ,x (1- ,i) 0)))))))))
+    (t (basic-decompose-multiplication arg num n-bits condensed mask))))
 	   
-(defun optimize-multiply (arg x)
+(defun optimize-multiply (arg x mask)
   (let* ((n-bits (logcount x))
 	 (condensed (make-array n-bits)))
     (let ((count 0) (bit 0))
@@ -1669,9 +1700,9 @@
 	       (setf count 1)
 	       (incf bit))
 	      (t (incf count)))))
-    (decompose-multiplication arg x n-bits condensed)))
+    (decompose-multiplication arg x n-bits condensed mask)))
 
-(defun *-transformer (y)
+(defun *-transformer (y mask)
   (cond
     ((= y (ash 1 (integer-length y)))
      ;; there's a generic transform for y = 2^k
@@ -1685,21 +1716,53 @@
     ;; FIXME: should make this more fine-grained.  If nothing else,
     ;; there should probably be a cutoff of about 9 instructions on
     ;; pentium-class machines.
-    (t (optimize-multiply 'x y))))
+    (t (optimize-multiply 'x y mask))))
 
+;;; KLUDGE: due to the manner in which DEFTRANSFORM is implemented, it
+;;; is vitally important that the transform for (UNSIGNED-BYTE 29)
+;;; multiply come after the transform for (UNSIGNED-BYTE 32) multiply.
+;;; When attempting to transform a function application, the compiler
+;;; examines the relevant transforms for the function in the reverse
+;;; order in which they were defined and takes the first one which
+;;; succeeds.  If the (UNSIGNED-BYTE 32) transform were to come after
+;;; the (UNSIGNED-BYTE 29) transform, the (UNSIGNED-BYTE 32) transform
+;;; would be attempted first.  Since (UNSIGNED-BYTE 29) is subsumed by
+;;; (UNSIGNED-BYTE 32), and assuming the arguments and result are
+;;; (UNSIGNED-BYTE 29)s, the (UNSIGNED-BYTE 32) transform would succeed
+;;; and force (UNSIGNED-BYTE 32) arithmetic where (UNSIGNED-BYTE 29)
+;;; arithmetic would work perfectly well--introducing unnecessary
+;;; shifting and causing efficiency notes where the user might not
+;;; expect them to occur.  So we define the (UNSIGNED-BYTE 29) transform
+;;; *after* the (UNSIGNED-BYTE 32) transform in order to attempt the
+;;; (UNSIGNED-BYTE 29) transform *before* the (UNSIGNED-BYTE 32)
+;;; transform.  Yuck.   -- njf, 2004-12-07
 (deftransform * ((x y)
 		 ((unsigned-byte 32) (constant-arg (unsigned-byte 32)))
 		 (unsigned-byte 32))
   "recode as leas, shifts and adds"
   (let ((y (lvar-value y)))
-    (*-transformer y)))
+    (*-transformer y #xffffffff)))
+
+(deftransform * ((x y)
+                 ((unsigned-byte 29) (constant-arg (unsigned-byte 29)))
+                 (unsigned-byte 29))
+  "recode as leas, shifts, and adds"
+  (let ((y (lvar-value y)))
+    (*-transformer y #x1fffffff)))
 
 (deftransform sb!vm::*-mod32
     ((x y) ((unsigned-byte 32) (constant-arg (unsigned-byte 32)))
      (unsigned-byte 32))
   "recode as leas, shifts and adds"
   (let ((y (lvar-value y)))
-    (*-transformer y)))
+    (*-transformer y #xffffffff)))
+
+(deftransform sb!vm::*-mod29
+    ((x y) ((unsigned-byte 29) (constant-arg (unsigned-byte 29)))
+     (unsigned-byte 29))
+  "recode as leas, shifts and adds"
+  (let ((y (lvar-value y)))
+    (*-transformer y #x1fffffff)))
 
 ;;; FIXME: we should also be able to write an optimizer or two to
 ;;; convert (+ (* x 2) 17), (- (* x 9) 5) to a %LEA.
