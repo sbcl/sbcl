@@ -735,6 +735,17 @@
 	     "unexpected end of file on ~S ~A"
 	     (stream-error-stream condition)
 	     (reader-eof-error-context condition)))))
+
+(define-condition reader-impossible-number-error (reader-error)
+  ((error :reader reader-impossible-number-error-error :initarg :error))
+  (:report
+   (lambda (condition stream)
+     (let ((error-stream (stream-error-stream condition)))
+       (format stream "READER-ERROR ~@[at ~W ~]on ~S:~%~?~%Original error: ~A"
+	       (file-position error-stream) error-stream
+	       (reader-error-format-control condition)
+	       (reader-error-format-arguments condition)
+	       (reader-impossible-number-error-error condition))))))
 
 ;;;; special SBCL extension conditions
 

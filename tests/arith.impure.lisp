@@ -65,4 +65,6 @@
 (assert (null (ignore-errors (compiled-logxor #c(2 3)))))
 (assert (= (compiled-logxor -6) -6))
 
+(assert (raises-error? (coerce (expt 10 1000) 'single-float) type-error))
+
 (sb-ext:quit :unix-status 104)

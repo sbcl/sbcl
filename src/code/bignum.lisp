@@ -980,8 +980,16 @@
 	       (declare (type bignum-index len))
 	       (let ((exp (+ exp bias)))
 		 (when (> exp max)
-		   (error "Too large to be represented as a ~S:~%  ~S"
-			  format x))
+		   ;; Why a SIMPLE-TYPE-ERROR? Well, this is mainly
+		   ;; called by COERCE, which requires an error of
+		   ;; TYPE-ERROR if the conversion can't happen
+		   ;; (except in certain circumstances when we are
+		   ;; coercing to a FUNCTION) -- CSR, 2002-09-18
+		   (error 'simple-type-error
+			  :format-control "Too large to be represented as a ~S:~%  ~S"
+			  :format-arguments (list format x)
+			  :expected-type format
+			  :datum x))
 		 exp)))
 
     (cond

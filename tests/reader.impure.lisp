@@ -15,6 +15,8 @@
 
 (in-package :cl-user)
 
+(load "assertoid.lisp")
+
 ;;; Bug 30, involving mistakes in binding the read table, made this
 ;;; code fail.
 (defun read-vector (stream char)
@@ -34,6 +36,11 @@
     (read-from-string "[#\\x]")
   (assert (equalp res #(#\x)))
   (assert (= pos 5)))
+
+;;; Bug 51b. (try to throw READER-ERRORs when the reader encounters
+;;; dubious input)
+(assert (raises-error? (read-from-string "1e1000") reader-error))
+(assert (raises-error? (read-from-string "1/0") reader-error))
 
 ;;; success
 (quit :unix-status 104)

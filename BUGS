@@ -297,9 +297,6 @@ WORKAROUND:
 	      (DEFGENERIC FOO03 (X))
 	      (ADD-METHOD (FUNCTION FOO03) M)))
 	   should give an error, but SBCL allows it.
-	b: READ should probably return READER-ERROR, not the bare 
-	   arithmetic error, when input a la "1/0" or "1e1000" causes
-	   an arithmetic error.
 
 52:
   It has been reported (e.g. by Peter Van Eynde) that there are 
@@ -733,65 +730,6 @@ WORKAROUND:
        (bar x)))
   shouldn't compile without error (because of the extra DEFMACRO symbol).
 
-131:
-  As of sbcl-0.pre7.86.flaky7.3, the cross-compiler, and probably 
-  the CL:COMPILE function (which is based on the same %COMPILE 
-  mechanism) get confused by 
-(defun sxhash (x)
-  (labels ((sxhash-number (x)
-	     (etypecase x
-	       (fixnum (sxhash x)) ; through DEFTRANSFORM
-	       (integer (sb!bignum:sxhash-bignum x))
-	       (single-float (sxhash x)) ; through DEFTRANSFORM
-	       (double-float (sxhash x)) ; through DEFTRANSFORM
-	       #!+long-float (long-float (error "stub: no LONG-FLOAT"))
-	       (ratio (let ((result 127810327))
-			(declare (type fixnum result))
-			(mixf result (sxhash-number (numerator x)))
-			(mixf result (sxhash-number (denominator x)))
-			result))
-	       (complex (let ((result 535698211))
-			  (declare (type fixnum result))
-			  (mixf result (sxhash-number (realpart x)))
-			  (mixf result (sxhash-number (imagpart x)))
-			  result))))
-	   (sxhash-recurse (x &optional (depthoid +max-hash-depthoid+))
-	     (declare (type index depthoid))
-	     (typecase x
-	       (list
-		(if (plusp depthoid)
-		    (mix (sxhash-recurse (car x) (1- depthoid))
-			 (sxhash-recurse (cdr x) (1- depthoid)))
-		    261835505))
-	       (instance
-		(if (typep x 'structure-object)
-		    (logxor 422371266
-			    (sxhash ; through DEFTRANSFORM
-			     (class-name (layout-class (%instance-layout x)))))
-		    309518995))
-	       (symbol (sxhash x)) ; through DEFTRANSFORM
-	       (number (sxhash-number x))
-	       (array
-		(typecase x
-		  (simple-string (sxhash x)) ; through DEFTRANSFORM
-		  (string (%sxhash-substring x))
-		  (bit-vector (let ((result 410823708))
-				(declare (type fixnum result))
-				(dotimes (i (min depthoid (length x)))
-				  (mixf result (aref x i)))
-				result))
-		  (t (logxor 191020317 (sxhash (array-rank x))))))
-	       (character
-		(logxor 72185131
-			(sxhash (char-code x)))) ; through DEFTRANSFORM
-	       (t 42))))
-    (sxhash-recurse x)))
-  complaining "function called with two arguments, but wants exactly
-  one" about SXHASH-RECURSE. (This might not be strictly a new bug, 
-  since IIRC post-fork CMU CL has also had problems with &OPTIONAL
-  arguments in FLET/LABELS: it might be an old Python bug which is 
-  only exercised by the new arrangement of the SBCL compiler.)
-
 135:
   Ideally, uninterning a symbol would allow it, and its associated
   FDEFINITION and PROCLAIM data, to be reclaimed by the GC. However, 
@@ -1021,18 +959,6 @@ WORKAROUND:
   The problem seems to be that the code walker used by the DEFMETHOD
   macro is unhappy with the illegal syntax in the method body, and
   is giving an unclear error message.
-
-168:
-  (reported by Dan Barlow on sbcl-devel 2002-05-10)
-  In sbcl-0.7.3.12, doing
-    (defstruct foo bar baz)
-    (compile nil (lambda (x) (or x (foo-baz x))))
-  gives an error
-    debugger invoked on condition of type SB-INT:BUG:
-       full call to SB-KERNEL:%INSTANCE-REF
-    This is probably a bug in SBCL itself. [...]
-  Since this is a reasonable user error, it shouldn't be reported as 
-  an SBCL bug. 
 
 172:
   sbcl's treatment of at least macro lambda lists is too permissive;
@@ -1356,13 +1282,19 @@ WORKAROUND:
 
   APD further reports that this bug is not present in CMUCL.
 
-200: "TRANSLATE-LOGICAL-PATHNAME fails on physical pathname namestrings"
-  Reported by Kevin Rosenburg on #lisp IRC 2002-09-16
-    (TRANSLATE-LOGICAL-PATHNAME "/")
-  should simply return #P"/", but signals an error in sbcl-0.7.7.28
+201: "Incautious type inference from compound CONS types"
+  (reported by APD sbcl-devel 2002-09-17)
+    (DEFUN FOO (X)
+      (LET ((Y (CAR (THE (CONS INTEGER *) X))))
+        (SETF (CAR X) NIL)
+        (FORMAT NIL "~S IS ~S, Y = ~S"
+                (CAR X)
+                (TYPECASE (CAR X)
+                  (INTEGER 'INTEGER)
+                  (T '(NOT INTEGER)))
+                Y)))
 
-  Fixed in sbcl-0.7.7.29: bug temporarily left here in BUGS to avoid
-  its number being accidentally reallocated
+    (FOO ' (1 . 2)) => "NIL IS INTEGER, Y = 1"
 
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:

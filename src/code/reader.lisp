@@ -800,13 +800,13 @@
      RIGHTDIGIT ; saw "[sign] {digit}* dot {digit}+"
       (ouch-read-buffer char)
       (setq char (read-char stream nil nil))
-      (unless char (return (make-float)))
+      (unless char (return (make-float stream)))
       (case (char-class char attribute-table)
 	(#.+char-attr-constituent-digit+ (go RIGHTDIGIT))
 	(#.+char-attr-constituent-expt+ (go EXPONENT))
 	(#.+char-attr-delimiter+
 	 (unread-char char stream)
-	 (return (make-float)))
+	 (return (make-float stream)))
 	(#.+char-attr-escape+ (go ESCAPE))
 	(#.+char-attr-multiple-escape+ (go MULT-ESCAPE))
 	(#.+char-attr-package-delimiter+ (go COLON))
@@ -859,12 +859,12 @@
      EXPTDIGIT ; got to EXPONENT, saw "[sign] {digit}+"
       (ouch-read-buffer char)
       (setq char (read-char stream nil nil))
-      (unless char (return (make-float)))
+      (unless char (return (make-float stream)))
       (case (char-class char attribute-table)
 	(#.+char-attr-constituent-digit+ (go EXPTDIGIT))
 	(#.+char-attr-delimiter+
 	 (unread-char char stream)
-	 (return (make-float)))
+	 (return (make-float stream)))
 	(#.+char-attr-escape+ (go ESCAPE))
 	(#.+char-attr-multiple-escape+ (go MULT-ESCAPE))
 	(#.+char-attr-package-delimiter+ (go COLON))
@@ -883,12 +883,12 @@
      RATIODIGIT ; saw "[sign] {digit}+ slash {digit}+"
       (ouch-read-buffer char)
       (setq char (read-char stream nil nil))
-      (unless char (return (make-ratio)))
+      (unless char (return (make-ratio stream)))
       (case (char-class2 char attribute-table)
 	(#.+char-attr-constituent-digit+ (go RATIODIGIT))
 	(#.+char-attr-delimiter+
 	 (unread-char char stream)
-	 (return (make-ratio)))
+	 (return (make-ratio stream)))
 	(#.+char-attr-escape+ (go ESCAPE))
 	(#.+char-attr-multiple-escape+ (go MULT-ESCAPE))
 	(#.+char-attr-package-delimiter+ (go COLON))
@@ -1147,7 +1147,7 @@
 				 (the index (* num base))))))))
        (setq number (+ num (* number base-power)))))))
 
-(defun make-float ()
+(defun make-float (stream)
   ;; Assume that the contents of *read-buffer* are a legal float, with nothing
   ;; else after it.
   (read-unwind-read-buffer)
@@ -1181,7 +1181,8 @@
     (cond ((eofp char)
 	   ;; If not, we've read the whole number.
 	   (let ((num (make-float-aux number divisor
-				      *read-default-float-format*)))
+				      *read-default-float-format*
+				      stream)))
 	     (return-from make-float (if negative-fraction (- num) num))))
 	  ((exponent-letterp char)
 	   (setq float-char char)
@@ -1243,7 +1244,7 @@
 					0))))
 		 (incf exponent correction)
 		 (setf number (/ number (expt 10 correction)))
-		 (setq num (make-float-aux number divisor float-format))
+		 (setq num (make-float-aux number divisor float-format stream))
 		 (setq num (* num (expt 10 exponent)))
 		 (return-from make-float (if negative-fraction
 					     (- num)
@@ -1251,10 +1252,15 @@
 	  ;; should never happen
 	  (t (bug "bad fallthrough in floating point reader")))))
 
-(defun make-float-aux (number divisor float-format)
-  (coerce (/ number divisor) float-format))
+(defun make-float-aux (number divisor float-format stream)
+  (handler-case
+      (coerce (/ number divisor) float-format)
+    (type-error (c)
+      (error 'reader-impossible-number-error
+	     :error c :stream stream
+	     :format-control "failed to build float"))))
 
-(defun make-ratio ()
+(defun make-ratio (stream)
   ;; Assume *READ-BUFFER* contains a legal ratio. Build the number from
   ;; the string.
   ;;
@@ -1278,7 +1284,12 @@
 	  (dig ()))
 	 ((or (eofp ch) (not (setq dig (digit-char-p ch *read-base*)))))
 	 (setq denominator (+ (* denominator *read-base*) dig)))
-    (let ((num (/ numerator denominator)))
+    (let ((num (handler-case
+		   (/ numerator denominator)
+		 (arithmetic-error (c)
+		   (error 'reader-impossible-number-error
+			  :error c :stream stream
+			  :format-control "failed to build ratio")))))
       (if negative-number (- num) num))))
 
 ;;;; cruft for dispatch macros
