@@ -597,7 +597,7 @@
 ;;; words, diddle its case according to *PRINT-CASE* and
 ;;; READTABLE-CASE.
 (defun output-symbol-name (name stream &optional (maybe-quote t))
-  (declare (type simple-base-string name))
+  (declare (type simple-string name))
   (setup-printer-state)
   (if (and maybe-quote (symbol-quotep name))
       (output-quoted-symbol-name name stream)
