@@ -63,7 +63,7 @@ important are
       
 @item
 There is only limited support for the ANSI @code{dynamic-extent}
-declaration.  @xref{Dynamic-extent allocation}
+declaration.  @xref{Dynamic-extent allocation}.
       
 @item
 The garbage collector is not particularly efficient, at least on

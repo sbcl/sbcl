@@ -426,50 +426,15 @@ types.
 
 
 @menu
-* Implementation Limitations::  
 * Type Errors at Compile Time::  
 * Precise Type Checking::       
 * Weakened Type Checking::      
 * Getting Existing Programs to Run::  
+* Implementation Limitations::  
 @end menu
 
-@node  Implementation Limitations, Type Errors at Compile Time, Handling of Types, Handling of Types
-@comment  node-name,  next,  previous,  up
-@subsection Implementation Limitations
 
-
-Ideally, the compiler would consider @emph{all} type declarations to
-be assertions, so that adding type declarations to a program, no
-matter how incorrect they might be, would @emph{never} cause undefined
-behavior. As of SBCL version 0.8.1, the compiler is known to fall
-short of this goal in two areas:
-
-  @itemize
-
-@item
-@code{Proclaim}ed constraints on argument and result types of a
-function are supposed to be checked by the function. If the function
-type is proclaimed before function definition, type checks are
-inserted by the compiler, but the standard allows the reversed order,
-in which case the compiler will trust the declaration.
-
-@item
-The compiler cannot check types of an unknown number of values; if the
-number of generated values is unknown, but the number of consumed is
-known, only consumed values are checked.
-
-@item
-There are a few poorly characterized but apparently very uncommon
-situations where a type declaration in an unexpected location will be
-trusted and never checked by the compiler.
-
-@end itemize
-
-These are important bugs, but are not necessarily easy to fix, so they
-may, alas, remain in the system for a while.
-
-
-@node  Type Errors at Compile Time, Precise Type Checking, Implementation Limitations, Handling of Types
+@node  Type Errors at Compile Time, Precise Type Checking, Handling of Types, Handling of Types
 @comment  node-name,  next,  previous,  up
 @subsection Type Errors at Compile Time
 @cindex Compile time type errors
@@ -593,7 +558,7 @@ option believe any or all type declarations with either partial or
 nonexistent runtime checking.
 
 
-@node  Getting Existing Programs to Run,  , Weakened Type Checking, Handling of Types
+@node  Getting Existing Programs to Run, Implementation Limitations, Weakened Type Checking, Handling of Types
 @comment  node-name,  next,  previous,  up
 @subsection Getting Existing Programs to Run
 @cindex Existing programs, to run
@@ -738,6 +703,41 @@ non-standard representation to be used for the local @code{pos}
 variable in the loop body.
 @c <!-- FIXME: <xref>ND-variables, once we crib the text from the 
 @c      CMU CL manual. -->
+
+@node  Implementation Limitations,  , Getting Existing Programs to Run, Handling of Types
+@comment  node-name,  next,  previous,  up
+@subsection Implementation Limitations
+
+
+Ideally, the compiler would consider @emph{all} type declarations to
+be assertions, so that adding type declarations to a program, no
+matter how incorrect they might be, would @emph{never} cause undefined
+behavior. As of SBCL version 0.8.1, the compiler is known to fall
+short of this goal in two areas:
+
+  @itemize
+
+@item
+@code{Proclaim}ed constraints on argument and result types of a
+function are supposed to be checked by the function. If the function
+type is proclaimed before function definition, type checks are
+inserted by the compiler, but the standard allows the reversed order,
+in which case the compiler will trust the declaration.
+
+@item
+The compiler cannot check types of an unknown number of values; if the
+number of generated values is unknown, but the number of consumed is
+known, only consumed values are checked.
+
+@item
+There are a few poorly characterized but apparently very uncommon
+situations where a type declaration in an unexpected location will be
+trusted and never checked by the compiler.
+
+@end itemize
+
+These are important bugs, but are not necessarily easy to fix, so they
+may, alas, remain in the system for a while.
 
 
 @node Compiler Policy, Open Coding and Inline Expansion, Handling of Types, The Compiler
