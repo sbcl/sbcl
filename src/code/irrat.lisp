@@ -54,6 +54,9 @@
 (def-math-rtn "acos" 1)
 #!-x86 (def-math-rtn "atan" 1)
 #!-x86 (def-math-rtn "atan2" 2)
+#!+x86 ;; for constant folding
+(defun %atan2 (x y)
+  (%atan2 x y))
 (def-math-rtn "sinh" 1)
 (def-math-rtn "cosh" 1)
 (def-math-rtn "tanh" 1)

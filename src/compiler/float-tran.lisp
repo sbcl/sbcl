@@ -1301,6 +1301,7 @@
 ;;;
 ;;; FIXME: ANSI allows any subtype of REAL for the components of COMPLEX.
 ;;; So what if the input type is (COMPLEX (SINGLE-FLOAT 0 1))?
+;;; Or (EQL #C(1 2))?
 (defoptimizer (conjugate derive-type) ((num))
   (lvar-type num))
 

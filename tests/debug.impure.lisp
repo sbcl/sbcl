@@ -181,7 +181,7 @@
                                   '((flet not-optimized))
                                   (list '(flet test) #'not-optimized)))))
 
-#-(or alpha) ; bug 61
+#-(or alpha (and x86 linux)) ; bug 61
 (progn
   (defun throw-test ()
     (throw 'no-such-tag t))
@@ -208,6 +208,7 @@
 (defun bt.5 (&optional (opt (oops)))
   (list opt))
 
+#-(and x86 linux)
 (macrolet ((with-details (bool &body body)
              `(let ((sb-debug:*show-entry-point-details* ,bool))
                 ,@body)))

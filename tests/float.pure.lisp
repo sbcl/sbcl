@@ -97,3 +97,15 @@
 			 floating-point-overflow))
   (assert (raises-error? (scale-float 1.0d0 (1+ most-positive-fixnum))
 			 floating-point-overflow)))
+
+;;; MISC.564: no out-of-line %ATAN2 for constant folding
+(assert (typep
+  (funcall
+   (compile
+    nil
+    '(lambda (p1)
+      (declare (optimize (speed 3) (safety 2) (debug 3) (space 0))
+       (type complex p1))
+      (phase (the (eql #c(1.0d0 2.0d0)) p1))))
+   #c(1.0d0 2.0d0))
+    'double-float))
