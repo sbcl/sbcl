@@ -540,16 +540,41 @@
 		  (declare (type (mod 32) j))))))))
 
 (defun bignum-gcd (a b)
-  (declare (type bignum-type a b))
   (let* ((a (if (%bignum-0-or-plusp a (%bignum-length a))
 		a
 		(negate-bignum a nil)))
 	 (b (if (%bignum-0-or-plusp b (%bignum-length b))
 		b
-		(negate-bignum b nil)))
-	 (len-a (%bignum-length a))
+		(negate-bignum b nil))))
+    (declare (type bignum-type a b))
+    (when (< a b)
+      (rotatef a b))
+    ;; While the length difference of A and B is sufficiently large,
+    ;; reduce using MOD (slowish, but it should equalize the sizes of
+    ;; A and B pretty quickly). After that, use the binary GCD
+    ;; algorithm to handle the rest. The initial reduction using MOD
+    ;; is sufficient to get rid of the embarrasing order of magnitude
+    ;; difference in GCD/LCM performance between SBCL and most other
+    ;; lisps.
+    ;;
+    ;; FIXME: Using a better algorithm (for example Weber's accelerated
+    ;; integer GCD) would be nice.
+    ;;   -- JES, 2004-07-31
+    (loop until (and (= (%bignum-length b) 1) (zerop (%bignum-ref b 0))) do
+	  (when (<= (%bignum-length a) (1+ (%bignum-length b)))
+	    (return-from bignum-gcd (bignum-binary-gcd a b)))
+	  (let ((rem (mod a b)))
+	    (if (fixnump rem)
+		(setf a (make-small-bignum rem))
+		(setf a rem))
+	    (rotatef a b)))
+    a))
+  
+(defun bignum-binary-gcd (a b)
+  (declare (type bignum-type a b))
+  (let* ((len-a (%bignum-length a))
 	 (len-b (%bignum-length b)))
-      (declare (type bignum-index len-a len-b))
+    (declare (type bignum-index len-a len-b))
     (with-bignum-buffers ((a-buffer len-a a)
 			  (b-buffer len-b b)
 			  (res-buffer (max len-a len-b)))

@@ -15,6 +15,10 @@ changes in sbcl-0.8.14 relative to sbcl-0.8.13:
     left shifts.
   * bug fix: provide default methods for INPUT-STREAM-P and
     OUTPUT-STREAM-P specialized on SB-GRAY:FUNDAMENTAL-STREAM.
+  * optimization: in taking the GCD of bignums, reduce the two bignums
+    to approximately the same size (using Euclid's algorithm) before
+    applying the more sophisticated binary GCD.  (thanks to Juho
+    Snellman)
 
 changes in sbcl-0.8.13 relative to sbcl-0.8.12:
   * new feature: SB-PACKAGE-LOCKS. See the "Package Locks" section of
