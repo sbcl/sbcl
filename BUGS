@@ -1236,6 +1236,11 @@ WORKAROUND:
   b. The body of (EVAL-WHEN (:COMPILE-TOPLEVEL) ...) is evaluated in
      the null lexical environment.
 
+206: ":SB-FLUID feature broken"
+  (reported by Antonio Martinez-Shotton sbcl-devel 2002-10-07)
+  Enabling :SB-FLUID in the target-features list in sbcl-0.7.8 breaks
+  the build.
+
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:
     These labels were used for bugs related to the old IR1 interpreter.

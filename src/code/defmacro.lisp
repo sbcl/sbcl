@@ -106,21 +106,23 @@
 ;;; DEFMACRO-MUNDANELY is like SB!XC:DEFMACRO, except that it doesn't
 ;;; have any EVAL-WHEN or IR1 magic associated with it, so it only
 ;;; takes effect in :LOAD-TOPLEVEL or :EXECUTE situations.
-;;;
-;;; FIXME: It'd probably be good (especially for DEFMACRO)
-;;; to make this share more code with DEFMACRO.
 (def!macro defmacro-mundanely (name lambda-list &body body)
-  (let ((whole (gensym "WHOLE-"))
-	(environment (gensym "ENVIRONMENT-")))
-    (multiple-value-bind (new-body local-decs doc)
-	(parse-defmacro lambda-list whole body name 'defmacro
-			:environment environment)
-      `(progn
-	 (setf (sb!xc:macro-function ',name)
-	       (lambda (,whole ,environment)
-		   ,@local-decs
-		   (block ,name
-		   ,new-body)))
-	 (setf (fdocumentation ',name 'macro)
-	       ,doc)
-	 ',name))))
+
+  ;; old way:
+  ;;(let ((whole (gensym "WHOLE-"))
+  ;;      (environment (gensym "ENVIRONMENT-")))
+  ;;  (multiple-value-bind (new-body local-decs doc)
+  ;;      (parse-defmacro lambda-list whole body name 'defmacro
+  ;;                      :environment environment)
+  ;;    `(progn
+  ;;       (setf (sb!xc:macro-function ',name)
+  ;;             (lambda (,whole ,environment)
+  ;;                 ,@local-decs
+  ;;                 (block ,name
+  ;;                 ,new-body)))
+  ;;       (setf (fdocumentation ',name 'macro)
+  ;;             ,doc)
+  ;;       ',name)))
+
+  `(let ()
+     (sb!xc:defmacro ,name ,lambda-list ,@body)))
