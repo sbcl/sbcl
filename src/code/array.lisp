@@ -372,7 +372,7 @@
 
 (defun array-in-bounds-p (array &rest subscripts)
   #!+sb-doc
-  "Returns T if the Subscipts are in bounds for the Array, Nil otherwise."
+  "Return T if the Subscipts are in bounds for the Array, Nil otherwise."
   (if (%array-row-major-index array subscripts nil)
       t))
 
@@ -381,7 +381,7 @@
 
 (defun aref (array &rest subscripts)
   #!+sb-doc
-  "Returns the element of the Array specified by the Subscripts."
+  "Return the element of the Array specified by the Subscripts."
   (row-major-aref array (%array-row-major-index array subscripts)))
 
 (defun %aset (array &rest stuff)
@@ -416,7 +416,7 @@
 
 (defun row-major-aref (array index)
   #!+sb-doc
-  "Returns the element of array corressponding to the row-major index. This is
+  "Return the element of array corressponding to the row-major index. This is
    SETF'able."
   (declare (optimize (safety 1)))
   (row-major-aref array index))
@@ -427,7 +427,7 @@
 
 (defun svref (simple-vector index)
   #!+sb-doc
-  "Returns the Index'th element of the given Simple-Vector."
+  "Return the INDEX'th element of the given Simple-Vector."
   (declare (optimize (safety 1)))
   (aref simple-vector index))
 
@@ -437,7 +437,7 @@
 
 (defun bit (bit-array &rest subscripts)
   #!+sb-doc
-  "Returns the bit from the Bit-Array at the specified Subscripts."
+  "Return the bit from the BIT-ARRAY at the specified SUBSCRIPTS."
   (declare (type (array bit) bit-array) (optimize (safety 1)))
   (row-major-aref bit-array (%array-row-major-index bit-array subscripts)))
 
@@ -458,7 +458,7 @@
 
 (defun sbit (simple-bit-array &rest subscripts)
   #!+sb-doc
-  "Returns the bit from the Simple-Bit-Array at the specified Subscripts."
+  "Return the bit from SIMPLE-BIT-ARRAY at the specified SUBSCRIPTS."
   (declare (type (simple-array bit) simple-bit-array) (optimize (safety 1)))
   (row-major-aref simple-bit-array
 		  (%array-row-major-index simple-bit-array subscripts)))
@@ -486,7 +486,7 @@
 
 (defun array-element-type (array)
   #!+sb-doc
-  "Returns the type of the elements of the array"
+  "Return the type of the elements of the array"
   (let ((type (get-type array)))
     (macrolet ((pick-element-type (&rest stuff)
 		 `(cond ,@(mapcar #'(lambda (stuff)
@@ -543,7 +543,7 @@
 
 (defun array-dimension (array axis-number)
   #!+sb-doc
-  "Returns the length of dimension AXIS-NUMBER of ARRAY."
+  "Return the length of dimension AXIS-NUMBER of ARRAY."
   (declare (array array) (type index axis-number))
   (cond ((not (array-header-p array))
 	 (unless (= axis-number 0)

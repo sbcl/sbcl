@@ -255,9 +255,6 @@
 	  (or (check-version "native code"
 			     +backend-fasl-file-implementation+
 			     +fasl-file-version+)
-	      (check-version "byte code"
-			     (backend-byte-fasl-file-implementation)
-			     +fasl-file-version+)
 	      (error "~S was compiled for implementation ~A, but this is a ~A."
 		     stream
 		     implementation

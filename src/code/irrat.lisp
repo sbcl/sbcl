@@ -119,7 +119,7 @@
 ;;; from the general complex case.
 (defun expt (base power)
   #!+sb-doc
-  "Returns BASE raised to the POWER."
+  "Return BASE raised to the POWER."
   (if (zerop power)
       (1+ (* base power))
     (labels (;; determine if the double float is an integer.
@@ -312,7 +312,7 @@
 
 (defun abs (number)
   #!+sb-doc
-  "Returns the absolute value of the number."
+  "Return the absolute value of the number."
   (number-dispatch ((number number))
     (((foreach single-float double-float fixnum rational))
      (abs number))

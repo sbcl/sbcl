@@ -31,9 +31,6 @@
        ;; seem to add much value, and it takes a lot of space. Perhaps
        ;; we could do this dispatch with a big CASE statement instead?
        (defun ,fn-name (name ,fp ,context ,sc-offsets)
-	 ;; FIXME: Perhaps put in OPTIMIZE declaration to make this
-	 ;; byte coded.
-	 ;;
 	 ;; FIXME: It would probably be good to do *STACK-TOP-HINT*
 	 ;; tricks to hide this internal error-handling logic from the
 	 ;; poor high level user, so his debugger tells him about

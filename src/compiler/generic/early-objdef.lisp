@@ -82,9 +82,8 @@
   function-header
   closure-header
   funcallable-instance-header
-  byte-code-function
-  byte-code-closure
   closure-function-header
+
   return-pc-header
   value-cell-header
   symbol-header

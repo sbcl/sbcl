@@ -3644,13 +3644,9 @@ gc_init_tables(void)
 #ifdef __i386__
     scavtab[type_ClosureHeader] = scav_closure_header;
     scavtab[type_FuncallableInstanceHeader] = scav_closure_header;
-    scavtab[type_ByteCodeFunction] = scav_closure_header;
-    scavtab[type_ByteCodeClosure] = scav_closure_header;
 #else
     scavtab[type_ClosureHeader] = scav_boxed;
     scavtab[type_FuncallableInstanceHeader] = scav_boxed;
-    scavtab[type_ByteCodeFunction] = scav_boxed;
-    scavtab[type_ByteCodeClosure] = scav_boxed;
 #endif
     scavtab[type_ValueCellHeader] = scav_boxed;
     scavtab[type_SymbolHeader] = scav_boxed;
@@ -3726,8 +3722,6 @@ gc_init_tables(void)
     transother[type_ReturnPcHeader] = trans_return_pc_header;
     transother[type_ClosureHeader] = trans_boxed;
     transother[type_FuncallableInstanceHeader] = trans_boxed;
-    transother[type_ByteCodeFunction] = trans_boxed;
-    transother[type_ByteCodeClosure] = trans_boxed;
     transother[type_ValueCellHeader] = trans_boxed;
     transother[type_SymbolHeader] = trans_boxed;
     transother[type_BaseChar] = trans_immediate;
@@ -3949,8 +3943,6 @@ possibly_valid_dynamic_space_pointer(lispobj *pointer)
 	    break;
 	case type_ClosureHeader:
 	case type_FuncallableInstanceHeader:
-	case type_ByteCodeFunction:
-	case type_ByteCodeClosure:
 	    if ((unsigned)pointer !=
 		((unsigned)start_addr+type_FunctionPointer)) {
 		if (gencgc_verbose)
@@ -4040,8 +4032,6 @@ possibly_valid_dynamic_space_pointer(lispobj *pointer)
 	    /* only pointed to by function pointers? */
 	case type_ClosureHeader:
 	case type_FuncallableInstanceHeader:
-	case type_ByteCodeFunction:
-	case type_ByteCodeClosure:
 	    if (gencgc_verbose)
 		FSHOW((stderr,
 		       "*Wo4: %x %x %x\n",
@@ -5068,8 +5058,6 @@ verify_space(lispobj *start, size_t words)
 		case type_ComplexArray:
 		case type_ClosureHeader:
 		case type_FuncallableInstanceHeader:
-		case type_ByteCodeFunction:
-		case type_ByteCodeClosure:
 		case type_ValueCellHeader:
 		case type_SymbolHeader:
 		case type_BaseChar:

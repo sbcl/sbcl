@@ -927,9 +927,7 @@
      (random-class) ; used for unknown type codes
 
      (function
-      :codes (#.sb!vm:byte-code-closure-type
-	      #.sb!vm:byte-code-function-type
-	      #.sb!vm:closure-header-type
+      :codes (#.sb!vm:closure-header-type
 	      #.sb!vm:function-header-type)
       :state :read-only)
      (funcallable-instance

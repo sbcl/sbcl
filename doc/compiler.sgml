@@ -777,10 +777,9 @@ would become something like
 
 </para></note>
 
-<para>When <parameter>speed</> is zero, the compiler emits byte code
-instead of native code. Byte code can be substantially more compact
-than native code (on the order of a factor of 2) and is usually much,
-much slower than native code (on the order of a factor of 50).</para>
+<para> (In early versions of SBCL, a <parameter>speed</> value of zero
+was used to enable byte compilation, but since version 0.7.0, SBCL
+only supports native compilation.)</para>
 
 <para>When <parameter>safety</> is zero, almost all runtime checking
 of types, array bounds, and so forth is suppressed.</para>

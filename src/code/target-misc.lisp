@@ -53,11 +53,11 @@
   #!+sb-doc "the value of LONG-SITE-NAME")
 (defun short-site-name ()
   #!+sb-doc
-  "Returns a string with the abbreviated site name, or NIL if not known."
+  "Return a string with the abbreviated site name, or NIL if not known."
   *short-site-name*)
 (defun long-site-name ()
   #!+sb-doc
-  "Returns a string with the long form of the site name, or NIL if not known."
+  "Return a string with the long form of the site name, or NIL if not known."
   *long-site-name*)
 
 ;;;; dribble stuff

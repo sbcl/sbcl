@@ -923,13 +923,13 @@
 
 #!-high-security-support
 (setf (fdocumentation 'make-concatenated-stream 'function)
-  "Returns a stream which takes its input from each of the Streams in turn,
+  "Return a stream which takes its input from each of the Streams in turn,
    going on to the next at EOF.")
 
 #!+high-security-support
 (defun make-concatenated-stream (&rest streams)
   #!+sb-doc
-  "Returns a stream which takes its input from each of the Streams in turn,
+  "Return a stream which takes its input from each of the Streams in turn,
    going on to the next at EOF."
   (dolist (stream streams)
     (unless (or (and (synonym-stream-p stream)
@@ -1066,8 +1066,8 @@
 
 #!+sb-doc
 (setf (fdocumentation 'make-echo-stream 'function)
-  "Returns a bidirectional stream which gets its input from Input-Stream and
-   sends its output to Output-Stream. In addition, all input is echoed to
+  "Return a bidirectional stream which gets its input from INPUT-STREAM and
+   sends its output to OUTPUT-STREAM. In addition, all input is echoed to
    the output stream")
 
 ;;;; string input streams
@@ -1147,8 +1147,8 @@
 (defun make-string-input-stream (string &optional
 					(start 0) (end (length string)))
   #!+sb-doc
-  "Returns an input stream which will supply the characters of String between
-  Start and End in order."
+  "Return an input stream which will supply the characters of STRING between
+  START and END in order."
   (declare (type string string)
 	   (type index start)
 	   (type (or index null) end))
@@ -1178,8 +1178,8 @@
 
 #!+sb-doc
 (setf (fdocumentation 'make-string-output-stream 'function)
-  "Returns an Output stream which will accumulate all output given it for
-   the benefit of the function Get-Output-Stream-String.")
+  "Return an output stream which will accumulate all output given it for
+   the benefit of the function GET-OUTPUT-STREAM-STRING.")
 
 (defun string-ouch (stream character)
   (let ((current (string-output-stream-index stream))
@@ -1352,7 +1352,7 @@
 
 #!+sb-doc
 (setf (fdocumentation 'make-indenting-stream 'function)
- "Returns an output stream which indents its output by some amount.")
+ "Return an output stream which indents its output by some amount.")
 
 ;;; INDENTING-INDENT writes the correct number of spaces needed to indent
 ;;; output on the given STREAM based on the specified SUB-STREAM.
@@ -1433,7 +1433,7 @@
 
 (defun make-case-frob-stream (target kind)
   #!+sb-doc
-  "Returns a stream that sends all output to the stream TARGET, but modifies
+  "Return a stream that sends all output to the stream TARGET, but modifies
    the case of letters, depending on KIND, which should be one of:
      :upcase - convert to upper case.
      :downcase - convert to lower case.

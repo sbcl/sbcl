@@ -255,7 +255,7 @@
 #!-sb-fluid (declaim (maybe-inline float-precision))
 (defun float-precision (f)
   #!+sb-doc
-  "Returns a non-negative number of significant digits in its float argument.
+  "Return a non-negative number of significant digits in its float argument.
   Will be less than FLOAT-DIGITS if denormalized or zero."
   (macrolet ((frob (digits bias decode)
 	       `(cond ((zerop f) 0)
@@ -280,7 +280,7 @@
 
 (defun float-sign (float1 &optional (float2 (float 1 float1)))
   #!+sb-doc
-  "Returns a floating-point number that has the same sign as
+  "Return a floating-point number that has the same sign as
    float1 and, if float2 is given, has the same absolute value
    as float2."
   (declare (float float1 float2))
@@ -474,7 +474,7 @@
 ;;; Dispatch to the correct type-specific i-d-f function.
 (defun integer-decode-float (x)
   #!+sb-doc
-  "Returns three values:
+  "Return three values:
    1) an integer representation of the significand.
    2) the exponent for the power of 2 that the significand must be multiplied
       by to get the actual value. This differs from the DECODE-FLOAT exponent
@@ -599,7 +599,7 @@
 ;;; Dispatch to the appropriate type-specific function.
 (defun decode-float (f)
   #!+sb-doc
-  "Returns three values:
+  "Return three values:
    1) a floating-point number representing the significand. This is always
       between 0.5 (inclusive) and 1.0 (exclusive).
    2) an integer representing the exponent.
@@ -721,7 +721,7 @@
 ;;; Dispatch to the correct type-specific scale-float function.
 (defun scale-float (f ex)
   #!+sb-doc
-  "Returns the value (* f (expt (float 2 f) ex)), but with no unnecessary loss
+  "Return the value (* f (expt (float 2 f) ex)), but with no unnecessary loss
   of precision or overflow."
   (number-dispatch ((f float))
     ((single-float)

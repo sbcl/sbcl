@@ -35,11 +35,11 @@
 
 (sb!xc:defmacro make-sequence-like (sequence length)
   #!+sb-doc
-  "Returns a sequence of the same type as SEQUENCE and the given LENGTH."
+  "Return a sequence of the same type as SEQUENCE and the given LENGTH."
   `(make-sequence-of-type (type-of ,sequence) ,length))
 
 (sb!xc:defmacro type-specifier-atom (type)
-  #!+sb-doc "Returns the broad class of which TYPE is a specific subclass."
+  #!+sb-doc "Return the broad class of which TYPE is a specific subclass."
   `(if (atom ,type) ,type (car ,type)))
 
 ) ; EVAL-WHEN
@@ -107,7 +107,7 @@
 			      '(integer (0) (0))))))
 
 (defun make-sequence-of-type (type length)
-  #!+sb-doc "Returns a sequence of the given TYPE and LENGTH."
+  #!+sb-doc "Return a sequence of the given TYPE and LENGTH."
   (declare (fixnum length))
   (case (type-specifier-atom type)
     (list (make-list length))
@@ -123,7 +123,7 @@
      (make-sequence-of-type (result-type-or-lose type) length))))
 
 (defun elt (sequence index)
-  #!+sb-doc "Returns the element of SEQUENCE specified by INDEX."
+  #!+sb-doc "Return the element of SEQUENCE specified by INDEX."
   (etypecase sequence
     (list
      (do ((count index (1- count))
@@ -246,7 +246,7 @@
 ;;; routines for other reasons (see above).
 (defun subseq (sequence start &optional end)
   #!+sb-doc
-  "Returns a copy of a subsequence of SEQUENCE starting with element number
+  "Return a copy of a subsequence of SEQUENCE starting with element number
    START and continuing to the end of SEQUENCE or the optional END."
   (seq-dispatch sequence
 		(list-subseq* sequence start end)
@@ -278,7 +278,7 @@
 ) ; EVAL-WHEN
 
 (defun copy-seq (sequence)
-  #!+sb-doc "Returns a copy of SEQUENCE which is EQUAL to SEQUENCE but not EQ."
+  #!+sb-doc "Return a copy of SEQUENCE which is EQUAL to SEQUENCE but not EQ."
   (seq-dispatch sequence
 		(list-copy-seq* sequence)
 		(vector-copy-seq* sequence)))
@@ -487,7 +487,7 @@
 
 (defun reverse (sequence)
   #!+sb-doc
-  "Returns a new sequence containing the same elements but in reverse order."
+  "Return a new sequence containing the same elements but in reverse order."
   (seq-dispatch sequence
 		(list-reverse* sequence)
 		(vector-reverse* sequence)))
@@ -532,7 +532,7 @@
 
 (defun nreverse (sequence)
   #!+sb-doc
-  "Returns a sequence of the same elements in reverse order; the argument
+  "Return a sequence of the same elements in reverse order; the argument
    is destroyed."
   (seq-dispatch sequence
 		(list-nreverse* sequence)
@@ -599,7 +599,7 @@
 ;;; efficiency, but space efficiency..)
 (defun concatenate (output-type-spec &rest sequences)
   #!+sb-doc
-  "Returns a new sequence of all the argument sequences concatenated together
+  "Return a new sequence of all the argument sequences concatenated together
   which shares no structure with the original argument sequences of the
   specified OUTPUT-TYPE-SPEC."
   (case (type-specifier-atom output-type-spec)
@@ -1122,8 +1122,8 @@
 (defun delete (item sequence &key from-end (test #'eql) test-not (start 0)
 		end count key)
   #!+sb-doc
-  "Returns a sequence formed by destructively removing the specified Item from
-  the given Sequence."
+  "Return a sequence formed by destructively removing the specified ITEM from
+  the given SEQUENCE."
   (declare (fixnum start))
   (let* ((length (length sequence))
 	 (end (or end length))
@@ -1160,8 +1160,8 @@
 
 (defun delete-if (predicate sequence &key from-end (start 0) key end count)
   #!+sb-doc
-  "Returns a sequence formed by destructively removing the elements satisfying
-  the specified Predicate from the given Sequence."
+  "Return a sequence formed by destructively removing the elements satisfying
+  the specified PREDICATE from the given SEQUENCE."
   (declare (fixnum start))
   (let* ((length (length sequence))
 	 (end (or end length))
@@ -1198,8 +1198,8 @@
 
 (defun delete-if-not (predicate sequence &key from-end (start 0) end key count)
   #!+sb-doc
-  "Returns a sequence formed by destructively removing the elements not
-  satisfying the specified Predicate from the given Sequence."
+  "Return a sequence formed by destructively removing the elements not
+  satisfying the specified PREDICATE from the given SEQUENCE."
   (declare (fixnum start))
   (let* ((length (length sequence))
 	 (end (or end length))
@@ -1345,7 +1345,7 @@
 (defun remove (item sequence &key from-end (test #'eql) test-not (start 0)
 		end count key)
   #!+sb-doc
-  "Returns a copy of SEQUENCE with elements satisfying the test (default is
+  "Return a copy of SEQUENCE with elements satisfying the test (default is
    EQL) with ITEM removed."
   (declare (fixnum start))
   (let* ((length (length sequence))
@@ -1363,8 +1363,8 @@
 
 (defun remove-if (predicate sequence &key from-end (start 0) end count key)
   #!+sb-doc
-  "Returns a copy of sequence with elements such that predicate(element)
-   is non-null are removed"
+  "Return a copy of sequence with elements such that predicate(element)
+   is non-null removed"
   (declare (fixnum start))
   (let* ((length (length sequence))
 	 (end (or end length))
@@ -1381,8 +1381,8 @@
 
 (defun remove-if-not (predicate sequence &key from-end (start 0) end count key)
   #!+sb-doc
-  "Returns a copy of sequence with elements such that predicate(element)
-   is null are removed"
+  "Return a copy of sequence with elements such that predicate(element)
+   is null removed"
   (declare (fixnum start))
   (let* ((length (length sequence))
 	 (end (or end length))
@@ -1668,8 +1668,8 @@
 (defun substitute (new old sequence &key from-end (test #'eql) test-not
 		   (start 0) count end key)
   #!+sb-doc
-  "Returns a sequence of the same kind as Sequence with the same elements
-  except that all elements equal to Old are replaced with New. See manual
+  "Return a sequence of the same kind as SEQUENCE with the same elements,
+  except that all elements equal to OLD are replaced with NEW. See manual
   for details."
   (declare (fixnum start))
   (let* ((length (length sequence))
@@ -1683,8 +1683,8 @@
 
 (defun substitute-if (new test sequence &key from-end (start 0) end count key)
   #!+sb-doc
-  "Returns a sequence of the same kind as Sequence with the same elements
-  except that all elements satisfying the Test are replaced with New. See
+  "Return a sequence of the same kind as SEQUENCE with the same elements
+  except that all elements satisfying the TEST are replaced with NEW. See
   manual for details."
   (declare (fixnum start))
   (let* ((length (length sequence))
@@ -1699,8 +1699,8 @@
 (defun substitute-if-not (new test sequence &key from-end (start 0)
 			   end count key)
   #!+sb-doc
-  "Returns a sequence of the same kind as Sequence with the same elements
-  except that all elements not satisfying the Test are replaced with New.
+  "Return a sequence of the same kind as SEQUENCE with the same elements
+  except that all elements not satisfying the TEST are replaced with NEW.
   See manual for details."
   (declare (fixnum start))
   (let* ((length (length sequence))
@@ -1717,9 +1717,9 @@
 (defun nsubstitute (new old sequence &key from-end (test #'eql) test-not
 		     end count key (start 0))
   #!+sb-doc
-  "Returns a sequence of the same kind as Sequence with the same elements
-  except that all elements equal to Old are replaced with New. The Sequence
-  may be destroyed. See manual for details."
+  "Return a sequence of the same kind as SEQUENCE with the same elements
+  except that all elements equal to OLD are replaced with NEW. The SEQUENCE
+  may be destructively modified. See manual for details."
   (declare (fixnum start))
   (let ((end (or end (length sequence)))
 	(count (or count most-positive-fixnum)))
@@ -1767,9 +1767,9 @@
 
 (defun nsubstitute-if (new test sequence &key from-end (start 0) end count key)
   #!+sb-doc
-  "Returns a sequence of the same kind as Sequence with the same elements
-   except that all elements satisfying the Test are replaced with New. The
-   Sequence may be destroyed. See manual for details."
+  "Return a sequence of the same kind as SEQUENCE with the same elements
+   except that all elements satisfying the TEST are replaced with NEW. 
+   SEQUENCE may be destructively modified. See manual for details."
   (declare (fixnum start))
   (let ((end (or end (length sequence)))
 	(count (or count most-positive-fixnum)))
@@ -1807,9 +1807,9 @@
 (defun nsubstitute-if-not (new test sequence &key from-end (start 0)
 			       end count key)
   #!+sb-doc
-  "Returns a sequence of the same kind as Sequence with the same elements
-   except that all elements not satisfying the Test are replaced with New.
-   The Sequence may be destroyed. See manual for details."
+  "Return a sequence of the same kind as SEQUENCE with the same elements
+   except that all elements not satisfying the TEST are replaced with NEW.
+   SEQUENCE may be destructively modified. See manual for details."
   (declare (fixnum start))
   (let ((end (or end (length sequence)))
 	(count (or count most-positive-fixnum)))
@@ -2019,7 +2019,7 @@
 (defun count (item sequence &key from-end (test #'eql) test-not (start 0)
 		end key)
   #!+sb-doc
-  "Returns the number of elements in SEQUENCE satisfying a test with ITEM,
+  "Return the number of elements in SEQUENCE satisfying a test with ITEM,
    which defaults to EQL."
   (declare (ignore from-end) (fixnum start))
   (let ((end (or end (length sequence))))
@@ -2053,7 +2053,7 @@
 
 (defun count-if (test sequence &key from-end (start 0) end key)
   #!+sb-doc
-  "Returns the number of elements in SEQUENCE satisfying TEST(el)."
+  "Return the number of elements in SEQUENCE satisfying TEST(el)."
   (declare (ignore from-end) (fixnum start))
   (let ((end (or end (length sequence))))
     (declare (type index end))
@@ -2084,7 +2084,7 @@
 
 (defun count-if-not (test sequence &key from-end (start 0) end key)
   #!+sb-doc
-  "Returns the number of elements in SEQUENCE not satisfying TEST(el)."
+  "Return the number of elements in SEQUENCE not satisfying TEST(el)."
   (declare (ignore from-end) (fixnum start))
   (let ((end (or end (length sequence))))
     (declare (type index end))

@@ -16,25 +16,23 @@
 
 ;;;; utilities used during code generation
 
+;;; the number of bytes used by the code object header
 (defun component-header-length (&optional
 				(component *component-being-compiled*))
-  #!+sb-doc
-  "Returns the number of bytes used by the code object header."
   (let* ((2comp (component-info component))
 	 (constants (ir2-component-constants 2comp))
 	 (num-consts (length constants)))
     (ash (logandc2 (1+ num-consts) 1) sb!vm:word-shift)))
 
+;;; the size of the NAME'd SB in the currently compiled component.
+;;; This is useful mainly for finding the size for allocating stack
+;;; frames.
 (defun sb-allocated-size (name)
-  #!+sb-doc
-  "The size of the Name'd SB in the currently compiled component. Useful
-  mainly for finding the size for allocating stack frames."
   (finite-sb-current-size (sb-or-lose name)))
 
+;;; the TN that is used to hold the number stack frame-pointer in
+;;; VOP's function, or NIL if no number stack frame was allocated
 (defun current-nfp-tn (vop)
-  #!+sb-doc
-  "Return the TN that is used to hold the number stack frame-pointer in VOP's
-  function. Returns NIL if no number stack frame was allocated."
   (unless (zerop (sb-allocated-size 'non-descriptor-stack))
     (let ((block (ir2-block-block (vop-block vop))))
     (when (ir2-environment-number-stack-p
@@ -42,19 +40,17 @@
 	    (block-environment block)))
       (ir2-component-nfp (component-info (block-component block)))))))
 
+;;; the TN that is used to hold the number stack frame-pointer in the
+;;; function designated by 2ENV, or NIL if no number stack frame was
+;;; allocated
 (defun callee-nfp-tn (2env)
-  #!+sb-doc
-  "Return the TN that is used to hold the number stack frame-pointer in the
-  function designated by 2env. Returns NIL if no number stack frame was
-  allocated."
   (unless (zerop (sb-allocated-size 'non-descriptor-stack))
     (when (ir2-environment-number-stack-p 2env)
       (ir2-component-nfp (component-info *component-being-compiled*)))))
 
+;;; the TN used for passing the return PC in a local call to the function
+;;; designated by 2ENV
 (defun callee-return-pc-tn (2env)
-  #!+sb-doc
-  "Return the TN used for passing the return PC in a local call to the function
-  designated by 2env."
   (ir2-environment-return-pc-pass 2env))
 
 ;;;; specials used during code generation

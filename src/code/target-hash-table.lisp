@@ -179,7 +179,7 @@
 
 (defun hash-table-count (hash-table)
   #!+sb-doc
-  "Returns the number of entries in the given HASH-TABLE."
+  "Return the number of entries in the given HASH-TABLE."
   (declare (type hash-table hash-table)
 	   (values index))
   (hash-table-number-entries hash-table))

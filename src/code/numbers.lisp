@@ -209,7 +209,7 @@
 
 (defun upgraded-complex-part-type (spec)
   #!+sb-doc
-  "Returns the element type of the most specialized COMPLEX number type that
+  "Return the element type of the most specialized COMPLEX number type that
    can hold parts of type SPEC."
   (cond ((unknown-type-p (specifier-type spec))
 	 (error "undefined type: ~S" spec))
@@ -285,7 +285,7 @@
 
 (defun conjugate (number)
   #!+sb-doc
-  "Returns the complex conjugate of NUMBER. For non-complex numbers, this is
+  "Return the complex conjugate of NUMBER. For non-complex numbers, this is
   an identity."
   (if (complexp number)
       (complex (realpart number) (- (imagpart number)))
@@ -323,9 +323,9 @@
 		       (res (car args) (,op res (car args))))
 		      ((null args) res))))))
   (define-arith + 0
-    "Returns the sum of its arguments. With no args, returns 0.")
+    "Return the sum of its arguments. With no args, returns 0.")
   (define-arith * 1
-    "Returns the product of its arguments. With no args, returns 1."))
+    "Return the product of its arguments. With no args, returns 1."))
 
 (defun - (number &rest more-numbers)
   #!+sb-doc
@@ -353,12 +353,12 @@
 
 (defun 1+ (number)
   #!+sb-doc
-  "Returns NUMBER + 1."
+  "Return NUMBER + 1."
   (1+ number))
 
 (defun 1- (number)
   #!+sb-doc
-  "Returns NUMBER - 1."
+  "Return NUMBER - 1."
   (1- number))
 
 (eval-when (:compile-toplevel)
@@ -556,7 +556,7 @@
 
 (defun truncate (number &optional (divisor 1))
   #!+sb-doc
-  "Returns number (or number/divisor) as an integer, rounded toward 0.
+  "Return number (or number/divisor) as an integer, rounded toward 0.
   The second returned value is the remainder."
   (macrolet ((truncate-float (rtype)
 	       `(let* ((float-div (coerce divisor ',rtype))
@@ -612,7 +612,7 @@
 
 (defun floor (number &optional (divisor 1))
   #!+sb-doc
-  "Returns the greatest integer not greater than number, or number/divisor.
+  "Return the greatest integer not greater than number, or number/divisor.
   The second returned value is (mod number divisor)."
   ;; If the numbers do not divide exactly and the result of
   ;; (/ NUMBER DIVISOR) would be negative then decrement the quotient
@@ -627,7 +627,7 @@
 
 (defun ceiling (number &optional (divisor 1))
   #!+sb-doc
-  "Returns the smallest integer not less than number, or number/divisor.
+  "Return the smallest integer not less than number, or number/divisor.
   The second returned value is the remainder."
   ;; If the numbers do not divide exactly and the result of
   ;; (/ NUMBER DIVISOR) would be positive then increment the quotient
@@ -663,14 +663,14 @@
 
 (defun rem (number divisor)
   #!+sb-doc
-  "Returns second result of TRUNCATE."
+  "Return second result of TRUNCATE."
   (multiple-value-bind (tru rem) (truncate number divisor)
     (declare (ignore tru))
     rem))
 
 (defun mod (number divisor)
   #!+sb-doc
-  "Returns second result of FLOOR."
+  "Return second result of FLOOR."
   (let ((rem (rem number divisor)))
     (if (and (not (zerop rem))
 	     (if (minusp divisor)
@@ -697,7 +697,7 @@
 
 (defun = (number &rest more-numbers)
   #!+sb-doc
-  "Returns T if all of its arguments are numerically equal, NIL otherwise."
+  "Return T if all of its arguments are numerically equal, NIL otherwise."
   (do ((nlist more-numbers (cdr nlist)))
       ((atom nlist) T)
      (declare (list nlist))
@@ -705,7 +705,7 @@
 
 (defun /= (number &rest more-numbers)
   #!+sb-doc
-  "Returns T if no two of its arguments are numerically equal, NIL otherwise."
+  "Return T if no two of its arguments are numerically equal, NIL otherwise."
   (do* ((head number (car nlist))
 	(nlist more-numbers (cdr nlist)))
        ((atom nlist) t)
@@ -718,7 +718,7 @@
 
 (defun < (number &rest more-numbers)
   #!+sb-doc
-  "Returns T if its arguments are in strictly increasing order, NIL otherwise."
+  "Return T if its arguments are in strictly increasing order, NIL otherwise."
   (do* ((n number (car nlist))
 	(nlist more-numbers (cdr nlist)))
        ((atom nlist) t)
@@ -727,7 +727,7 @@
 
 (defun > (number &rest more-numbers)
   #!+sb-doc
-  "Returns T if its arguments are in strictly decreasing order, NIL otherwise."
+  "Return T if its arguments are in strictly decreasing order, NIL otherwise."
   (do* ((n number (car nlist))
 	(nlist more-numbers (cdr nlist)))
        ((atom nlist) t)
@@ -736,7 +736,7 @@
 
 (defun <= (number &rest more-numbers)
   #!+sb-doc
-  "Returns T if arguments are in strictly non-decreasing order, NIL otherwise."
+  "Return T if arguments are in strictly non-decreasing order, NIL otherwise."
   (do* ((n number (car nlist))
 	(nlist more-numbers (cdr nlist)))
        ((atom nlist) t)
@@ -745,7 +745,7 @@
 
 (defun >= (number &rest more-numbers)
   #!+sb-doc
-  "Returns T if arguments are in strictly non-increasing order, NIL otherwise."
+  "Return T if arguments are in strictly non-increasing order, NIL otherwise."
   (do* ((n number (car nlist))
 	(nlist more-numbers (cdr nlist)))
        ((atom nlist) t)
@@ -754,7 +754,7 @@
 
 (defun max (number &rest more-numbers)
   #!+sb-doc
-  "Returns the greatest of its arguments."
+  "Return the greatest of its arguments."
   (do ((nlist more-numbers (cdr nlist))
        (result number))
       ((null nlist) (return result))
@@ -763,7 +763,7 @@
 
 (defun min (number &rest more-numbers)
   #!+sb-doc
-  "Returns the least of its arguments."
+  "Return the least of its arguments."
   (do ((nlist more-numbers (cdr nlist))
        (result number))
       ((null nlist) (return result))
@@ -907,7 +907,7 @@
 
 (defun logior (&rest integers)
   #!+sb-doc
-  "Returns the bit-wise or of its arguments. Args must be integers."
+  "Return the bit-wise or of its arguments. Args must be integers."
   (declare (list integers))
   (if integers
       (do ((result (pop integers) (logior result (pop integers))))
@@ -916,7 +916,7 @@
 
 (defun logxor (&rest integers)
   #!+sb-doc
-  "Returns the bit-wise exclusive or of its arguments. Args must be integers."
+  "Return the bit-wise exclusive or of its arguments. Args must be integers."
   (declare (list integers))
   (if integers
       (do ((result (pop integers) (logxor result (pop integers))))
@@ -925,7 +925,7 @@
 
 (defun logand (&rest integers)
   #!+sb-doc
-  "Returns the bit-wise and of its arguments. Args must be integers."
+  "Return the bit-wise and of its arguments. Args must be integers."
   (declare (list integers))
   (if integers
       (do ((result (pop integers) (logand result (pop integers))))
@@ -934,7 +934,7 @@
 
 (defun logeqv (&rest integers)
   #!+sb-doc
-  "Returns the bit-wise equivalence of its arguments. Args must be integers."
+  "Return the bit-wise equivalence of its arguments. Args must be integers."
   (declare (list integers))
   (if integers
       (do ((result (pop integers) (logeqv result (pop integers))))
@@ -943,37 +943,37 @@
 
 (defun lognand (integer1 integer2)
   #!+sb-doc
-  "Returns the complement of the logical AND of integer1 and integer2."
+  "Return the complement of the logical AND of integer1 and integer2."
   (lognand integer1 integer2))
 
 (defun lognor (integer1 integer2)
   #!+sb-doc
-  "Returns the complement of the logical OR of integer1 and integer2."
+  "Return the complement of the logical OR of integer1 and integer2."
   (lognor integer1 integer2))
 
 (defun logandc1 (integer1 integer2)
   #!+sb-doc
-  "Returns the logical AND of (LOGNOT integer1) and integer2."
+  "Return the logical AND of (LOGNOT integer1) and integer2."
   (logandc1 integer1 integer2))
 
 (defun logandc2 (integer1 integer2)
   #!+sb-doc
-  "Returns the logical AND of integer1 and (LOGNOT integer2)."
+  "Return the logical AND of integer1 and (LOGNOT integer2)."
   (logandc2 integer1 integer2))
 
 (defun logorc1 (integer1 integer2)
   #!+sb-doc
-  "Returns the logical OR of (LOGNOT integer1) and integer2."
+  "Return the logical OR of (LOGNOT integer1) and integer2."
   (logorc1 integer1 integer2))
 
 (defun logorc2 (integer1 integer2)
   #!+sb-doc
-  "Returns the logical OR of integer1 and (LOGNOT integer2)."
+  "Return the logical OR of integer1 and (LOGNOT integer2)."
   (logorc2 integer1 integer2))
 
 (defun lognot (number)
   #!+sb-doc
-  "Returns the bit-wise logical not of integer."
+  "Return the bit-wise logical not of integer."
   (etypecase number
     (fixnum (lognot (truly-the fixnum number)))
     (bignum (bignum-logical-not number))))
@@ -1040,7 +1040,7 @@
 
 (defun integer-length (integer)
   #!+sb-doc
-  "Returns the number of significant bits in the absolute value of integer."
+  "Return the number of significant bits in the absolute value of integer."
   (etypecase integer
     (fixnum
      (integer-length (truly-the fixnum integer)))
@@ -1051,17 +1051,18 @@
 
 (defun byte (size position)
   #!+sb-doc
-  "Returns a byte specifier which may be used by other byte functions."
+  "Return a byte specifier which may be used by other byte functions
+  (e.g. LDB)."
   (byte size position))
 
 (defun byte-size (bytespec)
   #!+sb-doc
-  "Returns the size part of the byte specifier bytespec."
+  "Return the size part of the byte specifier bytespec."
   (byte-size bytespec))
 
 (defun byte-position (bytespec)
   #!+sb-doc
-  "Returns the position part of the byte specifier bytespec."
+  "Return the position part of the byte specifier bytespec."
   (byte-position bytespec))
 
 (defun ldb (bytespec integer)
@@ -1071,7 +1072,7 @@
 
 (defun ldb-test (bytespec integer)
   #!+sb-doc
-  "Returns T if any of the specified bits in integer are 1's."
+  "Return T if any of the specified bits in integer are 1's."
   (ldb-test bytespec integer))
 
 (defun mask-field (bytespec integer)
@@ -1081,12 +1082,12 @@
 
 (defun dpb (newbyte bytespec integer)
   #!+sb-doc
-  "Returns new integer with newbyte in specified position, newbyte is right justified."
+  "Return new integer with newbyte in specified position, newbyte is right justified."
   (dpb newbyte bytespec integer))
 
 (defun deposit-field (newbyte bytespec integer)
   #!+sb-doc
-  "Returns new integer with newbyte in specified position, newbyte is not right justified."
+  "Return new integer with newbyte in specified position, newbyte is not right justified."
   (deposit-field newbyte bytespec integer))
 
 (defun %ldb (size posn integer)
@@ -1219,7 +1220,7 @@
 
 (defun gcd (&rest numbers)
   #!+sb-doc
-  "Returns the greatest common divisor of the arguments, which must be
+  "Return the greatest common divisor of the arguments, which must be
   integers. Gcd with no arguments is defined to be 0."
   (cond ((null numbers) 0)
 	((null (cdr numbers)) (abs (the integer (car numbers))))
@@ -1233,7 +1234,7 @@
 
 (defun lcm (&rest numbers)
   #!+sb-doc
-  "Returns the least common multiple of one or more integers. LCM of no
+  "Return the least common multiple of one or more integers. LCM of no
   arguments is defined to be 1."
   (cond ((null numbers) 1)
 	((null (cdr numbers)) (abs (the integer (car numbers))))
@@ -1291,7 +1292,7 @@
 ;;; From discussion on comp.lang.lisp and Akira Kurihara.
 (defun isqrt (n)
   #!+sb-doc
-  "Returns the root of the nearest integer less than n which is a perfect
+  "Return the root of the nearest integer less than n which is a perfect
    square."
   (declare (type unsigned-byte n) (values unsigned-byte))
   ;; Theoretically (> n 7), i.e., n-len-quarter > 0.
@@ -1316,8 +1317,8 @@
 
 (macrolet ((def-frob (name doc)
 	     `(defun ,name (number) ,doc (,name number))))
-  (def-frob zerop "Returns T if number = 0, NIL otherwise.")
-  (def-frob plusp "Returns T if number > 0, NIL otherwise.")
-  (def-frob minusp "Returns T if number < 0, NIL otherwise.")
-  (def-frob oddp "Returns T if number is odd, NIL otherwise.")
-  (def-frob evenp "Returns T if number is even, NIL otherwise."))
+  (def-frob zerop "Is this number zero?")
+  (def-frob plusp "Is this real number strictly positive?")
+  (def-frob minusp "Is this real number strictly negative?")
+  (def-frob oddp "Is this integer odd?")
+  (def-frob evenp "Is this integer even?"))

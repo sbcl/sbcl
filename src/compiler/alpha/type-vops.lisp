@@ -15,13 +15,13 @@
 
 (eval-when (:compile-toplevel :execute)
 
-(defparameter immediate-types
+(defparameter *immediate-types*
   (list unbound-marker-type base-char-type))
 
-(defparameter function-header-types
+(defparameter *function-header-types*
   (list funcallable-instance-header-type
-	byte-code-function-type byte-code-closure-type
-	function-header-type closure-function-header-type
+	function-header-type
+	closure-function-header-type
 	closure-header-type))
 
 (defun canonicalize-headers (headers)
@@ -56,10 +56,10 @@
 		       t))
 	 (lowtags (remove lowtag-limit type-codes :test #'<))
 	 (extended (remove lowtag-limit type-codes :test #'>))
-	 (immediates (intersection extended immediate-types :test #'eql))
-	 (headers (set-difference extended immediate-types :test #'eql))
-	 (function-p (if (intersection headers function-header-types)
-			 (if (subsetp headers function-header-types)
+	 (immediates (intersection extended *immediate-types* :test #'eql))
+	 (headers (set-difference extended *immediate-types* :test #'eql))
+	 (function-p (if (intersection headers *function-header-types*)
+			 (if (subsetp headers *function-header-types*)
 			     t
 			     (error "Can't test for mix of function subtypes ~
 				     and normal header types."))

@@ -247,8 +247,6 @@
 #|
 	      #'repr-complex-array
 	      ;; TO DO: #'repr-funcallable-instance
-	      ;; TO DO: #'repr-byte-code-function
-	      ;; TO DO: #'repr-byte-code-closure
 |#
 	      #'repr-symbol
 	      #'repr-base-char

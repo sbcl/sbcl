@@ -1167,17 +1167,17 @@
               (preprocess-conditionals sub-printer args))
           printer)))))
 
+;;; Return a version of the disassembly-template PRINTER with
+;;; compile-time tests (e.g. :constant without a value), and any
+;;; :CHOOSE operators resolved properly for the args ARGS.
+;;;
+;;; (:CHOOSE Sub*) simply returns the first Sub in which every field
+;;; reference refers to a valid arg.
 (defun preprocess-printer (printer args)
-  #!+sb-doc
-  "Returns a version of the disassembly-template PRINTER with compile-time
-  tests (e.g. :constant without a value), and any :CHOOSE operators resolved
-  properly for the args ARGS. (:CHOOSE Sub*) simply returns the first Sub in
-  which every field reference refers to a valid arg."
   (preprocess-conditionals (preprocess-chooses printer args) args))
 
+;;; Return the first non-keyword symbol in a depth-first search of TREE.
 (defun find-first-field-name (tree)
-  #!+sb-doc
-  "Returns the first non-keyword symbol in a depth-first search of TREE."
   (cond ((null tree)
          nil)
         ((and (symbolp tree) (not (keywordp tree)))
@@ -1523,16 +1523,14 @@
       (dpb int (byte size 0) -1)
       int))
 
+;;; Is ADDRESS aligned on a SIZE byte boundary?
 (defun aligned-p (address size)
-  #!+sb-doc
-  "Returns non-NIL if ADDRESS is aligned on a SIZE byte boundary."
   (declare (type address address)
            (type alignment size))
   (zerop (logand (1- size) address)))
 
+;;; Return ADDRESS aligned *upward* to a SIZE byte boundary.
 (defun align (address size)
-  #!+sb-doc
-  "Return ADDRESS aligned *upward* to a SIZE byte boundary."
   (declare (type address address)
            (type alignment size))
   (logandc1 (1- size) (+ (1- size) address)))
@@ -1553,10 +1551,10 @@
            (optimize (speed 3) (safety 0)))
   (sign-extend (read-suffix length dstate) length))
 
+;;; Get the value of the property called NAME in DSTATE. Also SETF'able.
+;;;
 ;;; KLUDGE: The associated run-time machinery for this is in
 ;;; target-disassem.lisp (much later). This is here just to make sure
 ;;; it's defined before it's used. -- WHN ca. 19990701
 (defmacro dstate-get-prop (dstate name)
-  #!+sb-doc
-  "Get the value of the property called NAME in DSTATE. Also setf'able."
   `(getf (dstate-properties ,dstate) ,name))

@@ -102,7 +102,7 @@
 
 (defun get-universal-time ()
   #!+sb-doc
-  "Returns a single integer for the current time of
+  "Return a single integer for the current time of
    day in universal time format."
   (multiple-value-bind (res secs) (sb!unix:unix-gettimeofday)
     (declare (ignore res))
@@ -110,7 +110,7 @@
 
 (defun get-decoded-time ()
   #!+sb-doc
-  "Returns nine values specifying the current time as follows:
+  "Return nine values specifying the current time as follows:
    second, minute, hour, date, month, year, day of week (0 = Monday), T
    (daylight savings times) or NIL (standard time), and timezone."
   (decode-universal-time (get-universal-time)))

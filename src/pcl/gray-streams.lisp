@@ -1,12 +1,13 @@
 ;;;; Gray streams implementation for SBCL, based on the Gray streams
-;;;; implementation for CMU CL, based on the stream-definition-by-user proposal
-;;;; by David N. Gray.
+;;;; implementation for CMU CL, based on the stream-definition-by-user
+;;;; proposal by David N. Gray.
 
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
 
-;;;; This software is in the public domain and is provided with absolutely no
-;;;; warranty. See the COPYING and CREDITS files for more information.
+;;;; This software is in the public domain and is provided with
+;;;; absolutely no warranty. See the COPYING and CREDITS files for
+;;;; more information.
 
 (in-package "SB-GRAY")
 
@@ -15,8 +16,8 @@
 (defgeneric stream-element-type (stream)
   #+sb-doc
   (:documentation
-   "Returns a type specifier for the kind of object returned by the
-  Stream. Class FUNDAMENTAL-CHARACTER-STREAM provides a default method
+   "Return a type specifier for the kind of object returned by the
+  STREAM. The class FUNDAMENTAL-CHARACTER-STREAM provides a default method
   which returns CHARACTER."))
 
 (defmethod stream-element-type ((stream lisp-stream))
@@ -28,7 +29,7 @@
 (defgeneric pcl-open-stream-p (stream)
   #+sb-doc
   (:documentation
-   "Return true if Stream is not closed. A default method is provided
+   "Return true if STREAM is not closed. A default method is provided
   by class FUNDAMENTAL-STREAM which returns true if CLOSE has not been
   called on the stream."))
 
@@ -45,8 +46,8 @@
 (defgeneric pcl-close (stream &key abort)
   #+sb-doc
   (:documentation
-   "Closes the given Stream. No more I/O may be performed, but
-  inquiries may still be made. If :Abort is non-nil, an attempt is made
+   "Close the given STREAM. No more I/O may be performed, but
+  inquiries may still be made. If :ABORT is true, an attempt is made
   to clean up the side effects of having created the stream."))
 
 (defmethod pcl-close ((stream lisp-stream) &key abort)
@@ -65,7 +66,7 @@
 
 (defgeneric input-stream-p (stream)
   #+sb-doc
-  (:documentation "Return non-nil if the given Stream can perform input operations."))
+  (:documentation "Can STREAM perform input operations?"))
 
 (defmethod input-stream-p ((stream lisp-stream))
   (and (not (eq (lisp-stream-in stream) #'closed-flame))
@@ -79,7 +80,7 @@
 
 (defgeneric output-stream-p (stream)
   #+sb-doc
-  (:documentation "Return non-nil if the given Stream can perform output operations."))
+  (:documentation "Can STREAM perform output operations?"))
 
 (defmethod output-stream-p ((stream lisp-stream))
   (and (not (eq (lisp-stream-in stream) #'closed-flame))
@@ -98,7 +99,7 @@
 (defgeneric stream-read-char (stream)
   #+sb-doc
   (:documentation
-   "This reads one character from the stream. It returns either a
+   "Read one character from the stream. Return either a
   character object, or the symbol :EOF if the stream is at end-of-file.
   Every subclass of FUNDAMENTAL-CHARACTER-INPUT-STREAM must define a
   method for this function."))
@@ -106,8 +107,8 @@
 (defgeneric stream-unread-char (stream character)
   #+sb-doc
   (:documentation
-   "Un-does the last call to STREAM-READ-CHAR, as in UNREAD-CHAR.
-  Returns NIL. Every subclass of FUNDAMENTAL-CHARACTER-INPUT-STREAM
+   "Un-do the last call to STREAM-READ-CHAR, as in UNREAD-CHAR.
+  Return NIL. Every subclass of FUNDAMENTAL-CHARACTER-INPUT-STREAM
   must define a method for this function."))
 
 (defgeneric stream-read-char-no-hang (stream)
@@ -126,7 +127,7 @@
 (defgeneric stream-peek-char (stream)
   #+sb-doc
   (:documentation
-   "Used to implement PEEK-CHAR; this corresponds to peek-type of NIL.
+   "This is used to implement PEEK-CHAR; this corresponds to PEEK-TYPE of NIL.
   It returns either a character or :EOF. The default method calls
   STREAM-READ-CHAR and STREAM-UNREAD-CHAR."))
 
@@ -139,7 +140,7 @@
 (defgeneric stream-listen (stream)
   #+sb-doc
   (:documentation
-   "Used by LISTEN. Returns true or false. The default method uses
+   "This is used by LISTEN. It returns true or false. The default method uses
   STREAM-READ-CHAR-NO-HANG and STREAM-UNREAD-CHAR. Most streams should
   define their own method since it will usually be trivial and will
   always be more efficient than the default method."))
@@ -153,7 +154,7 @@
 (defgeneric stream-read-line (stream)
   #+sb-doc
   (:documentation
-   "Used by READ-LINE. A string is returned as the first value. The
+   "This is used by READ-LINE. A string is returned as the first value. The
   second value is true if the string was terminated by end-of-file
   instead of the end of a line. The default method uses repeated
   calls to STREAM-READ-CHAR."))
@@ -195,14 +196,14 @@
 (defgeneric stream-write-char (stream character)
   #+sb-doc
   (:documentation
-   "Writes character to the stream and returns the character. Every
+   "Write CHARACTER to STREAM and return CHARACTER. Every
   subclass of FUNDAMENTAL-CHARACTER-OUTPUT-STREAM must have a method
   defined for this function."))
 
 (defgeneric stream-line-column (stream)
   #+sb-doc
   (:documentation
-   "This function returns the column number where the next character
+   "Return the column number where the next character
   will be written, or NIL if that is not meaningful for this stream.
   The first column on a line is numbered 0. This function is used in
   the implementation of PPRINT and the FORMAT ~T directive. For every
@@ -217,7 +218,7 @@
 ;;; FIXME: Should we support it? Probably not..
 (defgeneric stream-line-length (stream)
   #+sb-doc
-  (:documentation "Return the stream line length or Nil."))
+  (:documentation "Return the stream line length or NIL."))
 
 (defmethod stream-line-length ((stream fundamental-character-output-stream))
   nil)
@@ -225,8 +226,8 @@
 (defgeneric stream-start-line-p (stream)
   #+sb-doc
   (:documentation
-   "This is a predicate which returns T if the stream is positioned at
-  the beginning of a line, else NIL. It is permissible to always return
+   "Is STREAM known to be positioned at the beginning of a line?
+  It is permissible for an implementation to always return
   NIL. This is used in the implementation of FRESH-LINE. Note that
   while a value of 0 from STREAM-LINE-COLUMN also indicates the
   beginning of a line, there are cases where STREAM-START-LINE-P can be

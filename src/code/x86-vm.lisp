@@ -38,12 +38,12 @@
 
 (defun machine-type ()
   #!+sb-doc
-  "Returns a string describing the type of the local machine."
+  "Return a string describing the type of the local machine."
   "X86")
 
 (defun machine-version ()
   #!+sb-doc
-  "Returns a string describing the version of the local machine."
+  "Return a string describing the version of the local machine."
   "X86")
 
 ;;;; :CODE-OBJECT fixups

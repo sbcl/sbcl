@@ -242,9 +242,7 @@
   (code-location nil :type code-location)
   ;; an a-list of catch-tags to code-locations
   (%catches :unparsed :type (or list (member :unparsed)))
-  ;; pointer to frame on control stack. (unexported) When this frame
-  ;; is an interpreted-frame, this pointer is an index into the
-  ;; interpreter's stack.
+  ;; pointer to frame on control stack (unexported)
   pointer
   ;; This is the frame's number for prompt printing. Top is zero.
   (number 0 :type index))
@@ -281,20 +279,6 @@
 	    "~S~:[~;, interrupted~]"
 	    (debug-function-name (frame-debug-function obj))
 	    (compiled-frame-escaped obj))))
-
-(defstruct (interpreted-frame
-	    (:include frame)
-	    (:constructor make-interpreted-frame
-			  (pointer up debug-function code-location number
-			   real-frame closure))
-	    (:copier nil))
-  ;; This points to the compiled-frame for SB!BYTECODE:INTERNAL-APPLY-LOOP.
-  (real-frame nil :type compiled-frame)
-  ;; This is the closed over data used by the interpreter.
-  (closure nil :type simple-vector))
-(def!method print-object ((obj interpreted-frame) str)
-  (print-unreadable-object (obj str :type t)
-    (prin1 (debug-function-name (frame-debug-function obj)) str)))
 
 ;;;; DEBUG-FUNCTIONs
 
@@ -380,12 +364,12 @@
 
 #!+sb-doc
 (setf (fdocumentation 'debug-block-successors 'function)
-  "Returns the list of possible code-locations where execution may continue
+  "Return the list of possible code-locations where execution may continue
    when the basic-block represented by debug-block completes its execution.")
 
 #!+sb-doc
 (setf (fdocumentation 'debug-block-elsewhere-p 'function)
-  "Returns whether debug-block represents elsewhere code.")
+  "Return whether debug-block represents elsewhere code.")
 
 (defstruct (compiled-debug-block (:include debug-block)
 				 (:constructor
@@ -473,20 +457,7 @@
 	      (etypecase what
 		(code-location nil)
 		(debug-function (breakpoint-kind obj)))))))
-
-#!+sb-doc
-(setf (fdocumentation 'breakpoint-hook-function 'function)
-  "Returns the breakpoint's function the system calls when execution encounters
-   the breakpoint, and it is active. This is SETF'able.")
-
-#!+sb-doc
-(setf (fdocumentation 'breakpoint-what 'function)
-  "Returns the breakpoint's what specification.")
-
-#!+sb-doc
-(setf (fdocumentation 'breakpoint-kind 'function)
-  "Returns the breakpoint's kind specification.")
-
+
 ;;;; CODE-LOCATIONs
 
 (defstruct (code-location (:constructor nil)
@@ -515,11 +486,6 @@
   (print-unreadable-object (obj str :type t)
     (prin1 (debug-function-name (code-location-debug-function obj))
 	   str)))
-
-#!+sb-doc
-(setf (fdocumentation 'code-location-debug-function 'function)
-  "Returns the debug-function representing information about the function
-   corresponding to the code-location.")
 
 (defstruct (compiled-code-location
 	    (:include code-location)
@@ -713,9 +679,7 @@
 (defun top-frame ()
   (/show0 "entering TOP-FRAME")
   (multiple-value-bind (fp pc) (%caller-frame-and-pc)
-    (possibly-an-interpreted-frame
-     (compute-calling-frame (descriptor-sap fp) pc nil)
-     nil)))
+    (compute-calling-frame (descriptor-sap fp) pc nil)))
 
 ;;; Flush all of the frames above FRAME, and renumber all the frames
 ;;; below FRAME.
@@ -734,27 +698,24 @@
   ;; them to COMPUTE-CALLING-FRAME.
   (let ((down (frame-%down frame)))
     (if (eq down :unparsed)
-	(let* ((real (frame-real-frame frame))
-	       (debug-fun (frame-debug-function real)))
+	(let ((debug-fun (frame-debug-function frame)))
 	  (/show0 "in DOWN :UNPARSED case")
 	  (setf (frame-%down frame)
 		(etypecase debug-fun
 		  (compiled-debug-function
 		   (let ((c-d-f (compiled-debug-function-compiler-debug-fun
 				 debug-fun)))
-		     (possibly-an-interpreted-frame
-		      (compute-calling-frame
-		       (descriptor-sap
-			(get-context-value
-			 real sb!vm::ocfp-save-offset
-			 (sb!c::compiled-debug-function-old-fp c-d-f)))
+		     (compute-calling-frame
+		      (descriptor-sap
 		       (get-context-value
-			real sb!vm::lra-save-offset
-			(sb!c::compiled-debug-function-return-pc c-d-f))
-		       frame)
+			frame sb!vm::ocfp-save-offset
+			(sb!c::compiled-debug-function-old-fp c-d-f)))
+		      (get-context-value
+		       frame sb!vm::lra-save-offset
+		       (sb!c::compiled-debug-function-return-pc c-d-f))
 		      frame)))
 		  (bogus-debug-function
-		   (let ((fp (frame-pointer real)))
+		   (let ((fp (frame-pointer frame)))
 		     (when (cstack-pointer-valid-p fp)
 		       #!+x86
 			(multiple-value-bind (ra ofp) (x86-call-context fp)
@@ -823,80 +784,6 @@
 	   (setf (stack-ref pointer stack-slot) value))
 	  (#.sb!vm::lra-save-offset
 	   (setf (sap-ref-sap pointer (- (* (1+ stack-slot) 4))) value))))))
-
-;;; This doesn't do anything in sbcl-0.7.0, since the functionality
-;;; was lost in the switch from IR1 interpreter to bytecode interpreter.
-;;; However, it might be revived someday. (See the FIXME for
-;;; POSSIBLY-AN-INTERPRETED-FRAME.)
-;;;
-;;; (defvar *debugging-interpreter* nil
-;;;   #!+sb-doc
-;;;   "When set, the debugger foregoes making interpreted frames, so you can
-;;;    debug the functions that manifest the interpreter.")
-
-;;; Note: In CMU CL with the IR1 interpreter, this did
-;;;    This takes a newly computed frame, FRAME, and the frame above it
-;;;    on the stack, UP-FRAME, which is possibly NIL. FRAME is NIL when
-;;;    we hit the bottom of the control stack. When FRAME represents a
-;;;    call to SB!BYTECODE::INTERNAL-APPLY-LOOP, we make an interpreted frame
-;;;    to replace FRAME. The interpreted frame points to FRAME.
-;;; But with SBCL's switch to byte-interpreter-only, this is functionality
-;;; wasn't maintained, so this is just a placeholder, and when you
-;;; try to "debug byte code" you end up debugging the byte interpreter
-;;; instead.
-;;; 
-;;; (It might be good to update the old CMU CL functionality so that
-;;; you can really debug byte code instead of seeing a bunch of
-;;; confusing byte interpreter implementation stuff, so I've left the
-;;; placeholder in place. But be aware that doing so is a big messy
-;;; job: grep for 'interpreted-debug-' in the sbcl-0.6.13 sources to
-;;; see what you're getting into. -- WHN)
-(defun possibly-an-interpreted-frame (frame up-frame)
-
-  ;; new SBCL code, not ambitious enough to do anything tricky like
-  ;; hiding the byte interpreter when debugging
-  (declare (ignore up-frame))
-  (/show "doing trivial POSSIBLY-AN-INTERPRETED-FRAME")
-  frame
-
-  ;; old CMU CL code to hide IR1 interpreter when debugging:
-  ;;
-  ;;(if (or (not frame)
-  ;;        (not (eq (debug-function-name (frame-debug-function
-  ;;                                       frame))
-  ;;                 'sb!bytecode::internal-apply-loop))
-  ;;        *debugging-interpreter*
-  ;;        (compiled-frame-escaped frame))
-  ;;    frame
-  ;;    (flet ((get-var (name location)
-  ;;             (let ((vars (sb!di:ambiguous-debug-vars
-  ;;                          (sb!di:frame-debug-function frame) name)))
-  ;;               (when (or (null vars) (> (length vars) 1))
-  ;;                 (error "zero or more than one ~A variable in ~
-  ;;                         SB!BYTECODE::INTERNAL-APPLY-LOOP"
-  ;;                        (string-downcase name)))
-  ;;               (if (eq (debug-var-validity (car vars) location)
-  ;;                       :valid)
-  ;;                   (car vars)))))
-  ;;      (let* ((code-loc (frame-code-location frame))
-  ;;             (ptr-var (get-var "FRAME-PTR" code-loc))
-  ;;             (node-var (get-var "NODE" code-loc))
-  ;;             (closure-var (get-var "CLOSURE" code-loc)))
-  ;;        (if (and ptr-var node-var closure-var)
-  ;;            (let* ((node (debug-var-value node-var frame))
-  ;;                   (d-fun (make-interpreted-debug-function
-  ;;                           (sb!c::block-home-lambda (sb!c::node-block
-  ;;                                                     node)))))
-  ;;              (make-interpreted-frame
-  ;;               (debug-var-value ptr-var frame)
-  ;;               up-frame
-  ;;               d-fun
-  ;;               (make-interpreted-code-location node d-fun)
-  ;;               (frame-number frame)
-  ;;               frame
-  ;;               (debug-var-value closure-var frame)))
-  ;;            frame))))
-  )
 
 ;;; This returns a frame for the one existing in time immediately
 ;;; prior to the frame referenced by current-fp. This is current-fp's
@@ -1169,7 +1056,7 @@
 (defun frame-catches (frame)
   (let ((catch (descriptor-sap *current-catch-block*))
 	(res nil)
-	(fp (frame-pointer (frame-real-frame frame))))
+	(fp (frame-pointer frame)))
     (loop
       (when (zerop (sap-int catch)) (return (nreverse res)))
       (when (sap= fp
@@ -1223,12 +1110,6 @@
 	     (sap-ref-32 catch
 				(* sb!vm:catch-block-previous-catch-slot
 				   sb!vm:word-bytes)))))))
-
-;;; If an interpreted frame, return the real frame, otherwise frame.
-(defun frame-real-frame (frame)
-  (etypecase frame
-    (compiled-frame frame)
-    (interpreted-frame (interpreted-frame-real-frame frame))))
 
 ;;;; operations on DEBUG-FUNCTIONs
 
@@ -2162,20 +2043,11 @@
 ;;; Returns the value stored for DEBUG-VAR in frame. The value may be
 ;;; invalid. This is SETFable.
 (defun debug-var-value (debug-var frame)
-  (etypecase debug-var
-    (compiled-debug-var
-     (aver (typep frame 'compiled-frame))
-     (let ((res (access-compiled-debug-var-slot debug-var frame)))
-       (if (indirect-value-cell-p res)
-	   (value-cell-ref res)
-	   res)))
-    ;; (This function used to be more interesting, with more type
-    ;; cases here, before the IR1 interpreter went away. It might
-    ;; become more interesting again if we ever try to generalize the
-    ;; CMU CL POSSIBLY-AN-INTERPRETED-FRAME thing to elide
-    ;; internal-to-the-byte-interpreter debug frames the way that CMU
-    ;; CL elided internal-to-the-IR1-interpreter debug frames.)
-    ))
+  (aver (typep frame 'compiled-frame))
+  (let ((res (access-compiled-debug-var-slot debug-var frame)))
+    (if (indirect-value-cell-p res)
+	(value-cell-ref res)
+	res)))
 
 ;;; This returns what is stored for the variable represented by
 ;;; DEBUG-VAR relative to the FRAME. This may be an indirect value
@@ -2502,24 +2374,15 @@
 ;;; COMPILED-DEBUG-VAR case, access the current value to determine if
 ;;; it is an indirect value cell. This occurs when the variable is
 ;;; both closed over and set.
-(defun %set-debug-var-value (debug-var frame value)
-  (etypecase debug-var
-    (compiled-debug-var
-     (aver (typep frame 'compiled-frame))
-     (let ((current-value (access-compiled-debug-var-slot debug-var frame)))
-       (if (indirect-value-cell-p current-value)
-	   (value-cell-set current-value value)
-	   (set-compiled-debug-var-slot debug-var frame value))))
-    ;; (This function used to be more interesting, with more type
-    ;; cases here, before the IR1 interpreter went away. It might
-    ;; become more interesting again if we ever try to generalize the
-    ;; CMU CL POSSIBLY-AN-INTERPRETED-FRAME thing to elide
-    ;; internal-to-the-byte-interpreter debug frames the way that CMU
-    ;; CL elided internal-to-the-IR1-interpreter debug frames.)
-    )
-  value)
+(defun %set-debug-var-value (debug-var frame new-value)
+  (aver (typep frame 'compiled-frame))
+  (let ((old-value (access-compiled-debug-var-slot debug-var frame)))
+    (if (indirect-value-cell-p old-value)
+	(value-cell-set old-value new-value)
+	(set-compiled-debug-var-slot debug-var frame new-value)))
+  new-value)
 
-;;; This stores value for the variable represented by debug-var
+;;; This stores VALUE for the variable represented by debug-var
 ;;; relative to the frame. This assumes the location directly contains
 ;;; the variable's value; that is, there is no indirect value cell
 ;;; currently there in case the variable is both closed over and set.

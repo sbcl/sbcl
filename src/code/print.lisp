@@ -1552,15 +1552,12 @@
 (defun output-function (object stream)
   (let* ((*print-length* 3) ; in case we have to..
 	 (*print-level* 3)  ; ..print an interpreted function definition
-	 (name (cond ((find (function-subtype object)
-			    #(#.sb!vm:closure-header-type
-			      #.sb!vm:byte-code-closure-type))
-		      "CLOSURE")
-		     ((find (function-subtype object)
-			    #(#.sb!vm:function-header-type
-			      #.sb!vm:closure-function-header-type))
-		      (%function-name object))
-		     (t 'no-name-available)))
+	 ;; FIXME: This find-the-function-name idiom ought to be
+	 ;; pulled out in a function somewhere.
+	 (name (case (function-subtype object)
+		 (#.sb!vm:closure-header-type "CLOSURE")
+		 (#.sb!vm:function-header-type (%function-name object))
+		 (t 'no-name-available)))
 	 (identified-by-name-p (and (symbolp name)
 				    (fboundp name)
 				    (eq (fdefinition name) object))))

@@ -56,7 +56,7 @@
 
 #!+sb-doc
 (setf (fdocumentation 'restart-name 'function)
-      "Returns the name of the given restart object.")
+      "Return the name of the given restart object.")
 
 (defun restart-report (restart stream)
   (funcall (or (restart-report-function restart)
@@ -107,7 +107,7 @@
 
 (defun find-restart (name &optional condition)
   #!+sb-doc
-  "Returns the first restart named name. If name is a restart, it is returned
+  "Return the first restart named name. If name is a restart, it is returned
    if it is currently active. If no such restart is found, nil is returned.
    It is an error to supply nil as a name. If Condition is specified and not
    NIL, then only restarts associated with that condition (or with no

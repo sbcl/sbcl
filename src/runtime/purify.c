@@ -156,8 +156,6 @@ valid_dynamic_space_pointer(lispobj *pointer, lispobj *start_addr)
 	    break;
 	case type_ClosureHeader:
 	case type_FuncallableInstanceHeader:
-	case type_ByteCodeFunction:
-	case type_ByteCodeClosure:
 	    if ((int)pointer != ((int)start_addr+type_FunctionPointer)) {
 		if (pointer_filter_verbose) {
 		    fprintf(stderr,"*Wf2: %x %x %x\n", (unsigned int) pointer, 
@@ -242,8 +240,6 @@ valid_dynamic_space_pointer(lispobj *pointer, lispobj *start_addr)
 	    /* only pointed to by function pointers? */
 	case type_ClosureHeader:
 	case type_FuncallableInstanceHeader:
-	case type_ByteCodeFunction:
-	case type_ByteCodeClosure:
 	    if (pointer_filter_verbose) {
 		fprintf(stderr,"*Wo4: %x %x %x\n", (unsigned int) pointer, 
 			(unsigned int) start_addr, *start_addr);
@@ -621,12 +617,6 @@ apply_code_fixups_during_purify(struct code *old_code, struct code *new_code)
   unsigned  displacement = (unsigned)new_code - (unsigned)old_code;
   struct vector *fixups_vector;
 
-  /* Byte compiled code has no fixups. The trace table offset will be
-   * a fixnum if it's x86 compiled code - check. */
-  if (new_code->trace_table_offset & 0x3)
-    return;
-
-  /* Else it's x86 machine code. */
   ncode_words = fixnum_value(new_code->code_size);
   nheader_words = HeaderValue(*(lispobj *)new_code);
   nwords = ncode_words + nheader_words;
@@ -1249,8 +1239,6 @@ pscav(lispobj *addr, int nwords, boolean constant)
 #ifdef __i386__
 	      case type_ClosureHeader:
 	      case type_FuncallableInstanceHeader:
-	      case type_ByteCodeFunction:
-	      case type_ByteCodeClosure:
 		/* The function self pointer needs special care on the
 		 * x86 because it is the real entry point. */
 		{

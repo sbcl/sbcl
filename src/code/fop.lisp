@@ -24,7 +24,6 @@
 	  `(with-fop-stack ,pushp ,@forms)))
      (%define-fop ',name ,fop-code)))
 
-;;; FIXME: This can be byte coded.
 (defun %define-fop (name code)
   (let ((oname (svref *fop-names* code)))
     (when (and oname (not (eq oname name)))
@@ -626,7 +625,7 @@ bug.~:@>")
 	(name (pop-stack)))
     (setf (fdefinition name) fn)))
 
-;;; Modify a slot in a Constants object.
+;;; Modify a slot in a CONSTANTS object.
 (define-cloned-fops (fop-alter-code 140 nil) (fop-byte-alter-code 141)
   (let ((value (pop-stack))
 	(code (pop-stack)))

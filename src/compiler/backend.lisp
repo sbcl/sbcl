@@ -30,10 +30,7 @@
 
 ;;; the byte order of the target machine. :BIG-ENDIAN has the MSB first (e.g.
 ;;; IBM RT), :LITTLE-ENDIAN has the MSB last (e.g. DEC VAX).
-;;;
-;;; KLUDGE: In a sort of pun, this is also used as the value of 
-;;; BACKEND-BYTE-FASL-FILE-IMPLEMENTATION. -- WHN 20000302
-(defvar *backend-byte-order* nil)
+(defvar *backend-byte-order*)
 (declaim (type (member nil :little-endian :big-endian) *backend-byte-order*))
 
 ;;; translation from SC numbers to SC info structures. SC numbers are always

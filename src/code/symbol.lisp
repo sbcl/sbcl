@@ -204,7 +204,7 @@
 
 (defun keywordp (object)
   #!+sb-doc
-  "Returns true if Object is a symbol in the keyword package."
+  "Return true if Object is a symbol in the \"KEYWORD\" package."
   (and (symbolp object)
        (eq (symbol-package object) *keyword-package*)))
 

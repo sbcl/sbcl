@@ -973,7 +973,7 @@ argument")
 
 (defun arg (n)
   #!+sb-doc
-  "Returns the N'th argument's value if possible. Argument zero is the first
+  "Return the N'th argument's value if possible. Argument zero is the first
    argument in a frame's default printed representation. Count keyword/value
    pairs as separate arguments."
   (multiple-value-bind (var lambda-var-p)

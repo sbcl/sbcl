@@ -132,20 +132,21 @@
 
 (defun tree-equal (x y &key (test #'eql) test-not)
   #!+sb-doc
-  "Returns T if X and Y are isomorphic trees with identical leaves."
+  "Return T if X and Y are isomorphic trees with identical leaves."
   (if test-not
       (tree-equal-test-not x y test-not)
       (tree-equal-test x y test)))
 
 (defun endp (object)
   #!+sb-doc
-  "The recommended way to test for the end of a list. True if Object is nil,
-   false if Object is a cons, and an error for any other types of arguments."
+  "This is the recommended way to test for the end of a proper list. It
+   returns true if OBJECT is NIL, false if OBJECT is a CONS, and an error
+   for any other type of OBJECT."
   (endp object))
 
 (defun list-length (list)
   #!+sb-doc
-  "Returns the length of the given List, or Nil if the List is circular."
+  "Return the length of the given List, or Nil if the List is circular."
   (do ((n 0 (+ n 2))
        (y list (cddr y))
        (z list (cdr z)))
@@ -157,47 +158,47 @@
 
 (defun nth (n list)
   #!+sb-doc
-  "Returns the nth object in a list where the car is the zero-th element."
+  "Return the nth object in a list where the car is the zero-th element."
   (car (nthcdr n list)))
 
 (defun first (list)
   #!+sb-doc
-  "Returns the 1st object in a list or NIL if the list is empty."
+  "Return the 1st object in a list or NIL if the list is empty."
   (car list))
 (defun second (list)
-  "Returns the 2nd object in a list or NIL if there is no 2nd object."
+  "Return the 2nd object in a list or NIL if there is no 2nd object."
   (cadr list))
 (defun third (list)
   #!+sb-doc
-  "Returns the 3rd object in a list or NIL if there is no 3rd object."
+  "Return the 3rd object in a list or NIL if there is no 3rd object."
   (caddr list))
 (defun fourth (list)
   #!+sb-doc
-  "Returns the 4th object in a list or NIL if there is no 4th object."
+  "Return the 4th object in a list or NIL if there is no 4th object."
   (cadddr list))
 (defun fifth (list)
   #!+sb-doc
-  "Returns the 5th object in a list or NIL if there is no 5th object."
+  "Return the 5th object in a list or NIL if there is no 5th object."
   (car (cddddr list)))
 (defun sixth (list)
   #!+sb-doc
-  "Returns the 6th object in a list or NIL if there is no 6th object."
+  "Return the 6th object in a list or NIL if there is no 6th object."
   (cadr (cddddr list)))
 (defun seventh (list)
   #!+sb-doc
-  "Returns the 7th object in a list or NIL if there is no 7th object."
+  "Return the 7th object in a list or NIL if there is no 7th object."
   (caddr (cddddr list)))
 (defun eighth (list)
   #!+sb-doc
-  "Returns the 8th object in a list or NIL if there is no 8th object."
+  "Return the 8th object in a list or NIL if there is no 8th object."
   (cadddr (cddddr list)))
 (defun ninth (list)
   #!+sb-doc
-  "Returns the 9th object in a list or NIL if there is no 9th object."
+  "Return the 9th object in a list or NIL if there is no 9th object."
   (car (cddddr (cddddr list))))
 (defun tenth (list)
   #!+sb-doc
-  "Returns the 10th object in a list or NIL if there is no 10th object."
+  "Return the 10th object in a list or NIL if there is no 10th object."
   (cadr (cddddr (cddddr list))))
 (defun rest (list)
   #!+sb-doc
@@ -215,7 +216,7 @@
 
 (defun last (list &optional (n 1))
   #!+sb-doc
-  "Returns the last N conses (not the last element!) of a list."
+  "Return the last N conses (not the last element!) of a list."
   (declare (type index n))
   (do ((checked-list list (cdr checked-list))
        (returned-list list)
@@ -227,7 +228,7 @@
 
 (defun list (&rest args)
   #!+sb-doc
-  "Returns constructs and returns a list of its arguments."
+  "Return constructs and returns a list of its arguments."
   args)
 
 ;;; List* is done the same as list, except that the last cons is made a
@@ -235,7 +236,7 @@
 
 (defun list* (arg &rest others)
   #!+sb-doc
-  "Returns a list of the arguments with last cons a dotted pair"
+  "Return a list of the arguments with last cons a dotted pair"
   (cond ((atom others) arg)
 	((atom (cdr others)) (cons arg (car others)))
 	(t (do ((x others (cdr x)))
@@ -291,7 +292,7 @@
 
 (defun copy-list (list)
   #!+sb-doc
-  "Returns a new list which is EQUAL to LIST."
+  "Return a new list which is EQUAL to LIST."
   ;; The list is copied correctly even if the list is not terminated
   ;; by NIL. The new list is built by CDR'ing SPLICE which is always
   ;; at the tail of the new list.
@@ -308,7 +309,7 @@
 
 (defun copy-alist (alist)
   #!+sb-doc
-  "Returns a new association list which is EQUAL to ALIST."
+  "Return a new association list which is EQUAL to ALIST."
   (if (atom alist)
       alist
       (let ((result
@@ -341,7 +342,7 @@
 
 (defun revappend (x y)
   #!+sb-doc
-  "Returns (append (reverse x) y)"
+  "Return (append (reverse x) y)."
   (do ((top x (cdr top))
        (result y (cons (car top) result)))
       ((endp top) result)))
@@ -388,7 +389,7 @@
 
 (defun nreconc (x y)
   #!+sb-doc
-  "Returns (nconc (nreverse x) y)"
+  "Return (nconc (nreverse x) y)."
   (do ((1st (cdr x) (if (atom 1st) 1st (cdr 1st)))
        (2nd x 1st)		;2nd follows first down the list.
        (3rd y 2nd))		;3rd follows 2nd down the list.
@@ -648,8 +649,8 @@
 
 (defun member (item list &key key (test #'eql testp) (test-not nil notp))
   #!+sb-doc
-  "Returns tail of list beginning with first element satisfying EQLity,
-   :TEST, or :TEST-NOT with a given item."
+  "Return the tail of LIST beginning with first element satisfying EQLity,
+   :TEST, or :TEST-NOT with the given ITEM."
   (do ((list list (cdr list)))
       ((null list) nil)
     (let ((car (car list)))
@@ -879,7 +880,7 @@
 
 (defun assoc (item alist &key key test test-not)
   #!+sb-doc
-  "Returns the cons in ALIST whose car is equal (by a given test or EQL) to
+  "Return the cons in ALIST whose car is equal (by a given test or EQL) to
    the ITEM."
   ;; FIXME: Shouldn't there be a check for existence of both TEST and TEST-NOT?
   (cond (test
@@ -898,7 +899,7 @@
 
 (defun assoc-if (predicate alist &key key)
   #!+sb-doc
-  "Returns the first cons in alist whose car satisfies the Predicate. If
+  "Return the first cons in alist whose car satisfies the Predicate. If
    key is supplied, apply it to the car of each cons before testing."
   (if key
       (assoc-guts (funcall predicate (funcall key (caar alist))))
@@ -906,7 +907,7 @@
 
 (defun assoc-if-not (predicate alist &key key)
   #!+sb-doc
-  "Returns the first cons in ALIST whose car does not satisfy the PREDICATE.
+  "Return the first cons in ALIST whose car does not satisfy the PREDICATE.
   If KEY is supplied, apply it to the car of each cons before testing."
   (if key
       (assoc-guts (not (funcall predicate (funcall key (caar alist)))))
@@ -915,7 +916,7 @@
 (defun rassoc (item alist &key key test test-not)
   (declare (list alist))
   #!+sb-doc
-  "Returns the cons in ALIST whose cdr is equal (by a given test or EQL) to
+  "Return the cons in ALIST whose cdr is equal (by a given test or EQL) to
    the ITEM."
   (cond (test
 	 (if key
@@ -933,7 +934,7 @@
 
 (defun rassoc-if (predicate alist &key key)
   #!+sb-doc
-  "Returns the first cons in alist whose cdr satisfies the Predicate. If key
+  "Return the first cons in alist whose cdr satisfies the Predicate. If key
   is supplied, apply it to the cdr of each cons before testing."
   (if key
       (assoc-guts (funcall predicate (funcall key (cdar alist))))
@@ -941,7 +942,7 @@
 
 (defun rassoc-if-not (predicate alist &key key)
   #!+sb-doc
-  "Returns the first cons in alist whose cdr does not satisfy the Predicate.
+  "Return the first cons in alist whose cdr does not satisfy the Predicate.
   If key is supplied, apply it to the cdr of each cons before testing."
   (if key
       (assoc-guts (not (funcall predicate (funcall key (cdar alist)))))

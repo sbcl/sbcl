@@ -12,9 +12,11 @@
 (in-package :cl-user)
 
 ;;; Check for fbound external symbols in public packages that have no
-;;; argument list information. (This can happen if we get carried away
-;;; with byte compilation, since at least in sbcl-0.6.12 the byte
-;;; compiler can't record argument list information.)
+;;; argument list information. (This used to be possible when we got
+;;; carried away with byte compilation, since the byte compiler can't
+;;; record argument list information. Now that there's no byte
+;;; compiler, that can't happen, but it still shouldn't hurt to check
+;;; in case the argument information goes astray some other way.)
 (defvar *public-package-names*
   '("SB-ALIEN" "SB-C-CALL" "SB-DEBUG" "SB-EXT" "SB-GRAY" "SB-MP"
     "SB-PROFILE" "SB-PCL" "COMMON-LISP"))

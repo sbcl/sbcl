@@ -232,7 +232,7 @@
 ;;; like (MEMBER ITEM LIST :TEST #'EQ)
 (defun memq (item list)
   #!+sb-doc
-  "Returns tail of LIST beginning with first element EQ to ITEM."
+  "Return tail of LIST beginning with first element EQ to ITEM."
   ;; KLUDGE: These could be and probably should be defined as
   ;;   (MEMBER ITEM LIST :TEST #'EQ)),
   ;; but when I try to cross-compile that, I get an error from

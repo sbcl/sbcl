@@ -137,7 +137,7 @@
 ;;; The compiler emits calls to this when someone tries to funcall a symbol.
 (defun %coerce-name-to-function (name)
   #!+sb-doc
-  "Returns the definition for name, including any encapsulations. Settable
+  "Return the definition for name, including any encapsulations. Settable
    with SETF."
   (let ((fdefn (fdefinition-object name nil)))
     (or (and fdefn (fdefn-function fdefn))
@@ -261,9 +261,8 @@
 	       (setf encap-info next-info))))))
   t)
 
+;;; Does NAME have an encapsulation of the given TYPE?
 (defun encapsulated-p (name type)
-  #!+sb-doc
-  "Returns t if name has an encapsulation of the given type, otherwise nil."
   (let ((fdefn (fdefinition-object name nil)))
     (do ((encap-info (encapsulation-info (fdefn-function fdefn))
 		     (encapsulation-info

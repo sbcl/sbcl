@@ -79,13 +79,6 @@
 ;;; the conventional file extension for our fasl files
 (declaim (type simple-string *fasl-file-type*))
 (defvar *fasl-file-type* "fasl")
-
-;;; This is a sort of pun that we inherited from CMU CL. For ordinary,
-;;; non-byte-coded fasl files, the "implementation" is basically the
-;;; CPU. For byte-coded fasl files, the "implementation" is whether
-;;; the data are stored big-endianly or little-endianly.
-(defun backend-byte-fasl-file-implementation ()
-  *backend-byte-order*)
 
 ;;; information about below-Lisp-level linkage
 ;;;

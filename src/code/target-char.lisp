@@ -82,19 +82,19 @@
 
 (defun char-code (char)
   #!+sb-doc
-  "Returns the integer code of CHAR."
+  "Return the integer code of CHAR."
   (etypecase char
     (base-char (char-code (truly-the base-char char)))))
 
 (defun char-int (char)
   #!+sb-doc
-  "Returns the integer code of CHAR. This is the same as char-code, as
+  "Return the integer code of CHAR. This is the same as char-code, as
    CMU Common Lisp does not implement character bits or fonts."
   (char-code char))
 
 (defun code-char (code)
   #!+sb-doc
-  "Returns the character with the code CODE."
+  "Return the character with the code CODE."
   (declare (type char-code code))
   (code-char code))
 
@@ -235,14 +235,14 @@
 
 (defun char= (character &rest more-characters)
   #!+sb-doc
-  "Returns T if all of its arguments are the same character."
+  "Return T if all of the arguments are the same character."
   (do ((clist more-characters (cdr clist)))
       ((atom clist) T)
     (unless (eq (car clist) character) (return nil))))
 
 (defun char/= (character &rest more-characters)
   #!+sb-doc
-  "Returns T if no two of its arguments are the same character."
+  "Return T if no two of the arguments are the same character."
   (do* ((head character (car list))
 	(list more-characters (cdr list)))
        ((atom list) T)
@@ -253,7 +253,7 @@
 
 (defun char< (character &rest more-characters)
   #!+sb-doc
-  "Returns T if its arguments are in strictly increasing alphabetic order."
+  "Return T if the arguments are in strictly increasing alphabetic order."
   (do* ((c character (car list))
 	(list more-characters (cdr list)))
        ((atom list) T)
@@ -263,7 +263,7 @@
 
 (defun char> (character &rest more-characters)
   #!+sb-doc
-  "Returns T if its arguments are in strictly decreasing alphabetic order."
+  "Return T if the arguments are in strictly decreasing alphabetic order."
   (do* ((c character (car list))
 	(list more-characters (cdr list)))
        ((atom list) T)
@@ -273,7 +273,7 @@
 
 (defun char<= (character &rest more-characters)
   #!+sb-doc
-  "Returns T if its arguments are in strictly non-decreasing alphabetic order."
+  "Return T if the arguments are in strictly non-decreasing alphabetic order."
   (do* ((c character (car list))
 	(list more-characters (cdr list)))
        ((atom list) T)
@@ -283,7 +283,7 @@
 
 (defun char>= (character &rest more-characters)
   #!+sb-doc
-  "Returns T if its arguments are in strictly non-increasing alphabetic order."
+  "Return T if the arguments are in strictly non-increasing alphabetic order."
   (do* ((c character (car list))
 	(list more-characters (cdr list)))
        ((atom list) T)
@@ -300,7 +300,7 @@
 
 (defun char-equal (character &rest more-characters)
   #!+sb-doc
-  "Returns T if all of its arguments are the same character.
+  "Return T if all of the arguments are the same character.
   Font, bits, and case are ignored."
   (do ((clist more-characters (cdr clist)))
       ((atom clist) T)
@@ -310,7 +310,7 @@
 
 (defun char-not-equal (character &rest more-characters)
   #!+sb-doc
-  "Returns T if no two of its arguments are the same character.
+  "Return T if no two of the arguments are the same character.
    Font, bits, and case are ignored."
   (do* ((head character (car list))
 	(list more-characters (cdr list)))
@@ -324,7 +324,7 @@
 
 (defun char-lessp (character &rest more-characters)
   #!+sb-doc
-  "Returns T if its arguments are in strictly increasing alphabetic order.
+  "Return T if the arguments are in strictly increasing alphabetic order.
    Font, bits, and case are ignored."
   (do* ((c character (car list))
 	(list more-characters (cdr list)))
@@ -335,7 +335,7 @@
 
 (defun char-greaterp (character &rest more-characters)
   #!+sb-doc
-  "Returns T if its arguments are in strictly decreasing alphabetic order.
+  "Return T if the arguments are in strictly decreasing alphabetic order.
    Font, bits, and case are ignored."
   (do* ((c character (car list))
 	(list more-characters (cdr list)))
@@ -346,7 +346,7 @@
 
 (defun char-not-greaterp (character &rest more-characters)
   #!+sb-doc
-  "Returns T if its arguments are in strictly non-decreasing alphabetic order.
+  "Return T if the arguments are in strictly non-decreasing alphabetic order.
    Font, bits, and case are ignored."
   (do* ((c character (car list))
 	(list more-characters (cdr list)))
@@ -357,7 +357,7 @@
 
 (defun char-not-lessp (character &rest more-characters)
   #!+sb-doc
-  "Returns T if its arguments are in strictly non-increasing alphabetic order.
+  "Return T if the arguments are in strictly non-increasing alphabetic order.
    Font, bits, and case are ignored."
   (do* ((c character (car list))
 	(list more-characters (cdr list)))
@@ -370,7 +370,7 @@
 
 (defun char-upcase (char)
   #!+sb-doc
-  "Returns CHAR converted to upper-case if that is possible."
+  "Return CHAR converted to upper-case if that is possible."
   (declare (character char))
   (if (lower-case-p char)
       (code-char (- (char-code char) 32))
@@ -378,7 +378,7 @@
 
 (defun char-downcase (char)
   #!+sb-doc
-  "Returns CHAR converted to lower-case if that is possible."
+  "Return CHAR converted to lower-case if that is possible."
   (declare (character char))
   (if (upper-case-p char)
       (code-char (+ (char-code char) 32))

@@ -425,7 +425,7 @@
 
 (defun list-all-packages ()
   #!+sb-doc
-  "Returns a list of all existing packages."
+  "Return a list of all existing packages."
   (let ((res ()))
     (maphash #'(lambda (k v)
 		 (declare (ignore k))
@@ -435,7 +435,7 @@
 
 (defun intern (name &optional (package (sane-package)))
   #!+sb-doc
-  "Returns a symbol having the specified name, creating it if necessary."
+  "Return a symbol having the specified name, creating it if necessary."
   ;; We just simple-stringify the name and call INTERN*, where the real
   ;; logic is.
   (let ((name (if (simple-string-p name)
@@ -448,7 +448,7 @@
 
 (defun find-symbol (name &optional (package (sane-package)))
   #!+sb-doc
-  "Returns the symbol named String in Package. If such a symbol is found
+  "Return the symbol named String in Package. If such a symbol is found
   then the second value is :internal, :external or :inherited to indicate
   how the symbol is accessible. If no symbol is found then both values
   are NIL."

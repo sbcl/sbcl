@@ -1133,12 +1133,7 @@
     (dolist (entry (sb!c::ir2-component-entries 2comp))
       (let ((entry-handle (dump-one-entry entry code-handle file)))
 	(setf (gethash entry (fasl-output-entry-table file)) entry-handle)
-
 	(let ((old (gethash entry (fasl-output-patch-table file))))
-	  ;; FIXME: All this code is shared with
-	  ;; FASL-DUMP-BYTE-COMPONENT, and should probably be gathered
-	  ;; up into a named function (DUMP-PATCHES?) called from both
-	  ;; functions.
 	  (when old
 	    (dolist (patch old)
 	      (dump-alter-code-object (car patch)

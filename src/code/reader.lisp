@@ -205,7 +205,7 @@
 
 (defun get-macro-character (char &optional (rt *readtable*))
   #!+sb-doc
-  "Returns the function associated with the specified char which is a macro
+  "Return the function associated with the specified char which is a macro
   character. The optional readtable argument defaults to the current
   readtable."
   (let ((rt (or rt *standard-readtable*)))
@@ -1302,7 +1302,7 @@
 (defun get-dispatch-macro-character (disp-char sub-char
                                      &optional (rt *readtable*))
   #!+sb-doc
-  "Returns the macro character function for sub-char under disp-char
+  "Return the macro character function for sub-char under disp-char
    or nil if there is no associated function."
   (unless (digit-char-p sub-char)
     (let* ((sub-char (char-upcase sub-char))

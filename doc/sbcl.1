@@ -136,13 +136,14 @@ chance to see it.
 
 SBCL aims for but has not reached ANSI compliance.
 
-SBCL compiles Lisp to native code, or optionally to more-compact but
-much slower byte code.
+SBCL compiles Lisp to native code. (Unlike earlier versions of SBCL,
+byte compilation is no longer supported.)
 
-SBCL's garbage collector is generational and conservative.
+SBCL uses a generational conservative garbage collector for some ports,
+and a simple stop-and-copy garbage collector for other ports.
 
 SBCL includes a source level debugger, as well as the ANSI TRACE
-facility and a rudimentary profiler.
+facility and a profiler.
 
 .SH DIFFERENCES FROM CMU CL
 

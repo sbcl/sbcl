@@ -962,13 +962,13 @@
 ;;; Then if necessary, we look in "/etc/passwds" ("/etc/groups") which
 ;;; is really long and has to be fetched over the net.
 ;;;
+;;; The result is a SIMPLE-STRING or NIL.
+;;; 
 ;;; FIXME: Now that we no longer have lookup-group-name, we no longer need
 ;;; the GROUP-OR-USER argument.
 (defun get-group-or-user-name (group-or-user id)
-  #!+sb-doc
-  "Returns the simple-string user or group name of the user whose uid or gid
-   is id, or NIL if no such user or group exists. Group-or-user is either
-   :group or :user."
+  (declare (type (member :group :user) group-or-user))
+  (declare (type index id))
   (let ((id-string (let ((*print-base* 10)) (prin1-to-string id))))
     (declare (simple-string id-string))
     (multiple-value-bind (file1 file2)

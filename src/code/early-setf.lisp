@@ -32,7 +32,7 @@
 (declaim (ftype (function (t &optional (or null sb!c::lexenv))) sb!xc:get-setf-expansion))
 (defun sb!xc:get-setf-expansion (form &optional environment)
   #!+sb-doc
-  "Returns five values needed by the SETF machinery: a list of temporary
+  "Return five values needed by the SETF machinery: a list of temporary
    variables, a list of values with which to fill them, a list of temporaries
    for the new values, the setting function, and the accessing function."
   (let (temp)

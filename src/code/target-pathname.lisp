@@ -756,7 +756,7 @@ a host-structure or string."
 
 (defun host-namestring (pathname)
   #!+sb-doc
-  "Returns a string representation of the name of the host in the pathname."
+  "Return a string representation of the name of the host in the pathname."
   (declare (type pathname-designator pathname)
 	   (values (or null simple-base-string)))
   (with-pathname (pathname pathname)
@@ -769,7 +769,7 @@ a host-structure or string."
 
 (defun directory-namestring (pathname)
   #!+sb-doc
-  "Returns a string representation of the directories used in the pathname."
+  "Return a string representation of the directories used in the pathname."
   (declare (type pathname-designator pathname)
 	   (values (or null simple-base-string)))
   (with-pathname (pathname pathname)
@@ -782,7 +782,7 @@ a host-structure or string."
 
 (defun file-namestring (pathname)
   #!+sb-doc
-  "Returns a string representation of the name used in the pathname."
+  "Return a string representation of the name used in the pathname."
   (declare (type pathname-designator pathname)
 	   (values (or null simple-base-string)))
   (with-pathname (pathname pathname)
@@ -797,7 +797,7 @@ a host-structure or string."
 			  &optional
 			  (defaults *default-pathname-defaults*))
   #!+sb-doc
-  "Returns an abbreviated pathname sufficent to identify the pathname relative
+  "Return an abbreviated pathname sufficent to identify the pathname relative
    to the defaults."
   (declare (type pathname-designator pathname))
   (with-pathname (pathname pathname)

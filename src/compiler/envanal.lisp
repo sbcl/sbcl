@@ -24,10 +24,7 @@
 ;;;     continuations.
 ;;;  4. Delete all non-top-level functions with no references. This
 ;;;     should only get functions with non-NULL kinds, since normal
-;;;     functions are deleted when their references go to zero. If
-;;;     *BYTE-COMPILING*, then don't delete optional entries with no
-;;;     references, since the byte interpreter wants to call entries
-;;;     that the XEP doesn't.
+;;;     functions are deleted when their references go to zero. 
 (defun environment-analyze (component)
   (declare (type component component))
   (aver (every (lambda (x)

@@ -124,7 +124,10 @@
   (note (required-argument) :type string)
   ;; T if we should emit a failure note even if SPEED=INHIBIT-WARNINGS.
   (important nil :type (member t nil))
-  ;; usable for byte code, native code, or both
+  ;; usable for byte code, native code, or both?
+  ;;
+  ;; FIXME: Now that there's no byte compiler, this is stale and could
+  ;; all go away.
   (when :native :type (member :byte :native :both)))
 
 (defprinter (transform) type note important when)
