@@ -69,6 +69,8 @@ os_context_register_addr(os_context_t *context, int offset)
 	return CONTEXT_ADDR_FROM_STEM(ESI);
     case 14:
 	return CONTEXT_ADDR_FROM_STEM(EDI);
+    case 16:
+	return CONTEXT_ADDR_FROM_STEM(UESP);
     default:
 	return 0;
     }

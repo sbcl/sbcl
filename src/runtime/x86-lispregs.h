@@ -34,8 +34,9 @@
 #define reg_EBP REG(10)
 #define reg_ESI REG(12)
 #define reg_EDI REG(14)
+#define reg_UESP REG(16)
 
-#define REGNAMES "EAX", "ECX", "EDX", "EBX", "ESP", "EBP", "ESI", "EDI"
+#define REGNAMES "EAX", "ECX", "EDX", "EBX", "ESP", "EBP", "ESI", "EDI", "UESP"
 
 /* classification of registers
  *

@@ -679,7 +679,11 @@ void arrange_return_to_lisp_function(os_context_t *context, lispobj function)
     *os_context_pc_addr(context) = call_into_lisp;
     *os_context_register_addr(context,reg_ECX) = 0; 
     *os_context_register_addr(context,reg_EBP) = sp-2;
+#ifdef __NetBSD__ 
+    *os_context_register_addr(context,reg_UESP) = sp-14;
+#else
     *os_context_register_addr(context,reg_ESP) = sp-14;
+#endif
 #else
     /* this much of the calling convention is common to all
        non-x86 ports */
