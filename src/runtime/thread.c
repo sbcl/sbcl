@@ -153,7 +153,7 @@ pid_t create_thread(lispobj initial_function) {
 	clone(new_thread_trampoline,
 	      (((void*)th->control_stack_start)+THREAD_CONTROL_STACK_SIZE-4),
 	      (((getpid()!=parent_pid)?(CLONE_PARENT):0)
-	       |SIGALRM|CLONE_VM),th);
+	       |CLONE_FILES|SIGALRM|CLONE_VM),th);
     if(kid_pid<=0) 
 	goto cleanup;
 #else

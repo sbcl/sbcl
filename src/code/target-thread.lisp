@@ -145,11 +145,14 @@
   "Atomically release LOCK and enqueue ourselves on QUEUE.  Another
 thread may subsequently notify us using CONDITION-NOTIFY, at which
 time we reacquire LOCK and return to the caller."
-  (wait-on-queue queue lock)
-  (dequeue queue )
-  ;; FIXME not sure this is safe: some people say we should do this
-  ;; atomically
-  (get-mutex lock))
+  (unwind-protect
+       (wait-on-queue queue lock)
+    ;; If we are interrupted while waiting, we should do these things
+    ;; before returning.  Ideally, in the case of an unhandled signal,
+    ;; we should do them before entering the debugger, but this is
+    ;; better than nothing.
+    (dequeue queue)
+    (get-mutex lock)))
 
 (defun condition-notify (queue)
   "Notify one of the processes waiting on QUEUE"
