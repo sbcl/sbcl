@@ -1822,6 +1822,7 @@ changes in sbcl-0.8.1 relative to sbcl-0.8.0:
        values of the arguments, even in the presence of assignment.
     ** functions [N]SUBST*, LAST, NRECONC, [N]SUBLIS may return any
        object.
+    ** DISASSEMBLE works with closures and funcallable instances.
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles
