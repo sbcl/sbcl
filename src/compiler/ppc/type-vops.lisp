@@ -13,14 +13,13 @@
 
 (defun %test-fixnum (value target not-p &key temp)
   (assemble ()
-    ;; FIXME: again, this 3 should be FIXNUM-MASK
-    (inst andi. temp value 3)
+    (inst andi. temp value fixnum-tag-mask)
     (inst b? (if not-p :ne :eq) target)))
 
 (defun %test-fixnum-and-headers (value target not-p headers &key temp)
   (let ((drop-through (gen-label)))
     (assemble ()
-      (inst andi. temp value 3)
+      (inst andi. temp value fixnum-tag-mask)
       (inst beq (if not-p drop-through target)))
     (%test-headers value target not-p nil headers
 		   :drop-through drop-through :temp temp)))
@@ -140,13 +139,9 @@
 		 ,@(if mask
 		       `((inst andi. temp value ,mask)
 			 (inst twi 0 value (error-number-or-lose ',error-code))
-			 (inst twi :ne temp ,@(if ;; KLUDGE: At
-					          ;; present, MASK is
-					          ;; 3 or LOWTAG-MASK
-					          (eql mask 3)
-						  ;; KLUDGE
-						  `(0)
-						  type-codes))
+			 (inst twi :ne temp ,@(ecase mask
+						((fixnum-tag-mask) `(0))
+						((lowtag-mask) type-codes)))
 			 (move result value))
 		       `((let ((err-lab
 				(generate-error-code vop ,error-code value)))

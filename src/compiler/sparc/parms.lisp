@@ -32,18 +32,6 @@
   #!+sb-doc
   "Number of bytes in a word.")
 
-(def!constant n-fixnum-tag-bits (1- n-lowtag-bits)
-  #!+sb-doc
-  "Number of tag bits used for a fixnum")
-
-(def!constant fixnum-tag-mask (1- (ash 1 n-fixnum-tag-bits))
-  #!+sb-doc
-  "Mask to get the fixnum tag")
-
-(def!constant n-positive-fixnum-bits (- n-word-bits n-fixnum-tag-bits 1)
-  #!+sb-doc
-  "Maximum number of bits in a positive fixnum")
-
 (def!constant float-sign-shift 31)
 
 (def!constant single-float-bias 126)
