@@ -1704,7 +1704,8 @@
 	(unlink-node call)
 	(when vals
 	  (reoptimize-continuation (first vals)))
-	(propagate-to-args use fun))
+	(propagate-to-args use fun)
+        (reoptimize-call use))
       t)))
 
 ;;; If we see:
