@@ -1043,13 +1043,24 @@
 			    :key #'operand-parse-name))))))
   (values))
 
+(defun compute-parse-vop-operand-count (parse)
+  (declare (type vop-parse parse))
+  (labels ((compute-count-aux (parse)
+	     (declare (type vop-parse parse))
+	     (if (null (vop-parse-inherits parse))
+		 (length (vop-parse-operands parse))
+	         (+ (length (vop-parse-operands parse))
+		    (compute-count-aux 
+		     (vop-parse-or-lose (vop-parse-inherits parse)))))))
+    (if (null (vop-parse-inherits parse))
+	0
+        (compute-count-aux (vop-parse-or-lose (vop-parse-inherits parse))))))
+
 ;;; the top level parse function: clobber PARSE to represent the
 ;;; specified options.
 (defun parse-define-vop (parse specs)
   (declare (type vop-parse parse) (list specs))
-  (let ((*parse-vop-operand-count* (1- (+ (length (vop-parse-args parse))
-					  (length (vop-parse-results parse))
-					  (length (vop-parse-temps parse))))))
+  (let ((*parse-vop-operand-count* (compute-parse-vop-operand-count parse)))
     (dolist (spec specs)
       (unless (consp spec)
 	(error "malformed option specification: ~S" spec))
