@@ -206,7 +206,6 @@
       (when (eq (condition-slot-name cslot) name)
 	(return-from condition-reader-function
 		     (car (condition-slot-cell cslot)))))
-
     (let ((val (getf (condition-assigned-slots condition) name
 		     *empty-condition-slot*)))
       (if (eq val *empty-condition-slot*)
@@ -214,17 +213,15 @@
 		(slot (find-condition-class-slot class name)))
             (unless slot
 	      (error "missing slot ~S of ~S" name condition))
-	    (dolist (initarg (condition-slot-initargs slot))
-	      (let ((val (getf actual-initargs
-			       initarg
-			       *empty-condition-slot*)))
-		(unless (eq val *empty-condition-slot*)
-		  (return-from condition-reader-function
-			       (setf (getf (condition-assigned-slots condition)
-					   name)
-				     val)))))
-	    (setf (getf (condition-assigned-slots condition) name)
-		  (find-slot-default class slot)))
+	    (do ((initargs actual-initargs (cddr initargs)))
+		((endp initargs)
+		 (setf (getf (condition-assigned-slots condition) name)
+		       (find-slot-default class slot)))
+	      (when (member (car initargs) (condition-slot-initargs slot))
+		(return-from condition-reader-function
+		  (setf (getf (condition-assigned-slots condition)
+			      name)
+			(cadr initargs))))))
 	  val))))
 
 ;;;; MAKE-CONDITION
@@ -866,8 +863,9 @@
 		#!+sb-doc ,doc
 		;; FIXME: Perhaps this shared logic should be pulled out into
 		;; FLET MAYBE-INVOKE-RESTART? See whether it shrinks code..
-		(when (find-restart ',name condition)
-		  (invoke-restart ',name ,@args)))))
+	        (let ((restart (find-restart ',name condition)))
+		  (when restart
+		    (invoke-restart restart ,@args))))))
   (define-nil-returning-restart continue ()
     "Transfer control to a restart named CONTINUE, or return NIL if none exists.")
   (define-nil-returning-restart store-value (value)
