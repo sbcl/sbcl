@@ -4,6 +4,7 @@ changes in sbcl-0.8.16 relative to sbcl-0.8.15:
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** POSITION on displaced vectors with non-zero displacement
        returns the right answer.
+    ** (SIGNED-BYTE) is a valid type specifier for sequence creators.
 
 changes in sbcl-0.8.15 relative to sbcl-0.8.14:
   * incompatible change: SB-INT:*BEFORE-SAVE-INITIALIZATIONS* and

@@ -671,7 +671,7 @@
 			  do (setf result
 				   (+ (* 256 result)
 				      (sap-ref-8 sap (+ head j))))
-			  finally (return (if (logbitp result (1- i))
+			  finally (return (if (logbitp (1- i) result)
                                               (dpb result (byte i 0) -1)
                                               result))))))
 	      `(signed-byte ,i)

@@ -275,8 +275,9 @@
 	    (cons (cond
 		    ((eq (car type) 'string) `(vector character ,@(cdr type)))
 		    ((eq (car type) 'simple-string)
-		     `(simple-array character ,@(when (cdr type)
-						      (list (cdr type)))))
+		     `(simple-array character ,(if (cdr type)
+						   (cdr type)
+						   '(*))))
 		    (t type)))
 	    (t type)))
 	 (type (specifier-type adjusted-type)))

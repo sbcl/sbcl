@@ -175,3 +175,15 @@
   (let* ((x #(1 2 3))
          (y (make-array 2 :displaced-to x :displaced-index-offset 1)))
     (assert (= (position 2 y) 0))))
+
+;;; (SIMPLE-STRING) is a legal type specifier for creation functions
+(let ((a (make-sequence '(simple-string) 5))
+      (b (concatenate '(simple-string) "a" "bdec"))
+      (c (map '(simple-string) 'identity "abcde"))
+      (d (merge '(simple-string) "acd" "be" 'char>))
+      (e (coerce '(#\a #\b #\c #\e #\d) '(simple-string))))
+  (assert (= (length a) 5))
+  (assert (string= b "abdec"))
+  (assert (string= c "abcde"))
+  (assert (string= d "beacd"))
+  (assert (string= e "abced")))
