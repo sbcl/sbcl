@@ -1639,13 +1639,14 @@
                (ir2-convert-ref node 2block)))))
 	(combination
 	 (let ((kind (basic-combination-kind node)))
-	   (case kind
+	   (ecase kind
 	     (:local
 	      (ir2-convert-local-call node 2block))
 	     (:full
 	      (ir2-convert-full-call node 2block))
-	     (t
-	      (let ((fun (fun-info-ir2-convert kind)))
+	     (:known
+	      (let* ((info (basic-combination-fun-info node))
+		     (fun (fun-info-ir2-convert info)))
 		(cond (fun
 		       (funcall fun node 2block))
 		      ((eq (basic-combination-info node) :full)

@@ -1154,13 +1154,16 @@
   (args nil :type list)
   ;; the kind of function call being made. :LOCAL means that this is a
   ;; local call to a function in the same component, and that argument
-  ;; syntax checking has been done, etc. Calls to known global
-  ;; functions are represented by storing the FUN-INFO for the
-  ;; function in this slot. :FULL is a call to an (as yet) unknown
-  ;; function. :ERROR is like :FULL, but means that we have discovered
-  ;; that the call contains an error, and should not be reconsidered
-  ;; for optimization.
-  (kind :full :type (or (member :local :full :error) fun-info))
+  ;; syntax checking has been done, etc.  Calls to known global
+  ;; functions are represented by storing :KNOWN in this slot and the
+  ;; FUN-INFO for that function in the FUN-INFO slot.  :FULL is a call
+  ;; to an (as yet) unknown function, or to a known function declared
+  ;; NOTINLINE. :ERROR is like :FULL, but means that we have
+  ;; discovered that the call contains an error, and should not be
+  ;; reconsidered for optimization.
+  (kind :full :type (member :local :full :error :known))
+  ;; if a call to a known global function, contains the FUN-INFO.
+  (fun-info nil :type (or fun-info null))
   ;; some kind of information attached to this node by the back end
   (info nil))
 

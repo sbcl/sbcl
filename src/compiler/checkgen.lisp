@@ -332,26 +332,30 @@
 	   nil)
 	  ((basic-combination-p dest)
 	   (let ((kind (basic-combination-kind dest)))
-	     (cond ((eq cont (basic-combination-fun dest)) t)
-		   ((eq kind :local) t)
-                   ((eq kind :full)
-                    (and (combination-p dest)
-                         (not (values-subtypep ; explicit THE
-                               (continuation-externally-checkable-type cont)
-                               (continuation-type-to-check cont)))))
-
-		   ((eq kind :error) nil)
-                   ;; :ERROR means that we have an invalid syntax of
-                   ;; the call and the callee will detect it before
-                   ;; thinking about types.
-
-		   ((fun-info-ir2-convert kind) t)
-		   (t
-		    (dolist (template (fun-info-templates kind) nil)
-		      (when (eq (template-ltn-policy template) :fast-safe)
-			(multiple-value-bind (val win)
-			    (valid-fun-use dest (template-type template))
-			  (when (or val (not win)) (return t)))))))))
+	     (cond
+	       ((eq cont (basic-combination-fun dest)) t)
+	       (t
+		(ecase kind
+		  (:local t)
+		  (:full
+		   (and (combination-p dest)
+			(not (values-subtypep ; explicit THE
+			      (continuation-externally-checkable-type cont)
+			      (continuation-type-to-check cont)))))
+		  ;; :ERROR means that we have an invalid syntax of
+		  ;; the call and the callee will detect it before
+		  ;; thinking about types.
+		  (:error nil)
+		  (:known
+		   (let ((info (basic-combination-fun-info dest)))
+		     (if (fun-info-ir2-convert info)
+			 t
+			 (dolist (template (fun-info-templates info) nil)
+			   (when (eq (template-ltn-policy template)
+				     :fast-safe)
+			     (multiple-value-bind (val win)
+				 (valid-fun-use dest (template-type template))
+			       (when (or val (not win)) (return t)))))))))))))
 	  (t t))))
 
 ;;; Return a lambda form that we can convert to do a hairy type check

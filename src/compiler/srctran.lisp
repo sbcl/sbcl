@@ -2537,7 +2537,7 @@
            (cut-node (node &aux did-something)
              (when (and (not (block-delete-p (node-block node)))
                         (combination-p node)
-                        (fun-info-p (basic-combination-kind node)))
+			(eq (basic-combination-kind node) :known))
                (let* ((fun-ref (lvar-use (combination-fun node)))
                       (fun-name (leaf-source-name (ref-leaf fun-ref)))
                       (modular-fun (find-modular-version fun-name width)))

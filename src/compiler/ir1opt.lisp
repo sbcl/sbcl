@@ -391,8 +391,9 @@
 	 (delete-ref node)
 	 (unlink-node node))
 	(combination
-	 (let ((info (combination-kind node)))
-	   (when (fun-info-p info)
+	 (let ((kind (combination-kind node))
+	       (info (combination-fun-info node)))
+	   (when (and (eq kind :known) (fun-info-p info))
 	     (let ((attr (fun-info-attributes info)))
 	       (when (and (not (ir1-attributep attr call))
 			  ;; ### For now, don't delete potentially
@@ -639,23 +640,36 @@
     (propagate-fun-change node)
     (maybe-terminate-block node nil))
   (let ((args (basic-combination-args node))
-	(kind (basic-combination-kind node)))
-    (case kind
+	(kind (basic-combination-kind node))
+	(info (basic-combination-fun-info node)))
+    (ecase kind
       (:local
        (let ((fun (combination-lambda node)))
 	 (if (eq (functional-kind fun) :let)
 	     (propagate-let-args node fun)
 	     (propagate-local-call-args node fun))))
-      ((:full :error)
+      (:error
        (dolist (arg args)
 	 (when arg
 	   (setf (lvar-reoptimize arg) nil))))
-      (t
+      (:full
+       (dolist (arg args)
+	 (when arg
+	   (setf (lvar-reoptimize arg) nil)))
+       (when info
+	 (let ((fun (fun-info-derive-type info)))
+	   (when fun
+	     (let ((res (funcall fun node)))
+	       (when res
+		 (derive-node-type node (coerce-to-values res))
+		 (maybe-terminate-block node nil)))))))
+      (:known
+       (aver info)
        (dolist (arg args)
 	 (when arg
 	   (setf (lvar-reoptimize arg) nil)))
 
-       (let ((attr (fun-info-attributes kind)))
+       (let ((attr (fun-info-attributes info)))
 	 (when (and (ir1-attributep attr foldable)
 		    ;; KLUDGE: The next test could be made more sensitive,
 		    ;; only suppressing constant-folding of functions with
@@ -681,16 +695,16 @@
 	   (constant-fold-call node)
 	   (return-from ir1-optimize-combination)))
 
-       (let ((fun (fun-info-derive-type kind)))
+       (let ((fun (fun-info-derive-type info)))
 	 (when fun
 	   (let ((res (funcall fun node)))
 	     (when res
 	       (derive-node-type node (coerce-to-values res))
 	       (maybe-terminate-block node nil)))))
 
-       (let ((fun (fun-info-optimizer kind)))
+       (let ((fun (fun-info-optimizer info)))
 	 (unless (and fun (funcall fun node))
-	   (dolist (x (fun-info-transforms kind))
+	   (dolist (x (fun-info-transforms info))
 	     #!+sb-show
 	     (when *show-transforms-p*
 	       (let* ((lvar (basic-combination-fun node))
@@ -777,7 +791,11 @@
 		      (defined-fun-inlinep leaf)
 		      :no-chance)))
     (cond
-     ((eq inlinep :notinline) (values nil nil))
+     ((eq inlinep :notinline)
+      (let ((info (info :function :info (leaf-source-name leaf))))
+	(when info
+	  (setf (basic-combination-fun-info call) info))
+	(values nil nil)))
      ((not (and (global-var-p leaf)
 		(eq (global-var-kind leaf) :global-function)))
       (values leaf nil))
@@ -812,7 +830,10 @@
      (t
       (let ((info (info :function :info (leaf-source-name leaf))))
 	(if info
-	    (values leaf (setf (basic-combination-kind call) info))
+	    (values leaf
+		    (progn
+		      (setf (basic-combination-kind call) :known)
+		      (setf (basic-combination-fun-info call) info)))
 	    (values leaf nil)))))))
 
 ;;; Check whether CALL satisfies TYPE. If so, apply the type to the
@@ -1170,7 +1191,8 @@
              (() (null (rest sets)) :exit-if-null)
              (set-use (principal-lvar-use (set-value set)))
              (() (and (combination-p set-use)
-                      (fun-info-p (combination-kind set-use))
+		      (eq (combination-kind set-use) :known)
+                      (fun-info-p (combination-fun-info set-use))
                       (not (node-to-be-deleted-p set-use))
                       (eq (combination-fun-source-name set-use) '+))
                :exit-if-null)

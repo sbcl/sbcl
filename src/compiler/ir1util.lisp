@@ -1374,8 +1374,8 @@
 		(append before-args inside-args after-args))
 	  (change-ref-leaf (lvar-uses inside-fun)
 			   (find-free-fun 'list "???"))
-	  (setf (combination-kind inside)
-                (info :function :info 'list))
+	  (setf (combination-fun-info inside) (info :function :info 'list)
+		(combination-kind inside) :known)
 	  (setf (node-derived-type inside) *wild-type*)
 	  (flush-dest lvar)
 	  (values))))))
@@ -1601,13 +1601,15 @@
   (declare (type combination call))
   (let ((kind (basic-combination-kind call)))
     (or (eq kind :full)
-        (and (fun-info-p kind)
-             (not (fun-info-ir2-convert kind))
-             (dolist (template (fun-info-templates kind) t)
-               (when (eq (template-ltn-policy template) :fast-safe)
-                 (multiple-value-bind (val win)
-                     (valid-fun-use call (template-type template))
-                   (when (or val (not win)) (return nil)))))))))
+        (and (eq kind :known)
+	     (let ((info (basic-combination-fun-info call)))
+	       (and
+		(not (fun-info-ir2-convert info))
+		(dolist (template (fun-info-templates info) t)
+		  (when (eq (template-ltn-policy template) :fast-safe)
+		    (multiple-value-bind (val win)
+		       (valid-fun-use call (template-type template))
+		      (when (or val (not win)) (return nil)))))))))))
 
 ;;;; careful call
 

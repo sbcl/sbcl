@@ -1163,3 +1163,11 @@
                               (type (unsigned-byte 32) i))
                      (deref a i))))
   (compiler-note () (error "The code is not optimized.")))
+
+(handler-case
+    (compile nil '(lambda (x)
+		   (declare (type (integer -100 100) x))
+		   (declare (optimize speed))
+		   (declare (notinline identity))
+		   (1+ (identity x))))
+  (compiler-note () (error "IDENTITY derive-type not applied.")))

@@ -159,7 +159,8 @@
 ;;; can bail out to here.
 (defun ltn-default-call (call)
   (declare (type combination call))
-  (let ((kind (basic-combination-kind call)))
+  (let ((kind (basic-combination-kind call))
+	(info (basic-combination-fun-info call)))
     (annotate-fun-lvar (basic-combination-fun call))
 
     (dolist (arg (basic-combination-args call))
@@ -169,8 +170,9 @@
       (annotate-1-value-lvar arg))
 
     (cond
-      ((and (fun-info-p kind)
-            (fun-info-ir2-convert kind))
+      ((and (eq kind :known)
+	    (fun-info-p info)
+            (fun-info-ir2-convert info))
        (setf (basic-combination-info call) :funny)
        (setf (node-tail-p call) nil))
       (t
@@ -566,7 +568,7 @@
   (declare (type combination call)
 	   (type ltn-policy ltn-policy))
   (let ((safe-p (ltn-policy-safe-p ltn-policy))
-	(current (fun-info-templates (basic-combination-kind call)))
+	(current (fun-info-templates (basic-combination-fun-info call)))
 	(fallback nil)
 	(rejected nil))
     (loop
@@ -670,7 +672,7 @@
 			(or template
 			    (template-or-lose 'call-named)))
 		       *efficiency-note-cost-threshold*)))
-      (dolist (try (fun-info-templates (basic-combination-kind call)))
+      (dolist (try (fun-info-templates (basic-combination-fun-info call)))
 	(when (> (template-cost try) max-cost) (return)) ; FIXME: UNLESS'd be cleaner.
 	(let ((guard (template-guard try)))
 	  (when (and (or (not guard) (funcall guard))
@@ -740,7 +742,7 @@
 (defun ltn-analyze-known-call (call)
   (declare (type combination call))
   (let ((ltn-policy (node-ltn-policy call))
-        (method (fun-info-ltn-annotate (basic-combination-kind call)))
+        (method (fun-info-ltn-annotate (basic-combination-fun-info call)))
 	(args (basic-combination-args call)))
     (when method
       (funcall method call ltn-policy)
@@ -768,7 +770,7 @@
 		(and (leaf-has-source-name-p funleaf)
 		     (eq (lvar-fun-name (combination-fun call))
 			 (leaf-source-name funleaf))
-		     (let ((info (basic-combination-kind call)))
+		     (let ((info (basic-combination-fun-info call)))
 		       (not (or (fun-info-ir2-convert info)
 				(ir1-attributep (fun-info-attributes info)
 						recursive))))))
@@ -847,10 +849,10 @@
     (etypecase node
       (ref)
       (combination
-       (case (basic-combination-kind node)
+       (ecase (basic-combination-kind node)
 	 (:local (ltn-analyze-local-call node))
 	 ((:full :error) (ltn-default-call node))
-	 (t
+	 (:known
 	  (ltn-analyze-known-call node))))
       (cif (ltn-analyze-if node))
       (creturn (ltn-analyze-return node))

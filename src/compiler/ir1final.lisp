@@ -20,7 +20,7 @@
 (defun note-failed-optimization (node failures)
   (declare (type combination node) (list failures))
   (unless (or (node-deleted node)
-	      (not (fun-info-p (combination-kind node))))
+	      (not (eq :known (combination-kind node))))
     (let ((*compiler-error-context* node))
       (dolist (failure failures)
 	(let ((what (cdr failure))

@@ -25,15 +25,17 @@
 
 ;;; An &AUX variable in a boa-constructor without a default value
 ;;; means "do not initialize slot" and does not cause type error
+(declaim (notinline opaque-identity))
+(defun opaque-identity (x) x)
+
 (defstruct (boa-saux (:constructor make-boa-saux (&aux a (b 3) (c))))
     (a #\! :type (integer 1 2))
     (b #\? :type (integer 3 4))
     (c #\# :type (integer 5 6)))
 (let ((s (make-boa-saux)))
-  (declare (notinline identity))
   (locally (declare (optimize (safety 3))
                     (inline boa-saux-a))
-    (assert (raises-error? (identity (boa-saux-a s)) type-error)))
+    (assert (raises-error? (opaque-identity (boa-saux-a s)) type-error)))
   (setf (boa-saux-a s) 1)
   (setf (boa-saux-c s) 5)
   (assert (eql (boa-saux-a s) 1))
@@ -42,10 +44,9 @@
                                         ; these two checks should be
                                         ; kept separated
 (let ((s (make-boa-saux)))
-  (declare (notinline identity))
   (locally (declare (optimize (safety 0))
                     (inline boa-saux-a))
-    (assert (eql (identity (boa-saux-a s)) 0)))
+    (assert (eql (opaque-identity (boa-saux-a s)) 0)))
   (setf (boa-saux-a s) 1)
   (setf (boa-saux-c s) 5)
   (assert (eql (boa-saux-a s) 1))
@@ -53,10 +54,9 @@
   (assert (eql (boa-saux-c s) 5)))
 
 (let ((s (make-boa-saux)))
-  (declare (notinline identity))
   (locally (declare (optimize (safety 3))
                     (notinline boa-saux-a))
-    (assert (raises-error? (identity (boa-saux-a s)) type-error)))
+    (assert (raises-error? (opaque-identity (boa-saux-a s)) type-error)))
   (setf (boa-saux-a s) 1)
   (setf (boa-saux-c s) 5)
   (assert (eql (boa-saux-a s) 1))

@@ -965,7 +965,7 @@
            (let ((kind (basic-combination-kind node)))
              (format t "~(~A~A ~A~) "
                      (if (node-tail-p node) "tail " "")
-                     (if (fun-info-p kind) "known" kind)
+                     kind
                      (type-of node))
              (print-lvar (basic-combination-fun node))
              (dolist (arg (basic-combination-args node))
