@@ -283,4 +283,12 @@ void unblock_sigcont_and_sleep(void)
     sigwaitinfo(&set,0);
     sigprocmask(SIG_UNBLOCK,&set,0);
 }
+
+int interrupt_thread(pid_t pid, lispobj function)
+{
+    union sigval sigval;
+    sigval.sival_int=function;
+
+    sigqueue(pid, SIG_INTERRUPT_THREAD, sigval);
+}
 #endif

@@ -163,7 +163,7 @@ Lstack:
 /* Save the NPX state */
 	fwait			# Catch any pending NPX exceptions.
 	subl	$108,%esp	# Make room for the NPX state.
-	fnsave	(%esp)		# resets NPX
+	fnsave	(%esp)		# save and reset NPX
 
 	movl	(%esp),%eax	# Load NPX control word.
 	andl	$0xfffff3ff,%eax	# Set rounding mode to nearest.
@@ -223,12 +223,12 @@ Ldone:
 	sub	$8,%esp		# Ensure 3 slots are allocated, one above.
 	mov	%ebx,%ebp	# Switch to new frame.
 
-	/* Indirect the closure. */
 	call	*CLOSURE_FUN_OFFSET(%eax)
 	
-	/* Multi-value return; blow off any extra values. */
+	/* If the function returned multiple values, it will return to
+	   this point.  Lose them */
 	mov	%ebx, %esp
-	/* single value return */
+	/* A singled value function returns here */
 
 /* Restore the stack, in case there was a stack change. */
 	popl	%esp		# c-sp
@@ -672,6 +672,20 @@ GNAME(alloc_16_to_edi):
 	.size	GNAME(alloc_16_to_edi),.-GNAME(alloc_16_to_edi)
 		
 
+	.align	align_4byte,0x90
+	.globl	GNAME(post_signal_tramp)
+	.type	GNAME(post_signal_tramp),@function
+GNAME(post_signal_tramp):
+	/* this is notionally the second half of a function whose first half
+ 	 * doesn't exist.  This is where call_into_lisp returns when called 
+	 * using return_to_lisp_function */
+	addl $12,%esp  	/* clear call_into_lisp args from stack */
+	popa            /* restore registers */
+	popl %ebp       
+	ret
+	.size GNAME(post_signal_tramp),.-GNAME(post_signal_tramp)
+
+	
 
 #ifdef GENCGC_INLINE_ALLOC /* LISP_FEATURE_GENCGC */
 

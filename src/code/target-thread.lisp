@@ -27,18 +27,39 @@
 	       (funcall real-function))
 	     0))))))))
 
+;;; Conventional wisdom says that it's a bad idea to use these unless
+;;; you really need to.  Use a lock or a waitqueue instead
+(defun suspend-thread (thread-id)
+  (sb!unix:unix-kill thread-id :sigstop))
+(defun resume-thread (thread-id)
+  (sb!unix:unix-kill thread-id :sigcont))
+;;; Note warning about cleanup forms
 (defun destroy-thread (thread-id)
+  "Destroy the thread identified by THREAD-ID abruptly, without running cleanup forms"
   (sb!unix:unix-kill thread-id :sigterm)
   ;; may have been stopped for some reason, so now wake it up to
   ;; deliver the TERM
   (sb!unix:unix-kill thread-id :sigcont))
 
-;; Conventional wisdom says that it's a bad idea to use these unless
-;; you really need to.  Use a lock or a waitqueue instead
-(defun suspend-thread (thread-id)
-  (sb!unix:unix-kill thread-id :sigstop))
-(defun resume-thread (thread-id)
-  (sb!unix:unix-kill thread-id :sigcont))
+
+;;; a moderate degree of care is expected for use of interrupt-thread,
+;;; due to its nature: if you interrupt a thread that was holding
+;;; important locks then do something that turns out to need those
+;;; locks, you probably won't like the effect.  Used with thought
+;;; though, it's a good deal gentler than the last-resort functions above
+
+(defun interrupt-thread (thread function)
+  "Interrupt THREAD and make it run FUNCTION.  "
+  (sb!unix::syscall* ("interrupt_thread"
+		      sb!alien:unsigned-long  sb!alien:unsigned-long)
+		     thread
+		     thread (sb!kernel:get-lisp-obj-address
+			     (coerce function 'function))))
+(defun terminate-thread (thread-id)
+  "Terminate the thread identified by THREAD-ID, by causing it to run
+SB-EXT:QUIT - the usual cleanup forms will be evaluated"
+  (interrupt-thread thread-id 'sb!ext:quit))
+
 
 (defun current-thread-id ()
   (sb!sys:sap-int
@@ -225,7 +246,8 @@ restart if *BACKGROUND-THREADS-WAIT-FOR-DEBUGGER* says to do that instead"
       (cond (wait-p (get-foreground))
 	    (t  (invoke-restart (car (compute-restarts))))))))
 
-;;; install this with (setf SB!INT:*REPL-PROMPT-FUN* #'thread-prompt-fun)
+;;; install this with
+;;; (setf SB-INT:*REPL-PROMPT-FUN* #'sb-thread::thread-repl-prompt-fun)
 ;;; One day it will be default
 (defun thread-repl-prompt-fun (out-stream)
   (let ((lock *session-lock*))

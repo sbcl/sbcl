@@ -37,4 +37,5 @@ typedef int os_vm_prot_t;
 #define OS_VM_PROT_EXECUTE PROT_EXEC
 
 #define SIG_MEMORY_FAULT SIGSEGV
+#define SIG_INTERRUPT_THREAD SIGRTMIN
 

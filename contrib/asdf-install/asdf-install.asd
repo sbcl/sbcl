@@ -8,7 +8,7 @@
 
 ;;; this is appalling misuse of asdf.  please don't treat it as any
 ;;; kind of example.  this shouldn't be a compile-op, or if it is, should
-;;; define output-files properly instead oif leaving it be the fasl
+;;; define output-files properly instead of leaving it be the fasl
 (defclass exe-file (cl-source-file) ())
 (defmethod perform :after ((o compile-op) (c exe-file))
   (sb-executable:make-executable

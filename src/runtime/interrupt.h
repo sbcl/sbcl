@@ -49,6 +49,7 @@ extern void interrupt_internal_error(int, siginfo_t*, os_context_t*,
 				     boolean continuable);
 extern boolean handle_control_stack_guard_triggered(os_context_t *,void *);
 extern boolean interrupt_maybe_gc(int, siginfo_t*, void*);
+extern boolean handle_rt_signal(int, siginfo_t*, void*);
 extern void undoably_install_low_level_interrupt_handler (int signal,
 							  void
 							  handler(int,

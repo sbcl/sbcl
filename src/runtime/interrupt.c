@@ -505,7 +505,87 @@ gc_trigger_hit(int signal, siginfo_t *info, os_context_t *context)
 }
 #endif
 
-/* and similarly for the control stack guard page */
+/* manipulate the signal context and stack such that when the handler
+ * returns, it will call function instead of whatever it was doing
+ * previously
+ */
+
+extern lispobj call_into_lisp(lispobj fun, lispobj *args, int nargs);
+extern void post_signal_tramp(void);
+void return_to_lisp_function(os_context_t *context, lispobj function)
+{
+    void * fun=native_pointer(function);
+    char *code = &(((struct simple_fun *) fun)->code);
+    
+    u32 *sp=(u32 *)*os_context_register_addr(context,reg_ESP);
+    
+    /* Build a stack frame showing `interrupted' so that the
+     * user's backtrace makes (as much) sense (as usual) */
+#ifdef LISP_FEATURE_X86
+    /* Suppose the existence of some function that saved all
+     * registers, called call_into_lisp, then restored GP registers and
+     * returned.  We shortcut this: fake the stack that call_into_lisp
+     * would see, then arrange to have it called directly.  post_signal_tramp
+     * is the second half of this function
+     */
+
+    *(sp-14) = post_signal_tramp; /* return address for call_into_lisp */
+    *(sp-13) = function;        /* args for call_into_lisp : function*/
+    *(sp-12) = 0;		/*                           arg array */
+    *(sp-11) = 0;		/*                           no. args */
+    /* this order matches that used in POPAD */
+    *(sp-10)=*os_context_register_addr(context,reg_EDI);
+    *(sp-9)=*os_context_register_addr(context,reg_ESI);
+    /* this gets overwritten again before it's used, anyway */
+    *(sp-8)=*os_context_register_addr(context,reg_EBP);
+    *(sp-7)=0 ; /* POPAD doesn't set ESP, but expects a gap for it anyway */
+    *(sp-6)=*os_context_register_addr(context,reg_EBX);
+
+    *(sp-5)=*os_context_register_addr(context,reg_EDX);
+    *(sp-4)=*os_context_register_addr(context,reg_ECX);
+    *(sp-3)=*os_context_register_addr(context,reg_EAX);
+    *(sp-2)=*os_context_register_addr(context,reg_EBP);
+    *(sp-1)=*os_context_pc_addr(context);
+
+#else 
+    build_fake_control_stack_frames(th,context);
+#endif
+
+    *os_context_pc_addr(context) = call_into_lisp;
+#ifdef LISP_FEATURE_X86
+    *os_context_register_addr(context,reg_ECX) = 0; 
+    *os_context_register_addr(context,reg_EBP) = sp-2;
+    *os_context_register_addr(context,reg_ESP) = sp-14;
+#else
+    /* this much of the calling convention is common to all
+       non-x86 ports */
+    *os_context_register_addr(context,reg_NARGS) = 0; 
+    *os_context_register_addr(context,reg_LIP) = code;
+    *os_context_register_addr(context,reg_CFP) = 
+	current_control_frame_pointer;
+#endif
+#ifdef ARCH_HAS_NPC_REGISTER
+    *os_context_npc_addr(context) =
+	4 + *os_context_pc_addr(context);
+#endif
+#ifdef LISP_FEATURE_SPARC
+    *os_context_register_addr(context,reg_CODE) = 
+	fun + FUN_POINTER_LOWTAG;
+#endif
+#ifdef LISP_FEATURE_LINUX
+    /* Under Linux on some architectures it seems we have to restore
+       the FPU control word from the context, as after the signal is
+       delivered we have a null FPU control word. */
+    os_restore_fp_control(context);
+#endif 
+}
+
+boolean handle_rt_signal(int num, siginfo_t *info, void *v_context)
+{
+    struct 
+	os_context_t *context = (os_context_t*)arch_os_get_context(&v_context);
+    return_to_lisp_function(context,info->si_value.sival_int);
+}
 
 boolean handle_control_stack_guard_triggered(os_context_t *context,void *addr)
 {
@@ -514,49 +594,12 @@ boolean handle_control_stack_guard_triggered(os_context_t *context,void *addr)
      * it won't go back to what it was doing ... */
     if(addr>=(void *)CONTROL_STACK_GUARD_PAGE(th) && 
        addr<(void *)(CONTROL_STACK_GUARD_PAGE(th)+os_vm_page_size)) {
-	void *fun;
-	void *code;
-       /* fprintf(stderr, "hit end of control stack\n");  */
 	/* we hit the end of the control stack.  disable protection
 	 * temporarily so the error handler has some headroom */
-       protect_control_stack_guard_page(th->pid,0L);
+	protect_control_stack_guard_page(th->pid,0L);
 	
-	fun = (void *)
-	    native_pointer((lispobj) SymbolFunction(CONTROL_STACK_EXHAUSTED_ERROR));
-	code = &(((struct simple_fun *) fun)->code);
-
-	/* Build a stack frame showing `interrupted' so that the
-	 * user's backtrace makes (as much) sense (as usual) */
-       build_fake_control_stack_frames(th,context);
-	/* signal handler will "return" to this error-causing function */
-	*os_context_pc_addr(context) = code;
-#ifdef LISP_FEATURE_X86
-	*os_context_register_addr(context,reg_ECX) = 0; 
-#else
-	/* this much of the calling convention is common to all
-	   non-x86 ports */
-	*os_context_register_addr(context,reg_NARGS) = 0; 
-	*os_context_register_addr(context,reg_LIP) = code;
-	*os_context_register_addr(context,reg_CFP) = 
-	    current_control_frame_pointer;
-#endif
-#ifdef ARCH_HAS_NPC_REGISTER
-	*os_context_npc_addr(context) =
-	    4 + *os_context_pc_addr(context);
-#endif
-#ifdef LISP_FEATURE_SPARC
-	/* Bletch.  This is a feature of the SPARC calling convention,
-	   which sadly I'm not going to go into in large detail here,
-	   as I don't know it well enough.  Suffice to say that if the
-	   line 
-
-	   (INST MOVE CODE-TN FUNCTION) 
-
-	   in compiler/sparc/call.lisp is changed, then this bit can
-	   probably go away.  -- CSR, 2002-07-24 */
-	*os_context_register_addr(context,reg_CODE) = 
-	    fun + FUN_POINTER_LOWTAG;
-#endif
+	return_to_lisp_function
+	    (context, SymbolFunction(CONTROL_STACK_EXHAUSTED_ERROR));
 	return 1;
     }
     else return 0;
@@ -660,7 +703,9 @@ undoably_install_low_level_interrupt_handler (int signal,
     sigaddset_blockable(&sa.sa_mask);
     sa.sa_flags = SA_SIGINFO | SA_RESTART;
 #ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
-    if(signal==SIG_MEMORY_FAULT) sa.sa_flags|= SA_ONSTACK;
+    if((signal==SIG_MEMORY_FAULT) ||
+       (signal==SIG_INTERRUPT_THREAD))
+	sa.sa_flags|= SA_ONSTACK;
 #endif
     
     sigaction(signal, &sa, NULL);

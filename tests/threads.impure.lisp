@@ -15,6 +15,21 @@
 
 (in-package "SB-THREAD") ; this is white-box testing, really
 
+;;; For one of the interupt-thread tests, we want a foreign function
+;;; that does not make syscalls
+
+(setf SB-INT:*REPL-PROMPT-FUN* #'sb-thread::thread-repl-prompt-fun)
+(with-open-file (o "threads-foreign.c" :direction :output)
+  (format o "void loop_forever() { while(1) ; }~%"))
+(sb-ext:run-program	
+ "cc"
+ (or #+linux '("-shared" "-o" "threads-foreign.so" "threads-foreign.c")
+     (error "Missing shared library compilation options for this platform"))
+ :search t)
+(sb-alien:load-1-foreign "threads-foreign.so")
+(sb-alien:define-alien-routine loop-forever sb-alien:void)
+
+
 ;;; elementary "can we get a lock and release it again"
 (let ((l (make-mutex :name "foo"))
       (p (current-thread-id)))
@@ -71,5 +86,43 @@
       (condition-notify queue))
     (sleep 1)))
 
-;;; success
+
+(defun test-interrupt (function-to-interrupt &optional quit-p)
+  (let ((child  (make-thread function-to-interrupt)))
+    ;;(format t "gdb ./src/runtime/sbcl ~A~%attach ~A~%" child child)
+    (sleep 2)
+    (format t "interrupting child ~A~%" child)
+    (interrupt-thread child
+		      (lambda ()
+			(format t "child pid ~A~%" (current-thread-id))
+			(when quit-p (sb-ext:quit))))
+    (sleep 1)
+    child))
+
+;;; separate tests for (a) interrupting Lisp code, (b) C code, (c) a syscall,
+;;; (d) waiting on a lock
+
+(let ((child (test-interrupt (lambda () (loop)))))  (terminate-thread child))
+
+(test-interrupt #'loop-forever :quit)
+
+(let ((child (test-interrupt (lambda () (loop (sleep 2000))))))
+  ;; Interrupting a sleep form causes it to return early.  Welcome to Unix.
+  ;; Just to be sure our LOOP form works, let's check the child is still
+  ;; there
+  (assert (zerop (sb-unix:unix-kill child 0)))
+  (terminate-thread child))
+		
+(let ((lock (make-mutex :name "loctite"))
+      child)
+  (with-mutex (lock)
+    (setf child (test-interrupt
+		 (lambda ()
+		   (with-mutex (lock)
+		     (assert (eql (mutex-value lock) (current-thread-id))))
+		   (assert (not (eql (mutex-value lock) (current-thread-id)))))))
+    ;;hold onto lock for long enough that child can't get it immediately
+    (sleep 5))
+  (terminate-thread child))
+
 (sb-ext:quit :unix-status 104)
