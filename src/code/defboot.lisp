@@ -141,78 +141,101 @@
 (defmacro-mundanely prog2 (form1 result &body body)
   `(prog1 (progn ,form1 ,result) ,@body))
 
-;;; Now that we have the definition of MULTIPLE-VALUE-BIND, we can make a
-;;; reasonably readable definition of DEFUN.
-;;;
-;;; DEFUN expands into %DEFUN which is a function that is treated
-;;; magically by the compiler (through an IR1 transform) in order to
-;;; handle stuff like inlining. After the compiler has gotten the
-;;; information it wants out of macro definition, it compiles a call
-;;; to %%DEFUN which happens at load time.
-(defmacro-mundanely defun (&whole whole name args &body body)
+;;;; DEFUN
+
+;;; Should we save the inline expansion of the function named NAME?
+(defun inline-function-name-p (name)
+  (or
+   ;; the normal reason for saving the inline expansion
+   (info :function :inlinep name)
+   ;; another reason for saving the inline expansion: If the
+   ;; ANSI-recommended idiom
+   ;;   (DECLAIM (INLINE FOO))
+   ;;   (DEFUN FOO ..)
+   ;;   (DECLAIM (NOTINLINE FOO))
+   ;; has been used, and then we later do another
+   ;;   (DEFUN FOO ..)
+   ;; without a preceding
+   ;;   (DECLAIM (INLINE FOO))
+   ;; what should we do with the old inline expansion? Overwriting it
+   ;; with the new definition seems like the only unsurprising choice.
+   (info :function :inline-expansion name)))
+
+;;; Now that we have the definition of MULTIPLE-VALUE-BIND, we can
+;;; make a reasonably readable definition of DEFUN.
+(defmacro-mundanely defun (&environment env name args &body body)
+  "Define a function at top level."
+  #+sb-xc-host
+  (unless (symbol-package (function-name-block-name name))
+    (warn "DEFUN of uninterned symbol ~S (tricky for GENESIS)" name))
   (multiple-value-bind (forms decls doc) (parse-body body)
-    (let ((def `(lambda ,args
-		  ,@decls
-		  (block ,(function-name-block-name name)
-		    ,@forms))))
-      `(sb!c::%defun ',name #',def ,doc ',whole))))
-#+sb-xc-host (/show "before PROCLAIM" (sb!c::info :function :kind 'sb!c::%%defun))
-#+sb-xc-host (sb!xc:proclaim '(ftype function sb!c::%%defun)) ; to avoid
-					; undefined function warnings
-#+sb-xc-host (/show "after PROCLAIM" (sb!c::info :function :kind 'sb!c::%%defun))
-(defun sb!c::%%defun (name def doc &optional inline-expansion)
-  ;; When we're built as a cross-compiler, the DEF is a function
-  ;; implemented by the cross-compilation host, which is opaque to us.
-  ;; Similarly, other things like FDEFINITION or DOCUMENTATION either
-  ;; aren't ours to mess with or are meaningless to mess with. Thus,
-  ;; we punt.
-  #+sb-xc-host (declare (ignore def doc))
-  #-sb-xc-host 
-  (progn
-    (when (fboundp name)
-      (style-warn "redefining ~S in DEFUN" name))
-    (setf (sb!xc:fdefinition name) def)
-    (when doc
-      ;; FIXME: This should use shared SETF-name-parsing logic.
-      (if (and (consp name) (eq (first name) 'setf))
-	  (setf (fdocumentation (second name) 'setf) doc)
-	  (setf (fdocumentation name 'function) doc))))
-  ;; Other stuff remains meaningful whether we're cross-compiling or
-  ;; native compiling.
-  (become-defined-function-name name)
-  (when (or inline-expansion
-	    (info :function :inline-expansion name))
-    (setf (info :function :inline-expansion name)
-	  inline-expansion))
-  ;; Voila.
+    (let* ((lambda `(lambda ,args
+		      ,@decls
+		      (block ,(function-name-block-name name)
+			,@forms)))
+	   (want-to-inline )
+	   (inline-lambda
+	    (cond (;; Does the user not even want to inline?
+		   (not (inline-function-name-p name))
+		   nil)
+		  (;; Does inlining look too hairy to handle?
+		   (not (sb!c:lambda-independent-of-lexenv-p lambda env))
+		   (sb!c:maybe-compiler-note
+		    "lexical environment too hairy, can't inline DEFUN ~S"
+		    name)
+		   nil)
+		  (t
+		   ;; FIXME: The only reason that we return
+		   ;; LAMBDA-WITH-LEXENV instead of returning bare
+		   ;; LAMBDA is to avoid modifying downstream code
+		   ;; which expects LAMBDA-WITH-LEXENV. But the code
+		   ;; here is the only code which feeds into the
+		   ;; downstream code, and the generality of the
+		   ;; interface is no longer used, so it'd make sense
+		   ;; to simplify the interface instead of using the
+		   ;; old general LAMBDA-WITH-LEXENV interface in this
+		   ;; simplified way.
+		   `(sb!c:lambda-with-lexenv
+		     nil nil nil ; i.e. no DECLS, no MACROS, no SYMMACS
+		     ,@(rest lambda))))))
+      `(progn
+
+	 ;; In cross-compilation of toplevel DEFUNs, we arrange
+	 ;; for the LAMBDA to be statically linked by GENESIS.
+	 #+sb-xc-host
+	 (cold-fset ,name ,lambda)
+
+	 (eval-when (:compile-toplevel :load-toplevel :execute)
+	   (sb!c:%compiler-defun ',name ',inline-lambda))
+
+	 (%defun ',name
+		 ;; In normal compilation (not for cold load) this is
+		 ;; where the compiled LAMBDA first appears. In
+		 ;; cross-compilation, we manipulate the
+		 ;; previously-statically-linked LAMBDA here.
+		 #-sb-xc-host ,lambda
+		 #+sb-xc-host (fdefinition ',name)
+		 ,doc)))))
+#-sb-xc-host
+(defun %defun (name def doc)
+  (declare (type function def))
+  (declare (type (or null simple-string doc)))
+  (/show0 "entering %DEFUN, name (or block name) = ..")
+  (/primitive-print (symbol-name (function-name-block-name name)))
+  (aver (legal-function-name-p name))
+  (when (fboundp name)
+    (/show0 "redefining NAME")
+    (style-warn "redefining ~S in DEFUN" name))
+  (/show0 "setting FDEFINITION")
+  (setf (sb!xc:fdefinition name) def)
+  (when doc
+    ;; FIXME: This should use shared SETF-name-parsing logic.
+    (/show0 "setting FDOCUMENTATION")
+    (if (and (consp name) (eq (first name) 'setf))
+	(setf (fdocumentation (second name) 'setf) doc)
+	(setf (fdocumentation (the symbol name) 'function) doc)))
+  (/show0 "leaving %DEFUN")
   name)
-;;; FIXME: Now that the IR1 interpreter is going away and EVAL-WHEN is
-;;; becoming ANSI-compliant, it should be possible to merge this and
-;;; DEF-IR1-TRANSLATOR %DEFUN into a single DEFUN. (And does %%DEFUN
-;;; merge into that too? dunno..)
-(defun sb!c::%defun (name def doc source)
-  (declare (ignore source))
-  (flet ((set-type-info-from-def ()
-           (setf (info :function :type name)
-		 #-sb-xc-host (extract-function-type def)
-		 ;; When we're built as a cross-compiler, the DEF is
-		 ;; a function implemented by the cross-compilation
-		 ;; host, which is opaque to us, so we have to punt here.
-		 #+sb-xc-host *universal-function-type*)))
-    (ecase (info :function :where-from name)
-      (:assumed
-       (setf (info :function :where-from name) :defined)
-       (set-type-info-from-def)
-       (when (info :function :assumed-type name)
-	 (setf (info :function :assumed-type name) nil)))
-      (:declared)
-      (:defined
-       (set-type-info-from-def)
-       ;; We shouldn't need to clear this here because it should be
-       ;; clear already (having been cleared when the last definition
-       ;; was processed).
-       (aver (null (info :function :assumed-type name))))))
-  (sb!c::%%defun name def doc))
 
 ;;;; DEFVAR and DEFPARAMETER
 
@@ -313,8 +336,8 @@
     ;; form, we introduce a gratuitous binding of the variable to NIL
     ;; without the declarations, then evaluate the result form in that
     ;; environment. We spuriously reference the gratuitous variable,
-    ;; since we don't want to use IGNORABLE on what might be a special
-    ;; var.
+    ;; since since we don't want to use IGNORABLE on what might be a
+    ;; special var.
     (let ((n-list (gensym)))
       `(do ((,n-list ,list (cdr ,n-list)))
 	   ((endp ,n-list)

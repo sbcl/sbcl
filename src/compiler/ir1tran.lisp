@@ -18,7 +18,7 @@
 ;;; taken through the source to reach the form. This provides a way to
 ;;; keep track of the location of original source forms, even when
 ;;; macroexpansions and other arbitary permutations of the code
-;;; happen. This table is initialized by calling Find-Source-Paths on
+;;; happen. This table is initialized by calling FIND-SOURCE-PATHS on
 ;;; the original source.
 (declaim (hash-table *source-paths*))
 (defvar *source-paths*)
@@ -40,7 +40,7 @@
 ;;; *CURRENT-PATH* is the source path of the form we are currently
 ;;; translating. See NODE-SOURCE-PATH in the NODE structure.
 (declaim (list *current-path*))
-(defvar *current-path* nil)
+(defvar *current-path*)
 
 (defvar *derive-function-types* nil
   "Should the compiler assume that function types will never change,
@@ -325,11 +325,11 @@
 
 ;;; This function takes a form and the top-level form number for that
 ;;; form, and returns a lambda representing the translation of that
-;;; form in the current global environment. The lambda is top-level
-;;; lambda that can be called to cause evaluation of the forms. This
-;;; lambda is in the initial component. If FOR-VALUE is T, then the
-;;; value of the form is returned from the function, otherwise NIL is
-;;; returned.
+;;; form in the current global environment. The returned lambda is a
+;;; top-level lambda that can be called to cause evaluation of the
+;;; forms. This lambda is in the initial component. If FOR-VALUE is T,
+;;; then the value of the form is returned from the function,
+;;; otherwise NIL is returned.
 ;;;
 ;;; This function may have arbitrary effects on the global environment
 ;;; due to processing of PROCLAIMs and EVAL-WHENs. All syntax error
@@ -364,7 +364,8 @@
 
 ;;; *CURRENT-FORM-NUMBER* is used in FIND-SOURCE-PATHS to compute the
 ;;; form number to associate with a source path. This should be bound
-;;; to 0 around the processing of each truly top-level form.
+;;; to an initial value of 0 before the processing of each truly
+;;; top-level form.
 (declaim (type index *current-form-number*))
 (defvar *current-form-number*)
 
@@ -500,7 +501,7 @@
     (pushnew fun (component-reanalyze-functions *current-component*)))
   fun)
 
-;;; Generate a Ref node for LEAF, frobbing the LEAF structure as
+;;; Generate a REF node for LEAF, frobbing the LEAF structure as
 ;;; needed. If LEAF represents a defined function which has already
 ;;; been converted, and is not :NOTINLINE, then reference the
 ;;; functional instead.
@@ -1326,6 +1327,9 @@
 	      (new-venv nil cons))
 
       (dolist (var vars)
+	;; As far as I can see, LAMBDA-VAR-HOME should never have
+	;; been set before. Let's make sure. -- WHN 2001-09-29
+	(aver (null (lambda-var-home var)))
 	(setf (lambda-var-home var) lambda)
 	(let ((specvar (lambda-var-specvar var)))
 	  (cond (specvar
@@ -1646,24 +1650,24 @@
       last-entry)))
 
 ;;; This function generates the entry point functions for the
-;;; optional-dispatch Res. We accomplish this by recursion on the list of
-;;; arguments, analyzing the arglist on the way down and generating entry
-;;; points on the way up.
+;;; OPTIONAL-DISPATCH RES. We accomplish this by recursion on the list
+;;; of arguments, analyzing the arglist on the way down and generating
+;;; entry points on the way up.
 ;;;
-;;; Default-Vars is a reversed list of all the argument vars processed
-;;; so far, including supplied-p vars. Default-Vals is a list of the
-;;; names of the Default-Vars.
+;;; DEFAULT-VARS is a reversed list of all the argument vars processed
+;;; so far, including supplied-p vars. DEFAULT-VALS is a list of the
+;;; names of the DEFAULT-VARS.
 ;;;
-;;; Entry-Vars is a reversed list of processed argument vars,
-;;; excluding supplied-p vars. Entry-Vals is a list things that can be
-;;; evaluated to get the values for all the vars from the Entry-Vars.
+;;; ENTRY-VARS is a reversed list of processed argument vars,
+;;; excluding supplied-p vars. ENTRY-VALS is a list things that can be
+;;; evaluated to get the values for all the vars from the ENTRY-VARS.
 ;;; It has the var name for each required or optional arg, and has T
 ;;; for each supplied-p arg.
 ;;;
-;;; Vars is a list of the Lambda-Var structures for arguments that
-;;; haven't been processed yet. Supplied-p-p is true if a supplied-p
+;;; VARS is a list of the LAMBDA-VAR structures for arguments that
+;;; haven't been processed yet. SUPPLIED-P-P is true if a supplied-p
 ;;; argument has already been processed; only in this case are the
-;;; Default-XXX and Entry-XXX different.
+;;; DEFAULT-XXX and ENTRY-XXX different.
 ;;;
 ;;; The result at each point is a lambda which should be called by the
 ;;; above level to default the remaining arguments and evaluate the
@@ -1671,9 +1675,9 @@
 ;;; returning it as the result when the recursion bottoms out.
 ;;;
 ;;; Each level in the recursion also adds its entry point function to
-;;; the result Optional-Dispatch. For most arguments, the defaulting
+;;; the result OPTIONAL-DISPATCH. For most arguments, the defaulting
 ;;; function and the entry point function will be the same, but when
-;;; supplied-p args are present they may be different.
+;;; SUPPLIED-P args are present they may be different.
 ;;;
 ;;; When we run into a &REST or &KEY arg, we punt out to
 ;;; IR1-CONVERT-MORE, which finishes for us in this case.
@@ -1741,9 +1745,9 @@
 				aux-vals cont)))))))
 
 ;;; This function deals with the case where we have to make an
-;;; Optional-Dispatch to represent a lambda. We cons up the result and
+;;; OPTIONAL-DISPATCH to represent a LAMBDA. We cons up the result and
 ;;; call IR1-CONVERT-HAIRY-ARGS to do the work. When it is done, we
-;;; figure out the min-args and max-args.
+;;; figure out the MIN-ARGS and MAX-ARGS.
 (defun ir1-convert-hairy-lambda (body vars keyp allowp aux-vars aux-vals cont)
   (declare (list body vars aux-vars aux-vals) (type continuation cont))
   (let ((res (make-optional-dispatch :arglist vars
@@ -1853,8 +1857,8 @@
 ;;;; mark its extent. When doing GO or RETURN-FROM, we emit an Exit
 ;;;; node.
 
-;;; Make a :entry cleanup and emit an Entry node, then convert the
-;;; body in the modified environment. We make Cont start a block now,
+;;; Make a :ENTRY cleanup and emit an ENTRY node, then convert the
+;;; body in the modified environment. We make CONT start a block now,
 ;;; since if it was done later, the block would be in the wrong
 ;;; environment.
 (def-ir1-translator block ((name &rest forms) start cont)
@@ -1882,9 +1886,9 @@
       (ir1-convert-progn-body dummy cont forms))))
 
 
-;;; We make Cont start a block just so that it will have a block
+;;; We make CONT start a block just so that it will have a block
 ;;; assigned. People assume that when they pass a continuation into
-;;; IR1-Convert as Cont, it will have a block when it is done.
+;;; IR1-CONVERT as CONT, it will have a block when it is done.
 (def-ir1-translator return-from ((name &optional value)
 				 start cont)
   #!+sb-doc
@@ -2777,12 +2781,14 @@
 ;;; lambda-list and comparing it with the new one.
 (def-ir1-translator %defmacro ((qname qdef lambda-list doc) start cont
 			       :kind :function)
-  (let (;; QNAME is typically a quoted name. I think the idea is to let
-	;; %DEFMACRO work as an ordinary function when interpreting. Whatever
-	;; the reason it's there, we don't want it any more. -- WHN 19990603
+  (let (;; QNAME is typically a quoted name. I think the idea is to
+	;; let %DEFMACRO work as an ordinary function when
+	;; interpreting. Whatever the reason the quote is there, we
+	;; don't want it any more. -- WHN 19990603
 	(name (eval qname))
-	;; QDEF should be a sharp-quoted definition. We don't want to make a
-	;; function of it just yet, so we just drop the sharp-quote.
+	;; QDEF should be a sharp-quoted definition. We don't want to
+	;; make a function of it just yet, so we just drop the
+	;; sharp-quote.
 	(def (progn
 	       (aver (eq 'function (first qdef)))
 	       (aver (proper-list-of-length-p qdef 2))
@@ -2869,11 +2875,11 @@
 
 ;;; Convert FUN as a lambda in the null environment, but use the
 ;;; current compilation policy. Note that FUN may be a
-;;; LAMBDA-WITH-ENVIRONMENT, so we may have to augment the environment
-;;; to reflect the state at the definition site.
+;;; LAMBDA-WITH-LEXENV, so we may have to augment the environment to
+;;; reflect the state at the definition site.
 (defun ir1-convert-inline-lambda (fun &optional name)
   (destructuring-bind (decls macros symbol-macros &rest body)
-		      (if (eq (car fun) 'lambda-with-environment)
+		      (if (eq (car fun) 'lambda-with-lexenv)
 			  (cdr fun)
 			  `(() () () . ,(cdr fun)))
     (let ((*lexenv* (make-lexenv
@@ -2888,55 +2894,6 @@
 			     macros)
 		     :policy (lexenv-policy *lexenv*))))
       (ir1-convert-lambda `(lambda ,@body) name))))
-
-;;; Return a lambda that has been "closed" with respect to ENV,
-;;; returning a LAMBDA-WITH-ENVIRONMENT if there are interesting
-;;; macros or declarations. If there is something too complex (like a
-;;; lexical variable) in the environment, then we return NIL.
-(defun inline-syntactic-closure-lambda (lambda &optional (env *lexenv*))
-  (let ((variables (lexenv-variables env))
-	(functions (lexenv-functions env))
-	(decls ())
-	(symmacs ())
-	(macros ()))
-    (cond ((or (lexenv-blocks env) (lexenv-tags env)) nil)
-	  ((and (null variables) (null functions))
-	   lambda)
-	  ((dolist (x variables nil)
-	     (let ((name (car x))
-		   (what (cdr x)))
-	       (when (eq x (assoc name variables :test #'eq))
-		 (typecase what
-		   (cons
-		    (aver (eq (car what) 'macro))
-		    (push x symmacs))
-		   (global-var
-		    (aver (eq (global-var-kind what) :special))
-		    (push `(special ,name) decls))
-		   (t (return t))))))
-	   nil)
-	  ((dolist (x functions nil)
-	     (let ((name (car x))
-		   (what (cdr x)))
-	       (when (eq x (assoc name functions :test #'equal))
-		 (typecase what
-		   (cons
-		    (push (cons name
-				(function-lambda-expression (cdr what)))
-			  macros))
-		   (global-var
-		    (when (defined-function-p what)
-		      (push `(,(car (rassoc (defined-function-inlinep what)
-					    *inlinep-translations*))
-			      ,name)
-			    decls)))
-		   (t (return t))))))
-	   nil)
-	  (t
-	   `(lambda-with-environment ,decls
-				     ,macros
-				     ,symmacs
-				     . ,(rest lambda))))))
 
 ;;; Get a DEFINED-FUNCTION object for a function we are about to
 ;;; define. If the function has been forward referenced, then
@@ -2967,8 +2924,7 @@
 ;;; types if appropriate. This assertion is suppressed by the
 ;;; EXPLICIT-CHECK attribute, which is specified on functions that
 ;;; check their argument types as a consequence of type dispatching.
-;;; This avoids redundant checks such as NUMBERP on the args to +,
-;;; etc.
+;;; This avoids redundant checks such as NUMBERP on the args to +, etc.
 (defun assert-new-definition (var fun)
   (let ((type (leaf-type var))
 	(for-real (eq (leaf-where-from var) :declared))
@@ -3027,54 +2983,55 @@
 	(when expansion (setf (defined-function-functional var) fun)))
       fun)))
 
-;;; Convert the definition and install it in the global environment
-;;; with a LABELS-like effect. If the lexical environment is not null,
-;;; then we only install the definition during the processing of this
-;;; DEFUN, ensuring that the function cannot be called outside of the
-;;; correct environment. If the function is globally NOTINLINE, then
-;;; that inhibits even local substitution. Also, emit top-level code
-;;; to install the definition.
+;;; the even-at-compile-time part of DEFUN
 ;;;
-;;; This is one of the major places where the semantics of block
-;;; compilation is handled. Substitution for global names is totally
-;;; inhibited if *BLOCK-COMPILE* is NIL. And if *BLOCK-COMPILE* is
-;;; true and entry points are specified, then we don't install global
-;;; definitions for non-entry functions (effectively turning them into
-;;; local lexical functions.)
-(def-ir1-translator %defun ((name def doc source) start cont
-			    :kind :function)
-  (declare (ignore source))
-  (let* ((name (eval name))
-	 (lambda (second def))
-	 (*current-path* (revert-source-path 'defun))
-	 (expansion (unless (eq (info :function :inlinep name) :notinline)
-		      (inline-syntactic-closure-lambda lambda))))
-    ;; If not in a simple environment or NOTINLINE, then discard any
-    ;; forward references to this function.
-    (unless expansion (remhash name *free-functions*))
+;;; The INLINE-EXPANSION is a LAMBDA-WITH-LEXENV, or NIL if there is
+;;; no inline expansion.
+(defun %compiler-defun (name lambda-with-lexenv)
 
-    (let* ((var (get-defined-function name))
-	   (save-expansion (and (member (defined-function-inlinep var)
-					'(:inline :maybe-inline))
-				expansion)))
-      (setf (defined-function-inline-expansion var) expansion)
-      (setf (info :function :inline-expansion name) save-expansion)
-      ;; If there is a type from a previous definition, blast it,
-      ;; since it is obsolete.
-      (when (eq (leaf-where-from var) :defined)
-	(setf (leaf-type var) (specifier-type 'function)))
+  (let ((defined-function nil)) ; will be set below if we're in the compiler
+    
+    ;; when in the compiler
+    (when (boundp '*lexenv*) 
+      (when sb!xc:*compile-print*
+	(compiler-mumble "~&; recognizing DEFUN ~S~%" name))
+      (remhash name *free-functions*)
+      (setf defined-function (get-defined-function name)))
 
-      (let ((fun (ir1-convert-lambda-for-defun lambda
-					       var
-					       expansion
-					       #'ir1-convert-lambda)))
-	(ir1-convert
-	 start cont
-	 (if (and *block-compile* *entry-points*
-		  (not (member name *entry-points* :test #'equal)))
-	     `',name
-	     `(%%defun ',name ,fun ,doc
-		       ,@(when save-expansion `(',save-expansion)))))
+    (become-defined-function-name name)
 
-	(when sb!xc:*compile-print*
-	  (compiler-mumble "~&; converted ~S~%" name))))))
+    (cond (lambda-with-lexenv
+	   (setf (info :function :inline-expansion name) lambda-with-lexenv)
+	   (when defined-function 
+	     (setf (defined-function-inline-expansion defined-function)
+		   lambda-with-lexenv)))
+	  (t
+	   (clear-info :function :inline-expansion name)))
+
+    ;; old CMU CL comment:
+    ;;   If there is a type from a previous definition, blast it,
+    ;;   since it is obsolete.
+    (when (and defined-function
+	       (eq (leaf-where-from defined-function) :defined))
+      (setf (leaf-type defined-function)
+	    ;; FIXME: If this is a block compilation thing, shouldn't
+	    ;; we be setting the type to the full derived type for the
+	    ;; definition, instead of this most general function type?
+	    (specifier-type 'function))))
+
+  (values))
+
+;;;; hacking function names
+
+;;; This is like LAMBDA, except the result is tweaked so that
+;;; %FUNCTION-NAME or BYTE-FUNCTION-NAME can extract a name. (Also
+;;; possibly the name could also be used at compile time to emit
+;;; more-informative name-based compiler diagnostic messages as well.)
+(defmacro-mundanely named-lambda (name args &body body)
+
+  ;; FIXME: For now, in this stub version, we just discard the name. A
+  ;; non-stub version might use either macro-level LOAD-TIME-VALUE
+  ;; hackery or customized IR1-transform level magic to actually put
+  ;; the name in place.
+  (aver (legal-function-name-p name))
+  `(lambda ,args ,@body))

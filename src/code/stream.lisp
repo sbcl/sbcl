@@ -179,10 +179,6 @@
   (declare (type stream stream))
   (funcall (lisp-stream-misc stream) stream :interactive-p))
 
-(defun open-stream-p (stream)
-  (declare (type stream stream))
-  (not (eq (lisp-stream-in stream) #'closed-flame)))
-
 (defun close (stream &key abort)
   (declare (type stream stream))
   (when (open-stream-p stream)

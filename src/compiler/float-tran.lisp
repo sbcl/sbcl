@@ -269,7 +269,7 @@
 
 ;;; Do some stuff to recognize when the loser is doing mixed float and
 ;;; rational arithmetic, or different float types, and fix it up. If
-;;; we don't, he won't even get so much as an efficency note.
+;;; we don't, he won't even get so much as an efficiency note.
 (deftransform float-contagion-arg1 ((x y) * * :defun-only t :node node)
   `(,(continuation-function-name (basic-combination-fun node))
     (float x y) y))

@@ -894,22 +894,22 @@
 			      ,@more-seqs)
 			 ,',unfound-result)))))))
   (defquantifier some when pred-value :unfound-result nil :doc
-  "PREDICATE is applied to the elements with index 0 of the sequences, then 
-   possibly to those with index 1, and so on. SOME returns the first 
-   non-NIL value encountered, or NIL if the end of a sequence is reached.")
+  "Apply PREDICATE to the 0-indexed elements of the sequences, then 
+   possibly to those with index 1, and so on. Return the first 
+   non-NIL value encountered, or NIL if the end of any sequence is reached.")
   (defquantifier every unless nil :doc
-  "PREDICATE is applied to the elements with index 0 of the sequences, then
-   possibly to those with index 1, and so on. EVERY returns NIL as soon
+  "Apply PREDICATE to the 0-indexed elements of the sequences, then
+   possibly to those with index 1, and so on. Return NIL as soon
    as any invocation of PREDICATE returns NIL, or T if every invocation
    is non-NIL.")
   (defquantifier notany when nil :doc
-  "PREDICATE is applied to the elements with index 0 of the sequences, then 
-   possibly to those with index 1, and so on. NOTANY returns NIL as soon
+  "Apply PREDICATE to the 0-indexed elements of the sequences, then 
+   possibly to those with index 1, and so on. Return NIL as soon
    as any invocation of PREDICATE returns a non-NIL value, or T if the end
-   of a sequence is reached.")
+   of any sequence is reached.")
   (defquantifier notevery unless t :doc
-  "PREDICATE is applied to the elements with index 0 of the sequences, then
-   possibly to those with index 1, and so on. NOTEVERY returns T as soon
+  "Apply PREDICATE to 0-indexed elements of the sequences, then
+   possibly to those with index 1, and so on. Return T as soon
    as any invocation of PREDICATE returns NIL, or NIL if every invocation
    is non-NIL."))
 

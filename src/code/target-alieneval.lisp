@@ -579,23 +579,25 @@
       (t
        (error "~S is not an alien function." alien)))))
 
-(defmacro def-alien-routine (name result-type &rest args &environment env)
+(defmacro def-alien-routine (name result-type &rest args &environment lexenv)
   #!+sb-doc
-  "Def-C-Routine Name Result-Type
-		    {(Arg-Name Arg-Type [Style])}*
+  "DEF-ALIEN-ROUTINE Name Result-Type {(Arg-Name Arg-Type [Style])}*
 
-  Define a foreign interface function for the routine with the specified Name,
-  which may be either a string, symbol or list of the form (string symbol).
-  Return-Type is the Alien type for the function return value. VOID may be
-  used to specify a function with no result.
+  Define a foreign interface function for the routine with the specified NAME.
+  Also automatically DECLAIM the FTYPE of the defined function.
 
-  The remaining forms specifiy individual arguments that are passed to the
-  routine. Arg-Name is a symbol that names the argument, primarily for
-  documentation. Arg-Type is the C-Type of the argument. Style specifies the
-  say that the argument is passed.
+  NAME may be either a string, a symbol, or a list of the form (string symbol).
+
+  RETURN-TYPE is the alien type for the function return value. VOID may be
+  used to specify a function with no result. 
+
+  The remaining forms specify individual arguments that are passed to the
+  routine. ARG-NAME is a symbol that names the argument, primarily for
+  documentation. ARG-TYPE is the C type of the argument. STYLE specifies the
+  way that the argument is passed.
 
   :IN
-	An :In argument is simply passed by value. The value to be passed is
+	An :IN argument is simply passed by value. The value to be passed is
 	obtained from argument(s) to the interface function. No values are
 	returned for :In arguments. This is the default mode.
 
@@ -607,14 +609,15 @@
 	to arrays, records or functions.
 
   :COPY
-	Similar to :IN, except that the argument values are stored in on
-	the stack, and a pointer to the object is passed instead of
-	the values themselves.
+	This is similar to :IN, except that the argument values are stored
+        on the stack, and a pointer to the object is passed instead of
+	the value itself.
 
   :IN-OUT
-	A combination of :OUT and :COPY. A pointer to the argument is passed,
-	with the object being initialized from the supplied argument and
-	the return value being determined by accessing the object on return."
+	This is a combination of :OUT and :COPY. A pointer to the argument is
+        passed,	with the object being initialized from the supplied argument
+        and the return value being determined by accessing the object on
+        return."
   (multiple-value-bind (lisp-name alien-name)
       (pick-lisp-and-alien-names name)
     (collect ((docs) (lisp-args) (arg-types) (alien-vars)
@@ -628,7 +631,7 @@
 	      (unless (eq style :out)
 		(lisp-args name))
 	      (when (and (member style '(:out :in-out))
-			 (typep (parse-alien-type type env)
+			 (typep (parse-alien-type type lexenv)
 				'alien-pointer-type))
 		(error "can't use :OUT or :IN-OUT on pointer-like type:~%  ~S"
 		       type))
@@ -643,21 +646,32 @@
 		     (alien-args `(addr ,name))))
 	      (when (or (eq style :out) (eq style :in-out))
 		(results name)))))
-      `(defun ,lisp-name ,(lisp-args)
-	 ,@(docs)
-	 (with-alien
-	     ((,lisp-name (function ,result-type ,@(arg-types))
-			  :extern ,alien-name)
-	      ,@(alien-vars))
-	     ,(if (alien-values-type-p result-type)
-		  (let ((temps (make-gensym-list
-				(length
-				 (alien-values-type-values result-type)))))
-		    `(multiple-value-bind ,temps
-			 (alien-funcall ,lisp-name ,@(alien-args))
-		       (values ,@temps ,@(results))))
-		  `(values (alien-funcall ,lisp-name ,@(alien-args))
-			   ,@(results))))))))
+      `(progn
+
+	 ;; The theory behind this automatic DECLAIM is that (1) if
+	 ;; you're calling C, static typing is what you're doing
+	 ;; anyway, and (2) such a declamation can be (especially for
+	 ;; alien values) both messy to do by hand and very important
+	 ;; for performance of later code which uses the return value.
+	 (declaim (ftype (function (mapcar (constantly t) ',args)
+				   (alien ,result-type))
+			 ,lisp-name))
+
+	 (defun ,lisp-name ,(lisp-args)
+	   ,@(docs)
+	   (with-alien
+	    ((,lisp-name (function ,result-type ,@(arg-types))
+			 :extern ,alien-name)
+	     ,@(alien-vars))
+	    ,(if (alien-values-type-p result-type)
+		 (let ((temps (make-gensym-list
+			       (length
+				(alien-values-type-values result-type)))))
+		   `(multiple-value-bind ,temps
+			(alien-funcall ,lisp-name ,@(alien-args))
+		      (values ,@temps ,@(results))))
+		 `(values (alien-funcall ,lisp-name ,@(alien-args))
+			  ,@(results)))))))))
 
 (defun alien-typep (object type)
   #!+sb-doc

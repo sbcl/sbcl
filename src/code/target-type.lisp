@@ -129,8 +129,11 @@
 ;;; Pull the type specifier out of a function object.
 (defun extract-function-type (fun)
   (typecase fun
+    ;; FIXME: byte compiler to be deleted completely
+    #|
     (byte-function (byte-function-type fun))
     (byte-closure (byte-function-type (byte-closure-function fun)))
+    |#
     (t
      (specifier-type (%function-type (%closure-function fun))))))
 

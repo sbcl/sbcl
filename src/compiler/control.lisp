@@ -1,5 +1,5 @@
-;;;; This file contains the control analysis pass in the compiler. This
-;;;; pass determines the order in which the IR2 blocks are to be
+;;;; This file contains the control analysis pass in the compiler.
+;;;; This pass determines the order in which the IR2 blocks are to be
 ;;;; emitted, attempting to minimize the associated branching costs.
 ;;;;
 ;;;; At this point, we commit to generating IR2 (and ultimately
@@ -18,7 +18,7 @@
 
 (in-package "SB!C")
 
-;;; Insert Block in the emission order after the block After.
+;;; Insert BLOCK in the emission order after the block AFTER.
 (defun add-to-emit-order (block after)
   (declare (type block-annotation block after))
   (let ((next (block-annotation-next after)))
@@ -28,7 +28,7 @@
     (setf (block-annotation-prev next) block))
   (values))
 
-;;; If Block looks like the head of a loop, then attempt to rotate it.
+;;; If BLOCK looks like the head of a loop, then attempt to rotate it.
 ;;; A block looks like a loop head if the number of some predecessor
 ;;; is less than the block's number. Since blocks are numbered in
 ;;; reverse DFN, this will identify loop heads in a reducible flow
@@ -78,23 +78,24 @@
      (t
       block))))
 
-;;; Do a graph walk linking blocks into the emit order as we go. We call
-;;; FIND-ROTATED-LOOP-HEAD to do while-loop optimization.
+;;; Do a graph walk linking blocks into the emit order as we go. We
+;;; call FIND-ROTATED-LOOP-HEAD to do while-loop optimization.
 ;;;
 ;;; We treat blocks ending in tail local calls to other environments
-;;; specially. We can't walked the called function immediately, since it is in
-;;; a different function and we must keep the code for a function contiguous.
-;;; Instead, we return the function that we want to call so that it can be
-;;; walked as soon as possible, which is hopefully immediately.
+;;; specially. We can't walked the called function immediately, since
+;;; it is in a different function and we must keep the code for a
+;;; function contiguous. Instead, we return the function that we want
+;;; to call so that it can be walked as soon as possible, which is
+;;; hopefully immediately.
 ;;;
-;;; If any of the recursive calls ends in a tail local call, then we return
-;;; the last such function, since it is the only one we can possibly drop
-;;; through to. (But it doesn't have to be from the last block walked, since
-;;; that call might not have added anything.)
+;;; If any of the recursive calls ends in a tail local call, then we
+;;; return the last such function, since it is the only one we can
+;;; possibly drop through to. (But it doesn't have to be from the last
+;;; block walked, since that call might not have added anything.)
 ;;;
-;;; We defer walking successors whose successor is the component tail (end
-;;; in an error, NLX or tail full call.)  This is to discourage making error
-;;; code the drop-through.
+;;; We defer walking successors whose successor is the component tail
+;;; (end in an error, NLX or tail full call.) This is to discourage
+;;; making error code the drop-through.
 (defun control-analyze-block (block tail block-info-constructor)
   (declare (type cblock block) (type block-annotation tail))
   (unless (block-flag block)
@@ -125,15 +126,17 @@
 		   (control-analyze-block succ tail block-info-constructor))
 		 fun)))))))
 
-;;; Analyze all of the NLX EPs first to ensure that code reachable only from
-;;; a NLX is emitted contiguously with the code reachable from the Bind. Code
-;;; reachable from the Bind is inserted *before* the NLX code so that the Bind
-;;; marks the beginning of the code for the function. If the walks from NLX
-;;; EPs reach the bind block, then we just move it to the beginning.
+;;; Analyze all of the NLX EPs first to ensure that code reachable
+;;; only from a NLX is emitted contiguously with the code reachable
+;;; from the Bind. Code reachable from the Bind is inserted *before*
+;;; the NLX code so that the Bind marks the beginning of the code for
+;;; the function. If the walks from NLX EPs reach the bind block, then
+;;; we just move it to the beginning.
 ;;;
-;;; If the walk from the bind node encountered a tail local call, then we
-;;; start over again there to help the call drop through. Of course, it will
-;;; never get a drop-through if either function has NLX code.
+;;; If the walk from the bind node encountered a tail local call, then
+;;; we start over again there to help the call drop through. Of
+;;; course, it will never get a drop-through if either function has
+;;; NLX code.
 (defun control-analyze-1-fun (fun component block-info-constructor)
   (declare (type clambda fun) (type component component))
   (let* ((tail-block (block-info (component-tail component)))
@@ -162,13 +165,14 @@
   (values))
 
 ;;; Do control analysis on Component, finding the emit order. Our only
-;;; cleverness here is that we walk XEP's first to increase the probability
-;;; that the tail call will be a drop-through.
+;;; cleverness here is that we walk XEP's first to increase the
+;;; probability that the tail call will be a drop-through.
 ;;;
-;;; When we are done, we delete blocks that weren't reached by the walk.
-;;; Some return blocks are made unreachable by LTN without setting
-;;; COMPONENT-REANALYZE. We remove all deleted blocks from the IR2-COMPONENT
-;;; VALUES-RECEIVERS to keep stack analysis from getting confused.
+;;; When we are done, we delete blocks that weren't reached by the
+;;; walk. Some return blocks are made unreachable by LTN without
+;;; setting COMPONENT-REANALYZE. We remove all deleted blocks from the
+;;; IR2-COMPONENT VALUES-RECEIVERS to keep stack analysis from getting
+;;; confused.
 (defevent control-deleted-block "control analysis deleted dead block")
 (defun control-analyze (component block-info-constructor)
   (declare (type component component)
@@ -198,7 +202,7 @@
 
   (let ((2comp (component-info component)))
     (when (ir2-component-p 2comp)
-      ;; If it's not an ir2-component, don't worry about it.
+      ;; If it's not an IR2-COMPONENT, don't worry about it.
       (setf (ir2-component-values-receivers 2comp)
 	    (delete-if-not #'block-component
 			   (ir2-component-values-receivers 2comp)))))

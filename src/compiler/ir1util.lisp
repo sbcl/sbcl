@@ -14,9 +14,9 @@
 
 ;;;; cleanup hackery
 
-;;; Return the innermost cleanup enclosing Node, or NIL if there is none in
-;;; its function. If Node has no cleanup, but is in a let, then we must still
-;;; check the environment that the call is in.
+;;; Return the innermost cleanup enclosing NODE, or NIL if there is
+;;; none in its function. If NODE has no cleanup, but is in a LET,
+;;; then we must still check the environment that the call is in.
 (defun node-enclosing-cleanup (node)
   (declare (type node node))
   (do ((lexenv (node-lexenv node)
@@ -254,7 +254,7 @@
   (the environment (lambda-environment (node-home-lambda node))))
 
 ;;; Return the enclosing cleanup for environment of the first or last node
-;;; in Block.
+;;; in BLOCK.
 (defun block-start-cleanup (block)
   (declare (type cblock block))
   (node-enclosing-cleanup (continuation-next (block-start block))))
@@ -262,31 +262,31 @@
   (declare (type cblock block))
   (node-enclosing-cleanup (block-last block)))
 
-;;; Return the non-let lambda that holds Block's code.
+;;; Return the non-LET LAMBDA that holds BLOCK's code.
 (defun block-home-lambda (block)
   (declare (type cblock block))
   #!-sb-fluid (declare (inline node-home-lambda))
   (node-home-lambda (block-last block)))
 
-;;; Return the IR1 environment for Block.
+;;; Return the IR1 environment for BLOCK.
 (defun block-environment (block)
   (declare (type cblock block))
   #!-sb-fluid (declare (inline node-home-lambda))
   (lambda-environment (node-home-lambda (block-last block))))
 
-;;; Return the Top Level Form number of path, i.e. the ordinal number
+;;; Return the Top Level Form number of PATH, i.e. the ordinal number
 ;;; of its original source's top-level form in its compilation unit.
 (defun source-path-tlf-number (path)
   (declare (list path))
   (car (last path)))
 
-;;; Return the (reversed) list for the path in the original source
+;;; Return the (reversed) list for the PATH in the original source
 ;;; (with the Top Level Form number last).
 (defun source-path-original-source (path)
   (declare (list path) (inline member))
   (cddr (member 'original-source-start path :test #'eq)))
 
-;;; Return the Form Number of Path's original source inside the Top
+;;; Return the Form Number of PATH's original source inside the Top
 ;;; Level Form that contains it. This is determined by the order that
 ;;; we walk the subforms of the top level source form.
 (defun source-path-form-number (path)
@@ -299,7 +299,7 @@
 (defun source-path-forms (path)
   (subseq path 0 (position 'original-source-start path)))
 
-;;; Return the innermost source form for Node.
+;;; Return the innermost source form for NODE.
 (defun node-source-form (node)
   (declare (type node node))
   (let* ((path (node-source-path node))
@@ -357,10 +357,10 @@
     (aver (not (member block2 succ1 :test #'eq)))
     (cons block2 succ1)))
 
-;;; Like LINK-BLOCKS, but we separate BLOCK1 and BLOCK2. If this leaves a
-;;; successor with a single predecessor that ends in an IF, then set
-;;; BLOCK-TEST-MODIFIED so that any test constraint will now be able to be
-;;; propagated to the successor.
+;;; This is like LINK-BLOCKS, but we separate BLOCK1 and BLOCK2. If
+;;; this leaves a successor with a single predecessor that ends in an
+;;; IF, then set BLOCK-TEST-MODIFIED so that any test constraint will
+;;; now be able to be propagated to the successor.
 (defun unlink-blocks (block1 block2)
   (declare (type cblock block1 block2))
   (let ((succ1 (block-succ block1)))
@@ -380,11 +380,11 @@
 	  (setf (block-test-modified pred-block) t)))))
   (values))
 
-;;; Swing the succ/pred link between Block and Old to be between Block and
-;;; New. If Block ends in an IF, then we have to fix up the
-;;; consequent/alternative blocks to point to New. We also set
-;;; BLOCK-TEST-MODIFIED so that any test constraint will be applied to the new
-;;; successor.
+;;; Swing the succ/pred link between BLOCK and OLD to be between BLOCK
+;;; and NEW. If BLOCK ends in an IF, then we have to fix up the
+;;; consequent/alternative blocks to point to NEW. We also set
+;;; BLOCK-TEST-MODIFIED so that any test constraint will be applied to
+;;; the new successor.
 (defun change-block-successor (block old new)
   (declare (type cblock new old block) (inline member))
   (unlink-blocks block old)
@@ -413,9 +413,8 @@
   (values))
 
 ;;; Unlink a block from the next/prev chain. We also null out the
-;;; Component.
+;;; COMPONENT.
 (declaim (ftype (function (cblock) (values)) remove-from-dfo))
-#!-sb-fluid (declaim (inline remove-from-dfo))
 (defun remove-from-dfo (block)
   (let ((next (block-next block))
 	(prev (block-prev block)))
@@ -424,9 +423,8 @@
     (setf (block-prev next) prev))
   (values))
 
-;;; Add Block to the next/prev chain following After. We also set the
-;;; Component to be the same as for After.
-#!-sb-fluid (declaim (inline add-to-dfo))
+;;; Add BLOCK to the next/prev chain following AFTER. We also set the
+;;; Component to be the same as for AFTER.
 (defun add-to-dfo (block after)
   (declare (type cblock block after))
   (let ((next (block-next after))
@@ -439,8 +437,8 @@
     (setf (block-prev next) block))
   (values))
 
-;;; Set the Flag for all the blocks in Component to NIL, except for the head
-;;; and tail which are set to T.
+;;; Set the FLAG for all the blocks in COMPONENT to NIL, except for
+;;; the head and tail which are set to T.
 (declaim (ftype (function (component) (values)) clear-flags))
 (defun clear-flags (component)
   (let ((head (component-head component))
@@ -451,7 +449,7 @@
       (setf (block-flag block) nil)))
   (values))
 
-;;; Make a component with no blocks in it. The Block-Flag is initially
+;;; Make a component with no blocks in it. The BLOCK-FLAG is initially
 ;;; true in the head and tail blocks.
 (declaim (ftype (function nil component) make-empty-component))
 (defun make-empty-component ()
@@ -466,8 +464,8 @@
     (setf (block-prev tail) head)
     res))
 
-;;; Makes Node the Last node in its block, splitting the block if necessary.
-;;; The new block is added to the DFO immediately following Node's block.
+;;; Make NODE the LAST node in its block, splitting the block if necessary.
+;;; The new block is added to the DFO immediately following NODE's block.
 (defun node-ends-block (node)
   (declare (type node node))
   (let* ((block (node-block node))
@@ -506,15 +504,16 @@
 
 ;;;; deleting stuff
 
-;;; Deal with deleting the last (read) reference to a lambda-var. We
-;;; iterate over all local calls flushing the corresponding argument, allowing
-;;; the computation of the argument to be deleted. We also mark the let for
-;;; reoptimization, since it may be that we have deleted the last variable.
+;;; Deal with deleting the last (read) reference to a LAMBDA-VAR. We
+;;; iterate over all local calls flushing the corresponding argument,
+;;; allowing the computation of the argument to be deleted. We also
+;;; mark the let for reoptimization, since it may be that we have
+;;; deleted the last variable.
 ;;;
-;;; The lambda-var may still have some sets, but this doesn't cause too much
-;;; difficulty, since we can efficiently implement write-only variables. We
-;;; iterate over the sets, marking their blocks for dead code flushing, since
-;;; we can delete sets whose value is unused.
+;;; The LAMBDA-VAR may still have some SETs, but this doesn't cause
+;;; too much difficulty, since we can efficiently implement write-only
+;;; variables. We iterate over the sets, marking their blocks for dead
+;;; code flushing, since we can delete sets whose value is unused.
 (defun delete-lambda-var (leaf)
   (declare (type lambda-var leaf))
   (let* ((fun (lambda-var-home leaf))
@@ -536,9 +535,9 @@
 
   (values))
 
-;;; Note that something interesting has happened to Var. We only deal with
-;;; LET variables, marking the corresponding initial value arg as needing to be
-;;; reoptimized.
+;;; Note that something interesting has happened to VAR. We only deal
+;;; with LET variables, marking the corresponding initial value arg as
+;;; needing to be reoptimized.
 (defun reoptimize-lambda-var (var)
   (declare (type lambda-var var))
   (let ((fun (lambda-var-home var)))
@@ -554,8 +553,8 @@
 	   (reoptimize-continuation (car args))))))
   (values))
 
-;;; This function deletes functions that have no references. This need only
-;;; be called on functions that never had any references, since otherwise
+;;; Delete a function that has no references. This need only be called
+;;; on functions that never had any references, since otherwise
 ;;; DELETE-REF will handle the deletion.
 (defun delete-functional (fun)
   (aver (and (null (leaf-refs fun))
@@ -565,26 +564,28 @@
     (clambda (delete-lambda fun)))
   (values))
 
-;;; Deal with deleting the last reference to a lambda. Since there is only
-;;; one way into a lambda, deleting the last reference to a lambda ensures that
-;;; there is no way to reach any of the code in it. So we just set the
-;;; Functional-Kind for Fun and its Lets to :Deleted, causing IR1 optimization
-;;; to delete blocks in that lambda.
+;;; Deal with deleting the last reference to a LAMBDA. Since there is
+;;; only one way into a LAMBDA, deleting the last reference to a
+;;; LAMBDA ensures that there is no way to reach any of the code in
+;;; it. So we just set the FUNCTIONAL-KIND for FUN and its LETs to
+;;; :DELETED, causing IR1 optimization to delete blocks in that
+;;; lambda.
 ;;;
-;;; If the function isn't a Let, we unlink the function head and tail from
-;;; the component head and tail to indicate that the code is unreachable. We
-;;; also delete the function from Component-Lambdas (it won't be there before
-;;; local call analysis, but no matter.)  If the lambda was never referenced,
-;;; we give a note.
+;;; If the function isn't a LET, we unlink the function head and tail
+;;; from the component head and tail to indicate that the code is
+;;; unreachable. We also delete the function from COMPONENT-LAMBDAS
+;;; (it won't be there before local call analysis, but no matter.) If
+;;; the lambda was never referenced, we give a note.
 ;;;
-;;; If the lambda is an XEP, then we null out the Entry-Function in its
-;;; Entry-Function so that people will know that it is not an entry point
+;;; If the lambda is an XEP, then we null out the ENTRY-FUNCTION in its
+;;; ENTRY-FUNCTION so that people will know that it is not an entry point
 ;;; anymore.
 (defun delete-lambda (leaf)
   (declare (type clambda leaf))
   (let ((kind (functional-kind leaf))
 	(bind (lambda-bind leaf)))
     (aver (not (member kind '(:deleted :optional :top-level))))
+    (aver (not (functional-has-external-references-p leaf)))
     (setf (functional-kind leaf) :deleted)
     (setf (lambda-bind leaf) nil)
     (dolist (let (lambda-lets leaf))
@@ -621,23 +622,24 @@
 
   (values))
 
-;;; Deal with deleting the last reference to an Optional-Dispatch. We have
-;;; to be a bit more careful than with lambdas, since Delete-Ref is used both
-;;; before and after local call analysis. Afterward, all references to
-;;; still-existing optional-dispatches have been moved to the XEP, leaving it
-;;; with no references at all. So we look at the XEP to see whether an
-;;; optional-dispatch is still really being used. But before local call
-;;; analysis, there are no XEPs, and all references are direct.
+;;; Deal with deleting the last reference to an OPTIONAL-DISPATCH. We
+;;; have to be a bit more careful than with lambdas, since DELETE-REF
+;;; is used both before and after local call analysis. Afterward, all
+;;; references to still-existing OPTIONAL-DISPATCHes have been moved
+;;; to the XEP, leaving it with no references at all. So we look at
+;;; the XEP to see whether an optional-dispatch is still really being
+;;; used. But before local call analysis, there are no XEPs, and all
+;;; references are direct.
 ;;;
-;;; When we do delete the optional-dispatch, we grovel all of its
-;;; entry-points, making them be normal lambdas, and then deleting the ones
-;;; with no references. This deletes any e-p lambdas that were either never
-;;; referenced, or couldn't be deleted when the last deference was deleted (due
-;;; to their :OPTIONAL kind.)
+;;; When we do delete the OPTIONAL-DISPATCH, we grovel all of its
+;;; entry-points, making them be normal lambdas, and then deleting the
+;;; ones with no references. This deletes any e-p lambdas that were
+;;; either never referenced, or couldn't be deleted when the last
+;;; deference was deleted (due to their :OPTIONAL kind.)
 ;;;
-;;; Note that the last optional ep may alias the main entry, so when we process
-;;; the main entry, its kind may have been changed to NIL or even converted to
-;;; a let.
+;;; Note that the last optional ep may alias the main entry, so when
+;;; we process the main entry, its kind may have been changed to NIL
+;;; or even converted to a let.
 (defun delete-optional-dispatch (leaf)
   (declare (type optional-dispatch leaf))
   (let ((entry (functional-entry-function leaf)))
@@ -668,9 +670,9 @@
 
   (values))
 
-;;; Do stuff to delete the semantic attachments of a Ref node. When this
-;;; leaves zero or one reference, we do a type dispatch off of the leaf to
-;;; determine if a special action is appropriate.
+;;; Do stuff to delete the semantic attachments of a REF node. When
+;;; this leaves zero or one reference, we do a type dispatch off of
+;;; the leaf to determine if a special action is appropriate.
 (defun delete-ref (ref)
   (declare (type ref ref))
   (let* ((leaf (ref-leaf ref))
@@ -702,17 +704,17 @@
 
   (values))
 
-;;; This function is called by people who delete nodes; it provides a way to
-;;; indicate that the value of a continuation is no longer used. We null out
-;;; the Continuation-Dest, set Flush-P in the blocks containing uses of Cont
-;;; and set Component-Reoptimize. If the Prev of the use is deleted, then we
-;;; blow off reoptimization.
+;;; This function is called by people who delete nodes; it provides a
+;;; way to indicate that the value of a continuation is no longer
+;;; used. We null out the CONTINUATION-DEST, set FLUSH-P in the blocks
+;;; containing uses of CONT and set COMPONENT-REOPTIMIZE. If the PREV
+;;; of the use is deleted, then we blow off reoptimization.
 ;;;
-;;; If the continuation is :Deleted, then we don't do anything, since all
-;;; semantics have already been flushed. :Deleted-Block-Start start
-;;; continuations are treated just like :Block-Start; it is possible that the
-;;; continuation may be given a new dest (e.g. by SUBSTITUTE-CONTINUATION), so
-;;; we don't want to delete it.
+;;; If the continuation is :Deleted, then we don't do anything, since
+;;; all semantics have already been flushed. :DELETED-BLOCK-START
+;;; start continuations are treated just like :BLOCK-START; it is
+;;; possible that the continuation may be given a new dest (e.g. by
+;;; SUBSTITUTE-CONTINUATION), so we don't want to delete it.
 (defun flush-dest (cont)
   (declare (type continuation cont))
 
@@ -731,8 +733,8 @@
 
   (values))
 
-;;; Do a graph walk backward from Block, marking all predecessor blocks with
-;;; the DELETE-P flag.
+;;; Do a graph walk backward from BLOCK, marking all predecessor
+;;; blocks with the DELETE-P flag.
 (defun mark-for-deletion (block)
   (declare (type cblock block))
   (unless (block-delete-p block)
@@ -742,15 +744,16 @@
       (mark-for-deletion pred)))
   (values))
 
-;;;    Delete Cont, eliminating both control and value semantics. We set
-;;; FLUSH-P and COMPONENT-REOPTIMIZE similarly to in FLUSH-DEST. Here we must
-;;; get the component from the use block, since the continuation may be a
-;;; :DELETED-BLOCK-START.
+;;; Delete CONT, eliminating both control and value semantics. We set
+;;; FLUSH-P and COMPONENT-REOPTIMIZE similarly to in FLUSH-DEST. Here
+;;; we must get the component from the use block, since the
+;;; continuation may be a :DELETED-BLOCK-START.
 ;;;
-;;;    If Cont has DEST, then it must be the case that the DEST is unreachable,
-;;; since we can't compute the value desired. In this case, we call
-;;; MARK-FOR-DELETION to cause the DEST block and its predecessors to tell
-;;; people to ignore them, and to cause them to be deleted eventually.
+;;; If CONT has DEST, then it must be the case that the DEST is
+;;; unreachable, since we can't compute the value desired. In this
+;;; case, we call MARK-FOR-DELETION to cause the DEST block and its
+;;; predecessors to tell people to ignore them, and to cause them to
+;;; be deleted eventually.
 (defun delete-continuation (cont)
   (declare (type continuation cont))
   (aver (not (eq (continuation-kind cont) :deleted)))
@@ -815,10 +818,10 @@
       (ref (delete-ref node))
       (cif
        (flush-dest (if-test node)))
-      ;; The next two cases serve to maintain the invariant that a LET always
-      ;; has a well-formed COMBINATION, REF and BIND. We delete the lambda
-      ;; whenever we delete any of these, but we must be careful that this LET
-      ;; has not already been partially deleted.
+      ;; The next two cases serve to maintain the invariant that a LET
+      ;; always has a well-formed COMBINATION, REF and BIND. We delete
+      ;; the lambda whenever we delete any of these, but we must be
+      ;; careful that this LET has not already been partially deleted.
       (basic-combination
        (when (and (eq (basic-combination-kind node) :local)
 		  ;; Guards COMBINATION-LAMBDA agains the REF being deleted.
@@ -859,8 +862,8 @@
   (remove-from-dfo block)
   (values))
 
-;;; Do stuff to indicate that the return node Node is being deleted. We set
-;;; the RETURN to NIL.
+;;; Do stuff to indicate that the return node Node is being deleted.
+;;; We set the RETURN to NIL.
 (defun delete-return (node)
   (declare (type creturn node))
   (let ((fun (return-lambda node)))
@@ -868,8 +871,8 @@
     (setf (lambda-return fun) nil))
   (values))
 
-;;; If any of the Vars in fun were never referenced and was not declared
-;;; IGNORE, then complain.
+;;; If any of the VARS in FUN was never referenced and was not
+;;; declared IGNORE, then complain.
 (defun note-unreferenced-vars (fun)
   (declare (type clambda fun))
   (dolist (var (lambda-vars fun))
@@ -886,10 +889,11 @@
 
 (defvar *deletion-ignored-objects* '(t nil))
 
-;;; Return true if we can find Obj in Form, NIL otherwise. We bound our
-;;; recursion so that we don't get lost in circular structures. We ignore the
-;;; car of forms if they are a symbol (to prevent confusing function
-;;; referencess with variables), and we also ignore anything inside ' or #'.
+;;; Return true if we can find OBJ in FORM, NIL otherwise. We bound
+;;; our recursion so that we don't get lost in circular structures. We
+;;; ignore the car of forms if they are a symbol (to prevent confusing
+;;; function referencess with variables), and we also ignore anything
+;;; inside ' or #'.
 (defun present-in-form (obj form depth)
   (declare (type (integer 0 20) depth))
   (cond ((= depth 20) nil)
@@ -910,22 +914,24 @@
 		     (when (present-in-form obj (car l) depth)
 		       (return t)))))))))
 
-;;; This function is called on a block immediately before we delete it. We
-;;; check to see whether any of the code about to die appeared in the original
-;;; source, and emit a note if so.
+;;; This function is called on a block immediately before we delete
+;;; it. We check to see whether any of the code about to die appeared
+;;; in the original source, and emit a note if so.
 ;;;
-;;; If the block was in a lambda is now deleted, then we ignore the whole
-;;; block, since this case is picked off in DELETE-LAMBDA. We also ignore
-;;; the deletion of CRETURN nodes, since it is somewhat reasonable for a
-;;; function to not return, and there is a different note for that case anyway.
+;;; If the block was in a lambda is now deleted, then we ignore the
+;;; whole block, since this case is picked off in DELETE-LAMBDA. We
+;;; also ignore the deletion of CRETURN nodes, since it is somewhat
+;;; reasonable for a function to not return, and there is a different
+;;; note for that case anyway.
 ;;;
-;;; If the actual source is an atom, then we use a bunch of heuristics to
-;;; guess whether this reference really appeared in the original source:
+;;; If the actual source is an atom, then we use a bunch of heuristics
+;;; to guess whether this reference really appeared in the original
+;;; source:
 ;;; -- If a symbol, it must be interned and not a keyword.
-;;; -- It must not be an easily introduced constant (T or NIL, a fixnum or a
-;;;    character.)
-;;; -- The atom must be "present" in the original source form, and present in
-;;;    all intervening actual source forms.
+;;; -- It must not be an easily introduced constant (T or NIL, a fixnum
+;;;    or a character.)
+;;; -- The atom must be "present" in the original source form, and
+;;;    present in all intervening actual source forms.
 (defun note-block-deletion (block)
   (let ((home (block-home-lambda block)))
     (unless (eq (functional-kind home) :deleted)
@@ -951,19 +957,21 @@
 	    (return))))))
   (values))
 
-;;; Delete a node from a block, deleting the block if there are no nodes
-;;; left. We remove the node from the uses of its CONT, but we don't deal with
-;;; cleaning up any type-specific semantic attachments. If the CONT is :UNUSED
-;;; after deleting this use, then we delete CONT. (Note :UNUSED is not the
-;;; same as no uses. A continuation will only become :UNUSED if it was
-;;; :INSIDE-BLOCK before.)
+;;; Delete a node from a block, deleting the block if there are no
+;;; nodes left. We remove the node from the uses of its CONT, but we
+;;; don't deal with cleaning up any type-specific semantic
+;;; attachments. If the CONT is :UNUSED after deleting this use, then
+;;; we delete CONT. (Note :UNUSED is not the same as no uses. A
+;;; continuation will only become :UNUSED if it was :INSIDE-BLOCK
+;;; before.)
 ;;;
-;;; If the node is the last node, there must be exactly one successor. We
-;;; link all of our precedessors to the successor and unlink the block. In
-;;; this case, we return T, otherwise NIL. If no nodes are left, and the block
-;;; is a successor of itself, then we replace the only node with a degenerate
-;;; exit node. This provides a way to represent the bodyless infinite loop,
-;;; given the prohibition on empty blocks in IR1.
+;;; If the node is the last node, there must be exactly one successor.
+;;; We link all of our precedessors to the successor and unlink the
+;;; block. In this case, we return T, otherwise NIL. If no nodes are
+;;; left, and the block is a successor of itself, then we replace the
+;;; only node with a degenerate exit node. This provides a way to
+;;; represent the bodyless infinite loop, given the prohibition on
+;;; empty blocks in IR1.
 (defun unlink-node (node)
   (declare (type node node))
   (let* ((cont (node-cont node))
@@ -1025,8 +1033,8 @@
 	       (setf (node-prev node) nil)
 	       t)))))))
 
-;;; Return true if NODE has been deleted, false if it is still a valid part
-;;; of IR1.
+;;; Return true if NODE has been deleted, false if it is still a valid
+;;; part of IR1.
 (defun node-deleted (node)
   (declare (type node node))
   (let ((prev (node-prev node)))
@@ -1036,9 +1044,9 @@
 		(and (block-component block)
 		     (not (block-delete-p block))))))))
 
-;;; Delete all the blocks and functions in Component. We scan first marking
-;;; the blocks as delete-p to prevent weird stuff from being triggered by
-;;; deletion.
+;;; Delete all the blocks and functions in COMPONENT. We scan first
+;;; marking the blocks as delete-p to prevent weird stuff from being
+;;; triggered by deletion.
 (defun delete-component (component)
   (declare (type component component))
   (aver (null (component-new-functions component)))
@@ -1116,14 +1124,14 @@
     (reoptimize-continuation (node-cont ref)))
   (values))
 
-;;; Change all Refs for Old-Leaf to New-Leaf.
+;;; Change all REFS for OLD-LEAF to NEW-LEAF.
 (defun substitute-leaf (new-leaf old-leaf)
   (declare (type leaf new-leaf old-leaf))
   (dolist (ref (leaf-refs old-leaf))
     (change-ref-leaf ref new-leaf))
   (values))
 
-;;; Like SUBSITIUTE-LEAF, only there is a predicate on the Ref to tell
+;;; Like SUBSITUTE-LEAF, only there is a predicate on the Ref to tell
 ;;; whether to substitute.
 (defun substitute-leaf-if (test new-leaf old-leaf)
   (declare (type leaf new-leaf old-leaf) (type function test))
@@ -1132,9 +1140,9 @@
       (change-ref-leaf ref new-leaf)))
   (values))
 
-;;; Return a LEAF which represents the specified constant object. If the
-;;; object is not in *CONSTANTS*, then we create a new constant LEAF and
-;;; enter it.
+;;; Return a LEAF which represents the specified constant object. If
+;;; the object is not in *CONSTANTS*, then we create a new constant
+;;; LEAF and enter it.
 #!-sb-fluid (declaim (maybe-inline find-constant))
 (defun find-constant (object)
   (if (typep object '(or symbol number character instance))
@@ -1149,8 +1157,8 @@
 		   :type (ctype-of object)
 		   :where-from :defined)))
 
-;;; If there is a non-local exit noted in Entry's environment that exits to
-;;; Cont in that entry, then return it, otherwise return NIL.
+;;; If there is a non-local exit noted in ENTRY's environment that
+;;; exits to CONT in that entry, then return it, otherwise return NIL.
 (defun find-nlx-info (entry cont)
   (declare (type entry entry) (type continuation cont))
   (let ((entry-cleanup (entry-cleanup entry)))
@@ -1161,8 +1169,6 @@
 
 ;;;; functional hackery
 
-;;; If Functional is a Lambda, just return it; if it is an
-;;; optional-dispatch, return the main-entry.
 (declaim (ftype (function (functional) clambda) main-entry))
 (defun main-entry (functional)
   (etypecase functional
@@ -1170,10 +1176,10 @@
     (optional-dispatch
      (optional-dispatch-main-entry functional))))
 
-;;; Returns true if Functional is a thing that can be treated like
-;;; MV-Bind when it appears in an MV-Call. All fixed arguments must be
-;;; optional with null default and no supplied-p. There must be a rest
-;;; arg with no references.
+;;; RETURN true if FUNCTIONAL is a thing that can be treated like
+;;; MV-BIND when it appears in an MV-CALL. All fixed arguments must be
+;;; optional with null default and no SUPPLIED-P. There must be a
+;;; &REST arg with no references.
 (declaim (ftype (function (functional) boolean) looks-like-an-mv-bind))
 (defun looks-like-an-mv-bind (functional)
   (and (optional-dispatch-p functional)
@@ -1191,15 +1197,14 @@
 	      (return nil)))))))
 
 ;;; Return true if function is an XEP. This is true of normal XEPs
-;;; (:External kind) and top-level lambdas (:Top-Level kind.)
-#!-sb-fluid (declaim (inline external-entry-point-p))
+;;; (:EXTERNAL kind) and top-level lambdas (:TOP-LEVEL kind.)
 (defun external-entry-point-p (fun)
   (declare (type functional fun))
   (not (null (member (functional-kind fun) '(:external :top-level)))))
 
-;;; If Cont's only use is a non-notinline global function reference, then
-;;; return the referenced symbol, otherwise NIL. If Notinline-OK is true, then
-;;; we don't care if the leaf is notinline.
+;;; If CONT's only use is a non-notinline global function reference,
+;;; then return the referenced symbol, otherwise NIL. If NOTINLINE-OK
+;;; is true, then we don't care if the leaf is NOTINLINE.
 (defun continuation-function-name (cont &optional notinline-ok)
   (declare (type continuation cont))
   (let ((use (continuation-use cont)))
@@ -1214,13 +1219,14 @@
 	      nil))
 	nil)))
 
-;;; Return the COMBINATION node that is the call to the let Fun.
+;;; Return the COMBINATION node that is the call to the LET FUN.
 (defun let-combination (fun)
   (declare (type clambda fun))
   (aver (member (functional-kind fun) '(:let :mv-let)))
   (continuation-dest (node-cont (first (leaf-refs fun)))))
 
-;;; Return the initial value continuation for a let variable or NIL if none.
+;;; Return the initial value continuation for a LET variable, or NIL
+;;; if there is none.
 (defun let-var-initial-value (var)
   (declare (type lambda-var var))
   (let ((fun (lambda-var-home var)))
@@ -1236,10 +1242,10 @@
 
 (defvar *inline-expansion-limit* 200
   #!+sb-doc
-  "An upper limit on the number of inline function calls that will be expanded
-   in any given code object (single function or block compilation.)")
+  "an upper limit on the number of inline function calls that will be expanded
+   in any given code object (single function or block compilation)")
 
-;;; Check whether Node's component has exceeded its inline expansion
+;;; Check whether NODE's component has exceeded its inline expansion
 ;;; limit, and warn if so, returning NIL.
 (defun inline-expansion-ok (node)
   (let ((expanded (incf (component-inline-expansions
@@ -1247,6 +1253,17 @@
 			  (node-block node))))))
     (cond ((> expanded *inline-expansion-limit*) nil)
 	  ((= expanded *inline-expansion-limit*)
+	   ;; FIXME: If the objective is to stop the recursive
+	   ;; expansion of inline functions, wouldn't it be more
+	   ;; correct to look back through surrounding expansions
+	   ;; (which are, I think, stored in the *CURRENT-PATH*, and
+	   ;; possibly stored elsewhere too) and suppress expansion
+	   ;; and print this warning when the function being proposed
+	   ;; for inline expansion is found there? (I don't like the
+	   ;; arbitrary numerical limit in principle, and I think
+	   ;; it'll be a nuisance in practice if we ever want the
+	   ;; compiler to be able to use WITH-COMPILATION-UNIT on
+	   ;; arbitrarily huge blocks of code. -- WHN)
 	   (let ((*compiler-error-context* node))
 	     (compiler-note "*INLINE-EXPANSION-LIMIT* (~D) was exceeded, ~
 			     probably trying to~%  ~
@@ -1301,21 +1318,21 @@
 	    (:print-object (lambda (x stream)
 			     (print-unreadable-object (x stream :type t))))
 	    (:copier nil))
-  ;; A list of the stringified CARs of the enclosing non-original source forms
-  ;; exceeding the *enclosing-source-cutoff*.
+  ;; a list of the stringified CARs of the enclosing non-original source forms
+  ;; exceeding the *enclosing-source-cutoff*
   (enclosing-source nil :type list)
-  ;; A list of stringified enclosing non-original source forms.
+  ;; a list of stringified enclosing non-original source forms
   (source nil :type list)
-  ;; The stringified form in the original source that expanded into Source.
+  ;; the stringified form in the original source that expanded into SOURCE
   (original-source (required-argument) :type simple-string)
-  ;; A list of prefixes of "interesting" forms that enclose original-source.
+  ;; a list of prefixes of "interesting" forms that enclose original-source
   (context nil :type list)
-  ;; The FILE-INFO-NAME for the relevant FILE-INFO.
+  ;; the FILE-INFO-NAME for the relevant FILE-INFO
   (file-name (required-argument)
 	     :type (or pathname (member :lisp :stream)))
-  ;; The file position at which the top-level form starts, if applicable.
+  ;; the file position at which the top-level form starts, if applicable
   (file-position nil :type (or index null))
-  ;; The original source part of the source path.
+  ;; the original source part of the source path
   (original-source-path nil :type list))
 
 ;;; If true, this is the node which is used as context in compiler warning
@@ -1439,7 +1456,7 @@
   (let ((context *compiler-error-context*))
     (if (compiler-error-context-p context)
 	context
-	(let ((path (or *current-path*
+	(let ((path (or (and (boundp '*current-path*) *current-path*)
 			(if context
 			    (node-source-path context)
 			    nil))))
@@ -1497,8 +1514,8 @@
 (declaim (type index *last-message-count*))
 
 ;;; If the last message was given more than once, then print out an
-;;; indication of how many times it was repeated. We reset the message count
-;;; when we are done.
+;;; indication of how many times it was repeated. We reset the message
+;;; count when we are done.
 (defun note-message-repeats (&optional (terpri t))
   (cond ((= *last-message-count* 1)
 	 (when terpri (terpri *error-output*)))

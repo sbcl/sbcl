@@ -26,8 +26,8 @@
 ;;; 3. True if the operand is a more operand, false otherwise.
 ;;; 4. The costs for this operand.
 ;;; 5. The load-scs vector for this operand (NIL if more-p.)
-;;; 6. True if the costs or SCs in the VOP-INFO are inconsistent with the
-;;;    currently record ones.
+;;; 6. True if the costs or SCs in the VOP-INFO are inconsistent with
+;;;    the currently recorded ones.
 (defun get-operand-info (ref)
   (declare (type tn-ref ref))
   (let* ((arg-p (not (tn-ref-write-p ref)))
@@ -75,8 +75,8 @@
 		(vop-info-result-load-scs info)
 		(vop-info-more-result-costs info))))))
 
-;;; Convert a load-costs vector to the list of SCs allowed by the operand
-;;; restriction.
+;;; Convert a load-costs vector to the list of SCs allowed by the
+;;; operand restriction.
 (defun listify-restrictions (restr)
   (declare (type sc-vector restr))
   (collect ((res))
@@ -85,8 +85,8 @@
 	(res (svref *backend-sc-numbers* i))))
     (res)))
 
-;;; Try to give a helpful error message when Ref has no cost specified for
-;;; some SC allowed by the TN's primitive-type.
+;;; Try to give a helpful error message when REF has no cost specified
+;;; for some SC allowed by the TN's PRIMITIVE-TYPE.
 (defun bad-costs-error (ref)
   (declare (type tn-ref ref))
   (let* ((tn (tn-ref-tn ref))
@@ -182,8 +182,8 @@
 
 ;;;; VM consistency checking
 ;;;;
-;;;; We do some checking of the consistency of the VM definition at load
-;;;; time.
+;;;; We do some checking of the consistency of the VM definition at
+;;;; load time.
 
 ;;; FIXME: should probably be conditional on #!+SB-SHOW
 (defun check-move-function-consistency ()
@@ -303,10 +303,10 @@
 	       (setq unique t)))))
     (values (svref *backend-sc-numbers* min-scn) unique)))
 
-;;; Prepare for the possibility of a TN being allocated on the number stack by
-;;; setting NUMBER-STACK-P in all functions that TN is referenced in and in all
-;;; the functions in their tail sets. Refs is a TN-Refs list of references to
-;;; the TN.
+;;; Prepare for the possibility of a TN being allocated on the number
+;;; stack by setting NUMBER-STACK-P in all functions that TN is
+;;; referenced in and in all the functions in their tail sets. REFS is
+;;; a TN-REFS list of references to the TN.
 (defun note-number-stack-tn (refs)
   (declare (type (or tn-ref null) refs))
 
@@ -328,8 +328,9 @@
 
   (values))
 
-;;; If TN is a variable, return the name. If TN is used by a VOP emitted
-;;; for a return, then return a string indicating this. Otherwise, return NIL.
+;;; If TN is a variable, return the name. If TN is used by a VOP
+;;; emitted for a return, then return a string indicating this.
+;;; Otherwise, return NIL.
 (defun get-operand-name (tn arg-p)
   (declare (type tn tn))
   (let* ((actual (if (eq (tn-kind tn) :alias) (tn-save-tn tn) tn))
@@ -342,9 +343,9 @@
 	  (t
 	   nil))))
 
-;;; If policy indicates, give an efficiency note for doing the coercion
-;;; Vop, where Op is the operand we are coercing for and Dest-TN is the
-;;; distinct destination in a move.
+;;; If policy indicates, give an efficiency note for doing the
+;;; coercion VOP, where OP is the operand we are coercing for and
+;;; DEST-TN is the distinct destination in a move.
 (defun do-coerce-efficiency-note (vop op dest-tn)
   (declare (type vop-info vop) (type tn-ref op) (type (or tn null) dest-tn))
   (let* ((note (or (template-note vop) (template-name vop)))
@@ -380,15 +381,16 @@
   (values))
 
 ;;; Find a move VOP to move from the operand OP-TN to some other
-;;; representation corresponding to OTHER-SC and OTHER-PTYPE. Slot is the SC
-;;; slot that we grab from (move or move-argument). Write-P indicates that OP
-;;; is a VOP result, so OP is the move result and other is the arg, otherwise
-;;; OP is the arg and other is the result.
+;;; representation corresponding to OTHER-SC and OTHER-PTYPE. SLOT is
+;;; the SC slot that we grab from (move or move-argument). WRITE-P
+;;; indicates that OP is a VOP result, so OP is the move result and
+;;; other is the arg, otherwise OP is the arg and other is the result.
 ;;;
-;;; If an operand is of primitive type T, then we use the type of the other
-;;; operand instead, effectively intersecting the argument and result type
-;;; assertions. This way, a move VOP can restrict whichever operand makes more
-;;; sense, without worrying about which operand has the type info.
+;;; If an operand is of primitive type T, then we use the type of the
+;;; other operand instead, effectively intersecting the argument and
+;;; result type assertions. This way, a move VOP can restrict
+;;; whichever operand makes more sense, without worrying about which
+;;; operand has the type info.
 (defun find-move-vop (op-tn write-p other-sc other-ptype slot)
   (declare (type tn op-tn) (type sc other-sc)
 	   (type primitive-type other-ptype)
@@ -414,25 +416,27 @@
 		    :t-ok nil))
 	  (return info))))))
 	
-;;; Emit a coercion VOP for Op Before the specifed VOP or die trying. SCS
-;;; is the operand's LOAD-SCS vector, which we use to determine what SCs the
-;;; VOP will accept. We pick any acceptable coerce VOP, since it practice it
-;;; seems uninteresting to have more than one applicable.
+;;; Emit a coercion VOP for OP BEFORE the specifed VOP or die trying.
+;;; SCS is the operand's LOAD-SCS vector, which we use to determine
+;;; what SCs the VOP will accept. We pick any acceptable coerce VOP,
+;;; since it practice it seems uninteresting to have more than one
+;;; applicable.
 ;;;
 ;;; On the X86 port, stack SCs may be placed in the list of operand
 ;;; preferred SCs, and to prevent these stack SCs being selected when
 ;;; a register SC is available the non-stack SCs are searched first.
 ;;;
-;;; What we do is look at each SC allowed by both the operand restriction
-;;; and the operand primitive-type, and see whether there is a move VOP
-;;; which moves between the operand's SC and load SC. If we find such a
-;;; VOP, then we make a TN having the load SC as the representation.
+;;; What we do is look at each SC allowed by both the operand
+;;; restriction and the operand primitive-type, and see whether there
+;;; is a move VOP which moves between the operand's SC and load SC. If
+;;; we find such a VOP, then we make a TN having the load SC as the
+;;; representation.
 ;;;
-;;; Dest-TN is the TN that we are moving to, for a move or move-arg. This
-;;; is only for efficiency notes.
+;;; DEST-TN is the TN that we are moving to, for a move or move-arg.
+;;; This is only for efficiency notes.
 ;;;
-;;; If the TN is an unused result TN, then we don't actually emit the move;
-;;; we just change to the right kind of TN.
+;;; If the TN is an unused result TN, then we don't actually emit the
+;;; move; we just change to the right kind of TN.
 (defun emit-coerce-vop (op dest-tn scs before)
   (declare (type tn-ref op) (type sc-vector scs) (type (or vop null) before)
 	   (type (or tn null) dest-tn))
@@ -476,10 +480,11 @@
 		     (check-sc scn sc))
 	    (return)))))))
 
-;;; Scan some operands and call EMIT-COERCE-VOP on any for which we can't
-;;; load the operand. The coerce VOP is inserted Before the specified VOP.
-;;; Dest-TN is the destination TN if we are doing a move or move-arg, and is
-;;; NIL otherwise. This is only used for efficiency notes.
+;;; Scan some operands and call EMIT-COERCE-VOP on any for which we
+;;; can't load the operand. The coerce VOP is inserted Before the
+;;; specified VOP. Dest-TN is the destination TN if we are doing a
+;;; move or move-arg, and is NIL otherwise. This is only used for
+;;; efficiency notes.
 #!-sb-fluid (declaim (inline coerce-some-operands))
 (defun coerce-some-operands (ops dest-tn load-scs before)
   (declare (type (or tn-ref null) ops) (list load-scs)
@@ -501,12 +506,12 @@
 			  (vop-next vop)))
   (values))
 
-;;; Iterate over the more operands to a call VOP, emitting move-arg VOPs and
-;;; any necessary coercions. We determine which FP to use by looking at the
-;;; MOVE-ARGS annotation. If the vop is a :LOCAL-CALL, we insert any needed
-;;; coercions before the ALLOCATE-FRAME so that lifetime analysis doesn't get
-;;; confused (since otherwise, only passing locations are written between A-F
-;;; and call.)
+;;; Iterate over the more operands to a call VOP, emitting move-arg
+;;; VOPs and any necessary coercions. We determine which FP to use by
+;;; looking at the MOVE-ARGS annotation. If the vop is a :LOCAL-CALL,
+;;; we insert any needed coercions before the ALLOCATE-FRAME so that
+;;; lifetime analysis doesn't get confused (since otherwise, only
+;;; passing locations are written between A-F and call.)
 (defun emit-arg-moves (vop)
   (let* ((info (vop-info vop))
 	 (node (vop-node vop))
@@ -567,10 +572,11 @@
 				after)))))
   (values))
 
-;;; Scan the IR2 looking for move operations that need to be replaced with
-;;; special-case VOPs and emitting coercion VOPs for operands of normal VOPs.
-;;; We delete moves to TNs that are never read at this point, rather than
-;;; possibly converting them to some expensive move operation.
+;;; Scan the IR2 looking for move operations that need to be replaced
+;;; with special-case VOPs and emitting coercion VOPs for operands of
+;;; normal VOPs. We delete moves to TNs that are never read at this
+;;; point, rather than possibly converting them to some expensive move
+;;; operation.
 (defun emit-moves-and-coercions (block)
   (declare (type ir2-block block))
   (do ((vop (ir2-block-start-vop block)
@@ -603,9 +609,9 @@
        (t
 	(coerce-vop-operands vop))))))
 
-;;; If TN is in a number stack SC, make all the right annotations. Note
-;;; that this should be called after TN has been referenced, since it must
-;;; iterate over the referencing environments.
+;;; If TN is in a number stack SC, make all the right annotations.
+;;; Note that this should be called after TN has been referenced,
+;;; since it must iterate over the referencing environments.
 #!-sb-fluid (declaim (inline note-if-number-stack))
 (defun note-if-number-stack (tn 2comp restricted)
   (declare (type tn tn) (type ir2-component 2comp))
@@ -618,14 +624,15 @@
     (note-number-stack-tn (tn-writes tn)))
   (values))
 
-;;; Entry to representation selection. First we select the representation for
-;;; all normal TNs, setting the TN-SC. After selecting the TN representations,
-;;; we set the SC for all :ALIAS TNs to be the representation chosen for the
-;;; original TN. We then scan all the IR2, emitting any necessary coerce and
-;;; move-arg VOPs. Finally, we scan all TNs looking for ones that might be
-;;; placed on the number stack, noting this so that the number-FP can be
-;;; allocated. This must be done last, since references in new environments may
-;;; be introduced by MOVE-ARG insertion.
+;;; This is the entry to representation selection. First we select the
+;;; representation for all normal TNs, setting the TN-SC. After
+;;; selecting the TN representations, we set the SC for all :ALIAS TNs
+;;; to be the representation chosen for the original TN. We then scan
+;;; all the IR2, emitting any necessary coerce and move-arg VOPs.
+;;; Finally, we scan all TNs looking for ones that might be placed on
+;;; the number stack, noting this so that the number-FP can be
+;;; allocated. This must be done last, since references in new
+;;; environments may be introduced by MOVE-ARG insertion.
 (defun select-representations (component)
   (let ((costs (make-array sc-number-limit))
 	(2comp (component-info component)))

@@ -644,34 +644,6 @@
 (defun vector-push-extend (new-element
 			   vector
 			   &optional
-			   (extension nil extension-p))
-  #!+sb-doc
-  "This is like VECTOR-PUSH except that if the fill pointer gets too
-   large, VECTOR is extended to allow the push to work."
-  (declare (type vector vector))
-  (let ((old-fill-pointer (fill-pointer vector)))
-    (declare (type index old-fill-pointer))
-    (when (= old-fill-pointer (%array-available-elements vector))
-      (adjust-array vector (+ old-fill-pointer
-			      (if extension-p
-				  (the (integer 1 #.most-positive-fixnum)
-				    extension)
-				  (1+ old-fill-pointer)))))
-    (setf (%array-fill-pointer vector)
-	  (1+ old-fill-pointer))
-    ;; Wrapping the type test and the AREF in the same WITH-ARRAY-DATA
-    ;; saves some time.
-    (with-array-data ((v vector) (i old-fill-pointer) (end)
-		      :force-inline t)
-      (declare (ignore end) (optimize (safety 0)))
-      (if (simple-vector-p v) ; if common special case
-          (setf (aref v i) new-element)
-	  (setf (aref v i) new-element)))
-    old-fill-pointer))
-
-(defun vector-push-extend (new-element
-			   vector
-			   &optional
 			   (extension (1+ (length vector))))
   (declare (vector vector) (fixnum extension))
   (let ((fill-pointer (fill-pointer vector)))
@@ -684,9 +656,8 @@
 
 (defun vector-pop (array)
   #!+sb-doc
-  "Attempts to decrease the fill pointer by 1 and return the element
-   pointer to by the new fill pointer. If the original value of the fill
-   pointer is 0, an error occurs."
+  "Decrease the fill pointer by 1 and return the element pointed to by the
+  new fill pointer."
   (declare (vector array))
   (let ((fill-pointer (fill-pointer array)))
     (declare (fixnum fill-pointer))
@@ -704,7 +675,7 @@
 			   initial-contents fill-pointer
 			   displaced-to displaced-index-offset)
   #!+sb-doc
-  "Adjusts the Array's dimensions to the given Dimensions and stuff."
+  "Adjust ARRAY's dimensions to the given DIMENSIONS and stuff."
   (let ((dimensions (if (listp dimensions) dimensions (list dimensions))))
     (cond ((/= (the fixnum (length (the list dimensions)))
 	       (the fixnum (array-rank array)))

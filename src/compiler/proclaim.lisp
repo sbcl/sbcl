@@ -125,53 +125,42 @@
 	   (unless (csubtypep type (specifier-type 'function))
 	     (error "not a function type: ~S" (first args)))
 	   (dolist (name (rest args))
-	     (cond ((info :function :accessor-for name)
-		    ;; FIXME: This used to be a WARNING, which was
-		    ;; clearly wrong, since it would cause warnings to
-		    ;; be issued for conforming code, which is really
-		    ;; annoying for people who use Lisp code to build
-		    ;; Lisp systems (and check the return values from
-		    ;; COMPILE and COMPILE-FILE). Changing it to a
-		    ;; compiler note is somewhat better, since it's
-		    ;; after all news about a limitation of the
-		    ;; compiler, not a problem in the code. But even
-		    ;; better would be to handle FTYPE proclamations
-		    ;; for slot accessors, and since in the long run
-		    ;; slot accessors should become more like other
-		    ;; functions, this should eventually become
-		    ;; straightforward.
-		    (maybe-compiler-note
-		     "~@<ignoring FTYPE proclamation for ~
-                      slot accessor (currently unsupported): ~2I~_~S~:>"
-		     name))
-		   (t
 
-		    ;; KLUDGE: Something like the commented-out TYPE/=
-		    ;; check here would be nice, but it has been
-		    ;; commented out because TYPE/= doesn't support
-		    ;; function types. It could probably be made to do
-		    ;; so, but it might take some time, since function
-		    ;; types involve values types, which aren't
-		    ;; supported, and since the SUBTYPEP operator for
-		    ;; FUNCTION types is rather broken, e.g.
-		    ;;   (SUBTYPEP '(FUNCTION (T BOOLEAN) NIL)
-		    ;;             '(FUNCTION (FIXNUM FIXNUM) NIL)) => T, T
-		    ;; -- WHN 20000229
-		    #+nil
-		    (when (eq (info :function :where-from name) :declared)
-		      (let ((old-type (info :function :type name)))
-			(when (type/= type old-type)
-			  (style-warn
-			   "new FTYPE proclamation~@
-                            ~S~@
-                            for ~S does not match old FTYPE proclamation~@
-                            ~S"
-			   (list type name old-type)))))
+	     ;; KLUDGE: Something like the commented-out TYPE/=
+	     ;; check here would be nice, but it has been
+	     ;; commented out because TYPE/= doesn't support
+	     ;; function types. It could probably be made to do
+	     ;; so, but it might take some time, since function
+	     ;; types involve values types, which aren't
+	     ;; supported, and since the SUBTYPEP operator for
+	     ;; FUNCTION types is rather broken, e.g.
+	     ;;   (SUBTYPEP '(FUNCTION (T BOOLEAN) NIL)
+	     ;;             '(FUNCTION (FIXNUM FIXNUM) NIL)) => T, T
+	     ;; -- WHN 20000229
+	     #|
+	     (when (eq (info :function :where-from name) :declared)
+	       (let ((old-type (info :function :type name)))
+		 (when (type/= type old-type)
+		   (style-warn
+		    "new FTYPE proclamation~@
+                     ~S~@
+                     for ~S does not match old FTYPE proclamation~@
+                     ~S"
+		    (list type name old-type)))))
+             |#
 
-		    (proclaim-as-function-name name)
-		    (note-name-defined name :function)
-		    (setf (info :function :type name) type
-			  (info :function :where-from name) :declared)))))))
+	     ;; Now references to this function shouldn't be warned
+	     ;; about as undefined, since even if we haven't seen a
+	     ;; definition yet, we know one is planned. (But if this
+	     ;; function name was already declared as a structure
+	     ;; accessor, then that was already been taken care of.)
+	     (unless (info :function :accessor-for name)
+	       (proclaim-as-function-name name)
+	       (note-name-defined name :function))
+
+	     ;; the actual type declaration
+	     (setf (info :function :type name) type
+		   (info :function :where-from name) :declared)))))
       (freeze-type
        (dolist (type args)
 	 (let ((class (specifier-type type)))

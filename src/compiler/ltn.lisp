@@ -300,9 +300,9 @@
 ;;; Annotate the result continuation for a function. We use the
 ;;; RETURN-INFO computed by GTN to determine how to represent the
 ;;; return values within the function:
-;;; ---- If the tail-set has a fixed values count, then use that
+;;;  * If the TAIL-SET has a fixed values count, then use that
 ;;;    many values.
-;;; ---- If the actual uses of the result continuation in this function
+;;;  * If the actual uses of the result continuation in this function
 ;;;    have a fixed number of values (after intersection with the
 ;;;    assertion), then use that number. We throw out TAIL-P :FULL
 ;;;    and :LOCAL calls, since we know they will truly end up as TR
@@ -316,7 +316,7 @@
 ;;;    the result continuation before it reaches the RETURN. In
 ;;;    perverse code, we may annotate for unknown values when we
 ;;;    didn't have to.
-;;; ---- Otherwise, we must annotate the continuation for unknown values.
+;;; * Otherwise, we must annotate the continuation for unknown values.
 (defun ltn-analyze-return (node ltn-policy)
   (declare (type creturn node) (type ltn-policy ltn-policy))
   (let* ((cont (return-result node))
@@ -965,7 +965,7 @@
 ;;; Loop over the blocks in COMPONENT, doing stuff to nodes that
 ;;; receive values. In addition to the stuff done by FROB, we also see
 ;;; whether there are any unknown values receivers, making notations
-;;; in the components Generators and Receivers as appropriate.
+;;; in the components' GENERATORS and RECEIVERS as appropriate.
 ;;;
 ;;; If any unknown-values continations are received by this block (as
 ;;; indicated by IR2-BLOCK-POPPED), then we add the block to the
@@ -977,6 +977,10 @@
   (declare (type component component))
   (let ((2comp (component-info component)))
     (do-blocks (block component)
+      ;; This assertion seems to protect us from compiling a component
+      ;; twice. As noted above, "this is where we allocate IR2-BLOCKS
+      ;; because it is the first place we need them", so if one is
+      ;; already allocated here, something is wrong. -- WHN 2001-09-14
       (aver (not (block-info block)))
       (let ((2block (make-ir2-block block)))
 	(setf (block-info block) 2block)

@@ -21,7 +21,7 @@
   #!+sb-doc
   "the fixnum closest in value to negative infinity")
 
-;;;; magic specials initialized by genesis
+;;;; magic specials initialized by GENESIS
 
 ;;; FIXME: The DEFVAR here is redundant with the (DECLAIM (SPECIAL ..))
 ;;; of all static symbols in early-impl.lisp.
@@ -75,15 +75,20 @@
 
 ;;;; working with *CURRENT-ERROR-DEPTH* and *MAXIMUM-ERROR-DEPTH*
 
-;;; INFINITE-ERROR-PROTECT is used by ERROR and friends to keep us out of
-;;; hyperspace.
+;;; INFINITE-ERROR-PROTECT is used by ERROR and friends to keep us out
+;;; of hyperspace.
 (defmacro infinite-error-protect (&rest forms)
   `(unless (infinite-error-protector)
+     (/show0 "back from INFINITE-ERROR-PROTECTOR")
      (let ((*current-error-depth* (1+ *current-error-depth*)))
+       (/show0 "in INFINITE-ERROR-PROTECT, incremented error depth")
+       #+sb-show (sb-debug:backtrace)
        ,@forms)))
 
 ;;; a helper function for INFINITE-ERROR-PROTECT
 (defun infinite-error-protector ()
+  (/show0 "entering INFINITE-ERROR-PROTECTOR, *CURRENT-ERROR-DEPTH*=..")
+  (/hexstr *current-error-depth*)
   (cond ((not *cold-init-complete-p*)
 	 (%primitive print "Argh! error in cold init, halting")
 	 (%primitive sb!c:halt))
@@ -94,6 +99,8 @@
 	 (%primitive print "Argh! corrupted error depth, halting")
 	 (%primitive sb!c:halt))
 	((> *current-error-depth* *maximum-error-depth*)
+	 (/show0 "*MAXIMUM-ERROR-DEPTH*=..")
+	 (/hexstr *maximum-error-depth*)
 	 (/show0 "in INFINITE-ERROR-PROTECTOR, calling ERROR-ERROR")
 	 (error-error "Help! "
 		      *current-error-depth*
@@ -101,6 +108,7 @@
 		      "KERNEL:*MAXIMUM-ERROR-DEPTH* exceeded.")
 	 t)
 	(t
+	 (/show0 "returning normally from INFINITE-ERROR-PROTECTOR")
 	 nil)))
 
 ;;; FIXME: I had a badly broken version of INFINITE-ERROR-PROTECTOR at
@@ -157,8 +165,8 @@
 
 (defconstant bytes-per-scrub-unit 2048)
 
-;;; Zero the unused portion of the control stack so that old objects are not
-;;; kept alive because of uninitialized stack variables.
+;;; Zero the unused portion of the control stack so that old objects
+;;; are not kept alive because of uninitialized stack variables.
 ;;;
 ;;; FIXME: Why do we need to do this instead of just letting GC read
 ;;; the stack pointer and avoid messing with the unused portion of

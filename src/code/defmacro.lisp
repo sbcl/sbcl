@@ -80,10 +80,10 @@
 ;;; takes effect in :LOAD-TOPLEVEL or :EXECUTE situations.
 (def!macro defmacro-mundanely (name lambda-list &body body)
   (let ((whole (gensym "WHOLE-"))
-		  (environment (gensym "ENVIRONMENT-")))
-	      (multiple-value-bind (new-body local-decs doc)
-		  (parse-defmacro lambda-list whole body name 'defmacro
-				  :environment environment)
+	(environment (gensym "ENVIRONMENT-")))
+    (multiple-value-bind (new-body local-decs doc)
+	(parse-defmacro lambda-list whole body name 'defmacro
+			:environment environment)
       `(progn
 	 (setf (sb!xc:macro-function ',name)
 	       (lambda (,whole ,environment)

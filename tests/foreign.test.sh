@@ -20,10 +20,11 @@ make $testfilestem.o
 ld -shared -o $testfilestem.so $testfilestem.o
 
 ${SBCL:-sbcl} <<EOF
-  (when (fboundp 'load-foreign) ; not necessarily supported on all OSes..
-    (load-foreign '("$testfilestem.so"))
-    (def-alien-routine summish int (x int) (y int))
-    (assert (= (summish 10 20) 31)))
+  (unless (fboundp 'load-foreign) ; not necessarily supported on all OSes..
+    (sb-ext:quit :unix-status 52)) ; successfully unsupported:-|
+  (load-foreign '("$testfilestem.so"))
+  (def-alien-routine summish int (x int) (y int))
+  (assert (= (summish 10 20) 31))
   (sb-ext:quit :unix-status 52) ; success convention for Lisp program
 EOF
 if [ $? != 52 ]; then

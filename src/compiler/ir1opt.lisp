@@ -166,10 +166,10 @@
 	  (reoptimize-continuation (node-cont node))))))
   (values))
 
-;;; Similar to Derive-Node-Type, but asserts that it is an error for
-;;; Cont's value not to be typep to Type. If we improve the assertion,
-;;; we set TYPE-CHECK and TYPE-ASSERTED to guarantee that the new
-;;; assertion will be checked.
+;;; This is similar to DERIVE-NODE-TYPE, but asserts that it is an
+;;; error for CONT's value not to be TYPEP to TYPE. If we improve the
+;;; assertion, we set TYPE-CHECK and TYPE-ASSERTED to guarantee that
+;;; the new assertion will be checked.
 (defun assert-continuation-type (cont type)
   (declare (type continuation cont) (type ctype type))
   (let ((cont-type (continuation-asserted-type cont)))
@@ -184,7 +184,7 @@
 	  (reoptimize-continuation cont)))))
   (values))
 
-;;; Assert that Call is to a function of the specified Type. It is
+;;; Assert that CALL is to a function of the specified TYPE. It is
 ;;; assumed that the call is legal and has only constants in the
 ;;; keyword positions.
 (defun assert-call-type (call type)
@@ -216,9 +216,9 @@
 
 ;;;; IR1-OPTIMIZE
 
-;;; Do one forward pass over Component, deleting unreachable blocks
+;;; Do one forward pass over COMPONENT, deleting unreachable blocks
 ;;; and doing IR1 optimizations. We can ignore all blocks that don't
-;;; have the Reoptimize flag set. If Component-Reoptimize is true when
+;;; have the REOPTIMIZE flag set. If COMPONENT-REOPTIMIZE is true when
 ;;; we are done, then another iteration would be beneficial.
 ;;;
 ;;; We delete blocks when there is either no predecessor or the block
@@ -310,10 +310,10 @@
 ;;;  1. The successor has more than one predecessor.
 ;;;  2. The last node's CONT is also used somewhere else.
 ;;;  3. The successor is the current block (infinite loop).
-;;;  4. The next block has a different cleanup, and thus we may want to 
-;;;     insert cleanup code between the two blocks at some point.
-;;;  5. The next block has a different home lambda, and thus the control
-;;;     transfer is a non-local exit.
+;;;  4. The next block has a different cleanup, and thus we may want 
+;;;     to insert cleanup code between the two blocks at some point.
+;;;  5. The next block has a different home lambda, and thus the
+;;;     control transfer is a non-local exit.
 ;;;
 ;;; If we succeed, we return true, otherwise false.
 ;;;
@@ -604,14 +604,16 @@
 
 ;;; This function attempts to delete an exit node, returning true if
 ;;; it deletes the block as a consequence:
-;;; -- If the exit is degenerate (has no Entry), then we don't do anything,
-;;;    since there is nothing to be done.
-;;; -- If the exit node and its Entry have the same home lambda then we know
-;;;    the exit is local, and can delete the exit. We change uses of the
-;;;    Exit-Value to be uses of the original continuation, then unlink the
-;;;    node. If the exit is to a TR context, then we must do MERGE-TAIL-SETS
-;;;    on any local calls which delivered their value to this exit.
-;;; -- If there is no value (as in a GO), then we skip the value semantics.
+;;; -- If the exit is degenerate (has no Entry), then we don't do
+;;;    anything, since there is nothing to be done.
+;;; -- If the exit node and its Entry have the same home lambda then
+;;;    we know the exit is local, and can delete the exit. We change
+;;;    uses of the Exit-Value to be uses of the original continuation,
+;;;    then unlink the node. If the exit is to a TR context, then we
+;;;    must do MERGE-TAIL-SETS on any local calls which delivered
+;;;    their value to this exit.
+;;; -- If there is no value (as in a GO), then we skip the value
+;;;    semantics.
 ;;;
 ;;; This function is also called by environment analysis, since it
 ;;; wants all exits to be optimized even if normal optimization was
@@ -762,23 +764,25 @@
 ;;; This is called both by IR1 conversion and IR1 optimization when
 ;;; they have verified the type signature for the call, and are
 ;;; wondering if something should be done to special-case the call. If
-;;; Call is a call to a global function, then see whether it defined
+;;; CALL is a call to a global function, then see whether it defined
 ;;; or known:
-;;; -- If a DEFINED-FUNCTION should be inline expanded, then convert the
-;;;    expansion and change the call to call it. Expansion is enabled if
-;;;    :INLINE or if space=0. If the FUNCTIONAL slot is true, we never expand,
-;;;    since this function has already been converted. Local call analysis
-;;;    will duplicate the definition if necessary. We claim that the parent
-;;;    form is LABELS for context declarations, since we don't want it to be
-;;;    considered a real global function.
-;;; -- In addition to a direct check for the function name in the table, we
-;;;    also must check for slot accessors. If the function is a slot accessor,
-;;;    then we set the combination kind to the function info of %Slot-Setter or
-;;;    %Slot-Accessor, as appropriate.
-;;; -- If it is a known function, mark it as such by setting the Kind.
+;;; -- If a DEFINED-FUNCTION should be inline expanded, then convert
+;;;    the expansion and change the call to call it. Expansion is
+;;;    enabled if :INLINE or if SPACE=0. If the FUNCTIONAL slot is
+;;;    true, we never expand, since this function has already been
+;;;    converted. Local call analysis will duplicate the definition if
+;;;    necessary. We claim that the parent form is LABELS for context
+;;;    declarations, since we don't want it to be considered a real
+;;;    global function.
+;;; -- In addition to a direct check for the function name in the
+;;;    table, we also must check for slot accessors. If the function
+;;;    is a slot accessor, then we set the combination kind to the
+;;;    function info of %Slot-Setter or %Slot-Accessor, as
+;;;    appropriate.
+;;; -- If it is a known function, mark it as such by setting the KIND.
 ;;;
 ;;; We return the leaf referenced (NIL if not a leaf) and the
-;;; function-info assigned.
+;;; FUNCTION-INFO assigned.
 (defun recognize-known-call (call ir1-p)
   (declare (type combination call))
   (let* ((ref (continuation-use (basic-combination-fun call)))
@@ -913,8 +917,8 @@
 
 ;;;; known function optimization
 
-;;; Add a failed optimization note to FAILED-OPTIMZATIONS for Node,
-;;; Fun and Args. If there is already a note for Node and Transform,
+;;; Add a failed optimization note to FAILED-OPTIMZATIONS for NODE,
+;;; FUN and ARGS. If there is already a note for NODE and TRANSFORM,
 ;;; replace it, otherwise add a new one.
 (defun record-optimization-failure (node transform args)
   (declare (type combination node) (type transform transform)
@@ -1105,7 +1109,7 @@
 
 ;;;; local call optimization
 
-;;; Propagate Type to Leaf and its Refs, marking things changed. If
+;;; Propagate TYPE to LEAF and its REFS, marking things changed. If
 ;;; the leaf type is a function type, then just leave it alone, since
 ;;; TYPE is never going to be more specific than that (and
 ;;; TYPE-INTERSECTION would choke.)
@@ -1174,7 +1178,7 @@
 ;;;    would be NIL.
 ;;; -- the var's DEST has a different policy than the ARG's (think safety).
 ;;;
-;;; We change the Ref to be a reference to NIL with unused value, and
+;;; We change the REF to be a reference to NIL with unused value, and
 ;;; let it be flushed as dead code. A side-effect of this substitution
 ;;; is to delete the variable.
 (defun substitute-single-use-continuation (arg var)

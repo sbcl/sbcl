@@ -87,12 +87,14 @@
 ;;; (Are they used in anything time-critical, or just the debugger?)
 (defun context-register (context index)
   (declare (type (alien (* os-context-t)) context))
-  (deref (context-register-addr context index)))
+  (deref (the (alien (* unsigned-long))
+	   (context-register-addr context index))))
 
 (defun %set-context-register (context index new)
-(declare (type (alien (* os-context-t)) context))
-(setf (deref (context-register-addr context index))
-      new))
+  (declare (type (alien (* os-context-t)) context))
+  (setf (deref (the (alien (* unsigned-long))
+		 (context-register-addr context index)))
+	new))
 
 ;;; This is like CONTEXT-REGISTER, but returns the value of a float
 ;;; register. FORMAT is the type of float to return.
@@ -145,7 +147,6 @@
 ;;; to replicate)
 (defun internal-error-arguments (context)
   (declare (type (alien (* os-context-t)) context))
-  (sb!int::/show0 "entering INTERNAL-ERROR-ARGUMENTS")
   (let ((pc (context-pc context)))
     (declare (type system-area-pointer pc))
     ;; pc is a SAP pointing at - or actually, shortly after -

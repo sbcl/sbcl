@@ -46,12 +46,12 @@
 ;;; classes has been defined, the real definition of LOAD-DEFCLASS is
 ;;; installed by the file std-class.lisp
 (defmacro defclass (name %direct-superclasses %direct-slots &rest %options)
-  (setq supers  (copy-tree %direct-superclasses)
-	slots   (copy-tree %direct-slots)
-	options (copy-tree %options))
-  (let ((metaclass 'standard-class))
-    (dolist (option options)
-      (if (not (listp option))
+  (let ((supers  (copy-tree %direct-superclasses))
+	(slots   (copy-tree %direct-slots))
+	(options (copy-tree %options)))
+    (let ((metaclass 'standard-class))
+      (dolist (option options)
+        (if (not (listp option))
 	  (error "~S is not a legal defclass option." option)
 	  (when (eq (car option) ':metaclass)
 	    (unless (legal-class-name-p (cadr option))
@@ -59,66 +59,69 @@
 		      legal class name."
 		     (cadr option)))
 	    (setq metaclass
-		  (case (cadr option)
-		    (cl:standard-class 'standard-class)
-		    (cl:structure-class 'structure-class)
-		    (t (cadr option))))
+                    (case (cadr option)
+                      (cl:standard-class 'standard-class)
+                      (cl:structure-class 'structure-class)
+                      (t (cadr option))))
 	    (setf options (remove option options))
 	    (return t))))
 
-    (let ((*initfunctions* ())
-	  (*readers* ())		;Truly a crock, but we got
-	  (*writers* ()))               ;to have it to live nicely.
-      (declare (special *initfunctions* *readers* *writers*))
-      (let ((canonical-slots
-	      (mapcar #'(lambda (spec)
-			  (canonicalize-slot-specification name spec))
-		      slots))
-	    (other-initargs
-	      (mapcar #'(lambda (option)
-			  (canonicalize-defclass-option name option))
-		      options))
-	    ;; FIXME: What does this flag mean?
-	    (defstruct-p (and (eq *boot-state* 'complete)
-			      (let ((mclass (find-class metaclass nil)))
-				(and mclass
-				     (*subtypep
-				      mclass
-				      *the-class-structure-class*))))))
-	(let ((defclass-form
-		`(progn
-		   ,@(mapcar (lambda (x)
-			       `(declaim (ftype (function (t) t) ,x)))
-			     *readers*)
-		   ,@(mapcar (lambda (x)
-			       `(declaim (ftype (function (t t) t) ,x)))
-			     *writers*)
-		   (let ,(mapcar #'cdr *initfunctions*)
-		     (load-defclass ',name
-				    ',metaclass
-				    ',supers
-				    (list ,@canonical-slots)
-				    (list ,@(apply #'append
-						   (when defstruct-p
-						     '(:from-defclass-p t))
-						   other-initargs)))))))
-	  (if defstruct-p
-	      (progn
-		;; FIXME: The ANSI way to do this is with EVAL-WHEN
-		;; forms, not by side-effects at macroexpansion time.
-		;; But I (WHN 2001-09-02) am not even sure how to
-		;; reach this code path with ANSI (or art-of-the-MOP)
-		;; code, so I haven't tried to update it, since for
-		;; all I know maybe it could just be deleted instead.
-                (eval defclass-form) ; Define the class now, so that..
-                `(progn       ; ..the defstruct can be compiled.
-                   ,(class-defstruct-form (find-class name))
-                   ,defclass-form))
+      (let ((*initfunctions* ())
+            (*readers* ())		;Truly a crock, but we got
+            (*writers* ()))             ;to have it to live nicely.
+        (declare (special *initfunctions* *readers* *writers*))
+        (let ((canonical-slots
+                (mapcar #'(lambda (spec)
+                            (canonicalize-slot-specification name spec))
+                        slots))
+              (other-initargs
+                (mapcar #'(lambda (option)
+                            (canonicalize-defclass-option name option))
+                        options))
+              ;; DEFSTRUCT-P should be true, if the class is defined with a
+              ;; metaclass STRUCTURE-CLASS, such that a DEFSTRUCT is compiled
+              ;; for the class.
+              (defstruct-p (and (eq *boot-state* 'complete)
+                                (let ((mclass (find-class metaclass nil)))
+                                  (and mclass
+                                       (*subtypep
+                                        mclass
+                                        *the-class-structure-class*))))))
+          (let ((defclass-form
+                    `(progn
+                      ,@(mapcar (lambda (x)
+                                  `(declaim (ftype (function (t) t) ,x)))
+                                *readers*)
+                      ,@(mapcar (lambda (x)
+                                  `(declaim (ftype (function (t t) t) ,x)))
+                                *writers*)
+                      (let ,(mapcar #'cdr *initfunctions*)
+                        (load-defclass ',name
+                                       ',metaclass
+                                       ',supers
+                                       (list ,@canonical-slots)
+                                       (list ,@(apply #'append
+                                                      (when defstruct-p
+                                                        '(:from-defclass-p t))
+                                                      other-initargs)))))))
+            (if defstruct-p
+              (let* ((include (or (and supers
+                                       (fix-super (car supers)))
+                                  (and (not (eq name 'structure-object))
+                                       *the-class-structure-object*)))
+                     (defstruct-form (make-structure-class-defstruct-form name
+                                                                          slots
+                                                                          include)))
+                `(progn
+                  (eval-when (:compile-toplevel :load-toplevel :execute)
+                    ,defstruct-form) ; really compile the defstruct-form
+                  (eval-when (:compile-toplevel :load-toplevel :execute)
+                    ,defclass-form)))
 	      `(progn
-		 ;; By telling the type system at compile time about
-		 ;; the existence of a class named NAME, we can avoid
-		 ;; various bogus warnings about "type isn't defined yet".
-		 ,(when (and
+                ;; By telling the type system at compile time about
+                ;; the existence of a class named NAME, we can avoid
+                ;; various bogus warnings about "type isn't defined yet".
+                ,(when (and
 			 ;; But it's not so important to get rid of
 			 ;; "not defined yet" warnings during
 			 ;; bootstrapping, and machinery like
@@ -135,9 +138,16 @@
 			 ;; time; we don't in general know how to do
 			 ;; that for other classes. So punt then too.
 			 (eq metaclass 'standard-class))
-		    `(eval-when (:compile-toplevel :load-toplevel :execute)
-		       (inform-type-system-about-std-class ',name)))
-		 ,defclass-form)))))))
+                       `(eval-when (:compile-toplevel)
+                         ;; we only need :COMPILE-TOPLEVEL here, because this
+                         ;; should happen in the compile-time environment
+                         ;; only.
+                         ;; Later, INFORM-TYPE-SYSTEM-ABOUT-STD-CLASS is
+                         ;; called by way of LOAD-DEFCLASS (calling
+                         ;; ENSURE-CLASS-USING-CLASS) to establish the 'real'
+                         ;; type predicate.                         
+                         (inform-type-system-about-std-class ',name)))
+                ,defclass-form))))))))
 
 (defun make-initfunction (initform)
   (declare (special *initfunctions*))

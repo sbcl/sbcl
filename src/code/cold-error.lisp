@@ -116,7 +116,6 @@
 ;;; messing up --noprogrammer mode (which works by setting
 ;;; *DEBUGGER-HOOK*)
 (defun %break (what &optional (datum "break") &rest arguments)
-  ;; FIXME: Do we really want INFINITE-ERROR-PROTECT in BREAKish stuff?
   (sb!kernel:infinite-error-protect
     (with-simple-restart (continue "Return from ~S." what)
       (let ((sb!debug:*stack-top-hint* (maybe-find-stack-top-hint)))

@@ -1914,16 +1914,18 @@
   (type=-set (intersection-type-types type1)
 	     (intersection-type-types type2)))
 
-(flet ((intersection-complex-subtypep-arg1 (type1 type2)
-         (any/type (swapped-args-fun #'csubtypep)
-		   type2
-		   (intersection-type-types type1))))
-  (!define-type-method (intersection :simple-subtypep) (type1 type2)
-    (every/type #'intersection-complex-subtypep-arg1
-		type1
-		(intersection-type-types type2)))
-  (!define-type-method (intersection :complex-subtypep-arg1) (type1 type2)
-    (intersection-complex-subtypep-arg1 type1 type2)))
+(defun %intersection-complex-subtypep-arg1 (type1 type2)
+  (any/type (swapped-args-fun #'csubtypep)
+	    type2
+	    (intersection-type-types type1)))
+
+(!define-type-method (intersection :simple-subtypep) (type1 type2)
+  (every/type #'%intersection-complex-subtypep-arg1
+	      type1
+	      (intersection-type-types type2)))
+
+(!define-type-method (intersection :complex-subtypep-arg1) (type1 type2)
+  (%intersection-complex-subtypep-arg1 type1 type2))
 
 (!define-type-method (intersection :complex-subtypep-arg2) (type1 type2)
   (every/type #'csubtypep type1 (intersection-type-types type2)))
@@ -2187,6 +2189,15 @@
 			 :low low
 			 :high high))))
 
-(!defun-from-collected-cold-init-forms !late-type-cold-init)
+(locally
+  ;; Why SAFETY 0? To suppress the is-it-the-right-structure-type
+  ;; checking for declarations in structure accessors. Otherwise we
+  ;; can get caught in a chicken-and-egg bootstrapping problem, whose
+  ;; symptom on x86 OpenBSD sbcl-0.pre7.37.flaky5.22 is an illegal
+  ;; instruction trap. I haven't tracked it down, but I'm guessing it
+  ;; has to do with setting LAYOUTs when the LAYOUT hasn't been set
+  ;; yet. -- WHN
+  (declare (optimize (safety 0)))
+  (!defun-from-collected-cold-init-forms !late-type-cold-init))
 
 (/show0 "late-type.lisp end of file")

@@ -1542,7 +1542,7 @@
 	   (type (member t nil) use-labels))
   (pprint-logical-block (*standard-output* nil :per-line-prefix "; ")
     (let ((fun (compiled-function-or-lose object)))
-      (if (typep fun 'sb!kernel:byte-function)
+      (if nil #|(typep fun 'sb!kernel:byte-function)|# ; FIXME: byte compile to go away completely
 	  (sb!c:disassem-byte-fun fun)
 	  ;; We can't detect closures, so be careful.
 	  (disassemble-function (fun-self fun)

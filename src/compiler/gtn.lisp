@@ -30,11 +30,12 @@
   (values))
 
 ;;; We have to allocate the home TNs for variables before we can call
-;;; Assign-IR2-Environment so that we can close over TNs that haven't had their
-;;; home environment assigned yet. Here we evaluate the DEBUG-INFO/SPEED
-;;; tradeoff to determine how variables are allocated. If SPEED is 3, then all
-;;; variables are subject to lifetime analysis. Otherwise, only Let-P variables
-;;; are allocated normally, and that can be inhibited by DEBUG-INFO = 3.
+;;; ASSIGN-IR2-ENVIRONMENT so that we can close over TNs that haven't
+;;; had their home environment assigned yet. Here we evaluate the
+;;; DEBUG-INFO/SPEED tradeoff to determine how variables are
+;;; allocated. If SPEED is 3, then all variables are subject to
+;;; lifetime analysis. Otherwise, only LET-P variables are allocated
+;;; normally, and that can be inhibited by DEBUG-INFO = 3.
 (defun assign-lambda-var-tns (fun let-p)
   (declare (type clambda fun))
   (dolist (var (lambda-vars fun))
@@ -54,38 +55,42 @@
 	(setf (leaf-info var) res))))
   (values))
 
-;;; Give an IR2-Environment structure to Fun. We make the TNs which hold
-;;; environment values and the old-FP/return-PC.
-(defun assign-ir2-environment (fun)
-  (declare (type clambda fun))
-  (let ((env (lambda-environment fun)))
-    (collect ((env))
-      (dolist (thing (environment-closure env))
-	(let ((ptype (etypecase thing
-		       (lambda-var
-			(if (lambda-var-indirect thing)
-			    *backend-t-primitive-type*
-			    (primitive-type (leaf-type thing))))
-		       (nlx-info *backend-t-primitive-type*))))
-	  (env (cons thing (make-normal-tn ptype)))))
+;;; Give CLAMBDA an IR2-ENVIRONMENT structure. (And in order to
+;;; properly initialize the new structure, we make the TNs which hold
+;;; environment values and the old-FP/return-PC.)
+(defun assign-ir2-environment (clambda)
+  (declare (type clambda clambda))
+  (let ((lambda-environment (lambda-environment clambda))
+	(reversed-ir2-environment-alist nil))
+    ;; FIXME: should be MAPCAR, not DOLIST
+    (dolist (thing (environment-closure lambda-environment))
+      (let ((ptype (etypecase thing
+		     (lambda-var
+		      (if (lambda-var-indirect thing)
+			  *backend-t-primitive-type*
+			  (primitive-type (leaf-type thing))))
+		     (nlx-info *backend-t-primitive-type*))))
+	(push (cons thing (make-normal-tn ptype))
+	      reversed-ir2-environment-alist)))
 
-      (let ((res (make-ir2-environment
-		  :environment (env)
-		  :return-pc-pass (make-return-pc-passing-location
-				   (external-entry-point-p fun)))))
-	(setf (environment-info env) res)
-	(setf (ir2-environment-old-fp res)
-	      (make-old-fp-save-location env))
-	(setf (ir2-environment-return-pc res)
-	      (make-return-pc-save-location env)))))
+    (let ((res (make-ir2-environment
+		:environment (nreverse reversed-ir2-environment-alist)
+		:return-pc-pass (make-return-pc-passing-location
+				 (external-entry-point-p clambda)))))
+      (setf (environment-info lambda-environment) res)
+      (setf (ir2-environment-old-fp res)
+	    (make-old-fp-save-location lambda-environment))
+      (setf (ir2-environment-return-pc res)
+	    (make-return-pc-save-location lambda-environment))))
 
   (values))
 
-;;; Return true if Fun's result continuation is used in a TR full call. We
-;;; only consider explicit :Full calls. It is assumed that known calls are
-;;; never part of a tail-recursive loop, so we don't need to enforce
-;;; tail-recursion. In any case, we don't know which known calls will
-;;; actually be full calls until after LTN.
+;;; Return true if FUN's result continuation is used in a
+;;; tail-recursive full call. We only consider explicit :FULL calls.
+;;; It is assumed that known calls are never part of a tail-recursive
+;;; loop, so we don't need to enforce tail-recursion. In any case, we
+;;; don't know which known calls will actually be full calls until
+;;; after LTN.
 (defun has-full-call-use (fun)
   (declare (type clambda fun))
   (let ((return (lambda-return fun)))
@@ -96,13 +101,14 @@
 		      (eq (basic-combination-kind use) :full))
 	     (return t))))))
 
-;;; Return true if we should use the standard (unknown) return convention
-;;; for a tail-set. We use the standard return convention when:
-;;; -- We must use the standard convention to preserve tail-recursion, since
-;;;    the tail-set contains both an XEP and a TR full call.
-;;; -- It appears to be more efficient to use the standard convention, since
-;;;    there are no non-TR local calls that could benefit from a non-standard
-;;;    convention.
+;;; Return true if we should use the standard (unknown) return
+;;; convention for a TAIL-SET. We use the standard return convention
+;;; when:
+;;; -- We must use the standard convention to preserve tail-recursion,
+;;;    since the TAIL-SET contains both an XEP and a TR full call.
+;;; -- It appears to be more efficient to use the standard convention,
+;;;    since there are no non-TR local calls that could benefit from
+;;;    a non-standard convention.
 (defun use-standard-returns (tails)
   (declare (type tail-set tails))
   (let ((funs (tail-set-functions tails)))
@@ -120,11 +126,11 @@
 			   (eq (basic-combination-kind dest) :local))
 		  (return-from punt nil)))))))))
 
-;;; If policy indicates, give an efficency note about our inability to use
-;;; the known return convention. We try to find a function in the tail set
-;;; with non-constant return values to use as context. If there is no such
-;;; function, then be more vague.
-(defun return-value-efficency-note (tails)
+;;; If policy indicates, give an efficiency note about our inability to
+;;; use the known return convention. We try to find a function in the
+;;; tail set with non-constant return values to use as context. If
+;;; there is no such function, then be more vague.
+(defun return-value-efficiency-note (tails)
   (declare (type tail-set tails))
   (let ((funs (tail-set-functions tails)))
     (when (policy (lambda-bind (first funs))
@@ -151,18 +157,18 @@
 		  (return)))))))))
   (values))
 
-;;; Return a Return-Info structure describing how we should return from
-;;; functions in the specified tail set. We use the unknown values convention
-;;; if the number of values is unknown, or if it is a good idea for some other
-;;; reason. Otherwise we allocate passing locations for a fixed number of
-;;; values.
+;;; Return a RETURN-INFO structure describing how we should return
+;;; from functions in the specified tail set. We use the unknown
+;;; values convention if the number of values is unknown, or if it is
+;;; a good idea for some other reason. Otherwise we allocate passing
+;;; locations for a fixed number of values.
 (defun return-info-for-set (tails)
   (declare (type tail-set tails))
   (multiple-value-bind (types count) (values-types (tail-set-type tails))
     (let ((ptypes (mapcar #'primitive-type types))
 	  (use-standard (use-standard-returns tails)))
       (when (and (eq count :unknown) (not use-standard))
-	(return-value-efficency-note tails))
+	(return-value-efficiency-note tails))
       (if (or (eq count :unknown) use-standard)
 	  (make-return-info :kind :unknown
 			    :count count
@@ -172,10 +178,11 @@
 			    :types ptypes
 			    :locations (mapcar #'make-normal-tn ptypes))))))
 
-;;; If Tail-Set doesn't have any Info, then make a Return-Info for it. If
-;;; we choose a return convention other than :Unknown, and this environment is
-;;; for an XEP, then break tail recursion on the XEP calls, since we must
-;;; always use unknown values when returning from an XEP.
+;;; If TAIL-SET doesn't have any INFO, then make a RETURN-INFO for it.
+;;; If we choose a return convention other than :UNKNOWN, and this
+;;; environment is for an XEP, then break tail recursion on the XEP
+;;; calls, since we must always use unknown values when returning from
+;;; an XEP.
 (defun assign-return-locations (fun)
   (declare (type clambda fun))
   (let* ((tails (lambda-tail-set fun))
@@ -190,10 +197,11 @@
 	(setf (node-tail-p use) nil))))
   (values))
 
-;;; Make an IR2-NLX-Info structure for each NLX entry point recorded. We
-;;; call a VM supplied function to make the Save-SP restricted on the stack.
-;;; The NLX-Entry VOP's :Force-To-Stack Save-P value doesn't do this, since the
-;;; SP is an argument to the VOP, and thus isn't live afterwards.
+;;; Make an IR2-NLX-INFO structure for each NLX entry point recorded.
+;;; We call a VM supplied function to make the SAVE-SP restricted on
+;;; the stack. The NLX-ENTRY VOP's :FORCE-TO-STACK SAVE-P value
+;;; doesn't do this, since the SP is an argument to the VOP, and thus
+;;; isn't live afterwards.
 (defun assign-ir2-nlx-info (fun)
   (declare (type clambda fun))
   (let ((env (lambda-environment fun)))

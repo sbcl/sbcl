@@ -16,7 +16,7 @@
 
 ;;;; getting LAYOUTs
 
-;;; Return the compiler layout for Name. (The class referred to by
+;;; Return the compiler layout for NAME. (The class referred to by
 ;;; NAME must be a structure-like class.)
 (defun compiler-layout-or-lose (name)
   (let ((res (info :type :compiler-layout name)))
@@ -313,7 +313,7 @@
   (let* ((name (dd-name dd)))
     (collect ((res))
       (dolist (slot (dd-slots dd))
-	(let ((stype (dsd-type slot))
+	(let ((slot-type (dsd-type slot))
 	      (accessor-name (dsd-accessor-name slot))
 	      (argname (gensym "ARG"))
 	      (nvname (gensym "NEW-VALUE-")))
@@ -323,17 +323,25 @@
 	    (when (and accessor-name
 		       (not (eq accessor-name '%instance-ref)))
 	      (res `(declaim (inline ,accessor-name)))
-	      (res `(declaim (ftype (function (,name) ,stype) ,accessor-name)))
+	      (res `(declaim (ftype (function (,name) ,slot-type)
+				    ,accessor-name)))
 	      (res `(defun ,accessor-name (,argname)
-		      (truly-the ,stype (,accessor ,data ,offset))))
+		      ;; Note: The DECLARE here might seem redundant
+		      ;; with the DECLAIM FTYPE above, but it's not:
+		      ;; If we're not at toplevel, the PROCLAIM inside
+		      ;; the DECLAIM doesn't get executed until after
+		      ;; this function is compiled.
+		      (declare (type ,name ,argname))
+		      (truly-the ,slot-type (,accessor ,data ,offset))))
 	      (unless (dsd-read-only slot)
 		(res `(declaim (inline (setf ,accessor-name))))
-		(res `(declaim (ftype (function (,stype ,name) ,stype)
+		(res `(declaim (ftype (function (,slot-type ,name) ,slot-type)
 				      (setf ,accessor-name))))
 		;; FIXME: I rewrote this somewhat from the CMU CL definition.
 		;; Do some basic tests to make sure that reading and writing
 		;; raw slots still works correctly.
 		(res `(defun (setf ,accessor-name) (,nvname ,argname)
+			(declare (type ,name ,argname))
 			(setf (,accessor ,data ,offset) ,nvname)
 			,nvname)))))))
       (res))))
@@ -406,7 +414,7 @@
   (collect ((stuff))
     (let ((ltype (dd-lisp-type defstruct)))
       (dolist (slot (dd-slots defstruct))
-	(let ((name (dsd-accessor slot))
+	(let ((name (dsd-accessor-name slot))
 	      (index (dsd-index slot))
 	      (slot-type `(and ,(dsd-type slot)
 			       ,(dd-element-type defstruct))))

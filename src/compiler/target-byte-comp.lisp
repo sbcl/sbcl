@@ -13,7 +13,7 @@
 
 (in-package "SB!C")
 
-;;; Generate trace-file output for the byte compiler back-end.
+;;; Generate trace file output for the byte compiler back end.
 ;;;
 ;;; (Note: As of sbcl-0.6.7, this is target-only code not because it's
 ;;; logically target-only, but just because it's still implemented in

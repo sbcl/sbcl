@@ -605,12 +605,26 @@
     (sb!vm:sanctify-for-execution component)
     component))
 
-;;; This a no-op except in cold load. (In ordinary warm load,
-;;; everything involved with function definition can be handled nicely
-;;; by ordinary toplevel code.)
 (define-fop (fop-fset 74 nil)
-  (pop-stack)
-  (pop-stack))
+  ;; Ordinary, not-for-cold-load code shouldn't need to mess with this
+  ;; at all, since it's only used as part of the conspiracy between
+  ;; the cross-compiler and GENESIS to statically link FDEFINITIONs
+  ;; for cold init.
+  (warn "~@<FOP-FSET seen in ordinary load (not cold load) -- quite strange! ~
+If you didn't do something strange to cause this, please report it as a ~
+bug.~:@>")
+  ;; Unlike CMU CL, we don't treat this as a no-op in ordinary code.
+  ;; If the user (or, more likely, developer) is trying to reload
+  ;; compiled-for-cold-load code into a warm SBCL, we'll do a warm
+  ;; assignment. (This is partly for abstract tidiness, since the warm
+  ;; assignment is the closest analogy to what happens at cold load,
+  ;; and partly because otherwise our compiled-for-cold-load code will
+  ;; fail, since in SBCL things like compiled-for-cold-load %DEFUN
+  ;; depend more strongly than in CMU CL on FOP-FSET actually doing
+  ;; something.)
+  (let ((fn (pop-stack))
+	(name (pop-stack)))
+    (setf (fdefinition name) fn)))
 
 ;;; Modify a slot in a Constants object.
 (define-cloned-fops (fop-alter-code 140 nil) (fop-byte-alter-code 141)
@@ -645,6 +659,8 @@
 	      (format t "~S defined~%" fun))
       fun)))
 
+;;; FIXME: byte compiler to be completely deleted
+#|
 (define-fop (fop-make-byte-compiled-function 143)
   (let* ((size (read-arg 1))
 	 (layout (pop-stack))
@@ -660,6 +676,7 @@
 	    (load-fresh-line)
 	    (format t "~S defined~%" res))
     res))
+|#
 
 ;;;; Some Dylan FOPs used to live here. By 1 November 1998 the code
 ;;;; was sufficiently stale that the functions it called were no

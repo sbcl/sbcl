@@ -187,7 +187,7 @@
 
 ;;; Compute the initial flow analysis sets for BLOCK:
 ;;; -- For any lambda-var ref with a type check, add that constraint.
-;;; -- For any lambda-var set, delete all constraints on that var, and add
+;;; -- For any LAMBDA-VAR set, delete all constraints on that var, and add
 ;;;    those constraints to the set nuked by this block.
 (defun find-block-type-constraints (block)
   (declare (type cblock block))
@@ -217,7 +217,7 @@
 
       (setf (block-in block) nil)
       (setf (block-gen block) gen)
-      (setf (block-kill block) (kill))
+      (setf (block-kill-list block) (kill))
       (setf (block-out block) (copy-sset gen))
       (setf (block-type-asserted block) nil)
       (values))))
@@ -439,11 +439,11 @@
       (dolist (let (lambda-lets fun))
 	(frob let)))))
 
-;;; BLOCK-IN becomes the intersection of the OUT of the prececessors.
+;;; BLOCK-IN becomes the intersection of the OUT of the predecessors.
 ;;; Our OUT is:
 ;;;     out U (in - kill)
 ;;;
-;;; BLOCK-KILL is just a list of the lambda-vars killed, so we must
+;;; BLOCK-KILL-LIST is just a list of the lambda-vars killed, so we must
 ;;; compute the kill set when there are any vars killed. We bum this a
 ;;; bit by special-casing when only one var is killed, and just using
 ;;; that var's constraints as the kill set. This set could possibly be
@@ -457,30 +457,37 @@
 			(sset-intersection res (block-out b)))
 		      res))
 		   (t
-		    (when *check-consistency*
-		      (let ((*compiler-error-context* (block-last block)))
-			(compiler-warning
-			 "*** Unreachable code in constraint ~
-			  propagation... Bug?")))
+		    (let ((*compiler-error-context* (block-last block)))
+		      (compiler-warning
+		       "unreachable code in constraint ~
+			propagation -- apparent compiler bug"))
 		    (make-sset))))
-	 (kill (block-kill block))
+	 (kill-list (block-kill-list block))
 	 (out (block-out block)))
 
     (setf (block-in block) in)
-    (cond ((null kill)
+    (cond ((null kill-list)
 	   (sset-union (block-out block) in))
-	  ((null (rest kill))
-	   (let ((con (lambda-var-constraints (first kill))))
+	  ((null (rest kill-list))
+	   (let ((con (lambda-var-constraints (first kill-list))))
 	     (if con
 		 (sset-union-of-difference out in con)
 		 (sset-union out in))))
 	  (t
 	   (let ((kill-set (make-sset)))
-	     (dolist (var kill)
+	     (dolist (var kill-list)
 	       (let ((con (lambda-var-constraints var)))
 		 (when con
 		   (sset-union kill-set con))))
 	     (sset-union-of-difference (block-out block) in kill-set))))))
+
+;;; How many blocks does COMPONENT have?
+(defun component-n-blocks (component)
+  (let ((result 0))
+    (declare (type index result))
+    (do-blocks (block component :both)
+      (incf result))
+    result))
 
 (defun constraint-propagate (component)
   (declare (type component component))
@@ -499,14 +506,18 @@
 
   (setf (block-out (component-head component)) (make-sset))
 
-  (let ((did-something nil))
-    (loop
-      (do-blocks (block component)
-	(when (flow-propagate-constraints block)
-	  (setq did-something t)))
-
-      (unless did-something (return))
-      (setq did-something nil)))
+  (let (;; If we have to propagate changes more than this many times,
+	;; something is wrong.
+	(max-n-changes-remaining (component-n-blocks component)))
+    (declare (type fixnum max-n-changes-remaining))
+    (loop (aver (plusp max-n-changes-remaining))
+	  (decf max-n-changes-remaining)
+	  (let ((did-something nil))
+	    (do-blocks (block component)
+	      (when (flow-propagate-constraints block)
+		(setq did-something t)))
+	    (unless did-something
+	      (return)))))
 
   (do-blocks (block component)
     (use-result-constraints block))

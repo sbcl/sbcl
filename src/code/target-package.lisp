@@ -91,21 +91,22 @@
   (def-frob package-used-by-list package-%used-by-list)
   (def-frob package-shadowing-symbols package-%shadowing-symbols))
 
-(flet ((stuff (table)
-	 (let ((size (the fixnum
-			  (- (the fixnum (package-hashtable-size table))
-			     (the fixnum
-				  (package-hashtable-deleted table))))))
-	   (declare (fixnum size))
-	   (values (the fixnum
-			(- size
-			   (the fixnum
-				(package-hashtable-free table))))
-		   size))))
-  (defun package-internal-symbol-count (package)
-    (stuff (package-internal-symbols package)))
-  (defun package-external-symbol-count (package)
-    (stuff (package-external-symbols package))))
+(defun %package-hashtable-symbol-count (table)
+  (let ((size (the fixnum
+		(- (the fixnum (package-hashtable-size table))
+		   (the fixnum
+		     (package-hashtable-deleted table))))))
+    (declare (fixnum size))
+    (the fixnum
+      (- size
+	 (the fixnum
+	   (package-hashtable-free table))))))
+
+(defun package-internal-symbol-count (package)
+  (%package-hashtable-symbol-count (package-internal-symbols package)))
+
+(defun package-external-symbol-count (package)
+  (%package-hashtable-symbol-count (package-external-symbols package)))
 
 (defvar *package* (error "*PACKAGE* should be initialized in cold load!") 
   #!+sb-doc "the current package")

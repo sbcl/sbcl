@@ -128,7 +128,6 @@ the usual naming convention (names like *FOO*) for special variables"
   ;; will be cross-compiled correctly.
   #-sb-xc-host (setf (symbol-value name) value)
   #+sb-xc-host (progn
-		 (/show (symbol-package name))
 		 ;; Redefining our cross-compilation host's CL symbols
 		 ;; would be poor form.
 		 ;;

@@ -48,6 +48,23 @@
   (format t "~&No applicable method for ZUT-N-A-M ~S, yet.~%" args))
 (zut-n-a-m 1 2 3)
 
+
+;; structure-class tests setup
+(defclass structure-class-foo1 () () (:metaclass cl:structure-class))
+(defclass structure-class-foo2 (structure-class-foo1)
+  () (:metaclass cl:structure-class))
+
+;; standard-class tests setup
+(defclass standard-class-foo1 () () (:metaclass cl:standard-class))
+(defclass standard-class-foo2 (standard-class-foo1)
+  () (:metaclass cl:standard-class))
+
+
+(assert (typep (class-of (make-instance 'structure-class-foo1))
+               'structure-class))
+(assert (typep (make-instance 'structure-class-foo1) 'structure-class-foo1))
+(assert (typep (make-instance 'standard-class-foo1) 'standard-class-foo1))
+
 ;;;; success
 
 (sb-ext:quit :unix-status 104)

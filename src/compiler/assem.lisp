@@ -27,7 +27,7 @@
 ;;; This structure holds the state of the assembler.
 (defstruct (segment (:copier nil))
   ;; the name of this segment (for debugging output and stuff)
-  (name "Unnamed" :type simple-base-string)
+  (name "unnamed" :type simple-base-string)
   ;; Ordinarily this is a vector where instructions are written. If
   ;; the segment is made invalid (e.g. by APPEND-SEGMENT) then the
   ;; vector can be replaced by NIL.
@@ -91,7 +91,7 @@
   ;; have to be emitted at a specific place (e.g. one slot before the
   ;; end of the block).
   (queued-branches nil :type list)
-  ;; *** state used by the scheduler during instruction scheduling.
+  ;; *** state used by the scheduler during instruction scheduling
   ;;
   ;; the instructions who would have had a read dependent removed if
   ;; it were not for a delay slot. This is a list of lists. Each
@@ -654,11 +654,11 @@ p	    ;; the branch has two dependents and one of them dpends on
 	    (:predicate alignment-p)
 	    (:constructor make-alignment (bits size fill-byte))
 	    (:copier nil))
-  ;; The minimum number of low-order bits that must be zero.
+  ;; the minimum number of low-order bits that must be zero
   (bits 0 :type alignment)
-  ;; The amount of filler we are assuming this alignment op will take.
+  ;; the amount of filler we are assuming this alignment op will take
   (size 0 :type (integer 0 #.(1- (ash 1 max-alignment))))
-  ;; The byte used as filling.
+  ;; the byte used as filling
   (fill-byte 0 :type (or assembly-unit (signed-byte #.assembly-unit-bits))))
 
 ;;; a reference to someplace that needs to be back-patched when
@@ -667,9 +667,9 @@ p	    ;; the branch has two dependents and one of them dpends on
 	    (:include annotation)
 	    (:constructor make-back-patch (size function))
 	    (:copier nil))
-  ;; The area effected by this back-patch.
+  ;; the area effected by this back-patch
   (size 0 :type index)
-  ;; The function to use to generate the real data
+  ;; the function to use to generate the real data
   (function nil :type function))
 
 ;;; This is similar to a BACK-PATCH, but also an indication that the
@@ -1504,9 +1504,11 @@ p	    ;; the branch has two dependents and one of them dpends on
 	       (error "You can only specify :VOP-VAR once per instruction.")
 	       (setf vop-var (car args))))
 	  (:printer
+	   (sb!int:/noshow "uniquifying :PRINTER with" args)
 	   (push (eval `(list (multiple-value-list
 			       ,(sb!disassem:gen-printer-def-forms-def-form
 				 name
+				 (format nil "~A[~A]" name args)
 				 (cdr option-spec)))))
 		 pdefs))
 	  (:printer-list
@@ -1515,10 +1517,13 @@ p	    ;; the branch has two dependents and one of them dpends on
 	   (push
 	    (eval
 	     `(eval
-	       `(list ,@(mapcar #'(lambda (printer)
-				    `(multiple-value-list
-				      ,(sb!disassem:gen-printer-def-forms-def-form
-					',name printer nil)))
+	       `(list ,@(mapcar (lambda (printer)
+				  `(multiple-value-list
+				    ,(sb!disassem:gen-printer-def-forms-def-form
+				      ',name
+				      (format nil "~A[~A]" ',name printer)
+				      printer
+				      nil)))
 				,(cadr option-spec)))))
 	    pdefs))
 	  (t

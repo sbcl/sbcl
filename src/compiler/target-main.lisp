@@ -15,23 +15,24 @@
 
 ;;;; CL:COMPILE
 
-(defun get-lambda-to-compile (definition)
-  (if (consp definition)
-      definition
-      (multiple-value-bind (def env-p)
-			   (function-lambda-expression definition)
+(defun get-lambda-to-compile (definition-designator)
+  (if (consp definition-designator)
+      definition-designator
+      (multiple-value-bind (definition env-p)
+			   (function-lambda-expression definition-designator)
 	(when env-p
-	  (error "~S was defined in a non-null environment." definition))
-	(unless def
-	  (error "Can't find a definition for ~S." definition))
-	def)))
+	  (error "~S was defined in a non-null environment."
+		 definition-designator))
+	(unless definition
+	  (error "can't find a definition for ~S" definition-designator))
+	definition)))
 
-;;; Find the function that is being compiled by COMPILE and bash its name to
-;;; NAME. We also substitute for any references to name so that recursive
-;;; calls will be compiled direct. Lambda is the top-level lambda for the
-;;; compilation. A REF for the real function is the only thing in the
-;;; top-level lambda other than the bind and return, so it isn't too hard to
-;;; find.
+;;; Find the function that is being compiled by COMPILE and bash its
+;;; name to NAME. We also substitute for any references to name so
+;;; that recursive calls will be compiled direct. LAMBDA is the
+;;; top-level lambda for the compilation. A REF for the real function
+;;; is the only thing in the top-level lambda other than the bind and
+;;; return, so it isn't too hard to find.
 (defun compile-fix-function-name (lambda name)
   (declare (type clambda lambda) (type (or symbol cons) name))
   (when name
@@ -47,14 +48,21 @@
 (defun actually-compile (name definition)
   (with-compilation-values
     (sb!xc:with-compilation-unit ()
-      (let* (;; FIXME: Do we need this rebinding here? It's a literal
-	     ;; translation of the old CMU CL rebinding to
-	     ;; (OR *BACKEND-INFO-ENVIRONMENT* *INFO-ENVIRONMENT*),
-	     ;; and it's not obvious whether the rebinding to itself is
-	     ;; needed that SBCL doesn't need *BACKEND-INFO-ENVIRONMENT*.
+      ;; FIXME: These bindings were copied from SUB-COMPILE-FILE with
+      ;; few changes. Once things are stable, the shared bindings
+      ;; probably be merged back together into some shared utility
+      ;; macro, or perhaps both merged into one of the existing utility
+      ;; macros SB-C::WITH-COMPILATION-VALUES or
+      ;; CL:WITH-COMPILATION-UNIT.
+      (let* (;; FIXME: Do we need the *INFO-ENVIRONMENT* rebinding
+	     ;; here? It's a literal translation of the old CMU CL
+	     ;; rebinding to (OR *BACKEND-INFO-ENVIRONMENT*
+	     ;; *INFO-ENVIRONMENT*), and it's not obvious whether the
+	     ;; rebinding to itself is needed now that SBCL doesn't
+	     ;; need *BACKEND-INFO-ENVIRONMENT*.
 	     (*info-environment* *info-environment*)
 	     (*lexenv* (make-null-lexenv))
-	     (form `#',(get-lambda-to-compile definition))
+	     (form (get-lambda-to-compile definition))
 	     (*source-info* (make-lisp-source-info form))
 	     (*top-level-lambdas* ())
 	     (*block-compile* nil)
@@ -70,7 +78,6 @@
 	     (*last-format-string* nil)
 	     (*last-format-args* nil)
 	     (*last-message-count* 0)
-	     (*compile-object* (make-core-object))
 	     (*gensym-counter* 0)
 	     ;; FIXME: ANSI doesn't say anything about CL:COMPILE
 	     ;; interacting with these variables, so we shouldn't. As
@@ -82,24 +89,9 @@
 	     (*compile-print* nil))
 	(clear-stuff)
 	(find-source-paths form 0)
-	(let ((lambda (ir1-top-level form '(original-source-start 0 0) t)))
-
-	  (compile-fix-function-name lambda name)
-	  (let* ((component
-		  (block-component (node-block (lambda-bind lambda))))
-		 (*all-components* (list component)))
-	    (local-call-analyze component))
-
-	  (multiple-value-bind (components top-components)
-			       (find-initial-dfo (list lambda))
-	    (let ((*all-components* (append components top-components)))
-	      (dolist (component *all-components*)
-		(compile-component component))))
-
-	  (let ((compiled-fun (core-call-top-level-lambda lambda
-							  *compile-object*)))
-	    (fix-core-source-info *source-info* *compile-object* compiled-fun)
-	    compiled-fun))))))
+	(%compile form (make-core-object)
+		  :name name
+		  :path '(original-source-start 0 0))))))
 
 (defun compile (name &optional (definition (fdefinition name)))
   #!+sb-doc

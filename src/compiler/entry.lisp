@@ -14,10 +14,10 @@
 (in-package "SB!C")
 
 ;;; This phase runs before IR2 conversion, initializing each XEP's
-;;; Entry-Info structure. We call the VM-supplied
-;;; Select-Component-Format function to make VM-dependent
-;;; initializations in the IR2-Component. This includes setting the
-;;; IR2-Component-Kind and allocating fixed implementation overhead in
+;;; ENTRY-INFO structure. We call the VM-supplied
+;;; SELECT-COMPONENT-FORMAT function to make VM-dependent
+;;; initializations in the IR2-COMPONENT. This includes setting the
+;;; IR2-COMPONENT-KIND and allocating fixed implementation overhead in
 ;;; the constant pool. If there was a forward reference to a function,
 ;;; then the ENTRY-INFO will already exist, but will be uninitialized.
 (defun entry-analyze (component)
@@ -50,7 +50,7 @@
 	      (*print-case* :downcase))
 	  (write-to-string args)))))
 
-;;; Initialize Info structure to correspond to the XEP lambda Fun.
+;;; Initialize INFO structure to correspond to the XEP LAMBDA FUN.
 (defun compute-entry-info (fun info)
   (declare (type clambda fun) (type entry-info info))
   (let ((bind (lambda-bind fun))
@@ -67,41 +67,44 @@
       (setf (entry-info-type info) (type-specifier (leaf-type internal-fun)))))
   (values))
 
-;;; Replace all references to Component's non-closure XEPS that appear in
-;;; top-level components, changing to :TOP-LEVEL-XEP functionals. If the
-;;; cross-component ref is not in a :TOP-LEVEL component, or is to a closure,
+;;; Replace all references to COMPONENT's non-closure XEPs that appear
+;;; in top-level or externally-referenced components, changing to
+;;; :TOP-LEVEL-XEP FUNCTIONALs. If the cross-component ref is not in a
+;;; :TOP-LEVEL/externally-referenced component, or is to a closure,
 ;;; then substitution is suppressed.
 ;;;
-;;; When a cross-component ref is not substituted, we return T to indicate that
-;;; early deletion of this component's IR1 should not be done. We also return
-;;; T if this component contains :TOP-LEVEL lambdas (though it is not a
+;;; When a cross-component ref is not substituted, we return T to
+;;; indicate that early deletion of this component's IR1 should not be
+;;; done. We also return T if this component contains
+;;; :TOP-LEVEL/externally-referenced lambdas (though it is not a
 ;;; :TOP-LEVEL component.)
 ;;;
-;;; We deliberately don't use the normal reference deletion, since we don't
-;;; want to trigger deletion of the XEP (although it shouldn't hurt, since this
-;;; is called after Component is compiled.)  Instead, we just clobber the
-;;; REF-LEAF.
+;;; We deliberately don't use the normal reference deletion, since we
+;;; don't want to trigger deletion of the XEP (although it shouldn't
+;;; hurt, since this is called after COMPONENT is compiled.) Instead,
+;;; we just clobber the REF-LEAF.
 (defun replace-top-level-xeps (component)
   (let ((res nil))
     (dolist (lambda (component-lambdas component))
       (case (functional-kind lambda)
 	(:external
-	 (let* ((ef (functional-entry-function lambda))
-		(new (make-functional :kind :top-level-xep
-				      :info (leaf-info lambda)
-				      :name (leaf-name ef)
-				      :lexenv (make-null-lexenv)))
-		(closure (environment-closure
-			  (lambda-environment (main-entry ef)))))
-	   (dolist (ref (leaf-refs lambda))
-	     (let ((ref-component (block-component (node-block ref))))
-	       (cond ((eq ref-component component))
-		     ((or (not (eq (component-kind ref-component) :top-level))
-			  closure)
-		      (setq res t))
-		     (t
-		      (setf (ref-leaf ref) new)
-		      (push ref (leaf-refs new))))))))
+	 (unless (lambda-has-external-references-p lambda)
+	   (let* ((ef (functional-entry-function lambda))
+		  (new (make-functional :kind :top-level-xep
+					:info (leaf-info lambda)
+					:name (leaf-name ef)
+					:lexenv (make-null-lexenv)))
+		  (closure (environment-closure
+			    (lambda-environment (main-entry ef)))))
+	     (dolist (ref (leaf-refs lambda))
+	       (let ((ref-component (block-component (node-block ref))))
+		 (cond ((eq ref-component component))
+		       ((or (not (component-top-levelish-p ref-component))
+			    closure)
+			(setq res t))
+		       (t
+			(setf (ref-leaf ref) new)
+			(push ref (leaf-refs new)))))))))
 	(:top-level
 	 (setq res t))))
     res))

@@ -134,12 +134,12 @@
   ;; environment. So we just blow it off, 'cause anything real we do
   ;; would be wrong. But we still have to make an entry so we can tell
   ;; functions from macros.
-  (let ((env (or env (sb-kernel:make-null-lexenv))))
+  (let ((lexenv (sb-kernel::coerce-to-lexenv env)))
     (sb-c::make-lexenv
-      :default env
+      :default lexenv
       :functions
       (append (mapcar (lambda (f)
-			(cons (car f) (sb-c::make-functional :lexenv env)))
+			(cons (car f) (sb-c::make-functional :lexenv lexenv)))
 		      functions)
 	      (mapcar (lambda (m)
 			(list* (car m)

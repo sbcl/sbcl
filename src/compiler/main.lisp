@@ -30,13 +30,17 @@
 		  *last-source-form* *last-format-string* *last-format-args*
 		  *last-message-count* *lexenv*))
 
-(defvar *byte-compile-default* :maybe
+;;; FIXME: byte compiler to be removed completely
+(defvar *byte-compile-default* nil
   #!+sb-doc
   "the default value for the :BYTE-COMPILE argument to COMPILE-FILE")
 
 (defvar *byte-compile-top-level*
+  #|
   #-sb-xc-host t
   #+sb-xc-host nil ; since the byte compiler isn't supported in cross-compiler
+  |#
+  nil ; FIXME: byte compiler to be removed completely
   #!+sb-doc
   "Similar to *BYTE-COMPILE-DEFAULT*, but controls the compilation of top-level
    forms (evaluated at load-time) when the :BYTE-COMPILE argument is :MAYBE
@@ -44,13 +48,18 @@
 
 ;;; the value of the :BYTE-COMPILE argument which was passed to the
 ;;; compiler
-(defvar *byte-compile* :maybe)
+(defvar *byte-compile*
+  nil #|:maybe|#) ; FIXME: byte compiler to be removed completely
 
 ;;; Bound by COMPILE-COMPONENT to T when byte-compiling, and NIL when
 ;;; native compiling. During IR1 conversion this can also be :MAYBE,
-;;; in which case we must look at the policy, see (byte-compiling).
-(defvar *byte-compiling* :maybe)
-(declaim (type (member t nil :maybe) *byte-compile* *byte-compiling*
+;;; in which case we must look at the policy; see #'BYTE-COMPILING.
+(defvar *byte-compiling*
+  nil #|:maybe|#) ; FIXME: byte compiler to be removed completely
+
+(declaim (type (member t nil :maybe)
+	       *byte-compile*
+	       *byte-compiling*
 	       *byte-compile-default*))
 
 (defvar *check-consistency* nil)
@@ -374,6 +383,7 @@
   (values))
 
 (defun native-compile-component (component)
+  (/show "entering NATIVE-COMPILE-COMPONENT")
   (let ((*code-segment* nil)
 	(*elsewhere* nil))
     (maybe-mumble "GTN ")
@@ -465,12 +475,17 @@
   ;; We're done, so don't bother keeping anything around.
   (setf (component-info component) nil)
 
+  (/show "leaving NATIVE-COMPILE-COMPONENT")
   (values))
 
 (defun policy-byte-compile-p (thing)
+  nil
+  ;; FIXME: byte compiler to be removed completely
+  #|
   (policy thing
 	  (and (zerop speed)
-	       (<= debug 1))))
+	       (<= debug 1)))
+  |#)
 
 ;;; Return our best guess for whether we will byte compile code
 ;;; currently being IR1 converted. This is only a guess because the
@@ -479,21 +494,23 @@
 ;;; FIXME: This should be called something more mnemonic, e.g.
 ;;; PROBABLY-BYTE-COMPILING
 (defun byte-compiling ()
+  nil
+  ;; FIXME: byte compiler to be removed completely
+  #|
   (if (eq *byte-compiling* :maybe)
       (or (eq *byte-compile* t)
           (policy-byte-compile-p *lexenv*))
-      (and *byte-compile* *byte-compiling*)))
+      (and *byte-compile* *byte-compiling*))
+  |#)
 
 ;;; Delete components with no external entry points before we try to
 ;;; generate code. Unreachable closures can cause IR2 conversion to
 ;;; puke on itself, since it is the reference to the closure which
 ;;; normally causes the components to be combined.
-;;;
-;;; FIXME: The original CMU CL comment said "This doesn't really cover
-;;; all cases..." That's a little scary.
 (defun delete-if-no-entries (component)
-  (dolist (fun (component-lambdas component)
-	       (delete-component component))
+  (dolist (fun (component-lambdas component) (delete-component component))
+    (when (functional-has-external-references-p fun)
+      (return))
     (case (functional-kind fun)
       (:top-level (return))
       (:external
@@ -504,11 +521,15 @@
 	 (return))))))
 
 (defun byte-compile-this-component-p (component)
+  nil
+  ;; FIXME: byte compiler to be removed completely
+  #|
   (ecase *byte-compile*
     ((t) t)
     ((nil) nil)
     ((:maybe)
-     (every #'policy-byte-compile-p (component-lambdas component)))))
+     (every #'policy-byte-compile-p (component-lambdas component))))
+  |#)
 
 (defun compile-component (component)
   (let* ((*component-being-compiled* component)
@@ -791,7 +812,6 @@
 				  (file-info-source-root file-info))))
 	     (vector-push-extend form forms)
 	     (vector-push-extend pos (file-info-positions file-info))
-	     (clrhash *source-paths*)
 	     (find-source-paths form current-idx)
 	     (process-top-level-form form
 				     `(original-source-start 0 ,current-idx)
@@ -855,21 +875,6 @@
 	   (*policy* (lexenv-policy *lexenv*)))
       (process-top-level-progn forms path compile-time-too))))
 
-;;; Force any pending top-level forms to be compiled and dumped so
-;;; that they will be evaluated in the correct package environment.
-;;; Dump the form to be evaled at (cold) load time, and if EVAL is
-;;; true, eval the form immediately.
-(defun process-cold-load-form (form path eval)
-  (let ((object *compile-object*))
-    (etypecase object
-      (fasl-output
-       (compile-top-level-lambdas () t)
-       (fasl-dump-cold-load-form form object))
-      ((or null core-object)
-       (convert-and-maybe-compile form path)))
-    (when eval
-      (eval form))))
-
 ;;; Parse an EVAL-WHEN situations list, returning three flags,
 ;;; (VALUES COMPILE-TOPLEVEL LOAD-TOPLEVEL EXECUTE), indicating
 ;;; the types of situations present in the list.
@@ -891,6 +896,131 @@
 			situations)
 	  (intersection '(:load-toplevel load) situations)
 	  (intersection '(:execute eval) situations)))
+
+
+;;; utilities for extracting COMPONENTs of FUNCTIONALs
+(defun clambda-component (clambda)
+  (block-component (node-block (lambda-bind clambda))))
+(defun functional-components (f)
+  (declare (type functional f))
+  (etypecase f
+    (clambda (list (clambda-component f)))
+    (optional-dispatch (let ((result nil))
+			 (labels ((frob (clambda)
+				    (pushnew (clambda-component clambda)
+					     result))
+				  (maybe-frob (maybe-clambda)
+				    (when maybe-clambda
+				      (frob maybe-clambda))))
+			   (mapc #'frob (optional-dispatch-entry-points f))
+			   (maybe-frob (optional-dispatch-more-entry f))
+			   (maybe-frob (optional-dispatch-main-entry f)))))))
+
+(defun make-functional-from-top-level-lambda (definition
+					      &key
+					      name
+					      (path
+					       ;; I'd thought NIL should
+					       ;; work, but it doesn't.
+					       ;; -- WHN 2001-09-20
+					       (required-argument)))
+  (let* ((*current-path* path)
+         (component (make-empty-component))
+         (*current-component* component))
+    (setf (component-name component)
+          (format nil "~S initial component" name))
+    (setf (component-kind component) :initial)
+    (let* ((locall-fun (ir1-convert-lambda definition
+                                           (format nil "locall ~S" name)))
+           (fun (ir1-convert-lambda (make-xep-lambda locall-fun) name)))
+      (setf (functional-entry-function fun) locall-fun
+            (functional-kind fun) :external
+            (functional-has-external-references-p fun) t)
+      fun)))
+
+;;; Compile LAMBDA-EXPRESSION into *COMPILE-OBJECT*, returning a
+;;; description of the result.
+;;;   * If *COMPILE-OBJECT* is a CORE-OBJECT, then write the function
+;;;     into core and return the compiled FUNCTION value.
+;;;   * If *COMPILE-OBJECT* is a fasl file, then write the function
+;;;     into the fasl file and return a dump handle.
+;;;
+;;; If NAME is provided, then we try to use it as the name of the
+;;; function for debugging/diagnostic information.
+(defun %compile (lambda-expression
+		 *compile-object*
+		 &key
+		 name
+		 (path
+		  ;; This magical idiom seems to be the appropriate
+		  ;; path for compiling standalone LAMBDAs, judging
+		  ;; from the CMU CL code and experiment, so it's a
+		  ;; nice default for things where we don't have a
+		  ;; real source path (as in e.g. inside CL:COMPILE).
+		  '(original-source-start 0 0)))
+  (/show "entering %COMPILE" name)
+  (unless (or (null name) (legal-function-name-p name))
+    (error "not a legal function name: ~S" name))
+  (let* ((*lexenv* (make-lexenv :policy *policy*))
+         (fun (make-functional-from-top-level-lambda lambda-expression
+                                                     :name name
+						     :path path)))
+
+    (/noshow fun)
+
+    ;; FIXME: The compile-it code from here on is sort of a
+    ;; twisted version of the code in COMPILE-TOP-LEVEL. It'd be
+    ;; better to find a way to share the code there; or
+    ;; alternatively, to use this code to replace the code there.
+    ;; (The second alternative might be pretty easy if we used
+    ;; the :LOCALL-ONLY option to IR1-FOR-LAMBDA. Then maybe the
+    ;; whole FUNCTIONAL-KIND=:TOP-LEVEL case could go away..)
+
+    (/show "about to LOCAL-CALL-ANALYZE-UNTIL-DONE")
+    (local-call-analyze-until-done (list fun))
+
+    (multiple-value-bind (components-from-dfo top-components hairy-top)
+        (find-initial-dfo (list fun))
+
+      (let ((*all-components* (append components-from-dfo top-components)))
+        (/noshow components-from-dfo top-components *all-components*)
+	(mapc #'preallocate-environments-for-top-levelish-lambdas
+	      (append hairy-top top-components))
+        (dolist (component-from-dfo components-from-dfo)
+          (/show "compiling a COMPONENT-FROM-DFO")
+          (compile-component component-from-dfo)
+	  (/show "about to REPLACE-TOP-LEVEL-XEPS")
+          (replace-top-level-xeps component-from-dfo)))
+
+      (/show "about to go into PROG1")
+      (prog1
+          (let ((entry-table (etypecase *compile-object*
+                               (fasl-output (fasl-output-entry-table
+                                             *compile-object*))
+                               (core-object (core-object-entry-table
+                                             *compile-object*)))))
+            (multiple-value-bind (result found-p)
+                (gethash (leaf-info fun) entry-table)
+              (aver found-p)
+              result))
+        (mapc #'clear-ir1-info components-from-dfo)
+        (clear-stuff)
+	(/show "returning from %COMPILE")))))
+
+(defun process-top-level-cold-fset (name lambda-expression path)
+  (/show "entering PROCESS-TOP-LEVEL-COLD-FSET" name)
+  (unless (producing-fasl-file)
+    (error "can't COLD-FSET except in a fasl file"))
+  (unless (legal-function-name-p name)
+    (error "not a legal function name: ~S" name))
+  (fasl-dump-cold-fset name
+                       (%compile lambda-expression
+                                 *compile-object*
+                                 :name name
+				 :path path)
+                       *compile-object*)
+  (/show "finished with PROCESS-TOP-LEVEL-COLD-FSET" name)
+  (values))
 
 ;;; Process a top-level FORM with the specified source PATH.
 ;;;  * If this is a magic top-level form, then do stuff.
@@ -924,17 +1054,16 @@
 				     (car form)
 				     form))))
 	    (case (car form)
-	      ;; FIXME: It's not clear to me why we would want this
-	      ;; special case; it might have been needed for some
-	      ;; variation of the old GENESIS system, but it certainly
-	      ;; doesn't seem to be needed for ours. Sometime after the
-	      ;; system is running I'd like to remove it tentatively and
-	      ;; see whether anything breaks, and if nothing does break,
-	      ;; remove it permanently. (And if we *do* want special
-	      ;; treatment of all these, we probably want to treat WARN
-	      ;; the same way..)
-	      ((error cerror break signal)
-	       (process-cold-load-form form path nil))
+	      ;; In the cross-compiler, top level COLD-FSET arranges
+	      ;; for static linking at cold init time.
+	      #+sb-xc-host
+	      ((cold-fset)
+	       (aver (not compile-time-too))
+	       (destructuring-bind (cold-fset fun-name lambda-expression) form
+		 (declare (ignore cold-fset))
+		 (process-top-level-cold-fset fun-name
+					      lambda-expression
+					      path)))
 	      ((eval-when macrolet symbol-macrolet);things w/ 1 arg before body
 	       (need-at-least-one-arg form)
 	       (destructuring-bind (special-operator magic &rest body) form
@@ -1078,7 +1207,7 @@
      (compile-top-level (list lambda) t)
      lambda)))
 
-;;; Called by COMPILE-TOP-LEVEL when it was pased T for
+;;; This is called by COMPILE-TOP-LEVEL when it was passed T for
 ;;; LOAD-TIME-VALUE-P (which happens in COMPILE-LOAD-TIME-STUFF). We
 ;;; don't try to combine this component with anything else and frob
 ;;; the name. If not in a :TOP-LEVEL component, then don't bother
@@ -1087,7 +1216,7 @@
   (aver (null (cdr lambdas)))
   (let* ((lambda (car lambdas))
 	 (component (block-component (node-block (lambda-bind lambda)))))
-    (when (eq (component-kind component) :top-level)
+    (when (eql (component-kind component) :top-level)
       (setf (component-name component) (leaf-name lambda))
       (compile-component component)
       (clear-ir1-info component))))
@@ -1182,25 +1311,16 @@
 	  (object-call-top-level-lambda (elt lambdas loser))))))
   (values))
 
-;;; Compile LAMBDAS (a list of the lambdas for top-level forms) into
-;;; the object file. We loop doing local call analysis until it
-;;; converges, since a single pass might miss something due to
-;;; components being joined by LET conversion.
+;;; Compile LAMBDAS (a list of CLAMBDAs for top-level forms) into the
+;;; object file. 
 ;;;
 ;;; LOAD-TIME-VALUE-P seems to control whether it's MAKE-LOAD-FORM and
 ;;; COMPILE-LOAD-TIME-VALUE stuff. -- WHN 20000201
 (defun compile-top-level (lambdas load-time-value-p)
   (declare (list lambdas))
+
   (maybe-mumble "locall ")
-  (loop
-    (let ((did-something nil))
-      (dolist (lambda lambdas)
-	(let* ((component (block-component (node-block (lambda-bind lambda))))
-	       (*all-components* (list component)))
-	  (when (component-new-functions component)
-	    (setq did-something t)
-	    (local-call-analyze component))))
-      (unless did-something (return))))
+  (local-call-analyze-until-done lambdas)
 
   (maybe-mumble "IDFO ")
   (multiple-value-bind (components top-components hairy-top)
@@ -1232,8 +1352,7 @@
 	    (compile-load-time-value-lambda lambdas)
 	    (compile-top-level-lambdas lambdas top-level-closure)))
 
-      (dolist (component components)
-	(clear-ir1-info component))
+      (mapc #'clear-ir1-info components)
       (clear-stuff)))
   (values))
 
@@ -1251,12 +1370,7 @@
 ;;; Return (VALUES NIL WARNINGS-P FAILURE-P).
 (defun sub-compile-file (info)
   (declare (type source-info info))
-  (let* (;; These are bound in WITH-COMPILATION-UNIT now. -- WHN 20000308
-	 #+nil (*compiler-error-count* 0)
-	 #+nil (*compiler-warning-count* 0)
-	 #+nil (*compiler-style-warning-count* 0)
-	 #+nil (*compiler-note-count* 0)
-	 (*block-compile* *block-compile-argument*)
+  (let* ((*block-compile* *block-compile-argument*)
 	 (*package* (sane-package))
 	 (*policy* *policy*)
 	 (*lexenv* (make-null-lexenv))
@@ -1370,7 +1484,8 @@
      ;; extensions
      (trace-file nil) 
      ((:block-compile *block-compile-argument*) nil)
-     ((:byte-compile *byte-compile*) *byte-compile-default*))
+     ;; FIXME: byte compiler to be removed completely
+     #+nil ((:byte-compile *byte-compile*) *byte-compile-default*))
 
   #!+sb-doc
   "Compile INPUT-FILE, producing a corresponding fasl file and returning
@@ -1380,14 +1495,6 @@
         If given, internal data structures are dumped to the specified
         file, or if a value of T is given, to a file of *.trace type
         derived from the input file name.
-     :BYTE-COMPILE {T | NIL | :MAYBE}
-        Determines whether to compile into interpreted byte code instead of
-        machine instructions. Byte code is several times smaller, but much
-        slower. If :MAYBE, then only byte-compile when SPEED is 0 and
-        DEBUG <= 1. The default is the value of SB-EXT:*BYTE-COMPILE-DEFAULT*,
-        which is initially :MAYBE. (This option will probably become
-        formally deprecated starting around sbcl-0.7.0, when various 
-        cleanups related to the byte interpreter are planned.)
    Also, as a workaround for vaguely-non-ANSI behavior, the :BLOCK-COMPILE
    argument is quasi-supported, to determine whether multiple
    functions are compiled together as a unit, resolving function

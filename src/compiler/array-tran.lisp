@@ -499,7 +499,6 @@
 				   (element-type '*)
 				   unsafe?
 				   fail-inline?)
-  (/show "in %WITH-ARRAY-DATA-MACRO, yes.." array start end)
   (let ((size (gensym "SIZE-"))
 	(defaulted-end (gensym "DEFAULTED-END-"))
 	(data (gensym "DATA-"))

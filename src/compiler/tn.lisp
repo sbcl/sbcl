@@ -297,10 +297,11 @@
 
 ;;;; miscellaneous utilities
 
-;;; Emit a move-like template determined at run-time, with X as the argument
-;;; and Y as the result. Useful for move, coerce and type-check templates. If
-;;; supplied, then insert before VOP, otherwise insert at then end of the
-;;; block. Returns the last VOP inserted.
+;;; Emit a move-like template determined at run-time, with X as the
+;;; argument and Y as the result. Useful for move, coerce and
+;;; type-check templates. If supplied, then insert before VOP,
+;;; otherwise insert at then end of the block. Returns the last VOP
+;;; inserted.
 (defun emit-move-template (node block template x y &optional before)
   (declare (type node node) (type ir2-block block)
 	   (type template template) (type tn x y))

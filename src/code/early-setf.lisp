@@ -61,11 +61,12 @@
 	   ;; for macroexpansion in general. -- WHN 19991128
 	   (funcall temp
 		    form
-		    ;; As near as I can tell from the ANSI spec, macroexpanders
-		    ;; have a right to expect an actual lexical environment,
-		    ;; not just a NIL which is to be interpreted as a null
-		    ;; lexical environment. -- WHN 19991128
-		    (or environment (make-null-lexenv))))
+		    ;; As near as I can tell from the ANSI spec,
+		    ;; macroexpanders have a right to expect an actual
+		    ;; lexical environment, not just a NIL which is to
+		    ;; be interpreted as a null lexical environment.
+		    ;; -- WHN 19991128
+		    (coerce-to-lexenv environment)))
 	  (t
 	   (expand-or-get-setf-inverse form environment)))))
 

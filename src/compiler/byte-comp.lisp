@@ -141,10 +141,9 @@
     (def-system-constant 12 '(%fdefinition-marker% . %typep))
     (def-system-constant 13 '(%fdefinition-marker% . eql))
     (def-system-constant 14 '(%fdefinition-marker% . %negate))
-    (def-system-constant 15 '(%fdefinition-marker% . %%defun))
+    ;; (15 was %%DEFUN, no longer used as of sbcl-0.pre7.)
     (def-system-constant 16 '(%fdefinition-marker% . %%defmacro))
-    ;; no longer used as of sbcl-0.pre7:
-    #+nil (def-system-constant 17 '(%fdefinition-marker% . %%defconstant))
+    ;; (17 was %%DEFCONSTANT, no longer used as of sbcl-0.pre7.)
     (def-system-constant 18 '(%fdefinition-marker% . length))
     (def-system-constant 19 '(%fdefinition-marker% . equal))
     (def-system-constant 20 '(%fdefinition-marker% . append))
@@ -1113,7 +1112,7 @@
   (let ((lambda (bind-lambda bind))
 	(env (node-environment bind)))
     (ecase (lambda-kind lambda)
-      ((nil :top-level :escape :cleanup :optional)
+      ((nil :external :top-level :escape :cleanup :optional)
        (let* ((info (lambda-info lambda))
 	      (type-check (policy (lambda-bind lambda) (not (zerop safety))))
 	      (frame-size (byte-lambda-info-stack-size info)))
@@ -1852,21 +1851,23 @@
 (defun generate-xeps (component)
   (let ((xeps nil))
     (dolist (lambda (component-lambdas component))
-      (when (member (lambda-kind lambda) '(:external :top-level))
+      (when (or (member (lambda-kind lambda) '(:external :top-level))
+		(lambda-has-external-references-p lambda))
 	(push (cons lambda (make-xep-for lambda)) xeps)))
     xeps))
 
 ;;;; noise to actually do the compile
 
 (defun assign-locals (component)
-  ;; Process all of the lambdas in component, and assign stack frame
+  ;; Process all of the LAMBDAs in COMPONENT, and assign stack frame
   ;; locations for all the locals.
   (dolist (lambda (component-lambdas component))
-    ;; We don't generate any code for :EXTERNAL lambdas, so we don't
-    ;; need to allocate stack space. Also, we don't use the ``more''
-    ;; entry, so we don't need code for it.
+    ;; We don't generate any code for pure :EXTERNAL lambdas, so we
+    ;; don't need to allocate stack space for them. Also, we don't use
+    ;; the ``more'' entry point, so we don't need code for it.
     (cond
-     ((or (eq (lambda-kind lambda) :external)
+     ((or (and (eq (lambda-kind lambda) :external)
+	       (not (lambda-has-external-references-p lambda)))
 	  (and (eq (lambda-kind lambda) :optional)
 	       (eq (optional-dispatch-more-entry
 		    (lambda-optional-dispatch lambda))
@@ -1921,6 +1922,7 @@
   (values))
 
 (defun byte-compile-component (component)
+  (/show "entering BYTE-COMPILE-COMPONENT")
   (setf (component-info component) (make-byte-component-info))
   (maybe-mumble "ByteAnn ")
 
@@ -1983,6 +1985,7 @@
 	       (make-core-byte-component segment code-length constants xeps
 					 *compile-object*))
 	      (null))))))
+  (/show "leaving BYTE-COMPILE-COMPONENT")
   (values))
 
 ;;;; extra stuff for debugging

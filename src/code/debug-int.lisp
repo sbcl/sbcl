@@ -719,6 +719,7 @@
 ;;; Return the top frame of the control stack as it was before calling
 ;;; this function.
 (defun top-frame ()
+  (/show0 "entering TOP-FRAME")
   (multiple-value-bind (fp pc) (%caller-frame-and-pc)
     (possibly-an-interpreted-frame
      (compute-calling-frame (descriptor-sap fp)
@@ -738,12 +739,14 @@
 ;;; Return the frame immediately below FRAME on the stack; or when
 ;;; FRAME is the bottom of the stack, return NIL.
 (defun frame-down (frame)
+  (/show0 "entering FRAME-DOWN")
   ;; We have to access the old-fp and return-pc out of frame and pass
   ;; them to COMPUTE-CALLING-FRAME.
   (let ((down (frame-%down frame)))
     (if (eq down :unparsed)
 	(let* ((real (frame-real-frame frame))
 	       (debug-fun (frame-debug-function real)))
+	  (/show0 "in DOWN :UNPARSED case")
 	  (setf (frame-%down frame)
 		(etypecase debug-fun
 		  (compiled-debug-function
@@ -872,9 +875,10 @@
   ;; new SBCL code, not ambitious enough to do anything tricky like
   ;; hiding the byte interpreter when debugging
   (declare (ignore up-frame))
+  (/show "doing trivial POSSIBLY-AN-INTERPRETED-FRAME")
   frame
 
-  ;; old CMU CL code to hide IR1 interpreter when debugging 
+  ;; old CMU CL code to hide IR1 interpreter when debugging:
   ;;
   ;;(if (or (not frame)
   ;;        (not (eq (debug-function-name (frame-debug-function
@@ -974,60 +978,70 @@
 #!+x86
 (defun compute-calling-frame (caller ra up-frame)
   (declare (type system-area-pointer caller ra))
+  (/show0 "entering COMPUTE-CALLING-FRAME")
   (when (cstack-pointer-valid-p caller)
+    (/show0 "in WHEN")
     ;; First check for an escaped frame.
     (multiple-value-bind (code pc-offset escaped) (find-escaped-frame caller)
-	(cond (code
-	       ;; If it's escaped it may be a function end breakpoint trap.
-	       (when (and (code-component-p code)
-			  (eq (%code-debug-info code) :bogus-lra))
-		 ;; If :bogus-lra grab the real lra.
-		 (setq pc-offset (code-header-ref
-				  code (1+ real-lra-slot)))
-		 (setq code (code-header-ref code real-lra-slot))
-		 (aver code)))
-	      (t
-	       ;; not escaped
-	       (multiple-value-setq (pc-offset code)
-		 (compute-lra-data-from-pc ra))
-	       (unless code
-		 (setf code :foreign-function
-		       pc-offset 0
-		       escaped nil))))
+      (/show0 "at COND")
+      (cond (code
+	     (/show0 "in CODE clause")
+	     ;; If it's escaped it may be a function end breakpoint trap.
+	     (when (and (code-component-p code)
+			(eq (%code-debug-info code) :bogus-lra))
+	       ;; If :bogus-lra grab the real lra.
+	       (setq pc-offset (code-header-ref
+				code (1+ real-lra-slot)))
+	       (setq code (code-header-ref code real-lra-slot))
+	       (aver code)))
+	    (t
+	     (/show0 "in T clause")
+	     ;; not escaped
+	     (multiple-value-setq (pc-offset code)
+	       (compute-lra-data-from-pc ra))
+	     (unless code
+	       (setf code :foreign-function
+		     pc-offset 0
+		     escaped nil))))
 
-	(let ((d-fun (case code
-			   (:undefined-function
-			    (make-bogus-debug-function
-			     "undefined function"))
-			   (:foreign-function
-			    (make-bogus-debug-function
-			     "foreign function call land"))
-			   ((nil)
-			    (make-bogus-debug-function
-			     "bogus stack frame"))
-			   (t
-			    (debug-function-from-pc code pc-offset)))))
-	  (make-compiled-frame caller up-frame d-fun
-			       (code-location-from-pc d-fun pc-offset
-						      escaped)
-			       (if up-frame (1+ (frame-number up-frame)) 0)
-			       escaped)))))
+      (let ((d-fun (case code
+		     (:undefined-function
+		      (make-bogus-debug-function
+		       "undefined function"))
+		     (:foreign-function
+		      (make-bogus-debug-function
+		       "foreign function call land"))
+		     ((nil)
+		      (make-bogus-debug-function
+		       "bogus stack frame"))
+		     (t
+		      (debug-function-from-pc code pc-offset)))))
+	(/show0 "returning MAKE-COMPILED-FRAME from COMPUTE-CALLING-FRAME")
+	(make-compiled-frame caller up-frame d-fun
+			     (code-location-from-pc d-fun pc-offset
+						    escaped)
+			     (if up-frame (1+ (frame-number up-frame)) 0)
+			     escaped)))))
 
 #!+x86
 (defun find-escaped-frame (frame-pointer)
   (declare (type system-area-pointer frame-pointer))
+  (/show0 "entering FIND-ESCAPED-FRAME")
   (dotimes (index *free-interrupt-context-index* (values nil 0 nil))
     (sb!alien:with-alien
-	((lisp-interrupt-contexts (array (* os-context-t) nil)
-				  :extern))
+	((lisp-interrupt-contexts (array (* os-context-t) nil) :extern))
+      (/show0 "at head of WITH-ALIEN")
       (let ((context (sb!alien:deref lisp-interrupt-contexts index)))
+	(/show0 "got CONTEXT")
 	(when (= (sap-int frame-pointer)
 		 (sb!vm:context-register context sb!vm::cfp-offset))
 	  (without-gcing
+	   (/show0 "in WITHOUT-GCING")
 	   (let* ((component-ptr (component-ptr-from-pc
 				  (sb!vm:context-pc context)))
 		  (code (unless (sap= component-ptr (int-sap #x0))
 			  (component-from-component-ptr component-ptr))))
+	     (/show0 "got CODE")
 	     (when (null code)
 	       (return (values code 0 context)))
 	     (let* ((code-header-len (* (get-header-data code)
@@ -1037,6 +1051,7 @@
 			(- (get-lisp-obj-address code)
 			   sb!vm:other-pointer-type)
 			code-header-len)))
+	       (/show "got PC-OFFSET")
 	       (unless (<= 0 pc-offset
 			   (* (code-header-ref code sb!vm:code-code-size-slot)
 			      sb!vm:word-bytes))
@@ -1046,6 +1061,7 @@
 		 ;; FIXME: Should this be WARN or ERROR or what?
 		 (format t "** pc-offset ~S not in code obj ~S?~%"
 			 pc-offset code))
+	       (/show0 "returning from FIND-ESCAPED-FRAME")
 	       (return
 		(values code pc-offset context))))))))))
 
@@ -1743,8 +1759,8 @@
       (setf (compiled-debug-var-symbol (svref vars i))
 	    (intern (format nil "ARG-~V,'0D" width i)
 		    ;; KLUDGE: It's somewhat nasty to have a bare
-		    ;; package name string here. It would probably be
-		    ;; better to have #.(FIND-PACKAGE "SB!DEBUG")
+		    ;; package name string here. It would be
+		    ;; nicer to have #.(FIND-PACKAGE "SB!DEBUG")
 		    ;; instead, since then at least it would transform
 		    ;; correctly under package renaming and stuff.
 		    ;; However, genesis can't handle dumped packages..
@@ -1756,13 +1772,15 @@
 		    ;; would work fine) If this is possible, it would
 		    ;; probably be a good thing, since minimizing the
 		    ;; amount of stuff in cold init is basically good.
-		    "SB-DEBUG")))))
+		    (or (find-package "SB-DEBUG")
+			(find-package "SB!DEBUG")))))))
 
 ;;; Parse the packed representation of DEBUG-VARs from
 ;;; DEBUG-FUNCTION's SB!C::COMPILED-DEBUG-FUNCTION, returning a vector
 ;;; of DEBUG-VARs, or NIL if there was no information to parse.
 (defun parse-compiled-debug-vars (debug-function)
-  (let* ((cdebug-fun (compiled-debug-function-compiler-debug-fun debug-function))
+  (let* ((cdebug-fun (compiled-debug-function-compiler-debug-fun
+		      debug-function))
 	 (packed-vars (sb!c::compiled-debug-function-variables cdebug-fun))
 	 (args-minimal (eq (sb!c::compiled-debug-function-arguments cdebug-fun)
 			   :minimal)))
@@ -1778,7 +1796,8 @@
 	  (let* ((flags (geti))
 		 (minimal (logtest sb!c::compiled-debug-var-minimal-p flags))
 		 (deleted (logtest sb!c::compiled-debug-var-deleted-p flags))
-		 (live (logtest sb!c::compiled-debug-var-environment-live flags))
+		 (live (logtest sb!c::compiled-debug-var-environment-live
+				flags))
 		 (save (logtest sb!c::compiled-debug-var-save-loc-p flags))
 		 (symbol (if minimal nil (geti)))
 		 (id (if (logtest sb!c::compiled-debug-var-id-p flags)

@@ -101,35 +101,11 @@
     (dump-unsigned-32 mid-bits file)
     (dump-unsigned-32 high-bits file)
     (dump-integer-as-n-bytes exp-bits 4 file)))
-
-(defun dump-complex (x file)
-  (typecase x
-    ((complex single-float)
-     (dump-fop 'fop-complex-single-float file)
-     (dump-integer-as-n-bytes (single-float-bits (realpart x)) 4 file)
-     (dump-integer-as-n-bytes (single-float-bits (imagpart x)) 4 file))
-    ((complex double-float)
-     (dump-fop 'fop-complex-double-float file)
-     (let ((re (realpart x)))
-       (declare (double-float re))
-       (dump-unsigned-32 (double-float-low-bits re) file)
-       (dump-integer-as-n-bytes (double-float-high-bits re) 4 file))
-     (let ((im (imagpart x)))
-       (declare (double-float im))
-       (dump-unsigned-32 (double-float-low-bits im) file)
-       (dump-integer-as-n-bytes (double-float-high-bits im) 4 file)))
-    #!+long-float
-    ((complex long-float)
-     (dump-fop 'fop-complex-long-float file)
-     (dump-long-float (realpart x) file)
-     (dump-long-float (imagpart x) file))
-    (t
-     (sub-dump-object (realpart x) file)
-     (sub-dump-object (imagpart x) file)
-     (dump-fop 'fop-complex file))))
 
 ;;;; dumping things which don't exist in portable ANSI Common Lisp
 
+;;; FIXME: byte compiler to go away completely
+#|
 ;;; Dump a BYTE-FUNCTION object. We dump the layout and
 ;;; funcallable-instance info, but rely on the loader setting up the
 ;;; correct funcallable-instance-function.
@@ -145,3 +121,4 @@
     (dump-fop 'fop-make-byte-compiled-function file)
     (dump-byte nslots file))
   (values))
+|#

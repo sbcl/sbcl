@@ -102,12 +102,12 @@
 (assert (subtypep 'ratio 'real))
 (assert (subtypep 'ratio 'number))
 
-;;;; Douglas Thomas Crosher rewrote the CMU CL type test system to allow
-;;;; inline type tests for CONDITIONs and STANDARD-OBJECTs, and generally
-;;;; be nicer, and Martin Atzmueller ported the patches.
-;;;; They look nice but they're nontrivial enough that it's not obvious
-;;;; from inspection that everything is OK. Let's make sure that things
-;;;; still basically work.
+;;;; Douglas Thomas Crosher rewrote the CMU CL type test system to
+;;;; allow inline type tests for CONDITIONs and STANDARD-OBJECTs, and
+;;;; generally be nicer, and Martin Atzmueller ported the patches.
+;;;; They look nice but they're nontrivial enough that it's not
+;;;; obvious from inspection that everything is OK. Let's make sure
+;;;; that things still basically work.
 
 ;; structure type tests setup
 (defstruct structure-foo1)
@@ -149,6 +149,10 @@
      ;; structure type tests
      (assert (typep (make-structure-foo3) 'structure-foo2))
      (assert (not (typep (make-structure-foo1) 'structure-foo4)))
+     (assert (typep (nth-value 1
+			       (ignore-errors (structure-foo2-x
+					       (make-structure-foo1))))
+		    'type-error))
      (assert (null (ignore-errors
 		     (setf (structure-foo2-x (make-structure-foo1)) 11))))
 
@@ -196,8 +200,10 @@
 		    (sb-pcl:class-direct-subclasses (sb-pcl:find-class
 						     'simple-condition))
 		    (mapcar #'sb-pcl:find-class
-			    '(simple-type-error simple-error
-						sb-int:simple-style-warning)))))
+			    '(simple-type-error
+			      simple-error
+                              sb-int:simple-file-error
+                              sb-int:simple-style-warning)))))
 
      ;; precedence lists
      (assert (equal (sb-pcl:class-precedence-list

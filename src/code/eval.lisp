@@ -17,20 +17,20 @@
   (funcall (compile (gensym "EVAL-TMPFUN-")
 		    `(lambda ()
 
-		       ;; SPEED=0,DEBUG=1 => byte-compile
-		       (declare (optimize (speed 0) (debug 1))) 
+		       ;; The user can reasonably expect that the
+		       ;; interpreter will be safe.
+		       (declare (optimize (safety 3)))
 
-		       ;; Other than that, basically we care about
-		       ;; compilation speed, compilation speed, and
-		       ;; compilation speed. (There are cases where
-		       ;; the user wants something else, but we don't
-		       ;; know enough to guess that; and if he is
-		       ;; unhappy about our guessed emphasis, he
-		       ;; should explicitly compile his code, with
-		       ;; explicit declarations to tell us what to
-		       ;; emphasize.)
-		       (declare (optimize (space 1) (safety 1)))
-		       (declare (optimize (compilation-speed 3)))
+		       ;; It's also good if the interpreter doesn't
+		       ;; spend too long thinking about each input
+		       ;; form, since if the user'd wanted the
+		       ;; tradeoff to favor quality of compiled code
+		       ;; over compilation speed, he'd've explicitly
+		       ;; asked for compilation.
+		       (declare (optimize (compilation-speed 2)))
+
+		       ;; Other properties are relatively unimportant.
+		       (declare (optimize (speed 1) (debug 1) (space 1)))
 
 		       ,expr))))
 
@@ -157,38 +157,31 @@
       (t
        exp))))
 
-;;; Given a function, return three values:
-;;; 1] A lambda expression that could be used to define the function,
-;;;    or NIL if the definition isn't available.
-;;; 2] NIL if the function was definitely defined in a null lexical
-;;;    environment, and T otherwise.
-;;; 3] Some object that \"names\" the function. Although this is
-;;;    allowed to be any object, CMU CL always returns a valid
-;;;    function name or a string.
-;;;
-;;; If interpreted, use the interpreter interface. Otherwise, see
-;;; whether it was compiled with COMPILE. If that fails, check for an
-;;; inline expansion.
 (defun function-lambda-expression (fun)
-  (declare (type function fun))
-  (let* ((fun (%function-self fun))
-	 (name (%function-name fun))
-	 (code (sb!di::function-code-header fun))
-	 (info (sb!kernel:%code-debug-info code)))
-    (if info
-	(let ((source (first (sb!c::compiled-debug-info-source info))))
-	  (cond ((and (eq (sb!c::debug-source-from source) :lisp)
-		      (eq (sb!c::debug-source-info source) fun))
-		 (values (second (svref (sb!c::debug-source-name source) 0))
-			 nil name))
-		((stringp name)
-		 (values nil t name))
-		(t
-		 (let ((exp (info :function :inline-expansion name)))
-		   (if exp
-		       (values exp nil name)
-		       (values nil t name))))))
-	(values nil t name))))
+  "Return (VALUES DEFINING-LAMBDA-EXPRESSION CLOSURE-P NAME), where
+  DEFINING-LAMBDA-EXPRESSION is NIL if unknown, or a suitable argument
+  to COMPILE otherwise, CLOSURE-P is non-NIL if the function's definition
+  might have been enclosed in some non-null lexical environment, and
+  NAME is some name (for debugging only) or NIL if there is no name."
+    (declare (type function fun))
+    (let* ((fun (%function-self fun))
+	   (name (%function-name fun))
+	   (code (sb!di::function-code-header fun))
+	   (info (sb!kernel:%code-debug-info code)))
+      (if info
+        (let ((source (first (sb!c::compiled-debug-info-source info))))
+          (cond ((and (eq (sb!c::debug-source-from source) :lisp)
+                      (eq (sb!c::debug-source-info source) fun))
+                 (values (second (svref (sb!c::debug-source-name source) 0))
+                         nil name))
+                ((stringp name)
+                 (values nil t name))
+                (t
+                 (let ((exp (info :function :inline-expansion name)))
+                   (if exp
+                       (values exp nil name)
+                       (values nil t name))))))
+        (values nil t name))))
 
 ;;; miscellaneous full function definitions of things which are
 ;;; ordinarily handled magically by the compiler

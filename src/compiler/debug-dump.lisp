@@ -460,7 +460,7 @@
 
     (coerce-to-smallest-eltype (res))))
 
-;;; Return a vector of SC offsets describing Fun's return locations.
+;;; Return a vector of SC offsets describing FUN's return locations.
 ;;; (Must be known values return...)
 (defun compute-debug-returns (fun)
   (coerce-to-smallest-eltype
@@ -479,8 +479,7 @@
 		      (eq fun (optional-dispatch-main-entry dispatch)))))
     (make-compiled-debug-function
      :name (cond ((leaf-name fun))
-		 ((let ((ef (functional-entry-function
-			     fun)))
+		 ((let ((ef (functional-entry-function fun)))
 		    (and ef (leaf-name ef))))
 		 ((and main-p (leaf-name dispatch)))
 		 (t

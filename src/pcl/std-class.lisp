@@ -352,6 +352,16 @@
 (defmethod class-predicate-name ((class t))
   'constantly-nil)
 
+(defun fix-super (s)
+  (cond ((classp s) s)
+        ((not (legal-class-name-p s))
+          (error "~S is not a class or a legal class name." s))
+        (t
+          (or (find-class s nil)
+              (setf (find-class s)
+                      (make-instance 'forward-referenced-class
+                                     :name s))))))
+
 (defun ensure-class-values (class args)
   (let* ((initargs (copy-list args))
 	 (unsupplied (list 1))
@@ -366,25 +376,16 @@
 		  *the-class-standard-class*)
 		 (t
 		  (class-of class)))))
-    (flet ((fix-super (s)
-	     (cond ((classp s) s)
-		   ((not (legal-class-name-p s))
-		    (error "~S is not a class or a legal class name." s))
-		   (t
-		    (or (find-class s nil)
-			(setf (find-class s)
-			      (make-instance 'forward-referenced-class
-					     :name s)))))))
-      (loop (unless (remf initargs :metaclass) (return)))
-      (loop (unless (remf initargs :direct-superclasses) (return)))
-      (loop (unless (remf initargs :direct-slots) (return)))
-      (values meta
-	      (list* :direct-superclasses
-		     (and (neq supplied-supers unsupplied)
-			  (mapcar #'fix-super supplied-supers))
-		     :direct-slots
-		     (and (neq supplied-slots unsupplied) supplied-slots)
-		     initargs)))))
+    (loop (unless (remf initargs :metaclass) (return)))
+    (loop (unless (remf initargs :direct-superclasses) (return)))
+    (loop (unless (remf initargs :direct-slots) (return)))
+    (values meta
+            (list* :direct-superclasses
+                   (and (neq supplied-supers unsupplied)
+                        (mapcar #'fix-super supplied-supers))
+                   :direct-slots
+                   (and (neq supplied-slots unsupplied) supplied-slots)
+                   initargs))))
 
 
 (defmethod shared-initialize :after
@@ -477,6 +478,61 @@
   (unless (eq allocation :instance)
     (error "Structure slots must have :INSTANCE allocation.")))
 
+(defun make-structure-class-defstruct-form
+       (name direct-slots include)
+  (let* ((conc-name (intern (format nil "~S structure class " name)))
+         (constructor (intern (format nil "~A constructor" conc-name)))
+         (defstruct `(defstruct (,name
+                                 ,@(when include
+                                         `((:include ,(class-name include))))
+                                 (:print-function print-std-instance)
+                                 (:predicate nil)
+                                 (:conc-name ,conc-name)
+                                 (:constructor ,constructor ())
+                                 (:copier nil))
+                      ,@(mapcar (lambda (slot)
+                                  `(,(slot-definition-name slot)
+                                    +slot-unbound+))
+                                direct-slots)))
+         (reader-names (mapcar (lambda (slotd)
+                                 (intern (format nil
+                                                 "~A~A reader"
+                                                 conc-name
+                                                 (slot-definition-name
+                                                  slotd))))
+                               direct-slots))
+         (writer-names (mapcar (lambda (slotd)
+                                 (intern (format nil
+                                                 "~A~A writer"
+                                                 conc-name
+                                                 (slot-definition-name
+                                                  slotd))))
+                               direct-slots))
+         (readers-init
+           (mapcar (lambda (slotd reader-name)
+                     (let ((accessor
+                             (slot-definition-defstruct-accessor-symbol
+                              slotd)))
+                       `(defun ,reader-name (obj)
+                         (declare (type ,name obj))
+                         (,accessor obj))))
+                   direct-slots reader-names))
+         (writers-init
+           (mapcar (lambda (slotd writer-name)
+                     (let ((accessor
+                             (slot-definition-defstruct-accessor-symbol
+                              slotd)))
+                       `(defun ,writer-name (nv obj)
+                         (declare (type ,name obj))
+                         (setf (,accessor obj) nv))))
+                   direct-slots writer-names))
+         (defstruct-form
+             `(progn
+               ,defstruct
+               ,@readers-init ,@writers-init
+               (cons nil nil))))
+    (values defstruct-form constructor reader-names writer-names)))
+
 (defmethod shared-initialize :after
       ((class structure-class)
        slot-names
@@ -512,88 +568,39 @@
 			    direct-slots)))
 	(setq direct-slots (slot-value class 'direct-slots)))
     (when defstruct-p
-      (let* ((include (car (slot-value class 'direct-superclasses)))
-	     (conc-name (intern (format nil "~S structure class " name)))
-	     (constructor (intern (format nil "~A constructor" conc-name)))
-	     (defstruct `(defstruct (,name
-				      ,@(when include
-					  `((:include ,(class-name include))))
-				      (:print-function print-std-instance)
-				      (:predicate nil)
-				      (:conc-name ,conc-name)
-				      (:constructor ,constructor ())
-				      (:copier nil))
-			   ,@(mapcar (lambda (slot)
-				       `(,(slot-definition-name slot)
-					 +slot-unbound+))
-				     direct-slots)))
-	     (reader-names (mapcar (lambda (slotd)
-				     (intern (format nil
-						     "~A~A reader"
-						     conc-name
-						     (slot-definition-name
-						      slotd))))
-				   direct-slots))
-	     (writer-names (mapcar (lambda (slotd)
-				     (intern (format nil
-						     "~A~A writer"
-						     conc-name
-						     (slot-definition-name
-						      slotd))))
-				   direct-slots))
-	     (readers-init
-	      (mapcar (lambda (slotd reader-name)
-			(let ((accessor
-			       (slot-definition-defstruct-accessor-symbol
-				slotd)))
-			  `(defun ,reader-name (obj)
-			     (declare (type ,name obj))
-			     (,accessor obj))))
-		      direct-slots reader-names))
-	     (writers-init
-	      (mapcar (lambda (slotd writer-name)
-			(let ((accessor
-			       (slot-definition-defstruct-accessor-symbol
-				slotd)))
-			  `(defun ,writer-name (nv obj)
-			     (declare (type ,name obj))
-			     (setf (,accessor obj) nv))))
-		      direct-slots writer-names))
-	     (defstruct-form
-	       `(progn
-		  ,defstruct
-		  ,@readers-init ,@writers-init
-		  (cons nil nil))))
-	(unless (structure-type-p name) (eval defstruct-form))
-	(mapc #'(lambda (dslotd reader-name writer-name)
-		  (let* ((reader (gdefinition reader-name))
-			 (writer (when (gboundp writer-name)
-				   (gdefinition writer-name))))
-		    (setf (slot-value dslotd 'internal-reader-function)
-			  reader)
-		    (setf (slot-value dslotd 'internal-writer-function)
-			  writer)))
-	      direct-slots reader-names writer-names)
-	(setf (slot-value class 'defstruct-form) defstruct-form)
-	(setf (slot-value class 'defstruct-constructor) constructor))))
-  (add-direct-subclasses class direct-superclasses)
-  (setf (slot-value class 'class-precedence-list)
-	(compute-class-precedence-list class))
-  (setf (slot-value class 'slots) (compute-slots class))
-  (let ((lclass (cl:find-class (class-name class))))
-    (setf (sb-kernel:class-pcl-class lclass) class)
-    (setf (slot-value class 'wrapper) (sb-kernel:class-layout lclass)))
-  (update-pv-table-cache-info class)
-  (setq predicate-name (if predicate-name-p
+      (let ((include (car (slot-value class 'direct-superclasses))))
+        (multiple-value-bind (defstruct-form constructor reader-names writer-names)
+            (make-structure-class-defstruct-form name direct-slots include)
+          (unless (structure-type-p name) (eval defstruct-form))
+          (mapc #'(lambda (dslotd reader-name writer-name)
+                    (let* ((reader (gdefinition reader-name))
+                           (writer (when (gboundp writer-name)
+                                     (gdefinition writer-name))))
+                      (setf (slot-value dslotd 'internal-reader-function)
+                              reader)
+                      (setf (slot-value dslotd 'internal-writer-function)
+                              writer)))
+                direct-slots reader-names writer-names)
+          (setf (slot-value class 'defstruct-form) defstruct-form)
+          (setf (slot-value class 'defstruct-constructor) constructor))))
+    (add-direct-subclasses class direct-superclasses)
+    (setf (slot-value class 'class-precedence-list)
+            (compute-class-precedence-list class))
+    (setf (slot-value class 'slots) (compute-slots class))
+    (let ((lclass (cl:find-class (class-name class))))
+      (setf (sb-kernel:class-pcl-class lclass) class)
+      (setf (slot-value class 'wrapper) (sb-kernel:class-layout lclass)))
+    (update-pv-table-cache-info class)
+    (setq predicate-name (if predicate-name-p
 			   (setf (slot-value class 'predicate-name)
-				 (car predicate-name))
+                                   (car predicate-name))
 			   (or (slot-value class 'predicate-name)
 			       (setf (slot-value class 'predicate-name)
-				     (make-class-predicate-name
-				      (class-name class))))))
-  (make-class-predicate class predicate-name)
-  (add-slot-accessors class direct-slots))
-
+                                       (make-class-predicate-name
+                                        (class-name class))))))
+    (make-class-predicate class predicate-name)
+    (add-slot-accessors class direct-slots)))
+  
 (defmethod direct-slot-definition-class ((class structure-class) initargs)
   (declare (ignore initargs))
   (find-class 'structure-direct-slot-definition))

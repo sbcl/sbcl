@@ -52,7 +52,7 @@
 	   ))))))
 
 ;;; For each named function with an XEP, note the definition of that
-;;; name, and add derived type information to the info environment. We
+;;; name, and add derived type information to the INFO environment. We
 ;;; also delete the FUNCTIONAL from *FREE-FUNCTIONS* to eliminate the
 ;;; possibility that new references might be converted to it.
 (defun finalize-xep-definition (fun)
@@ -60,8 +60,7 @@
 	 (name (leaf-name leaf))
 	 (defined-ftype (definition-type leaf)))
     (setf (leaf-type leaf) defined-ftype)
-    (when (or (and name (symbolp name))
-	      (and (consp name) (eq (car name) 'setf)))
+    (when (legal-function-name-p name)
       (let* ((where (info :function :where-from name))
 	     (*compiler-error-context* (lambda-bind (main-entry leaf)))
 	     (global-def (gethash name *free-functions*))

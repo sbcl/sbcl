@@ -89,9 +89,9 @@
 				     (or (= speed 3) (< debug 2)))))
 		       arg-tn)))))))
 
-;;; Init the sets in Block for copy propagation. To find Gen, we just
+;;; Init the sets in BLOCK for copy propagation. To find GEN, we just
 ;;; look for MOVE vops, and then see whether the result is a eligible
-;;; copy TN. To find Kill, we must look at all VOP results, seeing
+;;; copy TN. To find KILL, we must look at all VOP results, seeing
 ;;; whether any of the reads of the written TN are copies for eligible
 ;;; TNs.
 (defun init-copy-sets (block)
@@ -118,11 +118,11 @@
 		      (sset-adjoin y kill))))))))))
 
     (setf (block-out block) (copy-sset gen))
-    (setf (block-kill block) kill)
+    (setf (block-kill-sset block) kill)
     (setf (block-gen block) gen))
   (values))
 
-;;; Do the flow analysis step for copy propagation on Block. We rely
+;;; Do the flow analysis step for copy propagation on BLOCK. We rely
 ;;; on OUT being initialized to GEN, and use SSET-UNION-OF-DIFFERENCE
 ;;; to incrementally build the union in OUT, rather than replacing OUT
 ;;; each time.
@@ -133,7 +133,9 @@
     (dolist (pred-block (rest pred))
       (sset-intersection in (block-out pred-block)))
     (setf (block-in block) in)
-    (sset-union-of-difference (block-out block) in (block-kill block))))
+    (sset-union-of-difference (block-out block)
+			      in
+			      (block-kill-sset block))))
 
 (defevent copy-deleted-move "Copy propagation deleted a move.")
 

@@ -60,6 +60,18 @@
   (or (cdr (assoc thing (ir2-environment-environment (environment-info env))))
       (etypecase thing
 	(lambda-var
+	 ;; I think that a failure of this assertion means that we're
+	 ;; trying to access a variable which was improperly closed
+	 ;; over. An ENVIRONMENT structure is a physical environment.
+	 ;; Every variable that a form refers to should either be in
+	 ;; its physical environment directly, or grabbed from a
+	 ;; surrounding physical environment when it was closed over.
+	 ;; The ASSOC expression above finds closed-over variables, so
+	 ;; if we fell through the ASSOC expression, it wasn't closed
+	 ;; over. Therefore, it must be in our physical environment
+	 ;; directly. If instead it is in some other physical
+	 ;; environment, then it's bogus for us to reference it here
+	 ;; without it being closed over. -- WHN 2001-09-29
 	 (aver (eq env (lambda-environment (lambda-var-home thing))))
 	 (leaf-info thing))
 	(nlx-info
@@ -146,6 +158,7 @@
 ;;; top-level variables, where optimization of the closure deleted the
 ;;; variable. Since we committed to the closure format when we
 ;;; pre-analyzed the top-level code, we just leave an empty slot.
+#!-gengc
 (defun ir2-convert-closure (node block leaf res)
   (declare (type ref node) (type ir2-block block)
 	   (type functional leaf) (type tn res))
@@ -1060,7 +1073,9 @@
 	(vop count-me node block *dynamic-counts-tn*
 	     (block-number (ir2-block-block block)))))
 
-    (emit-move node block (ir2-environment-return-pc-pass env)
+    (emit-move node
+	       block
+	       (ir2-environment-return-pc-pass env)
 	       (ir2-environment-return-pc env))
 
     (let ((lab (gen-label)))

@@ -396,20 +396,6 @@
 (defun two-arg-string< (x y) (string= x y))
 (defun two-arg-string> (x y) (string= x y))
 
-;;;; miscellaneous primitive stubs
-
-(macrolet ((def-frob (name &optional (args '(x)))
-	     `(defun ,name ,args (,name ,@args))))
-  (def-frob %code-code-size)
-  (def-frob %code-debug-info)
-  (def-frob %code-entry-points)
-  (def-frob %funcallable-instance-function)
-  (def-frob %funcallable-instance-layout)
-  (def-frob %funcallable-instance-lexenv)
-  (def-frob %function-next)
-  (def-frob %function-self)
-  (def-frob %set-funcallable-instance-function (fin new-val)))
-
 ;;;; funny functions
 
 ;;; (used both by the byte interpreter and by the IR1 interpreter)
