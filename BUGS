@@ -893,6 +893,16 @@ Error in function C::GET-LAMBDA-TO-COMPILE:
   Basically, the breakpoint facility wasn incompletely implemented
   in the X86 port of CMU CL, and we haven't fixed it in SBCL.
 
+97:
+  FRESH-LINE doesn't seem to work properly within pretty-printed
+  output. E.g. 
+    "~@<unhandled CONDITION (of type ~S): ~2I~_~A~:>~2%"
+  called on a CONDITION whose printer does
+    "~&~@<error in function ~S: ~3I~:_~?~:>"
+  gives two newlines between "unhandled CONDITION" and "error", when
+  (it at least seems as though) correct behavior would be to give one.
+
+
 KNOWN BUGS RELATED TO THE IR1 INTERPRETER
 
 (Note: At some point, the pure interpreter (actually a semi-pure

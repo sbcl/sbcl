@@ -582,18 +582,6 @@ Function and macro commands:
 (defvar *debug-restarts*)
 (defvar *debug-condition*)
 
-;;; Print *DEBUG-CONDITION*, taking care to avoid recursive invocation
-;;; of the debugger in case of a problem (e.g. a bug in the PRINT-OBJECT
-;;; method for *DEBUG-CONDITION*).
-(defun princ-debug-condition-carefully (stream)
-  (handler-case (princ *debug-condition* stream)
-    (error (condition)
-	   (format stream
-  		   "  (caught ~S when trying to print ~S)"
-		   (type-of condition)
-		   '*debug-condition*)))
-  *debug-condition*)
-
 (defun invoke-debugger (condition)
   #!+sb-doc
   "Enter the debugger."
@@ -645,16 +633,22 @@ reset to ~S."
        ;; the last line of output or so, and get confused.
        (flush-standard-output-streams)
 
-       ;; The initial output here goes to *ERROR-OUTPUT*, because the
+       ;; (The initial output here goes to *ERROR-OUTPUT*, because the
        ;; initial output is not interactive, just an error message,
        ;; and when people redirect *ERROR-OUTPUT*, they could
        ;; reasonably expect to see error messages logged there,
-       ;; regardless of what the debugger does afterwards.
-       (format *error-output*
-	       "~2&debugger invoked on condition of type ~S:~%  "
-	       (type-of *debug-condition*))
-       (princ-debug-condition-carefully *error-output*)
-       (terpri *error-output*)
+       ;; regardless of what the debugger does afterwards.)
+       (handler-case
+	   (format *error-output*
+		   "~2&~@<debugger invoked on condition of type ~S: ~
+                    ~2I~_~A~:>~%"
+		   (type-of *debug-condition*)
+		   *debug-condition*)
+	 (error (condition)
+	   (format *error-output*
+  		   "~&(caught ~S trying to print ~S when entering debugger)~%"
+		   (type-of condition)
+		   '*debug-condition*)))
 
        ;; After the initial error/condition/whatever announcement to
        ;; *ERROR-OUTPUT*, we become interactive, and should talk on

@@ -26,7 +26,7 @@
 		  *software-interrupt-vector* *load-verbose*
 		  *load-print-stuff* *in-compilation-unit*
 		  *aborted-compilation-unit-count* *char-name-alist*
-		  *beep-function* *gc-notify-before* *gc-notify-after*
+		  *gc-notify-before* *gc-notify-after*
 		  *posix-argv*))
 
 (declaim (ftype (function * *)

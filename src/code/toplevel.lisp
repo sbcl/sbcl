@@ -233,6 +233,8 @@
 
 ;;;; the default toplevel function
 
+;;; FIXME: Most stuff below here can probably be byte-compiled.
+
 (defvar / nil
   #!+sb-doc
   "a list of all the values returned by the most recent top-level EVAL")
@@ -298,10 +300,13 @@
 
     (/show0 "done with outer LET in TOPLEVEL-INIT")
   
-    ;; FIXME: There are lots of ways for errors to happen around here (e.g. bad
-    ;; command line syntax, or READ-ERROR while trying to READ an --eval
-    ;; string). Make sure that they're handled reasonably.
-
+    ;; FIXME: There are lots of ways for errors to happen around here
+    ;; (e.g. bad command line syntax, or READ-ERROR while trying to
+    ;; READ an --eval string). Make sure that they're handled
+    ;; reasonably. Also, perhaps all errors while parsing the command
+    ;; line should cause the system to QUIT, instead of trying to go
+    ;; into the Lisp debugger.
+    
     ;; Parse command line options.
     (loop while options do
 	  (/show0 "at head of LOOP WHILE OPTIONS DO in TOPLEVEL-INIT")
@@ -352,18 +357,26 @@
 		     ;; because we didn't recognize an option as a
 		     ;; toplevel option, then the option we gave up on
 		     ;; must have been an error. (E.g. in
-		     ;;   sbcl --eval '(a)' --evl '(b)' --end-toplevel-options
-		     ;; this test will let us detect that "--evl" is
-		     ;; an error.)
+		     ;;  "sbcl --eval '(a)' --eval'(b)' --end-toplevel-options"
+		     ;; this test will let us detect that the string
+		     ;; "--eval(b)" is an error.)
 		     (if (find "--end-toplevel-options" options
 			       :test #'string=)
 			 (error "bad toplevel option: ~S" (first options))
 			 (return)))))))
     (/show0 "done with LOOP WHILE OPTIONS DO in TOPLEVEL-INIT")
 
-    ;; Excise all the options that we processed, so that only user-level
-    ;; options are left visible to user code.
+    ;; Excise all the options that we processed, so that only
+    ;; user-level options are left visible to user code.
     (setf (rest *posix-argv*) options)
+
+    ;; Handle --noprogrammer option. We intentionally do this
+    ;; early so that it will affect the handling of initialization
+    ;; files and --eval options.
+    (/show0 "handling --noprogrammer option in TOPLEVEL-INIT")
+    (when noprogrammer
+      (setf *debugger-hook* 'noprogrammer-debugger-hook-fun
+	    *debug-io* *error-output*))
 
     ;; FIXME: Verify that errors in init files and/or --eval operations
     ;; lead to reasonable behavior.
@@ -416,15 +429,6 @@
 	(eval eval)
 	(flush-standard-output-streams))
 
-      ;; Handle stream binding controlled by --noprogrammer option.
-      ;;
-      ;; FIXME: When we do actually implement this, shouldn't it go
-      ;; earlier in the sequence, so that its stream bindings will
-      ;; affect the behavior of init files and --eval options?
-      (/show0 "handling --noprogrammer option in TOPLEVEL-INIT")
-      (when noprogrammer
-	(warn "stub: --noprogrammer option unimplemented")) ; FIXME
-
       (/show0 "falling into TOPLEVEL-REPL from TOPLEVEL-INIT")
       (toplevel-repl noprint))))
 
@@ -474,6 +478,36 @@
 		     (dolist (result results)
 		       (fresh-line)
 		       (prin1 result)))))))))))))
+
+(defun noprogrammer-debugger-hook-fun (condition old-debugger-hook)
+  (declare (ignore old-debugger-hook))
+  (flet ((failure-quit (&key recklessly-p)
+	   (quit :unix-status 1 :recklessly-p recklessly-p)))
+    ;; This HANDLER-CASE is here mostly to stop output immediately
+    ;; (and fall through to QUIT) when there's an I/O error. Thus,
+    ;; when we're run under a Perl script or something, we can die
+    ;; cleanly when the script dies (and our pipes are cut), instead
+    ;; of falling into ldb or something messy like that.
+    (handler-case
+	(progn
+	  (format *error-output*
+		  "~@<unhandled CONDITION (of type ~S): ~2I~_~A~:>~2%"
+		  (type-of condition)
+		  condition)
+	  ;; Flush *ERROR-OUTPUT* even before the BACKTRACE, so that
+	  ;; even if we hit an error within BACKTRACE we'll at least
+	  ;; have the CONDITION printed out before we die.
+	  (finish-output *error-output*)
+	  ;; (Where to truncate the BACKTRACE is of course arbitrary, but
+	  ;; it seems as though we should at least truncate it somewhere.)
+	  (sb!debug:backtrace 128 *error-output*)
+	  (finish-output *error-output*)
+	  (format *error-output*
+		  "~%unhandled CONDITION in --noprogrammer mode, quitting~%")
+	  (failure-quit))
+      (condition ()
+        (%primitive print "Argh! error within --noprogrammer error handling")
+	(failure-quit :recklessly-p t)))))
 
 ;;; a convenient way to get into the assembly-level debugger
 (defun %halt ()

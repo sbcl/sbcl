@@ -626,8 +626,7 @@
       (error 'simple-type-error
 	     :datum vector
 	     :expected-type '(and vector (satisfies array-has-fill-pointer-p))
-	     :format-control
-	     "~S is not an array with a fill-pointer."
+	     :format-control "~S is not an array with a fill pointer."
 	     :format-arguments (list vector))))
 
 (defun %set-fill-pointer (vector new)
@@ -641,7 +640,7 @@
       (error 'simple-type-error
 	     :datum vector
 	     :expected-type '(and vector (satisfies array-has-fill-pointer-p))
-	     :format-control "~S is not an array with a fill-pointer."
+	     :format-control "~S is not an array with a fill pointer."
 	     :format-arguments (list vector))))
 
 (defun vector-push (new-el array)
@@ -678,7 +677,7 @@
 
 (defun vector-pop (array)
   #!+sb-doc
-  "Attempts to decrease the fill-pointer by 1 and return the element
+  "Attempts to decrease the fill pointer by 1 and return the element
    pointer to by the new fill pointer. If the original value of the fill
    pointer is 0, an error occurs."
   (declare (vector array))
@@ -823,7 +822,7 @@
 	((numberp fill-pointer)
 	 (when (> fill-pointer new-array-size)
 	   (error "can't supply a value for :FILL-POINTER (~S) that is larger ~
-		  than the new length of the vector (~S)."
+		  than the new length of the vector (~S)"
 		  fill-pointer new-array-size))
 	 fill-pointer)
 	((eq fill-pointer t)

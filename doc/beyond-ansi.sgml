@@ -49,7 +49,7 @@ and call
 
 you will not get the correct result, but an error,
 
-<screen>debugger invoked on SB-DEBUG::*DEBUG-CONDITION* of type
+<screen>debugger invoked on SB-DEBUG:*DEBUG-CONDITION* of type
 SB-KERNEL:SIMPLE-CONTROL-ERROR:
   A function with declared result type NIL returned:
   FOO-P</screen>

@@ -547,8 +547,10 @@
 (define-condition style-warning (warning) ())
 
 (defun simple-condition-printer (condition stream)
-  (apply #'format stream (simple-condition-format-control condition)
-	 		 (simple-condition-format-arguments condition)))
+  (apply #'format
+	 stream
+	 (simple-condition-format-control condition)
+	 (simple-condition-format-arguments condition)))
 
 (define-condition simple-condition ()
   ((format-control :reader simple-condition-format-control
@@ -562,7 +564,13 @@
 
 (defun print-simple-error (condition stream)
   (format stream
-	  "~&~@<error in function ~S: ~3I~:_~?~:>"
+	  ;; FIXME: It seems reasonable to display the "in function
+	  ;; ~S" information, but doesn't the logic to display it
+	  ;; belong in the debugger or someplace like that instead of
+	  ;; in the format string for this particular family of
+	  ;; conditions? Then this printer might look more
+	  ;; ("~@<~S: ~2I~:_~?~:>" (TYPE-OF C) ..) instead.
+	  "~@<error in function ~S: ~2I~:_~?~:>"
 	  (condition-function-name condition)
 	  (simple-condition-format-control condition)
 	  (simple-condition-format-arguments condition)))
@@ -584,7 +592,7 @@
   (:report
    (lambda (condition stream)
      (format stream
-	     "~@<TYPE-ERROR in ~S: ~3I~:_~S is not of type ~S~:>."
+	     "~@<TYPE-ERROR in ~S: ~2I~:_~S is not of type ~S~:>."
 	     (condition-function-name condition)
 	     (type-error-datum condition)
 	     (type-error-expected-type condition)))))
@@ -607,7 +615,7 @@
   (:report
    (lambda (condition stream)
      (format stream
-	     "~&~@<FILE-ERROR in function ~S: ~3i~:_~?~:>"
+	     "~@<FILE-ERROR in function ~S: ~2I~:_~?~:>"
 	     (condition-function-name condition)
 	     (serious-condition-format-control condition)
 	     (serious-condition-format-arguments condition)))))

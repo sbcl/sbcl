@@ -302,10 +302,8 @@
 	   (bytes (- end start))
 	   (newtail (+ tail bytes)))
       (cond ((minusp bytes) ; error case
-	     (cerror "Just go on as if nothing happened."
-		     "~S called with :END before :START!"
-		     'output-raw-bytes))
-	    ((zerop bytes)) ; Easy case
+	     (error ":END before :START!"))
+	    ((zerop bytes)) ; easy case
 	    ((<= bytes space)
 	     (if (system-area-pointer-p thing)
 		 (system-area-copy thing
@@ -654,7 +652,7 @@
 ;;; Fill in the various routine slots for the given type. INPUT-P and
 ;;; OUTPUT-P indicate what slots to fill. The buffering slot must be
 ;;; set prior to calling this routine.
-(defun set-routines (stream type input-p output-p buffer-p)
+(defun set-fd-stream-routines (fd-stream type input-p output-p buffer-p)
   (let ((target-type (case type
 		       ((:default unsigned-byte)
 			'(unsigned-byte 8))
@@ -667,30 +665,30 @@
 	(input-size nil)
 	(output-size nil))
 
-    (when (fd-stream-obuf-sap stream)
-      (push (fd-stream-obuf-sap stream) *available-buffers*)
-      (setf (fd-stream-obuf-sap stream) nil))
-    (when (fd-stream-ibuf-sap stream)
-      (push (fd-stream-ibuf-sap stream) *available-buffers*)
-      (setf (fd-stream-ibuf-sap stream) nil))
+    (when (fd-stream-obuf-sap fd-stream)
+      (push (fd-stream-obuf-sap fd-stream) *available-buffers*)
+      (setf (fd-stream-obuf-sap fd-stream) nil))
+    (when (fd-stream-ibuf-sap fd-stream)
+      (push (fd-stream-ibuf-sap fd-stream) *available-buffers*)
+      (setf (fd-stream-ibuf-sap fd-stream) nil))
 
     (when input-p
       (multiple-value-bind (routine type size)
 	  (pick-input-routine target-type)
 	(unless routine
 	  (error "could not find any input routine for ~S" target-type))
-	(setf (fd-stream-ibuf-sap stream) (next-available-buffer))
-	(setf (fd-stream-ibuf-length stream) bytes-per-buffer)
-	(setf (fd-stream-ibuf-tail stream) 0)
+	(setf (fd-stream-ibuf-sap fd-stream) (next-available-buffer))
+	(setf (fd-stream-ibuf-length fd-stream) bytes-per-buffer)
+	(setf (fd-stream-ibuf-tail fd-stream) 0)
 	(if (subtypep type 'character)
-	    (setf (fd-stream-in stream) routine
-		  (fd-stream-bin stream) #'ill-bin)
-	    (setf (fd-stream-in stream) #'ill-in
-		  (fd-stream-bin stream) routine))
+	    (setf (fd-stream-in fd-stream) routine
+		  (fd-stream-bin fd-stream) #'ill-bin)
+	    (setf (fd-stream-in fd-stream) #'ill-in
+		  (fd-stream-bin fd-stream) routine))
 	(when (eql size 1)
-	  (setf (fd-stream-n-bin stream) #'fd-stream-read-n-bytes)
+	  (setf (fd-stream-n-bin fd-stream) #'fd-stream-read-n-bytes)
 	  (when buffer-p
-	    (setf (lisp-stream-in-buffer stream)
+	    (setf (lisp-stream-in-buffer fd-stream)
 		  (make-array +in-buffer-length+
 			      :element-type '(unsigned-byte 8)))))
 	(setf input-size size)
@@ -698,26 +696,26 @@
 
     (when output-p
       (multiple-value-bind (routine type size)
-	  (pick-output-routine target-type (fd-stream-buffering stream))
+	  (pick-output-routine target-type (fd-stream-buffering fd-stream))
 	(unless routine
 	  (error "could not find any output routine for ~S buffered ~S"
-		 (fd-stream-buffering stream)
+		 (fd-stream-buffering fd-stream)
 		 target-type))
-	(setf (fd-stream-obuf-sap stream) (next-available-buffer))
-	(setf (fd-stream-obuf-length stream) bytes-per-buffer)
-	(setf (fd-stream-obuf-tail stream) 0)
+	(setf (fd-stream-obuf-sap fd-stream) (next-available-buffer))
+	(setf (fd-stream-obuf-length fd-stream) bytes-per-buffer)
+	(setf (fd-stream-obuf-tail fd-stream) 0)
 	(if (subtypep type 'character)
-	  (setf (fd-stream-out stream) routine
-		(fd-stream-bout stream) #'ill-bout)
-	  (setf (fd-stream-out stream)
+	  (setf (fd-stream-out fd-stream) routine
+		(fd-stream-bout fd-stream) #'ill-bout)
+	  (setf (fd-stream-out fd-stream)
 		(or (if (eql size 1)
 		      (pick-output-routine 'base-char
-					   (fd-stream-buffering stream)))
+					   (fd-stream-buffering fd-stream)))
 		    #'ill-out)
-		(fd-stream-bout stream) routine))
-	(setf (fd-stream-sout stream)
+		(fd-stream-bout fd-stream) routine))
+	(setf (fd-stream-sout fd-stream)
 	      (if (eql size 1) #'fd-sout #'ill-out))
-	(setf (fd-stream-char-pos stream) 0)
+	(setf (fd-stream-char-pos fd-stream) 0)
 	(setf output-size size)
 	(setf output-type type)))
 
@@ -726,10 +724,10 @@
       (error "Element sizes for input (~S:~S) and output (~S:~S) differ?"
 	     input-type input-size
 	     output-type output-size))
-    (setf (fd-stream-element-size stream)
+    (setf (fd-stream-element-size fd-stream)
 	  (or input-size output-size))
 
-    (setf (fd-stream-element-type stream)
+    (setf (fd-stream-element-type fd-stream)
 	  (cond ((equal input-type output-type)
 		 input-type)
 		((null output-type)
@@ -745,131 +743,129 @@
 			input-type
 			output-type))))))
 
-;;; Handle miscellaneous operations on fd-stream.
-(defun fd-stream-misc-routine (stream operation &optional arg1 arg2)
+;;; Handle miscellaneous operations on FD-STREAM.
+(defun fd-stream-misc-routine (fd-stream operation &optional arg1 arg2)
   (declare (ignore arg2))
-  ;; FIXME: Declare TYPE FD-STREAM STREAM?
   (case operation
     (:listen
-     (or (not (eql (fd-stream-ibuf-head stream)
-		   (fd-stream-ibuf-tail stream)))
-	 (fd-stream-listen stream)
-	 (setf (fd-stream-listen stream)
+     (or (not (eql (fd-stream-ibuf-head fd-stream)
+		   (fd-stream-ibuf-tail fd-stream)))
+	 (fd-stream-listen fd-stream)
+	 (setf (fd-stream-listen fd-stream)
 	       (eql (sb!alien:with-alien ((read-fds (sb!alien:struct
 						     sb!unix:fd-set)))
 		      (sb!unix:fd-zero read-fds)
-		      (sb!unix:fd-set (fd-stream-fd stream) read-fds)
-		      (sb!unix:unix-fast-select (1+ (fd-stream-fd stream))
+		      (sb!unix:fd-set (fd-stream-fd fd-stream) read-fds)
+		      (sb!unix:unix-fast-select (1+ (fd-stream-fd fd-stream))
 						(sb!alien:addr read-fds)
 						nil nil 0 0))
 		    1))))
     (:unread
-     (setf (fd-stream-unread stream) arg1)
-     (setf (fd-stream-listen stream) t))
+     (setf (fd-stream-unread fd-stream) arg1)
+     (setf (fd-stream-listen fd-stream) t))
     (:close
      (cond (arg1
 	    ;; We got us an abort on our hands.
-	    (when (fd-stream-handler stream)
-		  (sb!sys:remove-fd-handler (fd-stream-handler stream))
-		  (setf (fd-stream-handler stream) nil))
-	    (when (and (fd-stream-file stream)
-		       (fd-stream-obuf-sap stream))
+	    (when (fd-stream-handler fd-stream)
+		  (sb!sys:remove-fd-handler (fd-stream-handler fd-stream))
+		  (setf (fd-stream-handler fd-stream) nil))
+	    (when (and (fd-stream-file fd-stream)
+		       (fd-stream-obuf-sap fd-stream))
 	      ;; We can't do anything unless we know what file were
 	      ;; dealing with, and we don't want to do anything
 	      ;; strange unless we were writing to the file.
-	      (if (fd-stream-original stream)
+	      (if (fd-stream-original fd-stream)
 		  ;; We have a handle on the original, just revert.
 		  (multiple-value-bind (okay err)
-		      (sb!unix:unix-rename (fd-stream-original stream)
-					   (fd-stream-file stream))
+		      (sb!unix:unix-rename (fd-stream-original fd-stream)
+					   (fd-stream-file fd-stream))
 		    (unless okay
-		      (cerror "Go on as if nothing bad happened."
-			"could not restore ~S to its original contents: ~A"
-			      (fd-stream-file stream)
-			      (sb!unix:get-unix-error-msg err))))
+		      (error "~@<could not restore ~S to its original ~
+                              contents: ~2I~_~A~:>"
+			     (fd-stream-file fd-stream)
+			     (sb!unix:get-unix-error-msg err))))
 		  ;; We can't restore the original, so nuke that puppy.
 		  (multiple-value-bind (okay err)
-		      (sb!unix:unix-unlink (fd-stream-file stream))
+		      (sb!unix:unix-unlink (fd-stream-file fd-stream))
 		    (unless okay
-		      (cerror "Go on as if nothing bad happened."
-			      "Could not remove ~S: ~A"
-			      (fd-stream-file stream)
-			      (sb!unix:get-unix-error-msg err)))))))
+		      (error "~@<could not remove ~S: ~2I~_~A~:>"
+			     (fd-stream-file fd-stream)
+			     (sb!unix:get-unix-error-msg err)))))))
 	   (t
-	    (fd-stream-misc-routine stream :finish-output)
-	    (when (and (fd-stream-original stream)
-		       (fd-stream-delete-original stream))
+	    (fd-stream-misc-routine fd-stream :finish-output)
+	    (when (and (fd-stream-original fd-stream)
+		       (fd-stream-delete-original fd-stream))
 	      (multiple-value-bind (okay err)
-		  (sb!unix:unix-unlink (fd-stream-original stream))
+		  (sb!unix:unix-unlink (fd-stream-original fd-stream))
 		(unless okay
-		  (cerror "Go on as if nothing bad happened."
-			  "could not delete ~S during close of ~S: ~A"
-			  (fd-stream-original stream)
-			  stream
-			  (sb!unix:get-unix-error-msg err)))))))
+		  (error "~@<could not delete ~S during close ~
+                           of ~S: ~2I~_~A~:>"
+			 (fd-stream-original fd-stream)
+			 fd-stream
+			 (sb!unix:get-unix-error-msg err)))))))
      (when (fboundp 'cancel-finalization)
-       (cancel-finalization stream))
-     (sb!unix:unix-close (fd-stream-fd stream))
-     (when (fd-stream-obuf-sap stream)
-       (push (fd-stream-obuf-sap stream) *available-buffers*)
-       (setf (fd-stream-obuf-sap stream) nil))
-     (when (fd-stream-ibuf-sap stream)
-       (push (fd-stream-ibuf-sap stream) *available-buffers*)
-       (setf (fd-stream-ibuf-sap stream) nil))
-     (sb!impl::set-closed-flame stream))
+       (cancel-finalization fd-stream))
+     (sb!unix:unix-close (fd-stream-fd fd-stream))
+     (when (fd-stream-obuf-sap fd-stream)
+       (push (fd-stream-obuf-sap fd-stream) *available-buffers*)
+       (setf (fd-stream-obuf-sap fd-stream) nil))
+     (when (fd-stream-ibuf-sap fd-stream)
+       (push (fd-stream-ibuf-sap fd-stream) *available-buffers*)
+       (setf (fd-stream-ibuf-sap fd-stream) nil))
+     (sb!impl::set-closed-flame fd-stream))
     (:clear-input
-     (setf (fd-stream-unread stream) nil)
-     (setf (fd-stream-ibuf-head stream) 0)
-     (setf (fd-stream-ibuf-tail stream) 0)
+     (setf (fd-stream-unread fd-stream) nil)
+     (setf (fd-stream-ibuf-head fd-stream) 0)
+     (setf (fd-stream-ibuf-tail fd-stream) 0)
      (catch 'eof-input-catcher
        (loop
 	(let ((count (sb!alien:with-alien ((read-fds (sb!alien:struct
 						      sb!unix:fd-set)))
 		       (sb!unix:fd-zero read-fds)
-		       (sb!unix:fd-set (fd-stream-fd stream) read-fds)
-		       (sb!unix:unix-fast-select (1+ (fd-stream-fd stream))
-					      (sb!alien:addr read-fds)
-					      nil
-					      nil
-					      0
-					      0))))
+		       (sb!unix:fd-set (fd-stream-fd fd-stream) read-fds)
+		       (sb!unix:unix-fast-select (1+ (fd-stream-fd fd-stream))
+						 (sb!alien:addr read-fds)
+						 nil
+						 nil
+						 0
+						 0))))
 	  (cond ((eql count 1)
-		 (do-input stream)
-		 (setf (fd-stream-ibuf-head stream) 0)
-		 (setf (fd-stream-ibuf-tail stream) 0))
+		 (do-input fd-stream)
+		 (setf (fd-stream-ibuf-head fd-stream) 0)
+		 (setf (fd-stream-ibuf-tail fd-stream) 0))
 		(t
 		 (return t)))))))
     (:force-output
-     (flush-output-buffer stream))
+     (flush-output-buffer fd-stream))
     (:finish-output
-     (flush-output-buffer stream)
+     (flush-output-buffer fd-stream)
      (do ()
-	 ((null (fd-stream-output-later stream)))
+	 ((null (fd-stream-output-later fd-stream)))
        (sb!sys:serve-all-events)))
     (:element-type
-     (fd-stream-element-type stream))
+     (fd-stream-element-type fd-stream))
     (:interactive-p
       ;; FIXME: sb!unix:unix-isatty is undefined.
-     (sb!unix:unix-isatty (fd-stream-fd stream)))
+     (sb!unix:unix-isatty (fd-stream-fd fd-stream)))
     (:line-length
      80)
     (:charpos
-     (fd-stream-char-pos stream))
+     (fd-stream-char-pos fd-stream))
     (:file-length
      (multiple-value-bind (okay dev ino mode nlink uid gid rdev size
 			   atime mtime ctime blksize blocks)
-	 (sb!unix:unix-fstat (fd-stream-fd stream))
+	 (sb!unix:unix-fstat (fd-stream-fd fd-stream))
        (declare (ignore ino nlink uid gid rdev
 			atime mtime ctime blksize blocks))
        (unless okay
-	 (error "error fstat'ing ~S: ~A"
-		stream
+	 (error "error in Unix fstat(2) on ~S: ~A"
+		fd-stream
 		(sb!unix:get-unix-error-msg dev)))
        (if (zerop mode)
 	   nil
-	   (truncate size (fd-stream-element-size stream)))))
+	   (truncate size (fd-stream-element-size fd-stream)))))
     (:file-position
-     (fd-stream-file-position stream arg1))))
+     (fd-stream-file-position fd-stream arg1))))
 
 (defun fd-stream-file-position (stream &optional newpos)
   (declare (type fd-stream stream)
@@ -948,7 +944,23 @@
 
 ;;;; creation routines (MAKE-FD-STREAM and OPEN)
 
-;;; Returns a FD-STREAM on the given file.
+;;; Create a stream for the given Unix file descriptor.
+;;;
+;;; If INPUT is non-NIL, allow input operations. If OUTPUT is non-nil,
+;;; allow output operations. If neither INPUT nor OUTPUT is specified,
+;;; default to allowing input.
+;;;
+;;; ELEMENT-TYPE indicates the element type to use (as for OPEN).
+;;;
+;;; BUFFERING indicates the kind of buffering to use.
+;;;
+;;; TIMEOUT (if true) is the number of seconds to wait for input. If
+;;; NIL (the default), then wait forever. When we time out, we signal
+;;; IO-TIMEOUT.
+;;;
+;;; FILE is the name of the file (will be returned by PATHNAME).
+;;;
+;;; NAME is used to identify the stream when printed.
 (defun make-fd-stream (fd
 		       &key
 		       (input nil input-p)
@@ -967,17 +979,6 @@
 		       auto-close)
   (declare (type index fd) (type (or index null) timeout)
 	   (type (member :none :line :full) buffering))
-  #!+sb-doc
-  "Create a stream for the given unix file descriptor.
-  If input is non-nil, allow input operations.
-  If output is non-nil, allow output operations.
-  If neither input nor output are specified, default to allowing input.
-  Element-type indicates the element type to use (as for open).
-  Buffering indicates the kind of buffering to use.
-  Timeout (if true) is the number of seconds to wait for input. If NIL (the
-    default), then wait forever. When we time out, we signal IO-TIMEOUT.
-  File is the name of the file (will be returned by PATHNAME).
-  Name is used to identify the stream when printed."
   (cond ((not (or input-p output-p))
 	 (setf input t))
 	((not (or input output))
@@ -990,7 +991,7 @@
 				 :pathname pathname
 				 :buffering buffering
 				 :timeout timeout)))
-    (set-routines stream element-type input output input-buffer-p)
+    (set-fd-stream-routines stream element-type input output input-buffer-p)
     (when (and auto-close (fboundp 'finalize))
       (finalize stream
 		(lambda ()
@@ -1000,54 +1001,35 @@
 			  fd))))
     stream))
 
-;;; Pick a name to use for the backup file.
-(defvar *backup-extension* ".BAK"
-  #!+sb-doc
-  "This is a string that OPEN tacks on the end of a file namestring to produce
-   a name for the :if-exists :rename-and-delete and :rename options. Also,
-   this can be a function that takes a namestring and returns a complete
-   namestring.")
+;;; Pick a name to use for the backup file for the :IF-EXISTS
+;;; :RENAME-AND-DELETE and :RENAME options.
 (defun pick-backup-name (name)
   (declare (type simple-string name))
-  (let ((ext *backup-extension*))
-    (etypecase ext
-      (simple-string (concatenate 'simple-string name ext))
-      (function (funcall ext name)))))
+  (concatenate 'simple-string name ".bak"))
 
-;;; Ensure that the given arg is one of the given list of valid things.
-;;; Allow the user to fix any problems.
-;;; FIXME: Why let the user fix any problems?
+;;; Ensure that the given arg is one of the given list of valid
+;;; things. Allow the user to fix any problems.
 (defun ensure-one-of (item list what)
   (unless (member item list)
-    (loop
-      (cerror "Enter new value for ~*~S"
-	      "~S is invalid for ~S. Must be one of~{ ~S~}"
-	      item
-	      what
-	      list)
-      (format (the stream *query-io*) "Enter new value for ~S: " what)
-      (force-output *query-io*)
-      (setf item (read *query-io*))
-      (when (member item list)
-	(return))))
-  item)
+    (error 'simple-type-error
+	   :datum item
+	   :expected-type `(member ,@list)
+	   :format-control "~@<~S is ~_invalid for ~S; ~_need one of~{ ~S~}~:>"
+	   :format-arguments (list item what list))))
 
 ;;; Rename NAMESTRING to ORIGINAL. First, check whether we have write
 ;;; access, since we don't want to trash unwritable files even if we
 ;;; technically can. We return true if we succeed in renaming.
 (defun do-old-rename (namestring original)
   (unless (sb!unix:unix-access namestring sb!unix:w_ok)
-    (cerror "Try to rename it anyway."
-	    "File ~S is not writable."
-	    namestring))
+    (error "~@<The file ~2I~_~S ~I~_is not writable.~:>" namestring))
   (multiple-value-bind (okay err) (sb!unix:unix-rename namestring original)
     (cond (okay t)
 	  (t
-	   (cerror "Use :SUPERSEDE instead."
-		   "Could not rename ~S to ~S: ~A."
-		   namestring
-		   original
-		   (sb!unix:get-unix-error-msg err))
+	   (error "~@<could not rename ~2I~_~S ~I~_to ~2I~_~S: ~4I~_~A~:>"
+		  namestring
+		  original
+		  (sb!unix:get-unix-error-msg err))
 	   nil))))
 
 (defun open (filename
@@ -1062,28 +1044,22 @@
 	     (if-does-not-exist if-does-not-exist)
 	     (if-exists if-exists))
   #!+sb-doc
-  "Return a stream which reads from or writes to Filename.
+  "Return a stream which reads from or writes to FILENAME.
   Defined keywords:
-   :direction - one of :input, :output, :io, or :probe
-   :element-type - Type of object to read or write, default BASE-CHAR
-   :if-exists - one of :error, :new-version, :rename, :rename-and-delete,
-		       :overwrite, :append, :supersede or nil
-   :if-does-not-exist - one of :error, :create or nil
+   :DIRECTION - one of :INPUT, :OUTPUT, :IO, or :PROBE
+   :ELEMENT-TYPE - the type of object to read or write, default BASE-CHAR
+   :IF-EXISTS - one of :ERROR, :NEW-VERSION, :RENAME, :RENAME-AND-DELETE,
+		       :OVERWRITE, :APPEND, :SUPERSEDE or NIL
+   :IF-DOES-NOT-EXIST - one of :ERROR, :CREATE or nil
   See the manual for details."
 
   (unless (eq external-format :default)
-    (error 'simple-error
-	   :format-control
-	   "Any external format other than :DEFAULT isn't recognized."))
+    (error "Any external format other than :DEFAULT isn't recognized."))
 
-  ;; First, make sure that DIRECTION is valid. Allow it to be changed
-  ;; if not.
-  ;;
-  ;; FIXME: Why allow it to be changed if not?
-  (setf direction
-	(ensure-one-of direction
-		       '(:input :output :io :probe)
-		       :direction))
+  ;; First, make sure that DIRECTION is valid.
+  (ensure-one-of direction
+		 '(:input :output :io :probe)
+		 :direction)
 
   ;; Calculate useful stuff.
   (multiple-value-bind (input output mask)
@@ -1105,12 +1081,11 @@
 		     (if (eq (pathname-version pathname) :newest)
 			 :new-version
 			 :error)))
-	     (setf if-exists ; FIXME: should just die, not allow resetting
-		   (ensure-one-of if-exists
-				  '(:error :new-version :rename
-				    :rename-and-delete :overwrite
-				    :append :supersede nil)
-				  :if-exists))
+	     (ensure-one-of if-exists
+			    '(:error :new-version :rename
+				     :rename-and-delete :overwrite
+				     :append :supersede nil)
+			    :if-exists)
 	     (case if-exists
 	       ((:error nil)
 		(setf mask (logior mask sb!unix:o_excl)))
@@ -1133,10 +1108,9 @@
 		     nil)
 		    (t
 		     :create))))
-      (setf if-does-not-exist ; FIXME: should just die, not allow resetting
-	    (ensure-one-of if-does-not-exist
-			   '(:error :create nil)
-			   :if-does-not-exist))
+      (ensure-one-of if-does-not-exist
+		     '(:error :create nil)
+		     :if-does-not-exist)
       (if (eq if-does-not-exist :create)
 	(setf mask (logior mask sb!unix:o_creat)))
 
@@ -1183,87 +1157,67 @@
 			      sb!unix:o_trunc)))
 	      (setf if-exists :supersede))))
 	
-	;; Okay, now we can try the actual open.
-	(loop
-	  (multiple-value-bind (fd errno)
-	      (if namestring
-		  (sb!unix:unix-open namestring mask mode)
-		  (values nil sb!unix:enoent))
+	;; Now we can try the actual Unix open(2).
+	(multiple-value-bind (fd errno)
+	    (if namestring
+		(sb!unix:unix-open namestring mask mode)
+		(values nil sb!unix:enoent))
+	  (labels ((open-error (format-control &rest format-arguments)
+		     (error 'simple-file-error
+			    :pathname pathname
+			    :format-control format-control
+			    :format-arguments format-arguments))
+		   (vanilla-open-error ()
+		     (open-error "~@<error opening ~S: ~2I~_~A~:>"
+				 pathname
+				 (sb!unix:get-unix-error-msg errno))))
 	    (cond ((numberp fd)
-		   (return
-		    (case direction
-		      ((:input :output :io)
-		       (make-fd-stream fd
-				       :input input
-				       :output output
-				       :element-type element-type
-				       :file namestring
-				       :original original
-				       :delete-original delete-original
-				       :pathname pathname
-				       :input-buffer-p t
-				       :auto-close t))
-		      (:probe
-		       (let ((stream
-			      (%make-fd-stream :name namestring :fd fd
-					       :pathname pathname
-					       :element-type element-type)))
-			 (close stream)
-			 stream)))))
+		   (case direction
+		     ((:input :output :io)
+		      (make-fd-stream fd
+				      :input input
+				      :output output
+				      :element-type element-type
+				      :file namestring
+				      :original original
+				      :delete-original delete-original
+				      :pathname pathname
+				      :input-buffer-p t
+				      :auto-close t))
+		     (:probe
+		      (let ((stream
+			     (%make-fd-stream :name namestring
+					      :fd fd
+					      :pathname pathname
+					      :element-type element-type)))
+			(close stream)
+			stream))))
 		  ((eql errno sb!unix:enoent)
 		   (case if-does-not-exist
-		     (:error
-		      (cerror "Return NIL."
-			      'simple-file-error
-			      :pathname pathname
-			      :format-control "error opening ~S: ~A"
-			      :format-arguments
-			      (list pathname
-				    (sb!unix:get-unix-error-msg errno))))
+		     (:error (vanilla-open-error))
 		     (:create
-		      (cerror "Return NIL."
-			      'simple-error
-			      :format-control
-			      "error creating ~S: Path does not exist."
-			      :format-arguments
-			      (list pathname))))
-		   (return nil))
-		  ((eql errno sb!unix:eexist)
-		   (unless (eq nil if-exists)
-		     (cerror "Return NIL."
-			     'simple-file-error
-			     :pathname pathname
-			     :format-control "error opening ~S: ~A"
-			     :format-arguments
-			     (list pathname
-				   (sb!unix:get-unix-error-msg errno))))
-		   (return nil))
-		  ((eql errno sb!unix:eacces)
-		   (cerror "Try again."
-			   "error opening ~S: ~A"
-			   pathname
-			   (sb!unix:get-unix-error-msg errno)))
+		      (open-error
+		       "~@<The path ~2I~_~S ~I~_does not exist.~:>"
+		       pathname))
+		     (t nil)))
+		  ((and (eql errno sb!unix:eexist) if-exists)
+		   nil)
 		  (t
-		   (cerror "Return NIL."
-			   "error opening ~S: ~A"
-			   pathname
-			   (sb!unix:get-unix-error-msg errno))
-		   (return nil)))))))))
+		   (vanilla-open-error)))))))))
 
 ;;;; initialization
 
-(defvar *tty* nil
-  #!+sb-doc
-  "The stream connected to the controlling terminal or NIL if there is none.")
-(defvar *stdin* nil
-  #!+sb-doc
-  "The stream connected to the standard input (file descriptor 0).")
-(defvar *stdout* nil
-  #!+sb-doc
-  "The stream connected to the standard output (file descriptor 1).")
-(defvar *stderr* nil
-  #!+sb-doc
-  "The stream connected to the standard error output (file descriptor 2).")
+;;; the stream connected to the controlling terminal, or NIL if there is none
+(defvar *tty*)
+
+;;; the stream connected to the standard input (file descriptor 0)
+(defvar *stdin*)
+
+;;; the stream connected to the standard output (file descriptor 1)
+(defvar *stdout*)
+
+;;; the stream connected to the standard error output (file descriptor 2)
+(defvar *stderr*)
 
 ;;; This is called when the cold load is first started up, and may also
 ;;; be called in an attempt to recover from nested errors.
@@ -1273,8 +1227,8 @@
   (setf *standard-output* (make-synonym-stream '*stdout*))
   (setf *standard-input*
 	(#!-high-security
-	 ;; FIXME: Why is *STANDARD-INPUT* a TWO-WAY-STREAM? ANSI says it's
-	 ;; an input stream.
+	 ;; FIXME: Why is *STANDARD-INPUT* a TWO-WAY-STREAM? ANSI says
+	 ;; it's an input stream.
 	 make-two-way-stream
 	 #!+high-security
 	 %make-two-way-stream (make-synonym-stream '*stdin*)
@@ -1283,7 +1237,7 @@
   (setf *query-io* (make-synonym-stream '*terminal-io*))
   (setf *debug-io* *query-io*)
   (setf *trace-output* *standard-output*)
-  nil)
+  (values))
 
 ;;; This is called whenever a saved core is restarted.
 (defun stream-reinit ()
@@ -1304,21 +1258,15 @@
 			      :buffering :line
 			      :auto-close t))
 	(setf *tty* (make-two-way-stream *stdin* *stdout*))))
-  nil)
+  (values))
 
-;;;; beeping
+;;;; miscellany
 
-(defun default-beep-function (stream)
+;;; the Unix way to beep
+(defun beep (stream)
   (write-char (code-char bell-char-code) stream)
   (finish-output stream))
 
-(defvar *beep-function* #'default-beep-function
-  #!+sb-doc
-  "This is called in BEEP to feep the user. It takes a stream.")
-
-(defun beep (&optional (stream *terminal-io*))
-  (funcall *beep-function* stream))
-
 ;;; This is kind of like FILE-POSITION, but is an internal hack used
 ;;; by the filesys stuff to get and set the file name.
 (defun file-name (stream &optional new-name)
@@ -1342,7 +1290,7 @@
   (declare (type (or string character) object) (type file-stream stream))
   #!+sb-doc
   "Return the delta in STREAM's FILE-POSITION that would be caused by writing
-   Object to Stream. Non-trivial only in implementations that support
+   OBJECT to STREAM. Non-trivial only in implementations that support
    international character sets."
   (declare (ignore stream))
   (etypecase object

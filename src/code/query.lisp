@@ -44,8 +44,6 @@
 	     (apply #'format *query-io* format-string arguments))
 	   (force-output *query-io*)))))))
 
-;;; This is similar to Y-OR-N-P, but it clears the input buffer, beeps, and
-;;; uses READ-LINE to get "YES" or "NO".
 (defun yes-or-no-p (&optional format-string &rest arguments)
   #!+sb-doc
   "YES-OR-NO-P is similar to Y-OR-N-P, except that it clears the

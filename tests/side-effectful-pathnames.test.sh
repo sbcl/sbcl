@@ -1,7 +1,5 @@
 #!/bin/sh
 
-sbcl="$1"
-
 # LOADing and COMPILEing files with logical pathnames
 testdir=`pwd`"/side-effectful-pathnames-test-$$"
 testfilestem="load-test"
@@ -12,7 +10,7 @@ cat >$testfilename <<EOF
   (in-package :cl-user)
   (defparameter *loaded* :yes)
 EOF
-$sbcl <<EOF
+${SBCL:-sbcl} <<EOF
   (in-package :cl-user)
   (setf (logical-pathname-translations "TEST")
         (list (list "**;*.*.*" "$testdir/**/*.*")))

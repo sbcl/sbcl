@@ -19,13 +19,18 @@
 # The value of SBCL_XC_HOST should be a command to invoke the
 # cross-compilation Lisp system in such a way that it reads commands
 # from standard input, and terminates when it reaches end of file on
-# standard input. Suitable values are:
+# standard input. Some suitable values are:
 #   "sbcl"        to use an existing SBCL binary as a cross-compilation host
 #   "sbcl --sysinit /dev/null --userinit /dev/null"
 #                 to use an existing SBCL binary as a cross-compilation host
 #                 even though you have stuff in your initialization files
 #                 which makes it behave in such a non-standard way that
 #                 it keeps the build from working
+#   "sbcl --noprogrammer"
+#                 to use an existing SBCL binary as a cross-compilation host
+#                 and tell it to handle errors as best it can by itself,
+#                 without trying to use *DEBUG-IO* to ask for help from
+#                 the programmer
 #   "lisp -batch" to use an existing CMU CL binary as a cross-compilation host
 #   "lisp -noinit -batch" 
 #                 to use an existing CMU CL binary as a cross-compilation host
@@ -42,7 +47,7 @@
 # require a second pass, just testing at build-the-cross-compiler time
 # whether the cross-compilation host returns suitable values from 
 # UPGRADED-ARRAY-ELEMENT-TYPE?)
-export SBCL_XC_HOST="${1:-sbcl}"
+export SBCL_XC_HOST="${1:-sbcl --noprogrammer}"
 echo //SBCL_XC_HOST=\"$SBCL_XC_HOST\"
 
 # If you're cross-compiling, you should probably just walk through the

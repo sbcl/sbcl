@@ -13,15 +13,13 @@
 # absolutely no warranty. See the COPYING and CREDITS files for
 # more information.
 
-sbcl="$1"
-
 testfilestem=$TMPDIR/sbcl-foreign-test-$$
 
 echo 'int summish(int x, int y) { return 1 + x + y; }' > $testfilestem.c
 make $testfilestem.o
 ld -shared -o $testfilestem.so $testfilestem.o
 
-$sbcl <<EOF
+${SBCL:-sbcl} <<EOF
   (load-foreign '("$testfilestem.so"))
   (def-alien-routine summish int (x int) (y int))
   (assert (= (summish 10 20) 31))

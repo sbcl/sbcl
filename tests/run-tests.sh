@@ -14,7 +14,7 @@
 # more information.
 
 # how we invoke SBCL
-sbcl=${1:-../src/runtime/sbcl --core ../output/sbcl.core --noinform --sysinit /dev/null --userinit /dev/null --noprint --noprogrammer}
+export SBCL="${1:-../src/runtime/sbcl --core ../output/sbcl.core --noinform --sysinit /dev/null --userinit /dev/null --noprint --noprogrammer}"
 
 # "Ten four" is the closest numerical slang I can find to "OK", so
 # it's the Unix status value that we expect from a successful test.
@@ -45,7 +45,7 @@ for f in *.pure.lisp; do
     fi
 done
 echo "  (sb-ext:quit :unix-status 104)) ; Return status=success."
-) | $sbcl ; tenfour
+) | $SBCL ; tenfour
 
 # *.impure.lisp files are Lisp code with side effects (e.g. doing
 # DEFSTRUCT or DEFTYPE or DEFVAR, or messing with the read table).
@@ -56,7 +56,7 @@ echo //running '*.impure.lisp' tests
 for f in *.impure.lisp; do
     if [ -f $f ]; then
         echo //running $f test
-        echo "(load \"$f\")" | $sbcl ; tenfour
+        echo "(load \"$f\")" | $SBCL ; tenfour
     fi
 done
 
@@ -68,7 +68,7 @@ echo //running '*.test.sh' tests
 for f in *.test.sh; do
     if [ -f $f ]; then
 	echo //running $f test
-	sh $f "$sbcl"; tenfour
+	sh $f "$SBCL"; tenfour
     fi
 done
 
@@ -78,7 +78,7 @@ echo //running '*.assertoids' tests
 for f in *.assertoids; do
     if [ -f $f ]; then
 	echo //running $f test
-	echo "(load \"$f\")" | $sbcl --eval '(load "assertoid.lisp")' ; tenfour
+	echo "(load \"$f\")" | $SBCL --eval '(load "assertoid.lisp")' ; tenfour
     fi
 done
 
@@ -91,7 +91,7 @@ for f in *.pure-cload.lisp; do
     # to LOAD them all into the same Lisp.)
     if [ -f $f ]; then
 	echo //running $f test
-	$sbcl <<EOF ; tenfour
+	$SBCL <<EOF ; tenfour
 		(compile-file "$f")
 		(progn (load *) (sb-ext:quit :unix-status 104))
 EOF
@@ -105,7 +105,7 @@ echo //running '*.impure-cload.lisp' tests
 for f in *.impure-cload.lisp; do
     if [ -f $f ]; then
 	echo //running $f test
-	$sbcl <<EOF ; tenfour
+	$SBCL <<EOF ; tenfour
 		(compile-file "$f")
 		(progn (load *) (sb-ext:quit :unix-status 104))
 EOF
