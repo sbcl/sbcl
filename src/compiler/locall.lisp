@@ -351,8 +351,8 @@
           (cond (losing-local-functional
                  (let ((*compiler-error-context* call))
                    (compiler-notify "couldn't inline expand because expansion ~
-		                   calls this LET-converted local function:~
-		                   ~%  ~S"
+                                     calls this LET-converted local function:~
+                                     ~%  ~S"
                                     (leaf-debug-name losing-local-functional)))
                  (loop for block = (block-next pred) then (block-next block)
                        until (eq block end)
@@ -586,8 +586,7 @@
       (when (optional-dispatch-keyp fun)
 	(when (oddp (length more))
 	  (compiler-warn "function called with odd number of ~
-  		          arguments in keyword portion")
-
+                          arguments in keyword portion")
 	  (setf (basic-combination-kind call) :error)
 	  (return-from convert-more-call))
 

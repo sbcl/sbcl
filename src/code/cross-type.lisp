@@ -369,8 +369,6 @@
     (cons (specifier-type 'cons))
     (character
      (cond ((typep x 'standard-char)
-	    ;; (Note that SBCL doesn't distinguish between BASE-CHAR and
-	    ;; CHARACTER.)
 	    (specifier-type 'character))
 	   ((not (characterp x))
 	    nil)

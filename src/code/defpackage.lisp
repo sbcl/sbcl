@@ -154,7 +154,7 @@
       for z = (remove-duplicates (intersection (cdr x)(cdr y) :test #'string=))
       when z do (error 'simple-program-error
 		       :format-control "Parameters ~S and ~S must be disjoint ~
-					but have common elements ~%   ~S"
+                                        but have common elements ~%   ~S"
 		       :format-arguments (list (car x)(car y) z)))))
 
 (defun stringify-name (name kind)

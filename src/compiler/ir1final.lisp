@@ -42,7 +42,7 @@
 	      (compiler-notify "~@<unable to ~
                                 ~2I~_~A ~
                                 ~I~_due to type uncertainty: ~
-			        ~2I~_~{~?~^~@:_~}~:>"
+                                ~2I~_~{~?~^~@:_~}~:>"
 			     note (messages))))
 	   ;; As best I can guess, it's OK to fall off the end here
 	   ;; because if it's not a VALID-FUNCTION-USE, the user

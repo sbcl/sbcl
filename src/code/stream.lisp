@@ -1404,7 +1404,7 @@
 	(indentation (indenting-stream-indentation ,stream)))
        ((>= i indentation))
      (%write-string
-      "							    "
+      #.(make-string 60 :initial-element #\Space)
       ,sub-stream
       0
       (min 60 (- indentation i)))))
@@ -1477,12 +1477,12 @@
   #!+sb-doc
   "Return a stream that sends all output to the stream TARGET, but modifies
    the case of letters, depending on KIND, which should be one of:
-     :upcase - convert to upper case.
-     :downcase - convert to lower case.
-     :capitalize - convert the first letter of words to upper case and the
-	rest of the word to lower case.
-     :capitalize-first - convert the first letter of the first word to upper
-	case and everything else to lower case."
+     :UPCASE - convert to upper case.
+     :DOWNCASE - convert to lower case.
+     :CAPITALIZE - convert the first letter of words to upper case and the
+        rest of the word to lower case.
+     :CAPITALIZE-FIRST - convert the first letter of the first word to upper
+        case and everything else to lower case."
   (declare (type stream target)
 	   (type (member :upcase :downcase :capitalize :capitalize-first)
 		 kind)

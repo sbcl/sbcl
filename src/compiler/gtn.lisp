@@ -137,8 +137,8 @@
 		   (let ((*compiler-error-context* (lambda-bind (first funs))))
 		     (compiler-notify
 		      "Return value count mismatch prevents known return ~
-		       from these functions:~
-		       ~{~%  ~A~}"
+                       from these functions:~
+                       ~{~%  ~A~}"
 		      (mapcar #'leaf-source-name
 			      (remove-if-not #'leaf-has-source-name-p funs)))))
 	(let ((ret (lambda-return fun)))
@@ -150,7 +150,7 @@
 		  (let ((*compiler-error-context* (lambda-bind fun)))
 		    (compiler-notify
 		     "Return type not fixed values, so can't use known return ~
-		      convention:~%  ~S"
+                      convention:~%  ~S"
 		     (type-specifier rtype)))
 		  (return)))))))))
   (values))

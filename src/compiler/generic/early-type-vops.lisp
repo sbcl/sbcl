@@ -57,7 +57,7 @@
 			 (if (subsetp headers *fun-header-widetags*)
 			     t
 			     (error "can't test for mix of function subtypes ~
-				     and normal header types"))
+                                     and normal header types"))
 			 nil)))
     (unless type-codes
       (error "At least one type must be supplied for TEST-TYPE."))

@@ -850,7 +850,7 @@ error if any of PACKAGES is not a valid package designator."
 	       :package package
 	       :format-control
 	       "Exporting these symbols from the ~A package:~%~S~%~
-	        results in name conflicts with these packages:~%~{~A ~}"
+                results in name conflicts with these packages:~%~{~A ~}"
 	       :format-arguments
 	       (list (package-%name package) cset
 		     (mapcar #'package-%name cpackages)))
@@ -953,7 +953,7 @@ error if any of PACKAGES is not a valid package designator."
 		 :package package
 		 :format-control
 		 "Importing these symbols into the ~A package ~
-		causes a name conflict:~%~S"
+                  causes a name conflict:~%~S"
 		 :format-arguments (list (package-%name package) cset))))
       ;; Add the new symbols to the internal hashtable.
       (let ((internal (package-internal-symbols package)))

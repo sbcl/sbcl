@@ -34,10 +34,10 @@
 
 ;;; a magic number used to identify our core files
 (defconstant core-magic
-  (logior (ash (char-code #\S) 24)
-	  (ash (char-code #\B) 16)
-	  (ash (char-code #\C) 8)
-	  (char-code #\L)))
+  (logior (ash (sb!xc:char-code #\S) 24)
+	  (ash (sb!xc:char-code #\B) 16)
+	  (ash (sb!xc:char-code #\C) 8)
+	  (sb!xc:char-code #\L)))
 
 ;;; the current version of SBCL core files
 ;;;
@@ -610,7 +610,8 @@
 
 (defun base-string-to-core (string &optional (gspace *dynamic*))
   #!+sb-doc
-  "Copy string into the cold core and return a descriptor to it."
+  "Copy STRING (which must only contain STANDARD-CHARs) into the cold
+core and return a descriptor to it."
   ;; (Remember that the system convention for storage of strings leaves an
   ;; extra null byte at the end to aid in call-out to C.)
   (let* ((length (length string))
@@ -626,44 +627,7 @@
 		       (make-fixnum-descriptor length))
     (dotimes (i length)
       (setf (bvref bytes (+ offset i))
-	    ;; KLUDGE: There's no guarantee that the character
-	    ;; encoding here will be the same as the character
-	    ;; encoding on the target machine, so using CHAR-CODE as
-	    ;; we do, or a bitwise copy as CMU CL code did, is sleazy.
-	    ;; (To make this more portable, perhaps we could use
-	    ;; indices into the sequence which is used to test whether
-	    ;; a character is a STANDARD-CHAR?) -- WHN 19990817
-	    (char-code (aref string i))))
-    (setf (bvref bytes (+ offset length))
-	  0) ; null string-termination character for C
-    des))
-
-(defun character-string-to-core (string &optional (gspace *dynamic*))
-  #!+sb-doc
-  "Copy string into the cold core and return a descriptor to it."
-  ;; (Remember that the system convention for storage of strings leaves an
-  ;; extra null byte at the end to aid in call-out to C.)
-  (let* ((length (length string))
-	 (des (allocate-vector-object gspace
-				      sb!vm:n-byte-bits
-				      (1+ length)
-				      sb!vm:simple-character-string-widetag))
-	 (bytes (gspace-bytes gspace))
-	 (offset (+ (* sb!vm:vector-data-offset sb!vm:n-word-bytes)
-		    (descriptor-byte-offset des))))
-    (write-wordindexed des
-		       sb!vm:vector-length-slot
-		       (make-fixnum-descriptor length))
-    (dotimes (i length)
-      (setf (bvref bytes (+ offset i))
-	    ;; KLUDGE: There's no guarantee that the character
-	    ;; encoding here will be the same as the character
-	    ;; encoding on the target machine, so using CHAR-CODE as
-	    ;; we do, or a bitwise copy as CMU CL code did, is sleazy.
-	    ;; (To make this more portable, perhaps we could use
-	    ;; indices into the sequence which is used to test whether
-	    ;; a character is a STANDARD-CHAR?) -- WHN 19990817
-	    (char-code (aref string i))))
+	    (sb!xc:char-code (aref string i))))
     (setf (bvref bytes (+ offset length))
 	  0) ; null string-termination character for C
     des))
@@ -845,7 +809,7 @@
 		       (make-fixnum-descriptor 0))
     (write-wordindexed symbol sb!vm:symbol-plist-slot *nil-descriptor*)
     (write-wordindexed symbol sb!vm:symbol-name-slot
-		       (character-string-to-core name *dynamic*))
+		       (base-string-to-core name *dynamic*))
     (write-wordindexed symbol sb!vm:symbol-package-slot *nil-descriptor*)
     symbol))
 
@@ -1231,7 +1195,7 @@
 		       ;; because that's the way CMU CL did it; I'm
 		       ;; not sure whether there's an underlying
 		       ;; reason. -- WHN 1990826
-		       (character-string-to-core "NIL" *dynamic*))
+		       (base-string-to-core "NIL" *dynamic*))
     (write-wordindexed des
 		       (+ 1 sb!vm:symbol-package-slot)
 		       result)
@@ -1316,7 +1280,7 @@
       (let* ((cold-package (car cold-package-symbols-entry))
 	     (symbols (cdr cold-package-symbols-entry))
 	     (shadows (package-shadowing-symbols cold-package))
-	     (documentation (character-string-to-core (documentation cold-package t)))
+	     (documentation (base-string-to-core (documentation cold-package t)))
 	     (internal *nil-descriptor*)
 	     (external *nil-descriptor*)
 	     (imported-internal *nil-descriptor*)
@@ -1396,7 +1360,7 @@
 	 (res *nil-descriptor*))
     (dolist (u (package-use-list pkg))
       (when (assoc u *cold-package-symbols*)
-	(cold-push (character-string-to-core (package-name u)) use)))
+	(cold-push (base-string-to-core (package-name u)) use)))
     (let* ((pkg-name (package-name pkg))
 	   ;; Make the package nickname lists for the standard packages
 	   ;; be the minimum specified by ANSI, regardless of what value
@@ -1417,7 +1381,7 @@
 				 (t
 				  (package-nicknames pkg)))))
       (dolist (warm-nickname warm-nicknames)
-	(cold-push (character-string-to-core warm-nickname) cold-nicknames)))
+	(cold-push (base-string-to-core warm-nickname) cold-nicknames)))
 
     (cold-push (number-to-core (truncate (package-internal-symbol-count pkg)
 					 0.8))
@@ -1434,7 +1398,7 @@
     (cold-push use res)
     (cold-push (cold-intern :use) res)
 
-    (cold-push (character-string-to-core (package-name pkg)) res)
+    (cold-push (base-string-to-core (package-name pkg)) res)
     res))
 
 ;;;; functions and fdefinition objects
@@ -1884,7 +1848,7 @@
 (defun linkage-info-to-core ()
   (let ((result *nil-descriptor*))
     (maphash (lambda (symbol value)
-	       (cold-push (cold-cons (character-string-to-core symbol)
+	       (cold-push (cold-cons (base-string-to-core symbol)
 				     (number-to-core value))
 			  result))
 	     *cold-foreign-symbol-table*)
@@ -2024,21 +1988,21 @@
 	      (depthoid (descriptor-fixnum depthoid-des)))
 	  (unless (= length old-length)
 	    (error "cold loading a reference to class ~S when the compile~%~
-		   time length was ~S and current length is ~S"
+                    time length was ~S and current length is ~S"
 		   name
 		   length
 		   old-length))
 	  (unless (equal inherits-list old-inherits-list)
 	    (error "cold loading a reference to class ~S when the compile~%~
-		   time inherits were ~S~%~
-		   and current inherits are ~S"
+                    time inherits were ~S~%~
+                    and current inherits are ~S"
 		   name
 		   inherits-list
 		   old-inherits-list))
 	  (unless (= depthoid old-depthoid)
 	    (error "cold loading a reference to class ~S when the compile~%~
-		   time inheritance depthoid was ~S and current inheritance~%~
-		   depthoid is ~S"
+                    time inheritance depthoid was ~S and current inheritance~%~
+                    depthoid is ~S"
 		   name
 		   depthoid
 		   old-depthoid)))
@@ -2143,7 +2107,7 @@
   (let* ((len (clone-arg))
 	 (string (make-string len)))
     (read-string-as-bytes *fasl-input-stream* string)
-    (character-string-to-core string)))
+    (base-string-to-core string)))
 
 (clone-cold-fop (fop-vector)
 		(fop-small-vector)
@@ -3008,7 +2972,7 @@ initially undefined function references:~2%")
 	  ;; (We write each character as a word in order to avoid
 	  ;; having to think about word alignment issues in the
 	  ;; sbcl-0.7.8 version of coreparse.c.)
-	  (write-word (char-code char))))
+	  (write-word (sb!xc:char-code char))))
 
       ;; Write the New Directory entry header.
       (write-word new-directory-core-entry-type-code)

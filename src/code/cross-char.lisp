@@ -20,7 +20,6 @@
 	(char ascii-standard-chars (- x 32))))
   (defun sb!xc:char-code (character)
     (declare (type standard-char character))
-    ;; FIXME: MacOS X?
     (if (char= character #\Newline)
 	10
 	(+ (position character ascii-standard-chars) 32))))

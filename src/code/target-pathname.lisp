@@ -48,7 +48,7 @@
 	(print-unreadable-object (pathname stream :type t)
 	  (format stream
 		  "~@<(with no namestring) ~_:HOST ~S ~_:DEVICE ~S ~_:DIRECTORY ~S ~
-		  ~_:NAME ~S ~_:TYPE ~S ~_:VERSION ~S~:>"
+                  ~_:NAME ~S ~_:TYPE ~S ~_:VERSION ~S~:>"
 		  (%pathname-host pathname)
 		  (%pathname-device pathname)
 		  (%pathname-directory pathname)
@@ -693,7 +693,7 @@ a host-structure or string."
 		  :expected-type 'null
 		  :format-control
 		  "The host in the namestring, ~S,~@
-		    does not match the explicit HOST argument, ~S."
+                   does not match the explicit HOST argument, ~S."
 		  :format-arguments (list new-host host)))
 	 (let ((pn-host (or new-host host (pathname-host defaults))))
 	   (values (%make-maybe-logical-pathname
@@ -817,7 +817,7 @@ a host-structure or string."
       (let ((host (%pathname-host pathname)))
 	(unless host
 	  (error "can't determine the namestring for pathnames with no ~
-		  host:~%  ~S" pathname))
+                  host:~%  ~S" pathname))
 	(funcall (host-unparse host) pathname)))))
 
 (defun host-namestring (pathname)
@@ -938,7 +938,7 @@ a host-structure or string."
 	     (setf in-wildcard t)
 	     (unless subs
 	       (error "not enough wildcards in FROM pattern to match ~
-		       TO pattern:~%  ~S"
+                       TO pattern:~%  ~S"
 		      pattern))
 	     (let ((sub (pop subs)))
 	       (typecase sub
@@ -953,7 +953,7 @@ a host-structure or string."
 		  (push sub strings))
 		 (t
 		  (error "can't substitute this into the middle of a word:~
-			  ~%  ~S"
+                          ~%  ~S"
 			 sub)))))))
 
     (when strings
@@ -970,7 +970,7 @@ a host-structure or string."
 ;;; Called when we can't see how source and from matched.
 (defun didnt-match-error (source from)
   (error "Pathname components from SOURCE and FROM args to TRANSLATE-PATHNAME~@
-	  did not match:~%  ~S ~S"
+          did not match:~%  ~S ~S"
 	 source from))
 
 ;;; Do TRANSLATE-COMPONENT for all components except host, directory
@@ -1083,14 +1083,14 @@ a host-structure or string."
 	       (let ((match (pop subs-left)))
 		 (when (listp match)
 		   (error ":WILD-INFERIORS is not paired in from and to ~
-			   patterns:~%  ~S ~S" from to))
+                           patterns:~%  ~S ~S" from to))
 		 (res (maybe-diddle-case match diddle-case))))
 	      ((member :wild-inferiors)
 	       (aver subs-left)
 	       (let ((match (pop subs-left)))
 		 (unless (listp match)
 		   (error ":WILD-INFERIORS not paired in from and to ~
-			   patterns:~%  ~S ~S" from to))
+                           patterns:~%  ~S ~S" from to))
 		 (dolist (x match)
 		   (res (maybe-diddle-case x diddle-case)))))
 	      (pattern
@@ -1162,7 +1162,7 @@ a host-structure or string."
 		     (or (alpha-char-p ch) (digit-char-p ch) (char= ch #\-)))
 	  (error 'namestring-parse-error
 		 :complaint "logical namestring character which ~
-			     is not alphanumeric or hyphen:~%  ~S"
+                             is not alphanumeric or hyphen:~%  ~S"
 		 :args (list ch)
 		 :namestring word :offset i))))
     (coerce word 'base-string)))
@@ -1215,7 +1215,7 @@ a host-structure or string."
 		(when (pattern)
 		  (error 'namestring-parse-error
 			 :complaint "double asterisk inside of logical ~
-				     word: ~S"
+                                     word: ~S"
 			 :args (list chunk)
 			 :namestring namestring
 			 :offset (+ (cdar chunks) pos)))
@@ -1334,7 +1334,7 @@ a host-structure or string."
 		       (unless (and res (plusp res))
 			 (error 'namestring-parse-error
 				:complaint "expected a positive integer, ~
-					    got ~S"
+                                            got ~S"
 				:args (list str)
 				:namestring namestr
 				:offset (+ pos (cdar chunks))))

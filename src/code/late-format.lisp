@@ -23,8 +23,7 @@
 
 (defun %print-format-error (condition stream)
   (format stream
-	  "~:[~;error in format: ~]~
-		 ~?~@[~%  ~A~%  ~V@T^~]"
+	  "~:[~;error in format: ~]~?~@[~%  ~A~%  ~V@T^~]"
 	  (format-error-print-banner condition)
 	  (format-error-complaint condition)
 	  (format-error-args condition)
@@ -635,7 +634,7 @@
 		 (setf args (nthcdr ,posn orig-args))
 		 (error 'format-error
 			:complaint "Index ~W out of bounds. Should have been ~
-				    between 0 and ~W."
+                                    between 0 and ~W."
 			:args (list ,posn (length orig-args))
 			:offset ,(1- end)))))
       (if colonp
@@ -652,7 +651,7 @@
 			(error 'format-error
 			       :complaint
 			       "Index ~W is out of bounds; should have been ~
-				between 0 and ~W."
+                                between 0 and ~W."
 			       :args (list new-posn (length orig-args))
 			       :offset ,(1- end)))))))
 	  (if params
@@ -1008,8 +1007,8 @@
 		   (if directive
 		       (error 'format-error
 			      :complaint
-			      "cannot include format directives inside the ~
-			       ~:[suffix~;prefix~] segment of ~~<...~~:>"
+                              "cannot include format directives inside the ~
+                               ~:[suffix~;prefix~] segment of ~~<...~~:>"
 			      :args (list prefix-p)
 			      :offset (1- (format-directive-end directive)))
 		       (apply #'concatenate 'string list)))))

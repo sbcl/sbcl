@@ -164,13 +164,13 @@
 	      (fill array initial-element))
 	    (when initial-contents-p
 	      (when initial-element-p
-		(error "can't specify both :INITIAL-ELEMENT and ~
-		:INITIAL-CONTENTS"))
-	      (unless (= length (length initial-contents))
-		(error "There are ~W elements in the :INITIAL-CONTENTS, but ~
-		       the vector length is ~W."
-		       (length initial-contents)
-		       length))
+                (error "can't specify both :INITIAL-ELEMENT and ~
+                :INITIAL-CONTENTS"))
+              (unless (= length (length initial-contents))
+                (error "There are ~W elements in the :INITIAL-CONTENTS, but ~
+                       the vector length is ~W."
+                       (length initial-contents)
+                       length))
 	      (replace array initial-contents))
 	    array))
 	;; it's either a complex array or a multidimensional array.
@@ -211,7 +211,7 @@
 	  (cond (displaced-to
 		 (when (or initial-element-p initial-contents-p)
 		   (error "Neither :INITIAL-ELEMENT nor :INITIAL-CONTENTS ~
-		   can be specified along with :DISPLACED-TO"))
+                   can be specified along with :DISPLACED-TO"))
 		 (let ((offset (or displaced-index-offset 0)))
 		   (when (> (+ offset total-size)
 			    (array-total-size displaced-to))
@@ -235,7 +235,7 @@
                                initial-element initial-element-p)
   (when (and initial-contents-p initial-element-p)
     (error "cannot supply both :INITIAL-CONTENTS and :INITIAL-ELEMENT to
-	    either MAKE-ARRAY or ADJUST-ARRAY."))
+            either MAKE-ARRAY or ADJUST-ARRAY."))
   (let ((data (if initial-element-p
 		  (make-array total-size
 			      :element-type element-type
@@ -260,13 +260,13 @@
 		      (incf index))
 		     (t
 		      (unless (typep contents 'sequence)
-			(error "malformed :INITIAL-CONTENTS: ~S is not a ~
-				sequence, but ~W more layer~:P needed."
+                        (error "malformed :INITIAL-CONTENTS: ~S is not a ~
+                                sequence, but ~W more layer~:P needed."
 			       contents
 			       (- (length dimensions) axis)))
 		      (unless (= (length contents) (car dims))
-			(error "malformed :INITIAL-CONTENTS: Dimension of ~
-				axis ~W is ~W, but ~S is ~W long."
+                        (error "malformed :INITIAL-CONTENTS: Dimension of ~
+                                axis ~W is ~W, but ~S is ~W long."
 			       axis (car dims) contents (length contents)))
 		      (if (listp contents)
 			  (dolist (content contents)
@@ -714,8 +714,8 @@
       (cond (initial-contents-p
 	     ;; array former contents replaced by INITIAL-CONTENTS
 	     (if (or initial-element-p displaced-to)
-		 (error "INITIAL-CONTENTS may not be specified with ~
-		 the :INITIAL-ELEMENT or :DISPLACED-TO option."))
+                 (error "INITIAL-CONTENTS may not be specified with ~
+                         the :INITIAL-ELEMENT or :DISPLACED-TO option."))
 	     (let* ((array-size (apply #'* dimensions))
 		    (array-data (data-vector-from-inits
 				 dimensions array-size element-type
@@ -735,11 +735,11 @@
 	    (displaced-to
 	     ;; We already established that no INITIAL-CONTENTS was supplied.
 	     (when initial-element
-	       (error "The :INITIAL-ELEMENT option may not be specified ~
-	              with :DISPLACED-TO."))
-	     (unless (subtypep element-type (array-element-type displaced-to))
-	       (error "can't displace an array of type ~S into another of ~
-		       type ~S"
+               (error "The :INITIAL-ELEMENT option may not be specified ~
+                       with :DISPLACED-TO."))
+             (unless (subtypep element-type (array-element-type displaced-to))
+               (error "can't displace an array of type ~S into another of ~
+                       type ~S"
 		      element-type (array-element-type displaced-to)))
 	     (let ((displacement (or displaced-index-offset 0))
 		   (array-size (apply #'* dimensions)))
@@ -819,19 +819,19 @@
 	 (when (array-has-fill-pointer-p old-array)
 	   (when (> (%array-fill-pointer old-array) new-array-size)
 	     (error "cannot ADJUST-ARRAY an array (~S) to a size (~S) that is ~
-		    smaller than its fill pointer (~S)"
+                     smaller than its fill pointer (~S)"
 		    old-array new-array-size (fill-pointer old-array)))
 	   (%array-fill-pointer old-array)))
 	((not (array-has-fill-pointer-p old-array))
 	 (error "cannot supply a non-NIL value (~S) for :FILL-POINTER ~
-		in ADJUST-ARRAY unless the array (~S) was originally ~
- 		created with a fill pointer"
+                 in ADJUST-ARRAY unless the array (~S) was originally ~
+                 created with a fill pointer"
 		fill-pointer
 		old-array))
 	((numberp fill-pointer)
 	 (when (> fill-pointer new-array-size)
 	   (error "can't supply a value for :FILL-POINTER (~S) that is larger ~
-		  than the new length of the vector (~S)"
+                   than the new length of the vector (~S)"
 		  fill-pointer new-array-size))
 	 fill-pointer)
 	((eq fill-pointer t)
@@ -1002,10 +1002,10 @@
      #!+sb-doc
      ,(format nil
 	      "Perform a bit-wise ~A on the elements of BIT-ARRAY-1 and ~
-	      BIT-ARRAY-2,~%  putting the results in RESULT-BIT-ARRAY. ~
-	      If RESULT-BIT-ARRAY is T,~%  BIT-ARRAY-1 is used. If ~
-	      RESULT-BIT-ARRAY is NIL or omitted, a new array is~%  created. ~
-	      All the arrays must have the same rank and dimensions."
+               BIT-ARRAY-2,~%  putting the results in RESULT-BIT-ARRAY. ~
+               If RESULT-BIT-ARRAY is T,~%  BIT-ARRAY-1 is used. If ~
+               RESULT-BIT-ARRAY is NIL or omitted, a new array is~%  created. ~
+               All the arrays must have the same rank and dimensions."
 	      (symbol-name function))
      (declare (type (array bit) bit-array-1 bit-array-2)
 	      (type (or (array bit) (member t nil)) result-bit-array))

@@ -283,11 +283,11 @@
 	     (*print-pretty* nil))
 	 (format nil
 		 "~%  ~
-	          compiled from ~S~%  ~
-	          at ~A~%  ~
-	          on ~A~%  ~
-	          using ~A version ~A~%"
-		 where
+                  compiled from ~S~%  ~
+                  at ~A~%  ~
+                  on ~A~%  ~
+                  using ~A version ~A~%"
+	 where
 		 (format-universal-time nil (get-universal-time))
 		 (machine-instance)
 		 (sb!xc:lisp-implementation-type)

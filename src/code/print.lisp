@@ -75,26 +75,26 @@
   #!+sb-doc
   "Bind the reader and printer control variables to values that enable READ
    to reliably read the results of PRINT. These values are:
-       *PACKAGE*			the COMMON-LISP-USER package
-       *PRINT-ARRAY*			T
-       *PRINT-BASE*			10
-       *PRINT-CASE*			:UPCASE
-       *PRINT-CIRCLE*			NIL
-       *PRINT-ESCAPE*			T
-       *PRINT-GENSYM*			T
-       *PRINT-LENGTH*			NIL
-       *PRINT-LEVEL*			NIL
-       *PRINT-LINES*			NIL
-       *PRINT-MISER-WIDTH*		NIL
-       *PRINT-PRETTY*			NIL
-       *PRINT-RADIX*			NIL
-       *PRINT-READABLY*			T
-       *PRINT-RIGHT-MARGIN*		NIL
-       *READ-BASE*			10
-       *READ-DEFAULT-FLOAT-FORMAT* 	SINGLE-FLOAT
-       *READ-EVAL*			T
-       *READ-SUPPRESS*			NIL
-       *READTABLE*			the standard readtable"
+       *PACKAGE*                        the COMMON-LISP-USER package
+       *PRINT-ARRAY*                    T
+       *PRINT-BASE*                     10
+       *PRINT-CASE*                     :UPCASE
+       *PRINT-CIRCLE*                   NIL
+       *PRINT-ESCAPE*                   T
+       *PRINT-GENSYM*                   T
+       *PRINT-LENGTH*                   NIL
+       *PRINT-LEVEL*                    NIL
+       *PRINT-LINES*                    NIL
+       *PRINT-MISER-WIDTH*              NIL
+       *PRINT-PRETTY*                   NIL
+       *PRINT-RADIX*                    NIL
+       *PRINT-READABLY*                 T
+       *PRINT-RIGHT-MARGIN*             NIL
+       *READ-BASE*                      10
+       *READ-DEFAULT-FLOAT-FORMAT*      SINGLE-FLOAT
+       *READ-EVAL*                      T
+       *READ-SUPPRESS*                  NIL
+       *READTABLE*                      the standard readtable"
   `(%with-standard-io-syntax (lambda () ,@body)))
 
 (defun %with-standard-io-syntax (function)
@@ -360,7 +360,7 @@
      ;; Someone forgot to initiate circularity detection.
      (let ((*print-circle* nil))
        (error "trying to use CHECK-FOR-CIRCULARITY when ~
-	       circularity checking isn't initiated")))
+               circularity checking isn't initiated")))
     ((t)
      ;; It's a second (or later) reference to the object while we are
      ;; just looking. So don't bother groveling it again.

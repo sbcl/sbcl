@@ -1592,8 +1592,8 @@
 	   ;; arbitrarily huge blocks of code. -- WHN)
 	   (let ((*compiler-error-context* node))
 	     (compiler-notify "*INLINE-EXPANSION-LIMIT* (~W) was exceeded, ~
-			       probably trying to~%  ~
-			       inline a recursive function."
+                               probably trying to~%  ~
+                               inline a recursive function."
 			      *inline-expansion-limit*))
 	   nil)
 	  (t t))))

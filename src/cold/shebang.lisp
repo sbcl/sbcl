@@ -73,6 +73,17 @@
 (declaim (type list *shebang-features*))
 (defvar *shebang-backend-subfeatures*)
 
+;;;; string checker, for catching non-portability early
+(defun make-quote-reader (standard-quote-reader)
+  (lambda (stream char)
+    (let ((result (funcall standard-quote-reader stream char)))
+      (unless (every (lambda (x) (typep x 'standard-char)) result)
+        (warn "Found non-STANDARD-CHAR in ~S" result))
+      result)))
+(compile 'make-quote-reader)
+
+(set-macro-character #\" (make-quote-reader (get-macro-character #\" nil)))
+
 ;;;; FIXME: Would it be worth implementing this?
 #|
 ;;;; readmacro syntax to remove spaces from FORMAT strings at compile time

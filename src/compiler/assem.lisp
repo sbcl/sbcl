@@ -953,7 +953,7 @@
 		    (when (< (find-alignment additional-delta)
 			     (chooser-alignment note))
 		      (error "~S shrunk by ~W bytes, but claimed that it ~
-			      preserves ~W bits of alignment."
+                              preserves ~W bits of alignment."
 			     note additional-delta (chooser-alignment note)))
 		    (incf delta additional-delta)
 		    (emit-filler segment additional-delta))
@@ -995,7 +995,7 @@
 			 (additional-delta (- old-size size)))
 		    (when (minusp additional-delta)
 		      (error "Alignment ~S needs more space now?  It was ~W, ~
-			    and is ~W now."
+                              and is ~W now."
 			     note old-size size))
 		    (when (plusp additional-delta)
 		      (emit-filler segment additional-delta)
@@ -1387,7 +1387,7 @@
 	       (arg (gensym (format nil "~:@(ARG-FOR-~S-~)" byte-spec-expr))))
 	  (when (ldb-test (byte byte-size byte-posn) overall-mask)
 	    (error "The byte spec ~S either overlaps another byte spec, or ~
-		    extends past the end."
+                    extends past the end."
 		   byte-spec-expr))
 	  (setf (ldb byte-spec overall-mask) -1)
 	  (arg-names arg)
@@ -1650,7 +1650,7 @@
 	     (setf (segment-postits ,segment-name) nil)
 	     (macrolet ((%%current-segment%% ()
 			  (error "You can't use INST without an ~
-				  ASSEMBLE inside emitters.")))
+                                  ASSEMBLE inside emitters.")))
                ;; KLUDGE: Some host lisps (CMUCL 18e Sparc at least)
                ;; can't deal with this declaration, so disable it on host
                ;; Ditto for earlier ENABLE-PACKAGE-LOCKS %%C-S%% %%C-V%%

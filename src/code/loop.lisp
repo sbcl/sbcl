@@ -1190,12 +1190,12 @@ code to be loaded.
 	    (t (unless (eq (loop-collector-class cruft) class)
 		 (loop-error
 		   "incompatible kinds of LOOP value accumulation specified for collecting~@
-		    ~:[as the value of the LOOP~;~:*INTO ~S~]: ~S and ~S"
+                    ~:[as the value of the LOOP~;~:*INTO ~S~]: ~S and ~S"
 		   name (car (loop-collector-history cruft)) collector))
 	       (unless (equal dtype (loop-collector-dtype cruft))
 		 (loop-warn
 		   "unequal datatypes specified in different LOOP value accumulations~@
-		   into ~S: ~S and ~S"
+                   into ~S: ~S and ~S"
 		   name dtype (loop-collector-dtype cruft))
 		 (when (eq (loop-collector-dtype cruft) t)
 		   (setf (loop-collector-dtype cruft) dtype)))
@@ -1664,7 +1664,7 @@ code to be loaded.
 		 (if (setq tem (loop-tassoc (car z) *loop-named-vars*))
 		     (loop-error
 		       "The variable substitution for ~S occurs twice in a USING phrase,~@
-			with ~S and ~S."
+                        with ~S and ~S."
 		       (car z) (cadr z) (cadr tem))
 		     (push (cons (car z) (cadr z)) *loop-named-vars*)))
 	       (when (or (null *loop-source-code*)
@@ -1742,7 +1742,7 @@ code to be loaded.
 		 nil t)))
 	   (t (loop-error
 		 "~S invalid preposition in sequencing or sequence path;~@
-	      maybe invalid prepositions were specified in iteration path descriptor?"
+              maybe invalid prepositions were specified in iteration path descriptor?"
 		 prep)))
 	 (when (and odir dir (not (eq dir odir)))
 	   (loop-error "conflicting stepping directions in LOOP sequencing path"))

@@ -540,12 +540,8 @@
 (defun walk-template-handle-repeat (form template stop-form context env)
   (if (eq form stop-form)
       (walk-template form (cdr template) context env)
-      (walk-template-handle-repeat-1 form
-				     template
-				     (car template)
-				     stop-form
-				     context
-				     env)))
+      (walk-template-handle-repeat-1
+       form template (car template) stop-form context env)))
 
 (defun walk-template-handle-repeat-1 (form template repeat-template
 					   stop-form context env)
@@ -554,10 +550,10 @@
 	 (if (null repeat-template)
 	     (walk-template stop-form (cdr template) context env)
 	     (error "while handling code walker REPEAT:
-		     ~%ran into STOP while still in REPEAT template")))
+                     ~%ran into STOP while still in REPEAT template")))
 	((null repeat-template)
 	 (walk-template-handle-repeat-1
-	   form template (car template) stop-form context env))
+          form template (car template) stop-form context env))
 	(t
 	 (recons form
 		 (walk-template (car form) (car repeat-template) context env)

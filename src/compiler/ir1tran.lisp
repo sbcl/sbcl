@@ -1069,7 +1069,7 @@
 		(functional
 		 (when (policy *lexenv* (>= speed inhibit-warnings))
 		   (compiler-notify "ignoring ~A declaration not at ~
-				     definition of local function:~%  ~S"
+                                     definition of local function:~%  ~S"
 				    sense name)))
 		(global-var
 		 (push (cons name (make-new-inlinep found sense))

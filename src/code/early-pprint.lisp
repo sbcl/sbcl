@@ -144,7 +144,7 @@
    PPRINT-LOGICAL-BLOCK, and only when the LIST argument to
    PPRINT-LOGICAL-BLOCK is supplied."
   (error "PPRINT-EXIT-IF-LIST-EXHAUSTED must be lexically inside ~
-	  PPRINT-LOGICAL-BLOCK."))
+          PPRINT-LOGICAL-BLOCK."))
 
 (defmacro pprint-pop ()
   #!+sb-doc

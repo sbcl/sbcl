@@ -116,12 +116,12 @@
   is intended to be wrapped around the compilation of all files in the same
   system. These keywords are defined:
     :OVERRIDE Boolean-Form
-	One of the effects of this form is to delay undefined warnings
-	until the end of the form, instead of giving them at the end of each
-	compilation. If OVERRIDE is NIL (the default), then the outermost
-	WITH-COMPILATION-UNIT form grabs the undefined warnings. Specifying
-	OVERRIDE true causes that form to grab any enclosed warnings, even if
-	it is enclosed by another WITH-COMPILATION-UNIT."
+        One of the effects of this form is to delay undefined warnings
+        until the end of the form, instead of giving them at the end of each
+        compilation. If OVERRIDE is NIL (the default), then the outermost
+        WITH-COMPILATION-UNIT form grabs the undefined warnings. Specifying
+        OVERRIDE true causes that form to grab any enclosed warnings, even if
+        it is enclosed by another WITH-COMPILATION-UNIT."
   `(%with-compilation-unit (lambda () ,@body) ,@options))
 
 (defun %with-compilation-unit (fn &key override)
@@ -221,12 +221,12 @@
 	    (when summary
 	      (if (eq kind :variable)
 		  (compiler-warn
-		   "~:[This ~(~A~) is~;These ~(~A~)s are~] undefined:~
-		    ~%  ~{~<~%  ~1:;~S~>~^ ~}"
+                   "~:[This ~(~A~) is~;These ~(~A~)s are~] undefined:~
+                    ~%  ~{~<~%  ~1:;~S~>~^ ~}"
 		   (cdr summary) kind summary)
 		  (compiler-style-warn
-		   "~:[This ~(~A~) is~;These ~(~A~)s are~] undefined:~
-		   ~%  ~{~<~%  ~1:;~S~>~^ ~}"
+                   "~:[This ~(~A~) is~;These ~(~A~)s are~] undefined:~
+                   ~%  ~{~<~%  ~1:;~S~>~^ ~}"
 		   (cdr summary) kind summary))))))))
 
   (unless (and (not abort-p)
