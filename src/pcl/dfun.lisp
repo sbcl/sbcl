@@ -763,11 +763,11 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
 ;;; considered as state transitions.
 (defvar *lazy-dfun-compute-p* t)
 (defvar *early-p* nil)
-(defvar *max-emf-precomputation-methods* 0)
+(defvar *max-emf-precomputation-methods* 10)
 
 (defun finalize-specializers (gf)
   (let ((methods (generic-function-methods gf)))
-    (when (< (length methods) *max-emf-precomputation-methods*)
+    (when (<= (length methods) *max-emf-precomputation-methods*)
       (let ((all-finalized t))
 	(dolist (method methods all-finalized)
 	  (dolist (specializer (method-specializers method))

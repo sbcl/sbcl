@@ -128,27 +128,20 @@
 	(order (car (method-combination-options combin)))
 	(around ())
 	(primary ()))
-    (dolist (m applicable-methods)
-      (let ((qualifiers (method-qualifiers m)))
-	(flet ((lose (method why)
-		 (invalid-method-error
-		   method
-		   "The method ~S ~A.~%~
-		    The method combination type ~S was defined with the~%~
-		    short form of DEFINE-METHOD-COMBINATION and so requires~%~
-		    all methods have either the single qualifier ~S or the~%~
-		    single qualifier :AROUND."
-		   method why type type)))
-	  (cond ((null qualifiers)
-		 (lose m "has no qualifiers"))
-		((cdr qualifiers)
-		 (lose m "has more than one qualifier"))
+    (flet ((invalid (gf combin m)
+	     (if *in-precompute-effective-methods-p*
+		 (return-from compute-effective-method
+		   `(%invalid-qualifiers ',gf ',combin ',m))
+		 (invalid-qualifiers gf combin m))))
+      (dolist (m applicable-methods)
+	(let ((qualifiers (method-qualifiers m)))
+	  (cond ((null qualifiers) (invalid generic-function combin m))
+		((cdr qualifiers) (invalid generic-function combin m))
 		((eq (car qualifiers) :around)
 		 (push m around))
 		((eq (car qualifiers) type)
 		 (push m primary))
-		(t
-		 (lose m "has an illegal qualifier"))))))
+		(t (invalid generic-function combin m))))))
     (setq around (nreverse around))
     (ecase order
       (:most-specific-last) ; nothing to be done, already in correct order
@@ -192,6 +185,26 @@
 	    (t
 	     `(call-method ,(car around)
 			   (,@(cdr around) (make-method ,main-method))))))))
+
+(defmethod invalid-qualifiers ((gf generic-function)
+			       (combin short-method-combination)
+			       method)
+  (let ((qualifiers (method-qualifiers method))
+	(type (method-combination-type combin)))
+    (let ((why (cond
+		 ((null qualifiers) "has no qualifiers")
+		 ((cdr qualifiers) "has too many qualifiers")
+		 (t (aver (and (neq (car qualifiers) type)
+			       (neq (car qualifiers) :around)))
+		    "has an invalid qualifier"))))
+      (invalid-method-error
+       method
+       "The method ~S on ~S ~A.~%~
+	The method combination type ~S was defined with the~%~
+	short form of DEFINE-METHOD-COMBINATION and so requires~%~
+	all methods have either the single qualifier ~S or the~%~
+	single qualifier :AROUND."
+       method gf why type type))))
 
 ;;;; long method combinations
 
@@ -496,3 +509,4 @@
 	    (return (nconc (frob required nr nreq)
 			   (frob optional no nopt)
 			   values)))))
+

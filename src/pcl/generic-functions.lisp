@@ -419,6 +419,8 @@
 
 (defgeneric find-method-combination (generic-function type options))
 
+(defgeneric invalid-qualifiers (generic-function combin method))
+
 (defgeneric (setf slot-accessor-function) (function slotd type))
 
 (defgeneric (setf slot-accessor-std-p) (value slotd type))

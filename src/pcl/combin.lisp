@@ -174,7 +174,8 @@
       (get-generic-fun-info gf)
     (declare (ignore nreq nkeys arg-info))
     (let ((ll (make-fast-method-call-lambda-list metatypes applyp))
-	  (error-p (eq (first effective-method) '%no-primary-method))
+	  (error-p (or (eq (first effective-method) '%no-primary-method)
+		       (eq (first effective-method) '%invalid-qualifiers)))
 	  (mc-args-p
 	   (when (eq *boot-state* 'complete)
 	     ;; Otherwise the METHOD-COMBINATION slot is not bound.
@@ -185,8 +186,12 @@
 	(error-p
 	 `(lambda (.pv-cell. .next-method-call. &rest .args.)
 	   (declare (ignore .pv-cell. .next-method-call.))
+	   (declare (ignorable .args.))
 	   (flet ((%no-primary-method (gf args)
-		    (apply #'no-primary-method gf args)))
+		    (apply #'no-primary-method gf args))
+		  (%invalid-qualifiers (gf combin method)
+		    (invalid-qualifiers gf combin method)))
+	     (declare (ignorable #'%no-primary-method #'%invalid-qualifiers))
 	     ,effective-method)))
 	(mc-args-p
 	 (let* ((required
@@ -331,59 +336,44 @@
   `(call-method-list
     ,@(mapcar (lambda (method) `(call-method ,method ())) methods)))
 
-(defun standard-compute-effective-method (generic-function combin applicable-methods)
-  (declare (ignore combin))
-  (let ((before ())
-	(primary ())
-	(after ())
-	(around ()))
-    (flet ((lose (method why)
-             (invalid-method-error
-              method
-              "The method ~S ~A.~%~
-               Standard method combination requires all methods to have one~%~
-               of the single qualifiers :AROUND, :BEFORE and :AFTER or to~%~
-               have no qualifier at all."
-              method why)))
+(defun standard-compute-effective-method
+    (generic-function combin applicable-methods)
+  (collect ((before) (primary) (after) (around))
+    (flet ((invalid (gf combin m)
+	     (if *in-precompute-effective-methods-p*
+		 (return-from standard-compute-effective-method
+		   `(%invalid-qualifiers ',gf ',combin ',m))
+		 (invalid-qualifiers gf combin m))))
       (dolist (m applicable-methods)
-        (let ((qualifiers (if (listp m)
-                            (early-method-qualifiers m)
-                            (method-qualifiers m))))
-          (cond
-            ((null qualifiers) (push m primary))
-            ((cdr qualifiers)
-              (lose m "has more than one qualifier"))
-            ((eq (car qualifiers) :around)
-              (push m around))
-            ((eq (car qualifiers) :before)
-              (push m before))
-            ((eq (car qualifiers) :after)
-              (push m after))
-            (t
-              (lose m "has an illegal qualifier"))))))
-    (setq before  (reverse before)
-	  after   (reverse after)
-	  primary (reverse primary)
-	  around  (reverse around))
-    (cond ((null primary)
+	(let ((qualifiers (if (listp m)
+			      (early-method-qualifiers m)
+			      (method-qualifiers m))))
+	  (cond
+	    ((null qualifiers) (primary m))
+	    ((cdr qualifiers) (invalid generic-function combin m))
+	    ((eq (car qualifiers) :around) (around m))
+	    ((eq (car qualifiers) :before) (before m))
+	    ((eq (car qualifiers) :after) (after m))
+	    (t (invalid generic-function combin m))))))
+    (cond ((null (primary))
 	   `(%no-primary-method ',generic-function .args.))
-	  ((and (null before) (null after) (null around))
+	  ((and (null (before)) (null (after)) (null (around)))
 	   ;; By returning a single call-method `form' here we enable
 	   ;; an important implementation-specific optimization.
-	   `(call-method ,(first primary) ,(rest primary)))
+	   `(call-method ,(first (primary)) ,(rest (primary))))
 	  (t
 	   (let ((main-effective-method
-		   (if (or before after)
+		   (if (or (before) (after))
 		       `(multiple-value-prog1
 			  (progn
-			    ,(make-call-methods before)
-			    (call-method ,(first primary)
-					 ,(rest primary)))
-			  ,(make-call-methods (reverse after)))
-		       `(call-method ,(first primary) ,(rest primary)))))
-	     (if around
-		 `(call-method ,(first around)
-			       (,@(rest around)
+			    ,(make-call-methods (before))
+			    (call-method ,(first (primary))
+					 ,(rest (primary))))
+			  ,(make-call-methods (reverse (after))))
+		       `(call-method ,(first (primary)) ,(rest (primary))))))
+	     (if (around)
+		 `(call-method ,(first (around))
+			       (,@(rest (around))
 				  (make-method ,main-effective-method)))
 		 main-effective-method))))))
 
@@ -405,12 +395,14 @@
 				     applicable-methods))
 
 (defun invalid-method-error (method format-control &rest format-arguments)
-  (error "~@<invalid method error for ~2I~_~S ~I~_method: ~2I~_~?~:>"
-	 method
-	 format-control
-	 format-arguments))
+  (let ((sb-debug:*stack-top-hint* (nth-value 1 (find-caller-name-and-frame))))
+    (error "~@<invalid method error for ~2I~_~S ~I~_method: ~2I~_~?~:>"
+	   method
+	   format-control
+	   format-arguments)))
 
 (defun method-combination-error (format-control &rest format-arguments)
-  (error "~@<method combination error in CLOS dispatch: ~2I~_~?~:>"
-	 format-control
-	 format-arguments))
+  (let ((sb-debug:*stack-top-hint* (nth-value 1 (find-caller-name-and-frame))))
+    (error "~@<method combination error in CLOS dispatch: ~2I~_~?~:>"
+	   format-control
+	   format-arguments)))

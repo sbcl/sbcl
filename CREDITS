@@ -596,7 +596,9 @@ Antonio Martinez-Shotton:
   He has contributed a number of bug fixes and bug reports to SBCL.
 
 Brian Mastenbrook:
-  He contributed to the port of SBCL to MacOS X.
+  He contributed to the port of SBCL to MacOS X.  He found a way to
+  overcome binary compatibility issues between different versions of
+  dlcompat on Darwin.
 
 Dave McDonald:
   He made a lot of progress toward getting SBCL to be bootstrappable
@@ -627,12 +629,15 @@ Kevin M. Rosenberg:
   Debian packages of SBCL.
 
 Christophe Rhodes:
-  He ported SBCL to SPARC, made various port-related and SPARC-related
-  changes (like *BACKEND-SUBFEATURES*), made many fixes and
-  improvements in the compiler's type system, has essentially
-  completed the work to enable bootstrapping SBCL under unrelated
-  (non-SBCL, non-CMU-CL) Common Lisps, and contributed in other ways
-  as well.
+  He ported SBCL to SPARC (based on the CMUCL backend), made various
+  port-related and SPARC-related changes (like *BACKEND-SUBFEATURES*),
+  made many fixes and improvements in the compiler's type system, has
+  essentially completed the work to enable bootstrapping SBCL under
+  unrelated (non-SBCL, non-CMU-CL) Common Lisps.  He participated in
+  the modernization of SBCL's CLOS implementation, implemented the
+  treatment of compiler notes as restartable conditions, provided
+  optimizations to compiler output, and contributed in other ways as
+  well.
 
 Stig Erik Sandoe:
   He showed how to convince the GNU toolchain to build SBCL in a way

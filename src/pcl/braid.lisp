@@ -720,3 +720,20 @@
 	  ~I~_when called with arguments ~2I~_~S.~:>"
 	 generic-function
 	 args))
+
+(defmethod invalid-qualifiers ((gf generic-function)
+			       combin
+			       method)
+  (let ((qualifiers (method-qualifiers method)))
+    (let ((why (cond
+		 ((cdr qualifiers) "has too many qualifiers")
+		 (t (aver (not (member (car qualifiers)
+				       '(:around :before :after))))
+		    "has an invalid qualifier"))))
+      (invalid-method-error
+       method
+       "The method ~S on ~S ~A.~%~
+        Standard method combination requires all methods to have one~%~
+        of the single qualifiers :AROUND, :BEFORE and :AFTER or to~%~
+        have no qualifier at all."
+       method gf why))))
