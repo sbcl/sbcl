@@ -2321,7 +2321,14 @@
         (specifier-type `(integer ,lo-res ,hi-res))))))
 
 (defoptimizer (code-char derive-type) ((code))
-  (specifier-type 'base-char))
+  (let ((type (lvar-type code)))
+    ;; FIXME: unions of integral ranges?  It ought to be easier to do
+    ;; this, given that CHARACTER-SET is basically an integral range
+    ;; type.  -- CSR, 2004-10-04
+    (when (numeric-type-p type)
+      (let* ((lo (numeric-type-low type))
+             (hi (numeric-type-high type)))
+        (specifier-type `(character-set ((,lo . ,hi))))))))
 
 (defoptimizer (values derive-type) ((&rest values))
   (make-values-type :required (mapcar #'lvar-type values)))
