@@ -85,3 +85,32 @@
 		    (list x)))))
   (assert (null value))
   (assert (typep error 'error)))
+
+;;; bug 169 (reported by Alexey Dejneka 2002-05-12, fixed by David
+;;; Lichteblau 2002-05-21)
+(progn
+  (multiple-value-bind (fun warnings-p failure-p)
+      (compile nil
+	       ;; Compiling this code should cause a STYLE-WARNING
+	       ;; about *X* looking like a special variable but not
+	       ;; being one.
+	       '(lambda (n)
+		  (let ((*x* n))
+		    (funcall (symbol-function 'x-getter))
+		    (print *x*))))
+    (assert (functionp fun))
+    (assert warnings-p)
+    (assert (not failure-p)))
+  (multiple-value-bind (fun warnings-p failure-p)
+      (compile nil
+	       ;; Compiling this code should not cause a warning
+	       ;; (because the DECLARE turns *X* into a special
+	       ;; variable as its name suggests it should be).
+	       '(lambda (n)
+		  (let ((*x* n))
+		    (declare (special *x*))
+		    (funcall (symbol-function 'x-getter))
+		    (print *x*))))
+    (assert (functionp fun))
+    (assert (not warnings-p))
+    (assert (not failure-p))))

@@ -1230,25 +1230,6 @@ WORKAROUND:
   Since this is a reasonable user error, it shouldn't be reported as 
   an SBCL bug. 
 
-169:
-  (reported by Alexey Dejneka on sbcl-devel 2002-05-12)
-  * (defun test (n)
-      (let ((*x* n))
-        (declare (special *x*))
-        (getx)))
-  ; in: LAMBDA NIL
-  ;     (LET ((*X* N))
-  ;     (DECLARE (SPECIAL *X*))
-  ;     (GETX))
-  ;
-  ; caught STYLE-WARNING:
-  ;   using the lexical binding of the symbol *X*, not the
-  ; dynamic binding, even though the symbol name follows the usual naming
-  ; convention (names like *FOO*) for special variables
-  ; compilation unit finished
-  ;   caught 1 STYLE-WARNING condition
-  But the code works as it should. Checked in 0.6.12.43 and later.
-
 171:
   (reported by Pierre Mai while investigating bug 47):
     (DEFCLASS FOO () ((A :SILLY T))) 

@@ -1187,7 +1187,6 @@
 			      :where-from (leaf-where-from specvar)
 			      :specvar specvar)))
 	  (t
-	   (note-lexical-binding name)
 	   (make-lambda-var :%source-name name)))))
 
 ;;; Make the default keyword for a &KEY arg, checking that the keyword

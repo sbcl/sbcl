@@ -1129,6 +1129,11 @@ changes in sbcl-0.7.4 relative to sbcl-0.7.3:
 changes in sbcl-0.7.5 relative to sbcl-0.7.4:
   * bug 140 fixed: redefinition of classes with different supertypes
     is now reflected in the type hierarchy. (thanks to Pierre Mai)
+  * bug 169 fixed: no more bogus warnings about using lexical bindings
+    despite the presence of perfectly good SPECIAL declarations. (thanks
+    to David Lichteblau)
+  * bug fix: Structure type predicate functions now check their argument
+    count as they should.
   * minor incompatible change: The LOAD function no longer, when given
     a wild pathname to load, loads all files matching that pathname;
     instead, an error of type FILE-ERROR is signalled.
