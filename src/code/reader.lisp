@@ -736,7 +736,8 @@
 	(colons 0)
 	(possibly-rational t)
 	(possibly-float t)
-	(escapes ()))
+	(escapes ())
+	(seen-multiple-escapes nil))
     (reset-read-buffer)
     (prog ((char firstchar))
       (case (char-class3 char attribute-table)
@@ -956,6 +957,7 @@
 	(#.+char-attr-package-delimiter+ (go COLON))
 	(t (go SYMBOL)))
       MULT-ESCAPE
+      (setq seen-multiple-escapes t)
       (do ((char (read-char stream t) (read-char stream t)))
 	  ((multiple-escape-p char))
 	(if (escapep char) (setq char (read-char stream t)))
@@ -983,7 +985,9 @@
 		;; a FIND-PACKAGE* function analogous to INTERN*
 		;; and friends?
 		(read-buffer-to-string)
-		*keyword-package*))
+		(if seen-multiple-escapes
+		    (read-buffer-to-string)
+		    *keyword-package*)))
       (reset-read-buffer)
       (setq escapes ())
       (setq char (read-char stream nil nil))

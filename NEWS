@@ -1835,6 +1835,8 @@ changes in sbcl-0.8.1 relative to sbcl-0.8.0:
     the arguments in the correct order.  (thanks to Wolfhard Buss)
   * fixed bug 235b: compiler uses return types of MAPCAR and friends
     in type inference.  (thanks to Robert E. Brown)
+  * bug fix: reading in symbols with an explicit package name of ""
+    (e.g. '||::FOO) now works corectly.  (reported by Henrik Motakef)
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** NIL is now allowed as a structure slot name.
     ** arbitrary numbers, not just reals, are allowed in certain

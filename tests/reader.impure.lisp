@@ -66,5 +66,10 @@
 	     (read-from-string "#S(READABLE-STRUCT :A T)"))
 	    t))
 
+;;; reported by Henrik Motakef
+(defpackage "")
+(assert (eq (symbol-package (read-from-string "||::FOO"))
+	    (find-package "")))
+
 ;;; success
 (quit :unix-status 104)
