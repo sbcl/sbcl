@@ -107,7 +107,7 @@
 	 :format-control "~@<~?: ~2I~_~A~:>"
 	 :format-arguments (list note-format (list stream) (strerror errno))))
 (defun simple-file-perror (note-format pathname errno)
-  (error 'simple-stream-error
+  (error 'simple-file-error
 	 :pathname pathname
 	 :format-control "~@<~?: ~2I~_~A~:>"
 	 :format-arguments

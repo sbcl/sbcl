@@ -523,6 +523,11 @@ Douglas Crosher:
   of the type system's handling of the CONS type to allow ANSI-style
   (CONS FOO BAR) types.
 
+Alexey Dejneka:
+  He has fixed many bugs in SBCL. I can't find a nice summary theme,
+  though, except that appears that at least some of them come from
+  going over the BUGS file to find outstanding problems to fix.
+
 Robert MacLachlan:
   He has continued to answer questions about, and contribute fixes to, 
   the CMU CL project. Some of these fixes, especially for compiler

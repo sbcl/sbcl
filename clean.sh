@@ -57,6 +57,8 @@ done
 #     certainly not source
 #   *~, #*#, TAGS
 #     common names for editor temporary files
+#   .#*
+#     rubbish left behind by CVS updates
 #   *.htm, *.html
 #     The system doc sources are SGML, any HTML is
 #     automatically-generated output.
@@ -68,6 +70,7 @@ find . \( \
 	-type l -or \
 	-name '*~' -or \
 	-name '#*#' -or \
+	-name '.#*' -or \
 	-name '?*.x86f' -or \
 	-name '?*.axpf' -or \
 	-name '?*.lbytef' -or \

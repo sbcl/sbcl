@@ -14,7 +14,7 @@
 ;;; FIXME: It's clever using :SUFFIX -TYPE for these things, but it's
 ;;; a pain for people just learning to find their way around the code
 ;;; who want to use lexical search to figure out where things like
-;;; EVEN-FIXNUM type are defined. Remove the :SUFFIXes and just expand
+;;; EVEN-FIXNUM-TYPE are defined. Remove the :SUFFIXes and just expand
 ;;; out the full names. Or even define them in DEF-FROB EVEN-FIXNUM-TYPE
 ;;; style so searches like 'def.*even-fixnum-type' can find them.
 
@@ -26,11 +26,16 @@
   ;; defined in the first DEFENUM. -- AL 20000216
   (defenum (:suffix -type)
     even-fixnum
-    function-pointer
+    ;; Note: CMU CL, and SBCL < 0.pre7.39, had FUNCTION-POINTER-TYPE
+    ;; here. We swapped FUNCTION-POINTER-TYPE and
+    ;; INSTANCE-POINTER-TYPE in sbcl-0.pre7.39 in order to help with a
+    ;; low-level pun in the function call sequence on the PPC port.
+    ;; For more information, see the PPC port code. -- WHN 2001-10-03
+    instance-pointer
     other-immediate-0
     list-pointer
     odd-fixnum
-    instance-pointer
+    function-pointer
     other-immediate-1
     other-pointer))
 

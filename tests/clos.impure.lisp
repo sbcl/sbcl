@@ -33,8 +33,8 @@
 (assert (= (wiggle (make-struct-a :x 6 :y 5))
            (jiggle (make-struct-b :x 19 :y 6 :z 2))))
 
-;;; Compiling DEFGENERIC should prevent "undefined function" style warnings
-;;; from code within the same file.
+;;; Compiling DEFGENERIC should prevent "undefined function" style
+;;; warnings from code within the same file.
 (defgeneric gf-defined-in-this-file ((x number) (y number)))
 (defun function-using-gf-defined-in-this-file (x y n)
   (unless (minusp n)
@@ -47,24 +47,26 @@
 (defmethod no-applicable-method ((zut-n-a-m (eql #'zut-n-a-m)) &rest args)
   (format t "~&No applicable method for ZUT-N-A-M ~S, yet.~%" args))
 (zut-n-a-m 1 2 3)
-
 
-;; structure-class tests setup
+;;; bug reported and fixed by Alexey Dejneka sbcl-devel 2001-09-10:
+;;; This DEFGENERIC shouldn't cause an error.
+(defgeneric ad-gf (a) (:method :around (x) x))
+
+;;; structure-class tests setup
 (defclass structure-class-foo1 () () (:metaclass cl:structure-class))
 (defclass structure-class-foo2 (structure-class-foo1)
   () (:metaclass cl:structure-class))
 
-;; standard-class tests setup
+;;; standard-class tests setup
 (defclass standard-class-foo1 () () (:metaclass cl:standard-class))
 (defclass standard-class-foo2 (standard-class-foo1)
   () (:metaclass cl:standard-class))
-
 
 (assert (typep (class-of (make-instance 'structure-class-foo1))
                'structure-class))
 (assert (typep (make-instance 'structure-class-foo1) 'structure-class-foo1))
 (assert (typep (make-instance 'standard-class-foo1) 'standard-class-foo1))
-
+
 ;;;; success
 
 (sb-ext:quit :unix-status 104)

@@ -244,7 +244,7 @@
 			;; The bound exists, so keep it open still.
 			(list new-val))))
 		   (t
-		    (error "Unknown bound type in make-interval!")))))
+		    (error "unknown bound type in MAKE-INTERVAL")))))
     (%make-interval :low (normalize-bound low)
 		    :high (normalize-bound high))))
 
@@ -630,7 +630,7 @@
 	      :low (bound-mul (interval-low x) (interval-low y))
 	      :high (bound-mul (interval-high x) (interval-high y))))
 	    (t
-	     (error "This shouldn't happen!"))))))
+	     (error "internal error in INTERVAL-MUL"))))))
 
 ;;; Divide two intervals.
 (defun interval-div (top bot)
@@ -680,7 +680,7 @@
 	      :low (bound-div (interval-low top) (interval-high bot) t)
 	      :high (bound-div (interval-high top) (interval-low bot) nil)))
 	    (t
-	     (error "This shouldn't happen!"))))))
+	     (error "internal error in INTERVAL-DIV"))))))
 
 ;;; Apply the function F to the interval X. If X = [a, b], then the
 ;;; result is [f(a), f(b)]. It is up to the user to make sure the
@@ -2662,10 +2662,11 @@
 	   (logand x ,mask)))))
 
 ;;;; arithmetic and logical identity operation elimination
-;;;;
-;;;; Flush calls to various arith functions that convert to the
-;;;; identity function or a constant.
 
+;;; Flush calls to various arith functions that convert to the
+;;; identity function or a constant.
+;;;
+;;; FIXME: Rewrite as DEF-FROB.
 (dolist (stuff '((ash 0 x)
 		 (logand -1 x)
 		 (logand 0 0)
@@ -2687,7 +2688,7 @@
   '(%negate y))
 (deftransform * ((x y) (rational (constant-argument (member 0))) *
 		 :when :both)
-  "convert (* x 0) to 0."
+  "convert (* x 0) to 0"
   0)
 
 ;;; Return T if in an arithmetic op including continuations X and Y,
@@ -2862,8 +2863,8 @@
 (dolist (x '(eq char= equal))
   (%deftransform x '(function * *) #'simple-equality-transform))
 
-;;; Similar to SIMPLE-EQUALITY-PREDICATE, except that we also try to
-;;; convert to a type-specific predicate or EQ:
+;;; This is similar to SIMPLE-EQUALITY-PREDICATE, except that we also
+;;; try to convert to a type-specific predicate or EQ:
 ;;; -- If both args are characters, convert to CHAR=. This is better than
 ;;;    just converting to EQ, since CHAR= may have special compilation
 ;;;    strategies for non-standard representations, etc.
@@ -3301,9 +3302,6 @@
 
 (defoptimizer (array-element-type derive-type) ((array))
   (let* ((array-type (continuation-type array)))
-    #!+sb-show
-    (format t "~& defoptimizer array-elt-derive-type - array-element-type ~~
-~A~%" array-type)
     (labels ((consify (list)
               (if (endp list)
                   '(eql nil)
@@ -3316,7 +3314,7 @@
                       ((consp element-type)
                        (specifier-type (consify element-type)))
                       (t
-                       (error "Can't grok type ~A~%" element-type))))))
+                       (error "can't understand type ~S~%" element-type))))))
       (cond ((array-type-p array-type)
             (get-element-type array-type))
            ((union-type-p array-type)             

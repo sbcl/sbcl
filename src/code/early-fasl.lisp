@@ -38,7 +38,7 @@
 
 ;;; This value should be incremented when the system changes in such
 ;;; a way that it will no longer work reliably with old fasl files.
-(defconstant +fasl-file-version+ 17)
+(defconstant +fasl-file-version+ 18)
 ;;; 2 = sbcl-0.6.4 uses COMPILE-OR-LOAD-DEFGENERIC.
 ;;; 3 = sbcl-0.6.6 uses private symbol, not :EMPTY, for empty HASH-TABLE slot.
 ;;; 4 = sbcl-0.6.7 uses HAIRY-DATA-VECTOR-REF and HAIRY-DATA-VECTOR-SET
@@ -72,6 +72,9 @@
 ;;;      interpreter, changed %DEFUN and DEFSTRUCT, changed the
 ;;;      meaning of FOP-FSET, and changed the layouts of various
 ;;;      internal compiler structures (e.g. DEFSTRUCT CLAMBDA)
+;;; 18 = sbcl-0.pre7.39 swapped FUNCTION-POINTER-TYPE and
+;;;      INSTANCE-POINTER-TYPE low-level type codes to help with
+;;;      the PPC port
 
 ;;; the conventional file extension for our fasl files
 (declaim (type simple-string *fasl-file-type*))

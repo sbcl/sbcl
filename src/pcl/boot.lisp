@@ -157,9 +157,6 @@ bootstrapping.
       standard-compute-effective-method))))
 
 (defmacro defgeneric (function-name lambda-list &body options)
-  (expand-defgeneric function-name lambda-list options))
-
-(defun expand-defgeneric (function-name lambda-list options)
   (let ((initargs ())
 	(methods ()))
     (flet ((duplicate-option (name)
@@ -171,11 +168,6 @@ bootstrapping.
 		    (arglist (elt qab arglist-pos))
 		    (qualifiers (subseq qab 0 arglist-pos))
 		    (body (nthcdr (1+ arglist-pos) qab)))
-	       (when (not (equal (cadr (getf initargs :method-combination))
-				 qualifiers))
-		 (error "bad method specification in DEFGENERIC ~A~%~
-			 -- qualifier mismatch for lambda list ~A"
-			function-name arglist))
 	       `(defmethod ,function-name ,@qualifiers ,arglist ,@body))))
       (macrolet ((initarg (key) `(getf initargs ,key)))
 	(dolist (option options)

@@ -929,26 +929,33 @@
    TRUENAMEing and the semantics of the Unix filesystem (symbolic links..)
    means this function can sometimes return files which don't have the same
    directory as PATHNAME."
-  (let ((truenames nil)
-	(merged-pathname (merge-pathnames pathname
+  (let (;; We create one entry in this hash table for each truename,
+	;; as an asymptotically fast way of removing duplicates (which
+	;; can arise when e.g. multiple symlinks map to the same
+	;; truename).
+	(truenames (make-hash-table :test #'equal))
+        (merged-pathname (merge-pathnames pathname
 					  (make-pathname :name :wild
 							 :type :wild
 							 :version :wild))))
     (!enumerate-matches (match merged-pathname)
-      (let ((*ignore-wildcards* t))
-	(push (truename (if (eq (sb!unix:unix-file-kind match) :directory)
-			    (concatenate 'string match "/")
-			    match))
-	      truenames)))
-    ;; FIXME: The DELETE-DUPLICATES here requires quadratic time,
-    ;; which is unnecessarily slow. That might not be an issue,
-    ;; though, since the time constant for doing TRUENAME on every
-    ;; directory entry is likely to be (much) larger, and the cost of
-    ;; all those TRUENAMEs on a huge directory might even be quadratic
-    ;; in the directory size. Someone who cares about enormous
-    ;; directories might want to check this. -- WHN 2001-06-19
-    (sort (delete-duplicates truenames :test #'string= :key #'pathname-name)
-	  #'string< :key #'pathname-name)))
+      (let ((*ignore-wildcards* t)
+            (truename (truename (if (eq (sb!unix:unix-file-kind match)
+					:directory)
+                                    (concatenate 'string match "/")
+                                    match))))
+        (setf (gethash (namestring truename) truenames)
+	      truename)))
+    (mapcar #'cdr
+	    ;; Sorting isn't required by the ANSI spec, but sorting
+	    ;; into some canonical order seems good just on the
+	    ;; grounds that the implementation should have repeatable
+	    ;; behavior when possible.
+            (sort (loop for name being each hash-key in truenames
+			using (hash-value truename)
+                        collect (cons name truename))
+                  #'string<
+		  :key #'car))))
 
 ;;;; translating Unix uid's
 ;;;;
