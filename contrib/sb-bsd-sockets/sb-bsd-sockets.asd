@@ -70,6 +70,8 @@
 (defsystem sb-bsd-sockets
     :version "0.58"
     :depends-on (sb-grovel)
+    #+sb-building-contrib :pathname
+    #+sb-building-contrib "SYS:CONTRIB;SB-BSD-SOCKETS;"
     :components ((:file "defpackage")
 		 (:file "split" :depends-on ("defpackage"))
                  (:file "array-data" :depends-on ("defpackage"))
@@ -80,7 +82,7 @@
 		 (:file "foreign-glue" :depends-on ("defpackage" "malloc"))
 		 (sb-grovel:grovel-constants-file
 		  "constants"
-		  :package :sockint  :pathname "constants.lisp"
+		  :package :sockint
 		  :depends-on  ("def-to-lisp" "defpackage" "foreign-glue"))
 		 (:file "sockets"
 			:depends-on ("constants" "array-data"))

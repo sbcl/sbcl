@@ -62,6 +62,21 @@
 
 ;;;; compiling and loading more of the system
 
+(let* ((sys *default-pathname-defaults*)
+       (src
+	(merge-pathnames
+	 (make-pathname :directory '(:relative "src" :wild-inferiors)
+			:name :wild :type :wild)
+	 sys))
+       (contrib
+	(merge-pathnames
+	 (make-pathname :directory '(:relative "contrib" :wild-inferiors)
+			:name :wild :type :wild)
+	 sys)))
+  (setf (logical-pathname-translations "SYS")
+	`(("SYS:SRC;**;*.*.*" ,src)
+	  ("SYS:CONTRIB;**;*.*.*" ,contrib))))
+
 ;;; FIXME: CMU CL's pclcom.lisp had extra optional stuff wrapped around
 ;;; COMPILE-PCL, at least some of which we should probably have too:
 ;;;
@@ -99,69 +114,69 @@
 		;; order dependencies from the old PCL defsys.lisp
 		;; dependency database.
 		#+nil "src/pcl/walk" ; #+NIL = moved to build-order.lisp-expr
-		"src/pcl/early-low"
-		"src/pcl/macros"
-                "src/pcl/compiler-support"
-		"src/pcl/low"
-                "src/pcl/slot-name"
-		"src/pcl/defclass"
-		"src/pcl/defs"
-		"src/pcl/fngen"
-		"src/pcl/cache"
-		"src/pcl/dlisp"
-		"src/pcl/dlisp2"
-		"src/pcl/boot"
-		"src/pcl/vector"
-		"src/pcl/slots-boot"
-		"src/pcl/combin"
-		"src/pcl/dfun"
-		"src/pcl/ctor"
-		"src/pcl/braid"
-		"src/pcl/dlisp3"
-		"src/pcl/generic-functions"
-		"src/pcl/slots"
-		"src/pcl/init"
-		"src/pcl/std-class"
-		"src/pcl/cpl"
-		"src/pcl/fsc"
-		"src/pcl/methods"
-		"src/pcl/fixup"
-		"src/pcl/defcombin"
-		"src/pcl/ctypes"
-		"src/pcl/env"
-		"src/pcl/documentation"
-		"src/pcl/print-object"
-		"src/pcl/precom1"
-		"src/pcl/precom2"
+		"SRC;PCL;EARLY-LOW"
+		"SRC;PCL;MACROS"
+                "SRC;PCL;COMPILER-SUPPORT"
+		"SRC;PCL;LOW"
+                "SRC;PCL;SLOT-NAME"
+		"SRC;PCL;DEFCLASS"
+		"SRC;PCL;DEFS"
+		"SRC;PCL;FNGEN"
+		"SRC;PCL;CACHE"
+		"SRC;PCL;DLISP"
+		"SRC;PCL;DLISP2"
+		"SRC;PCL;BOOT"
+		"SRC;PCL;VECTOR"
+		"SRC;PCL;SLOTS-BOOT"
+		"SRC;PCL;COMBIN"
+		"SRC;PCL;DFUN"
+		"SRC;PCL;CTOR"
+		"SRC;PCL;BRAID"
+		"SRC;PCL;DLISP3"
+		"SRC;PCL;GENERIC-FUNCTIONS"
+		"SRC;PCL;SLOTS"
+		"SRC;PCL;INIT"
+		"SRC;PCL;STD-CLASS"
+		"SRC;PCL;CPL"
+		"SRC;PCL;FSC"
+		"SRC;PCL;METHODS"
+		"SRC;PCL;FIXUP"
+		"SRC;PCL;DEFCOMBIN"
+		"SRC;PCL;CTYPES"
+		"SRC;PCL;ENV"
+		"SRC;PCL;DOCUMENTATION"
+		"SRC;PCL;PRINT-OBJECT"
+		"SRC;PCL;PRECOM1"
+		"SRC;PCL;PRECOM2"
 
 		;; miscellaneous functionality which depends on CLOS
-		"src/code/force-delayed-defbangmethods"
-                "src/code/late-condition"
+		"SRC;CODE;FORCE-DELAYED-DEFBANGMETHODS"
+                "SRC;CODE;LATE-CONDITION"
 
 		;; CLOS-level support for the Gray OO streams
 		;; extension (which is also supported by various
 		;; lower-level hooks elsewhere in the code)
-		"src/pcl/gray-streams-class"
-		"src/pcl/gray-streams"
+		"SRC;PCL;GRAY-STREAMS-CLASS"
+		"SRC;PCL;GRAY-STREAMS"
 
 		;; other functionality not needed for cold init, moved
 		;; to warm init to reduce peak memory requirement in
 		;; cold init
-		"src/code/describe"
-                "src/code/describe-policy"
-		"src/code/inspect"
-		"src/code/profile"
-		"src/code/ntrace"
-		"src/code/foreign"
-		"src/code/run-program"
+		"SRC;CODE;DESCRIBE"
+                "SRC;CODE;DESCRIBE-POLICY"
+		"SRC;CODE;INSPECT"
+		"SRC;CODE;PROFILE"
+		"SRC;CODE;NTRACE"
+		"SRC;CODE;FOREIGN"
+		"SRC;CODE;RUN-PROGRAM"
 
 		;; Code derived from PCL's pre-ANSI DESCRIBE-OBJECT
 		;; facility is still used in our ANSI DESCRIBE
 		;; facility, and should be compiled and loaded after
 		;; our DESCRIBE facility is compiled and loaded.
-		"src/pcl/describe"))
+		"SRC;PCL;DESCRIBE"))
 
-  (let ((fullname (concatenate 'string stem ".lisp")))
+  (let ((fullname (concatenate 'string "SYS:" stem ".LISP")))
     (sb-int:/show "about to compile" fullname)
     (flet ((report-recompile-restart (stream)
              (format stream "Recompile file ~S" fullname))

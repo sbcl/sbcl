@@ -23,6 +23,8 @@
 (defsystem asdf-install
   :depends-on (sb-posix sb-bsd-sockets)
   :version "0.2"
+  #+sb-building-contrib :pathname
+  #+sb-building-contrib "SYS:CONTRIB;ASDF-INSTALL;"
   :components ((:file "defpackage")
 	       (:exe-file "loader" :depends-on ("installer"))
 	       (:file "installer" :depends-on ("defpackage"))))

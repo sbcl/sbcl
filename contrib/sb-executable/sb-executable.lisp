@@ -40,13 +40,16 @@ exec sbcl --noinform ~{~A ~}--eval \"(with-open-file (i \\\"$0\\\" :element-type
 					   (make-pathname :type "fasl"))
 			  :element-type '(unsigned-byte 8))
 	(copy-stream in out))))
-  (let* ((out-name (namestring output-file))
+  (let* (;; FIXME: use OUT as the pathname designator
+	 (out-name (namestring (translate-logical-pathname output-file)))
 	 (prot (elt (multiple-value-list (sb-unix:unix-stat out-name)) 3)))
-    (sb-unix::void-syscall ("chmod" c-string int)
-			   out-name
-			   (logior prot
-				   (if (logand prot #o400) #o100)
-				   (if (logand prot  #o40)  #o10)
-				   (if (logand prot   #o4)   #o1)))))
+    (if prot
+	(sb-unix::void-syscall ("chmod" c-string int)
+			       out-name
+			       (logior prot
+				       (if (logand prot #o400) #o100)
+				       (if (logand prot  #o40)  #o10)
+				       (if (logand prot   #o4)   #o1)))
+	(error "stat() call failed"))))
 			 
 (provide 'sb-executable)

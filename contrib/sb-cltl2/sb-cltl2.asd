@@ -1,8 +1,12 @@
+;;; -*-  Lisp -*-
+
 (defpackage #:sb-cltl2-system (:use #:asdf #:cl))
 (in-package #:sb-cltl2-system)
 
 (defsystem sb-cltl2
-    :description "Some functionality, mentioned in CLtL2, but not present in ANSI."
+    :description "Functionality mentioned in CLtL2 but not present in ANSI."
+    #+sb-building-contrib :pathname
+    #+sb-building-contrib "SYS:CONTRIB;SB-CLTL2;"
     :components ((:file "defpackage")
 		 (:file "compiler-let" :depends-on ("defpackage"))
                  (:file "macroexpand" :depends-on ("defpackage"))

@@ -6,6 +6,8 @@
 
 (defsystem sb-rotate-byte
   :version "0.1"
+  #+sb-building-contrib :pathname
+  #+sb-building-contrib "SYS:CONTRIB;SB-ROTATE-BYTE;"
   :components 
   ((:file "package")
    (:file "compiler" :depends-on ("package"))
@@ -16,7 +18,9 @@
 		    :in-order-to ((compile-op (feature :x86))))
 	     (:file "ppc-vm"
 		    :in-order-to ((compile-op (feature :ppc)))))
-	    :pathname #.(make-pathname :directory '(:relative))
+	    :pathname
+	    #+sb-building-contrib "SYS:CONTRIB;SB-ROTATE-BYTE;"
+	    #-sb-building-contrib #.(make-pathname :directory '(:relative))
 	    :if-component-dep-fails :ignore)
    (:file "rotate-byte" :depends-on ("compiler"))))
 

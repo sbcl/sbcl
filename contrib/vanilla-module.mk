@@ -1,6 +1,6 @@
 
 $(MODULE).fasl: $(MODULE).lisp ../../output/sbcl.core
-	$(SBCL) --eval '(compile-file "$(MODULE)")' </dev/null
+	$(SBCL) --eval '(compile-file (format nil "SYS:CONTRIB;~:@(~A~);~:@(~A~).LISP" "$(MODULE)" "$(MODULE)"))' </dev/null
 
 test:: $(MODULE).fasl
 

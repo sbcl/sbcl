@@ -5,6 +5,8 @@
 
 (defsystem sb-grovel
     :version "0.01"
+    #+sb-building-contrib :pathname
+    #+sb-building-contrib "SYS:CONTRIB;SB-GROVEL;"
     :components ((:file "defpackage")
 		 (:file "def-to-lisp" :depends-on ("defpackage"))
 		 (:file "foreign-glue" :depends-on ("defpackage"))

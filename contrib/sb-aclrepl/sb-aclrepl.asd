@@ -6,6 +6,8 @@
 (defsystem sb-aclrepl
     :author "Kevin Rosenberg <kevin@rosenberg.net>"
     :description "An AllegroCL compatible REPL"
+    #+sb-building-contrib :pathname
+    #+sb-building-contrib "SYS:CONTRIB;SB-ACLREPL;"
     :components ((:file "toplevel")
 		 (:file "repl" :depends-on ("toplevel"))
 		 (:file "inspect" :depends-on ("repl"))

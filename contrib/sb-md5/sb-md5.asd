@@ -8,6 +8,8 @@
 (defsystem sb-md5
   :depends-on (sb-rotate-byte)
   :version "1.8"
+  #+sb-building-contrib :pathname
+  #+sb-building-contrib "SYS:CONTRIB;SB-MD5;"
   :components ((:file "md5")))
 
 (defmethod perform :after ((o load-op) (c (eql (find-system :sb-md5))))

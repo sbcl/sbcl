@@ -6,6 +6,8 @@
 
 (defsystem sb-simple-streams
   :depends-on (sb-bsd-sockets sb-posix)
+  #+sb-building-contrib :pathname
+  #+sb-building-contrib "SYS:CONTRIB;SB-SIMPLE-STREAMS;"
   :components ((:file "package")
                (:file "fndb")
                (:file "iodefs" :depends-on ("package"))

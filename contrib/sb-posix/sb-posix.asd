@@ -73,6 +73,8 @@
 
 (defsystem sb-posix
     :depends-on (sb-grovel)
+    #+sb-building-contrib :pathname
+    #+sb-building-contrib "SYS:CONTRIB;SB-POSIX;"
     :components ((:file "defpackage")
 		 (:file "designator" :depends-on ("defpackage"))
                  (:unix-dso "alien"

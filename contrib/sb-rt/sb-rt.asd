@@ -6,6 +6,8 @@
 
 (defsystem sb-rt
   :version "0.1.7" ; our version "0", GCL CVS version "1.7"
+  #+sb-building-contrib :pathname
+  #+sb-building-contrib "SYS:CONTRIB;SB-RT;"
   :components ((:file "rt")))
 
 (defmethod perform :after ((o load-op) (c (eql (find-system :sb-rt))))

@@ -261,6 +261,14 @@
        (let* ((untruename (file-info-untruename file-info))
 	      (dir (pathname-directory untruename)))
 	 (setf (debug-source-name res)
+	       #+sb-xc-host
+	       (let ((src (position "src" dir :test #'string= :from-end t)))
+		 (if src
+		     (format nil "SYS:~{~:@(~A~);~}~:@(~A~).LISP"
+			     (subseq dir src) (pathname-name untruename))
+		     ;; FIXME: just output/stuff-groveled-from-headers.lisp
+		     (namestring untruename)))
+	       #-sb-xc-host
 	       (namestring
 		(if (and dir (eq (first dir) :absolute))
 		    untruename
