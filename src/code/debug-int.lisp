@@ -454,9 +454,9 @@
   ;; the DEBUG-FUN containing this CODE-LOCATION
   (debug-fun nil :type debug-fun)
   ;; This is initially :UNSURE. Upon first trying to access an
-  ;; :unparsed slot, if the data is unavailable, then this becomes t,
+  ;; :UNPARSED slot, if the data is unavailable, then this becomes T,
   ;; and the code-location is unknown. If the data is available, this
-  ;; becomes nil, a known location. We can't use a separate type
+  ;; becomes NIL, a known location. We can't use a separate type
   ;; code-location for this since we must return code-locations before
   ;; we can tell whether they're known or unknown. For example, when
   ;; parsing the stack, we don't want to unpack all the variables and
@@ -1163,6 +1163,7 @@
 ;;; Return the name of the function represented by DEBUG-FUN. This may
 ;;; be a string or a cons; do not assume it is a symbol.
 (defun debug-fun-name (debug-fun)
+  (declare (type debug-fun debug-fun))
   (etypecase debug-fun
     (compiled-debug-fun
      (sb!c::compiled-debug-fun-name
@@ -1839,8 +1840,7 @@
        ;; interpreter.)
        ))
     ;; (There used to be more cases back before sbcl-0.7.0,,
-    ;; when we did special tricks to debug the IR1
-    ;; interpreter.)
+    ;; when we did special tricks to debug IR1-interpreted code.)
     ))
 (defun sub-compiled-code-location= (obj1 obj2)
   (= (compiled-code-location-pc obj1)

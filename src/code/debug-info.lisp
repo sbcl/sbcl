@@ -87,8 +87,18 @@
 
 (def!struct (compiled-debug-fun (:include debug-fun)
 				#-sb-xc-host (:pure t))
-  ;; The name of this function. If from a DEFUN, etc., then this is the
-  ;; function name, otherwise it is a descriptive string.
+  ;; KLUDGE: Courtesy of more than a decade of, ah, organic growth in
+  ;; CMU CL, there are two distinct -- but coupled -- mechanisms to
+  ;; finding the name of a function. The slot here is one mechanism
+  ;; (used in CMU CL to look up names in the debugger, e.g. in
+  ;; BACKTRACE). The other mechanism is the the NAME slot in function
+  ;; primitive objects (used in CMU CL to look up names elsewhere,
+  ;; e.g. in CL:FUNCTION-LAMBDA-EXPRESSION and in CL:DESCRIBE).
+  ;;
+  ;; They're coupled by the way that DEBUG-FUN objects are looked up.
+  ;; A list of DEBUG-FUN objects is maintained for each COMPONENT. To
+  ;; figure out which DEBUG-FUN object corresponds to your FUNCTION
+  ;; object, you compare the name values of each. -- WHN 2001-12-20
   (name (missing-arg) :type (or simple-string cons symbol))
   ;; The kind of function (same as FUNCTIONAL-KIND):
   (kind nil :type (member nil :optional :external :toplevel :cleanup))
@@ -114,11 +124,12 @@
   ;; blocks were emitted. The first block is the start of the
   ;; function. This slot may be NIL to save space.
   ;;
-  ;; FIXME: The "packed binary representation" description in the comment
-  ;; above is the same as the description of the old representation of
-  ;; VARIABLES which doesn't work properly in SBCL (because it doesn't
-  ;; transform correctly under package renaming). Check whether this slot's
-  ;; data might have the same problem that that slot's data did.
+  ;; FIXME: The "packed binary representation" description in the
+  ;; comment above is the same as the description of the old
+  ;; representation of VARIABLES which doesn't work properly in SBCL
+  ;; (because it doesn't transform correctly under package renaming).
+  ;; Check whether this slot's data might have the same problem that
+  ;; that slot's data did.
   (blocks nil :type (or (simple-array (unsigned-byte 8) (*)) null))
   ;; If all code locations in this function are in the same top level
   ;; form, then this is the number of that form, otherwise NIL. If
@@ -153,31 +164,31 @@
   ;;    The following location is the value of the &KEY argument with the
   ;;    specified name.
   ;;
-  ;; This may be NIL to save space. If no symbols are present, then this will
-  ;; be represented with an I-vector with sufficiently large element type. If
-  ;; this is :MINIMAL, then this means that the VARIABLES are all required
-  ;; arguments, and are in the order they appear in the VARIABLES vector. In
-  ;; other words, :MINIMAL stands in for a vector where every element holds its
-  ;; index.
+  ;; This may be NIL to save space. If no symbols are present, then
+  ;; this will be represented with an I-vector with sufficiently large
+  ;; element type. If this is :MINIMAL, then this means that the
+  ;; VARIABLES are all required arguments, and are in the order they
+  ;; appear in the VARIABLES vector. In other words, :MINIMAL stands
+  ;; in for a vector where every element holds its index.
   (arguments nil :type (or (simple-array * (*)) (member :minimal nil)))
   ;; There are three alternatives for this slot:
   ;;
-  ;; A vector
+  ;; a VECTOR
   ;;    A vector of SC-OFFSETS describing the return locations. The
   ;;    vector element type is chosen to hold the largest element.
   ;;
-  ;; :Standard
+  ;; :STANDARD
   ;;    The function returns using the standard unknown-values convention.
   ;;
-  ;; :Fixed
+  ;; :FIXED
   ;;    The function returns using the fixed-values convention, but
   ;;    in order to save space, we elected not to store a vector.
   (returns :fixed :type (or (simple-array * (*)) (member :standard :fixed)))
   ;; SC-Offsets describing where the return PC and return FP are kept.
   (return-pc (missing-arg) :type sc-offset)
   (old-fp (missing-arg) :type sc-offset)
-  ;; SC-Offset for the number stack FP in this function, or NIL if no NFP
-  ;; allocated.
+  ;; SC-Offset for the number stack FP in this function, or NIL if no
+  ;; NFP allocated.
   (nfp nil :type (or sc-offset null))
   ;; The earliest PC in this function at which the environment is properly
   ;; initialized (arguments moved from passing locations, etc.)
@@ -281,7 +292,7 @@
 (def!struct (compiled-debug-info
 	     (:include debug-info)
 	     #-sb-xc-host (:pure t))
-  ;; a simple-vector of alternating DEBUG-FUN objects and fixnum
+  ;; a SIMPLE-VECTOR of alternating DEBUG-FUN objects and fixnum
   ;; PCs, used to map PCs to functions, so that we can figure out what
   ;; function we were running in. Each function is valid between the
   ;; PC before it (inclusive) and the PC after it (exclusive). The PCs
