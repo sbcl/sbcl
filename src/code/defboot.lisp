@@ -91,12 +91,12 @@
 ;;; other things defined in terms of COND
 (defmacro-mundanely when (test &body forms)
   #!+sb-doc
-  "First arg is a predicate. If it is non-null, the rest of the forms are
+  "If the first argument is true, the rest of the forms are
   evaluated as a PROGN."
   `(cond (,test nil ,@forms)))
 (defmacro-mundanely unless (test &body forms)
   #!+sb-doc
-  "First arg is a predicate. If it is null, the rest of the forms are
+  "If the first argument is not true, the rest of the forms are
   evaluated as a PROGN."
   `(cond ((not ,test) nil ,@forms)))
 (defmacro-mundanely and (&rest forms)

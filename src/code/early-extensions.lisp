@@ -165,7 +165,7 @@
       (let ((n 0))
         (dolist (arg args)
           (unless (= (length arg) 2)
-            (error "bad arg spec: ~S" arg))
+            (error "bad argument spec: ~S" arg))
           (let ((arg-name (first arg))
                 (test (second arg)))
             (arg-vars arg-name)

@@ -486,7 +486,7 @@ Function and macro commands:
 					     s)))))
   string)
 
-;;; Print frame with verbosity level 1. If we hit a &REST arg, then
+;;; Print FRAME with verbosity level 1. If we hit a &REST arg, then
 ;;; print as many of the values as possible, punting the loop over
 ;;; lambda-list variables since any other arguments will be in the
 ;;; &REST arg's list of values.
@@ -510,25 +510,15 @@ Function and macro commands:
 					       (second ele) frame))
 				     results))
 		       (return))
-		     (push (make-unprintable-object "unavailable &REST arg")
+		     (push (make-unprintable-object
+			    "unavailable &REST argument")
 			   results)))))
       (sb!di:lambda-list-unavailable
        ()
        (push (make-unprintable-object "lambda list unavailable") results)))
-    ;; FIXME: For some reason this sometimes prints as
-    ;;    (FOO-BAR-LONG-THING
-    ;;     X
-    ;;     Y
-    ;;     Z)
-    ;; (OK) and sometimes prints as
-    ;;    (FOO-BAR-LONG-THING X
-    ;;                        Y
-    ;;                        Z)
-    ;; even when this second style causes confusingly long weird lines
-    ;; (bad). Handle printing explicitly inside our own
-    ;; PPRINT-LOGICAL-BLOCK, and force the preferred style for long
-    ;; lines.
-    (prin1 (mapcar #'ensure-printable-object (nreverse results)))
+    (pprint-logical-block (*standard-output* nil)
+      (let ((x (nreverse (mapcar #'ensure-printable-object results))))
+	(format t "(~@<~S~{ ~_~S~}~:>)" (first x) (rest x))))
     (when (sb!di:debug-function-kind d-fun)
       (write-char #\[)
       (prin1 (sb!di:debug-function-kind d-fun))
@@ -545,9 +535,9 @@ Function and macro commands:
 
 (defun frame-call-arg (var location frame)
   (lambda-var-dispatch var location
-    (make-unprintable-object "unused arg")
+    (make-unprintable-object "unused argument")
     (sb!di:debug-var-value var frame)
-    (make-unprintable-object "unavailable arg")))
+    (make-unprintable-object "unavailable argument")))
 
 ;;; Prints a representation of the function call causing FRAME to
 ;;; exist. VERBOSITY indicates the level of information to output;
@@ -606,7 +596,7 @@ Function and macro commands:
   (let ((old-hook *debugger-hook*))
     (when old-hook
       (let ((*debugger-hook* nil))
-	(funcall hook condition hook))))
+	(funcall old-hook condition old-hook))))
   (sb!unix:unix-sigsetmask 0)
 
   ;; Elsewhere in the system, we use the SANE-PACKAGE function for
@@ -936,7 +926,7 @@ reset to ~S."
 	:rest ((let ((var (second ele)))
 		 (lambda-var-dispatch var (sb!di:frame-code-location
 					   *current-frame*)
-		   (error "unused &REST arg before n'th argument")
+		   (error "unused &REST argument before n'th argument")
 		   (dolist (value
 			    (sb!di:debug-var-value var *current-frame*)
 			    (error
@@ -945,7 +935,7 @@ reset to ~S."
 		     (if (zerop n)
 			 (return-from nth-arg (values value nil))
 			 (decf n)))
-		   (error "invalid &REST arg before n'th argument")))))
+		   (error "invalid &REST argument before n'th argument")))))
       (decf n))))
 
 (defun arg (n)

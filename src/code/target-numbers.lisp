@@ -338,8 +338,8 @@
 
 (defun / (number &rest more-numbers)
   #!+sb-doc
-  "Divides the first arg by each of the following arguments, in turn.
-  With one arg, returns reciprocal."
+  "Divide the first argument by each of the following arguments, in turn.
+  With one argument, return reciprocal."
   (if more-numbers
       (do ((nlist more-numbers (cdr nlist))
 	   (result number))

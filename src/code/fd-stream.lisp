@@ -11,10 +11,17 @@
 
 (in-package "SB!IMPL")
 
+;;; FIXME: Wouldn't it be clearer to just have the structure
+;;; definition be DEFSTRUCT FILE-STREAM (instead of DEFSTRUCT
+;;; FD-STREAM)? That way we'd have TYPE-OF and PRINT-OBJECT refer to
+;;; these objects as FILE-STREAMs (the ANSI name) instead of the
+;;; internal implementation name FD-STREAM, and there might be other
+;;; benefits as well.
 (deftype file-stream () 'fd-stream)
 
 ;;;; buffer manipulation routines
 
+;;; FIXME: Is it really good to maintain this pool separate from the GC?
 (defvar *available-buffers* ()
   #!+sb-doc
   "List of available buffers. Each buffer is an sap pointing to

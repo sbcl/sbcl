@@ -247,7 +247,7 @@
 		   (error 'simple-type-error
 			  :datum thing
 			  :expected-type 'condition-class
-			  :format-control "bad thing for class arg:~%  ~S"
+			  :format-control "bad thing for class argument:~%  ~S"
 			  :format-arguments (list thing)))))
 	 (res (make-condition-object args)))
     (setf (%instance-layout res) (class-layout class))

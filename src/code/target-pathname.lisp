@@ -600,7 +600,7 @@ a host-structure or string."
 			     (extract-logical-host-prefix namestr start end)
 			     (pathname-host defaults))))
 	(unless parse-host
-	  (error "When Host arg is not supplied, Defaults arg must ~
+	  (error "When HOST argument is not supplied, DEFAULTS arg must ~
 		  have a non-null PATHNAME-HOST."))
 
 	(multiple-value-bind (new-host device directory file type version)

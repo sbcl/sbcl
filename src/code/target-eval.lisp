@@ -103,7 +103,7 @@
 ;;; EVAL-WHEN.
 (defun eval (original-exp)
   #!+sb-doc
-  "Evaluates its single arg in a null lexical environment, returns the
+  "Evaluates its single argument in a null lexical environment, returns the
   result or results."
   (declare (optimize (safety 1)))
   (let ((exp (macroexpand original-exp)))
