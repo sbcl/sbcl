@@ -1449,6 +1449,7 @@ changes in sbcl-0.7.11 relative to sbcl-0.7.10:
        to WITH A = 1 WITH A = (1+ A);
     ** IT is only a special loop symbol within the first clause of a
        conditional loop clause;
+    ** FILE-STREAM now names the class previously known as FD-STREAM;
   * incremented fasl file version number, because of the incompatible
     change to the DEFSTRUCT-DESCRIPTION structure.
 

@@ -11,14 +11,6 @@
 
 (in-package "SB!IMPL")
 
-;;; FIXME: Wouldn't it be clearer to just have the structure
-;;; definition be DEFSTRUCT FILE-STREAM (instead of DEFSTRUCT
-;;; FD-STREAM)? That way we'd have TYPE-OF and PRINT-OBJECT refer to
-;;; these objects as FILE-STREAMs (the ANSI name) instead of the
-;;; internal implementation name FD-STREAM, and there might be other
-;;; benefits as well.
-(deftype file-stream () 'fd-stream)
-
 ;;;; buffer manipulation routines
 
 ;;; FIXME: Is it really good to maintain this pool separate from the
@@ -39,10 +31,18 @@
       (pop *available-buffers*)
       (allocate-system-memory bytes-per-buffer)))
 
-;;;; the FD-STREAM structure
+;;;; the FILE-STREAM structure
 
-(defstruct (fd-stream
+(defstruct (file-stream
 	    (:constructor %make-fd-stream)
+	    ;; KLUDGE: in an ideal world, maybe we'd rewrite
+	    ;; everything to use FILE-STREAM rather than simply
+	    ;; providing this hack for compatibility with the old
+	    ;; code.  However, CVS doesn't deal terribly well with
+	    ;; file renaming, so for now we use this
+	    ;; backward-compatibility feature.
+	    (:conc-name fd-stream-)
+	    (:predicate fd-stream-p)
 	    (:include ansi-stream
 		      (misc #'fd-stream-misc-routine))
 	    (:copier nil))
@@ -87,7 +87,7 @@
   (timeout nil :type (or index null))
   ;; pathname of the file this stream is opened to (returned by PATHNAME)
   (pathname nil :type (or pathname null)))
-(def!method print-object ((fd-stream fd-stream) stream)
+(def!method print-object ((fd-stream file-stream) stream)
   (declare (type stream stream))
   (print-unreadable-object (fd-stream stream :type t :identity t)
     (format stream "for ~S" (fd-stream-name fd-stream))))
@@ -169,7 +169,7 @@
 ;;; writes. If so, just queue this one. Otherwise, try to write it. If
 ;;; this would block, queue it.
 (defun frob-output (stream base start end reuse-sap)
-  (declare (type fd-stream stream)
+  (declare (type file-stream stream)
 	   (type (or system-area-pointer (simple-array * (*))) base)
 	   (type index start end))
   (if (not (null (fd-stream-output-later stream))) ; something buffered.
@@ -596,7 +596,7 @@
 ;;; there is a definite amount of reading to be done, so blocking
 ;;; isn't too problematical.
 (defun fd-stream-read-n-bytes (stream buffer start requested eof-error-p)
-  (declare (type fd-stream stream))
+  (declare (type file-stream stream))
   (declare (type index start requested))
   (do ((total-copied 0))
       (nil)
@@ -882,7 +882,7 @@
      (fd-stream-file-position fd-stream arg1))))
 
 (defun fd-stream-file-position (stream &optional newpos)
-  (declare (type fd-stream stream)
+  (declare (type file-stream stream)
 	   (type (or index (member nil :start :end)) newpos))
   (if (null newpos)
       (sb!sys:without-interrupts
@@ -1285,7 +1285,7 @@
 ;;;
 ;;; FIXME: misleading name, screwy interface
 (defun file-name (stream &optional new-name)
-  (when (typep stream 'fd-stream)
+  (when (typep stream 'file-stream)
       (cond (new-name
 	     (setf (fd-stream-pathname stream) new-name)
 	     (setf (fd-stream-file stream)
