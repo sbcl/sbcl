@@ -226,7 +226,7 @@
 	(dest (continuation-dest cont)))
     (aver (not (eq ctype *wild-type*)))
     (multiple-value-bind (ctypes count) (no-fun-values-types ctype)
-      (multiple-value-bind (atypes acount) (no-fun-values-types ctype)
+      (multiple-value-bind (atypes acount) (no-fun-values-types atype)
         (aver (eq count acount))
         (cond ((not (eq count :unknown))
                (if (or (exit-p dest)
