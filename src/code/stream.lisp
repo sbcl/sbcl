@@ -904,7 +904,7 @@
 		  (let* ((stream (car current))
 			 (result (,fun stream nil nil)))
 		    (when result (return result)))
-		  (setf (concatenated-stream-current stream) current)))))
+		  (pop (concatenated-stream-current stream))))))
   (in-fun concatenated-in read-char)
   (in-fun concatenated-bin read-byte))
 

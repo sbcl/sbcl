@@ -73,3 +73,10 @@
 	   (get-output-stream-string out-stream))
 	 ;; (Before the fix, the LET* expression just signalled an error.)
 	 "a"))
+
+;; 0.7.12 doesn't advance current stream in concatenated streams
+;; correctly when searching a stream for a char to read.
+(with-input-from-string (p "")
+  (with-input-from-string (q "foo")
+    (let* ((r (make-concatenated-stream p q)))
+      (peek-char nil r))))

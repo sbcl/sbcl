@@ -1557,6 +1557,9 @@ changes in sbcl-0.7.13 relative to sbcl-0.7.12:
     Furthermore, a compliance bug has been fixed: SLOT-MISSING is now
     always called when a slot is not present in an instance.  (thanks
     to Gerd Moellmann)
+  * fixed a bug related to CONCATENATED-STREAMs: PEEK-CHAR will no
+    longer signal an error on unreading a character following EOF on
+    the previous constituent stream.  (thanks to Tony Martinez)
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** ARRAY-IN-BOUNDS-P now allows arbitrary integers as arguments,
        not just nonnegative fixnums;
