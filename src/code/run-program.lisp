@@ -347,7 +347,9 @@
 	(declare (simple-string s))
 	(let ((n (length s)))
 	  ;; Blast the string into place.
-	  (sb-kernel:copy-to-system-area (the simple-string s)
+	  (sb-kernel:copy-to-system-area (the simple-base-string
+                                           ;; FIXME
+                                           (coerce s 'simple-base-string))
 					 (* sb-vm:vector-data-offset
 					    sb-vm:n-word-bits)
 					 string-sap 0

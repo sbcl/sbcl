@@ -293,8 +293,7 @@
       (give-up-ir1-transform
        "cannot open-code creation of ~S" result-type-spec))
     #-sb-xc-host
-    (unless (csubtypep (ctype-of (sb!vm:saetp-initial-element-default saetp))
-		       eltype-type)
+    (unless (ctypep (sb!vm:saetp-initial-element-default saetp) eltype-type)
       ;; This situation arises e.g. in (MAKE-ARRAY 4 :ELEMENT-TYPE
       ;; '(INTEGER 1 5)) ANSI's definition of MAKE-ARRAY says "If
       ;; INITIAL-ELEMENT is not supplied, the consequences of later
