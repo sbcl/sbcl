@@ -1,0 +1,170 @@
+(in-package :BSD-SOCKETS-INTERNAL)
+(defconstant size-of-int 4)
+(defconstant size-of-char 1)
+(defconstant size-of-long 4)
+(defconstant AF-INET 2 "IP Protocol family")
+(defconstant AF-UNSPEC 0 "Unspecified.")
+(defconstant AF-LOCAL 1 "Local to host (pipes and file-domain).")
+(defconstant AF-UNIX 1 "Old BSD name for af-local. ")
+(defconstant AF-FILE 1 "POSIX name for af-local. ")
+(defconstant AF-INET6 10 "IP version 6. ")
+(defconstant AF-ROUTE 16 "Alias to emulate 4.4BSD ")
+(defconstant SOCK-STREAM 1 "Sequenced, reliable, connection-based byte streams.")
+(defconstant SOCK-DGRAM 2 "Connectionless, unreliable datagrams of fixed maximum length.")
+(defconstant SOCK-RAW 3 "Raw protocol interface.")
+(defconstant SOCK-RDM 4 "Reliably-delivered messages.")
+(defconstant SOCK-SEQPACKET 5 "Sequenced, reliable, connection-based, datagrams of fixed maximum length.")
+(defconstant SOL-SOCKET 1 "NIL")
+(defconstant SO-DEBUG 1 "Enable debugging in underlying protocol modules")
+(defconstant SO-REUSEADDR 2 "Enable local address reuse")
+(defconstant SO-TYPE 3 "NIL")
+(defconstant SO-ERROR 4 "NIL")
+(defconstant SO-DONTROUTE 5 "Bypass routing facilities: instead send direct to appropriate network interface for the network portion of the destination address")
+(defconstant SO-BROADCAST 6 "Request permission to send broadcast datagrams")
+(defconstant SO-SNDBUF 7 "NIL")
+(defconstant SO-PASSCRED 16 "NIL")
+(defconstant SO-RCVBUF 8 "NIL")
+(defconstant SO-KEEPALIVE 9 "Send periodic keepalives: if peer does not respond, we get SIGPIPE")
+(defconstant SO-OOBINLINE 10 "Put out-of-band data into the normal input queue when received")
+(defconstant SO-NO-CHECK 11 "NIL")
+(defconstant SO-PRIORITY 12 "NIL")
+(defconstant SO-LINGER 13 "For reliable streams, pause a while on closing when unsent messages are queued")
+(defconstant SO-BSDCOMPAT 14 "NIL")
+(defconstant SO-SNDLOWAT 19 "NIL")
+(defconstant SO-RCVLOWAT 18 "NIL")
+(defconstant SO-SNDTIMEO 21 "NIL")
+(defconstant SO-RCVTIMEO 20 "NIL")
+(defconstant TCP-NODELAY 1 "NIL")
+(defconstant SO-BINDTODEVICE 25 "NIL")
+(defconstant IFNAMSIZ 16 "NIL")
+(defconstant EADDRINUSE 98 "NIL")
+(defconstant EAGAIN 11 "NIL")
+(defconstant EBADF 9 "NIL")
+(defconstant ECONNREFUSED 111 "NIL")
+(defconstant EINTR 4 "NIL")
+(defconstant EINVAL 22 "NIL")
+(defconstant ENOBUFS 105 "NIL")
+(defconstant ENOMEM 12 "NIL")
+(defconstant EOPNOTSUPP 95 "NIL")
+(defconstant EPERM 1 "NIL")
+(defconstant EPROTONOSUPPORT 93 "NIL")
+(defconstant ESOCKTNOSUPPORT 94 "NIL")
+(defconstant ENETUNREACH 101 "NIL")
+(defconstant NETDB-INTERNAL -1 "See errno.")
+(defconstant NETDB-SUCCESS 0 "No problem.")
+(defconstant HOST-NOT-FOUND 1 "Authoritative Answer Host not found.")
+(defconstant TRY-AGAIN 2 "Non-Authoritative Host not found, or SERVERFAIL.")
+(defconstant NO-RECOVERY 3 "Non recoverable errors, FORMERR, REFUSED, NOTIMP.")
+(defconstant NO-DATA 4 "Valid name, no data record of requested type.")
+(defconstant NO-ADDRESS 4 "No address, look for MX record.")
+(defconstant O-NONBLOCK 2048 "NIL")
+(defconstant F-GETFL 3 "NIL")
+(defconstant F-SETFL 4 "NIL")
+(defconstant MSG-NOSIGNAL 16384 "NIL")
+(defconstant MSG-OOB 1 "NIL")
+(defconstant MSG-PEEK 2 "NIL")
+(defconstant MSG-TRUNC 32 "NIL")
+(defconstant MSG-WAITALL 256 "NIL")
+(define-c-struct PROTOENT 12)
+(define-c-accessor PROTOENT-NAME PROTOENT (* T) 0 4)
+(define-c-accessor PROTOENT-ALIASES PROTOENT (* (* T)) 4 4)
+(define-c-accessor PROTOENT-PROTO PROTOENT INTEGER 8 4)
+(declaim (inline GETPROTOBYNAME))
+(def-foreign-routine ("getprotobyname" GETPROTOBYNAME ) (* T) (NAME
+                                                                         C-STRING) )
+(defconstant INADDR-ANY 0 "NIL")
+(define-c-struct IN-ADDR 4)
+(define-c-accessor IN-ADDR-ADDR IN-ADDR (ARRAY (UNSIGNED 8) 4) 0 4)
+(define-c-struct SOCKADDR-IN 16)
+(define-c-accessor SOCKADDR-IN-FAMILY SOCKADDR-IN INTEGER 0 2)
+(define-c-accessor SOCKADDR-IN-PORT SOCKADDR-IN (ARRAY (UNSIGNED 8) 2) 2 2)
+(define-c-accessor SOCKADDR-IN-ADDR SOCKADDR-IN (ARRAY (UNSIGNED 8) 4) 4 4)
+(define-c-struct SOCKADDR-UN 110)
+(define-c-accessor SOCKADDR-UN-FAMILY SOCKADDR-UN INTEGER 0 2)
+(define-c-accessor SOCKADDR-UN-PATH SOCKADDR-UN (ARRAY (UNSIGNED 8) 108) 2 108)
+(define-c-struct HOSTENT 20)
+(define-c-accessor HOSTENT-NAME HOSTENT (* T) 0 4)
+(define-c-accessor HOSTENT-ALIASES HOSTENT (* C-STRING) 4 4)
+(define-c-accessor HOSTENT-TYPE HOSTENT INTEGER 8 4)
+(define-c-accessor HOSTENT-LENGTH HOSTENT INTEGER 12 4)
+(define-c-accessor HOSTENT-ADDRESSES HOSTENT (* (* (UNSIGNED 8))) 16 4)
+(declaim (inline SOCKET))
+(def-foreign-routine ("socket" SOCKET ) INTEGER (DOMAIN INTEGER) (TYPE
+                                                                            INTEGER) (PROTOCOL
+                                                                                      INTEGER) )
+(declaim (inline BIND))
+(def-foreign-routine ("bind" BIND ) INTEGER (SOCKFD INTEGER) (MY-ADDR
+                                                                        (* T)) (ADDRLEN
+                                                                                INTEGER) )
+(declaim (inline LISTEN))
+(def-foreign-routine ("listen" LISTEN ) INTEGER (SOCKET INTEGER) (BACKLOG
+                                                                            INTEGER) )
+(declaim (inline ACCEPT))
+(def-foreign-routine ("accept" ACCEPT ) INTEGER (SOCKET INTEGER) (MY-ADDR
+                                                                            (*
+                                                                             T)) (ADDRLEN
+                                                                                  INTEGER
+                                                                                  :IN-OUT) )
+(declaim (inline GETPEERNAME))
+(def-foreign-routine ("getpeername" GETPEERNAME ) INTEGER (SOCKET
+                                                                     INTEGER) (HER-ADDR
+                                                                               (*
+                                                                                T)) (ADDRLEN
+                                                                                     INTEGER
+                                                                                     :IN-OUT) )
+(declaim (inline GETSOCKNAME))
+(def-foreign-routine ("getsockname" GETSOCKNAME ) INTEGER (SOCKET
+                                                                     INTEGER) (MY-ADDR
+                                                                               (*
+                                                                                T)) (ADDRLEN
+                                                                                     INTEGER
+                                                                                     :IN-OUT) )
+(declaim (inline CONNECT))
+(def-foreign-routine ("connect" CONNECT ) INTEGER (SOCKET INTEGER) (HIS-ADDR
+                                                                              (*
+                                                                               T)) (ADDRLEN
+                                                                                    INTEGER) )
+(declaim (inline CLOSE))
+(def-foreign-routine ("close" CLOSE ) INTEGER (FD INTEGER) )
+(declaim (inline RECVFROM))
+(def-foreign-routine ("recvfrom" RECVFROM ) INTEGER (SOCKET INTEGER) (BUF
+                                                                                (*
+                                                                                 T)) (LEN
+                                                                                      INTEGER) (FLAGS
+                                                                                                INTEGER) (SOCKADDR
+                                                                                                          (*
+                                                                                                           T)) (SOCKLEN
+                                                                                                                (*
+                                                                                                                 INTEGER)) )
+(declaim (inline GETHOSTBYNAME))
+(def-foreign-routine ("gethostbyname" GETHOSTBYNAME ) (* T) (NAME
+                                                                       C-STRING) )
+(declaim (inline GETHOSTBYADDR))
+(def-foreign-routine ("gethostbyaddr" GETHOSTBYADDR ) (* T) (ADDR
+                                                                       (* T)) (LEN
+                                                                               INTEGER) (AF
+                                                                                         INTEGER) )
+(define-c-struct HOSTENT 20)
+(define-c-accessor HOSTENT-NAME HOSTENT (* T) 0 4)
+(define-c-accessor HOSTENT-LENGTH HOSTENT INTEGER 12 4)
+(declaim (inline SETSOCKOPT))
+(def-foreign-routine ("setsockopt" SETSOCKOPT ) INTEGER (SOCKET
+                                                                   INTEGER) (LEVEL
+                                                                             INTEGER) (OPTNAME
+                                                                                       INTEGER) (OPTVAL
+                                                                                                 (*
+                                                                                                  T)) (OPTLEN
+                                                                                                       INTEGER) )
+(declaim (inline FCNTL))
+(def-foreign-routine ("fcntl" FCNTL ) INTEGER (FD INTEGER) (CMD
+                                                                      INTEGER) (ARG
+                                                                                INTEGER) )
+(declaim (inline GETSOCKOPT))
+(def-foreign-routine ("getsockopt" GETSOCKOPT ) INTEGER (SOCKET
+                                                                   INTEGER) (LEVEL
+                                                                             INTEGER) (OPTNAME
+                                                                                       INTEGER) (OPTVAL
+                                                                                                 (*
+                                                                                                  T)) (OPTLEN
+                                                                                                       INTEGER
+                                                                                                       :IN-OUT) )

@@ -1,6 +1,6 @@
 IF YOU HAVE A BINARY DISTRIBUTION:
 
-The two files that SBCL needs to run are sbcl and sbcl.core.
+The two files that SBCL needs to run, at minimum, are sbcl and sbcl.core.
 They are in 
 	src/runtime/sbcl
 and
@@ -17,7 +17,8 @@ stuff.
 In order to get a usable system, you need to run sbcl in a way that
 it can find sbcl.core. There are three ways for it to find
 sbcl.core:
-  1. by default, in /usr/lib/sbcl.core or /usr/local/lib/sbcl.core
+
+  1. by default, in /usr/lib/sbcl/sbcl.core or /usr/local/lib/sbcl/sbcl.core
   2. by environment variable: 
      $ export SBCL_HOME=/foo/bar/
      $ sbcl
@@ -31,10 +32,21 @@ testing or other special cases.
 So: the standard installation procedure is
   1. Copy sbcl.core to /usr/lib or /usr/local/lib.
   2. Copy sbcl to /usr/bin or /usr/local/bin.
-  3. Optionally copy sbcl.1 to /usr/man/man1 or /usr/local/man/man1.
-The script install.sh does these for you (choosing the /usr/local
-subdirectory in each case).
+  3. Copy the contrib modules that you're using (if any) to the same place
+      as sbcl.core
+  4. Optionally copy sbcl.1 to /usr/man/man1 or /usr/local/man/man1.
 
+The script install.sh does all of this for you, including compilation
+of all contrib modules it can find, and installation of all those that
+pass their tests.  You should set the INSTALL_ROOT environment
+variable to /usr or /usr/local as appropriate before starting
+install.sh: e.g.
+
+   # INSTALL_ROOT=/usr/local sh install.sh
+
+or
+
+   $ INSTALL_ROOT=/home/me/sbcl sh install.sh
 
 IF YOU HAVE A SOURCE DISTRIBUTION:
 

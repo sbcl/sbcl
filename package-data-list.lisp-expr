@@ -615,7 +615,8 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
 
              ;; miscellaneous useful supported extensions
              "QUIT"
-
+	     "*MODULE-PROVIDER-FUNCTIONS*"
+	     
              ;; RUN-PROGRAM is not only useful for users, but also
              ;; useful to implement parts of SBCL itself, so we're
              ;; going to have to implement it anyway, so we might

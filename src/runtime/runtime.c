@@ -271,10 +271,12 @@ main(int argc, char *argv[], char *envp[])
 	    core = copied_existing_filename_or_null(lookhere);
 	    free(lookhere);
 	} else {
-	    core = copied_existing_filename_or_null("/usr/lib/sbcl.core");
+	    putenv("SBCL_HOME=/usr/local/lib/sbcl/");
+	    core = copied_existing_filename_or_null("/usr/local/lib/sbcl/sbcl.core");
 	    if (!core) {
+		putenv("SBCL_HOME=/usr/lib/sbcl/");
 		core =
-		    copied_existing_filename_or_null("/usr/local/lib/sbcl.core");
+		    copied_existing_filename_or_null("/usr/lib/sbcl/sbcl.core");
 	    }
 	}
 	if (!core) {

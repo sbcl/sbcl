@@ -1,0 +1,101 @@
+Proposed contrib standard, version $Revision$
+
+The SBCL contrib mechanism is intended to provide a mechanism to
+manage code which does not form part of SBCL itself, but which is
+sufficiently closely associated with it that it would not be sensible
+to run it as a completely separate project.  For example, alternative
+top-levels, foreign-function glue for calling out to libraries, editor
+support, etc.  Portable ANSI code would not usually be considered for
+the contrib mechanism, unless it does something that is only useful in
+the context of SBCL.
+
+* Responsibilities
+
+The contrib directory is offered for code which is aimed primarily at
+SBCL users, and which has release cycles attuned with those of SBCL
+itself, but which the SBCL maintainers do not consider to be part of
+the core system.  This being so, the primary responsibility for
+maintaining it remains with the provider of the system; the only
+commitment that SBCL maintainers make with respect to contrib code is
+to not install stale contrib code: a contrib that fails its test suite
+against a given version of SBCL will not be installed in that release.
+
+Note that despite leaving you the contrib maintainer with the
+responsibility of maintenance, we don't _necessarily_ (although we
+quite possibly would) offer you CVS access to the SBCL tree.  This is
+because we can't do that without letting you write to the rest of the
+tree as well (at least as far as I know, at sourceforge).  
+
+** Release cycle
+
+During the development cycle, changes to the core system may break
+contrib modules.  This may indicate bugs in SBCL (which we will
+probably want to fix before release anyway) or that the contrib uses
+deprecated features or internal symbols.
+
+During the end-of-month freeze, core developers should avoid
+committing anything that breaks a previously working contrib module.
+Contrib maintainers should checkout the frozen SBCL version and 
+submit patches where their contribs are broken.
+
+Contrib modules that still don't work at release time will not be
+installed.
+
+* Packaging
+
+Each contrib package lives in $ROOT/contrib/packagename, and will
+install into $(SBCL_HOME)/packagename
+
+A contrib package must contain a Makefile.  This is to have three targets
+
+all:     # do whatever compilation is necessary
+test:    # run the package tests
+install: # copy all necessary files into $(INSTALL_DIR)
+
+If the contrib package involves more than one file, you are encouraged
+to use ASDF to build it and load it.  A version of asdf is bundled as
+an SBCL contrib, which knows to look in $SBCL_HOME/systems/ for asd
+files - your install target should create an appropriate symlink there
+to the installed location of the system file.  Look in bsd-sockets/Makefile
+for an example of an asdf-using contrib
+
+$(INSTALL_DIR) will have been created by the system before your
+install target is called.  You do not need to make it yourself.
+
+* Tests
+
+You must provide a 'test' target in your package Makefile.  This will
+be called to test whether your package is OK for installation, so if
+you have used SBCL internal interfaces or similar, this would be a
+good place to test that they still exist, etc.
+
+* Documentation
+
+[ Would be at least nice.  My tendency is to say plain text or HTML,
+and optionally your choice of source format which can generate either
+of the preceding.  Document formats not available on typical
+well-endowed-with-free-stuff Unix systems are discouraged.  DocBook
+is fine, as the SBCL manual is DocBook anyway ]
+
+[ install.sh should copy the documentation somewhere that the user can
+find it ]
+
+* Lisp-level requirements
+
+An sbcl contrib should not stamp on sbcl internals or redefine symbols
+in CL, CL-USER.  Sometimes this is the only way to do something,
+though: individual cases will be considered on their merits.  A
+package that hacks undocumented(sic) interfaces may be accepted for
+contrib, but it does not follow from that that the interface is now
+published or will be preserved in future SBCL versions - contrib
+authors are encouraged instead to submit patches to SBCL that provide
+clean documented APIs which reasonably can be preserved.  If in doubt,
+seek consensus on the sbcl-devel list
+
+A contrib must load into its own Lisp package(s) instead of polluting
+CL-USER or one of the system packages.  The Lisp package name should
+be chosen in some way that has reasonable expectation of being unique.
+[We could potentially keep a registry of contrib archive name =>
+package name(s)]
+
+

@@ -1,0 +1,29 @@
+o/~  Hey Mr Tambourine Man, play some -*- Text -*- for me   o/~
+
+A semi-sane sockets interface for SBCL.  Usually also works in CMUCL, 
+but is rarely actually tested there so may require some massaging
+
+See INSTALL for prerequisites and build details
+
+It uses the regression tester from the CMU AI repository.  This is
+bundled in the file rt.lisp which is unchanged except where I added a
+DEFPACKAGE form.  The tests themselves are in tests.lisp, and can be
+run using the Makefile target intended for the purpose, or by
+evaluating (rt:do-tests).  Note that one of the tests is an HTTP
+client that connects back to ww.telent.net; if this bothers your
+expectations of privacy, don't run it.
+
+There is an automatically generated API reference in
+api-reference.html which you can regenerate if you can figure out how
+doc.lisp works.  You might find the examples in tests.lisp useful,
+too.
+
+Feedback, patches, development versions
+
+Instructions on how to access the CVS repository for db-sockets are
+at http://cvs.telent.net/
+
+If you find bugs or want to send patches for enhancements, by email to
+Daniel Barlow <dan@telent.net>, but please check the CVS version first.
+
+$Id$ 
