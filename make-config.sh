@@ -30,7 +30,8 @@ printf '(' >> $ltf
 
 echo //guessing default target CPU architecture from host architecture
 case `uname -m` in 
-    *86|x86_64) guessed_sbcl_arch=x86 ;; 
+    *86) guessed_sbcl_arch=x86 ;; 
+    *x86_64) guessed_sbcl_arch=x86-64 ;; 
     [Aa]lpha) guessed_sbcl_arch=alpha ;;
     sparc*) guessed_sbcl_arch=sparc ;;
     sun*) guessed_sbcl_arch=sparc ;;
@@ -131,7 +132,6 @@ case `uname` in
 		;;
 	    NetBSD)
                 printf ' :netbsd' >> $ltf
-		sbcl_os="netbsd"
 		ln -s Config.$sbcl_arch-netbsd Config
 		;;
 	    *)
@@ -186,7 +186,7 @@ cd $original_dir
 # similar with :STACK-GROWS-FOOWARD, too. -- WHN 2002-03-03
 if [ "$sbcl_arch" = "x86" ]; then
     printf ' :gencgc :stack-grows-downward-not-upward :c-stack-is-control-stack' >> $ltf
-    if [ "$sbcl_os" = "linux" ] || [ "$sbcl_os" = "freebsd" ] || [ "$sbcl_os" = "netbsd" ]; then
+    if [ "$sbcl_os" = "linux" ] || [ "$sbcl_os" = "freebsd" ]; then
 	printf ' :linkage-table' >> $ltf
     fi
 elif [ "$sbcl_arch" = "mips" ]; then
@@ -220,7 +220,7 @@ elif [ "$sbcl_arch" = "sparc" ]; then
     # FUNCDEF macro for assembler. No harm in running this on sparc-linux 
     # as well.
     sh tools-for-build/sparc-funcdef.sh > src/runtime/sparc-funcdef.h
-    if [ "$sbcl_os" = "sunos" ] || [ "$sbcl_os" = "linux" ]; then
+    if [ "$sbcl_os" = "sunos" ]; then
 	printf ' :linkage-table' >> $ltf
     fi
 else

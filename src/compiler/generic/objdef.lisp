@@ -226,11 +226,11 @@
 			  :lowtag fun-pointer-lowtag
 			  :widetag funcallable-instance-header-widetag
 			  :alloc-trans %make-funcallable-instance)
-  #!-x86
+  #!-(or x86 x86-64)
   (fun
    :ref-known (flushable) :ref-trans %funcallable-instance-fun
    :set-known (unsafe) :set-trans (setf %funcallable-instance-fun))
-  #!+x86
+  #!+(or x86 x86-64)
   (fun
    :ref-known (flushable) :ref-trans %funcallable-instance-fun
    ;; KLUDGE: There's no :SET-KNOWN or :SET-TRANS in this case.

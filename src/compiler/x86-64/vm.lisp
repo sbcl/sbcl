@@ -22,7 +22,7 @@
   (defvar *word-register-names* (make-array 16 :initial-element nil))
   (defvar *dword-register-names* (make-array 16 :initial-element nil))
   (defvar *qword-register-names* (make-array 32 :initial-element nil))
-  (defvar *xmm-register-names* (make-array 16 :initial-element nil)))
+  (defvar *float-register-names* (make-array 16 :initial-element nil)))
 
 (macrolet ((defreg (name offset size)
 	     (let ((offset-sym (symbolicate name "-OFFSET"))
@@ -102,24 +102,24 @@
 	     r8 r9 r10 r11 #+nil r12 #+nil r13 r14 r15)
 
   ;; floating point registers
-  (defreg xmm0 0 :float)
-  (defreg xmm1 1 :float)
-  (defreg xmm2 2 :float)
-  (defreg xmm3 3 :float)
-  (defreg xmm4 4 :float)
-  (defreg xmm5 5 :float)
-  (defreg xmm6 6 :float)
-  (defreg xmm7 7 :float)
-  (defreg xmm8 8 :float)
-  (defreg xmm9 9 :float)
-  (defreg xmm10 10 :float)
-  (defreg xmm11 11 :float)
-  (defreg xmm12 12 :float)
-  (defreg xmm13 13 :float)
-  (defreg xmm14 14 :float)
-  (defreg xmm15 15 :float)
-  (defregset *xmm-regs* xmm0 xmm1 xmm2 xmm3 xmm4 xmm5 xmm6 xmm7
-	     xmm8 xmm9 xmm10 xmm11 xmm12 xmm13 xmm14 xmm15)
+  (defreg float0 0 :float)
+  (defreg float1 1 :float)
+  (defreg float2 2 :float)
+  (defreg float3 3 :float)
+  (defreg float4 4 :float)
+  (defreg float5 5 :float)
+  (defreg float6 6 :float)
+  (defreg float7 7 :float)
+  (defreg float8 8 :float)
+  (defreg float9 9 :float)
+  (defreg float10 10 :float)
+  (defreg float11 11 :float)
+  (defreg float12 12 :float)
+  (defreg float13 13 :float)
+  (defreg float14 14 :float)
+  (defreg float15 15 :float)
+  (defregset *float-regs* float0 float1 float2 float3 float4 float5 float6 float7
+	     float8 float9 float10 float11 float12 float13 float14 float15)
 
   ;; registers used to pass arguments
   ;;
@@ -140,7 +140,7 @@
 ;;; words in a dword register.
 (define-storage-base registers :finite :size 32)
 
-(define-storage-base xmm-registers :finite :size 16)
+(define-storage-base float-registers :finite :size 16)
 
 (define-storage-base stack :unbounded :size 8)
 (define-storage-base constant :non-packed)
@@ -184,7 +184,7 @@
 ;;; (What a KLUDGE! Anyone who wants to come in and clean up this mess
 ;;; has my gratitude.) (FIXME: Maybe this should be me..)
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  (def!constant kludge-nondeterministic-catch-block-size 6))
+  (def!constant kludge-nondeterministic-catch-block-size 7))
 
 (!define-storage-classes
 
@@ -293,27 +293,27 @@
   ;; that can go in the floating point registers
 
   ;; non-descriptor SINGLE-FLOATs
-  (single-reg xmm-registers
+  (single-reg float-registers
 	      :locations #.(loop for i from 0 to 15 collect i)
-	      :constant-scs (fp-constant)
+	      :constant-scs nil ; (fp-constant)
 	      :save-p t
 	      :alternate-scs (single-stack))
 
   ;; non-descriptor DOUBLE-FLOATs
-  (double-reg xmm-registers
+  (double-reg float-registers
 	      :locations #.(loop for i from 0 to 15 collect i)
-	      :constant-scs (fp-constant)
+	      :constant-scs nil ; (fp-constant)
 	      :save-p t
 	      :alternate-scs (double-stack))
 
-  (complex-single-reg xmm-registers
+  (complex-single-reg float-registers
 		      :locations #.(loop for i from 0 to 14 by 2 collect i)
 		      :element-size 2
 		      :constant-scs ()
 		      :save-p t
 		      :alternate-scs (complex-single-stack))
 
-  (complex-double-reg xmm-registers
+  (complex-double-reg float-registers
 		      :locations #.(loop for i from 0 to 14 by 2 collect i)
 		      :element-size 2
 		      :constant-scs ()
@@ -361,8 +361,8 @@
   (def-misc-reg-tns word-reg ax bx cx dx bp sp di si)
   (def-misc-reg-tns byte-reg al ah bl bh cl ch dl dh)
   (def-misc-reg-tns single-reg 
-      xmm0 xmm1 xmm2 xmm3 xmm4 xmm5 xmm6 xmm7
-      xmm8 xmm9 xmm10 xmm11 xmm12 xmm13 xmm14 xmm15))
+      float0 float1 float2 float3 float4 float5 float6 float7
+      float8 float9 float10 float11 float12 float13 float14 float15))
 
 ;;; TNs for registers used to pass arguments
 (defparameter *register-arg-tns*

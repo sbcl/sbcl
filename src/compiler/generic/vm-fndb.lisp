@@ -52,9 +52,9 @@
 	   simple-array-complex-double-float-p
 	   #!+long-float simple-array-complex-long-float-p
 	   system-area-pointer-p realp
-           #!+#.(cl:if (cl:= 32 sb!vm:n-word-bits) '(and) '(or))
+           ;; #!+#.(cl:if (cl:= 32 sb!vm:n-word-bits) '(and) '(or))
            unsigned-byte-32-p
-           #!+#.(cl:if (cl:= 32 sb!vm:n-word-bits) '(and) '(or))
+           ;; #!+#.(cl:if (cl:= 32 sb!vm:n-word-bits) '(and) '(or))
            signed-byte-32-p
            #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
            unsigned-byte-64-p

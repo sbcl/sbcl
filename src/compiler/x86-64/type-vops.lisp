@@ -175,6 +175,7 @@
     (inst shr tmp 61)
     (inst jmp (if not-p :nz :z) target)))
 
+#+nil
 (define-vop (signed-byte-32-p type-predicate)
   (:translate signed-byte-32-p)
   (:generator 45
