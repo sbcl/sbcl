@@ -693,8 +693,8 @@
 			       `((fixnum (%instance-ref ,slots ,index))))
 			   ,@(when (or (null type) (eq type ':class))
 			       `((cons (cdr ,index))))
-			   (t ',*slot-unbound*)))
-	    (if (eq ,value ',*slot-unbound*)
+			   (t +slot-unbound+)))
+	    (if (eq ,value +slot-unbound+)
 		,default
 		,value))))))
 
@@ -771,9 +771,9 @@
 	    (typecase ,index
 	      ,@(when (or (null type) (eq type ':instance))
 		  `((fixnum (not (eq (%instance-ref ,slots ,index)
-				     ',*slot-unbound*)))))
+				     +slot-unbound+)))))
 	      ,@(when (or (null type) (eq type ':class))
-		  `((cons (not (eq (cdr ,index) ',*slot-unbound*)))))
+		  `((cons (not (eq (cdr ,index) +slot-unbound+)))))
 	      (t ,default)))))))
 
 (defmacro instance-boundp (pv-offset parameter position slot-name class)

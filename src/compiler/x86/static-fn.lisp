@@ -52,7 +52,7 @@
 	(let ((temp-name (intern (format nil "TEMP-~D" i))))
 	  (temp-names temp-name)
 	  (temps `(:temporary (:sc descriptor-reg
-			       :offset ,(nth i register-arg-offsets)
+			       :offset ,(nth i *register-arg-offsets*)
 			       :from ,(if (< i num-args)
 					  `(:argument ,i)
 					  '(:eval 1))

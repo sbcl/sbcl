@@ -285,12 +285,11 @@
 (defun print-fp-reg (value stream dstate)
   (declare (ignore dstate))
   (format stream "FR~D" value))
-
 (defun prefilter-fp-reg (value dstate)
   ;; just return it
   (declare (ignore dstate))
   value)
-)
+) ; EVAL-WHEN
 (sb!disassem:define-argument-type fp-reg
 				  :prefilter #'prefilter-fp-reg
 				  :printer #'print-fp-reg)
@@ -309,7 +308,7 @@
 		     (princ (schar (symbol-name word-width) 0) stream)))))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
-(defconstant conditions
+(defparameter *conditions*
   '((:o . 0)
     (:no . 1)
     (:b . 2) (:nae . 2) (:c . 2)
@@ -326,14 +325,13 @@
     (:nl . 13) (:ge . 13)
     (:le . 14) (:ng . 14)
     (:nle . 15) (:g . 15)))
-
 (defparameter *condition-name-vec*
   (let ((vec (make-array 16 :initial-element nil)))
-    (dolist (cond conditions)
+    (dolist (cond *conditions*)
       (when (null (aref vec (cdr cond)))
 	(setf (aref vec (cdr cond)) (car cond))))
     vec))
-);EVAL-WHEN
+) ; EVAL-WHEN
 
 ;;; Set assembler parameters. (In CMU CL, this was done with
 ;;; a call to a macro DEF-ASSEMBLER-PARAMS.)
@@ -344,7 +342,7 @@
   :printer *condition-name-vec*)
 
 (defun conditional-opcode (condition)
-  (cdr (assoc condition conditions :test #'eq)))
+  (cdr (assoc condition *conditions* :test #'eq)))
 
 ;;;; disassembler instruction formats
 
@@ -755,39 +753,39 @@
 (defun byte-reg-p (thing)
   (and (tn-p thing)
        (eq (sb-name (sc-sb (tn-sc thing))) 'registers)
-       (member (sc-name (tn-sc thing)) byte-sc-names)
+       (member (sc-name (tn-sc thing)) *byte-sc-names*)
        t))
 
 (defun byte-ea-p (thing)
   (typecase thing
     (ea (eq (ea-size thing) :byte))
     (tn
-     (and (member (sc-name (tn-sc thing)) byte-sc-names) t))
+     (and (member (sc-name (tn-sc thing)) *byte-sc-names*) t))
     (t nil)))
 
 (defun word-reg-p (thing)
   (and (tn-p thing)
        (eq (sb-name (sc-sb (tn-sc thing))) 'registers)
-       (member (sc-name (tn-sc thing)) word-sc-names)
+       (member (sc-name (tn-sc thing)) *word-sc-names*)
        t))
 
 (defun word-ea-p (thing)
   (typecase thing
     (ea (eq (ea-size thing) :word))
-    (tn (and (member (sc-name (tn-sc thing)) word-sc-names) t))
+    (tn (and (member (sc-name (tn-sc thing)) *word-sc-names*) t))
     (t nil)))
 
 (defun dword-reg-p (thing)
   (and (tn-p thing)
        (eq (sb-name (sc-sb (tn-sc thing))) 'registers)
-       (member (sc-name (tn-sc thing)) dword-sc-names)
+       (member (sc-name (tn-sc thing)) *dword-sc-names*)
        t))
 
 (defun dword-ea-p (thing)
   (typecase thing
     (ea (eq (ea-size thing) :dword))
     (tn
-     (and (member (sc-name (tn-sc thing)) dword-sc-names) t))
+     (and (member (sc-name (tn-sc thing)) *dword-sc-names*) t))
     (t nil)))
 
 (defun register-p (thing)
@@ -811,17 +809,19 @@
 (defun operand-size (thing)
   (typecase thing
     (tn
+     ;; FIXME: might as well be COND instead of having to use #. readmacro
+     ;; to hack up the code
      (case (sc-name (tn-sc thing))
-       (#.dword-sc-names
+       (#.*dword-sc-names*
 	:dword)
-       (#.word-sc-names
+       (#.*word-sc-names*
 	:word)
-       (#.byte-sc-names
+       (#.*byte-sc-names*
 	:byte)
-       ;; added by jrd. float-registers is a separate size (?)
-       (#.float-sc-names
+       ;; added by jrd: float-registers is a separate size (?)
+       (#.*float-sc-names*
 	:float)
-       (#.double-sc-names
+       (#.*double-sc-names*
 	:double)
        (t
 	(error "can't tell the size of ~S ~S" thing (sc-name (tn-sc thing))))))

@@ -49,7 +49,7 @@
 		   slots))
 		(t
 		 (make-array no-of-slots
-			     :initial-element sb-pcl::*slot-unbound*))))
+			     :initial-element +slot-unbound+))))
     instance))
 
 (defmacro allocate-funcallable-instance-slots (wrapper &optional
@@ -58,8 +58,8 @@
      ,(if slots-init-p
 	  `(if ,slots-init-p
 	       (make-array no-of-slots :initial-contents ,slots-init)
-	       (make-array no-of-slots :initial-element *slot-unbound*))
-	  `(make-array no-of-slots :initial-element *slot-unbound*))))
+	       (make-array no-of-slots :initial-element +slot-unbound+))
+	  `(make-array no-of-slots :initial-element +slot-unbound+))))
 
 (defun allocate-funcallable-instance (wrapper &optional
 					      (slots-init nil slots-init-p))

@@ -807,7 +807,7 @@ bootstrapping.
 		  (let* ((.slots. (get-slots-or-nil
 				   ,(car required-args+rest-arg)))
 			 (value (when .slots. (%instance-ref .slots. ,emf))))
-		    (if (eq value ',*slot-unbound*)
+		    (if (eq value +slot-unbound+)
 			(slot-unbound-internal ,(car required-args+rest-arg)
 					       ,emf)
 			value)))))
@@ -826,7 +826,7 @@ bootstrapping.
 		    (and .slots.
 			 (not (eq (%instance-ref
 				   .slots. (fast-instance-boundp-index ,emf))
-				  ',*slot-unbound*)))))))
+				  +slot-unbound+)))))))
 	   ||#
 	   (t
 	    (etypecase ,emf
@@ -877,7 +877,7 @@ bootstrapping.
      (cond ((null args) (error "1 or 2 args were expected."))
 	   ((null (cdr args))
 	    (let ((value (%instance-ref (get-slots (car args)) emf)))
-	      (if (eq value *slot-unbound*)
+	      (if (eq value +slot-unbound+)
 		  (slot-unbound-internal (car args) emf)
 		  value)))
 	   ((null (cddr args))
@@ -889,7 +889,7 @@ bootstrapping.
 	 (error "1 arg was expected.")
 	 (not (eq (%instance-ref (get-slots (car args))
 				 (fast-instance-boundp-index emf))
-		  *slot-unbound*))))
+		  +slot-unbound+))))
     (function
      (apply emf args))))
 
@@ -1422,11 +1422,11 @@ bootstrapping.
 (defvar *sgf-slots-init*
   (mapcar #'(lambda (canonical-slot)
 	      (if (memq (getf canonical-slot :name) '(arg-info source))
-		  *slot-unbound*
+		  +slot-unbound+
 		  (let ((initfunction (getf canonical-slot :initfunction)))
 		    (if initfunction
 			(funcall initfunction)
-			*slot-unbound*))))
+			+slot-unbound+))))
 	  (early-collect-inheritance 'standard-generic-function)))
 
 (defvar *sgf-method-class-index*
@@ -1435,7 +1435,7 @@ bootstrapping.
 (defun early-gf-p (x)
   (and (fsc-instance-p x)
        (eq (instance-ref (get-slots x) *sgf-method-class-index*)
-	   *slot-unbound*)))
+	   +slot-unbound+)))
 
 (defvar *sgf-methods-index*
   (bootstrap-slot-index 'standard-generic-function 'methods))

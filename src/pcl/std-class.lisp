@@ -37,20 +37,20 @@
     (writer (setf (slot-definition-writer-function slotd) function))
     (boundp (setf (slot-definition-boundp-function slotd) function))))
 
-(defconstant *slotd-reader-function-std-p* 1)
-(defconstant *slotd-writer-function-std-p* 2)
-(defconstant *slotd-boundp-function-std-p* 4)
-(defconstant *slotd-all-function-std-p* 7)
+(defconstant +slotd-reader-function-std-p+ 1)
+(defconstant +slotd-writer-function-std-p+ 2)
+(defconstant +slotd-boundp-function-std-p+ 4)
+(defconstant +slotd-all-function-std-p+ 7)
 
 (defmethod slot-accessor-std-p ((slotd effective-slot-definition) type)
   (let ((flags (slot-value slotd 'accessor-flags)))
     (declare (type fixnum flags))
     (if (eq type 'all)
-	(eql *slotd-all-function-std-p* flags)
+	(eql +slotd-all-function-std-p+ flags)
 	(let ((mask (ecase type
-		      (reader *slotd-reader-function-std-p*)
-		      (writer *slotd-writer-function-std-p*)
-		      (boundp *slotd-boundp-function-std-p*))))
+		      (reader +slotd-reader-function-std-p+)
+		      (writer +slotd-writer-function-std-p+)
+		      (boundp +slotd-boundp-function-std-p+))))
 	  (declare (type fixnum mask))
 	  (not (zerop (the fixnum (logand mask flags))))))))
 
@@ -58,9 +58,9 @@
 				       (slotd effective-slot-definition)
 				       type)
   (let ((mask (ecase type
-		(reader *slotd-reader-function-std-p*)
-		(writer *slotd-writer-function-std-p*)
-		(boundp *slotd-boundp-function-std-p*)))
+		(reader +slotd-reader-function-std-p+)
+		(writer +slotd-writer-function-std-p+)
+		(boundp +slotd-boundp-function-std-p+)))
 	(flags (slot-value slotd 'accessor-flags)))
     (declare (type fixnum mask flags))
     (setf (slot-value slotd 'accessor-flags)
@@ -432,7 +432,7 @@
 		(gather1 (cons (slot-definition-name dslotd)
 			       (if initfunction
 				   (funcall initfunction)
-				   *slot-unbound*))))))))
+				   +slot-unbound+))))))))
   (setq predicate-name (if predicate-name-p
 			   (setf (slot-value class 'predicate-name)
 				 (car predicate-name))
@@ -506,31 +506,39 @@
 				      (:constructor ,constructor ()))
 			   ,@(mapcar #'(lambda (slot)
 					 `(,(slot-definition-name slot)
-					   *slot-unbound*))
+					   +slot-unbound+))
 				     direct-slots)))
-	     (reader-names (mapcar #'(lambda (slotd)
-				       (intern (format nil "~A~A reader" conc-name
-						       (slot-definition-name slotd))))
+	     (reader-names (mapcar (lambda (slotd)
+				     (intern (format nil
+						     "~A~A reader"
+						     conc-name
+						     (slot-definition-name
+						      slotd))))
 				   direct-slots))
-	     (writer-names (mapcar #'(lambda (slotd)
-				       (intern (format nil "~A~A writer" conc-name
-						       (slot-definition-name slotd))))
+	     (writer-names (mapcar (lambda (slotd)
+				     (intern (format nil
+						     "~A~A writer"
+						     conc-name
+						     (slot-definition-name
+						      slotd))))
 				   direct-slots))
 	     (readers-init
-	      (mapcar #'(lambda (slotd reader-name)
-			  (let ((accessor
-				 (slot-definition-defstruct-accessor-symbol slotd)))
-			    `(defun ,reader-name (obj)
-			       (declare (type ,name obj))
-			       (,accessor obj))))
+	      (mapcar (lambda (slotd reader-name)
+			(let ((accessor
+			       (slot-definition-defstruct-accessor-symbol
+				slotd)))
+			  `(defun ,reader-name (obj)
+			     (declare (type ,name obj))
+			     (,accessor obj))))
 		      direct-slots reader-names))
 	     (writers-init
-	      (mapcar #'(lambda (slotd writer-name)
-			  (let ((accessor
-				 (slot-definition-defstruct-accessor-symbol slotd)))
-			    `(defun ,writer-name (nv obj)
-			       (declare (type ,name obj))
-			       (setf (,accessor obj) nv))))
+	      (mapcar (lambda (slotd writer-name)
+			(let ((accessor
+			       (slot-definition-defstruct-accessor-symbol
+				slotd)))
+			  `(defun ,writer-name (nv obj)
+			     (declare (type ,name obj))
+			     (setf (,accessor obj) nv))))
 		      direct-slots writer-names))
 	     (defstruct-form
 	       `(progn
@@ -542,8 +550,10 @@
 		  (let* ((reader (gdefinition reader-name))
 			 (writer (when (gboundp writer-name)
 				   (gdefinition writer-name))))
-		    (setf (slot-value dslotd 'internal-reader-function) reader)
-		    (setf (slot-value dslotd 'internal-writer-function) writer)))
+		    (setf (slot-value dslotd 'internal-reader-function)
+			  reader)
+		    (setf (slot-value dslotd 'internal-writer-function)
+			  writer)))
 	      direct-slots reader-names writer-names)
 	(setf (slot-value class 'defstruct-form) defstruct-form)
 	(setf (slot-value class 'defstruct-constructor) constructor))))
@@ -1091,7 +1101,7 @@
 		(setf (instance-ref nslots npos) (instance-ref oslots opos))
 		(progn
 		  (push name discarded)
-		  (unless (eq (instance-ref oslots opos) *slot-unbound*)
+		  (unless (eq (instance-ref oslots opos) +slot-unbound+)
 		    (setf (getf plist name) (instance-ref oslots opos)))))))
 
 	;; Go through all the old shared slots.
@@ -1102,7 +1112,7 @@
 	      (if npos
 		  (setf (instance-ref nslots npos) (cdr oclass-slot-and-val))
 		  (progn (push name discarded)
-			 (unless (eq val *slot-unbound*)
+			 (unless (eq val +slot-unbound+)
 			   (setf (getf plist name) val)))))))
 
 	;; Go through all the new local slots to compute the added slots.

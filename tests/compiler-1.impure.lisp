@@ -18,4 +18,15 @@
       'expected-value)))
 (assert (eq (bar) 'expected-value))
 
+(declaim (ftype (function (real) (values integer single-float)) valuesify))
+(defun valuesify (x)
+  (values (round x)
+	  (coerce x 'single-float)))
+(defun exercise-valuesify (x)
+  (multiple-value-bind (i f) (valuesify x)
+    (declare (type integer i))
+    (declare (type single-float f))
+    (+ i f)))
+(assert (= (exercise-valuesify 1.25) 2.25))
+
 (sb-ext:quit :unix-status 104) ; success

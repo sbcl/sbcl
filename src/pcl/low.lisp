@@ -131,10 +131,10 @@
 ;;;
 ;;; FIXME: Now that we're tightly integrated into SBCL, we could use the
 ;;; SBCL built-in unbound value token instead.
-(defconstant *slot-unbound* '..slot-unbound..)
+(defconstant +slot-unbound+ '..slot-unbound..)
 
 (defmacro %allocate-static-slot-storage--class (no-of-slots)
-  `(make-array ,no-of-slots :initial-element *slot-unbound*))
+  `(make-array ,no-of-slots :initial-element +slot-unbound+))
 
 (defmacro std-instance-class (instance)
   `(wrapper-class* (std-instance-wrapper ,instance)))

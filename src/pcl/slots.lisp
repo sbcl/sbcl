@@ -80,7 +80,7 @@
   (let ((entry (assoc slot-name (wrapper-class-slots wrapper))))
     (if (null entry)
 	(slot-missing (wrapper-class wrapper) object slot-name 'slot-value)
-	(if (eq (cdr entry) *slot-unbound*)
+	(if (eq (cdr entry) +slot-unbound+)
 	    (slot-unbound (wrapper-class wrapper) object slot-name)
 	    (cdr entry)))))
 
@@ -142,7 +142,7 @@
       `(accessor-set-slot-value ,object-form ,slot-name-form ,new-value-form)
       `(set-slot-value-normal ,object-form ,slot-name-form ,new-value-form)))
 
-(defconstant *optimize-slot-boundp* nil)
+(defconstant +optimize-slot-boundp+ nil)
 
 (defun slot-boundp (object slot-name)
   (let* ((class (class-of object))
@@ -207,7 +207,7 @@
 		   (error "The slot ~S has neither :INSTANCE nor :CLASS allocation, ~@
 			   so it can't be read by the default ~S method."
 			  slotd 'slot-value-using-class)))))
-    (if (eq value *slot-unbound*)
+    (if (eq value +slot-unbound+)
 	(slot-unbound class object (slot-definition-name slotd))
 	value)))
 
@@ -256,7 +256,7 @@
 		   (error "The slot ~S has neither :INSTANCE nor :CLASS allocation, ~@
 			   so it can't be read by the default ~S method."
 			  slotd 'slot-boundp-using-class)))))
-    (not (eq value *slot-unbound*))))
+    (not (eq value +slot-unbound+))))
 
 (defmethod slot-makunbound-using-class
 	   ((class std-class)
@@ -268,14 +268,16 @@
        (cond ((std-instance-p object)
 	      (unless (eq 't (wrapper-state (std-instance-wrapper object)))
 		(check-wrapper-validity object))
-	      (setf (%instance-ref (std-instance-slots object) location) *slot-unbound*))
+	      (setf (%instance-ref (std-instance-slots object) location)
+		    +slot-unbound+))
 	     ((fsc-instance-p object)
 	      (unless (eq 't (wrapper-state (fsc-instance-wrapper object)))
 		(check-wrapper-validity object))
-	      (setf (%instance-ref (fsc-instance-slots object) location) *slot-unbound*))
+	      (setf (%instance-ref (fsc-instance-slots object) location)
+		    +slot-unbound+))
 	     (t (error "unrecognized instance type"))))
       (cons
-       (setf (cdr location) *slot-unbound*))
+       (setf (cdr location) +slot-unbound+))
       (t
        (error "The slot ~S has neither :INSTANCE nor :CLASS allocation, ~@
 			   so it can't be written by the default ~S method."
@@ -289,7 +291,7 @@
   (let* ((function (slot-definition-internal-reader-function slotd))
 	 (value (funcall function object)))
     (declare (type function function))
-    (if (eq value *slot-unbound*)
+    (if (eq value +slot-unbound+)
 	(slot-unbound class object (slot-definition-name slotd))
 	value)))
 

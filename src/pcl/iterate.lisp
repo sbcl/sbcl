@@ -23,7 +23,8 @@
 
 (in-package "SB-ITERATE")
 
-;;; Are warnings to be issued for iterate/gather forms that aren't optimized?
+;;; Are warnings to be issued for iterate/gather forms that aren't
+;;; optimized?
 ;;;   NIL   => never
 ;;;   :USER => those resulting from user code
 ;;;   T     => always, even if it's the iteration macro that's suboptimal.
@@ -32,46 +33,6 @@
 ;;; ITERATE macro
 (defmacro iterate (clauses &body body &environment env)
   (optimize-iterate-form clauses body env))
-
-(defun
- simple-expand-iterate-form
- (clauses body)
-
- ;; Expand ITERATE. This is the "formal semantics" expansion, which we never
- ;; use.
- (let*
-  ((block-name (gensym))
-   (bound-var-lists (mapcar #'(lambda (clause)
-				     (let ((names (first clause)))
-					  (if (listp names)
-					      names
-					      (list names))))
-			   clauses))
-   (generator-vars (mapcar #'(lambda (clause)
-				    (declare (ignore clause))
-				    (gensym))
-			  clauses)))
-  `(block ,block-name
-       (let*
-	,(mapcan #'(lambda (gvar clause var-list)
-		     ;; For each clause, bind a generator temp to the clause,
-		     ;; then bind the specified var(s).
-		     (cons (list gvar (second clause))
-			   (copy-list var-list)))
-		generator-vars clauses bound-var-lists)
-
-	;; Note bug in formal semantics: there can be declarations in the head
-	;; of BODY; they go here, rather than inside loop.
-	(loop
-	 ,@(mapcar
-	    #'(lambda (var-list gen-var)
-		;; Set each bound variable (or set of vars) to the result of
-		;; calling the corresponding generator.
-		`(multiple-value-setq ,var-list
-		   (funcall ,gen-var #'(lambda nil (return-from
-						       ,block-name)))))
-	    bound-var-lists generator-vars)
-	 ,@body)))))
 
 ;;; temporary variable names used by ITERATE expansions
 (defparameter *iterate-temp-vars-list*

@@ -19,7 +19,7 @@
   (declare (type unsigned-byte n))
   (if (< n register-arg-count)
       (make-wired-tn *backend-t-primitive-type* descriptor-reg-sc-number
-		     (nth n register-arg-offsets))
+		     (nth n *register-arg-offsets*))
       (make-wired-tn *backend-t-primitive-type* control-stack-sc-number n)))
 
 ;;; Make a passing location TN for a local call return PC.
@@ -799,17 +799,19 @@
 	       ;; of the (new) stack frame before doing the call. Therefore,
 	       ;; we have to tell the lifetime stuff that we need to use them.
 	       ,@(when variable
-	       (mapcar #'(lambda (name offset)
-			   `(:temporary (:sc descriptor-reg
-					     :offset ,offset
-					     :from (:argument 0)
-					     :to :eval)
-					,name))
-		       register-arg-names register-arg-offsets))
+		   (mapcar #'(lambda (name offset)
+			       `(:temporary (:sc descriptor-reg
+						 :offset ,offset
+						 :from (:argument 0)
+						 :to :eval)
+					    ,name))
+			   *register-arg-names* *register-arg-offsets*))
 
 	       ,@(when (eq return :tail)
-	       '((:temporary (:sc unsigned-reg
-				  :from (:argument 1) :to (:argument 2)) old-fp-tmp)))
+		   '((:temporary (:sc unsigned-reg
+				      :from (:argument 1)
+				      :to (:argument 2))
+				 old-fp-tmp)))
 
 	       (:generator ,(+ (if named 5 0)
 			       (if variable 19 1)
@@ -824,16 +826,18 @@
 
 
 	       ,@(if variable
-		     ;; For variable call, compute the number of arguments and
-		     ;; move some of the arguments to registers.
+		     ;; For variable call, compute the number of
+		     ;; arguments and move some of the arguments to
+		     ;; registers.
 		     (collect ((noise))
 			      ;; Compute the number of arguments.
 			      (noise '(inst mov ecx new-fp))
 			      (noise '(inst sub ecx esp-tn))
-			      ;; Move the necessary args to registers, this
-			      ;; moves them all even if they are not all needed.
+			      ;; Move the necessary args to registers,
+			      ;; this moves them all even if they are
+			      ;; not all needed.
 			      (loop
-			       for name in register-arg-names
+			       for name in *register-arg-names*
 			       for index downfrom -1
 			       do (noise `(loadw ,name new-fp ,index)))
 			      (noise))
@@ -841,24 +845,26 @@
 			 (inst xor ecx ecx)
 		       (inst mov ecx (fixnumize nargs)))))
 	       ,@(cond ((eq return :tail)
-			'(;; Python has figured out what frame we should return
-			  ;; to so might as well use that clue. This seems
-			  ;; really important to the implementation of things
-			  ;; like (without-interrupts ...)
-
+			'(;; Python has figured out what frame we should
+			  ;; return to so might as well use that clue.
+			  ;; This seems really important to the
+			  ;; implementation of things like
+			  ;; (without-interrupts ...)
+			  ;;
 			  ;; dtc; Could be doing a tail call from a
-			  ;; known-local-call etc in which the old-fp or ret-pc
-			  ;; are in regs or in non-standard places. If the
-			  ;; passing location were wired to the stack in
-			  ;; standard locations then these moves will be
-			  ;; un-necessary; this is probably best for the x86.
+			  ;; known-local-call etc in which the old-fp
+			  ;; or ret-pc are in regs or in non-standard
+			  ;; places. If the passing location were
+			  ;; wired to the stack in standard locations
+			  ;; then these moves will be un-necessary;
+			  ;; this is probably best for the x86.
 			  (sc-case old-fp
 				   ((control-stack)
 				    (unless (= ocfp-save-offset
 					       (tn-offset old-fp))
-				      ;; FIXME: FORMAT T for stale diagnostic
-				      ;; output (several of them around here),
-				      ;; ick
+				      ;; FIXME: FORMAT T for stale
+				      ;; diagnostic output (several of
+				      ;; them around here), ick
 				      (format t "** tail-call old-fp not S0~%")
 				      (move old-fp-tmp old-fp)
 				      (storew old-fp-tmp
@@ -870,23 +876,26 @@
 					    ebp-tn
 					    (- (1+ ocfp-save-offset)))))
 
-			  ;; For tail call, we have to push the return-pc so
-			  ;; that it looks like we CALLed despite the fact that
-			  ;; we are going to JMP.
+			  ;; For tail call, we have to push the
+			  ;; return-pc so that it looks like we CALLed
+			  ;; despite the fact that we are going to JMP.
 			  (inst push return-pc)
 			  ))
 		       (t
-			;; For non-tail call, we have to save our frame pointer
-			;; and install the new frame pointer. We can't load
-			;; stack tns after this point.
-			`(;; Python doesn't seem to allocate a frame here which
-			  ;; doesn't leave room for the ofp/ret stuff.
+			;; For non-tail call, we have to save our
+			;; frame pointer and install the new frame
+			;; pointer. We can't load stack tns after this
+			;; point.
+			`(;; Python doesn't seem to allocate a frame
+			  ;; here which doesn't leave room for the
+			  ;; ofp/ret stuff.
 		
-			  ;; The variable args are on the stack and become the
-			  ;; frame, but there may be <3 args and 3 stack slots
-			  ;; are assumed allocate on the call. So need to
-			  ;; ensure there are at least 3 slots. This hack just
-			  ;; adds 3 more.
+			  ;; The variable args are on the stack and
+			  ;; become the frame, but there may be <3
+			  ;; args and 3 stack slots are assumed
+			  ;; allocate on the call. So need to ensure
+			  ;; there are at least 3 slots. This hack
+			  ;; just adds 3 more.
 			  ,(if variable
 			       '(inst sub esp-tn (fixnumize 3)))
 
@@ -1006,11 +1015,11 @@
   ;; We need to stretch the lifetime of return-pc past the argument
   ;; registers so that we can default the argument registers without
   ;; trashing return-pc.
-  (:temporary (:sc unsigned-reg :offset (first register-arg-offsets)
+  (:temporary (:sc unsigned-reg :offset (first *register-arg-offsets*)
 		   :from :eval) a0)
-  (:temporary (:sc unsigned-reg :offset (second register-arg-offsets)
+  (:temporary (:sc unsigned-reg :offset (second *register-arg-offsets*)
 		   :from :eval) a1)
-  (:temporary (:sc unsigned-reg :offset (third register-arg-offsets)
+  (:temporary (:sc unsigned-reg :offset (third *register-arg-offsets*)
 		   :from :eval) a2)
 
   (:generator 6
@@ -1070,7 +1079,7 @@
   (:temporary (:sc unsigned-reg :offset esi-offset :from (:argument 2)) esi)
   (:temporary (:sc unsigned-reg :offset ecx-offset :from (:argument 3)) ecx)
   (:temporary (:sc unsigned-reg :offset ebx-offset :from (:eval 0)) ebx)
-  (:temporary (:sc descriptor-reg :offset (first register-arg-offsets)
+  (:temporary (:sc descriptor-reg :offset (first *register-arg-offsets*)
 		   :from (:eval 0)) a0)
   (:temporary (:sc unsigned-reg :from (:eval 1)) old-fp-temp)
   (:node-var node)

@@ -25,73 +25,75 @@
 
 (in-package "SB-PCL")
 
-;;; FIXME: SB-PCL should probably USE-PACKAGE SB-KERNEL, since SB-PCL is built
-;;; on SB-KERNEL, and in the absence of USE-PACKAGE, it ends up using a
-;;; thundering herd of explicit prefixes to get to SB-KERNEL symbols.
-;;; Using the SB-INT and SB-EXT packages as well would help reduce
-;;; prefixing and make it more natural to reuse things (ONCE-ONLY,
-;;; *KEYWORD-PACKAGE*..) used in the main body of the system.
-;;; However, that would cause a conflict between the SB-ITERATE:ITERATE
-;;; macro and the SB-INT:ITERATE macro. (This could be resolved by
-;;; renaming SB-INT:ITERATE to SB-INT:NAMED-LET, or with
-;;; more gruntwork by punting the SB-ITERATE package and replacing
-;;; calls to SB-ITERATE:ITERATE with calls to CL:LOOP.
+;;; FIXME: SB-PCL should probably USE-PACKAGE SB-KERNEL, since SB-PCL
+;;; is built on SB-KERNEL, and in the absence of USE-PACKAGE, it ends
+;;; up using a thundering herd of explicit prefixes to get to
+;;; SB-KERNEL symbols. Using the SB-INT and SB-EXT packages as well
+;;; would help reduce prefixing and make it more natural to reuse
+;;; things (ONCE-ONLY, *KEYWORD-PACKAGE*..) used in the main body of
+;;; the system. However, that would cause a conflict between the
+;;; SB-ITERATE:ITERATE macro and the SB-INT:ITERATE macro. (This could
+;;; be resolved by renaming SB-INT:ITERATE to SB-INT:NAMED-LET, or
+;;; with more gruntwork by punting the SB-ITERATE package and
+;;; replacing calls to SB-ITERATE:ITERATE with calls to CL:LOOP.
 
 ;;; The caching algorithm implemented:
 ;;;
 ;;; << put a paper here >>
 ;;;
-;;; For now, understand that as far as most of this code goes, a cache has
-;;; two important properties. The first is the number of wrappers used as
-;;; keys in each cache line. Throughout this code, this value is always
-;;; called NKEYS. The second is whether or not the cache lines of a cache
-;;; store a value. Throughout this code, this always called VALUEP.
+;;; For now, understand that as far as most of this code goes, a cache
+;;; has two important properties. The first is the number of wrappers
+;;; used as keys in each cache line. Throughout this code, this value
+;;; is always called NKEYS. The second is whether or not the cache
+;;; lines of a cache store a value. Throughout this code, this always
+;;; called VALUEP.
 ;;;
 ;;; Depending on these values, there are three kinds of caches.
 ;;;
 ;;; NKEYS = 1, VALUEP = NIL
 ;;;
-;;; In this kind of cache, each line is 1 word long. No cache locking is
-;;; needed since all read's in the cache are a single value. Nevertheless
-;;; line 0 (location 0) is reserved, to ensure that invalid wrappers will
-;;; not get a first probe hit.
+;;; In this kind of cache, each line is 1 word long. No cache locking
+;;; is needed since all read's in the cache are a single value.
+;;; Nevertheless line 0 (location 0) is reserved, to ensure that
+;;; invalid wrappers will not get a first probe hit.
 ;;;
-;;; To keep the code simpler, a cache lock count does appear in location 0
-;;; of these caches, that count is incremented whenever data is written to
-;;; the cache. But, the actual lookup code (see make-dlap) doesn't need to
-;;; do locking when reading the cache.
+;;; To keep the code simpler, a cache lock count does appear in
+;;; location 0 of these caches, that count is incremented whenever
+;;; data is written to the cache. But, the actual lookup code (see
+;;; make-dlap) doesn't need to do locking when reading the cache.
 ;;;
 ;;; NKEYS = 1, VALUEP = T
 ;;;
-;;; In this kind of cache, each line is 2 words long. Cache locking must
-;;; be done to ensure the synchronization of cache reads. Line 0 of the
-;;; cache (location 0) is reserved for the cache lock count. Location 1
-;;; of the cache is unused (in effect wasted).
+;;; In this kind of cache, each line is 2 words long. Cache locking
+;;; must be done to ensure the synchronization of cache reads. Line 0
+;;; of the cache (location 0) is reserved for the cache lock count.
+;;; Location 1 of the cache is unused (in effect wasted).
 ;;;
 ;;; NKEYS > 1
 ;;;
-;;; In this kind of cache, the 0 word of the cache holds the lock count.
-;;; The 1 word of the cache is line 0. Line 0 of these caches is not
-;;; reserved.
+;;; In this kind of cache, the 0 word of the cache holds the lock
+;;; count. The 1 word of the cache is line 0. Line 0 of these caches
+;;; is not reserved.
 ;;;
-;;; This is done because in this sort of cache, the overhead of doing the
-;;; cache probe is high enough that the 1+ required to offset the location
-;;; is not a significant cost. In addition, because of the larger line
-;;; sizes, the space that would be wasted by reserving line 0 to hold the
-;;; lock count is more significant.
+;;; This is done because in this sort of cache, the overhead of doing
+;;; the cache probe is high enough that the 1+ required to offset the
+;;; location is not a significant cost. In addition, because of the
+;;; larger line sizes, the space that would be wasted by reserving
+;;; line 0 to hold the lock count is more significant.
 
 ;;; caches
 ;;;
-;;; A cache is essentially just a vector. The use of the individual `words'
-;;; in the vector depends on particular properties of the cache as described
-;;; above.
+;;; A cache is essentially just a vector. The use of the individual
+;;; `words' in the vector depends on particular properties of the
+;;; cache as described above.
 ;;;
-;;; This defines an abstraction for caches in terms of their most obvious
-;;; implementation as simple vectors. But, please notice that part of the
-;;; implementation of this abstraction, is the function lap-out-cache-ref.
-;;; This means that most port-specific modifications to the implementation
-;;; of caches will require corresponding port-specific modifications to the
-;;; lap code assembler.
+;;; This defines an abstraction for caches in terms of their most
+;;; obvious implementation as simple vectors. But, please notice that
+;;; part of the implementation of this abstraction, is the function
+;;; lap-out-cache-ref. This means that most port-specific
+;;; modifications to the implementation of caches will require
+;;; corresponding port-specific modifications to the lap code
+;;; assembler.
 (defmacro cache-vector-ref (cache-vector location)
   `(svref (the simple-vector ,cache-vector)
 	  (sb-ext:truly-the fixnum ,location)))
@@ -122,29 +124,28 @@
 		   1 (the fixnum (1+ old-count))))))))
 
 (deftype field-type ()
-  '(integer 0    ;#.(position 'number wrapper-layout)
-	    7))  ;#.(position 'number wrapper-layout :from-end t)
+  '(mod #.sb-kernel:layout-clos-hash-length))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
 (defun power-of-two-ceiling (x)
   (declare (fixnum x))
   ;;(expt 2 (ceiling (log x 2)))
   (the fixnum (ash 1 (integer-length (1- x)))))
-
-(defconstant *nkeys-limit* 256)
 ) ; EVAL-WHEN
+
+(defconstant +nkeys-limit+ 256)
 
 (defstruct (cache (:constructor make-cache ())
 		  (:copier copy-cache-internal))
   (owner nil)
-  (nkeys 1 :type (integer 1 #.*nkeys-limit*))
+  (nkeys 1 :type (integer 1 #.+nkeys-limit+))
   (valuep nil :type (member nil t))
   (nlines 0 :type fixnum)
   (field 0 :type field-type)
   (limit-fn #'default-limit-fn :type function)
   (mask 0 :type fixnum)
   (size 0 :type fixnum)
-  (line-size 1 :type (integer 1 #.(power-of-two-ceiling (1+ *nkeys-limit*))))
+  (line-size 1 :type (integer 1 #.(power-of-two-ceiling (1+ +nkeys-limit+))))
   (max-location 0 :type fixnum)
   (vector #() :type simple-vector)
   (overflow nil :type list))
@@ -156,15 +157,15 @@
 
 ;;; some facilities for allocation and freeing caches as they are needed
 
-;;; This is done on the assumption that a better port of PCL will arrange
-;;; to cons these all in the same static area. Given that, the fact that
-;;; PCL tries to reuse them should be a win.
+;;; This is done on the assumption that a better port of PCL will
+;;; arrange to cons these all in the same static area. Given that, the
+;;; fact that PCL tries to reuse them should be a win.
 
 (defvar *free-cache-vectors* (make-hash-table :size 16 :test 'eql))
 
-;;; Return a cache that has had flush-cache-vector-internal called on it. This
-;;; returns a cache of exactly the size requested, it won't ever return a
-;;; larger cache.
+;;; Return a cache that has had FLUSH-CACHE-VECTOR-INTERNAL called on
+;;; it. This returns a cache of exactly the size requested, it won't
+;;; ever return a larger cache.
 (defun get-cache-vector (size)
   (let ((entry (gethash size *free-cache-vectors*)))
     (without-interrupts
@@ -195,8 +196,8 @@
 	    (setf (cdr entry) cache-vector)
 	    nil)))))
 
-;;; This is just for debugging and analysis. It shows the state of the free
-;;; cache resource.
+;;; This is just for debugging and analysis. It shows the state of the
+;;; free cache resource.
 #+sb-show
 (defun show-free-cache-vectors ()
   (let ((elements ()))
@@ -220,17 +221,17 @@
 
 ;;;; wrapper cache numbers
 
-;;; The constant WRAPPER-CACHE-NUMBER-ADDS-OK controls the number of non-zero
-;;; bits wrapper cache numbers will have.
+;;; The constant WRAPPER-CACHE-NUMBER-ADDS-OK controls the number of
+;;; non-zero bits wrapper cache numbers will have.
 ;;;
-;;; The value of this constant is the number of wrapper cache numbers which
-;;; can be added and still be certain the result will be a fixnum. This is
-;;; used by all the code that computes primary cache locations from multiple
-;;; wrappers.
+;;; The value of this constant is the number of wrapper cache numbers
+;;; which can be added and still be certain the result will be a
+;;; fixnum. This is used by all the code that computes primary cache
+;;; locations from multiple wrappers.
 ;;;
-;;; The value of this constant is used to derive the next two which are the
-;;; forms of this constant which it is more convenient for the runtime code
-;;; to use.
+;;; The value of this constant is used to derive the next two which
+;;; are the forms of this constant which it is more convenient for the
+;;; runtime code to use.
 (defconstant wrapper-cache-number-length
   (integer-length sb-kernel:layout-clos-hash-max))
 (defconstant wrapper-cache-number-mask sb-kernel:layout-clos-hash-max)
@@ -239,47 +240,47 @@
 
 ;;;; wrappers themselves
 
-;;; This caching algorithm requires that wrappers have more than one wrapper
-;;; cache number. You should think of these multiple numbers as being in
-;;; columns. That is, for a given cache, the same column of wrapper cache
-;;; numbers will be used.
+;;; This caching algorithm requires that wrappers have more than one
+;;; wrapper cache number. You should think of these multiple numbers
+;;; as being in columns. That is, for a given cache, the same column
+;;; of wrapper cache numbers will be used.
 ;;;
-;;; If at some point the cache distribution of a cache gets bad, the cache
-;;; can be rehashed by switching to a different column.
+;;; If at some point the cache distribution of a cache gets bad, the
+;;; cache can be rehashed by switching to a different column.
 ;;;
-;;; The columns are referred to by field number which is that number which,
-;;; when used as a second argument to wrapper-ref, will return that column
-;;; of wrapper cache number.
+;;; The columns are referred to by field number which is that number
+;;; which, when used as a second argument to wrapper-ref, will return
+;;; that column of wrapper cache number.
 ;;;
-;;; This code is written to allow flexibility as to how many wrapper cache
-;;; numbers will be in each wrapper, and where they will be located. It is
-;;; also set up to allow port specific modifications to `pack' the wrapper
-;;; cache numbers on machines where the addressing modes make that a good
-;;; idea.
+;;; This code is written to allow flexibility as to how many wrapper
+;;; cache numbers will be in each wrapper, and where they will be
+;;; located. It is also set up to allow port specific modifications to
+;;; `pack' the wrapper cache numbers on machines where the addressing
+;;; modes make that a good idea.
 
-;;; In SBCL, as in CMU CL, we want to do type checking as early as possible;
-;;; structures help this.
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defconstant wrapper-cache-number-vector-length
-    sb-kernel:layout-clos-hash-length)
-  (defconstant wrapper-layout (make-list wrapper-cache-number-vector-length
-					 :initial-element 'number)))
+;;; In SBCL, as in CMU CL, we want to do type checking as early as
+;;; possible; structures help this. The structures are hard-wired to
+;;; have a fixed number of cache hash values, and that number must
+;;; correspond to the number of cache lines we use.
+(defconstant wrapper-cache-number-vector-length
+  sb-kernel:layout-clos-hash-length)
 
 (unless (boundp '*the-class-t*)
   (setq *the-class-t* nil))
 
-;;; Note that for SBCL, as for CMU CL, the WRAPPER of a built-in or structure
-;;; class will be some other kind of SB-KERNEL:LAYOUT, but this shouldn't
-;;; matter, since the only two slots that WRAPPER adds are meaningless in those
-;;; cases.
+;;; Note that for SBCL, as for CMU CL, the WRAPPER of a built-in or
+;;; structure class will be some other kind of SB-KERNEL:LAYOUT, but
+;;; this shouldn't matter, since the only two slots that WRAPPER adds
+;;; are meaningless in those cases.
 (defstruct (wrapper
 	    (:include sb-kernel:layout
-		      ;; KLUDGE: In CMU CL, the initialization default for
-		      ;; LAYOUT-INVALID was NIL. In SBCL, that has changed to
-		      ;; :UNINITIALIZED, but PCL code might still expect NIL
-		      ;; for the initialization default of WRAPPER-INVALID.
-		      ;; Instead of trying to find out, I just overrode the
-		      ;; LAYOUT default here. -- WHN 19991204
+		      ;; KLUDGE: In CMU CL, the initialization default
+		      ;; for LAYOUT-INVALID was NIL. In SBCL, that has
+		      ;; changed to :UNINITIALIZED, but PCL code might
+		      ;; still expect NIL for the initialization
+		      ;; default of WRAPPER-INVALID. Instead of trying
+		      ;; to find out, I just overrode the LAYOUT
+		      ;; default here. -- WHN 19991204
 		      (invalid nil))
 	    (:conc-name %wrapper-)
 	    (:constructor make-wrapper-internal))
@@ -292,31 +293,35 @@
 (defmacro wrapper-no-of-instance-slots (wrapper)
   `(sb-kernel:layout-length ,wrapper))
 
-;;; WRAPPER-STATE returns T (not generalized boolean, but T exactly) iff the
-;;; wrapper is valid. Any other return value denotes some invalid state.
-;;; Special conventions have been set up for certain invalid states, e.g.
-;;; obsoleteness or flushedness, but I (WHN 19991204) haven't been motivated to
-;;; reverse engineer them from the code and document them here.
+;;; WRAPPER-STATE returns T (not generalized boolean, but T exactly)
+;;; iff the wrapper is valid. Any other return value denotes some
+;;; invalid state. Special conventions have been set up for certain
+;;; invalid states, e.g. obsoleteness or flushedness, but I (WHN
+;;; 19991204) haven't been motivated to reverse engineer them from the
+;;; code and document them here.
 ;;;
 ;;; FIXME: This is awkward and unmnemonic. There is a function
-;;; (INVALID-WRAPPER-P) to test this return result abstractly for invalidness
-;;; but it's not called consistently; the functions that need to know whether a
-;;; wrapper is invalid often test (EQ (WRAPPER-STATE X) T), ick. It would be
-;;; good to use the abstract test instead. It would probably be even better to
-;;; switch the sense of the WRAPPER-STATE function, renaming it to
-;;; WRAPPER-INVALID and making it synonymous with LAYOUT-INVALID. Then the
-;;; INVALID-WRAPPER-P function would become trivial and would go away (replaced
-;;; with WRAPPER-INVALID), since all the various invalid wrapper states would
-;;; become generalized boolean "true" values. -- WHN 19991204
+;;; (INVALID-WRAPPER-P) to test this return result abstractly for
+;;; invalidness but it's not called consistently; the functions that
+;;; need to know whether a wrapper is invalid often test (EQ
+;;; (WRAPPER-STATE X) T), ick. It would be good to use the abstract
+;;; test instead. It would probably be even better to switch the sense
+;;; of the WRAPPER-STATE function, renaming it to WRAPPER-INVALID and
+;;; making it synonymous with LAYOUT-INVALID. Then the
+;;; INVALID-WRAPPER-P function would become trivial and would go away
+;;; (replaced with WRAPPER-INVALID), since all the various invalid
+;;; wrapper states would become generalized boolean "true" values. --
+;;; WHN 19991204
 #-sb-fluid (declaim (inline wrapper-state (setf wrapper-state)))
 (defun wrapper-state (wrapper)
   (let ((invalid (sb-kernel:layout-invalid wrapper)))
     (cond ((null invalid)
 	   t)
 	  ((atom invalid)
-	   ;; some non-PCL object. INVALID is probably :INVALID. We should
-	   ;; arguably compute the new wrapper here instead of returning NIL,
-	   ;; but we don't bother, since OBSOLETE-INSTANCE-TRAP can't use it.
+	   ;; some non-PCL object. INVALID is probably :INVALID. We
+	   ;; should arguably compute the new wrapper here instead of
+	   ;; returning NIL, but we don't bother, since
+	   ;; OBSOLETE-INSTANCE-TRAP can't use it.
 	   '(:obsolete nil))
 	  (t
 	   invalid))))
@@ -332,9 +337,9 @@
   `(%wrapper-class-slots ,wrapper))
 (defmacro wrapper-cache-number-vector (x) x)
 
-;;; This is called in BRAID when we are making wrappers for classes whose slots
-;;; are not initialized yet, and which may be built-in classes. We pass in the
-;;; class name in addition to the class.
+;;; This is called in BRAID when we are making wrappers for classes
+;;; whose slots are not initialized yet, and which may be built-in
+;;; classes. We pass in the class name in addition to the class.
 (defun boot-make-wrapper (length name &optional class)
   (let ((found (cl:find-class name nil)))
     (cond
@@ -356,10 +361,10 @@
 ;;; type testing and dispatch before PCL is loaded.
 (defvar *pcl-class-boot* nil)
 
-;;; In SBCL, as in CMU CL, the layouts (a.k.a wrappers) for built-in and
-;;; structure classes already exist when PCL is initialized, so we don't
-;;; necessarily always make a wrapper. Also, we help maintain the mapping
-;;; between cl:class and pcl::class objects.
+;;; In SBCL, as in CMU CL, the layouts (a.k.a wrappers) for built-in
+;;; and structure classes already exist when PCL is initialized, so we
+;;; don't necessarily always make a wrapper. Also, we help maintain
+;;; the mapping between cl:class and pcl::class objects.
 (defun make-wrapper (length class)
   (cond
    ((typep class 'std-class)
@@ -415,17 +420,18 @@
 	 (find-structure-class
 	  (cl:class-name (sb-kernel:layout-class wrapper))))))
 
-;;; The wrapper cache machinery provides general mechanism for trapping on the
-;;; next access to any instance of a given class. This mechanism is used to
-;;; implement the updating of instances when the class is redefined
-;;; (MAKE-INSTANCES-OBSOLETE). The same mechanism is also used to update
-;;; generic function caches when there is a change to the superclasses of a
-;;; class.
+;;; The wrapper cache machinery provides general mechanism for
+;;; trapping on the next access to any instance of a given class. This
+;;; mechanism is used to implement the updating of instances when the
+;;; class is redefined (MAKE-INSTANCES-OBSOLETE). The same mechanism
+;;; is also used to update generic function caches when there is a
+;;; change to the superclasses of a class.
 ;;;
-;;; Basically, a given wrapper can be valid or invalid. If it is invalid,
-;;; it means that any attempt to do a wrapper cache lookup using the wrapper
-;;; should trap. Also, methods on SLOT-VALUE-USING-CLASS check the wrapper
-;;; validity as well. This is done by calling CHECK-WRAPPER-VALIDITY.
+;;; Basically, a given wrapper can be valid or invalid. If it is
+;;; invalid, it means that any attempt to do a wrapper cache lookup
+;;; using the wrapper should trap. Also, methods on
+;;; SLOT-VALUE-USING-CLASS check the wrapper validity as well. This is
+;;; done by calling CHECK-WRAPPER-VALIDITY.
 
 ;;; FIXME: could become inline function
 (defmacro invalid-wrapper-p (wrapper)
@@ -437,13 +443,14 @@
   (ecase state
     ((:flush :obsolete)
      (let ((new-previous ()))
-       ;; First off, a previous call to invalidate-wrapper may have recorded
-       ;; owrapper as an nwrapper to update to. Since owrapper is about to
-       ;; be invalid, it no longer makes sense to update to it.
+       ;; First off, a previous call to INVALIDATE-WRAPPER may have
+       ;; recorded OWRAPPER as an NWRAPPER to update to. Since
+       ;; OWRAPPER is about to be invalid, it no longer makes sense to
+       ;; update to it.
        ;;
-       ;; We go back and change the previously invalidated wrappers so that
-       ;; they will now update directly to nwrapper. This corresponds to a
-       ;; kind of transitivity of wrapper updates.
+       ;; We go back and change the previously invalidated wrappers so
+       ;; that they will now update directly to NWRAPPER. This
+       ;; corresponds to a kind of transitivity of wrapper updates.
        (dolist (previous (gethash owrapper *previous-nwrappers*))
 	 (when (eq state ':obsolete)
 	   (setf (car previous) ':obsolete))
@@ -451,9 +458,8 @@
 	 (push previous new-previous))
 
        (let ((ocnv (wrapper-cache-number-vector owrapper)))
-	 (iterate ((type (list-elements wrapper-layout))
-		   (i (interval :from 0)))
-	   (when (eq type 'number) (setf (cache-number-vector-ref ocnv i) 0))))
+	 (dotimes (i sb-kernel:layout-clos-hash-length)
+	   (setf (cache-number-vector-ref ocnv i) 0)))
        (push (setf (wrapper-state owrapper) (list state nwrapper))
 	     new-previous)
 
@@ -473,14 +479,14 @@
 		    (obsolete-instance-trap owrapper (cadr state) instance)))))
 	  ;; This little bit of error checking is superfluous. It only
 	  ;; checks to see whether the person who implemented the trap
-	  ;; handling screwed up. Since that person is hacking internal
-	  ;; PCL code, and is not a user, this should be needless. Also,
-	  ;; since this directly slows down instance update and generic
-	  ;; function cache refilling, feel free to take it out sometime
-	  ;; soon.
+	  ;; handling screwed up. Since that person is hacking
+	  ;; internal PCL code, and is not a user, this should be
+	  ;; needless. Also, since this directly slows down instance
+	  ;; update and generic function cache refilling, feel free to
+	  ;; take it out sometime soon.
 	  ;;
-	  ;; FIXME: We probably need to add a #+SB-PARANOID feature to make
-	  ;; stuff like this optional. Until then, it stays in.
+	  ;; FIXME: We probably need to add a #+SB-PARANOID feature to
+	  ;; make stuff like this optional. Until then, it stays in.
 	  (cond ((neq nwrapper (wrapper-of instance))
 		 (error "wrapper returned from trap not wrapper of instance"))
 		((invalid-wrapper-p nwrapper)
@@ -639,14 +645,14 @@
 
 ;;; COMPUTE-PRIMARY-CACHE-LOCATION-FROM-LOCATION
 ;;;
-;;; This version is called on a cache line. It fetches the wrappers from
-;;; the cache line and determines the primary location. Various parts of
-;;; the cache filling code call this to determine whether it is appropriate
-;;; to displace a given cache entry.
+;;; This version is called on a cache line. It fetches the wrappers
+;;; from the cache line and determines the primary location. Various
+;;; parts of the cache filling code call this to determine whether it
+;;; is appropriate to displace a given cache entry.
 ;;;
-;;; If this comes across a wrapper whose cache-no is 0, it returns the symbol
-;;; invalid to suggest to its caller that it would be provident to blow away
-;;; the cache line in question.
+;;; If this comes across a wrapper whose CACHE-NO is 0, it returns the
+;;; symbol invalid to suggest to its caller that it would be provident
+;;; to blow away the cache line in question.
 (defun compute-primary-cache-location-from-location (to-cache
 						     from-location
 						     &optional
@@ -859,19 +865,17 @@
 ;;;;   add that having to practically write my own compiler in order to
 ;;;;   get just this simple thing is something of a drag.
 ;;;;
-;;;; KLUDGE: Maybe we could actually implement this as LABELS now, since AFAIK
-;;;; CMU CL doesn't freak out when you have a defun with a lot of LABELS in it
-;;;; (and if it does we can fix it instead of working around it). -- WHN
-;;;; 19991204
+;;;; KLUDGE: Maybe we could actually implement this as LABELS now,
+;;;; since AFAIK CMU CL doesn't freak out when you have a DEFUN with a
+;;;; lot of LABELS in it (and if it does we can fix it instead of
+;;;; working around it). -- WHN 19991204
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
 
 (defvar *cache* nil)
 
-;;; FIXME:
-;;;   (1) shouldn't be DEFCONSTANT, since it's not an EQL thing
-;;;   (2) should be undefined after bootstrapping
-(defconstant *local-cache-functions*
+;;; FIXME: should be undefined after bootstrapping
+(defparameter *local-cache-functions*
   '((cache () .cache.)
     (nkeys () (cache-nkeys .cache.))
     (line-size () (cache-line-size .cache.))
@@ -1055,10 +1059,10 @@
 ;;;   a cache
 ;;;   a mask
 ;;;   an absolute cache size (the size of the actual vector)
-;;; It tries to re-adjust the cache every time it makes a new fill. The
-;;; intuition here is that we want uniformity in the number of probes needed to
-;;; find an entry. Furthermore, adjusting has the nice property of throwing out
-;;; any entries that are invalid.
+;;; It tries to re-adjust the cache every time it makes a new fill.
+;;; The intuition here is that we want uniformity in the number of
+;;; probes needed to find an entry. Furthermore, adjusting has the
+;;; nice property of throwing out any entries that are invalid.
 (defvar *cache-expand-threshold* 1.25)
 
 (defun fill-cache (cache wrappers value &optional free-cache-p)
@@ -1225,13 +1229,13 @@
 
 ;;; Returns NIL or (values <field> <cache-vector>)
 ;;;
-;;; This is only called when it isn't possible to put the entry in the cache
-;;; the easy way. That is, this function assumes that FILL-CACHE-P has been
-;;; called as returned NIL.
+;;; This is only called when it isn't possible to put the entry in the
+;;; cache the easy way. That is, this function assumes that
+;;; FILL-CACHE-P has been called as returned NIL.
 ;;;
-;;; If this returns NIL, it means that it wasn't possible to find a wrapper
-;;; field for which all of the entries could be put in the cache (within the
-;;; limit).
+;;; If this returns NIL, it means that it wasn't possible to find a
+;;; wrapper field for which all of the entries could be put in the
+;;; cache (within the limit).
 (defun adjust-cache (cache wrappers value free-old-cache-p)
   (with-local-cache-functions (cache)
     (let ((ncache (get-cache-from-cache cache (nlines) (field))))
@@ -1279,8 +1283,8 @@
 	(when free-old-cache-p (free-cache cache))
 	(maybe-check-cache ncache)))))
 
-;;; This is the heart of the cache filling mechanism. It implements the
-;;; decisions about where entries are placed.
+;;; This is the heart of the cache filling mechanism. It implements
+;;; the decisions about where entries are placed.
 ;;;
 ;;; Find a line in the cache at which a new entry can be inserted.
 ;;;
@@ -1356,16 +1360,17 @@
 
 (defvar *empty-cache* (make-cache)) ; for defstruct slot initial value forms
 
-;;; Pre-allocate generic function caches. The hope is that this will put
-;;; them nicely together in memory, and that that may be a win. Of course
-;;; the first gc copy will probably blow that out, this really wants to be
-;;; wrapped in something that declares the area static.
+;;; Pre-allocate generic function caches. The hope is that this will
+;;; put them nicely together in memory, and that that may be a win. Of
+;;; course the first GC copy will probably blow that out, this really
+;;; wants to be wrapped in something that declares the area static.
 ;;;
-;;; This preallocation only creates about 25% more caches than PCL itself
-;;; uses. Some ports may want to preallocate some more of these.
+;;; This preallocation only creates about 25% more caches than PCL
+;;; itself uses. Some ports may want to preallocate some more of
+;;; these.
 ;;;
-;;; KLUDGE: Isn't something very similar going on in precom1.lisp? Do we need
-;;; it both here and there? Why? -- WHN 19991203
+;;; KLUDGE: Isn't something very similar going on in precom1.lisp? Do
+;;; we need it both here and there? Why? -- WHN 19991203
 (eval-when (:load-toplevel)
   (dolist (n-size '((1 513)(3 257)(3 129)(14 128)(6 65)(2 64)(7 33)(16 32)
 		    (16 17)(32 16)(64 9)(64 8)(6 5)(128 4)(35 2)))

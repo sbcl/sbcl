@@ -20,30 +20,33 @@
 
 ;;;; register specs
 
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defvar *byte-register-names* (make-array 8 :initial-element nil))
+  (defvar *word-register-names* (make-array 16 :initial-element nil))
+  (defvar *dword-register-names* (make-array 16 :initial-element nil))
+  (defvar *float-register-names* (make-array 8 :initial-element nil)))
+
 (macrolet ((defreg (name offset size)
 	     (let ((offset-sym (symbolicate name "-OFFSET"))
 		   (names-vector (symbolicate "*" size "-REGISTER-NAMES*")))
 	       `(progn
-		  (eval-when (:compile-toplevel :execute :load-toplevel)
-		    (defconstant ,offset-sym ,offset))
+		  (defconstant ,offset-sym ,offset)
 		  (setf (svref ,names-vector ,offset-sym)
 			,(symbol-name name)))))
-	   ;; FIXME: It looks to me as though DEFREGSET should also define the
-	   ;; *FOO-REGISTER-NAMES* variable.
+	   ;; FIXME: It looks to me as though DEFREGSET should also
+	   ;; define the related *FOO-REGISTER-NAMES* variable.
 	   (defregset (name &rest regs)
-	     `(eval-when (:compile-toplevel :execute :load-toplevel)
-		(defconstant ,name
+	     `(eval-when (:compile-toplevel :load-toplevel :execute)
+		(defparameter ,name
 		  (list ,@(mapcar (lambda (name)
 				    (symbolicate name "-OFFSET"))
 				  regs))))))
 
   ;; byte registers
   ;;
-  ;; Note: the encoding here is different then that used by the chip. We
-  ;; use this encoding so that the compiler thinks that AX (and EAX) overlap
-  ;; AL and AH instead of AL and CL.
-  (eval-when (:compile-toplevel :load-toplevel :execute)
-    (defvar *byte-register-names* (make-array 8 :initial-element nil)))
+  ;; Note: the encoding here is different than that used by the chip.
+  ;; We use this encoding so that the compiler thinks that AX (and
+  ;; EAX) overlap AL and AH instead of AL and CL.
   (defreg al 0 :byte)
   (defreg ah 1 :byte)
   (defreg cl 2 :byte)
@@ -52,11 +55,9 @@
   (defreg dh 5 :byte)
   (defreg bl 6 :byte)
   (defreg bh 7 :byte)
-  (defregset byte-regs al ah cl ch dl dh bl bh)
+  (defregset *byte-regs* al ah cl ch dl dh bl bh)
 
   ;; word registers
-  (eval-when (:compile-toplevel :load-toplevel :execute)
-    (defvar *word-register-names* (make-array 16 :initial-element nil)))
   (defreg ax 0 :word)
   (defreg cx 2 :word)
   (defreg dx 4 :word)
@@ -65,11 +66,9 @@
   (defreg bp 10 :word)
   (defreg si 12 :word)
   (defreg di 14 :word)
-  (defregset word-regs ax cx dx bx si di)
+  (defregset *word-regs* ax cx dx bx si di)
 
   ;; double word registers
-  (eval-when (:compile-toplevel :load-toplevel :execute)
-    (defvar *dword-register-names* (make-array 16 :initial-element nil)))
   (defreg eax 0 :dword)
   (defreg ecx 2 :dword)
   (defreg edx 4 :dword)
@@ -78,11 +77,9 @@
   (defreg ebp 10 :dword)
   (defreg esi 12 :dword)
   (defreg edi 14 :dword)
-  (defregset dword-regs eax ecx edx ebx esi edi)
+  (defregset *dword-regs* eax ecx edx ebx esi edi)
 
   ;; floating point registers
-  (eval-when (:compile-toplevel :load-toplevel :execute)
-    (defvar *float-register-names* (make-array 8 :initial-element nil)))
   (defreg fr0 0 :float)
   (defreg fr1 1 :float)
   (defreg fr2 2 :float)
@@ -91,15 +88,16 @@
   (defreg fr5 5 :float)
   (defreg fr6 6 :float)
   (defreg fr7 7 :float)
-  (defregset float-regs fr0 fr1 fr2 fr3 fr4 fr5 fr6 fr7)
+  (defregset *float-regs* fr0 fr1 fr2 fr3 fr4 fr5 fr6 fr7)
 
   ;; registers used to pass arguments
   ;;
   ;; the number of arguments/return values passed in registers
   (defconstant  register-arg-count 3)
   ;; names and offsets for registers used to pass arguments
-  (defconstant  register-arg-names '(edx edi esi))
-  (defregset    register-arg-offsets edx edi esi))
+  (eval-when (:compile-toplevel :load-toplevel :execute)
+    (defparameter *register-arg-names* '(edx edi esi)))
+  (defregset    *register-arg-offsets* edx edi esi))
 
 ;;;; SB definitions
 
@@ -145,23 +143,24 @@
     `(progn
        ,@(forms))))
 
-;;; The DEFINE-STORAGE-CLASS call for CATCH-BLOCK refers to the size of
-;;; CATCH-BLOCK. The size of CATCH-BLOCK isn't calculated until later in
-;;; the build process, and the calculation is entangled with code which has
-;;; lots of predependencies, including dependencies on the prior call of
-;;; DEFINE-STORAGE-CLASS. The proper way to unscramble this would be to
-;;; untangle the code, so that the code which calculates the size of
-;;; CATCH-BLOCK can be separated from the other lots-of-dependencies code, so
-;;; that the code which calculates the size of CATCH-BLOCK can be executed
-;;; early, so that this value is known properly at this point in compilation.
-;;; However, that would be a lot of editing of code that I (WHN 19990131) can't
-;;; test until the project is complete. So instead, I set the correct value by
-;;; hand here (a sort of nondeterministic guess of the right answer:-) and add
-;;; an assertion later, after the value is calculated, that the original guess
-;;; was correct.
+;;; The DEFINE-STORAGE-CLASS call for CATCH-BLOCK refers to the size
+;;; of CATCH-BLOCK. The size of CATCH-BLOCK isn't calculated until
+;;; later in the build process, and the calculation is entangled with
+;;; code which has lots of predependencies, including dependencies on
+;;; the prior call of DEFINE-STORAGE-CLASS. The proper way to
+;;; unscramble this would be to untangle the code, so that the code
+;;; which calculates the size of CATCH-BLOCK can be separated from the
+;;; other lots-of-dependencies code, so that the code which calculates
+;;; the size of CATCH-BLOCK can be executed early, so that this value
+;;; is known properly at this point in compilation. However, that
+;;; would be a lot of editing of code that I (WHN 19990131) can't test
+;;; until the project is complete. So instead, I set the correct value
+;;; by hand here (a sort of nondeterministic guess of the right
+;;; answer:-) and add an assertion later, after the value is
+;;; calculated, that the original guess was correct.
 ;;;
-;;; (What a KLUDGE! Anyone who wants to come in and clean up this mess has my
-;;; gratitude.) (FIXME: Maybe this should be me..)
+;;; (What a KLUDGE! Anyone who wants to come in and clean up this mess
+;;; has my gratitude.) (FIXME: Maybe this should be me..)
 (defconstant sb!vm::kludge-nondeterministic-catch-block-size 6)
 
 (define-storage-classes
@@ -213,7 +212,7 @@
   ;; immediate descriptor objects. Don't have to be seen by GC, but nothing
   ;; bad will happen if they are. (fixnums, characters, header values, etc).
   (any-reg registers
-	   :locations #.dword-regs
+	   :locations #.*dword-regs*
 	   :element-size 2
 ;	   :reserve-locations (#.eax-offset)
 	   :constant-scs (immediate)
@@ -222,7 +221,7 @@
 
   ;; pointer descriptor objects -- must be seen by GC
   (descriptor-reg registers
-		  :locations #.dword-regs
+		  :locations #.*dword-regs*
 		  :element-size 2
 ;		  :reserve-locations (#.eax-offset)
 		  :constant-scs (constant immediate)
@@ -231,7 +230,7 @@
 
   ;; non-descriptor characters
   (base-char-reg registers
-		 :locations #.byte-regs
+		 :locations #.*byte-regs*
 		 :reserve-locations (#.ah-offset #.al-offset)
 		 :constant-scs (immediate)
 		 :save-p t
@@ -239,7 +238,7 @@
 
   ;; non-descriptor SAPs (arbitrary pointers into address space)
   (sap-reg registers
-	   :locations #.dword-regs
+	   :locations #.*dword-regs*
 	   :element-size 2
 ;	   :reserve-locations (#.eax-offset)
 	   :constant-scs (immediate)
@@ -248,14 +247,14 @@
 
   ;; non-descriptor (signed or unsigned) numbers
   (signed-reg registers
-	      :locations #.dword-regs
+	      :locations #.*dword-regs*
 	      :element-size 2
 ;	      :reserve-locations (#.eax-offset)
 	      :constant-scs (immediate)
 	      :save-p t
 	      :alternate-scs (signed-stack))
   (unsigned-reg registers
-		:locations #.dword-regs
+		:locations #.*dword-regs*
 		:element-size 2
 ;		:reserve-locations (#.eax-offset)
 		:constant-scs (immediate)
@@ -265,12 +264,12 @@
   ;; miscellaneous objects that must not be seen by GC. Used only as
   ;; temporaries.
   (word-reg registers
-	    :locations #.word-regs
+	    :locations #.*word-regs*
 	    :element-size 2
 ;	    :reserve-locations (#.ax-offset)
 	    )
   (byte-reg registers
-	    :locations #.byte-regs
+	    :locations #.*byte-regs*
 ;	    :reserve-locations (#.al-offset #.ah-offset)
 	    )
 
@@ -325,20 +324,17 @@
 	       :element-size sb!vm::kludge-nondeterministic-catch-block-size))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
-
-(defconstant byte-sc-names '(base-char-reg byte-reg base-char-stack))
-(defconstant word-sc-names '(word-reg))
-(defconstant dword-sc-names
+(defparameter *byte-sc-names* '(base-char-reg byte-reg base-char-stack))
+(defparameter *word-sc-names* '(word-reg))
+(defparameter *dword-sc-names*
   '(any-reg descriptor-reg sap-reg signed-reg unsigned-reg control-stack
     signed-stack unsigned-stack sap-stack single-stack constant))
-
 ;;; added by jrd. I guess the right thing to do is to treat floats
 ;;; as a separate size...
 ;;;
 ;;; These are used to (at least) determine operand size.
-(defconstant float-sc-names '(single-reg))
-(defconstant double-sc-names '(double-reg double-stack))
-
+(defparameter *float-sc-names* '(single-reg))
+(defparameter *double-sc-names* '(double-reg double-stack))
 ) ; EVAL-WHEN
 
 ;;;; miscellaneous TNs for the various registers
@@ -348,8 +344,9 @@
 		      (dolist (reg-name reg-names)
 			(let ((tn-name (symbolicate reg-name "-TN"))
 			      (offset-name (symbolicate reg-name "-OFFSET")))
-			  ;; FIXME: Couldn't shouldn't this be DEFCONSTANT
-			  ;; instead of DEFPARAMETER?
+			  ;; FIXME: It'd be good to have the special
+			  ;; variables here be named with the *FOO*
+			  ;; convention.
 			  (forms `(defparameter ,tn-name
 				    (make-random-tn :kind :normal
 						    :sc (sc-or-lose ',sc-name)
@@ -366,7 +363,7 @@
 (defparameter *register-arg-tns*
   (mapcar (lambda (register-arg-name)
 	    (symbol-value (symbolicate register-arg-name "-TN")))
-	  register-arg-names))
+	  *register-arg-names*))
 
 ;;; FIXME: doesn't seem to be used in SBCL
 #|
@@ -379,8 +376,8 @@
 
 ;;; IMMEDIATE-CONSTANT-SC
 ;;;
-;;; If value can be represented as an immediate constant, then return the
-;;; appropriate SC number, otherwise return NIL.
+;;; If value can be represented as an immediate constant, then return
+;;; the appropriate SC number, otherwise return NIL.
 (def-vm-support-routine immediate-constant-sc (value)
   (typecase value
     ((or fixnum #-sb-xc-host system-area-pointer character)
@@ -436,11 +433,11 @@
     (ecase sb
       (registers
        (let* ((sc-name (sc-name sc))
-	      (name-vec (cond ((member sc-name byte-sc-names)
+	      (name-vec (cond ((member sc-name *byte-sc-names*)
 			       *byte-register-names*)
-			      ((member sc-name word-sc-names)
+			      ((member sc-name *word-sc-names*)
 			       *word-register-names*)
-			      ((member sc-name dword-sc-names)
+			      ((member sc-name *dword-sc-names*)
 			       *dword-register-names*))))
 	 (or (and name-vec
 		  (< -1 offset (length name-vec))
