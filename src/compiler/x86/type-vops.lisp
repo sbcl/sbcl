@@ -147,36 +147,23 @@
   (+ (* 2 (length type-codes))
      (if (> (apply #'max type-codes) lowtag-limit) 7 2)))
 
-(defmacro def-type-vops (pred-name check-name ptype error-code
-				   &rest type-codes)
-  (let ((cost (cost-to-test-types (mapcar #'eval type-codes))))
+(defmacro !define-type-vops (pred-name check-name ptype error-code
+			     (&rest type-codes)
+			     &key (variant nil variant-p))
+  ;; KLUDGE: UGH. Why do we need this eval? Can't we put this in the
+  ;; expansion?
+  (let* ((cost (cost-to-test-types (mapcar #'eval type-codes)))
+	 (prefix (if variant-p
+		     (concatenate 'string (string variant) "-")
+		     "")))
     `(progn
        ,@(when pred-name
-	   `((define-vop (,pred-name type-predicate)
+	   `((define-vop (,pred-name ,(intern (concatenate 'string prefix "TYPE-PREDICATE")))
 	       (:translate ,pred-name)
 	       (:generator ,cost
 		 (test-type value target not-p ,@type-codes)))))
        ,@(when check-name
-	   `((define-vop (,check-name check-type)
-	       (:generator ,cost
-		 (let ((err-lab
-			(generate-error-code vop ,error-code value)))
-		   (test-type value err-lab t ,@type-codes)
-		   (move result value))))))
-       ,@(when ptype
-	   `((primitive-type-vop ,check-name (:check) ,ptype))))))
-
-(defmacro def-simple-type-vops (pred-name check-name ptype error-code
-					  &rest type-codes)
-  (let ((cost (cost-to-test-types (mapcar #'eval type-codes))))
-    `(progn
-       ,@(when pred-name
-	   `((define-vop (,pred-name simple-type-predicate)
-	       (:translate ,pred-name)
-	       (:generator ,cost
-		 (test-type value target not-p ,@type-codes)))))
-       ,@(when check-name
-	   `((define-vop (,check-name simple-check-type)
+	   `((define-vop (,check-name ,(intern (concatenate 'string prefix "CHECK-TYPE")))
 	       (:generator ,cost
 		 (let ((err-lab
 			(generate-error-code vop ,error-code value)))
