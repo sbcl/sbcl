@@ -431,7 +431,8 @@ store_signal_data_for_later (struct interrupt_data *data, void *handler,
 {
     data->pending_handler = handler;
     data->pending_signal = signal;
-    memcpy(&(data->pending_info), info, sizeof(siginfo_t));
+    if(info)
+	memcpy(&(data->pending_info), info, sizeof(siginfo_t));
     memcpy(&(data->pending_mask),
 	   os_context_sigmask_addr(context),
 	   sizeof(sigset_t));
@@ -463,16 +464,19 @@ sig_stop_for_gc_handler(int signal, siginfo_t *info, void *void_context)
     sigset_t block;
 
     if(maybe_defer_handler(sig_stop_for_gc_handler,data,
-			   signal,info,context))
+			   signal,info,context)){
 	return;
-
+    }
     sigemptyset(&block);
     sigaddset_blockable(&block);
     sigprocmask(SIG_BLOCK, &block, 0);
     get_spinlock(&all_threads_lock,thread->pid);
     countdown_to_gc--;
     release_spinlock(&all_threads_lock);
+    /* need the context stored so it can have registers scavenged */
+    fake_foreign_function_call(context); 
     kill(getpid(),SIGSTOP);
+    undo_fake_foreign_function_call(context);
 }
 
 void
@@ -577,8 +581,9 @@ void handle_rt_signal(int num, siginfo_t *info, void *v_context)
     struct thread *th=arch_os_get_current_thread();
     struct interrupt_data *data=
 	th ? th->interrupt_data : global_interrupt_data;
-    if(maybe_defer_handler(handle_rt_signal,data,num,info,context))
+    if(maybe_defer_handler(handle_rt_signal,data,num,info,context)){
 	return ;
+    }
     arrange_return_to_lisp_function(context,info->si_value.sival_int);
 }
 #endif
@@ -625,6 +630,9 @@ interrupt_maybe_gc(int signal, siginfo_t *info, void *void_context)
     return 0;
 }
 
+#endif
+
+/* this is also used by from gencgc.c alloc() */
 boolean
 interrupt_maybe_gc_int(int signal, siginfo_t *info, void *void_context)
 {
@@ -638,7 +646,7 @@ interrupt_maybe_gc_int(int signal, siginfo_t *info, void *void_context)
     undo_fake_foreign_function_call(context);
     return 1;
 }
-#endif
+
 
 /*
  * noise to install handlers

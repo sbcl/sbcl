@@ -71,4 +71,6 @@ void sigaddset_blockable(sigset_t *s);
  * signal(..) handlers have another, and attempting to represent them
  * "cleanly" with union types is in fact a mess. */
 #define ARE_SAME_HANDLER(x, y) ((void*)(x) == (void*)(y))
+
 #endif
+

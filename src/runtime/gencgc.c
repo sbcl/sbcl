@@ -51,6 +51,13 @@
 /* assembly language stub that executes trap_PendingInterrupt */
 void do_pending_interrupt(void);
 
+/* forward declarations */
+int gc_find_freeish_pages(int *restart_page_ptr, int nbytes, int unboxed, struct alloc_region *alloc_region);
+void  gc_set_region_empty(struct alloc_region *region);
+void gc_alloc_update_all_page_tables(void);
+static void  gencgc_pickup_dynamic(void);
+boolean interrupt_maybe_gc_int(int, siginfo_t *, void *);
+
 
 /*
  * GC parameters
@@ -337,6 +344,8 @@ gen_av_mem_age(int gen)
 	/ ((double)generations[gen].bytes_allocated);
 }
 
+void fpu_save(int *);		/* defined in x86-assem.S */
+void fpu_restore(int *);	/* defined in x86-assem.S */
 /* The verbose argument controls how much to print: 0 for normal
  * level of detail; 1 for debugging. */
 static void
@@ -506,7 +515,7 @@ gc_alloc_new_region(int nbytes, int unboxed, struct alloc_region *alloc_region)
     gc_assert((alloc_region->first_page == 0)
 	      && (alloc_region->last_page == -1)
 	      && (alloc_region->free_pointer == alloc_region->end_addr));
-    get_spinlock(&free_pages_lock,alloc_region);
+    get_spinlock(&free_pages_lock,(int) alloc_region);
     if (unboxed) {
 	first_page =
 	    generations[gc_alloc_generation].alloc_unboxed_start_page;
@@ -710,7 +719,7 @@ gc_alloc_update_page_tables(int unboxed, struct alloc_region *alloc_region)
 
     next_page = first_page+1;
 
-    get_spinlock(&free_pages_lock,alloc_region);
+    get_spinlock(&free_pages_lock,(int) alloc_region);
     if (alloc_region->free_pointer != alloc_region->start_addr) {
 	/* some bytes were allocated in the region */
 	orig_first_page_bytes_used = page_table[first_page].bytes_used;
@@ -857,7 +866,7 @@ gc_alloc_large(int nbytes, int unboxed, struct alloc_region *alloc_region)
        index ahead of the current region and bumped up here to save a
        lot of re-scanning. */
 
-    get_spinlock(&free_pages_lock,alloc_region);
+    get_spinlock(&free_pages_lock,(int) alloc_region);
 
     if (unboxed) {
 	first_page =
@@ -3664,12 +3673,11 @@ garbage_collect_generation(int generation, int raise)
 	void **esp= (void **) &raise;
 #ifdef LISP_FEATURE_SB_THREAD
 	if(th!=arch_os_get_current_thread()) {
-	    os_context_t *last_context=th->interrupt_contexts
-		[fixnum_value(SymbolValue(FREE_INTERRUPT_CONTEXT_INDEX,th))];
-	    esp = *os_context_register_addr(last_context,reg_ESP);
+	    os_context_t *last_context=get_interrupt_context_for_thread(th);
+	    esp = (void **)*os_context_register_addr(last_context,reg_ESP);
 	}
 #endif
-	for (ptr = th->control_stack_end; ptr > esp;  ptr--) {
+	for (ptr = (void **)th->control_stack_end; ptr > esp;  ptr--) {
 	    preserve_pointer(*ptr);
 	}
     }
@@ -3972,7 +3980,7 @@ collect_garbage(unsigned last_gen)
     update_x86_dynamic_space_free_pointer();
     auto_gc_trigger = bytes_allocated + bytes_consed_between_gcs;
     if(gencgc_verbose)
-	fprintf(stderr,"Next gc when %d bytes have been consed\n",
+	fprintf(stderr,"Next gc when %ld bytes have been consed\n",
 		auto_gc_trigger);
     SHOW("returning from collect_garbage");
 }
@@ -4154,7 +4162,6 @@ gc_initialize_pointers(void)
 
 
 
-boolean maybe_gc_pending ;
 /* alloc(..) is the external interface for memory allocation. It
  * allocates to generation 0. It is not called from within the garbage
  * collector as it is only external uses that need the check for heap
@@ -4211,8 +4218,10 @@ alloc(int nbytes)
     if (auto_gc_trigger && bytes_allocated > auto_gc_trigger) {
 	/* set things up so that GC happens when we finish the PA
 	 * section.  */
-	maybe_gc_pending=1;
-	SetSymbolValue(PSEUDO_ATOMIC_INTERRUPTED, make_fixnum(1),th);
+	struct interrupt_data *data=th->interrupt_data;
+	os_context_t *context=get_interrupt_context_for_thread(th);
+	maybe_defer_handler
+	    (interrupt_maybe_gc_int,data,0,0,context);
     }
     new_obj = gc_alloc_with_region(nbytes,0,region,0);
     return (new_obj);
@@ -4293,10 +4302,9 @@ gencgc_handle_wp_violation(void* fault_addr)
 	     */
 	    if(page_table[page_index].write_protected_cleared != 1) 
 		lose("fault in heap page not marked as write-protected");
-	    
-	    /* Don't worry, we can handle it. */
-	    return 1;
 	}
+	/* Don't worry, we can handle it. */
+	return 1;
     }
 }
 /* This is to be called when we catch a SIGSEGV/SIGBUS, determine that
@@ -4307,7 +4315,7 @@ void
 unhandled_sigmemoryfault()
 {}
 
-gc_alloc_update_all_page_tables(void)
+void gc_alloc_update_all_page_tables(void)
 {
     /* Flush the alloc regions updating the tables. */
     struct thread *th;

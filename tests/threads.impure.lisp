@@ -100,7 +100,8 @@
     child))
 
 ;;; separate tests for (a) interrupting Lisp code, (b) C code, (c) a syscall,
-;;; (d) waiting on a lock
+;;; (d) waiting on a lock, (e) some code which we hope is likely to be
+;;; in pseudo-atomic
 
 (let ((child (test-interrupt (lambda () (loop)))))  (terminate-thread child))
 
@@ -124,5 +125,19 @@
     ;;hold onto lock for long enough that child can't get it immediately
     (sleep 5))
   (terminate-thread child))
+
+(defun alloc-stuff () (copy-list '(1 2 3 4 5)))
+(let ((c (test-interrupt (lambda () (loop (alloc-stuff))))))
+  ;; NB this only works on x86
+  (dotimes (i 100)
+    (sleep (random 1d0))
+    (interrupt-thread c
+		      (lambda ()
+			(assert (not SB-KERNEL:*PSEUDO-ATOMIC-ATOMIC*))))))
+  
+
+;; give the other thread time to die before we leave, otherwise the
+;; overall exit status is 0, not 104
+(sleep 2) 
 
 (sb-ext:quit :unix-status 104)
