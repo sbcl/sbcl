@@ -387,7 +387,7 @@
 ;;; slot values. Values for the alist slots are NCONCed to the
 ;;; beginning of the current value, rather than replacing it entirely.
 (defun make-lexenv (&key (default *lexenv*)
-			 funs vars blocks tags type-restrictions options
+			 funs vars blocks tags type-restrictions
 			 (lambda (lexenv-lambda default))
 			 (cleanup (lexenv-cleanup default))
 			 (policy (lexenv-policy default)))
@@ -402,8 +402,7 @@
      (frob blocks lexenv-blocks)
      (frob tags lexenv-tags)
      (frob type-restrictions lexenv-type-restrictions)
-     lambda cleanup policy
-     (frob options lexenv-options))))
+     lambda cleanup policy)))
 
 ;;; Makes a LEXENV, suitable for using in a MACROLET introduced
 ;;; macroexpander
@@ -432,9 +431,7 @@
      (lexenv-type-restrictions lexenv) ; XXX
      nil
      nil
-     (lexenv-policy lexenv)
-     nil ; XXX
-     )))
+     (lexenv-policy lexenv))))
 
 ;;;; flow/DFO/component hackery
 

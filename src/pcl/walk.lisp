@@ -136,7 +136,7 @@
 (defun bogo-fun-to-walker-info (bogo-fun)
   (declare (type function bogo-fun))
   (funcall bogo-fun *bogo-fun-magic-tag*))
-   
+
 (defun with-augmented-environment-internal (env funs macros)
   ;; Note: In order to record the correct function definition, we
   ;; would have to create an interpreted closure, but the

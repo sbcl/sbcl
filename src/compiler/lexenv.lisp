@@ -20,7 +20,7 @@
 	     (:constructor make-null-lexenv ())
 	     (:constructor internal-make-lexenv
 			   (funs vars blocks tags type-restrictions
-				 lambda cleanup policy options)))
+				 lambda cleanup policy)))
   ;; an alist of (NAME . WHAT), where WHAT is either a FUNCTIONAL (a
   ;; local function), a DEFINED-FUN, representing an
   ;; INLINE/NOTINLINE declaration, or a list (MACRO . <function>) (a
@@ -57,10 +57,7 @@
   ;; the lexically enclosing cleanup, or NIL if none enclosing within Lambda
   (cleanup nil)
   ;; the current OPTIMIZE policy
-  (policy *policy* :type policy)
-  ;; an alist of miscellaneous options that are associated with the
-  ;; lexical environment
-  (options nil :type list))
+  (policy *policy* :type policy))
 
 ;;; support for the idiom (in MACROEXPAND and elsewhere) that NIL is
 ;;; to be taken as a null lexical environment
