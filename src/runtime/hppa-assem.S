@@ -306,7 +306,7 @@ undefined_tramp:
         .byte	4
         .byte	UNDEFINED_FUN_ERROR
         .byte	254
-        .byte	(0x40 + sc_DescriptorReg)
+        .byte	(0x20 + sc_DescriptorReg)
         .byte	1
 	.align	4
 

@@ -281,13 +281,29 @@
     (compile nil '(lambda () (symbol-macrolet ((*standard-input* nil)) *standard-input*)))
   (assert failure-p)
   (assert (raises-error? (funcall function) program-error)))
-#|
+#||
 BUG 48c, not yet fixed:
 (multiple-value-bind (function warnings-p failure-p)
     (compile nil '(lambda () (symbol-macrolet ((s nil)) (declare (special s)) s)))
   (assert failure-p)
   (assert (raises-error? (funcall function) program-error)))
-|#
+||#
+
+;;; bug 120a: Turned out to be constraining code looking like (if foo
+;;; <X> <X>) where <X> was optimized by the compiler to be the exact
+;;; same block in both cases, but not turned into (PROGN FOO <X>).
+;;; Fixed by APD in sbcl-0.7.7.2, who provided this test:
+(declaim (inline dont-constrain-if-too-much))
+(defun dont-constrain-if-too-much (frame up-frame)
+  (declare (optimize (speed 3) (safety 1) (debug 1)))
+  (if (or (not frame) t)
+      frame
+      "bar"))
+(defun dont-constrain-if-too-much-aux (x y)
+  (declare (optimize (speed 3) (safety 1) (debug 1)))
+  (if x t (if y t (dont-constrain-if-too-much x y))))
+
+(assert (null (dont-constrain-if-too-much-aux nil nil)))  
 
 ;;;; tests not in the problem domain, but of the consistency of the
 ;;;; compiler machinery itself
