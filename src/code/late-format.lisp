@@ -1158,8 +1158,8 @@
 				  ;; subseq expansion.
 				  (subseq foo (1+ slash) (1- end)))))
 	   (first-colon (position #\: name))
-	   (last-colon (if first-colon (position #\: name :from-end t)))
-	   (package-name (if last-colon
+	   (second-colon (if first-colon (position #\: name :start (1+ first-colon))))
+	   (package-name (if first-colon
 			     (subseq name 0 first-colon)
 			     "COMMON-LISP-USER"))
 	   (package (find-package package-name)))
@@ -1169,7 +1169,10 @@
 	(error 'format-error
 	       :complaint "no package named ~S"
 	       :args (list package-name)))
-      (intern (if first-colon
-		  (subseq name (1+ first-colon))
-		  name)
+      (intern (cond
+		((and second-colon (= second-colon (1+ first-colon)))
+		 (subseq name (1+ second-colon)))
+		(first-colon
+		 (subseq name (1+ first-colon)))
+		(t name))
 	      package))))

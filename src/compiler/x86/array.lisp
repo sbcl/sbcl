@@ -72,6 +72,42 @@
 ;;; Note that the immediate SC for the index argument is disabled
 ;;; because it is not possible to generate a valid error code SC for
 ;;; an immediate value.
+;;;
+;;; FIXME: As per the KLUDGE note explaining the :IGNORE-FAILURE-P
+;;; flag in build-order.lisp-expr, compiling this file causes warnings
+;;;    Argument FOO to VOP CHECK-BOUND has SC restriction
+;;;    DESCRIPTOR-REG which is not allowed by the operand type:
+;;;      (:OR POSITIVE-FIXNUM)
+;;; CSR's message "format ~/ /" on sbcl-devel 2002-03-12 contained
+;;; a possible patch, described as
+;;;   Another patch is included more for information than anything --
+;;;   removing the descriptor-reg SCs from the CHECK-BOUND vop in
+;;;   x86/array.lisp seems to allow that file to compile without error[*],
+;;;   and build; I haven't tested rebuilding capability, but I'd be
+;;;   surprised if there were a problem.  I'm not certain that this is the
+;;;   correct fix, though, as the restrictions on the arguments to the VOP
+;;;   aren't the same as in the sparc and alpha ports, where, incidentally,
+;;;   the corresponding file builds without error currently.
+;;; Since neither of us (CSR or WHN) was quite sure that this is the
+;;; right thing, I've just recorded the patch here in hopes it might
+;;; help when someone attacks this problem again:
+;;;   diff -u -r1.7 array.lisp
+;;;   --- src/compiler/x86/array.lisp 11 Oct 2001 14:05:26 -0000      1.7
+;;;   +++ src/compiler/x86/array.lisp 12 Mar 2002 12:23:37 -0000
+;;;   @@ -76,10 +76,10 @@
+;;;      (:translate %check-bound)
+;;;      (:policy :fast-safe)
+;;;      (:args (array :scs (descriptor-reg))
+;;;   -        (bound :scs (any-reg descriptor-reg))
+;;;   -        (index :scs (any-reg descriptor-reg #+nil immediate) :target result))
+;;;   +        (bound :scs (any-reg))
+;;;   +        (index :scs (any-reg #+nil immediate) :target result))
+;;;      (:arg-types * positive-fixnum tagged-num)
+;;;   -  (:results (result :scs (any-reg descriptor-reg)))
+;;;   +  (:results (result :scs (any-reg)))
+;;;      (:result-types positive-fixnum)
+;;;      (:vop-var vop)
+;;;      (:save-p :compute-only)
 (define-vop (check-bound)
   (:translate %check-bound)
   (:policy :fast-safe)

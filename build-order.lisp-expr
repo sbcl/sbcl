@@ -515,7 +515,8 @@
  ("src/compiler/target/nlx")
  ("src/compiler/target/show")
  ("src/compiler/target/array"
-  ;; KLUDGE: Compiling this file raises alarming warnings of the form
+  ;; KLUDGE: Compiling this file for X86 raises alarming warnings of
+  ;; the form
   ;;    Argument FOO to VOP CHECK-BOUND has SC restriction
   ;;    DESCRIPTOR-REG which is not allowed by the operand type:
   ;;      (:OR POSITIVE-FIXNUM)
@@ -525,7 +526,8 @@
   ;; these warnings are severe enough that they would ordinarily abort
   ;; compilation, for now we blithely ignore them and press on to more
   ;; pressing problems. Someday, though, it would be nice to figure out
-  ;; what the problem is and fix it.. -- WHN 19990323
+  ;; what the problem is and fix it. (See the comments in
+  ;; src/compiler/x86/array for a candidate patch.) -- WHN 19990323
   :ignore-failure-p)
  ("src/compiler/target/pred")
  ("src/compiler/target/type-vops")

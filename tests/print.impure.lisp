@@ -63,5 +63,27 @@
 (assert (string= (format nil "~1,3,8,' $" 7.3) "   007.3"))
 (assert (string= (format nil "~2,3,8,'0$" 7.3) "00007.30"))
 
+;;; Check for symbol lookup in ~/ / directive -- double-colon was
+;;; broken in 0.7.1.36 and earlier
+(defun print-foo (stream arg colonp atsignp &rest params)
+  (declare (ignore colonp atsignp params))
+  (format stream "~d" arg))
+
+(assert (string= (format nil "~/print-foo/" 2) "2"))
+(assert (string= (format nil "~/cl-user:print-foo/" 2) "2"))
+(assert (string= (format nil "~/cl-user::print-foo/" 2) "2"))
+(assert (raises-error? (format nil "~/cl-user:::print-foo/" 2)))
+(assert (raises-error? (format nil "~/cl-user:a:print-foo/" 2)))
+(assert (raises-error? (format nil "~/a:cl-user:print-foo/" 2)))
+(assert (raises-error? (format nil "~/cl-user:print-foo:print-foo/" 2)))
+
+;;; better make sure that we get this one right, too
+(defun print-foo\:print-foo (stream arg colonp atsignp &rest params)
+  (declare (ignore colonp atsignp params))
+  (format stream "~d" arg))
+
+(assert (string= (format nil "~/cl-user:print-foo:print-foo/" 2) "2"))
+(assert (string= (format nil "~/cl-user::print-foo:print-foo/" 2) "2"))
+
 ;;; success
 (quit :unix-status 104)
