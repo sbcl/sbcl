@@ -11,6 +11,7 @@
 #include "sbcl.h"
 #include "runtime.h"
 #include "validate.h"		/* for CONTROL_STACK_SIZE etc */
+#include "alloc.h"
 #include "thread.h"
 #include "arch.h"
 #include "target-arch-os.h"

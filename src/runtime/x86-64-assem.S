@@ -321,7 +321,6 @@ GNAME(post_signal_tramp):
 	/* this is notionally the second half of a function whose first half
  	 * doesn't exist.  This is where call_into_lisp returns when called 
 	 * using return_to_lisp_function */
-	addq $24,%rsp  	/* clear call_into_lisp args from stack */
 	popq %r15
 	popq %r14
 	popq %r13
@@ -333,7 +332,7 @@ GNAME(post_signal_tramp):
 	popq %rdi
 	popq %rsi
 	popq %rbp
-	popq %rsp
+	addq $8,%rsp  /* if rsp was wrong we wouldn't get this far */
 	popq %rdx
 	popq %rbx
 	popq %rcx
