@@ -28,7 +28,6 @@ echo //doing warm init
 ./src/runtime/sbcl \
 --core output/cold-sbcl.core \
 --sysinit /dev/null --userinit /dev/null <<-'EOF' || exit 1
-
 	;; Now that we use the compiler for macros, interpreted
 	;; /SHOW doesn't work until later in init.
         #+sb-show (print "/hello, world!")

@@ -258,6 +258,7 @@ of SBCL which maintained the CMU-CL-style split into two packages.)"
                "GET-VECTOR-SUBTYPE"
                "HALT"
                "IF-EQ" "INLINE-SYNTACTIC-CLOSURE-LAMBDA"
+	       "INSERT-STEP-CONDITIONS"
                "INSTANCE-REF" "INSTANCE-SET"
                "IR2-COMPONENT-CONSTANTS" "IR2-CONVERT"
                "IR2-PHYSENV-NUMBER-STACK-P"
@@ -688,6 +689,14 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
 	       "*ED-FUNCTIONS*"
 	       "*MODULE-PROVIDER-FUNCTIONS*"
 	       "WITH-TIMEOUT" "TIMEOUT"
+
+	       ;; stepping interface
+	       "STEP-CONDITION" "STEP-FORM-CONDITION"
+	       "STEP-VALUES-CONDITION" "STEP-VARIABLE-CONDITION"
+	       "STEP-CONDITION-FORM" "STEP-CONDITION-SOURCE-PATH"
+               "STEP-CONDITION-PATHNAME" "STEP-CONDITION-RESULT"
+               "STEP-CONTINUE" "STEP-NEXT" "STEP-INTO" 
+               "*STEPPER-HOOK*"
 	     
 	       ;; RUN-PROGRAM is not only useful for users, but also
 	       ;; useful to implement parts of SBCL itself, so we're
@@ -746,6 +755,9 @@ retained, possibly temporariliy, because it might be used internally."
 	       ;; INFO stuff doesn't belong in a user-visible package, we
 	       ;; should be able to change it without apology.
 	       "*INFO-ENVIRONMENT*"
+
+               ;; stepping control
+               "*STEPPING*" "*STEP*"
 	       "CLEAR-INFO"
 	       "COMPACT-INFO-ENVIRONMENT"
 	       "DEFINE-INFO-CLASS" "DEFINE-INFO-TYPE"

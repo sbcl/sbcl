@@ -1075,6 +1075,64 @@ SB-EXT:PACKAGE-LOCKED-ERROR-SYMBOL."))
 	       (reader-impossible-number-error-error condition))))))
 
 (define-condition timeout (serious-condition) ())
+
+;;; Single stepping conditions
+
+(define-condition step-condition ()
+  ((form :initarg :form :reader step-condition-form))
+  #!+sb-doc
+  (:documentation "Common base class of single-stepping conditions.
+STEP-CONDITION-FORM holds a string representation of the form being
+stepped."))
+
+#!+sb-doc
+(setf (fdocumentation 'step-condition-form 'function)
+      "Form associated with the STEP-CONDITION.")
+
+(define-condition step-form-condition (step-condition)
+  ((source-path :initarg :source-path :reader step-condition-source-path)
+   (pathname :initarg :pathname :reader step-condition-pathname))
+  #!+sb-doc
+  (:documentation "Condition signalled by code compiled with
+single-stepping information when about to execute a form.
+STEP-CONDITION-FORM holds the form, STEP-CONDITION-PATHNAME holds the
+pathname of the original file or NIL, and STEP-CONDITION-SOURCE-PATH
+holds the source-path to the original form within that file or NIL.
+Associated with this condition are always the restarts STEP-INTO,
+STEP-NEXT, and STEP-CONTINUE."))
+
+#!+sb-doc
+(setf (fdocumentation 'step-condition-source-path 'function)
+      "Source-path of the original form associated with the
+STEP-FORM-CONDITION or NIL."
+      (fdocumentation 'step-condition-pathname 'function)
+      "Pathname of the original source-file associated with the
+STEP-FORM-CONDITION or NIL.")
+
+(define-condition step-result-condition (step-condition)
+  ((result :initarg :result :reader step-condition-result)))
+
+#!+sb-doc
+(setf (fdocumentation 'step-condition-result 'function)
+      "Return values associated with STEP-VALUES-CONDITION as a list,
+or the variable value associated with STEP-VARIABLE-CONDITION.")
+
+(define-condition step-values-condition (step-result-condition)
+  ()
+  #!+sb-doc
+  (:documentation "Condition signalled by code compiled with
+single-stepping information after executing a form.
+STEP-CONDITION-FORM holds the form, and STEP-CONDITION-RESULT holds
+the values returned by the form as a list. No associated restarts."))
+
+(define-condition step-variable-condition (step-result-condition)
+  ()
+  #!+sb-doc
+  (:documentation "Condition signalled by code compiled with
+single-stepping information when referencing a variable.
+STEP-CONDITION-FORM hold the symbol, and STEP-CONDITION-RESULT holds
+the value of the variable. No associated restarts."))
+
 
 ;;;; restart definitions
 
@@ -1115,6 +1173,27 @@ SB-EXT:PACKAGE-LOCKED-ERROR-SYMBOL."))
   (define-nil-returning-restart use-value (value)
     "Transfer control and VALUE to a restart named USE-VALUE, or return NIL if
    none exists."))
+
+;;; single-stepping restarts
+
+(macrolet ((def (name doc)
+	       #!-sb-doc (declare (ignore doc))
+	       `(defun ,name (condition)
+		 #!+sb-doc ,doc
+		 (invoke-restart (find-restart-or-control-error ',name condition)))))
+  (def step-continue
+      "Transfers control to the STEP-CONTINUE restart associated with
+the condition, continuing execution without stepping. Signals a
+CONTROL-ERROR if the restart does not exist.")
+  (def step-next
+      "Transfers control to the STEP-NEXT restart associated with the
+condition, executing the current form without stepping and continuing
+stepping with the next form. Signals CONTROL-ERROR is the restart does
+not exists.")
+  (def step-into
+      "Transfers control to the STEP-INTO restart associated with the
+condition, stepping into the current form. Signals a CONTROL-ERROR is
+the restart does not exist."))
 
 (/show0 "condition.lisp end of file")
 

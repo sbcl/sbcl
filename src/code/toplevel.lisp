@@ -38,6 +38,17 @@
 ;;; counts of nested errors (with internal errors double-counted)
 (defvar *maximum-error-depth*)
 (defvar *current-error-depth*)
+
+;;;; stepping control
+(defvar *step*)
+(defvar *stepping*)
+(defvar *step-form-stack* nil 
+  "A place for single steppers to push information about
+STEP-FORM-CONDITIONS avaiting the corresponding
+STEP-VALUES-CONDITIONS. The system is guaranteed to empty the stack
+when stepping terminates, so that it remains in sync, but doesn't
+modify it in any other way: it is provided for implmentors of single
+steppers to maintain contextual information.")
 
 ;;;; miscellaneous utilities for working with with TOPLEVEL
 
@@ -526,36 +537,39 @@
       ;; Each REPL in a multithreaded world should have bindings of
       ;; most CL specials (most critically *PACKAGE*).
       (with-rebound-io-syntax
-	;; WITH-SIMPLE-RESTART doesn't actually restart its body as
-	;; some (like WHN for an embarrassingly long time
-	;; ca. 2001-12-07) might think, but instead drops control back
-	;; out at the end. So when a TOPLEVEL or outermost-ABORT
-	;; restart happens, we need this outer LOOP wrapper to grab
-	;; control and start over again. (And it also wraps CATCH
-	;; 'TOPLEVEL-CATCHER for similar reasons.)
-	(loop
-	 (/show0 "about to set up restarts in TOPLEVEL-REPL")
-	 ;; There should only be one TOPLEVEL restart, and it's here,
-	 ;; so restarting at TOPLEVEL always bounces you all the way
-	 ;; out here.
-	 (with-simple-restart (toplevel
-			       "Restart at toplevel READ/EVAL/PRINT loop.")
-	   ;; We add a new ABORT restart for every debugger level, so
-	   ;; restarting at ABORT in a nested debugger gets you out to
-	   ;; the innermost enclosing debugger, and only when you're
-	   ;; in the outermost, unnested debugger level does
-	   ;; restarting at ABORT get you out to here.
-	   (with-simple-restart
-	       (abort
-		"~@<Reduce debugger level (leaving debugger, returning to toplevel).~@:>")
-	     (catch 'toplevel-catcher
-	       (sb!unix::reset-signal-mask)
-	       ;; In the event of a control-stack-exhausted-error, we
-	       ;; should have unwound enough stack by the time we get
-	       ;; here that this is now possible.
-	       (sb!kernel::protect-control-stack-guard-page 1)
-	       (funcall repl-fun noprint)
-	       (critically-unreachable "after REPL")))))))))
+	  (handler-bind ((step-condition 'invoke-stepper))
+	    (let ((*stepping* nil)
+		  (*step* nil))
+	      ;; WITH-SIMPLE-RESTART doesn't actually restart its body as
+	      ;; some (like WHN for an embarrassingly long time
+	      ;; ca. 2001-12-07) might think, but instead drops control back
+	      ;; out at the end. So when a TOPLEVEL or outermost-ABORT
+	      ;; restart happens, we need this outer LOOP wrapper to grab
+	      ;; control and start over again. (And it also wraps CATCH
+	      ;; 'TOPLEVEL-CATCHER for similar reasons.)
+	      (loop
+	       (/show0 "about to set up restarts in TOPLEVEL-REPL")
+	       ;; There should only be one TOPLEVEL restart, and it's here,
+	       ;; so restarting at TOPLEVEL always bounces you all the way
+	       ;; out here.
+	       (with-simple-restart (toplevel
+				     "Restart at toplevel READ/EVAL/PRINT loop.")
+		 ;; We add a new ABORT restart for every debugger level, so
+		 ;; restarting at ABORT in a nested debugger gets you out to
+		 ;; the innermost enclosing debugger, and only when you're
+		 ;; in the outermost, unnested debugger level does
+		 ;; restarting at ABORT get you out to here.
+		 (with-simple-restart
+		     (abort "~@<Reduce debugger level (leaving debugger, ~
+                            returning to toplevel).~@:>")
+		   (catch 'toplevel-catcher
+		     (sb!unix::reset-signal-mask)
+		     ;; In the event of a control-stack-exhausted-error, we
+		     ;; should have unwound enough stack by the time we get
+		     ;; here that this is now possible.
+		     (sb!kernel::protect-control-stack-guard-page 1)
+		     (funcall repl-fun noprint)
+		     (critically-unreachable "after REPL")))))))))))
 
 ;;; Our default REPL prompt is the minimal traditional one.
 (defun repl-prompt-fun (stream)
@@ -575,26 +589,31 @@
 (defun repl-fun (noprint)
   (/show0 "entering REPL")
   (loop
-   ;; (See comment preceding the definition of SCRUB-CONTROL-STACK.)
-   (scrub-control-stack)
-   (sb!thread::get-foreground)
-   (unless noprint
-     (funcall *repl-prompt-fun* *standard-output*)
-     ;; (Should *REPL-PROMPT-FUN* be responsible for doing its own
-     ;; FORCE-OUTPUT? I can't imagine a valid reason for it not to
-     ;; be done here, so leaving it up to *REPL-PROMPT-FUN* seems
-     ;; odd. But maybe there *is* a valid reason in some
-     ;; circumstances? perhaps some deadlock issue when being driven
-     ;; by another process or something...)
-     (force-output *standard-output*))
-   (let* ((form (funcall *repl-read-form-fun*
-			 *standard-input*
-			 *standard-output*))
-	  (results (multiple-value-list (interactive-eval form))))
-     (unless noprint
-       (dolist (result results)
-	 (fresh-line)
-	 (prin1 result))))))
+   (unwind-protect
+	(progn
+	  ;; (See comment preceding the definition of SCRUB-CONTROL-STACK.)
+	  (scrub-control-stack)
+	  (sb!thread::get-foreground)
+	  (unless noprint
+	    (funcall *repl-prompt-fun* *standard-output*)
+	    ;; (Should *REPL-PROMPT-FUN* be responsible for doing its own
+	    ;; FORCE-OUTPUT? I can't imagine a valid reason for it not to
+	    ;; be done here, so leaving it up to *REPL-PROMPT-FUN* seems
+	    ;; odd. But maybe there *is* a valid reason in some
+	    ;; circumstances? perhaps some deadlock issue when being driven
+	    ;; by another process or something...)
+	    (force-output *standard-output*))
+	  (let* ((form (funcall *repl-read-form-fun*
+				*standard-input*
+				*standard-output*))
+		 (results (multiple-value-list (interactive-eval form))))
+	    (unless noprint
+	      (dolist (result results)
+		(fresh-line)
+		(prin1 result)))))
+     ;; If we started stepping in the debugger we want to stop now.
+     (setf *stepping* nil
+	   *step* nil))))
 
 ;;; a convenient way to get into the assembly-level debugger
 (defun %halt ()

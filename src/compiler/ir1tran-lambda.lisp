@@ -865,7 +865,8 @@
                     (process-decls decls (append aux-vars vars) nil))
                    (forms (if (and *allow-debug-catch-tag*
                                    (policy *lexenv* (>= insert-debug-catch 2)))
-                              `((catch (make-symbol "SB-DEBUG-CATCH-TAG")
+                              `((catch (locally (declare (optimize (insert-step-conditions 0)))
+                                         (make-symbol "SB-DEBUG-CATCH-TAG"))
                                   ,@forms))
                               forms))
                    (forms (if (eq result-type *wild-type*)

@@ -478,6 +478,8 @@
     (ir1-error-bailout (start next result form)
       (let ((*current-path* (or (gethash form *source-paths*)
 				(cons form *current-path*))))
+	(if (step-form-p form)
+	    (ir1-convert-step start next result form)
 	(if (atom form)
 	    (cond ((and (symbolp form) (not (keywordp form)))
 		   (ir1-convert-var start next result form))
@@ -519,7 +521,7 @@
 					       :debug-name (debug-namify
 							    "LAMBDA CAR "
 							    opname)
-					       :allow-debug-catch-tag t))))))))
+					       :allow-debug-catch-tag t)))))))))
     (values))
 
   ;; Generate a reference to a manifest constant, creating a new leaf

@@ -167,6 +167,7 @@
 		"SRC;CODE;INSPECT"
 		"SRC;CODE;PROFILE"
 		"SRC;CODE;NTRACE"
+                "SRC;CODE;STEP"
 		"SRC;CODE;RUN-PROGRAM"
 
 		;; Code derived from PCL's pre-ANSI DESCRIBE-OBJECT

@@ -60,3 +60,9 @@
 (define-optimization-quality float-accuracy
     3
   ("degraded" "full" "full" "full"))
+
+(define-optimization-quality insert-step-conditions
+    (if (> debug (max speed space))
+        debug
+        0)
+  ("no" "no" "partial" "full"))

@@ -476,6 +476,7 @@
  ("src/compiler/ir1tran")
  ("src/compiler/ir1tran-lambda")
  ("src/compiler/ir1-translators")
+ ("src/compiler/ir1-step")
  ("src/compiler/ir1util")
  ("src/compiler/ir1report")
  ("src/compiler/ir1opt")

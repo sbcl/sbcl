@@ -71,6 +71,7 @@ $SBCL_XC_HOST <<-'EOF' || exit 1
 	       (safety 2)
 	       (space 1)
 	       (speed 2)
+               (sb!c:insert-step-conditions 0)
                (sb!c::stack-allocate-dynamic-extent 3)))))
         (compile 'proclaim-target-optimization)
 	(defun in-target-cross-compilation-mode (fun)

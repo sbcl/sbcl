@@ -35,6 +35,7 @@ indistinguishable from interpreted code debugging.
 * Exiting Commands::            
 * Information Commands::        
 * Function Tracing::            
+* Single Stepping::             
 @end menu
 
 @node  Starting the Debugger
@@ -900,7 +901,7 @@ Level @code{1} plus all interned local variables, source location
 information, and lifetime information that tells the debugger when
 arguments are available (even when @code{speed} is @code{3} or the
 argument is set).
-
+ 
 @item > 2
 Any level greater than @code{2} gives level @code{2} and in addition
 disables tail-call optimization, so that the backtrace will contain
@@ -917,6 +918,10 @@ obvious space penalty.
 If @code{debug} is greater than both @code{speed} and @code{space},
 the command @command{return} can be used to continue execution by
 returning a value from the current stack frame.
+
+If @code{debug} is also at least 2, then  the code is @emph{partially
+steppable}. If @code{debug} is 3, the code is @emph{fully steppable}.
+@xref{Single Stepping} for details.
 
 @end table
 
@@ -1006,16 +1011,15 @@ Displays all the frames from the current to the bottom.  Only shows
 @var{n} frames if specified.  The printing is controlled by @code{*debug-print-variable-alist*}.
 @end deffn
 
-@comment  FIXME (rudi 2004-03-31): sbcl doesn't support breakpoints
-@comment  and stepping as of version 0.8.9.  The `list-locations'
-@comment  command works, but executing a function leads to an error
-@comment  when a breakpoint is hit.  When stepping works, the
-@comment  commented-out section below should be reinstated and the
-@comment  example output updated to correspont to sbcl's behaviour.
+@deffn {Debugger Command} step
+Selects the @code{continue} restart if one exists and starts single stepping.
+@xref{Single Stepping}.
+@end deffn
 
-@c @node  Breakpoint Commands, , Information Commands, The Debugger
-@c @comment  node-name,  next,  previous,  up
-@c @section Breakpoint Commands
+@c The new instrumentation based single stepper doesn't support
+@c the following commands, but BREAKPOINT at least should be
+@c resurrectable via (TRACE FOO :BREAK T).
+
 @c @cindex Breakpoints
 
 @c SBCL supports setting of breakpoints inside compiled functions and
@@ -1063,12 +1067,6 @@ Displays all the frames from the current to the bottom.  Only shows
 @c Delete a breakpoint specified by its breakpoint number.  If no number
 @c is specified, delete all breakpoints.
 @c @end deffn
-
-@c @deffn {Debugger Command} step
-@c Step to the next possible breakpoint location in the current function.
-@c This always steps over function calls, instead of stepping into them.
-@c @end deffn
-
 
 @c @menu
 @c * Breakpoint Example::          
@@ -1180,5 +1178,34 @@ function entry or exit.
 @comment 0.8.9) in a state of flux.  When it's sorted out, revive the
 @comment cmucl documentation.
 
+@node Single Stepping
+@comment  node-name,  next,  previous,  up
+@section Single Stepping
+@cindex Stepper
+@cindex Single Stepping
 
+SBCL includes an instrumentation based single-stepper for compiled
+code, that can be invoked via the @code{step} macro, or from within
+the debugger. @xref{Debugger Policy Control} for details on enabling
+stepping for compiled code.
 
+Compiled code can be unsteppable, partially steppable, or fully steppable.
+
+@table @strong
+
+@item Unsteppable
+Single stepping is not possible.
+
+@item Partially steppable
+Single stepping is possible at sequential function call granularity:
+nested function calls cannot be stepped into, and no intermediate
+values are available.
+
+@item Fully steppable
+Single stepping is possible at individual function call argument
+granularity, nested calls can be stepped into, and intermediate values
+are available.
+
+@end table
+
+@include macro-common-lisp-step.texinfo
