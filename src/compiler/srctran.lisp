@@ -3245,6 +3245,7 @@
      (let* ((specifier (continuation-value type))
 	    (result-typeoid (careful-specifier-type specifier)))
        (cond
+	 ((null result-typeoid) nil)
 	 ((csubtypep result-typeoid (specifier-type 'number))
 	  ;; the difficult case: we have to cope with ANSI 12.1.5.3
 	  ;; Rule of Canonical Representation for Complex Rationals,

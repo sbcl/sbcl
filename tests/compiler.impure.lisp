@@ -719,7 +719,14 @@ BUG 48c, not yet fixed:
 (assert (equal (bug223-int 4) '(ext int 3)))
 (bug223-wrap)
 (assert (equal (bug223-int 4) '(ext ext int 2)))
-
+
+;;; COERCE got its own DEFOPTIMIZER which has to reimplement most of
+;;; SPECIFIER-TYPE-NTH-ARG.  For a while, an illegal type would throw
+;;; you into the debugger on compilation.
+(defun coerce-defopt (x)
+  ;; illegal, but should be compilable.
+  (coerce x '(values t)))
+(assert (null (ignore-errors (coerce-defopt 3))))
 
 ;;;; tests not in the problem domain, but of the consistency of the
 ;;;; compiler machinery itself
