@@ -1496,13 +1496,6 @@ WORKAROUND:
   (it is likely that the fault lies in PPRINT-LOGICAL-BLOCK, as
   suggested by the suggested implementation of PPRINT-TABULAR)
 
-342: PPRINT-TABULAR / PPRINT-LOGICAL-BLOCK logical block start position
-  The logical block introduced by PPRINT-LOGICAL-BLOCK should not
-  include the prefix, so that
-    (pprint-tabular *standard-output* '(1 2 3) t nil 2)
-  should print
-  "(1 2 3)" rather than "(1  2 3)".
-
 343: MOP:COMPUTE-DISCRIMINATING-FUNCTION overriding causes error
   Even the simplest possible overriding of
   COMPUTE-DISCRIMINATING-FUNCTION, suggested in the PCL implementation

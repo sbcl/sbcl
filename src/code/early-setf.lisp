@@ -428,11 +428,11 @@ GET-SETF-EXPANSION directly."
 ;;; DEFINE-SETF-EXPANDER is a lot like DEFMACRO.
 (def!macro sb!xc:define-setf-expander (access-fn lambda-list &body body)
   #!+sb-doc
-  "Syntax like DEFMACRO, but creates a Setf-Method generator. The body
-  must be a form that returns the five magical values."
+  "Syntax like DEFMACRO, but creates a setf expander function. The body
+  of the definition must be a form that returns five appropriate values."
   (unless (symbolp access-fn)
-    (error "DEFINE-SETF-EXPANDER access-function name ~S is not a symbol."
-	   access-fn))
+    (error "~S access-function name ~S is not a symbol."
+           'sb!xc:define-setf-expander access-fn))
   (with-unique-names (whole environment)
     (multiple-value-bind (body local-decs doc)
 	(parse-defmacro lambda-list whole body access-fn
@@ -576,10 +576,10 @@ GET-SETF-EXPANSION directly."
 
 (sb!xc:define-setf-expander the (type place &environment env)
   (declare (type sb!c::lexenv env))
-  (multiple-value-bind (dummies vals newval setter getter)
-      (get-setf-method place env)
-    (values dummies
-	      vals
-	      newval
-	      (subst `(the ,type ,(car newval)) (car newval) setter)
-	      `(the ,type ,getter))))
+  (multiple-value-bind (temps subforms store-vars setter getter)
+      (sb!xc:get-setf-expansion place env)
+    (values temps subforms store-vars
+            `(multiple-value-bind ,store-vars
+                 (the ,type (values ,@store-vars))
+               ,setter)
+            `(the ,type ,getter))))

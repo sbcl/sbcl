@@ -39,5 +39,12 @@
     (assert (null b))
     (assert (null d))))
 
+;;; SETF of THE with VALUES.
+(let (x y)
+  (setf (the (values fixnum fixnum) (values x y))
+        (values 1 2))
+  (assert (= x 1))
+  (assert (= y 2)))
+
 ;;; success
 (quit :unix-status 104)
