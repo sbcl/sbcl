@@ -1311,8 +1311,12 @@ changes in sbcl-0.7.9 relative to sbcl-0.7.8:
   * fixed bug 142: The FFI conversion of C string values to Lisp
     string values no longer conses excessively. (thanks to Nathan
     Froyd porting Raymond Toy's fix to CMU CL)
-  * improved MOP conformance in PCL (thanks to Nathan Froyd porting
-    Gerd Moellman's work in CMU CL)
+  * began to systematize and improve MOP conformance in PCL (thanks to
+    Nathan Froyd, Gerd Moellman and Pierre Mai):
+    ** SLOT-DEFINITION-ALLOCATION now returns :CLASS, not the class
+       itself;
+    ** GENERIC-FUNCTION-ARGUMENT-PRECEDENCE-ORDER is now implemented;
+    ** FINALIZE-INHERITANCE is now called on class finalization.
   * fixed bug 202: The compiler no longer fails on functions whose
     derived types contradict their declared type.
   * DEFMACRO is implemented via EVAL-WHEN instead of IR1 translation,

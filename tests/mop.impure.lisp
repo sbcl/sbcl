@@ -21,7 +21,8 @@
   (:use "CL"))
 
 (in-package "MOP-TEST")
-
+
+;;; Readers for Generic Function Metaobjects (pp. 216--218 of AMOP)
 (defgeneric fn-with-odd-arg-precedence (a b c)
   (:argument-precedence-order b c a))
 
@@ -44,6 +45,38 @@ currently, better put in a quick test in the hope that we can fix it soon:
 	 (let ((ll (sb-pcl:generic-function-lambda-list #'documentation)))
 	   (list (nth ll 1) (nth ll 0)))))
 ||#
+
+;;; Readers for Slot Definition Metaobjects (pp. 221--224 of AMOP)
+
+;;; Ensure that SLOT-DEFINITION-ALLOCATION returns :INSTANCE/:CLASS as
+;;; appropriate.
+(defclass sdm-test-class ()
+  ((an-instance-slot :accessor an-instance-slot)
+   (a-class-slot :allocation :class :accessor a-class-slot)))
+(dolist (m (list (list #'an-instance-slot :instance)
+		 (list #'a-class-slot :class)))
+  (let ((methods (sb-pcl:generic-function-methods (car m))))
+    (assert (= (length methods) 1))
+    (assert (eq (sb-pcl:slot-definition-allocation
+		 (sb-pcl:accessor-method-slot-definition
+		  (car methods)))
+		(cadr m)))))
+
+;;; Class Finalization Protocol (see section 5.5.2 of AMOP)
+(let ((finalized-count 0))
+  (defmethod sb-pcl:finalize-inheritance :after ((x sb-pcl::standard-class))
+    (incf finalized-count))
+  (defun get-count () finalized-count))
+(defclass finalization-test-1 () ())
+(make-instance 'finalization-test-1)
+(assert (= (get-count) 1))
+(defclass finalization-test-2 (finalization-test-3) ())
+(assert (= (get-count) 1))
+(defclass finalization-test-3 () ())
+(make-instance 'finalization-test-3)
+(assert (or (= (get-count) 2) (= (get-count) 3)))
+(make-instance 'finalization-test-2)
+(assert (= (get-count) 3))
 
 ;;;; success
 (sb-ext:quit :unix-status 104)
