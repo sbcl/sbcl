@@ -353,6 +353,14 @@
   (assert (eql (manyraw-dd copy) #c(0.33 0.33)))
   (assert (eql (manyraw-ee copy) #c(0.44d0 0.44d0))))
 
+;;;; miscellaneous old bugs
+
+(defstruct ya-struct)
+(when (ignore-errors (or (ya-struct-p) 12))
+  (error "YA-STRUCT-P of no arguments should signal an error."))
+(when (ignore-errors (or (ya-struct-p 'too 'many 'arguments) 12))
+  (error "YA-STRUCT-P of three arguments should signal an error."))
+
 ;;; success
 (format t "~&/returning success~%")
 (quit :unix-status 104)

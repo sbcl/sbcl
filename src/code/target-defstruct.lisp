@@ -213,11 +213,12 @@
 	    ((structure funcallable-structure)
 	     (/show0 "with-LAYOUT case")
 	     (lambda (object)
-	       (declare (optimize (speed 3) (safety 0)))
-	       (/noshow0 "in with-LAYOUT structure predicate closure, OBJECT,LAYOUT=..")
-	       (/nohexstr object)
-	       (/nohexstr layout)
-	       (typep-to-layout object layout)))
+	       (locally ; <- to keep SAFETY 0 from affecting arg count checking
+		 (declare (optimize (speed 3) (safety 0)))
+		 (/noshow0 "in with-LAYOUT structure predicate closure, OBJECT,LAYOUT=..")
+		 (/nohexstr object)
+		 (/nohexstr layout)
+		 (typep-to-layout object layout))))
 	    ;; structures with no LAYOUT (i.e. :TYPE VECTOR or :TYPE LIST)
 	    ;;
 	    ;; FIXME: should handle the :NAMED T case in these cases
