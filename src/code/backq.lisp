@@ -249,4 +249,12 @@
   '(backq-comma backq-comma-at backq-comma-dot backq-list
     backq-list* backq-append backq-nconc backq-cons backq-vector))
 
+;;; Since our backquote is installed on the host lisp, and since
+;;; developers make mistakes with backquotes and commas too, let's
+;;; ensure that we can report errors rather than get an undefined
+;;; function condition on %READER-ERROR.
+#+sb-xc-host ; proper definition happens for the target
+(defun %reader-error (stream format-string &rest format-args)
+  (bug "READER-ERROR on stream ~S: ~?" stream format-string format-args))
+
 (/show0 "done with backq.lisp")
