@@ -24,7 +24,9 @@
 #include <sys/param.h>
 #include <sys/stat.h>
 #include <signal.h>
+#ifdef LISP_FEATURE_SB_THREAD
 #include <sys/ptrace.h>
+#endif
 #include <sched.h>
 #include <errno.h>
 
