@@ -331,7 +331,7 @@
 		      ;; If we're not at toplevel, the PROCLAIM inside
 		      ;; the DECLAIM doesn't get executed until after
 		      ;; this function is compiled.
-		      #+nil (declare (type ,name ,argname))
+		      (declare (type ,name ,argname))
 		      (truly-the ,slot-type (,accessor ,data ,offset))))
 	      (unless (dsd-read-only slot)
 		(res `(declaim (inline (setf ,accessor-name))))
@@ -341,7 +341,7 @@
 		;; Do some basic tests to make sure that reading and writing
 		;; raw slots still works correctly.
 		(res `(defun (setf ,accessor-name) (,nvname ,argname)
-			#+nil (declare (type ,name ,argname))
+			(declare (type ,name ,argname))
 			(setf (,accessor ,data ,offset) ,nvname)
 			,nvname)))))))
       (res))))

@@ -835,15 +835,15 @@ changes in sbcl-0.7.0 relative to sbcl-0.6.13:
   how to make the compiler smart enough to fix this in general, but
   a workaround is given in the entry for 117 in the BUGS file.
 * The EVAL-WHEN code has been rewritten to be ANSI-compliant, and
-  various IR1-xxx bugs have gone away. Since the code is newer,
-  there might still be some new bugs (though not as many as
-  before Martin Atzmueller's fixes:-). But hopefully any remaining
-  bugs will be simpler, less fundamental, and more fixable then
-  the bugs in the old IR1 interpreter code.
+  various related bugs (IR1-1, IR1-2, IR1-3, IR1-3a) have gone away.
+  Since the code is newer, there might still be some new bugs
+  (though not as many as before Martin Atzmueller's fixes:-). But 
+  hopefully any remaining bugs will be simpler, less fundamental,
+  and more fixable then the bugs in the old IR1 interpreter code.
 * DEFSTRUCT and DEFCLASS have been substantially updated to take
   advantage of the new EVAL-WHEN stuff and to clean them up in 
-  general, and are now more ANSI-compliant in a number of ways. Martin
-  Atzmueller is responsible for a lot of this.
+  general, and they are now more ANSI-compliant in a number of
+  ways. Martin Atzmueller is responsible for a lot of this.
 * A bug in LOOP operations on hash tables has been fixed, thanks
   to a bug report and patch from Alexey Dejneka.
 * The default value of *BYTES-CONSED-BETWEEN-GCS* has been 
