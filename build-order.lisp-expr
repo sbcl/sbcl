@@ -299,8 +299,8 @@
  ;; for e.g. SPECIFIER-TYPE, needed by primtype.lisp
  ("src/code/early-type")
 
- ;; FIXME: Classic CMU CL had SAFETY 2 DEBUG 2 set around the compilation
- ;; of "code/class". Why?
+ ;; FIXME: Classic CMU CL had (OPTIMIZE (SAFETY 2) (DEBUG 2) declared
+ ;; around the compilation of "code/class". Why?
  ("src/code/class")
 
  ;; The definition of CONDITION-CLASS depends on SLOT-CLASS, defined

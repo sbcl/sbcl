@@ -28,7 +28,6 @@
 			(setf (leaf-info fun) (make-entry-info)))))
 	  (compute-entry-info fun info)
 	  (push info (ir2-component-entries 2comp))))))
-
   (select-component-format component)
   (values))
 

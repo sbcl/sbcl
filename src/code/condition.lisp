@@ -110,7 +110,7 @@
 				(declare (notinline sb!xc:find-class))
 				(find-class 'condition)))
       #'(lambda (cond stream)
-	  (format stream "Condition ~S was signalled." (type-of cond))))
+	(format stream "Condition ~S was signalled." (type-of cond))))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
 
@@ -119,8 +119,8 @@
 	       (reverse
 		(reduce #'append
 			(mapcar #'(lambda (x)
-				    (condition-class-cpl
-				     (sb!xc:find-class x)))
+				  (condition-class-cpl
+				   (sb!xc:find-class x)))
 				parent-types)))))
 	 (cond-layout (info :type :compiler-layout 'condition))
 	 (olayout (info :type :compiler-layout name))
@@ -362,11 +362,11 @@
 	(dolist (reader (condition-slot-readers slot))
 	  (setf (fdefinition reader)
 		#'(lambda (condition)
-		    (condition-reader-function condition name))))
+		  (condition-reader-function condition name))))
 	(dolist (writer (condition-slot-writers slot))
 	  (setf (fdefinition writer)
 		#'(lambda (new-value condition)
-		    (condition-writer-function condition new-value name))))))
+		  (condition-writer-function condition new-value name))))))
 
     ;; Compute effective slots and set up the class and hairy slots
     ;; (subsets of the effective slots.)
@@ -482,10 +482,10 @@
 	     (setq report
 		   (if (stringp arg)
 		       `#'(lambda (condition stream)
-			    (declare (ignore condition))
-			    (write-string ,arg stream))
+			  (declare (ignore condition))
+			  (write-string ,arg stream))
 		       `#'(lambda (condition stream)
-			    (funcall #',arg condition stream))))))
+			  (funcall #',arg condition stream))))))
 	  (:default-initargs
 	   (do ((initargs (rest option) (cddr initargs)))
 	       ((endp initargs))

@@ -85,9 +85,9 @@
 	(make-normal-tn *fixnum-primitive-type*)))
 
 
-;;; This function is called by the Entry-Analyze phase, allowing
-;;; VM-dependent initialization of the IR2-Component structure. We
-;;; push placeholder entries in the Constants to leave room for
+;;; This function is called by the ENTRY-ANALYZE phase, allowing
+;;; VM-dependent initialization of the IR2-COMPONENT structure. We
+;;; push placeholder entries in the CONSTANTS to leave room for
 ;;; additional noise in the code object header.
 (!def-vm-support-routine select-component-format (component)
   (declare (type component component))

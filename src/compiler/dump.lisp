@@ -43,11 +43,11 @@
   ;; an alist (PACKAGE . OFFSET) of the table offsets for each package
   ;; we have currently located.
   (packages () :type list)
-  ;; a table mapping from the Entry-Info structures for dumped XEPs to
+  ;; a table mapping from the ENTRY-INFO structures for dumped XEPs to
   ;; the table offsets of the corresponding code pointers
   (entry-table (make-hash-table :test 'eq) :type hash-table)
   ;; a table holding back-patching info for forward references to XEPs.
-  ;; The key is the Entry-Info structure for the XEP, and the value is
+  ;; The key is the ENTRY-INFO structure for the XEP, and the value is
   ;; a list of conses (<code-handle> . <offset>), where <code-handle>
   ;; is the offset in the table of the code object needing to be
   ;; patched, and <offset> is the offset that must be patched.
@@ -994,9 +994,9 @@
       ;; far as I know no modern CMU CL does either -- WHN
       ;; 2001-10-05). So might we be able to get rid of trace tables?
 
-      ;; Dump the constants, noting any :entries that have to be fixed up.
-      (do ((i sb!vm:code-constants-offset (1+ i)))
-	  ((>= i header-length))
+      ;; Dump the constants, noting any :ENTRY constants that have to
+      ;; be patched.
+      (loop for i from sb!vm:code-constants-offset below header-length do
 	(let ((entry (aref constants i)))
 	  (etypecase entry
 	    (constant
@@ -1008,10 +1008,19 @@
 		       (handle (gethash info
 					(fasl-output-entry-table
 					 fasl-output))))
+		  (declare (type sb!c::entry-info info))
 		  (cond
 		   (handle
 		    (dump-push handle fasl-output))
 		   (t
+
+		    ;; REMOVEME after fixing bug 138b.
+		    #|
+		    (unless (member info (sb!c::ir2-component-entries 2comp))
+		      (format t "~&i=~S~%" i)
+		      (error "bogus FASL-OUTPUT-PATCH-TABLE value ~S" info))
+                    |#
+
 		    (patches (cons info i))
 		    (dump-fop 'fop-misc-trap fasl-output)))))
 	       (:load-time-value
@@ -1051,6 +1060,7 @@
       (dump-fixups fixups fasl-output)
 
       (dump-fop 'fop-sanctify-for-execution fasl-output)
+
       (let ((handle (dump-pop fasl-output)))
 	(dolist (patch (patches))
 	  (push (cons handle (cdr patch))

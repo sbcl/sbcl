@@ -220,7 +220,7 @@
 
 ;;; Return a load-time constant TN with the specified KIND and INFO.
 ;;; If the desired CONSTANTS entry already exists, then reuse it,
-;;; otherwise allocate a anew load-time constant slot.
+;;; otherwise allocate a new load-time constant slot.
 (defun make-load-time-constant-tn (kind info)
   (declare (type keyword kind))
   (let* ((component (component-info *component-being-compiled*))

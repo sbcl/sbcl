@@ -84,15 +84,22 @@
   (list (make-stack-pointer-tn)
 	(make-normal-tn *fixnum-primitive-type*)))
 
-;;; This function is called by the Entry-Analyze phase, allowing
+;;; This function is called by the ENTRY-ANALYZE phase, allowing
 ;;; VM-dependent initialization of the IR2-COMPONENT structure. We
-;;; push placeholder entries in the Constants to leave room for
+;;; push placeholder entries in the CONSTANTS to leave room for
 ;;; additional noise in the code object header.
-;;;
-;;; For the x86 the first constant is a pointer to a list of fixups,
-;;; or NIL if the code object has none.
 (!def-vm-support-routine select-component-format (component)
   (declare (type component component))
+  ;; The 1+ here is because for the x86 the first constant is a
+  ;; pointer to a list of fixups, or NIL if the code object has none.
+  ;; (If I understand correctly, the fixups are needed at GC copy
+  ;; time because the X86 code isn't relocatable.)
+  ;;
+  ;; KLUDGE: It'd be cleaner to have the fixups entry be a named
+  ;; element of the CODE (aka component) primitive object. However,
+  ;; it's currently a large, tricky, error-prone chore to change
+  ;; the layout of any primitive object, so for the foreseeable future
+  ;; we'll just live with this ugliness. -- WHN 2002-01-02
   (dotimes (i (1+ code-constants-offset))
     (vector-push-extend nil
 			(ir2-component-constants (component-info component))))

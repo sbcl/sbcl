@@ -777,7 +777,7 @@
   (values))
 
 ;;; Convert a call to a local function. If the function has already
-;;; been let converted, then throw FUN to LOCAL-CALL-LOSSAGE. This
+;;; been LET converted, then throw FUN to LOCAL-CALL-LOSSAGE. This
 ;;; should only happen when we are converting inline expansions for
 ;;; local functions during optimization.
 (defun ir1-convert-local-combination (start cont form fun)

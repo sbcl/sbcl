@@ -33,8 +33,8 @@
 
       (note-function entry res object))))
 
-;;; Dump a component to core. We pass in the assembler fixups, code vector
-;;; and node info.
+;;; Dump a component to core. We pass in the assembler fixups, code
+;;; vector and node info.
 (defun make-core-component (component segment length trace-table fixups object)
   (declare (type component component)
 	   (type sb!assem:segment segment)

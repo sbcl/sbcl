@@ -148,11 +148,11 @@
 
 ;;; Emit code to load a function object representing LEAF into RES.
 ;;; This gets interesting when the referenced function is a closure:
-;;; we must make the closure and move the closed over values into it.
+;;; we must make the closure and move the closed-over values into it.
 ;;;
 ;;; LEAF is either a :TOPLEVEL-XEP functional or the XEP lambda for
 ;;; the called function, since local call analysis converts all
-;;; closure references. If a TL-XEP, we know it is not a closure.
+;;; closure references. If a :TOPLEVEL-XEP, we know it is not a closure.
 ;;;
 ;;; If a closed-over LAMBDA-VAR has no refs (is deleted), then we
 ;;; don't initialize that slot. This can happen with closures over
@@ -163,14 +163,38 @@
   (declare (type ref node) (type ir2-block block)
 	   (type functional leaf) (type tn res))
   (unless (leaf-info leaf)
-    (setf (leaf-info leaf) (make-entry-info)))
+    (setf (leaf-info leaf)
+	  (make-entry-info :name (functional-debug-name leaf))))
   (let ((entry (make-load-time-constant-tn :entry leaf))
 	(closure (etypecase leaf
 		   (clambda
+
+		    ;; Check for some weirdness which came up in bug
+		    ;; 138, 2002-01-02.
+		    ;;
+		    ;; The MAKE-LOAD-TIME-CONSTANT-TN call above puts
+		    ;; an :ENTRY record into the
+		    ;; IR2-COMPONENT-CONSTANTS table. The
+		    ;; dump-a-COMPONENT code
+		    ;;   * treats every HANDLEless :ENTRY record into a
+		    ;;     patch, and
+		    ;;   * expects every patch to correspond to an
+		    ;;     IR2-COMPONENT-ENTRIES record.
+		    ;; The IR2-COMPONENT-ENTRIES records are set by
+		    ;; ENTRY-ANALYZE walking over COMPONENT-LAMBDAS.
+		    ;; Bug 138b arose because there was a HANDLEless
+		    ;; :ENTRY record which didn't correspond to an
+		    ;; IR2-COMPONENT-ENTRIES record. That problem is
+		    ;; hard to debug when it's caught at dump time, so
+		    ;; this assertion tries to catch it here.
+		    (aver (member leaf
+				  (component-lambdas (lambda-component leaf))))
+
 		    (physenv-closure (get-lambda-physenv leaf)))
 		   (functional
 		    (aver (eq (functional-kind leaf) :toplevel-xep))
 		    nil))))
+
     (cond (closure
 	   (let ((this-env (node-physenv node)))
 	     (vop make-closure node block entry (length closure) res)

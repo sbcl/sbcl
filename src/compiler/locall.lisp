@@ -255,7 +255,7 @@
 ;;;
 ;;; Note that there is a lot of action going on behind the scenes
 ;;; here, triggered by reference deletion. In particular, the
-;;; COMPONENT-LAMBDAS are being hacked to remove newly deleted and let
+;;; COMPONENT-LAMBDAS are being hacked to remove newly deleted and LET
 ;;; converted LAMBDAs, so it is important that the LAMBDA is added to
 ;;; the COMPONENT-LAMBDAS when it is. Also, the COMPONENT-NEW-FUNS may
 ;;; contain all sorts of drivel, since it is not updated when we
@@ -283,6 +283,19 @@
 		      ;; FUN becomes part of COMPONENT-LAMBDAS now.
 		      (aver (not (member fun (component-lambdas component))))
 		      (push fun (component-lambdas component)))
+		     ((eql (lambda-inlinep fun) :inline)
+		      ;; FUNs marked :INLINE are sometimes in
+		      ;; COMPONENT-LAMBDAS and sometimes not. I (WHN
+		      ;; 2002-01-01) haven't figured this one out yet,
+		      ;; so don't assert anything.
+		      ;;
+		      ;; (One possibility: LAMBDAs to represent the
+		      ;; inline expansions of things which are defined
+		      ;; elsewhere might not be in COMPONENT-LAMBDAS,
+		      ;; which LAMBDAs to represent the inline
+		      ;; expansions of local functions might in
+		      ;; COMPONENT-LAMBDAS?)
+		      (values))
 		     (t ; FUN's old.
 		      ;; FUN should be in COMPONENT-LAMBDAS already.
 		      (aver (member fun (component-lambdas component)))))
