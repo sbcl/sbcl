@@ -168,6 +168,9 @@
  ;; to the old system if the futex() syscall is not available at
  ;; runtime
  ; :sb-futex
+
+ ;; Package locking support.
+ ; :sb-package-locks
  
  ;; This affects the definition of a lot of things in bignum.lisp. It
  ;; doesn't seem to be documented anywhere what systems it might apply

@@ -2559,6 +2559,9 @@ changes in sbcl-0.8.13 relative to sbcl-0.8.12:
     The symbols are also exported from SB-PCL for backwards
     compatibility, but more so than before SB-PCL should be treated as
     an implementation-internal package.
+  * new feature: SB-PACKAGE-LOCKS. See the fine manual for details,
+    add :SB-PACKAGE-LOCKS in customize-target-features.lisp to
+    enable them.
   * the SB-SPROF contrib now works on (most) non-x86 architectures.
     It is known as of this release not to work on the Alpha, however.
   * fixed bug #333: CHECK-TYPE now ensures that the type error
