@@ -1,6 +1,37 @@
+INTRODUCTION
+============
+
 The sb-aclrepl module offers an AllegroCL style Read-Eval-Print Loop for
 SBCL. An AllegroCL style inspector is integrated. Adding an AllegroCL style
 debugger is planned.
 
+USAGE
+=====
+To start sb-aclrepl as your read-eval-print loop, execute the command
+  (require 'sb-aclrepl)
+
+You can also all this command to your ~/.sbclrc to have sb-aclrepl be the default REPL
+for your SBCL sessions.
+
+EXAMPLE ~/.sbclrc FILE
+======================
+
+(ignore-errors (require 'sb-aclrepl))
+
+(when (find-package 'sb-aclrepl)
+  (push :aclrepl *features*))
+
+#+aclrepl
+(progn
+  (setq sb-aclrepl:*max-history* 100)
+  (setf (sb-aclrepl:alias "asdc") #'(lambda (sys) (asdf:oos 'asdf:load-op sys)))
+  (sb-aclrepl:alias "l" (sys) (asdf:oos 'asdf:load-op sys))
+  (sb-aclrepl:alias "t" (sys) (asdf:oos 'asdf:test-op sys))
+  ;; The 1 below means that two characaters ("up") are required
+  (sb-aclrepl:alias ("up" 1 "Use package") (package) (use-package package))
+  ;; The 0 below means only the first letter ("r") is required, such as ":r base64"
+  (sb-aclrepl:alias ("require" 0 "Require module") (sys) (require sys))
+)
+
 Questions, comments, or bug reports should be sent to Kevin Rosenberg
-<kevin@rosenbrg.net>.
+<kevin@rosenberg.net>.

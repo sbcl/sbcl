@@ -8,20 +8,106 @@
 
 (defun debugger (condition)
   "Enter the debugger."
-  (print "Entering debugger")
   (let ((old-hook *debugger-hook*))
     (when old-hook
       (let ((*debugger-hook* nil))
 	(funcall old-hook condition old-hook))))
+  (%debugger condition))
 
-  (format t "~&Error: ~A~%" condition)
-  (format t "~&  [Condition type: ~A]~%" (type-of condition))
-  (format t "~%")
-  (format t "~&Restart actions (select using :continue)~%")
+#+ignore
+(when (boundp 'sb-debug::*invoke-debugger-fun*)
+  (setq sb-debug::*invoke-debugger-fun* #'debugger))
+
+(defun print-condition (condition)
+  (format *output* "~&Error: ~A~%" condition))
+
+(defun print-condition-type (condition)
+  (format *output* "~&  [Condition type: ~A]~%" (type-of condition)))
+
+(defun print-restarts ()
+  (format *output* "~&Restart actions (select using :continue)~%")
   (let ((restarts (compute-restarts)))
     (dotimes (i (length restarts))
-      (format t "~&~2D: ~A~%" i (nth i restarts)))
-    (new-break :restarts (cons condition restarts)))
-  (sb-impl::toplevel-repl nil))
+      (format *output* "~&~2D: ~A~%" i (nth i restarts)))))
 
-;(setq sb-debug::*invoke-debugger-fun* #'debugger)
+(defun %debugger (condition)
+  (print-condition condition)
+  (print-condition-type condition)
+  (princ #\newline *output*)
+  (print-restarts) 
+  (debug-loop))
+
+(defun continuable-break-p ()
+  (when (eq 'continue
+	    (restart-name (car (compute-restarts))))
+    t))
+
+
+(declaim (special
+	  sb-debug::*debug-command-level sb-debug::*debug-command-level*
+	  sb-debug::*real-stack-top* sb-debug::*stack-top*
+	  sb-debug::*stack-top-hint* sb-debug::*current-frame*
+	  sb-debug::*flush-debug-errors*))
+
+(defun debug-loop ()
+  (let* ((sb-debug::*debug-command-level* (1+ sb-debug::*debug-command-level*))
+	 (sb-debug::*real-stack-top* (sb-di:top-frame))
+	 (sb-debug::*stack-top* (or sb-debug::*stack-top-hint*
+				    sb-debug::*real-stack-top*))
+	 (sb-debug::*stack-top-hint* nil)
+	 (sb-debug::*current-frame* sb-debug::*stack-top*))
+    (handler-bind ((sb-di:debug-condition
+		    (lambda (condition)
+		      (princ condition sb-debug::*debug-io*)
+		      (sb-int:/show0 "handling d-c by THROWing DEBUG-LOOP-CATCHER")
+		      (throw 'debug-loop-catcher nil))))
+      (fresh-line)
+      (sb-debug::print-frame-call sb-debug::*current-frame* :verbosity 2)
+      (loop
+	(catch 'debug-loop-catcher
+	  (handler-bind ((error (lambda (condition)
+				  (when sb-debug::*flush-debug-errors*
+				    (clear-input *debug-io*)
+				    (princ condition)
+				    ;; FIXME: Doing input on *DEBUG-IO*
+				    ;; and output on T seems broken.
+				    (format t
+					    "~&error flushed (because ~
+					     ~S is set)"
+					    'sb-debug::*flush-debug-errors*)
+				    (sb-int:/show0 "throwing DEBUG-LOOP-CATCHER")
+				    (throw 'debug-loop-catcher nil)))))
+	    ;; We have to bind LEVEL for the restart function created by
+	    ;; WITH-SIMPLE-RESTART.
+	    (let ((level sb-debug::*debug-command-level*)
+		  (restart-commands (sb-debug::make-restart-commands)))
+	      (with-simple-restart (abort
+				   "~@<Reduce debugger level (to debug level ~W).~@:>"
+				    level)
+		(sb-debug::debug-prompt *debug-io*)
+		(force-output *debug-io*)
+		(let* ((exp (read *debug-io*))
+		       (cmd-fun (sb-debug::debug-command-p exp restart-commands)))
+		  (cond ((not cmd-fun)
+			 (sb-debug::debug-eval-print exp))
+			((consp cmd-fun)
+			 (format t "~&Your command, ~S, is ambiguous:~%"
+				 exp)
+			 (dolist (ele cmd-fun)
+			   (format t "   ~A~%" ele)))
+			(t
+			 (funcall cmd-fun))))))))))))
+
+#+ignore
+(defun debug-loop ()
+  (let ((continuable (continuable-break-p)))
+    (if continuable
+      (aclrepl :continuable t)
+      (with-simple-restart (abort
+			    "~@<Reduce debugger level (to debug level ~W).~@:>"
+			    *break-level*)
+	(aclrepl)))))
+
+#+ignore
+(when (boundp 'sb-debug::*debug-loop-fun*)
+  (setq sb-debug::*debug-loop-fun* #'debug-loop))
