@@ -133,23 +133,27 @@ Tests are in the file <tt>tests.lisp</tt> and also make good examples.
 ;;; to look at /etc/syslog.conf or local equivalent to find out where
 ;;; the message ended up
 
-#-(or sunos darwin)
 (deftest simple-local-client
-    (let ((s (make-instance 'local-socket :type :datagram)))
-      (format t "Connecting ~A... " s)
-      (finish-output)
-      (handler-case
-          (socket-connect s "/dev/log")
-        (sb-bsd-sockets::socket-error ()
-          (setq s (make-instance 'local-socket :type :stream))
-          (format t "failed~%Retrying with ~A... " s)
-          (finish-output)
-          (socket-connect s "/dev/log")))
-      (format t "ok.~%")
-      (let ((stream (socket-make-stream s :input t :output t :buffering :none)))
-	(format stream
-		"<7>bsd-sockets: Don't panic.  We're testing local-domain client code; this message can safely be ignored")
-	t))
+    (progn
+      ;; SunOS (Solaris) and Darwin systems don't have a socket at 
+      ;; /dev/log.  We might also be building in a chroot or something, 
+      ;; so don't fail this test just because the file is unavailable
+      (when (probe-file "/dev/log")
+	(let ((s (make-instance 'local-socket :type :datagram)))
+	  (format t "Connecting ~A... " s)
+	  (finish-output)
+	  (handler-case
+	      (socket-connect s "/dev/log")
+	    (sb-bsd-sockets::socket-error ()
+	      (setq s (make-instance 'local-socket :type :stream))
+	      (format t "failed~%Retrying with ~A... " s)
+	      (finish-output)
+	      (socket-connect s "/dev/log")))
+	  (format t "ok.~%")
+	  (let ((stream (socket-make-stream s :input t :output t :buffering :none)))
+	    (format stream
+		    "<7>bsd-sockets: Don't panic.  We're testing local-domain client code; this message can safely be ignored"))))
+      t)
   t)
 
 
