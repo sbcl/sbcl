@@ -1330,7 +1330,6 @@
 	    (ir2-continuation-locs (continuation-info (second args)))
 	    nil))
 	  (nil)))
-
   (move-continuation-result node block () (node-cont node))
   (values))
 

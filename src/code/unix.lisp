@@ -697,7 +697,7 @@
 (defun unix-resolve-links (pathname)
   (declare (type simple-string pathname))
   (aver (not (relative-unix-pathname? pathname)))
-  (/show "entering UNIX-RESOLVE-LINKS")
+  (/noshow "entering UNIX-RESOLVE-LINKS")
   (loop with previous-pathnames = nil do
 	(/noshow pathname previous-pathnames)
 	(let ((link (unix-readlink pathname)))

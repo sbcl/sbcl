@@ -214,13 +214,6 @@
 
   ;; the ANSI-specified initial value of *PACKAGE*
   (setf *package* (find-package "COMMON-LISP-USER"))
-  ;; FIXME: I'm not sure where it should be done, but CL-USER really
-  ;; ought to USE-PACKAGE publicly accessible packages like SB-DEBUG
-  ;; (for ARG and VAR), SB-EXT, SB-EXT-C-CALL, and SB-EXT-ALIEN so
-  ;; that the user has a hint about which symbols we consider public.
-  ;; (Perhaps SB-DEBUG wouldn't need to be in the list if ARG and VAR
-  ;; could be typed directly, with no parentheses, at the debug prompt
-  ;; the way that e.g. F or BACKTRACE can be?)
 
   (/show0 "done initializing, setting *COLD-INIT-COMPLETE-P*")
   (setf *cold-init-complete-p* t)

@@ -409,8 +409,6 @@
 						   'string
 						   user-home
 						   "/.sbclrc"))))
-	(/show0 "assigned SYSINIT-TRUENAME and USERINIT-TRUENAME")
-
 
 	;; We wrap all the pre-REPL user/system customized startup code 
 	;; in a restart.
@@ -484,20 +482,14 @@
      ;; way we can convince the GC to just ignore dead areas of the
      ;; control stack, so that we don't need to rely on this
      ;; half-measure?
-     (/show0 "at head of LOOP")
      (scrub-control-stack)
-     (/show0 "back from SCRUB-CONTROL-STACK")
      (unless noprint
        (fresh-line)
-       (/show0 "back from FRESH-LINE")
        (princ (if (functionp *prompt*)
 		  (funcall *prompt*)
 		  *prompt*))
-       (/show0 "back from PRINC")
-       (flush-standard-output-streams)
-       (/show0 "back from FLUSH-STANDARD-OUTPUT-STREAMS"))
+       (flush-standard-output-streams))
      (let ((form (read *standard-input* nil eof-marker)))
-       (/show0 "back from READ")
        (if (eq form eof-marker)
 	   (quit)
 	   (let ((results (multiple-value-list (interactive-eval form))))

@@ -1300,6 +1300,21 @@ Error in function C::GET-LAMBDA-TO-COMPILE:
   internal compiler error. (This error occurs in sbcl-0.6.13 and in
   0.pre7.86.flaky7.14.)
 
+133:
+  Trying to compile something like 
+    (sb!alien:def-alien-routine "breakpoint_remove" sb!c-call:void
+      (code-obj sb!c-call:unsigned-long)
+      (pc-offset sb!c-call:int)
+      (old-inst sb!c-call:unsigned-long))
+  in SBCL-0.pre7.86.flaky7.22 after warm init fails with an error
+    cannot use values types here
+  probably because the SB-C-CALL:VOID type gets translated to (VALUES).
+  It should be valid to use VOID for a function return type, so perhaps
+  instead of calling SPECIFIER-TYPE (which excludes all VALUES types
+  automatically) we should call VALUES-SPECIFIER-TYPE and handle VALUES
+  types manually, allowing the special case (VALUES) but still excluding
+  all more-complex VALUES types.
+
 KNOWN BUGS RELATED TO THE IR1 INTERPRETER
 
 (Now that the IR1 interpreter has gone away, these should be 

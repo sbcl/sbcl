@@ -655,8 +655,7 @@
 	  (t
 	   (/noshow0 "default case")
 	   (let ((file (concatenate 'string directory name)))
-	     (/noshow0 "computed basic FILE=..")
-	     (/primitive-print file)
+	     (/noshow "computed basic FILE")
 	     (unless (or (null type) (eq type :unspecific))
 	       (/noshow0 "tweaking FILE for more-or-less-:UNSPECIFIC case")
 	       (setf file (concatenate 'string file "." type)))
@@ -664,8 +663,7 @@
 	       (/noshow0 "tweaking FILE for more-or-less-:WILD case")
 	       (setf file (concatenate 'string file "."
 				       (quick-integer-to-string version))))
-	     (/noshow0 "finished possibly tweaking FILE=..")
-	     (/primitive-print file)
+	     (/noshow0 "finished possibly tweaking FILE")
 	     (when (or (not verify-existence)
 		       (sb!unix:unix-file-kind file t))
 	       (/noshow0 "calling FUNCTION on FILE")
@@ -787,13 +785,9 @@
 	 (namestring (unix-namestring defaulted-pathname t)))
     (when (and namestring (sb!unix:unix-file-kind namestring t))
       (let ((trueishname (sb!unix:unix-resolve-links namestring)))
-	(/show0 "back from UNIX-RESOLVE-LINKS in PROBE-FILE")
 	(when trueishname
 	  (let ((*ignore-wildcards* t))
-	    (/show0 "calling UNIX-SIMPLIFY-PATHNAME in PROBE-FILE")
-	    (prog1
-		(pathname (sb!unix:unix-simplify-pathname trueishname))
-	      (/show0 "back from UNIX-SIMPLIFY-PATHNAME in PROBE-FILE"))))))))
+	    (pathname (sb!unix:unix-simplify-pathname trueishname))))))))
 
 ;;;; miscellaneous other operations
 
