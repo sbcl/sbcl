@@ -16,13 +16,6 @@
 #!-sb-fluid (declaim (inline internal-make-lexenv)) ; only called in one place
 (def!struct (lexenv
 	     (:constructor make-null-lexenv ())
-	     (:constructor make-null-interactive-lexenv
-			   (&aux (policy (list '(safety . 3)
-					       '(compilation-speed . 2)
-					       '(debug . 2)
-					       '(speed . 1)
-					       '(space . 1)
-					       '(inhibit-warnings . 1)))))
 	     (:constructor internal-make-lexenv
 			   (funs vars blocks tags
                                  type-restrictions

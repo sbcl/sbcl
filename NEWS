@@ -1,15 +1,21 @@
 changes in sbcl-0.8.21 (0.9alpha.1?) relative to sbcl-0.8.20:
+  * incompatible change: forms evaluated in the REPL now use the
+    global optimization policy.
+  * incompatible change: user- and system-initialization files are
+    no longer processed with LOAD, but by READ and EVAL; hence the
+    global optimization policy, startup package, readtable, etc, 
+    can be set by them.
   * internal entry point details and argument counts no longer appear
-     in backtraces unless explicitly requested by setting
-     SB-DEBUG:*SHOW-ENTRY-POINT-DETAILS*.
+    in backtraces unless explicitly requested by setting
+    SB-DEBUG:*SHOW-ENTRY-POINT-DETAILS*.
   * built-in and standard functions no longer have names like "top
-     level local call to FOO".
+    level local call to FOO".
   * fixed bug 32: functions defined in non-null lexical environments
-     now have more legible printed representation
+    now have more legible printed representation
   * fixed bug 33: functions defined in non-null lexical environemnts
-     are now more amenable to inspection by INSPECT.
+    are now more amenable to inspection by INSPECT.
   * workaround for bug 354: XEPs no longer appear in backtraces unless
-     explicitly requested.
+    explicitly requested.
   * fixed bug: COUNT and EQUAL no longer issue compiler efficiency
     notes when operating on objects known to be SIMPLE-BIT-VECTORs.
     (reported by Lutz Euler)

@@ -271,10 +271,7 @@ steppers to maintain contextual information.")
   "Evaluate FORM, returning whatever it returns and adjusting ***, **, *,
    +++, ++, +, ///, //, /, and -."
   (setf - form)
-  (let ((results
-         (multiple-value-list
-          (eval-in-lexenv form
-                          (make-null-interactive-lexenv)))))
+  (let ((results (multiple-value-list (eval form))))
     (setf /// //
 	  // /
 	  / results
@@ -303,6 +300,50 @@ steppers to maintain contextual information.")
 		  *trace-output*))
     (finish-output (symbol-value name)))
   (values))
+
+(defun process-init-file (truename)
+  (when truename
+    (restart-case 
+	(with-open-file (s truename :if-does-not-exist nil)
+	  (flet ((next ()
+		   (let ((form (read s nil s)))
+		     (if (eq s form)
+			 (return-from process-init-file nil)
+			 (eval form)))))
+	    (loop
+	       (restart-case
+		   (handler-bind ((error (lambda (e)
+					   (error
+					    "Error during processing of ~
+                                            initialization file ~A:~%~%  ~A"
+					    truename e))))
+		     (next))
+		 (continue ()
+		   :report "Ignore and continue processing.")))))
+      (abort ()
+	:report "Skip rest of initialization file."))))
+
+(defun process-eval-options (eval-strings)  
+  (/show0 "handling --eval options")
+  (flet ((process-1 (string)
+	   (multiple-value-bind (expr pos) (read-from-string string)
+	     (unless (eq string (read-from-string string nil string :start pos))
+	       (error "More the one expression in ~S" string))
+	     (eval expr)
+	     (flush-standard-output-streams))))
+    (restart-case
+	(dolist (expr-as-string eval-strings)
+	  (/show0 "handling one --eval option")
+	  (restart-case
+	      (handler-bind ((error (lambda (e)
+				      (error "Error during processing of --eval ~
+                                              option ~S:~%~%  ~A"
+					     expr-as-string e))))
+		(process-1 expr-as-string))
+	    (continue ()
+	      :report "Ignore and continue with next --eval option.")))
+      (abort ()
+	:report "Skip rest of --eval options."))))
 
 ;;; the default system top level function
 (defun toplevel-init ()
@@ -454,40 +495,11 @@ steppers to maintain contextual information.")
           ;; on.)
           (restart-case
               (progn
-                (flet ((process-init-file (truename)
-                         (when truename
-                           (unless (load truename)
-                             (error "~S was not successfully loaded."
-				    truename))
-                           (flush-standard-output-streams))))
-                  (process-init-file sysinit-truename)
-                  (process-init-file userinit-truename))
-
-                ;; Process --eval options.
-                (/show0 "handling --eval options in TOPLEVEL-INIT")
-                (dolist (expr-as-string (reverse reversed-evals))
-                  (/show0 "handling one --eval option in TOPLEVEL-INIT")
-                  (let ((expr (with-input-from-string (eval-stream
-                                                       expr-as-string)
-                                (let* ((eof-marker (cons :eof :eof))
-                                       (result (read eval-stream
-						     nil
-						     eof-marker))
-                                       (eof (read eval-stream nil eof-marker)))
-                                  (cond ((eq result eof-marker)
-                                         (error "unable to parse ~S"
-                                                expr-as-string))
-                                        ((not (eq eof eof-marker))
-                                         (error
-					  "more than one expression in ~S"
-					  expr-as-string))
-                                        (t
-                                         result))))))
-                    (eval expr)
-                    (flush-standard-output-streams))))
-            (continue ()
-              :report
-              "Continue anyway (skipping to toplevel read/eval/print loop)."
+		(process-init-file sysinit-truename)
+		(process-init-file userinit-truename)
+		(process-eval-options (reverse reversed-evals)))
+            (toplevel ()
+              :report "Skip to toplevel READ/EVAL/PRINT loop."
               (/show0 "CONTINUEing from pre-REPL RESTART-CASE")
               (values))                 ; (no-op, just fall through)
             (quit ()

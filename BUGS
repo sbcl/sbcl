@@ -1523,6 +1523,10 @@ WORKAROUND:
  (used on non-x86 platforms) being a more complete solution then what
  is done on x86.
 
+ On x86/linux large portions of tests/debug.impure.lisp have been commented
+ out as failures. The probable culprit for these problems is in x86-call-context
+ (things work fine on x86/freebsd).
+
  More generally, the debugger internals suffer from excessive x86/non-x86
  conditionalization and OAOOMization: refactoring the common parts would
  be good.
@@ -1536,7 +1540,11 @@ WORKAROUND:
  (sparc and x86 at least)
 
  Since SBCL 0.8.20.1 this is hidden unless *SHOW-ENTRY-POINT-DETAILS*
- is true.
+ is true (instead there appear two TEST frames at least on ppc). The
+ underlying cause seems to be that SB-C::TAIL-ANNOTATE will not merge
+ the tail-call for the XEP, since Python has by that time proved that
+ the function can never return; same happens if the function holds an
+ unconditional call to ERROR.
 
 355: change-class of generic-function
     (reported by Bruno Haible)
