@@ -76,7 +76,7 @@
 ;;; versions which break binary compatibility. But it certainly should
 ;;; be incremented for release versions which break binary
 ;;; compatibility.
-(def!constant +fasl-file-version+ 42)
+(def!constant +fasl-file-version+ 43)
 ;;; (record of versions before 2003 deleted in 2003-04-26/0.pre8.107 or so)
 ;;; 38: (2003-01-05) changed names of internal SORT machinery
 ;;; 39: (2003-02-20) in 0.7.12.1 a slot was added to
@@ -86,6 +86,10 @@
 ;;;     and -SB-THREAD builds
 ;;; 42: (2003-05-22) %NAME slot changed to NAME in
 ;;;     DEFSTRUCT-SLOT-DESCRIPTION
+;;; 43: (2003-07-18) Something could easily have changed incompatibly in
+;;;     recent maintenance, e.g. from (VECTOR NIL)-as-string support.
+;;;     (And experimental results suggest that compatibility was broken
+;;;     between about 0.8.1.29 and 0.8.1.39.)
 
 ;;; the conventional file extension for our fasl files
 (declaim (type simple-string *fasl-file-type*))
