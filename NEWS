@@ -864,6 +864,10 @@ changes in sbcl-0.7.0 relative to sbcl-0.6.13:
   :SB-PROPAGATE-FUN-TYPE are no longer considered to be optional
   features. Instead, the code that they used to control is always
   built into the system.
+* The support for (DECLAIM (INLINE FOO)) followed by (DEFUN FOO ..) in 
+  a non-null lexical environment has been weakened. (It will still
+  compile, but the compiler will be much less determined to inline FOO
+  than it used to be.)
 ?? Old operator names in the style DEF-FOO are now deprecated in favor
   of new corresponding names DEFINE-FOO, for consistency with the
   naming convention used in the ANSI standard). This mostly affects

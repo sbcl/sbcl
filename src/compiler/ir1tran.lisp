@@ -2895,56 +2895,6 @@
 		     :policy (lexenv-policy *lexenv*))))
       (ir1-convert-lambda `(lambda ,@body) name))))
 
-;;; Return a lambda that has been "closed" with respect to LEXENV,
-;;; returning a LAMBDA-WITH-LEXENV if there are interesting macros or
-;;; declarations. If there is something too complex (like a lexical
-;;; variable) in the environment, then we return NIL.
-(defun inline-syntactic-closure-lambda (lambda lexenv)
-  (declare (type lexenv lexenv))
-  (let ((variables (lexenv-variables lexenv))
-	(functions (lexenv-functions lexenv))
-	(decls ())
-	(symmacs ())
-	(macros ()))
-    (cond ((or (lexenv-blocks lexenv) (lexenv-tags lexenv)) nil)
-	  ((and (null variables) (null functions))
-	   lambda)
-	  ((dolist (x variables nil)
-	     (let ((name (car x))
-		   (what (cdr x)))
-	       (when (eq x (assoc name variables :test #'eq))
-		 (typecase what
-		   (cons
-		    (aver (eq (car what) 'macro))
-		    (push x symmacs))
-		   (global-var
-		    (aver (eq (global-var-kind what) :special))
-		    (push `(special ,name) decls))
-		   (t (return t))))))
-	   nil)
-	  ((dolist (x functions nil)
-	     (let ((name (car x))
-		   (what (cdr x)))
-	       (when (eq x (assoc name functions :test #'equal))
-		 (typecase what
-		   (cons
-		    (push (cons name
-				(function-lambda-expression (cdr what)))
-			  macros))
-		   (global-var
-		    (when (defined-function-p what)
-		      (push `(,(car (rassoc (defined-function-inlinep what)
-					    *inlinep-translations*))
-			      ,name)
-			    decls)))
-		   (t (return t))))))
-	   nil)
-	  (t
-	   `(lambda-with-lexenv ,decls
-				,macros
-				,symmacs
-				. ,(rest lambda))))))
-
 ;;; Get a DEFINED-FUNCTION object for a function we are about to
 ;;; define. If the function has been forward referenced, then
 ;;; substitute for the previous references.

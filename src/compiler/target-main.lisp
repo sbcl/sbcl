@@ -15,16 +15,17 @@
 
 ;;;; CL:COMPILE
 
-(defun get-lambda-to-compile (definition)
-  (if (consp definition)
-      definition
-      (multiple-value-bind (def env-p)
-			   (function-lambda-expression definition)
+(defun get-lambda-to-compile (definition-designator)
+  (if (consp definition-designator)
+      definition-designator
+      (multiple-value-bind (definition env-p)
+			   (function-lambda-expression definition-designator)
 	(when env-p
-	  (error "~S was defined in a non-null environment." definition))
-	(unless def
-	  (error "Can't find a definition for ~S." definition))
-	def)))
+	  (error "~S was defined in a non-null environment."
+		 definition-designator))
+	(unless definition
+	  (error "can't find a definition for ~S" definition-designator))
+	definition)))
 
 ;;; Find the function that is being compiled by COMPILE and bash its
 ;;; name to NAME. We also substitute for any references to name so

@@ -169,15 +169,35 @@
   (unless (symbol-package (function-name-block-name name))
     (warn "DEFUN of uninterned symbol ~S (tricky for GENESIS)" name))
   (multiple-value-bind (forms decls doc) (parse-body body)
-    (let* ((lambda-tail `(,args
-			  ,@decls
-			  (block ,(function-name-block-name name)
-			    ,@forms)))
-	   (lambda `(lambda ,@lambda-tail))
-	   (lambda-with-lexenv (and (inline-function-name-p name)
-				    (sb!c:inline-syntactic-closure-lambda
-				     lambda
-				     (coerce-to-lexenv env)))))
+    (let* ((lambda `(lambda ,args
+		      ,@decls
+		      (block ,(function-name-block-name name)
+			,@forms)))
+	   (want-to-inline )
+	   (inline-lambda
+	    (cond (;; Does the user not even want to inline?
+		   (not (inline-function-name-p name))
+		   nil)
+		  (;; Does inlining look too hairy to handle?
+		   (not (sb!c:lambda-independent-of-lexenv-p lambda env))
+		   (sb!c:maybe-compiler-note
+		    "lexical environment too hairy, can't inline DEFUN ~S"
+		    name)
+		   nil)
+		  (t
+		   ;; FIXME: The only reason that we return
+		   ;; LAMBDA-WITH-LEXENV instead of returning bare
+		   ;; LAMBDA is to avoid modifying downstream code
+		   ;; which expects LAMBDA-WITH-LEXENV. But the code
+		   ;; here is the only code which feeds into the
+		   ;; downstream code, and the generality of the
+		   ;; interface is no longer used, so it'd make sense
+		   ;; to simplify the interface instead of using the
+		   ;; old general LAMBDA-WITH-LEXENV interface in this
+		   ;; simplified way.
+		   `(sb!c:lambda-with-lexenv
+		     nil nil nil ; i.e. no DECLS, no MACROS, no SYMMACS
+		     ,@(rest lambda))))))
       `(progn
 
 	 ;; In cross-compilation of toplevel DEFUNs, we arrange
@@ -186,11 +206,11 @@
 	 (cold-fset ,name ,lambda)
 
 	 (eval-when (:compile-toplevel :load-toplevel :execute)
-	   (sb!c:%compiler-defun ',name ',lambda-with-lexenv))
+	   (sb!c:%compiler-defun ',name ',inline-lambda))
 
 	 (%defun ',name
 		 ;; In normal compilation (not for cold load) this is
-		 ;; where the lambda first appears. In
+		 ;; where the compiled LAMBDA first appears. In
 		 ;; cross-compilation, we manipulate the
 		 ;; previously-statically-linked LAMBDA here.
 		 #-sb-xc-host ,lambda

@@ -257,6 +257,8 @@
 
  ("src/code/setf-funs" :not-host)
 
+ ("src/code/stubs" :not-host)
+
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;;; compiler (and a few miscellaneous files whose dependencies make it
  ;;; convenient to stick them here)
@@ -414,7 +416,7 @@
 
  ("src/code/load")
 
- ("src/code/fop") ; needs macros from code/host-load.lisp
+ ("src/code/fop") ; needs macros from code/load.lisp
 
  ("src/compiler/ctype")
  ("src/compiler/disassem")
