@@ -1623,6 +1623,11 @@ changes in sbcl-0.8.0 relative to sbcl-0.7.14
   * incompatible change: the SB-PCL package should now be considered a
     private implementation detail, and no longer a semi-private MOP
     interface.
+  * minor incompatible change: due to rearrangement for threads, the
+    control stack and binding stack are now allocated at arbitrary
+    addresses instead of being hardcoded per-port.  Users affected by
+    this probably have to be doing advanced things with shared
+    libraries, and will know who they are.
   * known functions, which cannot be open coded by backend, are
     considered to be able to check types of their arguments.
     (reported by Nathan J. Froyd)
@@ -1635,6 +1640,10 @@ changes in sbcl-0.8.0 relative to sbcl-0.7.14
     specified-by-AMOP order of (CLASS NAME &REST ARGS &KEY).
   * fixed bug 20: DEFMETHOD can define methods using names that are
     not the proper names of classes to designate class specializers.
+  * Experimental native threads support, on x86 Linux.  This is not 
+    compiled in by default: you need to add :SB-THREAD to the target
+    features.  See the "Beyond ANSI" chapter of the manual for 
+    details.
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** COPY-ALIST now signals an error if its argument is a dotted
        list;
@@ -1643,14 +1652,9 @@ changes in sbcl-0.8.0 relative to sbcl-0.7.14
     ** the USE-VALUE, CONTINUE and STORE-VALUE functions now correctly
        exclude restarts of the same name associated with a different
        condition;
-  * Experimental native threads support, on x86 Linux.  This is not 
-    compiled in by default: you need to add :SB-THREAD to the target
-    features.  See the "Beyond ANSI" chapter of the manual for 
-    details.
-  * Due to rearrangement for threads, the control stack and binding stack
-    are now allocated at arbitrary addresses instead of being hardcoded
-    per-port.  Users affected by this probably have to be doing
-    advanced things with shared libraries, and will know who they are
+    ** DEFCLASS of forward-referenced classes with another
+       forward-referenced class in the superclasses list no longer
+       causes an error;
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles

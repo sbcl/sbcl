@@ -176,8 +176,16 @@
 ;;; that it doesn't happen again.
 ;;;
 ;;; First, the forward references:
-(defclass a (b) ())
-(defclass b () ())
+(defclass forward-ref-a (forward-ref-b) ())
+(defclass forward-ref-b () ())
+;;; (a couple more complicated examples found by Paul Dietz' test
+;;; suite):
+(defclass forward-ref-c1 (forward-ref-c2) ())
+(defclass forward-ref-c2 (forward-ref-c3) ())
+
+(defclass forward-ref-d1 (forward-ref-d2 forward-ref-d3) ())
+(defclass forward-ref-d2 (forward-ref-d4 forward-ref-d5) ())
+
 ;;; Then change-class
 (defclass class-with-slots ()
   ((a-slot :initarg :a-slot :accessor a-slot)
