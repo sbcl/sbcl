@@ -11,6 +11,22 @@
 
 (in-package "SB!IMPL")
 
+;;; the list of packages to use by default when no :USE argument is
+;;; supplied to MAKE-PACKAGE or other package creation forms
+;;;
+;;; ANSI specifies (1) that MAKE-PACKAGE and DEFPACKAGE use the same
+;;; value, and (2) that it (as an implementation-defined value) should
+;;; be documented, which we do in the doc string. So for OAOO reasons
+;;; we represent this value as a variable only at compile time, and
+;;; then use #. readmacro hacks to splice it into the target code as a
+;;; constant.
+(eval-when (:compile-toplevel)
+  (defparameter *default-package-use-list*
+    ;; ANSI says this is implementation-defined. So we make it NIL,
+    ;; the way God intended. Anyone who actually wants a random value
+    ;; is free to :USE (PACKAGE-USE-LIST :CL-USER) anyway.:-|
+    nil))
+
 (defmacro defpackage (package &rest options)
   #!+sb-doc
   "Defines a new package called PACKAGE. Each of OPTIONS should be one of the
@@ -142,7 +158,7 @@
   (let ((package (or (find-package name)
 		     (progn
 		       (when (eq use :default)
-			 (setf use *default-package-use-list*))
+			 (setf use '#.*default-package-use-list*))
 		       (make-package name
 				     :use nil
 				     :internal-symbols (or size 10)

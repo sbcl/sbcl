@@ -1,13 +1,3 @@
-for 0.7.0:
-
-* filed off the roughest edges (or, perhaps, at least hammered down the
-	protruding rusty nails and snipped off the trailing razor wire,
-	leaving some filing for later:-) from the monster
-	EVAL/EVAL-WHEN/%COMPILE/DEFUN/DEFSTRUCT cleanup:
-* more renaming (esp. for global as opposed to lexical names):
-* pending patches and bug reports that go in (or else get handled
-	somehow, rejected/logged/whatever) before 0.7.0:
-=======================================================================
 for early 0.7.x:
 
 * patches postponed until after 0.7.0:
@@ -38,7 +28,9 @@ for early 0.7.x:
 	** used %COMPILE where COMPILE-TOP-LEVEL used to be used
 	** removed now-redundant COMPILE-TOP-LEVEL and 
 		FUNCTIONAL-KIND=:TOP-LEVEL stuff from the compiler
-	** made FUNCTION-NAME logic work on closures, so that
+	** (ideally, but perhaps too hard, given what I've discovered
+		about the godawful internals of function debug names):
+		made FUNCTION-NAME logic work on closures, so that
 		various public functions like CL:PACKAGEP which
 		are now implemented as closures (because
 		they're structure slot accessors) won't be so
@@ -53,7 +45,12 @@ for early 0.7.x:
 	** cut-and-pasted DEF-BOOLEAN-ATTRIBUTE (maybe easier to fix
 		now that EVAL-WHEN does what it should..)
 	** incomplete manual
-	** :IGNORE-ERRORS-P cruft in stems-and-flags.lisp-expr
+	** :IGNORE-ERRORS-P cruft in stems-and-flags.lisp-expr. (It's
+		reasonable to support this as a crutch when initially
+		bootstrapping from balky xc hosts with their own
+		idiosyncratic ideas of what merits FAILURE-P, but it's
+		embarrassing to have to use it when bootstrapping 
+		under SBCL!),
 	** weird double-loading (first in GENESIS, then in warm init)
 		of src/assembly/target/*.lisp stuff, and the associated
 		weirdness of the half-baked state (compiler almost but
@@ -78,8 +75,9 @@ for early 0.7.x:
 	to remove dead symbols
 * made system handle stack overflow safely unless SAFETY is dominated
 	by SPEED or SPACE
-* Probably get rid of or at least rework the fdefinition/encapsulation
-	system so that (SYMBOL-FUNCTION 'FOO) = (FDEFINITION 'FOO).
+* Either get rid of or at least rework the fdefinition/encapsulation
+	system so that (SYMBOL-FUNCTION 'FOO) is identically equal to
+	(FDEFINITION 'FOO).
 =======================================================================
 for 0.9:
 

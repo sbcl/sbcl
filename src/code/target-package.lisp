@@ -24,11 +24,6 @@
 
 (!cold-init-forms
   (/show0 "entering !PACKAGE-COLD-INIT"))
-
-;;; the list of packages to use by default when no :USE argument is
-;;; supplied to MAKE-PACKAGE or other package creation forms
-(defvar *default-package-use-list*)
-(!cold-init-forms (setf *default-package-use-list* nil))
 
 ;;;; PACKAGE-HASHTABLE stuff
 
@@ -300,18 +295,19 @@
 	     (push n (package-%nicknames package)))))))
 
 (defun make-package (name &key
-			  (use *default-package-use-list*)
+			  (use '#.*default-package-use-list*)
 			  nicknames
 			  (internal-symbols 10)
 			  (external-symbols 10))
   #!+sb-doc
-  "Makes a new package having the specified Name and Nicknames. The
-  package will inherit all external symbols from each package in
-  the use list. :INTERNAL-SYMBOLS and :EXTERNAL-SYMBOLS are
+  #.(format nil
+     "Make a new package having the specified NAME, NICKNAMES, and 
+  USE list. :INTERNAL-SYMBOLS and :EXTERNAL-SYMBOLS are
   estimates for the number of internal and external symbols which
   will ultimately be present in the package. The default value of
-  USE is implementation-dependent, and in this implementation 
-  it is simply NIL."
+  USE is implementation-dependent, and in this implementation
+  it is ~S."
+     *default-package-use-list*)
 
   ;; Check for package name conflicts in name and nicknames, then
   ;; make the package.

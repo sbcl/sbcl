@@ -25,6 +25,8 @@ the free CMU CL programming environment. (The name is intended to
 acknowledge the connection: steel and banking are the industries where
 Carnegie and Mellon made the big bucks.)
 
+.SH LICENSING
+
 It is free software, mostly in the public domain, but with some
 subsystems under BSD-style licenses which allow modification and
 reuse as long as credit is given. It is provided "as is", with no
@@ -38,13 +40,21 @@ CREDITS file in the distribution.
 
 To run SBCL, type "sbcl" at the command line with no arguments. (SBCL
 understands command line arguments, but you probably won't need to use
-them unless you're a fairly advanced user, in which case you should
+them unless you're a fairly advanced user. If you are, you should
 read the COMMAND LINE SYNTAX section, below.) You should see some
 startup messages, then a prompt ("*"). Type a Lisp expression at the
-prompt, and SBCL will read it, execute it, print the result, 
+prompt, and SBCL will read it, execute it, print any values returned, 
 give you another prompt, and wait for your next input. E.g.
+
   * (+ 1 2 3)
+
   6
+  * (funcall (lambda (x y) (list x y y)) :toy :choo)
+
+  (:TOY :CHOO :CHOO)
+  * "Hello World"
+
+  "Hello World"
   *
 
 Many people like to run SBCL, like other Lisp systems, as a subprocess
@@ -55,64 +65,81 @@ subprocess.
 
 .SH OVERVIEW
 
-SBCL aims for but has not reached ANSI compliance.
+SBCL compiles Common Lisp to native code. (Even today, some 30 years
+after the MacLisp compiler, people will tell you that Lisp is an
+interpreted language. Ignore them.)
 
-SBCL compiles Common Lisp to native code, and is essentially a
-"compiler-only" implementation of the ANSI standard. (Unlike earlier
-versions of SBCL, byte compilation is no longer supported, and there
-is only a vestigial interpreter. Thus, in particular,
-COMPILED-FUNCTION-P is always equal to FUNCTIONP.)
+SBCL aims for but has not yet reached compliance with the ANSI
+standard for Common Lisp. More information on this is available in the
+BUGS section below.
 
-SBCL uses a generational conservative garbage collector for some ports,
-and a simple stop-and-copy garbage collector for other ports.
+SBCL also includes various non-ANSI extensions.
 
-SBCL also includes some non-ANSI extensions, notably
-  * Lispy extensions:
-    ** CMU-CL-style safe implementation of type declarations:
-       "Declarations are assertions."
-    ** source level debugger
-    ** profiler
-    ** saving the state of the running SBCL process, producing a
-       "core" file which can be restarted later
-    ** Gray streams (overloadable CLOS classes whose instances can
-       be used wherever ANSI streams can be used)
-    ** weak pointers and finalization (which have unfortunately
-       suffered from at least some code rot, e.g. weak hash tables
-       don't work)
-  * system interface extensions:
-    ** calling out to C code (a.k.a. FFI, foreign function interface)
-    ** some simple support for operations with a "scripting language" 
-       flavor, e.g. reading POSIX argc and argv, or executing a 
-       subprogram
+Many Lispy extensions have been retained from CMU CL:
+.TP 3
+\--
+CMU-CL-style safe implementation of type declarations:
+"Declarations are assertions."
+.TP 3
+\--
+the source level debugger (very similar to CMU CL's)
+.TP 3
+\--
+the profiler (now somewhat different from CMU CL's)
+.TP 3
+\--
+saving the state of the running SBCL process, producing a
+"core" file which can be restarted later
+.TP 3
+\--
+Gray streams (a de-facto standard system of overloadable CLOS classes
+whose instances can be used wherever ordinary ANSI streams can be used)
+.TP 3
+\--
+weak pointers and finalization (which have unfortunately
+suffered from at least some code rot, so that e.g. weak hash
+tables don't work)
+.PP
+
+Fundamental system interface extensions are also provided:
+.TP 3
+\--
+calling out to C code (a.k.a. FFI, foreign function interface,
+with very nearly the same interface as CMU CL)
+.TP 3
+\--
+some simple support for operations with a "scripting language" 
+flavor, e.g. reading POSIX argc and argv, or executing a 
+subprogram
+.PP
 
 .SH DIFFERENCES FROM CMU CL
 
 SBCL can be built from scratch using a plain vanilla ANSI Common Lisp
 system and a C compiler, and all of its properties are specified by
-the version of the source code that it was created from. (This clean
+the version of the source code that it was created from. This clean
 bootstrappability was the immediate motivation for forking off of the
-CMU CL development tree.) A variety of internal implementation
-differences are motivated by this.
+CMU CL development tree. A variety of implementation differences are
+motivated by this design goal.
 
-Maintenance work in SBCL since the fork has diverged in various
-details from the maintenance work in CMU CL. E.g. as of 2001-04-12,
-SBCL was more ANSI-compliant than CMU CL in various details such as
-support for PRINT-OBJECT and DESCRIBE-OBJECT, and SBCL's compiler was
-substantially better than CMU CL's at optimizing operations on
-non-simple vectors.
+Maintenance work in SBCL since the fork has diverged somewhat from the
+maintenance work in CMU CL. Many but not all bug fixes and
+improvements have been shared between the two projects, and sometimes
+the two projects disagree about what would be an improvement.
 
 Most extensions supported by CMU CL are not supported in SBCL,
 including Motif support, the Hemlock editor, search paths, the
-low-level Unix interface, the WIRE protocol, multithreading support,
-various user-level macros and functions (e.g. LETF, ITERATE, MEMQ,
+low-level Unix interface, the WIRE protocol, multithreading, various
+user-level macros and functions (e.g. LETF, ITERATE, MEMQ,
 REQUIRED-ARGUMENT), and many others.
 
 SBCL has retained some extensions from parent CMU CL. Many of the
 retained extensions are in these categories:
 .TP 3
 \--
-things which might be in the new ANSI spec, e.g. weak pointers,
-finalization, foreign function interface to C, and Gray streams
+things which might be in the new ANSI spec, e.g. safe type
+declarations, weak pointers, finalization, foreign function
+interface to C, and Gray streams
 .TP 3
 \--
 things which are universally available in Unix scripting languages,
@@ -120,54 +147,53 @@ e.g. RUN-PROGRAM and POSIX argv and getenv
 .TP 3
 \--
 hooks into the low level workings of the system which can be useful
-for debugging, e.g. a list of functions to be run whenever GC occurs,
-or parameters to modify compiler diagnostic output
+for debugging, e.g. requesting that a particular function be executed
+whenever GC occurs, or tuning compiler diagnostic output
 .TP 3
 \--
-unportable performance hacks, e.g. TRULY-THE, FREEZE-TYPE, and PURIFY
+unportable performance hacks, e.g. FREEZE-TYPE and PURIFY. For more
+information about these, look at the online documentation for symbols
+in the SB-EXT package, and look at the user manual.
 .PP
 
-There are also a few retained extensions which don't fall into
-any particular category, e.g.
-.TP 3
-\--
-the ability to save running Lisp images as executable files
-.PP
+There are also a few retained extensions which don't fall into any
+particular category, e.g. the ability to save running Lisp images as
+executable files.
 
 Some of the retained extensions have new names and/or different
 options than their CMU CL counterparts. For example, the SBCL function
-which saves a Lisp image to disk and kills it is called
-SAVE-LISP-AND-DIE instead of SAVE-LISP, and it supports fewer keyword
-options than CMU CL's SAVE-LISP.
+which saves a Lisp image to disk and kills the running process is
+called SAVE-LISP-AND-DIE instead of SAVE-LISP, and SBCL's
+SAVE-LISP-AND-DIE supports fewer keyword options than CMU CL's
+SAVE-LISP does.
 
-(Why doesn't SBCL support more extensions? Why the hell did I (WHN)
-drop all those nice extensions from CMU CL when the code already
-exists? This is a frequently asked question on the mailing list. The
-answer is that they're hard to maintain, and I have enough on my hands
-already. Also, in the case of some big and unquestionably useful
-extensions, like sockets and Motif, I think that SBCL has done its job
-by supplying the FFI, and that people who need, and understand, and
-are motivated to maintain the functionality should supply it as a
-separate library, which I'd be happy to distribute or link to on the
-SBCL home page. Finally, in the case of multithreading, I do think it
-belongs in the new ANSI spec, and it'd be a good feature to have, but
-I didn't think the CMU CL implementation was sufficiently mature, and
-it's such a complicated and far-reaching extension that I thought that
-trying to fix it would interfere with the more urgent task of getting
-basic ANSI support up to speed.)
+(Why doesn't SBCL support more extensions? Why drop all those nice
+extensions from CMU CL when the code already exists? This is a
+frequently asked question on the mailing list. In other cases, it's a
+design philosophy issue: arguably SBCL has done its job by supplying a
+stable FFI, and the right design decision is to move functionality
+derived from that, like socket support, into separate libraries,
+distributed as separate software packages by separate maintainers. In
+other cases it's a practical decision, hoping that focusing on a
+smaller number of things will let us do a better job on them. This is
+very much the case for multithreading: it's an important, valuable
+extension, but it's not easy to get right, and especially while SBCL
+is still working on basic ANSI compliance, difficult extensions aren't
+likely to be a priority.)
 
 .SH THE COMPILER
 
-As noted above, SBCL is essentially a compiler-only implementation of
-Lisp, with all nontrivial code being implemented by compilation, even
-when you type it interactively at the "interpreter" prompt.
+SBCL is essentially a compiler-only implementation of Lisp. All
+nontrivial Lisp code is compiled to native machine code before being
+executed, even when the Lisp code is typed interactively at the
+"interpreter" prompt.
 
 SBCL inherits from CMU CL the "Python" native code compiler. (Though
-we've essentially dropped the name to avoid confusion with the
-scripting language also called Python.) This compiler is very clever
-about understanding the type system of Common Lisp and using it to
-optimize code, and about producing notes to let the user know when the
-compiler doesn't have enough type information to produce efficient
+we've essentially dropped that name in order to avoid confusion with
+the scripting language also called Python.) This compiler is very
+clever about understanding the type system of Common Lisp and using it
+to optimize code, and about producing notes to let the user know when
+the compiler doesn't have enough type information to produce efficient
 code. It also tries (almost always successfully) to follow the unusual
 but very useful principle that "declarations are assertions", i.e.
 type declarations should be checked at runtime unless the user
@@ -181,6 +207,13 @@ extra levels of indirection in Common Lisp relative to C, the
 performance of SBCL isn't going to impress people who are impressed by
 small constant factors. However, even on the X86 it tends to be faster
 than byte interpreted languages (and can be a lot faster).
+
+The compiled code uses garbage collection to automatically
+manage memory. The garbage collector implementation varies considerably
+from CPU to CPU. In particular, on some CPUs the GC is nearly exact,
+while on others it's more conservative, and on some CPUs the GC
+is generational, while on others simpler stop and copy strategies
+are used.
 
 For more information about the compiler, see the user manual.
 

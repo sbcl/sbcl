@@ -813,7 +813,8 @@ changes in sbcl-0.6.13 relative to sbcl-0.6.12:
   fasl file version.
 
 changes in sbcl-0.7.0 relative to sbcl-0.6.13:
-* major incompatible change: The default fasl file extension has changed
+* major incompatible change: The default fasl file extension, i.e. the
+  default extension for files produced by COMPILE-FILE, has changed
   to ".fasl", for all architectures. (No longer ".x86f" and ".axpf".) 
 * compiler changes:
   ** There are many changes in the implementation of the compiler.
@@ -826,8 +827,9 @@ changes in sbcl-0.7.0 relative to sbcl-0.6.13:
      various related bugs (IR1-1, IR1-2, IR1-3, IR1-3a) have gone away.
      Since the code is newer, there might still be some new bugs
      (though not as many as before Martin Atzmueller's fixes:-). But 
-     hopefully any remaining bugs will be simpler, less fundamental,
-     and more fixable then the bugs in the old IR1 interpreter code.
+     the new code is substantially simpler and clearer, and hopefully
+     any remaining bugs will be simpler, less fundamental, and more
+     fixable then the bugs in the old code.
   ** The revised compiler is still a little unsteady on its feet.
      In particular,
      *** The debugging information it produces (particularly the names
@@ -843,34 +845,33 @@ changes in sbcl-0.7.0 relative to sbcl-0.6.13:
      *** the function-of-all-trades COERCE
      Mostly these should be transparent, but there's one
      potentially-annoying problem (bug 117): when the compiler
-     inline-expands a function and does type analysis on the
-     result, it can find control paths which have type
-     mismatches, and when it can't prove that they're not taken,
+     inline-expands a function and does type analysis on the result,
+     it can create control paths which have type mismatches, and
+     when it can't prove that those control paths aren't taken,
      it will issue WARNINGs about the type mismatches. This is 
      a particular problem in practice for the new sequence functions.
-     It's not clear how to make the compiler smart enough to fix
-     this in general, but a workaround is given in the entry for
-     117 in the BUGS file.
+     It's not clear how this should be fixed, and for now, a
+     workaround is given in the entry for 117 in the BUGS file.
   ** (Because of the interaction between the two previous items --
-     occasional inlining problems and new inline expansions -- the
-     new sequence function optimizations won't really kick in
-     properly until debugging information is straightened out in
-     some future version.)
+     occasional inlining problems and new inline expansions -- some
+     of the new sequence function optimizations won't really kick in
+     completely until debugging information, and then inlining, are
+     straightened out in some future version.)
 * minor incompatible changes:
   ** As part of a bug fix by Christophe Rhodes to DIRECTORY behavior,
      DIRECTORY no longer implicitly promotes NIL slots of its
-     pathname argument to :WILD. In particular, asking for the
-     contents of a directory, which you used to be able
-     to do without explicit wildcards, e.g. (DIRECTORY "/tmp/"), 
-     now needs explicit wildcards, e.g. (DIRECTORY "/tmp/*.*").
+     pathname argument to :WILD. In particular, when you ask for the
+     contents of a directory (which you used to be able to do without
+     explicit wildcards, e.g. (DIRECTORY "/tmp/")) you now need to use
+     explicit wildcards, e.g. (DIRECTORY "/tmp/*.*").
   ** changes in behavior that ANSI explicitly defines to be
      implementation dependent:
      *** The new compiler-only implementation still conforms with ANSI,
-         but acts a little different. Besides the obvious changes in
-         performance tradeoffs (that the cost per form passed to EVAL
-         has gone up, and the cost per form executed by EVAL has gone
-         down), the behavior of the system changes a little because
-         there are no longer any interpreted function objects.
+         but acts a little different than before. Besides the obvious
+	 changes in performance tradeoffs (that the cost per form passed
+	 to EVAL has gone up, and the cost per form executed by EVAL
+	 has gone down), the behavior of the system changes a little
+	 because there are no longer any interpreted function objects.
          COMPILED-FUNCTION-P is now synonymous with FUNCTIONP, and
          e.g. doing COMPILE on the output of interactive DEFUN is
          now a no-op.
@@ -889,13 +890,10 @@ changes in sbcl-0.7.0 relative to sbcl-0.6.13:
          4 million. (If your application spends a lot of time GCing and
          you have a lot of RAM, you might want to experiment with
          increasing it even more.)
-  ** The debugger prompt sequence now goes "5]", "5[2]", "5[3]",
-     etc. as you get deeper into recursive calls to the debugger
-     command loop, instead of the old "5]", "5]]", "5]]]"
-     sequence. (I was motivated to do this when squabbles between
-     ILISP and SBCL left me very deeply nested in the debugger. In the
-     short term, this change will probably provoke more ILISP/SBCL 
-     squabbles, but hopefully it will be an improvement in the long run.)
+  ** The SB-C-CALL package has been merged into the SB-ALIEN package.
+     However, almost all old code should still continue to work without
+     immediate update, as SB-C-CALL is now a (deprecated) nickname
+     for SB-ALIEN.
   ** Old operator names in the style DEF-FOO are now deprecated in
      favor of new corresponding names DEFINE-FOO, for consistency with
      the naming convention used in the ANSI standard (DEFSTRUCT, DEFVAR,
@@ -903,10 +901,13 @@ changes in sbcl-0.7.0 relative to sbcl-0.6.13:
      internal symbols, but a few supported extensions like
      SB-ALIEN:DEF-ALIEN-FUNCTION are also affected. (So e.g.
      DEF-ALIEN-FUNCTION becomes DEFINE-ALIEN-FUNCTION.)
-  ** The SB-C-CALL package has been merged into the SB-ALIEN package.
-     However, almost all old code should still continue to work without
-     immediate update, as SB-C-CALL is now a (deprecated) nickname
-     for SB-ALIEN.
+  ** The debugger prompt sequence now goes "5]", "5[2]", "5[3]",
+     etc. as you get deeper into recursive calls to the debugger
+     command loop, instead of the old "5]", "5]]", "5]]]"
+     sequence. (I was motivated to do this when squabbles between
+     ILISP and SBCL left me very deeply nested in the debugger. In the
+     short term, this change will probably provoke more ILISP/SBCL 
+     squabbles, but hopefully it will be an improvement in the long run.)
   ** SB-ALIEN:DEFINE-ALIEN-FUNCTION (also known by the old deprecated
      name DEF-ALIEN-FUNCTION) now does DECLAIM FTYPE for the defined
      function, since declaiming return types involving aliens is
@@ -916,6 +917,10 @@ changes in sbcl-0.7.0 relative to sbcl-0.6.13:
      longer reexported by the SB-EXT package. They're solely useful
      for alien code, so it seems more logical that you should get
      them from the SB-ALIEN package, not in SB-EXT.
+  ** :SB-CONSTRAIN-FLOAT-TYPE, :SB-PROPAGATE-FLOAT-TYPE, and
+     :SB-PROPAGATE-FUN-TYPE are no longer considered to be optional
+     features. Instead, the code that they used to control is always
+     built into the system.
 * many other bug fixes
   ** DEFSTRUCT and DEFCLASS have been substantially updated to take
      advantage of the new EVAL-WHEN stuff and to clean them up in 
@@ -955,21 +960,17 @@ changes in sbcl-0.7.0 relative to sbcl-0.6.13:
      Christophe Rhodes cleaned up the system self-test scripts (in tests/*),
      contributed the optimization of FIND-IF-NOT and POSITION-IF-NOT, and
      continues to work on the SPARC port (for those of you in a position
-     to look down on our little "PC" machines). 
+     to look down upon our little PC-compatible boxes from a great height). 
   ** PPRINT-LOGICAL-BLOCK now copies the *PRINT-LINES* value on entry
      and uses that copy, rather than the current dynamic value, when
-     it's trying to decide whether to truncate output . Thus e.g.
+     it's trying to decide whether to truncate output. Thus e.g.
        (let ((*print-lines* 50))
          (pprint-logical-block (stream nil)
            (dotimes (i 10)
              (let ((*print-lines* 8))
                (print (aref possiblybigthings i) stream)))))
-     should truncate the logical block only at 50 lines, instead of 
-     often truncating it at 8 lines.
-* :SB-CONSTRAIN-FLOAT-TYPE, :SB-PROPAGATE-FLOAT-TYPE, and
-  :SB-PROPAGATE-FUN-TYPE are no longer considered to be optional
-  features. Instead, the code that they used to control is always
-  built into the system.
+     should now truncate the logical block only at 50 lines, instead of
+     often truncating it at 8 lines, as it did before.
 * The doc/cmucl/ directory, containing old CMU CL documentation
   from the time of the fork, is no longer part of the base system.
   SourceForge has shut down its anonymous FTP service, and with it
@@ -986,7 +987,7 @@ planned incompatible changes in 0.7.x:
   and UNTRACE. (This shouldn't matter, though, unless you are
   using profiling. If you never profile anything, TRACE should
   continue to behave as before.)
-?? Inlining can now be controlled the ANSI way, without
+* Inlining can now be controlled the ANSI way, without
   MAYBE-INLINE, since the idiom
 	(DECLAIM (INLINE FOO))
 	(DEFUN FOO (..) ..)
