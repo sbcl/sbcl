@@ -220,5 +220,16 @@
   (assert (and w-p f-p))
   (assert (nth-value 1 (ignore-errors (funcall f)))))
 
+;;; floating point print/read consistency
+(let ((x (/ -9.349640046247849d-21 -9.381494249123696d-11)))
+  (let ((y (read-from-string (write-to-string x :readably t))))
+    (assert (eql x y))))
+
+(let ((x1 (float -5496527/100000000000000000))
+      (x2 (float -54965272/1000000000000000000)))
+  (assert (or (equal (multiple-value-list (integer-decode-float x1))
+		     (multiple-value-list (integer-decode-float x2)))
+	      (string/= (prin1-to-string x1) (prin1-to-string x2)))))
+
 ;;; success
 (quit :unix-status 104)

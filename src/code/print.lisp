@@ -1250,6 +1250,7 @@
 ;;; [CMUC]<steele>tradix.press. DO NOT EVEN THINK OF ATTEMPTING TO
 ;;; UNDERSTAND THIS CODE WITHOUT READING THE PAPER!
 
+(declaim (type (simple-array character (10)) *digits*))
 (defvar *digits* "0123456789")
 
 (defun flonum-to-string (x &optional width fdigits scale fmin)
@@ -1387,6 +1388,96 @@
     ;; all done
     (values digit-string (1+ digits) (= decpnt 0) (= decpnt digits) decpnt)))
 
+;;; implementation of figure 1 from Burger and Dybvig, 1996.  As the
+;;; implementation of the Dragon from Classic CMUCL (and above,
+;;; FLONUM-TO-STRING) says: "DO NOT EVEN THINK OF ATTEMPTING TO
+;;; UNDERSTAND THIS CODE WITHOUT READING THE PAPER!", and in this case
+;;; we have to add that even reading the paper might not bring
+;;; immediate illumination as CSR has attempted to turn idiomatic
+;;; Scheme into idiomatic Lisp.
+;;;
+;;; FIXME: figure 1 from Burger and Dybvig is the unoptimized
+;;; algorithm, noticeably slow at finding the exponent.  Figure 2 has
+;;; an improved algorithm, but CSR ran out of energy
+;;;
+;;; FIXME: Burger and Dybvig also provide an algorithm for
+;;; fixed-format floating point printing.  If it were implemented,
+;;; then we could delete the Dragon altogether (see FLONUM-TO-STRING).
+;;;
+;;; possible extension for the enthusiastic: printing floats in bases
+;;; other than base 10.
+(defconstant single-float-min-e
+  (nth-value 1 (decode-float least-positive-single-float)))
+(defconstant double-float-min-e
+  (nth-value 1 (decode-float least-positive-double-float)))
+#!+long-float
+(defconstant long-float-min-e
+  (nth-value 1 (decode-float least-positive-long-float)))
+
+(defun flonum-to-digits (v)
+  (let ((print-base 10) ; B
+	(float-radix 2) ; b
+	(float-digits (float-digits v)) ; p
+	(min-e
+	 (etypecase v
+	   (single-float single-float-min-e)
+	   (double-float double-float-min-e)
+	   #!+long-float
+	   (long-float long-float-min-e))))
+    (multiple-value-bind (f e)
+	(integer-decode-float v)
+      (let (;; FIXME: these even tests assume normal IEEE rounding
+	    ;; mode.  I wonder if we should cater for non-normal?
+	    (high-ok (evenp f))
+	    (low-ok (evenp f))
+	    (result (make-array 50 :element-type 'base-char
+				:fill-pointer 0 :adjustable t)))
+	(labels ((scale (r s m+ m-)
+		   (do ((k 0 (1+ k))
+			(s s (* s print-base)))
+		       ((not (or (> (+ r m+) s)
+				 (and high-ok (= (+ r m+) s))))
+			(do ((k k (1- k))
+			     (r r (* r print-base))
+			     (m+ m+ (* m+ print-base))
+			     (m- m- (* m- print-base)))
+			    ((not (or (< (* (+ r m+) print-base) s)
+				      (and high-ok (= (* (+ r m+) print-base) s))))
+			     (values k (generate r s m+ m-)))))))
+		 (generate (r s m+ m-)
+		   (let (d tc1 tc2)
+		     (tagbody
+		      loop
+			(setf (values d r) (truncate (* r print-base) s))
+			(setf m+ (* m+ print-base))
+			(setf m- (* m- print-base))
+			(setf tc1 (or (< r m-) (and low-ok (= r m-))))
+			(setf tc2 (or (> (+ r m+) s)
+				      (and high-ok (= (+ r m+) s))))
+			(when (or tc1 tc2)
+			  (go end))
+			(vector-push-extend (char *digits* d) result)
+			(go loop)
+		      end
+			(let ((d (cond
+				   ((and (not tc1) tc2) (1+ d))
+				   ((and tc1 (not tc2)) d)
+				   (t ; (and tc1 tc2)
+				    (if (< (* r 2) s) d (1+ d))))))
+			  (vector-push-extend (char *digits* d) result)
+			  (return-from generate result))))))
+	  (if (>= e 0)
+	      (if (/= f (expt float-radix (1- float-digits)))
+		  (let ((be (expt float-radix e)))
+		    (scale (* f be 2) 2 be be))
+		  (let* ((be (expt float-radix e))
+			 (be1 (* be float-radix)))
+		    (scale (* f be1 2) (* float-radix 2) be1 be)))
+	      (if (or (= e min-e) (/= f (expt float-radix (1- float-digits))))
+		  (scale (* f 2) (* (expt float-radix (- e)) 2) 1 1)
+		  (scale (* f float-radix 2)
+			 (* (expt float-radix (- 1 e)) 2) float-radix 1))))))))
+
 ;;; Given a non-negative floating point number, SCALE-EXPONENT returns
 ;;; a new floating point number Z in the range (0.1, 1.0] and an
 ;;; exponent E such that Z * 10^E is (approximately) equal to the
@@ -1451,6 +1542,12 @@
 ;;; attractive to handle exponential notation with the same accuracy
 ;;; as non-exponential notation, using the method described in the
 ;;; Steele and White paper.
+;;;
+;;; NOTE II: this has been bypassed slightly by implementing Burger
+;;; and Dybvig, 1996.  When someone has time (KLUDGE) they can
+;;; probably (a) implement the optimizations suggested by Burger and
+;;; Dyvbig, and (b) remove all vestiges of Dragon4, including from
+;;; fixed-format printing.
 
 ;;; Print the appropriate exponent marker for X and the specified exponent.
 (defun print-float-exponent (x exp stream)
@@ -1508,26 +1605,34 @@
 	(write-string "0.0" stream)
 	(print-float-exponent x 0 stream))
        (t
-	(output-float-aux x stream (float 1/1000 x) (float 10000000 x))))))))
+	(output-float-aux x stream -3 8)))))))
 (defun output-float-aux (x stream e-min e-max)
-  (if (and (>= x e-min) (< x e-max))
-      ;; free format
-      (multiple-value-bind (str len lpoint tpoint) (flonum-to-string x)
-	(declare (ignore len))
-	(when lpoint (write-char #\0 stream))
-	(write-string str stream)
-	(when tpoint (write-char #\0 stream))
-	(print-float-exponent x 0 stream))
-      ;; exponential format
-      (multiple-value-bind (f ex) (scale-exponent x)
-	(multiple-value-bind (str len lpoint tpoint)
-	    (flonum-to-string f nil nil 1)
-	  (declare (ignore len))
-	  (when lpoint (write-char #\0 stream))
-	  (write-string str stream)
-	  (when tpoint (write-char #\0 stream))
-	  ;; Subtract out scale factor of 1 passed to FLONUM-TO-STRING.
-	  (print-float-exponent x (1- ex) stream)))))
+  (multiple-value-bind (e string)
+      (flonum-to-digits x)
+    (cond
+      ((< e-min e e-max)
+       (if (plusp e)
+	   (progn
+	     (write-string string stream :end (min (length string) e))
+	     (dotimes (i (- e (length string)))
+	       (write-char #\0 stream))
+	     (write-char #\. stream)
+	     (write-string string stream :start (min (length string) e))
+	     (when (<= (length string) e)
+	       (write-char #\0 stream))
+	     (print-float-exponent x 0 stream))
+	   (progn
+	     (write-string "0." stream)
+	     (dotimes (i (- e))
+	       (write-char #\0 stream))
+	     (write-string string stream)
+	     (print-float-exponent x 0 stream))))
+      (t (write-string string stream :end 1)
+	 (write-char #\. stream)
+	 (write-string string stream :start 1)
+	 (when (= (length string) 1)
+	   (write-char #\0 stream))
+	 (print-float-exponent x (1- e) stream)))))
 
 ;;;; other leaf objects
 

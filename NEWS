@@ -2432,7 +2432,10 @@ changes in sbcl-0.8.11 relative to sbcl-0.8.10:
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** FILE-POSITION works as specified on BROADCAST-STREAMs.
     ** CAST optimizer forgot to flush argument derived type.
-
+    ** print/read consistency on floats is now orders of magnitude
+       more likely.  (thanks also to Bruno Haible for a similar report
+       and discussions)
+   
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles
     down, it might impact TRACE. They both encapsulate functions, and

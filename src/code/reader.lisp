@@ -1272,46 +1272,10 @@
 				  (#\F 'single-float)
 				  (#\D 'double-float)
 				  (#\L 'long-float)))
-		  num)
-	     ;; Raymond Toy writes: We need to watch out if the
-	     ;; exponent is too small or too large. We add enough to
-	     ;; EXPONENT to make it within range and scale NUMBER
-	     ;; appropriately. This should avoid any unnecessary
-	     ;; underflow or overflow problems.
-	     (multiple-value-bind (min-expo max-expo)
-		 ;; FIXME: These forms are broken w.r.t.
-		 ;; cross-compilation portability, as the
-		 ;; cross-compiler will call the host's LOG function
-		 ;; while attempting to constant-fold. Maybe some sort
-		 ;; of load-time-form magic could be used instead?
-		 (case float-format
-		   ((short-float single-float)
-		    (values
-		     (log sb!xc:least-positive-normalized-single-float 10f0)
-		     (log sb!xc:most-positive-single-float 10f0)))
-		   ((double-float #!-long-float long-float)
-		    (values
-		     (log sb!xc:least-positive-normalized-double-float 10d0)
-		     (log sb!xc:most-positive-double-float 10d0)))
-		   #!+long-float
-		   (long-float
-		    (values
-		     (log sb!xc:least-positive-normalized-long-float 10l0)
-		     (log sb!xc:most-positive-long-float 10l0))))
-	       (let ((correction (cond ((<= exponent min-expo)
-					(ceiling (- min-expo exponent)))
-				       ((>= exponent max-expo)
-					(floor (- max-expo exponent)))
-				       (t
-					0))))
-		 (incf exponent correction)
-		 (setf number (/ number (expt 10 correction)))
-		 (setq num (make-float-aux number divisor float-format stream))
-		 (setq num (* num (expt 10 exponent)))
-		 (return-from make-float (if negative-fraction
-					     (- num)
-					     num))))))
-	  ;; should never happen
+		  (result (make-float-aux (* (expt 10 exponent) number)
+					  divisor float-format stream)))
+	     (return-from make-float
+	       (if negative-fraction (- result) result))))
 	  (t (bug "bad fallthrough in floating point reader")))))
 
 (defun make-float-aux (number divisor float-format stream)
