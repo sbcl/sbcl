@@ -263,21 +263,13 @@
     (toplevel-init)
     (critically-unreachable "after TOPLEVEL-INIT")))
 
-(defun quit (&key recklessly-p
-		  (unix-code 0 unix-code-p)
-		  (unix-status unix-code))
+(defun quit (&key recklessly-p (unix-status 0))
   #!+sb-doc
   "Terminate the current Lisp. Things are cleaned up (with
 UNWIND-PROTECT and so forth) unless RECKLESSLY-P is non-NIL. On
 UNIX-like systems, UNIX-STATUS is used as the status code."
-  (declare (type (signed-byte 32) unix-status unix-code))
+  (declare (type (signed-byte 32) unix-status))
   (/show0 "entering QUIT")
-  ;; FIXME: UNIX-CODE was deprecated in sbcl-0.6.8, after having been
-  ;; around for less than a year. It should be safe to remove it after
-  ;; a year.
-  (when unix-code-p
-    (warn "The UNIX-CODE argument is deprecated. Use the UNIX-STATUS argument
-instead (which is another name for the same thing)."))
   (if recklessly-p
       (sb!unix:unix-exit unix-status)
       (throw '%end-of-the-world unix-status))
@@ -304,6 +296,8 @@ instead (which is another name for the same thing)."))
       (sb!thread::maybe-install-futex-functions)))
   (foreign-reinit)
   (gc-reinit)
+  ;; make sure TIME works correctly from saved cores
+  (setf *internal-real-time-base-seconds* nil)
   (mapc #'funcall *init-hooks*))
 
 ;;;; some support for any hapless wretches who end up debugging cold
