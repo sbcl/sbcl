@@ -1716,9 +1716,11 @@ changes in sbcl-0.8.0 relative to sbcl-0.8alpha.0
   * SB-MOP:DIRECT-SLOT-DEFINITION-CLASS and
     SB-MOP:EFFECTIVE-SLOT-DEFINITION-CLASS now have the
     specified-by-AMOP lambda list of (CLASS &REST INITARGS).
+  * compiler checks for duplicated variables in macro lambda lists.
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** the GENERIC-FUNCTION type is no longer disjoint from FUNCTION
        types.
+    ** &ENVIRONMENT parameter in macro lambda list is bound first.
 
 
 planned incompatible changes in 0.8.x:

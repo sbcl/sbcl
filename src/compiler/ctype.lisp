@@ -109,20 +109,16 @@
 			   ((:lossage-fun *lossage-fun*))
 			   ((:unwinnage-fun *unwinnage-fun*)))
   (declare (type function result-test) (type combination call)
-	   ;; FIXME: Could FUN-TYPE here actually be something like
+	   ;; FIXME: Could TYPE here actually be something like
 	   ;; (AND GENERIC-FUNCTION (FUNCTION (T) T))?  How
 	   ;; horrible...  -- CSR, 2003-05-03
-	   (type (or fun-type classoid) type))
+	   (type ctype type))
   (let* ((*lossage-detected* nil)
 	 (*unwinnage-detected* nil)
 	 (*compiler-error-context* call)
 	 (args (combination-args call))
 	 (nargs (length args)))
-    (if (typep type 'classoid)
-	(do ((i 1 (1+ i))
-	     (arg args (cdr arg)))
-	    ((null arg))
-	  (check-arg-type (car arg) *wild-type* i))
+    (if (fun-type-p type)
 	(let* ((required (fun-type-required type))
 	       (min-args (length required))
 	       (optional (fun-type-optional type))
@@ -158,7 +154,7 @@
 	     (check-fixed-and-rest args (append required optional) rest)
 	     (when keyp
 	       (check-key-args args max-args type))))
-	  
+
 	  (let* ((dtype (node-derived-type call))
 		 (return-type (fun-type-returns type))
 		 (cont (node-cont call))
@@ -175,7 +171,10 @@
 		    ((not int)
 		     (note-lossage "The result is a ~S, not a ~S."
 				   (type-specifier out-type)
-				   (type-specifier return-type))))))))
+				   (type-specifier return-type)))))))
+	(loop for arg in args
+              and i from 1
+              do (check-arg-type arg *wild-type* i)))
     (cond (*lossage-detected* (values nil t))
 	  (*unwinnage-detected* (values nil nil))
 	  (t (values t t)))))

@@ -341,3 +341,35 @@
 ;;; Bug reported by Paul Dietz on cmucl-imp and fixed by Gerd
 ;;; Moellmann: CONVERT-MORE-CALL failed on the following call
 (assert (eq (eval '((lambda (&key) 'u) :allow-other-keys nil)) 'u))
+
+;;; &ENVIRONMENT parameter should be bound first (from Paul Dietz'
+;;; test suit)
+(assert (eql (macrolet ((foo () 1))
+               (macrolet ((%f (&optional (x (macroexpand '(foo) env)) &environment env)
+                            x))
+                 (%f)))
+             1))
+
+;;; MACROLET should check for duplicated names
+(dolist (ll '((x (z x))
+              (x y &optional z x w)
+              (x y &optional z z)
+              (x &rest x)
+              (x &rest (y x))
+              (x &optional (y nil x))
+              (x &optional (y nil y))
+              (x &key x)
+              (x &key (y nil x))
+              (&key (y nil z) (z nil w))
+              (&whole x &optional x)
+              (&environment x &whole x)))
+  (assert (nth-value 2
+                     (handler-case
+                         (compile nil
+                                  `(lambda ()
+                                     (macrolet ((foo ,ll nil)
+                                                (bar (&environment env)
+                                                  `',(macro-function 'foo env)))
+                                       (bar))))
+                       (error (c)
+                         (values nil t t))))))

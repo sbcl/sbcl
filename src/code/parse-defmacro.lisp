@@ -19,6 +19,7 @@
 (declaim (type list *system-lets*))
 (defvar *user-lets* nil) ; LET bindings that the user has explicitly supplied
 (declaim (type list *user-lets*))
+(defvar *env-var* nil) ; &ENVIRONMENT variable name
 
 ;; the default default for unsupplied &OPTIONAL and &KEY args
 (defvar *default-default* nil)
@@ -42,12 +43,15 @@
     (let ((*arg-tests* ())
 	  (*user-lets* ())
 	  (*system-lets* ())
-	  (*ignorable-vars* ()))
+	  (*ignorable-vars* ())
+          (*env-var* nil))
       (multiple-value-bind (env-arg-used minimum maximum)
 	  (parse-defmacro-lambda-list lambda-list arg-list-name name
 				      error-kind error-fun (not anonymousp)
-				      nil env-arg-name)
-	(values `(let* ,(nreverse *system-lets*)
+				      nil)
+	(values `(let* (,@(when env-arg-used
+                            `((,*env-var* ,env-arg-name)))
+                        ,@(nreverse *system-lets*))
 		   ,@(when *ignorable-vars*
 		       `((declare (ignorable ,@*ignorable-vars*))))
 		   ,@*arg-tests*
@@ -55,7 +59,7 @@
 		     ,@declarations
 		     ,@forms))
 		`(,@(when (and env-arg-name (not env-arg-used))
-		      `((declare (ignore ,env-arg-name)))))
+                      `((declare (ignore ,env-arg-name)))))
 		documentation
 		minimum
 		maximum)))))
@@ -71,8 +75,7 @@
 				   error-fun
 				   &optional
 				   toplevel
-				   env-illegal
-				   env-arg-name)
+				   env-illegal)
   (let* (;; PATH is a sort of pointer into the part of the lambda list we're
 	 ;; considering at this point in the code. PATH-0 is the root of the
 	 ;; lambda list, which is the initial value of PATH.
@@ -161,10 +164,13 @@
                        (error "&ENVIRONMENT is not valid with ~S." error-kind))
                       ((not toplevel)
                        (error "&ENVIRONMENT is only valid at top level of ~
-                             lambda-list.")))
+                             lambda-list."))
+                      (env-arg-used
+                       (error "Repeated &ENVIRONMENT.")))
                 (cond ((and (cdr rest-of-args) (symbolp (cadr rest-of-args)))
                        (setq rest-of-args (cdr rest-of-args))
-                       (push-let-binding (car rest-of-args) env-arg-name nil)
+                       (check-defmacro-arg (car rest-of-args))
+                       (setq *env-var* (car rest-of-args))
                        (setq env-arg-used t))
                       (t
                        (defmacro-error "&ENVIRONMENT" error-kind name))))
@@ -266,6 +272,7 @@
 	   :maximum maximum)))
 
 (defun push-sub-list-binding (variable path object name error-kind error-fun)
+  (check-defmacro-arg variable)
   (let ((var (gensym "TEMP-")))
     (push `(,variable
 	    (let ((,var ,path))
@@ -280,6 +287,7 @@
 
 (defun push-let-binding (variable path systemp &optional condition
 				  (init-form *default-default*))
+  (check-defmacro-arg variable)
   (let ((let-form (if condition
 		      `(,variable (if ,condition ,path ,init-form))
 		      `(,variable ,path))))
@@ -307,6 +315,12 @@
 (defun defmacro-error (problem kind name)
   (error "illegal or ill-formed ~A argument in ~A~@[ ~S~]"
 	 problem kind name))
+
+(defun check-defmacro-arg (arg)
+  (when (or (and *env-var* (eq arg *env-var*))
+            (member arg *system-lets* :key #'car)
+            (member arg *user-lets* :key #'car))
+    (error "variable ~S occurs more than once" arg)))
 
 ;;; Determine whether KEY-LIST is a valid list of keyword/value pairs.
 ;;; Do not signal the error directly, 'cause we don't know how it
