@@ -1283,15 +1283,15 @@
 	       *compiler-error-print-level*
 	       *compiler-error-print-length*
 	       *compiler-error-print-lines*))
-(defvar *compiler-error-print-level* 3
+(defvar *compiler-error-print-level* 5
   #!+sb-doc
-  "The value for *PRINT-LEVEL* when printing compiler error messages.")
-(defvar *compiler-error-print-length* 5
+  "the value for *PRINT-LEVEL* when printing compiler error messages")
+(defvar *compiler-error-print-length* 10
   #!+sb-doc
-  "The value for *PRINT-LENGTH* when printing compiler error messages.")
-(defvar *compiler-error-print-lines* 5
+  "the value for *PRINT-LENGTH* when printing compiler error messages")
+(defvar *compiler-error-print-lines* 12
   #!+sb-doc
-  "The value for *PRINT-LINES* when printing compiler error messages.")
+  "the value for *PRINT-LINES* when printing compiler error messages")
 
 (defvar *enclosing-source-cutoff* 1
   #!+sb-doc

@@ -913,7 +913,7 @@
 	(push (/-derive-type-aux x-type y-type same-arg) result)))
     (setf result (flatten-list result))
     (if (rest result)
-	(make-union-type result)
+	(make-union-type-or-something result)
 	(first result))))
 
 (defoptimizer (log derive-type) ((x &optional y))
@@ -1095,7 +1095,7 @@
 	     (rat-result-p (csubtypep element-type
 				      (specifier-type 'rational))))
 	(if rat-result-p
-	    (make-union-type
+	    (make-union-type-or-something
 	     (list element-type
 		   (specifier-type
 		    `(complex ,(numeric-type-class element-type)))))

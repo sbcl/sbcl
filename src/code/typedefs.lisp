@@ -91,38 +91,38 @@
 
 ;;;; utilities
 
-;;; Like ANY and EVERY, except that we handle two-VALUES predicate
-;;; functions like SUBTYPEP. If the result is uncertain, then we
-;;; return (VALUES NIL NIL).
-;;;
-;;; If LIST-FIRST is true, then the list element is the first arg,
-;;; otherwise the second.
-(defun any/type (op thing list &key list-first)
+;;; sort of like ANY and EVERY, except:
+;;;   * We handle two-VALUES predicate functions like SUBTYPEP. (And
+;;;     if the result is uncertain, then we return (VALUES NIL NIL).)
+;;;   * THING is just an atom, and we apply OP (an arity-2 function)
+;;;     successively to THING and each element of LIST.
+(defun any/type (op thing list)
   (declare (type function op))
   (let ((certain? t))
     (dolist (i list (values nil certain?))
       (multiple-value-bind (sub-value sub-certain?)
-	  (if list-first
-	      (funcall op i thing)
-	      (funcall op thing i))
+	  (funcall op thing i)
 	(unless sub-certain? (setf certain? nil))
 	(when sub-value (return (values t t)))))))
-(defun every/type (op thing list &key list-first)
+(defun every/type (op thing list)
   (declare (type function op))
   (dolist (i list (values t t))
     (multiple-value-bind (sub-value sub-certain?)
-	(if list-first
-	    (funcall op i thing)
-	    (funcall op thing i))
+	(funcall op thing i)
       (unless sub-certain? (return (values nil nil)))
       (unless sub-value (return (values nil t))))))
 
-;;; Reverse the order of arguments of a SUBTYPEP-like function.
-(declaim (inline swapped/type))
-(defun swapped/type (op)
-  (declare (type function op))
+;;; Return a function like FUN, but expecting its (two) arguments in
+;;; the opposite order that FUN does.
+;;;
+;;; (This looks like a sort of general utility, but currently it's
+;;; used only in the implementation of the type system, so it's
+;;; internal to SB-KERNEL. -- WHN 2001-02-13)
+(declaim (inline swapped-args-fun))
+(defun swapped-args-fun (fun)
+  (declare (type function fun))
   (lambda (x y)
-    (funcall op y x)))
+    (funcall fun y x)))
 
 ;;; Compute the intersection for types that intersect only when one is a
 ;;; hierarchical subtype of the other.

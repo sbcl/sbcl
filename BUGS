@@ -845,9 +845,7 @@ Error in function C::GET-LAMBDA-TO-COMPILE:
   files and make it share the same new safe logic.
 
 80:
-  The subtle CMU CL bug discussed by Douglas Thomas Crosher on
-  cmucl-imp@cons.org 29 Jan 2001 sounds like something that probably
-  still exists in the corresponding SBCL code.
+  (fixed early Feb 2001 by MNA)
 
 
 KNOWN BUGS RELATED TO THE IR1 INTERPRETER
