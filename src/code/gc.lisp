@@ -359,17 +359,11 @@ function should notify the user that the system has finished GC'ing.")
 		   ;; animal.":-) -- WHN 2001-06-23
 		   (eff-n-bytes-freed (max 0 n-bytes-freed)))
 	      (declare (ignore ignore-me))
-	      (/show0 "got (DYNAMIC-USAGE) and EFF-N-BYTES-FREED")
 	      (incf *n-bytes-freed-or-purified*
 		    eff-n-bytes-freed)
-	      (/show0 "clearing *NEED-TO-COLLECT-GARBAGE*")
 	      (setf *need-to-collect-garbage* nil)
-	      (/show0 "calculating NEW-GC-TRIGGER")
-	      (let ((new-gc-trigger (+ post-gc-dynamic-usage
-				       *bytes-consed-between-gcs*)))
-		(/show0 "setting *GC-TRIGGER*")
-		(setf *gc-trigger* new-gc-trigger))
-	      (/show0 "calling SET-AUTO-GC-TRIGGER")
+	      (setf *gc-trigger*  (+ post-gc-dynamic-usage
+				     *bytes-consed-between-gcs*))
 	      (set-auto-gc-trigger *gc-trigger*)
 	      (dolist (hook *after-gc-hooks*)
 		(/show0 "doing a hook from *AFTER-GC--HOOKS*")
@@ -393,13 +387,6 @@ function should notify the user that the system has finished GC'ing.")
 			     start-time))))
   ;; FIXME: should probably return (VALUES), here and in RETURN-FROM
   nil)
-
-;;; This routine is called by the allocation miscops to decide whether
-;;; a GC should occur. The argument, OBJECT, is the newly allocated
-;;; object which must be returned to the caller.
-(defun maybe-gc (&optional object)
-  (sub-gc)
-  object)
 
 ;;; This is the user-advertised garbage collection function.
 (defun gc (&key (gen 0) (full nil) &allow-other-keys)

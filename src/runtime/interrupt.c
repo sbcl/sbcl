@@ -288,7 +288,7 @@ interrupt_handle_pending(os_context_t *context)
 	{
 	    fake_foreign_function_call(context);
 	}
-	funcall0(SymbolFunction(MAYBE_GC));
+	funcall0(SymbolFunction(SUB_GC));
 #ifndef __i386__
 	if (were_in_lisp)
 #endif
@@ -606,7 +606,7 @@ interrupt_maybe_gc(int signal, siginfo_t *info, void *void_context)
 	else {
 	    lispobj *old_free_space=current_dynamic_space;
 	    fake_foreign_function_call(context);
-	    funcall0(SymbolFunction(MAYBE_GC));
+	    funcall0(SymbolFunction(SUB_GC));
 	    undo_fake_foreign_function_call(context);
 	    if(current_dynamic_space==old_free_space) 
 		/* MAYBE-GC (as the name suggest) might not.  If it

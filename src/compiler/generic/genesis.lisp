@@ -1253,7 +1253,7 @@
   (macrolet ((frob (symbol)
 	       `(cold-set ',symbol
 			  (cold-fdefinition-object (cold-intern ',symbol)))))
-    (frob maybe-gc)
+    (frob sub-gc)
     (frob internal-error)
     (frob sb!kernel::control-stack-exhausted-error)
     (frob sb!di::handle-breakpoint)
