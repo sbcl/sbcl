@@ -1241,12 +1241,12 @@
 ;;; original exit continuation is the exit node's CONT.
 (defstruct (exit (:include node)
 		 (:copier nil))
-  ;; The Entry node that this is an exit for. If null, this is a
+  ;; the ENTRY node that this is an exit for. If null, this is a
   ;; degenerate exit. A degenerate exit is used to "fill" an empty
   ;; block (which isn't allowed in IR1.) In a degenerate exit, Value
   ;; is always also null.
   (entry nil :type (or entry null))
-  ;; The continuation yeilding the value we are to exit with. If NIL,
+  ;; the continuation yielding the value we are to exit with. If NIL,
   ;; then no value is desired (as in GO).
   (value nil :type (or continuation null)))
 (defprinter (exit :identity t)

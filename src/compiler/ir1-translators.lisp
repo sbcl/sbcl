@@ -85,8 +85,7 @@
       (ir1-convert-progn-body dummy cont forms))))
 
 
-(def-ir1-translator return-from ((name &optional value)
-				 start cont)
+(def-ir1-translator return-from ((name &optional value) start cont)
   #!+sb-doc
   "Return-From Block-Name Value-Form
   Evaluate the Value-Form, returning its values from the lexically enclosing
@@ -117,6 +116,9 @@
     (setf (continuation-dest value-cont) exit)
     (ir1-convert start value-cont value)
     (prev-link exit value-cont)
+    (let ((home-lambda (continuation-home-lambda-or-null start)))
+      (when home-lambda
+	(push entry (lambda-calls-or-closes home-lambda))))
     (use-continuation exit (second found))))
 
 ;;; Return a list of the segments of a TAGBODY. Each segment looks
@@ -197,11 +199,15 @@
   is constrained to be used only within the dynamic extent of the TAGBODY."
   (continuation-starts-block cont)
   (let* ((found (or (lexenv-find tag tags :test #'eql)
-		    (compiler-error "Go to nonexistent tag: ~S." tag)))
+		    (compiler-error "attempt to GO to nonexistent tag: ~S"
+				    tag)))
 	 (entry (first found))
 	 (exit (make-exit :entry entry)))
     (push exit (entry-exits entry))
     (prev-link exit start)
+    (let ((home-lambda (continuation-home-lambda-or-null start)))
+      (when home-lambda
+	(push entry (lambda-calls-or-closes home-lambda))))
     (use-continuation exit (second found))))
 
 ;;;; translators for compiler-magic special forms

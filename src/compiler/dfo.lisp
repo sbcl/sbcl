@@ -256,28 +256,41 @@
       (let ((res (find-initial-dfo-aux bind-block component)))
 	(declare (type component res))
 	;; Scavenge related lambdas.
-	(flet (;; Scavenge call relationship.
-	       (scavenge-call (call)
-		 (let ((call-home (lambda-home call)))
-		   (setf res (dfo-scavenge-dependency-graph call-home res))))
-	       ;; Scavenge closure-over relationship: if FUN refers to a
-	       ;; variable whose home lambda is not FUN, then the home lambda
-	       ;; should be in the same component as FUN. (sbcl-0.6.13, and
-	       ;; CMU CL, didn't do this, leading to the occasional failure
-	       ;; when physenv analysis, which is local to each component,
-	       ;; would bogusly conclude that a closed-over variable was
-	       ;; unused and thus delete it. See e.g. cmucl-imp 2001-11-29.)
-	       (scavenge-closure-var (var)
-		 (unless (null (lambda-var-refs var)) ; i.e. unless deleted
-		   (let ((var-home-home (lambda-home (lambda-var-home var))))
-		     (unless (eql (lambda-kind var-home-home) :deleted)
-		       (setf res
-			     (dfo-scavenge-dependency-graph var-home-home
-							    res)))))))
+	(labels ((scavenge-lambda (clambda)
+		   (setf res
+			 (dfo-scavenge-dependency-graph (lambda-home clambda)
+							res)))
+		 (scavenge-possibly-deleted-lambda (clambda)
+		   (unless (eql (lambda-kind clambda) :deleted)
+		     (scavenge-lambda clambda)))
+		 ;; Scavenge call relationship.
+		 (scavenge-call (called-lambda)
+		   (scavenge-lambda called-lambda))
+		 ;; Scavenge closure over a variable: if CLAMBDA
+		 ;; refers to a variable whose home lambda is not
+		 ;; CLAMBDA, then the home lambda should be in the
+		 ;; same component as CLAMBDA. (sbcl-0.6.13, and CMU
+		 ;; CL, didn't do this, leading to the occasional
+		 ;; failure when physenv analysis, which is local to
+		 ;; each component, would bogusly conclude that a
+		 ;; closed-over variable was unused and thus delete
+		 ;; it. See e.g. cmucl-imp 2001-11-29.)
+		 (scavenge-closure-var (var)
+		   (unless (null (lambda-var-refs var)) ; unless var deleted
+		     (let ((var-home-home (lambda-home (lambda-var-home var))))
+		       (scavenge-possibly-deleted-lambda var-home-home))))
+		 ;; Scavenge closure over an entry for nonlocal exit.
+		 ;; This is basically parallel to closure over a
+		 ;; variable above.
+		 (scavenge-entry (entry)
+		   (declare (type entry entry))
+		   (let ((entry-home (node-home-lambda entry)))
+		     (scavenge-possibly-deleted-lambda entry-home))))
 	  (dolist (cc (lambda-calls-or-closes clambda))
 	    (etypecase cc
 	      (clambda (scavenge-call cc))
-	      (lambda-var (scavenge-closure-var cc))))
+	      (lambda-var (scavenge-closure-var cc))
+	      (entry (scavenge-entry cc))))
 	  (when (eq (lambda-kind clambda) :external)
 	    (mapc #'scavenge-call (find-reference-funs clambda))))
 	;; Voila.

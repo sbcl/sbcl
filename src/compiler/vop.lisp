@@ -515,7 +515,7 @@
   ;;    the type constraint as a Lisp function type.
   ;;
   ;; If RESULT-TYPES is :CONDITIONAL, then this is an IF-FOO style
-  ;; conditional that yeilds its result as a control transfer. The
+  ;; conditional that yields its result as a control transfer. The
   ;; emit function takes two info arguments: the target label and a
   ;; boolean flag indicating whether to negate the sense of the test.
   (arg-types nil :type list)

@@ -1315,6 +1315,17 @@ Error in function C::GET-LAMBDA-TO-COMPILE:
   types manually, allowing the special case (VALUES) but still excluding
   all more-complex VALUES types.
 
+134:
+  (reported by Alexey Dejneka sbcl-devel 2001-12-07)
+    (let ((s '((1 2 3))))
+      (eval (eval ``(vector ,@',@s))))
+      
+    should return #(1 2 3), instead of this it causes a reader error.
+      
+    Interior call of BACKQUOTIFY erroneously optimizes ,@': it immediately
+    splices the temporal representation of ,@S.
+    
+    
 KNOWN BUGS RELATED TO THE IR1 INTERPRETER
 
 (Now that the IR1 interpreter has gone away, these should be 
