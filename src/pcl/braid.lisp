@@ -243,7 +243,7 @@
 				    smc
 				    name
 				    value)))
-	(set-slot 'source *load-truename*)
+	(set-slot 'source *load-pathname*)
 	(set-slot 'type 'standard)
 	(set-slot 'documentation "The standard method combination.")
 	(set-slot 'options ()))

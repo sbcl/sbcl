@@ -400,7 +400,7 @@
 	canonical-options (copy-tree canonical-options))
   (let ((ecd
 	  (make-early-class-definition name
-				       *load-truename*
+				       *load-pathname*
 				       metaclass
 				       supers
 				       canonical-slots

@@ -472,7 +472,7 @@
 
 (defclass definition-source-mixin (std-object)
   ((source
-    :initform *load-truename*
+    :initform *load-pathname*
     :reader definition-source
     :initarg :definition-source))
   (:metaclass std-class))

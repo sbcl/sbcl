@@ -320,7 +320,7 @@
 		    :direct-superclasses supers
 		    :direct-slots slots
 		    :definition-source `((defclass ,name)
-					 ,*load-truename*)
+					 ,*load-pathname*)
 		    other)))
     ;; Defclass of a class with a forward-referenced superclass does not
     ;; have a wrapper. RES is the incomplete PCL class. The Lisp class

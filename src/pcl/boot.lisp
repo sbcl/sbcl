@@ -239,7 +239,7 @@ bootstrapping.
   (apply #'ensure-generic-function
          fun-name
          :lambda-list lambda-list
-         :definition-source `((defgeneric ,fun-name) ,*load-truename*)
+         :definition-source `((defgeneric ,fun-name) ,*load-pathname*)
          initargs))
 
 ;;; As per section 3.4.2 of the ANSI spec, generic function lambda
@@ -1306,7 +1306,7 @@ bootstrapping.
 		       :definition-source `((defmethod ,gf-spec
 						,@qualifiers
 					      ,specializers)
-					    ,*load-truename*)
+					    ,*load-pathname*)
 		       initargs)))
     (unless (or (eq method-class 'standard-method)
 		(eq (find-class method-class nil) (class-of method)))
@@ -1764,7 +1764,7 @@ bootstrapping.
     (!bootstrap-set-slot 'standard-generic-function
 			 fin
 			 'source
-			 *load-truename*)
+			 *load-pathname*)
     (set-fun-name fin spec)
     (let ((arg-info (make-arg-info)))
       (setf (early-gf-arg-info fin) arg-info)

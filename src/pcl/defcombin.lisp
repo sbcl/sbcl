@@ -74,7 +74,7 @@
      ',type ',operator ',identity-with-one-arg ',documentation)))
 
 (defun load-short-defcombin (type operator ioa doc)
-  (let* ((truename *load-truename*)
+  (let* ((pathname *load-pathname*)
 	 (specializers
 	   (list (find-class 'generic-function)
 		 (intern-eql-specializer type)
@@ -95,7 +95,7 @@
 			   (short-combine-methods
 			    type options operator ioa new-method doc))
 			 args))
-	    :definition-source `((define-method-combination ,type) ,truename)))
+	    :definition-source `((define-method-combination ,type) ,pathname)))
     (when old-method
       (remove-method #'find-method-combination old-method))
     (add-method #'find-method-combination new-method)))
@@ -215,7 +215,7 @@
 					   :documentation doc))
 			  args))
 	     :definition-source `((define-method-combination ,type)
-			      ,*load-truename*))))
+				  ,*load-pathname*))))
     (setf (gethash type *long-method-combination-functions*) function)
     (when old-method (remove-method #'find-method-combination old-method))
     (add-method #'find-method-combination new-method)))
