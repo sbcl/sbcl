@@ -141,7 +141,7 @@ struct thread *create_thread(lispobj initial_function) {
 	clone(new_thread_trampoline,
 	      (((void*)th->control_stack_start)+THREAD_CONTROL_STACK_SIZE-4),
 	      (((getpid()!=parent_pid)?(CLONE_SIGHAND|CLONE_PARENT):0)
-	       |SIGTERM|CLONE_VM),th);
+	       |SIGALRM|CLONE_VM),th);
     if(kid_pid<=0) goto cleanup;
 #else
 #error this stuff presently only works on x86 Linux

@@ -46,6 +46,7 @@ lispobj *current_auto_gc_trigger;
  * is done).  For the GENCGC, it always points to DYNAMIC_SPACE_START. */
 lispobj *current_dynamic_space;
 
+boolean stop_the_world=0;
 pid_t parent_pid;
 
 void globals_init(void)

@@ -1,25 +1,21 @@
 (in-package "SB!THREAD")
 
-;; opaque type
-(sb!alien:define-alien-type thread (struct thread-struct))
-
 (sb!alien::define-alien-routine ("create_thread" %create-thread)
      sb!alien:unsigned-long (lisp-fun-address sb!alien:unsigned-long))
 
 (defun make-thread (function)
-  (%create-thread (sb!kernel:get-lisp-obj-address (coerce function 'function))))
-
-#||
-(defvar *foo* nil)
-(defun thread-nnop () (loop (setf *foo* (not *foo*)) (sleep 1)))
-(make-thread #'thread-nnop)
-
-(make-listener-thread "/dev/pts/6")
-
-||#
+  (%create-thread
+   (sb!kernel:get-lisp-obj-address (coerce function 'function))))
+(defun destroy-thread (thread-id)
+  (sb!unix:unix-kill thread-id :sigterm))
+(defun suspend-thread (thread-id)
+  (sb!unix:unix-kill thread-id :sigstop))
+(defun resume-thread (thread-id)
+  (sb!unix:unix-kill thread-id :sigcont))
 
 (defun current-thread-id ()
-  (int-sap (sb!vm::current-thread-offset-sap sb!vm::thread-this-slot)))
+  (sb!sys:sap-int
+   (sb!vm::current-thread-offset-sap sb!vm::thread-pid-slot)))
 
 (defun make-listener-thread (tty-name)
   (assert (probe-file tty-name))

@@ -25,6 +25,7 @@
 #include <signal.h>
 #include <sys/ptrace.h>
 #include <sched.h>
+#include <errno.h>
 
 #if defined(SVR4) || defined(__linux__)
 #include <time.h>
@@ -132,8 +133,6 @@ main(int argc, char *argv[], char *envp[])
     boolean end_runtime_options = 0;
 
     lispobj initial_function;
-
-    sigset_t sigset;
 
     /* KLUDGE: os_vm_page_size is set by os_init(), and on some
      * systems (e.g. Alpha) arch_init() needs need os_vm_page_size, so
@@ -289,63 +288,102 @@ More information about SBCL is available at <http://sbcl.sourceforge.net/>.\n\
     create_thread(initial_function);
     /* fprintf(stderr,"started lisp thread\n"); */
     gc_thread_pid=getpid();
-    sigemptyset(&sigset);
-    sigaddset(&sigset, SIGCHLD);
-    sigaddset(&sigset, SIGSEGV);
-    sigaddset(&sigset, SIGTERM);
-    sigprocmask(SIG_BLOCK,&sigset,0);
-    while(all_threads) {
-	int signal;
-	siginfo_t info;
-	/* fprintf(stderr,"parent thread waiting for a signal\n"); */
-	sigwaitinfo(&sigset,&info);
-	/*
-	fprintf(stderr,"parent thread got signal %d %x, maybe_gc_pending=%d\n",info.si_signo ,info.si_code , maybe_gc_pending);
-	*/
-	if((info.si_signo==SIGTERM) && 
-	   ((info.si_code==CLD_EXITED) ||
-	    (info.si_code==CLD_KILLED) ||
-	    (info.si_code==CLD_DUMPED))) {
-	    struct thread *th=find_thread_by_pid(info.si_pid);
-	    /* fprintf(stderr,"need to reap child %d %x\n",info.si_pid,th); */
+    parent_loop();
+}
 
-	    if(th) destroy_thread(th);
+static void parent_sighandler(int signum) 
+{
+    fprintf(stderr,"parent thread got signal %d , maybe_gc_pending=%d\n",
+	    signum, maybe_gc_pending);
+}
+
+static void parent_do_garbage_collect(void)
+{    
+    int pa_threads,waiting_threads;
+    struct thread *th;
+    int status,p;
+
+    stop_the_world=1;
+    /* first, we mark all threads interrupted.  This has no bad effect
+     * on non-PA threads, and saves doing the atomic
+     * test-one-location-and-set-another we'd otherwise have to do */
+    for_each_thread(th) 
+	SetTlSymbolValue(PSEUDO_ATOMIC_INTERRUPTED, make_fixnum(1),th);
+
+    /* Any PA threads running at this point will eventually get to the
+     * end of their PA section and pause at the top of
+     * interrupt_handle_pending.  So, now we know that no thread can
+     * turn its PA bit on behind our back */
+    do {
+	pa_threads=0; waiting_threads=0;
+	for_each_thread(th) {
+	    if(SymbolTlValue(PSEUDO_ATOMIC_ATOMIC,th)) pa_threads++;
+	    else {
+		fprintf(stderr,"attaching to %d ...",th->pid); 
+		if(ptrace(PTRACE_ATTACH,th->pid,0,0))
+		    perror("PTRACE_ATTACH");
+		else waiting_threads++;
+	    }
 	}
+	while(waiting_threads>0) {
+	    if((p=waitpid(-1,&status, WUNTRACED|__WALL))>0) {
+		if(WIFEXITED(status) || WIFSIGNALED(status)) 
+		    /* either this is a thread we haven't yet ptraced
+		     * (e.g. someone killed a PA thread from another
+		     * process) or the PTRACE_ATTACH failed for some
+		     * thread.  I don't think we can get a thread 
+		     * exiting _after_ it's received the ATTACH, so
+		     * don't count this reap towards our total */
+		    destroy_thread(find_thread_by_pid(p));
+		else
+		    waiting_threads--;
+	    }
+	}
+    } while(pa_threads>0);
+    collect_garbage(maybe_gc_pending-1);
+    maybe_gc_pending=0;
+    stop_the_world=0;
+    for_each_thread(th) 
+	if(ptrace(PTRACE_DETACH,th->pid,0,0))
+	    perror("PTRACE_DETACH");
+}
+
+static void /* noreturn */ parent_loop(void)
+{
+    struct sigaction sa;
+    sigset_t sigset;
+    sigemptyset(&sigset);
+
+    sigemptyset(&sigset);
+    sigaddset(&sigset, SIGALRM);
+    sigaddset(&sigset, SIGCHLD);
+    sigprocmask(SIG_UNBLOCK,&sigset,0);
+    sa.sa_handler=parent_sighandler;
+    sa.sa_mask=sigset;
+    sa.sa_flags= SA_RESTART;
+    sigaction(SIGALRM, &sa, 0);
+    sigaction(SIGCHLD, &sa, 0);
+
+    while(all_threads) {
+	int status;
+	pid_t pid=0;
+	fprintf(stderr,"parent thread waiting for a signal\n"); 
+	pause();
 	if(maybe_gc_pending) {
 	    /* someone asked for a garbage collection */
-	    int pa_thread;
+	    parent_do_garbage_collect();
+	} 
+	status=0;
+	while(all_threads && (pid=waitpid(-1,&status,__WALL|WNOHANG))) {
 	    struct thread *th;
-	    do {
-		pa_thread=0;
-		/* FIXME this is full of races, but it shows in
-		 * outline what needs doing */
-		for_each_thread(th) {
-		    if(SymbolTlValue(PSEUDO_ATOMIC_ATOMIC,th)) {
-			pa_thread++;
-			SetTlSymbolValue(PSEUDO_ATOMIC_INTERRUPTED,
-					 make_fixnum(1),th);
-
-		    } else {
-			int status;
-			/* fprintf(stderr,"attaching to %d ...",th->pid); */
-			if(ptrace(PTRACE_ATTACH,th->pid,0,0))
-			    perror("PTRACE_ATTACH");
-			sched_yield();
-			do {
-			    waitpid(th->pid,&status,__WALL);
-			    /* fprintf(stderr,"%d %d %d\n", 
-				    status,WIFSTOPPED(status),
-				    WSTOPSIG(status)); */
-			}while (WIFSTOPPED(status)==0);
-		    }
-		}
-	    } while(pa_thread);
-	    /* do the GC */
-	    collect_garbage(maybe_gc_pending-1);
-	    maybe_gc_pending=0;
-	    for_each_thread(th) 
-		if(ptrace(PTRACE_DETACH,th->pid,0,0))
-		    perror("PTRACE_DETACH");
+	    if(WIFEXITED(status) || WIFSIGNALED(status)) {
+		fprintf(stderr,"waitpid : child %d exited \n", pid);
+		th=find_thread_by_pid(pid);
+		/* FIXME lock all_threads */
+		if(th) destroy_thread(th);
+	    }else 
+		fprintf(stderr,"waitpid : child %d stopped? %d %d\n", pid,
+			WIFSTOPPED(status), WSTOPSIG(status));
 	}
     }
 }

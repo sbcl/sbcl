@@ -274,7 +274,7 @@ function should notify the user that the system has finished GC'ing.")
 (defun other-thread-collect-garbage (gen)
   (setf (sb!alien:extern-alien "maybe_gc_pending" (sb!alien:unsigned 32))
 	(1+ gen))
-  (sb!unix:unix-kill (gc-thread-pid) 11))
+  (sb!unix:unix-kill (gc-thread-pid) :SIGALRM))
 
 ;;; This variable contains the function that does the real GC. This is
 ;;; for low-level GC experimentation. Do not touch it if you do not

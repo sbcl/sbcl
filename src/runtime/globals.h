@@ -19,6 +19,7 @@
 #include "runtime.h"
 
 extern int foreign_function_call_active;
+extern boolean stop_the_world;
 
 extern lispobj *current_control_stack_pointer;
 extern lispobj *current_control_frame_pointer;
