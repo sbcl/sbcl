@@ -155,7 +155,7 @@
     :doc "private: implementation of the compiler"
     ;; (It seems strange to have the compiler USE SB-ALIEN-INTERNALS,
     ;; but the point seems to be to be able to express things like
-    ;; SB-C:DEFTRANSFORM SB-ALIEN-INTERNALS:MAKE-LOCAL-ALIEN without
+    ;; SB!C:DEFTRANSFORM SB-ALIEN-INTERNALS:MAKE-LOCAL-ALIEN without
     ;; having to use a bunch of package prefixes, by putting them
     ;; in the SB-C package. Maybe it'd be tidier to define an SB-ALIEN-COMP
     ;; package for this? But it seems like a fairly low priority.)
@@ -179,7 +179,7 @@
               "*BACKEND-T-PRIMITIVE-TYPE*"
 
               "*CODE-SEGMENT*" 
-              "*COUNT-VOP-USAGES*" "*ELSEWHERE*"
+              "*COUNT-VOP-USAGES*" "*ELSEWHERE*" "*FREE-FUNCTIONS*"
               "*SETF-ASSUMED-FBOUNDP*"
               "*SUPPRESS-VALUES-DECLARATION*"
 
@@ -1239,8 +1239,6 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
              "DEFAULT-STRUCTURE-PRINT"
              "LAYOUT" "LAYOUT-LENGTH"
              "LAMBDA-WITH-ENVIRONMENT" "LAYOUT-PURE" "DSD-RAW-TYPE"
-             "%COMPILER-DEFSTRUCT"
-             "%COMPILER-ONLY-DEFSTRUCT" "FUNCTION-%COMPILER-ONLY-DEFSTRUCT"
              "DEFSTRUCT-DESCRIPTION" "UNDEFINE-STRUCTURE"
              "DD-COPIER" "UNDEFINE-FUNCTION-NAME" "DD-TYPE"
              "CLASS-STATE" "INSTANCE"
@@ -1263,7 +1261,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
              "%INSTANCE-LAYOUT" "LAYOUT-CLOS-HASH"
              "%FUNCTION-TYPE" "PROCLAIM-AS-FUNCTION-NAME"
              "BECOME-DEFINED-FUNCTION-NAME"
-             "%%COMPILER-DEFSTRUCT" "%NUMERATOR" "CLASS-TYPEP"
+             "%%COMPILER-TRULY-DEFSTRUCT" "%NUMERATOR" "CLASS-TYPEP"
              "STRUCTURE-CLASS-PRINT-FUNCTION" "DSD-READ-ONLY"
              "LAYOUT-INHERITS" "DD-LENGTH" "%CODE-ENTRY-POINTS"
              "%DENOMINATOR"

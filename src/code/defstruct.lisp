@@ -215,48 +215,31 @@
 	    (when (and def-con (not (dd-alternate-metaclass defstruct)))
 	      `((setf (structure-class-constructor (sb!xc:find-class ',name))
 		      #',def-con))))))))
-;;; FIXME: I really would like to make structure accessors less special,
-;;; just ordinary inline functions. (Or perhaps inline functions with special
-;;; compact implementations of their expansions, to avoid bloating the system.)
+;;; FIXME: I really would like to make structure accessors less
+;;; special, just ordinary inline functions. (Or perhaps inline
+;;; functions with special compact implementations of their
+;;; expansions, to avoid bloating the system.)
 
 ;;; shared logic for CL:DEFSTRUCT and SB!XC:DEFSTRUCT
-;;;
-;;; FIXME: There should be some way to make this not be present in the
-;;; target executable, with EVAL-WHEN (COMPILE EXECUTE) and all that good
-;;; stuff, but for now I can't be bothered because of the messiness of
-;;; using CL:DEFMACRO in one case and SB!XC:DEFMACRO in another case.
-;;; Perhaps I could dodge this by defining it as an inline function instead?
-;;; Or perhaps just use MACROLET? I tried MACROLET and got nowhere and thought
-;;; I was tripping over either a compiler bug or ANSI weirdness, but this
-;;; test case seems to work in Debian CMU CL 2.4.9:
-;;;   (macrolet ((emit-printer () ''(print "********")))
-;;;     (defmacro fizz () (emit-printer)))
-;;; giving
-;;;   * (fizz)
-;;;   "********"
-;;;   "********"
-;;;   *
-(defmacro expander-for-defstruct (name-and-options
-				  slot-descriptions
-				  expanding-into-code-for-xc-host-p)
+(defmacro !expander-for-defstruct (name-and-options
+				   slot-descriptions
+				   expanding-into-code-for-xc-host-p)
   `(let ((name-and-options ,name-and-options)
 	 (slot-descriptions ,slot-descriptions)
 	 (expanding-into-code-for-xc-host-p
 	  ,expanding-into-code-for-xc-host-p))
-     (let* ((dd (parse-name-and-options-and-slot-descriptions
+     (let* ((dd (parse-defstruct-name-and-options-and-slot-descriptions
 		 name-and-options
 		 slot-descriptions))
 	    (name (dd-name dd)))
        (if (class-structure-p dd)
 	   (let ((inherits (inherits-for-structure dd)))
 	     `(progn
-		(/noshow0 "doing CLASS-STRUCTURE-P case for DEFSTRUCT " ,name)
 		(eval-when (:compile-toplevel :load-toplevel :execute)
-		  (%compiler-only-defstruct ',dd ',inherits))
+		  (%compiler-defstruct ',dd ',inherits)
+		  ,@(when (eq (dd-type dd) 'structure)
+		      `((%compiler-truly-defstruct ',dd))))
 		(%defstruct ',dd ',inherits)
-		,@(when (eq (dd-type dd) 'structure)
-		    `((%compiler-defstruct ',dd)))
-		(/noshow0 "starting not-for-the-xc-host section in DEFSTRUCT")
 		,@(unless expanding-into-code-for-xc-host-p
 		    (append (raw-accessor-definitions dd)
 			    (predicate-definitions dd)
@@ -266,10 +249,8 @@
 					;(copier-definition dd)
 			    (constructor-definitions dd)
 			    (class-method-definitions dd)))
-		(/noshow0 "done with DEFSTRUCT " ,name)
 		',name))
 	   `(progn
-	      (/show0 "doing NOT CLASS-STRUCTURE-P case for DEFSTRUCT " ,name)
 	      (eval-when (:compile-toplevel :load-toplevel :execute)
 		(setf (info :typed-structure :info ',name) ',dd))
 	      ,@(unless expanding-into-code-for-xc-host-p
@@ -277,7 +258,6 @@
 			  (typed-predicate-definitions dd)
 			  (typed-copier-definitions dd)
 			  (constructor-definitions dd)))
-	      (/noshow0 "done with DEFSTRUCT " ,name)
 	      ',name)))))
 
 (sb!xc:defmacro defstruct (name-and-options &rest slot-descriptions)
@@ -309,15 +289,15 @@
 
    :READ-ONLY {T | NIL}
        If true, no setter function is defined for this slot."
-    (expander-for-defstruct name-and-options slot-descriptions nil))
+    (!expander-for-defstruct name-and-options slot-descriptions nil))
 #+sb-xc-host
 (defmacro sb!xc:defstruct (name-and-options &rest slot-descriptions)
   #!+sb-doc
   "Cause information about a target structure to be built into the
   cross-compiler."
-  (expander-for-defstruct name-and-options slot-descriptions t))
+  (!expander-for-defstruct name-and-options slot-descriptions t))
 
-;;;; functions to create various parts of DEFSTRUCT definitions
+;;;; functions to generate code for various parts of DEFSTRUCT definitions
 
 ;;; Catch requests to mess up definitions in COMMON-LISP.
 #-sb-xc-host
@@ -454,14 +434,14 @@
     (error "no more than one of the following options may be specified:
   :PRINT-FUNCTION, :PRINT-OBJECT, :TYPE")))
 
-;;; Parse a single defstruct option and store the results in DEFSTRUCT.
-(defun parse-1-option (option defstruct)
+;;; Parse a single DEFSTRUCT option and store the results in DD.
+(defun parse-1-dd-option (option dd)
   (let ((args (rest option))
-	(name (dd-name defstruct)))
+	(name (dd-name dd)))
     (case (first option)
       (:conc-name
        (destructuring-bind (conc-name) args
-	 (setf (dd-conc-name defstruct)
+	 (setf (dd-conc-name dd)
 	       (if (symbolp conc-name)
 		   conc-name
 		   (make-symbol (string conc-name))))))
@@ -469,97 +449,96 @@
        (destructuring-bind (&optional (cname (symbolicate "MAKE-" name))
 				      &rest stuff)
 	   args
-	 (push (cons cname stuff) (dd-constructors defstruct))))
+	 (push (cons cname stuff) (dd-constructors dd))))
       (:copier
        (destructuring-bind (&optional (copier (symbolicate "COPY-" name)))
 	   args
-	 (setf (dd-copier defstruct) copier)))
+	 (setf (dd-copier dd) copier)))
       (:predicate
        (destructuring-bind (&optional (predicate-name (symbolicate name "-P")))
 	   args
-	 (setf (dd-predicate-name defstruct) predicate-name)))
+	 (setf (dd-predicate-name dd) predicate-name)))
       (:include
-       (when (dd-include defstruct)
+       (when (dd-include dd)
 	 (error "more than one :INCLUDE option"))
-       (setf (dd-include defstruct) args))
+       (setf (dd-include dd) args))
       (:alternate-metaclass
-       (setf (dd-alternate-metaclass defstruct) args))
+       (setf (dd-alternate-metaclass dd) args))
       (:print-function
-       (require-no-print-options-so-far defstruct)
-       (setf (dd-print-function defstruct)
+       (require-no-print-options-so-far dd)
+       (setf (dd-print-function dd)
 	     (the (or symbol cons) args)))
       (:print-object
-       (require-no-print-options-so-far defstruct)
-       (setf (dd-print-object defstruct)
+       (require-no-print-options-so-far dd)
+       (setf (dd-print-object dd)
 	     (the (or symbol cons) args)))
       (:type
        (destructuring-bind (type) args
 	 (cond ((eq type 'funcallable-structure)
-		(setf (dd-type defstruct) type))
+		(setf (dd-type dd) type))
 	       ((member type '(list vector))
-		(setf (dd-element-type defstruct) t)
-		(setf (dd-type defstruct) type))
+		(setf (dd-element-type dd) t)
+		(setf (dd-type dd) type))
 	       ((and (consp type) (eq (first type) 'vector))
 		(destructuring-bind (vector vtype) type
 		  (declare (ignore vector))
-		  (setf (dd-element-type defstruct) vtype)
-		  (setf (dd-type defstruct) 'vector)))
+		  (setf (dd-element-type dd) vtype)
+		  (setf (dd-type dd) 'vector)))
 	       (t
-		(error "~S is a bad :TYPE for Defstruct." type)))))
+		(error "~S is a bad :TYPE for DEFSTRUCT." type)))))
       (:named
        (error "The DEFSTRUCT option :NAMED takes no arguments."))
       (:initial-offset
        (destructuring-bind (offset) args
-	 (setf (dd-offset defstruct) offset)))
+	 (setf (dd-offset dd) offset)))
       (:pure
        (destructuring-bind (fun) args
-	 (setf (dd-pure defstruct) fun)))
+	 (setf (dd-pure dd) fun)))
       (t (error "unknown DEFSTRUCT option:~%  ~S" option)))))
 
 ;;; Given name and options, return a DD holding that info.
 (eval-when (:compile-toplevel :load-toplevel :execute)
-(defun parse-name-and-options (name-and-options)
+(defun parse-defstruct-name-and-options (name-and-options)
   (destructuring-bind (name &rest options) name-and-options
     (aver name) ; A null name doesn't seem to make sense here.
-    (let ((defstruct (make-defstruct-description name)))
+    (let ((dd (make-defstruct-description name)))
       (dolist (option options)
 	(cond ((consp option)
-	       (parse-1-option option defstruct))
+	       (parse-1-dd-option option dd))
 	      ((eq option :named)
-	       (setf (dd-named defstruct) t))
+	       (setf (dd-named dd) t))
 	      ((member option '(:constructor :copier :predicate :named))
-	       (parse-1-option (list option) defstruct))
+	       (parse-1-dd-option (list option) dd))
 	      (t
 	       (error "unrecognized DEFSTRUCT option: ~S" option))))
 
-      (case (dd-type defstruct)
+      (case (dd-type dd)
 	(structure
-	 (when (dd-offset defstruct)
+	 (when (dd-offset dd)
 	   (error ":OFFSET can't be specified unless :TYPE is specified."))
-	 (unless (dd-include defstruct)
-	   (incf (dd-length defstruct))))
+	 (unless (dd-include dd)
+	   (incf (dd-length dd))))
 	(funcallable-structure)
 	(t
-	 (require-no-print-options-so-far defstruct)
-	 (when (dd-named defstruct)
-	   (incf (dd-length defstruct)))
-	 (let ((offset (dd-offset defstruct)))
-	   (when offset (incf (dd-length defstruct) offset)))))
+	 (require-no-print-options-so-far dd)
+	 (when (dd-named dd)
+	   (incf (dd-length dd)))
+	 (let ((offset (dd-offset dd)))
+	   (when offset (incf (dd-length dd) offset)))))
 
-      (when (dd-include defstruct)
-	(do-inclusion-stuff defstruct))
+      (when (dd-include dd)
+	(do-dd-inclusion-stuff dd))
 
-      defstruct)))
+      dd)))
 
 ;;; Given name and options and slot descriptions (and possibly doc
 ;;; string at the head of slot descriptions) return a DD holding that
 ;;; info.
-(defun parse-name-and-options-and-slot-descriptions (name-and-options
-						     slot-descriptions)
-  (/noshow "PARSE-NAME-AND-OPTIONS-AND-SLOT-DESCRIPTIONS" name-and-options)
-  (let ((result (parse-name-and-options (if (atom name-and-options)
-					  (list name-and-options)
-					  name-and-options))))
+(defun parse-defstruct-name-and-options-and-slot-descriptions
+    (name-and-options slot-descriptions)
+  (let ((result (parse-defstruct-name-and-options (if (atom name-and-options)
+						      (list name-and-options)
+						      name-and-options))))
     (when (stringp (car slot-descriptions))
       (setf (dd-doc result) (pop slot-descriptions)))
     (dolist (slot-description slot-descriptions)
@@ -711,31 +690,29 @@
 
 ;;; Process any included slots pretty much like they were specified.
 ;;; Also inherit various other attributes.
-(defun do-inclusion-stuff (defstruct)
-  (destructuring-bind
-      (included-name &rest modified-slots)
-      (dd-include defstruct)
-    (let* ((type (dd-type defstruct))
+(defun do-dd-inclusion-stuff (dd)
+  (destructuring-bind (included-name &rest modified-slots) (dd-include dd)
+    (let* ((type (dd-type dd))
 	   (included-structure
-	    (if (class-structure-p defstruct)
+	    (if (class-structure-p dd)
 		(layout-info (compiler-layout-or-lose included-name))
 		(typed-structure-info-or-lose included-name))))
       (unless (and (eq type (dd-type included-structure))
 		   (type= (specifier-type (dd-element-type included-structure))
-			  (specifier-type (dd-element-type defstruct))))
+			  (specifier-type (dd-element-type dd))))
 	(error ":TYPE option mismatch between structures ~S and ~S."
-	       (dd-name defstruct) included-name))
+	       (dd-name dd) included-name))
 
-      (incf (dd-length defstruct) (dd-length included-structure))
-      (when (class-structure-p defstruct)
+      (incf (dd-length dd) (dd-length included-structure))
+      (when (class-structure-p dd)
 	(let ((mc (rest (dd-alternate-metaclass included-structure))))
-	  (when (and mc (not (dd-alternate-metaclass defstruct)))
-	    (setf (dd-alternate-metaclass defstruct)
+	  (when (and mc (not (dd-alternate-metaclass dd)))
+	    (setf (dd-alternate-metaclass dd)
 		  (cons included-name mc))))
-	(when (eq (dd-pure defstruct) :unspecified)
-	  (setf (dd-pure defstruct) (dd-pure included-structure)))
-	(setf (dd-raw-index defstruct) (dd-raw-index included-structure))
-	(setf (dd-raw-length defstruct) (dd-raw-length included-structure)))
+	(when (eq (dd-pure dd) :unspecified)
+	  (setf (dd-pure dd) (dd-pure included-structure)))
+	(setf (dd-raw-index dd) (dd-raw-index included-structure))
+	(setf (dd-raw-length dd) (dd-raw-length included-structure)))
 
       (dolist (included-slot (dd-slots included-structure))
 	(let* ((included-name (dsd-name included-slot))
@@ -743,10 +720,12 @@
 				   :key #'(lambda (x) (if (atom x) x (car x)))
 				   :test #'string=)
 			     `(,included-name))))
-	  (parse-1-dsd defstruct
+	  (parse-1-dsd dd
 		       modified
 		       (copy-structure included-slot)))))))
 
+;;;; various helper functions for setting up DEFSTRUCTs
+
 ;;; This function is called at macroexpand time to compute the INHERITS
 ;;; vector for a structure type definition.
 (defun inherits-for-structure (info)
@@ -809,7 +788,9 @@
 	      (setf (fdefinition `(setf ,(dsd-accessor-name slot)))
 		    (structure-slot-setter layout dsd))))))
 
-      ;; FIXME: See comment on corresponding code in %%COMPILER-DEFSTRUCT.
+      ;; FIXME: Someday it'd probably be good to go back to using
+      ;; closures for the out-of-line forms of structure accessors.
+      ;; See comment on corresponding code in %%COMPILER-TRULY-DEFSTRUCT.
       #|
       (when (dd-predicate info)
 	(protect-cl (dd-predicate info))
@@ -842,40 +823,8 @@
 
   (values))
 
-;;; This function is called at compile-time to do the
-;;; compile-time-only actions for defining a structure type. It
-;;; installs the class in the type system in a similar way to
-;;; %DEFSTRUCT, but is quieter and safer in the case of redefinition.
-;;;
-;;; The comments for the classic CMU CL version of this function said
-;;; that EVAL-WHEN doesn't do the right thing when nested or
-;;; non-top-level, and so CMU CL had the function magically called by
-;;; the compiler. Unfortunately, this doesn't do the right thing
-;;; either: compiling a function (DEFUN FOO () (DEFSTRUCT FOO X Y))
-;;; causes the class FOO to become defined, even though FOO is never
-;;; loaded or executed. Even more unfortunately, I've been unable to
-;;; come up with any EVAL-WHEN tricks which work -- I finally gave up
-;;; on this approach when trying to get the system to cross-compile
-;;; error.lisp. (Just because I haven't found it doesn't mean that it
-;;; doesn't exist, of course. Alas, I continue to have some trouble
-;;; understanding compile/load semantics in Common Lisp.) So we
-;;; continue to use the IR1 transformation approach, even though it's
-;;; known to be buggy. -- WHN 19990507
-;;;
-;;; Basically, this function avoids trashing the compiler by only
-;;; actually defining the class if there is no current definition.
-;;; Instead, we just set the INFO TYPE COMPILER-LAYOUT. This behavior
-;;; is left over from classic CMU CL and may not be necessary in the
-;;; new build system. -- WHN 19990507
-;;;
-;;; FUNCTION-%COMPILER-ONLY-DEFSTRUCT is an ordinary function, called
-;;; by both the IR1 transform version of %COMPILER-ONLY-DEFSTRUCT and
-;;; by the ordinary function version of %COMPILER-ONLY-DEFSTRUCT. (The
-;;; ordinary function version is there for the interpreter and for
-;;; code walkers.)
-(defun %compiler-only-defstruct (info inherits)
-  (function-%compiler-only-defstruct info inherits))
-(defun function-%compiler-only-defstruct (info inherits)
+;;; Do compile-time actions for DEFSTRUCT.
+(defun %compiler-defstruct (info inherits)
   (multiple-value-bind (class layout old-layout)
       (multiple-value-bind (clayout clayout-p)
 	  (info :type :compiler-layout (dd-name info))
@@ -905,15 +854,15 @@
     (setf (info :type :compiler-layout (dd-name info)) layout))
   (values))
 
-;;; This function does the (COMPILE LOAD EVAL) time actions for updating the
-;;; compiler's global meta-information to represent the definition of the
-;;; structure described by Info. This primarily amounts to setting up info
-;;; about the accessor and other implicitly defined functions. The constructors
-;;; are explicitly defined by top-level code.
-(defun %%compiler-defstruct (info)
+;;; Do (COMPILE LOAD EVAL) time actions for updating the compiler's
+;;; global meta-information to represent the definition of a structure
+;;; (truly a structure, not just DEFSTRUCT :TYPE VECTOR or DEFSTRUCT
+;;; :TYPE LIST) described by INFO.
+(defun %compiler-truly-defstruct (info)
   (declare (type defstruct-description info))
   (let* ((name (dd-name info))
 	 (class (sb!xc:find-class name)))
+
     (let ((copier (dd-copier info)))
       (when copier
 	(proclaim `(ftype (function (,name) ,name) ,copier))))
@@ -922,7 +871,7 @@
     ;; that CMU CL defined the predicate, instead of using DEFUN.
     ;; Perhaps it would be better to go back to to the CMU CL way, or
     ;; something similar. I want to reduce the amount of magic in
-    ;; defstruct functions, but making the predicate be a closure
+    ;; DEFSTRUCT functions, but making the predicate be a closure
     ;; looks like a good thing, and can even be done without magic.
     ;; (OTOH, there are some bootstrapping issues involved, since
     ;; GENESIS understands DEFUN but doesn't understand a
@@ -944,14 +893,21 @@
 	  (setf (info :function :accessor-for fun) class)
 	  (unless (dsd-read-only slot)
 	    (proclaim-as-defstruct-function-name setf-fun)
-	    (setf (info :function :accessor-for setf-fun) class))))))
+	    (setf (info :function :accessor-for setf-fun) class)))))
+
+    ;; FIXME: Couldn't this logic be merged into
+    ;; PROCLAIM-AS-DEFSTRUCT-FUNCTION?
+    (when (boundp 'sb!c:*free-functions*) ; when compiling
+      (let ((free-functions sb!c:*free-functions*))
+	(dolist (slot (dd-slots info))
+	  (let ((accessor-name (dsd-accessor-name slot)))
+	    (remhash accessor-name free-functions)
+	    (unless (dsd-read-only slot)
+	      (remhash `(setf ,accessor-name) free-functions))))
+	(remhash (dd-predicate-name info) free-functions)
+	(remhash (dd-copier info) free-functions))))
 
   (values))
-
-;;; Ordinarily this is preempted by an IR1 transformation, but this
-;;; definition is still useful for the interpreter and code walkers.
-(defun %compiler-defstruct (info)
-  (%%compiler-defstruct info))
 
 ;;;; redefinition stuff
 
@@ -1425,10 +1381,10 @@
 (dolist (args
 	 '#.(sb-cold:read-from-file
 	     "src/code/early-defstruct-args.lisp-expr"))
-  (let* ((defstruct (parse-name-and-options-and-slot-descriptions
-		     (first args)
-		     (rest args)))
-	 (inherits (inherits-for-structure defstruct)))
-    (function-%compiler-only-defstruct defstruct inherits)))
+  (let* ((dd (parse-defstruct-name-and-options-and-slot-descriptions
+	      (first args)
+	      (rest args)))
+	 (inherits (inherits-for-structure dd)))
+    (%compiler-defstruct dd inherits)))
 
 (/show0 "code/defstruct.lisp end of file")

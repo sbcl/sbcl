@@ -2244,37 +2244,6 @@
   "optimize away possible call to FDEFINITION at runtime"
   'thing)
 
-;;; This is a frob that DEFSTRUCT expands into to establish the compiler
-;;; semantics. The other code in the expansion and %%COMPILER-DEFSTRUCT do
-;;; most of the work, we just clear all of the functions out of
-;;; *FREE-FUNCTIONS* to keep things in synch. %%COMPILER-DEFSTRUCT is also
-;;; called at load-time.
-(def-ir1-translator %compiler-defstruct ((info) start cont :kind :function)
-  (let* ((info (eval info)))
-    (%%compiler-defstruct info)
-    (dolist (slot (dd-slots info))
-      (let ((accessor-name (dsd-accessor-name slot)))
-	(remhash accessor-name *free-functions*)
-	(unless (dsd-read-only slot)
-	  (remhash `(setf ,accessor-name) *free-functions*))))
-    (remhash (dd-predicate-name info) *free-functions*)
-    (remhash (dd-copier info) *free-functions*)
-    (ir1-convert start cont `(%%compiler-defstruct ',info))))
-
-;;; Return the contents of a quoted form.
-(defun unquote (x)
-  (if (and (consp x)
-	   (= 2 (length x))
-	   (eq 'quote (first x)))
-    (second x)
-    (error "not a quoted form")))
-
-;;; Don't actually compile anything, instead call the function now.
-(def-ir1-translator %compiler-only-defstruct
-		    ((info inherits) start cont :kind :function)
-  (function-%compiler-only-defstruct (unquote info) (unquote inherits))
-  (reference-constant start cont nil))
-
 ;;;; LET and LET*
 ;;;;
 ;;;; (LET and LET* can't be implemented as macros due to the fact that
