@@ -87,3 +87,12 @@
 		     :element-type 'character
 		     :initial-contents "abcdefghij")))
   (assert (string= (reverse a) "edcba")))
+
+;;; ARRAY-IN-BOUNDS-P should work when given non-INDEXes as its
+;;; subscripts (and return NIL, of course)
+(let ((a (make-array 10 :fill-pointer 5)))
+  (assert (not (array-in-bounds-p a -1)))
+  (assert (array-in-bounds-p a 3))
+  (assert (array-in-bounds-p a 7))
+  (assert (not (array-in-bounds-p a 11)))
+  (assert (not (array-in-bounds-p a (1+ most-positive-fixnum)))))

@@ -375,7 +375,7 @@
 	  (declare (list subs) (fixnum axis chunk-size result))
 	  (let ((index (car subs))
 		(dim (%array-dimension array axis)))
-	    (declare (fixnum index dim))
+	    (declare (fixnum dim))
 	    (unless (< -1 index dim)
 	      (if invalid-index-error-p
 		  (error 'simple-type-error
@@ -384,7 +384,7 @@
 			 :datum index
 			 :expected-type `(integer 0 (,dim)))
 		  (return-from %array-row-major-index nil)))
-	    (incf result (* chunk-size index))
+	    (incf result (* chunk-size (the fixnum index)))
 	    (setf chunk-size (* chunk-size dim))))
 	(let ((index (first subscripts))
 	      (length (length (the (simple-array * (*)) array))))

@@ -1501,6 +1501,11 @@ changes in sbcl-0.7.12 relative to sbcl-0.7.11:
        not cause a type error;
     ** CONSTANTP now returns true for all self-evaluating objects.
 
+changes in sbcl-0.7.13 relative to sbcl-0.7.12:
+  * fixed some bugs revealed by Paul Dietz' test suite:
+    ** ARRAY-IN-BOUNDS-P now allows arbitrary integers as arguments,
+       not just nonnegative fixnums;
+
 planned incompatible changes in 0.7.x:
   * (not done yet, but planned:) When the profiling interface settles
     down, maybe in 0.7.x, maybe later, it might impact TRACE. They both

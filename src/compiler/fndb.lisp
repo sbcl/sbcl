@@ -791,7 +791,7 @@
 (defknown array-rank (array) array-rank (foldable flushable))
 (defknown array-dimension (array array-rank) index (foldable flushable))
 (defknown array-dimensions (array) list (foldable flushable))
-(defknown array-in-bounds-p (array &rest index) boolean (foldable flushable))
+(defknown array-in-bounds-p (array &rest integer) boolean (foldable flushable))
 (defknown array-row-major-index (array &rest index) array-total-size
   (foldable flushable))
 (defknown array-total-size (array) array-total-size (foldable flushable))
