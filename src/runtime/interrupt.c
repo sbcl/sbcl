@@ -517,8 +517,6 @@ void return_to_lisp_function(os_context_t *context, lispobj function)
     void * fun=native_pointer(function);
     char *code = &(((struct simple_fun *) fun)->code);
     
-    u32 *sp=(u32 *)*os_context_register_addr(context,reg_ESP);
-    
     /* Build a stack frame showing `interrupted' so that the
      * user's backtrace makes (as much) sense (as usual) */
 #ifdef LISP_FEATURE_X86
@@ -528,6 +526,8 @@ void return_to_lisp_function(os_context_t *context, lispobj function)
      * would see, then arrange to have it called directly.  post_signal_tramp
      * is the second half of this function
      */
+    
+    u32 *sp=(u32 *)*os_context_register_addr(context,reg_ESP);
 
     *(sp-14) = post_signal_tramp; /* return address for call_into_lisp */
     *(sp-13) = function;        /* args for call_into_lisp : function*/
@@ -548,6 +548,7 @@ void return_to_lisp_function(os_context_t *context, lispobj function)
     *(sp-1)=*os_context_pc_addr(context);
 
 #else 
+    struct thread *th=arch_os_get_current_thread();
     build_fake_control_stack_frames(th,context);
 #endif
 
