@@ -101,11 +101,11 @@
      ;;   -- WHN 19990916
      ;;
      ;; FIXME: should have a check for overflow of static space
-     (load-symbol-value temp sb!impl::*static-space-free-pointer*)
+     (load-symbol-value temp sb!vm:*static-space-free-pointer*)
      (inst lea result (make-ea :byte :base temp :disp other-pointer-type))
      (inst add temp boxed)
      (inst add temp unboxed)
-     (store-symbol-value temp sb!impl::*static-space-free-pointer*)
+     (store-symbol-value temp sb!vm:*static-space-free-pointer*)
      (inst shl boxed (- type-bits word-shift))
      (inst or boxed code-header-type)
      (storew boxed result 0 other-pointer-type)

@@ -208,9 +208,14 @@
     sb!impl::fdefinition-object
 
     ;; free pointers
-    sb!impl::*read-only-space-free-pointer*
-    sb!impl::*static-space-free-pointer*
-    sb!impl::*initial-dynamic-space-free-pointer*
+    ;; 
+    ;; Note that these are FIXNUM word counts, not (as one might
+    ;; expect) byte counts or SAPs. The reason seems to be that by
+    ;; representing them this way, we can avoid consing bignums. 
+    ;; -- WHN 2000-10-02
+    *read-only-space-free-pointer*
+    *static-space-free-pointer*
+    *initial-dynamic-space-free-pointer*
 
     ;; things needed for non-local exit
     sb!impl::*current-catch-block*

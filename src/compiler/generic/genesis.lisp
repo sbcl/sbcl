@@ -3028,11 +3028,11 @@ initially undefined function references:~2%")
       (finalize-load-time-value-noise)
 
       ;; Tell the target Lisp how much stuff we've allocated.
-      (cold-set '*read-only-space-free-pointer*
+      (cold-set 'sb!vm:*read-only-space-free-pointer*
 		(allocate-descriptor *read-only* 0 sb!vm:even-fixnum-type))
-      (cold-set '*static-space-free-pointer*
+      (cold-set 'sb!vm:*static-space-free-pointer*
 		(allocate-descriptor *static* 0 sb!vm:even-fixnum-type))
-      (cold-set '*initial-dynamic-space-free-pointer*
+      (cold-set 'sb!vm:*initial-dynamic-space-free-pointer*
 		(allocate-descriptor *dynamic* 0 sb!vm:even-fixnum-type))
       (/show "done setting free pointers")
 
