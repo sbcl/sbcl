@@ -28,6 +28,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <signal.h>
+#include <errno.h>
 
 #include "genesis/config.h"
 
@@ -41,6 +42,7 @@ defconstant(char* lisp_name, long unix_number)
 	   lisp_name, unix_number, unix_number);
 }
 
+#define DEFERRNO(name) defconstant(#name, name)
 #define DEFSIGNAL(name) defconstant(#name, name)
 
 int
@@ -102,6 +104,15 @@ main(int argc, char *argv[])
   
     defconstant("s-iflnk",  S_IFLNK);
     defconstant("s-ifsock", S_IFSOCK);
+    printf("\n");
+
+    printf(";;; error numbers\n");
+    DEFERRNO(ENOENT);
+    DEFERRNO(EINTR);
+    DEFERRNO(EIO);
+    DEFERRNO(EEXIST);
+    DEFERRNO(ESPIPE);
+    DEFERRNO(EWOULDBLOCK);
     printf("\n");
 
     printf(";;; for wait3(2) in run-program.lisp\n");

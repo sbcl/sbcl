@@ -782,20 +782,12 @@ previous timer after the body has finished executing"
 	    (progn
 	      ,@body))))))
 
-
-(defconstant ENOENT 2) ; Unix error code, "No such file or directory"
-(defconstant EINTR 4) ; Unix error code, "Interrupted system call"
-(defconstant EIO 5) ; Unix error code, "I/O error"
-(defconstant EEXIST 17) ; Unix error code, "File exists"
-(defconstant ESPIPE 29) ; Unix error code, "Illegal seek"
-(defconstant EWOULDBLOCK 11) ; Unix error code, "Operation would block"
 ;;; FIXME: Many Unix error code definitions were deleted from the old
 ;;; CMU CL source code here, but not in the exports of SB-UNIX. I
 ;;; (WHN) hope that someday I'll figure out an automatic way to detect
 ;;; unused symbols in package exports, but if I don't, there are
 ;;; enough of them all in one place here that they should probably be
 ;;; removed by hand.
-
 
 ;;;; support routines for dealing with Unix pathnames
 
