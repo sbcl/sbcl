@@ -163,12 +163,12 @@
 (defun emit-slot-read-form (class-slot-p index slots)
   (if class-slot-p
       `(cdr ,index)
-      `(instance-ref ,slots ,index)))
+      `(clos-slots-ref ,slots ,index)))
 
 (defun emit-slot-write-form (class-slot-p index slots value)
   (if class-slot-p
       `(setf (cdr ,index) ,value)
-      `(and ,slots (setf (instance-ref ,slots ,index) ,value))))
+      `(and ,slots (setf (clos-slots-ref ,slots ,index) ,value))))
 
 (defun emit-boundp-check (value-form miss-fn arglist)
   `(let ((value ,value-form))

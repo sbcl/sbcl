@@ -46,15 +46,18 @@
      (declare (fixnum ,var))
      ,@body))
 
-
-(defmacro instance-ref (slots index)
-  `(svref ,slots ,index))
+(declaim (ftype (function (simple-vector index) t) clos-slots-ref))
+(defun clos-slots-ref (slots index)
+  (svref slots index))
+(declaim (ftype (function (t simple-vector index) t) (setf clos-slots-ref)))
+(defun (setf clos-slots-ref) (new-value slots index)
+  (setf (svref slots index) new-value))
 
 ;;; Note on implementation under CMU CL >=17 and SBCL: STD-INSTANCE-P
 ;;; is only used to discriminate between functions (including FINs)
 ;;; and normal instances, so we can return true on structures also. A
-;;; few uses of (or std-instance-p fsc-instance-p) are changed to
-;;; pcl-instance-p.
+;;; few uses of (OR STD-INSTANCE-P FSC-INSTANCE-P) are changed to
+;;; PCL-INSTANCE-P.
 (defmacro std-instance-p (x)
   `(sb-kernel:%instancep ,x))
 
@@ -184,9 +187,9 @@
 (defun pcl-instance-p (x)
   (typep (sb-kernel:layout-of x) 'wrapper))
 
-;;; We define this as STANDARD-INSTANCE, since we're going to clobber the
-;;; layout with some standard-instance layout as soon as we make it, and we
-;;; want the accessor to still be type-correct.
+;;; We define this as STANDARD-INSTANCE, since we're going to clobber
+;;; the layout with some standard-instance layout as soon as we make
+;;; it, and we want the accessor to still be type-correct.
 (defstruct (standard-instance
 	    (:predicate nil)
 	    (:constructor %%allocate-instance--class ())

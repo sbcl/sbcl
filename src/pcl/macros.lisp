@@ -51,7 +51,7 @@
 
 ;;; FIXME: CONSTANTLY-FOO should be boosted up to SB-INT too.
 (macrolet ((def-constantly-fun (name constant-expr)
-	     `(name-set-fdefinition ',name
+	     `(setf (symbol-function ',name)
 		    (constantly ,constant-expr))))
   (def-constantly-fun constantly-t t)
   (def-constantly-fun constantly-nil nil)

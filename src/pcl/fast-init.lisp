@@ -827,8 +827,8 @@
 	   (if *inline-iis-instance-locations-p*
 	       (typecase location
 		 (fixnum `((and slots
-                                (setf (instance-ref slots ,(const location))
-                                        value))))
+                                (setf (clos-slots-ref slots ,(const location))
+				      value))))
 		 (cons `((setf (cdr ,(const location)) value)))
 		 (t `(,default)))
 	       `((instance-write-internal pv slots ,(const pv-offset) value
@@ -845,11 +845,15 @@
 	   `((unless ,(if *inline-iis-instance-locations-p*
 			  (typecase location
 			    (fixnum `(not (and slots
-                                               (eq (instance-ref slots ,(const location))
+                                               (eq (clos-slots-ref
+						    slots
+						    ,(const location))
                                                    +slot-unbound+))))
-			    (cons `(not (eq (cdr ,(const location)) +slot-unbound+)))
+			    (cons `(not (eq (cdr ,(const location))
+					    +slot-unbound+)))
 			    (t default))
-			  `(instance-boundp-internal pv slots ,(const pv-offset)
+			  `(instance-boundp-internal
+			    pv slots ,(const pv-offset)
 			    ,default
 			    ,(typecase (pvref pv pv-offset)
 			       (fixnum ':instance)
@@ -857,7 +861,8 @@
 			       (t ':default))))
 	       ,@(let ((sforms (cons nil nil)))
 		   (dotimes-fixnum (i (cadddr form) (car sforms))
-		     (add-forms (first-form-to-lisp forms cvector pv) sforms)))))))
+		     (add-forms (first-form-to-lisp forms cvector pv)
+				sforms)))))))
 	(update-initialize-info-cache
 	 `((when (consp initargs)
 	     (setq initargs (cons (car initargs) (cdr initargs))))

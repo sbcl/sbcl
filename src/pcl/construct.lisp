@@ -637,7 +637,7 @@
                          (push val .initargs.)
                          (push initarg .initargs.))
                        (dolist (pos (cddr entry))
-                         (setf (instance-ref .slots. pos) val))))
+                         (setf (clos-slots-ref .slots. pos) val))))
 
 		   ,@(gathering1 (collecting)
                        (doplist (initarg value) supplied-initargs
@@ -646,7 +646,7 @@
 				       (push .value. .initargs.)
 				       (push ',initarg .initargs.)
 				       (dolist (.p. (pop .positions.))
-					 (setf (instance-ref .slots. .p.)
+					 (setf (clos-slots-ref .slots. .p.)
 					       .value.)))))))
 
 		   (dolist (fn .shared-initfns.)
@@ -784,7 +784,7 @@
 		   (dolist (entry .initfns-and-positions.)
 		     (let ((val (funcall (car entry))))
 		       (dolist (pos (cdr entry))
-			 (setf (instance-ref .slots. pos) val))))
+			 (setf (clos-slots-ref .slots. pos) val))))
 
 		   ,@(gathering1 (collecting)
 		       (doplist (initarg value) supplied-initargs
@@ -792,7 +792,8 @@
 			   (gather1
 			     `(let ((.value. ,value))
 				(dolist (.p. (pop .positions.))
-				  (setf (instance-ref .slots. .p.) .value.)))))))
+				  (setf (clos-slots-ref .slots. .p.)
+					.value.)))))))
 
 		   .instance.))))))))
 
@@ -914,8 +915,8 @@
 			     (gather1
 			       `(let ((.value. ,value))
 				  (dolist (.p. (pop .positions.))
-				    (setf (instance-ref .slots. .p.)
-                                            .value.)))))))
+				    (setf (clos-slots-ref .slots. .p.)
+					  .value.)))))))
 
 		     .instance.))))))))))
 

@@ -1099,11 +1099,12 @@
 		  (opos (interval :from 0)))
 	  (let ((npos (posq name nlayout)))
 	    (if npos
-		(setf (instance-ref nslots npos) (instance-ref oslots opos))
+		(setf (clos-slots-ref nslots npos)
+		      (clos-slots-ref oslots opos))
 		(progn
 		  (push name discarded)
-		  (unless (eq (instance-ref oslots opos) +slot-unbound+)
-		    (setf (getf plist name) (instance-ref oslots opos)))))))
+		  (unless (eq (clos-slots-ref oslots opos) +slot-unbound+)
+		    (setf (getf plist name) (clos-slots-ref oslots opos)))))))
 
 	;; Go through all the old shared slots.
 	(iterate ((oclass-slot-and-val (list-elements oclass-slots)))
@@ -1111,7 +1112,7 @@
 		(val (cdr oclass-slot-and-val)))
 	    (let ((npos (posq name nlayout)))
 	      (if npos
-		  (setf (instance-ref nslots npos) (cdr oclass-slot-and-val))
+		  (setf (clos-slots-ref nslots npos) (cdr oclass-slot-and-val))
 		  (progn (push name discarded)
 			 (unless (eq val +slot-unbound+)
 			   (setf (getf plist name) val)))))))
@@ -1159,15 +1160,15 @@
 	      (new-position (interval :from 0)))
       (let ((old-position (posq new-slot old-layout)))
 	(when old-position
-	  (setf (instance-ref new-slots new-position)
-		(instance-ref old-slots old-position)))))
+	  (setf (clos-slots-ref new-slots new-position)
+		(clos-slots-ref old-slots old-position)))))
 
     ;; "The values of slots specified as shared in the class CFROM and
     ;; as local in the class CTO are retained."
     (iterate ((slot-and-val (list-elements old-class-slots)))
       (let ((position (posq (car slot-and-val) new-layout)))
 	(when position
-	  (setf (instance-ref new-slots position) (cdr slot-and-val)))))
+	  (setf (clos-slots-ref new-slots position) (cdr slot-and-val)))))
 
     ;; Make the copy point to the old instance's storage, and make the
     ;; old instance point to the new storage.

@@ -817,7 +817,7 @@ bootstrapping.
 	       `(((typep ,emf 'fixnum)
 		  (let* ((.slots. (get-slots-or-nil
 				   ,(car required-args+rest-arg)))
-			 (value (when .slots. (instance-ref .slots. ,emf))))
+			 (value (when .slots. (clos-slots-ref .slots. ,emf))))
 		    (if (eq value +slot-unbound+)
 			(slot-unbound-internal ,(car required-args+rest-arg)
 					       ,emf)
@@ -828,14 +828,14 @@ bootstrapping.
 			(.slots. (get-slots-or-nil
 				  ,(car required-args+rest-arg))))
                     (when .slots.
-                         (setf (instance-ref .slots. ,emf) .new-value.))))))
+                         (setf (clos-slots-ref .slots. ,emf) .new-value.))))))
 	   #||
 	   ,@(when (and (null restp) (= 1 (length required-args+rest-arg)))
 	       `(((typep ,emf 'fast-instance-boundp)
 		  (let ((.slots. (get-slots-or-nil
 				  ,(car required-args+rest-arg))))
 		    (and .slots.
-			 (not (eq (instance-ref
+			 (not (eq (clos-slots-ref
 				   .slots. (fast-instance-boundp-index ,emf))
 				  +slot-unbound+)))))))
 	   ||#
@@ -888,20 +888,20 @@ bootstrapping.
      (cond ((null args) (error "1 or 2 args were expected."))
 	   ((null (cdr args))
 	    (let* ((slots (get-slots (car args)))
-                   (value (instance-ref slots emf)))
+                   (value (clos-slots-ref slots emf)))
 	      (if (eq value +slot-unbound+)
 		  (slot-unbound-internal (car args) emf)
 		  value)))
 	   ((null (cddr args))
-             (setf (instance-ref (get-slots (cadr args)) emf)
-                     (car args)))
+             (setf (clos-slots-ref (get-slots (cadr args)) emf)
+		   (car args)))
 	   (t (error "1 or 2 args were expected."))))
     (fast-instance-boundp
      (if (or (null args) (cdr args))
 	 (error "1 arg was expected.")
        (let ((slots (get-slots (car args))))
-	 (not (eq (instance-ref slots
-                                 (fast-instance-boundp-index emf))
+	 (not (eq (clos-slots-ref slots
+				  (fast-instance-boundp-index emf))
 		  +slot-unbound+)))))
     (function
      (apply emf args))))
@@ -1406,20 +1406,20 @@ bootstrapping.
 
 (defun early-gf-p (x)
   (and (fsc-instance-p x)
-       (eq (instance-ref (get-slots x) *sgf-method-class-index*)
+       (eq (clos-slots-ref (get-slots x) *sgf-method-class-index*)
 	   +slot-unbound+)))
 
 (defvar *sgf-methods-index*
   (!bootstrap-slot-index 'standard-generic-function 'methods))
 
 (defmacro early-gf-methods (gf)
-  `(instance-ref (get-slots ,gf) *sgf-methods-index*))
+  `(clos-slots-ref (get-slots ,gf) *sgf-methods-index*))
 
 (defvar *sgf-arg-info-index*
   (!bootstrap-slot-index 'standard-generic-function 'arg-info))
 
 (defmacro early-gf-arg-info (gf)
-  `(instance-ref (get-slots ,gf) *sgf-arg-info-index*))
+  `(clos-slots-ref (get-slots ,gf) *sgf-arg-info-index*))
 
 (defvar *sgf-dfun-state-index*
   (!bootstrap-slot-index 'standard-generic-function 'dfun-state))
@@ -1681,13 +1681,14 @@ bootstrapping.
 		       dfun)))
     (if (eq *boot-state* 'complete)
 	(setf (gf-dfun-state gf) new-state)
-	(setf (instance-ref (get-slots gf) *sgf-dfun-state-index*) new-state)))
+	(setf (clos-slots-ref (get-slots gf) *sgf-dfun-state-index*)
+	      new-state)))
   dfun)
 
 (defun gf-dfun-cache (gf)
   (let ((state (if (eq *boot-state* 'complete)
 		   (gf-dfun-state gf)
-		   (instance-ref (get-slots gf) *sgf-dfun-state-index*))))
+		   (clos-slots-ref (get-slots gf) *sgf-dfun-state-index*))))
     (typecase state
       (function nil)
       (cons (cadr state)))))
@@ -1695,7 +1696,7 @@ bootstrapping.
 (defun gf-dfun-info (gf)
   (let ((state (if (eq *boot-state* 'complete)
 		   (gf-dfun-state gf)
-		   (instance-ref (get-slots gf) *sgf-dfun-state-index*))))
+		   (clos-slots-ref (get-slots gf) *sgf-dfun-state-index*))))
     (typecase state
       (function nil)
       (cons (cddr state)))))
@@ -1704,7 +1705,7 @@ bootstrapping.
   (!bootstrap-slot-index 'standard-generic-function 'name))
 
 (defun !early-gf-name (gf)
-  (instance-ref (get-slots gf) *sgf-name-index*))
+  (clos-slots-ref (get-slots gf) *sgf-name-index*))
 
 (defun gf-lambda-list (gf)
   (let ((arg-info (if (eq *boot-state* 'complete)

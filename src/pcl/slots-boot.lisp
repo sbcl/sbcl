@@ -140,21 +140,23 @@
   (set-function-name
    (etypecase index
      (fixnum (if fsc-p
-		 #'(lambda (instance)
-		     (let ((value (instance-ref (fsc-instance-slots instance) index)))
-		       (if (eq value +slot-unbound+)
-			   (slot-unbound (class-of instance) instance slot-name)
-			   value)))
-		 #'(lambda (instance)
-		     (let ((value (instance-ref (std-instance-slots instance) index)))
-		       (if (eq value +slot-unbound+)
-			   (slot-unbound (class-of instance) instance slot-name)
-			   value)))))
-     (cons   #'(lambda (instance)
-		 (let ((value (cdr index)))
-		   (if (eq value +slot-unbound+)
-		       (slot-unbound (class-of instance) instance slot-name)
-		       value)))))
+		 (lambda (instance)
+		   (let ((value (clos-slots-ref (fsc-instance-slots instance)
+						index)))
+		     (if (eq value +slot-unbound+)
+			 (slot-unbound (class-of instance) instance slot-name)
+			 value)))
+		 (lambda (instance)
+		   (let ((value (clos-slots-ref (std-instance-slots instance)
+					      index)))
+		     (if (eq value +slot-unbound+)
+			 (slot-unbound (class-of instance) instance slot-name)
+			 value)))))
+     (cons   (lambda (instance)
+	       (let ((value (cdr index)))
+		 (if (eq value +slot-unbound+)
+		     (slot-unbound (class-of instance) instance slot-name)
+		     value)))))
    `(reader ,slot-name)))
 
 (defun make-optimized-std-writer-method-function (fsc-p slot-name index)
@@ -162,13 +164,15 @@
   (set-function-name
    (etypecase index
      (fixnum (if fsc-p
-		 #'(lambda (nv instance)
-		     (setf (instance-ref (fsc-instance-slots instance) index) nv))
-		 #'(lambda (nv instance)
-		     (setf (instance-ref (std-instance-slots instance) index) nv))))
-     (cons   #'(lambda (nv instance)
-		 (declare (ignore instance))
-		 (setf (cdr index) nv))))
+		 (lambda (nv instance)
+		   (setf (clos-slots-ref (fsc-instance-slots instance) index)
+			 nv))
+		 (lambda (nv instance)
+		   (setf (clos-slots-ref (std-instance-slots instance) index)
+			 nv))))
+     (cons   (lambda (nv instance)
+	       (declare (ignore instance))
+	       (setf (cdr index) nv))))
    `(writer ,slot-name)))
 
 (defun make-optimized-std-boundp-method-function (fsc-p slot-name index)
@@ -177,11 +181,11 @@
    (etypecase index
      (fixnum (if fsc-p
 		 #'(lambda (instance)
-		     (not (eq (instance-ref (fsc-instance-slots instance)
+		     (not (eq (clos-slots-ref (fsc-instance-slots instance)
 					     index)
 			      +slot-unbound+)))
 		 #'(lambda (instance)
-		     (not (eq (instance-ref (std-instance-slots instance)
+		     (not (eq (clos-slots-ref (std-instance-slots instance)
 					     index)
 			      +slot-unbound+)))))
      (cons   #'(lambda (instance)
@@ -191,11 +195,11 @@
 
 (defun make-optimized-structure-slot-value-using-class-method-function (function)
   (declare (type function function))
-  #'(lambda (class object slotd)
-      (let ((value (funcall function object)))
-	(if (eq value +slot-unbound+)
-	    (slot-unbound class object (slot-definition-name slotd))
-	    value))))
+  (lambda (class object slotd)
+    (let ((value (funcall function object)))
+      (if (eq value +slot-unbound+)
+	  (slot-unbound class object (slot-definition-name slotd))
+	  value))))
 
 (defun make-optimized-structure-setf-slot-value-using-class-method-function (function)
   (declare (type function function))
@@ -209,7 +213,9 @@
       (declare (ignore class slotd))
       (not (eq (funcall function object) +slot-unbound+))))
 
-(defun get-optimized-std-slot-value-using-class-method-function (class slotd name)
+(defun get-optimized-std-slot-value-using-class-method-function (class
+								 slotd
+								 name)
   (if (structure-class-p class)
       (ecase name
 	(reader (make-optimized-structure-slot-value-using-class-method-function
@@ -239,26 +245,28 @@
   (declare #.*optimize-speed*)
   (etypecase index
     (fixnum (if fsc-p
-		#'(lambda (class instance slotd)
-		    (declare (ignore slotd))
-		    (unless (fsc-instance-p instance) (error "not fsc"))
-		    (let ((value (instance-ref (fsc-instance-slots instance) index)))
-		      (if (eq value +slot-unbound+)
-			  (slot-unbound class instance slot-name)
-			  value)))
-		#'(lambda (class instance slotd)
-		    (declare (ignore slotd))
-		    (unless (std-instance-p instance) (error "not std"))
-		    (let ((value (instance-ref (std-instance-slots instance) index)))
-		      (if (eq value +slot-unbound+)
-			  (slot-unbound class instance slot-name)
-			  value)))))
-    (cons   #'(lambda (class instance slotd)
-		(declare (ignore slotd))
-		(let ((value (cdr index)))
-		  (if (eq value +slot-unbound+)
-		      (slot-unbound class instance slot-name)
-		      value))))))
+		(lambda (class instance slotd)
+		  (declare (ignore slotd))
+		  (unless (fsc-instance-p instance) (error "not fsc"))
+		  (let ((value (clos-slots-ref (fsc-instance-slots instance)
+					       index)))
+		    (if (eq value +slot-unbound+)
+			(slot-unbound class instance slot-name)
+			value)))
+		(lambda (class instance slotd)
+		  (declare (ignore slotd))
+		  (unless (std-instance-p instance) (error "not std"))
+		  (let ((value (clos-slots-ref (std-instance-slots instance)
+					       index)))
+		    (if (eq value +slot-unbound+)
+			(slot-unbound class instance slot-name)
+			value)))))
+    (cons   (lambda (class instance slotd)
+	      (declare (ignore slotd))
+	      (let ((value (cdr index)))
+		(if (eq value +slot-unbound+)
+		    (slot-unbound class instance slot-name)
+		    value))))))
 
 (defun make-optimized-std-setf-slot-value-using-class-method-function
     (fsc-p slot-name index)
@@ -266,15 +274,17 @@
   (declare (ignore slot-name))
   (etypecase index
     (fixnum (if fsc-p
-		#'(lambda (nv class instance slotd)
-		    (declare (ignore class slotd))
-		    (setf (instance-ref (fsc-instance-slots instance) index) nv))
-		#'(lambda (nv class instance slotd)
-		    (declare (ignore class slotd))
-		    (setf (instance-ref (std-instance-slots instance) index) nv))))
-    (cons   #'(lambda (nv class instance slotd)
-		(declare (ignore class instance slotd))
-		(setf (cdr index) nv)))))
+		(lambda (nv class instance slotd)
+		  (declare (ignore class slotd))
+		  (setf (clos-slots-ref (fsc-instance-slots instance) index)
+			nv))
+		(lambda (nv class instance slotd)
+		  (declare (ignore class slotd))
+		  (setf (clos-slots-ref (std-instance-slots instance) index)
+			nv))))
+    (cons  (lambda (nv class instance slotd)
+	     (declare (ignore class instance slotd))
+	     (setf (cdr index) nv)))))
 
 (defun make-optimized-std-slot-boundp-using-class-method-function
     (fsc-p slot-name index)
@@ -282,28 +292,29 @@
   (declare (ignore slot-name))
   (etypecase index
     (fixnum (if fsc-p
-		#'(lambda (class instance slotd)
-		    (declare (ignore class slotd))
-		    (not (eq (instance-ref (fsc-instance-slots instance)
-					    index)
-			     +slot-unbound+ )))
-		#'(lambda (class instance slotd)
-		    (declare (ignore class slotd))
-		    (not (eq (instance-ref (std-instance-slots instance)
-					    index)
-			     +slot-unbound+ )))))
-    (cons   #'(lambda (class instance slotd)
-		(declare (ignore class instance slotd))
-		(not (eq (cdr index) +slot-unbound+))))))
+		(lambda (class instance slotd)
+		  (declare (ignore class slotd))
+		  (not (eq (clos-slots-ref (fsc-instance-slots instance) index)
+			   +slot-unbound+)))
+		(lambda (class instance slotd)
+		  (declare (ignore class slotd))
+		  (not (eq (clos-slots-ref (std-instance-slots instance) index)
+			   +slot-unbound+)))))
+    (cons   (lambda (class instance slotd)
+	      (declare (ignore class instance slotd))
+	      (not (eq (cdr index) +slot-unbound+))))))
 
 (defun get-accessor-from-svuc-method-function (class slotd sdfun name)
   (macrolet ((emf-funcall (emf &rest args)
 	       `(invoke-effective-method-function ,emf nil ,@args)))
     (set-function-name
      (case name
-       (reader #'(lambda (instance) (emf-funcall sdfun class instance slotd)))
-       (writer #'(lambda (nv instance) (emf-funcall sdfun nv class instance slotd)))
-       (boundp #'(lambda (instance) (emf-funcall sdfun class instance slotd))))
+       (reader (lambda (instance)
+		 (emf-funcall sdfun class instance slotd)))
+       (writer (lambda (nv instance)
+		 (emf-funcall sdfun nv class instance slotd)))
+       (boundp (lambda (instance)
+		 (emf-funcall sdfun class instance slotd))))
      `(,name ,(class-name class) ,(slot-definition-name slotd)))))
 
 (defun make-internal-reader-method-function (class-name slot-name)
@@ -314,20 +325,27 @@
 	      (if wrapper
 		  (let* ((class (wrapper-class* wrapper))
 			 (index (or (instance-slot-index wrapper slot-name)
-				    (assq slot-name (wrapper-class-slots wrapper)))))
+				    (assq slot-name
+					  (wrapper-class-slots wrapper)))))
 		    (typecase index
 		      (fixnum 	
-		       (let ((value (instance-ref (get-slots instance) index)))
+		       (let ((value (clos-slots-ref (get-slots instance)
+						    index)))
 			 (if (eq value +slot-unbound+)
-			     (slot-unbound (class-of instance) instance slot-name)
+			     (slot-unbound (class-of instance)
+					   instance
+					   slot-name)
 			     value)))
 		      (cons
 		       (let ((value (cdr index)))
 			 (if (eq value +slot-unbound+)
-			     (slot-unbound (class-of instance) instance slot-name)
+			     (slot-unbound (class-of instance)
+					   instance
+					   slot-name)
 			     value)))
 		      (t
-		       (error "The wrapper for class ~S does not have the slot ~S"
+		       (error "~@<The wrapper for class ~S does not have ~
+                               the slot ~S~@:>"
 			      class slot-name))))
 		  (slot-value instance slot-name)))))))
 

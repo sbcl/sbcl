@@ -181,10 +181,10 @@
       default))
 
 (defun standard-instance-access (instance location)
-  (instance-ref (std-instance-slots instance) location))
+  (clos-slots-ref (std-instance-slots instance) location))
 
 (defun funcallable-standard-instance-access (instance location)
-  (instance-ref (fsc-instance-slots instance) location))
+  (clos-slots-ref (fsc-instance-slots instance) location))
 
 (defmethod slot-value-using-class ((class std-class)
 				   (object std-object)
@@ -198,12 +198,14 @@
 			  (unless (eq t (wrapper-state (std-instance-wrapper
 							object)))
 			    (check-wrapper-validity object))
-			  (instance-ref (std-instance-slots object) location))
+			  (clos-slots-ref (std-instance-slots object)
+					  location))
 			 ((fsc-instance-p object)
 			  (unless (eq t (wrapper-state (fsc-instance-wrapper
 							object)))
 			    (check-wrapper-validity object))
-			  (instance-ref (fsc-instance-slots object) location))
+			  (clos-slots-ref (fsc-instance-slots object)
+					  location))
 			 (t (error "unrecognized instance type"))))
 		  (cons
 		   (cdr location))
@@ -226,13 +228,13 @@
        (cond ((std-instance-p object)
 	      (unless (eq t (wrapper-state (std-instance-wrapper object)))
 		(check-wrapper-validity object))
-               (setf (instance-ref (std-instance-slots object) location)
-                       new-value))
+               (setf (clos-slots-ref (std-instance-slots object) location)
+		     new-value))
 	     ((fsc-instance-p object)
 	      (unless (eq t (wrapper-state (fsc-instance-wrapper object)))
 		(check-wrapper-validity object))
-               (setf (instance-ref (fsc-instance-slots object) location)
-                       new-value))
+               (setf (clos-slots-ref (fsc-instance-slots object) location)
+		     new-value))
 	     (t (error "unrecognized instance type"))))
       (cons
        (setf (cdr location) new-value))
@@ -252,12 +254,14 @@
 			  (unless (eq t (wrapper-state (std-instance-wrapper
 							object)))
 			    (check-wrapper-validity object))
-			  (instance-ref (std-instance-slots object) location))
+			  (clos-slots-ref (std-instance-slots object)
+					  location))
 			 ((fsc-instance-p object)
 			  (unless (eq t (wrapper-state (fsc-instance-wrapper
 							object)))
 			    (check-wrapper-validity object))
-			  (instance-ref (fsc-instance-slots object) location))
+			  (clos-slots-ref (fsc-instance-slots object)
+					  location))
 			 (t (error "unrecognized instance type"))))
 		  (cons
 		   (cdr location))
@@ -278,13 +282,13 @@
        (cond ((std-instance-p object)
 	      (unless (eq t (wrapper-state (std-instance-wrapper object)))
 		(check-wrapper-validity object))
-               (setf (instance-ref (std-instance-slots object) location)
-                       +slot-unbound+))
+               (setf (clos-slots-ref (std-instance-slots object) location)
+		     +slot-unbound+))
 	     ((fsc-instance-p object)
 	      (unless (eq t (wrapper-state (fsc-instance-wrapper object)))
 		(check-wrapper-validity object))
-               (setf (instance-ref (fsc-instance-slots object) location)
-                       +slot-unbound+))
+               (setf (clos-slots-ref (fsc-instance-slots object) location)
+		     +slot-unbound+))
 	     (t (error "unrecognized instance type"))))
       (cons
        (setf (cdr location) +slot-unbound+))

@@ -88,8 +88,9 @@
 	    (defstruct-p (and (eq *boot-state* 'complete)
 			      (let ((mclass (find-class metaclass nil)))
 				(and mclass
-				     (*subtypep mclass
-						*the-class-structure-class*))))))
+				     (*subtypep
+				      mclass
+				      *the-class-structure-class*))))))
 	(let ((defclass-form
                 (eval-when (:load-toplevel :execute)
                   `(progn
@@ -281,8 +282,8 @@
 	(loop (when (null others) (return nil))
 	      (let ((initarg (pop others)))
 		(unless (eq initarg :direct-default-initargs)
-		 (error "The defclass option ~S is not supported by the bootstrap~%~
-			object system."
+		 (error "~@<The defclass option ~S is not supported by ~
+			the bootstrap object system.~:@>"
 			initarg)))
 	      (setq default-initargs
 		    (nconc default-initargs (reverse (pop others)))))))
@@ -308,7 +309,8 @@
 ;;; standard slots must be computed the same way in this file as it is
 ;;; by the full object system later.
 (defmacro !bootstrap-get-slot (type object slot-name)
-  `(instance-ref (get-slots ,object) (!bootstrap-slot-index ,type ,slot-name)))
+  `(clos-slots-ref (get-slots ,object)
+		   (!bootstrap-slot-index ,type ,slot-name)))
 (defun !bootstrap-set-slot (type object slot-name new-value)
   (setf (!bootstrap-get-slot type object slot-name) new-value))
 

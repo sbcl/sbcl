@@ -649,15 +649,25 @@ changes in sbcl-0.6.11 relative to sbcl-0.6.10:
 * fixed bug 40: TYPEP, SUBTYPEP, UPGRADED-ARRAY-ELEMENT-TYPE, 
   and UPGRADED-COMPLEX-PART-TYPE now work better with of compound
   types built from undefined types, e.g. '(VECTOR SOME-UNDEF-TYPE).
-* The Gray subclassable streams extension now works, thanks to a 
-  patch from Martin Atzmueller.
 * DESCRIBE now works on structure objects again.
+* Most function call argument type mismatches are now handled as
+  STYLE-WARNINGs instead of full WARNINGs, since the compiler doesn't
+  know whether the function will be redefined before the call is
+  executed. (The compiler could flag local calls with full WARNINGs,
+  as per the ANSI spec "3.2.2.3 Semantic Constraints", but right now
+  it doesn't keep track of enough information to know whether calls
+  are local in this sense.)
 * Compiler output is now more verbose, with messages truncated
   later than before. (There should be some supported way for users
   to override the default verbosity, but I haven't decided how to 
   provide it yet, so this behavior is still controlled by the internal
   SB-C::*COMPILER-ERROR-PRINT-FOO* variables in
   src/compiler/ir1util.lisp.)
+* Fasl file format version numbers have increased again, because
+  support for the Gray streams extension changes the layout of the
+  system's STREAM objects.
+* The Gray subclassable streams extension now works, thanks to a 
+  patch from Martin Atzmueller.
 * The full LOAD-FOREIGN extension (not just the primitive
   LOAD-FOREIGN-1) now works, thanks to a patch from Martin Atzmueller.
 * The default behavior of RUN-PROGRAM has changed. Now, unlike CMU CL
@@ -670,9 +680,6 @@ changes in sbcl-0.6.11 relative to sbcl-0.6.10:
   for porting convenience.
 * LOAD-FOREIGN (and LOAD-1-FOREIGN) now support logical pathnames,
   as per Daniel Barlow's suggestion and Martin Atzmueller's patch
-* Fasl file format version numbers have increased again, because
-  support for the Gray streams extension changes the layout of the
-  system's STREAM objects.
 
 planned incompatible changes in 0.7.x:
 * The debugger prompt sequence now goes "5]", "5[2]", "5[3]", etc.
@@ -683,4 +690,5 @@ planned incompatible changes in 0.7.x:
 * When the profiling interface settles down, it might impact TRACE.
   They both encapsulate functions, and it's not clear yet how
   e.g. UNPROFILE will interact with TRACE and UNTRACE. (This shouldn't
-  matter, though, unless you are using profiling.)
+  matter, though, unless you are using profiling. If you never 
+  profile anything, TRACE should continue to behave as before.)
