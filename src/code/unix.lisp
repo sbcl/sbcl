@@ -390,6 +390,18 @@
 (defun unix-fsync (fd)
   (declare (type unix-fd fd))
   (void-syscall ("fsync" int) fd))
+
+(defun unix-setpgid (pid pgid)
+  (void-syscall ("setpgid" int int) pid pgid))
+
+(defun unix-tcsetpgrp (fd pgrpid)
+  (void-syscall ("tcsetpgrp" int int) fd pgrpid))
+
+(defun unix-setsid ()
+  (int-syscall ("setsid")))
+
+
+
 
 ;;;; sys/ioctl.h
 

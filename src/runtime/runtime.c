@@ -286,7 +286,12 @@ More information about SBCL is available at <http://sbcl.sourceforge.net/>.\n\
 
     FSHOW((stderr, "/funcalling initial_function=0x%lx\n", initial_function));
     create_thread(initial_function);
-    /* fprintf(stderr,"started lisp thread\n"); */
+    /* first lisp thread should be the foregound process, not us */
+    if(setpgid(all_threads->pid,0)==-1)
+	perror("setpgid child");
+    if(tcsetpgrp(0,all_threads->pid) == -1)
+	perror("tcsetpgrp child");
+ 
     gc_thread_pid=getpid();
     parent_loop();
 }
@@ -364,7 +369,8 @@ static void /* noreturn */ parent_loop(void)
     sigaction(SIGCHLD, &sa, 0);
 
     /* renounce sin, the world, and a controlling tty */
-    setsid();			
+    if(setpgid(0,0)==-1) perror("setpgid parent");
+
     while(all_threads) {
 	int status;
 	pid_t pid=0;

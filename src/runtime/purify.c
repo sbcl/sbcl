@@ -17,6 +17,9 @@
 #include <sys/types.h>
 #include <stdlib.h>
 #include <strings.h>
+#include <sys/ptrace.h>
+#include <linux/user.h>
+#include <errno.h>
 
 #include "runtime.h"
 #include "os.h"
@@ -364,6 +367,11 @@ setup_i386_stack_scav(lispobj *lowaddr, lispobj *base)
 	     * return addresses. This will also pick up pointers to
 	     * functions in code objects. */
 	    if (widetag_of(*start_addr) == CODE_HEADER_WIDETAG) {
+		/* FIXME asserting here is a really dumb thing to do.
+		 * If we've overflowed some arbitrary static limit, we
+		 * should just refuse to purify, instead of killing
+		 * the whole lisp session
+		 */
 		gc_assert(num_valid_stack_ra_locations <
 			  MAX_STACK_RETURN_ADDRESSES);
 		valid_stack_ra_locations[num_valid_stack_ra_locations] = sp;
@@ -1330,12 +1338,29 @@ purify(lispobj static_roots, lispobj read_only_roots)
     fflush(stdout);
 #endif
 
-#ifdef LISP_FEATURE_GENCGC
+#if 0
+    /* can't do this unless the threads in question are suspended with
+     * ptrace
+     */
+#if (defined(LISP_FEATURE_GENCGC) && defined(LISP_FEATURE_X86))
+    for_each_thread(thread) {
+	void **ptr;
+	struct user_regs_struct regs;
+	if(ptrace(PTRACE_GETREGS,thread->pid,0,&regs)){
+	    fprintf(stderr,"child pid %d, %s\n",thread->pid,strerror(errno));
+	    lose("PTRACE_GETREGS");
+	}
+	setup_i386_stack_scav(regs.ebp,
+			      ((void *)thread->control_stack_start)
+			      +THREAD_CONTROL_STACK_SIZE);
+    }
+#endif
+#endif
     setup_i386_stack_scav(((&static_roots)-2),
 			  ((void *)all_threads->control_stack_start)
 			  +THREAD_CONTROL_STACK_SIZE);
-    
-#endif
+
+
 
     pscav(&static_roots, 1, 0);
     pscav(&read_only_roots, 1, 1);
