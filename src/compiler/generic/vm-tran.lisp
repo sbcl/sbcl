@@ -414,7 +414,7 @@
                      (dotimes (i sb!vm:n-word-bytes accum)
                        (setf accum (logior accum (ash code (* 8 i))))))
 		   `(let ((code (sb!xc:char-code item)))
-                     (logior ,@(loop for i from 0 upto sb!vm:n-word-bytes
+                     (logior ,@(loop for i from 0 below sb!vm:n-word-bytes
                                      collect `(ash code ,(* 8 i))))))))
     `(let ((length (length sequence))
 	   (value ,value))
