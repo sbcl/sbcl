@@ -23,6 +23,10 @@ changes in sbcl-0.8.18 relative to sbcl-0.8.17:
   * bug fix: starting a core saved with shared objects loaded when
     those objects are not available no longer causes threaded SBCL to 
     hang. (reported by Sean Ross)
+  * bug fix: evaluated FUNCTION no longer bypasses encapsulation (eg.
+    TRACE).
+  * bug fix: (SETF MACRO-FUNCTION) now accepts an optional environment
+    argument, which must always be NIL. (reported by Kalle Niemitalo)
   * fixed some bugs related to Unicode integration:
     ** RUN-PROGRAM can allow its child to take input from a Lisp
        stream.  (reported by Stefan Scholl)

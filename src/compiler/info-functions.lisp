@@ -162,14 +162,16 @@
 	  (t
 	   nil))))
 
-;;; Note: Technically there could be an ENV optional argument to SETF
-;;; MACRO-FUNCTION, but since ANSI says that the consequences of
-;;; supplying that optional argument are undefined, we don't allow it.
-;;; (Thus our implementation of this unspecified behavior is to
-;;; complain that the wrong number of arguments was supplied. Since
-;;; the behavior is unspecified, this is conforming.:-)
-(defun (setf sb!xc:macro-function) (function symbol)
+(defun (setf sb!xc:macro-function) (function symbol &optional environment)
   (declare (symbol symbol) (type function function))
+  (when environment
+    ;; Note: Technically there could be an ENV optional argument to SETF
+    ;; MACRO-FUNCTION, but since ANSI says that the consequences of
+    ;; supplying a non-nil one are undefined, we don't allow it.
+    ;; (Thus our implementation of this unspecified behavior is to
+    ;; complain. SInce the behavior is unspecified, this is conforming.:-)
+    (error "Non-NIL environment argument in SETF of MACRO-FUNCTION ~S: ~S" 
+           symbol environment))
   (when (eq (info :function :kind symbol) :special-form)
     (error "~S names a special form." symbol))
   (setf (info :function :kind symbol) :macro)

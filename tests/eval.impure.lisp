@@ -124,5 +124,12 @@
   (error () :ok)
   (:no-error (c) (error "MAKE-PACKAGE succeeded: ~S" c)))
 
+;;; FUNCTION
+(defun function-eq-test ()
+  'ok)
+(trace function-eq-test)
+(assert (eq (eval '(function function-eq-test))
+            (funcall (compile nil '(lambda () (function function-eq-test))))))
+
 ;;; success
 (sb-ext:quit :unix-status 104)

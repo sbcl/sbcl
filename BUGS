@@ -1592,3 +1592,382 @@ WORKAROUND:
    (test)
  Has the XEP for TEST in the backtrace, not the TEST frame itself.
  (sparc and x86 at least)
+
+355: change-class of generic-function
+    (reported by Bruno Haible)
+  The MOP doesn't support change-class on a generic-function. However, SBCL
+  apparently supports it, since it doesn't give an error or warning when doing
+  so so. Then, however, it produces wrong results for calls to this generic 
+  function.
+  ;;; The effective-methods cache:
+  (progn
+    (defgeneric testgf35 (x))
+    (defmethod testgf35 ((x integer))
+      (cons 'integer (if (next-method-p) (call-next-method))))
+    (defmethod testgf35 ((x real))
+      (cons 'real (if (next-method-p) (call-next-method))))
+    (defclass customized5-generic-function (standard-generic-function)
+      ()
+      (:metaclass sb-pcl:funcallable-standard-class))
+    (defmethod sb-pcl:compute-effective-method ((gf customized5-generic-function) method-combination methods)
+      `(REVERSE ,(call-next-method)))
+    (list
+      (testgf35 3)
+      (progn
+        (change-class #'testgf35 'customized5-generic-function)
+        (testgf35 3))))
+  Expected: ((INTEGER REAL) (REAL INTEGER))
+  Got:      ((INTEGER REAL) (INTEGER REAL))
+  ;;; The discriminating-function cache:
+  (progn
+    (defgeneric testgf36 (x))
+    (defmethod testgf36 ((x integer))
+      (cons 'integer (if (next-method-p) (call-next-method))))
+    (defmethod testgf36 ((x real))
+      (cons 'real (if (next-method-p) (call-next-method))))
+    (defclass customized6-generic-function (standard-generic-function)
+      ()
+      (:metaclass sb-pcl:funcallable-standard-class))
+    (defmethod sb-pcl:compute-discriminating-function ((gf customized6-generic-function))
+      (let ((orig-df (call-next-method)))
+        #'(lambda (&rest arguments)
+            (reverse (apply orig-df arguments)))))
+    (list
+      (testgf36 3)
+      (progn
+        (change-class #'testgf36 'customized6-generic-function)
+        (testgf36 3))))
+  Expected: ((INTEGER REAL) (REAL INTEGER))
+  Got:      ((INTEGER REAL) (INTEGER REAL))
+
+356: PCL corruption
+    (reported by Bruno Haible)
+  After the "layout depth conflict" error, the CLOS is left in a state where
+  it's not possible to define new standard-class subclasses any more.
+  Test case:
+  (defclass prioritized-dispatcher ()
+    ((dependents :type list :initform nil)))
+  (defmethod sb-pcl:validate-superclass ((c1 sb-pcl:funcallable-standard-class) 
+                                         (c2 (eql (find-class 'prioritized-dispatcher))))
+    t)
+  (defclass prioritized-generic-function (prioritized-dispatcher standard-generic-function)
+    ()
+    (:metaclass sb-pcl:funcallable-standard-class))
+  ;; ERROR, Quit the debugger with ABORT
+  (defclass typechecking-reader-class (standard-class)
+    ())
+  Expected: #<STANDARD-CLASS TYPECHECKING-READER-CLASS>
+  Got:      ERROR "The assertion SB-PCL::WRAPPERS failed."
+
+357: defstruct inheritance of initforms
+    (reported by Bruno Haible)
+  When defstruct and defclass (with :metaclass structure-class) are mixed,
+  1. some slot initforms are ignored by the DEFSTRUCT generated constructor
+     function, and 
+  2. all slot initforms are ignored by MAKE-INSTANCE. (This can be arguably
+     OK for initforms that were given in a DEFSTRUCT form, but for those
+     given in a DEFCLASS form, I think it qualifies as a bug.)
+  Test case:
+  (defstruct structure02a
+    slot1
+    (slot2 t)
+    (slot3 (floor pi)))
+  (defclass structure02b (structure02a)
+    ((slot4 :initform -44)
+     (slot5)
+     (slot6 :initform t)
+     (slot7 :initform (floor (* pi pi)))
+     (slot8 :initform 88))
+    (:metaclass structure-class))
+  (defstruct (structure02c (:include structure02b (slot8 -88)))
+    slot9 
+    (slot10 t)
+    (slot11 (floor (exp 3))))
+  ;; 1. Form:
+  (let ((a (make-structure02c)))
+    (list (structure02c-slot4 a)
+          (structure02c-slot5 a)
+          (structure02c-slot6 a)
+          (structure02c-slot7 a)))
+  Expected: (-44 nil t 9)
+  Got: (SB-PCL::..SLOT-UNBOUND.. SB-PCL::..SLOT-UNBOUND..
+        SB-PCL::..SLOT-UNBOUND.. SB-PCL::..SLOT-UNBOUND..)
+  ;; 2. Form:
+  (let ((b (make-instance 'structure02c)))
+    (list (structure02c-slot2 b)
+          (structure02c-slot3 b)
+          (structure02c-slot4 b)
+          (structure02c-slot6 b)
+          (structure02c-slot7 b)
+          (structure02c-slot8 b)
+          (structure02c-slot10 b)
+          (structure02c-slot11 b)))
+  Expected: (t 3 -44 t 9 -88 t 20)
+  Got: (0 0 0 0 0 0 0 0)
+
+358: :DECLARE argument to ENSURE-GENERIC-FUNCTION 
+    (reported by Bruno Haible)
+  According to ANSI CL, ensure-generic-function must accept a :DECLARE
+  keyword argument. In SBCL 0.8.16 it does not.
+  Test case:
+  (progn
+    (ensure-generic-function 'foo113 :declare '((optimize (speed 3))))
+    (sb-pcl:generic-function-declarations #'foo113))
+  Expected: ((OPTIMIZE (SPEED 3)))
+  Got: ERROR
+    Invalid initialization argument:
+      :DECLARE
+    in call for class #<SB-MOP:FUNCALLABLE-STANDARD-CLASS STANDARD-GENERIC-FUNCTION>.
+  See also:
+    The ANSI Standard, Section 7.1.2
+
+  Bruno notes: The MOP specifies that ensure-generic-function accepts :DECLARATIONS.
+  The easiest way to be compliant to both specs is to accept both (exclusively
+  or cumulatively).
+
+359: wrong default value for ensure-generic-function's :generic-function-class argument
+    (reported by Bruno Haible)
+  ANSI CL is silent on this, but the MOP's specification of ENSURE-GENERIC-FUNCTION says:
+   "The remaining arguments are the complete set of keyword arguments
+    received by ENSURE-GENERIC-FUNCTION."
+  and the spec of ENSURE-GENERIC-FUNCTION-USING-CLASS:
+   ":GENERIC-FUNCTION-CLASS - a class metaobject or a class name. If it is not
+    supplied, it defaults to the class named STANDARD-GENERIC-FUNCTION."
+  This is not the case in SBCL. Test case:
+   (defclass my-generic-function (standard-generic-function)
+     ()
+     (:metaclass sb-pcl:funcallable-standard-class))
+   (setf (fdefinition 'foo1)
+         (make-instance 'my-generic-function :name 'foo1))
+   (ensure-generic-function 'foo1
+     :generic-function-class (find-class 'standard-generic-function))
+   (class-of #'foo1)
+   ; => #<SB-MOP:FUNCALLABLE-STANDARD-CLASS STANDARD-GENERIC-FUNCTION>
+   (setf (fdefinition 'foo2)
+         (make-instance 'my-generic-function :name 'foo2))
+   (ensure-generic-function 'foo2)
+   (class-of #'foo2)
+  Expected: #<SB-MOP:FUNCALLABLE-STANDARD-CLASS STANDARD-GENERIC-FUNCTION>
+  Got:      #<SB-MOP:FUNCALLABLE-STANDARD-CLASS MY-GENERIC-FUNCTION>
+
+360: CALL-METHOD not recognized in method-combination body
+  (reported by Bruno Haible)
+  This method combination, which adds 'redo' and 'return' restarts for each
+  method invocation to standard method combination, gives an error in SBCL.
+  (defun prompt-for-new-values ()
+    (format *debug-io* "~&New values: ")
+    (list (read *debug-io*)))
+  (defun add-method-restarts (form method)
+    (let ((block (gensym))
+          (tag (gensym)))
+      `(BLOCK ,block
+         (TAGBODY
+           ,tag
+           (RETURN-FROM ,block
+             (RESTART-CASE ,form
+               (METHOD-REDO ()
+                 :REPORT (LAMBDA (STREAM) (FORMAT STREAM "Try calling ~S again." ,method))
+                 (GO ,tag))
+               (METHOD-RETURN (L)
+                 :REPORT (LAMBDA (STREAM) (FORMAT STREAM "Specify return values for ~S call." ,method))
+                 :INTERACTIVE (LAMBDA () (PROMPT-FOR-NEW-VALUES))
+                 (RETURN-FROM ,block (VALUES-LIST L)))))))))
+  (defun convert-effective-method (efm)
+    (if (consp efm)
+      (if (eq (car efm) 'CALL-METHOD)
+        (let ((method-list (third efm)))
+          (if (or (typep (first method-list) 'method) (rest method-list))
+            ; Reduce the case of multiple methods to a single one.
+            ; Make the call to the next-method explicit.
+            (convert-effective-method
+              `(CALL-METHOD ,(second efm)
+                 ((MAKE-METHOD
+                    (CALL-METHOD ,(first method-list) ,(rest method-list))))))
+            ; Now the case of at most one method.
+            (if (typep (second efm) 'method)
+              ; Wrap the method call in a RESTART-CASE.
+              (add-method-restarts
+                (cons (convert-effective-method (car efm))
+                      (convert-effective-method (cdr efm)))
+                (second efm))
+              ; Normal recursive processing.
+              (cons (convert-effective-method (car efm))
+                    (convert-effective-method (cdr efm))))))
+        (cons (convert-effective-method (car efm))
+              (convert-effective-method (cdr efm))))
+      efm))
+  (define-method-combination standard-with-restarts ()
+         ((around (:around))
+          (before (:before))
+          (primary () :required t)
+          (after (:after)))
+    (flet ((call-methods-sequentially (methods)
+             (mapcar #'(lambda (method)
+                         `(CALL-METHOD ,method))
+                     methods)))
+      (let ((form (if (or before after (rest primary))
+                    `(MULTIPLE-VALUE-PROG1
+                       (PROGN
+                         ,@(call-methods-sequentially before)
+                         (CALL-METHOD ,(first primary) ,(rest primary)))
+                       ,@(call-methods-sequentially (reverse after)))
+                    `(CALL-METHOD ,(first primary)))))
+        (when around
+          (setq form
+                `(CALL-METHOD ,(first around)
+                              (,@(rest around) (MAKE-METHOD ,form)))))
+        (convert-effective-method form))))
+  (defgeneric testgf16 (x) (:method-combination standard-with-restarts))
+  (defclass testclass16a () ())
+  (defclass testclass16b (testclass16a) ())
+  (defclass testclass16c (testclass16a) ())
+  (defclass testclass16d (testclass16b testclass16c) ())
+  (defmethod testgf16 ((x testclass16a))
+    (list 'a
+          (not (null (find-restart 'method-redo)))
+          (not (null (find-restart 'method-return)))))
+  (defmethod testgf16 ((x testclass16b))
+    (cons 'b (call-next-method)))
+  (defmethod testgf16 ((x testclass16c))
+    (cons 'c (call-next-method)))
+  (defmethod testgf16 ((x testclass16d))
+    (cons 'd (call-next-method)))
+  (testgf16 (make-instance 'testclass16d))
+
+  Expected: (D B C A T T)
+  Got: ERROR CALL-METHOD outside of a effective method form
+
+  This is a bug because ANSI CL HyperSpec/Body/locmac_call-m__make-method
+  says
+   "The macro call-method invokes the specified method, supplying it with
+    arguments and with definitions for call-next-method and for next-method-p.
+    If the invocation of call-method is lexically inside of a make-method,
+    the arguments are those that were supplied to that method. Otherwise
+    the arguments are those that were supplied to the generic function."
+  and the example uses nothing more than these two cases (as you can see by
+  doing (trace convert-effective-method)).
+
+361: initialize-instance of standard-reader-method ignores :function argument
+    (reported by Bruno Haible)
+  Pass a custom :function argument to initialize-instance of a
+  standard-reader-method instance, but it has no effect.
+  ;; Check that it's possible to define reader methods that do typechecking.
+  (progn
+    (defclass typechecking-reader-method (sb-pcl:standard-reader-method)
+      ())
+    (defmethod initialize-instance ((method typechecking-reader-method) &rest initargs
+                                    &key slot-definition)
+      (let ((name (sb-pcl:slot-definition-name slot-definition))
+            (type (sb-pcl:slot-definition-type slot-definition)))
+        (apply #'call-next-method method
+               :function #'(lambda (args next-methods)
+                             (declare (ignore next-methods))
+                             (apply #'(lambda (instance)
+                                        (let ((value (slot-value instance name)))
+                                          (unless (typep value type)
+                                            (error "Slot ~S of ~S is not of type ~S: ~S"
+                                                   name instance type value))
+                                          value))
+                                    args))
+               initargs)))
+    (defclass typechecking-reader-class (standard-class)
+      ())
+    (defmethod sb-pcl:validate-superclass ((c1 typechecking-reader-class) (c2 standard-class))
+      t)
+    (defmethod reader-method-class ((class typechecking-reader-class) direct-slot &rest args)
+      (find-class 'typechecking-reader-method))
+    (defclass testclass25 ()
+      ((pair :type (cons symbol (cons symbol null)) :initarg :pair :accessor testclass25-pair))
+      (:metaclass typechecking-reader-class))
+   (macrolet ((succeeds (form)
+                 `(not (nth-value 1 (ignore-errors ,form)))))
+      (let ((p (list 'abc 'def))
+            (x (make-instance 'testclass25)))
+        (list (succeeds (make-instance 'testclass25 :pair '(seventeen 17)))
+              (succeeds (setf (testclass25-pair x) p))
+              (succeeds (setf (second p) 456))
+              (succeeds (testclass25-pair x))
+              (succeeds (slot-value x 'pair))))))
+  Expected: (t t t nil t)
+  Got:      (t t t t t)
+
+  (inspect (first (sb-pcl:generic-function-methods #'testclass25-pair)))
+  shows that the method was created with a FAST-FUNCTION slot but with a
+  FUNCTION slot of NIL.
+
+362: missing error when a slot-definition is created without a name
+    (reported by Bruno Haible)
+  The MOP says about slot-definition initialization:
+  "The :NAME argument is a slot name. An ERROR is SIGNALled if this argument
+   is not a symbol which can be used as a variable name. An ERROR is SIGNALled
+   if this argument is not supplied."
+  Test case:
+   (make-instance (find-class 'sb-pcl:standard-direct-slot-definition))
+  Expected: ERROR
+  Got: #<SB-MOP:STANDARD-DIRECT-SLOT-DEFINITION NIL>
+
+363: missing error when a slot-definition is created with a wrong documentation object
+    (reported by Bruno Haible)
+  The MOP says about slot-definition initialization:
+  "The :DOCUMENTATION argument is a STRING or NIL. An ERROR is SIGNALled
+   if it is not. This argument default to NIL during initialization."
+  Test case:
+   (make-instance (find-class 'sb-pcl:standard-direct-slot-definition)
+                  :name 'foo
+                  :documentation 'not-a-string)
+  Expected: ERROR
+  Got: #<SB-MOP:STANDARD-DIRECT-SLOT-DEFINITION FOO>
+
+364: does not support class objects as specializer names
+   (reported by Bruno Haible)
+  According to ANSI CL 7.6.2, class objects are valid specializer names,
+  and "Parameter specializer names are used in macros intended as the
+  user-level interface (defmethod)". DEFMETHOD's syntax section doesn't
+  mention this possibility in the BNF for parameter-specializer-name;
+  however, this appears to be an editorial omission, since the CLHS
+  mentions issue CLASS-OBJECT-SPECIALIZER:AFFIRM as being approved
+  by X3J13. SBCL doesn't support it:
+   (defclass foo () ())
+   (defmethod goo ((x #.(find-class 'foo))) x)
+  Expected: #<STANDARD-METHOD GOO (#<STANDARD-CLASS FOO>)>
+  Got:      ERROR "#<STANDARD-CLASS FOO> is not a legal class name."
+
+365: mixin on generic-function subclass
+    (reported by Bruno Haible)
+  a mixin class
+    (defclass prioritized-dispatcher ()
+      ((dependents :type list :initform nil)))
+  on a generic-function subclass:
+    (defclass prioritized-generic-function (prioritized-dispatcher standard-generic-function)
+      ()
+      (:metaclass sb-pcl:funcallable-standard-class))
+  SBCL gives an error on this, telling to define a method on SB-MOP:VALIDATE-SUPERCLASS. If done,
+    (defmethod sb-pcl:validate-superclass ((c1 sb-pcl:funcallable-standard-class) 
+                                           (c2 (eql (find-class 'prioritized-dispatcher))))
+      t)
+  then, however,
+    (defclass prioritized-generic-function (prioritized-dispatcher standard-generic-function)
+      ()
+      (:metaclass sb-pcl:funcallable-standard-class))
+  => debugger invoked on a SIMPLE-ERROR in thread 6687:
+    layout depth conflict: #(#<SB-KERNEL:LAYOUT for T {500E1E9}> ...)
+ 
+  Further discussion on this: http://thread.gmane.org/gmane.lisp.steel-bank.general/491
+
+366: cannot define two generic functions with user-defined class
+   (reported by Bruno Haible)
+  it is possible to define one generic function class and an instance
+  of it. But attempting to do the same thing again, in the same session,
+  leads to a "Control stack exhausted" error. Test case:
+    (defclass my-generic-function-1 (standard-generic-function)
+      ()
+      (:metaclass sb-pcl:funcallable-standard-class))
+    (defgeneric testgf-1 (x) (:generic-function-class my-generic-function-1)
+      (:method ((x integer)) (cons 'integer nil)))
+    (defclass my-generic-function-2 (standard-generic-function)
+      ()
+      (:metaclass sb-pcl:funcallable-standard-class))
+    (defgeneric testgf-2 (x) (:generic-function-class my-generic-function-2)
+      (:method ((x integer)) (cons 'integer nil)))
+  => SB-KERNEL::CONTROL-STACK-EXHAUSTED
+

@@ -46,5 +46,10 @@
   (assert (= x 1))
   (assert (= y 2)))
 
+;;; SETF of MACRO-FUNCTION must accept a NIL environment
+(let ((fun (constantly 'ok)))
+  (setf (macro-function 'nothing-at-all nil) fun)
+  (assert (eq fun (macro-function 'nothing-at-all nil))))
+
 ;;; success
 (quit :unix-status 104)

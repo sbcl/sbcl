@@ -128,7 +128,7 @@
 		(if (and (legal-fun-name-p name)
 			 (not (consp (let ((sb!c:*lexenv* lexenv))
 				       (sb!c:lexenv-find name funs)))))
-		    (fdefinition name)
+		    (%coerce-name-to-fun name)
 		    (%eval original-exp lexenv))))
 	     ((quote)
 	      (unless (= n-args 1)
