@@ -756,7 +756,7 @@
                                 ~I~_~A~:>"
 	       :format-arguments (list original new-name (strerror error))))
       (when (streamp file)
-	(file-name file new-namestring))
+	(file-name file new-name))
       (values new-name original (truename new-name)))))
 
 (defun delete-file (file)

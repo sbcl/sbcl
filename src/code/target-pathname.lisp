@@ -1506,7 +1506,10 @@ a host-structure or string."
 	   (values (member t nil)))
   (if (find-logical-host host nil)
       ;; This host is already defined, all is well and good.
-      t
+      nil
       ;; ANSI: "The specific nature of the search is
       ;; implementation-defined." SBCL: doesn't search at all
+      ;;
+      ;; FIXME: now that we have a SYS host that the system uses, it
+      ;; might be cute to search in "SYS:TRANSLATIONS;<name>.LISP"
       (error "logical host ~S not found" host)))

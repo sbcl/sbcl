@@ -2254,6 +2254,10 @@ changes in sbcl-0.8.8 relative to sbcl-0.8.7:
     ** INPUT-STREAM-P, OUTPUT-STREAM-P, STREAM-ELEMENT-TYPE and
        OPEN-STREAM-P signal a TYPE-ERROR if their argument is not a
        stream.
+    ** LOAD-LOGICAL-PATHNAME-TRANSLATIONS returns NIL if the logical
+       host is already defined.
+    ** RENAME-FILE works on streams instead of signalling an internal
+       type error.
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles
