@@ -2092,7 +2092,7 @@
       (multiple-value-bind (equalp certainp)
 	  (type= (array-type-element-type type1)
 		 (array-type-element-type type2))
-	;; by its nature, the call to TYPE= should never return NIL,
+	;; By its nature, the call to TYPE= should never return NIL,
 	;; T, as we don't know what the UNKNOWN-TYPE will grow up to
 	;; be.  -- CSR, 2002-08-19
 	(aver (not (and (not equalp) certainp)))
@@ -2108,7 +2108,7 @@
 (!define-type-method (array :negate) (type)
   ;; FIXME (and hint to PFD): we're vulnerable here to attacks of the
   ;; form "are (AND ARRAY (NOT (ARRAY T))) and (OR (ARRAY BIT) (ARRAY
-  ;; NIL) (ARRAY CHAR) ...) equivalent?  -- CSR, 2003-12-10
+  ;; NIL) (ARRAY CHAR) ...) equivalent?" -- CSR, 2003-12-10
   (make-negation-type :type type))
 
 (!define-type-method (array :unparse) (type)

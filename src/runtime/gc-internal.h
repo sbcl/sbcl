@@ -35,10 +35,10 @@
 #define FUN_RAW_ADDR_OFFSET (6*sizeof(lispobj) - FUN_POINTER_LOWTAG)
 
 /* values for the *_alloc_* parameters */
-#define FREE_PAGE 0
-#define BOXED_PAGE 1
-#define UNBOXED_PAGE 2
-#define OPEN_REGION_PAGE 4
+#define FREE_PAGE_FLAG 0
+#define BOXED_PAGE_FLAG 1
+#define UNBOXED_PAGE_FLAG 2
+#define OPEN_REGION_PAGE_FLAG 4
 
 #define ALLOC_BOXED 0
 #define ALLOC_UNBOXED 1
