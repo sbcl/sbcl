@@ -122,7 +122,10 @@
 ;;; Mumble conditional on *COMPILE-PROGRESS*.
 (defun maybe-mumble (&rest foo)
   (when *compile-progress*
-    (apply #'compiler-mumble foo)))
+    ;; MNA: compiler message patch
+    (compiler-mumble "~&")
+    (pprint-logical-block (*error-output* nil :per-line-prefix "; ")
+       (apply #'compiler-mumble foo))))
 
 (deftype object () '(or fasl-file core-object null))
 
@@ -225,19 +228,22 @@
 		   (zerop *compiler-warning-count*)
 		   (zerop *compiler-style-warning-count*)
 		   (zerop *compiler-note-count*)))
+    ;; MNA: compiler message patch
+    (format *error-output* "~&")
+    (pprint-logical-block (*error-output* nil :per-line-prefix "; ")
     (compiler-mumble
-     "~2&compilation unit ~:[finished~;aborted~]~
+                           "compilation unit ~:[finished~;aborted~]~
       ~[~:;~:*~&  caught ~D fatal ERROR condition~:P~]~
       ~[~:;~:*~&  caught ~D ERROR condition~:P~]~
       ~[~:;~:*~&  caught ~D WARNING condition~:P~]~
       ~[~:;~:*~&  caught ~D STYLE-WARNING condition~:P~]~
-      ~[~:;~:*~&  printed ~D note~:P~]~2%"
+      ~[~:;~:*~&  printed ~D note~:P~]"
      abort-p
      *aborted-compilation-unit-count*
      *compiler-error-count*
      *compiler-warning-count*
      *compiler-style-warning-count*
-     *compiler-note-count*)))
+                           *compiler-note-count*))))
 
 ;;; Evaluate BODY, then return (VALUES BODY-VALUE WARNINGS-P
 ;;; FAILURE-P), where BODY-VALUE is the first value of the body, and
@@ -491,7 +497,8 @@
 		 (return nil)))))))
 
     (when sb!xc:*compile-print*
-      (compiler-mumble "~&~:[~;byte ~]compiling ~A: "
+      ;; MNA: compiler message patch
+      (compiler-mumble "~&; ~:[~;byte ~]compiling ~A: "
 		       *byte-compiling*
 		       (component-name component)))
 
@@ -934,12 +941,15 @@
     (compiler-error "bad FILE-COMMENT form: ~S" form))
   (let ((file (first (source-info-current-file *source-info*))))
     (cond ((file-info-comment file)
-	   (compiler-warning "ignoring extra file comment:~%  ~S" form))
+            ;; MNA: compiler message patch
+            (pprint-logical-block (*error-output* nil :per-line-prefix "; ")
+              (compiler-warning "Ignoring extra file comment:~%  ~S." form)))
 	  (t
 	   (let ((comment (coerce (second form) 'simple-string)))
 	     (setf (file-info-comment file) comment)
 	     (when sb!xc:*compile-verbose*
-	       (compiler-mumble "~&FILE-COMMENT: ~A~2&" comment)))))))
+               ;; MNA: compiler message patch
+               (compiler-mumble "~&; FILE-COMMENT: ~A~2&" comment)))))))
 
 ;;; Force any pending top-level forms to be compiled and dumped so that they
 ;;; will be evaluated in the correct package environment. Dump the form to be
@@ -1379,7 +1389,8 @@
 	 (*compiler-error-bailout*
 	  #'(lambda ()
 	      (compiler-mumble
-	       "~2&fatal error, aborting compilation~%")
+               ;; MNA: compiler message patch
+	       "~2&; fatal error, aborting compilation~%")
 	      (return-from sub-compile-file (values nil t t))))
 	 (*current-path* nil)
 	 (*last-source-context* nil)
@@ -1439,18 +1450,20 @@
 (defun start-error-output (source-info)
   (declare (type source-info source-info))
   (dolist (x (source-info-files source-info))
-    (compiler-mumble "compiling file ~S (written ~A):~%"
+    ;; MNA: compiler message patch
+    (compiler-mumble "~&; compiling file ~S (written ~A):~%"
 		     (namestring (file-info-name x))
 		     (sb!int:format-universal-time nil
 						   (file-info-write-date x)
 						   :style :government
 						   :print-weekday nil
 						   :print-timezone nil)))
-  (compiler-mumble "~%")
   (values))
+
 (defun finish-error-output (source-info won)
   (declare (type source-info source-info))
-  (compiler-mumble "~&compilation ~:[aborted after~;finished in~] ~A~&"
+  ;; MNA: compiler message patch
+  (compiler-mumble "~&; compilation ~:[aborted after~;finished in~] ~A~&"
 		   won
 		   (elapsed-time-to-string
 		    (- (get-universal-time)
@@ -1535,7 +1548,8 @@
 	(close-fasl-file fasl-file (not compile-won))
 	(setq output-file-name (pathname (fasl-file-stream fasl-file)))
 	(when (and compile-won sb!xc:*compile-verbose*)
-	  (compiler-mumble "~2&~A written~%" (namestring output-file-name))))
+          ;; MNA: compiler message patch
+	  (compiler-mumble "~2&; ~A written~%" (namestring output-file-name))))
 
       (when sb!xc:*compile-verbose*
 	(finish-error-output source-info compile-won)))

@@ -517,6 +517,24 @@ returning an array as first value always.
   confused and compiles a full call to %INSTANCE-TYPEP (which doesn't exist
   as a function) instead.
 
+37a:
+  The %INSTANCE-TYPEP problem in bug 37 comes up also when compiling
+  and loading
+	(IN-PACKAGE :CL-USER)
+	(LOCALLY
+	  (DECLARE (OPTIMIZE (SAFETY 3) (SPEED 2) (SPACE 2)))
+	  (DECLAIM (FTYPE (FUNCTION (&REST T) (VALUES)) EMPTYVALUES))
+	  (DEFUN EMPTYVALUES (&REST REST)
+	    (DECLARE (IGNORE REST))
+	    (VALUES))
+	  (DEFSTRUCT DUMMYSTRUCT X Y)
+	  (DEFUN FROB-EMPTYVALUES (X)
+	    (LET ((RES (EMPTYVALUES X X X)))
+	      (UNLESS (TYPEP RES 'DUMMYSTRUCT)
+		'EXPECTED-RETURN-VALUE))))
+	(ASSERT (EQ (FROB-EMPTYVALUES 11) 'EXPECTED-RETURN-VALUE))
+
+
 38:
   DEFMETHOD doesn't check the syntax of &REST argument lists properly,
   accepting &REST even when it's not followed by an argument name:

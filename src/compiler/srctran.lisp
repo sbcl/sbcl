@@ -138,6 +138,26 @@
 		   `(cdr ,(frob (1- n))))))
       (frob n))))
 
+;;; MNA: cons compound-type patch
+;;; FIXIT: all commented out
+
+; ;;;; CONS assessor derive type optimizers.
+
+; (defoptimizer (car derive-type) ((cons))
+;   (let ((type (continuation-type cons)))
+;     (cond ((eq type (specifier-type 'null))
+;             (specifier-type 'null))
+;  	  ((cons-type-p type)
+;             (cons-type-car-type type)))))
+ 
+; (defoptimizer (cdr derive-type) ((cons))
+;   (let ((type (continuation-type cons)))
+;     (cond ((eq type (specifier-type 'null))
+;             (specifier-type 'null))
+;  	  ((cons-type-p type)
+;             (cons-type-cdr-type type)))))
+
+
 ;;;; arithmetic and numerology
 
 (def-source-transform plusp (x) `(> ,x 0))
@@ -2482,6 +2502,28 @@
   (frob logior)
   (frob logxor))
 
+;; MNA: defoptimizer for integer-length patch
+(defoptimizer (integer-length derive-type) ((x))
+  (let ((x-type (continuation-type x)))
+    (when (and (numeric-type-p x-type)
+               (csubtypep x-type (specifier-type 'integer)))
+      ;; If the X is of type (INTEGER LO HI), then the integer-length
+      ;; of X is (INTEGER (min lo hi) (max lo hi), basically.  Be
+      ;; careful about LO or HI being NIL, though.  Also, if 0 is
+      ;; contained in X, the lower bound is obviously 0.
+      (flet ((null-or-min (a b)
+               (and a b (min (integer-length a)
+                             (integer-length b))))
+             (null-or-max (a b)
+               (and a b (max (integer-length a)
+                             (integer-length b)))))
+        (let* ((min (numeric-type-low x-type))
+               (max (numeric-type-high x-type))
+               (min-len (null-or-min min max))
+               (max-len (null-or-max min max)))
+          (when (ctypep 0 x-type)
+            (setf min-len 0))
+          (specifier-type `(integer ,(or min-len '*) ,(or max-len '*))))))))
 ) ; PROGN
 
 ;;;; miscellaneous derive-type methods

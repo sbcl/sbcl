@@ -114,6 +114,12 @@
      (dolist (type (union-type-types type))
        (when (%%typep object type)
 	 (return t))))
+    ;; MNA: cons compound-type patch
+    ;; FIXIT: all commented out
+;     (cons-type
+;      (and (consp object)
+;  	  (%%typep (car object) (cons-type-car-type type))
+; 	  (%%typep (cdr object) (cons-type-cdr-type type))))
     (unknown-type
      ;; dunno how to do this ANSIly -- WHN 19990413
      #+sb-xc-host (error "stub: %%TYPEP UNKNOWN-TYPE in xcompilation host")

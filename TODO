@@ -1,4 +1,4 @@
-i    Accumulation of half-understood design decisions eventually
+    Accumulation of half-understood design decisions eventually
     chokes a program as a water weed chokes a canal. By refactoring
     you can ensure that your full understanding of how the program
     should be designed is always reflected in the program. As a

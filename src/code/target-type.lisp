@@ -43,6 +43,9 @@
 	 named-type
 	 member-type
 	 array-type
+         ;; MNA: cons compound-type patch         
+         ;; FIXIT: all commented out
+         ; cons-type
 	 sb!xc:built-in-class)
      (values (%typep obj type) t))
     (sb!xc:class
@@ -200,6 +203,10 @@
 			:complexp (not (typep x 'simple-array))
 			:element-type etype
 			:specialized-element-type etype)))
+    ;; MNA: cons compound-type patch
+    ;; FIXIT: all commented
+    ; (cons
+    ; (make-cons-type))
     (t
      (sb!xc:class-of x))))
 

@@ -1016,7 +1016,8 @@ bootstrapping.
 					       (cadar var))
 				       (values (make-keyword (car var))
 					       (car var)))
-				 `((,key (get-key-arg1 ,keyword ,args-tail))
+                                 ;; MNA: non-self-eval-keyword patch
+				 `((,key (get-key-arg1 ',keyword ,args-tail))
 				   (,variable (if (consp ,key)
 						  (car ,key)
 						  ,(cadr var))))))
@@ -1027,7 +1028,8 @@ bootstrapping.
 					       (cadar var))
 				       (values (make-keyword (car var))
 					       (car var)))
-				 `((,key (get-key-arg1 ,keyword ,args-tail))
+                                 ;; MNA: non-self-eval-keyword patch
+				 `((,key (get-key-arg1 ',keyword ,args-tail))
 				   (,(caddr var) ,key)
 				   (,variable (if (consp ,key)
 						  (car ,key)

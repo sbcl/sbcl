@@ -1053,9 +1053,10 @@
 			     (string= (symbol-name what) "CLASS"))) ; pcl hack
 		   (or (info :type :kind what)
 		       (and (consp what) (info :type :translator (car what)))))
-	      (unless (policy nil (= brevity 3))
+;;; MNA - abbreviated declaration bug
+;;               (unless (policy nil (= brevity 3))
 		;; FIXME: Is it ANSI to warn about this? I think not.
-		(compiler-note "abbreviated type declaration: ~S." spec))
+;;		(compiler-note "abbreviated type declaration: ~S." spec))
 	      (process-type-declaration spec res vars))
 	     ((info :declaration :recognized what)
 	      res)
@@ -1566,12 +1567,14 @@
 		       (let ((n-supplied (gensym "N-SUPPLIED-")))
 			 (temps n-supplied)
 			 (arg-vals n-value n-supplied)
-			 (tests `((eq ,n-key ,keyword)
+                         ;; MNA: non-self-eval-keyword patch
+			 (tests `((eq ,n-key ',keyword)
 				  (setq ,n-supplied t)
 				  (setq ,n-value ,n-value-temp)))))
 		      (t
 		       (arg-vals n-value)
-		       (tests `((eq ,n-key ,keyword)
+                        ;; MNA: non-self-eval-keyword patch
+		       (tests `((eq ,n-key ',keyword)
 				(setq ,n-value ,n-value-temp)))))))
 
 	    (unless allowp
@@ -1924,9 +1927,15 @@
     (setf (entry-cleanup entry) cleanup)
     (prev-link entry start)
     (use-continuation entry dummy)
-    (let ((*lexenv* (make-lexenv :blocks (list (cons name (list entry cont)))
+    
+    ;; MNA - Re: two obscure bugs in CMU CL
+    (let* ((env-entry (list entry cont))
+           (*lexenv*
+            (make-lexenv :blocks (list (cons name env-entry))
 				 :cleanup cleanup)))
+      (push env-entry (continuation-lexenv-uses cont))
       (ir1-convert-progn-body dummy cont forms))))
+
 
 ;;; We make Cont start a block just so that it will have a block
 ;;; assigned. People assume that when they pass a continuation into
@@ -2007,11 +2016,15 @@
 	      (conts))
       (starts dummy)
       (dolist (segment (rest segments))
-	(let ((tag-cont (make-continuation)))
+	;; MNA - Re: two obscure bugs
+	(let* ((tag-cont (make-continuation))
+               (tag (list (car segment) entry tag-cont)))          
 	  (conts tag-cont)
 	  (starts tag-cont)
 	  (continuation-starts-block tag-cont)
-	  (tags (list (car segment) entry tag-cont))))
+          (tags tag)
+          (push (cdr tag) (continuation-lexenv-uses tag-cont))
+          ))
       (conts cont)
 
       (let ((*lexenv* (make-lexenv :cleanup cleanup :tags (tags))))
@@ -2425,8 +2438,9 @@
   the Declarations have effect. If LOCALLY is a top-level form, then
   the Forms are also processed as top-level forms."
   (multiple-value-bind (forms decls) (sb!sys:parse-body body nil)
-    (let* ((*lexenv* (process-decls decls nil nil cont)))
-      (ir1-convert-aux-bindings start cont forms nil nil nil))))
+    (let ((*lexenv* (process-decls decls nil nil cont)))
+      ;;; MNA: locally patch - #'ir1-convert-progn-body gets called anyway!
+      (ir1-convert-progn-body start cont forms))))
 
 ;;;; FLET and LABELS
 
@@ -2914,7 +2928,8 @@
       (ir1-convert start cont `(%%defmacro ',name ,fun ,doc)))
 
     (when sb!xc:*compile-print*
-      (compiler-mumble "converted ~S~%" name))))
+      ;; MNA compiler message patch
+      (compiler-mumble "~&; converted ~S~%" name))))
 
 (def-ir1-translator %define-compiler-macro ((name def lambda-list doc)
 					    start cont
@@ -2940,7 +2955,8 @@
       (ir1-convert start cont `(%%define-compiler-macro ',name ,fun ,doc)))
 
     (when sb!xc:*compile-print*
-      (compiler-mumble "converted ~S~%" name))))
+      ;; MNA compiler message patch
+      (compiler-mumble "~&; converted ~S~%" name))))
 
 ;;; Update the global environment to correspond to the new definition.
 (def-ir1-translator %defconstant ((name value doc) start cont
@@ -2962,7 +2978,16 @@
 	 ;; FIXME: ANSI says EQL, not EQUALP. Perhaps make a special
 	 ;; variant of this warning for the case where they're EQUALP,
 	 ;; since people seem to be confused about this.
-	 (unless (equalp newval (info :variable :constant-value name))
+          
+          ;; MNA: re-defconstant patch
+          (when (or (and (listp newval)
+                         (or (null (list-length newval))
+                             (not (tree-equal newval
+                                              (info :variable
+                                                    :constant-value name)
+                                              :test #'equalp))))
+                    (not (equalp newval (info :variable
+                                              :constant-value name))))
 	   (compiler-warning "redefining constant ~S as:~%  ~S" name newval)))
 	(:global)
 	(t
@@ -3183,4 +3208,5 @@
 		       ,@(when save-expansion `(',save-expansion)))))
 
 	(when sb!xc:*compile-print*
-	  (compiler-mumble "converted ~S~%" name))))))
+          ;; MNA compiler message patch
+	  (compiler-mumble "~&; converted ~S~%" name))))))

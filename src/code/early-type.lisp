@@ -224,6 +224,25 @@
     (values-specifier-type-cache-clear))
   (values))
 
+
+;;; MNA: cons compound-type patch
+;;; FIXIT: all commented out
+;;;; Cons types:
+ 
+;;; The Cons-Type is used to represent cons types.
+;;;
+;; (defstruct (cons-type (:include ctype
+;;  				(:class-info (type-class-or-lose 'cons)))
+;;                              (:print-function %print-type))
+;;   ;;
+;;   ;; The car element type.
+;;   (car-type *wild-type* :type ctype)
+;;   ;;
+;;   ;; The cdr element type.
+;;   (cdr-type *wild-type* :type ctype))
+
+;; (define-type-class cons)
+
 ;;;; KLUDGE: not clear this really belongs here, but where?
 
 ;;; Is X a fixnum in the target Lisp?

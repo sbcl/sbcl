@@ -303,6 +303,16 @@
   (close (fasl-file-stream file) :abort abort-p)
   (values))
 
+
+;;; MNA dump-circular hack
+(defun circular-list-p (list)
+  (and (listp list)
+       (multiple-value-bind (res condition)
+           (ignore-errors (list-length list))
+         (if condition
+           nil
+           (null res)))))
+
 ;;;; main entries to object dumping
 
 ;;; This function deals with dumping objects that are complex enough so that
@@ -320,9 +330,14 @@
 	   (typecase x
 	     (symbol (dump-symbol x file))
 	     (list
+               ;; MNA dump-circular hack
+               (if (circular-list-p x)
+                 (progn
+                   (dump-list x file)
+                   (eq-save-object x file))
 	      (unless (equal-check-table x file)
 		(dump-list x file)
-		(equal-save-object x file)))
+                   (equal-save-object x file))))
 	     (layout
 	      (dump-layout x file)
 	      (eq-save-object x file))

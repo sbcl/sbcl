@@ -298,3 +298,10 @@
 ;;;; mutator accessors
 
 (defknown mutator-self () system-area-pointer (flushable movable))
+
+;;; MNA: open-coded-simple-array patch
+(defun %array-simp (a) a)
+(defknown %array-simp (simple-array) simple-array (movable foldable flushable))
+
+(defknown %array-data-vector (simple-array) simple-array (movable foldable flushable))
+(defknown %array-simp (simple-array) simple-array (movable foldable flushable))

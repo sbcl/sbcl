@@ -67,6 +67,14 @@
 	    (+ 1
 	       (if (numeric-type-low type) 1 0)
 	       (if (numeric-type-high type) 1 0))))
+        ;; MNA: cons compound-type patch
+        ;; FIXIT: all commented out
+;  	(cons-type
+;           (+ (type-test-cost (specifier-type 'cons))
+;              (function-cost 'car)
+;              (type-test-cost (cons-type-car-type type))
+;              (function-cost 'cdr)
+;              (type-test-cost (cons-type-cdr-type type))))
 	(t
 	 (function-cost 'typep)))))
 

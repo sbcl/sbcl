@@ -734,6 +734,10 @@
 
     (fresh-line stream)
 
+    ;; MNA: compiler message patch
+    (setf location-column-width (+ 2 location-column-width))
+    (princ "; " stream)
+
     ;; print the location
     ;; [this is equivalent to (format stream "~V,'0x:" plen printed-value), but
     ;;  usually avoids any consing]
@@ -780,11 +784,13 @@
   (with-print-restrictions
     (dolist (note (dstate-notes dstate))
       (format stream "~Vt; " *disassem-note-column*)
+      ;; MNA: compiler message patch
+      (pprint-logical-block (stream nil :per-line-prefix "; ")
       (etypecase note
 	(string
 	 (write-string note stream))
 	(function
-	 (funcall note stream)))
+           (funcall note stream))))
       (terpri stream))
     (fresh-line stream)
     (setf (dstate-notes dstate) nil)))
@@ -1588,6 +1594,7 @@
   (declare (type (or function symbol cons) object)
 	   (type (or (member t) stream) stream)
 	   (type (member t nil) use-labels))
+  (pprint-logical-block (*standard-output* nil :per-line-prefix "; ")
   (let ((fun (compiled-function-or-lose object)))
     (if (typep fun 'sb!kernel:byte-function)
 	(sb!c:disassem-byte-fun fun)
@@ -1595,7 +1602,7 @@
 	(disassemble-function (fun-self fun)
 			      :stream stream
 			      :use-labels use-labels)))
-  (values))
+  (values)))
 
 (defun disassemble-memory (address
 			   length

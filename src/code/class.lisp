@@ -1052,6 +1052,9 @@
      :inherits (sequence mutable-sequence mutable-collection
 		generic-sequence collection))
     (cons
+     ;; MNA: cons compound-type patch
+     ;; FIXIT :all commented out
+     ; :translation cons
      :codes (#.sb!vm:list-pointer-type)
      :inherits (list sequence
 		mutable-sequence mutable-collection

@@ -236,7 +236,7 @@ sigtrap_handler(int signal, siginfo_t *info, void *void_context)
 	 * seems to be no point in doing that, since we're just
 	 * going to lose(..) anyway. */
 	fake_foreign_function_call(context);
-	lose("%%primitive halt called; the party is over.");
+	lose("%%PRIMITIVE HALT called; the party is over.");
 
     case trap_Error:
     case trap_Cerror:

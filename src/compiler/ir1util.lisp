@@ -165,6 +165,9 @@
   (do-uses (node old)
     (delete-continuation-use node)
     (add-continuation-use node new))
+  ;; MNA: Re: two obscure bugs in CMU CL
+  (dolist (lexenv-use (continuation-lexenv-uses old))
+    (setf (cadr lexenv-use) new))
 
   (reoptimize-continuation new)
   (values))
@@ -1428,7 +1431,9 @@
 	(*print-lines* *compiler-error-print-lines*)
 	(*print-pretty* pretty))
     (if pretty
-	(format nil "  ~S~%" form)
+      ;;; MNA: compiler message patch
+      ;;; (format nil "  ~S~%" form)
+      (format nil "~<~@;  ~S~:>" (list form))
 	(prin1-to-string form))))
 
 ;;; Return a COMPILER-ERROR-CONTEXT structure describing the current error
@@ -1503,7 +1508,8 @@
   (cond ((= *last-message-count* 1)
 	 (when terpri (terpri *error-output*)))
 	((> *last-message-count* 1)
-	 (format *error-output* "[Last message occurs ~D times.]~2%"
+          ;; MNA: compiler message patch
+          (format *error-output* "~&; [Last message occurs ~D times]~2%"
 		 *last-message-count*)))
   (setq *last-message-count* 0))
 
@@ -1536,20 +1542,30 @@
 	  (when (pathnamep file)
 	    (note-message-repeats)
 	    (setq last nil)
-	    (format stream "~2&file: ~A~%" (namestring file))))
+            ;; MNA: compiler message patch
+            (format stream "~2&; file: ~A~%" (namestring file))))
 
 	(unless (and last
 		     (equal in (compiler-error-context-context last)))
 	  (note-message-repeats)
 	  (setq last nil)
-	  (format stream "~2&in:~{~<~%   ~4:;~{ ~S~}~>~^ =>~}~%" in))
+          ;; MNA: compiler message patch
+          (format stream "~&")
+          (pprint-logical-block (stream nil :per-line-prefix "; ")
+            (format stream "in:~{~<~%    ~4:;~{ ~S~}~>~^ =>~}" in))
+          (format stream "~%"))
+
 
 	(unless (and last
 		     (string= form
 			      (compiler-error-context-original-source last)))
 	  (note-message-repeats)
 	  (setq last nil)
-	  (write-string form stream))
+          ;; MNA: compiler message patch
+          (format stream "~&")
+          (pprint-logical-block (stream nil :per-line-prefix "; ")
+            (format stream "  ~A" form))
+          (format stream "~&"))
 
 	(unless (and last
 		     (equal enclosing
@@ -1557,7 +1573,8 @@
 	  (when enclosing
 	    (note-message-repeats)
 	    (setq last nil)
-	    (format stream "--> ~{~<~%--> ~1:;~A~> ~}~%" enclosing)))
+            ;; MNA: compiler message patch
+	    (format stream "~&; --> ~{~<~%; --> ~1:;~A~> ~}~%" enclosing)))
 
 	(unless (and last
 		     (equal source (compiler-error-context-source last)))
@@ -1565,12 +1582,17 @@
 	  (when source
 	    (note-message-repeats)
 	    (dolist (src source)
-	      (write-line "==>" stream)
-	      (write-string src stream))))))
+              ;; MNA: compiler message patch
+              (format stream "~&")
+              (write-string "; ==>" stream)
+              (format stream "~&")
+              (pprint-logical-block (stream nil :per-line-prefix "; ")
+                (write-string src stream)))))))
      (t
+       (format stream "~&")
       (note-message-repeats)
       (setq *last-format-string* nil)
-      (format stream "~2&")))
+       (format stream "~&")))
 
     (setq *last-error-context* context)
 
@@ -1582,7 +1604,11 @@
       (let ((*print-level*  *compiler-error-print-level*)
 	    (*print-length* *compiler-error-print-length*)
 	    (*print-lines*  *compiler-error-print-lines*))
-	(format stream "~&~?~&" format-string format-args))))
+        ;; MNA: compiler message patch
+        (format stream "~&")
+        (pprint-logical-block (stream nil :per-line-prefix "; ")
+          (format stream "~&~?" format-string format-args))
+        (format stream "~&"))))
 
   (incf *last-message-count*)
   (values))

@@ -352,6 +352,10 @@
 	    (part-of function))
 	   (base-char
 	    (exactly base-char))
+           ;; MNA: cons compound-type patch
+           ;; FIXIT: all commented out
+;            (cons-type
+;             (part-of list))
 	   (cons
 	    (part-of list))
 	   (t

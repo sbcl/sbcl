@@ -311,14 +311,18 @@
 
 ;;; Return the type of the first value indicated by Type. This is used
 ;;; by people who don't want to have to deal with values types.
-#!-sb-fluid (declaim (freeze-type values-type) (inline single-value-type))
+
+;;; MNA: fix-instance-typep-call patch
+#!-sb-fluid (declaim (freeze-type values-type))
+; (inline single-value-type))
 (defun single-value-type (type)
   (declare (type ctype type))
   (cond ((values-type-p type)
 	 (or (car (args-type-required type))
-	     (car (args-type-optional type))
+             (if (args-type-optional type)
+                 (type-union (car (args-type-optional type)) (specifier-type 'null)))
 	     (args-type-rest type)
-	     *universal-type*))
+             (specifier-type 'null)))
 	((eq type *wild-type*)
 	 *universal-type*)
 	(t
@@ -358,17 +362,19 @@
 	   (values (mapcar #'single-value-type req) (length req))))))
 
 ;;; Return two values:
+;;; MNA: fix-instance-typep-call patch
 ;;; 1. A list of all the positional (fixed and optional) types.
-;;; 2. The &REST type (if any). If keywords allowed, *UNIVERSAL-TYPE*.
-;;;    If no keywords or rest, *EMPTY-TYPE*.
-(defun values-type-types (type)
+;;; 2] The rest type (if any).  If keywords allowed, *universal-type*.
+;;;    If no keywords or rest then the default-type.
+(defun values-type-types (type &optional (default-type *empty-type*))
   (declare (type values-type type))
   (values (append (args-type-required type)
 		  (args-type-optional type))
 	  (cond ((args-type-keyp type) *universal-type*)
 		((args-type-rest type))
 		(t
-		 *empty-type*))))
+                  ;; MNA: fix-instance-typep-call patch
+                  default-type))))
 
 ;;; Return a list of OPERATION applied to the types in TYPES1 and
 ;;; TYPES2, padding with REST2 as needed. TYPES1 must not be shorter
@@ -420,13 +426,20 @@
 ;;; OPERATION returned true as its second value each time we called
 ;;; it. Since we approximate the intersection of VALUES types, the
 ;;; second value being true doesn't mean the result is exact.
-(defun args-type-op (type1 type2 operation nreq)
-  (declare (type ctype type1 type2) (type function operation nreq))
+;;; MNA: fix-instance-typep-call patch
+(defun args-type-op (type1 type2 operation nreq default-type)
+  ;;; MNA: fix-instance-typep-call patch
+  (declare (type ctype type1 type2 default-type)
+ 	   (type function operation nreq))
   (if (or (values-type-p type1) (values-type-p type2))
       (let ((type1 (coerce-to-values type1))
 	    (type2 (coerce-to-values type2)))
-	(multiple-value-bind (types1 rest1) (values-type-types type1)
-	  (multiple-value-bind (types2 rest2) (values-type-types type2)
+	(multiple-value-bind (types1 rest1)
+            ;;; MNA: fix-instance-typep-call patch
+            (values-type-types type1 default-type)
+	  (multiple-value-bind (types2 rest2)
+              ;;; MNA: fix-instance-typep-call patch
+              (values-type-types type2 default-type)
 	    (multiple-value-bind (rest rest-exact)
 		(funcall operation rest1 rest2)
 	      (multiple-value-bind (res res-exact)
@@ -447,7 +460,8 @@
 			       :optional (if opt-last
 					     (subseq opt 0 (1+ opt-last))
 					     ())
-			       :rest (if (eq rest *empty-type*) nil rest))
+                               ;; MNA fix-instance-typep-call patch
+			       :rest (if (eq rest default-type) nil rest))
 			      (and rest-exact res-exact)))))))))
       (funcall operation type1 type2)))
 
@@ -468,7 +482,9 @@
 	((eq type1 *empty-type*) type2)
 	((eq type2 *empty-type*) type1)
 	(t
-	 (values (args-type-op type1 type2 #'type-union #'min)))))
+          ;;; MNA: fix-instance-typep-call patch
+	 (values (args-type-op type1 type2 #'type-union #'min *empty-type*)))))
+;;;
 (defun-cached (values-type-intersection :hash-function type-cache-hash
 					:hash-bits 8
 					:values 2
@@ -479,7 +495,7 @@
   (cond ((eq type1 *wild-type*) (values type2 t))
 	((eq type2 *wild-type*) (values type1 t))
 	(t
-	 (args-type-op type1 type2 #'type-intersection #'max))))
+	 (args-type-op type1 type2 #'type-intersection #'max (specifier-type 'null)))))
 
 ;;; This is like TYPES-INTERSECT, except that it sort of works on
 ;;; VALUES types. Note that due to the semantics of
@@ -1672,6 +1688,68 @@
 	    (return (make-hairy-type :specifier spec)))
 	  (setq res int))))))
 
+
+;;; MNA: cons compound-type patch
+;;; FIXIT: all commented out
+
+; (define-type-class cons)
+ 
+; (def-type-translator cons (&optional car-type cdr-type)
+;   (make-cons-type :car-type (specifier-type car-type)
+;  		  :cdr-type (specifier-type cdr-type)))
+ 
+; (define-type-method (cons :unparse) (type)
+;   (let ((car-eltype (type-specifier (cons-type-car-type type)))
+;  	(cdr-eltype (type-specifier (cons-type-cdr-type type))))
+;     (cond ((and (eq car-eltype '*) (eq cdr-eltype '*))
+;  	   'cons)
+;  	  (t
+;  	   `(cons ,car-eltype ,cdr-eltype)))))
+ 
+; (define-type-method (cons :simple-=) (type1 type2)
+;   (declare (type cons-type type1 type2))
+;   (and (type= (cons-type-car-type type1) (cons-type-car-type type2))
+;        (type= (cons-type-cdr-type type1) (cons-type-cdr-type type2))))
+ 
+; (define-type-method (cons :simple-subtypep) (type1 type2)
+;   (declare (type cons-type type1 type2))
+;   (multiple-value-bind (val-car win-car)
+;       (csubtypep (cons-type-car-type type1) (cons-type-car-type type2))
+;     (multiple-value-bind (val-cdr win-cdr)
+;  	(csubtypep (cons-type-cdr-type type1) (cons-type-cdr-type type2))
+;       (if (and val-car val-cdr)
+;  	  (values t (and win-car win-cdr))
+;         (values nil (or win-car win-cdr))))))
+ 
+; ;;; CONS :simple-union method  -- Internal
+; ;;;
+; ;;; Give up if a precise type in not possible, to avoid returning overly
+; ;;; general types.
+; ;;;
+; (define-type-method (cons :simple-union) (type1 type2)
+;   (declare (type cons-type type1 type2))
+;   (let ((car-type1 (cons-type-car-type type1))
+;  	(car-type2 (cons-type-car-type type2))
+;  	(cdr-type1 (cons-type-cdr-type type1))
+;  	(cdr-type2 (cons-type-cdr-type type2)))
+;     (cond ((type= car-type1 car-type2)
+;  	   (make-cons-type :car-type car-type1
+;  			   :cdr-type (type-union cdr-type1 cdr-type2)))
+;  	  ((type= cdr-type1 cdr-type2)
+;  	   (make-cons-type :car-type (type-union cdr-type1 cdr-type2)
+;  			   :cdr-type cdr-type1)))))
+ 
+; (define-type-method (cons :simple-intersection) (type1 type2)
+;   (declare (type cons-type type1 type2))
+;   (multiple-value-bind (int-car win-car)
+;       (type-intersection (cons-type-car-type type1) (cons-type-car-type type2))
+;     (multiple-value-bind (int-cdr win-cdr)
+;  	(type-intersection (cons-type-cdr-type type1) (cons-type-cdr-type type2))
+;       (values (make-cons-type :car-type int-car :cdr-type int-cdr)
+;  	      (and win-car win-cdr)))))
+
+
+
 ;;; Return the type that describes all objects that are in X but not
 ;;; in Y. If we can't determine this type, then return NIL.
 ;;;

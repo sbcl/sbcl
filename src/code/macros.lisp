@@ -202,6 +202,83 @@
     (case-body-aux name keyform keyform-value clauses keys errorp proceedp
 		   `(,(if multi-p 'member 'or) ,@keys))))
 
+
+;;; MNA: typecase-implicit-declarations patch
+
+;;; TYPECASE-BODY (interface)
+;;;
+;;; TYPECASE-BODY returns code for all the standard "typecase" macros.
+;;; Name is the macro name, and keyform is the thing to case on.
+;;; test is applied to the value of keyform and the entire first element,
+;;; instead of each part, of the case branch.
+;;; When errorp, no t or otherwise branch is permitted,
+;;; and an ERROR form is generated. When proceedp, it is an error to
+;;; omit errorp, and the ERROR form generated is executed within a
+;;; RESTART-CASE allowing keyform to be set and retested.
+(defun typecase-body (name keyform cases test errorp proceedp needcasesp)
+  (unless (or cases (not needcasesp))
+    (warn "no clauses in ~S" name))
+  (let* ((keyform-symbol-p (symbolp keyform))
+         (keyform-value (unless keyform-symbol-p                         
+                          (gensym)))
+         (clauses ())
+         (keys ()))
+    (dolist (case cases)
+      (cond ((atom case)
+	     (error "~S -- Bad clause in ~S." case name))
+	    ((memq (car case) '(t otherwise))
+	     (if errorp
+		 (error 'simple-program-error
+			:format-control "No default clause is allowed in ~S: ~S"
+			:format-arguments (list name case))
+               (push `(t nil ,@(rest case)) clauses)))
+	    (t
+              (push (first case) keys)
+              (push (if keyform-symbol-p
+                      `((,test ,keyform ',(first case)) nil
+                        (locally
+                          ;; this will cause a compiler-warning ... disabled
+                          ;; for now.
+                          ;; (declare (type ,(first case) ,keyform))
+                          ,@(rest case)))
+                      `((,test ,keyform-value ',(first case)) nil
+                        ,@(rest case)))
+                    clauses))))
+    (if keyform-symbol-p
+      (typecase-symbol-body-aux name keyform clauses keys errorp proceedp
+                                (cons 'or keys))
+      (case-body-aux name keyform keyform-value clauses keys errorp proceedp
+                     (cons 'or keys)))))
+
+;;; TYPECASE-SYMBOL-BODY-AUX provides the expansion once CASE-BODY has groveled
+;;; all the cases, iff keyform is a symbol.
+(defun typecase-symbol-body-aux (name keyform clauses keys
+                                      errorp proceedp expected-type)
+  (if proceedp
+      (let ((block (gensym))
+	    (again (gensym)))
+        `(block ,block
+          (tagbody
+            ,again
+            (return-from
+              ,block
+              (cond ,@(nreverse clauses)
+                    (t
+                      (setf ,keyform
+                              (case-body-error
+                               ',name ',keyform ,keyform
+                               ',expected-type ',keys)))
+                    (go ,again))))))
+    `(progn
+      (cond
+        ,@(nreverse clauses)
+        ,@(if errorp
+              `((t (error 'sb!conditions::case-failure
+                    :name ',name
+                    :datum ,keyform
+                    :expected-type ',expected-type
+                    :possibilities ',keys))))))))
+
 ;;; CASE-BODY-AUX provides the expansion once CASE-BODY has groveled
 ;;; all the cases. Note: it is not necessary that the resulting code
 ;;; signal case-failure conditions, but that's what KMP's prototype
@@ -270,21 +347,21 @@
   "TYPECASE Keyform {(Type Form*)}*
   Evaluates the Forms in the first clause for which TYPEP of Keyform and Type
   is true."
-  (case-body 'typecase keyform cases nil 'typep nil nil nil))
+  (typecase-body 'typecase keyform cases 'typep nil nil nil))
 
 (defmacro-mundanely ctypecase (keyform &body cases)
   #!+sb-doc
   "CTYPECASE Keyform {(Type Form*)}*
   Evaluates the Forms in the first clause for which TYPEP of Keyform and Type
   is true. If no form is satisfied then a correctable error is signalled."
-  (case-body 'ctypecase keyform cases nil 'typep t t t))
+  (typecase-body 'ctypecase keyform cases 'typep t t t))
 
 (defmacro-mundanely etypecase (keyform &body cases)
   #!+sb-doc
   "ETYPECASE Keyform {(Type Form*)}*
   Evaluates the Forms in the first clause for which TYPEP of Keyform and Type
   is true. If no form is satisfied then an error is signalled."
-  (case-body 'etypecase keyform cases nil 'typep t nil t))
+  (typecase-body 'etypecase keyform cases 'typep t nil t))
 
 ;;;; WITH-FOO i/o-related macros
 

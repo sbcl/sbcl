@@ -124,7 +124,17 @@
   ;; CONTINUATION-TYPE-CHECK instead of the %'ed slot accessor.
   (%type-check t :type (member t nil :deleted :no-check :error))
   ;; Something or other that the back end annotates this continuation with.
-  (info nil))
+  
+  ;; MNA: Re: two obscure bugs in CMU CL
+  (info nil)
+  ;;
+  ;; Uses of this continuation in the lexical environment.  They are recorded
+  ;; so that when one continuation is substituted for another the environment
+  ;; may be updated properly. 
+  ;; MNAFIX
+  (lexenv-uses nil :type list)
+)
+
 (def!method print-object ((x continuation) stream)
   (print-unreadable-object (x stream :type t :identity t)))
 

@@ -36,8 +36,8 @@
 
 (defun control-stack-usage ()
   #!-x86 (- (sb!sys:sap-int (sb!c::control-stack-pointer-sap))
-	    control-stack-start)
-  #!+x86 (- control-stack-end
+            sb!vm:control-stack-start)
+  #!+x86 (- sb!vm:control-stack-end
 	    (sb!sys:sap-int (sb!c::control-stack-pointer-sap))))
 
 (defun binding-stack-usage ()

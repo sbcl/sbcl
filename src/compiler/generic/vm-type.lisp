@@ -159,6 +159,16 @@
 (defun hairy-type-check-template-name (type)
   (declare (type ctype type))
   (typecase type
+    ;; MNA: cons compound-type
+    ;; FIXIT: all commented out
+;     (cons-type
+;      (if (type= type (specifier-type 'cons))
+; 	 'sb!c:check-cons
+;        nil))
+;     (built-in-class
+;      (if (type= type (specifier-type 'symbol))
+;  	 'sb!c:check-symbol
+;        nil))
     (named-type
      (case (named-type-name type)
        (cons 'sb!c:check-cons)
