@@ -406,9 +406,8 @@
       (setf (fd-stream-obuf-tail fd-stream)
 	    (do* ((len (fd-stream-obuf-length fd-stream))
 		  (sap (fd-stream-obuf-sap fd-stream))
-		  (tail (fd-stream-obuf-tail fd-stream))
-		  (space (- len tail)))
-		 ((or (= start end) (< space 4)) tail)
+		  (tail (fd-stream-obuf-tail fd-stream)))
+		 ((or (= start end) (< (- len tail) 4)) tail)
 	      (let ((bits (char-code (aref string start))))
 		(incf tail
 		      (cond
@@ -441,8 +440,7 @@
 			 4)))
 		(incf start))))
       (when (< start end)
-	(flush-output-buffer fd-stream)
-	(frob-output fd-stream string start end nil)))
+	(flush-output-buffer fd-stream)))
     (when flush-p
       (flush-output-buffer fd-stream))))
 
