@@ -28,7 +28,7 @@
   (declare (type list keys))
   (loop
       for c in '#1=("Red" "Blue" . #1#)
-      for key in keys ))
+      for key in keys))
 
 ;;; sbcl-0.6.11.25 or so had DEF!STRUCT/MAKE-LOAD-FORM/HOST screwed up
 ;;; so that the compiler couldn't dump pathnames.

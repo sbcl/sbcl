@@ -1263,6 +1263,9 @@ changes in sbcl-0.7.8 relative to sbcl-0.7.7:
     found).
   * fixed bug 174: FORMAT's error message is slightly clearer when a
     non-printing character is used in a format directive.
+  * fixed several bugs in compiler checking of type declarations, i.e.
+    violations of the Python "declarations are assertions" principle
+    (thanks to Alexey Dejneka)
 
 planned incompatible changes in 0.7.x:
 * When the profiling interface settles down, maybe in 0.7.x, maybe

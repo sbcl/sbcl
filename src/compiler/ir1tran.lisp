@@ -544,21 +544,23 @@
 ;;; functional instead.
 (defun reference-leaf (start cont leaf)
   (declare (type continuation start cont) (type leaf leaf))
-  (let* ((leaf (or (and (defined-fun-p leaf)
-			(not (eq (defined-fun-inlinep leaf)
-				 :notinline))
-			(let ((functional (defined-fun-functional leaf)))
-			  (when (and functional
-				     (not (functional-kind functional)))
-			    (maybe-reanalyze-functional functional))))
-		   leaf))
-	 (res (make-ref (or (lexenv-find leaf type-restrictions)
-			    (leaf-type leaf))
-			leaf)))
-    (push res (leaf-refs leaf))
-    (setf (leaf-ever-used leaf) t)
-    (link-node-to-previous-continuation res start)
-    (use-continuation res cont)))
+  (with-continuation-type-assertion
+      (cont (or (lexenv-find leaf type-restrictions) *wild-type*)
+            "in DECLARE")
+    (let* ((leaf (or (and (defined-fun-p leaf)
+                          (not (eq (defined-fun-inlinep leaf)
+                                   :notinline))
+                          (let ((functional (defined-fun-functional leaf)))
+                            (when (and functional
+                                       (not (functional-kind functional)))
+                              (maybe-reanalyze-functional functional))))
+                     leaf))
+           (res (make-ref (leaf-type leaf)
+                          leaf)))
+      (push res (leaf-refs leaf))
+      (setf (leaf-ever-used leaf) t)
+      (link-node-to-previous-continuation res start)
+      (use-continuation res cont))))
 
 ;;; Convert a reference to a symbolic constant or variable. If the
 ;;; symbol is entered in the LEXENV-VARS we use that definition,
@@ -1115,7 +1117,7 @@
 				       `(values ,@types))
 				   cont
 				   res
-				   'values))))
+				   "in VALUES declaration"))))
       (dynamic-extent
        (when (policy *lexenv* (> speed inhibit-warnings))
 	 (compiler-note

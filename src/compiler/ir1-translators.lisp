@@ -718,9 +718,9 @@
 ;;; We make this work by getting USE-CONTINUATION to do the unioning
 ;;; across COND branches. We can't do it here, since we don't know how
 ;;; many branches there are going to be.
-(defun ir1ize-the-or-values (type cont lexenv name)
+(defun ir1ize-the-or-values (type cont lexenv place)
   (declare (type continuation cont) (type lexenv lexenv))
-  (let* ((ctype (values-specifier-type type))
+  (let* ((ctype (if (typep type 'ctype) type (values-specifier-type type)))
 	 (old-type (or (lexenv-find cont type-restrictions)
 		       *wild-type*))
 	 (intersects (values-types-equal-or-intersect old-type ctype))
@@ -734,10 +734,10 @@
 	       (not (policy *lexenv*
 			    (= inhibit-warnings 3)))) ;FIXME: really OK to suppress?
       (compiler-warn
-       "The type ~S in ~S declaration conflicts with an ~
+       "The type ~S ~A conflicts with an ~
         enclosing assertion:~%   ~S"
        (type-specifier ctype)
-       name
+       place
        (type-specifier old-type)))
     (make-lexenv :type-restrictions `((,cont . ,new))
 		 :default lexenv)))
@@ -749,7 +749,8 @@
 ;;; this didn't seem to expand into an assertion, at least for ALIEN
 ;;; values. Check that SBCL doesn't have this problem.
 (def-ir1-translator the ((type value) start cont)
-  (let ((*lexenv* (ir1ize-the-or-values type cont *lexenv* 'the)))
+  (with-continuation-type-assertion (cont (values-specifier-type type)
+                                          "in THE declaration")
     (ir1-convert start cont value)))
 
 ;;; This is like the THE special form, except that it believes
@@ -1011,7 +1012,10 @@
     (continuation-starts-block dummy-start)
     (ir1-convert start dummy-start result)
 
-    (substitute-continuation-uses cont dummy-start)
+    (with-continuation-type-assertion
+        (cont (continuation-asserted-type dummy-start)
+              "of the first form")
+      (substitute-continuation-uses cont dummy-start))
 
     (continuation-starts-block dummy-result)
     (ir1-convert-progn-body dummy-start dummy-result forms)

@@ -269,6 +269,36 @@
 	    ;; Uncomment and it works
 	    ))
     (eff)))
+
+;;; bug 192a, fixed by APD "more strict type checking" patch
+;;; (sbcl-devel 2002-08-07)
+(defun bug192a (x)
+  (declare (optimize (speed 0) (safety 3)))
+  ;; Even with bug 192a, this declaration was checked as an assertion.
+  (declare (real x))
+  (+ x
+     (locally
+       ;; Because of bug 192a, this declaration was trusted without checking.
+       (declare (single-float x))
+       (sin x))))
+(assert (null (ignore-errors (bug192a nil))))
+(multiple-value-bind (result error) (ignore-errors (bug192a 100))
+  (assert (null result))
+  (assert (equal (type-error-expected-type error) 'single-float)))
+
+;;; bug 194, fixed in part by APD "more strict type checking" patch
+;;; (sbcl-devel 2002-08-07)
+(progn
+  #+nil ; FIXME: still broken in 0.7.7.19 (after patch)
+  (multiple-value-bind (result error)
+      (ignore-errors (multiple-value-prog1 (progn (the real '(1 2 3)))))
+    (assert (null result))
+    (assert (typep error 'type-error)))
+  #+nil ; FIXME: still broken in 0.7.7.19 (after patch)
+  (multiple-value-bind (result error)
+      (ignore-errors (the real '(1 2 3)))
+    (assert (null result))
+    (assert (typep error 'type-error))))
 
 ;;; BUG 48a. and b. (symbol-macrolet handling), fixed by Eric Marsden
 ;;; and Raymond Toy for CMUCL, fix ported for sbcl-0.7.6.18.
@@ -276,9 +306,11 @@
     (compile nil '(lambda () (symbol-macrolet ((t nil)) t)))
   (assert failure-p)
   (assert (raises-error? (funcall function) program-error)))
-
 (multiple-value-bind (function warnings-p failure-p)
-    (compile nil '(lambda () (symbol-macrolet ((*standard-input* nil)) *standard-input*)))
+    (compile nil
+	     '(lambda ()
+		(symbol-macrolet ((*standard-input* nil))
+		  *standard-input*)))
   (assert failure-p)
   (assert (raises-error? (funcall function) program-error)))
 #||

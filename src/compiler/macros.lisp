@@ -709,6 +709,11 @@
     `(if ,n-res
 	 (values (cdr ,n-res) t)
 	 (values nil nil))))
+
+;;;
+(defmacro with-continuation-type-assertion ((cont ctype context) &body body)
+  `(let ((*lexenv* (ir1ize-the-or-values ,ctype ,cont *lexenv* ,context)))
+     ,@body))
 
 ;;;; the EVENT statistics/trace utility
 

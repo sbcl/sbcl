@@ -1,4 +1,4 @@
-tREPORTING BUGS
+REPORTING BUGS
 
 Bugs can be reported on the help mailing list
   sbcl-help@lists.sourceforge.net
@@ -183,7 +183,8 @@ WORKAROUND:
   then executing
     (FOO 1.5)
   will cause the INTEGERP case to be selected, giving bogus output a la
-    exactly 1.33..
+    exactly 2.5
+  (or (FOO 1000.5), "exactly 1001.5")
   This violates the "declarations are assertions" principle.
   According to the ANSI spec, in the section "System Class FUNCTION",
   this is a case of "lying to the compiler", but the lying is done
@@ -1280,17 +1281,9 @@ WORKAROUND:
      lists and &KEY arguments) do not signal errors when they should.
 
 192: "Python treats free type declarations as promises."
-  a. original report by Alexey Dejneka (on sbcl-devel 2002-08-26):
-       (declaim (optimize (speed 0) (safety 3)))
-       (defun f (x)
-         (declare (real x))
-         (+ x
-            (locally (declare (single-float x))
-            (sin x))))
-     Now (F NIL) correctly gives a type error, but (F 100) gives
-     a segmentation violation.
-  b. same fundamental problem in a different way, easy to stumble
-     across if you mistype and declare the wrong index in
+  b. What seemed like the same fundamental problem as bug 192a, but
+     was not fixed by the same (APD "more strict type checking
+     sbcl-devel 2002-08-97) patch:
      (DOTIMES (I ...) (DOTIMES (J ...) (DECLARE ...) ...)):
        (declaim (optimize (speed 1) (safety 3)))
        (defun trust-assertion (i)
@@ -1320,8 +1313,31 @@ WORKAROUND:
   bad argument value is).
 
 194: "no error from (THE REAL '(1 2 3)) in some cases"
-  (Actually this entry is probably two separate bugs, as
-  Alexey Dejneka commented on sbcl-devel 2002-09-03:)
+  fixed parts:
+    a. In sbcl-0.7.7.9, 
+         (multiple-value-prog1 (progn (the real '(1 2 3))))
+       returns (1 2 3) instead of signalling an error. This was fixed by 
+       APD's "more strict type checking patch", but although the fixed
+       code (in sbcl-0.7.7.19) works (signals TYPE-ERROR) interactively,
+       it's difficult to write a regression test for it, because 
+       (IGNORE-ERRORS (MULTIPLE-VALUE-PROG1 (PROGN (THE REAL '(1 2 3)))))
+       still returns (1 2 3).
+  still-broken parts:  
+    b. (IGNORE-ERRORS (MULTIPLE-VALUE-PROG1 (PROGN (THE REAL '(1 2 3)))))    
+       returns (1 2 3). (As above, this shows up when writing regression
+       tests for fixed-ness of part a.)
+    c. Also in sbcl-0.7.7.9, (IGNORE-ERRORS (THE REAL '(1 2 3))) => (1 2 3).
+    d. At the REPL,
+         (null (ignore-errors
+           (let ((arg1 1)
+                 (arg2 (identity (the real #(1 2 3)))))
+             (if (< arg1 arg2) arg1 arg2))))
+           => T
+      but putting the same expression inside (DEFUN FOO () ...),
+      (FOO) => NIL.
+  notes:
+    * Actually this entry is probably multiple bugs, as
+      Alexey Dejneka commented on sbcl-devel 2002-09-03:)
 	I don't think that placing these two bugs in one entry is
 	a good idea: they have different explanations. The second
 	(min 1 nil) is caused by flushing of unused code--IDENTITY
@@ -1330,35 +1346,12 @@ WORKAROUND:
 	for the result, it forgets about type assertion. The purpose
 	of IDENTITY is to save the restricted continuation from
 	inaccurate transformations.
-  In sbcl-0.7.7.9, 
-    (multiple-value-prog1 (progn (the real '(1 2 3))))
-  returns (1 2 3) instead of signalling an error. Also in sbcl-0.7.7.9,
-  a more complicated instance of this bug kept 
-  (IGNORE-ERRORS (MIN '(1 2 3))) from returning NIL as it should when
-  the MIN source transform expanded to (THE REAL '(1 2 3)), because
-  (IGNORE-ERRORS (THE REAL '(1 2 3))) returns (1 2 3).
-  Alexey Dejneka pointed out that
-  (IGNORE-ERRORS (IDENTITY (THE REAL '(1 2 3)))) works as it should.
-  (IGNORE-ERRORS (VALUES (THE REAL '(1 2 3)))) also works as it should.
-  Perhaps this is another case of VALUES type intersections behaving
-  in non-useful ways?
-    When I (WHN) tried to use the VALUES trick to work around this bug
-  in the MIN source transform, it didn't work for
-    (assert (null (ignore-errors (min 1 #(1 2 3)))))
-  Hand-expanding the source transform, I get
-    (assert (null (ignore-errors
-                   (let ((arg1 1)
-                         (arg2 (identity (the real #(1 2 3)))))
-                     (if (< arg1 arg2) arg1 arg2))))) 
-  which fails (i.e. the assertion fails, because the IGNORE-ERRORS
-  doesn't report MIN signalling a type error). At the REPL
-    (null (ignore-errors
-           (let ((arg1 1)
-                 (arg2 (identity (the real #(1 2 3)))))
-             (if (< arg1 arg2) arg1 arg2))))
-    => T
-  but when this expression is used as the body of (DEFUN FOO () ...)
-  then (FOO)=>NIL.
+    * Alexey Dejneka pointed out that
+	(IGNORE-ERRORS (IDENTITY (THE REAL '(1 2 3))))
+      works as it should. Also
+	(IGNORE-ERRORS (VALUES (THE REAL '(1 2 3))))
+      works as it should. Perhaps this is another case of VALUES type
+      intersections behaving in non-useful ways?
 
 195: "confusing reporting of not-a-REAL TYPE-ERRORs from THE REAL"
   In sbcl-0.7.7.10, (THE REAL #(1 2 3)) signals a type error which
