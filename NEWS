@@ -17,6 +17,8 @@ changes in sbcl-0.8.20 (0.9alpha.0?) relative to sbcl-0.8.19:
     CLOS classes has had redundant type checks removed.
   * optimization: added declarations to speed up operations that access
     the internal character database (for example STRING-UPCASE)
+  * optimization: comparison operations between floats and sufficiently small
+    fixnums no longer create extra rationals
   * fixed some bugs related to Unicode integration:
     ** portions of multibyte characters at the end of buffers for
        character-based file input are correctly transferred to the

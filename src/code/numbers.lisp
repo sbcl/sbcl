@@ -819,6 +819,15 @@ the first."
      (declare (type real number result))
      (if (< (car nlist) result) (setq result (car nlist)))))
 
+(defconstant most-positive-exactly-single-float-fixnum
+  (min #xffffff most-positive-fixnum))
+(defconstant most-negative-exactly-single-float-fixnum
+  (max #x-ffffff most-negative-fixnum))
+(defconstant most-positive-exactly-double-float-fixnum
+  (min #x1fffffffffffff most-positive-fixnum))
+(defconstant most-negative-exactly-double-float-fixnum
+  (max #x-1fffffffffffff most-negative-fixnum))
+
 (eval-when (:compile-toplevel :execute)
 
 ;;; The INFINITE-X-FINITE-Y and INFINITE-Y-FINITE-X args tell us how
@@ -838,6 +847,40 @@ the first."
     #!+long-float
     ((long-float (foreach single-float double-float))
      (,op x (coerce y 'long-float)))
+    ((fixnum (foreach single-float double-float))
+     (if (float-infinity-p y)
+         ,infinite-y-finite-x
+         ;; If the fixnum has an exact float representation, do a
+         ;; float comparison. Otherwise do the slow float -> ratio
+         ;; conversion.
+	 (multiple-value-bind (lo hi)
+	     (case '(dispatch-type y)
+	       ('single-float
+		(values most-negative-exactly-single-float-fixnum
+			most-positive-exactly-single-float-fixnum))
+	       ('double-float
+		(values most-negative-exactly-double-float-fixnum
+			most-positive-exactly-double-float-fixnum)))
+	   (if (<= lo y hi)
+	       (,op (coerce x '(dispatch-type y)) y)
+	       (,op x (rational y))))))
+    (((foreach single-float double-float) fixnum)
+     (if (eql y 0)
+         (,op x (coerce 0 '(dispatch-type x)))
+         (if (float-infinity-p x)
+             ,infinite-x-finite-y
+             ;; Likewise
+	     (multiple-value-bind (lo hi)
+		 (case '(dispatch-type x)
+		   ('single-float
+		    (values most-negative-exactly-single-float-fixnum
+			    most-positive-exactly-single-float-fixnum))
+		   ('double-float
+		    (values most-negative-exactly-double-float-fixnum
+			    most-positive-exactly-double-float-fixnum)))
+	       (if (<= lo y hi)
+		   (,op x (coerce y '(dispatch-type x)))
+		   (,op (rational x) y))))))
     (((foreach single-float double-float) double-float)
      (,op (coerce x 'double-float) y))
     ((double-float single-float)

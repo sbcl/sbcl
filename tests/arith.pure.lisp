@@ -224,3 +224,37 @@
   (frob /)
   (frob floor)
   (frob ceiling))
+
+;; Check that the logic in SB-KERNEL::BASIC-COMPARE for doing fixnum/float
+;; comparisons without rationalizing the floats still gives the right anwers
+;; in the edge cases (had a fencepost error).
+(macrolet ((test (range type sign)
+	     `(let (ints
+		    floats
+		    (start (- ,(find-symbol (format nil
+						    "MOST-~A-EXACTLY-~A-FIXNUM"
+						    sign type)
+					    :sb-kernel)
+			      ,range)))
+		(dotimes (i (1+ (* ,range 2)))
+		  (let* ((x (+ start i))
+			 (y (coerce x ',type)))
+		    (push x ints)
+		    (push y floats)))
+		(dolist (i ints)
+		  (dolist (f floats)
+		    (dolist (op '(< <= = >= >))
+		      (unless (eq (funcall op i f)
+				  (funcall op i (rationalize f)))
+			(error "(not (eq (~a ~a ~f) (~a ~a ~a)))~%"
+			       op i f
+			       op i (rationalize f)))
+		      (unless (eq (funcall op f i)
+				  (funcall op (rationalize f) i))
+			(error "(not (eq (~a ~f ~a) (~a ~a ~a)))~%"
+			       op f i
+			       op (rationalize f) i))))))))
+  (test 32 double-float negative)
+  (test 32 double-float positive)
+  (test 32 single-float negative)
+  (test 32 single-float positive))
