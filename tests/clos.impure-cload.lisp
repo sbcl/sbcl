@@ -119,6 +119,17 @@
 	    (declare (ignore x)) (setq y 'foo)))
   (style-warning (c) (error c)))
 
+;;; ctor optimization bugs:
+;;;
+;;; :DEFAULT-INITARGS not checked for validity
+(defclass invalid-default-initargs ()
+  ((foo :initarg :foo))
+  (:default-initargs :invalid-initarg 2))
+(multiple-value-bind (result condition)
+    (ignore-errors (make-instance 'invalid-default-initargs :foo 1))
+  (assert (null result))
+  (assert (typep condition 'program-error)))
+
 ;;; from Axel Schairer on cmucl-imp 2004-08-05
 (defclass class-with-symbol-initarg ()
   ((slot :initarg slot)))

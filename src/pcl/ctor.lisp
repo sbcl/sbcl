@@ -90,6 +90,12 @@
 	 (and (symbolp constant)
 	      (not (null (symbol-package constant)))))))
 
+;;; somewhat akin to DEFAULT-INITARGS (SLOT-CLASS T T), but just
+;;; collecting the defaulted initargs for the call.
+(defun ctor-default-initkeys (supplied-initargs class-default-initargs)
+  (loop for (key nil) in class-default-initargs
+        when (eq (getf supplied-initargs key '.not-there.) '.not-there.)
+        collect key))
 
 ;;; *****************
 ;;; CTORS   *********
@@ -317,8 +323,13 @@
 		      (member (slot-definition-allocation x)
 			      '(:instance :class)))
 		    (class-slots class))
-	     (null (check-initargs-1 class (plist-keys (ctor-initargs ctor))
-				     (append ii-methods si-methods) nil nil))
+	     (null (check-initargs-1
+                    class
+                    (append
+                     (ctor-default-initkeys
+                      (ctor-initargs ctor) (class-default-initargs class))
+                     (plist-keys (ctor-initargs ctor)))
+                    (append ii-methods si-methods) nil nil))
 	     (not (around-or-nonstandard-primary-method-p
 		   ii-methods *the-system-ii-method*))
 	     (not (around-or-nonstandard-primary-method-p
