@@ -970,58 +970,79 @@
   (reoptimize-continuation (node-cont call))
   (values))
 
+;;; Are there any declarations in force to say CLAMBDA shouldn't be
+;;; LET converted?
+(defun declarations-suppress-let-conversion-p (clambda)
+  ;; From the user's point of view, LET-converting something that
+  ;; has a name is inlining it. (The user can't see what we're doing
+  ;; with anonymous things, and suppressing inlining
+  ;; for such things can easily give Python acute indigestion, so 
+  ;; we don't.)
+  (when (leaf-has-source-name-p clambda)
+    ;; ANSI requires that explicit NOTINLINE be respected.
+    (or (eq (lambda-inlinep clambda) :notinline)
+	;; If (> DEBUG SPEED) we can guess that inlining generally
+	;; won't be appreciated, but if the user specifically requests
+	;; inlining, that takes precedence over our general guess.
+	(and (policy clambda (> debug speed))
+	     (not (eq (lambda-inlinep clambda) :inline))))))
+
 ;;; We also don't convert calls to named functions which appear in the
 ;;; initial component, delaying this until optimization. This
 ;;; minimizes the likelihood that we will LET-convert a function which
 ;;; may have references added due to later local inline expansion.
 (defun ok-initial-convert-p (fun)
   (not (and (leaf-has-source-name-p fun)
-	    (eq (component-kind (lambda-component fun))
-		:initial))))
+	    (or (declarations-suppress-let-conversion-p fun)
+		(eq (component-kind (lambda-component fun))
+		    :initial)))))
 
 ;;; This function is called when there is some reason to believe that
 ;;; CLAMBDA might be converted into a LET. This is done after local
-;;; call analysis, and also when a reference is deleted. We only
-;;; convert to a let when the function is a normal local function, has
-;;; no XEP, and is referenced in exactly one local call. Conversion is
-;;; also inhibited if the only reference is in a block about to be
-;;; deleted. We return true if we converted.
-;;;
-;;; These rules may seem unnecessarily restrictive, since there are
-;;; some cases where we could do the return with a jump that don't
-;;; satisfy these requirements. The reason for doing things this way
-;;; is that it makes the concept of a LET much more useful at the
-;;; level of IR1 semantics. The :ASSIGNMENT function kind provides
-;;; another way to optimize calls to single-return/multiple call
-;;; functions.
-;;;
-;;; We don't attempt to convert calls to functions that have an XEP,
-;;; since we might be embarrassed later when we want to convert a
-;;; newly discovered local call. Also, see OK-INITIAL-CONVERT-P.
+;;; call analysis, and also when a reference is deleted. We return
+;;; true if we converted.
 (defun maybe-let-convert (clambda)
   (declare (type clambda clambda))
-  (let ((refs (leaf-refs clambda)))
-    (when (and refs
-	       (null (rest refs))
-	       (member (functional-kind clambda) '(nil :assignment))
-	       (not (functional-entry-fun clambda)))
-      (let* ((ref-cont (node-cont (first refs)))
-	     (dest (continuation-dest ref-cont)))
-	(when (and dest
-                   (basic-combination-p dest)
-		   (eq (basic-combination-fun dest) ref-cont)
-		   (eq (basic-combination-kind dest) :local)
-		   (not (block-delete-p (node-block dest)))
-		   (cond ((ok-initial-convert-p clambda) t)
-			 (t
-			  (reoptimize-continuation ref-cont)
-			  nil)))
-	  (unless (eq (functional-kind clambda) :assignment)
-	    (let-convert clambda dest))
-	  (reoptimize-call dest)
-	  (setf (functional-kind clambda)
-		(if (mv-combination-p dest) :mv-let :let))))
-      t)))
+  (unless (declarations-suppress-let-conversion-p clambda)
+    ;; We only convert to a LET when the function is a normal local
+    ;; function, has no XEP, and is referenced in exactly one local
+    ;; call. Conversion is also inhibited if the only reference is in
+    ;; a block about to be deleted.
+    ;;
+    ;; These rules limiting LET conversion may seem unnecessarily
+    ;; restrictive, since there are some cases where we could do the
+    ;; return with a jump that don't satisfy these requirements. The
+    ;; reason for doing things this way is that it makes the concept
+    ;; of a LET much more useful at the level of IR1 semantics. The
+    ;; :ASSIGNMENT function kind provides another way to optimize
+    ;; calls to single-return/multiple call functions.
+    ;;
+    ;; We don't attempt to convert calls to functions that have an
+    ;; XEP, since we might be embarrassed later when we want to
+    ;; convert a newly discovered local call. Also, see
+    ;; OK-INITIAL-CONVERT-P.
+    (let ((refs (leaf-refs clambda)))
+      (when (and refs
+		 (null (rest refs))
+		 (member (functional-kind clambda) '(nil :assignment))
+		 (not (functional-entry-fun clambda)))
+	(let* ((ref-cont (node-cont (first refs)))
+	       (dest (continuation-dest ref-cont)))
+	  (when (and dest
+		     (basic-combination-p dest)
+		     (eq (basic-combination-fun dest) ref-cont)
+		     (eq (basic-combination-kind dest) :local)
+		     (not (block-delete-p (node-block dest)))
+		     (cond ((ok-initial-convert-p clambda) t)
+			   (t
+			    (reoptimize-continuation ref-cont)
+			    nil)))
+	    (unless (eq (functional-kind clambda) :assignment)
+	      (let-convert clambda dest))
+	    (reoptimize-call dest)
+	    (setf (functional-kind clambda)
+		  (if (mv-combination-p dest) :mv-let :let))))
+	t))))
 
 ;;;; tail local calls and assignments
 

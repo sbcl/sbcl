@@ -2065,8 +2065,8 @@
       (setf (functional-inlinep fun) (defined-fun-inlinep var))
       (assert-new-definition var fun)
       (setf (defined-fun-inline-expansion var) var-expansion)
-      ;; If definitely not an interpreter stub, then substitute for any
-      ;; old references.
+      ;; If definitely not an interpreter stub, then substitute for
+      ;; any old references.
       (unless (or (eq (defined-fun-inlinep var) :notinline)
 		  (not *block-compile*)
 		  (and fun-info

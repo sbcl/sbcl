@@ -1228,7 +1228,7 @@
   (derive-node-type node (continuation-type (set-value node)))
   (values))
 
-;;; Return true if the value of Ref will always be the same (and is
+;;; Return true if the value of REF will always be the same (and is
 ;;; thus legal to substitute.)
 (defun constant-reference-p (ref)
   (declare (type ref ref))

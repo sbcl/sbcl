@@ -189,10 +189,9 @@
 
 (defun sb!xc:compiler-macro-function (name &optional env)
   #!+sb-doc
-  "If NAME names a compiler-macro, returns the expansion function,
-   else returns NIL. Note: if the name is shadowed in ENV by a local
-   definition, or declared NOTINLINE, NIL is returned. Can be
-   set with SETF."
+  "If NAME names a compiler-macro, return the expansion function, else
+   return NIL. Note: if the name is shadowed in ENV by a local definition,
+   or declared NOTINLINE, NIL is returned. Can be set with SETF."
   (let ((found (and env
 		    (cdr (assoc name (sb!c::lexenv-funs env)
 				:test #'equal)))))

@@ -23,6 +23,14 @@ typedef off_t os_vm_offset_t;
 typedef int os_vm_prot_t;
 typedef int os_context_register_t;
 
+#if defined __OpenBSD__
+/* name defined for compatibility between OpenBSD 3.1 sigaltstack(2) and
+ * Linux sigaltstack(2) */
+typedef struct sigaltstack stack_t;
+#elif defined __FreeBSD__
+/* FreeBSD 4.6 already has stack_t defined. */
+#endif
+
 #if defined __FreeBSD__
 /* Note: The man page for sigaction(2) in FreeBSD 4.0 says that this
  * is an mcontext_t, but according to comments by Raymond Wiker in the
