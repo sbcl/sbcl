@@ -538,6 +538,7 @@ maybe_now_maybe_later(int signal, siginfo_t *info, void *void_context)
     interrupt_handle_now(signal, info, context);
 }
 
+#ifdef LISP_FEATURE_SB_THREAD
 void
 sig_stop_for_gc_handler(int signal, siginfo_t *info, void *void_context)
 {
@@ -567,6 +568,7 @@ sig_stop_for_gc_handler(int signal, siginfo_t *info, void *void_context)
 
     undo_fake_foreign_function_call(context);
 }
+#endif
 
 void
 interrupt_handle_now_handler(int signal, siginfo_t *info, void *void_context)
