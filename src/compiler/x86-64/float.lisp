@@ -630,7 +630,7 @@
 		(:vop-var vop)
 		(:save-p :compute-only)
 		(:generator 6
-		  (inst ,inst x y)))))
+		  (inst ,inst y x)))))
   (frob %single-float/unsigned %single-float cvtsi2ss single-reg single-float)
   (frob %double-float/unsigned %double-float cvtsi2sd double-reg double-float))
 
@@ -647,7 +647,7 @@
 	       (:save-p :compute-only)
 	       (:generator 2
 		(note-this-location vop :internal-error)
-		(inst ,inst x y)))))
+		(inst ,inst y x)))))
   (frob %single-float/double-float %single-float cvtsd2ss double-reg
 	double-float single-reg single-float)
 
@@ -843,7 +843,7 @@
 	(loadw lo-bits float double-float-value-slot
 	       other-pointer-lowtag)))
      (inst shl lo-bits 32)
-     (inst sar lo-bits 32)))
+     (inst shr lo-bits 32)))
 
 
 ;;;; float mode hackery

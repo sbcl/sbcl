@@ -669,6 +669,30 @@
     (write-wordindexed des 2 second)
     des))
 
+(defun write-double-float-bits (address index x)
+  (let ((hi (double-float-high-bits x))
+	(lo (double-float-low-bits x)))
+    (ecase sb!vm::n-word-bits
+      (32
+       (let ((high-bits (make-random-descriptor hi))
+	     (low-bits (make-random-descriptor lo)))
+	 (ecase sb!c:*backend-byte-order*
+	   (:little-endian
+	    (write-wordindexed address index low-bits)
+	    (write-wordindexed address index high-bits))
+	   (:big-endian
+	    (write-wordindexed address index high-bits)
+	    (write-wordindexed address (1+ index) low-bits)))))
+      (64
+       (let ((bits (make-random-descriptor
+		    (ecase sb!c:*backend-byte-order*
+		      (:little-endian (logior lo (ash hi 32)))
+		      ;; Just guessing.
+		      #+nil (:big-endian (logior (logand hi #xffffffff)
+						 (ash lo 32)))))))
+	 (write-wordindexed address index bits))))
+    address))
+
 (defun float-to-core (x)
   (etypecase x
     (single-float
@@ -684,17 +708,8 @@
      (let ((des (allocate-unboxed-object *dynamic*
 					 sb!vm:n-word-bits
 					 (1- sb!vm:double-float-size)
-					 sb!vm:double-float-widetag))
-	   (high-bits (make-random-descriptor (double-float-high-bits x)))
-	   (low-bits (make-random-descriptor (double-float-low-bits x))))
-       (ecase sb!c:*backend-byte-order*
-	 (:little-endian
-	  (write-wordindexed des sb!vm:double-float-value-slot low-bits)
-	  (write-wordindexed des (1+ sb!vm:double-float-value-slot) high-bits))
-	 (:big-endian
-	  (write-wordindexed des sb!vm:double-float-value-slot high-bits)
-	  (write-wordindexed des (1+ sb!vm:double-float-value-slot) low-bits)))
-       des))))
+					 sb!vm:double-float-widetag)))
+       (write-double-float-bits des sb!vm:double-float-value-slot x)))))
 
 (defun complex-single-float-to-core (num)
   (declare (type (complex single-float) num))
@@ -712,39 +727,10 @@
   (let ((des (allocate-unboxed-object *dynamic* sb!vm:n-word-bits
 				      (1- sb!vm:complex-double-float-size)
 				      sb!vm:complex-double-float-widetag)))
-    (let* ((real (realpart num))
-	   (high-bits (make-random-descriptor (double-float-high-bits real)))
-	   (low-bits (make-random-descriptor (double-float-low-bits real))))
-      (ecase sb!c:*backend-byte-order*
-	(:little-endian
-	 (write-wordindexed des sb!vm:complex-double-float-real-slot low-bits)
-	 (write-wordindexed des
-			    (1+ sb!vm:complex-double-float-real-slot)
-			    high-bits))
-	(:big-endian
-	 (write-wordindexed des sb!vm:complex-double-float-real-slot high-bits)
-	 (write-wordindexed des
-			    (1+ sb!vm:complex-double-float-real-slot)
-			    low-bits))))
-    (let* ((imag (imagpart num))
-	   (high-bits (make-random-descriptor (double-float-high-bits imag)))
-	   (low-bits (make-random-descriptor (double-float-low-bits imag))))
-      (ecase sb!c:*backend-byte-order*
-	(:little-endian
-	 (write-wordindexed des
-			    sb!vm:complex-double-float-imag-slot
-			    low-bits)
-	 (write-wordindexed des
-			    (1+ sb!vm:complex-double-float-imag-slot)
-			    high-bits))
-	(:big-endian
-	 (write-wordindexed des
-			    sb!vm:complex-double-float-imag-slot
-			    high-bits)
-	 (write-wordindexed des
-			    (1+ sb!vm:complex-double-float-imag-slot)
-			    low-bits))))
-    des))
+    (write-double-float-bits des sb!vm:complex-double-float-real-slot
+			     (realpart num))
+    (write-double-float-bits des sb!vm:complex-double-float-imag-slot
+			     (imagpart num))))
 
 ;;; Copy the given number to the core.
 (defun number-to-core (number)

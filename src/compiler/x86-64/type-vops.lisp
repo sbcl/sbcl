@@ -212,7 +212,7 @@
     (move rax-tn value)
     (inst test rax-tn 7)
     (inst jmp :ne (if not-p target not-target))
-    (inst sar rax-tn (+ 32 3 -1))
+    (inst shr rax-tn (+ 32 sb!vm::n-fixnum-tag-bits))
     (inst jmp (if not-p :nz :z) target)
     NOT-TARGET))
 
@@ -223,7 +223,7 @@
       (move rax-tn value)
       (inst test rax-tn 7)
       (inst jmp :ne nope)
-      (inst sar rax-tn (+ 32 3 -1))
+      (inst shr rax-tn (+ 32 sb!vm::n-fixnum-tag-bits))
       (inst jmp :nz nope)
       (move result value))))
 

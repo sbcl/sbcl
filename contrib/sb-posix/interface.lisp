@@ -220,7 +220,7 @@
 ;;; mmap, msync
 (define-call "mmap" sb-sys:system-area-pointer
   (lambda (res)
-    (= (sb-sys:sap-int res) #.(1- (expt 2 sb-vm::n-word-bits))))
+    (= (sb-sys:sap-int res) #.(1- (expt 2 sb-vm::n-machine-word-bits))))
   (addr sap-or-nil) (length unsigned) (prot unsigned)
   (flags unsigned) (fd file-descriptor) (offset sb-posix::off-t))
 

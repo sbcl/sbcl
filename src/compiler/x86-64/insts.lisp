@@ -908,9 +908,11 @@
 		(not (zerop (logior rex-w rex-r rex-x rex-b))))
 	(emit-rex-byte segment #b0100 rex-w rex-r rex-x rex-b)))))
 
-(defun maybe-emit-rex-for-ea (segment ea reg)
+(defun maybe-emit-rex-for-ea (segment ea reg &key operand-size)
   (let ((ea-p (ea-p ea)))		;emit-ea can also be called with a tn
-    (maybe-emit-rex-prefix segment (operand-size ea) reg 
+    (maybe-emit-rex-prefix segment
+			   (or operand-size (operand-size ea))
+			   reg
 			   (and ea-p (ea-index ea))
 			   (cond (ea-p (ea-base ea))
 				 ((and (tn-p ea)
@@ -2973,7 +2975,7 @@
 ;  (:printer reg-reg/mem ((op #x10) (width 1))) ;wrong
   (:emitter
    (emit-byte segment #xf2)
-   (maybe-emit-rex-for-ea segment src dst)
+   (maybe-emit-rex-for-ea segment src dst :operand-size :qword)
    (emit-byte segment #x0f)
    (emit-byte segment #x2d)
    (emit-ea segment src (reg-tn-encoding dst))))
@@ -2991,7 +2993,7 @@
 ;  (:printer reg-reg/mem ((op #x10) (width 1))) ;wrong
   (:emitter
    (emit-byte segment #xf3)
-   (maybe-emit-rex-for-ea segment src dst)
+   (maybe-emit-rex-for-ea segment src dst :operand-size :qword)
    (emit-byte segment #x0f)
    (emit-byte segment #x2d)
    (emit-ea segment src (reg-tn-encoding dst))))
@@ -3046,7 +3048,7 @@
 ;  (:printer reg-reg/mem ((op #x10) (width 1))) ;wrong
   (:emitter
    (emit-byte segment #xf2)
-   (maybe-emit-rex-for-ea segment src dst)
+   (maybe-emit-rex-for-ea segment src dst :operand-size :qword)
    (emit-byte segment #x0f)
    (emit-byte segment #x2c)
    (emit-ea segment src (reg-tn-encoding dst))))
@@ -3055,7 +3057,7 @@
 ;  (:printer reg-reg/mem ((op #x10) (width 1))) ;wrong
   (:emitter
    (emit-byte segment #xf3)
-   (maybe-emit-rex-for-ea segment src dst)
+   (maybe-emit-rex-for-ea segment src dst :operand-size :qword)
    (emit-byte segment #x0f)
    (emit-byte segment #x2c)
    (emit-ea segment src (reg-tn-encoding dst))))
