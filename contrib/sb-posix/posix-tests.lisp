@@ -17,6 +17,14 @@
   (defconstant +mode-rwx-all+ (logior sb-posix::s-irusr sb-posix::s-iwusr sb-posix::s-ixusr
 				      sb-posix::s-irgrp sb-posix::s-iwgrp sb-posix::s-ixgrp
 				      sb-posix::s-iroth sb-posix::s-iwoth sb-posix::s-ixoth)))
+
+(defmacro define-eacces-test (name form &rest values)
+  `(deftest ,name
+    (block ,name
+      (when (= (sb-posix:geteuid) 0)
+	(return-from ,name (values ,@values)))
+      ,form)
+    ,@values))
 
 (deftest chdir.1
   (sb-posix:chdir *test-directory*)
@@ -95,7 +103,7 @@
       (sb-posix:syscall-errno c)))
   #.sb-posix::eexist)
 
-(deftest mkdir.error.3
+(define-eacces-test mkdir.error.3
   (let* ((dir (merge-pathnames
 	       (make-pathname :directory '(:relative "mkdir.error.3"))
 	       *test-directory*))
@@ -166,7 +174,7 @@
 	  (or (= errno sb-posix::eexist) (= errno sb-posix::enotempty))))))
   t)
 
-(deftest rmdir.error.5
+(define-eacces-test rmdir.error.5
   (let* ((dir (merge-pathnames
 	       (make-pathname :directory '(:relative "rmdir.error.5"))
 	       *test-directory*))
@@ -233,7 +241,7 @@
       (sb-posix:syscall-errno c)))
   #.sb-posix::enoent)
 
-(deftest stat.error.2
+(define-eacces-test stat.error.2
   (let* ((dir (merge-pathnames
 	       (make-pathname :directory '(:relative "stat.error.2"))
 	       *test-directory*))

@@ -18,9 +18,6 @@
 
 echo //entering make-config.sh
 
-echo //checking that we are not root
-if [ `id -u` -eq 0 ] ; then echo 'Argh! we are (fake)root!'; exit 1; fi;
-
 echo //ensuring the existence of output/ directory
 if [ ! -d output ] ; then mkdir output; fi
 
