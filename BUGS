@@ -1294,6 +1294,35 @@ WORKAROUND:
   Then (foo (make-array 4 :element-type 'bit :adjustable t) nil)
   must return the same value as it prints, but it returns random garbage.
 
+240:
+  "confused lexical/special warnings in MULTIPLE-VALUE-BIND"
+  (from tonyms on #lisp IRC 2003-02-25)
+  In sbcl-0.7.12.55, compiling 
+    (cl:in-package :cl-user)
+    (defvar *foo* 0)
+    (defvar *bar* 1)
+    (defun bar ()
+      (multiple-value-bind (*foo* *bar*) 'eleventy-one
+        (bletch)))
+    (defun bletch () (format t "~&*FOO*=~S *BAR*=~S" *foo* *bar*))
+    (bar)
+  gives warnings like "using the lexical binding of the symbol *FOO*"
+  even though LOADing the fasl file shows that in fact the special
+  bindings are being used.
+
+241:
+  "DEFCLASS mysteriously remembers uninterned accessor names."
+  (from tonyms on #lisp IRC 2003-02-25)
+  In sbcl-0.7.12.55, typing
+    (defclass foo () ((bar :accessor foo-bar)))
+    (profile foo-bar)
+    (unintern 'foo-bar)
+    (defclass foo () ((bar :accessor foo-bar)))
+  gives the error message
+    "#:FOO-BAR already names an ordinary function or a macro."
+  So it's somehow checking the uninterned old accessor name instead
+  of the new requested accessor name, which seems broken to me (WHN).
+
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:
     These labels were used for bugs related to the old IR1 interpreter.
