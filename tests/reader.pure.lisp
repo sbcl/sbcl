@@ -51,3 +51,11 @@
     ;; so it'd be more logical for NON-TERMINATING-P to be T in
     ;; this case; but ANSI says it's NIL in this case.
     (assert (null non-terminating-p))))
+
+;;; rudimentary test of SET-SYNTAX-FROM-CHAR, just to verify that it
+;;; wasn't totally broken by the GET-MACRO-CHARACTER/SET-MACRO-CHARACTER
+;;; fixes in 0.7.3.16
+(assert (= 123579 (read-from-string "123579")))
+(let ((*readtable* (copy-readtable)))
+  (set-syntax-from-char #\7 #\;)
+  (assert (= 1235 (read-from-string "123579"))))
