@@ -4159,8 +4159,8 @@ alloc(int nbytes)
     struct alloc_region *region= 
 	th ? &(th->alloc_region) : &boxed_region; 
     void *new_obj;
-	void *new_free_pointer;
-
+    void *new_free_pointer;
+    
     /* Check for alignment allocation problems. */
     gc_assert((((unsigned)region->free_pointer & 0x7) == 0)
 	      && ((nbytes & 0x7) == 0));
@@ -4169,28 +4169,28 @@ alloc(int nbytes)
 	 * heap before Lisp starts.  This is before interrupts are enabled,
 	 * so we don't need to check for pseudo-atomic */
 	gc_assert(SymbolValue(PSEUDO_ATOMIC_ATOMIC,th));
-
+    
     /* maybe we can do this quickly ... */
     new_free_pointer = region->free_pointer + nbytes;
     if (new_free_pointer <= region->end_addr) {
 	new_obj = (void*)(region->free_pointer);
 	region->free_pointer = new_free_pointer;
 	return(new_obj);	/* yup */
-	}
-
+    }
+    
     /* we have to go the long way around, it seems.  Check whether 
      * we should GC in the near future
      */
-	if (auto_gc_trigger && bytes_allocated > auto_gc_trigger) {
-	    auto_gc_trigger *= 2;
+    if (auto_gc_trigger && bytes_allocated > auto_gc_trigger) {
+	auto_gc_trigger *= 2;
 	/* set things up so that GC happens when we finish the PA
 	 * section.  */
 	maybe_gc_pending=1;
 	SetSymbolValue(PSEUDO_ATOMIC_INTERRUPTED, make_fixnum(1),th);
-	}
+    }
     new_obj = gc_alloc_with_region(nbytes,0,region,0);
     return (new_obj);
-	}
+}
 
 
 /*
