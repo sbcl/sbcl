@@ -146,6 +146,8 @@ struct thread * create_thread_struct(lispobj initial_function) {
     th->binding_stack_pointer=th->binding_stack_start;
     th->this=th;
     th->os_thread=0;
+    th->interrupt_fun=NIL;
+    th->interrupt_fun_lock=0;
     th->state=STATE_STOPPED;
 #ifdef LISP_FEATURE_STACK_GROWS_DOWNWARD_NOT_UPWARD
     th->alien_stack_pointer=((void *)th->alien_stack_start
@@ -361,17 +363,38 @@ void unblock_sigcont_and_sleep(void)
 
 int interrupt_thread(os_thread_t pid, lispobj function)
 {
+    struct thread *th;
 #ifdef USE_LINUX_CLONE
     union sigval sigval;
-    struct thread *th;
     sigval.sival_int=function;
-    for_each_thread(th) 
-	if((th->pid==pid) && (th->state != STATE_DEAD))
-	    return sigqueue(pid, SIG_INTERRUPT_THREAD, sigval);
-    errno=EPERM; return -1;
-#else
-    lose("interrupt_thread unimplemented");
 #endif
+    for_each_thread(th) 
+	if((th->os_thread==pid) && (th->state != STATE_DEAD)) {
+#ifdef USE_LINUX_CLONE	    
+	    return sigqueue(pid, SIG_INTERRUPT_THREAD, sigval);
+#else
+	    /* In clone_threads, if A and B both interrupt C at approximately 
+	     * the same time, it does not matter: the second signal will be
+	     * masked until the handler has returned from the first one.
+	     * In pthreads though, we can't put the knowledge of what function
+	     * to call into the siginfo, so we have to store it in the 
+	     * destination thread, and do it in such a way that A won't 
+	     * clobber B's interrupt.  Hence this stupid linked list.
+	     *
+	     * This does depend on SIG_INTERRUPT_THREAD being queued
+	     * (as POSIX RT signals are): we need to keep
+	     * interrupt_fun data for exactly as many signals as are
+	     * going to be received by the destination thread.
+	     */
+	    struct cons * c;
+	    get_spinlock(&th->interrupt_fun_lock,arch_os_get_current_thread());
+	    c=alloc_cons(function,th->interrupt_fun);
+	    th->interrupt_fun=c;
+	    release_spinlock(&th->interrupt_fun_lock);
+	    return kill_thread(th->os_thread,SIG_INTERRUPT_THREAD);
+#endif
+	}
+    errno=EPERM; return -1;
 }
 
 int signal_thread_to_dequeue (os_thread_t pid)

@@ -63,6 +63,7 @@
 #include "interr.h"
 #include "genesis/fdefn.h"
 #include "genesis/simple-fun.h"
+#include "genesis/cons.h"
 
 
 
@@ -593,7 +594,7 @@ extern lispobj call_into_lisp(lispobj fun, lispobj *args, int nargs);
 extern void post_signal_tramp(void);
 void arrange_return_to_lisp_function(os_context_t *context, lispobj function)
 {
-#ifndef LISP_FEATURE_X86
+#if !(defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64))
     void * fun=native_pointer(function);
     void *code = &(((struct simple_fun *) fun)->code);
 #endif    
@@ -717,12 +718,21 @@ void interrupt_thread_handler(int num, siginfo_t *info, void *v_context)
 {
     os_context_t *context = (os_context_t*)arch_os_get_context(&v_context);
     struct thread *th=arch_os_get_current_thread();
+    struct cons *c;
     struct interrupt_data *data=
 	th ? th->interrupt_data : global_interrupt_data;
     if(maybe_defer_handler(interrupt_thread_handler,data,num,info,context)){
 	return ;
     }
+#ifdef  USE_LINUX_CLONE	    
     arrange_return_to_lisp_function(context,info->si_value.sival_int);
+#else
+    get_spinlock(&th->interrupt_fun_lock,(long)th);
+    c=((struct cons *)native_pointer(th->interrupt_fun));
+    arrange_return_to_lisp_function(context,c->car);
+    th->interrupt_fun=(lispobj *)(c->cdr);
+    release_spinlock(&th->interrupt_fun_lock);
+#endif
 }
 
 void thread_exit_handler(int num, siginfo_t *info, void *v_context)

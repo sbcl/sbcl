@@ -378,6 +378,8 @@
   (state)				; running, stopping, stopped, dead
   #!+(or x86 x86-64) (pseudo-atomic-atomic)
   #!+(or x86 x86-64) (pseudo-atomic-interrupted)
+  (interrupt-fun)
+  (interrupt-fun-lock)
   (interrupt-data :c-type "struct interrupt_data *" 
 		  :length #!+alpha 2 #!-alpha 1)
   (interrupt-contexts :c-type "os_context_t *" :rest-p t))

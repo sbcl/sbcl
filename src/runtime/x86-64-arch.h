@@ -13,17 +13,17 @@
  * architecture-abstracting patches for CSR's SPARC port. -- WHN 2002-02-15) */
 
 static inline void 
-get_spinlock(lispobj *word,int value)
+get_spinlock(lispobj *word,long value)
 {
 #ifdef LISP_FEATURE_SB_THREAD
-    u32 eax=0;
+    u64 rax=0;
     do {
 	asm ("xor %0,%0\n\
               lock cmpxchg %1,%2" 
-	     : "=a" (eax)
+	     : "=a" (rax)
 	     : "r" (value), "m" (*word)
 	     : "memory", "cc");
-    } while(eax!=0);
+    } while(rax!=0);
 #else
     *word=value;
 #endif
