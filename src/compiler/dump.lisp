@@ -905,9 +905,15 @@
 
 ;;; Dump characters and string-ish things.
 
-(defun dump-character (ch file)
-  (dump-fop 'fop-short-character file)
-  (dump-byte (char-code ch) file))
+(defun dump-character (char file)
+  (let ((code (sb!xc:char-code char)))
+    (cond
+      ((< code 256)
+       (dump-fop 'fop-short-character file)
+       (dump-byte code file))
+      (t
+       (dump-fop 'fop-character file)
+       (dump-unsigned-32 code file)))))
 
 (defun dump-base-chars-of-string (s fasl-output)
   (declare #+sb-xc-host (type simple-string s)

@@ -12,7 +12,7 @@
 
 (in-package "SB!IMPL")
 
-(def!constant sb!xc:char-code-limit 256
+(def!constant sb!xc:char-code-limit #x110000
   #!+sb-doc
   "the upper exclusive bound on values produced by CHAR-CODE")
 

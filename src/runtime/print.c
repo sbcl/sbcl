@@ -536,7 +536,7 @@ static void print_otherptr(lispobj obj)
 #endif
 	    
 	case SIMPLE_BASE_STRING_WIDETAG:
-	case SIMPLE_CHARACTER_STRING_WIDETAG:
+	case SIMPLE_CHARACTER_STRING_WIDETAG: /* FIXME */
 	    NEWLINE_OR_RETURN;
 	    cptr = (char *)(ptr+1);
 	    putchar('"');

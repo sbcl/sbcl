@@ -71,7 +71,7 @@
 	            :n-pad-elements 1
 	            :complex-typecode #.sb!vm:complex-base-string-widetag
 	            :importance 17)
-	 (character ,(code-char 0) 8 simple-character-string
+	 (character ,(code-char 0) 32 simple-character-string
 		    :n-pad-elements 1
 	            :complex-typecode #.sb!vm:complex-character-string-widetag
 	            :importance 17)

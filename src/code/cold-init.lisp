@@ -312,7 +312,7 @@ instead (which is another name for the same thing)."))
 (defun hexstr (thing)
   (/noshow0 "entering HEXSTR")
   (let ((addr (get-lisp-obj-address thing))
-	(str (make-string 10)))
+	(str (make-string 10 :element-type 'base-char)))
     (/noshow0 "ADDR and STR calculated")
     (setf (char str 0) #\0
 	  (char str 1) #\x)

@@ -1070,12 +1070,12 @@
 	    (truly-the index (+ index copy)))
       (sb!sys:without-gcing
        (system-area-copy (vector-sap string)
-			 (* index sb!vm:n-byte-bits)
+			 (* index sb!vm:n-word-bits)
 			 (if (typep buffer 'system-area-pointer)
 			     buffer
 			     (vector-sap buffer))
-			 (* start sb!vm:n-byte-bits)
-			 (* copy sb!vm:n-byte-bits))))
+			 (* start sb!vm:n-word-bits)
+			 (* copy sb!vm:n-word-bits))))
     (if (and (> requested copy) eof-error-p)
 	(error 'end-of-file :stream stream)
 	copy)))

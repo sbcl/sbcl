@@ -61,8 +61,10 @@
 	       (dolist (code char-names-list)
 		 (destructuring-bind (ccode names) code
 		   (dolist (name names)
-		     (results (cons name (code-char ccode))))))
-	       `(defparameter *char-name-alist* ',(results)))))
+		     (results (cons name ccode)))))
+	       `(defparameter *char-name-alist*
+                 (mapcar (lambda (x) (cons (car x) (code-char (cdr x))))
+                         ',(results))))))
   ;; Note: The *** markers here indicate character names which are
   ;; required by the ANSI specification of #'CHAR-NAME. For the others,
   ;; we prefer the ASCII standard name.

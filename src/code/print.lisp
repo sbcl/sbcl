@@ -1262,7 +1262,11 @@
 ;;; [CMUC]<steele>tradix.press. DO NOT EVEN THINK OF ATTEMPTING TO
 ;;; UNDERSTAND THIS CODE WITHOUT READING THE PAPER!
 
-(declaim (type (simple-array character (10)) *digits*))
+;;; and, to add to the confusion: this declaration may look wrong, but
+;;; in fact it's right.  FIXME: it should probably be local to
+;;; FLOAT-STRING, 'cause we're probably not ever going to print floats
+;;; in bases other than 10; then this declaration can go away.
+(declaim (type (simple-array base-char (10)) *digits*))
 (defvar *digits* "0123456789")
 
 (defun flonum-to-string (x &optional width fdigits scale fmin)

@@ -15,34 +15,28 @@
 
 ;;; Move a tagged char to an untagged representation.
 (define-vop (move-to-character)
-  (:args (x :scs (any-reg control-stack) :target al))
-  (:temporary (:sc byte-reg :offset al-offset
-		   :from (:argument 0) :to (:eval 0)) al)
-  (:ignore al)
-  (:temporary (:sc byte-reg :offset ah-offset :target y
-		   :from (:argument 0) :to (:result 0)) ah)
+  (:args (x :scs (any-reg control-stack) :target y))
   (:results (y :scs (character-reg character-stack)))
   (:note "character untagging")
   (:generator 1
-    (move eax-tn x)
-    (move y ah)))
+    (move y x)
+    (inst shr y n-widetag-bits)))
 (define-move-vop move-to-character :move
   (any-reg control-stack) (character-reg character-stack))
 
 ;;; Move an untagged char to a tagged representation.
 (define-vop (move-from-character)
-  (:args (x :scs (character-reg character-stack) :target ah))
-  (:temporary (:sc byte-reg :offset al-offset :target y
-		   :from (:argument 0) :to (:result 0)) al)
-  (:temporary (:sc byte-reg :offset ah-offset
-		   :from (:argument 0) :to (:result 0)) ah)
-  (:results (y :scs (any-reg descriptor-reg control-stack)))
+  (:args (x :scs (character-reg character-stack)))
+  (:results (y :scs (any-reg descriptor-reg)))
   (:note "character tagging")
   (:generator 1
-    (move ah x)				; Maybe move char byte.
-    (inst mov al character-widetag)	; x86 to type bits
-    (inst and eax-tn #xffff)		; Remove any junk bits.
-    (move y eax-tn)))
+    ;; FIXME: is this inefficient?  Is there a better way of writing
+    ;; it?  (fixnum tagging is done with LEA).  We can't use SHL
+    ;; because we either scribble over the source register or briefly
+    ;; have a non-descriptor in a descriptor register, unless we
+    ;; introduce a temporary.
+    (inst imul y x (ash 1 n-widetag-bits))
+    (inst or y character-widetag)))
 (define-move-vop move-from-character :move
   (character-reg character-stack) (any-reg descriptor-reg control-stack))
 
@@ -74,9 +68,10 @@
       (character-reg
        (move y x))
       (character-stack
-       (inst mov
-	     (make-ea :byte :base fp :disp (- (* (1+ (tn-offset y)) 4)))
-	     x)))))
+       ;; copied blindly.  No idea if it's right
+       (if (= (tn-offset fp) esp-offset)
+	   (storew x fp (tn-offset y))	; c-call
+	   (storew x fp (- (1+ (tn-offset y)))))))))
 (define-move-vop move-character-arg :move-arg
   (any-reg character-reg) (character-reg))
 
@@ -95,21 +90,17 @@
   (:results (res :scs (unsigned-reg)))
   (:result-types positive-fixnum)
   (:generator 1
-    (inst movzx res ch)))
+    (inst mov res ch)))
 
 (define-vop (code-char)
   (:translate code-char)
   (:policy :fast-safe)
-  (:args (code :scs (unsigned-reg unsigned-stack) :target eax))
+  (:args (code :scs (unsigned-reg unsigned-stack)))
   (:arg-types positive-fixnum)
-  (:temporary (:sc unsigned-reg :offset eax-offset :target res
-		   :from (:argument 0) :to (:result 0))
-	      eax)
   (:results (res :scs (character-reg)))
   (:result-types character)
   (:generator 1
-    (move eax code)
-    (move res al-tn)))
+    (inst mov res code)))
 
 ;;; comparison of CHARACTERs
 (define-vop (character-compare)

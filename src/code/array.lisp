@@ -94,7 +94,7 @@
     ((base-char standard-char)
      (values #.sb!vm:simple-base-string-widetag #.sb!vm:n-byte-bits))
     ((character)
-     (values #.sb!vm:simple-character-string-widetag #.sb!vm:n-byte-bits))
+     (values #.sb!vm:simple-character-string-widetag #.sb!vm:n-word-bits))
     ((bit)
      (values #.sb!vm:simple-bit-vector-widetag 1))
     ;; OK, we have to wade into SUBTYPEPing after all.

@@ -777,7 +777,7 @@
 (deftransform concatenate ((rtype &rest sequences)
 			   (t &rest (or simple-base-string
 					(simple-array nil (*))))
-			   (simple-array character (*))
+			   (simple-array base-string (*))
 			   :policy (< safety 3))
   (loop for rest-seqs on sequences
         for n-seq = (gensym "N-SEQ")
@@ -801,7 +801,8 @@
              (declare (ignore rtype))
              (let* (,@lets
                       (res (make-string (truncate (the index (+ ,@all-lengths))
-                                                  sb!vm:n-byte-bits))))
+                                                  sb!vm:n-byte-bits)
+                                        :element-type 'base-char)))
                (declare (type index ,@all-lengths))
                (let (,@(mapcar (lambda (name) `(,name 0)) starts))
                  (declare (type index ,@starts))

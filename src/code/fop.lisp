@@ -71,17 +71,28 @@
 ;;; of like READ-SEQUENCE specialized for files of (UNSIGNED-BYTE 8),
 ;;; with an automatic conversion from (UNSIGNED-BYTE 8) into CHARACTER
 ;;; for each element read
-(declaim (ftype (function (stream simple-string &optional index) (values)) read-string-as-bytes))
+(declaim (ftype (function (stream simple-string &optional index) (values))
+                read-string-as-bytes read-string-as-words))
 (defun read-string-as-bytes (stream string &optional (length (length string)))
   (dotimes (i length)
     (setf (aref string i)
-	  (code-char (read-byte stream))))
+	  (sb!xc:code-char (read-byte stream))))
   ;; FIXME: The classic CMU CL code to do this was
   ;;   (READ-N-BYTES FILE STRING START END).
   ;; It was changed for SBCL because we needed a portable version for
   ;; bootstrapping. Benchmark the non-portable version and see whether it's
   ;; significantly better than the portable version here. If it is, then use
   ;; add as an alternate definition, protected with #-SB-XC-HOST.
+  (values))
+(defun read-string-as-words (stream string &optional (length (length string)))
+  #+sb-xc-host (bug "READ-STRING-AS-WORDS called")
+  (dotimes (i length)
+    (setf (aref string i)
+	  (sb!xc:code-char (logior
+                            (read-byte stream)
+                            (ash (read-byte stream) 8)
+                            (ash (read-byte stream) 16)
+                            (ash (read-byte stream) 24)))))
   (values))
 
 ;;;; miscellaneous fops
@@ -123,11 +134,8 @@
   #-sb-xc-host
   (%primitive sb!c:make-other-immediate-type 0 sb!vm:unbound-marker-widetag))
 
-;;; CMU CL had FOP-CHARACTER as fop 68, but it's not needed in current
-;;; SBCL as we have no extended characters, only 1-byte characters.
-;;; (Ditto for CMU CL, actually: FOP-CHARACTER was speculative generality.)
-(define-fop (fop-short-character 69)
-  (code-char (read-arg 1)))
+(define-cloned-fops (fop-character 68) (fop-short-character 69)
+  (code-char (clone-arg)))
 
 (define-cloned-fops (fop-struct 48) (fop-small-struct 49)
   (let* ((size (clone-arg))
@@ -183,7 +191,12 @@
 			      (make-string (* ,n-size 2))))
 		      (done-with-fast-read-byte)
 		      (let ((,n-buffer *fasl-symbol-buffer*))
-			(read-string-as-bytes *fasl-input-stream*
+                        #+sb-xc-host
+                        (read-string-as-bytes *fasl-input-stream*
+                                              ,n-buffer
+                                              ,n-size)
+                        #-sb-xc-host
+			(read-string-as-words *fasl-input-stream*
 					      ,n-buffer
 					      ,n-size)
 			(push-fop-table (without-package-locks
@@ -232,7 +245,7 @@
 		    (fop-uninterned-small-symbol-save 13)
   (let* ((arg (clone-arg))
 	 (res (make-string arg)))
-    (read-string-as-bytes *fasl-input-stream* res)
+    (read-string-as-words *fasl-input-stream* res)
     (push-fop-table (make-symbol res))))
 
 (define-fop (fop-package 14)
@@ -350,10 +363,15 @@
     (read-string-as-bytes *fasl-input-stream* res)
     res))
 
+#+sb-xc-host
+(define-cloned-fops (fop-character-string 161) (fop-small-character-string 162)
+  (bug "CHARACTER-STRING FOP encountered"))
+
+#-sb-xc-host
 (define-cloned-fops (fop-character-string 161) (fop-small-character-string 162)
   (let* ((arg (clone-arg))
 	 (res (make-string arg)))
-    (read-string-as-bytes *fasl-input-stream* res)
+    (read-string-as-words *fasl-input-stream* res)
     res))
 
 (define-cloned-fops (fop-vector 39) (fop-small-vector 40)
@@ -629,7 +647,7 @@ bug.~:@>")
   (let* ((kind (pop-stack))
 	 (code-object (pop-stack))
 	 (len (read-arg 1))
-	 (sym (make-string len)))
+	 (sym (make-string len :element-type 'base-char)))
     (read-n-bytes *fasl-input-stream* sym 0 len)
     (sb!vm:fixup-code-object code-object
 			     (read-arg 4)

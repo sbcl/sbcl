@@ -4,7 +4,7 @@ never going to want to distinguish the CHARACTERness vs BASE-CHARness
 of characters by their widetags, because we can do it based on their
 CHAR-CODE; thus, calling the primitive type and storage classes
 BASE-CHAR is unneccesarily confusing.)
-  -- done for x86, ppc;
+  -- done for x86, ppc (Julian Squires);
   -- TODO: sparc, mips, hppa, alpha.
 
 ** implement a CHARACTER-SET-TYPE representation for sets of
@@ -36,7 +36,7 @@ support the whole of Unicode; or (c) add an extra level of indirection
 for strings so that the storage compaction can be mutated on demand,
 with garbage collector support.  None of these strategies is
 particularly appealing.)
-  -- done for x86, ppc:
+  -- done for x86, ppc (Julian Squires):
      >> cold init runs;
      >> warm load runs to completion;
      >> all contribs build and pass self-tests;

@@ -73,9 +73,12 @@
 	 (make-pathname :directory '(:relative "contrib" :wild-inferiors)
 			:name :wild :type :wild)
 	 sys)))
+  (sb-int:/show "about to set SYS logical pathname translations")
   (setf (logical-pathname-translations "SYS")
 	`(("SYS:SRC;**;*.*.*" ,src)
 	  ("SYS:CONTRIB;**;*.*.*" ,contrib))))
+
+(sb-int:/show "set SYS logical pathname translations")
 
 ;;; FIXME: CMU CL's pclcom.lisp had extra optional stuff wrapped around
 ;;; COMPILE-PCL, at least some of which we should probably have too:
@@ -175,7 +178,7 @@
 		;; facility, and should be compiled and loaded after
 		;; our DESCRIBE facility is compiled and loaded.
 		"SRC;PCL;DESCRIBE"))
-
+  (sb-int:/show "at head of DOLIST")
   (let ((fullname (concatenate 'string "SYS:" stem ".LISP")))
     (sb-int:/show "about to compile" fullname)
     (flet ((report-recompile-restart (stream)

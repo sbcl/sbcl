@@ -1248,7 +1248,7 @@
   (:results (value :scs (character-reg)))
   (:result-types character)
   (:generator 5
-    (inst mov value
+    (inst movzx value
 	  (make-ea :byte :base object :index index :scale 1
 		   :disp (- (* vector-data-offset n-word-bytes)
 			    other-pointer-lowtag)))))
@@ -1262,7 +1262,7 @@
   (:results (value :scs (character-reg)))
   (:result-types character)
   (:generator 4
-    (inst mov value
+    (inst movzx value
 	  (make-ea :byte :base object
 		   :disp (- (+ (* vector-data-offset n-word-bytes) index)
 			    other-pointer-lowtag)))))
@@ -1272,16 +1272,20 @@
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg) :to (:eval 0))
 	 (index :scs (unsigned-reg) :to (:eval 0))
-	 (value :scs (character-reg) :target result))
+	 (value :scs (character-reg) :target eax))
   (:arg-types simple-base-string positive-fixnum character)
+  (:temporary (:sc character-reg :offset eax-offset :target result
+                   :from (:argument 2) :to (:result 0))
+              eax)
   (:results (result :scs (character-reg)))
   (:result-types character)
   (:generator 5
+    (move eax value)
     (inst mov (make-ea :byte :base object :index index :scale 1
 		       :disp (- (* vector-data-offset n-word-bytes)
 				other-pointer-lowtag))
-	  value)
-    (move result value)))
+	  al-tn)
+    (move result eax)))
 
 (define-vop (data-vector-set-c/simple-base-string)
   (:translate data-vector-set)
@@ -1290,28 +1294,26 @@
 	 (value :scs (character-reg)))
   (:info index)
   (:arg-types simple-base-string (:constant (signed-byte 30)) character)
+  (:temporary (:sc unsigned-reg :offset eax-offset :target result
+                   :from (:argument 1) :to (:result 0))
+              eax)
   (:results (result :scs (character-reg)))
   (:result-types character)
   (:generator 4
-   (inst mov (make-ea :byte :base object
-		      :disp (- (+ (* vector-data-offset n-word-bytes) index)
-			       other-pointer-lowtag))
-	 value)
-   (move result value)))
+    (move eax value)
+    (inst mov (make-ea :byte :base object
+                       :disp (- (+ (* vector-data-offset n-word-bytes) index)
+                                other-pointer-lowtag))
+          al-tn)
+    (move result eax)))
 
-(define-vop (data-vector-ref/simple-character-string
-	     data-vector-ref/simple-base-string)
-  (:arg-types simple-character-string positive-fixnum))
-(define-vop (data-vector-ref-c/simple-character-string
-	     data-vector-ref-c/simple-base-string)
-  (:arg-types simple-character-string (:constant (signed-byte 30))))
+(define-full-reffer data-vector-ref/simple-character-string
+    simple-character-string vector-data-offset other-pointer-lowtag
+    (character-reg) character data-vector-ref)
 
-(define-vop (data-vector-set/simple-character-string
-	     data-vector-set/simple-base-string)
-  (:arg-types simple-character-string positive-fixnum character))
-(define-vop (data-vector-set-c/simple-character-string
-	     data-vector-set-c/simple-base-string)
-  (:arg-types simple-character-string (:constant (signed-byte 30)) character))
+(define-full-setter data-vector-ref/simple-character-string
+    simple-character-string vector-data-offset other-pointer-lowtag
+    (character-reg) character data-vector-set)
 
 ;;; signed-byte-8
 

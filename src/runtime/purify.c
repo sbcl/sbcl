@@ -934,7 +934,7 @@ ptrans_otherptr(lispobj thing, lispobj header, boolean constant)
         return ptrans_vector(thing, 8, 1, 0, constant);
 	
     case SIMPLE_CHARACTER_STRING_WIDETAG:
-	return ptrans_vector(thing, 8, 1, 0, constant);
+	return ptrans_vector(thing, 32, 1, 0, constant);
 	
     case SIMPLE_BIT_VECTOR_WIDETAG:
         return ptrans_vector(thing, 1, 0, 0, constant);
@@ -1159,7 +1159,7 @@ pscav(lispobj *addr, int nwords, boolean constant)
 
 	    case SIMPLE_CHARACTER_STRING_WIDETAG:
 		vector = (struct vector *)addr;
-		count = CEILING(NWORDS(fixnum_value(vector->length)+1,8)+2,2);
+		count = CEILING(NWORDS(fixnum_value(vector->length)+1,32)+2,2);
 		break;
 
 	    case SIMPLE_BIT_VECTOR_WIDETAG:
