@@ -846,7 +846,6 @@
 (defun preprocessor-macroexpand-1 (form)
   (handler-case (sb!xc:macroexpand-1 form *lexenv*)
     (error (condition)
-      (signal condition)
       (compiler-error "(during macroexpansion of ~A)~%~A"
 		      (let ((*print-level* 1)
 			    (*print-length* 2))
