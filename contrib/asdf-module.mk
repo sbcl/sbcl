@@ -3,8 +3,10 @@ export CC
 
 all: 
 	$(MAKE) -C ../asdf
-	echo "(asdf:operate 'asdf:load-op :$(SYSTEM) :force t)" | \
-	  $(SBCL) --eval '(load "../asdf/asdf")'
+	$(SBCL) --eval '(load "../asdf/asdf")' \
+	  --eval "(setf asdf::*central-registry* '((MERGE-PATHNAMES \"systems/\" (TRUENAME (SB-EXT:POSIX-GETENV \"SBCL_HOME\")))))" \
+	  --eval "(asdf:operate 'asdf:load-op :$(SYSTEM) :force t)" \
+	  --eval "(quit)"
 
 test: all
 	echo "(asdf:operate (quote asdf:load-op) :$(SYSTEM)) "\

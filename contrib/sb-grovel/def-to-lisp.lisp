@@ -43,8 +43,11 @@
     (format stream "main() { ~%
 printf(\"(in-package ~S)\\\n\");~%" package-name)  
     (format stream "printf(\"(cl:deftype int () '(%ssigned-byte %d))\\\n\",SIGNED_(int),8*sizeof (int));~%")
-    (format stream "printf(\"(cl:deftype char () '(unsigned-byte %d))\\\n\",SIGNED_(char),8*sizeof (char));~%")
-    (format stream "printf(\"(cl:deftype long () '(unsigned-byte %d))\\\n\",SIGNED_(long),8*sizeof (long));~%")
+    (format stream "printf(\"(cl:deftype char () '(%ssigned-byte %d))\\\n\",SIGNED_(char),8*sizeof (char));~%")
+    (format stream "printf(\"(cl:deftype long () '(%ssigned-byte %d))\\\n\",SIGNED_(long),8*sizeof (long));~%")
+    (format stream "printf(\"(cl:defconstant size-of-int %d)\\\n\",sizeof (int));~%")
+    (format stream "printf(\"(cl:defconstant size-of-char %d)\\\n\",sizeof (char));~%")
+    (format stream "printf(\"(cl:defconstant size-of-long %d)\\\n\",sizeof (long));~%")
     (dolist (def definitions)
       (destructuring-bind (type lispname cname &optional doc) def
         (cond ((eq type :integer)

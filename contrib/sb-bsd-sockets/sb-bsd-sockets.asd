@@ -1,40 +1,8 @@
 ;;; -*-  Lisp -*-
-
-(defpackage #:sb-bsd-sockets-system (:use #:asdf #:cl))
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (require :sb-grovel))
+(defpackage #:sb-bsd-sockets-system (:use #:asdf #:sb-grovel #:cl))
 (in-package #:sb-bsd-sockets-system)
-
-;;; constants.lisp requires special treatment
-
-(defclass constants-file (cl-source-file) ())
-
-(defmethod perform ((op compile-op) (component constants-file))
-  ;; we want to generate all our temporary files in the fasl directory
-  ;; because that's where we have write permission.  Can't use /tmp;
-  ;; it's insecure (these files will later be owned by root)
-  (let* ((output-file (car (output-files op component)))
-	 (filename (component-pathname component))
-	 (real-output-file
-	  (if (typep output-file 'logical-pathname)
-	      (translate-logical-pathname output-file)
-	      (pathname output-file)))
-	 (tmp-c-source (merge-pathnames #p"foo.c" real-output-file))
-	 (tmp-a-dot-out (merge-pathnames #p"a.out" real-output-file))
-	 (tmp-constants (merge-pathnames #p"constants.lisp-temp"
-					 real-output-file)))
-    (princ (list filename output-file real-output-file
-		 tmp-c-source tmp-a-dot-out tmp-constants))
-    (terpri)
-    (funcall (intern "C-CONSTANTS-EXTRACT"
-		     (find-package "SB-BSD-SOCKETS-SYSTEM"))
-	     filename tmp-c-source :sb-bsd-sockets-internal)
-    (and
-     (= (run-shell-command "gcc -o ~S ~S" (namestring tmp-a-dot-out)
-	 (namestring tmp-c-source)) 0)
-     (= (run-shell-command "~A >~A"
-			   (namestring tmp-a-dot-out)
-			   (namestring tmp-constants)) 0)
-     (compile-file tmp-constants :output-file output-file))))
-
 
 ;;; we also have a shared library with some .o files in it
 
@@ -94,7 +62,7 @@
 
 (defsystem sb-bsd-sockets
     :version "0.58"
-    :depends-on (sb-rt)
+    :depends-on (sb-rt sb-grovel)
     :components ((:file "defpackage")
 		 (:file "split" :depends-on ("defpackage"))
                  (:file "array-data" :depends-on ("defpackage"))
@@ -103,10 +71,10 @@
 					 (:c-source-file "get-h-errno")))
 		 (:file "malloc" :depends-on ("defpackage"))
 		 (:file "foreign-glue" :depends-on ("defpackage" "malloc"))
-		 (:constants-file "constants"
-				  :pathname "constants.lisp"
-				  :depends-on
-				  ("def-to-lisp" "defpackage" "foreign-glue"))
+		 (sb-grovel:grovel-constants-file
+		  "constants"
+		  :package :sockint  :pathname "constants.lisp"
+		  :depends-on  ("def-to-lisp" "defpackage" "foreign-glue"))
 		 (:file "sockets"
 			:depends-on ("constants" "array-data"))
 		 
