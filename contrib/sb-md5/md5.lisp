@@ -536,6 +536,10 @@ in SEQUENCE , which must be a vector with element-type (UNSIGNED-BYTE
     (finalize-md5-state state)))
 
 (defun md5sum-string (string &key (external-format :default) (start 0) end)
+  "Calculate the MD5 message-digest of the binary representation
+of STRING (as octets) in EXTERNAL-FORMAT. The boundaries START
+and END refer to character positions in the string, not to octets
+in the resulting binary representation."
   (declare (optimize (speed 3) (space 0) (debug 0))
            (type string string))
   (md5sum-sequence

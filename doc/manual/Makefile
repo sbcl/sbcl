@@ -18,6 +18,13 @@ MODULES=':sb-md5 :sb-rotate-byte :sb-grovel :sb-sprof :sb-bsd-sockets'
 # List of package names that docstring docs will be created for.
 PACKAGES=":COMMON-LISP :SB-ALIEN :SB-DEBUG :SB-EXT :SB-GRAY :SB-MOP :SB-PROFILE :SB-THREAD :SB-MD5 :SB-ROTATE-BYTE :SB-SPROF :SB-BSD-SOCKETS"
 
+# SBCL_SYSTEM is an optional argument to this make program. If this
+# variable is set, its contents are used as the command line for
+# invoking SBCL.
+
+# When passing a non-standard SBCL_SYSTEM, be sure to set the
+# environment variable SBCL_HOME to a useful value, as well.
+
 ifeq ($(MAKEINFO),)
   MAKEINFO:=makeinfo
 endif
@@ -80,7 +87,7 @@ info: $(INFOFILES)
 docstrings: tempfiles-stamp
 
 tempfiles-stamp:
-	DOCSTRINGDIR=$(DOCSTRINGDIR) PACKAGES=$(PACKAGES) MODULES=$(MODULES) sh make-tempfiles.sh && touch tempfiles-stamp
+	DOCSTRINGDIR=$(DOCSTRINGDIR) PACKAGES=$(PACKAGES) MODULES=$(MODULES) sh make-tempfiles.sh "$(SBCL_SYSTEM)" && touch tempfiles-stamp
 
 
 .PHONY: clean

@@ -13,15 +13,20 @@
 
 # We create the documentation from the in-tree sbcl if it is found,
 # else an installed sbcl is used.
-sbclsystem=`pwd`/../../src/runtime/sbcl
-sbclcore=`pwd`/../../output/sbcl.core
 
-if [ -e $sbclsystem ] && [ -e $sbclcore ] 
+if [ -z "$1" ]
 then
-    SBCLRUNTIME="${1:-$sbclsystem --core $sbclcore}"
-    export SBCL_HOME=`pwd`/../../contrib
+    sbclsystem=`pwd`/../../src/runtime/sbcl
+    sbclcore=`pwd`/../../output/sbcl.core
+    if [ -e $sbclsystem ] && [ -e $sbclcore ]
+    then
+        SBCLRUNTIME="$sbclsystem --core $sbclcore"
+        SBCL_HOME=`pwd`/../../contrib; export SBCL_HOME
+    else
+        SBCLRUNTIME="`which sbcl`"
+    fi
 else
-    SBCLRUNTIME="${1:-`which sbcl`}"
+    SBCLRUNTIME="$1"
 fi
 
 SBCL="$SBCLRUNTIME --noinform --sysinit /dev/null --userinit /dev/null --noprint --disable-debugger"
