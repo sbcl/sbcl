@@ -293,12 +293,24 @@
   (assert-program-error (defclass foo004 ()
 			  ((a :silly t))))
   ;; and some more, found by Wolfhard Buss and fixed for cmucl by Gerd
-  ;; Moellmann in 0.7.8.x:
+  ;; Moellmann in sbcl-0.7.8.x:
   (assert-program-error (progn
 			  (defmethod odd-key-args-checking (&key (key 42)) key)
 			  (odd-key-args-checking 3)))
   (assert (= (odd-key-args-checking) 42))
-  (assert (eq (odd-key-args-checking :key t) t)))
+  (assert (eq (odd-key-args-checking :key t) t))
+  ;; yet some more, fixed in sbcl-0.7.9.xx
+  (assert-program-error (defclass foo005 ()
+			  (:metaclass sb-pcl::funcallable-standard-class)
+			  (:metaclass 1)))
+  (assert-program-error (defclass foo006 ()
+			  ((a :reader (setf a)))))
+  (assert-program-error (defclass foo007 ()
+			  ((a :initarg 1))))
+  (assert-program-error (defclass foo008 ()
+			  (a :initarg :a)
+			  (:default-initargs :a 1)
+			  (:default-initargs :a 2))))
 
 ;;; DOCUMENTATION's argument-precedence-order wasn't being faithfully
 ;;; preserved through the bootstrap process until sbcl-0.7.8.39.
