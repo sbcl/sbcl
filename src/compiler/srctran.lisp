@@ -29,7 +29,7 @@
 (define-source-transform identity (x) `(prog1 ,x))
 (define-source-transform values (x) `(prog1 ,x))
 
-;;; Bind the value and make a closure that returns them.
+;;; Bind the value and make a closure that returns it.
 (define-source-transform constantly (value)
   (let ((rest (gensym "CONSTANTLY-REST-"))
 	(n-value (gensym "CONSTANTLY-VALUE-")))

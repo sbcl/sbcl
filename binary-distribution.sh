@@ -15,4 +15,10 @@ tar -cf $b-binary.tar \
     $b/BUGS $b/COPYING $b/CREDITS $b/INSTALL $b/NEWS $b/README \
     $b/install.sh \
     $b/doc/sbcl.1 \
-    $b/pubring.pgp
+    $b/pubring.pgp \
+    $b/contrib/vanilla-module.mk \
+    `for dir in $b/contrib/*; do 
+         if test -d $dir && test -e $dir/Makefile; then 
+             echo $dir
+         fi
+     done`

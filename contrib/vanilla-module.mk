@@ -4,5 +4,5 @@ $(MODULE).fasl: $(MODULE).lisp
 
 test:: $(MODULE).fasl
 
-install: test
+install:
 	cp $(MODULE).fasl $(INSTALL_DIR)

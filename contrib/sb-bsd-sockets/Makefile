@@ -11,6 +11,6 @@ test: all
 	  $(SBCL) --eval '(load "../asdf/asdf")'
 
 
-install: test
+install:
 	tar cf - . | ( cd $(INSTALL_DIR) && tar xpvf - )
 	( cd  $(SBCL_HOME)/systems && ln -fs ../$(SYSTEM)/$(SYSTEM).asd . )
