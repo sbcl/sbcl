@@ -1461,6 +1461,14 @@
        (TAGBODY (THE INTEGER (CATCH 'CT4 (LOGORC1 C -15950))) 1)
        B))))
 
+(compile nil
+  '(lambda (buffer i end)
+    (declare (optimize (debug 3)))
+    (loop (when (not (eql 0 end)) (return)))
+    (let ((s (make-string end)))
+      (setf (schar s i) (schar buffer i))
+      s)))
+
 ;;; check that constant string prefix and suffix don't cause the
 ;;; compiler to emit code deletion notes.
 (handler-bind ((sb-ext:code-deletion-note #'error))

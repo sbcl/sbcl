@@ -276,8 +276,7 @@
         (dolist (block (block-pred old-block))
           (change-block-successor block old-block new-block))
 
-        (ir1-convert new-start ctran filtered-lvar
-                     `(locally (declare (optimize (insert-step-conditions 0))) ,form))
+        (ir1-convert new-start ctran filtered-lvar form)
 
         ;; KLUDGE: Comments at the head of this function in CMU CL
         ;; said that somewhere in here we

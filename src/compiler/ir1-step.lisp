@@ -64,7 +64,8 @@
                     `(locally (declare (optimize (insert-step-conditions 0)))
                       (step-variable ,form-string ,form))))
       (list
-       (let* ((*step-arguments-p* (policy *lexenv* (= insert-step-conditions 3)))
+       (let* ((*step-arguments-p* (and *allow-instrumenting*
+                                       (policy *lexenv* (= insert-step-conditions 3))))
               (step-form `(step-form ,form-string
                                      ',(source-path-original-source *current-path*)
                                      *compile-file-pathname*))
@@ -88,7 +89,8 @@
                          ;; KLUDGE: packages we're not interested in stepping.
                          (mapcar #'find-package '(sb!c sb!int sb!impl sb!kernel sb!pcl)))))))
     (let ((lexenv *lexenv*))
-      (and (policy lexenv (>= insert-step-conditions 2))
+      (and *allow-instrumenting*
+           (policy lexenv (>= insert-step-conditions 2))
            (cond ((consp form)
                   (let ((op (car form)))
                     (or (and (consp op) (eq 'lambda (car op)))
@@ -99,6 +101,7 @@
                              (step-symbol-p op)))))
                  ((symbolp form)
                   (and *step-arguments-p*
+                       *allow-instrumenting*
                        (policy lexenv (= insert-step-conditions 3))
                        (not (consp (lexenv-find form vars)))
                        (not (constantp form))

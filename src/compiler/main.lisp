@@ -28,7 +28,8 @@
 		  #!+sb-show *compiler-trace-output*
 		  *last-source-context* *last-original-source*
 		  *last-source-form* *last-format-string* *last-format-args*
-		  *last-message-count* *lexenv* *fun-names-in-this-file*))
+		  *last-message-count* *lexenv* *fun-names-in-this-file*
+                  *allow-instrumenting*))
 
 ;;; Whether call of a function which cannot be defined causes a full
 ;;; warning.
@@ -914,14 +915,11 @@
     (setf (component-name component)
 	  (debug-namify "~S initial component" name))
     (setf (component-kind component) :initial)
-    (let* ((locall-fun (ir1-convert-lambdalike
-                        definition
-                        :debug-name (debug-namify "top level local call "
-						  name)
-			;; KLUDGE: we do this so that we get to have
-			;; nice debug returnness in functions defined
-			;; from the REPL
-			:allow-debug-catch-tag t))
+    (let* ((locall-fun (let ((*allow-instrumenting* t))
+                         (ir1-convert-lambdalike
+                          definition
+                          :debug-name (debug-namify "top level local call "
+                                                    name))))
            (fun (ir1-convert-lambda (make-xep-lambda-expression locall-fun)
 				    :source-name (or name '.anonymous.)
 				    :debug-name (unless name
@@ -955,7 +953,8 @@
 		  '(original-source-start 0 0)))
   (when name
     (legal-fun-name-or-type-error name))
-  (let* ((*lexenv* (make-lexenv :policy *policy*
+  (let* (
+         (*lexenv* (make-lexenv :policy *policy*
 				:handled-conditions *handled-conditions*
 				:disabled-package-locks *disabled-package-locks*))
          (fun (make-functional-from-toplevel-lambda lambda-expression
@@ -1403,6 +1402,7 @@
         (*source-info* info)
         (*toplevel-lambdas* ())
         (*fun-names-in-this-file* ())
+        (*allow-instrumenting* nil)
         (*compiler-error-bailout*
          (lambda ()
            (compiler-mumble "~2&; fatal error, aborting compilation~%")

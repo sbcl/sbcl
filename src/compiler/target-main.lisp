@@ -48,6 +48,7 @@
 	     (*source-info* (make-lisp-source-info form))
 	     (*toplevel-lambdas* ())
 	     (*block-compile* nil)
+             (*allow-instrumenting* nil)
 	     (*compiler-error-bailout*
 	      (lambda (&optional error)
                 (declare (ignore error))

@@ -840,8 +840,7 @@
 
 ;;; Convert a LAMBDA form into a LAMBDA leaf or an OPTIONAL-DISPATCH leaf.
 (defun ir1-convert-lambda (form &key (source-name '.anonymous.)
-                           debug-name
-                           allow-debug-catch-tag)
+                           debug-name)
 
   (unless (consp form)
     (compiler-error "A ~S was found when expecting a lambda expression:~%  ~S"
@@ -857,35 +856,34 @@
      "The lambda expression has a missing or non-list lambda list:~%  ~S"
      form))
 
-  (let ((*allow-debug-catch-tag* (and *allow-debug-catch-tag* allow-debug-catch-tag)))
-    (multiple-value-bind (vars keyp allow-other-keys aux-vars aux-vals)
-	(make-lambda-vars (cadr form))
-      (multiple-value-bind (forms decls) (parse-body (cddr form))
-	(binding* (((*lexenv* result-type)
-                    (process-decls decls (append aux-vars vars) nil))
-                   (forms (if (and *allow-debug-catch-tag*
-                                   (policy *lexenv* (>= insert-debug-catch 2)))
-                              `((catch (locally (declare (optimize (insert-step-conditions 0)))
-                                         (make-symbol "SB-DEBUG-CATCH-TAG"))
-                                  ,@forms))
-                              forms))
-                   (forms (if (eq result-type *wild-type*)
-                              forms
-                              `((the ,result-type (progn ,@forms)))))
-                   (res (if (or (find-if #'lambda-var-arg-info vars) keyp)
-                            (ir1-convert-hairy-lambda forms vars keyp
-                                                      allow-other-keys
-                                                      aux-vars aux-vals
-                                                      :source-name source-name
-                                                      :debug-name debug-name)
-                            (ir1-convert-lambda-body forms vars
-                                                     :aux-vars aux-vars
-                                                     :aux-vals aux-vals
-                                                     :source-name source-name
-                                                     :debug-name debug-name))))
-	  (setf (functional-inline-expansion res) form)
-	  (setf (functional-arg-documentation res) (cadr form))
-	  res)))))
+  (multiple-value-bind (vars keyp allow-other-keys aux-vars aux-vals)
+      (make-lambda-vars (cadr form))
+    (multiple-value-bind (forms decls) (parse-body (cddr form))
+      (binding* (((*lexenv* result-type)
+                  (process-decls decls (append aux-vars vars) nil))
+                 (forms (if (and *allow-instrumenting*
+                                 (policy *lexenv* (>= insert-debug-catch 2)))
+                            `((catch (locally (declare (optimize (insert-step-conditions 0)))
+                                       (make-symbol "SB-DEBUG-CATCH-TAG"))
+                                ,@forms))
+                            forms))
+                 (forms (if (eq result-type *wild-type*)
+                            forms
+                            `((the ,result-type (progn ,@forms)))))
+                 (res (if (or (find-if #'lambda-var-arg-info vars) keyp)
+                          (ir1-convert-hairy-lambda forms vars keyp
+                                                    allow-other-keys
+                                                    aux-vars aux-vals
+                                                    :source-name source-name
+                                                    :debug-name debug-name)
+                          (ir1-convert-lambda-body forms vars
+                                                   :aux-vars aux-vars
+                                                   :aux-vals aux-vals
+                                                   :source-name source-name
+                                                   :debug-name debug-name))))
+        (setf (functional-inline-expansion res) form)
+        (setf (functional-arg-documentation res) (cadr form))
+        res))))
 
 ;;; helper for LAMBDA-like things, to massage them into a form
 ;;; suitable for IR1-CONVERT-LAMBDA.
@@ -897,8 +895,8 @@
 ;;; 2003-01-25
 (defun ir1-convert-lambdalike (thing &rest args
 			       &key (source-name '.anonymous.)
-			       debug-name allow-debug-catch-tag)
-  (declare (ignorable source-name debug-name allow-debug-catch-tag))
+			       debug-name)
+  (declare (ignorable source-name debug-name))
   (ecase (car thing)
     ((lambda) (apply #'ir1-convert-lambda thing args))
     ((instance-lambda)
@@ -935,9 +933,7 @@
 ;;; reflect the state at the definition site.
 (defun ir1-convert-inline-lambda (fun &key
 				      (source-name '.anonymous.)
-				      debug-name
-				      allow-debug-catch-tag)
-  (declare (ignore allow-debug-catch-tag))
+				      debug-name)
   (destructuring-bind (decls macros symbol-macros &rest body)
 		      (if (eq (car fun) 'lambda-with-lexenv)
 			  (cdr fun)
@@ -953,8 +949,7 @@
 		     :policy (lexenv-policy *lexenv*))))
       (ir1-convert-lambda `(lambda ,@body)
 			  :source-name source-name
-			  :debug-name debug-name
-			  :allow-debug-catch-tag nil))))
+			  :debug-name debug-name))))
 
 ;;; Get a DEFINED-FUN object for a function we are about to define. If
 ;;; the function has been forward referenced, then substitute for the

@@ -86,6 +86,12 @@
 (defvar *constants*)
 (declaim (type hash-table *constants*))
 
+;;; *ALLOW-INSTRUMENTING* controls whether we should allow the
+;;; insertion of instrumenting code (like a (CATCH ...)) around code
+;;; to allow the debugger RETURN and STEP commands to function (we
+;;; disallow it for internal stuff).
+(defvar *allow-instrumenting*)
+
 ;;; miscellaneous forward declarations
 (defvar *code-segment*)
 #!+sb-dyncount (defvar *collect-dynamic-statistics*)

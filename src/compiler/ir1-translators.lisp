@@ -439,8 +439,7 @@
 		 '(lambda named-lambda instance-lambda lambda-with-lexenv))
 	 (ir1-convert-lambdalike
 			  thing
-			  :debug-name (debug-namify "#'" thing)
-			  :allow-debug-catch-tag t))
+			  :debug-name (debug-namify "#'" thing)))
 	((legal-fun-name-p thing)
 	 (find-lexically-apparent-fun
 		     thing "as the argument to FUNCTION"))
@@ -645,8 +644,7 @@
                              (ir1-convert-lambda d
                                                  :source-name n
                                                  :debug-name (debug-namify
-                                                              "FLET " n)
-                                                 :allow-debug-catch-tag t))
+                                                              "FLET " n)))
                            names defs)))
         (processing-decls (decls nil fvars next result)
           (let ((*lexenv* (make-lexenv :funs (pairlis names fvars))))
@@ -683,8 +681,7 @@
                           (ir1-convert-lambda def
                                               :source-name name
                                               :debug-name (debug-namify
-                                                           "LABELS " name)
-                                              :allow-debug-catch-tag t))
+                                                           "LABELS " name)))
                         names defs))))
         
         ;; Modify all the references to the dummy function leaves so
@@ -857,10 +854,11 @@
 ;;; Note that environment analysis replaces references to escape
 ;;; functions with references to the corresponding NLX-INFO structure.
 (def-ir1-translator %escape-fun ((tag) start next result)
-  (let ((fun (ir1-convert-lambda
-	      `(lambda ()
-		 (return-from ,tag (%unknown-values)))
-	      :debug-name (debug-namify "escape function for " tag))))
+  (let ((fun (let ((*allow-instrumenting* nil))
+               (ir1-convert-lambda
+                `(lambda ()
+                   (return-from ,tag (%unknown-values)))
+                :debug-name (debug-namify "escape function for " tag)))))
     (setf (functional-kind fun) :escape)
     (reference-leaf start next result fun)))
 

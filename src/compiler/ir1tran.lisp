@@ -50,11 +50,6 @@
   the efficiency of stable code.")
 
 (defvar *fun-names-in-this-file* nil)
-
-;;; *ALLOW-DEBUG-CATCH-TAG* controls whether we should allow the
-;;; insertion a (CATCH ...) around code to allow the debugger RETURN
-;;; command to function.
-(defvar *allow-debug-catch-tag* t)
 
 ;;;; namespace management utilities
 
@@ -390,7 +385,8 @@
   (declare (list path))
   (let* ((*current-path* path)
 	 (component (make-empty-component))
-	 (*current-component* component))
+	 (*current-component* component)
+         (*allow-instrumenting* t))
     (setf (component-name component) "initial component")
     (setf (component-kind component) :initial)
     (let* ((forms (if for-value `(,form) `(,form nil)))
@@ -521,8 +517,7 @@
                                                   opname
                                                   :debug-name (debug-namify
                                                                "LAMBDA CAR "
-                                                               opname)
-                                                  :allow-debug-catch-tag t)))))))))
+                                                               opname))))))))))
     (values))
 
   ;; Generate a reference to a manifest constant, creating a new leaf

@@ -822,10 +822,11 @@
 	     ;; called semi-inlining? A more descriptive name would
 	     ;; be nice. -- WHN 2002-01-07
 	     (frob ()
-	       (let ((res (ir1-convert-lambda-for-defun
-			   (defined-fun-inline-expansion leaf)
-			   leaf t
-			   #'ir1-convert-inline-lambda)))
+	       (let ((res (let ((*allow-instrumenting* t))
+                            (ir1-convert-lambda-for-defun
+                             (defined-fun-inline-expansion leaf)
+                             leaf t
+                             #'ir1-convert-inline-lambda))))
 		 (setf (defined-fun-functional leaf) res)
 		 (change-ref-leaf ref res))))
 	(if ir1-converting-not-optimizing-p
@@ -1088,8 +1089,8 @@
                                 (block-next (node-block call)))
       (let ((new-fun (ir1-convert-inline-lambda
 		      res
-		      :debug-name (debug-namify "LAMBDA-inlined " 
-						source-name 
+		      :debug-name (debug-namify "LAMBDA-inlined "
+						source-name
 						"<unknown function>")))
 	    (ref (lvar-use (combination-fun call))))
 	(change-ref-leaf ref new-fun)
