@@ -541,8 +541,9 @@ Nathan Froyd:
   cleanup, not visible at the user level but important for
   maintenance. (E.g. converting the PCL code to use LOOP instead
   of the old weird pre-ANSI ITERATE macro so that the code can be
-  read without being an expert in ancient languages and so that
-  can delete a thousand lines of implement-ITERATE macrology.)
+  read without being an expert in ancient languages and so that we
+  can delete a thousand lines of implement-ITERATE macrology from
+  the codebase.)
 
 Matthias Hoelzl:
   He reported and fixed COMPILE's misbehavior on macros.
@@ -569,9 +570,16 @@ Eric Marsden:
   Some of his fixes to CMU CL since the SBCL fork have been ported
   to SBCL.
 
+Antonio Martinez-Shotton:
+  He has contributed a number of bug fixes and bug reports to SBCL.
+
 Dave McDonald:
   He made a lot of progress toward getting SBCL to be bootstrappable
   under CLISP.
+
+Gerd Moellman:
+  He has made many cleanups and improvements, small and large, in
+  CMU CL (mostly in PCL), which we have gratefully ported to SBCL.
 
 William ("Bill") Newman:
   He continued to maintain SBCL after the fork, increasing ANSI
@@ -621,12 +629,12 @@ Raymond Wiker:
 
 INITIALS GLOSSARY (helpful when reading comments, CVS commit logs, etc.)
 
-AL   Arthur Lemmens
 MNA  Martin Atzmueller
 DB   Daniel Barlow
 DTC  Douglas Crosher
 APD  Alexey Dejneka
 NJF  Nathan Froyd
+AL   Arthur Lemmens
 RAM  Robert MacLachlan
 WHN  William ("Bill") Newman
 CSR  Christophe Rhodes

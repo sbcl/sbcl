@@ -60,6 +60,7 @@
   ()
   (:report
     (lambda (condition stream)
+      (declare (ignore condition))
       (format stream
              "Control stack exhausted (no more space for function call frames).  This is probably due to heavily nested or infinitely recursive function calls, or a tail call that SBCL cannot or has not optimized away."))))
 

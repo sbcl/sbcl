@@ -573,13 +573,18 @@
 			   ,@(when offset-var `(,offset-var)))
 	 (if (not (array-header-p ,n-array))
 	     (let ((,n-array ,n-array))
-	       (declare (type (simple-array * (*)) ,n-array))
+	       ;; The #-CMU is because tonyms reported (sbcl-devel
+	       ;; 2002-09-29) that this declaration confuses old CMU
+	       ;; CL on x86 Debian 2.2. -- WHN 2002-10-02
+	       #-cmu (declare (type (simple-array * (*)) ,n-array))
 	       ,(once-only ((n-len `(length ,n-array))
 			    (n-end `(or ,n-evalue ,n-len)))
 		  `(if (<= ,n-svalue ,n-end ,n-len)
 		       ;; success
 		       (values ,n-array ,n-svalue ,n-end 0)
-		       (failed-%with-array-data ,n-array ,n-svalue ,n-evalue))))
+		       (failed-%with-array-data ,n-array
+						,n-svalue
+						,n-evalue))))
 	     (,(if force-inline '%with-array-data-macro '%with-array-data)
 	      ,n-array ,n-svalue ,n-evalue))
        ,@forms)))

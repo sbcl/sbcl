@@ -191,6 +191,7 @@
   #!+sb-doc
   "If NAME names a compiler-macro in ENV, return the expansion function, else
    return NIL. Can be set with SETF when ENV is NIL."
+  (declare (ignore env))
   (legal-fun-name-or-type-error name)
   ;; Note: CMU CL used to return NIL here when a NOTINLINE declaration
   ;; was in force. That's fairly logical, given the specified effect
