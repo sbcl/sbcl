@@ -1,25 +1,58 @@
 (cl:in-package :sb-posix-internal)
 
-(defun make-alien-slot-name (alien-type slot-name)
-  (intern (format nil "~A-~A" alien-type slot-name)
-	  (symbol-package slot-name)))
-
-(declaim (inline alien-to-protocol-class))
-(defun alien-to-protocol-class (alien alien-type instance protocol-class slots)
-  "Copy SLOTS from the alien object ALIEN of type ALIEN-TYPE to INSTANCE, an instance of PROTOCOL-CLASS.
-We assume that SLOT names are the same in the alien object and in
-the protocol-class."
-  (unless instance
-    (setf instance (make-instance protocol-class)))
-  (loop for slot in slots
-	do (setf (slot-value instance slot)
-		 (sb-alien:slot alien slot)))
-  instance)
-
-(defun protocol-class-to-alien (instance protocol-class alien alien-type slots)
-  (loop for slot in slots
-	do (setf (sb-alien:slot alien slot) (slot-value instance slot)))
-  instance)
+(defmacro define-protocol-class 
+    (name alien-type superclasses slots &rest options)
+  (let ((to-protocol (intern (format nil "ALIEN-TO-~A" name)))
+	(to-alien (intern (format nil "~A-TO-ALIEN" name))))
+    `(progn
+      (defclass ,name ,superclasses 
+	,(loop for slotd in slots
+	       collect (ldiff slotd (member :array-length slotd)))
+	,@options)
+      (declaim (inline ,to-alien ,to-protocol))
+      (defun ,to-protocol (alien &optional instance)
+	(declare (type (sb-alien:alien (* ,alien-type)) alien)
+		 (type (or null ,name) instance))
+	(unless instance
+	  (setf instance (make-instance ',name)))
+	,@(loop for slotd in slots
+		;; FIXME: slotds in source are more complicated in general
+		;;
+		;; FIXME: baroque construction of intricate fragility
+		for array-length = (getf (cdr slotd) :array-length)
+		if array-length
+		  collect `(progn
+			     (let ((array (make-array ,array-length)))
+			       (setf (slot-value instance ',(car slotd))
+				     array)
+			       (dotimes (i ,array-length)
+				 (setf (aref array i)
+				       (sb-alien:deref 
+					(sb-alien:slot alien ',(car slotd))
+					i)))))
+		else
+		  collect `(setf (slot-value instance ',(car slotd))
+			         (sb-alien:slot alien ',(car slotd))))
+	instance)
+      (defun ,to-alien (instance &optional alien)
+	(declare (type (or null (sb-alien:alien (* ,alien-type))) alien)
+		 (type ,name instance))
+	(unless alien
+	  (setf alien (sb-alien:make-alien ,alien-type)))
+	,@(loop for slotd in slots
+		for array-length = (getf (cdr slotd) :array-length)
+		if array-length
+		  collect `(progn
+			     (let ((array (slot-value instance ',(car slotd))))
+			       (dotimes (i ,array-length)
+				 (setf (sb-alien:deref 
+					(sb-alien:slot alien ',(car slotd))
+					i)
+				       (aref array i)))))
+		else
+		  collect `(setf (sb-alien:slot alien ',(car slotd))
+			         (slot-value instance ',(car slotd)))))
+      (find-class ',name))))
 
 (define-condition sb-posix:syscall-error (error)
   ((errno :initarg :errno :reader sb-posix:syscall-errno))
@@ -162,17 +195,17 @@ the protocol-class."
 
 (define-call "getpagesize" int minusp)
 
-(defclass sb-posix::stat ()
-     ((sb-posix::mode :initarg :mode :accessor sb-posix:stat-mode)
-      (sb-posix::ino :initarg :ino :accessor sb-posix:stat-ino)
-      (sb-posix::dev :initarg :dev :accessor sb-posix:stat-dev)
-      (sb-posix::nlink :initarg :nlink :accessor sb-posix:stat-nlink)
-      (sb-posix::uid :initarg :uid :accessor sb-posix:stat-uid)
-      (sb-posix::gid :initarg :gid :accessor sb-posix:stat-gid)
-      (sb-posix::size :initarg :size :accessor sb-posix:stat-size)
-      (sb-posix::atime :initarg :atime :accessor sb-posix:stat-atime)
-      (sb-posix::mtime :initarg :mtime :accessor sb-posix:stat-mtime)
-      (sb-posix::ctime :initarg :ctime :accessor sb-posix:stat-ctime)))
+(define-protocol-class sb-posix::stat sb-posix::alien-stat ()
+  ((sb-posix::mode :initarg :mode :accessor sb-posix:stat-mode)
+   (sb-posix::ino :initarg :ino :accessor sb-posix:stat-ino)
+   (sb-posix::dev :initarg :dev :accessor sb-posix:stat-dev)
+   (sb-posix::nlink :initarg :nlink :accessor sb-posix:stat-nlink)
+   (sb-posix::uid :initarg :uid :accessor sb-posix:stat-uid)
+   (sb-posix::gid :initarg :gid :accessor sb-posix:stat-gid)
+   (sb-posix::size :initarg :size :accessor sb-posix:stat-size)
+   (sb-posix::atime :initarg :atime :accessor sb-posix:stat-atime)
+   (sb-posix::mtime :initarg :mtime :accessor sb-posix:stat-mtime)
+   (sb-posix::ctime :initarg :ctime :accessor sb-posix:stat-ctime)))
 
 (defmacro define-stat-call (name arg designator-fun type)
   ;; FIXME: this isn't the documented way of doing this, surely?
@@ -189,12 +222,7 @@ the protocol-class."
 		    a-stat)))
 	    (when (minusp r)
 	      (syscall-error))
-	    (alien-to-protocol-class a-stat 'sb-posix::alien-stat
-				     stat 'sb-posix::stat
-				     '(sb-posix::mode sb-posix::ino sb-posix::dev
-				       sb-posix::nlink sb-posix::uid sb-posix::gid
-				       sb-posix::size sb-posix::atime
-				       sb-posix::mtime sb-posix::ctime))))))))
+	    (alien-to-stat a-stat stat)))))))
 
 (define-stat-call "stat" pathname sb-posix::filename
 		  (function int c-string (* sb-posix::alien-stat)))
@@ -227,29 +255,24 @@ the protocol-class."
       (syscall-error)))
   (values (aref filedes2 0) (aref filedes2 1)))
 
-(defclass sb-posix::termios ()
-     ((sb-posix::iflag :initarg :iflag :accessor sb-posix:termios-iflag)
-      (sb-posix::oflag :initarg :oflag :accessor sb-posix:termios-oflag)
-      (sb-posix::cflag :initarg :cflag :accessor sb-posix:termios-cflag)
-      (sb-posix::lflag :initarg :lflag :accessor sb-posix:termios-lflag)
-      (sb-posix::cc :initarg :cc :accessor sb-posix:termios-cc)))
+(define-protocol-class sb-posix::termios sb-posix::alien-termios ()
+  ((sb-posix::iflag :initarg :iflag :accessor sb-posix:termios-iflag)
+   (sb-posix::oflag :initarg :oflag :accessor sb-posix:termios-oflag)
+   (sb-posix::cflag :initarg :cflag :accessor sb-posix:termios-cflag)
+   (sb-posix::lflag :initarg :lflag :accessor sb-posix:termios-lflag)
+   (sb-posix::cc :initarg :cc :accessor sb-posix:termios-cc :array-length sb-posix::nccs)))
 
 (export 'sb-posix::tcsetattr :sb-posix)
 (declaim (inline sb-posix::tcsetattr))
 (defun sb-posix::tcsetattr (fd actions termios)
   (sb-posix::with-alien-termios a-termios ()
-    (protocol-class-to-alien termios 'sb-posix::termios
-			     a-termios 'sb-posix::alien-termios
-			     '(sb-posix::iflag sb-posix::oflag
-			       sb-posix::cflag sb-posix::lflag))
-    (loop with ccs = (sb-posix::alien-termios-cc a-termios)
-	    for i from 0 below sb-posix::nccs
-	    do (setf (sb-alien:deref ccs i)
-		     (aref (sb-posix::termios-cc termios) i)))
+    (termios-to-alien termios a-termios)
     (let ((fd (sb-posix::file-descriptor fd)))
       (let* ((r (alien-funcall
-		 (extern-alien "tcsetattr" (function int int int sb-posix::alien-termios))
-		 fd actions termios)))
+		 (extern-alien 
+		  "tcsetattr" 
+		  (function int int int (* sb-posix::alien-termios)))
+		 fd actions a-termios)))
 	(when (minusp r)
 	  (syscall-error)))
       (values))))
@@ -258,19 +281,11 @@ the protocol-class."
 (defun sb-posix::tcgetattr (fd &optional termios)
   (sb-posix::with-alien-termios a-termios ()
     (let ((r (alien-funcall
-	      (extern-alien "tcgetattr" (function int int sb-posix::alien-termios))
+	      (extern-alien "tcgetattr" 
+			    (function int int (* sb-posix::alien-termios)))
 	      (sb-posix::file-descriptor fd)
 	      a-termios)))
       (when (minusp r)
 	(syscall-error))
-      (setf termios
-	    (alien-to-protocol-class a-termios 'alien-termios
-				     termios 'termios
-				     '(sb-posix::iflag sb-posix::oflag
-				       sb-posix::cflag sb-posix::lflag)))
-      (setf (sb-posix::termios-cc termios) (make-array sb-posix::nccs))
-      (loop with ccs = (sb-posix::alien-termios-cc a-termios)
-	    for i from 0 below sb-posix::nccs
-	    do (setf (aref (sb-posix::termios-cc termios) i)
-		     (sb-alien:deref ccs i)))))
+      (setf termios (alien-to-termios a-termios termios))))
   termios)

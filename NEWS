@@ -2543,6 +2543,9 @@ changes in sbcl-0.8.12 relative to sbcl-0.8.11:
   * fixed another bug in backquote printing: no more destructive
     modification of the form's list structure.  (reported by Brian
     Downing)
+  * the SB-POSIX contrib implementation has been adjusted so that it
+    no longer exhibits ridiculously poor performance when constructing
+    instances corresponding to C structs.
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles
