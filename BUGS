@@ -1112,6 +1112,22 @@ Error in function C::GET-LAMBDA-TO-COMPILE:
    Raymond Toy comments that this is tricky on the X86 since its FPU
    uses 80-bit precision internally.
 
+119:
+   a bug in the byte compiler and/or interpreter: Compile
+	(IN-PACKAGE :CL-USER)
+	(DECLAIM (OPTIMIZE (SPEED 0) (SAFETY 1) (DEBUG 1)))
+	(DEFUN BAR (&REST DIMS)
+	  (IF (EVERY #'INTEGERP DIMS)
+	      1
+	      2))
+   then execute (BAR '(1 2 3 4)). In sbcl-0.pre7.14.flaky4.8
+   this gives a TYPE-ERROR,
+     The value #:UNINITIALIZED-EVAL-STACK-ELEMENT is not
+	of type (MOD 536870911).
+   The same error will probably occur in earlier versions as well, 
+   although the name of the uninitialized-element placeholder will
+   be shorter.
+
 
 KNOWN BUGS RELATED TO THE IR1 INTERPRETER
 

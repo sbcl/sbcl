@@ -163,24 +163,16 @@
       ,(let ((*new-auxiliary-types* nil))
 	 ,@body)))
 
-;;; FIXME: Now that *NEW-AUXILIARY-TYPES* is born initialized to NIL,
-;;; we no longer need to make a distinction between this and
-;;; %PARSE-ALIEN-TYPE.
+;;; Parse TYPE as an alien type specifier and return the resultant
+;;; ALIEN-TYPE structure.
 (defun parse-alien-type (type env)
-  (declare (type (or sb!kernel:lexenv null) env))
-  #!+sb-doc
-  "Parse the list structure TYPE as an alien type specifier and return
-   the resultant ALIEN-TYPE structure."
-  (%parse-alien-type type env))
-
-(defun %parse-alien-type (type env)
   (declare (type (or sb!kernel:lexenv null) env))
   (if (consp type)
       (let ((translator (info :alien-type :translator (car type))))
 	(unless translator
 	  (error "unknown alien type: ~S" type))
 	(funcall translator type env))
-      (case (info :alien-type :kind type)
+      (ecase (info :alien-type :kind type)
 	(:primitive
 	 (let ((translator (info :alien-type :translator type)))
 	   (unless translator
@@ -863,15 +855,15 @@
       (when loser
 	(error "A dimension is not a non-negative fixnum: ~S" loser))))
 	
-  (let ((type (parse-alien-type ele-type env)))
+  (let ((parsed-ele-type (parse-alien-type ele-type env)))
     (make-alien-array-type
-     :element-type type
+     :element-type parsed-ele-type
      :dimensions dims
-     :alignment (alien-type-alignment type)
-     :bits (if (and (alien-type-bits type)
+     :alignment (alien-type-alignment parsed-ele-type)
+     :bits (if (and (alien-type-bits parsed-ele-type)
 		    (every #'integerp dims))
-	       (* (align-offset (alien-type-bits type)
-				(alien-type-alignment type))
+	       (* (align-offset (alien-type-bits parsed-ele-type)
+				(alien-type-alignment parsed-ele-type))
 		  (reduce #'* dims))))))
 
 (def-alien-type-method (array :unparse) (type)
