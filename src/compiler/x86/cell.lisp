@@ -145,13 +145,24 @@
   (:policy :fast)
   (:translate symbol-value))
 
-(defknown fast-symbol-global-value-xadd (symbol fixnum) fixnum ())
+(defknown locked-symbol-global-value-add (symbol fixnum) fixnum ())
 
-(define-vop (fast-symbol-global-value-xadd cell-xadd)
-  (:variant symbol-value-slot other-pointer-lowtag)
+(define-vop (locked-symbol-global-value-add)
+    (:args (object :scs (descriptor-reg) :to :result)
+	   (value :scs (any-reg) :target result))
+  (:arg-types * tagged-num)
+  (:results (result :scs (any-reg) :from (:argument 1)))
   (:policy :fast)
-  (:translate fast-symbol-global-value-xadd)
-  (:arg-types * tagged-num))
+  (:translate locked-symbol-global-value-add)
+  (:result-types tagged-num)
+  (:policy :fast-safe)
+  (:generator 4
+    (move result value)
+    (inst lock)
+    (inst add (make-ea :dword :base object
+		       :disp (- (* symbol-value-slot n-word-bytes)
+				other-pointer-lowtag))
+	  value)))
 
 #!+sb-thread
 (define-vop (boundp)
@@ -449,6 +460,7 @@
   (:policy :fast-safe)
   (:generator 5
     (move eax old-value)
+    (inst lock)
     (inst cmpxchg (make-ea :dword :base object :index slot :scale 1
 			   :disp (- (* instance-slots-offset n-word-bytes)
 				    instance-pointer-lowtag))

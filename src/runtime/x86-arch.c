@@ -146,7 +146,7 @@ get_spinlock(lispobj *word,int value)
 {
     u32 eax=0;
     do {
-	asm ("xor %0,%0;cmpxchg %1,%2" 
+	asm ("xor %0,%0;lock cmpxchg %1,%2" 
 	     : "=a" (eax)
 	     : "r" (value), "m" (*word)
 	     : "memory", "cc");

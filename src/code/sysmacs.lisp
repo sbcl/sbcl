@@ -23,8 +23,7 @@
   #!+sb-thread
   `(locally
     (declare (optimize (safety 0) (speed 3)))
-    (sb!vm::fast-symbol-global-value-xadd ',symbol-name ,delta)
-    ,symbol-name))
+    (sb!vm::locked-symbol-global-value-add ',symbol-name ,delta)))
 
 (defmacro without-gcing (&rest body)
   #!+sb-doc
