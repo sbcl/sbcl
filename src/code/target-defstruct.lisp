@@ -321,13 +321,21 @@
 	     ;; through here.
 	     (%slotplace-accessor-funs (slotplace instance-type-check-form)
 	       (/show "macroexpanding %SLOTPLACE-ACCESSOR-FUNS" slotplace instance-type-check-form)
-	       `(values (lambda (instance)
-			  (/noshow0 "in %SLOTPLACE-ACCESSOR-FUNS-defined reader")
-			  ,instance-type-check-form
-			  (/noshow0 "back from INSTANCE-TYPE-CHECK-FORM")
-			  ,slotplace)
-			(let ((typecheckfun (typespec-typecheckfun dsd-type)))
-			  (lambda (new-value instance)
+	       `(let ((typecheckfun (typespec-typecheckfun dsd-type)))
+                  (values (if (dsd-safe-p dsd)
+                              (lambda (instance)
+                                (/noshow0 "in %SLOTPLACE-ACCESSOR-FUNS-defined reader")
+                                ,instance-type-check-form
+                                (/noshow0 "back from INSTANCE-TYPE-CHECK-FORM")
+                                ,slotplace)
+                              (lambda (instance)
+                                (/noshow0 "in %SLOTPLACE-ACCESSOR-FUNS-defined reader")
+                                ,instance-type-check-form
+                                (/noshow0 "back from INSTANCE-TYPE-CHECK-FORM")
+                                (let ((value ,slotplace))
+                                  (funcall typecheckfun value)
+                                  value)))
+                          (lambda (new-value instance)
 			    (/noshow0 "in %SLOTPLACE-ACCESSOR-FUNS-defined writer")
 			    ,instance-type-check-form
 			    (/noshow0 "back from INSTANCE-TYPE-CHECK-FORM")
@@ -337,7 +345,7 @@
 
     (let ((dsd-index (dsd-index dsd))
 	  (dsd-type (dsd-type dsd)))
-	    
+
       #+sb-xc (/show0 "got DSD-TYPE=..")
       #+sb-xc (/hexstr dsd-type)
       (ecase (dd-type dd)
@@ -346,7 +354,7 @@
 	(structure
 	 #+sb-xc (/show0 "case of DSD-TYPE = STRUCTURE")
 	 (%native-slot-accessor-funs %instance-ref))
-				     
+
 	;; structures with the :TYPE option
 
 	;; FIXME: Worry about these later..

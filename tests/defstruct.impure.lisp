@@ -31,7 +31,6 @@
     (c #\# :type (integer 5 6)))
 (let ((s (make-boa-saux)))
   (declare (notinline identity))
-  #+nil ; bug 235a
   (locally (declare (optimize (safety 3))
                     (inline boa-saux-a))
     (assert (raises-error? (identity (boa-saux-a s)) type-error)))
@@ -47,6 +46,17 @@
   (locally (declare (optimize (safety 0))
                     (inline boa-saux-a))
     (assert (eql (identity (boa-saux-a s)) 0)))
+  (setf (boa-saux-a s) 1)
+  (setf (boa-saux-c s) 5)
+  (assert (eql (boa-saux-a s) 1))
+  (assert (eql (boa-saux-b s) 3))
+  (assert (eql (boa-saux-c s) 5)))
+
+(let ((s (make-boa-saux)))
+  (declare (notinline identity))
+  (locally (declare (optimize (safety 3))
+                    (notinline boa-saux-a))
+    (assert (raises-error? (identity (boa-saux-a s)) type-error)))
   (setf (boa-saux-a s) 1)
   (setf (boa-saux-c s) 5)
   (assert (eql (boa-saux-a s) 1))
@@ -475,6 +485,34 @@
 (assert (vector-struct-p (make-vector-struct)))
 (assert (not (vector-struct-p nil)))
 (assert (not (vector-struct-p #())))
+
+;;; bug 3d: type safety with redefined type constraints on slots
+(macrolet
+    ((test (type)
+       (let* ((base-name (intern (format nil "bug3d-~A" type)))
+              (up-name (intern (format nil "~A-up" base-name)))
+              (accessor (intern (format nil "~A-X" base-name)))
+              (up-accessor (intern (format nil "~A-X" up-name)))
+              (type-options (when type `((:type ,type)))))
+         `(progn
+            (defstruct (,base-name ,@type-options)
+              x y)
+            (defstruct (,up-name (:include ,base-name
+                                           (x "x" :type simple-string)
+                                           (y "y" :type simple-string))
+                                 ,@type-options))
+            (let ((ob (,(intern (format nil "MAKE-~A" up-name)))))
+              (setf (,accessor ob) 0)
+              (loop for decl in '(inline notinline)
+                    for fun = `(lambda (s)
+                                 (declare (optimize (safety 3))
+                                          (,decl ,',up-accessor))
+                                 (,',up-accessor s))
+                    do (assert (raises-error? (funcall (compile nil fun) ob)
+                                              type-error))))))))
+  (test nil)
+  (test list)
+  (test vector))
 
 ;;; success
 (format t "~&/returning success~%")

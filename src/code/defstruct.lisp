@@ -805,9 +805,16 @@
 			   (dsd-index included-slot))
 		     (dd-inherited-accessor-alist dd)
 		     :test #'eq :key #'car))
-	  (parse-1-dsd dd
-		       modified
-		       (copy-structure included-slot)))))))
+	  (let ((new-slot (parse-1-dsd dd
+                                       modified
+                                       (copy-structure included-slot))))
+            (when (and (neq (dsd-type new-slot) (dsd-type included-slot))
+                       (not (subtypep (dsd-type included-slot)
+                                      (dsd-type new-slot)))
+                       (dsd-safe-p included-slot))
+              (setf (dsd-safe-p new-slot) nil)
+              ;; XXX: notify?
+              )))))))
 
 ;;;; various helper functions for setting up DEFSTRUCTs
 

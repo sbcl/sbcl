@@ -84,24 +84,7 @@ WORKAROUND:
      an error may be signalled at read time and it would be good if
      SBCL did it.
 
-  c: Reading of not initialized slot sometimes causes SEGV (for inline
-     accessors it is fixed, but out-of-line still do not perform type
-     check).
-
-  d:
-    (declaim (optimize (safety 3) (speed 1) (space 1)))
-    (defstruct foo
-      x y)
-    (defstruct (stringwise-foo (:include foo
-                                         (x "x" :type simple-string)
-                                         (y "y" :type simple-string))))
-    (defparameter *stringwise-foo*
-      (make-stringwise-foo))
-    (setf (foo-x *stringwise-foo*) 0)
-    (defun frob-stringwise-foo (sf)
-      (aref (stringwise-foo-x sf) 0))
-    (frob-stringwise-foo *stringwise-foo*)
-  SEGV.
+  d: (fixed in 0.8.1.5)
 
 7:
   The "compiling top-level form:" output ought to be condensed.
