@@ -184,7 +184,8 @@
       (ecase kind
 	(:absolute
 	 ;; Record absolute fixups that point within the code object.
-	 (when (> code-end-addr (sap-ref-64 sap offset) obj-start-addr)
+	 ;; The fixup data is 32 bits, don't use SAP-REF-64 here.
+	 (when (> code-end-addr (sap-ref-32 sap offset) obj-start-addr)
 	   (frob code offset)))
 	(:relative
 	 ;; Record relative fixups that point outside the code object.

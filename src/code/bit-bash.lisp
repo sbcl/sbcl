@@ -109,24 +109,29 @@
 	   (type index offset)
 	   (values system-area-pointer index))
   (let ((address (sap-int sap)))
-    (values (int-sap #!-alpha (word-logical-andc2 address 3)
+    (values (int-sap #!-alpha (word-logical-andc2 address
+						  sb!vm::fixnum-tag-mask)
 		     #!+alpha (ash (ash address -2) 2))
-	    (+ (* (logand address 3) n-byte-bits) offset))))
+	    (+ (* (logand address sb!vm::fixnum-tag-mask) n-byte-bits)
+	       offset))))
 
 #!-sb-fluid (declaim (inline word-sap-ref %set-word-sap-ref))
 (defun word-sap-ref (sap offset)
   (declare (type system-area-pointer sap)
 	   (type index offset)
-	   (values (unsigned-byte 32))
+	   (values sb!vm:word)
 	   (optimize (speed 3) (safety 0) #-sb-xc-host (inhibit-warnings 3)))
-  (sap-ref-32 sap (the index (ash offset 2))))
+  (#.(if (= sb!vm:n-word-bits 32) 'sap-ref-32 'sap-ref-64)
+     sap (the index (ash offset sb!vm::n-fixnum-tag-bits))))
 (defun %set-word-sap-ref (sap offset value)
   (declare (type system-area-pointer sap)
 	   (type index offset)
-	   (type (unsigned-byte 32) value)
-	   (values (unsigned-byte 32))
-	   (optimize (speed 3) (safety 0) (inhibit-warnings 3)))
-  (setf (sap-ref-32 sap (the index (ash offset 2))) value))
+	     (type sb!vm:word value)
+	     (values sb!vm:word)
+	     (optimize (speed 3) (safety 0) (inhibit-warnings 3)))
+  (setf (#.(if (= sb!vm:n-word-bits 32) 'sap-ref-32 'sap-ref-64)
+	   sap (the index (ash offset sb!vm::n-fixnum-tag-bits)))
+	value))
 
 ;;;; CONSTANT-BIT-BASH
 

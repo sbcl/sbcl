@@ -1867,6 +1867,7 @@
   (:emitter
    (typecase where
      (label
+      (maybe-emit-rex-for-ea segment where nil)
       (emit-byte segment #b11101000) ; 32 bit relative
       (emit-back-patch segment
 		       4
@@ -1875,9 +1876,11 @@
 				     (- (label-position where)
 					(+ posn 4))))))
      (fixup
+      (maybe-emit-rex-for-ea segment where nil)
       (emit-byte segment #b11101000)
       (emit-relative-fixup segment where))
      (t
+      (maybe-emit-rex-for-ea segment where nil)
       (emit-byte segment #b11111111)
       (emit-ea segment where #b010)))))
 

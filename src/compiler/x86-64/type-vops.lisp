@@ -177,7 +177,7 @@
 
 (define-vop (signed-byte-32-p type-predicate)
   (:translate signed-byte-32-p)
-  (:generator 45
+  (:generator 7
     ;; (and (fixnum) (or (no bits set >31) (all bits set >31))
     (move rax-tn value)
     (inst test rax-tn 7)
@@ -189,7 +189,7 @@
     NOT-TARGET))
 
 (define-vop (check-signed-byte-32 check-type)
-  (:generator 45
+  (:generator 8
     (let ((nope (generate-error-code vop
 				     object-not-signed-byte-32-error
 				     value))
@@ -207,7 +207,7 @@
 
 (define-vop (unsigned-byte-32-p type-predicate)
   (:translate unsigned-byte-32-p)
-  (:generator 45
+  (:generator 7
     ;; (and (fixnum) (no bits set >31))
     (move rax-tn value)
     (inst test rax-tn 7)
@@ -217,7 +217,7 @@
     NOT-TARGET))
 
 (define-vop (check-unsigned-byte-32 check-type)
-  (:generator 45
+  (:generator 8
     (let ((nope
 	   (generate-error-code vop object-not-unsigned-byte-32-error value)))
       (move rax-tn value)
@@ -225,6 +225,98 @@
       (inst jmp :ne nope)
       (inst sar rax-tn (+ 32 3 -1))
       (inst jmp :nz nope)
+      (move result value))))
+
+;;; An (unsigned-byte 64) can be represented with either a positive
+;;; fixnum, a bignum with exactly one positive digit, or a bignum with
+;;; exactly two digits and the second digit all zeros.
+(define-vop (unsigned-byte-64-p type-predicate)
+  (:translate unsigned-byte-64-p)
+  (:generator 45
+    (let ((not-target (gen-label))
+	  (single-word (gen-label))
+	  (fixnum (gen-label)))
+      (multiple-value-bind (yep nope)
+	  (if not-p
+	      (values not-target target)
+	      (values target not-target))
+	;; Is it a fixnum?
+	(generate-fixnum-test value)
+	(move eax-tn value)
+	(inst jmp :e fixnum)
+
+	;; If not, is it an other pointer?
+	(inst and al-tn lowtag-mask)
+	(inst cmp al-tn other-pointer-lowtag)
+	(inst jmp :ne nope)
+	;; Get the header.
+	(loadw eax-tn value 0 other-pointer-lowtag)
+	;; Is it one?
+	(inst cmp eax-tn (+ (ash 1 n-widetag-bits) bignum-widetag))
+	(inst jmp :e single-word)
+	;; If it's other than two, we can't be an (unsigned-byte 64)
+	(inst cmp eax-tn (+ (ash 2 n-widetag-bits) bignum-widetag))
+	(inst jmp :ne nope)
+	;; Get the second digit.
+	(loadw eax-tn value (1+ bignum-digits-offset) other-pointer-lowtag)
+	;; All zeros, its an (unsigned-byte 64).
+	(inst or eax-tn eax-tn)
+	(inst jmp :z yep)
+	(inst jmp nope)
+	
+	(emit-label single-word)
+	;; Get the single digit.
+	(loadw eax-tn value bignum-digits-offset other-pointer-lowtag)
+
+	;; positive implies (unsigned-byte 64).
+	(emit-label fixnum)
+	(inst or eax-tn eax-tn)
+	(inst jmp (if not-p :s :ns) target)
+
+	(emit-label not-target)))))
+
+(define-vop (check-unsigned-byte-64 check-type)
+  (:generator 45
+    (let ((nope
+	   (generate-error-code vop object-not-unsigned-byte-64-error value))
+	  (yep (gen-label))
+	  (fixnum (gen-label))
+	  (single-word (gen-label)))
+
+      ;; Is it a fixnum?
+      (generate-fixnum-test value)
+      (move eax-tn value)
+      (inst jmp :e fixnum)
+
+      ;; If not, is it an other pointer?
+      (inst and al-tn lowtag-mask)
+      (inst cmp al-tn other-pointer-lowtag)
+      (inst jmp :ne nope)
+      ;; Get the header.
+      (loadw eax-tn value 0 other-pointer-lowtag)
+      ;; Is it one?
+      (inst cmp eax-tn (+ (ash 1 n-widetag-bits) bignum-widetag))
+      (inst jmp :e single-word)
+      ;; If it's other than two, we can't be an (unsigned-byte 64)
+      (inst cmp eax-tn (+ (ash 2 n-widetag-bits) bignum-widetag))
+      (inst jmp :ne nope)
+      ;; Get the second digit.
+      (loadw eax-tn value (1+ bignum-digits-offset) other-pointer-lowtag)
+      ;; All zeros, its an (unsigned-byte 64).
+      (inst or eax-tn eax-tn)
+      (inst jmp :z yep)
+      (inst jmp nope)
+	
+      (emit-label single-word)
+      ;; Get the single digit.
+      (loadw eax-tn value bignum-digits-offset other-pointer-lowtag)
+
+      ;; positive implies (unsigned-byte 64).
+      (emit-label fixnum)
+      (inst or eax-tn eax-tn)
+      (inst jmp :s nope)
+
+      (emit-label yep)
       (move result value))))
 
 ;;;; list/symbol types
