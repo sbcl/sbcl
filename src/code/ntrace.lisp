@@ -125,20 +125,14 @@
 		(values (fdefinition x) t))))
 	(function x)
 	(t (values (fdefinition x) t)))
-    (if (or #+sb-interpreter (sb-eval:interpreted-function-p res)
-	    nil)
-	(values res
-		named-p
-		#+sb-interpreter (if (sb-eval:interpreted-function-closure res)
-				     :interpreted-closure :interpreted))
-	(case (sb-kernel:get-type res)
-	  (#.sb-vm:closure-header-type
-	   (values (sb-kernel:%closure-function res)
-		   named-p
-		   :compiled-closure))
-	  (#.sb-vm:funcallable-instance-header-type
-	   (values res named-p :funcallable-instance))
-	  (t (values res named-p :compiled))))))
+    (case (sb-kernel:get-type res)
+      (#.sb-vm:closure-header-type
+       (values (sb-kernel:%closure-function res)
+	       named-p
+	       :compiled-closure))
+      (#.sb-vm:funcallable-instance-header-type
+       (values res named-p :funcallable-instance))
+      (t (values res named-p :compiled)))))
 
 ;;; When a function name is redefined, and we were tracing that name,
 ;;; then untrace the old definition and trace the new one.

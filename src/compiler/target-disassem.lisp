@@ -1522,9 +1522,6 @@
 	     (and (listp thing)
 		  (eq (car thing) 'setf)))
 	 (compiled-function-or-lose (fdefinition thing) thing))
-	#!+sb-interpreter
-	((sb!eval:interpreted-function-p thing)
-	 (compile-function-lambda-expr thing))
 	((functionp thing)
 	 thing)
 	((and (listp thing)

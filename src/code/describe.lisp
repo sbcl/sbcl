@@ -132,35 +132,6 @@
 		 ~:[no~;~] expansion is available."
 		inlinep (info :function :inline-expansion name))))))
 
-;;; Interpreted function describing; handles both closure and
-;;; non-closure functions. Instead of printing the compiled-from info,
-;;; we print the definition.
-#+sb-interpreter
-(defun %describe-function-interpreted (x s kind name)
-  (declare (type stream s))
-  (multiple-value-bind (exp closure-p dname)
-      (sb-eval:interpreted-function-lambda-expression x)
-    (let ((args (sb-eval:interpreted-function-arglist x)))
-      (format s "~@:_~@(~@[~A ~]arguments:~@:_~)" kind)
-      (if args
-	  (format s "  ~<~S~:>" args)
-	  (write-string "  There are no arguments." s)))
-    (let ((name (or name dname)))
-      (%describe-doc name s 'function kind)
-      (unless (eq kind :macro)
-	(%describe-function-name
-	 name
-	 s
-	 (type-specifier (sb-eval:interpreted-function-type x)))))
-    (when closure-p
-      (format s "~@:_Its closure environment is:~%")
-      (pprint-logical-block (s nil)
-	(pprint-indent :current 2)
-	(let ((closure (sb-eval:interpreted-function-closure x)))
-	  (dotimes (i (length closure))
-	    (format s "~@:_~S: ~S" i (svref closure i))))))
-    (format s "~@:_Its definition is:~@:_  ~S" exp)))
-
 ;;; Print information from the debug-info about where CODE-OBJ was
 ;;; compiled from.
 (defun %describe-compiled-from (code-obj s)
@@ -257,9 +228,6 @@
 	  (let ((data (byte-closure-data x)))
 	    (dotimes (i (length data))
 	      (format s "~@:_~S: ~S" i (svref data i))))))
-       #+sb-interpreter
-       (sb-eval:interpreted-function
-	(%describe-function-interpreted x s kind name))
        (standard-generic-function
 	;; There should be a special method for this case; we'll
 	;; delegate to that.

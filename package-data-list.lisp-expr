@@ -481,27 +481,10 @@ like *STACK-TOP-HINT*"
              "DSTATE-CUR-ADDR" "DSTATE-NEXT-ADDR"))
 
  #s(sb-cold:package-data
-    :name "SB!EVAL"
-    :doc "private: originally the implementation of the IR1 interpreter,
-and now that the IR1 interpreter is gone, home to some stuff which is still
-used by the bytecode interpreter"
+    :name "SB!BYTECODE"
+    :doc "private: stuff related to the bytecode interpreter"
     :use ("CL" "SB!KERNEL" "SB!INT")
-    :export #!-sb-interpreter
-            ("INTERNAL-EVAL")
-            #!+sb-interpreter
-            ("INTERNAL-EVAL"
-             #!+sb-show "*EVAL-STACK-TRACE*"
-             #!+sb-show "*INTERNAL-APPLY-NODE-TRACE*"
-             "FLUSH-INTERPRETED-FUNCTION-CACHE"
-             "INTERPRETED-FUNCTION"
-             "INTERPRETED-FUNCTION-ARGLIST"
-             "INTERPRETED-FUNCTION-CLOSURE"
-             "INTERPRETED-FUNCTION-LAMBDA-EXPRESSION"
-             "INTERPRETED-FUNCTION-NAME"
-             "INTERPRETED-FUNCTION-P"
-             "INTERPRETED-FUNCTION-TYPE"
-             "MAKE-INTERPRETED-FUNCTION"
-             "PRINT-INTERPRETED-FUNCTION-OBJECT"))
+    :export ("INTERNAL-EVAL"))
 
  #s(sb-cold:package-data
     :name "SB!EXT"
@@ -1200,7 +1183,6 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
              "STRING-TO-SIMPLE-STRING"
              "SYSTEM-AREA-CLEAR"
              "SYSTEM-AREA-COPY" "TWO-ARG-*"
-             "TRY-TO-RENAME-INTERPRETED-FUNCTION-AS-MACRO"
              "TWO-ARG-+" "TWO-ARG--"
              "TWO-ARG-/" "TWO-ARG-/=" "TWO-ARG-<"
              "TWO-ARG-<=" "TWO-ARG-="

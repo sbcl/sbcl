@@ -715,8 +715,7 @@
 
     (make-source-info :file-info file-info)))
 
-;;; Return a SOURCE-INFO to describe the incremental compilation of
-;;; FORM. Also used by SB!EVAL:INTERNAL-EVAL.
+;;; Return a SOURCE-INFO to describe the incremental compilation of FORM. 
 (defun make-lisp-source-info (form)
   (make-source-info :start-time (get-universal-time)
 		    :file-info (make-file-info :name :lisp

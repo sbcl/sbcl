@@ -156,10 +156,6 @@
 ;;; In all cases, SET-FUNCTION-NAME must return the new (or same)
 ;;; function. (Unlike other functions to set stuff, it does not return
 ;;; the new value.)
-;;;
-;;; FIXME: A similar operation is done in
-;;; TRY-TO-RENAME-INTERPRETED-FUNCTION-AS-MACRO. The code should be
-;;; shared.
 (defun set-function-name (fcn new-name)
   #+sb-doc
   "Set the name of a compiled function object. Return the function."
@@ -176,10 +172,7 @@
 		(set-function-name (sb-kernel:byte-closure-function fcn)
 				   new-name))
 	       (sb-kernel:byte-function
-		(setf (sb-kernel:byte-function-name fcn) new-name))
-	       #+sb-interpreter
-	       (sb-eval:interpreted-function
-		(setf (sb-eval:interpreted-function-name fcn) new-name))))
+		(setf (sb-kernel:byte-function-name fcn) new-name))))
 	 fcn)
 	(t
 	 ;; pw-- This seems wrong and causes trouble. Tests show

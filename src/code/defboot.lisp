@@ -192,9 +192,6 @@
 ;;; merge into that too? dunno..)
 (defun sb!c::%defun (name def doc source)
   (declare (ignore source))
-  #-sb-xc-host (progn
-		 #!+sb-interpreter
-		 (setf (sb!eval:interpreted-function-name def) name))
   (flet ((set-type-info-from-def ()
            (setf (info :function :type name)
 		 #-sb-xc-host (extract-function-type def)

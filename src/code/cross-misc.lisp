@@ -32,15 +32,6 @@
   `(progn ,@forms))
 
 ;;; When we're running as a cross-compiler in an arbitrary host ANSI
-;;; Lisp, we don't have any hooks available to manipulate the
-;;; debugging name and debugging argument list of an interpreted
-;;; function object (and don't care much about getting debugging name
-;;; and debugging argument list right anyway).
-(defun try-to-rename-interpreted-function-as-macro (f name lambda-list)
-  (declare (ignore f name lambda-list))
-  (values))
-
-;;; When we're running as a cross-compiler in an arbitrary host ANSI
 ;;; Lisp, we shouldn't be doing anything which is sensitive to GC.
 ;;; KLUDGE: I (WHN 19990131) think the proper long-term solution would
 ;;; be to remove any operations from cross-compiler source files

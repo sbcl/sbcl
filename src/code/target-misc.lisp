@@ -28,12 +28,6 @@
 	       (sb!c::byte-function-name x))
 	      (byte-closure
 	       (sb!c::byte-function-name (byte-closure-function x)))
-	      #!+sb-interpreter
-	      (sb!eval:interpreted-function
-	       (multiple-value-bind (exp closure-p dname)
-		   (sb!eval:interpreted-function-lambda-expression x)
-		 (declare (ignore exp closure-p))
-		 dname))
 	      (t ;; funcallable-instance
 	       (%function-name
 		(funcallable-instance-function x))))))))

@@ -246,10 +246,7 @@
 
  ("src/code/module" :not-host) ; maybe should be :BYTE-COMPILE T
 
- #!+sb-interpreter
- ("src/code/eval")
-
- ("src/code/target-eval" :not-host) ; FIXME: uses INFO, wants compiler macro
+ ("src/code/eval" :not-host) ; FIXME: uses INFO, wants compiler macro
 
  ("src/code/interr" :not-host)
 
@@ -593,10 +590,6 @@
  ;; target-only assemblerish stuff
  ("src/compiler/target-disassem"     :not-host)
  ("src/compiler/target/target-insts" :not-host)
-
- ;; the IR1 interpreter (as opposed to the byte code interpreter)
- #!+sb-interpreter ("src/compiler/eval-comp" :not-host)
- #!+sb-interpreter ("src/compiler/eval"      :not-host)
 
  ("src/code/debug" :not-host) ; maybe should be :BYTE-COMPILE T
 

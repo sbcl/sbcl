@@ -14,6 +14,7 @@
 ;;; Conventionally a string like "0.6.6", with three numeric fields,
 ;;; is used for released versions, and a string like "0.6.5.12", with
 ;;; four numeric fields, is used for versions which aren't released
-;;; but correspond only to CVS tags or snapshots.
-
-"0.pre7.15"
+;;; but correspond only to CVS tags or snapshots. (And occasionally for
+;;; internal versions I end up with more complicated stuff, like
+;;; "0.pre7.14.flaky4.13".)
+"0.pre7.16"

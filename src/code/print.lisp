@@ -1556,11 +1556,6 @@
 			    #(#.sb!vm:closure-header-type
 			      #.sb!vm:byte-code-closure-type))
 		      "CLOSURE")
-		     #!+sb-interpreter
-		     ((sb!eval::interpreted-function-p object)
-		      (or (sb!eval::interpreted-function-%name object)
-			  (sb!eval:interpreted-function-lambda-expression
-			   object)))
 		     ((find (function-subtype object)
 			    #(#.sb!vm:function-header-type
 			      #.sb!vm:closure-function-header-type))

@@ -35,22 +35,22 @@
 ;;; still useful in the target interpreter, and in the
 ;;; cross-compilation host.
 (defun sb!c::%defmacro (name definition lambda-list doc)
-  (try-to-rename-interpreted-function-as-macro definition name lambda-list)
   (sb!c::%%defmacro name definition doc))
 
 ;;; (called by SB!C::%DEFMACRO)
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defun sb!c::%%defmacro (name definition doc)
-    ;; Old note (ca. 1985, maybe:-): "Eventually %%DEFMACRO should deal with
-    ;; clearing old compiler information for the functional value."
+    ;; old note (ca. 1985, maybe:-): "Eventually %%DEFMACRO should
+    ;; deal with clearing old compiler information for the functional
+    ;; value."
     (clear-info :function :where-from name)
     ;; FIXME: It would be nice to warn about DEFMACRO of an
     ;; already-defined macro, but that's slightly hard to do because
     ;; in common usage DEFMACRO is defined at compile time and then
     ;; redefined at load time. We'd need to make a distinction between
     ;; the defined-at-compile-time state and the defined-at-load-time
-    ;; state to make this work. (Trying to warn about duplicate DEFTYPEs
-    ;; runs into the same problem.)
+    ;; state to make this work. (Trying to warn about duplicate
+    ;; DEFTYPEs runs into the same problem.)
     #+nil (when (sb!xc:macro-function name)
 	    (style-warn "redefining ~S in DEFMACRO" name))
     (setf (sb!xc:macro-function name) definition

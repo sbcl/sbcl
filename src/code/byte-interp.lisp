@@ -64,34 +64,34 @@
 #!-sb-fluid (declaim (inline eval-stack-ref))
 (defun eval-stack-ref (offset)
   (declare (type stack-pointer offset))
-  (svref sb!eval::*eval-stack* offset))
+  (svref sb!bytecode::*eval-stack* offset))
 
 #!-sb-fluid (declaim (inline (setf eval-stack-ref)))
 (defun (setf eval-stack-ref) (new-value offset)
   (declare (type stack-pointer offset))
-  (setf (svref sb!eval::*eval-stack* offset) new-value))
+  (setf (svref sb!bytecode::*eval-stack* offset) new-value))
 
 (defun push-eval-stack (value)
-  (let ((len (length (the simple-vector sb!eval::*eval-stack*)))
+  (let ((len (length (the simple-vector sb!bytecode::*eval-stack*)))
 	(sp *eval-stack-top*))
     (when (= len sp)
       (let ((new-stack (make-array (ash len 1))))
-	(replace new-stack sb!eval::*eval-stack* :end1 len :end2 len)
-	(setf sb!eval::*eval-stack* new-stack)))
+	(replace new-stack sb!bytecode::*eval-stack* :end1 len :end2 len)
+	(setf sb!bytecode::*eval-stack* new-stack)))
     (setf *eval-stack-top* (1+ sp))
     (setf (eval-stack-ref sp) value)))
 
 (defun allocate-eval-stack (amount)
-  (let* ((len (length (the simple-vector sb!eval::*eval-stack*)))
+  (let* ((len (length (the simple-vector sb!bytecode::*eval-stack*)))
 	 (sp *eval-stack-top*)
 	 (new-sp (+ sp amount)))
     (declare (type index sp new-sp))
     (when (>= new-sp len)
       (let ((new-stack (make-array (ash new-sp 1))))
-	(replace new-stack sb!eval::*eval-stack* :end1 len :end2 len)
-	(setf sb!eval::*eval-stack* new-stack)))
+	(replace new-stack sb!bytecode::*eval-stack* :end1 len :end2 len)
+	(setf sb!bytecode::*eval-stack* new-stack)))
     (setf *eval-stack-top* new-sp)
-    (let ((stack sb!eval::*eval-stack*))
+    (let ((stack sb!bytecode::*eval-stack*))
       (do ((i sp (1+ i))) ; FIXME: Use CL:FILL.
 	  ((= i new-sp))
 	(setf (svref stack i) '#:uninitialized-eval-stack-element))))
@@ -836,7 +836,7 @@
 	(format *trace-output*
 		"pc=~D, fp=~D, sp=~D, byte=#b~,'0X, frame:~%    ~S~%"
 		pc fp *eval-stack-top* byte
-		(subseq sb!eval::*eval-stack* fp *eval-stack-top*)))))
+		(subseq sb!bytecode::*eval-stack* fp *eval-stack-top*)))))
   (if (zerop (logand byte #x80))
       ;; Some stack operation. No matter what, we need the operand,
       ;; so compute it.

@@ -239,19 +239,13 @@
 
 ;;; Try to compile the closure arg to %TIME if it is interpreted.
 (defun massage-time-function (fun)
-  (cond
-   #!+sb-interpreter
-   ((sb!eval:interpreted-function-p fun)
-    (multiple-value-bind (def env-p) (function-lambda-expression fun)
-      (declare (ignore def))
-      (cond
-       (env-p
-	(warn "non-null environment for TIME form, forced to interpret.~@
-	       Compiling the entire form will produce more accurate times.")
-	fun)
-       (t
-	(compile nil fun)))))
-   (t fun)))
+  ;; This is just a placeholder as of the switch from IR1 interpreter
+  ;; to bytecode interpreter. Someday it might make sense to complain
+  ;; about bytecoded FUN and/or compile it to native code, so I've
+  ;; left the placeholder in place, but as of sbcl-0.7.0 it's not
+  ;; obvious how to do the right thing easily, so I haven't actually 
+  ;; done it. -- WHN
+  fun)
 
 ;;; Return all the data that we want TIME to report.
 (defun time-get-sys-info ()
