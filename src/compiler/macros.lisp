@@ -619,9 +619,10 @@
                                     (ctran-next it))
                                    (t (return)))))
            ,@(when lvar-var
-                   `((,lvar-var #1=(when (valued-node-p ,node-var)
-                                     (node-lvar ,node-var))
-                                #1#))))
+                   `((,lvar-var (when (valued-node-p ,node-var)
+				  (node-lvar ,node-var))
+		                (when (valued-node-p ,node-var)
+				  (node-lvar ,node-var))))))
           (nil)
        ,@body
        ,@(when restart-p
@@ -635,9 +636,10 @@
 	(n-prev (gensym)))
     `(loop with ,n-block = ,block
            for ,node-var = (block-last ,n-block) then (ctran-use ,n-prev)
-           while ,node-var ; FIXME: this is non-ANSI
-           for ,n-prev = (node-prev ,node-var)
-           and ,lvar = (when (valued-node-p ,node-var) (node-lvar ,node-var))
+           for ,n-prev = (when ,node-var (node-prev ,node-var))
+           and ,lvar = (when (and ,node-var (valued-node-p ,node-var))
+			 (node-lvar ,node-var))
+           while ,node-var
            do (progn
                 ,@body))))
 
