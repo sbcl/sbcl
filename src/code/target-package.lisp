@@ -477,15 +477,17 @@ error if any of PACKAGES is not a valid package designator."
 	     (push n (package-%nicknames package)))
 	    ((eq found package))
 	    ((string= (the string (package-%name found)) n)
-             (error 'simple-package-error
-                    :package package
-                    :format-control "~S is a package name, so it cannot be a nickname for ~S."
-                    :format-arguments (list n (package-%name package))))
+             (cerror "Ignore this nickname."
+		     'simple-package-error
+		     :package package
+		     :format-control "~S is a package name, so it cannot be a nickname for ~S."
+		     :format-arguments (list n (package-%name package))))
 	    (t
-             (error 'simple-package-error
-                    :package package
-                    :format-control "~S is already a nickname for ~S."
-                    :format-arguments (list n (package-%name found))))))))
+             (cerror "Leave this nickname alone."
+		     'simple-package-error
+		     :package package
+		     :format-control "~S is already a nickname for ~S."
+		     :format-arguments (list n (package-%name found))))))))
 
 (defun make-package (name &key
 			  (use '#.*default-package-use-list*)
