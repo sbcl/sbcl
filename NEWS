@@ -504,9 +504,12 @@ changes in sbcl-0.6.8 relative to sbcl-0.6.7:
   used to not be called for a saved Lisp image.)
 ?? The patch for the SUBSEQ bug reported on the cmucl-imp mailing
   list 12 September 2000 has been applied to SBCL.
-?? Martin Atzmueller's versions of two CMU CL patches, as posted on 
-  sbcl-devel 13 September 2000, have been installed. (The patches fix
-  a bug in SUBSEQ and <a bug in ??>.)
+?? Martin Atzmueller's version of a patch to fix a compiler crash,
+  as posted on sbcl-devel 13 September 2000, has been installed.
+?? Instead of installing Martin Atzmueller's patch for the
+  compiler transform for SUBSEQ, I deleted the compiler transform,
+  and transforms for some similar consing operations (CONCATENATE
+  
 ?? A bug in signal handling which kept TRACE from working on OpenBSD
   has been fixed.
   ?? Remember to remove this from the port-specific section of BUGS.

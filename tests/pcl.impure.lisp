@@ -30,3 +30,7 @@
 (defun function-using-gf-defined-in-this-file (x y n)
   (unless (minusp n)
     (gf-defined-in-this-file x y)))
+
+;;;; success
+
+(sb-ext:quit :unix-status 104)

@@ -183,6 +183,13 @@
   (frob (simple-array (unsigned-byte 4) (*)) 4))
 
 ;;;; simple string transforms
+;;;;
+;;;; Note: CMU CL had more of these, including transforms for
+;;;; functions which cons. In SBCL, we've gotten rid of the transforms
+;;;; for functions which cons, since our GC overhead is sufficiently
+;;;; large that it doesn't seem worth it to try to economize on
+;;;; function call overhead or on the overhead of runtime type
+;;;; dispatch in AREF.
 
 (deftransform subseq ((string start &optional (end nil))
 		      (simple-string t &optional t))
