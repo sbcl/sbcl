@@ -185,7 +185,7 @@
     (:function (if name
 		   (format s "Function: ~S" x)
 		   (format s "~S is a function." x))))
-  (format s "~@:_Its associated name (as in ~S) is ~S."
+  (format s "~@:_~@<Its associated name (as in ~S) is ~2I~_~S.~:>"
 	  'function-lambda-expression
 	  (%fun-name x))
   (case (widetag-of x)

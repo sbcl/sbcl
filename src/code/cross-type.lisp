@@ -66,29 +66,27 @@
     (warn "possible floating point information loss in ~S" call)))
 
 (defun sb!xc:type-of (object)
-  (labels (;; FIXME: This function is a no-op now that we no longer
-	   ;; have a distinct package T%CL to translate
-	   ;; for-the-target-Lisp CL symbols to, and should go away
-	   ;; completely.
-	   (translate (expr) expr))
-    (let ((raw-result (type-of object)))
-      (cond ((or (subtypep raw-result 'float)
-		 (subtypep raw-result 'complex))
-	     (warn-possible-cross-type-float-info-loss
-	      `(sb!xc:type-of ,object))
-	     (translate raw-result))
-	    ((subtypep raw-result 'integer)
-	     (cond ((<= 0 object 1)
-		    'bit)
-		   ((fixnump object)
-		    'fixnum)
-		   (t
-		    'integer)))
-	    ((some (lambda (type) (subtypep raw-result type))
-		   '(array character list symbol))
-	     (translate raw-result))
-	    (t
-	     (error "can't handle TYPE-OF ~S in cross-compilation"))))))
+  (let ((raw-result (type-of object)))
+    (cond ((or (subtypep raw-result 'float)
+	       (subtypep raw-result 'complex))
+	   (warn-possible-cross-type-float-info-loss
+	    `(sb!xc:type-of ,object))
+	   raw-result)
+	  ((subtypep raw-result 'integer)
+	   (cond ((<= 0 object 1)
+		  'bit)
+		 (;; We can't rely on the host's opinion of whether
+		  ;; it's a FIXNUM, but instead test against target
+		  ;; MOST-fooITIVE-FIXNUM limits.
+		  (fixnump object)
+		  'fixnum)
+		 (t
+		  'integer)))
+	  ((some (lambda (type) (subtypep raw-result type))
+		 '(array character list symbol))
+	   raw-result)
+	  (t
+	   (error "can't handle TYPE-OF ~S in cross-compilation")))))
 
 ;;; Is SYMBOL in the CL package? Note that we're testing this on the
 ;;; cross-compilation host, which could do things any old way. In
@@ -278,11 +276,20 @@
 		  (destructuring-bind (predicate-name) rest
 		    (if (and (in-cl-package-p predicate-name)
 			     (fboundp predicate-name))
-			;; Many things like KEYWORDP, ODDP, PACKAGEP,
+			;; Many predicates like KEYWORDP, ODDP, PACKAGEP,
 			;; and NULL correspond between host and target.
-			(values (not (null (funcall predicate-name
-						    host-object)))
-				t)
+			;; But we still need to handle errors, because
+			;; the code which calls us may not understand
+			;; that a type is unreachable. (E.g. when compiling
+			;; (AND STRING (SATISFIES ARRAY-HAS-FILL-POINTER-P))
+			;; CTYPEP may be called on the SATISFIES expression
+			;; even for non-STRINGs.)
+			(multiple-value-bind (result error?)
+			    (ignore-errors (funcall predicate-name
+						    host-object))
+			  (if error?
+			      (values nil nil)
+			      (values result t)))
 			;; For symbols not in the CL package, it's not
 			;; in general clear how things correspond
 			;; between host and target, so we punt.

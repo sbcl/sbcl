@@ -26,9 +26,9 @@
 ;;; desiderata:
 ;;;   * Non-commutativity keeps us from hashing e.g. #(1 5) to the
 ;;;     same value as #(5 1), and ending up in real trouble in some
-;;;     special cases like bit vectors the way that CMUCL SXHASH 18b
+;;;     special cases like bit vectors the way that CMUCL 18b SXHASH 
 ;;;     does. (Under CMUCL 18b, SXHASH of any bit vector is 1..)
-;;;   * We'd like to scatter our hash values the entire possible range
+;;;   * We'd like to scatter our hash values over the entire possible range
 ;;;     of values instead of hashing small or common key values (like
 ;;;     2 and NIL and #\a) to small FIXNUMs the way that the CMUCL 18b
 ;;;     SXHASH function does, again helping to avoid pathologies like

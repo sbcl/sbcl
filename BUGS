@@ -1236,6 +1236,32 @@ WORKAROUND:
   Enabling :SB-FLUID in the target-features list in sbcl-0.7.8 breaks
   the build.
 
+207: "poorly distributed SXHASH results for compound data"
+  SBCL's SXHASH could probably try a little harder. ANSI: "the
+  intent is that an implementation should make a good-faith
+  effort to produce hash-codes that are well distributed
+  within the range of non-negative fixnums". But
+	(let ((hits (make-hash-table)))
+	  (dotimes (i 16)
+	    (dotimes (j 16)
+	      (let* ((ij (cons i j))
+                     (newlist (push ij (gethash (sxhash ij) hits))))
+	        (when (cdr newlist)
+	          (format t "~&collision: ~S~%" newlist))))))
+  reports lots of collisions in sbcl-0.7.8. A stronger MIX function
+  would be an obvious way of fix. Maybe it would be acceptably efficient
+  to redo MIX using a lookup into a 256-entry s-box containing
+  29-bit pseudorandom numbers?
+
+208: "package confusion in PCL handling of structure slot handlers"
+  In sbcl-0.7.8 compiling and loading 
+	(in-package :cl)
+	(defstruct foo (slot (error "missing")) :type list :read-only t)
+	(defmethod print-object ((foo foo) stream) (print nil stream))
+  causes CERROR "attempting to modify a symbol in the COMMON-LISP
+  package: FOO-SLOT". (This is fairly bad code, but still it's hard
+  to see that it should cause symbols to be interned in the CL package.)
+
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:
     These labels were used for bugs related to the old IR1 interpreter.

@@ -1185,20 +1185,21 @@
 ;;; the CLM, but they are required for the implementation of
 ;;; WITH-OUTPUT-TO-STRING.
 
+(deftype string-with-fill-pointer ()
+  '(and string
+	(satisfies array-has-fill-pointer-p)))
+
 (defstruct (fill-pointer-output-stream
  	    (:include ansi-stream
 		      (out #'fill-pointer-ouch)
 		      (sout #'fill-pointer-sout)
 		      (misc #'fill-pointer-misc))
-	    (:constructor %make-fill-pointer-output-stream (string))
+	    (:constructor make-fill-pointer-output-stream (string))
 	    (:copier nil))
   ;; a string with a fill pointer where we stuff the stuff we write
-  (string (error "missing argument") :type string :read-only t))
-
-(defun make-fill-pointer-output-stream (string)
-  (declare (type string string))
-  (fill-pointer string) ; called for side effect of checking has-fill-pointer
-  (%make-fill-pointer-output-stream string))
+  (string (error "missing argument")
+	  :type string-with-fill-pointer
+	  :read-only t))
 
 (defun fill-pointer-ouch (stream character)
   (let* ((buffer (fill-pointer-output-stream-string stream))
