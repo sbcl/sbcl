@@ -36,6 +36,19 @@
 
 #include "validate.h"
 
+#ifdef LISP_FEATURE_SB_THREAD
+#error "Define threading support functions"
+#else
+struct thread *arch_os_get_current_thread() {
+    return all_threads;
+}
+int arch_os_thread_init(struct thread *thread) {
+    return 1;			/* success */
+}
+int arch_os_thread_cleanup(struct thread *thread) {
+    return 1;			/* success */
+}
+#endif
 
 os_context_register_t   *
 os_context_register_addr(os_context_t *context, int offset)

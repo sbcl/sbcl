@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <sched.h>
+#include <signal.h>
 #include <stddef.h>
 #ifndef CLONE_PARENT		/* lameass glibc 2.2  doesn't define this */
 #define CLONE_PARENT 0x00008000	/* even though the manpage documents it */
@@ -50,8 +51,13 @@ new_thread_trampoline(struct thread *th)
 	fprintf(stderr, "/continue\n");
     }
     th->unbound_marker = UNBOUND_MARKER_WIDETAG;
+#ifdef LISP_FEATURE_SB_THREAD
     /* wait here until our thread is linked into all_threads: see below */
     while(th->pid<1) sched_yield();
+#else
+    if(th->pid < 1)
+	lose("th->pid not set up right");
+#endif
 
     if(arch_os_thread_init(th)==0) 
 	return 1;		/* failure.  no, really */
@@ -249,8 +255,6 @@ struct thread *find_thread_by_pid(pid_t pid)
     return 0;
 }
 
-
-
 void block_sigcont(void)
 {
     /* don't allow ourselves to receive SIGCONT while we're in the
@@ -270,4 +274,3 @@ void unblock_sigcont_and_sleep(void)
     sigwaitinfo(&set,0);
     sigprocmask(SIG_UNBLOCK,&set,0);
 }
-

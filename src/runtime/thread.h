@@ -88,6 +88,7 @@ static inline void SetTlSymbolValue(u32 tagged_symbol_pointer,lispobj val, void 
 #endif
 }
 
-    
+int arch_os_thread_init(struct thread *thread);
+extern struct thread *arch_os_get_current_thread();
 
 #endif /* _INCLUDE_THREAD_H_ */

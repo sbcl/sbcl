@@ -159,13 +159,7 @@
   (def!constant dynamic-0-space-end     #x38000000)
   
   (def!constant dynamic-1-space-start   #x40000000)
-  (def!constant dynamic-1-space-end     #x48000000)
-
-  (def!constant control-stack-start   #x50000000)
-  (def!constant control-stack-end     #x51000000)
-
-  (def!constant binding-stack-start    #x60000000)
-  (def!constant binding-stack-end      #x61000000))  
+  (def!constant dynamic-1-space-end     #x48000000))  
 
 
 ;;;; other random constants.
@@ -222,6 +216,10 @@
     *current-catch-block*
     *current-unwind-protect-block*
 
+    *binding-stack-start*
+    *control-stack-start*
+    *control-stack-end*
+    
     ;; interrupt handling
     *free-interrupt-context-index*
     sb!unix::*interrupts-enabled*

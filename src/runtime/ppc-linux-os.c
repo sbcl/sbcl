@@ -41,10 +41,10 @@ size_t os_vm_page_size;
 struct thread *arch_os_get_current_thread() {
     return all_threads;
 }
-struct thread *arch_os_thread_init() {
+int arch_os_thread_init(struct thread *thread) {
     return 1;			/* success */
 }
-struct thread *arch_os_thread_cleanup() {
+int arch_os_thread_cleanup(struct thread *thread) {
     return 1;			/* success */
 }
 

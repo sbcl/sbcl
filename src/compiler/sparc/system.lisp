@@ -222,6 +222,8 @@
   (:generator 1
     (inst unimp pending-interrupt-trap)))
 
+#!+sb-thread
+(error "write a VOP for CURRENT-THREAD-OFFSET-SAP")
 
 (define-vop (halt)
   (:generator 1

@@ -17,8 +17,10 @@
 #include <sys/types.h>
 #include <stdlib.h>
 #include <strings.h>
+#if (defined(LISP_FEATURE_SB_THREAD) && defined(LISP_FEATURE_LINUX))
 #include <sys/ptrace.h>
 #include <linux/user.h>
+#endif
 #include <errno.h>
 
 #include "runtime.h"

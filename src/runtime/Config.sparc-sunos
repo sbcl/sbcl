@@ -22,6 +22,6 @@ ARCH_SRC = sparc-arch.c ldso-stubs.S
 OS_SRC = sunos-os.c sparc-sunos-os.c os-common.c 
 #LINKFLAGS+=-static 
 LINKFLAGS+= 
-OS_LIBS= -ldl -lsocket -lnsl 
+OS_LIBS= -ldl -lsocket -lnsl -lrt
 
 GC_SRC= cheneygc.c
