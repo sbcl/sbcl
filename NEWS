@@ -1059,6 +1059,8 @@ changes in sbcl-0.7.2 relative to sbcl-0.7.1:
        specification.)
 
 changes in sbcl-0.7.3 relative to sbcl-0.7.2:
+  * ANSI's DEFINE-SYMBOL-MACRO is now supported. (thanks to Nathan
+    Froyd porting CMU CL code originally by Douglas Thomas Crosher)
   * SBCL now runs on the PPC archtiecture under Linux. It actually did
     this as of 0.7.1.45, but was left out of the previous news section
     (thanks to Dan Barlow)
@@ -1070,8 +1072,8 @@ changes in sbcl-0.7.3 relative to sbcl-0.7.2:
     and V9 SPARCS, and also emission of code targeted to a particular
     backend chosen at runtime (thanks to Christophe Rhodes and Raymond
     Toy)
-  * ANSI's DEFINE-SYMBOL-MACRO is now supported. (thanks to Nathan
-    Froyd porting CMU CL code originally by Douglas Thomas Crosher)
+  * SBCL is closer to bootstrapping under CLISP, thanks to various
+    fixes by Christophe Rhodes.
   * The fasl file format has changed again, to allow the compiler's
     INFO database to support symbol macros.
   * The user manual (in doc/) is formatted into HTML more nicely.
@@ -1090,8 +1092,8 @@ changes in sbcl-0.7.3 relative to sbcl-0.7.2:
     future:) Brian Spilsbury has produced a Unicode-enabled variant of
     sbcl-0.7.0, available as a patch against sbcl-0.7.0 at
       <http://designix.com.au/brian/SBCL/sbcl-0.7.0-unicode.p0.gz>.
-  * Bugfix to GET-DISPATCH-MACRO-CHAR, now returning NIL for undefined
-    dispatch macro character combinations. (thanks to Alexey Dejenka)
+  * Bug 151 fixed: GET-DISPATCH-MACRO-CHAR now returns NIL for undefined
+    dispatch macro character combinations. (thanks to Alexey Dejneka)
   * Bugfix in PARSE-NAMESTRING: we now correctly parse unix namestrings 
     that superficially look like logical namestrings correctly.
   * USER-HOMEDIR-PATHNAME now returns a (physical) pathname that SBCL

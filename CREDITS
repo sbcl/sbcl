@@ -524,9 +524,9 @@ Cadabra, Inc. (later merged into GoTo.com):
 Douglas Crosher:
   He continued to improve CMU CL after SBCL forked from it, creating 
   many patches which were directly applicable to SBCL. Notable examples
-  include fixes for various compiler bugs, and a generalization
-  of the type system's handling of the CONS type to allow ANSI-style
-  (CONS FOO BAR) types. 
+  include fixes for various compiler bugs, the implementation of
+  CL:DEFINE-SYMBOL-MACRO, and a generalization of the type system's
+  handling of the CONS type to allow ANSI-style (CONS FOO BAR) types. 
 
 Alexey Dejneka:
   He has fixed many, many bugs. There's no single summary theme, but
@@ -571,6 +571,10 @@ Christophe Rhodes:
   SPARC port (and for CPU-architecture-neutral things motivated by
   it, like *BACKEND-FEATURES*). He's also contributed miscellaneous
   bug fixes.
+
+Brian Spilsbury:
+  He wrote Unicode-capable versions of SBCL's character, string, and
+  stream operations.
 
 Raymond Toy:
   He continued to work on CMU CL after the SBCL fork, especially on
