@@ -251,8 +251,8 @@
             (file-position ,stream-var (file-position ,stream-var))))
        (with-simple-restart (output-nothing
 			    "~@<Skip output of this character.~@:>")
-	 ,@body)
-      (incf (fd-stream-obuf-tail ,stream-var) ,size)
+	 ,@body
+	 (incf (fd-stream-obuf-tail ,stream-var) ,size))
       ,(ecase (car buffering)
 	 (:none
 	  `(flush-output-buffer ,stream-var))
