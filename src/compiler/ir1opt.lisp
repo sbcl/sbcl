@@ -336,12 +336,16 @@
               ;; thus the control transfer is a non-local exit.
               (not (eq (block-home-lambda block)
                        (block-home-lambda next)))
-              ;; Stack analysis phase wants ENTRY to start a block.
+              ;; Stack analysis phase wants ENTRY to start a block...
               (entry-p (block-start-node next))
               (let ((last (block-last block)))
                 (and (valued-node-p last)
                      (awhen (node-lvar last)
-                       (consp (lvar-uses it))))))
+                       (or 
+                        ;; ... and a DX-allocator to end a block.
+                        (lvar-dynamic-extent it)
+                        ;; FIXME: This is a partial workaround for bug 303.
+                        (consp (lvar-uses it)))))))
              nil)
             (t
              (join-blocks block next)

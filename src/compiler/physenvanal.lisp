@@ -38,6 +38,7 @@
 	(component-lambdas component))
 
   (find-non-local-exits component)
+  (recheck-dynamic-extent-lvars component)
   (find-cleanup-points component)
   (tail-annotate component)
 
@@ -325,6 +326,26 @@
 	  (if (eq (node-physenv exit) target-physenv)
 	      (maybe-delete-exit exit)
 	      (note-non-local-exit target-physenv exit))))))
+  (values))
+
+;;;; final decision on stack allocation of dynamic-extent structores
+(defun recheck-dynamic-extent-lvars (component)
+  (declare (type component component))
+  (dolist (lambda (component-lambdas component))
+    (loop for entry in (lambda-entries lambda)
+            for cleanup = (entry-cleanup entry)
+            do (when (eq (cleanup-kind cleanup) :dynamic-extent)
+                 (collect ((real-dx-lvars))
+                   (loop for lvar in (cleanup-info cleanup)
+                         do (let ((use (lvar-uses lvar)))
+                              (if (and (combination-p use)
+                                       (eq (basic-combination-kind use) :known)
+                                       (awhen (fun-info-stack-allocate-result
+                                               (basic-combination-fun-info use))
+                                         (funcall it use)))
+                                  (real-dx-lvars lvar)
+                                  (setf (lvar-dynamic-extent lvar) nil))))
+                   (setf (cleanup-info cleanup) (real-dx-lvars))))))
   (values))
 
 ;;;; cleanup emission

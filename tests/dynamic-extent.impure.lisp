@@ -35,5 +35,18 @@
   (callee rest))
 
 (assert (= (dxcaller 1 2 3 4 5 6 7) 22))
+
+;;; %NIP-VALUES
+(defun-with-dx foo ()
+  (flet ((bar (x &rest y)
+           (declare (dynamic-extent y))
+           (if (> x 0)
+               (values x (length y))
+               (values (car y)))))
+    (multiple-value-call #'list
+      (bar 1 2 3 4 5 6)
+      (bar -1 'a 'b))))
+
+(assert (equal (foo) '(1 5 a)))
 
 (sb-ext:quit :unix-status 104)

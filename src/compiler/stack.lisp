@@ -29,14 +29,15 @@
 	  (when (eq node last-pop)
 	    (setq saw-last t))
 
-	  (when lvar
-            (let ((dest (lvar-dest lvar))
-                  (2lvar (lvar-info lvar)))
-              (when (and (not (eq (node-block dest) block))
-                         2lvar
-                         (eq (ir2-lvar-kind 2lvar) :unknown))
-                (aver (or saw-last (not last-pop)))
-                (pushed lvar))))))
+	  (when (and lvar
+                     (or (lvar-dynamic-extent lvar)
+                         (let ((dest (lvar-dest lvar))
+                               (2lvar (lvar-info lvar)))
+                           (and (not (eq (node-block dest) block))
+                                2lvar
+                                (eq (ir2-lvar-kind 2lvar) :unknown)))))
+            (aver (or saw-last (not last-pop)))
+            (pushed lvar))))
 
       (setf (ir2-block-pushed 2block) (pushed))))
   (values))
@@ -86,7 +87,25 @@
                                               nle-start-stack)))
                          (setq new-end (merge-uvl-live-sets
                                         new-end next-stack))))
-                     block)
+                     block
+                     (lambda (dx-cleanup)
+                       (dolist (lvar (cleanup-info dx-cleanup))
+                         (let* ((generator (lvar-use lvar))
+                                (block (node-block generator))
+                                (2block (block-info block)))
+                           (aver (eq generator (block-last block)))
+                           ;; DX objects, living in the LVAR, are
+                           ;; alive in the environment, protected by
+                           ;; the CLEANUP. We also cannot move them
+                           ;; (because, in general, we cannot track
+                           ;; all references to them). Therefore,
+                           ;; everything, allocated deeper than a DX
+                           ;; object, should be kept alive until the
+                           ;; object is deallocated.
+                           (setq new-end (merge-uvl-live-sets
+                                          new-end (ir2-block-end-stack 2block)))
+                           (setq new-end (merge-uvl-live-sets
+                                          new-end (ir2-block-pushed 2block)))))))
 
     (setf (ir2-block-end-stack 2block) new-end)
 
@@ -268,10 +287,14 @@
 ;;; boundaries.
 (defun stack-analyze (component)
   (declare (type component component))
-  (let* ((2comp (component-info component))
-	 (receivers (ir2-component-values-receivers 2comp))
-	 (generators (find-values-generators receivers)))
+  (let* (#+nil(2comp (component-info component)) ; XXX
+	 #+nil(receivers (ir2-component-values-receivers 2comp))
+	 #+nil(generators (find-values-generators receivers)))
 
+    (do-blocks (block component)
+      (find-pushed-lvars block))
+
+    #+nil ; XXX
     (dolist (block generators)
       (find-pushed-lvars block))
 

@@ -40,7 +40,8 @@
 		     (storew reg ,list ,slot list-pointer-lowtag))))
 	     (let ((cons-cells (if star (1- num) num)))
 	       (pseudo-atomic
-		(allocation res (* (pad-data-block cons-size) cons-cells) node)
+		(allocation res (* (pad-data-block cons-size) cons-cells) node
+                            (awhen (sb!c::node-lvar node) (sb!c::lvar-dynamic-extent it)))
 		(inst lea res
 		      (make-ea :byte :base res :disp list-pointer-lowtag))
 		(move ptr res)

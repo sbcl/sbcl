@@ -77,7 +77,8 @@
   ;; recomputed: see LVAR-EXTERNALLY-CHECKABLE-TYPE.
   (%externally-checkable-type nil :type (or null ctype))
   ;; something or other that the back end annotates this lvar with
-  (info nil))
+  (info nil)
+  (dynamic-extent nil :type boolean))
 
 (def!method print-object ((x lvar) stream)
   (print-unreadable-object (x stream :type t :identity t)
@@ -430,13 +431,21 @@
   ;; non-messed-up environment. Null only temporarily. This could be
   ;; deleted due to unreachability.
   (mess-up nil :type (or node null))
-  ;; a list of all the NLX-INFO structures whose NLX-INFO-CLEANUP is
-  ;; this cleanup. This is filled in by physical environment analysis.
-  (nlx-info nil :type list))
+  ;; For all kinds, except :DYNAMIC-EXTENT: a list of all the NLX-INFO
+  ;; structures whose NLX-INFO-CLEANUP is this cleanup. This is filled
+  ;; in by physical environment analysis.
+  ;;
+  ;; For :DYNAMIC-EXTENT: a list of all DX LVARs, preserved by this
+  ;; cleanup. This is filled when the cleanup is created (now by
+  ;; locall call analysis) and is rechecked by physical environment
+  ;; analysis.
+  (info nil :type list))
 (defprinter (cleanup :identity t)
   kind
   mess-up
-  (nlx-info :test nlx-info))
+  (info :test info))
+(defmacro cleanup-nlx-info (cleanup)
+  `(cleanup-info ,cleanup))
 
 ;;; A PHYSENV represents the result of physical environment analysis.
 ;;;

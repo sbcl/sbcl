@@ -108,9 +108,12 @@
   (ltn-annotate nil :type (or function null))
   ;; If true, the special-case IR2 conversion method for this
   ;; function. This deals with funny functions, and anything else that
-  ;; can't be handled using the template mechanism. The Combination
+  ;; can't be handled using the template mechanism. The COMBINATION
   ;; node and the IR2-BLOCK are passed as arguments.
   (ir2-convert nil :type (or function null))
+  ;; If true, the function can stack-allocate the result. The
+  ;; COMBINATION node is passed as an argument.
+  (stack-allocate-result nil :type (or function null))
   ;; all the templates that could be used to translate this function
   ;; into IR2, sorted by increasing cost.
   (templates nil :type list)

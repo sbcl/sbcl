@@ -98,8 +98,12 @@
     (cond
      ((lvar-delayed-leaf lvar)
       (setf (ir2-lvar-kind info) :delayed))
-     (t (setf (ir2-lvar-locs info)
-              (list (make-normal-tn (ir2-lvar-primitive-type info)))))))
+     (t (let ((tn (make-normal-tn (ir2-lvar-primitive-type info))))
+          (setf (ir2-lvar-locs info) (list tn))
+          #!+stack-grows-downward-not-upward
+          (when (lvar-dynamic-extent lvar)
+            (setf (ir2-lvar-stack-pointer info)
+                  (make-stack-pointer-tn)))))))
   (ltn-annotate-casts lvar)
   (values))
 
@@ -118,6 +122,7 @@
 ;;; reference, otherwise we annotate for a single value.
 (defun annotate-fun-lvar (lvar &optional (delay t))
   (declare (type lvar lvar))
+  (aver (not (lvar-dynamic-extent lvar)))
   (let* ((tn-ptype (primitive-type (lvar-type lvar)))
 	 (info (make-ir2-lvar tn-ptype)))
     (setf (lvar-info lvar) info)
@@ -195,6 +200,7 @@
 (defun annotate-unknown-values-lvar (lvar)
   (declare (type lvar lvar))
 
+  (aver (not (lvar-dynamic-extent lvar)))
   (let ((2lvar (make-ir2-lvar nil)))
     (setf (ir2-lvar-kind 2lvar) :unknown)
     (setf (ir2-lvar-locs 2lvar) (make-unknown-values-locations))
@@ -219,6 +225,7 @@
 ;;; specified primitive TYPES.
 (defun annotate-fixed-values-lvar (lvar types)
   (declare (type lvar lvar) (list types))
+  (aver (not (lvar-dynamic-extent lvar)))   ; XXX
   (let ((res (make-ir2-lvar nil)))
     (setf (ir2-lvar-locs res) (mapcar #'make-normal-tn types))
     (setf (lvar-info lvar) res))

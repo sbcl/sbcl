@@ -694,7 +694,7 @@
 ;;; end. The tricky thing is a special cleanup block; all its nodes
 ;;; have the same cleanup info, corresponding to the start, so the
 ;;; same approach returns safe result.
-(defun map-block-nlxes (fun block)
+(defun map-block-nlxes (fun block &optional dx-cleanup-fun)
   (loop for cleanup = (block-end-cleanup block)
         then (node-enclosing-cleanup (cleanup-mess-up cleanup))
         while cleanup
@@ -709,7 +709,10 @@
                 (aver (combination-p mess-up))
                 (let* ((arg-lvar (first (basic-combination-args mess-up)))
                        (nlx-info (constant-value (ref-leaf (lvar-use arg-lvar)))))
-                (funcall fun nlx-info)))))))
+                (funcall fun nlx-info)))
+               ((:dynamic-extent)
+                (when dx-cleanup-fun
+                  (funcall dx-cleanup-fun cleanup)))))))
 
 ;;; Set the FLAG for all the blocks in COMPONENT to NIL, except for
 ;;; the head and tail which are set to T.

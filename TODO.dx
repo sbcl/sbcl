@@ -1,0 +1,10 @@
+* Bugs: multiple DX annotation; LVAR substitution.
+* Interaction with &REST.
+** Optimization: RETURN can clean the stack below returned values.
+* Non-X86 architectures.
+* Define (DEFOPTIMIZER (x STACK-ALLOCATE-RESULT)).
+* Restore stack analysis optimizations.
+* Why do we need %DYNAMIC-EXTENT-{START,END}, %CLEANUP-POINT?
+* Rename %POP-VALUES and similar to ???
+* Rename <arch>/values.lisp to <arch>/stack.lisp?
+* More stack-allocating functions.
