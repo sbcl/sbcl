@@ -91,8 +91,15 @@
      (setf old-value t1))))
 
 (defmacro with-mutex ((mutex &key value (wait-p t))  &body body)
-  (declare (ignore mutex value wait-p))
-  `(progn ,@body))
+  (cond ((not wait-p)
+	 `(unless (mutex-value ,mutex)
+	   (unwind-protect
+		(progn
+		  (setf (mutex-value ,mutex) (or ,value t))
+		  ,@body)
+	     (setf (mutex-value ,mutex) nil))))
+	(t 
+	 `(progn ,@body))))
 
 ;;; what's the best thing to do with these on unithread?
 #+NIl

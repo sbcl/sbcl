@@ -226,7 +226,7 @@
 
     ;; functions that the C code needs to call.  When adding to this list,
     ;; also add a `frob' form in genesis.lisp finish-symbols.
-    maybe-gc
+    sub-gc
     sb!kernel::internal-error
     sb!kernel::control-stack-exhausted-error
     sb!di::handle-breakpoint

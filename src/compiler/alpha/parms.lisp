@@ -186,7 +186,7 @@
     *posix-argv*
 
     ;; functions that the C code needs to call
-    maybe-gc
+    sub-gc
     sb!kernel::internal-error
     sb!kernel::control-stack-exhausted-error
     sb!di::handle-breakpoint

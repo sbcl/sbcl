@@ -34,7 +34,7 @@
       ,@body)
     (atomic-incf/symbol *gc-inhibit* -1)
     (when (and *need-to-collect-garbage* (zerop *gc-inhibit*))
-      (maybe-gc nil))))
+      (sub-gc))))
 
 
 ;;; EOF-OR-LOSE is a useful macro that handles EOF.
