@@ -214,3 +214,13 @@
   (let ((x 2d0))
     (loop for d of-type double-float downfrom 10d0 to 0d0 by x collect d))
   '(10d0 8d0 6d0 4d0 2d0 0d0)))
+
+(let ((fn (handler-case
+	      (compile nil '(lambda ()
+			     (declare (special x y))
+			     (loop thereis (pop x) thereis (pop y))))
+	    (warning (c) (error "Warned: ~S" c)))))
+  (let ((x (list nil nil 1))
+	(y (list nil 2 nil)))
+    (declare (special x y))
+    (assert (= (funcall fn) 2))))

@@ -479,8 +479,8 @@ code to be loaded.
 (defvar *loop-after-epilogue*)
 
 ;;; the "culprit" responsible for supplying a final value from the
-;;; loop. This is so LOOP-EMIT-FINAL-VALUE can moan about multiple
-;;; return values being supplied.
+;;; loop. This is so LOOP-DISALLOW-AGGREGATE-BOOLEANS can moan about
+;;; disallowed anonymous collections.
 (defvar *loop-final-value-culprit*)
 
 ;;; If this is true, we are in some branch of a conditional. Some
@@ -908,10 +908,6 @@ code to be loaded.
 (defun loop-emit-final-value (&optional (form nil form-supplied-p))
   (when form-supplied-p
     (push (loop-construct-return form) *loop-after-epilogue*))
-  (when *loop-final-value-culprit*
-    (loop-warn "The LOOP clause is providing a value for the iteration;~@
-		however, one was already established by a ~S clause."
-	       *loop-final-value-culprit*))
   (setq *loop-final-value-culprit* (car *loop-source-context*)))
 
 (defun loop-disallow-conditional (&optional kwd)
