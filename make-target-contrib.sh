@@ -14,6 +14,12 @@
 # provided with absolutely no warranty. See the COPYING and CREDITS
 # files for more information.
 
+# usually SBCL_HOME refers to the installed root of SBCL, not the
+# build directory.  Right now, however, where there are dependencies
+# between contrib packages, we want the _uninstalled_ versions to be
+# found
+export SBCL_HOME=`pwd`/contrib
+
 SBCL="`pwd`/src/runtime/sbcl --noinform --core `pwd`/output/sbcl.core --userinit /dev/null --sysinit /dev/null --disable-debugger"
 SBCL_BUILDING_CONTRIB=1
 export SBCL SBCL_BUILDING_CONTRIB

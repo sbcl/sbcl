@@ -1,4 +1,4 @@
-;;; This is asdf: Another System Definition Facility.  $Revision$
+;;; This is asdf: Another System Definition Facility.  $\Revision: 1.58 $
 ;;;
 ;;; Feedback, bug reports, and patches are all welcome: please mail to
 ;;; <cclan-list@lists.sf.net>.  But note first that the canonical
@@ -87,7 +87,7 @@
 
 (in-package #:asdf)
 
-(defvar *asdf-revision* (let* ((v "$\Revision: 1.57 $")
+(defvar *asdf-revision* (let* ((v "$\Revision: 1.58 $")
 			       (colon (position #\: v))
 			       (dot (position #\. v)))
 			  (and v colon dot 
@@ -805,6 +805,8 @@ Returns the new tree (which probably shares structure with the old one)"
 		       :key #'symbol-name :test 'equal)
 	append (list name val)))
 
+(defvar *serial-depends-on*)
+
 (defun parse-component-form (parent options)
   (destructuring-bind
 	(type name &rest rest &key
@@ -812,54 +814,62 @@ Returns the new tree (which probably shares structure with the old one)"
 	      ;; remove-keys form.  important to keep them in sync
 	      components pathname default-component-class
 	      perform explain output-files operation-done-p
-	      depends-on serialize in-order-to
+	      depends-on serial in-order-to
 	      ;; list ends
 	      &allow-other-keys) options
-    (declare (ignore serialize))
-	    ;; XXX add dependencies for serialized subcomponents
-	    (let* ((other-args (remove-keys
-				'(components pathname default-component-class
-				  perform explain output-files operation-done-p
-				  depends-on serialize in-order-to)
-				rest))
-		   (ret
-		    (or (find-component parent name)
-			(make-instance (class-for-type parent type)))))
-	      (apply #'reinitialize-instance
-		     ret
-		     :name (coerce-name name)
-		     :pathname pathname
-		     :parent parent
-		     :in-order-to (union-of-dependencies
-				   in-order-to
-				   `((compile-op (compile-op ,@depends-on))
-				     (load-op (load-op ,@depends-on))))
-		     :do-first `((compile-op (load-op ,@depends-on)))
-		     other-args)
-	      (when (typep ret 'module)
-		(setf (module-default-component-class ret)
-		      (or default-component-class
-			  (and (typep parent 'module)
-			       (module-default-component-class parent)))))
-	      (when components
-		(setf (module-components ret)
-		      (mapcar (lambda (x) (parse-component-form ret x)) components)))
-	      (loop for (n v) in `((perform ,perform) (explain ,explain)
-				   (output-files ,output-files)
-				   (operation-done-p ,operation-done-p))
-		    do (map 'nil
-			    ;; this is inefficient as most of the stored
-			    ;; methods will not be for this particular gf n
-			    ;; But this is hardly performance-critical
-			    (lambda (m) (remove-method (symbol-function n) m))
-			    (component-inline-methods ret))
-		    when v
-		    do (destructuring-bind (op qual (o c) &body body) v
-			 (pushnew
-			  (eval `(defmethod ,n ,qual ((,o ,op) (,c (eql ,ret)))
-				  ,@body))
-			  (component-inline-methods ret))))
-	      ret)))
+    (let* ((other-args (remove-keys
+			'(components pathname default-component-class
+			  perform explain output-files operation-done-p
+			  depends-on serial in-order-to)
+			rest))
+	   (ret
+	    (or (find-component parent name)
+		(make-instance (class-for-type parent type)))))
+      (when (boundp '*serial-depends-on*)
+	(setf depends-on
+	      (concatenate 'list *serial-depends-on* depends-on)))
+      (apply #'reinitialize-instance
+	     ret
+	     :name (coerce-name name)
+	     :pathname pathname
+	     :parent parent
+	     other-args)
+      (when (typep ret 'module)
+	(setf (module-default-component-class ret)
+	      (or default-component-class
+		  (and (typep parent 'module)
+		       (module-default-component-class parent))))
+	(let ((*serial-depends-on* nil))
+	  (setf (module-components ret)
+		(loop for c-form in components
+		      for c = (parse-component-form ret c-form)
+		      collect c
+		      if serial
+		      do (push (component-name c) *serial-depends-on*)))))
+      
+      (setf (slot-value ret 'in-order-to)
+	    (union-of-dependencies
+	     in-order-to
+	     `((compile-op (compile-op ,@depends-on))
+	       (load-op (load-op ,@depends-on))))
+	    (slot-value ret 'do-first) `((compile-op (load-op ,@depends-on))))
+      
+      (loop for (n v) in `((perform ,perform) (explain ,explain)
+			   (output-files ,output-files)
+			   (operation-done-p ,operation-done-p))
+	    do (map 'nil
+		    ;; this is inefficient as most of the stored
+		    ;; methods will not be for this particular gf n
+		    ;; But this is hardly performance-critical
+		    (lambda (m) (remove-method (symbol-function n) m))
+		    (component-inline-methods ret))
+	    when v
+	    do (destructuring-bind (op qual (o c) &body body) v
+		 (pushnew
+		  (eval `(defmethod ,n ,qual ((,o ,op) (,c (eql ,ret)))
+			  ,@body))
+		  (component-inline-methods ret))))
+      ret)))
 
 
 (defun resolve-symlinks (path)
@@ -926,8 +936,10 @@ output to *trace-output*.  Returns the shell's exit code."
 #+(and sbcl sbcl-hooks-require)
 (progn
   (defun module-provide-asdf (name)
-    (asdf:operate 'asdf:load-op name)
-    (provide name))
+    (let ((system (asdf:find-system name nil)))
+      (when system
+	(asdf:operate 'asdf:load-op name)
+	(provide name))))
 
   (pushnew
    (merge-pathnames "systems/"
