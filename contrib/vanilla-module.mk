@@ -1,5 +1,5 @@
 
-$(MODULE).fasl: $(MODULE).lisp
+$(MODULE).fasl: $(MODULE).lisp ../../output/sbcl.core
 	$(SBCL) --eval '(compile-file "$(MODULE)")' </dev/null
 
 test:: $(MODULE).fasl

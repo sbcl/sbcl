@@ -283,7 +283,7 @@ quit_cmd(char **ptr)
     fflush(stdout);
     fgets(buf, sizeof(buf), ldb_in);
     if (buf[0] == 'y' || buf[0] == 'Y' || buf[0] == '\n')
-        exit(0);
+        exit(1);
 }
 
 static void

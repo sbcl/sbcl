@@ -52,7 +52,17 @@
 		 (complex 1.5 -3/2) (complex 1.5 -1.5d0)
 	       
 		 #\x #\X #\*
+		 
+		 (copy-seq "foo") (copy-seq "foobar") (copy-seq "foobarbaz")
 
+		 (copy-seq #*)
+		 (copy-seq #*0) (copy-seq #*1)
+		 (copy-seq #*00) (copy-seq #*10)
+		 (copy-seq #*01) (copy-seq #*11)
+		 (copy-seq #*10010) (copy-seq #*100101) (bit-not #*01101)
+		 (make-array 6 :fill-pointer 6
+			     :element-type 'bit :initial-contents #*100101)
+		 
 		 #'allocate-instance #'no-applicable-method))
 	 (make-psxhash-extra-subtests ()
 	   (list (copy-seq "")
@@ -180,7 +190,8 @@
       ;; that the SXHASH distribution changes, not once every time the
       ;; tests are run.)
       (dolist (i sxhash-tests)
-	(unless (typep (sxhash i) '(and fixnum unsigned-byte))
+	(declare (notinline funcall))
+	(unless (typep (funcall #'sxhash i) '(and fixnum unsigned-byte))
 	  (error "bad SXHASH behavior for ~S" i))
 	(dolist (j sxhash-tests)
 	  (unless (eq (t->boolean (equal i j))
