@@ -38,5 +38,3 @@ typedef int os_vm_prot_t;
 
 #define SIG_MEMORY_FAULT SIGSEGV
 
-/* /usr/include/asm/sigcontext.h  */
-typedef long os_context_register_t ;

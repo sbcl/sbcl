@@ -1,0 +1,22 @@
+# This software is part of the SBCL system. See the README file for
+# more information.
+#
+# This software is derived from the CMU CL system, which was
+# written at Carnegie Mellon University and released into the
+# public domain. The software is in the public domain and is
+# provided with absolutely no warranty. See the COPYING and CREDITS
+# files for more information.
+
+CFLAGS += -g -O0
+LD = ld 
+LINKFLAGS = -v -g 
+NM = nm -p
+
+ASSEM_SRC = mips-assem.S #hppa-linux-stubs.S
+ARCH_SRC = mips-arch.c undefineds.c
+
+OS_SRC = linux-os.c  mips-linux-os.c os-common.c 
+LINKFLAGS+=-static
+OS_LIBS= -ldl
+
+GC_SRC= cheneygc.c

@@ -750,6 +750,7 @@ retained, possibly temporariliy, because it might be used internally."
 	     
              ;; ..and DEFTYPEs..
              "INDEX" "LOAD/STORE-INDEX"
+	     "SIGNED-BYTE-WITH-A-BITE-OUT"
 	     "UNSIGNED-BYTE-WITH-A-BITE-OUT"
              ;; ..and type predicates
              "INSTANCEP"

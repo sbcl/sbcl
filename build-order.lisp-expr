@@ -207,15 +207,15 @@
  
  ;; KLUDGE: I'd prefer to have this done with a "code/target" softlink
  ;; instead of a bunch of reader macros. -- WHN 19990308
- #!+pmax ("src/code/pmax-vm" :not-host)
- #!+(and sparc svr4) ("src/code/sparc-svr4-vm" :not-host)
- #!+(and sparc (not svr4)) ("src/code/sparc-vm" :not-host)
- #!+rt    ("src/code/rt-vm"    :not-host)
+ #!+sparc ("src/code/sparc-vm" :not-host)
  #!+hppa  ("src/code/hppa-vm"  :not-host)
  #!+x86   ("src/code/x86-vm"   :not-host)
  #!+ppc   ("src/code/ppc-vm"   :not-host)
  #!+alpha ("src/code/alpha-vm" :not-host)
- #!+sgi   ("src/code/sgi-vm"   :not-host)
+ #!+mips  ("src/code/mips-vm"  :not-host)
+
+ ;; FIXME: do we really want to keep this? -- CSR, 2002-08-31
+ #!+rt    ("src/code/rt-vm"    :not-host)
 
  ("src/code/target-signal" :not-host) ; needs OS-CONTEXT-T from x86-vm
 

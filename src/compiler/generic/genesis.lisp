@@ -1740,7 +1740,23 @@
 		  (logior (ash bits 3)
 			  (logand (bvref-32 gspace-bytes gspace-byte-offset)
 				  #xffe0e002)))))))
-      (:ppc
+      (:mips
+       (ecase kind
+	 (:jump
+	  (assert (zerop (ash value -28)))
+	  (setf (ldb (byte 26 0) 
+		     (bvref-32 gspace-bytes gspace-byte-offset))
+		(ash value -2)))
+	 (:lui
+	  (setf (bvref-32 gspace-bytes gspace-byte-offset)
+		(logior (mask-field (byte 16 16) (bvref-32 gspace-bytes gspace-byte-offset))
+			(+ (ash value -16)
+			   (if (logbitp 15 value) 1 0)))))
+	 (:addi
+	  (setf (bvref-32 gspace-bytes gspace-byte-offset)
+		(logior (mask-field (byte 16 16) (bvref-32 gspace-bytes gspace-byte-offset))
+			(ldb (byte 16 0) value))))))
+       (:ppc
        (ecase kind
          (:ba
           (setf (bvref-32 gspace-bytes gspace-byte-offset)

@@ -40,11 +40,20 @@
 ;;; alpha platform. -- CSR, 2002-06-24
 (def!type unsigned-byte-with-a-bite-out (s bite)
   (cond ((eq s '*) 'integer)
-        ((and (integerp s) (> s 1))
+        ((and (integerp s) (> s 0))
          (let ((bound (ash 1 s)))
            `(integer 0 ,(- bound bite 1))))
         (t
-         (error "Bad size specified for SIGNED-BYTE type specifier: ~S." s))))
+         (error "Bad size specified for UNSIGNED-BYTE type specifier: ~S." s))))
+
+;;; Motivated by the mips port. -- CSR, 2002-08-22
+(def!type signed-byte-with-a-bite-out (s bite)
+  (cond ((eq s '*) 'integer)
+	((and (integerp s) (> s 1))
+	 (let ((bound (ash 1 (1- s))))
+	   `(integer ,(- bound) ,(- bound bite 1))))
+	(t
+	 (error "Bad size specified for SIGNED-BYTE type specifier: ~S." s))))
 
 (def!type load/store-index (scale lowtag min-offset
 				 &optional (max-offset min-offset))

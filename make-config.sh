@@ -36,6 +36,8 @@ case `uname -m` in
     sun*) guessed_sbcl_arch=sparc ;;
     ppc) guessed_sbcl_arch=ppc ;;
     parisc) guessed_sbcl_arch=hppa ;;
+    mips) guessed_sbcl_arch=mips ;;
+    mipsel) guessed_sbcl_arch=mips; little_endian=yes ;;
     *)
         # If we're not building on a supported target architecture, we
 	# we have no guess, but it's not an error yet, since maybe
@@ -62,6 +64,8 @@ printf ":%s" "$sbcl_arch" >> $ltf
 # similar with :STACK-GROWS-FOOWARD, too. -- WHN 2002-03-03
 if [ "$sbcl_arch" = "x86" ] ; then
     printf ' :gencgc :stack-grows-downward-not-upward :c-stack-is-control-stack' >> $ltf
+elif [ "$sbcl_arch" = "mips" -a "$little_endian" = "yes" ] ; then
+    printf ' :little-endian' >> $ltf
 else
     # Nothing need be done in this case, but sh syntax wants a placeholder.
     echo > /dev/null
