@@ -600,9 +600,15 @@
 	(t
 	 (unless *cold-load-dump*
 	   (dump-fop 'fop-normal-load file))
+         #+sb-xc-host
 	 (dump-simple-base-string
           (coerce (package-name pkg) 'simple-base-string)
           file)
+         #-sb-xc-host
+	 (#!+sb-unicode dump-simple-character-string
+          #!-sb-unicode dump-simple-base-string
+	  (coerce (package-name pkg) '(simple-array character (*)))
+	  file)
 	 (dump-fop 'fop-package file)
 	 (unless *cold-load-dump*
 	   (dump-fop 'fop-maybe-cold-load file))
@@ -733,10 +739,24 @@
 					(*)))
 			    x)))
     (typecase simple-version
+      #+sb-xc-host
+      (simple-string
+       (unless (string-check-table x file)
+         (dump-simple-base-string simple-version file)
+         (string-save-object x file)))
+      #-sb-xc-host
       (simple-base-string
-       (unless (equal-check-table x file)
+       (unless (string-check-table x file)
 	 (dump-simple-base-string simple-version file)
-	 (equal-save-object x file)))
+	 (string-save-object x file)))
+      #-sb-xc-host
+      ((simple-array character (*))
+       #!+sb-unicode
+       (unless (string-check-table x file)
+	 (dump-simple-character-string simple-version file)
+	 (string-save-object x file))
+       #!-sb-unicode
+       (bug "how did we get here?"))
       (simple-vector
        (dump-simple-vector simple-version file)
        (eq-save-object x file))
@@ -979,7 +999,10 @@
 		      file)
 	   (dump-word pname-length file)))
 
-    (dump-base-chars-of-string pname file)
+    #+sb-xc-host (dump-base-chars-of-string pname file)
+    #-sb-xc-host (#!+sb-unicode dump-characters-of-string
+                  #!-sb-unicode dump-base-chars-of-string
+                  pname file)
 
     (unless *cold-load-dump*
       (setf (gethash s (fasl-output-eq-table file))

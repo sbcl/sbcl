@@ -1112,6 +1112,38 @@
   (setf (sap-ref-8 sap tail) bits)
   (code-char byte))
 
+#!+sb-unicode
+(let ((latin-9-table (let ((table (make-string 256)))
+                       (do ((i 0 (1+ i)))
+                           ((= i 256))
+                         (setf (aref table i) (code-char i)))
+                       (setf (aref table #xa4) (code-char #x20ac))
+                       (setf (aref table #xa6) (code-char #x0160))
+                       (setf (aref table #xa8) (code-char #x0161))
+                       (setf (aref table #xb4) (code-char #x017d))
+                       (setf (aref table #xb8) (code-char #x017e))
+                       (setf (aref table #xbc) (code-char #x0152))
+                       (setf (aref table #xbd) (code-char #x0153))
+                       (setf (aref table #xbe) (code-char #x0178))
+                       table))
+      (latin-9-reverse-1 (make-array 16
+                                     :element-type '(unsigned-byte 21)
+                                     :initial-contents '(#x0160 #x0161 #x0152 #x0153 0 0 0 0 #x0178 0 0 0 #x20ac #x017d #x017e 0)))
+      (latin-9-reverse-2 (make-array 16
+                                     :element-type '(unsigned-byte 8)
+                                     :initial-contents '(#xa6 #xa8 #xbc #xbd 0 0 0 0 #xbe 0 0 0 #xa4 #xb4 #xb8 0))))
+  (define-external-format (:latin-9 :latin9 :iso-8859-15)
+      1
+    (setf (sap-ref-8 sap tail)
+          (if (< bits 256)
+              (if (= bits (char-code (aref latin-9-table bits)))
+                  bits
+                  (error "cannot encode ~A in latin-9" bits))
+              (if (= (aref latin-9-reverse-1 (logand bits 15)) bits)
+                  (aref latin-9-reverse-2 (logand bits 15))
+                  (error "cannot encode ~A in latin-9" bits))))
+    (aref latin-9-table byte)))
+
 (define-external-format/variable-width (:utf-8 :utf8)
   (let ((bits (char-code byte)))
     (cond ((< bits #x80) 1)

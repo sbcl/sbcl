@@ -72,7 +72,8 @@
 			    :kind :fixed
 			    :length size))))))
 
-(dolist (code (list complex-base-string-widetag simple-array-widetag
+(dolist (code (list #!+sb-unicode complex-character-string-widetag
+                    complex-base-string-widetag simple-array-widetag
 		    complex-bit-vector-widetag complex-vector-widetag
 		    complex-array-widetag complex-vector-nil-widetag))
   (setf (svref *meta-room-info* code)
@@ -121,6 +122,12 @@
       (make-room-info :name 'simple-base-string
 		      :kind :string
 		      :length 0))
+
+#!+sb-unicode
+(setf (svref *meta-room-info* simple-character-string-widetag)
+      (make-room-info :name 'simple-character-string
+		      :kind :string
+		      :length 2))
 
 (setf (svref *meta-room-info* simple-array-nil-widetag)
       (make-room-info :name 'simple-array-nil
@@ -467,6 +474,7 @@
 	     #.single-float-widetag
 	     #.double-float-widetag
 	     #.simple-base-string-widetag
+             #!+sb-unicode #.simple-character-string-widetag
 	     #.simple-array-nil-widetag
 	     #.simple-bit-vector-widetag
 	     #.simple-array-unsigned-byte-2-widetag

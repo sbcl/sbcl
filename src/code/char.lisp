@@ -12,8 +12,8 @@
 
 (in-package "SB!IMPL")
 
-(def!constant sb!xc:char-code-limit 256
+(def!constant sb!xc:char-code-limit #!-sb-unicode 256 #!+sb-unicode #x110000
   #!+sb-doc
   "the upper exclusive bound on values produced by CHAR-CODE")
 
-(def!constant base-char-code-limit 256)
+(def!constant base-char-code-limit #!-sb-unicode 256 #!+sb-unicode 128)

@@ -1243,6 +1243,21 @@ NIL is returned when no such class exists."
       :inherits (base-string simple-string string vector simple-array
 		 array sequence)
       :prototype-form (make-array 0 :element-type 'base-char))
+     #!+sb-unicode
+     (character-string
+      :translation (vector character)
+      :codes (#.sb!vm:complex-character-string-widetag)
+      :direct-superclasses (string)
+      :inherits (string vector array sequence)
+      :prototype-form (make-array 0 :element-type 'character :fill-pointer t))
+     #!+sb-unicode
+     (simple-character-string
+      :translation (simple-array character (*))
+      :codes (#.sb!vm:simple-character-string-widetag)
+      :direct-superclasses (character-string simple-string)
+      :inherits (character-string simple-string string vector simple-array
+		 array sequence)
+      :prototype-form (make-array 0 :element-type 'character))
      (list
       :translation (or cons (member nil))
       :inherits (sequence))

@@ -91,8 +91,11 @@
     ;; and for all in any reasonable user programs.)
     ((t)
      (values #.sb!vm:simple-vector-widetag #.sb!vm:n-word-bits))
-    ((base-char standard-char character)
+    ((base-char standard-char #!-sb-unicode character)
      (values #.sb!vm:simple-base-string-widetag #.sb!vm:n-byte-bits))
+    #!+sb-unicode
+    ((character)
+     (values #.sb!vm:simple-character-string-widetag #.sb!vm:n-word-bits))
     ((bit)
      (values #.sb!vm:simple-bit-vector-widetag 1))
     ;; OK, we have to wade into SUBTYPEPing after all.
@@ -110,8 +113,11 @@
     ;; Pick off some easy common cases.
     ((t)
      #.sb!vm:complex-vector-widetag)
-    ((base-char character)
+    ((base-char #!-sb-unicode character)
      #.sb!vm:complex-base-string-widetag)
+    #!+sb-unicode
+    ((character)
+     #.sb!vm:complex-character-string-widetag)
     ((nil)
      #.sb!vm:complex-vector-nil-widetag)
     ((bit)
@@ -120,7 +126,12 @@
     (t
      (pick-vector-type type
        (nil #.sb!vm:complex-vector-nil-widetag)
+       #!-sb-unicode
        (character #.sb!vm:complex-base-string-widetag)
+       #!+sb-unicode
+       (base-char #.sb!vm:complex-base-string-widetag)
+       #!+sb-unicode
+       (character #.sb!vm:complex-character-string-widetag)
        (bit #.sb!vm:complex-bit-vector-widetag)
        (t #.sb!vm:complex-vector-widetag)))))
 
@@ -148,11 +159,15 @@
 		 (array (allocate-vector
 			 type
 			 length
-			 (ceiling (* (if (= type sb!vm:simple-base-string-widetag)
-					 (1+ length)
-					 length)
-				     n-bits)
-				  sb!vm:n-word-bits))))
+			 (ceiling
+                          (* (if (or (= type sb!vm:simple-base-string-widetag)
+                                     #!+sb-unicode
+                                     (= type
+                                        sb!vm:simple-character-string-widetag))
+                                 (1+ length)
+                                 length)
+                             n-bits)
+                          sb!vm:n-word-bits))))
 	    (declare (type index length))
 	    (when initial-element-p
 	      (fill array initial-element))
@@ -854,7 +869,9 @@
 	  ,@(map 'list
 		 (lambda (saetp)
 		   `((simple-array ,(sb!vm:saetp-specifier saetp) (*))
-		     ,(if (eq (sb!vm:saetp-specifier saetp) 'character)
+		     ,(if (or (eq (sb!vm:saetp-specifier saetp) 'character)
+                              #!+sb-unicode
+			      (eq (sb!vm:saetp-specifier saetp) 'base-char))
 			  *default-init-char-form*
 			  (sb!vm:saetp-initial-element-default saetp))))
 		 (remove-if-not

@@ -66,7 +66,8 @@
 
 (!define-type-vops simple-string-p check-simple-string nil
     object-not-simple-string-error
-  (simple-base-string-widetag simple-array-nil-widetag))
+  (#!+sb-unicode simple-character-string-widetag
+   simple-base-string-widetag simple-array-nil-widetag))
 
 (macrolet
     ((define-simple-array-type-vops ()
@@ -109,11 +110,15 @@
   (funcallable-instance-header-widetag))
 
 (!define-type-vops array-header-p nil nil nil
-  (simple-array-widetag complex-base-string-widetag complex-bit-vector-widetag
+  (simple-array-widetag
+   #!+sb-unicode complex-character-string-widetag
+   complex-base-string-widetag complex-bit-vector-widetag
    complex-vector-widetag complex-array-widetag complex-vector-nil-widetag))
 
 (!define-type-vops stringp check-string nil object-not-string-error
-  (simple-base-string-widetag complex-base-string-widetag
+  (#!+sb-unicode simple-character-string-widetag
+   #!+sb-unicode complex-character-string-widetag
+   simple-base-string-widetag complex-base-string-widetag
    simple-array-nil-widetag complex-vector-nil-widetag))
 
 (!define-type-vops base-string-p check-base-string nil object-not-base-string-error
@@ -126,6 +131,11 @@
 (!define-type-vops vector-nil-p check-vector-nil nil
     object-not-vector-nil-error
   (simple-array-nil-widetag complex-vector-nil-widetag))
+
+#!+sb-unicode
+(!define-type-vops character-string-p check-character-string nil
+    object-not-character-string-error
+  (simple-character-string-widetag complex-character-string-widetag))
 
 (!define-type-vops vectorp check-vector nil object-not-vector-error
   (complex-vector-widetag .

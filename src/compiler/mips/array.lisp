@@ -10,10 +10,8 @@
 ;;;; files for more information.
 
 (in-package "SB!VM")
-
 
 ;;;; Allocator for the array header.
-
 (define-vop (make-array-header)
   (:policy :fast-safe)
   (:translate make-array-header)
@@ -37,7 +35,6 @@
       (inst or result alloc-tn other-pointer-lowtag)
       (storew header result 0 other-pointer-lowtag)
       (inst addu alloc-tn bytes))))
-
 
 ;;;; Additional accessors and setters for the array header.
 (define-full-reffer %array-dimension *
@@ -59,12 +56,8 @@
     (inst sra temp n-widetag-bits)
     (inst subu temp (1- array-dimensions-offset))
     (inst sll res temp 2)))
-
-
 
 ;;;; Bounds checking routine.
-
-
 (define-vop (check-bound)
   (:translate %check-bound)
   (:policy :fast-safe)
@@ -82,15 +75,12 @@
       (inst beq temp zero-tn error)
       (inst nop)
       (move result index))))
-
-
 
 ;;;; Accessors/Setters
 
 ;;; Variants built on top of word-index-ref, etc.  I.e. those vectors whos
 ;;; elements are represented in integer registers and are built out of
 ;;; 8, 16, or 32 bit elements.
-
 (macrolet ((def-full-data-vector-frobs (type element-type &rest scs)
   `(progn
      (define-full-reffer ,(symbolicate "DATA-VECTOR-REF/" type) ,type
@@ -116,6 +106,8 @@
   
   (def-partial-data-vector-frobs simple-base-string base-char 
     :byte nil base-char-reg)
+  #!+sb-unicode
+  (def-full-data-vector-frobs simple-character-string character character-reg)
   
   (def-partial-data-vector-frobs simple-array-unsigned-byte-7 positive-fixnum
     :byte nil unsigned-reg signed-reg)
@@ -146,12 +138,8 @@
   (def-full-data-vector-frobs simple-array-signed-byte-32 signed-num
     signed-reg))
 
-
-
 ;;; Integer vectors whos elements are smaller than a byte.  I.e. bit, 2-bit,
 ;;; and 4-bit vectors.
-;;; 
-
 (macrolet ((def-small-data-vector-frobs (type bits)
   (let* ((elements-per-word (floor n-word-bits bits))
 	 (bit-shift (1- (integer-length elements-per-word))))
@@ -317,10 +305,7 @@
   (def-small-data-vector-frobs simple-array-unsigned-byte-2 2)
   (def-small-data-vector-frobs simple-array-unsigned-byte-4 4))
 
-
 ;;; And the float variants.
-;;; 
-
 (define-vop (data-vector-ref/simple-array-single-float)
   (:note "inline array access")
   (:translate data-vector-ref)
@@ -422,10 +407,8 @@
 		n-word-bytes))))
     (unless (location= result value)
       (inst fmove :double result value))))
-
 
 ;;; Complex float arrays.
-
 (define-vop (data-vector-ref/simple-array-complex-single-float)
   (:note "inline array access")
   (:translate data-vector-ref)
@@ -446,7 +429,6 @@
       (inst lwc1 imag-tn lip (- (* (1+ vector-data-offset) n-word-bytes)
 				other-pointer-lowtag)))
     (inst nop)))
-
 
 (define-vop (data-vector-set/simple-array-complex-single-float)
   (:note "inline array store")
@@ -530,38 +512,30 @@
 
 ;;; These VOPs are used for implementing float slots in structures (whose raw
 ;;; data is an unsigned-32 vector.
-;;;
 (define-vop (raw-ref-single data-vector-ref/simple-array-single-float)
   (:translate %raw-ref-single)
   (:arg-types sb!c::raw-vector positive-fixnum))
-;;;
 (define-vop (raw-set-single data-vector-set/simple-array-single-float)
   (:translate %raw-set-single)
   (:arg-types sb!c::raw-vector positive-fixnum single-float))
-;;;
 (define-vop (raw-ref-double data-vector-ref/simple-array-double-float)
   (:translate %raw-ref-double)
   (:arg-types sb!c::raw-vector positive-fixnum))
-;;;
 (define-vop (raw-set-double data-vector-set/simple-array-double-float)
   (:translate %raw-set-double)
   (:arg-types sb!c::raw-vector positive-fixnum double-float))
-
 (define-vop (raw-ref-complex-single
 	     data-vector-ref/simple-array-complex-single-float)
   (:translate %raw-ref-complex-single)
   (:arg-types sb!c::raw-vector positive-fixnum))
-;;;
 (define-vop (raw-set-complex-single
 	     data-vector-set/simple-array-complex-single-float)
   (:translate %raw-set-complex-single)
   (:arg-types sb!c::raw-vector positive-fixnum complex-single-float))
-;;;
 (define-vop (raw-ref-complex-double
 	     data-vector-ref/simple-array-complex-double-float)
   (:translate %raw-ref-complex-double)
   (:arg-types sb!c::raw-vector positive-fixnum))
-;;;
 (define-vop (raw-set-complex-double
 	     data-vector-set/simple-array-complex-double-float)
   (:translate %raw-set-complex-double)
@@ -569,17 +543,11 @@
 
 ;;; These vops are useful for accessing the bits of a vector irrespective of
 ;;; what type of vector it is.
-;;; 
-
 (define-full-reffer raw-bits * 0 other-pointer-lowtag (unsigned-reg) unsigned-num
   %raw-bits)
 (define-full-setter set-raw-bits * 0 other-pointer-lowtag (unsigned-reg)
   unsigned-num %set-raw-bits)
-
-
 
 ;;;; Misc. Array VOPs.
-
 (define-vop (get-vector-subtype get-header-data))
 (define-vop (set-vector-subtype set-header-data))
-

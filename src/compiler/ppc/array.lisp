@@ -111,9 +111,11 @@
        (:result-types ,element-type)))))
   (def-data-vector-frobs simple-base-string byte-index
     character character-reg)
+  #!+sb-unicode
+  (def-data-vector-frobs simple-character-string word-index
+    character character-reg)
   (def-data-vector-frobs simple-vector word-index
     * descriptor-reg any-reg)
-
   (def-data-vector-frobs simple-array-unsigned-byte-7 byte-index
     positive-fixnum unsigned-reg)
   (def-data-vector-frobs simple-array-unsigned-byte-8 byte-index

@@ -229,7 +229,9 @@
 
   ;; non-descriptor characters
   (character-reg registers
-		 :locations #.*byte-regs*
+		 :locations #!-sb-unicode #.*byte-regs*
+                            #!+sb-unicode #.*dword-regs*
+                 #!-sb-unicode #!-sb-unicode
 		 :reserve-locations (#.ah-offset #.al-offset)
 		 :constant-scs (immediate)
 		 :save-p t
@@ -322,11 +324,13 @@
   (catch-block stack :element-size kludge-nondeterministic-catch-block-size))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
-(defparameter *byte-sc-names* '(character-reg byte-reg character-stack))
+(defparameter *byte-sc-names*
+  '(#!-sb-unicode character-reg byte-reg #!-sb-unicode character-stack))
 (defparameter *word-sc-names* '(word-reg))
 (defparameter *dword-sc-names*
   '(any-reg descriptor-reg sap-reg signed-reg unsigned-reg control-stack
-    signed-stack unsigned-stack sap-stack single-stack constant))
+    signed-stack unsigned-stack sap-stack single-stack
+    #!+sb-unicode character-reg #!+sb-unicode character-stack constant))
 ;;; added by jrd. I guess the right thing to do is to treat floats
 ;;; as a separate size...
 ;;;

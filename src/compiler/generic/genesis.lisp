@@ -2106,6 +2106,11 @@ core and return a descriptor to it."
     (read-string-as-bytes *fasl-input-stream* string)
     (base-string-to-core string)))
 
+#!+sb-unicode
+(clone-cold-fop (fop-character-string)
+		(fop-small-character-string)
+  (bug "CHARACTER-STRING dumped by cross-compiler."))
+
 (clone-cold-fop (fop-vector)
 		(fop-small-vector)
   (let* ((size (clone-arg))

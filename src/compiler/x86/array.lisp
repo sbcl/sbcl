@@ -1239,6 +1239,79 @@
 
 ;;; simple-string
 
+#!+sb-unicode
+(progn
+(define-vop (data-vector-ref/simple-base-string)
+  (:translate data-vector-ref)
+  (:policy :fast-safe)
+  (:args (object :scs (descriptor-reg))
+	 (index :scs (unsigned-reg)))
+  (:arg-types simple-base-string positive-fixnum)
+  (:results (value :scs (character-reg)))
+  (:result-types character)
+  (:generator 5
+    (inst movzx value
+	  (make-ea :byte :base object :index index :scale 1
+		   :disp (- (* vector-data-offset n-word-bytes)
+			    other-pointer-lowtag)))))
+
+(define-vop (data-vector-ref-c/simple-base-string)
+  (:translate data-vector-ref)
+  (:policy :fast-safe)
+  (:args (object :scs (descriptor-reg)))
+  (:info index)
+  (:arg-types simple-base-string (:constant (signed-byte 30)))
+  (:results (value :scs (character-reg)))
+  (:result-types character)
+  (:generator 4
+    (inst movzx value
+	  (make-ea :byte :base object
+		   :disp (- (+ (* vector-data-offset n-word-bytes) index)
+			    other-pointer-lowtag)))))
+
+(define-vop (data-vector-set/simple-base-string)
+  (:translate data-vector-set)
+  (:policy :fast-safe)
+  (:args (object :scs (descriptor-reg) :to (:eval 0))
+	 (index :scs (unsigned-reg) :to (:eval 0))
+	 (value :scs (character-reg) :target eax))
+  (:arg-types simple-base-string positive-fixnum character)
+  (:temporary (:sc character-reg :offset eax-offset :target result
+                   :from (:argument 2) :to (:result 0))
+              eax)
+  (:results (result :scs (character-reg)))
+  (:result-types character)
+  (:generator 5
+    (move eax value)
+    (inst mov (make-ea :byte :base object :index index :scale 1
+		       :disp (- (* vector-data-offset n-word-bytes)
+				other-pointer-lowtag))
+	  al-tn)
+    (move result eax)))
+
+(define-vop (data-vector-set-c/simple-base-string)
+  (:translate data-vector-set)
+  (:policy :fast-safe)
+  (:args (object :scs (descriptor-reg) :to (:eval 0))
+	 (value :scs (character-reg)))
+  (:info index)
+  (:arg-types simple-base-string (:constant (signed-byte 30)) character)
+  (:temporary (:sc unsigned-reg :offset eax-offset :target result
+                   :from (:argument 1) :to (:result 0))
+              eax)
+  (:results (result :scs (character-reg)))
+  (:result-types character)
+  (:generator 4
+    (move eax value)
+    (inst mov (make-ea :byte :base object
+                       :disp (- (+ (* vector-data-offset n-word-bytes) index)
+                                other-pointer-lowtag))
+          al-tn)
+    (move result eax)))
+) ; PROGN
+
+#!-sb-unicode
+(progn
 (define-vop (data-vector-ref/simple-base-string)
   (:translate data-vector-ref)
   (:policy :fast-safe)
@@ -1283,7 +1356,7 @@
 	  value)
     (move result value)))
 
-(define-vop (data-vector-set/simple-base-string-c)
+(define-vop (data-vector-set-c/simple-base-string)
   (:translate data-vector-set)
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg) :to (:eval 0))
@@ -1298,6 +1371,16 @@
 			       other-pointer-lowtag))
 	 value)
    (move result value)))
+) ; PROGN
+
+#!+sb-unicode
+(define-full-reffer data-vector-ref/simple-character-string
+    simple-character-string vector-data-offset other-pointer-lowtag
+    (character-reg) character data-vector-ref)
+#!+sb-unicode
+(define-full-setter data-vector-ref/simple-character-string
+    simple-character-string vector-data-offset other-pointer-lowtag
+    (character-reg) character data-vector-set)
 
 ;;; signed-byte-8
 

@@ -1262,9 +1262,6 @@
 ;;; [CMUC]<steele>tradix.press. DO NOT EVEN THINK OF ATTEMPTING TO
 ;;; UNDERSTAND THIS CODE WITHOUT READING THE PAPER!
 
-(declaim (type (simple-array character (10)) *digits*))
-(defvar *digits* "0123456789")
-
 (defun flonum-to-string (x &optional width fdigits scale fmin)
   (cond ((zerop x)
 	 ;; Zero is a special case which FLOAT-STRING cannot handle.
@@ -1285,6 +1282,7 @@
 (defun float-string (fraction exponent precision width fdigits scale fmin)
   (let ((r fraction) (s 1) (m- 1) (m+ 1) (k 0)
 	(digits 0) (decpnt 0) (cutoff nil) (roundup nil) u low high
+        (digit-characters "0123456789")
 	(digit-string (make-array 50
 				  :element-type 'base-char
 				  :fill-pointer 0
@@ -1375,13 +1373,13 @@
       ;; Stop when either precision is exhausted or we have printed as
       ;; many fraction digits as permitted.
       (when (or low high (and cutoff (<= k cutoff))) (return))
-      (vector-push-extend (char *digits* u) digit-string)
+      (vector-push-extend (char digit-characters u) digit-string)
       (incf digits))
     ;; If cutoff occurred before first digit, then no digits are
     ;; generated at all.
     (when (or (not cutoff) (>= k cutoff))
       ;; Last digit may need rounding
-      (vector-push-extend (char *digits*
+      (vector-push-extend (char digit-characters
 				(cond ((and low (not high)) u)
 				      ((and high (not low)) (1+ u))
 				      (t (if (<= (ash r 1) s) u (1+ u)))))
@@ -1430,6 +1428,7 @@
   (let ((print-base 10) ; B
 	(float-radix 2) ; b
 	(float-digits (float-digits v)) ; p
+        (digit-characters "0123456789")
 	(min-e
 	 (etypecase v
 	   (single-float single-float-min-e)
@@ -1468,7 +1467,7 @@
 				      (and high-ok (= (+ r m+) s))))
 			(when (or tc1 tc2)
 			  (go end))
-			(vector-push-extend (char *digits* d) result)
+			(vector-push-extend (char digit-characters d) result)
 			(go loop)
 		      end
 			(let ((d (cond
@@ -1476,7 +1475,7 @@
 				   ((and tc1 (not tc2)) d)
 				   (t ; (and tc1 tc2)
 				    (if (< (* r 2) s) d (1+ d))))))
-			  (vector-push-extend (char *digits* d) result)
+			  (vector-push-extend (char digit-characters d) result)
 			  (return-from generate result))))))
 	  (if (>= e 0)
 	      (if (/= f (expt float-radix (1- float-digits)))

@@ -71,7 +71,8 @@
 ;;; of like READ-SEQUENCE specialized for files of (UNSIGNED-BYTE 8),
 ;;; with an automatic conversion from (UNSIGNED-BYTE 8) into CHARACTER
 ;;; for each element read
-(declaim (ftype (function (stream simple-string &optional index) (values)) read-string-as-bytes))
+(declaim (ftype (function (stream simple-string &optional index) (values))
+                read-string-as-bytes #!+sb-unicode read-string-as-words))
 (defun read-string-as-bytes (stream string &optional (length (length string)))
   (dotimes (i length)
     (setf (aref string i)
@@ -82,6 +83,17 @@
   ;; bootstrapping. Benchmark the non-portable version and see whether it's
   ;; significantly better than the portable version here. If it is, then use
   ;; it as an alternate definition, protected with #-SB-XC-HOST.
+  (values))
+#!+sb-unicode
+(defun read-string-as-words (stream string &optional (length (length string)))
+  #+sb-xc-host (bug "READ-STRING-AS-WORDS called")
+  (dotimes (i length)
+    (setf (aref string i)
+	  (sb!xc:code-char (logior
+                            (read-byte stream)
+                            (ash (read-byte stream) 8)
+                            (ash (read-byte stream) 16)
+                            (ash (read-byte stream) 24)))))
   (values))
 
 ;;;; miscellaneous fops
@@ -180,9 +192,16 @@
 			      (make-string (* ,n-size 2))))
 		      (done-with-fast-read-byte)
 		      (let ((,n-buffer *fasl-symbol-buffer*))
+                        #+sb-xc-host
 			(read-string-as-bytes *fasl-input-stream*
 					      ,n-buffer
 					      ,n-size)
+                        #-sb-xc-host
+			(#!+sb-unicode read-string-as-words
+                         #!-sb-unicode read-string-as-bytes
+                         *fasl-input-stream*
+                         ,n-buffer
+                         ,n-size)
 			(push-fop-table (without-package-locks
 					 (intern* ,n-buffer
 						  ,n-size
@@ -229,7 +248,10 @@
 		    (fop-uninterned-small-symbol-save 13)
   (let* ((arg (clone-arg))
 	 (res (make-string arg)))
+    #!-sb-unicode
     (read-string-as-bytes *fasl-input-stream* res)
+    #!+sb-unicode
+    (read-string-as-words *fasl-input-stream* res)
     (push-fop-table (make-symbol res))))
 
 (define-fop (fop-package 14)
@@ -346,6 +368,19 @@
 	 (res (make-string arg :element-type 'base-char)))
     (read-string-as-bytes *fasl-input-stream* res)
     res))
+
+#!+sb-unicode
+(progn
+  #+sb-xc-host
+  (define-cloned-fops (fop-character-string 161) (fop-small-character-string 162)
+    (bug "CHARACTER-STRING FOP encountered"))
+
+  #-sb-xc-host
+  (define-cloned-fops (fop-character-string 161) (fop-small-character-string 162)
+    (let* ((arg (clone-arg))
+           (res (make-string arg)))
+      (read-string-as-words *fasl-input-stream* res)
+      res)))
 
 (define-cloned-fops (fop-vector 39) (fop-small-vector 40)
   (let* ((size (clone-arg))

@@ -14,6 +14,17 @@
 ;;;; moves and coercions
 
 ;;; Move a tagged char to an untagged representation.
+#!+sb-unicode
+(define-vop (move-to-character)
+  (:args (x :scs (any-reg descriptor-reg) :target y
+            :load-if (not (location= x y))))
+  (:results (y :scs (character-reg)
+               :load-if (not (location= x y))))
+  (:note "character untagging")
+  (:generator 1
+    (move y x)
+    (inst shr y n-widetag-bits)))
+#!-sb-unicode
 (define-vop (move-to-character)
   (:args (x :scs (any-reg control-stack) :target al))
   (:temporary (:sc byte-reg :offset al-offset
@@ -27,9 +38,24 @@
     (move eax-tn x)
     (move y ah)))
 (define-move-vop move-to-character :move
-  (any-reg control-stack) (character-reg character-stack))
+  (any-reg #!-sb-unicode control-stack)
+  (character-reg #!-sb-unicode character-stack))
 
 ;;; Move an untagged char to a tagged representation.
+#!+sb-unicode
+(define-vop (move-from-character)
+  (:args (x :scs (character-reg)))
+  (:results (y :scs (any-reg descriptor-reg)))
+  (:note "character tagging")
+  (:generator 1
+    ;; FIXME: is this inefficient?  Is there a better way of writing
+    ;; it?  (fixnum tagging is done with LEA).  We can't use SHL
+    ;; because we either scribble over the source register or briefly
+    ;; have a non-descriptor in a descriptor register, unless we
+    ;; introduce a temporary.
+    (inst imul y x (ash 1 n-widetag-bits))
+    (inst or y character-widetag)))
+#!-sb-unicode
 (define-vop (move-from-character)
   (:args (x :scs (character-reg character-stack) :target ah))
   (:temporary (:sc byte-reg :offset al-offset :target y
@@ -44,7 +70,8 @@
     (inst and eax-tn #xffff)		; Remove any junk bits.
     (move y eax-tn)))
 (define-move-vop move-from-character :move
-  (character-reg character-stack) (any-reg descriptor-reg control-stack))
+  (character-reg #!-sb-unicode character-stack)
+  (any-reg descriptor-reg #!-sb-unicode control-stack))
 
 ;;; Move untagged character values.
 (define-vop (character-move)
@@ -74,9 +101,14 @@
       (character-reg
        (move y x))
       (character-stack
+       #!-sb-unicode
        (inst mov
 	     (make-ea :byte :base fp :disp (- (* (1+ (tn-offset y)) 4)))
-	     x)))))
+	     x)
+       #!+sb-unicode
+       (if (= (tn-offset fp) esp-offset)
+	   (storew x fp (tn-offset y))	; c-call
+	   (storew x fp (- (1+ (tn-offset y)))))))))
 (define-move-vop move-character-arg :move-arg
   (any-reg character-reg) (character-reg))
 
@@ -95,8 +127,22 @@
   (:results (res :scs (unsigned-reg)))
   (:result-types positive-fixnum)
   (:generator 1
-    (inst movzx res ch)))
+    #!-sb-unicode
+    (inst movzx res ch)
+    #!+sb-unicode
+    (inst mov res ch)))
 
+#!+sb-unicode
+(define-vop (code-char)
+  (:translate code-char)
+  (:policy :fast-safe)
+  (:args (code :scs (unsigned-reg unsigned-stack)))
+  (:arg-types positive-fixnum)
+  (:results (res :scs (character-reg)))
+  (:result-types character)
+  (:generator 1
+    (inst mov res code)))
+#!-sb-unicode
 (define-vop (code-char)
   (:translate code-char)
   (:policy :fast-safe)

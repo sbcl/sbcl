@@ -12,7 +12,6 @@
 (in-package "SB!VM")
 
 ;;;; allocator for the array header
-
 (define-vop (make-array-header)
   (:policy :fast-safe)
   (:translate make-array-header)
@@ -36,8 +35,6 @@
       (inst bis alloc-tn other-pointer-lowtag result)
       (storew header result 0 other-pointer-lowtag)
       (inst addq alloc-tn bytes alloc-tn))))
-
-
 
 ;;;; additional accessors and setters for the array header
 (define-full-reffer %array-dimension *
@@ -61,7 +58,6 @@
     (inst sll temp n-fixnum-tag-bits res)))
 
 ;;;; bounds checking routine
-
 (define-vop (check-bound)
   (:translate %check-bound)
   (:policy :fast-safe)
@@ -302,6 +298,8 @@
   
   (def-partial-data-vector-frobs simple-base-string character :byte nil
     character-reg)
+  #!+sb-unicode ; FIXME: what about when a word is 64 bits?
+  (def-full-data-vector-frobs simple-character-string character character-reg)
   
   (def-partial-data-vector-frobs simple-array-unsigned-byte-7 positive-fixnum
     :byte nil unsigned-reg signed-reg)

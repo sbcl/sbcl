@@ -712,16 +712,35 @@
 			    sb!vm:n-byte-bits)))
      string1))
 
+;;; KLUDGE: This isn't the nicest way of achieving efficient string
+;;; streams, but it does work; a more general framework for this kind
+;;; of optimization, as well as better handling of the possible
+;;; keyword arguments, would be nice.
+#!+sb-unicode
+(deftransform replace ((string1 string2 &key (start1 0) (start2 0)
+				end1 end2)
+		       ((simple-array character (*))
+                        (simple-array character (*))
+                        &rest t)
+		       *
+		       ;; FIXME: consider replacing this policy test
+		       ;; with some tests for the STARTx and ENDx
+		       ;; indices being valid, conditional on high
+		       ;; SAFETY code.
+		       ;;
+		       ;; FIXME: It turns out that this transform is
+		       ;; critical for the performance of string
+		       ;; streams.  Make this more explicit.
+		       :policy (< (max safety space) 3))
+  `(sb!impl::simple-character-string-replace-from-simple-character-string*
+    string1 string2 start1 end1 start2 end2))
+
 ;;; FIXME: this would be a valid transform for certain excluded cases:
 ;;;   * :TEST 'CHAR= or :TEST #'CHAR=
 ;;;   * :TEST 'EQL   or :TEST #'EQL
 ;;;   * :FROM-END NIL (or :FROM-END non-NIL, with a little ingenuity)
-;;;
-;;; also, it should be noted that there's nothing much in this
-;;; transform (as opposed to the ones for REPLACE and CONCATENATE)
-;;; that particularly limits it to SIMPLE-BASE-STRINGs.
 (deftransform search ((pattern text &key (start1 0) (start2 0) end1 end2)
-		      (simple-base-string simple-base-string &rest t)
+		      (simple-string simple-string &rest t)
 		      *
 		      :policy (> speed (max space safety)))
   `(block search
@@ -744,6 +763,9 @@
 ;;; at least once DYNAMIC-EXTENT works.
 ;;;
 ;;; FIXME: currently KLUDGEed because of bug 188
+;;;
+;;; FIXME: disabled for sb-unicode: probably want it back
+#!-sb-unicode
 (deftransform concatenate ((rtype &rest sequences)
 			   (t &rest (or simple-base-string
 					(simple-array nil (*))))

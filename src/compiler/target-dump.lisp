@@ -13,6 +13,22 @@
 
 (in-package "SB!FASL")
 
+;;; a helper function shared by DUMP-SIMPLE-CHARACTER-STRING and
+;;; DUMP-SYMBOL (in the target compiler: the cross-compiler uses the
+;;; portability knowledge and always dumps BASE-STRINGS).
+#!+sb-unicode
+(defun dump-characters-of-string (s fasl-output)
+  (declare (type string s) (type fasl-output fasl-output))
+  (dovector (c s)
+    (dump-word (char-code c) fasl-output))
+  (values))
+#!+sb-unicode
+(defun dump-simple-character-string (s file)
+  (declare (type (simple-array character (*)) s))
+  (dump-fop* (length s) fop-small-character-string fop-character-string file)
+  (dump-characters-of-string s file)
+  (values))
+
 ;;; Dump the first N bytes of VEC out to FILE. VEC is some sort of unboxed
 ;;; vector-like thing that we can BLT from.
 (defun dump-raw-bytes (vec n fasl-output)

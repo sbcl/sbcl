@@ -148,6 +148,9 @@
 
 (define-source-transform atom (x)
   `(not (consp ,x)))
+#!+sb-unicode
+(define-source-transform base-char-p (x)
+  `(typep ,x 'base-char))
 
 ;;;; TYPEP source transform
 

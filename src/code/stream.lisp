@@ -419,30 +419,42 @@
 ;;; and hence must be an N-BIN method.
 (defun fast-read-char-refill (stream eof-error-p eof-value)
   (let* ((ibuf (ansi-stream-cin-buffer stream))
-	 (count (funcall (ansi-stream-n-bin stream)
-			 stream
-			 ibuf
-			 +ansi-stream-in-buffer-extra+
-			 (- +ansi-stream-in-buffer-length+
-			    +ansi-stream-in-buffer-extra+)
-			 nil))
-	 (start (- +ansi-stream-in-buffer-length+ count)))
+         (count (funcall (ansi-stream-n-bin stream)
+                         stream
+                         ibuf
+                         +ansi-stream-in-buffer-extra+
+                         (- +ansi-stream-in-buffer-length+
+                            +ansi-stream-in-buffer-extra+)
+                         nil))
+         (start (- +ansi-stream-in-buffer-length+ count))
+         (n-character-array-bytes
+          #.(/ (sb!vm:saetp-n-bits
+                (find 'character
+                      sb!vm:*specialized-array-element-type-properties*
+                      :key #'sb!vm:saetp-specifier))
+               sb!vm:n-byte-bits)))
     (declare (type index start count))
     (cond ((zerop count)
-	   (setf (ansi-stream-in-index stream) +ansi-stream-in-buffer-length+)
-	   (funcall (ansi-stream-in stream) stream eof-error-p eof-value))
-	  (t
-	   (when (/= start +ansi-stream-in-buffer-extra+)
-	     (bit-bash-copy ibuf (+ (* +ansi-stream-in-buffer-extra+
-				       sb!vm:n-byte-bits)
-				    (* sb!vm:vector-data-offset
-				       sb!vm:n-word-bits))
-			    ibuf (+ (the index (* start sb!vm:n-byte-bits))
-				    (* sb!vm:vector-data-offset
-				       sb!vm:n-word-bits))
-			    (* count sb!vm:n-byte-bits)))
-	   (setf (ansi-stream-in-index stream) (1+ start))
-	   (aref ibuf start)))))
+           (setf (ansi-stream-in-index stream)
+                 +ansi-stream-in-buffer-length+)
+           (funcall (ansi-stream-in stream) stream eof-error-p eof-value))
+          (t
+           (when (/= start +ansi-stream-in-buffer-extra+)
+             (bit-bash-copy ibuf (+ (* +ansi-stream-in-buffer-extra+
+                                       sb!vm:n-byte-bits
+                                       n-character-array-bytes)
+                                    (* sb!vm:vector-data-offset
+                                       sb!vm:n-word-bits))
+                            ibuf (+ (the index (* start
+                                                  sb!vm:n-byte-bits
+                                                  n-character-array-bytes))
+                                    (* sb!vm:vector-data-offset
+                                       sb!vm:n-word-bits))
+                            (* count
+                               sb!vm:n-byte-bits
+                               n-character-array-bytes)))
+           (setf (ansi-stream-in-index stream) (1+ start))
+           (aref ibuf start)))))
 
 ;;; This is similar to FAST-READ-CHAR-REFILL, but we don't have to
 ;;; leave room for unreading.

@@ -22,6 +22,8 @@
 	   complex-vector-p
 	   base-char-p %standard-char-p %instancep
 	   base-string-p simple-base-string-p
+           #!+sb-unicode character-string-p
+           #!+sb-unicode simple-character-string-p
 	   array-header-p
 	   simple-array-p simple-array-nil-p vector-nil-p
 	   simple-array-unsigned-byte-2-p

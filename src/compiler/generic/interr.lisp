@@ -61,6 +61,11 @@
    "Object is not of type STRING.")
   (object-not-base-string
    "Object is not of type BASE-STRING.")
+  (object-not-vector-nil
+   "Object is not of type (VECTOR NIL).")
+  #!+sb-unicode
+  (object-not-character-string
+   "Object is not of type (VECTOR CHARACTER).")
   (object-not-bit-vector
    "Object is not of type BIT-VECTOR.")
   (object-not-array
