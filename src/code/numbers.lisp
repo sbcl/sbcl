@@ -675,14 +675,67 @@
     (multiple-value-bind (res rem) (,op number divisor)
       (values (float res (if (floatp rem) rem 1.0)) rem))))
 
-(!define-float-rounding-function ffloor floor
-  "Same as FLOOR, but returns first value as a float.")
-(!define-float-rounding-function fceiling ceiling
-  "Same as CEILING, but returns first value as a float." )
-(!define-float-rounding-function ftruncate truncate
-  "Same as TRUNCATE, but returns first value as a float.")
-(!define-float-rounding-function fround round
-  "Same as ROUND, but returns first value as a float.")
+(defun ftruncate (number &optional (divisor 1))
+  #!+sb-doc
+  "Same as TRUNCATE, but returns first value as a float."
+  (macrolet ((ftruncate-float (rtype)
+	       `(let* ((float-div (coerce divisor ',rtype))
+		       (res (%unary-ftruncate (/ number float-div))))
+		  (values res
+			  (- number
+			     (* (coerce res ',rtype) float-div))))))
+    (number-dispatch ((number real) (divisor real))
+      (((foreach fixnum bignum ratio) (or fixnum bignum ratio))
+       (multiple-value-bind (q r)
+	   (truncate number divisor)
+	 (values (float q) r)))
+      (((foreach single-float double-float #!+long-float long-float)
+	(or rational single-float))
+       (if (eql divisor 1)
+	   (let ((res (%unary-ftruncate number)))
+	     (values res (- number (coerce res '(dispatch-type number)))))
+	   (ftruncate-float (dispatch-type number))))
+      #!+long-float
+      ((long-float (or single-float double-float long-float))
+       (ftruncate-float long-float))
+      #!+long-float
+      (((foreach double-float single-float) long-float)
+       (ftruncate-float long-float))
+      ((double-float (or single-float double-float))
+       (ftruncate-float double-float))
+      ((single-float double-float)
+       (ftruncate-float double-float))
+      (((foreach fixnum bignum ratio)
+	(foreach single-float double-float #!+long-float long-float))
+       (ftruncate-float (dispatch-type divisor))))))
+
+(defun ffloor (number &optional (divisor 1))
+  "Same as FLOOR, but returns first value as a float."
+  (multiple-value-bind (tru rem) (ftruncate number divisor)
+    (if (and (not (zerop rem))
+             (if (minusp divisor)
+                 (plusp number)
+                 (minusp number)))
+        (values (1- tru) (+ rem divisor))
+        (values tru rem))))
+
+(defun fceiling (number &optional (divisor 1))
+  "Same as CEILING, but returns first value as a float."
+  (multiple-value-bind (tru rem) (ftruncate number divisor)
+    (if (and (not (zerop rem))
+             (if (minusp divisor)
+                 (minusp number)
+                 (plusp number)))
+        (values (+ tru 1) (- rem divisor))
+        (values tru rem))))
+
+;;; FIXME: this probably needs treatment similar to the use of
+;;; %UNARY-FTRUNCATE for FTRUNCATE.
+(defun fround (number &optional (divisor 1))
+  "Same as ROUND, but returns first value as a float."
+  (multiple-value-bind (res rem)
+      (round number divisor)
+    (values (float res (if (floatp rem) rem 1.0)) rem)))
 
 ;;;; comparisons
 

@@ -1620,6 +1620,13 @@
 		       #'%unary-truncate-derive-type-aux
 		       #'%unary-truncate))
 
+(defoptimizer (%unary-ftruncate derive-type) ((number))
+  (let ((divisor (specifier-type '(integer 1 1))))
+    (one-arg-derive-type number
+                         #'(lambda (n)
+                             (ftruncate-derive-type-quot-aux n divisor nil))
+                         #'%unary-ftruncate)))
+
 ;;; Define optimizers for FLOOR and CEILING.
 (macrolet
     ((def (name q-name r-name)

@@ -779,6 +779,13 @@ uninterruptibly frob the rounding modes & do ieee round-to-integer.
 		 (- rounded)
 		 rounded)))))))
 
+(defun %unary-ftruncate (number)
+  (number-dispatch ((number real))
+    ((integer) (float number))
+    ((ratio) (float (truncate (numerator number) (denominator number))))
+    (((foreach single-float double-float #!+long-float long-float))
+     (%unary-ftruncate number))))
+
 (defun rational (x)
   #!+sb-doc
   "RATIONAL produces a rational number for any real numeric argument. This is

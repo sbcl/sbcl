@@ -1346,3 +1346,69 @@
 		    (plusp number)))
 	   (values (1+ tru) (- rem ,defaulted-divisor))
 	   (values tru rem)))))
+
+(defknown %unary-ftruncate (real) float (movable foldable flushable))
+(defknown %unary-ftruncate/single (single-float) single-float
+  (movable foldable flushable))
+(defknown %unary-ftruncate/double (double-float) double-float
+  (movable foldable flushable))
+
+(defun %unary-ftruncate/single (x)
+  (declare (type single-float x))
+  (declare (optimize speed (safety 0)))
+  (let* ((bits (single-float-bits x))
+	 (exp (ldb sb!vm:single-float-exponent-byte bits))
+	 (biased (the single-float-exponent
+		   (- exp sb!vm:single-float-bias))))
+    (declare (type (signed-byte 32) bits))
+    (cond
+      ((= exp sb!vm:single-float-normal-exponent-max) x)
+      ((<= biased 0) (* x 0f0))
+      ((>= biased (float-digits x)) x)
+      (t
+       (let ((frac-bits (- (float-digits x) biased)))
+	 (setf bits (logandc2 bits (- (ash 1 frac-bits) 1)))
+	 (make-single-float bits))))))
+
+(defun %unary-ftruncate/double (x)
+  (declare (type double-float x))
+  (declare (optimize speed (safety 0)))
+  (let* ((high (double-float-high-bits x))
+	 (low (double-float-low-bits x))
+	 (exp (ldb sb!vm:double-float-exponent-byte high))
+	 (biased (the double-float-exponent
+		   (- exp sb!vm:double-float-bias))))
+    (declare (type (signed-byte 32) high)
+	     (type (unsigned-byte 32) low))
+    (cond
+      ((= exp sb!vm:double-float-normal-exponent-max) x)
+      ((<= biased 0) (* x 0d0))
+      ((>= biased (float-digits x)) x)
+      (t
+       (let ((frac-bits (- (float-digits x) biased)))
+	 (cond ((< frac-bits 32)
+		(setf low (logandc2 low (- (ash 1 frac-bits) 1))))
+	       (t
+		(setf low 0)
+		(setf high (logandc2 high (- (ash 1 (- frac-bits 32)) 1)))))
+	 (make-double-float high low))))))
+
+(macrolet
+    ((def (float-type fun)
+	 `(deftransform %unary-ftruncate ((x) (,float-type))
+	   (let ((x-type (lvar-type x))
+		 ;; these bounds may look wrong, but in fact they're
+		 ;; right: floats within these bounds are those which
+		 ;; TRUNCATE to a (SIGNED-BYTE 32).  ROUND would be
+		 ;; different.
+		 (low-bound (coerce (- (ash 1 31)) ',float-type))
+		 (high-bound (coerce (ash 1 31) ',float-type)))
+	     (if (csubtypep x-type
+			    (specifier-type
+			     `(,',float-type (,low-bound) (,high-bound))))
+		 '(coerce (%unary-truncate x) ',float-type)
+		 `(if (< ,low-bound x ,high-bound)
+		      (coerce (%unary-truncate x) ',',float-type)
+		      (,',fun x)))))))
+  (def single-float %unary-ftruncate/single)
+  (def double-float %unary-ftruncate/double))
