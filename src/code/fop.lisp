@@ -166,17 +166,6 @@
 
 ;;;; fops for loading symbols
 
-(defvar *load-symbol-buffer* (make-string 100))
-(declaim (simple-string *load-symbol-buffer*))
-(defvar *load-symbol-buffer-size* 100)
-(declaim (type index *load-symbol-buffer-size*))
-;;; FIXME:
-;;;   (1) *LOAD-SYMBOL-BUFFER-SIZE* is redundant, should just be
-;;;       (LENGTH *LOAD-SYMBOL-BUFFER*).
-;;;   (2) *LOAD-SYMBOL-BUFFER* should not have a global value, but should
-;;;       be bound on entry to FASL loading, and it should be renamed to
-;;;       *FASL-SYMBOL-BUFFER*.
-
 (macrolet (;; FIXME: Should all this code really be duplicated inside
 	   ;; each fop? Perhaps it would be better for this shared
 	   ;; code to live in FLET FROB1 and FLET FROB4 (for the
@@ -189,12 +178,11 @@
 		  (prepare-for-fast-read-byte *fasl-input-stream*
 		    (let ((,n-package ,package)
 			  (,n-size (fast-read-u-integer ,name-size)))
-		      (when (> ,n-size *load-symbol-buffer-size*)
-			(setq *load-symbol-buffer*
-			      (make-string (setq *load-symbol-buffer-size*
-						 (* ,n-size 2)))))
+		      (when (> ,n-size (length *fasl-symbol-buffer*))
+			(setq *fasl-symbol-buffer*
+			      (make-string (* ,n-size 2))))
 		      (done-with-fast-read-byte)
-		      (let ((,n-buffer *load-symbol-buffer*))
+		      (let ((,n-buffer *fasl-symbol-buffer*))
 			(read-string-as-bytes *fasl-input-stream*
 					      ,n-buffer
 					      ,n-size)
