@@ -28,8 +28,8 @@
   (declare (type simple-stream-buffer buffer)
 	   (type (integer 0 #.most-positive-fixnum) index))
   (if (vectorp buffer)
-      (sb-sys:sap-ref-8 (sb-sys:vector-sap buffer) index))
-      (sb-sys:sap-ref-8 buffer index))
+      (sb-sys:sap-ref-8 (sb-sys:vector-sap buffer) index)
+      (sb-sys:sap-ref-8 buffer index)))
 
 (defun (setf bref) (octet buffer index)
   (declare (type (unsigned-byte 8) octet)
