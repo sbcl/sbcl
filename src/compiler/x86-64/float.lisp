@@ -497,20 +497,14 @@
 	      hex8) 
 	(inst xorps xmm y))
   (frob (abs/double-float abs  double-reg double-float)
-	(inst lea hex8 (make-ea :qword :disp 1))
-	(inst ror hex8 1)
-	(inst sub hex8 1) ; #x7fffff..fff
-	(inst movd xmm hex8)
-	(inst andpd xmm y))
+	(inst movsd hex8 x)
+	(inst shl hex8 1)
+	(inst shr hex8 1)
+	(inst movsd y hex8))
   (frob (abs/single-float abs  single-reg single-float)
-	(inst lea hex8 (make-ea :qword :disp 1))
-	(inst rol hex8 31)
-	(inst sub hex8 1) ; #x7fffff..fff
-	(inst movd 
-	      ;; 32 bits only, again
-	      (make-random-tn :kind :normal :sc (tn-sc hex8) :offset (tn-offset hex8))
-	      hex8)
-	(inst andpd xmm y)))
+	(inst movss hex8 x)
+	(inst and hex8 #x7fffffff)
+	(inst movss y hex8)))
 
 ;;;; comparison
 
@@ -795,9 +789,17 @@
        (sc-case float
 	 (single-reg
 	  (inst movss stack-temp float)
-	  (inst mov bits stack-temp))
+	  (move bits stack-temp)
+	  ;; The upper 32 bits might contain garbage since writing a
+	  ;; single-float on the stack doesn't clear them. Zero them
+	  ;; out on the load.
+	  (inst shl bits 32)
+	  (inst shr bits 32))
 	 (single-stack
-	  (inst mov bits float))
+	  (move bits float)
+	  ;; As above.
+	  (inst shl bits 32)
+	  (inst shr bits 32))
 	 (descriptor-reg
 	  (loadw
 	   bits float single-float-value-slot
@@ -913,7 +915,6 @@
 
 ;;;; complex float VOPs
 
-#+nil
 (define-vop (make-complex-single-float)
   (:translate complex)
   (:args (real :scs (single-reg) :to :result :target r
@@ -928,37 +929,16 @@
   (:generator 5
     (sc-case r
       (complex-single-reg
-       (let ((r-real (complex-double-reg-real-tn r)))
+       (let ((r-real (complex-single-reg-real-tn r)))
 	 (unless (location= real r-real)
-	   (cond ((zerop (tn-offset r-real))
-		  (copy-fp-reg-to-fr0 real))
-		 ((zerop (tn-offset real))
-		  (inst fstd r-real))
-		 (t
-		  (inst fxch real)
-		  (inst fstd r-real)
-		  (inst fxch real)))))
-       (let ((r-imag (complex-double-reg-imag-tn r)))
+	   (inst movss r-real real)))
+       (let ((r-imag (complex-single-reg-imag-tn r)))
 	 (unless (location= imag r-imag)
-	   (cond ((zerop (tn-offset imag))
-		  (inst fstd r-imag))
-		 (t
-		  (inst fxch imag)
-		  (inst fstd r-imag)
-		  (inst fxch imag))))))
+	   (inst movss r-imag imag))))
       (complex-single-stack
-       (unless (location= real r)
-	 (cond ((zerop (tn-offset real))
-		(inst fst (ea-for-csf-real-stack r)))
-	       (t
-		(inst fxch real)
-		(inst fst (ea-for-csf-real-stack r))
-		(inst fxch real))))
-       (inst fxch imag)
-       (inst fst (ea-for-csf-imag-stack r))
-       (inst fxch imag)))))
+       (inst movss (ea-for-csf-real-stack r) real)
+       (inst movss (ea-for-csf-imag-stack r) imag)))))
 
-#+nil
 (define-vop (make-complex-double-float)
   (:translate complex)
   (:args (real :scs (double-reg) :target r
@@ -975,35 +955,14 @@
       (complex-double-reg
        (let ((r-real (complex-double-reg-real-tn r)))
 	 (unless (location= real r-real)
-	   (cond ((zerop (tn-offset r-real))
-		  (copy-fp-reg-to-fr0 real))
-		 ((zerop (tn-offset real))
-		  (inst fstd r-real))
-		 (t
-		  (inst fxch real)
-		  (inst fstd r-real)
-		  (inst fxch real)))))
+	   (inst movsd r-real real)))
        (let ((r-imag (complex-double-reg-imag-tn r)))
 	 (unless (location= imag r-imag)
-	   (cond ((zerop (tn-offset imag))
-		  (inst fstd r-imag))
-		 (t
-		  (inst fxch imag)
-		  (inst fstd r-imag)
-		  (inst fxch imag))))))
-      (complex-double-stack
-       (unless (location= real r)
-	 (cond ((zerop (tn-offset real))
-		(inst fstd (ea-for-cdf-real-stack r)))
-	       (t
-		(inst fxch real)
-		(inst fstd (ea-for-cdf-real-stack r))
-		(inst fxch real))))
-       (inst fxch imag)
-       (inst fstd (ea-for-cdf-imag-stack r))
-       (inst fxch imag)))))
+	   (inst movsd r-imag imag))))
+      (complex-single-stack
+       (inst movsd (ea-for-cdf-real-stack r) real)
+       (inst movsd (ea-for-cdf-imag-stack r) imag)))))
 
-#+nil
 (define-vop (complex-float-value)
   (:args (x :target r))
   (:results (r))
@@ -1016,14 +975,9 @@
 				  :sc (sc-or-lose 'double-reg)
 				  :offset (+ offset (tn-offset x)))))
 	     (unless (location= value-tn r)
-	       (cond ((zerop (tn-offset r))
-		      (copy-fp-reg-to-fr0 value-tn))
-		     ((zerop (tn-offset value-tn))
-		      (inst fstd r))
-		     (t
-		      (inst fxch value-tn)
-		      (inst fstd r)
-		      (inst fxch value-tn))))))
+	       (if (sc-is x complex-single-reg)
+		   (inst movss r value-tn)
+		   (inst movsd r value-tn)))))
 	  ((sc-is r single-reg)
 	   (let ((ea (sc-case x
 		       (complex-single-stack
@@ -1034,8 +988,7 @@
 			(ecase offset
 			  (0 (ea-for-csf-real-desc x))
 			  (1 (ea-for-csf-imag-desc x)))))))
-	     (with-empty-tn@fp-top(r)
-	       (inst fld ea))))
+	     (inst movss r ea)))
 	  ((sc-is r double-reg)
 	   (let ((ea (sc-case x
 		       (complex-double-stack
@@ -1046,11 +999,9 @@
 			(ecase offset
 			  (0 (ea-for-cdf-real-desc x))
 			  (1 (ea-for-cdf-imag-desc x)))))))
-	     (with-empty-tn@fp-top(r)
-	       (inst fldd ea))))
+	     (inst movsd r ea)))
 	  (t (error "COMPLEX-FLOAT-VALUE VOP failure")))))
 
-#+nil
 (define-vop (realpart/complex-single-float complex-float-value)
   (:translate realpart)
   (:args (x :scs (complex-single-reg complex-single-stack descriptor-reg)
@@ -1061,7 +1012,6 @@
   (:note "complex float realpart")
   (:variant 0))
 
-#+nil
 (define-vop (realpart/complex-double-float complex-float-value)
   (:translate realpart)
   (:args (x :scs (complex-double-reg complex-double-stack descriptor-reg)
@@ -1072,7 +1022,6 @@
   (:note "complex float realpart")
   (:variant 0))
 
-#+nil
 (define-vop (imagpart/complex-single-float complex-float-value)
   (:translate imagpart)
   (:args (x :scs (complex-single-reg complex-single-stack descriptor-reg)
@@ -1083,7 +1032,6 @@
   (:note "complex float imagpart")
   (:variant 1))
 
-#+nil
 (define-vop (imagpart/complex-double-float complex-float-value)
   (:translate imagpart)
   (:args (x :scs (complex-double-reg complex-double-stack descriptor-reg)

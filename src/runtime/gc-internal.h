@@ -30,13 +30,13 @@
 
 #define CEILING(x,y) (((x) + ((y) - 1)) & (~((y) - 1)))
 
-static inline unsigned int
-NWORDS(unsigned int x, unsigned int n_bits)
+static inline unsigned long
+NWORDS(unsigned long x, unsigned long n_bits)
 {
     /* A good compiler should be able to constant-fold this whole thing,
        even with the conditional. */
     if(n_bits <= N_WORD_BITS) {
-        unsigned int elements_per_word = N_WORD_BITS/n_bits;
+        unsigned long elements_per_word = N_WORD_BITS/n_bits;
 
         return CEILING(x, elements_per_word)/elements_per_word;
     }
@@ -60,21 +60,21 @@ NWORDS(unsigned int x, unsigned int n_bits)
 #define ALLOC_UNBOXED 1
 #define ALLOC_QUICK 1
 
-void *gc_general_alloc(int nbytes,int unboxed_p,int quick_p);
+void *gc_general_alloc(long nbytes,int unboxed_p,int quick_p);
 
-extern int (*scavtab[256])(lispobj *where, lispobj object);
+extern long (*scavtab[256])(lispobj *where, lispobj object);
 extern lispobj (*transother[256])(lispobj object);
-extern int (*sizetab[256])(lispobj *where);
+extern long (*sizetab[256])(lispobj *where);
 
 extern struct weak_pointer *weak_pointers; /* in gc-common.c */
 
 extern void scavenge(lispobj *start, long n_words);
 extern void scan_weak_pointers(void);
 
-lispobj  copy_large_unboxed_object(lispobj object, int nwords);
-lispobj  copy_unboxed_object(lispobj object, int nwords);
-lispobj  copy_large_object(lispobj object, int nwords);
-lispobj  copy_object(lispobj object, int nwords);
+lispobj  copy_large_unboxed_object(lispobj object, long nwords);
+lispobj  copy_unboxed_object(lispobj object, long nwords);
+lispobj  copy_large_object(lispobj object, long nwords);
+lispobj  copy_object(lispobj object, long nwords);
 
 lispobj *search_read_only_space(void *pointer);
 lispobj *search_static_space(void *pointer);

@@ -71,7 +71,7 @@ void arch_skip_instruction(os_context_t *context)
      * error-trap or cerror-trap then skip the data bytes that follow. */
 
     int vlen;
-    int code;
+    long code;
 
     
     /* Get and skip the Lisp interrupt code. */
@@ -150,17 +150,17 @@ arch_remove_breakpoint(void *pc, unsigned long orig_inst)
 
 /* When single stepping, single_stepping holds the original instruction
  * PC location. */
-unsigned int *single_stepping = NULL;
+unsigned long *single_stepping = NULL;
 #ifdef CANNOT_GET_TO_SINGLE_STEP_FLAG
-unsigned int  single_step_save1;
-unsigned int  single_step_save2;
-unsigned int  single_step_save3;
+unsigned long  single_step_save1;
+unsigned long  single_step_save2;
+unsigned long  single_step_save3;
 #endif
 
 void
 arch_do_displaced_inst(os_context_t *context, unsigned int orig_inst)
 {
-    unsigned int *pc = (unsigned int*)(*os_context_pc_addr(context));
+    unsigned long *pc = (unsigned long*)(*os_context_pc_addr(context));
 
     /* Put the original instruction back. */
     *((char *)pc) = orig_inst & 0xff;

@@ -29,8 +29,8 @@
 
 
 void gc_free_heap(void);
-inline int find_page_index(void *);
-inline void *page_address(int);
+inline long find_page_index(void *);
+inline void *page_address(long);
 int gencgc_handle_wp_violation(void *);
 
 struct page {
@@ -69,13 +69,13 @@ struct page {
      * than the actual bytes used for pages within the current
      * allocation regions. It should be 0 for all unallocated pages (not
      * hard to achieve). */
-    int  bytes_used;
+    long  bytes_used;
 
     /* The name of this field is not well-chosen for its actual use.
      * This is the offset from the start of the page to the start 
      * of the alloc_region which contains/contained it.  It's negative or 0
      */
-    int  first_object_offset;
+    long  first_object_offset;
 };
 
 /* values for the page.allocated field */
@@ -92,7 +92,7 @@ extern struct page page_table[NUM_PAGES];
 void sniff_code_object(struct code *code, unsigned displacement);
 void gencgc_apply_code_fixups(struct code *old_code, struct code *new_code);
 
-int  update_x86_dynamic_space_free_pointer(void);
+long  update_x86_dynamic_space_free_pointer(void);
 void  gc_alloc_update_page_tables(int unboxed,
 				  struct alloc_region *alloc_region);
 void gc_alloc_update_all_page_tables(void);
@@ -102,12 +102,12 @@ void gc_set_region_empty(struct alloc_region *region);
  * predicates
  */
 static inline int 
-space_matches_p(lispobj obj, int space)
+space_matches_p(lispobj obj, long space)
 {
-    int page_index=(void*)obj - (void *)DYNAMIC_SPACE_START;
+    long page_index=(void*)obj - (void *)DYNAMIC_SPACE_START;
     return ((page_index >= 0)
 	    && ((page_index =
-		 ((unsigned int)page_index)/PAGE_BYTES) < NUM_PAGES)
+		 ((unsigned long)page_index)/PAGE_BYTES) < NUM_PAGES)
 	    && (page_table[page_index].gen == space));
 }
 
