@@ -740,7 +740,7 @@
     (update-slots class (compute-slots class))
     (update-gfs-of-class class)
     (update-inits class (compute-default-initargs class))
-    (update-make-instance-function-table class))
+    (update-ctors 'finalize-inheritance :class class))
   (unless finalizep
     (dolist (sub (class-direct-subclasses class)) (update-class sub nil))))
 

@@ -388,8 +388,7 @@
 				       slots
 				       calls)
   (declare (ignore required-parameters env slots calls))
-  (or (and (eq (car form) 'make-instance)
-	   (expand-make-instance-form form))
+  (or ; (optimize-reader ...)?
       form))
 
 (defun can-optimize-access (form required-parameters env)

@@ -30,47 +30,38 @@
 
 (defmethod make-instance ((class class) &rest initargs)
   (unless (class-finalized-p class) (finalize-inheritance class))
-  (setq initargs (default-initargs class initargs))
-  #||
-  (check-initargs-1
-   class initargs
-   (list (list* 'allocate-instance class initargs)
-	 (list* 'initialize-instance (class-prototype class) initargs)
-	 (list* 'shared-initialize (class-prototype class) t initargs)))
-  ||#
-  (let* ((info (initialize-info class initargs))
-	 (valid-p (initialize-info-valid-p info)))
-    (when (and (consp valid-p) (eq (car valid-p) :invalid))
-      (error 'simple-program-error
-	     :format-control "Invalid initialization argument ~S for class ~S"
-	     :format-arguments (list (cdr valid-p) (class-name class)))))
-  (let ((instance (apply #'allocate-instance class initargs)))
-    (apply #'initialize-instance instance initargs)
-    instance))
+  (let ((class-default-initargs (class-default-initargs class)))
+    (when class-default-initargs
+      (setf initargs (default-initargs class initargs class-default-initargs)))
+    (when initargs
+      (when (and (eq *boot-state* 'complete)
+                 (not (getf initargs :allow-other-keys)))
+        (let ((class-proto (class-prototype class)))
+          (check-initargs-1
+           class initargs
+           (append (compute-applicable-methods
+                    #'allocate-instance (list class))
+                   (compute-applicable-methods 
+                    #'initialize-instance (list class-proto))
+                   (compute-applicable-methods 
+                    #'shared-initialize (list class-proto t)))))))
+    (let ((instance (apply #'allocate-instance class initargs)))
+      (apply #'initialize-instance instance initargs)
+      instance)))
 
-(defmethod default-initargs ((class slot-class) supplied-initargs)
-  (call-initialize-function
-   (initialize-info-default-initargs-function
-    (initialize-info class supplied-initargs))
-   nil supplied-initargs))
+(defmethod default-initargs ((class slot-class)
+			     supplied-initargs
+			     class-default-initargs)
+  (loop for (key fn) in class-default-initargs
+        when (eq (getf supplied-initargs key '.not-there.) '.not-there.)
+	  append (list key (funcall fn)) into default-initargs
+        finally
+	  (return (append supplied-initargs default-initargs))))
 
 (defmethod initialize-instance ((instance slot-object) &rest initargs)
   (apply #'shared-initialize instance t initargs))
 
 (defmethod reinitialize-instance ((instance slot-object) &rest initargs)
-  #||
-  (check-initargs-1
-   (class-of instance) initargs
-   (list (list* 'reinitialize-instance instance initargs)
-	 (list* 'shared-initialize instance nil initargs)))
-  ||#
-  (let* ((class (class-of instance))
-	 (info (initialize-info class initargs))
-	 (valid-p (initialize-info-ri-valid-p info)))
-    (when (and (consp valid-p) (eq (car valid-p) :invalid))
-      (error 'simple-program-error 
-	     :format-control "Invalid initialization argument ~S for class ~S"
-	     :format-arguments (list (cdr valid-p) (class-name class)))))
   (apply #'shared-initialize instance nil initargs)
   instance)
 
@@ -106,57 +97,44 @@
 	 (list* 'shared-initialize instance added-slots initargs)))
   (apply #'shared-initialize instance added-slots initargs))
 
-(defmethod shared-initialize
-    ((instance slot-object) slot-names &rest initargs)
-  (cond
-    ((eq slot-names t)
-     (call-initialize-function
-      (initialize-info-shared-initialize-t-fun
-       (initialize-info (class-of instance) initargs))
-      instance initargs))
-    ((eq slot-names nil)
-     (call-initialize-function
-      (initialize-info-shared-initialize-nil-fun
-       (initialize-info (class-of instance) initargs))
-      instance initargs))
-    (t
-     ;; Initialize the instance's slots in a two step process:
-     ;;   (1) A slot for which one of the initargs in initargs can set
-     ;;       the slot, should be set by that initarg. If more than
-     ;;       one initarg in initargs can set the slot, the leftmost
-     ;;       one should set it.
-     ;;   (2) Any slot not set by step 1, may be set from its initform
-     ;;       by step 2. Only those slots specified by the slot-names
-     ;;       argument are set. If slot-names is:
-     ;;       T
-     ;;	      then any slot not set in step 1 is set from its
-     ;;	      initform.
-     ;;       <list of slot names>
-     ;;	      then any slot in the list, and not set in step 1
-     ;;	      is set from its initform.
-     ;;       ()
-     ;;	      then no slots are set from initforms.
-     (flet ((initialize-slot-from-initarg (class instance slotd)
-              (let ((slot-initargs (slot-definition-initargs slotd)))
-                (doplist (initarg value) initargs
-                         (when (memq initarg slot-initargs)
-                           (setf (slot-value-using-class class instance slotd)
-                                 value)
-                           (return t)))))
-            (initialize-slot-from-initfunction (class instance slotd)
-              (unless (or (slot-boundp-using-class class instance slotd)
-                          (null (slot-definition-initfunction slotd)))
-                (setf (slot-value-using-class class instance slotd)
-                      (funcall (slot-definition-initfunction slotd)))))
-            (class-slot-p (slotd)
-              (eq :class (slot-definition-allocation slotd))))
-       (loop with class = (class-of instance)
-             for slotd in (class-slots class)
-             unless (or (class-slot-p slotd)
-                        (initialize-slot-from-initarg class instance slotd))
-             when (memq (slot-definition-name slotd) slot-names) do
-             (initialize-slot-from-initfunction class instance slotd))
-       instance))))
+(defmethod shared-initialize ((instance slot-object) slot-names &rest initargs)
+  (flet ((initialize-slot-from-initarg (class instance slotd)
+           (let ((slot-initargs (slot-definition-initargs slotd)))
+             (doplist (initarg value) initargs
+                      (when (memq initarg slot-initargs)
+                        (setf (slot-value-using-class class instance slotd)
+                              value)
+                        (return t)))))
+         (initialize-slot-from-initfunction (class instance slotd)
+           ;; CLHS: If a before method stores something in a slot,
+           ;; that slot won't be initialized from its :INITFORM, if any.
+	   (if (typep instance 'structure-object)
+	       (when (eq (funcall
+			  ;; not SLOT-VALUE-USING-CLASS, as that
+			  ;; throws an error if the value is the
+			  ;; unbound marker.
+			  (slot-definition-internal-reader-function slotd)
+			  instance)
+			 +slot-unbound+)
+		 (setf (slot-value-using-class class instance slotd)
+		       (let ((initfn (slot-definition-initfunction slotd)))
+			 (when initfn
+			   (funcall initfn)))))
+	       (unless (or (slot-boundp-using-class class instance slotd)
+			   (null (slot-definition-initfunction slotd)))
+		 (setf (slot-value-using-class class instance slotd)
+		       (funcall (slot-definition-initfunction slotd)))))))
+    (let* ((class (class-of instance))
+           (initfn-slotds
+            (loop for slotd in (class-slots class)
+                  unless (initialize-slot-from-initarg class instance slotd)
+                    collect slotd)))
+      (loop for slotd in initfn-slotds
+            when (and (not (eq :class (slot-definition-allocation slotd)))
+                      (or (eq t slot-names)
+                          (memq (slot-definition-name slotd) slot-names))) do
+              (initialize-slot-from-initfunction class instance slotd)))
+    instance))
 
 ;;; If initargs are valid return nil, otherwise signal an error.
 (defun check-initargs-1 (class initargs call-list

@@ -579,7 +579,10 @@ Dave McDonald:
 
 Gerd Moellman:
   He has made many cleanups and improvements, small and large, in
-  CMU CL (mostly in PCL), which we have gratefully ported to SBCL.
+  CMU CL (mostly in PCL), which we have gratefully ported to SBCL.  Of
+  particular note is his ctor MAKE-INSTANCE optimization, which is both
+  faster in the typical case than the old optimizations in PCL and
+  less buggy.
 
 William ("Bill") Newman:
   He continued to maintain SBCL after the fork, increasing ANSI

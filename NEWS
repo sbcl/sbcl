@@ -1452,6 +1452,14 @@ changes in sbcl-0.7.11 relative to sbcl-0.7.10:
     answer.
   * the compiler is now able to derive types more accurately from the
     COERCE and COMPILE functions.
+  * fixed bug 223: functional binding is considered to be constant
+    only for symbols in the CL package.
+  * fixed bug 231: SETQ did not check the type of a variable being set
+    (reported by Robert E. Brown)
+  * a new optimization for MAKE-INSTANCE has been included, fixing
+    various bugs (including relating to :ALLOCATION :CLASS slots and
+    :DEFAULT-INITARGS over-eager evalueation).  (thanks to Gerd
+    Moellmann)
   * fixed some more bugs revealed by Paul Dietz' test suite:
     ** As required by ANSI, LOOP now disallows anonymous collection
        clauses such as COLLECT I in conjunction with aggregate boolean
@@ -1473,10 +1481,6 @@ changes in sbcl-0.7.11 relative to sbcl-0.7.10:
   * incremented fasl file version number, because of the incompatible
     change to the DEFSTRUCT-DESCRIPTION structure, and again because
     of the new implementation of DEFINE-COMPILER-MACRO.
-  * fixed bug 223: functional binding is considered to be constant
-    only for symbols in the CL package.
-  * fixed bug 231: SETQ did not check the type of a variable being set
-    (reported by Robert E. Brown)
 
 planned incompatible changes in 0.7.x:
   * (not done yet, but planned:) When the profiling interface settles

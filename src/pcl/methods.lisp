@@ -508,12 +508,9 @@
 	    (when remove-again-p
 	      (remove-method generic-function method))))
 	(unless skip-dfun-update-p
-	  (when (member name
-			'(make-instance default-initargs
-			  allocate-instance shared-initialize
-			  initialize-instance))
-	    (update-make-instance-function-table (type-class
-						  (car specializers))))
+	  (update-ctors 'add-method
+			:generic-function generic-function
+			:method method)
 	  (update-dfun generic-function))
 	method)))
 
@@ -529,11 +526,9 @@
       (dolist (specializer (method-specializers method))
 	(remove-direct-method specializer method))
       (set-arg-info generic-function)
-      (when (member name
-		    '(make-instance
-		      default-initargs
-		      allocate-instance shared-initialize initialize-instance))
-	(update-make-instance-function-table (type-class (car specializers))))
+      (update-ctors 'remove-method
+		    :generic-function generic-function
+		    :method method)
       (update-dfun generic-function)
       generic-function)))
 

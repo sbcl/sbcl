@@ -230,13 +230,10 @@
 (defmacro precompile-random-code-segments (&optional system)
   `(progn
      (eval-when (:compile-toplevel)
-       (update-dispatch-dfuns)
-       (compile-iis-functions nil))
+       (update-dispatch-dfuns))
      (precompile-function-generators ,system)
      (precompile-dfun-constructors ,system)
-     (precompile-iis-functions ,system)
-     (eval-when (:load-toplevel)
-       (compile-iis-functions t))))
+     (precompile-ctors)))
 
 ;;; This definition is for interpreted code.
 (defun pcl-instance-p (x)

@@ -28,5 +28,31 @@
 
 (mio-test)
 
+;;; Some tests of bits of optimized MAKE-INSTANCE that were hopelessly
+;;; wrong until Gerd's ctor MAKE-INSTANCE optimization was ported.
+(defvar *d-i-s-e-count* 0)
+(defclass default-initargs-side-effect ()
+  ((x :initarg :x))
+  (:default-initargs :x (incf *d-i-s-e-count*)))
+(defun default-initargs-side-effect ()
+  (make-instance 'default-initargs-side-effect))
+(assert (= *d-i-s-e-count* 0))
+(default-initargs-side-effect)
+(assert (= *d-i-s-e-count* 1))
+(make-instance 'default-initargs-side-effect)
+(assert (= *d-i-s-e-count* 2))
+(make-instance 'default-initargs-side-effect :x 3)
+(assert (= *d-i-s-e-count* 2))
+
+(defclass class-allocation ()
+  ((x :allocation :class :initarg :x :initform 3)))
+(defun class-allocation-reader ()
+  (slot-value (make-instance 'class-allocation) 'x))
+(defun class-allocation-writer (value)
+  (setf (slot-value (make-instance 'class-allocation) 'x) value))
+(assert (= (class-allocation-reader) 3))
+(class-allocation-writer 4)
+(assert (= (class-allocation-reader) 4))
+
 ;;; success
 (sb-ext:quit :unix-status 104)

@@ -347,10 +347,8 @@ bootstrapping.
 			 lambda-list
 			 body
 			 env)
-  (let ((*make-instance-function-keys* nil)
-	(*optimize-asv-funcall-p* t)
+  (let ((*optimize-asv-funcall-p* t)
 	(*asv-readers* nil) (*asv-writers* nil) (*asv-boundps* nil))
-    (declare (special *make-instance-function-keys*))
     (multiple-value-bind (method-lambda unspecialized-lambda-list specializers)
 	(add-method-declarations name qualifiers lambda-list body env)
       (multiple-value-bind (method-function-lambda initargs)
@@ -380,9 +378,6 @@ bootstrapping.
 	     ;; intended. I hate that kind of bug (code which silently
 	     ;; gives the wrong answer), so we don't do a DECLAIM
 	     ;; here. -- WHN 20000229
-	     ,@(when *make-instance-function-keys*
-		 `((get-make-instance-functions
-		    ',*make-instance-function-keys*)))
 	     ,@(when (or *asv-readers* *asv-writers* *asv-boundps*)
 		 `((initialize-internal-slot-gfs*
 		    ',*asv-readers* ',*asv-writers* ',*asv-boundps*)))

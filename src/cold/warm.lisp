@@ -146,7 +146,7 @@
 		"src/pcl/slots-boot"
 		"src/pcl/combin"
 		"src/pcl/dfun"
-		"src/pcl/fast-init"
+		"src/pcl/ctor"
 		"src/pcl/braid"
 		"src/pcl/dlisp3"
 		"src/pcl/generic-functions"

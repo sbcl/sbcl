@@ -180,13 +180,7 @@
 	  (when (and new-value (class-wrapper new-value))
 	    (setf (find-class-cell-predicate cell)
 		  (fdefinition (class-predicate-name new-value))))
-	  (when (and new-value (not (forward-referenced-class-p new-value)))
-
-	    (dolist (keys+aok (find-class-cell-make-instance-function-keys
-			       cell))
-	      (update-initialize-info-internal
-	       (initialize-info new-value (car keys+aok) nil (cdr keys+aok))
-	       'make-instance-function))))
+	  (update-ctors 'setf-find-class :class new-value :name symbol))
 	new-value)
       (error "~S is not a legal class name." symbol)))
 

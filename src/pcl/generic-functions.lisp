@@ -332,8 +332,6 @@
 
 (defgeneric compute-effective-slot-definition-initargs (class direct-slotds))
 
-(defgeneric default-initargs (class supplied-initargs))
-
 (defgeneric describe-object (object stream))
 
 (defgeneric direct-slot-definition-class (class initargs))
@@ -418,6 +416,8 @@
 				      applicable-methods))
 
 (defgeneric compute-slot-accessor-info (slotd type gf))
+
+(defgeneric default-initargs (class initargs defaults))
 
 (defgeneric find-method-combination (generic-function type options))
 

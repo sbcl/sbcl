@@ -8,9 +8,10 @@ After CMU CL was was released into the public domain, it was
 maintained by volunteers, who continued the tradition of releasing
 their work into the public domain.
 
-All changes to SBCL since the fork from CMU CL have been released
-into the public domain.
+All changes to SBCL since the fork from CMU CL have been released into
+the public domain in jurisdictions where this is possible, or under
+the FreeBSD licence where not.
 
 Thus, there are no known obstacles to copying, using, and modifying
-SBCL freely, as long as the MIT, Symbolics, and Xerox copyright
-notices are retained.
+SBCL freely, as long as copyright notices of MIT, Symbolics, Xerox and
+Gerd Moellmann are retained.
