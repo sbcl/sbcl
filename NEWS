@@ -23,6 +23,8 @@ changes in sbcl-0.8.17 relative to sbcl-0.8.16:
     name conflict situations in CLHS 11.1.1.2.5, and provide a restart
     permitting resolution in favour of any of the conflicting symbols.
     (reported by Bruno Haible for CMUCL)
+  * FORMAT compile-time argument count checking has been enhanced.
+    (report from Bruno Haible for CMUCL)
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** RENAME-PACKAGE allows all package designators as new package
        names.

@@ -286,6 +286,15 @@ cat > $tmpfilename <<EOF
 EOF
 expect_failed_compile $tmpfilename
 
+# This should style-warn (but not warn or otherwise fail) as the call
+# to FORMAT has too many arguments, which is bad style but not
+# otherwise fatal.
+cat > $tmpfilename <<EOF
+(defun foo (a b)
+  (format nil "abc~~def" a b))
+EOF
+expect_warned_compile $tmpfilename
+
 rm $tmpfilename
 rm $compiled_tmpfilename
 

@@ -1374,7 +1374,7 @@
 			((char= c #\P)
 			 (unless (format-directive-colonp directive)
 			   (incf-both)))
-			((or (find c "IT%&|_();>") (char= c #\Newline)))
+			((or (find c "IT%&|_();>~") (char= c #\Newline)))
                         ;; FIXME: check correspondence of ~( and ~)
 			((char= c #\<)
 			 (walk-complex-directive walk-justification))
