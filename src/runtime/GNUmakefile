@@ -55,5 +55,9 @@ clean:
 	rm -f depend *.o sbcl sbcl.nm core *.tmp ; true
 
 depend: ${SRCS} sbcl.h
-	$(CC) -MM -E ${DEPEND_FLAGS} ${CFLAGS} ${CPPFLAGS} $? > depend.tmp
+	$(CC) -MM -E ${DEPEND_FLAGS} ${CFLAGS} ${CPPFLAGS} $^ > depend.tmp
 	mv -f depend.tmp depend
+
+# By including this file, we cause GNU to automatically make depend if
+# it can't find it or it is out of date
+include depend

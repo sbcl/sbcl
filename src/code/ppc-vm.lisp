@@ -1,0 +1,191 @@
+;;; This file contains the PPC specific runtime stuff.
+;;;
+(in-package "SB!VM")
+
+(defvar *number-of-signals* 64)
+(defvar *bits-per-word* 32)
+
+(define-alien-type os-context-t (struct os-context-t-struct))
+
+
+;;;; MACHINE-TYPE and MACHINE-VERSION
+
+(defun machine-type ()
+  "Returns a string describing the type of the local machine."
+  "PowerPC")
+
+(defun machine-version ()
+  "Returns a string describing the version of the local machine."
+  "who-knows?")
+
+
+
+;;; FIXUP-CODE-OBJECT -- Interface
+;;;
+(defun fixup-code-object (code offset fixup kind)
+  (declare (type index offset))
+  (unless (zerop (rem offset n-word-bytes))
+    (error "Unaligned instruction?  offset=#x~X." offset))
+  (sb!sys:without-gcing
+   (let ((sap (truly-the system-area-pointer
+			 (%primitive sb!kernel::code-instructions code))))
+     (ecase kind
+       (:b
+	(error "Can't deal with CALL fixups, yet."))
+       (:ba
+	(setf (ldb (byte 24 2) (sap-ref-32 sap offset))
+	      (ash fixup -2)))
+       (:ha
+	(let* ((h (ldb (byte 16 16) fixup))
+	       (l (ldb (byte 16 0) fixup)))
+	  ; Compensate for possible sign-extension when the low half
+	  ; is added to the high.  We could avoid this by ORI-ing
+	  ; the low half in 32-bit absolute loads, but it'd be
+	  ; nice to be able to do:
+	  ;  lis rX,foo@ha
+	  ;  lwz rY,foo@l(rX)
+	  ; and lwz/stw and friends all use a signed 16-bit offset.
+	  (setf (ldb (byte 16 0) (sap-ref-32 sap offset))
+		 (if (logbitp 15 l) (ldb (byte 16 0) (1+ h)) h))))
+       (:l
+	(setf (ldb (byte 16 0) (sap-ref-32 sap offset))
+	      (ldb (byte 16 0) fixup)))))))
+
+
+;;;; "Sigcontext" access functions, cut & pasted from x86-vm.lisp then
+;;;; hacked for types.
+
+(define-alien-routine ("os_context_pc_addr" context-pc-addr) (* unsigned-long)
+  (context (* os-context-t)))
+
+(defun context-pc (context)
+  (declare (type (alien (* os-context-t)) context))
+  (int-sap (deref (context-pc-addr context))))
+
+(define-alien-routine ("os_context_register_addr" context-register-addr)
+  (* unsigned-long)
+  (context (* os-context-t))
+  (index int))
+
+(defun context-register (context index)
+  (declare (type (alien (* os-context-t)) context))
+  (deref (context-register-addr context index)))
+
+(defun %set-context-register (context index new)
+(declare (type (alien (* os-context-t)) context))
+(setf (deref (context-register-addr context index))
+      new))
+;;; This is like CONTEXT-REGISTER, but returns the value of a float
+;;; register. FORMAT is the type of float to return.
+
+;;; FIXME: Whether COERCE actually knows how to make a float out of a
+;;; long is another question. This stuff still needs testing.
+#+nil
+(define-alien-routine ("os_context_fpregister_addr" context-float-register-addr)
+  (* long)
+  (context (* os-context-t))
+  (index int))
+#+nil
+(defun context-float-register (context index format)
+  (declare (type (alien (* os-context-t)) context))
+  (coerce (deref (context-float-register-addr context index)) format))
+#+nil
+(defun %set-context-float-register (context index format new)
+  (declare (type (alien (* os-context-t)) context))
+  (setf (deref (context-float-register-addr context index))
+        (coerce new format)))
+
+;;; Given a signal context, return the floating point modes word in
+;;; the same format as returned by FLOATING-POINT-MODES.
+(defun context-floating-point-modes (context)
+  ;; FIXME: As of sbcl-0.6.7 and the big rewrite of signal handling
+  ;; for POSIXness and (at the Lisp level) opaque signal contexts,
+  ;; this is needs to be rewritten as an alien function.
+  (warn "stub CONTEXT-FLOATING-POINT-MODES")
+  0)
+
+
+
+;;;; INTERNAL-ERROR-ARGS.
+
+;;; GIVEN a (POSIX) signal context, extract the internal error
+;;; arguments from the instruction stream.  This is e.g.
+
+;;; INTERNAL-ERROR-ARGS -- interface.
+;;;
+;;; Given the sigcontext, extract the internal error arguments from the
+;;; instruction stream.
+;;; 
+(defun internal-error-args (context)
+  (declare (type (alien (* os-context-t)) context))
+  (let* ((pc (context-pc context))
+	 (bad-inst (sap-ref-32 pc 0))
+	 (op (ldb (byte 16 16) bad-inst)))
+    (declare (type system-area-pointer pc))
+    (cond ((= op (logior (ash 3 10) (ash 6 5)))
+	   (args-for-unimp-inst context))
+	  ((and (= (ldb (byte 6 10) op) 3)
+		(= (ldb (byte 5 5) op) 24))
+	   (let* ((regnum (ldb (byte 5 0) op))
+		  (prev (sap-ref-32 (int-sap (- (sap-int pc) 4)) 0)))
+	     (if (and (= (ldb (byte 6 26) prev) 3)
+		      (= (ldb (byte 5 21) prev) 0))
+		 (values (ldb (byte 16 0) prev)
+			 (list (sb!c::make-sc-offset sb!vm:any-reg-sc-number
+                                                     (ldb (byte 5 16) prev))))
+		 (values #.(sb!kernel:error-number-or-lose
+			    'sb!kernel:invalid-arg-count-error)
+                         (list (sb!c::make-sc-offset sb!vm:any-reg-sc-number regnum))))))
+          
+	  (t
+	   (values #.(error-number-or-lose 'unknown-error) nil)))))
+
+(defun args-for-unimp-inst (context)
+  (declare (type (alien (* os-context-t)) context))
+  (let* ((pc (context-pc context))
+	 (length (sap-ref-8 pc 4))
+	 (vector (make-array length :element-type '(unsigned-byte 8))))
+    (declare (type system-area-pointer pc)
+	     (type (unsigned-byte 8) length)
+	     (type (simple-array (unsigned-byte 8) (*)) vector))
+    (copy-from-system-area pc (* sb!vm:n-byte-bits 5)
+			   vector (* sb!vm:n-word-bits
+				     sb!vm:vector-data-offset)
+			   (* length sb!vm:n-byte-bits))
+    (let* ((index 0)
+	   (error-number (sb!c::read-var-integer vector index)))
+      (collect ((sc-offsets))
+	       (loop
+		(when (>= index length)
+		  (return))
+		(sc-offsets (sb!c::read-var-integer vector index)))
+	       (values error-number (sc-offsets))))))
+
+
+
+;;; The loader uses this to convert alien names to the form they
+;;; occur in the symbol table.  This is ELF, so do nothing
+
+(defun extern-alien-name (name)
+  (declare (type simple-base-string name))
+  name)
+
+
+
+;;; SANCTIFY-FOR-EXECUTION -- Interface.
+;;;
+;;; Do whatever is necessary to make the given code component executable.
+;;; On the 601, we have less to do than on some other PowerPC chips.
+;;; This should what needs to be done in the general case.
+;;; 
+(defun sanctify-for-execution (component)
+  (without-gcing
+    (alien-funcall (extern-alien "ppc_flush_icache"
+				 (function void
+					   system-area-pointer
+					   unsigned-long))
+		   (code-instructions component)
+		   (* (code-header-ref component code-code-size-slot)
+		      n-word-bytes)))
+  nil)
+

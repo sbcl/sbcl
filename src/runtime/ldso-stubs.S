@@ -42,10 +42,6 @@ ldso_stub__ ## fct: ;                           \
 	.size	 ldso_stub__ ## fct,.L ## fct ## e1-ldso_stub__ ## fct ;
 
 #elif defined alpha
-	
-	/* I _hope_ this is correct - I haven't checked in the manual
- 	 * yet.  It works to the point of building and passing tests,
-	 * at any rate     - dan 2001.05.10 */
 #define LDSO_STUBIFY(fct)                       \
 .globl ldso_stub__ ## fct ;                     \
 	.type	 ldso_stub__ ## fct,@function ; \
@@ -53,6 +49,15 @@ ldso_stub__ ## fct: ;                           \
 	jmp fct ;                               \
 .L ## fct ## e1: ;                              \
 	.size	 ldso_stub__ ## fct,.L ## fct ## e1-ldso_stub__ ## fct ;
+
+#elif defined ppc
+#define LDSO_STUBIFY(fct)                       \
+.globl ldso_stub__ ## fct ;                     \
+	.type    ldso_stub__ ## fct,@function ; \
+ldso_stub__ ## fct: ;                           \
+        b fct ;                                 \
+.L ## fct ## e1: ;                              \
+        .size    ldso_stub__ ## fct,.L ## fct ## e1-ldso_stub__ ## fct ;
 	
 #else
 #error unsupported CPU architecture

@@ -53,6 +53,9 @@ extern void globals_init(void);
 #define EXTERN(name,bytes) .globl name 
 #endif
 #endif
+#ifdef ppc
+#define EXTERN(name,bytes) .globl name 
+#endif
 #ifdef __i386__
 #ifdef __linux__
 /* I'm very dubious about this.  Linux hasn't used _ on external names

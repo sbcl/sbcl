@@ -1612,11 +1612,7 @@
       (:alpha
 	 (ecase kind
          (:jmp-hint
-          (assert (zerop (ldb (byte 2 0) value)))
-          #+nil ;; was commented out in cmucl source too.  Don't know what
-          ;; it does   -dan 2001.05.03
-	    (setf (sap-ref-16 sap 0)
-                (logior (sap-ref-16 sap 0) (ldb (byte 14 0) (ash value -2)))))
+          (assert (zerop (ldb (byte 2 0) value))))
 	 (:bits-63-48
 	  (let* ((value (if (logbitp 15 value) (+ value (ash 1 16)) value))
 		 (value (if (logbitp 31 value) (+ value (ash 1 32)) value))
@@ -1643,6 +1639,20 @@
                 (ldb (byte 8 0) value)
                 (byte-vector-ref-8 gspace-bytes (1+ gspace-byte-offset))
                 (ldb (byte 8 8) value)))))
+      (:ppc
+       (ecase kind
+         (:ba
+          (setf (byte-vector-ref-32 gspace-bytes gspace-byte-offset)
+                (dpb (ash value -2) (byte 24 2) 
+                     (byte-vector-ref-32 gspace-bytes gspace-byte-offset))))
+         (:ha
+          (let* ((h (ldb (byte 16 16) value))
+                 (l (ldb (byte 16 0) value)))
+            (setf (byte-vector-ref-16 gspace-bytes (+ gspace-byte-offset 2))
+                  (if (logbitp 15 l) (ldb (byte 16 0) (1+ h)) h))))
+         (:l
+          (setf (byte-vector-ref-16 gspace-bytes (+ gspace-byte-offset 2))
+                (ldb (byte 16 0) value)))))     
       (:sparc
        (ecase kind
 	 (:call

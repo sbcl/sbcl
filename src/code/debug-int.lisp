@@ -3139,9 +3139,9 @@
       (breakpoint-do-displaced-inst signal-context
 				    (breakpoint-data-instruction data))
       ;; Some platforms have no usable sigreturn() call.  If your
-      ;; implementation of arch_do_displaced_inst() doesn't sigreturn(),
-      ;; add it to this list.
-      #!-(or hpux irix x86 alpha)
+      ;; implementation of arch_do_displaced_inst() _does_ sigreturn(),
+      ;; it's polite to warn here
+      #!+(and sparc solaris)
       (error "BREAKPOINT-DO-DISPLACED-INST returned?"))))
 
 (defun invoke-breakpoint-hooks (breakpoints component offset)

@@ -62,7 +62,7 @@ void breakpoint_do_displaced_inst(os_context_t* context,
      *
      * -dan 2001.08.09 */
 
-#if !(defined(hpux) || defined(irix) || defined(__i386__) || defined(alpha))
+#if (defined(sparc) && defined (solaris))
     undo_fake_foreign_function_call(context);
 #endif
     arch_do_displaced_inst(context, orig_inst);
