@@ -22,12 +22,6 @@ but instead
      the program loops endlessly instead of printing the object.
 
 
-KNOWN PORT-SPECIFIC BUGS
-
-OpenBSD-1:
-  The breakpoint-based TRACE facility doesn't work properly
-  in the OpenBSD port of sbcl-0.6.7.
-
 KNOWN BUGS RELATED TO THE IR1 INTERPRETER
 
 At some point, the pure interpreter (aka the "IR1 interpreter") will
@@ -48,6 +42,7 @@ IR1-2:
 	FOO
 	* (COMPILED-FUNCTION-P #'FOO)
 	T
+
 
 OTHER KNOWN BUGS:
 
@@ -761,3 +756,13 @@ Error in function C::GET-LAMBDA-TO-COMPILE:
 58:
   (SUBTYPEP '(AND ZILCH INTEGER) 'ZILCH)
   => NIL, NIL
+
+59:
+  CL:*DEFAULT-PATHNAME-DEFAULTS* doesn't behave as ANSI suggests (reflecting
+  current working directory). And there's no supported way to update
+  or query the current working directory (a la Unix "chdir" and "pwd"),
+  which is functionality that ILISP needs (and currently gets with low-level
+  hacks).
+
+60:
+  The debugger LIST-LOCATIONS command doesn't work properly.

@@ -314,9 +314,10 @@
 				bindings))
 		*handler-clusters*)))
      (multiple-value-prog1
-      ,@forms
-      ;; Wait for any float exceptions
-      #!+x86 (float-wait))))
+	 (progn
+	   ,@forms)
+       ;; Wait for any float exceptions.
+       #!+x86 (float-wait))))
 
 ;;;; HANDLER-CASE and IGNORE-ERRORS
 

@@ -502,20 +502,14 @@ changes in sbcl-0.6.8 relative to sbcl-0.6.7:
   of static symbols.
 * FINISH-OUTPUT is now called more consistently on QUIT. (It
   used to not be called for a saved Lisp image.)
-?? A bug related to the signal handling rewrite, keeping the DEBUG:ARG 
-  function from working, was fixed.
 * Martin Atzmueller's version of a patch to fix a compiler crash,
   as posted on sbcl-devel 13 September 2000, has been installed.
 * Instead of installing Martin Atzmueller's patch for the
   compiler transform for SUBSEQ, I deleted the compiler transform,
   and transforms for some similar consing operations.
-?? A bug in signal handling which kept TRACE from working on OpenBSD
+* A bug in signal handling which kept TRACE from working on OpenBSD
   has been fixed.
-  ?? Remember to remove this from the port-specific section of BUGS.
-?? The signal handling bug reported by Martin Atzmueller on 
-  sbcl-devel 13 September 2000, which caused the debugger to 
-  get confused after a Ctrl-C interrupt under ILISP, has been fixed.
-?? added enough DEFTRANSFORMs to allow (SXHASH 'FOO) to be optimized
+* added enough DEFTRANSFORMs to allow (SXHASH 'FOO) to be optimized
   away by constant folding
 * The system now defines its address space constants in one place
   (in the Lisp sources), and propagates them automatically elsewhere
@@ -526,3 +520,5 @@ changes in sbcl-0.6.8 relative to sbcl-0.6.7:
   the sources, because they have never saved me trouble and
   they've been source of trouble working with patches and other
   diff-related operations.
+* fixed the PROG1-vs.-PROGN bug in HANDLER-BIND (reported by 
+  ole.rohne@cern.ch on cmucl-help@cons.org 2000-10-25)

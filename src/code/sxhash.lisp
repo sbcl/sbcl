@@ -42,9 +42,20 @@
 		   (ash x -3) ; to get sign bit into hash
 		   361475658)))
 
-;;;; Some other common SXHASH cases are defined as DEFTRANSFORMs in order to
-;;;; avoid having to do TYPECASE at runtime.
+;;; Some other common SXHASH cases are defined as DEFTRANSFORMs in
+;;; order to avoid having to do TYPECASE at runtime.
+;;;
+;;; We also take the opportunity to handle the cases of constant
+;;; strings, and of symbols whose names are known at compile time;
+;;; except that since SXHASH on the cross-compilation host is not in
+;;; general compatible with SXHASH on the target SBCL, we can't so
+;;; easily do this optimization in the cross-compiler, and SBCL itself
+;;; doesn't seem to need this optimization, so we don't try.
 (deftransform sxhash ((x) (simple-string))
-  '(%sxhash-simple-string x))
+  (if #+sb-xc-host nil #-sb-xc-host (constant-continuation-p x)
+      (sxhash (continuation-value x))
+      '(%sxhash-simple-string x)))
 (deftransform sxhash ((x) (symbol))
-  '(%sxhash-simple-string (symbol-name x)))
+  (if #+sb-xc-host nil #-sb-xc-host (constant-continuation-p x)
+      (sxhash (continuation-value x))
+      '(%sxhash-simple-string (symbol-name x))))
