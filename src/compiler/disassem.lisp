@@ -461,17 +461,22 @@
                  overrides)
        ,args-var)))
 
-(defun gen-printer-def-forms-def-form (name def &optional (evalp t))
-  (declare (type symbol name))
+(defun gen-printer-def-forms-def-form (base-name
+				       uniquified-name
+				       def
+				       &optional
+				       (evalp t))
+  (declare (type symbol base-name))
+  (declare (type (or symbol string) uniquified-name))
   (destructuring-bind
       (format-name
        (&rest field-defs)
        &optional (printer-form :default)
-       &key ((:print-name print-name-form) `',name) control)
+       &key ((:print-name print-name-form) `',base-name) control)
       def
     (let ((format-var (gensym))
           (field-defs (filter-overrides field-defs evalp)))
-      `(let* ((*current-instruction-flavor* ',(cons name format-name))
+      `(let* ((*current-instruction-flavor* ',(cons base-name format-name))
               (,format-var (format-or-lose ',format-name))
               (args ,(gen-args-def-form field-defs format-var evalp))
               (funcache *disassem-function-cache*))
@@ -479,20 +484,23 @@
          ;; byte compilation of components of the SBCL system.
          ;;(declare (optimize (speed 0) (safety 0) (debug 0)))
          (multiple-value-bind (printer-fun printer-defun)
-             (find-printer-fun ',name
+             (find-printer-fun ',uniquified-name
 			       ',format-name
 			       ,(if (eq printer-form :default)
                                      `(format-default-printer ,format-var)
                                      (maybe-quote evalp printer-form))
                                args funcache)
            (multiple-value-bind (labeller-fun labeller-defun)
-               (find-labeller-fun args funcache)
+               (find-labeller-fun ',uniquified-name args funcache)
              (multiple-value-bind (prefilter-fun prefilter-defun)
-                 (find-prefilter-fun ',name ',format-name args funcache)
+                 (find-prefilter-fun ',uniquified-name
+				     ',format-name
+				     args
+				     funcache)
                (multiple-value-bind (mask id)
                    (compute-mask-id args)
                  (values
-                  `(make-instruction ',',name
+                  `(make-instruction ',',base-name
                                      ',',format-name
                                      ,',print-name-form
                                      ,(format-length ,format-var)
@@ -1025,6 +1033,7 @@
                                    (,',cache-slot ',,cache)))))))))))
 
 (defun find-printer-fun (%name %format-name printer-source args cache)
+  (declare (type (or string symbol) %name))
   (if (null printer-source)
       (values nil nil)
       (let ((printer-source (preprocess-printer printer-source args)))
@@ -1032,7 +1041,7 @@
 	   (name funstate cache function-cache-printers args
 		 :constraint printer-source
 		 :stem (concatenate 'string
-				    (symbol-name %name)
+				    (string %name)
 				    "-"
 				    (symbol-name %format-name)
 				    "-PRINTER"))
@@ -1401,14 +1410,14 @@
           (t
            (pd-error "bogus test-form: ~S" test)))))
 
-(defun find-labeller-fun (args cache)
+(defun find-labeller-fun (%name args cache)
   (let ((labelled-fields
          (mapcar #'arg-name (remove-if-not #'arg-use-label args))))
     (if (null labelled-fields)
         (values nil nil)
         (!with-cached-function
             (name funstate cache function-cache-labellers args
-             :stem "LABELLER"
+             :stem (concatenate 'string "LABELLER-" (string %name))
              :constraint labelled-fields)
           (let ((labels-form 'labels))
             (dolist (arg args)
@@ -1443,7 +1452,7 @@
                    ,labels-form))))))))
 
 (defun find-prefilter-fun (%name %format-name args cache)
-  (declare (type symbol %name))
+  (declare (type (or symbol string) %name %format-name))
   (let ((filtered-args (mapcar #'arg-name
 			       (remove-if-not #'arg-prefilter args))))
     (if (null filtered-args)
@@ -1451,9 +1460,9 @@
         (!with-cached-function
             (name funstate cache function-cache-prefilters args
              :stem (concatenate 'string
-				(symbol-name %name)
+				(string %name)
 				"-"
-				(symbol-name %format-name)
+				(string %format-name)
 				"-PREFILTER")
              :constraint filtered-args)
           (collect ((forms))

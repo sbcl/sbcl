@@ -1504,23 +1504,26 @@ p	    ;; the branch has two dependents and one of them dpends on
 	       (error "You can only specify :VOP-VAR once per instruction.")
 	       (setf vop-var (car args))))
 	  (:printer
-	   #+nil ; REMOVEME: I'll fix printers when bootstrapping works.
+	   (sb!int:/noshow "uniquifying :PRINTER with" args)
 	   (push (eval `(list (multiple-value-list
 			       ,(sb!disassem:gen-printer-def-forms-def-form
 				 name
+				 (format nil "~A[~A]" name args)
 				 (cdr option-spec)))))
 		 pdefs))
 	  (:printer-list
 	   ;; same as :PRINTER, but is EVALed first, and is a list of
 	   ;; printers
-	   #+nil ; REMOVEME: I'll fix printers when bootstrapping works.
 	   (push
 	    (eval
 	     `(eval
-	       `(list ,@(mapcar #'(lambda (printer)
-				    `(multiple-value-list
-				      ,(sb!disassem:gen-printer-def-forms-def-form
-					',name printer nil)))
+	       `(list ,@(mapcar (lambda (printer)
+				  `(multiple-value-list
+				    ,(sb!disassem:gen-printer-def-forms-def-form
+				      ',name
+				      (format nil "~A[~A]" ',name printer)
+				      printer
+				      nil)))
 				,(cadr option-spec)))))
 	    pdefs))
 	  (t
