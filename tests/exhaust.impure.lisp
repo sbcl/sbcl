@@ -21,12 +21,54 @@
 ;;; Post 0.7.6.1, this was rewritten to use mprotect()-based stack
 ;;; protection which does not require lisp code to check anything,
 ;;; and works at all optimization settings.  However, it now signals a
-;;; STORAGE-CONDITION instead of an ERROR, so this test needs revising
-(locally
-  (defun recurse () (recurse) (recurse))
-  (handler-case
-    (recurse)
-    (storage-condition (c) (declare (ignore c)) (quit :unix-status 104))))
-
-;;; oops
-(quit :unix-status 1)
+;;; STORAGE-CONDITION instead of an ERROR.
+
+(defun recurse () 
+  (recurse) 
+  (recurse))
+
+(defvar *count* 100)
+
+;;; Base-case: detecting exhaustion
+(assert (eq :exhausted
+            (handler-case
+                (recurse)
+              (storage-condition (c) 
+                (declare (ignore c))
+                :exhausted))))
+
+;;; Check that non-local control transfers restore the stack
+;;; exhaustion checking after unwinding -- and that previous test
+;;; didn't break it.
+(let ((exhaust-count 0)
+      (recurse-count 0))
+  (tagbody
+     :retry
+     (handler-bind ((storage-condition (lambda (c)
+                                         (declare (ignore c))
+                                         (if (= *count* (incf exhaust-count))
+                                             (go :stop)
+                                             (go :retry)))))
+       (incf recurse-count)
+       (recurse))
+     :stop)
+  (assert (= exhaust-count recurse-count *count*)))
+
+;;; Check that we can safely use user-provided restarts to
+;;; unwind.
+(let ((exhaust-count 0)
+      (recurse-count 0))
+  (block nil
+   (handler-bind ((storage-condition (lambda (c)
+                                       (declare (ignore c))
+                                       (if (= *count* (incf exhaust-count))
+                                           (return)
+                                           (invoke-restart (find-restart 'ok))))))
+      (loop
+       (with-simple-restart (ok "ok")
+         (incf recurse-count)
+         (recurse)))))
+  (assert (= exhaust-count recurse-count *count*)))
+
+;;; OK!
+(quit :unix-status 104)

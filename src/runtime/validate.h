@@ -27,13 +27,15 @@
 #include <thread.h>
 #ifdef LISP_FEATURE_STACK_GROWS_DOWNWARD_NOT_UPWARD 
 #define CONTROL_STACK_GUARD_PAGE(th) ((void *)(th->control_stack_start))
+#define CONTROL_STACK_RETURN_GUARD_PAGE(th) (CONTROL_STACK_GUARD_PAGE(th) + os_vm_page_size)
 #else
-#define CONTROL_STACK_GUARD_PAGE(th) \
-     (((void *)(th->control_stack_end)) - os_vm_page_size)
+#define CONTROL_STACK_GUARD_PAGE(th) (((void *)(th->control_stack_end)) - os_vm_page_size)
+#define CONTROL_STACK_RETURN_GUARD_PAGE(th) (CONTROL_STACK_GUARD_PAGE(th) - os_vm_page_size)
 #endif
 
 extern void validate(void);
 extern void protect_control_stack_guard_page(pid_t t_id, int protect_p);
+extern void protect_control_stack_return_guard_page(pid_t t_id, int protect_p);
 #endif
 
 /* note for anyone trying to port an architecture's support files

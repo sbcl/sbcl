@@ -701,17 +701,31 @@ void thread_exit_handler(int num, siginfo_t *info, void *v_context)
 
 boolean handle_control_stack_guard_triggered(os_context_t *context,void *addr){
     struct thread *th=arch_os_get_current_thread();
+    
     /* note the os_context hackery here.  When the signal handler returns, 
      * it won't go back to what it was doing ... */
-    if(addr>=(void *)CONTROL_STACK_GUARD_PAGE(th) && 
-       addr<(void *)(CONTROL_STACK_GUARD_PAGE(th)+os_vm_page_size)) {
-	/* we hit the end of the control stack.  disable protection
-	 * temporarily so the error handler has some headroom */
-	protect_control_stack_guard_page(th->pid,0L);
-	
-	arrange_return_to_lisp_function
-	    (context, SymbolFunction(CONTROL_STACK_EXHAUSTED_ERROR));
-	return 1;
+    if(addr >= CONTROL_STACK_GUARD_PAGE(th) && 
+       addr < CONTROL_STACK_GUARD_PAGE(th) + os_vm_page_size) {
+        /* We hit the end of the control stack: disable guard page
+         * protection so the error handler has some headroom, protect the
+         * previous page so that we can catch returns from the guard page
+         * and restore it. */
+        protect_control_stack_guard_page(th->pid,0);
+        protect_control_stack_return_guard_page(th->pid,1);
+        
+        arrange_return_to_lisp_function
+            (context, SymbolFunction(CONTROL_STACK_EXHAUSTED_ERROR));
+        return 1;
+    }
+    else if(addr >= CONTROL_STACK_RETURN_GUARD_PAGE(th) &&
+            addr < CONTROL_STACK_RETURN_GUARD_PAGE(th) + os_vm_page_size) {
+        /* We're returning from the guard page: reprotect it, and
+         * unprotect this one. This works even if we somehow missed
+         * the return-guard-page, and hit it on our way to new
+         * exhaustion instead. */
+        protect_control_stack_guard_page(th->pid,1);
+        protect_control_stack_return_guard_page(th->pid,0);
+        return 1;
     }
     else return 0;
 }
