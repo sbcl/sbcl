@@ -598,10 +598,11 @@
 ;;; READTABLE-CASE.
 (defun output-symbol-name (name stream &optional (maybe-quote t))
   (declare (type simple-string name))
-  (setup-printer-state)
-  (if (and maybe-quote (symbol-quotep name))
-      (output-quoted-symbol-name name stream)
-      (funcall *internal-symbol-output-fun* name stream)))
+  (let ((*readtable* (if *print-readably* *standard-readtable* *readtable*)))
+    (setup-printer-state)
+    (if (and maybe-quote (symbol-quotep name))
+	(output-quoted-symbol-name name stream)
+	(funcall *internal-symbol-output-fun* name stream))))
 
 ;;;; escaping symbols
 

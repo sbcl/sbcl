@@ -2358,6 +2358,8 @@ changes in sbcl-0.8.9 relative to sbcl-0.8.8:
        less than 10 works correctly.
     ** Reading floating-point numbers with *READ-BASE* set to a number
        more than 10 works correctly.
+    ** Printing with *PRINT-READABLY* targets the standard readtable, not
+       the readtable currently in effect.
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles
