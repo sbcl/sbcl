@@ -2778,15 +2778,20 @@
   (let ((car-type1 (cons-type-car-type type1))
 	(car-type2 (cons-type-car-type type2))
 	(cdr-type1 (cons-type-cdr-type type1))
-	(cdr-type2 (cons-type-cdr-type type2)))
+	(cdr-type2 (cons-type-cdr-type type2))
+	car-not1
+	car-not2)
     ;; UGH.  -- CSR, 2003-02-24
-    (macrolet ((frob-car (car1 car2 cdr1 cdr2)
+    (macrolet ((frob-car (car1 car2 cdr1 cdr2
+			  &optional (not1 nil not1p))
 		 `(type-union
 		   (make-cons-type ,car1 (type-union ,cdr1 ,cdr2))
 		   (make-cons-type
 		    (type-intersection ,car2
-		     (specifier-type
-		      `(not ,(type-specifier ,car1))))
+		     ,(if not1p
+			  not1
+			  `(specifier-type
+			    `(not ,(type-specifier ,car1)))))
 		    ,cdr2))))
       (cond ((type= car-type1 car-type2)
 	     (make-cons-type car-type1
@@ -2798,6 +2803,17 @@
 	     (frob-car car-type1 car-type2 cdr-type1 cdr-type2))
 	    ((csubtypep car-type2 car-type1)
 	     (frob-car car-type2 car-type1 cdr-type2 cdr-type1))
+	    ;; more general case of the above, but harder to compute
+	    ((progn
+	       (setf car-not1 (specifier-type
+			       `(not ,(type-specifier car-type1))))
+	       (not (csubtypep car-type2 car-not1)))
+	     (frob-car car-type1 car-type2 cdr-type1 cdr-type2 car-not1))
+	    ((progn
+	       (setf car-not2 (specifier-type
+			       `(not ,(type-specifier car-type2))))
+	       (not (csubtypep car-type1 car-not2)))
+	     (frob-car car-type2 car-type1 cdr-type2 cdr-type1 car-not2))
 	    ;; Don't put these in -- consider the effect of taking the
 	    ;; union of (CONS (INTEGER 0 2) (INTEGER 5 7)) and
 	    ;; (CONS (INTEGER 0 3) (INTEGER 5 6)).
