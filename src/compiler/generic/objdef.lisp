@@ -376,8 +376,8 @@
   (this :c-type "struct thread *" :length #!+alpha 2 #!-alpha 1)
   (next :c-type "struct thread *" :length #!+alpha 2 #!-alpha 1)
   (state)				; running, stopping, stopped, dead
-  #!+x86 (pseudo-atomic-atomic)
-  #!+x86 (pseudo-atomic-interrupted)
+  #!+(or x86 x86-64) (pseudo-atomic-atomic)
+  #!+(or x86 x86-64) (pseudo-atomic-interrupted)
   (interrupt-data :c-type "struct interrupt_data *" 
 		  :length #!+alpha 2 #!-alpha 1)
   (interrupt-contexts :c-type "os_context_t *" :rest-p t))

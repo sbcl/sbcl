@@ -161,7 +161,7 @@ void reset_signal_mask ()
 void 
 build_fake_control_stack_frames(struct thread *th,os_context_t *context)
 {
-#ifndef LISP_FEATURE_X86
+#ifndef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
     
     lispobj oldcont;
 
@@ -481,7 +481,7 @@ maybe_defer_handler(void *handler, struct interrupt_data *data,
      * actually use its argument for anything on x86, so this branch
      * may succeed even when context is null (gencgc alloc()) */
     if (
-#ifndef LISP_FEATURE_X86
+#if !defined(LISP_FEATURE_X86) && !defined(LISP_FEATURE_X86_64)
 	(!foreign_function_call_active) &&
 #endif
 	arch_pseudo_atomic_atomic(context)) {
@@ -679,11 +679,9 @@ void arrange_return_to_lisp_function(os_context_t *context, lispobj function)
     *os_context_pc_addr(context) = call_into_lisp;
     *os_context_register_addr(context,reg_ECX) = 0; 
     *os_context_register_addr(context,reg_EBP) = sp-2;
-#ifdef __NetBSD__ 
-    *os_context_register_addr(context,reg_UESP) = sp-14;
-#else
     *os_context_register_addr(context,reg_ESP) = sp-14;
-#endif
+#elif defined(LISP_FEATURE_X86_64)
+    lose("deferred gubbins still needs to be written");
 #else
     /* this much of the calling convention is common to all
        non-x86 ports */

@@ -28,7 +28,7 @@
 #include "genesis/primitive-objects.h"
 #include "thread.h"
 
-#ifndef LISP_FEATURE_X86
+#if !(defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64))
 
 /* KLUDGE: Sigh ... I know what the call frame looks like and it had
  * better not change. */

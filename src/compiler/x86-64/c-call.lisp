@@ -216,7 +216,8 @@
 	  (t
 	   ;; Setup the NPX for C; all the FP registers need to be
 	   ;; empty; pop them all.
-	   (dotimes (i 8)
+	   #+nil
+	   (dotimes (i 8) ; FIXME
 	     (inst fstp fr0-tn))
 
 	   (inst call function)
@@ -224,10 +225,11 @@
 	   (note-this-location vop :internal-error)
 
 	   ;; Restore the NPX for lisp; ensure no regs are empty
-	   (dotimes (i 7)
+	   #+nil
+	   (dotimes (i 7) ; FIXME
 	     (inst fldz))
-
-	   (if (and results
+	   #+nil
+	   (if (and results ; ANDME
 		    (location= (tn-ref-tn results) fr0-tn))
 	       ;; The return result is in fr0.
 	       (inst fxch fr7-tn) ; move the result back to fr0

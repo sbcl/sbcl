@@ -1404,7 +1404,7 @@ purify(lispobj static_roots, lispobj read_only_roots)
     printf(" bindings");
     fflush(stdout);
 #endif
-#if !defined(LISP_FEATURE_X86)
+#if !(defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64))
     pscav( (lispobj *)all_threads->binding_stack_start,
 	  (lispobj *)current_binding_stack_pointer -
 	   all_threads->binding_stack_start,

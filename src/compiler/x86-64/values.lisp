@@ -16,6 +16,35 @@
   (:generator 1
     (move rsp-tn ptr)))
 
+(define-vop (%%nip-values)
+  (:args (last-nipped-ptr :scs (any-reg) :target rdi)
+         (last-preserved-ptr :scs (any-reg) :target rsi)
+         (moved-ptrs :scs (any-reg) :more t))
+  (:results (r-moved-ptrs :scs (any-reg) :more t)
+            ;; same as MOVED-PTRS
+            )
+  (:temporary (:sc any-reg :offset rsi-offset) rsi)
+  (:temporary (:sc any-reg :offset rdi-offset) rdi)
+  (:ignore r-moved-ptrs)
+  (:generator 1
+    (move rdi last-nipped-ptr)
+    (move rsi last-preserved-ptr)
+    (inst sub rsi n-word-bytes)
+    (inst sub rdi n-word-bytes)
+    (inst cmp rsp-tn rsi)
+    (inst jmp :a done)
+    (inst std)
+    LOOP
+    (inst movs :qword)
+    (inst cmp rsp-tn rsi)
+    (inst jmp :be loop)
+    DONE
+    (inst lea rsp-tn (make-ea :qword :base rdi :disp n-word-bytes))
+    (inst sub rdi rsi)
+    (loop for moved = moved-ptrs then (tn-ref-across moved)
+          while moved
+          do (inst add (tn-ref-tn moved) rdi))))
+
 ;;; Push some values onto the stack, returning the start and number of values
 ;;; pushed as results. It is assumed that the Vals are wired to the standard
 ;;; argument locations. Nvals is the number of values to push.

@@ -189,6 +189,8 @@ if [ "$sbcl_arch" = "x86" ]; then
     if [ "$sbcl_os" = "linux" ] || [ "$sbcl_os" = "freebsd" ]; then
 	printf ' :linkage-table' >> $ltf
     fi
+elif [ "$sbcl_arch" = "x86-64" ]; then
+    printf ' :gencgc :stack-grows-downward-not-upward :c-stack-is-control-stack' >> $ltf
 elif [ "$sbcl_arch" = "mips" ]; then
     # Use a little C program to try to guess the endianness.  Ware
     # cross-compilers!

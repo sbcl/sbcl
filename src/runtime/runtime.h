@@ -45,13 +45,10 @@
 /* even on alpha, int happens to be 4 bytes.  long is longer. */
 /* FIXME: these names really shouldn't reflect their length and this
    is not quite right for some of the FFI stuff */
-#if 64 == N_WORD_BITS
-typedef unsigned long u32;
-typedef signed long s32;
-#else
+typedef unsigned long u64;
+typedef signed long s64;
 typedef unsigned int u32;
 typedef signed int s32;
-#endif
 
 /* this is an integral type the same length as a machine pointer */
 typedef unsigned long pointer_sized_uint_t ;

@@ -2168,7 +2168,9 @@ possibly_valid_dynamic_space_pointer(lispobj *pointer)
 	case SIMPLE_ARRAY_UNSIGNED_BYTE_8_WIDETAG:
 	case SIMPLE_ARRAY_UNSIGNED_BYTE_15_WIDETAG:
 	case SIMPLE_ARRAY_UNSIGNED_BYTE_16_WIDETAG:
+#ifdef  SIMPLE_ARRAY_UNSIGNED_BYTE_29_WIDETAG:
 	case SIMPLE_ARRAY_UNSIGNED_BYTE_29_WIDETAG:
+#endif
 	case SIMPLE_ARRAY_UNSIGNED_BYTE_31_WIDETAG:
 	case SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG:
 #ifdef SIMPLE_ARRAY_SIGNED_BYTE_8_WIDETAG
@@ -2256,7 +2258,9 @@ maybe_adjust_large_object(lispobj *where)
     case SIMPLE_ARRAY_UNSIGNED_BYTE_8_WIDETAG:
     case SIMPLE_ARRAY_UNSIGNED_BYTE_15_WIDETAG:
     case SIMPLE_ARRAY_UNSIGNED_BYTE_16_WIDETAG:
+#ifdef  SIMPLE_ARRAY_UNSIGNED_BYTE_29_WIDETAG
     case SIMPLE_ARRAY_UNSIGNED_BYTE_29_WIDETAG:
+#endif
     case SIMPLE_ARRAY_UNSIGNED_BYTE_31_WIDETAG:
     case SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG:
 #ifdef SIMPLE_ARRAY_SIGNED_BYTE_8_WIDETAG
@@ -3205,7 +3209,9 @@ verify_space(lispobj *start, size_t words)
 		case SIMPLE_ARRAY_UNSIGNED_BYTE_8_WIDETAG:
 		case SIMPLE_ARRAY_UNSIGNED_BYTE_15_WIDETAG:
 		case SIMPLE_ARRAY_UNSIGNED_BYTE_16_WIDETAG:
+#ifdef SIMPLE_ARRAY_UNSIGNED_BYTE_29_WIDETAG
 		case SIMPLE_ARRAY_UNSIGNED_BYTE_29_WIDETAG:
+#endif
 		case SIMPLE_ARRAY_UNSIGNED_BYTE_31_WIDETAG:
 		case SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG:
 #ifdef SIMPLE_ARRAY_SIGNED_BYTE_8_WIDETAG
@@ -4003,10 +4009,11 @@ alloc(int nbytes)
 #endif
     void *new_obj;
     void *new_free_pointer;
-
+    gc_assert(nbytes>0);
     /* Check for alignment allocation problems. */
     gc_assert((((unsigned)region->free_pointer & 0x7) == 0)
 	      && ((nbytes & 0x7) == 0));
+#if 0
     if(all_threads)
 	/* there are a few places in the C code that allocate data in the
 	 * heap before Lisp starts.  This is before interrupts are enabled,
@@ -4023,6 +4030,7 @@ alloc(int nbytes)
 	}
 #else
     gc_assert(SymbolValue(PSEUDO_ATOMIC_ATOMIC,th));
+#endif
 #endif
     
     /* maybe we can do this quickly ... */
