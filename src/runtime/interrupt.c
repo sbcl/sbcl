@@ -552,6 +552,16 @@ sig_stop_for_gc_handler(int signal, siginfo_t *info, void *void_context)
     sigset_t ss;
     int i;
     
+    /* KLUDGE: at least on Linux, the kernel apparently schedules a
+       thread immediately it is signalled.  However, we signal
+       SIG_STOP_FOR_GC while holding the spinlock, and consequently we
+       can easily end up with a kind of thundering herd of threads all
+       wanting to acquire the lock at the same time so that they can
+       tell the system that they've gone to sleep.  So we yield here.
+       Whether this is the right fix or not is unknown.  -- CSR,
+       2004-07-16 */
+    sched_yield();
+
     if(maybe_defer_handler(sig_stop_for_gc_handler,data,
 			   signal,info,context)) {
 	return;
