@@ -347,12 +347,13 @@ the @code{inspect} prompt.
 SBCL has the ability to save its state as a file for later
 execution. This functionality is important for its bootstrapping
 process, and is also provided as an extension to the user.  Note that
-foreign libraries loaded via @code{load-1-foreign} don't survive this
-process; a core should not be saved in this case.
+foreign libraries loaded via @code{load-shared-object} don't survive
+this process; a core should not be saved in this case.
 
 @emph{FIXME: what should be done for foreign libraries?}
 
-@emph{FIXME: document load-1-foreign somewhere}
+@emph{FIXME: document load-shared-object somewhere - it's in
+ffi.texinfo?}
 
 @include fun-sb-ext-save-lisp-and-die.texinfo
 

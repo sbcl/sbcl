@@ -71,7 +71,7 @@
   (let ((co (make-instance 'compile-op)))
     (let ((filename (car (output-files co c))))
       #+cmu (ext:load-foreign filename)
-      #+sbcl (sb-alien:load-1-foreign filename))))
+      #+sbcl (sb-alien:load-shared-object filename))))
 
 (defsystem sb-posix
     :depends-on (sb-grovel)

@@ -4,6 +4,11 @@ changes in sbcl-0.8.13 relative to sbcl-0.8.12:
     removing :SB-PACKAGE-LOCKS in customize-target-features.lisp, but
     if no major problems are found then it is likely that they will be
     compiled in unconditionally.
+  * major incompatible change: LOAD-FOREIGN and LOAD-1-FOREIGN are now
+    unsupported operators. To load a shared library into SBCL, use
+    SB-ALIEN:LOAD-SHARED-OBJECT. To load a non-shared object file,
+    link it into a shared library outside of SBCL and load it using
+    SB-ALIEN:LOAD-SHARED-OBJECT.
   * minor incompatible change: as threatened around sbcl-0.8.0, the
     home package of MOP-related symbols is now SB-MOP, not SB-PCL.
     The symbols are also exported from SB-PCL for backwards

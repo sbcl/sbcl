@@ -1,6 +1,7 @@
 #!/bin/sh
 
-# tests related to foreign function interface and LOAD-FOREIGN
+# tests related to foreign function interface and loading of shared
+# libraries
 
 # This software is part of the SBCL system. See the README file for
 # more information.
@@ -27,11 +28,11 @@ ${SBCL:-sbcl} <<EOF
   (define-alien-variable environ (* c-string))
   (defvar *environ* environ)
   (handler-case 
-      (load-foreign '("$testfilestem.so"))
+      (load-shared-object "$testfilestem.so")
     (sb-int:unsupported-operator ()
-     ;; At least as of sbcl-0.7.0.5, LOAD-FOREIGN isn't supported
-     ;; on every OS. In that case, there's nothing to test, and we
-     ;; can just fall through to success.
+     ;; At least as of sbcl-0.7.0.5, LOAD-SHARED-OBJECT isn't
+     ;; supported on every OS. In that case, there's nothing to test,
+     ;; and we can just fall through to success.
      (sb-ext:quit :unix-status 52))) ; success convention for Lisp program
   ;; Test that loading an object file didn't screw up our records
   ;; of variables visible in runtime. (This was a bug until 
@@ -46,12 +47,6 @@ if [ $? != 52 ]; then
     echo test failed: $?
     exit 1
 fi
-
-# FIXME: I rewrote the handling of ENV/ENVIRONMENT arguments for
-# LOAD-FOREIGN, but I can't think of a nice way to test it. (Kent Beck
-# would cry. If he didn't keel over on the spot and then commence
-# rolling over in his grave.:-) It would be good to make a test case
-# for it..
 
 echo //cleanup: removing $testfilestem.*
 rm $testfilestem.*

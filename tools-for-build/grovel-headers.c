@@ -29,6 +29,7 @@
 #include <unistd.h>
 #include <signal.h>
 #include <errno.h>
+#include <dlfcn.h>
 
 #include "genesis/config.h"
 
@@ -61,6 +62,14 @@ main(int argc, char *argv[])
 \n\
 ");
 
+    printf("(in-package \"SB!ALIEN\")\n\n");
+
+    printf (";;;flags for dlopen()\n");
+    
+    defconstant ("rtld-lazy", RTLD_LAZY);
+    defconstant ("rtld-now", RTLD_NOW);
+    defconstant ("rtld-global", RTLD_GLOBAL);
+    
     printf("(in-package \"SB!UNIX\")\n\n");
 
     printf(";;; types, types, types\n");

@@ -716,21 +716,14 @@ which can be manipulated in Lisp like this:
 @section Loading Unix Object Files
 
 Foreign object files can be loaded into the running Lisp process by
-calling the functions @code{load-foreign} or @code{load-1-foreign}.
+calling @code{load-shared-object}.
 
-The @code{sb-alien:load-1-foreign} function is the more primitive of
-the two operations. It loads a single object file into the currently
-running Lisp. The external symbols defining routines and variables are
-made available for future external references (e.g. by
+The @code{sb-alien:load-shared-object} loads a single object file into
+the currently running Lisp. The external symbols defining routines and
+variables are made available for future external references (e.g. by
 @code{extern-alien}). Forward references to foreign symbols aren't
-supported: @code{load-1-foreign} must be run before any of the defined
-symbols are referenced.
-
-@code{sb-alien:load-foreign} is built in terms of
-@code{load-1-foreign} and some other machinery like
-@code{sb-ext:run-program}.  It accepts a list of files and libraries,
-and runs the linker on the files and libraries, creating an absolute
-Unix object file which is then processed by @code{load-1-foreign}.
+supported: @code{load-shared-object} must be run before any of the
+defined symbols are referenced.
 
 @quotation
 Note: As of SBCL 0.7.5, all foreign code (code loaded with
@@ -1204,9 +1197,9 @@ It is possible to call this C function from Lisp using the file
 @end lisp
 
 To execute the above example, it is necessary to compile the C
-routine, e.g.: @samp{cc -c test.c} (In order to enable incremental
-loading with some linkers, you may need to say @samp{cc -G 0 -c
-test.c})
+routine, e.g.: @samp{cc -c test.c && ld -shared -o test.so test.o} (In
+order to enable incremental loading with some linkers, you may need to
+say @samp{cc -G 0 -c test.c})
 
 Once the C code has been compiled, you can start up Lisp and load it
 in: @samp{sbcl} Lisp should start up with its normal prompt.
@@ -1216,8 +1209,8 @@ separately. You don't have to recompile every time.)
 @samp{(compile-file "test.lisp")}
 
 Within Lisp, load the foreign object file to define the necessary
-symbols: @samp{(load-foreign "test.o")}.  This must be done before
-loading any code that refers to these symbols.
+symbols: @samp{(load-shared-object "test.so")}.  This must be done
+before loading any code that refers to these symbols.
 
 Now you can load the compiled Lisp (``fasl'') file into Lisp:
 @samp{(load "test.fasl")}

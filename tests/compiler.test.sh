@@ -265,7 +265,7 @@ expect_failed_compile $tmpfilename
 # references to the unbound variable.
 cat > $tmpfilename <<EOF
 (defmacro macro-with-unbound-variables (foo)
-  `(print ,bar))
+  \`(print ,bar))
 
 (macro-with-unbound-variables 'xxx)
 EOF

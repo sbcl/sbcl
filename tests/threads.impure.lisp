@@ -49,7 +49,7 @@
  (or #+linux '("-shared" "-o" "threads-foreign.so" "threads-foreign.c")
      (error "Missing shared library compilation options for this platform"))
  :search t)
-(sb-alien:load-1-foreign "threads-foreign.so")
+(sb-alien:load-shared-object "threads-foreign.so")
 (sb-alien:define-alien-routine loop-forever sb-alien:void)
 
 
