@@ -1,0 +1,51 @@
+@node sb-sprof
+@section sb-sprof
+@cindex Profiler
+
+The @code{sb-sprof} module provides an alternate profiler which works by
+taking samples of the program execution at regular intervals, instead of
+instrumenting functions like @code{profile} does. You might find
+@code{sb-sprof} more useful than @code{profile} when profiling functions
+in the @code{common-lisp}-package, SBCL internals, or code where the
+instrumenting overhead is excessive. On the other hand it only works on
+x86, and isn't completely reliable even there.
+
+@subsection Example Usage
+
+@lisp
+(require :sb-sprof)
+(sb-sprof:start-profiling)
+
+(defvar *a* 0)
+(dotimes (i (expt 2 26))
+  (setf *a* (logxor *a* (* i 5)
+                    (+ *a* i))))
+
+(sb-sprof:stop-profiling)
+(sb-sprof:report)
+@end lisp
+
+@subsection Functions
+
+@include fun-sb-sprof-report.texinfo
+
+@include fun-sb-sprof-reset.texinfo
+
+@include fun-sb-sprof-start-profiling.texinfo
+
+@include fun-sb-sprof-stop-profiling.texinfo
+
+@subsection Macros
+
+@include macro-sb-sprof-with-profiling.texinfo
+
+@subsection Variables
+
+@include var-sb-sprof-star-max-samples-star.texinfo
+
+@include var-sb-sprof-star-sample-interval-star.texinfo
+   
+@subsection Credits
+
+@code{sb-sprof} is an SBCL port of Gerd Moellmann's statistical profiler
+for CMUCL.
