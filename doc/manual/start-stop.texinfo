@@ -1,6 +1,6 @@
 @node Starting and Stopping
 @comment  node-name,  next,  previous,  up
-@chapter Starting and Stoppping
+@chapter Starting and Stopping
 
 @menu
 * Starting SBCL::               
@@ -29,7 +29,6 @@ You should end up in the toplevel @dfn{REPL} (read, eval, print
 -loop), where you can interact with SBCL by typing expressions.
 
 @smallexample
-@cartouche
 $ sbcl
 This is SBCL 0.8.13.60, an implementation of ANSI Common Lisp.
 More information about SBCL is available at <http://www.sbcl.org/>.
@@ -43,7 +42,6 @@ distribution for more information.
 4
 * (quit)
 $
-@end cartouche
 @end smallexample
 
 See also @ref{Command Line Options} and @ref{Stopping SBCL}.
@@ -111,8 +109,8 @@ using SBCL as part of a shell pipeline.
 SBCL can also be configured to exit if an unhandled error occurs,
 which is mainly useful for acting as part of a shell pipeline; doing
 so under most other circumstances would mean giving up large parts of
-the flexibility and robustness of Common Lisp. See @ref{Customization
-Hooks for Users}.
+the flexibility and robustness of Common Lisp. See @ref{Starting the
+Debugger}.
 
 
 @node Command Line Options
@@ -181,7 +179,7 @@ Print SBCL's version information, then exit.
 
 @end table
 
-In the future, runtime options may be added to control behavior such
+In the future, runtime options may be added to control behaviour such
 as lazy allocation of memory.
 
 Runtime options, including any --end-runtime-options option, are
@@ -228,7 +226,7 @@ cleanly in Unix pipelines.
 
 @item --disable-debugger
 This is equivalent to @code{--eval '(sb-ext:disable-debugger)'}.
-@xref{Customization Hooks for Users}.
+@xref{Starting the Debugger}.
 
 @end table
 
@@ -293,7 +291,7 @@ files follow.
 @comment  node-name,  next,  previous,  up
 @subsubsection Unix-style Command Line Protocol
 
-Standard Unix tools that are interpeters follow a common command line
+Standard Unix tools that are interpreters follow a common command line
 protocol that is necessary to work with ``shebang scripts''. SBCL
 doesn't do this by default, but adding the following snippet to an
 initialization file does the trick:
@@ -302,21 +300,21 @@ initialization file does the trick:
 ;;; If the first user-processable command-line argument is a filename,
 ;;; disable the debugger, load the file handling shebang-line and quit.
 (let ((script (and (second *posix-argv*) (probe-file (second *posix-argv*)))))
-  (when script
-    ;; Handle shebang-line
-    (set-dispatch-macro-character #\# #\!
-				  (lambda (stream char arg)
-				    (declare (ignore char arg))
-				    (read-line stream)))
-    ;; Disable debugger
-    (setf *invoke-debugger-hook* (lambda (condition hook)
-				   (declare (ignore hook))
-                                   ;; Uncomment to get backtraces on errors
-				   ;; (sb-debug:backtrace 20)
-				   (format *error-output* "Error: ~A~%" condition)
-				   (quit)))
-    (load script)
-    (quit)))
+   (when script
+      ;; Handle shebang-line
+      (set-dispatch-macro-character #\# #\!
+                                    (lambda (stream char arg)
+                                       (declare (ignore char arg))
+                                       (read-line stream)))
+      ;; Disable debugger
+      (setf *invoke-debugger-hook* (lambda (condition hook)
+                                      (declare (ignore hook))
+                                      ;; Uncomment to get backtraces on errors
+                                      ;; (sb-debug:backtrace 20)
+                                      (format *error-output* "Error: ~A~%" condition)
+                                      (quit)))
+      (load script)
+      (quit)))
 @end lisp
 
 Example file (@file{hello.lisp}):
@@ -329,14 +327,11 @@ Example file (@file{hello.lisp}):
 Usage examples:
 
 @smallexample
-@cartouche
 $ ./hello.lisp
 Hello, World!
-@end cartouche
 @end smallexample
 
 @smallexample
-@cartouche
 $ sbcl hello.lisp
 This is SBCL 0.8.13.70, an implementation of ANSI Common Lisp.
 More information about SBCL is available at <http://www.sbcl.org/>.
@@ -346,7 +341,6 @@ It is mostly in the public domain; some portions are provided under
 BSD-style licenses.  See the CREDITS and COPYING files in the
 distribution for more information.
 Hello, World!
-@end cartouche
 @end smallexample
 
 
@@ -363,9 +357,9 @@ handles recompilation automatically for ASDF-based systems.
 
 ;;; If a fasl was stale, try to recompile and load (once). 
 (defmethod asdf:perform :around ((o asdf:load-op) (c asdf:cl-source-file))
-  (handler-case (call-next-method o c)
-    ;; If a fasl was stale, try to recompile and load (once).
-    (sb-ext:invalid-fasl ()
-      (asdf:perform (make-instance 'asdf:compile-op) c)
-      (call-next-method))))
+   (handler-case (call-next-method o c)
+      ;; If a fasl was stale, try to recompile and load (once).
+      (sb-ext:invalid-fasl ()
+         (asdf:perform (make-instance 'asdf:compile-op) c)
+         (call-next-method))))
 @end lisp

@@ -525,7 +525,7 @@ default compilation policy provides full type checks.
 Any or all type declarations may be believed without runtime
 assertions, and assertions that are done may be imprecise.
 
-Used when @code{(> 0 safety (max speed space compilation-speed)}.
+Used when @code{(< 0 safety (max speed space compilation-speed)}.
 
 @item No Type Checks
 All declarations are believed without assertions. Also disables
@@ -768,34 +768,8 @@ Policy Control}.
 
 Ordinarily, when the @code{speed} quality is high, the compiler emits
 notes to notify the programmer about its inability to apply various
-optimizations. 
-
-Compiler diagnostics (of any severity other than @code{error}:
-@pxref{Diagnostic Severity}) can be silenced by using the
-@code{sb-ext:muffle-conditions} declaration, specifying the type of
-condition that is to be muffled (using an associated
-@code{muffle-warning} restart). 
-
-To muffle all compiler notes:
-
-@lisp
-(declaim (sb-ext:muffle-conditions sb-ext:compiler-note))
-@end lisp
-
-Compiler diagnostics can also be muffled in the lexical scope of a
-declaration, and also lexically unmuffled by the use of the
-sb-ext:unmuffle-conditions, for instance:
-
-@lisp
-(defun foo (x)
-  (declare (optimize speed) (fixnum x))
-  (declare (sb-ext:muffle-conditions sb-ext:compiler-note))
-  (values (* x 5) ; no compiler note from this
-    (locally
-      (declare (sb-ext:unmuffle-conditions sb-ext:compiler-note))
-      ;; this one gives a compiler note
-      (* x -5))))
-@end lisp
+optimizations. For selective muffling of these notes @xref{Controlling
+Verbosity}
 
 The value of @code{space} mostly influences the compiler's decision
 whether to inline operations, which tend to increase the size of

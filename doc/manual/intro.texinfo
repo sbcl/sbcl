@@ -281,7 +281,7 @@ automated documentation lookup.
 Currently @dfn{SLIME}@footnote{Historically, the ILISP package at
 @uref{http://ilisp.cons.org/} provided similar functionality, but it
 does not support modern SBCL versions.} (Superior Lisp Interaction
-Mode for Emacs) togather with Emacs is recommended for use with
+Mode for Emacs) together with Emacs is recommended for use with
 SBCL, though other options exist as well. 
 
 SLIME can be downloaded from
