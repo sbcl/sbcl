@@ -1070,10 +1070,11 @@
 		     (nm (car next-methods))
 		     (nms (cdr next-methods))
 		     (nmc (when nm
-			    (make-method-call :function (if (std-instance-p nm)
-							    (method-function nm)
-							    nm)
-					      :call-method-args (list nms)))))
+			    (make-method-call
+			     :function (if (std-instance-p nm)
+					   (method-function nm)
+					   nm)
+			     :call-method-args (list nms)))))
 		(if restp
 		    (let* ((rest (nthcdr nreq method-args))
 			   (args (ldiff method-args rest)))

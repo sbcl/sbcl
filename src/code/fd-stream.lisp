@@ -188,16 +188,16 @@
       (do-output stream (fd-stream-obuf-sap stream) 0 length t)
       (setf (fd-stream-obuf-tail stream) 0))))
 
-;;; Define output routines that output numbers size bytes long for the
-;;; given bufferings. Use body to do the actual output.
-(defmacro def-output-routines ((name size &rest bufferings) &body body)
+;;; Define output routines that output numbers SIZE bytes long for the
+;;; given bufferings. Use BODY to do the actual output.
+(defmacro def-output-routines ((name-fmt size &rest bufferings) &body body)
   (declare (optimize (speed 1)))
   (cons 'progn
 	(mapcar
 	    #'(lambda (buffering)
 		(let ((function
 		       (intern (let ((*print-case* :upcase))
-				 (format nil name (car buffering))))))
+				 (format nil name-fmt (car buffering))))))
 		  `(progn
 		     (defun ,function (stream byte)
 		       ,(unless (eq (car buffering) :none)
@@ -399,10 +399,10 @@
 
 ;;;; input routines and related noise
 
-(defvar *input-routines* ()
-  #!+sb-doc
-  "List of all available input routines. Each element is a list of the
-  element-type input, the function name, and the number of bytes per element.")
+;;; a list of all available input routines. Each element is a list of
+;;; the element-type input, the function name, and the number of bytes
+;;; per element.
+(defvar *input-routines* ())
 
 ;;; Fill the input buffer, and return the first character. Throw to
 ;;; EOF-INPUT-CATCHER if the eof was reached. Drop into SYSTEM:SERVER

@@ -1445,8 +1445,7 @@ p	    ;; the branch has two dependents and one of them dpends on
 			(multiple-value-bind (key var)
 			    (if (consp name)
 				(values (first name) (second name))
-				(values (intern (symbol-name name) :keyword)
-					name))
+				(values (keywordicate name) name))
 			  `(append (and ,supplied-p (list ',key ,var))
 				   ,(grovel state (cdr lambda-list))))))
 		     (&rest

@@ -1126,7 +1126,7 @@
 (declaim (ftype (function (symbol list t) keyword) make-keyword-for-arg))
 (defun make-keyword-for-arg (symbol vars keywordify)
   (let ((key (if (and keywordify (not (keywordp symbol)))
-		 (intern (symbol-name symbol) "KEYWORD")
+		 (keywordicate symbol)
 		 symbol)))
     (when (eq key :allow-other-keys)
       (compiler-error "No &KEY arg can be called :ALLOW-OTHER-KEYS."))

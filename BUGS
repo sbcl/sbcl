@@ -838,13 +838,6 @@ Error in function C::GET-LAMBDA-TO-COMPILE:
   clear what's the best fix. (See the "bug in type handling" discussion
   on cmucl-imp ca. 2001-03-22 and ca. 2001-02-12.)
 
-92:
-  (< SB-EXT:SINGLE-FLOAT-POSITIVE-INFINITY 100) signals an error:
-    error in function SB-KERNEL:INTEGER-DECODE-SINGLE-FLOAT:
-      can't decode NaN or infinity: #.EXT:SINGLE-FLOAT-POSITIVE-INFINITY
-  This is a bug in the original CMU CL code. I reported it to cmucl-imp
-  2001-03-22 in hopes that they'll fix it for us.
-
 93:
   In sbcl-0.6.11.26, (COMPILE 'IN-HOST-COMPILATION-MODE) in
   src/cold/shared.lisp doesn't correctly translate the
@@ -863,6 +856,17 @@ Error in function C::GET-LAMBDA-TO-COMPILE:
     TYPE-ERROR in SB-KERNEL::OBJECT-NOT-TYPE-ERROR-HANDLER:
       (:LINUX :X86 :IEEE-FLOATING-POINT :SB-CONSTRAIN-FLOAT-TYPE :SB-TEST
        :SB-INTERPRETER :SB-DOC :UNIX ...) is not of type SYMBOL.
+
+94: 
+  As reported by Christophe Rhodes on sbcl-devel 2001-03-28, the
+  old declaration 
+   (declaim (ftype (function (list list symbol t) list) parse-deftransform))
+  above DEFUN PARSE-DEFTRANSFORM was incorrect. The bad declaration was
+  removed in sbcl-0.6.11.28, but the compiler problem remains: the compiler
+  should've complained about the mismatch between the declaration and the
+  definition, and didn't. (The compiler in cmucl-2.5.1 does detect the 
+  problem and complain.)
+
 
 KNOWN BUGS RELATED TO THE IR1 INTERPRETER
 

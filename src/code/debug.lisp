@@ -1011,10 +1011,8 @@ argument")
 
 ;;; Interface to *DEBUG-COMMANDS*. No required arguments in args are
 ;;; permitted.
-;;;
-;;; FIXME: This is not needed in the target Lisp system.
-(defmacro def-debug-command (name args &rest body)
-  (let ((fun-name (intern (concatenate 'simple-string name "-DEBUG-COMMAND"))))
+(defmacro !def-debug-command (name args &rest body)
+  (let ((fun-name (symbolicate name "-DEBUG-COMMAND")))
     `(progn
        (setf *debug-commands*
 	     (remove ,name *debug-commands* :key #'car :test #'string=))
@@ -1025,7 +1023,7 @@ argument")
        (push (cons ,name #',fun-name) *debug-commands*)
        ',fun-name)))
 
-(defun def-debug-command-alias (new-name existing-name)
+(defun !def-debug-command-alias (new-name existing-name)
   (let ((pair (assoc existing-name *debug-commands* :test #'string=)))
     (unless pair (error "unknown debug command name: ~S" existing-name))
     (push (cons new-name (cdr pair)) *debug-commands*))
@@ -1096,7 +1094,7 @@ argument")
 
 ;;;; frame-changing commands
 
-(def-debug-command "UP" ()
+(!def-debug-command "UP" ()
   (let ((next (sb!di:frame-up *current-frame*)))
     (cond (next
 	   (setf *current-frame* next)
@@ -1104,7 +1102,7 @@ argument")
 	  (t
 	   (format t "~&Top of stack.")))))
 
-(def-debug-command "DOWN" ()
+(!def-debug-command "DOWN" ()
   (let ((next (sb!di:frame-down *current-frame*)))
     (cond (next
 	   (setf *current-frame* next)
@@ -1112,29 +1110,29 @@ argument")
 	  (t
 	   (format t "~&Bottom of stack.")))))
 
-(def-debug-command-alias "D" "DOWN")
+(!def-debug-command-alias "D" "DOWN")
 
 ;;; CMU CL had this command, but SBCL doesn't, since it's redundant
 ;;; with "FRAME 0", and it interferes with abbreviations for the
 ;;; TOPLEVEL restart.
-;;;(def-debug-command "TOP" ()
+;;;(!def-debug-command "TOP" ()
 ;;;  (do ((prev *current-frame* lead)
 ;;;       (lead (sb!di:frame-up *current-frame*) (sb!di:frame-up lead)))
 ;;;      ((null lead)
 ;;;       (setf *current-frame* prev)
 ;;;       (print-frame-call prev))))
 
-(def-debug-command "BOTTOM" ()
+(!def-debug-command "BOTTOM" ()
   (do ((prev *current-frame* lead)
        (lead (sb!di:frame-down *current-frame*) (sb!di:frame-down lead)))
       ((null lead)
        (setf *current-frame* prev)
        (print-frame-call prev))))
 
-(def-debug-command-alias "B" "BOTTOM")
+(!def-debug-command-alias "B" "BOTTOM")
 
-(def-debug-command "FRAME" (&optional
-			    (n (read-prompting-maybe "frame number: ")))
+(!def-debug-command "FRAME" (&optional
+			     (n (read-prompting-maybe "frame number: ")))
   (setf *current-frame*
 	(multiple-value-bind (next-frame-fun limit-string)
 	    (if (< n (sb!di:frame-number *current-frame*))
@@ -1153,7 +1151,7 @@ argument")
 		     (return frame)))))))
   (print-frame-call *current-frame*))
 
-(def-debug-command-alias "F" "FRAME")
+(!def-debug-command-alias "F" "FRAME")
 
 ;;;; commands for entering and leaving the debugger
 
@@ -1163,16 +1161,16 @@ argument")
 ;;; things in the system, "restart the top level REPL" in the debugger
 ;;; and "terminate the Lisp system" as the SB-EXT:QUIT function.)
 ;;;
-;;;(def-debug-command "QUIT" ()
+;;;(!def-debug-command "QUIT" ()
 ;;;  (throw 'sb!impl::top-level-catcher nil))
 
 ;;; CMU CL supported this GO debug command, but SBCL doesn't -- just
 ;;; type the CONTINUE restart name.
-;;;(def-debug-command "GO" ()
+;;;(!def-debug-command "GO" ()
 ;;;  (continue *debug-condition*)
 ;;;  (error "There is no restart named CONTINUE."))
 
-(def-debug-command "RESTART" ()
+(!def-debug-command "RESTART" ()
   (let ((num (read-if-available :prompt)))
     (when (eq num :prompt)
       (show-restarts *debug-restarts* *debug-io*)
@@ -1200,7 +1198,7 @@ argument")
 
 ;;;; information commands
 
-(def-debug-command "HELP" ()
+(!def-debug-command "HELP" ()
   ;; CMU CL had a little toy pager here, but "if you aren't running
   ;; ILISP (or a smart windowing system, or something) you deserve to
   ;; lose", so we've dropped it in SBCL. However, in case some
@@ -1211,21 +1209,21 @@ argument")
 	  *debug-help-string*
 	  '*debug-help-string*))
 
-(def-debug-command-alias "?" "HELP")
+(!def-debug-command-alias "?" "HELP")
 
-(def-debug-command "ERROR" ()
+(!def-debug-command "ERROR" ()
   (format *debug-io* "~A~%" *debug-condition*)
   (show-restarts *debug-restarts* *debug-io*))
 
-(def-debug-command "BACKTRACE" ()
+(!def-debug-command "BACKTRACE" ()
   (backtrace (read-if-available most-positive-fixnum)))
 
-(def-debug-command "PRINT" ()
+(!def-debug-command "PRINT" ()
   (print-frame-call *current-frame*))
 
-(def-debug-command-alias "P" "PRINT")
+(!def-debug-command-alias "P" "PRINT")
 
-(def-debug-command "LIST-LOCALS" ()
+(!def-debug-command "LIST-LOCALS" ()
   (let ((d-fun (sb!di:frame-debug-function *current-frame*)))
     (if (sb!di:debug-var-info-available d-fun)
 	(let ((*standard-output* *debug-io*)
@@ -1256,9 +1254,9 @@ argument")
 		    prefix))))
 	(write-line "There is no variable information available."))))
 
-(def-debug-command-alias "L" "LIST-LOCALS")
+(!def-debug-command-alias "L" "LIST-LOCALS")
 
-(def-debug-command "SOURCE" ()
+(!def-debug-command "SOURCE" ()
   (fresh-line)
   (print-code-location-source-form (sb!di:frame-code-location *current-frame*)
 				   (read-if-available 0)))
@@ -1382,7 +1380,7 @@ argument")
 ;;; breakpoint and step commands
 
 ;;; Step to the next code-location.
-(def-debug-command "STEP" ()
+(!def-debug-command "STEP" ()
   (setf *number-of-steps* (read-if-available 1))
   (set-step-breakpoint *current-frame*)
   (continue *debug-condition*)
@@ -1392,7 +1390,7 @@ argument")
 ;;; where the CONTINUE restart will transfer control. Set
 ;;; *POSSIBLE-BREAKPOINTS* to the code-locations which can then be
 ;;; used by sbreakpoint.
-(def-debug-command "LIST-LOCATIONS" ()
+(!def-debug-command "LIST-LOCATIONS" ()
   (let ((df (read-if-available *default-breakpoint-debug-function*)))
     (cond ((consp df)
 	   (setf df (sb!di:function-debug-function (eval df)))
@@ -1453,10 +1451,10 @@ argument")
 			    :function-end)
       (format t "~&::FUNCTION-END *Active* "))))
 
-(def-debug-command-alias "LL" "LIST-LOCATIONS")
+(!def-debug-command-alias "LL" "LIST-LOCATIONS")
 
 ;;; Set breakpoint at the given number.
-(def-debug-command "BREAKPOINT" ()
+(!def-debug-command "BREAKPOINT" ()
   (let ((index (read-prompting-maybe "location number, :START, or :END: "))
 	(break t)
 	(condition t)
@@ -1554,20 +1552,20 @@ argument")
       (print-breakpoint-info (first *breakpoints*))
       (format t "~&added"))))
 
-(def-debug-command-alias "BP" "BREAKPOINT")
+(!def-debug-command-alias "BP" "BREAKPOINT")
 
 ;;; List all breakpoints which are set.
-(def-debug-command "LIST-BREAKPOINTS" ()
+(!def-debug-command "LIST-BREAKPOINTS" ()
   (setf *breakpoints*
 	(sort *breakpoints* #'< :key #'breakpoint-info-breakpoint-number))
   (dolist (info *breakpoints*)
     (print-breakpoint-info info)))
 
-(def-debug-command-alias "LB" "LIST-BREAKPOINTS")
-(def-debug-command-alias "LBP" "LIST-BREAKPOINTS")
+(!def-debug-command-alias "LB" "LIST-BREAKPOINTS")
+(!def-debug-command-alias "LBP" "LIST-BREAKPOINTS")
 
 ;;; Remove breakpoint N, or remove all breakpoints if no N given.
-(def-debug-command "DELETE-BREAKPOINT" ()
+(!def-debug-command "DELETE-BREAKPOINT" ()
   (let* ((index (read-if-available nil))
 	 (bp-info
 	  (find index *breakpoints* :key #'breakpoint-info-breakpoint-number)))
@@ -1582,11 +1580,11 @@ argument")
 	   (setf *breakpoints* nil)
 	   (format t "all breakpoints deleted~%")))))
 
-(def-debug-command-alias "DBP" "DELETE-BREAKPOINT")
+(!def-debug-command-alias "DBP" "DELETE-BREAKPOINT")
 
 ;;; miscellaneous commands
 
-(def-debug-command "DESCRIBE" ()
+(!def-debug-command "DESCRIBE" ()
   (let* ((curloc (sb!di:frame-code-location *current-frame*))
 	 (debug-fun (sb!di:code-location-debug-function curloc))
 	 (function (sb!di:debug-function-function debug-fun)))

@@ -772,7 +772,14 @@
 
 (eval-when (:compile-toplevel :execute)
 
-(defun basic-compare (op)
+;;; The INFINITE-X-FINITE-Y and INFINITE-Y-FINITE-X args tell us how
+;;; to handle the case when X or Y is a floating-point infinity and
+;;; the other arg is a rational. (Section 12.1.4.1 of the ANSI spec
+;;; says that comparisons are done by converting the float to a
+;;; rational when comparing with a rational, but infinities can't be
+;;; converted to a rational, so we show some initiative and do it this
+;;; way instead.)
+(defun basic-compare (op &key infinite-x-finite-y infinite-y-finite-x)
   `(((fixnum fixnum) (,op x y))
 
     ((single-float single-float) (,op x y))
@@ -789,15 +796,24 @@
     (((foreach single-float double-float #!+long-float long-float) rational)
      (if (eql y 0)
 	 (,op x (coerce 0 '(dispatch-type x)))
-	 (,op (rational x) y)))
+	 (if (float-infinity-p x)
+	     ,infinite-x-finite-y
+	     (,op (rational x) y))))
     (((foreach bignum fixnum ratio) float)
-     (,op x (rational y)))))
+     (if (float-infinity-p y)
+	 ,infinite-y-finite-x
+	 (,op x (rational y))))))
 ) ; EVAL-WHEN
 
 (macrolet ((def-two-arg-</> (name op ratio-arg1 ratio-arg2 &rest cases)
              `(defun ,name (x y)
 		(number-dispatch ((x real) (y real))
-				 (basic-compare ,op)
+				 (basic-compare
+				  ,op
+				  :infinite-x-finite-y
+				  (,op x (coerce 0 '(dispatch-type x)))
+				  :infinite-y-finite-x
+				  (,op (coerce 0 '(dispatch-type y)) y))
 				 (((foreach fixnum bignum) ratio)
 				  (,op x (,ratio-arg2 (numerator y)
 						      (denominator y))))
@@ -828,8 +844,10 @@
 
 (defun two-arg-= (x y)
   (number-dispatch ((x number) (y number))
-    (basic-compare =)
-
+    (basic-compare =
+		   ;; An infinite value is never equal to a finite value.
+		   :infinite-x-finite-y nil
+		   :infinite-y-finite-x nil)
     ((fixnum (or bignum ratio)) nil)
 
     ((bignum (or fixnum ratio)) nil)

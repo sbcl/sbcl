@@ -284,7 +284,6 @@
 ;;; The second value is a list of all the arguments bound. We make the
 ;;; variables IGNORABLE so that we don't have to manually declare them
 ;;; Ignore if their only purpose is to make the syntax work.
-(declaim (ftype (function (list list symbol t) list) parse-deftransform))
 (defun parse-deftransform (lambda-list body args error-form)
   (multiple-value-bind (req opt restp rest keyp keys allowp)
       (parse-lambda-list lambda-list)
@@ -313,7 +312,7 @@
 	(dolist (spec keys)
 	  (if (or (atom spec) (atom (first spec)))
 	      (let* ((var (if (atom spec) spec (first spec)))
-		     (key (intern (symbol-name var) "KEYWORD")))
+		     (key (keywordicate var)))
 		(vars var)
 		(binds `(,var (find-keyword-continuation ,n-keys ,key)))
 		(keywords key))

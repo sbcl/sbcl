@@ -1267,8 +1267,7 @@
     (dolist (slot (dd-slots defstruct))
       (let ((dum (gensym))
 	    (name (dsd-name slot)))
-	(arglist `((,(intern (string name) "KEYWORD") ,dum)
-		   ,(dsd-default slot)))
+	(arglist `((,(keywordicate name) ,dum) ,(dsd-default slot)))
 	(types (dsd-type slot))
 	(vals dum)))
     (funcall creator
