@@ -14,7 +14,7 @@
 ;;; Break something like a lambda list (but not necessarily actually a
 ;;; lambda list, e.g. the representation of argument types which is
 ;;; used within an FTYPE specification) into its component parts. We
-;;; return eleven values:
+;;; return twelve values:
 ;;;  1. a list of the required args;
 ;;;  2. a list of the &OPTIONAL arg specs;
 ;;;  3. true if a &REST arg was specified;
@@ -22,10 +22,11 @@
 ;;;  5. true if &KEY args are present;
 ;;;  6. a list of the &KEY arg specs;
 ;;;  7. true if &ALLOW-OTHER-KEYS was specified.;
-;;;  8. a list of the &AUX specifiers;
-;;;  9. true if a &MORE arg was specified;
-;;; 10. the &MORE context var;
-;;; 11. the &MORE count var.
+;;;  8. true if any &AUX is present (new in SBCL vs. CMU CL);
+;;;  9. a list of the &AUX specifiers;
+;;; 10. true if a &MORE arg was specified;
+;;; 11. the &MORE context var;
+;;; 12. the &MORE count var.
 ;;;
 ;;; The top level lambda list syntax is checked for validity, but the
 ;;; arg specifiers are just passed through untouched. If something is
@@ -33,7 +34,7 @@
 ;;; recovery point.
 (declaim (ftype (function (list)
 			  (values list list boolean t boolean list boolean
-				  list boolean t t))
+				  boolean list boolean t t))
 		parse-lambda-list-like-thing
 		parse-lambda-list))
 (defun parse-lambda-list-like-thing (list)
@@ -47,6 +48,7 @@
           (more-context nil)
           (more-count nil)
           (keyp nil)
+	  (auxp nil)
           (allowp nil)
           (state :required))
       (declare (type (member :allow-other-keys :aux
@@ -92,7 +94,8 @@
               (&aux
                (when (member state '(:rest :more-context :more-count))
                  (compiler-error "misplaced &AUX in lambda list: ~S" list))
-               (setq state :aux))
+               (setq auxp t
+		     state :aux))
               ;; FIXME: I don't think ANSI says this is an error. (It
               ;; should certainly be good for a STYLE-WARNING,
               ;; though.)
@@ -120,7 +123,7 @@
       (when (eq state :rest)
         (compiler-error "&REST without rest variable"))
       
-      (values (required) (optional) restp rest keyp (keys) allowp (aux)
+      (values (required) (optional) restp rest keyp (keys) allowp auxp (aux)
               morep more-context more-count))))
 
 ;;; like PARSE-LAMBDA-LIST-LIKE-THING, except our LAMBDA-LIST argument
@@ -131,7 +134,7 @@
 (defun parse-lambda-list (lambda-list)
 
   ;; Classify parameters without checking their validity individually.
-  (multiple-value-bind (required optional restp rest keyp keys allowp aux
+  (multiple-value-bind (required optional restp rest keyp keys allowp auxp aux
 			morep more-context more-count)
       (parse-lambda-list-like-thing lambda-list)
 
@@ -170,7 +173,7 @@
 			     i))))))
 
     ;; Voila.
-    (values required optional restp rest keyp keys allowp aux
+    (values required optional restp rest keyp keys allowp auxp aux
 	    morep more-context more-count)))
 
 (/show0 "parse-lambda-list.lisp end of file")

@@ -241,12 +241,13 @@ bootstrapping.
 	     (error
 	      "invalid argument ~S in the generic function lambda list ~S"
 	      arg lambda-list))))
-    (multiple-value-bind (required optional restp rest keyp keys allowp aux
-		          morep more-context more-count)
+    (multiple-value-bind (required optional restp rest keyp keys allowp
+                          auxp aux morep more-context more-count)
 	(parse-lambda-list lambda-list)
       (declare (ignore required)) ; since they're no different in a gf ll
       (declare (ignore restp rest)) ; since they're no different in a gf ll
       (declare (ignore allowp)) ; since &ALLOW-OTHER-KEYS is fine either way
+      (declare (ignore aux)) ; since we require AUXP=NIL
       (declare (ignore more-context more-count)) ; safely ignored unless MOREP
       ;; no defaults allowed for &OPTIONAL arguments
       (dolist (i optional)
@@ -264,7 +265,7 @@ bootstrapping.
 				      (null (cddar i))))
 			     (null (cdr i)))))))
       ;; no &AUX allowed
-      (when aux
+      (when auxp
 	(error "&AUX is not allowed in a generic function lambda list: ~S"
 	       lambda-list))
       ;; Oh, *puhlease*... not specifically as per section 3.4.2 of

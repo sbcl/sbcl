@@ -1210,7 +1210,7 @@
 ;;; Given a structure and a BOA constructor spec, call CREATOR with
 ;;; the appropriate args to make a constructor.
 (defun create-boa-constructor (defstruct boa creator)
-  (multiple-value-bind (req opt restp rest keyp keys allowp aux)
+  (multiple-value-bind (req opt restp rest keyp keys allowp auxp aux)
       (parse-lambda-list (second boa))
     (collect ((arglist)
 	      (vars)
@@ -1281,7 +1281,7 @@
 
 	(when allowp (arglist '&allow-other-keys))
 
-	(when aux
+	(when auxp
 	  (arglist '&aux)
 	  (dolist (arg aux)
 	    (let* ((arg (if (consp arg) arg (list arg)))

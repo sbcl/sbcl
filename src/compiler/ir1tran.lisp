@@ -1233,9 +1233,10 @@
 (declaim (ftype (function (list) (values list boolean boolean list list))
 		make-lambda-vars))
 (defun make-lambda-vars (list)
-  (multiple-value-bind (required optional restp rest keyp keys allowp aux
+  (multiple-value-bind (required optional restp rest keyp keys allowp auxp aux
 			morep more-context more-count)
       (parse-lambda-list list)
+    (declare (ignore auxp)) ; since we just iterate over AUX regardless
     (collect ((vars)
 	      (names-so-far)
 	      (aux-vars)

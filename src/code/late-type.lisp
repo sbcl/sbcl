@@ -250,9 +250,10 @@
 ;;; used for both FUNCTION and VALUES types.
 (declaim (ftype (function (list args-type) (values)) parse-args-types))
 (defun parse-args-types (lambda-list result)
-  (multiple-value-bind (required optional restp rest keyp keys allowp aux)
+  (multiple-value-bind (required optional restp rest keyp keys allowp auxp aux)
       (parse-lambda-list-like-thing lambda-list)
-    (when aux
+    (declare (ignore aux)) ; since we require AUXP=NIL
+    (when auxp
       (error "&AUX in a FUNCTION or VALUES type: ~S." lambda-list))
     (setf (args-type-required result) (mapcar #'specifier-type required))
     (setf (args-type-optional result) (mapcar #'specifier-type optional))

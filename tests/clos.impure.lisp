@@ -121,6 +121,8 @@
   ;; forbidden &AUX
   (dislike '(defgeneric gf-for-ll-test-13 (x y z &optional a &aux g h)))
   (like    '(defgeneric gf-for-ll-test-14 (x y z &optional a)))
+  (dislike '(defgeneric gf-for-ll-test-bare-aux-1 (x &aux)))
+  (like    '(defgeneric gf-for-ll-test-bare-aux-2 (x)))
   ;; also can't use bogoDEFMETHODish type-qualifier-ish decorations
   ;; on required arguments
   (dislike '(defgeneric gf-for-11-test-15 ((arg t))))
