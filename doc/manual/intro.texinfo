@@ -131,7 +131,7 @@ likely to be fixed, tuned, or added.
 
 SBCL is descended from CMUCL, which is itself descended from Spice
 Lisp, including early implementations for the Mach operating system on
-the IBM RT, back in the 1980s. Design decisions from that time are
+the IBM RT, back in the 1980s. Some design decisions from that time are
 still reflected in the current implementation:
 
 @itemize
@@ -162,16 +162,20 @@ good) for performance. These are discussed in another chapter,
 @ref{Efficiency}.
 
 SBCL has diverged from CMUCL in that SBCL is now essentially a
-``compiler-only implementation'' of Common Lisp. A Common Lisp
-implementation is permitted to implement both a compiler and an
-interpreter, and there's some special support in the standard
-(e.g. the distinction between @code{functionp} and
-@code{compiled-function-p}) to help support that. But SBCL has only a
-vestigial, rudimentary true interpreter. In SBCL, the @code{eval}
-function only truly ``interprets'' a few special classes of forms,
-such as symbols which are @code{boundp}. More complicated forms are
-evaluated by calling @code{compile} and then calling @code{funcall} on
-the returned result.
+``compiler-only implementation'' of Common Lisp. This is a change in
+implementation strategy, taking advantage of the freedom ``any of these
+facilities might share the same execution strategy'' guaranteed in the
+ANSI specification section 3.1 (``Evaluation''). It does not mean SBCL
+can't be used interactively, and in fact the change is largely invisible
+to the casual user, since SBCL still can and does execute code
+interactively by compiling it on the fly. (It is visible if you know how
+to look, like using @code{compiled-function-p}; and it is visible in the
+way that that SBCL doesn't have many bugs which behave differently in
+interpreted code than in compiled code.) What it means is that in SBCL,
+the @code{eval} function only truly ``interprets'' a few easy kinds of
+forms, such as symbols which are @code{boundp}. More complicated forms
+are evaluated by calling @code{compile} and then calling @code{funcall}
+on the returned result.
   
 The direct ancestor of SBCL is the x86 port of CMUCL. This port was in
 some ways the most cobbled-together of all the CMUCL ports, since a

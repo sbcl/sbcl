@@ -1411,3 +1411,40 @@ WORKAROUND:
   is closed." -- implying that even though undesirable, early deletion
   is legal. Restoring the original would none the less be the polite
   thing to do.
+
+326: "*PRINT-CIRCLE* crosstalk between streams"
+  In sbcl-0.8.10.48 it's possible for *PRINT-CIRCLE* references to be
+  mixed between streams when output operations are intermingled closely
+  enough (as by doing output on S2 from within (PRINT-OBJECT X S1) in the
+  test case below), so that e.g. the references #2# appears on a stream
+  with no preceding #2= on that stream to define it (because the #2= was
+  sent to another stream).
+    (cl:in-package :cl-user)
+    (defstruct foo index)
+    (defparameter *foo* (make-foo :index 4))
+    (defstruct bar)
+    (defparameter *bar* (make-bar))
+    (defparameter *tangle* (list *foo* *bar* *foo*))
+    (defmethod print-object ((foo foo) stream)
+      (let ((index (foo-index foo)))
+        (format *trace-output*
+    	    "~&-$- emitting FOO ~D, ambient *BAR*=~S~%"
+    	    index *bar*)
+        (format stream "[FOO ~D]" index))
+      foo)
+    (let ((tsos (make-string-output-stream))
+          (ssos (make-string-output-stream)))
+      (let ((*print-circle* t)
+    	(*trace-output* tsos)
+    	(*standard-output* ssos))
+        (prin1 *tangle* *standard-output*))
+      (let ((string (get-output-stream-string ssos)))
+        (unless (string= string "(#1=[FOO 4] #S(BAR) #1#)")
+          ;; In sbcl-0.8.10.48 STRING was "(#1=[FOO 4] #2# #1#)".:-(
+          (error "oops: ~S" string))))
+  It might be straightforward to fix this by turning the
+  *CIRCULARITY-HASH-TABLE* and *CIRCULARITY-COUNTER* variables into
+  per-stream slots, but (1) it would probably be sort of messy faking
+  up the special variable binding semantics using UNWIND-PROTECT and
+  (2) it might be sort of a pain to test that no other bugs had been
+  introduced. 

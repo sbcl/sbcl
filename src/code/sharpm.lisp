@@ -217,7 +217,8 @@
 ;; substitutes in arrays and structures as well as lists. The first arg is an
 ;; alist of the things to be replaced assoc'd with the things to replace them.
 (defun circle-subst (old-new-alist tree)
-  (cond ((not (typep tree '(or cons (array t) structure-object standard-object)))
+  (cond ((not (typep tree
+		     '(or cons (array t) structure-object standard-object)))
 	 (let ((entry (find tree old-new-alist :key #'second)))
 	   (if entry (third entry) tree)))
 	((null (gethash tree *sharp-equal-circle-table*))
