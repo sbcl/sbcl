@@ -20,7 +20,7 @@
 (in-package "SB-COLD")
 
 ;;; We need the #! readtable modifications.
-(load "src/cold/shebang.lisp")
+(load (merge-pathnames "shebang.lisp" *load-truename*))
 
 ;;; #!+ and #!- now refer to *FEATURES* values (as opposed to the way
 ;;; that they referred to special target-only *SHEBANG-FEATURES* values

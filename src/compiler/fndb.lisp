@@ -108,7 +108,14 @@
 
 ;;; This is not FLUSHABLE, since it's required to signal an error if
 ;;; unbound.
-(defknown (symbol-value symbol-function) (symbol) t ())
+(defknown (symbol-value) (symbol) t ())
+;;; From CLHS, "If the symbol is globally defined as a macro or a
+;;; special operator, an object of implementation-dependent nature and
+;;; identity is returned. If the symbol is not globally defined as
+;;; either a macro or a special operator, and if the symbol is fbound,
+;;; a function object is returned".  Our objects of
+;;; implementation-dependent nature happen to be functions.
+(defknown (symbol-function) (symbol) function ())
 
 (defknown boundp (symbol) boolean (flushable))
 (defknown fboundp ((or symbol cons)) boolean (unsafely-flushable explicit-check))
@@ -946,7 +953,7 @@
 (defknown (read read-preserving-whitespace read-char-no-hang read-char)
   (&optional streamlike t t t) t (explicit-check))
 
-(defknown read-delimited-list (character &optional streamlike t) t
+(defknown read-delimited-list (character &optional streamlike t) list
   (explicit-check))
 (defknown read-line (&optional streamlike t t t) (values t boolean)
   (explicit-check))

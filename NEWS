@@ -1502,6 +1502,17 @@ changes in sbcl-0.7.12 relative to sbcl-0.7.11:
     ** CONSTANTP now returns true for all self-evaluating objects.
 
 changes in sbcl-0.7.13 relative to sbcl-0.7.12:
+  * incompatible packaging change: in line with Unix convention, 
+    SBCL now looks for its core file in /usr/{local/,}lib/sbcl/sbcl.core 
+    if it's not in $SBCL_HOME.  It also sets SBCL_HOME to match.
+  * REQUIRE and PROVIDE are now optionally capable of doing something
+    useful: see the documentation string for REQUIRE
+  * infrastructure for a managed SBCL contrib system: contributed 
+    modules in this release include:
+    ** the ASDF system definition facility;
+    ** an interface to the BSD Sockets API;
+    ** an ACL-like convenience interface to the repl; 
+       (thanks to Kevin Rosenberg)
   * fixed a bug in LOG, so that LOG of a rational argument near 1 now
     gives a closer approximation to the right answer than previously.
     (thanks to Raymond Toy)
@@ -1535,6 +1546,9 @@ changes in sbcl-0.7.13 relative to sbcl-0.7.12:
     many list operations.  (thanks to Robert E. Brown)
   * fixed a bug in the reader: the #n# reader macro now works for
     objects of type STANDARD-OBJECT.  (reported by Tony Martinez)
+  * the compiler is now aware that SYMBOL-FUNCTION returns a FUNCTION
+    and that READ-DELIMITED-LIST returns a LIST.  (thanks to Robert
+    E. Brown and Tony Martinez respectively)
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** ARRAY-IN-BOUNDS-P now allows arbitrary integers as arguments,
        not just nonnegative fixnums;
@@ -1543,17 +1557,9 @@ changes in sbcl-0.7.13 relative to sbcl-0.7.12:
        freshly-consed result bit-array);
     ** ELT now signals an error on an invalid sequence index in safe
        code;
-  * incompatible packaging change: in line with Unix convention, 
-    SBCL now looks for its core file in /usr/{local/,}lib/sbcl/sbcl.core 
-    if it's not in $SBCL_HOME.  It also sets SBCL_HOME to match
-  * REQUIRE and PROVIDE are now optionally capable of doing something
-    useful: see the documentation string for REQUIRE
-  * infrastructure for a managed SBCL contrib system: contributed 
-    modules in this release include 
-	- the ASDF system definition facility
-	- an interface to the BSD Sockets API
-	- an ACL-like convenience interface to the repl 
-		(thanks to Kevin Rosenberg)
+    ** the type system is now cleverer about negations of numeric
+       types, and consequently understands the BIGNUM and RATIO types
+       better;
 
 planned incompatible changes in 0.7.x:
   * (not done yet, but planned:) When the profiling interface settles
