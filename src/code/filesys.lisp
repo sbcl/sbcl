@@ -787,11 +787,12 @@
     (error 'simple-file-error
 	   :pathname pathname
 	   :format-control "can't use a wild pathname here"))
-  (let ((namestring (unix-namestring pathname t)))
+  (let* ((defaulted-pathname (merge-pathnames
+			      pathname
+			      (sane-default-pathname-defaults)))
+	 (namestring (unix-namestring defaulted-pathname t)))
     (when (and namestring (sb!unix:unix-file-kind namestring))
-      (let ((truename (sb!unix:unix-resolve-links
-		       (sb!unix:unix-maybe-prepend-current-directory
-			namestring))))
+      (let ((truename (sb!unix:unix-resolve-links namestring)))
 	(when truename
 	  (let ((*ignore-wildcards* t))
 	    (pathname (sb!unix:unix-simplify-pathname truename))))))))

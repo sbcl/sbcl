@@ -33,3 +33,4 @@
   (when (find-package public-package)
     (check-ext-symbols-arglist public-package)))
 (terpri)
+(print "done with interface.pure.lisp")

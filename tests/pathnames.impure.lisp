@@ -158,6 +158,96 @@
 (assert (equal (namestring (translate-logical-pathname
                             "test0:foo;bar;baz;mum.quux.3"))
                "/library/foo/foo/bar/baz/mum.quux"))
+
+;;;; MERGE-PATHNAME tests
+;;;;
+;;;; There are some things we don't bother testing, just because they're
+;;;; not meaningful on the underlying filesystem anyway.
+;;;;
+;;;; Mostly that means that we don't do devices, we don't do versions
+;;;; except minimally in LPNs (they get lost in the translation to
+;;;; physical hosts, so it's not much of an issue), and we don't do
+;;;; hosts except for LPN hosts
+;;;;
+;;;; Although these tests could conceivably be useful in principle for
+;;;; other implementations, they depend quite heavily on the rules for
+;;;; namestring parsing, which are implementation-specific. So, success
+;;;; or failure in these tests doesn't tell you anything about
+;;;; ansi-compliance unless your PARSE-NAMESTRING works like ours.
 
-;;; success
+(setf (logical-pathname-translations "scratch")
+      '(("**;*.*.*" "/usr/local/doc/**/*")))
+
+(loop for (expected-result . params) in
+      `(;; trivial merge
+        (#P"/usr/local/doc/foo" #p"foo" #p"/usr/local/doc/")
+        ;; If pathname does not specify a host, device, directory,
+        ;; name, or type, each such component is copied from
+        ;; default-pathname.
+        ;; 1) no name, no type
+        (#p"/supplied-dir/name.type" #p"/supplied-dir/" #p"/dir/name.type")
+        ;; 2) no directory, no type
+        (#p"/dir/supplied-name.type" #p"supplied-name" #p"/dir/name.type")
+        ;; 3) no name, no dir (must use make-pathname as ".foo" is parsed
+        ;; as a name)
+        (#p"/dir/name.supplied-type"
+         ,(make-pathname :type "supplied-type")
+	 #p"/dir/name.type")
+        ;; If (pathname-directory pathname) is a list whose car is
+        ;; :relative, and (pathname-directory default-pathname) is a
+        ;; list, then the merged directory is [...]
+        (#p"/aaa/bbb/ccc/ddd/qqq/www" #p"qqq/www" #p"/aaa/bbb/ccc/ddd/eee")
+        ;; except that if the resulting list contains a string or
+        ;; :wild immediately followed by :back, both of them are
+        ;; removed.
+        (#P"/aaa/bbb/ccc/blah/eee"
+         ;; "../" in a namestring is parsed as :up not :back, so make-pathname
+         ,(make-pathname :directory '(:relative :back "blah"))
+	 #p"/aaa/bbb/ccc/ddd/eee")
+        ;; If (pathname-directory default-pathname) is not a list or
+        ;; (pathname-directory pathname) is not a list whose car is
+        ;; :relative, the merged directory is (or (pathname-directory
+        ;; pathname) (pathname-directory default-pathname))
+        (#P"/absolute/path/name.type"
+         #p"/absolute/path/name"
+	 #p"/dir/default-name.type")
+        ;; === logical pathnames ===
+        ;; recognizes a logical pathname namestring when
+        ;; default-pathname is a logical pathname
+	;; FIXME: 0.6.12.20 fails this one.
+        #+nil (#P"scratch:foo;name1" #p"name1" #p"scratch:foo;")
+        ;; or when the namestring begins with the name of a defined
+        ;; logical host followed by a colon [I assume that refers to pathname
+        ;; rather than default-pathname]
+        (#p"SCRATCH:FOO;NAME2" #p"scratch:;name2" #p"scratch:foo;")
+        ;; conduct the previous set of tests again, with a lpn first argument
+        (#P"SCRATCH:USR;LOCAL;DOC;FOO" #p"scratch:;foo" #p"/usr/local/doc/")
+        (#p"SCRATCH:SUPPLIED-DIR;NAME.TYPE"
+	 #p"scratch:supplied-dir;"
+	 #p"/dir/name.type")
+        (#p"SCRATCH:DIR;SUPPLIED-NAME.TYPE"
+	 #p"scratch:;supplied-name"
+	 #p"/dir/name.type")
+        (#p"SCRATCH:DIR;NAME.SUPPLIED-TYPE"
+         ,(make-pathname :host "scratch" :type "supplied-type")
+	 #p"/dir/name.type")
+        (#p"SCRATCH:AAA;BBB;CCC;DDD;FOO;BAR"
+         ,(make-pathname :host "scratch"
+			 :directory '(:relative "foo")
+			 :name "bar")
+         #p"/aaa/bbb/ccc/ddd/eee")
+        (#p"SCRATCH:AAA;BBB;CCC;FOO;BAR"
+         ,(make-pathname :host "scratch"
+			 :directory '(:relative :back "foo")
+			 :name "bar")
+         #p"/aaa/bbb/ccc/ddd/eee")
+        (#p"SCRATCH:ABSOLUTE;PATH;NAME.TYPE"
+         #p"scratch:absolute;path;name" #p"/dir/default-name.type")
+
+        ;; TODO: test version handling in LPNs
+        )
+      do (assert (string= (namestring (apply #'merge-pathnames params))
+                          (namestring expected-result))))
+
+;;;; success
 (quit :unix-status 104)
