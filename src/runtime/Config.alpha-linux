@@ -7,9 +7,7 @@
 # provided with absolutely no warranty. See the COPYING and CREDITS
 # files for more information.
 
-# -mcpu=pca56 makes _my_ alpha go fast, I'm told.  Yours may do something 
-# else.
-CFLAGS += -mcpu=pca56 -Dalpha 
+CFLAGS += -Dalpha 
 LD = ld -taso
 LINKFLAGS = -dynamic -v -g  -Wl,-T  -Wl,ld-script.alpha-linux
 NM = nm -p
