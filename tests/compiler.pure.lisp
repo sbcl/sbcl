@@ -605,3 +605,12 @@
                 (LET ((V7 (%F1)))
                   (+ 359749 35728422))))
             -24076)))
+
+;;; bug in Alpha backend: not enough sanity checking of arguments to
+;;; instructions
+(assert (= (funcall (compile nil 
+			     '(lambda (x) 
+				(declare (fixnum x)) 
+				(ash x -257)))
+		    1024)
+	   0))

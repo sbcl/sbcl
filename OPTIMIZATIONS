@@ -154,5 +154,18 @@ of representation selection. Problem: inter-TN dependencies.
 #14
 The derived type of (/ (THE (DOUBLE-FLOAT (0D0)) X) (THE (DOUBLE-FLOAT
 1D0) Y)) is (DOUBLE-FLOAT 0.0d0). While it might be reasonable, it is
-better to derive (DOUBLE-FLOAT (-0.0d0)).
+better to derive (OR (MEMBER 0.0d0) (DOUBLE-FLOAT (0.0d0))).
+--------------------------------------------------------------------------------
+#15
+On the alpha, the system is reluctant to refer directly to a constant bignum,
+preferring to load a large constant through a slow sequence of instructions,
+then cons up a bignum for it:
+
+(LAMBDA (A)
+  (DECLARE (OPTIMIZE (SAFETY 1) (SPEED 3) (DEBUG 1))
+           (TYPE (INTEGER -10000 10000) A)
+           (IGNORABLE A))
+  (CASE A
+    ((89 125 16) (ASH A (MIN 18 -706)))
+    (T (DPB -3 (BYTE 30 30) -1))))
 --------------------------------------------------------------------------------

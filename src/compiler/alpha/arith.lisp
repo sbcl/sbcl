@@ -196,7 +196,7 @@
   (:translate ash)
   (:policy :fast-safe)
   (:temporary (:sc non-descriptor-reg) ndesc)
-  (:temporary (:sc non-descriptor-reg :to :eval) temp)
+  (:temporary (:sc non-descriptor-reg) temp)
   (:generator 3
     (inst bge amount positive)
     (inst subq zero-tn amount ndesc)
@@ -223,7 +223,7 @@
   (:translate ash)
   (:policy :fast-safe)
   (:temporary (:sc non-descriptor-reg) ndesc)
-  (:temporary (:sc non-descriptor-reg :to :eval) temp)
+  (:temporary (:sc non-descriptor-reg) temp)
   (:generator 3
     (inst bge amount positive)
     (inst subq zero-tn amount ndesc)
@@ -249,8 +249,8 @@
   (:result-types signed-num)
   (:generator 1
     (cond
-      ((< count 0) (inst sra number (- count) result))
-      ((> count 0) (inst sll number count result))
+      ((< count 0) (inst sra number (min 63 (- count)) result))
+      ((> count 0) (inst sll number (min 63 count) result))
       (t (bug "identity ASH not transformed away")))))
 
 (define-vop (fast-ash-c/unsigned=>unsigned)
@@ -266,7 +266,7 @@
     (cond
       ((< count -63) (move zero-tn result))
       ((< count 0) (inst sra number (- count) result))
-      ((> count 0) (inst sll number count result))
+      ((> count 0) (inst sll number (min 63 count) result))
       (t (bug "identity ASH not transformed away")))))
 
 (define-vop (signed-byte-64-len)

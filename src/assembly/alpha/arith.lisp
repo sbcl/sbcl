@@ -208,7 +208,7 @@
 ;;;; division
 
 (define-assembly-routine (signed-truncate
-			  (:note "(signed-byte 32) truncate")
+			  (:note "(signed-byte 64) truncate")
 			  (:cost 60)
 			  (:policy :fast-safe)
 			  (:translate truncate)
@@ -241,9 +241,8 @@
     (emit-label label))
   (inst move zero-tn rem)
   (inst move zero-tn quo)
-  (inst sll dividend 32 dividend)
 
-  (dotimes (i 32)
+  (dotimes (i 64)
     (inst srl dividend 63 temp1)
     (inst sll rem 1 rem)
     (inst bis temp1 rem rem)

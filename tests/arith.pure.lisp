@@ -156,3 +156,32 @@
 
 ;;; Alpha bignum arithmetic bug:
 (assert (= (* 966082078641 419216044685) 404997107848943140073085))
+
+;;; Alpha smallnum arithmetic bug:
+(assert (= (ash -129876 -1026) -1))
+
+;;; Alpha middlenum (yes, really! Affecting numbers between 2^32 and
+;;; 2^64 :) arithmetic bug
+(let ((fn (compile nil '(LAMBDA (A B C D)
+          (DECLARE (TYPE (INTEGER -1621 -513) A)
+                   (TYPE (INTEGER -3 34163) B)
+                   (TYPE (INTEGER -9485132993 81272960) C)
+                   (TYPE (INTEGER -255340814 519943) D)
+                   (IGNORABLE A B C D)
+                   (OPTIMIZE (SPEED 3) (SAFETY 1) (DEBUG 1)))
+          (TRUNCATE C (MIN -100 4149605))))))
+  (assert (= (funcall fn -1332 5864 -6963328729 -43789079) 69633287)))
+
+;;; Here's another fantastic Alpha backend bug: the code to load
+;;; immediate 64-bit constants into a register was wrong.
+(let ((fn (compile nil '(LAMBDA (A B C D)
+          (DECLARE (TYPE (INTEGER -3563 2733564) A)
+                   (TYPE (INTEGER -548947 7159) B)
+                   (TYPE (INTEGER -19 0) C)
+                   (TYPE (INTEGER -2546009 0) D)
+                   (IGNORABLE A B C D)
+                   (OPTIMIZE (SPEED 3) (SAFETY 1) (DEBUG 1)))
+          (CASE A
+            ((89 125 16) (ASH A (MIN 18 -706)))
+            (T (DPB -3 (BYTE 30 30) -1)))))))
+  (assert (= (funcall fn 1227072 -529823 -18 -792831) -2147483649)))

@@ -495,10 +495,36 @@
 	 (unless (= high 0)
 	   (inst ldah reg high reg)))))
     ((or (unsigned-byte 32) (signed-byte 64) (unsigned-byte 64))
+     ;; Since it took NJF and CSR a good deal of puzzling to work out
+     ;; (a) what a previous version of this was doing and (b) why it
+     ;; was wrong:
+     ;;
+     ;; write VALUE = a_63 * 2^63 + a_48-62 * 2^48 
+     ;;               + a_47 * 2^47 + a_32-46 * 2^32
+     ;;               + a_31 * 2^31 + a_16-30 * 2^16
+     ;;               + a_15 * 2^15 + a_0-14
+     ;;
+     ;; then, because of the wonders of sign-extension and
+     ;; twos-complement arithmetic modulo 2^64, if a_15 is set, LDA
+     ;; (which sign-extends its argument) will add 
+     ;;
+     ;;    (a_15 * 2^15 + a_0-14 - 65536).  
+     ;;
+     ;; So we need to add that 65536 back on, which is what this
+     ;; LOGBITP business is doing.  The same applies for bits 31 and
+     ;; 47 (bit 63 is taken care of by the fact that all of this
+     ;; arithmetic is mod 2^64 anyway), but we have to be careful that
+     ;; we consider the altered value, not the original value.
+     ;;
+     ;; I think, anyway.  -- CSR, 2003-09-26
      (let* ((value1 (if (logbitp 15 value) (+ value (ash 1 16)) value))
-	    (value2 (if (logbitp 31 value) (+ value (ash 1 32)) value1))
-	    (value3 (if (logbitp 47 value) (+ value (ash 1 48)) value2)))
+	    (value2 (if (logbitp 31 value1) (+ value1 (ash 1 32)) value1))
+	    (value3 (if (logbitp 47 value2) (+ value2 (ash 1 48)) value2)))
        (inst lda reg (ldb (byte 16 32) value2) zero-tn)
+       ;; FIXME: Don't yet understand these conditionals.  If I'm
+       ;; right, surely we can just consider the zeroness of the
+       ;; particular bitfield, not the zeroness of the whole thing?
+       ;; -- CSR, 2003-09-26
        (unless (= value3 0)
 	 (inst ldah reg (ldb (byte 16 48) value3) reg))
        (unless (and (= value2 0) (= value3 0))
