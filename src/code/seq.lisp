@@ -32,7 +32,7 @@
              (integer (if (minusp count)
                           0
                           (1- most-positive-fixnum))))
-           (mod #.most-positive-fixnum))))
+           (mod #.sb!xc:most-positive-fixnum))))
 
 (sb!xc:defmacro define-sequence-traverser (name args &body body)
   (multiple-value-bind (body declarations docstring)
