@@ -364,8 +364,8 @@
 ;;; Return two values:
 ;;; MNA: fix-instance-typep-call patch
 ;;; 1. A list of all the positional (fixed and optional) types.
-;;; 2] The rest type (if any).  If keywords allowed, *universal-type*.
-;;;    If no keywords or rest then the default-type.
+;;; 2. The &REST type (if any). If keywords allowed, *UNIVERSAL-TYPE*.
+;;;    If no keywords or &REST, then the DEFAULT-TYPE.
 (defun values-type-types (type &optional (default-type *empty-type*))
   (declare (type values-type type))
   (values (append (args-type-required type)

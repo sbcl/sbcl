@@ -744,6 +744,22 @@ Error in function C::GET-LAMBDA-TO-COMPILE:
   then requesting a BACKTRACE at the debugger prompt gives no information
   about where in the user program the problem occurred.
 
+62:
+  The compiler is supposed to do type inference well enough that 
+  the declaration in
+    (TYPECASE X
+      ((SIMPLE-ARRAY SINGLE-FLOAT)
+       (LOCALLY
+         (DECLARE (TYPE (SIMPLE-ARRAY SINGLE-FLOAT) X))
+         ..))
+      ..)
+  is redundant. However, it doesn't. As a quick fix to work around
+  the problem, sbcl-0.6.8.10 was patched to automatically add the
+  appropriate declarations in the macroexpansion of TYPECASE and 
+  related macros (thanks to Martin Atzmueller porting Juan Jose
+  Garcia Ripoll's CMU CL patch). But the underlying compiler problem
+  really should be fixed instead, and at that time the workarounds
+  in the TYPECASE-ish expansions should be removed.
 
 KNOWN BUGS RELATED TO THE IR1 INTERPRETER
 

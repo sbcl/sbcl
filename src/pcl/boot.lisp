@@ -988,8 +988,9 @@ bootstrapping.
 		     (&rest	     (setq state 'rest))
 		     (&aux	      (setq state 'aux))
 		     (otherwise
-		      (error "encountered the non-standard lambda list keyword ~S"
-			     var)))
+		      (error
+		       "encountered the non-standard lambda list keyword ~S"
+		       var)))
 		   nil)
 		 (case state
 		   (required `((,var (pop ,args-tail))))

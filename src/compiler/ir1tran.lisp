@@ -48,13 +48,6 @@
 (defvar *converting-for-interpreter* nil)
 ;;; FIXME: Rename to *IR1-FOR-INTERPRETER-NOT-COMPILER-P*.
 
-;;; *COMPILE-TIME-DEFINE-MACROS* is true when we want DEFMACRO
-;;; definitions to be installed in the compilation environment as
-;;; interpreted functions. We set this to false when compiling some
-;;; parts of the system.
-(defvar *compile-time-define-macros* t)
-;;; FIXME: I think this can go away with the new system.
-
 ;;; FIXME: This nastiness was one of my original motivations to start
 ;;; hacking CMU CL. The non-ANSI behavior can be useful, but it should
 ;;; be made not the default, and perhaps should be controlled by
@@ -2723,11 +2716,11 @@
 	       `(multiple-value-call #'%throw ,tag ,result)))
 
 ;;; This is a special special form used to instantiate a cleanup as
-;;; the current cleanup within the body. Kind is a the kind of cleanup
-;;; to make, and Mess-Up is a form that does the mess-up action. We
-;;; make the MESS-UP be the USE of the Mess-Up form's continuation,
+;;; the current cleanup within the body. KIND is a the kind of cleanup
+;;; to make, and MESS-UP is a form that does the mess-up action. We
+;;; make the MESS-UP be the USE of the MESS-UP form's continuation,
 ;;; and introduce the cleanup into the lexical environment. We
-;;; back-patch the Entry-Cleanup for the current cleanup to be the new
+;;; back-patch the ENTRY-CLEANUP for the current cleanup to be the new
 ;;; cleanup, since this inner cleanup is the interesting one.
 (def-ir1-translator %within-cleanup ((kind mess-up &body body) start cont)
   (let ((dummy (make-continuation))
@@ -2744,13 +2737,13 @@
 
 ;;; This is a special special form that makes an "escape function"
 ;;; which returns unknown values from named block. We convert the
-;;; function, set its kind to :Escape, and then reference it. The
+;;; function, set its kind to :ESCAPE, and then reference it. The
 ;;; :Escape kind indicates that this function's purpose is to
 ;;; represent a non-local control transfer, and that it might not
 ;;; actually have to be compiled.
 ;;;
 ;;; Note that environment analysis replaces references to escape
-;;; functions with references to the corresponding NLX-Info structure.
+;;; functions with references to the corresponding NLX-INFO structure.
 (def-ir1-translator %escape-function ((tag) start cont)
   (let ((fun (ir1-convert-lambda
 	      `(lambda ()
@@ -2759,7 +2752,7 @@
     (reference-leaf start cont fun)))
 
 ;;; Yet another special special form. This one looks up a local
-;;; function and smashes it to a :Cleanup function, as well as
+;;; function and smashes it to a :CLEANUP function, as well as
 ;;; referencing it.
 (def-ir1-translator %cleanup-function ((name) start cont)
   (let ((fun (lexenv-find name functions)))
@@ -2769,7 +2762,7 @@
 
 ;;; We represent the possibility of the control transfer by making an
 ;;; "escape function" that does a lexical exit, and instantiate the
-;;; cleanup using %within-cleanup.
+;;; cleanup using %WITHIN-CLEANUP.
 (def-ir1-translator catch ((tag &body body) start cont)
   #!+sb-doc
   "Catch Tag Form*
@@ -2789,8 +2782,8 @@
 ;;; UNWIND-PROTECT is similar to CATCH, but more hairy. We make the
 ;;; cleanup forms into a local function so that they can be referenced
 ;;; both in the case where we are unwound and in any local exits. We
-;;; use %Cleanup-Function on this to indicate that reference by
-;;; %Unwind-Protect isn't "real", and thus doesn't cause creation of
+;;; use %CLEANUP-FUNCTION on this to indicate that reference by
+;;; %UNWIND-PROTECT ISN'T "real", and thus doesn't cause creation of
 ;;; an XEP.
 (def-ir1-translator unwind-protect ((protected &body cleanup) start cont)
   #!+sb-doc
@@ -2825,12 +2818,12 @@
 ;;;; multiple-value stuff
 
 ;;; If there are arguments, MULTIPLE-VALUE-CALL turns into an
-;;; MV-Combination.
+;;; MV-COMBINATION.
 ;;;
 ;;; If there are no arguments, then we convert to a normal
-;;; combination, ensuring that a MV-Combination always has at least
+;;; combination, ensuring that a MV-COMBINATION always has at least
 ;;; one argument. This can be regarded as an optimization, but it is
-;;; more important for simplifying compilation of MV-Combinations.
+;;; more important for simplifying compilation of MV-COMBINATIONS.
 (def-ir1-translator multiple-value-call ((fun &rest args) start cont)
   #!+sb-doc
   "MULTIPLE-VALUE-CALL Function Values-Form*
@@ -2858,16 +2851,16 @@
 	(use-continuation node cont)
 	(setf (basic-combination-args node) (arg-conts))))))
 
-;;; Multiple-Value-Prog1 is represented implicitly in IR1 by having a
+;;; MULTIPLE-VALUE-PROG1 is represented implicitly in IR1 by having a
 ;;; the result code use result continuation (CONT), but transfer
 ;;; control to the evaluation of the body. In other words, the result
-;;; continuation isn't Immediately-Used-P by the nodes that compute
+;;; continuation isn't IMMEDIATELY-USED-P by the nodes that compute
 ;;; the result.
 ;;;
 ;;; In order to get the control flow right, we convert the result with
 ;;; a dummy result continuation, then convert all the uses of the
-;;; dummy to be uses of CONT. If a use is an Exit, then we also
-;;; substitute CONT for the dummy in the corresponding Entry node so
+;;; dummy to be uses of CONT. If a use is an EXIT, then we also
+;;; substitute CONT for the dummy in the corresponding ENTRY node so
 ;;; that they are consistent. Note that this doesn't amount to
 ;;; changing the exit target, since the control destination of an exit
 ;;; is determined by the block successor; we are just indicating the
@@ -2880,7 +2873,7 @@
 ;;; Note that we both exploit and maintain the invariant that the CONT
 ;;; to an IR1 convert method either has no block or starts the block
 ;;; that control should transfer to after completion for the form.
-;;; Nested MV-Prog1's work because during conversion of the result
+;;; Nested MV-PROG1's work because during conversion of the result
 ;;; form, we use dummy continuation whose block is the true control
 ;;; destination.
 (def-ir1-translator multiple-value-prog1 ((result &rest forms) start cont)
@@ -2967,12 +2960,9 @@
        (compiler-error "The special form ~S can't be redefined as a macro."
 		       name)))
 
-    (setf (info :function :kind name) :macro)
-    (setf (info :function :where-from name) :defined)
-
-    (when *compile-time-define-macros*
-      (setf (info :function :macro-function name)
-	    (coerce def 'function)))
+    (setf (info :function :kind name) :macro
+	  (info :function :where-from name) :defined
+	  (info :function :macro-function name) (coerce def 'function))
 
     (let* ((*current-path* (revert-source-path 'defmacro))
 	   (fun (ir1-convert-lambda def name)))
@@ -2983,22 +2973,37 @@
       (ir1-convert start cont `(%%defmacro ',name ,fun ,doc)))
 
     (when sb!xc:*compile-print*
-      ;; MNA compiler message patch
+      ;; FIXME: It would be nice to convert this, and the other places
+      ;; which create compiler diagnostic output prefixed by
+      ;; semicolons, to use some common utility which automatically
+      ;; prefixes all its output with semicolons. (The addition of
+      ;; semicolon prefixes was introduced ca. sbcl-0.6.8.10 as the
+      ;; "MNA compiler message patch", and implemented by modifying a
+      ;; bunch of output statements on a case-by-case basis, which
+      ;; seems unnecessarily error-prone and unclear, scattering
+      ;; implicit information about output style throughout the
+      ;; system.) Starting by rewriting COMPILER-MUMBLE to add
+      ;; semicolon prefixes would be a good start, and perhaps also:
+      ;;   * Add semicolon prefixes for "FOO assembled" messages emitted 
+      ;;     when e.g. src/assembly/x86/assem-rtns.lisp is processed.
+      ;;   * At least some debugger output messages deserve semicolon
+      ;;     prefixes too:
+      ;;     ** restarts table
+      ;;     ** "Within the debugger, you can type HELP for help."
       (compiler-mumble "~&; converted ~S~%" name))))
 
 (def-ir1-translator %define-compiler-macro ((name def lambda-list doc)
 					    start cont
 					    :kind :function)
   (let ((name (eval name))
-	(def (second def))) ; Don't want to make a function just yet...
+	(def (second def))) ; We don't want to make a function just yet...
 
     (when (eq (info :function :kind name) :special-form)
       (compiler-error "attempt to define a compiler-macro for special form ~S"
 		      name))
 
-    (when *compile-time-define-macros*
-      (setf (info :function :compiler-macro-function name)
-	    (coerce def 'function)))
+    (setf (info :function :compiler-macro-function name)
+	  (coerce def 'function))
 
     (let* ((*current-path* (revert-source-path 'define-compiler-macro))
 	   (fun (ir1-convert-lambda def name)))
@@ -3191,8 +3196,8 @@
 	 (*current-path* (revert-source-path 'defun))
 	 (expansion (unless (eq (info :function :inlinep name) :notinline)
 		      (inline-syntactic-closure-lambda lambda))))
-    ;; If not in a simple environment or NOTINLINE, then discard any forward
-    ;; references to this function.
+    ;; If not in a simple environment or NOTINLINE, then discard any
+    ;; forward references to this function.
     (unless expansion (remhash name *free-functions*))
 
     (let* ((var (get-defined-function name))
@@ -3201,8 +3206,8 @@
 				expansion)))
       (setf (defined-function-inline-expansion var) expansion)
       (setf (info :function :inline-expansion name) save-expansion)
-      ;; If there is a type from a previous definition, blast it, since it is
-      ;; obsolete.
+      ;; If there is a type from a previous definition, blast it,
+      ;; since it is obsolete.
       (when (eq (leaf-where-from var) :defined)
 	(setf (leaf-type var) (specifier-type 'function)))
 

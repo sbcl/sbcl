@@ -155,7 +155,6 @@
               "*BACKEND-T-PRIMITIVE-TYPE*"
 
               "*CODE-SEGMENT*" 
-              "*COMPILE-TIME-DEFINE-MACROS*"
               "*COMPILING-FOR-INTERPRETER*" "*CONVERTING-FOR-INTERPRETER*"
               "*COUNT-VOP-USAGES*" "*ELSEWHERE*"
               "*FASL-HEADER-STRING-START-STRING*"
@@ -677,6 +676,7 @@ retained, possibly temporariliy, because it might be used internally."
              "ASSQ" "DELQ" "MEMQ"
 	     "%FIND-PACKAGE-OR-LOSE" "FIND-UNDELETED-PACKAGE-OR-LOSE"
              "SANE-PACKAGE"
+             "CIRCULAR-LIST-P"
 
 	     ;; ..and macros
              "COLLECT"

@@ -244,10 +244,11 @@
 
 ;;;; opening and closing fasl files
 
-;;; Open a fasl file, write its header, and return a FASL-FILE object for
-;;; dumping to it. Some human-readable information about the source code is
-;;; given by the string WHERE. If BYTE-P is true, this file will contain no
-;;; native code, and is thus largely implementation independent.
+;;; Open a fasl file, write its header, and return a FASL-FILE object
+;;; for dumping to it. Some human-readable information about the
+;;; source code is given by the string WHERE. If BYTE-P is true, this
+;;; file will contain no native code, and is thus largely
+;;; implementation independent.
 (defun open-fasl-file (name where &optional byte-p)
   (declare (type pathname name))
   (let* ((stream (open name
@@ -260,8 +261,9 @@
     ;; semi-human-readable) string which is used to identify fasl files.
     (write-string sb!c:*fasl-header-string-start-string* stream)
 
-    ;; The constant string which begins the header is followed by arbitrary
-    ;; human-readable text, terminated by a special character code.
+    ;; The constant string which begins the header is followed by
+    ;; arbitrary human-readable text, terminated by a special
+    ;; character code.
     (with-standard-io-syntax
      (format stream
 	     "~%  ~
@@ -303,8 +305,15 @@
   (close (fasl-file-stream file) :abort abort-p)
   (values))
 
+;;;; main entries to object dumping
 
-;;; MNA dump-circular hack
+;;; KLUDGE: This definition doesn't really belong in this file, but at
+;;; least it can be compiled without error here, and it's used here.
+;;; The definition requires the IGNORE-ERRORS macro, and in
+;;; sbcl-0.6.8.11 that's defined in early-target-error.lisp, and all
+;;; of the files which would otherwise be natural homes for this
+;;; definition (e.g. early-extensions.lisp or late-extensions.lisp)
+;;; are compiled before early-target-error.lisp. -- WHN 2000-11-07
 (defun circular-list-p (list)
   (and (listp list)
        (multiple-value-bind (res condition)
@@ -313,13 +322,12 @@
            nil
            (null res)))))
 
-;;;; main entries to object dumping
-
-;;; This function deals with dumping objects that are complex enough so that
-;;; we want to cache them in the table, rather than repeatedly dumping them.
-;;; If the object is in the EQ-TABLE, then we push it, otherwise, we do a type
-;;; dispatch to a type specific dumping function. The type specific branches
-;;; do any appropriate EQUAL-TABLE check and table entry.
+;;; This function deals with dumping objects that are complex enough
+;;; so that we want to cache them in the table, rather than repeatedly
+;;; dumping them. If the object is in the EQ-TABLE, then we push it,
+;;; otherwise, we do a type dispatch to a type specific dumping
+;;; function. The type specific branches do any appropriate
+;;; EQUAL-TABLE check and table entry.
 ;;;
 ;;; When we go to dump the object, we enter it in the CIRCULARITY-TABLE.
 (defun dump-non-immediate-object (x file)
@@ -330,11 +338,22 @@
 	   (typecase x
 	     (symbol (dump-symbol x file))
 	     (list
-               ;; MNA dump-circular hack
-               (if (circular-list-p x)
-                 (progn
-                   (dump-list x file)
-                   (eq-save-object x file))
+	      ;; KLUDGE: The code in this case has been hacked
+	      ;; to match Douglas Crosher's quick fix to CMU CL
+	      ;; (on cmucl-imp 1999-12-27), applied in sbcl-0.6.8.11
+	      ;; with help from Martin Atzmueller. This is not an
+	      ;; ideal solution; to quote DTC,
+	      ;;   The compiler locks up trying to coalesce the
+	      ;;   constant lists. The hack below will disable the
+	      ;;   coalescing of lists while dumping and allows
+              ;;   the code to compile. The real fix would be to
+	      ;;   take a little more care while dumping these.
+	      ;; So if better list coalescing is needed, start here.
+	      ;; -- WHN 2000-11-07
+              (if (circular-list-p x)
+                (progn
+                  (dump-list x file)
+                  (eq-save-object x file))
 	      (unless (equal-check-table x file)
 		(dump-list x file)
                    (equal-save-object x file))))
@@ -345,10 +364,11 @@
 	      (dump-structure x file)
 	      (eq-save-object x file))
 	     (array
-	      ;; FIXME: The comment at the head of DUMP-NON-IMMEDIATE-OBJECT
-	      ;; says it's for objects which we want to save, instead of
-	      ;; repeatedly dumping them. But then we dump arrays here without
-	      ;; doing anything like EQUAL-SAVE-OBJECT. What gives?
+	      ;; FIXME: The comment at the head of
+	      ;; DUMP-NON-IMMEDIATE-OBJECT says it's for objects which
+	      ;; we want to save, instead of repeatedly dumping them.
+	      ;; But then we dump arrays here without doing anything
+	      ;; like EQUAL-SAVE-OBJECT. What gives?
 	      (dump-array x file))
 	     (number
 	      (unless (equal-check-table x file)
@@ -359,19 +379,20 @@
 		  (integer (dump-integer x file)))
 		(equal-save-object x file)))
 	     (t
-	      ;; This probably never happens, since bad things tend to be
-	      ;; detected during IR1 conversion.
+	      ;; This probably never happens, since bad things tend to
+	      ;; be detected during IR1 conversion.
 	      (error "This object cannot be dumped into a fasl file:~% ~S"
 		     x))))))
   (values))
 
-;;; Dump an object of any type by dispatching to the correct type-specific
-;;; dumping function. We pick off immediate objects, symbols and and magic
-;;; lists here. Other objects are handled by Dump-Non-Immediate-Object.
+;;; Dump an object of any type by dispatching to the correct
+;;; type-specific dumping function. We pick off immediate objects,
+;;; symbols and and magic lists here. Other objects are handled by
+;;; DUMP-NON-IMMEDIATE-OBJECT.
 ;;;
-;;; This is the function used for recursive calls to the fasl dumper. We don't
-;;; worry about creating circularities here, since it is assumed that there is
-;;; a top-level call to Dump-Object.
+;;; This is the function used for recursive calls to the fasl dumper.
+;;; We don't worry about creating circularities here, since it is
+;;; assumed that there is a top-level call to DUMP-OBJECT.
 (defun sub-dump-object (x file)
   (cond ((listp x)
 	 (if x
@@ -386,10 +407,11 @@
 	(t
 	 (dump-non-immediate-object x file))))
 
-;;; Dump stuff to backpatch already dumped objects. Infos is the list of
-;;; Circularity structures describing what to do. The patching FOPs take the
-;;; value to store on the stack. We compute this value by fetching the
-;;; enclosing object from the table, and then CDR'ing it if necessary.
+;;; Dump stuff to backpatch already dumped objects. INFOS is the list
+;;; of CIRCULARITY structures describing what to do. The patching FOPs
+;;; take the value to store on the stack. We compute this value by
+;;; fetching the enclosing object from the table, and then CDR'ing it
+;;; if necessary.
 (defun dump-circularities (infos file)
   (let ((table (fasl-file-eq-table file)))
     (dolist (info infos)
@@ -412,13 +434,13 @@
       (dump-unsigned-32 (gethash (circularity-object info) table) file)
       (dump-unsigned-32 (circularity-index info) file))))
 
-;;; Set up stuff for circularity detection, then dump an object. All shared
-;;; and circular structure will be exactly preserved within a single call to
-;;; Dump-Object. Sharing between objects dumped by separate calls is only
-;;; preserved when convenient.
+;;; Set up stuff for circularity detection, then dump an object. All
+;;; shared and circular structure will be exactly preserved within a
+;;; single call to Dump-Object. Sharing between objects dumped by
+;;; separate calls is only preserved when convenient.
 ;;;
-;;; We peek at the object type so that we only pay the circular detection
-;;; overhead on types of objects that might be circular.
+;;; We peek at the object type so that we only pay the circular
+;;; detection overhead on types of objects that might be circular.
 (defun dump-object (x file)
   (if (or (array-header-p x)
 	  (simple-vector-p x)

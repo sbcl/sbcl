@@ -29,10 +29,21 @@
     (+ i f)))
 (assert (= (exercise-valuesify 1.25) 2.25))
 
-;;; A bug inherited from CMU CL screwed up special variable bindings
-;;; inside closures. This was fixed in sbcl-0.6.8.10 by applying the
-;;; patches Douglas Crosher posted to cmucl-imp@cons.org 2000-03-10
-;;; (split across two different messages).
-;;; FIXME: I'd like to find a test case for this..
+
+;;; Don Geddis reported this test case 25 December 1999 on a CMU CL
+;;; mailing list: dumping circular lists caused an infinite loop.
+;;; Douglas Crosher reported a patch 27 Dec 1999. The patch was tested
+;;; on SBCL by Martin Atzmueller 2 Nov 2000, and merged in
+;;; sbcl-0.6.8.11.
+(defun q1 () (dolist (x '#1=("A" "B" . #1#)) x))
+(defun q2 () (dolist (x '#1=("C" "D" . #1#)) x))
+(defun q3 () (dolist (x '#1=("E" "F" . #1#)) x))
+(defun q4 () (dolist (x '#1=("C" "D" . #1#)) x))
+(defun never5 ())
+(defun useful (keys)
+  (declare (type list keys))
+  (loop
+      for c in '#1=("Red" "Blue" . #1#)
+      for key in keys ))
 
 (sb-ext:quit :unix-status 104) ; success

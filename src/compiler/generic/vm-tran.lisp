@@ -82,6 +82,8 @@
 (deftransform data-vector-ref ((array index)
                                (simple-array t))
   (let ((array-type (continuation-type array)))
+    ;; FIXME: How could this happen? Doesn't the limitation to arg
+    ;; type SIMPLE-ARRAY guarantee that ARRAY-TYPE is an ARRAY-TYPE?
     (unless (array-type-p array-type)
       (give-up-ir1-transform))
     (let ((dims (array-type-dimensions array-type)))
@@ -89,8 +91,8 @@
         (give-up-ir1-transform))
       (let* ((el-type (array-type-element-type array-type))
              (total-size (if (or (atom dims) (member '* dims))
-                            '*
-                           (reduce #'* dims)))
+			     '*
+			     (reduce #'* dims)))
              (type-sp `(simple-array ,(type-specifier el-type)
                         (,total-size))))
         (if (atom dims)
@@ -134,6 +136,8 @@
 (deftransform data-vector-set ((array index new-value)
 			       (simple-array t t))
   (let ((array-type (continuation-type array)))
+    ;; FIXME: How could this happen? Doesn't the limitation to arg
+    ;; type SIMPLE-ARRAY guarantee that ARRAY-TYPE is an ARRAY-TYPE?
     (unless (array-type-p array-type)
       (give-up-ir1-transform))
     (let ((dims (array-type-dimensions array-type)))
@@ -141,11 +145,11 @@
 	(give-up-ir1-transform))
       (let* ((el-type (array-type-element-type array-type))
              (total-size (if (or (atom dims) (member '* dims))
-			    '*
-                           (reduce #'* dims)))
+			     '*
+			     (reduce #'* dims)))
              (type-sp `(simple-array ,(type-specifier el-type)
                         (,total-size))))
-        	(if (atom dims)
+	(if (atom dims)
 	    `(let ((a (truly-the ,type-sp (%array-simp array))))
 	       (data-vector-set a index new-value))
 	    `(let ((a (truly-the ,type-sp (%array-data-vector array))))
