@@ -251,6 +251,8 @@ void sigcont_handler(int signal, siginfo_t *info, void *void_context)
     /* we need to have a handler installed for this signal so that
      * sigwaitinfo() for it actually returns at the appropriate time
      */
+    fprintf(stderr, "Thread %d received stray SIGCONT\n",
+	    arch_os_get_current_thread()->pid);
 }
 
 void

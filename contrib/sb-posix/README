@@ -81,13 +81,20 @@ results if the stream is buffered.
 A filename is a string.  
 
 A pathname is a designator for a file-descriptor: the filename is
-computed as if by NAMESTRING
+computed using the same mechanism as the implementation would
+use to map pathnames to OS filenames internally.
+
+In an implementation that supports pathnames to files on other hosts, 
+using mechanisms not available to the underlying OS (for example, 
+using an FTP or HTTP client in the Lisp implementation), the effect 
+of supplying this interface with a pathname to such a file is undefined.
+
 
 ** buffer
 
-A buffer is an opaque object with accessors BUFFER-START and
-BUFFER-LENGTH, which represents an area of memory that system calls
-may access.  A buffer can be created using ALLOCATE-BUFFER or GET-BUFFER.
+A buffer is an opaque object which represents an area of memory that
+system calls may access.  It has accessors BUFFER-START and
+BUFFER-LENGTH, and can be created using ALLOCATE-BUFFER or GET-BUFFER.
 
 [ TODO: GET-BUFFER is a silly name.  Come up with a better one ]
 

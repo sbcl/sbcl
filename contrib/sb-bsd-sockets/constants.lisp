@@ -10,12 +10,12 @@
 
 ;;; then the stuff we're looking for
 ((:integer af-inet "AF_INET" "IP Protocol family")
- (:integer af-unspec "AF_UNSPEC" "Unspecified.")
+ (:integer af-unspec "AF_UNSPEC" "Unspecified")
  (:integer af-local
 	   #+(or sunos solaris) "AF_UNIX"
 	   #-(or sunos solaris) "AF_LOCAL"
 	   "Local to host (pipes and file-domain).")
- #+linux (:integer af-inet6 "AF_INET6"   "IP version 6. ")
+ #+linux (:integer af-inet6 "AF_INET6"   "IP version 6")
  #+linux (:integer af-route "AF_NETLINK" "Alias to emulate 4.4BSD ")
  
  (:integer sock-stream "SOCK_STREAM"

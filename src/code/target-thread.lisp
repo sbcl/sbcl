@@ -83,6 +83,8 @@
 (sb!alien:define-alien-routine "block_sigcont"  void)
 (sb!alien:define-alien-routine "unblock_sigcont_and_sleep"  void)
 
+;;; this should only be called while holding the queue spinlock.
+;;; it releases the spinlock before sleeping
 (defun wait-on-queue (queue &optional lock)
   (let ((pid (current-thread-id)))
     ;; FIXME what should happen if we get interrupted when we've blocked
@@ -90,28 +92,23 @@
     (block-sigcont)
     (when lock (release-mutex lock))
     (sb!sys:without-interrupts
-     (get-spinlock queue 2 pid)
-     (pushnew pid (waitqueue-data queue))
-     (setf (waitqueue-lock queue) 0))
+     (pushnew pid (waitqueue-data queue)))
+    (setf (waitqueue-lock queue) 0)
     (unblock-sigcont-and-sleep)))
 
+;;; this should only be called while holding the queue spinlock.  It doesn't
+;;; release it
 (defun dequeue (queue)
   (let ((pid (current-thread-id)))
-    (sb!sys:without-interrupts
-     (get-spinlock queue 2 pid)
+    (sb!sys:without-interrupts     
      (setf (waitqueue-data queue)
-	   (delete pid (waitqueue-data queue)))
-     (setf (waitqueue-lock queue) 0))))
+	   (delete pid (waitqueue-data queue))))))
 
+;;; this should probably only be called while holding the queue spinlock.
+;;; not sure
 (defun signal-queue-head (queue)
-  (let ((pid (current-thread-id))
-	h)
-    (sb!sys:without-interrupts
-     (get-spinlock queue 2 pid)
-     (setf h (car (waitqueue-data queue)))
-     (setf (waitqueue-lock queue) 0))
-    (when h
-      (sb!unix:unix-kill h :sigcont))))
+  (let ((p (car (waitqueue-data queue))))
+    (when p (sb!unix:unix-kill p  :sigcont))))
 
 ;;;; mutex
 
@@ -120,20 +117,25 @@
   (let ((pid (current-thread-id)))
     (unless new-value (setf new-value pid))
     (assert (not (eql new-value (mutex-value lock))))
+    (get-spinlock lock 2 pid)
     (loop
      (unless
 	 ;; args are object slot-num old-value new-value
 	 (sb!vm::%instance-set-conditional lock 4 nil new-value)
        (dequeue lock)
+       (setf (waitqueue-lock lock) 0)
        (return t))
-     (unless wait-p (return nil))
+     (unless wait-p
+       (setf (waitqueue-lock lock) 0)
+       (return nil))
      (wait-on-queue lock nil))))
 
 (defun release-mutex (lock &optional (new-value nil))
   (declare (type mutex lock))
   ;; we assume the lock is ours to release
-  (setf (mutex-value lock) new-value)
-  (signal-queue-head lock))
+  (with-spinlock (lock)
+    (setf (mutex-value lock) new-value)
+    (signal-queue-head lock)))
 
 
 (defmacro with-mutex ((mutex &key value (wait-p t))  &body body)
@@ -152,12 +154,15 @@
 thread may subsequently notify us using CONDITION-NOTIFY, at which
 time we reacquire LOCK and return to the caller."
   (unwind-protect
-       (wait-on-queue queue lock)
+       (progn
+	 (get-spinlock queue 2 (current-thread-id))
+	 (wait-on-queue queue lock))
     ;; If we are interrupted while waiting, we should do these things
     ;; before returning.  Ideally, in the case of an unhandled signal,
     ;; we should do them before entering the debugger, but this is
     ;; better than nothing.
-    (dequeue queue)
+    (with-spinlock (queue)
+      (dequeue queue))
     (get-mutex lock)))
 
 (defun condition-notify (queue)
