@@ -250,7 +250,7 @@
     (compiler-style-warn "duplicate definitions in ~S" definitions))
   (let* ((processed-definitions (mapcar definitionize-fun definitions))
          (*lexenv* (make-lexenv definitionize-keyword processed-definitions)))
-    (funcall fun)))
+    (funcall fun definitionize-keyword processed-definitions)))
 
 ;;; Tweak *LEXENV* to include the DEFINITIONS from a MACROLET, then
 ;;; call FUN (with no arguments).
@@ -292,9 +292,11 @@
   defined. Name is the local macro name, Lambda-List is the DEFMACRO style
   destructuring lambda list, and the Forms evaluate to the expansion. The
   Forms are evaluated in the null environment."
-  (funcall-in-macrolet-lexenv definitions
-			      (lambda ()
-				(ir1-translate-locally body start cont))))
+  (funcall-in-macrolet-lexenv
+   definitions
+   (lambda (&key funs)
+     (declare (ignore funs))
+     (ir1-translate-locally body start cont))))
 
 (defun funcall-in-symbol-macrolet-lexenv (definitions fun)
   (%funcall-in-foomacrolet-lexenv
@@ -321,8 +323,8 @@
   body, references to a Name will effectively be replaced with the Expansion."
   (funcall-in-symbol-macrolet-lexenv
    macrobindings
-   (lambda ()
-     (ir1-translate-locally body start cont))))
+   (lambda (&key vars)
+     (ir1-translate-locally body start cont :vars vars))))
 
 ;;; not really a special form, but..
 (def-ir1-translator declare ((&rest stuff) start cont)
@@ -579,10 +581,10 @@
 ;;; but we don't need to worry about that within an IR1 translator,
 ;;; since toplevel-formness is picked off by PROCESS-TOPLEVEL-FOO
 ;;; forms before we hit the IR1 transform level.
-(defun ir1-translate-locally (body start cont)
+(defun ir1-translate-locally (body start cont &key vars funs)
   (declare (type list body) (type continuation start cont))
   (multiple-value-bind (forms decls) (parse-body body nil)
-    (let ((*lexenv* (process-decls decls nil nil cont)))
+    (let ((*lexenv* (process-decls decls vars funs cont)))
       (ir1-convert-aux-bindings start cont forms nil nil))))
 
 (def-ir1-translator locally ((&body body) start cont)

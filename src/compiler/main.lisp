@@ -799,11 +799,11 @@
 ;;; Process a top level use of LOCALLY, or anything else (e.g.
 ;;; MACROLET) at top level which has declarations and ordinary forms.
 ;;; We parse declarations and then recursively process the body.
-(defun process-toplevel-locally (body path compile-time-too)
+(defun process-toplevel-locally (body path compile-time-too &key vars funs)
   (declare (list path))
   (multiple-value-bind (forms decls) (parse-body body nil)
     (let* ((*lexenv*
-	    (process-decls decls nil nil (make-continuation)))
+	    (process-decls decls vars funs (make-continuation)))
 	   ;; Binding *POLICY* is pretty much of a hack, since it
 	   ;; causes LOCALLY to "capture" enclosed proclamations. It
 	   ;; is necessary because CONVERT-AND-MAYBE-COMPILE uses the
@@ -1113,17 +1113,19 @@
                      ((macrolet)
                       (funcall-in-macrolet-lexenv
                        magic
-                       (lambda ()
+                       (lambda (&key funs)
+                         (declare (ignore funs))
                          (process-toplevel-locally body
                                                    path
                                                    compile-time-too))))
                      ((symbol-macrolet)
                       (funcall-in-symbol-macrolet-lexenv
                        magic
-                       (lambda ()
+                       (lambda (&key vars)
                          (process-toplevel-locally body
                                                    path
-                                                   compile-time-too)))))))
+                                                   compile-time-too
+                                                   :vars vars)))))))
                 ((locally)
                  (process-toplevel-locally (rest form) path compile-time-too))
                 ((progn)

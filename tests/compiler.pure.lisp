@@ -211,3 +211,13 @@
              (list (mext '(1 2))
                    (mint (1 2)))))
          '((:MEXT 1 2) (:MINT (:MEXT 1 2)))))
+
+;;; bug 48c: SYMBOL-MACROLET should signal PROGRAM-ERROR if introduced
+;;; symbol is declared to be SPECIAL
+(multiple-value-bind (result error)
+    (ignore-errors (funcall (lambda ()
+                              (symbol-macrolet ((s '(1 2)))
+                                  (declare (special s))
+                                s))))
+  (assert (null result))
+  (assert (typep error 'program-error)))

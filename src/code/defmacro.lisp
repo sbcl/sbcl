@@ -42,6 +42,8 @@
             ;; old note (ca. 1985, maybe:-): "Eventually %%DEFMACRO
             ;; should deal with clearing old compiler information for
             ;; the functional value."
+            ,@(unless set-args-p
+                '((declare (ignore lambda-list))))
             (ecase (info :function :kind name)
               ((nil))
               (:function

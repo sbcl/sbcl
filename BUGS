@@ -264,11 +264,6 @@ WORKAROUND:
 	d: (DEFGENERIC IF (X)) should signal a PROGRAM-ERROR, but instead
 	   causes a COMPILER-ERROR.
 
-48:
-  SYMBOL-MACROLET bugs reported by Peter Van Eynde July 25, 2000:
-	c: SYMBOL-MACROLET should signal PROGRAM-ERROR if something
-	   it binds is declared SPECIAL inside.
-
 51:
   miscellaneous errors reported by Peter Van Eynde July 25, 2000:
 	a: (PROGN
