@@ -267,15 +267,17 @@
   (:generator 0
     (aver (location= result rsp-tn))
     (unless (zerop amount)
-      (let ((delta (logandc2 (+ amount 3) 3)))
+      (let ((delta (logandc2 (+ amount 7) 7)))
 	(inst sub rsp-tn delta)))
+    ;; C stack must be 16 byte aligned
+    (inst and rsp-tn #xfffffff0)
     (move result rsp-tn)))
 
 (define-vop (dealloc-number-stack-space)
   (:info amount)
   (:generator 0
     (unless (zerop amount)
-      (let ((delta (logandc2 (+ amount 3) 3)))
+      (let ((delta (logandc2 (+ amount 7) 7)))
 	(inst add rsp-tn delta)))))
 
 (define-vop (alloc-alien-stack-space)

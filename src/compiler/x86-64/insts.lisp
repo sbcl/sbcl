@@ -1,5 +1,5 @@
-;;;; that part of the description of the x86 instruction set (for
-;;;; 80386 and above) which can live on the cross-compilation host
+;;;; that part of the description of the x86-64 instruction set
+;;;; which can live on the cross-compilation host
 
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
@@ -304,6 +304,16 @@
 		     *default-address-size*))
 		dstate)))
 
+(sb!disassem:define-arg-type imm-data-upto-dword
+  :prefilter (lambda (value dstate)
+	       (declare (ignore value)) ; always nil anyway
+	       (let ((width (width-bits
+			     (or (sb!disassem:dstate-get-prop dstate 'width)
+				 *default-address-size*))))
+		 (if (= width 64)
+		     (sb!disassem:read-signed-suffix 32 dstate)
+		   (sb!disassem:read-suffix width dstate)))))
+
 (sb!disassem:define-arg-type signed-imm-data
   :prefilter (lambda (value dstate)
 	       (declare (ignore value)) ; always nil anyway
@@ -470,7 +480,7 @@
 				     :include 'rex-simple
 				     :default-printer '(:name
 							:tab accum ", " imm))
-  (imm :type 'imm-data))
+  (imm :type 'imm-data-upto-dword))
 
 (sb!disassem:define-instruction-format (reg-no-width 8
 				     :default-printer '(:name :tab reg))
@@ -604,7 +614,7 @@
 					:default-printer
 					'(:name :tab reg/mem ", " imm))
   (reg/mem :type 'sized-rex-reg/mem)
-  (imm     :type 'imm-data))
+  (imm     :type 'imm-data-upto-dword))
 
 ;;; Same as reg/mem, but with using the accumulator in the default printer
 (sb!disassem:define-instruction-format
@@ -1199,7 +1209,8 @@
   (:printer rex-reg-reg/mem-dir ((op #b100010)))
   ;; immediate to register/memory
   (:printer reg/mem-imm ((op '(#b1100011 #b000))))
-  (:printer rex-reg/mem-imm ((op '(#b1100011 #b000))))
+  ;; doesn't work for 8-bit register yet
+  (:printer rex-reg/mem-imm ((op '(#b11000111 #b000))))
 
   (:emitter
    (let ((size (matching-operand-size dst src)))
@@ -1377,6 +1388,8 @@
   (:printer reg-no-width ((op #b10010)) '(:name :tab accum ", " reg))
   ;; Register/Memory with Register.
   (:printer reg-reg/mem ((op #b1000011)))
+  ;; doesn't work for 8-bit register yet
+  (:printer rex-reg-reg/mem ((op #b10000111)))
   (:emitter
    (let ((size (matching-operand-size operand1 operand2)))
      (maybe-emit-operand-size-prefix segment size)
@@ -2155,7 +2168,9 @@
 	 (t
 	  (unless (or (ea-p where) (tn-p where))
 		  (error "don't know what to do with ~A" where))
-	  (maybe-emit-rex-for-ea segment where nil)
+	  ;; near jump defaults to 64 bit
+	  ;; w-bit in rex prefix is unnecessary 
+	  (maybe-emit-rex-for-ea segment where nil :operand-size :dword)
 	  (emit-byte segment #b11111111)
 	  (emit-ea segment where #b100)))))
 

@@ -25,6 +25,14 @@ changes in sbcl-0.8.20 (0.9alpha.0?) relative to sbcl-0.8.19:
        ";" and "#|") are more forgiving to encoding errors; they will
        STYLE-WARN and then attempt to resync the stream at a character
        boundary.  (thanks to Teemu Kalvas)
+  * fixed some bugs in the x86-64 port:
+    ** Negative short int return values from c-calls are sign-extended
+       correctly.
+    ** The stack is aligned to 16-bytes for c-calls, as required by
+       the ABI. (thanks to Cheuksan Wang)
+    ** The disassembler understands more x86-64. (thanks to Cheuksan Wang)
+    ** The regression tests use SB-ALIEN:INT instead of SB-ALIEN:INTEGER
+       for enums. (thanks to Vincent Arkesteijn)
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** Space, Tab, Linefeed, Return and Page have the invalid
        secondary constituent character trait.
