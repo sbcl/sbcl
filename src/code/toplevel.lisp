@@ -386,10 +386,6 @@
 	   ;; return its truename.
 	   (probe-init-files (&rest possible-init-file-names)
 	     (/show0 "entering PROBE-INIT-FILES")
-
-	     ;; REMOVEME: commented out while compiler has problems
-	     #+nil
-
 	     (prog1
 		 (find-if (lambda (x)
 			    (and (stringp x) (probe-file x)))
