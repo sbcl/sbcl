@@ -23,7 +23,7 @@
 ;;; primitive integer types that fit in registers
 (/show0 "primtype.lisp 24")
 (!def-primitive-type positive-fixnum (any-reg signed-reg unsigned-reg)
-  :type (unsigned-byte 29))
+  :type (unsigned-byte #.sb!vm:n-positive-fixnum-bits))
 (/show0 "primtype.lisp 27")
 #!-alpha
 (!def-primitive-type unsigned-byte-31 (signed-reg unsigned-reg descriptor-reg)
@@ -40,7 +40,7 @@
 (!def-primitive-type unsigned-byte-64 (unsigned-reg descriptor-reg)
   :type (unsigned-byte 64))
 (!def-primitive-type fixnum (any-reg signed-reg)
-  :type (signed-byte 30))
+  :type (signed-byte #.(1+ sb!vm:n-positive-fixnum-bits)))
 #!-alpha
 (!def-primitive-type signed-byte-32 (signed-reg descriptor-reg)
   :type (signed-byte 32))
@@ -197,7 +197,7 @@
 		(integer
 		 (cond ((and hi lo)
 			(dolist (spec
-				  `((positive-fixnum 0 ,(1- (ash 1 29)))
+				  `((positive-fixnum 0 ,sb!xc:most-positive-fixnum)
 				    #!-alpha
 				    (unsigned-byte-31 0 ,(1- (ash 1 31)))
 				    #!-alpha
@@ -206,16 +206,16 @@
 				    (unsigned-byte-63 0 ,(1- (ash 1 63)))
 				    #!+alpha
 				    (unsigned-byte-64 0 ,(1- (ash 1 64)))
-				    (fixnum ,(ash -1 29)
-					    ,(1- (ash 1 29)))
+				    (fixnum ,sb!xc:most-negative-fixnum
+					    ,sb!xc:most-positive-fixnum)
 				    #!-alpha
 				    (signed-byte-32 ,(ash -1 31)
 							  ,(1- (ash 1 31)))
 				    #!+alpha
 				    (signed-byte-64 ,(ash -1 63)
 						    ,(1- (ash 1 63))))
-				 (if (or (< hi (ash -1 29))
-					 (> lo (1- (ash 1 29))))
+				 (if (or (< hi sb!xc:most-negative-fixnum)
+					 (> lo sb!xc:most-positive-fixnum))
 				     (part-of bignum)
 				     (any)))
 			  (let ((type (car spec))

@@ -126,7 +126,7 @@
 	 ((complex long-float) #C(0.0l0 0.0l0) #!+x86 192 #!+sparc 256
 	  simple-array-complex-long-float
 	  :importance 1)
-	 (t 0 32 simple-vector :importance 18))))
+	 (t 0 #.sb!vm:n-word-bits simple-vector :importance 18))))
 
 (defvar sb!kernel::*specialized-array-element-types*
   (map 'list
