@@ -529,22 +529,16 @@
 
 (/show0 "filesys.lisp 498")
 
-;;; FIXME: could maybe be EVAL-WHEN (COMPILE EVAL)
-
-(defmacro enumerate-matches ((var pathname &optional result
-				  &key (verify-existence t)
-                                  (follow-links t))
-			     &body body)
-  (let ((body-name (gensym "ENUMERATE-MATCHES-BODY-FUN-")))
-    `(block nil
-       (flet ((,body-name (,var)
-		,@body))
-         (declare (dynamic-extent ,body-name))
-	 (%enumerate-matches (pathname ,pathname)
-			     ,verify-existence
-                             ,follow-links
-			     #',body-name)
-	 ,result))))
+(defmacro !enumerate-matches ((var pathname &optional result
+				   &key (verify-existence t)
+				   (follow-links t))
+			      &body body)
+  `(block nil
+     (%enumerate-matches (pathname ,pathname)
+			 ,verify-existence
+			 ,follow-links
+			 (lambda (,var) ,@body))
+     ,result))
 
 (/show0 "filesys.lisp 500")
 
@@ -768,7 +762,7 @@
       ;; Otherwise, the ordinary rules apply.
       (let* ((namestring (physicalize-pathname (pathname pathname-spec)))
 	     (matches nil)) ; an accumulator for actual matches
-	(enumerate-matches (match namestring nil :verify-existence for-input)
+	(!enumerate-matches (match namestring nil :verify-existence for-input)
           (push match matches))
 	(case (length matches)
 	  (0 nil)
@@ -940,7 +934,7 @@
 					  (make-pathname :name :wild
 							 :type :wild
 							 :version :wild))))
-    (enumerate-matches (match merged-pathname)
+    (!enumerate-matches (match merged-pathname)
       (let ((*ignore-wildcards* t))
 	(push (truename (if (eq (sb!unix:unix-file-kind match) :directory)
 			    (concatenate 'string match "/")

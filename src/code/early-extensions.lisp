@@ -589,6 +589,13 @@
 	;; a constant as long as the new value is EQL to the old
 	;; value.)
 	))
+
+;;; COLD-FSET is supposed to be handled specially by the compiler. If
+;;; it's used in the wrong place (not a toplevel form) or in the wrong
+;;; bootstrap phase (not when cross-compiling for cold load) you'll
+;;; fall through to here.
+(defmacro cold-fset (&rest rest)
+  (error "misplaced COLD-FSET"))
 
 ;;;; ONCE-ONLY
 ;;;;

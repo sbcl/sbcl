@@ -139,14 +139,16 @@
   (gspace nil :type (or gspace null))
   ;; the offset in words from the start of GSPACE, or NIL if not set yet
   (word-offset nil :type (or (unsigned-byte #.sb!vm:word-bits) null))
-  ;; the high and low halves of the descriptor KLUDGE: Judging from
-  ;; the comments in genesis.lisp of the CMU CL old-rt compiler, this
-  ;; split dates back from a very early version of genesis where
-  ;; 32-bit integers were represented as conses of two 16-bit
-  ;; integers. In any system with nice (UNSIGNED-BYTE 32) structure
-  ;; slots, like CMU CL >= 17 or any version of SBCL, there seems to
-  ;; be no reason to persist in this. -- WHN 19990917
-  high low)
+  ;; the high and low halves of the descriptor
+  ;;
+  ;; KLUDGE: Judging from the comments in genesis.lisp of the CMU CL
+  ;; old-rt compiler, this split dates back from a very early version
+  ;; of genesis where 32-bit integers were represented as conses of
+  ;; two 16-bit integers. In any system with nice (UNSIGNED-BYTE 32)
+  ;; structure slots, like CMU CL >= 17 or any version of SBCL, there
+  ;; seems to be no reason to persist in this. -- WHN 19990917
+  high
+  low)
 (def!method print-object ((des descriptor) stream)
   (let ((lowtag (descriptor-lowtag des)))
     (print-unreadable-object (des stream :type t)
@@ -1024,8 +1026,8 @@
 	;;   (CAR COLD-INTERN-INFO) = descriptor of symbol
 	;;   (CDR COLD-INTERN-INFO) = list of packages, other than symbol's
 	;;			    own package, referring to symbol
-	;; (*COLD-PACKAGE-SYMBOLS* and *COLD-SYMBOLS* store basically the same
-	;; information, but with the mapping running the opposite way.)
+	;; (*COLD-PACKAGE-SYMBOLS* and *COLD-SYMBOLS* store basically the
+	;; same information, but with the mapping running the opposite way.)
 	(cold-intern-info (get symbol 'cold-intern-info)))
     (unless cold-intern-info
       (cond ((eq (symbol-package symbol) package)
@@ -1293,41 +1295,69 @@
     (cold-push (string-to-core (package-name pkg)) res)
     res))
 
-;;;; fdefinition objects
+;;;; functions and fdefinition objects
 
 ;;; a hash table mapping from fdefinition names to descriptors of cold
-;;; objects. Note: Since fdefinition names can be lists like '(SETF
-;;; FOO), and we want to have only one entry per name, this must be an
-;;; 'EQUAL hash table, not the default 'EQL.
+;;; objects
+;;;
+;;; Note: Since fdefinition names can be lists like '(SETF FOO), and
+;;; we want to have only one entry per name, this must be an 'EQUAL
+;;; hash table, not the default 'EQL.
 (defvar *cold-fdefn-objects*)
 
 (defvar *cold-fdefn-gspace* nil)
 
-;;; Given a cold representation of an FDEFN name, return a warm representation.
-;;;
-;;; Note: Despite the name, this actually has little to do with
-;;; FDEFNs, it's just a function for warming up values, and the only
-;;; values it knows how to warm up are symbols and lists. (The
-;;; connection to FDEFNs is that symbols and lists are the only
-;;; possible names for functions.)
-(declaim (ftype (function (descriptor) (or symbol list)) warm-fdefn-name))
-(defun warm-fdefn-name (des)
-  (ecase (descriptor-lowtag des)
-    (#.sb!vm:list-pointer-type ; FIXME: no #.
-     (if (= (descriptor-bits des) (descriptor-bits *nil-descriptor*))
-	 nil
-	 ;; FIXME: If we cold-intern this again, we might get a different
-	 ;; name. Check to make sure that any hash tables along the way
-	 ;; are 'EQUAL not 'EQL.
-	 (cons (warm-fdefn-name (read-wordindexed des sb!vm:cons-car-slot))
-	       (warm-fdefn-name (read-wordindexed des sb!vm:cons-cdr-slot)))))
-    (#.sb!vm:other-pointer-type ; FIXME: no #.
-     (or (gethash (descriptor-bits des) *cold-symbols*)
-	 (descriptor-bits des)))))
+;;; Given a cold representation of a symbol, return a warm
+;;; representation. 
+(defun warm-symbol (des)
+  ;; Note that COLD-INTERN is responsible for keeping the
+  ;; *COLD-SYMBOLS* table up to date, so if DES happens to refer to an
+  ;; uninterned symbol, the code below will fail. But as long as we
+  ;; don't need to look up uninterned symbols during bootstrapping,
+  ;; that's OK..
+  (multiple-value-bind (symbol found-p)
+      (gethash (descriptor-bits des) *cold-symbols*)
+    (declare (type symbol symbol))
+    (unless found-p
+      (error "no warm symbol"))
+    symbol))
+  
+;;; like CL:CAR, CL:CDR, and CL:NULL but for cold values
+(defun cold-car (des)
+  (aver (= (descriptor-lowtag des) sb!vm:list-pointer-type))
+  (read-wordindexed des sb!vm:cons-car-slot))
+(defun cold-cdr (des)
+  (aver (= (descriptor-lowtag des) sb!vm:list-pointer-type))
+  (read-wordindexed des sb!vm:cons-cdr-slot))
+(defun cold-null (des)
+  (= (descriptor-bits des)
+     (descriptor-bits *nil-descriptor*)))
+  
+;;; Given a cold representation of a function name, return a warm
+;;; representation.
+(declaim (ftype (function (descriptor) (or symbol list)) warm-fun-name))
+(defun warm-fun-name (des)
+  (let ((result
+	 (ecase (descriptor-lowtag des)
+	   (#.sb!vm:list-pointer-type
+	    (aver (not (cold-null des))) ; function named NIL? please no..
+	    ;; Do cold (DESTRUCTURING-BIND (COLD-CAR COLD-CADR) DES ..).
+	    (let* ((car-des (cold-car des))
+		   (cdr-des (cold-cdr des))
+		   (cadr-des (cold-car cdr-des))
+		   (cddr-des (cold-cdr cdr-des)))
+	      (aver (cold-null cddr-des))
+	      (list (warm-symbol car-des)
+		    (warm-symbol cadr-des))))
+	   (#.sb!vm:other-pointer-type
+	    (warm-symbol des)))))
+    (unless (legal-function-name-p result)
+      (error "not a legal function name: ~S" result))
+    result))
 
 (defun cold-fdefinition-object (cold-name &optional leave-fn-raw)
   (declare (type descriptor cold-name))
-  (let ((warm-name (warm-fdefn-name cold-name)))
+  (let ((warm-name (warm-fun-name cold-name)))
     (or (gethash warm-name *cold-fdefn-objects*)
 	(let ((fdefn (allocate-boxed-object (or *cold-fdefn-gspace* *dynamic*)
 					    (1- sb!vm:fdefn-size)
@@ -1343,7 +1373,8 @@
 	    (write-wordindexed fdefn
 			       sb!vm:fdefn-raw-addr-slot
 			       (make-random-descriptor
-				(cold-foreign-symbol-address-as-integer "undefined_tramp"))))
+				(cold-foreign-symbol-address-as-integer
+				 "undefined_tramp"))))
 	  fdefn))))
 
 (defun cold-fset (cold-name defn)
@@ -1799,8 +1830,8 @@
 
 ;;;; cold fops for loading symbols
 
-;;; Load a symbol SIZE characters long from *FASL-INPUT-STREAM* and intern
-;;; that symbol in PACKAGE.
+;;; Load a symbol SIZE characters long from *FASL-INPUT-STREAM* and
+;;; intern that symbol in PACKAGE.
 (defun cold-load-symbol (size package)
   (let ((string (make-string size)))
     (read-string-as-bytes *fasl-input-stream* string)
@@ -1830,8 +1861,9 @@
   (let* ((size (clone-arg))
 	 (name (make-string size)))
     (read-string-as-bytes *fasl-input-stream* name)
-    (let ((symbol (allocate-symbol name)))
-      (push-fop-table symbol))))
+    (let ((symbol-des (allocate-symbol name)))
+      (/show "doing uninterned symbol save fop" name symbol-des) ; REMOVEME
+      (push-fop-table symbol-des))))
 
 ;;;; cold fops for loading lists
 
@@ -2641,13 +2673,14 @@
 		     (if (= (descriptor-bits fun)
 			    (descriptor-bits *nil-descriptor*))
 			 (push name undefs)
-			 (let ((addr (read-wordindexed fdefn
-						       sb!vm:fdefn-raw-addr-slot)))
+			 (let ((addr (read-wordindexed
+				      fdefn sb!vm:fdefn-raw-addr-slot)))
 			   (push (cons name (descriptor-bits addr))
 				 funs)))))
 	       *cold-fdefn-objects*)
       (format t "~%~|~%initially defined functions:~2%")
-      (dolist (info (sort funs #'< :key #'cdr))
+      (setf funs (sort funs #'< :key #'cdr))
+      (dolist (info funs)
 	(format t "0x~8,'0X: ~S   #X~8,'0X~%" (cdr info) (car info)
 		(- (cdr info) #x17)))
       (format t
@@ -2662,33 +2695,33 @@ cross-compiler knew their inline definition and used that everywhere
 that they were called before the out-of-line definition is installed,
 as is fairly common for structure accessors.)
 initially undefined function references:~2%")
-      (labels ((key (name)
-		 (etypecase name
-		   (symbol (symbol-name name))
-		   ;; FIXME: should use standard SETF-function parsing logic
-		   (list (key (second name))))))
-	(dolist (name (sort undefs #'string< :key #'key))
-	  (format t "~S" name)
-	  ;; FIXME: This ACCESSOR-FOR stuff should go away when the
-	  ;; code has stabilized. (It's only here to help me
-	  ;; categorize the flood of undefined functions caused by
-	  ;; completely rewriting the bootstrap process. Hopefully any
-	  ;; future maintainers will mostly have small numbers of
-	  ;; undefined functions..)
-	  (let ((accessor-for (info :function :accessor-for name)))
-	    (when accessor-for
-	      (format t " (accessor for ~S)" accessor-for)))
-	  (format t "~%")))))
 
-  (format t "~%~|~%layout names:~2%")
-  (collect ((stuff))
-    (maphash #'(lambda (name gorp)
-		 (declare (ignore name))
-		 (stuff (cons (descriptor-bits (car gorp))
-			      (cdr gorp))))
-	     *cold-layouts*)
-    (dolist (x (sort (stuff) #'< :key #'car))
-      (apply #'format t "~8,'0X: ~S[~D]~%~10T~S~%" x)))
+      ;; REMOVEME: for debugging weird SORT problem
+      (setf (symbol-value '*genesis-original-undefs*) (copy-list undefs))
+
+      (setf undefs (sort undefs #'string< :key #'function-name-block-name))
+      (dolist (name undefs)
+        (format t "~S" name)
+	;; FIXME: This ACCESSOR-FOR stuff should go away when the
+	;; code has stabilized. (It's only here to help me
+	;; categorize the flood of undefined functions caused by
+	;; completely rewriting the bootstrap process. Hopefully any
+	;; future maintainers will mostly have small numbers of
+	;; undefined functions..)
+	(let ((accessor-for (info :function :accessor-for name)))
+	  (when accessor-for
+	    (format t " (accessor for ~S)" accessor-for)))
+	(format t "~%")))
+
+    (format t "~%~|~%layout names:~2%")
+    (collect ((stuff))
+      (maphash #'(lambda (name gorp)
+                   (declare (ignore name))
+                   (stuff (cons (descriptor-bits (car gorp))
+                                (cdr gorp))))
+               *cold-layouts*)
+      (dolist (x (sort (stuff) #'< :key #'car))
+        (apply #'format t "~8,'0X: ~S[~D]~%~10T~S~%" x))))
 
   (values))
 

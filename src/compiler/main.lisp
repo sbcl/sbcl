@@ -855,21 +855,6 @@
 	   (*policy* (lexenv-policy *lexenv*)))
       (process-top-level-progn forms path compile-time-too))))
 
-;;; Force any pending top-level forms to be compiled and dumped so
-;;; that they will be evaluated in the correct package environment.
-;;; Dump the form to be evaled at (cold) load time, and if EVAL is
-;;; true, eval the form immediately.
-(defun process-cold-load-form (form path eval)
-  (let ((object *compile-object*))
-    (etypecase object
-      (fasl-output
-       (compile-top-level-lambdas () t)
-       (fasl-dump-cold-load-form form object))
-      ((or null core-object)
-       (convert-and-maybe-compile form path)))
-    (when eval
-      (eval form))))
-
 ;;; Parse an EVAL-WHEN situations list, returning three flags,
 ;;; (VALUES COMPILE-TOPLEVEL LOAD-TOPLEVEL EXECUTE), indicating
 ;;; the types of situations present in the list.
@@ -891,6 +876,45 @@
 			situations)
 	  (intersection '(:load-toplevel load) situations)
 	  (intersection '(:execute eval) situations)))
+
+
+;;; Arrange for static linkage at cold init time between FUN-NAME and
+;;; the function defined by LAMBDA-EXPRESSION.
+#+sb-xc-host
+(defun process-cold-fset (fun-name lambda-expression path)
+  (/show "doing PROCESS-COLD-FSET" fun-name *policy*)
+  (unless (producing-fasl-file)
+    (error "can't COLD-FSET except in a fasl file"))
+  (unless (legal-function-name-p fun-name)
+    (error "not a legal function name: ~S" fun-name))
+  (let* ((*lexenv* (make-lexenv :policy *policy*))
+	 (lambda (ir1-top-level lambda-expression path nil))
+	 (component (block-component (node-block (lambda-bind lambda)))))
+    (/show (byte-compile-this-component-p component))
+    (/show (%coerce-to-policy lambda))
+    (/show (component-lambdas component))
+    (/show (mapcar #'%coerce-to-policy (component-lambdas component)))
+    (/show (%coerce-to-policy *lexenv*))
+    (let (;; FIXME: This binding is a quick hack to solve the problem
+	  ;; of COMPILE-COMPONENT bogusly byte-compiling COMPONENT
+	  ;; even though current *POLICY* should keep that from
+	  ;; happening. I cut-and-pasted it from
+	  ;; SUB-COMPILE-TOP-LEVEL-LAMBDAS. It's especially
+	  ;; inappropriate here, since the function being compiled
+	  ;; isn't a "top level lambda" in the way that that term is
+	  ;; usually used in the compiler, i.e. it's not called
+	  ;; automatically at load time. But it seems like an ugly
+	  ;; hack both here and in SUB-COMPILE-TOP-LEVEL-LAMBDAS. I
+	  ;; think COMPILE-COMPONENT's to-byte-compile-or-not logic
+	  ;; should be fixed so that this kind of weirdness isn't
+	  ;; needed.
+	  (*byte-compile* (if (eq *byte-compile* :maybe)
+			      *byte-compile-top-level*
+			      *byte-compile*)))
+      (compile-component component))
+    (clear-ir1-info component)
+    (fasl-dump-cold-fset fun-name lambda *compile-object*))
+  (values))
 
 ;;; Process a top-level FORM with the specified source PATH.
 ;;;  * If this is a magic top-level form, then do stuff.
@@ -924,17 +948,14 @@
 				     (car form)
 				     form))))
 	    (case (car form)
-	      ;; FIXME: It's not clear to me why we would want this
-	      ;; special case; it might have been needed for some
-	      ;; variation of the old GENESIS system, but it certainly
-	      ;; doesn't seem to be needed for ours. Sometime after the
-	      ;; system is running I'd like to remove it tentatively and
-	      ;; see whether anything breaks, and if nothing does break,
-	      ;; remove it permanently. (And if we *do* want special
-	      ;; treatment of all these, we probably want to treat WARN
-	      ;; the same way..)
-	      ((error cerror break signal)
-	       (process-cold-load-form form path nil))
+	      ;; In the cross-compiler, COLD-FSET arranges for static
+	      ;; linking at cold init time.
+	      #+sb-xc-host
+	      ((cold-fset)
+	       (aver (not compile-time-too))
+	       (destructuring-bind (cold-fset fun-name lambda-expression) form
+		 (declare (ignore cold-fset))
+		 (process-cold-fset fun-name lambda-expression path)))
 	      ((eval-when macrolet symbol-macrolet);things w/ 1 arg before body
 	       (need-at-least-one-arg form)
 	       (destructuring-bind (special-operator magic &rest body) form
@@ -1078,7 +1099,7 @@
      (compile-top-level (list lambda) t)
      lambda)))
 
-;;; Called by COMPILE-TOP-LEVEL when it was pased T for
+;;; This is called by COMPILE-TOP-LEVEL when it was passed T for
 ;;; LOAD-TIME-VALUE-P (which happens in COMPILE-LOAD-TIME-STUFF). We
 ;;; don't try to combine this component with anything else and frob
 ;;; the name. If not in a :TOP-LEVEL component, then don't bother
@@ -1182,10 +1203,10 @@
 	  (object-call-top-level-lambda (elt lambdas loser))))))
   (values))
 
-;;; Compile LAMBDAS (a list of the lambdas for top-level forms) into
-;;; the object file. We loop doing local call analysis until it
-;;; converges, since a single pass might miss something due to
-;;; components being joined by LET conversion.
+;;; Compile LAMBDAS (a list of the lambda expressions for top-level
+;;; forms) into the object file. We loop doing local call analysis
+;;; until it converges, since a single pass might miss something due
+;;; to components being joined by LET conversion.
 ;;;
 ;;; LOAD-TIME-VALUE-P seems to control whether it's MAKE-LOAD-FORM and
 ;;; COMPILE-LOAD-TIME-VALUE stuff. -- WHN 20000201

@@ -169,8 +169,9 @@
 
 ;;;; magic BACKQ- versions of builtin functions
 
-;;; Define synonyms for the lisp functions we use, so that by using them, we
-;;; backquoted material will be recognizable to the pretty-printer.
+;;; Define synonyms for the lisp functions we use, so that by using
+;;; them, the backquoted material will be recognizable to the
+;;; pretty-printer.
 (macrolet ((def-frob (b-name name)
 	     (let ((args (gensym "ARGS")))
 	       ;; FIXME: This function should be INLINE so that the lists
@@ -194,15 +195,16 @@
 
 ;;; Install BACKQ stuff in the current *READTABLE*.
 ;;;
-;;; In the target Lisp, we have to wait to do this until the readtable has been
-;;; created. In the cross-compilation host Lisp, we can do this right away.
-;;; (You may ask: In the cross-compilation host, which already has its own
-;;; implementation of the backquote readmacro, why do we do this at all?
-;;; Because the cross-compilation host might -- as SBCL itself does -- express
-;;; the backquote expansion in terms of internal, nonportable functions. By
-;;; redefining backquote in terms of functions which are guaranteed to exist on
-;;; the target Lisp, we ensure that backquote expansions in code-generating
-;;; code work properly.)
+;;; In the target Lisp, we have to wait to do this until the readtable
+;;; has been created. In the cross-compilation host Lisp, we can do
+;;; this right away. (You may ask: In the cross-compilation host,
+;;; which already has its own implementation of the backquote
+;;; readmacro, why do we do this at all? Because the cross-compilation
+;;; host might -- as SBCL itself does -- express the backquote
+;;; expansion in terms of internal, nonportable functions. By
+;;; redefining backquote in terms of functions which are guaranteed to
+;;; exist on the target Lisp, we ensure that backquote expansions in
+;;; code-generating code work properly.)
 (defun !backq-cold-init ()
   (set-macro-character #\` #'backquote-macro)
   (set-macro-character #\, #'comma-macro))

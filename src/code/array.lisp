@@ -261,6 +261,8 @@
 	   (fill-data-vector data dimensions initial-contents)))
     data))
 
+;;; FIXME: commented out because COLD-FSET doesn't like it
+#|
 (defun fill-data-vector (vector dimensions initial-contents)
   (let ((index 0))
     (labels ((frob (axis dims contents)
@@ -283,6 +285,7 @@
 			  (dotimes (i (length contents))
 			    (frob (1+ axis) (cdr dims) (aref contents i))))))))
       (frob 0 dimensions initial-contents))))
+|#
 
 (defun vector (&rest objects)
   #!+sb-doc
@@ -641,6 +644,12 @@
 	   (setf (%array-fill-pointer array) (1+ fill-pointer))
 	   fill-pointer))))
 
+;;; FIXME: commented out because COLD-FSET doesn't like it:
+;;; (%FAILED-AVER
+;;; "(COMMON-LISP:= (COMMON-LISP:LENGTH (SB!C::BLOCK-SUCC SB!C::CALL-BLOCK)) 1)")
+;;; in INSERT-LET-BODY in LET-CONVERT in MAYBE-LET-CONVERT in DELETE-REF
+;;; in DELETE-BLOCK in IR1-OPTIMIZE
+#|
 (defun vector-push-extend (new-element
 			   vector
 			   &optional
@@ -668,6 +677,7 @@
           (setf (aref v i) new-element)
 	  (setf (aref v i) new-element)))
     old-fill-pointer))
+|#
 
 (defun vector-push-extend (new-element
 			   vector

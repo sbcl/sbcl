@@ -406,7 +406,7 @@
   (collect ((stuff))
     (let ((ltype (dd-lisp-type defstruct)))
       (dolist (slot (dd-slots defstruct))
-	(let ((name (dsd-accessor slot))
+	(let ((name (dsd-accessor-name slot))
 	      (index (dsd-index slot))
 	      (slot-type `(and ,(dsd-type slot)
 			       ,(dd-element-type defstruct))))

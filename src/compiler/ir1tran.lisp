@@ -325,11 +325,11 @@
 
 ;;; This function takes a form and the top-level form number for that
 ;;; form, and returns a lambda representing the translation of that
-;;; form in the current global environment. The lambda is top-level
-;;; lambda that can be called to cause evaluation of the forms. This
-;;; lambda is in the initial component. If FOR-VALUE is T, then the
-;;; value of the form is returned from the function, otherwise NIL is
-;;; returned.
+;;; form in the current global environment. The returned lambda is a
+;;; top-level lambda that can be called to cause evaluation of the
+;;; forms. This lambda is in the initial component. If FOR-VALUE is T,
+;;; then the value of the form is returned from the function,
+;;; otherwise NIL is returned.
 ;;;
 ;;; This function may have arbitrary effects on the global environment
 ;;; due to processing of PROCLAIMs and EVAL-WHENs. All syntax error
@@ -2777,12 +2777,14 @@
 ;;; lambda-list and comparing it with the new one.
 (def-ir1-translator %defmacro ((qname qdef lambda-list doc) start cont
 			       :kind :function)
-  (let (;; QNAME is typically a quoted name. I think the idea is to let
-	;; %DEFMACRO work as an ordinary function when interpreting. Whatever
-	;; the reason it's there, we don't want it any more. -- WHN 19990603
+  (let (;; QNAME is typically a quoted name. I think the idea is to
+	;; let %DEFMACRO work as an ordinary function when
+	;; interpreting. Whatever the reason the quote is there, we
+	;; don't want it any more. -- WHN 19990603
 	(name (eval qname))
-	;; QDEF should be a sharp-quoted definition. We don't want to make a
-	;; function of it just yet, so we just drop the sharp-quote.
+	;; QDEF should be a sharp-quoted definition. We don't want to
+	;; make a function of it just yet, so we just drop the
+	;; sharp-quote.
 	(def (progn
 	       (aver (eq 'function (first qdef)))
 	       (aver (proper-list-of-length-p qdef 2))
@@ -2869,11 +2871,11 @@
 
 ;;; Convert FUN as a lambda in the null environment, but use the
 ;;; current compilation policy. Note that FUN may be a
-;;; LAMBDA-WITH-ENVIRONMENT, so we may have to augment the environment
-;;; to reflect the state at the definition site.
+;;; LAMBDA-WITH-LEXENV, so we may have to augment the environment to
+;;; reflect the state at the definition site.
 (defun ir1-convert-inline-lambda (fun &optional name)
   (destructuring-bind (decls macros symbol-macros &rest body)
-		      (if (eq (car fun) 'lambda-with-environment)
+		      (if (eq (car fun) 'lambda-with-lexenv)
 			  (cdr fun)
 			  `(() () () . ,(cdr fun)))
     (let ((*lexenv* (make-lexenv
@@ -2890,9 +2892,9 @@
       (ir1-convert-lambda `(lambda ,@body) name))))
 
 ;;; Return a lambda that has been "closed" with respect to ENV,
-;;; returning a LAMBDA-WITH-ENVIRONMENT if there are interesting
-;;; macros or declarations. If there is something too complex (like a
-;;; lexical variable) in the environment, then we return NIL.
+;;; returning a LAMBDA-WITH-LEXENV if there are interesting macros or
+;;; declarations. If there is something too complex (like a lexical
+;;; variable) in the environment, then we return NIL.
 (defun inline-syntactic-closure-lambda (lambda &optional (env *lexenv*))
   (let ((variables (lexenv-variables env))
 	(functions (lexenv-functions env))
@@ -2933,10 +2935,10 @@
 		   (t (return t))))))
 	   nil)
 	  (t
-	   `(lambda-with-environment ,decls
-				     ,macros
-				     ,symmacs
-				     . ,(rest lambda))))))
+	   `(lambda-with-lexenv ,decls
+				,macros
+				,symmacs
+				. ,(rest lambda))))))
 
 ;;; Get a DEFINED-FUNCTION object for a function we are about to
 ;;; define. If the function has been forward referenced, then
@@ -2967,8 +2969,7 @@
 ;;; types if appropriate. This assertion is suppressed by the
 ;;; EXPLICIT-CHECK attribute, which is specified on functions that
 ;;; check their argument types as a consequence of type dispatching.
-;;; This avoids redundant checks such as NUMBERP on the args to +,
-;;; etc.
+;;; This avoids redundant checks such as NUMBERP on the args to +, etc.
 (defun assert-new-definition (var fun)
   (let ((type (leaf-type var))
 	(for-real (eq (leaf-where-from var) :declared))
@@ -3027,54 +3028,72 @@
 	(when expansion (setf (defined-function-functional var) fun)))
       fun)))
 
-;;; Convert the definition and install it in the global environment
-;;; with a LABELS-like effect. If the lexical environment is not null,
-;;; then we only install the definition during the processing of this
-;;; DEFUN, ensuring that the function cannot be called outside of the
-;;; correct environment. If the function is globally NOTINLINE, then
-;;; that inhibits even local substitution. Also, emit top-level code
-;;; to install the definition.
-;;;
-;;; This is one of the major places where the semantics of block
-;;; compilation is handled. Substitution for global names is totally
-;;; inhibited if *BLOCK-COMPILE* is NIL. And if *BLOCK-COMPILE* is
-;;; true and entry points are specified, then we don't install global
-;;; definitions for non-entry functions (effectively turning them into
-;;; local lexical functions.)
-(def-ir1-translator %defun ((name def doc source) start cont
-			    :kind :function)
-  (declare (ignore source))
-  (let* ((name (eval name))
-	 (lambda (second def))
-	 (*current-path* (revert-source-path 'defun))
-	 (expansion (unless (eq (info :function :inlinep name) :notinline)
-		      (inline-syntactic-closure-lambda lambda))))
-    ;; If not in a simple environment or NOTINLINE, then discard any
-    ;; forward references to this function.
-    (unless expansion (remhash name *free-functions*))
+;;; the even-at-compile-time part of DEFUN
+(defun %compiler-defun (name lambda-with-lexenv)
 
-    (let* ((var (get-defined-function name))
-	   (save-expansion (and (member (defined-function-inlinep var)
-					'(:inline :maybe-inline))
-				expansion)))
-      (setf (defined-function-inline-expansion var) expansion)
-      (setf (info :function :inline-expansion name) save-expansion)
-      ;; If there is a type from a previous definition, blast it,
-      ;; since it is obsolete.
-      (when (eq (leaf-where-from var) :defined)
-	(setf (leaf-type var) (specifier-type 'function)))
+  (when sb!xc:*compile-print*
+    (compiler-mumble "~&; recognizing DEFUN ~S~%" name))
 
-      (let ((fun (ir1-convert-lambda-for-defun lambda
-					       var
-					       expansion
-					       #'ir1-convert-lambda)))
-	(ir1-convert
-	 start cont
-	 (if (and *block-compile* *entry-points*
-		  (not (member name *entry-points* :test #'equal)))
-	     `',name
-	     `(%%defun ',name ,fun ,doc
-		       ,@(when save-expansion `(',save-expansion)))))
+  ;; FIXME: Couldn't these be PROCLAIM-AS-FUNCTION-NAME instead?
+  (become-defined-function-name name)
+  (remhash name *free-functions*)
 
-	(when sb!xc:*compile-print*
-	  (compiler-mumble "~&; converted ~S~%" name))))))
+  (let ((defined-function (get-defined-function name)))
+
+    (when lambda-with-lexenv
+      (setf (info :function :inline-expansion name) lambda-with-lexenv)
+      (setf (defined-function-inline-expansion defined-function)
+	    lambda-with-lexenv))
+
+    ;; old CMU CL comment:
+    ;;   If there is a type from a previous definition, blast it,
+    ;;   since it is obsolete.
+    (when (eq (leaf-where-from defined-function) :defined)
+      (setf (leaf-type defined-function)
+	    ;; FIXME: If this is a block compilation thing, shouldn't
+	    ;; we be setting the type to the full derived type for the
+	    ;; definition, instead of this most general function type?
+	    (specifier-type 'function))))
+
+  (values))
+
+;;;; hacking function names
+
+;;; This is like LAMBDA, except the result is tweaked so that
+;;; %FUNCTION-NAME or BYTE-FUNCTION-NAME can extract a name. (Also
+;;; possibly the name could also be used at compile time to emit
+;;; more-informative name-based compiler diagnostic messages as well.)
+(defmacro-mundanely named-lambda (name args &body body)
+
+  ;; FIXME: For now, in this stub version, we just discard the name. A
+  ;; non-stub version might use either macro-level LOAD-TIME-VALUE
+  ;; hackery or customized IR1-transform level magic to actually put
+  ;; the name in place.
+  (aver (legal-function-name-p name))
+  `(lambda ,args ,@body))
+
+;;; REMOVEME: old way of handling COLD-FSET
+#|
+(defknown cold-fset ..)
+;;; COLD-FSET arranges for GENESIS to set (FDEFINITION NAME) to FUN.
+;;; Toplevel COLD-FSETs are translated into %TOPLEVEL-COLD-FSET to be
+;;; processed here. (It's not clear that non-toplevel COLD-FSETs make
+;;; much sense, so they're treated as errors.)
+#+sb-xc-host
+(def-ir1-translator %toplevel-cold-fset ((fun-name fun) start cont)
+  (/show "translating %TOPLEVEL-COLD-FSET" fun-name fun)
+  (unless (producing-fasl-file)
+    (error "can't COLD-FSET except in a fasl file"))
+  (unless (legal-function-name-p fun-name)
+    (error "not a legal function name: ~S" fun-name))
+  (/show "done translating %TOPLEVEL-COLD-FSET" fun-name fun)
+  ,,
+  (values))
+#+sb-xc-host
+(def-ir1-translator cold-fset ((fun-name fun) start cont)
+  (declare (ignore fun))
+  ;; Toplevel COLD-FSETs are transformed into %TOPLEVEL-COLD-FSET
+  ;; before we get to IR1, so any COLD-FSET left over must be
+  ;; non-toplevel, which isn't allowed.
+  (error "non-toplevel COLD-FSET ~S" fun-name))
+|#

@@ -231,18 +231,6 @@
       (aver (not (gethash x circ)))
       (setf (gethash x circ) x)))
   (values))
-
-;;; Dump FORM to a fasl file so that it evaluated at load time in normal
-;;; load and at cold-load time in cold load. This is used to dump package
-;;; frobbing forms.
-(defun fasl-dump-cold-load-form (form fasl-output)
-  (declare (type fasl-output fasl-output))
-  (dump-fop 'fop-normal-load fasl-output)
-  (let ((*cold-load-dump* t))
-    (dump-object form fasl-output))
-  (dump-fop 'fop-eval-for-effect fasl-output)
-  (dump-fop 'fop-maybe-cold-load fasl-output)
-  (values))
 
 ;;;; opening and closing fasl files
 
@@ -1038,6 +1026,19 @@
 	       (:load-time-value
 		(dump-push (cdr entry) fasl-output))
 	       (:fdefinition
+
+		;; REMOVEME
+		;;
+		;; What kind of weird things are being dumped here?
+		;; (I added this code when I was having trouble
+		;; getting GENESIS to deal with new DEFUN stuff.
+		;; -- WHN 2001-08-08)
+		#!+sb-show
+		(unless (legal-function-name-p (cdr entry))
+		  (/show "dumping FOP-FDEFINITION with exotic name" entry)
+		  #+(and sbcl sb-xc-host) (sb-debug:backtrace)
+		  #+(and sbcl sb-xc) (sb!debug:backtrace))
+
 		(dump-object (cdr entry) fasl-output)
 		(dump-fop 'fop-fdefinition fasl-output))))
 	    (null
@@ -1105,10 +1106,6 @@
 ;;; Dump a function-entry data structure corresponding to ENTRY to
 ;;; FILE. CODE-HANDLE is the table offset of the code object for the
 ;;; component.
-;;;
-;;; If the entry is a DEFUN, then we also dump a FOP-FSET so that the
-;;; cold loader can instantiate the definition at cold-load time,
-;;; allowing forward references to functions in top-level forms.
 (defun dump-one-entry (entry code-handle file)
   (declare (type sb!c::entry-info entry) (type index code-handle)
 	   (type fasl-output file))
@@ -1119,12 +1116,7 @@
     (dump-object (sb!c::entry-info-type entry) file)
     (dump-fop 'fop-function-entry file)
     (dump-unsigned-32 (label-position (sb!c::entry-info-offset entry)) file)
-    (let ((handle (dump-pop file)))
-      (when (and name (or (symbolp name) (listp name)))
-	(dump-object name file)
-	(dump-push handle file)
-	(dump-fop 'fop-fset file))
-      handle)))
+    (dump-pop file)))
 
 ;;; Alter the code object referenced by CODE-HANDLE at the specified
 ;;; OFFSET, storing the object referenced by ENTRY-HANDLE.
@@ -1205,6 +1197,9 @@
     (dump-object nil file)
 
     ;; Dump the constants.
+    ;;
+    ;; FIXME: There's a family resemblance between this and the
+    ;; corresponding code in DUMP-CODE-OBJECT. Could some be shared?
     (dotimes (i (length constants))
       (let ((entry (aref constants i)))
 	(etypecase entry
@@ -1228,6 +1223,20 @@
 	     (:load-time-value
 	      (dump-push (cdr entry) file))
 	     (:fdefinition
+
+	      ;; REMOVEME
+	      ;;
+	      ;; What kind of weird things are being dumped here?
+	      ;; (I added this code when I was having trouble
+	      ;; getting GENESIS to deal with new DEFUN stuff.
+	      ;; -- WHN 2001-08-08)
+	      #!+sb-show
+	      (unless (legal-function-name-p (cdr entry))
+		(/show "dumping FOP-FDEFINITION with exotic name" entry)
+		#+(and sbcl sb-xc-host) (sb-debug:backtrace)
+		#+(and sbcl sb-xc) (sb!debug:backtrace))
+
+
 	      (dump-object (cdr entry) file)
 	      (dump-fop 'fop-fdefinition file))
 	     (:type-predicate
@@ -1297,34 +1306,50 @@
 	    (remhash info patch-table))))))
   (values))
 
-;;; Dump a FOP-FUNCALL to call an already dumped top-level lambda at
-;;; load time.
-(defun fasl-dump-top-level-lambda-call (fun file)
-  (declare (type sb!c::clambda fun) (type fasl-output file))
+(defun dump-push-previously-dumped-fun (fun fasl-output)
+  (declare (type sb!c::clambda fun))
   (let ((handle (gethash (sb!c::leaf-info fun)
-			 (fasl-output-entry-table file))))
+			 (fasl-output-entry-table fasl-output))))
     (aver handle)
-    (dump-push handle file)
-    (dump-fop 'fop-funcall-for-effect file)
-    (dump-byte 0 file))
+    (dump-push handle fasl-output))
   (values))
 
+;;; Dump a FOP-FUNCALL to call an already-dumped top-level lambda at
+;;; load time.
+(defun fasl-dump-top-level-lambda-call (fun fasl-output)
+  (declare (type sb!c::clambda fun))
+  (dump-push-previously-dumped-fun fun fasl-output)
+  (dump-fop 'fop-funcall-for-effect fasl-output)
+  (dump-byte 0 fasl-output)
+  (values))
+
+;;; Dump a FOP-FSET to statically link already-dumped FUN to FUN-NAME
+;;; at cold init.
+#+sb-xc-host
+(defun fasl-dump-cold-fset (fun-name fun fasl-output)
+  (declare (type sb!c::clambda fun))
+  (aver (legal-function-name-p fun-name))
+  (dump-non-immediate-object fun-name fasl-output)
+  (dump-push-previously-dumped-fun fun fasl-output)
+  (dump-fop 'fop-fset fasl-output)
+  (values))
+    
 ;;; Compute the correct list of DEBUG-SOURCE structures and backpatch
 ;;; all of the dumped DEBUG-INFO structures. We clear the
 ;;; FASL-OUTPUT-DEBUG-INFO, so that subsequent components with
 ;;; different source info may be dumped.
-(defun fasl-dump-source-info (info file)
-  (declare (type sb!c::source-info info) (type fasl-output file))
+(defun fasl-dump-source-info (info fasl-output)
+  (declare (type sb!c::source-info info))
   (let ((res (sb!c::debug-source-for-info info))
 	(*dump-only-valid-structures* nil))
-    (dump-object res file)
-    (let ((res-handle (dump-pop file)))
-      (dolist (info-handle (fasl-output-debug-info file))
-	(dump-push res-handle file)
-	(dump-fop 'fop-structset file)
-	(dump-unsigned-32 info-handle file)
-	(dump-unsigned-32 2 file))))
-  (setf (fasl-output-debug-info file) nil)
+    (dump-object res fasl-output)
+    (let ((res-handle (dump-pop fasl-output)))
+      (dolist (info-handle (fasl-output-debug-info fasl-output))
+	(dump-push res-handle fasl-output)
+	(dump-fop 'fop-structset fasl-output)
+	(dump-unsigned-32 info-handle fasl-output)
+	(dump-unsigned-32 2 fasl-output))))
+  (setf (fasl-output-debug-info fasl-output) nil)
   (values))
 
 ;;;; dumping structures
