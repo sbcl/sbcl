@@ -1820,38 +1820,92 @@
 ;;; FIXME: It's probably necessary to do something to fix the
 ;;; analogous problem with INTEGER and RATIONAL types. Perhaps
 ;;; bounded RATIONAL types should be represented as (OR RATIO INTEGER).
-(defun coerce-bound (bound type inner-coerce-bound-fun)
+(defun coerce-bound (bound type upperp inner-coerce-bound-fun)
   (declare (type function inner-coerce-bound-fun))
-  (cond ((eql bound '*)
-	 bound)
-	((consp bound)
-	 (destructuring-bind (inner-bound) bound
-	   (list (funcall inner-coerce-bound-fun inner-bound type))))
-	(t
-	 (funcall inner-coerce-bound-fun bound type))))
-(defun inner-coerce-real-bound (bound type)
-  (ecase type
-    (rational (rationalize bound))
-    (float (if (floatp bound)
-	       bound
-	       ;; Coerce to the widest float format available, to
-	       ;; avoid unnecessary loss of precision:
-	       (coerce bound 'long-float)))))
-(defun coerced-real-bound (bound type)
-  (coerce-bound bound type #'inner-coerce-real-bound))
-(defun coerced-float-bound (bound type)
-  (coerce-bound bound type #'coerce))
+  (if (eql bound '*)
+      bound
+      (funcall inner-coerce-bound-fun bound type upperp)))
+(defun inner-coerce-real-bound (bound type upperp)
+  #+sb-xc-host (declare (ignore upperp))
+  (let #+sb-xc-host ()
+       #-sb-xc-host
+       ((nl (load-time-value (symbol-value 'sb!xc:most-negative-long-float)))
+        (pl (load-time-value (symbol-value 'sb!xc:most-positive-long-float))))
+    (let ((nbound (if (consp bound) (car bound) bound))
+          (consp (consp bound)))
+      (ecase type
+        (rational
+         (if consp
+             (list (rational nbound))
+             (rational nbound)))
+        (float
+         (cond
+           ((floatp nbound) bound)
+           (t
+            ;; Coerce to the widest float format available, to avoid
+            ;; unnecessary loss of precision, but don't coerce
+            ;; unrepresentable numbers, except on the host where we
+            ;; shouldn't be making these types (but KLUDGE: can't even
+            ;; assert portably that we're not).
+            #-sb-xc-host
+            (ecase upperp
+              ((nil)
+               (when (< nbound nl) (return-from inner-coerce-real-bound nl)))
+              ((t)
+               (when (> nbound pl) (return-from inner-coerce-real-bound pl))))
+            (let ((result (coerce nbound 'long-float)))
+              (if consp (list result) result)))))))))
+(defun inner-coerce-float-bound (bound type upperp)
+  #+sb-xc-host (declare (ignore upperp))
+  (let #+sb-xc-host ()
+       #-sb-xc-host
+       ((nd (load-time-value (symbol-value 'sb!xc:most-negative-double-float)))
+        (pd (load-time-value (symbol-value 'sb!xc:most-positive-double-float)))
+        (ns (load-time-value (symbol-value 'sb!xc:most-negative-single-float)))
+        (ps (load-time-value
+             (symbol-value 'sb!xc:most-positive-single-float))))
+    (let ((nbound (if (consp bound) (car bound) bound))
+          (consp (consp bound)))
+      (ecase type
+        (single-float
+         (cond
+           ((typep nbound 'single-float) bound)
+           (t
+            #-sb-xc-host
+            (ecase upperp
+              ((nil)
+               (when (< nbound ns) (return-from inner-coerce-float-bound ns)))
+              ((t)
+               (when (> nbound ps) (return-from inner-coerce-float-bound ps))))
+            (let ((result (coerce nbound 'single-float)))
+              (if consp (list result) result)))))
+        (double-float
+         (cond
+           ((typep nbound 'double-float) bound)
+           (t
+            #-sb-xc-host
+            (ecase upperp
+              ((nil)
+               (when (< nbound nd) (return-from inner-coerce-float-bound nd)))
+              ((t)
+               (when (> nbound pd) (return-from inner-coerce-float-bound pd))))
+            (let ((result (coerce nbound 'double-float)))
+              (if consp (list result) result)))))))))
+(defun coerced-real-bound (bound type upperp)
+  (coerce-bound bound type upperp #'inner-coerce-real-bound))
+(defun coerced-float-bound (bound type upperp)
+  (coerce-bound bound type upperp #'inner-coerce-float-bound))
 (!def-type-translator real (&optional (low '*) (high '*))
-  (specifier-type `(or (float ,(coerced-real-bound  low 'float)
-			      ,(coerced-real-bound high 'float))
-		       (rational ,(coerced-real-bound  low 'rational)
-				 ,(coerced-real-bound high 'rational)))))
+  (specifier-type `(or (float ,(coerced-real-bound  low 'float nil)
+			      ,(coerced-real-bound high 'float t))
+		       (rational ,(coerced-real-bound  low 'rational nil)
+				 ,(coerced-real-bound high 'rational t)))))
 (!def-type-translator float (&optional (low '*) (high '*))
   (specifier-type 
-   `(or (single-float ,(coerced-float-bound  low 'single-float)
-		      ,(coerced-float-bound high 'single-float))
-	(double-float ,(coerced-float-bound  low 'double-float)
-		      ,(coerced-float-bound high 'double-float))
+   `(or (single-float ,(coerced-float-bound  low 'single-float nil)
+		      ,(coerced-float-bound high 'single-float t))
+	(double-float ,(coerced-float-bound  low 'double-float nil)
+		      ,(coerced-float-bound high 'double-float t))
 	#!+long-float ,(error "stub: no long float support yet"))))
 
 (defmacro !define-float-format (f)

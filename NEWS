@@ -49,6 +49,8 @@ changes in sbcl-0.8.17 relative to sbcl-0.8.16:
        complaint.
     ** Case-altering FORMAT directives work correctly on non-ASCII
        characters.
+    ** The REAL type specifier handles bounds outside the floating
+       point ranges without signalling FLOATING-POINT-OVERFLOW.
 
 changes in sbcl-0.8.16 relative to sbcl-0.8.15:
   * enhancement: saving cores with foreign code loaded is now

@@ -219,3 +219,9 @@
 		(subtypep '(complex (integer 1 2))
 			  '(member #c(1 1) #c(1 2) #c(2 1) #c(2 2))))
 	       '(nil t)))
+
+(assert (typep 0 '(real #.(ash -1 10000) #.(ash 1 10000))))
+(assert (subtypep '(real #.(ash -1 1000) #.(ash 1 1000))
+                  '(real #.(ash -1 10000) #.(ash 1 10000))))
+(assert (subtypep '(real (#.(ash -1 1000)) (#.(ash 1 1000)))
+                  '(real #.(ash -1 1000) #.(ash 1 1000))))
