@@ -996,13 +996,15 @@
   (remove-from-dfo block)
   (values))
 
-;;; Do stuff to indicate that the return node Node is being deleted.
-;;; We set the RETURN to NIL.
+;;; Do stuff to indicate that the return node NODE is being deleted.
 (defun delete-return (node)
   (declare (type creturn node))
-  (let ((fun (return-lambda node)))
+  (let* ((fun (return-lambda node))
+         (tail-set (lambda-tail-set fun)))
     (aver (lambda-return fun))
-    (setf (lambda-return fun) nil))
+    (setf (lambda-return fun) nil)
+    (when (and tail-set (not (find-if #'lambda-return (tail-set-funs tail-set))))
+      (setf (tail-set-type tail-set) *empty-type*)))
   (values))
 
 ;;; If any of the VARS in FUN was never referenced and was not

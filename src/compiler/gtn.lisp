@@ -167,7 +167,8 @@
   (multiple-value-bind (types count) (values-types (tail-set-type tails))
     (let ((ptypes (mapcar #'primitive-type types))
 	  (use-standard (use-standard-returns tails)))
-      (when (and (eq count :unknown) (not use-standard))
+      (when (and (eq count :unknown) (not use-standard)
+                 (not (eq (tail-set-type tails) *empty-type*)))
 	(return-value-efficiency-note tails))
       (if (or (eq count :unknown) use-standard)
 	  (make-return-info :kind :unknown
