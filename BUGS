@@ -1260,6 +1260,48 @@ WORKAROUND:
     object #<SB-PCL::STANDARD-CLASS "unbound">.
   (reported by Brian Spilsbury sbcl-devel 2002-04-09)
 
+156:
+  FUNCTION-LAMBDA-EXPRESSION doesn't work right in 0.7.0 or 0.7.2.9:
+    * (function-lambda-expression #'(lambda (x) x))
+    debugger invoked on condition of type TYPE-ERROR:
+      The value NIL is not of type SB-C::DEBUG-SOURCE
+  (reported by Alexey Dejneka sbcl-devel 2002-04-12)
+
+157:
+  Functions SUBTYPEP, TYPEP, UPGRADED-ARRAY-ELEMENT-TYPE, and 
+  UPGRADED-COMPLEX-PART-TYPE should have an optional environment argument.
+  (reported by Alexey Dejneka sbcl-devel 2002-04-12)
+
+158:
+  Compiling the following code causes SBCL 0.7.2 to bug. This only
+  happens with optimization enabled, and only when the loop variable is
+  being incremented by more than 1.
+    (defun foo (array)
+      (declare (optimize (safety 0) (space 0) (debug 0) (speed 3)))
+      (loop for i from 0 to 10 by 2
+            do (foo (svref array i))) (svref array (1+ i)))
+  (reported by Eric Marsden sbcl-devel 2002-04-15)
+
+159:
+  * (lisp-implementation-version)
+  "0.7.2.6"
+  * (defstruct (foo
+                (:constructor make-foo (&key (bar nil bar-p)
+                                        &aux (baz (if bar-p bar 2)))))
+
+      bar
+      baz)
+  debugger invoked on condition of type SB-KERNEL::ARG-COUNT-ERROR:
+    error while parsing arguments to DESTRUCTURING-BIND:
+      invalid number of elements in
+        (BAR NIL BAR-P)
+      to satisfy lambda list
+        (SB-KERNEL::WOT &OPTIONAL (SB-KERNEL::DEF NIL SB-KERNEL::DEF-P)):
+      between 1 and 2 expected, but 3 found
+  (reported by Christophe Rhodes and Martin Atzmueller sbcl-devel
+  2002-05-15)
+
+
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:
     These labels were used for bugs related to the old IR1 interpreter.
