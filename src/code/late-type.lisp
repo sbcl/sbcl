@@ -1381,8 +1381,8 @@
   (let ((dims1 (array-type-dimensions type1))
 	(dims2 (array-type-dimensions type2))
 	(complexp2 (array-type-complexp type2)))
-    ;; See whether dimensions are compatible.
-    (cond ((not (or (eq dims2 '*)
+    (cond (;; not subtypep unless dimensions are compatible
+	   (not (or (eq dims2 '*)
 		    (and (not (eq dims1 '*))
 			 ;; (sbcl-0.6.4 has trouble figuring out that
 			 ;; DIMS1 and DIMS2 must be lists at this
@@ -1395,18 +1395,27 @@
 				(the list dims1)
 				(the list dims2)))))
 	   (values nil t))
-	  ;; See whether complexpness is compatible.
+	  ;; not subtypep unless complexness is compatible
 	  ((not (or (eq complexp2 :maybe)
 		    (eq (array-type-complexp type1) complexp2)))
 	   (values nil t))
-	  ;; If the TYPE2 eltype is wild, we win. Otherwise, the types
-	  ;; must be identical.
-	  ((or (eq (array-type-element-type type2) *wild-type*)
-	       (type= (specialized-element-type-maybe type1)
-		      (specialized-element-type-maybe type2)))
+	  ;; Since we didn't fail any of the tests above, we win
+	  ;; if the TYPE2 element type is wild.
+	  ((eq (array-type-element-type type2) *wild-type*)
 	   (values t t))
-	  (t
-	   (values nil t)))))
+	  (;; Since we didn't match any of the special cases above, we
+	   ;; can't give a good answer unless both the element types
+	   ;; have been defined.
+	   (or (unknown-type-p (array-type-element-type type1))
+	       (unknown-type-p (array-type-element-type type2)))
+	   (values nil nil))
+	  (;; Otherwise, the subtype relationship holds iff the
+	   ;; types are equal, and they're equal iff the specialized
+	   ;; element types are identical.
+	   t
+	   (values (type= (specialized-element-type-maybe type1)
+			  (specialized-element-type-maybe type2))
+		   t)))))
 
 (!define-superclasses array
   ((string string)

@@ -406,15 +406,6 @@ returning an array as first value always.
   accepting &REST even when it's not followed by an argument name:
 	(DEFMETHOD FOO ((X T) &REST) NIL)
 
-40:
-  TYPEP treats the result of UPGRADED-ARRAY-ELEMENT-TYPE as gospel,
-  so that (TYPEP (MAKE-ARRAY 3) '(VECTOR SOMETHING-NOT-DEFINED-YET))
-  returns (VALUES T T). Probably it should be an error instead,
-  complaining that the type SOMETHING-NOT-DEFINED-YET is not defined.
-  Or perhaps UPGRADED-ARRAY-ELEMENT-TYPE should just fail when a type
-  isn't defined yet. (What if the definition of
-  SOMETHING-NOT-DEFINED-YET turns out to be SINGLE-FLOAT?) 
-
 41:
   TYPEP of VALUES types is sometimes implemented very inefficiently, e.g. in 
 	(DEFTYPE INDEXOID () '(INTEGER 0 1000))

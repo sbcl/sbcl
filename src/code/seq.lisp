@@ -186,11 +186,12 @@
 		     (vlen (car (array-type-dimensions type))))
 		 (if (and (numberp vlen) (/= vlen length))
 		   (error 'simple-type-error
-			  ;; these two are under-specified by ANSI
+			  ;; These two are under-specified by ANSI.
 			  :datum (type-specifier type)
 			  :expected-type (type-specifier type)
 			  :format-control
-			  "The length of ~S does not match the specified length  of ~S."
+			  "The length of ~S does not match the specified ~
+                           length=~S."
 			  :format-arguments
 			  (list (type-specifier type) length)))
 		 (if iep

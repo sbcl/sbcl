@@ -460,19 +460,6 @@
 				    ',(find-class-cell name)
 				    object)))))))))
 
-#|
-;;; Return (VALUES BEST-GUESS EXACT?), where BEST-GUESS is a CTYPE
-;;; which corresponds to the value returned by
-;;; CL:UPGRADED-ARRAY-ELEMENT-TYPE, and EXACT? tells whether that
-;;; result might change when we encounter a DEFTYPE.
-(declaim (maybe-inline upgraded-array-element-ctype-2))
-(defun upgraded-array-element-ctype-2 (spec)
-  (let ((ctype (specifier-type `(array ,spec))))
-    (values (array-type-specialized-element-type
-	     (specifier-type `(array ,spec)))
-	    (not (unknown-type-p (array-type-element-type ctype))))))
-|#
-
 ;;; If the specifier argument is a quoted constant, then we consider
 ;;; converting into a simple predicate or other stuff. If the type is
 ;;; constant, but we can't transform the call, then we convert to

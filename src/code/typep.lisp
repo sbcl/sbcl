@@ -9,7 +9,7 @@
 
 (in-package "SB!KERNEL")
 
-;;; The actual TYPEP engine. The compiler only generates calls to this
+;;; the actual TYPEP engine. The compiler only generates calls to this
 ;;; function when it can't figure out anything more intelligent to do.
 (defun %typep (object specifier)
   (%%typep object
@@ -101,6 +101,12 @@
 			     (or (eq (car want) '*)
 				 (= (car want) (car got))))
 		  (return nil))))
+	  (if (unknown-type-p (array-type-element-type type))
+	      ;; better to fail this way than to get bogosities like
+	      ;;   (TYPEP (MAKE-ARRAY 11) '(ARRAY SOME-UNDEFINED-TYPE)) => T
+	      (error "~@<unknown element type in array type: ~2I~_~S~:>"
+		     (type-specifier type))
+	      t)
 	  (or (eq (array-type-element-type type) *wild-type*)
 	      (values (type= (array-type-specialized-element-type type)
 			     (specifier-type (array-element-type
@@ -159,7 +165,7 @@
      (error "Function types are not a legal argument to TYPEP:~%  ~S"
 	    (type-specifier type)))))
 
-;;; Do type test from a class cell, allowing forward reference and
+;;; Do a type test from a class cell, allowing forward reference and
 ;;; redefinition.
 (defun class-cell-typep (obj-layout cell object)
   (let ((class (class-cell-class cell)))
@@ -167,7 +173,7 @@
       (error "The class ~S has not yet been defined." (class-cell-name cell)))
     (class-typep obj-layout class object)))
 
-;;; Test whether Obj-Layout is from an instance of Class.
+;;; Test whether OBJ-LAYOUT is from an instance of CLASS.
 (defun class-typep (obj-layout class object)
   (declare (optimize speed))
   (when (layout-invalid obj-layout)

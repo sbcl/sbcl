@@ -16,9 +16,7 @@
 
 (in-package "CL-USER")
 
-(defmacro grab-condition (&body body)
-  `(nth-value 1
-     (ignore-errors ,@body)))
+(load "assertoid.lisp")
 
 (setf (logical-pathname-translations "demo0")
       '(("**;*.*.*" "/tmp/")))

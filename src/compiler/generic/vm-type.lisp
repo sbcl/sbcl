@@ -122,7 +122,7 @@
 
 ;;; This function is called when the type code wants to find out how
 ;;; an array will actually be implemented. We set the
-;;; Specialized-Element-Type to correspond to the actual
+;;; SPECIALIZED-ELEMENT-TYPE to correspond to the actual
 ;;; specialization used in this implementation.
 (declaim (ftype (function (array-type) array-type) specialize-array-type))
 (defun specialize-array-type (type)

@@ -650,6 +650,9 @@ changes in sbcl-0.6.11 relative to sbcl-0.6.10:
   but like most other programs, it defaults to copying the Unix
   environment from the original process instead of starting the
   new process in an empty environment.
+* fixed bug 40: TYPEP, SUBTYPEP, UPGRADED-ARRAY-ELEMENT-TYPE, 
+  and UPGRADED-COMPLEX-PART-TYPE now work better with of compound
+  types built from undefined types, e.g. '(VECTOR SOME-UNDEF-TYPE).
 * Extensions which manipulate the Unix environment now support
   an :ENVIRONMENT keyword option which doesn't smash case or 
   do other bad things. The CMU-CL-style :ENV option is retained

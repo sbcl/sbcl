@@ -14,6 +14,13 @@
 
 (cl:in-package :cl-user)
 
+(defmacro grab-condition (&body body)
+  `(nth-value 1
+     (ignore-errors ,@body)))
+
+(defmacro raises-error? (&body body)
+  `(typep (nth-value 1 (ignore-errors ,@body)) 'error))
+
 ;;; EXPR is an expression to evaluate (both with EVAL and with
 ;;; COMPILE/FUNCALL). EXTRA-OPTIMIZATIONS is a list of lists of
 ;;; optimizations to pass to (DECLARE (OPTIMIZE ..)), to cause the

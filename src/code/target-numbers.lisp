@@ -210,8 +210,10 @@
 (defun upgraded-complex-part-type (spec)
   #!+sb-doc
   "Returns the element type of the most specialized COMPLEX number type that
-   can hold parts of type Spec."
-  (cond ((subtypep spec 'single-float)
+   can hold parts of type SPEC."
+  (cond ((unknown-type-p (specifier-type spec))
+	 (error "undefined type: ~S" spec))
+	((subtypep spec 'single-float)
 	 'single-float)
 	((subtypep spec 'double-float)
 	 'double-float)
@@ -220,7 +222,8 @@
 	 'long-float)
 	((subtypep spec 'rational)
 	 'rational)
-	(t)))
+	(t
+	 'real)))
 
 (defun complex (realpart &optional (imagpart 0))
   #!+sb-doc
