@@ -1,6 +1,6 @@
 # -*- makefile -*-
 CFLAGS = -Dppc -g -Wall -O2 -no-cpp-precomp
-OS_SRC = bsd-os.c os-common.c ppc-darwin-os.c ppc-darwin-dlshim.c
+OS_SRC = bsd-os.c os-common.c ppc-darwin-os.c ppc-darwin-dlshim.c ppc-darwin-langinfo.c
 OS_LIBS = -lSystem -lc -lm
 
 # Avoid the gcc 3.3 prerelease tarpit of death!

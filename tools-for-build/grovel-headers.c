@@ -29,8 +29,13 @@
 #include <unistd.h>
 #include <signal.h>
 #include <errno.h>
-#include <dlfcn.h>
-#include <langinfo.h>
+#ifdef __APPLE_CC__
+  #include "../src/runtime/ppc-darwin-dlshim.h"
+  #include "../src/runtime/ppc-darwin-langinfo.h"
+#else
+  #include <dlfcn.h>
+  #include <langinfo.h>
+#endif
 
 #include "genesis/config.h"
 

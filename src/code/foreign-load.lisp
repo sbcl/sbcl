@@ -75,7 +75,7 @@
            (setf dlerror (dlerror)
                  (shared-object-sap obj) nil)))
     (when dlerror
-      (cerror dlerror))))
+      (cerror "Ignore the error and continue anyway" "dlerror returned an error: ~S" dlerror))))
 
 (defun load-shared-object (file)
   "Load a shared library/dynamic shared object file/general dlopenable

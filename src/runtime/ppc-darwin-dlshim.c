@@ -19,6 +19,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "ppc-darwin-dlshim.h"
 
 /* Darwin does not define the standard ELF
  * dlopen/dlclose/dlsym/dlerror interface to shared libraries, so this
@@ -30,12 +31,9 @@
 
 static char dl_self; /* I'm going to abuse this */
 
-#define RTLD_LAZY 1
-#define RTLD_NOW 2
-#define RTLD_GLOBAL 0x100
-
 static int callback_count;
 static struct mach_header* last_header;
+static int last_was_error = 0;
 
 void dlshim_image_callback(struct mach_header* ptr, unsigned long phooey)
 {
@@ -157,8 +155,17 @@ const char* dlerror()
     if (!errbuf) {
 	errbuf = (char*) malloc(256*sizeof(char));
     }
-    snprintf(errbuf, 255, "%s in %s: %d %d", c, d, a, b);
-    return errbuf;
+    if (!(c || d)) {
+        last_was_error = 0;
+        snprintf(errbuf, 255, "%s in %s: %d %d", c, d, a, b);
+        return errbuf;
+    } else if (last_was_error) {
+        last_was_error = 0;
+        snprintf(errbuf, 255, "Can't find symbol");
+        return errbuf;
+    }
+    last_was_error = 0;
+    return NULL;
 }
 
 void* dlsym(void* handle, char* symbol)
@@ -169,6 +176,7 @@ void* dlsym(void* handle, char* symbol)
 	    retsym = NSLookupAndBindSymbol(symbol);
 	    return NSAddressOfSymbol(retsym);
 	} else {
+            last_was_error = 1;
 	    return NULL;
 	}
     } else {
@@ -177,6 +185,7 @@ void* dlsym(void* handle, char* symbol)
 	    retsym = NSLookupSymbolInImage(handle, symbol, 0);
 	    return NSAddressOfSymbol(retsym);
 	} else {
+            last_was_error = 1;
 	    return NULL;
 	}
     }
