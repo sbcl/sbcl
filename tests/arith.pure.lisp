@@ -34,12 +34,8 @@
 ;;; In a bug reported by Wolfhard Buss on cmucl-imp 2002-06-18 (BUG
 ;;; 184), sbcl didn't catch all divisions by zero, notably divisions
 ;;; of bignums and ratios by 0.  Fixed in sbcl-0.7.6.13.
-(macrolet ((test (form) `(multiple-value-bind (val cond)
-			     (ignore-errors ,form)
-			   (assert (null val))
-			   (assert (typep cond 'division-by-zero)))))
-  (test (/ 2/3 0))
-  (test (/ (1+ most-positive-fixnum) 0)))
+(assert (raises-error? (/ 2/3 0) division-by-zero))
+(assert (raises-error? (/ (1+ most-positive-fixnum) 0) division-by-zero))
 
 ;;; In a bug reported by Raymond Toy on cmucl-imp 2002-07-18, (COERCE
 ;;; <RATIONAL> '(COMPLEX FLOAT)) was failing to return a complex
@@ -47,6 +43,13 @@
 (assert (= (coerce 1 '(complex float)) #c(1.0 0.0)))
 (assert (= (coerce 1/2 '(complex float)) #c(0.5 0.0)))
 (assert (= (coerce 1.0d0 '(complex float)) #c(1.0d0 0.0d0)))
+
+;;; COERCE also sometimes failed to verify that a particular coercion
+;;; was possible (in particular coercing rationals to bounded float
+;;; types.
+(assert (raises-error? (coerce 1 '(float 2.0 3.0)) type-error))
+(assert (raises-error? (coerce 1 '(single-float -1.0 0.0)) type-error))
+(assert (eql (coerce 1 '(single-float -1.0 2.0)) 1.0))
 
 ;;; ANSI says MIN and MAX should signal TYPE-ERROR if any argument
 ;;; isn't REAL. SBCL 0.7.7 didn't in the 1-arg case. (reported as a

@@ -420,7 +420,15 @@
 (defstruct (conc-name-syntax :conc-name) a-conc-name-slot)
 (assert (eq (a-conc-name-slot (make-conc-name-syntax :a-conc-name-slot 'y))
 	    'y))
-
+;;; and further :CONC-NAME NIL was being wrongly treated:
+(defpackage "DEFSTRUCT-TEST-SCRATCH")
+(defstruct (conc-name-nil :conc-name)
+  defstruct-test-scratch::conc-name-nil-slot)
+(assert (= (defstruct-test-scratch::conc-name-nil-slot
+	    (make-conc-name-nil :conc-name-nil-slot 1)) 1))
+(assert (raises-error? (conc-name-nil-slot (make-conc-name-nil))
+		       undefined-function))
+
 ;;; success
 (format t "~&/returning success~%")
 (quit :unix-status 104)

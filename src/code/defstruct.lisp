@@ -626,7 +626,9 @@
     (setf (dsd-%name slot) (string name))
     (setf (dd-slots defstruct) (nconc (dd-slots defstruct) (list slot)))
 
-    (let ((accessor-name (symbolicate (or (dd-conc-name defstruct) "") name))
+    (let ((accessor-name (if (dd-conc-name defstruct)
+			     (symbolicate (dd-conc-name defstruct) name)
+			     name))
 	  (predicate-name (dd-predicate-name defstruct)))
       (setf (dsd-accessor-name slot) accessor-name)
       (when (eql accessor-name predicate-name)
