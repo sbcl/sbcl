@@ -270,12 +270,6 @@ More information about SBCL is available at <http://sbcl.sourceforge.net/>.\n\
     arch_install_interrupt_handlers();
     os_install_interrupt_handlers();
 
-#ifdef PSEUDO_sATOMIC_ATOMIC
-    /* Turn on pseudo atomic for when we call into Lisp. */
-    SHOW("turning on pseudo atomic");
-    SetSymbolValue(PSEUDO_ATOMIC_ATOMIC, make_fixnum(1),0);
-    SetSymbolValue(PSEUDO_ATOMIC_INTERRUPTED, make_fixnum(0),0);
-#endif
 
     /* Convert remaining argv values to something that Lisp can grok. */
     SHOW("setting POSIX-ARGV symbol value");

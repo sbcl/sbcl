@@ -4115,9 +4115,8 @@ gc_initialize_pointers(void)
 
 
 
-/* a counter for how deep we are in alloc(..) calls */
-int alloc_entered = 0;
 
+extern boolean maybe_gc_pending ;
 /* alloc(..) is the external interface for memory allocation. It
  * allocates to generation 0. It is not called from within the garbage
  * collector as it is only external uses that need the check for heap
@@ -4128,146 +4127,65 @@ int alloc_entered = 0;
  * (E.g. the most significant word of a 2-word bignum in MOVE-FROM-UNSIGNED.)
  *
  * The check for a GC trigger is only performed when the current
- * region is full, so in most cases it's not needed. Further MAYBE-GC
- * is only called once because Lisp will remember "need to collect
- * garbage" and get around to it when it can. */
+ * region is full, so in most cases it's not needed. */
+
 char *
 alloc(int nbytes)
 {
     struct thread *th=arch_os_get_current_thread();
     struct alloc_region *region= 
 	th ? &(th->alloc_region) : &boxed_region; 
+    void *new_obj;
+    void *new_free_pointer;
+
     /* Check for alignment allocation problems. */
     gc_assert((((unsigned)region->free_pointer & 0x7) == 0)
 	      && ((nbytes & 0x7) == 0));
-    if (SymbolValue(PSEUDO_ATOMIC_ATOMIC,th)) {/* if already in a pseudo atomic */
-	
-	void *new_free_pointer;
 
-    retry1:
-	if (alloc_entered) {
-	    SHOW("alloc re-entered in already-pseudo-atomic case");
-	}
-	++alloc_entered;
-
-	/* Check whether there is room in the current region. */
-	new_free_pointer = region->free_pointer + nbytes;
-
-	/* FIXME: Shouldn't we be doing some sort of lock here, to
-	 * keep from getting screwed if an interrupt service routine
-	 * allocates memory between the time we calculate new_free_pointer
-	 * and the time we write it back to region->free_pointer?
-	 * Perhaps I just don't understand pseudo-atomics..
-	 *
-	 * Perhaps I don't. It looks as though what happens is if we
-	 * were interrupted any time during the pseudo-atomic
-	 * interval (which includes now) we discard the allocated
-	 * memory and try again. So, at least we don't return
-	 * a memory area that was allocated out from underneath us
-	 * by code in an ISR.
-	 * Still, that doesn't seem to prevent
-	 * region->free_pointer from getting corrupted:
-	 *   We read region->free_pointer.
-	 *   They read region->free_pointer.
-	 *   They write region->free_pointer.
-	 *   We write region->free_pointer, scribbling over
-	 *     whatever they wrote. */
-
-	if (new_free_pointer <= region->end_addr) {
-	    /* If so then allocate from the current region. */
-	    void  *new_obj = region->free_pointer;
-	    region->free_pointer = new_free_pointer;
-	    alloc_entered--;
-	    return((void *)new_obj);
-	}
-
-	if (auto_gc_trigger && bytes_allocated > auto_gc_trigger) {
-	    /* Double the trigger. */
-	    auto_gc_trigger *= 2;
-	    alloc_entered--;
-	    /* Exit the pseudo-atomic. */
-	    SetSymbolValue(PSEUDO_ATOMIC_ATOMIC, make_fixnum(0),th);
-	    if (SymbolValue(PSEUDO_ATOMIC_INTERRUPTED,th) != 0) {
-		/* Handle any interrupts that occurred during
-		 * gc_alloc(..). */
-		do_pending_interrupt();
-	    }
-	    funcall0(SymbolFunction(MAYBE_GC));
-	    /* Re-enter the pseudo-atomic. */
-	    SetSymbolValue(PSEUDO_ATOMIC_INTERRUPTED, make_fixnum(0),th);
-	    SetSymbolValue(PSEUDO_ATOMIC_ATOMIC, make_fixnum(1),th);
-	    goto retry1;
-	}
-	/* Call gc_alloc(). */
-	{
-	    void *new_obj = gc_alloc_with_region(nbytes,0,region,0);
-	    alloc_entered--;
-	    return (new_obj);
-	}
-    } else {
-	void *result;
-	void *new_free_pointer;
-
-    retry2:
-	/* At least wrap this allocation in a pseudo atomic to prevent
-	 * gc_alloc() from being re-entered. */
+    if (!(SymbolValue(PSEUDO_ATOMIC_ATOMIC,th))) {
+	lose("alloc() called non-atomically");
 	SetSymbolValue(PSEUDO_ATOMIC_INTERRUPTED, make_fixnum(0),th);
 	SetSymbolValue(PSEUDO_ATOMIC_ATOMIC, make_fixnum(1),th);
+	new_obj=alloc(nbytes);
 
-	if (alloc_entered)
-	    SHOW("alloc re-entered in not-already-pseudo-atomic case");
-	++alloc_entered;
-
-	/* Check whether there is room in the current region. */
-	new_free_pointer = region->free_pointer + nbytes;
-
-	if (new_free_pointer <= region->end_addr) {
-	    /* If so then allocate from the current region. */
-	    void *new_obj = region->free_pointer;
-	    region->free_pointer = new_free_pointer;
-	    alloc_entered--;
-	    SetSymbolValue(PSEUDO_ATOMIC_ATOMIC, make_fixnum(0),th);
-	    if (SymbolValue(PSEUDO_ATOMIC_INTERRUPTED,th)) {
-		/* Handle any interrupts that occurred during
-		 * gc_alloc(..). */
-		do_pending_interrupt();
-		goto retry2;
-	    }
-
-	    return((void *)new_obj);
-	}
-
-	/* KLUDGE: There's lots of code around here shared with the
-	 * the other branch. Is there some way to factor out the
-	 * duplicate code? -- WHN 19991129 */
-	if (auto_gc_trigger && bytes_allocated > auto_gc_trigger) {
-	    /* Double the trigger. */
-	    auto_gc_trigger *= 2;
-	    alloc_entered--;
-	    /* Exit the pseudo atomic. */
-	    SetSymbolValue(PSEUDO_ATOMIC_ATOMIC, make_fixnum(0),th);
-	    if (SymbolValue(PSEUDO_ATOMIC_INTERRUPTED,th) != 0) {
-		/* Handle any interrupts that occurred during
-		 * gc_alloc(..); */
-		do_pending_interrupt();
-	    }
-	    funcall0(SymbolFunction(MAYBE_GC));
-	    goto retry2;
-	}
-
-	/* Else call gc_alloc(). */
-	result = gc_alloc_with_region(nbytes,0,region,0);
-	alloc_entered--;
 	SetSymbolValue(PSEUDO_ATOMIC_ATOMIC, make_fixnum(0),th);
-	if (SymbolValue(PSEUDO_ATOMIC_INTERRUPTED,th) != 0) {
-	    /* Handle any interrupts that occurred during gc_alloc(..). */
+	if (SymbolValue(PSEUDO_ATOMIC_INTERRUPTED,th)) {
 	    do_pending_interrupt();
-	    goto retry2;
 	}
-
-	return result;
+	return new_obj;
     }
+
+    /* ok, now we're in a pseudo atomic */
+
+    /* maybe we can do this quickly ... */
+    new_free_pointer = region->free_pointer + nbytes;
+    if (new_free_pointer <= region->end_addr) {
+	new_obj = (void*)(region->free_pointer);
+	region->free_pointer = new_free_pointer;
+	return(new_obj);	/* yup */
+    }
+    
+    /* we have to go the long way around, it seems.  Check whether 
+     * we should GC in the near future
+     */
+    if (auto_gc_trigger && bytes_allocated > auto_gc_trigger) {
+	auto_gc_trigger *= 2;
+	/* set things up so that GC happens when we finish the PA
+	 * section.  Note the interesting conditions that obtain when
+	 * we were originally called from outside a PA section: the GC
+	 * will happen from just up there in alloc() and as there are
+	 * unlikely to be any references to the new object from
+	 * elsewhere, we rely on preserve_pointers' control-stack
+	 * checking to lock down the page(s) pointed to by new_obj
+	 * XXX how does it know how _big_ the object is?
+	 */
+	maybe_gc_pending=1;
+	SetSymbolValue(PSEUDO_ATOMIC_INTERRUPTED, make_fixnum(1),th);
+    }
+    new_obj = gc_alloc_with_region(nbytes,0,region,0);
+    return (new_obj);
 }
+
 
 /*
  * noise to manipulate the gc trigger stuff

@@ -32,6 +32,7 @@ struct thread {
     pid_t pid;
     u32 tls_cookie;		/* on x86, the LDT index */
     struct thread *this,*next;
+    lispobj pseudo_atomic_atomic,pseudo_atomic_interrupted; /* slots 23,24 */
 };
 union per_thread_data {
     struct thread thread;

@@ -23,8 +23,26 @@ What to do with the debugger?  Each thread can rebind *debug-io*,
 which provided we actually _use_ it for debugging (need to check this)
 absolves us of the need to care too much
 
-
 * seriously broken : affecting correct running
+
+10) locking, in general
+
+10a) waiting for locks
+
+we would like some mechanism to sleep and be woken on lock contention.
+sys_futex will be in 2.6, but is not in 2.4 (though there are patches,
+and it may be that the red hat kernel has merged them).  In the
+meantime, we probably have to fake something with signals and maybe
+sigwait() (looks like a good way to sleep for signals without having a
+signal handler be called).  This means we need to manage our own
+queues too
+
+We _could_ do something a bit less sophisticated, and just busy-wait
+but loop calling (something in the kernel that calls schedule()).  say
+select(0).  Tuning spin retry attempts vs scheduler-friendly attempts
+is not possible without knowing the lock contention.  So, we could
+just pass that decision onto the user.  If 2.6 is going to be widely
+used in the next six months or so, this could be a win.
 
 14) allocation/gc still needs locking.
 
@@ -33,13 +51,27 @@ a) lots of threads can allocate at once, if allocation happens
 b) but creating a new region must be a one-at-a-time operation
 c) if any thread is allocating, no thread is allowed to gc
 
-Note that this means we have to be careful about calling gc from
-within the allocator: the check for need-to-gc must happen in such a
-way that the allocator lock is free before gc is triggered.  Ideally,
-the allocation attempt should then be repeated after the gc has
-finished.
+allocation is protected by an rwlock, with unlimited 'readers'
+(allocators) and a maximum of 1 'writer' (new region creation or gc)
 
-10) locking, in general
+when we need a new region, we have to drop our own readlock on the
+allocator first, otherwise we'll deadlock waiting for our own task.
+Then we have to repeat the allocation request
+
+Do we need access to locks from C?  On the non-x86 ports, we can get
+the gc lock for writing in maybe-gc, which is lisp (and not called
+from inside a pa, because it gets delayed and handled in
+pending_interrupt) but allocation is done inline, which is potentially
+a problem.  Ceases to be a problem if we can port the gencgc to
+non-x86, though.  That might be simplest (and doesn't have to be c either)
+
+On the x86 we're going to have to work out exactly what needs locking,
+and see if we can lock it from lisp space.  Suspect not.  Half the
+allocation seems to be done from VOPs (unsurprising, really)
+
+how does this all relate to the existing pseudo-atomic stuff?  PA 
+delays the delivery of signals to the thread until a critical section
+is complete.  I think that's orthogonal.
 
 * broken but uninteresting or cosmetic
 
@@ -48,26 +80,34 @@ finished.
 12) fix ROOM
 
 13) fix other runtime stuff that has been temporarily ripped out
- - control stack scrubbing and bounds checking
+ - control stack scrubbing, chiefly
 
 * code cleanup
 
-17) code in target-thread.lisp, thread.c, x86/system.lisp (interrupt
-contexts) has brittle dependency on thread.h
+17) code in thread.c and x86/system.lisp (interrupt contexts) has brittle
+dependency on thread.h
 
-20) read genesis again and convince ourselves it does actually work
+17a) code in x86/macros.lisp (the allocate macro) has GROSS and
+DISGUSTING dependency ditto
+
+I think the cleanest way to deal with these is probably to define struct
+thread using the primitive object stuff, so that the offsets are all
+available in make-host-1
 
 15) it would be nice to have a faster way to find the current thread
     from C than calling getpid().  For x86 we can write a bit of asm
-    to find the thread pointer in dynamic_values_start[1] and have it
-    stored there at thread init.  For other ports something more
+    to dereference %gs:(offsetof self), for other ports something more
     complicated needs doing, unless we can find a register to use for
-    the tls base that C promises not to overwrite.  
+    the tls base that C promises not to overwrite.
 
 18) do we need per-thread alien stack anyway? remembering that alien
-    code runs on the control stack, there seem to be only a few palces
+    code runs on the control stack, there seem to be only a few places
     this area gets used at all
 
 22) allocate-on-same-page stuff in gc_find_freeish_pages needs
     re-enabling to avoid massive heap fragmentation
 
+23) Some of the static symbols also have static tls offsets and the
+    code that accesses them could be a lot shorter (faster is nice,
+    but avoiding allocating a register is even nicer) if these were
+    known at host-1 compile time

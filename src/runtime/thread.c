@@ -59,7 +59,7 @@ struct thread *create_thread(lispobj initial_function) {
     union per_thread_data *per_thread;
     struct thread *th=0;	/*  subdue gcc */
     void *spaces=0;
-
+    
     /* may as well allocate all the spaces at once: it saves us from
      * having to decide what to do if only some of the allocations
      * succeed */
@@ -89,16 +89,19 @@ struct thread *create_thread(lispobj initial_function) {
 	    SetSymbolValue(FREE_TLS_INDEX,
 			   make_fixnum(sizeof(struct thread)/sizeof(lispobj)),
 			   0);
-	((struct symbol *)(BINDING_STACK_START-OTHER_POINTER_LOWTAG))
-	    ->tls_index=make_fixnum(1);
-	((struct symbol *)(BINDING_STACK_POINTER-OTHER_POINTER_LOWTAG))
-	    ->tls_index=make_fixnum(2);
-	((struct symbol *)(CONTROL_STACK_START-OTHER_POINTER_LOWTAG))
-	    ->tls_index=make_fixnum(3);
-	((struct symbol *)(ALIEN_STACK-OTHER_POINTER_LOWTAG))->tls_index=
-	    make_fixnum(THREAD_SLOT_OFFSET_WORDS(alien_stack_pointer));
-	((struct symbol *)(CURRENT_THREAD-OTHER_POINTER_LOWTAG))
-	    ->tls_index=make_fixnum(THREAD_SLOT_OFFSET_WORDS(this));
+#define STATIC_TLS_INIT(sym,field) \
+  ((struct symbol *)(sym-OTHER_POINTER_LOWTAG))->tls_index= \
+  make_fixnum(THREAD_SLOT_OFFSET_WORDS(field))
+				  
+	STATIC_TLS_INIT(BINDING_STACK_START,binding_stack_start);
+	STATIC_TLS_INIT(BINDING_STACK_POINTER,binding_stack_pointer);
+	STATIC_TLS_INIT(CONTROL_STACK_START,control_stack_start);
+	STATIC_TLS_INIT(ALIEN_STACK,alien_stack_pointer);
+	STATIC_TLS_INIT(CURRENT_THREAD,this);
+	STATIC_TLS_INIT(PSEUDO_ATOMIC_ATOMIC,pseudo_atomic_atomic); /* FIXME OAOOM: allocation, x86/macros.lisp */
+	STATIC_TLS_INIT(PSEUDO_ATOMIC_INTERRUPTED,pseudo_atomic_interrupted);
+				/* FIXME too */
+#undef STATIC_TLS_INIT
     }
 
     th->control_stack_start = spaces;
@@ -114,15 +117,18 @@ struct thread *create_thread(lispobj initial_function) {
 #else
     th->alien_stack_pointer=((void *)th->alien_stack_start);
 #endif
+    th->pseudo_atomic_interrupted=0;
+    /* runtime.c used to set PSEUDO_ATOMIC_ATOMIC =1 globally.  I'm not
+     * sure why, but it appears to help */
+    th->pseudo_atomic_atomic=make_fixnum(1);
     gc_set_region_empty(&th->alloc_region);
     
     bind_variable(CURRENT_CATCH_BLOCK,make_fixnum(0),th);
     bind_variable(CURRENT_UNWIND_PROTECT_BLOCK,make_fixnum(0),th); 
-    bind_variable(PSEUDO_ATOMIC_ATOMIC,make_fixnum(0),th);
-    bind_variable(PSEUDO_ATOMIC_INTERRUPTED,make_fixnum(0),th);
-    bind_variable(FREE_INTERRUPT_CONTEXT_INDEX,make_fixnum(0),th);
+        bind_variable(FREE_INTERRUPT_CONTEXT_INDEX,make_fixnum(0),th);
     bind_variable(INTERRUPT_PENDING, NIL,th);
     bind_variable(INTERRUPTS_ENABLED,T,th);
+
     th->next=all_threads;
     protect_control_stack_guard_page(th,1);
 #if defined(LISP_FEATURE_X86) && defined (LISP_FEATURE_LINUX)

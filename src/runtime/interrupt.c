@@ -100,7 +100,7 @@ static int pending_signal = 0;
 static siginfo_t pending_info;
 static sigset_t pending_mask;
 
-static boolean maybe_gc_pending = 0;
+boolean maybe_gc_pending = 0;
 
 /*
  * utility routines used by various signal handlers
