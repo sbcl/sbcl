@@ -170,7 +170,7 @@
      (if (type= type (specifier-type 'cons))
 	 'sb!c:check-cons
 	 nil))
-    (built-in-class
+    (built-in-classoid
      (if (type= type (specifier-type 'symbol))
 	 'sb!c:check-symbol
 	 nil))

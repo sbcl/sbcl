@@ -322,11 +322,7 @@
 		    :definition-source `((defclass ,name)
 					 ,*load-pathname*)
 		    other)))
-    ;; Defclass of a class with a forward-referenced superclass does not
-    ;; have a wrapper. RES is the incomplete PCL class. The Lisp class
-    ;; does not yet exist. Maybe should return NIL in that case as RES
-    ;; is not useful to the user?
-    (and (class-wrapper res) (sb-kernel:layout-class (class-wrapper res)))))
+    res))
 
 (setf (gdefinition 'load-defclass) #'real-load-defclass)
 
@@ -336,8 +332,10 @@
 (defmethod ensure-class-using-class (name (class null) &rest args &key)
   (multiple-value-bind (meta initargs)
       (ensure-class-values class args)
+    (set-class-type-translation (class-prototype meta) name)
     (setf class (apply #'make-instance meta :name name initargs)
 	  (find-class name) class)
+    (set-class-type-translation class name)
     class))
 
 (defmethod ensure-class-using-class (name (class pcl-class) &rest args &key)
@@ -346,6 +344,7 @@
     (unless (eq (class-of class) meta) (change-class class meta))
     (apply #'reinitialize-instance class initargs)
     (setf (find-class name) class)
+    (set-class-type-translation class name)
     class))
 
 (defmethod class-predicate-name ((class t))
@@ -444,15 +443,15 @@
     (remf initargs :metaclass)
     (loop (unless (remf initargs :direct-superclasses) (return)))
     (loop (unless (remf initargs :direct-slots) (return)))
-    (values meta
-            (list* :direct-superclasses
-                   (and (neq supplied-supers unsupplied)
-                        (mapcar #'fix-super supplied-supers))
-                   :direct-slots
-                   (and (neq supplied-slots unsupplied) supplied-slots)
-                   initargs))))
+    (values
+     meta
+     (nconc
+      (when (neq supplied-supers unsupplied)
+	(list :direct-superclasses (mapcar #'fix-super supplied-supers)))
+      (when (neq supplied-slots unsupplied)
+	(list :direct-slots supplied-slots))
+      initargs))))
 
-
 (defmethod shared-initialize :after
 	   ((class std-class)
 	    slot-names
@@ -530,6 +529,22 @@
   (map-dependents class
 		  (lambda (dependent)
 		    (apply #'update-dependent class dependent initargs))))
+
+(defmethod shared-initialize :after ((class condition-class) slot-names
+				     &key direct-superclasses)
+  (declare (ignore slot-names))
+  (let ((classoid (find-classoid (class-name class))))
+    (with-slots (wrapper class-precedence-list prototype predicate-name
+			 (direct-supers direct-superclasses))
+	class
+      (setf (classoid-pcl-class classoid) class)
+      (setq direct-supers direct-superclasses)
+      (setq wrapper (classoid-layout classoid))
+      (setq class-precedence-list (compute-class-precedence-list class))
+      (setq prototype (make-condition (class-name class)))
+      (add-direct-subclasses class direct-superclasses)
+      (setq predicate-name (make-class-predicate-name (class-name class)))
+      (make-class-predicate class predicate-name))))
 
 (defmethod shared-initialize :after
     ((slotd structure-slot-definition) slot-names &key
@@ -641,9 +656,9 @@
     (setf (slot-value class 'class-precedence-list)
             (compute-class-precedence-list class))
     (setf (slot-value class 'slots) (compute-slots class))
-    (let ((lclass (cl:find-class (class-name class))))
-      (setf (sb-kernel:class-pcl-class lclass) class)
-      (setf (slot-value class 'wrapper) (sb-kernel:class-layout lclass)))
+    (let ((lclass (find-classoid (class-name class))))
+      (setf (classoid-pcl-class lclass) class)
+      (setf (slot-value class 'wrapper) (classoid-layout lclass)))
     (update-pv-table-cache-info class)
     (setq predicate-name (if predicate-name-p
 			   (setf (slot-value class 'predicate-name)
@@ -654,7 +669,7 @@
                                         (class-name class))))))
     (make-class-predicate class predicate-name)
     (add-slot-accessors class direct-slots)))
-  
+
 (defmethod direct-slot-definition-class ((class structure-class) initargs)
   (declare (ignore initargs))
   (find-class 'structure-direct-slot-definition))
@@ -1129,7 +1144,7 @@
 ;;; obsolete the wrapper.
 ;;;
 ;;; FIXME: either here or in INVALID-WRAPPER-P looks like a good place
-;;; for (AVER (NOT (EQ (SB-KERNEL:LAYOUT-INVALID OWRAPPER)
+;;; for (AVER (NOT (EQ (LAYOUT-INVALID OWRAPPER)
 ;;;                    :UNINITIALIZED)))
 ;;;
 ;;; Thanks to Gerd Moellmann for the explanation.  -- CSR, 2002-10-29
@@ -1145,7 +1160,7 @@
 	      ;; a violation of locality or what might be considered
 	      ;; good style.  There has to be a better way!  -- CSR,
 	      ;; 2002-10-29
-	      (eq (sb-kernel:layout-invalid owrapper) t))
+	      (eq (layout-invalid owrapper) t))
       (let ((nwrapper (make-wrapper (wrapper-no-of-instance-slots owrapper)
 				    class)))
 	(setf (wrapper-instance-slots-layout nwrapper)

@@ -148,9 +148,10 @@
 					 :object (coerce-to-class (car args))))
 	       (class-eq (class-eq-specializer (coerce-to-class (car args))))
 	       (eql      (intern-eql-specializer (car args))))))
-	((and (null args) (typep type 'cl:class))
-	 (or (sb-kernel:class-pcl-class type)
-	     (find-structure-class (cl:class-name type))))
+	;; FIXME: do we still need this?
+	((and (null args) (typep type 'classoid))
+	 (or (classoid-pcl-class type)
+	     (ensure-non-standard-class (classoid-name type))))
 	((specializerp type) type)))
 
 ;;; interface
@@ -216,7 +217,7 @@
     ((not and or) `(,(car type) ,@(mapcar #'convert-to-system-type
 					  (cdr type))))
     ((class class-eq) ; class-eq is impossible to do right
-     (sb-kernel:layout-class (class-wrapper (cadr type))))
+     (layout-classoid (class-wrapper (cadr type))))
     (eql type)
     (t (if (null (cdr type))
 	   (car type)
@@ -357,17 +358,17 @@
 (/show "about to set up SB-PCL::*BUILT-IN-CLASSES*")
 (defvar *built-in-classes*
   (labels ((direct-supers (class)
-	     (/noshow "entering DIRECT-SUPERS" (sb-kernel::class-name class))
-	     (if (typep class 'cl:built-in-class)
-		 (sb-kernel:built-in-class-direct-superclasses class)
-		 (let ((inherits (sb-kernel:layout-inherits
-				  (sb-kernel:class-layout class))))
+	     (/noshow "entering DIRECT-SUPERS" (classoid-name class))
+	     (if (typep class 'built-in-classoid)
+		 (built-in-classoid-direct-superclasses class)
+		 (let ((inherits (layout-inherits
+				  (classoid-layout class))))
 		   (/noshow inherits)
 		   (list (svref inherits (1- (length inherits)))))))
 	   (direct-subs (class)
-	     (/noshow "entering DIRECT-SUBS" (sb-kernel::class-name class))
+	     (/noshow "entering DIRECT-SUBS" (classoid-name class))
 	     (collect ((res))
-	       (let ((subs (sb-kernel:class-subclasses class)))
+	       (let ((subs (classoid-subclasses class)))
 		 (/noshow subs)
 		 (when subs
 		   (dohash (sub v subs)
@@ -402,25 +403,26 @@
     (mapcar (lambda (kernel-bic-entry)
 	      (/noshow "setting up" kernel-bic-entry)
 	      (let* ((name (car kernel-bic-entry))
-		     (class (cl:find-class name)))
+		     (class (find-classoid name)))
 		(/noshow name class)
 		`(,name
-		  ,(mapcar #'cl:class-name (direct-supers class))
-		  ,(mapcar #'cl:class-name (direct-subs class))
+		  ,(mapcar #'classoid-name (direct-supers class))
+		  ,(mapcar #'classoid-name (direct-subs class))
 		  ,(map 'list
 			(lambda (x)
-			  (cl:class-name (sb-kernel:layout-class x)))
+			  (classoid-name
+			   (layout-classoid x)))
 			(reverse
-			 (sb-kernel:layout-inherits
-			  (sb-kernel:class-layout class))))
+			 (layout-inherits
+			  (classoid-layout class))))
 		  ,(prototype name))))
 	    (remove-if (lambda (kernel-bic-entry)
 			 (member (first kernel-bic-entry)
 				 ;; I'm not sure why these are removed from
 				 ;; the list, but that's what the original
 				 ;; CMU CL code did. -- WHN 20000715
-				 '(t sb-kernel:instance
-				     sb-kernel:funcallable-instance
+				 '(t instance
+				     funcallable-instance
 				     function stream)))
 		       sb-kernel::*built-in-classes*))))
 (/noshow "done setting up SB-PCL::*BUILT-IN-CLASSES*")
@@ -430,22 +432,22 @@
 (defclass t () ()
   (:metaclass built-in-class))
 
-(defclass sb-kernel:instance (t) ()
+(defclass instance (t) ()
   (:metaclass built-in-class))
 
 (defclass function (t) ()
   (:metaclass built-in-class))
 
-(defclass sb-kernel:funcallable-instance (function) ()
+(defclass funcallable-instance (function) ()
   (:metaclass built-in-class))
 
-(defclass stream (sb-kernel:instance) ()
+(defclass stream (instance) ()
   (:metaclass built-in-class))
 
 (defclass slot-object (t) ()
   (:metaclass slot-class))
 
-(defclass structure-object (slot-object sb-kernel:instance) ()
+(defclass structure-object (slot-object instance) ()
   (:metaclass structure-class))
 
 (defstruct (dead-beef-structure-object
@@ -455,10 +457,9 @@
 (defclass std-object (slot-object) ()
   (:metaclass std-class))
 
-(defclass standard-object (std-object sb-kernel:instance) ())
+(defclass standard-object (std-object instance) ())
 
-(defclass funcallable-standard-object (std-object
-				       sb-kernel:funcallable-instance)
+(defclass funcallable-standard-object (std-object funcallable-instance)
   ()
   (:metaclass funcallable-standard-class))
 
@@ -517,6 +518,16 @@
     :initform nil
     :reader class-predicate-name)))
 
+(def!method make-load-form ((class class) &optional env)
+  ;; FIXME: should we not instead pass ENV to FIND-CLASS?  Probably
+  ;; doesn't matter while all our environments are the same...
+  (declare (ignore env))
+  (let ((name (class-name class)))
+    (unless (and name (eq (find-class name nil) class))
+      (error "~@<Can't use anonymous or undefined class as constant: ~S~:@>"
+	     class))
+    `(find-class ',name)))
+
 ;;; The class PCL-CLASS is an implementation-specific common
 ;;; superclass of all specified subclasses of the class CLASS.
 (defclass pcl-class (class)
@@ -561,6 +572,8 @@
 (defclass forward-referenced-class (pcl-class) ())
 
 (defclass built-in-class (pcl-class) ())
+
+(defclass condition-class (pcl-class) ())
 
 (defclass structure-class (slot-class)
   ((defstruct-form

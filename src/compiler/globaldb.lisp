@@ -1252,8 +1252,8 @@
 ;;; meaningful error if we only have the cons.
 (define-info-type
   :class :type
-  :type :class
-  :type-spec (or sb!kernel::class-cell null)
+  :type :classoid
+  :type-spec (or sb!kernel::classoid-cell null)
   :default nil)
 
 ;;; layout for this type being used by the compiler
@@ -1261,8 +1261,8 @@
   :class :type
   :type :compiler-layout
   :type-spec (or layout null)
-  :default (let ((class (sb!xc:find-class name nil)))
-	     (when class (class-layout class))))
+  :default (let ((class (find-classoid name nil)))
+	     (when class (classoid-layout class))))
 
 (define-info-class :typed-structure)
 (define-info-type

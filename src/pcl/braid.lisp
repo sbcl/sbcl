@@ -65,9 +65,9 @@
 					      (slots-init nil slots-init-p))
   (let ((fin (%make-pcl-funcallable-instance nil nil
 					     (get-instance-hash-code))))
-    (set-funcallable-instance-fun
+    (set-funcallable-instance-function
      fin
-     #'(sb-kernel:instance-lambda (&rest args)
+     #'(instance-lambda (&rest args)
 	 (declare (ignore args))
 	 (error "The function of the funcallable-instance ~S has not been set."
 		fin)))
@@ -146,7 +146,7 @@
 			(built-in-class built-in-class-wrapper)
 			(structure-class structure-class-wrapper)))
 	     (class (or (find-class name nil)
-			(allocate-standard-instance wrapper))))	
+			(allocate-standard-instance wrapper))))
 	(setf (find-class name) class)))
     (dolist (definition *early-class-definitions*)
       (let ((name (ecd-class-name definition))
@@ -255,7 +255,8 @@
        (metaclass-name class name
 	class-eq-wrapper source direct-supers direct-subclasses cpl wrapper
 	&optional
-	proto direct-slots slots direct-default-initargs default-initargs)
+	(proto nil proto-p)
+	direct-slots slots direct-default-initargs default-initargs)
   (flet ((classes (names) (mapcar #'find-class names))
 	 (set-slot (slot-name value)
 	   (!bootstrap-set-slot metaclass-name class slot-name value)))
@@ -323,7 +324,8 @@
 	  (set-slot 'from-defclass-p t)
 	  (set-slot 'plist nil)
 	  (set-slot 'prototype (funcall constructor-sym)))
-	(set-slot 'prototype (or proto (allocate-standard-instance wrapper))))
+	(set-slot 'prototype
+		  (if proto-p proto (allocate-standard-instance wrapper))))
     class))
 
 (defun !bootstrap-make-slot-definitions (name class slots wrapper effective-p)
@@ -493,11 +495,11 @@
     (dolist (e *built-in-classes*)
       (destructuring-bind (name supers subs cpl prototype) e
 	(let* ((class (find-class name))
-	       (lclass (cl:find-class name))
-	       (wrapper (sb-kernel:class-layout lclass)))
+	       (lclass (find-classoid name))
+	       (wrapper (classoid-layout lclass)))
 	  (set (get-built-in-class-symbol name) class)
 	  (set (get-built-in-wrapper-symbol name) wrapper)
-	  (setf (sb-kernel:class-pcl-class lclass) class)
+	  (setf (classoid-pcl-class lclass) class)
 
 	  (!bootstrap-initialize-class 'built-in-class class
 				       name class-eq-wrapper nil
@@ -512,7 +514,7 @@
 	    (make-class-predicate class (class-predicate-name class))))))
 
 (defmacro wrapper-of-macro (x)
-  `(sb-kernel:layout-of ,x))
+  `(layout-of ,x))
 
 (defun class-of (x)
   (wrapper-class* (wrapper-of-macro x)))
@@ -521,8 +523,6 @@
 #-sb-fluid (declaim (inline wrapper-of))
 (defun wrapper-of (x)
   (wrapper-of-macro x))
-
-(defvar *find-structure-class* nil)
 
 (defun eval-form (form)
   (lambda () (eval form)))
@@ -536,22 +536,28 @@
     :initform ,(structure-slotd-init-form slotd)
     :initfunction ,(eval-form (structure-slotd-init-form slotd))))
 
-(defun find-structure-class (symbol)
-  (if (structure-type-p symbol)
-      (unless (eq *find-structure-class* symbol)
-	(let ((*find-structure-class* symbol))
-	  (ensure-class symbol
-			:metaclass 'structure-class
-			:name symbol
-			:direct-superclasses
-                        (mapcar #'cl:class-name
-                                (sb-kernel:class-direct-superclasses
-                                 (cl:find-class symbol)))
-			:direct-slots
-			(mapcar #'slot-initargs-from-structure-slotd
-				(structure-type-slot-description-list
-				 symbol)))))
-      (error "~S is not a legal structure class name." symbol)))
+(defun ensure-non-standard-class (name)
+  (flet
+      ((ensure (metaclass &optional (slots nil slotsp))
+	 (let ((supers
+		(mapcar #'classoid-name (classoid-direct-superclasses
+					 (find-classoid name)))))
+	   (if slotsp
+	       (ensure-class-using-class name nil
+					 :metaclass metaclass :name name
+					 :direct-superclasses supers
+					 :direct-slots slots)
+	       (ensure-class-using-class name nil
+					 :metaclass metaclass :name name
+					 :direct-superclasses supers)))))
+    (cond ((structure-type-p name)
+	   (ensure 'structure-class
+		   (mapcar #'slot-initargs-from-structure-slotd
+			   (structure-type-slot-description-list name))))
+	  ((condition-type-p name)
+	   (ensure 'condition-class))
+	  (t
+	   (error "~@<~S is not the name of a class.~@:>" name)))))
 
 (defun make-class-predicate (class name)
   (let* ((gf (ensure-generic-function name))
@@ -589,27 +595,38 @@
 ;;; Set the inherits from CPL, and register the layout. This actually
 ;;; installs the class in the Lisp type system.
 (defun update-lisp-class-layout (class layout)
-  (let ((lclass (sb-kernel:layout-class layout)))
-    (unless (eq (sb-kernel:class-layout lclass) layout)
-      (setf (sb-kernel:layout-inherits layout)
-              (sb-kernel:order-layout-inherits
+  (let ((lclass (layout-classoid layout)))
+    (unless (eq (classoid-layout lclass) layout)
+      (setf (layout-inherits layout)
+              (order-layout-inherits
                (map 'simple-vector #'class-wrapper
                     (reverse (rest (class-precedence-list class))))))
-      (sb-kernel:register-layout layout :invalidate t)
+      (register-layout layout :invalidate t)
 
       ;; Subclasses of formerly forward-referenced-class may be
       ;; unknown to CL:FIND-CLASS and also anonymous. This
       ;; functionality moved here from (SETF FIND-CLASS).
       (let ((name (class-name class)))
-	(setf (cl:find-class name) lclass
-	      ;; FIXME: It's nasty to use double colons. Perhaps the
-	      ;; best way to fix this is not to export CLASS-%NAME
-	      ;; from SB-KERNEL, but instead to move the whole
-	      ;; UPDATE-LISP-CLASS-LAYOUT function to SB-KERNEL, and
-	      ;; export it. (since it's also nasty for us to be
-	      ;; reaching into %KERNEL implementation details my
-	      ;; messing with raw CLASS-%NAME)
-	      (sb-kernel::class-%name lclass) name)))))
+	(setf (find-classoid name) lclass
+	      (classoid-name lclass) name)))))
+
+(defun set-class-type-translation (class name)
+  (let ((classoid (find-classoid name nil)))
+    (etypecase classoid
+      (null)
+      (built-in-classoid
+       (let ((translation (built-in-classoid-translation classoid)))
+	 (cond
+	   (translation
+	    (aver (ctype-p translation))
+	    (setf (info :type :translator class)
+		  (lambda (spec) (declare (ignore spec)) translation)))
+	   (t
+	    (setf (info :type :translator class)
+		  (lambda (spec) (declare (ignore spec)) classoid))))))
+      (classoid
+       (setf (info :type :translator class)
+	     (lambda (spec) (declare (ignore spec)) classoid))))))
 
 (clrhash *find-class*)
 (!bootstrap-meta-braid)
@@ -622,19 +639,21 @@
 (dohash (name x *find-class*)
 	(let* ((class (find-class-from-cell name x))
 	       (layout (class-wrapper class))
-	       (lclass (sb-kernel:layout-class layout))
-	       (lclass-pcl-class (sb-kernel:class-pcl-class lclass))
-	       (olclass (cl:find-class name nil)))
+	       (lclass (layout-classoid layout))
+	       (lclass-pcl-class (classoid-pcl-class lclass))
+	       (olclass (find-classoid name nil)))
 	  (if lclass-pcl-class
 	      (aver (eq class lclass-pcl-class))
-	      (setf (sb-kernel:class-pcl-class lclass) class))
+	      (setf (classoid-pcl-class lclass) class))
 
 	  (update-lisp-class-layout class layout)
 
 	  (cond (olclass
 		 (aver (eq lclass olclass)))
 		(t
-		 (setf (cl:find-class name) lclass)))))
+		 (setf (find-classoid name) lclass)))
+
+	  (set-class-type-translation class name)))
 
 (setq *boot-state* 'braid)
 

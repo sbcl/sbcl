@@ -125,40 +125,10 @@
 
 (defmethod make-load-form ((object wrapper) &optional env)
   (declare (ignore env))
-  (let ((pname (sb-kernel:class-proper-name (sb-kernel:layout-class object))))
+  (let ((pname (classoid-proper-name
+		(layout-classoid object))))
     (unless pname
       (error "can't dump wrapper for anonymous class:~%  ~S"
-	     (sb-kernel:layout-class object)))
-    `(sb-kernel:class-layout (cl:find-class ',pname))))
-
-;;;; The following are hacks to deal with CMU CL having two different CLASS
-;;;; classes.
+	     (layout-classoid object)))
+    `(classoid-layout (find-classoid ',pname))))
 
-(defun coerce-to-pcl-class (class)
-  (if (typep class 'cl:class)
-      (or (sb-kernel:class-pcl-class class)
-	  (find-structure-class (cl:class-name class)))
-      class))
-
-(defmethod make-instance ((class cl:class) &rest stuff)
-  (apply #'make-instance (coerce-to-pcl-class class) stuff))
-(defmethod change-class (instance (class cl:class) &rest initargs)
-  (apply #'change-class instance (coerce-to-pcl-class class) initargs))
-
-(macrolet ((frob (&rest names)
-	     `(progn
-		,@(mapcar (lambda (name)
-			    `(defmethod ,name ((class cl:class))
-			       (funcall #',name
-					(coerce-to-pcl-class class))))
-			  names))))
-  (frob
-    class-direct-slots
-    class-prototype
-    class-precedence-list
-    class-direct-default-initargs
-    class-direct-superclasses
-    compute-class-precedence-list
-    class-default-initargs class-finalized-p
-    class-direct-subclasses class-slots
-    make-instances-obsolete))

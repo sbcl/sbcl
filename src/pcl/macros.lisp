@@ -75,9 +75,7 @@
 
 ;;;; FIND-CLASS
 ;;;;
-;;;; This is documented in the CLOS specification. FIXME: Except that
-;;;; SBCL deviates from the spec by having CL:FIND-CLASS distinct from
-;;;; PCL:FIND-CLASS, alas.
+;;;; This is documented in the CLOS specification.
 
 (/show "pcl/macros.lisp 119")
 
@@ -110,8 +108,8 @@
 (defun find-class-from-cell (symbol cell &optional (errorp t))
   (or (find-class-cell-class cell)
       (and *create-classes-from-internal-structure-definitions-p*
-	   (structure-type-p symbol)
-	   (find-structure-class symbol))
+	   (or (structure-type-p symbol) (condition-type-p symbol))
+	   (ensure-non-standard-class symbol))
       (cond ((null errorp) nil)
 	    ((legal-class-name-p symbol)
 	     (error "There is no class named ~S." symbol))
@@ -124,8 +122,7 @@
   (find-class-cell-predicate cell))
 
 (defun legal-class-name-p (x)
-  (and (symbolp x)
-       (not (keywordp x))))
+  (symbolp x))
 
 (defun find-class (symbol &optional (errorp t) environment)
   (declare (ignore environment))
@@ -149,9 +146,6 @@
 
 (/show "pcl/macros.lisp 187")
 
-;;; Note that in SBCL as in CMU CL,
-;;;   COMMON-LISP:FIND-CLASS /= SB-PCL:FIND-CLASS.
-;;; (Yes, this is a KLUDGE!)
 (define-compiler-macro find-class (&whole form
 				   symbol &optional (errorp t) environment)
   (declare (ignore environment))
@@ -166,8 +160,8 @@
 	   (or (find-class-cell-class ,class-cell)
 	       ,(if errorp
 		    `(find-class-from-cell ',symbol ,class-cell t)
-		    `(and (sb-kernel:class-cell-class
-			   ',(sb-kernel:find-class-cell symbol))
+		    `(and (classoid-cell-classoid
+			   ',(find-classoid-cell symbol))
 			  (find-class-from-cell ',symbol ,class-cell nil))))))
       form))
 

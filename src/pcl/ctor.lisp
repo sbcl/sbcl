@@ -92,13 +92,13 @@
 ;;; When the optimized function is computed, the function of the
 ;;; funcallable instance is set to it.
 ;;;
-(sb-kernel:!defstruct-with-alternate-metaclass ctor
+(!defstruct-with-alternate-metaclass ctor
   :slot-names (function-name class-name class initargs)
   :boa-constructor %make-ctor
   :superclass-name pcl-funcallable-instance
-  :metaclass-name sb-kernel:random-pcl-class
-  :metaclass-constructor sb-kernel:make-random-pcl-class
-  :dd-type sb-kernel:funcallable-structure
+  :metaclass-name random-pcl-classoid
+  :metaclass-constructor make-random-pcl-classoid
+  :dd-type funcallable-structure
   :runtime-type-checks-p nil)
 
 ;;; List of all defined ctors.
@@ -115,11 +115,11 @@
 (defun install-initial-constructor (ctor &key force-p)
   (when (or force-p (ctor-class ctor))
     (setf (ctor-class ctor) nil)
-    (setf (sb-kernel:funcallable-instance-fun ctor)
-	  #'(sb-kernel:instance-lambda (&rest args)
+    (setf (funcallable-instance-fun ctor)
+	  #'(instance-lambda (&rest args)
 	      (install-optimized-constructor ctor)
 	      (apply ctor args)))
-    (setf (sb-kernel:%funcallable-instance-info ctor 1)
+    (setf (%funcallable-instance-info ctor 1)
 	  (ctor-function-name ctor))))
 
 ;;;
@@ -210,8 +210,8 @@
 	       (function-name (make-ctor-function-name class-name initargs)))
 	  ;;
 	  ;; Prevent compiler warnings for calling the ctor.
-	  (sb-kernel:proclaim-as-fun-name function-name)
-	  (sb-kernel:note-name-defined function-name :function)
+	  (proclaim-as-fun-name function-name)
+	  (note-name-defined function-name :function)
 	  (when (eq (info :function :where-from function-name) :assumed)
 	    (setf (info :function :where-from function-name) :defined)
 	    (when (info :function :assumed-type function-name)
@@ -252,7 +252,7 @@
       (finalize-inheritance class))
     (setf (ctor-class ctor) class)
     (pushnew ctor (plist-value class 'ctors))
-    (setf (sb-kernel:funcallable-instance-fun ctor)
+    (setf (funcallable-instance-fun ctor)
 	  ;; KLUDGE: Gerd here has the equivalent of (COMPILE NIL
 	  ;; (CONSTRUCTOR-FUNCTION-FORM)), but SBCL's COMPILE doesn't
 	  ;; deal with INSTANCE-LAMBDA expressions, only with LAMBDA
@@ -312,13 +312,13 @@
 
 (defun fallback-generator (ctor ii-methods si-methods)
   (declare (ignore ii-methods si-methods))
-  `(sb-kernel:instance-lambda ,(make-ctor-parameter-list ctor)
+  `(instance-lambda ,(make-ctor-parameter-list ctor)
      (make-instance ,(ctor-class ctor) ,@(ctor-initargs ctor))))
 
 (defun optimizing-generator (ctor ii-methods si-methods)
   (multiple-value-bind (body before-method-p)
       (fake-initialization-emf ctor ii-methods si-methods)
-    `(sb-kernel:instance-lambda ,(make-ctor-parameter-list ctor)
+    `(instance-lambda ,(make-ctor-parameter-list ctor)
        (declare #.*optimize-speed*)
        ,(wrap-in-allocate-forms ctor body before-method-p))))
 
@@ -339,7 +339,7 @@
 	`(let ((.instance. (%make-standard-instance nil
 						    (get-instance-hash-code)))
 	       (.slots. (make-array
-			 ,(sb-kernel:layout-length wrapper)
+			 ,(layout-length wrapper)
 	                 ,@(when before-method-p
 			     '(:initial-element +slot-unbound+)))))
 	   (setf (std-instance-wrapper .instance.) ,wrapper)
@@ -426,7 +426,7 @@
 	 (initargs (ctor-initargs ctor))
 	 (initkeys (plist-keys initargs))
 	 (slot-vector
-	  (make-array (sb-kernel:layout-length (class-wrapper class))
+	  (make-array (layout-length (class-wrapper class))
 		      :initial-element nil))
 	 (class-inits ())
 	 (default-initargs (class-default-initargs class))

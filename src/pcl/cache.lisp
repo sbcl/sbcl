@@ -112,7 +112,7 @@
 		   1 (the fixnum (1+ old-count))))))))
 
 (deftype field-type ()
-  '(mod #.sb-kernel:layout-clos-hash-length))
+  '(mod #.layout-clos-hash-length))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
 (defun power-of-two-ceiling (x)
@@ -221,10 +221,10 @@
 ;;; are the forms of this constant which it is more convenient for the
 ;;; runtime code to use.
 (defconstant wrapper-cache-number-length
-  (integer-length sb-kernel:layout-clos-hash-max))
-(defconstant wrapper-cache-number-mask sb-kernel:layout-clos-hash-max)
+  (integer-length layout-clos-hash-max))
+(defconstant wrapper-cache-number-mask layout-clos-hash-max)
 (defconstant wrapper-cache-number-adds-ok
-  (truncate most-positive-fixnum sb-kernel:layout-clos-hash-max))
+  (truncate most-positive-fixnum layout-clos-hash-max))
 
 ;;;; wrappers themselves
 
@@ -251,15 +251,15 @@
 ;;; have a fixed number of cache hash values, and that number must
 ;;; correspond to the number of cache lines we use.
 (defconstant wrapper-cache-number-vector-length
-  sb-kernel:layout-clos-hash-length)
+  layout-clos-hash-length)
 
 (unless (boundp '*the-class-t*)
   (setq *the-class-t* nil))
 
 (defmacro wrapper-class (wrapper)
-  `(sb-kernel:class-pcl-class (sb-kernel:layout-class ,wrapper)))
+  `(classoid-pcl-class (layout-classoid ,wrapper)))
 (defmacro wrapper-no-of-instance-slots (wrapper)
-  `(sb-kernel:layout-length ,wrapper))
+  `(layout-length ,wrapper))
 
 (defmacro wrapper-instance-slots-layout (wrapper)
   `(%wrapper-instance-slots-layout ,wrapper))
@@ -271,19 +271,20 @@
 ;;; whose slots are not initialized yet, and which may be built-in
 ;;; classes. We pass in the class name in addition to the class.
 (defun boot-make-wrapper (length name &optional class)
-  (let ((found (cl:find-class name nil)))
+  (let ((found (find-classoid name nil)))
     (cond
      (found
-      (unless (sb-kernel:class-pcl-class found)
-	(setf (sb-kernel:class-pcl-class found) class))
-      (aver (eq (sb-kernel:class-pcl-class found) class))
-      (let ((layout (sb-kernel:class-layout found)))
+      (unless (classoid-pcl-class found)
+	(setf (classoid-pcl-class found) class))
+      (aver (eq (classoid-pcl-class found) class))
+      (let ((layout (classoid-layout found)))
 	(aver layout)
 	layout))
      (t
       (make-wrapper-internal
        :length length
-       :class (sb-kernel:make-standard-class :name name :pcl-class class))))))
+       :classoid (make-standard-classoid
+		  :name name :pcl-class class))))))
 
 ;;; The following variable may be set to a STANDARD-CLASS that has
 ;;; already been created by the lisp code and which is to be redefined
@@ -294,35 +295,36 @@
 ;;; In SBCL, as in CMU CL, the layouts (a.k.a wrappers) for built-in
 ;;; and structure classes already exist when PCL is initialized, so we
 ;;; don't necessarily always make a wrapper. Also, we help maintain
-;;; the mapping between CL:CLASS and PCL::CLASS objects.
+;;; the mapping between CL:CLASS and SB-KERNEL:CLASSOID objects.
 (defun make-wrapper (length class)
   (cond
    ((typep class 'std-class)
     (make-wrapper-internal
      :length length
-     :class
+     :classoid
      (let ((owrap (class-wrapper class)))
        (cond (owrap
-	      (sb-kernel:layout-class owrap))
+	      (layout-classoid owrap))
 	     ((*subtypep (class-of class)
 			 *the-class-standard-class*)
 	      (cond ((and *pcl-class-boot*
 			  (eq (slot-value class 'name) *pcl-class-boot*))
-		     (let ((found (cl:find-class (slot-value class 'name))))
-		       (unless (sb-kernel:class-pcl-class found)
-			 (setf (sb-kernel:class-pcl-class found) class))
-		       (aver (eq (sb-kernel:class-pcl-class found) class))
+		     (let ((found (find-classoid
+				   (slot-value class 'name))))
+		       (unless (classoid-pcl-class found)
+			 (setf (classoid-pcl-class found) class))
+		       (aver (eq (classoid-pcl-class found) class))
 		       found))
 		    (t
-		     (sb-kernel:make-standard-class :pcl-class class))))
+		     (make-standard-classoid :pcl-class class))))
 	     (t
-	      (sb-kernel:make-random-pcl-class :pcl-class class))))))
+	      (make-random-pcl-classoid :pcl-class class))))))
    (t
-    (let* ((found (cl:find-class (slot-value class 'name)))
-	   (layout (sb-kernel:class-layout found)))
-      (unless (sb-kernel:class-pcl-class found)
-	(setf (sb-kernel:class-pcl-class found) class))
-      (aver (eq (sb-kernel:class-pcl-class found) class))
+    (let* ((found (find-classoid (slot-value class 'name)))
+	   (layout (classoid-layout found)))
+      (unless (classoid-pcl-class found)
+	(setf (classoid-pcl-class found) class))
+      (aver (eq (classoid-pcl-class found) class))
       (aver layout)
       layout))))
 
@@ -350,13 +352,13 @@
 (defmacro cache-number-vector-ref (cnv n)
   `(wrapper-cache-number-vector-ref ,cnv ,n))
 (defmacro wrapper-cache-number-vector-ref (wrapper n)
-  `(sb-kernel:layout-clos-hash ,wrapper ,n))
+  `(layout-clos-hash ,wrapper ,n))
 
 (declaim (inline wrapper-class*))
 (defun wrapper-class* (wrapper)
   (or (wrapper-class wrapper)
-      (find-structure-class
-       (cl:class-name (sb-kernel:layout-class wrapper)))))
+      (ensure-non-standard-class
+       (classoid-name (layout-classoid wrapper)))))
 
 ;;; The wrapper cache machinery provides general mechanism for
 ;;; trapping on the next access to any instance of a given class. This
@@ -373,7 +375,7 @@
 
 (declaim (inline invalid-wrapper-p))
 (defun invalid-wrapper-p (wrapper)
-  (not (null (sb-kernel:layout-invalid wrapper))))
+  (not (null (layout-invalid wrapper))))
 
 (defvar *previous-nwrappers* (make-hash-table))
 
@@ -395,10 +397,10 @@
       (push previous new-previous))
 
     (let ((ocnv (wrapper-cache-number-vector owrapper)))
-      (dotimes (i sb-kernel:layout-clos-hash-length)
+      (dotimes (i layout-clos-hash-length)
 	(setf (cache-number-vector-ref ocnv i) 0)))
 
-    (push (setf (sb-kernel:layout-invalid owrapper) (list state nwrapper))
+    (push (setf (layout-invalid owrapper) (list state nwrapper))
 	  new-previous)
 
     (setf (gethash owrapper *previous-nwrappers*) ()
@@ -406,7 +408,7 @@
 
 (defun check-wrapper-validity (instance)
   (let* ((owrapper (wrapper-of instance))
-	 (state (sb-kernel:layout-invalid owrapper)))
+	 (state (layout-invalid owrapper)))
     (if (null state)
 	owrapper
 	(ecase (car state)
@@ -417,7 +419,7 @@
 
 (declaim (inline check-obsolete-instance))
 (defun check-obsolete-instance (instance)
-  (when (invalid-wrapper-p (sb-kernel:layout-of instance))
+  (when (invalid-wrapper-p (layout-of instance))
     (check-wrapper-validity instance)))
 
 (defvar *free-caches* nil)
@@ -608,6 +610,7 @@
 	(std       (find-class 'std-class))
 	(standard  (find-class 'standard-class))
 	(fsc       (find-class 'funcallable-standard-class))
+	(condition (find-class 'condition-class))
 	(structure (find-class 'structure-class))
 	(built-in  (find-class 'built-in-class)))
     (flet ((specializer->metatype (x)
@@ -615,22 +618,19 @@
 		     (if (eq *boot-state* 'complete)
 			 (class-of (specializer-class x))
 			 (class-of x))))
-	       (cond ((eq x *the-class-t*) t)
-		     ((*subtypep meta-specializer std)
-		      'standard-instance)
-		     ((*subtypep meta-specializer standard)
-		      'standard-instance)
-		     ((*subtypep meta-specializer fsc)
-		      'standard-instance)
-		     ((*subtypep meta-specializer structure)
-		      'structure-instance)
-		     ((*subtypep meta-specializer built-in)
-		      'built-in-instance)
-		     ((*subtypep meta-specializer slot)
-		      'slot-instance)
-		     (t (error "PCL cannot handle the specializer ~S (meta-specializer ~S)."
-			       new-specializer
-			       meta-specializer))))))
+	       (cond
+		 ((eq x *the-class-t*) t)
+		 ((*subtypep meta-specializer std) 'standard-instance)
+		 ((*subtypep meta-specializer standard) 'standard-instance)
+		 ((*subtypep meta-specializer fsc) 'standard-instance)
+		 ((*subtypep meta-specializer condition) 'condition-instance)
+		 ((*subtypep meta-specializer structure) 'structure-instance)
+		 ((*subtypep meta-specializer built-in) 'built-in-instance)
+		 ((*subtypep meta-specializer slot) 'slot-instance)
+		 (t (error "~@<PCL cannot handle the specializer ~S ~
+                            (meta-specializer ~S).~@:>"
+			   new-specializer
+			   meta-specializer))))))
       ;; We implement the following table. The notation is
       ;; that X and Y are distinct meta specializer names.
       ;;

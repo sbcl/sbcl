@@ -26,9 +26,9 @@
     (/primitive-print (symbol-name name))
     (when trans-p
       (/show0 "in TRANS-P case")
-      (let ((class (class-cell-class (find-class-cell name)))
+      (let ((classoid (classoid-cell-classoid (find-classoid-cell name)))
 	    (type (specifier-type translation)))
-	(setf (built-in-class-translation class) type)
+	(setf (built-in-classoid-translation classoid) type)
 	(setf (info :type :builtin name) type)))))
 
 ;;; numeric types

@@ -499,19 +499,19 @@
        (when (eql type instance-header-widetag)
 	 (incf total-objects)
 	 (incf total-bytes size)
-	 (let* ((class (layout-class (%instance-ref obj 0)))
-		(found (gethash class totals)))
+	 (let* ((classoid (layout-classoid (%instance-ref obj 0)))
+		(found (gethash classoid totals)))
 	   (cond (found
 		  (incf (the fixnum (car found)))
 		  (incf (the fixnum (cdr found)) size))
 		 (t
-		  (setf (gethash class totals) (cons 1 size)))))))
+		  (setf (gethash classoid totals) (cons 1 size)))))))
      space)
 
     (collect ((totals-list))
-      (maphash (lambda (class what)
+      (maphash (lambda (classoid what)
 		 (totals-list (cons (prin1-to-string
-				     (class-proper-name class))
+				     (classoid-proper-name classoid))
 				    what)))
 	       totals)
       (let ((sorted (sort (totals-list) #'> :key #'cddr))

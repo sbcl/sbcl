@@ -71,7 +71,7 @@
 	  ;; even if it hasn't been defined yet, the user doesn't get
 	  ;; obscure warnings about undefined internal implementation
 	  ;; functions like HAIRY-MAKE-instance-name.
-	  (sb-kernel:become-defined-fun-name sym)
+	  (become-defined-fun-name sym)
 	  `(,sym ',class (list ,@initargs)))))))
 
 (defmacro expanding-make-instance-toplevel (&rest forms &environment env)

@@ -11,46 +11,44 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-;;;; Note that the MOP is not in a supported state. Package issues
-;;;; (both MOP/SB-PCL and CL/SB-PCL) have yet to be resolved, and
-;;;; there is likely to be missing functionality.  However, this seems
-;;;; a good a way as any of ensuring that we have no regressions.
+;;;; Note that the MOP is not in an entirely supported state.
+;;;; However, this seems a good a way as any of ensuring that we have
+;;;; no regressions.
 
 (defpackage "MOP-TEST"
-  ;; eventually, we might want "MOP" as well here.
-  (:use "CL"))
+  (:use "CL" "SB-MOP"))
 
 (in-package "MOP-TEST")
 
 ;;; Readers for Class Metaobjects (pp. 212--214 of AMOP)
 (defclass red-herring (forward-ref) ())
 
-(assert (null (sb-pcl:class-direct-slots (sb-pcl:find-class 'forward-ref))))
-(assert (null (sb-pcl:class-direct-default-initargs
-	       (sb-pcl:find-class 'forward-ref))))
+(assert (null (class-direct-slots (find-class 'forward-ref))))
+(assert (null (class-direct-default-initargs
+	       (find-class 'forward-ref))))
 
 ;;; Readers for Generic Function Metaobjects (pp. 216--218 of AMOP)
 (defgeneric fn-with-odd-arg-precedence (a b c)
   (:argument-precedence-order b c a))
 
 (assert (equal
-	 (sb-pcl:generic-function-lambda-list #'fn-with-odd-arg-precedence)
+	 (generic-function-lambda-list #'fn-with-odd-arg-precedence)
 	 '(a b c)))
 (assert (equal
-	 (sb-pcl:generic-function-argument-precedence-order #'fn-with-odd-arg-precedence)
+	 (generic-function-argument-precedence-order #'fn-with-odd-arg-precedence)
 	 '(b c a)))
 ;;; Test for DOCUMENTATION's order, which was wrong until sbcl-0.7.8.39
 (assert (equal
-	 (sb-pcl:generic-function-argument-precedence-order #'documentation)
-	 (let ((ll (sb-pcl:generic-function-lambda-list #'documentation)))
+	 (generic-function-argument-precedence-order #'documentation)
+	 (let ((ll (generic-function-lambda-list #'documentation)))
 	   (list (nth 1 ll) (nth 0 ll)))))
 
 (assert (null
-	 (sb-pcl:generic-function-declarations #'fn-with-odd-arg-precedence)))
+	 (generic-function-declarations #'fn-with-odd-arg-precedence)))
 (defgeneric gf-with-declarations (x)
   (declare (optimize (speed 3)))
   (declare (optimize (safety 0))))
-(let ((decls (sb-pcl:generic-function-declarations #'gf-with-declarations)))
+(let ((decls (generic-function-declarations #'gf-with-declarations)))
   (assert (= (length decls) 2))
   (assert (member '(optimize (speed 3)) decls :test #'equal))
   (assert (member '(optimize (safety 0)) decls :test #'equal)))
@@ -64,16 +62,16 @@
    (a-class-slot :allocation :class :accessor a-class-slot)))
 (dolist (m (list (list #'an-instance-slot :instance)
 		 (list #'a-class-slot :class)))
-  (let ((methods (sb-pcl:generic-function-methods (car m))))
+  (let ((methods (generic-function-methods (car m))))
     (assert (= (length methods) 1))
-    (assert (eq (sb-pcl:slot-definition-allocation
-		 (sb-pcl:accessor-method-slot-definition
+    (assert (eq (slot-definition-allocation
+		 (accessor-method-slot-definition
 		  (car methods)))
 		(cadr m)))))
 
 ;;; Class Finalization Protocol (see section 5.5.2 of AMOP)
 (let ((finalized-count 0))
-  (defmethod sb-pcl:finalize-inheritance :after ((x sb-pcl::standard-class))
+  (defmethod finalize-inheritance :after ((x standard-class))
     (incf finalized-count))
   (defun get-count () finalized-count))
 (defclass finalization-test-1 () ())
@@ -99,10 +97,32 @@
 ;;; relationships.  These aren't necessarily true, but are probably
 ;;; not going to change often.
 (dolist (x '(number array sequence character symbol))
-  (assert (eq (car (sb-pcl:class-direct-superclasses (sb-pcl:find-class x)))
-	      (sb-pcl:find-class t)))
-  (assert (member (sb-pcl:find-class x)
-		  (sb-pcl:class-direct-subclasses (sb-pcl:find-class t)))))
+  (assert (eq (car (class-direct-superclasses (find-class x)))
+	      (find-class t)))
+  (assert (member (find-class x)
+		  (class-direct-subclasses (find-class t)))))
+
+;;; the class-prototype of the NULL class used to be some weird
+;;; standard-instance-like thing.  Make sure it's actually NIL.
+;;;
+;;; (and FIXME: eventually turn this into asserting that the prototype
+;;; of all built-in-classes is of the relevant type)
+(assert (null (class-prototype (find-class 'null))))
+
+;;; simple consistency checks for the SB-PCL (perhaps AKA SB-MOP)
+;;; package: all of the functionality specified in AMOP is in
+;;; functions:
+(assert (null (loop for x being each external-symbol in "SB-PCL"
+		    unless (fboundp x) collect x)))
+;;; and all generic functions in SB-PCL have at least one specified
+;;; method, except for UPDATE-DEPENDENT
+(assert (null (loop for x being each external-symbol in "SB-PCL"
+		    unless (or (eq x 'update-dependent)
+			       (not (typep (fdefinition x) 'generic-function))
+			       (> (length (generic-function-methods
+					   (fdefinition x)))
+				  0))
+		    collect x)))
 
 ;;;; success
 (sb-ext:quit :unix-status 104)

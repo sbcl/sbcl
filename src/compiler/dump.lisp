@@ -1258,7 +1258,7 @@
   (when (layout-invalid obj)
     (compiler-error "attempt to dump reference to obsolete class: ~S"
 		    (layout-class obj)))
-  (let ((name (sb!xc:class-name (layout-class obj))))
+  (let ((name (classoid-name (layout-classoid obj))))
     (unless name
       (compiler-error "dumping anonymous layout: ~S" obj))
     (dump-fop 'fop-normal-load file)

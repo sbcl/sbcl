@@ -135,9 +135,9 @@
 					      object)))))))
     (member-type
      (if (member object (member-type-members type)) t))
-    (sb!xc:class
+    (classoid
      #+sb-xc-host (ctypep object type)
-     #-sb-xc-host (class-typep (layout-of object) type object))
+     #-sb-xc-host (classoid-typep (layout-of object) type object))
     (union-type
      (some (lambda (union-type-type) (%%typep object union-type-type))
 	   (union-type-types type)))
@@ -188,24 +188,25 @@
 
 ;;; Do a type test from a class cell, allowing forward reference and
 ;;; redefinition.
-(defun class-cell-typep (obj-layout cell object)
-  (let ((class (class-cell-class cell)))
-    (unless class
-      (error "The class ~S has not yet been defined." (class-cell-name cell)))
-    (class-typep obj-layout class object)))
+(defun classoid-cell-typep (obj-layout cell object)
+  (let ((classoid (classoid-cell-classoid cell)))
+    (unless classoid
+      (error "The class ~S has not yet been defined."
+	     (classoid-cell-name cell)))
+    (classoid-typep obj-layout classoid object)))
 
-;;; Test whether OBJ-LAYOUT is from an instance of CLASS.
-(defun class-typep (obj-layout class object)
+;;; Test whether OBJ-LAYOUT is from an instance of CLASSOID.
+(defun classoid-typep (obj-layout classoid object)
   (declare (optimize speed))
   (when (layout-invalid obj-layout)
-    (if (and (typep (sb!xc:class-of object) 'sb!xc:standard-class) object)
+    (if (and (typep (classoid-of object) 'standard-classoid) object)
 	(setq obj-layout (sb!pcl::check-wrapper-validity object))
 	(error "TYPEP was called on an obsolete object (was class ~S)."
-	       (class-proper-name (layout-class obj-layout)))))
-  (let ((layout (class-layout class))
+	       (classoid-proper-name (layout-classoid obj-layout)))))
+  (let ((layout (classoid-layout classoid))
 	(obj-inherits (layout-inherits obj-layout)))
     (when (layout-invalid layout)
-      (error "The class ~S is currently invalid." class))
+      (error "The class ~S is currently invalid." classoid))
     (or (eq obj-layout layout)
 	(dotimes (i (length obj-inherits) nil)
 	  (when (eq (svref obj-inherits i) layout)

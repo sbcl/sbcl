@@ -286,62 +286,56 @@
      (assert (subtypep 'simple-error 'error))
      (assert (not (subtypep 'condition 'simple-condition)))
      (assert (not (subtypep 'error 'simple-error)))
-     (assert (eq (car (sb-kernel:class-direct-superclasses
+     (assert (eq (car (sb-pcl:class-direct-superclasses
 		       (find-class 'simple-condition)))
 		 (find-class 'condition)))
 
-     (assert (eq (car (sb-pcl:class-direct-superclasses (sb-pcl:find-class
-							 'simple-condition)))
-		 (sb-pcl:find-class 'condition)))
-
-    (let ((subclasses (mapcar #'sb-pcl:find-class
+    (let ((subclasses (mapcar #'find-class
                               '(simple-type-error
                                 simple-error
                                 simple-warning
                                 sb-int:simple-file-error
                                 sb-int:simple-style-warning))))
       (assert (null (set-difference
-                     (sb-pcl:class-direct-subclasses (sb-pcl:find-class
+                     (sb-pcl:class-direct-subclasses (find-class
                                                       'simple-condition))
                      subclasses))))
 
      ;; precedence lists
      (assert (equal (sb-pcl:class-precedence-list
-		     (sb-pcl:find-class 'simple-condition))
-		    (mapcar #'sb-pcl:find-class '(simple-condition
-						  condition
-						  sb-kernel:instance
-						  t))))
+		     (find-class 'simple-condition))
+		    (mapcar #'find-class '(simple-condition
+					   condition
+					   sb-kernel:instance
+					   t))))
 
      ;; stream classes
-     (assert (null (sb-kernel:class-direct-superclasses
-		    (find-class 'fundamental-stream))))
-     (assert (equal (sb-pcl:class-direct-superclasses (sb-pcl:find-class
+     (assert (equal (sb-pcl:class-direct-superclasses (find-class
 						       'fundamental-stream))
-		    (mapcar #'sb-pcl:find-class '(standard-object stream))))
+		    (mapcar #'find-class '(standard-object stream))))
      (assert (null (set-difference
-		    (sb-pcl:class-direct-subclasses (sb-pcl:find-class
+		    (sb-pcl:class-direct-subclasses (find-class
 						     'fundamental-stream))
-		    (mapcar #'sb-pcl:find-class '(fundamental-binary-stream
-						  fundamental-character-stream
-						  fundamental-output-stream
-						  fundamental-input-stream)))))
-     (assert (equal (sb-pcl:class-precedence-list (sb-pcl:find-class
+		    (mapcar #'find-class '(fundamental-binary-stream
+					   fundamental-character-stream
+					   fundamental-output-stream
+					   fundamental-input-stream)))))
+     (assert (equal (sb-pcl:class-precedence-list (find-class
 						   'fundamental-stream))
-		    (mapcar #'sb-pcl:find-class '(fundamental-stream
-						  standard-object
-						  sb-pcl::std-object
-						  sb-pcl::slot-object
-						  stream
-						  sb-kernel:instance
-						  t))))
-     (assert (equal (sb-pcl:class-precedence-list (sb-pcl:find-class
+		    (mapcar #'find-class '(fundamental-stream
+					   standard-object
+					   sb-pcl::std-object
+					   sb-pcl::slot-object
+					   stream
+					   sb-kernel:instance
+					   t))))
+     (assert (equal (sb-pcl:class-precedence-list (find-class
 						   'fundamental-stream))
-		    (mapcar #'sb-pcl:find-class '(fundamental-stream
-						  standard-object
-						  sb-pcl::std-object
-						  sb-pcl::slot-object stream
-						  sb-kernel:instance t))))
+		    (mapcar #'find-class '(fundamental-stream
+					   standard-object
+					   sb-pcl::std-object
+					   sb-pcl::slot-object stream
+					   sb-kernel:instance t))))
      (assert (subtypep (find-class 'stream) (find-class t)))
      (assert (subtypep (find-class 'fundamental-stream) 'stream))
      (assert (not (subtypep 'stream 'fundamental-stream)))))

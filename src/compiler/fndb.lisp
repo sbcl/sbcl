@@ -96,10 +96,10 @@
 ;;;; classes
 
 (sb!xc:deftype name-for-class () t)
-(defknown class-name (sb!xc:class) name-for-class (flushable))
-(defknown find-class (name-for-class &optional t lexenv-designator)
-  (or sb!xc:class null) ())
-(defknown class-of (t) sb!xc:class (flushable))
+(defknown classoid-name (classoid) name-for-class (flushable))
+(defknown find-classoid (name-for-class &optional t lexenv-designator)
+  (or classoid null) ())
+(defknown classoid-of (t) classoid (flushable))
 (defknown layout-of (t) layout (flushable))
 (defknown copy-structure (structure-object) structure-object
   (flushable unsafe))

@@ -144,20 +144,15 @@
 			   sb!alien-internals:alien-value)))
 	     (values nil t))
 	    (;; special case when TARGET-TYPE isn't a type spec, but
-	     ;; instead a CLASS object
-	     (typep target-type 'sb!xc::structure-class)
-	     ;; SBCL-specific types which have an analogue specially
-	     ;; created on the host system
-	     (if (sb!xc:subtypep (sb!xc:class-name target-type)
-				 'sb!kernel::structure!object)
-		 (values (typep host-object (sb!xc:class-name target-type)) t)
-		 (values nil t)))
+	     ;; instead a CLASS object.
+	     (typep target-type 'class)
+	     (bug "We don't support CROSS-TYPEP of CLASS type specifiers"))
 	    ((and (symbolp target-type)
 		  (find-class target-type nil)
 		  (subtypep target-type 'sb!kernel::structure!object))
 	     (values (typep host-object target-type) t))
 	    ((and (symbolp target-type)
-		  (sb!xc:find-class target-type nil)
+		  (find-classoid target-type nil)
 		  (sb!xc:subtypep target-type 'cl:structure-object)
 		  (typep host-object '(or symbol number list character)))
 	     (values nil t))
@@ -217,8 +212,8 @@
 		 (values nil t))) ; but "obviously not a complex" being easy
 	    ;; Some types require translation between the cross-compilation
 	    ;; host Common Lisp and the target SBCL.
-	    ((target-type-is-in '(sb!xc:class))
-	     (values (typep host-object 'sb!xc:class) t))
+	    ((target-type-is-in '(classoid))
+	     (values (typep host-object 'classoid) t))
 	    ((target-type-is-in '(fixnum))
 	     (values (fixnump host-object) t))
 	    ;; Some types are too hard to handle in the positive
@@ -376,14 +371,14 @@
      (cond ((typep x 'standard-char)
 	    ;; (Note that SBCL doesn't distinguish between BASE-CHAR and
 	    ;; CHARACTER.)
-	    (sb!xc:find-class 'base-char))
+	    (find-classoid 'base-char))
 	   ((not (characterp x))
 	    nil)
 	   (t
 	    ;; Beyond this, there seems to be no portable correspondence.
 	    (error "can't map host Lisp CHARACTER ~S to target Lisp" x))))
     (structure!object
-     (sb!xc:find-class (uncross (class-name (class-of x)))))
+     (find-classoid (uncross (class-name (class-of x)))))
     (t
      ;; There might be more cases which we could handle with
      ;; sufficient effort; since all we *need* to handle are enough

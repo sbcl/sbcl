@@ -166,13 +166,13 @@
       (freeze-type
        (dolist (type args)
 	 (let ((class (specifier-type type)))
-	   (when (typep class 'sb!xc:class)
-	     (setf (class-state class) :sealed)
-	     (let ((subclasses (class-subclasses class)))
+	   (when (typep class 'classoid)
+	     (setf (classoid-state class) :sealed)
+	     (let ((subclasses (classoid-subclasses class)))
 	       (when subclasses
 		 (dohash (subclass layout subclasses)
 		   (declare (ignore layout))
-		   (setf (class-state subclass) :sealed))))))))
+		   (setf (classoid-state subclass) :sealed))))))))
       (optimize
        (setq *policy* (process-optimize-decl form *policy*)))
       ((inline notinline maybe-inline)

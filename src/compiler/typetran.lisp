@@ -99,10 +99,10 @@
 
 ;;; If FIND-CLASS is called on a constant class, locate the CLASS-CELL
 ;;; at load time.
-(deftransform find-class ((name) ((constant-arg symbol)) *)
+(deftransform find-classoid ((name) ((constant-arg symbol)) *)
   (let* ((name (continuation-value name))
-	 (cell (find-class-cell name)))
-    `(or (class-cell-class ',cell)
+	 (cell (find-classoid-cell name)))
+    `(or (classoid-cell-classoid ',cell)
 	 (error "class not yet defined: ~S" name))))
 
 ;;;; standard type predicates, i.e. those defined in package COMMON-LISP,
@@ -395,7 +395,7 @@
   (aver (constant-continuation-p spec))
   (let* ((spec (continuation-value spec))
 	 (class (specifier-type spec))
-	 (name (sb!xc:class-name class))
+	 (name (classoid-name class))
 	 (otype (continuation-type object))
 	 (layout (let ((res (info :type :compiler-layout name)))
 		   (if (and res (not (layout-invalid res)))
@@ -408,7 +408,7 @@
       ((csubtypep otype class)
        t)
       ;; If not properly named, error.
-      ((not (and name (eq (sb!xc:find-class name) class)))
+      ((not (and name (eq (find-classoid name) class)))
        (compiler-error "can't compile TYPEP of anonymous or undefined ~
 			class:~%  ~S"
 		       class))
@@ -426,8 +426,8 @@
 	     (t
 	      (values '(lambda (x) (declare (ignore x)) t) 'layout-of)))
 	 (cond
-	   ((and (eq (class-state class) :sealed) layout
-		 (not (class-subclasses class)))
+	   ((and (eq (classoid-state class) :sealed) layout
+		 (not (classoid-subclasses class)))
 	    ;; Sealed and has no subclasses.
 	    (let ((n-layout (gensym)))
 	      `(and (,pred object)
@@ -436,7 +436,7 @@
 			      `((when (layout-invalid ,n-layout)
 				  (%layout-invalid-error object ',layout))))
 		      (eq ,n-layout ',layout)))))
-	   ((and (typep class 'basic-structure-class) layout)
+	   ((and (typep class 'basic-structure-classoid) layout)
 	    ;; structure type tests; hierarchical layout depths
 	    (let ((depthoid (layout-depthoid layout))
 		  (n-layout (gensym)))
@@ -474,9 +474,9 @@
 	   (t
 	    (/noshow "default case -- ,PRED and CLASS-CELL-TYPEP")
 	    `(and (,pred object)
-		  (class-cell-typep (,get-layout object)
-				    ',(find-class-cell name)
-				    object)))))))))
+		  (classoid-cell-typep (,get-layout object)
+				       ',(find-classoid-cell name)
+		                       object)))))))))
 
 ;;; If the specifier argument is a quoted constant, then we consider
 ;;; converting into a simple predicate or other stuff. If the type is
@@ -526,7 +526,7 @@
 	    (typecase type
 	      (numeric-type
 	       (source-transform-numeric-typep object type))
-	      (sb!xc:class
+	      (classoid
 	       `(%instance-typep ,object ,spec))
 	      (array-type
 	       (source-transform-array-typep object type))

@@ -115,8 +115,8 @@
   "Return the type of OBJECT."
   (if (typep object '(or function array complex))
     (type-specifier (ctype-of object))
-    (let* ((class (layout-class (layout-of object)))
-	   (name (class-name class)))
+    (let* ((classoid (layout-classoid (layout-of object)))
+	   (name (classoid-name classoid)))
       (if (typep object 'instance)
       (case name
 	(sb!alien-internals:alien-value
@@ -124,7 +124,7 @@
 	   ,(sb!alien-internals:unparse-alien-type
 	     (sb!alien-internals:alien-value-type object))))
 	(t
-	 (class-proper-name class)))
+	 (classoid-proper-name classoid)))
       name))))
 
 ;;;; equality predicates
@@ -209,7 +209,7 @@
 		(len (layout-length layout-x)))
 	   (and (typep y 'instance)
 		(eq layout-x (%instance-layout y))
-		(structure-class-p (layout-class layout-x))
+		(structure-classoid-p (layout-classoid layout-x))
 		(do ((i 1 (1+ i)))
 		    ((= i len) t)
 		  (declare (fixnum i))

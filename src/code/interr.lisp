@@ -242,7 +242,7 @@
 (deferr layout-invalid-error (object layout)
   (error 'layout-invalid
 	 :datum object
-	 :expected-type (layout-class layout)))
+	 :expected-type (layout-classoid layout)))
 
 (deferr odd-key-args-error ()
   (error 'simple-program-error
