@@ -2354,6 +2354,8 @@ changes in sbcl-0.8.9 relative to sbcl-0.8.8:
        constitute a word.
     ** Printing the "Space" character with escaping on now yields "#\\ ", 
        rather than "#\\Space", as mandated by ANSI 22.1.3.2.
+    ** Reading floating-point numbers with *READ-BASE* set to a number
+       less than 10 works correctly.
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles

@@ -107,3 +107,64 @@
   (assert (equal (multiple-value-list
                   (parse-integer string))
                  '(123 6))))
+
+(let ((*read-base* *read-base*))
+  (dolist (float-string '(".9" ".9e9" ".9e+9" ".9e-9"
+			  "-.9" "-.9e9" "-.9e+9" "-.9e-9"
+			  "+.9" "+.9e9" "+.9e+9" "+.9e-9"
+			  "0.9" "0.9e9" "0.9e+9" "0.9e-9"
+			  "9.09" "9.09e9" "9.09e+9" "9.09e-9"
+			  "9e9" "9e+9" "9e-9"))
+    (loop for i from 2 to 36
+	  do (setq *read-base* i)
+	  do (assert (typep (read-from-string float-string)
+			    *read-default-float-format*))
+	  do (assert (typep
+		      (read-from-string (substitute #\E #\e float-string))
+		      *read-default-float-format*))
+	  if (position #\e float-string)
+	  do (assert (typep
+		      (read-from-string (substitute #\s #\e float-string))
+		      'short-float))
+	  and do (assert (typep
+			  (read-from-string (substitute #\S #\e float-string))
+			  'short-float))
+	  and do (assert (typep
+			  (read-from-string (substitute #\f #\e float-string))
+			  'single-float))
+	  and do (assert (typep
+			  (read-from-string (substitute #\F #\e float-string))
+			  'single-float))
+	  and do (assert (typep
+			  (read-from-string (substitute #\d #\e float-string))
+			  'double-float))
+	  and do (assert (typep
+			  (read-from-string (substitute #\D #\e float-string))
+			  'double-float))
+	  and do (assert (typep
+			  (read-from-string (substitute #\d #\e float-string))
+			  'long-float))
+	  and do (assert (typep
+			  (read-from-string (substitute #\D #\e float-string))
+			  'long-float)))))
+
+(let ((*read-base* *read-base*))
+  (dolist (integer-string '("1." "2." "3." "4." "5." "6." "7." "8." "9." "0."))
+    (loop for i from 2 to 36
+	  do (setq *read-base* i)
+	  do (assert (typep (read-from-string integer-string) 'integer)))))
+
+(let ((*read-base* *read-base*))
+  (dolist (symbol-string '("A." "a." "Z." "z."
+			   
+			   "+.9eA" "+.9ea"
+			   
+			   "0.A" "0.a" "0.Z" "0.z"
+
+			   "9eA" "9ea" "9e+A" "9e+a" "9e-A" "9e-a"
+			   "Ae9" "ae9" "Ae+9" "ae+9" "Ae-9" "ae-9"
+			   
+			   "A.0" "A.0e10" "a.0" "a.0e10"))
+    (loop for i from 2 to 36
+	  do (setq *read-base* i)
+	  do (assert (typep (read-from-string symbol-string) 'symbol)))))

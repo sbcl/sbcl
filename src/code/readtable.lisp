@@ -26,6 +26,9 @@
 (def!constant +char-attr-constituent-digit+ 7)
 (def!constant +char-attr-constituent-sign+ 8)
 ;; the "9" entry intentionally left blank for some reason -- WHN 19990806
+;;
+;; appropriated by CSR 2004-03-16
+(def!constant +char-attr-constituent-decimal-digit+ 9)
 (def!constant +char-attr-multiple-escape+ 10)
 (def!constant +char-attr-package-delimiter+ 11)
 (def!constant +char-attr-delimiter+ 12) ; (a fake for READ-UNQUALIFIED-TOKEN)
