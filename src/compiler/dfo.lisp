@@ -365,7 +365,7 @@
     (the simple-string
       (if (stringp leaf-debug-name)
 	  leaf-debug-name
-	  (debug-namify "function ~S" leaf-debug-name)))))
+	  (debug-namify "function " leaf-debug-name)))))
 
 ;;; Given a list of top level lambdas, return
 ;;;   (VALUES NONTOP-COMPONENTS TOP-COMPONENTS HAIRY-TOP-COMPONENTS).

@@ -1084,10 +1084,9 @@
                                 (block-next (node-block call)))
       (let ((new-fun (ir1-convert-inline-lambda
 		      res
-		      :debug-name (debug-namify "LAMBDA-inlined ~A"
-						(as-debug-name
-						 source-name
-						 "<unknown function>"))))
+		      :debug-name (debug-namify "LAMBDA-inlined " 
+						source-name 
+						"<unknown function>")))
 	    (ref (lvar-use (combination-fun call))))
 	(change-ref-leaf ref new-fun)
 	(setf (combination-kind call) :full)

@@ -171,19 +171,58 @@ dynamic binding, even though the symbol name follows the usual naming~@
 convention (names like *FOO*) for special variables" symbol))
   (values))
 
-;;; shorthand for creating debug names from source names or other
-;;; stems, e.g.
-;;;   (DEBUG-NAMIFY "FLET ~S" SOURCE-NAME)
-;;;   (DEBUG-NAMIFY "top level form ~S" FORM)
+;;; Hacky (duplicating machinery found elsewhere because this function
+;;; turns out to be on a critical path in the compiler) shorthand for
+;;; creating debug names from source names or other stems, e.g.
 ;;;
-;;; FIXME: This function seems to have a lot in common with
-;;; STRINGIFY-FORM, and perhaps there's some way to merge the two
-;;; functions.
-(declaim (ftype (sfunction (string &rest t) string) debug-namify))
-(defun debug-namify (format-string &rest format-arguments)
-  (with-standard-io-syntax
-   (let ((*print-readably* nil)
-         (*package* *cl-package*)
-         (*print-length* 3)
-         (*print-level* 2))
-     (apply #'format nil format-string format-arguments))))
+;;;   (DEBUG-NAMIFY "FLET " SOURCE-NAME) -> "FLET FOO:BAR"
+;;;   (DEBUG-NAMIFY "top level form " FORM) -> "top level form (QUUX :FOO)"
+;;;
+;;; If ALT is given it must be a string -- it is then used in place of
+;;; either HEAD or TAIL if either of them is EQ to SB-C::.ANONYMOUS. 
+;;;
+(declaim (inline debug-namify))
+(defun debug-namify (head tail &optional alt)
+  (declare (type (or null string) alt))
+  (flet ((symbol-debug-name (symbol)
+	   ;; KLUDGE: (OAOOM warning) very much akin to OUTPUT-SYMBOL.
+	   (if (and alt (eq '.anonymous. symbol))
+	       alt
+	       (let ((package (symbol-package symbol))
+		     (name (symbol-name symbol)))
+		 (cond
+		   ((eq package *keyword-package*)
+		    (concatenate 'string ":" name))
+		   ((eq package *cl-package*)
+		    name)
+		   ((null package)
+		    (concatenate 'string "#:" name))
+		   (t
+		    (multiple-value-bind (symbol status) 
+			(find-symbol name package)
+		      (declare (ignore symbol))
+		      (concatenate 'string 
+				   (package-name package)
+				   (if (eq status :external) ":" "::")
+				   name))))))))
+    (cond ((and (stringp head) (stringp tail))
+	   (concatenate 'string head tail))
+	  ((and (stringp head) (symbolp tail))
+	   (concatenate 'string head (symbol-debug-name tail)))
+	  ((and (symbolp head) (stringp tail))
+	   (concatenate 'string (symbol-debug-name head) tail))
+	  (t
+	   (macrolet ((out (obj s)
+			`(typecase ,obj
+			  (string (write-string ,obj ,s))
+			  (symbol (write-string (symbol-debug-name ,obj) ,s))
+			  (t (prin1 ,obj ,s)))))
+	     (with-standard-io-syntax
+	       (let ((*print-readably* nil)
+		     (*print-pretty* nil)
+		     (*package* *cl-package*)
+		     (*print-length* 3)
+		     (*print-level* 2))
+		 (with-output-to-string (s)
+		   (out head s)
+		   (out tail s)))))))))

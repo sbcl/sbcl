@@ -186,7 +186,7 @@
   (with-ir1-environment-from-node (lambda-bind (main-entry fun))
     (let ((res (ir1-convert-lambda (make-xep-lambda-expression fun)
 				   :debug-name (debug-namify
-						"XEP for ~A"
+						"XEP for "
 						(leaf-debug-name fun)))))
       (setf (functional-kind res) :external
 	    (leaf-ever-used res) t
@@ -345,7 +345,7 @@
                           (ir1-convert-lambda
                            (functional-inline-expansion original-functional)
                            :debug-name (debug-namify
-                                        "local inline ~A"
+                                        "local inline "
                                         (leaf-debug-name
                                          original-functional)))))))
           (cond (losing-local-functional
@@ -546,7 +546,7 @@
 	    `(lambda ,vars
 	       (declare (ignorable ,@ignores))
 	       (%funcall ,entry ,@args))
-	    :debug-name (debug-namify "hairy function entry ~S"
+	    :debug-name (debug-namify "hairy function entry "
 				      (lvar-fun-name
 				       (basic-combination-fun call)))))))
     (convert-call ref call new-fun)

@@ -134,7 +134,7 @@
       (let ((def `(lambda (,whole ,environment)
 		    ,@local-decs
 		    ,body))
-	    (debug-name (debug-namify "DEFINE-COMPILER-MACRO ~S" name)))
+	    (debug-name (sb!c::debug-namify "DEFINE-COMPILER-MACRO " name)))
 	`(eval-when (:compile-toplevel :load-toplevel :execute)
 	  (sb!c::%define-compiler-macro ',name
 					#',def

@@ -214,7 +214,7 @@
  					  :aux-vars (rest aux-vars)
  					  :aux-vals (rest aux-vals)
  					  :debug-name (debug-namify
- 						       "&AUX bindings ~S"
+ 						       "&AUX bindings " 
  						       aux-vars))))
 	(reference-leaf start ctran fun-lvar fun)
 	(ir1-convert-combination-args fun-lvar ctran next result
@@ -427,8 +427,8 @@
                                                        ,@(default-vals))))
                                          arg-vars
                                          :debug-name
-                                         (debug-namify "&OPTIONAL processor ~D"
-                                                       (random 100))
+                                         (debug-namify "&OPTIONAL processor "
+						       (gensym))
                                          :note-lexical-bindings nil))))
     (mapc (lambda (var arg-var)
 	    (when (cdr (leaf-refs arg-var))
@@ -622,7 +622,7 @@
 		     (%funcall ,(optional-dispatch-main-entry res)
 			       ,@(arg-vals))))
 		 (arg-vars)
-		 :debug-name (debug-namify "~S processing" '&more)
+		 :debug-name "&MORE processing"
                  :note-lexical-bindings nil)))
 	(setf (optional-dispatch-more-entry res)
               (register-entry-point ep res)))))
@@ -708,9 +708,8 @@
 			body (main-vars)
 			:aux-vars (append (bind-vars) aux-vars)
 			:aux-vals (append (bind-vals) aux-vals)
-			:debug-name (debug-namify "varargs entry for ~A"
-						  (as-debug-name source-name
-								 debug-name))))
+			:debug-name (debug-namify
+				     "varargs entry for " source-name debug-name)))
 	   (last-entry (convert-optional-entry main-entry default-vars
 					       (main-vals) ())))
       (setf (optional-dispatch-main-entry res)
@@ -778,9 +777,9 @@
 			 :aux-vars aux-vars
 			 :aux-vals aux-vals
 			 :debug-name (debug-namify
-				      "hairy arg processor for ~A"
-				      (as-debug-name source-name
-						     debug-name)))))
+				      "hairy arg processor for "
+				      source-name
+				      debug-name))))
                (setf (optional-dispatch-main-entry res) fun)
                (register-entry-point fun res)
                (push (if supplied-p-p
@@ -847,7 +846,7 @@
 				      &key
 				      (source-name '.anonymous.)
 				      (debug-name (debug-namify
-						   "OPTIONAL-DISPATCH ~S"
+						   "OPTIONAL-DISPATCH "
 						   vars)))
   (declare (list body vars aux-vars aux-vals))
   (let ((res (make-optional-dispatch :arglist vars

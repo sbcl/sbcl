@@ -909,8 +909,8 @@
     (setf (component-kind component) :initial)
     (let* ((locall-fun (ir1-convert-lambdalike
                         definition
-                        :debug-name (debug-namify "top level local call ~S"
-                                                  name)
+                        :debug-name (debug-namify "top level local call "
+						  name)
 			;; KLUDGE: we do this so that we get to have
 			;; nice debug returnness in functions defined
 			;; from the REPL

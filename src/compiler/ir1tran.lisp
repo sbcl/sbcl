@@ -396,7 +396,7 @@
     (let* ((forms (if for-value `(,form) `(,form nil)))
 	   (res (ir1-convert-lambda-body
 		 forms ()
-		 :debug-name (debug-namify "top level form ~S" form))))
+		 :debug-name (debug-namify "top level form " form))))
       (setf (functional-entry-fun res) res
 	    (functional-arg-documentation res) ()
 	    (functional-kind res) :toplevel)
@@ -520,7 +520,7 @@
 					      (ir1-convert-lambda
 					       opname
 					       :debug-name (debug-namify
-							    "LAMBDA CAR ~S"
+							    "LAMBDA CAR "
 							    opname)
 					       :allow-debug-catch-tag t))))))))
     (values))

@@ -430,7 +430,7 @@
 		 '(lambda named-lambda instance-lambda lambda-with-lexenv))
 	 (ir1-convert-lambdalike
 			  thing
-			  :debug-name (debug-namify "#'~S" thing)
+			  :debug-name (debug-namify "#'" thing)
 			  :allow-debug-catch-tag t))
 	((legal-fun-name-p thing)
 	 (find-lexically-apparent-fun
@@ -544,8 +544,8 @@
                       (processing-decls (decls vars nil next result)
                         (let ((fun (ir1-convert-lambda-body
                                     forms vars
-                                    :debug-name (debug-namify "LET ~S"
-                                                              bindings))))
+                                    :debug-name (debug-namify "LET "
+							      bindings))))
                           (reference-leaf start ctran fun-lvar fun))
                         (values next result))))
             (ir1-convert-combination-args fun-lvar ctran next result values))))))
@@ -625,7 +625,7 @@
                              (ir1-convert-lambda d
                                                  :source-name n
                                                  :debug-name (debug-namify
-                                                              "FLET ~S" n)
+                                                              "FLET " n)
                                                  :allow-debug-catch-tag t))
                            names defs)))
         (processing-decls (decls nil fvars next result)
@@ -647,7 +647,7 @@
 					 (make-functional
 					  :%source-name name
 					  :%debug-name (debug-namify
-							"LABELS placeholder ~S"
+							"LABELS placeholder "
 							name)))
 				       names))
 	     ;; (like PAIRLIS but guaranteed to preserve ordering:)
@@ -660,7 +660,7 @@
 			  (ir1-convert-lambda def
 					      :source-name name
 					      :debug-name (debug-namify
-							   "LABELS ~S" name)
+							   "LABELS " name)
 					      :allow-debug-catch-tag t))
 			names defs))))
 
@@ -833,7 +833,7 @@
   (let ((fun (ir1-convert-lambda
 	      `(lambda ()
 		 (return-from ,tag (%unknown-values)))
-	      :debug-name (debug-namify "escape function for ~S" tag))))
+	      :debug-name (debug-namify "escape function for " tag))))
     (setf (functional-kind fun) :escape)
     (reference-leaf start next result fun)))
 
