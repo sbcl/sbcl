@@ -1098,6 +1098,25 @@ WORKAROUND:
   probably because of a bogus implementation of
   os_restore_fp_control().
 
+266:
+  David Lichteblau provided (sbcl-devel 2003-06-01) a patch to fix
+  behaviour of streams with element-type (SIGNED-BYTE 8).  The patch
+  looks reasonable, if not obviously correct; however, it caused the
+  PPC/Linux port to segfault during warm-init while loading
+  src/pcl/std-class.fasl.  A workaround patch was made, but it would
+  be nice to understand why the first patch caused problems, and to
+  fix the cause if possible.
+
+267:
+  In
+    (defun fact (x i)
+      (if (= x 0)
+          i
+          (fact (1- x) (* x i))))
+  sbcl does not convert the self-recursive call to a jump, though it
+  is allowed to by CLHS 3.2.2.3.  CMUCL, however, does perform this
+  optimization.
+
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:
     These labels were used for bugs related to the old IR1 interpreter.

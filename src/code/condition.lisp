@@ -689,7 +689,7 @@
 	     (when (= pos (read-sequence string error-stream))
 	       (setq lineno (1+ (count #\Newline string))
 		     colno (- pos
-			      (or (position #\Newline string :from-end t) 0)
+			      (or (position #\Newline string :from-end t) -1)
 			      1))))
 	   (file-position error-stream pos))
 	 (format stream

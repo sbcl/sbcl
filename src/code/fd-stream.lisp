@@ -687,6 +687,8 @@
 		     ;; (unsigned-byte 8).  Because there's no buffer, the
 		     ;; other element-types will dispatch to the appropriate
 		     ;; input (output) routine in fast-read-byte.
+		     (equal target-type '(unsigned-byte 8))
+		     #+nil
 		     (or (eq type 'unsigned-byte)
 			 (eq type :default)))
 	    (setf (ansi-stream-in-buffer fd-stream)
