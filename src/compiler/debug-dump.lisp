@@ -524,10 +524,11 @@
 	   (setf (compiled-debug-fun-arguments dfun)
 		 (compute-args fun var-locs))))
 
-    (when (>= level 2)
+    (if (>= level 2)
       (multiple-value-bind (blocks tlf-num) (compute-debug-blocks fun var-locs)
 	(setf (compiled-debug-fun-tlf-number dfun) tlf-num)
-	(setf (compiled-debug-fun-blocks dfun) blocks)))
+	(setf (compiled-debug-fun-blocks dfun) blocks))
+      (setf (compiled-debug-fun-tlf-number dfun) (find-tlf-number fun)))
 
     (if (xep-p fun)
 	(setf (compiled-debug-fun-returns dfun) :standard)

@@ -24,7 +24,7 @@
 ;;; 5) would be nice to have some interface to the compiler that lets us
 ;;;   fake the filename and position, for use with C-M-x
 
-(declaim (optimize (debug 3)))
+(declaim (optimize (debug 1)))
 
 (defpackage :sb-introspect
   (:use "CL")
@@ -80,20 +80,16 @@ Returns a DEFINITION-SOURCE object"))
 
 ;; Internal-only, don't call this directly
 (defun find-function-definition-source (o)
-  (let* ((name (sb-vm::%simple-fun-name o))
-	 (debug-info
+  (let* ((debug-info
 	  (sb-kernel:%code-debug-info
 	   (sb-kernel:fun-code-header(sb-kernel::%closure-fun o))))
 	 (debug-source
 	  (car (sb-c::compiled-debug-info-source debug-info)))
-	 (debug-fun
-	  (loop for debug-fun
-		across (sb-c::compiled-debug-info-fun-map debug-info)
-		when (and (sb-c::debug-fun-p debug-fun)
-			  (eql (sb-c::compiled-debug-fun-name debug-fun) name))
-		return debug-fun))
+	 (debug-fun (elt (sb-c::compiled-debug-info-fun-map debug-info) 0))
 	 (tlf (and debug-fun (sb-c::compiled-debug-fun-tlf-number debug-fun))))
-    ;; FIXME why only the first debug-source?  can there be >1?
+    ;; HAZARDOUS ASSUMPTION: in CMUCL it's possible to get >1 debug-source
+    ;; for a debug-info (one per file).  In SBCL the function that builds
+    ;; debug-sources always produces singleton lists
     (sb-int:aver (not (cdr (sb-c::compiled-debug-info-source debug-info))))
     (make-definition-source
      :pathname
