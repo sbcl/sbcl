@@ -319,7 +319,7 @@
 ;;; passes them on to CONT.
 (defun convert-type-check (cont types)
   (declare (type continuation cont) (type list types))
-  (with-belated-ir1-environment (continuation-dest cont)
+  (with-ir1-environment-from-node (continuation-dest cont)
 
     ;; Ensuring that CONT starts a block lets us freely manipulate its uses.
     (ensure-block-start cont)

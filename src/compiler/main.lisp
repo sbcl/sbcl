@@ -310,6 +310,7 @@
 ;;; Do all the IR1 phases for a non-top-level component.
 (defun ir1-phases (component)
   (declare (type component component))
+  (aver-live-component component)
   (let ((*constraint-number* 0)
 	(loop-count 1)
         (*delayed-ir1-transforms* nil))
@@ -440,7 +441,7 @@
 	      (null))))))
 
   ;; We're done, so don't bother keeping anything around.
-  (setf (component-info component) nil)
+  (setf (component-info component) :dead)
 
   (values))
 
@@ -462,6 +463,7 @@
 	 (return))))))
 
 (defun compile-component (component)
+  (aver-live-component component)
   (let* ((*component-being-compiled* component))
     (when sb!xc:*compile-print*
       (compiler-mumble "~&; compiling ~A: " (component-name component)))
@@ -1124,8 +1126,8 @@
   (let ((lambda (compile-load-time-stuff `(progn ,@forms) name nil)))
     (fasl-dump-toplevel-lambda-call lambda *compile-object*)))
 
-;;; Does the actual work of COMPILE-LOAD-TIME-VALUE or
-;;; COMPILE-MAKE-LOAD-FORM- INIT-FORMS.
+;;; Do the actual work of COMPILE-LOAD-TIME-VALUE or
+;;; COMPILE-MAKE-LOAD-FORM-INIT-FORMS.
 (defun compile-load-time-stuff (form name for-value)
   (with-ir1-namespace
    (let* ((*lexenv* (make-null-lexenv))

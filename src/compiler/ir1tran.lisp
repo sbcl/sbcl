@@ -33,7 +33,7 @@
 ;;; FIXME: It's confusing having one variable named *CURRENT-COMPONENT*
 ;;; and another named *COMPONENT-BEING-COMPILED*. (In CMU CL they
 ;;; were called *CURRENT-COMPONENT* and *COMPILE-COMPONENT* respectively,
-;;; which also confusing.)
+;;; which was also confusing.)
 (declaim (type (or component null) *current-component*))
 (defvar *current-component*)
 
@@ -488,6 +488,7 @@
 ;;; Add FUN to the COMPONENT-REANALYZE-FUNS. FUN is returned.
 (defun maybe-reanalyze-fun (fun)
   (declare (type functional fun))
+  (aver-live-component *current-component*)
   (when (typep fun '(or optional-dispatch clambda))
     (pushnew fun (component-reanalyze-funs *current-component*)))
   fun)
@@ -1354,6 +1355,10 @@
 				debug-name)
   (declare (list body vars aux-vars aux-vals)
 	   (type (or continuation null) result))
+
+  ;; We're about to try to put new blocks into *CURRENT-COMPONENT*.
+  (aver-live-component *current-component*)
+
   (let* ((bind (make-bind))
 	 (lambda (make-lambda :vars vars
 			      :bind bind
@@ -1415,6 +1420,7 @@
 
     (link-blocks (component-head *current-component*) (node-block bind))
     (push lambda (component-new-funs *current-component*))
+
     lambda))
 
 ;;; Create the actual entry-point function for an optional entry
@@ -1691,8 +1697,7 @@
 			:aux-vars (append (bind-vars) aux-vars)
 			:aux-vals (append (bind-vals) aux-vals)
 			:result cont
-			:debug-name (debug-namify "~S processor for ~A"
-						  '&more
+			:debug-name (debug-namify "varargs entry point for ~A"
 						  (as-debug-name source-name
 								 debug-name))))
 	   (last-entry (convert-optional-entry main-entry default-vars
@@ -1828,6 +1833,7 @@
 				     :%source-name source-name
 				     :%debug-name debug-name))
 	(min (or (position-if #'lambda-var-arg-info vars) (length vars))))
+    (aver-live-component *current-component*)
     (push res (component-new-funs *current-component*))
     (ir1-convert-hairy-args res () () () () vars nil body aux-vars aux-vals
 			    cont source-name debug-name)
@@ -1848,6 +1854,7 @@
 
 ;;; Convert a LAMBDA form into a LAMBDA leaf or an OPTIONAL-DISPATCH leaf.
 (defun ir1-convert-lambda (form &key (source-name '.anonymous.) debug-name)
+
   (unless (consp form)
     (compiler-error "A ~S was found when expecting a lambda expression:~%  ~S"
 		    (type-of form)

@@ -291,7 +291,10 @@
   (out nil)
   ;; the component this block is in, or NIL temporarily during IR1
   ;; conversion and in deleted blocks
-  (component *current-component* :type (or component null))
+  (component (progn
+	       (aver-live-component *current-component*)
+	       *current-component*)
+	     :type (or component null))
   ;; a flag used by various graph-walking code to determine whether
   ;; this block has been processed already or what. We make this
   ;; initially NIL so that FIND-INITIAL-DFO doesn't have to scan the
@@ -314,9 +317,9 @@
   ;; The IR1 block that this block is in the INFO for.
   (block (missing-arg) :type cblock)
   ;; the next and previous block in emission order (not DFO). This
-  ;; determines which block we drop though to, and also used to chain
-  ;; together overflow blocks that result from splitting of IR2 blocks
-  ;; in lifetime analysis.
+  ;; determines which block we drop though to, and is also used to
+  ;; chain together overflow blocks that result from splitting of IR2
+  ;; blocks in lifetime analysis.
   (next nil :type (or block-annotation null))
   (prev nil :type (or block-annotation null)))
 
@@ -400,8 +403,13 @@
   (reanalyze nil :type boolean)
   ;; some sort of name for the code in this component
   (name "<unknown>" :type simple-string)
-  ;; some kind of info used by the back end
-  (info nil)
+  ;; When I am a child, this is :NO-IR2-YET.
+  ;; In my adulthood, IR2 stores notes to itself here.
+  ;; After I have left the great wheel and am staring into the GC, this
+  ;;   is set to :DEAD to indicate that it's a gruesome error to operate
+  ;;   on me (e.g. by using me as *CURRENT-COMPONENT*, or by pushing
+  ;;   LAMBDAs onto my NEW-FUNS, as in sbcl-0.pre7.115).
+  (info :no-ir2-yet :type (or ir2-component (member :no-ir2-yet :dead)))
   ;; the SOURCE-INFO structure describing where this component was
   ;; compiled from
   (source-info *source-info* :type source-info)
@@ -424,6 +432,16 @@
 (defprinter (component :identity t)
   name
   (reanalyze :test reanalyze))
+
+;;; Check that COMPONENT is suitable for roles which involve adding
+;;; new code. (gotta love imperative programming with lotso in-place
+;;; side-effects...)
+(defun aver-live-component (component)
+  ;; FIXME: As of sbcl-0.pre7.115, we're asserting that
+  ;; COMPILE-COMPONENT hasn't happened yet. Might it be even better
+  ;; (certainly stricter, possibly also correct...) to assert that
+  ;; IR1-FINALIZE hasn't happened yet?
+  (aver (not (eql (component-info component) :dead))))
 
 ;;; Before sbcl-0.7.0, there were :TOPLEVEL things which were magical
 ;;; in multiple ways. That's since been refactored into the orthogonal

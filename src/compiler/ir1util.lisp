@@ -36,7 +36,7 @@
   (declare (type cblock block1 block2) (type node node)
 	   (type (or cleanup null) cleanup))
   (setf (component-reanalyze (block-component block1)) t)
-  (with-belated-ir1-environment node
+  (with-ir1-environment-from-node node
     (let* ((start (make-continuation))
 	   (block (continuation-starts-block start))
 	   (cont (make-continuation))
@@ -1072,7 +1072,7 @@
 	     (aver (and succ (null (cdr succ))))
 	     (cond
 	      ((member block succ)
-	       (with-belated-ir1-environment node
+	       (with-ir1-environment-from-node node
 		 (let ((exit (make-exit))
 		       (dummy (make-continuation)))
 		   (setf (continuation-next prev) nil)

@@ -178,7 +178,7 @@
 (defun make-xep (fun)
   (declare (type functional fun))
   (aver (not (functional-entry-fun fun)))
-  (with-belated-ir1-environment (lambda-bind (main-entry fun))
+  (with-ir1-environment-from-node (lambda-bind (main-entry fun))
     (let ((res (ir1-convert-lambda (make-xep-lambda-expression fun)
 				   :debug-name (debug-namify
 						"XEP for ~A"
@@ -265,6 +265,7 @@
 ;;; NEW-FUNS, but we don't add lambdas to the LAMBDAS.
 (defun locall-analyze-component (component)
   (declare (type component component))
+  (aver-live-component component)
   (loop
     (let* ((new-fun (pop (component-new-funs component)))
 	   (fun (or new-fun (pop (component-reanalyze-funs component)))))
@@ -330,7 +331,7 @@
 		   (and (>= speed space) (>= speed compilation-speed)))
 	   (not (eq (functional-kind (node-home-lambda call)) :external))
 	   (inline-expansion-ok call))
-      (with-belated-ir1-environment call
+      (with-ir1-environment-from-node call
 	(let* ((*lexenv* (functional-lexenv fun))
 	       (won nil)
 	       (res (catch 'local-call-lossage
@@ -523,7 +524,7 @@
   (declare (list vars ignores args) (type ref ref) (type combination call)
 	   (type clambda entry))
   (let ((new-fun
-	 (with-belated-ir1-environment call
+	 (with-ir1-environment-from-node call
 	   (ir1-convert-lambda
 	    `(lambda ,vars
 	       (declare (ignorable . ,ignores))
@@ -681,11 +682,11 @@
   (let* ((call-block (node-block call))
 	 (bind-block (node-block (lambda-bind clambda)))
 	 (component (block-component call-block)))
+    (aver-live-component component)
     (let ((clambda-component (block-component bind-block)))
       (unless (eq clambda-component component)
 	(aver (eq (component-kind component) :initial))
 	(join-components component clambda-component)))
-
     (let ((*current-component* component))
       (node-ends-block call))
     ;; FIXME: Use PROPER-LIST-OF-LENGTH-P here, and look for other

@@ -145,10 +145,10 @@
 	(trace-1 fname info new-value)))))
 (push #'trace-redefined-update *setf-fdefinition-hook*)
 
-;;; Annotate some forms to evaluate with pre-converted functions. Each
-;;; form is really a cons (exp . function). Loc is the code location
-;;; to use for the lexical environment. If Loc is NIL, evaluate in the
-;;; null environment. If Form is NIL, just return NIL.
+;;; Annotate a FORM to evaluate with pre-converted functions. FORM is
+;;; really a cons (EXP . FUNCTION). LOC is the code location to use
+;;; for the lexical environment. If LOC is NIL, evaluate in the null
+;;; environment. If FORM is NIL, just return NIL.
 (defun coerce-form (form loc)
   (when form
     (let ((exp (car form)))
@@ -172,6 +172,7 @@
 		      (declare (ignore frame))
 		      (let ((*current-frame* nil))
 			(funcall fun)))))))))
+
 (defun coerce-form-list (forms loc)
   (mapcar #'(lambda (x) (coerce-form x loc)) forms))
 
@@ -234,6 +235,7 @@
 (defun trace-start-breakpoint-fun (info)
   (let (conditionp)
     (values
+
      #'(lambda (frame bpt)
 	 (declare (ignore bpt))
 	 (discard-invalid-entries frame)
@@ -245,7 +247,6 @@
 			  (funcall (cdr condition) frame))
 		      (or (not wherein)
 			  (trace-wherein-p frame wherein)))))
-
 	 (when conditionp
 	   (let ((sb-kernel:*current-level* 0)
 		 (*standard-output* *trace-output*)

@@ -412,7 +412,7 @@
   #!+sb-doc
   "FUNCTION Name
   Return the lexically apparent definition of the function Name. Name may also
-  be a lambda."
+  be a lambda expression."
   (if (consp thing)
       (case (car thing)
 	((lambda)

@@ -657,7 +657,7 @@
 		    `(eq ,node-var (block-last ,n-block))
 		    `(eq ,cont-var ,n-last-cont))
 	   (return nil))))))
-;;; like Do-Nodes, only iterating in reverse order
+;;; like DO-NODES, only iterating in reverse order
 (defmacro do-nodes-backwards ((node-var cont-var block) &body body)
   (let ((n-block (gensym))
 	(n-start (gensym))
@@ -674,17 +674,22 @@
 	 (when (eq ,n-next ,n-start)
 	   (return nil))))))
 
-;;; Bind the IR1 context variables so that IR1 conversion can be done
-;;; after the main conversion pass has finished.
-;;;
-;;; The lexical environment is presumably already null...
-(defmacro with-belated-ir1-environment (node &rest forms)
-  (let ((n-node (gensym)))
-    `(let* ((,n-node ,node)
-	    (*current-component* (block-component (node-block ,n-node)))
-	    (*lexenv* (node-lexenv ,n-node))
-	    (*current-path* (node-source-path ,n-node)))
-       ,@forms)))
+;;; Bind the IR1 context variables to the values associated with NODE,
+;;; so that new, extra IR1 conversion related to NODE can be done
+;;; after the original conversion pass has finished.
+(defmacro with-ir1-environment-from-node (node &rest forms)
+  `(flet ((closure-needing-ir1-environment-from-node ()
+	    ,@forms))
+     (%with-ir1-environment-from-node
+      ,node
+      #'closure-needing-ir1-environment-from-node)))
+(defun %with-ir1-environment-from-node (node fun)
+  (declare (type node node) (type function fun))
+  (let ((*current-component* (block-component (node-block node)))
+	(*lexenv* (node-lexenv node))
+	(*current-path* (node-source-path node)))
+    (aver-live-component *current-component*)
+    (funcall fun)))
 
 ;;; Bind the hashtables used for keeping track of global variables,
 ;;; functions, etc. Also establish condition handlers.

@@ -568,7 +568,7 @@
 ;;; become unreachable, resulting in a spurious note.
 (defun convert-if-if (use node)
   (declare (type node use) (type cif node))
-  (with-belated-ir1-environment node
+  (with-ir1-environment-from-node node
     (let* ((block (node-block node))
 	   (test (if-test node))
 	   (cblock (if-consequent node))
@@ -818,7 +818,7 @@
 		 (change-ref-leaf ref res))))
 	(if ir1-p
 	    (frob)
-	    (with-belated-ir1-environment call
+	    (with-ir1-environment-from-node call
 	      (frob)
 	      (locall-analyze-component *current-component*))))
 
@@ -1083,10 +1083,10 @@
 ;;; integrated into the control flow.
 (defun transform-call (node res)
   (declare (type combination node) (list res))
-  (with-belated-ir1-environment node
+  (with-ir1-environment-from-node node
     (let ((new-fun (ir1-convert-inline-lambda
 		    res
-		    :debug-name "<something inlined in TRANSFORM-CALL>"))
+		    :debug-name "something inlined in TRANSFORM-CALL"))
 	  (ref (continuation-use (combination-fun node))))
       (change-ref-leaf ref new-fun)
       (setf (combination-kind node) :full)
@@ -1481,7 +1481,7 @@
 			    min)
 			   (t nil))))
 	  (when count
-	    (with-belated-ir1-environment node
+	    (with-ir1-environment-from-node node
 	      (let* ((dums (make-gensym-list count))
 		     (ignore (gensym))
 		     (fun (ir1-convert-lambda
@@ -1525,7 +1525,7 @@
 	       (mapc #'flush-dest (subseq vals nvars))
 	       (setq vals (subseq vals 0 nvars)))
 	      ((< nvals nvars)
-	       (with-belated-ir1-environment use
+	       (with-ir1-environment-from-node use
 		 (let ((node-prev (node-prev use)))
 		   (setf (node-prev use) nil)
 		   (setf (continuation-next node-prev) nil)

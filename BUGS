@@ -1359,6 +1359,14 @@ Error in function C::GET-LAMBDA-TO-COMPILE:
   wrong? Something later on is dropping the ball and neglecting
   to look at all the components it should? Something else?
 
+  Tracing more things like IR1-PHASES and COMPILE-COMPONENT, it
+  looks as though the problem is that WITH-BELATED-IR1-ENVIRONMENT
+  is binding *CURRENT-COMPONENT* (i.e., where new code will be inserted)
+  to a COMPONENT which has already been passed to COMPILE-COMPONENT
+  (once and for all, so it'll never pass that way again). It seems
+  as though there's a broken invariant there: *CURRENT-COMPONENT*
+  should never be something which has already been COMPILE-COMPONENTed.
+
 139:
   In sbcl-0.pre7.107, (DIRECTORY "*.*") is broken, as reported by 
   Nathan Froyd sbcl-devel 2001-12-28.
