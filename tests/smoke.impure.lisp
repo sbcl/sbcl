@@ -36,5 +36,9 @@
 (defvar *baz* nil)
 (copy-symbol '*baz* t)
 
+;;; SETQ should return its value.
+(assert (typep (setq *baz* 1) 'integer))
+(assert (typep (in-package :cl-user) 'package))
+
 ;;; success
 (quit :unix-status 104)

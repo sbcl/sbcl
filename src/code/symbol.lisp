@@ -35,10 +35,8 @@
   (about-to-modify-symbol-value symbol)
   (%set-symbol-value symbol new-value))
 
-;;; can't do this yet, the appropriate vop only gets defined in
-;;; compiler/target/cell, 400 lines hence
-;;;(defun %set-symbol-value (symbol new-value)
-;;;  (%set-symbol-value symbol new-value))
+(defun %set-symbol-value (symbol new-value)
+  (%set-symbol-value symbol new-value))
 
 (defun makunbound (symbol)
   #!+sb-doc

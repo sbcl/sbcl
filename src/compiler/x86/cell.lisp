@@ -63,8 +63,7 @@
 (define-vop (set)
   (:args (symbol :scs (descriptor-reg))
          (value :scs (descriptor-reg any-reg)))
-  (:translate sb!kernel:%set-symbol-value)
-  (:temporary (:sc descriptor-reg ) tls)
+  (:temporary (:sc descriptor-reg) tls)
   ;;(:policy :fast-safe)
   (:generator 4
     (let ((global-val (gen-label))

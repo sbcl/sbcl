@@ -81,3 +81,19 @@
 	     type lowtag result))
     (do-inits node block name result lowtag inits args)
     (move-continuation-result node block locs cont)))
+
+;;; KLUDGE: this is set up automatically in #!-SB-THREAD builds by the
+;;; :SET-TRANS thing in objdef.lisp.  However, for #!+SB-THREAD builds
+;;; we need to use a special VOP, so we have to do this by hand.
+;;; -- CSR, 2003-05-08
+#!+sb-thread
+(let ((fun-info (fun-info-or-lose '%set-symbol-value)))
+  (setf (fun-info-ir2-convert fun-info)
+	(lambda (node block)
+	  (let ((args (basic-combination-args node)))
+	    (destructuring-bind (symbol value) args
+	      (let ((value-tn (continuation-tn node block value)))
+		(vop set node block
+		     (continuation-tn node block symbol) value-tn)
+		(move-continuation-result
+		 node block (list value-tn) (node-cont node))))))))

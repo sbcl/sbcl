@@ -512,7 +512,6 @@
  ("src/compiler/early-aliencomp")
  ("src/compiler/target/c-call")
  ("src/compiler/target/cell")
- ("src/code/late-symbol" :not-host)
  ("src/compiler/target/values")
  ("src/compiler/target/alloc")
  ("src/compiler/target/call")
