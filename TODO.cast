@@ -1,11 +1,13 @@
 important things:
 
-* IR2 type checking
 * unite VOPs with CASTs
+  ** (!) CAST on result - for VOP selection
+  ** (?) on argument - for type checking
 * (!) MV type checking
 * preserve DFO during IR1 optimization
 * (?) flush unused CASTs
 * good type error diagnostics
+* VALUES declaration
 
 =======================================================================
 for late cast branch or post-merge:

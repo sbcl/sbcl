@@ -32,7 +32,6 @@ echo //doing warm init
 	;; Now that we use the compiler for macros, interpreted
 	;; /SHOW doesn't work until later in init.
         #+sb-show (print "/hello, world!")
-        (sb!ext:purify)
 
         ;; Until PRINT-OBJECT and other machinery is set up,
 	;; we want limits on printing to avoid infinite output.

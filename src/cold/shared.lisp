@@ -151,6 +151,10 @@
     ;; delete any preexisting object file in order to avoid confusing
     ;; ourselves later should we happen to bail out of compilation
     ;; with an error.
+    #-nil
+    (when (probe-file obj)
+      (delete-file obj))
+    #+nil
     (when (probe-file obj)
       (if (> (file-write-date src)
              (file-write-date obj))

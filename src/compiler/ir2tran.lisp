@@ -411,6 +411,27 @@
 	  dest))
   (values))
 
+;;; Move each SRC TN into the corresponding DEST TN, checking types
+;;; and defaulting any unsupplied source values to NIL
+(defun move-results-checked (node block src dest types)
+  (declare (type node node) (type ir2-block block) (list src dest types))
+  (let ((nsrc (length src))
+	(ndest (length dest))
+        (ntypes (length types)))
+    (mapc (lambda (from to type)
+            (if type
+                (emit-type-check node block from to type)
+                (emit-move node block from to)))
+	  (if (> ndest nsrc)
+	      (append src (make-list (- ndest nsrc)
+				     :initial-element (emit-constant nil)))
+	      src)
+	  dest
+          (if (> ndest ntypes)
+	      (append types (make-list (- ndest ntypes)))
+	      types)))
+  (values))
+
 ;;; If necessary, emit coercion code needed to deliver the RESULTS to
 ;;; the specified continuation. NODE and BLOCK provide context for
 ;;; emitting code. Although usually obtained from STANDARD-RESULT-TNs
@@ -445,21 +466,32 @@
 (defun ir2-convert-cast (node block)
   (declare (type cast node)
            (type ir2-block block))
-  (aver (not (cast-type-check node)))
   (let* ((cont (node-cont node))
          (2cont (continuation-info cont))
          (value (cast-value node))
          (2value (continuation-info value)))
     (cond ((not 2cont))
           ((eq (ir2-continuation-kind 2cont) :unused))
-          ((eq (ir2-continuation-kind 2cont)
-               (ir2-continuation-kind 2value))
+          ((and (eq (ir2-continuation-kind 2cont) :unknown)
+                (eq (ir2-continuation-kind 2value) :unknown))
+           (aver (not (cast-type-check node)))
            (move-results-coerced node block
                                  (ir2-continuation-locs 2value)
                                  (ir2-continuation-locs 2cont)))
-          ((eq (ir2-continuation-kind 2cont) :fixed)
-           (aver (eq (ir2-continuation-kind 2value) :unknown))
-           ())
+          ((and (eq (ir2-continuation-kind 2cont) :fixed)
+                (eq (ir2-continuation-kind 2value) :fixed))
+           (if (cast-type-check node)
+               (move-results-checked node block
+                                     (ir2-continuation-locs 2value)
+                                     (ir2-continuation-locs 2cont)
+                                     (multiple-value-bind (check types)
+                                         (cast-check-types node nil)
+                                       (aver (eq check :simple))
+                                       types))
+               (move-results-coerced node block
+                                     (ir2-continuation-locs 2value)
+                                     (ir2-continuation-locs 2cont))))
+          ;; FIXME: unknown values packing/unpacking -- APD, 2002-02-11
           (t (bug "quux")))))
 
 ;;;; template conversion

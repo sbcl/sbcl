@@ -301,28 +301,31 @@
 (defun parse-args-types (lambda-list result)
   (multiple-value-bind (required optional restp rest keyp keys allowp auxp aux)
       (parse-lambda-list-like-thing lambda-list)
-    (declare (ignore aux)) ; since we require AUXP=NIL
+    (declare (ignore aux))              ; since we require AUXP=NIL
     (when auxp
       (error "&AUX in a FUNCTION or VALUES type: ~S." lambda-list))
-    (setf (args-type-required result)
-          (mapcar #'single-value-specifier-type required))
-    (setf (args-type-optional result)
-          (mapcar #'single-value-specifier-type optional))
-    (setf (args-type-rest result)
-          (if restp (single-value-specifier-type rest) nil))
-    (setf (args-type-keyp result) keyp)
-    (collect ((key-info))
-      (dolist (key keys)
-	(unless (proper-list-of-length-p key 2)
-	  (error "Keyword type description is not a two-list: ~S." key))
-	(let ((kwd (first key)))
-	  (when (find kwd (key-info) :key #'key-info-name)
-	    (error "~@<repeated keyword ~S in lambda list: ~2I~_~S~:>"
-		   kwd lambda-list))
-	  (key-info (make-key-info :name kwd
-				   :type (single-value-specifier-type (second key))))))
-      (setf (args-type-keywords result) (key-info)))
-    (setf (args-type-allowp result) allowp)
+    (let ((required (mapcar #'single-value-specifier-type required))
+          (optional (mapcar #'single-value-specifier-type optional))
+          (rest (if restp (single-value-specifier-type rest) nil)))
+      (setf (args-type-required result) required)
+      (setf (args-type-optional result)
+            (if (and restp (not keyp))
+                (values-adjust-optional optional rest)
+                optional))
+      (setf (args-type-rest result) rest)
+      (setf (args-type-keyp result) keyp)
+      (collect ((key-info))
+        (dolist (key keys)
+          (unless (proper-list-of-length-p key 2)
+            (error "Keyword type description is not a two-list: ~S." key))
+          (let ((kwd (first key)))
+            (when (find kwd (key-info) :key #'key-info-name)
+              (error "~@<repeated keyword ~S in lambda list: ~2I~_~S~:>"
+                     kwd lambda-list))
+            (key-info (make-key-info :name kwd
+                                     :type (single-value-specifier-type (second key))))))
+        (setf (args-type-keywords result) (key-info)))
+      (setf (args-type-allowp result) allowp))
     (values)))
 
 ;;; Return the lambda-list-like type specification corresponding
@@ -364,7 +367,7 @@
 (!def-type-translator values (&rest values)
   (let ((res (%make-values-type)))
     (parse-args-types values res)
-    res))
+    (maybe-wild-type res)))
 
 ;;;; VALUES types interfaces
 ;;;;

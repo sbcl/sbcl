@@ -60,7 +60,38 @@
 		      (class-info (type-class-or-lose 'values)))
             (:constructor %make-values-type)
 	    (:copier nil)))
-(define-cached-synonym make-values-type)
+
+(defun maybe-wild-type (type)
+  (declare (type values-type type))
+  (if (and (null (values-type-required type))
+           (null (values-type-optional type))
+           (eq (values-type-rest type) *universal-type*)
+           (not (values-type-keyp type)))
+      *wild-type*
+      type))
+
+(defun-cached (make-values-type-cached
+               :hash-bits 8
+               :hash-function (lambda (x) (logand (sxhash x) 255)))
+    ((args equal))
+  (maybe-wild-type (apply #'%make-values-type args)))
+
+(declaim (inline adjust-optional))
+(defun values-adjust-optional (optional rest)
+  (declare (type list optional) (type ctype rest))
+  (let ((last-real (position rest optional
+                             :from-end t
+                             :test-not #'type=)))
+    (if last-real
+        (subseq optional 0 (1+ last-real))
+        nil)))
+
+(defun make-values-type (&rest args &key optional rest keyp
+                         &allow-other-keys)
+  (let ((args (if (and rest (not keyp))
+                  `(:optional ,(values-adjust-optional optional rest) ,@args)
+                  args)))
+    (make-values-type-cached args)))
 
 (!define-type-class values)
 

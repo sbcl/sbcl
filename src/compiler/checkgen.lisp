@@ -291,7 +291,7 @@
 ;;; an appropriate VOP.
 (defun probable-type-check-p (cast)
   (declare (type cast cast))
-  nil
+  t
   #+nil
   (let ((dest (continuation-dest cont)))
     (cond ((or (not dest)

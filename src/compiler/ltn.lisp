@@ -810,10 +810,10 @@
 
 (defun ltn-annotate-cast (cast)
   (declare (type cast))
-  (aver (not (cast-type-check cast)))   ; FIXME
   (let ((2cont (continuation-info (node-cont cast)))
         (value (cast-value cast)))
     (aver 2cont)
+    ;; XXX
     (ecase (ir2-continuation-kind 2cont)
       (:unknown
        (annotate-unknown-values-continuation value))
