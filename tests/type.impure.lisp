@@ -101,6 +101,36 @@
 (assert (not (subtypep 'symbol 'keyword)))
 (assert (subtypep 'ratio 'real))
 (assert (subtypep 'ratio 'number))
+
+;;; bug 50.g: Smarten up hairy type specifiers slightly. We may wish
+;;; to revisit this, perhaps by implementing a COMPLEMENT type
+;;; (analogous to UNION and INTERSECTION) to take the logic out of the
+;;; HAIRY domain.
+(assert-nil-t (subtypep 'atom 'cons))
+(assert-nil-t (subtypep 'cons 'atom))
+(assert-nil-t (subtypep '(not list) 'cons))
+(assert-nil-t (subtypep '(not float) 'single-float))
+(assert-t-t (subtypep '(not atom) 'cons))
+(assert-t-t (subtypep 'cons '(not atom)))
+;;; FIXME: Another thing to revisit is %INVOKE-TYPE-METHOD.
+;;; Essentially, the problem is that when the two arguments to
+;;; subtypep are of different specifier-type types (e.g. HAIRY and
+;;; UNION), there are two applicable type methods -- in this case
+;;; HAIRY-COMPLEX-SUBTYPEP-ARG1-TYPE-METHOD and
+;;; UNION-COMPLEX-SUBTYPEP-ARG2-TYPE-METHOD.  Both of these exist, but
+;;; [!%]INVOKE-TYPE-METHOD aren't smart enough to know that if one of
+;;; them returns NIL, NIL (indicating uncertainty) it should try the
+;;; other; this is complicated by the presence of other TYPE-METHODS
+;;; (e.g. INTERSECTION and UNION) whose return convention may or may
+;;; not follow the same standard.
+#||
+(assert-nil-t (subtypep '(not cons) 'list))
+(assert-nil-t (subtypep '(not single-float) 'float))
+||#
+;;; If we fix the above FIXME, we should for free have fixed bug 58.
+#||
+(assert-t-t (subtypep '(and zilch integer) 'zilch))
+||#
 
 ;;;; Douglas Thomas Crosher rewrote the CMU CL type test system to
 ;;;; allow inline type tests for CONDITIONs and STANDARD-OBJECTs, and

@@ -337,9 +337,11 @@ WORKAROUND:
 	   blows up at the level of SPECIFIER-TYPE with
 	   "Lower bound (0) is greater than upper bound (0)." Probably
 	   SPECIFIER-TYPE should return the NIL type instead.
-	g: The type system isn't all that smart about relationships
-	   between hairy types, as shown in the type.erg test results,
-	   e.g. (SUBTYPEP 'CONS '(NOT ATOM)) => NIL, NIL.
+	g: The type system [still] isn't all that smart about relationships
+	   between hairy types. [The original example from PVE was
+	   (SUBTYPEP 'CONS '(NOT ATOM)) => NIL, NIL, which was fixed
+	   by CSR in sbcl-0.7.1.28, but there are still
+           plenty of corner cases out there.]
 
 51:
   miscellaneous errors reported by Peter Van Eynde July 25, 2000:
@@ -1116,6 +1118,11 @@ WORKAROUND:
   * (subtypep 'b 'a)
   T
   T
+
+  This is probably due to underzealous clearing of the type caches; a
+  brute-force solution in that case would be to make a defclass expand
+  into something that included a call to SB-KERNEL::CLEAR-TYPE-CACHES,
+  but there may be a better solution.
 
 141: 
   Pretty-printing nested backquotes doesn't work right, as 

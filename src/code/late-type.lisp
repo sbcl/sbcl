@@ -976,7 +976,75 @@
 	  (t
 	   (values nil nil)))))
 
-(!define-type-method (hairy :complex-subtypep-arg1 :complex-=) (type1 type2)
+(!define-type-method (hairy :complex-subtypep-arg1) (type1 type2)
+  (let ((hairy-spec (hairy-type-specifier type1)))
+     (cond ((and (consp hairy-spec) (eq (car hairy-spec) 'not))
+	    ;; You may not believe this. I couldn't either. But then I
+	    ;; sat down and drew lots of Venn diagrams. Comments
+	    ;; involving a and b refer to the call (subtypep '(not a)
+	    ;; 'b) -- CSR, 2002-02-27.
+	    (block nil
+	      ;; (Several logical truths in this block are true as
+	      ;; long as b/=T. As of sbcl-0.7.1.28, it seems
+	      ;; impossible to construct a case with b=T where we
+	      ;; actually reach this type method, but we'll test for
+	      ;; and exclude this case anyway, since future
+	      ;; maintenance might make it possible for it to end up
+	      ;; in this code.)
+	      (multiple-value-bind (equal certain)
+		  (type= type2 (specifier-type t))
+		(unless certain
+		  (return (values nil nil)))
+		(when equal
+		  (return (values t t))))
+	      (let ((complement-type1 (specifier-type (cadr hairy-spec))))
+		;; Do the special cases first, in order to give us a
+		;; chance if subtype/supertype relationships are hairy.
+		(multiple-value-bind (equal certain) 
+		    (type= complement-type1 type2)
+		  ;; If a = b, ~a is not a subtype of b (unless b=T,
+		  ;; which was excluded above).
+		  (unless certain
+		    (return (values nil nil)))
+		  (when equal
+		    (return (values nil t))))
+		;; This (TYPE= TYPE1 TYPE2) branch would never be
+		;; taken, as type1 and type2 will only be equal if
+		;; they're both NOT types, and then the
+		;; :SIMPLE-SUBTYPEP method would be used instead.
+		;; ((type= type1 type2) (values t t))
+		(multiple-value-bind (equal certain)
+		    (csubtypep complement-type1 type2)
+		  ;; If a is a subtype of b, ~a is not a subtype of b
+		  ;; (unless b=T, which was excluded above).
+		  (unless certain
+		    (return (values nil nil)))
+		  (when equal
+		    (return (values nil t))))
+		(multiple-value-bind (equal certain)
+		    (csubtypep type2 complement-type1)
+		  ;; If b is a subtype of a, ~a is not a subtype of b.
+		  ;; (FIXME: That's not true if a=T. Do we know at
+		  ;; this point that a is not T?)
+		  (unless certain
+		    (return (values nil nil)))
+		  (when equal
+		    (return (values nil t))))
+		;; Other cases here would rely on being able to catch
+		;; all possible cases, which the fragility of this
+		;; type system doesn't inspire me; for instance, if a
+		;; is type= to ~b, then we want T, T; if this is not
+		;; the case and the types are disjoint (have an
+		;; intersection of *empty-type*) then we want NIL, T;
+		;; else if the union of a and b is the
+		;; *universal-type* then we want T, T. So currently we
+		;; still claim to be unsure about e.g. (subtypep '(not
+		;; fixnum) 'single-float).
+		)))
+	   (t
+	    (values nil nil)))))
+
+(!define-type-method (hairy :complex-=) (type1 type2)
   (declare (ignore type1 type2))
   (values nil nil))
 
@@ -996,9 +1064,11 @@
   ;; Check legality of arguments.
   (destructuring-bind (not typespec) whole
     (declare (ignore not))
-    (specifier-type typespec)) ; must be legal typespec
-  ;; Create object.
-  (make-hairy-type :specifier whole))
+    (let ((spec (type-specifier (specifier-type typespec)))) ; must be legal typespec
+      (if (and (listp spec) (eq (car spec) 'not))
+	  ;; canonicalize (not (not foo))
+	  (specifier-type (cadr spec))
+	  (make-hairy-type :specifier whole)))))
 
 (!def-type-translator satisfies (&whole whole fun)
   (declare (ignore fun))
