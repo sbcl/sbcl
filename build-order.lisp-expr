@@ -453,6 +453,7 @@
  ("src/compiler/main") ; needs DEFSTRUCT FASL-OUTPUT from dump.lisp
  ("src/compiler/target-main" :not-host)
  ("src/compiler/ir1tran")
+ ("src/compiler/ir1tran-lambda")
  ("src/compiler/ir1-translators")
  ("src/compiler/ir1util")
  ("src/compiler/ir1report")
