@@ -108,6 +108,14 @@
       (print-byte-reg value stream dstate)
       (print-mem-access value stream t dstate)))
 
+(defun print-word-reg/mem (value stream dstate)
+  (declare (type (or list reg) value)
+	   (type stream stream)
+	   (type sb!disassem:disassem-state dstate))
+  (if (typep value 'reg)
+      (print-word-reg value stream dstate)
+      (print-mem-access value stream nil dstate)))
+
 (defun print-label (value stream dstate)
   (declare (ignore dstate))
   (sb!disassem:princ16 value stream))
@@ -273,6 +281,9 @@
 (sb!disassem:define-arg-type byte-reg/mem
   :prefilter #'prefilter-reg/mem
   :printer #'print-byte-reg/mem)
+(sb!disassem:define-arg-type word-reg/mem
+  :prefilter #'prefilter-reg/mem
+  :printer #'print-word-reg/mem)
 
 ;;; added by jrd
 (eval-when (:compile-toplevel :load-toplevel :execute)
@@ -470,6 +481,12 @@
 	   			:type 'sized-reg/mem)
   ;; optional fields
   (imm))
+
+(sb!disassem:define-instruction-format (ext-reg/mem-imm 24
+                                        :include 'ext-reg/mem
+					:default-printer
+                                        '(:name :tab reg/mem ", " imm))
+  (imm :type 'imm-data))
 
 ;;;; This section was added by jrd, for fp instructions.
 
@@ -1613,19 +1630,33 @@
 	   (emit-byte segment (dpb opcode (byte 3 3) #b10000011))
 	   (emit-ea segment src (reg-tn-encoding index))))))
 
+(eval-when (:compile-toplevel :execute)
+  (defun bit-test-inst-printer-list (subop)
+    `((ext-reg/mem-imm ((op (#b1011101 ,subop))
+                        (reg/mem nil :type word-reg/mem)
+                        (imm nil :type imm-data)
+                        (width 0)))
+      (ext-reg-reg/mem ((op ,(dpb subop (byte 3 2) #b1000001))
+                        (width 1))
+                       (:name :tab reg/mem ", " reg)))))
+
 (define-instruction bt (segment src index)
+  (:printer-list (bit-test-inst-printer-list #b100))
   (:emitter
    (emit-bit-test-and-mumble segment src index #b100)))
 
 (define-instruction btc (segment src index)
+  (:printer-list (bit-test-inst-printer-list #b111))
   (:emitter
    (emit-bit-test-and-mumble segment src index #b111)))
 
 (define-instruction btr (segment src index)
+  (:printer-list (bit-test-inst-printer-list #b110))
   (:emitter
    (emit-bit-test-and-mumble segment src index #b110)))
 
 (define-instruction bts (segment src index)
+  (:printer-list (bit-test-inst-printer-list #b101))
   (:emitter
    (emit-bit-test-and-mumble segment src index #b101)))
 

@@ -1296,9 +1296,9 @@ WORKAROUND:
   for :EXTERNAL-FORMAT in DEFKNOWN OPEN (and LOAD) is a workaround for
   the problem (and should be removed when the problem is fixed).
 
-245:
-  On X86 IMUL instruction with an immediate operand is printed
-  incorrectly.
+245: bugs in disassembler
+  a. On X86 an immediate operand for IMUL is printed incorrectly.
+  b. On X86 operand size prefix is not recognized.
 
 246: "NTH-VALUE scaling problem"
   NTH-VALUE's current implementation for constant integers scales in
