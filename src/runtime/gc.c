@@ -68,11 +68,12 @@ static int scav_lose(lispobj *where, lispobj object);
 #define CEILING(x,y) (((x) + ((y) - 1)) & (~((y) - 1)))
 
 
-/* Predicates */
+/* predicates */
 
 #if defined(DEBUG_SPACE_PREDICATES)
 
-boolean from_space_p(lispobj object)
+boolean
+from_space_p(lispobj object)
 {
 	lispobj *ptr;
 
@@ -86,7 +87,8 @@ boolean from_space_p(lispobj object)
 		(ptr < from_space_free_pointer));
 }	    
 
-boolean new_space_p(lispobj object)
+boolean
+new_space_p(lispobj object)
 {
 	lispobj *ptr;
 
@@ -111,7 +113,7 @@ boolean new_space_p(lispobj object)
 #endif
 
 
-/* Copying Objects */
+/* copying objects */
 
 static lispobj
 copy_object(lispobj object, int nwords)
@@ -151,10 +153,11 @@ copy_object(lispobj object, int nwords)
 }
 
 
-/* Collect Garbage */
+/* collecting garbage */
 
 #ifdef PRINTNOISE
-static double tv_diff(struct timeval *x, struct timeval *y)
+static double
+tv_diff(struct timeval *x, struct timeval *y)
 {
     return (((double) x->tv_sec + (double) x->tv_usec * 1.0e-6) -
 	    ((double) y->tv_sec + (double) y->tv_usec * 1.0e-6));
@@ -168,7 +171,8 @@ static double tv_diff(struct timeval *x, struct timeval *y)
 #else
 #define U32 unsigned long
 #endif
-static void zero_stack(void)
+static void
+zero_stack(void)
 {
     U32 *ptr = (U32 *)current_control_stack_pointer;
  search:
@@ -188,10 +192,11 @@ static void zero_stack(void)
 #undef U32
 
 
-/* this is not generational.  It's called with a last_gen arg, which we shun.
- */
-
-void collect_garbage(unsigned ignore)
+/* Note: The generic GC interface we're implementing passes us a
+ * last_generation argument. That's meaningless for us, since we're
+ * not a generational GC. So we ignore it. */
+void
+collect_garbage(unsigned ignore)
 {
 #ifdef PRINTNOISE
 struct timeval start_tv, stop_tv;
@@ -231,8 +236,10 @@ struct timeval start_tv, stop_tv;
 	from_space_free_pointer = (lispobj *)SymbolValue(ALLOCATION_POINTER);
 #endif
 
+#ifdef PRINTNOISE
 	fprintf(stderr,"from_space = %lx\n",
 		(unsigned long) current_dynamic_space);
+#endif
 	if (current_dynamic_space == (lispobj *) DYNAMIC_0_SPACE_START)
 	    new_space = (lispobj *)DYNAMIC_1_SPACE_START;
 	else if (current_dynamic_space == (lispobj *) DYNAMIC_1_SPACE_START)
@@ -377,7 +384,7 @@ struct timeval start_tv, stop_tv;
 }
 
 
-/* Scavenging */
+/* scavenging */
 
 #define DIRECT_SCAV 0
 
@@ -456,7 +463,8 @@ scavenge(lispobj *start, u32 nwords)
 	gc_assert(nwords == 0);
 }
 
-static void scavenge_newspace(void)
+static void
+scavenge_newspace(void)
 {
     lispobj *here, *next;
 
@@ -470,13 +478,13 @@ static void scavenge_newspace(void)
     }
     /* printf("done with newspace\n"); */
 }
-
 
-/* Scavenging Interrupt Contexts */
+/* scavenging interrupt contexts */
 
 static int boxed_registers[] = BOXED_REGISTERS;
 
-static void scavenge_interrupt_context(os_context_t *context)
+static void
+scavenge_interrupt_context(os_context_t *context)
 {
 	int i;
 #ifdef reg_LIP
@@ -561,7 +569,6 @@ void scavenge_interrupt_contexts(void)
 	os_context_t *context;
 
 	index = fixnum_value(SymbolValue(FREE_INTERRUPT_CONTEXT_INDEX));
-	printf("Number of active contexts: %d\n", index);
 
 	for (i = 0; i < index; i++) {
 		context = lisp_interrupt_contexts[i];
@@ -570,9 +577,10 @@ void scavenge_interrupt_contexts(void)
 }
 
 
-/* Debugging Code */
+/* debugging code */
 
-void print_garbage(lispobj *from_space, lispobj *from_space_free_pointer)
+void
+print_garbage(lispobj *from_space, lispobj *from_space_free_pointer)
 {
 	lispobj *start;
 	int total_words_not_copied;
@@ -627,7 +635,7 @@ void print_garbage(lispobj *from_space, lispobj *from_space_free_pointer)
 }
 
 
-/* Code and Code-Related Objects */
+/* code and code-related objects */
 
 #define RAW_ADDR_OFFSET (6*sizeof(lispobj) - type_FunctionPointer)
 
@@ -964,7 +972,7 @@ trans_function_header(lispobj object)
 
 
 
-/* Instances */
+/* instances */
 
 #if DIRECT_SCAV
 static int
@@ -999,7 +1007,7 @@ scav_instance_pointer(lispobj *where, lispobj object)
 #endif
 
 
-/* Lists and Conses */
+/* lists and conses */
 
 static lispobj trans_list(lispobj object);
 
@@ -1100,7 +1108,7 @@ trans_list(lispobj object)
 }
 
 
-/* Scavenging and Transporting Other Pointers */
+/* scavenging and transporting other pointers */
 
 #if DIRECT_SCAV
 static int
@@ -1148,7 +1156,7 @@ scav_other_pointer(lispobj *where, lispobj object)
 #endif
 
 
-/* Immediate, Boxed, and Unboxed Objects */
+/* immediate, boxed, and unboxed objects */
 
 static int
 size_pointer(lispobj *where)
@@ -1212,7 +1220,7 @@ size_boxed(lispobj *where)
 }
 
 /* Note: on the sparc we don't have to do anything special for fdefns, */
-/* cause the raw-addr has a function lowtag. */
+/* 'cause the raw-addr has a function lowtag. */
 #ifndef sparc
 static int
 scav_fdefn(lispobj *where, lispobj object)
@@ -1273,7 +1281,7 @@ size_unboxed(lispobj *where)
 }
 
 
-/* Vector-Like Objects */
+/* vector-like objects */
 
 #define NWORDS(x,y) (CEILING((x),(y)) / (y))
 
@@ -1889,7 +1897,7 @@ size_vector_complex_long_float(lispobj *where)
 #endif
 
 
-/* Weak Pointers */
+/* weak pointers */
 
 #define WEAK_POINTER_NWORDS \
 	CEILING((sizeof(struct weak_pointer) / sizeof(lispobj)), 2)
@@ -1978,7 +1986,7 @@ void scan_weak_pointers(void)
 
 
 
-/* Initialization */
+/* initialization */
 
 static int
 scav_lose(lispobj *where, lispobj object)
@@ -2008,11 +2016,17 @@ size_lose(lispobj *where)
 	return 1;
 }
 
-void gc_init(void)
+/* KLUDGE: SBCL already has two GC implementations, and if someday the
+ * precise generational GC is revived, it might have three. It would
+ * be nice to share the scavtab[] data set up here, and perhaps other
+ * things too, between all of them, rather than trying to maintain
+ * multiple copies. -- WHN 2001-05-09 */
+void
+gc_init(void)
 {
 	int i;
 
-	/* Scavenge Table */
+	/* scavenge table */
 	for (i = 0; i < 256; i++)
 	    scavtab[i] = scav_lose; 
 	/* scavtab[i] = scav_immediate; */
@@ -2281,10 +2295,8 @@ void gc_init(void)
         sizetab[type_InstanceHeader] = size_boxed;
 	sizetab[type_Fdefn] = size_boxed;
 }
-
-
 
-/* Noise to manipulate the gc trigger stuff. */
+/* noise to manipulate the gc trigger stuff */
 
 #ifndef ibmrt
 

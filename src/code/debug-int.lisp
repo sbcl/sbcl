@@ -2864,13 +2864,13 @@
 							 sb!vm::nfp-offset))
 				#!-alpha
 				(sap-ref-sap fp
-						    (* sb!vm::nfp-save-offset
-						       sb!vm:word-bytes))
+					     (* sb!vm::nfp-save-offset
+						sb!vm:word-bytes))
 				#!+alpha
-				(%alpha::make-number-stack-pointer
+				(sb!vm::make-number-stack-pointer
 				 (sap-ref-32 fp
-						    (* sb!vm::nfp-save-offset
-						       sb!vm:word-bytes))))))
+					     (* sb!vm::nfp-save-offset
+						sb!vm:word-bytes))))))
 		  ,@body)))
     (ecase (sb!c:sc-offset-scn sc-offset)
       ((#.sb!vm:any-reg-sc-number

@@ -20,12 +20,14 @@ echo //entering make-config.sh
 
 ltf=`pwd`/local-target-features.lisp-expr
 echo //initializing $ltf
-echo '; This is a machine-generated file and should not be edited by hand.' > $ltf
+echo ';;;; This is a machine-generated file.' > $ltf
+echo ';;;; Please do not edit it by hand.' > $ltf
+echo ';;;; See make-config.sh.' > $ltf
 echo -n '(' >> $ltf
 
-echo '//setting up "target"-named symlinks to designate target architecture'
+echo //setting up CPU-architecture-dependent information
 # Currently supported: x86 alpha
-sbcl_arch=x86
+sbcl_arch=${SBCL_ARCH:-x86}
 echo -n ":$sbcl_arch" >> $ltf 
 for d in src/compiler src/assembly; do
     echo //setting up symlink $d/target
