@@ -175,10 +175,14 @@
        ;; ANSI Common Lisp operations.
        (eval-when (:compile-toplevel :load-toplevel :execute)
 	 (let ((,expr-tmp ,expr))
-	   (unless (and (boundp ',symbol)
-			(constantp ',symbol)
-			(funcall ,eqx (symbol-value ',symbol) ,expr-tmp))
-	     (defconstant ,symbol ,expr ,@(when doc `(,doc))))))
+	   (cond ((boundp ',symbol)
+		  (unless (and (constantp ',symbol)
+			       (funcall ,eqx
+					(symbol-value ',symbol)
+					,expr-tmp))
+		    (error "already bound differently: ~S")))
+		 (t
+		  (defconstant ,symbol ,expr-tmp ,@(when doc `(,doc)))))))
        ;; The #+SB-XC :COMPILE-TOPLEVEL situation is special, since we
        ;; want to define the symbol not just in the cross-compilation
        ;; host Lisp (which was handled above) but also in the
@@ -193,7 +197,7 @@
        ;; instead. -- WHN 2000-11-03
        #+sb-xc
        (eval-when (:compile-toplevel)
-	 (let ((,expr-tmp ,expr))
+	 (let ((,expr-tmp ,symbol))
 	   (unless (and (eql (info :variable :kind ',symbol) :constant)
 			(funcall ,eqx
 				 (info :variable :constant-value ',symbol)

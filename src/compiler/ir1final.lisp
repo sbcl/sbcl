@@ -27,13 +27,7 @@
 	      (note (transform-note (car failure))))
 	  (cond
 	   ((consp what)
-	    ;; FIXME: This sometimes gets too long for a single line, e.g.
-	    ;;   "note: unable to optimize away possible call to FDEFINITION at runtime due to type uncertainty:"
-	    ;; It would be nice to pretty-print it somehow, but how?
-	    ;; ~@<..~:@> adds ~_ directives to the spaces which are in
-	    ;; the format string, but a lot of the spaces where we'd want
-	    ;; to break are in the included ~A string instead.
-	    (compiler-note "unable to ~A because:~%~6T~?"
+	    (compiler-note "~@<unable to ~2I~_~A ~I~_because: ~2I~_~?~:>"
 			   note (first what) (rest what)))
 	   ((valid-function-use node what
 				:argument-test #'types-intersect
@@ -45,10 +39,17 @@
 		(valid-function-use node what
 				    :warning-function #'frob
 				    :error-function #'frob))
-
-	      (compiler-note "unable to ~A due to type uncertainty:~@
-			      ~{~6T~?~^~&~}"
-			     note (messages))))))))))
+	      (compiler-note "~@<unable to ~
+                              ~2I~_~A ~
+                              ~I~_due to type uncertainty: ~
+			      ~2I~_~{~?~^~@:_~}~:>"
+			     note (messages))))
+	   ;; As best I can guess, it's OK to fall off the end here
+	   ;; because if it's not a VALID-FUNCTION-USE, the user
+	   ;; doesn't want to hear about it. The things I caught when
+	   ;; I put ERROR "internal error: unexpected FAILURE=~S" here
+	   ;; didn't look like things we need to report. -- WHN 2001-02-07
+	   ))))))
 
 ;;; For each named function with an XEP, note the definition of that
 ;;; name, and add derived type information to the info environment. We

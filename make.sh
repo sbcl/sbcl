@@ -4,7 +4,7 @@
 # for getting an executable from it. We want any two reconstructions
 # starting from the same source to end up in the same result. That's
 # just a basic intellectual premise."
-#     -- Christian Quinnec, in _Lisp In Small Pieces_, p. 313
+#     -- Christian Queinnec, in _Lisp In Small Pieces_, p. 313
 
 # This software is part of the SBCL system. See the README file for
 # more information.

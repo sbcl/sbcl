@@ -79,3 +79,5 @@ for f in *.assertoids; do
 	echo "(load \"$f\")" | $sbcl --eval '(load "assertoid.lisp")' ; tenfour
     fi
 done
+
+echo '//apparent success (reached end of run-tests.sh normally)'
