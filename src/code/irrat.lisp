@@ -269,18 +269,53 @@
 	     (* base power)
 	     (exp (* power (log base)))))))))
 
+;;; FIXME: Maybe rename this so that it's clearer that it only works
+;;; on integers?
+(defun log2 (x)
+  (declare (type integer x))
+  ;; CMUCL comment:
+  ;;
+  ;;   Write x = 2^n*f where 1/2 < f <= 1.  Then log2(x) = n +
+  ;;   log2(f).  So we grab the top few bits of x and scale that
+  ;;   appropriately, take the log of it and add it to n.
+  ;;
+  ;; Motivated by an attempt to get LOG to work better on bignums.
+  (let ((n (integer-length x)))
+    (if (< n sb!vm:double-float-digits)
+	(log (coerce x 'double-float) 2.0d0)
+	(let ((f (ldb (byte sb!vm:double-float-digits
+			    (- n sb!vm:double-float-digits))
+		      x)))
+	  (+ n (log (scale-float (coerce f 'double-float)
+				 (- sb!vm:double-float-digits))
+		    2.0d0))))))
+
 (defun log (number &optional (base nil base-p))
   #!+sb-doc
   "Return the logarithm of NUMBER in the base BASE, which defaults to e."
   (if base-p
-      (if (zerop base)
-	  base				; ANSI spec
-	  (/ (log number) (log base)))
+      (cond
+	((zerop base) base) ; ANSI spec
+	((and (typep number '(integer (0) *))
+	      (typep base '(integer (0) *)))
+	 (coerce (/ (log2 number) (log2 base)) 'single-float))
+	(t (/ (log number) (log base))))
       (number-dispatch ((number number))
-	(((foreach fixnum bignum ratio))
+	(((foreach fixnum bignum))
 	 (if (minusp number)
 	     (complex (log (- number)) (coerce pi 'single-float))
-	     (coerce (%log (coerce number 'double-float)) 'single-float)))
+	     (coerce (/ (log2 number) (log (exp 1.0d0) 2.0d0)) 'single-float)))
+	((ratio)
+	 (if (minusp number)
+	     (complex (log (- number)) (coerce pi 'single-float))
+	     (let ((numerator (numerator number))
+		   (denominator (denominator number)))
+	       (if (= (integer-length numerator)
+		      (integer-length denominator))
+		   (coerce (%log1p (coerce (- number 1) 'double-float))
+			   'single-float)
+		   (coerce (- (log numerator) (log denominator))
+			      'single-float)))))
 	(((foreach single-float double-float))
 	 ;; Is (log -0) -infinity (libm.a) or -infinity + i*pi (Kahan)?
 	 ;; Since this doesn't seem to be an implementation issue
