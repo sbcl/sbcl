@@ -1112,9 +1112,8 @@
 	  (without-gcing
 	   (let* ((component-ptr (component-ptr-from-pc
 				  (sb!vm:context-pc context)))
-		  (code (if (sap= component-ptr (int-sap #x0))
-			    nil ; FIXME: UNLESS might be clearer than IF.
-			    (component-from-component-ptr component-ptr))))
+		  (code (unless (sap= component-ptr (int-sap #x0))
+			  (component-from-component-ptr component-ptr))))
 	     (when (null code)
 	       (return (values code 0 context)))
 	     (let* ((code-header-len (* (get-header-data code)
@@ -1127,8 +1126,10 @@
 	       (unless (<= 0 pc-offset
 			   (* (code-header-ref code sb!vm:code-code-size-slot)
 			      sb!vm:word-bytes))
-		 ;; We were in an assembly routine. Therefore, use the LRA as
-		 ;; the pc.
+		 ;; We were in an assembly routine. Therefore, use the
+		 ;; LRA as the pc.
+		 ;;
+		 ;; FIXME: Should this be WARN or ERROR or what?
 		 (format t "** pc-offset ~S not in code obj ~S?~%"
 			 pc-offset code))
 	       (return
@@ -1204,8 +1205,7 @@
 		  (elsewhere-p
 		   (>= pc (sb!c::compiled-debug-function-elsewhere-pc
 			   (svref function-map 0)))))
-	      ;; FIXME: I don't think SB!C is the home package of INDEX.
-	      (declare (type sb!c::index i))
+	      (declare (type sb!int:index i))
 	      (loop
 		(when (or (= i len)
 			  (< pc (if elsewhere-p

@@ -642,11 +642,11 @@
 		       (arithmetic-error-operation condition)
 		       (arithmetic-error-operands condition))))))
 
-(define-condition division-by-zero	 (arithmetic-error) ())
+(define-condition division-by-zero         (arithmetic-error) ())
 (define-condition floating-point-overflow  (arithmetic-error) ())
 (define-condition floating-point-underflow (arithmetic-error) ())
 (define-condition floating-point-inexact   (arithmetic-error) ())
-(define-condition floating-point-invalid-operation   (arithmetic-error) ())
+(define-condition floating-point-invalid-operation (arithmetic-error) ())
 
 (define-condition print-not-readable (error)
   ((object :reader print-not-readable-object :initarg :object))
@@ -657,6 +657,8 @@
        (format stream "~S cannot be printed readably." obj)))))
 
 (define-condition reader-error (parse-error stream-error)
+  ;; FIXME: Do we need FORMAT-CONTROL and FORMAT-ARGUMENTS when
+  ;; we have an explicit :REPORT function? I thought we didn't..
   ((format-control
     :reader reader-error-format-control
     :initarg :format-control)
@@ -688,6 +690,7 @@
 ;;; floating point exceptions?
 (define-condition floating-point-exception (arithmetic-error)
   ((flags :initarg :traps
+          :initform nil
 	  :reader floating-point-exception-traps))
   (:report (lambda (condition stream)
 	     (format stream

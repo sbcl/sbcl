@@ -64,22 +64,6 @@ FIX:
 	  it always works.
 -------------------------------------------------------------------------------
 PROBLEM:
-	    When cross-compiling host-byte-comp.lisp, I get bogus
-	warnings
-		caught STYLE-WARNING:
-		  undefined function: %%DEFCONSTANT
-		caught STYLE-WARNING:
-		  This function is undefined:
-		  %%DEFCONSTANT
-MUSING:
-	    The best way to clean this up would be as a side-effect of
-	a larger cleanup, making all the %%DEFFOO stuff use EVAL-WHEN
-	instead of IR1 magic.
-	    There's probably some way to do it with a quick local hack too.
-FIX:
-	??
--------------------------------------------------------------------------------
-PROBLEM:
 	    My system of parallel build directories seems to add
 	complexity without adding value.
 FIX:
@@ -122,30 +106,15 @@ PROBLEM:
 	thing in itself, but might be a fair amount of work.)
 FIX:
 	?? Delete, delete, delete.
--------------------------------------------------------------------------------
-PROBLEM:
-	    The hashing code is new and should be tested.
-FIX:
-	?? Enable the existing test code.
 ===============================================================================
 other known issues with no particular target date:
-
-user manual including, at a minimum, updated versions of the
-CMU CL user manual information on the compiler and the alien
-interface
 
 bugs listed on the man page
 
 more regression tests
 
-various bugs fixed in CMUCL since this code was forked off of it
-ca. 19980801, since most of these haven't been fixed yet in SBCL
-
 byte compilation of appropriate parts of the system, so that the
 system core isn't so big
-
-uninterning needed-only-at-init-time stuff after init is complete,
-so that the system core isn't so big
 
 Search for unused external symbols (ones which are not bound, fbound,
 types, or whatever, and also have no other uses as e.g. flags) and
