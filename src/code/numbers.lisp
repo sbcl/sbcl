@@ -1161,6 +1161,18 @@ the first."
   (let ((mask (ash (ldb (byte size 0) -1) posn)))
     (logior (logand newbyte mask)
 	    (logand integer (lognot mask)))))
+
+(defun sb!c::mask-signed-field (size integer)
+  #!+sb-doc
+  "Extract SIZE lower bits from INTEGER, considering them as a
+2-complement SIZE-bits representation of a signed integer."
+  (cond ((zerop size)
+         0)
+        ((logbitp (1- size) integer)
+         (dpb integer (byte size 0) -1))
+        (t
+         (ldb (byte size 0) integer))))
+
 
 ;;;; BOOLE
 
@@ -1404,7 +1416,7 @@ the first."
                          (bignum (logand x ,pattern)))))
                 (,name ,@(loop for arg in lambda-list
                                collect `(prepare-argument ,arg)))))))
-    (loop for infos being each hash-value of sb!c::*modular-funs*
+    (loop for infos being each hash-value of (sb!c::modular-class-funs sb!c::*unsigned-modular-class*)
           ;; FIXME: We need to process only "toplevel" functions
           when (listp infos)
           do (loop for info in infos
@@ -1413,6 +1425,28 @@ the first."
                    and lambda-list = (sb!c::modular-fun-info-lambda-list info)
                    for pattern = (1- (ash 1 width))
                    do (forms (definition name lambda-list width pattern)))))
+  `(progn ,@(forms)))
+
+#.
+(collect ((forms))
+  (flet ((definition (name lambda-list width)
+           `(defun ,name ,lambda-list
+              (flet ((prepare-argument (x)
+                       (declare (integer x))
+                       (etypecase x
+                         ((signed-byte ,width) x)
+                         (fixnum (sb!c::mask-signed-field ,width x))
+                         (bignum (sb!c::mask-signed-field ,width x)))))
+                (,name ,@(loop for arg in lambda-list
+                               collect `(prepare-argument ,arg)))))))
+    (loop for infos being each hash-value of (sb!c::modular-class-funs sb!c::*signed-modular-class*)
+          ;; FIXME: We need to process only "toplevel" functions
+          when (listp infos)
+          do (loop for info in infos
+                   for name = (sb!c::modular-fun-info-name info)
+                   and width = (sb!c::modular-fun-info-width info)
+                   and lambda-list = (sb!c::modular-fun-info-lambda-list info)
+                   do (forms (definition name lambda-list width)))))
   `(progn ,@(forms)))
 
 ;;; KLUDGE: these out-of-line definitions can't use the modular
@@ -1432,3 +1466,9 @@ the first."
     (fixnum (ldb (byte 64 0) (ash (logand integer #xffffffffffffffff) amount)))
     (bignum (ldb (byte 64 0)
 		 (ash (logand integer #xffffffffffffffff) amount)))))
+
+#!+x86
+(defun sb!vm::ash-left-smod30 (integer amount)
+  (etypecase integer
+    ((signed-byte 30) (sb!c::mask-signed-field 30 (ash integer amount)))
+    (integer (sb!c::mask-signed-field 30 (ash (sb!c::mask-signed-field 30 integer) amount)))))

@@ -580,12 +580,12 @@
   
 
 ;;;; modular functions
-(define-modular-fun +-mod32 (x y) + 32)
+(define-modular-fun +-mod32 (x y) + :unsigned 32)
 (define-vop (fast-+-mod32/unsigned=>unsigned fast-+/unsigned=>unsigned)
   (:translate +-mod32))
 (define-vop (fast-+-mod32-c/unsigned=>unsigned fast-+-c/unsigned=>unsigned)
   (:translate +-mod32))
-(define-modular-fun --mod32 (x y) - 32)
+(define-modular-fun --mod32 (x y) - :unsigned 32)
 (define-vop (fast---mod32/unsigned=>unsigned fast--/unsigned=>unsigned)
   (:translate --mod32))
 (define-vop (fast---mod32-c/unsigned=>unsigned fast---c/unsigned=>unsigned)
@@ -604,7 +604,7 @@
     (sb!c::give-up-ir1-transform))
   '(%primitive fast-ash-left-mod32/unsigned=>unsigned integer count))
 
-(define-modular-fun lognot-mod32 (x) lognot 32)
+(define-modular-fun lognot-mod32 (x) lognot :unsigned 32)
 (define-vop (lognot-mod32/unsigned=>unsigned)
   (:translate lognot-mod32)
   (:args (x :scs (unsigned-reg)))
@@ -623,7 +623,7 @@
 	     (modvop (symbolicate 'fast- fun '-mod32/unsigned=>unsigned))
 	     (vop (symbolicate 'fast- fun '/unsigned=>unsigned)))
 	 `(progn
-	    (define-modular-fun ,mfun-name (x y) ,fun 32)
+	    (define-modular-fun ,mfun-name (x y) ,fun :unsigned 32)
 	    (define-vop (,modvop ,vop)
 	      (:translate ,mfun-name))))))
   (define-modular-backend logxor)

@@ -153,26 +153,31 @@
 
 ;;; For a documentation, see CUT-TO-WIDTH.
 
-;;; hash: name -> { :GOOD | optimizer | ({modular-fun-info}*)}
-(defvar *modular-funs*
-  (make-hash-table :test 'eq))
+(defstruct modular-class
+  ;; hash: name -> { :GOOD | optimizer | ({modular-fun-info}*)}
+  (funs (make-hash-table :test 'eq))
+  ;; hash: modular-variant -> (prototype width)
+  ;;
+  ;; FIXME: Reimplement with generic function names of kind
+  ;; (MODULAR-VERSION prototype width)
+  (versions (make-hash-table :test 'eq))
+  ;; list of increasing widths
+  (widths nil))
+(defvar *unsigned-modular-class* (make-modular-class))
+(defvar *signed-modular-class* (make-modular-class))
+(defun find-modular-class (kind)
+  (ecase kind
+    (:unsigned *unsigned-modular-class*)
+    (:signed *signed-modular-class*)))
 
-;;; hash: modular-variant -> (prototype width)
-;;;
-;;; FIXME: Reimplement with generic function names of kind
-;;; (MODULAR-VERSION prototype width)
-(defvar *modular-versions* (make-hash-table :test 'eq))
-
-;;; List of increasing widths
-(defvar *modular-funs-widths* nil)
 (defstruct modular-fun-info
   (name (missing-arg) :type symbol)
   (width (missing-arg) :type (integer 0))
   (lambda-list (missing-arg) :type list)
   (prototype (missing-arg) :type symbol))
 
-(defun find-modular-version (fun-name width)
-  (let ((infos (gethash fun-name *modular-funs*)))
+(defun find-modular-version (fun-name class width)
+  (let ((infos (gethash fun-name (modular-class-funs (find-modular-class class)))))
     (if (listp infos)
         (find-if (lambda (item-width) (>= item-width width))
                  infos
@@ -180,11 +185,14 @@
         infos)))
 
 ;;; Return (VALUES prototype-name width)
-(defun modular-version-info (name)
-  (values-list (gethash name *modular-versions*)))
+(defun modular-version-info (name class)
+  (values-list (gethash name (modular-class-versions (find-modular-class class)))))
 
-(defun %define-modular-fun (name lambda-list prototype width)
-  (let* ((infos (the list (gethash prototype *modular-funs*)))
+(defun %define-modular-fun (name lambda-list prototype class width)
+  (let* ((class (find-modular-class class))
+         (funs (modular-class-funs class))
+         (versions (modular-class-versions class))
+         (infos (the list (gethash prototype funs)))
          (info (find-if (lambda (item-width) (= item-width width))
                         infos
                         :key #'modular-fun-info-width)))
@@ -195,7 +203,7 @@
           (setf (modular-fun-info-name info) name)
           (style-warn "Redefining modular version ~S of ~S for width ~S."
                       name prototype width))
-        (setf (gethash prototype *modular-funs*)
+        (setf (gethash prototype funs)
               (merge 'list
                      (list (make-modular-fun-info :name name
                                                   :width width
@@ -203,43 +211,51 @@
                                                   :prototype prototype))
                      infos
                      #'< :key #'modular-fun-info-width)
-              (gethash name *modular-versions*)
-              (list prototype width))))
-  (setq *modular-funs-widths*
-        (merge 'list (list width) *modular-funs-widths* #'<)))
+              (gethash name versions)
+              (list prototype width)))
+    (setf (modular-class-widths class)
+          (merge 'list (list width) (modular-class-widths class) #'<))))
 
-(defmacro define-modular-fun (name lambda-list prototype width)
+(defmacro define-modular-fun (name lambda-list prototype class width)
   (check-type name symbol)
   (check-type prototype symbol)
+  (check-type class (member :unsigned :signed))
   (check-type width unsigned-byte)
   (dolist (arg lambda-list)
     (when (member arg lambda-list-keywords)
       (error "Lambda list keyword ~S is not supported for ~
               modular function lambda lists." arg)))
   `(progn
-     (%define-modular-fun ',name ',lambda-list ',prototype ,width)
+     (%define-modular-fun ',name ',lambda-list ',prototype ',class ,width)
      (defknown ,name ,(mapcar (constantly 'integer) lambda-list)
-               (unsigned-byte ,width)
-               (foldable flushable movable))))
+               (,(ecase class
+                   (:unsigned 'unsigned-byte)
+                   (:signed 'signed-byte))
+                 ,width)
+               (foldable flushable movable)
+               :derive-type (make-modular-fun-type-deriver
+                             ',prototype ',class ,width))))
 
-(defun %define-good-modular-fun (name)
-  (setf (gethash name *modular-funs*) :good)
+(defun %define-good-modular-fun (name class)
+  (setf (gethash name (modular-class-funs (find-modular-class class))) :good)
   name)
 
-(defmacro define-good-modular-fun (name)
+(defmacro define-good-modular-fun (name class)
   (check-type name symbol)
-  `(%define-good-modular-fun ',name))
+  (check-type class (member :unsigned :signed))
+  `(%define-good-modular-fun ',name ',class))
 
 (defmacro define-modular-fun-optimizer
-    (name ((&rest lambda-list) &key (width (gensym "WIDTH")))
+    (name ((&rest lambda-list) class &key (width (gensym "WIDTH")))
      &body body)
   (check-type name symbol)
+  (check-type class (member :unsigned :signed))
   (dolist (arg lambda-list)
     (when (member arg lambda-list-keywords)
       (error "Lambda list keyword ~S is not supported for ~
               modular function lambda lists." arg)))
   (with-unique-names (call args)
-    `(setf (gethash ',name *modular-funs*)
+    `(setf (gethash ',name (modular-class-funs (find-modular-class ',class)))
            (lambda (,call ,width)
              (declare (type basic-combination ,call)
                       (type (integer 0) width))

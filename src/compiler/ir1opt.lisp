@@ -195,24 +195,12 @@
 (defun assert-lvar-type (lvar type policy)
   (declare (type lvar lvar) (type ctype type))
   (unless (values-subtypep (lvar-derived-type lvar) type)
-    (let* ((dest (lvar-dest lvar))
-           (ctran (node-prev dest)))
-      (with-ir1-environment-from-node dest
-        (let* ((cast (make-cast lvar type policy))
-               (internal-lvar (make-lvar))
-               (internal-ctran (make-ctran)))
-          (setf (ctran-next ctran) cast
-                (node-prev cast) ctran)
-          (use-continuation cast internal-ctran internal-lvar)
-          (link-node-to-previous-ctran dest internal-ctran)
-          (substitute-lvar internal-lvar lvar)
-          (setf (lvar-dest lvar) cast)
-          (reoptimize-lvar lvar)
-          (when (return-p dest)
-            (node-ends-block cast))
-          (setf (block-attributep (block-flags (node-block cast))
-                                  type-check type-asserted)
-                t))))))
+    (let ((internal-lvar (make-lvar))
+          (dest (lvar-dest lvar)))
+      (substitute-lvar internal-lvar lvar)
+      (let ((cast (insert-cast-before dest lvar type policy)))
+        (use-lvar cast internal-lvar))))
+  (values))
 
 
 ;;;; IR1-OPTIMIZE
@@ -1352,11 +1340,24 @@
               t))
            (eq (node-home-lambda ref)
                (lambda-home (lambda-var-home var))))
+      (let ((ref-type (single-value-type (node-derived-type ref))))
+        (cond ((csubtypep (single-value-type (lvar-type arg)) ref-type)
+               (substitute-lvar-uses lvar arg
+                                     ;; Really it is (EQ (LVAR-USES LVAR) REF):
+                                     t)
+               (delete-lvar-use ref))
+              (t
+               (let* ((value (make-lvar))
+                      (cast (insert-cast-before ref value ref-type
+                                                ;; KLUDGE: it should be (TYPE-CHECK 0)
+                                                *policy*)))
+                 (setf (cast-type-to-check cast) *wild-type*)
+                 (substitute-lvar-uses value arg
+                                     ;; FIXME
+                                     t)
+                 (%delete-lvar-use ref)
+                 (add-lvar-use cast lvar)))))
       (setf (node-derived-type ref) *wild-type*)
-      (substitute-lvar-uses lvar arg
-                            ;; Really it is (EQ (LVAR-USES LVAR) REF):
-                            t)
-      (delete-lvar-use ref)
       (change-ref-leaf ref (find-constant nil))
       (delete-ref ref)
       (unlink-node ref)

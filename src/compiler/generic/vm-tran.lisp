@@ -488,32 +488,37 @@
 
 
 ;;;; modular functions
-(define-good-modular-fun logand)
-(define-good-modular-fun logior)
+(define-good-modular-fun logand :unsigned)
+(define-good-modular-fun logior :unsigned)
 ;;; FIXME: XOR? ANDC1, ANDC2?  -- CSR, 2003-09-16
 
 (macrolet
-    ((def (name width)
+    ((def (name class width)
+       (let ((type (ecase class
+                     (:unsigned 'unsigned-byte)
+                     (:signed 'signed-byte))))
 	 `(progn
-	    (defknown ,name (integer (integer 0)) (unsigned-byte ,width)
-		      (foldable flushable movable))	   
-	    (define-modular-fun-optimizer ash ((integer count) :width width)
+	    (defknown ,name (integer (integer 0)) (,type ,width)
+		      (foldable flushable movable))
+	    (define-modular-fun-optimizer ash ((integer count) ,class :width width)
 	      (when (and (<= width ,width)
 			 (or (and (constant-lvar-p count)
 				  (plusp (lvar-value count)))
 			     (csubtypep (lvar-type count)
-					(specifier-type '(and unsigned-byte
-							  fixnum)))))
-		(cut-to-width integer width)
+					(specifier-type '(and unsigned-byte fixnum)))))
+		(cut-to-width integer ,class width)
 		',name))
-	    (setf (gethash ',name *modular-versions*) `(ash ,',width)))))
+            (setf (gethash ',name (modular-class-versions (find-modular-class ',class)))
+                  `(ash ,',width))))))
   ;; This should really be dependent on SB!VM:N-WORD-BITS, but since we
   ;; don't have a true Alpha64 port yet, we'll have to stick to
   ;; SB!VM:N-MACHINE-WORD-BITS for the time being.  --njf, 2004-08-14
   #!+#.(cl:if (cl:= 32 sb!vm:n-machine-word-bits) '(and) '(or))
-  (def sb!vm::ash-left-mod32 32)
+  (progn
+    #!+x86 (def sb!vm::ash-left-smod30 :signed 30)
+    (def sb!vm::ash-left-mod32 :unsigned 32))
   #!+#.(cl:if (cl:= 64 sb!vm:n-machine-word-bits) '(and) '(or))
-  (def sb!vm::ash-left-mod64 64))
+  (def sb!vm::ash-left-mod64 :unsigned 64))
 
 
 ;;;; word-wise logical operations

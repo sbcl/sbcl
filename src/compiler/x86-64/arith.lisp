@@ -1234,18 +1234,18 @@
 
 ;;;; Modular functions
 
-(define-modular-fun +-mod64 (x y) + 64)
+(define-modular-fun +-mod64 (x y) + :unsigned 64)
 (define-vop (fast-+-mod64/unsigned=>unsigned fast-+/unsigned=>unsigned)
   (:translate +-mod64))
 (define-vop (fast-+-mod64-c/unsigned=>unsigned fast-+-c/unsigned=>unsigned)
   (:translate +-mod64))
-(define-modular-fun --mod64 (x y) - 64)
+(define-modular-fun --mod64 (x y) - :unsigned 64)
 (define-vop (fast---mod64/unsigned=>unsigned fast--/unsigned=>unsigned)
   (:translate --mod64))
 (define-vop (fast---mod64-c/unsigned=>unsigned fast---c/unsigned=>unsigned)
   (:translate --mod64))
 
-(define-modular-fun *-mod64 (x y) * 64)
+(define-modular-fun *-mod64 (x y) * :unsigned 64)
 (define-vop (fast-*-mod64/unsigned=>unsigned fast-*/unsigned=>unsigned)
   (:translate *-mod64))
 ;;; (no -C variant as x86 MUL instruction doesn't take an immediate)
@@ -1260,7 +1260,7 @@
   (unsigned-byte 64)
   (foldable flushable movable))
 
-(define-modular-fun-optimizer %lea ((base index scale disp) :width width)
+(define-modular-fun-optimizer %lea ((base index scale disp) :unsigned :width width)
   (when (and (<= width 64)
 	     (constant-lvar-p scale)
 	     (constant-lvar-p disp))
@@ -1286,7 +1286,7 @@
   (:translate %lea-mod64))
 
 ;;; logical operations
-(define-modular-fun lognot-mod64 (x) lognot 64)
+(define-modular-fun lognot-mod64 (x) lognot :unsigned 64)
 (define-vop (lognot-mod64/unsigned=>unsigned)
   (:translate lognot-mod64)
   (:args (x :scs (unsigned-reg unsigned-stack) :target r
@@ -1304,7 +1304,7 @@
     (move r x)
     (inst not r)))
 
-(define-modular-fun logxor-mod64 (x y) logxor 64)
+(define-modular-fun logxor-mod64 (x y) logxor :unsigned 64)
 (define-vop (fast-logxor-mod64/unsigned=>unsigned
              fast-logxor/unsigned=>unsigned)
   (:translate logxor-mod64))
