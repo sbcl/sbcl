@@ -1672,37 +1672,6 @@
 	(funcall (ansi-stream-sout target) target str 0 len)
 	(stream-write-string target str 0 len))))
 
-;;;; stream commands
-
-(defstruct (stream-command (:constructor make-stream-command
-					 (name &optional args))
-			   (:copier nil))
-  (name nil :type symbol)
-  (args nil :type list))
-(def!method print-object ((obj stream-command) str)
-  (print-unreadable-object (obj str :type t :identity t)
-    (prin1 (stream-command-name obj) str)))
-
-;;; Take a stream and wait for text or a command to appear on it. If
-;;; text appears before a command, return NIL, otherwise return a
-;;; command.
-;;;
-;;; We can't simply call the stream's misc method because NIL is an
-;;; ambiguous return value: does it mean text arrived, or does it mean
-;;; the stream's misc method had no :GET-COMMAND implementation? We
-;;; can't return NIL until there is text input. We don't need to loop
-;;; because any stream implementing :GET-COMMAND would wait until it
-;;; had some input. If the LISTEN fails, then we have some stream we
-;;; must wait on.
-(defun get-stream-command (stream)
-  (let ((cmdp (funcall (ansi-stream-misc stream) stream :get-command)))
-    (cond (cmdp)
-	  ((listen stream)
-	   nil)
-	  (t
-	   ;; This waits for input and returns NIL when it arrives.
-	   (unread-char (read-char stream) stream)))))
-
 ;;;; READ-SEQUENCE
 
 (defun read-sequence (seq stream &key (start 0) end)

@@ -871,33 +871,17 @@ reset to ~S."
 				    level)
 		(debug-prompt *debug-io*)
 		(force-output *debug-io*)
-		(let ((input (sb!int:get-stream-command *debug-io*)))
-		  (cond (input
-			 (let ((cmd-fun (debug-command-p
-					 (sb!int:stream-command-name input)
-					 restart-commands)))
-			   (cond
-			    ((not cmd-fun)
-			     (error "unknown stream-command: ~S" input))
-			    ((consp cmd-fun)
-			     (error "ambiguous debugger command: ~S" cmd-fun))
-			    (t
-			     (apply cmd-fun
-				    (sb!int:stream-command-args input))))))
+		(let* ((exp (read *debug-io*))
+		       (cmd-fun (debug-command-p exp restart-commands)))
+		  (cond ((not cmd-fun)
+			 (debug-eval-print exp))
+			((consp cmd-fun)
+			 (format t "~&Your command, ~S, is ambiguous:~%"
+				 exp)
+			 (dolist (ele cmd-fun)
+			   (format t "   ~A~%" ele)))
 			(t
-			 (let* ((exp (read *debug-io*))
-				(cmd-fun (debug-command-p exp
-							  restart-commands)))
-			   (cond ((not cmd-fun)
-				  (debug-eval-print exp))
-				 ((consp cmd-fun)
-				  (format t
-					  "~&Your command, ~S, is ambiguous:~%"
-					  exp)
-				  (dolist (ele cmd-fun)
-				    (format t "   ~A~%" ele)))
-				 (t
-				  (funcall cmd-fun)))))))))))))))
+			 (funcall cmd-fun))))))))))))
 
 ;;; FIXME: We could probably use INTERACTIVE-EVAL for much of this logic.
 (defun debug-eval-print (expr)

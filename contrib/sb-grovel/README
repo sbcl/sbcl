@@ -1,0 +1,41 @@
+Many of the structure offsets and symbolic constants necessary to do
+FFI vary between architectures and operating systems.  To avoid a
+maintenance nightmare, we derive them automatically by creating and
+running a small C program.  The C program is created by
+def-to-lisp.lisp with input from a GROVEL-CONSTANTS-FILE
+
+The ASDF component type GROVEL-CONSTANTS-FILE has its PERFORM
+operation defined to write out a C source file, compile it, and run
+it.  The output from this program is Lisp, which is then itself
+compiled.
+
+How to use it from your own system
+
+1) Create a Lisp package for the foreign constants/functions to go into.
+It needs to use SB-GROVEL and SB-ALIEN
+
+2) Make your system depend on the "sb-grovel" system
+
+3) Create a grovel-constants data file - see example-constants.lisp in
+this directory
+
+4) Add it as a component in your system. e.g.
+
+(defsystem sbcl-hemlock
+    :depends-on (sb-grovel)
+    :components
+    ((:module "sbcl"
+	      :components
+	      ((:file "defpackage")
+	       (sb-grovel:grovel-constants-file "example-constants"
+						:package :sbcl-hemlock
+						)))))
+
+Make sure to specify the package you chose in step 1
+
+5) Build stuff
+
+---
+
+Note that we assume that the C type char has 8 bits. 
+
