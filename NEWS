@@ -2330,6 +2330,8 @@ changes in sbcl-0.8.9 relative to sbcl-0.8.8:
   * optimization: the hash algorithm for strings has changed to one
     that is less vulnerable to spurious collisions.  (thanks to Juho
     Snellman)
+  * optimization: VECTOR-POP, VECTOR-PUSH-EXTEND and REPLACE do less
+    needless bounds checking.  (thanks to Juho Snellman)
   * optimization: implemented multiplication as a modular
     (UNSIGNED-BYTE 32) operation on the PPC backend.
   * fixed some bugs revealed by Paul Dietz' test suite:

@@ -472,6 +472,8 @@
 			    (1- source-index)))
 	     ((= target-index (the fixnum (1- target-start))) target-sequence)
 	   (declare (fixnum target-index source-index))
+	   ;; disable bounds checking
+	   (declare (optimize (safety 0)))
 	   (setf (aref target-sequence target-index)
 		 (aref source-sequence source-index))))
        (do ((target-index target-start (1+ target-index))
@@ -480,6 +482,8 @@
 		(= source-index (the fixnum source-end)))
 	    target-sequence)
 	 (declare (fixnum target-index source-index))
+	 ;; disable bounds checking
+	 (declare (optimize (safety 0)))
 	 (setf (aref target-sequence target-index)
 	       (aref source-sequence source-index)))))
 

@@ -643,7 +643,9 @@
     (declare (fixnum fill-pointer))
     (when (= fill-pointer (%array-available-elements vector))
       (adjust-array vector (+ fill-pointer extension)))
-    (setf (aref vector fill-pointer) new-element)
+    ;; disable bounds checking
+    (locally (declare (optimize (safety 0)))
+      (setf (aref vector fill-pointer) new-element))
     (setf (%array-fill-pointer vector) (1+ fill-pointer))
     fill-pointer))
 
@@ -656,9 +658,12 @@
     (declare (fixnum fill-pointer))
     (if (zerop fill-pointer)
 	(error "There is nothing left to pop.")
-	(aref array
-	      (setf (%array-fill-pointer array)
-		    (1- fill-pointer))))))
+	;; disable bounds checking (and any fixnum test)
+	(locally (declare (optimize (safety 0)))
+	  (aref array
+		(setf (%array-fill-pointer array)
+		      (1- fill-pointer)))))))
+
 
 ;;;; ADJUST-ARRAY
 
