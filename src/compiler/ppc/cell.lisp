@@ -11,7 +11,6 @@
 ;;;; files for more information.
 
 (in-package "SB!VM")
-
 
 ;;;; Data object ref/set stuff.
 
@@ -32,17 +31,14 @@
   (:generator 1
     (storew value object offset lowtag)))
 
-
 
 ;;;; Symbol hacking VOPs:
 
 ;;; The compiler likes to be able to directly SET symbols.
-;;;
 (define-vop (set cell-set)
   (:variant symbol-value-slot other-pointer-lowtag))
 
 ;;; Do a cell ref with an error check for being unbound.
-;;;
 (define-vop (checked-cell-ref)
   (:args (object :scs (descriptor-reg) :target obj-temp))
   (:results (value :scs (descriptor-reg any-reg)))
@@ -51,9 +47,8 @@
   (:save-p :compute-only)
   (:temporary (:scs (descriptor-reg) :from (:argument 0)) obj-temp))
 
-;;; With Symbol-Value, we check that the value isn't the trap object.  So
-;;; Symbol-Value of NIL is NIL.
-;;;
+;;; With SYMBOL-VALUE, we check that the value isn't the trap object.
+;;; So SYMBOL-VALUE of NIL is NIL.
 (define-vop (symbol-value checked-cell-ref)
   (:translate symbol-value)
   (:generator 9
@@ -63,7 +58,8 @@
       (inst cmpwi value unbound-marker-widetag)
       (inst beq err-lab))))
 
-;;; Like CHECKED-CELL-REF, only we are a predicate to see if the cell is bound.
+;;; Like CHECKED-CELL-REF, only we are a predicate to see if the cell
+;;; is bound.
 (define-vop (boundp-frob)
   (:args (object :scs (descriptor-reg)))
   (:conditional)
@@ -83,6 +79,19 @@
   (:policy :fast)
   (:translate symbol-value))
 
+(define-vop (symbol-hash)
+  (:policy :fast-safe)
+  (:translate symbol-hash)
+  (:args (symbol :scs (descriptor-reg)))
+  (:results (res :scs (any-reg)))
+  (:result-types positive-fixnum)
+  (:generator 2
+    ;; The symbol-hash slot of NIL holds NIL because it is also the
+    ;; cdr slot, so we have to strip off the two low bits to make sure
+    ;; it is a fixnum.  The lowtag selection magic that is required to
+    ;; ensure this is explained in the comment in objdef.lisp
+    (loadw res symbol symbol-hash-slot other-pointer-lowtag)
+    (inst clrrwi res res (1- n-lowtag-bits))))
 
 ;;;; Fdefinition (fdefn) objects.
 
