@@ -1271,8 +1271,8 @@
 ;;; of 0 before the dispatch so that the bignum code doesn't have to worry
 ;;; about "small bignum" zeros.
 (defun two-arg-gcd (u v)
-  (cond ((eql u 0) v)
-	((eql v 0) u)
+  (cond ((eql u 0) (abs v))
+	((eql v 0) (abs u))
 	(t
 	 (number-dispatch ((u integer) (v integer))
 	   ((fixnum fixnum)

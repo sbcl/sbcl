@@ -102,3 +102,7 @@
 		   (= (funcall fn 2) x2)
 		   (= (funcall fn 3) x3))
 	(error "bad results for ~D" x)))))
+
+;;; (GCD 0 x) must return (abs x)
+(dolist (x (list -10 (* 3 most-negative-fixnum)))
+  (assert (= (gcd 0 x) (abs x))))

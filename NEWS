@@ -2037,6 +2037,7 @@ changes in sbcl-0.8.4 relative to sbcl-0.8.3:
     ** (FLOAT X) for X of type DOUBLE-FLOAT now returns X in all
        circumstances.
     ** optimizer for (EXPT X 0) did not work for X not of type FLOAT.
+    ** (GCD 0 <negative-integer>) returned <negative-integer>.
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles
