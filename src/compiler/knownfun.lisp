@@ -135,36 +135,30 @@
   ;; string used in efficiency notes
   (note (missing-arg) :type string)
   ;; T if we should emit a failure note even if SPEED=INHIBIT-WARNINGS.
-  (important nil :type (member t nil))
-  ;; usable for byte code, native code, or both?
-  ;;
-  ;; FIXME: Now that there's no byte compiler, this is stale and could
-  ;; all go away.
-  (when :native :type (member :byte :native :both)))
+  (important nil :type (member t nil)))
 
-(defprinter (transform) type note important when)
+(defprinter (transform) type note important)
 
 ;;; Grab the FUN-INFO and enter the function, replacing any old
 ;;; one with the same type and note.
 (declaim (ftype (function (t list function &optional (or string null)
-			     (member t nil) (member :native :byte :both))
+			     (member t nil))
 			  *)
 		%deftransform))
-(defun %deftransform (name type fun &optional note important (when :native))
+(defun %deftransform (name type fun &optional note important)
   (let* ((ctype (specifier-type type))
 	 (note (or note "optimize"))
 	 (info (fun-info-or-lose name))
 	 (old (find-if (lambda (x)
 			 (and (type= (transform-type x) ctype)
 			      (string-equal (transform-note x) note)
-			      (eq (transform-important x) important)
-			      (eq (transform-when x) when)))
+			      (eq (transform-important x) important)))
 		       (fun-info-transforms info))))
     (if old
 	(setf (transform-function old) fun
 	      (transform-note old) note)
 	(push (make-transform :type ctype :function fun :note note
-			      :important important :when when)
+			      :important important)
 	      (fun-info-transforms info)))
     name))
 

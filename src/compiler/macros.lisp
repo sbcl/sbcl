@@ -386,13 +386,10 @@
 ;;;             which means efficiency notes will be generated when this
 ;;;             transform fails even if INHIBIT-WARNINGS=SPEED (but not if
 ;;;             INHIBIT-WARNINGS>SPEED).
-;;;   :WHEN {:NATIVE | :BYTE | :BOTH}
-;;;           - Indicates whether this transform applies to native code,
-;;;             byte-code or both (default :native.)
 (defmacro deftransform (name (lambda-list &optional (arg-types '*)
 					  (result-type '*)
 					  &key result policy node defun-only
-					  eval-name important (when :native))
+					  eval-name important)
 			     &body body-decls-doc)
   (when (and eval-name defun-only)
     (error "can't specify both DEFUN-ONLY and EVAL-NAME"))
@@ -433,8 +430,7 @@
 		     `'(function ,arg-types ,result-type))
 		(lambda ,@stuff)
 		,doc
-		,(if important t nil)
-		,when)))))))
+		,(if important t nil))))))))
 
 ;;;; DEFKNOWN and DEFOPTIMIZER
 

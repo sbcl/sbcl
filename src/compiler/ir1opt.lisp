@@ -982,20 +982,7 @@
 		    (policy node (>= speed inhibit-warnings))
 		    (policy node (> speed inhibit-warnings))))
 	 (*compiler-error-context* node))
-    (cond ((not (member (transform-when transform)
-			'(:native :both)))
-	   ;; FIXME: Make sure that there's a transform for
-	   ;; (MEMBER SYMBOL ..) into MEMQ.
-	   ;; FIXME: Note that when/if I make SHARE operation to shared
-	   ;; constant data between objects in the system, remember that a
-	   ;; SHAREd list, or other SHAREd compound object, can be processed
-	   ;; recursively, so that e.g. the two lists above can share their
-	   ;; '(:BOTH) tail sublists.
-	   (let ((when (transform-when transform)))
-	     (not (or (eq when :both)
-		      (eq when :native))))
-	   t)
-	  ((or (not constrained)
+    (cond ((or (not constrained)
 	       (valid-fun-use node type :strict-result t))
 	   (multiple-value-bind (severity args)
 	       (catch 'give-up-ir1-transform

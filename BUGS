@@ -1301,6 +1301,15 @@ WORKAROUND:
   (reported by Christophe Rhodes and Martin Atzmueller sbcl-devel
   2002-05-15)
 
+160:
+  USER-HOMEDIR-PATHNAME returns a pathname that SBCL can't do anything
+  with.  Probably we should return an absolute physical pathname
+  instead.  (Reported by Peter van Eynde sbcl-devel 2002-03-29)
+
+161:
+  Typep on certain SATISFIES types doesn't take account of the fact
+  that the function could cause an error; e.g. (TYPEP #\! '(SATISFIES
+  FBOUNDP)) raises an error when it should return NIL.
 
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:

@@ -214,13 +214,13 @@
 		      (declare (ignorable dacc))
 		      ,push-dacc))))))))))
 
-(deftransform elt ((s i) ((simple-array * (*)) *) * :when :both)
+(deftransform elt ((s i) ((simple-array * (*)) *) *)
   '(aref s i))
 
-(deftransform elt ((s i) (list *) * :when :both)
+(deftransform elt ((s i) (list *) *)
   '(nth i s))
 
-(deftransform %setelt ((s i v) ((simple-array * (*)) * *) * :when :both)
+(deftransform %setelt ((s i v) ((simple-array * (*)) * *) *)
   '(%aset s i v))
 
 (deftransform %setelt ((s i v) (list * *))
@@ -228,7 +228,7 @@
 
 (macrolet ((def (name)
              `(deftransform ,name ((e l &key (test #'eql)) * *
-				   :node node :when :both)
+				   :node node)
                 (unless (constant-continuation-p l)
                   (give-up-ir1-transform))
 

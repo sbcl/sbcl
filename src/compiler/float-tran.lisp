@@ -18,23 +18,22 @@
 (defknown %single-float (real) single-float (movable foldable flushable))
 (defknown %double-float (real) double-float (movable foldable flushable))
 
-(deftransform float ((n &optional f) (* &optional single-float) * :when :both)
+(deftransform float ((n &optional f) (* &optional single-float) *)
   '(%single-float n))
 
-(deftransform float ((n f) (* double-float) * :when :both)
+(deftransform float ((n f) (* double-float) *)
   '(%double-float n))
 
-(deftransform %single-float ((n) (single-float) * :when :both)
+(deftransform %single-float ((n) (single-float) *)
   'n)
 
-(deftransform %double-float ((n) (double-float) * :when :both)
+(deftransform %double-float ((n) (double-float) *)
   'n)
 
 ;;; RANDOM
 (macrolet ((frob (fun type)
 	     `(deftransform random ((num &optional state)
-				    (,type &optional *) *
-				    :when :both)
+				    (,type &optional *) *)
 		"Use inline float operations."
 		'(,fun num (or state *random-state*)))))
   (frob %random-single-float single-float)
@@ -139,26 +138,26 @@
 (defknown scale-double-float (double-float fixnum) double-float
   (movable foldable flushable))
 
-(deftransform decode-float ((x) (single-float) * :when :both)
+(deftransform decode-float ((x) (single-float) *)
   '(decode-single-float x))
 
-(deftransform decode-float ((x) (double-float) * :when :both)
+(deftransform decode-float ((x) (double-float) *)
   '(decode-double-float x))
 
-(deftransform integer-decode-float ((x) (single-float) * :when :both)
+(deftransform integer-decode-float ((x) (single-float) *)
   '(integer-decode-single-float x))
 
-(deftransform integer-decode-float ((x) (double-float) * :when :both)
+(deftransform integer-decode-float ((x) (double-float) *)
   '(integer-decode-double-float x))
 
-(deftransform scale-float ((f ex) (single-float *) * :when :both)
+(deftransform scale-float ((f ex) (single-float *) *)
   (if (and #!+x86 t #!-x86 nil
 	   (csubtypep (continuation-type ex)
 		      (specifier-type '(signed-byte 32))))
       '(coerce (%scalbn (coerce f 'double-float) ex) 'single-float)
       '(scale-single-float f ex)))
 
-(deftransform scale-float ((f ex) (double-float *) * :when :both)
+(deftransform scale-float ((f ex) (double-float *) *)
   (if (and #!+x86 t #!-x86 nil
 	   (csubtypep (continuation-type ex)
 		      (specifier-type '(signed-byte 32))))
@@ -292,7 +291,7 @@
 ;;; do it for any rational that has a precise representation as a
 ;;; float (such as 0).
 (macrolet ((frob (op)
-	     `(deftransform ,op ((x y) (float rational) * :when :both)
+	     `(deftransform ,op ((x y) (float rational) *)
 		"open-code FLOAT to RATIONAL comparison"
 		(unless (constant-continuation-p y)
 		  (give-up-ir1-transform
@@ -398,7 +397,7 @@
              `(progn
                (deftransform ,name ((x) (single-float) ,rtype)
                  `(coerce (,',prim (coerce x 'double-float)) 'single-float))
-               (deftransform ,name ((x) (double-float) ,rtype :when :both)
+               (deftransform ,name ((x) (double-float) ,rtype)
                  `(,',prim x)))))
   (def exp %exp *)
   (def log %log float)
@@ -433,7 +432,7 @@
                                  (type-specifier (continuation-type x)))
                                 `(coerce (,',prim (coerce x 'double-float)) 'single-float)))
                   #!-x86 `(coerce (,',prim (coerce x 'double-float)) 'single-float))
-               (deftransform ,name ((x) (double-float) * :when :both)
+               (deftransform ,name ((x) (double-float) *)
                  #!+x86 (cond ((csubtypep (continuation-type x)
                                           (specifier-type '(double-float
                                                             (#.(- (expt 2d0 64)))
@@ -453,18 +452,18 @@
 (deftransform atan ((x y) (single-float single-float) *)
   `(coerce (%atan2 (coerce x 'double-float) (coerce y 'double-float))
     'single-float))
-(deftransform atan ((x y) (double-float double-float) * :when :both)
+(deftransform atan ((x y) (double-float double-float) *)
   `(%atan2 x y))
 
 (deftransform expt ((x y) ((single-float 0f0) single-float) *)
   `(coerce (%pow (coerce x 'double-float) (coerce y 'double-float))
     'single-float))
-(deftransform expt ((x y) ((double-float 0d0) double-float) * :when :both)
+(deftransform expt ((x y) ((double-float 0d0) double-float) *)
   `(%pow x y))
 (deftransform expt ((x y) ((single-float 0f0) (signed-byte 32)) *)
   `(coerce (%pow (coerce x 'double-float) (coerce y 'double-float))
     'single-float))
-(deftransform expt ((x y) ((double-float 0d0) (signed-byte 32)) * :when :both)
+(deftransform expt ((x y) ((double-float 0d0) (signed-byte 32)) *)
   `(%pow x (coerce y 'double-float)))
 
 ;;; ANSI says log with base zero returns zero.
@@ -473,7 +472,7 @@
 
 ;;; Handle some simple transformations.
 
-(deftransform abs ((x) ((complex double-float)) double-float :when :both)
+(deftransform abs ((x) ((complex double-float)) double-float)
   '(%hypot (realpart x) (imagpart x)))
 
 (deftransform abs ((x) ((complex single-float)) single-float)
@@ -481,7 +480,7 @@
 		   (coerce (imagpart x) 'double-float))
 	  'single-float))
 
-(deftransform phase ((x) ((complex double-float)) double-float :when :both)
+(deftransform phase ((x) ((complex double-float)) double-float)
   '(%atan2 (imagpart x) (realpart x)))
 
 (deftransform phase ((x) ((complex single-float)) single-float)
@@ -489,7 +488,7 @@
 		   (coerce (realpart x) 'double-float))
 	  'single-float))
 
-(deftransform phase ((x) ((float)) float :when :both)
+(deftransform phase ((x) ((float)) float)
   '(if (minusp (float-sign x))
        (float pi x)
        (float 0 x)))

@@ -97,8 +97,7 @@
 
 ;;; If FIND-CLASS is called on a constant class, locate the CLASS-CELL
 ;;; at load time.
-(deftransform find-class ((name) ((constant-arg symbol)) *
-			  :when :both)
+(deftransform find-class ((name) ((constant-arg symbol)) *)
   (let* ((name (continuation-value name))
 	 (cell (find-class-cell name)))
     `(or (class-cell-class ',cell)
@@ -385,7 +384,7 @@
 ;;; then we also check whether the layout for the object is invalid
 ;;; and signal an error if so. Otherwise, look up the indirect
 ;;; class-cell and call CLASS-CELL-TYPEP at runtime.
-(deftransform %instance-typep ((object spec) (* *) * :node node :when :both)
+(deftransform %instance-typep ((object spec) (* *) * :node node)
   (aver (constant-continuation-p spec))
   (let* ((spec (continuation-value spec))
 	 (class (specifier-type spec))
@@ -526,7 +525,7 @@
 
 ;;;; coercion
 
-(deftransform coerce ((x type) (* *) * :when :both)
+(deftransform coerce ((x type) (* *) *)
   (unless (constant-continuation-p type)
     (give-up-ir1-transform))
   (let ((tspec (specifier-type (continuation-value type))))

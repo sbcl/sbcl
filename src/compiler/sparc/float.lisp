@@ -2548,7 +2548,7 @@
 	   (make-canonical-union-type (list (continuation-type x)
 					    (continuation-type y)))))))
 
-(deftransform max ((x y) (number number) * :when :both)
+(deftransform max ((x y) (number number) *)
   (let ((x-type (continuation-type x))
 	(y-type (continuation-type y))
 	(signed (specifier-type '(signed-byte #.sb!vm:n-word-bits)))
@@ -2578,7 +2578,7 @@
 	       (if (> ,arg1 ,arg2)
 		   ,arg1 ,arg2)))))))
 
-(deftransform min ((x y) (real real) * :when :both)
+(deftransform min ((x y) (real real) *)
   (let ((x-type (continuation-type x))
 	(y-type (continuation-type y))
 	(signed (specifier-type '(signed-byte #.sb!vm:n-word-bits)))

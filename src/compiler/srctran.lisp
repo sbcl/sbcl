@@ -40,7 +40,7 @@
 ;;; lambda with the appropriate fixed number of args. If the
 ;;; destination is a FUNCALL, then do the &REST APPLY thing, and let
 ;;; MV optimization figure things out.
-(deftransform complement ((fun) * * :node node :when :both)
+(deftransform complement ((fun) * * :node node)
   "open code"
   (multiple-value-bind (min max)
       (fun-type-nargs (continuation-type fun))
@@ -2492,7 +2492,7 @@
 		 "place constant arg last"))
 
 ;;; Handle the case of a constant BOOLE-CODE.
-(deftransform boole ((op x y) * * :when :both)
+(deftransform boole ((op x y) * *)
   "convert to inline logical operations"
   (unless (constant-continuation-p op)
     (give-up-ir1-transform "BOOLE code is not a constant."))
@@ -2521,7 +2521,7 @@
 ;;;; converting special case multiply/divide to shifts
 
 ;;; If arg is a constant power of two, turn * into a shift.
-(deftransform * ((x y) (integer integer) * :when :both)
+(deftransform * ((x y) (integer integer) *)
   "convert x*2^k to shift"
   (unless (constant-continuation-p y)
     (give-up-ir1-transform))
@@ -2608,7 +2608,7 @@
     (frob y t)))
 
 ;;; Do the same for MOD.
-(deftransform mod ((x y) (integer integer) * :when :both)
+(deftransform mod ((x y) (integer integer) *)
   "convert remainder mod 2^k to LOGAND"
   (unless (constant-continuation-p y)
     (give-up-ir1-transform))
@@ -2645,7 +2645,7 @@
 		   (logand x ,mask))))))
 
 ;;; And the same for REM.
-(deftransform rem ((x y) (integer integer) * :when :both)
+(deftransform rem ((x y) (integer integer) *)
   "convert remainder mod 2^k to LOGAND"
   (unless (constant-continuation-p y)
     (give-up-ir1-transform))
@@ -2664,8 +2664,7 @@
 ;;; Flush calls to various arith functions that convert to the
 ;;; identity function or a constant.
 (macrolet ((def (name identity result)
-             `(deftransform ,name ((x y) (* (constant-arg (member ,identity)))
-                                    * :when :both)
+             `(deftransform ,name ((x y) (* (constant-arg (member ,identity))) *)
                 "fold identity operations"
                 ',result)))
   (def ash 0 x)
@@ -2678,12 +2677,10 @@
 
 ;;; These are restricted to rationals, because (- 0 0.0) is 0.0, not -0.0, and
 ;;; (* 0 -4.0) is -0.0.
-(deftransform - ((x y) ((constant-arg (member 0)) rational) *
-		 :when :both)
+(deftransform - ((x y) ((constant-arg (member 0)) rational) *)
   "convert (- 0 x) to negate"
   '(%negate y))
-(deftransform * ((x y) (rational (constant-arg (member 0))) *
-		 :when :both)
+(deftransform * ((x y) (rational (constant-arg (member 0))) *)
   "convert (* x 0) to 0"
   0)
 
@@ -2725,7 +2722,7 @@
 ;;;
 ;;; If y is not constant, not zerop, or is contagious, or a positive
 ;;; float +0.0 then give up.
-(deftransform + ((x y) (t (constant-arg t)) * :when :both)
+(deftransform + ((x y) (t (constant-arg t)) *)
   "fold zero arg"
   (let ((val (continuation-value y)))
     (unless (and (zerop val)
@@ -2738,7 +2735,7 @@
 ;;;
 ;;; If y is not constant, not zerop, or is contagious, or a negative
 ;;; float -0.0 then give up.
-(deftransform - ((x y) (t (constant-arg t)) * :when :both)
+(deftransform - ((x y) (t (constant-arg t)) *)
   "fold zero arg"
   (let ((val (continuation-value y)))
     (unless (and (zerop val)
@@ -2749,8 +2746,7 @@
 
 ;;; Fold (OP x +/-1)
 (macrolet ((def (name result minus-result)
-             `(deftransform ,name ((x y) (t (constant-arg real))
-                                    * :when :both)
+             `(deftransform ,name ((x y) (t (constant-arg real)) *)
                 "fold identity operations"
                 (let ((val (continuation-value y)))
                   (unless (and (= (abs val) 1)
@@ -2787,7 +2783,7 @@
 ;;; doing them?  -- WHN 19990917
 (macrolet ((def (name)
              `(deftransform ,name ((x y) ((constant-arg (integer 0 0)) integer)
-                                   * :when :both)
+                                   *)
                 "fold zero arg"
                 0)))
   (def ash)
@@ -2795,7 +2791,7 @@
 
 (macrolet ((def (name)
              `(deftransform ,name ((x y) ((constant-arg (integer 0 0)) integer)
-                                   * :when :both)
+                                   *)
                 "fold zero arg"
                 '(values 0 0))))
   (def truncate)
@@ -2849,8 +2845,7 @@
 ;;; if there is no intersection between the types of the arguments,
 ;;; then the result is definitely false.
 (deftransform simple-equality-transform ((x y) * *
-					 :defun-only t
-					 :when :both)
+					 :defun-only t)
   (cond ((same-leaf-ref-p x y)
 	 t)
 	((not (types-equal-or-intersect (continuation-type x)
@@ -2878,7 +2873,7 @@
 ;;;    these interesting cases.
 ;;; -- If Y is a fixnum, then we quietly pass because the back end can
 ;;;    handle that case, otherwise give an efficiency note.
-(deftransform eql ((x y) * * :when :both)
+(deftransform eql ((x y) * *)
   "convert to simpler equality predicate"
   (let ((x-type (continuation-type x))
 	(y-type (continuation-type y))
@@ -2904,7 +2899,7 @@
 
 ;;; Convert to EQL if both args are rational and complexp is specified
 ;;; and the same for both.
-(deftransform = ((x y) * * :when :both)
+(deftransform = ((x y) * *)
   "open code"
   (let ((x-type (continuation-type x))
 	(y-type (continuation-type y)))
@@ -2982,18 +2977,18 @@
 	      (t
 	       (give-up-ir1-transform))))))
 
-(deftransform < ((x y) (integer integer) * :when :both)
+(deftransform < ((x y) (integer integer) *)
   (ir1-transform-< x y x y '>))
 
-(deftransform > ((x y) (integer integer) * :when :both)
+(deftransform > ((x y) (integer integer) *)
   (ir1-transform-< y x x y '<))
 
 #-sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
-(deftransform < ((x y) (float float) * :when :both)
+(deftransform < ((x y) (float float) *)
   (ir1-transform-< x y x y '>))
 
 #-sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
-(deftransform > ((x y) (float float) * :when :both)
+(deftransform > ((x y) (float float) *)
   (ir1-transform-< y x x y '<))
 
 ;;;; converting N-arg comparisons

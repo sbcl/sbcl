@@ -465,7 +465,7 @@
 ;;; FUNCALL is implemented on %FUNCALL, which can only call functions
 ;;; (not symbols). %FUNCALL is used directly in some places where the
 ;;; call should always be open-coded even if FUNCALL is :NOTINLINE.
-(deftransform funcall ((function &rest args) * * :when :both)
+(deftransform funcall ((function &rest args) * *)
   (let ((arg-names (make-gensym-list (length args))))
     `(lambda (function ,@arg-names)
        (%funcall ,(if (csubtypep (continuation-type function)
@@ -490,7 +490,6 @@
       (values nil t)))
 
 (deftransform %coerce-callable-to-fun ((thing) (function) *
-				       :when :both
 				       :important t)
   "optimize away possible call to FDEFINITION at runtime"
   'thing)
