@@ -44,6 +44,8 @@ changes in sbcl-0.8.14 relative to sbcl-0.8.13:
     ** literal spaces directly after ~<Newline> directives within a
        format-logical-block (~:< ~@:>) do not induce :FILL-style
        conditional newlines.
+    ** PRINT-UNREADABLE-OBJECT inserts spaces as specified (and only
+       as specified: it no longer includes conditional newlines).
 
 changes in sbcl-0.8.13 relative to sbcl-0.8.12:
   * new feature: SB-PACKAGE-LOCKS. See the "Package Locks" section of

@@ -249,15 +249,12 @@
 	   (when type
 	     (write (type-of object) :stream stream :circle nil
 		    :level nil :length nil)
-	     (when (or body identity)
-	       (write-char #\space stream)
-	       (pprint-newline :fill stream)))
+	     (write-char #\space stream))
 	   (when body
 	     (funcall body))
 	   (when identity
-	     (when body
-	       (write-char #\space stream)
-	       (pprint-newline :fill stream))
+	     (when (or body (not type))
+	       (write-char #\space stream))
 	     (write-char #\{ stream)
 	     (write (get-lisp-obj-address object) :stream stream
 		    :radix nil :base 16)
