@@ -1823,6 +1823,33 @@
 
 ;;;; etc.
 
+(defun get-underlying-stream (stream direction)
+  (typecase stream
+    (synonym-stream
+     (get-underlying-stream
+      (symbol-value (synonym-stream-symbol stream)) direction))
+    ((or two-way-stream echo-stream)
+     (get-underlying-stream (if (eql direction :input)
+				(two-way-stream-input-stream stream)
+				(two-way-stream-output-stream stream))
+			    direction))
+    (concatenated-stream
+     (get-underlying-stream (concatenated-stream-current stream) direction))
+    (broadcast-stream
+     ;; XXX kludgey.  we should return all underlying streams.  Presently
+     ;; we're only using this function for input though, so this code never
+     ;; runs anyway
+     (get-underlying-stream (car (broadcast-stream-streams stream)) direction))
+    (indenting-stream
+     (get-underlying-stream (indenting-stream-stream stream) direction))
+    (case-frob-stream
+     (get-underlying-stream (case-frob-stream-target stream) direction))
+    ;; leaving us with file-stream, string-stream, ansi-stream, gray-stream
+    ;; etc: the base cases
+    (t  stream)))
+
+
 ;;; (These were inline throughout this file, but that's not appropriate
 ;;; globally.)
 (declaim (maybe-inline read-char unread-char read-byte listen))
+

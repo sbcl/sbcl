@@ -15,6 +15,8 @@
 
 ;;; FIXME: Is it really good to maintain this pool separate from the
 ;;; GC and the C malloc logic?
+
+;;; FIXME 2: access to this should be locked anyway, probably
 (defvar *available-buffers* ()
   #!+sb-doc
   "List of available buffers. Each buffer is an sap pointing to
@@ -87,6 +89,7 @@
   (timeout nil :type (or index null))
   ;; pathname of the file this stream is opened to (returned by PATHNAME)
   (pathname nil :type (or pathname null)))
+
 (def!method print-object ((fd-stream file-stream) stream)
   (declare (type stream stream))
   (print-unreadable-object (fd-stream stream :type t :identity t)

@@ -166,79 +166,7 @@
 ;;; a chance of clearing more of it: callers are currently (2002.07.18)
 ;;; REPL and SUB-GC
 
-(defun scrub-control-stack ()
-  (declare (optimize (speed 3) (safety 0))
-	   (values (unsigned-byte 20))) ; FIXME: DECLARE VALUES?
-
-  #!-stack-grows-downward-not-upward
-  (let* ((csp (sap-int (sb!c::control-stack-pointer-sap)))
-	 (initial-offset (logand csp (1- bytes-per-scrub-unit)))
-	 (end-of-stack
-	  (- sb!vm:control-stack-end sb!c:*backend-page-size*)))
-    (labels
-	((scrub (ptr offset count)
-	   (declare (type system-area-pointer ptr)
-		    (type (unsigned-byte 16) offset)
-		    (type (unsigned-byte 20) count)
-		    (values (unsigned-byte 20)))
-	   (cond ((>= (sap-int ptr) end-of-stack) 0)
-		 ((= offset bytes-per-scrub-unit)
-		  (look (sap+ ptr bytes-per-scrub-unit) 0 count))
-		 (t
-		  (setf (sap-ref-32 ptr offset) 0)
-		  (scrub ptr (+ offset sb!vm:n-word-bytes) count))))
-	 (look (ptr offset count)
-	   (declare (type system-area-pointer ptr)
-		    (type (unsigned-byte 16) offset)
-		    (type (unsigned-byte 20) count)
-		    (values (unsigned-byte 20)))
-	   (cond ((>= (sap-int ptr) end-of-stack) 0)
-		 ((= offset bytes-per-scrub-unit)
-		  count)
-		 ((zerop (sap-ref-32 ptr offset))
-		  (look ptr (+ offset sb!vm:n-word-bytes) count))
-		 (t
-		  (scrub ptr offset (+ count sb!vm:n-word-bytes))))))
-      (declare (type (unsigned-byte 32) csp))
-      (scrub (int-sap (- csp initial-offset))
-	     (* (floor initial-offset sb!vm:n-word-bytes) sb!vm:n-word-bytes)
-	     0)))
-
-  #!+stack-grows-downward-not-upward
-  (let* ((csp (sap-int (sb!c::control-stack-pointer-sap)))
-	 (end-of-stack (+ sb!vm:control-stack-start sb!c:*backend-page-size*))
-	 (initial-offset (logand csp (1- bytes-per-scrub-unit))))
-    (labels
-	((scrub (ptr offset count)
-	   (declare (type system-area-pointer ptr)
-		    (type (unsigned-byte 16) offset)
-		    (type (unsigned-byte 20) count)
-		    (values (unsigned-byte 20)))
-	   (let ((loc (int-sap (- (sap-int ptr) (+ offset sb!vm:n-word-bytes)))))
-	     (cond ((< (sap-int loc) end-of-stack) 0)
-		   ((= offset bytes-per-scrub-unit)
-		    (look (int-sap (- (sap-int ptr) bytes-per-scrub-unit))
-			  0 count))
-		   (t ;; need to fix bug in %SET-STACK-REF
-		    (setf (sap-ref-32 loc 0) 0)
-		    (scrub ptr (+ offset sb!vm:n-word-bytes) count)))))
-	 (look (ptr offset count)
-	   (declare (type system-area-pointer ptr)
-		    (type (unsigned-byte 16) offset)
-		    (type (unsigned-byte 20) count)
-		    (values (unsigned-byte 20)))
-	   (let ((loc (int-sap (- (sap-int ptr) offset))))
-	     (cond ((< (sap-int loc) end-of-stack) 0)
-		   ((= offset bytes-per-scrub-unit)
-		    count)
-		   ((zerop (sb!kernel::get-lisp-obj-address (stack-ref loc 0)))
-		    (look ptr (+ offset sb!vm:n-word-bytes) count))
-		   (t
-		    (scrub ptr offset (+ count sb!vm:n-word-bytes)))))))
-      (declare (type (unsigned-byte 32) csp))
-      (scrub (int-sap (+ csp initial-offset))
-	     (* (floor initial-offset sb!vm:n-word-bytes) sb!vm:n-word-bytes)
-	     0))))
+(defun scrub-control-stack ()  )
 
 ;;;; the default toplevel function
 
@@ -296,7 +224,8 @@
 (defun toplevel-init ()
 
   (/show0 "entering TOPLEVEL-INIT")
-  
+  (setf sb!thread::*session-lock* (sb!thread:make-mutex :name "the terminal"))
+  (sb!thread::get-foreground)
   (let ((sysinit nil)        ; value of --sysinit option
 	(userinit nil)       ; value of --userinit option
 	(reversed-evals nil) ; values of --eval options, in reverse order; and
@@ -508,14 +437,15 @@
 	   ;; in the event of a control-stack-exhausted-error, we should
 	   ;; have unwound enough stack by the time we get here that this
 	   ;; is now possible
-	   (sb!kernel::protect-control-stack-guard-page 1)
+	   (sb!kernel::protect-control-stack-guard-page t)
 	   (repl noprint)
 	   (critically-unreachable "after REPL")))))))
 
 ;;; Our default REPL prompt is the minimal traditional one.
-(defun repl-prompt-fun (stream)
-  (fresh-line stream)
-  (write-string "* " stream)) ; arbitrary but customary REPL prompt
+(defun repl-prompt-fun (in out)
+  (declare (type stream in out) (ignore in))
+  (fresh-line out)
+  (write-string "* " out)) ; arbitrary but customary REPL prompt
 
 ;;; Our default form reader does relatively little magic, but does
 ;;; handle the Unix-style EOF-is-end-of-process convention.
@@ -536,8 +466,8 @@
   Lisp form). The OUT stream is there to support magic which requires
   issuing new prompts.")
 (defvar *repl-prompt-fun* #'repl-prompt-fun
-  "a function of one argument STREAM for the toplevel REPL to call: Prompt
-  the user for input.")
+  "a function of two stream arguments IN and OUT for the toplevel REPL
+to call: Prompt the user for input.")
 
 (defun repl (noprint)
   (/show0 "entering REPL")
@@ -546,7 +476,7 @@
      ;; (See comment preceding the definition of SCRUB-CONTROL-STACK.)
      (scrub-control-stack)
      (unless noprint
-       (funcall *repl-prompt-fun* *standard-output*)
+       (funcall *repl-prompt-fun* *standard-input* *standard-output*)
        ;; (Should *REPL-PROMPT-FUN* be responsible for doing its own
        ;; FORCE-OUTPUT? I can't imagine a valid reason for it not to
        ;; be done here, so leaving it up to *REPL-PROMPT-FUN* seems

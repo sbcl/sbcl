@@ -33,8 +33,7 @@
 #include "arch.h"
 #include "interr.h"
 #include "sbcl.h"
-#include "genesis/symbol.h"
-#include "genesis/static-symbols.h"
+#include "thread.h"
 
 unsigned char build_id[] =
 #include "../../output/build-id.tmp"
@@ -94,7 +93,7 @@ process_directory(int fd, u32 *ptr, int count)
  *   defined(__i386__)
  * ? */
 #if defined(LISP_FEATURE_X86)
-	    SetSymbolValue(ALLOCATION_POINTER, (lispobj)free_pointer);
+	    SetSymbolValue(ALLOCATION_POINTER, (lispobj)free_pointer,0);
 #else
 	    dynamic_space_free_pointer = free_pointer;
 #endif

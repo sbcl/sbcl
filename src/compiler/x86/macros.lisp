@@ -84,6 +84,27 @@
 			   (- other-pointer-lowtag)))
 	 ,reg))
 
+(defmacro load-tl-symbol-value (reg symbol)
+  `(progn
+    (inst mov ,reg
+     (make-ea :dword
+      :disp (+ nil-value
+	       (static-symbol-offset ',symbol)
+	       (ash symbol-tls-index-slot word-shift)
+	       (- other-pointer-lowtag))))
+    (inst gs-segment-prefix)
+    (inst mov ,reg (make-ea :dword :scale 1 :index ,reg))))
+
+(defmacro store-tl-symbol-value (reg symbol temp)
+  `(progn
+    (inst mov ,temp
+     (make-ea :dword
+      :disp (+ nil-value
+	       (static-symbol-offset ',symbol)
+	       (ash symbol-tls-index-slot word-shift)
+	       (- other-pointer-lowtag))))
+    (inst gs-segment-prefix)
+    (inst mov (make-ea :dword :scale 1 :index ,temp) ,reg)))
 
 (defmacro load-type (target source &optional (offset 0))
   #!+sb-doc
@@ -309,46 +330,21 @@
 (defmacro pseudo-atomic (&rest forms)
   (let ((label (gensym "LABEL-")))
     `(let ((,label (gen-label)))
-      ;; FIXME: The MAKE-EA noise should become a MACROLET macro or
-      ;; something. (perhaps SVLB, for static variable low byte)
-      (inst mov (make-ea :byte :disp (+ nil-value
-					(static-symbol-offset
-					 '*pseudo-atomic-interrupted*)
-					(ash symbol-value-slot word-shift)
-					;; FIXME: Use mask, not minus, to
-					;; take out type bits.
-					(- other-pointer-lowtag)))
-       0)
-      (inst mov (make-ea :byte :disp (+ nil-value
-					(static-symbol-offset
-					 '*pseudo-atomic-atomic*)
-					(ash symbol-value-slot word-shift)
-					(- other-pointer-lowtag)))
-       (fixnumize 1))
-      ,@forms
-      (inst mov (make-ea :byte :disp (+ nil-value
-					(static-symbol-offset
-					 '*pseudo-atomic-atomic*)
-					(ash symbol-value-slot word-shift)
-					(- other-pointer-lowtag)))
-       0)
-      ;; KLUDGE: Is there any requirement for interrupts to be
-      ;; handled in order? It seems as though an interrupt coming
-      ;; in at this point will be executed before any pending interrupts.
-      ;; Or do incoming interrupts check to see whether any interrupts
-      ;; are pending? I wish I could find the documentation for
-      ;; pseudo-atomics.. -- WHN 19991130
-      (inst cmp (make-ea :byte
-		 :disp (+ nil-value
-			  (static-symbol-offset
-			   '*pseudo-atomic-interrupted*)
-			  (ash symbol-value-slot word-shift)
-			  (- other-pointer-lowtag)))
-       0)
-      (inst jmp :eq ,label)
+      (inst gs-segment-prefix)
+      (inst mov (make-ea :byte :disp (* 4 thread-pseudo-atomic-atomic-slot)) 1)
+      (inst gs-segment-prefix)
+      (inst mov (make-ea :byte 
+		 :disp (* 4 thread-pseudo-atomic-interrupted-slot)) 0) 
+       ,@forms
+      (inst gs-segment-prefix)
+      (inst mov (make-ea :byte :disp (* 4 thread-pseudo-atomic-atomic-slot)) 0)
+      (inst gs-segment-prefix)
+	 (inst cmp (make-ea :byte
+		 :disp (* 4 thread-pseudo-atomic-interrupted-slot)) 0)
+	 (inst jmp :eq ,label)
       ;; if PAI was set, interrupts were disabled at the same time
       ;; using the process signal mask.  
-      (inst break pending-interrupt-trap)
+	 (inst break pending-interrupt-trap)
       (emit-label ,label))))
 
 ;;;; indexed references

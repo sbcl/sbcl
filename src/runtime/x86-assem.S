@@ -19,9 +19,7 @@
 #include "genesis/closure.h"
 #include "genesis/fdefn.h"
 #include "genesis/static-symbols.h"
-#include "genesis/symbol.h"	
 
-	
 /* Minimize conditionalization for different OS naming schemes. */
 #if defined __linux__  || defined __FreeBSD__ /* (but *not* OpenBSD) */
 #define GNAME(var) var
@@ -178,15 +176,6 @@ GNAME(call_into_lisp):
 	movl	%eax, GNAME(foreign_function_call_active)
 
 	movl	%esp,%ebx	# remember current stack
-	cmpl	$CONTROL_STACK_START,%esp
-	jbe	ChangeToLispStack
-	cmpl	$CONTROL_STACK_END,%esp
-	jbe	OnLispStack
-ChangeToLispStack:
-	/* Setup the *alien-stack* pointer */
-	movl	%esp,ALIEN_STACK + SYMBOL_VALUE_OFFSET
-	movl	$CONTROL_STACK_END,%esp		# new stack
-OnLispStack:
 	pushl	%ebx		# Save entry stack on (maybe) new stack.
 
 	/* Establish Lisp args. */
@@ -662,7 +651,7 @@ GNAME(alloc_16_to_edi):
 		
 
 
-#ifdef LISP_FEATURE_GENCGC_INLINE_ALLOC /* disabled at present */
+#ifdef GENCGC_INLINE_ALLOC /* LISP_FEATURE_GENCGC */
 
 /* These routines are called from Lisp when an inline allocation 
  * overflows. Every register except the result needs to be preserved.

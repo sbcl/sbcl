@@ -326,7 +326,7 @@
   ;; subtract 3 from (sb-kernel:get-lisp-obj-address 'NIL) you get the
   ;; first data slot, and if you subtract 7 you get a symbol header.
 
-  (value :set-trans %set-symbol-value
+  (value ; :set-trans %set-symbol-value (not that simple any more)
 	 :init :unbound)		;also the CAR of NIL-as-end-of-list
   (hash)				;the CDR of NIL-as-end-of-list
 
@@ -336,7 +336,8 @@
   (name :ref-trans symbol-name :init :arg)
   (package :ref-trans symbol-package
 	   :set-trans %set-symbol-package
-	   :init :null))
+	   :init :null)
+  (tls-index))
 
 (define-primitive-object (complex-single-float
 			  :lowtag other-pointer-lowtag
@@ -359,3 +360,27 @@
   (real :c-type "long double" :length #!+x86 3 #!+sparc 4)
   (imag :c-type "long double" :length #!+x86 3 #!+sparc 4))
 
+;;; this isn't actually a lisp object at all, it's a c structure that lives
+;;; in c-land.  However, we need sight of so many parts of it from Lisp that
+;;; it makes sense to define it here anyway, so that the GENESIS machinery
+;;; can take care of maintaining Lisp and C versions.
+;;; Hence the even-fixnum lowtag just so we don't get odd(sic) numbers 
+;;; added to the slot offsets
+(define-primitive-object (thread :lowtag even-fixnum-lowtag)
+  ;; unbound_marker is borrowed very briefly at thread startup to 
+  ;; pass the address of initial-function into new_thread_trampoline 
+  (unbound-marker :init :unbound) ; tls[0] = UNBOUND_MARKER_WIDETAG 
+  (binding-stack-start :c-type "lispobj *")
+  (binding-stack-pointer :c-type "lispobj *")
+  (control-stack-start :c-type "lispobj *")
+  (alien-stack-start :c-type "lispobj *")
+  (alien-stack-pointer :c-type "lispobj *")
+  (alloc-region :c-type "struct alloc_region" :length 5)
+  (pid :c-type "pid_t")
+  (tls-cookie)				;  on x86, the LDT index 
+  (this :c-type "struct thread *")
+  (next :c-type "struct thread *")
+  (pseudo-atomic-atomic)
+  (pseudo-atomic-interrupted)
+  (interrupt-data :c-type "struct interrupt_data *")
+  (interrupt-contexts :c-type "os_context_t *" :rest-p t))

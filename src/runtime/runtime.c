@@ -17,11 +17,16 @@
 #include <string.h>
 #include <libgen.h>
 #include <sys/types.h>
+#include <sys/wait.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/file.h>
 #include <sys/param.h>
 #include <sys/stat.h>
+#include <signal.h>
+#include <sys/ptrace.h>
+#include <sched.h>
+#include <errno.h>
 
 #if defined(SVR4) || defined(__linux__)
 #include <time.h>
@@ -44,6 +49,7 @@
 #include "core.h"
 #include "save.h"
 #include "lispregs.h"
+#include "thread.h"
 
 #include "genesis/static-symbols.h"
 #include "genesis/symbol.h"
@@ -174,6 +180,10 @@ See the COPYING file in the distribution for more information.\n\
 More information about SBCL is available at <http://sbcl.sourceforge.net/>.\n\
 ", SBCL_VERSION_STRING);
 }
+
+int gc_thread_pid;
+FILE *stdlog;
+
 
 int
 main(int argc, char *argv[], char *envp[])
@@ -333,35 +343,125 @@ main(int argc, char *argv[], char *envp[])
 
     gc_initialize_pointers();
 
-#ifdef BINDING_STACK_POINTER
-    SetSymbolValue(BINDING_STACK_POINTER, BINDING_STACK_START);
-#endif
-
     interrupt_init();
-
     arch_install_interrupt_handlers();
     os_install_interrupt_handlers();
 
-#ifdef PSEUDO_ATOMIC_ATOMIC
-    /* Turn on pseudo atomic for when we call into Lisp. */
-    SHOW("turning on pseudo atomic");
-    SetSymbolValue(PSEUDO_ATOMIC_ATOMIC, make_fixnum(1));
-    SetSymbolValue(PSEUDO_ATOMIC_INTERRUPTED, make_fixnum(0));
-#endif
-
     /* Convert remaining argv values to something that Lisp can grok. */
     SHOW("setting POSIX-ARGV symbol value");
-    SetSymbolValue(POSIX_ARGV, alloc_string_list(argv));
+    SetSymbolValue(POSIX_ARGV, alloc_string_list(argv),0);
 
     /* Install a handler to pick off SIGINT until the Lisp system gets
      * far enough along to install its own handler. */
     sigint_init();
 
     FSHOW((stderr, "/funcalling initial_function=0x%lx\n", initial_function));
-    funcall0(initial_function);
+    create_thread(initial_function);
 
-    /* initial_function() is not supposed to return. */
-    lose("Lisp initial_function gave up control.");
-    return 0; /* dummy value: return something */
+    gc_thread_pid=getpid();
+    parent_loop();
+}
+
+static void parent_sighandler(int signum) 
+{
+    fprintf(stderr,"parent thread got signal %d , maybe_gc_pending=%d\n",
+	    signum, maybe_gc_pending);
+}
+
+static void parent_do_garbage_collect(void)
+{    
+    int waiting_threads=0;
+    struct thread *th;
+    int status,p;
+
+    for_each_thread(th) {
+	fprintf(stderr,"attaching to %d ...",th->pid); 
+	if(ptrace(PTRACE_ATTACH,th->pid,0,0))
+	    perror("PTRACE_ATTACH");
+	else waiting_threads++;
+    }
+    stop_the_world=1;
+
+    do {
+	/* not sure if we have to wait for PTRACE_ATTACH to finish
+	 * before we can send PTRACE_CONT, so let's play it safe
+	 */
+	while(waiting_threads>0) {
+	    if((p=waitpid(-1,&status, WUNTRACED|__WALL))>0) {
+		if(WIFEXITED(status) || WIFSIGNALED(status)) 
+		    destroy_thread(find_thread_by_pid(p));
+		else {
+		    fprintf(stderr, "wait returned pid %d\n",p);
+		    waiting_threads--;
+		}
+	    }
+	}
+	for_each_thread(th) {
+	    if(SymbolTlValue(PSEUDO_ATOMIC_ATOMIC,th)) {
+		/* restart the child, sending it a signal that will cause it 
+		 * to go into interrupt_handle_pending as soon as it's
+		 * finished being pseudo_atomic */
+		fprintf(stderr, "%d was pseudo-atomic, letting it resume\n",
+			th->pid);
+		if(ptrace(PTRACE_CONT,th->pid,0,SIGCONT))
+		    perror("PTRACE_CONT");
+		waiting_threads++;
+	    }
+	}
+    } while (waiting_threads>0);
+		
+    collect_garbage(maybe_gc_pending-1);
+    maybe_gc_pending=0;
+    stop_the_world=0;
+    for_each_thread(th) 
+	if(ptrace(PTRACE_DETACH,th->pid,0,0))
+	    perror("PTRACE_DETACH");
+}
+
+static void /* noreturn */ parent_loop(void)
+{
+    struct sigaction sa;
+    sigset_t sigset;
+
+    sigemptyset(&sigset);
+
+    sigaddset(&sigset, SIGALRM);
+    sigaddset(&sigset, SIGCHLD);
+    sigprocmask(SIG_UNBLOCK,&sigset,0);
+    sa.sa_handler=parent_sighandler;
+    sa.sa_mask=sigset;
+    sa.sa_flags=0;
+    sigaction(SIGALRM, &sa, 0);
+    sigaction(SIGCHLD, &sa, 0);
+
+    sigemptyset(&sigset);
+    sa.sa_handler=SIG_IGN;
+    sa.sa_mask=sigset;
+    sa.sa_flags=0;
+    sigaction(SIGINT, &sa, 0);
+
+    while(all_threads) {
+	int status;
+	pid_t pid=0;
+	while(pid=waitpid(-1,&status,__WALL|WUNTRACED)) {
+	    struct thread *th;
+	    if(maybe_gc_pending) parent_do_garbage_collect();
+	    if(pid==-1) {
+		if(errno == EINTR) continue;
+		if(errno == ECHILD) break;
+		fprintf(stderr,"waitpid: %s\n",strerror(errno));
+		continue;
+	    }
+	    th=find_thread_by_pid(pid);
+	    if(!th) continue;
+	    if(WIFEXITED(status) || WIFSIGNALED(status)) {
+		fprintf(stderr,"waitpid : child %d %x exited \n", pid,th);
+		destroy_thread(th);		
+		/* FIXME arrange to call or fake (free-mutex *session-lock*)
+		 * if necessary */
+	    }
+	    status=0;
+	}
+    }
 }
 

@@ -14,9 +14,12 @@
 
 #ifndef LANGUAGE_ASSEMBLY
 
+#include <sys/types.h>
+#include <unistd.h>
 #include "runtime.h"
 
 extern int foreign_function_call_active;
+extern boolean stop_the_world;
 
 extern lispobj *current_control_stack_pointer;
 extern lispobj *current_control_frame_pointer;
@@ -31,6 +34,7 @@ extern lispobj *current_auto_gc_trigger;
 #endif
 
 extern lispobj *current_dynamic_space;
+extern pid_t parent_pid;
 
 extern void globals_init(void);
 

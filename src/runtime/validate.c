@@ -72,8 +72,6 @@ validate(void)
     ensure_space( (lispobj *)DYNAMIC_0_SPACE_START  , DYNAMIC_SPACE_SIZE);
     ensure_space( (lispobj *)DYNAMIC_1_SPACE_START  , DYNAMIC_SPACE_SIZE);
 #endif
-    ensure_space( (lispobj *)CONTROL_STACK_START  , CONTROL_STACK_SIZE);
-    ensure_space( (lispobj *)BINDING_STACK_START  , BINDING_STACK_SIZE);
 #ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
     ensure_space( (lispobj *) ALTERNATE_SIGNAL_STACK_START, SIGSTKSZ);
 #endif
@@ -85,11 +83,11 @@ validate(void)
 #ifdef PRINTNOISE
     printf(" done.\n");
 #endif
-    protect_control_stack_guard_page(1);
 }
 
-void protect_control_stack_guard_page(int protect_p) {
-    os_protect(CONTROL_STACK_GUARD_PAGE,
+void protect_control_stack_guard_page(pid_t t_id, int protect_p) {
+    struct thread *th= find_thread_by_pid(t_id);
+    os_protect(CONTROL_STACK_GUARD_PAGE(th),
 	       os_vm_page_size,protect_p ?
 	       (OS_VM_PROT_READ|OS_VM_PROT_EXECUTE) : OS_VM_PROT_ALL);
 }

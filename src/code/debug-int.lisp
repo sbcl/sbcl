@@ -527,15 +527,20 @@
 #!-sb-fluid (declaim (inline control-stack-pointer-valid-p))
 (defun control-stack-pointer-valid-p (x)
   (declare (type system-area-pointer x))
-  #!-stack-grows-downward-not-upward
-  (and (sap< x (current-sp))
-       (sap<= (int-sap control-stack-start)
-	      x)
-       (zerop (logand (sap-int x) #b11)))
-  #!+stack-grows-downward-not-upward
-  (and (sap>= x (current-sp))
-       (sap> (int-sap control-stack-end) x)
-       (zerop (logand (sap-int x) #b11))))
+  (let* ((control-stack-start
+	  (descriptor-sap sb!vm::*control-stack-start*))
+	 (control-stack-end
+	  (sap+
+	   (descriptor-sap sb!vm::*binding-stack-start*) -4)))
+    #!-stack-grows-downward-not-upward
+    (and (sap< x (current-sp))
+	 (sap<= control-stack-start
+		x)
+	 (zerop (logand (sap-int x) #b11)))
+    #!+stack-grows-downward-not-upward
+    (and (sap>= x (current-sp))
+	 (sap> control-stack-end x)
+	 (zerop (logand (sap-int x) #b11)))))
 
 #!+x86
 (sb!alien:define-alien-routine component-ptr-from-pc (system-area-pointer)
@@ -711,7 +716,7 @@
 		     (when (control-stack-pointer-valid-p fp)
 		       #!+x86
 			(multiple-value-bind (ra ofp) (x86-call-context fp)
-			  (compute-calling-frame ofp ra frame))
+			 (and ra (compute-calling-frame ofp ra frame)))
 			#!-x86
 		       (compute-calling-frame
 			#!-alpha
@@ -883,90 +888,55 @@
 			     escaped)))))
 
 #!+x86
+(defun nth-interrupt-context (n)
+  (declare (type (unsigned-byte 32) n))
+  (sb!alien:sap-alien (sb!vm::current-thread-offset-sap 
+		       (+ sb!vm::thread-interrupt-contexts-offset n))
+		      (* os-context-t)))
+
+#!+x86
 (defun find-escaped-frame (frame-pointer)
   (declare (type system-area-pointer frame-pointer))
   (/noshow0 "entering FIND-ESCAPED-FRAME")
   (dotimes (index *free-interrupt-context-index* (values nil 0 nil))
-    (sb!alien:with-alien
-	((lisp-interrupt-contexts (array (* os-context-t) nil) :extern))
-      (/noshow0 "at head of WITH-ALIEN")
-      (let ((context (sb!alien:deref lisp-interrupt-contexts index)))
-	(/noshow0 "got CONTEXT")
-	(when (= (sap-int frame-pointer)
-		 (sb!vm:context-register context sb!vm::cfp-offset))
-	  (without-gcing
-	   (/noshow0 "in WITHOUT-GCING")
-	   (let* ((component-ptr (component-ptr-from-pc
-				  (sb!vm:context-pc context)))
-		  (code (unless (sap= component-ptr (int-sap #x0))
-			  (component-from-component-ptr component-ptr))))
-	     (/noshow0 "got CODE")
-	     (when (null code)
-	       (return (values code 0 context)))
-	     (let* ((code-header-len (* (get-header-data code)
-					sb!vm:n-word-bytes))
-		    (pc-offset
-		     (- (sap-int (sb!vm:context-pc context))
-			(- (get-lisp-obj-address code)
-			   sb!vm:other-pointer-lowtag)
-			code-header-len)))
-	       (/noshow "got PC-OFFSET")
-	       (unless (<= 0 pc-offset
-			   (* (code-header-ref code sb!vm:code-code-size-slot)
-			      sb!vm:n-word-bytes))
-		 ;; We were in an assembly routine. Therefore, use the
-		 ;; LRA as the pc.
-		 ;;
-		 ;; FIXME: Should this be WARN or ERROR or what?
-		 (format t "** pc-offset ~S not in code obj ~S?~%"
-			 pc-offset code))
-	       (/noshow0 "returning from FIND-ESCAPED-FRAME")
-	       (return
-		(values code pc-offset context))))))))))
+    (/noshow0 "at head of WITH-ALIEN")
+    (let ((context (nth-interrupt-context index)))
+      (/noshow0 "got CONTEXT")
+      (when (= (sap-int frame-pointer)
+	       (sb!vm:context-register context sb!vm::cfp-offset))
+	(without-gcing
+	 (/noshow0 "in WITHOUT-GCING")
+	 (let* ((component-ptr (component-ptr-from-pc
+				(sb!vm:context-pc context)))
+		(code (unless (sap= component-ptr (int-sap #x0))
+			(component-from-component-ptr component-ptr))))
+	   (/noshow0 "got CODE")
+	   (when (null code)
+	     (return (values code 0 context)))
+	   (let* ((code-header-len (* (get-header-data code)
+				      sb!vm:n-word-bytes))
+		  (pc-offset
+		   (- (sap-int (sb!vm:context-pc context))
+		      (- (get-lisp-obj-address code)
+			 sb!vm:other-pointer-lowtag)
+		      code-header-len)))
+	     (/noshow "got PC-OFFSET")
+	     (unless (<= 0 pc-offset
+			 (* (code-header-ref code sb!vm:code-code-size-slot)
+			    sb!vm:n-word-bytes))
+	       ;; We were in an assembly routine. Therefore, use the
+	       ;; LRA as the pc.
+	       ;;
+	       ;; FIXME: Should this be WARN or ERROR or what?
+	       (format t "** pc-offset ~S not in code obj ~S?~%"
+		       pc-offset code))
+	     (/noshow0 "returning from FIND-ESCAPED-FRAME")
+	     (return
+	       (values code pc-offset context)))))))))
 
 #!-x86
 (defun find-escaped-frame (frame-pointer)
-  (declare (type system-area-pointer frame-pointer))
-  (dotimes (index *free-interrupt-context-index* (values nil 0 nil))
-    (sb!alien:with-alien
-     ((lisp-interrupt-contexts (array (* os-context-t) nil) :extern))
-     (let ((scp (sb!alien:deref lisp-interrupt-contexts index)))
-       (when (= (sap-int frame-pointer)
-                (sb!vm:context-register scp sb!vm::cfp-offset))
-         (without-gcing
-          (let ((code (code-object-from-bits
-                       (sb!vm:context-register scp sb!vm::code-offset))))
-            (when (symbolp code)
-              (return (values code 0 scp)))
-            (let* ((code-header-len (* (get-header-data code)
-                                       sb!vm:n-word-bytes))
-                   (pc-offset
-                    (- (sap-int (sb!vm:context-pc scp))
-                       (- (get-lisp-obj-address code)
-                          sb!vm:other-pointer-lowtag)
-                       code-header-len)))
-              ;; Check to see whether we were executing in a branch
-              ;; delay slot.
-              #!+(or pmax sgi) ; pmax only (and broken anyway)
-              (when (logbitp 31 (sb!alien:slot scp '%mips::sc-cause))
-                (incf pc-offset sb!vm:n-word-bytes))
-              (unless (<= 0 pc-offset
-                          (* (code-header-ref code sb!vm:code-code-size-slot)
-                             sb!vm:n-word-bytes))
-                ;; We were in an assembly routine. Therefore, use the
-                ;; LRA as the pc.
-                (setf pc-offset
-                      (- (sb!vm:context-register scp sb!vm::lra-offset)
-                         (get-lisp-obj-address code)
-                         code-header-len)))
-               (return
-                (if (eq (%code-debug-info code) :bogus-lra)
-                    (let ((real-lra (code-header-ref code
-                                                     real-lra-slot)))
-                      (values (lra-code-header real-lra)
-                              (get-header-data real-lra)
-                              nil))
-                  (values code pc-offset scp)))))))))))
+  (error "find-escaped-frame non-x86 version was stale, restore from HEAD"))
 
 ;;; Find the code object corresponding to the object represented by
 ;;; bits and return it. We assume bogus functions correspond to the

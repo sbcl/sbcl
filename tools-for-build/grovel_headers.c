@@ -110,6 +110,7 @@ main(int argc, char *argv[])
     defconstant("tiocswinsz", TIOCSWINSZ);
     defconstant("tiocgpgrp",  TIOCGPGRP);
     defconstant("tiocspgrp",  TIOCSPGRP);
+    defconstant("tiocsctty",  TIOCSCTTY);
     /* KLUDGE: These are referenced by old CMUCL-derived code, but
      * Linux doesn't define them.
      *

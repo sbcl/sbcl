@@ -165,6 +165,8 @@ ldso_stub__ ## fct: ;                           \
  LDSO_STUBIFY(send)
  LDSO_STUBIFY(setitimer)
  LDSO_STUBIFY(setpgrp)
+ LDSO_STUBIFY(setpgid)
+ LDSO_STUBIFY(setsid)
 #if !defined(SVR4)
  LDSO_STUBIFY(sigsetmask)
 #endif
@@ -182,6 +184,7 @@ ldso_stub__ ## fct: ;                           \
  LDSO_STUBIFY(tcgetattr)
  LDSO_STUBIFY(tcsendbreak)
  LDSO_STUBIFY(tcsetattr)
+ LDSO_STUBIFY(tcsetpgrp)
  LDSO_STUBIFY(truncate)
  LDSO_STUBIFY(ttyname)
  LDSO_STUBIFY(tzname)

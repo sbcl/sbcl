@@ -40,11 +40,10 @@
 #include "arch.h"
 #include "gc.h"
 #include "gc-internal.h"
+#include "thread.h"
 #include "genesis/vector.h"
 #include "genesis/weak-pointer.h"
 #include "genesis/simple-fun.h"
-#include "genesis/static-symbols.h"
-#include "genesis/symbol.h"
 /* assembly language stub that executes trap_PendingInterrupt */
 void do_pending_interrupt(void);
 
@@ -248,6 +247,13 @@ unsigned int  gencgc_oldest_gen_to_gc = NUM_GENERATIONS-1;
  * search of the heap. XX Gencgc obviously needs to be better
  * integrated with the Lisp code. */
 static int  last_free_page;
+
+/* This lock is to prevent multiple threads from simultaneously
+ * allocating new regions which overlap each other.  Note that the
+ * majority of GC is single-threaded, but alloc() may be called
+ * from >1 thread at a time and must be thread-safe */
+static lispobj free_pages_lock=0;
+
 
 /*
  * miscellaneous heap functions
@@ -483,16 +489,16 @@ gc_alloc_new_region(int nbytes, int unboxed, struct alloc_region *alloc_region)
     int i;
 
     /*
-    FSHOW((stderr,
-	   "/alloc_new_region for %d bytes from gen %d\n",
-	   nbytes, gc_alloc_generation));
+      FSHOW((stderr,
+      "/alloc_new_region for %d bytes from gen %d\n",
+      nbytes, gc_alloc_generation));
     */
 
     /* Check that the region is in a reset state. */
     gc_assert((alloc_region->first_page == 0)
 	      && (alloc_region->last_page == -1)
 	      && (alloc_region->free_pointer == alloc_region->end_addr));
-
+    get_spinlock(&free_pages_lock,alloc_region);
     if (unboxed) {
 	first_page =
 	    generations[gc_alloc_generation].alloc_unboxed_start_page;
@@ -502,7 +508,7 @@ gc_alloc_new_region(int nbytes, int unboxed, struct alloc_region *alloc_region)
     }
     last_page=gc_find_freeish_pages(&first_page,nbytes,unboxed,alloc_region);
     bytes_found=(4096 - page_table[first_page].bytes_used)
-	    + 4096*(last_page-first_page);
+	+ 4096*(last_page-first_page);
 
     /* Set up the alloc_region. */
     alloc_region->first_page = first_page;
@@ -511,20 +517,6 @@ gc_alloc_new_region(int nbytes, int unboxed, struct alloc_region *alloc_region)
 	+ page_address(first_page);
     alloc_region->free_pointer = alloc_region->start_addr;
     alloc_region->end_addr = alloc_region->start_addr + bytes_found;
-
-    if (gencgc_zero_check) {
-	int *p;
-	for (p = (int *)alloc_region->start_addr;
-	    p < (int *)alloc_region->end_addr; p++) {
-	    if (*p != 0) {
-		/* KLUDGE: It would be nice to use %lx and explicit casts
-		 * (long) in code like this, so that it is less likely to
-		 * break randomly when running on a machine with different
-		 * word sizes. -- WHN 19991129 */
-		lose("The new region at %x is not zero.", p);
-	    }
-	}
-    }
 
     /* Set up the pages. */
 
@@ -561,13 +553,30 @@ gc_alloc_new_region(int nbytes, int unboxed, struct alloc_region *alloc_region)
 	    alloc_region->start_addr - page_address(i);
 	page_table[i].allocated |= OPEN_REGION_PAGE ;
     }
-
     /* Bump up last_free_page. */
     if (last_page+1 > last_free_page) {
 	last_free_page = last_page+1;
 	SetSymbolValue(ALLOCATION_POINTER,
-		       (lispobj)(((char *)heap_base) + last_free_page*4096));
+		       (lispobj)(((char *)heap_base) + last_free_page*4096),
+		       0);
     }
+    free_pages_lock=0;
+    
+    /* we can do this after releasing free_pages_lock */
+    if (gencgc_zero_check) {
+	int *p;
+	for (p = (int *)alloc_region->start_addr;
+	     p < (int *)alloc_region->end_addr; p++) {
+	    if (*p != 0) {
+		/* KLUDGE: It would be nice to use %lx and explicit casts
+		 * (long) in code like this, so that it is less likely to
+		 * break randomly when running on a machine with different
+		 * word sizes. -- WHN 19991129 */
+		lose("The new region at %x is not zero.", p);
+	    }
+	}
+    }
+
 }
 
 /* If the record_new_objects flag is 2 then all new regions created
@@ -631,18 +640,18 @@ add_new_area(int first_page, int offset, int size)
 	    + (*new_areas)[i].offset
 	    + (*new_areas)[i].size;
 	/*FSHOW((stderr,
-	       "/add_new_area S1 %d %d %d %d\n",
-	       i, c, new_area_start, area_end));*/
+	  "/add_new_area S1 %d %d %d %d\n",
+	  i, c, new_area_start, area_end));*/
 	if (new_area_start == area_end) {
 	    /*FSHOW((stderr,
-		   "/adding to [%d] %d %d %d with %d %d %d:\n",
-		   i,
-		   (*new_areas)[i].page,
-		   (*new_areas)[i].offset,
-		   (*new_areas)[i].size,
-		   first_page,
-		   offset,
-		    size);*/
+	      "/adding to [%d] %d %d %d with %d %d %d:\n",
+	      i,
+	      (*new_areas)[i].page,
+	      (*new_areas)[i].offset,
+	      (*new_areas)[i].size,
+	      first_page,
+	      offset,
+	      size);*/
 	    (*new_areas)[i].size += size;
 	    return;
 	}
@@ -652,8 +661,8 @@ add_new_area(int first_page, int offset, int size)
     (*new_areas)[new_areas_index].offset = offset;
     (*new_areas)[new_areas_index].size = size;
     /*FSHOW((stderr,
-	   "/new_area %d page %d offset %d size %d\n",
-	   new_areas_index, first_page, offset, size));*/
+      "/new_area %d page %d offset %d size %d\n",
+      new_areas_index, first_page, offset, size));*/
     new_areas_index++;
 
     /* Note the max new_areas used. */
@@ -680,9 +689,9 @@ gc_alloc_update_page_tables(int unboxed, struct alloc_region *alloc_region)
     int byte_cnt;
 
     /*
-    FSHOW((stderr,
-	   "/gc_alloc_update_page_tables() to gen %d:\n",
-	   gc_alloc_generation));
+      FSHOW((stderr,
+      "/gc_alloc_update_page_tables() to gen %d:\n",
+      gc_alloc_generation));
     */
 
     first_page = alloc_region->first_page;
@@ -777,10 +786,10 @@ gc_alloc_update_page_tables(int unboxed, struct alloc_region *alloc_region)
 	    add_new_area(first_page,orig_first_page_bytes_used, region_size);
 
 	/*
-	FSHOW((stderr,
-	       "/gc_alloc_update_page_tables update %d bytes to gen %d\n",
-	       region_size,
-	       gc_alloc_generation));
+	  FSHOW((stderr,
+	  "/gc_alloc_update_page_tables update %d bytes to gen %d\n",
+	  region_size,
+	  gc_alloc_generation));
 	*/
     } else {
 	/* There are no bytes allocated. Unallocate the first_page if
@@ -816,14 +825,14 @@ gc_alloc_large(int nbytes, int unboxed, struct alloc_region *alloc_region)
     int large = (nbytes >= large_object_size);
 
     /*
-    if (nbytes > 200000)
-	FSHOW((stderr, "/alloc_large %d\n", nbytes));
+      if (nbytes > 200000)
+      FSHOW((stderr, "/alloc_large %d\n", nbytes));
     */
 
     /*
-    FSHOW((stderr,
-	   "/gc_alloc_large() for %d bytes from gen %d\n",
-	   nbytes, gc_alloc_generation));
+      FSHOW((stderr,
+      "/gc_alloc_large() for %d bytes from gen %d\n",
+      nbytes, gc_alloc_generation));
     */
 
     /* If the object is small, and there is room in the current region
@@ -837,6 +846,8 @@ gc_alloc_large(int nbytes, int unboxed, struct alloc_region *alloc_region)
        the current boxed free region. XX could probably keep a page
        index ahead of the current region and bumped up here to save a
        lot of re-scanning. */
+
+    get_spinlock(&free_pages_lock,alloc_region);
 
     if (unboxed) {
 	first_page =
@@ -934,8 +945,9 @@ gc_alloc_large(int nbytes, int unboxed, struct alloc_region *alloc_region)
     if (last_page+1 > last_free_page) {
 	last_free_page = last_page+1;
 	SetSymbolValue(ALLOCATION_POINTER,
-		       (lispobj)(((char *)heap_base) + last_free_page*4096));
+		       (lispobj)(((char *)heap_base) + last_free_page*4096),0);
     }
+    free_pages_lock=0;
 
     return((void *)(page_address(first_page)+orig_first_page_bytes_used));
 }
@@ -965,7 +977,9 @@ gc_find_freeish_pages(int *restart_page_ptr, int nbytes, int unboxed, struct all
 
     do {
 	first_page = restart_page;
-	if (large)		
+	/* FIXME we really ought to be able to use part-filled pages.  This
+	 * was disabled while finding strange corruption bugs */
+	if (1 || large)		
 	    while ((first_page < NUM_PAGES)
 		   && (page_table[first_page].allocated != FREE_PAGE))
 		first_page++;
@@ -973,13 +987,9 @@ gc_find_freeish_pages(int *restart_page_ptr, int nbytes, int unboxed, struct all
 	    while (first_page < NUM_PAGES) {
 		if(page_table[first_page].allocated == FREE_PAGE)
 		    break;
-		/* I don't know why we need the gen=0 test, but it
-		 * breaks randomly if that's omitted -dan 2003.02.26
-		 */
 		if((page_table[first_page].allocated ==
 		    (unboxed ? UNBOXED_PAGE : BOXED_PAGE)) &&
 		   (page_table[first_page].large_object == 0) &&
-		   (gc_alloc_genration == 0) &&
 		   (page_table[first_page].gen == gc_alloc_generation) &&
 		   (page_table[first_page].bytes_used < (4096-32)) &&
 		   (page_table[first_page].write_protected == 0) &&
@@ -1109,7 +1119,7 @@ void *
 gc_general_alloc(int nbytes,int unboxed_p,int quick_p)
 {
     struct alloc_region *my_region = 
-      unboxed_p ? &unboxed_region : &boxed_region;
+	unboxed_p ? &unboxed_region : &boxed_region;
     return gc_alloc_with_region(nbytes,unboxed_p, my_region,quick_p);
 }
 
@@ -1486,8 +1496,8 @@ copy_large_unboxed_object(lispobj object, int nwords)
  * code and code-related objects
  */
 /*
-static lispobj trans_fun_header(lispobj object);
-static lispobj trans_boxed(lispobj object);
+  static lispobj trans_fun_header(lispobj object);
+  static lispobj trans_boxed(lispobj object);
 */
 
 /* Scan a x86 compiled code object, looking for possible fixups that
@@ -1683,19 +1693,19 @@ gencgc_apply_code_fixups(struct code *old_code, struct code *new_code)
     nheader_words = HeaderValue(*(lispobj *)new_code);
     nwords = ncode_words + nheader_words;
     /* FSHOW((stderr,
-	     "/compiled code object at %x: header words = %d, code words = %d\n",
-	     new_code, nheader_words, ncode_words)); */
+       "/compiled code object at %x: header words = %d, code words = %d\n",
+       new_code, nheader_words, ncode_words)); */
     constants_start_addr = (void *)new_code + 5*4;
     constants_end_addr = (void *)new_code + nheader_words*4;
     code_start_addr = (void *)new_code + nheader_words*4;
     code_end_addr = (void *)new_code + nwords*4;
     /*
-    FSHOW((stderr,
-	   "/const start = %x, end = %x\n",
-	   constants_start_addr,constants_end_addr));
-    FSHOW((stderr,
-	   "/code start = %x; end = %x\n",
-	   code_start_addr,code_end_addr));
+      FSHOW((stderr,
+      "/const start = %x, end = %x\n",
+      constants_start_addr,constants_end_addr));
+      FSHOW((stderr,
+      "/code start = %x; end = %x\n",
+      code_start_addr,code_end_addr));
     */
 
     /* The first constant should be a pointer to the fixups for this
@@ -1878,129 +1888,129 @@ scav_vector(lispobj *where, lispobj object)
     weak_p_obj = hash_table[10];
 
     /* index vector */
-    {
-	lispobj index_vector_obj = hash_table[13];
+ {
+     lispobj index_vector_obj = hash_table[13];
 
-	if (is_lisp_pointer(index_vector_obj) &&
-	    (widetag_of(*(lispobj *)native_pointer(index_vector_obj)) ==
-	     SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG)) {
-	    index_vector = ((unsigned int *)native_pointer(index_vector_obj)) + 2;
-	    /*FSHOW((stderr, "/index_vector = %x\n",index_vector));*/
-	    length = fixnum_value(((unsigned int *)native_pointer(index_vector_obj))[1]);
-	    /*FSHOW((stderr, "/length = %d\n", length));*/
-	} else {
-	    lose("invalid index_vector %x", index_vector_obj);
-	}
-    }
+     if (is_lisp_pointer(index_vector_obj) &&
+	 (widetag_of(*(lispobj *)native_pointer(index_vector_obj)) ==
+	  SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG)) {
+	 index_vector = ((unsigned int *)native_pointer(index_vector_obj)) + 2;
+	 /*FSHOW((stderr, "/index_vector = %x\n",index_vector));*/
+	 length = fixnum_value(((unsigned int *)native_pointer(index_vector_obj))[1]);
+	 /*FSHOW((stderr, "/length = %d\n", length));*/
+     } else {
+	 lose("invalid index_vector %x", index_vector_obj);
+     }
+ }
 
-    /* next vector */
-    {
-	lispobj next_vector_obj = hash_table[14];
+ /* next vector */
+ {
+     lispobj next_vector_obj = hash_table[14];
 
-	if (is_lisp_pointer(next_vector_obj) &&
-	    (widetag_of(*(lispobj *)native_pointer(next_vector_obj)) ==
-	     SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG)) {
-	    next_vector = ((unsigned int *)native_pointer(next_vector_obj)) + 2;
-	    /*FSHOW((stderr, "/next_vector = %x\n", next_vector));*/
-	    next_vector_length = fixnum_value(((unsigned int *)native_pointer(next_vector_obj))[1]);
-	    /*FSHOW((stderr, "/next_vector_length = %d\n", next_vector_length));*/
-	} else {
-	    lose("invalid next_vector %x", next_vector_obj);
-	}
-    }
+     if (is_lisp_pointer(next_vector_obj) &&
+	 (widetag_of(*(lispobj *)native_pointer(next_vector_obj)) ==
+	  SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG)) {
+	 next_vector = ((unsigned int *)native_pointer(next_vector_obj)) + 2;
+	 /*FSHOW((stderr, "/next_vector = %x\n", next_vector));*/
+	 next_vector_length = fixnum_value(((unsigned int *)native_pointer(next_vector_obj))[1]);
+	 /*FSHOW((stderr, "/next_vector_length = %d\n", next_vector_length));*/
+     } else {
+	 lose("invalid next_vector %x", next_vector_obj);
+     }
+ }
 
-    /* maybe hash vector */
-    {
-	/* FIXME: This bare "15" offset should become a symbolic
-	 * expression of some sort. And all the other bare offsets
-	 * too. And the bare "16" in scavenge(hash_table, 16). And
-	 * probably other stuff too. Ugh.. */
-	lispobj hash_vector_obj = hash_table[15];
+ /* maybe hash vector */
+ {
+     /* FIXME: This bare "15" offset should become a symbolic
+      * expression of some sort. And all the other bare offsets
+      * too. And the bare "16" in scavenge(hash_table, 16). And
+      * probably other stuff too. Ugh.. */
+     lispobj hash_vector_obj = hash_table[15];
 
-	if (is_lisp_pointer(hash_vector_obj) &&
-	    (widetag_of(*(lispobj *)native_pointer(hash_vector_obj))
-	     == SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG)) {
-	    hash_vector = ((unsigned int *)native_pointer(hash_vector_obj)) + 2;
-	    /*FSHOW((stderr, "/hash_vector = %x\n", hash_vector));*/
-	    gc_assert(fixnum_value(((unsigned int *)native_pointer(hash_vector_obj))[1])
-		      == next_vector_length);
-	} else {
-	    hash_vector = NULL;
-	    /*FSHOW((stderr, "/no hash_vector: %x\n", hash_vector_obj));*/
-	}
-    }
+     if (is_lisp_pointer(hash_vector_obj) &&
+	 (widetag_of(*(lispobj *)native_pointer(hash_vector_obj))
+	  == SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG)) {
+	 hash_vector = ((unsigned int *)native_pointer(hash_vector_obj)) + 2;
+	 /*FSHOW((stderr, "/hash_vector = %x\n", hash_vector));*/
+	 gc_assert(fixnum_value(((unsigned int *)native_pointer(hash_vector_obj))[1])
+		   == next_vector_length);
+     } else {
+	 hash_vector = NULL;
+	 /*FSHOW((stderr, "/no hash_vector: %x\n", hash_vector_obj));*/
+     }
+ }
 
-    /* These lengths could be different as the index_vector can be a
-     * different length from the others, a larger index_vector could help
-     * reduce collisions. */
-    gc_assert(next_vector_length*2 == kv_length);
+ /* These lengths could be different as the index_vector can be a
+  * different length from the others, a larger index_vector could help
+  * reduce collisions. */
+ gc_assert(next_vector_length*2 == kv_length);
 
-    /* now all set up.. */
+ /* now all set up.. */
 
-    /* Work through the KV vector. */
-    {
-	int i;
-	for (i = 1; i < next_vector_length; i++) {
-	    lispobj old_key = kv_vector[2*i];
-	    unsigned int  old_index = (old_key & 0x1fffffff)%length;
+ /* Work through the KV vector. */
+ {
+     int i;
+     for (i = 1; i < next_vector_length; i++) {
+	 lispobj old_key = kv_vector[2*i];
+	 unsigned int  old_index = (old_key & 0x1fffffff)%length;
 
-	    /* Scavenge the key and value. */
-	    scavenge(&kv_vector[2*i],2);
+	 /* Scavenge the key and value. */
+	 scavenge(&kv_vector[2*i],2);
 
-	    /* Check whether the key has moved and is EQ based. */
-	    {
-		lispobj new_key = kv_vector[2*i];
-		unsigned int new_index = (new_key & 0x1fffffff)%length;
+	 /* Check whether the key has moved and is EQ based. */
+     {
+	 lispobj new_key = kv_vector[2*i];
+	 unsigned int new_index = (new_key & 0x1fffffff)%length;
 
-		if ((old_index != new_index) &&
-		    ((!hash_vector) || (hash_vector[i] == 0x80000000)) &&
-		    ((new_key != empty_symbol) ||
-		     (kv_vector[2*i] != empty_symbol))) {
+	 if ((old_index != new_index) &&
+	     ((!hash_vector) || (hash_vector[i] == 0x80000000)) &&
+	     ((new_key != empty_symbol) ||
+	      (kv_vector[2*i] != empty_symbol))) {
 
-		    /*FSHOW((stderr,
-			   "* EQ key %d moved from %x to %x; index %d to %d\n",
-			   i, old_key, new_key, old_index, new_index));*/
+	     /*FSHOW((stderr,
+	       "* EQ key %d moved from %x to %x; index %d to %d\n",
+	       i, old_key, new_key, old_index, new_index));*/
 
-		    if (index_vector[old_index] != 0) {
-			/*FSHOW((stderr, "/P1 %d\n", index_vector[old_index]));*/
+	     if (index_vector[old_index] != 0) {
+		 /*FSHOW((stderr, "/P1 %d\n", index_vector[old_index]));*/
 
-			/* Unlink the key from the old_index chain. */
-			if (index_vector[old_index] == i) {
-			    /*FSHOW((stderr, "/P2a %d\n", next_vector[i]));*/
-			    index_vector[old_index] = next_vector[i];
-			    /* Link it into the needing rehash chain. */
-			    next_vector[i] = fixnum_value(hash_table[11]);
-			    hash_table[11] = make_fixnum(i);
-			    /*SHOW("P2");*/
-			} else {
-			    unsigned prior = index_vector[old_index];
-			    unsigned next = next_vector[prior];
+		 /* Unlink the key from the old_index chain. */
+		 if (index_vector[old_index] == i) {
+		     /*FSHOW((stderr, "/P2a %d\n", next_vector[i]));*/
+		     index_vector[old_index] = next_vector[i];
+		     /* Link it into the needing rehash chain. */
+		     next_vector[i] = fixnum_value(hash_table[11]);
+		     hash_table[11] = make_fixnum(i);
+		     /*SHOW("P2");*/
+		 } else {
+		     unsigned prior = index_vector[old_index];
+		     unsigned next = next_vector[prior];
 
-			    /*FSHOW((stderr, "/P3a %d %d\n", prior, next));*/
+		     /*FSHOW((stderr, "/P3a %d %d\n", prior, next));*/
 
-			    while (next != 0) {
-				/*FSHOW((stderr, "/P3b %d %d\n", prior, next));*/
-				if (next == i) {
-				    /* Unlink it. */
-				    next_vector[prior] = next_vector[next];
-				    /* Link it into the needing rehash
-				     * chain. */
-				    next_vector[next] =
-					fixnum_value(hash_table[11]);
-				    hash_table[11] = make_fixnum(next);
-				    /*SHOW("/P3");*/
-				    break;
-				}
-				prior = next;
-				next = next_vector[next];
-			    }
-			}
-		    }
-		}
-	    }
-	}
-    }
-    return (CEILING(kv_length + 2, 2));
+		     while (next != 0) {
+			 /*FSHOW((stderr, "/P3b %d %d\n", prior, next));*/
+			 if (next == i) {
+			     /* Unlink it. */
+			     next_vector[prior] = next_vector[next];
+			     /* Link it into the needing rehash
+			      * chain. */
+			     next_vector[next] =
+				 fixnum_value(hash_table[11]);
+			     hash_table[11] = make_fixnum(next);
+			     /*SHOW("/P3");*/
+			     break;
+			 }
+			 prior = next;
+			 next = next_vector[next];
+		     }
+		 }
+	     }
+	 }
+     }
+     }
+ }
+ return (CEILING(kv_length + 2, 2));
 }
 
 
@@ -2090,7 +2100,7 @@ static lispobj*
 search_read_only_space(lispobj *pointer)
 {
     lispobj* start = (lispobj*)READ_ONLY_SPACE_START;
-    lispobj* end = (lispobj*)SymbolValue(READ_ONLY_SPACE_FREE_POINTER);
+    lispobj* end = (lispobj*)SymbolValue(READ_ONLY_SPACE_FREE_POINTER,0);
     if ((pointer < start) || (pointer >= end))
 	return NULL;
     return (search_space(start, (pointer+2)-start, pointer));
@@ -2100,7 +2110,7 @@ static lispobj *
 search_static_space(lispobj *pointer)
 {
     lispobj* start = (lispobj*)STATIC_SPACE_START;
-    lispobj* end = (lispobj*)SymbolValue(STATIC_SPACE_FREE_POINTER);
+    lispobj* end = (lispobj*)SymbolValue(STATIC_SPACE_FREE_POINTER,0);
     if ((pointer < start) || (pointer >= end))
 	return NULL;
     return (search_space(start, (pointer+2)-start, pointer));
@@ -2165,7 +2175,10 @@ possibly_valid_dynamic_space_pointer(lispobj *pointer)
      *   (2) Perhaps find some other hack to protect against this, e.g.
      *       recording the result of the last call to allocate-lisp-memory,
      *       and returning true from this function when *pointer is
-     *       a reference to that result. */
+     *       a reference to that result. 
+     *
+     * (surely pseudo-atomic is supposed to be used for exactly this?)
+     */
     switch (lowtag_of((lispobj)pointer)) {
     case FUN_POINTER_LOWTAG:
 	/* Start_addr should be the enclosing code object, or a closure
@@ -2204,13 +2217,13 @@ possibly_valid_dynamic_space_pointer(lispobj *pointer)
 	}
 	/* Is it plausible cons? */
 	if ((is_lisp_pointer(start_addr[0])
-	    || ((start_addr[0] & 3) == 0) /* fixnum */
-	    || (widetag_of(start_addr[0]) == BASE_CHAR_WIDETAG)
-	    || (widetag_of(start_addr[0]) == UNBOUND_MARKER_WIDETAG))
-	   && (is_lisp_pointer(start_addr[1])
-	       || ((start_addr[1] & 3) == 0) /* fixnum */
-	       || (widetag_of(start_addr[1]) == BASE_CHAR_WIDETAG)
-	       || (widetag_of(start_addr[1]) == UNBOUND_MARKER_WIDETAG)))
+	     || ((start_addr[0] & 3) == 0) /* fixnum */
+	     || (widetag_of(start_addr[0]) == BASE_CHAR_WIDETAG)
+	     || (widetag_of(start_addr[0]) == UNBOUND_MARKER_WIDETAG))
+	    && (is_lisp_pointer(start_addr[1])
+		|| ((start_addr[1] & 3) == 0) /* fixnum */
+		|| (widetag_of(start_addr[1]) == BASE_CHAR_WIDETAG)
+		|| (widetag_of(start_addr[1]) == UNBOUND_MARKER_WIDETAG)))
 	    break;
 	else {
 	    if (gencgc_verbose)
@@ -2533,6 +2546,7 @@ preserve_pointer(void *addr)
     int addr_page_index = find_page_index(addr);
     int first_page;
     int i;
+    void *object_start;
     unsigned region_allocation;
 
     /* quick check 1: Address is quite likely to have been invalid. */
@@ -2785,31 +2799,31 @@ scavenge_generation(int generation)
 
 	    /* Do a limited check for write_protected pages. If all pages
 	     * are write_protected then there is no need to scavenge. */
-	    {
-		int j, all_wp = 1;
-		for (j = i; j <= last_page; j++)
-		    if (page_table[j].write_protected == 0) {
-			all_wp = 0;
-			break;
-		    }
+	{
+	    int j, all_wp = 1;
+	    for (j = i; j <= last_page; j++)
+		if (page_table[j].write_protected == 0) {
+		    all_wp = 0;
+		    break;
+		}
 #if !SC_GEN_CK
-		if (all_wp == 0)
+	    if (all_wp == 0)
 #endif
-		    {
-			scavenge(page_address(i), (page_table[last_page].bytes_used
-						   + (last_page-i)*4096)/4);
+	    {
+		scavenge(page_address(i), (page_table[last_page].bytes_used
+					   + (last_page-i)*4096)/4);
 
-			/* Now scan the pages and write protect those
-			 * that don't have pointers to younger
-			 * generations. */
-			if (enable_page_protection) {
-			    for (j = i; j <= last_page; j++) {
-				num_wp += update_page_write_prot(j);
-			    }
-			}
+		/* Now scan the pages and write protect those
+		 * that don't have pointers to younger
+		 * generations. */
+		if (enable_page_protection) {
+		    for (j = i; j <= last_page; j++) {
+			num_wp += update_page_write_prot(j);
 		    }
+		}
 	    }
-	    i = last_page;
+	}
+	i = last_page;
 	}
     }
 
@@ -2830,9 +2844,9 @@ scavenge_generation(int generation)
 	    FSHOW((stderr, "/scavenge_generation() %d\n", generation));
 	    FSHOW((stderr,
 		   "/page bytes_used=%d first_object_offset=%d dont_move=%d\n",
-		    page_table[i].bytes_used,
-		    page_table[i].first_object_offset,
-		    page_table[i].dont_move));
+		   page_table[i].bytes_used,
+		   page_table[i].first_object_offset,
+		   page_table[i].dont_move));
 	    lose("write to protected page %d in scavenge_generation()", i);
 	}
     }
@@ -2909,37 +2923,37 @@ scavenge_newspace_generation_one_scan(int generation)
 	    /* Do a limited check for write-protected pages. If all
 	     * pages are write-protected then no need to scavenge,
 	     * except if the pages are marked dont_move. */
-	    {
-		int j, all_wp = 1;
-		for (j = i; j <= last_page; j++)
-		    if ((page_table[j].write_protected == 0)
-			|| (page_table[j].dont_move != 0)) {
-			all_wp = 0;
-			break;
-		    }
-
-		if (!all_wp) {
-		    int size;
-
-		    /* Calculate the size. */
-		    if (last_page == i)
-			size = (page_table[last_page].bytes_used
-				- page_table[i].first_object_offset)/4;
-		    else
-			size = (page_table[last_page].bytes_used
-				+ (last_page-i)*4096
-				- page_table[i].first_object_offset)/4;
-		    
-		    {
-			new_areas_ignore_page = last_page;
-			
-			scavenge(page_address(i) +
-				 page_table[i].first_object_offset,
-				 size);
-
-		    }
+	{
+	    int j, all_wp = 1;
+	    for (j = i; j <= last_page; j++)
+		if ((page_table[j].write_protected == 0)
+		    || (page_table[j].dont_move != 0)) {
+		    all_wp = 0;
+		    break;
 		}
+
+	    if (!all_wp) {
+		int size;
+
+		/* Calculate the size. */
+		if (last_page == i)
+		    size = (page_table[last_page].bytes_used
+			    - page_table[i].first_object_offset)/4;
+		else
+		    size = (page_table[last_page].bytes_used
+			    + (last_page-i)*4096
+			    - page_table[i].first_object_offset)/4;
+		    
+	    {
+		new_areas_ignore_page = last_page;
+			
+		scavenge(page_address(i) +
+			 page_table[i].first_object_offset,
+			 size);
+
 	    }
+	    }
+	}
 
 	    i = last_page;
 	}
@@ -2987,8 +3001,8 @@ scavenge_newspace_generation(int generation)
     current_new_areas_index = new_areas_index;
 
     /*FSHOW((stderr,
-	     "The first scan is finished; current_new_areas_index=%d.\n",
-	     current_new_areas_index));*/
+      "The first scan is finished; current_new_areas_index=%d.\n",
+      current_new_areas_index));*/
 
     while (current_new_areas_index > 0) {
 	/* Move the current to the previous new areas */
@@ -3050,8 +3064,8 @@ scavenge_newspace_generation(int generation)
 	current_new_areas_index = new_areas_index;
 
 	/*FSHOW((stderr,
-	         "The re-scan has finished; current_new_areas_index=%d.\n",
-	         current_new_areas_index));*/
+	  "The re-scan has finished; current_new_areas_index=%d.\n",
+	  current_new_areas_index));*/
     }
 
     /* Turn off recording of areas allocated by gc_alloc(). */
@@ -3138,15 +3152,15 @@ free_oldspace(void)
 
 	    /* Remove any write-protection. We should be able to rely
 	     * on the write-protect flag to avoid redundant calls. */
-	    {
-		void  *page_start = (void *)page_address(last_page);
+	{
+	    void  *page_start = (void *)page_address(last_page);
 	
-		if (page_table[last_page].write_protected) {
-		    os_protect(page_start, 4096, OS_VM_PROT_ALL);
-		    page_table[last_page].write_protected = 0;
-		}
+	    if (page_table[last_page].write_protected) {
+		os_protect(page_start, 4096, OS_VM_PROT_ALL);
+		page_table[last_page].write_protected = 0;
 	    }
-	    last_page++;
+	}
+	last_page++;
 	}
 	while ((last_page < last_free_page)
 	       && (page_table[last_page].allocated != FREE_PAGE)
@@ -3231,7 +3245,7 @@ verify_space(lispobj *start, size_t words)
     int is_in_dynamic_space = (find_page_index((void*)start) != -1);
     int is_in_readonly_space =
 	(READ_ONLY_SPACE_START <= (unsigned)start &&
-	 (unsigned)start < SymbolValue(READ_ONLY_SPACE_FREE_POINTER));
+	 (unsigned)start < SymbolValue(READ_ONLY_SPACE_FREE_POINTER,0));
 
     while (words > 0) {
 	size_t count = 1;
@@ -3241,10 +3255,10 @@ verify_space(lispobj *start, size_t words)
 	    int page_index = find_page_index((void*)thing);
 	    int to_readonly_space =
 		(READ_ONLY_SPACE_START <= thing &&
-		 thing < SymbolValue(READ_ONLY_SPACE_FREE_POINTER));
+		 thing < SymbolValue(READ_ONLY_SPACE_FREE_POINTER,0));
 	    int to_static_space =
 		(STATIC_SPACE_START <= thing &&
-		 thing < SymbolValue(STATIC_SPACE_FREE_POINTER));
+		 thing < SymbolValue(STATIC_SPACE_FREE_POINTER,0));
 
 	    /* Does it point to the dynamic space? */
 	    if (page_index != -1) {
@@ -3273,9 +3287,9 @@ verify_space(lispobj *start, size_t words)
 		 *   FIXME: Add a variable to enable this
 		 * dynamically. */
 		/*
-		if (!possibly_valid_dynamic_space_pointer((lispobj *)thing)) {
-		    lose("ptr %x to invalid object %x", thing, start); 
-		}
+		  if (!possibly_valid_dynamic_space_pointer((lispobj *)thing)) {
+		  lose("ptr %x to invalid object %x", thing, start); 
+		  }
 		*/
 	    } else {
 		/* Verify that it points to another valid space. */
@@ -3438,18 +3452,20 @@ verify_gc(void)
      * to grep for all foo_size and rename the appropriate ones to
      * foo_count. */
     int read_only_space_size =
-	(lispobj*)SymbolValue(READ_ONLY_SPACE_FREE_POINTER)
+	(lispobj*)SymbolValue(READ_ONLY_SPACE_FREE_POINTER,0)
 	- (lispobj*)READ_ONLY_SPACE_START;
     int static_space_size =
-	(lispobj*)SymbolValue(STATIC_SPACE_FREE_POINTER)
+	(lispobj*)SymbolValue(STATIC_SPACE_FREE_POINTER,0)
 	- (lispobj*)STATIC_SPACE_START;
-    int binding_stack_size =
-	(lispobj*)SymbolValue(BINDING_STACK_POINTER)
-	- (lispobj*)BINDING_STACK_START;
-
+    struct thread *th;
+    for_each_thread(th) {
+	int binding_stack_size =
+	    (lispobj*)SymbolValue(BINDING_STACK_POINTER,th)
+	    - (lispobj*)th->binding_stack_start;
+	verify_space(th->binding_stack_start, binding_stack_size);
+    }
     verify_space((lispobj*)READ_ONLY_SPACE_START, read_only_space_size);
     verify_space((lispobj*)STATIC_SPACE_START   , static_space_size);
-    verify_space((lispobj*)BINDING_STACK_START  , binding_stack_size);
 }
 
 static void
@@ -3587,7 +3603,7 @@ garbage_collect_generation(int generation, int raise)
     unsigned long bytes_freed;
     unsigned long i;
     unsigned long static_space_size;
-
+    struct thread *th;
     gc_assert(generation <= (NUM_GENERATIONS-1));
 
     /* The oldest generation can't be raised. */
@@ -3629,11 +3645,32 @@ garbage_collect_generation(int generation, int raise)
      * be un-protected anyway before unmapping later. */
     unprotect_oldspace();
 
-    /* Scavenge the stack's conservative roots. */
-    {
+    /* Scavenge the stacks' conservative roots. */
+    for_each_thread(th) {
 	void **ptr;
-	for (ptr = (void **)CONTROL_STACK_END - 1;
-	     ptr > (void **)&raise;
+	struct user_regs_struct regs;
+	if(ptrace(PTRACE_GETREGS,th->pid,0,&regs)){
+	    fprintf(stderr,"child pid %d, %s\n",th->pid,strerror(errno));
+	    lose("PTRACE_GETREGS");
+	}
+	preserve_pointer(regs.ebx);
+	preserve_pointer(regs.ecx);
+	preserve_pointer(regs.edx);
+	preserve_pointer(regs.esi);
+	preserve_pointer(regs.edi);
+	preserve_pointer(regs.ebp);
+	preserve_pointer(regs.eax);
+	fprintf(stderr,"conservatively scanning stack from 0x%x to 0x%x\n",
+		((void **)
+		 ((void *)th->control_stack_start
+		  + THREAD_CONTROL_STACK_SIZE)
+		 -1),
+		regs.esp);
+	for (ptr = ((void **)
+		    ((void *)th->control_stack_start
+		     + THREAD_CONTROL_STACK_SIZE)
+		    -1);
+	     ptr > regs.esp;
 	     ptr--) {
 	    preserve_pointer(*ptr);
 	}
@@ -3655,18 +3692,29 @@ garbage_collect_generation(int generation, int raise)
 
     /* Scavenge the Lisp functions of the interrupt handlers, taking
      * care to avoid SIG_DFL and SIG_IGN. */
-    for (i = 0; i < NSIG; i++) {
-	union interrupt_handler handler = interrupt_handlers[i];
-	if (!ARE_SAME_HANDLER(handler.c, SIG_IGN) &&
-	    !ARE_SAME_HANDLER(handler.c, SIG_DFL)) {
-	    scavenge((lispobj *)(interrupt_handlers + i), 1);
+    for_each_thread(th) {
+	struct interrupt_data *data=th->interrupt_data;
+	for (i = 0; i < NSIG; i++) {
+	    union interrupt_handler handler = data->interrupt_handlers[i];
+	    if (!ARE_SAME_HANDLER(handler.c, SIG_IGN) &&
+		!ARE_SAME_HANDLER(handler.c, SIG_DFL)) {
+		scavenge((lispobj *)(data->interrupt_handlers + i), 1);
+	    }
 	}
     }
-
-    /* Scavenge the binding stack. */
-    scavenge((lispobj *) BINDING_STACK_START,
-	     (lispobj *)SymbolValue(BINDING_STACK_POINTER) -
-	     (lispobj *)BINDING_STACK_START);
+    /* Scavenge the binding stacks. */
+ {
+     struct thread *th;
+     for_each_thread(th) {
+	 long len= (lispobj *)SymbolValue(BINDING_STACK_POINTER,th) -
+	     th->binding_stack_start;
+	 scavenge((lispobj *) th->binding_stack_start,len);
+	 /* do the tls as well */
+	 len=fixnum_value(SymbolValue(FREE_TLS_INDEX,0)) -
+	     (sizeof (struct thread))/(sizeof (lispobj));
+         scavenge((lispobj *) (th+1),len);
+     }
+ }
 
     /* The original CMU CL code had scavenge-read-only-space code
      * controlled by the Lisp-level variable
@@ -3689,7 +3737,7 @@ garbage_collect_generation(int generation, int raise)
 
     /* Scavenge static space. */
     static_space_size =
-	(lispobj *)SymbolValue(STATIC_SPACE_FREE_POINTER) -
+	(lispobj *)SymbolValue(STATIC_SPACE_FREE_POINTER,0) -
 	(lispobj *)STATIC_SPACE_START;
     if (gencgc_verbose > 1) {
 	FSHOW((stderr,
@@ -3721,68 +3769,68 @@ garbage_collect_generation(int generation, int raise)
 #if RESCAN_CHECK
     /* As a check re-scavenge the newspace once; no new objects should
      * be found. */
-    {
-	int old_bytes_allocated = bytes_allocated;
-	int bytes_allocated;
+ {
+     int old_bytes_allocated = bytes_allocated;
+     int bytes_allocated;
 
-	/* Start with a full scavenge. */
-	scavenge_newspace_generation_one_scan(new_space);
+     /* Start with a full scavenge. */
+     scavenge_newspace_generation_one_scan(new_space);
 
-	/* Flush the current regions, updating the tables. */
-	gc_alloc_update_all_page_tables();
+     /* Flush the current regions, updating the tables. */
+     gc_alloc_update_all_page_tables();
 
-	bytes_allocated = bytes_allocated - old_bytes_allocated;
+     bytes_allocated = bytes_allocated - old_bytes_allocated;
 
-	if (bytes_allocated != 0) {
-	    lose("Rescan of new_space allocated %d more bytes.",
-		 bytes_allocated);
-	}
-    }
+     if (bytes_allocated != 0) {
+	 lose("Rescan of new_space allocated %d more bytes.",
+	      bytes_allocated);
+     }
+ }
 #endif
 
-    scan_weak_pointers();
+ scan_weak_pointers();
 
-    /* Flush the current regions, updating the tables. */
-    gc_alloc_update_all_page_tables();
+ /* Flush the current regions, updating the tables. */
+ gc_alloc_update_all_page_tables();
 
-    /* Free the pages in oldspace, but not those marked dont_move. */
-    bytes_freed = free_oldspace();
+ /* Free the pages in oldspace, but not those marked dont_move. */
+ bytes_freed = free_oldspace();
 
-    /* If the GC is not raising the age then lower the generation back
-     * to its normal generation number */
-    if (!raise) {
-	for (i = 0; i < last_free_page; i++)
-	    if ((page_table[i].bytes_used != 0)
-		&& (page_table[i].gen == NUM_GENERATIONS))
-		page_table[i].gen = generation;
-	gc_assert(generations[generation].bytes_allocated == 0);
-	generations[generation].bytes_allocated =
-	    generations[NUM_GENERATIONS].bytes_allocated;
-	generations[NUM_GENERATIONS].bytes_allocated = 0;
-    }
+ /* If the GC is not raising the age then lower the generation back
+  * to its normal generation number */
+ if (!raise) {
+     for (i = 0; i < last_free_page; i++)
+	 if ((page_table[i].bytes_used != 0)
+	     && (page_table[i].gen == NUM_GENERATIONS))
+	     page_table[i].gen = generation;
+     gc_assert(generations[generation].bytes_allocated == 0);
+     generations[generation].bytes_allocated =
+	 generations[NUM_GENERATIONS].bytes_allocated;
+     generations[NUM_GENERATIONS].bytes_allocated = 0;
+ }
 
-    /* Reset the alloc_start_page for generation. */
-    generations[generation].alloc_start_page = 0;
-    generations[generation].alloc_unboxed_start_page = 0;
-    generations[generation].alloc_large_start_page = 0;
-    generations[generation].alloc_large_unboxed_start_page = 0;
+ /* Reset the alloc_start_page for generation. */
+ generations[generation].alloc_start_page = 0;
+ generations[generation].alloc_unboxed_start_page = 0;
+ generations[generation].alloc_large_start_page = 0;
+ generations[generation].alloc_large_unboxed_start_page = 0;
 
-    if (generation >= verify_gens) {
-	if (gencgc_verbose)
-	    SHOW("verifying");
-	verify_gc();
-	verify_dynamic_space();
-    }
+ if (generation >= verify_gens) {
+     if (gencgc_verbose)
+	 SHOW("verifying");
+     verify_gc();
+     verify_dynamic_space();
+ }
 
-    /* Set the new gc trigger for the GCed generation. */
-    generations[generation].gc_trigger =
-	generations[generation].bytes_allocated
-	+ generations[generation].bytes_consed_between_gc;
+ /* Set the new gc trigger for the GCed generation. */
+ generations[generation].gc_trigger =
+     generations[generation].bytes_allocated
+     + generations[generation].bytes_consed_between_gc;
 
-    if (raise)
-	generations[generation].num_gc = 0;
-    else
-	++generations[generation].num_gc;
+ if (raise)
+     generations[generation].num_gc = 0;
+ else
+     ++generations[generation].num_gc;
 }
 
 /* Update last_free_page, then SymbolValue(ALLOCATION_POINTER). */
@@ -3800,7 +3848,7 @@ update_x86_dynamic_space_free_pointer(void)
     last_free_page = last_page+1;
 
     SetSymbolValue(ALLOCATION_POINTER,
-		   (lispobj)(((char *)heap_base) + last_free_page*4096));
+		   (lispobj)(((char *)heap_base) + last_free_page*4096),0);
     return 0; /* dummy value: return something ... */
 }
 
@@ -4004,7 +4052,7 @@ gc_free_heap(void)
     gc_set_region_empty(&unboxed_region);
 
     last_free_page = 0;
-    SetSymbolValue(ALLOCATION_POINTER, (lispobj)((char *)heap_base));
+    SetSymbolValue(ALLOCATION_POINTER, (lispobj)((char *)heap_base),0);
 
     if (verify_after_free_heap) {
 	/* Check whether purify has left any bad pointers. */
@@ -4075,7 +4123,7 @@ gencgc_pickup_dynamic(void)
 {
     int page = 0;
     int addr = DYNAMIC_SPACE_START;
-    int alloc_ptr = SymbolValue(ALLOCATION_POINTER);
+    int alloc_ptr = SymbolValue(ALLOCATION_POINTER,0);
 
     /* Initialize the first region. */
     do {
@@ -4119,19 +4167,21 @@ extern boolean maybe_gc_pending ;
 char *
 alloc(int nbytes)
 {
-    struct alloc_region *region=  &boxed_region; 
+    struct thread *th=arch_os_get_current_thread();
+    struct alloc_region *region= 
+	th ? &(th->alloc_region) : &boxed_region; 
     void *new_obj;
     void *new_free_pointer;
-
+    
     /* Check for alignment allocation problems. */
     gc_assert((((unsigned)region->free_pointer & 0x7) == 0)
 	      && ((nbytes & 0x7) == 0));
-    /* At this point we should either be in pseudo-atomic, or early
-     * enough in cold initn that interrupts are not yet enabled anyway.
-     * It would be nice to assert same.
-     */
-    gc_assert(SymbolValue(PSEUDO_ATOMIC_ATOMIC));
-
+    if(all_threads)
+	/* there are a few places in the C code that allocate data in the
+	 * heap before Lisp starts.  This is before interrupts are enabled,
+	 * so we don't need to check for pseudo-atomic */
+	gc_assert(SymbolValue(PSEUDO_ATOMIC_ATOMIC,th));
+    
     /* maybe we can do this quickly ... */
     new_free_pointer = region->free_pointer + nbytes;
     if (new_free_pointer <= region->end_addr) {
@@ -4148,7 +4198,7 @@ alloc(int nbytes)
 	/* set things up so that GC happens when we finish the PA
 	 * section.  */
 	maybe_gc_pending=1;
-	SetSymbolValue(PSEUDO_ATOMIC_INTERRUPTED, make_fixnum(1));
+	SetSymbolValue(PSEUDO_ATOMIC_INTERRUPTED, make_fixnum(1),th);
     }
     new_obj = gc_alloc_with_region(nbytes,0,region,0);
     return (new_obj);
@@ -4259,6 +4309,9 @@ unhandled_sigmemoryfault()
 gc_alloc_update_all_page_tables(void)
 {
     /* Flush the alloc regions updating the tables. */
+    struct thread *th;
+    for_each_thread(th) 
+        gc_alloc_update_page_tables(0, &th->alloc_region);
     gc_alloc_update_page_tables(1, &unboxed_region);
     gc_alloc_update_page_tables(0, &boxed_region);
 }
