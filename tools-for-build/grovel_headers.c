@@ -27,6 +27,9 @@
 #include <sys/termios.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <signal.h>
+
+#include "genesis/config.h"
 
 #define DEFTYPE(lispname,cname) { cname foo; \
     printf("(define-alien-type " lispname " (%s %d))\n", (((foo=-1)<0) ? "sb!alien:signed" : "unsigned"), (8 * (sizeof foo))); }
@@ -37,6 +40,8 @@ defconstant(char* lisp_name, long unix_number)
     printf("(defconstant %s %ld) ; #x%lx\n",
 	   lisp_name, unix_number, unix_number);
 }
+
+#define DEFSIGNAL(name) defconstant(#name, name)
 
 int
 main(int argc, char *argv[])
@@ -138,6 +143,50 @@ main(int argc, char *argv[])
       defconstant("tiocsltc", TIOCSLTC);
     */
     printf("\n");
+
+    printf(";;; signals\n");
+    DEFSIGNAL(SIGALRM);
+    DEFSIGNAL(SIGBUS);
+    DEFSIGNAL(SIGCHLD);
+    DEFSIGNAL(SIGCONT);
+#ifndef LISP_FEATURE_LINUX
+    DEFSIGNAL(SIGEMT);
+#endif
+    DEFSIGNAL(SIGFPE);
+    DEFSIGNAL(SIGHUP);
+    DEFSIGNAL(SIGILL);
+    DEFSIGNAL(SIGINT);
+    DEFSIGNAL(SIGIO);
+    DEFSIGNAL(SIGIOT);
+    DEFSIGNAL(SIGKILL);
+    DEFSIGNAL(SIGPIPE);
+    DEFSIGNAL(SIGPROF);
+    DEFSIGNAL(SIGQUIT);
+    DEFSIGNAL(SIGSEGV);
+#ifdef LISP_FEATURE_LINUX
+    DEFSIGNAL(SIGSTKFLT);
+#endif
+    DEFSIGNAL(SIGSTOP);
+#ifndef LISP_FEATURE_LINUX
+    DEFSIGNAL(SIGSYS);
+#endif
+    DEFSIGNAL(SIGTERM);
+    DEFSIGNAL(SIGTRAP);
+    DEFSIGNAL(SIGTSTP);
+    DEFSIGNAL(SIGTTIN);
+    DEFSIGNAL(SIGTTOU);
+    DEFSIGNAL(SIGURG);
+    DEFSIGNAL(SIGUSR1);
+    DEFSIGNAL(SIGUSR2);
+    DEFSIGNAL(SIGVTALRM);
+#ifdef LISP_FEATURE_SVR4
+    DEFSIGNAL(SIGWAITING);
+#endif
+    DEFSIGNAL(SIGWINCH);
+#ifndef LISP_FEATURE_HPUX
+    DEFSIGNAL(SIGXCPU);
+    DEFSIGNAL(SIGXFSZ);
+#endif
 
     return 0;
 }

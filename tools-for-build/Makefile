@@ -9,6 +9,8 @@
 
 include ../src/runtime/Config
 
+CPPFLAGS=-I../src/runtime
+
 all: grovel_headers determine-endianness
 
 clean: 

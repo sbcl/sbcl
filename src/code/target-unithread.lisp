@@ -56,7 +56,7 @@
     (let ((h (car (waitqueue-data queue))))
       (setf (waitqueue-lock queue) 0)
       (when h
-	(sb!unix:unix-kill h :sigcont)))))
+	(sb!unix:unix-kill h sb!unix:sigcont)))))
 
 ;;;; mutex
 

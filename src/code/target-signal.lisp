@@ -26,7 +26,7 @@
 ;;; should be a valid signal number or a keyword of the standard UNIX
 ;;; signal name.
 (defun unix-kill (pid signal)
-  (real-unix-kill pid (unix-signal-number signal)))
+  (real-unix-kill pid signal))
 
 #!-sb-fluid (declaim (inline real-unix-killpg))
 (sb!alien:define-alien-routine ("killpg" real-unix-killpg) sb!alien:int
@@ -37,7 +37,7 @@
 ;;; PGRP. SIGNAL should be a valid signal number or a keyword of the
 ;;; standard UNIX signal name.
 (defun unix-killpg (pgrp signal)
-  (real-unix-killpg pgrp (unix-signal-number signal)))
+  (real-unix-killpg pgrp signal))
 
 ;;; Set the current set of masked signals (those being blocked from
 ;;; delivery).
@@ -60,10 +60,10 @@
 
 ;;;; interface to enabling and disabling signal handlers
 
-(defun enable-interrupt (signal-designator handler)
+(defun enable-interrupt (signal handler)
   (declare (type (or function fixnum (member :default :ignore)) handler))
   (without-gcing
-   (let ((result (install-handler (unix-signal-number signal-designator)
+   (let ((result (install-handler signal
 				  (case handler
 				    (:default sig_dfl)
 				    (:ignore sig_ign)
@@ -127,20 +127,20 @@
 (defun sb!kernel:signal-cold-init-or-reinit ()
   #!+sb-doc
   "Enable all the default signals that Lisp knows how to deal with."
-  (enable-interrupt :sigint #'sigint-handler)
-  (enable-interrupt :sigquit #'sigquit-handler)
-  (enable-interrupt :sigill #'sigill-handler)
-  (enable-interrupt :sigtrap #'sigtrap-handler)
-  (enable-interrupt :sigiot #'sigiot-handler)
+  (enable-interrupt sigint #'sigint-handler)
+  (enable-interrupt sigquit #'sigquit-handler)
+  (enable-interrupt sigill #'sigill-handler)
+  (enable-interrupt sigtrap #'sigtrap-handler)
+  (enable-interrupt sigiot #'sigiot-handler)
   #!-linux
-  (enable-interrupt :sigemt #'sigemt-handler)
-  (enable-interrupt :sigfpe #'sb!vm:sigfpe-handler)
-  (enable-interrupt :sigbus #'sigbus-handler)
-  (enable-interrupt :sigsegv #'sigsegv-handler)
+  (enable-interrupt sigemt #'sigemt-handler)
+  (enable-interrupt sigfpe #'sb!vm:sigfpe-handler)
+  (enable-interrupt sigbus #'sigbus-handler)
+  (enable-interrupt sigsegv #'sigsegv-handler)
   #!-linux
-  (enable-interrupt :sigsys #'sigsys-handler)
-  (enable-interrupt :sigpipe #'sigpipe-handler)
-  (enable-interrupt :sigalrm #'sigalrm-handler)
+  (enable-interrupt sigsys #'sigsys-handler)
+  (enable-interrupt sigpipe #'sigpipe-handler)
+  (enable-interrupt sigalrm #'sigalrm-handler)
   (values))
 
 ;;;; etc.

@@ -17,7 +17,7 @@
 	  ;; can't use handling-end-of-the-world, because that flushes
 	  ;; output streams, and we don't necessarily have any (or we
 	  ;; could be sharing them)
-	  (sb!sys:enable-interrupt :sigint :ignore)
+	  (sb!sys:enable-interrupt sb!unix:sigint :ignore)
 	  (sb!unix:unix-exit
 	   (catch 'sb!impl::%end-of-the-world 
 	     (with-simple-restart 
@@ -30,16 +30,16 @@
 ;;; Conventional wisdom says that it's a bad idea to use these unless
 ;;; you really need to.  Use a lock or a waitqueue instead
 (defun suspend-thread (thread-id)
-  (sb!unix:unix-kill thread-id :sigstop))
+  (sb!unix:unix-kill thread-id sb!unix:sigstop))
 (defun resume-thread (thread-id)
-  (sb!unix:unix-kill thread-id :sigcont))
+  (sb!unix:unix-kill thread-id sb!unix:sigcont))
 ;;; Note warning about cleanup forms
 (defun destroy-thread (thread-id)
   "Destroy the thread identified by THREAD-ID abruptly, without running cleanup forms"
-  (sb!unix:unix-kill thread-id :sigterm)
+  (sb!unix:unix-kill thread-id sb!unix:sigterm)
   ;; may have been stopped for some reason, so now wake it up to
   ;; deliver the TERM
-  (sb!unix:unix-kill thread-id :sigcont))
+  (sb!unix:unix-kill thread-id sb!unix:sigcont))
 
 
 ;;; a moderate degree of care is expected for use of interrupt-thread,
@@ -128,7 +128,7 @@ SB-EXT:QUIT - the usual cleanup forms will be evaluated"
 ;;; this should only be called while holding the queue spinlock.
 (defun signal-queue-head (queue)
   (let ((p (car (waitqueue-data queue))))
-    (when p (sb!unix:unix-kill p  :sigcont))))
+    (when p (sb!unix:unix-kill p  sb!unix:sigcont))))
 
 ;;;; mutex
 
@@ -218,7 +218,7 @@ time we reacquire LOCK and return to the caller."
 		       (sb!sys:make-fd-stream err :input t :output t :buffering :line))
 		      (sb!impl::*descriptor-handlers* nil))
 		 (get-mutex *session-lock*)
-		 (sb!sys:enable-interrupt :sigint #'sb!unix::sigint-handler)
+		 (sb!sys:enable-interrupt sb!unix:sigint #'sb!unix::sigint-handler)
 		 (unwind-protect
 		      (sb!impl::toplevel-repl nil)
 		   (sb!int:flush-standard-output-streams)))))

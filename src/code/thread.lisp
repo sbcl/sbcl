@@ -32,14 +32,14 @@
 (defun get-foreground ()
   (when (not (eql (mutex-value *session-lock*) (current-thread-id)))
     (get-mutex *session-lock*))
-  (sb!sys:enable-interrupt :sigint #'sb!unix::sigint-handler)
+  (sb!sys:enable-interrupt sb!unix:sigint #'sb!unix::sigint-handler)
   t)
 #!-sb-thread
 (defun get-foreground () t)
 
 #!+sb-thread
 (defun release-foreground ()
-  (sb!sys:enable-interrupt :sigint :ignore)
+  (sb!sys:enable-interrupt sb!unix:sigint :ignore)
   (release-mutex *session-lock*)
   t)
 #!-sb-thread

@@ -124,10 +124,10 @@
 	     (values pid
 		     (if (position signal
 				   #.(vector
-				      (sb-unix:unix-signal-number :sigstop)
-				      (sb-unix:unix-signal-number :sigtstp)
-				      (sb-unix:unix-signal-number :sigttin)
-				      (sb-unix:unix-signal-number :sigttou)))
+				      sb-unix:sigstop
+				      sb-unix:sigtstp
+				      sb-unix:sigttin
+				      sb-unix:sigttou))
 			 :stopped
 			 :signaled)
 		     signal
@@ -212,7 +212,7 @@
 	   (sb-unix:unix-ioctl (sb-sys:fd-stream-fd (process-pty proc))
 			       sb-unix:TIOCSIGSEND
 			       (sb-sys:int-sap
-				(sb-unix:unix-signal-number signal))))
+				signal)))
 	  ((:process-group #-hpux :pty-process-group)
 	   (sb-unix:unix-killpg pid signal))
 	  (t
@@ -220,8 +220,7 @@
       (cond ((not okay)
 	     (values nil errno))
 	    ((and (eql pid (process-pid proc))
-		  (= (sb-unix:unix-signal-number signal)
-		     (sb-unix:unix-signal-number :sigcont)))
+		  (= signal sb-unix:sigcont))
 	     (setf (process-%status proc) :running)
 	     (setf (process-exit-code proc) nil)
 	     (when (process-status-hook proc)
@@ -537,7 +536,7 @@
   (when (and env-p environment-p)
     (error "can't specify :ENV and :ENVIRONMENT simultaneously"))
   ;; Make sure that the interrupt handler is installed.
-  (sb-sys:enable-interrupt :sigchld #'sigchld-handler)
+  (sb-sys:enable-interrupt sb-unix:sigchld #'sigchld-handler)
   ;; Prepend the program to the argument list.
   (push (namestring program) args)
   (let (;; Clear various specials used by GET-DESCRIPTOR-FOR to
