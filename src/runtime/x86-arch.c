@@ -24,6 +24,7 @@
 #include "interr.h"
 #include "breakpoint.h"
 #include "monitor.h"
+#include "thread.h"
 
 #define BREAKPOINT_INST 0xcc	/* INT3 */
 
@@ -112,13 +113,13 @@ arch_internal_error_arguments(os_context_t *context)
 boolean
 arch_pseudo_atomic_atomic(os_context_t *context)
 {
-    return SymbolValue(PSEUDO_ATOMIC_ATOMIC);
+    return SymbolValue(PSEUDO_ATOMIC_ATOMIC,0);
 }
 
 void
 arch_set_pseudo_atomic_interrupted(os_context_t *context)
 {
-    SetSymbolValue(PSEUDO_ATOMIC_INTERRUPTED, make_fixnum(1));
+    SetSymbolValue(PSEUDO_ATOMIC_INTERRUPTED, make_fixnum(1),0);
 }
 
 /*

@@ -81,7 +81,11 @@ int os_set_tls_pointer(struct thread *thread) {
 			   + 3)); /* privilege level */
     return n;
 }
-    
+
+struct thread *arch_os_get_current_thread() {
+    return find_thread_by_pid(getpid());
+}
+
 
 /* KLUDGE: As of kernel 2.2.14 on Red Hat 6.2, there's code in the
  * <sys/ucontext.h> file to define symbolic names for offsets into

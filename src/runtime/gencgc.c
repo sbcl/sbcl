@@ -648,7 +648,8 @@ gc_alloc_new_region(int nbytes, int unboxed, struct alloc_region *alloc_region)
     if (last_page+1 > last_free_page) {
 	last_free_page = last_page+1;
 	SetSymbolValue(ALLOCATION_POINTER,
-		       (lispobj)(((char *)heap_base) + last_free_page*4096));
+		       (lispobj)(((char *)heap_base) + last_free_page*4096),
+		       0);
 	if (last_page+1 > last_used_page)
 	    last_used_page = last_page+1;
     }
@@ -1113,7 +1114,7 @@ gc_alloc_large(int nbytes, int unboxed, struct alloc_region *alloc_region)
     if (last_page+1 > last_free_page) {
 	last_free_page = last_page+1;
 	SetSymbolValue(ALLOCATION_POINTER,
-		       (lispobj)(((char *)heap_base) + last_free_page*4096));
+		       (lispobj)(((char *)heap_base) + last_free_page*4096),0);
 	if (last_page+1 > last_used_page)
 	    last_used_page = last_page+1;
     }
@@ -2173,7 +2174,7 @@ static lispobj*
 search_read_only_space(lispobj *pointer)
 {
     lispobj* start = (lispobj*)READ_ONLY_SPACE_START;
-    lispobj* end = (lispobj*)SymbolValue(READ_ONLY_SPACE_FREE_POINTER);
+    lispobj* end = (lispobj*)SymbolValue(READ_ONLY_SPACE_FREE_POINTER,0);
     if ((pointer < start) || (pointer >= end))
 	return NULL;
     return (search_space(start, (pointer+2)-start, pointer));
@@ -2183,7 +2184,7 @@ static lispobj *
 search_static_space(lispobj *pointer)
 {
     lispobj* start = (lispobj*)STATIC_SPACE_START;
-    lispobj* end = (lispobj*)SymbolValue(STATIC_SPACE_FREE_POINTER);
+    lispobj* end = (lispobj*)SymbolValue(STATIC_SPACE_FREE_POINTER,0);
     if ((pointer < start) || (pointer >= end))
 	return NULL;
     return (search_space(start, (pointer+2)-start, pointer));
@@ -3312,7 +3313,7 @@ verify_space(lispobj *start, size_t words)
     int is_in_dynamic_space = (find_page_index((void*)start) != -1);
     int is_in_readonly_space =
 	(READ_ONLY_SPACE_START <= (unsigned)start &&
-	 (unsigned)start < SymbolValue(READ_ONLY_SPACE_FREE_POINTER));
+	 (unsigned)start < SymbolValue(READ_ONLY_SPACE_FREE_POINTER,0));
 
     while (words > 0) {
 	size_t count = 1;
@@ -3322,10 +3323,10 @@ verify_space(lispobj *start, size_t words)
 	    int page_index = find_page_index((void*)thing);
 	    int to_readonly_space =
 		(READ_ONLY_SPACE_START <= thing &&
-		 thing < SymbolValue(READ_ONLY_SPACE_FREE_POINTER));
+		 thing < SymbolValue(READ_ONLY_SPACE_FREE_POINTER,0));
 	    int to_static_space =
 		(STATIC_SPACE_START <= thing &&
-		 thing < SymbolValue(STATIC_SPACE_FREE_POINTER));
+		 thing < SymbolValue(STATIC_SPACE_FREE_POINTER,0));
 
 	    /* Does it point to the dynamic space? */
 	    if (page_index != -1) {
@@ -3511,17 +3512,15 @@ verify_gc(void)
      * to grep for all foo_size and rename the appropriate ones to
      * foo_count. */
     int read_only_space_size =
-	(lispobj*)SymbolValue(READ_ONLY_SPACE_FREE_POINTER)
+	(lispobj*)SymbolValue(READ_ONLY_SPACE_FREE_POINTER,0)
 	- (lispobj*)READ_ONLY_SPACE_START;
     int static_space_size =
-	(lispobj*)SymbolValue(STATIC_SPACE_FREE_POINTER)
+	(lispobj*)SymbolValue(STATIC_SPACE_FREE_POINTER,0)
 	- (lispobj*)STATIC_SPACE_START;
     struct thread *th;
     for_each_thread(th) {
-	/* XXX this needs to be a per-process special and accessed 
-	 * appropriately for such */
 	int binding_stack_size =
-	    (lispobj*)SymbolValue(BINDING_STACK_POINTER)
+	    (lispobj*)SymbolValue(BINDING_STACK_POINTER,th)
 	    - (lispobj*)th->binding_stack_start;
 	verify_space(th->binding_stack_start, binding_stack_size);
     }
@@ -3757,7 +3756,7 @@ garbage_collect_generation(int generation, int raise)
       * per-thread value of BINDING_STACK_POINTER */
      for(th=all_threads;th;th=th->next)
 	 scavenge((lispobj *) th->binding_stack_start,
-		  (lispobj *)SymbolValue(BINDING_STACK_POINTER) -
+		  (lispobj *)SymbolValue(BINDING_STACK_POINTER,th) -
 		  (lispobj *)th->binding_stack_start);
  }
 
@@ -3782,7 +3781,7 @@ garbage_collect_generation(int generation, int raise)
 
     /* Scavenge static space. */
     static_space_size =
-	(lispobj *)SymbolValue(STATIC_SPACE_FREE_POINTER) -
+	(lispobj *)SymbolValue(STATIC_SPACE_FREE_POINTER,0) -
 	(lispobj *)STATIC_SPACE_START;
     if (gencgc_verbose > 1) {
 	FSHOW((stderr,
@@ -3895,7 +3894,7 @@ update_x86_dynamic_space_free_pointer(void)
     last_free_page = last_page+1;
 
     SetSymbolValue(ALLOCATION_POINTER,
-		   (lispobj)(((char *)heap_base) + last_free_page*4096));
+		   (lispobj)(((char *)heap_base) + last_free_page*4096),0);
     return 0; /* dummy value: return something ... */
 }
 
@@ -4112,7 +4111,7 @@ gc_free_heap(void)
     unboxed_region.end_addr = page_address(0);
 
     last_free_page = 0;
-    SetSymbolValue(ALLOCATION_POINTER, (lispobj)((char *)heap_base));
+    SetSymbolValue(ALLOCATION_POINTER, (lispobj)((char *)heap_base),0);
 
     current_region_free_pointer = boxed_region.free_pointer;
     current_region_end_addr = boxed_region.end_addr;
@@ -4198,7 +4197,7 @@ gencgc_pickup_dynamic(void)
 {
     int page = 0;
     int addr = DYNAMIC_SPACE_START;
-    int alloc_ptr = SymbolValue(ALLOCATION_POINTER);
+    int alloc_ptr = SymbolValue(ALLOCATION_POINTER,0);
 
     /* Initialize the first region. */
     do {
@@ -4250,7 +4249,7 @@ alloc(int nbytes)
     gc_assert((((unsigned)current_region_free_pointer & 0x7) == 0)
 	      && ((nbytes & 0x7) == 0));
 
-    if (SymbolValue(PSEUDO_ATOMIC_ATOMIC)) {/* if already in a pseudo atomic */
+    if (SymbolValue(PSEUDO_ATOMIC_ATOMIC,0)) {/* if already in a pseudo atomic */
 	
 	void *new_free_pointer;
 
@@ -4296,16 +4295,16 @@ alloc(int nbytes)
 	    auto_gc_trigger *= 2;
 	    alloc_entered--;
 	    /* Exit the pseudo-atomic. */
-	    SetSymbolValue(PSEUDO_ATOMIC_ATOMIC, make_fixnum(0));
-	    if (SymbolValue(PSEUDO_ATOMIC_INTERRUPTED) != 0) {
+	    SetSymbolValue(PSEUDO_ATOMIC_ATOMIC, make_fixnum(0),0);
+	    if (SymbolValue(PSEUDO_ATOMIC_INTERRUPTED,0) != 0) {
 		/* Handle any interrupts that occurred during
 		 * gc_alloc(..). */
 		do_pending_interrupt();
 	    }
 	    funcall0(SymbolFunction(MAYBE_GC));
 	    /* Re-enter the pseudo-atomic. */
-	    SetSymbolValue(PSEUDO_ATOMIC_INTERRUPTED, make_fixnum(0));
-	    SetSymbolValue(PSEUDO_ATOMIC_ATOMIC, make_fixnum(1));
+	    SetSymbolValue(PSEUDO_ATOMIC_INTERRUPTED, make_fixnum(0),0);
+	    SetSymbolValue(PSEUDO_ATOMIC_ATOMIC, make_fixnum(1),0);
 	    goto retry1;
 	}
 	/* Call gc_alloc(). */
@@ -4324,8 +4323,8 @@ alloc(int nbytes)
     retry2:
 	/* At least wrap this allocation in a pseudo atomic to prevent
 	 * gc_alloc() from being re-entered. */
-	SetSymbolValue(PSEUDO_ATOMIC_INTERRUPTED, make_fixnum(0));
-	SetSymbolValue(PSEUDO_ATOMIC_ATOMIC, make_fixnum(1));
+	SetSymbolValue(PSEUDO_ATOMIC_INTERRUPTED, make_fixnum(0),0);
+	SetSymbolValue(PSEUDO_ATOMIC_ATOMIC, make_fixnum(1),0);
 
 	if (alloc_entered)
 	    SHOW("alloc re-entered in not-already-pseudo-atomic case");
@@ -4339,8 +4338,8 @@ alloc(int nbytes)
 	    void *new_obj = current_region_free_pointer;
 	    current_region_free_pointer = new_free_pointer;
 	    alloc_entered--;
-	    SetSymbolValue(PSEUDO_ATOMIC_ATOMIC, make_fixnum(0));
-	    if (SymbolValue(PSEUDO_ATOMIC_INTERRUPTED)) {
+	    SetSymbolValue(PSEUDO_ATOMIC_ATOMIC, make_fixnum(0),0);
+	    if (SymbolValue(PSEUDO_ATOMIC_INTERRUPTED,0)) {
 		/* Handle any interrupts that occurred during
 		 * gc_alloc(..). */
 		do_pending_interrupt();
@@ -4358,8 +4357,8 @@ alloc(int nbytes)
 	    auto_gc_trigger *= 2;
 	    alloc_entered--;
 	    /* Exit the pseudo atomic. */
-	    SetSymbolValue(PSEUDO_ATOMIC_ATOMIC, make_fixnum(0));
-	    if (SymbolValue(PSEUDO_ATOMIC_INTERRUPTED) != 0) {
+	    SetSymbolValue(PSEUDO_ATOMIC_ATOMIC, make_fixnum(0),0);
+	    if (SymbolValue(PSEUDO_ATOMIC_INTERRUPTED,0) != 0) {
 		/* Handle any interrupts that occurred during
 		 * gc_alloc(..); */
 		do_pending_interrupt();
@@ -4375,8 +4374,8 @@ alloc(int nbytes)
 	current_region_end_addr = boxed_region.end_addr;
 
 	alloc_entered--;
-	SetSymbolValue(PSEUDO_ATOMIC_ATOMIC, make_fixnum(0));
-	if (SymbolValue(PSEUDO_ATOMIC_INTERRUPTED) != 0) {
+	SetSymbolValue(PSEUDO_ATOMIC_ATOMIC, make_fixnum(0),0);
+	if (SymbolValue(PSEUDO_ATOMIC_INTERRUPTED,0) != 0) {
 	    /* Handle any interrupts that occurred during gc_alloc(..). */
 	    do_pending_interrupt();
 	    goto retry2;

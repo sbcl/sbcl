@@ -21,6 +21,7 @@
 #include "globals.h"
 #include "alloc.h"
 #include "breakpoint.h"
+#include "thread.h"
 
 #define REAL_LRA_SLOT 0
 #ifndef __i386__

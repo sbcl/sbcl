@@ -11,24 +11,33 @@
 
 7) some static symbols need attention
 
-    ;; these are per-thread indexes into binding stack, I think
+    ;; these are per-thread indexes into binding stack, so will
+    ;; work if SymbolValue knows how to look up tls values
     *current-catch-block*
     *current-unwind-protect-block*
     *binding-stack-pointer*
 
-    ;; interrupt handling.  these all need attention
+    ;; interrupt handling.  these two are assigned but not bound, and
+    ;; probably should be visible across threads (so are ok)
     *pseudo-atomic-atomic*
     *pseudo-atomic-interrupted*
-    sb!unix::*interrupt-pending*
+
+    ;; do we need separate interrupt contexts per thread?  very
+    ;; probably, yes.  A gets interrupted, B gets interrupted, 
+    ;; A returns from handler before B returns from handler.
+    ;; So, bind this to 0 when each thread starts executing,
+    ;; and all's well
     *free-interrupt-context-index*
-    sb!unix::*interrupts-enabled*
+
+    ;; used for without-interrupts in much the same way as the
+    ;; *pseudo-atomic-...* variables are used for PA.  I think
+    ;; these will be OK if bound to T,0 on thread startup
+    sb!unix::*interrupts-enabled*  
+    sb!unix::*interrupt-pending*
 
     ;; either we have to lock around this, or provide each thread its
     ;; own region
     *allocation-pointer*
-
-8) after doing 7, fix up the things that are expected to happen
-   per-thread (e.g. binding stack scavenging)
 
 9) when creating a new thread, initialise dynamic bindings from
    current thread, not from initial thread
@@ -41,3 +50,16 @@
 
 13) fix other runtime stuff that has been temporarily ripped out
  - control stack scrubbing and bounds checking
+
+14) allocation and gc needs fairly serious attention.  There is only
+    one ALLOCATION-POINTER, access to which is not locked other (other
+    than by PA).
+
+15) it would be nice to have a faster way to find the current thread
+    from C than calling getpid().  For x86 we can write a bit of asm
+    to find the thread pointer in dynamic_values_start[1] and have it
+    stored there at thread init.  For other ports something more
+    complicated needs doing, unless we can find a register to use for
+    the tls base that C promises not to overwrite.  
+
+16) interrupt contexts: we need per-thread interrupt context arrays

@@ -41,9 +41,8 @@ struct thread *init_thread(lispobj initial_function) {
     th->dynamic_values_start=
 	(lispobj*)((void*)th->alien_stack_start+ALIEN_STACK_SIZE);
     if(all_threads) {
-	/* XXX this is wrong, should be copying from the current
-	   thread instead */
-	memcpy(th->dynamic_values_start,all_threads->dynamic_values_start,
+	memcpy(th->dynamic_values_start,
+	       arch_os_get_current_thread()->dynamic_values_start,
 	       dynamic_values_bytes);
     } else {
 	int i;
@@ -60,7 +59,7 @@ struct thread *init_thread(lispobj initial_function) {
     ((struct symbol *)native_pointer(ALIEN_STACK))->value
 	=LOW_WORD(th->dynamic_values_start-1);
 #ifdef BINDING_STACK_POINTER
-    SetSymbolValue(BINDING_STACK_POINTER, LOW_WORD(th->binding_stack_start));
+    SetSymbolValue(BINDING_STACK_POINTER, LOW_WORD(th->binding_stack_start),th);
 #endif
 
     th->next=all_threads;
@@ -92,3 +91,10 @@ struct thread *init_thread(lispobj initial_function) {
     return 0;
 }
 
+struct thread *find_thread_by_pid(pid_t pid) 
+{
+    struct thread *th;
+    for_each_thread(th)
+	if(th->pid==pid) return th;
+    return 0;
+}

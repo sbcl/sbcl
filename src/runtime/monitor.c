@@ -33,6 +33,7 @@
 #include "globals.h"
 #include "lispregs.h"
 #include "interrupt.h"
+#include "thread.h"
 
 /* When we need to do command input, we use this stream, which is not
  * in general stdin, so that things will "work" (as well as being
@@ -174,6 +175,7 @@ regs_cmd(char **ptr)
 #if !defined(__i386__)
     printf("BSP\t=\t0x%08X\n", (unsigned long)current_binding_stack_pointer);
 #endif
+#if 0
 #ifdef __i386__
     printf("BSP\t=\t0x%08lx\n",
 	   (unsigned long)SymbolValue(BINDING_STACK_POINTER));
@@ -192,7 +194,7 @@ regs_cmd(char **ptr)
 	   (unsigned long)SymbolValue(STATIC_SPACE_FREE_POINTER));
     printf("RDONLY\t=\t0x%08lx\n",
 	   (unsigned long)SymbolValue(READ_ONLY_SPACE_FREE_POINTER));
-
+#endif /* 0 */
 #ifdef MIPS
     printf("FLAGS\t=\t0x%08x\n", current_flags_register);
 #endif
@@ -328,8 +330,9 @@ static void
 print_context_cmd(char **ptr)
 {
     int free;
+    struct thread *thread=arch_os_get_current_thread();
 
-    free = SymbolValue(FREE_INTERRUPT_CONTEXT_INDEX)>>2;
+    free = SymbolValue(FREE_INTERRUPT_CONTEXT_INDEX,thread)>>2;
 	
     if (more_p(ptr)) {
 	int index;
@@ -374,8 +377,9 @@ static void
 catchers_cmd(char **ptr)
 {
     struct catch_block *catch;
+    struct thread *thread=arch_os_get_current_thread();
 
-    catch = (struct catch_block *)SymbolValue(CURRENT_CATCH_BLOCK);
+    catch = (struct catch_block *)SymbolValue(CURRENT_CATCH_BLOCK,thread);
 
     if (catch == NULL)
         printf("There are no active catchers!\n");

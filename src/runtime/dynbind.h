@@ -12,8 +12,8 @@
 #ifndef _DYNBIND_H_
 #define _DYNBIND_H_
 
-extern void bind_variable(lispobj symbol, lispobj value);
-extern void unbind(void);
-extern void unbind_to_here(lispobj *bsp);
+extern void bind_variable(lispobj symbol, lispobj value,void *thread);
+extern void unbind(void *thread);
+extern void unbind_to_here(lispobj *bsp,void *thread);
 
 #endif

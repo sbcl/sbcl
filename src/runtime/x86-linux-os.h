@@ -8,6 +8,7 @@ static inline os_context_t *arch_os_get_context(void **void_context) {
     return (os_context_t *) *void_context;
 }
 
+extern struct thread *os_get_current_thread();
 unsigned long os_context_fp_control(os_context_t *context);
 void os_restore_fp_control(os_context_t *context);
 

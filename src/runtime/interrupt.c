@@ -31,6 +31,7 @@
 #include "alloc.h"
 #include "dynbind.h"
 #include "interr.h"
+#include "thread.h"
 
 void sigaddset_blockable(sigset_t *s)
 {
@@ -160,7 +161,7 @@ void
 fake_foreign_function_call(os_context_t *context)
 {
     int context_index;
-
+    struct thread *thread=arch_os_get_current_thread();
     /* Get current Lisp state from context. */
 #ifdef reg_ALLOC
     dynamic_space_free_pointer =
@@ -180,7 +181,7 @@ fake_foreign_function_call(os_context_t *context)
 
     /* Do dynamic binding of the active interrupt context index
      * and save the context in the context array. */
-    context_index = SymbolValue(FREE_INTERRUPT_CONTEXT_INDEX)>>2;
+    context_index = SymbolValue(FREE_INTERRUPT_CONTEXT_INDEX,thread)>>2;
     /* FIXME: Ick! Why use abstract "make_fixnum" in some places if
      * you're going to convert from fixnum by bare >>2 in other
      * places? Use fixnum_value(..) here, and look for other places
@@ -191,7 +192,7 @@ fake_foreign_function_call(os_context_t *context)
     }
 
     bind_variable(FREE_INTERRUPT_CONTEXT_INDEX,
-		  make_fixnum(context_index + 1));
+		  make_fixnum(context_index + 1),thread);
 
     lisp_interrupt_contexts[context_index] = context;
 
@@ -202,6 +203,7 @@ fake_foreign_function_call(os_context_t *context)
 void
 undo_fake_foreign_function_call(os_context_t *context)
 {
+    struct thread *thread=arch_os_get_current_thread();
     /* Block all blockable signals. */
     sigset_t block;
     sigemptyset(&block);
@@ -218,7 +220,7 @@ undo_fake_foreign_function_call(os_context_t *context)
      * perhaps yes, unbind_to_here() really would be clearer and less
      * fragile.. */
     /* dan (2001.08.10) thinks the above supposition is probably correct */
-    unbind();
+    unbind(thread);
 
 #ifdef reg_ALLOC
     /* Put the dynamic space free pointer back into the context. */
@@ -280,8 +282,8 @@ interrupt_handle_pending(os_context_t *context)
 #ifndef __i386__
     boolean were_in_lisp = !foreign_function_call_active;
 #endif
-
-    SetSymbolValue(INTERRUPT_PENDING, NIL);
+    struct thread *thread=arch_os_get_current_thread();
+    SetSymbolValue(INTERRUPT_PENDING, NIL,thread);
 
     if (maybe_gc_pending) {
 	maybe_gc_pending = 0;
@@ -444,6 +446,7 @@ static void
 maybe_now_maybe_later(int signal, siginfo_t *info, void *void_context)
 {
     os_context_t *context = arch_os_get_context(&void_context);
+    struct thread *thread=arch_os_get_current_thread();
 
 #ifdef LISP_FEATURE_LINUX
     os_restore_fp_control(context);
@@ -452,7 +455,7 @@ maybe_now_maybe_later(int signal, siginfo_t *info, void *void_context)
     /* see comments at top of code/signal.lisp for what's going on here
      * with INTERRUPTS_ENABLED/INTERRUPT_HANDLE_NOW 
      */
-    if (SymbolValue(INTERRUPTS_ENABLED) == NIL) {
+    if (SymbolValue(INTERRUPTS_ENABLED,thread) == NIL) {
 
 	/* FIXME: This code is exactly the same as the code in the
 	 * other leg of the if(..), and should be factored out into
@@ -463,7 +466,7 @@ maybe_now_maybe_later(int signal, siginfo_t *info, void *void_context)
 	       os_context_sigmask_addr(context),
 	       sizeof(sigset_t));
 	sigaddset_blockable(os_context_sigmask_addr(context));
-        SetSymbolValue(INTERRUPT_PENDING, T);
+        SetSymbolValue(INTERRUPT_PENDING, T,thread);
 
     } else if (
 #ifndef __i386__
