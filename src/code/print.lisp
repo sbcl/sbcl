@@ -117,9 +117,11 @@
 	(*read-eval* t)
 	(*read-suppress* nil)
 	;; FIXME: It doesn't seem like a good idea to expose our
-	;; disaster-recovery *STANDARD-READTABLE* here. Perhaps we
-	;; should do a COPY-READTABLE? The consing would be unfortunate,
-	;; though.
+	;; disaster-recovery *STANDARD-READTABLE* here. What if some
+	;; enterprising user corrupts the disaster-recovery readtable
+	;; by doing destructive readtable operations within
+	;; WITH-STANDARD-IO-SYNTAX? Perhaps we should do a
+	;; COPY-READTABLE? The consing would be unfortunate, though.
 	(*readtable* *standard-readtable*))
     (funcall function)))
 
@@ -221,8 +223,8 @@
   slashification off."
   (stringify-object object nil))
 
-;;; This produces the printed representation of an object as a string. The
-;;; few ...-TO-STRING functions above call this.
+;;; This produces the printed representation of an object as a string.
+;;; The few ...-TO-STRING functions above call this.
 (defvar *string-output-streams* ())
 (defun stringify-object (object &optional (*print-escape* *print-escape*))
   (let ((stream (if *string-output-streams*
@@ -284,17 +286,18 @@
 
 ;;;; circularity detection stuff
 
-;;; When *PRINT-CIRCLE* is T, this gets bound to a hash table that (eventually)
-;;; ends up with entries for every object printed. When we are initially
-;;; looking for circularities, we enter a T when we find an object for the
-;;; first time, and a 0 when we encounter an object a second time around.
-;;; When we are actually printing, the 0 entries get changed to the actual
-;;; marker value when they are first printed.
+;;; When *PRINT-CIRCLE* is T, this gets bound to a hash table that
+;;; (eventually) ends up with entries for every object printed. When
+;;; we are initially looking for circularities, we enter a T when we
+;;; find an object for the first time, and a 0 when we encounter an
+;;; object a second time around. When we are actually printing, the 0
+;;; entries get changed to the actual marker value when they are first
+;;; printed.
 (defvar *circularity-hash-table* nil)
 
-;;; When NIL, we are just looking for circularities. After we have found them
-;;; all, this gets bound to 0. Then whenever we need a new marker, it is
-;;; incremented.
+;;; When NIL, we are just looking for circularities. After we have
+;;; found them all, this gets bound to 0. Then whenever we need a new
+;;; marker, it is incremented.
 (defvar *circularity-counter* nil)
 
 (defun check-for-circularity (object &optional assign)
@@ -416,18 +419,18 @@
 	       (numberp object)
 	       (characterp object)
 	       (and (symbolp object) (symbol-package object) t))
-	   ;; If it a number, character, or interned symbol, we do not want
-	   ;; to check for circularity/sharing.
+	   ;; If it a number, character, or interned symbol, we do not
+	   ;; want to check for circularity/sharing.
 	   (print-it stream))
 	  ((or *circularity-hash-table*
 	       (consp object)
 	       (typep object 'instance)
 	       (typep object '(array t *)))
-	   ;; If we have already started circularity detection, this object
-	   ;; might be a sharded reference. If we have not, then if it is
-	   ;; a cons, a instance, or an array of element type t it might
-	   ;; contain a circular reference to itself or multiple shared
-	   ;; references.
+	   ;; If we have already started circularity detection, this
+	   ;; object might be a sharded reference. If we have not,
+	   ;; then if it is a cons, a instance, or an array of element
+	   ;; type t it might contain a circular reference to itself
+	   ;; or multiple shared references.
 	   (check-it stream))
 	  (t
 	   (print-it stream)))))
@@ -506,13 +509,13 @@
 
 ;;;; symbols
 
-;;; Values of *PRINT-CASE* and (READTABLE-CASE *READTABLE*) the last time the
-;;; printer was called.
+;;; Values of *PRINT-CASE* and (READTABLE-CASE *READTABLE*) the last
+;;; time the printer was called.
 (defvar *previous-case* nil)
 (defvar *previous-readtable-case* nil)
 
-;;; This variable contains the current definition of one of three symbol
-;;; printers. SETUP-PRINTER-STATE sets this variable.
+;;; This variable contains the current definition of one of three
+;;; symbol printers. SETUP-PRINTER-STATE sets this variable.
 (defvar *internal-symbol-output-function* nil)
 
 ;;; This function sets the internal global symbol
@@ -592,8 +595,9 @@
 	(output-symbol-name name stream))
       (output-symbol-name (symbol-name object) stream nil)))
 
-;;; Output the string NAME as if it were a symbol name. In other words,
-;;; diddle its case according to *PRINT-CASE* and READTABLE-CASE.
+;;; Output the string NAME as if it were a symbol name. In other
+;;; words, diddle its case according to *PRINT-CASE* and
+;;; READTABLE-CASE.
 (defun output-symbol-name (name stream &optional (maybe-quote t))
   (declare (type simple-base-string name))
   (setup-printer-state)
@@ -673,8 +677,8 @@
     (when (zerop (aref *character-attributes* i))
       (setf (aref *character-attributes* i) funny-attribute))))
 
-;;; For each character, the value of the corresponding element is the lowest
-;;; base in which that character is a digit.
+;;; For each character, the value of the corresponding element is the
+;;; lowest base in which that character is a digit.
 (defvar *digit-bases*
   (make-array char-code-limit
 	      :element-type '(unsigned-byte 8)
@@ -732,7 +736,7 @@
      TEST-SIGN ; At end, see whether it is a sign...
       (return (not (test sign)))
 
-     OTHER ; Not potential number, see whether funny chars...
+     OTHER ; not potential number, see whether funny chars...
       (let ((mask (logxor (logior lowercase-attribute uppercase-attribute
 				  funny-attribute)
 			  letter-attribute)))
@@ -752,7 +756,7 @@
       (when (test sign extension) (advance START-STUFF nil))
       (return t)
 
-     DOT-FOUND ; Leading dots...
+     DOT-FOUND ; leading dots...
       (when (test letter) (advance START-DOT-MARKER nil))
       (when (digitp) (advance DOT-DIGIT))
       (when (test number other) (advance OTHER nil))
@@ -760,7 +764,7 @@
       (when (char= current #\.) (advance DOT-FOUND))
       (return t)
 
-     START-STUFF ; Leading stuff before any dot or digit.
+     START-STUFF ; leading stuff before any dot or digit
       (when (digitp)
 	(if (test letter)
 	    (advance LAST-DIGIT-ALPHA)
@@ -771,40 +775,40 @@
       (when (test sign extension slash) (advance START-STUFF nil))
       (return t)
 
-     START-MARKER ; Number marker in leading stuff...
+     START-MARKER ; number marker in leading stuff...
       (when (test letter) (advance OTHER nil))
       (go START-STUFF)
 
-     START-DOT-STUFF ; Leading stuff containing dot w/o digit...
+     START-DOT-STUFF ; leading stuff containing dot w/o digit...
       (when (test letter) (advance START-DOT-STUFF nil))
       (when (digitp) (advance DOT-DIGIT))
       (when (test sign extension dot slash) (advance START-DOT-STUFF nil))
       (when (test number other) (advance OTHER nil))
       (return t)
 
-     START-DOT-MARKER ; Number marker in leading stuff w/ dot..
-      ;; Leading stuff containing dot w/o digit followed by letter...
+     START-DOT-MARKER ; number marker in leading stuff w/ dot..
+      ;; leading stuff containing dot w/o digit followed by letter...
       (when (test letter) (advance OTHER nil))
       (go START-DOT-STUFF)
 
-     DOT-DIGIT ; In a thing with dots...
+     DOT-DIGIT ; in a thing with dots...
       (when (test letter) (advance DOT-MARKER))
       (when (digitp) (advance DOT-DIGIT))
       (when (test number other) (advance OTHER nil))
       (when (test sign extension dot slash) (advance DOT-DIGIT))
       (return t)
 
-     DOT-MARKER ; Number maker in number with dot...
+     DOT-MARKER ; number marker in number with dot...
       (when (test letter) (advance OTHER nil))
       (go DOT-DIGIT)
 
-     LAST-DIGIT-ALPHA ; Previous char is a letter digit...
+     LAST-DIGIT-ALPHA ; previous char is a letter digit...
       (when (or (digitp) (test sign slash))
 	(advance ALPHA-DIGIT))
       (when (test letter number other dot) (advance OTHER nil))
       (return t)
 
-     ALPHA-DIGIT ; Seen a digit which is a letter...
+     ALPHA-DIGIT ; seen a digit which is a letter...
       (when (or (digitp) (test sign slash))
 	(if (test letter)
 	    (advance LAST-DIGIT-ALPHA)
@@ -813,11 +817,11 @@
       (when (test number other dot) (advance OTHER nil))
       (return t)
 
-     ALPHA-MARKER ; Number marker in number with alpha digit...
+     ALPHA-MARKER ; number marker in number with alpha digit...
       (when (test letter) (advance OTHER nil))
       (go ALPHA-DIGIT)
 
-     DIGIT ; Seen only real numeric digits...
+     DIGIT ; seen only ordinary (non-alphabetic) numeric digits...
       (when (digitp)
 	(if (test letter)
 	    (advance ALPHA-DIGIT)
@@ -828,47 +832,47 @@
       (when (char= current #\.) (advance DOT-DIGIT))
       (return t)
 
-     MARKER ; Number marker in a numeric number...
+     MARKER ; number marker in a numeric number...
       (when (test letter) (advance OTHER nil))
       (go DIGIT))))
 
 ;;;; *INTERNAL-SYMBOL-OUTPUT-FUNCTION*
 ;;;;
 ;;;; Case hackery. These functions are stored in
-;;;; *INTERNAL-SYMBOL-OUTPUT-FUNCTION* according to the values of *PRINT-CASE*
-;;;; and READTABLE-CASE.
+;;;; *INTERNAL-SYMBOL-OUTPUT-FUNCTION* according to the values of
+;;;; *PRINT-CASE* and READTABLE-CASE.
 
-;; Called when:
-;; READTABLE-CASE	*PRINT-CASE*
-;; :UPCASE		:UPCASE
-;; :DOWNCASE		:DOWNCASE
-;; :PRESERVE		any
+;;; called when:
+;;; READTABLE-CASE	*PRINT-CASE*
+;;; :UPCASE		:UPCASE
+;;; :DOWNCASE		:DOWNCASE
+;;; :PRESERVE		any
 (defun output-preserve-symbol (pname stream)
   (declare (simple-string pname))
   (write-string pname stream))
 
-;; Called when:
-;; READTABLE-CASE	*PRINT-CASE*
-;; :UPCASE		:DOWNCASE
+;;; called when:
+;;; READTABLE-CASE	*PRINT-CASE*
+;;; :UPCASE		:DOWNCASE
 (defun output-lowercase-symbol (pname stream)
   (declare (simple-string pname))
   (dotimes (index (length pname))
     (let ((char (schar pname index)))
       (write-char (char-downcase char) stream))))
 
-;; Called when:
-;; READTABLE-CASE	*PRINT-CASE*
-;; :DOWNCASE		:UPCASE
+;;; called when:
+;;; READTABLE-CASE	*PRINT-CASE*
+;;; :DOWNCASE		:UPCASE
 (defun output-uppercase-symbol (pname stream)
   (declare (simple-string pname))
   (dotimes (index (length pname))
     (let ((char (schar pname index)))
       (write-char (char-upcase char) stream))))
 
-;; Called when:
-;; READTABLE-CASE	*PRINT-CASE*
-;; :UPCASE		:CAPITALIZE
-;; :DOWNCASE		:CAPITALIZE
+;;; called when:
+;;; READTABLE-CASE	*PRINT-CASE*
+;;; :UPCASE		:CAPITALIZE
+;;; :DOWNCASE		:CAPITALIZE
 (defun output-capitalize-symbol (pname stream)
   (declare (simple-string pname))
   (let ((prev-not-alpha t)
@@ -885,9 +889,9 @@
 		    stream)
 	(setq prev-not-alpha (not (alpha-char-p char)))))))
 
-;; Called when:
-;; READTABLE-CASE	*PRINT-CASE*
-;; :INVERT		any
+;;; called when:
+;;; READTABLE-CASE	*PRINT-CASE*
+;;; :INVERT		any
 (defun output-invert-symbol (pname stream)
   (declare (simple-string pname))
   (let ((all-upper t)
@@ -1100,24 +1104,20 @@
 		stream)))
 
 ;;;; bignum printing
-;;;;
-;;;; written by Steven Handerson (based on Skef's idea)
-;;;;
-;;;; rewritten to remove assumptions about the length of fixnums for the
-;;;; MIPS port by William Lott
 
-;;; *BASE-POWER* holds the number that we keep dividing into the bignum for
-;;; each *print-base*. We want this number as close to *most-positive-fixnum*
-;;; as possible, i.e. (floor (log most-positive-fixnum *print-base*)).
+;;; *BASE-POWER* holds the number that we keep dividing into the
+;;; bignum for each *print-base*. We want this number as close to
+;;; *most-positive-fixnum* as possible, i.e. (floor (log
+;;; most-positive-fixnum *print-base*)).
 (defparameter *base-power* (make-array 37 :initial-element nil))
 
-;;; *FIXNUM-POWER--1* holds the number of digits for each *print-base* that
-;;; fit in the corresponding *base-power*.
+;;; *FIXNUM-POWER--1* holds the number of digits for each *PRINT-BASE*
+;;; that fit in the corresponding *base-power*.
 (defparameter *fixnum-power--1* (make-array 37 :initial-element nil))
 
-;;; Print the bignum to the stream. We first generate the correct value for
-;;; *base-power* and *fixnum-power--1* if we have not already. Then we call
-;;; bignum-print-aux to do the printing.
+;;; Print the bignum to the stream. We first generate the correct
+;;; value for *base-power* and *fixnum-power--1* if we have not
+;;; already. Then we call bignum-print-aux to do the printing.
 (defun print-bignum (big stream)
   (unless (aref *base-power* *print-base*)
     (do ((power-1 -1 (1+ power-1))
@@ -1168,14 +1168,12 @@
   (write-char #\) stream))
 
 ;;;; float printing
-;;;;
-;;;; written by Bill Maddox
 
-;;; FLONUM-TO-STRING (and its subsidiary function FLOAT-STRING) does most of
-;;; the work for all printing of floating point numbers in the printer and in
-;;; FORMAT. It converts a floating point number to a string in a free or
-;;; fixed format with no exponent. The interpretation of the arguments is as
-;;; follows:
+;;; FLONUM-TO-STRING (and its subsidiary function FLOAT-STRING) does
+;;; most of the work for all printing of floating point numbers in the
+;;; printer and in FORMAT. It converts a floating point number to a
+;;; string in a free or fixed format with no exponent. The
+;;; interpretation of the arguments is as follows:
 ;;;
 ;;;     X	- The floating point number to convert, which must not be
 ;;;		negative.
@@ -1217,22 +1215,23 @@
 ;;;     POINT-POS       - The position of the digit preceding the decimal
 ;;;		       point. Zero indicates point before first digit.
 ;;;
-;;; NOTE:  FLONUM-TO-STRING goes to a lot of trouble to guarantee accuracy.
-;;; Specifically, the decimal number printed is the closest possible
-;;; approximation to the true value of the binary number to be printed from
-;;; among all decimal representations  with the same number of digits. In
-;;; free-format output, i.e. with the number of digits unconstrained, it is
-;;; guaranteed that all the information is preserved, so that a properly-
-;;; rounding reader can reconstruct the original binary number, bit-for-bit,
-;;; from its printed decimal representation. Furthermore, only as many digits
-;;; as necessary to satisfy this condition will be printed.
+;;; NOTE: FLONUM-TO-STRING goes to a lot of trouble to guarantee
+;;; accuracy. Specifically, the decimal number printed is the closest
+;;; possible approximation to the true value of the binary number to
+;;; be printed from among all decimal representations with the same
+;;; number of digits. In free-format output, i.e. with the number of
+;;; digits unconstrained, it is guaranteed that all the information is
+;;; preserved, so that a properly- rounding reader can reconstruct the
+;;; original binary number, bit-for-bit, from its printed decimal
+;;; representation. Furthermore, only as many digits as necessary to
+;;; satisfy this condition will be printed.
 ;;;
-;;; FLOAT-STRING actually generates the digits for positive numbers. The
-;;; algorithm is essentially that of algorithm Dragon4 in "How to Print
-;;; Floating-Point Numbers Accurately" by Steele and White. The current
-;;; (draft) version of this paper may be found in [CMUC]<steele>tradix.press.
-;;; DO NOT EVEN THINK OF ATTEMPTING TO UNDERSTAND THIS CODE WITHOUT READING
-;;; THE PAPER!
+;;; FLOAT-STRING actually generates the digits for positive numbers.
+;;; The algorithm is essentially that of algorithm Dragon4 in "How to
+;;; Print Floating-Point Numbers Accurately" by Steele and White. The
+;;; current (draft) version of this paper may be found in
+;;; [CMUC]<steele>tradix.press. DO NOT EVEN THINK OF ATTEMPTING TO
+;;; UNDERSTAND THIS CODE WITHOUT READING THE PAPER!
 
 (defvar *digits* "0123456789")
 
@@ -1261,19 +1260,20 @@
 				  :fill-pointer 0
 				  :adjustable t)))
     ;; Represent fraction as r/s, error bounds as m+/s and m-/s.
-    ;; Rational arithmetic avoids loss of precision in subsequent calculations.
+    ;; Rational arithmetic avoids loss of precision in subsequent
+    ;; calculations.
     (cond ((> exponent 0)
 	   (setq r (ash fraction exponent))
 	   (setq m- (ash 1 exponent))
 	   (setq m+ m-))
 	  ((< exponent 0)
 	   (setq s (ash 1 (- exponent)))))
-    ;;adjust the error bounds m+ and m- for unequal gaps
+    ;; Adjust the error bounds m+ and m- for unequal gaps.
     (when (= fraction (ash 1 precision))
       (setq m+ (ash m+ 1))
       (setq r (ash r 1))
       (setq s (ash s 1)))
-    ;;scale value by requested amount, and update error bounds
+    ;; Scale value by requested amount, and update error bounds.
     (when scale
       (if (minusp scale)
 	  (let ((scale-factor (expt 10 (- scale))))
@@ -1282,7 +1282,7 @@
 	    (setq r (* r scale-factor))
 	    (setq m+ (* m+ scale-factor))
 	    (setq m- (* m- scale-factor)))))
-    ;;scale r and s and compute initial k, the base 10 logarithm of r
+    ;; Scale r and s and compute initial k, the base 10 logarithm of r.
     (do ()
 	((>= r (ceiling s 10)))
       (decf k)
@@ -1294,24 +1294,25 @@
 	  ((< (+ (ash r 1) m+) (ash s 1)))
 	(setq s (* s 10))
 	(incf k))
-      ;;determine number of fraction digits to generate
+      ;; Determine number of fraction digits to generate.
       (cond (fdigits
-	     ;;use specified number of fraction digits
+	     ;; Use specified number of fraction digits.
 	     (setq cutoff (- fdigits))
 	     ;;don't allow less than fmin fraction digits
 	     (if (and fmin (> cutoff (- fmin))) (setq cutoff (- fmin))))
 	    (width
-	     ;;use as many fraction digits as width will permit
-	     ;;but force at least fmin digits even if width will be exceeded
+	     ;; Use as many fraction digits as width will permit but
+	     ;; force at least fmin digits even if width will be
+	     ;; exceeded.
 	     (if (< k 0)
 		 (setq cutoff (- 1 width))
 		 (setq cutoff (1+ (- k width))))
 	     (if (and fmin (> cutoff (- fmin))) (setq cutoff (- fmin)))))
-      ;;If we decided to cut off digit generation before precision has
-      ;;been exhausted, rounding the last digit may cause a carry propagation.
-      ;;We can prevent this, preserving left-to-right digit generation, with
-      ;;a few magical adjustments to m- and m+. Of course, correct rounding
-      ;;is also preserved.
+      ;; If we decided to cut off digit generation before precision
+      ;; has been exhausted, rounding the last digit may cause a carry
+      ;; propagation. We can prevent this, preserving left-to-right
+      ;; digit generation, with a few magical adjustments to m- and
+      ;; m+. Of course, correct rounding is also preserved.
       (when (or fdigits width)
 	(let ((a (- cutoff k))
 	      (y s))
@@ -1322,13 +1323,13 @@
 	  (setq m+ (max y m+))
 	  (when (= m+ y) (setq roundup t))))
       (when (< (+ (ash r 1) m+) (ash s 1)) (return)))
-    ;;zero-fill before fraction if no integer part
+    ;; Zero-fill before fraction if no integer part.
     (when (< k 0)
       (setq decpnt digits)
       (vector-push-extend #\. digit-string)
       (dotimes (i (- k))
 	(incf digits) (vector-push-extend #\0 digit-string)))
-    ;;generate the significant digits
+    ;; Generate the significant digits.
     (do ()(nil)
       (decf k)
       (when (= k -1)
@@ -1341,45 +1342,46 @@
       (if roundup
 	  (setq high (>= (ash r 1) (- (ash s 1) m+)))
 	  (setq high (> (ash r 1) (- (ash s 1) m+))))
-      ;;stop when either precision is exhausted or we have printed as many
-      ;;fraction digits as permitted
+      ;; Stop when either precision is exhausted or we have printed as
+      ;; many fraction digits as permitted.
       (when (or low high (and cutoff (<= k cutoff))) (return))
       (vector-push-extend (char *digits* u) digit-string)
       (incf digits))
     ;; If cutoff occurred before first digit, then no digits are
     ;; generated at all.
     (when (or (not cutoff) (>= k cutoff))
-      ;;last digit may need rounding
+      ;; Last digit may need rounding
       (vector-push-extend (char *digits*
 				(cond ((and low (not high)) u)
 				      ((and high (not low)) (1+ u))
 				      (t (if (<= (ash r 1) s) u (1+ u)))))
 			  digit-string)
       (incf digits))
-    ;;zero-fill after integer part if no fraction
+    ;; Zero-fill after integer part if no fraction.
     (when (>= k 0)
       (dotimes (i k) (incf digits) (vector-push-extend #\0 digit-string))
       (vector-push-extend #\. digit-string)
       (setq decpnt digits))
-    ;;add trailing zeroes to pad fraction if fdigits specified
+    ;; Add trailing zeroes to pad fraction if fdigits specified.
     (when fdigits
       (dotimes (i (- fdigits (- digits decpnt)))
 	(incf digits)
 	(vector-push-extend #\0 digit-string)))
-    ;;all done
+    ;; all done
     (values digit-string (1+ digits) (= decpnt 0) (= decpnt digits) decpnt)))
 
-;;; Given a non-negative floating point number, SCALE-EXPONENT returns a new
-;;; floating point number Z in the range (0.1, 1.0] and an exponent E such
-;;; that Z * 10^E is (approximately) equal to the original number. There may
-;;; be some loss of precision due the floating point representation. The
-;;; scaling is always done with long float arithmetic, which helps printing of
-;;; lesser precisions as well as avoiding generic arithmetic.
+;;; Given a non-negative floating point number, SCALE-EXPONENT returns
+;;; a new floating point number Z in the range (0.1, 1.0] and an
+;;; exponent E such that Z * 10^E is (approximately) equal to the
+;;; original number. There may be some loss of precision due the
+;;; floating point representation. The scaling is always done with
+;;; long float arithmetic, which helps printing of lesser precisions
+;;; as well as avoiding generic arithmetic.
 ;;;
-;;; When computing our initial scale factor using EXPT, we pull out part of
-;;; the computation to avoid over/under flow. When denormalized, we must pull
-;;; out a large factor, since there is more negative exponent range than
-;;; positive range.
+;;; When computing our initial scale factor using EXPT, we pull out
+;;; part of the computation to avoid over/under flow. When
+;;; denormalized, we must pull out a large factor, since there is more
+;;; negative exponent range than positive range.
 (defun scale-exponent (original-x)
   (let* ((x (coerce original-x 'long-float)))
     (multiple-value-bind (sig exponent) (decode-float x)
@@ -1407,19 +1409,20 @@
 
 ;;;; entry point for the float printer
 
-;;; Entry point for the float printer as called by PRINT, PRIN1, PRINC,
-;;; etc. The argument is printed free-format, in either exponential or
+;;; the float printer as called by PRINT, PRIN1, PRINC, etc. The
+;;; argument is printed free-format, in either exponential or
 ;;; non-exponential notation, depending on its magnitude.
 ;;;
-;;; NOTE: When a number is to be printed in exponential format, it is scaled in
-;;; floating point. Since precision may be lost in this process, the
-;;; guaranteed accuracy properties of FLONUM-TO-STRING are lost. The
-;;; difficulty is that FLONUM-TO-STRING performs extensive computations with
-;;; integers of similar magnitude to that of the number being printed. For
-;;; large exponents, the bignums really get out of hand. If bignum arithmetic
-;;; becomes reasonably fast and the exponent range is not too large, then it
-;;; might become attractive to handle exponential notation with the same
-;;; accuracy as non-exponential notation, using the method described in the
+;;; NOTE: When a number is to be printed in exponential format, it is
+;;; scaled in floating point. Since precision may be lost in this
+;;; process, the guaranteed accuracy properties of FLONUM-TO-STRING
+;;; are lost. The difficulty is that FLONUM-TO-STRING performs
+;;; extensive computations with integers of similar magnitude to that
+;;; of the number being printed. For large exponents, the bignums
+;;; really get out of hand. If bignum arithmetic becomes reasonably
+;;; fast and the exponent range is not too large, then it might become
+;;; attractive to handle exponential notation with the same accuracy
+;;; as non-exponential notation, using the method described in the
 ;;; Steele and White paper.
 
 ;;; Print the appropriate exponent marker for X and the specified exponent.
@@ -1438,25 +1441,22 @@
 		  (long-float #\L))
 		plusp exp))))
 
-;;; Write out an infinity using #. notation, or flame out if
-;;; *PRINT-READABLY* is true and *READ-EVAL* is false.
 (defun output-float-infinity (x stream)
-  (declare (type float x) (type stream stream))
+  (declare (float x) (stream stream))
   (cond (*read-eval*
-	 (write-string "#." stream))
-	(*print-readably*
-	 (error 'print-not-readable :object x))
-	(t
-	 (write-string "#<" stream)))
-  (write-string "EXT:" stream)
-  (princ (float-format-name x) stream)
+         (write-string "#." stream))
+        (*print-readably*
+         (error 'print-not-readable :object x))
+        (t
+         (write-string "#<" stream)))
+  (write-string "SB-EXT:" stream)
+  (write-string (symbol-name (float-format-name x)) stream)
   (write-string (if (plusp x) "-POSITIVE-" "-NEGATIVE-")
-		stream)
+                stream)
   (write-string "INFINITY" stream)
   (unless *read-eval*
     (write-string ">" stream)))
 
-;;; Output a #< NaN or die trying.
 (defun output-float-nan (x stream)
   (print-unreadable-object (x stream)
     (princ (float-format-name x) stream)

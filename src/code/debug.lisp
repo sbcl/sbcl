@@ -1164,8 +1164,10 @@ argument")
 ;;;(!def-debug-command "QUIT" ()
 ;;;  (throw 'sb!impl::top-level-catcher nil))
 
-;;; CMU CL supported this GO debug command, but SBCL doesn't -- just
-;;; type the CONTINUE restart name.
+;;; CMU CL supported this GO debug command, but SBCL doesn't -- in
+;;; SBCL you just type the CONTINUE restart name instead (or "RESTART
+;;; CONTINUE", that's OK too).
+
 ;;;(!def-debug-command "GO" ()
 ;;;  (continue *debug-condition*)
 ;;;  (error "There is no restart named CONTINUE."))
@@ -1205,7 +1207,7 @@ argument")
   ;; desperate holdout is running this on a dumb terminal somewhere,
   ;; we tell him where to find the message stored as a string.
   (format *debug-io*
-	  "~&~a~2%(The HELP string is stored in ~S.)~%"
+	  "~&~A~2%(The HELP string is stored in ~S.)~%"
 	  *debug-help-string*
 	  '*debug-help-string*))
 

@@ -37,7 +37,7 @@ runtime environment, some command line arguments are processed during
 the initialization of the Common Lisp system, and any remaining
 command line arguments are passed on to user code.
 
-The full, unambiguous syntax for SBCL is
+The full, unambiguous syntax for invoking SBCL at the command line is
 .TP 3
 .B sbcl [runtime options] --end-runtime-options [toplevel options] --end-toplevel-options [user options]
 .PP
@@ -57,7 +57,8 @@ Supported runtime options are
 .B --core <corefilename>
 Run the specified Lisp core file instead of the default. (See the FILES
 section.) Note that if the Lisp core file is a user-created core file, it may
-run a nonstandard toplevel which does not accept the standard toplevel options.
+run a nonstandard toplevel which does not recognize the standard toplevel
+options.
 .TP 3
 .B --noinform
 Suppress the printing of any banner or other informational message at
@@ -75,42 +76,38 @@ Lisp toplevel logic gets a chance to see it.
 Supported toplevel options for the standard SBCL core are
 .TP 3
 .B --sysinit <filename>
-Load filename instead of the default system-wide
-initialization file. (See the FILES section.)
-There is no special option to cause
-no system-wide initialization file to be read, but on a Unix
-system "--sysinit /dev/null" can be used to achieve the same effect.
+Load filename instead of the default system-wide initialization file.
+(See the FILES section.) There is no special option to cause no
+system-wide initialization file to be read, but on a Unix system
+"--sysinit /dev/null" can be used to achieve the same effect.
 .TP 3
 .B --userinit <filename>
-Load filename instead of the default user
-initialization file. (See the FILES section.)
-There is no special option to cause
-no user initialization file to be read, but on a Unix
-system "--userinit /dev/null" can be used to achieve the same effect.
+Load filename instead of the default user initialization file. (See
+the FILES section.) There is no special option to cause no user
+initialization file to be read, but on a Unix system "--userinit
+/dev/null" can be used to achieve the same effect.
 .TP 3
 .B --eval <command>
 After executing any initialization file, but before starting the
-read-eval-print loop on standard input,
-evaluate the command given. More than
-one --eval option can be used, and all will be executed,
-in the order they appear on the command line.
+read-eval-print loop on standard input, evaluate the command given.
+More than one --eval option can be used, and all will be executed, in
+the order they appear on the command line.
 .TP 3
 .B --noprint
-When ordinarily the toplevel "read-eval-print loop" would be
-executed, execute a "read-eval loop" instead, i.e. don't print
-a prompt and don't echo results. (Combined with the --noinform
-runtime option, this makes it easier to write Lisp
-"scripts" which work in Unix pipelines.)
+When ordinarily the toplevel "read-eval-print loop" would be executed,
+execute a "read-eval loop" instead, i.e. don't print a prompt and
+don't echo results. Combined with the --noinform runtime option, this
+makes it easier to write Lisp "scripts" which work in Unix pipelines.
 .TP 3
 .B --noprogrammer
-Ordinarily the system initializes *DEBUG-IO* to *TERMINAL-IO*.
-When the --notty option is set, however, *DEBUG-IO* is instead
-set to a stream which sends its output to *ERROR-OUTPUT* and
-which raises an error on input. As a result, any attempt by the
-program to get programmer feedback through the debugger
-causes an error which abnormally terminates the entire
-Lisp environment. (This can be useful behavior for programs
-which are to run without programmer supervision.)
+By default, a Common Lisp system tries to ask the programmer for help
+when it gets in trouble (by printing a debug prompt on *DEBUG-IO*).
+However, this is not useful behavior for a system running with no
+programmer available, and this option tries to set up more appropriate
+behavior for that situation. Thus we set *DEBUG-IO* to send its output
+to *ERROR-OUTPUT*, and to raise an error if any input is requested
+from it, and we set *DEBUGGER-HOOK* to output a backtrace, then exit
+the process with a failure code.
 .PP
 
 Regardless of the order in which --sysinit, --userinit, and --eval
@@ -121,12 +118,12 @@ loop is started on standard input. At any step, error conditions or
 commands such as SB-EXT:QUIT can cause execution to be terminated
 before proceeding to subsequent steps.
 
-Note that when running SBCL from a core file created by a user call to
-the SB-EXT:SAVE-LISP-AND-DIE, the toplevel options may be under the
-control of user code passed as arguments to SB-EXT:SAVE-LISP-AND-DIE.
-For this purpose, the --end-toplevel-options option itself can be
-considered a toplevel option, i.e. the user core, at its option, may
-not support it.
+Note that when running SBCL with the --core option, using a core file
+created by a user call to the SB-EXT:SAVE-LISP-AND-DIE, the toplevel
+options may be under the control of user code passed as arguments to
+SB-EXT:SAVE-LISP-AND-DIE. For this purpose, the --end-toplevel-options
+option itself can be considered a toplevel option, i.e. the user core,
+at its option, may not support it.
 
 In the standard SBCL startup sequence (i.e. with no user core
 involved) toplevel options and any --end-toplevel-options option are
@@ -151,32 +148,43 @@ SBCL can be built from scratch using a plain vanilla ANSI Common Lisp
 system and a C compiler, and all of its properties are specified by
 the version of the source code that it was created from. (This clean
 bootstrappability was the immediate motivation for forking off of the
-CMU CL development tree.)
+CMU CL development tree.) A variety of internal implementation
+differences are motivated by this.
 
-Many extensions supported by CMU CL, like Motif support,
-the Hemlock editor, search paths, the WIRE protocol, various
-user-level macros and functions (e.g. LETF, ITERATE, MEMQ,
+Maintenance work in SBCL since the fork has diverged in various
+details from the maintenance work in CMU CL. E.g. as of 2001-04-12,
+SBCL was more ANSI-compliant than CMU CL in various details such as
+support for PRINT-OBJECT and DESCRIBE-OBJECT, and SBCL's compiler was
+substantially better than CMU CL's at optimizing operations on
+non-simple vectors.
+
+Most extensions supported by CMU CL are not supported in SBCL,
+including Motif support, the Hemlock editor, search paths, the
+low-level Unix interface, the WIRE protocol, multithreading support,
+various user-level macros and functions (e.g. LETF, ITERATE, MEMQ,
 REQUIRED-ARGUMENT), and many others.
 
-SBCL has retained some extensions of its parent CMU CL. Many
-of them are in three categories:
+SBCL has retained some extensions from parent CMU CL. Many of the
+retained extensions are in these categories:
+.TP 3
+\--
+things which might be in the new ANSI spec, e.g. weak pointers,
+finalization, foreign function interface to C, and Gray streams
+.TP 3
+\--
+things which are universally available in Unix scripting languages,
+e.g. RUN-PROGRAM and POSIX argv and getenv
 .TP 3
 \--
 hooks into the low level workings of the system which can be useful
-for debugging (e.g. a list of functions to be run whenever GC occurs,
-or an operator to cause a particular string to be compiled into a fasl
-file)
+for debugging, e.g. a list of functions to be run whenever GC occurs,
+or parameters to modify compiler diagnostic output
 .TP 3
 \--
-non-portable performance hacks (e.g. PURIFY, which causes
-everything currently in existence to become immune to GC)
-.TP 3
-\--
-things which might be in the new ANSI spec (e.g. weak pointers,
-finalization, foreign function interface to C, and Gray streams)
+unportable performance hacks, e.g. TRULY-THE, FREEZE-TYPE, and PURIFY
 .PP
 
-There are also various retained extensions which don't fall into
+There are also a few retained extensions which don't fall into
 any particular category, e.g.
 .TP 3
 \--
@@ -188,6 +196,22 @@ options than their CMU CL counterparts. For example, the SBCL function
 which saves a Lisp image to disk and kills it is called
 SAVE-LISP-AND-DIE instead of SAVE-LISP, and it supports fewer keyword
 options than CMU CL's SAVE-LISP.
+
+(Why doesn't SBCL support more extensions? Why the hell did I (WHN)
+drop all those nice extensions from CMU CL when the code already
+exists? This is a frequently asked question on the mailing list. The
+answer is that they're hard to maintain, and I have enough on my hands
+already. Also, in the case of some big and unquestionably useful
+extensions, like sockets and Motif, I think that SBCL has done its job
+by supplying the FFI, and that people who need, and understand, and
+are motivated to maintain the functionality should supply it as a
+separate library, which I'd be happy to distribute or link to on the
+SBCL home page. Finally, in the case of multithreading, I do think it
+belongs in the new ANSI spec, and it'd be a good feature to have, but
+I didn't think the CMU CL implementation was sufficiently mature, and
+it's such a complicated and far-reaching extension that I thought that
+trying to fix it would interfere with the more urgent task of getting
+basic ANSI support up to speed.)
 
 .SH THE COMPILER
 
@@ -234,7 +258,7 @@ port to the Alpha has been reported on the mailing lists; check
 the archives (available from the home page at
 <http://sbcl.sourceforge.net/>) for information.
 
-As of version 0.6.8, SBCL requires on the order of 16Mb to run. In
+As of version 0.6.11, SBCL requires on the order of 16Mb to run. In
 some future version, this number could shrink significantly, since
 large parts of the system are far from execution bottlenecks and could
 reasonably be stored in compact byte compiled form. (CMU CL does this
@@ -262,17 +286,25 @@ variable.
 
 /etc/sbclrc and /usr/local/etc/sbclrc are the standard locations for
 system-wide SBCL initialization files, unless overridden by the
-SBCL_HOME variable.
+SBCL_HOME variable or the --sysinit command line option.
+
 
 $HOME/.sbclrc is the standard location for a user's SBCL
-initialization file.
+initialization file, unless overridden by the --userinit
+command line option.
 
 .SH BUGS
 
-Too numerous to list, alas. This section attempts to list the most
-serious known bugs, and a reasonably representative sampling of
-others. For more information on bugs, see the BUGS file in the
-distribution.
+To report a bug, please send mail to sbcl-help@lists.sourceforge.net
+or sbcl-devel@lists.sourceforge.net. As with any software bug report,
+it's most helpful if you remember to describe the environment where
+the problem occurs (machine type, O/S name and version, etc.) and if
+you can provide enough information to reproduce the problem,
+preferably in compact form.
+
+This section attempts to list the most serious and long-standing bugs
+or surprising performance hits. For more detailed and current
+information on bugs, see the BUGS file in the distribution.
 
 It is possible to get in deep trouble by exhausting
 memory. To plagiarize a sadly apt description of a language not
@@ -289,13 +321,6 @@ like Linux and *BSD, this means that if the SBCL system turns out to
 use more virtual memory than the system has available for it, other
 processes to be killed randomly (!)
 .PP
-
-The facility for dumping a running Lisp image to disk gets confused
-when run without the PURIFY option, and creates an unnecessarily large
-core file (apparently representing memory usage up to the previous
-high-water mark). Moreover, when the file is loaded, it confuses the
-GC, so that thereafter memory usage can never be reduced below that
-level.
 
 The compiler is overaggressive about static typing, assuming that a
 function's return type never changes. Thus compiling and loading a
@@ -317,13 +342,16 @@ compiling a file containing
 then running (FOO 1) gives NOT-THIS-TIME, because the
 never compiled code to check the declaration.
 
-The TRACE facility can't be used on some kinds of functions.
+The implementation of multidimensional arrays, especially
+multidimensional arrays of floating point numbers, is very
+inefficient.
 
-SYMBOL-FUNCTION is much slower than you'd expect, being implemented
-not as a slot access but as a search through the compiler/kernel
-"globaldb" database.
+SYMBOL-FUNCTION is much slower than you might expect, being
+implemented not as a slot access but as a search through the
+compiler/kernel "globaldb" database.
 
-CLOS (based on the PCL reference implementation) is quite slow.
+CLOS (based on the PCL reference implementation) is somewhat
+inefficient.
 
 There are many nagging pre-ANSIisms, e.g.
 .TP 3
@@ -345,15 +373,19 @@ function as SB-EXT:MAYBE-INLINE to get the desired effect.)
 \--
 The DYNAMIC-EXTENT declaration is not implemented, and is simply
 ignored. (This is allowed by the ANSI spec, but can have a large
-efficiency cost in some kinds of code.)
+efficiency cost in some kinds of code, e.g. code which uses a lot
+of upward closures or &REST lists.)
 .TP 3
 --
 Compiling DEFSTRUCT in strange places (e.g. inside a DEFUN) doesn't
 do anything like what it should.
 .TP 3
 \--
-The symbol * is the name of a type similar to T. (It's used as part
-of the implementation of compound types like (ARRAY * 1).)
+The symbol * is the name of a type similar to T. (It's used as part of
+the implementation of compound types like (ARRAY * 1) and (CONS * *).
+In a strict ANSI implementation, * would not be the name of a type,
+but instead just a symbol which is recognized and handled specially by
+certain type expanders.)
 .PP
 
 .SH SUPPORT

@@ -225,10 +225,12 @@ WORKAROUND:
 
 26:
   reported by Sam Steingold on the cmucl-imp mailing list 12 May 2000:
-
-Also, there is another bug: `array-displacement' should return an array
-or nil as first value (as per ANSI CL), while CMUCL declares it as
-returning an array as first value always.
+    Also, there is another bug: `array-displacement' should return an
+    array or nil as first value (as per ANSI CL), while CMUCL declares
+    it as returning an array as first value always.
+  (Actually, I think the old CMU CL version in SBCL never returns NIL,
+  i.e. it's not just a declaration problem, but the definition doesn't
+  behave ANSIly.)
 
 27:
   Sometimes (SB-EXT:QUIT) fails with 
@@ -878,6 +880,18 @@ Error in function C::GET-LAMBDA-TO-COMPILE:
   multiple-VALUES types. (Some issues related to this were discussed
   on cmucl-imp at some length sometime in 2000.)
 
+95:
+  The facility for dumping a running Lisp image to disk gets confused
+  when run without the PURIFY option, and creates an unnecessarily large
+  core file (apparently representing memory usage up to the previous
+  high-water mark). Moreover, when the file is loaded, it confuses the
+  GC, so that thereafter memory usage can never be reduced below that
+  level.
+
+96:
+  The TRACE facility can't be used on some kinds of functions.
+  Basically, the breakpoint facility wasn incompletely implemented
+  in the X86 port of CMU CL, and we haven't fixed it in SBCL.
 
 KNOWN BUGS RELATED TO THE IR1 INTERPRETER
 

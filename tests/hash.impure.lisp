@@ -186,7 +186,6 @@
 	    ;; (If you get a surprising failure here, maybe you were
 	    ;; just very unlucky; see the notes above.)
 	    (error "bad SXHASH behavior for ~S ~S" i j))))
-      #|
       (dolist (i psxhash-tests)
 	(unless (typep (sb-int:psxhash i) '(and fixnum unsigned-byte))
 	  (error "bad PSXHASH behavior for ~S" i))
@@ -196,7 +195,7 @@
 	    ;; (If you get a surprising failure here, maybe you were
 	    ;; just very unlucky; see the notes above.)
 	    (error "bad PSXHASH behavior for ~S ~S" i j))))
-      |#)))
+      )))
 
 ;;; success
 (quit :unix-status 104)

@@ -23,9 +23,10 @@
   #+sb-doc
   "Print a description of the object X."
   (let ((stream (out-synonym-of stream-designator)))
-    #+nil (fresh-line stream)
     (pprint-logical-block (stream nil)
-      (describe-object x stream)))
+      (fresh-line stream)
+      (describe-object x stream)
+      (fresh-line stream)))
   (values))
 
 ;;;; miscellaneous DESCRIBE-OBJECT methods
@@ -147,12 +148,12 @@
 	 s
 	 (type-specifier (sb-eval:interpreted-function-type x)))))
     (when closure-p
-      (format s "~@:_Its closure environment is:")
+      (format s "~@:_Its closure environment is:~%")
       (pprint-logical-block (s nil)
 	(pprint-indent :current 2)
-	(let ((clos (sb-eval:interpreted-function-closure x)))
-	  (dotimes (i (length clos))
-	    (format s "~@:_~S: ~S" i (svref clos i))))))
+	(let ((closure (sb-eval:interpreted-function-closure x)))
+	  (dotimes (i (length closure))
+	    (format s "~@:_~S: ~S" i (svref closure i))))))
     (format s "~@:_Its definition is:~@:_  ~S" exp)))
 
 ;;; Print information from the debug-info about where CODE-OBJ was
@@ -274,9 +275,9 @@
 	(multiple-value-bind (symbol status)
 	    (find-symbol (symbol-name x) package)
 	  (declare (ignore symbol))
-	  (format s "~S is an ~(~A~) symbol in ~S."
+	  (format s "~S is ~_an ~(~A~) symbol ~_in ~S."
 		  x status (symbol-package x)))
-	(format s "~S is an uninterned symbol." x)))
+	(format s "~S is ~_an uninterned symbol." x)))
   ;; TO DO: We could grovel over all packages looking for and
   ;; reporting other phenomena, e.g. IMPORT and SHADOW, or
   ;; availability in some package even after (SYMBOL-PACKAGE X) has
@@ -299,12 +300,12 @@
 	(format s "~@<Its current value is ~3I~:_~S.~:>"
 		(eval x))))
      ((boundp x)
-      (format s "~@:_It is a ~A; its value is ~S." wot (symbol-value x)))
+      (format s "~@:_It is a ~A; its ~_value is ~S." wot (symbol-value x)))
      ((not (eq kind :global))
       (format s "~@:_It is a ~A; no current value." wot)))
 
     (when (eq (info :variable :where-from x) :declared)
-      (format s "~@:_Its declared type is ~S."
+      (format s "~@:_Its declared type ~_is ~S."
 	      (type-specifier (info :variable :type x))))
 
     (%describe-doc x s 'variable kind))
@@ -322,9 +323,9 @@
 
   ;; TO DO: Print out other stuff from the INFO database:
   ;;   * Does it name a type or class?
-  ;;   * Is it a structure accessor? (important since those are 
+  ;;   * Is it a structure accessor? (This is important since those are 
   ;;     magical in some ways, e.g. blasting the structure if you 
-  ;;     redefine them)
+  ;;     redefine them.)
 
   ;; Print other documentation.
   (%describe-doc x s 'structure "Structure")

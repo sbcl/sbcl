@@ -212,20 +212,19 @@ main(int argc, char *argv[], char *envp[])
 "This is SBCL " SBCL_VERSION_STRING ", an implementation of ANSI Common Lisp.
 
 SBCL is derived from the CMU CL system created at Carnegie Mellon University.
-Besides material created at Carnegie Mellon University, and material
-contributed by volunteers since its release into the public domain, CMU CL
-contained, and SBCL contains, material copyrighted by
-  Massachusetts Institute of Technology, 1986;
-  Symbolics, Inc., 1989, 1990, 1991, 1992; and
-  Xerox Corporation, 1985, 1986, 1987, 1988, 1989, 1990.
-More information about the origin of SBCL is available in the CREDITS file
-in the distribution.
+Besides software and documentation originally created at Carnegie Mellon
+University, SBCL contains some software originally from the Massachusetts
+Institute of Technology, Symbolics Incorporated, and Xerox Corporation, and
+material contributed by volunteers since the release of CMU CL into the
+public domain. See the CREDITS file in the distribution for more information.
 
 SBCL is a free software system, provided as is, with absolutely no warranty.
-It is mostly public domain software, but also includes some software from
-MIT, Symbolics, and Xerox, used under BSD-style licenses which allow copying
-only under certain conditions. More information about copying SBCL is
-available in the COPYING file in the distribution.
+It is mostly in the public domain, but also includes some software copyrighted
+  Massachusetts Institute of Technology, 1986;
+  Symbolics, Inc., 1989, 1990, 1991, 1992; and
+  Xerox Corporation, 1985, 1986, 1987, 1988, 1989, 1990
+used under BSD-style licenses allowing copying only under certain conditions.
+See the COPYING file in the distribution for more information.
 
 More information on SBCL is available at <http://sbcl.sourceforge.net/>.
 ");

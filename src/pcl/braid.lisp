@@ -1,10 +1,10 @@
 ;;;; bootstrapping the meta-braid
 ;;;;
-;;;; The code in this file takes the early definitions that have been saved
-;;;; up and actually builds those class objects. This work is largely driven
-;;;; off of those class definitions, but the fact that STANDARD-CLASS is the
-;;;; class of all metaclasses in the braid is built into this code pretty
-;;;; deeply.
+;;;; The code in this file takes the early definitions that have been
+;;;; saved up and actually builds those class objects. This work is
+;;;; largely driven off of those class definitions, but the fact that
+;;;; STANDARD-CLASS is the class of all metaclasses in the braid is
+;;;; built into this code pretty deeply.
 
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
@@ -264,9 +264,6 @@
       (setq *standard-method-combination* smc))))
 
 ;;; Initialize a class metaobject.
-;;;
-;;; FIXME: This and most stuff in this file is probably only needed at
-;;; init time.
 (defun !bootstrap-initialize-class
        (metaclass-name class name
 	class-eq-wrapper source direct-supers direct-subclasses cpl wrapper
@@ -605,9 +602,9 @@
 		 (reverse (rest (class-precedence-list class)))))
       (sb-kernel:register-layout layout :invalidate nil)
 
-      ;; Subclasses of formerly forward-referenced-class may be unknown
-      ;; to CL:FIND-CLASS and also anonymous. This functionality moved
-      ;; here from (SETF FIND-CLASS).
+      ;; Subclasses of formerly forward-referenced-class may be
+      ;; unknown to CL:FIND-CLASS and also anonymous. This
+      ;; functionality moved here from (SETF FIND-CLASS).
       (let ((name (class-name class)))
 	(setf (cl:find-class name) lclass
 	      ;; FIXME: It's nasty to use double colons. Perhaps the
@@ -619,42 +616,35 @@
 	      ;; messing with raw CLASS-%NAME)
 	      (sb-kernel::class-%name lclass) name)))))
 
-(eval-when (:load-toplevel :execute)
+(clrhash *find-class*)
+(!bootstrap-meta-braid)
+(!bootstrap-accessor-definitions t)
+(!bootstrap-class-predicates t)
+(!bootstrap-accessor-definitions nil)
+(!bootstrap-class-predicates nil)
+(!bootstrap-built-in-classes)
 
-  (clrhash *find-class*)
-  (!bootstrap-meta-braid)
-  (!bootstrap-accessor-definitions t)
-  (!bootstrap-class-predicates t)
-  (!bootstrap-accessor-definitions nil)
-  (!bootstrap-class-predicates nil)
-  (!bootstrap-built-in-classes)
+(dohash (name x *find-class*)
+	(let* ((class (find-class-from-cell name x))
+	       (layout (class-wrapper class))
+	       (lclass (sb-kernel:layout-class layout))
+	       (lclass-pcl-class (sb-kernel:class-pcl-class lclass))
+	       (olclass (cl:find-class name nil)))
+	  (if lclass-pcl-class
+	      (aver (eq class lclass-pcl-class))
+	      (setf (sb-kernel:class-pcl-class lclass) class))
 
-  (dohash (name x *find-class*)
-    (let* ((class (find-class-from-cell name x))
-	   (layout (class-wrapper class))
-	   (lclass (sb-kernel:layout-class layout))
-	   (lclass-pcl-class (sb-kernel:class-pcl-class lclass))
-	   (olclass (cl:find-class name nil)))
-      (if lclass-pcl-class
-	  (aver (eq class lclass-pcl-class))
-	  (setf (sb-kernel:class-pcl-class lclass) class))
+	  (update-lisp-class-layout class layout)
 
-      (update-lisp-class-layout class layout)
+	  (cond (olclass
+		 (aver (eq lclass olclass)))
+		(t
+		 (setf (cl:find-class name) lclass)))))
 
-      (cond (olclass
-	     (aver (eq lclass olclass)))
-	    (t
-	     (setf (cl:find-class name) lclass)))))
-
-  (setq *boot-state* 'braid)
-
-  ) ; EVAL-WHEN
+(setq *boot-state* 'braid)
 
 (defmethod no-applicable-method (generic-function &rest args)
-  ;; FIXME: probably could be ERROR instead of CERROR
-  (cerror "Retry call to ~S."
-	  "There is no matching method for the generic function ~S~@
-	  when called with arguments ~S."
-	  generic-function
-	  args)
-  (apply generic-function args))
+  (error "~@<There is no matching method for the generic function ~2I~_~S~
+	  ~I~_when called with arguments ~2I~_~S.~:>"
+	 generic-function
+	 args))

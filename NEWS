@@ -696,6 +696,10 @@ changes in sbcl-0.6.12 relative to sbcl-0.6.11:
   complex special functions have been merged from CMU CL sources.
   (When I was first setting up SBCL, I misunderstood a compile-time
   conditional #-OLD-SPECFUN, and so accidentally deleted them.)
+?? The --noprogrammer command line option is now supported. (Its
+  behavior is slightly different in detail from what the old man
+  page claimed it would do, but it's appropriate under the same
+  circumstances.)
 * The :SB-PROPAGATE-FLOAT-TYPE and :SB-PROPAGATE-FUN-TYPE features
   are now supported, and enabled by default. Thus, the compiler can
   handle many floating point and complex operations much less

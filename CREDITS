@@ -41,9 +41,8 @@ bootstrap itself cleanly, it was tedious to try keep such credits
 attached to individual source files, so they have been moved here
 instead.
 
-William Harold Newman <william.newman@airmail.net> did this
-transformation, and so any errors made are probably his. Corrections
-would be appreciated.
+Bill Newman <william.newman@airmail.net> did this transformation, and
+so any errors made are probably his. Corrections would be appreciated.
 
 
 MORE DETAILS ON SBCL'S CLOS CODE
@@ -165,8 +164,9 @@ alone.
 
 Guy Steele wrote the original character functions
 	code/char.lisp
-They were subsequently rewritten by David Dill, speeded up by Scott Fahlman,
-and rewritten without fonts and with a new type system by Rob MachLachlan.
+They were subsequently rewritten by David Dill, speeded up by Scott
+Fahlman, and rewritten without fonts and with a new type system by Rob
+MachLachlan.
 
 Lee Schumacher made the Spice Lisp version of backquote. The comment
 in the CMU CL sources suggests he based it on someone else's code for
@@ -288,9 +288,14 @@ and maintained "mostly by Skef Wholey and Rob MacLachlan. Scott
 Fahlman, Dan Aronson, and Steve Handerson did stuff here too."
 The same credit statement was given for the original Mach OS interface code.
 
-The CMU CL printer, print.lisp, was credited as "written by
-Neal Feinberg, Bill Maddox, Steven Handerson, and Skef Wholey, and
-modified by various CMU Common Lisp maintainers." 
+The CMU CL printer, print.lisp, was credited as "written by Neal
+Feinberg, Bill Maddox, Steven Handerson, and Skef Wholey, and modified
+by various CMU Common Lisp maintainers." The comments on the float
+printer said specifically that it was written by Bill Maddox. The
+comments on bignum printing said specifically that it was written by
+Steven Handerson (based on Skef's idea), and that it was rewritten by
+William Lott to remove assumptions about length of fixnums on the MIPS
+port.
 
 The comments in the main body of the CMU CL debugger 
 	code/debug.lisp
@@ -453,8 +458,11 @@ checking on various tricky cases of standard functions (e.g. MAP with
 complicated result types, and interactions of various variants of
 STREAM).
 
-Raymond Toy wrote the PROPAGATE-FLOAT-TYPE extension and various
-other floating point optimizations.
+Raymond Toy wrote CMU CL's PROPAGATE-FLOAT-TYPE extension and various
+other floating point optimizations. (In SBCL, the PROPAGATE-FLOAT-TYPE
+entry in *FEATURES* first became SB-PROPAGATE-FLOAT-TYPE, then went
+away completely as the code became an unconditional part of the
+system.)
 
 CMU CL's long float support was written by Douglas T. Crosher.
 
@@ -477,8 +485,10 @@ whenever I got stuck.
 
 CREDITS SINCE THE RELEASE OF SBCL
 
-(Some more details are available in the NEWS file and in the 
-project's CVS change logs.)
+(Note: (1) This is probably incomplete, since there's no systematic
+procedure for updating it. (2) Some more details are available in the
+NEWS file, in the project's CVS change logs, and in the archives of
+the sbcl-devel mailing list.)
 
 Martin Atzmueller:
   He reported many bugs, fixed many bugs, ported various fixes
@@ -494,7 +504,7 @@ Daniel Barlow:
   file loading code to work under SBCL.
 
 Cadabra, Inc. (later merged into GoTo.com):
-  They hired William Newman to do some consulting for them,
+  They hired Bill Newman to do some consulting for them,
   including the implementation of EQUALP hash tables for CMU CL;
   then agreed to release the EQUALP code into the public domain,
   giving SBCL (and CMU CL) EQUALP hash tables.
@@ -512,16 +522,23 @@ Robert MacLachlan:
   problems, has been invaluable to the CMU CL project and, by
   porting, invaluable to the SBCL project as well.
 
-William Newman:
-  He continued to work on the project after the fork, increasing
-  ANSI compliance, fixing bugs, regularizing the internals of the
+Bill Newman:
+  He continued to work on SBCL after the fork, increasing ANSI
+  compliance, fixing bugs, regularizing the internals of the
   system, deleting unused extensions, improving performance in 
   some areas (especially sequence functions and non-simple vectors),
   and updating documentation.
 
+Raymond Toy:
+  He continued to work on CMU CL after the SBCL fork, especially on
+  floating point stuff. Various patches and fixes of his have been
+  ported to SBCL.
+
 Peter Van Eynde:
-  He wrestled the CLISP test suite into a portable test suite which 
-  can be used on SBCL, and submitted many other bug reports as well.
+  He wrestled the CLISP test suite into a portable test suite
+  (clocc ansi-test) which can be used on SBCL, provided a slew of
+  of bug reports resulting from that, and submitted many other bug
+  reports as well.
 
 Colin Walters:
   His O(N) implementation of the general case of MAP, posted on the
