@@ -21,48 +21,6 @@
 		     (space 1)
 		     (speed 2)))
 
-;;;; KLUDGE: Compile and load files which really belong in cold load but are
-;;;; here for various unsound reasons. We handle them here, before the package
-;;;; hacking below, because they use the SB!FOO cold package name convention
-;;;; instead of the SB-FOO final package name convention (since they really
-;;;; do belong in cold load and will hopefully make it back there reasonably
-;;;; soon). -- WHN 19991207
-
-(dolist (stem '(;; FIXME: The assembly files here probably belong in
-		;; cold load instead of warm load. They ended up here
-		;; as a quick hack to work around the consequences of
-		;; my misunderstanding how ASSEMBLE-FILE works when I
-		;; wrote the cold build code. The cold build code
-		;; expects only one FASL filename per source file,
-		;; when it turns out we really need one FASL file for
-		;; ASSEMBLE-FILE output and another for COMPILE-FILE
-		;; output. It would probably be good to redo the cold
-		;; build code so that the COMPILE-FILE stuff generated
-		;; here can be loaded at the same time as the
-		;; ASSEMBLE-FILE stuff generated there.
-		"src/assembly/target/assem-rtns"
-		"src/assembly/target/array"
-		"src/assembly/target/arith"
-		"src/assembly/target/alloc"))
-  ;; KLUDGE: Cut-and-paste programming, the sign of a true professional.:-|
-  ;; (Hopefully this will go away as we move the files above into cold load.)
-  ;; -- WHN 19991214
-  (let ((fullname (concatenate 'string stem ".lisp")))
-    ;; (Now that we use byte compiler for interpretation, /SHOW
-    ;; doesn't get compiled properly until the src/assembly files have
-    ;; been loaded, so we use PRINT instead.)
-    #+sb-show (print "/about to compile src/assembly file")
-    #+sb-show (print fullname)
-    (multiple-value-bind
-	(compiled-truename compilation-warnings-p compilation-failure-p)
-	(compile-file fullname)
-      (declare (ignore compilation-warnings-p))
-      #+sb-show (print "/done compiling src/assembly file")
-      (if compilation-failure-p
-	  (error "COMPILE-FILE of ~S failed." fullname)
-	  (unless (load compiled-truename)
-	    (error "LOAD of ~S failed." compiled-truename))))))
-
 ;;;; package hacking
 
 ;;; Our cross-compilation host is out of the picture now, so we no

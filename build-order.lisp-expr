@@ -527,10 +527,19 @@
  ("src/compiler/target/type-vops")
  ("src/compiler/generic/late-type-vops")
 
- ("src/assembly/target/assem-rtns" :assem)
- ("src/assembly/target/array"      :assem)
- ("src/assembly/target/arith"      :assem)
- ("src/assembly/target/alloc"      :assem)
+ ;; KLUDGE: The assembly files need to be compiled twice: once as
+ ;; normal lisp files, and once by sb-c:assemble-file.  We play some
+ ;; symlink games to make sure we don't scribble over anything we
+ ;; shouldn't, but these are actually the same files:
+
+ ("src/compiler/assembly/target/assem-rtns")
+ ("src/compiler/assembly/target/array")
+ ("src/compiler/assembly/target/arith")
+ ("src/compiler/assembly/target/alloc")
+ ("src/assembly/target/assem-rtns" :assem :not-host)
+ ("src/assembly/target/array"      :assem :not-host)
+ ("src/assembly/target/arith"      :assem :not-host)
+ ("src/assembly/target/alloc"      :assem :not-host)
 
  ("src/compiler/pseudo-vops")
 

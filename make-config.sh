@@ -92,6 +92,15 @@ for d in src/compiler src/assembly; do
     cd $original_dir
 done
 
+echo //setting up symlink src/compiler/assembly
+if [ -h src/compiler/assembly ] ; then
+    rm src/compiler/assembly
+elif [ -w src/compiler/assembly ] ; then
+    echo "I'm afraid to replace non-symlink compiler/assembly with a symlink."
+    exit 1
+fi
+ln -s ../assembly src/compiler/assembly
+
 echo //setting up OS-dependent information
 original_dir=`pwd`
 cd src/runtime/

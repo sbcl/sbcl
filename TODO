@@ -33,11 +33,6 @@ for late 0.7.x:
 		idiosyncratic ideas of what merits FAILURE-P, but it's
 		embarrassing to have to use it when bootstrapping 
 		under SBCL!),
-	** weird double-loading (first in GENESIS, then in warm init)
-		of src/assembly/target/*.lisp stuff, and the associated
-		weirdness of the half-baked state (compiler almost but
-		not quite ready for prime time..) of the system after
-		cold init
 * fixups now feasible because of pre7 changes
 	** ANSIfied DECLAIM INLINE stuff (deprecating MAYBE-INLINE,
 		including e.g. on the man page)
