@@ -36,12 +36,11 @@
 	  (unless (sb!impl::whitespacep char)
 	    (return (unread-char char stream))))))
 
+;;; like LISTEN, but any whitespace in the input stream will be flushed
 (defun listen-skip-whitespace (&optional (stream *standard-input*))
-  #!+sb-doc
-  "See LISTEN. Any whitespace in the input stream will be flushed."
   (do ((char (read-char-no-hang stream nil nil nil)
 	     (read-char-no-hang stream nil nil nil)))
       ((null char) nil)
-    (cond ((not (sb!impl::whitespace-char-p char))
+    (cond ((not (whitespace-char-p char))
 	   (unread-char char stream)
 	   (return t)))))

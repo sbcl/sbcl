@@ -20,7 +20,7 @@
 (setf *backend-fasl-file-type* "x86f")
 (setf *backend-fasl-file-implementation* :x86)
 
-(setf *backend-fasl-file-version* 9)
+(setf *backend-fasl-file-version* 10)
 ;;; 2 = sbcl-0.6.4 uses COMPILE-OR-LOAD-DEFGENERIC.
 ;;; 3 = sbcl-0.6.6 uses private symbol, not :EMPTY, for empty HASH-TABLE slot.
 ;;; 4 = sbcl-0.6.7 uses HAIRY-DATA-VECTOR-REF and HAIRY-DATA-VECTOR-SET
@@ -35,11 +35,17 @@
 ;;; 7 = around sbcl-0.6.9.8, merged SB-CONDITIONS package into SB-KERNEL
 ;;; 8 = sbcl-0.6.10.4 revived Gray stream support, changing stream layouts.
 ;;; 9 = deleted obsolete CONS-UNIQUE-TAG bytecode in sbcl-0.6.11.8
+;;; (somewhere in here also changes to AND and OR CTYPE layouts) 
+;;; 10 = new layout for CONDITION in sbcl-0.6.11.38
 
 (setf *backend-register-save-penalty* 3)
 
 (setf *backend-byte-order* :little-endian)
 
+;;; KLUDGE: It would seem natural to set this by asking our C runtime
+;;; code for it, but mostly we need it for GENESIS, which doesn't in
+;;; general have our C runtime code running to ask, so instead we set
+;;; it by hand. -- WHN 2001-04-15
 (setf *backend-page-size* 4096)
 ;;; comment from CMU CL:
 ;;;

@@ -68,6 +68,15 @@
 		:format-control "bad argument to ~S: ~S"
 		:format-arguments (list function-name datum)))))
 
+;;; a shared idiom in ERROR, CERROR, and BREAK: The user probably
+;;; doesn't want to hear that the error "occurred in" one of these
+;;; functions, so we try to point the top of the stack to our caller
+;;; instead.
+(eval-when (:compile-toplevel :execute)
+  (defmacro-mundanely maybe-find-stack-top-hint ()
+    `(or sb!debug:*stack-top-hint*
+	 (nth-value 1 (sb!kernel:find-caller-name-and-frame)))))
+
 (defun error (datum &rest arguments)
   #!+sb-doc
   "Invoke the signal facility on a condition formed from datum and arguments.
@@ -80,16 +89,7 @@
   (sb!kernel:infinite-error-protect
     (let ((condition (coerce-to-condition datum arguments
 					  'simple-error 'error))
-	  ;; FIXME: Why is *STACK-TOP-HINT* in SB-DEBUG instead of SB-DI?
-	  ;; SB-DEBUG should probably be only for true interface stuff.
-	  (sb!debug:*stack-top-hint* sb!debug:*stack-top-hint*))
-      (unless (and (condition-function-name condition)
-		   sb!debug:*stack-top-hint*)
-	(multiple-value-bind (name frame) (sb!kernel:find-caller-name)
-	  (unless (condition-function-name condition)
-	    (setf (condition-function-name condition) name))
-	  (unless sb!debug:*stack-top-hint*
-	    (setf sb!debug:*stack-top-hint* frame))))
+	  (sb!debug:*stack-top-hint* (maybe-find-stack-top-hint)))
       (let ((sb!debug:*stack-top-hint* nil))
 	(signal condition))
       (invoke-debugger condition))))
@@ -104,14 +104,7 @@
 						arguments
 						'simple-error
 						'error)))
-	    (sb!debug:*stack-top-hint* sb!debug:*stack-top-hint*))
-	(unless (and (condition-function-name condition)
-		     sb!debug:*stack-top-hint*)
-	  (multiple-value-bind (name frame) (sb!kernel:find-caller-name)
-	    (unless (condition-function-name condition)
-	      (setf (condition-function-name condition) name))
-	    (unless sb!debug:*stack-top-hint*
-	      (setf sb!debug:*stack-top-hint* frame))))
+	    (sb!debug:*stack-top-hint* (maybe-find-stack-top-hint)))
 	(with-condition-restarts condition (list (find-restart 'continue))
 	  (let ((sb!debug:*stack-top-hint* nil))
 	    (signal condition))
@@ -124,9 +117,7 @@
    of condition handling occurring."
   (sb!kernel:infinite-error-protect
     (with-simple-restart (continue "Return from BREAK.")
-      (let ((sb!debug:*stack-top-hint*
-	     (or sb!debug:*stack-top-hint*
-		 (nth-value 1 (sb!kernel:find-caller-name)))))
+      (let ((sb!debug:*stack-top-hint* (maybe-find-stack-top-hint)))
 	(invoke-debugger
 	 (coerce-to-condition datum arguments 'simple-condition 'break)))))
   nil)

@@ -1083,9 +1083,7 @@
    (lambda (condition stream)
      ;; Don't try to print the structure, since it probably won't work.
      (format stream
-	     "obsolete structure error in ~S:~@
-	      for a structure of type: ~S"
-	     (sb-kernel::condition-function-name condition)
+	     "~@<obsolete structure error for a structure of type ~2I~_~S~:>"
 	     (type-of (obsolete-structure-datum condition))))))
 
 (defun obsolete-instance-trap (owrapper nwrapper instance)

@@ -272,17 +272,6 @@
             (write-char #\> stream))))
   nil)
 
-;;;; WHITESPACE-CHAR-P
-
-;;; This is used in other files, but is defined in this one for some reason.
-(defun whitespace-char-p (char)
-  #!+sb-doc
-  "Determines whether or not the character is considered whitespace."
-  (or (char= char #\space)
-      (char= char (code-char tab-char-code))
-      (char= char (code-char return-char-code))
-      (char= char #\linefeed)))
-
 ;;;; circularity detection stuff
 
 ;;; When *PRINT-CIRCLE* is T, this gets bound to a hash table that

@@ -27,9 +27,10 @@
   ()
   (:report
    (lambda (condition stream)
-     (format stream "Layout-invalid error in ~S:~@
-		     Type test of class ~S was passed obsolete instance:~%  ~S"
-	     (condition-function-name condition)
+     (format stream
+	     "~@<invalid structure layout: ~
+              ~2I~_A test for class ~4I~_~S ~
+              ~2I~_was passed the obsolete instance ~4I~_~S~:>"
 	     (sb!kernel:class-proper-name (type-error-expected-type condition))
 	     (type-error-datum condition)))))
 
@@ -38,7 +39,8 @@
    (possibilities :reader case-failure-possibilities :initarg :possibilities))
   (:report
     (lambda (condition stream)
-      (format stream "~@<~S fell through ~S expression. ~:_Wanted one of ~:S.~:>"
+      (format stream "~@<~S fell through ~S expression. ~
+                      ~:_Wanted one of ~:S.~:>"
 	      (type-error-datum condition)
 	      (case-failure-name condition)
 	      (case-failure-possibilities condition)))))

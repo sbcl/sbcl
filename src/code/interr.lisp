@@ -68,165 +68,138 @@
 
 (deferr object-not-function-error (object)
   (error 'type-error
-	 :function-name name
 	 :datum object
 	 :expected-type 'function))
 
 (deferr object-not-list-error (object)
   (error 'type-error
-	 :function-name name
 	 :datum object
 	 :expected-type 'list))
 
 (deferr object-not-bignum-error (object)
   (error 'type-error
-	 :function-name name
 	 :datum object
 	 :expected-type 'bignum))
 
 (deferr object-not-ratio-error (object)
   (error 'type-error
-	 :function-name name
 	 :datum object
 	 :expected-type 'ratio))
 
 (deferr object-not-single-float-error (object)
   (error 'type-error
-	 :function-name name
 	 :datum object
 	 :expected-type 'single-float))
 
 (deferr object-not-double-float-error (object)
   (error 'type-error
-	 :function-name name
 	 :datum object
 	 :expected-type 'double-float))
 
 #!+long-float
 (deferr object-not-long-float-error (object)
   (error 'type-error
-	 :function-name name
 	 :datum object
 	 :expected-type 'long-float))
 
 (deferr object-not-simple-string-error (object)
   (error 'type-error
-	 :function-name name
 	 :datum object
 	 :expected-type 'simple-string))
 
 (deferr object-not-simple-bit-vector-error (object)
   (error 'type-error
-	 :function-name name
 	 :datum object
 	 :expected-type 'simple-bit-vector))
 
 (deferr object-not-simple-vector-error (object)
   (error 'type-error
-	 :function-name name
 	 :datum object
 	 :expected-type 'simple-vector))
 
 (deferr object-not-fixnum-error (object)
   (error 'type-error
-	 :function-name name
 	 :datum object
 	 :expected-type 'fixnum))
 
 (deferr object-not-function-or-symbol-error (object)
   (error 'type-error
-	 :function-name name
 	 :datum object
 	 :expected-type '(or function symbol)))
 
 (deferr object-not-vector-error (object)
   (error 'type-error
-	 :function-name name
 	 :datum object
 	 :expected-type 'vector))
 
 (deferr object-not-string-error (object)
   (error 'type-error
-	 :function-name name
 	 :datum object
 	 :expected-type 'string))
 
 (deferr object-not-bit-vector-error (object)
   (error 'type-error
-	 :function-name name
 	 :datum object
 	 :expected-type 'bit-vector))
 
 (deferr object-not-array-error (object)
   (error 'type-error
-	 :function-name name
 	 :datum object
 	 :expected-type 'array))
 
 (deferr object-not-number-error (object)
   (error 'type-error
-	 :function-name name
 	 :datum object
 	 :expected-type 'number))
 
 (deferr object-not-rational-error (object)
   (error 'type-error
-	 :function-name name
 	 :datum object
 	 :expected-type 'rational))
 
 (deferr object-not-float-error (object)
   (error 'type-error
-	 :function-name name
 	 :datum object
 	 :expected-type 'float))
 
 (deferr object-not-real-error (object)
   (error 'type-error
-	 :function-name name
 	 :datum object
 	 :expected-type 'real))
 
 (deferr object-not-integer-error (object)
   (error 'type-error
-	 :function-name name
 	 :datum object
 	 :expected-type 'integer))
 
 (deferr object-not-cons-error (object)
   (error 'type-error
-	 :function-name name
 	 :datum object
 	 :expected-type 'cons))
 
 (deferr object-not-symbol-error (object)
   (error 'type-error
-	 :function-name name
 	 :datum object
 	 :expected-type 'symbol))
 
 (deferr undefined-symbol-error (fdefn-or-symbol)
   (error 'undefined-function
-	 :function-name name
 	 :name (etypecase fdefn-or-symbol
 		 (symbol fdefn-or-symbol)
 		 (fdefn (fdefn-name fdefn-or-symbol)))))
 
 (deferr object-not-coerceable-to-function-error (object)
   (error 'type-error
-	 :function-name name
 	 :datum object
 	 :expected-type 'coerceable-to-function))
 
 (deferr invalid-argument-count-error (nargs)
   (error 'simple-program-error
-	 :function-name name
 	 :format-control "invalid number of arguments: ~S"
 	 :format-arguments (list nargs)))
 
 (deferr bogus-argument-to-values-list-error (list)
   (error 'simple-type-error
-	 :function-name name
 	 :datum list
 	 :expected-type 'list
 	 :format-control
@@ -234,42 +207,37 @@
 	 :format-arguments (list list)))
 
 (deferr unbound-symbol-error (symbol)
-  (error 'unbound-variable :function-name name :name symbol))
+  (error 'unbound-variable :name symbol))
 
 (deferr object-not-base-char-error (object)
   (error 'type-error
-	 :function-name name
 	 :datum object
 	 :expected-type 'base-char))
 
 (deferr object-not-sap-error (object)
   (error 'type-error
-	 :function-name name
 	 :datum object
 	 :expected-type 'system-area-pointer))
 
 (deferr invalid-unwind-error ()
   (error 'simple-control-error
-	 :function-name name
 	 :format-control
-	 "attempt to RETURN-FROM a block or GO to a tag that no longer exists"))
+	 "attempt to RETURN-FROM a block or GO to a tag that no longer exists"
+	 ))
 
 (deferr unseen-throw-tag-error (tag)
   (error 'simple-control-error
-	 :function-name name
 	 :format-control "attempt to THROW to a tag that does not exist: ~S"
 	 :format-arguments (list tag)))
 
 (deferr nil-function-returned-error (function)
   (error 'simple-control-error
-	 :function-name name
 	 :format-control
 	 "A function with declared result type NIL returned:~%  ~S"
 	 :format-arguments (list function)))
 
 (deferr division-by-zero-error (this that)
   (error 'division-by-zero
-	 :function-name name
 	 :operation 'division
 	 :operands (list this that)))
 
@@ -278,193 +246,163 @@
 		  (layout-invalid (%instance-layout object)))
 	     'layout-invalid
 	     'type-error)
-	 :function-name name
 	 :datum object
 	 :expected-type type))
 
 (deferr layout-invalid-error (object layout)
   (error 'layout-invalid
-	 :function-name name
 	 :datum object
 	 :expected-type (layout-class layout)))
 
 (deferr odd-key-arguments-error ()
   (error 'simple-program-error
-	 :function-name name
 	 :format-control "odd number of &KEY arguments"))
 
 (deferr unknown-key-argument-error (key-name)
   (error 'simple-program-error
-	 :function-name name
 	 :format-control "unknown &KEY argument: ~S"
 	 :format-arguments (list key-name)))
 
 (deferr invalid-array-index-error (array bound index)
   (error 'simple-error
-	 :function-name name
 	 :format-control
 	 "invalid array index ~D for ~S (should be nonnegative and <~D)"
 	 :format-arguments (list index array bound)))
 
 (deferr object-not-simple-array-error (object)
   (error 'type-error
-	 :function-name name
 	 :datum object
 	 :expected-type 'simple-array))
 
 (deferr object-not-signed-byte-32-error (object)
   (error 'type-error
-	 :function-name name
 	 :datum object
 	 :expected-type '(signed-byte 32)))
 
 (deferr object-not-unsigned-byte-32-error (object)
   (error 'type-error
-	 :function-name name
 	 :datum object
 	 :expected-type '(unsigned-byte 32)))
 
 (deferr object-not-simple-array-unsigned-byte-2-error (object)
   (error 'type-error
-	 :function-name name
 	 :datum object
 	 :expected-type '(simple-array (unsigned-byte 2) (*))))
 
 (deferr object-not-simple-array-unsigned-byte-4-error (object)
   (error 'type-error
-	 :function-name name
 	 :datum object
 	 :expected-type '(simple-array (unsigned-byte 4) (*))))
 
 (deferr object-not-simple-array-unsigned-byte-8-error (object)
   (error 'type-error
-	 :function-name name
 	 :datum object
 	 :expected-type '(simple-array (unsigned-byte 8) (*))))
 
 (deferr object-not-simple-array-unsigned-byte-16-error (object)
   (error 'type-error
-	 :function-name name
 	 :datum object
 	 :expected-type '(simple-array (unsigned-byte 16) (*))))
 
 (deferr object-not-simple-array-unsigned-byte-32-error (object)
   (error 'type-error
-	 :function-name name
 	 :datum object
 	 :expected-type '(simple-array (unsigned-byte 32) (*))))
 
 (deferr object-not-simple-array-signed-byte-8-error (object)
   (error 'type-error
-	 :function-name name
 	 :datum object
 	 :expected-type '(simple-array (signed-byte 8) (*))))
 
 (deferr object-not-simple-array-signed-byte-16-error (object)
   (error 'type-error
-	 :function-name name
 	 :datum object
 	 :expected-type '(simple-array (signed-byte 16) (*))))
 
 (deferr object-not-simple-array-signed-byte-30-error (object)
   (error 'type-error
-	 :function-name name
 	 :datum object
 	 :expected-type '(simple-array (signed-byte 30) (*))))
 
 (deferr object-not-simple-array-signed-byte-32-error (object)
   (error 'type-error
-	 :function-name name
 	 :datum object
 	 :expected-type '(simple-array (signed-byte 32) (*))))
 
 (deferr object-not-simple-array-single-float-error (object)
   (error 'type-error
-	 :function-name name
 	 :datum object
 	 :expected-type '(simple-array single-float (*))))
 
 (deferr object-not-simple-array-double-float-error (object)
   (error 'type-error
-	 :function-name name
 	 :datum object
 	 :expected-type '(simple-array double-float (*))))
 
 (deferr object-not-simple-array-complex-single-float-error (object)
   (error 'type-error
-	 :function-name name
 	 :datum object
 	 :expected-type '(simple-array (complex single-float) (*))))
 
 (deferr object-not-simple-array-complex-double-float-error (object)
   (error 'type-error
-	 :function-name name
 	 :datum object
 	 :expected-type '(simple-array (complex double-float) (*))))
 
 #!+long-float
 (deferr object-not-simple-array-complex-long-float-error (object)
   (error 'type-error
-	 :function-name name
 	 :datum object
 	 :expected-type '(simple-array (complex long-float) (*))))
 
 (deferr object-not-complex-error (object)
   (error 'type-error
-	 :function-name name
 	 :datum object
 	 :expected-type 'complex))
 
 (deferr object-not-complex-rational-error (object)
   (error 'type-error
-	 :function-name name
 	 :datum object
 	 :expected-type '(complex rational)))
 
 (deferr object-not-complex-single-float-error (object)
   (error 'type-error
-	 :function-name name
 	 :datum object
 	 :expected-type '(complex single-float)))
 
 (deferr object-not-complex-double-float-error (object)
   (error 'type-error
-	 :function-name name
 	 :datum object
 	 :expected-type '(complex double-float)))
 
 #!+long-float
 (deferr object-not-complex-long-float-error (object)
   (error 'type-error
-	 :function-name name
 	 :datum object
 	 :expected-type '(complex long-float)))
 
 (deferr object-not-weak-pointer-error (object)
   (error 'type-error
-	 :function-name name
 	 :datum object
 	 :expected-type 'weak-pointer))
 
 (deferr object-not-instance-error (object)
   (error 'type-error
-	 :function-name name
 	 :datum object
 	 :expected-type 'instance))
 
 (deferr object-not-complex-vector-error (object)
   (error 'type-error
-	 :function-name name
 	 :datum object
 	 :expected-type '(and vector (not simple-array))))
 
 ;;;; fetching errorful function name
 
-;;; This variable is used to prevent infinite recursive lossage when
+;;; This flag is used to prevent infinite recursive lossage when
 ;;; we can't find the caller for some reason.
 (defvar *finding-name* nil)
 
-(defun find-caller-name ()
+(defun find-caller-name-and-frame ()
   (if *finding-name*
       (values "<error finding caller name -- already finding name>" nil)
       (handler-case
@@ -520,7 +458,6 @@
 			     (svref *internal-errors* error-number))))
 	   (cond ((null handler)
 		  (error 'simple-error
-			 :function-name name
 			 :format-control
 			 "unknown internal error, ~D? args=~S"
 			 :format-arguments
@@ -531,7 +468,6 @@
 				       arguments))))
 		 ((not (functionp handler))
 		  (error 'simple-error
-			 :function-name name
 			 :format-control "internal error ~D: ~A; args=~S"
 			 :format-arguments
 			 (list error-number

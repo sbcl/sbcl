@@ -292,8 +292,9 @@
 	(flet ((check-version (variant possible-implementation needed-version)
 		 (when (string= possible-implementation implementation)
 		   (unless (= version needed-version)
-		     (error "~@<~S was compiled for ~A fasl file format ~
-			     version ~D, but we need version ~D.~:@>"
+		     (error "~@<~S is in ~A fasl file format version ~D, ~
+                             but this version of SBCL uses ~
+                             format version ~D.~:@>"
 			    stream
 			    variant
 			    version

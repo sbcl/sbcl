@@ -17,10 +17,10 @@
 
 ;;; We save space in macro definitions by calling this function.
 (defun do-arg-count-error (error-kind name arg lambda-list minimum maximum)
-  (multiple-value-bind (fname sb!debug:*stack-top-hint*) (find-caller-name)
+  (multiple-value-bind (fname sb!debug:*stack-top-hint*)
+      (find-caller-name-and-frame)
     (error 'defmacro-ll-arg-count-error
 	   :kind error-kind
-	   :function-name fname
 	   :name name
 	   :argument arg
 	   :lambda-list lambda-list
@@ -34,15 +34,10 @@
 	 :initform nil)))
 
 (defun print-defmacro-ll-bind-error-intro (condition stream)
-  (if (null (defmacro-lambda-list-bind-error-name condition))
-      (format stream
-	      "error while parsing arguments to ~A in ~S:~%"
-	      (defmacro-lambda-list-bind-error-kind condition)
-	      (condition-function-name condition))
-      (format stream
-	      "error while parsing arguments to ~A ~S:~%"
-	      (defmacro-lambda-list-bind-error-kind condition)
-	      (defmacro-lambda-list-bind-error-name condition))))
+  (format stream
+	  "error while parsing arguments to ~A~@[ ~S~]:~%"
+	  (defmacro-lambda-list-bind-error-kind condition)
+	  (defmacro-lambda-list-bind-error-name condition)))
 
 (define-condition defmacro-bogus-sublist-error
 		  (defmacro-lambda-list-bind-error)

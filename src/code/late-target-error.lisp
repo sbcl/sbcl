@@ -54,11 +54,9 @@
 				  condition-class
 				  make-condition-class)
 	    (:copier nil))
-
-  (function-name nil)
   ;; actual initargs supplied to MAKE-CONDITION
   (actual-initargs (required-argument) :type list)
-  ;; plist mapping slot names to any values that were assigned or
+  ;; a plist mapping slot names to any values that were assigned or
   ;; defaulted after creation
   (assigned-slots () :type list))
 
@@ -562,29 +560,11 @@
 
 (define-condition simple-warning (simple-condition warning) ())
 
-(defun print-simple-error (condition stream)
-  (format stream
-	  ;; FIXME: It seems reasonable to display the "in function
-	  ;; ~S" information, but doesn't the logic to display it
-	  ;; belong in the debugger or someplace like that instead of
-	  ;; in the format string for this particular family of
-	  ;; conditions? Then this printer might look more
-	  ;; ("~@<~S: ~2I~:_~?~:>" (TYPE-OF C) ..) instead.
-	  "~@<error in function ~S: ~2I~:_~?~:>"
-	  (condition-function-name condition)
-	  (simple-condition-format-control condition)
-	  (simple-condition-format-arguments condition)))
-
-(define-condition simple-error (simple-condition error) ()
-  ;; This is the condition type used by ERROR and CERROR when
-  ;; a format-control string is supplied as the first argument.
-  (:report print-simple-error))
+;;; This is the condition type used by ERROR and CERROR when
+;;; a format-control string is supplied as the first argument.
+(define-condition simple-error (simple-condition error) ())
 
 (define-condition storage-condition (serious-condition) ())
-
-;;; FIXME: Should we really be reporting CONDITION-FUNCTION-NAME data
-;;; on an ad hoc basis, for some conditions and not others? Why not
-;;; standardize it somehow? perhaps by making the debugger report it?
 
 (define-condition type-error (error)
   ((datum :reader type-error-datum :initarg :datum)
@@ -592,9 +572,7 @@
   (:report
    (lambda (condition stream)
      (format stream
-	     "~@<TYPE-ERROR in ~S: ~
-              ~2I~_The value ~4I~:_~S ~2I~_is not of type ~4I~_~S.~:>"
-	     (condition-function-name condition)
+	     "~@<The value ~2I~:_~S ~I~_is not of type ~2I~_~S.~:>"
 	     (type-error-datum condition)
 	     (type-error-expected-type condition)))))
 
@@ -608,7 +586,7 @@
   (:report
    (lambda (condition stream)
      (format stream
-	     "END-OF-FILE on ~S"
+	     "end of file on ~S"
 	     (stream-error-stream condition)))))
 
 (define-condition file-error (error)
@@ -616,8 +594,12 @@
   (:report
    (lambda (condition stream)
      (format stream
-	     "~@<FILE-ERROR in function ~S: ~2I~:_~?~:>"
-	     (condition-function-name condition)
+	     "~@<error on file ~_~S: ~2I~:_~?~:>"
+	     (file-error-pathname condition)
+	     ;; FIXME: ANSI's FILE-ERROR doesn't have FORMAT-CONTROL and 
+	     ;; FORMAT-ARGUMENTS, and the inheritance here doesn't seem
+	     ;; to give us FORMAT-CONTROL or FORMAT-ARGUMENTS either.
+	     ;; So how does this work?
 	     (serious-condition-format-control condition)
 	     (serious-condition-format-arguments condition)))))
 
@@ -631,16 +613,14 @@
   (:report
    (lambda (condition stream)
      (format stream
-	     "error in ~S: The variable ~S is unbound."
-	     (condition-function-name condition)
+	     "The variable ~S is unbound."
 	     (cell-error-name condition)))))
 
 (define-condition undefined-function (cell-error) ()
   (:report
    (lambda (condition stream)
      (format stream
-	     "error in ~S: The function ~S is undefined."
-	     (condition-function-name condition)
+	     "The function ~S is undefined."
 	     (cell-error-name condition)))))
 
 (define-condition arithmetic-error (error)
@@ -674,8 +654,6 @@
        (format stream "~S cannot be printed readably." obj)))))
 
 (define-condition reader-error (parse-error stream-error)
-  ;; FIXME: Do we need FORMAT-CONTROL and FORMAT-ARGUMENTS when
-  ;; we have an explicit :REPORT function? I thought we didn't..
   ((format-control
     :reader reader-error-format-control
     :initarg :format-control)
@@ -727,8 +705,7 @@
   (:report
    (lambda (condition stream)
      (format stream
-	     "error in ~S: ~S: index too large"
-	     (condition-function-name condition)
+	     "The index ~S is too large."
 	     (type-error-datum condition)))))
 
 (define-condition io-timeout (stream-error)
@@ -737,7 +714,7 @@
    (lambda (condition stream)
      (declare (type stream stream))
      (format stream
-	     "IO-TIMEOUT ~(~A~)ing ~S"
+	     "I/O timeout ~(~A~)ing ~S"
 	     (io-timeout-direction condition)
 	     (stream-error-stream condition)))))
 
@@ -765,7 +742,7 @@
   (:report
    (lambda (condition stream)
      (format stream
-	     "unexpected EOF on ~S ~A"
+	     "unexpected end of file on ~S ~A"
 	     (stream-error-stream condition)
 	     (reader-eof-error-context condition)))))
 
