@@ -145,7 +145,9 @@
            (list *undefined-function-frame*
                  (list '(flet test) #'optimized))))
   
-  #-x86 ; bug 353: This test fails at least most of the time for x86/linux ca. 0.8.20.16. -- WHN
+  ;; bug 353: This test fails at least most of the time for x86/linux
+  ;; ca. 0.8.20.16. -- WHN
+  #-(x86 linux)
   (assert (verify-backtrace 
            (lambda () (test #'not-optimized))
            (list *undefined-function-frame*
