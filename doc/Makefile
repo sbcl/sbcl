@@ -48,7 +48,7 @@ CATALOG:=`pwd`/catalog-${OS}.xml
 CHECK:=XML_CATALOG_FILES="$(CATALOG)" xmllint --noout --xinclude --postvalid $(DOCFILE) || exit 1
 
 .PHONY: all
-all: html pdf 
+all: html 
 
 .PHONY: dist
 dist: html pdf
