@@ -2265,6 +2265,9 @@ changes in sbcl-0.8.8 relative to sbcl-0.8.7:
     recognized as being TYPEP their class.
   * bug fix: the PUSHNEW documentation string has been corrected.
     (thanks to Vincent Arkesteijn)
+  * bug fix: defaulting of the value for the last of an atypically
+    large number of multiple values being bound was not being
+    performed correctly on the Alpha or PPC platforms
   * optimization: implemented multiplication as a modular
     (UNSIGNED-BYTE 32) operation on the x86 backend.
   * optimization: SEARCH on simple-base-strings can now be open-coded.

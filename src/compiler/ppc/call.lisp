@@ -317,9 +317,8 @@ default-value-8
 		      ((null remaining))
 		    (let ((def (car remaining)))
 		      (emit-label (car def))
-		      (when (null (cdr remaining))
-			(inst b defaulting-done))
 		      (store-stack-tn (cdr def) null-tn)))
+		  (inst b defaulting-done)
 		  (trace-table-entry trace-table-normal))))))
 
 	(inst compute-code-from-lra code-tn code-tn lra-label temp)))

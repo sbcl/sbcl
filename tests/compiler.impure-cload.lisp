@@ -340,5 +340,25 @@
              (DECLARE (IGNORE OTHER-1))))
     (continuation-1)))
 
+;;; reported by antifuchs/bdowning/etc on #lisp: ITERATE failure on
+;;; (iter (for i in '(1 2 3)) (+ i 50))
+(defun values-producer () (values 1 2 3 4 5 6 7))
+
+(defun values-consumer (fn)
+  (let (a b c d e f g h)
+    (multiple-value-bind (aa bb cc dd ee ff gg hh) (funcall fn)
+      (setq a aa)
+      (setq b bb)
+      (setq c cc)
+      (setq d dd)
+      (setq e ee)
+      (setq f ff)
+      (setq g gg)
+      (setq h hh)
+      (values a b c d e f g h))))
+
+(let ((list (multiple-value-list (values-consumer #'values-producer))))
+  (assert (= (length list) 8))
+  (assert (null (nth 7 list))))
 
 (sb-ext:quit :unix-status 104)
