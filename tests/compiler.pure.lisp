@@ -1605,3 +1605,16 @@
          '(lambda (s ei x y)
            (declare (type (simple-array function (2)) s) (type ei ei))
            (funcall (aref s ei) x y))))
+
+;;; MISC.320: ir1-transform can create an intercomponent reference to
+;;; a DEFINED-FUN.
+(assert (eql 102 (funcall
+  (compile
+   nil
+   '(lambda ()
+     (declare (optimize (speed 3) (space 0) (safety 2)
+               (debug 2) (compilation-speed 0)))
+     (catch 'ct2
+       (elt '(102)
+            (flet ((%f12 () (rem 0 -43)))
+              (multiple-value-call #'%f12 (values))))))))))
