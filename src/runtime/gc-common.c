@@ -15,21 +15,6 @@
  */
 
 /*
- * GENerational Conservative Garbage Collector for SBCL x86
- */
-
-/*
- * This software is part of the SBCL system. See the README file for
- * more information.
- *
- * This software is derived from the CMU CL system, which was
- * written at Carnegie Mellon University and released into the
- * public domain. The software is in the public domain and is
- * provided with absolutely no warranty. See the COPYING and CREDITS
- * files for more information.
- */
-
-/*
  * For a review of garbage collection techniques (e.g. generational
  * GC) and terminology (e.g. "scavenging") see Paul R. Wilson,
  * "Uniprocessor Garbage Collection Techniques". As of 20000618, this
@@ -1806,4 +1791,26 @@ gc_init_tables(void)
     sizetab[WEAK_POINTER_WIDETAG] = size_weak_pointer;
     sizetab[INSTANCE_HEADER_WIDETAG] = size_boxed;
     sizetab[FDEFN_WIDETAG] = size_boxed;
+}
+
+
+/* Find the code object for the given pc, or return NULL on
+   failure. */
+lispobj *
+component_ptr_from_pc(lispobj *pc)
+{
+    lispobj *object = NULL;
+
+    if ( (object = search_read_only_space(pc)) )
+	;
+    else if ( (object = search_static_space(pc)) )
+	;
+    else
+	object = search_dynamic_space(pc);
+
+    if (object) /* if we found something */
+	if (widetag_of(*object) == CODE_HEADER_WIDETAG)
+	    return(object);
+
+    return (NULL);
 }

@@ -542,11 +542,9 @@
 	 (sap> control-stack-end x)
 	 (zerop (logand (sap-int x) #b11)))))
 
-#!+x86
 (sb!alien:define-alien-routine component-ptr-from-pc (system-area-pointer)
   (pc system-area-pointer))
 
-#!+x86
 (defun component-from-component-ptr (component-ptr)
   (declare (type system-area-pointer component-ptr))
   (make-lisp-obj (logior (sap-int component-ptr)

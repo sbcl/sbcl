@@ -1955,64 +1955,34 @@ scav_weak_pointer(lispobj *where, lispobj object)
 }
 
 
-/* Scan an area looking for an object which encloses the given pointer.
- * Return the object start on success or NULL on failure. */
-static lispobj *
-search_space(lispobj *start, size_t words, lispobj *pointer)
+lispobj *
+search_read_only_space(void *pointer)
 {
-    while (words > 0) {
-	size_t count = 1;
-	lispobj thing = *start;
-
-	/* If thing is an immediate then this is a cons. */
-	if (is_lisp_pointer(thing)
-	    || ((thing & 3) == 0) /* fixnum */
-	    || (widetag_of(thing) == BASE_CHAR_WIDETAG)
-	    || (widetag_of(thing) == UNBOUND_MARKER_WIDETAG))
-	    count = 2;
-	else
-	    count = (sizetab[widetag_of(thing)])(start);
-
-	/* Check whether the pointer is within this object. */
-	if ((pointer >= start) && (pointer < (start+count))) {
-	    /* found it! */
-	    /*FSHOW((stderr,"/found %x in %x %x\n", pointer, start, thing));*/
-	    return(start);
-	}
-
-	/* Round up the count. */
-	count = CEILING(count,2);
-
-	start += count;
-	words -= count;
-    }
-    return (NULL);
-}
-
-lispobj*
-search_read_only_space(lispobj *pointer)
-{
-    lispobj* start = (lispobj*)READ_ONLY_SPACE_START;
-    lispobj* end = (lispobj*)SymbolValue(READ_ONLY_SPACE_FREE_POINTER,0);
-    if ((pointer < start) || (pointer >= end))
+    lispobj *start = (lispobj *) READ_ONLY_SPACE_START;
+    lispobj *end = (lispobj *) SymbolValue(READ_ONLY_SPACE_FREE_POINTER,0);
+    if ((pointer < (void *)start) || (pointer >= (void *)end))
 	return NULL;
-    return (search_space(start, (pointer+2)-start, pointer));
+    return (search_space(start, 
+			 (((lispobj *)pointer)+2)-start, 
+			 (lispobj *) pointer));
 }
 
 lispobj *
-search_static_space(lispobj *pointer)
+search_static_space(void *pointer)
 {
-    lispobj* start = (lispobj*)STATIC_SPACE_START;
-    lispobj* end = (lispobj*)SymbolValue(STATIC_SPACE_FREE_POINTER,0);
-    if ((pointer < start) || (pointer >= end))
+    lispobj *start = (lispobj *)STATIC_SPACE_START;
+    lispobj *end = (lispobj *)SymbolValue(STATIC_SPACE_FREE_POINTER,0);
+    if ((pointer < (void *)start) || (pointer >= (void *)end))
 	return NULL;
-    return (search_space(start, (pointer+2)-start, pointer));
+    return (search_space(start, 
+			 (((lispobj *)pointer)+2)-start, 
+			 (lispobj *) pointer));
 }
 
 /* a faster version for searching the dynamic space. This will work even
  * if the object is in a current allocation region. */
 lispobj *
-search_dynamic_space(lispobj *pointer)
+search_dynamic_space(void *pointer)
 {
     int page_index = find_page_index(pointer);
     lispobj *start;
@@ -2023,7 +1993,9 @@ search_dynamic_space(lispobj *pointer)
 	return NULL;
     start = (lispobj *)((void *)page_address(page_index)
 			+ page_table[page_index].first_object_offset);
-    return (search_space(start, (pointer+2)-start, pointer));
+    return (search_space(start, 
+			 (((lispobj *)pointer)+2)-start, 
+			 (lispobj *)pointer));
 }
 
 /* Is there any possibility that pointer is a valid Lisp object
@@ -4085,29 +4057,6 @@ alloc(int nbytes)
     }
     new_obj = gc_alloc_with_region(nbytes,0,region,0);
     return (new_obj);
-}
-
-
-/* Find the code object for the given pc, or return NULL on failure.
- *
- * FIXME: PC shouldn't be lispobj*, should it? Maybe void*? */
-lispobj *
-component_ptr_from_pc(lispobj *pc)
-{
-    lispobj *object = NULL;
-
-    if ( (object = search_read_only_space(pc)) )
-	;
-    else if ( (object = search_static_space(pc)) )
-	;
-    else
-	object = search_dynamic_space(pc);
-
-    if (object) /* if we found something */
-	if (widetag_of(*object) == CODE_HEADER_WIDETAG) /* if it's a code object */
-	    return(object);
-
-    return (NULL);
 }
 
 /*

@@ -27,7 +27,7 @@
 ;;; USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH
 ;;; DAMAGE.
 
-;;; Statistical profiler for x86.
+;;; Statistical profiler.
 
 ;;; Overview:
 ;;;
@@ -414,7 +414,7 @@
 (deftype address ()
   "Type used for addresses, for instance, program counters,
    code start/end locations etc."
-  '(unsigned-byte 32))
+  '(unsigned-byte #+alpha 64 #-alpha 32))
 
 (defconstant +unknown-address+ 0
   "Constant representing an address that cannot be determined.")
@@ -580,8 +580,19 @@
 
 #-x86
 (defun sigprof-handler (signal code scp)
-  (declare (ignore signal code scp))
-  (error "Implement me."))
+  (declare (ignore signal code))
+  (when (and *sampling*
+	     (< *samples-index* (length *samples*)))
+    (sb-sys:without-gcing
+     (with-alien ((scp (* os-context-t) :local scp))
+       (locally (declare (optimize (inhibit-warnings 2)))
+	 (let* ((pc-ptr (sb-vm:context-pc scp))
+		(fp (sb-vm::context-register scp #.sb-vm::cfp-offset))
+		(ra (sap-ref-32 
+		     (int-sap fp)
+		     (* sb-vm::lra-save-offset sb-vm::n-word-bytes))))
+	   (record (sap-int pc-ptr))
+	   (record ra)))))))
 
 ;;; Map function FN over code objects in dynamic-space.  FN is called
 ;;; with two arguments, the object and its size in bytes.
@@ -922,8 +933,8 @@
 
 ;;; Return a CALL-GRAPH structure for the current contents of
 ;;; *SAMPLES*.  The result contain a list of nodes sorted by self-time
-;;; in the FLAT-NODES slot, and a dag in Vertices, with call cycles
-;;; reduced to Cycle structures.
+;;; in the FLAT-NODES slot, and a dag in VERTICES, with call cycles
+;;; reduced to CYCLE structures.
 (defun make-call-graph ()
   (stop-profiling)
   (show-progress "~&Computing call graph ")
@@ -1100,7 +1111,7 @@
       ((nil)))
     graph))
 
-;;;; Silly Examples
+;;; silly examples
 
 (defun test-0 (n &optional (depth 0))
   (declare (optimize (debug 3)))
@@ -1113,4 +1124,8 @@
   (with-profiling (:reset t :max-samples 1000 :report :graph)
     (test-0 7)))
 
-;;; End of file.
+
+;;; provision
+(provide 'sb-sprof)
+
+;;; end of file

@@ -7,8 +7,13 @@ taking samples of the program execution at regular intervals, instead of
 instrumenting functions like @code{profile} does. You might find
 @code{sb-sprof} more useful than @code{profile} when profiling functions
 in the @code{common-lisp}-package, SBCL internals, or code where the
-instrumenting overhead is excessive. On the other hand it only works on
-x86, and isn't completely reliable even there.
+instrumenting overhead is excessive.
+
+This module is known not to work consistently on the Alpha platform,
+for technical reasons related to the implementation of a machine
+language idiom for marking sections of code to be treated as atomic by
+the garbage collector;  However, it should work on other platforms,
+and the deficiency on the Alpha will eventually be rectified.
 
 @subsection Example Usage
 

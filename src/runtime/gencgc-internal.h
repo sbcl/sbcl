@@ -32,7 +32,6 @@ void gc_free_heap(void);
 inline int find_page_index(void *);
 inline void *page_address(int);
 int gencgc_handle_wp_violation(void *);
-lispobj *search_dynamic_space(lispobj *);
 
 struct page {
 
