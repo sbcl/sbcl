@@ -29,6 +29,8 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "runtime.h"
+#include "sbcl.h"
 #include "util.h"
    
 /*
@@ -107,7 +109,15 @@ free_directory_lispy_filenames(char** directory_lispy_filenames)
  * stat(2) stuff
  */
 
-typedef long my_dev_t;
+/* As of 0.6.12, the FFI can't handle 64-bit values. For now, we use
+ * these munged-to-32-bits values for might-be-64-bit slots of
+ * stat_wrapper as a workaround, so that at least we can still work
+ * when values are small.
+ *
+ * FIXME: But of course we should fix the FFI so that we can use the
+ * actual 64-bit values instead. */
+typedef long ffi_dev_t; /* since Linux dev_t can be 64 bits */
+typedef u32 ffi_off_t; /* since OpenBSD 2.8 st_size is 64 bits */
 
 /* a representation of stat(2) results which doesn't depend on CPU or OS */
 struct stat_wrapper {
@@ -121,14 +131,14 @@ struct stat_wrapper {
      * happen, and I nodded sagely. But now I know better.:-| This is
      * another entry for Dan Barlow's ongoing episodic rant about C
      * header files, I guess.. -- WHN 2001-05-10 */
-    my_dev_t      wrapped_st_dev;         /* device */
+    ffi_dev_t     wrapped_st_dev;         /* device */
     ino_t         wrapped_st_ino;         /* inode */
     mode_t        wrapped_st_mode;        /* protection */
     nlink_t       wrapped_st_nlink;       /* number of hard links */
     uid_t         wrapped_st_uid;         /* user ID of owner */
     gid_t         wrapped_st_gid;         /* group ID of owner */
-    my_dev_t      wrapped_st_rdev;        /* device type (if inode device) */
-    off_t         wrapped_st_size;        /* total size, in bytes */
+    ffi_dev_t     wrapped_st_rdev;        /* device type (if inode device) */
+    ffi_off_t     wrapped_st_size;        /* total size, in bytes */
     unsigned long wrapped_st_blksize;     /* blocksize for filesystem I/O */
     unsigned long wrapped_st_blocks;      /* number of blocks allocated */
     time_t        wrapped_st_atime;       /* time_t of last access */

@@ -519,7 +519,10 @@
 ;;; Note that st-dev is a long, not a dev-t. This is because dev-t on
 ;;; linux 32 bit archs is a 64 bit quantity, but alien doesn's support
 ;;; those. We don't actually access that field anywhere, though, so
-;;; until we can get 64 bit alien support it'll do.
+;;; until we can get 64 bit alien support it'll do. Also note that
+;;; st_size is a long, not an off-t, because off-t is a 64-bit
+;;; quantity on Alpha. And FIXME: "No one would want a file length
+;;; longer than 32 bits anyway, right?":-|
 (def-alien-type nil
   (struct wrapped_stat
     (st-dev unsigned-long)              ; would be dev-t in a real stat
@@ -529,7 +532,7 @@
     (st-uid  uid-t)
     (st-gid  gid-t)
     (st-rdev unsigned-long)             ; would be dev-t in a real stat
-    (st-size off-t)
+    (st-size unsigned-long)		; would be off-t in a real stat
     (st-blksize unsigned-long)
     (st-blocks unsigned-long)
     (st-atime time-t)

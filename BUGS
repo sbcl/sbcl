@@ -930,6 +930,16 @@ Error in function C::GET-LAMBDA-TO-COMPILE:
   the first time around, until regression tests are written I'm not 
   comfortable merging the patches in the CVS version of SBCL.
 
+101:
+  The error message for calls to structure accessors with the
+  wrong number of arguments is confusing and of the wrong
+  condition class (TYPE-ERROR instead of PROGRAM-ERROR):
+    * (defstruct foo x y)
+    * (foo-x)
+    debugger invoked on condition of type SIMPLE-TYPE-ERROR:
+    Structure for accessor FOO-X is not a FOO:
+    301988783
+
 
 KNOWN BUGS RELATED TO THE IR1 INTERPRETER
 

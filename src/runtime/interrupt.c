@@ -75,7 +75,7 @@ os_context_t *lisp_interrupt_contexts[MAX_INTERRUPTS];
  *
  * However, some signals need special handling, e.g. 
  *
- * o the SIGSEGV (for Linux) or SIGBUS (for FreeBSD) used by the
+ * o the SIGSEGV (for e.g. Linux) or SIGBUS (for e.g. FreeBSD) used by the
  *   garbage collector to detect violations of write protection,
  *   because some cases of such signals (e.g. GC-related violations of
  *   write protection) are handled at C level and never passed on to
@@ -513,10 +513,10 @@ gc_trigger_hit(int signal, siginfo_t *info, os_context_t *context)
 #endif
 
 #ifndef __i386__
-/* This function gets called from the SIGSEGV (Linux) or SIGBUS (BSD)
- * handler.  Here we check whether the signal was due to treading on
- * the mprotect()ed zone - and if so, arrange for a GC to happen.
- */
+/* This function gets called from the SIGSEGV (for e.g. Linux or
+ * OpenBSD) or SIGBUS (for e.g. FreeBSD) handler. Here we check
+ * whether the signal was due to treading on the mprotect()ed zone -
+ * and if so, arrange for a GC to happen. */
 boolean
 interrupt_maybe_gc(int signal, siginfo_t *info, void *void_context)
 {

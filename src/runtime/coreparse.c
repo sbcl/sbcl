@@ -117,19 +117,8 @@ process_directory(int fd, long *ptr, int count)
 lispobj
 load_core_file(char *file)
 {
+    u32 *header, val, len, *ptr, remaining_len;
     int fd = open(file, O_RDONLY), count;
-
-    /* KLUDGE: This kind of conditionalization everywhere that 32-bit
-     * ints are used is really nasty. It would be much nicer to define
-     * a typedef like addr_as_int once and for all in each
-     * architecture file, then use that everywhere. -- WHN 19990904 */
-#ifndef alpha
-    long *header,  val, len, *ptr;
-    long remaining_len;
-#else
-    u32 *header, val, len, *ptr;
-    u32 remaining_len;
-#endif
 
     lispobj initial_function = NIL;
     FSHOW((stderr, "/entering load_core_file(%s)\n", file));

@@ -2772,10 +2772,6 @@ initially undefined function references:~2%")
     (write-long *data-page*)
     (multiple-value-bind (floor rem)
 	(floor (gspace-byte-address gspace) sb!c:*backend-page-size*)
-      ;; FIXME: Define an INSIST macro which does like ASSERT, but
-      ;; less expensively (ERROR, not CERROR), and which reports
-      ;; "internal error" on failure. Use it here and elsewhere in the
-      ;; system.
       (aver (zerop rem))
       (write-long floor))
     (write-long pages)
