@@ -946,15 +946,9 @@ SB-EXT:PACKAGE-LOCKED-ERROR-SYMBOL."))
 ;;;; setup of CONDITION machinery, only because that makes it easier to
 ;;;; get cold init to work.
 
+;;; OAOOM warning: see cross-condition.lisp
 (define-condition encapsulated-condition (condition)
   ((condition :initarg :condition :reader encapsulated-condition)))
-
-;;; This comes to play if we have multiple levels of encapsulated
-;;; errors and we need to dump them with MAKE-CONDITION-LOAD-FORM.
-;;; Should not see much/any use, but better to have it.
-(def!method make-load-form ((condition encapsulated-condition) &optional env)
-  `(make-condition 'encapsulated-condition
-    :condition ,(make-condition-load-form (encapsulated-condition condition) env)))
 
 (define-condition values-type-error (type-error)
   ()

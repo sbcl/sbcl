@@ -17,7 +17,12 @@
 ;;; compiler, it will only be a style-warning.
 (define-condition format-too-many-args-warning (simple-warning) ())
 
-(define-condition encapsulated-condition () ())
+;;; OAOOM warning: see condition.lisp -- we want a full definition in
+;;; the cross-compiler as well, in order to have nice error messages
+;;; instead of complaints of undefined-function
+;;; ENCAPSULATED-CONDITION.
+(define-condition encapsulated-condition (condition)
+  ((condition :initarg :condition :reader encapsulated-condition)))
 
 (define-condition bug (simple-error)
   ()
