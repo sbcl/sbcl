@@ -12,10 +12,10 @@
 ;;; relevant result, so this must be a string, not NIL.
 ;;;
 ;;; Conventionally a string like "0.6.6", with three numeric fields,
-;;; is used for released versions, and a string like "0.6.5.12", with
-;;; four numeric fields, is used for CVS checkins which aren't
-;;; released. (And occasionally for internal versions, especially for
-;;; internal versions off the main CVS branch, it gets hairier, e.g.
-;;; "0.pre7.14.flaky4.13".)
+;;; is used for released versions, and a string like "0.6.5.xyzzy",
+;;; with something arbitrary in the fourth field, is used for CVS
+;;; checkins which aren't released. (And occasionally for internal
+;;; versions, especially for internal versions off the main CVS
+;;; branch, it gets hairier, e.g. "0.pre7.14.flaky4.13".)
 
-"0.7.8.34"
+"0.7.8.35"

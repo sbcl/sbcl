@@ -1272,6 +1272,9 @@ WORKAROUND:
   correct generic function definition in the PCL source code, SBCL
   returns "WRONG!" for the call.
 
+210: "unsafe evaluation of DEFSTRUCT slot initforms in BOA constructors"
+  (fixed in sbcl-0.7.8.35)
+
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:
     These labels were used for bugs related to the old IR1 interpreter.

@@ -360,6 +360,21 @@
   (error "YA-STRUCT-P of no arguments should signal an error."))
 (when (ignore-errors (or (ya-struct-p 'too 'many 'arguments) 12))
   (error "YA-STRUCT-P of three arguments should signal an error."))
+
+;;; bug 210: Until sbcl-0.7.8.32 BOA constructors had SAFETY 0
+;;; declared inside on the theory that slot types were already
+;;; checked, which bogusly suppressed unbound-variable and other
+;;; checks within the evaluation of initforms.
+(defvar *bug210*)
+(defstruct (bug210a (:constructor bug210a ()))
+  (slot *bug210*))
+(defstruct bug210b
+  (slot *bug210*))
+;;; Because of bug 210, this assertion used to fail.
+(assert (typep (nth-value 1 (ignore-errors (bug210a))) 'unbound-variable))
+;;; Even with bug 210, these assertions succeeded.
+(assert (typep (nth-value 1 (ignore-errors *bug210*)) 'unbound-variable))
+(assert (typep (nth-value 1 (ignore-errors (make-bug210b))) 'unbound-variable))
 
 ;;; success
 (format t "~&/returning success~%")

@@ -1176,7 +1176,6 @@
        (let ((,instance (truly-the ,(dd-name dd)
 			  (%make-instance-with-layout
 			   (%delayed-get-compiler-layout ,(dd-name dd))))))
-	 (declare (optimize (safety 0))) ; Suppress redundant slot type checks.
 	 ,@(when raw-index
 	     `((setf (%instance-ref ,instance ,raw-index)
 		     (make-array ,(dd-raw-length dd)
