@@ -18,6 +18,9 @@
 
 (in-package "SB!EXT")
 
+;;; something not EQ to anything we might legitimately READ
+(defparameter *eof-object* (make-symbol "EOF-OBJECT"))
+
 ;;; a type used for indexing into arrays, and for related quantities
 ;;; like lengths of lists
 ;;;
@@ -54,20 +57,6 @@
 (defconstant return-char-code 13)
 (defconstant escape-char-code 27)
 (defconstant rubout-char-code 127)
-
-;;; Concatenate together the names of some strings and symbols,
-;;; producing a symbol in the current package.
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (declaim (ftype (function (&rest (or string symbol)) symbol) symbolicate))
-  (defun symbolicate (&rest things)
-    (values (intern (apply #'concatenate
-			   'string
-			   (mapcar #'string things))))))
-
-;;; like SYMBOLICATE, but producing keywords
-(defun keywordicate (&rest things)
-  (let ((*package* *keyword-package*))
-    (apply #'symbolicate things)))
 
 ;;;; miscellaneous iteration extensions
 
@@ -359,6 +348,27 @@
 (declaim (ftype (function (index) list) make-gensym-list))
 (defun make-gensym-list (n)
   (loop repeat n collect (gensym)))
+
+;;; ANSI guarantees that some symbols are self-evaluating. This
+;;; function is to be called just before a change which would affect
+;;; that. (We don't absolutely have to call this function before such
+;;; changes, since such changes are given as undefined behavior. In
+;;; particular, we don't if the runtime cost would be annoying. But
+;;; otherwise it's nice to do so.)
+(defun about-to-modify (symbol)
+  (declare (type symbol symbol))
+  (cond ((eq symbol t)
+	 (error "Veritas aeterna. (can't change T)"))
+	((eq symbol nil)
+	 (error "Nihil ex nihil. (can't change NIL)"))
+	((keywordp symbol)
+	 (error "Keyword values can't be changed."))
+	;; (Just because a value is CONSTANTP is not a good enough
+	;; reason to complain here, because we want DEFCONSTANT to
+	;; be able to use this function, and it's legal to DEFCONSTANT
+	;; a constant as long as the new value is EQL to the old
+	;; value.)
+	))
 
 #|
 ;;; REMOVEME when done testing byte cross-compiler

@@ -17,19 +17,20 @@
     (push (cons label state) *trace-table-info*))
   (values))
 
-;;; Convert the list of (label . state) entries into an ivector.
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defconstant tt-bits-per-state 3)
-  (defconstant tt-bytes-per-entry 2)
-  (defconstant tt-bits-per-entry (* tt-bytes-per-entry sb!vm:byte-bits))
-  (defconstant tt-bits-per-offset (- tt-bits-per-entry tt-bits-per-state))
-  (defconstant tt-max-offset (1- (ash 1 tt-bits-per-offset))))
+(defconstant tt-bits-per-state 3)
+(defconstant tt-bytes-per-entry 2)
+(defconstant tt-bits-per-entry (* tt-bytes-per-entry sb!vm:byte-bits))
+(defconstant tt-bits-per-offset (- tt-bits-per-entry tt-bits-per-state))
+(defconstant tt-max-offset (1- (ash 1 tt-bits-per-offset)))
+
 (deftype tt-state ()
   `(unsigned-byte ,tt-bits-per-state))
 (deftype tt-entry ()
   `(unsigned-byte ,tt-bits-per-entry))
 (deftype tt-offset ()
   `(unsigned-byte ,tt-bits-per-offset))
+
+;;; Convert the list of (LABEL . STATE) entries into an ivector.
 (declaim (ftype (function (list) (simple-array tt-entry 1)) pack-trace-table))
 (defun pack-trace-table (entries)
   (declare (list entries))

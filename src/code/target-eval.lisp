@@ -93,13 +93,14 @@
 
 ;;;; EVAL and friends
 
-;;; This needs to be initialized in the cold load, since the top-level catcher
-;;; will always restore the initial value.
+;;; This needs to be initialized in the cold load, since the top-level
+;;; catcher will always restore the initial value.
 (defvar *eval-stack-top* 0)
 
 ;;; Pick off a few easy cases, and call INTERNAL-EVAL for the rest. If
-;;; *ALREADY-EVALED-THIS* is true, then we bind it to NIL before doing a call
-;;; so that the effect is confined to the lexical scope of the EVAL-WHEN.
+;;; *ALREADY-EVALED-THIS* is true, then we bind it to NIL before doing
+;;; a call so that the effect is confined to the lexical scope of the
+;;; EVAL-WHEN.
 (defun eval (original-exp)
   #!+sb-doc
   "Evaluates its single arg in a null lexical environment, returns the
@@ -140,8 +141,8 @@
 		  ((null name)
 		   (do ((args (cdr exp) (cddr args)))
 		       ((null (cddr args))
-			;; We duplicate the call to SET so that the correct
-			;; value gets returned.
+			;; We duplicate the call to SET so that the
+			;; correct value gets returned.
 			(set (first args) (eval (second args))))
 		     (set (first args) (eval (second args)))))
 		(let ((symbol (first name)))

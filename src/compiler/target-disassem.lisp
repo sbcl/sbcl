@@ -1788,7 +1788,7 @@
 
 ;;; routines to find things in the Lisp environment
 
-(defconstant groked-symbol-slots
+(defparameter *grokked-symbol-slots*
   (sort `((,sb!vm:symbol-value-slot . symbol-value)
 	  (,sb!vm:symbol-plist-slot . symbol-plist)
 	  (,sb!vm:symbol-name-slot . symbol-name)
@@ -1808,7 +1808,7 @@ symbol object that we know about.")
   (declare (type address address))
   (if (not (aligned-p address sb!vm:word-bytes))
       (values nil nil)
-      (do ((slots-tail groked-symbol-slots (cdr slots-tail)))
+      (do ((slots-tail *grokked-symbol-slots* (cdr slots-tail)))
 	  ((null slots-tail)
 	   (values nil nil))
 	(let* ((field (car slots-tail))

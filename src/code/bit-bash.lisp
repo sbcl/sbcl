@@ -13,8 +13,6 @@
 
 ;;;; constants and types
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-
 (defconstant unit-bits sb!vm:word-bits
   #!+sb-doc
   "The number of bits to process at a time.")
@@ -22,6 +20,9 @@
 (defconstant max-bits (ash most-positive-fixnum -2)
   #!+sb-doc
   "The maximum number of bits that can be delt with during a single call.")
+
+;;; FIXME: Do we really need EVAL-WHEN around these DEFTYPEs?
+(eval-when (:compile-toplevel :load-toplevel :execute)
 
 (deftype unit ()
   `(unsigned-byte ,unit-bits))

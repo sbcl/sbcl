@@ -209,20 +209,21 @@
 
 ;;;; representation selection
 
-;;; VOPs that we ignore in initial cost computation. We ignore SET in the
-;;; hopes that nobody is setting specials inside of loops. We ignore
-;;; TYPE-CHECK-ERROR because we don't want the possibility of error to bias the
-;;; result. Notes are suppressed for T-C-E as well, since we don't need to
-;;; worry about the efficiency of that case.
-(defconstant ignore-cost-vops '(set type-check-error))
-(defconstant suppress-note-vops '(type-check-error))
+;;; VOPs that we ignore in initial cost computation. We ignore SET in
+;;; the hopes that nobody is setting specials inside of loops. We
+;;; ignore TYPE-CHECK-ERROR because we don't want the possibility of
+;;; error to bias the result. Notes are suppressed for T-C-E as well,
+;;; since we don't need to worry about the efficiency of that case.
+(defparameter *ignore-cost-vops* '(set type-check-error))
+(defparameter *suppress-note-vops* '(type-check-error))
 
-;;; We special-case the move VOP, since using this costs for the normal MOVE
-;;; would spuriously encourage descriptor representations. We won't actually
-;;; need to coerce to descriptor and back, since we will replace the MOVE with
-;;; a specialized move VOP. What we do is look at the other operand. If its
-;;; representation has already been chosen (e.g. if it is wired), then we use
-;;; the appropriate move costs, otherwise we just ignore the references.
+;;; We special-case the move VOP, since using this costs for the
+;;; normal MOVE would spuriously encourage descriptor representations.
+;;; We won't actually need to coerce to descriptor and back, since we
+;;; will replace the MOVE with a specialized move VOP. What we do is
+;;; look at the other operand. If its representation has already been
+;;; chosen (e.g. if it is wired), then we use the appropriate move
+;;; costs, otherwise we just ignore the references.
 (defun add-representation-costs (refs scs costs
 				      ops-slot costs-slot more-costs-slot
 				      write-p)
@@ -236,34 +237,34 @@
 		 (incf (svref costs scn) res)))))
       (let* ((vop (tn-ref-vop ref))
 	     (info (vop-info vop)))
-	(case (vop-info-name info)
-	  (#.ignore-cost-vops)
-	  (move
-	   (let ((rep (tn-sc
-		       (tn-ref-tn
-			(if write-p
-			    (vop-args vop)
-			    (vop-results vop))))))
-	     (when rep
-	       (if write-p
-		   (dolist (scn scs)
-		     (let ((res (svref (sc-move-costs
-					(svref *backend-sc-numbers* scn))
-				       (sc-number rep))))
-		       (when res
-			 (incf (svref costs scn) res))))
-		   (dolist (scn scs)
-		     (let ((res (svref (sc-move-costs rep) scn)))
-		       (when res
-			 (incf (svref costs scn) res))))))))
-	  (t
-	   (do ((cost (funcall costs-slot info) (cdr cost))
-		(op (funcall ops-slot vop) (tn-ref-across op)))
-	       ((null cost)
-		(add-costs (funcall more-costs-slot info)))
-	     (when (eq op ref)
-	       (add-costs (car cost))
-	       (return))))))))
+	(unless (find (vop-info-name info) *ignore-cost-vops*)
+	  (case (vop-info-name info)
+	    (move
+	     (let ((rep (tn-sc
+			 (tn-ref-tn
+			  (if write-p
+			      (vop-args vop)
+			      (vop-results vop))))))
+	       (when rep
+		 (if write-p
+		     (dolist (scn scs)
+		       (let ((res (svref (sc-move-costs
+					  (svref *backend-sc-numbers* scn))
+					 (sc-number rep))))
+			 (when res
+			   (incf (svref costs scn) res))))
+		     (dolist (scn scs)
+		       (let ((res (svref (sc-move-costs rep) scn)))
+			 (when res
+			   (incf (svref costs scn) res))))))))
+	    (t
+	     (do ((cost (funcall costs-slot info) (cdr cost))
+		  (op (funcall ops-slot vop) (tn-ref-across op)))
+		 ((null cost)
+		  (add-costs (funcall more-costs-slot info)))
+	       (when (eq op ref)
+		 (add-costs (car cost))
+		 (return)))))))))
   (values))
 
 ;;; Return the best representation for a normal TN. SCs is a list
@@ -354,7 +355,7 @@
 	 (*compiler-error-context* op-node))
     (cond ((eq (tn-kind op-tn) :constant))
 	  ((policy op-node (<= speed brevity) (<= space brevity)))
-	  ((member (template-name (vop-info op-vop)) suppress-note-vops))
+	  ((member (template-name (vop-info op-vop)) *suppress-note-vops*))
 	  ((null dest-tn)
 	   (let* ((op-info (vop-info op-vop))
 		  (op-note (or (template-note op-info)

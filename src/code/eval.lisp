@@ -9,7 +9,7 @@
 
 (in-package "SB!EVAL")
 
-;;; This flag is used by EVAL-WHEN to keep track of when code has already been
-;;; evaluated so that it can avoid multiple evaluation of nested EVAL-WHEN
-;;; (COMPILE)s.
+;;; This flag is used by EVAL-WHEN to keep track of when code has
+;;; already been evaluated so that it can avoid multiple evaluation of
+;;; nested EVAL-WHEN (COMPILE)s.
 (defvar *already-evaled-this* nil)

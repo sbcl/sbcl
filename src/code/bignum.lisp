@@ -108,13 +108,9 @@
 
 ;;;; What's a bignum?
 
-(eval-when (:compile-toplevel :load-toplevel :execute) ; necessary for DEFTYPE
-
 (defconstant digit-size 32)
 
 (defconstant maximum-bignum-length (1- (ash 1 (- 32 sb!vm:type-bits))))
-
-) ; EVAL-WHEN
 
 ;;;; internal inline routines
 

@@ -967,23 +967,30 @@
       ;; Put shadowing symbols in the shadowing symbols list.
       (setf (package-%shadowing-symbols pkg) (sixth spec))))
 
+  ;; FIXME: These assignments are also done at toplevel in
+  ;; boot-extensions.lisp. They should probably only be done once.
+  (/show0 "setting up *CL-PACKAGE* and *KEYWORD-PACKAGE*")
+  (setq *cl-package* (find-package "COMMON-LISP"))
+  (setq *keyword-package* (find-package "KEYWORD"))
+
   (/show0 "about to MAKUNBOUND *!INITIAL-SYMBOLS*")
   (makunbound '*!initial-symbols*)       ; (so that it gets GCed)
 
-  ;; Make some other packages that should be around in the cold load. The
-  ;; COMMON-LISP-USER package is required by the ANSI standard, but not
-  ;; completely specified by it, so in the cross-compilation host Lisp it could
-  ;; contain various symbols, USE-PACKAGEs, or nicknames that we don't want in
-  ;; our target SBCL. For that reason, we handle it specially, not dumping the
-  ;; host Lisp version at genesis time..
+  ;; Make some other packages that should be around in the cold load.
+  ;; The COMMON-LISP-USER package is required by the ANSI standard,
+  ;; but not completely specified by it, so in the cross-compilation
+  ;; host Lisp it could contain various symbols, USE-PACKAGEs, or
+  ;; nicknames that we don't want in our target SBCL. For that reason,
+  ;; we handle it specially, not dumping the host Lisp version at
+  ;; genesis time..
   (assert (not (find-package "COMMON-LISP-USER")))
   ;; ..but instead making our own from scratch here.
   (/show0 "about to MAKE-PACKAGE COMMON-LISP-USER")
   (make-package "COMMON-LISP-USER"
 		:nicknames '("CL-USER")
 		:use '("COMMON-LISP"
-		       ;; ANSI encourages us to put extension packages in the
-		       ;; USE list of COMMON-LISP-USER.
+		       ;; ANSI encourages us to put extension packages
+		       ;; in the USE list of COMMON-LISP-USER.
 		       "SB!ALIEN" "SB!C-CALL" "SB!DEBUG"
 		       "SB!EXT" "SB!GRAY" "SB!PROFILE"))
 
@@ -996,16 +1003,11 @@
   (/show0 "about to SETQ *IN-PACKAGE-INIT*")
   (setq *in-package-init* nil)
 
-  ;; FIXME: These assignments are also done at toplevel in
-  ;; boot-extensions.lisp. They should probably only be done once.
-  (setq *cl-package* (find-package "COMMON-LISP"))
-  (setq *keyword-package* (find-package "KEYWORD"))
-
   ;; For the kernel core image wizards, set the package to *CL-PACKAGE*.
   ;;
-  ;; FIXME: We should just set this to (FIND-PACKAGE "COMMON-LISP-USER")
-  ;; once and for all here, instead of setting it once here and resetting
-  ;; it later.
+  ;; FIXME: We should just set this to (FIND-PACKAGE
+  ;; "COMMON-LISP-USER") once and for all here, instead of setting it
+  ;; once here and resetting it later.
   (setq *package* *cl-package*))
 
 (!cold-init-forms

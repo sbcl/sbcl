@@ -923,7 +923,7 @@
 ;;; Parse an inline/notinline declaration. If it's a local function we're
 ;;; defining, set its INLINEP. If a global function, add a new FENV entry.
 (defun process-inline-declaration (spec res fvars)
-  (let ((sense (cdr (assoc (first spec) inlinep-translations :test #'eq)))
+  (let ((sense (cdr (assoc (first spec) *inlinep-translations* :test #'eq)))
 	(new-fenv ()))
     (dolist (name (rest spec))
       (let ((fvar (find name fvars :key #'leaf-name :test #'equal)))
@@ -1347,24 +1347,24 @@
   (values))
 
 ;;; Create a lambda node out of some code, returning the result. The
-;;; bindings are specified by the list of var structures Vars. We deal
-;;; with adding the names to the Lexenv-Variables for the conversion.
-;;; The result is added to the New-Functions in the
-;;; *Current-Component* and linked to the component head and tail.
+;;; bindings are specified by the list of VAR structures VARS. We deal
+;;; with adding the names to the LEXENV-VARIABLES for the conversion.
+;;; The result is added to the NEW-FUNCTIONS in the
+;;; *CURRENT-COMPONENT* and linked to the component head and tail.
 ;;;
-;;; We detect special bindings here, replacing the original Var in the
+;;; We detect special bindings here, replacing the original VAR in the
 ;;; lambda list with a temporary variable. We then pass a list of the
-;;; special vars to IR1-Convert-Special-Bindings, which actually emits
+;;; special vars to IR1-CONVERT-SPECIAL-BINDINGS, which actually emits
 ;;; the special binding code.
 ;;;
-;;; We ignore any Arg-Info in the Vars, trusting that someone else is
+;;; We ignore any ARG-INFO in the VARS, trusting that someone else is
 ;;; dealing with &nonsense.
 ;;;
-;;; Aux-Vars is a list of Var structures for variables that are to be
-;;; sequentially bound. Each Aux-Val is a form that is to be evaluated
-;;; to get the initial value for the corresponding Aux-Var. Interface
-;;; is a flag as T when there are real aux values (see let* and
-;;; ir1-convert-aux-bindings.)
+;;; AUX-VARS is a list of VAR structures for variables that are to be
+;;; sequentially bound. Each AUX-VAL is a form that is to be evaluated
+;;; to get the initial value for the corresponding AUX-VAR. Interface
+;;; is a flag as T when there are real aux values (see LET* and
+;;; IR1-CONVERT-AUX-BINDINGS.)
 (defun ir1-convert-lambda-body (body vars &optional aux-vars aux-vals
 				     interface result)
   (declare (list body vars aux-vars aux-vals)
@@ -2063,7 +2063,7 @@
 ;;; inhibit evaluation of any enclosed EVAL-WHENs, either by IR1
 ;;; conversion done by EVAL, or by conversion of the body for
 ;;; load-time processing. If *ALREADY-EVALED-THIS* is true then we *do
-;;; not* eval since some enclosing eval-when already did.
+;;; not* EVAL since some enclosing EVAL-WHEN already did.
 ;;;
 ;;; We know we are EVAL'ing for LOAD since we wouldn't get called
 ;;; otherwise. If LOAD is a situation we call FUN on body. If we
@@ -2086,7 +2086,31 @@
 		       (not sb!eval::*already-evaled-this*)))
 	 (sb!eval::*already-evaled-this* t))
     (when do-eval
-      (eval `(progn ,@body)))
+
+      ;; This is the natural way to do it.
+      #-(and sb-xc-host (or sbcl cmu))
+      (eval `(progn ,@body))
+
+      ;; This is a disgusting hack to work around bug IR1-3 when using
+      ;; SBCL (or CMU CL, for that matter) as a cross-compilation
+      ;; host. When we go from the cross-compiler (where we bound
+      ;; SB!EVAL::*ALREADY-EVALED-THIS*) to the host compiler (which
+      ;; has a separate SB-EVAL::*ALREADY-EVALED-THIS* variable), EVAL
+      ;; would go and executes nested EVAL-WHENs even when they're not
+      ;; toplevel forms. Using EVAL-WHEN instead of bare EVAL causes
+      ;; the cross-compilation host to bind its own
+      ;; *ALREADY-EVALED-THIS* variable, so that the problem is
+      ;; suppressed.
+      ;;
+      ;; FIXME: Once bug IR1-3 is fixed, this hack can go away. (Or if
+      ;; CMU CL doesn't fix the bug, then this hack can be made
+      ;; conditional on #+CMU.)
+      #+(and sb-xc-host (or sbcl cmu))
+      (let (#+sbcl (sb-eval::*already-evaled-this* t)
+	    #+cmu (stub:probably similar but has not been tested))
+	(eval `(eval-when (:compile-toplevel :load-toplevel :execute)
+		 ,@body))))
+
     (if (or (intersection '(:load-toplevel load) situations)
 	    (and *converting-for-interpreter*
 		 (intersection '(:execute eval) situations)))
@@ -2098,11 +2122,37 @@
   "EVAL-WHEN (Situation*) Form*
   Evaluate the Forms in the specified Situations, any of COMPILE, LOAD, EVAL.
   This is conceptually a compile-only implementation, so EVAL is a no-op."
-  (do-eval-when-stuff situations body
-		      #'(lambda (forms)
-			  (ir1-convert-progn-body start cont forms))))
 
-;;; Like DO-EVAL-WHEN-STUFF, only do a macrolet. Fun is not passed any
+  ;; It's difficult to handle EVAL-WHENs completely correctly in the
+  ;; cross-compiler. (Common Lisp is not a cross-compiler-friendly
+  ;; language..) Since we, the system implementors, control not only
+  ;; the cross-compiler but also the code that it processes, we can
+  ;; handle this either by making the cross-compiler smarter about
+  ;; handling EVAL-WHENs (hard) or by avoiding the use of difficult
+  ;; EVAL-WHEN constructs (relatively easy). However, since EVAL-WHENs
+  ;; can be generated by many macro expansions, it's not always easy
+  ;; to detect problems by skimming the source code, so we'll try to
+  ;; add some code here to help out.
+  ;;
+  ;; Nested EVAL-WHENs are tricky.
+  #+sb-xc-host
+  (labels ((contains-toplevel-eval-when-p (body-part)
+	     (and (consp body-part)
+		  (or (eq (first body-part) 'eval-when)
+		      (and (member (first body-part)
+				   '(locally macrolet progn symbol-macrolet))
+			   (some #'contains-toplevel-eval-when-p
+				 (rest body-part)))))))
+    (/show "testing for nested EVAL-WHENs" body)
+    (when (some #'contains-toplevel-eval-when-p body)
+      (compiler-style-warning "nested EVAL-WHENs in cross-compilation")))
+
+  (do-eval-when-stuff situations
+		      body
+		      (lambda (forms)
+			(ir1-convert-progn-body start cont forms))))
+
+;;; Like DO-EVAL-WHEN-STUFF, only do a MACROLET. FUN is not passed any
 ;;; arguments.
 (defun do-macrolet-stuff (definitions fun)
   (declare (list definitions) (type function fun))
@@ -2859,13 +2909,18 @@
 
 ;;;; interface to defining macros
 
-;;;; DEFMACRO, DEFUN and DEFCONSTANT expand into calls to %DEFxxx
-;;;; functions so that we get a chance to see what is going on. We
-;;;; define IR1 translators for these functions which look at the
-;;;; definition and then generate a call to the %%DEFxxx function.
+;;;; FIXME:
+;;;;   classic CMU CL comment:
+;;;;     DEFMACRO and DEFUN expand into calls to %DEFxxx functions
+;;;;     so that we get a chance to see what is going on. We define
+;;;;     IR1 translators for these functions which look at the
+;;;;     definition and then generate a call to the %%DEFxxx function.
+;;;; Alas, this implementation doesn't do the right thing for
+;;;; non-toplevel uses of these forms, so this should probably
+;;;; be changed to use EVAL-WHEN instead.
 
 ;;; Return a new source path with any stuff intervening between the
-;;; current path and the first form beginning with Name stripped off.
+;;; current path and the first form beginning with NAME stripped off.
 ;;; This is used to hide the guts of DEFmumble macros to prevent
 ;;; annoying error messages.
 (defun revert-source-path (name)
@@ -2957,80 +3012,6 @@
     (when sb!xc:*compile-print*
       ;; MNA compiler message patch
       (compiler-mumble "~&; converted ~S~%" name))))
-
-;;; Update the global environment to correspond to the new definition.
-(def-ir1-translator %defconstant ((name value doc) start cont
-				  :kind :function)
-  (let ((name (eval name))
-	(newval (eval value)))
-    (unless (symbolp name)
-      (compiler-error "constant name not a symbol: ~S" name))
-    (when (eq name t)
-      (compiler-error "The value of T can't be changed."))
-    (when (eq name nil)
-      (compiler-error "Nihil ex nihil. (can't change NIL)"))
-    (when (keywordp name)
-      (compiler-error "Keyword values can't be changed."))
-
-    (let ((kind (info :variable :kind name)))
-      (case kind
-	(:constant
-	 ;; Note: This behavior (disparaging any non-EQL modification)
-	 ;; is unpopular, but it is specified by ANSI (i.e. ANSI says
-	 ;; a non-EQL change has undefined consequences). I think it's
-	 ;; a bad idea to encourage nonconforming programming style
-	 ;; even if it's convenient. If people really want things
-	 ;; which are constant in some sense other than EQL, I suggest
-	 ;; either just using DEFVAR (which is what I generally do),
-	 ;; or defining something like this (untested) code:
-	 ;;   (DEFMACRO DEFCONSTANT-EQX (SYMBOL EXPR EQX &OPTIONAL DOC)
-	 ;;     "This macro is to be used instead of DEFCONSTANT for values  
-         ;;     which are appropriately compared using the function given by
-         ;;     the EQX argument instead of EQL."
-	 ;;     (LET ((EXPR-TMP (GENSYM "EXPR-TMP-")))
-         ;;       `(EVAL-WHEN (:COMPILE-TOPLEVEL :LOAD-TOPLEVEL :EXECUTE)
-	 ;;	     (LET ((,EXPR-TMP ,EXPR))
-	 ;;	       (UNLESS (AND (BOUNDP ,SYMBOL)
-	 ;;			    (CONSTANTP ,SYMBOL)
-	 ;;			    (FUNCALL ,EQX
-	 ;;                                  (SYMBOL-VALUE ,SYMBOL)
-	 ;;                                  ,EXPR-TMP))
-	 ;;		 (DEFCONSTANT ,SYMBOL ,EXPR ,@(WHEN DOC `(,DOC))))))))
-	 ;; I prefer using DEFVAR, though, first because it's trivial,
-	 ;; and second because using DEFCONSTANT lets the compiler
-	 ;; optimize code by removing indirection, copying the current
-	 ;; value of the constant directly into the code, and for
-	 ;; consed data structures, this optimization can become a
-	 ;; pessimization. (And consed data structures are exactly
-	 ;; where you'd be tempted to use DEFCONSTANT-EQX.) Why is
-	 ;; this a pessimization? It does remove a layer of
-	 ;; indirection, but it makes it hard for the system's
-	 ;; load/dump logic to see that all references to the consed
-	 ;; data structure refer to the same (EQ) object. If you use
-	 ;; something like DEFCONSTANT-EQX, you'll tend to get one
-	 ;; copy of the data structure bound to the symbol, and one
-	 ;; more copy for each file where code refers to the constant.
-	 ;; If you're moderately clever with MAKE-LOAD-FORM, you might
-	 ;; be able to make the copy bound to the symbol at load time
-	 ;; be EQ to the references in code in the same file, but it
-	 ;; seems to be rather tricky to force code in different files
-	 ;; to refer the same copy without doing the DEFVAR thing of
-	 ;; indirection through a symbol. -- WHN 2000-11-02
-	 (unless (eql newval
-		      (info :variable :constant-value name))
-	   (compiler-warning "redefining constant ~S as:~%  ~S" name newval)))
-	(:global)
-	(t
-	 (compiler-warning "redefining ~(~A~) ~S to be a constant"
-			   kind
-			   name))))
-
-    (setf (info :variable :kind name) :constant)
-    (setf (info :variable :where-from name) :defined)
-    (setf (info :variable :constant-value name) newval)
-    (remhash name *free-variables*))
-
-  (ir1-convert start cont `(%%defconstant ,name ,value ,doc)))
 
 ;;;; defining global functions
 
@@ -3095,7 +3076,7 @@
 		   (global-var
 		    (when (defined-function-p what)
 		      (push `(,(car (rassoc (defined-function-inlinep what)
-					    inlinep-translations))
+					    *inlinep-translations*))
 			      ,name)
 			    decls)))
 		   (t (return t))))))

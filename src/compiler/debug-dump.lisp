@@ -22,8 +22,8 @@
   '(member :unknown-return :known-return :internal-error :non-local-exit
 	   :block-start :call-site :single-value-return :non-local-entry))
 
-;;; The Location-Info structure holds the information what we need about
-;;; locations which code generation decided were "interesting".
+;;; The LOCATION-INFO structure holds the information what we need
+;;; about locations which code generation decided were "interesting".
 (defstruct (location-info
 	    (:constructor make-location-info (kind label vop)))
   ;; The kind of location noted.
@@ -33,9 +33,9 @@
   ;; The VOP that emitted this location (for node, save-set, ir2-block, etc.)
   (vop nil :type vop))
 
-;;; Called during code generation in places where there is an "interesting"
-;;; location: some place where we are likely to end up in the debugger, and
-;;; thus want debug info.
+;;; This is called during code generation in places where there is an
+;;; "interesting" location: someplace where we are likely to end up
+;;; in the debugger, and thus want debug info.
 (defun note-debug-location (vop label kind)
   (declare (type vop vop) (type (or label null) label)
 	   (type location-kind kind))
@@ -50,10 +50,11 @@
   (declare (type ir2-block 2block))
   (block-environment (ir2-block-block 2block)))
 
-;;; Given a local conflicts vector and an IR2 block to represent the set of
-;;; live TNs, and the Var-Locs hash-table representing the variables dumped,
-;;; compute a bit-vector representing the set of live variables. If the TN is
-;;; environment-live, we only mark it as live when it is in scope at Node.
+;;; Given a local conflicts vector and an IR2 block to represent the
+;;; set of live TNs, and the VAR-LOCS hash-table representing the
+;;; variables dumped, compute a bit-vector representing the set of
+;;; live variables. If the TN is environment-live, we only mark it as
+;;; live when it is in scope at NODE.
 (defun compute-live-vars (live node block var-locs vop)
   (declare (type ir2-block block) (type local-tn-bit-vector live)
 	   (type hash-table var-locs) (type node node)
@@ -81,9 +82,10 @@
 (defvar *previous-location*)
 (declaim (type index *previous-location*))
 
-;;; Dump a compiled debug-location into *BYTE-BUFFER* that describes the
-;;; code/source map and live info. If true, VOP is the VOP associated with
-;;; this location, for use in determining whether TNs are spilled.
+;;; Dump a compiled debug-location into *BYTE-BUFFER* that describes
+;;; the code/source map and live info. If true, VOP is the VOP
+;;; associated with this location, for use in determining whether TNs
+;;; are spilled.
 (defun dump-1-location (node block kind tlf-num label live var-locs vop)
   (declare (type node node) (type ir2-block block)
 	   (type local-tn-bit-vector live)
@@ -92,7 +94,7 @@
 	   (type hash-table var-locs) (type (or vop null) vop))
 
   (vector-push-extend
-   (dpb (position-or-lose kind compiled-code-location-kinds)
+   (dpb (position-or-lose kind *compiled-code-location-kinds*)
 	compiled-code-location-kind-byte
 	0)
    *byte-buffer*)
@@ -111,8 +113,8 @@
 
   (values))
 
-;;; Extract context info from a Location-Info structure and use it to dump a
-;;; compiled code-location.
+;;; Extract context info from a Location-Info structure and use it to
+;;; dump a compiled code-location.
 (defun dump-location-from-info (loc tlf-num var-locs)
   (declare (type location-info loc) (type (or index null) tlf-num)
 	   (type hash-table var-locs))
@@ -127,8 +129,8 @@
 		     vop))
   (values))
 
-;;; Scan all the blocks, determining if all locations are in the same TLF,
-;;; and returning it or NIL.
+;;; Scan all the blocks, determining if all locations are in the same
+;;; TLF, and returning it or NIL.
 (defun find-tlf-number (fun)
   (declare (type clambda fun))
   (let ((res (source-path-tlf-number (node-source-path (lambda-bind fun)))))
@@ -194,13 +196,13 @@
 	 *byte-buffer*))))
   (values))
 
-;;; Return a vector and an integer (or null) suitable for use as the BLOCKS
-;;; and TLF-NUMBER in Fun's debug-function. This requires two passes to
-;;; compute:
-;;; -- Scan all blocks, dumping the header and successors followed by all the
-;;;    non-elsewhere locations.
-;;; -- Dump the elsewhere block header and all the elsewhere locations (if
-;;;    any.)
+;;; Return a vector and an integer (or null) suitable for use as the
+;;; BLOCKS and TLF-NUMBER in Fun's debug-function. This requires two
+;;; passes to compute:
+;;; -- Scan all blocks, dumping the header and successors followed
+;;;    by all the non-elsewhere locations.
+;;; -- Dump the elsewhere block header and all the elsewhere 
+;;;    locations (if any.)
 (defun compute-debug-blocks (fun var-locs)
   (declare (type clambda fun) (type hash-table var-locs))
   (setf (fill-pointer *byte-buffer*) 0)
@@ -235,10 +237,10 @@
 
     (values (copy-seq *byte-buffer*) tlf-num)))
 
-;;; Return a list of DEBUG-SOURCE structures containing information derived
-;;; from Info. Unless :BYTE-COMPILE T was specified, we always dump the
-;;; Start-Positions, since it is too hard figure out whether we need them or
-;;; not.
+;;; Return a list of DEBUG-SOURCE structures containing information
+;;; derived from INFO. Unless :BYTE-COMPILE T was specified, we always
+;;; dump the Start-Positions, since it is too hard figure out whether
+;;; we need them or not.
 (defun debug-source-for-info (info)
   (declare (type source-info info))
   (assert (not (source-info-current-file info)))
@@ -271,17 +273,18 @@
 	  (source-info-files info)))
 
 ;;; Given an arbitrary sequence, coerce it to an unsigned vector if
-;;; possible. Ordinarily we coerce it to the smallest specialized vector
-;;; we can. However, we also have a special hack for cross-compiling at
-;;; bootstrap time, when arbitrarily-specialized aren't fully supported:
-;;; in that case, we coerce it only to a vector whose element size is an
-;;; integer multiple of output byte size.
+;;; possible. Ordinarily we coerce it to the smallest specialized
+;;; vector we can. However, we also have a special hack for
+;;; cross-compiling at bootstrap time, when arbitrarily-specialized
+;;; aren't fully supported: in that case, we coerce it only to a
+;;; vector whose element size is an integer multiple of output byte
+;;; size.
 (defun coerce-to-smallest-eltype (seq)
   (let ((maxoid #-sb-xc-host 0
-		;; An initial value value of 255 prevents us from specializing
-		;; the array to anything smaller than (UNSIGNED-BYTE 8), which
-		;; keeps the cross-compiler's portable specialized array output
-		;; functions happy.
+		;; An initial value value of 255 prevents us from
+		;; specializing the array to anything smaller than
+		;; (UNSIGNED-BYTE 8), which keeps the cross-compiler's
+		;; portable specialized array output functions happy.
 		#+sb-xc-host 255))
     (flet ((frob (x)
 	     (if (typep x 'unsigned-byte)
@@ -304,15 +307,15 @@
   (make-sc-offset (sc-number (tn-sc tn))
 		  (tn-offset tn)))
 
-;;; Dump info to represent Var's location being TN. ID is an integer that
-;;; makes Var's name unique in the function. Buffer is the vector we stick the
-;;; result in. If Minimal is true, we suppress name dumping, and set the
-;;; minimal flag.
+;;; Dump info to represent Var's location being TN. ID is an integer
+;;; that makes Var's name unique in the function. Buffer is the vector
+;;; we stick the result in. If Minimal is true, we suppress name
+;;; dumping, and set the minimal flag.
 ;;;
 ;;; The debug-var is only marked as always-live if the TN is
-;;; environment live and is an argument. If a :debug-environment TN, then we
-;;; also exclude set variables, since the variable is not guaranteed to be live
-;;; everywhere in that case.
+;;; environment live and is an argument. If a :debug-environment TN,
+;;; then we also exclude set variables, since the variable is not
+;;; guaranteed to be live everywhere in that case.
 (defun dump-1-variable (fun var tn id minimal buffer)
   (declare (type lambda-var var) (type (or tn null) tn) (type index id)
 	   (type clambda fun))
@@ -348,10 +351,11 @@
       (vector-push-extend (tn-sc-offset save-tn) buffer)))
   (values))
 
-;;; Return a vector suitable for use as the DEBUG-FUNCTION-VARIABLES of FUN.
-;;; LEVEL is the current DEBUG-INFO quality. VAR-LOCS is a hashtable in which
-;;; we enter the translation from LAMBDA-VARS to the relative position of that
-;;; variable's location in the resulting vector.
+;;; Return a vector suitable for use as the DEBUG-FUNCTION-VARIABLES
+;;; of FUN. LEVEL is the current DEBUG-INFO quality. VAR-LOCS is a
+;;; hashtable in which we enter the translation from LAMBDA-VARS to
+;;; the relative position of that variable's location in the resulting
+;;; vector.
 (defun compute-variables (fun level var-locs)
   (declare (type clambda fun) (type hash-table var-locs))
   (collect ((vars))
@@ -405,7 +409,7 @@
     (coerce buffer 'simple-vector)))
 
 ;;; Return Var's relative position in the function's variables (determined
-;;; from the Var-Locs hashtable.)  If Var is deleted, the return DELETED.
+;;; from the Var-Locs hashtable.)  If Var is deleted, then return DELETED.
 (defun debug-location-for (var var-locs)
   (declare (type lambda-var var) (type hash-table var-locs))
   (let ((res (gethash var var-locs)))
@@ -417,12 +421,13 @@
 
 ;;;; arguments/returns
 
-;;; Return a vector to be used as the COMPILED-DEBUG-FUNCTION-ARGUMENTS for
-;;; Fun. If fun is the MAIN-ENTRY for an optional dispatch, then look at the
-;;; ARGLIST to determine the syntax, otherwise pretend all arguments are fixed.
+;;; Return a vector to be used as the
+;;; COMPILED-DEBUG-FUNCTION-ARGUMENTS for Fun. If fun is the
+;;; MAIN-ENTRY for an optional dispatch, then look at the ARGLIST to
+;;; determine the syntax, otherwise pretend all arguments are fixed.
 ;;;
-;;; ### This assumption breaks down in EPs other than the main-entry, since
-;;; they may or may not have supplied-p vars, etc.
+;;; ### This assumption breaks down in EPs other than the main-entry,
+;;; since they may or may not have supplied-p vars, etc.
 (defun compute-arguments (fun var-locs)
   (declare (type clambda fun) (type hash-table var-locs))
   (collect ((res))
@@ -456,8 +461,8 @@
 
     (coerce-to-smallest-eltype (res))))
 
-;;; Return a vector of SC offsets describing Fun's return locations. (Must
-;;; be known values return...)
+;;; Return a vector of SC offsets describing Fun's return locations.
+;;; (Must be known values return...)
 (defun compute-debug-returns (fun)
   (coerce-to-smallest-eltype
    (mapcar #'(lambda (loc)
@@ -488,8 +493,9 @@
      :start-pc (label-position (ir2-environment-environment-start 2env))
      :elsewhere-pc (label-position (ir2-environment-elsewhere-start 2env)))))
 
-;;; Return a complete C-D-F structure for Fun. This involves determining
-;;; the DEBUG-INFO level and filling in optional slots as appropriate.
+;;; Return a complete C-D-F structure for Fun. This involves
+;;; determining the DEBUG-INFO level and filling in optional slots as
+;;; appropriate.
 (defun compute-1-debug-function (fun var-locs)
   (declare (type clambda fun) (type hash-table var-locs))
   (let* ((dfun (dfun-from-fun fun))
@@ -532,18 +538,18 @@
 
 ;;;; minimal debug functions
 
-;;; Return true if Dfun can be represented as a minimal debug function.
-;;; Dfun is a cons (<start offset> . C-D-F).
+;;; Return true if DFUN can be represented as a minimal debug
+;;; function. DFUN is a cons (<start offset> . C-D-F).
 (defun debug-function-minimal-p (dfun)
   (declare (type cons dfun))
   (let ((dfun (cdr dfun)))
     (and (member (compiled-debug-function-arguments dfun) '(:minimal nil))
 	 (null (compiled-debug-function-blocks dfun)))))
 
-;;; Dump a packed binary representation of a Dfun into *byte-buffer*.
-;;; Prev-Start and Start are the byte offsets in the code where the previous
-;;; function started and where this one starts. Prev-Elsewhere is the previous
-;;; function's elsewhere PC.
+;;; Dump a packed binary representation of a DFUN into *BYTE-BUFFER*.
+;;; PREV-START and START are the byte offsets in the code where the
+;;; previous function started and where this one starts.
+;;; PREV-ELSEWHERE is the previous function's elsewhere PC.
 (defun dump-1-minimal-dfun (dfun prev-start start prev-elsewhere)
   (declare (type compiled-debug-function dfun)
 	   (type index prev-start start prev-elsewhere))
@@ -567,7 +573,7 @@
       (setf (ldb minimal-debug-function-name-style-byte options) name-rep)
       (setf (ldb minimal-debug-function-kind-byte options)
 	    (position-or-lose (compiled-debug-function-kind dfun)
-		      minimal-debug-function-kinds))
+			      *minimal-debug-function-kinds*))
       (setf (ldb minimal-debug-function-returns-byte options)
 	    (etypecase (compiled-debug-function-returns dfun)
 	      ((member :standard) minimal-debug-function-returns-standard)
@@ -617,8 +623,8 @@
 			  prev-elsewhere)
 		       *byte-buffer*)))
 
-;;; Return a byte-vector holding all the debug functions for a component in
-;;; the packed binary minimal-debug-function format.
+;;; Return a byte-vector holding all the debug functions for a
+;;; component in the packed binary minimal-debug-function format.
 (defun compute-minimal-debug-functions (dfuns)
   (declare (list dfuns))
   (setf (fill-pointer *byte-buffer*) 0)
@@ -654,8 +660,9 @@
   (declare (type component component))
   (collect ((dfuns))
     (let ((var-locs (make-hash-table :test 'eq))
-	  ;; FIXME: What is *BYTE-BUFFER* for? Has it become dead code now that
-	  ;; we no longer use minimal-debug-function representation?
+	  ;; FIXME: What is *BYTE-BUFFER* for? Has it become dead code
+	  ;; now that we no longer use minimal-debug-function
+	  ;; representation?
 	  (*byte-buffer* (make-array 10
 				     :element-type '(unsigned-byte 8)
 				     :fill-pointer 0
@@ -668,19 +675,20 @@
       (let* ((sorted (sort (dfuns) #'< :key #'car))
 	     ;; FIXME: CMU CL had
 	     ;;    (IF (EVERY #'DEBUG-FUNCTION-MINIMAL-P SORTED)
-	     ;;	(COMPUTE-MINIMAL-DEBUG-FUNCTIONS SORTED)
-	     ;;	(COMPUTE-DEBUG-FUNCTION-MAP SORTED))
-	     ;; here. We've gotten rid of the minimal-debug-function case in
-	     ;; SBCL because the minimal representation couldn't be made to
-	     ;; transform properly under package renaming. Now that that
-	     ;; case is gone, a lot of code is dead, and once everything is
-	     ;; known to work, the dead code should be deleted.
+	     ;;	       (COMPUTE-MINIMAL-DEBUG-FUNCTIONS SORTED)
+	     ;;	       (COMPUTE-DEBUG-FUNCTION-MAP SORTED))
+	     ;; here. We've gotten rid of the minimal-debug-function
+	     ;; case in SBCL because the minimal representation
+	     ;; couldn't be made to transform properly under package
+	     ;; renaming. Now that that case is gone, a lot of code is
+	     ;; dead, and once everything is known to work, the dead
+	     ;; code should be deleted.
 	     (function-map (compute-debug-function-map sorted)))
 	(make-compiled-debug-info :name (component-name component)
 				  :function-map function-map)))))
 
-;;; Write BITS out to BYTE-BUFFER in backend byte order. The length of BITS
-;;; must be evenly divisible by eight.
+;;; Write BITS out to BYTE-BUFFER in backend byte order. The length of
+;;; BITS must be evenly divisible by eight.
 (defun write-packed-bit-vector (bits byte-buffer)
   (declare (type simple-bit-vector bits) (type byte-buffer byte-buffer))
   (multiple-value-bind (initial step done)

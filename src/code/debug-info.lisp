@@ -16,8 +16,8 @@
 ;;;; We represent the place where some value is stored with a SC-OFFSET,
 ;;;; which is the SC number and offset encoded as an integer.
 
-(defconstant sc-offset-scn-byte (byte 5 0))
-(defconstant sc-offset-offset-byte (byte 22 5))
+(defconstant-eqx sc-offset-scn-byte (byte 5 0) #'equalp)
+(defconstant-eqx sc-offset-offset-byte (byte 22 5) #'equalp)
 (def!type sc-offset () '(unsigned-byte 27))
 
 (defmacro make-sc-offset (scn offset)
@@ -73,13 +73,13 @@
 ;;;;    ...more <kind, delta, top-level form offset, form-number, live-set>
 ;;;;       tuples...
 
-(defconstant compiled-debug-block-nsucc-byte (byte 2 0))
+(defconstant-eqx compiled-debug-block-nsucc-byte (byte 2 0) #'equalp)
 (defconstant compiled-debug-block-elsewhere-p #b00000100)
 
-(defconstant compiled-code-location-kind-byte (byte 3 0))
-(defconstant compiled-code-location-kinds
-  '#(:unknown-return :known-return :internal-error :non-local-exit
-     :block-start :call-site :single-value-return :non-local-entry))
+(defconstant-eqx compiled-code-location-kind-byte (byte 3 0) #'equalp)
+(defparameter *compiled-code-location-kinds*
+  #(:unknown-return :known-return :internal-error :non-local-exit
+    :block-start :call-site :single-value-return :non-local-entry))
 
 ;;;; DEBUG-FUNCTION objects
 
@@ -234,31 +234,28 @@ Well, I guess you need to at least know which function is an XEP for the real
 function (which would be useful info anyway).
 |#
 
-;;; Following are definitions of bit-fields in the first byte of the minimal
-;;; debug function:
+;;; The following are definitions of bit-fields in the first byte of
+;;; the minimal debug function:
 (defconstant minimal-debug-function-name-symbol 0)
 (defconstant minimal-debug-function-name-packaged 1)
 (defconstant minimal-debug-function-name-uninterned 2)
 (defconstant minimal-debug-function-name-component 3)
-(defconstant minimal-debug-function-name-style-byte (byte 2 0))
-(defconstant minimal-debug-function-kind-byte (byte 3 2))
-(defconstant minimal-debug-function-kinds
-  '#(nil :optional :external :top-level :cleanup))
+(defconstant-eqx minimal-debug-function-name-style-byte (byte 2 0) #'equalp)
+(defconstant-eqx minimal-debug-function-kind-byte (byte 3 2) #'equalp)
+(defparameter *minimal-debug-function-kinds*
+  #(nil :optional :external :top-level :cleanup))
 (defconstant minimal-debug-function-returns-standard 0)
 (defconstant minimal-debug-function-returns-specified 1)
 (defconstant minimal-debug-function-returns-fixed 2)
-(defconstant minimal-debug-function-returns-byte (byte 2 5))
+(defconstant-eqx minimal-debug-function-returns-byte (byte 2 5) #'equalp)
 
 ;;; The following are bit-flags in the second byte of the minimal debug
 ;;; function:
-
-;;; If true, wrap (SETF ...) around the name.
+;;;   * If true, wrap (SETF ...) around the name.
 (defconstant minimal-debug-function-setf-bit (ash 1 0))
-
-;;; If true, there is a NFP.
+;;;   * If true, there is a NFP.
 (defconstant minimal-debug-function-nfp-bit (ash 1 1))
-
-;;; If true, variables (hence arguments) have been dumped.
+;;;   * If true, variables (hence arguments) have been dumped.
 (defconstant minimal-debug-function-variables-bit (ash 1 2))
 
 ;;;; debug source

@@ -317,54 +317,50 @@
 	      (format-print-ordinal stream (next-arg))
 	      (format-print-cardinal stream (next-arg))))))
 
-(defconstant cardinal-ones
+(defparameter *cardinal-ones*
   #(nil "one" "two" "three" "four" "five" "six" "seven" "eight" "nine"))
 
-(defconstant cardinal-tens
+(defparameter *cardinal-tens*
   #(nil nil "twenty" "thirty" "forty"
 	"fifty" "sixty" "seventy" "eighty" "ninety"))
 
-(defconstant cardinal-teens
+(defparameter *cardinal-teens*
   #("ten" "eleven" "twelve" "thirteen" "fourteen"  ;;; RAD
     "fifteen" "sixteen" "seventeen" "eighteen" "nineteen"))
 
-(defconstant cardinal-periods
+(defparameter *cardinal-periods*
   #("" " thousand" " million" " billion" " trillion" " quadrillion"
     " quintillion" " sextillion" " septillion" " octillion" " nonillion"
     " decillion" " undecillion" " duodecillion" " tredecillion"
     " quattuordecillion" " quindecillion" " sexdecillion" " septendecillion"
     " octodecillion" " novemdecillion" " vigintillion"))
 
-(defconstant ordinal-ones
+(defparameter *ordinal-ones*
   #(nil "first" "second" "third" "fourth"
-	"fifth" "sixth" "seventh" "eighth" "ninth")
-  #!+sb-doc
-  "Table of ordinal ones-place digits in English")
+	"fifth" "sixth" "seventh" "eighth" "ninth"))
 
-(defconstant ordinal-tens
+(defparameter *ordinal-tens*
   #(nil "tenth" "twentieth" "thirtieth" "fortieth"
-	"fiftieth" "sixtieth" "seventieth" "eightieth" "ninetieth")
-  #!+sb-doc
-  "Table of ordinal tens-place digits in English")
+	"fiftieth" "sixtieth" "seventieth" "eightieth" "ninetieth"))
 
 (defun format-print-small-cardinal (stream n)
   (multiple-value-bind (hundreds rem) (truncate n 100)
     (when (plusp hundreds)
-      (write-string (svref cardinal-ones hundreds) stream)
+      (write-string (svref *cardinal-ones* hundreds) stream)
       (write-string " hundred" stream)
       (when (plusp rem)
 	(write-char #\space stream)))
     (when (plusp rem)
       (multiple-value-bind (tens ones) (truncate rem 10)
 	(cond ((< 1 tens)
-	      (write-string (svref cardinal-tens tens) stream)
+	      (write-string (svref *cardinal-tens* tens) stream)
 	      (when (plusp ones)
 		(write-char #\- stream)
-		(write-string (svref cardinal-ones ones) stream)))
+		(write-string (svref *cardinal-ones* ones) stream)))
 	     ((= tens 1)
-	      (write-string (svref cardinal-teens ones) stream))
+	      (write-string (svref *cardinal-teens* ones) stream))
 	     ((plusp ones)
-	      (write-string (svref cardinal-ones ones) stream)))))))
+	      (write-string (svref *cardinal-ones* ones) stream)))))))
 
 (defun format-print-cardinal (stream n)
   (cond ((minusp n)
@@ -385,7 +381,7 @@
       (unless (zerop beyond)
 	(write-char #\space stream))
       (format-print-small-cardinal stream here)
-      (write-string (svref cardinal-periods period) stream))))
+      (write-string (svref *cardinal-periods* period) stream))))
 
 (defun format-print-ordinal (stream n)
   (when (minusp n)
@@ -399,16 +395,16 @@
       (multiple-value-bind (tens ones) (truncate bot 10)
 	(cond ((= bot 12) (write-string "twelfth" stream))
 	      ((= tens 1)
-	       (write-string (svref cardinal-teens ones) stream);;;RAD
+	       (write-string (svref *cardinal-teens* ones) stream);;;RAD
 	       (write-string "th" stream))
 	      ((and (zerop tens) (plusp ones))
-	       (write-string (svref ordinal-ones ones) stream))
+	       (write-string (svref *ordinal-ones* ones) stream))
 	      ((and (zerop ones)(plusp tens))
-	       (write-string (svref ordinal-tens tens) stream))
+	       (write-string (svref *ordinal-tens* tens) stream))
 	      ((plusp bot)
-	       (write-string (svref cardinal-tens tens) stream)
+	       (write-string (svref *cardinal-tens* tens) stream)
 	       (write-char #\- stream)
-	       (write-string (svref ordinal-ones ones) stream))
+	       (write-string (svref *ordinal-ones* ones) stream))
 	      ((plusp number)
 	       (write-string "th" stream))
 	      (t

@@ -22,40 +22,16 @@ but instead
      the program loops endlessly instead of printing the object.
 
 
-KNOWN BUGS RELATED TO THE IR1 INTERPRETER
+NOTES:
 
-(Note: At some point, the pure interpreter (aka the "IR1 interpreter")
-will probably go away (replaced by constructs like
-  (DEFUN EVAL (X) (FUNCALL (COMPILE NIL (LAMBDA ..)))))
-and at that time these bugs should go away automatically. Until then,
-they'll probably remain, since they're not considered urgent.
-After the IR1 interpreter goes away is also the preferred time
-to start systematically exterminating cases where debugging
-functionality (backtrace, breakpoint, etc.) breaks down, since
-getting rid of the IR1 interpreter will reduce the number of
-special cases we need to support.)
+There is also some information on bugs in the manual page and
+in the TODO file. Eventually more such information may move here.
 
-IR1-1:
-  The FUNCTION special operator doesn't check properly whether its
-  argument is a function name. E.g. (FUNCTION (X Y)) returns a value
-  instead of failing with an error. (Later attempting to funcall the
-  value does cause an error.) 
-
-IR1-2:
-  COMPILED-FUNCTION-P bogusly reports T for interpreted functions:
-	* (DEFUN FOO (X) (- 12 X))
-	FOO
-	* (COMPILED-FUNCTION-P #'FOO)
-	T
+The gaps in the number sequence belong to old bugs which have been
+fixed.
 
 
 KNOWN BUGS OF NO SPECIAL CLASS:
-
-(Note:
-  * There is also some information on bugs in the manual page and
-    in the TODO file. Eventually more such information may move here.
-  * The gaps in the number sequence belong to old bugs which were
-    eliminated.)
 
 2:
   DEFSTRUCT should almost certainly overwrite the old LAYOUT information
@@ -776,3 +752,63 @@ Error in function C::GET-LAMBDA-TO-COMPILE:
     (FAIL 12)
   then requesting a BACKTRACE at the debugger prompt gives no information
   about where in the user program the problem occurred.
+
+
+KNOWN BUGS RELATED TO THE IR1 INTERPRETER
+
+(Note: At some point, the pure interpreter (actually a semi-pure
+interpreter aka "the IR1 interpreter") will probably go away, replaced
+by constructs like
+  (DEFUN EVAL (X) (FUNCALL (COMPILE NIL (LAMBDA ..)))))
+and at that time these bugs should either go away automatically or
+become more tractable to fix. Until then, they'll probably remain,
+since some of them aren't considered urgent, and the rest are too hard
+to fix as long as so many special cases remain. After the IR1
+interpreter goes away is also the preferred time to start
+systematically exterminating cases where debugging functionality
+(backtrace, breakpoint, etc.) breaks down, since getting rid of the
+IR1 interpreter will reduce the number of special cases we need to
+support.)
+
+IR1-1:
+  The FUNCTION special operator doesn't check properly whether its
+  argument is a function name. E.g. (FUNCTION (X Y)) returns a value
+  instead of failing with an error. (Later attempting to funcall the
+  value does cause an error.) 
+
+IR1-2:
+  COMPILED-FUNCTION-P bogusly reports T for interpreted functions:
+	* (DEFUN FOO (X) (- 12 X))
+	FOO
+	* (COMPILED-FUNCTION-P #'FOO)
+	T
+
+IR1-3:
+  Executing 
+    (DEFVAR *SUPPRESS-P* T)
+    (EVAL '(UNLESS *SUPPRESS-P*
+             (EVAL-WHEN (:COMPILE-TOPLEVEL :LOAD-TOPLEVEL :EXECUTE)
+               (FORMAT T "surprise!"))))
+  prints "surprise!". Probably the entire EVAL-WHEN mechanism ought to be
+  rewritten from scratch to conform to the ANSI definition, abandoning
+  the *ALREADY-EVALED-THIS* hack which is used in sbcl-0.6.8.9 (and
+  in the original CMU CL source, too). This should be easier to do --
+  though still nontrivial -- once the various IR1 interpreter special
+  cases are gone.
+
+IR1-3a:
+  EVAL-WHEN's idea of what's a toplevel form is even more screwed up 
+  than the example in IR1-3 would suggest, since COMPILE-FILE and
+  COMPILE both print both "right now!" messages when compiling the
+  following code,
+    (LAMBDA (X)
+      (COND (X
+             (EVAL-WHEN (:COMPILE-TOPLEVEL :LOAD-TOPLEVEL :EXECUTE)
+	       (PRINT "yes! right now!"))
+             "yes!")
+            (T
+             (EVAL-WHEN (:COMPILE-TOPLEVEL :LOAD-TOPLEVEL :EXECUTE)
+               (PRINT "no! right now!"))
+             "no!")))
+  and while EVAL doesn't print the "right now!" messages, the first
+  FUNCALL on the value returned by EVAL causes both of them to be printed.

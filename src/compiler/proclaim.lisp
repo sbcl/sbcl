@@ -130,6 +130,8 @@
        (dolist (name args)
 	 (unless (symbolp name)
 	   (error "can't declare a non-symbol as SPECIAL: ~S" name))
+	 (when (constantp name)
+	   (error "can't declare a constant as SPECIAL: ~S" name))
 	 (clear-info :variable :constant-value name)
 	 (setf (info :variable :kind name) :special)))
       (type

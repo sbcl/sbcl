@@ -19,10 +19,9 @@
   (options sb-c-call:int)
   (rusage sb-c-call:int))
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defconstant wait-wnohang #-svr4 1 #+svr4 #o100)
-  (defconstant wait-wuntraced #-svr4 2 #+svr4 4)
-  (defconstant wait-wstopped #-svr4 #o177 #+svr4 wait-wuntraced))
+(defconstant wait-wnohang #-svr4 1 #+svr4 #o100)
+(defconstant wait-wuntraced #-svr4 2 #+svr4 4)
+(defconstant wait-wstopped #-svr4 #o177 #+svr4 wait-wuntraced)
 
 (defun wait3 (&optional do-not-hang check-for-stopped)
   "Return any available status information on child process. "

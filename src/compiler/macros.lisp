@@ -242,7 +242,7 @@
     NAME-attributes attribute-name*
       Return a set of the named attributes."
 
-  (let ((const-name (symbolicate name "-ATTRIBUTE-TRANSLATIONS"))
+  (let ((translations-name (symbolicate "*" name "-ATTRIBUTE-TRANSLATIONS*"))
 	(test-name (symbolicate name "-ATTRIBUTEP")))
     (collect ((alist))
       (do ((mask 1 (ash mask 1))
@@ -251,13 +251,15 @@
 	(alist (cons (car names) mask)))
 
       `(progn
+
 	 (eval-when (:compile-toplevel :load-toplevel :execute)
-	   (defconstant ,const-name ',(alist)))
+	   (defparameter ,translations-name ',(alist)))
 
 	 (defmacro ,test-name (attributes &rest attribute-names)
 	   "Automagically generated boolean attribute test function. See
 	    Def-Boolean-Attribute."
-	   `(logtest ,(compute-attribute-mask attribute-names ,const-name)
+	   `(logtest ,(compute-attribute-mask attribute-names
+					      ,translations-name)
 		     (the attributes ,attributes)))
 
 	 (define-setf-expander ,test-name (place &rest attributes
@@ -274,7 +276,8 @@
 	       (error "multiple store variables for ~S" place))
 	     (let ((newval (gensym))
 		   (n-place (gensym))
-		   (mask (compute-attribute-mask attributes ,const-name)))
+		   (mask (compute-attribute-mask attributes
+						 ,translations-name)))
 	       (values `(,@temps ,n-place)
 		       `(,@values ,get)
 		       `(,newval)
@@ -289,7 +292,7 @@
 	 (defmacro ,(symbolicate name "-ATTRIBUTES") (&rest attribute-names)
 	   "Automagically generated boolean attribute creation function. See
 	    Def-Boolean-Attribute."
-	   (compute-attribute-mask attribute-names ,const-name))))))
+	   (compute-attribute-mask attribute-names ,translations-name))))))
 ;;; #+SB-XC-HOST SB!XC:DEFMACRO version is in late-macros.lisp. -- WHN 19990806
 
 ;;; And now for some gratuitous pseudo-abstraction...

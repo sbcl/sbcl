@@ -17,9 +17,7 @@
 ;;; depth and what Common Lisp ordinarily calls length; it's incremented either
 ;;; when we descend into a compound object or when we step through elements of
 ;;; a compound object.
-(eval-when (:compile-toplevel :load-toplevel :execute)
 (defconstant +max-hash-depthoid+ 4)
-) ; EVAL-WHEN
 
 ;;;; mixing hash values
 

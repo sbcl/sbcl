@@ -9,8 +9,6 @@
 
 (in-package "SB!VM")
 
-(eval-when (:compile-toplevel :execute :load-toplevel)
-
 (defconstant lowtag-bits 3
   #!+sb-doc
   "Number of bits at the low end of a pointer used for type information.")
@@ -30,8 +28,6 @@
 (defconstant type-mask (1- (ash 1 type-bits))
   #!+sb-doc
   "Mask to extract the type from a header word.")
-
-); eval-when
 
 ;;; FIXME: Couldn't/shouldn't these be DEFCONSTANT instead of DEFPARAMETER?
 (defparameter *target-most-positive-fixnum* (1- (ash 1 29))

@@ -89,9 +89,9 @@ $SBCL_XC_HOST <<-'EOF' || exit 1
 	    (write *target-object-file-names* :stream s :readably t)))
 	;; If you're experimenting with the system under a
         ;; cross-compilation host which supports CMU-CL-style SAVE-LISP,
-        ;; this can be a good time to run it,
-	;; The resulting core isn't used in the normal build, but
-        ;; can be handy for experimenting with the system.
+        ;; this can be a good time to run it. The resulting core isn't
+	;; used in the normal build, but can be handy for experimenting
+	;; with the system.
 	(when (find :sb-show *shebang-features*)
           #+cmu (ext:save-lisp "output/after-xc.core" :load-init-file nil)
           #+sbcl (sb-ext:save-lisp-and-die "output/after-xc.core"))
@@ -101,14 +101,17 @@ $SBCL_XC_HOST <<-'EOF' || exit 1
 #
 # In a fresh host Lisp invocation, load the cross-compiler (in order
 # to get various definitions that GENESIS needs, not in order to
-# cross-compile GENESIS, compile and load GENESIS, then run GENESIS.
-# (We use a fresh host Lisp invocation here for basically the same
-# reasons we did before when loading and running the cross-compiler.)
+# cross-compile GENESIS, then load and run GENESIS. (We use a fresh
+# host Lisp invocation here for basically the same reasons we did
+# before when loading and running the cross-compiler.)
 #
-# (This second invocation of GENESIS is done because in order to
+# (Why do we need this second invocation of GENESIS? In order to
 # create a .core file, as opposed to just a .h file, GENESIS needs
-# symbol table data on the C runtime, which we can get only after the 
-# C runtime has been built.)
+# symbol table data on the C runtime. And we can get that symbol
+# data only after the C runtime has been built. Therefore, even
+# though we ran GENESIS earlier, we couldn't get it to make a .core
+# file at that time; but we needed to run it earlier in order to 
+# get to where we can write a .core file.)
 echo //loading and running GENESIS to create cold-sbcl.core
 $SBCL_XC_HOST <<-'EOF' || exit 1
 	(setf *print-level* 5 *print-length* 5)

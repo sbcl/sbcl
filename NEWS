@@ -536,15 +536,38 @@ changes in sbcl-0.6.9 relative to sbcl-0.6.8:
   into everyone's system when I do a "cvs update".) When no
   customize-target-features.lisp file exists, the target *FEATURES* list
   should be constructed the same way as before.
-* The QUIT debugger command is gone, since it did something
-  rather different than the SB-EXT:QUIT command, and since it never
-  worked properly outside the main toplevel read/eval/print loop.
-  Invoking the new TOPLEVEL restart provides the same functionality.
-* The GO debugger command is also gone, since you can just invoke
-  the CONTINUE restart directly instead.
-* The TOP debugger command is also gone, since it's redundant with 
-  'f 0', and since it interfered with abbreviations for the TOPLEVEL
-  restart.
+* fixed bug 1 (error handling before read-eval-print loop starts), and
+  redid debugger restarts and related debugger commands somewhat while
+  doing so:
+  ** The QUIT debugger command is gone, since it did something
+     rather different than the SB-EXT:QUIT command, and since it never
+     worked properly outside the main toplevel read/eval/print loop.
+     Invoking the new TOPLEVEL restart provides the same functionality.
+  ** The GO debugger command is also gone, since you can just invoke
+     the CONTINUE restart directly instead.
+  ** The TOP debugger command is also gone, since it's redundant with the
+     FRAME 0 command, and since it interfered with abbreviations for the
+     TOPLEVEL restart.
+* DEFCONSTANT has been made more ANSI-compatible (completely ANSI-compatible,
+  as far as I know):
+  ** DEFCONSTANT now tests reassignments using EQL, not EQUAL, in order to 
+     warn about behavior which is undefined under the ANSI spec. Note: This
+     is specified by ANSI, but it's not very popular with programmers.
+     If it causes you problems, take a look at the new SB-INT:DEFCONSTANT-EQX
+     macro in the SBCL sources for an example of a workaround which you
+     might use to make portable ANSI-standard code which does what you want.
+  ** DEFCONSTANT's implementation is now based on EVAL-WHEN instead of on
+     pre-ANSI IR1 translation magic, so it does the ANSI-specified thing
+     when it's used as a non-toplevel form. (This is required in order
+     to implement the DEFCONSTANT-EQX macro.)
+?? fixed bug: (DEFCONSTANT X 1) (DEFVAR X) (SETF X 2) no longer "works".
+?? fixed bug 21, a compiler bug re. special variables in closures. One
+  consequence of this is that ILISP should work better, because idioms like
+  (LET ((*PACKAGE* ..)) (DO-SOMETHING)) no longer have screwy side-effects.
+* The core file version number and fasl file version number have been 
+  incremented, because the old noncompliant DEFCONSTANT behavior involved
+  calling functions which no longer exist.
+
 ?? signal handling reliability
 ?? fixed some bugs mentioned in the man page:
   ?? DEFUN-vs.-DECLAIM

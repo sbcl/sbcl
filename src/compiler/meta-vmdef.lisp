@@ -233,8 +233,10 @@
        (sb!assem:assemble (*code-segment* ,(first lambda-list))
 	 ,@body))))
 
-(defconstant sc-vop-slots '((:move . sc-move-vops)
-			    (:move-argument . sc-move-arg-vops)))
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defparameter *sc-vop-slots*
+    '((:move . sc-move-vops)
+      (:move-argument . sc-move-arg-vops))))
 
 ;;; We record the VOP and costs for all SCs that we can move between
 ;;; (including implicit loading).
@@ -246,7 +248,7 @@
   an extra argument, which is the frame pointer of the frame to move into."
   (when (or (oddp (length scs)) (null scs))
     (error "malformed SCs spec: ~S" scs))
-  (let ((accessor (or (cdr (assoc kind sc-vop-slots))
+  (let ((accessor (or (cdr (assoc kind *sc-vop-slots*))
 		      (error "unknown kind ~S" kind))))
     `(progn
        ,@(when (eq kind :move)
@@ -1420,8 +1422,9 @@
 
 ;;;; setting up VOP-INFO
 
-(defconstant slot-inherit-alist
-  '((:generator-function . vop-info-generator-function)))
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defparameter *slot-inherit-alist*
+    '((:generator-function . vop-info-generator-function))))
 
 ;;; Something to help with inheriting VOP-Info slots. We return a
 ;;; keyword/value pair that can be passed to the constructor. Slot is the
@@ -1432,7 +1435,7 @@
 ;;; we return the Form so that the slot is recomputed.
 (defmacro inherit-vop-info (slot parse test form)
   `(if (and ,parse ,test)
-       (list ,slot `(,',(or (cdr (assoc slot slot-inherit-alist))
+       (list ,slot `(,',(or (cdr (assoc slot *slot-inherit-alist*))
 			    (error "unknown slot ~S" slot))
 		     (template-or-lose ',(vop-parse-name ,parse))))
        (list ,slot ,form)))

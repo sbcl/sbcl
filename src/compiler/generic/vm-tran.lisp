@@ -18,9 +18,9 @@
 (defconstant vector-data-bit-offset
   (* sb!vm:vector-data-offset sb!vm:word-bits))
 
-;;; We need to define these predicates, since the TYPEP source transform picks
-;;; whichever predicate was defined last when there are multiple predicates for
-;;; equivalent types.
+;;; We need to define these predicates, since the TYPEP source
+;;; transform picks whichever predicate was defined last when there
+;;; are multiple predicates for equivalent types.
 (def-source-transform short-float-p (x) `(single-float-p ,x))
 #!-long-float
 (def-source-transform long-float-p (x) `(double-float-p ,x))

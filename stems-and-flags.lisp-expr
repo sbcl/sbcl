@@ -78,17 +78,17 @@
  ("code/defbangtype")
  ("code/defbangmacro")
 
+ ("code/primordial-extensions")
+
  ;; for various constants e.g. SB!VM:*TARGET-MOST-POSITIVE-FIXNUM* and
  ;; SB!VM:LOWTAG-BITS, needed by "early-objdef" and others
  ("compiler/generic/early-vm")
- ("compiler/generic/early-vm-macs")
  ("compiler/generic/early-objdef")
  ("compiler/target/parms")
  ("code/early-array") ; needs "early-vm" numbers
 
  ("code/parse-body")       ; on host for PARSE-BODY
  ("code/parse-defmacro")   ; on host for PARSE-DEFMACRO
- ("code/early-defboot")    ; on host for FILE-COMMENT, DO-ANONYMOUS, etc.
  ("code/boot-extensions")  ; on host for COLLECT etc.
  ("code/early-extensions") ; on host for SYMBOLICATE etc.
  ("code/late-extensions")  ; FIXME: maybe no longer needed on host now that

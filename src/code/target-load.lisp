@@ -38,17 +38,12 @@
 
 ;;;; SLOLOAD
 
-;;; something not EQ to anything read from a file
-;;; FIXME: shouldn't be DEFCONSTANT; and maybe make a shared EOF cookie in
-;;; SB-INT:*EOF-VALUE*?
-(defconstant load-eof-value '(()))
-
 ;;; Load a text file.
 (defun sloload (stream verbose print)
   (do-load-verbose stream verbose)
-  (do ((sexpr (read stream nil load-eof-value)
-	      (read stream nil load-eof-value)))
-      ((eq sexpr load-eof-value)
+  (do ((sexpr (read stream nil *eof-object*)
+	      (read stream nil *eof-object*)))
+      ((eq sexpr *eof-object*)
        t)
     (if print
 	(let ((results (multiple-value-list (eval sexpr))))

@@ -76,9 +76,9 @@
 #!+high-security-support
 (defmacro-mundanely check-type-var (place type-var &optional type-string)
   #!+sb-doc
-  "Signals an error of type type-error if the contents of place are not of the
-   specified type to which the type-var evaluates. If an error is signaled,
-   this can only return if STORE-VALUE is invoked. It will store into place
+  "Signals an error of type TYPE-ERROR if the contents of PLACE are not of the
+   specified type to which the TYPE-VAR evaluates. If an error is signaled,
+   this can only return if STORE-VALUE is invoked. It will store into PLACE
    and start over."
   (let ((place-value (gensym))
 	(type-value (gensym)))
@@ -90,32 +90,52 @@
 
 ;;;; DEFCONSTANT
 
-(defmacro-mundanely defconstant (var val &optional doc)
+(defmacro-mundanely defconstant (name value &optional documentation)
   #!+sb-doc
-  "For defining global constants at top level. The DEFCONSTANT says that the
-  value is constant and may be compiled into code. If the variable already has
-  a value, and this is not equal to the init, an error is signalled. The third
-  argument is an optional documentation string for the variable."
-  `(sb!c::%defconstant ',var ,val ',doc))
+  "For defining global constants. The DEFCONSTANT says that the value
+  is constant and may be compiled into code. If the variable already has
+  a value, and this is not EQL to the init, the code is not portable
+  (undefined behavior). The third argument is an optional documentation
+  string for the variable."
+  `(eval-when (:compile-toplevel :load-toplevel :execute)
+     (sb!c::%defconstant ',name ,value ',documentation)))
 
-;;; These are like the other %MUMBLEs except that we currently
-;;; actually do something interesting at load time, namely checking
-;;; whether the constant is being redefined.
+;;; (to avoid "undefined function" warnings when cross-compiling)
+(sb!xc:proclaim '(ftype function sb!c::%defconstant))
+
+;;; the guts of DEFCONSTANT
 (defun sb!c::%defconstant (name value doc)
-  (sb!c::%%defconstant name value doc))
-#+sb-xc-host (sb!xc:proclaim '(ftype function sb!c::%%defconstant)) ; to avoid
-					; undefined function warnings
-(defun sb!c::%%defconstant (name value doc)
+  (/show "doing %DEFCONSTANT" name value doc)
+  (unless (symbolp name)
+    (error "constant name not a symbol: ~S" name))
+  (about-to-modify name)
+  (let ((kind (info :variable :kind name)))
+    (case kind
+      (:constant
+       ;; Note 1: This behavior (discouraging any non-EQL
+       ;; modification) is unpopular, but it is specified by ANSI
+       ;; (i.e. ANSI says a non-EQL change has undefined
+       ;; consequences). If people really want bindings which are
+       ;; constant in some sense other than EQL, I suggest either just
+       ;; using DEFVAR (which is usually appropriate, despite the
+       ;; un-mnemonic name), or defining something like
+       ;; SB-INT:DEFCONSTANT-EQX (which is occasionally more
+       ;; appropriate). -- WHN 2000-11-03
+       (unless (eql value
+		    (info :variable :constant-value name))
+	 (cerror "Go ahead and change the value."
+		 "The constant ~S is being redefined."
+		 name)))
+      (:global
+       ;; (This is OK -- undefined variables are of this kind. So we
+       ;; don't warn or error or anything, just fall through.)
+       )
+      (t (warn "redefining ~(~A~) ~S to be a constant" kind name))))
   (when doc
     (setf (fdocumentation name 'variable) doc))
-  (when (boundp name)
-    (unless (equalp (symbol-value name) value)
-      (cerror "Go ahead and change the value."
-	      "The constant ~S is being redefined."
-	      name)))
   (setf (symbol-value name) value)
   (setf (info :variable :kind name) :constant)
-  (clear-info :variable :constant-value name)
+  (setf (info :variable :constant-value name) value)
   name)
 
 ;;;; DEFINE-COMPILER-MACRO

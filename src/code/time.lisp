@@ -99,9 +99,9 @@
   (minutes-west sb!c-call:int :out)
   (daylight-savings-p sb!alien:boolean :out))
 
-;;; Subtract from the returned Internal-Time to get the universal time.
-;;; The offset between our time base and the Perq one is 2145 weeks and
-;;; five days.
+;;; Subtract from the returned Internal-Time to get the universal
+;;; time. The offset between our time base and the Perq one is 2145
+;;; weeks and five days.
 (defconstant seconds-in-week (* 60 60 24 7))
 (defconstant weeks-offset 2145)
 (defconstant seconds-offset 432000)

@@ -45,17 +45,16 @@
 		   (frob var type))
 		 (frob var type)))))))
 
-;;; Our guess for the preferred order to do type tests in (cheaper and/or more
-;;; probable first.)
-;;; FIXME: not an EQL thing, should not be DEFCONSTANT
-(defconstant type-test-ordering
+;;; our guess for the preferred order in which to do type tests
+;;; (cheaper and/or more probable first.)
+(defparameter *type-test-ordering*
   '(fixnum single-float double-float integer #!+long-float long-float bignum
     complex ratio))
 
-;;; Return true if Type1 should be tested before Type2.
+;;; Should TYPE1 be tested before TYPE2?
 (defun type-test-order (type1 type2)
-  (let ((o1 (position type1 type-test-ordering))
-	(o2 (position type2 type-test-ordering)))
+  (let ((o1 (position type1 *type-test-ordering*))
+	(o2 (position type2 *type-test-ordering*)))
     (cond ((not o1) nil)
 	  ((not o2) t)
 	  (t

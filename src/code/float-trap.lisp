@@ -16,7 +16,7 @@
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
 
-(defconstant float-trap-alist
+(defparameter *float-trap-alist*
   (list (cons :underflow float-underflow-trap-bit)
 	(cons :overflow float-overflow-trap-bit)
 	(cons :inexact float-inexact-trap-bit)
@@ -24,20 +24,19 @@
 	(cons :divide-by-zero float-divide-by-zero-trap-bit)
 	#!+x86 (cons :denormalized-operand float-denormal-trap-bit)))
 
-;;; Return a mask with all the specified float trap bits set.
-(defun float-trap-mask (names)
-  (reduce #'logior
-	  (mapcar #'(lambda (x)
-		      (or (cdr (assoc x float-trap-alist))
-			  (error "Unknown float trap kind: ~S." x)))
-		  names)))
-
-(defconstant rounding-mode-alist
+(defparameter *rounding-mode-alist*
   (list (cons :nearest float-round-to-nearest)
 	(cons :zero float-round-to-zero)
 	(cons :positive-infinity float-round-to-positive)
 	(cons :negative-infinity float-round-to-negative)))
 
+;;; Return a mask with all the specified float trap bits set.
+(defun float-trap-mask (names)
+  (reduce #'logior
+	  (mapcar #'(lambda (x)
+		      (or (cdr (assoc x *float-trap-alist*))
+			  (error "unknown float trap kind: ~S" x)))
+		  names)))
 ); Eval-When (Compile Load Eval)
 
 ;;; interpreter stubs
@@ -82,8 +81,8 @@
       (setf (ldb float-traps-byte modes) (float-trap-mask traps)))
     (when round-p
       (setf (ldb float-rounding-mode modes)
-	    (or (cdr (assoc rounding-mode rounding-mode-alist))
-		(error "Unknown rounding mode: ~S." rounding-mode))))
+	    (or (cdr (assoc rounding-mode *rounding-mode-alist*))
+		(error "unknown rounding mode: ~S" rounding-mode))))
     (when current-x-p
       (setf (ldb float-exceptions-byte modes)
 	    (float-trap-mask current-exceptions)))
@@ -112,13 +111,13 @@
 			   ,@(mapcar #'(lambda (x)
 					 `(when (logtest bits ,(cdr x))
 					    (res ',(car x))))
-				     float-trap-alist)
+				     *float-trap-alist*)
 			   (res))))
 	     (frob))))
     (let ((modes (floating-point-modes)))
       `(:traps ,(exc-keys (ldb float-traps-byte modes))
 	:rounding-mode ,(car (rassoc (ldb float-rounding-mode modes)
-				     rounding-mode-alist))
+				     *rounding-mode-alist*))
 	:current-exceptions ,(exc-keys (ldb float-exceptions-byte modes))
 	:accrued-exceptions ,(exc-keys (ldb float-sticky-bits modes))
 	:fast-mode ,(logtest float-fast-bit modes)))))

@@ -602,8 +602,6 @@
 (declaim (type (simple-array (unsigned-byte 16) (#.char-code-limit))
 	       *character-attributes*))
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-
 ;;; Constants which are a bit-mask for each interesting character attribute.
 (defconstant other-attribute		(ash 1 0)) ; Anything else legal.
 (defconstant number-attribute		(ash 1 1)) ; A numeric digit.
@@ -615,9 +613,11 @@
 (defconstant slash-attribute		(ash 1 7)) ; /
 (defconstant funny-attribute		(ash 1 8)) ; Anything illegal.
 
-;;; LETTER-ATTRIBUTE is a local of SYMBOL-QUOTEP. It matches letters that
-;;; don't need to be escaped (according to READTABLE-CASE.)
-(defconstant attribute-names
+(eval-when (:compile-toplevel :load-toplevel :execute)
+
+;;; LETTER-ATTRIBUTE is a local of SYMBOL-QUOTEP. It matches letters
+;;; that don't need to be escaped (according to READTABLE-CASE.)
+(defparameter *attribute-names*
   `((number . number-attribute) (lowercase . lowercase-attribute)
     (uppercase . uppercase-attribute) (letter . letter-attribute)
     (sign . sign-attribute) (extension . extension-attribute)
@@ -688,9 +688,10 @@
 		       (the fixnum
 			    (logand
 			     (logior ,@(mapcar
-					#'(lambda (x)
-					    (or (cdr (assoc x attribute-names))
-						(error "Blast!")))
+					(lambda (x)
+					  (or (cdr (assoc x
+							  *attribute-names*))
+					      (error "Blast!")))
 					attributes))
 			     bits)))))
 	     (digitp ()

@@ -11,18 +11,46 @@
 
 (in-package "SB!EXT")
 
-;;; Lots of code wants to get to the KEYWORD package or the COMMON-LISP package
-;;; without a lot of fuss, so we cache them in variables. TO DO: How much
-;;; does this actually buy us? It sounds sensible, but I don't know for sure
-;;; that it saves space or time.. -- WHN 19990521
+;;; Lots of code wants to get to the KEYWORD package or the
+;;; COMMON-LISP package without a lot of fuss, so we cache them in
+;;; variables. TO DO: How much does this actually buy us? It sounds
+;;; sensible, but I don't know for sure that it saves space or time..
+;;; -- WHN 19990521
+;;;
+;;; (The initialization forms here only matter on the cross-compilation
+;;; host; In the target SBCL, these variables are set in cold init.)
 (declaim (type package *cl-package* *keyword-package*))
-(defvar *cl-package*        (find-package "COMMON-LISP"))
-(defvar *keyword-package*   (find-package "KEYWORD"))
+(defvar *cl-package*      (find-package "COMMON-LISP"))
+(defvar *keyword-package* (find-package "KEYWORD"))
+
+;;; a helper function for various macros which expect clauses of a
+;;; given length, etc.
+;;;
+;;; KLUDGE: This implementation will hang on circular list structure.
+;;; Since this is an error-checking utility, i.e. its job is to deal
+;;; with screwed-up input, it'd be good style to fix it so that it can
+;;; deal with circular list structure.
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  ;; Return true if X is a proper list whose length is between MIN and
+  ;; MAX (inclusive).
+  (defun proper-list-of-length-p (x min &optional (max min))
+    (cond ((minusp max)
+	   nil)
+	  ((null x)
+	   (zerop min))
+	  ((consp x)
+	   (and (plusp max)
+		(proper-list-of-length-p (cdr x)
+					 (if (plusp (1- min))
+					   (1- min)
+					   0)
+					 (1- max))))
+	  (t nil))))
 
 ;;;; the COLLECT macro
 
-;;; helper functions for COLLECT, which become the expanders of the MACROLET
-;;; definitions created by COLLECT
+;;; helper functions for COLLECT, which become the expanders of the
+;;; MACROLET definitions created by COLLECT
 ;;;
 ;;; COLLECT-NORMAL-EXPANDER handles normal collection macros.
 ;;;
@@ -124,9 +152,9 @@
   `(labels ((,name ,(mapcar #'first binds) ,@body))
      (,name ,@(mapcar #'second binds))))
 
-;;; Once-Only is a utility useful in writing source transforms and macros.
-;;; It provides an easy way to wrap a LET around some code to ensure that some
-;;; forms are only evaluated once.
+;;; ONCE-ONLY is a utility useful in writing source transforms and
+;;; macros. It provides a concise way to wrap a LET around some code
+;;; to ensure that some forms are only evaluated once.
 (defmacro once-only (specs &body body)
   #!+sb-doc
   "Once-Only ({(Var Value-Expression)}*) Form*
@@ -181,8 +209,9 @@
   ;; which is pretty, but which would have required adding awkward
   ;; build order constraints on SBCL (or figuring out some way to make
   ;; inline definitions installable at build-the-cross-compiler time,
-  ;; which was too ambitious for now). Rather than mess with that,
-  ;; we just define ASSQ explicitly in terms of more primitive operations:
+  ;; which was too ambitious for now). Rather than mess with that, we
+  ;; just define ASSQ explicitly in terms of more primitive
+  ;; operations:
   (dolist (pair alist)
     (when (eq (car pair) item)
       (return pair))))

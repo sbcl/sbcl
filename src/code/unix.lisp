@@ -36,10 +36,9 @@
 
 (sb!xc:defmacro def-unix-error (name number description)
   `(progn
+     (defconstant ,name ,number ,description)
      (eval-when (:compile-toplevel :execute)
-       (push (cons ,number ,description) *compiler-unix-errors*))
-     (eval-when (:compile-toplevel :load-toplevel :execute)
-       (defconstant ,name ,number ,description))))
+       (push (cons ,number ,description) *compiler-unix-errors*))))
 
 (sb!xc:defmacro emit-unix-errors ()
   (let* ((max (apply #'max (mapcar #'car *compiler-unix-errors*)))
@@ -193,9 +192,8 @@
   #!+linux long
   #!+bsd   quad-t)
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (/show0 "unix.lisp 215")
-  (defconstant fd-setsize 1024))
+(/show0 "unix.lisp 195")
+(defconstant fd-setsize 1024)
 (/show0 "unix.lisp 217")
 
 (def-alien-type nil
@@ -328,7 +326,6 @@
   (void-syscall ("close" int) fd))
 
 ;;; fcntlbits.h
-(eval-when (:compile-toplevel :load-toplevel :execute)
 
 (/show0 "unix.lisp 337")
 (defconstant o_rdonly  0) ; read-only flag
@@ -352,7 +349,6 @@
   #!+linux #o2000
   #!+bsd   #x0008)
 (/show0 "unix.lisp 361")
-) ; EVAL-WHEN
 
 ;;;; timebits.h
 

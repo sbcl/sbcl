@@ -119,9 +119,9 @@
 		   :complex-=	     (type-class-complex-= x)
 		   :unparse	       (type-class-unparse x)))
 
-;;; KLUDGE: If the slots of TYPE-CLASS ever change, the slots here will have to
-;;; be tweaked to match. -- WHN 19991021
-(defconstant type-class-function-slots
+;;; KLUDGE: If the slots of TYPE-CLASS ever change, the slots here
+;;; will have to be tweaked to match. -- WHN 19991021
+(defparameter *type-class-function-slots*
   '((:simple-subtypep . type-class-simple-subtypep)
     (:complex-subtypep-arg1 . type-class-complex-subtypep-arg1)
     (:complex-subtypep-arg2 . type-class-complex-subtypep-arg2)
@@ -134,7 +134,7 @@
     (:unparse . type-class-unparse)))
 
 (defun class-function-slot-or-lose (name)
-  (or (cdr (assoc name type-class-function-slots))
+  (or (cdr (assoc name *type-class-function-slots*))
       (error "~S is not a defined type class method." name)))
 ;;; FIXME: This seems to be called at runtime by cold init code.
 ;;; Make sure that it's not being called at runtime anywhere but

@@ -11,8 +11,7 @@
 
 (in-package "SB!IMPL")
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defconstant in-buffer-length 512 "the size of a stream in-buffer"))
+(defconstant in-buffer-length 512 "the size of a stream in-buffer")
 
 (deftype in-buffer-type ()
   `(simple-array (unsigned-byte 8) (,in-buffer-length)))

@@ -1813,7 +1813,7 @@
 	      (let* ((locations
 		      (dotimes (k (sb!c::read-var-integer blocks i)
 				  (result locations-buffer))
-			(let ((kind (svref sb!c::compiled-code-location-kinds
+			(let ((kind (svref sb!c::*compiled-code-location-kinds*
 					   (aref+ blocks i)))
 			      (pc (+ last-pc
 				     (sb!c::read-var-integer blocks i)))
@@ -2003,7 +2003,7 @@
       (if (logtest flags sb!c::minimal-debug-function-setf-bit)
 	  `(setf ,base)
 	  base))
-    :kind (svref sb!c::minimal-debug-function-kinds
+    :kind (svref sb!c::*minimal-debug-function-kinds*
 		 (ldb sb!c::minimal-debug-function-kind-byte options))
     :variables
     (when vars-p
@@ -3622,7 +3622,7 @@
 			#!+x86 sb!vm::ebx-offset)))
 	(nargs (make-lisp-obj
 		(sb!vm:context-register scp sb!vm::nargs-offset)))
- 	(reg-arg-offsets '#.sb!vm::register-arg-offsets)
+ 	(reg-arg-offsets '#.sb!vm::*register-arg-offsets*)
 	(results nil))
     (without-gcing
      (dotimes (arg-num nargs)

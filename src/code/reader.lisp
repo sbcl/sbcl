@@ -55,21 +55,20 @@
 
 ;;;; constants for character attributes. These are all as in the manual.
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defconstant whitespace 0)
-  (defconstant terminating-macro 1)
-  (defconstant escape 2)
-  (defconstant constituent 3)
-  (defconstant constituent-dot 4)
-  (defconstant constituent-expt 5)
-  (defconstant constituent-slash 6)
-  (defconstant constituent-digit 7)
-  (defconstant constituent-sign 8)
-  ;; the "9" entry intentionally left blank for some reason -- WHN 19990806
-  (defconstant multiple-escape 10)
-  (defconstant package-delimiter 11)
-  ;; a fake attribute for use in read-unqualified-token
-  (defconstant delimiter 12))
+(defconstant whitespace 0)
+(defconstant terminating-macro 1)
+(defconstant escape 2)
+(defconstant constituent 3)
+(defconstant constituent-dot 4)
+(defconstant constituent-expt 5)
+(defconstant constituent-slash 6)
+(defconstant constituent-digit 7)
+(defconstant constituent-sign 8)
+;; the "9" entry intentionally left blank for some reason -- WHN 19990806
+(defconstant multiple-escape 10)
+(defconstant package-delimiter 11)
+;; a fake attribute for use in read-unqualified-token
+(defconstant delimiter 12)
 
 ;;;; macros and functions for character tables
 
@@ -233,10 +232,7 @@
 
 ;;;; definitions to support internal programming conventions
 
-;;; FIXME: DEFCONSTANT doesn't actually work this way..
-(defconstant eof-object '(*eof*))
-
-(defmacro eofp (char) `(eq ,char eof-object))
+(defmacro eofp (char) `(eq ,char *eof-object*))
 
 (defun flush-whitespace (stream)
   ;; This flushes whitespace chars, returning the last char it read (a
@@ -349,15 +345,15 @@
 
 (defun inchpeek-read-buffer ()
   (if (>= (the fixnum *inch-ptr*) (the fixnum *ouch-ptr*))
-      eof-object
+      *eof-object*
       (elt *read-buffer* *inch-ptr*)))
 
 (defun inch-read-buffer ()
   (if (>= *inch-ptr* *ouch-ptr*)
-    eof-object
-    (prog1
-	(elt *read-buffer* *inch-ptr*)
-      (incf *inch-ptr*))))
+      *eof-object*
+      (prog1
+	  (elt *read-buffer* *inch-ptr*)
+	(incf *inch-ptr*))))
 
 (defmacro unread-buffer ()
   `(decf *inch-ptr*))
@@ -394,9 +390,9 @@
    that followed the object."
   (cond
    (recursivep
-    ;; Loop for repeating when a macro returns nothing.
+    ;; a loop for repeating when a macro returns nothing
     (loop
-      (let ((char (read-char stream eof-error-p eof-object)))
+      (let ((char (read-char stream eof-error-p *eof-object*)))
 	(cond ((eofp char) (return eof-value))
 	      ((whitespacep char))
 	      (t
@@ -425,7 +421,7 @@
    the manual."
   (prog1
       (read-preserving-whitespace stream eof-error-p eof-value recursivep)
-    (let ((whitechar (read-char stream nil eof-object)))
+    (let ((whitechar (read-char stream nil *eof-object*)))
       (if (and (not (eofp whitechar))
 	       (or (not (whitespacep whitechar))
 		   recursivep))
@@ -549,7 +545,7 @@
 ;;; -- The position of the first package delimiter (or NIL).
 (defun internal-read-extended-token (stream firstchar)
   (reset-read-buffer)
-  (do ((char firstchar (read-char stream nil eof-object))
+  (do ((char firstchar (read-char stream nil *eof-object*))
        (escapes ())
        (colon nil))
       ((cond ((eofp char) t)
@@ -562,7 +558,7 @@
 	   ;; It can't be a number, even if it's 1\23.
 	   ;; Read next char here, so it won't be casified.
 	   (push *ouch-ptr* escapes)
-	   (let ((nextchar (read-char stream nil eof-object)))
+	   (let ((nextchar (read-char stream nil *eof-object*)))
 	     (if (eofp nextchar)
 		 (reader-eof-error stream "after escape character")
 		 (ouch-read-buffer nextchar))))
@@ -570,13 +566,13 @@
 	   ;; Read to next multiple-escape, escaping single chars along the
 	   ;; way.
 	   (loop
-	     (let ((ch (read-char stream nil eof-object)))
+	     (let ((ch (read-char stream nil *eof-object*)))
 	       (cond
 		((eofp ch)
 		 (reader-eof-error stream "inside extended token"))
 		((multiple-escape-p ch) (return))
 		((escapep ch)
-		 (let ((nextchar (read-char stream nil eof-object)))
+		 (let ((nextchar (read-char stream nil *eof-object*)))
 		   (if (eofp nextchar)
 		       (reader-eof-error stream "after escape character")
 		       (ouch-read-buffer nextchar))))
@@ -1303,8 +1299,8 @@
   (let ((numargp nil)
 	(numarg 0)
 	(sub-char ()))
-    (do* ((ch (read-char stream nil eof-object)
-	      (read-char stream nil eof-object))
+    (do* ((ch (read-char stream nil *eof-object*)
+	      (read-char stream nil *eof-object*))
 	  (dig ()))
 	 ((or (eofp ch)
 	      (not (setq dig (digit-char-p ch))))

@@ -409,7 +409,7 @@
 	    ((:maybe)
 	     (give-up-ir1-transform
 	      "The array type is ambiguous; must call ~
-	      array-has-fill-pointer-p at runtime.")))))))
+	      ARRAY-HAS-FILL-POINTER-P at runtime.")))))))
 
 ;;; Primitive used to verify indices into arrays. If we can tell at
 ;;; compile-time or we are generating unsafe code, don't bother with

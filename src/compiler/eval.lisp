@@ -574,9 +574,9 @@
 ;;;; INTERNAL-EVAL
 
 ;;; Evaluate an arbitary form. We convert the form, then call internal
-;;; apply on it. If *ALREADY-EVALED-THIS* is true, then we bind it to NIL
-;;; around the apply to limit the inhibition to the lexical scope of the
-;;; EVAL-WHEN.
+;;; APPLY on it. If *ALREADY-EVALED-THIS* is true, then we bind it to
+;;; NIL around the apply to limit the inhibition to the lexical scope
+;;; of the EVAL-WHEN.
 (defun internal-eval (form &optional quietly)
   (let ((res (sb!c:compile-for-eval form quietly)))
     (if *already-evaled-this*

@@ -13,7 +13,7 @@
 # provided with absolutely no warranty. See the COPYING and CREDITS
 # files for more information.
 
-echo //entering make-host-2.sh
+echo //entering make-target-2.sh
 
 # Do warm init stuff, e.g. building and loading CLOS, and stuff which
 # can't be done until CLOS is running.

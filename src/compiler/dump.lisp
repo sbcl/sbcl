@@ -276,8 +276,8 @@
 	     (sb!xc:lisp-implementation-version)))
     (dump-byte sb!c:*fasl-header-string-stop-char-code* res)
 
-    ;; Finish the header by outputting fasl file implementation and version in
-    ;; machine-readable form.
+    ;; Finish the header by outputting fasl file implementation and
+    ;; version in machine-readable form.
     (multiple-value-bind (implementation version)
 	(if byte-p
 	    (values *backend-byte-order*

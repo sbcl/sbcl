@@ -15,10 +15,11 @@
 
 (in-package "SB!C")
 
-;;; FIXME: shouldn't SB-C::&MORE be in this list?
-(defconstant sb!xc:lambda-list-keywords
+;;; FIXME: Shouldn't SB-C::&MORE be in this list?
+(defconstant-eqx sb!xc:lambda-list-keywords
   '(&optional &rest &key &aux &body &whole &allow-other-keys &environment)
   #!+sb-doc
+  #'equal
   "symbols which are magical in a lambda list")
 
 ;;;; cross-compiler-only versions of CL special variables, so that we
@@ -52,12 +53,13 @@
   (brevity nil :type cookie-quality)
   (debug   nil :type cookie-quality))
 
-;;; KLUDGE: This needs to be executable in cold init toplevel forms, earlier
-;;; than the default copier closure created by DEFSTRUCT toplevel forms would
-;;; be available, and earlier than LAYOUT-INFO is initialized (which is a
-;;; prerequisite for COPY-STRUCTURE to work), so we define it explicitly using
-;;; DEFUN, so that it can be installed by the cold loader, and using
-;;; hand-written, hand-maintained slot-by-slot copy it doesn't need to call
+;;; KLUDGE: This needs to be executable in cold init toplevel forms,
+;;; earlier than the default copier closure created by DEFSTRUCT
+;;; toplevel forms would be available, and earlier than LAYOUT-INFO is
+;;; initialized (which is a prerequisite for COPY-STRUCTURE to work),
+;;; so we define it explicitly using DEFUN, so that it can be
+;;; installed by the cold loader, and using hand-written,
+;;; hand-maintained slot-by-slot copy it doesn't need to call
 ;;; COPY-STRUCTURE. -- WHN 19991019
 (defun copy-cookie (cookie)
   (make-cookie :speed   (cookie-speed   cookie)
@@ -67,10 +69,11 @@
 	       :brevity (cookie-brevity cookie)
 	       :debug   (cookie-debug   cookie)))
 
-;;; *DEFAULT-COOKIE* holds the current global compiler policy information.
-;;; Whenever the policy is changed, we copy the structure so that old uses will
-;;; still get the old values. *DEFAULT-INTERFACE-COOKIE* holds any values
-;;; specified by an OPTIMIZE-INTERFACE declaration.
+;;; *DEFAULT-COOKIE* holds the current global compiler policy
+;;; information. Whenever the policy is changed, we copy the structure
+;;; so that old uses will still get the old values.
+;;; *DEFAULT-INTERFACE-COOKIE* holds any values specified by an
+;;; OPTIMIZE-INTERFACE declaration.
 ;;;
 ;;; FIXME: Why isn't COOKIE called POLICY?
 (declaim (type cookie *default-cookie* *default-interface-cookie*))
@@ -80,7 +83,7 @@
 ;;; possible values for the INLINE-ness of a function.
 (deftype inlinep ()
   '(member :inline :maybe-inline :notinline nil))
-(defconstant inlinep-translations
+(defparameter *inlinep-translations*
   '((inline . :inline)
     (notinline . :notinline)
     (maybe-inline . :maybe-inline)))
@@ -153,11 +156,11 @@
 (declaim (ftype (function (symbol) (values)) note-lexical-binding))
 (defun note-lexical-binding (symbol)
   (let ((name (symbol-name symbol)))
-    ;; This check is intended to protect us from getting silently burned when
-    ;; we define
+    ;; This check is intended to protect us from getting silently
+    ;; burned when we define
     ;;   foo.lisp:
-    ;;     (DEFVAR *FOO*)
-    ;;     (DEFUN FOO (X) (1+ X *FOO*))
+    ;;     (DEFVAR *FOO* -3)
+    ;;     (DEFUN FOO (X) (+ X *FOO*))
     ;;   bar.lisp:
     ;;     (DEFUN BAR (X)
     ;;       (LET ((*FOO* X))
@@ -165,6 +168,7 @@
     ;; and then we happen to compile bar.lisp before foo.lisp.
     (when (and (char= #\* (aref name 0))
 	       (char= #\* (aref name (1- (length name)))))
+      ;; FIXME: should be COMPILER-STYLE-WARNING?
       (style-warn "using the lexical binding of the symbol ~S, not the~@
 dynamic binding, even though the symbol name follows the usual naming~@
 convention (names like *FOO*) for special variables" symbol)))

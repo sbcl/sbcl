@@ -85,26 +85,33 @@
       ((sb!sys:positive-primep n)
        n)))
 
-;;;; info classes, info types, and type numbers, part I: what's needed not only
-;;;; at compile time but also at run time
+;;;; info classes, info types, and type numbers, part I: what's needed
+;;;; not only at compile time but also at run time
 
-;;;; Note: This section is a blast from the past, a little trip down memory
-;;;; lane to revisit the weird host/target interactions of the CMU CL build
-;;;; process. Because of the way that the cross-compiler and target compiler
-;;;; share stuff here, if you change anything in here, you'd be well-advised to
-;;;; nuke all your fasl files and restart compilation from the very beginning
-;;;; of the bootstrap process.
+;;;; Note: This section is a blast from the past, a little trip down
+;;;; memory lane to revisit the weird host/target interactions of the
+;;;; CMU CL build process. Because of the way that the cross-compiler
+;;;; and target compiler share stuff here, if you change anything in
+;;;; here, you'd be well-advised to nuke all your fasl files and
+;;;; restart compilation from the very beginning of the bootstrap
+;;;; process.
 
-;;; Why do we suppress the :COMPILE-TOPLEVEL situation here when we're running
-;;; the cross-compiler? The cross-compiler (which was built from these sources)
-;;; has its version of these data and functions defined in the same places we'd
-;;; be defining into. We're happy with its version, since it was compiled from
-;;; the same sources, so there's no point in overwriting its nice compiled
-;;; version of this stuff with our interpreted version. (And any time we're
-;;; *not* happy with its version, perhaps because we've been editing the
-;;; sources partway through bootstrapping, tch tch, overwriting its version
-;;; with our version would be unlikely to help, because that would make the
-;;; cross-compiler very confused.)
+;;; At run time, we represent the type of info that we want by a small
+;;; non-negative integer.
+(defconstant type-number-bits 6)
+(deftype type-number () `(unsigned-byte ,type-number-bits))
+
+;;; Why do we suppress the :COMPILE-TOPLEVEL situation here when we're
+;;; running the cross-compiler? The cross-compiler (which was built
+;;; from these sources) has its version of these data and functions
+;;; defined in the same places we'd be defining into. We're happy with
+;;; its version, since it was compiled from the same sources, so
+;;; there's no point in overwriting its nice compiled version of this
+;;; stuff with our interpreted version. (And any time we're *not*
+;;; happy with its version, perhaps because we've been editing the
+;;; sources partway through bootstrapping, tch tch, overwriting its
+;;; version with our version would be unlikely to help, because that
+;;; would make the cross-compiler very confused.)
 (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
 
 (defstruct (class-info
@@ -117,11 +124,6 @@
   (name nil :type keyword :read-only t)
   ;; List of Type-Info structures for each type in this class.
   (types () :type list))
-
-;;; At run time, we represent the type of info that we want by a small
-;;; non-negative integer.
-(defconstant type-number-bits 6)
-(deftype type-number () `(unsigned-byte ,type-number-bits))
 
 ;;; a map from type numbers to TYPE-INFO objects. There is one type
 ;;; number for each defined CLASS/TYPE pair.
@@ -536,8 +538,8 @@
 
   (values))
 
-;;; Exact density (modulo rounding) of the hashtable in a compact info
-;;; environment in names/bucket.
+;;; the exact density (modulo rounding) of the hashtable in a compact
+;;; info environment in names/bucket
 (defconstant compact-info-environment-density 65)
 
 ;;; Iterate over the environment once to find out how many names and entries
@@ -822,9 +824,11 @@
 	whole)))
 |#
 
-;;; the maximum density of the hashtable in a volatile env (in names/bucket)
-;;; FIXME: actually seems to be measured in percent, should be converted
-;;; to be measured in names/bucket
+;;; the maximum density of the hashtable in a volatile env (in
+;;; names/bucket)
+;;;
+;;; FIXME: actually seems to be measured in percent, should be
+;;; converted to be measured in names/bucket
 (defconstant volatile-info-environment-density 50)
 
 ;;; Make a new volatile environment of the specified size.

@@ -1,4 +1,4 @@
-;;; time printing routines built upon the Common Lisp FORMAT function
+;;;; time printing routines built upon the Common Lisp FORMAT function
 
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
@@ -11,40 +11,34 @@
 
 (in-package "SB!EXT")
 
-(defconstant abbrev-weekday-table
-  '#("Mon" "Tue" "Wed" "Thu" "Fri" "Sat" "Sun"))
+(defparameter *abbrev-weekday-table*
+  #("Mon" "Tue" "Wed" "Thu" "Fri" "Sat" "Sun"))
 
-(defconstant long-weekday-table
-  '#("Monday" "Tuesday" "Wednesday" "Thursday" "Friday" "Saturday"
-     "Sunday"))
+(defparameter *long-weekday-table*
+  #("Monday" "Tuesday" "Wednesday" "Thursday" "Friday" "Saturday" "Sunday"))
 
-(defconstant abbrev-month-table
-  '#("Jan" "Feb" "Mar" "Apr" "May" "Jun" "Jul" "Aug" "Sep" "Oct" "Nov"
-     "Dec"))
+(defparameter *abbrev-month-table*
+  #("Jan" "Feb" "Mar" "Apr" "May" "Jun" "Jul" "Aug" "Sep" "Oct" "Nov" "Dec"))
 
-(defconstant long-month-table
-  '#("January" "February" "March" "April" "May" "June" "July" "August"
-     "September" "October" "November" "December"))
+(defparameter *long-month-table*
+  #("January" "February" "March" "April" "May" "June" "July" "August"
+   "September" "October" "November" "December"))
 
-;;; The timezone-table is incomplete but workable.
+;;; The timezone table is incomplete but workable.
+(defparameter *timezone-table*
+  #("GMT" "" "" "" "" "EST" "CST" "MST" "PST"))
 
-(defconstant timezone-table
-  '#("GMT" "" "" "" "" "EST" "CST" "MST" "PST"))
+(defparameter *daylight-table*
+  #(nil nil nil nil nil "EDT" "CDT" "MDT" "PDT"))
 
-(defconstant daylight-table
-  '#(nil nil nil nil nil "EDT" "CDT" "MDT" "PDT"))
-
-;;; Valid-Destination-P ensures the destination stream is okay
-;;; for the Format function.
-
+;;; VALID-DESTINATION-P ensures the destination stream is okay for the
+;;; FORMAT function.
 (defun valid-destination-p (destination)
   (or (not destination)
       (eq destination 't)
       (streamp destination)
       (and (stringp destination)
 	   (array-has-fill-pointer-p destination))))
-
-;;; Format-Universal-Time - External.
 
 ;;; CMU CL made the default style :SHORT here. I've changed that to :LONG, on
 ;;; the theory that since the 8/7/1999 style is hard to decode unambiguously,
@@ -58,7 +52,7 @@
 ;;;   8601 formats (like e.g. :iso-8601 and :iso-8601-short) and migrate
 ;;;   slowly towards ISO dates in the user code...
 ;;; The :ISO-8601 and :ISO-8601-SHORT options sound sensible to me. Maybe
-;;; someone will do them for CMU CL and we can steal them here.
+;;; someone will do them for CMU CL and we can steal them for SBCL.
 (defun format-universal-time (destination universal-time
 					  &key
 					  (timezone nil)
@@ -74,7 +68,7 @@
    destination which can be accepted by the Format function. The
    timezone keyword is an integer specifying hours west of Greenwich.
    The style keyword can be :SHORT (numeric date), :LONG (months and
-   weekdays expressed as words), :ABBREVIATED (like :long but words are
+   weekdays expressed as words), :ABBREVIATED (like :LONG but words are
    abbreviated), or :GOVERNMENT (of the form \"XX Month XXXX XX:XX:XX\")
    The keyword argument DATE-FIRST, if nil, will print the time first instead
    of the date (the default). The PRINT- keywords, if nil, inhibit
@@ -97,9 +91,9 @@
     (let ((time-string "~2,'0D:~2,'0D")
 	  (date-string
 	   (case style
-	     (:short "~D/~D/~D")	     ;;  MM/DD/Y
-	     ((:abbreviated :long) "~A ~D, ~D")  ;;  Month DD, Y
-	     (:government "~2,'0D ~:@(~A~) ~D")      ;;  DD MON Y
+	     (:short "~D/~D/~D")	        ;;  MM/DD/Y
+	     ((:abbreviated :long) "~A ~D, ~D") ;;  Month DD, Y
+	     (:government "~2,'0D ~:@(~A~) ~D") ;;  DD MON Y
 	     (t
 	      (error "~A: Unrecognized :style keyword value." style))))
 	  (time-args
@@ -108,18 +102,18 @@
 		       (:short
 			(list month day year))
 		       (:abbreviated
-			(list (svref abbrev-month-table (1- month)) day year))
+			(list (svref *abbrev-month-table* (1- month)) day year))
 		       (:long
-			(list (svref long-month-table (1- month)) day year))
+			(list (svref *long-month-table* (1- month)) day year))
 		       (:government
-			(list day (svref abbrev-month-table (1- month))
+			(list day (svref *abbrev-month-table* (1- month))
 			      year)))))
       (declare (simple-string time-string date-string))
       (when print-weekday
 	(push (case style
-		((:short :long) (svref long-weekday-table dow))
-		(:abbreviated (svref abbrev-weekday-table dow))
-		(:government (svref abbrev-weekday-table dow)))
+		((:short :long) (svref *long-weekday-table* dow))
+		(:abbreviated (svref *abbrev-weekday-table* dow))
+		(:government (svref *abbrev-weekday-table* dow)))
 	      date-args)
 	(setq date-string
 	      (concatenate 'simple-string "~A, " date-string)))
@@ -149,7 +143,7 @@
   (if (and (integerp tz)
 	   (or (and dst (= tz 0))
 	       (<= 5 tz 8)))
-      (svref (if dst daylight-table timezone-table) tz)
+      (svref (if dst *daylight-table* *timezone-table*) tz)
       (multiple-value-bind (rest seconds) (truncate (* tz 60 60) 60)
 	(multiple-value-bind (hours minutes) (truncate rest 60)
 	  (format nil "[~C~D~@[~*:~2,'0D~@[~*:~2,'0D~]~]]"
@@ -160,7 +154,6 @@
 		  (not (zerop seconds))
 		  (abs seconds))))))
 
-;;; Format-Decoded-Time - External.
 (defun format-decoded-time (destination seconds minutes hours
 					  day month year
 					  &key (timezone nil)
@@ -171,14 +164,14 @@
 					  (print-timezone t)
 					  (print-weekday t))
   #!+sb-doc
-  "Format-Decoded-Time formats a string containing decoded-time
+  "FORMAT-DECODED-TIME formats a string containing decoded time
    expressed in a humanly-readable manner. The destination is any
-   destination which can be accepted by the Format function. The
+   destination which can be accepted by the FORMAT function. The
    timezone keyword is an integer specifying hours west of Greenwich.
-   The style keyword can be :short (numeric date), :long (months and
-   weekdays expressed as words), or :abbreviated (like :long but words are
-   abbreviated). The keyword date-first, if nil, will cause the time
-   to be printed first instead of the date (the default). The print-
+   The style keyword can be :SHORT (numeric date), :LONG (months and
+   weekdays expressed as words), or :ABBREVIATED (like :LONG but words are
+   abbreviated). The keyword DATE-FIRST, if NIL, will cause the time
+   to be printed first instead of the date (the default). The PRINT-
    keywords, if nil, inhibit the printing of certain semi-obvious
    parts of the string."
   (unless (valid-destination-p destination)

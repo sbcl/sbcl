@@ -35,15 +35,8 @@
   "VARIABLE must evaluate to a symbol. This symbol's special value cell is
   set to the specified new value."
   (declare (type symbol variable))
-  (cond ((null variable)
-	 (error "Nihil ex nihil, NIL can't be set."))
-	((eq variable t)
-	 (error "Veritas aeterna, T can't be set."))
-	((and (boundp '*keyword-package*)
-	      (keywordp variable))
-	 (error "Keywords can't be set."))
-	(t
-	 (%set-symbol-value variable new-value))))
+  (about-to-modify variable)
+  (%set-symbol-value variable new-value))
 
 (defun %set-symbol-value (symbol new-value)
   (%set-symbol-value symbol new-value))
@@ -200,6 +193,7 @@
       (setf (symbol-function new-symbol) (symbol-function symbol))))
   new-symbol)
 
+;;; FIXME: This declaration should be redundant.
 (declaim (special *keyword-package*))
 
 (defun keywordp (object)

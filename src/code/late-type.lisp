@@ -790,11 +790,11 @@
 
 ;;; A list of all the float formats, in order of decreasing precision.
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  (defconstant float-formats
+  (defparameter *float-formats*
     '(long-float double-float single-float short-float)))
 
 ;;; The type of a float format.
-(deftype float-format () `(member ,@float-formats))
+(deftype float-format () `(member ,@*float-formats*))
 
 #!+negative-zero-is-not-zero
 (defun make-numeric-type (&key class format (complexp :real) low high
@@ -1267,19 +1267,19 @@
 ;;; either one is null, return NIL.
 (defun float-format-max (f1 f2)
   (when (and f1 f2)
-    (dolist (f float-formats (error "Bad float format: ~S." f1))
+    (dolist (f *float-formats* (error "bad float format: ~S" f1))
       (when (or (eq f f1) (eq f f2))
 	(return f)))))
 
-;;; Return the result of an operation on Type1 and Type2 according to
+;;; Return the result of an operation on TYPE1 and TYPE2 according to
 ;;; the rules of numeric contagion. This is always NUMBER, some float
 ;;; format (possibly complex) or RATIONAL. Due to rational
 ;;; canonicalization, there isn't much we can do here with integers or
 ;;; rational complex numbers.
 ;;;
-;;; If either argument is not a Numeric-Type, then return NUMBER. This
+;;; If either argument is not a NUMERIC-TYPE, then return NUMBER. This
 ;;; is useful mainly for allowing types that are technically numbers,
-;;; but not a Numeric-Type.
+;;; but not a NUMERIC-TYPE.
 (defun numeric-contagion (type1 type2)
   (if (and (numeric-type-p type1) (numeric-type-p type2))
       (let ((class1 (numeric-type-class type1))

@@ -61,7 +61,7 @@
 	(setf (gethash name *alien-type-classes*)
 	      (make-alien-type-class :name name :include include)))))
 
-(defconstant method-slot-alist
+(defparameter *method-slot-alist*
   '((:unparse . alien-type-class-unparse)
     (:type= . alien-type-class-type=)
     (:subtypep . alien-type-class-subtypep)
@@ -76,13 +76,13 @@
     (:result-tn . alien-type-class-result-tn)))
 
 (defun method-slot (method)
-  (cdr (or (assoc method method-slot-alist)
+  (cdr (or (assoc method *method-slot-alist*)
 	   (error "no method ~S" method))))
 
 ) ; EVAL-WHEN
 
-;;; We define a keyword "BOA" constructor so that we can reference the slot
-;;; names in init forms.
+;;; We define a keyword "BOA" constructor so that we can reference the
+;;; slot names in init forms.
 (def!macro def-alien-type-class ((name &key include include-args) &rest slots)
   (let ((defstruct-name
 	 (intern (concatenate 'string "ALIEN-" (symbol-name name) "-TYPE"))))

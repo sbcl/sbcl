@@ -57,9 +57,9 @@
 
 (defun make-random-state (&optional state)
   #!+sb-doc
-  "Make a random state object. If State is not supplied, return a copy
-  of the default random state. If State is a random state, then return a
-  copy of it. If state is T then return a random state generated from
+  "Make a random state object. If STATE is not supplied, return a copy
+  of the default random state. If STATE is a random state, then return a
+  copy of it. If STATE is T then return a random state generated from
   the universal time."
   (flet ((copy-random-state (state)
 	   (let ((state (random-state-state state))

@@ -1228,10 +1228,10 @@
 	       (%delayed-get-compiler-layout ,(dd-name defstruct)))
 	 ,@(when n-raw-data
 	     `((setf (%instance-ref ,temp ,raw-index) ,n-raw-data)))
-	 ,@(mapcar #'(lambda (dsd value)
-		       (multiple-value-bind (accessor index data)
-			   (slot-accessor-form defstruct dsd temp n-raw-data)
-			 `(setf (,accessor ,data ,index) ,value)))
+	 ,@(mapcar (lambda (dsd value)
+		     (multiple-value-bind (accessor index data)
+			 (slot-accessor-form defstruct dsd temp n-raw-data)
+		       `(setf (,accessor ,data ,index) ,value)))
 		   (dd-slots defstruct)
 		   values)
 	 ,temp))))
@@ -1269,7 +1269,7 @@
 	     defstruct (dd-default-constructor defstruct)
 	     (arglist) (vals) (types) (vals))))
 
-;;; Given a structure and a BOA constructor spec, call Creator with
+;;; Given a structure and a BOA constructor spec, call CREATOR with
 ;;; the appropriate args to make a constructor.
 (defun create-boa-constructor (defstruct boa creator)
   (multiple-value-bind (req opt restp rest keyp keys allowp aux)

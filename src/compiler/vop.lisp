@@ -12,10 +12,9 @@
 
 (in-package "SB!C")
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  ;; the largest number of TNs whose liveness changes that we can have
-  ;; in any block
-  (defconstant local-tn-limit 64))
+;;; the largest number of TNs whose liveness changes that we can have
+;;; in any block
+(defconstant local-tn-limit 64)
 
 (deftype local-tn-number () `(integer 0 (,local-tn-limit)))
 (deftype local-tn-count () `(integer 0 ,local-tn-limit))
@@ -355,9 +354,9 @@
   return-pc
   return-pc-pass)
 
-;;; The Return-Info structure is used by GTN to represent the return strategy
-;;; and locations for all the functions in a given Tail-Set. It is stored in
-;;; the Tail-Set-Info.
+;;; The RETURN-INFO structure is used by GTN to represent the return
+;;; strategy and locations for all the functions in a given TAIL-SET.
+;;; It is stored in the TAIL-SET-INFO.
 (defstruct return-info
   ;; The return convention used:
   ;; -- If :Unknown, we use the standard return convention.
@@ -380,10 +379,10 @@
   locations)
 
 (defstruct ir2-nlx-info
-  ;; If the kind is :Entry (a lexical exit), then in the home environment, this
-  ;; holds a Value-Cell object containing the unwind block pointer. In the
-  ;; other cases nobody directly references the unwind-block, so we leave this
-  ;; slot null.
+  ;; If the kind is :ENTRY (a lexical exit), then in the home
+  ;; environment, this holds a VALUE-CELL object containing the unwind
+  ;; block pointer. In the other cases nobody directly references the
+  ;; unwind-block, so we leave this slot null.
   (home nil :type (or tn null))
   ;; The saved control stack pointer.
   (save-sp (required-argument) :type tn)

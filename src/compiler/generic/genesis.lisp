@@ -44,7 +44,8 @@
 ;;;
 ;;; 0: inherited from CMU CL
 ;;; 1: rearranged static symbols for sbcl-0.6.8
-(defconstant sbcl-core-version-integer 1)
+;;; 2: eliminated non-ANSI %DEFCONSTANT/%%DEFCONSTANT support
+(defconstant sbcl-core-version-integer 2)
 
 (defun round-up (number size)
   #!+sb-doc
@@ -62,12 +63,11 @@
 (defvar *read-only*)
 (defconstant read-only-space-id 3)
 
-(eval-when (:compile-toplevel :execute :load-toplevel)
-  (defconstant descriptor-low-bits 16
-    "the number of bits in the low half of the descriptor")
-  (defconstant target-space-alignment (ash 1 descriptor-low-bits)
-    "the alignment requirement for spaces in the target.
-  Must be at least (ASH 1 DESCRIPTOR-LOW-BITS)"))
+(defconstant descriptor-low-bits 16
+  "the number of bits in the low half of the descriptor")
+(defconstant target-space-alignment (ash 1 descriptor-low-bits)
+  "the alignment requirement for spaces in the target.
+  Must be at least (ASH 1 DESCRIPTOR-LOW-BITS)")
 
 ;;; a GENESIS-time representation of a memory space (e.g. read-only space,
 ;;; dynamic space, or static space)
