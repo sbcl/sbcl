@@ -32,6 +32,8 @@
     (assert (equal (bit-xor a b) #*001111111111111111111111111111111))
     (assert (equal (bit-and a b) #*010000000000000000000000000000000)))
   ;; now test the biggy, mostly that it works...
+  #-x86-64 ; except on machines where addressable space is likely to be
+           ; much bigger than physical memory
   (let ((a (make-array (1- array-dimension-limit) :element-type 'bit :initial-element 0))
 	(b (make-array (1- array-dimension-limit) :element-type 'bit :initial-element 0)))
     (bit-not a a)

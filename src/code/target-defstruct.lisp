@@ -395,8 +395,8 @@
       (when raw-index
 	(let* ((data (%instance-ref structure raw-index))
 	       (raw-len (length data))
-	       (new (make-array raw-len :element-type '(unsigned-byte 32))))
-	  (declare (type (simple-array (unsigned-byte 32) (*)) data))
+	       (new (make-array raw-len :element-type 'sb!vm::word)))
+	  (declare (type (simple-array sb!vm::word (*)) data))
 	  (setf (%instance-ref res raw-index) new)
 	  (dotimes (i raw-len)
 	    (setf (aref new i) (aref data i))))))

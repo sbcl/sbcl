@@ -83,6 +83,12 @@
 	   (fixnum offset))
   (sap-ref-64 sap offset))
 
+;;; Return the unsigned word of natural size OFFSET bytes from SAP.
+(defun sap-ref-word (sap offset)
+  (declare (type system-area-pointer sap)
+	   (fixnum offset))
+  (sap-ref-word sap offset))
+
 ;;; Return the 32-bit SAP at OFFSET bytes from SAP.
 (defun sap-ref-sap (sap offset)
   (declare (type system-area-pointer sap)
@@ -132,6 +138,12 @@
 	   (fixnum offset))
   (signed-sap-ref-64 sap offset))
 
+;;; Return the signed word of natural size OFFSET bytes from SAP.
+(defun signed-sap-ref-word (sap offset)
+  (declare (type system-area-pointer sap)
+	   (fixnum offset))
+  (signed-sap-ref-word sap offset))
+
 (defun %set-sap-ref-8 (sap offset new-value)
   (declare (type system-area-pointer sap)
 	   (fixnum offset)
@@ -156,6 +168,12 @@
 	   (type (unsigned-byte 64) new-value))
   (setf (sap-ref-64 sap offset) new-value))
 
+(defun %set-sap-ref-word (sap offset new-value)
+  (declare (type system-area-pointer sap)
+	   (fixnum offset)
+	   (type (unsigned-byte #.sb!vm:n-machine-word-bits) new-value))
+  (setf (sap-ref-word sap offset) new-value))
+
 (defun %set-signed-sap-ref-8 (sap offset new-value)
   (declare (type system-area-pointer sap)
 	   (fixnum offset)
@@ -179,6 +197,12 @@
 	   (fixnum offset)
 	   (type (signed-byte 64) new-value))
   (setf (signed-sap-ref-64 sap offset) new-value))
+
+(defun %set-signed-sap-ref-word (sap offset new-value)
+  (declare (type system-area-pointer sap)
+	   (fixnum offset)
+	   (type (signed-byte #.sb!vm:n-machine-word-bits) new-value))
+  (setf (signed-sap-ref-word sap offset) new-value))
 
 (defun %set-sap-ref-sap (sap offset new-value)
   (declare (type system-area-pointer sap new-value)

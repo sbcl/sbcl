@@ -33,6 +33,7 @@
 	 (y :scs (any-reg descriptor-reg immediate)
 	    :load-if (not (and (sc-is x any-reg descriptor-reg immediate)
 			       (sc-is y control-stack constant)))))
+  (:temporary (:sc descriptor-reg) temp)
   (:conditional)
   (:info target not-p)
   (:policy :fast-safe)
@@ -45,12 +46,18 @@
 	  (integer
 	   (if (and (zerop val) (sc-is x any-reg descriptor-reg))
 	       (inst test x x) ; smaller
-	     (inst cmp x (fixnumize val))))
+	     (let ((fixnumized (fixnumize val)))
+	       (if (typep fixnumized
+			  '(or (signed-byte 32) (unsigned-byte 31)))
+		   (inst cmp x fixnumized)
+		 (progn
+		   (inst mov temp fixnumized)
+		   (inst cmp x temp))))))
 	  (symbol
 	   (inst cmp x (+ nil-value (static-symbol-offset val))))
 	  (character
 	   (inst cmp x (logior (ash (char-code val) n-widetag-bits)
-			       base-char-widetag))))))
+			       character-widetag))))))
      ((sc-is x immediate) ; and y not immediate
       ;; Swap the order to fit the compare instruction.
       (let ((val (tn-value x)))
@@ -58,12 +65,18 @@
 	  (integer
 	   (if (and (zerop val) (sc-is y any-reg descriptor-reg))
 	       (inst test y y) ; smaller
-	     (inst cmp y (fixnumize val))))
+	     (let ((fixnumized (fixnumize val)))
+	       (if (typep fixnumized
+			  '(or (signed-byte 32) (unsigned-byte 31)))
+		   (inst cmp y fixnumized)
+		 (progn
+		   (inst mov temp fixnumized)
+		   (inst cmp y temp))))))
 	  (symbol
 	   (inst cmp y (+ nil-value (static-symbol-offset val))))
 	  (character
 	   (inst cmp y (logior (ash (char-code val) n-widetag-bits)
-			       base-char-widetag))))))
+			       character-widetag))))))
       (t
        (inst cmp x y)))
 

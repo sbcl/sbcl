@@ -21,6 +21,7 @@
 #include "genesis/symbol.h"
 #include "genesis/binding.h"
 #include "genesis/thread.h"
+#include "genesis/static-symbols.h"
 
 #if defined(BINDING_STACK_POINTER)
 #define GetBSP() ((struct binding *)SymbolValue(BINDING_STACK_POINTER,thread))

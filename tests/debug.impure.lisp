@@ -110,17 +110,17 @@
          (declare (optimize (speed 1) (debug 2))) ; no tail call elimination
          (funcall fun)))
   #-x86 ; <- known bug (?): fails for me on 0.8.17.31/Linux/x86 -- WHN 2004-12-27
-  (dolist (frame '(#-x86 "undefined function" ; bug 353
+  (dolist (frame '(#-(or x86 x86-64) "undefined function" ; bug 353
                    "FLET COMMON-LISP-USER::TEST"))
     (assert (verify-backtrace (lambda () (test #'optimized)) frame
                               :test #'equal
-                              :allow-bogus-frames (or #+x86 t))))
-  (dolist (frame '(#-x86 "undefined function" ; bug 353
+                              :allow-bogus-frames (or #+(or x86 x86-64) t))))
+  (dolist (frame '(#-(or x86 x86-64) "undefined function" ; bug 353
                    "FLET COMMON-LISP-USER::NOT-OPTIMIZED"
                    "FLET COMMON-LISP-USER::TEST"))
     (assert (verify-backtrace (lambda () (test #'not-optimized)) frame
                               :test #'equal
-                              :allow-bogus-frames (or #+x86 t)))))
+                              :allow-bogus-frames (or #+(or x86 x86-64) t)))))
 
 ;;; Division by zero was a common error on PPC.  It depended on the
 ;;; return function either being before INTEGER-/-INTEGER in memory,
@@ -151,8 +151,8 @@
   (defun throw-test ()
     (throw 'no-such-tag t))
   (assert (verify-backtrace #'throw-test 
-                            #-(or x86 sparc) 'throw-test
-                            #+(or x86 sparc) "XEP for COMMON-LISP-USER::THROW-TEST" ; bug 354
+                            #-(or x86 x86-64 sparc) 'throw-test
+                            #+(or x86 x86-64 sparc) "XEP for COMMON-LISP-USER::THROW-TEST" ; bug 354
                             :test #'equal)))
 
 ;;; success

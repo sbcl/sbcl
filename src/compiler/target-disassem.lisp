@@ -485,7 +485,8 @@
 	(when (> words 0)
 	  (print-words words stream dstate))
 	(when (> bytes 0)
-	  (print-bytes bytes stream dstate))))
+	  (print-inst bytes stream dstate)))
+      (print-bytes alignment stream dstate))
     (incf (dstate-next-offs dstate) alignment)))
 
 ;;; Iterate through the instructions in SEGMENT, calling FUNCTION for
@@ -525,29 +526,39 @@
 	   (let ((fun-prefix-p (call-fun-hooks chunk stream dstate)))
 	     (if (> (dstate-next-offs dstate) (dstate-cur-offs dstate))
 		 (setf prefix-p fun-prefix-p)
-		 (let ((inst (find-inst chunk ispace)))
-		   (cond ((null inst)
-			  (handle-bogus-instruction stream dstate))
-			 (t
-			  (setf (dstate-next-offs dstate)
-				(+ (dstate-cur-offs dstate)
-				   (inst-length inst)))
-
+	       (let ((inst (find-inst chunk ispace)))
+		 (cond ((null inst)
+			(handle-bogus-instruction stream dstate))
+		       (t
+			(setf (dstate-next-offs dstate)
+			      (+ (dstate-cur-offs dstate)
+				 (inst-length inst)))
+			(let ((orig-next (dstate-next-offs dstate)))
+			  (print-inst (inst-length inst) stream dstate :trailing-space nil)
 			  (let ((prefilter (inst-prefilter inst))
 				(control (inst-control inst)))
 			    (when prefilter
 			      (funcall prefilter chunk dstate))
-
+			    
+			    ;; print any instruction bytes recognized by the prefilter which calls read-suffix
+			    ;; and updates next-offs
+			    (let ((suffix-len (- (dstate-next-offs dstate) orig-next)))
+			      (when (plusp suffix-len)
+				(print-inst suffix-len stream dstate :offset (inst-length inst) :trailing-space nil))
+			      (dotimes (i (- *disassem-inst-column-width* (* 2 (+ (inst-length inst) suffix-len))))
+				(write-char #\space stream)))
+			    (write-char #\space stream)
+			    
 			    (funcall function chunk inst)
-
+			    
 			    (setf prefix-p (null (inst-printer inst)))
-
+			    
 			    (when control
-			      (funcall control chunk inst stream dstate))))))
-		 )))))
-
+			      (funcall control chunk inst stream dstate))
+			    ))))))))))
+    
       (setf (dstate-cur-offs dstate) (dstate-next-offs dstate))
-
+      
       (unless (null stream)
 	(unless prefix-p
 	  (print-notes-and-newline stream dstate))
@@ -727,6 +738,17 @@
       (terpri stream))
     (fresh-line stream)
     (setf (dstate-notes dstate) nil)))
+
+;;; Print NUM instruction bytes to STREAM as hex values.
+(defun print-inst (num stream dstate &key (offset 0) (trailing-space t))
+  (let ((sap (dstate-segment-sap dstate))
+	(start-offs (+ offset (dstate-cur-offs dstate))))
+    (dotimes (offs num)
+      (format stream "~2,'0x" (sb!sys:sap-ref-8 sap (+ offs start-offs))))
+    (when trailing-space
+      (dotimes (i (- *disassem-inst-column-width* (* 2 num)))
+	(write-char #\space stream))
+      (write-char #\space stream))))
 
 ;;; Disassemble NUM bytes to STREAM as simple `BYTE' instructions.
 (defun print-bytes (num stream dstate)
@@ -1785,7 +1807,7 @@
 (defun sap-ref-int (sap offset length byte-order)
   (declare (type sb!sys:system-area-pointer sap)
 	   (type (unsigned-byte 16) offset)
-	   (type (member 1 2 4) length)
+	   (type (member 1 2 4 8) length)
 	   (type (member :little-endian :big-endian) byte-order)
 	   (optimize (speed 3) (safety 0)))
   (ecase length
@@ -1803,14 +1825,31 @@
 	   (+ (sb!sys:sap-ref-8 sap offset)
 	      (ash (sb!sys:sap-ref-8 sap (+ 1 offset)) 8)
 	      (ash (sb!sys:sap-ref-8 sap (+ 2 offset)) 16)
-	      (ash (sb!sys:sap-ref-8 sap (+ 3 offset)) 24))))))
+	      (ash (sb!sys:sap-ref-8 sap (+ 3 offset)) 24))))
+    (8 (if (eq byte-order :big-endian)
+	   (+ (ash (sb!sys:sap-ref-8 sap offset) 56)
+	      (ash (sb!sys:sap-ref-8 sap (+ 1 offset)) 48)
+	      (ash (sb!sys:sap-ref-8 sap (+ 2 offset)) 40)
+	      (ash (sb!sys:sap-ref-8 sap (+ 3 offset)) 32)
+	      (ash (sb!sys:sap-ref-8 sap (+ 4 offset)) 24)
+	      (ash (sb!sys:sap-ref-8 sap (+ 5 offset)) 16)
+	      (ash (sb!sys:sap-ref-8 sap (+ 6 offset)) 8)
+	      (sb!sys:sap-ref-8 sap (+ 7 offset)))
+	   (+ (sb!sys:sap-ref-8 sap offset)
+	      (ash (sb!sys:sap-ref-8 sap (+ 1 offset)) 8)
+	      (ash (sb!sys:sap-ref-8 sap (+ 2 offset)) 16)
+	      (ash (sb!sys:sap-ref-8 sap (+ 3 offset)) 24)
+	      (ash (sb!sys:sap-ref-8 sap (+ 4 offset)) 32)
+	      (ash (sb!sys:sap-ref-8 sap (+ 5 offset)) 40)
+	      (ash (sb!sys:sap-ref-8 sap (+ 6 offset)) 48)
+	      (ash (sb!sys:sap-ref-8 sap (+ 7 offset)) 56))))))
 
 (defun read-suffix (length dstate)
-  (declare (type (member 8 16 32) length)
+  (declare (type (member 8 16 32 64) length)
 	   (type disassem-state dstate)
 	   (optimize (speed 3) (safety 0)))
-  (let ((length (ecase length (8 1) (16 2) (32 4))))
-    (declare (type (unsigned-byte 3) length))
+  (let ((length (ecase length (8 1) (16 2) (32 4) (64 8))))
+    (declare (type (unsigned-byte 4) length))
     (prog1
       (sap-ref-int (dstate-segment-sap dstate)
 		   (dstate-next-offs dstate)
@@ -2007,6 +2046,7 @@
 	       (let ((num (pop lengths)))
 		 (print-notes-and-newline stream dstate)
 		 (print-current-address stream dstate)
+		 (print-inst num stream dstate)
 		 (print-bytes num stream dstate)
 		 (incf (dstate-cur-offs dstate) num)
 		 (when note

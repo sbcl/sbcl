@@ -23,43 +23,48 @@
 		 offset))
 
 (defstruct (arg-state (:copier nil))
+  (register-args 0)
+  (xmm-args 0)
   (stack-frame-size 0))
 
+(defun int-arg (state prim-type reg-sc stack-sc)
+  (let ((reg-args (arg-state-register-args state)))
+    (cond ((< reg-args 6)
+	   (setf (arg-state-register-args state) (1+ reg-args))
+	   (my-make-wired-tn prim-type reg-sc
+			     (nth reg-args *c-call-register-arg-offsets*)))
+	  (t
+	   (let ((frame-size (arg-state-stack-frame-size state)))
+	     (setf (arg-state-stack-frame-size state) (1+ frame-size))
+	     (my-make-wired-tn prim-type stack-sc frame-size))))))
+
 (define-alien-type-method (integer :arg-tn) (type state)
-  (let ((stack-frame-size (arg-state-stack-frame-size state)))
-    (setf (arg-state-stack-frame-size state) (1+ stack-frame-size))
-    (multiple-value-bind (ptype stack-sc)
-	(if (alien-integer-type-signed type)
-	    (values 'signed-byte-64 'signed-stack)
-	    (values 'unsigned-byte-64 'unsigned-stack))
-      (my-make-wired-tn ptype stack-sc stack-frame-size))))
+  (if (alien-integer-type-signed type)
+      (int-arg state 'signed-byte-64 'signed-reg 'signed-stack)
+      (int-arg state 'unsigned-byte-64 'unsigned-reg 'unsigned-stack)))
 
 (define-alien-type-method (system-area-pointer :arg-tn) (type state)
   (declare (ignore type))
-  (let ((stack-frame-size (arg-state-stack-frame-size state)))
-    (setf (arg-state-stack-frame-size state) (1+ stack-frame-size))
-    (my-make-wired-tn 'system-area-pointer
-		      'sap-stack
-		      stack-frame-size)))
+  (int-arg state 'system-area-pointer 'sap-reg 'sap-stack))
 
-#!+long-float
-(define-alien-type-method (long-float :arg-tn) (type state)
-  (declare (ignore type))
-  (let ((stack-frame-size (arg-state-stack-frame-size state)))
-    (setf (arg-state-stack-frame-size state) (+ stack-frame-size 3))
-    (my-make-wired-tn 'long-float 'long-stack stack-frame-size)))
+(defun float-arg (state prim-type reg-sc stack-sc)
+  (let ((xmm-args (arg-state-xmm-args state)))
+    (cond ((< xmm-args 8)
+	   (setf (arg-state-xmm-args state) (1+ xmm-args))
+	   (my-make-wired-tn prim-type reg-sc
+			     (nth xmm-args *float-regs*)))
+	  (t
+	   (let ((frame-size (arg-state-stack-frame-size state)))
+	     (setf (arg-state-stack-frame-size state) (1+ frame-size))
+	     (my-make-wired-tn prim-type stack-sc frame-size))))))
 
 (define-alien-type-method (double-float :arg-tn) (type state)
   (declare (ignore type))
-  (let ((stack-frame-size (arg-state-stack-frame-size state)))
-    (setf (arg-state-stack-frame-size state) (+ stack-frame-size 2))
-    (my-make-wired-tn 'double-float 'double-stack stack-frame-size)))
+  (float-arg state 'double-float 'double-reg 'double-stack))
 
 (define-alien-type-method (single-float :arg-tn) (type state)
   (declare (ignore type))
-  (let ((stack-frame-size (arg-state-stack-frame-size state)))
-    (setf (arg-state-stack-frame-size state) (1+ stack-frame-size))
-    (my-make-wired-tn 'single-float 'single-stack stack-frame-size)))
+  (float-arg state 'single-float 'single-reg 'single-stack))
 
 (defstruct (result-state (:copier nil))
   (num-results 0))
@@ -69,12 +74,17 @@
     (0 eax-offset)
     (1 edx-offset)))
 
+;; XXX The return handling probably doesn't conform to the ABI
+
 (define-alien-type-method (integer :result-tn) (type state)
   (let ((num-results (result-state-num-results state)))
     (setf (result-state-num-results state) (1+ num-results))
     (multiple-value-bind (ptype reg-sc)
 	(if (alien-integer-type-signed type)
-	    (values 'signed-byte-64 'signed-reg)
+	    (values (if (= (sb!alien::alien-integer-type-bits type) 32)
+			'signed-byte-32
+			'signed-byte-64)
+		    'signed-reg)
 	    (values 'unsigned-byte-64 'unsigned-reg))
       (my-make-wired-tn ptype reg-sc (result-reg-offset num-results)))))
 
@@ -85,24 +95,17 @@
     (my-make-wired-tn 'system-area-pointer 'sap-reg
 		      (result-reg-offset num-results))))
 
-#!+long-float
-(define-alien-type-method (long-float :result-tn) (type state)
-  (declare (ignore type))
-  (let ((num-results (result-state-num-results state)))
-    (setf (result-state-num-results state) (1+ num-results))
-    (my-make-wired-tn 'long-float 'long-reg (* num-results 2))))
-
 (define-alien-type-method (double-float :result-tn) (type state)
   (declare (ignore type))
   (let ((num-results (result-state-num-results state)))
     (setf (result-state-num-results state) (1+ num-results))
-    (my-make-wired-tn 'double-float 'double-reg (* num-results 2))))
+    (my-make-wired-tn 'double-float 'double-reg num-results)))
 
 (define-alien-type-method (single-float :result-tn) (type state)
   (declare (ignore type))
   (let ((num-results (result-state-num-results state)))
     (setf (result-state-num-results state) (1+ num-results))
-    (my-make-wired-tn 'single-float 'single-reg (* num-results 2))))
+    (my-make-wired-tn 'single-float 'single-reg num-results 2)))
 
 (define-alien-type-method (values :result-tn) (type state)
   (let ((values (alien-values-type-values type)))
@@ -188,51 +191,61 @@
   (:translate foreign-symbol-address)
   (:policy :fast-safe)
   (:args)
-  (:arg-types (:constant simple-base-string))
+  (:arg-types (:constant simple-string))
   (:info foreign-symbol)
   (:results (res :scs (sap-reg)))
   (:result-types system-area-pointer)
   (:generator 2
    (inst lea res (make-fixup (extern-alien-name foreign-symbol) :foreign))))
 
+#!+linkage-table
+(define-vop (foreign-symbol-dataref-address)
+  (:translate foreign-symbol-dataref-address)
+  (:policy :fast-safe)
+  (:args)
+  (:arg-types (:constant simple-string))
+  (:info foreign-symbol)
+  (:results (res :scs (sap-reg)))
+  (:result-types system-area-pointer)
+  (:generator 2
+   (inst mov res (make-fixup (extern-alien-name foreign-symbol) :foreign-dataref))))
+
 (define-vop (call-out)
   (:args (function :scs (sap-reg))
 	 (args :more t))
   (:results (results :more t))
-  (:temporary (:sc unsigned-reg :offset eax-offset
-		   :from :eval :to :result) eax)
-  (:temporary (:sc unsigned-reg :offset ecx-offset
-		   :from :eval :to :result) ecx)
-  (:temporary (:sc unsigned-reg :offset edx-offset
-		   :from :eval :to :result) edx)
-  (:node-var node)
+  (:temporary (:sc unsigned-reg :offset rax-offset :to :result) rax)
+  (:temporary (:sc unsigned-reg :offset rcx-offset
+		   :from :eval :to :result) rcx)
   (:vop-var vop)
   (:save-p t)
-  (:ignore args ecx edx)
   (:generator 0
-    (cond ((policy node (> space speed))
-	   (move eax function)
-	   (inst call (make-fixup (extern-alien-name "call_into_c") :foreign)))
-	  (t
-	   ;; Setup the NPX for C; all the FP registers need to be
-	   ;; empty; pop them all.
-	   (dotimes (i 8)
-	     (inst fstp fr0-tn))
-
-	   (inst call function)
-	   ;; To give the debugger a clue. XX not really internal-error?
-	   (note-this-location vop :internal-error)
-
-	   ;; Restore the NPX for lisp; ensure no regs are empty
-	   (dotimes (i 7)
-	     (inst fldz))
-
-	   (if (and results
-		    (location= (tn-ref-tn results) fr0-tn))
-	       ;; The return result is in fr0.
-	       (inst fxch fr7-tn) ; move the result back to fr0
-	       (inst fldz)) ; insure no regs are empty
-	   ))))
+    ;; ABI: AL contains amount of arguments passed in XMM registers
+    ;; for vararg calls.
+    (move-immediate rax
+		    (loop for tn-ref = args then (tn-ref-across tn-ref)
+		       while tn-ref
+		       count (eq (sb-name (sc-sb (tn-sc (tn-ref-tn tn-ref))))
+				 'float-registers)))
+    (inst call function)
+    ;; To give the debugger a clue. XX not really internal-error?
+    (note-this-location vop :internal-error)
+    ;; Sign-extend s-b-32 return values.
+    (dolist (res (if (listp results)
+		     results
+		     (list results)))
+      (let ((tn (tn-ref-tn res)))	       
+	(when (eq (sb!c::tn-primitive-type tn)
+		  (primitive-type-or-lose 'signed-byte-32))
+	  (inst movsxd tn (make-random-tn :kind :normal
+					  :sc (sc-or-lose 'dword-reg)
+					  :offset (tn-offset tn))))))
+    ;; FLOAT15 needs to contain FP zero in Lispland
+    (inst xor rcx rcx)
+    (inst movd (make-random-tn :kind :normal 
+			       :sc (sc-or-lose 'double-reg)
+			       :offset float15-offset)
+	  rcx)))
 
 (define-vop (alloc-number-stack-space)
   (:info amount)

@@ -116,7 +116,7 @@
 	  :start (+ (ash 1 n-lowtag-bits) other-immediate-0-lowtag)
 	  :step 4)
   ;; NOTE: the binary numbers off to the side are only valid for 32-bit
-  ;; ports; add #x1000 if you want to know the values for 64-bit ports.
+  ;; ports; add #b1000 if you want to know the values for 64-bit ports.
   ;; And note that the numbers get a little scrambled further down.
   ;;   --njf, 2004-08-09
   bignum                            ; 00001010
@@ -151,7 +151,9 @@
   unused05                          ; 01101110
   unused06                          ; 01110010
   unused07                          ; 01110110
+  #!+#.(cl:if (cl:= 32 sb!vm:n-word-bits) '(and) '(or))
   unused08                          ; 01111010
+  #!+#.(cl:if (cl:= 32 sb!vm:n-word-bits) '(and) '(or))
   unused09                          ; 01111110
 
   #!+#.(cl:if (cl:= 32 sb!vm:n-word-bits) '(and) '(or))

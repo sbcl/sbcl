@@ -18,11 +18,11 @@
 ;;;; register specs
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  (defvar *byte-register-names* (make-array 8 :initial-element nil))
+  (defvar *byte-register-names* (make-array 32 :initial-element nil))
   (defvar *word-register-names* (make-array 16 :initial-element nil))
   (defvar *dword-register-names* (make-array 16 :initial-element nil))
   (defvar *qword-register-names* (make-array 32 :initial-element nil))
-  (defvar *xmm-register-names* (make-array 16 :initial-element nil)))
+  (defvar *float-register-names* (make-array 16 :initial-element nil)))
 
 (macrolet ((defreg (name offset size)
 	     (let ((offset-sym (symbolicate name "-OFFSET"))
@@ -49,15 +49,29 @@
   ;; Note: the encoding here is different than that used by the chip.
   ;; We use this encoding so that the compiler thinks that AX (and
   ;; EAX) overlap AL and AH instead of AL and CL.
-  (defreg al 0 :byte)
-  (defreg ah 1 :byte)
-  (defreg cl 2 :byte)
-  (defreg ch 3 :byte)
-  (defreg dl 4 :byte)
-  (defreg dh 5 :byte)
-  (defreg bl 6 :byte)
-  (defreg bh 7 :byte)
-  (defregset *byte-regs* al ah cl ch dl dh bl bh)
+  ;;
+  ;; High-byte are registers disabled on AMD64, since they can't be
+  ;; encoded for an op that has a REX-prefix and we don't want to
+  ;; add special cases into the code generation. The overlap doesn't
+  ;; therefore exist anymore, but the numbering hasn't been changed
+  ;; to reflect this.
+  (defreg al    0 :byte)
+  (defreg cl    2 :byte)
+  (defreg dl    4 :byte)
+  (defreg bl    6 :byte)
+  (defreg sil  12 :byte)
+  (defreg dil  14 :byte)
+  (defreg r8b  16 :byte)
+  (defreg r9b  18 :byte)
+  (defreg r10b 20 :byte)
+  (defreg r11b 22 :byte)
+  (defreg r12b 24 :byte)
+  (defreg r13b 26 :byte)
+  (defreg r14b 28 :byte)
+  (defreg r15b 30 :byte)
+  (defregset *byte-regs*
+      al cl dl bl sil dil r8b r9b r10b
+      r11b #+nil r12b #+nil r13b r14b r15b)
 
   ;; word registers
   (defreg ax 0 :word)
@@ -102,24 +116,24 @@
 	     r8 r9 r10 r11 #+nil r12 #+nil r13 r14 r15)
 
   ;; floating point registers
-  (defreg xmm0 0 :float)
-  (defreg xmm1 1 :float)
-  (defreg xmm2 2 :float)
-  (defreg xmm3 3 :float)
-  (defreg xmm4 4 :float)
-  (defreg xmm5 5 :float)
-  (defreg xmm6 6 :float)
-  (defreg xmm7 7 :float)
-  (defreg xmm8 8 :float)
-  (defreg xmm9 9 :float)
-  (defreg xmm10 10 :float)
-  (defreg xmm11 11 :float)
-  (defreg xmm12 12 :float)
-  (defreg xmm13 13 :float)
-  (defreg xmm14 14 :float)
-  (defreg xmm15 15 :float)
-  (defregset *xmm-regs* xmm0 xmm1 xmm2 xmm3 xmm4 xmm5 xmm6 xmm7
-	     xmm8 xmm9 xmm10 xmm11 xmm12 xmm13 xmm14 xmm15)
+  (defreg float0 0 :float)
+  (defreg float1 1 :float)
+  (defreg float2 2 :float)
+  (defreg float3 3 :float)
+  (defreg float4 4 :float)
+  (defreg float5 5 :float)
+  (defreg float6 6 :float)
+  (defreg float7 7 :float)
+  (defreg float8 8 :float)
+  (defreg float9 9 :float)
+  (defreg float10 10 :float)
+  (defreg float11 11 :float)
+  (defreg float12 12 :float)
+  (defreg float13 13 :float)
+  (defreg float14 14 :float)
+  (defreg float15 15 :float)
+  (defregset *float-regs* float0 float1 float2 float3 float4 float5 float6 float7
+	     float8 float9 float10 float11 float12 float13 float14 float15)
 
   ;; registers used to pass arguments
   ;;
@@ -128,7 +142,8 @@
   ;; names and offsets for registers used to pass arguments
   (eval-when (:compile-toplevel :load-toplevel :execute)
     (defparameter *register-arg-names* '(rdx rdi rsi)))
-  (defregset    *register-arg-offsets* rdx rdi rsi))
+  (defregset    *register-arg-offsets* rdx rdi rsi)
+  (defregset    *c-call-register-arg-offsets* rdi rsi rdx rcx r8 r9))
 
 ;;;; SB definitions
 
@@ -140,7 +155,7 @@
 ;;; words in a dword register.
 (define-storage-base registers :finite :size 32)
 
-(define-storage-base xmm-registers :finite :size 16)
+(define-storage-base float-registers :finite :size 16)
 
 (define-storage-base stack :unbounded :size 8)
 (define-storage-base constant :non-packed)
@@ -191,6 +206,9 @@
   ;; non-immediate constants in the constant pool
   (constant constant)
 
+  (fp-single-zero immediate-constant)
+  (fp-double-zero immediate-constant)
+
   (immediate immediate-constant)
 
   ;;
@@ -204,7 +222,7 @@
   ;; XXX alpha backend has :element-size 2 :alignment 2 in these entries
   (signed-stack stack)			; (signed-byte 32)
   (unsigned-stack stack)		; (unsigned-byte 32)
-  (base-char-stack stack)		; non-descriptor characters.
+  (character-stack stack)		; non-descriptor characters.
   (sap-stack stack)			; System area pointers.
   (single-stack stack)			; single-floats
   (double-stack stack)
@@ -246,12 +264,14 @@
 		  :alternate-scs (control-stack))
 
   ;; non-descriptor characters
-  (base-char-reg registers
-		 :locations #.*byte-regs*
-		 :reserve-locations (#.ah-offset #.al-offset)
+  (character-reg registers
+		 :locations #!-sb-unicode #.*byte-regs*
+		            #!+sb-unicode #.*qword-regs*
+		 #!-sb-unicode #!-sb-unicode
+		 :reserve-locations (#.al-offset)
 		 :constant-scs (immediate)
 		 :save-p t
-		 :alternate-scs (base-char-stack))
+		 :alternate-scs (character-stack))
 
   ;; non-descriptor SAPs (arbitrary pointers into address space)
   (sap-reg registers
@@ -293,27 +313,27 @@
   ;; that can go in the floating point registers
 
   ;; non-descriptor SINGLE-FLOATs
-  (single-reg xmm-registers
-	      :locations #.(loop for i from 0 to 15 collect i)
-	      :constant-scs (fp-constant)
+  (single-reg float-registers
+	      :locations #.(loop for i from 0 below 15 collect i)
+	      :constant-scs (fp-single-zero)
 	      :save-p t
 	      :alternate-scs (single-stack))
 
   ;; non-descriptor DOUBLE-FLOATs
-  (double-reg xmm-registers
-	      :locations #.(loop for i from 0 to 15 collect i)
-	      :constant-scs (fp-constant)
+  (double-reg float-registers
+	      :locations #.(loop for i from 0 below 15 collect i)
+	      :constant-scs (fp-double-zero)
 	      :save-p t
 	      :alternate-scs (double-stack))
 
-  (complex-single-reg xmm-registers
+  (complex-single-reg float-registers
 		      :locations #.(loop for i from 0 to 14 by 2 collect i)
 		      :element-size 2
 		      :constant-scs ()
 		      :save-p t
 		      :alternate-scs (complex-single-stack))
 
-  (complex-double-reg xmm-registers
+  (complex-double-reg float-registers
 		      :locations #.(loop for i from 0 to 14 by 2 collect i)
 		      :element-size 2
 		      :constant-scs ()
@@ -324,12 +344,14 @@
   (catch-block stack :element-size kludge-nondeterministic-catch-block-size))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
-(defparameter *byte-sc-names* '(base-char-reg byte-reg base-char-stack))
+(defparameter *byte-sc-names* 
+  '(#!-sb-unicode character-reg byte-reg #!-sb-unicode character-stack))
 (defparameter *word-sc-names* '(word-reg))
 (defparameter *dword-sc-names* '(dword-reg))
 (defparameter *qword-sc-names* 
   '(any-reg descriptor-reg sap-reg signed-reg unsigned-reg control-stack
-    signed-stack unsigned-stack sap-stack single-stack constant))
+    signed-stack unsigned-stack sap-stack single-stack 
+    #!+sb-unicode character-reg #!+sb-unicode character-stack constant))
 ;;; added by jrd. I guess the right thing to do is to treat floats
 ;;; as a separate size...
 ;;;
@@ -359,10 +381,11 @@
 		    r8 r9 r10 r11  r12 r13 r14 r15)
   (def-misc-reg-tns dword-reg eax ebx ecx edx ebp esp edi esi)
   (def-misc-reg-tns word-reg ax bx cx dx bp sp di si)
-  (def-misc-reg-tns byte-reg al ah bl bh cl ch dl dh)
+  (def-misc-reg-tns byte-reg al cl dl bl sil dil r8b r9b r10b
+		    r11b r14b r15b)
   (def-misc-reg-tns single-reg 
-      xmm0 xmm1 xmm2 xmm3 xmm4 xmm5 xmm6 xmm7
-      xmm8 xmm9 xmm10 xmm11 xmm12 xmm13 xmm14 xmm15))
+      float0 float1 float2 float3 float4 float5 float6 float7
+      float8 float9 float10 float11 float12 float13 float14 float15))
 
 ;;; TNs for registers used to pass arguments
 (defparameter *register-arg-tns*
@@ -436,7 +459,7 @@
 		  (svref name-vec offset))
 	     ;; FIXME: Shouldn't this be an ERROR?
 	     (format nil "<unknown reg: off=~W, sc=~A>" offset sc-name))))
-      (float-registers (format nil "FR~D" offset))
+      (float-registers (format nil "FLOAT~D" offset))
       (stack (format nil "S~D" offset))
       (constant (format nil "Const~D" offset))
       (immediate-constant "Immed")
@@ -446,14 +469,27 @@
 
 ;;; The loader uses this to convert alien names to the form they need in
 ;;; the symbol table (for example, prepending an underscore).
+
+;;; The loader uses this to convert alien names to the form they need in
+;;; the symbol table (for example, prepending an underscore).
 (defun extern-alien-name (name)
-  (declare (type simple-base-string name))
-  ;; OpenBSD is non-ELF, and needs a _ prefix
-  #!+openbsd (concatenate 'string "_" name)
-  ;; The other (ELF) ports currently don't need any prefix
-  #!-openbsd name)
+  (declare (type string name))
+  ;; ELF ports currently don't need any prefix
+  (typecase name
+    (simple-base-string name)
+    (base-string (coerce name 'simple-base-string))
+    (t (handler-case (coerce name 'simple-base-string)
+	 (type-error () (error "invalid external alien name: ~S" name))))))
 
 (defun dwords-for-quad (value)
   (let* ((lo (logand value (1- (ash 1 32))))
-	 (hi (ash (- value lo) -32)))
+	 (hi (ash value -32)))
     (values lo hi)))
+
+(defun words-for-dword (value)
+  (let* ((lo (logand value (1- (ash 1 16))))
+	 (hi (ash value -16)))
+    (values lo hi)))
+
+(def!constant cfp-offset rbp-offset) ; pfw - needed by stuff in /code
+

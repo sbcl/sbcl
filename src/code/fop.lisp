@@ -89,11 +89,11 @@
   #+sb-xc-host (bug "READ-STRING-AS-WORDS called")
   (dotimes (i length)
     (setf (aref string i)
-	  (sb!xc:code-char (logior
-                            (read-byte stream)
-                            (ash (read-byte stream) 8)
-                            (ash (read-byte stream) 16)
-                            (ash (read-byte stream) 24)))))
+	  (let ((code 0))
+	    ;; FIXME: is this the same as READ-WORD-ARG?
+	    (dotimes (k sb!vm:n-word-bytes (sb!xc:code-char code))
+	      (setf code (logior code (ash (read-byte stream) 
+					   (* k sb!vm:n-byte-bits))))))))
   (values))
 
 ;;;; miscellaneous fops

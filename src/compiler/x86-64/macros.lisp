@@ -48,6 +48,8 @@
 
 (defmacro make-ea-for-object-slot (ptr slot lowtag)
   `(make-ea :qword :base ,ptr :disp (- (* ,slot n-word-bytes) ,lowtag)))
+(defmacro make-ea-for-object-slot-half (ptr slot lowtag)
+  `(make-ea :dword :base ,ptr :disp (- (* ,slot n-word-bytes) ,lowtag)))
 
 (defmacro loadw (value ptr &optional (slot 0) (lowtag 0))
   `(inst mov ,value (make-ea-for-object-slot ,ptr ,slot ,lowtag)))
@@ -58,9 +60,10 @@
 		 (not (typep ,value 
 			     '(or (signed-byte 32) (unsigned-byte 32)))))
 	    (multiple-value-bind (lo hi) (dwords-for-quad ,value)
-	      (inst mov (make-ea-for-object-slot ,ptr ,slot ,lowtag) lo)
-	      (inst mov (make-ea-for-object-slot ,ptr (floor (+ ,slot 0.5))
-						 ,lowtag)   hi)))
+	      (inst mov (make-ea-for-object-slot-half
+			 ,ptr ,slot ,lowtag) lo)
+	      (inst mov (make-ea-for-object-slot-half
+			 ,ptr (+ ,slot 1/2) ,lowtag) hi)))
 	   (t
 	    (inst mov (make-ea-for-object-slot ,ptr ,slot ,lowtag) ,value)))))
 
@@ -150,10 +153,65 @@
 ;;; This macro should only be used inside a pseudo-atomic section,
 ;;; which should also cover subsequent initialization of the
 ;;; object.
+(defun allocation-tramp (alloc-tn size &optional ignored)
+  (declare (ignore ignored))
+  (inst push size)
+  (inst lea r13-tn (make-ea :qword
+			    :disp (make-fixup (extern-alien-name "alloc_tramp")
+					      :foreign)))
+  (inst call r13-tn)
+  (inst pop alloc-tn)
+  (values))
+
+(defun allocation (alloc-tn size &optional ignored)
+  (declare (ignore ignored))
+  (let ((not-inline (gen-label))
+	(done (gen-label))
+	;; Yuck.
+	(in-elsewhere (eq *elsewhere* sb!assem::**current-segment**))
+	(free-pointer
+	 (make-ea :qword :disp 
+		  #!+sb-thread (* n-word-bytes thread-alloc-region-slot)
+		  #!-sb-thread (make-fixup (extern-alien-name "boxed_region")
+					   :foreign)
+		  :scale 1))		; thread->alloc_region.free_pointer
+	(end-addr 
+	 (make-ea :qword :disp
+		  #!+sb-thread (* n-word-bytes (1+ thread-alloc-region-slot))
+		  #!-sb-thread (make-fixup (extern-alien-name "boxed_region")
+					   :foreign 8)
+		  :scale 1)))		; thread->alloc_region.end_addr
+    (cond (in-elsewhere
+	   (allocation-tramp alloc-tn size))
+	  (t
+	   (unless (and (tn-p size) (location= alloc-tn size))
+	     (inst mov alloc-tn size))
+	   #!+sb-thread (inst fs-segment-prefix)
+	   (inst add alloc-tn free-pointer)
+	   #!+sb-thread (inst fs-segment-prefix)
+	   (inst cmp end-addr alloc-tn)
+	   (inst jmp :be NOT-INLINE)
+	   #!+sb-thread (inst fs-segment-prefix)
+	   (inst xchg free-pointer alloc-tn)
+	   (emit-label DONE)
+	   (assemble (*elsewhere*)
+	     (emit-label NOT-INLINE)
+	     (cond ((numberp size)
+		    (allocation-tramp alloc-tn size))
+		   (t
+		    (inst sub alloc-tn free-pointer)
+		    (allocation-tramp alloc-tn alloc-tn)))
+	     (inst jmp DONE))
+	   (values)))))
+
+#+nil
 (defun allocation (alloc-tn size &optional ignored)
   (declare (ignore ignored))
   (inst push size)
-  (inst call (make-fixup (extern-alien-name "alloc_tramp") :foreign))
+  (inst lea r13-tn (make-ea :qword
+			    :disp (make-fixup (extern-alien-name "alloc_tramp")
+					      :foreign)))
+  (inst call r13-tn)
   (inst pop alloc-tn)
   (values))
 
@@ -167,7 +225,7 @@
     (storew (logior (ash (1- ,size) n-widetag-bits) ,widetag)
 	    ,result-tn)
     (inst lea ,result-tn
-     (make-ea :byte :base ,result-tn :disp other-pointer-lowtag))
+	  (make-ea :qword :base ,result-tn :disp other-pointer-lowtag))
     ,@forms))
 
 ;;;; error code

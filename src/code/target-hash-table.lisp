@@ -161,12 +161,14 @@
 	   (length (almost-primify (max scaled-size
 					(1+ +min-hash-table-size+))))
 	   (index-vector (make-array length
-				     :element-type '(unsigned-byte 32)
+				     :element-type
+				     '(unsigned-byte #.sb!vm:n-word-bits)
 				     :initial-element 0))
 	   ;; needs to be the same length as the KV vector
            ;; (FIXME: really?  why doesn't the code agree?)
 	   (next-vector (make-array size+1
-				    :element-type '(unsigned-byte 32)))
+				    :element-type
+				    '(unsigned-byte #.sb!vm:n-word-bits)))
 	   (kv-vector (make-array (* 2 size+1)
 				  :initial-element +empty-ht-slot+))
 	   (table (%make-hash-table
@@ -182,7 +184,7 @@
 		   :next-vector next-vector
 		   :hash-vector (unless (eq test 'eq)
 				  (make-array size+1
-					      :element-type '(unsigned-byte 32)
+					      :element-type '(unsigned-byte #.sb!vm:n-word-bits)
 					      :initial-element +magic-hash-vector-value+)))))
       (declare (type index size+1 scaled-size length))
       ;; Set up the free list, all free. These lists are 0 terminated.
@@ -246,18 +248,18 @@
 	 (new-kv-vector (make-array (* 2 new-size)
 				    :initial-element +empty-ht-slot+))
 	 (new-next-vector (make-array new-size
-				      :element-type '(unsigned-byte 32)
+				      :element-type '(unsigned-byte #.sb!vm:n-word-bits)
 				      :initial-element 0))
 	 (new-hash-vector (when old-hash-vector
 			    (make-array new-size
-					:element-type '(unsigned-byte 32)
+					:element-type '(unsigned-byte #.sb!vm:n-word-bits)
 					:initial-element +magic-hash-vector-value+)))
 	 (old-index-vector (hash-table-index-vector table))
 	 (new-length (almost-primify
 		      (truncate (/ (float new-size)
 				(hash-table-rehash-threshold table)))))
 	 (new-index-vector (make-array new-length
-				       :element-type '(unsigned-byte 32)
+				       :element-type '(unsigned-byte #.sb!vm:n-word-bits)
 				       :initial-element 0)))
     (declare (type index new-size new-length old-size))
 

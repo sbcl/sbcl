@@ -31,6 +31,7 @@
     (ea-for-xf-desc tn complex-double-float-imag-slot)))
 
 (macrolet ((ea-for-xf-stack (tn kind)
+	     (declare (ignore kind))
 	     `(make-ea
 	       :qword :base rbp-tn
 	       :disp (- (* (+ (tn-offset ,tn) 1)
@@ -77,66 +78,29 @@
 ;;;; move functions
 
 ;;; X is source, Y is destination.
+
+(define-move-fun (load-fp-zero 1) (vop x y)
+  ((fp-single-zero) (single-reg)
+   (fp-double-zero) (double-reg))
+  (identity x) ; KLUDGE: IDENTITY as IGNORABLE...
+  (inst movq y fp-double-zero-tn))
+
 (define-move-fun (load-single 2) (vop x y)
   ((single-stack) (single-reg))
   (inst movss y (ea-for-sf-stack x)))
 
-;;; got this far 20040627
-
 (define-move-fun (store-single 2) (vop x y)
   ((single-reg) (single-stack))
-  (cond ((zerop (tn-offset x))
-	 (inst fst (ea-for-sf-stack y)))
-	(t
-	 (inst fxch x)
-	 (inst fst (ea-for-sf-stack y))
-	 ;; This may not be necessary as ST0 is likely invalid now.
-	 (inst fxch x))))
+  (inst movss (ea-for-sf-stack y) x))
 
 (define-move-fun (load-double 2) (vop x y)
   ((double-stack) (double-reg))
-  (with-empty-tn@fp-top(y)
-     (inst fldd (ea-for-df-stack x))))
+  (inst movsd y (ea-for-df-stack x)))
 
 (define-move-fun (store-double 2) (vop x y)
   ((double-reg) (double-stack))
-  (cond ((zerop (tn-offset x))
-	 (inst fstd (ea-for-df-stack y)))
-	(t
-	 (inst fxch x)
-	 (inst fstd (ea-for-df-stack y))
-	 ;; This may not be necessary as ST0 is likely invalid now.
-	 (inst fxch x))))
+  (inst movsd  (ea-for-df-stack y) x))
 
-
-
-;;; The i387 has instructions to load some useful constants. This
-;;; doesn't save much time but might cut down on memory access and
-;;; reduce the size of the constant vector (CV). Intel claims they are
-;;; stored in a more precise form on chip. Anyhow, might as well use
-;;; the feature. It can be turned off by hacking the
-;;; "immediate-constant-sc" in vm.lisp.
-(eval-when (:compile-toplevel :execute)
-  (setf *read-default-float-format* 'double-float))
-(define-move-fun (load-fp-constant 2) (vop x y)
-  ((fp-constant) (single-reg double-reg))
-  (let ((value (sb!c::constant-value (sb!c::tn-leaf x))))
-    (with-empty-tn@fp-top(y)
-      (cond ((zerop value)
-	     (inst fldz))
-	    ((= value 1e0)
-	     (inst fld1))
-	    ((= value (coerce pi *read-default-float-format*))
-	     (inst fldpi))
-	    ((= value (log 10e0 2e0))
-	     (inst fldl2t))
-	    ((= value (log 2.718281828459045235360287471352662e0 2e0))
-	     (inst fldl2e))
-	    ((= value (log 2e0 10e0))
-	     (inst fldlg2))
-	    ((= value (log 2e0 2.718281828459045235360287471352662e0))
-	     (inst fldln2))
-	    (t (warn "ignoring bogus i387 constant ~A" value))))))
 (eval-when (:compile-toplevel :execute)
   (setf *read-default-float-format* 'single-float))
 
@@ -160,77 +124,50 @@
 (define-move-fun (load-complex-single 2) (vop x y)
   ((complex-single-stack) (complex-single-reg))
   (let ((real-tn (complex-single-reg-real-tn y)))
-    (with-empty-tn@fp-top (real-tn)
-      (inst fld (ea-for-csf-real-stack x))))
+    (inst movss real-tn (ea-for-csf-real-stack x)))
   (let ((imag-tn (complex-single-reg-imag-tn y)))
-    (with-empty-tn@fp-top (imag-tn)
-      (inst fld (ea-for-csf-imag-stack x)))))
+    (inst movss imag-tn (ea-for-csf-imag-stack x))))
 
 (define-move-fun (store-complex-single 2) (vop x y)
   ((complex-single-reg) (complex-single-stack))
-  (let ((real-tn (complex-single-reg-real-tn x)))
-    (cond ((zerop (tn-offset real-tn))
-	   (inst fst (ea-for-csf-real-stack y)))
-	  (t
-	   (inst fxch real-tn)
-	   (inst fst (ea-for-csf-real-stack y))
-	   (inst fxch real-tn))))
-  (let ((imag-tn (complex-single-reg-imag-tn x)))
-    (inst fxch imag-tn)
-    (inst fst (ea-for-csf-imag-stack y))
-    (inst fxch imag-tn)))
+  (let ((real-tn (complex-single-reg-real-tn x))
+	(imag-tn (complex-single-reg-imag-tn x)))
+    (inst movss (ea-for-csf-real-stack y) real-tn)
+    (inst movss (ea-for-csf-imag-stack y) imag-tn)))
 
 (define-move-fun (load-complex-double 2) (vop x y)
   ((complex-double-stack) (complex-double-reg))
   (let ((real-tn (complex-double-reg-real-tn y)))
-    (with-empty-tn@fp-top(real-tn)
-      (inst fldd (ea-for-cdf-real-stack x))))
+    (inst movsd real-tn (ea-for-cdf-real-stack x)))
   (let ((imag-tn (complex-double-reg-imag-tn y)))
-    (with-empty-tn@fp-top(imag-tn)
-      (inst fldd (ea-for-cdf-imag-stack x)))))
+    (inst movsd imag-tn (ea-for-cdf-imag-stack x))))
 
 (define-move-fun (store-complex-double 2) (vop x y)
   ((complex-double-reg) (complex-double-stack))
-  (let ((real-tn (complex-double-reg-real-tn x)))
-    (cond ((zerop (tn-offset real-tn))
-	   (inst fstd (ea-for-cdf-real-stack y)))
-	  (t
-	   (inst fxch real-tn)
-	   (inst fstd (ea-for-cdf-real-stack y))
-	   (inst fxch real-tn))))
-  (let ((imag-tn (complex-double-reg-imag-tn x)))
-    (inst fxch imag-tn)
-    (inst fstd (ea-for-cdf-imag-stack y))
-    (inst fxch imag-tn)))
+  (let ((real-tn (complex-double-reg-real-tn x))
+	(imag-tn (complex-double-reg-imag-tn x)))
+    (inst movsd (ea-for-cdf-real-stack y) real-tn)
+    (inst movsd (ea-for-cdf-imag-stack y) imag-tn)))
 
 
 ;;;; move VOPs
 
 ;;; float register to register moves
-(define-vop (float-move)
-  (:args (x))
-  (:results (y))
-  (:note "float move")
-  (:generator 0
-     (unless (location= x y)
-	(cond ((zerop (tn-offset y))
-	       (copy-fp-reg-to-fr0 x))
-	      ((zerop (tn-offset x))
-	       (inst fstd y))
-	      (t
-	       (inst fxch x)
-	       (inst fstd y)
-	       (inst fxch x))))))
-
-(define-vop (single-move float-move)
-  (:args (x :scs (single-reg) :target y :load-if (not (location= x y))))
-  (:results (y :scs (single-reg) :load-if (not (location= x y)))))
-(define-move-vop single-move :move (single-reg) (single-reg))
-
-(define-vop (double-move float-move)
-  (:args (x :scs (double-reg) :target y :load-if (not (location= x y))))
-  (:results (y :scs (double-reg) :load-if (not (location= x y)))))
-(define-move-vop double-move :move (double-reg) (double-reg))
+(macrolet ((frob (vop sc)
+	     `(progn
+		(define-vop (,vop)
+		  (:args (x :scs (,sc)
+			    :target y
+			    :load-if (not (location= x y))))
+		  (:results (y :scs (,sc)
+			       :load-if (not (location= x y))))
+		  (:note "float move")
+		  (:generator 0
+		    (unless (location= y x)
+		      (inst movq y x))))
+		(define-move-vop ,vop :move (,sc) (,sc)))))
+  (frob single-move single-reg)
+  (frob double-move double-reg))
 
 ;;; complex float register to register moves
 (define-vop (complex-float-move)
@@ -241,21 +178,14 @@
      (unless (location= x y)
        ;; Note the complex-float-regs are aligned to every second
        ;; float register so there is not need to worry about overlap.
-       (let ((x-real (complex-double-reg-real-tn x))
-	     (y-real (complex-double-reg-real-tn y)))
-	 (cond ((zerop (tn-offset y-real))
-		(copy-fp-reg-to-fr0 x-real))
-	       ((zerop (tn-offset x-real))
-		(inst fstd y-real))
-	       (t
-		(inst fxch x-real)
-		(inst fstd y-real)
-		(inst fxch x-real))))
-       (let ((x-imag (complex-double-reg-imag-tn x))
-	     (y-imag (complex-double-reg-imag-tn y)))
-	 (inst fxch x-imag)
-	 (inst fstd y-imag)
-	 (inst fxch x-imag)))))
+       ;; (It would be better to put the imagpart in the top half of the 
+       ;; register, or something, but let's worry about that later)
+       (let ((x-real (complex-single-reg-real-tn x))
+	     (y-real (complex-single-reg-real-tn y)))
+	 (inst movq y-real x-real))
+       (let ((x-imag (complex-single-reg-imag-tn x))
+	     (y-imag (complex-single-reg-imag-tn y)))
+	 (inst movq y-imag x-imag)))))
 
 (define-vop (complex-single-move complex-float-move)
   (:args (x :scs (complex-single-reg) :target y
@@ -283,8 +213,7 @@
      (with-fixed-allocation (y
 			     single-float-widetag
 			     single-float-size node)
-       (with-tn@fp-top(x)
-	 (inst fst (ea-for-sf-desc y))))))
+       (inst movss (ea-for-sf-desc y) x))))
 (define-move-vop move-from-single :move
   (single-reg) (descriptor-reg))
 
@@ -298,11 +227,11 @@
 			     double-float-widetag
 			     double-float-size
 			     node)
-       (with-tn@fp-top(x)
-	 (inst fstd (ea-for-df-desc y))))))
+       (inst movsd (ea-for-df-desc y) x))))
 (define-move-vop move-from-double :move
   (double-reg) (descriptor-reg))
 
+#+nil
 (define-vop (move-from-fp-constant)
   (:args (x :scs (fp-constant)))
   (:results (y :scs (descriptor-reg)))
@@ -312,6 +241,7 @@
        (1f0 (load-symbol-value y *fp-constant-1f0*))
        (0d0 (load-symbol-value y *fp-constant-0d0*))
        (1d0 (load-symbol-value y *fp-constant-1d0*)))))
+#+nil
 (define-move-vop move-from-fp-constant :move
   (fp-constant) (descriptor-reg))
 
@@ -321,8 +251,7 @@
   (:results (y :scs (single-reg)))
   (:note "pointer to float coercion")
   (:generator 2
-     (with-empty-tn@fp-top(y)
-       (inst fld (ea-for-sf-desc x)))))
+    (inst movss y (ea-for-sf-desc x))))
 (define-move-vop move-to-single :move (descriptor-reg) (single-reg))
 
 (define-vop (move-to-double)
@@ -330,8 +259,7 @@
   (:results (y :scs (double-reg)))
   (:note "pointer to float coercion")
   (:generator 2
-     (with-empty-tn@fp-top(y)
-       (inst fldd (ea-for-df-desc x)))))
+    (inst movsd y (ea-for-df-desc x))))
 (define-move-vop move-to-double :move (descriptor-reg) (double-reg))
 
 
@@ -348,11 +276,9 @@
 			     complex-single-float-size
 			     node)
        (let ((real-tn (complex-single-reg-real-tn x)))
-	 (with-tn@fp-top(real-tn)
-	   (inst fst (ea-for-csf-real-desc y))))
+	 (inst movss (ea-for-csf-real-desc y) real-tn))
        (let ((imag-tn (complex-single-reg-imag-tn x)))
-	 (with-tn@fp-top(imag-tn)
-	   (inst fst (ea-for-csf-imag-desc y)))))))
+	 (inst movss (ea-for-csf-imag-desc y) imag-tn)))))
 (define-move-vop move-from-complex-single :move
   (complex-single-reg) (descriptor-reg))
 
@@ -367,11 +293,9 @@
 			     complex-double-float-size
 			     node)
        (let ((real-tn (complex-double-reg-real-tn x)))
-	 (with-tn@fp-top(real-tn)
-	   (inst fstd (ea-for-cdf-real-desc y))))
+	 (inst movsd (ea-for-cdf-real-desc y) real-tn))
        (let ((imag-tn (complex-double-reg-imag-tn x)))
-	 (with-tn@fp-top(imag-tn)
-	   (inst fstd (ea-for-cdf-imag-desc y)))))))
+	 (inst movsd (ea-for-cdf-imag-desc y) imag-tn)))))
 (define-move-vop move-from-complex-double :move
   (complex-double-reg) (descriptor-reg))
 
@@ -384,18 +308,22 @@
 		  (:note "pointer to complex float coercion")
 		  (:generator 2
 		    (let ((real-tn (complex-double-reg-real-tn y)))
-		      (with-empty-tn@fp-top(real-tn)
-			,@(ecase format
-			   (:single '((inst fld (ea-for-csf-real-desc x))))
-			   (:double '((inst fldd (ea-for-cdf-real-desc x)))))))
+		      ,@(ecase
+			 format
+			 (:single
+			  '((inst movss real-tn (ea-for-csf-real-desc x))))
+			 (:double
+			  '((inst movsd real-tn (ea-for-cdf-real-desc x))))))
 		    (let ((imag-tn (complex-double-reg-imag-tn y)))
-		      (with-empty-tn@fp-top(imag-tn)
-			,@(ecase format
-			   (:single '((inst fld (ea-for-csf-imag-desc x))))
-			   (:double '((inst fldd (ea-for-cdf-imag-desc x)))))))))
+		      ,@(ecase
+			 format
+			 (:single
+			  '((inst movss imag-tn (ea-for-csf-imag-desc x))))
+			 (:double 
+			  '((inst movsd imag-tn (ea-for-cdf-imag-desc x))))))))
 		(define-move-vop ,name :move (descriptor-reg) (,sc)))))
-	  (frob move-to-complex-single complex-single-reg :single)
-	  (frob move-to-complex-double complex-double-reg :double))
+  (frob move-to-complex-single complex-single-reg :single)
+  (frob move-to-complex-double complex-double-reg :double))
 
 ;;;; the move argument vops
 ;;;;
@@ -411,38 +339,29 @@
 			     :load-if (not (sc-is y ,sc))))
 		  (:results (y))
 		  (:note "float argument move")
-		  (:generator ,(case format (:single 2) (:double 3) (:long 4))
+		  (:generator ,(case format (:single 2) (:double 3) )
 		    (sc-case y
 		      (,sc
 		       (unless (location= x y)
-			  (cond ((zerop (tn-offset y))
-				 (copy-fp-reg-to-fr0 x))
-				((zerop (tn-offset x))
-				 (inst fstd y))
-				(t
-				 (inst fxch x)
-				 (inst fstd y)
-				 (inst fxch x)))))
+			 (inst movq y x)))
 		      (,stack-sc
 		       (if (= (tn-offset fp) esp-offset)
 			   (let* ((offset (* (tn-offset y) n-word-bytes))
 				  (ea (make-ea :dword :base fp :disp offset)))
-			     (with-tn@fp-top(x)
-				,@(ecase format
-					 (:single '((inst fst ea)))
-					 (:double '((inst fstd ea))))))
+			     ,@(ecase format
+				      (:single '((inst movss ea x)))
+				      (:double '((inst movsd ea x)))))
 			   (let ((ea (make-ea
 				      :dword :base fp
 				      :disp (- (* (+ (tn-offset y)
 						     ,(case format
 							    (:single 1)
-							    (:double 2)
-							    (:long 3)))
+							    (:double 2) ))
 						  n-word-bytes)))))
 			     (with-tn@fp-top(x)
 			       ,@(ecase format
-				    (:single '((inst fst  ea)))
-				    (:double '((inst fstd ea)))))))))))
+				    (:single '((inst movss ea x)))
+				    (:double '((inst movsd ea x)))))))))))
 		(define-move-vop ,name :move-arg
 		  (,sc descriptor-reg) (,sc)))))
   (frob move-single-float-arg single-reg single-stack :single)
@@ -457,53 +376,35 @@
 			     :load-if (not (sc-is y ,sc))))
 		  (:results (y))
 		  (:note "complex float argument move")
-		  (:generator ,(ecase format (:single 2) (:double 3) (:long 4))
+		  (:generator ,(ecase format (:single 2) (:double 3))
 		    (sc-case y
 		      (,sc
 		       (unless (location= x y)
 			 (let ((x-real (complex-double-reg-real-tn x))
 			       (y-real (complex-double-reg-real-tn y)))
-			   (cond ((zerop (tn-offset y-real))
-				  (copy-fp-reg-to-fr0 x-real))
-				 ((zerop (tn-offset x-real))
-				  (inst fstd y-real))
-				 (t
-				  (inst fxch x-real)
-				  (inst fstd y-real)
-				  (inst fxch x-real))))
+			   (inst movsd y-real x-real))
 			 (let ((x-imag (complex-double-reg-imag-tn x))
 			       (y-imag (complex-double-reg-imag-tn y)))
-			   (inst fxch x-imag)
-			   (inst fstd y-imag)
-			   (inst fxch x-imag))))
+			   (inst movsd y-imag x-imag))))
 		      (,stack-sc
 		       (let ((real-tn (complex-double-reg-real-tn x)))
-			 (cond ((zerop (tn-offset real-tn))
-				,@(ecase format
-				    (:single
-				     '((inst fst
-					(ea-for-csf-real-stack y fp))))
-				    (:double
-				     '((inst fstd
-					(ea-for-cdf-real-stack y fp))))))
-			       (t
-				(inst fxch real-tn)
-				,@(ecase format
-				    (:single
-				     '((inst fst
-					(ea-for-csf-real-stack y fp))))
-				    (:double
-				     '((inst fstd
-					(ea-for-cdf-real-stack y fp)))))
-				(inst fxch real-tn))))
-		       (let ((imag-tn (complex-double-reg-imag-tn x)))
-			 (inst fxch imag-tn)
 			 ,@(ecase format
-			     (:single
-			      '((inst fst (ea-for-csf-imag-stack y fp))))
-			     (:double
-			      '((inst fstd (ea-for-cdf-imag-stack y fp)))))
-			 (inst fxch imag-tn))))))
+				  (:single
+				   '((inst movss
+				      (ea-for-csf-real-stack y fp)
+				      real-tn)))
+				  (:double
+				   '((inst movsd
+				      (ea-for-cdf-real-stack y fp)
+				      real-tn)))))
+		       (let ((imag-tn (complex-double-reg-imag-tn x)))
+			 ,@(ecase format
+				  (:single
+				   '((inst movss
+				      (ea-for-csf-imag-stack y fp) imag-tn)))
+				  (:double
+				   '((inst movsd
+				      (ea-for-cdf-imag-stack y fp) imag-tn)))))))))
 		(define-move-vop ,name :move-arg
 		  (,sc descriptor-reg) (,sc)))))
   (frob move-complex-single-float-arg
@@ -519,690 +420,183 @@
 
 ;;;; arithmetic VOPs
 
-;;; dtc: the floating point arithmetic vops
-;;;
-;;; Note: Although these can accept x and y on the stack or pointed to
-;;; from a descriptor register, they will work with register loading
-;;; without these. Same deal with the result - it need only be a
-;;; register. When load-tns are needed they will probably be in ST0
-;;; and the code below should be able to correctly handle all cases.
-;;;
-;;; However it seems to produce better code if all arg. and result
-;;; options are used; on the P86 there is no extra cost in using a
-;;; memory operand to the FP instructions - not so on the PPro.
-;;;
-;;; It may also be useful to handle constant args?
-;;;
-;;; 22-Jul-97: descriptor args lose in some simple cases when
-;;; a function result computed in a loop. Then Python insists
-;;; on consing the intermediate values! For example
-#|
-(defun test(a n)
-  (declare (type (simple-array double-float (*)) a)
-	   (fixnum n))
-  (let ((sum 0d0))
-    (declare (type double-float sum))
-  (dotimes (i n)
-    (incf sum (* (aref a i)(aref a i))))
-    sum))
-|#
-;;; So, disabling descriptor args until this can be fixed elsewhere.
-(macrolet
-    ((frob (op fop-sti fopr-sti
-	       fop fopr sname scost
-	       fopd foprd dname dcost
-	       lname lcost)
-       #!-long-float (declare (ignore lcost lname))
-       `(progn
-	 (define-vop (,sname)
-	   (:translate ,op)
-	   (:args (x :scs (single-reg single-stack #+nil descriptor-reg)
-		     :to :eval)
-		  (y :scs (single-reg single-stack #+nil descriptor-reg)
-		     :to :eval))
-	   (:temporary (:sc single-reg :offset fr0-offset
-			    :from :eval :to :result) fr0)
-	   (:results (r :scs (single-reg single-stack)))
-	   (:arg-types single-float single-float)
-	   (:result-types single-float)
-	   (:policy :fast-safe)
-	   (:note "inline float arithmetic")
-	   (:vop-var vop)
-	   (:save-p :compute-only)
-	   (:node-var node)
-	   (:generator ,scost
-	     ;; Handle a few special cases
-	     (cond
-	      ;; x, y, and r are the same register.
-	      ((and (sc-is x single-reg) (location= x r) (location= y r))
-	       (cond ((zerop (tn-offset r))
-		      (inst ,fop fr0))
-		     (t
-		      (inst fxch r)
-		      (inst ,fop fr0)
-		      ;; XX the source register will not be valid.
-		      (note-next-instruction vop :internal-error)
-		      (inst fxch r))))
+(define-vop (float-op)
+  (:args (x) (y))
+  (:results (r))
+  (:policy :fast-safe)
+  (:note "inline float arithmetic")
+  (:vop-var vop)
+  (:save-p :compute-only))
 
-	      ;; x and r are the same register.
-	      ((and (sc-is x single-reg) (location= x r))
-	       (cond ((zerop (tn-offset r))
-		      (sc-case y
-			 (single-reg
-			  ;; ST(0) = ST(0) op ST(y)
-			  (inst ,fop y))
-			 (single-stack
-			  ;; ST(0) = ST(0) op Mem
-			  (inst ,fop (ea-for-sf-stack y)))
-			 (descriptor-reg
-			  (inst ,fop (ea-for-sf-desc y)))))
-		     (t
-		      ;; y to ST0
-		      (sc-case y
-			 (single-reg
-			  (unless (zerop (tn-offset y))
-				  (copy-fp-reg-to-fr0 y)))
-			 ((single-stack descriptor-reg)
-			  (inst fstp fr0)
-			  (if (sc-is y single-stack)
-			      (inst fld (ea-for-sf-stack y))
-			    (inst fld (ea-for-sf-desc y)))))
-		      ;; ST(i) = ST(i) op ST0
-		      (inst ,fop-sti r)))
-	       (maybe-fp-wait node vop))
-	      ;; y and r are the same register.
-	      ((and (sc-is y single-reg) (location= y r))
-	       (cond ((zerop (tn-offset r))
-		      (sc-case x
-			 (single-reg
-			  ;; ST(0) = ST(x) op ST(0)
-			  (inst ,fopr x))
-			 (single-stack
-			  ;; ST(0) = Mem op ST(0)
-			  (inst ,fopr (ea-for-sf-stack x)))
-			 (descriptor-reg
-			  (inst ,fopr (ea-for-sf-desc x)))))
-		     (t
-		      ;; x to ST0
-		      (sc-case x
-			(single-reg
-			 (unless (zerop (tn-offset x))
-				 (copy-fp-reg-to-fr0 x)))
-			((single-stack descriptor-reg)
-			 (inst fstp fr0)
-			 (if (sc-is x single-stack)
-			     (inst fld (ea-for-sf-stack x))
-			   (inst fld (ea-for-sf-desc x)))))
-		      ;; ST(i) = ST(0) op ST(i)
-		      (inst ,fopr-sti r)))
-	       (maybe-fp-wait node vop))
-	      ;; the default case
-	      (t
-	       ;; Get the result to ST0.
+(macrolet ((frob (name sc ptype)
+	     `(define-vop (,name float-op)
+		(:args (x :scs (,sc))
+		       (y :scs (,sc)))
+		(:results (r :scs (,sc)))
+		(:arg-types ,ptype ,ptype)
+		(:result-types ,ptype))))
+  (frob single-float-op single-reg single-float)
+  (frob double-float-op double-reg double-float))
 
-	       ;; Special handling is needed if x or y are in ST0, and
-	       ;; simpler code is generated.
-	       (cond
-		;; x is in ST0
-		((and (sc-is x single-reg) (zerop (tn-offset x)))
-		 ;; ST0 = ST0 op y
-		 (sc-case y
-		   (single-reg
-		    (inst ,fop y))
-		   (single-stack
-		    (inst ,fop (ea-for-sf-stack y)))
-		   (descriptor-reg
-		    (inst ,fop (ea-for-sf-desc y)))))
-		;; y is in ST0
-		((and (sc-is y single-reg) (zerop (tn-offset y)))
-		 ;; ST0 = x op ST0
-		 (sc-case x
-		   (single-reg
-		    (inst ,fopr x))
-		   (single-stack
-		    (inst ,fopr (ea-for-sf-stack x)))
-		   (descriptor-reg
-		    (inst ,fopr (ea-for-sf-desc x)))))
-		(t
-		 ;; x to ST0
-		 (sc-case x
-		   (single-reg
-		    (copy-fp-reg-to-fr0 x))
-		   (single-stack
-		    (inst fstp fr0)
-		    (inst fld (ea-for-sf-stack x)))
-		   (descriptor-reg
-		    (inst fstp fr0)
-		    (inst fld (ea-for-sf-desc x))))
-		 ;; ST0 = ST0 op y
-		 (sc-case y
-		   (single-reg
-		    (inst ,fop y))
-		   (single-stack
-		    (inst ,fop (ea-for-sf-stack y)))
-		   (descriptor-reg
-		    (inst ,fop (ea-for-sf-desc y))))))
+(macrolet ((frob (op sinst sname scost dinst dname dcost)
+	     `(progn
+		(define-vop (,sname single-float-op)
+		    (:translate ,op)
+		  (:results (r :scs (single-reg)))
+		  (:temporary (:sc single-reg) tmp)
+		  (:generator ,scost
+                    (inst movss tmp x)
+		    (inst ,sinst tmp y)
+		    (inst movss r tmp)))
+		(define-vop (,dname double-float-op)
+		  (:translate ,op)
+		  (:results (r :scs (double-reg)))
+		  (:temporary (:sc single-reg) tmp)
+		  (:generator ,dcost
+                    (inst movsd tmp x)
+		    (inst ,dinst tmp y)
+		    (inst movsd r tmp))))))
+  (frob + addss +/single-float 2 addsd +/double-float 2)
+  (frob - subss -/single-float 2 subsd -/double-float 2)
+  (frob * mulss */single-float 4 mulsd */double-float 5)
+  (frob / divss //single-float 12 divsd //double-float 19))
 
-	       (note-next-instruction vop :internal-error)
 
-	       ;; Finally save the result.
-	       (sc-case r
-		 (single-reg
-		  (cond ((zerop (tn-offset r))
-			 (maybe-fp-wait node))
-			(t
-			 (inst fst r))))
-		 (single-stack
-		  (inst fst (ea-for-sf-stack r))))))))
-
-	 (define-vop (,dname)
-	   (:translate ,op)
-	   (:args (x :scs (double-reg double-stack #+nil descriptor-reg)
-		     :to :eval)
-		  (y :scs (double-reg double-stack #+nil descriptor-reg)
-		     :to :eval))
-	   (:temporary (:sc double-reg :offset fr0-offset
-			    :from :eval :to :result) fr0)
-	   (:results (r :scs (double-reg double-stack)))
-	   (:arg-types double-float double-float)
-	   (:result-types double-float)
-	   (:policy :fast-safe)
-	   (:note "inline float arithmetic")
-	   (:vop-var vop)
-	   (:save-p :compute-only)
-	   (:node-var node)
-	   (:generator ,dcost
-	     ;; Handle a few special cases.
-	     (cond
-	      ;; x, y, and r are the same register.
-	      ((and (sc-is x double-reg) (location= x r) (location= y r))
-	       (cond ((zerop (tn-offset r))
-		      (inst ,fop fr0))
-		     (t
-		      (inst fxch x)
-		      (inst ,fopd fr0)
-		      ;; XX the source register will not be valid.
-		      (note-next-instruction vop :internal-error)
-		      (inst fxch r))))
-
-	      ;; x and r are the same register.
-	      ((and (sc-is x double-reg) (location= x r))
-	       (cond ((zerop (tn-offset r))
-		      (sc-case y
-			 (double-reg
-			  ;; ST(0) = ST(0) op ST(y)
-			  (inst ,fopd y))
-			 (double-stack
-			  ;; ST(0) = ST(0) op Mem
-			  (inst ,fopd (ea-for-df-stack y)))
-			 (descriptor-reg
-			  (inst ,fopd (ea-for-df-desc y)))))
-		     (t
-		      ;; y to ST0
-		      (sc-case y
-			 (double-reg
-			  (unless (zerop (tn-offset y))
-				  (copy-fp-reg-to-fr0 y)))
-			 ((double-stack descriptor-reg)
-			  (inst fstp fr0)
-			  (if (sc-is y double-stack)
-			      (inst fldd (ea-for-df-stack y))
-			    (inst fldd (ea-for-df-desc y)))))
-		      ;; ST(i) = ST(i) op ST0
-		      (inst ,fop-sti r)))
-	       (maybe-fp-wait node vop))
-	      ;; y and r are the same register.
-	      ((and (sc-is y double-reg) (location= y r))
-	       (cond ((zerop (tn-offset r))
-		      (sc-case x
-			 (double-reg
-			  ;; ST(0) = ST(x) op ST(0)
-			  (inst ,foprd x))
-			 (double-stack
-			  ;; ST(0) = Mem op ST(0)
-			  (inst ,foprd (ea-for-df-stack x)))
-			 (descriptor-reg
-			  (inst ,foprd (ea-for-df-desc x)))))
-		     (t
-		      ;; x to ST0
-		      (sc-case x
-			 (double-reg
-			  (unless (zerop (tn-offset x))
-				  (copy-fp-reg-to-fr0 x)))
-			 ((double-stack descriptor-reg)
-			  (inst fstp fr0)
-			  (if (sc-is x double-stack)
-			      (inst fldd (ea-for-df-stack x))
-			    (inst fldd (ea-for-df-desc x)))))
-		      ;; ST(i) = ST(0) op ST(i)
-		      (inst ,fopr-sti r)))
-	       (maybe-fp-wait node vop))
-	      ;; the default case
-	      (t
-	       ;; Get the result to ST0.
-
-	       ;; Special handling is needed if x or y are in ST0, and
-	       ;; simpler code is generated.
-	       (cond
-		;; x is in ST0
-		((and (sc-is x double-reg) (zerop (tn-offset x)))
-		 ;; ST0 = ST0 op y
-		 (sc-case y
-		   (double-reg
-		    (inst ,fopd y))
-		   (double-stack
-		    (inst ,fopd (ea-for-df-stack y)))
-		   (descriptor-reg
-		    (inst ,fopd (ea-for-df-desc y)))))
-		;; y is in ST0
-		((and (sc-is y double-reg) (zerop (tn-offset y)))
-		 ;; ST0 = x op ST0
-		 (sc-case x
-		   (double-reg
-		    (inst ,foprd x))
-		   (double-stack
-		    (inst ,foprd (ea-for-df-stack x)))
-		   (descriptor-reg
-		    (inst ,foprd (ea-for-df-desc x)))))
-		(t
-		 ;; x to ST0
-		 (sc-case x
-		   (double-reg
-		    (copy-fp-reg-to-fr0 x))
-		   (double-stack
-		    (inst fstp fr0)
-		    (inst fldd (ea-for-df-stack x)))
-		   (descriptor-reg
-		    (inst fstp fr0)
-		    (inst fldd (ea-for-df-desc x))))
-		 ;; ST0 = ST0 op y
-		 (sc-case y
-		   (double-reg
-		    (inst ,fopd y))
-		   (double-stack
-		    (inst ,fopd (ea-for-df-stack y)))
-		   (descriptor-reg
-		    (inst ,fopd (ea-for-df-desc y))))))
-
-	       (note-next-instruction vop :internal-error)
-
-	       ;; Finally save the result.
-	       (sc-case r
-		 (double-reg
-		  (cond ((zerop (tn-offset r))
-			 (maybe-fp-wait node))
-			(t
-			 (inst fst r))))
-		 (double-stack
-		  (inst fstd (ea-for-df-stack r))))))))
-	 )))
-
-    (frob + fadd-sti fadd-sti
-	  fadd fadd +/single-float 2
-	  faddd faddd +/double-float 2
-	  +/long-float 2)
-    (frob - fsub-sti fsubr-sti
-	  fsub fsubr -/single-float 2
-	  fsubd fsubrd -/double-float 2
-	  -/long-float 2)
-    (frob * fmul-sti fmul-sti
-	  fmul fmul */single-float 3
-	  fmuld fmuld */double-float 3
-	  */long-float 3)
-    (frob / fdiv-sti fdivr-sti
-	  fdiv fdivr //single-float 12
-	  fdivd fdivrd //double-float 12
-	  //long-float 12))
 
-(macrolet ((frob (name inst translate sc type)
+(macrolet ((frob ((name translate sc type) &body body)
 	     `(define-vop (,name)
-	       (:args (x :scs (,sc) :target fr0))
-	       (:results (y :scs (,sc)))
-	       (:translate ,translate)
-	       (:policy :fast-safe)
-	       (:arg-types ,type)
-	       (:result-types ,type)
-	       (:temporary (:sc double-reg :offset fr0-offset
-				:from :argument :to :result) fr0)
-	       (:ignore fr0)
-	       (:note "inline float arithmetic")
-	       (:vop-var vop)
-	       (:save-p :compute-only)
-	       (:generator 1
-		(note-this-location vop :internal-error)
-		(unless (zerop (tn-offset x))
-		  (inst fxch x)		; x to top of stack
-		  (unless (location= x y)
-		    (inst fst x)))	; Maybe save it.
-		(inst ,inst)		; Clobber st0.
-		(unless (zerop (tn-offset y))
-		  (inst fst y))))))
-
-  (frob abs/single-float fabs abs single-reg single-float)
-  (frob abs/double-float fabs abs double-reg double-float)
-
-  (frob %negate/single-float fchs %negate single-reg single-float)
-  (frob %negate/double-float fchs %negate double-reg double-float))
+		  (:args (x :scs (,sc)))
+		(:results (y :scs (,sc)))
+		(:translate ,translate)
+		(:policy :fast-safe)
+		(:arg-types ,type)
+		(:result-types ,type)
+		(:temporary (:sc any-reg) hex8)
+		(:temporary
+		 (:sc ,sc) xmm)
+		(:note "inline float arithmetic")
+		(:vop-var vop)
+		(:save-p :compute-only)
+		(:generator 1
+			    (note-this-location vop :internal-error)
+			    ;; we should be able to do this better.  what we 
+			    ;; really would like to do is use the target as the
+			    ;; temp whenever it's not also the source
+			    (unless (location= x y)
+			      (inst movq y x))
+			    ,@body))))
+  (frob (%negate/double-float %negate double-reg double-float)
+	(inst lea hex8 (make-ea :qword :disp 1))
+	(inst ror hex8 1)		; #x8000000000000000
+	(inst movd xmm hex8)
+	(inst xorpd y xmm))
+  (frob (%negate/single-float %negate single-reg single-float)
+	(inst lea hex8 (make-ea :qword :disp 1))
+	(inst rol hex8 31)
+	(inst movd xmm hex8)
+	(inst xorps y xmm))
+  (frob (abs/double-float abs  double-reg double-float)
+	(inst mov hex8 -1)
+	(inst shr hex8 1)
+	(inst movd xmm hex8)
+	(inst andpd y xmm))
+  (frob (abs/single-float abs  single-reg single-float)
+	(inst mov hex8 -1)
+	(inst shr hex8 33)
+	(inst movd xmm hex8)
+	(inst andps y xmm)))
 
 ;;;; comparison
 
-(define-vop (=/float)
-  (:args (x) (y))
-  (:temporary (:sc word-reg :offset eax-offset :from :eval) temp)
+(define-vop (float-compare)
   (:conditional)
   (:info target not-p)
   (:policy :fast-safe)
   (:vop-var vop)
   (:save-p :compute-only)
-  (:note "inline float comparison")
-  (:ignore temp)
-  (:generator 3
-     (note-this-location vop :internal-error)
-     (cond
-      ;; x is in ST0; y is in any reg.
-      ((zerop (tn-offset x))
-       (inst fucom y))
-      ;; y is in ST0; x is in another reg.
-      ((zerop (tn-offset y))
-       (inst fucom x))
-      ;; x and y are the same register, not ST0
-      ((location= x y)
-       (inst fxch x)
-       (inst fucom fr0-tn)
-       (inst fxch x))
-      ;; x and y are different registers, neither ST0.
-      (t
-       (inst fxch x)
-       (inst fucom y)
-       (inst fxch x)))
-     (inst fnstsw)			; status word to ax
-     (inst and ah-tn #x45)		; C3 C2 C0
-     (inst cmp ah-tn #x40)
-     (inst jmp (if not-p :ne :e) target)))
+  (:note "inline float comparison"))
 
-(define-vop (=/single-float =/float)
-  (:translate =)
-  (:args (x :scs (single-reg))
-	 (y :scs (single-reg)))
+;;; comiss and comisd can cope with one or other arg in memory: we
+;;; could (should, indeed) extend these to cope with descriptor args
+;;; and stack args
+
+(define-vop (single-float-compare float-compare)
+  (:args (x :scs (single-reg)) (y :scs (single-reg)))
+  (:conditional)
   (:arg-types single-float single-float))
-
-(define-vop (=/double-float =/float)
-  (:translate =)
-  (:args (x :scs (double-reg))
-	 (y :scs (double-reg)))
+(define-vop (double-float-compare float-compare)
+  (:args (x :scs (double-reg)) (y :scs (double-reg)))
+  (:conditional)
   (:arg-types double-float double-float))
 
-(define-vop (<single-float)
-  (:translate <)
-  (:args (x :scs (single-reg single-stack descriptor-reg))
-	 (y :scs (single-reg single-stack descriptor-reg)))
-  (:arg-types single-float single-float)
-  (:temporary (:sc single-reg :offset fr0-offset :from :eval) fr0)
-  (:temporary (:sc word-reg :offset eax-offset :from :eval) temp)
-  (:conditional)
+(define-vop (=/single-float single-float-compare)
+    (:translate =)
   (:info target not-p)
-  (:policy :fast-safe)
-  (:note "inline float comparison")
-  (:ignore temp)
-  (:generator 3
-    ;; Handle a few special cases.
-    (cond
-     ;; y is ST0.
-     ((and (sc-is y single-reg) (zerop (tn-offset y)))
-      (sc-case x
-	(single-reg
-	 (inst fcom x))
-	((single-stack descriptor-reg)
-	 (if (sc-is x single-stack)
-	     (inst fcom (ea-for-sf-stack x))
-	   (inst fcom (ea-for-sf-desc x)))))
-      (inst fnstsw)			; status word to ax
-      (inst and ah-tn #x45))
-
-     ;; general case when y is not in ST0
-     (t
-      ;; x to ST0
-      (sc-case x
-	 (single-reg
-	  (unless (zerop (tn-offset x))
-		  (copy-fp-reg-to-fr0 x)))
-	 ((single-stack descriptor-reg)
-	  (inst fstp fr0)
-	  (if (sc-is x single-stack)
-	      (inst fld (ea-for-sf-stack x))
-	    (inst fld (ea-for-sf-desc x)))))
-      (sc-case y
-	(single-reg
-	 (inst fcom y))
-	((single-stack descriptor-reg)
-	 (if (sc-is y single-stack)
-	     (inst fcom (ea-for-sf-stack y))
-	   (inst fcom (ea-for-sf-desc y)))))
-      (inst fnstsw)			; status word to ax
-      (inst and ah-tn #x45)		; C3 C2 C0
-      (inst cmp ah-tn #x01)))
-    (inst jmp (if not-p :ne :e) target)))
-
-(define-vop (<double-float)
-  (:translate <)
-  (:args (x :scs (double-reg double-stack descriptor-reg))
-	 (y :scs (double-reg double-stack descriptor-reg)))
-  (:arg-types double-float double-float)
-  (:temporary (:sc double-reg :offset fr0-offset :from :eval) fr0)
-  (:temporary (:sc word-reg :offset eax-offset :from :eval) temp)
-  (:conditional)
-  (:info target not-p)
-  (:policy :fast-safe)
-  (:note "inline float comparison")
-  (:ignore temp)
-  (:generator 3
-    ;; Handle a few special cases
-    (cond
-     ;; y is ST0.
-     ((and (sc-is y double-reg) (zerop (tn-offset y)))
-      (sc-case x
-	(double-reg
-	 (inst fcomd x))
-	((double-stack descriptor-reg)
-	 (if (sc-is x double-stack)
-	     (inst fcomd (ea-for-df-stack x))
-	   (inst fcomd (ea-for-df-desc x)))))
-      (inst fnstsw)			; status word to ax
-      (inst and ah-tn #x45))
-
-     ;; General case when y is not in ST0.
-     (t
-      ;; x to ST0
-      (sc-case x
-	 (double-reg
-	  (unless (zerop (tn-offset x))
-		  (copy-fp-reg-to-fr0 x)))
-	 ((double-stack descriptor-reg)
-	  (inst fstp fr0)
-	  (if (sc-is x double-stack)
-	      (inst fldd (ea-for-df-stack x))
-	    (inst fldd (ea-for-df-desc x)))))
-      (sc-case y
-	(double-reg
-	 (inst fcomd y))
-	((double-stack descriptor-reg)
-	 (if (sc-is y double-stack)
-	     (inst fcomd (ea-for-df-stack y))
-	   (inst fcomd (ea-for-df-desc y)))))
-      (inst fnstsw)			; status word to ax
-      (inst and ah-tn #x45)		; C3 C2 C0
-      (inst cmp ah-tn #x01)))
-    (inst jmp (if not-p :ne :e) target)))
-
-(define-vop (>single-float)
-  (:translate >)
-  (:args (x :scs (single-reg single-stack descriptor-reg))
-	 (y :scs (single-reg single-stack descriptor-reg)))
-  (:arg-types single-float single-float)
-  (:temporary (:sc single-reg :offset fr0-offset :from :eval) fr0)
-  (:temporary (:sc word-reg :offset eax-offset :from :eval) temp)
-  (:conditional)
-  (:info target not-p)
-  (:policy :fast-safe)
-  (:note "inline float comparison")
-  (:ignore temp)
-  (:generator 3
-    ;; Handle a few special cases.
-    (cond
-     ;; y is ST0.
-     ((and (sc-is y single-reg) (zerop (tn-offset y)))
-      (sc-case x
-	(single-reg
-	 (inst fcom x))
-	((single-stack descriptor-reg)
-	 (if (sc-is x single-stack)
-	     (inst fcom (ea-for-sf-stack x))
-	   (inst fcom (ea-for-sf-desc x)))))
-      (inst fnstsw)			; status word to ax
-      (inst and ah-tn #x45)
-      (inst cmp ah-tn #x01))
-
-     ;; general case when y is not in ST0
-     (t
-      ;; x to ST0
-      (sc-case x
-	 (single-reg
-	  (unless (zerop (tn-offset x))
-		  (copy-fp-reg-to-fr0 x)))
-	 ((single-stack descriptor-reg)
-	  (inst fstp fr0)
-	  (if (sc-is x single-stack)
-	      (inst fld (ea-for-sf-stack x))
-	    (inst fld (ea-for-sf-desc x)))))
-      (sc-case y
-	(single-reg
-	 (inst fcom y))
-	((single-stack descriptor-reg)
-	 (if (sc-is y single-stack)
-	     (inst fcom (ea-for-sf-stack y))
-	   (inst fcom (ea-for-sf-desc y)))))
-      (inst fnstsw)			; status word to ax
-      (inst and ah-tn #x45)))
-    (inst jmp (if not-p :ne :e) target)))
-
-(define-vop (>double-float)
-  (:translate >)
-  (:args (x :scs (double-reg double-stack descriptor-reg))
-	 (y :scs (double-reg double-stack descriptor-reg)))
-  (:arg-types double-float double-float)
-  (:temporary (:sc double-reg :offset fr0-offset :from :eval) fr0)
-  (:temporary (:sc word-reg :offset eax-offset :from :eval) temp)
-  (:conditional)
-  (:info target not-p)
-  (:policy :fast-safe)
-  (:note "inline float comparison")
-  (:ignore temp)
-  (:generator 3
-    ;; Handle a few special cases.
-    (cond
-     ;; y is ST0.
-     ((and (sc-is y double-reg) (zerop (tn-offset y)))
-      (sc-case x
-	(double-reg
-	 (inst fcomd x))
-	((double-stack descriptor-reg)
-	 (if (sc-is x double-stack)
-	     (inst fcomd (ea-for-df-stack x))
-	   (inst fcomd (ea-for-df-desc x)))))
-      (inst fnstsw)			; status word to ax
-      (inst and ah-tn #x45)
-      (inst cmp ah-tn #x01))
-
-     ;; general case when y is not in ST0
-     (t
-      ;; x to ST0
-      (sc-case x
-	 (double-reg
-	  (unless (zerop (tn-offset x))
-		  (copy-fp-reg-to-fr0 x)))
-	 ((double-stack descriptor-reg)
-	  (inst fstp fr0)
-	  (if (sc-is x double-stack)
-	      (inst fldd (ea-for-df-stack x))
-	    (inst fldd (ea-for-df-desc x)))))
-      (sc-case y
-	(double-reg
-	 (inst fcomd y))
-	((double-stack descriptor-reg)
-	 (if (sc-is y double-stack)
-	     (inst fcomd (ea-for-df-stack y))
-	   (inst fcomd (ea-for-df-desc y)))))
-      (inst fnstsw)			; status word to ax
-      (inst and ah-tn #x45)))
-    (inst jmp (if not-p :ne :e) target)))
-
-;;; Comparisons with 0 can use the FTST instruction.
-
-(define-vop (float-test)
-  (:args (x))
-  (:temporary (:sc word-reg :offset eax-offset :from :eval) temp)
-  (:conditional)
-  (:info target not-p y)
-  (:variant-vars code)
-  (:policy :fast-safe)
   (:vop-var vop)
-  (:save-p :compute-only)
-  (:note "inline float comparison")
-  (:ignore temp y)
+  (:generator 3
+    (note-this-location vop :internal-error)
+    (inst comiss x y)
+    ;; if PF&CF, there was a NaN involved => not equal
+    ;; otherwise, ZF => equal
+    (cond (not-p
+	   (inst jmp :p target)
+	   (inst jmp :ne target))
+	  (t
+	   (let ((not-lab (gen-label)))
+	     (inst jmp :p not-lab)
+	     (inst jmp :e target)
+	     (emit-label not-lab))))))
+
+(define-vop (=/double-float double-float-compare)
+    (:translate =)
+  (:info target not-p)
+  (:vop-var vop)
+  (:generator 3
+    (note-this-location vop :internal-error)
+    (inst comisd x y)
+    (cond (not-p
+	   (inst jmp :p target)
+	   (inst jmp :ne target))
+	  (t
+	   (let ((not-lab (gen-label)))
+	     (inst jmp :p not-lab)
+	     (inst jmp :e target)
+	     (emit-label not-lab))))))
+
+;; XXX all of these probably have bad NaN behaviour
+(define-vop (<double-float double-float-compare)
+  (:translate <)
+  (:info target not-p)
   (:generator 2
-     (note-this-location vop :internal-error)
-     (cond
-      ;; x is in ST0
-      ((zerop (tn-offset x))
-       (inst ftst))
-      ;; x not ST0
-      (t
-       (inst fxch x)
-       (inst ftst)
-       (inst fxch x)))
-     (inst fnstsw)			; status word to ax
-     (inst and ah-tn #x45)		; C3 C2 C0
-     (unless (zerop code)
-	(inst cmp ah-tn code))
-     (inst jmp (if not-p :ne :e) target)))
+    (inst comisd x y)
+    (inst jmp (if not-p :nc :c) target)))
 
-(define-vop (=0/single-float float-test)
-  (:translate =)
-  (:args (x :scs (single-reg)))
-  (:arg-types single-float (:constant (single-float 0f0 0f0)))
-  (:variant #x40))
-(define-vop (=0/double-float float-test)
-  (:translate =)
-  (:args (x :scs (double-reg)))
-  (:arg-types double-float (:constant (double-float 0d0 0d0)))
-  (:variant #x40))
-
-(define-vop (<0/single-float float-test)
+(define-vop (<single-float single-float-compare)
   (:translate <)
-  (:args (x :scs (single-reg)))
-  (:arg-types single-float (:constant (single-float 0f0 0f0)))
-  (:variant #x01))
-(define-vop (<0/double-float float-test)
-  (:translate <)
-  (:args (x :scs (double-reg)))
-  (:arg-types double-float (:constant (double-float 0d0 0d0)))
-  (:variant #x01))
+  (:info target not-p)
+  (:generator 2
+    (inst comiss x y)
+    (inst jmp (if not-p :nc :c) target)))
 
-(define-vop (>0/single-float float-test)
+(define-vop (>double-float double-float-compare)
   (:translate >)
-  (:args (x :scs (single-reg)))
-  (:arg-types single-float (:constant (single-float 0f0 0f0)))
-  (:variant #x00))
-(define-vop (>0/double-float float-test)
+  (:info target not-p)
+  (:generator 2
+    (inst comisd x y)
+    (inst jmp (if not-p :na :a) target)))
+
+(define-vop (>single-float single-float-compare)
   (:translate >)
-  (:args (x :scs (double-reg)))
-  (:arg-types double-float (:constant (double-float 0d0 0d0)))
-  (:variant #x00))
+  (:info target not-p)
+  (:generator 2
+    (inst comiss x y)
+    (inst jmp (if not-p :na :a) target)))
+
 
 
 ;;;; conversion
 
-(macrolet ((frob (name translate to-sc to-type)
+(macrolet ((frob (name translate inst to-sc to-type)
 	     `(define-vop (,name)
 		(:args (x :scs (signed-stack signed-reg) :target temp))
 		(:temporary (:sc signed-stack) temp)
@@ -1218,17 +612,16 @@
 		  (sc-case x
 		    (signed-reg
 		     (inst mov temp x)
-		     (with-empty-tn@fp-top(y)
-		       (note-this-location vop :internal-error)
-		       (inst fild temp)))
+		     (note-this-location vop :internal-error)
+		     (inst ,inst y temp))
 		    (signed-stack
-		     (with-empty-tn@fp-top(y)
-		       (note-this-location vop :internal-error)
-		       (inst fild x))))))))
-  (frob %single-float/signed %single-float single-reg single-float)
-  (frob %double-float/signed %double-float double-reg double-float))
+		     (note-this-location vop :internal-error)
+		     (inst ,inst y x)))))))
+  (frob %single-float/signed %single-float cvtsi2ss single-reg single-float)
+  (frob %double-float/signed %double-float cvtsi2sd double-reg double-float))
 
-(macrolet ((frob (name translate to-sc to-type)
+#+nil
+(macrolet ((frob (name translate inst to-sc to-type)
 	     `(define-vop (,name)
 		(:args (x :scs (unsigned-reg)))
 		(:results (y :scs (,to-sc)))
@@ -1240,18 +633,11 @@
 		(:vop-var vop)
 		(:save-p :compute-only)
 		(:generator 6
-		 (inst push 0)
-		 (inst push x)
-		 (with-empty-tn@fp-top(y)
-		   (note-this-location vop :internal-error)
-		   (inst fildl (make-ea :dword :base rsp-tn)))
-		 (inst add rsp-tn 16)))))
-  (frob %single-float/unsigned %single-float single-reg single-float)
-  (frob %double-float/unsigned %double-float double-reg double-float))
+		  (inst ,inst y x)))))
+  (frob %single-float/unsigned %single-float cvtsi2ss single-reg single-float)
+  (frob %double-float/unsigned %double-float cvtsi2sd double-reg double-float))
 
-;;; These should be no-ops but the compiler might want to move some
-;;; things around.
-(macrolet ((frob (name translate from-sc from-type to-sc to-type)
+(macrolet ((frob (name translate inst from-sc from-type to-sc to-type)
 	     `(define-vop (,name)
 	       (:args (x :scs (,from-sc) :target y))
 	       (:results (y :scs (,to-sc)))
@@ -1264,34 +650,18 @@
 	       (:save-p :compute-only)
 	       (:generator 2
 		(note-this-location vop :internal-error)
-		(unless (location= x y)
-		  (cond
-		   ((zerop (tn-offset x))
-		    ;; x is in ST0, y is in another reg. not ST0
-		    (inst fst  y))
-		   ((zerop (tn-offset y))
-		    ;; y is in ST0, x is in another reg. not ST0
-		    (copy-fp-reg-to-fr0 x))
-		   (t
-		    ;; Neither x or y are in ST0, and they are not in
-		    ;; the same reg.
-		    (inst fxch x)
-		    (inst fst  y)
-		    (inst fxch x))))))))
-
-  (frob %single-float/double-float %single-float double-reg
+		(inst ,inst y x)))))
+  (frob %single-float/double-float %single-float cvtsd2ss double-reg
 	double-float single-reg single-float)
 
-  (frob %double-float/single-float %double-float single-reg single-float
-	double-reg double-float))
+  (frob %double-float/single-float %double-float cvtss2sd 
+	single-reg single-float double-reg double-float))
 
-(macrolet ((frob (trans from-sc from-type round-p)
+(macrolet ((frob (trans inst from-sc from-type round-p)
+             (declare (ignore round-p))
 	     `(define-vop (,(symbolicate trans "/" from-type))
 	       (:args (x :scs (,from-sc)))
-	       (:temporary (:sc signed-stack) stack-temp)
-	       ,@(unless round-p
-		       '((:temporary (:sc unsigned-stack) scw)
-			 (:temporary (:sc any-reg) rcw)))
+	       (:temporary (:sc any-reg) temp-reg)
 	       (:results (y :scs (signed-reg)))
 	       (:arg-types ,from-type)
 	       (:result-types signed-num)
@@ -1301,33 +671,20 @@
 	       (:vop-var vop)
 	       (:save-p :compute-only)
 	       (:generator 5
-		,@(unless round-p
-		   '((note-this-location vop :internal-error)
-		     ;; Catch any pending FPE exceptions.
-		     (inst wait)))
-		(,(if round-p 'progn 'pseudo-atomic)
-		 ;; Normal mode (for now) is "round to best".
-		 (with-tn@fp-top (x)
-		   ,@(unless round-p
-		     '((inst fnstcw scw) ; save current control word
-		       (move rcw scw)	; into 16-bit register
-		       (inst or rcw (ash #b11 10)) ; CHOP
-		       (move stack-temp rcw)
-		       (inst fldcw stack-temp)))
-		   (sc-case y
-		     (signed-stack
-		      (inst fist y))
-		     (signed-reg
-		      (inst fist stack-temp)
-		      (inst mov y stack-temp)))
-		   ,@(unless round-p
-		      '((inst fldcw scw)))))))))
-  (frob %unary-truncate single-reg single-float nil)
-  (frob %unary-truncate double-reg double-float nil)
+		 (sc-case y
+			  (signed-stack
+			   (inst ,inst temp-reg x)
+			   (move y temp-reg))
+			  (signed-reg
+			   (inst ,inst y x)
+			   ))))))
+  (frob %unary-truncate cvttss2si single-reg single-float nil)
+  (frob %unary-truncate cvttsd2si double-reg double-float nil)
 
-  (frob %unary-round single-reg single-float t)
-  (frob %unary-round double-reg double-float t))
+  (frob %unary-round cvtss2si single-reg single-float t)
+  (frob %unary-round cvtsd2si double-reg double-float t))
 
+#+nil ;; will we need this?
 (macrolet ((frob (trans from-sc from-type round-p)
 	     `(define-vop (,(symbolicate trans "/" from-type "=>UNSIGNED"))
 	       (:args (x :scs (,from-sc) :target fr0))
@@ -1379,7 +736,7 @@
 				      (sc-is res single-stack)
 				      (location= bits res))))))
   (:results (res :scs (single-reg single-stack)))
-  (:temporary (:sc signed-stack) stack-temp)
+ ; (:temporary (:sc signed-stack) stack-temp)
   (:arg-types signed-num)
   (:result-types single-float)
   (:translate make-single-float)
@@ -1396,31 +753,25 @@
        (single-reg
 	(sc-case bits
 	  (signed-reg
-	   ;; source must be in memory
-	   (inst mov stack-temp bits)
-	   (with-empty-tn@fp-top(res)
-	      (inst fld stack-temp)))
+	   (inst movd res bits))
 	  (signed-stack
-	   (with-empty-tn@fp-top(res)
-	      (inst fld bits))))))))
+	   (inst movd res bits)))))))
 
 (define-vop (make-double-float)
   (:args (hi-bits :scs (signed-reg))
 	 (lo-bits :scs (unsigned-reg)))
   (:results (res :scs (double-reg)))
-  (:temporary (:sc double-stack) temp)
+  (:temporary (:sc unsigned-reg) temp)
   (:arg-types signed-num unsigned-num)
   (:result-types double-float)
   (:translate make-double-float)
   (:policy :fast-safe)
   (:vop-var vop)
   (:generator 2
-    (let ((offset (1+ (tn-offset temp))))
-      (storew hi-bits rbp-tn (- offset))
-      (storew lo-bits rbp-tn (- (1+ offset)))
-      (with-empty-tn@fp-top(res)
-	(inst fldd (make-ea :dword :base rbp-tn
-			    :disp (- (* (1+ offset) n-word-bytes))))))))
+    (move temp hi-bits)
+    (inst shl temp 32)
+    (inst or temp lo-bits)
+    (inst movd res temp)))
 
 (define-vop (single-float-bits)
   (:args (float :scs (single-reg descriptor-reg)
@@ -1437,11 +788,10 @@
       (signed-reg
        (sc-case float
 	 (single-reg
-	  (with-tn@fp-top(float)
-	    (inst fst stack-temp)
-	    (inst mov bits stack-temp)))
+	  (inst movss stack-temp float)
+	  (move bits stack-temp))
 	 (single-stack
-	  (inst mov bits float))
+	  (move bits float))
 	 (descriptor-reg
 	  (loadw
 	   bits float single-float-value-slot
@@ -1449,14 +799,16 @@
       (signed-stack
        (sc-case float
 	 (single-reg
-	  (with-tn@fp-top(float)
-	    (inst fst bits))))))))
+	  (inst movss bits float)))))
+    ;; Sign-extend
+    (inst shl bits 32)
+    (inst sar bits 32)))
 
 (define-vop (double-float-high-bits)
   (:args (float :scs (double-reg descriptor-reg)
 		:load-if (not (sc-is float double-stack))))
   (:results (hi-bits :scs (signed-reg)))
-  (:temporary (:sc double-stack) temp)
+  (:temporary (:sc signed-stack :from :argument :to :result) temp)
   (:arg-types double-float)
   (:result-types signed-num)
   (:translate double-float-high-bits)
@@ -1465,23 +817,20 @@
   (:generator 5
      (sc-case float
        (double-reg
-	(with-tn@fp-top(float)
-	  (let ((where (make-ea :dword :base rbp-tn
-				:disp (- (* (+ 2 (tn-offset temp))
-					    n-word-bytes)))))
-	    (inst fstd where)))
-	(loadw hi-bits rbp-tn (- (1+ (tn-offset temp)))))
+	(inst movsd temp float)
+	(move hi-bits temp))
        (double-stack
-	(loadw hi-bits rbp-tn (- (1+ (tn-offset float)))))
+	(loadw hi-bits ebp-tn (- (tn-offset float))))
        (descriptor-reg
-	(loadw hi-bits float (1+ double-float-value-slot)
-	       other-pointer-lowtag)))))
+	(loadw hi-bits float double-float-value-slot
+	       other-pointer-lowtag)))
+     (inst sar hi-bits 32)))
 
 (define-vop (double-float-low-bits)
   (:args (float :scs (double-reg descriptor-reg)
 		:load-if (not (sc-is float double-stack))))
   (:results (lo-bits :scs (unsigned-reg)))
-  (:temporary (:sc double-stack) temp)
+  (:temporary (:sc signed-stack :from :argument :to :result) temp)
   (:arg-types double-float)
   (:result-types unsigned-num)
   (:translate double-float-low-bits)
@@ -1490,17 +839,15 @@
   (:generator 5
      (sc-case float
        (double-reg
-	(with-tn@fp-top(float)
-	  (let ((where (make-ea :dword :base rbp-tn
-				:disp (- (* (+ 2 (tn-offset temp))
-					    n-word-bytes)))))
-	    (inst fstd where)))
-	(loadw lo-bits rbp-tn (- (+ 2 (tn-offset temp)))))
+	(inst movsd temp float)
+	(move lo-bits temp))
        (double-stack
-	(loadw lo-bits rbp-tn (- (+ 2 (tn-offset float)))))
+	(loadw lo-bits ebp-tn (- (tn-offset float))))
        (descriptor-reg
 	(loadw lo-bits float double-float-value-slot
-	       other-pointer-lowtag)))))
+	       other-pointer-lowtag)))
+     (inst shl lo-bits 32)
+     (inst shr lo-bits 32)))
 
 
 ;;;; float mode hackery
@@ -1558,1086 +905,6 @@
    (move res new)))
 
 
-(progn
-
-;;; Let's use some of the 80387 special functions.
-;;;
-;;; These defs will not take effect unless code/irrat.lisp is modified
-;;; to remove the inlined alien routine def.
-
-(macrolet ((frob (func trans op)
-	     `(define-vop (,func)
-	       (:args (x :scs (double-reg) :target fr0))
-	       (:temporary (:sc double-reg :offset fr0-offset
-				:from :argument :to :result) fr0)
-	       (:ignore fr0)
-	       (:results (y :scs (double-reg)))
-	       (:arg-types double-float)
-	       (:result-types double-float)
-	       (:translate ,trans)
-	       (:policy :fast-safe)
-	       (:note "inline NPX function")
-	       (:vop-var vop)
-	       (:save-p :compute-only)
-	       (:node-var node)
-	       (:generator 5
-		(note-this-location vop :internal-error)
-		(unless (zerop (tn-offset x))
-		  (inst fxch x)		; x to top of stack
-		  (unless (location= x y)
-		    (inst fst x)))	; maybe save it
-		(inst ,op)		; clobber st0
-		(cond ((zerop (tn-offset y))
-		       (maybe-fp-wait node))
-		      (t
-		       (inst fst y)))))))
-
-  ;; Quick versions of fsin and fcos that require the argument to be
-  ;; within range 2^63.
-  (frob fsin-quick %sin-quick fsin)
-  (frob fcos-quick %cos-quick fcos)
-  (frob fsqrt %sqrt fsqrt))
-
-;;; Quick version of ftan that requires the argument to be within
-;;; range 2^63.
-(define-vop (ftan-quick)
-  (:translate %tan-quick)
-  (:args (x :scs (double-reg) :target fr0))
-  (:temporary (:sc double-reg :offset fr0-offset
-		   :from :argument :to :result) fr0)
-  (:temporary (:sc double-reg :offset fr1-offset
-		   :from :argument :to :result) fr1)
-  (:results (y :scs (double-reg)))
-  (:arg-types double-float)
-  (:result-types double-float)
-  (:policy :fast-safe)
-  (:note "inline tan function")
-  (:vop-var vop)
-  (:save-p :compute-only)
-  (:generator 5
-    (note-this-location vop :internal-error)
-    (case (tn-offset x)
-       (0
-	(inst fstp fr1))
-       (1
-	(inst fstp fr0))
-       (t
-	(inst fstp fr0)
-	(inst fstp fr0)
-	(inst fldd (make-random-tn :kind :normal
-				   :sc (sc-or-lose 'double-reg)
-				   :offset (- (tn-offset x) 2)))))
-    (inst fptan)
-    ;; Result is in fr1
-    (case (tn-offset y)
-       (0
-	(inst fxch fr1))
-       (1)
-       (t
-	(inst fxch fr1)
-	(inst fstd y)))))
-
-;;; These versions of fsin, fcos, and ftan try to use argument
-;;; reduction but to do this accurately requires greater precision and
-;;; it is hopelessly inaccurate.
-#+nil
-(macrolet ((frob (func trans op)
-	     `(define-vop (,func)
-		(:translate ,trans)
-		(:args (x :scs (double-reg) :target fr0))
-		(:temporary (:sc unsigned-reg :offset eax-offset
-				 :from :eval :to :result) eax)
-		(:temporary (:sc unsigned-reg :offset fr0-offset
-				 :from :argument :to :result) fr0)
-		(:temporary (:sc unsigned-reg :offset fr1-offset
-				 :from :argument :to :result) fr1)
-		(:results (y :scs (double-reg)))
-		(:arg-types double-float)
-		(:result-types double-float)
-		(:policy :fast-safe)
-		(:note "inline sin/cos function")
-		(:vop-var vop)
-		(:save-p :compute-only)
-		(:ignore eax)
-		(:generator 5
-		  (note-this-location vop :internal-error)
-		  (unless (zerop (tn-offset x))
-			  (inst fxch x)		 ; x to top of stack
-			  (unless (location= x y)
-				  (inst fst x))) ; maybe save it
-		  (inst ,op)
-		  (inst fnstsw)			 ; status word to ax
-		  (inst and ah-tn #x04)		 ; C2
-		  (inst jmp :z DONE)
-		  ;; Else x was out of range so reduce it; ST0 is unchanged.
-		  (inst fstp fr1) 		; Load 2*PI
-		  (inst fldpi)
-		  (inst fadd fr0)
-		  (inst fxch fr1)
-		  LOOP
-		  (inst fprem1)
-		  (inst fnstsw)		; status word to ax
-		  (inst and ah-tn #x04)	; C2
-		  (inst jmp :nz LOOP)
-		  (inst ,op)
-		  DONE
-		  (unless (zerop (tn-offset y))
-			  (inst fstd y))))))
-	  (frob fsin  %sin fsin)
-	  (frob fcos  %cos fcos))
-
-
-
-;;; These versions of fsin, fcos, and ftan simply load a 0.0 result if
-;;; the argument is out of range 2^63 and would thus be hopelessly
-;;; inaccurate.
-(macrolet ((frob (func trans op)
-	     `(define-vop (,func)
-		(:translate ,trans)
-		(:args (x :scs (double-reg) :target fr0))
-		(:temporary (:sc double-reg :offset fr0-offset
-				 :from :argument :to :result) fr0)
-		(:temporary (:sc unsigned-reg :offset eax-offset
-			     :from :argument :to :result) eax)
-		(:results (y :scs (double-reg)))
-		(:arg-types double-float)
-		(:result-types double-float)
-		(:policy :fast-safe)
-		(:note "inline sin/cos function")
-		(:vop-var vop)
-		(:save-p :compute-only)
-		(:ignore eax)
-		(:generator 5
-		  (note-this-location vop :internal-error)
-		  (unless (zerop (tn-offset x))
-			  (inst fxch x)		 ; x to top of stack
-			  (unless (location= x y)
-				  (inst fst x))) ; maybe save it
-		  (inst ,op)
-		  (inst fnstsw)			 ; status word to ax
-		  (inst and ah-tn #x04)		 ; C2
-		  (inst jmp :z DONE)
-		  ;; Else x was out of range so reduce it; ST0 is unchanged.
-		  (inst fstp fr0)		; Load 0.0
-		  (inst fldz)
-		  DONE
-		  (unless (zerop (tn-offset y))
-			  (inst fstd y))))))
-	  (frob fsin  %sin fsin)
-	  (frob fcos  %cos fcos))
-
-(define-vop (ftan)
-  (:translate %tan)
-  (:args (x :scs (double-reg) :target fr0))
-  (:temporary (:sc double-reg :offset fr0-offset
-		   :from :argument :to :result) fr0)
-  (:temporary (:sc double-reg :offset fr1-offset
-		   :from :argument :to :result) fr1)
-  (:temporary (:sc unsigned-reg :offset eax-offset
-		   :from :argument :to :result) eax)
-  (:results (y :scs (double-reg)))
-  (:arg-types double-float)
-  (:result-types double-float)
-  (:ignore eax)
-  (:policy :fast-safe)
-  (:note "inline tan function")
-  (:vop-var vop)
-  (:save-p :compute-only)
-  (:ignore eax)
-  (:generator 5
-    (note-this-location vop :internal-error)
-    (case (tn-offset x)
-       (0
-	(inst fstp fr1))
-       (1
-	(inst fstp fr0))
-       (t
-	(inst fstp fr0)
-	(inst fstp fr0)
-	(inst fldd (make-random-tn :kind :normal
-				   :sc (sc-or-lose 'double-reg)
-				   :offset (- (tn-offset x) 2)))))
-    (inst fptan)
-    (inst fnstsw)			 ; status word to ax
-    (inst and ah-tn #x04)		 ; C2
-    (inst jmp :z DONE)
-    ;; Else x was out of range so reduce it; ST0 is unchanged.
-    (inst fldz)			 ; Load 0.0
-    (inst fxch fr1)
-    DONE
-    ;; Result is in fr1
-    (case (tn-offset y)
-       (0
-	(inst fxch fr1))
-       (1)
-       (t
-	(inst fxch fr1)
-	(inst fstd y)))))
-
-#+nil
-(define-vop (fexp)
-  (:translate %exp)
-  (:args (x :scs (double-reg double-stack descriptor-reg) :target fr0))
-  (:temporary (:sc double-reg :offset fr0-offset
-		   :from :argument :to :result) fr0)
-  (:temporary (:sc double-reg :offset fr1-offset
-		   :from :argument :to :result) fr1)
-  (:temporary (:sc double-reg :offset fr2-offset
-		   :from :argument :to :result) fr2)
-  (:results (y :scs (double-reg)))
-  (:arg-types double-float)
-  (:result-types double-float)
-  (:policy :fast-safe)
-  (:note "inline exp function")
-  (:vop-var vop)
-  (:save-p :compute-only)
-  (:generator 5
-     (note-this-location vop :internal-error)
-     (sc-case x
-	(double-reg
-	 (cond ((zerop (tn-offset x))
-		;; x is in fr0
-		(inst fstp fr1)
-		(inst fldl2e)
-		(inst fmul fr1))
-	       (t
-		;; x is in a FP reg, not fr0
-		(inst fstp fr0)
-		(inst fldl2e)
-		(inst fmul x))))
-	((double-stack descriptor-reg)
-	 (inst fstp fr0)
-	 (inst fldl2e)
-	 (if (sc-is x double-stack)
-	     (inst fmuld (ea-for-df-stack x))
-	   (inst fmuld (ea-for-df-desc x)))))
-     ;; Now fr0=x log2(e)
-     (inst fst fr1)
-     (inst frndint)
-     (inst fst fr2)
-     (inst fsubp-sti fr1)
-     (inst f2xm1)
-     (inst fld1)
-     (inst faddp-sti fr1)
-     (inst fscale)
-     (inst fld fr0)
-     (case (tn-offset y)
-       ((0 1))
-       (t (inst fstd y)))))
-
-;;; Modified exp that handles the following special cases:
-;;; exp(+Inf) is +Inf; exp(-Inf) is 0; exp(NaN) is NaN.
-(define-vop (fexp)
-  (:translate %exp)
-  (:args (x :scs (double-reg) :target fr0))
-  (:temporary (:sc word-reg :offset eax-offset :from :eval :to :result) temp)
-  (:temporary (:sc double-reg :offset fr0-offset
-		   :from :argument :to :result) fr0)
-  (:temporary (:sc double-reg :offset fr1-offset
-		   :from :argument :to :result) fr1)
-  (:temporary (:sc double-reg :offset fr2-offset
-		   :from :argument :to :result) fr2)
-  (:results (y :scs (double-reg)))
-  (:arg-types double-float)
-  (:result-types double-float)
-  (:policy :fast-safe)
-  (:note "inline exp function")
-  (:vop-var vop)
-  (:save-p :compute-only)
-  (:ignore temp)
-  (:generator 5
-     (note-this-location vop :internal-error)
-     (unless (zerop (tn-offset x))
-       (inst fxch x)		; x to top of stack
-       (unless (location= x y)
-	 (inst fst x)))	; maybe save it
-     ;; Check for Inf or NaN
-     (inst fxam)
-     (inst fnstsw)
-     (inst sahf)
-     (inst jmp :nc NOINFNAN)	    ; Neither Inf or NaN.
-     (inst jmp :np NOINFNAN)	    ; NaN gives NaN? Continue.
-     (inst and ah-tn #x02)	      ; Test sign of Inf.
-     (inst jmp :z DONE)		 ; +Inf gives +Inf.
-     (inst fstp fr0)		    ; -Inf gives 0
-     (inst fldz)
-     (inst jmp-short DONE)
-     NOINFNAN
-     (inst fstp fr1)
-     (inst fldl2e)
-     (inst fmul fr1)
-     ;; Now fr0=x log2(e)
-     (inst fst fr1)
-     (inst frndint)
-     (inst fst fr2)
-     (inst fsubp-sti fr1)
-     (inst f2xm1)
-     (inst fld1)
-     (inst faddp-sti fr1)
-     (inst fscale)
-     (inst fld fr0)
-     DONE
-     (unless (zerop (tn-offset y))
-	     (inst fstd y))))
-
-;;; Expm1 = exp(x) - 1.
-;;; Handles the following special cases:
-;;;   expm1(+Inf) is +Inf; expm1(-Inf) is -1.0; expm1(NaN) is NaN.
-(define-vop (fexpm1)
-  (:translate %expm1)
-  (:args (x :scs (double-reg) :target fr0))
-  (:temporary (:sc word-reg :offset eax-offset :from :eval :to :result) temp)
-  (:temporary (:sc double-reg :offset fr0-offset
-		   :from :argument :to :result) fr0)
-  (:temporary (:sc double-reg :offset fr1-offset
-		   :from :argument :to :result) fr1)
-  (:temporary (:sc double-reg :offset fr2-offset
-		   :from :argument :to :result) fr2)
-  (:results (y :scs (double-reg)))
-  (:arg-types double-float)
-  (:result-types double-float)
-  (:policy :fast-safe)
-  (:note "inline expm1 function")
-  (:vop-var vop)
-  (:save-p :compute-only)
-  (:ignore temp)
-  (:generator 5
-     (note-this-location vop :internal-error)
-     (unless (zerop (tn-offset x))
-       (inst fxch x)		; x to top of stack
-       (unless (location= x y)
-	 (inst fst x)))	; maybe save it
-     ;; Check for Inf or NaN
-     (inst fxam)
-     (inst fnstsw)
-     (inst sahf)
-     (inst jmp :nc NOINFNAN)	    ; Neither Inf or NaN.
-     (inst jmp :np NOINFNAN)	    ; NaN gives NaN? Continue.
-     (inst and ah-tn #x02)	      ; Test sign of Inf.
-     (inst jmp :z DONE)		 ; +Inf gives +Inf.
-     (inst fstp fr0)		    ; -Inf gives -1.0
-     (inst fld1)
-     (inst fchs)
-     (inst jmp-short DONE)
-     NOINFNAN
-     ;; Free two stack slots leaving the argument on top.
-     (inst fstp fr2)
-     (inst fstp fr0)
-     (inst fldl2e)
-     (inst fmul fr1)	; Now fr0 = x log2(e)
-     (inst fst fr1)
-     (inst frndint)
-     (inst fsub-sti fr1)
-     (inst fxch fr1)
-     (inst f2xm1)
-     (inst fscale)
-     (inst fxch fr1)
-     (inst fld1)
-     (inst fscale)
-     (inst fstp fr1)
-     (inst fld1)
-     (inst fsub fr1)
-     (inst fsubr fr2)
-     DONE
-     (unless (zerop (tn-offset y))
-       (inst fstd y))))
-
-(define-vop (flog)
-  (:translate %log)
-  (:args (x :scs (double-reg double-stack descriptor-reg) :target fr0))
-  (:temporary (:sc double-reg :offset fr0-offset
-		   :from :argument :to :result) fr0)
-  (:temporary (:sc double-reg :offset fr1-offset
-		   :from :argument :to :result) fr1)
-  (:results (y :scs (double-reg)))
-  (:arg-types double-float)
-  (:result-types double-float)
-  (:policy :fast-safe)
-  (:note "inline log function")
-  (:vop-var vop)
-  (:save-p :compute-only)
-  (:generator 5
-     (note-this-location vop :internal-error)
-     (sc-case x
-	(double-reg
-	 (case (tn-offset x)
-	    (0
-	     ;; x is in fr0
-	     (inst fstp fr1)
-	     (inst fldln2)
-	     (inst fxch fr1))
-	    (1
-	     ;; x is in fr1
-	     (inst fstp fr0)
-	     (inst fldln2)
-	     (inst fxch fr1))
-	    (t
-	     ;; x is in a FP reg, not fr0 or fr1
-	     (inst fstp fr0)
-	     (inst fstp fr0)
-	     (inst fldln2)
-	     (inst fldd (make-random-tn :kind :normal
-					:sc (sc-or-lose 'double-reg)
-					:offset (1- (tn-offset x))))))
-	 (inst fyl2x))
-	((double-stack descriptor-reg)
-	 (inst fstp fr0)
-	 (inst fstp fr0)
-	 (inst fldln2)
-	 (if (sc-is x double-stack)
-	     (inst fldd (ea-for-df-stack x))
-	     (inst fldd (ea-for-df-desc x)))
-	 (inst fyl2x)))
-     (inst fld fr0)
-     (case (tn-offset y)
-       ((0 1))
-       (t (inst fstd y)))))
-
-(define-vop (flog10)
-  (:translate %log10)
-  (:args (x :scs (double-reg double-stack descriptor-reg) :target fr0))
-  (:temporary (:sc double-reg :offset fr0-offset
-		   :from :argument :to :result) fr0)
-  (:temporary (:sc double-reg :offset fr1-offset
-		   :from :argument :to :result) fr1)
-  (:results (y :scs (double-reg)))
-  (:arg-types double-float)
-  (:result-types double-float)
-  (:policy :fast-safe)
-  (:note "inline log10 function")
-  (:vop-var vop)
-  (:save-p :compute-only)
-  (:generator 5
-     (note-this-location vop :internal-error)
-     (sc-case x
-	(double-reg
-	 (case (tn-offset x)
-	    (0
-	     ;; x is in fr0
-	     (inst fstp fr1)
-	     (inst fldlg2)
-	     (inst fxch fr1))
-	    (1
-	     ;; x is in fr1
-	     (inst fstp fr0)
-	     (inst fldlg2)
-	     (inst fxch fr1))
-	    (t
-	     ;; x is in a FP reg, not fr0 or fr1
-	     (inst fstp fr0)
-	     (inst fstp fr0)
-	     (inst fldlg2)
-	     (inst fldd (make-random-tn :kind :normal
-					:sc (sc-or-lose 'double-reg)
-					:offset (1- (tn-offset x))))))
-	 (inst fyl2x))
-	((double-stack descriptor-reg)
-	 (inst fstp fr0)
-	 (inst fstp fr0)
-	 (inst fldlg2)
-	 (if (sc-is x double-stack)
-	     (inst fldd (ea-for-df-stack x))
-	     (inst fldd (ea-for-df-desc x)))
-	 (inst fyl2x)))
-     (inst fld fr0)
-     (case (tn-offset y)
-       ((0 1))
-       (t (inst fstd y)))))
-
-(define-vop (fpow)
-  (:translate %pow)
-  (:args (x :scs (double-reg double-stack descriptor-reg) :target fr0)
-	 (y :scs (double-reg double-stack descriptor-reg) :target fr1))
-  (:temporary (:sc double-reg :offset fr0-offset
-		   :from (:argument 0) :to :result) fr0)
-  (:temporary (:sc double-reg :offset fr1-offset
-		   :from (:argument 1) :to :result) fr1)
-  (:temporary (:sc double-reg :offset fr2-offset
-		   :from :load :to :result) fr2)
-  (:results (r :scs (double-reg)))
-  (:arg-types double-float double-float)
-  (:result-types double-float)
-  (:policy :fast-safe)
-  (:note "inline pow function")
-  (:vop-var vop)
-  (:save-p :compute-only)
-  (:generator 5
-     (note-this-location vop :internal-error)
-     ;; Setup x in fr0 and y in fr1
-     (cond
-      ;; x in fr0; y in fr1
-      ((and (sc-is x double-reg) (zerop (tn-offset x))
-	    (sc-is y double-reg) (= 1 (tn-offset y))))
-      ;; y in fr1; x not in fr0
-      ((and (sc-is y double-reg) (= 1 (tn-offset y)))
-       ;; Load x to fr0
-       (sc-case x
-	  (double-reg
-	   (copy-fp-reg-to-fr0 x))
-	  (double-stack
-	   (inst fstp fr0)
-	   (inst fldd (ea-for-df-stack x)))
-	  (descriptor-reg
-	   (inst fstp fr0)
-	   (inst fldd (ea-for-df-desc x)))))
-      ;; x in fr0; y not in fr1
-      ((and (sc-is x double-reg) (zerop (tn-offset x)))
-       (inst fxch fr1)
-       ;; Now load y to fr0
-       (sc-case y
-	  (double-reg
-	   (copy-fp-reg-to-fr0 y))
-	  (double-stack
-	   (inst fstp fr0)
-	   (inst fldd (ea-for-df-stack y)))
-	  (descriptor-reg
-	   (inst fstp fr0)
-	   (inst fldd (ea-for-df-desc y))))
-       (inst fxch fr1))
-      ;; x in fr1; y not in fr1
-      ((and (sc-is x double-reg) (= 1 (tn-offset x)))
-       ;; Load y to fr0
-       (sc-case y
-	  (double-reg
-	   (copy-fp-reg-to-fr0 y))
-	  (double-stack
-	   (inst fstp fr0)
-	   (inst fldd (ea-for-df-stack y)))
-	  (descriptor-reg
-	   (inst fstp fr0)
-	   (inst fldd (ea-for-df-desc y))))
-       (inst fxch fr1))
-      ;; y in fr0;
-      ((and (sc-is y double-reg) (zerop (tn-offset y)))
-       (inst fxch fr1)
-       ;; Now load x to fr0
-       (sc-case x
-	  (double-reg
-	   (copy-fp-reg-to-fr0 x))
-	  (double-stack
-	   (inst fstp fr0)
-	   (inst fldd (ea-for-df-stack x)))
-	  (descriptor-reg
-	   (inst fstp fr0)
-	   (inst fldd (ea-for-df-desc x)))))
-      ;; Neither x or y are in either fr0 or fr1
-      (t
-       ;; Load y then x
-       (inst fstp fr0)
-       (inst fstp fr0)
-       (sc-case y
-	  (double-reg
-	   (inst fldd (make-random-tn :kind :normal
-				      :sc (sc-or-lose 'double-reg)
-				      :offset (- (tn-offset y) 2))))
-	  (double-stack
-	   (inst fldd (ea-for-df-stack y)))
-	  (descriptor-reg
-	   (inst fldd (ea-for-df-desc y))))
-       ;; Load x to fr0
-       (sc-case x
-	  (double-reg
-	   (inst fldd (make-random-tn :kind :normal
-				      :sc (sc-or-lose 'double-reg)
-				      :offset (1- (tn-offset x)))))
-	  (double-stack
-	   (inst fldd (ea-for-df-stack x)))
-	  (descriptor-reg
-	   (inst fldd (ea-for-df-desc x))))))
-
-     ;; Now have x at fr0; and y at fr1
-     (inst fyl2x)
-     ;; Now fr0=y log2(x)
-     (inst fld fr0)
-     (inst frndint)
-     (inst fst fr2)
-     (inst fsubp-sti fr1)
-     (inst f2xm1)
-     (inst fld1)
-     (inst faddp-sti fr1)
-     (inst fscale)
-     (inst fld fr0)
-     (case (tn-offset r)
-       ((0 1))
-       (t (inst fstd r)))))
-
-(define-vop (fscalen)
-  (:translate %scalbn)
-  (:args (x :scs (double-reg double-stack descriptor-reg) :target fr0)
-	 (y :scs (signed-stack signed-reg) :target temp))
-  (:temporary (:sc double-reg :offset fr0-offset
-		   :from (:argument 0) :to :result) fr0)
-  (:temporary (:sc double-reg :offset fr1-offset :from :eval :to :result) fr1)
-  (:temporary (:sc signed-stack :from (:argument 1) :to :result) temp)
-  (:results (r :scs (double-reg)))
-  (:arg-types double-float signed-num)
-  (:result-types double-float)
-  (:policy :fast-safe)
-  (:note "inline scalbn function")
-  (:generator 5
-     ;; Setup x in fr0 and y in fr1
-     (sc-case x
-       (double-reg
-	(case (tn-offset x)
-	  (0
-	   (inst fstp fr1)
-	   (sc-case y
-	     (signed-reg
-	      (inst mov temp y)
-	      (inst fild temp))
-	     (signed-stack
-	      (inst fild y)))
-	   (inst fxch fr1))
-	  (1
-	   (inst fstp fr0)
-	   (sc-case y
-	     (signed-reg
-	      (inst mov temp y)
-	      (inst fild temp))
-	     (signed-stack
-	      (inst fild y)))
-	   (inst fxch fr1))
-	  (t
-	   (inst fstp fr0)
-	   (inst fstp fr0)
-	   (sc-case y
-	     (signed-reg
-	      (inst mov temp y)
-	      (inst fild temp))
-	     (signed-stack
-	      (inst fild y)))
-	   (inst fld (make-random-tn :kind :normal
-				     :sc (sc-or-lose 'double-reg)
-				     :offset (1- (tn-offset x)))))))
-       ((double-stack descriptor-reg)
-	(inst fstp fr0)
-	(inst fstp fr0)
-	(sc-case y
-	  (signed-reg
-	   (inst mov temp y)
-	   (inst fild temp))
-	  (signed-stack
-	   (inst fild y)))
-	(if (sc-is x double-stack)
-	    (inst fldd (ea-for-df-stack x))
-	    (inst fldd (ea-for-df-desc x)))))
-     (inst fscale)
-     (unless (zerop (tn-offset r))
-       (inst fstd r))))
-
-(define-vop (fscale)
-  (:translate %scalb)
-  (:args (x :scs (double-reg double-stack descriptor-reg) :target fr0)
-	 (y :scs (double-reg double-stack descriptor-reg) :target fr1))
-  (:temporary (:sc double-reg :offset fr0-offset
-		   :from (:argument 0) :to :result) fr0)
-  (:temporary (:sc double-reg :offset fr1-offset
-		   :from (:argument 1) :to :result) fr1)
-  (:results (r :scs (double-reg)))
-  (:arg-types double-float double-float)
-  (:result-types double-float)
-  (:policy :fast-safe)
-  (:note "inline scalb function")
-  (:vop-var vop)
-  (:save-p :compute-only)
-  (:generator 5
-     (note-this-location vop :internal-error)
-     ;; Setup x in fr0 and y in fr1
-     (cond
-      ;; x in fr0; y in fr1
-      ((and (sc-is x double-reg) (zerop (tn-offset x))
-	    (sc-is y double-reg) (= 1 (tn-offset y))))
-      ;; y in fr1; x not in fr0
-      ((and (sc-is y double-reg) (= 1 (tn-offset y)))
-       ;; Load x to fr0
-       (sc-case x
-	  (double-reg
-	   (copy-fp-reg-to-fr0 x))
-	  (double-stack
-	   (inst fstp fr0)
-	   (inst fldd (ea-for-df-stack x)))
-	  (descriptor-reg
-	   (inst fstp fr0)
-	   (inst fldd (ea-for-df-desc x)))))
-      ;; x in fr0; y not in fr1
-      ((and (sc-is x double-reg) (zerop (tn-offset x)))
-       (inst fxch fr1)
-       ;; Now load y to fr0
-       (sc-case y
-	  (double-reg
-	   (copy-fp-reg-to-fr0 y))
-	  (double-stack
-	   (inst fstp fr0)
-	   (inst fldd (ea-for-df-stack y)))
-	  (descriptor-reg
-	   (inst fstp fr0)
-	   (inst fldd (ea-for-df-desc y))))
-       (inst fxch fr1))
-      ;; x in fr1; y not in fr1
-      ((and (sc-is x double-reg) (= 1 (tn-offset x)))
-       ;; Load y to fr0
-       (sc-case y
-	  (double-reg
-	   (copy-fp-reg-to-fr0 y))
-	  (double-stack
-	   (inst fstp fr0)
-	   (inst fldd (ea-for-df-stack y)))
-	  (descriptor-reg
-	   (inst fstp fr0)
-	   (inst fldd (ea-for-df-desc y))))
-       (inst fxch fr1))
-      ;; y in fr0;
-      ((and (sc-is y double-reg) (zerop (tn-offset y)))
-       (inst fxch fr1)
-       ;; Now load x to fr0
-       (sc-case x
-	  (double-reg
-	   (copy-fp-reg-to-fr0 x))
-	  (double-stack
-	   (inst fstp fr0)
-	   (inst fldd (ea-for-df-stack x)))
-	  (descriptor-reg
-	   (inst fstp fr0)
-	   (inst fldd (ea-for-df-desc x)))))
-      ;; Neither x or y are in either fr0 or fr1
-      (t
-       ;; Load y then x
-       (inst fstp fr0)
-       (inst fstp fr0)
-       (sc-case y
-	  (double-reg
-	   (inst fldd (make-random-tn :kind :normal
-				      :sc (sc-or-lose 'double-reg)
-				      :offset (- (tn-offset y) 2))))
-	  (double-stack
-	   (inst fldd (ea-for-df-stack y)))
-	  (descriptor-reg
-	   (inst fldd (ea-for-df-desc y))))
-       ;; Load x to fr0
-       (sc-case x
-	  (double-reg
-	   (inst fldd (make-random-tn :kind :normal
-				      :sc (sc-or-lose 'double-reg)
-				      :offset (1- (tn-offset x)))))
-	  (double-stack
-	   (inst fldd (ea-for-df-stack x)))
-	  (descriptor-reg
-	   (inst fldd (ea-for-df-desc x))))))
-
-     ;; Now have x at fr0; and y at fr1
-     (inst fscale)
-     (unless (zerop (tn-offset r))
-	     (inst fstd r))))
-
-(define-vop (flog1p)
-  (:translate %log1p)
-  (:args (x :scs (double-reg) :to :result))
-  (:temporary (:sc double-reg :offset fr0-offset
-		   :from :argument :to :result) fr0)
-  (:temporary (:sc double-reg :offset fr1-offset
-		   :from :argument :to :result) fr1)
-  (:temporary (:sc word-reg :offset eax-offset :from :eval) temp)
-  (:results (y :scs (double-reg)))
-  (:arg-types double-float)
-  (:result-types double-float)
-  (:policy :fast-safe)
-  (:note "inline log1p function")
-  (:ignore temp)
-  (:generator 5
-     ;; x is in a FP reg, not fr0, fr1.
-     (inst fstp fr0)
-     (inst fstp fr0)
-     (inst fldd (make-random-tn :kind :normal
-				:sc (sc-or-lose 'double-reg)
-				:offset (- (tn-offset x) 2)))
-     ;; Check the range
-     (inst push #x3e947ae1)	; Constant 0.29
-     (inst fabs)
-     (inst fld (make-ea :dword :base rsp-tn))
-     (inst fcompp)
-     (inst add rsp-tn 4)
-     (inst fnstsw)			; status word to ax
-     (inst and ah-tn #x45)
-     (inst jmp :z WITHIN-RANGE)
-     ;; Out of range for fyl2xp1.
-     (inst fld1)
-     (inst faddd (make-random-tn :kind :normal
-				 :sc (sc-or-lose 'double-reg)
-				 :offset (- (tn-offset x) 1)))
-     (inst fldln2)
-     (inst fxch fr1)
-     (inst fyl2x)
-     (inst jmp DONE)
-
-     WITHIN-RANGE
-     (inst fldln2)
-     (inst fldd (make-random-tn :kind :normal
-				:sc (sc-or-lose 'double-reg)
-				:offset (- (tn-offset x) 1)))
-     (inst fyl2xp1)
-     DONE
-     (inst fld fr0)
-     (case (tn-offset y)
-       ((0 1))
-       (t (inst fstd y)))))
-
-;;; The Pentium has a less restricted implementation of the fyl2xp1
-;;; instruction and a range check can be avoided.
-(define-vop (flog1p-pentium)
-  (:translate %log1p)
-  (:args (x :scs (double-reg double-stack descriptor-reg) :target fr0))
-  (:temporary (:sc double-reg :offset fr0-offset
-		   :from :argument :to :result) fr0)
-  (:temporary (:sc double-reg :offset fr1-offset
-		   :from :argument :to :result) fr1)
-  (:results (y :scs (double-reg)))
-  (:arg-types double-float)
-  (:result-types double-float)
-  (:policy :fast-safe)
-  (:guard (member :pentium-style-fyl2xp1 *backend-subfeatures*))
-  (:note "inline log1p with limited x range function")
-  (:vop-var vop)
-  (:save-p :compute-only)
-  (:generator 4
-     (note-this-location vop :internal-error)
-     (sc-case x
-	(double-reg
-	 (case (tn-offset x)
-	    (0
-	     ;; x is in fr0
-	     (inst fstp fr1)
-	     (inst fldln2)
-	     (inst fxch fr1))
-	    (1
-	     ;; x is in fr1
-	     (inst fstp fr0)
-	     (inst fldln2)
-	     (inst fxch fr1))
-	    (t
-	     ;; x is in a FP reg, not fr0 or fr1
-	     (inst fstp fr0)
-	     (inst fstp fr0)
-	     (inst fldln2)
-	     (inst fldd (make-random-tn :kind :normal
-					:sc (sc-or-lose 'double-reg)
-					:offset (1- (tn-offset x)))))))
-	((double-stack descriptor-reg)
-	 (inst fstp fr0)
-	 (inst fstp fr0)
-	 (inst fldln2)
-	 (if (sc-is x double-stack)
-	     (inst fldd (ea-for-df-stack x))
-	   (inst fldd (ea-for-df-desc x)))))
-     (inst fyl2xp1)
-     (inst fld fr0)
-     (case (tn-offset y)
-       ((0 1))
-       (t (inst fstd y)))))
-
-(define-vop (flogb)
-  (:translate %logb)
-  (:args (x :scs (double-reg double-stack descriptor-reg) :target fr0))
-  (:temporary (:sc double-reg :offset fr0-offset
-		   :from :argument :to :result) fr0)
-  (:temporary (:sc double-reg :offset fr1-offset
-		   :from :argument :to :result) fr1)
-  (:results (y :scs (double-reg)))
-  (:arg-types double-float)
-  (:result-types double-float)
-  (:policy :fast-safe)
-  (:note "inline logb function")
-  (:vop-var vop)
-  (:save-p :compute-only)
-  (:generator 5
-     (note-this-location vop :internal-error)
-     (sc-case x
-	(double-reg
-	 (case (tn-offset x)
-	    (0
-	     ;; x is in fr0
-	     (inst fstp fr1))
-	    (1
-	     ;; x is in fr1
-	     (inst fstp fr0))
-	    (t
-	     ;; x is in a FP reg, not fr0 or fr1
-	     (inst fstp fr0)
-	     (inst fstp fr0)
-	     (inst fldd (make-random-tn :kind :normal
-					:sc (sc-or-lose 'double-reg)
-					:offset (- (tn-offset x) 2))))))
-	((double-stack descriptor-reg)
-	 (inst fstp fr0)
-	 (inst fstp fr0)
-	 (if (sc-is x double-stack)
-	     (inst fldd (ea-for-df-stack x))
-	   (inst fldd (ea-for-df-desc x)))))
-     (inst fxtract)
-     (case (tn-offset y)
-       (0
-	(inst fxch fr1))
-       (1)
-       (t (inst fxch fr1)
-	  (inst fstd y)))))
-
-(define-vop (fatan)
-  (:translate %atan)
-  (:args (x :scs (double-reg double-stack descriptor-reg) :target fr0))
-  (:temporary (:sc double-reg :offset fr0-offset
-		   :from (:argument 0) :to :result) fr0)
-  (:temporary (:sc double-reg :offset fr1-offset
-		   :from (:argument 0) :to :result) fr1)
-  (:results (r :scs (double-reg)))
-  (:arg-types double-float)
-  (:result-types double-float)
-  (:policy :fast-safe)
-  (:note "inline atan function")
-  (:vop-var vop)
-  (:save-p :compute-only)
-  (:generator 5
-     (note-this-location vop :internal-error)
-     ;; Setup x in fr1 and 1.0 in fr0
-     (cond
-      ;; x in fr0
-      ((and (sc-is x double-reg) (zerop (tn-offset x)))
-       (inst fstp fr1))
-      ;; x in fr1
-      ((and (sc-is x double-reg) (= 1 (tn-offset x)))
-       (inst fstp fr0))
-      ;; x not in fr0 or fr1
-      (t
-       ;; Load x then 1.0
-       (inst fstp fr0)
-       (inst fstp fr0)
-       (sc-case x
-	  (double-reg
-	   (inst fldd (make-random-tn :kind :normal
-				      :sc (sc-or-lose 'double-reg)
-				      :offset (- (tn-offset x) 2))))
-	  (double-stack
-	   (inst fldd (ea-for-df-stack x)))
-	  (descriptor-reg
-	   (inst fldd (ea-for-df-desc x))))))
-     (inst fld1)
-     ;; Now have x at fr1; and 1.0 at fr0
-     (inst fpatan)
-     (inst fld fr0)
-     (case (tn-offset r)
-       ((0 1))
-       (t (inst fstd r)))))
-
-(define-vop (fatan2)
-  (:translate %atan2)
-  (:args (x :scs (double-reg double-stack descriptor-reg) :target fr1)
-	 (y :scs (double-reg double-stack descriptor-reg) :target fr0))
-  (:temporary (:sc double-reg :offset fr0-offset
-		   :from (:argument 1) :to :result) fr0)
-  (:temporary (:sc double-reg :offset fr1-offset
-		   :from (:argument 0) :to :result) fr1)
-  (:results (r :scs (double-reg)))
-  (:arg-types double-float double-float)
-  (:result-types double-float)
-  (:policy :fast-safe)
-  (:note "inline atan2 function")
-  (:vop-var vop)
-  (:save-p :compute-only)
-  (:generator 5
-     (note-this-location vop :internal-error)
-     ;; Setup x in fr1 and y in fr0
-     (cond
-      ;; y in fr0; x in fr1
-      ((and (sc-is y double-reg) (zerop (tn-offset y))
-	    (sc-is x double-reg) (= 1 (tn-offset x))))
-      ;; x in fr1; y not in fr0
-      ((and (sc-is x double-reg) (= 1 (tn-offset x)))
-       ;; Load y to fr0
-       (sc-case y
-	  (double-reg
-	   (copy-fp-reg-to-fr0 y))
-	  (double-stack
-	   (inst fstp fr0)
-	   (inst fldd (ea-for-df-stack y)))
-	  (descriptor-reg
-	   (inst fstp fr0)
-	   (inst fldd (ea-for-df-desc y)))))
-      ((and (sc-is x double-reg) (zerop (tn-offset x))
-	    (sc-is y double-reg) (zerop (tn-offset x)))
-       ;; copy x to fr1
-       (inst fst fr1))
-      ;; y in fr0; x not in fr1
-      ((and (sc-is y double-reg) (zerop (tn-offset y)))
-       (inst fxch fr1)
-       ;; Now load x to fr0
-       (sc-case x
-	  (double-reg
-	   (copy-fp-reg-to-fr0 x))
-	  (double-stack
-	   (inst fstp fr0)
-	   (inst fldd (ea-for-df-stack x)))
-	  (descriptor-reg
-	   (inst fstp fr0)
-	   (inst fldd (ea-for-df-desc x))))
-       (inst fxch fr1))
-      ;; y in fr1; x not in fr1
-      ((and (sc-is y double-reg) (= 1 (tn-offset y)))
-       ;; Load x to fr0
-       (sc-case x
-	  (double-reg
-	   (copy-fp-reg-to-fr0 x))
-	  (double-stack
-	   (inst fstp fr0)
-	   (inst fldd (ea-for-df-stack x)))
-	  (descriptor-reg
-	   (inst fstp fr0)
-	   (inst fldd (ea-for-df-desc x))))
-       (inst fxch fr1))
-      ;; x in fr0;
-      ((and (sc-is x double-reg) (zerop (tn-offset x)))
-       (inst fxch fr1)
-       ;; Now load y to fr0
-       (sc-case y
-	  (double-reg
-	   (copy-fp-reg-to-fr0 y))
-	  (double-stack
-	   (inst fstp fr0)
-	   (inst fldd (ea-for-df-stack y)))
-	  (descriptor-reg
-	   (inst fstp fr0)
-	   (inst fldd (ea-for-df-desc y)))))
-      ;; Neither y or x are in either fr0 or fr1
-      (t
-       ;; Load x then y
-       (inst fstp fr0)
-       (inst fstp fr0)
-       (sc-case x
-	  (double-reg
-	   (inst fldd (make-random-tn :kind :normal
-				      :sc (sc-or-lose 'double-reg)
-				      :offset (- (tn-offset x) 2))))
-	  (double-stack
-	   (inst fldd (ea-for-df-stack x)))
-	  (descriptor-reg
-	   (inst fldd (ea-for-df-desc x))))
-       ;; Load y to fr0
-       (sc-case y
-	  (double-reg
-	   (inst fldd (make-random-tn :kind :normal
-				      :sc (sc-or-lose 'double-reg)
-				      :offset (1- (tn-offset y)))))
-	  (double-stack
-	   (inst fldd (ea-for-df-stack y)))
-	  (descriptor-reg
-	   (inst fldd (ea-for-df-desc y))))))
-
-     ;; Now have y at fr0; and x at fr1
-     (inst fpatan)
-     (inst fld fr0)
-     (case (tn-offset r)
-       ((0 1))
-       (t (inst fstd r)))))
-) ; PROGN #!-LONG-FLOAT
-
-
 ;;;; complex float VOPs
 
 (define-vop (make-complex-single-float)
@@ -2654,35 +921,15 @@
   (:generator 5
     (sc-case r
       (complex-single-reg
-       (let ((r-real (complex-double-reg-real-tn r)))
+       (let ((r-real (complex-single-reg-real-tn r)))
 	 (unless (location= real r-real)
-	   (cond ((zerop (tn-offset r-real))
-		  (copy-fp-reg-to-fr0 real))
-		 ((zerop (tn-offset real))
-		  (inst fstd r-real))
-		 (t
-		  (inst fxch real)
-		  (inst fstd r-real)
-		  (inst fxch real)))))
-       (let ((r-imag (complex-double-reg-imag-tn r)))
+	   (inst movss r-real real)))
+       (let ((r-imag (complex-single-reg-imag-tn r)))
 	 (unless (location= imag r-imag)
-	   (cond ((zerop (tn-offset imag))
-		  (inst fstd r-imag))
-		 (t
-		  (inst fxch imag)
-		  (inst fstd r-imag)
-		  (inst fxch imag))))))
+	   (inst movss r-imag imag))))
       (complex-single-stack
-       (unless (location= real r)
-	 (cond ((zerop (tn-offset real))
-		(inst fst (ea-for-csf-real-stack r)))
-	       (t
-		(inst fxch real)
-		(inst fst (ea-for-csf-real-stack r))
-		(inst fxch real))))
-       (inst fxch imag)
-       (inst fst (ea-for-csf-imag-stack r))
-       (inst fxch imag)))))
+       (inst movss (ea-for-csf-real-stack r) real)
+       (inst movss (ea-for-csf-imag-stack r) imag)))))
 
 (define-vop (make-complex-double-float)
   (:translate complex)
@@ -2700,33 +947,13 @@
       (complex-double-reg
        (let ((r-real (complex-double-reg-real-tn r)))
 	 (unless (location= real r-real)
-	   (cond ((zerop (tn-offset r-real))
-		  (copy-fp-reg-to-fr0 real))
-		 ((zerop (tn-offset real))
-		  (inst fstd r-real))
-		 (t
-		  (inst fxch real)
-		  (inst fstd r-real)
-		  (inst fxch real)))))
+	   (inst movsd r-real real)))
        (let ((r-imag (complex-double-reg-imag-tn r)))
 	 (unless (location= imag r-imag)
-	   (cond ((zerop (tn-offset imag))
-		  (inst fstd r-imag))
-		 (t
-		  (inst fxch imag)
-		  (inst fstd r-imag)
-		  (inst fxch imag))))))
+	   (inst movsd r-imag imag))))
       (complex-double-stack
-       (unless (location= real r)
-	 (cond ((zerop (tn-offset real))
-		(inst fstd (ea-for-cdf-real-stack r)))
-	       (t
-		(inst fxch real)
-		(inst fstd (ea-for-cdf-real-stack r))
-		(inst fxch real))))
-       (inst fxch imag)
-       (inst fstd (ea-for-cdf-imag-stack r))
-       (inst fxch imag)))))
+       (inst movsd (ea-for-cdf-real-stack r) real)
+       (inst movsd (ea-for-cdf-imag-stack r) imag)))))
 
 (define-vop (complex-float-value)
   (:args (x :target r))
@@ -2740,14 +967,9 @@
 				  :sc (sc-or-lose 'double-reg)
 				  :offset (+ offset (tn-offset x)))))
 	     (unless (location= value-tn r)
-	       (cond ((zerop (tn-offset r))
-		      (copy-fp-reg-to-fr0 value-tn))
-		     ((zerop (tn-offset value-tn))
-		      (inst fstd r))
-		     (t
-		      (inst fxch value-tn)
-		      (inst fstd r)
-		      (inst fxch value-tn))))))
+	       (if (sc-is x complex-single-reg)
+		   (inst movss r value-tn)
+		   (inst movsd r value-tn)))))
 	  ((sc-is r single-reg)
 	   (let ((ea (sc-case x
 		       (complex-single-stack
@@ -2758,8 +980,7 @@
 			(ecase offset
 			  (0 (ea-for-csf-real-desc x))
 			  (1 (ea-for-csf-imag-desc x)))))))
-	     (with-empty-tn@fp-top(r)
-	       (inst fld ea))))
+	     (inst movss r ea)))
 	  ((sc-is r double-reg)
 	   (let ((ea (sc-case x
 		       (complex-double-stack
@@ -2770,8 +991,7 @@
 			(ecase offset
 			  (0 (ea-for-cdf-real-desc x))
 			  (1 (ea-for-cdf-imag-desc x)))))))
-	     (with-empty-tn@fp-top(r)
-	       (inst fldd ea))))
+	     (inst movsd r ea)))
 	  (t (error "COMPLEX-FLOAT-VALUE VOP failure")))))
 
 (define-vop (realpart/complex-single-float complex-float-value)

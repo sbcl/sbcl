@@ -40,7 +40,7 @@ initial_thread_trampoline(struct thread *th)
 
     if(th->pid < 1) lose("th->pid not set up right");
     th->state=STATE_RUNNING;
-#if defined(LISP_FEATURE_X86)
+#if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
     return call_into_lisp_first_time(function,args,0);
 #else
     return funcall0(function);
@@ -141,11 +141,11 @@ struct thread * create_thread_struct(lispobj initial_function) {
     th->state=STATE_STOPPED;
 #ifdef LISP_FEATURE_STACK_GROWS_DOWNWARD_NOT_UPWARD
     th->alien_stack_pointer=((void *)th->alien_stack_start
-			     + ALIEN_STACK_SIZE-4); /* naked 4.  FIXME */
+			     + ALIEN_STACK_SIZE-N_WORD_BYTES);
 #else
     th->alien_stack_pointer=((void *)th->alien_stack_start);
 #endif
-#ifdef LISP_FEATURE_X86
+#if defined(LISP_FEATURE_X86) || defined (LISP_FEATURE_X86_64)
     th->pseudo_atomic_interrupted=0;
     th->pseudo_atomic_atomic=0;
 #endif
@@ -163,7 +163,7 @@ struct thread * create_thread_struct(lispobj initial_function) {
     SetSymbolValue(BINDING_STACK_START,(lispobj)th->binding_stack_start,th);
     SetSymbolValue(CONTROL_STACK_START,(lispobj)th->control_stack_start,th);
     SetSymbolValue(CONTROL_STACK_END,(lispobj)th->control_stack_end,th);
-#ifdef LISP_FEATURE_X86
+#if defined(LISP_FEATURE_X86) || defined (LISP_FEATURE_X86_64)
     SetSymbolValue(BINDING_STACK_POINTER,(lispobj)th->binding_stack_pointer,th);
     SetSymbolValue(ALIEN_STACK,(lispobj)th->alien_stack_pointer,th);
     SetSymbolValue(PSEUDO_ATOMIC_ATOMIC,(lispobj)th->pseudo_atomic_atomic,th);

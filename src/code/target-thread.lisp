@@ -351,7 +351,8 @@ SB-EXT:QUIT - the usual cleanup forms will be evaluated"
   "Call FUNCTION once for each known thread, giving it the thread structure as argument"
   (let ((function (coerce function 'function)))
     (loop for thread = (alien-sap (extern-alien "all_threads" (* t)))
-	  then  (sb!sys:sap-ref-sap thread (* 4 sb!vm::thread-next-slot))
+	  then  (sb!sys:sap-ref-sap thread (* sb!vm:n-word-bytes
+					      sb!vm::thread-next-slot))
 	  until (sb!sys:sap= thread (sb!sys:int-sap 0))
 	  collect (funcall function thread))))
 
@@ -359,9 +360,11 @@ SB-EXT:QUIT - the usual cleanup forms will be evaluated"
   (let ((thread (alien-sap (extern-alien "all_threads" (* t)))))
     (loop 
      (when (sb!sys:sap= thread (sb!sys:int-sap 0)) (return nil))
-     (let ((pid (sb!sys:sap-ref-32 thread (* 4 sb!vm::thread-pid-slot))))
+     (let ((pid (sb!sys:sap-ref-32 thread (* sb!vm:n-word-bytes
+					     sb!vm::thread-pid-slot))))
        (when (= pid id) (return thread))
-       (setf thread (sb!sys:sap-ref-sap thread (* 4 sb!vm::thread-next-slot)))))))
+       (setf thread (sb!sys:sap-ref-sap thread (* sb!vm:n-word-bytes
+						  sb!vm::thread-next-slot)))))))
 
 ;;; internal use only.  If you think you need to use this, either you
 ;;; are an SBCL developer, are doing something that you should discuss
@@ -371,7 +374,8 @@ SB-EXT:QUIT - the usual cleanup forms will be evaluated"
   (let ((thread (thread-sap-from-id thread-id)))
     (when thread
       (let* ((index (sb!vm::symbol-tls-index symbol))
-	     (tl-val (sb!sys:sap-ref-32 thread (* 4 index))))
+	     (tl-val (sb!sys:sap-ref-word thread
+					  (* sb!vm:n-word-bytes index))))
 	(if (eql tl-val sb!vm::unbound-marker-widetag)
 	    (sb!vm::symbol-global-value symbol)
 	    (sb!kernel:make-lisp-obj tl-val))))))

@@ -112,6 +112,7 @@
   (:results (res :scs (sap-reg) :from (:argument 0)
 		 :load-if (not (location= ptr res))))
   (:result-types system-area-pointer)
+  (:temporary (:sc signed-reg) temp)
   (:policy :fast-safe)
   (:generator 1
     (cond ((and (sc-is ptr sap-reg) (sc-is res sap-reg)
@@ -120,15 +121,26 @@
 	     (signed-reg
 	      (inst lea res (make-ea :qword :base ptr :index offset :scale 1)))
 	     (immediate
-	      (inst lea res (make-ea :qword :base ptr
-				     :disp (tn-value offset))))))
+	      (let ((value (tn-value offset)))
+		(cond ((typep value '(or (signed-byte 32) (unsigned-byte 31)))
+		       (inst lea res (make-ea :qword :base ptr :disp value)))
+		      (t
+		       (inst mov temp value)
+		       (inst lea res (make-ea :qword :base ptr
+					      :index temp
+					      :scale 1))))))))
 	  (t
 	   (move res ptr)
 	   (sc-case offset
 	     (signed-reg
 	      (inst add res offset))
 	     (immediate
-	      (inst add res (tn-value offset))))))))
+	      (let ((value (tn-value offset)))
+		(cond ((typep value '(or (signed-byte 32) (unsigned-byte 31)))
+		       (inst add res (tn-value offset)))
+		      (t
+		       (inst mov temp value)
+		       (inst add res temp))))))))))
 
 (define-vop (pointer-)
   (:translate sap-)

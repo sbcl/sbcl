@@ -17,7 +17,7 @@
 
 ;;;; compiler constants
 
-(def!constant +backend-fasl-file-implementation+ :x86)
+(def!constant +backend-fasl-file-implementation+ :x86-64)
 
 (setf *backend-register-save-penalty* 3)
 

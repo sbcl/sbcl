@@ -24,31 +24,28 @@
 (define-vop (set-slot)
   (:args (object :scs (descriptor-reg))
 	 (value :scs (descriptor-reg any-reg immediate)))
+  (:temporary (:sc descriptor-reg) temp)
   (:info name offset lowtag)
   (:ignore name)
   (:results)
   (:generator 1
-     (if (sc-is value immediate)
+    (if (sc-is value immediate)
 	(let ((val (tn-value value)))
-	   (etypecase val
-	      (integer
-	       (inst mov
-		     (make-ea :dword :base object
-			      :disp (- (* offset n-word-bytes) lowtag))
-		     (fixnumize val)))
-	      (symbol
-	       (inst mov
-		     (make-ea :dword :base object
-			      :disp (- (* offset n-word-bytes) lowtag))
-		     (+ nil-value (static-symbol-offset val))))
-	      (character
-	       (inst mov
-		     (make-ea :dword :base object
-			      :disp (- (* offset n-word-bytes) lowtag))
-		     (logior (ash (char-code val) n-widetag-bits)
-			     base-char-widetag)))))
-       ;; Else, value not immediate.
-       (storew value object offset lowtag))))
+	  (move-immediate (make-ea :qword
+				   :base object
+				   :disp (- (* offset n-word-bytes)
+					    lowtag))
+			  (etypecase val
+			    (integer
+			     (fixnumize val))
+			    (symbol
+			     (+ nil-value (static-symbol-offset val)))
+			    (character
+			     (logior (ash (char-code val) n-widetag-bits)
+				     character-widetag)))
+			  temp))
+	;; Else, value not immediate.
+	(storew value object offset lowtag))))
 
 
 

@@ -24,14 +24,14 @@
        (load-symbol y val))
       (character
        (inst mov y (logior (ash (char-code val) n-widetag-bits)
-			   base-char-widetag))))))
+			   character-widetag))))))
 
 (define-move-fun (load-number 1) (vop x y)
   ((immediate) (signed-reg unsigned-reg))
   (inst mov y (tn-value x)))
 
-(define-move-fun (load-base-char 1) (vop x y)
-  ((immediate) (base-char-reg))
+(define-move-fun (load-character 1) (vop x y)
+  ((immediate) (character-reg))
   (inst mov y (char-code (tn-value x))))
 
 (define-move-fun (load-system-area-pointer 1) (vop x y)
@@ -44,7 +44,7 @@
 
 (define-move-fun (load-stack 5) (vop x y)
   ((control-stack) (any-reg descriptor-reg)
-   (base-char-stack) (base-char-reg)
+   (character-stack) (character-reg)
    (sap-stack) (sap-reg)
    (signed-stack) (signed-reg)
    (unsigned-stack) (unsigned-reg))
@@ -52,7 +52,7 @@
 
 (define-move-fun (store-stack 5) (vop x y)
   ((any-reg descriptor-reg) (control-stack)
-   (base-char-reg) (base-char-stack)
+   (character-reg) (character-stack)
    (sap-reg) (sap-stack)
    (signed-reg) (signed-stack)
    (unsigned-reg) (unsigned-stack))
@@ -67,6 +67,7 @@
 	       (not (or (location= x y)
 			(and (sc-is x any-reg descriptor-reg immediate)
 			     (sc-is y control-stack))))))
+  (:temporary (:sc unsigned-reg) temp)
   (:effects)
   (:affected)
   (:generator 0
@@ -77,19 +78,13 @@
 	    (integer
 	     (if (and (zerop val) (sc-is y any-reg descriptor-reg))
 		 (inst xor y y)
-		 (multiple-value-bind (lo hi) (dwords-for-quad (fixnumize val))
-		   (cond ((zerop hi)
-			  (inst mov y lo))
-			 (t
-			  (inst mov y hi)
-			  (inst shl y 32)
-			  (inst or y lo))))))
+		 (move-immediate y (fixnumize val) temp)))
 	    (symbol
 	     (inst mov y (+ nil-value (static-symbol-offset val))))
 	    (character
 	     (inst mov y (logior (ash (char-code val) n-widetag-bits)
-				 base-char-widetag)))))
-      (move y x))))
+				 character-widetag)))))
+	(move y x))))
 
 (define-move-vop move :move
   (any-reg descriptor-reg immediate)
@@ -99,6 +94,22 @@
 ;;; doesn't think it is a hairy type. This also allows checking of a
 ;;; few of the values in a continuation to fall out.
 (primitive-type-vop move (:check) t)
+
+(defun move-immediate (target val &optional tmp-tn)
+  (cond
+    ;; If target is a register, we can just mov it there directly
+    ((and (tn-p target)
+	  (sc-is target signed-reg unsigned-reg descriptor-reg any-reg))
+     (inst mov target val))
+    ;; Likewise if the value is small enough.
+    ((typep val '(signed-byte 31))
+     (inst mov target val))
+    ;; Otherwise go through the temporary register
+    (tmp-tn
+     (inst mov tmp-tn val)
+     (inst mov target tmp-tn))
+    (t
+     (error "~A is not a register, no temporary given, and immediate ~A too large" target val))))
 
 ;;; The MOVE-ARG VOP is used for moving descriptor values into
 ;;; another frame for argument or known value passing.
@@ -124,16 +135,12 @@
 	       ((or (signed-byte 29) (unsigned-byte 29))
 		(inst mov y (fixnumize val)))
 	       (integer
-		(multiple-value-bind (lo hi)
-		    (dwords-for-quad (fixnumize val))
-		  (inst mov y hi)
-		  (inst shl y 32)
-		  (inst or y lo)))
+		(move-immediate y (fixnumize val)))
 	       (symbol
 		(load-symbol y val))
 	       (character
 		(inst mov y (logior (ash (char-code val) n-widetag-bits)
-				    base-char-widetag)))))
+				    character-widetag)))))
 	   (move y x)))
       ((control-stack)
        (if (sc-is x immediate)
@@ -148,7 +155,7 @@
 			    fp (tn-offset y)))
 		   (character
 		    (storew (logior (ash (char-code val) n-widetag-bits)
-				    base-char-widetag)
+				    character-widetag)
 			    fp (tn-offset y))))
 	       ;; Lisp stack
 	       (etypecase val
@@ -159,7 +166,7 @@
 			  fp (- (1+ (tn-offset y)))))
 		 (character
 		  (storew (logior (ash (char-code val) n-widetag-bits)
-				  base-char-widetag)
+				  character-widetag)
 			  fp (- (1+ (tn-offset y))))))))
 	 (if (= (tn-offset fp) esp-offset)
 	     ;; C-call
@@ -263,29 +270,6 @@
 
 ;;; Result may be a bignum, so we have to check. Use a worst-case cost
 ;;; to make sure people know they may be number consing.
-;;;
-;;; KLUDGE: I assume this is suppressed in favor of the "faster inline
-;;; version" below. (See also mysterious comment "we don't want a VOP
-;;; on this one" on DEFINE-ASSEMBLY-ROUTINE (MOVE-FROM-SIGNED) in
-;;; "src/assembly/x86/alloc.lisp".) -- WHN 19990916
-#+nil
-(define-vop (move-from-signed)
-  (:args (x :scs (signed-reg unsigned-reg) :target eax))
-  (:temporary (:sc unsigned-reg :offset eax-offset :from (:argument 0)) eax)
-  (:temporary (:sc unsigned-reg :offset ebx-offset :to (:result 0) :target y)
-	      ebx)
-  (:temporary (:sc unsigned-reg :offset ecx-offset
-		   :from (:argument 0) :to (:result 0)) ecx)
-  (:ignore ecx)
-  (:results (y :scs (any-reg descriptor-reg)))
-  (:note "signed word to integer coercion")
-  (:generator 20
-    (move eax x)
-    (inst call (make-fixup 'move-from-signed :assembly-routine))
-    (move y ebx)))
-;;; Faster inline version,
-;;; KLUDGE: Do we really want the faster inline version? It's sorta big.
-;;; It is nice that it doesn't use any temporaries, though. -- WHN 19990916
 (define-vop (move-from-signed)
   (:args (x :scs (signed-reg unsigned-reg) :to :result))
   (:results (y :scs (any-reg descriptor-reg) :from :argument))
@@ -342,7 +326,8 @@
 	 ;; Note: As on the mips port, space for a two word bignum is
 	 ;; always allocated and the header size is set to either one
 	 ;; or two words as appropriate.
-	 (inst jmp :ns one-word-bignum)
+	 (inst cmp y 63)
+	 (inst jmp :l one-word-bignum)
 	 ;; two word bignum
 	 (inst mov y (logior (ash (1- (+ bignum-digits-offset 2))
 				  n-widetag-bits)

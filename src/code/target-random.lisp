@@ -202,8 +202,7 @@
   (* arg
      (- (sb!impl::make-double-float
 	 (dpb (ash (random-chunk state)
-		   (- sb!vm:double-float-digits random-chunk-length
-		      sb!vm:n-word-bits))
+	 	   (- sb!vm:double-float-digits random-chunk-length 32))
 	      sb!vm:double-float-significand-byte
 	      (sb!impl::double-float-high-bits 1d0))
 	 (random-chunk state))

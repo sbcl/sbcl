@@ -98,11 +98,16 @@
 		 (simple-array-unsigned-byte-16-widetag . 1)
 		 (simple-array-unsigned-byte-31-widetag . 2)
 		 (simple-array-unsigned-byte-32-widetag . 2)
+		 (simple-array-unsigned-byte-60-widetag . 3)
+		 (simple-array-unsigned-byte-63-widetag . 3)
+		 (simple-array-unsigned-byte-64-widetag . 3)
 		 (simple-array-signed-byte-8-widetag . 0)
 		 (simple-array-signed-byte-16-widetag . 1)
 		 (simple-array-unsigned-byte-29-widetag . 2)
 		 (simple-array-signed-byte-30-widetag . 2)
 		 (simple-array-signed-byte-32-widetag . 2)
+		 (simple-array-signed-byte-61-widetag . 3)
+		 (simple-array-signed-byte-64-widetag . 3)
 		 (simple-array-single-float-widetag . 2)
 		 (simple-array-double-float-widetag . 3)
 		 (simple-array-complex-single-float-widetag . 3)
@@ -110,13 +115,14 @@
   (let* ((name (car stuff))
 	 (size (cdr stuff))
 	 (sname (string name)))
-    (setf (svref *meta-room-info* (symbol-value name))
-	  (make-room-info :name (intern (subseq sname
-						0
-						(mismatch sname "-WIDETAG"
-							  :from-end t)))
-			  :kind :vector
-			  :length size))))
+    (when (boundp name)
+      (setf (svref *meta-room-info* (symbol-value name))
+	    (make-room-info :name (intern (subseq sname
+						  0
+						  (mismatch sname "-WIDETAG"
+							    :from-end t)))
+			    :kind :vector
+			    :length size)))))
 
 (setf (svref *meta-room-info* simple-base-string-widetag)
       (make-room-info :name 'simple-base-string
@@ -213,7 +219,7 @@
 	    #+nil
 	    (prev nil))
 	(loop
-	  (let* ((header (sap-ref-32 current 0))
+	  (let* ((header (sap-ref-word current 0))
 		 (header-widetag (logand header #xFF))
 		 (info (svref *room-info* header-widetag)))
 	    (cond
@@ -441,7 +447,7 @@
 			       (%primitive code-instructions obj))))
 	   (incf code-words words)
 	   (dotimes (i words)
-	     (when (zerop (sap-ref-32 sap (* i n-word-bytes)))
+	     (when (zerop (sap-ref-word sap (* i n-word-bytes)))
 	       (incf no-ops))))))
      space)
 
@@ -484,7 +490,7 @@
 	     #.simple-array-unsigned-byte-32-widetag
 	     #.simple-array-signed-byte-8-widetag
 	     #.simple-array-signed-byte-16-widetag
-	     #.simple-array-signed-byte-30-widetag
+	     ; #.simple-array-signed-byte-30-widetag
 	     #.simple-array-signed-byte-32-widetag
 	     #.simple-array-single-float-widetag
 	     #.simple-array-double-float-widetag

@@ -72,8 +72,8 @@
 
 (define-primitive-object (double-float :lowtag other-pointer-lowtag
 				       :widetag double-float-widetag)
-  (filler)
-  (value :c-type "double" :length 2))
+  #!-x86-64 (filler)
+  (value :c-type "double" :length #!-x86-64 2 #!+x86-64 1))
 
 #!+long-float
 (define-primitive-object (long-float :lowtag other-pointer-lowtag
@@ -170,9 +170,9 @@
 (define-primitive-object (simple-fun :type function
 				     :lowtag fun-pointer-lowtag
 				     :widetag simple-fun-header-widetag)
-  #!-x86 (self :ref-trans %simple-fun-self
+  #!-(or x86 x86-64) (self :ref-trans %simple-fun-self
 	       :set-trans (setf %simple-fun-self))
-  #!+x86 (self
+  #!+(or x86 x86-64) (self
 	  ;; KLUDGE: There's no :SET-KNOWN, :SET-TRANS, :REF-KNOWN, or
 	  ;; :REF-TRANS here in this case. Instead, there's separate
 	  ;; DEFKNOWN/DEFINE-VOP/DEFTRANSFORM stuff in
@@ -226,11 +226,11 @@
 			  :lowtag fun-pointer-lowtag
 			  :widetag funcallable-instance-header-widetag
 			  :alloc-trans %make-funcallable-instance)
-  #!-x86
+  #!-(or x86 x86-64)
   (fun
    :ref-known (flushable) :ref-trans %funcallable-instance-fun
    :set-known (unsafe) :set-trans (setf %funcallable-instance-fun))
-  #!+x86
+  #!+(or x86 x86-64)
   (fun
    :ref-known (flushable) :ref-trans %funcallable-instance-fun
    ;; KLUDGE: There's no :SET-KNOWN or :SET-TRANS in this case.
@@ -295,13 +295,13 @@
 (define-primitive-object (unwind-block)
   (current-uwp :c-type #!-alpha "struct unwind_block *" #!+alpha "u32")
   (current-cont :c-type #!-alpha "lispobj *" #!+alpha "u32")
-  #!-x86 current-code
+  #!-(or x86 x86-64) current-code
   entry-pc)
 
 (define-primitive-object (catch-block)
   (current-uwp :c-type #!-alpha "struct unwind_block *" #!+alpha "u32")
   (current-cont :c-type #!-alpha "lispobj *" #!+alpha "u32")
-  #!-x86 current-code
+  #!-(or x86 x86-64) current-code
   entry-pc
   tag
   (previous-catch :c-type #!-alpha "struct catch_block *" #!+alpha "u32")
@@ -350,9 +350,9 @@
 (define-primitive-object (complex-double-float
 			  :lowtag other-pointer-lowtag
 			  :widetag complex-double-float-widetag)
-  (filler)
-  (real :c-type "double" :length 2)
-  (imag :c-type "double" :length 2))
+  #!-x86-64 (filler) 
+  (real :c-type "double" :length #!-x86-64 2 #!+x86-64 1)
+  (imag :c-type "double" :length #!-x86-64 2 #!+x86-64 1))
 
 ;;; this isn't actually a lisp object at all, it's a c structure that lives
 ;;; in c-land.  However, we need sight of so many parts of it from Lisp that
@@ -376,8 +376,8 @@
   (this :c-type "struct thread *" :length #!+alpha 2 #!-alpha 1)
   (next :c-type "struct thread *" :length #!+alpha 2 #!-alpha 1)
   (state)				; running, stopping, stopped, dead
-  #!+x86 (pseudo-atomic-atomic)
-  #!+x86 (pseudo-atomic-interrupted)
+  #!+(or x86 x86-64) (pseudo-atomic-atomic)
+  #!+(or x86 x86-64) (pseudo-atomic-interrupted)
   (interrupt-data :c-type "struct interrupt_data *" 
 		  :length #!+alpha 2 #!-alpha 1)
   (interrupt-contexts :c-type "os_context_t *" :rest-p t))

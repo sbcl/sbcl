@@ -79,8 +79,8 @@
     (load-tl-symbol-value temp *current-unwind-protect-block*)
     (storew temp block unwind-block-current-uwp-slot)
     (storew rbp-tn block unwind-block-current-cont-slot)
-    (storew (make-fixup nil :code-object entry-label)
-	    block catch-block-entry-pc-slot)))
+    (inst lea temp (make-fixup nil :code-object entry-label))
+    (storew temp block catch-block-entry-pc-slot)))
 
 ;;; like MAKE-UNWIND-BLOCK, except that we also store in the specified
 ;;; tag, and link the block into the CURRENT-CATCH list
@@ -95,8 +95,8 @@
     (load-tl-symbol-value temp *current-unwind-protect-block*)
     (storew temp block  unwind-block-current-uwp-slot)
     (storew rbp-tn block  unwind-block-current-cont-slot)
-    (storew (make-fixup nil :code-object entry-label)
-	    block catch-block-entry-pc-slot)
+    (inst lea temp (make-fixup nil :code-object entry-label))
+    (storew temp block catch-block-entry-pc-slot)
     (storew tag block catch-block-tag-slot)
     (load-tl-symbol-value temp *current-catch-block*)
     (storew temp block catch-block-previous-catch-slot)
@@ -211,7 +211,7 @@
     ;; Copy them down.
     (inst std)
     (inst rep)
-    (inst movs :dword)
+    (inst movs :qword)
 
     DONE
     ;; Reset the CSP at last moved arg.

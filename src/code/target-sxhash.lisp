@@ -89,28 +89,20 @@
   (declare (optimize (speed 3) (safety 0)))
   (declare (type string string))
   (declare (type index count))
-  (let ((result 0))
-    (declare (type (unsigned-byte 32) result))
-    (unless (typep string '(vector nil))
-      (dotimes (i count)
-	(declare (type index i))
-	(setf result
-	      (ldb (byte 32 0)
-		   (+ result (char-code (aref string i)))))
-	(setf result
-	      (ldb (byte 32 0)
-		   (+ result (ash result 10))))
-	(setf result
-	      (logxor result (ash result -6)))))
-    (setf result
-	  (ldb (byte 32 0)
-	       (+ result (ash result 3))))
-    (setf result
-	  (logxor result (ash result -11)))
-    (setf result
-	  (ldb (byte 32 0)
-	       (logxor result (ash result 15))))
-    (logand result most-positive-fixnum)))
+  (macrolet ((set-result (form)
+	       `(setf result (ldb (byte #.sb!vm:n-word-bits 0) ,form))))
+    (let ((result 0))
+      (declare (type (unsigned-byte #.sb!vm:n-word-bits) result))
+      (unless (typep string '(vector nil))
+	(dotimes (i count)
+	  (declare (type index i))
+	  (set-result (+ result (char-code (aref string i))))
+	  (set-result (+ result (ash result 10)))
+	  (set-result (logxor result (ash result -6)))))
+      (set-result (+ result (ash result 3)))
+      (set-result (logxor result (ash result -11)))
+      (set-result (logxor result (ash result 15)))
+      (logand result most-positive-fixnum))))
 ;;; test:
 ;;;   (let ((ht (make-hash-table :test 'equal)))
 ;;;     (do-all-symbols (symbol)

@@ -121,7 +121,7 @@
 		   :from (:argument 1) :to (:result 0)) eax)
   (:generator 6
     (move eax data)
-    (inst shl eax (- n-widetag-bits 2))
+    (inst shl eax (- n-widetag-bits n-fixnum-tag-bits))
     (inst mov al-tn (make-ea :byte :base x :disp (- other-pointer-lowtag)))
     (storew eax x 0 other-pointer-lowtag)
     (move res x)))
@@ -142,7 +142,7 @@
   (:results (res :scs (any-reg descriptor-reg) :from (:argument 0)))
   (:generator 2
     (move res val)
-    (inst shl res (- n-widetag-bits 2))
+    (inst shl res (- n-widetag-bits n-fixnum-tag-bits))
     (inst or res (sc-case type
 		   (unsigned-reg type)
 		   (immediate (tn-value type))))))

@@ -117,10 +117,12 @@
   (:result-types tagged-num)
   (:note "inline fixnum arithmetic"))
 
+;; 31 not 64 because it's hard work loading 64 bit constants, and since
+;; sign-extension of immediates causes problems with 32.
 (define-vop (fast-unsigned-binop-c fast-safe-arith-op)
   (:args (x :target r :scs (unsigned-reg unsigned-stack)))
   (:info y)
-  (:arg-types unsigned-num (:constant (unsigned-byte 32)))
+  (:arg-types unsigned-num (:constant (unsigned-byte 31)))
   (:results (r :scs (unsigned-reg)
 	       :load-if (not (location= x r))))
   (:result-types unsigned-num)
@@ -134,7 +136,7 @@
   (:results (r :scs (signed-reg)
 	       :load-if (not (location= x r))))
   (:result-types signed-num)
-  (:note "inline (signed-byte 64) arithmetic"))
+  (:note "inline (signed-byte 32) arithmetic"))
 
 (macrolet ((define-binop (translate untagged-penalty op)
 	     `(progn
@@ -609,8 +611,7 @@
 		 (t 
 		  ;; shift too far then back again, to zero tag bits
 		  (inst sar result (- 3 amount))
-		  (inst lea result
-			(make-ea :qword :index result :scale 8))))))))
+		  (inst shl result 3)))))))
 
 
 (define-vop (fast-ash-left/fixnum=>fixnum)
@@ -960,6 +961,7 @@
   (:temporary (:sc unsigned-reg :from (:argument 0)) t1)
   (:generator 60
     (move result arg)
+    (move t1 arg)
 
     (inst mov temp result)  
     (inst shr temp 1)
@@ -992,8 +994,7 @@
     (inst add result temp)
 
     ;;; now do the upper half
-    (move t1 arg)
-    (inst bswap t1)
+    (inst shr t1 32)
 
     (inst mov temp t1)  
     (inst shr temp 1)
@@ -1063,7 +1064,7 @@
 
 (define-vop (fast-conditional-c/signed fast-conditional/signed)
   (:args (x :scs (signed-reg signed-stack)))
-  (:arg-types signed-num (:constant (signed-byte 32)))
+  (:arg-types signed-num (:constant (signed-byte 31)))
   (:info target not-p y))
 
 (define-vop (fast-conditional/unsigned fast-conditional)
@@ -1076,9 +1077,8 @@
 
 (define-vop (fast-conditional-c/unsigned fast-conditional/unsigned)
   (:args (x :scs (unsigned-reg unsigned-stack)))
-  (:arg-types unsigned-num (:constant (unsigned-byte 32)))
+  (:arg-types unsigned-num (:constant (unsigned-byte 31)))
   (:info target not-p y))
-
 
 (macrolet ((define-conditional-vop (tran cond unsigned not-cond not-unsigned)
 	     `(progn
@@ -1253,6 +1253,13 @@
 (define-vop (fast-ash-left-mod64-c/unsigned=>unsigned
              fast-ash-c/unsigned=>unsigned)
   (:translate ash-left-mod64))
+(define-vop (fast-ash-left-mod64/unsigned=>unsigned
+             fast-ash-left/unsigned=>unsigned))
+(deftransform ash-left-mod64 ((integer count)
+			      ((unsigned-byte 64) (unsigned-byte 6)))
+  (when (sb!c::constant-lvar-p count)
+    (sb!c::give-up-ir1-transform))
+  '(%primitive fast-ash-left-mod64/unsigned=>unsigned integer count))
 
 (in-package "SB!C")
 

@@ -698,7 +698,7 @@
 ;;;
 ;;; FIXME: This should use the data in *RAW-SLOT-DATA-LIST*.
 (defun structure-raw-slot-type-and-size (type)
-  (cond ((and (sb!xc:subtypep type '(unsigned-byte 32))
+  (cond ((and (sb!xc:subtypep type 'sb!vm:word)
 	      (multiple-value-bind (fixnum? fixnum-certain?)
 		  (sb!xc:subtypep type 'fixnum)
 		;; (The extra test for FIXNUM-CERTAIN? here is
@@ -914,8 +914,9 @@
 			  ;; FIXME: when the 64-bit world rolls
 			  ;; around, this will need to be reviewed,
 			  ;; along with the whole RAW-SLOT thing.
-			  `(truly-the (simple-array (unsigned-byte 32) (*))
-			              ,raw-vector-bare-form))
+			  `(truly-the
+			    (simple-array sb!vm:word (*))
+			    ,raw-vector-bare-form))
 			raw-vector-bare-form)))
 	      `(,raw-slot-accessor ,raw-vector-form ,scaled-dsd-index)))))))
 
@@ -1314,7 +1315,7 @@
 	 ,@(when raw-index
 	     `((setf (%instance-ref ,instance ,raw-index)
 		     (make-array ,(dd-raw-length dd)
-				 :element-type '(unsigned-byte 32)))))
+				 :element-type 'sb!vm:word))))
 	 ,@(mapcar (lambda (dsd value)
 		     ;; (Note that we can't in general use the
 		     ;; ordinary named slot setter function here

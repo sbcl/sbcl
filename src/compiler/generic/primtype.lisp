@@ -25,26 +25,27 @@
 (!def-primitive-type positive-fixnum (any-reg signed-reg unsigned-reg)
   :type (unsigned-byte #.sb!vm:n-positive-fixnum-bits))
 (/show0 "primtype.lisp 27")
-#!-alpha
+#!+#.(cl:if (cl:= sb!vm::n-machine-word-bits 32) '(and) '(or))
 (!def-primitive-type unsigned-byte-31 (signed-reg unsigned-reg descriptor-reg)
   :type (unsigned-byte 31))
 (/show0 "primtype.lisp 31")
-#!-alpha
+#!+#.(cl:if (cl:= sb!vm::n-machine-word-bits 32) '(and) '(or))
 (!def-primitive-type unsigned-byte-32 (unsigned-reg descriptor-reg)
   :type (unsigned-byte 32))
 (/show0 "primtype.lisp 35")
-#!+alpha
+#!+#.(cl:if (cl:= sb!vm::n-machine-word-bits 64) '(and) '(or))
 (!def-primitive-type unsigned-byte-63 (signed-reg unsigned-reg descriptor-reg)
   :type (unsigned-byte 63))
-#!+alpha
+#!+#.(cl:if (cl:= sb!vm::n-machine-word-bits 64) '(and) '(or))
 (!def-primitive-type unsigned-byte-64 (unsigned-reg descriptor-reg)
   :type (unsigned-byte 64))
 (!def-primitive-type fixnum (any-reg signed-reg)
   :type (signed-byte #.(1+ sb!vm:n-positive-fixnum-bits)))
-#!-alpha
+;; x86-64 needs a signed-byte-32 for proper handling of c-call return values.
+#!+#.(cl:if (cl:= sb!vm::n-machine-word-bits 32) '(and) '(or x86-64))
 (!def-primitive-type signed-byte-32 (signed-reg descriptor-reg)
   :type (signed-byte 32))
-#!+alpha
+#!+#.(cl:if (cl:= sb!vm::n-machine-word-bits 64) '(and) '(or))
 (!def-primitive-type signed-byte-64 (signed-reg descriptor-reg)
   :type (signed-byte 64))
 
@@ -52,17 +53,16 @@
 
 (/show0 "primtype.lisp 53")
 (!def-primitive-type-alias tagged-num (:or positive-fixnum fixnum))
-(!def-primitive-type-alias unsigned-num (:or #!-alpha unsigned-byte-32
-					     #!-alpha unsigned-byte-31
-					     #!+alpha unsigned-byte-64
-					     #!+alpha unsigned-byte-63
-					     positive-fixnum))
-(!def-primitive-type-alias signed-num (:or #!-alpha signed-byte-32
-					   #!+alpha signed-byte-64
-					   fixnum
-					   #!-alpha unsigned-byte-31
-					   #!+alpha unsigned-byte-63
-					   positive-fixnum))
+(!def-primitive-type-alias unsigned-num 
+  #!+#.(cl:if (cl:= sb!vm::n-machine-word-bits 64) '(and) '(or))
+  (:or unsigned-byte-64 unsigned-byte-63 positive-fixnum)
+  #!-#.(cl:if (cl:= sb!vm::n-machine-word-bits 64) '(and) '(or))
+  (:or unsigned-byte-32 unsigned-byte-31 positive-fixnum))
+(!def-primitive-type-alias signed-num 
+  #!+#.(cl:if (cl:= sb!vm::n-machine-word-bits 64) '(and) '(or))
+  (:or signed-byte-64 fixnum unsigned-byte-63 positive-fixnum)
+  #!-#.(cl:if (cl:= sb!vm::n-machine-word-bits 64) '(and) '(or))
+  (:or signed-byte-32 fixnum unsigned-byte-31 positive-fixnum))
 
 ;;; other primitive immediate types
 (/show0 "primtype.lisp 68")
@@ -161,32 +161,48 @@
 	       (case t1-name
 		 (positive-fixnum
 		  (if (or (eq t2-name 'fixnum)
-			  (eq t2-name #!-alpha 'signed-byte-32
-				      #!+alpha 'signed-byte-64)
-			  (eq t2-name #!-alpha 'unsigned-byte-31
-				      #!+alpha 'unsigned-byte-63)
-			  (eq t2-name #!-alpha 'unsigned-byte-32
-				      #!+alpha 'unsigned-byte-64))
+			  (eq t2-name
+			      (ecase sb!vm::n-machine-word-bits
+				(32 'signed-byte-32)
+				(64 'signed-byte-64)))
+			  (eq t2-name
+			      (ecase sb!vm::n-machine-word-bits
+				(32 'unsigned-byte-31)
+				(64 'unsigned-byte-63)))
+			  (eq t2-name
+			      (ecase sb!vm::n-machine-word-bits
+				(32 'unsigned-byte-32)
+				(64 'unsigned-byte-64))))
 		      t2))
 		 (fixnum
 		  (case t2-name
-		    (#!-alpha signed-byte-32
-		     #!+alpha signed-byte-64 t2)
-		    (#!-alpha unsigned-byte-31
-		     #!+alpha unsigned-byte-63
-		     (primitive-type-or-lose
-		      #!-alpha 'signed-byte-32
-		      #!+alpha 'signed-byte-64))))
-		 (#!-alpha signed-byte-32
-		  #!+alpha signed-byte-64
-		  (if (eq t2-name #!-alpha 'unsigned-byte-31
-				  #!+alpha 'unsigned-byte-63)
+		    (#.(ecase sb!vm::n-machine-word-bits
+			 (32 'signed-byte-32)
+			 (64 'signed-byte-64))
+		       t2)
+		    (#.(ecase sb!vm::n-machine-word-bits
+			 (32 'unsigned-byte-31)
+			 (64 'unsigned-byte-63))
+		       (primitive-type-or-lose
+			(ecase sb!vm::n-machine-word-bits
+			  (32 'signed-byte-32)
+			  (64 'signed-byte-64))))))
+		 (#.(ecase sb!vm::n-machine-word-bits
+		      (32 'signed-byte-32)
+		      (64 'signed-byte-64))
+		  (if (eq t2-name
+			  (ecase sb!vm::n-machine-word-bits
+			    (32 'unsigned-byte-31)
+			    (64 'unsigned-byte-63)))
 		      t1))
-		 (#!-alpha unsigned-byte-31
-		  #!+alpha unsigned-byte-63
-		  (if (eq t2-name #!-alpha 'unsigned-byte-32
-				  #!+alpha 'unsigned-byte-64)
-		      t2))))))
+		 (#.(ecase sb!vm::n-machine-word-bits
+		      (32 'unsigned-byte-31)
+		      (64 'unsigned-byte-63))
+		    (if (eq t2-name
+			    (ecase sb!vm::n-machine-word-bits
+			      (32 'unsigned-byte-32)
+			      (64 'unsigned-byte-64)))
+			t2))))))
       (etypecase type
 	(numeric-type
 	 (let ((lo (numeric-type-low type))
@@ -198,22 +214,26 @@
 		 (cond ((and hi lo)
 			(dolist (spec
 				  `((positive-fixnum 0 ,sb!xc:most-positive-fixnum)
-				    #!-alpha
-				    (unsigned-byte-31 0 ,(1- (ash 1 31)))
-				    #!-alpha
-				    (unsigned-byte-32 0 ,(1- (ash 1 32)))
-				    #!+alpha
-				    (unsigned-byte-63 0 ,(1- (ash 1 63)))
-				    #!+alpha
-				    (unsigned-byte-64 0 ,(1- (ash 1 64)))
+				    ,@(ecase sb!vm::n-machine-word-bits
+					(32
+					 `((unsigned-byte-31
+					    0 ,(1- (ash 1 31)))
+					   (unsigned-byte-32
+					    0 ,(1- (ash 1 32)))))
+					(64
+					 `((unsigned-byte-63
+					    0 ,(1- (ash 1 63)))
+					   (unsigned-byte-64
+					    0 ,(1- (ash 1 64))))))
 				    (fixnum ,sb!xc:most-negative-fixnum
 					    ,sb!xc:most-positive-fixnum)
-				    #!-alpha
-				    (signed-byte-32 ,(ash -1 31)
-							  ,(1- (ash 1 31)))
-				    #!+alpha
-				    (signed-byte-64 ,(ash -1 63)
-						    ,(1- (ash 1 63))))
+				    ,(ecase sb!vm::n-machine-word-bits
+				       (32
+					`(signed-byte-32 ,(ash -1 31)
+					                 ,(1- (ash 1 31))))
+				       (64
+					`(signed-byte-64 ,(ash -1 63)
+							 ,(1- (ash 1 63))))))
 				 (if (or (< hi sb!xc:most-negative-fixnum)
 					 (> lo sb!xc:most-positive-fixnum))
 				     (part-of bignum)

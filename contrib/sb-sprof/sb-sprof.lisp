@@ -423,7 +423,7 @@
 (deftype address ()
   "Type used for addresses, for instance, program counters,
    code start/end locations etc."
-  '(unsigned-byte #+alpha 64 #-alpha 32))
+  '(unsigned-byte #.sb-vm::n-machine-word-bits))
 
 (defconstant +unknown-address+ 0
   "Constant representing an address that cannot be determined.")
@@ -580,9 +580,9 @@
        (locally (declare (optimize (inhibit-warnings 2)))
 	 (let* ((pc-ptr (sb-vm:context-pc scp))
 		(fp (sb-vm::context-register scp #.sb-vm::ebp-offset))
-		(ra (sap-ref-32 (int-sap fp)
-				(- (* (1+ sb-vm::return-pc-save-offset)
-				      sb-vm::n-word-bytes)))))
+		(ra (sap-ref-word (int-sap fp)
+				  (- (* (1+ sb-vm::return-pc-save-offset)
+					sb-vm::n-word-bytes)))))
 	   (record (sap-int pc-ptr))
 	   (record ra)))))))
 
@@ -596,7 +596,7 @@
        (locally (declare (optimize (inhibit-warnings 2)))
 	 (let* ((pc-ptr (sb-vm:context-pc scp))
 		(fp (sb-vm::context-register scp #.sb-vm::cfp-offset))
-		(ra (sap-ref-32 
+		(ra (sap-ref-word 
 		     (int-sap fp)
 		     (* sb-vm::lra-save-offset sb-vm::n-word-bytes))))
 	   (record (sap-int pc-ptr))

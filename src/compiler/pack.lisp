@@ -1417,7 +1417,7 @@
     ;; For non-x86 ports the presence of a save-tn associated with a
     ;; tn is used to identify the old-fp and return-pc tns. It depends
     ;; on the old-fp and return-pc being passed in registers.
-    #!-x86
+    #!-(or x86 x86-64)
     (when (and (not (eq (tn-kind tn) :specified-save))
 	       (conflicts-in-sc original sc offset))
       (error "~S is wired to a location that it conflicts with." tn))
@@ -1444,7 +1444,7 @@
     ;; the stack so the above hack for the other ports does not always
     ;; work. Here the old-fp and return-pc tns are identified by being
     ;; on the stack in their standard save locations.
-    #!+x86
+    #!+(or x86 x86-64)
     (when (and (not (eq (tn-kind tn) :specified-save))
 	       (not (and (string= (sb-name sb) "STACK")
 			 (or (= offset 0)

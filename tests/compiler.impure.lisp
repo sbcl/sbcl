@@ -898,7 +898,7 @@
 
 ;;;; MUFFLE-CONDITIONS test (corresponds to the test in the manual)
 (defvar *compiler-note-count* 0)
-#-alpha ; FIXME: make a better test!
+#-(or alpha x86-64) ; FIXME: make a better test!
 (handler-bind ((sb-ext:compiler-note (lambda (c)
 				       (declare (ignore c))
 				       (incf *compiler-note-count*))))

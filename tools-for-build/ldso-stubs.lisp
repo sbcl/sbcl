@@ -55,7 +55,7 @@ ldso_stub__~A: ;                                \\
 #endif
         .text"
 
-#!+x86 "
+#!+(or x86 x86-64) "
 #define LDSO_STUBIFY(fct)                       \\
 	.align 16 ;                             \\
 .globl ldso_stub__ ## fct ;                     \\

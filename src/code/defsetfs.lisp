@@ -41,12 +41,10 @@
 (defsetf %instance-ref %instance-set)
 (defsetf %raw-ref-single %raw-set-single)
 (defsetf %raw-ref-double %raw-set-double)
-#!+long-float
-(defsetf %raw-ref-long %raw-set-long)
+
 (defsetf %raw-ref-complex-single %raw-set-complex-single)
 (defsetf %raw-ref-complex-double %raw-set-complex-double)
-#!+long-float
-(defsetf %raw-ref-complex-long %raw-set-complex-long)
+
 (defsetf %instance-layout %set-instance-layout)
 (defsetf %funcallable-instance-info %set-funcallable-instance-info)
 
@@ -118,6 +116,8 @@
 (defsetf signed-sap-ref-32 %set-signed-sap-ref-32)
 (defsetf sap-ref-64 %set-sap-ref-64)
 (defsetf signed-sap-ref-64 %set-signed-sap-ref-64)
+(defsetf sap-ref-word %set-sap-ref-word)
+(defsetf signed-sap-ref-word %set-signed-sap-ref-word)
 (defsetf sap-ref-sap %set-sap-ref-sap)
 (defsetf sap-ref-single %set-sap-ref-single)
 (defsetf sap-ref-double %set-sap-ref-double)

@@ -1184,8 +1184,8 @@
   (declare (optimize #-sb-xc-host (sb!ext:inhibit-warnings 3)))
   (let ((res (dpb exp
 		  sb!vm:single-float-exponent-byte
-		  (logandc2 (sb!ext:truly-the (unsigned-byte #.(1- sb!vm:n-word-bits))
-					      (%bignum-ref bits 1))
+		  (logandc2 (logand #xffffffff
+				    (%bignum-ref bits 1))
 			    sb!vm:single-float-hidden-bit))))
     (make-single-float
      (if plusp
@@ -1196,14 +1196,15 @@
   (declare (optimize #-sb-xc-host (sb!ext:inhibit-warnings 3)))
   (let ((hi (dpb exp
 		 sb!vm:double-float-exponent-byte
-		 (logandc2 (sb!ext:truly-the (unsigned-byte #.(1- sb!vm:n-word-bits))
-					     (%bignum-ref bits 2))
-			   sb!vm:double-float-hidden-bit))))
-    (make-double-float
-     (if plusp
-	 hi
-	 (logior hi (ash -1 sb!vm:float-sign-shift)))
-     (%bignum-ref bits 1))))
+		 (logandc2 (ecase sb!vm::n-word-bits
+			     (32 (%bignum-ref bits 2))
+			     (64 (ash (%bignum-ref bits 1) -32)))
+			   sb!vm:double-float-hidden-bit)))
+	(lo (logand #xffffffff (%bignum-ref bits 1))))
+    (make-double-float (if plusp
+			   hi
+			   (logior hi (ash -1 sb!vm:float-sign-shift)))
+		       lo)))
 #!+(and long-float x86)
 (defun long-float-from-bits (bits exp plusp)
   (declare (fixnum exp))

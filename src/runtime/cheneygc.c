@@ -90,19 +90,19 @@ zero_stack(void)
 
 
 void *
-gc_general_alloc(int bytes, int unboxed_p, int quick_p) {
+gc_general_alloc(long bytes, int unboxed_p, int quick_p) {
     lispobj *new=new_space_free_pointer;
     new_space_free_pointer+=(bytes/N_WORD_BYTES);
     return new;
 }
 
-lispobj  copy_large_unboxed_object(lispobj object, int nwords) {
+lispobj  copy_large_unboxed_object(lispobj object, long nwords) {
     return copy_object(object,nwords);
 }
-lispobj  copy_unboxed_object(lispobj object, int nwords) {
+lispobj  copy_unboxed_object(lispobj object, long nwords) {
     return copy_object(object,nwords);
 }
-lispobj  copy_large_object(lispobj object, int nwords) {
+lispobj  copy_large_object(lispobj object, long nwords) {
     return copy_object(object,nwords);
 }
 
@@ -495,47 +495,9 @@ print_garbage(lispobj *from_space, lispobj *from_space_free_pointer)
 }
 
 
-/* code and code-related objects */
-
-/* FIXME (1) this could probably be defined using something like
- *  sizeof(lispobj)*floor(sizeof(struct simple_fun)/sizeof(lispobj))
- *    -  FUN_POINTER_LOWTAG
- * as I'm reasonably sure that simple_fun->code must always be the 
- * last slot in the object 
-
- * FIXME (2) it also appears in purify.c, and it has a different value
- * for SPARC users in that bit
- */
-
-#define FUN_RAW_ADDR_OFFSET (6*sizeof(lispobj) - FUN_POINTER_LOWTAG)
-
-/* Note: on the sparc we don't have to do anything special for fdefns, */
-/* 'cause the raw-addr has a function lowtag. */
-#ifndef LISP_FEATURE_SPARC
-static int
-scav_fdefn(lispobj *where, lispobj object)
-{
-    struct fdefn *fdefn;
-
-    fdefn = (struct fdefn *)where;
-    
-    if ((char *)(fdefn->fun + FUN_RAW_ADDR_OFFSET) 
-	== (char *)((unsigned long)(fdefn->raw_addr))) {
-        scavenge(where + 1, sizeof(struct fdefn)/sizeof(lispobj) - 1);
-        fdefn->raw_addr =
-            (u32) ((char *) LOW_WORD(fdefn->fun)) + FUN_RAW_ADDR_OFFSET;
-        return sizeof(struct fdefn) / sizeof(lispobj);
-    }
-    else
-        return 1;
-}
-#endif
-
-
-
 /* vector-like objects */
 
-static int
+static long
 scav_vector(lispobj *where, lispobj object)
 {
     if (HeaderValue(object) == subtype_VectorValidHashing) {
@@ -552,7 +514,7 @@ scav_vector(lispobj *where, lispobj object)
 #define WEAK_POINTER_NWORDS \
 	CEILING((sizeof(struct weak_pointer) / sizeof(lispobj)), 2)
 
-static int
+static long
 scav_weak_pointer(lispobj *where, lispobj object)
 {
     /* Do not let GC scavenge the value slot of the weak pointer */

@@ -22,12 +22,12 @@
 (define-alien-type char (integer 8))
 (define-alien-type short (integer 16))
 (define-alien-type int (integer 32))
-(define-alien-type long (integer #!-alpha 32 #!+alpha 64))
+(define-alien-type long (integer #.sb!vm::n-machine-word-bits))
 
 (define-alien-type unsigned-char (unsigned 8))
 (define-alien-type unsigned-short (unsigned 16))
 (define-alien-type unsigned-int (unsigned 32))
-(define-alien-type unsigned-long (unsigned #!-alpha 32 #!+alpha 64))
+(define-alien-type unsigned-long (unsigned #.sb!vm::n-machine-word-bits))
 
 (define-alien-type float single-float)
 (define-alien-type double double-float)

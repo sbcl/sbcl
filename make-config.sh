@@ -30,7 +30,8 @@ printf '(' >> $ltf
 
 echo //guessing default target CPU architecture from host architecture
 case `uname -m` in 
-    *86|x86_64) guessed_sbcl_arch=x86 ;; 
+    *86) guessed_sbcl_arch=x86 ;; 
+    *x86_64) guessed_sbcl_arch=x86-64 ;; 
     [Aa]lpha) guessed_sbcl_arch=alpha ;;
     sparc*) guessed_sbcl_arch=sparc ;;
     sun*) guessed_sbcl_arch=sparc ;;
@@ -189,6 +190,8 @@ if [ "$sbcl_arch" = "x86" ]; then
     if [ "$sbcl_os" = "linux" ] || [ "$sbcl_os" = "freebsd" ] || [ "$sbcl_os" = "netbsd" ]; then
 	printf ' :linkage-table' >> $ltf
     fi
+elif [ "$sbcl_arch" = "x86-64" ]; then
+    printf ' :gencgc :stack-grows-downward-not-upward :c-stack-is-control-stack :linkage-table' >> $ltf
 elif [ "$sbcl_arch" = "mips" ]; then
     # Use a little C program to try to guess the endianness.  Ware
     # cross-compilers!

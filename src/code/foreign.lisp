@@ -52,8 +52,7 @@
       ;; If the address is from linkage-table and refers to data
       ;; we need to do a bit of juggling.
       (if (and sharedp datap)
-          ;; FIXME: 64bit badness here
-          (int-sap (sap-ref-32 (int-sap addr) 0))
+          (int-sap (sap-ref-word (int-sap addr) 0))
           (int-sap addr)))))
 
 #-sb-xc-host

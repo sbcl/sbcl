@@ -509,13 +509,14 @@ Martin Atzmueller:
 Daniel Barlow:
   His contributions have included support for shared object loading
   (from CMUCL), the Cheney GC for non-x86 ports (from CMUCL), Alpha
-  and PPC ports (from CMUCL), control stack exhaustion checking (new)
-  and native threads support for x86 Linux (new).  He also refactored
-  the garbage collectors for understandability, wrote code
-  (e.g. grovel-headers.c and stat_wrapper stuff) to find
-  machine-dependent and OS-dependent constants automatically, and was
-  original author of the asdf, asdf-install, sb-bsd-sockets,
-  sb-executable, sb-grovel and sb-posix contrib packages.
+  and PPC ports (from CMUCL), control stack exhaustion checking (new),
+  native threads support for x86 Linux (new), and the initial x86-64
+  backend (new).  He also refactored the garbage collectors for
+  understandability, wrote code (e.g. grovel-headers.c and
+  stat_wrapper stuff) to find machine-dependent and OS-dependent
+  constants automatically, and was original author of the asdf,
+  asdf-install, sb-bsd-sockets, sb-executable, sb-grovel and sb-posix
+  contrib packages.
 
 Robert E. Brown:
   He has reported various bugs and submitted several patches, 
@@ -697,7 +698,8 @@ Juho Snellman:
   function on strings, removal of unneccessary bounds checks, and
   multiple improvements to performance of common operations on
   bignums.  He ported and enhanced the statistical profiler written by
-  Gerd Moellmann for CMU CL.
+  Gerd Moellmann for CMU CL.  He completed the work on the x86-64 port
+  of SBCL.
 
 Brian Spilsbury:
   He wrote Unicode-capable versions of SBCL's character, string, and
@@ -724,6 +726,9 @@ Colin Walters:
   His O(N) implementation of the general case of MAP, posted on the
   cmucl-imp@cons.org mailing list, was the inspiration for similar MAP
   code added in sbcl-0.6.8.
+
+Cheuksan Edward Wang:
+  He assisted in debugging the SBCL x86-64 backend.
 
 Raymond Wiker:
   He ported sbcl-0.6.3 back to FreeBSD, restoring the ancestral

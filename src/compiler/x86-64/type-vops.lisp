@@ -13,26 +13,24 @@
 
 ;;;; test generation utilities
 
-;;; Emit the most compact form of the test immediate instruction,
-;;; using an 8 bit test when the immediate is only 8 bits and the
-;;; value is one of the four low registers (eax, ebx, ecx, edx) or the
-;;; control stack.
+(defun make-byte-tn (tn)
+  (aver (sc-is tn any-reg descriptor-reg unsigned-reg signed-reg))
+  (make-random-tn :kind :normal
+		  :sc (sc-or-lose 'byte-reg)
+		  :offset (tn-offset tn)))
+
 (defun generate-fixnum-test (value)
   "zero flag set if VALUE is fixnum"
   (let ((offset (tn-offset value)))
-    (cond ((and (sc-is value any-reg descriptor-reg)
-		(or (= offset eax-offset) (= offset ebx-offset)
-		    (= offset ecx-offset) (= offset edx-offset)))
-	   (inst test (make-random-tn :kind :normal
-				      :sc (sc-or-lose 'byte-reg)
-				      :offset offset)
-		 7))
-	  ((sc-is value control-stack)
+    ;; The x86 backend uses a pun from E[A-D]X -> [A-D]L for these
+    ;; tests. The Athlon 64 optimization guide says that this is a 
+    ;; bad idea, so it's been removed.
+    (cond ((sc-is value control-stack)
 	   (inst test (make-ea :byte :base rbp-tn
 			       :disp (- (* (1+ offset) n-word-bytes)))
-		 7))
+		 sb!vm::fixnum-tag-mask))
 	  (t
-	   (inst test value 7)))))
+	   (inst test value sb!vm::fixnum-tag-mask)))))
 
 (defun %test-fixnum (value target not-p)
   (generate-fixnum-test value)
@@ -46,28 +44,21 @@
 
 (defun %test-immediate (value target not-p immediate)
   ;; Code a single instruction byte test if possible.
-  (let ((offset (tn-offset value)))
-    (cond ((and (sc-is value any-reg descriptor-reg)
-		(or (= offset rax-offset) (= offset rbx-offset)
-		    (= offset rcx-offset) (= offset rdx-offset)))
-	   (inst cmp (make-random-tn :kind :normal
-				     :sc (sc-or-lose 'byte-reg)
-				     :offset offset)
-		 immediate))
-	  (t
-	   (move rax-tn value)
-	   (inst cmp al-tn immediate))))
+  (cond ((sc-is value any-reg descriptor-reg)
+	 (inst cmp (make-byte-tn value) immediate))
+	(t
+	 (move rax-tn value)
+	 (inst cmp al-tn immediate)))
   (inst jmp (if not-p :ne :e) target))
 
-(defun %test-lowtag (value target not-p lowtag &optional al-loaded)
-  (unless al-loaded
-    (move rax-tn value)
-    (inst and al-tn lowtag-mask))
-  (inst cmp al-tn lowtag)
+(defun %test-lowtag (value target not-p lowtag)
+  (move rax-tn value)
+  (inst and rax-tn lowtag-mask)
+  (inst cmp rax-tn lowtag)
   (inst jmp (if not-p :ne :e) target))
 
 (defun %test-headers (value target not-p function-p headers
-			    &optional (drop-through (gen-label)) al-loaded)
+			    &optional (drop-through (gen-label)))
   (let ((lowtag (if function-p fun-pointer-lowtag other-pointer-lowtag)))
     (multiple-value-bind (equal less-or-equal when-true when-false)
 	;; EQUAL and LESS-OR-EQUAL are the conditions for branching to TARGET.
@@ -76,7 +67,7 @@
 	(if not-p
 	    (values :ne :a drop-through target)
 	    (values :e :na target drop-through))
-      (%test-lowtag value when-false t lowtag al-loaded)
+      (%test-lowtag value when-false t lowtag)
       (inst mov al-tn (make-ea :byte :base value :disp (- lowtag)))
       (do ((remaining headers (cdr remaining)))
 	  ((null remaining))
@@ -177,48 +168,150 @@
 
 (define-vop (signed-byte-32-p type-predicate)
   (:translate signed-byte-32-p)
-  (:generator 45
-    ;; (and (fixnum) (no bits set >32))
+  (:generator 7
+    ;; (and (fixnum) (or (no bits set >31) (all bits set >31))
     (move rax-tn value)
     (inst test rax-tn 7)
     (inst jmp :ne (if not-p target not-target))
-    (inst sar rax-tn (+ 32 3))
-    (inst jmp (if not-p :nz :z) target)
+    (inst sar rax-tn (+ 32 3 -1))
+    (if not-p
+	(progn
+	  (inst jmp :nz target)
+	  (inst jmp not-target))
+	(inst jmp :z target))
+    (inst cmp rax-tn -1)
+    (inst jmp (if not-p :ne :eq) target)
     NOT-TARGET))
 
 (define-vop (check-signed-byte-32 check-type)
-  (:generator 45
+  (:generator 8
     (let ((nope (generate-error-code vop
 				     object-not-signed-byte-32-error
-				     value)))
+				     value))
+	  (ok (gen-label)))
       (move rax-tn value)
       (inst test rax-tn 7)
       (inst jmp :ne nope)
-      (inst sar rax-tn (+ 32 3))
-      (inst jmp :nz nope)
+      (inst sar rax-tn (+ 32 3 -1))      
+      (inst jmp :z ok)
+      (inst cmp rax-tn -1)
+      (inst jmp :ne nope)
+      (emit-label OK)
       (move result value))))
 
 
 (define-vop (unsigned-byte-32-p type-predicate)
   (:translate unsigned-byte-32-p)
-  (:generator 45
+  (:generator 7
     ;; (and (fixnum) (no bits set >31))
     (move rax-tn value)
     (inst test rax-tn 7)
     (inst jmp :ne (if not-p target not-target))
-    (inst sar rax-tn (+ 32 3 -1))
+    (inst shr rax-tn (+ 32 sb!vm::n-fixnum-tag-bits))
     (inst jmp (if not-p :nz :z) target)
     NOT-TARGET))
 
 (define-vop (check-unsigned-byte-32 check-type)
-  (:generator 45
+  (:generator 8
     (let ((nope
 	   (generate-error-code vop object-not-unsigned-byte-32-error value)))
       (move rax-tn value)
       (inst test rax-tn 7)
       (inst jmp :ne nope)
-      (inst sar rax-tn (+ 32 3 -1))
+      (inst shr rax-tn (+ 32 sb!vm::n-fixnum-tag-bits))
       (inst jmp :nz nope)
+      (move result value))))
+
+;;; An (unsigned-byte 64) can be represented with either a positive
+;;; fixnum, a bignum with exactly one positive digit, or a bignum with
+;;; exactly two digits and the second digit all zeros.
+(define-vop (unsigned-byte-64-p type-predicate)
+  (:translate unsigned-byte-64-p)
+  (:generator 45
+    (let ((not-target (gen-label))
+	  (single-word (gen-label))
+	  (fixnum (gen-label)))
+      (multiple-value-bind (yep nope)
+	  (if not-p
+	      (values not-target target)
+	      (values target not-target))
+	;; Is it a fixnum?
+	(generate-fixnum-test value)
+	(move eax-tn value)
+	(inst jmp :e fixnum)
+
+	;; If not, is it an other pointer?
+	(inst and eax-tn lowtag-mask)
+	(inst cmp eax-tn other-pointer-lowtag)
+	(inst jmp :ne nope)
+	;; Get the header.
+	(loadw eax-tn value 0 other-pointer-lowtag)
+	;; Is it one?
+	(inst cmp eax-tn (+ (ash 1 n-widetag-bits) bignum-widetag))
+	(inst jmp :e single-word)
+	;; If it's other than two, we can't be an (unsigned-byte 64)
+	(inst cmp eax-tn (+ (ash 2 n-widetag-bits) bignum-widetag))
+	(inst jmp :ne nope)
+	;; Get the second digit.
+	(loadw eax-tn value (1+ bignum-digits-offset) other-pointer-lowtag)
+	;; All zeros, its an (unsigned-byte 64).
+	(inst or eax-tn eax-tn)
+	(inst jmp :z yep)
+	(inst jmp nope)
+	
+	(emit-label single-word)
+	;; Get the single digit.
+	(loadw eax-tn value bignum-digits-offset other-pointer-lowtag)
+
+	;; positive implies (unsigned-byte 64).
+	(emit-label fixnum)
+	(inst or eax-tn eax-tn)
+	(inst jmp (if not-p :s :ns) target)
+
+	(emit-label not-target)))))
+
+(define-vop (check-unsigned-byte-64 check-type)
+  (:generator 45
+    (let ((nope
+	   (generate-error-code vop object-not-unsigned-byte-64-error value))
+	  (yep (gen-label))
+	  (fixnum (gen-label))
+	  (single-word (gen-label)))
+
+      ;; Is it a fixnum?
+      (generate-fixnum-test value)
+      (move eax-tn value)
+      (inst jmp :e fixnum)
+
+      ;; If not, is it an other pointer?
+      (inst and eax-tn lowtag-mask)
+      (inst cmp eax-tn other-pointer-lowtag)
+      (inst jmp :ne nope)
+      ;; Get the header.
+      (loadw eax-tn value 0 other-pointer-lowtag)
+      ;; Is it one?
+      (inst cmp eax-tn (+ (ash 1 n-widetag-bits) bignum-widetag))
+      (inst jmp :e single-word)
+      ;; If it's other than two, we can't be an (unsigned-byte 64)
+      (inst cmp eax-tn (+ (ash 2 n-widetag-bits) bignum-widetag))
+      (inst jmp :ne nope)
+      ;; Get the second digit.
+      (loadw eax-tn value (1+ bignum-digits-offset) other-pointer-lowtag)
+      ;; All zeros, its an (unsigned-byte 64).
+      (inst or eax-tn eax-tn)
+      (inst jmp :z yep)
+      (inst jmp nope)
+	
+      (emit-label single-word)
+      ;; Get the single digit.
+      (loadw eax-tn value bignum-digits-offset other-pointer-lowtag)
+
+      ;; positive implies (unsigned-byte 64).
+      (emit-label fixnum)
+      (inst or eax-tn eax-tn)
+      (inst jmp :s nope)
+
+      (emit-label yep)
       (move result value))))
 
 ;;;; list/symbol types

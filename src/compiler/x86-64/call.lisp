@@ -204,6 +204,7 @@
    ((<= nvals register-arg-count)
     (let ((regs-defaulted (gen-label)))
       (note-this-location vop :unknown-return)
+      (inst nop)
       (inst jmp-short regs-defaulted)
       ;; Default the unsupplied registers.
       (let* ((2nd-tn-ref (tn-ref-across values))
@@ -228,6 +229,7 @@
 	  (default-stack-slots (gen-label)))
       (note-this-location vop :unknown-return)
       ;; Branch off to the MV case.
+      (inst nop)
       (inst jmp-short regs-defaulted)
       ;; Do the single value case.
       ;; Default the register args
@@ -285,6 +287,7 @@
 	  (count-okay (gen-label)))
       (note-this-location vop :unknown-return)
       ;; Branch off to the MV case.
+      (inst nop)
       (inst jmp-short regs-defaulted)
 
       ;; Default the register args, and set up the stack as if we
@@ -382,6 +385,7 @@
   (declare (type tn args nargs start count))
   (let ((variable-values (gen-label))
 	(done (gen-label)))
+    (inst nop)
     (inst jmp-short variable-values)
 
     (cond ((location= start (first *register-arg-tns*))
@@ -443,6 +447,7 @@
   (:args (fp)
 	 (nfp)
 	 (args :more t))
+  (:temporary (:sc unsigned-reg) return-label)
   (:results (values :more t))
   (:save-p t)
   (:move-args :local-call)
@@ -464,8 +469,8 @@
 	((sap-stack)
 	 #+nil (format t "*call-local: ret-tn on stack; offset=~S~%"
 		       (tn-offset ret-tn))
-	 (storew (make-fixup nil :code-object return)
-		 rbp-tn (- (1+ (tn-offset ret-tn)))))
+	 (inst lea return-label (make-fixup nil :code-object return))
+	 (storew return-label rbp-tn (- (1+ (tn-offset ret-tn)))))
 	((sap-reg)
 	 (inst lea ret-tn (make-fixup nil :code-object return)))))
 
@@ -482,6 +487,7 @@
   (:args (fp)
 	 (nfp)
 	 (args :more t))
+  (:temporary (:sc unsigned-reg) return-label)
   (:save-p t)
   (:move-args :local-call)
   (:info save callee target)
@@ -503,8 +509,8 @@
 	 #+nil (format t "*multiple-call-local: ret-tn on stack; offset=~S~%"
 		       (tn-offset ret-tn))
 	 ;; Stack
-	 (storew (make-fixup nil :code-object return)
-		 rbp-tn (- (1+ (tn-offset ret-tn)))))
+	 (inst lea return-label (make-fixup nil :code-object return))
+	 (storew return-label rbp-tn (- (1+ (tn-offset ret-tn)))))
 	((sap-reg)
 	 ;; Register
 	 (inst lea ret-tn (make-fixup nil :code-object return)))))
@@ -528,6 +534,7 @@
   (:args (fp)
 	 (nfp)
 	 (args :more t))
+  (:temporary (:sc unsigned-reg) return-label)
   (:results (res :more t))
   (:move-args :local-call)
   (:save-p t)
@@ -551,8 +558,8 @@
 	 #+nil (format t "*known-call-local: ret-tn on stack; offset=~S~%"
 		       (tn-offset ret-tn))
 	 ;; Stack
-	 (storew (make-fixup nil :code-object return)
-		 rbp-tn (- (1+ (tn-offset ret-tn)))))
+	 (inst lea return-label (make-fixup nil :code-object return))
+	 (storew return-label rbp-tn (- (1+ (tn-offset ret-tn)))))
 	((sap-reg)
 	 ;; Register
 	 (inst lea ret-tn (make-fixup nil :code-object return)))))
@@ -894,6 +901,7 @@
 	 (ret-addr))
   (:temporary (:sc unsigned-reg :offset rsi-offset :from (:argument 0)) rsi)
   (:temporary (:sc unsigned-reg :offset rax-offset :from (:argument 1)) rax)
+  (:temporary (:sc unsigned-reg) call-target)
 ;  (:ignore ret-addr old-fp)
   (:generator 75
     ;; Move these into the passing locations if they are not already there.
@@ -910,8 +918,11 @@
 	    (error "tail-call-variable: ret-addr not on stack in standard save location?"))
 
 
+    (inst lea call-target
+	  (make-ea :qword
+		   :disp (make-fixup 'tail-call-variable :assembly-routine)))
     ;; And jump to the assembly routine.
-    (inst jmp (make-fixup 'tail-call-variable :assembly-routine))))
+    (inst jmp call-target)))
 
 ;;;; unknown values return
 
@@ -1031,6 +1042,7 @@
   (:temporary (:sc unsigned-reg :offset rsi-offset :from (:argument 2)) rsi)
   (:temporary (:sc unsigned-reg :offset rcx-offset :from (:argument 3)) rcx)
   (:temporary (:sc unsigned-reg :offset rbx-offset :from (:eval 0)) rbx)
+  (:temporary (:sc unsigned-reg) return-asm)
   (:temporary (:sc descriptor-reg :offset (first *register-arg-offsets*)
 		   :from (:eval 0)) a0)
   (:temporary (:sc unsigned-reg :from (:eval 1)) old-fp-temp)
@@ -1064,7 +1076,10 @@
     (move rcx nvals)
     (move rbx rbp-tn)
     (move rbp-tn old-fp)
-    (inst jmp (make-fixup 'return-multiple :assembly-routine))
+    (inst lea return-asm
+	  (make-ea :qword :disp (make-fixup 'return-multiple
+					    :assembly-routine)))
+    (inst jmp return-asm)
     (trace-table-entry trace-table-normal)))
 
 ;;;; XEP hackery
@@ -1262,7 +1277,7 @@
        (inst lea dst (make-ea :byte :base dst :disp list-pointer-lowtag))
        ;; Convert the count into a raw value, so that we can use the
        ;; LOOP instruction.
-       (inst shr rcx (1- n-word-bytes))
+       (inst shr rcx (1- n-lowtag-bits))
        ;; Set decrement mode (successive args at lower addresses)
        (inst std)
        ;; Set up the result.
