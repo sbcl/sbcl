@@ -536,16 +536,14 @@ Douglas Crosher:
   handling of the CONS type to allow ANSI-style (CONS FOO BAR) types. 
 
 Alexey Dejneka:
-  He has fixed many, many bugs. There's no single summary theme, but
-  he's fixed about a dozen different bugs in LOOP alone, and more
-  in the compiler itself. It appears that a lot of his fixes there
-  and elsewhere reflect systematic public-spiritedness, fixing bugs
-  as they show up in sbcl-devel or as archived in the BUGS file.
+  He fixed many, many bugs on various themes, and has done a
+  tremendous amount of work on the compiler in particular, fixing
+  bugs and refactoring.
 
 Paul Dietz
   He is in the process of writing a comprehensive test suite for the
   requirements of the ANSI Common Lisp standard.  Already, at the
-  halfway stage, it has caught many tens of bugs in SBCL, and provided
+  halfway stage, it has caught hundreds of bugs in SBCL, and provided
   simple test cases for them.
 
 Miles Egan

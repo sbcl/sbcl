@@ -76,7 +76,7 @@
 ;;; versions which break binary compatibility. But it certainly should
 ;;; be incremented for release versions which break binary
 ;;; compatibility.
-(def!constant +fasl-file-version+ 44)
+(def!constant +fasl-file-version+ 45)
 ;;; (record of versions before 2003 deleted in 2003-04-26/0.pre8.107 or so)
 ;;; 38: (2003-01-05) changed names of internal SORT machinery
 ;;; 39: (2003-02-20) in 0.7.12.1 a slot was added to
@@ -95,6 +95,11 @@
 ;;;     <Krystof_> I think I renumbered everything again
 ;;;     <Krystof_> simple-array-unsigned-byte-7, probably
 ;;;     <Krystof_> (thanks to pfdietz)
+;;; 45: (2003-10-02) I (WHN) incremented the version for the 0.8.4 
+;;;     release because I couldn't immediately convince myself that
+;;;     .fasl files could never possibly ever refer to the SB-C
+;;;     CONTINUATION-related data types which were changed 
+;;;     incompatibly in 0.8.3.62.
 
 ;;; the conventional file extension for our fasl files
 (declaim (type simple-string *fasl-file-type*))

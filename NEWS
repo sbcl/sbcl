@@ -2031,8 +2031,8 @@ changes in sbcl-0.8.4 relative to sbcl-0.8.3:
   * fixed bug 285: TRUNCATE on bignum arguments, and indeed bignum
     arithmetic in general, is now much more reliable on the PPC
     platform.
-  * bug fix: LOGCOUNT on (UNSIGNED-BYTE 64) objects on the Alpha platform
-    now returs the right answer.
+  * bug fix: LOGCOUNT on (UNSIGNED-BYTE 64) objects on the Alpha 
+    platform now returns the right answer.
   * optimization: restored some effective method precomputation in
     CLOS (turned off by an ANSI fix in sbcl-0.8.3); the amount of
     precomputation is now tunable.
@@ -2054,18 +2054,18 @@ changes in sbcl-0.8.4 relative to sbcl-0.8.3:
     MEMBER-types to numeric.
   * bug fix: COMPILE-FILE must bind *READTABLE*. (reported by Doug
     McNaught)
-  * bug fix: (SETF AREF) on byte-sized-element arrays with constant index
-    argument now works properly on the Alpha platform.
+  * bug fix: (SETF AREF) on byte-sized-element arrays with constant 
+    index argument now works properly on the Alpha platform.
   * bug fix: floating point exception treatment on the Alpha platform
     is improved.
-  * bug fix: FILE-POSITION works much better on string input and output
-    streams.  (thanks to Nikodemus Siivola)
+  * bug fix: FILE-POSITION works much better on string input and 
+    output streams.  (thanks to Nikodemus Siivola)
   * bug fix: many threading/garbage collection symptoms sorted.  
-    SB-THREAD:INTERRUPT-THREAD now safe to call on a thread that might
-    be pseudo-atomic  
-  * internal change: Stopping for GC is now done with signals not ptrace.
-    GC is now done in whichever thread wanted it, instead of in the parent.  
-    This permits a
+    SB-THREAD:INTERRUPT-THREAD now safe to call on a thread that 
+    might be pseudo-atomic.
+  * internal change: Stopping for GC is now done with signals not 
+    ptrace. GC is now done in whichever thread wanted it, instead of
+    in the parent. 
   * bug fix: GC hooks (missing since 0.8) reinstated, so finalizers 
     work again.
   * bug fix: result form in DO is not contained in the implicit
@@ -2075,8 +2075,8 @@ changes in sbcl-0.8.4 relative to sbcl-0.8.3:
     renamed (e.g. SB-C::CONTINUATION-TYPE has become SB-C::LVAR-TYPE).
   * added type deriver for ISQRT (thanks to Robert E. Brown).
   * bug fix: better support for loading from the command line when an
-    initialization file sets (READTABLE-CASE *READTABLE*).  (thanks to
-    Adam Warner)
+    initialization file sets (READTABLE-CASE *READTABLE*).  (thanks 
+    to Adam Warner)
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** the RETURN clause in LOOP is now equivalent to DO (RETURN ...).
     ** ROUND and FROUND now give the right answer when given very
@@ -2101,7 +2101,11 @@ changes in sbcl-0.8.4 relative to sbcl-0.8.3:
        an error during type derivation.
     ** bignum multiplication on the Alpha platform now returns the
        right answer.
-  * builds on SuSE AMD64, although still generates a 32-bit binary.
+  * porting: The system now builds on SuSE AMD64, although it still
+    generates a 32-bit binary.
+  * .fasl file incompatibility: The fasl file version number has
+    been incremented (because of the changes to internal compiler
+    data structures referred to above).
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles
