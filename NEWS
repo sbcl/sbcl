@@ -2069,6 +2069,8 @@ changes in sbcl-0.8.4 relative to sbcl-0.8.3:
        with negative last argument.
     ** byte specifiers with zero size and position no longer cause
        an error during type derivation.
+    ** bignum multiplication on the Alpha platform now returns the
+       right answer.
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles

@@ -153,3 +153,6 @@
   (assert (= (funcall f 1) 0))
   (assert (= (funcall f most-positive-fixnum) 0))
   (assert (= (funcall f -1) 0)))
+
+;;; Alpha bignum arithmetic bug:
+(assert (= (* 966082078641 419216044685) 404997107848943140073085))

@@ -627,7 +627,7 @@
   (:generator 6
     (inst mulq x y lo)
     (inst addq lo carry-in lo)
-    (inst sra lo 32 hi)
+    (inst srl lo 32 hi)
     (inst mskll lo 4 lo)))
 
 
@@ -646,7 +646,7 @@
     (inst mulq x y lo)
     (inst addq lo prev lo)
     (inst addq lo carry-in lo)
-    (inst sra lo 32 hi)
+    (inst srl lo 32 hi)
     (inst mskll lo 4 lo)))
 
 (define-vop (bignum-mult)
