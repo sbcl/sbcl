@@ -27,32 +27,47 @@
   (let* ((ty (cond
 	       ((eql type (intern "INTEGER"))
 		`(,type ,(* 8 length)))
-	       ((and (listp type) (eql (car type) (intern "*"))) ; pointer
+	       ((and (consp type) (eql (car type) (intern "*"))) ; pointer
 		`(unsigned ,(* 8 length)))
 	       ((eql type (intern "C-STRING")) ; c-string as array
 		`(base-char 8))
-	       ((and (listp type) (eql (car type) (intern "ARRAY")))
-		(cadr type))))
+	       ((and (consp type) (eql (car type) (intern "ARRAY")))
+		(cadr type))
+	       ((let ((type (sb-alien-internals:unparse-alien-type
+			     (sb-alien-internals:parse-alien-type type nil))))
+		  (cond
+		    ((consp type)
+		     (case (car type)
+		       (signed `(integer ,(cadr type)))
+		       (unsigned type)))
+		    (t (error "foo")))))))
 	 (sap-ref-? (intern (format nil "~ASAP-REF-~A"
 				    (if (member (car ty) '(INTEGER SIGNED))
 					"SIGNED-" "")
 				    (cadr ty))
 			    (find-package "SB-SYS"))))
-    (labels ((template (before after)
-	       `(let* ((addr (+ 8 (logandc1 7 (sb-kernel:get-lisp-obj-address ptr))))
-		       (sap (sb-sys:int-sap (the (unsigned-byte 32) (+ addr ,offset)))))
+    (labels
+	((template (before after)
+	   `(let* ((addr
+		    (the (unsigned-byte ,sb-vm:n-machine-word-bits)
+		      (+ #.(ash 1 sb-vm:n-lowtag-bits)
+			 (logandc1 #.(1- (ash 1 sb-vm:n-lowtag-bits))
+				   (sb-kernel:get-lisp-obj-address ptr)))))
+		   (sap (sb-sys:int-sap
+			 (the (unsigned-byte ,sb-vm:n-machine-word-bits)
+			   (+ addr ,offset)))))
 		 (,before (,sap-ref-? sap index) ,after))))
       `(progn
 	 ;;(declaim (inline ,el (setf ,el)))
 	 (defun ,el (ptr &optional (index 0))
-	   (declare (optimize (speed 3)))
+	   (declare (optimize (speed 3) (safety 0)))
 	   (sb-sys:without-gcing 
 	    ,(if (eql type (intern "C-STRING"))
 		 `(naturalize-bounded-c-string ptr ,offset ,length)
 		 (template 'prog1 nil))))
 	 (defconstant ,(intern (format nil "OFFSET-OF-~A" el)) ,offset)
 	 (defun (setf ,el) (newval ptr &optional (index 0))
-	   (declare (optimize (speed 3)))
+	   (declare (optimize (speed 3) (safety 0)))
 	   (sb-sys:without-gcing 
 	    ,(if (eql type (intern "C-STRING"))
 		 `(set-bounded-c-string ptr ,offset ,length newval)
@@ -68,6 +83,7 @@
       (defun ,(p "ALLOCATE-") () (make-array ,size :initial-element 0
 					     :element-type '(unsigned-byte 8)))
       (defconstant ,(p "SIZE-OF-") ,size)
+      (deftype ,name () '(simple-array (unsigned-byte 8) (,size)))
       (defun ,(p "FREE-" ) (p) (declare (ignore p)))
       (defmacro ,(p "WITH-") (var (&rest field-values) &body body)
 	(labels ((field-name (x)

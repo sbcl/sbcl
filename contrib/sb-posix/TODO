@@ -1,4 +1,4 @@
-1) optional arguments
+1) optional arguments (e.g. OPEN)
 
 3) partial list of section 2 manpages from Debian Linux box: functions
 we may want to consider interfaces for.  Some of the obviously
@@ -8,28 +8,28 @@ in this list does _not_ imply we've definitely decided something needs
 adding.
 
 FD_CLR FD_ISSET FD_SET FD_ZERO accept acct adjtime adjtimex bdflush
-bind break brk cacheflush capget capset chroot clone connect creat
-create_module delete_module execve exit fcntl fdatasync flock fork
-fstat fstatfs fsync ftime ftruncate getcontext getdents getdomainname
+bind break brk cacheflush capget capset chroot clone connect
+create_module delete_module execve exit fcntl flock fork
+fstatfs ftime getcontext getdents getdomainname
 getdtablesize getgroups gethostid gethostname getitimer 
 getpeername getpriority getrlimit getrusage getsockname getsockopt
 gettimeofday gtty idle init_module ioctl ioctl_list ioperm iopl listen
-llseek lock lseek lstat madvise mincore mknod mlock mlockall 
+llseek lock madvise mincore mknod mlock mlockall 
 modify_ldt mount mprotect mpx mremap msgctl msgget msgop msgrcv msgsnd
-munlock munlockall nanosleep nice open pause pipe poll
+munlock munlockall nanosleep nice pause poll
 prctl pread prof profil pselect ptrace pwrite query_module quotactl
-read readlink readv reboot recv recvfrom recvmsg rename rmdir
+read readlink readv reboot recv recvfrom recvmsg
 sbrk sched_get_priority_max sched_get_priority_min sched_getparam
 sched_getscheduler sched_rr_get_interval sched_setparam
 sched_setscheduler sched_yield select semctl semget semop send
 sendfile sendmsg sendto setcontext setdomainname setgroups sethostid
 sethostname setitimer setpgrp setpriority setrlimit setsid setsockopt
 settimeofday sgetmask shmat shmctl shmdt shmget shmop shutdown
- sigaction sigaltstack sigblock siggetmask sigmask signal sigpause
+sigaction sigaltstack sigblock siggetmask sigmask signal sigpause
 sigpending sigprocmask sigreturn sigsetmask sigsuspend sigvec socket
-socketcall socketpair ssetmask stat statfs stime stty swapoff swapon
-symlink sync syscalls sysctl sysfs sysinfo syslog time times truncate
-ulimit umask umount uname ustat utime utimes vfork vhangup wait wait3
+socketcall socketpair ssetmask statfs stime stty swapoff swapon
+syscalls sysctl sysfs sysinfo syslog time times
+ulimit umount uname ustat utime utimes vfork vhangup wait wait3
 wait4 waitpid write writev
 
 4) In the spec but not implemented: 

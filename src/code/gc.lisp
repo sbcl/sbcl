@@ -186,9 +186,6 @@ and submit it as a patch."
 (declaim (type (or index null) *gc-trigger*))
 (defvar *gc-trigger* nil)
 
-;;; When >0, inhibits garbage collection.
-(defvar *gc-inhibit*) ; initialized in cold init
-
 ;;; When T, indicates that a GC should have happened but did not due to 
 ;;; *GC-INHIBIT*. 
 (defvar *need-to-collect-garbage* nil) ; initialized in cold init

@@ -1,4 +1,4 @@
 (defpackage :sb-posix (:use)
-  (:export #:syscall-error))
+  (:export #:syscall-error #:syscall-errno))
 
 (defpackage :sb-posix-internal (:use #:sb-alien #:cl))

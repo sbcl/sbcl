@@ -1,4 +1,5 @@
 a.out
 *.lisp-temp
 foo.c
+test-lab
 test-passed

@@ -434,7 +434,7 @@
 	 (move result value)))))
 
 ;;; helper for alien stuff.
-(defmacro sb!sys::with-pinned-objects ((&rest objects) &body body)
+(defmacro with-pinned-objects ((&rest objects) &body body)
   "Arrange with the garbage collector that the pages occupied by
 OBJECTS will not be moved in memory for the duration of BODY.
 Useful for e.g. foreign calls where another thread may trigger

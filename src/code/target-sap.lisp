@@ -78,7 +78,6 @@
   (sap-ref-32 sap offset))
 
 ;;; Return the 64-bit quadword at OFFSET bytes from SAP.
-#!+alpha
 (defun sap-ref-64 (sap offset)
   (declare (type system-area-pointer sap)
 	   (fixnum offset))
@@ -128,7 +127,6 @@
   (signed-sap-ref-32 sap offset))
 
 ;;; Return the signed 64-bit quadword at OFFSET bytes from SAP.
-#!+alpha
 (defun signed-sap-ref-64 (sap offset)
   (declare (type system-area-pointer sap)
 	   (fixnum offset))
@@ -152,7 +150,6 @@
 	   (type (unsigned-byte 32) new-value))
   (setf (sap-ref-32 sap offset) new-value))
 
-#!+alpha
 (defun %set-sap-ref-64 (sap offset new-value)
   (declare (type system-area-pointer sap)
 	   (fixnum offset)
@@ -177,7 +174,6 @@
 	   (type (signed-byte 32) new-value))
   (setf (signed-sap-ref-32 sap offset) new-value))
 
-#!+alpha
 (defun %set-signed-sap-ref-64 (sap offset new-value)
   (declare (type system-area-pointer sap)
 	   (fixnum offset)

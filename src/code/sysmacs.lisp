@@ -11,12 +11,6 @@
 
 (in-package "SB!IMPL")
 
-;;; FIXME Not the most sensible way to do this: we could just use
-;;; LOCK ADD, given that we don't need the old version.  This will
-;;; do until we get around to writing new VOPs
-;;; FIXME in fact we're not SMP-safe without LOCK anyway, but
-;;; this will do us for UP systems
-
 (defmacro atomic-incf/symbol (symbol-name &optional (delta 1))
   #!-sb-thread
   `(incf ,symbol-name ,delta)
@@ -24,6 +18,10 @@
   `(locally
     (declare (optimize (safety 0) (speed 3)))
     (sb!vm::locked-symbol-global-value-add ',symbol-name ,delta)))
+
+;;; When >0, inhibits garbage collection.
+(declaim (type index *gc-inhibit*))
+(defvar *gc-inhibit*) ; initialized in cold init
 
 (defmacro without-gcing (&rest body)
   #!+sb-doc
