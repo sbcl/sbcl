@@ -524,28 +524,28 @@ boolean handle_control_stack_guard_triggered(os_context_t *context,void *addr)
      * it won't go back to what it was doing ... */
     if(addr>=CONTROL_STACK_GUARD_PAGE && 
        addr<(CONTROL_STACK_GUARD_PAGE+os_vm_page_size)) {
-	void *function;
+	void *fun;
+	void *code;
+	
 	/* we hit the end of the control stack.  disable protection
 	 * temporarily so the error handler has some headroom */
 	protect_control_stack_guard_page(0);
 	
-	function=
-	    &(((struct simple_fun *)
-	       native_pointer(SymbolFunction(CONTROL_STACK_EXHAUSTED_ERROR)))
-	      ->code);
+	fun = native_pointer(SymbolFunction(CONTROL_STACK_EXHAUSTED_ERROR));
+	code = &(((struct simple_fun *) fun)->code);
 
 	/* Build a stack frame showing `interrupted' so that the
 	 * user's backtrace makes (as much) sense (as usual) */
 	build_fake_control_stack_frames(context);
 	/* signal handler will "return" to this error-causing function */
-	*os_context_pc_addr(context) = function;
+	*os_context_pc_addr(context) = code;
 #ifdef LISP_FEATURE_X86
-	/* this much of the calling convention is common to all
-	   non-x86 ports */
 	*os_context_register_addr(context,reg_ECX) = 0; 
 #else
+	/* this much of the calling convention is common to all
+	   non-x86 ports */
 	*os_context_register_addr(context,reg_NARGS) = 0; 
-	*os_context_register_addr(context,reg_LIP) = function;
+	*os_context_register_addr(context,reg_LIP) = code;
 	*os_context_register_addr(context,reg_CFP) = 
 	    current_control_frame_pointer;
 #endif
@@ -562,9 +562,9 @@ boolean handle_control_stack_guard_triggered(os_context_t *context,void *addr)
 	   (INST MOVE CODE-TN FUNCTION) 
 
 	   in compiler/sparc/call.lisp is changed, then this bit can
-	   probably go away. -- CSR, 2002-07-24 */
+	   probably go away.  -- CSR, 2002-07-24 */
 	*os_context_register_addr(context,reg_CODE) = 
-	    function - SIMPLE_FUN_CODE_OFFSET;
+	    fun + FUN_POINTER_LOWTAG;
 #endif
 	return 1;
     }
