@@ -2522,8 +2522,8 @@ changes in sbcl-0.8.12 relative to sbcl-0.8.11:
   * minor incompatible change: the system no longer provides
     optimization hints (conditions which are TYPEP
     SB-EXT:COMPILER-NOTE) for conforming code in default compilation
-    mode; these hints are emitted when higher SPEED optimization is
-    requested, as before.
+    mode; these hints are still emitted when higher SPEED optimization
+    is requested.
   * new contrib module: a sampling profiler (profiling by statistical
     sampling, rather than by instrumenting functions) is available as
     the SB-SPROF contrib.  (thanks to Gerd Moellmann and Juho Snellman)
