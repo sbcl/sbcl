@@ -165,7 +165,18 @@
 
 ) ; EVAL-WHEN
 
-;;; Parse the specification and generate some accessor macros.
+;;; Define a new class of boolean attributes, with the attributes
+;;; having the specified Attribute-Names. Name is the name of the
+;;; class, which is used to generate some macros to manipulate sets of
+;;; the attributes:
+;;;
+;;;    NAME-attributep attributes attribute-name*
+;;;      Return true if one of the named attributes is present, false
+;;;      otherwise. When set with SETF, updates the place Attributes
+;;;      setting or clearing the specified attributes.
+;;;
+;;;    NAME-attributes attribute-name*
+;;;      Return a set of the named attributes.
 ;;;
 ;;; KLUDGE: This is expanded out twice, by cut-and-paste, in a
 ;;;   (DEF!MACRO FOO (..) .. CL:GET-SETF-EXPANSION ..)
@@ -178,19 +189,6 @@
 ;;; do it now, because the system isn't running yet, so it'd be too
 ;;; hard to check that my changes were correct -- WHN 19990806
 (def!macro def-boolean-attribute (name &rest attribute-names)
-  #!+sb-doc
-  "Def-Boolean-Attribute Name Attribute-Name*
-  Define a new class of boolean attributes, with the attributes having the
-  specified Attribute-Names. Name is the name of the class, which is used to
-  generate some macros to manipulate sets of the attributes:
-
-    NAME-attributep attributes attribute-name*
-      Return true if one of the named attributes is present, false otherwise.
-      When set with SETF, updates the place Attributes setting or clearing the
-      specified attributes.
-
-    NAME-attributes attribute-name*
-      Return a set of the named attributes."
 
   (let ((translations-name (symbolicate "*" name "-ATTRIBUTE-TRANSLATIONS*"))
 	(test-name (symbolicate name "-ATTRIBUTEP")))
@@ -246,24 +244,25 @@
 ;;; #+SB-XC-HOST SB!XC:DEFMACRO version is in late-macros.lisp. -- WHN 19990806
 
 ;;; And now for some gratuitous pseudo-abstraction...
+;;;
+;;; ATTRIBUTES-UNION 
+;;;   Return the union of all the sets of boolean attributes which are its
+;;;   arguments.
+;;; ATTRIBUTES-INTERSECTION
+;;;   Return the intersection of all the sets of boolean attributes which
+;;;   are its arguments.
+;;; ATTRIBUTES=
+;;;   True if the attributes present in Attr1 are identical to
+;;;   those in Attr2.
 (defmacro attributes-union (&rest attributes)
-  #!+sb-doc
-  "Returns the union of all the sets of boolean attributes which are its
-  arguments."
   `(the attributes
 	(logior ,@(mapcar #'(lambda (x) `(the attributes ,x)) attributes))))
 (defmacro attributes-intersection (&rest attributes)
-  #!+sb-doc
-  "Returns the intersection of all the sets of boolean attributes which are its
-  arguments."
   `(the attributes
 	(logand ,@(mapcar #'(lambda (x) `(the attributes ,x)) attributes))))
 (declaim (ftype (function (attributes attributes) boolean) attributes=))
 #!-sb-fluid (declaim (inline attributes=))
 (defun attributes= (attr1 attr2)
-  #!+sb-doc
-  "Returns true if the attributes present in Attr1 are identical to those in
-  Attr2."
   (eql attr1 attr2))
 
 ;;;; lambda-list parsing utilities
@@ -581,7 +580,6 @@
 ;;;
 ;;; If supplied, RESULT-FORM is the value to return.
 (defmacro do-blocks ((block-var component &optional ends result) &body body)
-  #!+sb-doc
   (unless (member ends '(nil :head :tail :both))
     (error "losing ENDS value: ~S" ends))
   (let ((n-component (gensym))
@@ -596,10 +594,8 @@
 			(block-next ,block-var)))
 	   ((eq ,block-var ,n-tail) ,result)
 	 ,@body))))
+;;; like Do-Blocks, only iterating over the blocks in reverse order
 (defmacro do-blocks-backwards ((block-var component &optional ends result) &body body)
-  #!+sb-doc
-  "Do-Blocks-Backwards (Block-Var Component [Ends] [Result-Form]) {Declaration}* {Form}*
-  Like Do-Blocks, only iterate over the blocks in reverse order."
   (unless (member ends '(nil :head :tail :both))
     (error "losing ENDS value: ~S" ends))
   (let ((n-component (gensym))
@@ -615,12 +611,11 @@
 	   ((eq ,block-var ,n-head) ,result)
 	 ,@body))))
 
-;;; Could change it not to replicate the code someday perhaps...
+;;; Iterate over the uses of CONTINUATION, binding NODE to each one
+;;; successively.
+;;;
+;;; XXX Could change it not to replicate the code someday perhaps...
 (defmacro do-uses ((node-var continuation &optional result) &body body)
-  #!+sb-doc
-  "Do-Uses (Node-Var Continuation [Result]) {Declaration}* {Form}*
-  Iterate over the uses of Continuation, binding Node to each one
-  successively."
   (once-only ((n-cont continuation))
     `(ecase (continuation-kind ,n-cont)
        (:unused)
@@ -634,6 +629,11 @@
 			   ,result)
 	  ,@body)))))
 
+;;; Iterate over the nodes in Block, binding Node-Var to the each node
+;;; and Cont-Var to the node's Cont. The only keyword option is
+;;; Restart-P, which causes iteration to be restarted when a node is
+;;; deleted out from under us. (If not supplied, this is an error.)
+;;;
 ;;; In the forward case, we terminate on Last-Cont so that we don't
 ;;; have to worry about our termination condition being changed when
 ;;; new code is added during the iteration. In the backward case, we
@@ -643,18 +643,12 @@
 ;;; When RESTART-P is supplied to DO-NODES, we start iterating over
 ;;; again at the beginning of the block when we run into a
 ;;; continuation whose block differs from the one we are trying to
-;;; iterate over, either beacuse the block was split, or because a
+;;; iterate over, either because the block was split, or because a
 ;;; node was deleted out from under us (hence its block is NIL.) If
 ;;; the block start is deleted, we just punt. With RESTART-P, we are
 ;;; also more careful about termination, re-indirecting the BLOCK-LAST
 ;;; each time.
 (defmacro do-nodes ((node-var cont-var block &key restart-p) &body body)
-  #!+sb-doc
-  "Do-Nodes (Node-Var Cont-Var Block {Key Value}*) {Declaration}* {Form}*
-  Iterate over the nodes in Block, binding Node-Var to the each node and
-  Cont-Var to the node's Cont. The only keyword option is Restart-P, which
-  causes iteration to be restarted when a node is deleted out from under us (if
-  not supplied, this is an error.)"
   (let ((n-block (gensym))
 	(n-last-cont (gensym)))
     `(let* ((,n-block ,block)
@@ -680,10 +674,8 @@
 		    `(eq ,node-var (block-last ,n-block))
 		    `(eq ,cont-var ,n-last-cont))
 	   (return nil))))))
+;;; like Do-Nodes, only iterating in reverse order
 (defmacro do-nodes-backwards ((node-var cont-var block) &body body)
-  #!+sb-doc
-  "Do-Nodes-Backwards (Node-Var Cont-Var Block) {Declaration}* {Form}*
-  Like Do-Nodes, only iterates in reverse order."
   (let ((n-block (gensym))
 	(n-start (gensym))
 	(n-last (gensym))
@@ -699,12 +691,11 @@
 	 (when (eq ,n-next ,n-start)
 	   (return nil))))))
 
+;;; Bind the IR1 context variables so that IR1 conversion can be done
+;;; after the main conversion pass has finished.
+;;;
 ;;; The lexical environment is presumably already null...
 (defmacro with-ir1-environment (node &rest forms)
-  #!+sb-doc
-  "With-IR1-Environment Node Form*
-  Bind the IR1 context variables so that IR1 conversion can be done after the
-  main conversion pass has finished."
   (let ((n-node (gensym)))
     `(let* ((,n-node ,node)
 	    (*current-component* (block-component (node-block ,n-node)))
@@ -724,12 +715,11 @@
 		    (warning #'compiler-warning-handler))
        ,@forms)))
 
+;;; Look up NAME in the lexical environment namespace designated by
+;;; SLOT, returning the <value, T>, or <NIL, NIL> if no entry. The
+;;; :TEST keyword may be used to determine the name equality
+;;; predicate.
 (defmacro lexenv-find (name slot &key test)
-  #!+sb-doc
-  "LEXENV-FIND Name Slot {Key Value}*
-  Look up Name in the lexical environment namespace designated by Slot,
-  returning the <value, T>, or <NIL, NIL> if no entry. The :TEST keyword
-  may be used to determine the name equality predicate."
   (once-only ((n-res `(assoc ,name (,(symbolicate "LEXENV-" slot) *lexenv*)
 			     :test ,(or test '#'eq))))
     `(if ,n-res
@@ -772,18 +762,17 @@
 
 ) ; EVAL-WHEN
 
+;;; Return the number of times that EVENT has happened.
 (declaim (ftype (function (symbol) fixnum) event-count))
 (defun event-count (name)
-  #!+sb-doc
-  "Return the number of times that Event has happened."
   (event-info-count (event-info-or-lose name)))
 
+;;; Return the function that is called when Event happens. If this is
+;;; null, there is no action. The function is passed the node to which
+;;; the event happened, or NIL if there is no relevant node. This may
+;;; be set with SETF.
 (declaim (ftype (function (symbol) (or function null)) event-action))
 (defun event-action (name)
-  #!+sb-doc
-  "Return the function that is called when Event happens. If this is null,
-  there is no action. The function is passed the node to which the event
-  happened, or NIL if there is no relevant node. This may be set with SETF."
   (event-info-action (event-info-or-lose name)))
 (declaim (ftype (function (symbol (or function null)) (or function null))
 		%set-event-action))
@@ -792,12 +781,12 @@
 	new-value))
 (defsetf event-action %set-event-action)
 
+;;; Return the non-negative integer which represents the level of
+;;; significance of the event Name. This is used to determine whether
+;;; to print a message when the event happens. This may be set with
+;;; SETF.
 (declaim (ftype (function (symbol) unsigned-byte) event-level))
 (defun event-level (name)
-  #!+sb-doc
-  "Return the non-negative integer which represents the level of significance
-  of the event Name. This is used to determine whether to print a message when
-  the event happens. This may be set with SETF."
   (event-info-level (event-info-or-lose name)))
 (declaim (ftype (function (symbol unsigned-byte) unsigned-byte) %set-event-level))
 (defun %set-event-level (name new-value)
@@ -805,15 +794,12 @@
 	new-value))
 (defsetf event-level %set-event-level)
 
-;;; Make an EVENT-INFO structure and stash it in a variable so we can
-;;; get at it quickly.
+;;; Define a new kind of event. Name is a symbol which names the event
+;;; and Description is a string which describes the event. Level
+;;; (default 0) is the level of significance associated with this
+;;; event; it is used to determine whether to print a Note when the
+;;; event happens.
 (defmacro defevent (name description &optional (level 0))
-  #!+sb-doc
-  "Defevent Name Description
-  Define a new kind of event. Name is a symbol which names the event and
-  Description is a string which describes the event. Level (default 0) is the
-  level of significance associated with this event; it is used to determine
-  whether to print a Note when the event happens."
   (let ((var-name (symbolicate "*" name "-EVENT-INFO*")))
     `(eval-when (:compile-toplevel :load-toplevel :execute)
        (defvar ,var-name
@@ -824,27 +810,22 @@
        (setf (gethash ',name *event-info*) ,var-name)
        ',name)))
 
+;;; the lowest level of event that will print a note when it occurs
 (declaim (type unsigned-byte *event-note-threshold*))
-(defvar *event-note-threshold* 1
-  #!+sb-doc
-  "This variable is a non-negative integer specifying the lowest level of
-  event that will print a note when it occurs.")
+(defvar *event-note-threshold* 1)
 
-;;; Increment the counter and do any action. Mumble about the event if
-;;; policy indicates.
+;;; Note that the event with the specified Name has happened. Node is
+;;; evaluated to determine the node to which the event happened.
 (defmacro event (name &optional node)
-  #!+sb-doc
-  "Event Name Node
-  Note that the event with the specified Name has happened. Node is evaluated
-  to determine the node to which the event happened."
+  ;; Increment the counter and do any action. Mumble about the event if
+  ;; policy indicates.
   `(%event ,(event-info-var (event-info-or-lose name)) ,node))
 
+;;; Print a listing of events and their counts, sorted by the count.
+;;; Events that happened fewer than Min-Count times will not be
+;;; printed. Stream is the stream to write to.
 (declaim (ftype (function (&optional unsigned-byte stream) (values)) event-statistics))
 (defun event-statistics (&optional (min-count 1) (stream *standard-output*))
-  #!+sb-doc
-  "Print a listing of events and their counts, sorted by the count. Events
-  that happened fewer than Min-Count times will not be printed. Stream is the
-  stream to write to."
   (collect ((info))
     (maphash #'(lambda (k v)
 		 (declare (ignore k))
@@ -870,6 +851,9 @@
 
 #!-sb-fluid (declaim (inline find-in position-in map-in))
 
+;;; Find Element in a null-terminated List linked by the accessor
+;;; function Next. Key, Test and Test-Not are the same as for generic
+;;; sequence functions.
 (defun find-in (next
 		element
 		list
@@ -877,10 +861,6 @@
 		(key #'identity)
 		(test #'eql test-p)
 		(test-not nil not-p))
-  #!+sb-doc
-  "Find Element in a null-terminated List linked by the accessor function
-  Next. Key, Test and Test-Not are the same as for generic sequence
-  functions."
   (when (and test-p not-p)
     (error "It's silly to supply both :TEST and :TEST-NOT arguments."))
   (if not-p
@@ -893,6 +873,9 @@
 	(when (funcall test (funcall key current) element)
 	  (return current)))))
 
+;;; Return the position of Element (or NIL if absent) in a
+;;; null-terminated List linked by the accessor function Next. Key,
+;;; Test and Test-Not are the same as for generic sequence functions.
 (defun position-in (next
 		    element
 		    list
@@ -900,10 +883,6 @@
 		    (key #'identity)
 		    (test #'eql test-p)
 		    (test-not nil not-p))
-  #!+sb-doc
-  "Return the position of Element (or NIL if absent) in a null-terminated List
-  linked by the accessor function Next. Key, Test and Test-Not are the same as
-  for generic sequence functions."
   (when (and test-p not-p)
     (error "It's silly to supply both :TEST and :TEST-NOT arguments."))
   (if not-p
@@ -918,10 +897,9 @@
 	(when (funcall test (funcall key current) element)
 	  (return i)))))
 
+;;; Map FUNCTION over the elements in a null-terminated LIST linked by the
+;;; accessor function NEXT, returning an ordinary list of the results.
 (defun map-in (next function list)
-  #!+sb-doc
-  "Map Function over the elements in a null-terminated List linked by the
-  accessor function Next, returning a list of the results."
   (collect ((res))
     (do ((current list (funcall next current)))
 	((null current))
@@ -963,6 +941,9 @@
 	 (values)))))
 ;;; #+SB-XC-HOST SB!XC:DEFMACRO version is in late-macros.lisp. -- WHN 19990806
 
+;;; Push ITEM onto a list linked by the accessor function NEXT that is
+;;; stored in PLACE.
+;;;
 ;;; KLUDGE: This is expanded out twice, by cut-and-paste, in a
 ;;;   (DEF!MACRO FOO (..) .. CL:GET-SETF-EXPANSION ..)
 ;;;   #+SB-XC-HOST
@@ -975,9 +956,6 @@
 ;;; system isn't running yet, so it'd be too hard to check that my changes were
 ;;; correct -- WHN 19990806
 (def!macro push-in (next item place &environment env)
-  #!+sb-doc
-  "Push Item onto a list linked by the accessor function Next that is stored in
-  Place."
   (multiple-value-bind (temps vals stores store access)
       (get-setf-expansion place env)
     (when (cdr stores)

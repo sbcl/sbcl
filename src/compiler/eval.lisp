@@ -34,75 +34,81 @@
 (declaim (type list *interpreted-function-cache*))
 
 ;;; Setting this causes the stack operations to dump a trace.
-;;;
-;;; FIXME: perhaps should be #!+SB-SHOW
+#+!sb-show
 (defvar *eval-stack-trace* nil)
 
-;;; Push value on *eval-stack*, growing the stack if necessary. This returns
-;;; value. We save *eval-stack-top* in a local and increment the global before
-;;; storing value on the stack to prevent a GC timing problem. If we stored
-;;; value on the stack using *eval-stack-top* as an index, and we GC'ed before
-;;; incrementing *eval-stack-top*, then INTERPRETER-GC-HOOK would clear the
+;;; Push value on *EVAL-STACK*, growing the stack if necessary. This
+;;; returns value. We save *EVAL-STACK-TOP* in a local and increment
+;;; the global before storing value on the stack to prevent a GC
+;;; timing problem. If we stored value on the stack using
+;;; *EVAL-STACK-TOP* as an index, and we GC'ed before incrementing
+;;; *EVAL-STACK-TOP*, then INTERPRETER-GC-HOOK would clear the
 ;;; location.
 (defun eval-stack-push (value)
   (let ((len (length (the simple-vector *eval-stack*))))
     (when (= len *eval-stack-top*)
-      (when *eval-stack-trace* (format t "[PUSH: growing stack.]~%"))
+      #+!sb-show (when *eval-stack-trace*
+		   (format t "[PUSH: growing stack.]~%"))
       (let ((new-stack (make-array (ash len 1))))
 	(replace new-stack *eval-stack* :end1 len :end2 len)
 	(setf *eval-stack* new-stack))))
   (let ((top *eval-stack-top*))
-    (when *eval-stack-trace* (format t "pushing ~D.~%" top))
+    #+!sb-show (when *eval-stack-trace* (format t "pushing ~D.~%" top))
     (incf *eval-stack-top*)
     (setf (svref *eval-stack* top) value)))
 
-;;; This returns the last value pushed on *eval-stack* and decrements the top
-;;; pointer. We forego setting elements off the end of the stack to nil for GC
-;;; purposes because there is a *before-gc-hook* to take care of this for us.
-;;; However, because of the GC hook, we must be careful to grab the value
-;;; before decrementing *eval-stack-top* since we could GC between the
-;;; decrement and the reference, and the hook would clear the stack slot.
+;;; Return the last value pushed on *EVAL-STACK* and decrement the top
+;;; pointer. We forego setting elements off the end of the stack to
+;;; nil for GC purposes because there is a *BEFORE-GC-HOOK* to take
+;;; care of this for us. However, because of the GC hook, we must be
+;;; careful to grab the value before decrementing *EVAL-STACK-TOP*
+;;; since we could GC between the decrement and the reference, and the
+;;; hook would clear the stack slot.
 (defun eval-stack-pop ()
   (when (zerop *eval-stack-top*)
     (error "attempt to pop empty eval stack"))
   (let* ((new-top (1- *eval-stack-top*))
 	 (value (svref *eval-stack* new-top)))
-    (when *eval-stack-trace* (format t "popping ~D --> ~S.~%" new-top value))
+    #+!sb-show (when *eval-stack-trace*
+		 (format t "popping ~D --> ~S.~%" new-top value))
     (setf *eval-stack-top* new-top)
     value))
 
-;;; This allocates n locations on the stack, bumping the top pointer and
-;;; growing the stack if necessary. We set new slots to nil in case we GC
-;;; before having set them; we don't want to hold on to potential garbage
-;;; from old stack fluctuations.
+;;; Allocate N locations on the stack, bumping the top pointer and
+;;; growing the stack if necessary. We set new slots to nil in case we
+;;; GC before having set them; we don't want to hold on to potential
+;;; garbage from old stack fluctuations.
 (defun eval-stack-extend (n)
   (let ((len (length (the simple-vector *eval-stack*))))
     (when (> (+ n *eval-stack-top*) len)
-      (when *eval-stack-trace* (format t "[EXTEND: growing stack.]~%"))
+      #+!sb-show (when *eval-stack-trace*
+		   (format t "[EXTEND: growing stack.]~%"))
       (let ((new-stack (make-array (+ n (ash len 1)))))
 	(replace new-stack *eval-stack* :end1 len :end2 len)
 	(setf *eval-stack* new-stack))))
   (let ((new-top (+ *eval-stack-top* n)))
-  (when *eval-stack-trace* (format t "extending to ~D.~%" new-top))
+    #+!sb-show (when *eval-stack-trace*
+		 (format t "extending to ~D.~%" new-top))
     (do ((i *eval-stack-top* (1+ i)))
 	((= i new-top))
       (setf (svref *eval-stack* i) nil))
     (setf *eval-stack-top* new-top)))
 
-;;; The anthesis of EVAL-STACK-EXTEND.
+;;; the antithesis of EVAL-STACK-EXTEND
 (defun eval-stack-shrink (n)
-  (when *eval-stack-trace*
-    (format t "shrinking to ~D.~%" (- *eval-stack-top* n)))
+  #+!sb-show (when *eval-stack-trace*
+	       (format t "shrinking to ~D.~%" (- *eval-stack-top* n)))
   (decf *eval-stack-top* n))
 
 ;;; This is used to shrink the stack back to a previous frame pointer.
-(defun eval-stack-set-top (ptr)
-  (when *eval-stack-trace* (format t "setting top to ~D.~%" ptr))
+(defun eval-stack-reset-top (ptr)
+  #+!sb-show (when *eval-stack-trace*
+	       (format t "setting top to ~D.~%" ptr))
   (setf *eval-stack-top* ptr))
 
-;;; This returns a local variable from the current stack frame. This is used
-;;; for references the compiler represents as a lambda-var leaf. This is a
-;;; macro for SETF purposes.
+;;; Return a local variable from the current stack frame. This is used
+;;; for references the compiler represents as a lambda-var leaf. It is
+;;; a macro as a quick and dirty way of making it SETFable.
 ;;;
 ;;; FIXME: used only in this file, needn't be in runtime
 (defmacro eval-stack-local (fp offset)
@@ -110,12 +116,12 @@
 
 ;;;; interpreted functions
 
-;;; The list of INTERPRETED-FUNCTIONS that have translated definitions.
+;;; the list of INTERPRETED-FUNCTIONS that have translated definitions
 (defvar *interpreted-function-cache* nil)
 (declaim (type list *interpreted-function-cache*))
 
-;;; Return a function that will lazily convert Lambda when called, and will
-;;; cache translations.
+;;; Return a function that will lazily convert LAMBDA when called, and
+;;; will cache translations.
 (defun make-interpreted-function (lambda)
   (let ((res (%make-interpreted-function :lambda lambda
 					 :arglist (second lambda))))
@@ -308,7 +314,7 @@
 			    (compute-closure node ,lambda frame-ptr closure)))
 		       ;; No need to clean up stack slots for GC due to
 		       ;; SB!EXT:*BEFORE-GC-HOOK*.
-		       (eval-stack-set-top frame-ptr)
+		       (eval-stack-reset-top frame-ptr)
 		       (return-from
 			internal-apply-loop
 			(internal-apply ,lambda ,args ,calling-closure
@@ -350,7 +356,8 @@
 ;;; This controls printing visited nodes in INTERNAL-APPLY-LOOP. We use it
 ;;; here, and INTERNAL-INVOKE uses it to print function call looking output
 ;;; to further describe sb!c::combination nodes.
-(defvar *internal-apply-node-trace* nil)
+#!+sb-show (defvar *internal-apply-node-trace* nil)
+#!+sb-show
 (defun maybe-trace-funny-fun (node name &rest args)
   (when *internal-apply-node-trace*
     (format t "(~S ~{ ~S~})  c~S~%"
@@ -378,7 +385,7 @@
 	 (sb!c::%special-bind
 	  (let ((value (eval-stack-pop))
 		(global-var (eval-stack-pop)))
-	    (maybe-trace-funny-fun node ,name global-var value)
+	    #!+sb-show (maybe-trace-funny-fun node ,name global-var value)
 	    (sb!sys:%primitive sb!c:bind
 			       value
 			       (sb!c::global-var-name global-var))))
@@ -386,7 +393,7 @@
 	  ;; Throw away arg telling me which special, and tell the dynamic
 	  ;; binding mechanism to unbind one variable.
 	  (eval-stack-pop)
-	  (maybe-trace-funny-fun node ,name)
+	  #!+sb-show (maybe-trace-funny-fun node ,name)
 	  (sb!sys:%primitive sb!c:unbind))
 	 (sb!c::%catch
 	  (let* ((tag (eval-stack-pop))
@@ -399,7 +406,7 @@
 		 (values
 		  (multiple-value-list
 		   (catch tag
-		     (maybe-trace-funny-fun node ,name tag)
+		     #!+sb-show (maybe-trace-funny-fun node ,name tag)
 		     (multiple-value-setq (block node cont last-cont)
 		       (internal-apply-loop (sb!c::continuation-next cont)
 					    frame-ptr lambda args closure))
@@ -414,7 +421,7 @@
 		  (t
 		   ;; Fix up the interpreter's stack after having thrown here.
 		   ;; We won't need to do this in the final implementation.
-		   (eval-stack-set-top stack-top)
+		   (eval-stack-reset-top stack-top)
 		   ;; Take the values received in the list bound above, and
 		   ;; massage them into the form expected by the continuation
 		   ;; of the non-local-exit info.
@@ -443,7 +450,7 @@
 		 (stack-top *eval-stack-top*))
 	    (unwind-protect
 		(progn
-		  (maybe-trace-funny-fun node ,name)
+		  #!+sb-show (maybe-trace-funny-fun node ,name)
 		  (multiple-value-setq (block node cont last-cont)
 		    (internal-apply-loop (sb!c::continuation-next cont)
 					 frame-ptr lambda args closure))
@@ -459,7 +466,7 @@
 		     ;; Fix up the interpreter's stack after having thrown
 		     ;; here. We won't need to do this in the final
 		     ;; implementation.
-		     (eval-stack-set-top stack-top)
+		     (eval-stack-reset-top stack-top)
 		     ;; Push some bogus values for exit context to keep the
 		     ;; MV-BIND in the UNWIND-PROTECT translation happy.
 		     (eval-stack-push '(nil nil 0))
@@ -476,11 +483,11 @@
 	  ;; Return the current state of evaluation to the previous invocation
 	  ;; of INTERNAL-APPLY-LOOP which happens to be running in the
 	  ;; SB!C::%CATCH branch of this code.
-	  (maybe-trace-funny-fun node ,name)
+	  #!+sb-show (maybe-trace-funny-fun node ,name)
 	  (return-from internal-apply-loop
 		       (values block node cont last-cont)))
 	 (sb!c::%nlx-entry
-	  (maybe-trace-funny-fun node ,name)
+	  #!+sb-show (maybe-trace-funny-fun node ,name)
 	  ;; This just marks a spot in the code for CATCH, UNWIND-PROTECT, and
 	  ;; non-local lexical exits (GO or RETURN-FROM).
 	  ;; Do nothing since sb!c::%catch does it all when it catches a THROW.
@@ -495,7 +502,7 @@
 		 ;; consistency checking. SB!C::%MORE-ARG-CONTEXT always runs
 		 ;; within an XEP, so the lambda has an extra arg.
 		 (more-args (nthcdr fixed-arg-count args)))
-	    (maybe-trace-funny-fun node ,name fixed-arg-count)
+	    #!+sb-show (maybe-trace-funny-fun node ,name fixed-arg-count)
 	    (aver (eq (sb!c::continuation-info cont) :multiple))
 	    (eval-stack-push (list more-args (length more-args)))))
 	 (sb!c::%unknown-values
@@ -506,8 +513,8 @@
 	  ;; have non-locally lexically exited. Return the :fell-through flag
 	  ;; and the current state of evaluation to the previous invocation
 	  ;; of INTERNAL-APPLY-LOOP which happens to be running in the
-	  ;; sb!c::entry branch of INTERNAL-APPLY-LOOP.
-	  (maybe-trace-funny-fun node ,name)
+	  ;; SB!C::ENTRY branch of INTERNAL-APPLY-LOOP.
+	  #!+sb-show (maybe-trace-funny-fun node ,name)
 	  ;; Discard the NLX-INFO arg...
 	  (eval-stack-pop)
 	  (return-from internal-apply-loop
@@ -565,10 +572,6 @@
 	     (t
 	      (aver (typep ,kind 'sb!c::function-info))
 	      (do-combination :full nil ,type))))))
-
-(defun trace-eval (on)
-  (setf *eval-stack-trace* on)
-  (setf *internal-apply-node-trace* on))
 
 ;;;; INTERNAL-EVAL
 
@@ -594,32 +597,34 @@
 ;;; FIXME: maybe used only in this file, if so, needn't be in runtime
 (defmacro value (node info value frame-ptr function)
   `(cond ((sb!c::node-tail-p ,node)
-	  (eval-stack-set-top ,frame-ptr)
+	  (eval-stack-reset-top ,frame-ptr)
 	  (return-from ,function ,value))
 	 ((member ,info '(:multiple :return) :test #'eq)
 	  (eval-stack-push (list ,value)))
 	 (t (aver (eq ,info :single))
 	    (eval-stack-push ,value))))
 
+#!+sb-show
 (defun maybe-trace-nodes (node)
   (when *internal-apply-node-trace*
     (format t "<~A-node> c~S~%"
 	    (type-of node)
 	    (sb!c::cont-num (sb!c::node-cont node)))))
 
-;;; This interprets lambda, a compiler IR1 data structure representing a
-;;; function, applying it to args. Closure is the environment in which to run
-;;; lambda, the variables and such closed over to form lambda. The call occurs
-;;; on the interpreter's stack, so save the current top and extend the stack
-;;; for this lambda's call frame. Then store the args into locals on the
-;;; stack.
+;;; Interpret LAMBDA, a compiler IR1 data structure representing a
+;;; function, applying it to ARGS. CLOSURE is the environment in which
+;;; to run LAMBDA, the variables and such closed over to form LAMBDA.
+;;; The call occurs on the interpreter's stack, so save the current
+;;; top and extend the stack for this lambda's call frame. Then store
+;;; the args into locals on the stack.
 ;;;
-;;; Args is the list of arguments to apply to. If IGNORE-UNUSED is true, then
-;;; values for un-read variables are present in the argument list, and must be
-;;; discarded (always true except in a local call.)  Args may run out of values
-;;; before vars runs out of variables (in the case of an XEP with optionals);
-;;; we just do CAR of nil and store nil. This is not the proper defaulting
-;;; (which is done by explicit code in the XEP.)
+;;; ARGS is the list of arguments to apply to. If IGNORE-UNUSED is
+;;; true, then values for un-read variables are present in the
+;;; argument list, and must be discarded (always true except in a
+;;; local call.) ARGS may run out of values before VARS runs out of
+;;; variables (in the case of an XEP with optionals); we just do CAR
+;;; of NIL and store NIL. This is not the proper defaulting (which is
+;;; done by explicit code in the XEP.)
 (defun internal-apply (lambda args closure &optional (ignore-unused t))
   (let ((frame-ptr *eval-stack-top*))
     (eval-stack-extend (sb!c:lambda-eval-info-frame-size (sb!c::lambda-info lambda)))
@@ -674,41 +679,42 @@
 	(let ((cont (sb!c::node-cont node)))
 	  (etypecase node
 	    (sb!c::ref
-	     (maybe-trace-nodes node)
+	     #!+sb-show (maybe-trace-nodes node)
 	     (let ((info (sb!c::continuation-info cont)))
 	       (unless (eq info :unused)
 		 (value node info (leaf-value node frame-ptr closure)
 			frame-ptr internal-apply-loop))))
 	    (sb!c::combination
-	     (maybe-trace-nodes node)
+	     #!+sb-show (maybe-trace-nodes node)
 	     (combination-node :normal))
 	    (sb!c::cif
-	     (maybe-trace-nodes node)
+	     #!+sb-show (maybe-trace-nodes node)
 	     ;; IF nodes always occur at the end of a block, so pick another.
 	     (set-block (if (eval-stack-pop)
 			    (sb!c::if-consequent node)
 			    (sb!c::if-alternative node))))
 	    (sb!c::bind
-	     (maybe-trace-nodes node)
-	     ;; Ignore bind nodes since INTERNAL-APPLY extends the stack for
-	     ;; all of a lambda's locals, and the sb!c::combination branch
-	     ;; handles LET binds (moving values off stack top into locals).
+	     #!+sb-show (maybe-trace-nodes node)
+	     ;; Ignore bind nodes since INTERNAL-APPLY extends the
+	     ;; stack for all of a lambda's locals, and the
+	     ;; SB!C::COMBINATION branch handles LET binds (moving
+	     ;; values off stack top into locals).
 	     )
 	    (sb!c::cset
-	     (maybe-trace-nodes node)
+	     #!+sb-show (maybe-trace-nodes node)
 	     (let ((info (sb!c::continuation-info cont))
 		   (res (set-leaf-value node frame-ptr closure
 					(eval-stack-pop))))
 	       (unless (eq info :unused)
 		 (value node info res frame-ptr internal-apply-loop))))
 	    (sb!c::entry
-	     (maybe-trace-nodes node)
+	     #!+sb-show (maybe-trace-nodes node)
 	     (let ((info (cdr (assoc node (sb!c:lambda-eval-info-entries
 					   (sb!c::lambda-info lambda))))))
 	       ;; No info means no-op entry for CATCH or UNWIND-PROTECT.
 	       (when info
-		 ;; Store stack top for restoration in local exit situation
-		 ;; in sb!c::exit branch.
+		 ;; Store stack top for restoration in local exit
+		 ;; situation in SB!C::EXIT branch.
 		 (setf (eval-stack-local frame-ptr
 					 (sb!c:entry-node-info-st-top info))
 		       *eval-stack-top*)
@@ -750,7 +756,7 @@
 				(sb!c::block-start
 				 (car (sb!c::block-succ block))))))))))))
 	    (sb!c::exit
-	     (maybe-trace-nodes node)
+	     #!+sb-show (maybe-trace-nodes node)
 	     (let* ((incoming-values (sb!c::exit-value node))
 		    (values (if incoming-values (eval-stack-pop))))
 	       (cond
@@ -759,7 +765,7 @@
 		      (sb!c::node-block (sb!c::exit-entry node))))
 		 ;; Local exit.
 		 ;; Fixup stack top and massage values for destination.
-		 (eval-stack-set-top
+		 (eval-stack-reset-top
 		  (eval-stack-local frame-ptr
 				    (sb!c:entry-node-info-st-top
 				     (cdr (assoc (sb!c::exit-entry node)
@@ -786,12 +792,12 @@
 			(values values (sb!c::nlx-info-target info) nil cont)
 			(values :non-local-go (sb!c::nlx-info-target info)))))))))
 	    (sb!c::creturn
-	     (maybe-trace-nodes node)
+	     #!+sb-show (maybe-trace-nodes node)
 	     (let ((values (eval-stack-pop)))
-	       (eval-stack-set-top frame-ptr)
+	       (eval-stack-reset-top frame-ptr)
 	       (return-from internal-apply-loop (values-list values))))
 	    (sb!c::mv-combination
-	     (maybe-trace-nodes node)
+	     #!+sb-show (maybe-trace-nodes node)
 	     (combination-node :mv-call)))
 	  ;; See function doc below.
 	  (reference-this-var-to-keep-it-alive node)
@@ -1020,20 +1026,20 @@
 (defun internal-invoke (arg-count &optional tailp)
   (let ((args (eval-stack-args arg-count)) ;LET says this init form runs first.
 	(fun (eval-stack-pop)))
-    (when tailp (eval-stack-set-top tailp))
-    (when *internal-apply-node-trace*
-      (format t "(~S~{ ~S~})~%" fun args))
+    (when tailp (eval-stack-reset-top tailp))
+    #!+sb-show (when *internal-apply-node-trace*
+		 (format t "(~S~{ ~S~})~%" fun args))
     (apply fun args)))
 
 ;;; This is almost just like INTERNAL-INVOKE. We call
 ;;; MV-EVAL-STACK-ARGS, and our function is in a list on the stack
 ;;; instead of simply on the stack.
 (defun mv-internal-invoke (arg-count &optional tailp)
-  (let ((args (mv-eval-stack-args arg-count)) ;LET runs this init form first.
+  (let ((args (mv-eval-stack-args arg-count)) ; LET runs this init form first.
 	(fun (car (eval-stack-pop))))
-    (when tailp (eval-stack-set-top tailp))
-    (when *internal-apply-node-trace*
-      (format t "(~S~{ ~S~})~%" fun args))
+    (when tailp (eval-stack-reset-top tailp))
+    #!+sb-show (when *internal-apply-node-trace*
+		 (format t "(~S~{ ~S~})~%" fun args))
     (apply fun args)))
 
 ;;; Return a list of the top arg-count elements on the interpreter's

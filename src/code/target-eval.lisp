@@ -51,16 +51,17 @@
 ;;;; One of the steps in building a nice debuggable macro is changing
 ;;;; its MACRO-FUNCTION to print as e.g.
 ;;;;   #<Interpreted Function "DEFMACRO BAR" {9166351}>
-;;;; instead of some
-;;;; weird internal representation showing the environment argument and stuff.
-;;;; This function is called in order to try to make that happen.
+;;;; instead of some weird internal representation showing the
+;;;; environment argument and stuff. This function is called in order
+;;;; to try to make that happen.
 ;;;;
-;;;; When we're running in the target SBCL, we own the INTERPRETED-FUNCTION
-;;;; definition, and we can do this; that's what the definition below does.
-;;;; When we're a Python cross-compiler running in some arbitrary ANSI Common
-;;;; Lisp, we can't do this (and we don't care that much about making nice
-;;;; debuggable macros anyway). In that environment, a stub no-op version of
-;;;; this function is used.
+;;;; When we're running in the target SBCL, we own the
+;;;; INTERPRETED-FUNCTION definition, and we can do this; that's what
+;;;; the definition below does. When we're a Python cross-compiler
+;;;; running in some arbitrary ANSI Common Lisp, we can't do this (and
+;;;; we don't care that much about making nice debuggable macros
+;;;; anyway). In that environment, a stub no-op version of this
+;;;; function is used.
 (defun try-to-rename-interpreted-function-as-macro (f name lambda-list)
   (aver (sb!eval:interpreted-function-p f))
   (setf (sb!eval:interpreted-function-name f)

@@ -479,7 +479,8 @@ like *STACK-TOP-HINT*"
     :name "SB!EVAL"
     :doc "private: the implementation of the IR1 interpreter"
     :use ("CL" "SB!KERNEL" "SB!INT")
-    :export ("*EVAL-STACK-TRACE*" "*INTERNAL-APPLY-NODE-TRACE*"
+    :export (#!+sb-show "*EVAL-STACK-TRACE*"
+             #!+sb-show "*INTERNAL-APPLY-NODE-TRACE*"
              "FLUSH-INTERPRETED-FUNCTION-CACHE" "INTERNAL-EVAL"
              "INTERPRETED-FUNCTION"
              "INTERPRETED-FUNCTION-ARGLIST"
@@ -489,8 +490,7 @@ like *STACK-TOP-HINT*"
              "INTERPRETED-FUNCTION-P"
              "INTERPRETED-FUNCTION-TYPE"
              "MAKE-INTERPRETED-FUNCTION"
-             "PRINT-INTERPRETED-FUNCTION-OBJECT"
-             "TRACE-EVAL"))
+             "PRINT-INTERPRETED-FUNCTION-OBJECT"))
 
  #s(sb-cold:package-data
     :name "SB!EXT"

@@ -64,8 +64,6 @@
 ;;; the index of the next free element of the interpreter's evaluation stack
 (defvar *eval-stack-top* 0)
 
-(defmacro current-stack-pointer () '*eval-stack-top*)
-
 #!-sb-fluid (declaim (inline eval-stack-ref))
 (defun eval-stack-ref (offset)
   (declare (type stack-pointer offset))
@@ -78,24 +76,24 @@
 
 (defun push-eval-stack (value)
   (let ((len (length (the simple-vector sb!eval::*eval-stack*)))
-	(sp (current-stack-pointer)))
+	(sp *eval-stack-top*))
     (when (= len sp)
       (let ((new-stack (make-array (ash len 1))))
 	(replace new-stack sb!eval::*eval-stack* :end1 len :end2 len)
 	(setf sb!eval::*eval-stack* new-stack)))
-    (setf (current-stack-pointer) (1+ sp))
+    (setf *eval-stack-top* (1+ sp))
     (setf (eval-stack-ref sp) value)))
 
 (defun allocate-eval-stack (amount)
   (let* ((len (length (the simple-vector sb!eval::*eval-stack*)))
-	 (sp (current-stack-pointer))
+	 (sp *eval-stack-top*)
 	 (new-sp (+ sp amount)))
     (declare (type index sp new-sp))
     (when (>= new-sp len)
       (let ((new-stack (make-array (ash new-sp 1))))
 	(replace new-stack sb!eval::*eval-stack* :end1 len :end2 len)
 	(setf sb!eval::*eval-stack* new-stack)))
-    (setf (current-stack-pointer) new-sp)
+    (setf *eval-stack-top* new-sp)
     (let ((stack sb!eval::*eval-stack*))
       (do ((i sp (1+ i))) ; FIXME: DOTIMES? or just :INITIAL-ELEMENT in MAKE-ARRAY?
 	  ((= i new-sp))
@@ -103,9 +101,9 @@
   (values))
 
 (defun pop-eval-stack ()
-  (let* ((new-sp (1- (current-stack-pointer)))
+  (let* ((new-sp (1- *eval-stack-top*))
 	 (value (eval-stack-ref new-sp)))
-    (setf (current-stack-pointer) new-sp)
+    (setf *eval-stack-top* new-sp)
     value))
 
 (defmacro multiple-value-pop-eval-stack ((&rest vars) &body body)
@@ -118,17 +116,17 @@
       (unless (and (consp body) (consp (car body)) (eq (caar body) 'declare))
 	(return))
       (push (pop body) decls))
-    `(let ((,new-sp-var (- (current-stack-pointer) ,num-vars)))
+    `(let ((,new-sp-var (- *eval-stack-top* ,num-vars)))
        (declare (type stack-pointer ,new-sp-var))
        (let ,(mapcar #'(lambda (var)
 			 `(,var (eval-stack-ref
 				 (+ ,new-sp-var ,(incf index)))))
 		     vars)
 	 ,@(nreverse decls)
-	 (setf (current-stack-pointer) ,new-sp-var)
+	 (setf *eval-stack-top* ,new-sp-var)
 	 ,@body))))
 
-(defun stack-copy (dest src count)
+(defun eval-stack-copy (dest src count)
   (declare (type stack-pointer dest src count))
   (let ((stack *eval-stack*))
     (if (< dest src)
@@ -244,7 +242,7 @@
 			     sb!vm:code-trace-table-offset-slot))
   (setf (funcallable-instance-function xep)
 	#'(instance-lambda (&more context count)
-	    (let ((old-sp (current-stack-pointer)))
+	    (let ((old-sp *eval-stack-top*))
 	      (declare (type stack-pointer old-sp))
 	      (dotimes (i count)
 		(push-eval-stack (%more-arg context i)))
@@ -257,7 +255,7 @@
   (let ((res (make-byte-closure xep closure-vars)))
     (setf (funcallable-instance-function res)
 	  #'(instance-lambda (&more context count)
-	      (let ((old-sp (current-stack-pointer)))
+	      (let ((old-sp *eval-stack-top*))
 		(declare (type stack-pointer old-sp))
 		(dotimes (i count)
 		  (push-eval-stack (%more-arg context i)))
@@ -483,7 +481,7 @@
 	   (ignore old-pc)
 	   (type pc pc)
 	   (type stack-pointer fp))
-  (let ((value (eval-stack-ref (1- (current-stack-pointer)))))
+  (let ((value (eval-stack-ref (1- *eval-stack-top*))))
     (push-eval-stack value))
   (byte-interpret component pc fp))
 
@@ -521,13 +519,13 @@
 		     (declare (type index src))
 		     (multiple-value-bind (values-above dst)
 			 (grovel (1- remaining-blocks) (1- src))
-		       (stack-copy dst src block-count)
+		       (eval-stack-copy dst src block-count)
 		       (values (+ values-above block-count)
 			       (+ dst block-count))))))))
     (multiple-value-bind (total-count end-ptr)
-	(grovel (pop-eval-stack) (1- (current-stack-pointer)))
+	(grovel (pop-eval-stack) (1- *eval-stack-top*))
       (setf (eval-stack-ref end-ptr) total-count)
-      (setf (current-stack-pointer) (1+ end-ptr))))
+      (setf *eval-stack-top* (1+ end-ptr))))
   (byte-interpret component pc fp))
 
 (define-xop default-unknown-values (component old-pc pc fp)
@@ -541,7 +539,7 @@
     (declare (type index desired supplied)
 	     (type fixnum delta))
     (cond ((minusp delta)
-	   (incf (current-stack-pointer) delta))
+	   (incf *eval-stack-top* delta))
 	  ((plusp delta)
 	   (dotimes (i delta)
 	     (push-eval-stack nil)))))
@@ -766,7 +764,7 @@
 	   (type pc old-pc pc)
 	   (type stack-pointer fp))
   (with-extended-operand (component pc operand new-pc)
-    (let ((value (eval-stack-ref (1- (current-stack-pointer))))
+    (let ((value (eval-stack-ref (1- *eval-stack-top*)))
 	  (type (code-header-ref component
 				 (+ operand sb!vm:code-constants-offset))))
       (unless (if (functionp type)
@@ -781,7 +779,7 @@
 
     (byte-interpret component new-pc fp)))
 
-;;;; the byte-interpreter
+;;;; the actual byte-interpreter
 
 ;;; The various operations are encoded as follows.
 ;;;
@@ -838,8 +836,8 @@
       (let ((*byte-trace* nil))
 	(format *trace-output*
 		"pc=~D, fp=~D, sp=~D, byte=#b~,'0X, frame:~%    ~S~%"
-		pc fp (current-stack-pointer) byte
-		(subseq sb!eval::*eval-stack* fp (current-stack-pointer))))))
+		pc fp *eval-stack-top* byte
+		(subseq sb!eval::*eval-stack* fp *eval-stack-top*)))))
   (if (zerop (logand byte #x80))
       ;; Some stack operation. No matter what, we need the operand,
       ;; so compute it.
@@ -871,8 +869,8 @@
 		    (if (zerop operand)
 			(let ((operand (pop-eval-stack)))
 			  (declare (type index operand))
-			  (decf (current-stack-pointer) operand))
-			(decf (current-stack-pointer) operand)))))
+			  (decf *eval-stack-top* operand))
+			(decf *eval-stack-top* operand)))))
 	(byte-interpret component new-pc fp))
       (if (zerop (logand byte #x40))
 	  ;; Some kind of call.
@@ -961,7 +959,7 @@
 	   (type (integer 0 #.call-arguments-limit) num-args))
   (invoke-local-entry-point component (component-ref-24 component (1+ pc))
 			    component old-pc
-			    (- (current-stack-pointer) num-args)
+			    (- *eval-stack-top* num-args)
 			    old-fp))
 
 (defun do-tail-local-call (component pc fp num-args)
@@ -972,9 +970,9 @@
 	(old-sp (eval-stack-ref (- fp 2)))
 	(old-pc (eval-stack-ref (- fp 3)))
 	(old-component (eval-stack-ref (- fp 4)))
-	(start-of-args (- (current-stack-pointer) num-args)))
-    (stack-copy old-sp start-of-args num-args)
-    (setf (current-stack-pointer) (+ old-sp num-args))
+	(start-of-args (- *eval-stack-top* num-args)))
+    (eval-stack-copy old-sp start-of-args num-args)
+    (setf *eval-stack-top* (+ old-sp num-args))
     (invoke-local-entry-point component (component-ref-24 component (1+ pc))
 			      old-component old-pc old-sp old-fp)))
 
@@ -999,15 +997,15 @@
 	    (values (component-ref-24 component (1+ target)) (+ target 4))
 	    (values (* byte 2) (1+ target))))
     (declare (type pc entry-pc))
-    (let ((fp (current-stack-pointer)))
+    (let ((fp *eval-stack-top*))
       (allocate-eval-stack stack-frame-size)
       (byte-interpret component entry-pc fp))))
 
 ;;; Call a function with some arguments popped off of the interpreter
-;;; stack, and restore the SP to the specifier value.
+;;; stack, and restore the SP to the specified value.
 (defun byte-apply (function num-args restore-sp)
   (declare (type function function) (type index num-args))
-  (let ((start (- (current-stack-pointer) num-args)))
+  (let ((start (- *eval-stack-top* num-args)))
     (declare (type stack-pointer start))
     (macrolet ((frob ()
 		 `(case num-args
@@ -1021,7 +1019,7 @@
 			   ((< i start))
 			 (declare (fixnum i))
 			 (push (eval-stack-ref i) args))
-		       (setf (current-stack-pointer) restore-sp)
+		       (setf *eval-stack-top* restore-sp)
 		       (apply function args)))))
 	       (call-1 (n)
 		 (collect ((binds)
@@ -1031,7 +1029,7 @@
 		       (binds `(,dum (eval-stack-ref (+ start ,i))))
 		       (args dum)))
 		   `(let ,(binds)
-		      (setf (current-stack-pointer) restore-sp)
+		      (setf *eval-stack-top* restore-sp)
 		      (funcall function ,@(args))))))
       (frob))))
 
@@ -1042,7 +1040,7 @@
 	   (type stack-pointer old-fp)
 	   (type (integer 0 #.call-arguments-limit) num-args)
 	   (type (member t nil) named))
-  (let* ((old-sp (- (current-stack-pointer) num-args 1))
+  (let* ((old-sp (- *eval-stack-top* num-args 1))
 	 (fun-or-fdefn (eval-stack-ref old-sp))
 	 (function (if named
 		       (or (fdefn-function fun-or-fdefn)
@@ -1085,7 +1083,7 @@
 	   (type stack-pointer fp)
 	   (type (integer 0 #.call-arguments-limit) num-args)
 	   (type (member t nil) named))
-  (let* ((start-of-args (- (current-stack-pointer) num-args))
+  (let* ((start-of-args (- *eval-stack-top* num-args))
 	 (fun-or-fdefn (eval-stack-ref (1- start-of-args)))
 	 (function (if named
 		       (or (fdefn-function fun-or-fdefn)
@@ -1103,12 +1101,12 @@
 	     (type function function))
     (typecase function
       (byte-function
-       (stack-copy old-sp start-of-args num-args)
-       (setf (current-stack-pointer) (+ old-sp num-args))
+       (eval-stack-copy old-sp start-of-args num-args)
+       (setf *eval-stack-top* (+ old-sp num-args))
        (invoke-xep old-component old-pc old-sp old-fp num-args function))
       (byte-closure
-       (stack-copy old-sp start-of-args num-args)
-       (setf (current-stack-pointer) (+ old-sp num-args))
+       (eval-stack-copy old-sp start-of-args num-args)
+       (setf *eval-stack-top* (+ old-sp num-args))
        (invoke-xep old-component old-pc old-sp old-fp num-args
 		   (byte-closure-function function)
 		   (byte-closure-data function)))
@@ -1154,7 +1152,7 @@
 	  (*byte-trace* nil)
 	  (*print-level* sb!debug:*debug-print-level*)
 	  (*print-length* sb!debug:*debug-print-length*)
-	  (sp (current-stack-pointer)))
+	  (sp *eval-stack-top*))
       (format *trace-output*
 	      "~&INVOKE-XEP: ocode= ~S[~D]~%  ~
 	       osp= ~D, ofp= ~D, nargs= ~D, SP= ~D:~%  ~
@@ -1184,7 +1182,7 @@
 		 (error "too many arguments")))
 	      (t
 	       (let* ((more-args-supplied (- num-args max))
-		      (sp (current-stack-pointer))
+		      (sp *eval-stack-top*)
 		      (more-args-start (- sp more-args-supplied))
 		      (restp (hairy-byte-function-rest-arg-p xep))
 		      (rest (and restp
@@ -1199,7 +1197,7 @@
 		 (cond
 		  ((not (hairy-byte-function-keywords-p xep))
 		   (aver restp)
-		   (setf (current-stack-pointer) (1+ more-args-start))
+		   (setf *eval-stack-top* (1+ more-args-start))
 		   (setf (eval-stack-ref more-args-start) rest))
 		  (t
 		   (unless (evenp more-args-supplied)
@@ -1210,7 +1208,7 @@
 		   ;; more args currently are. There might be more or
 		   ;; fewer. And also, we need to flatten the parsed
 		   ;; args with the defaults before we scan the
-		   ;; keywords. So we copy all the more args to a
+		   ;; keywords. So we copy all the &MORE args to a
 		   ;; temporary area at the end of the stack.
 		   (let* ((num-more-args
 			   (hairy-byte-function-num-more-args xep))
@@ -1221,7 +1219,7 @@
 		     (declare (type index temp)
 			      (type stack-pointer new-sp temp-sp))
 		     (allocate-eval-stack (- temp-sp sp))
-		     (stack-copy temp more-args-start more-args-supplied)
+		     (eval-stack-copy temp more-args-start more-args-supplied)
 		     (when restp
 		       (setf (eval-stack-ref more-args-start) rest)
 		       (incf more-args-start))
@@ -1264,7 +1262,7 @@
 		       (when (and bogus-key-p (not allow))
 			 (with-debugger-info (old-component ret-pc old-fp)
 			   (error "unknown keyword: ~S" bogus-key))))
-		     (setf (current-stack-pointer) new-sp)))))
+		     (setf *eval-stack-top* new-sp)))))
 	       (hairy-byte-function-more-args-entry-point xep))))))))
     (declare (type pc entry-point))
     (invoke-local-entry-point (byte-function-component xep) entry-point
@@ -1283,17 +1281,17 @@
        (let ((old-sp (eval-stack-ref (- fp 2))))
 	 (case num-results
 	   (0
-	    (setf (current-stack-pointer) old-sp)
+	    (setf *eval-stack-top* old-sp)
 	    (values))
 	   (1
 	    (let ((result (pop-eval-stack)))
-	      (setf (current-stack-pointer) old-sp)
+	      (setf *eval-stack-top* old-sp)
 	      result))
 	   (t
 	    (let ((results nil))
 	      (dotimes (i num-results)
 		(push (pop-eval-stack) results))
-	      (setf (current-stack-pointer) old-sp)
+	      (setf *eval-stack-top* old-sp)
 	      (values-list results))))))
       (t
        ;; ### function end breakpoint?
@@ -1309,16 +1307,17 @@
 	;; wants single value
 	(let ((result (if (zerop num-results)
 			  nil
-			  (eval-stack-ref (- (current-stack-pointer)
+			  (eval-stack-ref (- *eval-stack-top*
 					     num-results)))))
-	  (setf (current-stack-pointer) old-sp)
+	  (setf *eval-stack-top* old-sp)
 	  (push-eval-stack result)
 	  (byte-interpret old-component old-pc old-fp))
 	;; wants multiple values
 	(progn
-	  (stack-copy old-sp (- (current-stack-pointer) num-results)
-		      num-results)
-	  (setf (current-stack-pointer) (+ old-sp num-results))
+	  (eval-stack-copy old-sp
+			   (- *eval-stack-top* num-results)
+			   num-results)
+	  (setf *eval-stack-top* (+ old-sp num-results))
 	  (push-eval-stack num-results)
 	  (byte-interpret old-component (- old-pc) old-fp)))))
 

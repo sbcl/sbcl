@@ -715,48 +715,38 @@
 	    (:copier nil))
   ;; the UT that compilation started at
   (start-time (get-universal-time) :type unsigned-byte)
-  ;; a list of the FILE-INFO structures for this compilation
-  (files nil :type list)
-  ;; the tail of the FILES for the file we are currently reading
-  (current-file nil :type list)
-  ;; the stream that we are using to read the CURRENT-FILE, or NIL if
+  ;; the FILE-INFO structure for this compilation
+  (file-info nil :type (or file-info null))
+  ;; the stream that we are using to read the FILE-INFO, or NIL if
   ;; no stream has been opened yet
   (stream nil :type (or stream null)))
 
-;;; Given a list of pathnames, return a SOURCE-INFO structure.
-(defun make-file-source-info (files)
-  (declare (list files))
-  (let ((file-info
-	 (mapcar (lambda (x)
-		   (make-file-info :name (truename x)
-				   :untruename x
-				   :write-date (file-write-date x)))
-		 files)))
+;;; Given a pathname, return a SOURCE-INFO structure.
+(defun make-file-source-info (file)
+  (let ((file-info (make-file-info :name (truename file)
+				   :untruename file
+				   :write-date (file-write-date file))))
 
-    (make-source-info :files file-info
-		      :current-file file-info)))
+    (make-source-info :file-info file-info)))
 
 ;;; Return a SOURCE-INFO to describe the incremental compilation of
 ;;; FORM. Also used by SB!EVAL:INTERNAL-EVAL.
 (defun make-lisp-source-info (form)
-  (make-source-info
-   :start-time (get-universal-time)
-   :files (list (make-file-info :name :lisp
-				:forms (vector form)
-				:positions '#(0)))))
+  (make-source-info :start-time (get-universal-time)
+		    :file-info (make-file-info :name :lisp
+					       :forms (vector form)
+					       :positions '#(0))))
 
 ;;; Return a SOURCE-INFO which will read from STREAM.
 (defun make-stream-source-info (stream)
-  (let ((files (list (make-file-info :name :stream))))
-    (make-source-info
-     :files files
-     :current-file files
-     :stream stream)))
+  (let ((file-info (make-file-info :name :stream)))
+    (make-source-info :file-info file-info
+		      :stream stream)))
 
-;;; Read a form from STREAM; or for EOF, use the trick popularized by
-;;; Kent Pitman of returning STREAM itself. If an error happens, then
-;;; convert it to standard abort-the-compilation error condition
-;;; (possibly recording some extra location information).
+;;; Return a form read from STREAM; or for EOF, use the trick
+;;; popularized by Kent Pitman of returning STREAM itself. If an error
+;;; happens, then convert it to standard abort-the-compilation error
+;;; condition (possibly recording some extra location information).
 (defun read-for-compile-file (stream position)
   (handler-case (read stream nil stream)
     (reader-error (condition)
@@ -777,24 +767,24 @@
 	    :position position))))
 
 ;;; If STREAM is present, return it, otherwise open a stream to the
-;;; current file. There must be a current file. When we open a new
-;;; file, we also reset *PACKAGE* and policy. This gives the effect of
-;;; rebinding around each file.
+;;; current file. There must be a current file.
 ;;;
-;;; FIXME: Since we now do the standard ANSI thing of only one file
-;;; per compile (unlike the CMU CL extended COMPILE-FILE) this code is
-;;; becoming stale, and the remaining bits of it (and the related code
-;;; in ADVANCE-SOURCE-FILE) can go away.
+;;; FIXME: This is probably an unnecessarily roundabout way to do
+;;; things now that we process a single file in COMPILE-FILE (unlike
+;;; the old CMU CL code, which accepted multiple files). Also, the old
+;;; comment said
+;;;   When we open a new file, we also reset *PACKAGE* and policy.
+;;;   This gives the effect of rebinding around each file.
+;;; which doesn't seem to be true now. Check to make sure that if
+;;; such rebinding is necessary, it's still done somewhere.
 (defun get-source-stream (info)
   (declare (type source-info info))
-  (cond ((source-info-stream info))
-	(t
-	 (let* ((finfo (first (source-info-current-file info)))
-		(name (file-info-name finfo)))
-	   (setq sb!xc:*compile-file-truename* name)
-	   (setq sb!xc:*compile-file-pathname* (file-info-untruename finfo))
-	   (setf (source-info-stream info)
-		 (open name :direction :input))))))
+  (or (source-info-stream info)
+      (let* ((file-info (source-info-file-info info))
+	     (name (file-info-name file-info)))
+	(setf sb!xc:*compile-file-truename* name
+	      sb!xc:*compile-file-pathname* (file-info-untruename file-info)
+	      (source-info-stream info) (open name :direction :input)))))
 
 ;;; Close the stream in INFO if it is open.
 (defun close-source-info (info)
@@ -804,65 +794,33 @@
   (setf (source-info-stream info) nil)
   (values))
 
-;;; Advance INFO to the next source file. If there is no next source
-;;; file, return NIL, otherwise T.
-(defun advance-source-file (info)
-  (declare (type source-info info))
-  (close-source-info info)
-  (let ((prev (pop (source-info-current-file info))))
-    (if (source-info-current-file info)
-	(let ((current (first (source-info-current-file info))))
-	  (setf (file-info-source-root current)
-		(+ (file-info-source-root prev)
-		   (length (file-info-forms prev))))
-	  t)
-	nil)))
-
-;;; Read the sources from the source files and process them.
-(defun process-sources (info)
-  (let* ((file (first (source-info-current-file info)))
+;;; Read the source file.
+(defun process-source (info)
+  (let* ((file-info (source-info-file-info info))
 	 (stream (get-source-stream info)))
     (loop
      (let* ((pos (file-position stream))
 	    (form (read-for-compile-file stream pos)))
        (if (eq form stream) ; i.e., if EOF
 	   (return)
-	   (let* ((forms (file-info-forms file))
+	   (let* ((forms (file-info-forms file-info))
 		  (current-idx (+ (fill-pointer forms)
-				  (file-info-source-root file))))
+				  (file-info-source-root file-info))))
 	     (vector-push-extend form forms)
-	     (vector-push-extend pos (file-info-positions file))
+	     (vector-push-extend pos (file-info-positions file-info))
 	     (clrhash *source-paths*)
 	     (find-source-paths form current-idx)
 	     (process-top-level-form form
 				     `(original-source-start 0
-							     ,current-idx))))))
-    (when (advance-source-file info)
-      (process-sources info))))
-
-;;; Return the FILE-INFO describing the INDEX'th form.
-;;;
-;;; FIXME: This is unnecessarily general cruft now that we only read
-;;; a single file in COMPILE-FILE.
-(defun find-file-info (index info)
-  (declare (type index index) (type source-info info))
-  (dolist (file (source-info-files info))
-    (when (> (+ (length (file-info-forms file))
-		(file-info-source-root file))
-	     index)
-      (return file))))
+							     ,current-idx))))))))
 
 ;;; Return the INDEX'th source form read from INFO and the position
 ;;; where it was read.
-;;;
-;;; FIXME: This is unnecessarily general cruft now that we only read
-;;; a single file in COMPILE-FILE.
 (defun find-source-root (index info)
-  (declare (type source-info info) (type index index))
-  (let* ((file (find-file-info index info))
-	 (idx (- index (file-info-source-root file))))
-    (values (aref (file-info-forms file) idx)
-	    (aref (file-info-positions file) idx))))
+  (declare (type index index) (type source-info info))
+  (let ((file-info (source-info-file-info info)))
+    (values (aref (file-info-forms file-info) index)
+	    (aref (file-info-positions file-info) index))))
 
 ;;;; top-level form processing
 
@@ -1203,7 +1161,7 @@
 
 ;;; Read all forms from INFO and compile them, with output to OBJECT.
 ;;; Return (VALUES NIL WARNINGS-P FAILURE-P).
-(defun sub-compile-file (info &optional d-s-info)
+(defun sub-compile-file (info)
   (declare (type source-info info))
   (let* (;; These are bound in WITH-COMPILATION-UNIT now. -- WHN 20000308
 	 #+nil (*compiler-error-count* 0)
@@ -1239,14 +1197,14 @@
 	 (sb!xc:with-compilation-unit ()
 	   (clear-stuff)
 
-	   (process-sources info)
+	   (process-source info)
 
 	   (finish-block-compilation)
 	   (compile-top-level-lambdas () t)
 	   (let ((object *compile-object*))
 	     (etypecase object
 	       (fasl-output (fasl-dump-source-info info object))
-	       (core-object (fix-core-source-info info object d-s-info))
+	       (core-object (fix-core-source-info info object))
 	       (null)))
 	   nil))
       ;; Some errors are sufficiently bewildering that we just fail
@@ -1258,12 +1216,10 @@
 	       condition)
        (values nil t t)))))
 
-;;; Return a list of pathnames for the named files. All the files must
-;;; exist.
-(defun verify-source-files (stuff)
-  (let* ((stuff (if (listp stuff) stuff (list stuff)))
-	 (default-host (make-pathname
-			:host (pathname-host (pathname (first stuff))))))
+;;; Return a pathname for the named file. The file must exist.
+(defun verify-source-file (pathname-designator)
+  (let* ((pathname (pathname pathname-designator))
+	 (default-host (make-pathname :host (pathname-host pathname))))
     (flet ((try-with-type (path type error-p)
 	     (let ((new (merge-pathnames
 			 path (make-pathname :type type
@@ -1271,16 +1227,11 @@
 	       (if (probe-file new)
 		   new
 		   (and error-p (truename new))))))
-      (unless stuff
-	(error "can't compile with no source files"))
-      (mapcar #'(lambda (x)
-		  (let ((x (pathname x)))
-		    (cond ((typep x 'logical-pathname)
-			   (try-with-type x "LISP" t))
-			  ((probe-file x) x)
-			  ((try-with-type x "lisp"  nil))
-			  ((try-with-type x "lisp"  t)))))
-	      stuff))))
+      (cond ((typep pathname 'logical-pathname)
+	     (try-with-type pathname "LISP" t))
+	    ((probe-file pathname) pathname)
+	    ((try-with-type pathname "lisp"  nil))
+	    ((try-with-type pathname "lisp"  t))))))
 
 (defun elapsed-time-to-string (tsec)
   (multiple-value-bind (tmin sec) (truncate tsec 60)
@@ -1290,11 +1241,12 @@
 ;;; Print some junk at the beginning and end of compilation.
 (defun start-error-output (source-info)
   (declare (type source-info source-info))
-  (dolist (x (source-info-files source-info))
+  (let ((file-info (source-info-file-info source-info)))
     (compiler-mumble "~&; compiling file ~S (written ~A):~%"
-		     (namestring (file-info-name x))
+		     (namestring (file-info-name file-info))
 		     (sb!int:format-universal-time nil
-						   (file-info-write-date x)
+						   (file-info-write-date
+						    file-info)
 						   :style :government
 						   :print-weekday nil
 						   :print-timezone nil)))
@@ -1366,15 +1318,8 @@
 	 (compile-won nil)
 	 (warnings-p nil)
 	 (failure-p t) ; T in case error keeps this from being set later
-	 ;; KLUDGE: The listifying and unlistifying in the stuff
-	 ;; related to VERIFY-SOURCE-FILES below is to interface to
-	 ;; old CMU CL code which accepted and returned lists of
-	 ;; multiple source files. It would be cleaner to redo
-	 ;; VERIFY-SOURCE-FILES as VERIFY-SOURCE-FILE, accepting a
-	 ;; single source file, and do a similar transformation on
-	 ;; MAKE-FILE-SOURCE-INFO too. -- WHN 20000201
-	 (input-pathname (first (verify-source-files (list input-file))))
-	 (source-info (make-file-source-info (list input-pathname)))
+	 (input-pathname (verify-source-file input-file))
+	 (source-info (make-file-source-info input-pathname))
 	 (*compiler-trace-output* nil)) ; might be modified below
 				
     (unwind-protect

@@ -1457,13 +1457,13 @@
 		    (incf n)))
 
 		(let* ((tlf (source-path-tlf-number path))
-		       (file (find-file-info tlf *source-info*)))
+		       (file-info (source-info-file-info *source-info*)))
 		  (make-compiler-error-context
 		   :enclosing-source (short)
 		   :source (full)
 		   :original-source (stringify-form form)
 		   :context src-context
-		   :file-name (file-info-name file)
+		   :file-name (file-info-name file-info)
 		   :file-position
 		   (multiple-value-bind (ignore pos)
 		       (find-source-root tlf *source-info*)

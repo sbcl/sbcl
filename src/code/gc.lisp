@@ -156,13 +156,13 @@ and submit it as a patch."
 (declaim (type index *gc-run-time*))
 
 ;;; a limit to help catch programs which allocate too much memory,
-;;; since a hard heap overflow is so hard to recover from. 
+;;; since a hard heap overflow is so hard to recover from
 (declaim (type (or unsigned-byte null) *soft-heap-limit*))
 (defvar *soft-heap-limit* nil)
 
-;;; Internal trigger. When the dynamic usage increases beyond this
-;;; amount, the system notes that a garbage collection needs to occur by
-;;; setting *NEED-TO-COLLECT-GARBAGE* to T. It starts out as NIL meaning
+;;; When the dynamic usage increases beyond this amount, the system
+;;; notes that a garbage collection needs to occur by setting
+;;; *NEED-TO-COLLECT-GARBAGE* to T. It starts out as NIL meaning
 ;;; nobody has figured out what it should be yet.
 (defvar *gc-trigger* nil)
 
@@ -253,7 +253,7 @@ has finished GC'ing.")
 ;;; is not greater than *GC-TRIGGER*.
 ;;;
 ;;; For GENCGC all generations < GEN will be GC'ed.
-(defun sub-gc (&key  force-p (gen 0))
+(defun sub-gc (&key force-p (gen 0))
   (/show0 "entering SUB-GC")
   (unless *already-maybe-gcing*
     (let* ((*already-maybe-gcing* t)
@@ -376,14 +376,13 @@ has finished GC'ing.")
   object)
 
 ;;; This is the user-advertised garbage collection function.
-
 (defun gc (&key (gen 0) (full nil) &allow-other-keys)
   #!+(and sb-doc gencgc)
   "Initiate a garbage collection. GEN controls the number of generations
   to garbage collect."
   #!+(and sb-doc (not gencgc))
-  "Initiate a garbage collection. GEN may be provided for compatibility, but
-  is ignored."
+  "Initiate a garbage collection. GEN may be provided for compatibility with
+  generational garbage collectors, but is ignored in this implementation."
   (sub-gc :force-p t :gen (if full 6 gen)))
 
 

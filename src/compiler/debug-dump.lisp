@@ -198,7 +198,7 @@
   (values))
 
 ;;; Return a vector and an integer (or null) suitable for use as the
-;;; BLOCKS and TLF-NUMBER in Fun's debug-function. This requires two
+;;; BLOCKS and TLF-NUMBER in FUN's debug-function. This requires two
 ;;; passes to compute:
 ;;; -- Scan all blocks, dumping the header and successors followed
 ;;;    by all the non-elsewhere locations.
@@ -244,59 +244,58 @@
 ;;; we need them or not.
 (defun debug-source-for-info (info)
   (declare (type source-info info))
-  (aver (not (source-info-current-file info)))
-  (mapcar #'(lambda (x)
-	      (let ((res (make-debug-source
-			  :from :file
-			  :created (file-info-write-date x)
-			  :compiled (source-info-start-time info)
-			  :source-root (file-info-source-root x)
-			  :start-positions
-			  (unless (eq *byte-compile* t)
-			    (coerce-to-smallest-eltype
-			     (file-info-positions x)))))
-		    (name (file-info-name x)))
-		(etypecase name
-		  ((member :lisp)
-		   (setf (debug-source-from res) name)
-		   (setf (debug-source-name res)
-			 (coerce (file-info-forms x) 'simple-vector)))
-		  (pathname
-		   (let* ((untruename (file-info-untruename x))
-			  (dir (pathname-directory untruename)))
-		     (setf (debug-source-name res)
-			   (namestring
-			    (if (and dir (eq (first dir) :absolute))
-				untruename
-				name))))))
-		res))
-	  (source-info-files info)))
+  (let* ((file-info (source-info-file-info info))
+	 (res (make-debug-source
+	       :from :file
+	       :created (file-info-write-date file-info)
+	       :compiled (source-info-start-time info)
+	       :source-root (file-info-source-root file-info)
+	       :start-positions
+	       (unless (eq *byte-compile* t)
+		 (coerce-to-smallest-eltype
+		  (file-info-positions file-info)))))
+	 (name (file-info-name file-info)))
+    (etypecase name
+      ((member :lisp)
+       (setf (debug-source-from res) name)
+       (setf (debug-source-name res)
+	     (coerce (file-info-forms file-info) 'simple-vector)))
+      (pathname
+       (let* ((untruename (file-info-untruename file-info))
+	      (dir (pathname-directory untruename)))
+	 (setf (debug-source-name res)
+	       (namestring
+		(if (and dir (eq (first dir) :absolute))
+		    untruename
+		    name))))))
+    (list res)))
+
 
 ;;; Given an arbitrary sequence, coerce it to an unsigned vector if
 ;;; possible. Ordinarily we coerce it to the smallest specialized
 ;;; vector we can. However, we also have a special hack for
 ;;; cross-compiling at bootstrap time, when arbitrarily-specialized
-;;; aren't fully supported: in that case, we coerce it only to a
-;;; vector whose element size is an integer multiple of output byte
+;;; vectors aren't fully supported: in that case, we coerce it only to
+;;; a vector whose element size is an integer multiple of output byte
 ;;; size.
 (defun coerce-to-smallest-eltype (seq)
   (let ((maxoid #-sb-xc-host 0
-		;; An initial value value of 255 prevents us from
+		;; An initial value of 255 prevents us from
 		;; specializing the array to anything smaller than
 		;; (UNSIGNED-BYTE 8), which keeps the cross-compiler's
 		;; portable specialized array output functions happy.
 		#+sb-xc-host 255))
     (flet ((frob (x)
 	     (if (typep x 'unsigned-byte)
-	       (when (>= x maxoid)
-		 (setf maxoid x))
-	       (return-from coerce-to-smallest-eltype
-		 (coerce seq 'simple-vector)))))
+		 (when (>= x maxoid)
+		   (setf maxoid x))
+		 (return-from coerce-to-smallest-eltype
+		   (coerce seq 'simple-vector)))))
       (if (listp seq)
-	(dolist (i seq)
-	  (frob i))
-	(dovector (i seq)
-	  (frob i)))
+	  (dolist (i seq)
+	    (frob i))
+	  (dovector (i seq)
+	    (frob i)))
       (coerce seq `(simple-array (integer 0 ,maxoid) (*))))))
 
 ;;;; variables

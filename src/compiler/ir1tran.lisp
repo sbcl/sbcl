@@ -382,7 +382,7 @@
 
 ;;; This function is called on freshly read forms to record the
 ;;; initial location of each form (and subform.) Form is the form to
-;;; find the paths in, and TLF-Num is the top-level form number of the
+;;; find the paths in, and TLF-NUM is the top-level form number of the
 ;;; truly top-level form.
 ;;;
 ;;; This gets a bit interesting when the source code is circular. This
