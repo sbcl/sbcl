@@ -97,7 +97,11 @@ case `uname` in
     Linux)
 	printf ' :linux' >> $ltf
 	sbcl_os="linux"
-	ln -s Config.$sbcl_arch-linux Config
+       if [ $sbcl_arch = "x86-64" ]; then
+           ln -s Config.x86_64-linux Config                                    
+       else                                                                    
+           ln -s Config.$sbcl_arch-linux Config                                
+       fi 
 	ln -s $sbcl_arch-linux-os.h target-arch-os.h
 	ln -s linux-os.h target-os.h
 	;;
