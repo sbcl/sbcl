@@ -23,10 +23,7 @@
 #include "dynbind.h"
 #include "lispregs.h"
 #include "validate.h"
-
-#ifdef GENCGC
-#include "gencgc.h"
-#endif
+#include "gc-internal.h"
 
 static long
 write_bytes(FILE *file, char *addr, long bytes)
@@ -134,7 +131,7 @@ save(char *filename, lispobj init_function)
 		 (lispobj *)current_dynamic_space,
 		 dynamic_space_free_pointer);
 #else
-#ifdef GENCGC
+#ifdef LISP_FEATURE_GENCGC
     /* Flush the current_region, updating the tables. */
     gc_alloc_update_page_tables(0,&boxed_region);
     gc_alloc_update_page_tables(1,&unboxed_region);

@@ -1,6 +1,9 @@
 /*
  * Generational Conservative Garbage Collector for SBCL x86
+ *
+ * inline functions that gc-common.c needs sight of
  */
+
 
 /*
  * This software is part of the SBCL system. See the README file for
@@ -13,8 +16,8 @@
  * files for more information.
  */
 
-#ifndef _GENCGC_H_
-#define _GENCGC_H_
+#ifndef _GENCGC_INTERNAL_H_
+#define _GENCGC_INTERNAL_H_
 
 void gc_free_heap(void);
 inline int find_page_index(void *);
@@ -67,14 +70,6 @@ struct page {
 };
 
 /* values for the page.allocated field */
-#define FREE_PAGE 0
-#define BOXED_PAGE 1
-#define UNBOXED_PAGE 2
-
-/* values for the *_alloc_* parameters */
-#define ALLOC_BOXED 0
-#define ALLOC_UNBOXED 1
-#define ALLOC_QUICK 1
 
 
 /* the number of pages needed for the dynamic space - rounding up */
@@ -97,13 +92,41 @@ struct alloc_region {
 
 extern struct alloc_region  boxed_region;
 extern struct alloc_region  unboxed_region;
+extern int from_space, new_space;
+extern struct weak_pointer *weak_pointers;
 
 void  gencgc_pickup_dynamic(void);
 
 void sniff_code_object(struct code *code, unsigned displacement);
+void gencgc_apply_code_fixups(struct code *old_code, struct code *new_code);
 
 int  update_x86_dynamic_space_free_pointer(void);
 void  gc_alloc_update_page_tables(int unboxed,
 				  struct alloc_region *alloc_region);
+/*
+ * predicates
+ */
+static inline int 
+space_matches_p(lispobj obj, int space)
+{
+    int page_index=(void*)obj - (void *)DYNAMIC_SPACE_START;
+    return ((page_index >= 0)
+	    && ((page_index = ((unsigned int)page_index)/4096) < NUM_PAGES)
+	    && (page_table[page_index].gen == space));
+}
 
-#endif _GENCGC_H_
+static inline boolean
+from_space_p(lispobj obj)
+{
+    return space_matches_p(obj,from_space);
+}
+
+static inline boolean
+new_space_p(lispobj obj)
+{
+    return space_matches_p(obj,new_space);
+}
+
+
+
+#endif 

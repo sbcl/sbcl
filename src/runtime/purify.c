@@ -26,9 +26,8 @@
 #include "interrupt.h"
 #include "purify.h"
 #include "interr.h"
-#ifdef GENCGC
-#include "gencgc.h"
-#endif
+#include "gc.h"
+#include "gc-internal.h"
 
 #define PRINTNOISE
 
@@ -76,7 +75,9 @@ static int later_count = 0;
 #define CEILING(x,y) (((x) + ((y) - 1)) & (~((y) - 1)))
 #define NWORDS(x,y) (CEILING((x),(y)) / (y))
 
-/* FIXME: (1) Shouldn't this be defined in sbcl.h? */
+/* FIXME: Shouldn't this be defined in sbcl.h?  See also notes in
+ * cheneygc.c */
+
 #ifdef sparc
 #define FUN_RAW_ADDR_OFFSET 0
 #else
@@ -86,9 +87,7 @@ static int later_count = 0;
 static boolean
 forwarding_pointer_p(lispobj obj)
 {
-    lispobj *ptr;
-
-    ptr = (lispobj *)obj;
+    lispobj *ptr = native_pointer(obj);
 
     return ((static_end <= ptr && ptr <= static_free) ||
             (read_only_end <= ptr && ptr <= read_only_free));
@@ -112,7 +111,7 @@ dynamic_pointer_p(lispobj ptr)
 
 #ifdef __i386__
 
-#ifdef GENCGC
+#ifdef LISP_FEATURE_GENCGC
 /*
  * enhanced x86/GENCGC stack scavenging by Douglas Crosher
  *
@@ -463,7 +462,7 @@ ptrans_boxed(lispobj thing, lispobj header, boolean constant)
     bcopy(old, new, nwords * sizeof(lispobj));
 
     /* Deposit forwarding pointer. */
-    result = (lispobj)new | lowtag_of(thing);
+    result = make_lispobj(new, lowtag_of(thing));
     *old = result;
 
     /* Scavenge it. */
@@ -507,7 +506,7 @@ ptrans_instance(lispobj thing, lispobj header, boolean constant)
 	    bcopy(old, new, nwords * sizeof(lispobj));
 
 	    /* Deposit forwarding pointer. */
-	    result = (lispobj)new | lowtag_of(thing);
+	    result = make_lispobj(new, lowtag_of(thing));
 	    *old = result;
 
 	    /* Scavenge it. */
@@ -539,7 +538,7 @@ ptrans_fdefn(lispobj thing, lispobj header)
     bcopy(old, new, nwords * sizeof(lispobj));
 
     /* Deposit forwarding pointer. */
-    result = (lispobj)new | lowtag_of(thing);
+    result = make_lispobj(new, lowtag_of(thing));
     *old = result;
 
     /* Scavenge the function. */
@@ -557,19 +556,19 @@ ptrans_unboxed(lispobj thing, lispobj header)
 {
     int nwords;
     lispobj result, *new, *old;
-
+    
     nwords = 1 + HeaderValue(header);
-
+    
     /* Allocate it */
     old = (lispobj *)native_pointer(thing);
     new = read_only_free;
     read_only_free += CEILING(nwords, 2);
-
+    
     /* Copy it. */
     bcopy(old, new, nwords * sizeof(lispobj));
-
+    
     /* Deposit forwarding pointer. */
-    result = (lispobj)new | lowtag_of(thing);
+    result = make_lispobj(new , lowtag_of(thing));
     *old = result;
 
     return result;
@@ -597,7 +596,7 @@ ptrans_vector(lispobj thing, int bits, int extra,
 
     bcopy(vector, new, nwords * sizeof(lispobj));
 
-    result = (lispobj)new | lowtag_of(thing);
+    result = make_lispobj(new, lowtag_of(thing));
     vector->header = result;
 
     if (boxed)
@@ -635,7 +634,7 @@ apply_code_fixups_during_purify(struct code *old_code, struct code *new_code)
     if ((fixups==0) ||
 	(fixups==UNBOUND_MARKER_WIDETAG) ||
 	!is_lisp_pointer(fixups)) {
-#ifdef GENCGC
+#ifdef LISP_FEATURE_GENCGC
 	/* Check for a possible errors. */
 	sniff_code_object(new_code,displacement);
 #endif
@@ -683,7 +682,7 @@ apply_code_fixups_during_purify(struct code *old_code, struct code *new_code)
     /* No longer need the fixups. */
     new_code->constants[0] = 0;
 
-#ifdef GENCGC
+#ifdef LISP_FEATURE_GENCGC
     /* Check for possible errors. */
     sniff_code_object(new_code,displacement);
 #endif
@@ -705,11 +704,11 @@ ptrans_code(lispobj thing)
 
     bcopy(code, new, nwords * sizeof(lispobj));
 
-#ifdef __i386__
+#ifdef LISP_FEATURE_X86
     apply_code_fixups_during_purify(code,new);
 #endif
 
-    result = (lispobj)new | OTHER_POINTER_LOWTAG;
+    result = make_lispobj(new, OTHER_POINTER_LOWTAG);
 
     /* Stick in a forwarding pointer for the code object. */
     *(lispobj *)code = result;
@@ -783,12 +782,13 @@ ptrans_func(lispobj thing, lispobj header)
 
         function = (struct simple_fun *)native_pointer(thing);
         code =
-	    (native_pointer(thing) -
-	     (HeaderValue(function->header)*sizeof(lispobj))) |
-            OTHER_POINTER_LOWTAG;
-
+	    make_lispobj
+	    ((native_pointer(thing) -
+	      (HeaderValue(function->header))), OTHER_POINTER_LOWTAG);
+	
         /* This will cause the function's header to be replaced with a 
          * forwarding pointer. */
+
         ptrans_code(code);
 
         /* So we can just return that. */
@@ -816,7 +816,7 @@ ptrans_func(lispobj thing, lispobj header)
         bcopy(old, new, nwords * sizeof(lispobj));
 
         /* Deposit forwarding pointer. */
-        result = (lispobj)new | lowtag_of(thing);
+        result = make_lispobj(new, lowtag_of(thing));
         *old = result;
 
         /* Scavenge it. */
@@ -874,7 +874,7 @@ ptrans_list(lispobj thing, boolean constant)
         thing = new->cdr = old->cdr;
 
         /* Set up the forwarding pointer. */
-        *(lispobj *)old = ((lispobj)new) | LIST_POINTER_LOWTAG;
+        *(lispobj *)old = make_lispobj(new, LIST_POINTER_LOWTAG);
 
         /* And count this cell. */
         length++;
@@ -885,7 +885,7 @@ ptrans_list(lispobj thing, boolean constant)
     /* Scavenge the list we just copied. */
     pscav((lispobj *)orig, length * WORDS_PER_CONS, constant);
 
-    return ((lispobj)orig) | LIST_POINTER_LOWTAG;
+    return make_lispobj(orig, LIST_POINTER_LOWTAG);
 }
 
 static lispobj
@@ -1324,7 +1324,7 @@ purify(lispobj static_roots, lispobj read_only_roots)
     fflush(stdout);
 #endif
 
-#ifdef GENCGC
+#ifdef LISP_FEATURE_GENCGC
     gc_assert((lispobj *)CONTROL_STACK_END > ((&read_only_roots)+1));
     setup_i386_stack_scav(((&static_roots)-2), (lispobj *)CONTROL_STACK_END);
 #endif
@@ -1349,7 +1349,7 @@ purify(lispobj static_roots, lispobj read_only_roots)
 	  current_control_stack_pointer - (lispobj *)CONTROL_STACK_START,
 	  0);
 #else
-#ifdef GENCGC
+#ifdef LISP_FEATURE_GENCGC
     pscav_i386_stack();
 #endif
 #endif
@@ -1445,7 +1445,7 @@ purify(lispobj static_roots, lispobj read_only_roots)
 #if !defined(__i386__)
     dynamic_space_free_pointer = current_dynamic_space;
 #else
-#if defined GENCGC
+#if defined LISP_FEATURE_GENCGC
     gc_free_heap();
 #else
 #error unsupported case /* in CMU CL, was "ibmrt using GC" */

@@ -38,9 +38,6 @@
 #include "validate.h"
 size_t os_vm_page_size;
 
-#if defined GENCGC
-#include "gencgc.h"
-#endif
 
 /* KLUDGE: As of kernel 2.2.14 on Red Hat 6.2, there's code in the
  * <sys/ucontext.h> file to define symbolic names for offsets into

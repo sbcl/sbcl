@@ -160,11 +160,6 @@ boolean is_valid_lisp_addr(os_vm_address_t addr)
 
 
 
-#if defined GENCGC
-
-#error "GENCGC is not yet supported (presumably on x86 solaris?)"
-
-#else
 
 static void
 sigsegv_handler(int signal, siginfo_t *info, void* void_context)
@@ -178,8 +173,6 @@ sigsegv_handler(int signal, siginfo_t *info, void* void_context)
 	    interrupt_handle_now(signal, info, context);
     }
 }
-
-#endif
 
 void
 os_install_interrupt_handlers()

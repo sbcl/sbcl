@@ -68,7 +68,7 @@ process_directory(int fd, u32 *ptr, int count)
 
 	switch (id) {
 	case DYNAMIC_CORE_SPACE_ID:
-#ifdef GENCGC	  
+#ifdef LISP_FEATURE_GENCGC	  
 	    if (addr != (os_vm_address_t)DYNAMIC_SPACE_START) {
 	        fprintf(stderr, "in core: 0x%lx; in runtime: 0x%lx \n",
 			(long)addr, (long)DYNAMIC_SPACE_START);
@@ -87,7 +87,7 @@ process_directory(int fd, u32 *ptr, int count)
 /* FIXME: Should the conditional here be reg_ALLOC instead of
  *   defined(__i386__)
  * ? */
-#if defined(__i386__)
+#if defined(LISP_FEATURE_X86)
 	    SetSymbolValue(ALLOCATION_POINTER, (lispobj)free_pointer);
 #else
 	    dynamic_space_free_pointer = free_pointer;

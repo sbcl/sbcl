@@ -21,4 +21,4 @@ OS_SRC = linux-os.c  alpha-linux-os.c os-common.c
 LINKFLAGS+=-rdynamic # -static
 OS_LIBS= -ldl
 
-GC_SRC= gc.c
+GC_SRC= cheneygc.c

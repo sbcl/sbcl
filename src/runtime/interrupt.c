@@ -502,7 +502,8 @@ interrupt_handle_now_handler(int signal, siginfo_t *info, void *void_context)
  * stuff to detect and handle hitting the GC trigger
  */
 
-#ifndef GENCGC /* since GENCGC has its own way to record trigger */
+#ifndef LISP_FEATURE_GENCGC 
+/* since GENCGC has its own way to record trigger */
 static boolean
 gc_trigger_hit(int signal, siginfo_t *info, os_context_t *context)
 {
@@ -522,8 +523,8 @@ boolean handle_control_stack_guard_triggered(os_context_t *context,void *addr)
 {
     /* note the os_context hackery here.  When the signal handler returns, 
      * it won't go back to what it was doing ... */
-    if(addr>=CONTROL_STACK_GUARD_PAGE && 
-       addr<(CONTROL_STACK_GUARD_PAGE+os_vm_page_size)) {
+    if(addr>=(void *)CONTROL_STACK_GUARD_PAGE && 
+       addr<(void *)(CONTROL_STACK_GUARD_PAGE+os_vm_page_size)) {
 	void *fun;
 	void *code;
 	
@@ -531,7 +532,8 @@ boolean handle_control_stack_guard_triggered(os_context_t *context,void *addr)
 	 * temporarily so the error handler has some headroom */
 	protect_control_stack_guard_page(0);
 	
-	fun = native_pointer(SymbolFunction(CONTROL_STACK_EXHAUSTED_ERROR));
+	fun = (void *)
+	    native_pointer((lispobj) SymbolFunction(CONTROL_STACK_EXHAUSTED_ERROR));
 	code = &(((struct simple_fun *) fun)->code);
 
 	/* Build a stack frame showing `interrupted' so that the
@@ -571,7 +573,7 @@ boolean handle_control_stack_guard_triggered(os_context_t *context,void *addr)
     else return 0;
 }
 
-#ifndef __i386__
+#ifndef LISP_FEATURE_X86
 /* This function gets called from the SIGSEGV (for e.g. Linux or
  * OpenBSD) or SIGBUS (for e.g. FreeBSD) handler. Here we check
  * whether the signal was due to treading on the mprotect()ed zone -
@@ -582,11 +584,13 @@ interrupt_maybe_gc(int signal, siginfo_t *info, void *void_context)
     os_context_t *context=(os_context_t *) void_context;
 
     if (!foreign_function_call_active
-#ifndef GENCGC /* since GENCGC has its own way to record trigger */
+#ifndef LISP_FEATURE_GENCGC 
+	/* nb: GENCGC on non-x86?  I really don't think so.  This
+	 * happens every time */
 	&& gc_trigger_hit(signal, info, context)
 #endif
 	) {
-#ifndef GENCGC /* since GENCGC has its own way to record trigger */
+#ifndef LISP_FEATURE_GENCGC 
 	clear_auto_gc_trigger();
 #endif
 

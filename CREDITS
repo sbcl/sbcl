@@ -243,7 +243,7 @@ Also, Christopher Hoover and William Lott wrote compiler/generic/vm-macs.lisp
 to centralize information about machine-dependent macros and constants.
 
 Sean Hallgren is credited with most of the Alpha backend.  Julian
-Dolby created the CMU CL Alpha/linux port. Douglas Crosher added
+Dolby created the CMU CL Alpha/Linux port. Douglas Crosher added
 complex-float support.
 
 The original PPC backend was the work of Gary Byers.  Some bug fixes
@@ -552,9 +552,7 @@ Espen S Johnsen:
 
 Arthur Lemmens:
   He found and fixed a number of SBCL bugs while partially porting
-  SBCL to bootstrap under <some other Common Lisp system -- LispWorks
-  for Windows? -- which could probably be found in the sbcl-devel
-  archives>.
+  SBCL to bootstrap under Lispworks for Windows
 
 Robert MacLachlan:
   He has continued to answer questions about, and contribute fixes to, 

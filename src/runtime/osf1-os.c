@@ -49,9 +49,6 @@
 #include "validate.h"
 size_t os_vm_page_size;
 
-#if defined GENCGC
-#include "gencgc.h"
-#endif
 
 
 void os_init(void)

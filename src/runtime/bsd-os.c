@@ -37,9 +37,6 @@
 #include "validate.h"
 vm_size_t os_vm_page_size;
 
-#if defined GENCGC
-#include "gencgc.h"
-#endif
 
 /* The different BSD variants have diverged in exactly where they
  * store signal context information, but at least they tend to use the
@@ -204,15 +201,7 @@ is_valid_lisp_addr(os_vm_address_t addr)
  * any OS-dependent special low-level handling for signals
  */
 
-#if !defined GENCGC
-
-void
-os_install_interrupt_handlers(void)
-{
-    SHOW("os_install_interrupt_handlers()/bsd-os/!defined(GENCGC)");
-}
-
-#else
+#if defined LISP_FEATURE_GENCGC
 
 /*
  * The GENCGC needs to be hooked into whatever signal is raised for
@@ -246,4 +235,12 @@ os_install_interrupt_handlers(void)
     SHOW("leaving os_install_interrupt_handlers()");
 }
 
-#endif /* !defined GENCGC */
+#else
+/* As of 2002.07.31, this configuration has never been tested */
+void
+os_install_interrupt_handlers(void)
+{
+    SHOW("os_install_interrupt_handlers()/bsd-os/!defined(GENCGC)");
+}
+
+#endif /* defined GENCGC */
