@@ -31,9 +31,9 @@
 #include "genesis/symbol.h"
 
 static void
-write_word(unsigned long word, FILE *file) 
+write_lispobj(lispobj obj, FILE *file) 
 {
-    fwrite(&word, sizeof(unsigned long), 1, file);
+    fwrite(&obj, sizeof(lispobj), 1, file);
 }
 
 static long
@@ -71,9 +71,9 @@ output_space(FILE *file, int id, lispobj *addr, lispobj *end)
     int words, bytes, data;
     static char *names[] = {NULL, "dynamic", "static", "read-only"};
 
-    write_word(id, file);
+    write_lispobj(id, file);
     words = end - addr;
-    write_word(words, file);
+    write_lispobj(words, file);
 
     bytes = words * sizeof(lispobj);
 
@@ -82,9 +82,9 @@ output_space(FILE *file, int id, lispobj *addr, lispobj *end)
 
     data = write_bytes(file, (char *)addr, bytes);
 
-    write_word(data, file);
-    write_word((long)addr / os_vm_page_size, file);
-    write_word((bytes + os_vm_page_size - 1) / os_vm_page_size, file);
+    write_lispobj(data, file);
+    write_lispobj((long)addr / os_vm_page_size, file);
+    write_lispobj((bytes + os_vm_page_size - 1) / os_vm_page_size, file);
 }
 
 boolean
@@ -121,14 +121,14 @@ save(char *filename, lispobj init_function)
     printf("[saving current Lisp image into %s:\n", filename);
     fflush(stdout);
 
-    write_word(CORE_MAGIC, file);
+    write_lispobj(CORE_MAGIC, file);
 
-    write_word(VERSION_CORE_ENTRY_TYPE_CODE, file);
-    write_word(3, file);
-    write_word(SBCL_CORE_VERSION_INTEGER, file);
+    write_lispobj(VERSION_CORE_ENTRY_TYPE_CODE, file);
+    write_lispobj(3, file);
+    write_lispobj(SBCL_CORE_VERSION_INTEGER, file);
 
-    write_word(BUILD_ID_CORE_ENTRY_TYPE_CODE, file);
-    write_word(/* (We're writing the word count of the entry here, and the 2
+    write_lispobj(BUILD_ID_CORE_ENTRY_TYPE_CODE, file);
+    write_lispobj(/* (We're writing the word count of the entry here, and the 2
 	  * term is one word for the leading BUILD_ID_CORE_ENTRY_TYPE_CODE
 	  * word and one word where we store the count itself.) */
 	 2 + strlen(build_id),
@@ -136,11 +136,11 @@ save(char *filename, lispobj init_function)
     {
 	char *p;
 	for (p = build_id; *p; ++p)
-	    write_word(*p, file);
+	    write_lispobj(*p, file);
     }
 
-    write_word(NEW_DIRECTORY_CORE_ENTRY_TYPE_CODE, file);
-    write_word(/* (word count = 3 spaces described by 5 words each, plus the
+    write_lispobj(NEW_DIRECTORY_CORE_ENTRY_TYPE_CODE, file);
+    write_lispobj(/* (word count = 3 spaces described by 5 words each, plus the
 	  * entry type code, plus this count itself) */
 	 (5*3)+2, file);
     output_space(file,
@@ -168,11 +168,11 @@ save(char *filename, lispobj init_function)
 		 (lispobj *)SymbolValue(ALLOCATION_POINTER,0));
 #endif
 
-    write_word(INITIAL_FUN_CORE_ENTRY_TYPE_CODE, file);
-    write_word(3, file);
-    write_word(init_function, file);
+    write_lispobj(INITIAL_FUN_CORE_ENTRY_TYPE_CODE, file);
+    write_lispobj(3, file);
+    write_lispobj(init_function, file);
 
-    write_word(END_CORE_ENTRY_TYPE_CODE, file);
+    write_lispobj(END_CORE_ENTRY_TYPE_CODE, file);
 
     fclose(file);
     printf("done]\n");
