@@ -105,12 +105,12 @@
   (declare (type (unsigned-byte 8) b) (type fasl-output fasl-output))
   (write-byte b (fasl-output-stream fasl-output)))
 
-;;; Dump a 4 byte unsigned integer.
-(defun dump-unsigned-32 (num fasl-output)
-  (declare (type (unsigned-byte 32) num))
+;; Dump a word-sized integer.
+(defun dump-word (num fasl-output)
+  (declare (type sb!vm:word num))
   (declare (type fasl-output fasl-output))
   (let ((stream (fasl-output-stream fasl-output)))
-    (dotimes (i 4)
+    (dotimes (i sb!vm:n-word-bytes)
       (write-byte (ldb (byte 8 (* 8 i)) num) stream))))
 
 ;;; Dump NUM to the fasl stream, represented by N bytes. This works
@@ -151,7 +151,8 @@
 	 #!+sb-show
 	 (when *fop-nop4-count*
 	   (dump-byte ,(get 'fop-nop4 'fop-code) ,file)
-	   (dump-unsigned-32 (mod (incf *fop-nop4-count*) (expt 2 32)) ,file))
+	   (dump-integer-as-n-bytes (mod (incf *fop-nop4-count*) (expt 2 32))
+                                    4 ,file))
 	 (dump-byte ',val ,file))
       (error "compiler bug: ~S is not a legal fasload operator." fs))))
 
@@ -168,7 +169,7 @@
 	    (dump-byte ,n-n ,n-file))
 	   (t
 	    (dump-fop ',word-fop ,n-file)
-	    (dump-unsigned-32 ,n-n ,n-file)))))
+	    (dump-word ,n-n ,n-file)))))
 
 ;;; Push the object at table offset Handle on the fasl stack.
 (defun dump-push (handle fasl-output)
@@ -296,11 +297,11 @@
     ;; Finish the header by outputting fasl file implementation,
     ;; version, and key *FEATURES*.
     (flet ((dump-counted-string (string)
-	     (dump-unsigned-32 (length string) res)
+	     (dump-word (length string) res)
 	     (dotimes (i (length string))
 	       (dump-byte (char-code (aref string i)) res))))
       (dump-counted-string (symbol-name +backend-fasl-file-implementation+))
-      (dump-unsigned-32 +fasl-file-version+ res)      
+      (dump-word +fasl-file-version+ res)      
       (dump-counted-string *features-affecting-fasl-format*))
 
     res))
@@ -315,7 +316,7 @@
   ;; End the group.
   (dump-fop 'fop-verify-empty-stack fasl-output)
   (dump-fop 'fop-verify-table-size fasl-output)
-  (dump-unsigned-32 (fasl-output-table-free fasl-output)
+  (dump-word (fasl-output-table-free fasl-output)
 		    fasl-output)
   (dump-fop 'fop-end-group fasl-output)
 
@@ -427,7 +428,7 @@
 	       (i 0 (1+ i)))
 	      ((eq current value)
 	       (dump-fop 'fop-nthcdr file)
-	       (dump-unsigned-32 i file))
+	       (dump-word i file))
 	    (declare (type index i)))))
 
       (ecase (circularity-type info)
@@ -435,8 +436,8 @@
         (:rplacd     (dump-fop 'fop-rplacd    file))
         (:svset      (dump-fop 'fop-svset     file))
         (:struct-set (dump-fop 'fop-structset file)))
-      (dump-unsigned-32 (gethash (circularity-object info) table) file)
-      (dump-unsigned-32 (circularity-index info) file))))
+      (dump-word (gethash (circularity-object info) table) file)
+      (dump-word (circularity-index info) file))))
 
 ;;; Set up stuff for circularity detection, then dump an object. All
 ;;; shared and circular structure will be exactly preserved within a
@@ -507,12 +508,12 @@
     ((signed-byte 8)
      (dump-fop 'fop-byte-integer file)
      (dump-byte (logand #xFF n) file))
-    ((unsigned-byte 31)
+    ((unsigned-byte #.(1- sb!vm:n-word-bits))
      (dump-fop 'fop-word-integer file)
-     (dump-unsigned-32 n file))
-    ((signed-byte 32)
+     (dump-word n file))
+    ((signed-byte #.sb!vm:n-word-bits)
      (dump-fop 'fop-word-integer file)
-     (dump-integer-as-n-bytes n 4 file))
+     (dump-integer-as-n-bytes n #.sb!vm:n-word-bytes file))
     (t
      (let ((bytes (ceiling (1+ (integer-length n)) 8)))
        (dump-fop* bytes fop-small-integer fop-integer file)
@@ -527,9 +528,7 @@
      (dump-fop 'fop-double-float file)
      (let ((x x))
        (declare (double-float x))
-       ;; FIXME: Why sometimes DUMP-UNSIGNED-32 and sometimes
-       ;; DUMP-INTEGER-AS-N-BYTES .. 4?
-       (dump-unsigned-32 (double-float-low-bits x) file)
+       (dump-integer-as-n-bytes (double-float-low-bits x) 4 file)
        (dump-integer-as-n-bytes (double-float-high-bits x) 4 file)))
     #!+long-float
     (long-float
@@ -548,11 +547,11 @@
      (dump-fop 'fop-complex-double-float file)
      (let ((re (realpart x)))
        (declare (double-float re))
-       (dump-unsigned-32 (double-float-low-bits re) file)
+       (dump-integer-as-n-bytes (double-float-low-bits re) 4 file)
        (dump-integer-as-n-bytes (double-float-high-bits re) 4 file))
      (let ((im (imagpart x)))
        (declare (double-float im))
-       (dump-unsigned-32 (double-float-low-bits im) file)
+       (dump-integer-as-n-bytes (double-float-low-bits im) 4 file)
        (dump-integer-as-n-bytes (double-float-high-bits im) 4 file)))
     #!+long-float
     ((complex long-float)
@@ -789,7 +788,7 @@
     (labels ((dump-unsigned-vector (size bytes)
 	       (unless data-only
 		 (dump-fop 'fop-int-vector file)
-		 (dump-unsigned-32 len file)
+		 (dump-word len file)
 		 (dump-byte size file))
 	       ;; The case which is easy to handle in a portable way is when
 	       ;; the element size is a multiple of the output byte size, and
@@ -820,16 +819,15 @@
 	       ;; target machine.)
 	       (unless data-only
 		 (dump-fop 'fop-signed-int-vector file)
-		 (dump-unsigned-32 len file)
+		 (dump-word len file)
 		 (dump-byte size file))
 	       (dump-raw-bytes vec bytes file)))
       (etypecase vec
 	#-sb-xc-host
 	((simple-array nil (*))
 	 (dump-unsigned-vector 0 0))
-	;; KLUDGE: What exactly does the (ASH .. -3) stuff do? -- WHN 19990902
 	(simple-bit-vector
-	 (dump-unsigned-vector 1 (ash (+ (the index len) 7) -3)))
+	 (dump-unsigned-vector 1 (ceiling len 8)))
 	;; KLUDGE: This isn't the best way of expressing that the host
 	;; may not have specializations for (unsigned-byte 2) and
 	;; (unsigned-byte 4), which means that these types are
@@ -839,10 +837,10 @@
 	;; CSR, 2002-05-07
 	#-sb-xc-host
 	((simple-array (unsigned-byte 2) (*))
-	 (dump-unsigned-vector 2 (ash (+ (the index (ash len 1)) 7) -3)))
+	 (dump-unsigned-vector 2 (ceiling len 8)))
 	#-sb-xc-host
 	((simple-array (unsigned-byte 4) (*))
-	 (dump-unsigned-vector 4 (ash (+ (the index (ash len 2)) 7) -3)))
+	 (dump-unsigned-vector 4 (ceiling len 8)))
 	#-sb-xc-host
 	((simple-array (unsigned-byte 7) (*))
 	 (dump-unsigned-vector 7 len))
@@ -858,16 +856,34 @@
 	 (dump-unsigned-vector 31 (* 4 len)))
 	((simple-array (unsigned-byte 32) (*))
 	 (dump-unsigned-vector 32 (* 4 len)))
+        #-sb-xc-host
+        #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
+        ((simple-array (unsigned-byte-63) (*))
+         (dump-unsigned-vector 63 (* 8 len)))
+        #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
+        ((simple-array (unsigned-byte-64) (*))
+         (dump-unsigned-vector 64 (* 8 len)))
 	((simple-array (signed-byte 8) (*))
 	 (dump-signed-vector 8 len))
 	((simple-array (signed-byte 16) (*))
 	 (dump-signed-vector 16 (* 2 len)))
+        #!+#.(cl:if (cl:= 32 sb!vm:n-word-bits) '(and) '(or))
 	((simple-array (unsigned-byte 29) (*))
 	 (dump-signed-vector 29 (* 4 len)))
+        #!+#.(cl:if (cl:= 32 sb!vm:n-word-bits) '(and) '(or))
 	((simple-array (signed-byte 30) (*))
 	 (dump-signed-vector 30 (* 4 len)))
 	((simple-array (signed-byte 32) (*))
-	 (dump-signed-vector 32 (* 4 len)))))))
+	 (dump-signed-vector 32 (* 4 len)))
+        #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
+        ((simple-array (unsigned-byte 60) (*))
+         (dump-signed-vector 60 (* 8 len)))
+        #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
+        ((simple-array (signed-byte 61) (*))
+         (dump-signed-vector 61 (* 8 len)))
+        #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
+        ((simple-array (signed-byte 64) (*))
+         (dump-signed-vector 64 (* 8 len)))))))
 
 ;;; Dump characters and string-ish things.
 
@@ -935,7 +951,7 @@
 		      fop-symbol-in-byte-package-save
 		      fop-symbol-in-package-save
 		      file)
-	   (dump-unsigned-32 pname-length file)))
+	   (dump-word pname-length file)))
 
     (dump-characters-of-string pname file)
 
@@ -999,7 +1015,7 @@
 	 (aver (null name))
 	 (dump-fop 'fop-code-object-fixup fasl-output)))
       ;; No matter what the flavor, we'll always dump the position
-      (dump-unsigned-32 position fasl-output)))
+      (dump-word position fasl-output)))
   (values))
 
 ;;; Dump out the constant pool and code-vector for component, push the
@@ -1089,8 +1105,8 @@
 	       (dump-integer-as-n-bytes total-length 2 fasl-output))
 	      (t
 	       (dump-fop 'fop-code fasl-output)
-	       (dump-unsigned-32 num-consts fasl-output)
-	       (dump-unsigned-32 total-length fasl-output))))
+	       (dump-word num-consts fasl-output)
+	       (dump-word total-length fasl-output))))
 
       ;; These two dumps are only ones which contribute to our
       ;; TOTAL-LENGTH value.
@@ -1113,7 +1129,7 @@
 
 (defun dump-assembler-routines (code-segment length fixups routines file)
   (dump-fop 'fop-assembler-code file)
-  (dump-unsigned-32 length file)
+  (dump-word length file)
   (write-segment-contents code-segment (fasl-output-stream file))
   (dolist (routine routines)
     (dump-fop 'fop-normal-load file)
@@ -1121,7 +1137,7 @@
       (dump-object (car routine) file))
     (dump-fop 'fop-maybe-cold-load file)
     (dump-fop 'fop-assembler-routine file)
-    (dump-unsigned-32 (label-position (cdr routine)) file))
+    (dump-word (label-position (cdr routine)) file))
   (dump-fixups fixups file)
   (dump-fop 'fop-sanctify-for-execution file)
   (dump-pop file))
@@ -1138,7 +1154,7 @@
     (dump-object (sb!c::entry-info-arguments entry) file)
     (dump-object (sb!c::entry-info-type entry) file)
     (dump-fop 'fop-fun-entry file)
-    (dump-unsigned-32 (label-position (sb!c::entry-info-offset entry)) file)
+    (dump-word (label-position (sb!c::entry-info-offset entry)) file)
     (dump-pop file)))
 
 ;;; Alter the code object referenced by CODE-HANDLE at the specified
@@ -1164,7 +1180,7 @@
 
   (dump-fop 'fop-verify-empty-stack file)
   (dump-fop 'fop-verify-table-size file)
-  (dump-unsigned-32 (fasl-output-table-free file) file)
+  (dump-word (fasl-output-table-free file) file)
 
   #!+sb-dyncount
   (let ((info (sb!c::ir2-component-dyncount-info (component-info component))))
@@ -1235,8 +1251,9 @@
       (dolist (info-handle (fasl-output-debug-info fasl-output))
 	(dump-push res-handle fasl-output)
 	(dump-fop 'fop-structset fasl-output)
-	(dump-unsigned-32 info-handle fasl-output)
-	(dump-unsigned-32 2 fasl-output))))
+	(dump-word info-handle fasl-output)
+        ;; FIXME: what is this bare `2'?  --njf, 2004-08-16
+	(dump-word 2 fasl-output))))
   (setf (fasl-output-debug-info fasl-output) nil)
   (values))
 

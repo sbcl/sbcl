@@ -281,7 +281,7 @@
   ;; the GSPACE that this descriptor is allocated in, or NIL if not set yet.
   (gspace nil :type (or gspace null))
   ;; the offset in words from the start of GSPACE, or NIL if not set yet
-  (word-offset nil :type (or (unsigned-byte #.sb!vm:n-word-bits) null))
+  (word-offset nil :type (or sb!vm:word null))
   ;; the high and low halves of the descriptor
   ;;
   ;; KLUDGE: Judging from the comments in genesis.lisp of the CMU CL
@@ -1904,9 +1904,9 @@
   (aver (member pushp '(nil t)))
   (aver (member stackp '(nil t)))
   `(progn
-    (macrolet ((clone-arg () '(read-arg 4)))
+    (macrolet ((clone-arg () '(read-word-arg)))
       (define-cold-fop (,name :pushp ,pushp :stackp ,stackp) ,@forms))
-    (macrolet ((clone-arg () '(read-arg 1)))
+    (macrolet ((clone-arg () '(read-byte-arg)))
       (define-cold-fop (,small-name :pushp ,pushp :stackp ,stackp) ,@forms))))
 
 ;;; Cause a fop to be undefined in cold load.
@@ -1933,7 +1933,7 @@
 (define-cold-fop (fop-misc-trap) *unbound-marker*)
 
 (define-cold-fop (fop-short-character)
-  (make-character-descriptor (read-arg 1)))
+  (make-character-descriptor (read-byte-arg)))
 
 (define-cold-fop (fop-empty-list) *nil-descriptor*)
 (define-cold-fop (fop-truth) (cold-intern t))
@@ -2031,9 +2031,9 @@
 		  (push-fop-table
 		   (cold-load-symbol (read-arg ,pname-len)
 				     (svref *current-fop-table* index)))))))
-  (frob fop-symbol-in-package-save 4 4)
-  (frob fop-small-symbol-in-package-save 1 4)
-  (frob fop-symbol-in-byte-package-save 4 1)
+  (frob fop-symbol-in-package-save #.sb!vm:n-word-bytes #.sb!vm:n-word-bytes)
+  (frob fop-small-symbol-in-package-save 1 #.sb!vm:n-word-bytes)
+  (frob fop-symbol-in-byte-package-save #.sb!vm:n-word-bytes 1)
   (frob fop-small-symbol-in-byte-package-save 1 1))
 
 (clone-cold-fop (fop-lisp-symbol-save)
@@ -2063,9 +2063,9 @@
      (declare (fixnum index))))
 
 (define-cold-fop (fop-list)
-  (cold-stack-list (read-arg 1) *nil-descriptor*))
+  (cold-stack-list (read-byte-arg) *nil-descriptor*))
 (define-cold-fop (fop-list*)
-  (cold-stack-list (read-arg 1) (pop-stack)))
+  (cold-stack-list (read-byte-arg) (pop-stack)))
 (define-cold-fop (fop-list-1)
   (cold-stack-list 1 *nil-descriptor*))
 (define-cold-fop (fop-list-2)
@@ -2124,8 +2124,8 @@
     result))
 
 (define-cold-fop (fop-int-vector)
-  (let* ((len (read-arg 4))
-	 (sizebits (read-arg 1))
+  (let* ((len (read-word-arg))
+	 (sizebits (read-byte-arg))
 	 (type (case sizebits
 		 (0 sb!vm:simple-array-nil-widetag)
 		 (1 sb!vm:simple-bit-vector-widetag)
@@ -2144,7 +2144,7 @@
                  (63 (prog1 sb!vm:simple-array-unsigned-byte-63-widetag
                        (setf sizebits 64)))
                  #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
-                 (64 (sb!vm:simple-array-unsigned-byte-64-widetag))
+                 (64 sb!vm:simple-array-unsigned-byte-64-widetag)
 		 (t (error "losing element size: ~W" sizebits))))
 	 (result (allocate-vector-object *dynamic* sizebits len type))
 	 (start (+ (descriptor-byte-offset result)
@@ -2159,7 +2159,7 @@
     result))
 
 (define-cold-fop (fop-single-float-vector)
-  (let* ((len (read-arg 4))
+  (let* ((len (read-word-arg))
 	 (result (allocate-vector-object
 		  *dynamic*
 		  sb!vm:n-word-bits
@@ -2167,7 +2167,7 @@
 		  sb!vm:simple-array-single-float-widetag))
 	 (start (+ (descriptor-byte-offset result)
 		   (ash sb!vm:vector-data-offset sb!vm:word-shift)))
-	 (end (+ start (* len sb!vm:n-word-bytes))))
+	 (end (+ start (* len 4))))
     (read-bigvec-as-sequence-or-die (descriptor-bytes result)
 				    *fasl-input-stream*
 				    :start start
@@ -2181,7 +2181,7 @@
 #!+long-float (not-cold-fop fop-complex-long-float-vector)
 
 (define-cold-fop (fop-array)
-  (let* ((rank (read-arg 4))
+  (let* ((rank (read-word-arg))
 	 (data-vector (pop-stack))
 	 (result (allocate-boxed-object *dynamic*
 					(+ sb!vm:array-dimensions-offset rank)
@@ -2252,7 +2252,7 @@
 (defvar *load-time-value-counter*)
 
 (define-cold-fop (fop-funcall)
-  (unless (= (read-arg 1) 0)
+  (unless (= (read-byte-arg) 0)
     (error "You can't FOP-FUNCALL arbitrary stuff in cold load."))
   (let ((counter *load-time-value-counter*))
     (cold-push (cold-cons
@@ -2274,7 +2274,7 @@
 				    sb!vm:simple-vector-widetag)))
 
 (define-cold-fop (fop-funcall-for-effect :pushp nil)
-  (if (= (read-arg 1) 0)
+  (if (= (read-byte-arg) 0)
       (cold-push (pop-stack)
 		 *current-reversed-cold-toplevels*)
       (error "You can't FOP-FUNCALL arbitrary stuff in cold load.")))
@@ -2282,18 +2282,18 @@
 ;;;; cold fops for fixing up circularities
 
 (define-cold-fop (fop-rplaca :pushp nil)
-  (let ((obj (svref *current-fop-table* (read-arg 4)))
-	(idx (read-arg 4)))
+  (let ((obj (svref *current-fop-table* (read-word-arg)))
+	(idx (read-word-arg)))
     (write-memory (cold-nthcdr idx obj) (pop-stack))))
 
 (define-cold-fop (fop-rplacd :pushp nil)
-  (let ((obj (svref *current-fop-table* (read-arg 4)))
-	(idx (read-arg 4)))
+  (let ((obj (svref *current-fop-table* (read-word-arg)))
+	(idx (read-word-arg)))
     (write-wordindexed (cold-nthcdr idx obj) 1 (pop-stack))))
 
 (define-cold-fop (fop-svset :pushp nil)
-  (let ((obj (svref *current-fop-table* (read-arg 4)))
-	(idx (read-arg 4)))
+  (let ((obj (svref *current-fop-table* (read-word-arg)))
+	(idx (read-word-arg)))
     (write-wordindexed obj
 		   (+ idx
 		      (ecase (descriptor-lowtag obj)
@@ -2302,14 +2302,14 @@
 		   (pop-stack))))
 
 (define-cold-fop (fop-structset :pushp nil)
-  (let ((obj (svref *current-fop-table* (read-arg 4)))
-	(idx (read-arg 4)))
+  (let ((obj (svref *current-fop-table* (read-word-arg)))
+	(idx (read-word-arg)))
     (write-wordindexed obj (1+ idx) (pop-stack))))
 
 ;;; In the original CMUCL code, this actually explicitly declared PUSHP
 ;;; to be T, even though that's what it defaults to in DEFINE-COLD-FOP.
 (define-cold-fop (fop-nthcdr)
-  (cold-nthcdr (read-arg 4) (pop-stack)))
+  (cold-nthcdr (read-word-arg) (pop-stack)))
 
 (defun cold-nthcdr (index obj)
   (dotimes (i index)
@@ -2402,9 +2402,9 @@
 		     (bvref-32 (descriptor-bytes des) i)))))
        des)))
 
-(define-cold-code-fop fop-code (read-arg 4) (read-arg 4))
+(define-cold-code-fop fop-code (read-word-arg) (read-word-arg))
 
-(define-cold-code-fop fop-small-code (read-arg 1) (read-arg 2))
+(define-cold-code-fop fop-small-code (read-byte-arg) (read-halfword-arg))
 
 (clone-cold-fop (fop-alter-code :pushp nil)
 		(fop-byte-alter-code)
@@ -2418,7 +2418,7 @@
 	 (arglist (pop-stack))
 	 (name (pop-stack))
 	 (code-object (pop-stack))
-	 (offset (calc-offset code-object (read-arg 4)))
+	 (offset (calc-offset code-object (read-word-arg)))
 	 (fn (descriptor-beyond code-object
 				offset
 				sb!vm:fun-pointer-lowtag))
@@ -2476,16 +2476,16 @@
 (define-cold-fop (fop-foreign-fixup)
   (let* ((kind (pop-stack))
 	 (code-object (pop-stack))
-	 (len (read-arg 1))
+	 (len (read-byte-arg))
 	 (sym (make-string len)))
     (read-string-as-bytes *fasl-input-stream* sym)
-    (let ((offset (read-arg 4))
+    (let ((offset (read-word-arg))
 	  (value (cold-foreign-symbol-address-as-integer sym)))
       (do-cold-fixup code-object offset value kind))
     code-object))
 
 (define-cold-fop (fop-assembler-code)
-  (let* ((length (read-arg 4))
+  (let* ((length (read-word-arg))
 	 (header-n-words
 	  ;; Note: we round the number of constants up to ensure that
 	  ;; the code vector will be properly aligned.
@@ -2518,7 +2518,7 @@
 (define-cold-fop (fop-assembler-routine)
   (let* ((routine (pop-stack))
 	 (des (pop-stack))
-	 (offset (calc-offset des (read-arg 4))))
+	 (offset (calc-offset des (read-word-arg))))
     (record-cold-assembler-routine
      routine
      (+ (logandc2 (descriptor-bits des) sb!vm:lowtag-mask) offset))
@@ -2528,14 +2528,14 @@
   (let* ((routine (pop-stack))
 	 (kind (pop-stack))
 	 (code-object (pop-stack))
-	 (offset (read-arg 4)))
+	 (offset (read-word-arg)))
     (record-cold-assembler-fixup routine code-object offset kind)
     code-object))
 
 (define-cold-fop (fop-code-object-fixup)
   (let* ((kind (pop-stack))
 	 (code-object (pop-stack))
-	 (offset (read-arg 4))
+	 (offset (read-word-arg))
 	 (value (descriptor-bits code-object)))
     (do-cold-fixup code-object offset value kind)
     code-object))

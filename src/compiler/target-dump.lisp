@@ -37,7 +37,7 @@
 	  (sub-dump-object vector file)
 	  (sub-dump-object (subseq vector start end) file)))
     (dump-fop 'fop-array file)
-    (dump-unsigned-32 rank file)
+    (dump-word rank file)
     (eq-save-object array file)))
 
 ;;;; various dump-a-number operations
@@ -45,20 +45,20 @@
 (defun dump-single-float-vector (vec file)
   (let ((length (length vec)))
     (dump-fop 'fop-single-float-vector file)
-    (dump-unsigned-32 length file)
-    (dump-raw-bytes vec (* length sb!vm:n-word-bytes) file)))
+    (dump-word length file)
+    (dump-raw-bytes vec (* length 4) file)))
 
 (defun dump-double-float-vector (vec file)
   (let ((length (length vec)))
     (dump-fop 'fop-double-float-vector file)
-    (dump-unsigned-32 length file)
-    (dump-raw-bytes vec (* length sb!vm:n-word-bytes 2) file)))
+    (dump-word length file)
+    (dump-raw-bytes vec (* length 8) file)))
 
 #!+long-float
 (defun dump-long-float-vector (vec file)
   (let ((length (length vec)))
     (dump-fop 'fop-long-float-vector file)
-    (dump-unsigned-32 length file)
+    (dump-word length file)
     (dump-raw-bytes vec
 		    (* length sb!vm:n-word-bytes #!+x86 3 #!+sparc 4)
 		    file)))
@@ -66,20 +66,20 @@
 (defun dump-complex-single-float-vector (vec file)
   (let ((length (length vec)))
     (dump-fop 'fop-complex-single-float-vector file)
-    (dump-unsigned-32 length file)
-    (dump-raw-bytes vec (* length sb!vm:n-word-bytes 2) file)))
+    (dump-word length file)
+    (dump-raw-bytes vec (* length 8) file)))
 
 (defun dump-complex-double-float-vector (vec file)
   (let ((length (length vec)))
     (dump-fop 'fop-complex-double-float-vector file)
-    (dump-unsigned-32 length file)
-    (dump-raw-bytes vec (* length sb!vm:n-word-bytes 2 2) file)))
+    (dump-word length file)
+    (dump-raw-bytes vec (* length 16) file)))
 
 #!+long-float
 (defun dump-complex-long-float-vector (vec file)
   (let ((length (length vec)))
     (dump-fop 'fop-complex-long-float-vector file)
-    (dump-unsigned-32 length file)
+    (dump-word length file)
     (dump-raw-bytes vec
 		    (* length sb!vm:n-word-bytes #!+x86 3 #!+sparc 4 2)
 		    file)))
@@ -90,8 +90,11 @@
   (let ((exp-bits (long-float-exp-bits float))
 	(high-bits (long-float-high-bits float))
 	(low-bits (long-float-low-bits float)))
-    (dump-unsigned-32 low-bits file)
-    (dump-unsigned-32 high-bits file)
+    ;; We could get away with DUMP-WORD here, since the x86 has 4-byte words,
+    ;; but we prefer to make things as explicit as possible.
+    ;;     --njf, 2004-08-16
+    (dump-integer-as-n-bytes low-bits 4 file)
+    (dump-integer-as-n-bytes high-bits 4 file)
     (dump-integer-as-n-bytes exp-bits 2 file)))
 
 #!+(and long-float sparc)
@@ -101,7 +104,10 @@
 	(high-bits (long-float-high-bits float))
 	(mid-bits (long-float-mid-bits float))
 	(low-bits (long-float-low-bits float)))
-    (dump-unsigned-32 low-bits file)
-    (dump-unsigned-32 mid-bits file)
-    (dump-unsigned-32 high-bits file)
+    ;; We could get away with DUMP-WORD here, since the sparc has 4-byte
+    ;; words, but we prefer to make things as explicit as possible.
+    ;;     --njf, 2004-08-16
+    (dump-integer-as-n-bytes low-bits 4 file)
+    (dump-integer-as-n-bytes mid-bits 4 file)
+    (dump-integer-as-n-bytes high-bits 4 file)
     (dump-integer-as-n-bytes exp-bits 4 file)))

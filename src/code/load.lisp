@@ -51,6 +51,10 @@
 
 #!-sb-fluid (declaim (inline read-byte))
 
+;;; FIXME: why do all of these reading functions and macros declare
+;;; (SPEED 0)?  was there some bug in the compiler which has since
+;;; been fixed?  --njf, 2004-09-08
+
 ;;; This expands into code to read an N-byte unsigned integer using
 ;;; FAST-READ-BYTE.
 (defmacro fast-read-u-integer (n)
@@ -87,7 +91,7 @@
 	 (cnt 1 (1+ cnt)))
 	((>= cnt n) res))))
 
-;;; Read an N-byte unsigned integer from the *FASL-INPUT-STREAM*
+;;; Read an N-byte unsigned integer from the *FASL-INPUT-STREAM*.
 (defmacro read-arg (n)
   (declare (optimize (speed 0)))
   (if (= n 1)
@@ -97,11 +101,19 @@
 	  (fast-read-u-integer ,n)
 	  (done-with-fast-read-byte)))))
 
-;;; FIXME: This deserves a more descriptive name, and should probably
-;;; be implemented as an ordinary function, not a macro.
-;;;
-;;; (for the names: There seem to be only two cases, so it could be
-;;; named READ-U-INTEGER-8 and READ-U-INTEGER-32 or something.)
+(declaim (inline read-byte-arg read-halfword-arg read-word-arg))
+(defun read-byte-arg ()
+  (declare (optimize (speed 0)))
+  (read-arg 1))
+
+(defun read-halfword-arg ()
+  (declare (optimize (speed 0)))
+  (read-arg #.(/ sb!vm:n-word-bytes 2)))
+
+(defun read-word-arg ()
+  (declare (optimize (speed 0)))
+  (read-arg #.sb!vm:n-word-bytes))
+
 
 ;;;; the fop table
 
@@ -293,7 +305,7 @@
 
       ;; Read and validate version-specific compatibility stuff.
       (flet ((string-from-stream ()
-               (let* ((length (read-arg 4))
+               (let* ((length (read-word-arg))
 		      (result (make-string length)))
 		 (read-string-as-bytes stream result)
 		 result)))
@@ -301,7 +313,7 @@
 	(let* ((implementation (keywordicate (string-from-stream)))
 	       ;; FIXME: The logic above to read a keyword from the fasl file
 	       ;; could probably be shared with the read-a-keyword fop.
-	       (version (read-arg 4)))
+	       (version (read-word-arg)))
 	  (flet ((check-version (variant
 				 possible-implementation
 				 needed-version)
