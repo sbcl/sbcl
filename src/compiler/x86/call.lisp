@@ -645,8 +645,9 @@
 		 (inst pop ebp-tn))
 
 		(t
-		 (cerror "Continue any-way"
-			 "VOP return-local doesn't work if old-fp (in slot %s) is not in slot 0"
+		 (cerror "Continue anyway"
+			 "VOP return-local doesn't work if old-fp (in slot ~
+                          ~S) is not in slot 0"
 			 (tn-offset old-fp)))))
 
 	 ((any-reg descriptor-reg)

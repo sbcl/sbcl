@@ -754,13 +754,13 @@
 				(rassoc name (funs)))))
 		(unless name
 		  (error "no move function defined to ~:[save~;load~] SC ~S ~
-			  with ~S ~:[to~;from~] from SC ~S"
+			  ~:[to~;from~] from SC ~S"
 			 load-p sc-name load-p (sc-name alt)))
 		
 		(cond (found
 		       (unless (eq (cdr found) name)
 			 (error "can't tell whether to ~:[save~;load~]~@
-				 or ~S when operand is in SC ~S"
+				 with ~S or ~S when operand is in SC ~S"
 				load-p name (cdr found) (sc-name alt)))
 		       (pushnew alt (car found)))
 		      (t

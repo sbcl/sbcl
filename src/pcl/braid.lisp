@@ -194,7 +194,8 @@
 		   class)
 	      (dolist (slot slots)
 		(unless (eq (getf slot :allocation :instance) :instance)
-		  (error "Slot allocation ~S is not supported in bootstrap.")))
+		  (error "Slot allocation ~S is not supported in bootstrap."
+			 (getf slot :allocation))))
 
 	      (when (typep wrapper 'wrapper)
 		(setf (wrapper-instance-slots-layout wrapper)

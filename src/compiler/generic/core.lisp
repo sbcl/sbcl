@@ -58,7 +58,7 @@
 		    (:foreign
 		     (aver (stringp name))
 		     (or (foreign-symbol-address-as-integer name)
-			 (error "unknown foreign symbol: ~S")))
+			 (error "unknown foreign symbol: ~S" name)))
 		    #!+x86
 		    (:code-object
 		     (aver (null name))

@@ -86,7 +86,7 @@
 		 '(array character list symbol))
 	   raw-result)
 	  (t
-	   (error "can't handle TYPE-OF ~S in cross-compilation")))))
+	   (error "can't handle TYPE-OF ~S in cross-compilation" object)))))
 
 ;;; Is SYMBOL in the CL package? Note that we're testing this on the
 ;;; cross-compilation host, which could do things any old way. In

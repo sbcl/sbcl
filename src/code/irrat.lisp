@@ -83,10 +83,8 @@
 
 ;;; INTEXP -- Handle the rational base, integer power case.
 
-;;; FIXME: As long as the system dies on stack overflow or memory
-;;; exhaustion, it seems reasonable to have this, but its default
-;;; should be NIL, and when it's NIL, anything should be accepted.
-(defparameter *intexp-maximum-exponent* 10000)
+(declaim (type (or integer null) *intexp-maximum-exponent*))
+(defparameter *intexp-maximum-exponent* nil)
 
 ;;; This function precisely calculates base raised to an integral
 ;;; power. It separates the cases by the sign of power, for efficiency
@@ -94,13 +92,10 @@
 ;;; a positive integer. Values of power are calculated as positive
 ;;; integers, and inverted if negative.
 (defun intexp (base power)
-  (when (> (abs power) *intexp-maximum-exponent*)
-    ;; FIXME: should be ordinary error, not CERROR. (Once we set the
-    ;; default for the variable to NIL, the un-continuable error will
-    ;; be less obnoxious.)
-    (cerror "Continue with calculation."
-	    "The absolute value of ~S exceeds ~S."
-	    power '*intexp-maximum-exponent* base power))
+  (when (and *intexp-maximum-exponent*
+	     (> (abs power) *intexp-maximum-exponent*))
+    (error "The absolute value of ~S exceeds ~S."
+	    power '*intexp-maximum-exponent*))
   (cond ((minusp power)
 	 (/ (intexp base (- power))))
 	((eql base 2)

@@ -755,7 +755,7 @@
 	   ;; take up about the same space as corresponding fixnums, there
 	   ;; should be no way that we fall through to this case: any shift
 	   ;; right by a bignum should give zero. But let's check anyway:
-	  (t (error "bignum overflow: can't shift right by ~S")))))
+	  (t (error "bignum overflow: can't shift right by ~S" count)))))
 
 (defun bignum-ashift-right-digits (bignum digits)
   (declare (type bignum-type bignum)

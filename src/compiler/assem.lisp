@@ -768,7 +768,7 @@ p	    ;; the branch has two dependents and one of them dpends on
   (declare (type segment segment)
 	   (type annotation note))
   (when (annotation-posn note)
-    (error "attempt to emit ~S a second time"))
+    (error "attempt to emit ~S a second time" note))
   (setf (annotation-posn note) (segment-current-posn segment))
   (setf (annotation-index note) (segment-current-index segment))
   (let ((last (segment-last-annotation segment))

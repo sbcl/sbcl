@@ -500,7 +500,7 @@
 	((continuation-block cont)
 	 (block-home-lambda-or-null (continuation-block cont)))
 	(t
-	 (bug "confused about home lambda for ~S"))))
+	 (bug "confused about home lambda for ~S" cont))))
 
 ;;; Return the LAMBDA that is CONT's home.
 (declaim (ftype (sfunction (continuation) clambda)

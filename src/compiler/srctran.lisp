@@ -3254,7 +3254,19 @@
 ;;;; or T and the control string is a function (i.e. FORMATTER), then
 ;;;; convert the call to FORMAT to just a FUNCALL of that function.
 
-(defun check-format-args (string args)
+;;; for compile-time argument count checking.
+;;;
+;;; FIXME I: this is currently called from DEFTRANSFORMs, the vast
+;;; majority of which are not going to transform the code, but instead
+;;; are going to GIVE-UP-IR1-TRANSFORM unconditionally.  It would be
+;;; nice to make this explicit, maybe by implementing a new
+;;; "optimizer" (say, DEFOPTIMIZER CONSISTENCY-CHECK).
+;;;
+;;; FIXME II: In some cases, type information could be correlated; for
+;;; instance, ~{ ... ~} requires a list argument, so if the
+;;; continuation-type of a corresponding argument is known and does
+;;; not intersect the list type, a warning could be signalled.
+(defun check-format-args (string args fun)
   (declare (type string string))
   (unless (typep string 'simple-string)
     (setq string (coerce string 'simple-string)))
@@ -3266,9 +3278,9 @@
       (let ((nargs (length args)))
 	(cond
 	  ((< nargs min)
-	   (compiler-warn "Too few arguments (~D) to FORMAT ~S: ~
+	   (compiler-warn "Too few arguments (~D) to ~S ~S: ~
                            requires at least ~D."
-			  nargs string min))
+			  nargs fun string min))
 	  ((> nargs max)
 	   (;; to get warned about probably bogus code at
 	    ;; cross-compile time.
@@ -3276,8 +3288,8 @@
 	    ;; ANSI saith that too many arguments doesn't cause a
 	    ;; run-time error.
 	    #-sb-xc-host compiler-style-warn
-	    "Too many arguments (~D) to FORMAT ~S: uses at most ~D."
-	    nargs string max)))))))
+	    "Too many arguments (~D) to ~S ~S: uses at most ~D."
+	    nargs fun string max)))))))
 
 (deftransform format ((dest control &rest args) (t simple-string &rest t) *
 		      :node node)
@@ -3286,13 +3298,13 @@
     ((policy node (> speed space))
      (unless (constant-continuation-p control)
        (give-up-ir1-transform "The control string is not a constant."))
-     (check-format-args (continuation-value control) args)
+     (check-format-args (continuation-value control) args 'format)
      (let ((arg-names (make-gensym-list (length args))))
        `(lambda (dest control ,@arg-names)
 	 (declare (ignore control))
 	 (format dest (formatter ,(continuation-value control)) ,@arg-names))))
     (t (when (constant-continuation-p control)
-	 (check-format-args (continuation-value control) args))
+	 (check-format-args (continuation-value control) args 'format))
        (give-up-ir1-transform))))
 
 (deftransform format ((stream control &rest args) (stream function &rest t) *
@@ -3309,6 +3321,60 @@
        (declare (ignore tee))
        (funcall control *standard-output* ,@arg-names)
        nil)))
+
+(macrolet
+    ((def (name)
+	 `(deftransform ,name
+	      ((control &rest args) (simple-string &rest t) *)
+	    (when (constant-continuation-p control)
+	      (check-format-args (continuation-value control) args ',name))
+	   (give-up-ir1-transform))))
+  (def error)
+  (def warn)
+  #+sb-xc-host ; Only we should be using these
+  (progn
+    (def style-warn)
+    (def compiler-abort)
+    (def compiler-error)
+    (def compiler-warn)
+    (def compiler-style-warn)
+    (def compiler-notify)
+    (def maybe-compiler-notify)
+    (def bug)))
+
+(deftransform cerror ((report control &rest args)
+		      (simple-string simple-string &rest t) *)
+  (unless (and (constant-continuation-p control)
+	       (constant-continuation-p report))
+    (give-up-ir1-transform))
+  (multiple-value-bind (min1 max1)
+      (handler-case (sb!format:%compiler-walk-format-string
+		     (continuation-value control) args)
+	(sb!format:format-error (c)
+	  (compiler-warn "~A" c)))
+    (when min1
+      (multiple-value-bind (min2 max2)
+	  (handler-case (sb!format:%compiler-walk-format-string
+			 (continuation-value report) args)
+	    (sb!format:format-error (c)
+	      (compiler-warn "~A" c)))
+	(when min2
+	  (let ((nargs (length args)))
+	    (cond
+	      ((< nargs (min min1 min2))
+	       (compiler-warn "Too few arguments (~D) to ~S ~S ~S: ~
+                               requires at least ~D."
+			      nargs 'cerror report control min))
+	      ((> nargs (max max1 max2))
+	       (;; to get warned about probably bogus code at
+		;; cross-compile time.
+		#+sb-xc-host compiler-warn
+	        ;; ANSI saith that too many arguments doesn't cause a
+	        ;; run-time error.
+		#-sb-xc-host compiler-style-warn
+		"Too many arguments (~D) to ~S ~S ~S: uses at most ~D."
+		nargs 'cerror report control max))))))))
+  (give-up-ir1-transform))
 
 (defoptimizer (coerce derive-type) ((value type))
   (cond

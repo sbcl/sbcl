@@ -818,7 +818,8 @@
 	  (when cset
 	    (cerror
 	     "Unintern the conflicting symbols in the ~2*~A package."
-	     "Use'ing package ~A results in name conflicts for these symbols:~%~S"
+	     "Using package ~A results in name conflicts for these symbols:~%~
+              ~S"
 	     (package-%name pkg) cset (package-%name package))
 	    (dolist (s cset) (moby-unintern s package))))
 
