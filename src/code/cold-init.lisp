@@ -260,11 +260,8 @@
   ;; The show is on.
   (terpri)
   (/show0 "going into toplevel loop")
-  (let ((wot (catch '%end-of-the-world
-	       (/show0 "inside CATCH '%END-OF-THE-WORLD")
-	       (toplevel))))
-    (flush-standard-output-streams)
-    (sb!unix:unix-exit wot)))
+  (handling-end-of-the-world 
+    (toplevel)))
 
 (defun quit (&key recklessly-p
 		  (unix-code 0 unix-code-p)

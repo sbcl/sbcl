@@ -742,10 +742,4 @@ Error in function C::GET-LAMBDA-TO-COMPILE:
   unrelated infinite-regress-errors problems, many related to 
   revised signal handling, which were fixed around the same time.
 
-* Even when FINISH-OUTPUT is called, the system doesn't in general
-  flush the last line of output unless it's terminated by a newline.
-  (This is particularly annoying because several Lisp functions like
-  PRINT *precede* their output with a newline, instead of following
-  it with a newline.)
-
 * (SUBTYPEP '(AND ZILCH INTEGER) 'ZILCH) => NIL, NIL

@@ -59,6 +59,21 @@
 (defvar *maximum-error-depth*)
 (defvar *current-error-depth*)
 
+;;;; miscellaneous utilities for working with with TOPLEVEL
+
+;;; Execute BODY in a context where any %END-OF-THE-WORLD (thrown e.g.
+;;; by QUIT) is caught and any final processing and return codes are
+;;; handled appropriately.
+(defmacro handling-end-of-the-world (&body body)
+  (let ((caught (gensym "CAUGHT")))
+    `(let ((,caught (catch '%end-of-the-world
+		      (/show0 "inside CATCH '%END-OF-THE-WORLD")
+		      ,@body)))
+       (/show0 "back from CATCH '%END-OF-THE-WORLD, flushing output")
+       (flush-standard-output-streams)
+       (/show0 "calling UNIX-EXIT")
+       (sb!unix:unix-exit ,caught))))
+
 ;;;; working with *CURRENT-ERROR-DEPTH* and *MAXIMUM-ERROR-DEPTH*
 
 ;;; INFINITE-ERROR-PROTECT is used by ERROR and friends to keep us out of

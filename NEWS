@@ -497,12 +497,11 @@ changes in sbcl-0.6.8 relative to sbcl-0.6.7:
   to Martin Atzmueller's review of it.
 * The debugger now flushes standard output streams before it begins
   its output ("debugger invoked" and so forth).
-?? The core version number and fasl file version number have both
+* The core version number and fasl file version number have both
   been incremented, because of incompatible changes in the layout
   of static symbols.
-?? FINISH-OUTPUT now works better than it did before. (It used to 
-  have trouble with characters which weren't followed by a linefeed.)
-  ?? Remember to remove this from BUGS.
+* FINISH-OUTPUT is now called more consistently on QUIT. (It
+  used to not be called for a saved Lisp image.)
 ?? The patch for the SUBSEQ bug reported on the cmucl-imp mailing
   list 12 September 2000 has been applied to SBCL.
 ?? Martin Atzmueller's versions of two CMU CL patches, as posted on 

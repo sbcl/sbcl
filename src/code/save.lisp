@@ -93,14 +93,11 @@
   (dolist (f *before-save-initializations*)
     (funcall f))
   (flet ((restart-lisp ()
-	   (sb!unix:unix-exit
-	    (catch '%end-of-the-world
-	      (reinit)
-	      ;; FIXME: Wouldn't it be more correct to do this running
-	      ;; backwards through the list, instead of forwards?
-	      (dolist (f *after-save-initializations*)
-		(funcall f))
-	      (funcall toplevel)))))
+           (handling-end-of-the-world
+	     (reinit)
+	     (dolist (f *after-save-initializations*)
+	       (funcall f))
+	     (funcall toplevel))))
     ;; FIXME: Perhaps WITHOUT-GCING should be wrapped around the
     ;; LET as well, to avoid the off chance of an interrupt triggering
     ;; GC and making our saved RESTART-LISP address invalid?
