@@ -63,10 +63,9 @@
 # recommended way to make that happen.
 #######################################################################
 
-if [ "" != "$*" ]; then
-    echo no command line arguments supported in this version of slam
-    exit 1
-fi
+HOST_TYPE="${1:-sbcl}"
+
+echo //HOST_TYPE=\"$HOST_TYPE\"
 
 # We don't try to be general about this in this script the way we are
 # in make.sh, since the idiosyncrasies of SBCL command line argument
@@ -74,7 +73,21 @@ fi
 # and the SBCL-vs-CMUCL dependence of --core/-core argument syntax
 # make it too messy to try deal with arbitrary SBCL_XC_HOST variants.
 # So you have no choice:
-export SBCL_XC_HOST='sbcl --disable-debugger'
+case "$HOST_TYPE" in
+    cmucl) LISP="lisp -batch"
+           INIT="-noinit"
+           CORE="-core"
+           ;;
+    sbcl)  LISP="sbcl"
+           INIT="--sysinit /dev/null --userinit /dev/null"
+           CORE="--core"
+           ;;
+    *)     echo unknown host type: "$HOST_TYPE"
+           echo should be one of "sbcl" or "cmucl"
+           exit 1
+esac
+
+export SBCL_XC_HOST="$LISP $INIT"
 
 # (We don't do make-host-1.sh at all. Hopefully nothing relevant has
 # changed.)
@@ -84,7 +97,7 @@ sh make-target-1.sh || exit 1
 # Instead of doing the full make-host-2.sh, we (1) use after-xc.core
 # to rebuild only obviously-out-of-date Lisp files, then (2) run
 # GENESIS.
-sbcl --core output/after-xc.core --sysinit /dev/null --userinit /dev/null <<'EOF' || exit 1
+$LISP $CORE output/after-xc.core $INIT <<'EOF' || exit 1
   (load "src/cold/slam.lisp")
 EOF
 # (This ^ used to be

@@ -1380,6 +1380,12 @@ WORKAROUND:
   produce invalid code, but type checking is not accurate. Similar
   problems exist with VALUES-TYPE-INTERSECTION.)
 
+218: "VALUES type specifier semantics"
+  (THE (VALUES ...) ...) in safe code discards extra values.
+
+  (defun test (x y) (the (values integer) (truncate x y)))
+  (test 10 4) => 2
+
 
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:
