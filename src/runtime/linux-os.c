@@ -28,10 +28,12 @@
 #include "os.h"
 #include "arch.h"
 #include "globals.h"
-#include "sbcl.h"
 #include "interrupt.h"
 #include "interr.h"
 #include "lispregs.h"
+#include "runtime.h"
+#include "genesis/static-symbols.h"
+#include "genesis/fdefn.h"
 #include <sys/socket.h>
 #include <sys/utsname.h>
 
@@ -225,7 +227,11 @@ sigsegv_handler(int signal, siginfo_t *info, void* void_context)
     void* fault_addr = (void*)info->si_addr;
     if (!gencgc_handle_wp_violation(fault_addr)) 
 	if(!handle_guard_page_triggered(context,fault_addr))
-	    interrupt_handle_now(signal, info, void_context);
+#ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
+            arrange_return_to_lisp_function(context, SymbolFunction(MEMORY_FAULT_ERROR));
+#else
+            interrupt_handle_now(signal, info, context);
+#endif
 }
 
 #else

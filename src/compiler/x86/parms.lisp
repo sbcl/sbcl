@@ -271,6 +271,7 @@
     sb!kernel::control-stack-exhausted-error
     sb!kernel::undefined-alien-variable-error
     sb!kernel::undefined-alien-function-error
+    sb!kernel::memory-fault-error
     sb!di::handle-breakpoint
     fdefinition-object
     #!+sb-thread sb!thread::handle-thread-exit

@@ -1251,6 +1251,7 @@ core and return a descriptor to it."
     (frob sb!kernel::control-stack-exhausted-error)
     (frob sb!kernel::undefined-alien-variable-error)
     (frob sb!kernel::undefined-alien-function-error)
+    (frob sb!kernel::memory-fault-error)
     (frob sb!di::handle-breakpoint)
     (frob sb!di::handle-fun-end-breakpoint)
     (frob sb!thread::handle-thread-exit))

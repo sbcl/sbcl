@@ -461,3 +461,6 @@
 
 (defun undefined-alien-function-error ()
   (error 'undefined-alien-function-error))
+
+(defun memory-fault-error ()
+  (error 'memory-fault-error))

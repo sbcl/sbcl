@@ -20,6 +20,12 @@ changes in sbcl-0.8.21 (0.9alpha.1?) relative to sbcl-0.8.20:
     are now more amenable to inspection by INSPECT.
   * workaround for bug 354: XEPs no longer appear in backtraces unless
     explicitly requested.
+  * fixed bug: receiving the signal which results from attempting to
+    write to mprotect()ed memory (SIGSEGV on Linux and some *BSDs,
+    SIGBUS on other *BSDs) on architectures where the C stack is also
+    the Lisp stack (x86 and x86-64) from foreign code no longer leads
+    to debugger confusion or wild instability.  (reported by Cheuksan
+    Wang)
   * fixed bug: COUNT and EQUAL no longer issue compiler efficiency
     notes when operating on objects known to be SIMPLE-BIT-VECTORs.
     (reported by Lutz Euler)

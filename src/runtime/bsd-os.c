@@ -188,9 +188,11 @@ memory_fault_handler(int signal, siginfo_t *siginfo, void *void_context)
     os_context_t *context = arch_os_get_context(&void_context);
     if (!gencgc_handle_wp_violation(fault_addr)) 
         if(!handle_guard_page_triggered(context,fault_addr))
-	    /* FIXME is this context or void_context?  not that it */
-	    /* makes a difference currently except on linux/sparc */
-	    interrupt_handle_now(signal, siginfo, void_context);
+#ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
+	    arrange_return_to_lisp_function(context, SymbolFunction(MEMORY_FAULT_HANDLER));
+#else
+	    interrupt_handle_now(signal, siginfo, context);
+#endif
 }
 void
 os_install_interrupt_handlers(void)

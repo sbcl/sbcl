@@ -2083,3 +2083,17 @@ WORKAROUND:
   Type deriver for CONJUGATE thinks that it returns an object of the
   same type as its argument, which is wrong for such types as (EQL
   #C(1 2)).
+
+377: Memory fault error reporting
+  On those architectures where :C-STACK-IS-CONTROL-STACK is in
+  *FEATURES*, we handle SIG_MEMORY_FAULT (SEGV or BUS) on an altstack,
+  so we cannot handle the signal directly (as in interrupt_handle_now())
+  in the case when the signal comes from some external agent (the user
+  using kill(1), or a fault in some foreign code, for instance).  As
+  of sbcl-0.8.20.20, this is fixed by calling
+  arrange_return_to_lisp_function() to a new error-signalling
+  function, but as a result the error reporting is poor: we cannot
+  even tell the user at which address the fault occurred.  We should
+  arrange such that arguments can be passed to the function called from
+  arrange_return_to_lisp_function(), but this looked hard to do in
+  general without suffering from memory leaks.
