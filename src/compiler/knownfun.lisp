@@ -51,7 +51,10 @@
   ;; may be eliminated if value is unused. The function has no side
   ;; effects except possibly cons. If a function might signal errors,
   ;; then it is not flushable even if it is movable, foldable or
-  ;; unsafely-flushable. Implies UNSAFELY-FLUSHABLE.
+  ;; unsafely-flushable. Implies UNSAFELY-FLUSHABLE. (In safe code
+  ;; type checking of arguments is always performed by the caller, so
+  ;; a function which SHOULD signal an error if arguments are not of
+  ;; declared types may be FLUSHABLE.)
   flushable
   ;; unsafe call may be eliminated if value is unused. The function
   ;; has no side effects except possibly cons and signalling an error

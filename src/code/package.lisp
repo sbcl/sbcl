@@ -111,7 +111,7 @@
   "DO-SYMBOLS (VAR [PACKAGE [RESULT-FORM]]) {DECLARATION}* {TAG | FORM}*
    Executes the FORMs at least once for each symbol accessible in the given
    PACKAGE with VAR bound to the current symbol."
-  (multiple-value-bind (body decls) body-decls
+  (multiple-value-bind (body decls) (parse-body body-decls nil)
     (let ((flet-name (gensym "DO-SYMBOLS-")))
       `(block nil
 	 (flet ((,flet-name (,var)

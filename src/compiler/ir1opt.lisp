@@ -485,6 +485,9 @@
                           (if (policy node (= safety 3))
                               (and (ir1-attributep attr flushable)
                                    (every (lambda (arg)
+                                            ;; FIXME: when bug 203
+                                            ;; will be fixed, remove
+                                            ;; this check
                                             (member (continuation-type-check arg)
                                                     '(nil :deleted)))
                                           (basic-combination-args node))

@@ -1317,11 +1317,15 @@ changes in sbcl-0.7.9 relative to sbcl-0.7.8:
     derived types contradict their declared type.
   * DEFMACRO is implemented via EVAL-WHEN instead of IR1 translation,
     so it can be non-toplevel.
+  * The fasl file version number has changed (because of the new
+    implementation of DEFMACRO).
   * fixed bugs 46h and 46i: TWO-WAY- and CONCATENATED-STREAM creation
     functions now check the types of their inputs as required by ANSI.
   * fixed bug 48c: SYMBOL-MACROLET signals PROGRAM-ERROR when an
     introduced symbol is DECLAREd to be SPECIAL.
   * fixed reading of (COMPLEX DOUBLE-FLOAT) literals from fasl files
+  * fixed bug: :COUNT argument to sequence functions may be negative
+  * fixed bug: body of DO-SYMBOLS may contain declarations
 
 planned incompatible changes in 0.7.x:
 * When the profiling interface settles down, maybe in 0.7.x, maybe

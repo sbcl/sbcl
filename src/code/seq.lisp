@@ -104,6 +104,14 @@
 			      `(integer 0 ,max-end)
 			      ;; This seems silly, is there something better?
 			      '(integer (0) 0)))))
+
+(declaim (inline adjust-count)
+         (ftype (function (sequence-count) index) adjust-count))
+(defun adjust-count (count)
+  (cond ((not count) most-positive-fixnum)
+        ((< count 0) 0)
+        (t count)))
+
 
 (defun elt (sequence index)
   #!+sb-doc "Return the element of SEQUENCE specified by INDEX."
@@ -1106,7 +1114,7 @@
   (declare (fixnum start))
   (let* ((length (length sequence))
 	 (end (or end length))
-	 (count (or count most-positive-fixnum)))
+	 (count (adjust-count count)))
     (declare (type index length end)
 	     (fixnum count))
     (seq-dispatch sequence
@@ -1144,7 +1152,7 @@
   (declare (fixnum start))
   (let* ((length (length sequence))
 	 (end (or end length))
-	 (count (or count most-positive-fixnum)))
+	 (count (adjust-count count)))
     (declare (type index length end)
 	     (fixnum count))
     (seq-dispatch sequence
@@ -1182,7 +1190,7 @@
   (declare (fixnum start))
   (let* ((length (length sequence))
 	 (end (or end length))
-	 (count (or count most-positive-fixnum)))
+	 (count (adjust-count count)))
     (declare (type index length end)
 	     (fixnum count))
     (seq-dispatch sequence
@@ -1329,7 +1337,7 @@
   (declare (fixnum start))
   (let* ((length (length sequence))
 	 (end (or end length))
-	 (count (or count most-positive-fixnum)))
+	 (count (adjust-count count)))
     (declare (type index length end)
 	     (fixnum count))
     (seq-dispatch sequence
@@ -1347,7 +1355,7 @@
   (declare (fixnum start))
   (let* ((length (length sequence))
 	 (end (or end length))
-	 (count (or count most-positive-fixnum)))
+	 (count (adjust-count count)))
     (declare (type index length end)
 	     (fixnum count))
     (seq-dispatch sequence
@@ -1365,7 +1373,7 @@
   (declare (fixnum start))
   (let* ((length (length sequence))
 	 (end (or end length))
-	 (count (or count most-positive-fixnum)))
+	 (count (adjust-count count)))
     (declare (type index length end)
 	     (fixnum count))
     (seq-dispatch sequence
@@ -1653,7 +1661,7 @@
   (declare (fixnum start))
   (let* ((length (length sequence))
 	 (end (or end length))
-	 (count (or count most-positive-fixnum)))
+	 (count (adjust-count count)))
     (declare (type index length end)
 	     (fixnum count))
     (subst-dispatch 'normal)))
@@ -1668,7 +1676,7 @@
   (declare (fixnum start))
   (let* ((length (length sequence))
 	 (end (or end length))
-	 (count (or count most-positive-fixnum))
+	 (count (adjust-count count))
 	 test-not
 	 old)
     (declare (type index length end)
@@ -1684,7 +1692,7 @@
   (declare (fixnum start))
   (let* ((length (length sequence))
 	 (end (or end length))
-	 (count (or count most-positive-fixnum))
+	 (count (adjust-count count))
 	 test-not
 	 old)
     (declare (type index length end)
@@ -1701,7 +1709,7 @@
   may be destructively modified. See manual for details."
   (declare (fixnum start))
   (let ((end (or end (length sequence)))
-	(count (or count most-positive-fixnum)))
+	(count (adjust-count count)))
     (declare (fixnum count))
     (if (listp sequence)
 	(if from-end
@@ -1751,7 +1759,7 @@
    SEQUENCE may be destructively modified. See manual for details."
   (declare (fixnum start))
   (let ((end (or end (length sequence)))
-	(count (or count most-positive-fixnum)))
+	(count (adjust-count count)))
     (declare (fixnum end count))
     (if (listp sequence)
 	(if from-end
@@ -1791,7 +1799,7 @@
    SEQUENCE may be destructively modified. See manual for details."
   (declare (fixnum start))
   (let ((end (or end (length sequence)))
-	(count (or count most-positive-fixnum)))
+	(count (adjust-count count)))
     (declare (fixnum end count))
     (if (listp sequence)
 	(if from-end

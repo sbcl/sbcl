@@ -140,6 +140,11 @@
 ;;; the :END arg to a sequence
 (sb!xc:deftype sequence-end () '(or null index))
 
+;;; the :COUNT arg to a sequence
+(sb!xc:deftype sequence-count ()
+  `(or null (integer ,(- sb!xc:array-dimension-limit)
+                     (,sb!xc:array-dimension-limit))))
+
 ;;; a valid argument to a stream function
 ;;;
 ;;; FIXME: should probably be STREAM-DESIGNATOR, after the term
