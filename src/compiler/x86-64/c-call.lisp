@@ -214,42 +214,39 @@
   (:args (function :scs (sap-reg))
 	 (args :more t))
   (:results (results :more t))
-  (:temporary (:sc unsigned-reg :offset eax-offset
-		   :from :eval :to :result) eax)
-  (:temporary (:sc unsigned-reg :offset ecx-offset
-		   :from :eval :to :result) ecx)
-  (:temporary (:sc unsigned-reg :offset edx-offset
-		   :from :eval :to :result) edx)
+  (:temporary (:sc unsigned-reg :offset rax-offset :to :result) rax)
+  (:temporary (:sc unsigned-reg :offset rcx-offset
+		   :from :eval :to :result) rcx)
   (:node-var node)
   (:vop-var vop)
   (:save-p t)
-  (:ignore args ecx edx)
   (:generator 0
-    (cond ;; This probably doesn't make sense on x86-64 since the space-
-          ;; intensive x87-frobbing doesn't need to be done. Disabled.
-          #+nil 
-	  ((policy node (> space speed))
-	   (move eax function)
-	   (inst call (make-fixup (extern-alien-name "call_into_c") :foreign)))
-	  (t
- 	   (inst call function)
-	   ;; To give the debugger a clue. XX not really internal-error?
-	   (note-this-location vop :internal-error)
-	   ;; Sign-extend s-b-32 return values.
-	   (dolist (res (if (listp results)
-			    results
-			    (list results)))
-	     (let ((tn (tn-ref-tn res)))	       
-	       (when (eq (sb!c::tn-primitive-type tn)
-			 (primitive-type-or-lose 'signed-byte-32))
-		 (inst shl tn 32)
-		 (inst sar tn 32))))
-           ;; FLOAT15 needs to contain FP zero in Lispland
-           (inst xor ecx ecx)
-           (inst movd (make-random-tn :kind :normal 
-                                      :sc (sc-or-lose 'double-reg)
-                                      :offset float15-offset)
-                      ecx)))))
+    ;; ABI: AL contains amount of arguments passed in XMM registers
+    ;; for vararg calls.
+    (move-immediate rax
+		    (loop for tn-ref = args then (tn-ref-across tn-ref)
+		       while tn-ref
+		       count (eq (sb-name (sc-sb (tn-sc (tn-ref-tn tn-ref))))
+				 'float-registers)))
+    (inst call function)
+    ;; To give the debugger a clue. XX not really internal-error?
+    (note-this-location vop :internal-error)
+    ;; Sign-extend s-b-32 return values.
+    (dolist (res (if (listp results)
+		     results
+		     (list results)))
+      (let ((tn (tn-ref-tn res)))	       
+	(when (eq (sb!c::tn-primitive-type tn)
+		  (primitive-type-or-lose 'signed-byte-32))
+	  (inst movsxd tn (make-random-tn :kind :normal
+					  :sc (sc-or-lose 'dword-reg)
+					  :offset (tn-offset tn))))))
+    ;; FLOAT15 needs to contain FP zero in Lispland
+    (inst xor rcx rcx)
+    (inst movd (make-random-tn :kind :normal 
+			       :sc (sc-or-lose 'double-reg)
+			       :offset float15-offset)
+	  rcx)))
 
 (define-vop (alloc-number-stack-space)
   (:info amount)
