@@ -119,6 +119,7 @@ ldso_stub__ ## fct: ; \
  LDSO_STUBIFY(sinh)
  LDSO_STUBIFY(socket)
  LDSO_STUBIFY(stat)
+ LDSO_STUBIFY(strerror)
  LDSO_STUBIFY(symlink)
  LDSO_STUBIFY(sync)
  LDSO_STUBIFY(tanh)
@@ -780,7 +781,6 @@ ldso_stub__ ## fct: ; \
 /*  LDSO_STUBIFY(strcpy) */
 /*  LDSO_STUBIFY(strcspn) */
 /*  LDSO_STUBIFY(strdup) */
-/*  LDSO_STUBIFY(strerror) */
 /*  LDSO_STUBIFY(strfry) */
 /*  LDSO_STUBIFY(strftime) */
 /*  LDSO_STUBIFY(strlen) */

@@ -415,7 +415,7 @@
       (let* ((pathname-directory (%pathname-directory pathname))
 	     (defaults-directory (%pathname-directory defaults))
 	     (prefix-len (length defaults-directory))
-	     (result-dir
+	     (result-directory
 	      (cond ((and (> prefix-len 1)
 			  (>= (length pathname-directory) prefix-len)
 			  (compare-component (subseq pathname-directory
@@ -430,7 +430,7 @@
 		    (t
 		     ;; We are a relative directory. So we lose.
 		     (lose)))))
-	(strings (unparse-unix-directory-list result-dir)))
+	(strings (unparse-unix-directory-list result-directory)))
       (let* ((pathname-version (%pathname-version pathname))
 	     (version-needed (and pathname-version
 				  (not (eq pathname-version :newest))))
@@ -486,6 +486,25 @@
   '*unix-host*)
 
 ;;;; wildcard matching stuff
+
+;;; Return a list of all the Lispy filenames (not including e.g. the
+;;; Unix magic "." and "..") in the directory named by DIRECTORY-NAME.
+(defun directory-lispy-filenames (directory-name)
+  (with-alien ((adlf (* c-string)
+		     (alien-funcall (extern-alien
+				     "alloc_directory_lispy_filenames"
+				     (function (* c-string) c-string))
+				    directory-name)))
+    (if (null-alien adlf)
+	(error 'simple-file-error
+	       :pathname directory-name
+	       :format-control "~@<couldn't read directory ~S: ~2I~_~A~:>"
+	       :format-arguments (list directory-name (strerror)))
+	(unwind-protect
+	    (c-strings->string-list adlf)
+	  (alien-funcall (extern-alien "free_directory_lispy_filenames"
+				       (function void (* c-string)))
+			 adlf)))))
 
 (/show0 "filesys.lisp 498")
 
@@ -548,16 +567,16 @@
 		      ,@body))))
 	     (do-directory-entries ((name directory) &body body)
 	       `(let ((dir (sb!unix:open-dir ,directory)))
-	     (when dir
-	       (unwind-protect
-		   (loop
-			  (let ((,name (sb!unix:read-dir dir)))
-			    (cond ((null ,name)
-			      (return))
-				  ((string= ,name "."))
-				  ((string= ,name ".."))
-				  (t
-				   ,@body))))
+		  (when dir
+		    (unwind-protect
+			(loop
+			 (let ((,name (sb!unix:read-dir dir)))
+			   (cond ((null ,name)
+				  (return))
+				 ((string= ,name "."))
+				 ((string= ,name ".."))
+				 (t
+				  ,@body))))
 		      (sb!unix:close-dir dir))))))
     (if tail
 	(let ((piece (car tail)))

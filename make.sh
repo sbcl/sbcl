@@ -2,7 +2,6 @@
 
 # "When we build software, it's a good idea to have a reliable method
 # for getting an executable from it. We want any two reconstructions
-
 # starting from the same source to end up in the same result. That's
 # just a basic intellectual premise."
 #     -- Christian Queinnec, in _Lisp In Small Pieces_, p. 313

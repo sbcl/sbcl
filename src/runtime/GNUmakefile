@@ -44,7 +44,7 @@ SRCS =	alloc.c backtrace.c breakpoint.c coreparse.c \
 	dynbind.c globals.c interr.c interrupt.c \
 	monitor.c parse.c print.c purify.c \
 	regnames.c run-program.c runtime.c save.c search.c \
-	time.c validate.c vars.c \
+	time.c util.c validate.c vars.c wrap.c \
 	${ARCH_SRC} ${ASSEM_SRC} ${OS_SRC} ${GC_SRC}
 
 OBJS = $(patsubst %.c,%.o,$(patsubst %.S,%.o,$(patsubst %.s,%.o,$(SRCS))))

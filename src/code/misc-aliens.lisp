@@ -16,3 +16,11 @@
   (dest (* char))
   (src (* char))
   (n unsigned-int))
+
+(def-alien-routine ("os_get_errno" get-errno) integer)
+(setf (fdocumentation 'get-errno 'function)
+      "Return the value of the C library pseudo-variable named \"errno\".")
+
+;;; Decode errno into a string.
+(defun strerror (&optional (errno (get-errno)))
+  (alien-funcall (extern-alien "strerror" (function c-string int)) errno))

@@ -21,5 +21,4 @@ find . -name "*.[ch]" -print | xargs egrep -s '^[ 	]*[^ 	/*]' | wc -l
 #   * doesn't catch #if 0 convention for commenting out blocks
 #   * doesn't catch stale source files which are no longer used
 
-# There are assembler source lines, too, but there seem to be less than
-# 1000 for each machine type. (Hardly worth considering!:-)
+echo "(ignoring .sh, .S, etc.)"

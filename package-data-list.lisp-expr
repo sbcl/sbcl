@@ -134,6 +134,14 @@
  #s(sb-cold:package-data
     :name "SB!C"
     :doc "private: implementation of the compiler"
+    ;; (It seems strange to have the compiler USE SB-ALIEN-INTERNALS,
+    ;; but the point seems to be to be able to express things like
+    ;; SB-C:DEFTRANSFORM SB-ALIEN-INTERNALS:MAKE-LOCAL-ALIEN without
+    ;; having to use a bunch of package prefixes, by putting them
+    ;; in the SB-C package. Maybe it'd be tidier to define an SB-ALIEN-COMP
+    ;; package for this? But it seems like a fairly low priority.)
+    ;; (Probably the same considerations also explain why BIGNUM is
+    ;;in the USE list.)
     :use ("CL" "SB!ALIEN-INTERNALS" "SB!ALIEN" "SB!BIGNUM"
           #!+sb-dyncount "SB-DYNCOUNT"
           "SB!EXT" "SB!INT" "SB!KERNEL" "SB!ASSEM" "SB!SYS")
@@ -295,7 +303,7 @@
     :doc "public: some types used with ALIENs"
     :use ("CL" "SB!SYS" "SB!ALIEN-INTERNALS" "SB!ALIEN" "SB!INT" "SB!EXT")
     :reexport ("FLOAT" "CHAR")
-    :export ("C-STRING" "DOUBLE" "INT" "LONG"
+    :export ("C-STRING" "DOUBLE" "GET-ERRNO" "INT" "LONG"
              "SHORT" "UNSIGNED-CHAR" "UNSIGNED-INT"
              "UNSIGNED-LONG" "UNSIGNED-SHORT" "VOID"))
 
@@ -734,6 +742,9 @@ retained, possibly temporariliy, because it might be used internally."
              ;; used for FORMAT tilde paren
              "MAKE-CASE-FROB-STREAM"
 
+             ;; helpers for C library calls
+             "STRERROR" "SIMPLE-PERROR"
+
              ;; debuggers' little helpers
              #!+sb-show "*/SHOW*"
              #!+sb-show "HEXSTR"
@@ -750,6 +761,9 @@ retained, possibly temporariliy, because it might be used internally."
              ;; might as well be shared among the various files which
              ;; need it:
              "*EOF-OBJECT*"
+
+             ;; alien interface utilities
+             "C-STRINGS->STRING-LIST"
 
              ;; misc. utilities used internally
              "LEGAL-FUNCTION-NAME-P"
@@ -1458,7 +1472,7 @@ no guarantees of interface stability."
              "DADDR-T" "DEV-T" "DIRECT" "EXECGRP" "EXECOTH" "EXECOWN" "F-DUPFD"
              "F-GETFD" "F-GETFL" "F-GETOWN" "F-SETFD" "F-SETFL" "F-SETOWN"
              "FAPPEND" "FASYNC" "FCREAT" "FEXCL" "FIONREAD" "FNDELAY" "FTRUNC"
-             "F_OK" "GET-UNIX-ERROR-MSG" "GET-ERRNO" "GID-T"
+             "F_OK" "GET-UNIX-ERROR-MSG" "GID-T"
              "INO-T" "UNIX-SETITIMER" "UNIX-GETITIMER"
              "KBDCGET" "KBDCRESET" "KBDCRST" "KBDCSET"
              "KBDCSSTD" "KBDGCLICK" "KBDSCLICK" "KBDSGET" "L_INCR" "L_SET"

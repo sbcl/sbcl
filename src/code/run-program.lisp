@@ -49,13 +49,7 @@
 
 (defun posix-environ ()
   "Return the Unix environment (\"man environ\") as a list of SIMPLE-STRINGs."
-  (let ((reversed-result nil))
-    (dotimes (i most-positive-fixnum (error "can't happen"))
-      (declare (type index i))
-      (let ((env-item (deref environ i)))
-	(if env-item
-            (push env-item reversed-result)
-	    (return (nreverse reversed-result)))))))
+  (c-strings->string-list environ))
 
 ;;; Convert as best we can from a SBCL representation of a Unix
 ;;; environment to a CMU CL representation.

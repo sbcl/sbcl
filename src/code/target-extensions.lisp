@@ -44,3 +44,22 @@
     (cond ((not (whitespace-char-p char))
 	   (unread-char char stream)
 	   (return t)))))
+
+;;;; helpers for C library calls
+
+;;; Signal a SIMPLE-CONDITION/ERROR condition associated with an ANSI C
+;;; errno problem, arranging for the condition's print representation
+;;; to be similar to the ANSI C perror(3) style.
+(defun simple-perror (prefix-string
+		      &key
+		      (errno (get-errno))
+		      (simple-error 'simple-error)
+		      other-condition-args)
+  (declare (type symbol simple-error))
+  (aver (subtypep simple-error 'simple-condition))
+  (aver (subtypep simple-error 'error))
+  (apply #'error
+	 simple-error
+	 :format-control "~@<~A: ~2I~_~A~:>"
+	 :format-arguments (list prefix-string (strerror errno))
+	 other-condition-args))

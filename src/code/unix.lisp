@@ -27,7 +27,7 @@
 
 (/show0 "unix.lisp 21")
 
-;;;; common machine-independent structures
+;;;; common machine-independent stuff
 
 (eval-when (:compile-toplevel :execute)
 
@@ -52,6 +52,8 @@
 
 ) ; EVAL-WHEN
 
+;;; FIXME: Couldn't all the *UNIX-ERRORS*/*COMPILER-UNIX-ERRORS* cruft
+;;; be replaced by POSIX strerror(3)?
 (defvar *unix-errors*)
 
 (/show0 "unix.lisp 52")
@@ -61,6 +63,18 @@
 	   (prog1 (when name `(defconstant ,name ,cur))
 	     (setf cur (funcall inc cur 1)))))
     `(progn ,@(mapcar #'defform names))))
+
+;;; Given a C-level zero-terminated array of C strings, return a
+;;; corresponding Lisp-level list of SIMPLE-STRINGs.
+(defun c-strings->string-list (c-strings)
+  (declare (type (alien (* c-string)) c-strings))
+  (let ((reversed-result nil))
+    (dotimes (i most-positive-fixnum (error "argh! can't happen"))
+      (declare (type index i))
+      (let ((c-string (deref c-strings i)))
+	(if c-string
+            (push c-string reversed-result)
+	    (return (nreverse reversed-result)))))))
 
 ;;;; Lisp types used by syscalls
 
@@ -73,9 +87,6 @@
 (deftype unix-gid () '(unsigned-byte 32))
 
 ;;;; system calls
-
-(def-alien-routine ("os_get_errno" get-errno) integer
-  "Return the value of the C library pseudo-variable named \"errno\".")
 
 (/show0 "unix.lisp 74")
 
@@ -126,10 +137,9 @@
 
 ;;; from stdio.h
 
+;;; Rename the file with string NAME1 to the string NAME2. NIL and an
+;;; error code is returned if an error occurs.
 (defun unix-rename (name1 name2)
-  #!+sb-doc
-  "Unix-rename renames the file with string NAME1 to the string
-   NAME2. NIL and an error code is returned if an error occurs."
   (declare (type unix-pathname name1 name2))
   (void-syscall ("rename" c-string c-string) name1 name2))
 
@@ -195,6 +205,8 @@
 
 ;;;; direntry.h
 
+(/show0 "unix.lisp 304")
+
 (def-alien-type nil
   (struct direct
     (d-ino long); inode number of entry
@@ -202,23 +214,19 @@
     (d-reclen unsigned-short)		; length of this record
     (d_type unsigned-char)
     (d-name (array char 256))))		; name must be no longer than this
-(/show0 "unix.lisp 289")
-
-;;;; dirent.h
 
-;;; operations on Unix directories
+;;;; dirent.h
 
 ;;;; FIXME: It might be really nice to implement these in C, so that
 ;;;; we don't need to do horrible things like hand-copying the
 ;;;; direntry struct slot types into an alien struct.
+
 
 ;;; FIXME: DIRECTORY is an external symbol of package CL, so we should
 ;;; use some other name for this low-level implementation type.
 (defstruct (directory (:copier nil))
   name
   (dir-struct (required-argument) :type system-area-pointer))
-(/show0 "unix.lisp 304")
-
 (def!method print-object ((dir directory) stream)
   (print-unreadable-object (dir stream :type t)
     (prin1 (directory-name dir) stream)))
@@ -504,14 +512,13 @@
 		 (addr (deref ptr offset)))
 	       len))
 
+;;; Set up a unix-piping mechanism consisting of
+;;; an input pipe and an output pipe.  Return two
+;;; values: if no error occurred the first value is the pipe
+;;; to be read from and the second is can be written to.  If
+;;; an error occurred the first value is NIL and the second
+;;; the unix error code.
 (defun unix-pipe ()
-  #!+sb-doc
-  "Unix-pipe sets up a unix-piping mechanism consisting of
-  an input pipe and an output pipe.  Unix-Pipe returns two
-  values: if no error occurred the first value is the pipe
-  to be read from and the second is can be written to.  If
-  an error occurred the first value is NIL and the second
-  the unix error code."
   (with-alien ((fds (array int 2)))
     (syscall ("pipe" (* int))
 	     (values (deref fds 0) (deref fds 1))
@@ -1077,7 +1084,7 @@
 ;;; And now for something completely different ...
 (emit-unix-errors)
 
-;;;; support routines for dealing with unix pathnames
+;;;; support routines for dealing with Unix pathnames
 
 (defun unix-file-kind (name &optional check-for-links)
   #!+sb-doc
@@ -1103,9 +1110,8 @@
 	    (concatenate 'simple-string dir "/" name)
 	    name))))
 
+;;; Return the pathname with all symbolic links resolved.
 (defun unix-resolve-links (pathname)
-  #!+sb-doc
-  "Returns the pathname with all symbolic links resolved."
   (declare (simple-string pathname))
   (let ((len (length pathname))
 	(pending pathname))

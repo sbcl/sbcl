@@ -1489,30 +1489,30 @@ a host-structure or string."
 
 ;;; Unparse a logical pathname string.
 (defun unparse-enough-namestring (pathname defaults)
-  (let* ((path-dir (pathname-directory pathname))
-         (def-dir (pathname-directory defaults))
-         (enough-dir
+  (let* ((path-directory (pathname-directory pathname))
+         (def-directory (pathname-directory defaults))
+         (enough-directory
            ;; Go down the directory lists to see what matches.  What's
            ;; left is what we want, more or less.
-           (cond ((and (eq (first path-dir) (first def-dir))
-                       (eq (first path-dir) :absolute))
+           (cond ((and (eq (first path-directory) (first def-directory))
+                       (eq (first path-directory) :absolute))
                    ;; Both paths are :ABSOLUTE, so find where the
                    ;; common parts end and return what's left
-                   (do* ((p (rest path-dir) (rest p))
-                         (d (rest def-dir) (rest d)))
+                   (do* ((p (rest path-directory) (rest p))
+                         (d (rest def-directory) (rest d)))
                         ((or (endp p) (endp d)
                              (not (equal (first p) (first d))))
                          `(:relative ,@p))))
                  (t
                    ;; At least one path is :RELATIVE, so just return the
                    ;; original path.  If the original path is :RELATIVE,
-                   ;; then that's the right one.  If PATH-DIR is
+                   ;; then that's the right one.  If PATH-DIRECTORY is
                    ;; :ABSOLUTE, we want to return that except when
-                   ;; DEF-DIR is :ABSOLUTE, as handled above. so return
+                   ;; DEF-DIRECTORY is :ABSOLUTE, as handled above. so return
                    ;; the original directory.
-                   path-dir))))
+                   path-directory))))
     (make-pathname :host (pathname-host pathname)
-                   :directory enough-dir
+                   :directory enough-directory
                    :name (pathname-name pathname)
                    :type (pathname-type pathname)
                    :version (pathname-version pathname))))
