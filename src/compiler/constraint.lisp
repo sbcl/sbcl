@@ -279,7 +279,7 @@
 (defun constrain-float-type (x y greater or-equal)
   (declare (type numeric-type x y))
   (declare (ignorable x y greater or-equal)) ; for CROSS-FLOAT-INFINITY-KLUDGE
-  
+
   (aver (eql (numeric-type-class x) 'float))
   (aver (eql (numeric-type-class y) 'float))
   #+sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
@@ -378,8 +378,7 @@
       (let* ((cont (node-cont ref))
 	     (dest (continuation-dest cont)))
 	(cond ((and (if-p dest)
-		    (csubtypep (specifier-type 'null) not-res)
-		    (eq (continuation-asserted-type cont) *wild-type*))
+		    (csubtypep (specifier-type 'null) not-res))
 	       (setf (node-derived-type ref) *wild-type*)
 	       (change-ref-leaf ref (find-constant t)))
 	      (t
@@ -429,10 +428,11 @@
          (when var
            (when ref-preprocessor
              (funcall ref-preprocessor node gen))
-           (when (continuation-type-check cont)
-             (let* ((atype (continuation-derived-type cont))
-                    (con (find-constraint 'typep var atype nil)))
-               (sset-adjoin con gen))))))
+           (let ((dest (continuation-dest cont)))
+             (when (and (cast-p dest))
+               (let* ((atype (single-value-type (cast-derived-type dest))) ; FIXME
+                      (con (find-constraint 'typep var atype nil)))
+                 (sset-adjoin con gen)))))))
       (cset
        (let ((var (set-var node)))
          (when (lambda-var-p var)

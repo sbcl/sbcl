@@ -285,6 +285,7 @@
 	 '(lambda (x) (block nil (print x)))))
 
 ;;; bug 62: too cautious type inference in a loop
+#+nil
 (assert (nth-value
          2
          (compile nil

@@ -233,7 +233,7 @@
 	   (emit-move ref ir2-block entry res))))
   (values))
 
-;;; Convert a SET node. If the node's CONT is annotated, then we also
+;;; Convert a SET node. If the NODE's CONT is annotated, then we also
 ;;; deliver the value to that continuation. If the var is a lexical
 ;;; variable with no refs, then we don't actually set anything, since
 ;;; the variable has been deleted.
@@ -289,20 +289,7 @@
 	     (first (ir2-continuation-locs 2cont)))))
 	 (ptype (ir2-continuation-primitive-type 2cont)))
 
-    (cond ((and (eq (continuation-type-check cont) t)
-		(multiple-value-bind (check types)
-		    (continuation-check-types cont nil)
-		  (aver (eq check :simple))
-		  ;; If the proven type is a subtype of the possibly
-		  ;; weakened type check then it's always true and is
-		  ;; flushed.
-		  (unless (values-subtypep (continuation-proven-type cont)
-					   (first types))
-		    (let ((temp (make-normal-tn ptype)))
-		      (emit-type-check node block cont-tn temp
-				       (first types))
-		      temp)))))
-	  ((eq (tn-primitive-type cont-tn) ptype) cont-tn)
+    (cond ((eq (tn-primitive-type cont-tn) ptype) cont-tn)
 	  (t
 	   (let ((temp (make-normal-tn ptype)))
 	     (emit-move node block cont-tn temp)
@@ -322,29 +309,15 @@
   (let* ((locs (ir2-continuation-locs (continuation-info cont)))
 	 (nlocs (length locs)))
     (aver (= nlocs (length ptypes)))
-    (if (eq (continuation-type-check cont) t)
-	(multiple-value-bind (check types) (continuation-check-types cont nil)
-	  (aver (eq check :simple))
-	  (let ((ntypes (length types)))
-	    (mapcar (lambda (from to-type assertion)
-		      (let ((temp (make-normal-tn to-type)))
-			(if assertion
-			    (emit-type-check node block from temp assertion)
-			    (emit-move node block from temp))
-			temp))
-		    locs ptypes
-		    (if (< ntypes nlocs)
-			(append types (make-list (- nlocs ntypes)
-						 :initial-element nil))
-			types))))
-	(mapcar (lambda (from to-type)
-		  (if (eq (tn-primitive-type from) to-type)
-		      from
-		      (let ((temp (make-normal-tn to-type)))
-			(emit-move node block from temp)
-			temp)))
-		locs
-		ptypes))))
+
+    (mapcar (lambda (from to-type)
+              (if (eq (tn-primitive-type from) to-type)
+                  from
+                  (let ((temp (make-normal-tn to-type)))
+                    (emit-move node block from temp)
+                    temp)))
+            locs
+            ptypes)))
 
 ;;;; utilities for delivering values to continuations
 
@@ -467,6 +440,27 @@
 		 ((reference-tn-list (ir2-continuation-locs 2cont) t))
 		 nvals))))))
   (values))
+
+;;; CAST
+(defun ir2-convert-cast (node block)
+  (declare (type cast node)
+           (type ir2-block block))
+  (aver (not (cast-type-check node)))
+  (let* ((cont (node-cont node))
+         (2cont (continuation-info cont))
+         (value (cast-value node))
+         (2value (continuation-info value)))
+    (cond ((not 2cont))
+          ((eq (ir2-continuation-kind 2cont) :unused))
+          ((eq (ir2-continuation-kind 2cont)
+               (ir2-continuation-kind 2value))
+           (move-results-coerced node block
+                                 (ir2-continuation-locs 2value)
+                                 (ir2-continuation-locs 2cont)))
+          ((eq (ir2-continuation-kind 2cont) :fixed)
+           (aver (eq (ir2-continuation-kind 2value) :unknown))
+           ())
+          (t (bug "quux")))))
 
 ;;;; template conversion
 
@@ -537,13 +531,7 @@
   (declare (type combination call) (type continuation cont)
 	   (type template template) (list rtypes))
   (let* ((dtype (node-derived-type call))
-	 (type (if (and (or (eq (template-ltn-policy template) :safe)
-			    (policy call (= safety 0)))
-			(continuation-type-check cont))
-		   (values-type-intersection
-		    dtype
-		    (continuation-asserted-type cont))
-		   dtype))
+	 (type dtype)
 	 (types (mapcar #'primitive-type
 			(if (values-type-p type)
 			    (append (values-type-required type)
@@ -848,21 +836,11 @@
 	  (values (make-load-time-constant-tn :fdefinition name) t))
 	(let* ((locs (ir2-continuation-locs 2cont))
 	       (loc (first locs))
-	       (check (continuation-type-check cont))
 	       (function-ptype (primitive-type-or-lose 'function)))
 	  (aver (and (eq (ir2-continuation-kind 2cont) :fixed)
 		     (= (length locs) 1)))
-	  (cond ((eq (tn-primitive-type loc) function-ptype)
-		 (aver (not (eq check t)))
-		 (values loc nil))
-		(t
-		 (let ((temp (make-normal-tn function-ptype)))
-		   (aver (and (eq (ir2-continuation-primitive-type 2cont)
-				  function-ptype)
-			      (eq check t)))
-		   (emit-type-check node block loc temp
-				    (specifier-type 'function))
-		   (values temp nil))))))))
+          (aver (eq (tn-primitive-type loc) function-ptype))
+	  (values loc nil)))))
 
 ;;; Set up the args to NODE in the current frame, and return a TN-REF
 ;;; list for the passing locations.
@@ -1654,6 +1632,8 @@
 	 (ir2-convert-return node 2block))
 	(cset
 	 (ir2-convert-set node 2block))
+        (cast
+         (ir2-convert-cast node 2block))
 	(mv-combination
 	 (cond
 	  ((eq (basic-combination-kind node) :local)

@@ -52,6 +52,13 @@
 (defvar *num-fixups* 0)
 ;;; FIXME: When the system runs, it'd be interesting to see what this is.
 
+(declaim (inline my-adjust-array))
+(defun my-adjust-array (array size)
+  (let ((length (length array))
+        (new (make-array size :element-type '(unsigned-byte 32))))
+    (replace new array)
+    new))
+
 ;;; This gets called by LOAD to resolve newly positioned objects
 ;;; with things (like code instructions) that have to refer to them.
 ;;;
@@ -69,8 +76,7 @@
 	   (let ((fixups (code-header-ref code code-constants-offset)))
 	     (cond ((typep fixups '(simple-array (unsigned-byte 32) (*)))
 		    (let ((new-fixups
-			   (adjust-array fixups (1+ (length fixups))
-					 :element-type '(unsigned-byte 32))))
+			   (my-adjust-array fixups (1+ (length fixups)))))
 		      (setf (aref new-fixups (length fixups)) offset)
 		      (setf (code-header-ref code code-constants-offset)
 			    new-fixups)))
@@ -80,7 +86,7 @@
 				(zerop fixups))
 		      (format t "** Init. code FU = ~S~%" fixups)) ; FIXME
 		    (setf (code-header-ref code code-constants-offset)
-			  (make-specializable-array
+			  (make-array
 			   1
 			   :element-type '(unsigned-byte 32)
 			   :initial-element offset)))))))
@@ -132,8 +138,7 @@
 	   (let ((fixups (code-header-ref code code-constants-offset)))
 	     (cond ((typep fixups '(simple-array (unsigned-byte 32) (*)))
 		    (let ((new-fixups
-			   (adjust-array fixups (1+ (length fixups))
-					 :element-type '(unsigned-byte 32))))
+			   (my-adjust-array fixups (1+ (length fixups)))))
 		      (setf (aref new-fixups (length fixups)) offset)
 		      (setf (code-header-ref code code-constants-offset)
 			    new-fixups)))
@@ -143,7 +148,7 @@
 				(zerop fixups))
 		      (sb!impl::!cold-lose "Argh! can't process fixup"))
 		    (setf (code-header-ref code code-constants-offset)
-			  (make-specializable-array
+			  (make-array
 			   1
 			   :element-type '(unsigned-byte 32)
 			   :initial-element offset)))))))

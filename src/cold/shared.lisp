@@ -152,7 +152,10 @@
     ;; ourselves later should we happen to bail out of compilation
     ;; with an error.
     (when (probe-file obj)
-      (delete-file obj))
+      (if (> (file-write-date src)
+             (file-write-date obj))
+          (delete-file obj)
+          (return-from compile-stem (pathname obj))))
 
     ;; Original comment:
     ;;

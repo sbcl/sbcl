@@ -288,16 +288,22 @@
 ;;; bug 194, fixed in part by APD "more strict type checking" patch
 ;;; (sbcl-devel 2002-08-07)
 (progn
-  #+nil ; FIXME: still broken in 0.7.7.19 (after patch)
   (multiple-value-bind (result error)
       (ignore-errors (multiple-value-prog1 (progn (the real '(1 2 3)))))
     (assert (null result))
     (assert (typep error 'type-error)))
-  #+nil ; FIXME: still broken in 0.7.7.19 (after patch)
   (multiple-value-bind (result error)
       (ignore-errors (the real '(1 2 3)))
     (assert (null result))
     (assert (typep error 'type-error))))
+
+(defun bug194d ()
+  (null (ignore-errors
+          (let ((arg1 1)
+                (arg2 (identity (the real #(1 2 3)))))
+            (if (< arg1 arg2) arg1 arg2)))))
+(assert (eq (bug194d) t))
+
 
 ;;; BUG 48a. and b. (symbol-macrolet handling), fixed by Eric Marsden
 ;;; and Raymond Toy for CMUCL, fix ported for sbcl-0.7.6.18.
@@ -312,13 +318,10 @@
 		  *standard-input*)))
   (assert failure-p)
   (assert (raises-error? (funcall function) program-error)))
-#||
-BUG 48c, not yet fixed:
 (multiple-value-bind (function warnings-p failure-p)
     (compile nil '(lambda () (symbol-macrolet ((s nil)) (declare (special s)) s)))
   (assert failure-p)
   (assert (raises-error? (funcall function) program-error)))
-||#
 
 ;;; bug 120a: Turned out to be constraining code looking like (if foo
 ;;; <X> <X>) where <X> was optimized by the compiler to be the exact
@@ -602,7 +605,6 @@ BUG 48c, not yet fixed:
 (assert (equal (check-embedded-thes 0 1  :a 3.5f0) '(:a 3.5f0)))
 (assert (typep (check-embedded-thes 0 1  2 2.5d0) 'type-error))
 
-#+nil
 (assert (equal (check-embedded-thes 3 0  2 :a) '(2 :a)))
 (assert (typep (check-embedded-thes 3 0  4 2.5f0) 'type-error))
 
@@ -762,6 +764,30 @@ BUG 48c, not yet fixed:
 (let ((x (function-lambda-expression #'bug228)))
   (when x
     (assert (= (funcall (compile nil x) 1) 2))))
+
+;;;
+(defun bug192b (i)
+  (dotimes (j i)
+    (declare (type (mod 4) i))
+    (unless (< i 5)
+      (print j))))
+(assert (raises-error? (bug192b 6) type-error))
+
+(defun bug192c (x y)
+  (locally (declare (type fixnum x y))
+    (+ x (* 2 y))))
+(assert (raises-error? (bug192c 1.1 2) type-error))
+
+(assert (raises-error? (progn (the real (list 1)) t) type-error))
+
+(defun bug236 (a f)
+  (declare (optimize (speed 2) (safety 0)))
+  (+ 1d0
+     (the double-float
+       (multiple-value-prog1
+           (svref a 0)
+         (unless f (return-from foo 0))))))
+#+nil(assert (eql (bug236 #(4) 0)))
 
 ;;;; tests not in the problem domain, but of the consistency of the
 ;;;; compiler machinery itself

@@ -112,7 +112,10 @@
        (let ((uses (cons node (block-start-uses block))))
 	 (setf (block-start-uses block) uses)
 	 (setf (continuation-use cont)
-	       (if (cdr uses) nil (car uses)))))))
+	       (if (cdr uses) nil (car uses)))
+         (let ((block (node-block node)))
+           (unless (block-last block)
+             (setf (block-last block) node)))))))
   (setf (node-cont node) cont)
   (values))
 
@@ -148,9 +151,11 @@
        (if (eq old (basic-combination-fun dest))
 	   (setf (basic-combination-fun dest) new)
 	   (setf (basic-combination-args dest)
-		 (nsubst new old (basic-combination-args dest))))))
+		 (nsubst new old (basic-combination-args dest)))))
+      (cast (setf (cast-value dest) new))
+      (null))
 
-    (flush-dest old)
+    (when dest (flush-dest old))
     (setf (continuation-dest new) dest)
     (setf (continuation-%externally-checkable-type new) nil))
   (values))
@@ -168,7 +173,7 @@
   (do-uses (node old)
     (delete-continuation-use node)
     (add-continuation-use node new))
-  (dolist (lexenv-use (continuation-lexenv-uses old))
+  (dolist (lexenv-use (continuation-lexenv-uses old)) ; FIXME - APD
     (setf (cadr lexenv-use) new))
 
   (reoptimize-continuation new)
@@ -386,7 +391,7 @@
 #!-sb-fluid (declaim (inline continuation-single-value-p))
 (defun continuation-single-value-p (cont)
   (not (typep (continuation-dest cont)
-              '(or creturn exit mv-combination))))
+              '(or creturn exit mv-combination cast))))
 
 ;;; Return a new LEXENV just like DEFAULT except for the specified
 ;;; slot values. Values for the alist slots are NCONCed to the
@@ -640,7 +645,7 @@
 
   (values))
 
-;;; Note that something interesting has happened to VAR. 
+;;; Note that something interesting has happened to VAR.
 (defun reoptimize-lambda-var (var)
   (declare (type lambda-var var))
   (let ((fun (lambda-var-home var)))
@@ -774,7 +779,7 @@
 			      (maybe-convert-to-assignment fun)))
 			 (t
 			  (maybe-convert-to-assignment fun)))))))
-	
+
 	(dolist (ep (optional-dispatch-entry-points leaf))
 	  (frob ep))
 	(when (optional-dispatch-more-entry leaf)
@@ -846,8 +851,6 @@
 	    (setf (block-attributep (block-flags block) flush-p type-asserted)
 		  t))))))
 
-  (setf (continuation-%type-check cont) nil)
-
   (values))
 
 ;;; Do a graph walk backward from BLOCK, marking all predecessor
@@ -901,13 +904,10 @@
   (setf (continuation-dest cont) nil)
   (setf (continuation-%externally-checkable-type cont) nil)
   (setf (continuation-next cont) nil)
-  (setf (continuation-asserted-type cont) *empty-type*)
   (setf (continuation-%derived-type cont) *empty-type*)
-  (setf (continuation-type-to-check cont) *empty-type*)
   (setf (continuation-use cont) nil)
   (setf (continuation-block cont) nil)
   (setf (continuation-reoptimize cont) nil)
-  (setf (continuation-%type-check cont) nil)
   (setf (continuation-info cont) nil)
 
   (values))
@@ -987,7 +987,9 @@
        (flush-dest (set-value node))
        (let ((var (set-var node)))
 	 (setf (basic-var-sets var)
-	       (delete node (basic-var-sets var))))))
+	       (delete node (basic-var-sets var)))))
+      (cast
+       (flush-dest (cast-value node))))
 
     (delete-continuation (node-prev node)))
 
@@ -1238,8 +1240,6 @@
 	  (setf (combination-kind inside) :full)
 	  (setf (node-derived-type inside) *wild-type*)
 	  (flush-dest cont)
-	  (setf (continuation-asserted-type cont) *wild-type*)
-          (setf (continuation-type-to-check cont) *wild-type*)
 	  (values))))))
 
 ;;;; leaf hackery
@@ -1511,3 +1511,19 @@
 
   (let ((action (event-info-action info)))
     (when action (funcall action node))))
+
+;;;
+(defun make-cast (value type policy)
+  (declare (type continuation value)
+           (type ctype type)
+           (type policy policy))
+  (%make-cast :asserted-type type
+              :type-to-check (maybe-weaken-check type policy)
+              :value value
+              :derived-type type))
+
+(defun cast-type-check (cast)
+  (declare (type cast cast))
+  (when (cast-reoptimize cast)
+    (ir1-optimize-cast cast t))
+  (cast-%type-check cast))

@@ -72,7 +72,7 @@
 				      handler))))))
      (cond ((= result sig_dfl) :default)
 	   ((= result sig_ign) :ignore)
-	   (t (the function (sb!kernel:make-lisp-obj result)))))))
+	   (t (the t #| function |# (sb!kernel:make-lisp-obj result)))))))
 
 (defun default-interrupt (signal)
   (enable-interrupt signal :default))

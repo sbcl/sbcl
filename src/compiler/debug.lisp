@@ -528,6 +528,8 @@
        (barf "IF not at block end: ~S" node)))
     (cset
      (check-dest (set-value node) node))
+    (cast
+     (check-dest (cast-value node) node))
     (bind
      (check-fun-reached (bind-lambda node) node))
     (creturn
@@ -994,7 +996,13 @@
                     ((exit-entry node)
                      (format t "exit <no value>"))
                     (t
-                     (format t "exit <degenerate>"))))))
+                     (format t "exit <degenerate>")))))
+           (cast
+            (let ((value (cast-value node)))
+              (format t "cast c~D ~A[~S -> ~S]" (cont-num value)
+                      (if (cast-%type-check node) #\+ #\-)
+                      (cast-type-to-check node)
+                      (cast-asserted-type node)))))
          (pprint-newline :mandatory)
          (when (eq node last) (return)))))
 

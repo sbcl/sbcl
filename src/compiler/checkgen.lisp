@@ -164,7 +164,7 @@
 (defun maybe-negate-check (cont types original-types force-hairy)
   (declare (type continuation cont) (list types))
   (multiple-value-bind (ptypes count)
-      (no-fun-values-types (continuation-proven-type cont))
+      (no-fun-values-types (continuation-derived-type cont))
     (if (eq count :unknown)
         (if (and (every #'type-check-template types) (not force-hairy))
             (values :simple types)
@@ -219,16 +219,18 @@
 ;;; consideration. If it is cheaper to test for the difference between
 ;;; the derived type and the asserted type, then we check for the
 ;;; negation of this type instead.
-(defun continuation-check-types (cont force-hairy)
-  (declare (type continuation cont))
-  (let ((ctype (continuation-type-to-check cont))
-        (atype (continuation-asserted-type cont))
-	(dest (continuation-dest cont)))
+(defun cast-check-types (cast force-hairy)
+  (declare (type cast cast))
+  (let* ((ctype (cast-type-to-check cast))
+         (atype (cast-asserted-type cast))
+         (value (cast-value cast)))
     (aver (not (eq ctype *wild-type*)))
     (multiple-value-bind (ctypes count) (no-fun-values-types ctype)
-      (multiple-value-bind (atypes acount) (no-fun-values-types ctype)
+      (multiple-value-bind (atypes acount) (no-fun-values-types atype)
         (aver (eq count acount))
         (cond ((not (eq count :unknown))
+               (maybe-negate-check value ctypes atypes force-hairy)
+               #+nil
                (if (or (exit-p dest)
                        (and (return-p dest)
                             (multiple-value-bind (ignore count)
@@ -237,6 +239,7 @@
                               (eq count :unknown))))
                    (maybe-negate-check cont ctypes atypes t)
                    (maybe-negate-check cont ctypes atypes force-hairy)))
+              #+nil
               ((and (mv-combination-p dest)
                     (eq (basic-combination-kind dest) :local))
                (aver (values-type-p ctype))
@@ -248,25 +251,26 @@
                (values :too-hairy nil)))))))
 
 ;;; Do we want to do a type check?
-(defun worth-type-check-p (cont)
-  (let ((dest (continuation-dest cont)))
-    (not (or (values-subtypep (continuation-proven-type cont)
-                              (continuation-type-to-check cont))
-             (and (combination-p dest)
-                  (eq (combination-kind dest) :full)
-                  ;; The theory is that the type assertion is from a
-                  ;; declaration in (or on) the callee, so the callee
-                  ;; should be able to do the check. We want to let
-                  ;; the callee do the check, because it is possible
-                  ;; that by the time of call that declaration will be
-                  ;; changed and we do not want to make people
-                  ;; recompile all calls to a function when they were
-                  ;; originally compiled with a bad declaration. (See
-                  ;; also bug 35.)
-                  (values-subtypep (continuation-externally-checkable-type cont)
-                                   (continuation-type-to-check cont)))
-             (and (mv-combination-p dest) ; bug 220
-                  (eq (mv-combination-kind dest) :full))))))
+(defun worth-type-check-p (cast)
+  (declare (type cast cast))
+  (not (or (not (cast-type-check cast))
+           #+nil
+           (and (combination-p dest)
+                (eq (combination-kind dest) :full)
+                ;; The theory is that the type assertion is from a
+                ;; declaration in (or on) the callee, so the callee
+                ;; should be able to do the check. We want to let
+                ;; the callee do the check, because it is possible
+                ;; that by the time of call that declaration will be
+                ;; changed and we do not want to make people
+                ;; recompile all calls to a function when they were
+                ;; originally compiled with a bad declaration. (See
+                ;; also bug 35.)
+                (values-subtypep (continuation-externally-checkable-type cont)
+                                 (continuation-type-to-check cont)))
+           #+nil
+           (and (mv-combination-p dest) ; bug 220
+                (eq (mv-combination-kind dest) :full)))))
 
 ;;; Return true if CONT is a continuation whose type the back end is
 ;;; likely to want to check. Since we don't know what template the
@@ -285,8 +289,10 @@
 ;;; type checks. The penalty for erring by being too speculative is
 ;;; much nastier, e.g. falling through without ever being able to find
 ;;; an appropriate VOP.
-(defun probable-type-check-p (cont)
-  (declare (type continuation cont))
+(defun probable-type-check-p (cast)
+  (declare (type cast cast))
+  nil
+  #+nil
   (let ((dest (continuation-dest cont)))
     (cond ((or (not dest)
 	       (policy dest (zerop safety)))
@@ -342,90 +348,95 @@
 			 ',(type-specifier (third type))))))
 		 temps
 		 types)
-       (values ,@temps))))
+       (truly-the ,(if (proper-list-of-length-p types 1)
+                       (type-specifier (third (car types)))
+                       `(values ,@(mapcar #'(lambda (type)
+                                              (type-specifier (third type)))
+                                          types)))
+                  (values ,@temps)))))
 
 ;;; Splice in explicit type check code immediately before the node
 ;;; which is CONT's DEST. This code receives the value(s) that were
 ;;; being passed to CONT, checks the type(s) of the value(s), then
 ;;; passes them on to CONT.
-(defun convert-type-check (cont types)
-  (declare (type continuation cont) (type list types))
-  (with-ir1-environment-from-node (continuation-dest cont)
+(defun convert-type-check (cast types)
+  (declare (type cast cast) (type list types))
+  (let ((cont (cast-value cast)))
+    (with-ir1-environment-from-node cast
 
-    ;; Ensuring that CONT starts a block lets us freely manipulate its uses.
-    (ensure-block-start cont)
+      ;; Ensuring that CONT starts a block lets us freely manipulate its uses.
+      (ensure-block-start cont)
 
-    ;; Make a new continuation and move CONT's uses to it.
-    (let* ((new-start (make-continuation))
-	   (dest (continuation-dest cont))
-	   (prev (node-prev dest)))
-      (continuation-starts-block new-start)
-      (substitute-continuation-uses new-start cont)
+      ;; Make a new continuation and move CONT's uses to it.
+      (let ((new-start (make-continuation))
+            (prev (node-prev cast)))
+        (continuation-starts-block new-start)
+        (substitute-continuation-uses new-start cont)
 
-      ;; Setting TYPE-CHECK in CONT to :DELETED indicates that the
-      ;; check has been done.
-      (setf (continuation-%type-check cont) :deleted)
+        ;; Make the CAST node start its block so that we can splice in
+        ;; the type check code.
+        (when (continuation-use prev)
+          (node-ends-block (continuation-use prev)))
 
-      ;; Make the DEST node start its block so that we can splice in
-      ;; the type check code.
-      (when (continuation-use prev)
-	(node-ends-block (continuation-use prev)))
+        (let* ((prev-block (continuation-block prev))
+               (new-block (continuation-block new-start))
+               (dummy (make-continuation)))
 
-      (let* ((prev-block (continuation-block prev))
-	     (new-block (continuation-block new-start))
-	     (dummy (make-continuation)))
+          ;; Splice in the new block before DEST, giving the new block
+          ;; all of DEST's predecessors.
+          (dolist (block (block-pred prev-block))
+            (change-block-successor block prev-block new-block))
 
-	;; Splice in the new block before DEST, giving the new block
-	;; all of DEST's predecessors.
-	(dolist (block (block-pred prev-block))
-	  (change-block-successor block prev-block new-block))
+          ;; Convert the check form, using the new block start as START
+          ;; and a dummy continuation as CONT.
+          (ir1-convert new-start dummy (make-type-check-form types))
 
-	;; Convert the check form, using the new block start as START
-	;; and a dummy continuation as CONT.
-	(ir1-convert new-start dummy (make-type-check-form types))
+          ;; TO DO: Why should this be true? -- WHN 19990601
+          (aver (eq (continuation-block dummy) new-block))
 
-	;; TO DO: Why should this be true? -- WHN 19990601
-	(aver (eq (continuation-block dummy) new-block))
+          ;; KLUDGE: Comments at the head of this function in CMU CL
+          ;; said that somewhere in here we
+          ;;   Set the new block's start and end cleanups to the *start*
+          ;;   cleanup of PREV's block. This overrides the incorrect
+          ;;   default from WITH-IR1-ENVIRONMENT-FROM-NODE.
+          ;; Unfortunately I can't find any code which corresponds to this.
+          ;; Perhaps it was a stale comment? Or perhaps I just don't
+          ;; understand.. -- WHN 19990521
 
-	;; KLUDGE: Comments at the head of this function in CMU CL
-	;; said that somewhere in here we
-	;;   Set the new block's start and end cleanups to the *start*
-	;;   cleanup of PREV's block. This overrides the incorrect
-	;;   default from WITH-IR1-ENVIRONMENT-FROM-NODE.
-	;; Unfortunately I can't find any code which corresponds to this.
-	;; Perhaps it was a stale comment? Or perhaps I just don't
-	;; understand.. -- WHN 19990521
+          (let ((node (continuation-use dummy)))
+            (setf (block-last new-block) node)
+            ;; Change the use to a use of CONT. (We need to use the
+            ;; dummy continuation to get the control transfer right,
+            ;; because we want to go to PREV's block, not CONT's.)
+            (delete-continuation-use node)
+            (add-continuation-use node cont))
+          ;; Link the new block to PREV's block.
+          (link-blocks new-block prev-block))
 
-       	(let ((node (continuation-use dummy)))
-	  (setf (block-last new-block) node)
-	  ;; Change the use to a use of CONT. (We need to use the
-	  ;; dummy continuation to get the control transfer right,
-	  ;; because we want to go to PREV's block, not CONT's.)
-	  (delete-continuation-use node)
-	  (add-continuation-use node cont))
-	;; Link the new block to PREV's block.
-	(link-blocks new-block prev-block))
-
-      ;; MAKE-TYPE-CHECK-FORM generated a form which checked the type
-      ;; of 'DUMMY, not a real form. At this point we convert to the
-      ;; real form by finding 'DUMMY and overwriting it with the new
-      ;; continuation. (We can find 'DUMMY because no LET conversion
-      ;; has been done yet.) The [mv-]combination code from the
-      ;; mv-bind in the check form will be the use of the new check
-      ;; continuation. We substitute for the first argument of this
-      ;; node.
-      (let* ((node (continuation-use cont))
-	     (args (basic-combination-args node))
-	     (victim (first args)))
-	(aver (and (= (length args) 1)
+        ;; MAKE-TYPE-CHECK-FORM generated a form which checked the type
+        ;; of 'DUMMY, not a real form. At this point we convert to the
+        ;; real form by finding 'DUMMY and overwriting it with the new
+        ;; continuation. (We can find 'DUMMY because no LET conversion
+        ;; has been done yet.) The [mv-]combination code from the
+        ;; mv-bind in the check form will be the use of the new check
+        ;; continuation. We substitute for the first argument of this
+        ;; node.
+        (let* ((node (continuation-use cont))
+               (args (basic-combination-args node))
+               (victim (first args)))
+          (aver (and (= (length args) 1)
 		     (eq (constant-value
 			  (ref-leaf
 			   (continuation-use victim)))
 			 'dummy)))
-	(substitute-continuation new-start victim)))
+          (substitute-continuation new-start victim)))
 
-    ;; Invoking local call analysis converts this call to a LET.
-    (locall-analyze-component *current-component*))
+      ;; Invoking local call analysis converts this call to a LET.
+      (locall-analyze-component *current-component*)
+
+      (reoptimize-continuation (cast-value cast))
+      (setf (cast-type-to-check cast) *wild-type*)
+      (setf (cast-%type-check cast) nil)))
 
   (values))
 
@@ -490,40 +501,33 @@
 ;;; which may lead to inappropriate template choices due to the
 ;;; modification of argument types.
 (defun generate-type-checks (component)
-  (collect ((conts))
+  (collect ((casts))
     (do-blocks (block component)
       (when (block-type-check block)
 	(do-nodes (node cont block)
-	  (let ((type-check (continuation-type-check cont)))
-	    (unless (member type-check '(nil :deleted))
-	      (let ((atype (continuation-asserted-type cont)))
-		(do-uses (use cont)
-		  (unless (values-types-equal-or-intersect
-			   (node-derived-type use) atype)
-		    (unless (policy node (= inhibit-warnings 3))
-		      (emit-type-warning use))))))
-	    (when (eq type-check t)
-	      (cond ((worth-type-check-p cont)
-                     (conts (cons cont (not (probable-type-check-p cont)))))
-                    ((probable-type-check-p cont)
-                     (setf (continuation-%type-check cont) :deleted))
-                    (t
-                     (setf (continuation-%type-check cont) :no-check))))))
+          (when (cast-p node)
+            (cond ((worth-type-check-p node)
+                   (casts (cons node (not (probable-type-check-p node)))))
+                  #+nil
+                  ((probable-type-check-p cont)
+                   (setf (continuation-%type-check cont) :deleted))
+                  (t
+                   (aver (null (cast-%type-check node)))))))
 	(setf (block-type-check block) nil)))
-    (dolist (cont (conts))
-      (destructuring-bind (cont . force-hairy) cont
+    (dolist (cast (casts))
+      (destructuring-bind (cast . force-hairy) cast
         (multiple-value-bind (check types)
-            (continuation-check-types cont force-hairy)
+            (cast-check-types cast force-hairy)
           (ecase check
             (:simple)
             (:hairy
-             (convert-type-check cont types))
+             (convert-type-check cast types))
             (:too-hairy
-             (let* ((context (continuation-dest cont))
-                    (*compiler-error-context* context))
-               (when (policy context (>= safety inhibit-warnings))
+             (let ((*compiler-error-context* cast))
+               (when (policy cast (>= safety inhibit-warnings))
                  (compiler-note
                   "type assertion too complex to check:~% ~S."
-                  (type-specifier (continuation-asserted-type cont)))))
-             (setf (continuation-%type-check cont) :deleted)))))))
+                  (type-specifier (cast-asserted-type cast)))))
+             (setf (cast-type-to-check cast) *wild-type*)
+             (setf (cast-%type-check cast) nil)))))))
   (values))

@@ -155,7 +155,8 @@
     (let* ((dtype (node-derived-type call))
 	   (return-type (fun-type-returns type))
 	   (cont (node-cont call))
-	   (out-type
+	   (out-type dtype
+             #+nil
 	    (if (or (not (continuation-type-check cont))
 		    (and strict-result (policy call (/= safety 0))))
 		dtype
@@ -729,7 +730,8 @@
       (let* ((type-returns (fun-type-returns type))
 	     (return (lambda-return (main-entry functional)))
 	     (atype (when return
-		      (continuation-asserted-type (return-result return)))))
+                      nil
+		      #+nil(continuation-derived-type (return-result return))))) ; !!
 	(cond
 	 ((and atype (not (values-types-equal-or-intersect atype
 							   type-returns)))

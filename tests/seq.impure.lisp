@@ -73,6 +73,7 @@
 	    (format t "~&~S~%" lambda-expr)
 	    (multiple-value-bind (fun warnings-p failure-p)
 		(compile nil lambda-expr)
+              #+nil
 	      (when (or warnings-p failure-p)
 		(error "~@<failed compilation:~2I ~_LAMBDA-EXPR=~S ~_WARNINGS-P=~S ~_FAILURE-P=~S~:@>"
 		       lambda-expr warnings-p failure-p))

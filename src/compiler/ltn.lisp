@@ -58,15 +58,6 @@
     ((:safe :fast-safe) t)
     ((:small :fast) nil)))
 
-;;; Called when an unsafe policy indicates that no type check should
-;;; be done on CONT. We delete the type check unless it is :ERROR
-;;; (indicating a compile-time type error.)
-(defun flush-type-check (cont)
-  (declare (type continuation cont))
-  (when (member (continuation-type-check cont) '(t :no-check))
-    (setf (continuation-%type-check cont) :deleted))
-  (values))
-
 ;;; an annotated continuation's primitive-type
 #!-sb-fluid (declaim (inline continuation-ptype))
 (defun continuation-ptype (cont)
@@ -99,9 +90,7 @@
 ;;; Annotate a normal single-value continuation. If its only use is a
 ;;; ref that we are allowed to delay the evaluation of, then we mark
 ;;; the continuation for delayed evaluation, otherwise we assign a TN
-;;; to hold the continuation's value. If the continuation has a type
-;;; check, we make the TN according to the proven type to ensure that
-;;; the possibly erroneous value can be represented.
+;;; to hold the continuation's value.
 (defun annotate-1-value-continuation (cont)
   (declare (type continuation cont))
   (let ((info (continuation-info cont)))
@@ -109,54 +98,35 @@
     (cond
      ((continuation-delayed-leaf cont)
       (setf (ir2-continuation-kind info) :delayed))
-     ((member (continuation-type-check cont) '(:deleted nil))
-      (setf (ir2-continuation-locs info)
-	    (list (make-normal-tn (ir2-continuation-primitive-type info)))))
-     (t
-      (setf (ir2-continuation-locs info)
-	    (list (make-normal-tn
-		   (primitive-type
-		    (single-value-type (continuation-proven-type cont)))))))))
+     (t (setf (ir2-continuation-locs info)
+              (list (make-normal-tn (ir2-continuation-primitive-type info)))))))
+  (ltn-annotate-casts cont)
   (values))
 
 ;;; Make an IR2-CONTINUATION corresponding to the continuation type
-;;; and then do ANNOTATE-1-VALUE-CONTINUATION. If POLICY-KEYWORD isn't
-;;; a safe policy keyword, then we clear the TYPE-CHECK flag.
-(defun annotate-ordinary-continuation (cont ltn-policy)
-  (declare (type continuation cont)
-	   (type ltn-policy ltn-policy))
+;;; and then do ANNOTATE-1-VALUE-CONTINUATION.
+(defun annotate-ordinary-continuation (cont)
+  (declare (type continuation cont))
   (let ((info (make-ir2-continuation
 	       (primitive-type (continuation-type cont)))))
     (setf (continuation-info cont) info)
-    (unless (ltn-policy-safe-p ltn-policy)
-      (flush-type-check cont))
     (annotate-1-value-continuation cont))
   (values))
 
 ;;; Annotate the function continuation for a full call. If the only
 ;;; reference is to a global function and DELAY is true, then we delay
 ;;; the reference, otherwise we annotate for a single value.
-;;;
-;;; Unlike for an argument, we only clear the type check flag when the
-;;; LTN-POLICY is unsafe, since the check for a valid function
-;;; object must be done before the call.
-(defun annotate-fun-continuation (cont ltn-policy &optional (delay t))
-  (declare (type continuation cont) (type ltn-policy ltn-policy))
-  (unless (ltn-policy-safe-p ltn-policy)
-    (flush-type-check cont))
-  (let* ((ptype (primitive-type (continuation-type cont)))
-	 (tn-ptype (if (member (continuation-type-check cont) '(:deleted nil))
-		       ptype
-		       (primitive-type
-			(single-value-type
-			 (continuation-proven-type cont)))))
-	 (info (make-ir2-continuation ptype)))
+(defun annotate-fun-continuation (cont &optional (delay t))
+  (declare (type continuation cont))
+  (let* ((tn-ptype (primitive-type (continuation-type cont)))
+	 (info (make-ir2-continuation tn-ptype)))
     (setf (continuation-info cont) info)
     (let ((name (continuation-fun-name cont t)))
       (if (and delay name)
 	  (setf (ir2-continuation-kind info) :delayed)
 	  (setf (ir2-continuation-locs info)
 		(list (make-normal-tn tn-ptype))))))
+  (ltn-annotate-casts cont)
   (values))
 
 ;;; If TAIL-P is true, then we check to see whether the call can really
@@ -178,56 +148,47 @@
 	     (setf (node-tail-p call) nil)))))
   (values))
 
-;;; We set the kind to :FULL or :FUNNY, depending on whether there is an
-;;; IR2-CONVERT method. If a funny function, then we inhibit tail recursion
-;;; and type check normally, since the IR2 convert method is going to want to
-;;; deliver values normally. We still annotate the function continuation,
-;;; since IR2tran might decide to call after all.
+;;; We set the kind to :FULL or :FUNNY, depending on whether there is
+;;; an IR2-CONVERT method. If a funny function, then we inhibit tail
+;;; recursion normally, since the IR2 convert method is going to want
+;;; to deliver values normally. We still annotate the function
+;;; continuation, since IR2tran might decide to call after all.
 ;;;
-;;; If not funny, we flush arg type checks, when LTN-POLICY is not
-;;; safe.
-;;;
-;;; Note that args may already be annotated because template selection can
-;;; bail out to here.
+;;; Note that args may already be annotated because template selection
+;;; can bail out to here.
 (defun ltn-default-call (call ltn-policy)
   (declare (type combination call) (type ltn-policy ltn-policy))
   (let ((kind (basic-combination-kind call)))
     (annotate-fun-continuation (basic-combination-fun call) ltn-policy)
 
     (cond
-     ((and (fun-info-p kind)
-	   (fun-info-ir2-convert kind))
-      (setf (basic-combination-info call) :funny)
-      (setf (node-tail-p call) nil)
-      (dolist (arg (basic-combination-args call))
-	(unless (continuation-info arg)
-	  (setf (continuation-info arg)
-		(make-ir2-continuation
-		 (primitive-type
-		  (continuation-type arg)))))
-	(annotate-1-value-continuation arg)))
-     (t
-      (let ((safe-p (ltn-policy-safe-p ltn-policy)))
-	(dolist (arg (basic-combination-args call))
-	  (unless safe-p (flush-type-check arg))
-	  (unless (continuation-info arg)
-	    (setf (continuation-info arg)
-		  (make-ir2-continuation
-		   (primitive-type
-		    (continuation-type arg)))))
-	  (annotate-1-value-continuation arg)))
-      (when (eq kind :error)
-	(setf (basic-combination-kind call) :full))
-      (setf (basic-combination-info call) :full)
-      (flush-full-call-tail-transfer call))))
+      ((and (fun-info-p kind)
+            (fun-info-ir2-convert kind))
+       (setf (basic-combination-info call) :funny)
+       (setf (node-tail-p call) nil)
+       (dolist (arg (basic-combination-args call))
+         (unless (continuation-info arg)
+           (setf (continuation-info arg)
+                 (make-ir2-continuation
+                  (primitive-type
+                   (continuation-type arg)))))
+         (annotate-1-value-continuation arg)))
+      (t
+       (dolist (arg (basic-combination-args call))
+         (unless (continuation-info arg)
+           (setf (continuation-info arg)
+                 (make-ir2-continuation
+                  (primitive-type
+                   (continuation-type arg)))))
+         (annotate-1-value-continuation arg))
+       (when (eq kind :error)
+         (setf (basic-combination-kind call) :full))
+       (setf (basic-combination-info call) :full)
+       (flush-full-call-tail-transfer call))))
 
   (values))
 
 ;;; Annotate a continuation for unknown multiple values:
-;;; -- Delete any type check, regardless of LTN-POLICY, since IR2
-;;;    conversion isn't prepared to check unknown-values continuations.
-;;;    If we delete a type check when the policy is safe, then we emit
-;;;    a warning.
 ;;; -- Add the continuation to the IR2-BLOCK-POPPED if it is used
 ;;;    across a block boundary.
 ;;; -- Assign an :UNKNOWN IR2-CONTINUATION.
@@ -236,19 +197,8 @@
 ;;; of CONT's DEST, and called in the order that the continuations are
 ;;; received. Otherwise the IR2-BLOCK-POPPED and
 ;;; IR2-COMPONENT-VALUES-FOO would get all messed up.
-(defun annotate-unknown-values-continuation (cont ltn-policy)
-  (declare (type continuation cont) (type ltn-policy ltn-policy))
-  (when (eq (continuation-type-check cont) t)
-    (let* ((dest (continuation-dest cont))
-	   (*compiler-error-context* dest))
-      (when (and (ltn-policy-safe-p ltn-policy)
-		 (policy dest (>= safety inhibit-warnings)))
-	(compiler-note "compiler limitation: ~
-                        unable to check type assertion in ~
-			unknown-values context:~%  ~S"
-		       (continuation-asserted-type cont))))
-    (setf (continuation-%type-check cont) :deleted))
-
+(defun annotate-unknown-values-continuation (cont)
+  (declare (type continuation cont))
   (let* ((block (node-block (continuation-dest cont)))
 	 (use (continuation-use cont))
 	 (2block (block-info block)))
@@ -261,36 +211,17 @@
     (setf (ir2-continuation-locs 2cont) (make-unknown-values-locations))
     (setf (continuation-info cont) 2cont))
 
+  (ltn-annotate-casts cont)
   (values))
 
 ;;; Annotate CONT for a fixed, but arbitrary number of values, of the
-;;; specified primitive TYPES. If the continuation has a type check,
-;;; we annotate for the number of values indicated by TYPES, but only
-;;; use proven type information.
-(defun annotate-fixed-values-continuation (cont ltn-policy types)
-  (declare (type continuation cont) (type ltn-policy ltn-policy) (list types))
-  (unless (ltn-policy-safe-p ltn-policy)
-    (flush-type-check cont))
+;;; specified primitive TYPES.
+(defun annotate-fixed-values-continuation (cont types)
+  (declare (type continuation cont) (list types))
   (let ((res (make-ir2-continuation nil)))
-    (if (member (continuation-type-check cont) '(:deleted nil))
-	(setf (ir2-continuation-locs res) (mapcar #'make-normal-tn types))
-	(let* ((proven (mapcar (lambda (x)
-				 (make-normal-tn (primitive-type x)))
-			       (values-types
-				(continuation-proven-type cont))))
-	       (num-proven (length proven))
-	       (num-types (length types)))
-	  (setf (ir2-continuation-locs res)
-		(cond
-		 ((< num-proven num-types)
-		  (append proven
-			  (make-n-tns (- num-types num-proven)
-				      *backend-t-primitive-type*)))
-		 ((> num-proven num-types)
-		  (subseq proven 0 num-types))
-		 (t
-		  proven)))))
+    (setf (ir2-continuation-locs res) (mapcar #'make-normal-tn types))
     (setf (continuation-info cont) res))
+  (ltn-annotate-casts cont)
   (values))
 
 ;;;; node-specific analysis functions
@@ -315,8 +246,8 @@
 ;;;    perverse code, we may annotate for unknown values when we
 ;;;    didn't have to.
 ;;; * Otherwise, we must annotate the continuation for unknown values.
-(defun ltn-analyze-return (node ltn-policy)
-  (declare (type creturn node) (type ltn-policy ltn-policy))
+(defun ltn-analyze-return (node)
+  (declare (type creturn node))
   (let* ((cont (return-result node))
 	 (fun (return-lambda node))
 	 (returns (tail-set-info (lambda-tail-set fun)))
@@ -329,16 +260,14 @@
 			 (member (basic-combination-info use) '(:local :full)))
 	      (res (node-derived-type use))))
 
-	  (let ((int (values-type-intersection
-		      (res)
-		      (continuation-asserted-type cont))))
+	  (let ((int (res)))
 	    (multiple-value-bind (types kind)
 		(values-types (if (eq int *empty-type*) (res) int))
 	      (if (eq kind :unknown)
-		  (annotate-unknown-values-continuation cont ltn-policy)
+		  (annotate-unknown-values-continuation cont)
 		  (annotate-fixed-values-continuation
-		   cont ltn-policy (mapcar #'primitive-type types))))))
-	(annotate-fixed-values-continuation cont ltn-policy types)))
+		   cont (mapcar #'primitive-type types))))))
+	(annotate-fixed-values-continuation cont types)))
 
   (values))
 
@@ -346,14 +275,12 @@
 ;;; continuation. We look at the called lambda to determine number and
 ;;; type of return values desired. It is assumed that only a function
 ;;; that LOOKS-LIKE-AN-MV-BIND will be converted to a local call.
-(defun ltn-analyze-mv-bind (call ltn-policy)
-  (declare (type mv-combination call)
-	   (type ltn-policy ltn-policy))
+(defun ltn-analyze-mv-bind (call)
+  (declare (type mv-combination call))
   (setf (basic-combination-kind call) :local)
   (setf (node-tail-p call) nil)
   (annotate-fixed-values-continuation
    (first (basic-combination-args call))
-   ltn-policy
    (mapcar (lambda (var)
 	     (primitive-type (basic-var-type var)))
 	   (lambda-vars
@@ -376,35 +303,33 @@
 ;;; in IR1 as an MV call to the %THROW funny function. We annotate the
 ;;; tag continuation for a single value and the values continuation
 ;;; for unknown values.
-(defun ltn-analyze-mv-call (call ltn-policy)
-  (declare (type mv-combination call) (type ltn-policy ltn-policy))
+(defun ltn-analyze-mv-call (call)
+  (declare (type mv-combination call))
   (let ((fun (basic-combination-fun call))
 	(args (basic-combination-args call)))
     (cond ((eq (continuation-fun-name fun) '%throw)
 	   (setf (basic-combination-info call) :funny)
-	   (annotate-ordinary-continuation (first args) ltn-policy)
-	   (annotate-unknown-values-continuation (second args) ltn-policy)
+	   (annotate-ordinary-continuation (first args))
+	   (annotate-unknown-values-continuation (second args))
 	   (setf (node-tail-p call) nil))
 	  (t
 	   (setf (basic-combination-info call) :full)
 	   (annotate-fun-continuation (basic-combination-fun call)
-				      ltn-policy
 				      nil)
 	   (dolist (arg (reverse args))
-	     (annotate-unknown-values-continuation arg ltn-policy))
+	     (annotate-unknown-values-continuation arg))
 	   (flush-full-call-tail-transfer call))))
 
   (values))
 
 ;;; Annotate the arguments as ordinary single-value continuations. And
 ;;; check the successor.
-(defun ltn-analyze-local-call (call ltn-policy)
-  (declare (type combination call)
-	   (type ltn-policy ltn-policy))
+(defun ltn-analyze-local-call (call)
+  (declare (type combination call))
   (setf (basic-combination-info call) :local)
   (dolist (arg (basic-combination-args call))
     (when arg
-      (annotate-ordinary-continuation arg ltn-policy)))
+      (annotate-ordinary-continuation arg)))
   (when (node-tail-p call)
     (set-tail-local-call-successor call))
   (values))
@@ -425,10 +350,10 @@
   (values))
 
 ;;; Annotate the value continuation.
-(defun ltn-analyze-set (node ltn-policy)
-  (declare (type cset node) (type ltn-policy ltn-policy))
+(defun ltn-analyze-set (node)
+  (declare (type cset node))
   (setf (node-tail-p node) nil)
-  (annotate-ordinary-continuation (set-value node) ltn-policy)
+  (annotate-ordinary-continuation (set-value node))
   (values))
 
 ;;; If the only use of the TEST continuation is a combination
@@ -438,8 +363,8 @@
 ;;; a conditional template if the call immediately precedes the IF
 ;;; node in the same block, we know that any predicate will already be
 ;;; annotated.
-(defun ltn-analyze-if (node ltn-policy)
-  (declare (type cif node) (type ltn-policy ltn-policy))
+(defun ltn-analyze-if (node)
+  (declare (type cif node))
   (setf (node-tail-p node) nil)
   (let* ((test (if-test node))
 	 (use (continuation-use test)))
@@ -447,17 +372,17 @@
 		 (let ((info (basic-combination-info use)))
 		   (and (template-p info)
 			(eq (template-result-types info) :conditional))))
-      (annotate-ordinary-continuation test ltn-policy)))
+      (annotate-ordinary-continuation test)))
   (values))
 
 ;;; If there is a value continuation, then annotate it for unknown
 ;;; values. In this case, the exit is non-local, since all other exits
 ;;; are deleted or degenerate by this point.
-(defun ltn-analyze-exit (node ltn-policy)
+(defun ltn-analyze-exit (node)
   (setf (node-tail-p node) nil)
   (let ((value (exit-value node)))
     (when value
-      (annotate-unknown-values-continuation value ltn-policy)))
+      (annotate-unknown-values-continuation value)))
   (values))
 
 ;;; We need a special method for %UNWIND-PROTECT that ignores the
@@ -525,10 +450,6 @@
       (when (null args) (return nil))
       (let ((arg (car args))
 	    (type (car types)))
-	(when (and (eq (continuation-type-check arg) :no-check)
-		   safe-p
-		   (not (eq (template-ltn-policy template) :safe)))
-	  (return nil))
 	(unless (operand-restriction-ok type (continuation-ptype arg)
 					:cont arg)
 	  (return nil))))))
@@ -586,7 +507,6 @@
   (declare (type template template) (type combination call))
   (let* ((guard (template-guard template))
 	 (cont (node-cont call))
-	 (atype (continuation-asserted-type cont))
 	 (dtype (node-derived-type call)))
     (cond ((and guard (not (funcall guard)))
 	   (values nil :guard))
@@ -601,13 +521,7 @@
 		      (immediately-used-p (if-test dest) call))
 		 (values t nil)
 		 (values nil :conditional))))
-	  ((template-results-ok
-	    template
-	    (if (and (or (eq (template-ltn-policy template) :safe)
-			 (not safe-p))
-		     (continuation-type-check cont))
-		(values-type-intersection dtype atype)
-		dtype))
+	  ((template-results-ok template dtype)
 	   (values t nil))
 	  (t
 	   (values nil :result-types)))))
@@ -818,29 +732,6 @@
 			       . ,(messages))))))))
   (values))
 
-;;; Flush type checks according to policy. If the policy is
-;;; unsafe, then we never do any checks. If our policy is safe, and
-;;; we are using a safe template, then we can also flush arg and
-;;; result type checks. Result type checks are only flushed when the
-;;; continuation has a single use. Result type checks are not flush if
-;;; the policy is safe because the selection of template for results
-;;; readers assumes the type check is done (uses the derived type
-;;; which is the intersection of the proven and asserted types).
-(defun flush-type-checks-according-to-ltn-policy (call ltn-policy template)
-  (declare (type combination call) (type ltn-policy ltn-policy)
-	   (type template template))
-  (let ((safe-op (eq (template-ltn-policy template) :safe)))
-    (when (or (not (ltn-policy-safe-p ltn-policy)) safe-op)
-      (dolist (arg (basic-combination-args call))
-	(flush-type-check arg)))
-    (when safe-op
-      (let ((cont (node-cont call)))
-	(when (and (eq (continuation-use cont) call)
-		   (not (ltn-policy-safe-p ltn-policy)))
-	  (flush-type-check cont)))))
-
-  (values))
-
 ;;; If a function has a special-case annotation method use that,
 ;;; otherwise annotate the argument continuations and try to find a
 ;;; template corresponding to the type signature. If there is none,
@@ -892,12 +783,46 @@
       (setf (basic-combination-info call) template)
       (setf (node-tail-p call) nil)
 
-      (flush-type-checks-according-to-ltn-policy call ltn-policy template)
-
       (dolist (arg args)
 	(annotate-1-value-continuation arg))))
 
   (values))
+
+;;; CASTs are merely continuation annotations than nodes. So we wait
+;;; until value consumer deside how values should be passed, and after
+;;; that we propagate this decision backwards through CAST chain. The
+;;; exception is a dangling CAST with a type check, which we process
+;;; immediately.
+(defun ltn-analyze-cast (cast)
+  (declare (type cast cast))
+  (setf (node-tail-p cast) nil)
+  (when (and (cast-type-check cast)
+             (not (continuation-dest (node-cont cast))))
+    ;; FIXME
+    )
+  (values))
+
+(defun ltn-annotate-casts (cont)
+  (declare (type continuation cont))
+  (do-uses (node cont)
+    (when (cast-p node)
+      (ltn-annotate-cast node))))
+
+(defun ltn-annotate-cast (cast)
+  (declare (type cast))
+  (aver (not (cast-type-check cast)))   ; FIXME
+  (let ((2cont (continuation-info (node-cont cast)))
+        (value (cast-value cast)))
+    (aver 2cont)
+    (ecase (ir2-continuation-kind 2cont)
+      (:unknown
+       (annotate-unknown-values-continuation value))
+      (:fixed
+       (annotate-fixed-values-continuation
+        value
+        (mapcar #'tn-primitive-type (ir2-continuation-locs 2cont))))))
+  (values))
+
 
 ;;;; interfaces
 
@@ -917,24 +842,25 @@
       (ref)
       (combination
        (case (basic-combination-kind node)
-	 (:local (ltn-analyze-local-call node ltn-policy))
+	 (:local (ltn-analyze-local-call node))
 	 ((:full :error) (ltn-default-call node ltn-policy))
 	 (t
 	  (ltn-analyze-known-call node ltn-policy))))
       (cif
-       (ltn-analyze-if node ltn-policy))
+       (ltn-analyze-if node))
       (creturn
-       (ltn-analyze-return node ltn-policy))
+       (ltn-analyze-return node))
       ((or bind entry))
       (exit
-       (ltn-analyze-exit node ltn-policy))
-      (cset (ltn-analyze-set node ltn-policy))
+       (ltn-analyze-exit node))
+      (cset (ltn-analyze-set node))
+      (cast (ltn-analyze-cast node))
       (mv-combination
        (ecase (basic-combination-kind node)
 	 (:local
-	  (ltn-analyze-mv-bind node ltn-policy))
+	  (ltn-analyze-mv-bind node))
 	 ((:full :error)
-	  (ltn-analyze-mv-call node ltn-policy)))))
+	  (ltn-analyze-mv-call node)))))
     (when (eq node (block-last block))
       (return))))
 

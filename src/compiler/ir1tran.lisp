@@ -215,7 +215,7 @@
 ;;; CONSTANT might be circular. We also check that the constant (and
 ;;; any subparts) are dumpable at all.
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  ;; The EVAL-WHEN is necessary for #.(1+ LIST-TO-HASH-TABLE-THRESHOLD) 
+  ;; The EVAL-WHEN is necessary for #.(1+ LIST-TO-HASH-TABLE-THRESHOLD)
   ;; below. -- AL 20010227
   (def!constant list-to-hash-table-threshold 32))
 (defun maybe-emit-make-load-forms (constant)
@@ -303,10 +303,6 @@
 ;;; our block and link it to that block. If the continuation is not
 ;;; currently used, then we set the DERIVED-TYPE for the continuation
 ;;; to that of the node, so that a little type propagation gets done.
-;;;
-;;; We also deal with a bit of THE's semantics here: we weaken the
-;;; assertion on CONT to be no stronger than the assertion on CONT in
-;;; our scope. See the IR1-CONVERT method for THE.
 #!-sb-fluid (declaim (inline use-continuation))
 (defun use-continuation (node cont)
   (declare (type node node) (type continuation cont))
@@ -334,20 +330,7 @@
       (error "~S is already a predecessor of ~S." node-block block))
     (push node-block (block-pred block))
     (add-continuation-use node cont)
-    (unless (eq (continuation-asserted-type cont) *wild-type*)
-      (let* ((restriction (or (lexenv-find cont type-restrictions)
-                              *wild-type*))
-             (wrestriction (or (lexenv-find cont weakend-type-restrictions)
-                               *wild-type*))
-             (newatype (values-type-union (continuation-asserted-type cont)
-                                          restriction))
-             (newctype (values-type-union (continuation-type-to-check cont)
-                                          wrestriction)))
-	(when (or (type/= newatype (continuation-asserted-type cont))
-                  (type/= newctype (continuation-type-to-check cont)))
-	  (setf (continuation-asserted-type cont) newatype)
-          (setf (continuation-type-to-check cont) newctype)
-	  (reoptimize-continuation cont))))))
+    (reoptimize-continuation cont)))
 
 ;;;; exported functions
 
@@ -522,7 +505,7 @@
      (when (producing-fasl-file)
        (maybe-emit-make-load-forms value))
      (let* ((leaf (find-constant value))
-	    (res (make-ref (leaf-type leaf) leaf)))
+	    (res (make-ref leaf)))
        (push res (leaf-refs leaf))
        (link-node-to-previous-continuation res start)
        (use-continuation res cont)))
@@ -543,7 +526,7 @@
   (when (typep functional '(or optional-dispatch clambda))
 
     ;; When FUNCTIONAL knows its component
-    (when (lambda-p functional) 
+    (when (lambda-p functional)
       (aver (eql (lambda-component functional) *current-component*)))
 
     (pushnew functional
@@ -557,23 +540,26 @@
 ;;; functional instead.
 (defun reference-leaf (start cont leaf)
   (declare (type continuation start cont) (type leaf leaf))
-  (with-continuation-type-assertion
-      (cont (or (lexenv-find leaf type-restrictions) *wild-type*)
-            "in DECLARE")
-    (let* ((leaf (or (and (defined-fun-p leaf)
-                          (not (eq (defined-fun-inlinep leaf)
-                                   :notinline))
-                          (let ((functional (defined-fun-functional leaf)))
-                            (when (and functional
-                                       (not (functional-kind functional)))
-                              (maybe-reanalyze-functional functional))))
-                     leaf))
-           (res (make-ref (leaf-type leaf)
-                          leaf)))
-      (push res (leaf-refs leaf))
-      (setf (leaf-ever-used leaf) t)
-      (link-node-to-previous-continuation res start)
-      (use-continuation res cont))))
+  (let* ((type (lexenv-find leaf type-restrictions))
+         (leaf (or (and (defined-fun-p leaf)
+                        (not (eq (defined-fun-inlinep leaf)
+                                 :notinline))
+                        (let ((functional (defined-fun-functional leaf)))
+                          (when (and functional
+                                     (not (functional-kind functional)))
+                            (maybe-reanalyze-functional functional))))
+                   leaf))
+         (ref (make-ref leaf)))
+    (push ref (leaf-refs leaf))
+    (setf (leaf-ever-used leaf) t)
+    (link-node-to-previous-continuation ref start)
+    (cond (type (let* ((ref-cont (make-continuation))
+                       (cast (make-cast ref-cont type (lexenv-policy *lexenv*))))
+                  (setf (continuation-dest ref-cont) cast)
+                  (use-continuation ref ref-cont)
+                  (link-node-to-previous-continuation cast ref-cont)
+                  (use-continuation cast cont)))
+          (t (use-continuation ref cont)))))
 
 ;;; Convert a reference to a symbolic constant or variable. If the
 ;;; symbol is entered in the LEXENV-VARS we use that definition,
@@ -595,6 +581,7 @@
        (reference-leaf start cont var))
       (cons
        (aver (eq (car var) 'MACRO))
+       ;; FIXME: [Free] type declarations. -- APD, 2002-01-26
        (ir1-convert start cont (cdr var)))
       (heap-alien-info
        (ir1-convert start cont `(%heap-alien ',var)))))
@@ -748,7 +735,7 @@
 		ir1-convert-combination))
 (defun ir1-convert-combination (start cont form fun)
   (let ((fun-cont (make-continuation)))
-    (reference-leaf start fun-cont fun)
+    (ir1-convert start fun-cont `(the (or function symbol) ,fun))
     (ir1-convert-combination-args fun-cont cont (cdr form))))
 
 ;;; Convert the arguments to a call and make the COMBINATION
@@ -759,9 +746,6 @@
   (declare (type continuation fun-cont cont) (list args))
   (let ((node (make-combination fun-cont)))
     (setf (continuation-dest fun-cont) node)
-    (assert-continuation-type fun-cont
-			      (specifier-type '(or function symbol))
-                              (lexenv-policy *lexenv*))
     (setf (continuation-%externally-checkable-type fun-cont) nil)
     (collect ((arg-conts))
       (let ((this-start fun-cont))
@@ -832,8 +816,7 @@
 	 (type (leaf-type var)))
     (when (validate-call-type node type t)
       (setf (continuation-%derived-type fun-cont) type)
-      (setf (continuation-reoptimize fun-cont) nil)
-      (setf (continuation-%type-check fun-cont) nil)))
+      (setf (continuation-reoptimize fun-cont) nil)))
   (values))
 
 ;;; Convert a call to a local function, or if the function has already
@@ -1115,8 +1098,8 @@
 	:policy (process-optimize-decl spec (lexenv-policy res))))
       (type
        (process-type-decl (cdr spec) res vars))
-      (values
-       (if *suppress-values-declaration*
+      (values ;; FIXME -- APD, 2002-01-26
+       (if t ; *suppress-values-declaration*
 	   res
 	   (let ((types (cdr spec)))
 	     (ir1ize-the-or-values (if (eql (length types) 1)
@@ -1262,12 +1245,12 @@
 		       (compiler-error
 			"The list ~S is too long to be an arg specifier."
 			spec)))))))
-	
+
 	(dolist (name required)
 	  (let ((var (varify-lambda-arg name (names-so-far))))
 	    (vars var)
 	    (names-so-far name)))
-	
+
 	(dolist (spec optional)
 	  (if (atom spec)
 	      (let ((var (varify-lambda-arg spec (names-so-far))))
@@ -1282,7 +1265,7 @@
 		(vars var)
 		(names-so-far name)
 		(parse-default spec info))))
-	
+
 	(when restp
 	  (let ((var (varify-lambda-arg rest (names-so-far))))
 	    (setf (lambda-var-arg-info var) (make-arg-info :kind :rest))
@@ -1300,7 +1283,7 @@
 		  (make-arg-info :kind :more-count))
 	    (vars var)
 	    (names-so-far more-count)))
-	
+
 	(dolist (spec keys)
 	  (cond
 	   ((atom spec)
@@ -1337,7 +1320,7 @@
 		(vars var)
 		(names-so-far name)
 		(parse-default spec info))))))
-	
+
 	(dolist (spec aux)
 	  (cond ((atom spec)
 		 (let ((var (varify-lambda-arg spec nil)))
@@ -1370,12 +1353,12 @@
       (ir1-convert-progn-body start cont body)
       (let ((fun-cont (make-continuation))
 	    (fun (ir1-convert-lambda-body body
-					  (list (first aux-vars))
-					  :aux-vars (rest aux-vars)
-					  :aux-vals (rest aux-vals)
-					  :debug-name (debug-namify
-						       "&AUX bindings ~S"
-						       aux-vars))))
+ 					  (list (first aux-vars))
+ 					  :aux-vars (rest aux-vars)
+ 					  :aux-vals (rest aux-vals)
+ 					  :debug-name (debug-namify
+ 						       "&AUX bindings ~S"
+ 						       aux-vars))))
 	(reference-leaf start fun-cont fun)
 	(ir1-convert-combination-args fun-cont cont
 				      (list (first aux-vals)))))
@@ -1451,6 +1434,8 @@
 			      :%debug-name debug-name))
 	 (result (or result (make-continuation))))
 
+    (continuation-starts-block result)
+
     ;; just to check: This function should fail internal assertions if
     ;; we didn't set up a valid debug name above.
     ;;
@@ -1481,7 +1466,7 @@
 				   :cleanup nil)))
 	(setf (bind-lambda bind) lambda)
 	(setf (node-lexenv bind) *lexenv*)
-	
+
 	(let ((cont1 (make-continuation))
 	      (cont2 (make-continuation)))
 	  (continuation-starts-block cont1)
@@ -2153,7 +2138,7 @@
 (defun %compiler-defun (name lambda-with-lexenv)
 
   (let ((defined-fun nil)) ; will be set below if we're in the compiler
-    
+
     (when (boundp '*lexenv*) ; when in the compiler
       (when sb!xc:*compile-print*
 	(compiler-mumble "~&; recognizing DEFUN ~S~%" name))
@@ -2165,7 +2150,7 @@
     (cond (lambda-with-lexenv
 	   (setf (info :function :inline-expansion-designator name)
 		 lambda-with-lexenv)
-	   (when defined-fun 
+	   (when defined-fun
 	     (setf (defined-fun-inline-expansion defined-fun)
 		   lambda-with-lexenv)))
 	  (t

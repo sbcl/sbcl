@@ -647,9 +647,9 @@
 	      ((function type &rest args) node ltn-policy)
   (setf (basic-combination-info node) :funny)
   (setf (node-tail-p node) nil)
-  (annotate-ordinary-continuation function ltn-policy)
+  (annotate-ordinary-continuation function)
   (dolist (arg args)
-    (annotate-ordinary-continuation arg ltn-policy)))
+    (annotate-ordinary-continuation arg)))
 
 (defoptimizer (%alien-funcall ir2-convert)
 	      ((function type &rest args) call block)

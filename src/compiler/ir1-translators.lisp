@@ -470,9 +470,7 @@
 
 (def-ir1-translator %funcall ((function &rest args) start cont)
   (let ((fun-cont (make-continuation)))
-    (ir1-convert start fun-cont function)
-    (assert-continuation-type fun-cont (specifier-type 'function)
-                              (lexenv-policy *lexenv*))
+    (ir1-convert start fun-cont `(the function ,function))
     (ir1-convert-combination-args fun-cont cont args)))
 
 ;;; This source transform exists to reduce the amount of work for the
@@ -680,94 +678,48 @@
 
 ;;;; the THE special operator, and friends
 
-;;; Do stuff to recognize a THE or VALUES declaration. CONT is the
-;;; continuation that the assertion applies to, TYPE is the type
-;;; specifier and LEXENV is the current lexical environment. NAME is
-;;; the name of the declaration we are doing, for use in error
-;;; messages.
-;;;
-;;; This is somewhat involved, since a type assertion may only be made
-;;; on a continuation, not on a node. We can't just set the
-;;; continuation asserted type and let it go at that, since there may
-;;; be parallel THE's for the same continuation, i.e.
-;;;     (if ...
-;;;	 (the foo ...)
-;;;	 (the bar ...))
-;;;
-;;; In this case, our representation can do no better than the union
-;;; of these assertions. And if there is a branch with no assertion,
-;;; we have nothing at all. We really need to recognize scoping, since
-;;; we need to be able to discern between parallel assertions (which
-;;; we union) and nested ones (which we intersect).
-;;;
-;;; We represent the scoping by throwing our innermost (intersected)
-;;; assertion on CONT into the TYPE-RESTRICTIONS. As we go down, we
-;;; intersect our assertions together. If CONT has no uses yet, we
-;;; have not yet bottomed out on the first COND branch; in this case
-;;; we optimistically assume that this type will be the one we end up
-;;; with, and set the ASSERTED-TYPE to it. We can never get better
-;;; than the type that we have the first time we bottom out. Later
-;;; THE's (or the absence thereof) can only weaken this result.
-;;;
-;;; We make this work by getting USE-CONTINUATION to do the unioning
-;;; across COND branches. We can't do it here, since we don't know how
-;;; many branches there are going to be.
-(defun ir1ize-the-or-values (type cont lexenv place)
-  (declare (type continuation cont) (type lexenv lexenv))
-  (let* ((atype (if (typep type 'ctype) type (compiler-values-specifier-type type)))
-	 (old-atype (or (lexenv-find cont type-restrictions)
-                        *wild-type*))
-         (old-ctype (or (lexenv-find cont weakend-type-restrictions)
-                        *wild-type*))
-	 (intersects (values-types-equal-or-intersect old-atype atype))
-	 (new-atype (values-type-intersection old-atype atype))
-         (new-ctype (values-type-intersection
-                     old-ctype (maybe-weaken-check atype (lexenv-policy lexenv)))))
-    (when (null (find-uses cont))
-      (setf (continuation-asserted-type cont) new-atype)
-      (setf (continuation-type-to-check cont) new-ctype))
-    (when (and (not intersects)
-	       ;; FIXME: Is it really right to look at *LEXENV* here,
-	       ;; instead of looking at the LEXENV argument? Why?
-	       (not (policy *lexenv*
-			    (= inhibit-warnings 3)))) ;FIXME: really OK to suppress?
-      (compiler-warn
-       "The type ~S ~A conflicts with an enclosing assertion:~%   ~S"
-       (type-specifier atype)
-       place
-       (type-specifier old-atype)))
-    (make-lexenv :type-restrictions `((,cont . ,new-atype))
-                 :weakend-type-restrictions `((,cont . ,new-ctype))
-		 :default lexenv)))
+;;; A logic shared among THE and TRULY-THE.
+(defun the-in-policy (type value policy start cont)
+  (let ((type (if (ctype-p type) type
+                  (compiler-values-specifier-type type))))
+    (cond ((or (and (leaf-p value)
+                    (values-subtypep (leaf-type value) type))
+               (and (sb!xc:constantp value)
+                    (ctypep (constant-form-value value) type)))
+           (ir1-convert start cont value))
+          (t (let ((value-cont (make-continuation)))
+               (ir1-convert start value-cont value)
+               (let ((cast (make-cast value-cont type policy)))
+                 (link-node-to-previous-continuation cast value-cont)
+                 (setf (continuation-dest value-cont) cast)
+                 (use-continuation cast cont)))))))
 
 ;;; Assert that FORM evaluates to the specified type (which may be a
-;;; VALUES type).
+;;; VALUES type). TYPE may be a type specifier or (as a hack) a CTYPE.
 ;;;
 ;;; FIXME: In a version of CMU CL that I used at Cadabra ca. 20000101,
 ;;; this didn't seem to expand into an assertion, at least for ALIEN
 ;;; values. Check that SBCL doesn't have this problem.
 (def-ir1-translator the ((type value) start cont)
-  (with-continuation-type-assertion (cont (compiler-values-specifier-type type)
-                                          "in THE declaration")
-    (ir1-convert start cont value)))
+  (the-in-policy type value (lexenv-policy *lexenv*) start cont))
 
 ;;; This is like the THE special form, except that it believes
 ;;; whatever you tell it. It will never generate a type check, but
 ;;; will cause a warning if the compiler can prove the assertion is
 ;;; wrong.
-;;;
-;;; Since the CONTINUATION-DERIVED-TYPE is computed as the union of
-;;; its uses's types, setting it won't work. Instead we must intersect
-;;; the type with the uses's DERIVED-TYPE.
 (def-ir1-translator truly-the ((type value) start cont)
   #!+sb-doc
+  ""
   (declare (inline member))
+  #-nil
   (let ((type (compiler-values-specifier-type type))
 	(old (find-uses cont)))
     (ir1-convert start cont value)
     (do-uses (use cont)
       (unless (member use old :test #'eq)
-	(derive-node-type use type)))))
+	(derive-node-type use type))))
+  #+nil
+  (the-in-policy type value '((type-check . 0)) start cont))
 
 ;;;; SETQ
 
@@ -799,6 +751,7 @@
 	     (setq-var start cont leaf (second things)))
 	    (cons
 	     (aver (eq (car leaf) 'MACRO))
+             ;; FIXME: [Free] type declaration. -- APD, 2002-01-26
 	     (ir1-convert start cont `(setf ,(cdr leaf) ,(second things))))
 	    (heap-alien-info
 	     (ir1-convert start cont
@@ -813,12 +766,10 @@
 ;;; This should only need to be called in SETQ.
 (defun setq-var (start cont var value)
   (declare (type continuation start cont) (type basic-var var))
-  (let ((dest (make-continuation)))
-    (ir1-convert start dest value)
-    (assert-continuation-type dest
-                              (or (lexenv-find var type-restrictions)
-                                  (leaf-type var))
-                              (lexenv-policy *lexenv*))
+  (let ((dest (make-continuation))
+        (type (or (lexenv-find var type-restrictions)
+                  (leaf-type var))))
+    (ir1-convert start dest `(the ,type ,value))
     (let ((res (make-set :var var :value dest)))
       (setf (continuation-dest dest) res)
       (setf (leaf-ever-used var) t)
@@ -1011,11 +962,7 @@
     (continuation-starts-block dummy-start)
     (ir1-convert start dummy-start result)
 
-    (with-continuation-type-assertion
-        ;; FIXME: policy
-        (cont (continuation-asserted-type dummy-start)
-              "of the first form")
-      (substitute-continuation-uses cont dummy-start))
+    (substitute-continuation-uses cont dummy-start)
 
     (continuation-starts-block dummy-result)
     (ir1-convert-progn-body dummy-start dummy-result forms)
