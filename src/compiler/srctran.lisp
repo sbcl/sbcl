@@ -3086,18 +3086,20 @@
 ;;; Expand MAX and MIN into the obvious comparisons.
 (define-source-transform max (arg &rest more-args)
   (if (null more-args)
-      `(values ,arg)
+      `(the real ,arg) ; ANSI: should signal TYPE-ERROR if any arg not a REAL
       (once-only ((arg1 arg)
 		  (arg2 `(max ,@more-args)))
 	`(if (> ,arg1 ,arg2)
-	     ,arg1 ,arg2))))
+	     ,arg1
+	     ,arg2))))
 (define-source-transform min (arg &rest more-args)
   (if (null more-args)
-      `(values ,arg)
+      `(the real ,arg) ; ANSI: should signal TYPE-ERROR if any arg not a REAL
       (once-only ((arg1 arg)
 		  (arg2 `(min ,@more-args)))
 	`(if (< ,arg1 ,arg2)
-	     ,arg1 ,arg2))))
+	     ,arg1
+	     ,arg2))))
 
 ;;;; converting N-arg arithmetic functions
 ;;;;

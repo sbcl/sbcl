@@ -1349,6 +1349,14 @@ WORKAROUND:
   error message stays the same (even BACKTRACE doesn't tell you what the
   bad argument value is).
 
+194: "no error from (THE REAL '(1 2 3)) in some cases"
+  In sbcl-0.7.7.9, 
+    (multiple-value-prog1 (progn (the real '(1 2 3))))
+  returns (1 2 3) instead of signalling an error. Also in sbcl-0.7.7.9,
+  a more complicated instance of this bug kept 
+  (IGNORE-ERRORS (MIN '(1 2 3))) from returning NIL as it should when
+  the MIN source transform expanded to (THE REAL '(1 2 3)), because
+  (IGNORE-ERRORS (THE REAL '(1 2 3))) returns (1 2 3).
 
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:

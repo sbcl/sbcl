@@ -1211,7 +1211,7 @@
 ;;; the appropriate args to make a constructor.
 (defun create-boa-constructor (defstruct boa creator)
   (multiple-value-bind (req opt restp rest keyp keys allowp aux)
-      (sb!kernel:parse-lambda-list (second boa))
+      (parse-lambda-list (second boa))
     (collect ((arglist)
 	      (vars)
 	      (types))

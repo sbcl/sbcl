@@ -47,3 +47,12 @@
 (assert (= (coerce 1 '(complex float)) #c(1.0 0.0)))
 (assert (= (coerce 1/2 '(complex float)) #c(0.5 0.0)))
 (assert (= (coerce 1.0d0 '(complex float)) #c(1.0d0 0.0d0)))
+
+;;; ANSI: MIN and MAX should signal TYPE-ERROR if any argument
+;;; isn't REAL. SBCL 0.7.7 didn't. (reported as a bug in CMU CL
+;;; on IRC by lrasinen 2002-09-01)
+;;;
+;;; FIXME: Alas, even with the new fixed definition of MIN, no error
+;;; is thrown, because of bug 194, so until bug 194 is fixed, we can't
+;;; use this test.
+#+nil (assert (null (ignore-errors (min '(1 2 3)))))

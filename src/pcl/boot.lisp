@@ -234,27 +234,43 @@ bootstrapping.
          initargs))
 
 ;;; As per section 3.4.2 of the ANSI spec, generic function lambda
-;;; lists have a number of limitations, which we check here.
+;;; lists have some special limitations, which we check here.
 (defun check-gf-lambda-list (lambda-list)
-  (macrolet ((ensure (condition)
-               `(unless ,condition
-                  (error "Invalid argument ~S in the generic function lambda list ~S."
-                         it lambda-list))))
-    (process-lambda-list lambda-list
-      (&required (ensure (symbolp it)))
-      (&optional (ensure (or (symbolp it)
-                             (and (consp it) (symbolp (car it)) (null (cdr it))))))
-      (&rest (ensure (symbolp it)))
-      (&key (ensure (or (symbolp it)
-                        (and (consp it)
-                             (or (symbolp (car it))
-                                 (and (consp (car it))
-                                      (symbolp (caar it))
-                                      (symbolp (cadar it))
-                                      (null (cddar it))))
-                             (null (cdr it))))))
-      ((&aux (error "&AUX is not allowed in the generic function lambda list ~S."
-                    lambda-list))))))
+  (flet ((ensure (arg ok)
+           (unless ok
+	     (error
+	      "invalid argument ~S in the generic function lambda list ~S"
+	      arg lambda-list))))
+    (multiple-value-bind (required optional restp rest keyp keys allowp aux
+		          morep more-context more-count)
+	(parse-lambda-list lambda-list)
+      (declare (ignore required)) ; since they're no different in a gf ll
+      (declare (ignore restp rest)) ; since they're no different in a gf ll
+      (declare (ignore allowp)) ; since &ALLOW-OTHER-KEYS is fine either way
+      (declare (ignore more-context more-count)) ; safely ignored unless MOREP
+      ;; no defaults allowed for &OPTIONAL arguments
+      (dolist (i optional)
+	(ensure i (or (symbolp i)
+		      (and (consp i) (symbolp (car i)) (null (cdr i))))))
+      ;; no defaults allowed for &KEY arguments
+      (when keyp
+	(dolist (i keys)
+	  (ensure i (or (symbolp i)
+			(and (consp i)
+			     (or (symbolp (car i))
+				 (and (consp (car i))
+				      (symbolp (caar i))
+				      (symbolp (cadar i))
+				      (null (cddar i))))
+			     (null (cdr i)))))))
+      ;; no &AUX allowed
+      (when aux
+	(error "&AUX is not allowed in a generic function lambda list: ~S"
+	       lambda-list))
+      ;; Oh, *puhlease*... not specifically as per section 3.4.2 of
+      ;; the ANSI spec, but the CMU CL &MORE extension does not
+      ;; belong here!
+      (aver (not morep)))))
 
 (defmacro defmethod (&rest args &environment env)
   (multiple-value-bind (name qualifiers lambda-list body)

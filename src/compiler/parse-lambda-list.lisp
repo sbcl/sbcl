@@ -11,8 +11,10 @@
 
 (/show0 "parse-lambda-list.lisp 12")
 
-;;; Break a lambda list into its component parts. We return eleven
-;;; values:
+;;; Break something like a lambda list (but not necessarily actually a
+;;; lambda list, e.g. the representation of argument types which is
+;;; used within an FTYPE specification) into its component parts. We
+;;; return eleven values:
 ;;;  1. a list of the required args;
 ;;;  2. a list of the &OPTIONAL arg specs;
 ;;;  3. true if a &REST arg was specified;
@@ -32,92 +34,143 @@
 (declaim (ftype (function (list)
 			  (values list list boolean t boolean list boolean
 				  list boolean t t))
+		parse-lambda-list-like-thing
 		parse-lambda-list))
-(defun parse-lambda-list (list)
+(defun parse-lambda-list-like-thing (list)
   (collect ((required)
-	    (optional)
-	    (keys)
-	    (aux))
+            (optional)
+            (keys)
+            (aux))
     (let ((restp nil)
-	  (rest nil)
-	  (morep nil)
-	  (more-context nil)
-	  (more-count nil)
-	  (keyp nil)
-	  (allowp nil)
-	  (state :required))
+          (rest nil)
+          (morep nil)
+          (more-context nil)
+          (more-count nil)
+          (keyp nil)
+          (allowp nil)
+          (state :required))
       (declare (type (member :allow-other-keys :aux
-			     :key
-			     :more-context :more-count
-			     :optional
-			     :post-more :post-rest
-			     :required :rest)
-		     state))
+                             :key
+                             :more-context :more-count
+                             :optional
+                             :post-more :post-rest
+                             :required :rest)
+                     state))
       (dolist (arg list)
-	(if (and (symbolp arg)
-		 (let ((name (symbol-name arg)))
-		   (and (plusp (length name))
-			(char= (char name 0) #\&))))
-	    (case arg
-	      (&optional
-	       (unless (eq state :required)
-		 (compiler-error "misplaced &OPTIONAL in lambda list: ~S"
-				 list))
-	       (setq state :optional))
-	      (&rest
-	       (unless (member state '(:required :optional))
-		 (compiler-error "misplaced &REST in lambda list: ~S" list))
-	       (setq state :rest))
-	      (&more
-	       (unless (member state '(:required :optional))
-		 (compiler-error "misplaced &MORE in lambda list: ~S" list))
-	       (setq morep t
-		     state :more-context))
-	      (&key
-	       (unless (member state
-			       '(:required :optional :post-rest :post-more))
-		 (compiler-error "misplaced &KEY in lambda list: ~S" list))
-	       (setq keyp t
-		     state :key))
-	      (&allow-other-keys
-	       (unless (eq state ':key)
-		 (compiler-error "misplaced &ALLOW-OTHER-KEYS in ~
+        (if (and (symbolp arg)
+                 (let ((name (symbol-name arg)))
+                   (and (plusp (length name))
+                        (char= (char name 0) #\&))))
+            (case arg
+              (&optional
+               (unless (eq state :required)
+                 (compiler-error "misplaced &OPTIONAL in lambda list: ~S"
+                                 list))
+               (setq state :optional))
+              (&rest
+               (unless (member state '(:required :optional))
+                 (compiler-error "misplaced &REST in lambda list: ~S" list))
+               (setq state :rest))
+              (&more
+               (unless (member state '(:required :optional))
+                 (compiler-error "misplaced &MORE in lambda list: ~S" list))
+               (setq morep t
+                     state :more-context))
+              (&key
+               (unless (member state
+                               '(:required :optional :post-rest :post-more))
+                 (compiler-error "misplaced &KEY in lambda list: ~S" list))
+               (setq keyp t
+                     state :key))
+              (&allow-other-keys
+               (unless (eq state ':key)
+                 (compiler-error "misplaced &ALLOW-OTHER-KEYS in ~
                                   lambda list: ~S"
-				 list))
-	       (setq allowp t
-		     state :allow-other-keys))
-	      (&aux
-	       (when (member state '(:rest :more-context :more-count))
-		 (compiler-error "misplaced &AUX in lambda list: ~S" list))
-	       (setq state :aux))
-	      ;; FIXME: I don't think ANSI says this is an error. (It
-	      ;; should certainly be good for a STYLE-WARNING,
-	      ;; though.)
-	      (t
-	       (compiler-error "unknown &KEYWORD in lambda list: ~S" arg)))
-	    (case state
-	      (:required (required arg))
-	      (:optional (optional arg))
-	      (:rest
-	       (setq restp t
-		     rest arg
-		     state :post-rest))
-	      (:more-context
-	       (setq more-context arg
-		     state :more-count))
-	      (:more-count
-	       (setq more-count arg
-		     state :post-more))
-	      (:key (keys arg))
-	      (:aux (aux arg))
-	      (t
-	       (compiler-error "found garbage in lambda list when expecting ~
-				a keyword: ~S"
-			       arg)))))
+                                 list))
+               (setq allowp t
+                     state :allow-other-keys))
+              (&aux
+               (when (member state '(:rest :more-context :more-count))
+                 (compiler-error "misplaced &AUX in lambda list: ~S" list))
+               (setq state :aux))
+              ;; FIXME: I don't think ANSI says this is an error. (It
+              ;; should certainly be good for a STYLE-WARNING,
+              ;; though.)
+              (t
+               (compiler-error "unknown &KEYWORD in lambda list: ~S" arg)))
+            (case state
+              (:required (required arg))
+              (:optional (optional arg))
+              (:rest
+               (setq restp t
+                     rest arg
+                     state :post-rest))
+              (:more-context
+               (setq more-context arg
+                     state :more-count))
+              (:more-count
+               (setq more-count arg
+                     state :post-more))
+              (:key (keys arg))
+              (:aux (aux arg))
+              (t
+               (compiler-error "found garbage in lambda list when expecting ~
+                                a keyword: ~S"
+                               arg)))))
       (when (eq state :rest)
-	(compiler-error "&REST without rest variable"))
+        (compiler-error "&REST without rest variable"))
       
       (values (required) (optional) restp rest keyp (keys) allowp (aux)
-	      morep more-context more-count))))
+              morep more-context more-count))))
+
+;;; like PARSE-LAMBDA-LIST-LIKE-THING, except our LAMBDA-LIST argument
+;;; really *is* a lambda list, not just a "lambda-list-like thing", so
+;;; can barf on things which're illegal as arguments in lambda lists
+;;; even if they could conceivably be legal in not-quite-a-lambda-list
+;;; weirdosities
+(defun parse-lambda-list (lambda-list)
+
+  ;; Classify parameters without checking their validity individually.
+  (multiple-value-bind (required optional restp rest keyp keys allowp aux
+			morep more-context more-count)
+      (parse-lambda-list-like-thing lambda-list)
+
+    ;; Check validity of parameters.
+    (flet ((need-symbol (x why)
+	     (unless (symbolp x)
+	       (compiler-error "~A is not a symbol: ~S" why x))))
+      (dolist (i required)
+	(need-symbol i "Required argument"))
+      (dolist (i optional)
+	(typecase i
+	  (symbol)
+	  (cons
+	   (destructuring-bind (var &optional init-form supplied-p) i
+	     (declare (ignore init-form supplied-p))
+	     (need-symbol var "&OPTIONAL parameter name")))
+	  (t
+	   (compiler-error "&OPTIONAL parameter is not a symbol or cons: ~S"
+			   i))))
+      (when restp
+	(need-symbol rest "&REST argument"))
+      (when keyp
+	(dolist (i keys)
+	  (typecase i
+	    (symbol)
+	    (cons
+	     (destructuring-bind (var-or-kv &optional init-form supplied-p) i
+	       (declare (ignore init-form supplied-p))
+	       (if (consp var-or-kv)
+		   (destructuring-bind (keyword-name var) var-or-kv
+		     (declare (ignore keyword-name))
+		     (need-symbol var "&KEY parameter name"))
+		   (need-symbol var-or-kv "&KEY parameter name"))))
+	    (t
+	     (compiler-error "&KEY parameter is not a symbol or cons: ~S"
+			     i))))))
+
+    ;; Voila.
+    (values required optional restp rest keyp keys allowp aux
+	    morep more-context more-count)))
 
 (/show0 "parse-lambda-list.lisp end of file")

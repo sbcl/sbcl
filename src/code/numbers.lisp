@@ -765,6 +765,7 @@
        (result number))
       ((null nlist) (return result))
      (declare (list nlist))
+     (declare (type real number result))
      (if (> (car nlist) result) (setq result (car nlist)))))
 
 (defun min (number &rest more-numbers)
@@ -774,6 +775,7 @@
        (result number))
       ((null nlist) (return result))
      (declare (list nlist))
+     (declare (type real number result))
      (if (< (car nlist) result) (setq result (car nlist)))))
 
 (eval-when (:compile-toplevel :execute)

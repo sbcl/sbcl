@@ -251,7 +251,7 @@
 (declaim (ftype (function (list args-type) (values)) parse-args-types))
 (defun parse-args-types (lambda-list result)
   (multiple-value-bind (required optional restp rest keyp keys allowp aux)
-      (parse-lambda-list lambda-list)
+      (parse-lambda-list-like-thing lambda-list)
     (when aux
       (error "&AUX in a FUNCTION or VALUES type: ~S." lambda-list))
     (setf (args-type-required result) (mapcar #'specifier-type required))

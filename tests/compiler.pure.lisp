@@ -147,3 +147,18 @@
     (ignore-errors (some-undefined-function))
   (assert (null value))
   (assert (eq (cell-error-name error) 'some-undefined-function)))
+
+;;; Non-symbols shouldn't be allowed as VARs in lambda lists. (Where VAR
+;;; is a variable name, as in section 3.4.1 of the ANSI spec.)
+(assert (null (ignore-errors (eval '(lambda ("foo") 12)))))
+(assert (ignore-errors (eval '(lambda (foo) 12))))
+(assert (null (ignore-errors (eval '(lambda (&optional 12) "foo")))))
+(assert (ignore-errors (eval '(lambda (&optional twelve) "foo"))))
+(assert (null (ignore-errors (eval '(lambda (&optional (12 12)) "foo")))))
+(assert (ignore-errors (eval '(lambda (&optional (twelve 12)) "foo"))))
+(assert (null (ignore-errors (eval '(lambda (&key #\c) "foo")))))
+(assert (ignore-errors (eval '(lambda (&key c) "foo"))))
+(assert (null (ignore-errors (eval '(lambda (&key (#\c #\c)) "foo")))))
+(assert (ignore-errors (eval '(lambda (&key (c #\c)) "foo"))))
+(assert (null (ignore-errors (eval '(lambda (&key ((#\c #\c) #\c)) "foo")))))
+(assert (ignore-errors (eval '(lambda (&key ((:c cbyanyothername) #\c)) "foo"))))
