@@ -776,7 +776,7 @@ WORKAROUND:
 
   This bug was fixed in sbcl-0.7.4.1 by invalidating the PCL wrapper
   class upon redefinition. Unfortunately, doing so causes bug #176 to
-  appear.  Pending further investication, one or other of these bugs
+  appear.  Pending further investigation, one or other of these bugs
   might be present at any given time.
 
 141: 
@@ -786,12 +786,6 @@ WORKAROUND:
   ``(FOO SB-IMPL::BACKQ-COMMA-AT S)
   * (lisp-implementation-version)
   "0.pre7.129"
-
-142:
-  (as reported by Lynn Quam on cmucl-imp ca. 2002-01-16)
-  %NATURALIZE-C-STRING conses a lot, like 16 bytes per byte
-  of the naturalized string. We could probably port the patches
-  from the cmucl-imp mailing list.
 
 143:
   (reported by Jesse Bouwman 2001-10-24 through the unfortunately

@@ -109,7 +109,7 @@
 				     (class-slots (class-of previous)))))
     (dolist (slotd current-slotds)
       (if (and (not (memq (slot-definition-name slotd) previous-slot-names))
-	       (eq (slot-definition-allocation slotd) ':instance))
+	       (eq (slot-definition-allocation slotd) :instance))
 	  (push (slot-definition-name slotd) added-slots)))
     (check-initargs-1
      (class-of current) initargs
@@ -131,61 +131,55 @@
 
 (defmethod shared-initialize
     ((instance slot-object) slot-names &rest initargs)
-  (when (eq slot-names t)
-    (return-from shared-initialize
-      (call-initialize-function
-       (initialize-info-shared-initialize-t-fun
-	(initialize-info (class-of instance) initargs))
-       instance initargs)))
-  (when (eq slot-names nil)
-    (return-from shared-initialize
-      (call-initialize-function
-       (initialize-info-shared-initialize-nil-fun
-	(initialize-info (class-of instance) initargs))
-       instance initargs)))
-  ;; Initialize the instance's slots in a two step process:
-  ;;   (1) A slot for which one of the initargs in initargs can set
-  ;;       the slot, should be set by that initarg. If more than
-  ;;       one initarg in initargs can set the slot, the leftmost
-  ;;       one should set it.
-  ;;   (2) Any slot not set by step 1, may be set from its initform
-  ;;       by step 2. Only those slots specified by the slot-names
-  ;;       argument are set. If slot-names is:
-  ;;       T
-  ;;	      then any slot not set in step 1 is set from its
-  ;;	      initform.
-  ;;       <list of slot names>
-  ;;	      then any slot in the list, and not set in step 1
-  ;;	      is set from its initform.
-  ;;       ()
-  ;;	      then no slots are set from initforms.
-  (let* ((class (class-of instance))
-	 (slotds (class-slots class))
-	 (std-p (pcl-instance-p instance)))
-    (dolist (slotd slotds)
-      (let ((slot-name (slot-definition-name slotd))
-	    (slot-initargs (slot-definition-initargs slotd)))
-	(unless (progn
-		  ;; Try to initialize the slot from one of the initargs.
-		  ;; If we succeed return T, otherwise return nil.
-		  (doplist (initarg val) initargs
-			   (when (memq initarg slot-initargs)
-			     (setf (slot-value-using-class class
-							   instance
-							   slotd)
-				   val)
-			     (return t))))
-	  ;; Try to initialize the slot from its initform.
-	  (if (and slot-names
-		   (or (eq slot-names t)
-		       (memq slot-name slot-names))
-		   (or (and (not std-p) (eq slot-names t))
-		       (not (slot-boundp-using-class class instance slotd))))
-	      (let ((initfunction (slot-definition-initfunction slotd)))
-		(when initfunction
-		  (setf (slot-value-using-class class instance slotd)
-			(funcall initfunction))))))))
-    instance))
+  (cond
+    ((eq slot-names t)
+     (call-initialize-function
+      (initialize-info-shared-initialize-t-fun
+       (initialize-info (class-of instance) initargs))
+      instance initargs))
+    ((eq slot-names nil)
+     (call-initialize-function
+      (initialize-info-shared-initialize-nil-fun
+       (initialize-info (class-of instance) initargs))
+      instance initargs))
+    (t
+     ;; Initialize the instance's slots in a two step process:
+     ;;   (1) A slot for which one of the initargs in initargs can set
+     ;;       the slot, should be set by that initarg. If more than
+     ;;       one initarg in initargs can set the slot, the leftmost
+     ;;       one should set it.
+     ;;   (2) Any slot not set by step 1, may be set from its initform
+     ;;       by step 2. Only those slots specified by the slot-names
+     ;;       argument are set. If slot-names is:
+     ;;       T
+     ;;	      then any slot not set in step 1 is set from its
+     ;;	      initform.
+     ;;       <list of slot names>
+     ;;	      then any slot in the list, and not set in step 1
+     ;;	      is set from its initform.
+     ;;       ()
+     ;;	      then no slots are set from initforms.
+     (flet ((initialize-slot-from-initarg (class instance slotd)
+              (let ((slot-initargs (slot-definition-initargs slotd)))
+                (doplist (initarg value) initargs
+                         (when (memq initarg slot-initargs)
+                           (setf (slot-value-using-class class instance slotd)
+                                 value)
+                           (return t)))))
+            (initialize-slot-from-initfunction (class instance slotd)
+              (unless (or (slot-boundp-using-class class instance slotd)
+                          (null (slot-definition-initfunction slotd)))
+                (setf (slot-value-using-class class instance slotd)
+                      (funcall (slot-definition-initfunction slotd)))))
+            (class-slot-p (slotd)
+              (eq :class (slot-definition-allocation slotd))))
+       (loop with class = (class-of instance)
+             for slotd in (class-slots class)
+             unless (or (class-slot-p slotd)
+                        (initialize-slot-from-initarg class instance slotd))
+             when (memq (slot-definition-name slotd) slot-names) do
+             (initialize-slot-from-initfunction class instance slotd))
+       instance))))
 
 ;;; If initargs are valid return nil, otherwise signal an error.
 (defun check-initargs-1 (class initargs call-list

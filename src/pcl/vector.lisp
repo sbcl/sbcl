@@ -638,7 +638,7 @@
 	 (standard-class-p class)
 	 (not (eq class *the-class-t*)) ; shouldn't happen, though.
 	 (let ((slotd (find-slot-definition class slot-name)))
-	   (and slotd (classp (slot-definition-allocation slotd)))))))
+	   (and slotd (eq :class (slot-definition-allocation slotd)))))))
 
 (defun skip-fast-slot-access-p (class-form slot-name-form type)
   (let ((class (and (constantp class-form) (eval class-form)))

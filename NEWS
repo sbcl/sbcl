@@ -1299,6 +1299,11 @@ changes in sbcl-0.7.8 relative to sbcl-0.7.7:
 
 changes in sbcl-0.7.9 relative to sbcl-0.7.8:
   * fixed bug: VALUES-LIST is no longer optimized away
+  * fixed bug 142: The FFI conversion of C string values to Lisp
+    string values no longer conses excessively. (thanks to Nathan
+    Froyd porting Raymond Toy's fix to CMU CL)
+  * improved MOP conformance in PCL (thanks to Nathan Froyd porting
+    Gerd Moellman's work in CMU CL)
 
 planned incompatible changes in 0.7.x:
 * When the profiling interface settles down, maybe in 0.7.x, maybe

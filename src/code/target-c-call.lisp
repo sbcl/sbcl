@@ -37,11 +37,14 @@
 
 (defun %naturalize-c-string (sap)
   (declare (type system-area-pointer sap))
-  (with-alien ((ptr (* char) sap))
-    (let* ((length (alien-funcall (extern-alien "strlen"
-						(function integer (* char)))
-				  ptr))
-	   (result (make-string length)))
+  (locally
       (declare (optimize (speed 3) (safety 0)))
-      (sb!kernel:%byte-blt sap 0 result 0 length)
-      result)))
+    (let ((length (loop for offset of-type fixnum upfrom 0
+                        until (zerop (sap-ref-8 sap offset))
+                        finally (return offset))))
+      (let ((result (make-string length)))
+	(sb!kernel:copy-from-system-area sap 0
+                                         result (* sb!vm:vector-data-offset
+                                                   sb!vm:n-word-bits)
+                                         (* length sb!vm:n-byte-bits))
+	result))))

@@ -460,7 +460,7 @@
   (setf (plist-value class 'class-slot-cells)
 	(let (collect)
 	  (dolist (dslotd direct-slots)
-	    (when (eq (slot-definition-allocation dslotd) class)
+	    (when (eq :class (slot-definition-allocation dslotd))
 	      (let ((initfunction (slot-definition-initfunction dslotd)))
 		(push (cons (slot-definition-name dslotd)
 			       (if initfunction
@@ -498,13 +498,6 @@
   (map-dependents class
 		  (lambda (dependent)
 		    (apply #'update-dependent class dependent initargs))))
-
-(defmethod shared-initialize :after ((slotd standard-slot-definition)
-				     slot-names &key)
-  (declare (ignore slot-names))
-  (with-slots (allocation class)
-    slotd
-    (setq allocation (if (eq allocation :class) class allocation))))
 
 (defmethod shared-initialize :after ((slotd structure-slot-definition)
 				     slot-names
@@ -719,8 +712,9 @@
 	(class-slots    ()))
     (dolist (eslotd eslotds)
       (let ((alloc (slot-definition-allocation eslotd)))
-	(cond ((eq alloc :instance) (push eslotd instance-slots))
-	      ((classp alloc)       (push eslotd class-slots)))))
+	(case alloc
+          (:instance (push eslotd instance-slots))
+          (:class (push eslotd class-slots)))))
 
     ;; If there is a change in the shape of the instances then the
     ;; old class is now obsolete.
@@ -765,7 +759,7 @@
   (let (collect)
     (dolist (eslotd eslotds)
       (push (assoc (slot-definition-name eslotd)
-                   (class-slot-cells (slot-definition-allocation eslotd)))
+                   (class-slot-cells (slot-definition-class eslotd)))
             collect))
     (nreverse collect)))
 
@@ -862,8 +856,9 @@
 	(class-slots    ()))
     (dolist (eslotd eslotds)
       (let ((alloc (slot-definition-allocation eslotd)))
-	(cond ((eq alloc :instance) (push eslotd instance-slots))
-	      ((classp alloc)       (push eslotd class-slots)))))
+	(case alloc
+          (:instance (push eslotd instance-slots))
+          (:class (push eslotd class-slots)))))
     (let ((nlayout (compute-layout cpl instance-slots)))
       (dolist (eslotd instance-slots)
 	(setf (slot-definition-location eslotd)
@@ -871,7 +866,7 @@
     (dolist (eslotd class-slots)
       (setf (slot-definition-location eslotd)
 	    (assoc (slot-definition-name eslotd)
-		   (class-slot-cells (slot-definition-allocation eslotd)))))
+		   (class-slot-cells (slot-definition-class eslotd)))))
     (mapc #'initialize-internal-slot-functions eslotds)
     eslotds))
 
