@@ -688,11 +688,9 @@ WORKAROUND:
   propagation or with SSA, but consider
 
     (let ((x 0))
-      (loop (if (random-boolean)
-                (incf x 2)
-                (incf x 5))))
+      (loop (incf x 2)))
 
-  The careful type of X is {2k+5n} :-(. Is it really important to be
+  The careful type of X is {2k} :-(. Is it really important to be
   able to work with unions of many intervals?
 
 190: "PPC/Linux pipe? buffer? bug"

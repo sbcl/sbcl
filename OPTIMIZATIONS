@@ -80,7 +80,6 @@ uses generic arithmetic
   memory location for iteration variable
 
 ;;; -*- mode: lisp -*-
-;;; $Id$
 ;;; http://www.bagley.org/~doug/shootout/
 ;;; from Friedrich Dominicus
 
@@ -157,4 +156,9 @@ It could be optimized to
 (lambda (x) (list x x))
 
 (if Y were used only once, the current compiler would optimize it)
+--------------------------------------------------------------------------------
+#12
+(typep (truly-the (simple-array * (*)) x) 'simple-vector)
+
+tests lowtag.
 --------------------------------------------------------------------------------
