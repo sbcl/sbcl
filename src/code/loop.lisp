@@ -248,7 +248,7 @@ constructed.
 (defun make-loop-minimax (answer-variable type)
   (let ((infinity-data (cdr (assoc type
 				   *loop-minimax-type-infinities-alist*
-				   :test #'subtypep))))
+				   :test #'sb!xc:subtypep))))
     (make-loop-minimax-internal
       :answer-variable answer-variable
       :type type
@@ -478,109 +478,103 @@ a LET-like macro, and a SETQ-like macro, which perform LOOP-style destructuring.
 
 ;;;; LOOP-local variables
 
-;;;This is the "current" pointer into the LOOP source code.
+;;; This is the "current" pointer into the LOOP source code.
 (defvar *loop-source-code*)
 
-;;;This is the pointer to the original, for things like NAMED that
-;;;insist on being in a particular position
+;;; This is the pointer to the original, for things like NAMED that
+;;; insist on being in a particular position
 (defvar *loop-original-source-code*)
 
-;;;This is *loop-source-code* as of the "last" clause. It is used
-;;;primarily for generating error messages (see loop-error, loop-warn).
+;;; This is *loop-source-code* as of the "last" clause. It is used
+;;; primarily for generating error messages (see loop-error, loop-warn).
 (defvar *loop-source-context*)
 
-;;;List of names for the LOOP, supplied by the NAMED clause.
+;;; list of names for the LOOP, supplied by the NAMED clause
 (defvar *loop-names*)
 
-;;;The macroexpansion environment given to the macro.
+;;; The macroexpansion environment given to the macro.
 (defvar *loop-macro-environment*)
 
-;;;This holds variable names specified with the USING clause.
+;;; This holds variable names specified with the USING clause.
 ;;; See LOOP-NAMED-VARIABLE.
 (defvar *loop-named-variables*)
 
 ;;; LETlist-like list being accumulated for one group of parallel bindings.
 (defvar *loop-variables*)
 
-;;;List of declarations being accumulated in parallel with
-;;;*loop-variables*.
+;;; list of declarations being accumulated in parallel with *LOOP-VARIABLES*
 (defvar *loop-declarations*)
 
-;;;Used by LOOP for destructuring binding, if it is doing that itself.
-;;; See loop-make-variable.
+;;; This is used by LOOP for destructuring binding, if it is doing
+;;; that itself. See LOOP-MAKE-VARIABLE.
 (defvar *loop-desetq-crocks*)
 
-;;; List of wrapping forms, innermost first, which go immediately inside
-;;; the current set of parallel bindings being accumulated in
-;;; *loop-variables*. The wrappers are appended onto a body. E.g.,
-;;; this list could conceivably has as its value ((with-open-file (g0001
-;;; g0002 ...))), with g0002 being one of the bindings in
-;;; *loop-variables* (this is why the wrappers go inside of the variable
-;;; bindings).
+;;; list of wrapping forms, innermost first, which go immediately
+;;; inside the current set of parallel bindings being accumulated in
+;;; *LOOP-VARIABLES*. The wrappers are appended onto a body. E.g.,
+;;; this list could conceivably have as its value
+;;;   ((WITH-OPEN-FILE (G0001 G0002 ...))),
+;;; with G0002 being one of the bindings in *LOOP-VARIABLES* (This is
+;;; why the wrappers go inside of the variable bindings).
 (defvar *loop-wrappers*)
 
-;;;This accumulates lists of previous values of *loop-variables* and the
-;;;other lists  above, for each new nesting of bindings. See
-;;;loop-bind-block.
+;;; This accumulates lists of previous values of *LOOP-VARIABLES* and
+;;; the other lists above, for each new nesting of bindings. See
+;;; LOOP-BIND-BLOCK.
 (defvar *loop-bind-stack*)
 
-;;;This is a LOOP-global variable for the (obsolete) NODECLARE clause
-;;;which inhibits  LOOP from actually outputting a type declaration for
-;;;an iteration (or any) variable.
-(defvar *loop-nodeclare*)
-
-;;;This is simply a list of LOOP iteration variables, used for checking
-;;;for duplications.
+;;; This is simply a list of LOOP iteration variables, used for
+;;; checking for duplications.
 (defvar *loop-iteration-variables*)
 
-;;;List of prologue forms of the loop, accumulated in reverse order.
+;;; list of prologue forms of the loop, accumulated in reverse order
 (defvar *loop-prologue*)
 
 (defvar *loop-before-loop*)
 (defvar *loop-body*)
 (defvar *loop-after-body*)
 
-;;;This is T if we have emitted any body code, so that iteration driving
-;;;clauses can be disallowed. This is not strictly the same as
-;;;checking *loop-body*, because we permit some clauses  such as RETURN
-;;;to not be considered "real" body (so as to permit the user to "code"
-;;;an  abnormal return value "in loop").
+;;; This is T if we have emitted any body code, so that iteration
+;;; driving clauses can be disallowed. This is not strictly the same
+;;; as checking *LOOP-BODY*, because we permit some clauses such as
+;;; RETURN to not be considered "real" body (so as to permit the user
+;;; to "code" an abnormal return value "in loop").
 (defvar *loop-emitted-body*)
 
-;;;List of epilogue forms (supplied by FINALLY generally), accumulated
-;;; in reverse order.
+;;; list of epilogue forms (supplied by FINALLY generally), accumulated
+;;; in reverse order
 (defvar *loop-epilogue*)
 
-;;;List of epilogue forms which are supplied after the above "user"
-;;;epilogue. "normal" termination return values are provide by putting
-;;;the return form in here. Normally this is done using
-;;;loop-emit-final-value, q.v.
+;;; list of epilogue forms which are supplied after the above "user"
+;;; epilogue. "Normal" termination return values are provide by
+;;; putting the return form in here. Normally this is done using
+;;; LOOP-EMIT-FINAL-VALUE, q.v.
 (defvar *loop-after-epilogue*)
 
-;;;The "culprit" responsible for supplying a final value from the loop.
-;;;This  is so loop-emit-final-value can moan about multiple return
-;;;values being supplied.
+;;; the "culprit" responsible for supplying a final value from the
+;;; loop. This is so LOOP-EMIT-FINAL-VALUE can moan about multiple
+;;; return values being supplied.
 (defvar *loop-final-value-culprit*)
 
-;;;If not NIL, we are in some branch of a conditional. Some clauses may
-;;;be disallowed.
+;;; If this is true, we are in some branch of a conditional. Some
+;;; clauses may be disallowed.
 (defvar *loop-inside-conditional*)
 
-;;;If not NIL, this is a temporary bound around the loop for holding the
-;;;temporary  value for "it" in things like "when (f) collect it". It
-;;;may be used as a supertemporary by some other things.
+;;; If not NIL, this is a temporary bound around the loop for holding
+;;; the temporary value for "it" in things like "when (f) collect it".
+;;; It may be used as a supertemporary by some other things.
 (defvar *loop-when-it-variable*)
 
-;;;Sometimes we decide we need to fold together parts of the loop, but
-;;;some part of the generated iteration  code is different for the first
-;;;and remaining iterations. This variable will be the temporary which
-;;;is the flag used in the loop to tell whether we are in the first or
-;;;remaining iterations.
+;;; Sometimes we decide we need to fold together parts of the loop,
+;;; but some part of the generated iteration code is different for the
+;;; first and remaining iterations. This variable will be the
+;;; temporary which is the flag used in the loop to tell whether we
+;;; are in the first or remaining iterations.
 (defvar *loop-never-stepped-variable*)
 
-;;;List of all the value-accumulation descriptor structures in the loop.
-;;; See loop-get-collection-info.
-(defvar *loop-collection-cruft*)		; for multiple COLLECTs (etc)
+;;; list of all the value-accumulation descriptor structures in the
+;;; loop. See LOOP-GET-COLLECTION-INFO.
+(defvar *loop-collection-cruft*) ; for multiple COLLECTs (etc.)
 
 ;;;; code analysis stuff
 
@@ -589,7 +583,7 @@ a LET-like macro, and a SETQ-like macro, which perform LOOP-style destructuring.
     (when (setq constantp (constantp new-form))
       (setq constant-value (eval new-form)))
     (when (and constantp expected-type)
-      (unless (typep constant-value expected-type)
+      (unless (sb!xc:typep constant-value expected-type)
 	(loop-warn "The form ~S evaluated to ~S, which was not of the anticipated type ~S."
 		   form constant-value expected-type)
 	(setq constantp nil constant-value nil)))
@@ -608,10 +602,11 @@ a LET-like macro, and a SETQ-like macro, which perform LOOP-style destructuring.
 
 (defun loop-code-duplication-threshold (env)
   (declare (ignore env))
-  (let (;; If we could read optimization declaration information (as with
-	;; the DECLARATION-INFORMATION function (present in CLTL2, removed
-	;; from ANSI standard) we could set these values flexibly. Without
-	;; DECLARATION-INFORMATION, we have to set them to constants.
+  (let (;; If we could read optimization declaration information (as
+	;; with the DECLARATION-INFORMATION function (present in
+	;; CLTL2, removed from ANSI standard) we could set these
+	;; values flexibly. Without DECLARATION-INFORMATION, we have
+	;; to set them to constants.
 	(speed 1)
 	(space 1))
     (+ 40 (* (- speed space) 10))))
@@ -659,7 +654,7 @@ a LET-like macro, and a SETQ-like macro, which perform LOOP-style destructuring.
 	(push (pop rbefore) main-body)
 	(pop rafter))
       (unless rbefore (return (makebody)))
-      ;; The first forms in rbefore & rafter (which are the chronologically
+      ;; The first forms in RBEFORE & RAFTER (which are the chronologically
       ;; last forms in the list) differ, therefore they cannot be moved
       ;; into the main body. If everything that chronologically precedes
       ;; them either differs or is equal but is okay to duplicate, we can
@@ -680,9 +675,10 @@ a LET-like macro, and a SETQ-like macro, which perform LOOP-style destructuring.
 	      ((or (not (setq inc (estimate-code-size (car bb) env)))
 		   (> (incf count inc) threshold))
 	       ;; Ok, we have found a non-duplicatable piece of code.
-	       ;; Everything chronologically after it must be in the central
-	       ;; body. Everything chronologically at and after lastdiff goes
-	       ;; into the central body under a flag test.
+	       ;; Everything chronologically after it must be in the
+	       ;; central body. Everything chronologically at and
+	       ;; after LASTDIFF goes into the central body under a
+	       ;; flag test.
 	       (let ((then nil) (else nil))
 		 (do () (nil)
 		   (push (pop rbefore) else)
@@ -695,8 +691,8 @@ a LET-like macro, and a SETQ-like macro, which perform LOOP-style destructuring.
 		 (push `(if ,flagvar ,(pify (psimp then)) ,(pify (psimp else)))
 		       main-body))
 	       ;; Everything chronologically before lastdiff until the
-	       ;; non-duplicatable form (car bb) is the same in rbefore and
-	       ;; rafter so just copy it into the body
+	       ;; non-duplicatable form (CAR BB) is the same in
+	       ;; RBEFORE and RAFTER, so just copy it into the body.
 	       (do () (nil)
 		 (pop rafter)
 		 (push (pop rbefore) main-body)
@@ -828,7 +824,7 @@ a LET-like macro, and a SETQ-like macro, which perform LOOP-style destructuring.
 			     &optional (default-type required-type))
   (if (null specified-type)
       default-type
-      (multiple-value-bind (a b) (subtypep specified-type required-type)
+      (multiple-value-bind (a b) (sb!xc:subtypep specified-type required-type)
 	(cond ((not b)
 	       (loop-warn "LOOP couldn't verify that ~S is a subtype of the required type ~S."
 			  specified-type required-type))
@@ -844,7 +840,6 @@ a LET-like macro, and a SETQ-like macro, which perform LOOP-style destructuring.
 	(*loop-source-context* nil)
 	(*loop-iteration-variables* nil)
 	(*loop-variables* nil)
-	(*loop-nodeclare* nil)
 	(*loop-named-variables* nil)
 	(*loop-declarations* nil)
 	(*loop-desetq-crocks* nil)
@@ -968,8 +963,9 @@ a LET-like macro, and a SETQ-like macro, which perform LOOP-style destructuring.
 ;;;; loop types
 
 (defun loop-typed-init (data-type)
-  (when (and data-type (subtypep data-type 'number))
-    (if (or (subtypep data-type 'float) (subtypep data-type '(complex float)))
+  (when (and data-type (sb!xc:subtypep data-type 'number))
+    (if (or (sb!xc:subtypep data-type 'float)
+	    (sb!xc:subtypep data-type '(complex float)))
 	(coerce 0 data-type)
 	0)))
 
@@ -1084,13 +1080,7 @@ a LET-like macro, and a SETQ-like macro, which perform LOOP-style destructuring.
 		    (push (list newvar initialization) *loop-variables*)
 		    ;; *LOOP-DESETQ-CROCKS* gathered in reverse order.
 		    (setq *loop-desetq-crocks*
-		      (list* name newvar *loop-desetq-crocks*))
-		    ;; FIXME: We can delete this, right?
-		    #+ignore
-		    (loop-make-variable name
-					nil
-					dtype
-					iteration-variable-p)))))
+		      (list* name newvar *loop-desetq-crocks*))))))
 	(t (let ((tcar nil) (tcdr nil))
 	     (if (atom dtype) (setq tcar (setq tcdr dtype))
 		 (setq tcar (car dtype) tcdr (cdr dtype)))
@@ -1104,11 +1094,11 @@ a LET-like macro, and a SETQ-like macro, which perform LOOP-style destructuring.
 (defun loop-declare-variable (name dtype)
   (cond ((or (null name) (null dtype) (eq dtype t)) nil)
 	((symbolp name)
-	 (unless (or (eq dtype t) (member (the symbol name) *loop-nodeclare*))
+	 (unless (sb!xc:subtypep t dtype)
 	   (let ((dtype (let ((init (loop-typed-init dtype)))
-			  (if (typep init dtype)
-			    dtype
-			    `(or (member ,init) ,dtype)))))
+			  (if (sb!xc:typep init dtype)
+			      dtype
+			      `(or (member ,init) ,dtype)))))
 	     (push `(type ,dtype ,name) *loop-declarations*))))
 	((consp name)
 	 (cond ((consp dtype)
@@ -1432,7 +1422,9 @@ a LET-like macro, and a SETQ-like macro, which perform LOOP-style destructuring.
   (let ((form (loop-get-form))
 	(type (loop-check-data-type (loop-optional-type)
 				    *loop-real-data-type*)))
-    (when (and (consp form) (eq (car form) 'the) (subtypep (second form) type))
+    (when (and (consp form)
+	       (eq (car form) 'the)
+	       (sb!xc:subtypep (second form) type))
       (setq type (second form)))
     (multiple-value-bind (number constantp value)
 	(loop-constant-fold-if-possible form type)

@@ -312,35 +312,6 @@
 	 ;; it'd be wasteful to check again on every AREF.
 	 (declare (optimize (safety 0))) 
 	 (setf (aref data i) item)))))
-
-(deftransform position ((item list &key (test #'eql)) (t list))
-  "open code"
-  '(do ((i 0 (1+ i))
-	(l list (cdr l)))
-       ((endp l) nil)
-     (declare (type index i))
-     (when (funcall test item (car l)) (return i))))
-
-(deftransform position ((item vec &key (test #'eql) (start 0)
-			      (end (length vec)))
-			(t simple-array &key (:start t) (:end index)))
-  "open code"
-  '(do ((i start (1+ i)))
-       ((= i end) nil)
-     (declare (type index i))
-     (when (funcall test item (aref vec i)) (return i))))
-
-;;; names of predicates that compute the same value as CHAR= when
-;;; applied to characters
-(defparameter *char=-functions* '(eql equal char=))
-
-(deftransform find ((item sequence &key from-end (test #'eql) (start 0) end)
-		    (t simple-string &rest t))
-  `(if (position item sequence
-		 ,@(when from-end `(:from-end from-end))
-		 :test test :start start :end end)
-       item
-       nil))
 
 ;;;; utilities
 
@@ -715,3 +686,159 @@
 	   null-type)
 	  ((cons-type-p type)
 	   (cons-type-cdr-type type)))))
+
+;;;; FIND, POSITION, and their -IF and -IF-NOT variants
+
+;;; We want to make sure that %FIND-POSITION is inline-expanded into
+;;; %FIND-POSITION-IF only when %FIND-POSITION-IF has an inline
+;;; expansion, so we factor out the condition into this function.
+(defun check-inlineability-of-find-position-if (sequence from-end)
+  (let ((ctype (continuation-type sequence)))
+    (cond ((csubtypep ctype (specifier-type 'vector))
+	   ;; It's not worth trying to inline vector code unless we
+	   ;; know a fair amount about it at compile time.
+	   (upgraded-element-type-specifier-or-give-up sequence)
+	   (unless (constant-continuation-p from-end)
+	     (give-up-ir1-transform
+	      "FROM-END argument value not known at compile time")))
+	  ((csubtypep ctype (specifier-type 'list))
+	   ;; Inlining on lists is generally worthwhile.
+	   ) 
+	  (t
+	   (give-up-ir1-transform
+	    "sequence type not known at compile time")))))
+
+;;; %FIND-POSITION-IF for LIST data
+(deftransform %find-position-if ((predicate sequence from-end start end key)
+				 (function list t t t function)
+				 *
+				 :policy (> speed space)
+				 :important t)
+  "expand inline"
+  '(let ((index 0)
+	 (find nil)
+	 (position nil))
+     (declare (type index index))
+     (dolist (i sequence (values find position))
+       (let ((key-i (funcall key i)))
+	 (when (and end (>= index end))
+	   (return (values find position)))
+	 (when (>= index start)
+	   (when (funcall predicate key-i)
+	     ;; This hack of dealing with non-NIL FROM-END for list data
+	     ;; by iterating forward through the list and keeping track of
+	     ;; the last time we found a match might be more screwy than
+	     ;; what the user expects, but it seems to be allowed by the
+	     ;; ANSI standard. (And if the user is screwy enough to ask
+	     ;; for FROM-END behavior on list data, turnabout is fair play.)
+	     ;;
+	     ;; It's also not enormously efficient, calling PREDICATE and
+	     ;; KEY more often than necessary; but all the alternatives
+	     ;; seem to have their own efficiency problems.
+	     (if from-end
+		 (setf find i
+		       position index)
+		 (return (values i index))))))
+       (incf index))))
+
+;;; %FIND-POSITION for LIST data can be expanded into %FIND-POSITION-IF
+;;; without loss of efficiency. (I.e., the optimizer should be able
+;;; to straighten everything out.)
+(deftransform %find-position ((item sequence from-end start end key test)
+			      (t list t t t t t)
+			      *
+			      :policy (> speed space)
+			      :important t)
+  "expand inline"
+  '(%find-position-if (let ((test-fun (%coerce-callable-to-function test)))
+			(lambda (i)
+			  (funcall test-fun i item)))
+		      sequence
+		      from-end
+		      start
+		      end
+		      (%coerce-callable-to-function key)))
+
+;;; The inline expansions for the VECTOR case are saved as macros so
+;;; that we can share them between the DEFTRANSFORMs and the default
+;;; cases in the DEFUNs. (This isn't needed for the LIST case, because
+;;; the DEFTRANSFORMs for LIST are less choosy about when to expand.)
+(defun %find-position-or-find-position-if-vector-expansion (sequence-arg
+							    from-end
+							    start
+							    end-arg
+							    element
+							    done-p-expr)
+  (let ((offset (gensym "OFFSET"))
+	(block (gensym "BLOCK"))
+	(index (gensym "INDEX"))
+	(n-sequence (gensym "N-SEQUENCE-"))
+	(sequence (gensym "SEQUENCE"))
+	(n-end (gensym "N-END-"))
+	(end (gensym "END-")))
+    `(let ((,n-sequence ,sequence-arg)
+	   (,n-end ,end-arg))
+       (with-array-data ((,sequence ,n-sequence :offset-var ,offset)
+			 (,start ,start)
+			 (,end (or ,n-end (length ,n-sequence))))
+         (block ,block
+	   (macrolet ((maybe-return ()
+			'(let ((,element (aref ,sequence ,index)))
+			   (when ,done-p-expr
+			     (return-from ,block
+			       (values ,element
+				       (- ,index ,offset)))))))
+	     (if ,from-end
+		 (loop for ,index
+		       ;; (If we aren't fastidious about declaring that 
+		       ;; INDEX might be -1, then (FIND 1 #() :FROM-END T)
+		       ;; can send us off into never-never land, since
+		       ;; INDEX is initialized to -1.)
+		       of-type index-or-minus-1
+		       from (1- ,end) downto ,start do
+		       (maybe-return))
+		 (loop for ,index of-type index from ,start below ,end do
+		       (maybe-return))))
+	   (values nil nil))))))
+
+(def!macro %find-position-vector-macro (item sequence
+					     from-end start end key test)
+  (let ((element (gensym "ELEMENT")))
+    (%find-position-or-find-position-if-vector-expansion
+     sequence
+     from-end
+     start
+     end
+     element
+     `(funcall ,test ,item (funcall ,key ,element)))))
+
+(def!macro %find-position-if-vector-macro (predicate sequence
+						     from-end start end key)
+  (let ((element (gensym "ELEMENT")))
+    (%find-position-or-find-position-if-vector-expansion
+     sequence
+     from-end
+     start
+     end
+     element
+     `(funcall ,predicate (funcall ,key ,element)))))
+
+;;; %FIND-POSITION and %FIND-POSITION-IF for VECTOR data
+(deftransform %find-position-if ((predicate sequence from-end start end key)
+				 (function vector t t t function)
+				 *
+				 :policy (> speed space)
+				 :important t)
+  "expand inline"
+  (check-inlineability-of-find-position-if sequence from-end)
+  '(%find-position-if-vector-macro predicate sequence
+				   from-end start end key))
+(deftransform %find-position ((item sequence from-end start end key test)
+			      (t vector t t t function function)
+			      *
+			      :policy (> speed space)
+			      :important t)
+  "expand inline"
+  (check-inlineability-of-find-position-if sequence from-end)
+  '(%find-position-vector-macro item sequence
+				from-end start end key test))

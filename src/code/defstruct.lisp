@@ -604,6 +604,7 @@
 
     (let* ((accname (symbolicate (or (dd-conc-name defstruct) "") name))
 	   (existing (info :function :accessor-for accname)))
+      (declare (notinline find)) ; to avoid bug 117 bogowarnings
       (if (and (structure-class-p existing)
 	       (not (eq (sb!xc:class-name existing) (dd-name defstruct)))
 	       (string= (dsd-%name (find accname

@@ -42,6 +42,12 @@
 ;;; bound because ANSI specifies it as an exclusive bound.)
 (def!type index () `(integer 0 (,sb!xc:array-dimension-limit)))
 
+;;; like INDEX, but augmented with -1 (useful when using the index
+;;; to count downwards to 0, e.g. LOOP FOR I FROM N DOWNTO 0, with
+;;; an implementation which terminates the loop by testing for the
+;;; index leaving the loop range)
+(def!type index-or-minus-1 () `(integer -1 (,sb!xc:array-dimension-limit)))
+
 ;;; the default value used for initializing character data. The ANSI
 ;;; spec says this is arbitrary. CMU CL used #\NULL, which we avoid
 ;;; because it's not in the ANSI table of portable characters.

@@ -126,12 +126,6 @@
 (sb!xc:deftype logical-host-designator ()
   '(or host string))
 
-;;; like INDEX, but augmented with -1 (useful when using the index
-;;; to count downwards to 0, e.g. LOOP FOR I FROM N DOWNTO 0, with
-;;; an implementation which terminates the loop by testing for the
-;;; index leaving the loop range)
-(sb!xc:deftype index-or-minus-1 () `(integer -1 ,(1- most-positive-fixnum)))
-
 ;;; a thing returned by the irrational functions. We assume that they
 ;;; never compute a rational result.
 (sb!xc:deftype irrational ()

@@ -784,6 +784,7 @@
 ;;; we reach the mess-up node. After then, we can keep the values from
 ;;; being discarded by placing a marker on the simulated stack.
 (defun byte-stack-analyze (component)
+  (declare (notinline find)) ; to avoid bug 117 bogowarnings
   (let ((head nil))
     (let ((*byte-continuation-counter* 0))
       (do-blocks (block component)

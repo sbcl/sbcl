@@ -1301,6 +1301,14 @@
 (defknown %coerce-name-to-function ((or symbol cons)) function (flushable))
 (defknown %coerce-callable-to-function (callable) function (flushable))
 (defknown failed-%with-array-data (t t t) nil)
+(defknown %find-position
+  (t sequence t index sequence-end function function)
+  (values t (or index null))
+  (flushable call))
+(defknown %find-position-if 
+  (function sequence t index sequence-end function)
+  (values t (or index null))
+  (call))
 
 ;;; Structure slot accessors or setters are magically "known" to be
 ;;; these functions, although the var remains the Slot-Accessor

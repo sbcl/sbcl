@@ -312,14 +312,19 @@
 
 ) ; EVAL-WHEN
 
-;;; Compute the effective slots of class, copying inherited slots and
-;;; side-effecting direct slots.
+;;; Compute the effective slots of CLASS, copying inherited slots and
+;;; destructively modifying direct slots.
+;;;
+;;; FIXME: It'd be nice to explain why it's OK to destructively modify
+;;; direct slots. Presumably it follows from the semantics of
+;;; inheritance and redefinition of conditions, but finding the cite
+;;; and documenting it here would be good. (Or, if this is not in fact
+;;; ANSI-compliant, fixing it would also be good.:-)
 (defun compute-effective-slots (class)
   (collect ((res (copy-list (condition-class-slots class))))
     (dolist (sclass (condition-class-cpl class))
       (dolist (sslot (condition-class-slots sclass))
-	(let ((found (find (condition-slot-name sslot) (res)
-			   :test #'eq)))
+	(let ((found (find (condition-slot-name sslot) (res))))
 	  (cond (found
 		 (setf (condition-slot-initargs found)
 		       (union (condition-slot-initargs found)

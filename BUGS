@@ -1070,11 +1070,33 @@ Error in function C::GET-LAMBDA-TO-COMPILE:
     internal error, failed AVER:
       "(COMMON-LISP:EQ (SB!C::TN-ENVIRONMENT SB!C:TN) SB!C::TN-ENV)"
 
-116:
-  The error message from compiling
-    (LAMBDA (X) (LET ((NIL 1)) X))
-  is
+117:
+  When the compiler inline expands functions, it may be that different
+  kinds of return values are generated from different code branches.
+  E.g. an inline expansion of POSITION generates integer results 
+  from one branch, and NIL results from another. When that inline
+  expansion is used in a context where only one of those results
+  is acceptable, e.g.
+    (defun foo (x)
+      (aref *a1* (position x *a2*)))
+  and the compiler can't prove that the unacceptable branch is 
+  never taken, then bogus type mismatch warnings can be generated.
+  If you need to suppress the type mismatch warnings, you can
+  suppress the inline expansion,
+    (defun foo (x)
+      #+sbcl (declare (notinline position)) ; to suppress bug 117 bogowarnings
+      (aref *a1* (position x *a2*)))
+  or, sometimes, suppress them by declaring the result to be of an
+  appropriate type,
+    (defun foo (x)
+      (aref *a1* (the integer (position x *a2*))))
 
+  This is not a new compiler problem in 0.7.0, but the new compiler
+  transforms for FIND, POSITION, FIND-IF, and POSITION-IF make it 
+  more conspicuous. If you don't need performance from these functions,
+  and the bogus warnings are a nuisance for you, you can return to
+  your pre-0.7.0 state of grace with
+    #+sbcl (declaim (notinline find position find-if position-if)) ; bug 117..
 
 KNOWN BUGS RELATED TO THE IR1 INTERPRETER
 

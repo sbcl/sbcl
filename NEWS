@@ -812,6 +812,18 @@ changes in sbcl-0.6.13 relative to sbcl-0.6.12:
   the byte fasl file version is now equal to the ordinary
   fasl file version.
 
+changes in sbcl-0.7.0 relative to sbcl-0.6.13:
+* There are new compiler optimizations for various functions: FIND,
+  POSITION, FIND-IF, POSITION-IF, FILL, COERCE, TRUNCATE, FLOOR, and
+  CEILING. Mostly these should be transparent, but there's one 
+  potentially-annoying problem (bug 117): when the compiler inline
+  expands the FIND/POSITION family of functions and does type
+  analysis on the result, it can find control paths which have 
+  type mismatches, and when it can't prove that they're not taken,
+  it will issue WARNINGs about the type mismatches. It's not clear
+  how to make the compiler smart enough to fix this in general, but
+  a workaround is given in the entry for 117 in the BUGS file.
+
 planned incompatible changes in 0.7.x:
 * The debugger prompt sequence now goes "5]", "5[2]", "5[3]", etc.
   as you get deeper into recursive calls to the debugger command loop,

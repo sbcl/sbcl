@@ -25,7 +25,7 @@
   ((call :initarg :call
 	 :reader cross-type-style-warning-call)
    (message :reader cross-type-style-warning-message
-	    #+cmu :initarg #+cmu :message ; to stop bogus non-STYLE WARNING
+	    #+cmu :initarg #+cmu :message ; (to stop bogus non-STYLE WARNING)
 	    ))
   (:report (lambda (c s)
 	     (format
@@ -108,198 +108,221 @@
 ;;; like SUBTYPEP: the first value for its conservative opinion (never
 ;;; T unless it's certain) and the second value to tell whether it's
 ;;; certain.
-(defun cross-typep (host-object target-type)
-  (flet ((warn-and-give-up ()
-	   ;; We don't have to keep track of this as long as system performance
-	   ;; is acceptable, since giving up conservatively is a safe way out.
+(defun cross-typep (host-object raw-target-type)
+  (let ((target-type (type-expand raw-target-type)))
+    (flet ((warn-and-give-up ()
+	   ;; We don't have to keep track of this as long as system
+	   ;; performance is acceptable, since giving up
+	   ;; conservatively is a safe way out.
 	   #+nil
 	   (warn 'cross-type-giving-up-conservatively
-		 :call `(cross-typep ,host-object ,target-type))
+		 :call `(cross-typep ,host-object ,raw-target-type))
 	   (values nil nil))
-	 (warn-about-possible-float-info-loss ()
-	   (warn-possible-cross-type-float-info-loss
-	    `(cross-typep ,host-object ,target-type))))
-    (cond (;; Handle various SBCL-specific types which can't exist on
-	   ;; the ANSI cross-compilation host. KLUDGE: This code will
-	   ;; need to be tweaked by hand if the names of these types
-	   ;; ever change, ugh!
-	   (if (consp target-type)
-	       (member (car target-type)
-		       '(sb!alien:alien))
-	       (member target-type
-		       '(system-area-pointer
-			 funcallable-instance
-			 sb!alien-internals:alien-value)))
-	   (values nil t))
-	  (;; special case when TARGET-TYPE isn't a type spec, but
-	   ;; instead a CLASS object
-	   (typep target-type 'sb!xc::structure-class)
-	   ;; SBCL-specific types which have an analogue specially
-	   ;; created on the host system
-	   (if (sb!xc:subtypep (sb!xc:class-name target-type)
-			       'sb!kernel::structure!object)
-	       (values (typep host-object (sb!xc:class-name target-type)) t)
-	       (values nil t)))
-	  ((and (symbolp target-type)
-		(find-class target-type nil)
-		(subtypep target-type 'sb!kernel::structure!object))
-	   (values (typep host-object target-type) t))
-	  ((and (symbolp target-type)
-		(sb!xc:find-class target-type nil)
-		(sb!xc:subtypep target-type 'cl:structure-object)
-		(typep host-object '(or symbol number list character)))
-	   (values nil t))
-	  (;; easy cases of arrays and vectors
-	   (member target-type
-		   '(array simple-string simple-vector string vector))
-	   (values (typep host-object target-type) t))
-	  (;; general cases of vectors
-	   (and (not (unknown-type-p (values-specifier-type target-type)))
-		(sb!xc:subtypep target-type 'cl:vector))
-	   (if (vectorp host-object)
-	       (warn-and-give-up) ; general case of vectors being way too hard
-	       (values nil t))) ; but "obviously not a vector" being easy
-	  (;; general cases of arrays
-	   (and (not (unknown-type-p (values-specifier-type target-type)))
-		(sb!xc:subtypep target-type 'cl:array))
-	   (if (arrayp host-object)
-	       (warn-and-give-up) ; general case of arrays being way too hard
-	       (values nil t))) ; but "obviously not an array" being easy
-	  ((consp target-type)
-	   (let ((first (first target-type))
-		 (rest (rest target-type)))
-	     (case first
-	       ;; Many complex types are guaranteed to correspond exactly
-	       ;; between any host ANSI Common Lisp and the target SBCL.
-	       ((integer member mod rational real signed-byte unsigned-byte)
-		(values (typep host-object target-type) t))
-	       ;; Floating point types are guaranteed to correspond,
-	       ;; too, but less exactly.
-	       ((single-float double-float)
-		(cond ((floatp host-object)
-		       (warn-about-possible-float-info-loss)
-		       (values (typep host-object target-type) t))
-		      (t
-		       (values nil t))))
-	       ;; Some complex types have translations that are less
-	       ;; trivial.
-	       (and (every/type #'cross-typep host-object rest))
-	       (or  (any/type   #'cross-typep host-object rest))
-	       ;; If we want to work with the KEYWORD type, we need
-	       ;; to grok (SATISFIES KEYWORDP).
-	       (satisfies
-		(destructuring-bind (predicate-name) rest
-		  (if (and (in-cl-package-p predicate-name)
-			   (fboundp predicate-name))
-		      ;; Many things like KEYWORDP, ODDP, PACKAGEP,
-		      ;; and NULL correspond between host and target.
-		      (values (not (null (funcall predicate-name host-object)))
-			      t)
-		      ;; For symbols not in the CL package, it's not
-		      ;; in general clear how things correspond
-		      ;; between host and target, so we punt.
-		      (warn-and-give-up))))
-	       ;; Some complex types are too hard to handle in the positive
-	       ;; case, but at least we can be confident in a large fraction of
-	       ;; the negative cases..
-	       ((base-string simple-base-string simple-string)
-		(if (stringp host-object)
-		    (warn-and-give-up)
-		    (values nil t)))
-	       ((vector simple-vector)
-		(if (vectorp host-object)
-		    (warn-and-give-up)
-		    (values nil t)))
-	       ((array simple-array)
-		(if (arrayp host-object)
-		    (warn-and-give-up)
-		    (values nil t)))
-	       (function
-		(if (functionp host-object)
-		    (warn-and-give-up)
-		    (values nil t)))
-	       ;; And the Common Lisp type system is complicated, and
-	       ;; we don't try to implement everything.
-	       (otherwise (warn-and-give-up)))))
-	  (t
-	   (case target-type
-	     ((*)
-	      ;; KLUDGE: SBCL has * as an explicit wild type. While this is
-	      ;; sort of logical (because (e.g. (ARRAY * 1)) is a valid type)
-	      ;; it's not ANSI: looking at the ANSI definitions of complex
-	      ;; types like like ARRAY shows that they consider * different
-	      ;; from other type names. Someday we should probably get rid of
-	      ;; this non-ANSIism in base SBCL, but until we do, we might as
-	      ;; well here in the cross compiler. And in order to make sure
-	      ;; that we don't continue doing it after we someday patch SBCL's
-	      ;; type system so that * is no longer a type, we make this
-	      ;; assertion:
-	      (aver (typep (specifier-type '*) 'named-type))
-	      (values t t))
-	     ;; Many simple types are guaranteed to correspond exactly
+	   (warn-about-possible-float-info-loss ()
+	     (warn-possible-cross-type-float-info-loss
+	       `(cross-typep ,host-object ,raw-target-type)))
+	   ;; a convenient idiom for making more matches to special cases:
+	   ;; Test both forms of target type for membership in LIST.
+	   ;;
+	   ;; (In order to avoid having to use too much deep knowledge
+	   ;; of types, it's sometimes convenient to test RAW-TARGET-TYPE
+	   ;; as well as the expanded type, since we can get matches with
+	   ;; just EQL. E.g. SIMPLE-STRING can be matched with EQL, while
+	   ;; safely matching its expansion,
+	   ;;  (OR (SIMPLE-ARRAY CHARACTER (*)) (SIMPLE-BASE-STRING *))
+	   ;; would require logic clever enough to know that, e.g., OR is
+	   ;; commutative.)
+	   (target-type-is-in (list)
+	     (or (member raw-target-type list)
+		 (member target-type list))))
+      (cond (;; Handle various SBCL-specific types which can't exist on
+	     ;; the ANSI cross-compilation host. KLUDGE: This code will
+	     ;; need to be tweaked by hand if the names of these types
+	     ;; ever change, ugh!
+	     (if (consp target-type)
+		 (member (car target-type)
+			 '(sb!alien:alien))
+		 (member target-type
+			 '(system-area-pointer
+			   funcallable-instance
+			   sb!alien-internals:alien-value)))
+	     (values nil t))
+	    (;; special case when TARGET-TYPE isn't a type spec, but
+	     ;; instead a CLASS object
+	     (typep target-type 'sb!xc::structure-class)
+	     ;; SBCL-specific types which have an analogue specially
+	     ;; created on the host system
+	     (if (sb!xc:subtypep (sb!xc:class-name target-type)
+				 'sb!kernel::structure!object)
+		 (values (typep host-object (sb!xc:class-name target-type)) t)
+		 (values nil t)))
+	    ((and (symbolp target-type)
+		  (find-class target-type nil)
+		  (subtypep target-type 'sb!kernel::structure!object))
+	     (values (typep host-object target-type) t))
+	    ((and (symbolp target-type)
+		  (sb!xc:find-class target-type nil)
+		  (sb!xc:subtypep target-type 'cl:structure-object)
+		  (typep host-object '(or symbol number list character)))
+	     (values nil t))
+	    (;; easy cases of arrays and vectors
+	     (target-type-is-in
+	      '(array simple-string simple-vector string vector))
+	     (values (typep host-object target-type) t))
+	    (;; general cases of vectors
+	     (and (not (unknown-type-p (values-specifier-type target-type)))
+		  (sb!xc:subtypep target-type 'cl:vector))
+	     (if (vectorp host-object)
+		 (warn-and-give-up) ; general-case vectors being way too hard
+		 (values nil t))) ; but "obviously not a vector" being easy
+	    (;; general cases of arrays
+	     (and (not (unknown-type-p (values-specifier-type target-type)))
+		  (sb!xc:subtypep target-type 'cl:array))
+	     (if (arrayp host-object)
+		 (warn-and-give-up) ; general-case arrays being way too hard
+		 (values nil t))) ; but "obviously not an array" being easy
+	    ((target-type-is-in '(*))
+	     ;; KLUDGE: SBCL has * as an explicit wild type. While
+	     ;; this is sort of logical (because (e.g. (ARRAY * 1)) is
+	     ;; a valid type) it's not ANSI: looking at the ANSI
+	     ;; definitions of complex types like like ARRAY shows
+	     ;; that they consider * different from other type names.
+	     ;; Someday we should probably get rid of this non-ANSIism
+	     ;; in base SBCL, but until we do, we might as well here
+	     ;; in the cross compiler. And in order to make sure that
+	     ;; we don't continue doing it after we someday patch
+	     ;; SBCL's type system so that * is no longer a type, we
+	     ;; make this assertion. -- WHN 2001-08-08
+	     (aver (typep (specifier-type '*) 'named-type))
+	     (values t t))
+	    (;; Many simple types are guaranteed to correspond exactly
 	     ;; between any host ANSI Common Lisp and the target
 	     ;; Common Lisp. (Some array types are too, but they
 	     ;; were picked off earlier.)
-	     ((bit character complex cons float function integer keyword
-	       list nil null number rational real signed-byte symbol t
-	       unsigned-byte)
-	      (values (typep host-object target-type) t))
-	     ;; Floating point types are guaranteed to correspond,
+	     (target-type-is-in
+	      '(bit character complex cons float function integer keyword
+		    list nil null number rational real signed-byte symbol t
+		    unsigned-byte))
+	     (values (typep host-object target-type) t))
+	    (;; Floating point types are guaranteed to correspond,
 	     ;; too, but less exactly.
-	     ((single-float double-float)
-	      (cond ((floatp host-object)
-		     (warn-about-possible-float-info-loss)
-		     (values (typep host-object target-type) t))
-		    (t
-		     (values nil t))))
-	     ;; Some types require translation between the cross-compilation
-	     ;; host Common Lisp and the target SBCL.
-	     (sb!xc:class (values (typep host-object 'sb!xc:class) t))
-	     (fixnum (values (fixnump host-object) t))
-	     ;; Some types are too hard to handle in the positive
-	     ;; case, but at least we can be confident in a large
-	     ;; fraction of the negative cases..
-	     ((base-string simple-base-string simple-string)
-	      (if (stringp host-object)
-		  (warn-and-give-up)
-		  (values nil t)))
-	     ((character base-char)
-	      (cond ((typep host-object 'standard-char)
-		     (values t t))
-		    ((not (characterp host-object))
-		     (values nil t))
-		    (t
-		     (warn-and-give-up))))
-	     ((stream instance)
-	      ;; Neither target CL:STREAM nor target
-	      ;; SB!KERNEL:INSTANCE is implemented as a
-	      ;; STRUCTURE-OBJECT, so they'll fall through the tests
-	      ;; above. We don't want to assume too much about them
-	      ;; here, but at least we know enough about them to say
-	      ;; that neither T nor NIL nor indeed any other symbol in
-	      ;; the cross-compilation host is one. That knowledge
-	      ;; suffices to answer so many of the questions that the
-	      ;; cross-compiler asks that it's well worth
-	      ;; special-casing it here.
-	      (if (symbolp host-object)
-		  (values nil t)
-		  (warn-and-give-up)))
-	     ;; And the Common Lisp type system is complicated, and we
-	     ;; don't try to implement everything.
-	     (otherwise (warn-and-give-up)))))))
+	     (target-type-is-in
+	      '(single-float double-float))
+	     (cond ((floatp host-object)
+		    (warn-about-possible-float-info-loss)
+		    (values (typep host-object target-type) t))
+		   (t
+		    (values nil t))))
+	    ;; Some types require translation between the cross-compilation
+	    ;; host Common Lisp and the target SBCL.
+	    ((target-type-is-in '(sb!xc:class))
+	     (values (typep host-object 'sb!xc:class) t))
+	    ((target-type-is-in '(fixnum))
+	     (values (fixnump host-object) t))
+	    ;; Some types are too hard to handle in the positive
+	    ;; case, but at least we can be confident in a large
+	    ;; fraction of the negative cases..
+	    ((target-type-is-in
+	      '(base-string simple-base-string simple-string))
+	     (if (stringp host-object)
+		 (warn-and-give-up)
+		 (values nil t)))
+	    ((target-type-is-in '(character base-char))
+	     (cond ((typep host-object 'standard-char)
+		    (values t t))
+		   ((not (characterp host-object))
+		    (values nil t))
+		   (t
+		    (warn-and-give-up))))
+	    ((target-type-is-in '(stream instance))
+	     ;; Neither target CL:STREAM nor target SB!KERNEL:INSTANCE
+	     ;; is implemented as a STRUCTURE-OBJECT, so they'll fall
+	     ;; through the tests above. We don't want to assume too
+	     ;; much about them here, but at least we know enough
+	     ;; about them to say that neither T nor NIL nor indeed
+	     ;; any other symbol in the cross-compilation host is one.
+	     ;; That knowledge suffices to answer so many of the
+	     ;; questions that the cross-compiler asks that it's well
+	     ;; worth special-casing it here.
+	     (if (symbolp host-object)
+		 (values nil t)
+		 (warn-and-give-up)))
+	    ;; various hacks for composite types..
+	    ((consp target-type)
+	     (let ((first (first target-type))
+		   (rest (rest target-type)))
+	       (case first
+		 ;; Many complex types are guaranteed to correspond exactly
+		 ;; between any host ANSI Common Lisp and the target SBCL.
+		 ((integer member mod rational real signed-byte unsigned-byte)
+		  (values (typep host-object target-type) t))
+		 ;; Floating point types are guaranteed to correspond,
+		 ;; too, but less exactly.
+		 ((single-float double-float)
+		  (cond ((floatp host-object)
+			 (warn-about-possible-float-info-loss)
+			 (values (typep host-object target-type) t))
+			(t
+			 (values nil t))))
+		 ;; Some complex types have translations that are less
+		 ;; trivial.
+		 (and (every/type #'cross-typep host-object rest))
+		 (or  (any/type   #'cross-typep host-object rest))
+		 ;; If we want to work with the KEYWORD type, we need
+		 ;; to grok (SATISFIES KEYWORDP).
+		 (satisfies
+		  (destructuring-bind (predicate-name) rest
+		    (if (and (in-cl-package-p predicate-name)
+			     (fboundp predicate-name))
+			;; Many things like KEYWORDP, ODDP, PACKAGEP,
+			;; and NULL correspond between host and target.
+			(values (not (null (funcall predicate-name
+						    host-object)))
+				t)
+			;; For symbols not in the CL package, it's not
+			;; in general clear how things correspond
+			;; between host and target, so we punt.
+			(warn-and-give-up))))
+		 ;; Some complex types are too hard to handle in the
+		 ;; positive case, but at least we can be confident in
+		 ;; a large fraction of the negative cases..
+		 ((base-string simple-base-string simple-string)
+		  (if (stringp host-object)
+		      (warn-and-give-up)
+		      (values nil t)))
+		 ((vector simple-vector)
+		  (if (vectorp host-object)
+		      (warn-and-give-up)
+		      (values nil t)))
+		 ((array simple-array)
+		  (if (arrayp host-object)
+		      (warn-and-give-up)
+		      (values nil t)))
+		 (function
+		  (if (functionp host-object)
+		      (warn-and-give-up)
+		      (values nil t)))
+		 ;; And the Common Lisp type system is complicated,
+		 ;; and we don't try to implement everything.
+		 (otherwise (warn-and-give-up)))))
+	    ;; And the Common Lisp type system is complicated, and
+	    ;; we don't try to implement everything.
+	    (t
+	     (warn-and-give-up))))))
 
-;;; An incomplete TYPEP which runs at cross-compile time to tell whether OBJECT
-;;; is the host Lisp representation of a target SBCL type specified by
-;;; TARGET-TYPE-SPEC. It need make no pretense to completeness, since it
-;;; need only handle the cases which arise when building SBCL itself, e.g.
-;;; testing that range limits FOO and BAR in (INTEGER FOO BAR) are INTEGERs.
+;;; This is an incomplete TYPEP which runs at cross-compile time to
+;;; tell whether OBJECT is the host Lisp representation of a target
+;;; SBCL type specified by TARGET-TYPE-SPEC. It need make no pretense
+;;; to completeness, since it need only handle the cases which arise
+;;; when building SBCL itself, e.g. testing that range limits FOO and
+;;; BAR in (INTEGER FOO BAR) are INTEGERs.
 (defun sb!xc:typep (host-object target-type-spec &optional (env nil env-p))
   (declare (ignore env))
   (aver (null env-p)) ; 'cause we're too lazy to think about it
   (multiple-value-bind (opinion certain-p)
       (cross-typep host-object target-type-spec)
-    ;; A program that calls TYPEP doesn't want uncertainty and probably
-    ;; can't handle it.
+    ;; A program that calls TYPEP doesn't want uncertainty and
+    ;; probably can't handle it.
     (if certain-p
 	opinion
 	(error "uncertain in SB!XC:TYPEP ~S ~S"
