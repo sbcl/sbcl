@@ -2,6 +2,9 @@ changes in sbcl-0.8.16 relative to sbcl-0.8.15:
   * enhancement: saving cores with foreign code loaded is now
     supported on x86/NetBSD and sparc/Linux in addition to the previously
     supported platforms.
+  * bug fix: on some platforms repeated installations caused multiple
+    copies of HTML documentation to be installed -- should not happen
+    any more. (reported by Stefan Scholl)
   * bug fix: parsing self-recursive alien record types multiple times
     no longer causes infinite recursion. (reported by Thomas F. Burdick,
     original patch by Helmut Eller for CMUCL)

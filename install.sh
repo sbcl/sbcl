@@ -99,7 +99,7 @@ done
 # html
 for html in doc/manual/sbcl doc/manual/asdf
 do
-  test -d $html && cp -r $html $BUILD_ROOT$DOC_DIR/html/`basename $html` \
+  test -d $html && cp -R -L $html $BUILD_ROOT$DOC_DIR/html \
       && echo " html $BUILD_ROOT$DOC_DIR/html/`basename $html`/index.html"
 done
 
