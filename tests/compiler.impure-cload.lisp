@@ -117,5 +117,27 @@
                '((1 2 3) (7 14 21) (21 14 7))))
 
 (delete-package :bug148)
+
+;;; bug 258
+(defpackage :bug258 (:use :cl))
+(in-package :bug258)
+
+(defun u-b-sra (ad0)
+  (declare (special *foo* *bar*))
+  (declare (optimize (safety 3) (speed 2) (space 1) (debug 1)))
+  (labels ((c.frob (x)
+             (1- x))
+           (ad.frob (ad)
+             (mapcar #'c.frob ad)))
+    (declare (inline c.frob ad.frob))
+    (list (the list ad0)
+          (funcall (if (listp ad0) #'ad.frob #'print) ad0)
+          (funcall (if (listp ad0) #'ad.frob #'print) (reverse ad0)))))
+
+(assert (equal (u-b-sra '(4 9 7))
+               '((4 9 7) (3 8 6) (6 8 3))))
+
+(delete-package :bug258)
+
 
 (sb-ext:quit :unix-status 104)

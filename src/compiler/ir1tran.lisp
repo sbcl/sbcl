@@ -557,6 +557,8 @@
 ;;; functional instead.
 (defun reference-leaf (start cont leaf)
   (declare (type continuation start cont) (type leaf leaf))
+  (when (functional-p leaf)
+    (assure-functional-live-p leaf))
   (let* ((type (lexenv-find leaf type-restrictions))
          (leaf (or (and (defined-fun-p leaf)
                         (not (eq (defined-fun-inlinep leaf)
@@ -848,30 +850,7 @@
 ;;; are converting inline expansions for local functions during
 ;;; optimization.
 (defun ir1-convert-local-combination (start cont form functional)
-
-  ;; The test here is for "when LET converted", as a translation of
-  ;; the old CMU CL comments into code. Unfortunately, the old CMU CL
-  ;; comments aren't specific enough to tell whether the correct
-  ;; translation is FUNCTIONAL-SOMEWHAT-LETLIKE-P or
-  ;; FUNCTIONAL-LETLIKE-P or what. The old CMU CL code assumed that
-  ;; any non-null FUNCTIONAL-KIND meant that the function "had been
-  ;; LET converted", which might even be right, but seems fragile, so
-  ;; we try to be pickier.
-  (when (or
-	 ;; looks LET-converted
-	 (functional-somewhat-letlike-p functional)
-	 ;; It's possible for a LET-converted function to end up
-	 ;; deleted later. In that case, for the purposes of this
-	 ;; analysis, it is LET-converted: LET-converted functionals
-	 ;; are too badly trashed to expand them inline, and deleted
-	 ;; LET-converted functionals are even worse.
-	 (eql (functional-kind functional) :deleted))
-    (throw 'locall-already-let-converted functional))
-  ;; Any other non-NIL KIND value is a case we haven't found a
-  ;; justification for, and at least some such values (e.g. :EXTERNAL
-  ;; and :TOPLEVEL) seem obviously wrong.
-  (aver (null (functional-kind functional)))
-
+  (assure-functional-live-p functional)
   (ir1-convert-combination start
 			   cont
 			   form

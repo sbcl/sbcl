@@ -1602,6 +1602,20 @@
 			      *inline-expansion-limit*))
 	   nil)
 	  (t t))))
+
+;;; Make sure that FUNCTIONAL is not let-converted or deleted.
+(defun assure-functional-live-p (functional)
+  (declare (type functional functional))
+  (when (and (or
+              ;; looks LET-converted
+              (functional-somewhat-letlike-p functional)
+              ;; It's possible for a LET-converted function to end up
+              ;; deleted later. In that case, for the purposes of this
+              ;; analysis, it is LET-converted: LET-converted functionals
+              ;; are too badly trashed to expand them inline, and deleted
+              ;; LET-converted functionals are even worse.
+              (eql (functional-kind functional) :deleted)))
+    (throw 'locall-already-let-converted functional)))
 
 ;;;; careful call
 

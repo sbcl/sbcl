@@ -1039,19 +1039,7 @@ WORKAROUND:
   callees.)
 
 258:
-  Compiler fails on
-
-    (defun u-b-sra (ad0)
-      (declare (special *foo* *bar*))
-      (declare (optimize (safety 3) (speed 2) (space 1) (debug 1)))
-      (labels ((c.frob (x)
-                 (random x))
-               (ad.frob (ad)
-                 (mapcar #'c.frob ad)))
-        (declare (inline c.frob ad.frob))
-        (list (the list ad0)
-              (funcall (if (listp ad0) #'ad.frob #'print) ad0)
-              (funcall (if (listp ad0) #'ad.frob #'print) (reverse ad0)))))
+  (fixed in 0.8.1.3)
 
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:
