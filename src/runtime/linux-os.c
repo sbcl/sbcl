@@ -260,8 +260,12 @@ os_install_interrupt_handlers(void)
 {
     undoably_install_low_level_interrupt_handler(SIG_MEMORY_FAULT,
 						 sigsegv_handler);
+#ifdef LISP_FEATURE_SB_THREAD
     undoably_install_low_level_interrupt_handler(SIG_INTERRUPT_THREAD,
 						 handle_rt_signal);
+    undoably_install_low_level_interrupt_handler(SIG_STOP_FOR_GC,
+						 sig_stop_for_gc_handler);
+#endif
     undoably_install_low_level_interrupt_handler(SIGCONT,
 						 sigcont_handler);
 }

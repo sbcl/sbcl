@@ -4204,7 +4204,7 @@ alloc(int nbytes)
 	    __asm__("movl %fs,%0" : "=r" (fs)  : );
 	    fprintf(stderr, "fs is %x, th->tls_cookie=%x (should be identical)\n",
 		    debug_get_fs(),th->tls_cookie);
-	    lose("If you see this message before 2003.05.01, mail details to sbcl-devel\n");
+	    lose("If you see this message before 2003.12.01, mail details to sbcl-devel\n");
 	}
 #else
     gc_assert(SymbolValue(PSEUDO_ATOMIC_ATOMIC,th));

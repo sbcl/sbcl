@@ -12,7 +12,7 @@
  * here? (The answer wasn't obvious to me when merging the
  * architecture-abstracting patches for CSR's SPARC port. -- WHN 2002-02-15) */
 
-inline void 
+static inline void 
 get_spinlock(lispobj *word,int value)
 {
     u32 eax=0;
@@ -25,7 +25,7 @@ get_spinlock(lispobj *word,int value)
     } while(eax!=0);
 }
 
-inline void
+static inline void
 release_spinlock(lispobj *word)
 {
     *word=0;

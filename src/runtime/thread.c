@@ -24,6 +24,7 @@
 int dynamic_values_bytes=4096*sizeof(lispobj);	/* same for all threads */
 struct thread *all_threads;
 lispobj all_threads_lock;
+int countdown_to_gc;
 extern struct interrupt_data * global_interrupt_data;
 
 void get_spinlock(lispobj *word,int value);
@@ -290,18 +291,18 @@ int interrupt_thread(pid_t pid, lispobj function)
     union sigval sigval;
     sigval.sival_int=function;
 
-    sigqueue(pid, SIG_INTERRUPT_THREAD, sigval);
+    return sigqueue(pid, SIG_INTERRUPT_THREAD, sigval);
 }
 
-int gc_stop_the_world()
+void gc_stop_the_world()
 {
     /* stop all other threads by sending them SIG_STOP_FOR_GC */
-    struct thread *th=arch_os_get_current_thread();
+    struct thread *p,*th=arch_os_get_current_thread();
     int countdown_to_gc=0;
     struct thread *tail=0;
     int finished=0;
     do {
-	get_spinlock(&all_threads_lock,th);
+	get_spinlock(&all_threads_lock,th->pid);
 	if(tail!=all_threads) {
 	    /* new threads always get consed onto the front of all_threads,
 	     * and may be created by any thread that we haven't signalled
@@ -319,13 +320,12 @@ int gc_stop_the_world()
 	release_spinlock(&all_threads_lock);
 	sched_yield();
     } while(!finished);
-    return 0;
 }
 
-int gc_start_the_world()
+void gc_start_the_world()
 {
     struct thread *p,*th=arch_os_get_current_thread();
-    get_spinlock(&all_threads_lock);
+    get_spinlock(&all_threads_lock,th->pid);
     for(p=all_threads;p;p=p->next) {
 	if(p==th) continue;
 	kill(p->pid,SIGCONT);
