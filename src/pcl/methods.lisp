@@ -561,8 +561,8 @@
 	(pushnew other-class (class-incompatible-superclass-list class))))))
 
 (defun superclasses-compatible-p (class1 class2)
-  (let ((cpl1 (class-precedence-list class1))
-	(cpl2 (class-precedence-list class2)))
+  (let ((cpl1 (cpl-or-nil class1))
+	(cpl2 (cpl-or-nil class2)))
     (dolist (sc1 cpl1 t)
       (dolist (ic (class-incompatible-superclass-list sc1))
 	(when (memq ic cpl2)

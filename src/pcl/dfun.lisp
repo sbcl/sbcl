@@ -709,6 +709,10 @@ And so, we are saved.
 	  ((and (eq *boot-state* 'complete)
 		(compute-applicable-methods-emf-std-p gf))
 	   (let* ((caching-p (use-caching-dfun-p gf))
+		  ;; KLUDGE: the only effect of this (when
+		  ;; *LAZY-DFUN-COMPUTE-P* is true, as it usually is)
+		  ;; is to signal an error when we try to add methods
+		  ;; with the wrong qualifiers to a generic function.
 		  (classes-list (precompute-effective-methods
 				 gf caching-p
 				 (not *lazy-dfun-compute-p*))))
@@ -1322,6 +1326,12 @@ And so, we are saved.
       (mapcar (lambda (x) (position x lambda-list))
 	      argument-precedence-order)))
 
+(defun cpl-or-nil (class)
+  (if (eq *boot-state* 'complete)
+      (when (class-finalized-p class)
+        (class-precedence-list class))
+      (early-class-precedence-list class)))
+
 (defun saut-and (specl type)
   (let ((applicable nil)
 	(possibly-applicable t))
@@ -1345,8 +1355,8 @@ And so, we are saved.
 
 (defun saut-not-class (specl ntype)
   (let* ((class (type-class specl))
-	 (cpl (class-precedence-list class)))
-     (not (memq (cadr ntype) cpl))))
+	 (cpl (cpl-or-nil class)))
+    (not (memq (cadr ntype) cpl))))
 
 (defun saut-not-prototype (specl ntype)
   (let* ((class (case (car specl)
@@ -1354,8 +1364,8 @@ And so, we are saved.
 		  (class-eq  (cadr specl))
 		  (prototype (cadr specl))
 		  (class     (cadr specl))))
-	 (cpl (class-precedence-list class)))
-     (not (memq (cadr ntype) cpl))))
+	 (cpl (cpl-or-nil class)))
+    (not (memq (cadr ntype) cpl))))
 
 (defun saut-not-class-eq (specl ntype)
   (let ((class (case (car specl)
@@ -1369,9 +1379,7 @@ And so, we are saved.
     (t   t)))
 
 (defun class-applicable-using-class-p (specl type)
-  (let ((pred (memq specl (if (eq *boot-state* 'complete)
-			      (class-precedence-list type)
-			      (early-class-precedence-list type)))))
+  (let ((pred (memq specl (cpl-or-nil type))))
     (values pred
 	    (or pred
 		(if (not *in-precompute-effective-methods-p*)
@@ -1393,7 +1401,7 @@ And so, we are saved.
     (class (class-applicable-using-class-p (cadr specl) (cadr type)))
     (t     (values nil (let ((class (type-class specl)))
 			 (memq (cadr type)
-			       (class-precedence-list class)))))))
+			       (cpl-or-nil class)))))))
 
 (defun saut-class-eq (specl type)
   (if (eq (car specl) 'eql)
