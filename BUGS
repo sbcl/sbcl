@@ -1311,6 +1311,23 @@ WORKAROUND:
   that the function could cause an error; e.g. (TYPEP #\! '(SATISFIES
   FBOUNDP)) raises an error when it should return NIL.
 
+162:
+  When a function is called with too few arguments, causing the
+  debugger to be entered, the uninitialized slots in the bad call frame 
+  seem to cause GCish problems, being interpreted as tagged data even
+  though they're not. In particular, executing ROOM in the
+  debugger at that point causes AVER failures:
+    * (machine-type)
+    "X86"
+    * (lisp-implementation-version)
+    "0.7.2.12"
+    * (typep 10)
+    ...
+    0] (room)
+    ...
+    failed AVER: "(SAP= CURRENT END)"
+  (reported by Robert E. Brown 2002-04-16)
+
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:
     These labels were used for bugs related to the old IR1 interpreter.
