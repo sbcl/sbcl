@@ -263,13 +263,24 @@
 	  (dolist (call calls)
 	    (let ((call-home (lambda-home call)))
 	      (setf res (dfo-scavenge-dependency-graph call-home res)))))
-	;; TO DO: Scavenge closure-over relationships.
-	(values)
+	;; Scavenge closure-over relationships: if FUN refers to a
+	;; variable whose home lambda is not FUN, then the home lambda
+	;; should be in the same component as FUN. (sbcl-0.6.13, and
+	;; CMU CL, didn't do this, leading to the occasional failure
+	;; when physenv analysis, which is local to each component,
+	;; would bogusly conclude that a closed-over variable was
+	;; unused and thus delete it. See e.g. cmucl-imp 2001-11-29.)
+	(dolist (var (lambda-refers-to-vars clambda))
+	  (unless (null (lambda-var-refs var)) ; i.e. unless deleted
+	    (let ((var-home-home (lambda-home (lambda-var-home var))))
+	      (unless (eql (lambda-kind var-home-home) :deleted)
+		(setf res
+		      (dfo-scavenge-dependency-graph var-home-home res))))))
 	;; Voila.
 	res)))))
 
-;;; Return true if CLAMBDA either is an XEP or has EXITS to some of its
-;;; ENTRIES.
+;;; Return true if CLAMBDA either is an XEP or has EXITS to some of
+;;; its ENTRIES.
 (defun has-xep-or-nlx (clambda)
   (declare (type clambda clambda))
   (or (eq (functional-kind clambda) :external)

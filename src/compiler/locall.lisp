@@ -861,7 +861,8 @@
   (dolist (called (lambda-calls fun))
     (dolist (ref (leaf-refs called))
       (let ((this-call (continuation-dest (node-cont ref))))
-	(when (and (node-tail-p this-call)
+	(when (and this-call
+		   (node-tail-p this-call)
 		   (eq (node-home-lambda this-call) fun))
 	  (setf (node-tail-p this-call) nil)
 	  (ecase (functional-kind called)
