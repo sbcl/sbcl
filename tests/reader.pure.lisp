@@ -173,3 +173,37 @@
     (loop for i from 2 to 36
 	  do (setq *read-base* i)
 	  do (assert (typep (read-from-string symbol-string) 'symbol)))))
+
+(let ((standard-chars " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~
+")
+      (standard-terminating-macro-chars "\"'(),;`")
+      (standard-nonterminating-macro-chars "#"))
+  (flet ((frob (char)
+	   (multiple-value-bind (fun non-terminating-p)
+	       (get-macro-character char)
+	     (cond
+	       ((find char standard-terminating-macro-chars)
+		(unless (and fun (not non-terminating-p))
+		  (list char)))
+	       ((find char standard-nonterminating-macro-chars)
+		(unless (and fun non-terminating-p)
+		  (list char)))
+	       (t (unless (and (not fun) (not non-terminating-p))
+		    (list char)))))))
+    (let ((*readtable* (copy-readtable nil)))
+      (assert (null (loop for c across standard-chars append (frob c)))))))
+
+(let ((standard-chars " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~
+")
+      (undefined-chars "!\"$%&,;>?@[]^_`~{}/dDeEfFgGhHiIjJkKlLmMnNqQtTuUvVwWyYzZ"))
+  (flet ((frob (char)
+	   (let ((fun (get-dispatch-macro-character #\# char)))
+	     (cond
+	       ((find char undefined-chars)
+		(when fun (list char)))
+	       ((digit-char-p char 10)
+		(when fun (list char)))
+	       (t
+		(unless fun (list char)))))))
+    (let ((*readtable* (copy-readtable nil)))
+      (assert (null (loop for c across standard-chars append (frob c)))))))

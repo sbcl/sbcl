@@ -2562,6 +2562,9 @@ changes in sbcl-0.8.13 relative to sbcl-0.8.12:
   * fixed bug #333: CHECK-TYPE now ensures that the type error
     signalled, if any, has the right object to be accessed by
     TYPE-ERROR-DATUM.  (reported by Tony Martinez)
+  * fixed a bug: #\Space (and other whitespace characters) are no
+    longer considered to be macro characters in standard syntax by
+    GET-MACRO-CHARACTER.
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles

@@ -276,6 +276,7 @@
   (let ((*readtable* *standard-readtable*))
 
     (flet ((whitespaceify (char)
+	     (set-cmt-entry char nil)
 	     (set-cat-entry char +char-attr-whitespace+)))
       (whitespaceify (code-char tab-char-code))
       (whitespaceify #\linefeed)
@@ -284,7 +285,7 @@
       (whitespaceify (code-char return-char-code)))
 
     (set-cat-entry #\\ +char-attr-escape+)
-    (set-cmt-entry #\\ #'read-token)
+    (set-cmt-entry #\\ nil)
 
     ;; Easy macro-character definitions are in this source file.
     (set-macro-character #\" #'read-string)
@@ -301,8 +302,8 @@
 	((= ichar #O200))
       (setq char (code-char ichar))
       (when (constituentp char *standard-readtable*)
-	    (set-cat-entry char (get-secondary-attribute char))
-	    (set-cmt-entry char nil)))))
+	(set-cat-entry char (get-secondary-attribute char))
+	(set-cmt-entry char nil)))))
 
 ;;;; implementation of the read buffer
 
