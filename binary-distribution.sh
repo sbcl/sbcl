@@ -9,7 +9,7 @@
 # a tar file with no directory prefixes. Since sbcl-0.6.10, we've
 # switched over to trying to do this the way everyone else does.)
 
-b=${1:?missing base directory name argument}
+b=${1:?"missing base directory name argument"}
 tar -cf $b-binary.tar \
     $b/output/sbcl.core $b/src/runtime/sbcl \
     $b/BUGS $b/COPYING $b/CREDITS $b/INSTALL $b/NEWS $b/README \
