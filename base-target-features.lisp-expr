@@ -244,12 +244,12 @@
  ;;      any Sun UltraSPARC (possibly also non-Ultras -- currently untested)
  ;;   :ppc
  ;;      any PowerPC CPU
- ;;
- ;; (No other CPUs are supported by SBCL as of 0.7.5, but MIPS or HPPA
- ;; support could be ported from CMU CL if anyone is sufficiently
- ;; motivated to do so, or if you're *really* motivated, you could
- ;; write a port from scratch for a new CPU architecture.)
- ;;
+ ;;   :hppa
+ ;;      any PA-RISC CPU
+ ;;   :mips
+ ;;      any MIPS CPU (in little-endian mode with :little-endian -- currently
+ ;;      untested)
+ ;;   
  ;; (CMU CL also had a :pentium feature, which affected the definition
  ;; of some floating point vops. It was present but not enabled or
  ;; documented in the CMU CL code that SBCL is derived from, and has
@@ -279,8 +279,8 @@
  ;;              with the SunOS kernel.
  ;;   :osf1    = We're intended to run under Tru64 (aka Digital Unix
  ;;              aka OSF/1).
- ;; (No others are supported by SBCL as of 0.7.5, but :hpux or
- ;; :irix support could be ported from CMU CL if anyone is
- ;; sufficiently motivated to do so, and it'd even be possible,
- ;; though harder, to port the system to Microsoft Windows.)
+ ;; (No others are supported by SBCL as of 0.7.5, but :hpux or :irix
+ ;; support could be ported from CMU CL if anyone is sufficiently
+ ;; motivated to do so, and it'd even be possible, though harder, to
+ ;; port the system to Microsoft Windows or MacOS X.)
  )

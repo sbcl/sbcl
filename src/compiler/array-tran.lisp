@@ -51,6 +51,11 @@
 				(array-type-specialized-element-type type))))
   (continuation-type new-value))
 
+(defun assert-array-complex (array)
+  (assert-continuation-type array
+			    (make-array-type :complexp t
+					     :element-type *wild-type*)))
+
 ;;; Return true if ARG is NIL, or is a constant-continuation whose
 ;;; value is NIL, false otherwise.
 (defun unsupplied-or-nil (arg)
@@ -138,6 +143,24 @@
 	       '(*))
 	      (t
 	       '*))))))
+
+;;; Complex array operations should assert that their array argument
+;;; is complex.  In SBCL, vectors with fill-pointers are complex.
+(defoptimizer (fill-pointer derive-type) ((vector))
+  (assert-array-complex vector))
+(defoptimizer (%set-fill-pointer derive-type) ((vector index))
+  (declare (ignorable index))
+  (assert-array-complex vector))
+
+(defoptimizer (vector-push derive-type) ((object vector))
+  (declare (ignorable object))
+  (assert-array-complex vector))
+(defoptimizer (vector-push-extend derive-type)
+    ((object vector &optional index))
+  (declare (ignorable object index))
+  (assert-array-complex vector))
+(defoptimizer (vector-pop derive-type) ((vector))
+  (assert-array-complex vector))
 
 ;;;; constructors
 

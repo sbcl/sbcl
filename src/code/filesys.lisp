@@ -618,7 +618,7 @@
 	     (unless (or (null type) (eq type :unspecific))
 	       (/noshow0 "tweaking FILE for more-or-less-:UNSPECIFIC case")
 	       (setf file (concatenate 'string file "." type)))
-	     (unless (member version '(nil :newest :wild))
+	     (unless (member version '(nil :newest :wild :unspecific))
 	       (/noshow0 "tweaking FILE for more-or-less-:WILD case")
 	       (setf file (concatenate 'string file "."
 				       (quick-integer-to-string version))))

@@ -35,7 +35,6 @@
 (declaim (type hash-table *disassem-insts*))
 
 (defvar *disassem-inst-space* nil)
-(declaim (type (or null inst-space) *disassem-inst-space*))
 
 ;;; minimum alignment of instructions, in bytes
 (defvar *disassem-inst-alignment-bytes* sb!vm:n-word-bytes)
@@ -259,6 +258,10 @@
   (choices nil :type list))
 (def!method print-object ((ispace inst-space) stream)
   (print-unreadable-object (ispace stream :type t :identity t)))
+
+;;; now that we've defined the structure, we can declaim the type of
+;;; the variable:
+(declaim (type (or null inst-space) *disassem-inst-space*))
 
 (defstruct (inst-space-choice (:conc-name ischoice-)
                               (:copier nil))

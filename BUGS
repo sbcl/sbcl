@@ -1353,6 +1353,46 @@ WORKAROUND:
 196: "confusing error message for unREAL second arg to ATAN"
   (fixed in sbcl-0.7.7.18)
 
+197: "failed AVER on compiling or evaluating function constants"
+  (reported by Antonio Martinez sbcl-devel 2002-09-12)
+    When compiling or evaluating function constants, such as in
+      (EVAL `(LAMBDA () (FUNCALL ,(LAMBDA () NIL))))
+    I get the following error message:
+         debugger invoked on condition of type SB-INT:BUG:
+             failed AVER: "(LEAF-HAS-SOURCE-NAME-P LEAF)"
+
+  Although this seems a dubious use of function constants, it would be
+  good either to make it work or to produce a useful error message.
+
+198: "conflicting THEs are not necessarily all checked"
+  (reported by APD sbcl-devel 2002-09-14)
+    (DEFUN FOO (X)
+      (LET (Y)
+        (SETF Y (THE SINGLE-FLOAT (THE INTEGER X)))
+        (LIST Y Y)))
+
+    (FOO 3) => error "3 is not of type SINGLE-FLOAT"
+    (FOO 3F0) => (3F0 3F0)
+
+  APD also reports that this code has not worked as intended in SBCL
+  since the days of sbcl-0.7.0, while CMUCL correctly detects the type
+  error ("is not of type NIL") for all inputs.
+
+199: "hairy FUNCTION types confuse the compiler"
+  (reported by APD sbcl-devel 2002-09-15)
+    (DEFUN MUR (F)
+      (EQ NIL (FUNCALL F)))
+
+    (DEFUN FOO (F X)
+      (DECLARE (TYPE (AND FUNCTION (SATISFIES MUR)) F))
+      (FUNCALL F X))
+
+  fails to compile, printing
+    failed AVER:
+      "(AND (EQ (IR2-CONTINUATION-PRIMITIVE-TYPE 2CONT) FUNCTION-PTYPE) (EQ CHECK T))"
+
+  APD further reports that this bug is not present in CMUCL.
+
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:
     These labels were used for bugs related to the old IR1 interpreter.
