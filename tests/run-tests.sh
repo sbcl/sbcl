@@ -13,7 +13,7 @@
 # absolutely no warranty. See the COPYING and CREDITS files for
 # more information.
 
-# how we invoke SBCL
+# how we invoke SBCL in the tests
 export SBCL="${1:-../src/runtime/sbcl --core ../output/sbcl.core --noinform --sysinit /dev/null --userinit /dev/null --noprint --noprogrammer}"
 
 # "Ten four" is the closest numerical slang I can find to "OK", so

@@ -118,11 +118,6 @@
 	      classes)))
 
 (defun !bootstrap-meta-braid ()
-  (let* ((name 'class)
-	 (predicate-name (make-type-predicate-name name)))
-    (setf (gdefinition predicate-name)
-	  #'(lambda (x) (declare (ignore x)) t))
-    (do-satisfies-deftype name predicate-name))
   (let* ((*create-classes-from-internal-structure-definitions-p* nil)
 	 std-class-wrapper std-class
 	 standard-class-wrapper standard-class

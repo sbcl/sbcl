@@ -77,19 +77,6 @@
   ;; If ALLOCATION is :CLASS, this is a cons whose car holds the value.
   (cell nil :type (or cons null)))
 
-(eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
-  ;; the appropriate initialization value for the CPL slot of a
-  ;; CONDITION, calculated by looking at the INHERITS information in
-  ;; the LAYOUT of the CONDITION
-  (defun condition-class-cpl-from-layout (condition)
-    (declare (type condition condition))
-    (let* ((class (sb!xc:find-class condition))
-	   (layout (class-layout class))
-	   (superset (map 'list #'identity (layout-inherits layout))))
-      (delete-if (lambda (superclass)
-		   (not (typep superclass 'condition-class)))
-		 superset))))
-
 ;;; KLUDGE: It's not clear to me why CONDITION-CLASS has itself listed
 ;;; in its CPL, while other classes derived from CONDITION-CLASS don't
 ;;; have themselves listed in their CPLs. This behavior is inherited

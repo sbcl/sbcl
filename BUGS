@@ -118,33 +118,6 @@ WORKAROUND:
 	  (during macroexpansion of IN-PACKAGE,
 	  during macroexpansion of DEFFOO)
 
-14:
-  The ANSI syntax for non-STANDARD method combination types in CLOS is
-	(DEFGENERIC FOO (X) (:METHOD-COMBINATION PROGN))
-	(DEFMETHOD FOO PROGN ((X BAR)) (PRINT 'NUMBER))
-  If you mess this up, omitting the PROGN qualifier in in DEFMETHOD,
-	(DEFGENERIC FOO (X) (:METHOD-COMBINATION PROGN))
-	(DEFMETHOD FOO ((X BAR)) (PRINT 'NUMBER))
-  the error mesage is not easy to understand:
-	   INVALID-METHOD-ERROR was called outside the dynamic scope
-	of a method combination function (inside the body of
-	DEFINE-METHOD-COMBINATION or a method on the generic
-	function COMPUTE-EFFECTIVE-METHOD).
-  It would be better if it were more informative, a la
-	   The method combination type for this method (STANDARD) does
-	not match the method combination type for the generic function
-	(PROGN).
-  Also, after you make the mistake of omitting the PROGN qualifier
-  on a DEFMETHOD, doing a new DEFMETHOD with the correct qualifier
-  no longer works:
-	(DEFMETHOD FOO PROGN ((X BAR)) (PRINT 'NUMBER))
-  gives
-	   INVALID-METHOD-ERROR was called outside the dynamic scope
-	of a method combination function (inside the body of
-	DEFINE-METHOD-COMBINATION or a method on the generic
-	function COMPUTE-EFFECTIVE-METHOD).
-  This is not very helpful..
-
 15:
   (SUBTYPEP '(FUNCTION (T BOOLEAN) NIL)
             '(FUNCTION (FIXNUM FIXNUM) NIL)) => T, T

@@ -18,6 +18,9 @@
 
 echo //entering make-config.sh
 
+echo //ensuring the existence of output/ directory
+if [ ! -d output ] ; then mkdir output; fi
+
 ltf=`pwd`/local-target-features.lisp-expr
 echo //initializing $ltf
 echo ';;;; This is a machine-generated file.' > $ltf
@@ -25,9 +28,24 @@ echo ';;;; Please do not edit it by hand.' > $ltf
 echo ';;;; See make-config.sh.' > $ltf
 echo -n '(' >> $ltf
 
+echo //guessing default target CPU architecture from host architecture
+case `uname -m` in 
+    *86) guessed_sbcl_arch=x86 ;; 
+    [Aa]lpha) guessed_sbcl_arch=alpha ;;
+    *)
+        # If we're not building on a supported target architecture, we
+	# we have no guess, but it's not an error yet, since maybe
+	# target architecture will be specified explicitly below.
+	guessed_sbcl_arch=''
+	;;
+esac
+
 echo //setting up CPU-architecture-dependent information
-# Currently supported: x86 alpha
-sbcl_arch=${SBCL_ARCH:-x86}
+sbcl_arch=${SBCL_ARCH:-$guessed_sbcl_arch}
+if [ "$sbcl_arch" = "" ] ; then
+    echo "can't guess target SBCL architecture, need SBCL_ARCH environment var"
+    exit 1
+fi
 echo -n ":$sbcl_arch" >> $ltf 
 for d in src/compiler src/assembly; do
     echo //setting up symlink $d/target
@@ -52,25 +70,33 @@ echo //setting up OS-dependent information
 original_dir=`pwd`
 cd src/runtime/
 rm -f Config
-if [ `uname` = Linux ]; then
-    echo -n ' :linux' >> $ltf
-    ln -s Config.$sbcl_arch-linux Config
-elif uname | grep BSD; then
-    echo -n ' :bsd' >> $ltf
-    if [ `uname` = FreeBSD ]; then
-	echo -n ' :freebsd' >> $ltf
-	ln -s Config.$sbcl_arch-freebsd Config
-    elif [ `uname` = OpenBSD ]; then
-	echo -n ' :openbsd' >> $ltf
-	ln -s Config.$sbcl_arch-openbsd Config
-    else
-	echo unsupported BSD variant: `uname`
+case `uname` in 
+    Linux)
+	echo -n ' :linux' >> $ltf
+	ln -s Config.$sbcl_arch-linux Config
+	;;
+    *BSD)
+	echo -n ' :bsd' >> $ltf
+	case `uname` in
+	    FreeBSD)
+		echo -n ' :freebsd' >> $ltf
+		ln -s Config.$sbcl_arch-freebsd Config
+		;;
+	    OpenBSD)
+		echo -n ' :openbsd' >> $ltf
+		ln -s Config.$sbcl_arch-openbsd Config
+		;;
+	    *)
+		echo unsupported BSD variant: `uname`
+		exit 1
+		;;
+	esac
+	;;
+    *)
+	echo unsupported OS type: `uname`
 	exit 1
-    fi
-else
-    echo unsupported OS type: `uname`
-    exit 1
-fi
+	;;
+esac
 cd $original_dir
 
 echo //finishing $ltf

@@ -306,15 +306,30 @@
 	(primary ())
 	(after ())
 	(around ()))
-    (dolist (m applicable-methods)
-      (let ((qualifiers (if (listp m)
-			    (early-method-qualifiers m)
-			    (method-qualifiers m))))
-	(cond ((member ':before qualifiers)  (push m before))
-	      ((member ':after  qualifiers)  (push m after))
-	      ((member ':around  qualifiers) (push m around))
-	      (t
-	       (push m primary)))))
+    (flet ((lose (method why)
+             (invalid-method-error
+              method
+              "The method ~S ~A.~%~
+               Standard method combination requires all methods to have one~%~
+               of the single qualifiers :AROUND, :BEFORE and :AFTER or to~%~
+               have no qualifier at all."
+              method why)))
+      (dolist (m applicable-methods)
+        (let ((qualifiers (if (listp m)
+                            (early-method-qualifiers m)
+                            (method-qualifiers m))))
+          (cond
+            ((null qualifiers) (push m primary))
+            ((cdr qualifiers)
+              (lose m "has more than one qualifier"))
+            ((eq (car qualifiers) :around)
+              (push m around))
+            ((eq (car qualifiers) :before)
+              (push m before))
+            ((eq (car qualifiers) :after)
+              (push m after))
+            (t
+              (lose m "has an illegal qualifier"))))))
     (setq before  (reverse before)
 	  after   (reverse after)
 	  primary (reverse primary)
