@@ -236,9 +236,7 @@
 	   (let ((inherits (inherits-for-structure dd)))
 	     `(progn
 		(eval-when (:compile-toplevel :load-toplevel :execute)
-		  (%compiler-defstruct ',dd ',inherits)
-		  ,@(when (eq (dd-type dd) 'structure)
-		      `((%compiler-truly-defstruct ',dd))))
+		  (%compiler-defstruct ',dd ',inherits))
 		(%defstruct ',dd ',inherits)
 		,@(unless expanding-into-code-for-xc-host-p
 		    (append (raw-accessor-definitions dd)
@@ -790,7 +788,6 @@
 
       ;; FIXME: Someday it'd probably be good to go back to using
       ;; closures for the out-of-line forms of structure accessors.
-      ;; See comment on corresponding code in %%COMPILER-TRULY-DEFSTRUCT.
       #|
       (when (dd-predicate info)
 	(protect-cl (dd-predicate info))
@@ -823,12 +820,13 @@
 
   (values))
 
-;;; Do compile-time actions for DEFSTRUCT.
-(defun %compiler-defstruct (info inherits)
+;;; Do (COMPILE LOAD EVAL)-time actions for the defstruct described by DD.
+(defun %compiler-defstruct (dd inherits)
+  (declare (type defstruct-description dd))
   (multiple-value-bind (class layout old-layout)
       (multiple-value-bind (clayout clayout-p)
-	  (info :type :compiler-layout (dd-name info))
-	(ensure-structure-class info
+	  (info :type :compiler-layout (dd-name dd))
+	(ensure-structure-class dd
 				inherits
 				(if clayout-p "previously compiled" "current")
 				"compiled"
@@ -849,63 +847,43 @@
 	  (t
 	   (unless (eq (class-layout class) layout)
 	     (register-layout layout :invalidate nil))
-	   (setf (sb!xc:find-class (dd-name info)) class)))
+	   (setf (sb!xc:find-class (dd-name dd)) class)))
 
-    (setf (info :type :compiler-layout (dd-name info)) layout))
-  (values))
+    (setf (info :type :compiler-layout (dd-name dd)) layout))
 
-;;; Do (COMPILE LOAD EVAL) time actions for updating the compiler's
-;;; global meta-information to represent the definition of a structure
-;;; (truly a structure, not just DEFSTRUCT :TYPE VECTOR or DEFSTRUCT
-;;; :TYPE LIST) described by INFO.
-(defun %compiler-truly-defstruct (info)
-  (declare (type defstruct-description info))
-  (let* ((name (dd-name info))
-	 (class (sb!xc:find-class name)))
+  (ecase (dd-type dd)
+    ((vector list funcallable-structure)
+     ;; nothing extra to do in this case
+     )
+    ((structure)
+     (let* ((name (dd-name dd))
+	    (class (sb!xc:find-class name)))
 
-    (let ((copier (dd-copier info)))
-      (when copier
-	(proclaim `(ftype (function (,name) ,name) ,copier))))
+       (let ((copier (dd-copier dd)))
+	 (when copier
+	   (proclaim `(ftype (function (,name) ,name) ,copier))))
 
-    ;; FIXME: This (and corresponding code in %DEFSTRUCT) are the way
-    ;; that CMU CL defined the predicate, instead of using DEFUN.
-    ;; Perhaps it would be better to go back to to the CMU CL way, or
-    ;; something similar. I want to reduce the amount of magic in
-    ;; DEFSTRUCT functions, but making the predicate be a closure
-    ;; looks like a good thing, and can even be done without magic.
-    ;; (OTOH, there are some bootstrapping issues involved, since
-    ;; GENESIS understands DEFUN but doesn't understand a
-    ;; (SETF SYMBOL-FUNCTION) call inside %DEFSTRUCT.)
-    #|
-    (let ((predicate-name (dd-predicate-name info)))
-      (when predicate-name
-	(proclaim-as-defstruct-function-name predicate-name)
-	(setf (info :function :inlinep pred) :inline)
-	(setf (info :function :inline-expansion predicate-name)
-	      `(lambda (x) (typep x ',name)))))
-    |#
+       (dolist (slot (dd-slots dd))
+	 (let* ((fun (dsd-accessor-name slot))
+		(setf-fun `(setf ,fun)))
+	   (when (and fun (eq (dsd-raw-type slot) t))
+	     (proclaim-as-defstruct-function-name fun)
+	     (setf (info :function :accessor-for fun) class)
+	     (unless (dsd-read-only slot)
+	       (proclaim-as-defstruct-function-name setf-fun)
+	       (setf (info :function :accessor-for setf-fun) class)))))
 
-    (dolist (slot (dd-slots info))
-      (let* ((fun (dsd-accessor-name slot))
-	     (setf-fun `(setf ,fun)))
-	(when (and fun (eq (dsd-raw-type slot) t))
-	  (proclaim-as-defstruct-function-name fun)
-	  (setf (info :function :accessor-for fun) class)
-	  (unless (dsd-read-only slot)
-	    (proclaim-as-defstruct-function-name setf-fun)
-	    (setf (info :function :accessor-for setf-fun) class)))))
-
-    ;; FIXME: Couldn't this logic be merged into
-    ;; PROCLAIM-AS-DEFSTRUCT-FUNCTION?
-    (when (boundp 'sb!c:*free-functions*) ; when compiling
-      (let ((free-functions sb!c:*free-functions*))
-	(dolist (slot (dd-slots info))
-	  (let ((accessor-name (dsd-accessor-name slot)))
-	    (remhash accessor-name free-functions)
-	    (unless (dsd-read-only slot)
-	      (remhash `(setf ,accessor-name) free-functions))))
-	(remhash (dd-predicate-name info) free-functions)
-	(remhash (dd-copier info) free-functions))))
+       ;; FIXME: Couldn't this logic be merged into
+       ;; PROCLAIM-AS-DEFSTRUCT-FUNCTION?
+       (when (boundp 'sb!c:*free-functions*) ; when compiling
+	 (let ((free-functions sb!c:*free-functions*))
+	   (dolist (slot (dd-slots dd))
+	     (let ((accessor-name (dsd-accessor-name slot)))
+	       (remhash accessor-name free-functions)
+	       (unless (dsd-read-only slot)
+		 (remhash `(setf ,accessor-name) free-functions))))
+	   (remhash (dd-predicate-name dd) free-functions)
+	   (remhash (dd-copier dd) free-functions))))))
 
   (values))
 

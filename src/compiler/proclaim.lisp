@@ -19,41 +19,6 @@
 (defvar *undefined-warnings*)
 (declaim (list *undefined-warnings*))
 
-;;; Check that NAME is a valid function name, returning the name if
-;;; OK, and doing an error if not. In addition to checking for basic
-;;; well-formedness, we also check that symbol names are not NIL or
-;;; the name of a special form.
-(defun check-function-name (name)
-  (typecase name
-    (list
-     (unless (and (consp name) (consp (cdr name))
-		  (null (cddr name)) (eq (car name) 'setf)
-		  (symbolp (cadr name)))
-       (compiler-error "illegal function name: ~S" name))
-     name)
-    (symbol
-     (when (eq (info :function :kind name) :special-form)
-       (compiler-error "Special form is an illegal function name: ~S" name))
-     name)
-    (t
-     (compiler-error "illegal function name: ~S" name))))
-
-;;; This is called to do something about SETF functions that overlap
-;;; with SETF macros. Perhaps we should interact with the user to see
-;;; whether the macro should be blown away, but for now just give a
-;;; warning. Due to the weak semantics of the (SETF FUNCTION) name, we
-;;; can't assume that they aren't just naming a function (SETF FOO)
-;;; for the heck of it. NAME is already known to be well-formed.
-(defun note-if-setf-function-and-macro (name)
-  (when (consp name)
-    (when (or (info :setf :inverse name)
-	      (info :setf :expander name))
-      (compiler-style-warning
-       "defining as a SETF function a name that already has a SETF macro:~
-       ~%  ~S"
-       name)))
-  (values))
-
 ;;; Look up some symbols in *FREE-VARIABLES*, returning the var
 ;;; structures for any which exist. If any of the names aren't
 ;;; symbols, we complain.

@@ -17,30 +17,65 @@
 
 (in-package "SB!C")
 
+;;; Check that NAME is a valid function name, returning the name if
+;;; OK, and signalling an error if not. In addition to checking for
+;;; basic well-formedness, we also check that symbol names are not NIL
+;;; or the name of a special form.
+(defun check-function-name (name)
+  (typecase name
+    (list
+     (unless (and (consp name) (consp (cdr name))
+		  (null (cddr name)) (eq (car name) 'setf)
+		  (symbolp (cadr name)))
+       (compiler-error "illegal function name: ~S" name)))
+    (symbol
+     (when (eq (info :function :kind name) :special-form)
+       (compiler-error "Special form is an illegal function name: ~S" name)))
+    (t
+     (compiler-error "illegal function name: ~S" name)))
+  name)
+
 ;;; Record a new function definition, and check its legality.
 (declaim (ftype (function ((or symbol cons)) t) proclaim-as-function-name))
 (defun proclaim-as-function-name (name)
   (check-function-name name)
-  (ecase (info :function :kind name)
-    (:function
-     (let ((accessor-for (info :function :accessor-for name)))
-       (when accessor-for
-	 (compiler-style-warning
-	  "~@<The function ~
+  (when (fboundp name)
+    (ecase (info :function :kind name)
+      (:function
+       (let ((accessor-for (info :function :accessor-for name)))
+	 (when accessor-for
+	   (compiler-style-warning
+	    "~@<The function ~
            ~2I~_~S ~
            ~I~_was previously defined as a slot accessor for ~
            ~2I~_~S.~:>"
-	  name
-	  accessor-for)
-	 (clear-info :function :accessor-for name))))
-    (:macro
-     (compiler-style-warning "~S was previously defined as a macro." name)
-     (setf (info :function :where-from name) :assumed)
-     (clear-info :function :macro-function name))
-    ((nil)))
+	    name
+	    accessor-for)
+	   (clear-info :function :accessor-for name))))
+      (:macro
+       (compiler-style-warning "~S was previously defined as a macro." name)
+       (setf (info :function :where-from name) :assumed)
+       (clear-info :function :macro-function name))
+      ((nil))))
   (setf (info :function :kind name) :function)
   (note-if-setf-function-and-macro name)
   name)
+
+;;; This is called to do something about SETF functions that overlap
+;;; with SETF macros. Perhaps we should interact with the user to see
+;;; whether the macro should be blown away, but for now just give a
+;;; warning. Due to the weak semantics of the (SETF FUNCTION) name, we
+;;; can't assume that they aren't just naming a function (SETF FOO)
+;;; for the heck of it. NAME is already known to be well-formed.
+(defun note-if-setf-function-and-macro (name)
+  (when (consp name)
+    (when (or (info :setf :inverse name)
+	      (info :setf :expander name))
+      (compiler-style-warning
+       "defining as a SETF function a name that already has a SETF macro:~
+       ~%  ~S"
+       name)))
+  (values))
 
 ;;; Make NAME no longer be a function name: clear everything back to
 ;;; the default.
