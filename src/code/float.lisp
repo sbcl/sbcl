@@ -195,7 +195,7 @@
      (and (zerop (ldb sb!vm:long-float-exponent-byte (long-float-exp-bits x)))
 	  (not (zerop x))))))
 
-(macrolet ((def-frob (name doc single double #!+(and long-float x86) long)
+(macrolet ((def (name doc single double #!+(and long-float x86) long)
 	     `(defun ,name (x)
 		,doc
 		(number-dispatch ((x float))
@@ -221,7 +221,7 @@
 			     sb!vm:long-float-normal-exponent-max)
 			  ,long)))))))
 
-  (def-frob float-infinity-p
+  (def float-infinity-p
     "Return true if the float X is an infinity (+ or -)."
     (zerop (ldb sb!vm:single-float-significand-byte bits))
     (and (zerop (ldb sb!vm:double-float-significand-byte hi))
@@ -230,7 +230,7 @@
     (and (zerop (ldb sb!vm:long-float-significand-byte hi))
 	 (zerop lo)))
 
-  (def-frob float-nan-p
+  (def float-nan-p
     "Return true if the float X is a NaN (Not a Number)."
     (not (zerop (ldb sb!vm:single-float-significand-byte bits)))
     (or (not (zerop (ldb sb!vm:double-float-significand-byte hi)))
@@ -239,7 +239,7 @@
     (or (not (zerop (ldb sb!vm:long-float-significand-byte hi)))
 	(not (zerop lo))))
 
-  (def-frob float-trapping-nan-p
+  (def float-trapping-nan-p
     "Return true if the float X is a trapping NaN (Not a Number)."
     (zerop (logand (ldb sb!vm:single-float-significand-byte bits)
 		   sb!vm:single-float-trapping-nan-bit))

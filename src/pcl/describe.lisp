@@ -132,7 +132,7 @@
   (pprint-logical-block (stream nil)
     (format stream "~&~S is a ~S." package (type-of package))
     (format stream
-	    "~@[~&It has nicknames ~{~:_~S~^ ~}~]"
+	    "~@[~&It has nicknames ~2I~{~:_~S~^ ~}~]"
 	    (package-nicknames package))
     (let* ((internal (package-internal-symbols package))
 	   (internal-count (- (package-hashtable-size internal)
@@ -143,9 +143,13 @@
       (format stream
 	      "~&It has ~S internal and ~S external symbols."
 	      internal-count external-count))
-    (format stream
-	    "~@[~&It uses ~{~:_~S~^ ~}~]"
-	    (package-use-list package))
-    (format stream
-	    "~@[~&It is used by ~{~:_~S~^ ~}~]"
-	    (package-used-by-list package))))
+    (flet (;; Turn a list of packages into something a human likes
+	   ;; to read.
+	   (humanize (package-list)
+	     (sort (mapcar #'package-name package-list) #'string<)))
+      (format stream
+	      "~@[~&It uses packages named ~2I~{~:_~S~^ ~}~]"
+	      (humanize (package-use-list package)))
+      (format stream
+	      "~@[~&It is used by packages named ~2I~{~:_~S~^ ~}~]"
+	      (humanize (package-used-by-list package))))))

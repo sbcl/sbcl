@@ -13,15 +13,15 @@
 
 (in-package "SB!IMPL")
 
-(macrolet ((def-frob (name &optional (args '(x)))
+(macrolet ((def (name &optional (args '(x)))
 	     `(defun ,name ,args (,name ,@args))))
-  (def-frob %code-code-size)
-  (def-frob %code-debug-info)
-  (def-frob %code-entry-points)
-  (def-frob %funcallable-instance-fun)
-  (def-frob %funcallable-instance-layout)
-  (def-frob %funcallable-instance-lexenv)
-  (def-frob %set-funcallable-instance-fun (fin new-val)))
+  (def %code-code-size)
+  (def %code-debug-info)
+  (def %code-entry-points)
+  (def %funcallable-instance-fun)
+  (def %funcallable-instance-layout)
+  (def %funcallable-instance-lexenv)
+  (def %set-funcallable-instance-fun (fin new-val)))
 
 (defun %caller-frame-and-pc ()
   (%caller-frame-and-pc))

@@ -1647,7 +1647,7 @@
 
 ;;; Define optimizers for FLOOR and CEILING.
 (macrolet
-    ((frob-opt (name q-name r-name)
+    ((def (name q-name r-name)
        (let ((q-aux (symbolicate q-name "-AUX"))
 	     (r-aux (symbolicate r-name "-AUX")))
 	 `(progn
@@ -1711,54 +1711,52 @@
 		 (when (and quot rem)
 		   (make-values-type :required (list quot rem))))))))))
 
-  ;; FIXME: DEF-FROB-OPT, not just FROB-OPT
-  (frob-opt floor floor-quotient-bound floor-rem-bound)
-  (frob-opt ceiling ceiling-quotient-bound ceiling-rem-bound))
+  (def floor floor-quotient-bound floor-rem-bound)
+  (def ceiling ceiling-quotient-bound ceiling-rem-bound))
 
 ;;; Define optimizers for FFLOOR and FCEILING
-(macrolet
-    ((frob-opt (name q-name r-name)
-       (let ((q-aux (symbolicate "F" q-name "-AUX"))
-	     (r-aux (symbolicate r-name "-AUX")))
-	 `(progn
-	   ;; Compute type of quotient (first) result.
-	   (defun ,q-aux (number-type divisor-type)
-	     (let* ((number-interval
-		     (numeric-type->interval number-type))
-		    (divisor-interval
-		     (numeric-type->interval divisor-type))
-		    (quot (,q-name (interval-div number-interval
-						 divisor-interval)))
-		    (res-type (numeric-contagion number-type divisor-type)))
-	       (make-numeric-type
-		:class (numeric-type-class res-type)
-		:format (numeric-type-format res-type)
-		:low  (interval-low quot)
-		:high (interval-high quot))))
+(macrolet ((def (name q-name r-name)
+	     (let ((q-aux (symbolicate "F" q-name "-AUX"))
+		   (r-aux (symbolicate r-name "-AUX")))
+	       `(progn
+		  ;; Compute type of quotient (first) result.
+		  (defun ,q-aux (number-type divisor-type)
+		    (let* ((number-interval
+			    (numeric-type->interval number-type))
+			   (divisor-interval
+			    (numeric-type->interval divisor-type))
+			   (quot (,q-name (interval-div number-interval
+							divisor-interval)))
+			   (res-type (numeric-contagion number-type
+							divisor-type)))
+		      (make-numeric-type
+		       :class (numeric-type-class res-type)
+		       :format (numeric-type-format res-type)
+		       :low  (interval-low quot)
+		       :high (interval-high quot))))
 
-	   (defoptimizer (,name derive-type) ((number divisor))
-	     (flet ((derive-q (n d same-arg)
-		      (declare (ignore same-arg))
-		      (if (and (numeric-type-real-p n)
-			       (numeric-type-real-p d))
-			  (,q-aux n d)
-			  *empty-type*))
-		    (derive-r (n d same-arg)
-		      (declare (ignore same-arg))
-		      (if (and (numeric-type-real-p n)
-			       (numeric-type-real-p d))
-			  (,r-aux n d)
-			  *empty-type*)))
-	       (let ((quot (two-arg-derive-type
-			    number divisor #'derive-q #',name))
-		     (rem (two-arg-derive-type
-			   number divisor #'derive-r #'mod)))
-		 (when (and quot rem)
-		   (make-values-type :required (list quot rem))))))))))
+		  (defoptimizer (,name derive-type) ((number divisor))
+		    (flet ((derive-q (n d same-arg)
+			     (declare (ignore same-arg))
+			     (if (and (numeric-type-real-p n)
+				      (numeric-type-real-p d))
+				 (,q-aux n d)
+				 *empty-type*))
+			   (derive-r (n d same-arg)
+			     (declare (ignore same-arg))
+			     (if (and (numeric-type-real-p n)
+				      (numeric-type-real-p d))
+				 (,r-aux n d)
+				 *empty-type*)))
+		      (let ((quot (two-arg-derive-type
+				   number divisor #'derive-q #',name))
+			    (rem (two-arg-derive-type
+				  number divisor #'derive-r #'mod)))
+			(when (and quot rem)
+			  (make-values-type :required (list quot rem))))))))))
 
-  ;; FIXME: DEF-FROB-OPT, not just FROB-OPT
-  (frob-opt ffloor floor-quotient-bound floor-rem-bound)
-  (frob-opt fceiling ceiling-quotient-bound ceiling-rem-bound))
+  (def ffloor floor-quotient-bound floor-rem-bound)
+  (def fceiling ceiling-quotient-bound ceiling-rem-bound))
 
 ;;; functions to compute the bounds on the quotient and remainder for
 ;;; the FLOOR function
@@ -2665,18 +2663,18 @@
 
 ;;; Flush calls to various arith functions that convert to the
 ;;; identity function or a constant.
-(macrolet ((def-frob (name identity result)
+(macrolet ((def (name identity result)
              `(deftransform ,name ((x y) (* (constant-arg (member ,identity)))
                                     * :when :both)
                 "fold identity operations"
                 ',result)))
-  (def-frob ash 0 x)
-  (def-frob logand -1 x)
-  (def-frob logand 0 0)
-  (def-frob logior 0 x)
-  (def-frob logior -1 -1)
-  (def-frob logxor -1 (lognot x))
-  (def-frob logxor 0 x))
+  (def ash 0 x)
+  (def logand -1 x)
+  (def logand 0 0)
+  (def logior 0 x)
+  (def logior -1 -1)
+  (def logxor -1 (lognot x))
+  (def logxor 0 x))
 
 ;;; These are restricted to rationals, because (- 0 0.0) is 0.0, not -0.0, and
 ;;; (* 0 -4.0) is -0.0.
@@ -2750,7 +2748,7 @@
   'x)
 
 ;;; Fold (OP x +/-1)
-(macrolet ((def-frob (name result minus-result)
+(macrolet ((def (name result minus-result)
              `(deftransform ,name ((x y) (t (constant-arg real))
                                     * :when :both)
                 "fold identity operations"
@@ -2759,9 +2757,9 @@
                                (not-more-contagious y x))
                     (give-up-ir1-transform))
                   (if (minusp val) ',minus-result ',result)))))
-  (def-frob * x (%negate x))
-  (def-frob / x (%negate x))
-  (def-frob expt x (/ 1 x)))
+  (def * x (%negate x))
+  (def / x (%negate x))
+  (def expt x (/ 1 x)))
 
 ;;; Fold (expt x n) into multiplications for small integral values of
 ;;; N; convert (expt x 1/2) to sqrt.
@@ -2787,24 +2785,23 @@
 ;;; transformations?
 ;;; Perhaps we should have to prove that the denominator is nonzero before
 ;;; doing them?  -- WHN 19990917
-(macrolet ((def-frob (name)
+(macrolet ((def (name)
              `(deftransform ,name ((x y) ((constant-arg (integer 0 0)) integer)
                                    * :when :both)
                 "fold zero arg"
                 0)))
-  (def-frob ash)
-  (def-frob /))
+  (def ash)
+  (def /))
 
-(macrolet ((def-frob (name)
+(macrolet ((def (name)
              `(deftransform ,name ((x y) ((constant-arg (integer 0 0)) integer)
                                    * :when :both)
                 "fold zero arg"
                 '(values 0 0))))
-  (def-frob truncate)
-  (def-frob round)
-  (def-frob floor)
-  (def-frob ceiling))
-
+  (def truncate)
+  (def round)
+  (def floor)
+  (def ceiling))
 
 ;;;; character operations
 
@@ -2862,11 +2859,11 @@
 	(t
 	 (give-up-ir1-transform))))
 
-(macrolet ((def-frob (x)
+(macrolet ((def (x)
              `(%deftransform ',x '(function * *) #'simple-equality-transform)))
-  (def-frob eq)
-  (def-frob char=)
-  (def-frob equal))
+  (def eq)
+  (def char=)
+  (def equal))
 
 ;;; This is similar to SIMPLE-EQUALITY-PREDICATE, except that we also
 ;;; try to convert to a type-specific predicate or EQ:

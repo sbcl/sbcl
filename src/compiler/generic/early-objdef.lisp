@@ -15,7 +15,7 @@
 ;;; a pain for people just learning to find their way around the code
 ;;; who want to use lexical search to figure out where things like
 ;;; EVEN-FIXNUM-LOWTAG are defined. Remove the :SUFFIXes and just expand
-;;; out the full names. Or even define them in DEF-FROB EVEN-FIXNUM-LOWTAG
+;;; out the full names. Or even define them in DEF EVEN-FIXNUM-LOWTAG
 ;;; style so searches like 'def.*even-fixnum-lowtag' can find them.
 
 ;;; tags for the main low-level types, to be stored in the low three

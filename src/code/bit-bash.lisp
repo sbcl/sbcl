@@ -39,20 +39,20 @@
 ;;; A particular implementation must offer either VOPs to translate
 ;;; these, or DEFTRANSFORMs to convert them into something supported
 ;;; by the architecture.
-(macrolet ((def-frob (name &rest args)
+(macrolet ((def (name &rest args)
 	     `(defun ,name ,args
 		(,name ,@args))))
-  (def-frob 32bit-logical-not x)
-  (def-frob 32bit-logical-and x y)
-  (def-frob 32bit-logical-or x y)
-  (def-frob 32bit-logical-xor x y)
-  (def-frob 32bit-logical-nor x y)
-  (def-frob 32bit-logical-eqv x y)
-  (def-frob 32bit-logical-nand x y)
-  (def-frob 32bit-logical-andc1 x y)
-  (def-frob 32bit-logical-andc2 x y)
-  (def-frob 32bit-logical-orc1 x y)
-  (def-frob 32bit-logical-orc2 x y))
+  (def 32bit-logical-not x)
+  (def 32bit-logical-and x y)
+  (def 32bit-logical-or x y)
+  (def 32bit-logical-xor x y)
+  (def 32bit-logical-nor x y)
+  (def 32bit-logical-eqv x y)
+  (def 32bit-logical-nand x y)
+  (def 32bit-logical-andc1 x y)
+  (def 32bit-logical-andc2 x y)
+  (def 32bit-logical-orc1 x y)
+  (def 32bit-logical-orc2 x y))
 
 ;;; Shift NUMBER by the low-order bits of COUNTOID, adding zero bits
 ;;; at the "end" and removing bits from the "start". On big-endian

@@ -19,18 +19,18 @@
 
 ;;; These functions are only needed by the interpreter, 'cause the
 ;;; compiler inlines them.
-(macrolet ((def-frob (name)
+(macrolet ((def (name)
 	     `(progn
 		(defun ,name (array)
 		  (,name array))
 		(defun (setf ,name) (value array)
 		  (setf (,name array) value)))))
-  (def-frob %array-fill-pointer)
-  (def-frob %array-fill-pointer-p)
-  (def-frob %array-available-elements)
-  (def-frob %array-data-vector)
-  (def-frob %array-displacement)
-  (def-frob %array-displaced-p))
+  (def %array-fill-pointer)
+  (def %array-fill-pointer-p)
+  (def %array-available-elements)
+  (def %array-data-vector)
+  (def %array-displacement)
+  (def %array-displaced-p))
 
 (defun %array-rank (array)
   (%array-rank array))

@@ -5,11 +5,8 @@ for 0.7.0:
 	leaving some filing for later:-) from the monster
 	EVAL/EVAL-WHEN/%COMPILE/DEFUN/DEFSTRUCT cleanup:
 * more renaming (esp. for global as opposed to lexical names):
-	** reserved DO-FOO-style names for iteration macros
-	** s/ARGUMENT/ARG/
-	** perhaps s/DEF-FROB/DEF/ or s/DEF-FROB/DEFINE/
-	** merged SB-C-CALL into SB-ALIEN
-* Perhaps rename "cold" stuff (e.g. SB-COLD and src/cold/) to "boot".
+	** Rename "cold" stuff (e.g. SB-COLD and src/cold/, though
+		not e.g. #'COLD-INIT) to "boot".
 * fixed CREDITS, since it's gone pretty stale
 * reviewed NEWS
 * pending patches and bug reports that go in (or else get handled

@@ -204,7 +204,7 @@
 ;;; Define synonyms for the lisp functions we use, so that by using
 ;;; them, the backquoted material will be recognizable to the
 ;;; pretty-printer.
-(macrolet ((def-frob (b-name name)
+(macrolet ((def (b-name name)
 	     (let ((args (gensym "ARGS")))
 	       ;; FIXME: This function should be INLINE so that the lists
 	       ;; aren't consed twice, but I ran into an optimizer bug the
@@ -213,11 +213,11 @@
 	       ;; then make these INLINE.
 	       `(defun ,b-name (&rest ,args)
 		  (apply #',name ,args)))))
-  (def-frob backq-list list)
-  (def-frob backq-list* list*)
-  (def-frob backq-append append)
-  (def-frob backq-nconc nconc)
-  (def-frob backq-cons cons))
+  (def backq-list list)
+  (def backq-list* list*)
+  (def backq-append append)
+  (def backq-nconc nconc)
+  (def backq-cons cons))
 
 (/show0 "backq.lisp 204")
 

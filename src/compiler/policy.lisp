@@ -25,7 +25,7 @@
 ;;; names of recognized optimization policy qualities
 (defvar *policy-qualities*) ; (initialized at cold init)
 
-;;; Is X the name of an optimization quality?
+;;; Is X the name of an optimization policy quality?
 (defun policy-quality-name-p (x)
   (memq x *policy-qualities*))
 

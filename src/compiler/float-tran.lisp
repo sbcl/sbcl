@@ -390,29 +390,29 @@
   (double-float) double-float
   (movable foldable flushable))
 
-(macrolet ((def-frob (name prim rtype)
+(macrolet ((def (name prim rtype)
              `(progn
                (deftransform ,name ((x) (single-float) ,rtype)
                  `(coerce (,',prim (coerce x 'double-float)) 'single-float))
                (deftransform ,name ((x) (double-float) ,rtype :when :both)
                  `(,',prim x)))))
-  (def-frob exp %exp *)
-  (def-frob log %log float)
-  (def-frob sqrt %sqrt float)
-  (def-frob asin %asin float)
-  (def-frob acos %acos float)
-  (def-frob atan %atan *)
-  (def-frob sinh %sinh *)
-  (def-frob cosh %cosh *)
-  (def-frob tanh %tanh *)
-  (def-frob asinh %asinh *)
-  (def-frob acosh %acosh float)
-  (def-frob atanh %atanh float))
+  (def exp %exp *)
+  (def log %log float)
+  (def sqrt %sqrt float)
+  (def asin %asin float)
+  (def acos %acos float)
+  (def atan %atan *)
+  (def sinh %sinh *)
+  (def cosh %cosh *)
+  (def tanh %tanh *)
+  (def asinh %asinh *)
+  (def acosh %acosh float)
+  (def atanh %atanh float))
 
 ;;; The argument range is limited on the x86 FP trig. functions. A
 ;;; post-test can detect a failure (and load a suitable result), but
 ;;; this test is avoided if possible.
-(macrolet ((def-frob (name prim prim-quick)
+(macrolet ((def (name prim prim-quick)
              (declare (ignorable prim-quick))
              `(progn
                 (deftransform ,name ((x) (single-float) *)
@@ -442,9 +442,9 @@
                                 (type-specifier (continuation-type x)))
                                `(,',prim x)))
                  #!-x86 `(,',prim x)))))
-  (def-frob sin %sin %sin-quick)
-  (def-frob cos %cos %cos-quick)
-  (def-frob tan %tan %tan-quick))
+  (def sin %sin %sin-quick)
+  (def cos %cos %cos-quick)
+  (def tan %tan %tan-quick))
 
 (deftransform atan ((x y) (single-float single-float) *)
   `(coerce (%atan2 (coerce x 'double-float) (coerce y 'double-float))

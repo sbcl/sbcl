@@ -679,18 +679,18 @@
 	(+ rem divisor)
 	rem)))
 
-(macrolet ((def-frob (name op doc)
+(macrolet ((def (name op doc)
 	     `(defun ,name (number &optional (divisor 1))
 		,doc
 		(multiple-value-bind (res rem) (,op number divisor)
 		  (values (float res (if (floatp rem) rem 1.0)) rem)))))
-  (def-frob ffloor floor
+  (def ffloor floor
     "Same as FLOOR, but returns first value as a float.")
-  (def-frob fceiling ceiling
+  (def fceiling ceiling
     "Same as CEILING, but returns first value as a float." )
-  (def-frob ftruncate truncate
+  (def ftruncate truncate
     "Same as TRUNCATE, but returns first value as a float.")
-  (def-frob fround round
+  (def fround round
     "Same as ROUND, but returns first value as a float."))
 
 ;;;; comparisons
@@ -978,13 +978,13 @@
     (fixnum (lognot (truly-the fixnum number)))
     (bignum (bignum-logical-not number))))
 
-(macrolet ((def-frob (name op big-op)
+(macrolet ((def (name op big-op)
 	     `(defun ,name (x y)
 	       (number-dispatch ((x integer) (y integer))
 		 (bignum-cross-fixnum ,op ,big-op)))))
-  (def-frob two-arg-and logand bignum-logical-and)
-  (def-frob two-arg-ior logior bignum-logical-ior)
-  (def-frob two-arg-xor logxor bignum-logical-xor))
+  (def two-arg-and logand bignum-logical-and)
+  (def two-arg-ior logior bignum-logical-ior)
+  (def two-arg-xor logxor bignum-logical-xor))
 
 (defun logcount (integer)
   #!+sb-doc
@@ -1315,10 +1315,10 @@
 
 ;;;; miscellaneous number predicates
 
-(macrolet ((def-frob (name doc)
+(macrolet ((def (name doc)
 	     `(defun ,name (number) ,doc (,name number))))
-  (def-frob zerop "Is this number zero?")
-  (def-frob plusp "Is this real number strictly positive?")
-  (def-frob minusp "Is this real number strictly negative?")
-  (def-frob oddp "Is this integer odd?")
-  (def-frob evenp "Is this integer even?"))
+  (def zerop "Is this number zero?")
+  (def plusp "Is this real number strictly positive?")
+  (def minusp "Is this real number strictly negative?")
+  (def oddp "Is this integer odd?")
+  (def evenp "Is this integer even?"))

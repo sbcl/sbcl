@@ -879,9 +879,17 @@
 
 ;;;; data structure dumping routines
 
-;;; When we print Continuations and TNs, we assign them small numeric IDs so
-;;; that we can get a handle on anonymous objects given a printout.
-(macrolet ((def-frob (counter vto vfrom fto ffrom)
+;;; When we print CONTINUATIONs and TNs, we assign them small numeric
+;;; IDs so that we can get a handle on anonymous objects given a
+;;; printout.
+;;;
+;;; FIXME:
+;;;   * Perhaps this machinery should be #!+SB-SHOW.
+;;;   * Probably the hash tables should either be weak hash tables,
+;;;     or only allocated within a single compilation unit. Otherwise
+;;;     there will be a tendency for them to grow without bound and
+;;;     keep garbage from being collected.
+(macrolet ((def (counter vto vfrom fto ffrom)
 	     `(progn
 		(defvar ,vto (make-hash-table :test 'eq))
 		(defvar ,vfrom (make-hash-table :test 'eql))
@@ -897,9 +905,10 @@
 		
 		(defun ,ffrom (num)
 		  (values (gethash num ,vfrom))))))
-  (def-frob *continuation-number* *continuation-numbers* *number-continuations* cont-num num-cont)
-  (def-frob *tn-id* *tn-ids* *id-tns* tn-id id-tn)
-  (def-frob *label-id* *id-labels* *label-ids* label-id id-label))
+  (def *continuation-number* *continuation-numbers* *number-continuations*
+       cont-num num-cont)
+  (def *tn-id* *tn-ids* *id-tns* tn-id id-tn)
+  (def *label-id* *id-labels* *label-ids* label-id id-label))
 
 ;;; Print a terse one-line description of LEAF.
 (defun print-leaf (leaf &optional (stream *standard-output*))

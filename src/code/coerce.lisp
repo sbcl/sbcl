@@ -11,7 +11,7 @@
 
 (in-package "SB!IMPL")
 
-(macrolet ((def-frob (name result access src-type &optional typep)
+(macrolet ((def (name result access src-type &optional typep)
 	     `(defun ,name (object ,@(if typep '(type) ()))
 		(do* ((index 0 (1+ index))
 		      (length (length (the ,(ecase src-type
@@ -27,20 +27,20 @@
 			   (:list '(pop in-object))
 			   (:vector '(aref in-object index))))))))
 
-  (def-frob list-to-simple-string* (make-string length) schar :list)
+  (def list-to-simple-string* (make-string length) schar :list)
 
-  (def-frob list-to-bit-vector* (make-array length :element-type '(mod 2))
+  (def list-to-bit-vector* (make-array length :element-type '(mod 2))
     sbit :list)
 
-  (def-frob list-to-vector* (make-sequence-of-type type length)
+  (def list-to-vector* (make-sequence-of-type type length)
     aref :list t)
 
-  (def-frob vector-to-vector* (make-sequence-of-type type length)
+  (def vector-to-vector* (make-sequence-of-type type length)
     aref :vector t)
 
-  (def-frob vector-to-simple-string* (make-string length) schar :vector)
+  (def vector-to-simple-string* (make-string length) schar :vector)
 
-  (def-frob vector-to-bit-vector* (make-array length :element-type '(mod 2))
+  (def vector-to-bit-vector* (make-array length :element-type '(mod 2))
     sbit :vector))
 
 (defun vector-to-list* (object)

@@ -1497,7 +1497,7 @@
 
 ;;;; n-argument functions
 
-(macrolet ((def-frob (name)
+(macrolet ((def (name)
 	     `(defoptimizer (,name ir2-convert) ((&rest args) node block)
 		(let* ((refs (move-tail-full-call-args node block))
 		       (cont (node-cont node))
@@ -1507,8 +1507,8 @@
 		  (vop* ,name node block (refs) ((first res) nil)
 			(length args))
 		  (move-continuation-result node block res cont)))))
-  (def-frob list)
-  (def-frob list*))
+  (def list)
+  (def list*))
 
 ;;; Convert the code in a component into VOPs.
 (defun ir2-convert (component)

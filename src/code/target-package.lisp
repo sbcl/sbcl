@@ -84,12 +84,12 @@
 ;;; ANSI says (in the definition of DELETE-PACKAGE) that these, and
 ;;; most other operations, are unspecified for deleted packages. We
 ;;; just do the easy thing and signal errors in that case.
-(macrolet ((def-frob (ext real)
+(macrolet ((def (ext real)
 	     `(defun ,ext (x) (,real (find-undeleted-package-or-lose x)))))
-  (def-frob package-nicknames package-%nicknames)
-  (def-frob package-use-list package-%use-list)
-  (def-frob package-used-by-list package-%used-by-list)
-  (def-frob package-shadowing-symbols package-%shadowing-symbols))
+  (def package-nicknames package-%nicknames)
+  (def package-use-list package-%use-list)
+  (def package-used-by-list package-%used-by-list)
+  (def package-shadowing-symbols package-%shadowing-symbols))
 
 (defun %package-hashtable-symbol-count (table)
   (let ((size (the fixnum

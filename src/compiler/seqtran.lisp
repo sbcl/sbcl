@@ -227,8 +227,9 @@
 (deftransform %setelt ((s i v) (list * *))
   '(setf (car (nthcdr i s)) v))
 
-(macrolet ((def-frob (name)
-             `(deftransform ,name ((e l &key (test #'eql)) * * :node node :when :both)
+(macrolet ((def (name)
+             `(deftransform ,name ((e l &key (test #'eql)) * *
+				   :node node :when :both)
                 (unless (constant-continuation-p l)
                   (give-up-ir1-transform))
 
@@ -246,14 +247,14 @@
                                       ,(frob (cdr els)))
                                  nil)))
                     (frob val))))))
-  (def-frob member)
-  (def-frob memq))
+  (def member)
+  (def memq))
 
 ;;; FIXME: We have rewritten the original code that used DOLIST to this
 ;;; more natural MACROLET.  However, the original code suggested that when
 ;;; this was done, a few bytes could be saved by a call to a shared
 ;;; function.  This remains to be done.
-(macrolet ((def-frob (fun eq-fun)
+(macrolet ((def (fun eq-fun)
              `(deftransform ,fun ((item list &key test) (t list &rest t) *)
                 "convert to EQ test"
                 ;; FIXME: The scope of this transformation could be
@@ -272,9 +273,9 @@
                                                  (specifier-type 'number))
                        (give-up-ir1-transform "Item might be a number.")))
                 `(,',eq-fun item list))))
-  (def-frob delete delq)
-  (def-frob assoc assq)
-  (def-frob member memq))
+  (def delete delq)
+  (def assoc assq)
+  (def member memq))
 
 (deftransform delete-if ((pred list) (t list))
   "open code"
@@ -537,23 +538,23 @@
 ;;; We transform the case-sensitive string predicates into a non-keyword
 ;;; version. This is an IR1 transform so that we don't have to worry about
 ;;; changing the order of evaluation.
-(macrolet ((def-frob (fun pred*)
+(macrolet ((def (fun pred*)
              `(deftransform ,fun ((string1 string2 &key (start1 0) end1
                                                          (start2 0) end2)
                                    * *)
                 `(,',pred* string1 string2 start1 end1 start2 end2))))
-  (def-frob string< string<*)
-  (def-frob string> string>*)
-  (def-frob string<= string<=*)
-  (def-frob string>= string>=*)
-  (def-frob string= string=*)
-  (def-frob string/= string/=*))
+  (def string< string<*)
+  (def string> string>*)
+  (def string<= string<=*)
+  (def string>= string>=*)
+  (def string= string=*)
+  (def string/= string/=*))
 
 ;;; Return a form that tests the free variables STRING1 and STRING2
 ;;; for the ordering relationship specified by LESSP and EQUALP. The
 ;;; start and end are also gotten from the environment. Both strings
 ;;; must be SIMPLE-STRINGs.
-(macrolet ((def-frob (name lessp equalp)
+(macrolet ((def (name lessp equalp)
              `(deftransform ,name ((string1 string2 start1 end1 start2 end2)
                                     (simple-string simple-string t t t t) *)
                 `(let* ((end1 (if (not end1) (length string1) end1))
@@ -569,24 +570,25 @@
                                       (truly-the index
                                                  (+ index
                                                     (truly-the fixnum
-                                                               (- start2 start1))))))
+                                                               (- start2
+								  start1))))))
                              index)
                             (t nil))
                       ,(if ',equalp 'end1 nil))))))
-  (def-frob string<* t nil)
-  (def-frob string<=* t t)
-  (def-frob string>* nil nil)
-  (def-frob string>=* nil t))
+  (def string<* t nil)
+  (def string<=* t t)
+  (def string>* nil nil)
+  (def string>=* nil t))
 
-(macrolet ((def-frob (name result-fun)
+(macrolet ((def (name result-fun)
              `(deftransform ,name ((string1 string2 start1 end1 start2 end2)
                                    (simple-string simple-string t t t t) *)
                 `(,',result-fun
                   (sb!impl::%sp-string-compare
                    string1 start1 (or end1 (length string1))
                    string2 start2 (or end2 (length string2)))))))
-  (def-frob string=* not)
-  (def-frob string/=* identity))
+  (def string=* not)
+  (def string/=* identity))
 
 
 ;;;; string-only transforms for sequence functions
@@ -705,46 +707,46 @@
 	    "sequence type not known at compile time")))))
 
 ;;; %FIND-POSITION-IF and %FIND-POSITION-IF-NOT for LIST data
-(macrolet ((def-frob (name condition)
-	       `(deftransform ,name ((predicate sequence from-end start end key)
-				     (function list t t t function)
-				     *
-				     :policy (> speed space)
-				     :important t)
-		  "expand inline"
-		  `(let ((index 0)
-			 (find nil)
-			 (position nil))
-		    (declare (type index index))
-		    (dolist (i sequence (values find position))
-		      (let ((key-i (funcall key i)))
-			(when (and end (>= index end))
-			  (return (values find position)))
-			(when (>= index start)
-			  (,',condition (funcall predicate key-i)
-			    ;; This hack of dealing with non-NIL
-			    ;; FROM-END for list data by iterating
-			    ;; forward through the list and keeping
-			    ;; track of the last time we found a match
-			    ;; might be more screwy than what the user
-			    ;; expects, but it seems to be allowed by
-			    ;; the ANSI standard. (And if the user is
-			    ;; screwy enough to ask for FROM-END
-			    ;; behavior on list data, turnabout is
-			    ;; fair play.)
-			    ;;
-			    ;; It's also not enormously efficient,
-			    ;; calling PREDICATE and KEY more often
-			    ;; than necessary; but all the
-			    ;; alternatives seem to have their own
-			    ;; efficiency problems.
-			    (if from-end
-				(setf find i
-				      position index)
-				(return (values i index))))))
-		      (incf index))))))
-  (def-frob %find-position-if when)
-  (def-frob %find-position-if-not unless))
+(macrolet ((def (name condition)
+	     `(deftransform ,name ((predicate sequence from-end start end key)
+				   (function list t t t function)
+				   *
+				   :policy (> speed space)
+				   :important t)
+		"expand inline"
+		`(let ((index 0)
+		       (find nil)
+		       (position nil))
+		   (declare (type index index))
+		   (dolist (i sequence (values find position))
+		     (let ((key-i (funcall key i)))
+		       (when (and end (>= index end))
+			 (return (values find position)))
+		       (when (>= index start)
+			 (,',condition (funcall predicate key-i)
+			  ;; This hack of dealing with non-NIL
+			  ;; FROM-END for list data by iterating
+			  ;; forward through the list and keeping
+			  ;; track of the last time we found a match
+			  ;; might be more screwy than what the user
+			  ;; expects, but it seems to be allowed by
+			  ;; the ANSI standard. (And if the user is
+			  ;; screwy enough to ask for FROM-END
+			  ;; behavior on list data, turnabout is
+			  ;; fair play.)
+			  ;;
+			  ;; It's also not enormously efficient,
+			  ;; calling PREDICATE and KEY more often
+			  ;; than necessary; but all the
+			  ;; alternatives seem to have their own
+			  ;; efficiency problems.
+			  (if from-end
+			      (setf find i
+				    position index)
+			      (return (values i index))))))
+		     (incf index))))))
+  (def %find-position-if when)
+  (def %find-position-if-not unless))
 		      
 ;;; %FIND-POSITION for LIST data can be expanded into %FIND-POSITION-IF
 ;;; without loss of efficiency. (I.e., the optimizer should be able
