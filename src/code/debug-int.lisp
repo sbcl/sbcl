@@ -1002,8 +1002,9 @@ register."
          ;; This conditional logic should probably go into
          ;; architecture specific files somehow.
          #!+ppc (sap-int (sb!vm::context-lr scp))
-         #!-(or ppc) (- (sb!vm:context-register scp sb!vm::lra-offset)
-                        sb!vm:other-pointer-lowtag))
+         #!+sparc (+ (sb!vm:context-register scp sb!vm::lip-offset) 8)
+         #!-(or ppc sparc) (- (sb!vm:context-register scp sb!vm::lra-offset)
+                              sb!vm:other-pointer-lowtag))
         (code-header-len (* (get-header-data code)
                             sb!vm:n-word-bytes)))
   (values (- return-machine-address
