@@ -834,13 +834,23 @@ Error in function C::GET-LAMBDA-TO-COMPILE:
 
 88:
   The type system doesn't understand that the intersection of the
-  types (MEMBER :FOO) and (OR KEYWORD NULL) is (MEMBER :FOO).
+  types (MEMBER :FOO) and (OR KEYWORD NULL) is (MEMBER :FOO). Thus,
+  the optimizer can't make some useful valid type inferences.
 
 89:
   The type system doesn't understand the the intersection of the types
   KEYWORD and (OR KEYWORD NULL) is KEYWORD, perhaps because KEYWORD
   is itself an intersection type and that causes technical problems
-  with the simplification.
+  with the simplification. Thus, the optimizer can't make some useful
+  valid type inferences.
+
+90: 
+  a latent cross-compilation/bootstrapping bug: The cross-compilation
+  host's CL:CHAR-CODE-LIMIT is used in target code in readtable.lisp
+  and possibly elsewhere. Instead, we should use the target system's
+  CHAR-CODE-LIMIT. This will probably cause problems if we try to 
+  bootstrap on a system which uses a different value of CHAR-CODE-LIMIT
+  than SBCL does.
 
 
 KNOWN BUGS RELATED TO THE IR1 INTERPRETER

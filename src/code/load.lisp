@@ -56,7 +56,7 @@
 
 ;;; the FASL file we're reading from
 (defvar *fasl-file*)
-(declaim (type lisp-stream fasl-file))
+(declaim (type lisp-stream *fasl-file*))
 
 (defvar *load-print* nil
   #!+sb-doc

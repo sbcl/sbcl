@@ -14,20 +14,21 @@
 ;;; the size of a stream in-buffer
 ;;;
 ;;; KLUDGE: The EVAL-WHEN wrapper isn't needed except when using CMU
-;;; CL as a cross-compilation host. cmucl-2.4.19 issues full WARNINGs
-;;; (not just STYLE-WARNINGs!) when processing this file, and when
-;;; processing other files which use LISP-STREAM. -- WHN 2000-12-13
+;;; CL as a cross-compilation host. Without it, cmucl-2.4.19 issues
+;;; full WARNINGs (not just STYLE-WARNINGs!) when processing this
+;;; file, and when processing other files which use LISP-STREAM.
+;;; -- WHN 2000-12-13
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  (defconstant in-buffer-length 512))
+  (defconstant +in-buffer-length+ 512))
 
 (deftype in-buffer-type ()
-  `(simple-array (unsigned-byte 8) (,in-buffer-length)))
+  `(simple-array (unsigned-byte 8) (,+in-buffer-length+)))
 
 (defstruct (lisp-stream (:constructor nil)
 			(:copier nil))
   ;; Buffered input.
   (in-buffer nil :type (or in-buffer-type null))
-  (in-index in-buffer-length :type index)	; index into IN-BUFFER
+  (in-index +in-buffer-length+ :type index)	; index into IN-BUFFER
   (in #'ill-in :type function)			; READ-CHAR function
   (bin #'ill-bin :type function)		; byte input function
   (n-bin #'ill-bin :type function)		; n-byte input function

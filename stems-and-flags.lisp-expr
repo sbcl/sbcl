@@ -574,7 +574,7 @@
  ("code/byte-types" :not-host)
  ("compiler/byte-comp")
  ("compiler/target-byte-comp" :not-host)
- ;; FIXME: Could byte-interp be moved here? It'd be logical..
+ ("code/byte-interp" :not-host) ; needs *SYSTEM-CONSTANT-CODES* from byte-comp
 
  ;; defines SB!DI:DO-DEBUG-FUNCTION-BLOCKS, needed by target-disassem.lisp
  ("code/debug-int" :not-host)
@@ -594,8 +594,6 @@
  ("code/parse-defmacro-errors" :not-host)
 
  ("code/bit-bash"    :not-host) ; needs %NEGATE from assembly/target/arith
-
- ("code/byte-interp" :not-host) ; needs *SYSTEM-CONSTANT-CODES* from byte-comp
 
  ("code/target-load" :not-host) ; needs specials from code/load.lisp
 

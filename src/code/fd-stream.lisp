@@ -691,7 +691,7 @@
 	  (setf (fd-stream-n-bin stream) #'fd-stream-read-n-bytes)
 	  (when buffer-p
 	    (setf (lisp-stream-in-buffer stream)
-		  (make-array in-buffer-length
+		  (make-array +in-buffer-length+
 			      :element-type '(unsigned-byte 8)))))
 	(setf input-size size)
 	(setf input-type type)))

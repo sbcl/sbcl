@@ -55,26 +55,6 @@
 	 :format-control control
 	 :format-arguments args))
 
-;;;; constants for character attributes. These are all as in the manual.
-
-;;; FIXME: It's disturbing to bind nice names like ESCAPE and DELIMITER
-;;; as constants throughout the entire SB-IMPL package. Perhaps these
-;;; could be given some standard prefix, so instead we have constants
-;;; CHATTR-ESCAPE and CHATTR-DELIMITER and so forth.
-(defconstant whitespace 0)
-(defconstant terminating-macro 1)
-(defconstant escape 2)
-(defconstant constituent 3)
-(defconstant constituent-dot 4)
-(defconstant constituent-expt 5)
-(defconstant constituent-slash 6)
-(defconstant constituent-digit 7)
-(defconstant constituent-sign 8)
-;; the "9" entry intentionally left blank for some reason -- WHN 19990806
-(defconstant multiple-escape 10)
-(defconstant package-delimiter 11)
-(defconstant delimiter 12) ; (a fake for use in READ-UNQUALIFIED-TOKEN)
-
 ;;;; macros and functions for character tables
 
 ;;; FIXME: could be SB!XC:DEFMACRO inside EVAL-WHEN (COMPILE EVAL)
@@ -113,28 +93,28 @@
 
 #!-sb-fluid (declaim (inline whitespacep))
 (defun whitespacep (char &optional (rt *readtable*))
-  (test-attribute char whitespace rt))
+  (test-attribute char +char-attr-whitespace+ rt))
 
 (defmacro constituentp (char &optional (rt '*readtable*))
-  `(>= (get-cat-entry ,char ,rt) constituent))
+  `(>= (get-cat-entry ,char ,rt) +char-attr-constituent+))
 
 (defmacro terminating-macrop (char &optional (rt '*readtable*))
-  `(test-attribute ,char terminating-macro ,rt))
+  `(test-attribute ,char +char-attr-terminating-macro+ ,rt))
 
 (defmacro escapep (char &optional (rt '*readtable*))
-  `(test-attribute ,char escape ,rt))
+  `(test-attribute ,char +char-attr-escape+ ,rt))
 
 (defmacro multiple-escape-p (char &optional (rt '*readtable*))
-  `(test-attribute ,char multiple-escape ,rt))
+  `(test-attribute ,char +char-attr-multiple-escape+ ,rt))
 
 (defmacro token-delimiterp (char &optional (rt '*readtable*))
   ;; depends on actual attribute numbering above.
-  `(<= (get-cat-entry ,char ,rt) terminating-macro))
+  `(<= (get-cat-entry ,char ,rt) +char-attr-terminating-macro+))
 
 ;;;; secondary attribute table
 
-;;; There are a number of "secondary" attributes which are constant properties
-;;; of characters (as long as they are constituents).
+;;; There are a number of "secondary" attributes which are constant
+;;; properties of characters (as long as they are constituents).
 
 (defvar *secondary-attribute-table*)
 (declaim (type attribute-table *secondary-attribute-table*))
@@ -146,26 +126,26 @@
 (defun !cold-init-secondary-attribute-table ()
   (setq *secondary-attribute-table*
 	(make-array char-code-limit :element-type '(unsigned-byte 8)
-		    :initial-element constituent))
-  (!set-secondary-attribute #\: package-delimiter)
-  (!set-secondary-attribute #\| multiple-escape)	; |) [for EMACS]
-  (!set-secondary-attribute #\. constituent-dot)
-  (!set-secondary-attribute #\+ constituent-sign)
-  (!set-secondary-attribute #\- constituent-sign)
-  (!set-secondary-attribute #\/ constituent-slash)
+		    :initial-element +char-attr-constituent+))
+  (!set-secondary-attribute #\: +char-attr-package-delimiter+)
+  (!set-secondary-attribute #\| +char-attr-multiple-escape+) ; |) [for EMACS]
+  (!set-secondary-attribute #\. +char-attr-constituent-dot+)
+  (!set-secondary-attribute #\+ +char-attr-constituent-sign+)
+  (!set-secondary-attribute #\- +char-attr-constituent-sign+)
+  (!set-secondary-attribute #\/ +char-attr-constituent-slash+)
   (do ((i (char-code #\0) (1+ i)))
       ((> i (char-code #\9)))
-    (!set-secondary-attribute (code-char i) constituent-digit))
-  (!set-secondary-attribute #\E constituent-expt)
-  (!set-secondary-attribute #\F constituent-expt)
-  (!set-secondary-attribute #\D constituent-expt)
-  (!set-secondary-attribute #\S constituent-expt)
-  (!set-secondary-attribute #\L constituent-expt)
-  (!set-secondary-attribute #\e constituent-expt)
-  (!set-secondary-attribute #\f constituent-expt)
-  (!set-secondary-attribute #\d constituent-expt)
-  (!set-secondary-attribute #\s constituent-expt)
-  (!set-secondary-attribute #\l constituent-expt))
+    (!set-secondary-attribute (code-char i) +char-attr-constituent-digit+))
+  (!set-secondary-attribute #\E +char-attr-constituent-expt+)
+  (!set-secondary-attribute #\F +char-attr-constituent-expt+)
+  (!set-secondary-attribute #\D +char-attr-constituent-expt+)
+  (!set-secondary-attribute #\S +char-attr-constituent-expt+)
+  (!set-secondary-attribute #\L +char-attr-constituent-expt+)
+  (!set-secondary-attribute #\e +char-attr-constituent-expt+)
+  (!set-secondary-attribute #\f +char-attr-constituent-expt+)
+  (!set-secondary-attribute #\d +char-attr-constituent-expt+)
+  (!set-secondary-attribute #\s +char-attr-constituent-expt+)
+  (!set-secondary-attribute #\l +char-attr-constituent-expt+))
 
 (defmacro get-secondary-attribute (char)
   `(elt *secondary-attribute-table*
@@ -194,7 +174,7 @@
   optional readtable (defaults to the current readtable). The
   FROM-TABLE defaults to the standard Lisp readtable when NIL."
   (let ((really-from-readtable (or from-readtable *standard-readtable*)))
-    ;; Copy from-char entries to to-char entries, but make sure that if
+    ;; Copy FROM-CHAR entries to TO-CHAR entries, but make sure that if
     ;; from char is a constituent you don't copy non-movable secondary
     ;; attributes (constituent types), and that said attributes magically
     ;; appear if you transform a non-constituent to a constituent.
@@ -217,7 +197,7 @@
    returns T."
   (if non-terminatingp
       (set-cat-entry char (get-secondary-attribute char) rt)
-      (set-cat-entry char terminating-macro rt))
+      (set-cat-entry char +char-attr-terminating-macro+ rt))
   (set-cmt-entry char function rt)
   T)
 
@@ -248,7 +228,7 @@
 	  (do ((attribute-table (character-attribute-table *readtable*))
 	       (char (fast-read-char t) (fast-read-char t)))
 	      ((/= (the fixnum (aref attribute-table (char-code char)))
-		   whitespace)
+		   +char-attr-whitespace+)
 	       (done-with-fast-read-char)
 	       char)))
 	;; fundamental-stream
@@ -256,7 +236,7 @@
 	     (char (stream-read-char stream) (stream-read-char stream)))
 	    ((or (eq char :eof)
 		 (/= (the fixnum (aref attribute-table (char-code char)))
-		     whitespace))
+		     +char-attr-whitespace+))
 	     (if (eq char :eof)
 		 (error 'end-of-file :stream stream)
 		 char))))))
@@ -268,14 +248,14 @@
   ;; All characters default to "constituent" in MAKE-READTABLE.
   ;; *** un-constituent-ize some of these ***
   (let ((*readtable* *standard-readtable*))
-    (set-cat-entry (code-char tab-char-code) whitespace)
-    (set-cat-entry #\linefeed whitespace)
-    (set-cat-entry #\space whitespace)
-    (set-cat-entry (code-char form-feed-char-code) whitespace)
-    (set-cat-entry (code-char return-char-code) whitespace)
-    (set-cat-entry #\\ escape)
+    (set-cat-entry (code-char tab-char-code) +char-attr-whitespace+)
+    (set-cat-entry #\linefeed +char-attr-whitespace+)
+    (set-cat-entry #\space +char-attr-whitespace+)
+    (set-cat-entry (code-char form-feed-char-code) +char-attr-whitespace+)
+    (set-cat-entry (code-char return-char-code) +char-attr-whitespace+)
+    (set-cat-entry #\\ +char-attr-escape+)
     (set-cmt-entry #\\ #'read-token)
-    (set-cat-entry (code-char rubout-char-code) whitespace)
+    (set-cat-entry (code-char rubout-char-code) +char-attr-whitespace+)
     (set-cmt-entry #\: #'read-token)
     (set-cmt-entry #\| #'read-token)
     ;; macro definitions
@@ -386,8 +366,9 @@
 
 (declaim (special *standard-input*))
 
-;;; READ-PRESERVING-WHITESPACE behaves just like READ, only it makes sure
-;;; to leave terminating whitespace in the stream.
+;;; READ-PRESERVING-WHITESPACE behaves just like READ, only it makes
+;;; sure to leave terminating whitespace in the stream. (This is a
+;;; COMMON-LISP exported symbol.)
 (defun read-preserving-whitespace (&optional (stream *standard-input*)
 					     (eof-error-p t)
 					     (eof-value nil)
@@ -412,10 +393,11 @@
     (let ((*sharp-equal-alist* nil))
       (read-preserving-whitespace stream eof-error-p eof-value t)))))
 
+;;; Return NIL or a list with one thing, depending.
+;;;
+;;; for functions that want comments to return so that they can look
+;;; past them. Assumes char is not whitespace.
 (defun read-maybe-nothing (stream char)
-  ;;returns nil or a list with one thing, depending.
-  ;;for functions that want comments to return so they can look
-  ;;past them. Assumes char is not whitespace.
   (let ((retval (multiple-value-list
 		 (funcall (get-cmt-entry char *readtable*) stream char))))
     (if retval (rplacd retval nil))))
@@ -434,6 +416,7 @@
 		   recursivep))
 	  (unread-char whitechar stream)))))
 
+;;; (This is a COMMON-LISP exported symbol.)
 (defun read-delimited-list (endchar &optional
 				    (input-stream *standard-input*)
 				    recursive-p)
@@ -595,7 +578,7 @@
 	  (t
 	   (when (and (constituentp char)
 			(eql (get-secondary-attribute char)
-                             package-delimiter)
+                             +char-attr-package-delimiter+)
 		      (not colon))
 	     (setq colon *ouch-ptr*))
 	   (ouch-read-buffer char))))))
@@ -606,8 +589,8 @@
 (defmacro char-class (char attable)
   `(let ((att (aref ,attable (char-code ,char))))
      (declare (fixnum att))
-     (if (<= att terminating-macro)
-	 delimiter
+     (if (<= att +char-attr-terminating-macro+)
+	 +char-attr-delimiter+
 	 att)))
 
 ;;; Return the character class for CHAR, which might be part of a
@@ -615,33 +598,34 @@
 (defmacro char-class2 (char attable)
   `(let ((att (aref ,attable (char-code ,char))))
      (declare (fixnum att))
-     (if (<= att terminating-macro)
-	 delimiter
+     (if (<= att +char-attr-terminating-macro+)
+	 +char-attr-delimiter+
 	 (if (digit-char-p ,char *read-base*)
-	     constituent-digit
-	     (if (= att constituent-digit)
-		 constituent
+	     +char-attr-constituent-digit+
+	     (if (= att +char-attr-constituent-digit+)
+		 +char-attr-constituent+
 		 att)))))
 
-;;; Return the character class for a char which might be part of a rational or
-;;; floating number. (Assume that it is a digit if it could be.)
+;;; Return the character class for a char which might be part of a
+;;; rational or floating number. (Assume that it is a digit if it
+;;; could be.)
 (defmacro char-class3 (char attable)
   `(let ((att (aref ,attable (char-code ,char))))
      (declare (fixnum att))
      (if possibly-rational
 	 (setq possibly-rational
 	       (or (digit-char-p ,char *read-base*)
-		   (= att constituent-slash))))
+		   (= att +char-attr-constituent-slash+))))
      (if possibly-float
 	 (setq possibly-float
 	       (or (digit-char-p ,char 10)
-		   (= att constituent-dot))))
-     (if (<= att terminating-macro)
-	 delimiter
+		   (= att +char-attr-constituent-dot+))))
+     (if (<= att +char-attr-terminating-macro+)
+	 +char-attr-delimiter+
 	 (if (digit-char-p ,char (max *read-base* 10))
 	     (if (digit-char-p ,char *read-base*)
-		 constituent-digit
-		 constituent)
+		 +char-attr-constituent-digit+
+		 +char-attr-constituent+)
 	     att))))
 
 ;;;; token fetching
@@ -655,8 +639,9 @@
   "The radix that Lisp reads numbers in.")
 (declaim (type (integer 2 36) *read-base*))
 
-;;; Modify the read buffer according to READTABLE-CASE, ignoring escapes.
-;;; ESCAPES is a list of the escaped indices, in reverse order.
+;;; Modify the read buffer according to READTABLE-CASE, ignoring
+;;; ESCAPES. ESCAPES is a list of the escaped indices, in reverse
+;;; order.
 (defun casify-read-buffer (escapes)
   (let ((case (readtable-case *readtable*)))
     (cond
@@ -721,12 +706,12 @@
     (reset-read-buffer)
     (prog ((char firstchar))
       (case (char-class3 char attribute-table)
-	(#.constituent-sign (go SIGN))
-	(#.constituent-digit (go LEFTDIGIT))
-	(#.constituent-dot (go FRONTDOT))
-	(#.escape (go ESCAPE))
-	(#.package-delimiter (go COLON))
-	(#.multiple-escape (go MULT-ESCAPE))
+	(#.+char-attr-constituent-sign+ (go SIGN))
+	(#.+char-attr-constituent-digit+ (go LEFTDIGIT))
+	(#.+char-attr-constituent-dot+ (go FRONTDOT))
+	(#.+char-attr-escape+ (go ESCAPE))
+	(#.+char-attr-package-delimiter+ (go COLON))
+	(#.+char-attr-multiple-escape+ (go MULT-ESCAPE))
 	;; can't have eof, whitespace, or terminating macro as first char!
 	(t (go SYMBOL)))
      SIGN ; saw "sign"
@@ -736,30 +721,31 @@
       (setq possibly-rational t
 	    possibly-float t)
       (case (char-class3 char attribute-table)
-	(#.constituent-digit (go LEFTDIGIT))
-	(#.constituent-dot (go SIGNDOT))
-	(#.escape (go ESCAPE))
-	(#.package-delimiter (go COLON))
-	(#.multiple-escape (go MULT-ESCAPE))	
-	(#.delimiter (unread-char char stream) (go RETURN-SYMBOL))
+	(#.+char-attr-constituent-digit+ (go LEFTDIGIT))
+	(#.+char-attr-constituent-dot+ (go SIGNDOT))
+	(#.+char-attr-escape+ (go ESCAPE))
+	(#.+char-attr-package-delimiter+ (go COLON))
+	(#.+char-attr-multiple-escape+ (go MULT-ESCAPE))	
+	(#.+char-attr-delimiter+ (unread-char char stream) (go RETURN-SYMBOL))
 	(t (go SYMBOL)))
      LEFTDIGIT ; saw "[sign] {digit}+"
       (ouch-read-buffer char)
       (setq char (read-char stream nil nil))
       (unless char (return (make-integer)))
       (case (char-class3 char attribute-table)
-	(#.constituent-digit (go LEFTDIGIT))
-	(#.constituent-dot (if possibly-float
-			       (go MIDDLEDOT)
-			       (go SYMBOL)))
-	(#.constituent-expt (go EXPONENT))
-	(#.constituent-slash (if possibly-rational
-				 (go RATIO)
-				 (go SYMBOL)))
-	(#.delimiter (unread-char char stream) (return (make-integer)))
-	(#.escape (go ESCAPE))
-	(#.multiple-escape (go MULT-ESCAPE))
-	(#.package-delimiter (go COLON))
+	(#.+char-attr-constituent-digit+ (go LEFTDIGIT))
+	(#.+char-attr-constituent-dot+ (if possibly-float
+					   (go MIDDLEDOT)
+					   (go SYMBOL)))
+	(#.+char-attr-constituent-expt+ (go EXPONENT))
+	(#.+char-attr-constituent-slash+ (if possibly-rational
+					     (go RATIO)
+					     (go SYMBOL)))
+	(#.+char-attr-delimiter+ (unread-char char stream)
+				 (return (make-integer)))
+	(#.+char-attr-escape+ (go ESCAPE))
+	(#.+char-attr-multiple-escape+ (go MULT-ESCAPE))
+	(#.+char-attr-package-delimiter+ (go COLON))
 	(t (go SYMBOL)))
      MIDDLEDOT ; saw "[sign] {digit}+ dot"
       (ouch-read-buffer char)
@@ -767,118 +753,124 @@
       (unless char (return (let ((*read-base* 10))
 			     (make-integer))))
       (case (char-class char attribute-table)
-	(#.constituent-digit (go RIGHTDIGIT))
-	(#.constituent-expt (go EXPONENT))
-	(#.delimiter
+	(#.+char-attr-constituent-digit+ (go RIGHTDIGIT))
+	(#.+char-attr-constituent-expt+ (go EXPONENT))
+	(#.+char-attr-delimiter+
 	 (unread-char char stream)
 	 (return (let ((*read-base* 10))
 		   (make-integer))))
-	(#.escape (go ESCAPE))
-	(#.multiple-escape (go MULT-ESCAPE))
-	(#.package-delimiter (go COLON))
+	(#.+char-attr-escape+ (go ESCAPE))
+	(#.+char-attr-multiple-escape+ (go MULT-ESCAPE))
+	(#.+char-attr-package-delimiter+ (go COLON))
 	(t (go SYMBOL)))
      RIGHTDIGIT ; saw "[sign] {digit}* dot {digit}+"
       (ouch-read-buffer char)
       (setq char (read-char stream nil nil))
       (unless char (return (make-float)))
       (case (char-class char attribute-table)
-	(#.constituent-digit (go RIGHTDIGIT))
-	(#.constituent-expt (go EXPONENT))
-	(#.delimiter (unread-char char stream) (return (make-float)))
-	(#.escape (go ESCAPE))
-	(#.multiple-escape (go MULT-ESCAPE))
-	(#.package-delimiter (go COLON))
+	(#.+char-attr-constituent-digit+ (go RIGHTDIGIT))
+	(#.+char-attr-constituent-expt+ (go EXPONENT))
+	(#.+char-attr-delimiter+
+	 (unread-char char stream)
+	 (return (make-float)))
+	(#.+char-attr-escape+ (go ESCAPE))
+	(#.+char-attr-multiple-escape+ (go MULT-ESCAPE))
+	(#.+char-attr-package-delimiter+ (go COLON))
 	(t (go SYMBOL)))
      SIGNDOT ; saw "[sign] dot"
       (ouch-read-buffer char)
       (setq char (read-char stream nil nil))
       (unless char (go RETURN-SYMBOL))
       (case (char-class char attribute-table)
-	(#.constituent-digit (go RIGHTDIGIT))
-	(#.delimiter (unread-char char stream) (go RETURN-SYMBOL))
-	(#.escape (go ESCAPE))
-	(#.multiple-escape (go MULT-ESCAPE))
+	(#.+char-attr-constituent-digit+ (go RIGHTDIGIT))
+	(#.+char-attr-delimiter+ (unread-char char stream) (go RETURN-SYMBOL))
+	(#.+char-attr-escape+ (go ESCAPE))
+	(#.+char-attr-multiple-escape+ (go MULT-ESCAPE))
 	(t (go SYMBOL)))
      FRONTDOT ; saw "dot"
       (ouch-read-buffer char)
       (setq char (read-char stream nil nil))
       (unless char (%reader-error stream "dot context error"))
       (case (char-class char attribute-table)
-	(#.constituent-digit (go RIGHTDIGIT))
-	(#.constituent-dot (go DOTS))
-	(#.delimiter  (%reader-error stream "dot context error"))
-	(#.escape (go ESCAPE))
-	(#.multiple-escape (go MULT-ESCAPE))
-	(#.package-delimiter (go COLON))
+	(#.+char-attr-constituent-digit+ (go RIGHTDIGIT))
+	(#.+char-attr-constituent-dot+ (go DOTS))
+	(#.+char-attr-delimiter+  (%reader-error stream "dot context error"))
+	(#.+char-attr-escape+ (go ESCAPE))
+	(#.+char-attr-multiple-escape+ (go MULT-ESCAPE))
+	(#.+char-attr-package-delimiter+ (go COLON))
 	(t (go SYMBOL)))
      EXPONENT
       (ouch-read-buffer char)
       (setq char (read-char stream nil nil))
       (unless char (go RETURN-SYMBOL))
       (case (char-class char attribute-table)
-	(#.constituent-sign (go EXPTSIGN))
-	(#.constituent-digit (go EXPTDIGIT))
-	(#.delimiter (unread-char char stream) (go RETURN-SYMBOL))
-	(#.escape (go ESCAPE))
-	(#.multiple-escape (go MULT-ESCAPE))
-	(#.package-delimiter (go COLON))
+	(#.+char-attr-constituent-sign+ (go EXPTSIGN))
+	(#.+char-attr-constituent-digit+ (go EXPTDIGIT))
+	(#.+char-attr-delimiter+ (unread-char char stream) (go RETURN-SYMBOL))
+	(#.+char-attr-escape+ (go ESCAPE))
+	(#.+char-attr-multiple-escape+ (go MULT-ESCAPE))
+	(#.+char-attr-package-delimiter+ (go COLON))
 	(t (go SYMBOL)))
      EXPTSIGN ; got to EXPONENT, and saw a sign character
       (ouch-read-buffer char)
       (setq char (read-char stream nil nil))
       (unless char (go RETURN-SYMBOL))
       (case (char-class char attribute-table)
-	(#.constituent-digit (go EXPTDIGIT))
-	(#.delimiter (unread-char char stream) (go RETURN-SYMBOL))
-	(#.escape (go ESCAPE))
-	(#.multiple-escape (go MULT-ESCAPE))
-	(#.package-delimiter (go COLON))
+	(#.+char-attr-constituent-digit+ (go EXPTDIGIT))
+	(#.+char-attr-delimiter+ (unread-char char stream) (go RETURN-SYMBOL))
+	(#.+char-attr-escape+ (go ESCAPE))
+	(#.+char-attr-multiple-escape+ (go MULT-ESCAPE))
+	(#.+char-attr-package-delimiter+ (go COLON))
 	(t (go SYMBOL)))
      EXPTDIGIT ; got to EXPONENT, saw "[sign] {digit}+"
       (ouch-read-buffer char)
       (setq char (read-char stream nil nil))
       (unless char (return (make-float)))
       (case (char-class char attribute-table)
-	(#.constituent-digit (go EXPTDIGIT))
-	(#.delimiter (unread-char char stream) (return (make-float)))
-	(#.escape (go ESCAPE))
-	(#.multiple-escape (go MULT-ESCAPE))
-	(#.package-delimiter (go COLON))
+	(#.+char-attr-constituent-digit+ (go EXPTDIGIT))
+	(#.+char-attr-delimiter+
+	 (unread-char char stream)
+	 (return (make-float)))
+	(#.+char-attr-escape+ (go ESCAPE))
+	(#.+char-attr-multiple-escape+ (go MULT-ESCAPE))
+	(#.+char-attr-package-delimiter+ (go COLON))
 	(t (go SYMBOL)))
      RATIO ; saw "[sign] {digit}+ slash"
       (ouch-read-buffer char)
       (setq char (read-char stream nil nil))
       (unless char (go RETURN-SYMBOL))
       (case (char-class2 char attribute-table)
-	(#.constituent-digit (go RATIODIGIT))
-	(#.delimiter (unread-char char stream) (go RETURN-SYMBOL))
-	(#.escape (go ESCAPE))
-	(#.multiple-escape (go MULT-ESCAPE))
-	(#.package-delimiter (go COLON))
+	(#.+char-attr-constituent-digit+ (go RATIODIGIT))
+	(#.+char-attr-delimiter+ (unread-char char stream) (go RETURN-SYMBOL))
+	(#.+char-attr-escape+ (go ESCAPE))
+	(#.+char-attr-multiple-escape+ (go MULT-ESCAPE))
+	(#.+char-attr-package-delimiter+ (go COLON))
 	(t (go SYMBOL)))
      RATIODIGIT ; saw "[sign] {digit}+ slash {digit}+"
       (ouch-read-buffer char)
       (setq char (read-char stream nil nil))
       (unless char (return (make-ratio)))
       (case (char-class2 char attribute-table)
-	(#.constituent-digit (go RATIODIGIT))
-	(#.delimiter (unread-char char stream) (return (make-ratio)))
-	(#.escape (go ESCAPE))
-	(#.multiple-escape (go MULT-ESCAPE))
-	(#.package-delimiter (go COLON))
+	(#.+char-attr-constituent-digit+ (go RATIODIGIT))
+	(#.+char-attr-delimiter+
+	 (unread-char char stream)
+	 (return (make-ratio)))
+	(#.+char-attr-escape+ (go ESCAPE))
+	(#.+char-attr-multiple-escape+ (go MULT-ESCAPE))
+	(#.+char-attr-package-delimiter+ (go COLON))
 	(t (go SYMBOL)))
      DOTS ; saw "dot {dot}+"
       (ouch-read-buffer char)
       (setq char (read-char stream nil nil))
       (unless char (%reader-error stream "too many dots"))
       (case (char-class char attribute-table)
-	(#.constituent-dot (go DOTS))
-	(#.delimiter
+	(#.+char-attr-constituent-dot+ (go DOTS))
+	(#.+char-attr-delimiter+
 	 (unread-char char stream)
 	 (%reader-error stream "too many dots"))
-	(#.escape (go ESCAPE))
-	(#.multiple-escape (go MULT-ESCAPE))
-	(#.package-delimiter (go COLON))
+	(#.+char-attr-escape+ (go ESCAPE))
+	(#.+char-attr-multiple-escape+ (go MULT-ESCAPE))
+	(#.+char-attr-package-delimiter+ (go COLON))
 	(t (go SYMBOL)))
      SYMBOL ; not a dot, dots, or number
       (let ((stream (in-synonym-of stream)))
@@ -890,15 +882,15 @@
 	       (setq char (fast-read-char nil nil))
 	       (unless char (go RETURN-SYMBOL))
 	       (case (char-class char attribute-table)
-		 (#.escape (done-with-fast-read-char)
-			   (go ESCAPE))
-		 (#.delimiter (done-with-fast-read-char)
-			      (unread-char char stream)
-			      (go RETURN-SYMBOL))
-		 (#.multiple-escape (done-with-fast-read-char)
-				    (go MULT-ESCAPE))
-		 (#.package-delimiter (done-with-fast-read-char)
-				      (go COLON))
+		 (#.+char-attr-escape+ (done-with-fast-read-char)
+				       (go ESCAPE))
+		 (#.+char-attr-delimiter+ (done-with-fast-read-char)
+					  (unread-char char stream)
+					  (go RETURN-SYMBOL))
+		 (#.+char-attr-multiple-escape+ (done-with-fast-read-char)
+						(go MULT-ESCAPE))
+		 (#.+char-attr-package-delimiter+ (done-with-fast-read-char)
+						  (go COLON))
 		 (t (go SYMBOL-LOOP)))))
 	    ;; fundamental-stream
 	    (prog ()
@@ -907,11 +899,11 @@
 	     (setq char (stream-read-char stream))
 	     (when (eq char :eof) (go RETURN-SYMBOL))
 	     (case (char-class char attribute-table)
-	       (#.escape (go ESCAPE))
-	       (#.delimiter (stream-unread-char stream char)
+	       (#.+char-attr-escape+ (go ESCAPE))
+	       (#.+char-attr-delimiter+ (stream-unread-char stream char)
 			    (go RETURN-SYMBOL))
-	       (#.multiple-escape (go MULT-ESCAPE))
-	       (#.package-delimiter (go COLON))
+	       (#.+char-attr-multiple-escape+ (go MULT-ESCAPE))
+	       (#.+char-attr-package-delimiter+ (go COLON))
 	       (t (go SYMBOL-LOOP))))))
      ESCAPE ; saw an escape
       ;; Don't put the escape in the read buffer.
@@ -924,10 +916,10 @@
       (setq char (read-char stream nil nil))
       (unless char (go RETURN-SYMBOL))
       (case (char-class char attribute-table)
-	(#.delimiter (unread-char char stream) (go RETURN-SYMBOL))
-	(#.escape (go ESCAPE))
-	(#.multiple-escape (go MULT-ESCAPE))
-	(#.package-delimiter (go COLON))
+	(#.+char-attr-delimiter+ (unread-char char stream) (go RETURN-SYMBOL))
+	(#.+char-attr-escape+ (go ESCAPE))
+	(#.+char-attr-multiple-escape+ (go MULT-ESCAPE))
+	(#.+char-attr-package-delimiter+ (go COLON))
 	(t (go SYMBOL)))
       MULT-ESCAPE
       (do ((char (read-char stream t) (read-char stream t)))
@@ -938,10 +930,10 @@
       (setq char (read-char stream nil nil))
       (unless char (go RETURN-SYMBOL))
       (case (char-class char attribute-table)
-	(#.delimiter (unread-char char stream) (go RETURN-SYMBOL))
-	(#.escape (go ESCAPE))
-	(#.multiple-escape (go MULT-ESCAPE))
-	(#.package-delimiter (go COLON))
+	(#.+char-attr-delimiter+ (unread-char char stream) (go RETURN-SYMBOL))
+	(#.+char-attr-escape+ (go ESCAPE))
+	(#.+char-attr-multiple-escape+ (go MULT-ESCAPE))
+	(#.+char-attr-package-delimiter+ (go COLON))
 	(t (go SYMBOL)))
       COLON
       (casify-read-buffer escapes)
@@ -963,14 +955,14 @@
       (setq char (read-char stream nil nil))
       (unless char (reader-eof-error stream "after reading a colon"))
       (case (char-class char attribute-table)
-	(#.delimiter
+	(#.+char-attr-delimiter+
 	 (unread-char char stream)
 	 (%reader-error stream
 			"illegal terminating character after a colon: ~S"
 			char))
-	(#.escape (go ESCAPE))
-	(#.multiple-escape (go MULT-ESCAPE))
-	(#.package-delimiter (go INTERN))
+	(#.+char-attr-escape+ (go ESCAPE))
+	(#.+char-attr-multiple-escape+ (go MULT-ESCAPE))
+	(#.+char-attr-package-delimiter+ (go INTERN))
 	(t (go SYMBOL)))
       INTERN
       (setq colons 2)
@@ -978,14 +970,14 @@
       (unless char
 	(reader-eof-error stream "after reading a colon"))
       (case (char-class char attribute-table)
-	(#.delimiter
+	(#.+char-attr-delimiter+
 	 (unread-char char stream)
 	 (%reader-error stream
 			"illegal terminating character after a colon: ~S"
 			char))
-	(#.escape (go ESCAPE))
-	(#.multiple-escape (go MULT-ESCAPE))
-	(#.package-delimiter
+	(#.+char-attr-escape+ (go ESCAPE))
+	(#.+char-attr-multiple-escape+ (go MULT-ESCAPE))
+	(#.+char-attr-package-delimiter+
 	 (%reader-error stream
 			"too many colons after ~S name"
 			package-designator))

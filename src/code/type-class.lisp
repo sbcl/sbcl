@@ -108,51 +108,56 @@
   )
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
+  ;; KLUDGE: If the slots of TYPE-CLASS ever change, the slots here
+  ;; will have to be tweaked to match. -- WHN 19991021
+  (defparameter *type-class-function-slots*
+    '((:simple-subtypep . type-class-simple-subtypep)
+      (:complex-subtypep-arg1 . type-class-complex-subtypep-arg1)
+      (:complex-subtypep-arg2 . type-class-complex-subtypep-arg2)
+      (:simple-union2 . type-class-simple-union2)
+      (:complex-union2 . type-class-complex-union2)
+      (:simple-intersection2 . type-class-simple-intersection2)
+      (:complex-intersection2 . type-class-complex-intersection2)
+      (:simple-= . type-class-simple-=)
+      (:complex-= . type-class-complex-=)
+      (:unparse . type-class-unparse))))
 
-;;; Copy TYPE-CLASS object X, using only operations which will work early in
-;;; cold load. (COPY-STRUCTURE won't work early in cold load, because it needs
-;;; RAW-INDEX and RAW-LENGTH information from LAYOUT-INFO, and LAYOUT-INFO
-;;; isn't initialized early in cold load.)
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  
+;;; Copy TYPE-CLASS object X, using only operations which will work
+;;; early in cold load. (COPY-STRUCTURE won't work early in cold load,
+;;; because it needs RAW-INDEX and RAW-LENGTH information from
+;;; LAYOUT-INFO, and LAYOUT-INFO isn't initialized early in cold
+;;; load.)
 ;;;
-;;; FIXME: It's nasty having to maintain this hand-written copy function. And
-;;; it seems intrinsically dain-bramaged to have RAW-INDEX and RAW-LENGTH in
-;;; LAYOUT-INFO instead of directly in LAYOUT. We should fix this: * Move
-;;; RAW-INDEX and RAW-LENGTH slots into LAYOUT itself. * Rewrite the various
-;;; CHECK-LAYOUT-related functions so that they check RAW-INDEX and RAW-LENGTH
-;;; too. * Remove this special hacked copy function, just use COPY-STRUCTURE
-;;; instead. (For even more improvement, it'd be good to move the raw slots
+;;; FIXME: It's nasty having to maintain this hand-written copy
+;;; function. And it seems intrinsically dain-bramaged to have
+;;; RAW-INDEX and RAW-LENGTH in LAYOUT-INFO instead of directly in
+;;; LAYOUT. We should fix this:
+;;;   * Move RAW-INDEX and RAW-LENGTH slots into LAYOUT itself.
+;;;   * Rewrite the various CHECK-LAYOUT-related functions so that
+;;;     they check RAW-INDEX and RAW-LENGTH too.
+;;;   * Remove this special hacked copy function, just use
+;;;     COPY-STRUCTURE instead.
+;;; (For even more improvement, it might be good to move the raw slots
 ;;; into the same object as the ordinary slots, instead of having the
-;;; unfortunate extra level of indirection. But that'd probably require a lot
-;;; of work, including updating the garbage collector to understand it.)
+;;; unfortunate extra level of indirection. But that'd probably
+;;; require a lot of work, including updating the garbage collector to
+;;; understand it. And it might even hurt overall performance, because
+;;; the positive effect of removing indirection could be cancelled by
+;;; the negative effect of imposing an unnecessary GC write barrier on
+;;; raw data which doesn't actually affect GC.)
 (declaim (ftype (function (type-class) type-class) copy-type-class-coldly))
 (defun copy-type-class-coldly (x)
-  ;; KLUDGE: If the slots of TYPE-CLASS ever change, the slots here will have
-  ;; to be hand-tweaked to match. -- WHN 19991021
+  ;; KLUDGE: If the slots of TYPE-CLASS ever change in a way not
+  ;; reflected in *TYPE-CLASS-FUNCTION-SLOTS*, the slots here will
+  ;; have to be hand-tweaked to match. -- WHN 2001-03-19
   (make-type-class :name                  (type-class-name x)
-		   :simple-subtypep       (type-class-simple-subtypep x)
-		   :complex-subtypep-arg1 (type-class-complex-subtypep-arg1 x)
-		   :complex-subtypep-arg2 (type-class-complex-subtypep-arg2 x)
-		   :simple-union2	  (type-class-simple-union2 x)
-		   :complex-union2	  (type-class-complex-union2 x)
-		   :simple-intersection2  (type-class-simple-intersection2 x)
-		   :complex-intersection2 (type-class-complex-intersection2 x)
-		   :simple-=	          (type-class-simple-= x)
-		   :complex-=	          (type-class-complex-= x)
-		   :unparse	          (type-class-unparse x)))
-
-;;; KLUDGE: If the slots of TYPE-CLASS ever change, the slots here
-;;; will have to be tweaked to match. -- WHN 19991021
-(defparameter *type-class-function-slots*
-  '((:simple-subtypep . type-class-simple-subtypep)
-    (:complex-subtypep-arg1 . type-class-complex-subtypep-arg1)
-    (:complex-subtypep-arg2 . type-class-complex-subtypep-arg2)
-    (:simple-union2 . type-class-simple-union2)
-    (:complex-union2 . type-class-complex-union2)
-    (:simple-intersection2 . type-class-simple-intersection2)
-    (:complex-intersection2 . type-class-complex-intersection2)
-    (:simple-= . type-class-simple-=)
-    (:complex-= . type-class-complex-=)
-    (:unparse . type-class-unparse)))
+		   . #.(mapcan (lambda (type-class-function-slot)
+				 (destructuring-bind (keyword . slot-accessor)
+				     type-class-function-slot
+				   `(,keyword (,slot-accessor x))))
+			       *type-class-function-slots*)))
 
 (defun class-function-slot-or-lose (name)
   (or (cdr (assoc name *type-class-function-slots*))

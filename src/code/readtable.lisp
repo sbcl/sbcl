@@ -14,25 +14,42 @@
 (sb!xc:deftype attribute-table ()
   '(simple-array (unsigned-byte 8) (#.char-code-limit)))
 
+;;; constants for readtable character attributes. These are all as in
+;;; the manual.
+(defconstant +char-attr-whitespace+ 0)
+(defconstant +char-attr-terminating-macro+ 1)
+(defconstant +char-attr-escape+ 2)
+(defconstant +char-attr-constituent+ 3)
+(defconstant +char-attr-constituent-dot+ 4)
+(defconstant +char-attr-constituent-expt+ 5)
+(defconstant +char-attr-constituent-slash+ 6)
+(defconstant +char-attr-constituent-digit+ 7)
+(defconstant +char-attr-constituent-sign+ 8)
+;; the "9" entry intentionally left blank for some reason -- WHN 19990806
+(defconstant +char-attr-multiple-escape+ 10)
+(defconstant +char-attr-package-delimiter+ 11)
+(defconstant +char-attr-delimiter+ 12) ; (a fake for READ-UNQUALIFIED-TOKEN)
+
 (sb!xc:defstruct (readtable (:conc-name nil)
 			    (:predicate readtablep))
   #!+sb-doc
-  "Readtable is a data structure that maps characters into syntax
+  "A READTABLE is a data structure that maps characters into syntax
    types for the Common Lisp expression reader."
   ;; The CHARACTER-ATTRIBUTE-TABLE is a vector of CHAR-CODE-LIMIT
   ;; integers for describing the character type. Conceptually, there
-  ;; are 4 distinct "primary" character attributes: WHITESPACE,
-  ;; TERMINATING-MACRO, ESCAPE, and CONSTITUENT. Non-terminating
+  ;; are 4 distinct "primary" character attributes:
+  ;; +CHAR-ATTR-WHITESPACE+, +CHAR-ATTR-TERMINATING-MACRO+,
+  ;; +CHAR-ATTR-ESCAPE+, and +CHAR-ATTR-CONSTITUENT+. Non-terminating
   ;; macros (such as the symbol reader) have the attribute
-  ;; CONSTITUENT.
+  ;; +CHAR-ATTR-CONSTITUENT+.
   ;;
-  ;; In order to make the READ-TOKEN fast, all this information is
-  ;; stored in the character attribute table by having different
-  ;; varieties of constituents.
+  ;; In order to make READ-TOKEN fast, all this information is stored
+  ;; in the character attribute table by having different varieties of
+  ;; constituents.
   (character-attribute-table
    (make-array char-code-limit
 	       :element-type '(unsigned-byte 8)
-	       :initial-element constituent)
+	       :initial-element +char-attr-constituent+)
    :type attribute-table)
   ;; The CHARACTER-MACRO-TABLE is a vector of CHAR-CODE-LIMIT
   ;; functions. One of these functions called with appropriate
@@ -43,8 +60,7 @@
   (character-macro-table
    (make-array char-code-limit :initial-element #'undefined-macro-char)
    :type (simple-vector #.char-code-limit))
-  ;; DISPATCH-TABLES entry, which is an alist from dispatch characters
-  ;; to vectors of CHAR-CODE-LIMIT functions, for use in defining
-  ;; dispatching macros (like #-macro).
+  ;; an alist from dispatch characters to vectors of CHAR-CODE-LIMIT
+  ;; functions, for use in defining dispatching macros (like #-macro)
   (dispatch-tables () :type list)
   (readtable-case :upcase :type (member :upcase :downcase :preserve :invert)))

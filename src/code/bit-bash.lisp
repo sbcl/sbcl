@@ -19,9 +19,6 @@
 ;;; the maximum number of bits that can be dealt with in a single call
 (defconstant max-bits (ash most-positive-fixnum -2))
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-
-;;; FIXME: Do we really need EVAL-WHEN around the DEFTYPEs?
 (deftype unit ()
   `(unsigned-byte ,unit-bits))
 
@@ -36,8 +33,6 @@
 
 (deftype word-offset ()
   `(integer 0 (,(ceiling max-bits unit-bits))))
-
-) ; EVAL-WHEN
 
 ;;;; support routines
 
