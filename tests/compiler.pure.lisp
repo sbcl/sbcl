@@ -274,3 +274,12 @@
 		(let ((v (make-array 0 :fill-pointer 0)))
 		  (vector-push-extend 1 v)
 		  (copy-seq v))))
+
+;;; to support INLINE functions inside MACROLET, it is necessary for
+;;; FUNCTION-LAMBDA-EXPRESSION to return a proper lambda expression in
+;;; certain circumstances, one of which is when compile is called from
+;;; top-level.
+(assert (equal
+	 (function-lambda-expression
+	  (compile nil '(lambda (x) (block nil (print x)))))
+	 '(lambda (x) (block nil (print x)))))
