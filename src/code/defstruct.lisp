@@ -931,11 +931,13 @@
               `(,value-the ,dsd-type ,(subst instance 'instance
                                              accessor-place-form)))
             (sb!c:source-transform-lambda (new-value instance)
-               (destructuring-bind (accessor-name &rest accessor-args)
-                   accessor-place-form
-                 `(,(info :setf :inverse accessor-name)
-                    ,@(subst instance 'instance accessor-args)
-                    (the ,dsd-type ,new-value)))))))
+              (destructuring-bind (accessor-name &rest accessor-args)
+                  accessor-place-form
+                (once-only ((new-value new-value)
+                            (instance instance))
+                  `(,(info :setf :inverse accessor-name)
+                     ,@(subst instance 'instance accessor-args)
+                     (the ,dsd-type ,new-value))))))))
 
 ;;; Return a LAMBDA form which can be used to set a slot.
 (defun slot-setter-lambda-form (dd dsd)

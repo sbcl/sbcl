@@ -31,6 +31,8 @@ changes in sbcl-0.8.18 relative to sbcl-0.8.17:
     argument, which must always be NIL. (reported by Kalle Niemitalo)
   * bug fix: printing 1.0d+23 no longer results in an error.
     (reported by Rolf Wester for CMUCL; bug fix from Raymond Toy)
+  * bug fix: structure slot setters preserve evaluation order. (thanks
+    to Gabor Melis)
   * fixed some bugs related to Unicode integration:
     ** RUN-PROGRAM can allow its child to take input from a Lisp
        stream.  (reported by Stefan Scholl)

@@ -562,6 +562,17 @@
             (setf (find-class 'foo) nil)
             (defstruct foo slot-1)))))
 
+;;; bug 348, evaluation order of slot writer arguments. Fixed by Gabor
+;;; Melis.
+(defstruct bug-348 x)
+
+(assert (eql -1 (let ((i (eval '-2))
+                      (x (make-bug-348)))
+                  (funcall #'(setf bug-348-x)
+                           (incf i)
+                           (aref (vector x) (incf i)))
+                  (bug-348-x x))))
+
 ;;; success
 (format t "~&/returning success~%")
 (quit :unix-status 104)
