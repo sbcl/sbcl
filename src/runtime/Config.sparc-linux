@@ -7,9 +7,7 @@
 # provided with absolutely no warranty. See the COPYING and CREDITS
 # files for more information.
 
-# -mcpu=pca56 makes _my_ alpha go fast, I'm told.  Yours may do something 
-# else.
-CFLAGS = -g -Wall -Dsparc
+CFLAGS = -g -O3 -Wall -Dsparc
 ASFLAGS = -g -Wall -Dsparc
 LD = ld 
 LINKFLAGS = -v -g 
