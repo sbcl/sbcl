@@ -114,3 +114,8 @@
     (ignore-errors (count-if #'zerop #(0 a 0 b c) :start 1 :from-end 11))
   (declare (ignore v))
   (assert (eql (type-error-datum e) 'c)))
+
+;;; :COUNT may be negative and BIGNUM
+(assert (equal (remove 1 '(1 2 3 1) :count 1) '(2 3 1)))
+(assert (equal (remove 1 '(1 2 3 1) :count (* 2 most-positive-fixnum)) '(2 3)))
+(assert (equal (remove 1 '(1 2 3 1) :count (* -2 most-positive-fixnum)) '(1 2 3 1)))

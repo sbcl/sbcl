@@ -142,8 +142,7 @@
 
 ;;; the :COUNT arg to a sequence
 (sb!xc:deftype sequence-count ()
-  `(or null (integer ,(- sb!xc:array-dimension-limit)
-                     (,sb!xc:array-dimension-limit))))
+  `(or null integer))
 
 ;;; a valid argument to a stream function
 ;;;

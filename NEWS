@@ -1393,6 +1393,8 @@ changes in sbcl-0.7.10 relative to sbcl-0.7.9:
     ** PSETQ now works as required in the presence of side-effecting
        symbol-macro places;
     ** NCONC accepts any object as its last argument
+    ** :COUNT argument to sequence functions may be BIGNUM (thanks to
+       Gerd Moellman)
   * fixed bug 166: compiler preserves "there is a way to go"
     invariant when deleting code.
   * fixed bug 172: macro lambda lists with required arguments after
