@@ -70,7 +70,11 @@
 ;;; part I: TYPEP
 (assert (typep #(11) '(simple-array t 1)))
 (assert (typep #(11) '(simple-array (or integer symbol) 1)))
-;;; FIXME: broken by 0.pre7.15 #!-SB-INTERPRETER stuff
+;;; FIXME: This is broken because of compiler bug 123: the compiler
+;;; optimizes the type test to T, so it never gets a chance to raise a
+;;; runtime error. (It used to work under the IR1 interpreter just
+;;; because the IR1 interpreter doesn't try to optimize TYPEP as hard
+;;; as the byte compiler does.)
 #+nil (assert (raises-error? (typep #(11) '(simple-array undef-type 1))))
 (assert (not (typep 11 '(simple-array undef-type 1))))
 ;;; part II: SUBTYPEP

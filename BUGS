@@ -1187,6 +1187,57 @@ Error in function C::GET-LAMBDA-TO-COMPILE:
    #+NIL) and I'd like to go back to see whether this really is
    a compiler bug before I delete this BUGS entry.
 
+123:
+   The *USE-IMPLEMENTATION-TYPES* hack causes bugs, particularly
+     (IN-PACKAGE :SB-KERNEL)
+     (TYPE= (SPECIFIER-TYPE '(VECTOR T))
+	    (SPECIFIER-TYPE '(VECTOR UNDEFTYPE)))
+   Then because of this, the compiler bogusly optimizes
+	(TYPEP #(11) '(SIMPLE-ARRAY UNDEF-TYPE 1))
+   to T. Unfortunately, just setting *USE-IMPLEMENTATION-TYPES* to 
+   NIL around sbcl-0.pre7.14.flaky4.12 didn't work: the compiler complained
+   about type mismatches (probably harmlessly, another instance of bug 117);
+   and then cold init died with a segmentation fault.
+
+124:
+   As of version 0.pre7.14, SBCL's implementation of MACROLET makes
+   the entire lexical environment at the point of MACROLET available
+   in the bodies of the macroexpander functions. In particular, it 
+   allows the function bodies (which run at compile time) to try to 
+   access lexical variables (which are only defined at runtime).
+   It doesn't even issue a warning, which is bad.
+  
+   The SBCL behavior arguably conforms to the ANSI spec (since the
+   spec says that the behavior is undefined, ergo anything conforms).
+   However, it would be better to issue a compile-time error.
+   Unfortunately I (WHN) don't see any simple way to detect this
+   condition in order to issue such an error, so for the meantime
+   SBCL just does this weird broken "conforming" thing.
+
+   The ANSI standard says, in the definition of the special operator
+   MACROLET,
+       The macro-expansion functions defined by MACROLET are defined
+       in the lexical environment in which the MACROLET form appears.
+       Declarations and MACROLET and SYMBOL-MACROLET definitions affect
+       the local macro definitions in a MACROLET, but the consequences
+       are undefined if the local macro definitions reference any
+       local variable or function bindings that are visible in that
+       lexical environment. 
+   Then it seems to contradict itself by giving the example
+	(defun foo (x flag)
+	   (macrolet ((fudge (z)
+	                 ;The parameters x and flag are not accessible
+	                 ; at this point; a reference to flag would be to
+	                 ; the global variable of that name.
+	                 ` (if flag (* ,z ,z) ,z)))
+	    ;The parameters x and flag are accessible here.
+	     (+ x
+	        (fudge x)
+	        (fudge (+ x 1)))))
+   The comment "a reference to flag would be to the global variable
+   of the same name" sounds like good behavior for the system to have.
+   but actual specification quoted above says that the actual behavior
+   is undefined.
 
 KNOWN BUGS RELATED TO THE IR1 INTERPRETER
 
