@@ -245,11 +245,12 @@
 ;;; If the last message was given more than once, then print out an
 ;;; indication of how many times it was repeated. We reset the message
 ;;; count when we are done.
-(defun note-message-repeats (&optional (terpri t))
+(defun note-message-repeats (stream &optional (terpri t))
   (cond ((= *last-message-count* 1)
-	 (when terpri (terpri *standard-output*)))
+	 (when terpri 
+	   (terpri stream)))
 	((> *last-message-count* 1)
-          (format *standard-output* "~&; [Last message occurs ~W times.]~2%"
+	 (format stream "~&; [Last message occurs ~W times.]~2%"
 		 *last-message-count*)))
   (setq *last-message-count* 0))
 
@@ -261,88 +262,83 @@
 ;;;
 ;;; We suppress printing of messages identical to the previous, but
 ;;; record the number of times that the message is repeated.
-(defmacro print-compiler-message (format-string format-args)
+(defmacro print-compiler-message (stream format-string format-args)
   `(with-compiler-io-syntax
-     (%print-compiler-message ,format-string ,format-args)))
+     (%print-compiler-message ,stream ,format-string ,format-args)))
 
-(defun %print-compiler-message (format-string format-args)
+(defun %print-compiler-message (stream format-string format-args)
   (declare (type simple-string format-string))
   (declare (type list format-args))  
-  (let ((stream *standard-output*)
-	(context (find-error-context format-args)))
-    (cond
-     (context
-      (let ((file (compiler-error-context-file-name context))
-	    (in (compiler-error-context-context context))
-	    (form (compiler-error-context-original-source context))
-	    (enclosing (compiler-error-context-enclosing-source context))
-	    (source (compiler-error-context-source context))
-	    (last *last-error-context*))
+  (let ((context (find-error-context format-args)))
+    (cond (context
+	   (let ((file (compiler-error-context-file-name context))
+		 (in (compiler-error-context-context context))
+		 (form (compiler-error-context-original-source context))
+		 (enclosing (compiler-error-context-enclosing-source context))
+		 (source (compiler-error-context-source context))
+		 (last *last-error-context*))
 
-	(unless (and last
-		     (equal file (compiler-error-context-file-name last)))
-	  (when (pathnamep file)
-	    (note-message-repeats)
-	    (setq last nil)
-            (format stream "~2&; file: ~A~%" (namestring file))))
+	     (unless  (and last
+			   (equal file (compiler-error-context-file-name last)))
+	       (when (pathnamep file)
+		 (note-message-repeats stream)
+		 (setq last nil)
+		 (format stream "~2&; file: ~A~%" (namestring file))))
+	     
+	     (unless (and last
+			  (equal in (compiler-error-context-context last)))
+	       (note-message-repeats stream)
+	       (setq last nil)
+	       (pprint-logical-block (stream nil :per-line-prefix "; ")
+		 (format stream "in:~{~<~%    ~4:;~{ ~S~}~>~^ =>~}" in))
+	       (terpri stream))
+	     
+	     (unless (and last
+			  (string= form
+				   (compiler-error-context-original-source last)))
+	       (note-message-repeats stream)
+	       (setq last nil)
+	       (pprint-logical-block (stream nil :per-line-prefix "; ")
+		 (format stream "  ~A" form))
+	       (fresh-line stream))
+	     
+	     (unless (and last
+			  (equal enclosing
+				 (compiler-error-context-enclosing-source last)))
+	       (when enclosing
+		 (note-message-repeats stream)
+		 (setq last nil)
+		 (format stream "~&; --> ~{~<~%; --> ~1:;~A~> ~}~%" enclosing)))
+	     
+	     (unless (and last
+			  (equal source (compiler-error-context-source last)))
+	       (setq *last-format-string* nil)
+	       (when source
+		 (note-message-repeats stream)
+		 (dolist (src source)
+		   (fresh-line stream)
+		   (write-string "; ==>" stream)
+		   (terpri stream)
+		   (pprint-logical-block (stream nil :per-line-prefix "; ")
+		     (write-string src stream)))))))
+	  (t
+	   (fresh-line stream)
+	   (note-message-repeats stream)
+	   (setq *last-format-string* nil)))
+    
+    (setq *last-error-context* context))
 
-	(unless (and last
-		     (equal in (compiler-error-context-context last)))
-	  (note-message-repeats)
-	  (setq last nil)
-          (format stream "~&")
-          (pprint-logical-block (stream nil :per-line-prefix "; ")
-            (format stream "in:~{~<~%    ~4:;~{ ~S~}~>~^ =>~}" in))
-          (format stream "~%"))
-
-	(unless (and last
-		     (string= form
-			      (compiler-error-context-original-source last)))
-	  (note-message-repeats)
-	  (setq last nil)
-          (format stream "~&")
-          (pprint-logical-block (stream nil :per-line-prefix "; ")
-            (format stream "  ~A" form))
-          (format stream "~&"))
-
-	(unless (and last
-		     (equal enclosing
-			    (compiler-error-context-enclosing-source last)))
-	  (when enclosing
-	    (note-message-repeats)
-	    (setq last nil)
-	    (format stream "~&; --> ~{~<~%; --> ~1:;~A~> ~}~%" enclosing)))
-
-	(unless (and last
-		     (equal source (compiler-error-context-source last)))
-	  (setq *last-format-string* nil)
-	  (when source
-	    (note-message-repeats)
-	    (dolist (src source)
-              (format stream "~&")
-              (write-string "; ==>" stream)
-              (format stream "~&")
-              (pprint-logical-block (stream nil :per-line-prefix "; ")
-                (write-string src stream)))))))
-     (t
-       (format stream "~&")
-      (note-message-repeats)
-      (setq *last-format-string* nil)
-       (format stream "~&")))
-
-    (setq *last-error-context* context)
-
-    ;; FIXME: this testing for effective equality of compiler messages
-    ;; is ugly, and really ought to be done at a higher level.
-    (unless (and (equal format-string *last-format-string*)
-		 (tree-equal format-args *last-format-args*))
-      (note-message-repeats nil)
-      (setq *last-format-string* format-string)
-      (setq *last-format-args* format-args)
-      (format stream "~&")
-      (pprint-logical-block (stream nil :per-line-prefix "; ")
-        (format stream "~&~?" format-string format-args))
-      (format stream "~&")))
+  ;; FIXME: this testing for effective equality of compiler messages
+  ;; is ugly, and really ought to be done at a higher level.
+  (unless (and (equal format-string *last-format-string*)
+	       (tree-equal format-args *last-format-args*))
+    (note-message-repeats stream nil)
+    (setq *last-format-string* format-string)
+    (setq *last-format-args* format-args)
+    (fresh-line stream)
+    (pprint-logical-block (stream nil :per-line-prefix "; ")
+      (format stream "~&~?" format-string format-args))
+    (fresh-line stream))
   
   (incf *last-message-count*)
   (values))
@@ -358,9 +354,9 @@
 		(warning 'warning)
 		((or error compiler-error) 'error))))
     (print-compiler-message
+     *error-output*
      (format nil "caught ~S:~%~~@<  ~~@;~~A~~:>" what)
-     (list (with-output-to-string (s) (princ condition s)))))
-  (values))
+     (list (princ-to-string condition)))))
 
 ;;; The act of signalling one of these beasts must not cause WARNINGSP
 ;;; (or FAILUREP) to be set from COMPILE or COMPILE-FILE, so we can't
@@ -380,56 +376,57 @@ a STYLE-WARNING (or any more serious condition)."))
    "A condition type signalled when the compiler deletes code that the user
 has written, having proved that it is unreachable."))
 
-(defun compiler-notify (datum &rest args)
-  (unless (if *compiler-error-context*
+(macrolet ((with-condition ((condition datum args) &body body)
+	     (with-unique-names (block)
+	       `(block ,block
+		  (let ((,condition
+			 (coerce-to-condition ,datum ,args
+					      'simple-compiler-note
+					      'with-condition)))
+		    (restart-case
+			(signal ,condition)
+		      (muffle-warning ()
+			(return-from ,block (values))))
+		    ,@body
+		    (values))))))
+
+  (defun compiler-notify (datum &rest args)
+    (unless (if *compiler-error-context*
 	      (policy *compiler-error-context* (= inhibit-warnings 3))
 	      (policy *lexenv* (= inhibit-warnings 3)))
-    (let ((condition
-	   (coerce-to-condition datum args
-				'simple-compiler-note 'compiler-notify)))
-      (restart-case
-	  (signal condition)
-	(muffle-warning ()
-	  (return-from compiler-notify (values))))
-      (incf *compiler-note-count*)
-      (print-compiler-message 
-       (format nil "note: ~~A")
-       (list (with-output-to-string (s) (princ condition s))))))
-  (values))
+      (with-condition (condition datum args)
+	(incf *compiler-note-count*)
+	(print-compiler-message 
+	 *error-output*
+	 (format nil "note: ~~A")
+	 (list (princ-to-string condition)))))
+    (values))
 
-;;; Issue a note when we might or might not be in the compiler.
-(defun maybe-compiler-notify (&rest rest)
-  (if (boundp '*lexenv*) ; if we're in the compiler
-      (apply #'compiler-notify rest)
-      (progn
-	(let ((condition
-	       (coerce-to-condition (car rest) (cdr rest)
-				    'simple-compiler-note
-				    'maybe-compiler-notify)))
-	  (restart-case
-	      (signal condition)
-	    (muffle-warning ()
-	      (return-from maybe-compiler-notify (values))))
-	  (let ((stream *standard-output*))
+  ;; Issue a note when we might or might not be in the compiler.
+  (defun maybe-compiler-notify (&rest rest)
+    (if (boundp '*lexenv*) ; if we're in the compiler
+	(apply #'compiler-notify rest)
+	(with-condition (condition (car rest) (cdr rest))
+	  (let ((stream *error-output*))
 	    (pprint-logical-block (stream nil :per-line-prefix ";")
 	      (format stream " note: ~3I~_")
 	      (pprint-logical-block (stream nil)
 		(format stream "~A" condition)))
 	    ;; (outside logical block, no per-line-prefix)
-	    (fresh-line stream)))
-	(values))))
+	    (fresh-line stream))))))
 
 ;;; The politically correct way to print out progress messages and
 ;;; such like. We clear the current error context so that we know that
 ;;; it needs to be reprinted, and we also FORCE-OUTPUT so that the
 ;;; message gets seen right away.
 (declaim (ftype (function (string &rest t) (values)) compiler-mumble))
-(defun compiler-mumble (format-string &rest format-args)
-  (note-message-repeats)
-  (setq *last-error-context* nil)
-  (apply #'format *standard-output* format-string format-args)
-  (force-output *standard-output*)
-  (values))
+(defun compiler-mumble (control &rest args)
+  (let ((stream *standard-output*))
+    (note-message-repeats stream)
+    (setq *last-error-context* nil)
+    (apply #'format stream control args)
+    (force-output stream)
+    (values)))
 
 ;;; Return a string that somehow names the code in COMPONENT. We use
 ;;; the source path for the bind node for an arbitrary entry point to

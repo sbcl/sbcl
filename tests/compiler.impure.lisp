@@ -990,5 +990,13 @@
 	  (grovel-results name))))))
 (identify-suspect-vops)
 
+;;;; tests for compiler output
+(let* ((*error-output* (make-broadcast-stream))
+       (output (with-output-to-string (*standard-output*)
+		 (compile-file "compiler-output-test.lisp" 
+			       :print nil :verbose nil))))
+  (print output)
+  (assert (zerop (length output))))
+
 ;;; success
 (quit :unix-status 104)

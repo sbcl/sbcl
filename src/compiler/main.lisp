@@ -243,21 +243,20 @@
 	       (zerop *compiler-warning-count*)
 	       (zerop *compiler-style-warning-count*)
 	       (zerop *compiler-note-count*))
-    (fresh-line *standard-output*)
-    (pprint-logical-block (*standard-output* nil :per-line-prefix "; ")
-      (compiler-mumble "compilation unit ~:[finished~;aborted~]~
-                       ~[~:;~:*~&  caught ~W fatal ERROR condition~:P~]~
-                       ~[~:;~:*~&  caught ~W ERROR condition~:P~]~
-                       ~[~:;~:*~&  caught ~W WARNING condition~:P~]~
-                       ~[~:;~:*~&  caught ~W STYLE-WARNING condition~:P~]~
-                       ~[~:;~:*~&  printed ~W note~:P~]"
-		       abort-p
-		       *aborted-compilation-unit-count*
-		       *compiler-error-count*
-		       *compiler-warning-count*
-		       *compiler-style-warning-count*
-		       *compiler-note-count*)))
-  (fresh-line *standard-output*))
+    (pprint-logical-block (*error-output* nil :per-line-prefix "; ")
+      (format *error-output* "~&compilation unit ~:[finished~;aborted~]~
+                             ~[~:;~:*~&  caught ~W fatal ERROR condition~:P~]~
+                             ~[~:;~:*~&  caught ~W ERROR condition~:P~]~
+                             ~[~:;~:*~&  caught ~W WARNING condition~:P~]~
+                             ~[~:;~:*~&  caught ~W STYLE-WARNING condition~:P~]~
+                             ~[~:;~:*~&  printed ~W note~:P~]~%"
+	      abort-p
+	      *aborted-compilation-unit-count*
+	      *compiler-error-count*
+	      *compiler-warning-count*
+	      *compiler-style-warning-count*
+	      *compiler-note-count*))
+    (force-output *error-output*)))
 
 ;;; Evaluate BODY, then return (VALUES BODY-VALUE WARNINGS-P
 ;;; FAILURE-P), where BODY-VALUE is the first value of the body, and

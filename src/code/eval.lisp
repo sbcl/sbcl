@@ -77,7 +77,8 @@
   #!+sb-doc
   "Evaluate the argument in a null lexical environment, returning the
   result or results."
-  (eval-in-lexenv original-exp (make-null-lexenv)))
+  (with-compilation-unit ()
+    (eval-in-lexenv original-exp (make-null-lexenv))))
 
 ;;; Pick off a few easy cases, and the various top level EVAL-WHEN
 ;;; magical cases, and call %EVAL for the rest.

@@ -131,5 +131,10 @@
 (assert (eq (eval '(function function-eq-test))
             (funcall (compile nil '(lambda () (function function-eq-test))))))
 
+;;; No extra output, please
+(assert (equal ".."
+	       (with-output-to-string (*standard-output*)
+		 (eval '(progn (princ ".") (let ((x 42)) t) (princ "."))))))
+
 ;;; success
 (sb-ext:quit :unix-status 104)
