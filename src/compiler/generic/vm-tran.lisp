@@ -464,8 +464,8 @@
                (constant-lvar-p count)  ; ?
                (plusp (lvar-value count)))
       (cut-to-width integer width)
-      '#1#)
-    (setf (gethash '#1# *modular-versions*) '(ash 64))))
+      '#1#))
+  (setf (gethash '#1# *modular-versions*) '(ash 64)))
 
 
 ;;; There are two different ways the multiplier can be recoded. The
