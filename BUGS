@@ -170,12 +170,6 @@ WORKAROUND:
 45:
   a slew of floating-point-related errors reported by Peter Van Eynde
   on July 25, 2000:
-	b: SBCL's value for LEAST-POSITIVE-SHORT-FLOAT on the x86 is 
-	   bogus, and should probably be 1.4012985e-45. In SBCL,
-	   (/ LEAST-POSITIVE-SHORT-FLOAT 2) returns a number smaller
-	   than LEAST-POSITIVE-SHORT-FLOAT. Similar problems 
-	   exist for LEAST-NEGATIVE-SHORT-FLOAT, LEAST-POSITIVE-LONG-FLOAT,
-	   and LEAST-NEGATIVE-LONG-FLOAT.
 	c: Many expressions generate floating infinity on x86/Linux:
 		(/ 1 0.0)
 		(/ 1 0.0d0)

@@ -919,7 +919,10 @@
              (setf (defined-fun-functional defined-fun-res)
                    res)
              (unless (eq (defined-fun-inlinep defined-fun-res) :notinline)
-               (substitute-leaf res defined-fun-res))
+               (substitute-leaf-if
+                (lambda (ref)
+                  (policy ref (> recognize-self-calls 0)))
+                res defined-fun-res))
 	     res)
 	   (apply #'ir1-convert-lambda `(lambda ,@(cddr thing))
 		  :debug-name name args))))

@@ -1968,6 +1968,13 @@ changes in sbcl-0.8.3 relative to sbcl-0.8.2:
   * x86 bug fix in control stack exhaustion checking: now shows backtrace
   * bug fix in WITH-TIMEOUT: now the body can have more than one form.
     (thanks to Stig Sandoe)
+  * new optimization: inside a named function any reference to a
+    function with the same name is considered to be a self-reference;
+    this behaviour is controlled with SB-C::RECOGNIZE-SELF-CALLS
+    optimization quality.
+  * new optimization on x86: logical functions and + now have
+    optimized (UNSIGNED-BYTE 32) versions, which are automatically
+    used when the result is truncated to 32 bits.
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** The system now obeys the constraint imposed by
        UPGRADED-ARRAY-ELEMENT-TYPE that the upgraded array element

@@ -43,3 +43,9 @@
         3
         0)
   ("no" "maybe" "yes" "yes"))
+
+(define-optimization-quality recognize-self-calls
+    (if (> (max speed space) debug)
+        3
+        0)
+  ("no" "maybe" "yes" "yes"))

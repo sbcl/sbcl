@@ -1253,20 +1253,13 @@
   (:args (object :scs (descriptor-reg))
 	 (index :scs (unsigned-reg)))
   (:arg-types simple-base-string positive-fixnum)
-  (:temporary (:sc unsigned-reg ; byte-reg
-		   :offset eax-offset ; al-offset
-		   :target value
-		   :from (:eval 0) :to (:result 0))
-	      eax)
-  (:ignore eax)
   (:results (value :scs (base-char-reg)))
   (:result-types base-char)
   (:generator 5
-    (inst mov al-tn
+    (inst mov value
 	  (make-ea :byte :base object :index index :scale 1
 		   :disp (- (* vector-data-offset n-word-bytes)
-			    other-pointer-lowtag)))
-    (move value al-tn)))
+			    other-pointer-lowtag)))))
 
 (define-vop (data-vector-ref-c/simple-base-string)
   (:translate data-vector-ref)
@@ -1274,25 +1267,20 @@
   (:args (object :scs (descriptor-reg)))
   (:info index)
   (:arg-types simple-base-string (:constant (signed-byte 30)))
-  (:temporary (:sc unsigned-reg :offset eax-offset :target value
-		   :from (:eval 0) :to (:result 0))
-	      eax)
-  (:ignore eax)
   (:results (value :scs (base-char-reg)))
   (:result-types base-char)
   (:generator 4
-    (inst mov al-tn
+    (inst mov value
 	  (make-ea :byte :base object
 		   :disp (- (+ (* vector-data-offset n-word-bytes) index)
-			    other-pointer-lowtag)))
-    (move value al-tn)))
+			    other-pointer-lowtag)))))
 
 (define-vop (data-vector-set/simple-base-string)
   (:translate data-vector-set)
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg) :to (:eval 0))
 	 (index :scs (unsigned-reg) :to (:eval 0))
-	 (value :scs (base-char-reg)))
+	 (value :scs (base-char-reg) :target result))
   (:arg-types simple-base-string positive-fixnum base-char)
   (:results (result :scs (base-char-reg)))
   (:result-types base-char)
