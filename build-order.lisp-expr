@@ -376,6 +376,8 @@
  ("src/code/cross-type" :not-target)
  ("src/compiler/generic/vm-type")
  ("src/compiler/proclaim")
+
+ ("src/code/class-init")
  ("src/code/typecheckfuns")
 
  ;; The DEFSTRUCT machinery needs SB!XC:SUBTYPEP, defined in 
@@ -399,11 +401,10 @@
  ("src/compiler/compiler-error")
 
  ("src/code/type-init")
- 
  ;; Now that the type system is initialized, fix up UNKNOWN types that
  ;; have crept in.
  ("src/compiler/fixup-type")
- 
+
  ;; These define target types needed by fndb.lisp.
  ("src/code/package")
  ("src/code/random")

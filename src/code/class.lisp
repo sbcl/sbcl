@@ -1158,9 +1158,8 @@
       :depth 3
       :inherits (instance)))))
 
-;;; comment from CMU CL:
-;;;   See also type-init.lisp where we finish setting up the
-;;;   translations for built-in types.
+;;; See also src/code/class-init.lisp where we finish setting up the
+;;; translations for built-in types.
 (!cold-init-forms
   (dolist (x *built-in-classes*)
     #-sb-xc-host (/show0 "at head of loop over *BUILT-IN-CLASSES*")

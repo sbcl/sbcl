@@ -24,11 +24,6 @@
 
 ;;;; standard types
 
-;;; also has a definition in src/code/class.lisp, but we need it
-;;; earlier for array specialization.
-(sb!xc:deftype fixnum ()
-  '(integer #.sb!xc:most-negative-fixnum #.sb!xc:most-positive-fixnum))
-
 (sb!xc:deftype boolean () '(member t nil))
 
 (sb!xc:deftype mod (n)
@@ -59,7 +54,7 @@
 
 (sb!xc:deftype extended-char ()
   #!+sb-doc
-  "Type of characters that aren't base-char's. None in CMU CL."
+  "Type of CHARACTERs that aren't BASE-CHARs."
   '(and character (not base-char)))
 
 (sb!xc:deftype standard-char ()
