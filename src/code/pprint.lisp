@@ -364,21 +364,23 @@
 ;;;; tab support
 
 (defun compute-tab-size (tab section-start column)
-  (let ((origin (if (tab-sectionp tab) section-start 0))
-	(colnum (tab-colnum tab))
-	(colinc (tab-colinc tab)))
+  (let* ((origin (if (tab-sectionp tab) section-start 0))
+         (colnum (tab-colnum tab))
+         (colinc (tab-colinc tab))
+         (position (- column origin)))
     (cond ((tab-relativep tab)
 	   (unless (<= colinc 1)
-	     (let ((newposn (+ column colnum)))
+	     (let ((newposn (+ position colnum)))
 	       (let ((rem (rem newposn colinc)))
 		 (unless (zerop rem)
 		   (incf colnum (- colinc rem))))))
 	   colnum)
-	  ((<= column (+ colnum origin))
-	   (- (+ colnum origin) column))
-	  (t
+	  ((< position colnum)
+           (- colnum position))
+	  ((zerop colinc) 0)
+          (t
 	   (- colinc
-	      (rem (- column origin) colinc))))))
+	      (rem (- position colnum) colinc))))))
 
 (defun index-column (index stream)
   (let ((column (pretty-stream-buffer-start-column stream))
