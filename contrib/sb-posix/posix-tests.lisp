@@ -326,3 +326,8 @@
     (sb-posix:syscall-error (c)
       (sb-posix:syscall-errno c)))
   #.sb-posix::eisdir)
+
+(deftest fcntl.1
+  (let ((fd (sb-posix:open "/dev/null" sb-posix::o-nonblock)))
+    (= (sb-posix:fcntl fd sb-posix::f-getfl) sb-posix::o-nonblock))
+  t)

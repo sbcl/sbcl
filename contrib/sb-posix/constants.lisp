@@ -281,6 +281,7 @@
  (:integer f-dupfd "F_DUPFD")
  (:integer f-getfd "F_GETFD")
  (:integer f-setfd "F_SETFD")
+ (:integer f-getfl "F_GETFL")
  (:integer f-setfl "F_SETFL")
  (:integer f-getlk "F_GETLK")
  (:integer f-setlk "F_SETLK")
