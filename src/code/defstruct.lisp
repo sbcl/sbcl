@@ -1523,8 +1523,12 @@
 			 (let ((dsd (find (symbol-name slot-name) dd-slots
 					  :key #'dsd-%name
 					  :test #'string=)))
+			   ;; KLUDGE: bug 117 bogowarning.  Neither
+			   ;; DECLAREing the type nor TRULY-THE cut
+			   ;; the mustard -- it still gives warnings.
+			   (enforce-type dsd defstruct-slot-description)
 			   `(setf (,(dsd-accessor-name dsd) ,object-gensym)
-				  ,slot-name)))
+			          ,slot-name)))
 		       slot-names)
 	     ,object-gensym))
 			      

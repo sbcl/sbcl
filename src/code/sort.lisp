@@ -72,7 +72,7 @@
 		   (rotatef (%elt 1) (%elt current-heap-size))
 		   (decf current-heap-size)
 		   (%heapify 1))))))
-
+  ;; FIXME: Oh dear.
   (declaim (inline sort-vector))
   (defun sort-vector (vector start end predicate key)
     (declare (type vector vector))

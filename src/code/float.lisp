@@ -196,59 +196,60 @@
      (and (zerop (ldb sb!vm:long-float-exponent-byte (long-float-exp-bits x)))
 	  (not (zerop x))))))
 
-(macrolet ((def (name doc single double #!+(and long-float x86) long)
-	     `(defun ,name (x)
-		,doc
-		(number-dispatch ((x float))
-		  ((single-float)
-		   (let ((bits (single-float-bits x)))
-		     (and (> (ldb sb!vm:single-float-exponent-byte bits)
-			     sb!vm:single-float-normal-exponent-max)
-			  ,single)))
-		  ((double-float)
-		   (let ((hi (double-float-high-bits x))
-			 (lo (double-float-low-bits x)))
-		     (declare (ignorable lo))
-		     (and (> (ldb sb!vm:double-float-exponent-byte hi)
-			     sb!vm:double-float-normal-exponent-max)
-			  ,double)))
-		  #!+(and long-float x86)
-		  ((long-float)
-		   (let ((exp (long-float-exp-bits x))
-			 (hi (long-float-high-bits x))
-			 (lo (long-float-low-bits x)))
-		     (declare (ignorable lo))
-		     (and (> (ldb sb!vm:long-float-exponent-byte exp)
-			     sb!vm:long-float-normal-exponent-max)
-			  ,long)))))))
+(defmacro !define-float-dispatching-function
+    (name doc single double #!+(and long-float x86) long)
+  `(defun ,name (x)
+    ,doc
+    (number-dispatch ((x float))
+     ((single-float)
+      (let ((bits (single-float-bits x)))
+	(and (> (ldb sb!vm:single-float-exponent-byte bits)
+		sb!vm:single-float-normal-exponent-max)
+	     ,single)))
+     ((double-float)
+      (let ((hi (double-float-high-bits x))
+	    (lo (double-float-low-bits x)))
+	(declare (ignorable lo))
+	(and (> (ldb sb!vm:double-float-exponent-byte hi)
+		sb!vm:double-float-normal-exponent-max)
+	     ,double)))
+     #!+(and long-float x86)
+     ((long-float)
+      (let ((exp (long-float-exp-bits x))
+	    (hi (long-float-high-bits x))
+	    (lo (long-float-low-bits x)))
+	(declare (ignorable lo))
+	(and (> (ldb sb!vm:long-float-exponent-byte exp)
+		sb!vm:long-float-normal-exponent-max)
+	     ,long))))))
 
-  (def float-infinity-p
-    "Return true if the float X is an infinity (+ or -)."
-    (zerop (ldb sb!vm:single-float-significand-byte bits))
-    (and (zerop (ldb sb!vm:double-float-significand-byte hi))
-	 (zerop lo))
-    #!+(and long-float x86)
-    (and (zerop (ldb sb!vm:long-float-significand-byte hi))
-	 (zerop lo)))
+(!define-float-dispatching-function float-infinity-p
+  "Return true if the float X is an infinity (+ or -)."
+  (zerop (ldb sb!vm:single-float-significand-byte bits))
+  (and (zerop (ldb sb!vm:double-float-significand-byte hi))
+       (zerop lo))
+  #!+(and long-float x86)
+  (and (zerop (ldb sb!vm:long-float-significand-byte hi))
+       (zerop lo)))
 
-  (def float-nan-p
-    "Return true if the float X is a NaN (Not a Number)."
-    (not (zerop (ldb sb!vm:single-float-significand-byte bits)))
-    (or (not (zerop (ldb sb!vm:double-float-significand-byte hi)))
-	(not (zerop lo)))
-    #!+(and long-float x86)
-    (or (not (zerop (ldb sb!vm:long-float-significand-byte hi)))
-	(not (zerop lo))))
+(!define-float-dispatching-function float-nan-p
+  "Return true if the float X is a NaN (Not a Number)."
+  (not (zerop (ldb sb!vm:single-float-significand-byte bits)))
+  (or (not (zerop (ldb sb!vm:double-float-significand-byte hi)))
+      (not (zerop lo)))
+  #!+(and long-float x86)
+  (or (not (zerop (ldb sb!vm:long-float-significand-byte hi)))
+      (not (zerop lo))))
 
-  (def float-trapping-nan-p
-    "Return true if the float X is a trapping NaN (Not a Number)."
-    (zerop (logand (ldb sb!vm:single-float-significand-byte bits)
-		   sb!vm:single-float-trapping-nan-bit))
-    (zerop (logand (ldb sb!vm:double-float-significand-byte hi)
-		   sb!vm:double-float-trapping-nan-bit))
-    #!+(and long-float x86)
-    (zerop (logand (ldb sb!vm:long-float-significand-byte hi)
-		   sb!vm:long-float-trapping-nan-bit))))
+(!define-float-dispatching-function float-trapping-nan-p
+  "Return true if the float X is a trapping NaN (Not a Number)."
+  (zerop (logand (ldb sb!vm:single-float-significand-byte bits)
+		 sb!vm:single-float-trapping-nan-bit))
+  (zerop (logand (ldb sb!vm:double-float-significand-byte hi)
+		 sb!vm:double-float-trapping-nan-bit))
+  #!+(and long-float x86)
+  (zerop (logand (ldb sb!vm:long-float-significand-byte hi)
+		 sb!vm:long-float-trapping-nan-bit)))
 
 ;;; If denormalized, use a subfunction from INTEGER-DECODE-FLOAT to find the
 ;;; actual exponent (and hence how denormalized it is), otherwise we just

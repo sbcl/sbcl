@@ -1964,46 +1964,36 @@
 ;;; the user interface to FIND and POSITION: Get all our ducks in a
 ;;; row, then call %FIND-POSITION.
 (declaim (inline find position))
-(macrolet ((def-find-position (fun-name values-index)
-	     `(defun ,fun-name (item
-				sequence
-				&key
-				from-end
-				(start 0)
-				end
-				key
-				test
-				test-not)
-		(nth-value
-		 ,values-index
-		 (%find-position item
-				 sequence
-				 from-end
-				 start
-				 end
-				 (effective-find-position-key key)
-				 (effective-find-position-test test
-							       test-not))))))
-  (def-find-position find 0)
-  (def-find-position position 1))
+(defmacro !def-find-position (fun-name values-index)
+  `(defun ,fun-name (item sequence &key
+		     from-end (start 0) end
+		     key test test-not)
+    (nth-value
+     ,values-index
+     (%find-position item sequence
+                     from-end start
+                     end (effective-find-position-key key)
+                     (effective-find-position-test test test-not)))))
+(!def-find-position find 0)
+(!def-find-position position 1)
 
 ;;; the user interface to FIND-IF and POSITION-IF, entirely analogous
 ;;; to the interface to FIND and POSITION
 (declaim (inline find-if position-if))
-(macrolet ((def-find-position-if (fun-name values-index)
-	     `(defun ,fun-name (predicate sequence
-				&key from-end (start 0) end key)
-		(nth-value
-		 ,values-index
-		 (%find-position-if (%coerce-callable-to-fun predicate)
-				    sequence
-				    from-end
-				    start
-				    end
-				    (effective-find-position-key key))))))
+(defmacro !def-find-position-if (fun-name values-index)
+  `(defun ,fun-name (predicate sequence
+		     &key from-end (start 0) end key)
+    (nth-value
+     ,values-index
+     (%find-position-if (%coerce-callable-to-fun predicate)
+                        sequence
+                        from-end
+                        start
+                        end
+                        (effective-find-position-key key)))))
 
-  (def-find-position-if find-if 0)
-  (def-find-position-if position-if 1))
+(!def-find-position-if find-if 0)
+(!def-find-position-if position-if 1)
 
 ;;; the deprecated functions FIND-IF-NOT and POSITION-IF-NOT. We
 ;;; didn't bother to worry about optimizing them, except note that on
@@ -2026,20 +2016,20 @@
 ;;; FIXME: Maybe remove uses of these deprecated functions (and
 ;;; definitely of :TEST-NOT) within the implementation of SBCL.
 (declaim (inline find-if-not position-if-not))
-(macrolet ((def-find-position-if-not (fun-name values-index)
-	     `(defun ,fun-name (predicate sequence
-				&key from-end (start 0) end key)
-		(nth-value
-		 ,values-index
-		 (%find-position-if-not (%coerce-callable-to-fun predicate)
-				        sequence
-				        from-end
-				        start
-				        end
-				        (effective-find-position-key key))))))
+(defmacro !def-find-position-if-not (fun-name values-index)
+  `(defun ,fun-name (predicate sequence
+		     &key from-end (start 0) end key)
+    (nth-value
+     ,values-index
+     (%find-position-if-not (%coerce-callable-to-fun predicate)
+                            sequence
+                            from-end
+                            start
+                            end
+                            (effective-find-position-key key)))))
 
-  (def-find-position-if-not find-if-not 0)
-  (def-find-position-if-not position-if-not 1))
+(!def-find-position-if-not find-if-not 0)
+(!def-find-position-if-not position-if-not 1)
 
 
 ;;;; COUNT-IF, COUNT-IF-NOT, and COUNT
