@@ -1271,6 +1271,19 @@ WORKAROUND:
   macro is unhappy with the illegal syntax in the method body, and
   is giving an unclear error message.
 
+168:
+  (reported by Dan Barlow on sbcl-devel 2002-05-10)
+  In sbcl-0.7.3.12, doing
+    (defstruct foo bar baz)
+    (compile nil (lambda (x) (or x (foo-baz x))))
+  gives an error
+    debugger invoked on condition of type SB-INT:BUG:
+       full call to SB-KERNEL:%INSTANCE-REF
+    This is probably a bug in SBCL itself. [...]
+  Since this is a reasonable user error, it shouldn't be reported as 
+  an SBCL bug. 
+
+
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:
     These labels were used for bugs related to the old IR1 interpreter.
