@@ -56,9 +56,12 @@ echo -n ":$sbcl_arch" >> $ltf
 # the absence of :gencgc in *features*). This isn't a great
 # separation, but for now, rather than have :gencgc in
 # base-target-features.lisp-expr, we add it into local-target-features
-# if we're building for x86. -- CSR, 2002-02-21
+# if we're building for x86. -- CSR, 2002-02-21 Then we do something
+# similar with :STACK-GROWS-FOOWARD, too. -- WHN 2002-03-03
 if [ "$sbcl_arch" = "x86" ] ; then
-    echo -n ' :gencgc' >> $ltf
+    echo -n ' :gencgc :stack-grows-downward' >> $ltf
+else
+    echo -n ' :stack-grows-upward' >> $ltf
 fi
 for d in src/compiler src/assembly; do
     echo //setting up symlink $d/target

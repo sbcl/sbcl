@@ -171,7 +171,7 @@
   (declare (optimize (speed 3) (safety 0))
 	   (values (unsigned-byte 20))) ; FIXME: DECLARE VALUES?
 
-  #!-x86 ; machines where stack grows upwards (I guess) -- WHN 19990906
+  #!+stack-grows-upward
   (labels
       ((scrub (ptr offset count)
          (declare (type system-area-pointer ptr)
@@ -201,7 +201,7 @@
 	     (* (floor initial-offset sb!vm:n-word-bytes) sb!vm:n-word-bytes)
 	     0)))
 
-  #!+x86 ;; (Stack grows downwards.)
+  #!+stack-grows-downward
   (labels
       ((scrub (ptr offset count)
 	 (declare (type system-area-pointer ptr)

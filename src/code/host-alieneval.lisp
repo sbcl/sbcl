@@ -760,7 +760,7 @@
 
 #!+long-float
 (define-alien-type-class (long-float :include (float (bits #!+x86 96
-							    #!+sparc 128))
+							   #!+sparc 128))
 				     :include-args (type)))
 
 #!+long-float

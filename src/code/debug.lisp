@@ -13,11 +13,28 @@
 
 ;;;; variables and constants
 
-(defvar *debug-print-level* 3
+;;; things to consider when tweaking these values:
+;;;   * We're afraid to just default them to NIL and NIL, in case the
+;;;     user inadvertently causes a hairy data structure to be printed
+;;;     when he inadvertently enters the debugger.
+;;;   * We don't want to truncate output too much. These days anyone
+;;;     can easily run their Lisp in a windowing system or under Emacs,
+;;;     so it's not the end of the world even if the worst case is a
+;;;     few thousand lines of output.
+;;;   * As condition :REPORT methods are converted to use the pretty
+;;;     printer, they acquire *PRINT-LEVEL* constraints, so e.g. under
+;;;     sbcl-0.7.1.28's old value of *DEBUG-PRINT-LEVEL*=3, an
+;;;     ARG-COUNT-ERROR printed as 
+;;;       error while parsing arguments to DESTRUCTURING-BIND:
+;;;         invalid number of elements in
+;;;           #
+;;;         to satisfy lambda list
+;;;           #:
+;;;         exactly 2 expected, but 5 found
+(defvar *debug-print-level* 5
   #!+sb-doc
   "*PRINT-LEVEL* for the debugger")
-
-(defvar *debug-print-length* 5
+(defvar *debug-print-length* 7
   #!+sb-doc
   "*PRINT-LENGTH* for the debugger")
 
@@ -591,6 +608,7 @@ Function and macro commands:
 ;;; These are bound on each invocation of INVOKE-DEBUGGER.
 (defvar *debug-restarts*)
 (defvar *debug-condition*)
+(defvar *nested-debug-condition*)
 
 (defun invoke-debugger (condition)
   #!+sb-doc
@@ -635,7 +653,8 @@ reset to ~S."
 	    (*readtable* *debug-readtable*)
 	    (*print-readably* nil)
 	    (*print-pretty* t)
-	    (*package* original-package))
+	    (*package* original-package)
+	    (*nested-debug-condition* nil))
 
        ;; Before we start our own output, finish any pending output.
        ;; Otherwise, if the user tried to track the progress of
@@ -655,14 +674,21 @@ reset to ~S."
 		   (type-of *debug-condition*)
 		   *debug-condition*)
 	 (error (condition)
-	   (format *error-output*
-  		   "~&(caught ~S trying to print ~S when entering debugger)~%"
-		   (type-of condition)
-		   '*debug-condition*)
+           (setf *nested-debug-condition* condition)
+	   (let ((ndc-type (type-of *nested-debug-condition*)))
+	     (format *error-output*
+		     "~&~@<(A ~S was caught when trying to print ~S when ~
+                      entering the debugger. Printing was aborted and the ~
+                      ~S was stored in ~S.)~@:>~%"
+		     ndc-type
+		     '*debug-condition*
+		     ndc-type
+		     '*nested-debug-condition*))
 	   (when (typep condition 'cell-error)
 	     ;; what we really want to know when it's e.g. an UNBOUND-VARIABLE:
 	     (format *error-output*
-		     "~&(CELL-ERROR-NAME = ~S)~%)"
+		     "~&(CELL-ERROR-NAME ~S) = ~S~%"
+		     '*debug-condition*
 		     (cell-error-name *debug-condition*)))))
 
        ;; After the initial error/condition/whatever announcement to

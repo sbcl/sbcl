@@ -34,7 +34,8 @@
   (declare (type bit sign) (type (unsigned-byte 53) sig)
 	   (type (unsigned-byte 11) exp))
   (make-double-float (dpb exp sb!vm:double-float-exponent-byte
-			  (dpb (ash sig -32) sb!vm:double-float-significand-byte
+			  (dpb (ash sig -32)
+			       sb!vm:double-float-significand-byte
 			       (if (zerop sign) 0 -1)))
 		     (ldb (byte 32 0) sig)))
 #!+(and long-float x86)

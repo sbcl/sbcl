@@ -48,7 +48,7 @@
   symbol)
 
 ;;; Return the built-in hash value for SYMBOL.
-#!+(or x86 mips) ;; only backends for which a symbol-hash vop exists
+#!+(or x86 mips) ;; only backends for which a SYMBOL-HASH vop exists
 (defun symbol-hash (symbol)
   (symbol-hash symbol))
 

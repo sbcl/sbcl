@@ -41,8 +41,9 @@
 ) ; EVAL-WHEN
 
 ;;;; stubs for the Unix math library
-
-;;; Please refer to the Unix man pages for details about these routines.
+;;;;
+;;;; Many of these are unnecessary on the X86 because they're built
+;;;; into the FPU.
 
 ;;; trigonometric
 #!-x86 (def-math-rtn "sin" 1)

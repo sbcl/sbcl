@@ -527,12 +527,12 @@
 #!-sb-fluid (declaim (inline cstack-pointer-valid-p))
 (defun cstack-pointer-valid-p (x)
   (declare (type system-area-pointer x))
-  #!-x86 ; stack grows toward high address values
+  #!+stack-grows-upward
   (and (sap< x (current-sp))
        (sap<= (int-sap control-stack-start)
 	      x)
        (zerop (logand (sap-int x) #b11)))
-  #!+x86 ; stack grows toward low address values
+  #!+stack-grows-downward
   (and (sap>= x (current-sp))
        (sap> (int-sap control-stack-end) x)
        (zerop (logand (sap-int x) #b11))))

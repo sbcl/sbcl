@@ -199,41 +199,45 @@
 		  (push-let-binding var nil nil))))
 	      (t
 	       (error "non-symbol in lambda-list: ~S" var)))))
-    (push `(unless ,(if restp
-			;; (If RESTP, then the argument list might be
-			;; dotted, in which case ordinary LENGTH won't
-			;; work.)
-			`(list-of-length-at-least-p ,path-0 ,minimum)
-			`(proper-list-of-length-p ,path-0 ,minimum ,maximum))
-	     ,(if (eq error-fun 'error)
-		  `(arg-count-error ',error-kind ',name ,path-0
-				    ',lambda-list ,minimum
-				    ,(unless restp maximum))
-		  `(,error-fun 'arg-count-error
-			       :kind ',error-kind
-			       ,@(when name `(:name ',name))
-			       :args ,path-0
-			       :lambda-list ',lambda-list
-			       :minimum ,minimum
-			       ,@(unless restp
-				   `(:maximum ,maximum)))))
-	  *arg-tests*)
-    (when keys
-      (let ((problem (gensym "KEY-PROBLEM-"))
-	    (info (gensym "INFO-")))
-	(push `(multiple-value-bind (,problem ,info)
-		   (verify-keywords ,rest-name
-				    ',keys
-				    ',allow-other-keys-p)
-		 (when ,problem
-		   (,error-fun
-		    'defmacro-ll-broken-key-list-error
-		    :kind ',error-kind
-		    ,@(when name `(:name ',name))
-		    :problem ,problem
-		    :info ,info)))
-	      *arg-tests*)))
-    (values env-arg-used minimum (if (null restp) maximum nil))))
+    (let (;; common subexpression, suitable for passing to functions
+	  ;; which expect a MAXIMUM argument regardless of whether
+	  ;; there actually is a maximum number of arguments
+	  ;; (expecting MAXIMUM=NIL when there is no maximum)
+	  (explicit-maximum (and (not restp) maximum)))
+      (push `(unless ,(if restp
+			  ;; (If RESTP, then the argument list might be
+			  ;; dotted, in which case ordinary LENGTH won't
+			  ;; work.)
+			  `(list-of-length-at-least-p ,path-0 ,minimum)
+			  `(proper-list-of-length-p ,path-0 ,minimum ,maximum))
+	       ,(if (eq error-fun 'error)
+		    `(arg-count-error ',error-kind ',name ,path-0
+				      ',lambda-list ,minimum
+				      ,explicit-maximum)
+		    `(,error-fun 'arg-count-error
+				 :kind ',error-kind
+				 ,@(when name `(:name ',name))
+				 :args ,path-0
+				 :lambda-list ',lambda-list
+				 :minimum ,minimum
+				 :maximum ,explicit-maximum)))
+	    *arg-tests*)
+      (when keys
+	(let ((problem (gensym "KEY-PROBLEM-"))
+	      (info (gensym "INFO-")))
+	  (push `(multiple-value-bind (,problem ,info)
+		     (verify-keywords ,rest-name
+				      ',keys
+				      ',allow-other-keys-p)
+		   (when ,problem
+		     (,error-fun
+		      'defmacro-lambda-list-broken-key-list-error
+		      :kind ',error-kind
+		      ,@(when name `(:name ',name))
+		      :problem ,problem
+		      :info ,info)))
+		*arg-tests*)))
+      (values env-arg-used minimum explicit-maximum))))
 
 (defun push-sub-list-binding (variable path object name error-kind error-fun)
   (let ((var (gensym "TEMP-")))

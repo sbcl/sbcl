@@ -50,10 +50,11 @@
      sb!vm:read-only-space-start))
 
 (defun control-stack-usage ()
-  #!-x86 (- (sb!sys:sap-int (sb!c::control-stack-pointer-sap))
-            sb!vm:control-stack-start)
-  #!+x86 (- sb!vm:control-stack-end
-	    (sb!sys:sap-int (sb!c::control-stack-pointer-sap))))
+  #!+stack-grows-upward (- (sb!sys:sap-int (sb!c::control-stack-pointer-sap))
+			     sb!vm:control-stack-start)
+  #!+stack-grows-downward (- sb!vm:control-stack-end
+			     (sb!sys:sap-int
+			      (sb!c::control-stack-pointer-sap))))
 
 (defun binding-stack-usage ()
   (- (sb!sys:sap-int (sb!c::binding-stack-pointer-sap))

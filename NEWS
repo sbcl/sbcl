@@ -1014,6 +1014,8 @@ changes in sbcl-0.7.2 relative to sbcl-0.7.1:
     for non-GENCGC systems has been increased to 20M (since that
     seems much closer to the likely performance optimum for modern
     systems than the old 4M value was)
+  * minor incompatible change: new larger values for *DEBUG-PRINT-LENGTH*
+    and *DEBUG-PRINT-LEVEL*
   * SBCL runs on SPARC systems now. (thanks to Christophe Rhodes' port
     of CMU CL's support for SPARC, and various endianness and other 
     SBCL portability fixes due to Christophe Rhodes and Dan Barlow)
