@@ -384,7 +384,7 @@
 	 (res (make-array-header sb!vm:simple-array-widetag rank)))
     (declare (simple-array vec)
 	     (type (unsigned-byte 24) rank))
-    (set-array-header res vec length length 0
+    (set-array-header res vec length nil 0
 		      (do ((i rank (1- i))
 			   (dimensions () (cons (pop-stack) dimensions)))
 			  ((zerop i) dimensions)

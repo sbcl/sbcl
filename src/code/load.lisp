@@ -348,31 +348,26 @@
 	(loop
 	  (let ((byte (read-byte stream)))
 
-	    ;; stale code from before rewrite of *FOP-STACK* as
-	    ;; adjustable vector (probably worth rewriting when next
-	    ;; anyone needs to debug FASL stuff)
-	    #|
 	    ;; Do some debugging output.
 	    #!+sb-show
 	    (when *show-fops-p*
-	      (let ((ptr *fop-stack-pointer*)
-		    (stack *fop-stack*))
-		(fresh-line *trace-output*)
-		;; The FOP operations are stack based, so it's sorta
-		;; logical to display the operand before the operator.
-		;; ("reverse Polish notation")
-		(unless (= ptr (length stack))
-		  (write-char #\space *trace-output*)
-		  (prin1 (svref stack ptr) *trace-output*)
-		  (terpri *trace-output*))
-		;; Display the operator.
-		(format *trace-output*
-			"~&~S (#X~X at ~D) (~S)~%"
-			(svref *fop-names* byte)
-			byte
-			(1- (file-position stream))
-			(svref *fop-funs* byte))))
-            |#
+              (let* ((stack *fop-stack*)
+                     (ptr (1- (fill-pointer *fop-stack*))))
+                (fresh-line *trace-output*)
+                ;; The FOP operations are stack based, so it's sorta
+                ;; logical to display the operand before the operator.
+                ;; ("reverse Polish notation")
+                (unless (= ptr -1)
+                  (write-char #\space *trace-output*)
+                  (prin1 (aref stack ptr) *trace-output*)
+                  (terpri *trace-output*))
+                ;; Display the operator.
+                (format *trace-output*
+                        "~&~S (#X~X at ~D) (~S)~%"
+                        (aref *fop-names* byte)
+                        byte
+                        (1- (file-position stream))
+                        (svref *fop-funs* byte))))
 
 	    ;; Actually execute the fop.
 	    (funcall (the function (svref *fop-funs* byte)))))))))

@@ -2366,6 +2366,8 @@ changes in sbcl-0.8.9 relative to sbcl-0.8.8:
 changes in sbcl-0.8.10 relative to sbcl-0.8.9:
   * bug fix: compiler emitted division in optimized DEREF.  (thanks for
     the test case to Dave Roberts)
+  * bug fix: multidimensional simple arrays loaded from FASLs had fill
+    pointers.  (reported by Sean Ross)
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles
