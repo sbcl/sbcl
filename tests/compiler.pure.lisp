@@ -129,3 +129,10 @@
 (dotimes (i 14)
   (when (typep i '(and integer (satisfies oddp)))
     (print i)))
+
+;;; bug 156 (reported by APD sbcl-devel 2002-04-12, fixed by CSR patch
+;;; sbcl-devel 2002-07-02): FUNCTION-LAMBDA-EXPRESSION of
+;;; interactively-compiled functions was broken by sleaziness and
+;;; confusion in the assault on 0.7.0, so this expression used to
+;;; signal TYPE-ERROR when it found NIL instead of a DEBUG-SOURCE.
+(eval '(function-lambda-expression #'(lambda (x) x)))

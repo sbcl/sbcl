@@ -945,6 +945,29 @@
                 (gethash (leaf-info fun) entry-table)
               (aver found-p)
               result))
+	;; KLUDGE: This code duplicates some other code in this
+	;; file. In the great reorganzation, the flow of program logic
+	;; changed from the original CMUCL model, and that path (as of
+	;; sbcl-0.7.5 in SUB-COMPILE-FILE) was no longer followed for
+	;; CORE-OBJECTS, leading to BUG 156. This place is
+	;; transparently not the right one for this code, but I don't
+	;; have a clear enough overview of the compiler to know how to
+	;; rearrange it all so that this operation fits in nicely, and
+	;; it was blocking reimplementation of 
+	;; (DECLAIM (INLINE FOO)) (MACROLET ((..)) (DEFUN FOO ...))
+	;;
+	;; FIXME: This KLUDGE doesn't solve all the problem in an
+	;; ideal way, as (1) definitions typed in at the REPL without
+	;; an INLINE declaration will give a NULL
+	;; FUNCTION-LAMBDA-EXPRESSION (allowable, but not ideal) and
+	;; (2) INLINE declarations will yield a
+	;; FUNCTION-LAMBDA-EXPRESSION headed by
+	;; SB-C:LAMBDA-WITH-LEXENV, even for null LEXENV.
+	;;
+	;; CSR, 2002-07-02
+	(when (core-object-p *compile-object*)
+	  (fix-core-source-info *source-info* *compile-object*))
+
         (mapc #'clear-ir1-info components-from-dfo)
         (clear-stuff)))))
 

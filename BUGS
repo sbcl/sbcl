@@ -1130,13 +1130,6 @@ WORKAROUND:
   but it has happened in more complicated cases (which I haven't
   figured out how to reproduce).
 
-156:
-  FUNCTION-LAMBDA-EXPRESSION doesn't work right in 0.7.0 or 0.7.2.9:
-    * (function-lambda-expression #'(lambda (x) x))
-    debugger invoked on condition of type TYPE-ERROR:
-      The value NIL is not of type SB-C::DEBUG-SOURCE
-  (reported by Alexey Dejneka sbcl-devel 2002-04-12)
-
 157:
   Functions SUBTYPEP, TYPEP, UPGRADED-ARRAY-ELEMENT-TYPE, and 
   UPGRADED-COMPLEX-PART-TYPE should have an optional environment argument.
