@@ -635,8 +635,8 @@
 		(ecase (cleanup-kind (nlx-info-cleanup nlx-info))
 		  ((:catch :unwind-protect)
 		   (consume :nlx-entry))
-		  ;; If for a lexical exit, we will see a breakup later, so
-		  ;; don't consume :NLX-ENTRY now.
+		  ;; If for a lexical exit, we will see a breakup
+		  ;; later, so don't consume :NLX-ENTRY now.
 		  (:tagbody)
 		  (:block
 		   (let ((cont (nlx-info-continuation nlx-info)))
@@ -1861,9 +1861,9 @@
   ;; Process all of the lambdas in component, and assign stack frame
   ;; locations for all the locals.
   (dolist (lambda (component-lambdas component))
-    ;; We don't generate any code for :external lambdas, so we don't need
-    ;; to allocate stack space. Also, we don't use the ``more'' entry,
-    ;; so we don't need code for it.
+    ;; We don't generate any code for :EXTERNAL lambdas, so we don't
+    ;; need to allocate stack space. Also, we don't use the ``more''
+    ;; entry, so we don't need code for it.
     (cond
      ((or (eq (lambda-kind lambda) :external)
 	  (and (eq (lambda-kind lambda) :optional)
@@ -1927,12 +1927,12 @@
   ;; stay in the argument area and which need to be moved into locals.
   (assign-locals component)
 
-  ;; Annotate every continuation with information about how we want the
-  ;; values.
+  ;; Annotate every continuation with information about how we want
+  ;; the values.
   (annotate-ir1 component)
 
-  ;; Determine what stack values are dead, and emit cleanup code to pop
-  ;; them.
+  ;; Determine what stack values are dead, and emit cleanup code to
+  ;; pop them.
   (byte-stack-analyze component)
 
   ;; Make sure any newly added blocks have a block-number.

@@ -1106,13 +1106,6 @@
 #!+x86
 (defun find-escaped-frame (frame-pointer)
   (declare (type system-area-pointer frame-pointer))
-
-  ;; FIXME: These conditionals are a hack to get the system to
-  ;; bootstrap itself despite a byte interpreter/compiler bug. Without
-  ;; it, the byte interpreter blows up when trying to cross-compile
-  ;; this function, hitting #:UNINITIALIZED-EVAL-STACK-ELEMENT while
-  ;; executing (SB-XC:MACRO-FUNCTION 'SB!EXT:WITH-ALIEN).
-  #+sb-xc (values nil 0 nil) #-sb-xc ; REMOVEME
   (dotimes (index *free-interrupt-context-index* (values nil 0 nil))
     (sb!alien:with-alien
 	((lisp-interrupt-contexts (array (* os-context-t) nil)
