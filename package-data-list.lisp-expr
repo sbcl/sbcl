@@ -759,15 +759,15 @@ retained, possibly temporariliy, because it might be used internally."
 	       ;; INFO stuff doesn't belong in a user-visible package, we
 	       ;; should be able to change it without apology.
 	       "*INFO-ENVIRONMENT*"
-
-               ;; stepping control
-               "*STEPPING*" "*STEP*"
 	       "CLEAR-INFO"
 	       "COMPACT-INFO-ENVIRONMENT"
 	       "DEFINE-INFO-CLASS" "DEFINE-INFO-TYPE"
 	       "DO-INFO"
 	       "INFO"
 	       "MAKE-INFO-ENVIRONMENT"
+
+               ;; stepping control
+               "*STEPPING*" "*STEP*"
 
 	       ;; packages grabbed once and for all
 	       "*KEYWORD-PACKAGE*" "*CL-PACKAGE*"
@@ -1774,6 +1774,7 @@ SB-KERNEL) have been undone, but probably more remain."
 	       ;; SB!KERNEL.)
 	       "%PRIMITIVE"
 	       "%STANDARD-CHAR-P"
+               "*FOREIGN-LOCK*"
                "*LINKAGE-INFO*"
 	       "*LONG-SITE-NAME*" "*SHORT-SITE-NAME*"
                "*RUNTIME-DLHANDLE*"
@@ -1825,7 +1826,8 @@ SB-KERNEL) have been undone, but probably more remain."
 	       "SIGNED-SAP-REF-64" "SIGNED-SAP-REF-8"
 	       ;; FIXME: STRUCTURE!OBJECT stuff probably belongs in SB!KERNEL.
 	       "STRUCTURE!OBJECT" "STRUCTURE!OBJECT-MAKE-LOAD-FORM"
-	       "SYSTEM-AREA-POINTER" "SYSTEM-AREA-POINTER-P" "VECTOR-SAP"
+	       "SYSTEM-AREA-POINTER" "SYSTEM-AREA-POINTER-P" 
+               "UPDATE-LINKAGE-TABLE" "VECTOR-SAP"
 	       "WAIT-UNTIL-FD-USABLE" "WITH-ENABLED-INTERRUPTS"
 	       "WITH-FD-HANDLER"
 	       "WITH-INTERRUPTS" "WITH-PINNED-OBJECTS" "WITHOUT-GCING"

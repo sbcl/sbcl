@@ -23,20 +23,34 @@ PUNT=104
 
 testfilestem=${TMPDIR:-/tmp}/sbcl-foreign-test-$$
 
-# Make a little shared object file to test with.
+## Make a little shared object files to test with.
+
 echo 'int summish(int x, int y) { return 1 + x + y; }' > $testfilestem.c
 echo 'int numberish = 42;' >> $testfilestem.c
 echo 'int nummish(int x) { return numberish + x; }' >> $testfilestem.c
 cc -c $testfilestem.c -o $testfilestem.o
 ld -shared -o $testfilestem.so $testfilestem.o
 
-# Foreign definitions & load
+echo 'int foo = 13;' > $testfilestem-foobar.c
+echo 'int bar() { return 42; }' >> $testfilestem-foobar.c
+cc -c $testfilestem-foobar.c -o $testfilestem-foobar.o
+ld -shared -o $testfilestem-foobar.so $testfilestem-foobar.o
+
+echo 'int foo = 42;' > $testfilestem-foobar2.c
+echo 'int bar() { return 13; }' >> $testfilestem-foobar2.c
+cc -c $testfilestem-foobar2.c -o $testfilestem-foobar2.o
+ld -shared -o $testfilestem-foobar2.so $testfilestem-foobar2.o
+
+## Foreign definitions & load
+
 cat > $testfilestem.def.lisp <<EOF
   (define-alien-variable environ (* c-string))
   (defvar *environ* environ)
   (eval-when (:compile-toplevel :load-toplevel :execute)
-    (handler-case 
-        (load-shared-object "$testfilestem.so")
+    (handler-case
+        (progn
+          (load-shared-object "$testfilestem.so")
+          (load-shared-object "$testfilestem-foobar.so"))
       (sb-int:unsupported-operator ()
         ;; At least as of sbcl-0.7.0.5, LOAD-SHARED-OBJECT isn't
         ;; supported on every OS. In that case, there's nothing to test,
@@ -45,6 +59,8 @@ cat > $testfilestem.def.lisp <<EOF
   (define-alien-routine summish int (x int) (y int))
   (define-alien-variable numberish int)
   (define-alien-routine nummish int (x int))
+  (define-alien-variable "foo" int)
+  (define-alien-routine "bar" int)
 
   ;; Test that loading an object file didn't screw up our records
   ;; of variables visible in runtime. (This was a bug until 
@@ -63,6 +79,18 @@ cat > $testfilestem.test.lisp <<EOF
   (setf numberish 13)
   (assert (= 13 numberish))
   (assert (= 14 (nummish 1)))
+
+  (assert (= 13 foo))
+  (assert (= 42 (bar)))
+  ;; test realoading object file with new definitions
+  (rename-file "$testfilestem-foobar.so" "$testfilestem-foobar.bak")
+  (rename-file "$testfilestem-foobar2.so" "$testfilestem-foobar.so")
+  (load-shared-object "$testfilestem-foobar.so")
+  (assert (= 42 foo))
+  (assert (= 13 (bar)))
+  (rename-file "$testfilestem-foobar.so" "$testfilestem-foobar2.so")
+  (rename-file "$testfilestem-foobar.bak" "$testfilestem-foobar.so")
+
   (sb-ext:quit :unix-status 52) ; success convention for Lisp program
 EOF
 

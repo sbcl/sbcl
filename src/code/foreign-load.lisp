@@ -11,6 +11,12 @@
 
 (in-package "SB!ALIEN")
 
+;;; Used to serialize modifications to *linkage-info*,
+;;; *shared-objects* and the linkage-table proper. Calls thru
+;;; linkage-table are unaffected.
+(defvar *foreign-lock*
+  (sb!thread:make-mutex :name "foreign definition lock"))
+
 (define-unsupported-fun load-foreign
     "Unsupported as of SBCL 0.8.13. See LOAD-SHARED-OBJECT."
   "~S is unsupported as of SBCL 0.8.13. See LOAD-SHARED-OBJECT." 
@@ -38,55 +44,82 @@
 
 (defstruct shared-object file sap)
 
-(defun dlopen-or-lose (filename)
-  (dlerror) ; clear old errors
-  (let ((sap (dlopen filename (logior rtld-global rtld-now))))
+(defun dlopen-or-lose (&optional (obj nil objp))
+  (when objp
+    (dlclose-or-lose obj))
+  (dlerror) ; clear errors
+  (let* ((file (when obj (shared-object-file obj)))
+         (sap (dlopen file (logior rtld-global rtld-now))))
+    (aver (or (not objp) file))
     (when (zerop (sap-int sap))
+      (if objp
+          (setf (shared-object-sap obj) *runtime-dlhandle*)
+          (setf *runtime-dlhandle* nil))
       (error "Could not open ~:[runtime~;~:*shared object ~S~]: ~A"
-	     filename (dlerror)))
+             obj (dlerror)))
+    (when objp
+      (setf (shared-object-sap obj) sap))
     sap))
 
+(defun dlclose-or-lose (&optional (obj nil objp))
+  (dlerror)
+  (let (dlerror)
+    (cond ((and (not objp) *runtime-dlhandle*)
+           (dlclose *runtime-dlhandle*)
+           (setf dlerror (dlerror)
+                 *runtime-dlhandle* nil))
+          ((and objp (shared-object-sap obj))
+           (dlclose (shared-object-sap obj))
+           (setf dlerror (dlerror)
+                 (shared-object-sap obj) nil)))
+    (when dlerror
+      (cerror dlerror))))
+
 (defun load-shared-object (file)
-  "Load a shared library/dynamic shared object file/general
-dlopenable alien container, such as a .so on an ELF platform.
+  "Load a shared library/dynamic shared object file/general dlopenable
+alien container, such as a .so on an ELF platform.
+
+Reloading the same shared object will replace the old definitions; if
+a symbol was previously referenced thru the object and is not present
+in the reloaded version an error will be signalled. Sameness is
+determined using the library filename. Reloading may not work as
+expected if user or library-code has called dlopen on FILE.
 
 References to foreign symbols in loaded shared objects do not survive
 intact through SB-EXT:SAVE-LISP-AND die on all platforms. See
 SB-EXT:SAVE-LISP-AND-DIE for details."
-  (let* ((real-file (or (unix-namestring file) file))
-         (sap (dlopen-or-lose real-file))
-	 (obj (make-shared-object :file real-file :sap sap))) 
-    (unless (member sap *shared-objects*
-		    :test #'sap= :key #'shared-object-sap)
-      (setf *shared-objects* (append *shared-objects* (list obj))))
-    (pathname real-file)))
+  (sb!thread:with-mutex (*foreign-lock*)
+    (let* ((filename (or (unix-namestring file) file))
+           (old (find filename *shared-objects* :key #'shared-object-file :test #'equal))
+           (obj (or old (make-shared-object :file filename))))
+      (dlopen-or-lose obj)
+      (setf *shared-objects* (append (remove obj *shared-objects*)
+                                     (list obj)))
+      #!+linkage-table
+      (when old
+        (update-linkage-table))
+      (pathname filename))))
 
 (defun try-reopen-shared-object (obj)
-  (restart-case 
-      (let ((sap (dlopen-or-lose (shared-object-file obj))))
-        (setf (shared-object-sap obj) sap)
-        obj)
-    (skip ()
-      :report "Skip this shared object and continue. References to ~
-               foreign symbols in this shared object will fail, ~
-               causing potential corruption."
-      *runtime-dlhandle*)))
+  (with-simple-restart (skip "~@<Skip this shared object and continue. ~
+                              References to foreign symbols in this ~
+                              shared object will fail with undefined ~
+                              consequences.~:>")
+    (dlopen-or-lose obj)
+    obj))
 
 ;;; Open libraries in *SHARED-OBJECTS* and the runtime. Called during
 ;;; initialization. 
 (defun reopen-shared-objects ()
   ;; Ensure that the runtime is open
-  (setf *runtime-dlhandle* (dlopen-or-lose nil)
+  (setf *runtime-dlhandle* (dlopen-or-lose)
         *shared-objects* (mapcar #'try-reopen-shared-object *shared-objects*)))
 
 ;;; Close all dlopened libraries and clear out sap entries in
 ;;; *SHARED-OBJECTS*.
 (defun close-shared-objects ()
-  (dolist (obj (reverse *shared-objects*))
-    (dlclose (shared-object-sap obj))
-    (setf (shared-object-sap obj) nil))
-  (dlclose *runtime-dlhandle*)
-  (setf *runtime-dlhandle* nil))
+  (mapc #'dlclose-or-lose (reverse *shared-objects*))
+  (dlclose-or-lose))
 
 (defun get-dynamic-foreign-symbol-address (symbol)
   (dlerror) ; clear old errors

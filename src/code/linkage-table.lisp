@@ -19,10 +19,7 @@
 
 (in-package "SB!IMPL")
 
-;;; Used to serialize modifications to *linkage-info* and the linkage-table
-;;; proper. Calls thru linkage-table are unaffected.
-(defvar *linkage-table-lock*
-  (sb!thread:make-mutex :name "linkage-table lock"))
+(defvar *foreign-lock*) ; initialized in foreign-load.lisp
 
 (define-alien-routine arch-write-linkage-table-jmp void
   (table-address system-area-pointer)
@@ -65,23 +62,22 @@
 ;;; in the linkage table.
 (defun ensure-foreign-symbol-linkage (name datap)
   (/show0 "ensure-foreign-symbol-linkage")
-  (sb!thread:with-mutex (*linkage-table-lock*)
+  (sb!thread:with-mutex (*foreign-lock*)
     (let ((info (or (gethash name *linkage-info*)
                     (link-foreign-symbol name datap))))
       (when info
         (linkage-info-address info)))))
 
-;;; Initialize the linkage-table. Called during initialization after
-;;; all shared libraries have been reopened.
-(defun linkage-table-reinit ()
-  (/show0 "linkage-table-reinit")
-  ;; No locking here, as this should be done just once per image initialization,
-  ;; before any threads user are spawned.
+;;; Update the linkage-table. Called during initialization after all
+;;; shared libraries have been reopened, and after a previously loaded
+;;; shared object is reloaded.
+(defun update-linkage-table ()
+  ;; Doesn't take care of it's own locking -- callers are responsible
   (maphash (lambda (name info)
-	     (let ((datap (linkage-info-datap info))
-		   (table-address (linkage-info-address info))
-		   (real-address (get-dynamic-foreign-symbol-address name)))
-	       (cond (real-address
+             (let ((datap (linkage-info-datap info))
+                   (table-address (linkage-info-address info))
+                   (real-address (get-dynamic-foreign-symbol-address name)))
+               (cond (real-address
                       (write-linkage-table-entry table-address
                                                  real-address
                                                  datap))
@@ -92,4 +88,4 @@
                                segfaults, and potential corruption."
                               "Could not resolve foreign function ~S for ~
                                linkage-table." name)))))
-	   *linkage-info*))
+           *linkage-info*))
