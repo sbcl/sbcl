@@ -1781,20 +1781,21 @@ changes in sbcl-0.8.1 relative to sbcl-0.8.0:
     functions defined in the same file. This also permits the system
     to warn on static type mismatches and function
     redefinition.  (Currently it does not work with high DEBUG level.)
-  * when issuing notes, the compiler now signals a condition of type
+  * minor incompatible change: VALUES declaration is disabled.
+  * When issuing notes, the compiler now signals a condition of type
     SB-EXT:COMPILER-NOTE, and provides an associated MUFFLE-WARNING
     restart for use in user handlers.  It is expected that the
     COMPILER-NOTE condition will eventually become a condition
     supertype to a hierarchy of note types, which will then be
-    handleable in a similar fashion; other than
-    SB-INT:SIMPLE-COMPILER-NOTE, an implementation detail, no such
-    note subtypes yet exist.
-  * changes in type checking closed the following bugs:
+    handleable in a similar fashion. However, at the moment, no such
+    note subtypes yet exist. (SB-INT:SIMPLE-COMPILER-NOTE exists,
+    but it's an implementation detail, not a classification for the
+    purpose above.)
+  * Changes in type checking closed the following bugs:
     ** type checking of unused values (192b, 194d, 203);
     ** template selection based on unsafe type assertions (192c, 236);
     ** type checking in branches (194bc).
-  * VALUES declaration is disabled.
-  * a short form of VALUES type specifier has ANSI meaning (it has
+  * A short form of VALUES type specifier has ANSI meaning (it has
     increased the number of situations when SBCL cannot perform type
     checking).
   * fixed bug in DEFSTRUCT: once again, naming structure slots with
@@ -1806,63 +1807,63 @@ changes in sbcl-0.8.1 relative to sbcl-0.8.0:
     outputs FRESH-LINE or TERPRI, and no longer converts its stream
     argument to a pretty-print stream. Instead, it leaves any such 
     operations to DESCRIBE-OBJECT methods.
-  * bug fix: APROPOS now respects the EXTERNAL-ONLY flag.  (reported
+  * bug fix: APROPOS now respects the EXTERNAL-ONLY flag. (reported
     by Teemu Kalvas)
   * bug fix: NIL is now a valid destructuring argument in DEFMACRO
-    lambda lists.  (thanks to David Lichteblau)
-  * bug fix: defining a generic function with a :METHOD-CLASS being a
+    lambda lists. (thanks to David Lichteblau)
+  * bug fix: Defining a generic function with a :METHOD-CLASS being a
     subclass of STANDARD-METHOD no longer causes stack exhaustion.
     (thanks to Gerd Moellmann)
   * fixed bug 246: increased compilation speed of long
     MULTIPLE-VALUE-BIND (and likewise of NTH-VALUE with a constant
-    integer argument).
+    integer argument)
   * a contributed module implementing COMPILER-LET and MACROEXPAND-ALL
     has been included.
   * DEFCONSTANT now throws a condition of type
     SB-EXT:DEFCONSTANT-UNEQL if it is being asked to redefine a
     constant to a non-EQL value; CONTINUE and ABORT restarts
-    respectively change and preserve the value.
-  * fixed bug 63: the code walker, part of the implementation of CLOS,
-    is better at handling symbol macros.
-  * bug fix: there is no longer a type named LENGTH.  (reported by
-    Raymond Toy)
-  * bug fix: in macro-like defining macros/special operators the
-    implicit block does not enclose lambda list.
-  * fixed bugs 10 and 43: VALUES, AND, OR and MEMBER are not suitable as 
-    atomic type specifiers, and their use properly signals an error now.
-  * bug fix: an argument count mismatch for a type specifier in code
+    respectively change and preserve the value. 
+  * fixed bug 63: The code walker, part of the implementation of CLOS,
+    is now better at handling symbol macros.
+  * bug fix: There is no longer an internal implementation type named
+    CL:LENGTH. (reported by Raymond Toy)
+  * bug fix: In macro-like defining macros/special operators the
+    implicit block does not enclose the lambda list.
+  * fixed bugs 10 and 43: Bare VALUES, AND, OR and MEMBER symbols (not
+    enclosed in parentheses) are not suitable as type specifiers, and
+    their use properly signals an error now.
+  * bug fix: An argument count mismatch for a type specifier in code
     being compiled no longer causes an unhandled error at compile
     time, but signals a compile-time warning.
-  * fixed simple vector readable printing.
+  * fixed simple vector readable printing
   * bug fix: DESCRIBE takes more care over whether the class
     precedence list slot of a class is bound before accessing it.
     (reported by Markus Krummenacker)
   * bug fix: FORMATTER can successfully compile pretty-printer format
     strings which use variants of the ~* directive inside.
   * bug fix: SEARCH now applies its TEST predicate to the elements of
-    the arguments in the correct order.  (thanks to Wolfhard Buss)
-  * fixed bug 235b: compiler uses return types of MAPCAR and friends
-    in type inference.  (thanks to Robert E. Brown)
-  * bug fix: reading in symbols with an explicit package name of ""
-    (e.g. '||::FOO) now works corectly.  (reported by Henrik Motakef)
+    the arguments in the correct order. (thanks to Wolfhard Buss)
+  * fixed bug 235b: The compiler uses return types of MAPCAR and friends
+    in type inference. (thanks to Robert E. Brown)
+  * bug fix: Reading in symbols with an explicit package name of ""
+    (e.g. '||::FOO) now works correctly.  (reported by Henrik Motakef)
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** NIL is now allowed as a structure slot name.
-    ** arbitrary numbers, not just reals, are allowed in certain
+    ** Arbitrary numbers, not just REALs, are allowed in certain
        circumstances in LOOP for-as-arithmetic clauses.
-    ** multiple class redefinitions before slot access no longer
+    ** Multiple class redefinitions before slot access no longer
        causes a type error.
     ** (SETF FIND-CLASS) now accepts NIL as an argument to remove the
        association between the name and a class.
-    ** generic functions with non-standard method-combination and over
+    ** Generic functions with non-standard method-combination and over
        five methods all of which return constants no longer return NIL
-       after the first few invocations.  (thanks to Gerd Moellmann)
+       after the first few invocations. (thanks to Gerd Moellmann)
     ** CALL-NEXT-METHOD with no arguments now passes the original
        values of the arguments, even in the presence of assignment.
-    ** functions [N]SUBST*, LAST, NRECONC, [N]SUBLIS may return any
+    ** Functions [N]SUBST*, LAST, NRECONC, [N]SUBLIS may return any
        object.
     ** DISASSEMBLE works with closures and funcallable instances.
-    ** ADD-METHOD now returns the generic function, not the new
-       method.
+    ** ADD-METHOD now returns the generic function, not the new method.
     ** FIND-METHOD signals an error if the lengths of the specializers
        is incompatible with the generic function, even if the ERRORP
        argument is true.

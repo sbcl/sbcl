@@ -182,6 +182,14 @@
       (unless (zerop possible-result)
 	(return possible-result)))))
 
+;;; Dan Barlow's quick summary from IRC 2003-06-21:
+;;;   fwiw, load-foreign does random stuff with ld so that you can use
+;;;   it with static libraries
+;;;   if you have shared objects, load-1-foreign will do fine
+;;; and
+;;;   I think my position on this matter is consistent with Tim Moore's:
+;;;   use (cmucl equivalent of) load-1-foreign, load-foreign is arse
+;;;   though he may say ass
 (defun load-foreign (files
 		     &key
 		     (libraries '("-lc"))
