@@ -1513,6 +1513,8 @@ changes in sbcl-0.7.13 relative to sbcl-0.7.12:
     ** an interface to the BSD Sockets API;
     ** an ACL-like convenience interface to the repl; 
        (thanks to Kevin Rosenberg)
+    ** an implementation of ROTATE-BYTE, with efficient implementation
+       on x86 hardware;
   * fixed a bug in LOG, so that LOG of a rational argument near 1 now
     gives a closer approximation to the right answer than previously.
     (thanks to Raymond Toy)
