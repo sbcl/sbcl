@@ -1,4 +1,4 @@
-;;;; patches to hide some implementation idiosyncrasies in our
+;;;; patches to work around implementation idiosyncrasies in our
 ;;;; cross-compilation host
 
 ;;;; This software is part of the SBCL system. See the README file for
@@ -80,6 +80,11 @@
 
 (in-package :sb-cold)
 
+(defmacro munging-cl-package (&body body)
+  #-clisp `(progn ,@body)
+  #+clisp `(ext:without-package-lock ("CL")
+	     ,@body))
+
 ;;; Do the exports of COMMON-LISP conform to the standard? If not, try
 ;;; to make them conform. (Of course, ANSI says that bashing symbols
 ;;; in the COMMON-LISP package like this is undefined, but then if the
@@ -96,17 +101,15 @@
 	     (declare (ignore value))
 	     (unless (gethash key standard-ht)
 	       (warn "removing non-ANSI export from package CL: ~S" key)
-	       #+CLISP (ext:without-package-lock ("CL")
-						 (unexport (intern key cl) cl))
-	       #-CLISP (unexport (intern key cl) cl)))
+	       (munging-cl-package
+		(unexport (intern key cl) cl))))
 	   host-ht)
   (maphash (lambda (key value)
 	     (declare (ignore value))
 	     (unless (gethash key host-ht)
 	       (warn "adding required-by-ANSI export to package CL: ~S" key)
-	       #+CLISP (ext:without-package-lock ("CL")
-						 (export (intern key cl) cl))
-	       #-CLISP (export (intern key cl) cl))
+	       (munging-cl-package 
+		(export (intern key cl) cl)))
 	     
 	     ;; FIXME: My righteous indignation below was misplaced. ANSI sez
 	     ;; (in 11.1.2.1, "The COMMON-LISP Package") that it's OK for

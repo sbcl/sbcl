@@ -128,43 +128,18 @@
 
 (in-package "SB!C")
 
-(defun %def-reffer (name offset lowtag)
-  (let ((info (fun-info-or-lose name)))
-    (setf (fun-info-ir2-convert info)
-	  (lambda (node block)
-	    (ir2-convert-reffer node block name offset lowtag))))
-  name)
-
 (defmacro def-reffer (name offset lowtag)
   `(%def-reffer ',name ,offset ,lowtag))
-
-(defun %def-setter (name offset lowtag)
-  (let ((info (fun-info-or-lose name)))
-    (setf (fun-info-ir2-convert info)
-	  (if (listp name)
-	      (lambda (node block)
-		(ir2-convert-setfer node block name offset lowtag))
-	      (lambda (node block)
-		(ir2-convert-setter node block name offset lowtag)))))
-  name)
-
 (defmacro def-setter (name offset lowtag)
   `(%def-setter ',name ,offset ,lowtag))
-
-(defun %def-alloc (name words var-length header lowtag inits)
-  (let ((info (fun-info-or-lose name)))
-    (setf (fun-info-ir2-convert info)
-	  (if var-length
-	      (lambda (node block)
-		(ir2-convert-variable-allocation node block name words header
-						 lowtag inits))
-	      (lambda (node block)
-		(ir2-convert-fixed-allocation node block name words header
-					      lowtag inits)))))
-  name)
-
 (defmacro def-alloc (name words var-length header lowtag inits)
   `(%def-alloc ',name ,words ,var-length ,header ,lowtag ,inits))
+;;; KLUDGE: The %DEF-FOO functions used to implement the macros here
+;;; are defined later in another file, since they use structure slot
+;;; setters defined later, and we can't have physical forward
+;;; references to structure slot setters because ANSI in its wisdom
+;;; allows the xc host CL to implement structure slot setters as SETF
+;;; expanders instead of SETF functions. -- WHN 2002-02-09
 
 ;;;; some general constant definitions
 

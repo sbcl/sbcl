@@ -337,6 +337,9 @@
  ;; defines IR1-ATTRIBUTES macro, needed by proclaim.lisp
  ("src/compiler/knownfun")
 
+ ;; needs FUN-INFO structure slot setters, defined in knownfun.lisp
+ ("src/compiler/fun-info-funs")
+
  ;; stuff needed by "code/defstruct"
  ("src/code/cross-type" :not-target)
  ("src/compiler/generic/vm-type")

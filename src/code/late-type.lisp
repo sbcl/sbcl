@@ -800,6 +800,7 @@
 (defun simplified-compound-types (input-types %compound-type-p simplify2)
   (let ((simplified-types (make-array (length input-types)
 				      :fill-pointer 0
+				      :adjustable t
 				      :element-type 'ctype
 				      ;; (This INITIAL-ELEMENT shouldn't
 				      ;; matter, but helps avoid type

@@ -55,11 +55,11 @@
   (let ((*backquote-count* (1+ *backquote-count*)))
     (multiple-value-bind (flag thing)
 	(backquotify stream (read stream t nil t))
-      (if (eq flag *bq-at-flag*)
-	  (%reader-error stream ",@ after backquote in ~S" thing))
-      (if (eq flag *bq-dot-flag*)
-	  (%reader-error stream ",. after backquote in ~S" thing))
-      (values (backquotify-1 flag thing) 'list))))
+      (when (eq flag *bq-at-flag*)
+	(%reader-error stream ",@ after backquote in ~S" thing))
+      (when (eq flag *bq-dot-flag*)
+	(%reader-error stream ",. after backquote in ~S" thing))
+      (backquotify-1 flag thing))))
 
 (/show0 "backq.lisp 64")
 
@@ -71,14 +71,12 @@
     (%reader-error stream "comma not inside a backquote"))
   (let ((c (read-char stream))
 	(*backquote-count* (1- *backquote-count*)))
-    (values
-     (cond ((char= c #\@)
-	    (cons *bq-at-flag* (read stream t nil t)))
-	   ((char= c #\.)
-	    (cons *bq-dot-flag* (read stream t nil t)))
-	   (t (unread-char c stream)
-	      (cons *bq-comma-flag* (read stream t nil t))))
-     'list)))
+    (cond ((char= c #\@)
+	   (cons *bq-at-flag* (read stream t nil t)))
+	  ((char= c #\.)
+	   (cons *bq-dot-flag* (read stream t nil t)))
+	  (t (unread-char c stream)
+	     (cons *bq-comma-flag* (read stream t nil t))))))
 
 (/show0 "backq.lisp 83")
 
@@ -108,11 +106,11 @@
 	   (values 'vector (backquotify-1 dflag d))))
 	(t (multiple-value-bind (aflag a) (backquotify stream (car code))
 	     (multiple-value-bind (dflag d) (backquotify stream (cdr code))
-	       (if (eq dflag *bq-at-flag*)
-		   ;; Get the errors later.
-		   (%reader-error stream ",@ after dot in ~S" code))
-	       (if (eq dflag *bq-dot-flag*)
-		   (%reader-error stream ",. after dot in ~S" code))
+	       (when (eq dflag *bq-at-flag*)
+		 ;; Get the errors later.
+		 (%reader-error stream ",@ after dot in ~S" code))
+	       (when (eq dflag *bq-dot-flag*)
+		 (%reader-error stream ",. after dot in ~S" code))
 	       (cond
 		((eq aflag *bq-at-flag*)
 		 (if (null dflag)

@@ -24,6 +24,8 @@
 	 name offset lowtag)
     (move-continuation-result node block (list value-tn) (node-cont node))))
 
+;;; FIXME: Isn't there a name for this which looks less like a typo?
+;;; (The name IR2-CONVERT-SETTER is used for something else, just above.)
 (defoptimizer ir2-convert-setfer ((value object) node block name offset lowtag)
   (let ((value-tn (continuation-tn node block value)))
     (vop set-slot node block (continuation-tn node block object) value-tn
