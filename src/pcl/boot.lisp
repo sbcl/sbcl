@@ -221,16 +221,16 @@ bootstrapping.
 	 #',fun-name))))
 
 (defun compile-or-load-defgeneric (fun-name)
-  (sb-kernel:proclaim-as-fun-name fun-name)
-  (sb-kernel:note-name-defined fun-name :function)
+  (proclaim-as-fun-name fun-name)
+  (note-name-defined fun-name :function)
   (unless (eq (info :function :where-from fun-name) :declared)
     (setf (info :function :where-from fun-name) :defined)
     (setf (info :function :type fun-name)
-	  (sb-kernel:specifier-type 'function))))
+	  (specifier-type 'function))))
 
 (defun load-defgeneric (fun-name lambda-list &rest initargs)
   (when (fboundp fun-name)
-    (sb-kernel::style-warn "redefining ~S in DEFGENERIC" fun-name)
+    (style-warn "redefining ~S in DEFGENERIC" fun-name)
     (let ((fun (fdefinition fun-name)))
       (when (generic-function-p fun)
         (loop for method in (generic-function-initial-methods fun)
@@ -1310,8 +1310,8 @@ bootstrapping.
                                      (parse-specializers specializers)
 				     nil))))
       (when method
-	(sb-kernel::style-warn "redefining ~S~{ ~S~} ~S in DEFMETHOD"
-			       gf-spec qualifiers specializers))))
+	(style-warn "redefining ~S~{ ~S~} ~S in DEFMETHOD"
+		    gf-spec qualifiers specializers))))
   (let ((method (apply #'add-named-method
 		       gf-spec qualifiers specializers lambda-list
 		       :definition-source `((defmethod ,gf-spec
@@ -1439,15 +1439,15 @@ bootstrapping.
       (analyze-lambda-list lambda-list)
     (declare (ignore keyword-parameters))
     (let* ((old (info :function :type name)) ;FIXME:FDOCUMENTATION instead?
-	   (old-ftype (if (sb-kernel:fun-type-p old) old nil))
-	   (old-restp (and old-ftype (sb-kernel:fun-type-rest old-ftype)))
+	   (old-ftype (if (fun-type-p old) old nil))
+	   (old-restp (and old-ftype (fun-type-rest old-ftype)))
 	   (old-keys (and old-ftype
-			  (mapcar #'sb-kernel:key-info-name
-				  (sb-kernel:fun-type-keywords
+			  (mapcar #'key-info-name
+				  (fun-type-keywords
 				   old-ftype))))
-	   (old-keysp (and old-ftype (sb-kernel:fun-type-keyp old-ftype)))
+	   (old-keysp (and old-ftype (fun-type-keyp old-ftype)))
 	   (old-allowp (and old-ftype
-			    (sb-kernel:fun-type-allowp old-ftype)))
+			    (fun-type-allowp old-ftype)))
 	   (keywords (union old-keys (mapcar #'keyword-spec-name keywords))))
       `(function ,(append (make-list nrequired :initial-element t)
 			  (when (plusp noptional)
@@ -1777,10 +1777,10 @@ bootstrapping.
      fin
      (or function
 	 (if (eq spec 'print-object)
-	     #'(sb-kernel:instance-lambda (instance stream)
+	     #'(instance-lambda (instance stream)
 		 (print-unreadable-object (instance stream :identity t)
 		   (format stream "std-instance")))
-	     #'(sb-kernel:instance-lambda (&rest args)
+	     #'(instance-lambda (&rest args)
 		 (declare (ignore args))
 		 (error "The function of the funcallable-instance ~S~
 			 has not been set." fin)))))

@@ -45,7 +45,7 @@
       ((csubtypep otype std-obj) t)
       ((not (types-equal-or-intersect otype std-obj)) nil)
       (t
-       `(typep (sb-kernel:layout-of object) 'sb-pcl::wrapper)))))
+       `(typep (layout-of object) 'sb-pcl::wrapper)))))
 
 (define-source-context defmethod (name &rest stuff)
   (let ((arg-pos (position-if #'listp stuff)))

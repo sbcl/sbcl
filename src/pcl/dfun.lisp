@@ -689,7 +689,7 @@ And so, we are saved.
 
 (defun make-initial-dfun (gf)
   (let ((initial-dfun
-	 #'(sb-kernel:instance-lambda (&rest args)
+	 #'(instance-lambda (&rest args)
 	     (initial-dfun gf args))))
     (multiple-value-bind (dfun cache info)
 	(if (and (eq *boot-state* 'complete)
@@ -725,17 +725,17 @@ And so, we are saved.
   (let* ((methods (early-gf-methods gf))
 	 (slot-name (early-method-standard-accessor-slot-name (car methods))))
     (ecase type
-      (reader #'(sb-kernel:instance-lambda (instance)
+      (reader #'(instance-lambda (instance)
 		  (let* ((class (class-of instance))
 			 (class-name (!bootstrap-get-slot 'class class 'name)))
 		    (!bootstrap-get-slot class-name instance slot-name))))
-      (boundp #'(sb-kernel:instance-lambda (instance)
+      (boundp #'(instance-lambda (instance)
 		  (let* ((class (class-of instance))
 			 (class-name (!bootstrap-get-slot 'class class 'name)))
 		    (not (eq +slot-unbound+
 			     (!bootstrap-get-slot class-name
 						  instance slot-name))))))
-      (writer #'(sb-kernel:instance-lambda (new-value instance)
+      (writer #'(instance-lambda (new-value instance)
 		  (let* ((class (class-of instance))
 			 (class-name (!bootstrap-get-slot 'class class 'name)))
 		    (!bootstrap-set-slot class-name instance slot-name new-value)))))))
@@ -829,7 +829,7 @@ And so, we are saved.
 	specls all-same-p)
     (cond ((null methods)
 	   (values
-	    #'(sb-kernel:instance-lambda (&rest args)
+	    #'(instance-lambda (&rest args)
 		(apply #'no-applicable-method gf args))
 	    nil
 	    (no-methods-dfun-info)))
@@ -1474,7 +1474,7 @@ And so, we are saved.
       (if function-p
 	  (lambda (method-alist wrappers)
 	    (declare (ignore method-alist wrappers))
-	    #'(sb-kernel:instance-lambda (&rest args)
+	    #'(instance-lambda (&rest args)
 		(apply #'no-applicable-method gf args)))
 	  (lambda (method-alist wrappers)
 	    (declare (ignore method-alist wrappers))

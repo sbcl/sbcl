@@ -640,9 +640,9 @@
     (setf (slot-value class 'class-precedence-list)
             (compute-class-precedence-list class))
     (setf (slot-value class 'slots) (compute-slots class))
-    (let ((lclass (sb-kernel:find-classoid (class-name class))))
-      (setf (sb-kernel:classoid-pcl-class lclass) class)
-      (setf (slot-value class 'wrapper) (sb-kernel:classoid-layout lclass)))
+    (let ((lclass (find-classoid (class-name class))))
+      (setf (classoid-pcl-class lclass) class)
+      (setf (slot-value class 'wrapper) (classoid-layout lclass)))
     (update-pv-table-cache-info class)
     (setq predicate-name (if predicate-name-p
 			   (setf (slot-value class 'predicate-name)
@@ -1128,7 +1128,7 @@
 ;;; obsolete the wrapper.
 ;;;
 ;;; FIXME: either here or in INVALID-WRAPPER-P looks like a good place
-;;; for (AVER (NOT (EQ (SB-KERNEL:LAYOUT-INVALID OWRAPPER)
+;;; for (AVER (NOT (EQ (LAYOUT-INVALID OWRAPPER)
 ;;;                    :UNINITIALIZED)))
 ;;;
 ;;; Thanks to Gerd Moellmann for the explanation.  -- CSR, 2002-10-29
@@ -1144,7 +1144,7 @@
 	      ;; a violation of locality or what might be considered
 	      ;; good style.  There has to be a better way!  -- CSR,
 	      ;; 2002-10-29
-	      (eq (sb-kernel:layout-invalid owrapper) t))
+	      (eq (layout-invalid owrapper) t))
       (let ((nwrapper (make-wrapper (wrapper-no-of-instance-slots owrapper)
 				    class)))
 	(setf (wrapper-instance-slots-layout nwrapper)

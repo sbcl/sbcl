@@ -160,8 +160,8 @@
 	   (or (find-class-cell-class ,class-cell)
 	       ,(if errorp
 		    `(find-class-from-cell ',symbol ,class-cell t)
-		    `(and (sb-kernel:classoid-cell-classoid
-			   ',(sb-kernel:find-classoid-cell symbol))
+		    `(and (classoid-cell-classoid
+			   ',(find-classoid-cell symbol))
 			  (find-class-from-cell ',symbol ,class-cell nil))))))
       form))
 

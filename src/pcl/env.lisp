@@ -125,10 +125,10 @@
 
 (defmethod make-load-form ((object wrapper) &optional env)
   (declare (ignore env))
-  (let ((pname (sb-kernel:classoid-proper-name
-		(sb-kernel:layout-classoid object))))
+  (let ((pname (classoid-proper-name
+		(layout-classoid object))))
     (unless pname
       (error "can't dump wrapper for anonymous class:~%  ~S"
-	     (sb-kernel:layout-classoid object)))
-    `(sb-kernel:classoid-layout (sb-kernel:find-classoid ',pname))))
+	     (layout-classoid object)))
+    `(classoid-layout (find-classoid ',pname))))
 

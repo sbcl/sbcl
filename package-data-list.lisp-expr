@@ -1295,6 +1295,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
              "CLASSOID-LAYOUT" "CLASSOID-NAME"
              "DD-RAW-LENGTH" "NOTE-NAME-DEFINED"
              "%CODE-CODE-SIZE" "DD-SLOTS"
+	     "DD-INCLUDE"
              "%IMAGPART" "DSD-ACCESSOR-NAME"
              "%CODE-DEBUG-INFO" "DSD-%NAME"
              "LAYOUT-CLASSOID" "LAYOUT-INVALID"
@@ -1310,6 +1311,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
              "BECOME-DEFINED-FUN-NAME"
              "%NUMERATOR" "CLASSOID-TYPEP"
              "DSD-READ-ONLY"
+	     "DSD-DEFAULT"
              "LAYOUT-INHERITS" "DD-LENGTH" "%CODE-ENTRY-POINTS"
              "%DENOMINATOR"
 
@@ -1326,6 +1328,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
              "%FUNCALLABLE-INSTANCE-INFO" "RANDOM-CHUNK"
              "MAKE-FUNCALLABLE-STRUCTURE-CLASSOID" "LAYOUT-CLOS-HASH-MAX"
              "CLASSOID-CELL-NAME" "BUILT-IN-CLASSOID-DIRECT-SUPERCLASSES"
+	     "BUILT-IN-CLASSOID-TRANSLATION"
              "RANDOM-LAYOUT-CLOS-HASH"
              "CLASSOID-PCL-CLASS" "FUNCALLABLE-STRUCTURE"
              "FUNCALLABLE-INSTANCE-FUN"
@@ -1396,18 +1399,13 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
 extensions, but even they are not guaranteed to be present in
 later versions of SBCL, and the other stuff in here is
 definitely not guaranteed to be present in later versions of SBCL."
-    ;; FIXME: SB-PCL should probably USE-PACKAGE SB-KERNEL, since SB-PCL
-    ;; is built on SB-KERNEL, and in the absence of USE-PACKAGE, it ends
-    ;; up using a thundering herd of explicit prefixes to get to
-    ;; SB-KERNEL symbols. However, it'll probably be too messy to do
-    ;; this until the duplicate SB-PCL:CLASS/CL:CLASS hierarchy kludge
-    ;; is unscrewed, since until it is there are too many things which
-    ;; conflict between the two packages.
-    :use ("CL" "SB!INT" "SB!EXT" "SB!WALKER")
+    :use ("CL" "SB!INT" "SB!EXT" "SB!WALKER" "SB!KERNEL")
     :import-from (("SB!KERNEL" "FUNCALLABLE-INSTANCE-P" "%FUN-DOC"
                    "PACKAGE-DOC-STRING"
                    "PACKAGE-HASHTABLE-SIZE" "PACKAGE-HASHTABLE-FREE"
                    "PACKAGE-INTERNAL-SYMBOLS" "PACKAGE-EXTERNAL-SYMBOLS"))
+    ;; FIXME: should we now reexport CLASS and friends, too?
+    ;; Probably.  See if AMOP has a list of exported symbols.
     :reexport ("ADD-METHOD" "ALLOCATE-INSTANCE"
                "COMPUTE-APPLICABLE-METHODS"
                "ENSURE-GENERIC-FUNCTION"
