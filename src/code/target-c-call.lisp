@@ -42,7 +42,7 @@
     (let ((length (loop for offset of-type fixnum upfrom 0
                         until (zerop (sap-ref-8 sap offset))
                         finally (return offset))))
-      (let ((result (make-string length)))
+      (let ((result (make-string length :element-type 'base-char)))
 	(sb!kernel:copy-from-system-area sap 0
                                          result (* sb!vm:vector-data-offset
                                                    sb!vm:n-word-bits)

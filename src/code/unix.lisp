@@ -47,7 +47,7 @@
 
 ;;;; Lisp types used by syscalls
 
-(deftype unix-pathname () 'simple-string)
+(deftype unix-pathname () 'simple-base-string)
 (deftype unix-fd () `(integer 0 ,most-positive-fixnum))
 
 (deftype unix-file-mode () '(unsigned-byte 32))
@@ -796,7 +796,7 @@ previous timer after the body has finished executing"
 (defun unix-file-kind (name &optional check-for-links)
   #!+sb-doc
   "Return either :FILE, :DIRECTORY, :LINK, :SPECIAL, or NIL."
-  (declare (simple-string name))
+  (declare (simple-base-string name))
   (multiple-value-bind (res dev ino mode)
       (if check-for-links (unix-lstat name) (unix-stat name))
     (declare (type (or fixnum null) mode)

@@ -1013,8 +1013,8 @@
 ;;; Pick a name to use for the backup file for the :IF-EXISTS
 ;;; :RENAME-AND-DELETE and :RENAME options.
 (defun pick-backup-name (name)
-  (declare (type simple-string name))
-  (concatenate 'simple-string name ".bak"))
+  (declare (type simple-base-string name))
+  (concatenate 'simple-base-string name ".bak"))
 
 ;;; Ensure that the given arg is one of the given list of valid
 ;;; things. Allow the user to fix any problems.

@@ -54,7 +54,7 @@
    checked for whatever they may have protected."
   (declare (type simple-base-string namestr)
 	   (type index start end))
-  (let* ((result (make-string (- end start)))
+  (let* ((result (make-string (- end start) :element-type 'base-char))
 	 (dst 0)
 	 (quoted nil))
     (do ((src start (1+ src)))
@@ -521,9 +521,9 @@
 	(let ((piece (car tail)))
 	  (etypecase piece
 	    (simple-string
-	     (let ((head (concatenate 'string head piece)))
+	     (let ((head (concatenate 'base-string head piece)))
 	       (with-directory-node-noted (head)
-		 (%enumerate-directories (concatenate 'string head "/")
+		 (%enumerate-directories (concatenate 'base-string head "/")
 					 (cdr tail) pathname
 					 verify-existence follow-links
 					 nodes function))))
@@ -532,7 +532,7 @@
 				     verify-existence follow-links
 				     nodes function)
 	     (dolist (name (ignore-errors (directory-lispy-filenames head)))
-	       (let ((subdir (concatenate 'string head name)))
+	       (let ((subdir (concatenate 'base-string head name)))
 		 (multiple-value-bind (res dev ino mode)
 		     (unix-xstat subdir)
 		   (declare (type (or fixnum null) mode))
@@ -543,14 +543,14 @@
 					  (eql (cdr dir) ino))
 				 (return t)))
 		       (let ((nodes (cons (cons dev ino) nodes))
-			     (subdir (concatenate 'string subdir "/")))
+			     (subdir (concatenate 'base-string subdir "/")))
 			 (%enumerate-directories subdir tail pathname
 						 verify-existence follow-links
 						 nodes function))))))))
 	    ((or pattern (member :wild))
 	     (dolist (name (directory-lispy-filenames head))
 	       (when (or (eq piece :wild) (pattern-matches piece name))
-		 (let ((subdir (concatenate 'string head name)))
+		 (let ((subdir (concatenate 'base-string head name)))
 		   (multiple-value-bind (res dev ino mode)
 		       (unix-xstat subdir)
 		     (declare (type (or fixnum null) mode))
@@ -558,15 +558,15 @@
 				(eql (logand mode sb!unix:s-ifmt)
 				     sb!unix:s-ifdir))
 		       (let ((nodes (cons (cons dev ino) nodes))
-			     (subdir (concatenate 'string subdir "/")))
+			     (subdir (concatenate 'base-string subdir "/")))
 			 (%enumerate-directories subdir (rest tail) pathname
 						 verify-existence follow-links
 						 nodes function))))))))
 	  ((member :up)
 	     (with-directory-node-removed (head)
-	     (let ((head (concatenate 'string head "..")))
+	     (let ((head (concatenate 'base-string head "..")))
 	       (with-directory-node-noted (head)
-		 (%enumerate-directories (concatenate 'string head "/")
+		 (%enumerate-directories (concatenate 'base-string head "/")
 					 (rest tail) pathname
 					 verify-existence follow-links
 					 nodes function)))))))
@@ -608,19 +608,19 @@
 			  (components-match file-type type)
 			  (components-match file-version version))
 		 (funcall function
-			  (concatenate 'string
+			  (concatenate 'base-string
 				       directory
 				       complete-filename))))))
 	  (t
 	   (/noshow0 "default case")
-	   (let ((file (concatenate 'string directory name)))
+	   (let ((file (concatenate 'base-string directory name)))
 	     (/noshow "computed basic FILE")
 	     (unless (or (null type) (eq type :unspecific))
 	       (/noshow0 "tweaking FILE for more-or-less-:UNSPECIFIC case")
-	       (setf file (concatenate 'string file "." type)))
+	       (setf file (concatenate 'base-string file "." type)))
 	     (unless (member version '(nil :newest :wild :unspecific))
 	       (/noshow0 "tweaking FILE for more-or-less-:WILD case")
-	       (setf file (concatenate 'string file "."
+	       (setf file (concatenate 'base-string file "."
 				       (quick-integer-to-string version))))
 	     (/noshow0 "finished possibly tweaking FILE")
 	     (when (or (not verify-existence)
@@ -638,11 +638,11 @@
 	((zerop n) "0")
 	((eql n 1) "1")
 	((minusp n)
-	 (concatenate 'simple-string "-"
-		      (the simple-string (quick-integer-to-string (- n)))))
+	 (concatenate 'simple-base-string "-"
+		      (the simple-base-string (quick-integer-to-string (- n)))))
 	(t
 	 (do* ((len (1+ (truncate (integer-length n) 3)))
-	       (res (make-string len))
+	       (res (make-string len :element-type 'base-char))
 	       (i (1- len) (1- i))
 	       (q n)
 	       (r 0))
