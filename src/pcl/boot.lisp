@@ -1232,7 +1232,7 @@ bootstrapping.
        (gboundp name)
        (if (eq *boot-state* 'complete)
 	   (standard-generic-function-p (gdefinition name))
-	   (funcallable-instance-p (gdefinition name)))))
+	   (sb-kernel:funcallable-instance-p (gdefinition name)))))
 
 (defvar *method-function-plist* (make-hash-table :test 'eq))
 (defvar *mf1* nil)

@@ -662,4 +662,7 @@
  ("src/pcl/early-low")
  ("src/pcl/macros")
  ("src/pcl/compiler-support")
+ ("src/pcl/low")
+ ;; I hope this is the right approach...
+ ("src/pcl/target-low" :not-host)
  )

@@ -35,7 +35,7 @@
 ;;;; warranty about the software, its performance or its conformity to any
 ;;;; specification.
 
-(in-package "SB-PCL")
+(in-package "SB!PCL")
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
 (defvar *optimize-speed*
@@ -54,11 +54,14 @@
 ;;;; compiled efficiently.
 
 ;;; Note that for SBCL, as for CMU CL, the WRAPPER of a built-in or
-;;; structure class will be some other kind of SB-KERNEL:LAYOUT, but
+;;; structure class will be some other kind of SB!KERNEL:LAYOUT, but
 ;;; this shouldn't matter, since the only two slots that WRAPPER adds
 ;;; are meaningless in those cases.
+
+;;; FIXME: DEFSTRUCT/DEF!STRUCT?  Not an issue when we're not yet
+;;; using CLOS in the build, but this might happen soon...
 (defstruct (wrapper
-	    (:include sb-kernel:layout
+	    (:include sb!kernel:layout
 		      ;; KLUDGE: In CMU CL, the initialization default
 		      ;; for LAYOUT-INVALID was NIL. In SBCL, that has
 		      ;; changed to :UNINITIALIZED, but PCL code might
@@ -72,48 +75,21 @@
 	    (:copier nil))
   (instance-slots-layout nil :type list)
   (class-slots nil :type list))
-#-sb-fluid (declaim (sb-ext:freeze-type wrapper))
+#!-sb-fluid (declaim (sb!ext:freeze-type wrapper))
 
-;;;; PCL's view of funcallable instances
-
-(sb-kernel:!defstruct-with-alternate-metaclass pcl-funcallable-instance
-  ;; KLUDGE: Note that neither of these slots is ever accessed by its
-  ;; accessor name as of sbcl-0.pre7.63. Presumably everything works
-  ;; by puns based on absolute locations. Fun fun fun.. -- WHN 2001-10-30
-  :slot-names (clos-slots name hash-code)
-  :boa-constructor %make-pcl-funcallable-instance
-  :superclass-name sb-kernel:funcallable-instance
-  :metaclass-name sb-kernel:random-pcl-class
-  :metaclass-constructor sb-kernel:make-random-pcl-class
-  :dd-type sb-kernel:funcallable-structure
-  ;; Only internal implementation code will access these, and these
-  ;; accesses (slot readers in particular) could easily be a
-  ;; bottleneck, so it seems reasonable to suppress runtime type
-  ;; checks.
-  ;;
-  ;; (Except note KLUDGE above that these accessors aren't used at all
-  ;; (!) as of sbcl-0.pre7.63, so for now it's academic.)
-  :runtime-type-checks-p nil)
-
-(import 'sb-kernel:funcallable-instance-p)
-
-(defun set-funcallable-instance-fun (fin new-value)
-  (declare (type function new-value))
-  (aver (funcallable-instance-p fin))
-  (setf (sb-kernel:funcallable-instance-fun fin) new-value))
 (defmacro fsc-instance-p (fin)
-  `(funcallable-instance-p ,fin))
+  `(sb!kernel:funcallable-instance-p ,fin))
 (defmacro fsc-instance-wrapper (fin)
-  `(sb-kernel:%funcallable-instance-layout ,fin))
+  `(sb!kernel:%funcallable-instance-layout ,fin))
 ;;; FIXME: This seems to bear no relation at all to the CLOS-SLOTS
-;;; slot in the FUNCALLABLE-INSTANCE structure, above, which
-;;; (bizarrely) seems to be set to the NAME of the
-;;; FUNCALLABLE-INSTANCE. At least, the index 1 seems to return the
-;;; NAME, and the index 2 NIL.  Weird.  -- CSR, 2002-11-07
+;;; slot in the FUNCALLABLE-INSTANCE structure in
+;;; src/pcl/target-low.lisp, which (bizarrely) seems to be set to the
+;;; NAME of the FUNCALLABLE-INSTANCE. At least, the index 1 seems to
+;;; return the NAME, and the index 2 NIL.  Weird.  -- CSR, 2002-11-07
 (defmacro fsc-instance-slots (fin)
-  `(sb-kernel:%funcallable-instance-info ,fin 0))
+  `(sb!kernel:%funcallable-instance-info ,fin 0))
 (defmacro fsc-instance-hash (fin)
-  `(sb-kernel:%funcallable-instance-info ,fin 3))
+  `(sb!kernel:%funcallable-instance-info ,fin 3))
 
 (declaim (inline clos-slots-ref (setf clos-slots-ref)))
 (declaim (ftype (function (simple-vector index) t) clos-slots-ref))
@@ -129,10 +105,10 @@
 ;;; few uses of (OR STD-INSTANCE-P FSC-INSTANCE-P) are changed to
 ;;; PCL-INSTANCE-P.
 (defmacro std-instance-p (x)
-  `(sb-kernel:%instancep ,x))
+  `(sb!kernel:%instancep ,x))
 
 ;; a temporary definition used for debugging the bootstrap
-#+sb-show
+#!+sb-show
 (defun print-std-instance (instance stream depth)
   (declare (ignore depth))	
   (print-unreadable-object (instance stream :type t :identity t)
@@ -181,16 +157,16 @@
 ;;; function. (Unlike other functions to set stuff, it does not return
 ;;; the new value.)
 (defun set-fun-name (fcn new-name)
-  #+sb-doc
+  #!+sb-doc
   "Set the name of a compiled function object. Return the function."
   (declare (special *boot-state* *the-class-standard-generic-function*))
   (cond ((symbolp fcn)
 	 (set-fun-name (symbol-function fcn) new-name))
-	((funcallable-instance-p fcn)
+	((sb!kernel:funcallable-instance-p fcn)
 	 (if (if (eq *boot-state* 'complete)
 		 (typep fcn 'generic-function)
 		 (eq (class-of fcn) *the-class-standard-generic-function*))
-	     (setf (sb-kernel:%funcallable-instance-info fcn 1) new-name)
+	     (setf (sb!kernel:%funcallable-instance-info fcn 1) new-name)
 	     (bug "unanticipated function type"))
 	 fcn)
 	(t
@@ -210,12 +186,15 @@
 	 ;; it loses some info of potential hacking value. So,
 	 ;; lets not do this...
 	 #+nil
-	 (let ((header (sb-kernel:%closure-fun fcn)))
-	   (setf (sb-kernel:%simple-fun-name header) new-name))
+	 (let ((header (sb!kernel:%closure-fun fcn)))
+	   (setf (sb!kernel:%simple-fun-name header) new-name))
 
 	 ;; XXX Maybe add better scheme here someday.
 	 fcn)))
 
+;;; FIXME: This is a ripe candidate for deletion: it's only used
+;;; (twice) in boot.lisp, and is really not necessary in these heady
+;;; days of generalized function names.
 (defun intern-fun-name (name)
   (cond ((symbolp name) name)
 	((listp name)
@@ -237,38 +216,15 @@
 
 ;;; This definition is for interpreted code.
 (defun pcl-instance-p (x)
-  (typep (sb-kernel:layout-of x) 'wrapper))
-
-;;; CMU CL comment:
-;;;   We define this as STANDARD-INSTANCE, since we're going to
-;;;   clobber the layout with some standard-instance layout as soon as
-;;;   we make it, and we want the accessor to still be type-correct.
-#|
-(defstruct (standard-instance
-	    (:predicate nil)
-	    (:constructor %%allocate-instance--class ())
-	    (:copier nil)
-	    (:alternate-metaclass sb-kernel:instance
-				  cl:standard-class
-				  sb-kernel:make-standard-class))
-  (slots nil))
-|#
-(sb-kernel:!defstruct-with-alternate-metaclass standard-instance
-  :slot-names (slots hash-code)
-  :boa-constructor %make-standard-instance
-  :superclass-name sb-kernel:instance
-  :metaclass-name cl:standard-class
-  :metaclass-constructor sb-kernel:make-standard-class
-  :dd-type structure
-  :runtime-type-checks-p nil)
+  (typep (sb!kernel:layout-of x) 'wrapper))
 
 ;;; Both of these operations "work" on structures, which allows the above
 ;;; weakening of STD-INSTANCE-P.
-(defmacro std-instance-slots (x) `(sb-kernel:%instance-ref ,x 1))
-(defmacro std-instance-wrapper (x) `(sb-kernel:%instance-layout ,x))
+(defmacro std-instance-slots (x) `(sb!kernel:%instance-ref ,x 1))
+(defmacro std-instance-wrapper (x) `(sb!kernel:%instance-layout ,x))
 ;;; KLUDGE: This one doesn't "work" on structures.  However, we
 ;;; ensure, in SXHASH and friends, never to call it on structures.
-(defmacro std-instance-hash (x) `(sb-kernel:%instance-ref ,x 2))
+(defmacro std-instance-hash (x) `(sb!kernel:%instance-ref ,x 2))
 
 ;;; FIXME: These functions are called every place we do a
 ;;; CALL-NEXT-METHOD, and probably other places too. It's likely worth
@@ -284,12 +240,13 @@
 (defun get-slots-or-nil (instance)
   ;; Suppress a code-deletion note.  FIXME: doing the FIXME above,
   ;; integrating PCL more with the compiler, would remove the need for
-  ;; this icky stuff.
-  (declare (optimize (inhibit-warnings 3)))
+  ;; this icky stuff; FIXME II and clearly this isn't the right thing
+  ;; in the new build system either.
+  #-sb-xc-host (declare (optimize (inhibit-warnings 3)))
   (when (pcl-instance-p instance)
     (get-slots instance)))
 
-(defmacro built-in-or-structure-wrapper (x) `(sb-kernel:layout-of ,x))
+(defmacro built-in-or-structure-wrapper (x) `(sb!kernel:layout-of ,x))
 
 (defmacro get-wrapper (inst)
   (once-only ((wrapper `(wrapper-of ,inst)))
@@ -313,7 +270,7 @@
 	(incf hash-code)
 	(setq hash-code 0))))
 
-(defun sb-impl::sxhash-instance (x)
+(defun sb!impl::sxhash-instance (x)
   (cond
     ((std-instance-p x) (std-instance-hash x))
     ((fsc-instance-p x) (fsc-instance-hash x))
@@ -328,10 +285,10 @@
 ;;; The definition of STRUCTURE-TYPE-P was moved to early-low.lisp.
 
 (defun get-structure-dd (type)
-  (sb-kernel:layout-info (sb-kernel:class-layout (cl:find-class type))))
+  (sb!kernel:layout-info (sb!kernel:class-layout (sb!xc:find-class type))))
 
 (defun structure-type-included-type-name (type)
-  (let ((include (sb-kernel::dd-include (get-structure-dd type))))
+  (let ((include (sb!kernel::dd-include (get-structure-dd type))))
     (if (consp include)
 	(car include)
 	include)))
@@ -339,24 +296,24 @@
 (defun structure-type-slot-description-list (type)
   (nthcdr (length (let ((include (structure-type-included-type-name type)))
 		    (and include
-			 (sb-kernel:dd-slots (get-structure-dd include)))))
-	  (sb-kernel:dd-slots (get-structure-dd type))))
+			 (sb!kernel:dd-slots (get-structure-dd include)))))
+	  (sb!kernel:dd-slots (get-structure-dd type))))
 
 (defun structure-slotd-name (slotd)
-  (sb-kernel:dsd-name slotd))
+  (sb!kernel:dsd-name slotd))
 
 (defun structure-slotd-accessor-symbol (slotd)
-  (sb-kernel:dsd-accessor-name slotd))
+  (sb!kernel:dsd-accessor-name slotd))
 
 (defun structure-slotd-reader-function (slotd)
-  (fdefinition (sb-kernel:dsd-accessor-name slotd)))
+  (fdefinition (sb!kernel:dsd-accessor-name slotd)))
 
 (defun structure-slotd-writer-function (slotd)
-  (unless (sb-kernel:dsd-read-only slotd)
-    (fdefinition `(setf ,(sb-kernel:dsd-accessor-name slotd)))))
+  (unless (sb!kernel:dsd-read-only slotd)
+    (fdefinition `(setf ,(sb!kernel:dsd-accessor-name slotd)))))
 
 (defun structure-slotd-type (slotd)
-  (sb-kernel:dsd-type slotd))
+  (sb!kernel:dsd-type slotd))
 
 (defun structure-slotd-init-form (slotd)
-  (sb-kernel::dsd-default slotd))
+  (sb!kernel::dsd-default slotd))

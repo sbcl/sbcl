@@ -102,7 +102,7 @@
 		#+nil "src/pcl/early-low"
 		#+nil "src/pcl/macros"
                 #+nil "src/pcl/compiler-support"
-		"src/pcl/low"
+		#+nil "src/pcl/low"
                 "src/pcl/slot-name"
 		"src/pcl/defclass"
 		"src/pcl/defs"
