@@ -180,34 +180,42 @@
   ;; replaced by an encapsulation of type TYPE.
   (definition nil :type function))
 
-;;; We must bind and close over info. Consider the case where we
-;;; encapsulate (the second) an encapsulated (the first) definition,
-;;; and later someone unencapsulates the encapsulated (first)
-;;; definition. We don't want our encapsulation (second) to bind
-;;; basic-definition to the encapsulated (first) definition when it no
-;;; longer exists. When unencapsulating, we make sure to clobber the
-;;; appropriate info structure to allow basic-definition to be bound
-;;; to the next definition instead of an encapsulation that no longer
-;;; exists.
+;;; Replace the definition of NAME with a function that binds NAME's
+;;; arguments a variable named argument-list, binds name's definition
+;;; to a variable named basic-definition, and evaluates BODY in that
+;;; context. TYPE is whatever you would like to associate with this
+;;; encapsulation for identification in case you need multiple
+;;; encapsulations of the same name.
 (defun encapsulate (name type body)
-  #!+sb-doc
-  "Replaces the definition of NAME with a function that binds name's arguments
-   a variable named argument-list, binds name's definition to a variable named
-   basic-definition, and evaluates BODY in that context. TYPE is
-   whatever you would like to associate with this encapsulation for
-   identification in case you need multiple encapsuations of the same name."
   (let ((fdefn (fdefinition-object name nil)))
     (unless (and fdefn (fdefn-function fdefn))
       (error 'undefined-function :name name))
+    ;; We must bind and close over INFO. Consider the case where we
+    ;; encapsulate (the second) an encapsulated (the first)
+    ;; definition, and later someone unencapsulates the encapsulated
+    ;; (first) definition. We don't want our encapsulation (second) to
+    ;; bind basic-definition to the encapsulated (first) definition
+    ;; when it no longer exists. When unencapsulating, we make sure to
+    ;; clobber the appropriate INFO structure to allow
+    ;; basic-definition to be bound to the next definition instead of
+    ;; an encapsulation that no longer exists.
     (let ((info (make-encapsulation-info type (fdefn-function fdefn))))
       (setf (fdefn-function fdefn)
-	    #'(lambda (&rest argument-list)
-		(declare (special argument-list))
-		(let ((basic-definition (encapsulation-info-definition info)))
-		  (declare (special basic-definition))
-		  (eval body)))))))
+	    (lambda (&rest argument-list)
+	      (declare (special argument-list))
+	      (let ((basic-definition (encapsulation-info-definition info)))
+		(declare (special basic-definition))
+		(eval body)))))))
 
-;;; Finds the encapsulation info that has been closed over.
+;;; This is like FIND-IF, except that we do it on a compiled closure's
+;;; environment.
+(defun find-if-in-closure (test fun)
+  (dotimes (index (1- (get-closure-length fun)))
+    (let ((elt (%closure-index-ref fun index)))
+      (when (funcall test elt)
+	(return elt)))))
+
+;;; Find the encapsulation info that has been closed over.
 (defun encapsulation-info (fun)
   (and (functionp fun)
        (= (get-type fun) sb!vm:closure-header-type)

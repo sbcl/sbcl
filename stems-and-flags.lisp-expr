@@ -246,8 +246,6 @@
 
  ("src/code/module" :not-host) ; maybe should be :BYTE-COMPILE T
 
- ("src/code/eval" :not-host) ; FIXME: uses INFO, wants compiler macro
-
  ("src/code/interr" :not-host)
 
  ("src/code/query"  :not-host) ; maybe should be :BYTE-COMPILE T
@@ -557,19 +555,20 @@
  ;; (directly or indirectly) on stuff compiled as part of the compiler
 
  ("src/compiler/generic/target-core" :not-host) ; uses stuff from
-                                            ;   "compiler/generic/core"
+                                                ;   "compiler/generic/core"
 
+ ("src/code/eval"              :not-host) ; uses INFO, wants compiler macro
  ("src/code/target-sap"        :not-host) ; uses SAP-INT-TYPE
  ("src/code/target-package"    :not-host) ; needs "code/package"
  ("src/code/target-random"     :not-host) ; needs "code/random"
  ("src/code/target-hash-table" :not-host) ; needs "code/hash-table"
  ("src/code/reader"            :not-host) ; needs "code/readtable"
  ("src/code/target-pathname"   :not-host) ; needs "code/pathname", maybe 
-                                      ;   should be :BYTE-COMPILE T
+                                          ;   should be :BYTE-COMPILE T
  ("src/code/filesys"           :not-host) ; needs HOST from "code/pathname",
-                                      ;   maybe should be :BYTE-COMPILE T
+                                          ;   maybe should be :BYTE-COMPILE T
  ("src/code/save"              :not-host) ; uses the definition of PATHNAME
-                                      ;   from "code/pathname"
+                                          ;   from "code/pathname"
  ("src/code/sharpm"            :not-host) ; uses stuff from "code/reader"
 
  ;; stuff for byte compilation

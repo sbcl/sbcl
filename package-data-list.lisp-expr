@@ -483,8 +483,8 @@ like *STACK-TOP-HINT*"
  #s(sb-cold:package-data
     :name "SB!BYTECODE"
     :doc "private: stuff related to the bytecode interpreter"
-    :use ("CL" "SB!KERNEL" "SB!INT")
-    :export ("INTERNAL-EVAL"))
+    :use ("CL" "SB!EXT" "SB!INT" "SB!KERNEL")
+    :export ())
 
  #s(sb-cold:package-data
     :name "SB!EXT"
@@ -1463,7 +1463,9 @@ definitely not guaranteed to be present in later versions of SBCL."
 necessary for system interfacing\" (said cmu-user.tex at the time
 of the SBCL code fork). That probably was and is a good idea, but in
 practice, the distinctions between this package and SB-KERNEL
-and even SB-VM seem to have become somewhat blurred over the years."
+and even SB-VM seem to have become somewhat blurred over the years.
+Some anomalies (e.g. FIND-IF-IN-CLOSURE being in SB-SYS instead of
+SB-KERNEL) have been undone, but probably more remain."
     :use ("CL" "SB!EXT" "SB!INT")
     :export ("%ASSEMBLER-CODE-TYPE" "%BIND-ALIGNED-SAP"
              ;; FIXME: %PRIMITIVE shouldn't be here. (I now know that %SYS
@@ -1487,7 +1489,7 @@ and even SB-VM seem to have become somewhat blurred over the years."
              "DO-DO-BODY" "DOUBLE-FLOAT-RADIX"
              "ENABLE-INTERRUPT" "ENUMERATION"
              "FD-STREAM" "FD-STREAM-FD"
-             "FD-STREAM-P" "FIND-IF-IN-CLOSURE"
+             "FD-STREAM-P" 
              "FOREIGN-SYMBOL-ADDRESS" "FOREIGN-SYMBOL-ADDRESS-AS-INTEGER"
              "GET-PAGE-SIZE" "GET-SYSTEM-INFO"
              "IGNORE-INTERRUPT"

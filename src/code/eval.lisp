@@ -1,3 +1,5 @@
+;;;; EVAL and friends
+
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
 ;;;;
@@ -9,57 +11,13 @@
 
 (in-package "SB!BYTECODE")
 
-;;; This is defined here so that the printer etc. can call
-;;; INTERPRETED-FUNCTION-P before the full interpreter is loaded.
-
-;;; an interpreted function
-(defstruct (interpreted-function
-	    (:alternate-metaclass sb!kernel:funcallable-instance
-				  sb!kernel:funcallable-structure-class
-				  sb!kernel:make-funcallable-structure-class)
-	    (:type sb!kernel:funcallable-structure)
-	    (:constructor %make-interpreted-function)
-	    (:copier nil)
-	    ;; FIXME: Binding PRINT-OBJECT isn't going to help unless
-	    ;; we fix the print-a-funcallable-instance code so that
-	    ;; it calls PRINT-OBJECT in this case.
-	    (:print-object
-	     (lambda (x stream)
-	       (print-unreadable-object (x stream :identity t)
-		 (interpreted-function-%name x)))))
-  ;; The name of this interpreted function, or NIL if none specified.
-  (%name nil)
-  ;; This function's debug arglist.
-  (arglist nil)
-  ;; A lambda that can be converted to get the definition.
-  (lambda nil)
-  ;; If this function has been converted, then this is the XEP. If this is
-  ;; false, then the function is not in the cache (or is in the process of
-  ;; being removed.)
-  (definition nil :type (or sb!c::clambda null))
-  ;; The number of consecutive GCs that this function has been unused.
-  ;; This is used to control cache replacement.
-  (gcs 0 :type sb!c::index)
-  ;; True if Lambda has been converted at least once, and thus warnings should
-  ;; be suppressed on additional conversions.
-  (converted-once nil)
-  ;; For a closure, the closure date vector.
-  (closure nil :type (or null simple-vector)))
-
-;;; FIXME: Could we make this extra IN-PACKAGE go away, so that all
-;;; this bytecode interpreter implementation stuff was in the
-;;; SB!BYTECODE package?
-(in-package "SB!IMPL")
-
-;;;; EVAL and friends
-
 ;;; This needs to be initialized in the cold load, since the top-level
 ;;; catcher will always restore the initial value.
 (defvar *eval-stack-top* 0)
 
 ;;; general case of EVAL (except in that it can't handle toplevel
 ;;; EVAL-WHEN magic properly): Delegate to the byte compiler.
-(defun sb!bytecode:internal-eval (expr)
+(defun %eval (expr)
   (funcall (compile (gensym "EVAL-TMPFUN-")
 		    `(lambda ()
 
@@ -80,10 +38,8 @@
 
 		       ,expr))))
 
-;;; Pick off a few easy cases, and call INTERNAL-EVAL for the rest. If
-;;; *ALREADY-EVALED-THIS* is true, then we bind it to NIL before doing
-;;; a call so that the effect is confined to the lexical scope of the
-;;; EVAL-WHEN.
+;;; Pick off a few easy cases, and the various top-level EVAL-WHEN
+;;; magical cases, and call %EVAL for the rest. 
 (defun eval (original-exp)
   #!+sb-doc
   "Evaluate the argument in a null lexical environment, returning the
@@ -97,8 +53,17 @@
 	  (values (info :variable :constant-value exp)))
 	 ((:special :global)
 	  (symbol-value exp))
+	 ;; FIXME: This special case here is a symptom of non-ANSI
+	 ;; weirdness in SBCL's ALIEN implementation, which could
+	 ;; cause problems for e.g. code walkers. It'd probably be
+	 ;; good to ANSIfy it by making alien variable accessors into
+	 ;; ordinary forms, e.g. (SB-UNIX:ENV) and (SETF SB-UNIX:ENV),
+	 ;; instead of magical symbols, e.g. plain SB-UNIX:ENV. Then
+	 ;; if the old magical-symbol syntax is to be retained for
+	 ;; compatibility, it can be implemented with
+	 ;; DEFINE-SYMBOL-MACRO, keeping the code walkers happy.
 	 (:alien
-	  (sb!bytecode:internal-eval original-exp))))
+	  (%eval original-exp))))
       (list
        (let ((name (first exp))
 	     (args (1- (length exp))))
@@ -111,7 +76,7 @@
 		      (and (consp name)
 			   (eq (car name) 'setf)))
 		  (fdefinition name)
-		  (sb!bytecode:internal-eval original-exp))))
+		  (%eval original-exp))))
 	   (quote
 	    (unless (= args 1)
 	      (error "wrong number of args to QUOTE:~% ~S" exp))
@@ -135,7 +100,7 @@
 		    ;; variable; the code should now act as though that
 		    ;; variable is NIL. This should be tested..
 		    (:special)
-		    (t (return (sb!bytecode:internal-eval original-exp))))))))
+		    (t (return (%eval original-exp))))))))
 	   ((progn)
 	    (when (> args 0)
 	      (dolist (x (butlast (rest exp)) (eval (car (last exp))))
@@ -147,7 +112,7 @@
 		(when (> args 1)
 		  (dolist (x (butlast (cddr exp)) (eval (car (last exp))))
 		    (eval x)))
-		(sb!bytecode:internal-eval original-exp)))
+		(%eval original-exp)))
 	   (t
 	    (if (and (symbolp name)
 		     (eq (info :function :kind name) :function))
@@ -155,7 +120,7 @@
 		  (dolist (arg (rest exp))
 		    (args (eval arg)))
 		  (apply (symbol-function name) (args)))
-		(sb!bytecode:internal-eval original-exp))))))
+		(%eval original-exp))))))
       (t
        exp))))
 
@@ -191,14 +156,6 @@
 		       (values exp nil name)
 		       (values nil t name))))))
 	(values nil t name))))
-
-;;; This is like FIND-IF, except that we do it on a compiled closure's
-;;; environment.
-(defun find-if-in-closure (test fun)
-  (dotimes (index (1- (get-closure-length fun)))
-    (let ((elt (%closure-index-ref fun index)))
-      (when (funcall test elt)
-	(return elt)))))
 
 ;;; miscellaneous full function definitions of things which are
 ;;; ordinarily handled magically by the compiler
