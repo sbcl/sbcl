@@ -30,6 +30,58 @@
 
 (declaim (optimize (speed 1) (space 2)))
 
+;;; This checks to see whether the array is simple and the start and
+;;; end are in bounds. If so, it proceeds with those values.
+;;; Otherwise, it calls %WITH-ARRAY-DATA. Note that %WITH-ARRAY-DATA
+;;; may be further optimized.
+;;;
+;;; Given any ARRAY, bind DATA-VAR to the array's data vector and
+;;; START-VAR and END-VAR to the start and end of the designated
+;;; portion of the data vector. SVALUE and EVALUE are any start and
+;;; end specified to the original operation, and are factored into the
+;;; bindings of START-VAR and END-VAR. OFFSET-VAR is the cumulative
+;;; offset of all displacements encountered, and does not include
+;;; SVALUE.
+;;;
+;;; When FORCE-INLINE is set, the underlying %WITH-ARRAY-DATA form is
+;;; forced to be inline, overriding the ordinary judgment of the
+;;; %WITH-ARRAY-DATA DEFTRANSFORMs. Ordinarily the DEFTRANSFORMs are
+;;; fairly picky about their arguments, figuring that if you haven't
+;;; bothered to get all your ducks in a row, you probably don't care
+;;; that much about speed anyway! But in some cases it makes sense to
+;;; do type testing inside %WITH-ARRAY-DATA instead of outside, and
+;;; the DEFTRANSFORM can't tell that that's going on, so it can make
+;;; sense to use FORCE-INLINE option in that case.
+(defmacro with-array-data (((data-var array &key offset-var)
+			    (start-var &optional (svalue 0))
+			    (end-var &optional (evalue nil))
+			    &key force-inline)
+			   &body forms)
+  (once-only ((n-array array)
+	      (n-svalue `(the index ,svalue))
+	      (n-evalue `(the (or index null) ,evalue)))
+    `(multiple-value-bind (,data-var
+			   ,start-var
+			   ,end-var
+			   ,@(when offset-var `(,offset-var)))
+	 (if (not (array-header-p ,n-array))
+	     (let ((,n-array ,n-array))
+	       (declare (type (simple-array * (*)) ,n-array))
+	       ,(once-only ((n-len `(length ,n-array))
+			    (n-end `(or ,n-evalue ,n-len)))
+		  `(if (<= ,n-svalue ,n-end ,n-len)
+		       ;; success
+		       (values ,n-array ,n-svalue ,n-end 0)
+		       ;; failure: Make a NOTINLINE call to
+		       ;; %WITH-ARRAY-DATA with our bad data
+		       ;; to cause the error to be signalled.
+		       (locally
+			 (declare (notinline %with-array-data))
+			 (%with-array-data ,n-array ,n-svalue ,n-evalue)))))
+	     (,(if force-inline '%with-array-data-macro '%with-array-data)
+	      ,n-array ,n-svalue ,n-evalue))
+       ,@forms)))
+
 ;;; This is the fundamental definition of %WITH-ARRAY-DATA, for use in
 ;;; DEFTRANSFORMs and DEFUNs.
 (defmacro %with-array-data-macro (array
@@ -39,7 +91,6 @@
 				  (element-type '*)
 				  unsafe?
 				  fail-inline?)
-  (format t "~&/in %WITH-ARRAY-DATA-MACRO, ELEMENT-TYPE=~S~%" element-type)
   (let ((size (gensym "SIZE-"))
 	(data (gensym "DATA-"))
 	(cumulative-offset (gensym "CUMULATIVE-OFFSET-")))
@@ -92,8 +143,6 @@
 				:policy (> speed space))
   "inline non-SIMPLE-vector-handling logic"
   (let ((element-type (upgraded-element-type-specifier-or-give-up array)))
-    (format t "~&/in DEFTRANSFORM %WITH-ARRAY-DATA, ELEMENT-TYPE=~S~%"
-	    element-type)
     `(%with-array-data-macro array start end
 			     :unsafe? ,(policy node (= safety 0))
 			     :element-type ,element-type)))
@@ -182,7 +231,6 @@
 
 (setf (function-info-transforms (info :function :info 'coerce)) nil)
 (deftransform coerce ((x type) (* *) * :when :both)
-  (format t "~&/looking at DEFTRANSFORM COERCE~%")
   (unless (constant-continuation-p type)
     (give-up-ir1-transform))
   (let ((tspec (specifier-type (continuation-value type))))
@@ -314,14 +362,9 @@
 	(end (gensym "END-")))
     `(let ((,n-sequence ,sequence-arg)
 	   (,n-end ,end-arg))
-       ;;(format t "~&/n-sequence=~S~%" ,n-sequence)
-       ;;(format t "~&/simplicity=~S~%" (typep ,n-sequence 'simple-array))
-       ;;(describe ,n-sequence)
        (with-array-data ((,sequence ,n-sequence :offset-var ,offset)
 			 (,start ,start)
 			 (,end (or ,n-end (length ,n-sequence))))
-         ;;(format t "~&sequence=~S~%start=~S~%end=~S~%" ,sequence ,start ,end)
-	 ;;(format t "~&/n-sequence=~S~%" ,n-sequence)
          (block ,block
 	   (macrolet ((maybe-return ()
 			'(let ((,element (aref ,sequence ,index)))

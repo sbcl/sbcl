@@ -7,8 +7,6 @@
 (defun %with-array-data (array start end)
   (%with-array-data-macro array start end :fail-inline? t))
 
-;;; FIXME: vector-push-extend patch
-
 ;;; Like CMU CL, we use HEAPSORT. However, instead of trying to
 ;;; generalize the CMU CL code to allow START and END values, this
 ;;; code has been written from scratch following Chapter 7 of
@@ -122,18 +120,22 @@
 (defun vector-push-extend (new-element
 			   vector
 			   &optional
-			   (extension (1+ (length vector))))
+			   (extension nil extension-p))
   (declare (type vector vector))
-  (declare (type (integer 1 #.most-positive-fixnum) extension))
   (let ((old-fill-pointer (fill-pointer vector)))
     (declare (type index old-fill-pointer))
     (when (= old-fill-pointer (%array-available-elements vector))
-      (adjust-array vector (+ old-fill-pointer extension)))
+      (adjust-array vector (+ old-fill-pointer
+			      (if extension-p
+				  (the (integer 1 #.most-positive-fixnum)
+				    extension)
+				  (1+ old-fill-pointer)))))
     (setf (%array-fill-pointer vector)
 	  (1+ old-fill-pointer))
     ;; Wrapping the type test and the AREF in the same WITH-ARRAY-DATA
     ;; saves some time.
-    (with-array-data ((v vector) (i old-fill-pointer) (end))
+    (with-array-data ((v vector) (i old-fill-pointer) (end)
+		      :force-inline t)
       (declare (ignore end) (optimize (safety 0)))
       (if (simple-vector-p v) ; if common special case
           (setf (aref v i) new-element)
@@ -142,6 +144,16 @@
 
 ;;; FIXME: should DEFUN REPLACE in terms of same expansion as
 ;;; DEFTRANSFORM
+#+nil
+(defun replace (..)
+  (cond ((and (typep seq1 'simple-vector)
+	      (typep seq2 'simple-vector))
+	 (%replace-vector-vector ..))
+	((and (typep seq1 'simple-string)
+	      (typep seq2 'simple-string))
+	 (%replace-vector-vector ..))
+	(t
+	 ..)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;; POSITION/FIND stuff
@@ -154,9 +166,10 @@
   ;; NIL is never returned; and give (NEED (FIND ..)) workaround.
   (error "need to fix FIXMEs"))
   
-;;; logic to unravel :TEST and :TEST-NOT options in FIND/POSITION/etc.
-(declaim (inline %effective-test))
-(defun %effective-find-position-test (test test-not)
+;;; logic to unravel :TEST, :TEST-NOT, and :KEY options in FIND,
+;;; POSITION-IF, etc.
+(declaim (inline effective-find-position-test effective-find-position-key))
+(defun effective-find-position-test (test test-not)
   (cond ((and test test-not)
 	 (error "can't specify both :TEST and :TEST-NOT"))
 	(test (%coerce-callable-to-function test))
@@ -166,79 +179,12 @@
 	 ;; anyway, we don't care.)
 	 (complement (%coerce-callable-to-function test-not)))
 	(t #'eql)))
+(defun effective-find-position-key (key)
+  (if key
+      (%coerce-callable-to-function key)
+      #'identity))
 
-;;; the user interface to FIND and POSITION: Get all our ducks in a row,
-;;; then call %FIND-POSITION
-;;;
-;;; FIXME: These should probably be (MACROLET (..) (DEF-SOURCE-TRANSFORM ..))
-;;; instead of this DEFCONSTANT silliness.
-(eval-when (:compile-toplevel :execute)
-  (defconstant +find-fun-args+
-    '(item
-      sequence
-      &key
-      from-end
-      (start 0)
-      end
-      key
-      test
-      test-not))
-  (defconstant +find-fun-frob+
-    '(%find-position item
-		     sequence
-		     from-end
-		     start
-		     end
-		     (if key (%coerce-callable-to-function key) #'identity)
-		     (%effective-find-position-test test test-not))))
-(declaim (inline find position))
-(defun find     #.+find-fun-args+
-  (nth-value 0  #.+find-fun-frob+))
-(defun position #.+find-fun-args+
-  (nth-value 1  #.+find-fun-frob+))
-
-;;; the user interface to FIND-IF and POSITION-IF, entirely analogous
-;;; to the interface to FIND and POSITION
-(eval-when (:compile-toplevel :execute)
-  (defconstant +find-if-fun-args+
-    '(predicate
-      sequence
-      &key
-      from-end
-      (start 0)
-      end
-      (key #'identity)))
-  (defconstant +find-if-fun-frob+
-    '(%find-position-if (%coerce-callable-to-function predicate)
-			sequence
-			from-end
-			start
-			end
-			(%coerce-callable-to-function key))))
-;;; FIXME: A running SBCL doesn't like to have its FIND-IF and
-;;; POSITION-IF DEFUNed, dunno why yet..
-#|
-;;(declaim (maybe-inline find-if cl-user::%position-if))
-(defun find-if     #.+find-if-fun-args+
-  (nth-value 0     #.+find-if-fun-frob+))
-(defun cl-user::%position-if #.+find-if-fun-args+
-  (nth-value 1     #.+find-if-fun-frob+))
-(setf (symbol-function 'position-if)
-      #'cl-user::%position-if)
-;;(declaim (inline find-if cl-user::%position-if))
-|#
-
-;;; the deprecated functions FIND-IF-NOT and POSITION-IF-NOT
-(defun find-if-not     (predicate sequence &key from-end (start 0) end key)
-  (nth-value 0 (%find-position-if (complement (%coerce-callable-to-function
-					       predicate))
-				  sequence from-end start end key)))
-(defun position-if-not (predicate sequence &key from-end (start 0) end key)
-  (nth-value 1 (%find-position-if (complement (%coerce-callable-to-function
-					       predicate))
-				  sequence from-end start end key)))
-;;; FIXME: Remove uses of these deprecated functions, and of :TEST-NOT too.
-
+;;; shared guts of out-of-line FIND, POSITION, FIND-IF, and POSITION-IF
 (macrolet (;; shared logic for defining %FIND-POSITION and
 	   ;; %FIND-POSITION-IF in terms of various inlineable cases
 	   ;; of the expression defined in FROB and VECTOR*-FROB
@@ -275,3 +221,65 @@
 		 `(%find-position-if-vector-macro predicate ,sequence
 						  from-end start end key)))
       (frobs))))
+
+;;; the user interface to FIND and POSITION: Get all our ducks in a row,
+;;; then call %FIND-POSITION
+(declaim (inline find position))
+(macrolet ((def-find-position (fun-name values-index)
+	     `(defun ,fun-name (item
+				sequence
+				&key
+				from-end
+				(start 0)
+				end
+				key
+				test
+				test-not)
+		(nth-value
+		 ,values-index
+		 (%find-position item
+				 sequence
+				 from-end
+				 start
+				 end
+				 (effective-find-position-key key)
+				 (effective-find-position-test test
+							       test-not))))))
+  (def-find-position find 0)
+  (def-find-position position 1))
+
+;;; the user interface to FIND-IF and POSITION-IF, entirely analogous
+;;; to the interface to FIND and POSITION
+(declaim (inline find-if position-if))
+(macrolet ((def-find-position-if (fun-name values-index)
+	     `(defun ,fun-name (predicate sequence
+				&key from-end (start 0) end key)
+		(nth-value
+		 ,values-index
+		 (%find-position-if (%coerce-callable-to-function predicate)
+				    sequence
+				    from-end
+				    start
+				    end
+				    (effective-find-position-key key))))))
+  
+  (def-find-position-if find-if 0)
+  (def-find-position-if position-if 1))
+
+;;; the deprecated functions FIND-IF-NOT and POSITION-IF-NOT
+(macrolet ((def-find-position-if-not (fun-name values-index)
+	     `(defun ,fun-name (predicate sequence
+				&key from-end (start 0) end key)
+		(nth-value
+		 ,values-index
+		 (%find-position-if (complement (%coerce-callable-to-function
+						 predicate))
+				    sequence
+				    from-end
+				    start
+				    end
+				    (effective-find-position-key key))))))
+  (def-find-position-if-not find-if-not 0)
+  (def-find-position-if-not position-if-not 1))
+;;; FIXME: Remove uses of these deprecated functions, and of :TEST-NOT too.
+

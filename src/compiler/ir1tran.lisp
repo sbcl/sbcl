@@ -1927,7 +1927,7 @@
     (prev-link exit value-cont)
     (use-continuation exit (second found))))
 
-;;; Return a list of the segments of a tagbody. Each segment looks
+;;; Return a list of the segments of a TAGBODY. Each segment looks
 ;;; like (<tag> <form>* (go <next tag>)). That is, we break up the
 ;;; tagbody into segments of non-tag statements, and explicitly
 ;;; represent the drop-through with a GO. The first segment has a
@@ -1939,7 +1939,7 @@
   (collect ((segments))
     (let ((current (cons nil body)))
       (loop
-	(let ((tag-pos (position-if-not #'listp current :start 1)))
+	(let ((tag-pos (position-if (complement #'listp) current :start 1)))
 	  (unless tag-pos
 	    (segments `(,@current nil))
 	    (return))
