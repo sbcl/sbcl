@@ -91,8 +91,8 @@
 ;;;; hacking the Unix environment
 
 (def-alien-routine ("getenv" posix-getenv) c-string
-  "Return the environment string \"name=value\" which corresponds to NAME, or
-   NIL if there is none."
+  "Return the \"value\" part of the environment string \"name=value\" which
+   corresponds to NAME, or NIL if there is none."
   (name c-string))
 
 ;;; from stdio.h

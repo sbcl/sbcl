@@ -374,7 +374,7 @@
 				     applicable-methods))
 
 (defun invalid-method-error (method format-control &rest format-arguments)
-  (error "~@<invalid method error for ~2I_~S ~I~_method: ~2I~_~?~:>"
+  (error "~@<invalid method error for ~2I~_~S ~I~_method: ~2I~_~?~:>"
 	 method
 	 format-control
 	 format-arguments))

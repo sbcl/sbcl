@@ -191,8 +191,9 @@ and submit it as a patch."
 (defun default-gc-notify-before (notify-stream bytes-in-use)
   (declare (type stream notify-stream))
   (format notify-stream
-	  "~&; GC is beginning with ~:D bytes in use.~%"
-	  bytes-in-use)
+	  "~&; GC is beginning with ~:D bytes in use at internal runtime ~D.~%"
+	  bytes-in-use
+	  (get-internal-run-time))
   (finish-output notify-stream))
 (defparameter *gc-notify-before* #'default-gc-notify-before
   #!+sb-doc
@@ -207,11 +208,11 @@ and submit it as a patch."
 				new-trigger)
   (declare (type stream notify-stream))
   (format notify-stream
-	  "~&; GC has finished with ~:D bytes in use (~:D bytes freed).~%"
+	  "~&; GC has finished with ~:D bytes in use (~:D bytes freed)~@
+           ; at internal runtime ~D. The new GC trigger is ~:D bytes.~%"
 	  bytes-retained
-	  bytes-freed)
-  (format notify-stream
-	  "~&; The new GC trigger is ~:D bytes.~%"
+	  bytes-freed
+	  (get-internal-run-time)
 	  new-trigger)
   (finish-output notify-stream))
 (defparameter *gc-notify-after* #'default-gc-notify-after
@@ -226,7 +227,6 @@ has finished GC'ing.")
 
 (sb!alien:def-alien-routine collect-garbage sb!c-call:int
   #!+gencgc (last-gen sb!c-call:int))
-
 
 (sb!alien:def-alien-routine set-auto-gc-trigger sb!c-call:void
   (dynamic-usage sb!c-call:unsigned-long))

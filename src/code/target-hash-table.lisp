@@ -504,8 +504,8 @@
 
 (defun remhash (key hash-table)
   #!+sb-doc
-  "Remove the entry in HASH-TABLE associated with KEY. Returns T if there
-   was such an entry, and NIL if not."
+  "Remove the entry in HASH-TABLE associated with KEY. Return T if there
+   was such an entry, or NIL if not."
   (declare (type hash-table hash-table)
 	   (values (member t nil)))
   (without-gcing
