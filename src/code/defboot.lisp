@@ -199,7 +199,7 @@
 #-sb-xc-host
 (defun %defun (name def doc)
   (declare (type function def))
-  (declare (type (or null simple-string doc)))
+  (declare (type (or null simple-string) doc))
   (aver (legal-fun-name-p name)) ; should've been checked by DEFMACRO DEFUN
   (when (fboundp name)
     (/show0 "redefining NAME in %DEFUN")

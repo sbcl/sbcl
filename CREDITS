@@ -541,6 +541,12 @@ Alexey Dejneka:
   and elsewhere reflect systematic public-spiritedness, fixing bugs
   as they show up in sbcl-devel or as archived in the BUGS file.
 
+Paul Dietz
+  He is in the process of writing a comprehensive test suite for the
+  requirements of the ANSI Common Lisp standard.  Already, at the
+  halfway stage, it has caught many tens of bugs in SBCL, and provided
+  simple test cases for them.
+
 Nathan Froyd:
   He has fixed various bugs, and also done a lot of internal
   cleanup, not visible at the user level but important for
@@ -601,14 +607,16 @@ William ("Bill") Newman:
   rid of various functionality (e.g. the byte interpreter).
 
 Kevin M. Rosenberg:
-  He provided the ACL-style toplevel.
+  He provided the ACL-style toplevel, and a number of MOP-related bug
+  reports.
 
 Christophe Rhodes:
   He ported SBCL to SPARC, made various port-related and SPARC-related
   changes (like *BACKEND-SUBFEATURES*), made many fixes and
-  improvements in the compiler's type system, has done a substantial
-  amount of work on bootstrapping SBCL under unrelated (non-SBCL,
-  non-CMU-CL) Common Lisps, and contributed in other ways as well.
+  improvements in the compiler's type system, has essentially
+  completed the work to enable bootstrapping SBCL under unrelated
+  (non-SBCL, non-CMU-CL) Common Lisps, and contributed in other ways
+  as well.
 
 Stig Erik Sandoe:
   He showed how to convince the GNU toolchain to build SBCL in a way
