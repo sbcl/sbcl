@@ -1154,6 +1154,11 @@
 (define-vop (fast---mod32-c/unsigned=>unsigned fast---c/unsigned=>unsigned)
   (:translate --mod32))
 
+(define-modular-fun *-mod32 (x y) * 32)
+(define-vop (fast-*-mod32/unsigned=>unsigned fast-*/unsigned=>unsigned)
+  (:translate *-mod32))
+;;; (no -C variant as x86 MUL instruction doesn't take an immediate)
+
 (define-vop (fast-ash-left-mod32-c/unsigned=>unsigned
              fast-ash-c/unsigned=>unsigned)
   (:translate ash-left-mod32))
@@ -1656,25 +1661,35 @@
 	      (t (incf count)))))
     (decompose-multiplication arg x n-bits condensed)))
 
+(defun *-transformer (y)
+  (cond
+    ((= y (ash 1 (integer-length y)))
+     ;; there's a generic transform for y = 2^k
+     (give-up-ir1-transform))
+    ((member y '(3 5 9))
+     ;; we can do these multiplications directly using LEA
+     `(%lea x x ,(1- y) 0))
+    ((member :pentium4 *backend-subfeatures*)
+     ;; the pentium4's multiply unit is reportedly very good
+     (give-up-ir1-transform))
+    ;; FIXME: should make this more fine-grained.  If nothing else,
+    ;; there should probably be a cutoff of about 9 instructions on
+    ;; pentium-class machines.
+    (t (optimize-multiply 'x y))))
+
 (deftransform * ((x y)
 		 ((unsigned-byte 32) (constant-arg (unsigned-byte 32)))
 		 (unsigned-byte 32))
   "recode as leas, shifts and adds"
   (let ((y (lvar-value y)))
-    (cond
-      ((= y (ash 1 (integer-length y)))
-       ;; there's a generic transform for y = 2^k
-       (give-up-ir1-transform))
-      ((member y '(3 5 9))
-       ;; we can do these multiplications directly using LEA
-       `(%lea x x ,(1- y) 0))
-      ((member :pentium4 *backend-subfeatures*)
-       ;; the pentium4's multiply unit is reportedly very good
-       (give-up-ir1-transform))
-      ;; FIXME: should make this more fine-grained.  If nothing else,
-      ;; there should probably be a cutoff of about 9 instructions on
-      ;; pentium-class machines.
-      (t (optimize-multiply 'x y)))))
+    (*-transformer y)))
+
+(deftransform sb!vm::*-mod32
+    ((x y) ((unsigned-byte 32) (constant-arg (unsigned-byte 32)))
+     (unsigned-byte 32))
+  "recode as leas, shifts and adds"
+  (let ((y (lvar-value y)))
+    (*-transformer y)))
 
 ;;; FIXME: we should also be able to write an optimizer or two to
 ;;; convert (+ (* x 2) 17), (- (* x 9) 5) to a %LEA.
