@@ -289,6 +289,6 @@ sigsegv_handler(int signal, siginfo_t *info, void* void_context)
 void
 os_install_interrupt_handlers(void)
 {
-    interrupt_install_low_level_handler(SIGSEGV, sigsegv_handler);
+    undoably_install_low_level_interrupt_handler(SIGSEGV, sigsegv_handler);
 }
 

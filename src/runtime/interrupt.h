@@ -36,10 +36,11 @@ extern void interrupt_handle_pending(os_context_t*);
 extern void interrupt_internal_error(int, siginfo_t*, os_context_t*,
 				     boolean continuable);
 extern boolean interrupt_maybe_gc(int, siginfo_t*, void*);
-extern void interrupt_install_low_level_handler (int signal,
-						 void handler(int,
-							      siginfo_t*,
-							      void*));
+extern void undoably_install_low_level_interrupt_handler (int signal,
+							  void
+							  handler(int,
+								  siginfo_t*,
+								  void*));
 extern unsigned long install_handler(int signal,
 				     void handler(int, siginfo_t*, void*));
 

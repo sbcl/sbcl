@@ -338,9 +338,9 @@ static void sigfpe_handler(int signal, int code, os_context_t *context)
 
 void arch_install_interrupt_handlers()
 {
-    interrupt_install_low_level_handler(SIGILL,sigill_handler);
-    interrupt_install_low_level_handler(SIGTRAP,sigtrap_handler);
-    interrupt_install_low_level_handler(SIGFPE,sigfpe_handler);
+    undoably_install_low_level_interrupt_handler(SIGILL,  sigill_handler);
+    undoably_install_low_level_interrupt_handler(SIGTRAP, sigtrap_handler);
+    undoably_install_low_level_interrupt_handler(SIGFPE,  sigfpe_handler);
 }
 
 extern lispobj call_into_lisp(lispobj fun, lispobj *args, int nargs);

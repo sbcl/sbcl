@@ -235,11 +235,11 @@ os_install_interrupt_handlers(void)
 {
     SHOW("os_install_interrupt_handlers()/bsd-os/defined(GENCGC)");
 #if defined __FreeBSD__
-    SHOW("__FreeBSD__ case");
-    interrupt_install_low_level_handler(SIGBUS, memory_fault_handler);
+    undoably_install_low_level_interrupt_handler(SIGBUS,
+						 memory_fault_handler);
 #elif defined __OpenBSD__
-    FSHOW((stderr, "/__OpenBSD__ case, SIGSEGV=%d\n", SIGSEGV));
-    interrupt_install_low_level_handler(SIGSEGV, memory_fault_handler);
+    undoably_install_low_level_interrupt_handler(SIGSEGV,
+						 memory_fault_handler);
 #else
 #error unsupported BSD variant
 #endif

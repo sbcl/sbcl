@@ -565,20 +565,74 @@ interrupt_maybe_gc(int signal, siginfo_t *info, void *void_context)
  * noise to install handlers
  */
 
-/* Install a special low-level handler for signal; or if handler is
- * SIG_DFL, remove any special handling for signal. */
+/*
+ * what low-level signal handlers looked like before
+ * undoably_install_low_level_interrupt_handler() got involved
+ */
+struct low_level_signal_handler_state {
+    int was_modified;
+    void (*handler)(int, siginfo_t*, void*);
+} old_low_level_signal_handler_states[NSIG];
+
 void
-interrupt_install_low_level_handler (int signal,
-				     void handler(int, siginfo_t*, void*))
+uninstall_low_level_interrupt_handlers_atexit(void)
+{
+    int signal;
+    for (signal = 0; signal < NSIG; ++signal) {
+	struct low_level_signal_handler_state
+	    *old_low_level_signal_handler_state =
+	    old_low_level_signal_handler_states + signal;
+	if (old_low_level_signal_handler_state->was_modified) {
+	    struct sigaction sa;
+	    sa.sa_sigaction = old_low_level_signal_handler_state->handler;
+	    sigemptyset(&sa.sa_mask);
+	    sa.sa_flags = SA_SIGINFO | SA_RESTART; 
+	    sigaction(signal, &sa, NULL);
+	}
+    }
+}
+
+/* Install a special low-level handler for signal; or if handler is
+ * SIG_DFL, remove any special handling for signal.
+ *
+ * The "undoably_" part is because we also arrange with atexit() for
+ * the handler to be restored to its old value. This is for tidiness,
+ * though it shouldn't really matter in normal operation of the
+ * program, except perhaps that it removes a window when e.g. SIGINT
+ * would be handled bizarrely. The original motivation was that some
+ * memory corruption problems in OpenBSD ca sbcl-0.6.12.12 became
+ * unnecessarily hard to debug when they ended up back in gencgc.c
+ * code (courtesy of the gencgc SIGSEGV handler) after exit() was
+ * called. */
+void
+undoably_install_low_level_interrupt_handler (int signal,
+					      void handler(int,
+							   siginfo_t*,
+							   void*))
 {
     struct sigaction sa;
+    struct low_level_signal_handler_state *old_low_level_signal_handler_state =
+	old_low_level_signal_handler_states + signal;
+
+    if (0 > signal || signal >= NSIG) {
+	lose("bad signal number %d", signal);
+    }
 
     sa.sa_sigaction = handler;
     sigemptyset(&sa.sa_mask);
     sigaddset_blockable(&sa.sa_mask);
     sa.sa_flags = SA_SIGINFO | SA_RESTART;
 
-    sigaction(signal, &sa, NULL);
+    /* In the case of interrupt handlers which are modified
+     * more than once, we only save the original unmodified
+     * copy. */
+    if (!old_low_level_signal_handler_state->was_modified) {
+	old_low_level_signal_handler_state->was_modified = 1;
+	sigaction(signal, &sa, &old_low_level_signal_handler_state->handler);
+    } else {
+	sigaction(signal, &sa, NULL);
+    }
+
     interrupt_low_level_handlers[signal] =
 	(ARE_SAME_HANDLER(handler,SIG_DFL) ? 0 : handler);
 }
@@ -635,6 +689,11 @@ interrupt_init(void)
     int i;
 
     SHOW("entering interrupt_init()");
+
+    /* Set up for recovery from any installed low-level handlers. */
+    atexit(&uninstall_low_level_interrupt_handlers_atexit);
+
+    /* Set up high level handler information. */
     for (i = 0; i < NSIG; i++) {
         interrupt_handlers[i].c =
 	    /* (The cast here blasts away the distinction between
@@ -644,5 +703,6 @@ interrupt_init(void)
 	     * 3-argument form is expected.) */
 	    (void (*)(int, siginfo_t*, void*))SIG_DFL;
     }
+
     SHOW("returning from interrupt_init()");
 }

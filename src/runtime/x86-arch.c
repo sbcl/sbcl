@@ -266,8 +266,8 @@ void
 arch_install_interrupt_handlers()
 {
     SHOW("entering arch_install_interrupt_handlers()");
-    interrupt_install_low_level_handler(SIGILL , sigtrap_handler);
-    interrupt_install_low_level_handler(SIGTRAP, sigtrap_handler);
+    undoably_install_low_level_interrupt_handler(SIGILL , sigtrap_handler);
+    undoably_install_low_level_interrupt_handler(SIGTRAP, sigtrap_handler);
     SHOW("returning from arch_install_interrupt_handlers()");
 }
 
