@@ -298,12 +298,12 @@
 
     (setf (lambda-home lambda) lambda)
     (collect ((svars)
-             (new-venv nil cons))
+              (new-venv nil cons))
 
       (dolist (var vars)
 	;; As far as I can see, LAMBDA-VAR-HOME should never have
 	;; been set before. Let's make sure. -- WHN 2001-09-29
-	(aver (null (lambda-var-home var)))
+	(aver (not (lambda-var-home var)))
 	(setf (lambda-var-home var) lambda)
 	(let ((specvar (lambda-var-specvar var)))
 	  (cond (specvar
@@ -327,7 +327,6 @@
             (setf (lambda-tail-set lambda) tail-set)
             (setf (lambda-return lambda) return)
             (setf (continuation-dest result) return)
-            (flush-continuation-externally-checkable-type result)
             (setf (block-last block) return)
             (link-node-to-previous-continuation return result)
             (use-continuation return dummy))

@@ -774,6 +774,46 @@
                              (ir1-attributep (fun-info-attributes it)
                                              explicit-check)))))))
 
+;;; Call FUN with (arg-continuation arg-type)
+(defun map-combination-args-and-types (fun call)
+  (declare (type function fun) (type combination call))
+  (binding* ((type (continuation-type (combination-fun call)))
+             (nil (fun-type-p type) :exit-if-null)
+             (args (combination-args call)))
+    (dolist (req (fun-type-required type))
+      (when (null args) (return-from map-combination-args-and-types))
+      (let ((arg (pop args)))
+        (funcall fun arg req)))
+    (dolist (opt (fun-type-optional type))
+      (when (null args) (return-from map-combination-args-and-types))
+      (let ((arg (pop args)))
+        (funcall fun arg opt)))
+
+    (let ((rest (fun-type-rest type)))
+      (when rest
+        (dolist (arg args)
+          (funcall fun arg rest))))
+
+    (dolist (key (fun-type-keywords type))
+      (let ((name (key-info-name key)))
+        (do ((arg args (cddr arg)))
+            ((null arg))
+          (when (eq (continuation-value (first arg)) name)
+            (funcall fun (second arg) (key-info-type key))))))))
+
+;;; Assert that CALL is to a function of the specified TYPE. It is
+;;; assumed that the call is legal and has only constants in the
+;;; keyword positions.
+(defun assert-call-type (call type)
+  (declare (type combination call) (type fun-type type))
+  (derive-node-type call (fun-type-returns type))
+  (let ((policy (lexenv-policy (node-lexenv call))))
+    (map-combination-args-and-types
+     (lambda (arg type)
+       (assert-continuation-type arg type policy))
+     call))
+  (values))
+
 ;;;; FIXME: Move to some other file.
 (defun check-catch-tag-type (tag)
   (declare (type continuation tag))

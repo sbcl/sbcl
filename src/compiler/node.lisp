@@ -1193,6 +1193,14 @@
 			     "<deleted>"))
 		       args)))
 
+(defun call-full-like-p (call)
+  (declare (type combination call))
+  (let ((kind (basic-combination-kind call)))
+    (or (eq kind :full)
+        (and (fun-info-p kind)
+             (null (fun-info-templates kind))
+             (not (fun-info-ir2-convert kind))))))
+
 ;;; An MV-COMBINATION is to MULTIPLE-VALUE-CALL as a COMBINATION is to
 ;;; FUNCALL. This is used to implement all the multiple-value
 ;;; receiving forms.

@@ -87,34 +87,31 @@
 (defun %continuation-%externally-checkable-type (cont)
   (declare (type continuation cont))
   (let ((dest (continuation-dest cont)))
-      (if (not (and dest (combination-p dest)))
-          ;; TODO: MV-COMBINATION
-          (setf (continuation-%externally-checkable-type cont) *wild-type*)
-          (let* ((fun (combination-fun dest))
-                 (args (combination-args dest))
-                 (fun-type (continuation-type fun)))
-            (setf (continuation-%externally-checkable-type fun) *wild-type*)
-            (if (or (not (fun-type-p fun-type))
-                    ;; FUN-TYPE might be (AND FUNCTION (SATISFIES ...)).
-                    (fun-type-wild-args fun-type))
-                (progn (dolist (arg args)
-                         (when arg
-                           (setf (continuation-%externally-checkable-type arg)
-                                 *wild-type*)))
-                       *wild-type*)
-                (let* ((arg-types (append (fun-type-required fun-type)
-                                          (fun-type-optional fun-type)
-                                          (let ((rest (list (or (fun-type-rest fun-type)
-                                                                *wild-type*))))
-                                            (setf (cdr rest) rest)))))
-                  ;; TODO: &KEY
-                  (loop
-                     for arg of-type continuation in args
-                     and type of-type ctype in arg-types
-                     do (when arg
-                          (setf (continuation-%externally-checkable-type arg)
-                                (coerce-to-values type))))
-                  (continuation-%externally-checkable-type cont)))))))
+    (if (not (and dest
+                  (combination-p dest)))
+        ;; TODO: MV-COMBINATION
+        (setf (continuation-%externally-checkable-type cont) *wild-type*)
+        (let* ((fun (combination-fun dest))
+               (args (combination-args dest))
+               (fun-type (continuation-type fun)))
+          (setf (continuation-%externally-checkable-type fun) *wild-type*)
+          (if (or (not (call-full-like-p dest))
+                  (not (fun-type-p fun-type))
+                  ;; FUN-TYPE might be (AND FUNCTION (SATISFIES ...)).
+                  (fun-type-wild-args fun-type))
+              (dolist (arg args)
+                (when arg
+                  (setf (continuation-%externally-checkable-type arg)
+                        *wild-type*)))
+              (map-combination-args-and-types
+               (lambda (arg type)
+                 (setf (continuation-%externally-checkable-type arg)
+                       (acond ((continuation-%externally-checkable-type arg)
+                               (values-type-intersection
+                                it (coerce-to-values type)))
+                              (t (coerce-to-values type)))))
+               dest)))))
+  (continuation-%externally-checkable-type cont))
 (declaim (inline flush-continuation-externally-checkable-type))
 (defun flush-continuation-externally-checkable-type (cont)
   (declare (type continuation cont))
@@ -220,37 +217,6 @@
             (reoptimize-continuation cont)
             checked-value)))))
 
-;;; Assert that CALL is to a function of the specified TYPE. It is
-;;; assumed that the call is legal and has only constants in the
-;;; keyword positions.
-(defun assert-call-type (call type)
-  (declare (type combination call) (type fun-type type))
-  (derive-node-type call (fun-type-returns type))
-  (let ((args (combination-args call))
-        (policy (lexenv-policy (node-lexenv call))))
-    (dolist (req (fun-type-required type))
-      (when (null args) (return-from assert-call-type))
-      (let ((arg (pop args)))
-	(assert-continuation-type arg req policy)))
-    (dolist (opt (fun-type-optional type))
-      (when (null args) (return-from assert-call-type))
-      (let ((arg (pop args)))
-	(assert-continuation-type arg opt policy)))
-
-    (let ((rest (fun-type-rest type)))
-      (when rest
-	(dolist (arg args)
-	  (assert-continuation-type arg rest policy))))
-
-    (dolist (key (fun-type-keywords type))
-      (let ((name (key-info-name key)))
-	(do ((arg args (cddr arg)))
-	    ((null arg))
-	  (when (eq (continuation-value (first arg)) name)
-	    (assert-continuation-type
-	     (second arg) (key-info-type key)
-             policy))))))
-  (values))
 
 ;;;; IR1-OPTIMIZE
 

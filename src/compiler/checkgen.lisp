@@ -280,27 +280,26 @@
   (declare (type cast cast))
   (let* ((cont (node-cont cast))
          (dest (continuation-dest cont)))
-    (not (or (not (cast-type-check cast))
-             (and (combination-p dest)
-                  (let ((kind (combination-kind dest)))
-                    (or (eq kind :full)
-                        ;; The theory is that the type assertion is
-                        ;; from a declaration in (or on) the callee,
-                        ;; so the callee should be able to do the
-                        ;; check. We want to let the callee do the
-                        ;; check, because it is possible that by the
-                        ;; time of call that declaration will be
-                        ;; changed and we do not want to make people
-                        ;; recompile all calls to a function when they
-                        ;; were originally compiled with a bad
-                        ;; declaration. (See also bug 35.)
-                        (and (fun-info-p kind)
-                             (null (fun-info-templates kind))
-                             (not (fun-info-ir2-convert kind)))))
-                  (and
-                   (immediately-used-p cont cast)
-                   (values-subtypep (continuation-externally-checkable-type cont)
-                                   (cast-type-to-check cast))))))))
+    (cond ((not (cast-type-check cast))
+           nil)
+          ((and (combination-p dest)
+                (call-full-like-p dest)
+                ;; The theory is that the type assertion is
+                ;; from a declaration in (or on) the callee,
+                ;; so the callee should be able to do the
+                ;; check. We want to let the callee do the
+                ;; check, because it is possible that by the
+                ;; time of call that declaration will be
+                ;; changed and we do not want to make people
+                ;; recompile all calls to a function when they
+                ;; were originally compiled with a bad
+                ;; declaration. (See also bug 35.)
+                (immediately-used-p cont cast)
+                (values-subtypep (continuation-externally-checkable-type cont)
+                                 (cast-type-to-check cast)))
+           nil)
+          (t
+           t))))
 
 ;;; Return true if CONT is a continuation whose type the back end is
 ;;; likely to want to check. Since we don't know what template the
