@@ -905,7 +905,9 @@
 		 (lvar-uses (basic-combination-fun call))
 		 call))
 	       ((not leaf))
-	       ((and (leaf-has-source-name-p leaf)
+	       ((and (global-var-p leaf)
+                     (eq (global-var-kind leaf) :global-function)
+                     (leaf-has-source-name-p leaf)
                      (or (info :function :source-transform (leaf-source-name leaf))
                          (and info
                               (ir1-attributep (fun-info-attributes info)

@@ -1389,15 +1389,4 @@ WORKAROUND:
   (probably related to the bug 280.)
 
 313: "source-transforms are Lisp-1"
-  (reported by Antonio Menezes Leitao on cll)
-
-  PROPAGATE-FUN-CHANGE when checking, whether source transform is
-  applicable, does not check variable/function original position of the
-  COMBINATION-FUN. So the following functions are miscompiled:
-
-    (defun foo (cadr) (if (functionp cadr) (funcall cadr 1) nil))
-
-    (defvar cadr)
-    (defun foo (cadr) (funcall (truly-the function cadr) 1))
-
-  (check with (FOO #'IDENTITY))
+  (fixed in 0.8.10.2)
