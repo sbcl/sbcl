@@ -215,7 +215,7 @@
 			 (if (= index-reg #b100) nil index-reg)
 			 (ash 1 index-scale))))))
 	    ((and (= mod #b00) (= r/m #b101))
-	     (list nil (sb!disassem:read-signed-suffix 32 dstate)) )
+	     (list 'rip (sb!disassem:read-signed-suffix 32 dstate)) )
 	    ((= mod #b00)
 	     (list full-reg))
 	    ((= mod #b01)

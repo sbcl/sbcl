@@ -24,7 +24,7 @@
     (princ (sb!disassem:dstate-get-prop dstate 'width) stream)
     (princ '| PTR | stream))
   (write-char #\[ stream)
-  (let ((firstp t))
+  (let ((firstp t) (rip-p nil))
     (macrolet ((pel ((var val) &body body)
 		 ;; Print an element of the address, maybe with
 		 ;; a leading separator.
@@ -35,7 +35,11 @@
 		      ,@body
 		      (setq firstp nil)))))
       (pel (base-reg (first value))
-	(print-addr-reg base-reg stream dstate))
+	(cond ((eql 'rip base-reg)
+	       (setf rip-p t)
+	       (princ base-reg stream))
+	      (t
+	       (print-addr-reg base-reg stream dstate))))
       (pel (index-reg (third value))
 	(print-addr-reg index-reg stream dstate)
 	(let ((index-scale (fourth value)))
@@ -46,14 +50,25 @@
 	(when (and offset (or firstp (not (zerop offset))))
 	  (unless (or firstp (minusp offset))
 	    (write-char #\+ stream))
-	  (if firstp
-            (progn
-              (sb!disassem:princ16 offset stream)
-              (or (minusp offset)
-                  (nth-value 1
-                    (sb!disassem::note-code-constant-absolute offset dstate))
-                  (sb!disassem:maybe-note-assembler-routine offset
-                                                            nil
-                                                            dstate)))
-            (princ offset stream))))))
+	  (cond
+	    (rip-p
+	     (princ offset stream)
+	     (let ((addr (+ offset (sb!disassem:dstate-next-addr dstate))))
+	       (or (nth-value 1
+			      (sb!disassem::note-code-constant-absolute
+			       addr dstate))
+		   (sb!disassem:maybe-note-assembler-routine addr
+							     nil
+							     dstate))))
+	    (firstp
+	     (progn
+	       (sb!disassem:princ16 offset stream)
+	       (or (minusp offset)
+		   (nth-value 1
+			      (sb!disassem::note-code-constant-absolute offset dstate))
+		   (sb!disassem:maybe-note-assembler-routine offset
+							     nil
+							     dstate))))
+	     (t
+	      (princ offset stream)))))))
   (write-char #\] stream))
