@@ -135,90 +135,99 @@
   (:note "inline (signed-byte 32) arithmetic"))
 
 
-(macrolet ((define-var-binop (translate untagged-penalty op 
-                                        &optional arg-swap restore-fixnum-mask)
-               `(progn
-                 (define-vop (,(symbolicate "FAST-" translate "/FIXNUM=>FIXNUM")
-                              fast-fixnum-binop)
-                     ,@(when restore-fixnum-mask
-                             `((:temporary (:sc non-descriptor-reg) temp)))
-                     (:translate ,translate)
-                     (:generator 2
-                      ,(if arg-swap
-                           `(inst ,op ,(if restore-fixnum-mask 'temp 'r) y x)
-                           `(inst ,op ,(if restore-fixnum-mask 'temp 'r) x y))
-                      ;; FIXME: remind me what convention we used for 64bitizing
-                      ;; stuff?  -- CSR, 2003-08-27
-                      ,@(when restore-fixnum-mask
-                              `((inst clrrwi r temp (1- n-lowtag-bits))))))
-                 (define-vop (,(symbolicate "FAST-" translate "/SIGNED=>SIGNED")
-                              fast-signed-binop)
-                     (:translate ,translate)
-                   (:generator ,(1+ untagged-penalty)
-                    ,(if arg-swap
-                         `(inst ,op r y x)
-                         `(inst ,op r x y))))
-                 (define-vop (,(symbolicate "FAST-" translate "/UNSIGNED=>UNSIGNED")
-                              fast-unsigned-binop)
-                     (:translate ,translate)
-                   (:generator ,(1+ untagged-penalty)
-                    ,(if arg-swap
-                         `(inst ,op r y x)
-                         `(inst ,op r x y))))))
-           (define-const-binop (translate untagged-penalty op)
-               `(progn
-     
-                 (define-vop (,(symbolicate 'fast- translate '-c/fixnum=>fixnum)
-                              fast-fixnum-binop-c)
-                     (:translate ,translate)
-                   (:generator 1
-                    (inst ,op r x (fixnumize y))))
-                 (define-vop (,(symbolicate 'fast- translate '-c/signed=>signed)
-                              fast-signed-binop-c)
-                     (:translate ,translate)
-                   (:generator ,untagged-penalty
-                    (inst ,op r x y)))
-                 (define-vop (,(symbolicate 'fast- translate '-c/unsigned=>unsigned)
-                              fast-unsigned-binop-c)
-                     (:translate ,translate)
-                   (:generator ,untagged-penalty
-                    (inst ,op r x y)))))
-           (defmacro define-const-logop (translate untagged-penalty op)
-             `(progn
-     
-               (define-vop (,(symbolicate 'fast- translate '-c/fixnum=>fixnum)
-                            fast-fixnum-logop-c)
-                   (:translate ,translate)
-                 (:generator 1
-                  (inst ,op r x (fixnumize y))))
-               (define-vop (,(symbolicate 'fast- translate '-c/signed=>signed)
-                            fast-signed-logop-c)
-                   (:translate ,translate)
-                 (:generator ,untagged-penalty
-                  (inst ,op r x y)))
-               (define-vop (,(symbolicate 'fast- translate '-c/unsigned=>unsigned)
-                            fast-unsigned-logop-c)
-                   (:translate ,translate)
-                 (:generator ,untagged-penalty
-                  (inst ,op r x y))))))
-  (define-var-binop + 4 add)
-  (define-var-binop - 4 sub)
-  (define-var-binop logand 2 and)
-  (define-var-binop logandc1 2 andc t)
-  (define-var-binop logandc2 2 andc)
-  (define-var-binop logior 2 or)
-  (define-var-binop logorc1 2 orc t t)
-  (define-var-binop logorc2 2 orc nil t)
-  (define-var-binop logxor 2 xor)
-  (define-var-binop logeqv 2 eqv nil t)
-  (define-var-binop lognand 2 nand nil t)
-  (define-var-binop lognor 2 nor nil t)
+(eval-when (:compile-toplevel :load-toplevel :execute)
 
-  (define-const-binop + 4 addi)
-  (define-const-binop - 4 subi)
-  (define-const-logop logand 2 andi.)
-  (define-const-logop logior 2 ori)
-  (define-const-logop logxor 2 xori))
+(defmacro define-var-binop (translate untagged-penalty op 
+			    &optional arg-swap restore-fixnum-mask)
+  `(progn
+     (define-vop (,(symbolicate "FAST-" translate "/FIXNUM=>FIXNUM")
+		  fast-fixnum-binop)
+       ,@(when restore-fixnum-mask
+	   `((:temporary (:sc non-descriptor-reg) temp)))
+       (:translate ,translate)
+       (:generator 2
+	 ,(if arg-swap
+	     `(inst ,op ,(if restore-fixnum-mask 'temp 'r) y x)
+	     `(inst ,op ,(if restore-fixnum-mask 'temp 'r) x y))
+	 ;; FIXME: remind me what convention we used for 64bitizing
+	 ;; stuff?  -- CSR, 2003-08-27
+	 ,@(when restore-fixnum-mask
+	     `((inst clrrwi r temp (1- n-lowtag-bits))))))
+     (define-vop (,(symbolicate "FAST-" translate "/SIGNED=>SIGNED")
+		  fast-signed-binop)
+       (:translate ,translate)
+       (:generator ,(1+ untagged-penalty)
+         ,(if arg-swap
+	     `(inst ,op r y x)
+	     `(inst ,op r x y))))
+     (define-vop (,(symbolicate "FAST-" translate "/UNSIGNED=>UNSIGNED")
+		  fast-unsigned-binop)
+       (:translate ,translate)
+       (:generator ,(1+ untagged-penalty)
+	 ,(if arg-swap
+	     `(inst ,op r y x)
+	     `(inst ,op r x y))))))
+
+
+(defmacro define-const-binop (translate untagged-penalty op)
+  `(progn
+     
+     (define-vop (,(symbolicate 'fast- translate '-c/fixnum=>fixnum)
+		  fast-fixnum-binop-c)
+       (:translate ,translate)
+       (:generator 1
+	 (inst ,op r x (fixnumize y))))
+     (define-vop (,(symbolicate 'fast- translate '-c/signed=>signed)
+		  fast-signed-binop-c)
+       (:translate ,translate)
+       (:generator ,untagged-penalty
+	 (inst ,op r x y)))
+     (define-vop (,(symbolicate 'fast- translate '-c/unsigned=>unsigned)
+		  fast-unsigned-binop-c)
+       (:translate ,translate)
+       (:generator ,untagged-penalty
+	 (inst ,op r x y)))))
+
+(defmacro define-const-logop (translate untagged-penalty op)
+  `(progn
+     
+     (define-vop (,(symbolicate 'fast- translate '-c/fixnum=>fixnum)
+		  fast-fixnum-logop-c)
+       (:translate ,translate)
+       (:generator 1
+	 (inst ,op r x (fixnumize y))))
+     (define-vop (,(symbolicate 'fast- translate '-c/signed=>signed)
+		  fast-signed-logop-c)
+       (:translate ,translate)
+       (:generator ,untagged-penalty
+	 (inst ,op r x y)))
+     (define-vop (,(symbolicate 'fast- translate '-c/unsigned=>unsigned)
+		  fast-unsigned-logop-c)
+       (:translate ,translate)
+       (:generator ,untagged-penalty
+	 (inst ,op r x y)))))
+
+); eval-when
+
+(define-var-binop + 4 add)
+(define-var-binop - 4 sub)
+(define-var-binop logand 2 and)
+(define-var-binop logandc1 2 andc t)
+(define-var-binop logandc2 2 andc)
+(define-var-binop logior 2 or)
+(define-var-binop logorc1 2 orc t t)
+(define-var-binop logorc2 2 orc nil t)
+(define-var-binop logxor 2 xor)
+(define-var-binop logeqv 2 eqv nil t)
+(define-var-binop lognand 2 nand nil t)
+(define-var-binop lognor 2 nor nil t)
+
+(define-const-binop + 4 addi)
+(define-const-binop - 4 subi)
+(define-const-logop logand 2 andi.)
+(define-const-logop logior 2 ori)
+(define-const-logop logxor 2 xori)
+
 
 ;;; Special case fixnum + and - that trap on overflow.  Useful when we
 ;;; don't know that the output type is a fixnum.
@@ -474,26 +483,20 @@
     (sb!c::give-up-ir1-transform))
   '(%primitive fast-ash-left-mod32/unsigned=>unsigned integer count))
 
-(macrolet ((define-modular-backend (fun &optional constantp)
-             (collect ((forms))
-               (dolist (info '((29 fixnum) (32 unsigned)))
-                 (destructuring-bind (width regtype) info
-                   (let ((mfun-name (intern (format nil "~A-MOD~A" fun width)))
-                         (mvop (intern (format nil "FAST-~A-MOD~A/~A=>~A"
-                                               fun width regtype regtype)))
-                         (mcvop (intern (format nil "FAST-~A-MOD~A-C/~A=>~A"
-                                                fun width regtype regtype)))
-                         (vop (intern (format nil "FAST-~A/~A=>~A"
-                                              fun regtype regtype)))
-                         (cvop (intern (format nil "FAST-~A-C/~A=>~A"
-                                               fun regtype regtype))))
-                     (forms `(define-modular-fun ,mfun-name (x y) ,fun ,width))
-                     (forms `(define-vop (,mvop ,vop)
-                              (:translate ,mfun-name)))
-                     (when constantp
-                       (forms `(define-vop (,mcvop ,cvop)
-                                (:translate ,mfun-name)))))))
-               `(progn ,@(forms)))))
+(macrolet 
+    ((define-modular-backend (fun &optional constantp)
+       (let ((mfun-name (symbolicate fun '-mod32))
+	     (modvop (symbolicate 'fast- fun '-mod32/unsigned=>unsigned))
+	     (modcvop (symbolicate 'fast- fun 'mod32-c/unsigned=>unsigned))
+	     (vop (symbolicate 'fast- fun '/unsigned=>unsigned))
+	     (cvop (symbolicate 'fast- fun '-c/unsigned=>unsigned)))
+	 `(progn
+	    (define-modular-fun ,mfun-name (x y) ,fun 32)
+	    (define-vop (,modvop ,vop)
+	      (:translate ,mfun-name))
+	    ,@(when constantp
+		`((define-vop (,modcvop ,cvop)
+		    (:translate ,mfun-name))))))))
   (define-modular-backend + t)
   (define-modular-backend - t)
   (define-modular-backend * t)

@@ -580,34 +580,16 @@
   
 
 ;;;; modular functions
-
-(macrolet ((define-modular-backend (fun &optional constantp)
-             (collect ((forms))
-               (dolist (info '((29 fixnum) (32 unsigned)))
-                 (destructuring-bind (width regtype) info
-                   (let ((mfun-name (intern (format nil "~A-MOD~A" fun width)))
-                         (mvop (intern (format nil "FAST-~A-MOD~A/~A=>~A"
-                                               fun width regtype regtype)))
-                         (mcvop (intern (format nil "FAST-~A-MOD~A-C/~A=>~A"
-                                                fun width regtype regtype)))
-                         (vop (intern (format nil "FAST-~A/~A=>~A"
-                                              fun regtype regtype)))
-                         (cvop (intern (format nil "FAST-~A-C/~A=>~A"
-                                               fun regtype regtype))))
-                     (forms `(define-modular-fun ,mfun-name (x y) ,fun ,width))
-                     (forms `(define-vop (,mvop ,vop)
-                              (:translate ,mfun-name)))
-                     (when constantp
-                       (forms `(define-vop (,mcvop ,cvop)
-                                (:translate ,mfun-name)))))))
-               `(progn ,@(forms)))))
-  (define-modular-backend + t)
-  (define-modular-backend - t)
-  ;; FIXME: constant versions of these could be defined if anybody
-  ;; cared enough to implement them. -- CSR/NJF
-  (define-modular-backend logxor)
-  (define-modular-backend logandc1)
-  (define-modular-backend logandc2))
+(define-modular-fun +-mod32 (x y) + 32)
+(define-vop (fast-+-mod32/unsigned=>unsigned fast-+/unsigned=>unsigned)
+  (:translate +-mod32))
+(define-vop (fast-+-mod32-c/unsigned=>unsigned fast-+-c/unsigned=>unsigned)
+  (:translate +-mod32))
+(define-modular-fun --mod32 (x y) - 32)
+(define-vop (fast---mod32/unsigned=>unsigned fast--/unsigned=>unsigned)
+  (:translate --mod32))
+(define-vop (fast---mod32-c/unsigned=>unsigned fast---c/unsigned=>unsigned)
+  (:translate --mod32))
 
 (define-vop (fast-ash-left-mod32-c/unsigned=>unsigned
 	     fast-ash-c/unsigned=>unsigned)
@@ -632,6 +614,21 @@
   (:policy :fast-safe)
   (:generator 1
     (inst uaddcm zero-tn x res)))
+
+(macrolet
+    ((define-modular-backend (fun)
+       (let ((mfun-name (symbolicate fun '-mod32))
+	     ;; FIXME: if anyone cares, add constant-arg vops.  --
+	     ;; CSR, 2003-09-16
+	     (modvop (symbolicate 'fast- fun '-mod32/unsigned=>unsigned))
+	     (vop (symbolicate 'fast- fun '/unsigned=>unsigned)))
+	 `(progn
+	    (define-modular-fun ,mfun-name (x y) ,fun 32)
+	    (define-vop (,modvop ,vop)
+	      (:translate ,mfun-name))))))
+  (define-modular-backend logxor)
+  (define-modular-backend logandc1)
+  (define-modular-backend logandc2))
 
 (define-source-transform logeqv (&rest args)
   (if (oddp (length args))

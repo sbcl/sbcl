@@ -1234,34 +1234,21 @@
 
 ;;;; Modular functions
 
-(macrolet ((define-modular-backend (fun &optional constantp)
-             (collect ((forms))
-               (dolist (info '((60 fixnum) (64 unsigned)))
-                 (destructuring-bind (width regtype) info
-                   (let ((mfun-name (intern (format nil "~A-MOD~A" fun width)))
-                         (mvop (intern (format nil "FAST-~A-MOD~A/~A=>~A"
-                                               fun width regtype regtype)))
-                         (mcvop (intern (format nil "FAST-~A-MOD~A-C/~A=>~A"
-                                                fun width regtype regtype)))
-                         (vop (intern (format nil "FAST-~A/~A=>~A"
-                                              fun regtype regtype)))
-                         (cvop (intern (format nil "FAST-~A-C/~A=>~A"
-                                               fun regtype regtype))))
-                     (forms `(define-modular-fun ,mfun-name (x y) ,fun ,width))
-                     (forms `(define-vop (,mvop ,vop)
-                              (:translate ,mfun-name)))
-                     (when constantp
-                       (forms `(define-vop (,mcvop ,cvop)
-                                (:translate ,mfun-name)))))))
-               `(progn ,@(forms)))))
-  (define-modular-backend + t)
-  (define-modular-backend - t)
-  (define-modular-backend *)            ; FIXME: there exists a
-                                        ; FAST-*-C/FIXNUM=>FIXNUM VOP which
-                                        ; should be used for the MOD60 case,
-                                        ; but the MOD64 case cannot accept
-                                        ; immediate arguments.
-  (define-modular-backend logxor t))
+(define-modular-fun +-mod64 (x y) + 64)
+(define-vop (fast-+-mod64/unsigned=>unsigned fast-+/unsigned=>unsigned)
+  (:translate +-mod64))
+(define-vop (fast-+-mod64-c/unsigned=>unsigned fast-+-c/unsigned=>unsigned)
+  (:translate +-mod64))
+(define-modular-fun --mod64 (x y) - 64)
+(define-vop (fast---mod64/unsigned=>unsigned fast--/unsigned=>unsigned)
+  (:translate --mod64))
+(define-vop (fast---mod64-c/unsigned=>unsigned fast---c/unsigned=>unsigned)
+  (:translate --mod64))
+
+(define-modular-fun *-mod64 (x y) * 64)
+(define-vop (fast-*-mod64/unsigned=>unsigned fast-*/unsigned=>unsigned)
+  (:translate *-mod64))
+;;; (no -C variant as x86 MUL instruction doesn't take an immediate)
 
 (define-vop (fast-ash-left-mod64-c/unsigned=>unsigned
              fast-ash-c/unsigned=>unsigned)
@@ -1316,6 +1303,14 @@
   (:generator 1
     (move r x)
     (inst not r)))
+
+(define-modular-fun logxor-mod64 (x y) logxor 64)
+(define-vop (fast-logxor-mod64/unsigned=>unsigned
+             fast-logxor/unsigned=>unsigned)
+  (:translate logxor-mod64))
+(define-vop (fast-logxor-mod64-c/unsigned=>unsigned
+             fast-logxor-c/unsigned=>unsigned)
+  (:translate logxor-mod64))
 
 (define-source-transform logeqv (&rest args)
   (if (oddp (length args))
