@@ -199,7 +199,10 @@
 
 (sb!disassem:define-argument-type displacement
   :sign-extend t
-  :use-label #'offset-next)
+  :use-label #'offset-next
+  :printer #'(lambda (value stream dstate)
+	       (sb!disassem:maybe-note-assembler-routine value nil dstate)
+	       (print-label value stream dstate)))
 
 (sb!disassem:define-argument-type accum
   :printer #'(lambda (value stream dstate)

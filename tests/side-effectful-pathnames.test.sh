@@ -57,13 +57,13 @@ rm -r $testdir
 # was removed from UNIX-STAT. Let's make sure that it works now.
 #
 # Set up an empty directory to work with.
-testfilestem=$TMPDIR/sbcl-mkdir-test-$$
-if ! rm -rf $testfilestem ; then
-  echo "$testfilestem already exists and cannot be deleted"
+testdir=$TMPDIR/sbcl-mkdir-test-$$
+if ! rm -rf $testdir ; then
+  echo "$testdir already exists and could not be deleted"
   exit 1;
 fi
-mkdir $testfilestem
-cd  $testfilestem
+mkdir $testdir
+cd $testdir
 #
 # Provoke failure.
 $SBCL <<EOF
@@ -76,23 +76,23 @@ $SBCL <<EOF
 EOF
 if [ $? != 52 ]; then
     echo ENSURE-DIRECTORIES-EXIST test failed, unexpected SBCL return code=$?
-    find $testfilestem -print
+    find $testdir -print
     exit 1
 fi
-if [ ! -d $testfilestem/foo/bar ] ; then
-    echo test failed: $testfilestem/foo/bar is not a directory
-    find $testfilestem -print
+if [ ! -d $testdir/foo/bar ] ; then
+    echo test failed: $testdir/foo/bar is not a directory
+    find $testdir -print
     exit 1
 fi;
-if [ ! -d $testfilestem/baz/quux ] ; then
-    echo test failed: $testfilestem/baz/quux is not a directory
-    find $testfilestem -print
+if [ ! -d $testdir/baz/quux ] ; then
+    echo test failed: $testdir/baz/quux is not a directory
+    find $testdir -print
     exit 1
 fi;
 #
 # We succeeded, life is good. Now we don't need the test directory
 # any more; and come back home.
-rm -r $testfilestem
+rm -r $testdir
 cd $original_pwd
 
 # success convention for script

@@ -1031,9 +1031,9 @@
 
 (defun default-directory ()
   #!+sb-doc
-  "Returns the pathname for the default directory. This is the place where
+  "Return the pathname for the default directory. This is the place where
   a file will be written if no directory is specified. This may be changed
-  with setf."
+  with SETF."
   (multiple-value-bind (gr dir-or-error) (sb!unix:unix-current-directory)
     (if gr
 	(let ((*ignore-wildcards* t))

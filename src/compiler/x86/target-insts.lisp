@@ -47,6 +47,13 @@
 	  (unless (or firstp (minusp offset))
 	    (write-char #\+ stream))
 	  (if firstp
-	      (sb!disassem:princ16 offset stream)
-	      (princ offset stream))))))
+            (progn
+              (sb!disassem:princ16 offset stream)
+              (or (minusp offset)
+                  (nth-value 1
+                    (sb!disassem::note-code-constant-absolute offset dstate))
+                  (sb!disassem:maybe-note-assembler-routine offset
+                                                            nil
+                                                            dstate)))
+            (princ offset stream))))))
   (write-char #\] stream))
