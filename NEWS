@@ -914,10 +914,11 @@ changes in sbcl-0.7.0 relative to sbcl-0.6.13:
   ILISP and SBCL left me very deeply nested in the debugger. In the
   short term, this change will probably provoke more ILISP/SBCL 
   squabbles, but hopefully it will be an improvement in the long run.)
-?? minor incompatible change: The default output representation for
-  unprintable ASCII characters which, unlike e.g. #\Newline, don't
-  have names defined in the ANSI Common Lisp standard, is now based
-  on their ASCII symbolic names: #\Nul, #\Soh, #\Stx, etc.
+* minor incompatible change: The CHAR-NAME of unprintable ASCII
+  characters which, unlike e.g. #\Newline and #\Tab, don't have names
+  specified in the ANSI Common Lisp standard, is now based on their
+  ASCII symbolic names (#\Nul, #\Soh, #\Stx, etc.) The old CMU CL
+  names (#\Null, #\^a, #\^b, etc.) are still accepted by NAME-CHAR.
 ?? Old operator names in the style DEF-FOO are now deprecated in
   favor of new corresponding names DEFINE-FOO, for consistency with
   the naming convention used in the ANSI standard (DEFSTRUCT, DEFVAR,

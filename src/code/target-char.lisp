@@ -32,51 +32,53 @@
 (deftype char-code ()
   `(integer 0 (,char-code-limit)))
 
+;;; This is the alist of (character-name . character) for characters
+;;; with long names. The first name in this list for a given character
+;;; is used on typeout and is the preferred form for input.
 (macrolet ((frob (char-names-list)
 	     (collect ((results))
 	       (dolist (code char-names-list)
 		 (destructuring-bind (ccode names) code
 		   (dolist (name names)
 		     (results (cons name (code-char ccode))))))
-	       `(defparameter *char-name-alist* ',(results)
-  #!+sb-doc
-  "This is the alist of (character-name . character) for characters with
-  long names. The first name in this list for a given character is used
-  on typeout and is the preferred form for input."))))
-  (frob ((#x00 ("Null" "^@" "Nul"))
-	 (#x01 ("^a" "Soh"))
-	 (#x02 ("^b" "Stx"))
-	 (#x03 ("^c" "Etx"))
-	 (#x04 ("^d" "Eot"))
-	 (#x05 ("^e" "Enq"))
-	 (#x06 ("^f" "Ack"))
-	 (#x07 ("Bell" "^g" "Bel"))
-	 (#x08 ("Backspace" "^h" "Bs"))
-	 (#x09 ("Tab" "^i" "Ht"))
-	 (#x0A ("Newline" "Linefeed" "^j" "Lf" "Nl" ))
+	       `(defparameter *char-name-alist* ',(results)))))
+  ;; Note: The *** markers here indicate character names which are
+  ;; required by the ANSI specification of #'CHAR-NAME. For the others,
+  ;; we prefer the ASCII standard name.
+  (frob ((#x00 ("Nul" "Null" "^@"))
+	 (#x01 ("Soh" "^a"))
+	 (#x02 ("Stx" "^b"))
+	 (#x03 ("Etx" "^c"))
+	 (#x04 ("Eot" "^d"))
+	 (#x05 ("Enq" "^e"))
+	 (#x06 ("Ack" "^f"))
+	 (#x07 ("Bel" "Bell" "^g"))
+	 (#x08 ("Backspace" "^h" "Bs")) ; *** See Note above.
+	 (#x09 ("Tab" "^i" "Ht")) ; *** See Note above.
+	 (#x0A ("Newline" "Linefeed" "^j" "Lf" "Nl" )) ; *** See Note above.
 	 (#x0B ("Vt" "^k"))
-	 (#x0C ("Page" "^l" "Form" "Formfeed" "Ff" "Np"))
-	 (#x0D ("Return" "^m" "Cr"))
-	 (#x0E ("^n" "So"))
-	 (#x0F ("^o" "Si"))
-	 (#x10 ("^p" "Dle"))
-	 (#x11 ("^q" "Dc1"))
-	 (#x12 ("^r" "Dc2"))
-	 (#x13 ("^s" "Dc3"))
-	 (#x14 ("^t" "Dc4"))
-	 (#x15 ("^u" "Nak"))
-	 (#x16 ("^v" "Syn"))
-	 (#x17 ("^w" "Etb"))
-	 (#x18 ("^x" "Can"))
-	 (#x19 ("^y" "Em"))
-	 (#x1A ("^z" "Sub"))
-	 (#x1B ("Escape" "^[" "Altmode" "Esc" "Alt"))
-	 (#x1C ("^\\" "Fs"))
-	 (#x1D ("^]" "Gs"))
-	 (#x1E ("^^" "Rs"))
-	 (#x1F ("^_" "Us"))
-	 (#x20 ("Space" "Sp"))
-	 (#x7f ("Rubout" "Delete" "Del")))))
+	 (#x0C ("Page" "^l" "Form" "Formfeed" "Ff" "Np")) ; *** See Note above.
+	 (#x0D ("Return" "^m" "Cr")) ; *** See Note above.
+	 (#x0E ("So" "^n"))
+	 (#x0F ("Si" "^o"))
+	 (#x10 ("Dle" "^p"))
+	 (#x11 ("Dc1" "^q"))
+	 (#x12 ("Dc2" "^r"))
+	 (#x13 ("Dc3" "^s"))
+	 (#x14 ("Dc4" "^t"))
+	 (#x15 ("Nak" "^u"))
+	 (#x16 ("Syn" "^v"))
+	 (#x17 ("Etb" "^w"))
+	 (#x18 ("Can" "^x"))
+	 (#x19 ("Em" "^y"))
+	 (#x1A ("Sub" "^z"))
+	 (#x1B ("Esc" "Escape" "^[" "Altmode" "Alt"))
+	 (#x1C ("Fs" "^\\"))
+	 (#x1D ("Gs" "^]"))
+	 (#x1E ("Rs" "^^"))
+	 (#x1F ("Us" "^_"))
+	 (#x20 ("Space" "Sp")) ; *** See Note above.
+	 (#x7f ("Rubout" "Delete" "Del"))))) ; *** See Note above.
 
 ;;;; accessor functions
 
@@ -88,8 +90,8 @@
 
 (defun char-int (char)
   #!+sb-doc
-  "Return the integer code of CHAR. This is the same as char-code, as
-   CMU Common Lisp does not implement character bits or fonts."
+  "Return the integer code of CHAR. (In SBCL this is the same as CHAR-CODE, as
+   there are no character bits or fonts.)"
   (char-code char))
 
 (defun code-char (code)
@@ -100,7 +102,7 @@
 
 (defun character (object)
   #!+sb-doc
-  "Coerces its argument into a character object if possible. Accepts
+  "Coerce OBJECT into a CHARACTER if possible. Legal inputs are 
   characters, strings and symbols of length 1."
   (flet ((do-error (control args)
 	   (error 'simple-type-error
@@ -123,14 +125,13 @@
 
 (defun char-name (char)
   #!+sb-doc
-  "Given a character object, char-name returns the name for that
-  object (a symbol)."
+  "Return the name (a STRING) for a CHARACTER object."
   (car (rassoc char *char-name-alist*)))
 
 (defun name-char (name)
   #!+sb-doc
-  "Given an argument acceptable to string, name-char returns a character
-  object whose name is that symbol, if one exists. Otherwise, () is returned."
+  "Given an argument acceptable to STRING, NAME-CHAR returns a character
+  whose name is that string, if one exists. Otherwise, NIL is returned."
   (cdr (assoc (string name) *char-name-alist* :test #'string-equal)))
 
 ;;;; predicates

@@ -5,9 +5,9 @@ for 0.7.0:
 	leaving some filing for later:-) from the monster
 	EVAL/EVAL-WHEN/%COMPILE/DEFUN/DEFSTRUCT cleanup:
 	** made inlining DEFUN inside MACROLET work again
-* incompatible changes listed in NEWS:
-	** changed default output representation of *PRINT-ESCAPE*-ed
-		unprintable ASCII characters to #\Nul, #\Soh, etc.
+	** (SB-DEBUG:BACKTRACE) output should start with something
+		including the name BACKTRACE, not (as in 0.pre7.88)
+		just "0: (\"hairy arg processor\" ...)"
 * more renaming in global external names:
 	** used DEFINE-THE-FOO-THING and DEFFOO style consistently (and 
 		deprecated supported extensions named in the DEF-FOO
