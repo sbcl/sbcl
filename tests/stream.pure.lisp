@@ -102,3 +102,23 @@
   (assert (char= (read-char stream) #\a))
   (assert (file-position stream :end))
   (assert (eq (read-char stream nil 'foo) 'foo)))
+
+;;; MAKE-STRING-OUTPUT-STREAM and WITH-OUTPUT-TO-STRING take an
+;;; :ELEMENT-TYPE keyword argument
+(macrolet ((frob (element-type-form)
+	     `(progn
+		(let ((s (with-output-to-string 
+			   (s nil ,@(when element-type-form
+				      `(:element-type ,element-type-form))))))
+		  (assert (typep s '(simple-array ,(if element-type-form
+						       (eval element-type-form)
+						       'character)
+						  (0)))))
+		(get-output-stream-string 
+		 (make-string-output-stream
+		  ,@(when element-type-form
+		      `(:element-type ,element-type-form)))))))
+  (frob nil)
+  (frob 'character)
+  (frob 'base-char)
+  (frob 'nil))

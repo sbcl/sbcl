@@ -1182,12 +1182,16 @@
 		      (sout #'string-sout)
 		      (misc #'string-out-misc)
                       ;; The string we throw stuff in.
-                      (string (make-string 40)
+                      (string (missing-arg)
 			      :type (simple-array character (*))))
-	    (:constructor make-string-output-stream ())
+	    (:constructor make-string-output-stream 
+			  (&key (element-type 'character)
+			   &aux (string (make-string 40))))
 	    (:copier nil))
   ;; Index of the next location to use.
-  (index 0 :type fixnum))
+  (index 0 :type fixnum)
+  ;; Requested element type
+  (element-type 'character))
 
 #!+sb-doc
 (setf (fdocumentation 'make-string-output-stream 'function)
@@ -1254,8 +1258,19 @@
 (defun get-output-stream-string (stream)
   (declare (type string-output-stream stream))
   (let* ((length (string-output-stream-index stream))
-	 (result (make-string length)))
-    (replace result (string-output-stream-string stream))
+	 (element-type (string-output-stream-element-type stream))
+	 (result 
+	  (case element-type
+	    ;; Overwhelmingly common case; can be inlined.
+	    ((character) (make-string length))
+	    (t (make-string length :element-type element-type)))))
+    ;; For the benefit of the REPLACE transform, let's do this, so
+    ;; that the common case isn't ludicrously expensive.
+    (etypecase result 
+      ((simple-array character (*)) 
+       (replace result (string-output-stream-string stream)))
+      ((simple-array nil (*))
+       (replace result (string-output-stream-string stream))))
     (setf (string-output-stream-index stream) 0)
     result))
 

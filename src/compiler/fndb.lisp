@@ -919,7 +919,10 @@
 (defknown make-echo-stream (stream stream) stream (flushable))
 (defknown make-string-input-stream (string &optional index index) stream
   (flushable unsafe))
-(defknown make-string-output-stream () stream (flushable))
+(defknown make-string-output-stream 
+    (&key (:element-type type-specifier)) 
+    stream 
+  (flushable))
 (defknown get-output-stream-string (stream) simple-string ())
 (defknown streamp (t) boolean (movable foldable flushable))
 (defknown stream-element-type (stream) type-specifier

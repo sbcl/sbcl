@@ -1937,6 +1937,11 @@ changes in sbcl-0.8.2 relative to sbcl-0.8.1:
     ** condition slot accessors are methods.
     ** (VECTOR NIL) is a subtype of STRING.
 
+changes in sbcl-0.8.3 relative to sbcl-0.8.2:
+  * bug fix: WITH-OUTPUT-TO-STRING (and MAKE-STRING-OUTPUT-STREAM) now
+    accept and act upon their :ELEMENT-TYPE keyword argument.
+    (reported by Edi Weitz)
+
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles
     down, it might impact TRACE. They both encapsulate functions, and

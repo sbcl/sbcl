@@ -363,8 +363,9 @@
 	   ,@(when index
 	       `((setf ,index (string-input-stream-current ,var)))))))))
 
-(defmacro-mundanely with-output-to-string ((var &optional string)
-					   &body forms-decls)
+(defmacro-mundanely with-output-to-string 
+    ((var &optional string &key (element-type ''character))
+     &body forms-decls)
   (multiple-value-bind (forms decls) (parse-body forms-decls nil)
     (if string
       `(let ((,var (make-fill-pointer-output-stream ,string)))
@@ -372,7 +373,7 @@
   	 (unwind-protect
 	     (progn ,@forms)
   	   (close ,var)))
-      `(let ((,var (make-string-output-stream)))
+      `(let ((,var (make-string-output-stream :element-type ,element-type)))
   	 ,@decls
   	 (unwind-protect
 	     (progn ,@forms)
