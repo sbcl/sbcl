@@ -37,13 +37,7 @@
 ;;; strings in the unasterisked versions and using this in the
 ;;; transforms conditional on SAFETY>SPEED,SPACE).
 (defun %check-vector-sequence-bounds (vector start end)
-  (declare (type vector vector)
-	   (type index start)
-	   (type (or index null) end))
-  (let ((length (length vector)))
-    (if (<= 0 start (or end length) length)
-	(or end length)
-	(signal-bounding-indices-bad-error string start end))))
+  (%check-vector-sequence-bounds vector start end))
 
 (eval-when (:compile-toplevel)
 ;;; WITH-ONE-STRING is used to set up some string hacking things. The
