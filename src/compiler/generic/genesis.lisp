@@ -80,8 +80,8 @@
   "the alignment requirement for spaces in the target.
   Must be at least (ASH 1 DESCRIPTOR-LOW-BITS)")
 
-;;; a GENESIS-time representation of a memory space (e.g. read-only space,
-;;; dynamic space, or static space)
+;;; a GENESIS-time representation of a memory space (e.g. read-only
+;;; space, dynamic space, or static space)
 (defstruct (gspace (:constructor %make-gspace)
 		   (:copier nil))
   ;; name and identifier for this GSPACE
@@ -365,8 +365,9 @@
                                         ,(* i 8))))
 		   (ash-list-be
 		    (loop for i from 0 to (1- number-octets)
-			  collect `(ash (aref byte-vector (+ byte-index
-							   ,(- number-octets 1 i)))
+			  collect `(ash (aref byte-vector
+					      (+ byte-index
+						 ,(- number-octets 1 i)))
 				        ,(* i 8))))
                    (setf-list-le
                     (loop for i from 0 to (1- number-octets)
@@ -383,14 +384,14 @@
 		   (aver (= sb!vm:n-word-bits 32))
 		   (aver (= sb!vm:n-byte-bits 8))
 		   (logior ,@(ecase sb!c:*backend-byte-order*
-				    (:little-endian ash-list-le)
-				    (:big-endian ash-list-be))))
-		(defun (setf ,name) (new-value byte-vector byte-index)
-		  (aver (= sb!vm:n-word-bits 32))
-		  (aver (= sb!vm:n-byte-bits 8))
-		  (setf ,@(ecase sb!c:*backend-byte-order*
-				 (:little-endian setf-list-le)
-				 (:big-endian setf-list-be))))))))
+			       (:little-endian ash-list-le)
+			       (:big-endian ash-list-be))))
+		 (defun (setf ,name) (new-value byte-vector byte-index)
+		   (aver (= sb!vm:n-word-bits 32))
+		   (aver (= sb!vm:n-byte-bits 8))
+		   (setf ,@(ecase sb!c:*backend-byte-order*
+			     (:little-endian setf-list-le)
+			     (:big-endian setf-list-be))))))))
   (make-byte-vector-ref-n 8)
   (make-byte-vector-ref-n 16)
   (make-byte-vector-ref-n 32))

@@ -1911,7 +1911,7 @@
 	   (let ((,ltns (ir2-block-local-tns ,n-block)))
 	     ;; Do TNs always-live in this block and live :MORE TNs.
 	     (do ((,n-conf (ir2-block-global-tns ,n-block)
-			   (global-conflicts-next ,n-conf)))
+			   (global-conflicts-next-blockwise ,n-conf)))
 		 ((null ,n-conf))
 	       (when (or (eq (global-conflicts-kind ,n-conf) :live)
 			 (let ((,i (global-conflicts-number ,n-conf)))

@@ -704,7 +704,7 @@
 	       ((:environment :debug-environment) (incf environment))
 	       (t (incf global)))
 	     (do ((conf (tn-global-conflicts tn)
-			(global-conflicts-tn-next conf)))
+			(global-conflicts-next-tnwise conf)))
 		 ((null conf))
 	       (incf confs)))
 	    (t
@@ -755,7 +755,7 @@
 			    (component-info component)))
 	  (barf "~S not in COMPONENT-TNs for ~S" tn component)))
        (conf
-	(do ((conf conf (global-conflicts-tn-next conf))
+	(do ((conf conf (global-conflicts-next-tnwise conf))
 	     (prev nil conf))
 	    ((null conf))
 	  (unless (eq (global-conflicts-tn conf) tn)
@@ -798,7 +798,7 @@
 (defun check-block-conflicts (component)
   (do-ir2-blocks (block component)
     (do ((conf (ir2-block-global-tns block)
-	       (global-conflicts-next conf))
+	       (global-conflicts-next-blockwise conf))
 	 (prev nil conf))
 	((null conf))
       (when prev
@@ -806,7 +806,7 @@
 		   (tn-number (global-conflicts-tn prev)))
 	  (barf "~S and ~S out of order in ~S" prev conf block)))
 
-      (unless (find-in #'global-conflicts-tn-next
+      (unless (find-in #'global-conflicts-next-tnwise
 		       conf
 		       (tn-global-conflicts
 			(global-conflicts-tn conf)))
@@ -835,7 +835,7 @@
 	   (fp (ir2-physenv-old-fp 2env))
 	   (2block (block-info (lambda-block (physenv-lambda env)))))
       (do ((conf (ir2-block-global-tns 2block)
-		 (global-conflicts-next conf)))
+		 (global-conflicts-next-blockwise conf)))
 	  ((null conf))
 	(let ((tn (global-conflicts-tn conf)))
 	  (unless (or (eq (global-conflicts-kind conf) :write)
@@ -1120,7 +1120,7 @@
 (defun add-always-live-tns (block tn)
   (declare (type ir2-block block) (type tn tn))
   (do ((conf (ir2-block-global-tns block)
-	     (global-conflicts-next conf)))
+	     (global-conflicts-next-blockwise conf)))
       ((null conf))
     (when (eq (global-conflicts-kind conf) :live)
       (let ((btn (global-conflicts-tn conf)))
@@ -1154,7 +1154,7 @@
   (let ((confs (tn-global-conflicts tn)))
     (cond (confs
 	   (clrhash *list-conflicts-table*)
-	   (do ((conf confs (global-conflicts-tn-next conf)))
+	   (do ((conf confs (global-conflicts-next-tnwise conf)))
 	       ((null conf))
 	     (let ((block (global-conflicts-block conf)))
 	       (add-always-live-tns block tn)
@@ -1179,7 +1179,7 @@
 				(not (tn-global-conflicts tn)))
 		       (res tn)))))
 	       (do ((gtn (ir2-block-global-tns block)
-			 (global-conflicts-next gtn)))
+			 (global-conflicts-next-blockwise gtn)))
 		   ((null gtn))
 		 (when (or (eq (global-conflicts-kind gtn) :live)
 			   (/= (sbit confs (global-conflicts-number gtn)) 0))

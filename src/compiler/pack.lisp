@@ -52,7 +52,7 @@
      (confs
       (let ((loc-confs (svref (finite-sb-conflicts sb) offset))
 	    (loc-live (svref (finite-sb-always-live sb) offset)))
-	(do ((conf confs (global-conflicts-tn-next conf)))
+	(do ((conf confs (global-conflicts-next-tnwise conf)))
 	    ((null conf)
 	     nil)
 	  (let* ((block (global-conflicts-block conf))
@@ -109,7 +109,7 @@
 	    (setf (sbit loc-live num) 1)
 	    (set-bit-vector (svref loc-confs num))))
 	 (confs
-	  (do ((conf confs (global-conflicts-tn-next conf)))
+	  (do ((conf confs (global-conflicts-next-tnwise conf)))
 	      ((null conf))
 	    (let* ((block (global-conflicts-block conf))
 		   (num (ir2-block-number block))

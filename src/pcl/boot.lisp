@@ -817,11 +817,6 @@ bootstrapping.
      (trace-emf-call ,emf ,restp (list ,@required-args+rest-arg))
      (invoke-fast-method-call ,emf ,@required-args+rest-arg)))
 
-;;; KLUDGE: an opaque-to-the-compiler IDENTITY function to hide code
-;;; from the too-easily-bewildered compiler type checker
-(defun trust-me-i-know-what-i-am-doing (x)
-  x)
-
 (defmacro invoke-effective-method-function (emf restp
 						&rest required-args+rest-arg)
   (unless (constantp restp)
@@ -859,27 +854,8 @@ bootstrapping.
 		  (let ((.new-value. ,(car required-args+rest-arg))
 			(.slots. (get-slots-or-nil
 				  ,(car required-args+rest-arg))))
-		    ;; KLUDGE: As of sbcl-0.7.4.20 or so, there's not
-		    ;; enough information available either at
-		    ;; macroexpansion time or at compile time to
-		    ;; exclude the possibility that a two-argument
-		    ;; CALL-NEXT-METHOD might be a FIXNUM-encoded slot
-		    ;; writer, and when the compiler sees into this
-		    ;; macroexpansion, it can tell that the type
-		    ;; of this clause -- just in case of being
-		    ;; a slot writer -- doesn't match the type
-		    ;; needed for CALL-NEXT-METHOD, and complain.
-		    ;; (E.g. in
-		    ;;   (defmethod get-price ((obj1 a) (obj2 c))
-		    ;;     (* 3 (call-next-method)))
-		    ;; in the original bug report from Stig Erik
-		    ;; Sandoe. As a quick hack to make the bogus
-		    ;; warning go away we use this
-		    ;; opaque-to-the-compiler IDENTITY operation to
-		    ;; hide any possible type mismatch.)
-		    (trust-me-i-know-what-i-am-doing
-		     (when .slots.
-		       (setf (clos-slots-ref .slots. ,emf) .new-value.)))))))
+		    (when .slots.
+		      (setf (clos-slots-ref .slots. ,emf) .new-value.))))))
 	   ;; (In cmucl-2.4.8 there was a commented-out third ,@(WHEN
 	   ;; ...) clause here to handle SLOT-BOUNDish stuff. Since
 	   ;; there was no explanation and presumably the code is 10+
@@ -977,7 +953,32 @@ bootstrapping.
 
 (defmacro bind-fast-lexical-method-macros ((args rest-arg next-method-call)
 					   &body body)
-  `(macrolet ((call-next-method-bind (&body body)
+  `(macrolet ((narrowed-emf (emf)
+	        ;; INVOKE-EFFECTIVE-METHOD-FUNCTION has code in it to
+		;; dispatch on the possibility that EMF might be of
+		;; type FIXNUM (as an optimized representation of a
+		;; slot accessor). But as far as I (WHN 2002-06-11)
+		;; can tell, it's impossible for such a representation
+		;; to end up as .NEXT-METHOD-CALL. By reassuring
+		;; INVOKE-E-M-F that when called from this context
+		;; it needn't worry about the FIXNUM case, we can
+		;; keep those cases from being compiled, which is
+		;; good both because it saves bytes and because it
+		;; avoids annoying type mismatch compiler warnings.
+		;;
+                ;; KLUDGE: In sbcl-0.7.4.29, the compiler's type
+		;; system isn't smart enough about NOT and intersection
+		;; types to benefit from a (NOT FIXNUM) declaration
+		;; here. -- WHN 2002-06-12
+		;;
+		;; FIXME: Might the FUNCTION type be omittable here,
+		;; leaving only METHOD-CALLs? Failing that, could this
+		;; be documented somehow? (It'd be nice if the types
+		;; involved could be understood without solving the
+                ;; halting problem.)
+                `(the (or function method-call fast-method-call)
+		   ,emf))
+	      (call-next-method-bind (&body body)
                `(let () ,@body))
 	      (call-next-method-body (cnm-args)
                `(if ,',next-method-call
@@ -992,10 +993,11 @@ bootstrapping.
                             (consp cnm-args)
                             (eq (car cnm-args) 'list))
                        `(invoke-effective-method-function
-                         ,',next-method-call nil
+                         (narrowed-emf ,',next-method-call)
+			 nil
                          ,@(cdr cnm-args))
                        (let ((call `(invoke-effective-method-function
-                                     ,',next-method-call
+                                     (narrowed-emf ,',next-method-call)
                                      ,',(not (null rest-arg))
                                      ,@',args
                                      ,@',(when rest-arg `(,rest-arg)))))

@@ -888,7 +888,7 @@
   (writes nil :type (or tn-ref null))
   ;; a link we use when building various temporary TN lists
   (next* nil :type (or tn null))
-  ;; some block that contains a reference to this TN, or Nil if we
+  ;; some block that contains a reference to this TN, or NIL if we
   ;; haven't seen any reference yet. If the TN is local, then this is
   ;; the block it is local to.
   (local nil :type (or ir2-block null))
@@ -899,7 +899,8 @@
   (local-number nil :type (or local-tn-number null))
   ;; If this object is a local TN, this slot is a bit-vector with 1
   ;; for the local-number of every TN that we conflict with.
-  (local-conflicts (make-array local-tn-limit :element-type 'bit
+  (local-conflicts (make-array local-tn-limit
+			       :element-type 'bit
 			       :initial-element 0)
 		   :type local-tn-bit-vector)
   ;; head of the list of GLOBAL-CONFLICTS structures for a global TN.
@@ -907,8 +908,8 @@
   ;; the intersection between the lifetimes for two global TNs to be
   ;; easily found. If null, then this TN is a local TN.
   (global-conflicts nil :type (or global-conflicts null))
-  ;; during lifetime analysis, this is used as a pointer into the
-  ;; conflicts chain, for scanning through blocks in reverse DFO
+  ;; During lifetime analysis, this is used as a pointer into the
+  ;; conflicts chain, for scanning through blocks in reverse DFO.
   (current-conflict nil)
   ;; In a :SAVE TN, this is the TN saved. In a :NORMAL or :ENVIRONMENT
   ;; TN, this is the associated save TN. In TNs with no save TN, this
@@ -940,28 +941,28 @@
 (defstruct (global-conflicts
 	    (:constructor make-global-conflicts (kind tn block number))
 	    (:copier nil))
-  ;; the IR2-Block that this structure represents the conflicts for
+  ;; the IR2-BLOCK that this structure represents the conflicts for
   (block (missing-arg) :type ir2-block)
-  ;; thread running through all the Global-Conflict for Block. This
+  ;; thread running through all the GLOBAL-CONFLICTSs for BLOCK. This
   ;; thread is sorted by TN number
-  (next nil :type (or global-conflicts null))
-  ;; the way that TN is used by Block
+  (next-blockwise nil :type (or global-conflicts null))
+  ;; the way that TN is used by BLOCK
   ;;
-  ;;    :READ
-  ;;	The TN is read before it is written. It starts the block live,
-  ;;	but is written within the block.
+  ;;   :READ
+  ;;	 The TN is read before it is written. It starts the block live,
+  ;;	 but is written within the block.
   ;;
-  ;;    :WRITE
-  ;;	The TN is written before any read. It starts the block dead,
-  ;;	and need not have a read within the block.
+  ;;   :WRITE
+  ;;	 The TN is written before any read. It starts the block dead,
+  ;;	 and need not have a read within the block.
   ;;
-  ;;    :READ-ONLY
-  ;;	The TN is read, but never written. It starts the block live,
-  ;;	and is not killed by the block. Lifetime analysis will promote
-  ;;	:READ-ONLY TNs to :LIVE if they are live at the block end.
+  ;;   :READ-ONLY
+  ;;	 The TN is read, but never written. It starts the block live,
+  ;;	 and is not killed by the block. Lifetime analysis will promote
+  ;;	 :READ-ONLY TNs to :LIVE if they are live at the block end.
   ;;
-  ;;    :LIVE
-  ;;	The TN is not referenced. It is live everywhere in the block.
+  ;;   :LIVE
+  ;;	 The TN is not referenced. It is live everywhere in the block.
   (kind :read-only :type (member :read :write :read-only :live))
   ;; a local conflicts vector representing conflicts with TNs live in
   ;; BLOCK. The index for the local TN number of each TN we conflict
@@ -974,8 +975,8 @@
 	     :type local-tn-bit-vector)
   ;; the TN we are recording conflicts for.
   (tn (missing-arg) :type tn)
-  ;; thread through all the Global-Conflicts for TN
-  (tn-next nil :type (or global-conflicts null))
+  ;; thread through all the GLOBAL-CONFLICTSs for TN
+  (next-tnwise nil :type (or global-conflicts null))
   ;; TN's local TN number in BLOCK. :LIVE TNs don't have local numbers.
   (number nil :type (or local-tn-number null)))
 (defprinter (global-conflicts)
