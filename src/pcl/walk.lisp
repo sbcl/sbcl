@@ -358,13 +358,19 @@
   `(eval-when (:load-toplevel :execute)
      (setf (get-walker-template-internal ',name) ',template)))
 
-(defun get-walker-template (x)
+(defun get-walker-template (x context)
   (cond ((symbolp x)
          (get-walker-template-internal x))
 	((and (listp x) (eq (car x) 'lambda))
 	 '(lambda repeat (eval)))
 	(t
-	 (error "can't get template for ~S" x))))
+	 ;; FIXME: In an ideal world we would do something similar to
+	 ;; COMPILER-ERROR here, replacing the form within the walker
+	 ;; with an error-signalling form. This is slightly less
+	 ;; pretty, but informative non the less. Best is the enemy of
+	 ;; good, etc.
+	 (error "Illegal function call in method body:~%  ~S"
+		context))))
 
 ;;;; the actual templates
 
@@ -452,7 +458,7 @@
 		newform)))
 	 (t
 	  (let* ((fn (car newform))
-		 (template (get-walker-template fn)))
+		 (template (get-walker-template fn newform)))
 	    (if template
 		(if (symbolp template)
 		    (funcall template newform context env)
@@ -623,7 +629,7 @@
 		   (cdr body) fn env doc-string-p declarations)))
 	((and form
 	      (listp form)
-	      (null (get-walker-template (car form)))
+	      (null (get-walker-template (car form) form))
 	      (progn
 		(multiple-value-setq (new-form macrop)
 				     (sb-xc:macroexpand-1 form env))

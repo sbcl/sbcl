@@ -481,20 +481,6 @@ WORKAROUND:
 
   This is probably the same bug as 216
 
-167:
-  In sbcl-0.7.3.11, compiling the (illegal) code 
-    (in-package :cl-user)
-    (defmethod prove ((uustk uustk))
-      (zap ((frob () nil))
-        (frob)))
-  gives the (not terribly clear) error message
-    ; caught ERROR:
-    ;   (during macroexpansion of (DEFMETHOD PROVE ...))
-    ; can't get template for (FROB NIL NIL)
-  The problem seems to be that the code walker used by the DEFMETHOD
-  macro is unhappy with the illegal syntax in the method body, and
-  is giving an unclear error message.
-
 173:
   The compiler sometimes tries to constant-fold expressions before
   it checks to see whether they can be reached. This can lead to 

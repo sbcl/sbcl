@@ -12,6 +12,8 @@ changes in sbcl-0.8.13 relative to sbcl-0.8.12:
   * fixed bug: initialization of condition class metaobjects no longer
     causes an instance of the condition to be created. (reported by Marco
     Baringer)
+  * fixed bug #167: errors signalled due to illegal syntax in method 
+    bodies are now more legible.
   * fixed bug #338: instances of EQL-SPECIFIER are now valid type
     designators and can hence be used with TYPEP.
   * fixed bug #333: CHECK-TYPE now ensures that the type error
