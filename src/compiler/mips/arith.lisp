@@ -1,6 +1,15 @@
+;;;; the VM definition arithmetic VOPs for MIPS
+
+;;;; This software is part of the SBCL system. See the README file for
+;;;; more information.
+;;;;
+;;;; This software is derived from the CMU CL system, which was
+;;;; written at Carnegie Mellon University and released into the
+;;;; public domain. The software is in the public domain and is
+;;;; provided with absolutely no warranty. See the COPYING and CREDITS
+;;;; files for more information.
+
 (in-package "SB!VM")
-
-
 
 ;;;; Unary operations.
 
@@ -250,15 +259,11 @@
   (:results (result :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
-    (cond ((< count 0)
-	   ;; It is a right shift.
-	   (inst srl result number (min (- count) 31)))
-	  ((> count 0)
-	   ;; It is a left shift.
-	   (inst sll result number (min count 31)))
-	  (t
-	   ;; Count=0?  Shouldn't happen, but it's easy:
-	   (move result number)))))
+    (cond 
+      ((< count -31) (move result zero-tn))
+      ((< count 0) (inst srl result number (min (- count) 31)))
+      ((> count 0) (inst sll result number (min count 31)))
+      (t (bug "identity ASH not transformed away")))))
 
 (define-vop (fast-ash-c/signed=>signed)
   (:policy :fast-safe)
@@ -270,15 +275,10 @@
   (:results (result :scs (signed-reg)))
   (:result-types signed-num)
   (:generator 1
-    (cond ((< count 0)
-	   ;; It is a right shift.
-	   (inst sra result number (min (- count) 31)))
-	  ((> count 0)
-	   ;; It is a left shift.
-	   (inst sll result number (min count 31)))
-	  (t
-	   ;; Count=0?  Shouldn't happen, but it's easy:
-	   (move result number)))))
+    (cond 
+      ((< count 0) (inst sra result number (min (- count) 31)))
+      ((> count 0) (inst sll result number (min count 31)))
+      (t (bug "identity ASH not transformed away")))))
 
 (define-vop (signed-byte-32-len)
   (:translate integer-length)
