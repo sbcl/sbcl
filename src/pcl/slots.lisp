@@ -75,34 +75,6 @@
 	 (t
 	  (error "unrecognized instance type")))))
 
-(defun get-class-slot-value-1 (object wrapper slot-name)
-  (let ((entry (assoc slot-name (wrapper-class-slots wrapper))))
-    (if (null entry)
-	(slot-missing (wrapper-class wrapper) object slot-name 'slot-value)
-	(if (eq (cdr entry) +slot-unbound+)
-	    (slot-unbound (wrapper-class wrapper) object slot-name)
-	    (cdr entry)))))
-
-(defun set-class-slot-value-1 (new-value object wrapper slot-name)
-  (let ((entry (assoc slot-name (wrapper-class-slots wrapper))))
-    (if (null entry)
-	(slot-missing (wrapper-class wrapper)
-		      object
-		      slot-name
-		      'setf
-		      new-value)
-	(setf (cdr entry) new-value))))
-
-(defmethod class-slot-value ((class std-class) slot-name)
-  (let ((wrapper (class-wrapper class))
-	(prototype (class-prototype class)))
-    (get-class-slot-value-1 prototype wrapper slot-name)))
-
-(defmethod (setf class-slot-value) (nv (class std-class) slot-name)
-  (let ((wrapper (class-wrapper class))
-	(prototype (class-prototype class)))
-    (set-class-slot-value-1 nv prototype wrapper slot-name)))
-
 (defun find-slot-definition (class slot-name)
   (dolist (slot (class-slots class) nil)
     (when (eql slot-name (slot-definition-name slot))
@@ -112,7 +84,7 @@
   (let* ((class (class-of object))
 	 (slot-definition (find-slot-definition class slot-name)))
     (if (null slot-definition)
-	(slot-missing class object slot-name 'slot-value)
+	(values (slot-missing class object slot-name 'slot-value))
 	(slot-value-using-class class object slot-definition))))
 
 (define-compiler-macro slot-value (&whole form object slot-name)
@@ -125,7 +97,8 @@
   (let* ((class (class-of object))
 	 (slot-definition (find-slot-definition class slot-name)))
     (if (null slot-definition)
-	(slot-missing class object slot-name 'setf new-value)
+	(progn (slot-missing class object slot-name 'setf new-value)
+	       new-value)
 	(setf (slot-value-using-class class object slot-definition)
 	      new-value))))
 
@@ -139,7 +112,7 @@
   (let* ((class (class-of object))
 	 (slot-definition (find-slot-definition class slot-name)))
     (if (null slot-definition)
-	(slot-missing class object slot-name 'slot-boundp)
+	(not (not (slot-missing class object slot-name 'slot-boundp)))
 	(slot-boundp-using-class class object slot-definition))))
 
 (setf (gdefinition 'slot-boundp-normal) #'slot-boundp)
@@ -155,7 +128,8 @@
 	 (slot-definition (find-slot-definition class slot-name)))
     (if (null slot-definition)
 	(slot-missing class object slot-name 'slot-makunbound)
-	(slot-makunbound-using-class class object slot-definition))))
+	(slot-makunbound-using-class class object slot-definition))
+    object))
 
 (defun slot-exists-p (object slot-name)
   (let ((class (class-of object)))
@@ -196,7 +170,7 @@
                            ~S method.~@:>"
 			  slotd 'slot-value-using-class)))))
     (if (eq value +slot-unbound+)
-	(slot-unbound class object (slot-definition-name slotd))
+	(values (slot-unbound class object (slot-definition-name slotd)))
 	value)))
 
 (defmethod (setf slot-value-using-class)
@@ -346,13 +320,15 @@
   (error 'unbound-slot :name slot-name :instance instance))
 
 (defun slot-unbound-internal (instance position)
-  (slot-unbound (class-of instance) instance
-		(etypecase position
-		  (fixnum
-		   (nth position
-			(wrapper-instance-slots-layout (wrapper-of instance))))
-		  (cons
-		   (car position)))))
+  (values
+   (slot-unbound
+    (class-of instance)
+    instance
+    (etypecase position
+      (fixnum
+       (nth position (wrapper-instance-slots-layout (wrapper-of instance))))
+      (cons
+       (car position))))))
 
 (defmethod allocate-instance ((class standard-class) &rest initargs)
   (declare (ignore initargs))

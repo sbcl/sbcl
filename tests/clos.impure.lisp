@@ -592,7 +592,9 @@
 	    'slot-value))
 (assert (eq (funcall (lambda (x) (setf (slot-value x 'baz) 'baz))
 		     (make-instance 'class-with-all-slots-missing))
-	    'setf))
+	    ;; SLOT-MISSING's value is specified to be ignored; we
+	    ;; return NEW-VALUE.
+	    'baz))
 
 ;;; we should be able to specialize on anything that names a class.
 (defclass name-for-class () ())

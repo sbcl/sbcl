@@ -35,19 +35,21 @@
 			(slot-value
 			 (make-method-function
 			  (lambda (obj)
-			    (slot-missing (class-of obj) obj slot-name
-					  'slot-value))))
+			    (values
+			     (slot-missing (class-of obj) obj slot-name
+					   'slot-value)))))
 			(slot-boundp
 			 (make-method-function
 			  (lambda (obj)
-			    (slot-missing (class-of obj) obj slot-name
-					  'slot-boundp))))
+			    (not (not
+				  (slot-missing (class-of obj) obj slot-name
+						'slot-boundp))))))
 			(setf
 			 (make-method-function
 			  (lambda (val obj)
-			    (declare (ignore val))
 			    (slot-missing (class-of obj) obj slot-name
-					  'setf))))))))
+					  'setf val)
+			    val)))))))
 	       (setf (getf (getf initargs :plist) :slot-name-lists)
 		     (list (list nil slot-name)))
 	       (setf (getf (getf initargs :plist) :pv-table-symbol)
@@ -107,9 +109,11 @@
 	 (form
 	  `(let ((.ignore.
 		  (load-time-value
-		   (ensure-accessor 'writer ',writer-name ',slot-name))))
+		   (ensure-accessor 'writer ',writer-name ',slot-name)))
+		 (.new-value. ,new-value))
 	    (declare (ignore .ignore.))
-	    (funcall #',writer-name ,new-value ,object))))
+	    (funcall #',writer-name .new-value. ,object)
+	    .new-value.)))
     (if bindings
 	`(let ,bindings ,form)
 	form)))
@@ -165,27 +169,29 @@
   (declare #.*optimize-speed*)
   (set-fun-name
    (etypecase index
-     (fixnum (if fsc-p
-		 (lambda (instance)
-		   (check-obsolete-instance instance)
-		   (let ((value (clos-slots-ref (fsc-instance-slots instance)
-						index)))
-		     (if (eq value +slot-unbound+)
-			 (slot-unbound (class-of instance) instance slot-name)
-			 value)))
-		 (lambda (instance)
-		   (check-obsolete-instance instance)
-		   (let ((value (clos-slots-ref (std-instance-slots instance)
-					      index)))
-		     (if (eq value +slot-unbound+)
-			 (slot-unbound (class-of instance) instance slot-name)
-			 value)))))
-     (cons   (lambda (instance)
-	       (check-obsolete-instance instance)
-	       (let ((value (cdr index)))
-		 (if (eq value +slot-unbound+)
-		     (slot-unbound (class-of instance) instance slot-name)
-		     value)))))
+     (fixnum
+      (if fsc-p
+	  (lambda (instance)
+	    (check-obsolete-instance instance)
+	    (let ((value (clos-slots-ref (fsc-instance-slots instance) index)))
+	      (if (eq value +slot-unbound+)
+		  (values
+		   (slot-unbound (class-of instance) instance slot-name))
+		  value)))
+	  (lambda (instance)
+	    (check-obsolete-instance instance)
+	    (let ((value (clos-slots-ref (std-instance-slots instance) index)))
+	      (if (eq value +slot-unbound+)
+		  (values
+		   (slot-unbound (class-of instance) instance slot-name))
+		  value)))))
+     (cons
+      (lambda (instance)
+	(check-obsolete-instance instance)
+	(let ((value (cdr index)))
+	  (if (eq value +slot-unbound+)
+	      (values (slot-unbound (class-of instance) instance slot-name))
+	      value)))))
    `(reader ,slot-name)))
 
 (defun make-optimized-std-writer-method-function (fsc-p slot-name index)
@@ -301,7 +307,7 @@
 		  (let ((value (clos-slots-ref (fsc-instance-slots instance)
 					       index)))
 		    (if (eq value +slot-unbound+)
-			(slot-unbound class instance slot-name)
+			(values (slot-unbound class instance slot-name))
 			value)))
 		(lambda (class instance slotd)
 		  (declare (ignore slotd))
@@ -309,14 +315,14 @@
 		  (let ((value (clos-slots-ref (std-instance-slots instance)
 					       index)))
 		    (if (eq value +slot-unbound+)
-			(slot-unbound class instance slot-name)
+			(values (slot-unbound class instance slot-name))
 			value)))))
     (cons   (lambda (class instance slotd)
 	      (declare (ignore slotd))
 	      (check-obsolete-instance instance)
 	      (let ((value (cdr index)))
 		(if (eq value +slot-unbound+)
-		    (slot-unbound class instance slot-name)
+		    (values (slot-unbound class instance slot-name))
 		    value))))))
 
 (defun make-optimized-std-setf-slot-value-using-class-method-function
@@ -389,16 +395,16 @@
 		       (let ((value (clos-slots-ref (get-slots instance)
 						    index)))
 			 (if (eq value +slot-unbound+)
-			     (slot-unbound (class-of instance)
-					   instance
-					   slot-name)
+			     (values (slot-unbound (class-of instance)
+						   instance
+						   slot-name))
 			     value)))
 		      (cons
 		       (let ((value (cdr index)))
 			 (if (eq value +slot-unbound+)
-			     (slot-unbound (class-of instance)
-					   instance
-					   slot-name)
+			     (values (slot-unbound (class-of instance)
+						   instance
+						   slot-name))
 			     value)))
 		      (t
 		       (error "~@<The wrapper for class ~S does not have ~

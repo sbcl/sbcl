@@ -661,7 +661,7 @@
 	      ;; FIXME: FIND-SLOT-DEFAULT throws an error if the slot
 	      ;; is unbound; maybe it should be a CELL-ERROR of some
 	      ;; sort?
-	      (error () (slot-unbound class x slot-name)))))
+	      (error () (values (slot-unbound class x slot-name))))))
     (setf (slot-definition-writer-function slotd)
 	  (lambda (v x)
 	    (condition-writer-function x v slot-name)))
