@@ -374,8 +374,7 @@
 	   (pieces "/"))
 	  (t
 	   (error "invalid directory component: ~S" dir)))))
-    (unless (null (pieces))
-      (apply #'concatenate 'simple-string (pieces)))))
+    (apply #'concatenate 'simple-string (pieces))))
 
 (defun unparse-unix-directory (pathname)
   (declare (type pathname pathname))
@@ -402,8 +401,7 @@
 	(strings (if (eq version :wild)
 		     ".*"
 		     (format nil ".~D" version)))))
-    (unless (null (strings))
-      (apply #'concatenate 'simple-string (strings)))))
+    (apply #'concatenate 'simple-string (strings))))
 
 (/show0 "filesys.lisp 406")
 
