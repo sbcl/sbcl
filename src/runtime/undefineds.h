@@ -38,7 +38,8 @@ F(brk)
 #if defined(hpux) \
      || defined(SVR4) \
      || defined(__FreeBSD__) \
-     || defined(__OpenBSD__)
+     || defined(__OpenBSD__) \
+     || defined(__NetBSD__)
 F(cfgetospeed)
 F(cfsetospeed)
 F(cfgetispeed)
@@ -152,7 +153,7 @@ F(sigreturn)
 #if !defined(SVR4)
 F(sigsetmask)
 #endif
-#if !defined(SVR4) && !defined(__FreeBSD__) && !defined(__OpenBSD__)
+#if !defined(SVR4) && !defined(__FreeBSD__) && !defined(__OpenBSD__) && !defined(__NetBSD__)
 F(sigstack)
 F(sigvec)
 #endif
@@ -177,6 +178,7 @@ F(readdir)
      || defined(SVR4) \
      || defined(__FreeBSD__) \
      || defined(__OpenBSD__) \
+     || defined(__NetBSD__) \
      || defined(__linux__)
 F(tcgetattr)
 F(tcsetattr)
@@ -194,7 +196,8 @@ F(umask)
      && !defined(parisc) \
      && !defined(SOLARIS) \
      && !defined(__OpenBSD__) \
-     && !defined(__FreeBSD__)
+     && !defined(__FreeBSD__) \
+     && !defined(__NetBSD__)
 F(umount)
 #endif
 F(unlink)
@@ -204,7 +207,7 @@ F(utimes)
 #ifndef irix
 F(vfork)
 #endif
-#if !defined(osf1) && !defined(__FreeBSD__) && !defined(__OpenBSD__)
+#if !defined(osf1) && !defined(__FreeBSD__) && !defined(__OpenBSD__) && !defined(__NetBSD__)
 F(vhangup)
 #endif
 F(wait)

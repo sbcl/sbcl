@@ -17,6 +17,7 @@
   (the string ; (to force error in case of unsupported BSD variant)
        #!+FreeBSD "FreeBSD"
        #!+OpenBSD "OpenBSD"
+       #!+NetBSD "NetBSD"
        #!+Darwin "Darwin"))
 
 (defvar *software-version* nil)

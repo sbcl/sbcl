@@ -18,7 +18,11 @@
 #include <sys/signal.h>
 
 typedef caddr_t os_vm_address_t;
+#ifdef __NetBSD__
+typedef vsize_t os_vm_size_t;
+#else
 typedef vm_size_t os_vm_size_t;
+#endif
 typedef off_t os_vm_offset_t;
 typedef int os_vm_prot_t;
 typedef int os_context_register_t;
@@ -28,7 +32,7 @@ typedef int os_context_register_t;
  * Linux sigaltstack(2) */
 typedef struct sigaltstack stack_t;
 #elif defined __FreeBSD__
-/* FreeBSD 4.6 already has stack_t defined. */
+/* FreeBSD 4.6 and NetBSD 1.6 already have stack_t defined. */
 #endif
 
 #if defined __FreeBSD__

@@ -129,6 +129,10 @@ case `uname` in
 		sbcl_os="openbsd"
 		ln -s Config.$sbcl_arch-openbsd Config
 		;;
+	    NetBSD)
+                printf ' :netbsd' >> $ltf
+		ln -s Config.$sbcl_arch-netbsd Config
+		;;
 	    *)
 		echo unsupported BSD variant: `uname`
 		exit 1
