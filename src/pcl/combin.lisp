@@ -177,10 +177,18 @@
 	  ;; When there are no primary methods and a next-method call occurs
 	  ;; effective-method is (error "No mumble..") and the defined
 	  ;; args are not used giving a compiler warning.
-	  (error-p (eq (first effective-method) 'error)))
-      `(lambda ,ll
-	(declare (ignore ,@(if error-p ll '(.pv-cell. .next-method-call.))))
-	,effective-method))))
+	  (error-p (eq (first effective-method) '%no-primary-method)))
+      (cond
+	(error-p
+	 `(lambda (.pv-cell. .next-method-call. &rest .args.)
+	   (declare (ignore .pv-cell. .next-method-call.))
+	   (flet ((%no-primary-method (gf args)
+		    (apply #'no-primary-method gf args)))
+	     ,effective-method)))
+	(t
+	 `(lambda ,ll
+	   (declare (ignore ,@(if error-p ll '(.pv-cell. .next-method-call.))))
+	   ,effective-method))))))
 
 (defun expand-emf-call-method (gf form metatypes applyp env)
   (declare (ignore gf metatypes applyp env))
@@ -341,8 +349,7 @@
 	  primary (reverse primary)
 	  around  (reverse around))
     (cond ((null primary)
-	   `(error "There is no primary method for the generic function ~S."
-		   ',generic-function))
+	   `(%no-primary-method ',generic-function .args.))
 	  ((and (null before) (null after) (null around))
 	   ;; By returning a single call-method `form' here we enable
 	   ;; an important implementation-specific optimization.

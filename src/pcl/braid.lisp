@@ -635,3 +635,13 @@
 	 generic-function
 	 method
 	 args))
+
+;;; An extension to the ANSI standard: in the presence of e.g. a
+;;; :BEFORE method, it would seem that going through
+;;; NO-APPLICABLE-METHOD is prohibited, as in fact there is an
+;;; applicable method.  -- CSR, 2002-11-15
+(defmethod no-primary-method (generic-function &rest args)
+  (error "~@<There is no primary method for the generic function ~2I~_~S~
+	  ~I~_when called with arguments ~2I~_~S.~:>"
+	 generic-function
+	 args))

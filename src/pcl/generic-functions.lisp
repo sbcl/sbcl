@@ -495,6 +495,8 @@
 
 (defgeneric no-next-method (generic-function method &rest args))
 
+(defgeneric no-primary-method (generic-function &rest args))
+
 (defgeneric reader-method-class (class direct-slot &rest initargs))
 
 (defgeneric reinitialize-instance (gf &rest args &key &allow-other-keys))
