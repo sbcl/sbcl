@@ -1357,3 +1357,6 @@
 
 (defknown %fun-name (function) t (flushable))
 (defknown (setf %fun-name) (t function) t (unsafe))
+
+(defknown policy-quality (policy symbol) policy-quality
+          (flushable))

@@ -565,6 +565,9 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
              "*USE-IMPLEMENTATION-TYPES*"
              "*DERIVE-FUNCTION-TYPES*"
 
+             ;; ..and inspector of compiler policy
+             "DESCRIBE-COMPILER-POLICY"
+
              ;; a special form for breaking out of our "declarations
              ;; are assertions" default
              "TRULY-THE"

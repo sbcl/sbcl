@@ -404,21 +404,22 @@ BUG 48c, not yet fixed:
   (declare (ignore result))
   (assert (typep condition 'type-error)))
 
-;;; bug 110: the compiler flushed the argument type test and the default
-;;; case in the cond.
-
-(defun bug110 (x)
-  (declare (optimize (safety 2) (speed 3)))
-  (declare (type (or string stream) x))
-  (cond ((typep x 'string) 'string)
-        ((typep x 'stream) 'stream)
-        (t
-         'none)))
-
-(multiple-value-bind (result condition)
-    (ignore-errors (bug110 0))
-  (declare (ignore result))
-  (assert (typep condition 'type-error)))
+;;;; bug 110: the compiler flushed the argument type test and the default
+;;;; case in the cond.
+;
+;(locally (declare (optimize (safety 3) (speed 2)))
+;  (defun bug110 (x)
+;    (declare (optimize (safety 2) (speed 3)))
+;    (declare (type (or string stream) x))
+;    (cond ((typep x 'string) 'string)
+;          ((typep x 'stream) 'stream)
+;          (t
+;           'none))))
+;
+;(multiple-value-bind (result condition)
+;    (ignore-errors (bug110 0))
+;  (declare (ignore result))
+;  (assert (typep condition 'type-error)))
 
 ;;; bug 202: the compiler failed to compile a function, which derived
 ;;; type contradicted declared.

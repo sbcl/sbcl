@@ -178,6 +178,7 @@
 		;; to warm init to reduce peak memory requirement in
 		;; cold init
 		"src/code/describe"
+                "src/code/describe-policy"
 		"src/code/inspect"
 		"src/code/profile"
 		"src/code/ntrace"

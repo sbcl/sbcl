@@ -48,11 +48,11 @@
 	       (compiler-warn "ignoring unknown optimization quality ~
                                ~S in ~S"
 			       quality spec))
-	      ((not (and (typep raw-value 'real) (<= 0 raw-value 3)))
+	      ((not (typep raw-value 'policy-quality))
 	       (compiler-warn "ignoring bad optimization value ~S in ~S"
 			      raw-value spec))
 	      (t
-	       (push (cons quality (rational raw-value))
+	       (push (cons quality raw-value)
 		     result)))))
     ;; Add any nonredundant entries from old POLICY.
     (dolist (old-entry policy)

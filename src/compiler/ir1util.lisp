@@ -1505,3 +1505,8 @@
 
   (let ((action (event-info-action info)))
     (when action (funcall action node))))
+
+;;; It should be in locall.lisp, but is used before in ir1opt.lisp.
+(define-optimization-quality verify-arg-count
+    (if (zerop safety) 0 3)
+  ("no" "maybe" "yes" "yes"))

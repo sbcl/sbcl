@@ -1624,7 +1624,7 @@
 	    (return-from ir1-optimize-mv-call)))
 
 	(let ((count (cond (total-nvals)
-			   ((and (policy node (zerop safety))
+			   ((and (policy node (zerop verify-arg-count))
 				 (eql min max))
 			    min)
 			   (t nil))))

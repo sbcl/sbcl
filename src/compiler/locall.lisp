@@ -134,21 +134,11 @@
 	   (temps (make-gensym-list (length (lambda-vars fun)))))
        `(lambda (,n-supplied ,@temps)
 	  (declare (type index ,n-supplied))
-	  ,(if (policy *lexenv* (zerop safety))
+	  ,(if (policy *lexenv* (zerop verify-arg-count))
 	       `(declare (ignore ,n-supplied))
 	       `(%verify-arg-count ,n-supplied ,nargs))
 	  (locally
-	    ;; KLUDGE: The intent here is to enable tail recursion
-	    ;; optimization, since leaving frames for wrapper
-	    ;; functions like this on the stack is actually more
-	    ;; annoying than helpful for debugging. Unfortunately
-	    ;; trying to express this by messing with the
-	    ;; ANSI-standard declarations is a little awkward, since
-	    ;; no matter how we do it we'll tend to have side-effects
-	    ;; on things like SPEED-vs.-SAFETY comparisons. Perhaps
-	    ;; it'd be better to define a new SB-EXT:TAIL-RECURSIVELY
-	    ;; declaration and use that? -- WHN 2002-07-08
-	    (declare (optimize (speed 2) (debug 1)))
+	    (declare (optimize (let-convertion 3)))
 	    (%funcall ,fun ,@temps)))))
     (optional-dispatch
      (let* ((min (optional-dispatch-min-args fun))
@@ -992,6 +982,9 @@
 
 ;;; Are there any declarations in force to say CLAMBDA shouldn't be
 ;;; LET converted?
+(define-optimization-quality let-convertion
+    (if (<= debug speed) 3 0)
+  ("off" "maybe" "on" "on"))
 (defun declarations-suppress-let-conversion-p (clambda)
   ;; From the user's point of view, LET-converting something that
   ;; has a name is inlining it. (The user can't see what we're doing
@@ -1001,10 +994,11 @@
   (when (leaf-has-source-name-p clambda)
     ;; ANSI requires that explicit NOTINLINE be respected.
     (or (eq (lambda-inlinep clambda) :notinline)
-	;; If (> DEBUG SPEED) we can guess that inlining generally
-	;; won't be appreciated, but if the user specifically requests
-	;; inlining, that takes precedence over our general guess.
-	(and (policy clambda (> debug speed))
+	;; If (= LET-CONVERTION 0) we can guess that inlining
+	;; generally won't be appreciated, but if the user
+	;; specifically requests inlining, that takes precedence over
+	;; our general guess.
+	(and (policy clambda (= let-convertion 0))
 	     (not (eq (lambda-inlinep clambda) :inline))))))
 
 ;;; We also don't convert calls to named functions which appear in the

@@ -12,7 +12,7 @@
 (in-package "SB!C")
 
 ;;; a value for an optimization declaration
-(def!type policy-quality () '(rational 0 3))
+(def!type policy-quality () '(integer 0 3))
 
 ;;; CMU CL used a special STRUCTURE-OBJECT type POLICY to represent
 ;;; the state of optimization policy at any point in compilation. This
@@ -22,12 +22,23 @@
 ;;; alists instead.
 (def!type policy () 'list)
 
+(eval-when (#-sb-xc-host :compile-toplevel :load-toplevel :execute)
+  (defstruct policy-dependent-quality
+    dummy
+    name
+    expression
+    getter
+    values-documentation))
+
 ;;; names of recognized optimization policy qualities
 (defvar *policy-qualities*) ; (initialized at cold init)
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defvar *policy-dependent-qualities* nil)) ; alist of POLICY-DEPENDENT-QUALITYs
 
 ;;; Is X the name of an optimization policy quality?
 (defun policy-quality-name-p (x)
-  (memq x *policy-qualities*))
+  (or (memq x *policy-qualities*)
+      (assq x *policy-dependent-qualities*)))
 
 ;;; *POLICY* holds the current global compiler policy information, as
 ;;; an alist mapping from optimization quality name to quality value.
@@ -71,36 +82,10 @@
 ;;; Look up a named optimization quality in POLICY. This is only
 ;;; called by compiler code for known-valid QUALITY-NAMEs, e.g. SPEED;
 ;;; it's an error if it's called for a quality which isn't defined.
-;;;
-;;; FIXME: After this is debugged, it should get a DEFKNOWN.
-#+nil (declaim (ftype (function (policy symbol) policy-quality)))
 (defun policy-quality (policy quality-name)
-  (let ((acons (assoc quality-name policy)))
-    (unless acons
-      (error "Argh! no such optimization quality ~S in~%  ~S"
-	     quality-name policy))
-    (let ((result (cdr acons)))
-      (unless (typep result '(rational 0 3))
-	(error "Argh! bogus optimization quality ~S" acons))
-      result)))
-
-;;; Return a list of symbols naming the optimization qualities which
-;;; appear in EXPR.
-;;;
-;;; FIXME: Doing this is slightly flaky (since we can't do it right
-;;; without all the headaches of true code walking), and it shouldn't
-;;; be necessary with modern Python anyway, as long as POLICY-QUALITY
-;;; is properly DEFKNOWNed to have no side effects so that it can be
-;;; optimized away if unused. So this should probably go away.
-(defun policy-qualities-used-by (expr)
-  (let ((result nil))
-    (labels ((recurse (x)
-	       (if (listp x)
-		   (map nil #'recurse x)
-		   (when (policy-quality-name-p x)
-		     (pushnew x result)))))
-      (recurse expr)
-      result)))
+  (let* ((acons (assoc quality-name policy))
+         (result (or (cdr acons) 1)))
+    result))
 
 ;;; syntactic sugar for querying optimization policy qualities
 ;;;
@@ -109,10 +94,34 @@
 ;;; referring to them by name, e.g. (> SPEED SPACE).
 (defmacro policy (thing expr)
   (let* ((n-policy (gensym "N-POLICY-"))
-	 (used-qualities (policy-qualities-used-by expr))
 	 (binds (mapcar (lambda (name)
 			  `(,name (policy-quality ,n-policy ',name)))
-			used-qualities)))
+			*policy-qualities*))
+         (dependent-binds
+          (loop for (name . info) in *policy-dependent-qualities*
+               collect `(,name (policy-quality ,n-policy ',name))
+               collect `(,name (if (= ,name 1)
+                                   ,(policy-dependent-quality-expression info)
+                                   ,name)))))
     `(let* ((,n-policy (%coerce-to-policy ,thing))
-	    ,@binds)
+	    ,@binds
+            ,@dependent-binds)
+       (declare (ignorable ,@*policy-qualities*
+                           ,@(mapcar #'car *policy-dependent-qualities*)))
        ,expr)))
+
+;;; Dependent qualities
+(defmacro define-optimization-quality
+    (name expression &optional documentation)
+  `(eval-when (:compile-toplevel :load-toplevel :execute)
+     (let ((acons (assoc ',name *policy-dependent-qualities*))
+           (item (make-policy-dependent-quality
+                  :name ',name
+                  :expression ',expression
+                  :getter (lambda (policy) (policy policy ,expression))
+                  :values-documentation ',documentation)))
+       (if acons
+           (setf (cdr acons) item)
+           (push `(,',name . ,item) *policy-dependent-qualities*)))
+     ',name))
+

@@ -116,22 +116,28 @@
 
 ;;;; checking strategy determination
 
+(define-optimization-quality type-check
+    (cond ((= safety 0) 0)
+          ;; FIXME: It is duplicated in PROBABLE-TYPE-CHECK-P and in
+          ;; some other places.
+
+          ((and (<= speed safety)
+                (<= space safety)
+                (<= compilation-speed safety))
+           3)
+          (t 2))
+  ("no" "maybe" "fast" "full"))
+
 ;;; Return the type we should test for when we really want to check
-;;; for TYPE. If speed, space or compilation speed is more important
-;;; than safety, then we return a weaker type if it is easier to
-;;; check. First we try the defined type weakenings, then look for any
-;;; predicate that is cheaper.
+;;; for TYPE. If type checking policy is "fast", then we return a
+;;; weaker type if it is easier to check. First we try the defined
+;;; type weakenings, then look for any predicate that is cheaper.
 (defun maybe-weaken-check (type policy)
   (declare (type ctype type))
-  (cond ((policy policy (zerop safety))
-         *wild-type*)
-        ((policy policy
-		 (and (<= speed safety)
-		      (<= space safety)
-		      (<= compilation-speed safety)))
-	 type)
-	(t
-	 (weaken-values-type type))))
+  (ecase (policy policy type-check)
+    (0 *wild-type*)
+    (2 (weaken-values-type type))
+    (3 type)))
 
 ;;; This is like VALUES-TYPES, only we mash any complex function types
 ;;; to FUNCTION.
