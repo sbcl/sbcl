@@ -34,7 +34,7 @@
   (sb!unix:unix-kill thread-id :sigcont))
 
 ;; Conventional wisdom says that it's a bad idea to use these unless
-;; you really need to.  Use a lock instead
+;; you really need to.  Use a lock or a waitqueue instead
 (defun suspend-thread (thread-id)
   (sb!unix:unix-kill thread-id :sigstop))
 (defun resume-thread (thread-id)
@@ -107,6 +107,7 @@
   (declare (type mutex lock))
   (let ((pid (current-thread-id)))
     (unless new-value (setf new-value pid))
+    (assert (not (eql new-value (mutex-value lock))))
     (loop
      (unless
 	 ;; args are object slot-num old-value new-value

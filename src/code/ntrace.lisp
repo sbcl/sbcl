@@ -250,7 +250,7 @@
 			(trace-wherein-p frame wherein)))))
        (when conditionp
 	 (let ((sb-kernel:*current-level-in-print* 0)
-	       (*standard-output* *trace-output*)
+	       (*standard-output* (make-string-output-stream))
 	       (*in-trace* t))
 	   (fresh-line)
 	   (print-trace-indentation)
@@ -263,7 +263,9 @@
 		 (prin1 `(,(trace-info-what info) ,@arg-list)))
 	       (print-frame-call frame))
 	   (terpri)
-	   (trace-print frame (trace-info-print info)))
+	   (trace-print frame (trace-info-print info))
+	   (write-sequence (get-output-stream-string *standard-output*)
+			   *trace-output*))
 	 (trace-maybe-break info (trace-info-break info) "before" frame)))
 
      (lambda (frame cookie)
@@ -290,7 +292,7 @@
 		     (let ((cond (trace-info-condition-after info)))
 		       (and cond (funcall (cdr cond) frame)))))
 	(let ((sb-kernel:*current-level-in-print* 0)
-	      (*standard-output* *trace-output*)
+	      (*standard-output* (make-string-output-stream))
 	      (*in-trace* t))
 	  (fresh-line)
 	  (pprint-logical-block (*standard-output* nil)
@@ -302,7 +304,9 @@
 	      (pprint-newline :linear)
 	      (prin1 v)))
 	  (terpri)
-	  (trace-print frame (trace-info-print-after info)))
+	  (trace-print frame (trace-info-print-after info))
+	  (write-sequence (get-output-stream-string *standard-output*)
+			  *trace-output*))
 	(trace-maybe-break info
 			   (trace-info-break-after info)
 			   "after"

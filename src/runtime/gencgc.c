@@ -3641,8 +3641,9 @@ garbage_collect_generation(int generation, int raise)
 	void **ptr;
 	struct user_regs_struct regs;
 	if(ptrace(PTRACE_GETREGS,th->pid,0,&regs)){
+	    /* probably doesn't exist any more. */
 	    fprintf(stderr,"child pid %d, %s\n",th->pid,strerror(errno));
-	    lose("PTRACE_GETREGS");
+	    perror("PTRACE_GETREGS");
 	}
 	preserve_pointer(regs.ebx);
 	preserve_pointer(regs.ecx);
@@ -3651,12 +3652,14 @@ garbage_collect_generation(int generation, int raise)
 	preserve_pointer(regs.edi);
 	preserve_pointer(regs.ebp);
 	preserve_pointer(regs.eax);
+#if 0
 	fprintf(stderr,"conservatively scanning stack from 0x%x to 0x%x\n",
 		((void **)
 		 ((void *)th->control_stack_start
 		  + THREAD_CONTROL_STACK_SIZE)
 		 -1),
 		regs.esp);
+#endif
 	for (ptr = ((void **)
 		    ((void *)th->control_stack_start
 		     + THREAD_CONTROL_STACK_SIZE)

@@ -458,9 +458,11 @@ static void /* noreturn */ parent_loop(void)
 	while(pid=waitpid(-1,&status,__WALL|WUNTRACED)) {
 	    struct thread *th;
 	    fprintf(stderr,"waitpid pid %d\n",pid);
-	    if(maybe_gc_pending) parent_do_garbage_collect();
 	    if(pid==-1) {
-		if(errno == EINTR) continue;
+		if(errno == EINTR) {
+		    if(maybe_gc_pending) parent_do_garbage_collect();
+		    continue;
+		}
 		if(errno == ECHILD) break;
 		fprintf(stderr,"waitpid: %s\n",strerror(errno));
 		continue;
