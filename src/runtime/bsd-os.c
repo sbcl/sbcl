@@ -164,6 +164,10 @@ os_map(int fd, int offset, os_vm_address_t addr, os_vm_size_t len)
     return addr;
 }
 
+/* FIXME: If this can be a no-op on BSD/x86, then it 
+ * deserves a more precise name.
+ *
+ * (Perhaps os_prepare_data_area_to_be_executed()?) */
 void
 os_flush_icache(os_vm_address_t address, os_vm_size_t length)
 {

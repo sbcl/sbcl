@@ -116,13 +116,25 @@
 ;;;   * On FreeBSD,
 ;;;     ** The space 0x0E000000-0x10000000 is "Foreign segment".
 ;;;     ** The space 0x20000000-0x30000000 is reserved for shared libs.
-;;; And there have been a few changes since the fork:
+;;; And there have been some changes since the fork from CMU CL:
+;;;   * The OpenBSD port is new since the fork. We started with
+;;;     the FreeBSD address map, which actually worked until the
+;;;     Alpha port patches, for reasons which in retrospect are rather
+;;;     mysterious. After the Alpha port patches were added, the
+;;;     OpenBSD port suffered memory corruption problems. While
+;;;     debugging those, it was discovered that src/runtime/trymap
+;;;     failed for the control stack region #x40000000-#x47fff000.
+;;;     After the control stack was moved upward out of this region
+;;;     (stealing some bytes from dynamic space) the problems went
+;;;     away.
 ;;;   * The FreeBSD STATIC-SPACE-START value was bumped up from
 ;;;     #x28000000 to #x30000000 when FreeBSD ld.so dynamic linking
 ;;;     support was added for FreeBSD ca. 20000910. This was to keep from
-;;;     stomping on an address range that the dynamic libraries want to use. 
-;;;     (They want to use this address range even if we try to reserve it
-;;;     with a call to validate() as the first operation in main().)
+;;;     stomping on an address range that the dynamic libraries want to
+;;;     use. (They want to use this address range even if we try to
+;;;     reserve it with a call to validate() as the first operation in
+;;;     main().)
+
 #!+linux
 (progn
 
@@ -155,10 +167,15 @@
   (defconstant binding-stack-start   #x38000000)
   (defconstant binding-stack-end     #x3ffff000)
 
-  (defconstant control-stack-start   #x40000000)
-  (defconstant control-stack-end     #x47fff000)
-
-  (defconstant dynamic-space-start   #x48000000)
+  (defconstant control-stack-start
+    #+freebsd #x40000000
+    #+openbsd #x48000000)
+  (defconstant control-stack-end
+    #+freebsd #x47fff000
+    #+openbsd #x4ffff000)
+  (defconstant dynamic-space-start
+    #+freebsd #x48000000
+    #+openbsd #x50000000)
   (defconstant dynamic-space-end     #x88000000))
 
 ;;; Given that NIL is the first thing allocated in static space, we

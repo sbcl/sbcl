@@ -37,8 +37,12 @@
 ;;; 9 = deleted obsolete CONS-UNIQUE-TAG bytecode in sbcl-0.6.11.8
 ;;; (somewhere in here also changes to AND and OR CTYPE layouts) 
 ;;; 10 = new layout for CONDITION in sbcl-0.6.11.38
-;;; 11 = new helper functions for MAKE-LOAD-FORM (HASH-TABLE) in
+;;; 11 = (a) new helper functions for MAKE-LOAD-FORM (HASH-TABLE) in
 ;;;      sbcl-0.6.12.11
+;;;      (b) new address space constants for OpenBSD in 0.6.12.17,
+;;;          doesn't need separate version from (a) because the OpenBSD
+;;;          port was broken from sometime before 0.6.12.11 until
+;;;          the address space was changed
 
 (setf *backend-register-save-penalty* 3)
 
