@@ -1271,6 +1271,14 @@ WORKAROUND:
   So it's somehow checking the uninterned old accessor name instead
   of the new requested accessor name, which seems broken to me (WHN).
 
+242: "WRITE-SEQUENCE suboptimality"
+  (observed from clx performance)
+  In sbcl-0.7.13, WRITE-SEQUENCE of a sequence of type 
+  (SIMPLE-ARRAY (UNSIGNED-BYTE 8) (*)) on a stream with element-type
+  (UNSIGNED-BYTE 8) will write to the stream one byte at a time,
+  rather than writing the sequence in one go, leading to severe
+  performance degradation.
+
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:
     These labels were used for bugs related to the old IR1 interpreter.

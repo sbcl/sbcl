@@ -51,7 +51,7 @@
       (car (sort (append
 		  (package-nicknames cl:*package*)
 		  (list (package-name cl:*package*)))
-		 #'string-lessp))
+		 (lambda (a b) (< (length a) (length b)))))
       (package-name cl:*package*)))
 
 (defun read-cmd (input-stream)
