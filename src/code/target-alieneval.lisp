@@ -178,9 +178,10 @@
 (def!method print-object ((value alien-value) stream)
   (print-unreadable-object (value stream)
     (format stream
-	    "~S :SAP #X~8,'0X"
+	    "~S ~S #X~8,'0X ~S ~S"
 	    'alien-value
-	    (sap-int (alien-value-sap value)))))
+	    :sap (sap-int (alien-value-sap value))
+	    :type (unparse-alien-type (alien-value-type value)))))
 
 #!-sb-fluid (declaim (inline null-alien))
 (defun null-alien (x)

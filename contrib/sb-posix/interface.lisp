@@ -25,7 +25,7 @@
 (define-call "fchown" int minusp (fd file-descriptor)
 	     (owner sb-posix::uid-t)  (group sb-posix::gid-t))
 (define-call "link" int minusp (oldpath filename) (newpath filename))
-;; no lchown on Darwin
+;;; no lchown on Darwin
 #-darwin 
 (define-call "lchown" int minusp (pathname filename)
 	     (owner sb-posix::uid-t)  (group sb-posix::gid-t))
@@ -35,7 +35,15 @@
 (define-call "symlink" int minusp (oldpath filename) (newpath filename))
 (define-call "unlink" int minusp (pathname filename))
 
-
+(define-call "opendir" (* t) null-alien (pathname filename))
+(define-call "readdir" (* t)
+  ;; readdir() has the worst error convention in the world.  It's just
+  ;; too painful to support.  (return is NULL _and_ errno "unchanged"
+  ;; is not an error, it's EOF).
+  not
+  (dir (* t)))
+(define-call "closedir" int minusp (dir (* t)))
+  
 ;;; uid, gid
 
 (define-call "geteuid" sb-posix::uid-t not)	;"always successful", it says

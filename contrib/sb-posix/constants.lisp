@@ -10,7 +10,8 @@
  
  "sys/socket.h" "sys/un.h" "netinet/in.h" "netinet/in_systm.h"
  "netinet/ip.h" "net/if.h" "netdb.h" "errno.h" "netinet/tcp.h"
- "fcntl.h" "sys/mman.h")
+ "fcntl.h" "sys/mman.h"
+ "dirent.h")
 
 ;;; then the stuff we're looking for
 ((:integer af-inet "AF_INET" "IP Protocol family")
@@ -53,4 +54,10 @@
  (:integer map-shared "MAP_SHARED" "mmap: shared memory")
  (:integer map-private "MAP_PRIVATE" "mmap: private mapping")
  (:integer map-fixed "MAP_FIXED" "mmap: map at given location")
+
+ ;; opendir()
+ (:structure dirent
+	     ("struct dirent"
+	      (:c-string name "char *" "d_name"
+			 :distrust-length #+solaris t #-solaris nil)))
  )

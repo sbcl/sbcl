@@ -250,4 +250,5 @@
 		    (length new-failures)
 		    new-failures)))
 	  ))
+      (finish-output s)
       (null pending))))

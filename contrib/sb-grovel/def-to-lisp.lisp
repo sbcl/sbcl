@@ -5,7 +5,7 @@
   (destructuring-bind (c-name &rest elements) c-struct
     (format stream "printf(\"(sb-grovel::define-c-struct ~A %d)\\n\",sizeof (~A));~%" lisp-name c-name)
     (dolist (e elements)
-      (destructuring-bind (lisp-type lisp-el-name c-type c-el-name) e
+      (destructuring-bind (lisp-type lisp-el-name c-type c-el-name &key distrust-length) e
 	;; FIXME: this format string doesn't actually guarantee
 	;; non-multilined-string-constantness, it just makes it more
 	;; likely.  Sort out the required behaviour (and maybe make
@@ -18,8 +18,10 @@
         (format stream "{ ~A t;printf(\"%d \",((unsigned long)&(t.~A)) - ((unsigned long)&(t)) ); }~%"
                 c-name c-el-name)
         ;; length
-        (format stream "{ ~A t;printf(\"%d\",(sizeof t.~A));}~%"
-                c-name c-el-name)
+	(if distrust-length
+	    (format stream "printf(\"nil\");")
+	    (format stream "{ ~A t;printf(\"%d\",(sizeof t.~A));}~%"
+		    c-name c-el-name))
         (format stream "printf(\")\\n\");~%")))))
 
 (defun c-for-function (stream lisp-name alien-defn)

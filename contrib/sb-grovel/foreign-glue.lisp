@@ -22,14 +22,17 @@
 
 ;;;    (define-c-accessor STAT-ATIME STAT (INTEGER 32) 56 4)
 
-
 (defmacro define-c-accessor (el structure type offset length)
   (declare (ignore structure))
   (let* ((ty (cond
-	       ((eql type 'integer) `(,type ,(* 8 length)))
-	       ((eql (car type) '*) `(unsigned ,(* 8 length)))
-	       ((eql type 'c-string) `(unsigned ,(* 8 length)))
-	       ((eql (car type) 'array) (cadr type))))
+	       ((eql type (intern "INTEGER"))
+		`(,type ,(* 8 length)))
+	       ((and (listp type) (eql (car type) (intern "*"))) ; pointer
+		`(unsigned ,(* 8 length)))
+	       ((eql type (intern "C-STRING")) ; c-string as array
+		`(base-char 8))
+	       ((and (listp type) (eql (car type) (intern "ARRAY")))
+		(cadr type))))
 	 (sap-ref-? (intern (format nil "~ASAP-REF-~A"
 				    (if (member (car ty) '(INTEGER SIGNED))
 					"SIGNED-" "")
@@ -40,16 +43,20 @@
 		       (sap (sb-sys:int-sap (the (unsigned-byte 32) (+ addr ,offset)))))
 		 (,before (,sap-ref-? sap index) ,after))))
       `(progn
-	;;(declaim (inline ,el (setf ,el)))
-	(defun ,el (ptr &optional (index 0))
-	  (declare (optimize (speed 3)))
-	  (sb-sys:without-gcing 
-	   ,(template 'prog1 nil)))
-	(defconstant ,(intern (format nil "OFFSET-OF-~A" el)) ,offset)
-	(defun (setf ,el) (newval ptr &optional (index 0))
-	  (declare (optimize (speed 3)))
-	  (sb-sys:without-gcing 
-	   ,(template 'setf 'newval)))))))
+	 ;;(declaim (inline ,el (setf ,el)))
+	 (defun ,el (ptr &optional (index 0))
+	   (declare (optimize (speed 3)))
+	   (sb-sys:without-gcing 
+	    ,(if (eql type (intern "C-STRING"))
+		 `(naturalize-bounded-c-string ptr ,offset ,length)
+		 (template 'prog1 nil))))
+	 (defconstant ,(intern (format nil "OFFSET-OF-~A" el)) ,offset)
+	 (defun (setf ,el) (newval ptr &optional (index 0))
+	   (declare (optimize (speed 3)))
+	   (sb-sys:without-gcing 
+	    ,(if (eql type (intern "C-STRING"))
+		 `(set-bounded-c-string ptr ,offset ,length newval)
+		 (template 'setf 'newval))))))))
 
 
 ;;; make memory allocator for appropriately-sized block of memory, and
@@ -94,3 +101,45 @@ elements of the returned vector.  See also FOREIGN-VECTOR-UNTIL-ZERO"
     (loop for i from 0 to (1- length) by size
 	  do (setf (aref result i) (sb-alien:deref ptr i)))
     result))
+
+(defun naturalize-bounded-c-string (pointer offset &optional max-length)
+  "Return the 0-terminated string starting at (+ POINTER OFFSET) with
+maximum length MAX-LENGTH, as a lisp object."
+  (let* ((ptr
+	  (typecase pointer
+	    (sb-sys:system-area-pointer
+	     (sap-alien (sb-sys:sap+ pointer offset) (* sb-alien:char)))
+	    (t
+	     (sap-alien (sb-sys:sap+ (alien-sap pointer) offset) (* sb-alien:char)))))
+	 (length (loop for i upfrom 0
+ 		       until (or (and max-length
+				      (= i (1- max-length)))
+				 (= (sb-alien:deref ptr i) 0))
+ 		       finally (return i)))
+	 (result (make-string length
+			      :element-type 'base-char)))
+    (sb-kernel:copy-from-system-area (alien-sap ptr) 0
+				     result (* sb-vm:vector-data-offset
+					       sb-vm:n-word-bits)
+				     (* length sb-vm:n-byte-bits))
+    result))
+
+(defun set-bounded-c-string (pointer offset max-length value)
+  "Set the range from POINTER + OFFSET to at most POINTER + OFFSET +
+MAX-LENGTH to the string contained in VALUE."
+  (assert (numberp max-length) nil
+	  "Structure field must have a grovelable maximum length.")
+  (assert (< (length value) max-length))
+  (let* ((ptr
+	  (typecase pointer
+	    (sb-sys:system-area-pointer
+	     (sap-alien (sb-sys:sap+ pointer offset) (* sb-alien:char)))
+	    (t
+	     (sap-alien (sb-sys:sap+ (alien-sap pointer) offset) (* sb-alien:char)))))
+	 (length (length value)))
+    (sb-kernel:copy-to-system-area value (* sb-vm:vector-data-offset
+					     sb-vm:n-word-bits)
+				   (alien-sap ptr) 0
+				   (* length sb-vm:n-byte-bits))
+    (setf (sb-alien:deref ptr length) 0)
+    value))

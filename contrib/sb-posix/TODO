@@ -18,7 +18,7 @@ llseek lock lseek lstat madvise mincore mknod mlock mlockall
 modify_ldt mount mprotect mpx mremap msgctl msgget msgop msgrcv msgsnd
 msync munlock munlockall nanosleep nice open pause pipe poll
 prctl pread prof profil pselect ptrace pwrite query_module quotactl
-read readdir readlink readv reboot recv recvfrom recvmsg rename rmdir
+read readlink readv reboot recv recvfrom recvmsg rename rmdir
 sbrk sched_get_priority_max sched_get_priority_min sched_getparam
 sched_getscheduler sched_rr_get_interval sched_setparam
 sched_setscheduler sched_yield select semctl semget semop send
@@ -49,5 +49,6 @@ exceptional exit. For example, EINTR, EAGAIN, reading or writing big
 buffers, etc... It may be more efficient to just compare two integers
 than going thru an exception mechanism that will be invoked everytime.
 
-
-
+9) proper alien definitions of structures [ possibly an sb-grovel
+problem, but the way we define calls exposes the problem -- see
+readdir() ]
