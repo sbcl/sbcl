@@ -113,6 +113,63 @@ alloc_string_list(char *array_ptr[])
     }
 }
 
+/* miscellaneous chattiness */
+
+void
+print_help()
+{
+    puts(
+"SBCL is a Common Lisp programming environment. Ordinarily you shouldn't\n\
+need command line options when you invoke it interactively: you can just\n\
+start it and work with the customary Lisp READ-EVAL-PRINT loop.\n\
+\n\
+One option idiom which is sometimes useful interactively (e.g. when\n\
+exercising a test case for a bug report) is\n\
+  sbcl --sysinit /dev/null --userinit /dev/null\n\
+to keep SBCL from reading any initialization files at startup. And some\n\
+people like to suppress the default startup message:\n\
+  sbcl --noinform\n\
+\n\
+Other options can be useful when you're running SBCL noninteractively,\n\
+e.g. from a script, or if you have a strange system configuration, so\n\
+that SBCL can't by default find one of the files it needs. For\n\
+information on such options, see the sbcl(1) man page.\n\
+\n\
+More information on SBCL can be found on its man page, or at\n\
+<http://sbcl.sf.net/>.\n");
+}
+
+void
+print_version()
+{
+    printf("SBCL %s\n", SBCL_VERSION_STRING);
+}
+
+void
+print_banner()
+{
+    printf(
+"This is SBCL %s, an implementation of ANSI Common Lisp.\n\
+\n\
+SBCL is derived from the CMU CL system created at Carnegie Mellon University.\n\
+Besides software and documentation originally created at Carnegie Mellon\n\
+University, SBCL contains some software originally from the Massachusetts\n\
+Institute of Technology, Symbolics Incorporated, and Xerox Corporation, and\n\
+material contributed by volunteers since the release of CMU CL into the\n\
+public domain. See the CREDITS file in the distribution for more information.\n\
+\n\
+SBCL is a free software system, provided as is, with absolutely no warranty.\n\
+It is mostly in the public domain, but also includes some software copyrighted\n\
+  Massachusetts Institute of Technology, 1986;\n\
+  Symbolics, Inc., 1989, 1990, 1991, 1992; and\n\
+  Xerox Corporation, 1985, 1986, 1987, 1988, 1989, 1990\n\
+used under BSD-style licenses allowing copying only under certain conditions.\n\
+See the COPYING file in the distribution for more information.\n\
+\n\
+More information about SBCL is available at <http://sbcl.sourceforge.net/>.\n\
+", SBCL_VERSION_STRING);
+}
+
 int
 main(int argc, char *argv[], char *envp[])
 {
@@ -154,6 +211,16 @@ main(int argc, char *argv[], char *envp[])
 		    core = copied_string(argv[argi]);
 		    ++argi;
 		}
+	    } else if (0 == strcmp(arg, "--help")) {
+		/* I think this is the (or a) usual convention: upon
+		 * seeing "--help" we immediately print our help
+		 * string and exit, ignoring everything else. */
+		print_help();
+		exit(0);
+	    } else if (0 == strcmp(arg, "--version")) {
+		/* As in "--help" case, I think this is expected. */
+		print_version();
+		exit(0);
 	    } else if (0 == strcmp(arg, "--end-runtime-options")) {
 		end_runtime_options = 1;
 		++argi;
@@ -216,26 +283,7 @@ main(int argc, char *argv[], char *envp[])
     }
 
     if (!noinform) {
-	printf(
-"This is SBCL %s, an implementation of ANSI Common Lisp.\n\
-\n\
-SBCL is derived from the CMU CL system created at Carnegie Mellon University.\n\
-Besides software and documentation originally created at Carnegie Mellon\n\
-University, SBCL contains some software originally from the Massachusetts\n\
-Institute of Technology, Symbolics Incorporated, and Xerox Corporation, and\n\
-material contributed by volunteers since the release of CMU CL into the\n\
-public domain. See the CREDITS file in the distribution for more information.\n\
-\n\
-SBCL is a free software system, provided as is, with absolutely no warranty.\n\
-It is mostly in the public domain, but also includes some software copyrighted\n\
-  Massachusetts Institute of Technology, 1986;\n\
-  Symbolics, Inc., 1989, 1990, 1991, 1992; and\n\
-  Xerox Corporation, 1985, 1986, 1987, 1988, 1989, 1990\n\
-used under BSD-style licenses allowing copying only under certain conditions.\n\
-See the COPYING file in the distribution for more information.\n\
-\n\
-More information about SBCL is available at <http://sbcl.sourceforge.net/>.\n\
-", SBCL_VERSION_STRING);
+	print_banner();
 	fflush(stdout);
     }
 
