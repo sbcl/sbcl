@@ -1237,3 +1237,12 @@ WORKAROUND:
   but there remains a possibility of a function with a
   (tail)-recursive simplification pass and transforms/VOPs for base
   cases.
+
+287: PPC/Linux miscompilation or corruption in first GC
+  When the runtime is compiled with -O3 on certain PPC/Linux machines, a
+  segmentation fault is reported at the point of first triggered GC,
+  during the compilation of DEFSTRUCT WRAPPER.  As a temporary workaround,
+  the runtime is no longer compiled with -O3 on PPC/Linux, but it is likely
+  that this merely obscures, not solves, the underlying problem; as and when
+  underlying problems are fixed, it would be worth trying again to provoke
+  this problem.
