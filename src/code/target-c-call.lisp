@@ -30,18 +30,17 @@
 (define-alien-type-translator void ()
   (parse-alien-type '(values) (sb!kernel:make-null-lexenv)))
 
+#+nil 
+(define-alien-routine strlen integer
+  (s (* char)))
+
 (defun %naturalize-c-string (sap)
   (declare (type system-area-pointer sap))
   (with-alien ((ptr (* char) sap))
-    (locally
-     (declare (optimize (speed 3) (safety 0)))
-     (let ((length (loop
-		     for offset of-type fixnum upfrom 0
-		     until (zerop (deref ptr offset))
-		     finally (return offset))))
-       (let ((result (make-string length)))
-	 (sb!kernel:copy-from-system-area (alien-sap ptr) 0
-					  result (* sb!vm:vector-data-offset
-						    sb!vm:n-word-bits)
-					  (* length sb!vm:n-byte-bits))
-	 result)))))
+    (let* ((length (alien-funcall (extern-alien "strlen"
+						(function integer (* char)))
+				  ptr))
+	   (result (make-string length)))
+      (declare (optimize (speed 3) (safety 0)))
+      (sb!kernel:%byte-blt sap 0 result 0 length)
+      result)))

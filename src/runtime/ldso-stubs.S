@@ -2,8 +2,11 @@
  * stubs for C-linkage library functions which we need to refer to 
  * from Lisp 
  *
- * These exist for the benefit of Lisp code that needs to refer to
- * foreign symbols when dlsym() is not available (i.e. when dumping
+ * (But note this is only the Linux version, as per the FIXME
+ * note in the BSD version in undefineds.h.)
+ *
+ * These stubs exist for the benefit of Lisp code that needs to refer 
+ * to foreign symbols when dlsym() is not available (i.e. when dumping
  * cold-sbcl.core, when we may be running in a host that's not SBCL,
  * or on platforms that don't have it at all). If the runtime is
  * dynamically linked, library functions won't be linked into it, so
@@ -140,6 +143,7 @@ ldso_stub__ ## fct: ;                           \
  LDSO_STUBIFY(socket)
  LDSO_STUBIFY(stat)
  LDSO_STUBIFY(strerror)
+ LDSO_STUBIFY(strlen)
  LDSO_STUBIFY(symlink)
  LDSO_STUBIFY(sync)
  LDSO_STUBIFY(tanh)

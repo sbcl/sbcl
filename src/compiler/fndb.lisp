@@ -1304,7 +1304,7 @@
   (t sequence t index sequence-end function function)
   (values t (or index null))
   (flushable call))
-(defknown %find-position-if 
+(defknown (%find-position-if %find-position-if-not)
   (function sequence t index sequence-end function)
   (values t (or index null))
   (call))

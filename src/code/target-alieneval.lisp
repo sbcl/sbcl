@@ -195,7 +195,7 @@
   (let ((alien-type (parse-alien-type type env)))
     (if (eq (compute-alien-rep-type alien-type) 'system-area-pointer)
 	`(%sap-alien ,sap ',alien-type)
-	(error "cannot make aliens of type ~S out of SAPs" type))))
+	(error "cannot make an alien of type ~S out of a SAP" type))))
 
 (defun %sap-alien (sap type)
   (declare (type system-area-pointer sap)

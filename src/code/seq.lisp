@@ -1910,6 +1910,14 @@
 	       (vector*-frob (sequence)
 		 `(%find-position-if-vector-macro predicate ,sequence
 						  from-end start end key)))
+      (frobs)))
+  (defun %find-position-if-not (predicate sequence-arg from-end start end key)
+    (macrolet ((frob (sequence from-end)
+		 `(%find-position-if-not predicate ,sequence
+		                         ,from-end start end key))
+	       (vector*-frob (sequence)
+		 `(%find-position-if-not-vector-macro predicate ,sequence
+						  from-end start end key)))
       (frobs))))
 
 ;;; the user interface to FIND and POSITION: Get all our ducks in a
@@ -1956,11 +1964,10 @@
   (def-find-position-if find-if 0)
   (def-find-position-if position-if 1))
 
-;;; the deprecated functions FIND-IF-NOT and POSITION-IF-NOT. We don't
-;;; bother to worry about optimizing them.
-;;;
-;;; (Except note that on Sat, Oct 06, 2001 at 04:22:38PM +0100,
-;;; Christophe Rhodes wrote on sbcl-devel
+;;; the deprecated functions FIND-IF-NOT and POSITION-IF-NOT. We
+;;; didn't bother to worry about optimizing them, except note that on
+;;; Sat, Oct 06, 2001 at 04:22:38PM +0100, Christophe Rhodes wrote on
+;;; sbcl-devel
 ;;;
 ;;;     My understanding is that while the :test-not argument is
 ;;;     deprecated in favour of :test (complement #'foo) because of
@@ -1981,18 +1988,19 @@
 ;;;
 ;;; FIXME: Remove uses of these deprecated functions (and of :TEST-NOT
 ;;; too) within the implementation of SBCL.
+(declaim (inline find-if-not position-if-not))
 (macrolet ((def-find-position-if-not (fun-name values-index)
 	     `(defun ,fun-name (predicate sequence
 				&key from-end (start 0) end key)
 		(nth-value
 		 ,values-index
-		 (%find-position-if (complement (%coerce-callable-to-fun
-						 predicate))
-				    sequence
-				    from-end
-				    start
-				    end
-				    (effective-find-position-key key))))))
+		 (%find-position-if-not (%coerce-callable-to-fun predicate)
+				        sequence
+				        from-end
+				        start
+				        end
+				        (effective-find-position-key key))))))
+  
   (def-find-position-if-not find-if-not 0)
   (def-find-position-if-not position-if-not 1))
 

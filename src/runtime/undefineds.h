@@ -1,5 +1,21 @@
 /*
  * routines that must be linked into the core for Lisp to work
+ *
+ * but note this is only the BSD version, as per the FIXME
+ *
+ * FIXME: It's tedious and error-prone having to edit both this file and
+ * the analogous ldso-stubs.S file when we change the references to
+ * functions, enough so that it would probably be good to rewrite
+ * both files in terms of a shared list of function names.
+ * E.g. the function names could be in shared-function-names.h
+ *   SHARED_FUNCTION(cos)
+ *   SHARED_FUNCTION(sinh)
+ *   SHARED_FUNCTION(strlen)
+ * etc. and the per-OS files could look like
+ *   #define SHARED_FUNCTION(f) ....  
+ *   #include "shared-function-names.h"
+ *   ...then going on to do OS-specific things
+ * "Once and only once."
  */
 
 /*
@@ -12,7 +28,7 @@
  * provided with absolutely no warranty. See the COPYING and CREDITS
  * files for more information.
  */
-
+   
 /* Pick up all the syscalls. */
 F(accept)
 F(access)
@@ -226,6 +242,9 @@ F(cbrt)
 F(sqrt)
 #endif
 F(hypot)
+
+/* string things */
+F(strlen)
 
 /* network support */
 F(gethostbyname)

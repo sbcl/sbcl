@@ -1013,7 +1013,7 @@
 (defun cold-intern (symbol &optional (package (symbol-package symbol)))
 
   ;; Anything on the cross-compilation host which refers to the target
-  ;; machinery through the host SB-XC package can be translated to
+  ;; machinery through the host SB-XC package should be translated to
   ;; something on the target which refers to the same machinery
   ;; through the target COMMON-LISP package.
   (let ((p (find-package "SB-XC")))
@@ -1021,6 +1021,25 @@
       (setf package *cl-package*))
     (when (eq (symbol-package symbol) p)
       (setf symbol (intern (symbol-name symbol) *cl-package*))))
+
+  ;; Make sure that the symbol has an appropriate package. In
+  ;; particular, catch the so-easy-to-make error of typing something
+  ;; like SB-KERNEL:%BYTE-BLT in cold sources when what you really
+  ;; need is SB!KERNEL:%BYTE-BLT.
+  (let ((package-name (package-name package)))
+    (cond ((find package-name '("COMMON-LISP" "KEYWORD") :test #'string=)
+	   ;; That's OK then.
+	   (values))
+	  ((string= package-name "SB!" :end1 3 :end2 3)
+	   ;; That looks OK, too. (All the target-code packages
+	   ;; have names like that.)
+	   (values))
+	  (t
+	   ;; looks bad: maybe COMMON-LISP-USER? maybe an extension
+	   ;; package in the xc host? something we can't think of
+	   ;; a valid reason to dump, anyway...
+	   (error "internal error: PACKAGE-NAME=~S looks too much like a typo."
+		  package-name))))
 
   (let (;; Information about each cold-interned symbol is stored
 	;; in COLD-INTERN-INFO.
