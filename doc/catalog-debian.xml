@@ -10,22 +10,22 @@
 
     <!-- Resolve DTD URL system ID to local file -->
     <rewriteSystem
-        systemIdStartString="http://www.oasis-open.org/docbook/xml/4.2/"
-        rewritePrefix="dtd/xml/4.2/" />
+        systemIdStartString="http://www.oasis-open.org/docbook/xml/4.1/"
+        rewritePrefix="dtd/xml/4.1/" />
     <!-- Resolve stylesheet URL to local file -->
     <rewriteURI
         uriStartString="http://docbook.sourceforge.net/release/xsl/current/"
         rewritePrefix="stylesheet/xsl/nwalsh/" />
 
     <!-- Resolve DTD PUBLIC identifiers -->
-    <nextCatalog  catalog="dtd/xml/4.2/catalog.xml" />
+    <nextCatalog  catalog="dtd/xml/4.1/catalog.xml" />
 
     <!-- To resolve simple DTD SYSTEM identifiers. -->
     <!-- Note: this does not work with Java resolver -->
     <!--   classes in Saxon or Xalan -->
     <system
          systemId="docbook.dtd"
-         uri="dtd/xml/4.2/xml/docbookx.dtd" />
+         uri="dtd/xml/4.1/xml/docbookx.dtd" />
 
     <!-- To resolve short stylesheet references -->
     <uri
