@@ -1,3 +1,20 @@
+planned incompatible changes in 0.8.x:
+  * (not done yet, but planned:) When the profiling interface settles
+    down, it might impact TRACE. They both encapsulate functions, and
+    it's not clear yet how e.g. UNPROFILE will interact with TRACE
+    and UNTRACE. (This shouldn't matter, though, unless you are using
+    profiling. If you never profile anything, TRACE should continue to
+    behave as before.)
+  * (not done yet, but planned:) Inlining can now be controlled the
+    ANSI way, without MAYBE-INLINE, since the idiom
+	(DECLAIM (INLINE FOO))
+	(DEFUN FOO (..) ..)
+	(DECLAIM (NOTINLINE FOO))
+	(DEFUN BAR (..) (FOO ..))
+	(DEFUN BLETCH (..) (DECLARE (INLINE FOO)) (FOO ..))
+    now does what ANSI says it should. The CMU-CL-style 
+    SB-EXT:MAYBE-INLINE declaration is now deprecated and ignored.
+
 for early 0.8.x:
 
 * test file reworking
