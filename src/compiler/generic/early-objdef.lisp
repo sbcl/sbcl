@@ -18,8 +18,15 @@
 ;;; out the full names. Or even define them in DEF EVEN-FIXNUM-LOWTAG
 ;;; style so searches like 'def.*even-fixnum-lowtag' can find them.
 
-;;; tags for the main low-level types, to be stored in the low three
-;;; bits to identify the type of a machine word 
+;;; Tags for the main low-level types are stored in the low three
+;;; bits to identify the type of a machine word.  Certain constraints 
+;;; apply:
+;;;   * EVEN-FIXNUM-LOWTAG and ODD-FIXNUM-LOWTAG must be 0 and 4: code
+;;;     which shifts left two places to convert raw integers to tagged
+;;;     fixnums is ubiquitous.
+;;;   * LIST-POINTER-LOWTAG + 4 = OTHER-POINTER-LOWTAG: NIL is both a
+;;;     cons and a symbol (at the same address) and depends on this.
+;;;     See the definition of SYMBOL in objdef.lisp
 (eval-when (:compile-toplevel :load-toplevel :execute)
   ;; The EVAL-WHEN is necessary (at least for Lispworks), because the
   ;; second DEFENUM uses the value of OTHER-IMMEDIATE-0-LOWTAG, which is

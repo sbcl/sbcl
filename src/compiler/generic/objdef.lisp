@@ -316,9 +316,20 @@
 (define-primitive-object (symbol :lowtag other-pointer-lowtag
 				 :widetag symbol-header-widetag
 				 #!-x86 :alloc-trans #!-x86 make-symbol)
+
+  ;; Beware when changing this definition.  NIL-the-symbol is defined
+  ;; using this layout, and NIL-the-end-of-list-marker is the cons 
+  ;; ( NIL . NIL ), living in the first two slots of NIL-the-symbol
+  ;; (conses have no header).  Careful selection of lowtags ensures
+  ;; that the same pointer can be used for both purposes:
+  ;; OTHER-POINTER-LOWTAG is 7, LIST-POINTER-LOWTAG is 3, so if you
+  ;; subtract 3 from (sb-kernel:get-lisp-obj-address 'NIL) you get the
+  ;; first data slot, and if you subtract 7 you get a symbol header.
+
   (value :set-trans %set-symbol-value
-	 :init :unbound)
-  #!+x86 (hash)
+	 :init :unbound)		;also the CAR of NIL-as-end-of-list
+  (hash)				;the CDR of NIL-as-end-of-list
+
   (plist :ref-trans symbol-plist
 	 :set-trans %set-symbol-plist
 	 :init :null)

@@ -290,9 +290,10 @@
   
   (let ((sysinit nil)        ; value of --sysinit option
 	(userinit nil)       ; value of --userinit option
-	(reversed-evals nil) ; values of --eval options, in reverse order
+	(reversed-evals nil) ; values of --eval options, in reverse order; and
+	                     ; also --load options, translated into --eval
 	(noprint nil)        ; Has a --noprint option been seen?
-	(noprogrammer nil)   ; Has a --noprogammer option been seen?
+	(noprogrammer nil)   ; Has a --noprogrammer option been seen?
 	(options (rest *posix-argv*))) ; skipping program name
 
     (/show0 "done with outer LET in TOPLEVEL-INIT")
@@ -302,7 +303,9 @@
     ;; READ an --eval string). Make sure that they're handled
     ;; reasonably. Also, perhaps all errors while parsing the command
     ;; line should cause the system to QUIT, instead of trying to go
-    ;; into the Lisp debugger.
+    ;; into the Lisp debugger, since trying to go into the debugger
+    ;; gets into various annoying issues of where we should go after
+    ;; the user tries to return from the debugger.
     
     ;; Parse command line options.
     (loop while options do
@@ -337,6 +340,9 @@
 					 eval-as-string))
 				 (t
 				  (push eval reversed-evals)))))))
+		    ((string= option "--load")
+		     (pop-option)
+		     (push `(load ,(pop-option)) reversed-evals))
 		    ((string= option "--noprint")
 		     (pop-option)
 		     (setf noprint t))
@@ -375,9 +381,6 @@
       (setf *debugger-hook* 'noprogrammer-debugger-hook-fun
 	    *debug-io* *error-output*))
 
-    ;; FIXME: Verify that errors in init files and/or --eval operations
-    ;; lead to reasonable behavior.
-
     ;; Handle initialization files.
     (/show0 "handling initialization files in TOPLEVEL-INIT")
     (flet (;; If any of POSSIBLE-INIT-FILE-NAMES names a real file,
@@ -392,10 +395,9 @@
       (let* ((sbcl-home (posix-getenv "SBCL_HOME"))
 	     (sysinit-truename (if sbcl-home
 				   (probe-init-files sysinit
-						     (concatenate
-						      'string
-						      sbcl-home
-						      "/sbclrc"))
+						     (concatenate 'string
+								  sbcl-home
+								  "/sbclrc"))
 				   (probe-init-files sysinit
 						     "/etc/sbclrc"
 						     "/usr/local/etc/sbclrc")))
@@ -403,10 +405,9 @@
 			    (error "The HOME environment variable is unbound, ~
 				    so user init file can't be found.")))
 	     (userinit-truename (probe-init-files userinit
-						  (concatenate
-						   'string
-						   user-home
-						   "/.sbclrc"))))
+						  (concatenate 'string
+							       user-home
+							       "/.sbclrc"))))
 
 	;; We wrap all the pre-REPL user/system customized startup code 
 	;; in a restart.
@@ -416,17 +417,19 @@
 	;; Unix environment errors, e.g. a missing file or a typo on
 	;; the Unix command line, and you don't need to get into Lisp
 	;; to debug them, you should just start over and do it right
-	;; at the Unix level. Errors below here are usually errors in
-	;; user Lisp code, and it might be helpful to let the user
-	;; reach the REPL in order to help figure out what's going on.)
+	;; at the Unix level. Errors below here are generally errors
+	;; in user Lisp code, and it might be helpful to let the user
+	;; reach the REPL in order to help figure out what's going
+	;; on.)
 	(restart-case
-	    (flet ((process-init-file (truename)
-		     (when truename
-		       (unless (load truename)
-			 (error "~S was not successfully loaded." truename))
-		       (flush-standard-output-streams))))
-	      (process-init-file sysinit-truename)
-	      (process-init-file userinit-truename)
+	    (progn
+	      (flet ((process-init-file (truename)
+		       (when truename
+			 (unless (load truename)
+			   (error "~S was not successfully loaded." truename))
+			 (flush-standard-output-streams))))
+		(process-init-file sysinit-truename)
+		(process-init-file userinit-truename))
 
 	      ;; Process --eval options.
 	      (/show0 "handling --eval options in TOPLEVEL-INIT")

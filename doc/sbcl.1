@@ -301,6 +301,11 @@ read-eval-print loop on standard input, evaluate the command given.
 More than one --eval option can be used, and all will be executed, in
 the order they appear on the command line.
 .TP 3
+.B --load <filename>
+This is equivalent to --eval '(load "<filename>")'. The special
+syntax is intended to reduce quoting headaches when invoking SBCL
+from shell scripts.
+.TP 3
 .B --noprint
 When ordinarily the toplevel "read-eval-print loop" would be executed,
 execute a "read-eval loop" instead, i.e. don't print a prompt and

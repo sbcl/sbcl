@@ -1010,11 +1010,14 @@ changes in sbcl-0.7.2 relative to sbcl-0.7.1:
     (> SPEED DEBUG). (This is an incompatible change because there are
     programs which relied on the old CMU-CL-style behavior to optimize
     away their unbounded recursion which will now die of stack overflow.)
+  * new syntactic sugar for the Unix command line: --load foo.bar is now
+    an alternate notation for --eval '(load "foo.bar")'.
   * bug fixes:
     ** The system now hunts for the C variable "environ" in a more
        devious way, to avoid segfaults when the C library version
        differs between compile time and run time. (thanks to Christophe
        Rhodes)
+    ** INTEGER-valued CATCH tags now work. (thanks to Alexey Dejneka)
   * several changes related to debugging:
     ** suppression of tail recursion, as noted above
     ** The default implementation of TRACE has changed. :ENCAPSULATE T

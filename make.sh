@@ -34,6 +34,10 @@
 #   "lisp -noinit -batch" 
 #                 to use an existing CMU CL binary as a cross-compilation host
 #                 when you have weird things in your .cmucl-init file
+# Someday CLISP should work
+#   "clisp"
+# but as of sbcl-0.7.1.17, it still doesn't. (SBCL's fault: too much 
+# unportable code!)
 #
 # FIXME: Make a more sophisticated command line parser, probably
 # accepting "sh make.sh --xc-host foolisp" instead of the
