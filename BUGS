@@ -255,13 +255,6 @@ WORKAROUND:
   type safety errors reported by Peter Van Eynde July 25, 2000:
 	c: (COERCE 'AND 'FUNCTION) returns something related to
 	   (MACRO-FUNCTION 'AND), but ANSI says it should raise an error.
-	h: (MAKE-CONCATENATED-STREAM (MAKE-STRING-OUTPUT-STREAM))
-	   should signal TYPE-ERROR.
-	i: MAKE-TWO-WAY-STREAM doesn't check that its arguments can
-	   be used for input and output as needed. It should fail with
-	   TYPE-ERROR when handed e.g. the results of
-	   MAKE-STRING-INPUT-STREAM or MAKE-STRING-OUTPUT-STREAM in
-	   the inappropriate positions, but doesn't.
 	k: READ-BYTE is supposed to signal TYPE-ERROR when its argument is 
 	   not a binary input stream, but instead cheerfully reads from
 	   character streams, e.g. (MAKE-STRING-INPUT-STREAM "abc").

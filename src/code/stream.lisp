@@ -607,16 +607,12 @@
 				       (bout #'broadcast-bout)
 				       (sout #'broadcast-sout)
 				       (misc #'broadcast-misc))
-			     (:constructor #!-high-security-support
-					   make-broadcast-stream
-					   #!+high-security-support
-					   %make-broadcast-stream (&rest
-								   streams))
+			     (:constructor %make-broadcast-stream
+					   (&rest streams))
 			     (:copier nil))
   ;; a list of all the streams we broadcast to
   (streams () :type list :read-only t))
 
-#!+high-security-support
 (defun make-broadcast-stream (&rest streams)
   (dolist (stream streams)
     (unless (or (and (synonym-stream-p stream)
@@ -736,24 +732,16 @@
 		      (bout #'two-way-bout)
 		      (sout #'two-way-sout)
 		      (misc #'two-way-misc))
-	    (:constructor #!-high-security-support
-			  make-two-way-stream
-			  #!+high-security-support
-			  %make-two-way-stream (input-stream output-stream))
+	    (:constructor %make-two-way-stream (input-stream output-stream))
 	    (:copier nil))
   (input-stream (missing-arg) :type stream :read-only t)
   (output-stream (missing-arg) :type stream :read-only t))
 (defprinter (two-way-stream) input-stream output-stream)
 
-#!-high-security-support
-(setf (fdocumentation 'make-two-way-stream 'function)
-  "Return a bidirectional stream which gets its input from Input-Stream and
-   sends its output to Output-Stream.")
-#!+high-security-support
 (defun make-two-way-stream (input-stream output-stream)
   #!+sb-doc
-  "Return a bidirectional stream which gets its input from Input-Stream and
-   sends its output to Output-Stream."
+  "Return a bidirectional stream which gets its input from INPUT-STREAM and
+   sends its output to OUTPUT-STREAM."
   ;; FIXME: This idiom of the-real-stream-of-a-possibly-synonym-stream
   ;; should be encapsulated in a function, and used here and most of
   ;; the other places that SYNONYM-STREAM-P appears.
@@ -832,10 +820,8 @@
 		      (bin #'concatenated-bin)
 		      (n-bin #'concatenated-n-bin)
 		      (misc #'concatenated-misc))
-	    (:constructor
-	     #!-high-security-support make-concatenated-stream
-	     #!+high-security-support %make-concatenated-stream
-		 (&rest streams &aux (current streams)))
+	    (:constructor %make-concatenated-stream
+			  (&rest streams &aux (current streams)))
 	    (:copier nil))
   ;; The car of this is the substream we are reading from now.
   current
@@ -854,15 +840,9 @@
 	    ":STREAMS ~S"
 	    (concatenated-stream-streams x))))
 
-#!-high-security-support
-(setf (fdocumentation 'make-concatenated-stream 'function)
-  "Return a stream which takes its input from each of the Streams in turn,
-   going on to the next at EOF.")
-
-#!+high-security-support
 (defun make-concatenated-stream (&rest streams)
   #!+sb-doc
-  "Return a stream which takes its input from each of the Streams in turn,
+  "Return a stream which takes its input from each of the streams in turn,
    going on to the next at EOF."
   (dolist (stream streams)
     (unless (or (and (synonym-stream-p stream)
@@ -945,7 +925,7 @@
 		      (bin #'echo-bin)
 		      (misc #'echo-misc)
 		      (n-bin #'ill-bin))
-	    (:constructor make-echo-stream (input-stream output-stream))
+	    (:constructor %make-echo-stream (input-stream output-stream))
 	    (:copier nil))
   unread-stuff)
 (def!method print-object ((x echo-stream) stream)
@@ -954,6 +934,27 @@
 	    ":INPUT-STREAM ~S :OUTPUT-STREAM ~S"
 	    (two-way-stream-input-stream x)
 	    (two-way-stream-output-stream x))))
+
+(defun make-echo-stream (input-stream output-stream)
+  #!+sb-doc
+  "Return a bidirectional stream which gets its input from INPUT-STREAM and
+   sends its output to OUTPUT-STREAM. In addition, all input is echoed to
+   the output stream."
+  (unless (or (and (synonym-stream-p output-stream)
+	 	   (output-stream-p (symbol-value
+				     (synonym-stream-symbol output-stream))))
+	      (output-stream-p output-stream))
+    (error 'type-error
+	   :datum output-stream
+	   :expected-type '(satisfies output-stream-p)))
+  (unless (or (and (synonym-stream-p input-stream)
+		   (input-stream-p (symbol-value
+				    (synonym-stream-symbol input-stream))))
+	      (input-stream-p input-stream))
+    (error 'type-error
+	   :datum input-stream
+	   :expected-type '(satisfies input-stream-p)))
+  (funcall #'%make-echo-stream input-stream output-stream))
 
 (macrolet ((in-fun (name fun out-slot stream-method &rest args)
 	     `(defun ,name (stream ,@args)
@@ -997,11 +998,6 @@
 	       (funcall (ansi-stream-misc out) out operation arg1 arg2)
 	       (stream-misc-dispatch out operation arg1 arg2)))))))
 
-#!+sb-doc
-(setf (fdocumentation 'make-echo-stream 'function)
-  "Return a bidirectional stream which gets its input from INPUT-STREAM and
-   sends its output to OUTPUT-STREAM. In addition, all input is echoed to
-   the output stream")
 
 ;;;; string input streams
 

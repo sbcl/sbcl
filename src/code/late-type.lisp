@@ -1533,7 +1533,7 @@
 	;; previously we threw an error here:
 	;; (error "Lower bound ~S is greater than upper bound ~S." l h))
 	;; but ANSI doesn't say anything about that, so:
-	(specifier-type 'nil)
+	*empty-type*
       (make-numeric-type :class 'integer
 			 :complexp :real
 			 :enumerable (not (null (and l h)))
@@ -1548,7 +1548,7 @@
 	   ;; as above, previously we did
 	   ;; (error "Lower bound ~S is not less than upper bound ~S." low high))
 	   ;; but it is correct to do
-	   (specifier-type 'nil)
+	   *empty-type*
 	 (make-numeric-type :class ',class :format ',format :low lb :high hb)))))
 
 (!def-bounded-type rational rational nil)
