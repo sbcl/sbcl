@@ -13,6 +13,8 @@
  * files for more information.
  */
 
+#include "sbcl.h"
+
 #include <stdio.h>
 #include <string.h>
 #include <libgen.h>
@@ -37,7 +39,6 @@
 #include "signal.h"
 
 #include "runtime.h"
-#include "sbcl.h"
 #include "alloc.h"
 #include "vars.h"
 #include "globals.h"
