@@ -1202,6 +1202,38 @@
 	     (denominator
 	      (progv nil nil (values (boole boole-and 0 v9)))))))))
    1 2 3)))
+
+;;; non-continuous dead UVL blocks
+(defun non-continuous-stack-test (x)
+  (multiple-value-call #'list
+    (eval '(values 11 12))
+    (eval '(values 13 14))
+    (block ext
+      (return-from non-continuous-stack-test
+        (multiple-value-call #'list
+          (eval '(values :b1 :b2))
+          (eval '(values :b3 :b4))
+          (block int
+            (return-from ext
+              (multiple-value-call (eval #'values)
+                (eval '(values 1 2))
+                (eval '(values 3 4))
+                (block ext
+                  (return-from int
+                    (multiple-value-call (eval #'values)
+                      (eval '(values :a1 :a2))
+                      (eval '(values :a3 :a4))
+                      (block int
+                        (return-from ext
+                          (multiple-value-call (eval #'values)
+                            (eval '(values 5 6))
+                            (eval '(values 7 8))
+                            (if x
+                                :ext
+                                (return-from int :int))))))))))))))))
+(assert (equal (non-continuous-stack-test t) '(11 12 13 14 1 2 3 4 5 6 7 8 :ext)))
+(assert (equal (non-continuous-stack-test nil) '(:b1 :b2 :b3 :b4 :a1 :a2 :a3 :a4 :int)))
+
 
 ;;; MISC.275
 (assert

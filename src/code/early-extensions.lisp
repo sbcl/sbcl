@@ -1097,7 +1097,7 @@ which can be found at <http://sbcl.sourceforge.net/>.~:@>"
                (let ((it ,test)) (declare (ignorable it)),@body)
                (acond ,@rest))))))
 
-;;; (binding* ({(name initial-value [flag])}*) body)
+;;; (binding* ({(names initial-value [flag])}*) body)
 ;;; FLAG may be NIL or :EXIT-IF-NULL
 ;;;
 ;;; This form unites LET*, MULTIPLE-VALUE-BIND and AWHEN.
@@ -1115,7 +1115,15 @@ which can be found at <http://sbcl.sourceforge.net/>.~:@>"
                      (symbol
                       (values (list names) nil))
                      (list
-                      (values names nil)))
+                      (collect ((new-names) (ignorable))
+                        (dolist (name names)
+                          (when (eq name nil)
+                            (setq name (gensym))
+                            (ignorable name))
+                          (new-names name))
+                        (values (new-names)
+                                (when (ignorable)
+                                  `((declare (ignorable ,@(ignorable)))))))))
                  (setq form `(multiple-value-bind ,names
                                  ,initial-value
                                ,@declarations

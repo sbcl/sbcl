@@ -182,35 +182,51 @@
 ;;; wastes only space.
 (defun discard-unused-values (block1 block2)
   (declare (type cblock block1 block2))
-  (let* ((block1-stack (ir2-block-end-stack (block-info block1)))
-         (block2-stack (ir2-block-start-stack (block-info block2)))
-         (cleanup-code
-          (cond ((eq (car block1-stack) (car block2-stack))
-                 (binding* ((preserved-count (mismatch block1-stack block2-stack)
-                              :exit-if-null)
-                            (n-last-preserved (1- preserved-count))
-                            (nipped-count (- (length block1-stack)
-                                             (length block2-stack)))
-                            (n-last-nipped (+ n-last-preserved nipped-count)))
-                   (aver (equal (nthcdr (1+ n-last-nipped) block1-stack)
-                                (nthcdr preserved-count block2-stack)))
-                   (compiler-notify "%NIP-VALUES emitted")
-                   `(%nip-values ',(elt block1-stack n-last-nipped)
-                                 ',(elt block1-stack n-last-preserved)
-                                 ,@(loop for moved in block1-stack
-                                         repeat preserved-count
-                                         collect `',moved))))
-                (t
-                 (let* ((n-popped (- (length block1-stack)
-                                     (length block2-stack)))
-                       (last-popped (elt block1-stack (1- n-popped))))
-                   (when *check-consistency*
-                     (aver (equal block2-stack (nthcdr n-popped block1-stack))))
-                   `(%pop-values ',last-popped))))))
-    (when cleanup-code
+  (collect ((cleanup-code))
+    (labels ((find-popped (before after)
+               ;; Returns (VALUES popped last-popped rest), where
+               ;; BEFORE = (APPEND popped rest) and
+               ;; (EQ (FIRST rest) (FIRST after))
+               (if (null after)
+                   (values before (first (last before)) nil)
+                   (loop with first-preserved = (car after)
+                         for last-popped = nil then maybe-popped
+                         for rest on before
+                         for maybe-popped = (car rest)
+                         while (neq maybe-popped first-preserved)
+                         collect maybe-popped into popped
+                         finally (return (values popped last-popped rest)))))
+             (discard (before-stack after-stack)
+               (cond
+                 ((eq (car before-stack) (car after-stack))
+                  (binding* ((moved-count (mismatch before-stack after-stack)
+                                          :exit-if-null)
+                             ((moved qmoved)
+                              (loop for moved-lvar in before-stack
+                                    repeat moved-count
+                                    collect moved-lvar into moved
+                                    collect `',moved-lvar into qmoved
+                                    finally (return (values moved qmoved))))
+                             (q-last-moved (car (last qmoved)))
+                             ((nil last-nipped rest)
+                              (find-popped (nthcdr moved-count before-stack)
+                                           (nthcdr moved-count after-stack))))
+                    (cleanup-code
+                     `(%nip-values ',last-nipped ,q-last-moved
+                       ,@qmoved))
+                    (discard (nconc moved rest) after-stack)))
+                 (t
+                  (multiple-value-bind (popped last-popped rest)
+                      (find-popped before-stack after-stack)
+                    (declare (ignore popped))
+                    (cleanup-code `(%pop-values ',last-popped))
+                    (discard rest after-stack))))))
+      (discard (ir2-block-end-stack (block-info block1))
+               (ir2-block-start-stack (block-info block2))))
+    (when (cleanup-code)
       (let* ((block (insert-cleanup-code block1 block2
                                          (block-start-node block2)
-                                         cleanup-code))
+                                         `(progn ,@(cleanup-code))))
              (2block (make-ir2-block block)))
         (setf (block-info block) 2block)
         (add-to-emit-order 2block (block-info block1))
