@@ -97,13 +97,9 @@
 
 ;;; Given a signal context, return the floating point modes word in
 ;;; the same format as returned by FLOATING-POINT-MODES.
-(defun context-floating-point-modes (context)
-  ;; FIXME: As of sbcl-0.6.7 and the big rewrite of signal handling
-  ;; for POSIXness and (at the Lisp level) opaque signal contexts,
-  ;; this is needs to be rewritten as an alien function.
-  (warn "stub CONTEXT-FLOATING-POINT-MODES")
-  0)
-
+(define-alien-routine ("os_context_fp_control" context-floating-point-modes)
+    (sb!alien:unsigned 32)
+  (context (* os-context-t)))
 
 
 ;;;; INTERNAL-ERROR-ARGS.

@@ -67,6 +67,17 @@ os_context_sigmask_addr(os_context_t *context)
     return &context->uc_sigmask;
 }
 
+unsigned long
+os_context_fp_control(os_context_t *context)
+{
+    /* So this may look like nice, well behaved code. However, closer
+       inspection reveals that gpr is simply the general purpose
+       registers, and PT_FPSCR is an offset that is larger than 32
+       (the number of ppc registers), but that happens to get the
+       right answer. -- CSR, 2002-07-11 */
+    return &((context->uc_mcontext.regs)->gpr[PT_FPSCR]); 
+}
+
 void os_flush_icache(os_vm_address_t address, os_vm_size_t length)
 {
     /* see ppc-arch.c */
