@@ -105,8 +105,9 @@ be terribly useful.
 not scale linearly in size with the number of characters in the
 system.  (Rationale: having a readtable with 2^21 entries would make
 even current bloated sbcl.core look tiny.)
-  -- done reader;
-  -- TODO: symbol printer.
+  -- done reader, symbol printer, format subsystem.
+     (Note that the symbol printer has multiple bugs in its logic
+     which have not been fixed by this branch.)
 
 ** implement an SB-ALIEN:UTF8-STRING parallel to SB-ALIEN:C-STRING.
 (Rationale: for calling out to Pango or similar.  Actually, a valid

@@ -34,7 +34,7 @@
   (string (missing-arg) :type simple-string)
   (start (missing-arg) :type (and unsigned-byte fixnum))
   (end (missing-arg) :type (and unsigned-byte fixnum))
-  (character (missing-arg) :type base-char)
+  (character (missing-arg) :type chararacter)
   (colonp nil :type (member t nil))
   (atsignp nil :type (member t nil))
   (params nil :type list))
@@ -219,8 +219,11 @@
   (etypecase directive
     (format-directive
      (let ((expander
-	    (aref *format-directive-expanders*
-		  (char-code (format-directive-character directive))))
+            (let ((char (format-directive-character directive)))
+              (typecase char
+                (base-char
+                 (aref *format-directive-expanders* (char-code char)))
+                (character nil))))
 	   (*default-format-error-offset*
 	    (1- (format-directive-end directive))))
        (declare (type (or null function) expander))

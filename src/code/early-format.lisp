@@ -18,9 +18,9 @@
 	  #-sb-xc-host (code-char tab-char-code)))
 
 (defvar *format-directive-expanders*
-  (make-array char-code-limit :initial-element nil))
+  (make-array base-char-code-limit :initial-element nil))
 (defvar *format-directive-interpreters*
-  (make-array char-code-limit :initial-element nil))
+  (make-array base-char-code-limit :initial-element nil))
 
 (defvar *default-format-error-control-string* nil)
 (defvar *default-format-error-offset* nil)
