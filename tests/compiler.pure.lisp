@@ -1691,3 +1691,30 @@
         (funcall f array1)
         (setf (aref array2 i) v)
         (assert (equal array1 array2))))))
+
+(let ((fn (compile nil '(lambda (x)
+			  (declare (type bit x))
+			  (declare (optimize speed))
+			  (let ((b (make-array 64 :element-type 'bit
+					       :initial-element 0)))
+			    (count x b))))))
+  (assert (= (funcall fn 0) 64))
+  (assert (= (funcall fn 1) 0)))
+
+(let ((fn (compile nil '(lambda (x y)
+			  (declare (type simple-bit-vector x y))
+			  (declare (optimize speed))
+			  (equal x y)))))
+  (assert (funcall 
+	   fn 
+	   (make-array 64 :element-type 'bit :initial-element 0)
+	   (make-array 64 :element-type 'bit :initial-element 0)))
+  (assert (not 
+	   (funcall 
+	    fn
+	    (make-array 64 :element-type 'bit :initial-element 0)
+	    (let ((b (make-array 64 :element-type 'bit :initial-element 0)))
+	      (setf (sbit b 63) 1)
+	      b)))))
+		    
+		   

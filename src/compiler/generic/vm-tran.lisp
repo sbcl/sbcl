@@ -317,7 +317,7 @@
 		    (end-1 (+ sb!vm:vector-data-offset
 			      (floor (1- length) sb!vm:n-word-bits))))
 		   ((= i end-1)
-		    (let* ((extra (mod length sb!vm:n-word-bits))
+		    (let* ((extra (1+ (mod (1- length) sb!vm:n-word-bits)))
 			   (mask (1- (ash 1 extra)))
 			   (numx
 			    (logand
@@ -335,8 +335,7 @@
 				     (:big-endian
 				      '(- sb!vm:n-word-bits extra))))
 			     (%raw-bits y i))))
-		      (declare (type (mod #.sb!vm:n-word-bits)
-                                     extra)
+		      (declare (type (integer 1 #.sb!vm:n-word-bits) extra)
 			       (type sb!vm:word mask numx numy))
 		      (= numx numy)))
 		(declare (type index i end-1))
@@ -357,7 +356,7 @@
                        (truncate (truly-the index (1- length))
                                  sb!vm:n-word-bits))))
             ((= index end-1)
-             (let* ((extra (mod length sb!vm:n-word-bits))
+             (let* ((extra (1+ (mod (1- length) sb!vm:n-word-bits)))
 		    (mask (1- (ash 1 extra)))
 		    (bits (logand (ash mask
 				       ,(ecase sb!c:*backend-byte-order*
@@ -365,7 +364,7 @@
 					       (:big-endian
 						'(- sb!vm:n-word-bits extra))))
 				  (%raw-bits sequence index))))
-               (declare (type (mod #.sb!vm:n-word-bits) extra))
+               (declare (type (integer 1 #.sb!vm:n-word-bits) extra))
                (declare (type sb!vm:word mask bits))
                ;; could consider LOGNOT for the zero case instead of
                ;; doing the subtraction...

@@ -6,6 +6,9 @@ changes in sbcl-0.8.20 (0.9alpha.0?) relative to sbcl-0.8.19:
     related to the ~@F format directive.
   * fixed bug: SET-SYNTAX-FROM-CHAR correctly shallow-copies a
     dispatch table if the from-char is a dispatch macro character.
+  * fixed bug: COUNT and EQUAL on bit vectors with lengths divisible
+    by the wordsize no longer ignore the last word.  (reported by Lutz
+    Euler)
   * fixed some bugs related to Unicode integration:
     ** portions of multibyte characters at the end of buffers for
        character-based file input are correctly transferred to the
