@@ -48,6 +48,8 @@
 
 (defmacro make-ea-for-object-slot (ptr slot lowtag)
   `(make-ea :qword :base ,ptr :disp (- (* ,slot n-word-bytes) ,lowtag)))
+(defmacro make-ea-for-object-slot-half (ptr slot lowtag)
+  `(make-ea :dword :base ,ptr :disp (- (* ,slot n-word-bytes) ,lowtag)))
 
 (defmacro loadw (value ptr &optional (slot 0) (lowtag 0))
   `(inst mov ,value (make-ea-for-object-slot ,ptr ,slot ,lowtag)))
@@ -58,9 +60,10 @@
 		 (not (typep ,value 
 			     '(or (signed-byte 32) (unsigned-byte 32)))))
 	    (multiple-value-bind (lo hi) (dwords-for-quad ,value)
-	      (inst mov (make-ea-for-object-slot ,ptr ,slot ,lowtag) lo)
-	      (inst mov (make-ea-for-object-slot ,ptr (floor (+ ,slot 0.5))
-						 ,lowtag)   hi)))
+	      (inst mov (make-ea-for-object-slot-half
+			 ,ptr ,slot ,lowtag) lo)
+	      (inst mov (make-ea-for-object-slot-half
+			 ,ptr (+ ,slot 1/2) ,lowtag) hi)))
 	   (t
 	    (inst mov (make-ea-for-object-slot ,ptr ,slot ,lowtag) ,value)))))
 

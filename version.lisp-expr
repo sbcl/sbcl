@@ -17,4 +17,4 @@
 ;;; checkins which aren't released. (And occasionally for internal
 ;;; versions, especially for internal versions off the main CVS
 ;;; branch, it gets hairier, e.g. "0.pre7.14.flaky4.13".)
-"0.8.15.14.x86-64-again-branch.25"
+"0.8.15.14.x86-64-again-branch.26"
