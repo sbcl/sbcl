@@ -94,6 +94,9 @@
 		 (:static-file "doc" :pathname "doc.lisp")
 		 (:static-file "TODO")))
 
+(defmethod perform :after ((o load-op) (c (eql (find-system :sb-bsd-sockets))))
+  (provide 'sb-bsd-sockets))
+
 (defmethod perform ((o test-op) (c (eql (find-system :sb-bsd-sockets))))
   (or (funcall (intern "DO-TESTS" (find-package "SB-RT")))
       (error "test-op failed")))

@@ -16,6 +16,9 @@
 			:if-component-dep-fails :ignore)
 	       (:file "rotate-byte" :depends-on ("compiler"))))
 
+(defmethod perform :after ((o load-op) (c (eql (find-system :sb-rotate-byte))))
+  (provide 'sb-rotate-byte))
+
 (defmethod perform ((o test-op) (c (eql (find-system :sb-rotate-byte))))
   (or (load (compile-file "rotate-byte-tests.lisp"))
       (error "test-op failed")))

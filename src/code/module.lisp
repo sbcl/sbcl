@@ -42,29 +42,36 @@
    needs to be. If PATHNAMES is not supplied, functions from the list
    *MODULE-PROVIDER-FUNCTIONS* are called in order with MODULE-NAME
    as an argument, until one of them returns non-NIL."
-  (unless (member (string module-name) *modules* :test #'string=)
-    (cond (pathnames
-	   (unless (listp pathnames) (setf pathnames (list pathnames)))
-	   ;; ambiguity in standard: should we try all pathnames in the
-	   ;; list, or should we stop as soon as one of them calls PROVIDE?
-	   (dolist (ele pathnames t)
-	     (load ele)))
-	  (t
-	   (unless (some (lambda (p) (funcall p module-name))
-			 sb!ext::*module-provider-functions*)
-	     (error "Don't know how to load ~A" module-name))))))
-
+  (let ((saved-modules (copy-list *modules*)))
+    (unless (member (string module-name) *modules* :test #'string=)
+      (cond (pathnames
+	     (unless (listp pathnames) (setf pathnames (list pathnames)))
+	     ;; ambiguity in standard: should we try all pathnames in the
+	     ;; list, or should we stop as soon as one of them calls PROVIDE?
+	     (dolist (ele pathnames t)
+	       (load ele))
+             ;; should we do this?  Probably can't hurt, while we're
+             ;; taking the above view of "load everything"...  though
+             ;; maybe having REQUIRE directly call PROVIDE is
+             ;; aesthetically suboptimal.
+	     (provide module-name))
+	    (t
+	     (unless (some (lambda (p) (funcall p module-name))
+			   sb!ext::*module-provider-functions*)
+	       (error "Don't know how to load ~A" module-name)))))
+    (set-difference *modules* saved-modules)))
 
 ;;;; miscellany
 
 (defun module-provide-contrib (name)
-  "Stringify and downcase NAME if it is a symbol, then attempt to load
-   the file $SBCL_HOME/name/name"
-  (let ((name (if (symbolp name) (string-downcase (symbol-name name)) name)))
+  "Stringify and downcase NAME, then attempt to load the file
+   $SBCL_HOME/name/name"
+  (let ((filesys-name (string-downcase (string name))))
     (load
-     (merge-pathnames (make-pathname :directory (list :relative name)
-				     :name name)
+     (merge-pathnames (make-pathname :directory (list :relative filesys-name)
+				     :name filesys-name)
 		      (truename (posix-getenv "SBCL_HOME")))))
-  (provide name))
+  (provide name)
+  t)
 
 

@@ -1,4 +1,4 @@
-;;; This is asdf: Another System Definition Facility.  1.68
+;;; This is asdf: Another System Definition Facility.  1.72
 ;;;
 ;;; Feedback, bug reports, and patches are all welcome: please mail to
 ;;; <cclan-list@lists.sf.net>.  But note first that the canonical
@@ -89,7 +89,7 @@
 
 (in-package #:asdf)
 
-(defvar *asdf-revision* (let* ((v "1.68")
+(defvar *asdf-revision* (let* ((v "1.72")
 			       (colon (or (position #\: v) -1))
 			       (dot (position #\. v)))
 			  (and v colon dot 
@@ -889,6 +889,7 @@ Returns the new tree (which probably shares structure with the old one)"
 	      depends-on serial in-order-to
 	      ;; list ends
 	      &allow-other-keys) options
+    (check-component-input type name depends-on components in-order-to)
     (let* ((other-args (remove-keys
 			'(components pathname default-component-class
 			  perform explain output-files operation-done-p
@@ -943,6 +944,22 @@ Returns the new tree (which probably shares structure with the old one)"
 		  (component-inline-methods ret))))
       ret)))
 
+(defun check-component-input (type name depends-on components in-order-to)
+  "A partial test of the values of a component."
+  (unless (listp depends-on)
+    (sysdef-error-component ":depends-on must be a list."
+			    type name depends-on))
+  (unless (listp components)
+    (sysdef-error-component ":components must be NIL or a list of components."
+			    type name components))
+  (unless (and (listp in-order-to) (listp (car in-order-to)))
+    (sysdef-error-component ":in-order-to must be NIL or a list of components."
+			   type name in-order-to)))
+
+(defun sysdef-error-component (msg type name value)
+  (sysdef-error (concatenate 'string msg
+			     "~&The value specified for ~(~A~) ~A is ~W")
+		type name value))
 
 (defun resolve-symlinks (path)
   #-allegro (truename path)
@@ -1020,7 +1037,7 @@ output to *trace-output*.  Returns the shell's exit code."
     (let ((system (asdf:find-system name nil)))
       (when system
 	(asdf:operate 'asdf:load-op name)
-	(provide name))))
+	t)))
 
   (pushnew
    '(merge-pathnames "systems/"

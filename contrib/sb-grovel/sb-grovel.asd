@@ -10,6 +10,9 @@
 		 (:file "foreign-glue" :depends-on ("defpackage"))
 		 (:file "array-data" :depends-on ("defpackage"))))
 
+(defmethod perform :after ((o load-op) (c (eql (find-system :sb-grovel))))
+  (provide 'sb-grovel))
+
 (defmethod perform ((o test-op) (c (eql (find-system :sb-grovel))))
   t)
 

@@ -13,8 +13,8 @@
 		  :package :sb-posix :depends-on  ("defpackage"))
 		 (:file "interface" :depends-on ("constants" "macros"))))
 
-#|
-(defmethod perform ((o test-op) (c (eql (find-system :sb-grovel))))
-  t)
+(defmethod perform :after ((o test-op) (c (eql (find-system :sb-posix))))
+  (provide 'sb-posix))
 
-|#
+(defmethod perform ((o test-op) (c (eql (find-system :sb-posix))))
+  t)

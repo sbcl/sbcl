@@ -11,6 +11,9 @@
 		 (:file "inspect" :depends-on ("repl"))
 		 (:file "debug" :depends-on ("repl"))))
 
+(defmethod perform :after ((o load-op) (c (eql (find-system :sb-aclrepl))))
+  (provide 'sb-aclrepl))
+
 (defmethod perform ((o test-op) (c (eql (find-system :sb-aclrepl))))
   (oos 'load-op 'sb-aclrepl-tests)
   (oos 'test-op 'sb-aclrepl-tests))
