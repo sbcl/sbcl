@@ -330,14 +330,53 @@
 				      '(- sb!vm:n-word-bits extra))))
 			     (%raw-bits y i))))
 		      (declare (type (integer 0 31) extra)
-			       (type (unsigned-byte 32) mask numx numy))
+			       (type sb!vm:word mask numx numy))
 		      (= numx numy)))
 		(declare (type index i end-1))
 		(let ((numx (%raw-bits x i))
 		      (numy (%raw-bits y i)))
-		  (declare (type (unsigned-byte 32) numx numy))
+		  (declare (type sb!vm:word numx numy))
 		  (unless (= numx numy)
 		    (return nil))))))))
+
+(deftransform count ((sequence item) (simple-bit-vector bit) *
+                     :policy (>= speed space))
+  `(let ((length (length sequence)))
+    (if (zerop length)
+        0
+        (do ((index sb!vm:vector-data-offset (1+ index))
+             (count 0)
+             (end-1 (+ sb!vm:vector-data-offset
+                       (truncate (truly-the index (1- length))
+                                 sb!vm:n-word-bits))))
+            ((= index end-1)
+             (let* ((extra (mod length sb!vm:n-word-bits))
+		    (mask (1- (ash 1 extra)))
+		    (bits (logand (ash mask
+				       ,(ecase sb!c:*backend-byte-order*
+					       (:little-endian 0)
+					       (:big-endian
+						'(- sb!vm:n-word-bits extra))))
+				  (%raw-bits sequence index))))
+               (declare (type sb!vm:word mask bits))
+               ;; could consider LOGNOT for the zero case instead of
+               ;; doing the subtraction...
+               (incf count ,(if (constant-lvar-p item)
+                                (if (zerop (lvar-value item))
+                                    '(- extra (logcount bits))
+                                    '(logcount bits))
+                                '(if (zerop item)
+                                     (- extra (logcount bits))
+                                     (logcount bits))))))
+          (declare (type index index count end-1)
+		   (optimize (speed 3) (safety 0)))
+          (incf count ,(if (constant-lvar-p item)
+                           (if (zerop (lvar-value item))
+                               '(- sb!vm:n-word-bits (logcount (%raw-bits sequence index)))
+                               '(logcount (%raw-bits sequence index)))
+                           '(if (zerop item)
+                             (- sb!vm:n-word-bits (logcount (%raw-bits sequence index)))
+                             (logcount (%raw-bits sequence index)))))))))
 
 (deftransform fill ((sequence item) (simple-bit-vector bit) *
 		    :policy (>= speed space))

@@ -39,7 +39,24 @@
     (assert (= (aref a (- array-dimension-limit 2)) 1))
     (bit-and a b a)
     (assert (= (aref a 0) 0))
-    (assert (= (aref a (- array-dimension-limit 2)) 0))))
+    (assert (= (aref a (- array-dimension-limit 2)) 0)))
+  ;; a special COUNT transform on bitvectors; triggers on (>= SPEED SPACE)
+  (locally
+   (declare (optimize (speed 3) (space 1)))
+   (let ((bv1 (make-array 5 :element-type 'bit))
+	 (bv2 (make-array 0 :element-type 'bit))
+	 (bv3 (make-array 68 :element-type 'bit)))
+     (declare (type simple-bit-vector bv1 bv2 bv3))
+     (setf (sbit bv3 42) 1)
+     ;; bitvector smaller than the word size
+     (assert (= 0 (count 1 bv1)))
+     (assert (= 5 (count 0 bv1)))
+     ;; special case of 0-length bitvectors
+     (assert (= 0 (count 1 bv2)))
+     (assert (= 0 (count 0 bv2)))
+     ;; bitvector larger than the word size
+     (assert (= 1 (count 1 bv3)))
+     (assert (= 67 (count 0 bv3))))))
 
 (bit-vector-test)
 

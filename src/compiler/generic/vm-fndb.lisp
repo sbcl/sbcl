@@ -98,7 +98,7 @@
 (defknown %layout-invalid-error (t layout) nil)
 
 
-(sb!xc:deftype raw-vector () '(simple-array (unsigned-byte 32) (*)))
+(sb!xc:deftype raw-vector () '(simple-array sb!vm:word (*)))
 
 (defknown %raw-ref-single (raw-vector index) single-float
   (foldable flushable))
@@ -128,9 +128,9 @@
   (unsafe))
 
 
-(defknown %raw-bits (t fixnum) (unsigned-byte 32)
+(defknown %raw-bits (t fixnum) sb!vm:word
   (foldable flushable))
-(defknown (%set-raw-bits) (t fixnum (unsigned-byte 32)) (unsigned-byte 32)
+(defknown (%set-raw-bits) (t fixnum sb!vm:word) sb!vm:word
   (unsafe))
 
 
@@ -164,17 +164,17 @@
 (defknown %set-stack-ref (system-area-pointer index t) t (unsafe))
 (defknown lra-code-header (t) t (movable flushable))
 (defknown fun-code-header (t) t (movable flushable))
-(defknown make-lisp-obj ((unsigned-byte 32)) t (movable flushable))
-(defknown get-lisp-obj-address (t) (unsigned-byte 32) (movable flushable))
+(defknown make-lisp-obj (sb!vm:word) t (movable flushable))
+(defknown get-lisp-obj-address (t) sb!vm:word (movable flushable))
 (defknown fun-word-offset (function) index (movable flushable))
 
 ;;;; 32-bit logical operations
 
-(defknown merge-bits ((unsigned-byte 5) (unsigned-byte 32) (unsigned-byte 32))
-  (unsigned-byte 32)
+(defknown merge-bits ((unsigned-byte 5) sb!vm:word sb!vm:word)
+  sb!vm:word
   (foldable flushable movable))
 
-(defknown 32bit-logical-not ((unsigned-byte 32)) (unsigned-byte 32)
+(defknown 32bit-logical-not (sb!vm:word) sb!vm:word
   (foldable flushable movable))
 
 (defknown (32bit-logical-and 32bit-logical-nand
@@ -182,11 +182,11 @@
 	   32bit-logical-xor 32bit-logical-eqv
 	   32bit-logical-andc1 32bit-logical-andc2
 	   32bit-logical-orc1 32bit-logical-orc2)
-	  ((unsigned-byte 32) (unsigned-byte 32)) (unsigned-byte 32)
+	  (sb!vm:word sb!vm:word) sb!vm:word
   (foldable flushable movable))
 
-(defknown (shift-towards-start shift-towards-end) ((unsigned-byte 32) fixnum)
-  (unsigned-byte 32)
+(defknown (shift-towards-start shift-towards-end) (sb!vm:word fixnum)
+  sb!vm:word
   (foldable flushable movable))
 
 ;;;; bignum operations
