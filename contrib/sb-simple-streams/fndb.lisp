@@ -83,7 +83,7 @@ TODO (rudi 2003-05-19): make the above work, make (defknown open) use it.
     ;; :derive-type #'result-type-open-class
     )
 
-  (sb-c:defknown listen (&optional sb-kernel:streamlike
+  (sb-c:defknown listen (&optional sb-kernel:stream-designator
                                    (or null (integer 1 10) (member character)))
     boolean (sb-c::unsafely-flushable sb-c::explicit-check))
 

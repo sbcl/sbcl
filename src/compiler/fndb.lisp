@@ -185,17 +185,14 @@
 
 ;;;; from the "Packages" chapter:
 
-(sb!xc:deftype package-designator () '(or stringable sb!xc:package))
-(sb!xc:deftype symbols () '(or list symbol))
-
 (defknown gentemp (&optional string package-designator) symbol)
 
-(defknown make-package (stringable &key
-				   (:use list)
-				   (:nicknames list)
-				   ;; ### extensions...
-				   (:internal-symbols index)
-				   (:external-symbols index))
+(defknown make-package (string-designator &key
+					  (:use list)
+					  (:nicknames list)
+					  ;; ### extensions...
+					  (:internal-symbols index)
+					  (:external-symbols index))
   sb!xc:package)
 (defknown find-package (package-designator) (or sb!xc:package null)
   (flushable))
@@ -214,15 +211,17 @@
 (defknown find-symbol (string &optional package-designator)
   (values symbol (member :internal :external :inherited nil))
   (flushable))
-(defknown (export import) (symbols &optional package-designator) (eql t))
+(defknown (export import) (symbols-designator &optional package-designator) 
+  (eql t))
 (defknown unintern (symbol &optional package-designator) boolean)
-(defknown unexport (symbols &optional package-designator) (eql t))
-(defknown shadowing-import (symbols &optional package-designator) (eql t))
+(defknown unexport (symbols-designator &optional package-designator) (eql t))
+(defknown shadowing-import (symbols-designator &optional package-designator)
+  (eql t))
 (defknown shadow ((or symbol string list) &optional package-designator)
   (eql t))
 (defknown (use-package unuse-package)
   ((or list package-designator) &optional package-designator) (eql t))
-(defknown find-all-symbols (stringable) list (flushable))
+(defknown find-all-symbols (string-designator) list (flushable))
 
 ;;;; from the "Numbers" chapter:
 
@@ -420,7 +419,7 @@
 (defknown char-int (character) char-code (movable foldable flushable))
 (defknown char-name (character) (or simple-string null)
   (movable foldable flushable))
-(defknown name-char (stringable) (or character null)
+(defknown name-char (string-designator) (or character null)
   (movable foldable flushable))
 (defknown code-char (char-code) base-char
   ;; By suppressing constant folding on CODE-CHAR when the
@@ -859,10 +858,8 @@
 (defknown char (string index) character (foldable flushable))
 (defknown schar (simple-string index) character (foldable flushable))
 
-(sb!xc:deftype stringable () '(or character string symbol))
-
 (defknown (string= string-equal)
-  (stringable stringable &key (:start1 index) (:end1 sequence-end)
+  (string-designator string-designator &key (:start1 index) (:end1 sequence-end)
 	      (:start2 index) (:end2 sequence-end))
   boolean
   (foldable flushable))
@@ -870,7 +867,7 @@
 (defknown (string< string> string<= string>= string/= string-lessp
 		   string-greaterp string-not-lessp string-not-greaterp
 		   string-not-equal)
-  (stringable stringable &key (:start1 index) (:end1 sequence-end)
+  (string-designator string-designator &key (:start1 index) (:end1 sequence-end)
 	      (:start2 index) (:end2 sequence-end))
   (or index null)
   (foldable flushable))
@@ -880,28 +877,28 @@
   simple-string (flushable))
 
 (defknown (string-trim string-left-trim string-right-trim)
-  (sequence stringable) simple-string (flushable))
+  (sequence string-designator) simple-string (flushable))
 
 (defknown (string-upcase string-downcase string-capitalize)
-  (stringable &key (:start index) (:end sequence-end))
+  (string-designator &key (:start index) (:end sequence-end))
   simple-string (flushable))
 
 (defknown (nstring-upcase nstring-downcase nstring-capitalize)
   (string &key (:start index) (:end sequence-end))
   string ())
 
-(defknown string (stringable) string
+(defknown string (string-designator) string
   (flushable explicit-check))
 
 ;;;; internal non-keyword versions of string predicates:
 
 (defknown (string<* string>* string<=* string>=* string/=*)
-  (stringable stringable index sequence-end index sequence-end)
+  (string-designator string-designator index sequence-end index sequence-end)
   (or index null)
   (foldable flushable))
 
 (defknown string=*
-  (stringable stringable index sequence-end index sequence-end)
+  (string-designator string-designator index sequence-end index sequence-end)
   boolean
   (foldable flushable))
 
@@ -972,24 +969,24 @@
   (values callable boolean)
   ())
 (defknown (pprint-fill pprint-linear)
-  (streamlike t &optional t t)
+  (stream-designator t &optional t t)
   null
   ())
 (defknown pprint-tabular
-  (streamlike t &optional t t unsigned-byte)
+  (stream-designator t &optional t t unsigned-byte)
   null
   ())
 (defknown pprint-indent
-  ((member :block :current) real &optional streamlike)
+  ((member :block :current) real &optional stream-designator)
   null
   ())
 (defknown pprint-newline
-  ((member :linear :fill :miser :mandatory) &optional streamlike)
+  ((member :linear :fill :miser :mandatory) &optional stream-designator)
   null
   ())
 (defknown pprint-tab
   ((member :line :section :line-relative :section-relative)
-   unsigned-byte unsigned-byte &optional streamlike)
+   unsigned-byte unsigned-byte &optional stream-designator)
   null
   ())
 (defknown set-pprint-dispatch
@@ -1000,20 +997,21 @@
 
 ;;; may return any type due to eof-value...
 (defknown (read read-preserving-whitespace read-char-no-hang read-char)
-  (&optional streamlike t t t) t (explicit-check))
+  (&optional stream-designator t t t) t (explicit-check))
 
-(defknown read-delimited-list (character &optional streamlike t) list
+(defknown read-delimited-list (character &optional stream-designator t) list
   (explicit-check))
-(defknown read-line (&optional streamlike t t t) (values t boolean)
+(defknown read-line (&optional stream-designator t t t) (values t boolean)
   (explicit-check))
-(defknown unread-char (character &optional streamlike) t
+(defknown unread-char (character &optional stream-designator) t
   (explicit-check))
-(defknown peek-char (&optional (or character (member nil t)) streamlike t t t)
+(defknown peek-char (&optional (or character (member nil t)) 
+			       stream-designator t t t)
   t
   (explicit-check))
-(defknown listen (&optional streamlike) boolean (flushable explicit-check))
+(defknown listen (&optional stream-designator) boolean (flushable explicit-check))
 
-(defknown clear-input (&optional stream) null (explicit-check))
+(defknown clear-input (&optional stream-designator) null (explicit-check))
 
 (defknown read-from-string
   (string &optional t t
@@ -1034,7 +1032,7 @@
 
 (defknown write
   (t &key
-     (:stream streamlike)
+     (:stream stream-designator)
      (:escape t)
      (:radix t)
      (:base (integer 2 36))
@@ -1054,7 +1052,9 @@
   (any explicit-check)
   :derive-type #'result-type-first-arg)
 
-(defknown (prin1 print princ) (t &optional streamlike) t (any explicit-check)
+(defknown (prin1 print princ) (t &optional stream-designator) 
+  t 
+  (any explicit-check)
   :derive-type #'result-type-first-arg)
 
 ;;; xxx-TO-STRING functions are not foldable because they depend on
@@ -1070,24 +1070,25 @@
 
 (defknown (prin1-to-string princ-to-string) (t) simple-string (flushable))
 
-(defknown write-char (character &optional streamlike) character
+(defknown write-char (character &optional stream-designator) character
   (explicit-check))
 (defknown (write-string write-line)
-  (string &optional streamlike &key (:start index) (:end sequence-end))
+  (string &optional stream-designator &key (:start index) (:end sequence-end))
   string
   (explicit-check))
 
 (defknown (terpri finish-output force-output clear-output)
-  (&optional streamlike) null
+  (&optional stream-designator) null
   (explicit-check))
 
-(defknown fresh-line (&optional streamlike) boolean
+(defknown fresh-line (&optional stream-designator) boolean
   (explicit-check))
 
 (defknown write-byte (integer stream) integer
   (explicit-check))
 
-(defknown format ((or streamlike string) (or string function) &rest t)
+(defknown format ((or (member nil t) stream string) 
+		  (or string function) &rest t)
   (or string null)
   (explicit-check))
 
@@ -1289,8 +1290,8 @@
   t)
 (defknown dribble (&optional filename &key (:if-exists t)) (values))
 
-(defknown apropos      (stringable &optional package-designator t) (values))
-(defknown apropos-list (stringable &optional package-designator t) list
+(defknown apropos      (string-designator &optional package-designator t) (values))
+(defknown apropos-list (string-designator &optional package-designator t) list
   (flushable))
 
 (defknown get-decoded-time ()

@@ -2326,6 +2326,8 @@ changes in sbcl-0.8.9 relative to sbcl-0.8.8:
     ** MAKE-STRING-INPUT-STREAM accepts NIL as a value for :END.
     ** MAKE-STRING-INPUT-STREAM functions correctly for strings with
        element-type NIL.
+    ** CLEAR-INPUT accepts NIL and T for its (optional) stream
+       argument.
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles

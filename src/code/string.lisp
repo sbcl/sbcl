@@ -23,7 +23,7 @@
 	(t
 	 (error 'simple-type-error
 		:datum x
-		:expected-type 'stringable
+		:expected-type 'string-designator
 		:format-control "~S cannot be coerced to a string."
 		:format-arguments (list x)))))
 

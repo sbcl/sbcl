@@ -129,9 +129,7 @@
 ;;; FIXME: could probably go away
 (sb!xc:deftype form () t)
 
-;;; Maclisp compatibility...
-;;; FIXME: should be STRING-DESIGNATOR (the term used in the ANSI spec)
-(sb!xc:deftype stringable () '(or string symbol character))
+(sb!xc:deftype string-designator () '(or string symbol character))
 
 ;;; a thing legal in places where we want the name of a file
 (sb!xc:deftype filename () '(or string pathname))
@@ -141,6 +139,10 @@
   '(or string pathname #+sb-xc-host stream #-sb-xc-host file-stream))
 (sb!xc:deftype logical-host-designator ()
   '(or host string))
+
+(sb!xc:deftype package-designator () '(or string-designator sb!xc:package))
+;;; a designator for a list of symbols
+(sb!xc:deftype symbols-designator () '(or list symbol))
 
 ;;; a thing returned by the irrational functions. We assume that they
 ;;; never compute a rational result.
@@ -161,10 +163,7 @@
   `(or null integer))
 
 ;;; a valid argument to a stream function
-;;;
-;;; FIXME: should probably be STREAM-DESIGNATOR, after the term
-;;; used in the ANSI spec (if this is in fact exactly the same thing)
-(sb!xc:deftype streamlike () '(or stream (member nil t)))
+(sb!xc:deftype stream-designator () '(or stream (member nil t)))
 
 ;;; an object suitable for input to standard functions that accept
 ;;; "environment objects" (of the ANSI glossary)

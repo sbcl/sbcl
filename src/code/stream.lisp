@@ -465,7 +465,7 @@
 
 (defun %write-string (string stream start end)
   (declare (type string string))
-  (declare (type streamlike stream))
+  (declare (type stream-designator stream))
   (declare (type index start end))
   (let ((stream (out-synonym-of stream)))
     (cond ((ansi-stream-p stream)
