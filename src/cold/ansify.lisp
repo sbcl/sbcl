@@ -12,6 +12,28 @@
 
 ;;;; CLISP issues
 
+;;; as explained on #lisp ca. October 2003:
+;;;   <Krystof> chandler: nope, I'm blaming another clisp bug
+;;;   <Krystof> [8]> least-positive-short-float
+;;;   <Krystof> 2.93874s-39
+;;;   <Krystof> [9]> (coerce * 'single-float)
+;;;   <Krystof> 0.0
+;;;   <chandler> aah
+;;;   <mwh> "oops"
+;;;   <Krystof> yep
+;;;   <mwh> tried that on clisp from fink:
+;;;   <mwh> [1]> least-positive-short-float
+;;;   <mwh> 2.93874s-39
+;;;   <mwh> [2]> (coerce * 'single-float)
+;;;   <mwh> *** - floating point underflow
+;;;   <Krystof> yeah
+;;;   <mwh> shall i not try to build sbcl with that?
+;;;   <Krystof> if you turn off underflow traps, then you get 0.0
+;;;   <mwh> well, that makes sense, i guess
+;;;   <Krystof> #+clisp
+;;;   <Krystof> (ext:without-package-lock ("SYSTEM")
+;;;   <Krystof>   (setf system::*inhibit-floating-point-underflow* t))
+;;;   <Krystof> (in src/cold/ansify.lisp)
 #+clisp
 (ext:without-package-lock ("SYSTEM")
   (setf system::*inhibit-floating-point-underflow* t))
@@ -46,6 +68,12 @@
   (warn "CMU CL has a broken implementation of READ-SEQUENCE.")
   (pushnew :no-ansi-read-sequence *features*))
 
+;;; This is apparently quite old, according to 
+;;; <http://tunes.org/~nef/logs/lisp/03.10.22>:
+;;;   <dan`b> (error "CMUCL on Alpha can't read floats in the format \"1.0l0\".
+;;;   <dan`b> the warning relates to a random vinary produced from cvs of
+;;;           around feb 2000, the corresponding sources to which I never found
+;;; (But it seems harmless to leave it here forever just in case.)
 #+(and cmu alpha)
 (unless (ignore-errors (read-from-string "1.0l0"))
   (error "CMUCL on Alpha can't read floats in the format \"1.0l0\".  Patch your core file~%~%"))
@@ -54,10 +82,11 @@
 (ext:set-floating-point-modes :traps '(:overflow :invalid :divide-by-zero))
 
 ;;;; OpenMCL issues
+
+;;; This issue in OpenMCL led to some SBCL bug reports ca. late 2003.
 #+openmcl 
 (unless (ignore-errors (funcall (constantly t) 1 2 3)) 
   (error "please find a binary that understands CONSTANTLY to build from"))
-
 
 ;;;; general non-ANSI-ness
 
