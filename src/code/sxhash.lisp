@@ -18,7 +18,7 @@
 ;;; order to avoid boxing.
 (deftransform sxhash ((x) (single-float))
   '(let* ((val (+ 0.0f0 x))
-	  (bits (single-float-bits val)))
+	  (bits (logand (single-float-bits val) #.(1- (ash 1 32)))))
      (logxor 66194023
 	     (sxhash (the fixnum
 			  (logand most-positive-fixnum
@@ -26,7 +26,7 @@
 					  (ash bits -7))))))))
 (deftransform sxhash ((x) (double-float))
   '(let* ((val (+ 0.0d0 x))
-	  (hi (double-float-high-bits val))
+	  (hi (logand (double-float-high-bits val) #.(1- (ash 1 32))))
 	  (lo (double-float-low-bits val))
 	  (hilo (logxor hi lo)))
      (logxor 475038542
@@ -39,8 +39,8 @@
 ;;; simple.
 (deftransform sxhash ((x) (fixnum))
   '(logand most-positive-fixnum
-	   (logxor (ash (logand x (ash most-positive-fixnum -4)) 4) 
-		   (ash x -1) ; to get sign bit into hash
+	   (logxor (ash (logand x (ash most-positive-fixnum -4)) 4)
+		   (logand (ash x -1) most-positive-fixnum) ; to get sign bit into hash
 		   361475658)))
 
 ;;; SXHASH of SIMPLE-BIT-VECTOR values is defined as a DEFTRANSFORM
@@ -68,7 +68,6 @@
 				'(- sb!vm:n-word-bits
 				    (mod length sb!vm:n-word-bits)))))
 		       (%raw-bits x i))))
-		 (declare (type (unsigned-byte 32) num))
 		 (mix result ,(ecase sb!c:*backend-byte-order*
 				(:little-endian
 				 '(logand num most-positive-fixnum))
@@ -76,7 +75,6 @@
 				 '(ash num (- sb!vm:n-lowtag-bits)))))))
 	   (declare (type index i end-1))
 	   (let ((num (%raw-bits x i)))
-	     (declare (type (unsigned-byte 32) num))
 	     (mixf result ,(ecase sb!c:*backend-byte-order*
 			     (:little-endian
 			      '(logand num most-positive-fixnum))
@@ -113,7 +111,7 @@
 	;; (which contains NIL itself) is a negative fixnum.
 	(if (= 0 result)
 	    (let ((sxhash (%sxhash-simple-string (symbol-name x))))
-	      ;; We could do a (logor sxhash #x10000000) to ensure
+	      ;; We could do a (logior sxhash #x10000000) to ensure
 	      ;; that we never store a 0 in the slot. However, it's
 	      ;; such an unlikely event (1/5e8?) that it makes more
 	      ;; sense to optimize for the common case...

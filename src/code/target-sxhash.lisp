@@ -36,9 +36,10 @@
 ;;;   * We'd like this to be simple and fast, too.
 ;;;
 ;;; FIXME: Should this be INLINE?
-(declaim (ftype (function ((and fixnum unsigned-byte)
-			   (and fixnum unsigned-byte))
-			  (and fixnum unsigned-byte)) mix))
+(declaim (ftype (sfunction ((and fixnum unsigned-byte)
+                            (and fixnum unsigned-byte))
+                           (and fixnum unsigned-byte))
+                mix))
 (defun mix (x y)
   ;; FIXME: We wouldn't need the nasty (SAFETY 0) here if the compiler
   ;; were smarter about optimizing ASH. (Without the THE FIXNUM below,
@@ -89,7 +90,7 @@
   (declare (type string string))
   (declare (type index count))
   (let ((result 0))
-    (declare (type (unsigned-byte 32) result))    
+    (declare (type (unsigned-byte 32) result))
     (unless (typep string '(vector nil))
       (dotimes (i count)
 	(declare (type index i))
@@ -143,6 +144,12 @@
     (trick x count)))
 
 ;;;; the SXHASH function
+
+;; simple cases
+(declaim (ftype (sfunction (integer) (integer 0 #.sb!xc:most-positive-fixnum))
+                sxhash-bignum))
+(declaim (ftype (sfunction (t) (integer 0 #.sb!xc:most-positive-fixnum))
+                sxhash-instance))
 
 (defun sxhash (x)
   ;; profiling SXHASH is hard, but we might as well try to make it go
