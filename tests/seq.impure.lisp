@@ -267,8 +267,18 @@
     (assert-type-error (concatenate 'simple-array "foo" "bar"))
     (assert-type-error (map 'simple-array #'identity '(1 2 3)))
     (assert-type-error (coerce '(1 2 3) 'simple-array))
+    (assert-type-error (merge 'simple-array '(1 3) '(2 4) '<))
     ;; but COERCE has an exemption clause:
-    (assert (string= "foo" (coerce "foo" 'simple-array)))))
+    (assert (string= "foo" (coerce "foo" 'simple-array)))
+    ;; ... though not in all cases.
+    (assert-type-error (coerce '(#\f #\o #\o) 'simple-array))))
+
+;;; As pointed out by Raymond Toy on #lisp IRC, MERGE had some issues
+;;; with user-defined types until sbcl-0.7.8.11
+(deftype list-typeoid () 'list)
+(assert (equal '(1 2 3 4) (merge 'list-typeoid '(1 3) '(2 4) '<)))
+;;; and also with types that weren't precicely LIST
+(assert (equal '(1 2 3 4) (merge 'cons '(1 3) '(2 4) '<)))
 
 ;;; success
 (quit :unix-status 104)

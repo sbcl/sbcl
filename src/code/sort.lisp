@@ -422,25 +422,27 @@
   #!+sb-doc
   "Merge the sequences SEQUENCE1 and SEQUENCE2 destructively into a
    sequence of type RESULT-TYPE using PREDICATE to order the elements."
-  (if (eq result-type 'list)
-      (let ((result (merge-lists* (coerce sequence1 'list)
-				  (coerce sequence2 'list)
-				  predicate key)))
-	result)
-      (let* ((vector-1 (coerce sequence1 'vector))
-	     (vector-2 (coerce sequence2 'vector))
-	     (length-1 (length vector-1))
-	     (length-2 (length vector-2))
-	     (result (make-sequence result-type
-				    (+ length-1 length-2))))
-	(declare (vector vector-1 vector-2)
-		 (fixnum length-1 length-2))
-
-	#!+high-security (aver (typep result result-type))
-	(if (and (simple-vector-p result)
-		 (simple-vector-p vector-1)
-		 (simple-vector-p vector-2))
-	    (merge-vectors vector-1 length-1 vector-2 length-2
-			   result predicate key svref)
-	    (merge-vectors vector-1 length-1 vector-2 length-2
-			   result predicate key aref)))))
+  (let ((type (specifier-type result-type)))
+    (cond
+      ((csubtypep type (specifier-type 'list))
+       (let ((result (merge-lists* (coerce sequence1 'list)
+				   (coerce sequence2 'list)
+				   predicate key)))
+	 result))
+      ((csubtypep type (specifier-type 'vector))
+       (let* ((vector-1 (coerce sequence1 'vector))
+	      (vector-2 (coerce sequence2 'vector))
+	      (length-1 (length vector-1))
+	      (length-2 (length vector-2))
+	      (result (make-sequence result-type
+				     (+ length-1 length-2))))
+	 (declare (vector vector-1 vector-2)
+		  (fixnum length-1 length-2))
+	 (if (and (simple-vector-p result)
+		  (simple-vector-p vector-1)
+		  (simple-vector-p vector-2))
+	     (merge-vectors vector-1 length-1 vector-2 length-2
+			    result predicate key svref)
+	     (merge-vectors vector-1 length-1 vector-2 length-2
+			    result predicate key aref))))
+      (t (bad-sequence-type-error result-type)))))
