@@ -13,20 +13,6 @@
 
 ;;;; general warm init compilation policy
 
-;;; Without generational GC, GC gets really slow unless we collect in
-;;; large chunks. For small chunks, efficiency tends to grow roughly
-;;; linearly with chunk size. Later we hit diminishing returns as we
-;;; approach the total amount of RAM we use, or we can even get into
-;;; performance trouble by clobbering cache and VM systems too hard.
-;;; But modern machines tend to think of 20 Mb as a moderate amount of
-;;; memory, and it's of the same order of magnitude as the amount of
-;;; RAM we need for the build, so it seems like a plausible chunk size.
-#-gencgc
-(progn
-  (sb!ext:gc-off)
-  (setf (sb!ext:bytes-consed-between-gcs) (* 20 (expt 10 6)))
-  (sb!ext:gc-on))
-
 (proclaim '(optimize (compilation-speed 1)
 		     (debug #+sb-show 2 #-sb-show 1)
 		     (inhibit-warnings 2)

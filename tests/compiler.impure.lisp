@@ -58,6 +58,72 @@
 ;;; compiler warning instead of a failure to compile.)
 (defun foo ()
   (catch 0 (print 1331)))
+
+;;;; tests not in the problem domain, but of the consistency of the
+;;;; compiler machinery itself
 
+(in-package "SB-C")
+
+;;; Hunt for wrong-looking things in fundamental compiler definitions,
+;;; and gripe about them.
+;;;
+;;; FIXME: It should be possible to (1) repair the things that this
+;;; code gripes about, and then (2) make the code signal errors
+;;; instead of just printing complaints to standard output, in order
+;;; to prevent the code from later falling back into disrepair.
+(defun grovel-results (function)
+  (dolist (template (fun-info-templates (info :function :info function)))
+    (when (template-more-results-type template)
+      (format t "~&Template ~A has :MORE results, and translates ~A.~%"
+	      (template-name template)
+	      function)
+      (return nil))
+    (when (eq (template-result-types template) :conditional)
+      ;; dunno.
+      (return t))
+    (let ((types (template-result-types template))
+	  (result-type (fun-type-returns (info :function :type function))))
+      (cond
+	((values-type-p result-type)
+	 (do ((ltypes (append (args-type-required result-type)
+			      (args-type-optional result-type))
+		      (rest ltypes))
+	      (types types (rest types)))
+	     ((null ltypes)
+	      (unless (null types)
+		(format t "~&More types than ltypes in ~A, translating ~A.~%"
+			(template-name template)
+			function)
+		(return nil)))
+	   (when (null types)
+	     (unless (null ltypes)
+	       (format t "~&More ltypes than types in ~A, translating ~A.~%"
+		       (template-name template)
+		       function)
+	       (return nil)))))
+	((eq result-type (specifier-type nil))
+	 (unless (null types)
+	   (format t "~&Template ~A returns values for function ~A with RESULT-TYPE NIL.~%"
+		   (template-name template)
+		   function)
+	   (return nil)))
+	((/= (length types) 1)
+	 (format t "~&Template ~A isn't returning 1 value for ~A.~%"
+		 (template-name template)
+		 function)
+	 (return nil))
+	(t t)))))
+(defun identify-suspect-vops (&optional (env (first
+					      (last *info-environment*))))
+  (do-info (env :class class :type type :name name :value value)
+    (when (and (eq class :function) (eq type :type))
+      ;; OK, so we have an entry in the INFO database. Now, if ...
+      (let* ((info (info :function :info name))
+	     (templates (and info (fun-info-templates info))))
+	(when templates
+	  ;; ... it has translators
+	  (grovel-results name))))))
+(identify-suspect-vops)
+
 ;;; success
 (quit :unix-status 104)
