@@ -16,7 +16,7 @@
                (:file "classes" :depends-on ("iodefs"))
                (:file "internal" :depends-on ("classes"))
                (:file "strategy" :depends-on ("internal"))
-               (:file "impl" :depends-on ("internal" "fndb"))
+               (:file "impl" :depends-on ("internal" "fndb" "file" "string"))
                (:file "file" :depends-on ("strategy"))
                (:file "direct" :depends-on ("strategy"))
                (:file "null" :depends-on ("strategy"))
@@ -43,5 +43,3 @@
                     (c (eql (find-system :sb-simple-streams-tests))))
   (or (funcall (intern "DO-TESTS" (find-package "SB-RT")))
       (error "test-op failed")))
-
-
