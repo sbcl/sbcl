@@ -1946,6 +1946,8 @@ changes in sbcl-0.8.3 relative to sbcl-0.8.2:
     is the greater.  (thanks to Patrik Nordebo)
   * bug fix: MAKE-ARRAY ignored :INITIAL-CONTENTS NIL. (reported by
     Kalle Olavi Niemitalo)
+  * bug fix: the CLASS-PROTOTYPE of the GENERIC-FUNCTION class is now
+    printable.  (reported by Eric Marsden)
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles

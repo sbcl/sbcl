@@ -114,7 +114,7 @@
 (defmethod print-object ((slotd slot-definition) stream)
   (named-object-print-function slotd stream))
 
-(defmethod print-object ((generic-function generic-function) stream)
+(defmethod print-object ((generic-function standard-generic-function) stream)
   (named-object-print-function
     generic-function
     stream
