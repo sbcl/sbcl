@@ -689,7 +689,9 @@
                   (if (plusp amount)
                       (inst shl result amount)
                       (inst shr result (- amount))))
-		 (t (inst xor result result)))))))
+		 (t (if (sc-is result unsigned-reg)
+                        (inst xor result result)
+                        (inst mov result 0))))))))
 
 (define-vop (fast-ash-left/signed=>signed)
   (:translate ash)
