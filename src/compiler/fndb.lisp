@@ -1215,7 +1215,7 @@
    (:verbose t)
    (:print t)
    (:if-does-not-exist (member :error :create nil))
-   (:external-format (member :default)))
+   (:external-format keyword))
   t)
 
 (defknown directory (pathname-designator &key)
@@ -1267,7 +1267,7 @@
 		     (member t)))
    (:verbose t)
    (:print t)
-   (:external-format t)
+   (:external-format keyword)
 
    ;; extensions
    (:trace-file t)
