@@ -4,14 +4,6 @@ for 0.7.0:
 	protruding rusty nails and snipped off the trailing razor wire,
 	leaving some filing for later:-) from the monster
 	EVAL/EVAL-WHEN/%COMPILE/DEFUN/DEFSTRUCT cleanup:
-	** substantially rewrote DEFSTRUCT implementation to work
-		cleanly with EVAL-WHEN, not sleazily use DEFUN for 
-		structure functions, implement out-of-line structure
-		accessors as closures, reduce or eliminate non-ANSI
-		magicality of structure functions
-		*** made structure type tests work again
-		*** got rid of bogus warnings about "redefinition" of
-			structure accessors
 	** made inlining DEFUN inside MACROLET work again
 	** made %COMPILE set up debugging data more like the way the
 		debugger expects (and maybe even completely
@@ -30,7 +22,7 @@ for 0.7.0:
 	** reserved DO-FOO-style names for iteration macros
 	** finished s/FUNCTION/FUN/
 	** s/VARIABLE/VAR/
-	** s/TOPLEVEL/TOP-LEVEL/
+	** s/TOP-LEVEL/TOPLEVEL/
 * global style systematization:
 	** s/#'(lambda/(lambda/
 	** four-space indentation in C

@@ -610,6 +610,8 @@
 ;;;   RAW? is true if TYPE should be stored in a raw slot.
 ;;;   RAW-TYPE is the raw slot type, or NIL if no raw slot.
 ;;;   WORDS is the number of words in the raw slot, or NIL if no raw slot.
+;;;
+;;; FIXME: This should use the data in *RAW-SLOT-DATA-LIST*.
 (defun structure-raw-slot-type-and-size (type)
   (cond #+nil
 	(;; FIXME: For now we suppress raw slots, since there are various
@@ -777,12 +779,7 @@
 
     ;; Various other operations only make sense on the target SBCL.
     #-sb-xc-host
-    (progn
-      (remhash (dd-name dd) *typecheckfuns*)
-      (%target-defstruct dd layout)
-      (when (dd-doc dd)
-	(setf (fdocumentation (dd-name dd) 'type)
-	      (dd-doc dd)))))
+    (%target-defstruct dd layout))
 
   (values))
 
@@ -825,6 +822,11 @@
 		 (declare (type ,dsd-type new-value))
 		 ,instance-type-decl
 		 (setf ,accessor-place-form new-value))))))
+
+;;; Return a LAMBDA form which can be used to set a slot.
+(defun slot-setter-lambda-form (dd dsd)
+  (funcall (nth-value 1
+		      (slot-accessor-inline-expansion-designators dd dsd))))
 
 ;;; core compile-time setup of any class with a LAYOUT, used even by
 ;;; !DEFSTRUCT-WITH-ALTERNATE-METACLASS weirdosities
@@ -1118,53 +1120,6 @@
 
     (res)))
 
-;;;; slot accessors for raw slots
-
-;;; Return info about how to read/write a slot in the value stored in
-;;; OBJECT. This is also used by constructors (since we can't safely
-;;; use the accessor function, since some slots are read-only). If
-;;; supplied, DATA is a variable holding the raw-data vector.
-;;;
-;;; returned values:
-;;; 1. accessor function name (SETFable)
-;;; 2. index to pass to accessor.
-;;; 3. object form to pass to accessor
-(defun slot-accessor-form (defstruct slot object &optional data)
-  (let ((rtype (dsd-raw-type slot)))
-    (values
-     (ecase rtype
-       (single-float '%raw-ref-single)
-       (double-float '%raw-ref-double)
-       #!+long-float
-       (long-float '%raw-ref-long)
-       (complex-single-float '%raw-ref-complex-single)
-       (complex-double-float '%raw-ref-complex-double)
-       #!+long-float
-       (complex-long-float '%raw-ref-complex-long)
-       (unsigned-byte 'aref)
-       ((t) '%instance-ref))
-     (case rtype
-       #!+long-float
-       (complex-long-float
-	(truncate (dsd-index slot) #!+x86 6 #!+sparc 8))
-       #!+long-float
-       (long-float
-	(truncate (dsd-index slot) #!+x86 3 #!+sparc 4))
-       (double-float
-	(ash (dsd-index slot) -1))
-       (complex-double-float
-	(ash (dsd-index slot) -2))
-       (complex-single-float
-	(ash (dsd-index slot) -1))
-       (t
-	(dsd-index slot)))
-     (cond
-      ((eq rtype t) object)
-      (data)
-      (t
-       `(truly-the (simple-array (unsigned-byte 32) (*))
-		   (%instance-ref ,object ,(dd-raw-index defstruct))))))))
-
 ;;; These functions are called to actually make a constructor after we
 ;;; have processed the arglist. The correct variant (according to the
 ;;; DD-TYPE) should be called. The function is defined with the
@@ -1176,10 +1131,12 @@
 ;;;     various weird places, whereas STRUCTURE structures have
 ;;;     a LAYOUT slot.
 ;;;   * We really want to use LIST to make list structures, instead of
-;;;     MAKE-LIST/(SETF ELT).
+;;;     MAKE-LIST/(SETF ELT). (We can't in general use VECTOR in an
+;;;     analogous way, since VECTOR makes a SIMPLE-VECTOR and vector-typed
+;;;     structures can have arbitrary subtypes of VECTOR, not necessarily
+;;;     SIMPLE-VECTOR.)
 ;;;   * STRUCTURE structures can have raw slots that must also be
-;;;     allocated and indirectly referenced. We use SLOT-ACCESSOR-FORM
-;;;     to compute how to set the slots, which deals with raw slots.
+;;;     allocated and indirectly referenced. 
 (defun create-vector-constructor (dd cons-name arglist vars types values)
   (let ((temp (gensym))
 	(etype (dd-element-type dd)))
@@ -1224,9 +1181,10 @@
 	 ,@(when n-raw-data
 	     `((setf (%instance-ref ,temp ,raw-index) ,n-raw-data)))
 	 ,@(mapcar (lambda (dsd value)
-		     (multiple-value-bind (accessor index data)
-			 (slot-accessor-form dd dsd temp n-raw-data)
-		       `(setf (,accessor ,data ,index) ,value)))
+		     ;; (Note that we can't in general use the ordinary
+		     ;; slot accessor function here because the slot
+		     ;; might be :READ-ONLY.)
+		     `(,(slot-setter-lambda-form dd dsd) ,value ,temp))
 		   (dd-slots dd)
 		   values)
 	 ,temp))))

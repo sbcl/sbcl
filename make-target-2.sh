@@ -42,6 +42,7 @@ echo //doing warm init
         ;; initialized yet.)
         (setq *print-length* 10)
 	(setq *print-level* 5)
+        (setq *print-circle* t)
 
         ;; Do warm init.
         #+sb-show (print "/about to LOAD warm.lisp")
@@ -56,6 +57,7 @@ echo //doing warm init
 	;; control variables to their ANSI defaults.
         (setq *print-length* nil)
 	(setq *print-level* nil)
+        (setq *print-circle* nil)
 
 	;; FIXME: Why is it that, at least on x86 sbcl-0.6.12.46,
 	;; GC :FULL T isn't nearly as effective as PURIFY here?

@@ -318,6 +318,11 @@
       (manyraw-ee *manyraw*) #c(0.44d0 0.44d0))
 
 (let ((copy (copy-manyraw *manyraw*)))
+  (assert (eql (manyraw-a copy) (expt 2 30)))
+  (assert (eql (manyraw-b copy) 0.1))
+  (assert (eql (manyraw-c copy) 0.2d0))
+  (assert (eql (manyraw-d copy) #c(0.3 0.3)))
+  (assert (eql (manyraw-e copy) #c(0.4d0 0.4d0)))
   (assert (eql (manyraw-aa copy) (expt 2 31)))
   (assert (eql (manyraw-bb copy) 0.11))
   (assert (eql (manyraw-cc copy) 0.22d0))

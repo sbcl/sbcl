@@ -148,9 +148,7 @@
   (/show0 "leaving PROTECT-CL")
   (values))
 
-;;; the part of %DEFSTRUCT which sets up out-of-line implementations
-;;; of those structure functions which are sufficiently similar
-;;; between structures that they can be closures
+;;; the part of %DEFSTRUCT which makes sense only on the target SBCL
 ;;;
 ;;; (The "static" in the name is because it needs to be done not only
 ;;; in ordinary toplevel %DEFSTRUCT, but also in cold init as early as
@@ -162,9 +160,11 @@
 
   (/show0 "entering %TARGET-DEFSTRUCT")
 
+  (remhash (dd-name dd) *typecheckfuns*)
+
   ;; (Constructors aren't set up here, because constructors are
   ;; varied enough (possibly parsing any specified argument list)
-  ;; that we can't reasonably implement them as closures, and so
+  ;; that we can't reasonably implement them as closures, so we
   ;; implement them with DEFUN instead.)
 
   ;; Set FDEFINITIONs for slot accessors.
@@ -222,9 +222,12 @@
 	     (/show0 ":TYPE LIST case")
 	     #'listp))))
 
+  (when (dd-doc dd)
+    (setf (fdocumentation (dd-name dd) 'type)
+	  (dd-doc dd)))
+
   (/show0 "leaving %TARGET-DEFSTRUCT")
   (values))
-
 
 ;;;; generating out-of-line slot accessor functions
 

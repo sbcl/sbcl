@@ -418,7 +418,7 @@
 	   ;; if it is a compound object it might contain a circular
 	   ;; reference to itself or multiple shared references.
 	   (or *circularity-hash-table*
-	       (compound-object-p x))
+	       (compound-object-p object))
 	   (check-it stream))
 	  (t
 	   (print-it stream)))))
