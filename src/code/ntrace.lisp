@@ -461,8 +461,7 @@
     current))
 
 ;;; Compute the expansion of TRACE in the non-trivial case (arguments
-;;; specified.) If there are no :FUNCTION specs, then don't use a LET.
-;;; This allows TRACE to be used without the full interpreter.
+;;; specified.) 
 (defun expand-trace (specs)
   (collect ((binds)
 	    (forms))
@@ -480,13 +479,20 @@
 	   ((and (keywordp name)
 		 (not (or (fboundp name) (macro-function name))))
 	    (error "unknown TRACE option: ~S" name))
+	   ((stringp name)
+	    (let ((package (find-undeleted-package-or-lose name)))
+	      (do-all-symbols (symbol (find-package name))
+		(when (and (eql package (symbol-package symbol))
+			   (fboundp symbol)
+			   (not (macro-function symbol))
+			   (not (special-operator-p symbol)))
+		  (forms `(trace-1 ',symbol ',options))))))
 	   (t
 	    (forms `(trace-1 ',name ',options))))
 	  (setq current (parse-trace-options current options)))))
-
-    (if (binds)
-	`(let ,(binds) (list ,@(forms)))
-	`(list ,@(forms)))))
+    
+    `(let ,(binds)
+      (list ,@(forms)))))
 
 (defun %list-traced-funs ()
   (loop for x being each hash-value in *traced-funs*
@@ -498,7 +504,9 @@
    TRACE is a debugging tool that provides information when specified functions
    are called. In its simplest form:
        (TRACE NAME-1 NAME-2 ...)
-   (The NAMEs are not evaluated.)
+   The NAMEs are not evaluated. Each may be a symbol, denoting an
+   individual function, or a string, denoting all functions fbound
+   to symbols whose home package is the package with the given name.
 
    Options allow modification of the default behavior. Each option is a pair
    of an option keyword and a value form. Global options are specified before
@@ -605,6 +613,11 @@
   #+sb-doc
   "Remove tracing from the specified functions. With no args, untrace all
    functions."
+  ;; KLUDGE: Since we now allow (TRACE FOO BAR "SB-EXT") to trace not
+  ;; only #'FOO and #'BAR but also all the functions in #<PACKAGE "SB-EXT">,
+  ;; it would be probably be best for consistency to do something similar
+  ;; with UNTRACE. (But I leave it to someone who uses and cares about
+  ;; UNTRACE-with-args more often than I do.) -- WHN 2003-12-17
   (if specs
       (collect ((res))
 	(let ((current specs))

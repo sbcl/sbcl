@@ -71,7 +71,8 @@
                             (length static-space-refs)
                             (length dynamic-space-refs)))
                (format t "Symbol ~a::~a~%"
-                       (and (symbol-package obj) (package-name (symbol-package obj)))
+                       (and (symbol-package obj)
+			    (package-name (symbol-package obj)))
                        (symbol-name obj))
                (unless (null read-only-space-refs)
                  (princ "   Reference in read-only space: ")
