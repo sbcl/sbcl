@@ -55,7 +55,7 @@
   (:generator 0
     (move list arg)
     (move start esp-tn)			; WARN pointing 1 below
-    (inst mov nil-temp *nil-value*)
+    (inst mov nil-temp nil-value)
 
     LOOP
     (inst cmp list nil-temp)

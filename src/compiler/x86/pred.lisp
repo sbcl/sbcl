@@ -50,7 +50,7 @@
 	       (inst test x x) ; smaller
 	     (inst cmp x (fixnumize val))))
 	  (symbol
-	   (inst cmp x (+ *nil-value* (static-symbol-offset val))))
+	   (inst cmp x (+ nil-value (static-symbol-offset val))))
 	  (character
 	   (inst cmp x (logior (ash (char-code val) type-bits)
 			       base-char-type))))))
@@ -63,7 +63,7 @@
 	       (inst test y y) ; smaller
 	     (inst cmp y (fixnumize val))))
 	  (symbol
-	   (inst cmp y (+ *nil-value* (static-symbol-offset val))))
+	   (inst cmp y (+ nil-value (static-symbol-offset val))))
 	  (character
 	   (inst cmp y (logior (ash (char-code val) type-bits)
 			       base-char-type))))))

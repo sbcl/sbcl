@@ -52,7 +52,7 @@
 		(inst mov ecx (fixnumize 2)) ; arg count
 		(inst jmp
 		      (make-ea :dword
-			       :disp (+ *nil-value*
+			       :disp (+ nil-value
 					(static-function-offset
 					 ',(symbolicate "TWO-ARG-" fun)))))
 
@@ -147,7 +147,7 @@
   (inst push eax)
   (inst mov ecx (fixnumize 1))	  ; arg count
   (inst jmp (make-ea :dword
-		     :disp (+ *nil-value* (static-function-offset '%negate))))
+		     :disp (+ nil-value (static-function-offset '%negate))))
 
   FIXNUM
   (move res x)
@@ -198,14 +198,14 @@
 					; SINGLE-FLOAT-BITS are parallel,
 					; should be named parallelly.
 		(inst jmp (make-ea :dword
-				   :disp (+ *nil-value*
+				   :disp (+ nil-value
 					    (static-function-offset
 					     ',static-fn))))
 
 		INLINE-FIXNUM-COMPARE
 		(inst cmp x y)
 		(inst jmp ,test RETURN-TRUE)
-		(inst mov res *nil-value*)
+		(inst mov res nil-value)
 		;; FIXME: A note explaining this return convention, or a
 		;; symbolic name for it, would be nice. (It looks as though we
 		;; should be hand-crafting the same return sequence as would be
@@ -243,7 +243,7 @@
   (inst jmp :nz DO-STATIC-FN)
 
   RETURN-NIL
-  (inst mov res *nil-value*)
+  (inst mov res nil-value)
   (inst pop eax)
   (inst add eax 2)
   (inst jmp eax)
@@ -256,7 +256,7 @@
   (inst push eax)
   (inst mov ecx (fixnumize 2))
   (inst jmp (make-ea :dword
-		     :disp (+ *nil-value* (static-function-offset 'eql))))
+		     :disp (+ nil-value (static-function-offset 'eql))))
 
   RETURN-T
   (load-symbol res t)
@@ -278,13 +278,13 @@
 			  (:temp ecx unsigned-reg ecx-offset)
 			  )
   (inst test x 3)		       ; descriptor?
-  (inst jmp :nz DO-STATIC-FN)	   ; yes do it here
+  (inst jmp :nz DO-STATIC-FN)          ; yes, do it here
   (inst test y 3)		       ; descriptor?
   (inst jmp :nz DO-STATIC-FN)
   (inst cmp x y)
   (inst jmp :e RETURN-T)		; ok
 
-  (inst mov res *nil-value*)
+  (inst mov res nil-value)
   (inst pop eax)
   (inst add eax 2)
   (inst jmp eax)
@@ -297,7 +297,7 @@
   (inst push eax)
   (inst mov ecx (fixnumize 2))
   (inst jmp (make-ea :dword
-		     :disp (+ *nil-value* (static-function-offset 'two-arg-=))))
+		     :disp (+ nil-value (static-function-offset 'two-arg-=))))
 
   RETURN-T
   (load-symbol res t))

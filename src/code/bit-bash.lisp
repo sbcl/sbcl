@@ -213,7 +213,7 @@
 	;; care.
 	(cond
 	 ((zerop length)
-	  ;; Actually, we aren't even writing one word. This is real easy.
+	  ;; Actually, we aren't even writing one word. This is really easy.
 	  )
 	 ((= length unit-bits)
 	  ;; DST-BIT-OFFSET must be equal to zero, or we would be writing

@@ -120,7 +120,7 @@
   (declare (type spaces space))
   (ecase space
     (:static
-     (values (int-sap *static-space-start*)
+     (values (int-sap static-space-start)
 	     (int-sap (* *static-space-free-pointer* word-bytes))))
     (:read-only
      (values (int-sap *read-only-space-start*)

@@ -1767,7 +1767,7 @@ scavenge(lispobj *start, long nwords)
 		lispobj first_word = *ptr;
 	
 		if (first_word == 0x01) {
-		    /* Yep, there be a forwarding pointer. */
+		    /* Yes, there's a forwarding pointer. */
 		    *start = ptr[1];
 		    words_scavenged = 1;
 		}
@@ -1780,7 +1780,7 @@ scavenge(lispobj *start, long nwords)
 	    }
 	} else {
 	    if ((object & 3) == 0) {
-		/* It's a fixnum. Real easy.. */
+		/* It's a fixnum: really easy.. */
 		words_scavenged = 1;
 	    } else {
 		/* It's some sort of header object or another. */

@@ -112,7 +112,7 @@
       (emit-label done)
       (assemble (*elsewhere*)
 	(emit-label bogus)
-	(inst mov code *nil-value*)
+	(inst mov code nil-value)
 	(inst jmp done)))))
 
 (define-vop (code-from-lra code-from-mumble)

@@ -108,7 +108,7 @@
 	 ;; low tag of 3 is added the resulting value points to the
 	 ;; raw address slot of the fdefn (at +4).
 	 (inst call (make-ea :dword
-			     :disp (+ *nil-value*
+			     :disp (+ nil-value
 				      (static-function-offset function))))
 	 ,(collect ((bindings) (links))
 		   (do ((temp (temp-names) (cdr temp))

@@ -357,7 +357,7 @@ like *STACK-TOP-HINT*"
  #s(sb-cold:package-data
     :name "SB!DI"
     :doc "private: primitives used to write debuggers"
-    :use ("CL" "SB!EXT" "SB!INT" "SB!KERNEL" "SB!SYS")
+    :use ("CL" "SB!EXT" "SB!INT" "SB!KERNEL" "SB!SYS" "SB!VM")
     :import-from (("SB!C"
                    "DEBUG-SOURCE-FROM" "DEBUG-SOURCE-NAME"
                    "DEBUG-SOURCE-CREATED" "DEBUG-SOURCE-COMPILED"
@@ -1694,7 +1694,7 @@ structure representations"
              "TARGET-FASL-CODE-FORMAT" "TARGET-FASL-FILE-TYPE"
              "TARGET-HEAP-ADDRESS-SPACE" "*TARGET-MOST-NEGATIVE-FIXNUM*"
              "*TARGET-MOST-POSITIVE-FIXNUM*" "*READ-ONLY-SPACE-START*"
-             "*STATIC-SPACE-START*" "TRACE-TABLE-CALL-SITE"
+             "STATIC-SPACE-START" "TRACE-TABLE-CALL-SITE"
              "TRACE-TABLE-FUNCTION-EPILOGUE" "TRACE-TABLE-FUNCTION-PROLOGUE"
              "TRACE-TABLE-NORMAL" "TYPE-BITS" "TYPE-MASK" "UNBOUND-MARKER-TYPE"
              "UNSIGNED-IMMEDIATE-SC-NUMBER"

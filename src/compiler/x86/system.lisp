@@ -316,7 +316,7 @@
   (:temporary (:sc unsigned-reg :from (:eval 0) :to (:eval 1)) temp)
   (:save-p t)
   (:generator 25
-    (inst cmp inherit *nil-value*)
+    (inst cmp inherit nil-value)
     (inst jmp :e FRESH-STACK)
 
     ;; Child inherits the stack of the parent.
@@ -385,7 +385,7 @@
 
     RETURN
     ;; Stack already clean if it reaches here. Parent returns NIL.
-    (inst mov child *nil-value*)
+    (inst mov child nil-value)
     (inst jmp-short DONE)
 
     STACK-SAVE-DONE

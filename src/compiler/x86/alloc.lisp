@@ -27,8 +27,8 @@
   (:node-var node)
   (:generator 0
     (cond ((zerop num)
-	   ;; (move result *nil-value*)
-	   (inst mov result *nil-value*))
+	   ;; (move result nil-value)
+	   (inst mov result nil-value))
 	  ((and star (= num 1))
 	   (move result (tn-ref-tn things)))
 	  (t
@@ -58,7 +58,7 @@
 		       (setf things (tn-ref-across things))
 		       (store-car (tn-ref-tn things) ptr cons-cdr-slot))
 		      (t
-		       (storew *nil-value* ptr cons-cdr-slot
+		       (storew nil-value ptr cons-cdr-slot
 			       list-pointer-type)))
 		(assert (null (tn-ref-across things)))))
 	     (move result res))))))
@@ -110,7 +110,7 @@
      (inst or boxed code-header-type)
      (storew boxed result 0 other-pointer-type)
      (storew unboxed result code-code-size-slot other-pointer-type)
-     (inst mov temp *nil-value*)
+     (inst mov temp nil-value)
      (storew temp result code-entry-points-slot other-pointer-type))
     (storew temp result code-debug-info-slot other-pointer-type)))
 
@@ -138,8 +138,8 @@
      (inst or boxed code-header-type)
      (storew boxed result 0 other-pointer-type)
      (storew unboxed result code-code-size-slot other-pointer-type)
-     (storew *nil-value* result code-entry-points-slot other-pointer-type))
-    (storew *nil-value* result code-debug-info-slot other-pointer-type)))
+     (storew nil-value result code-entry-points-slot other-pointer-type))
+    (storew nil-value result code-debug-info-slot other-pointer-type)))
 
 (define-vop (make-fdefn)
   (:policy :fast-safe)
@@ -150,7 +150,7 @@
   (:generator 37
     (with-fixed-allocation (result fdefn-type fdefn-size node)
       (storew name result fdefn-name-slot other-pointer-type)
-      (storew *nil-value* result fdefn-function-slot other-pointer-type)
+      (storew nil-value result fdefn-function-slot other-pointer-type)
       (storew (make-fixup (extern-alien-name "undefined_tramp") :foreign)
 	      result fdefn-raw-addr-slot other-pointer-type))))
 
@@ -251,5 +251,5 @@
       (inst shr temp 1)
       (inst and temp #xfffffffc)
       (storew temp result symbol-hash-slot other-pointer-type)
-      (storew *nil-value* result symbol-plist-slot other-pointer-type)
-      (storew *nil-value* result symbol-package-slot other-pointer-type))))
+      (storew nil-value result symbol-plist-slot other-pointer-type)
+      (storew nil-value result symbol-package-slot other-pointer-type))))

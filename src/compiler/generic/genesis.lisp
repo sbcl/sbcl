@@ -2639,7 +2639,7 @@
 	      ;; We actually ran GENESIS, use the real value.
 	      (descriptor-bits (cold-intern symbol))
 	      ;; We didn't run GENESIS, so guess at the address.
-	      (+ sb!vm:*static-space-start*
+	      (+ sb!vm:static-space-start
 		 sb!vm:word-bytes
 		 sb!vm:other-pointer-type
 		 (if symbol (sb!vm:static-symbol-offset symbol) 0)))))
@@ -2943,7 +2943,7 @@ initially undefined function references:~2%")
 				     sb!vm:*read-only-space-start*))
 	   (*static*    (make-gspace :static
 				     static-space-id
-				     sb!vm:*static-space-start*))
+				     sb!vm:static-space-start))
 	   (*dynamic*   (make-gspace :dynamic
 				     dynamic-space-id
 				     sb!vm:*dynamic-space-start*))

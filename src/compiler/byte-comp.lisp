@@ -1217,7 +1217,7 @@
 		 found
 		 name))))
 	 ((eql values 0)
-	  ;; Real easy!
+	  ;; really easy!
 	  nil)
 	 (t
 	  (etypecase leaf

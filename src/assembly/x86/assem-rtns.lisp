@@ -74,7 +74,7 @@
   ;; Handle the register arg cases.
   ZERO-VALUES
   (move esp-tn ebx)
-  (inst mov edx *nil-value*)
+  (inst mov edx nil-value)
   (inst mov edi edx)
   (inst mov esi edx)
   (inst jmp eax)
@@ -89,7 +89,7 @@
   TWO-VALUES
   (loadw edx esi -1)
   (loadw edi esi -2)
-  (inst mov esi *nil-value*)
+  (inst mov esi nil-value)
   (inst lea esp-tn (make-ea :dword :base ebx :disp (* -2 word-bytes)))
   (inst jmp eax)
 

@@ -68,12 +68,12 @@
 ;;;; macros to generate useful values
 
 (defmacro load-symbol (reg symbol)
-  `(inst mov ,reg (+ *nil-value* (static-symbol-offset ,symbol))))
+  `(inst mov ,reg (+ nil-value (static-symbol-offset ,symbol))))
 
 (defmacro load-symbol-value (reg symbol)
   `(inst mov ,reg
 	 (make-ea :dword
-		  :disp (+ *nil-value*
+		  :disp (+ nil-value
 			   (static-symbol-offset ',symbol)
 			   (ash symbol-value-slot word-shift)
 			   (- other-pointer-type)))))
@@ -81,7 +81,7 @@
 (defmacro store-symbol-value (reg symbol)
   `(inst mov
 	 (make-ea :dword
-		  :disp (+ *nil-value*
+		  :disp (+ nil-value
 			   (static-symbol-offset ',symbol)
 			   (ash symbol-value-slot word-shift)
 			   (- other-pointer-type)))
@@ -389,7 +389,7 @@
        (when *enable-pseudo-atomic*
 	 ;; FIXME: The MAKE-EA noise should become a MACROLET macro or
 	 ;; something. (perhaps SVLB, for static variable low byte)
-	 (inst mov (make-ea :byte :disp (+ *nil-value*
+	 (inst mov (make-ea :byte :disp (+ nil-value
 					   (static-symbol-offset
 					    'sb!impl::*pseudo-atomic-interrupted*)
 					   (ash symbol-value-slot word-shift)
@@ -397,7 +397,7 @@
 					   ;; take out type bits.
 					   (- other-pointer-type)))
 	       0)
-	 (inst mov (make-ea :byte :disp (+ *nil-value*
+	 (inst mov (make-ea :byte :disp (+ nil-value
 					   (static-symbol-offset
 					    'sb!impl::*pseudo-atomic-atomic*)
 					   (ash symbol-value-slot word-shift)
@@ -405,7 +405,7 @@
 	       (fixnumize 1)))
        ,@forms
        (when *enable-pseudo-atomic*
-	 (inst mov (make-ea :byte :disp (+ *nil-value*
+	 (inst mov (make-ea :byte :disp (+ nil-value
 					   (static-symbol-offset
 					    'sb!impl::*pseudo-atomic-atomic*)
 					   (ash symbol-value-slot word-shift)
@@ -418,7 +418,7 @@
 	 ;; are pending? I wish I could find the documentation for
 	 ;; pseudo-atomics.. -- WHN 19991130
 	 (inst cmp (make-ea :byte
-			    :disp (+ *nil-value*
+			    :disp (+ nil-value
 				     (static-symbol-offset
 				      'sb!impl::*pseudo-atomic-interrupted*)
 				     (ash symbol-value-slot word-shift)

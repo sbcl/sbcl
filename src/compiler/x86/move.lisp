@@ -82,7 +82,7 @@
 		 (inst xor y y)
 	       (inst mov y (fixnumize val))))
 	    (symbol
-	     (inst mov y (+ *nil-value* (static-symbol-offset val))))
+	     (inst mov y (+ nil-value (static-symbol-offset val))))
 	    (character
 	     (inst mov y (logior (ash (char-code val) type-bits)
 				 base-char-type)))))
@@ -135,7 +135,7 @@
 		   (integer
 		    (storew (fixnumize val) fp (tn-offset y)))
 		   (symbol
-		    (storew (+ *nil-value* (static-symbol-offset val))
+		    (storew (+ nil-value (static-symbol-offset val))
 			    fp (tn-offset y)))
 		   (character
 		    (storew (logior (ash (char-code val) type-bits)
@@ -146,7 +146,7 @@
 		 (integer
 		  (storew (fixnumize val) fp (- (1+ (tn-offset y)))))
 		 (symbol
-		  (storew (+ *nil-value* (static-symbol-offset val))
+		  (storew (+ nil-value (static-symbol-offset val))
 			  fp (- (1+ (tn-offset y)))))
 		 (character
 		  (storew (logior (ash (char-code val) type-bits)

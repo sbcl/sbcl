@@ -251,7 +251,7 @@
       ;; Default the unsuppled registers.
       (let* ((2nd-tn-ref (tn-ref-across values))
 	     (2nd-tn (tn-ref-tn 2nd-tn-ref)))
-	(inst mov 2nd-tn *nil-value*)
+	(inst mov 2nd-tn nil-value)
 	(when (> nvals 2)
 	  (loop
 	    for tn-ref = (tn-ref-across 2nd-tn-ref)
@@ -274,7 +274,7 @@
       (inst jmp-short regs-defaulted)
       ;; Do the single value case.
       ;; Default the register args
-      (inst mov eax-tn *nil-value*)
+      (inst mov eax-tn nil-value)
       (do ((i 1 (1+ i))
 	   (val (tn-ref-across values) (tn-ref-across val)))
 	  ((= i (min nvals register-arg-count)))
@@ -288,7 +288,7 @@
 
       (emit-label regs-defaulted)
 
-      (inst mov eax-tn *nil-value*)
+      (inst mov eax-tn nil-value)
       (storew edx-tn ebx-tn -1)
       (collect ((defaults))
 	(do ((i register-arg-count (1+ i))
@@ -335,7 +335,7 @@
       ;; the MV return point.
       (inst mov ebx-tn esp-tn)
       (inst push edx-tn)
-      (inst mov edi-tn *nil-value*)
+      (inst mov edi-tn nil-value)
       (inst push edi-tn)
       (inst mov esi-tn edi-tn)
       ;; Compute a pointer to where to put the [defaulted] stack values.
@@ -345,7 +345,7 @@
 		     :disp (* (- (1+ register-arg-count)) word-bytes)))
       ;; Load EAX with NIL so we can quickly store it, and set up stuff
       ;; for the loop.
-      (inst mov eax-tn *nil-value*)
+      (inst mov eax-tn nil-value)
       (inst std)
       (inst mov ecx-tn (- nvals register-arg-count))
       ;; Jump into the default loop.
@@ -392,7 +392,7 @@
       (inst mov ecx-tn eax-tn)
       (inst shr ecx-tn word-shift)	; word count
       ;; Load EAX with NIL for fast storing.
-      (inst mov eax-tn *nil-value*)
+      (inst mov eax-tn nil-value)
       ;; Do the store.
       (emit-label default-stack-vals)
       (inst rep)
@@ -1033,7 +1033,7 @@
     (when (< nvals register-arg-count)
       (let* ((arg-tns (nthcdr nvals (list a0 a1 a2)))
 	     (first (first arg-tns)))
-	(inst mov first *nil-value*)
+	(inst mov first nil-value)
 	(dolist (tn (cdr arg-tns))
 	  (inst mov tn first))))
     ;; And away we go. Except that return-pc is still on the
@@ -1294,7 +1294,7 @@
       (move src context)
       (move ecx count)
       ;; Check to see whether there are no args, and just return NIL if so.
-      (inst mov result *nil-value*)
+      (inst mov result nil-value)
       (inst jecxz done)
       (inst lea dst (make-ea :dword :index ecx :scale 2))
       (pseudo-atomic
@@ -1321,7 +1321,7 @@
        ;; Go back for more.
        (inst loop loop)
        ;; NIL out the last cons.
-       (storew *nil-value* dst 1 sb!vm:list-pointer-type))
+       (storew nil-value dst 1 sb!vm:list-pointer-type))
       (emit-label done))))
 
 ;;; Return the location and size of the more arg glob created by Copy-More-Arg.

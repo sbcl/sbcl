@@ -157,7 +157,7 @@
     (cond ((zerop nvals))
 	  ((= nvals 1)
 	   (let ((no-values (gen-label)))
-	     (inst mov (tn-ref-tn values) *nil-value*)
+	     (inst mov (tn-ref-tn values) nil-value)
 	     (inst jecxz no-values)
 	     (loadw (tn-ref-tn values) start -1)
 	     (emit-label no-values)))
@@ -183,7 +183,7 @@
 	       (assemble (*elsewhere*)
 		 (dolist (def (defaults))
 		   (emit-label (car def))
-		   (inst mov (cdr def) *nil-value*))
+		   (inst mov (cdr def) nil-value))
 		 (inst jmp defaulting-done))))))
     (inst mov esp-tn sp)))
 

@@ -42,7 +42,7 @@
 
 (defun static-space-usage ()
   (- (* sb!vm:*static-space-free-pointer* sb!vm:word-bytes)
-     sb!vm:*static-space-start*))
+     sb!vm:static-space-start))
 
 (defun read-only-space-usage ()
   (- (* sb!vm::*read-only-space-free-pointer* sb!vm:word-bytes)

@@ -43,7 +43,7 @@
 	       (inst mov
 		     (make-ea :dword :base object
 			      :disp (- (* offset word-bytes) lowtag))
-		     (+ *nil-value* (static-symbol-offset val))))
+		     (+ nil-value (static-symbol-offset val))))
 	      (character
 	       (inst mov
 		     (make-ea :dword :base object
@@ -140,7 +140,7 @@
   (:save-p :compute-only)
   (:generator 10
     (loadw value object fdefn-function-slot other-pointer-type)
-    (inst cmp value *nil-value*)
+    (inst cmp value nil-value)
     ;; FIXME: UNDEFINED-SYMBOL-ERROR seems to actually be for symbols with no
     ;; function value, not, as the name might suggest, symbols with no ordinary
     ;; value. Perhaps the name could be made more mnemonic?
@@ -175,7 +175,7 @@
   (:args (fdefn :scs (descriptor-reg) :target result))
   (:results (result :scs (descriptor-reg)))
   (:generator 38
-    (storew *nil-value* fdefn fdefn-function-slot other-pointer-type)
+    (storew nil-value fdefn fdefn-function-slot other-pointer-type)
     (storew (make-fixup (extern-alien-name "undefined_tramp") :foreign)
 	    fdefn fdefn-raw-addr-slot other-pointer-type)
     (move result fdefn)))
