@@ -64,8 +64,7 @@ TODO (rudi 2003-05-19): make the above work, make (defknown open) use it.
 ||#
 
 
-(handler-bind ((error #'(lambda (condition) (declare (ignore condition))
-                                (continue))))
+(handler-bind ((error #'continue))
   (sb-c:defknown open (t &rest t
                          &key (:direction (member :input :output :io :probe))
                          (:element-type sb-kernel:type-specifier)
@@ -85,7 +84,7 @@ TODO (rudi 2003-05-19): make the above work, make (defknown open) use it.
     )
 
   (sb-c:defknown listen (&optional sb-kernel:streamlike
-                                   (or null (integer 1 10) (member 'character)))
+                                   (or null (integer 1 10) (member character)))
     boolean (sb-c::unsafely-flushable sb-c::explicit-check))
 
   (sb-c:defknown read-sequence (sequence stream &key (:start sb-int:index)

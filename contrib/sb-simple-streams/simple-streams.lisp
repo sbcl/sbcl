@@ -345,16 +345,14 @@
 			 start end blocking)
   (when (and (null buffer) (not (eql start end)))
     (with-stream-class (single-channel-simple-stream stream)
-      (setf buffer (sm buffer stream))
-      (setf end (sm buffpos stream))))
+      (setf buffer (sm buffer stream))))
   (write-octets stream buffer start end blocking))
 
 (defmethod device-write ((stream dual-channel-simple-stream) buffer
 			 start end blocking)
   (when (and (null buffer) (not (eql start end)))
     (with-stream-class (dual-channel-simple-stream stream)
-      (setf buffer (sm out-buffer stream))
-      (setf end (sm outpos stream))))
+      (setf buffer (sm out-buffer stream))))
   (write-octets stream buffer start end blocking))
 
 (defmethod device-clear-output ((stream simple-stream))

@@ -46,7 +46,7 @@
                 (sm buffer-ptr stream) 0)
           (remove-stream-instance-flags stream :dirty)
           (return 0))
-	(let ((bytes-written (device-write stream nil ptr nil blocking)))
+	(let ((bytes-written (device-write stream nil ptr bytes blocking)))
 	  (declare (fixnum bytes-written))
 	  (when (minusp bytes-written)
 	    (error "DEVICE-WRITE error."))
@@ -73,7 +73,7 @@
       (declare (type fixnum ptr bytes))
       (loop
 	(when (>= ptr bytes) (setf (sm outpos stream) 0) (return 0))
-	(let ((bytes-written (device-write stream nil ptr nil blocking)))
+	(let ((bytes-written (device-write stream nil ptr bytes blocking)))
 	  (declare (fixnum bytes-written))
 	  (when (minusp bytes-written)
 	    (error "DEVICE-WRITE error."))
