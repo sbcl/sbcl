@@ -9,7 +9,7 @@
 
  <!-- common expressions I haven't figured out how to mark up -->
  <!-- KLUDGE: There doesn't seem to be any DocBook tag for names of
-      programming languages. Typesetting Lisp Common Lisp as an
+      programming languages. Typesetting Common Lisp as an
       <application> looks funny. Is there a better way?
       WHN 20000505 -->
  <!ENTITY CommonLisp "Common Lisp">
@@ -36,7 +36,7 @@
     <para>This manual is part of the &SBCL; software system. See the
     <filename>README</> file for more information.</para>
 
-    <para>This manual is derived in part from the manual for the &CMUCL;
+    <para>This manual is largely derived from the manual for the &CMUCL;
     system, which was produced at Carnegie Mellon University and
     later released into the public domain. This manual is in the
     public domain and is provided with absolutely no warranty. See the

@@ -43,7 +43,7 @@
 (sb!xc:defmacro without-interrupts (&body body)
   #!+sb-doc
   "Execute BODY in a context impervious to interrupts."
-  (let ((name (gensym)))
+  (let ((name (gensym "WITHOUT-INTERRUPTS-BODY-")))
     `(flet ((,name () ,@body))
        (if *interrupts-enabled*
 	   (unwind-protect

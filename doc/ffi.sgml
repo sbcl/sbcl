@@ -88,8 +88,7 @@ has the corresponding &SBCL; FFI type
 Types may be either named or anonymous.  With structure and union
 types, the name is part of the type specifier, allowing recursively
 defined types such as:
-<programlisting>
-(struct foo (a (* (struct foo))))</programlisting>
+<programlisting>(struct foo (a (* (struct foo))))</programlisting>
 An anonymous structure or union type is specified by using the name
 <literal>nil</>.  The <function>with-alien</> macro defines a local
 scope which <quote>captures</> any named type definitions.  Other types
@@ -105,11 +104,10 @@ the <function>define-alien-type</> macro.
 The foreign types form a subsystem of the &SBCL; type system.  An
 <type>alien</> type specifier provides a way to use any foreign type as a
 Lisp type specifier.  For example
-<programlisting>
-(typep foo '(alien (* int)))</programlisting>
+<programlisting>(typep foo '(alien (* int)))</programlisting>
 can be used to determine whether <varname>foo</> is a pointer to a foreign
 <type>int</>. <type>alien</> type specifiers can be used in the same ways
-as ordinary Lisp type specifiers (like <type>string</>.)  Alien type
+as ordinary Lisp type specifiers (like <type>string</>.) Alien type
 declarations are subject to the same
 precise type checking <!-- FIXME: should be linked to id="precisetypechecking" -->
 as any other declaration.
@@ -121,7 +119,7 @@ foreign type system overlap with native Lisp type
 specifiers in some cases.  For example, the type specifier
 <type>(alien single-float)</type> is identical to <type>single-float</>, since
 foreign floats are automatically converted to Lisp floats.  When
-<function>type-of</> is called on an Alien value that is not automatically
+<function>type-of</> is called on an alien value that is not automatically
 converted to a Lisp value, then it will return an <type>alien</> type
 specifier.
 </para>
@@ -190,7 +188,7 @@ These are the basic foreign type specifiers:
       <function>define-alien-type</> or <function>with-alien</>,
       then this defines, respectively, a new global or local foreign
       structure type.  If no <varname>fields</> are specified, then
-      the fields are taken from the current (local or global) Alien
+      the fields are taken from the current (local or global) alien
       structure type definition of <varname>name</>.
     </para>
   </listitem>
@@ -297,20 +295,19 @@ These are the basic foreign type specifiers:
   <listitem>
     <para>
       The foreign type specifier <type>sb-alien:c-string</>
-      is similar to \code{(* char)}, but is interpreted as a
+      is similar to <type>(* char)</>, but is interpreted as a
       null-terminated string, and is automatically converted into a
       Lisp string when accessed; or if the pointer is C <literal>NULL</>
       or <literal>0</>, then accessing it gives Lisp <literal>nil</>.
     </para>  
     <para>
-      Assigning a Lisp string to a \code{c-string} structure field or
+      Assigning a Lisp string to a <type>c-string</> structure field or
       variable stores the contents of the string to the memory already
       pointed to by that variable.  When a foreign object of type
       <type>(* char)</> is assigned to a <type>c-string</>, then the
       <type>c-string</> pointer is assigned to.  This allows
       <type>c-string</> pointers to be initialized.  For example:
-      <programlisting>
-        (cl:in-package "CL-USER") ; which USEs package "SB-ALIEN"
+      <programlisting>(cl:in-package "CL-USER") ; which USEs package "SB-ALIEN"
         (define-alien-type nil (struct foo (str c-string)))
         (defun make-foo (str) (let ((my-foo (make-alien (struct foo))))
         (setf (slot my-foo 'str) (make-alien char (length str))
@@ -410,7 +407,7 @@ record type.</para>
 <synopsis>(sb-alien:alien-sap foreign-value type)</>
 
 <para>The <function>sb-alien:alien-sap</> function
-returns the SAP which points to \var{alien-value}'s data.
+returns the SAP which points to <varname>alien-value</>'s data.
 As of 2002-07-04, it looks as though this and other SAP functionality
 may become deprecated, since it shouldn't be needed by user code.
 </para>
@@ -477,26 +474,704 @@ allocates foreign values on the stack.</para>
 
 <sect1><title>Foreign Variables</>
 <!-- AKA "Alien Variables" in the CMU CL manual -->
-<para>(TO DO: Update corresponding section of &CMUCL; manual.)</para>
+
+<para>
+Both local (stack allocated) and external (C global) foreign variables are
+supported.
+</para>
+
+<sect2><title>Local Foreign Variables</>
+
+<synopsis>(sb-alien:with-alien var-definitions &amp;body body)</>
+
+<para>The <function>with-alien</>
+macro establishes local 
+foreign variables 
+with the specified
+alien types and names.
+This form is analogous to defining a local variable in C: additional
+storage is allocated, and the initial value is copied.
+This form is less
+analogous to LET-allocated Lisp variables, since the variables
+can't be captured in closures: they live only for the dynamic extent
+of the body, and referring to them outside is a gruesome error.
+</para>
+
+<para>The <varname>var-definitions</> argument is a list of 
+variable definitions, each of the form
+<programlisting>(name type &amp;optional initial-value)</programlisting>
+The names of the variables are established as symbol-macros; the bindings have
+lexical scope, and may be assigned with <function>setq</>
+or <function>setf</>.
+</para>  
+ 
+<para>The <function>with-alien</> macro also establishes
+a new scope for named structures
+and unions.  Any <varname>type</> specified for a variable may contain
+named structure or union types with the slots specified.  Within the
+lexical scope of the binding specifiers and body, a locally defined
+foreign structure type <type>foo</> can be referenced by its name using
+<type>(struct foo)</>.
+</para>
+
+</sect2>
+
+<sect2><title>External Foreign Variables</>
+
+<para>
+External foreign names are strings, and Lisp names are symbols. When
+an external foreign value is represented using a Lisp variable, there
+must be a way to convert from one name syntax into the other. The
+macros <function>extern-alien</>, <function>define-alien-variable</> and
+<function>define-alien-routine</> use this conversion heuristic:
+<itemizedlist>
+  <listitem><para>Alien names are converted to Lisp names by uppercasing and
+    replacing underscores with hyphens.</para></listitem>
+  <listitem><para>Conversely, Lisp names are converted to alien names by
+    lowercasing and replacing hyphens with underscores.</para></listitem>
+  <listitem><para>Both the Lisp symbol and alien string names may be
+    separately specified by using a list of the form
+    <programlisting>(alien-string lisp-symbol)</></para></listitem>
+</itemizedlist>
+
+<synopsis>(sb-alien:define-alien-variable name type)</>
+
+<para>
+The <function>define-alien-variable</> macro  
+defines <varname>name</> as an external foreign variable of the
+specified foreign <type>type</>.  <varname>name</> and <type>type</> are not
+evaluated.  The Lisp name of the variable (see above) becomes a
+global alien variable.  Global alien variables
+are effectively ``global symbol macros''; a reference to the
+variable fetches the contents of the external variable.  Similarly,
+setting the variable stores new contents---the new contents must be
+of the declared <type>type</>. Someday, they may well be implemented
+using the &ANSI; <function>define-symbol-macro</> mechanism, but 
+as of &SBCL; 0.7.5, they are still implemented using an older
+more-or-less parallel mechanism inherited from &CMUCL;.
+</para>
+  
+<para>
+For example, to access a C-level counter <varname>foo</>, one could
+write
+<programlisting>
+(define-alien-variable "foo" int)
+;; Now it is possible to get the value of the C variable foo simply by
+;; referencing that Lisp variable:
+(print foo)
+(setf foo 14)
+(incf foo)</programlisting>
+</para>
+
+<synopsis>(sb-alien:get-errno)</>
+
+<para>
+Since in modern C libraries, the <varname>errno</> "variable" is typically
+no longer a variable, but some some bizarre artificial construct
+which behaves superficially like a variable within a given thread,
+it can no longer reliably be accessed through the ordinary 
+<varname>define-alien-variable</> mechanism. Instead, &SBCL; provides
+the operator <function>sb-alien:get-errno</> to allow Lisp code to read it.
+</para>
+
+<synopsis>(sb-alien:extern-alien name type)</>
+
+<para>
+The <function>extern-alien</> macro
+returns an alien with the specified <type>type</> which
+points to an externally defined value.  <varname>name</> is not evaluated,
+and may be either a string or a symbol. <type>type</> is
+an unevaluated alien type specifier.
+</para>
+
 </sect1>
 
-<sect1><title>Foreign Data Structure Example</>
+<sect1><title>Foreign Data Structure Examples</>
 <!-- AKA "Alien Data Structure Example" in the CMU CL manual -->
-<para>(TO DO: Update corresponding section of &CMUCL; manual.)</para>
+
+<para>
+Now that we have alien types, operations and variables, we can manipulate
+foreign data structures.  This C declaration 
+<programlisting>
+struct foo {
+    int a;
+    struct foo *b[100];
+};</programlisting>
+can be translated into the following alien type:
+<programlisting>(define-alien-type nil
+  (struct foo
+    (a int)
+    (b (array (* (struct foo)) 100))))</programlisting>
+</para>
+
+<para>
+Once the <type>foo</> alien type has been defined as above,
+the C expression 
+<programlisting>
+struct foo f;
+f.b[7].a</programlisting>
+can be translated in this way:
+<programlisting>
+(with-alien ((f (struct foo)))
+  (slot (deref (slot f 'b) 7) 'a)
+  ;;
+  ;; Do something with f...
+  )</programlisting>
+</para>
+
+<para>
+Or consider this example of an external C variable and some accesses:
+<programlisting>
+struct c_struct {
+        short x, y;
+        char a, b;
+        int z;
+        c_struct *n;
+};
+extern struct c_struct *my_struct;
+my_struct->x++;
+my_struct->a = 5;
+my_struct = my_struct->n;</programlisting>
+which can be manipulated in Lisp like this:
+<programlisting>
+(define-alien-type nil
+  (struct c-struct
+          (x short)
+          (y short)
+          (a char)
+          (b char)
+          (z int)
+          (n (* c-struct))))
+(define-alien-variable "my_struct" (* c-struct))
+(incf (slot my-struct 'x))
+(setf (slot my-struct 'a) 5)
+(setq my-struct (slot my-struct 'n))</programlisting>
+</para>
+
 </sect1>
 
 <sect1><title>Loading Unix Object Files</>
-<para>(TO DO: Update corresponding section of &CMUCL; manual.)</para>
+
+<para>
+Foreign object files can be loaded into the running Lisp process by
+calling the functions <function>load-foreign</> or
+<function>load-1-foreign</>.
+</para>
+
+<para> The <function>sb-alien:load-1-foreign</> function is the more
+primitive of the two operations. It loads a single object file. into
+the currently running Lisp. The external symbols defining routines and
+variables are made available for future external references (e.g. by
+<function>extern-alien</>). Forward references to foreign symbols
+aren't supported: <function>load-1-foreign</> must be run before any
+of the defined symbols are referenced.
+</para>
+
+<para><function>sb-alien:load-foreign</> is built in terms of
+<function>load-1-foreign</> and some other machinery
+like <function>sb-ext:run-program</>. 
+It accepts a list of files and libraries, 
+and runs the linker on the files and
+libraries, creating an absolute Unix object file which is then 
+processed by <function>load-1-foreign</>.</para>
+
+<para> Note that as of &SBCL; 0.7.5, all foreign code (code loaded
+with <function>load-1-function</> or <function>load-function</>) is
+lost when a Lisp core is saved with
+<function>sb-ext:save-lisp-and-die</>, and no attempt is made to
+restore it when the core is loaded. Historically this has been an
+annoyance both for &SBCL; users and for &CMUCL; users.
+It's hard to solve this problem completely cleanly, but some
+generally-reliable partial solution might be useful. Once someone in
+either camp gets sufficiently annoyed to create it, some mechanism for
+automatically restoring foreign code is likely to be added.</para>
+
 </sect1>
 
 <sect1><title>Foreign Function Calls</>
-<!-- AKA "Alien Function Calls" in the CMU CL manual -->
-<para>(TO DO: Update corresponding section of &CMUCL; manual.)</para>
+
+<para>
+The foreign function call interface allows a Lisp program to call
+functions written in other languages using the C calling convention.
+</para>
+
+<para>
+Lisp sets up various interrupt handling routines and other environment
+information when it first starts up, and expects these to be in place
+at all times. The C functions called by Lisp should either not change
+the environment, especially the interrupt entry points, or should make
+sure that these entry points are restored when the C function returns
+to Lisp. If a C function makes changes without restoring things to the
+way they were when the C function was entered, there is no telling
+what will happen.
+</para>
+
+<sect2><title>The <function>alien-funcall</> Primitive</title>
+
+<synopsis>(sb-alien:alien-funcall alien-function &amp;rest arguments)</>
+
+<para>
+The <function>alien-funcall</> function is the foreign function call
+primitive: <varname>alien-function</> is called with the supplied
+<varname>arguments</> and its C return value is returned as a Lisp value.
+The <varname>alien-function</> is an arbitrary
+run-time expression; to refer to a constant function, use
+<function>extern-alien</> or a value defined by
+<function>define-alien-routine</>.
+</para>
+  
+<para>
+The type of <function>alien-function</>
+must be <type>(alien (function ...))</>
+or <type>(alien (* (function ...)))</>.
+The function type is used to
+determine how to call the function (as though it was declared with
+a prototype.)  The type need not be known at compile time, but only
+known-type calls are efficiently compiled.  Limitations:
+<itemizedlist>
+  <listitem><para>Structure type return values are not implemented.</></>
+  <listitem><para>Passing of structures by value is not implemented.</></>
+</itemizedlist>
+
+<para>
+Here is an example which allocates a <type>(struct foo)</>, calls a foreign
+function to initialize it, then returns a Lisp vector of all the
+<type>(* (struct foo))</> objects filled in by the foreign call:
+<programlisting>
+;; Allocate a foo on the stack.
+(with-alien ((f (struct foo)))
+  ;; Call some C function to fill in foo fields.
+  (alien-funcall (extern-alien "mangle_foo" (function void (* foo)))
+                 (addr f))
+  ;; Find how many foos to use by getting the A field.
+  (let* ((num (slot f 'a))
+         (result (make-array num)))
+    ;; Get a pointer to the array so that we don't have to keep extracting it:
+    (with-alien ((a (* (array (* (struct foo)) 100)) (addr (slot f 'b))))
+      ;; Loop over the first N elements and stash them in the result vector.
+      (dotimes (i num)
+        (setf (svref result i) (deref (deref a) i)))
+      ;; Voila.
+      result)))</programlisting>
+</para>
+
+</sect2>
+
+<sect2><title>The <function>define-alien-routine</> Macro</>
+
+<synopsis>(sb-alien:define-alien-routine} name result-type &amp;rest arg-specifiers)</>
+
+<para>
+The <function>define-alien-routine</> macro is a convenience
+for automatically generating Lisp
+interfaces to simple foreign functions.  The primary feature is the
+parameter style specification, which translates the C
+pass-by-reference idiom into additional return values.
+</para>
+  
+<para>
+<varname>name</> is usually a string external symbol, but may also be a
+symbol Lisp name or a list of the foreign name and the Lisp name.
+If only one name is specified, the other is automatically derived
+as for <function>extern-alien</>.
+<varname>result-type</> is the alien type of the return value.
+</para>
+
+<para>
+Each element of the <varname>arg-specifiers</> list 
+specifies an argument to the foreign function, and is
+of the form
+<programlisting>(aname atype &amp;optional style)</programlisting>
+<varname>aname</> is the symbol name of the argument to the constructed
+function (for documentation). <varname>atype</> is the alien type of
+corresponding foreign argument.  The semantics of the actual call
+are the same as for <function>alien-funcall</>. <varname>style</>
+specifies how this argument should be handled at call and return time,
+and should be one of the following
+<itemizedlist>
+  <listitem><para><varname>:in</>specifies that the argument is
+    passed by value. This is the default. <varname>:in</> arguments
+    have no corresponding return value from the Lisp function.
+    </para></listitem>
+  <listitem><para><varname>:copy</> is similar to <varname>:in</>,
+    but the argument is copied
+    to a pre-allocated object and a pointer to this object is passed
+    to the foreign routine.</para></listitem>
+  <listitem><para><varname>:out</> specifies a pass-by-reference
+    output value.  The type of the argument must be a pointer to
+    a fixed-sized object (such as an integer or pointer).
+    <varname>:out</> and <varname>:in-out</> style cannot
+    be used with pointers to arrays, records or functions.  An
+    object of the correct size is allocated on the stack, and
+    its address is passed to the foreign function.  When the
+    function returns, the contents
+    of this location are returned as one of the values of the Lisp
+    function (and the location is automatically deallocated).
+    </para></listitem>
+  <listitem><para><varname>:in-out</> is a combination of
+    <varname>:copy</> and <varname>:out</>.
+    The argument is copied to a pre-allocated object and a pointer to
+    this object is passed to the foreign routine.  On return, the
+    contents of this location is returned as an additional value.
+    </para></listitem>
+</itemizedlist>
+</para>
+
+<note>
+<para>
+Any efficiency-critical foreign interface function should be inline
+expanded, which can be done by preceding the
+<function>define-alien-routine</> call with:
+<programlisting>(declaim (inline lisp-name))</programlisting>
+In addition to avoiding the Lisp call overhead, this allows
+pointers, word-integers and floats to be passed using non-descriptor
+representations, avoiding consing.)
+</para>
+</note>
+
+</sect2>
+
+<sect2><title><function>define-alien-routine</> Example</title>
+
+<para>
+Consider the C function <function>cfoo</>
+with the following calling convention:
+<programlisting>
+void
+cfoo (str, a, i)
+    char *str;
+    char *a; /* update */
+    int *i; /* out */
+{
+  /* body of cfoo(...) */
+}</programlisting>
+This can be described by the following call to
+<function>define-alien-routine</>:
+<programlisting>
+(define-alien-routine "cfoo" void
+  (str c-string)
+  (a char :in-out)
+  (i int :out))</programlisting>
+The Lisp function <function>cfoo</> will have
+two arguments (<varname>str</> and <varname>a</>)
+and two return values (<varname>a</> and <varname>i</>).
+
+</sect2>
+
+<sect2><title>Calling Lisp From C</>
+
+<para>
+Calling Lisp functions from C is sometimes possible, but is extremely
+hackish and poorly supported as of &SBCL; 0.7.5.
+See <function>funcall0</> ... <function>funcall3</> in
+the runtime system. The
+arguments must be valid &SBCL; object descriptors (so that 
+e.g. fixnums must be
+left-shifted by 2.) As of &SBCL; 0.7.5, the format
+of object descriptors is documented only by the source code and 
+by the old &CMUCL; "INTERNALS" documentation.</para>
+
+<para> Note that the garbage collector moves objects, and won't be
+able to fix up any references in C variables, so either turn GC off or
+don't keep Lisp pointers in C data unless they are to statically
+allocated objects. It is possible to use the
+<function>sb-ext:purify</> function to place live data structures in
+static space so that they won't move during GC. </para>
+
+<!-- FIXME: This is a "changebar" section from the CMU CL manual.
+     I (WHN 2002-07-14) am not very familiar with this content, so 
+     I'm not immediately prepared to try to update it for SBCL, and
+     I'm not feeling masochistic enough to work to encourage this
+     kind of low-level hack anyway. However, I acknowledge that callbacks
+     are sometimes really really necessary, so I include the original
+     text in case someone is hard-core enough to benefit from it. If
+     anyone brings the information up to date for SBCL, it belong
+     either in the main manual or on a CLiki SBCL Internals page.
+LaTeX \subsection{Accessing Lisp Arrays}
+LaTeX 
+LaTeX Due to the way \cmucl{} manages memory, the amount of memory that can
+LaTeX be dynamically allocated by \code{malloc} or \funref{make-alien} is
+LaTeX limited\footnote{\cmucl{} mmaps a large piece of memory for it's own
+LaTeX   use and this memory is typically about 8 MB above the start of the C
+LaTeX   heap.  Thus, only about 8 MB of memory can be dynamically
+LaTeX   allocated.}.
+LaTeX 
+LaTeX To overcome this limitation, it is possible to access the content of
+LaTeX Lisp arrays which are limited only by the amount of physical memory
+LaTeX and swap space available.  However, this technique is only useful if
+LaTeX the foreign function takes pointers to memory instead of allocating
+LaTeX memory for itself.  In latter case, you will have to modify the
+LaTeX foreign functions.
+LaTeX 
+LaTeX This technique takes advantage of the fact that \cmucl{} has
+LaTeX specialized array types (\pxlref{specialized-array-types}) that match
+LaTeX a typical C array.  For example, a \code{(simple-array double-float
+LaTeX   (100))} is stored in memory in essentially the same way as the C
+LaTeX array \code{double x[100]} would be.  The following function allows us
+LaTeX to get the physical address of such a Lisp array:
+LaTeX \begin{example}
+LaTeX (defun array-data-address (array)
+LaTeX   "Return the physical address of where the actual data of an array is
+LaTeX stored.
+LaTeX 
+LaTeX ARRAY must be a specialized array type in CMU Lisp.  This means ARRAY
+LaTeX must be an array of one of the following types:
+LaTeX 
+LaTeX                   double-float
+LaTeX                   single-float
+LaTeX                   (unsigned-byte 32)
+LaTeX                   (unsigned-byte 16)
+LaTeX                   (unsigned-byte  8)
+LaTeX                   (signed-byte 32)
+LaTeX                   (signed-byte 16)
+LaTeX                   (signed-byte  8)
+LaTeX "
+LaTeX   (declare (type (or #+signed-array (array (signed-byte 8))
+LaTeX                      #+signed-array (array (signed-byte 16))
+LaTeX                      #+signed-array (array (signed-byte 32))
+LaTeX                      (array (unsigned-byte 8))
+LaTeX                      (array (unsigned-byte 16))
+LaTeX                      (array (unsigned-byte 32))
+LaTeX                      (array single-float)
+LaTeX                      (array double-float))
+LaTeX                  array)
+LaTeX            (optimize (speed 3) (safety 0))
+LaTeX            (ext:optimize-interface (safety 3)))
+LaTeX   ;; with-array-data will get us to the actual data.  However, because
+LaTeX   ;; the array could have been displaced, we need to know where the
+LaTeX   ;; data starts.
+LaTeX   (lisp::with-array-data ((data array)
+LaTeX                           (start)
+LaTeX                           (end))
+LaTeX     (declare (ignore end))
+LaTeX     ;; DATA is a specialized simple-array.  Memory is laid out like this:
+LaTeX     ;;
+LaTeX     ;;   byte offset    Value
+LaTeX     ;;        0         type code (should be 70 for double-float vector)
+LaTeX     ;;        4         4 * number of elements in vector
+LaTeX     ;;        8         1st element of vector
+LaTeX     ;;      ...         ...
+LaTeX     ;;
+LaTeX     (let ((addr (+ 8 (logandc1 7 (kernel:get-lisp-obj-address data))))
+LaTeX           (type-size (let ((type (array-element-type data)))
+LaTeX                        (cond ((or (equal type '(signed-byte 8))
+LaTeX                                   (equal type '(unsigned-byte 8)))
+LaTeX                               1)
+LaTeX                              ((or (equal type '(signed-byte 16))
+LaTeX                                   (equal type '(unsigned-byte 16)))
+LaTeX                               2)
+LaTeX                              ((or (equal type '(signed-byte 32))
+LaTeX                                   (equal type '(unsigned-byte 32)))
+LaTeX                               4)
+LaTeX                              ((equal type 'single-float)
+LaTeX                               4)
+LaTeX                              ((equal type 'double-float)
+LaTeX                               8)
+LaTeX                              (t
+LaTeX                               (error "Unknown specialized array element type"))))))
+LaTeX       (declare (type (unsigned-byte 32) addr)
+LaTeX                (optimize (speed 3) (safety 0) (ext:inhibit-warnings 3)))
+LaTeX       (system:int-sap (the (unsigned-byte 32)
+LaTeX                         (+ addr (* type-size start)))))))
+LaTeX \end{example}
+LaTeX 
+LaTeX Assume we have the C function below that we wish to use:
+LaTeX \begin{example}
+LaTeX   double dotprod(double* x, double* y, int n)
+LaTeX   \{
+LaTeX     int k;
+LaTeX     double sum = 0;
+LaTeX 
+LaTeX     for (k = 0; k < n; ++k) \{
+LaTeX       sum += x[k] * y[k];
+LaTeX     \}
+LaTeX   \}
+LaTeX \end{example}
+LaTeX The following example generates two large arrays in Lisp, and calls the C
+LaTeX function to do the desired computation.  This would not have been
+LaTeX possible using \code{malloc} or \code{make-alien} since we need about
+LaTeX 16 MB of memory to hold the two arrays.
+LaTeX \begin{example}
+LaTeX   (define-alien-routine "dotprod" double
+LaTeX     (x (* double-float) :in)
+LaTeX     (y (* double-float) :in)
+LaTeX     (n int :in))
+LaTeX     
+LaTeX   (let ((x (make-array 1000000 :element-type 'double-float))
+LaTeX         (y (make-array 1000000 :element-type 'double-float)))
+LaTeX     ;; Initialize X and Y somehow
+LaTeX     (let ((x-addr (system:int-sap (array-data-address x)))
+LaTeX           (y-addr (system:int-sap (array-data-address y))))
+LaTeX       (dotprod x-addr y-addr 1000000)))    
+LaTeX \end{example}
+LaTeX In this example, it may be useful to wrap the inner \code{let}
+LaTeX expression in an \code{unwind-protect} that first turns off garbage
+LaTeX collection and then turns garbage collection on afterwards.  This will
+LaTeX prevent garbage collection from moving \code{x} and \code{y} after we
+LaTeX have obtained the (now erroneous) addresses but before the call to
+LaTeX \code{dotprod} is made.
+LaTeX 
+-->
+
 </sect1>
 
-<sect1><title>Step-by-Step Example of the Foreign Function Interface</>
-<!-- AKA "Step-by-Step Alien Example" in the CMU CL manual -->
-<para>(TO DO: Update corresponding section of &CMUCL; manual.)</para>
+<sect1><title>Step-By-Step Example of the Foreign Function Interface</>
+
+<para>
+This section presents a complete example of an interface to a somewhat
+complicated C function.  
+</para>
+
+<para>
+Suppose you have the following C function which you want to be able to
+call from Lisp in the file <filename>test.c</>
+<programlisting>
+struct c_struct
+{
+  int x;
+  char *s;
+};
+ 
+struct c_struct *c_function (i, s, r, a)
+    int i;
+    char *s;
+    struct c_struct *r;
+    int a[10];
+{
+  int j;
+  struct c_struct *r2;
+ 
+  printf("i = %d\n", i);
+  printf("s = %s\n", s);
+  printf("r->x = %d\n", r->x);
+  printf("r->s = %s\n", r->s);
+  for (j = 0; j < 10; j++) printf("a[%d] = %d.\n", j, a[j]);
+  r2 = (struct c_struct *) malloc (sizeof(struct c_struct));
+  r2->x = i + 5;
+  r2->s = "a C string";
+  return(r2);
+};</programlisting>
+</para>
+
+<para>
+It is possible to call this C function from Lisp using the file
+<filename>test.lisp</> containing
+<programlisting>
+(cl:defpackage "TEST-C-CALL" (:use "CL" "SB-ALIEN" "SB-C-CALL"))
+(cl:in-package "TEST-C-CALL")
+
+;;; Define the record C-STRUCT in Lisp.
+(define-alien-type nil
+    (struct c-struct
+            (x int)
+            (s c-string)))
+
+;;; Define the Lisp function interface to the C routine.  It returns a
+;;; pointer to a record of type C-STRUCT.  It accepts four parameters:
+;;; I, an int; S, a pointer to a string; R, a pointer to a C-STRUCT
+;;; record; and A, a pointer to the array of 10 ints.
+;;;
+;;; The INLINE declaration eliminates some efficiency notes about heap
+;;; allocation of alien values.
+(declaim (inline c-function))
+(define-alien-routine c-function
+    (* (struct c-struct))
+  (i int)
+  (s c-string)
+  (r (* (struct c-struct)))
+  (a (array int 10)))
+
+;;; a function which sets up the parameters to the C function and
+;;; actually calls it
+(defun call-cfun ()
+  (with-alien ((ar (array int 10))
+               (c-struct (struct c-struct)))
+    (dotimes (i 10)                     ; Fill array.
+      (setf (deref ar i) i))
+    (setf (slot c-struct 'x) 20)
+    (setf (slot c-struct 's) "a Lisp string")
+
+    (with-alien ((res (* (struct c-struct))
+                      (c-function 5 "another Lisp string" (addr c-struct) ar)))
+      (format t "~&amp;back from C function~%")
+      (multiple-value-prog1
+          (values (slot res 'x)
+                  (slot res 's))
+
+        ;; Deallocate result. (after we are done referring to it:
+        ;; "Pillage, *then* burn.")
+        (free-alien res)))))</programlisting>
+</para>
+
+<para>
+To execute the above example, it is necessary to compile the C routine,
+e.g.:
+<userinput>cc -c test.c</>
+(In order to enable incremental loading with some linkers, you may need
+to say
+<userinput>cc -G 0 -c test.c</>)
+</para>
+
+<para>
+Once the C code has been compiled, you can start up Lisp and load it in:
+<userinput>sbcl</>.
+Lisp should start up with its normal prompt.</para>
+
+<para>
+Within Lisp, 
+compile the Lisp file. (This step can be done separately. You don't
+have to recompile every time.)
+<userinput>(compile-file "test.lisp")</>
+
+<para>
+Within Lisp, load the foreign object file to define the necessary
+symbols:
+<userinput>(load-foreign "test.o")</>.
+This must be done before loading any code that refers
+to these symbols.
+<para>
+
+<para>
+Now you can load the compiled Lisp ("fasl") file into Lisp:
+<userinput>(load "test.fasl")</>
+And once the Lisp file is loaded, you can call the 
+Lisp routine that sets up the parameters and calls the C
+function:
+<userinput>(test-c-call::call-cfun)</>
+</para>
+
+<para>
+The C routine should print the following information to standard output:
+<!-- FIXME: What should be here is a verbatim environment for computer
+     output, but since I don't know one in DocBook, I made do with
+     PROGRAMLISTING for now... -->
+<programlisting>i = 5
+s = another Lisp string
+r->x = 20
+r->s = a Lisp string
+a[0] = 0.
+a[1] = 1.
+a[2] = 2.
+a[3] = 3.
+a[4] = 4.
+a[5] = 5.
+a[6] = 6.
+a[7] = 7.
+a[8] = 8.
+a[9] = 9.</programlisting>
+After return from the C function,
+the Lisp wrapper function should print the following output:
+<programlisting>back from C function</programlisting>
+And upon return from the Lisp wrapper function,
+before the next prompt is printed, the
+Lisp read-eval-print loop should print the following return values:
+<!-- FIXME: As above, it's not a program listing, but computer output... -->
+<programlisting>
+10
+"a C string"
+</programlisting>
+</para>
+
 </sect1>
 
 </chapter>

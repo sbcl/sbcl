@@ -890,7 +890,7 @@
 	  (cond ((fixnump posn)
 		 ;; Adjust for buffered output: If there is any output
 		 ;; buffered, the *real* file position will be larger
-		 ;; than reported by lseek because lseek obviously
+		 ;; than reported by lseek() because lseek() obviously
 		 ;; cannot take into account output we have not sent
 		 ;; yet.
 		 (dolist (later (fd-stream-output-later stream))

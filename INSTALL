@@ -135,9 +135,7 @@ To build the system binaries:
        13 hours on a 133MHz Pentium (P54C) with 48Mb RAM, running OpenBSD 2.6.
      Around the 48Mb mark, the build process is starved for RAM:
      on my 48Mb OpenBSD machine with nothing else running, it
-     spent about 2/3 of its wall clock time swapping. Anything which 
-     substantially increases memory use, like running X11, Emacs, or, 
-     God forbid, Netscape, can increase the build time substantially.
+     spent about 2/3 of its wall clock time swapping. 
 
 Now you should have the same src/runtime/sbcl and output/sbcl.core
 files that come with the binary distribution, and you can install

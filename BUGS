@@ -584,11 +584,6 @@ WORKAROUND:
   GC, so that thereafter memory usage can never be reduced below that
   level.
 
-96:
-  The TRACE facility can't be used on some kinds of functions.
-  (Basically, the breakpoint facility was incompletely implemented
-  in the X86 port of CMU CL, and hasn't been fixed in SBCL.)
-
 98:
   In sbcl-0.6.11.41 (and in all earlier SBCL, and in CMU
   CL), out-of-line structure slot setters are horribly inefficient

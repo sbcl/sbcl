@@ -179,19 +179,49 @@ and submit it as a patch."
 
 ;;; a limit to help catch programs which allocate too much memory,
 ;;; since a hard heap overflow is so hard to recover from
+;;;
+;;; FIXME: Like *GC-TRIGGER*, this variable (1) should probably be
+;;; denominated in a larger unit than bytes and (2) should probably be
+;;; renamed so that it's clear from the name what unit it's
+;;; denominated in.
 (declaim (type (or unsigned-byte null) *soft-heap-limit*))
-(defvar *soft-heap-limit* nil)
+(defvar *soft-heap-limit*
+  ;; As long as *GC-TRIGGER* is DECLAIMed as INDEX, we know that
+  ;; MOST-POSITIVE-FIXNUM is a hard limit on how much memory can be
+  ;; allocated. (Not necessarily *the* hard limit, which is fairly
+  ;; likely something like a Unix per-process limit that we don't know
+  ;; about, but a hard limit anyway.) And this gives us a reasonable
+  ;; conservative default for the soft limit...
+  (- most-positive-fixnum
+     *bytes-consed-between-gcs*))
+
+;;;; The following specials are used to control when garbage
+;;;; collection occurs.
 
 ;;; When the dynamic usage increases beyond this amount, the system
 ;;; notes that a garbage collection needs to occur by setting
 ;;; *NEED-TO-COLLECT-GARBAGE* to T. It starts out as NIL meaning
 ;;; nobody has figured out what it should be yet.
-(defvar *gc-trigger* nil)
-
+;;;
+;;; FIXME: *GC-TRIGGER* seems to be denominated in bytes, not words.
+;;; And limiting it to INDEX is fairly reasonable in order to avoid
+;;; bignum arithmetic on every allocation, and to minimize the need
+;;; for thought about weird gotchas of the GC-control mechanism itself
+;;; consing as it operates. But as of sbcl-0.7.5, 512Mbytes of memory
+;;; costs $54.95 at Fry's in Dallas but cheap consumer 64-bit machines
+;;; are still over the horizon, so gratuitously limiting our heap size
+;;; to FIXNUM bytes seems fairly stupid. It'd be reasonable to
+;;; (1) allow arbitrary UNSIGNED-BYTE values of *GC-TRIGGER*, or
+;;; (2) redenominate this variable in words instead of bytes, postponing
+;;;     the problem to heaps which exceed 50% of the machine's address
+;;;     space, or even
+;;; (3) redemoninate this variable in CONS-sized two-word units,
+;;;     allowing it to cover the entire memory space at the price of
+;;;     possible loss of clarity.
+;;; (And whatever is done, it'd also be good to rename the variable so
+;;; that it's clear what unit it's denominated in.)
 (declaim (type (or index null) *gc-trigger*))
-
-;;;; The following specials are used to control when garbage collection
-;;;; occurs.
+(defvar *gc-trigger* nil)
 
 ;;; When non-NIL, inhibits garbage collection.
 (defvar *gc-inhibit*) ; initialized in cold init
