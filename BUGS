@@ -1169,30 +1169,24 @@ Error in function C::GET-LAMBDA-TO-COMPILE:
    is attached to FOO in 120a above, and used to optimize code which
    calls FOO. 
 
-121:
-  In sbcl-0.7.14.flaky4.10, the last MAPTEST test case at the end
-  of tests/map-tests.impure.lisp dies with 
-	  The value
-	    #<SB-C::MV-COMBINATION
-	      :FUN #<SB-C::REF
-	             :LEAF #<SB-C::GLOBAL-VAR
-	                     :NAME +
-	                     :TYPE #
-	                     :WHERE-FROM :DECLARED
-	                     :KIND :GLOBAL-FUNCTION>>
-	      :ARGS (#<SB-C::COMBINATION :FUN # :ARGS (#)>)>
-	  is not of type
-	    SB-C::COMBINATION.
-  in 
-	(SB-C::GENERATE-BYTE-CODE-FOR-REF
-	 #<SB-ASSEM:SEGMENT :NAME "Byte Output">
-	 #<SB-C::REF
-	   :LEAF #<SB-C::GLOBAL-VAR
-	           :NAME +
-	           :TYPE #<SB-KERNEL:FUNCTION-TYPE (FUNCTION # NUMBER)>
-	           :WHERE-FROM :DECLARED
-	           :KIND :GLOBAL-FUNCTION>>
-	 #<SB-C::CONTINUATION {506AD995}>)
+122:
+   There was some sort of screwup in handling of
+   (IF (NOT (IGNORE-ERRORS ..))). E.g.
+	(defun foo1i ()
+	  (if (not (ignore-errors
+		     (make-pathname :host "foo" :directory "!bla" :name "bar")))
+	      (print "ok")
+	      (error "notunlessnot")))
+   The (NOT (IGNORE-ERRORS ..)) form evaluates to T, so this should be
+   printing "ok", but instead it's going to the ERROR. This problem
+   seems to've been introduced by MNA's HANDLER-CASE patch (sbcl-devel
+   2001-07-17) and as a workaround (put in sbcl-0.pre7.14.flaky4.12)
+   I reverted back to the old weird HANDLER-CASE code. However, I
+   think the problem looks like a compiler bug in handling RETURN-FROM,
+   so I left the MNA-patched code in HANDLER-CASE (suppressed with
+   #+NIL) and I'd like to go back to see whether this really is
+   a compiler bug before I delete this BUGS entry.
+
 
 KNOWN BUGS RELATED TO THE IR1 INTERPRETER
 
