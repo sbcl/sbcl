@@ -2386,6 +2386,8 @@ changes in sbcl-0.8.10 relative to sbcl-0.8.9:
     values.  (thanks to Zach Beane)
   * bug fix: streams with element-type (SIGNED-BYTE <N>) for <N>
     greater than 32 handle EOF correctly.
+  * bug fix: on X86 an immediate argument of the IMUL instruction is
+    correctly printed in disassembly. (thanks to Lutz Euler)
   * bug fix: class slots in redefined classes preserve their old
     values.  (thanks to Bruno Haible and Nikodemus Siivola)
   * bug fix: compilation of funcalls of CXX+R (e.g. CDDR) now
