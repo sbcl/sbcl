@@ -246,14 +246,16 @@ valid_dynamic_space_pointer(lispobj *pointer, lispobj *start_addr)
     case type_ByteCodeClosure:
       if ((int)pointer != ((int)start_addr+type_FunctionPointer)) {
 	if (pointer_filter_verbose) {
-	  fprintf(stderr,"*Wf2: %x %x %x\n", pointer, start_addr, *start_addr);
+	  fprintf(stderr,"*Wf2: %x %x %x\n", (unsigned int) pointer, 
+		  (unsigned int) start_addr, *start_addr);
 	}
 	return 0;
       }
       break;
     default:
       if (pointer_filter_verbose) {
-	fprintf(stderr,"*Wf3: %x %x %x\n", pointer, start_addr, *start_addr);
+	fprintf(stderr,"*Wf3: %x %x %x\n", (unsigned int) pointer, 
+		(unsigned int) start_addr, *start_addr);
       }
       return 0;
     }
@@ -261,7 +263,8 @@ valid_dynamic_space_pointer(lispobj *pointer, lispobj *start_addr)
   case type_ListPointer:
     if ((int)pointer != ((int)start_addr+type_ListPointer)) {
       if (pointer_filter_verbose)
-	fprintf(stderr,"*Wl1: %x %x %x\n", pointer, start_addr, *start_addr);
+	fprintf(stderr,"*Wl1: %x %x %x\n", (unsigned int) pointer, 
+		(unsigned int) start_addr, *start_addr);
       return 0;
     }
     /* Is it plausible cons? */
@@ -276,20 +279,23 @@ valid_dynamic_space_pointer(lispobj *pointer, lispobj *start_addr)
       break;
     } else {
       if (pointer_filter_verbose) {
-	fprintf(stderr,"*Wl2: %x %x %x\n", pointer, start_addr, *start_addr);
+	fprintf(stderr,"*Wl2: %x %x %x\n", (unsigned int) pointer, 
+		(unsigned int) start_addr, *start_addr);
       }
       return 0;
     }
   case type_InstancePointer:
     if ((int)pointer != ((int)start_addr+type_InstancePointer)) {
       if (pointer_filter_verbose) {
-	fprintf(stderr,"*Wi1: %x %x %x\n", pointer, start_addr, *start_addr);
+	fprintf(stderr,"*Wi1: %x %x %x\n", (unsigned int) pointer, 
+		(unsigned int) start_addr, *start_addr);
       }
       return 0;
     }
     if (TypeOf(start_addr[0]) != type_InstanceHeader) {
       if (pointer_filter_verbose) {
-	fprintf(stderr,"*Wi2: %x %x %x\n", pointer, start_addr, *start_addr);
+	fprintf(stderr,"*Wi2: %x %x %x\n", (unsigned int) pointer, 
+		(unsigned int) start_addr, *start_addr);
       }
       return 0;
     }
@@ -297,14 +303,16 @@ valid_dynamic_space_pointer(lispobj *pointer, lispobj *start_addr)
   case type_OtherPointer:
     if ((int)pointer != ((int)start_addr+type_OtherPointer)) {
       if (pointer_filter_verbose) {
-	fprintf(stderr,"*Wo1: %x %x %x\n", pointer, start_addr, *start_addr);
+	fprintf(stderr,"*Wo1: %x %x %x\n", (unsigned int) pointer, 
+		(unsigned int) start_addr, *start_addr);
       }
       return 0;
     }
     /* Is it plausible?  Not a cons. X should check the headers. */
     if(Pointerp(start_addr[0]) || ((start_addr[0] & 3) == 0)) {
       if (pointer_filter_verbose) {
-	fprintf(stderr,"*Wo2: %x %x %x\n", pointer, start_addr, *start_addr);
+	fprintf(stderr,"*Wo2: %x %x %x\n", (unsigned int) pointer, 
+		(unsigned int) start_addr, *start_addr);
       }
       return 0;
     }
@@ -312,7 +320,8 @@ valid_dynamic_space_pointer(lispobj *pointer, lispobj *start_addr)
     case type_UnboundMarker:
     case type_BaseChar:
       if (pointer_filter_verbose) {
-	fprintf(stderr,"*Wo3: %x %x %x\n", pointer, start_addr, *start_addr);
+	fprintf(stderr,"*Wo3: %x %x %x\n", (unsigned int) pointer, 
+		(unsigned int) start_addr, *start_addr);
       }
       return 0;
 
@@ -322,13 +331,15 @@ valid_dynamic_space_pointer(lispobj *pointer, lispobj *start_addr)
     case type_ByteCodeFunction:
     case type_ByteCodeClosure:
       if (pointer_filter_verbose) {
-	fprintf(stderr,"*Wo4: %x %x %x\n", pointer, start_addr, *start_addr);
+	fprintf(stderr,"*Wo4: %x %x %x\n", (unsigned int) pointer, 
+		(unsigned int) start_addr, *start_addr);
       }
       return 0;
 
     case type_InstanceHeader:
       if (pointer_filter_verbose) {
-	fprintf(stderr,"*Wo5: %x %x %x\n", pointer, start_addr, *start_addr);
+	fprintf(stderr,"*Wo5: %x %x %x\n", (unsigned int) pointer, 
+		(unsigned int) start_addr, *start_addr);
       }
       return 0;
 
@@ -399,14 +410,16 @@ valid_dynamic_space_pointer(lispobj *pointer, lispobj *start_addr)
 
     default:
       if (pointer_filter_verbose) {
-	fprintf(stderr,"*Wo6: %x %x %x\n", pointer, start_addr, *start_addr);
+	fprintf(stderr,"*Wo6: %x %x %x\n", (unsigned int) pointer, 
+		(unsigned int) start_addr, *start_addr);
       }
       return 0;
     }
     break;
   default:
     if (pointer_filter_verbose) {
-      fprintf(stderr,"*W?: %x %x %x\n", pointer, start_addr, *start_addr);
+      fprintf(stderr,"*W?: %x %x %x\n", (unsigned int) pointer, 
+	      (unsigned int) start_addr, *start_addr);
     }
     return 0;
   }
@@ -476,7 +489,7 @@ pscav_i386_stack(void)
 	      *valid_stack_ra_locations[i],
 	      (int)(*valid_stack_ra_locations[i])
 	      - ((int)valid_stack_ra_code_objects[i] - (int)code_obj),
-	      valid_stack_ra_code_objects[i], code_obj);
+	      (unsigned int) valid_stack_ra_code_objects[i], code_obj);
     }
     *valid_stack_ra_locations[i] =
       ((int)(*valid_stack_ra_locations[i])
@@ -590,6 +603,7 @@ static lispobj ptrans_instance(lispobj thing, lispobj header, boolean constant)
 	}
     default:
 	gc_abort();
+	return NIL; /* dummy value: return something ... */
     }
 }
 
@@ -682,7 +696,6 @@ apply_code_fixups_during_purify(struct code *old_code, struct code *new_code)
   int nheader_words, ncode_words, nwords;
   void  *constants_start_addr, *constants_end_addr;
   void  *code_start_addr, *code_end_addr;
-  lispobj p;
   lispobj fixups = NIL;
   unsigned  displacement = (unsigned)new_code - (unsigned)old_code;
   struct vector *fixups_vector;
@@ -1143,7 +1156,7 @@ pscav_code(struct code*code)
 static lispobj *pscav(lispobj *addr, int nwords, boolean constant)
 {
     lispobj thing, *thingp, header;
-    int count;
+    int count = 0; /* (0 = dummy init value to stop GCC warning) */
     struct vector *vector;
 
     while (nwords > 0) {
@@ -1436,11 +1449,11 @@ int purify(lispobj static_roots, lispobj read_only_roots)
     fflush(stdout);
 #endif
 #if !defined(ibmrt) && !defined(__i386__)
-    pscav(BINDING_STACK_START,
-	  current_binding_stack_pointer - (lispobj *)BINDING_STACK_START,
+    pscav( (lispobj *)BINDING_STACK_START,
+	  (lispobj *)current_binding_stack_pointer - (lispobj *)BINDING_STACK_START,
 	  0);
 #else
-    pscav(BINDING_STACK_START,
+    pscav( (lispobj *)BINDING_STACK_START,
 	  (lispobj *)SymbolValue(BINDING_STACK_POINTER) -
 	  (lispobj *)BINDING_STACK_START,
 	  0);
@@ -1455,7 +1468,7 @@ int purify(lispobj static_roots, lispobj read_only_roots)
       fprintf(stderr,
 	      "scavenging read only space: %d bytes\n",
 	      read_only_space_size * sizeof(lispobj));
-      pscav(READ_ONLY_SPACE_START, read_only_space_size, 0);
+      pscav( (lispobj *)READ_ONLY_SPACE_START, read_only_space_size, 0);
     }
 #endif
 

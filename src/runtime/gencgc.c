@@ -386,7 +386,7 @@ print_generation_stats(int verbose) /* FIXME: should take FILE argument */
 	gc_assert(generations[i].bytes_allocated
 		  == generation_bytes_allocated(i));
 	fprintf(stderr,
-		"   %8d: %5d %5d %5d %5d %8d %5d %8d %4d %3d %7.4lf\n",
+		"   %8d: %5d %5d %5d %5d %8d %5d %8d %4d %3d %7.4f\n",
 		i,
 		boxed_cnt, unboxed_cnt, large_boxed_cnt, large_unboxed_cnt,
 		generations[i].bytes_allocated,
@@ -397,7 +397,7 @@ print_generation_stats(int verbose) /* FIXME: should take FILE argument */
 		generations[i].num_gc,
 		gen_av_mem_age(i));
     }
-    fprintf(stderr,"   Total bytes allocated=%d\n", bytes_allocated);
+    fprintf(stderr,"   Total bytes allocated=%ld\n", bytes_allocated);
 
     fpu_restore(fpu_state);
 }
@@ -691,7 +691,7 @@ struct new_area {
     int  size;
 };
 static struct new_area (*new_areas)[];
-static new_areas_index;
+static int new_areas_index;
 int max_new_areas;
 
 /* Add a new area to new_areas. */
@@ -1196,6 +1196,7 @@ static void
 
     /* shouldn't happen */
     gc_assert(0);
+    return((void *) NIL); /* dummy value: return something ... */
 }
 
 /* Allocate space from the boxed_region. If there is not enough free
@@ -1314,6 +1315,7 @@ static void
 
     /* shouldn't happen? */
     gc_assert(0);
+    return((void *) NIL); /* dummy value: return something ... */
 }
 
 static inline void
@@ -1750,7 +1752,10 @@ scavenge(lispobj *start, long nwords)
 {
     while (nwords > 0) {
 	lispobj object;
-	int type, words_scavenged;
+#if DIRECT_SCAV
+	int type;
+#endif
+	int words_scavenged;
 
 	object = *start;
 	
@@ -1916,8 +1921,6 @@ void
 sniff_code_object(struct code *code, unsigned displacement)
 {
     int nheader_words, ncode_words, nwords;
-    lispobj fheaderl;
-    struct function *fheaderp;
     void *p;
     void *constants_start_addr, *constants_end_addr;
     void *code_start_addr, *code_end_addr;
@@ -2097,7 +2100,6 @@ apply_code_fixups(struct code *old_code, struct code *new_code)
     int nheader_words, ncode_words, nwords;
     void *constants_start_addr, *constants_end_addr;
     void *code_start_addr, *code_end_addr;
-    lispobj p;
     lispobj fixups = NIL;
     unsigned displacement = (unsigned)new_code - (unsigned)old_code;
     struct vector *fixups_vector;
@@ -2537,7 +2539,6 @@ trans_list(lispobj object)
 {
     lispobj new_list_pointer;
     struct cons *cons, *new_cons;
-    int n = 0;
     lispobj cdr;
 
     gc_assert(from_space_p(object));
@@ -2883,12 +2884,14 @@ scav_vector(lispobj *where, lispobj object)
 {
     unsigned int kv_length;
     lispobj *kv_vector;
-    unsigned int  length;
+    unsigned int length = 0; /* (0 = dummy to stop GCC warning) */
     lispobj *hash_table;
     lispobj empty_symbol;
-    unsigned int  *index_vector, *next_vector, *hash_vector;
+    unsigned int *index_vector = NULL; /* (NULL = dummy to stop GCC warning) */
+    unsigned int *next_vector = NULL; /* (NULL = dummy to stop GCC warning) */
+    unsigned int *hash_vector = NULL; /* (NULL = dummy to stop GCC warning) */
     lispobj weak_p_obj;
-    unsigned next_vector_length;
+    unsigned next_vector_length = 0;
 
     /* FIXME: A comment explaining this would be nice. It looks as
      * though SB-VM:VECTOR-VALID-HASHING-SUBTYPE is set for EQ-based
@@ -3653,7 +3656,7 @@ static lispobj
 trans_weak_pointer(lispobj object)
 {
     lispobj copy;
-    struct weak_pointer *wp;
+    /* struct weak_pointer *wp; */
 
     gc_assert(Pointerp(object));
 
@@ -3686,7 +3689,7 @@ void scan_weak_pointers(void)
     struct weak_pointer *wp;
     for (wp = weak_pointers; wp != NULL; wp = wp->next) {
 	lispobj value = wp->value;
-	lispobj first, *first_pointer;
+	lispobj *first_pointer;
 
 	first_pointer = (lispobj *)PTR(value);
 
@@ -4316,9 +4319,6 @@ valid_dynamic_space_pointer(lispobj *pointer)
 static void
 maybe_adjust_large_object(lispobj *where)
 {
-    int tag;
-    lispobj *new;
-    lispobj *source, *dest;
     int first_page;
     int nwords;
 
@@ -4979,12 +4979,10 @@ scavenge_newspace_generation(int generation)
     /* the new_areas array currently being written to by gc_alloc */
     struct new_area  (*current_new_areas)[] = &new_areas_1;
     int current_new_areas_index;
-    int current_new_areas_allocated;
 
     /* the new_areas created but the previous scavenge cycle */
     struct new_area  (*previous_new_areas)[] = NULL;
     int previous_new_areas_index;
-    int previous_new_areas_allocated;
 
 #define SC_NS_GEN_CK 0
 #if SC_NS_GEN_CK
@@ -5117,14 +5115,13 @@ scavenge_newspace_generation(int generation)
 static void
 unprotect_oldspace(void)
 {
-    int bytes_freed = 0;
     int i;
 
     for (i = 0; i < last_free_page; i++) {
 	if ((page_table[i].allocated != FREE_PAGE)
 	    && (page_table[i].bytes_used != 0)
 	    && (page_table[i].gen == from_space)) {
-	    void *page_start, *addr;
+	    void *page_start;
 
 	    page_start = (void *)page_address(i);
 
@@ -5239,7 +5236,7 @@ print_ptr(lispobj *addr)
 
     if (pi1 != -1)
 	fprintf(stderr,"  %x: page %d  alloc %d  gen %d  bytes_used %d  offset %d  dont_move %d\n",
-		addr,
+		(unsigned int) addr,
 		pi1,
 		page_table[pi1].allocated,
 		page_table[pi1].gen,
@@ -5610,7 +5607,6 @@ write_protect_generation_pages(int generation)
 static void
 garbage_collect_generation(int generation, int raise)
 {
-    unsigned long allocated = bytes_allocated;
     unsigned long bytes_freed;
     unsigned long i;
     unsigned long read_only_space_size, static_space_size;
@@ -5692,7 +5688,7 @@ garbage_collect_generation(int generation, int raise)
     }
 
     /* Scavenge the binding stack. */
-    scavenge(BINDING_STACK_START,
+    scavenge( (lispobj *) BINDING_STACK_START,
 	     (lispobj *)SymbolValue(BINDING_STACK_POINTER) -
 	     (lispobj *)BINDING_STACK_START);
 
@@ -5703,7 +5699,7 @@ garbage_collect_generation(int generation, int raise)
 	FSHOW((stderr,
 	       "/scavenge read only space: %d bytes\n",
 	       read_only_space_size * sizeof(lispobj)));
-	scavenge(READ_ONLY_SPACE_START, read_only_space_size);
+	scavenge( (lispobj *) READ_ONLY_SPACE_START, read_only_space_size);
     }
 
     static_space_size =
@@ -5713,7 +5709,7 @@ garbage_collect_generation(int generation, int raise)
 	FSHOW((stderr,
 	       "/scavenge static space: %d bytes\n",
 	       static_space_size * sizeof(lispobj)));
-    scavenge(STATIC_SPACE_START, static_space_size);
+    scavenge( (lispobj *) STATIC_SPACE_START, static_space_size);
 
     /* All generations but the generation being GCed need to be
      * scavenged. The new_space generation needs special handling as
@@ -5812,6 +5808,7 @@ update_x86_dynamic_space_free_pointer(void)
 
     SetSymbolValue(ALLOCATION_POINTER,
 		   (lispobj)(((char *)heap_base) + last_free_page*4096));
+    return 0; /* dummy value: return something ... */
 }
 
 /* GC all generations below last_gen, raising their objects to the
@@ -5986,14 +5983,11 @@ gc_free_heap(void)
 		     addr);
 	    }
 	} else if (gencgc_zero_check_during_free_heap) {
-	    int *page_start, i;
-
 	    /* Double-check that the page is zero filled. */
+	    int *page_start, i;
 	    gc_assert(page_table[page].allocated == FREE_PAGE);
 	    gc_assert(page_table[page].bytes_used == 0);
-
-	    page_start = (int *)page_address(i);
-
+	    page_start = (int *)page_address(page);
 	    for (i=0; i<1024; i++) {
 		if (page_start[i] != 0) {
 		    lose("free region not zero at %x", page_start + i);
@@ -6323,9 +6317,9 @@ component_ptr_from_pc(lispobj *pc)
 {
     lispobj *object = NULL;
 
-    if (object = search_read_only_space(pc))
+    if ( (object = search_read_only_space(pc)) )
 	;
-    else if (object = search_static_space(pc))
+    else if ( (object = search_static_space(pc)) )
 	;
     else
 	object = search_dynamic_space(pc);

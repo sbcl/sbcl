@@ -19,7 +19,8 @@ all: sbcl sbcl.nm
 # from CMU CL. It's presumably to work around some optimizer bug in gcc,
 # but the fork was a long time ago, and the optimizer could easily
 # have been fixed since then. Try doing without it.
-CFLAGS =  -g -Wall -O2 -fno-strength-reduce -DGENCGC
+# CFLAGS =  -g -Wall -O2 -fno-strength-reduce -DGENCGC
+CFLAGS =  -g -Wall -O3 -DGENCGC
 ASFLAGS = -g -DGENCGC
 DEPEND_FLAGS =
 CPPFLAGS = -I.

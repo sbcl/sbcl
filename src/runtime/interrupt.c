@@ -220,7 +220,7 @@ void
 interrupt_internal_error(int signal, siginfo_t *info, os_context_t *context,
 			 boolean continuable)
 {
-    lispobj context_sap;
+    lispobj context_sap = 0;
 
     fake_foreign_function_call(context);
 
@@ -257,7 +257,9 @@ interrupt_internal_error(int signal, siginfo_t *info, os_context_t *context,
 void
 interrupt_handle_pending(os_context_t *context)
 {
+#ifndef __i386__
     boolean were_in_lisp = !foreign_function_call_active;
+#endif
 
     SetSymbolValue(INTERRUPT_PENDING, NIL);
 
@@ -302,7 +304,9 @@ void
 interrupt_handle_now(int signal, siginfo_t *info, void *void_context)
 {
     os_context_t *context = (os_context_t*)void_context;
-    int were_in_lisp;
+#ifndef __i386__
+    boolean were_in_lisp;
+#endif
     union interrupt_handler handler;
 
 #ifdef __linux__
@@ -315,8 +319,8 @@ interrupt_handle_now(int signal, siginfo_t *info, void *void_context)
 	return;
     }
 
-    were_in_lisp = !foreign_function_call_active;
 #ifndef __i386__
+    were_in_lisp = !foreign_function_call_active;
     if (were_in_lisp)
 #endif
     {

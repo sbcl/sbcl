@@ -236,7 +236,7 @@ static void search_cmd(char **ptr)
 
 static void call_cmd(char **ptr)
 {
-    lispobj thing = parse_lispobj(ptr), function, result, cons, args[3];
+    lispobj thing = parse_lispobj(ptr), function, result = 0, cons, args[3];
     int numargs;
 
     if (LowtagOf(thing) == type_OtherPointer) {

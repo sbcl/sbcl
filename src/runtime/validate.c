@@ -24,7 +24,7 @@ static void ensure_space(lispobj *start, unsigned long size)
 {
     if (os_validate((os_vm_address_t)start,(os_vm_size_t)size)==NULL) {
 	fprintf(stderr,
-		"ensure_space: failed to validate %ld bytes at 0x%08X\n",
+		"ensure_space: failed to validate %ld bytes at 0x%08lx\n",
 		size,
 		(unsigned long)start);
 	exit(1);
@@ -59,11 +59,11 @@ void validate(void)
 	fflush(stdout);
 #endif
 
-	ensure_space(READ_ONLY_SPACE_START, READ_ONLY_SPACE_SIZE);
-	ensure_space(STATIC_SPACE_START   , STATIC_SPACE_SIZE);
-	ensure_space(DYNAMIC_SPACE_START  , DYNAMIC_SPACE_SIZE);
-	ensure_space(CONTROL_STACK_START  , CONTROL_STACK_SIZE);
-	ensure_space(BINDING_STACK_START  , BINDING_STACK_SIZE);
+	ensure_space( (lispobj *)READ_ONLY_SPACE_START, READ_ONLY_SPACE_SIZE);
+	ensure_space( (lispobj *)STATIC_SPACE_START   , STATIC_SPACE_SIZE);
+	ensure_space( (lispobj *)DYNAMIC_SPACE_START  , DYNAMIC_SPACE_SIZE);
+	ensure_space( (lispobj *)CONTROL_STACK_START  , CONTROL_STACK_SIZE);
+	ensure_space( (lispobj *)BINDING_STACK_START  , BINDING_STACK_SIZE);
 
 #ifdef HOLES
 	make_holes();

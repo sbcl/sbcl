@@ -51,7 +51,8 @@
 
 static void sigint_handler(int signal, siginfo_t *info, void *void_context)
 {
-    printf("\nSIGINT hit at 0x%08lX\n", *os_context_pc_addr(void_context));
+    printf("\nSIGINT hit at 0x%08lX\n", 
+	   (unsigned long) *os_context_pc_addr(void_context));
     ldb_monitor();
 }
 
@@ -75,6 +76,7 @@ successful_malloc(size_t size)
     } else {
 	return result;
     }
+    return (void *) NULL; /* dummy value: return something ... */
 }
 
 char *
@@ -185,7 +187,9 @@ main(int argc, char *argv[], char *envp[])
 	char *sbcl_home = getenv("SBCL_HOME");
 	if (sbcl_home) {
 	    char *lookhere;
-	    asprintf(&lookhere, "%s/sbcl.core", sbcl_home);
+	    lookhere = (char *) calloc(strlen("/sbcl.core") + strlen(sbcl_home) + 1,
+					sizeof(char));
+	    sprintf(lookhere, "%s/sbcl.core", sbcl_home);
 	    core = copied_existing_filename_or_null(lookhere);
 	    free(lookhere);
 	} else {
@@ -293,4 +297,6 @@ More information on SBCL is available at <http://sbcl.sourceforge.net/>.
 
     /* initial_function() is not supposed to return. */
     lose("Lisp initial_function gave up control.");
+    return 0; /* dummy value: return something */
 }
+

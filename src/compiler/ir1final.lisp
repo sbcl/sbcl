@@ -12,10 +12,11 @@
 
 (in-package "SB!C")
 
-;;; Give the user grief about optimizations that we weren't able to do. It
-;;; is assumed that they want to hear, or there wouldn't be any entries in the
-;;; table. If the node has been deleted or is no longer a known call, then do
-;;; nothing; some other optimization must have gotten to it.
+;;; Give the user grief about optimizations that we weren't able to
+;;; do. It is assumed that the user wants to hear about this, or there
+;;; wouldn't be any entries in the table. If the node has been deleted
+;;; or is no longer a known call, then do nothing; some other
+;;; optimization must have gotten to it.
 (defun note-failed-optimization (node failures)
   (declare (type combination node) (list failures))
   (unless (or (node-deleted node)
@@ -26,6 +27,12 @@
 	      (note (transform-note (car failure))))
 	  (cond
 	   ((consp what)
+	    ;; FIXME: This sometimes gets too long for a single line, e.g.
+	    ;;   "note: unable to optimize away possible call to FDEFINITION at runtime due to type uncertainty:"
+	    ;; It would be nice to pretty-print it somehow, but how?
+	    ;; ~@<..~:@> adds ~_ directives to the spaces which are in
+	    ;; the format string, but a lot of the spaces where we'd want
+	    ;; to break are in the included ~A string instead.
 	    (compiler-note "unable to ~A because:~%~6T~?"
 			   note (first what) (rest what)))
 	   ((valid-function-use node what

@@ -660,11 +660,11 @@ reset to ~S."
        (let (;; FIXME: The first two bindings here seem wrong,
 	     ;; violating the principle of least surprise, and making
 	     ;; it impossible for the user to do reasonable things
-	     ;; like using PRINT to send output to the program's
-	     ;; ordinary (possibly redirected-to-a-file)
-	     ;; *STANDARD-OUTPUT*, or using PEEK-CHAR or some such
-	     ;; thing on the program's ordinary (possibly also
-	     ;; redirected) *STANDARD-INPUT*.
+	     ;; like using PRINT at the debugger prompt to send output
+	     ;; to the program's ordinary (possibly
+	     ;; redirected-to-a-file) *STANDARD-OUTPUT*, or using
+	     ;; PEEK-CHAR or some such thing on the program's ordinary
+	     ;; (possibly also redirected) *STANDARD-INPUT*.
 	     (*standard-input* *debug-io*)
 	     (*standard-output* *debug-io*)
 	     ;; This seems reasonable: e.g. if the user has redirected
@@ -674,10 +674,11 @@ reset to ~S."
 	     (*error-output* *debug-io*))
 	 (unless (typep condition 'step-condition)
 	   (format *debug-io*
-		   "~%~@<entering the debugger because of ~S~:@_~:@_~
-                   Within the debugger, you can type HELP for help. At ~
-                   any command prompt (inside the debugger or not) you can ~
-                   type (SB-EXT:QUIT) to terminate the SBCL executable.~:@>~2%"
+		   "~%~@<Within the debugger, you can type HELP for help. At ~
+                   any command prompt (within the debugger or not) you can ~
+                   type (SB-EXT:QUIT) to terminate the SBCL executable. ~
+                   The condition which caused the debugger to be entered ~
+                   is bound to ~S.~:@>~2%"
 		   '*debug-condition*)
 	   (show-restarts *debug-restarts* *debug-io*)
 	   (terpri *debug-io*))

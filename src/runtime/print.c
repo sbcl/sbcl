@@ -34,7 +34,7 @@ static int max_lines = 20, cur_lines = 0;
 static int max_depth = 5, brief_depth = 2, cur_depth = 0;
 static int max_length = 5;
 static boolean dont_descend = 0, skip_newline = 0;
-static cur_clock = 0;
+static int cur_clock = 0;
 
 static void print_obj(char *prefix, lispobj obj);
 
@@ -277,7 +277,7 @@ static void print_otherimm(lispobj obj)
             break;
 
         default:
-            printf(": data=%ld", (obj>>8)&0xffffff);
+            printf(": data=%ld", (long) (obj>>8)&0xffffff);
             break;
     }
 }
@@ -334,7 +334,7 @@ static void print_list(lispobj obj)
 static void brief_struct(lispobj obj)
 {
     printf("#<ptr to 0x%08lx instance>",
-           ((struct instance *)PTR(obj))->slots[0]);
+           (unsigned long) ((struct instance *)PTR(obj))->slots[0]);
 }
 
 static void print_struct(lispobj obj)
@@ -461,7 +461,7 @@ static void print_otherptr(lispobj obj)
                 NEWLINE;
                 printf("0x");
                 while (count-- > 0)
-                    printf("%08lx", *--ptr);
+                    printf("%08lx", (unsigned long) *--ptr);
                 break;
 
             case type_Ratio:
@@ -608,9 +608,9 @@ static void print_otherptr(lispobj obj)
             case type_Sap:
                 NEWLINE;
 #ifndef alpha
-                printf("0x%08lx", *ptr);
+                printf("0x%08lx", (unsigned long) *ptr);
 #else
-                printf("0x%016lx", *(long*)(ptr+1));
+                printf("0x%016lx", *(lispobj*)(ptr+1));
 #endif
                 break;
 
@@ -670,7 +670,7 @@ static void print_obj(char *prefix, lispobj obj)
         }
         else
             newline(NULL);
-        printf("%s0x%08lx: ", prefix, obj);
+        printf("%s0x%08lx: ", prefix, (unsigned long) obj);
         if (cur_depth < brief_depth) {
             fputs(lowtag_Names[type], stdout);
             (*verbose_fns[type])(obj);

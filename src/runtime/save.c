@@ -144,7 +144,7 @@ save(char *filename, lispobj init_function)
     gc_alloc_update_page_tables(1,&unboxed_region);
     update_x86_dynamic_space_free_pointer();
 #endif
-    output_space(file, DYNAMIC_SPACE_ID, DYNAMIC_SPACE_START,
+    output_space(file, DYNAMIC_SPACE_ID, (lispobj *)DYNAMIC_SPACE_START,
 		 (lispobj *)SymbolValue(ALLOCATION_POINTER));
 #endif
 
