@@ -283,7 +283,7 @@
 		              (object)
 		      (error 'type-error
 		             :datum object
-		             :expected-type `(simple-array
+		             :expected-type '(simple-array
 					      ,(sb!vm:saetp-specifier saetp)
 					      (*)))))
 		  sb!vm:*specialized-array-element-type-properties*))))

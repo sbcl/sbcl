@@ -339,6 +339,12 @@
   (declare (optimize (safety 3)))
   (assert (raises-error? (elt (list 1 2 3) 3) type-error)))
 
+;;; confusion in the refactoring led to this signalling an unbound
+;;; variable, not a type error.
+(defun svrefalike (x)
+  (svref x 0))
+(assert (raises-error? (svrefalike #*0) type-error))
+
 ;;; checks for uniform bounding index handling under SAFETY 3 code.
 ;;;
 ;;; KLUDGE: not all in one big form because that causes SBCL to spend
