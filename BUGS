@@ -288,10 +288,6 @@ WORKAROUND:
 
 48:
   SYMBOL-MACROLET bugs reported by Peter Van Eynde July 25, 2000:
-	a: (SYMBOL-MACROLET ((T TRUE)) ..) should probably signal
-	   PROGRAM-ERROR, but SBCL accepts it instead.
-	b: SYMBOL-MACROLET should refuse to bind something which is
-	   declared as a global variable, signalling PROGRAM-ERROR.
 	c: SYMBOL-MACROLET should signal PROGRAM-ERROR if something
 	   it binds is declared SPECIAL inside.
 
@@ -622,15 +618,6 @@ WORKAROUND:
   modify nontrivial code which was apparently written incorrectly
   the first time around, until regression tests are written I'm not 
   comfortable merging the patches in the CVS version of SBCL.
-
-102:
-  As reported by Arthur Lemmens sbcl-devel 2001-05-05, ANSI
-  requires that SYMBOL-MACROLET refuse to rebind special variables,
-  but SBCL doesn't do this. (Also as reported by AL in the same
-  message, SBCL depended on this nonconforming behavior to build
-  itself, because of the way that **CURRENT-SEGMENT** was implemented.
-  As of sbcl-0.7.3.x, this dependence on the nonconforming behavior
-  has been fixed, but the nonconforming behavior remains.)
 
 104:
   (DESCRIBE 'SB-ALIEN:DEF-ALIEN-TYPE) reports the macro argument list

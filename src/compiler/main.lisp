@@ -1000,8 +1000,9 @@
 	   (*compiler-error-bailout*
 	    (lambda ()
 	      (convert-and-maybe-compile
-	       `(error "execution of a form compiled with errors:~% ~S"
-		       ',form)
+	       `(error 'simple-program-error
+		 :format-control "execution of a form compiled with errors:~% ~S"
+		 :format-arguments (list ',form))
 	       path)
 	      (throw 'process-toplevel-form-error-abort nil))))
 

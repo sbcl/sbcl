@@ -302,6 +302,9 @@
          (compiler-error
           "The local symbol macro name ~S is not a symbol."
           name))
+       (let ((kind (info :variable :kind name)))
+	 (when (member kind '(:special :constant))
+	   (compiler-error "Attempt to bind a ~(~A~) variable with SYMBOL-MACROLET: ~S" kind name)))
        `(,name . (MACRO . ,expansion))))
    :vars
    definitions

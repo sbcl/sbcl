@@ -428,8 +428,9 @@
 				cont
 				form
 				&optional
-				(proxy ``(error "execution of a form compiled with errors:~% ~S"
-						',,form)))
+				(proxy ``(error 'simple-program-error
+					  :format-control "execution of a form compiled with errors:~% ~S"
+					  :format-arguments (list ',,form))))
 			       &body body)
 			      (let ((skip (gensym "SKIP")))
 				`(block ,skip

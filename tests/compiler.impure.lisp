@@ -160,6 +160,25 @@
    ;; a call to prevent the other arguments from being optimized away
    (logand a1 a2 a3 a4 a5 a6 a7 a8 a9)))
 
+;;; BUG 48a. and b. (symbol-macrolet handling), fixed by Eric Marsden
+;;; and Raymond Toy for CMUCL, fix ported for sbcl-0.7.6.18.
+(multiple-value-bind (function warnings-p failure-p)
+    (compile nil '(lambda () (symbol-macrolet ((t nil)) t)))
+  (assert failure-p)
+  (assert (raises-error? (funcall function) program-error)))
+
+(multiple-value-bind (function warnings-p failure-p)
+    (compile nil '(lambda () (symbol-macrolet ((*standard-input* nil)) *standard-input*)))
+  (assert failure-p)
+  (assert (raises-error? (funcall function) program-error)))
+#|
+BUG 48c, not yet fixed:
+(multiple-value-bind (function warnings-p failure-p)
+    (compile nil '(lambda () (symbol-macrolet ((s nil)) (declare (special s)) s)))
+  (assert failure-p)
+  (assert (raises-error? (funcall function) program-error)))
+|#
+
 ;;;; tests not in the problem domain, but of the consistency of the
 ;;;; compiler machinery itself
 
