@@ -1671,6 +1671,8 @@ changes in sbcl-0.8.0 relative to sbcl-0.7.14
   * fixed bug in MEMBER type: (MEMBER 0.0) is not the same as
     (SINGLE-FLOAT 0.0 0.0), because of the existence of -0.0 which is
     TYPEP the latter but not the former.
+  * compiler issues a full WARNING on calling of an undefined function
+    with a name from the CL package.
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** COPY-ALIST now signals an error if its argument is a dotted
        list;

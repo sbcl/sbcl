@@ -30,6 +30,10 @@
 		  *last-source-form* *last-format-string* *last-format-args*
 		  *last-message-count* *lexenv*))
 
+;;; Whether call of a function which cannot be defined causes a full
+;;; warning.
+(defvar *flame-on-necessarily-undefined-function* nil)
+
 (defvar *check-consistency* nil)
 (defvar *all-components*)
 
@@ -179,14 +183,20 @@
 		(warnings (undefined-warning-warnings undef))
 		(undefined-warning-count (undefined-warning-count undef)))
 	    (dolist (*compiler-error-context* warnings)
-	      (compiler-style-warn "undefined ~(~A~): ~S" kind name))
+              (if #-sb-xc-host (and (eq kind :function)
+                                    (symbolp name) ; FIXME: (SETF CL:fo)
+                                    (eq (symbol-package name) *cl-package*)
+                                    *flame-on-necessarily-undefined-function*)
+                  #+sb-xc-host nil
+                  (compiler-warn "undefined ~(~A~): ~S" kind name)
+                  (compiler-style-warn "undefined ~(~A~): ~S" kind name)))
 	    (let ((warn-count (length warnings)))
 	      (when (and warnings (> undefined-warning-count warn-count))
 		(let ((more (- undefined-warning-count warn-count)))
 		  (compiler-style-warn
 		   "~W more use~:P of undefined ~(~A~) ~S"
 		   more kind name))))))
-	
+
 	(dolist (kind '(:variable :function :type))
 	  (let ((summary (mapcar #'undefined-warning-name
 				 (remove kind undefs :test-not #'eq

@@ -84,5 +84,8 @@ echo //doing warm init
 	;; not wanted by default after build is complete. (And if it's
 	;; wanted, it can easily be turned back on.)
 	#+sb-show (setf sb-int:*/show* nil)
+        ;; The system is complete now, all standard functions are
+        ;; defined.
+        (setq sb-c::*flame-on-necessarily-undefined-function* t)
 	(sb-ext:save-lisp-and-die "output/sbcl.core" :purify t)
 	EOF
