@@ -42,7 +42,7 @@
 (!def-primitive-type fixnum (any-reg signed-reg)
   :type (signed-byte #.(1+ sb!vm:n-positive-fixnum-bits)))
 ;; x86-64 needs a signed-byte-32 for proper handling of c-call return values.
-#!+#.(cl:if (cl:= sb!vm::n-machine-word-bits 64) '(and) '(or x86-64))
+#!+#.(cl:if (cl:= sb!vm::n-machine-word-bits 32) '(and) '(or x86-64))
 (!def-primitive-type signed-byte-32 (signed-reg descriptor-reg)
   :type (signed-byte 32))
 #!+#.(cl:if (cl:= sb!vm::n-machine-word-bits 64) '(and) '(or))
@@ -53,13 +53,17 @@
 
 (/show0 "primtype.lisp 53")
 (!def-primitive-type-alias tagged-num (:or positive-fixnum fixnum))
-(!def-primitive-type-alias unsigned-num (:or unsigned-byte-64
-					     unsigned-byte-63
-					     positive-fixnum))
-(!def-primitive-type-alias signed-num (:or signed-byte-64
-					   fixnum
-					   unsigned-byte-63
-					   positive-fixnum))
+(!def-primitive-type-alias unsigned-num 
+  #!+#.(cl:if (cl:= sb!vm:n-machine-word-bits 64) '(and) '(or))
+  (:or unsigned-byte-64 unsigned-byte-63 positive-fixnum)
+  #!-#.(cl:if (cl:= sb!vm:n-machine-word-bits 64) '(and) '(or))
+  (:or unsigned-byte-32 unsigned-byte-31 positive-fixnum))
+(!def-primitive-type-alias signed-num 
+  #!+#.(cl:if (cl:= sb!vm:n-machine-word-bits 64) '(and) '(or))
+  ;; FIXME: should we not include SIGNED-BYTE-32 for the x86-64?
+  (:or signed-byte-64 unsigned-byte-63 fixnum positive-fixnum)
+  #!-#.(cl:if (cl:= sb!vm:n-machine-word-bits 64) '(and) '(or))
+  (:or signed-byte-32 unsigned-byte-31 fixnum positive-fixnum))
 
 ;;; other primitive immediate types
 (/show0 "primtype.lisp 68")
