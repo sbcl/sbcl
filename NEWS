@@ -1268,6 +1268,7 @@ changes in sbcl-0.7.8 relative to sbcl-0.7.7:
     (thanks to Alexey Dejneka)
   * fixed several bugs in PCL's error checking (thanks to Gerd
     Moellmann)
+  * fixed bug in printing of FILE-ERROR (thanks to Antonio Martinez)
 
 planned incompatible changes in 0.7.x:
 * When the profiling interface settles down, maybe in 0.7.x, maybe

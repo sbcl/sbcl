@@ -582,15 +582,7 @@
   ((pathname :reader file-error-pathname :initarg :pathname))
   (:report
    (lambda (condition stream)
-     (format stream
-	     "~@<error on file ~_~S: ~2I~:_~?~:>"
-	     (file-error-pathname condition)
-	     ;; FIXME: ANSI's FILE-ERROR doesn't have FORMAT-CONTROL and 
-	     ;; FORMAT-ARGUMENTS, and the inheritance here doesn't seem
-	     ;; to give us FORMAT-CONTROL or FORMAT-ARGUMENTS either.
-	     ;; So how does this work?
-	     (serious-condition-format-control condition)
-	     (serious-condition-format-arguments condition)))))
+     (format stream "error on file ~S" (file-error-pathname condition)))))
 
 (define-condition package-error (error)
   ((package :reader package-error-package :initarg :package)))
