@@ -16,6 +16,7 @@ testdir=`pwd`"/filesys-test-$$"
 mkdir $testdir
 echo this is a test > $testdir/test-1.tmp
 echo this is a test > $testdir/test-2.tmp
+echo this is a test > $testdir/wild\?test.tmp
 cd $testdir
 ln -s test-1.tmp link-1
 ln -s `pwd`/test-2.tmp link-2
@@ -29,7 +30,8 @@ expected_truenames=\
    #p\"$testdir/link-5\"\
    #p\"$testdir/link-6\"\
    #p\"$testdir/test-1.tmp\"\
-   #p\"$testdir/test-2.tmp\")"
+   #p\"$testdir/test-2.tmp\"\
+   #p\"$testdir/wild\\\\?test.tmp\")"
 $SBCL <<EOF
   (in-package :cl-user)
   (let* ((directory (directory "./*.*"))

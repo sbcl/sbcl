@@ -1288,9 +1288,6 @@ WORKAROUND:
     (defclass c0 (b) ())
     (make-instance 'c19)
 
-177:
-  (fixed in sbcl-0.7.4.24)
-
 178: "AVER failure compiling confused THEs in FUNCALL"
   In sbcl-0.7.4.24, compiling
     (defun bug178 (x)
@@ -1303,12 +1300,7 @@ WORKAROUND:
       (funcall (the nil x)))
 
 179:
-  Reported by Miles Egan on sbcl-devel 11 June 2002:
-  In sbcl-0.7.4.x, doing
-    $ touch /tmp/bad\*
-    $ sbcl
-    * (directory "/tmp/*")
-  yields an error: "bad place for a wild pathname"
+  (fixed in sbcl-0.7.4.28)
 
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:

@@ -1141,6 +1141,8 @@ changes in sbcl-0.7.5 relative to sbcl-0.7.4:
     to David Lichteblau)
   * bug 175 fixed: more-closely-ANSI CHANGE-CLASS function, now
     accepting initargs. (thanks to Espen Johnsen and Pierre Mai)
+  * bug 179 fixed: DIRECTORY can now deal with filenames with pattern
+    characters in them.
   * bug fix: Structure type predicate functions now check their argument
     count as they should.
   * bug fix: classes with :METACLASS STRUCTURE-CLASS now print

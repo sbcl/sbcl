@@ -266,7 +266,7 @@
   (declare (type pathname name))
   (let* ((stream (open name
 		       :direction :output
-		       :if-exists :new-version
+		       :if-exists :supersede
 		       :element-type 'sb!assem:assembly-unit))
 	 (res (make-fasl-output :stream stream)))
 
@@ -576,9 +576,8 @@
 ;;; this function is not parallel to other functions DUMP-FOO, e.g.
 ;;; DUMP-SYMBOL and DUMP-LIST. The mapping between names and behavior
 ;;; should be made more consistent.
+(declaim (ftype (function (package fasl-output) index) dump-package))
 (defun dump-package (pkg file)
-  (declare (type package pkg) (type fasl-output file))
-  #+nil (declare (values index))
   (declare (inline assoc))
   (cond ((cdr (assoc pkg (fasl-output-packages file) :test #'eq)))
 	(t
@@ -821,8 +820,17 @@
 	;; KLUDGE: What exactly does the (ASH .. -3) stuff do? -- WHN 19990902
 	(simple-bit-vector
 	 (dump-unsigned-vector 1 (ash (+ (the index len) 7) -3)))
+	;; KLUDGE: This isn't the best way of expressing that the host
+	;; may not have specializations for (unsigned-byte 2) and
+	;; (unsigned-byte 4), which means that these types are
+	;; type-equivalent to (simple-array (unsigned-byte 8) (*));
+	;; the workaround is to remove them from the etypecase, since
+	;; they can't be dumped from the cross-compiler anyway. --
+	;; CSR, 2002-05-07
+	#-sb-xc-host
 	((simple-array (unsigned-byte 2) (*))
 	 (dump-unsigned-vector 2 (ash (+ (the index (ash len 1)) 7) -3)))
+	#-sb-xc-host
 	((simple-array (unsigned-byte 4) (*))
 	 (dump-unsigned-vector 4 (ash (+ (the index (ash len 2)) 7) -3)))
 	((simple-array (unsigned-byte 8) (*))

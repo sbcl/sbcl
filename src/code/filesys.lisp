@@ -827,11 +827,11 @@
         (merged-pathname (merge-pathnames pathname
 					  *default-pathname-defaults*)))
     (!enumerate-matches (match merged-pathname)
-      (let ((*ignore-wildcards* t)
-            (truename (truename (if (eq (sb!unix:unix-file-kind match)
-					:directory)
-                                    (concatenate 'string match "/")
-                                    match))))
+      (let* ((*ignore-wildcards* t)
+	     (truename (truename (if (eq (sb!unix:unix-file-kind match)
+					 :directory)
+				     (concatenate 'string match "/")
+				     match))))
         (setf (gethash (namestring truename) truenames)
 	      truename)))
     (mapcar #'cdr

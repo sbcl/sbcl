@@ -124,9 +124,8 @@
 ;;; names a macro or special form, then we error out using the
 ;;; supplied context which indicates what we were trying to do that
 ;;; demanded a function.
+(declaim (ftype (function (t string) global-var) find-free-fun))
 (defun find-free-fun (name context)
-  (declare (string context))
-  #+nil (declare (values global-var))
   (or (let ((old-free-fun (gethash name *free-funs*)))
 	(and (not (invalid-free-fun-p old-free-fun))
 	     old-free-fun))
@@ -171,8 +170,8 @@
 ;;; corresponding value. Otherwise, we make a new leaf using
 ;;; information from the global environment and enter it in
 ;;; *FREE-VARS*. If the variable is unknown, then we emit a warning.
+(declaim (ftype (function (t) (or leaf cons heap-alien-info)) find-free-var))
 (defun find-free-var (name)
-  #+nil (declare (values (or leaf cons heap-alien-info))) ; see FIXME comment
   (unless (symbolp name)
     (compiler-error "Variable name is not a symbol: ~S." name))
   (or (gethash name *free-vars*)
