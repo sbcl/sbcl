@@ -655,10 +655,10 @@
 	 (eq *boot-state* 'complete)
 	 (not (slot-accessor-std-p slotd type)))))
 
-(defmacro instance-read-internal (pv slots pv-offset default &optional type)
-  (unless (member type '(nil :instance :class :default))
-    (error "illegal type argument to ~S: ~S" 'instance-read-internal type))
-  (if (eq type :default)
+(defmacro instance-read-internal (pv slots pv-offset default &optional kind)
+  (unless (member kind '(nil :instance :class :default))
+    (error "illegal kind argument to ~S: ~S" 'instance-read-internal kind))
+  (if (eq kind :default)
       default
       (let* ((index (gensym))
 	     (value index))
@@ -676,11 +676,11 @@
 			   ;; to shut it up.  (see also mail Rudi
 			   ;; Schlatte sbcl-devel 2003-09-21) -- CSR,
 			   ;; 2003-11-30
-			   ,@(when (or (null type) (eq type :instance))
+			   ,@(when (or (null kind) (eq kind :instance))
 			       `((fixnum
 				  (and ,slots ; KLUDGE
 				   (clos-slots-ref ,slots ,index)))))
-			   ,@(when (or (null type) (eq type :class))
+			   ,@(when (or (null kind) (eq kind :class))
 			       `((cons (cdr ,index))))
 			   (t +slot-unbound+)))
 	    (if (eq ,value +slot-unbound+)
@@ -703,21 +703,26 @@
     :instance))
 
 (defmacro instance-write-internal (pv slots pv-offset new-value default
-				      &optional type)
-  (unless (member type '(nil :instance :class :default))
-    (error "illegal type argument to ~S: ~S" 'instance-write-internal type))
-  (if (eq type :default)
+				      &optional kind (type t))
+  (unless (member kind '(nil :instance :class :default))
+    (error "illegal kind argument to ~S: ~S" 'instance-write-internal kind))
+  (if (eq kind :default)
       default
       (let* ((index (gensym)))
 	`(locally (declare #.*optimize-speed*)
 	  (let ((,index (pvref ,pv ,pv-offset)))
 	    (typecase ,index
-	      ,@(when (or (null type) (eq type :instance))
+	      ,@(when (or (null kind) (eq kind :instance))
                   `((fixnum (and ,slots
 			     (setf (clos-slots-ref ,slots ,index)
-				   ,new-value)))))
-	      ,@(when (or (null type) (eq type :class))
-		  `((cons (setf (cdr ,index) ,new-value))))
+				   (locally
+				     (declare (optimize (safety 3)))
+				     (the ,type ,new-value)))))))
+	      ,@(when (or (null kind) (eq kind :class))
+		  `((cons (setf (cdr ,index)
+			   (locally
+			     (declare (optimize (safety 3)))
+			     (the ,type ,new-value))))))
 	      (t ,default)))))))
 
 (defmacro instance-write (pv-offset
@@ -732,7 +737,16 @@
 	,pv-offset ,new-value
 	(accessor-set-slot-value ,parameter ,slot-name ,new-value)
 	,(if (generate-fast-class-slot-access-p class slot-name)
-	     :class :instance))))
+	     :class :instance)
+	,(if (and (eq *boot-state* 'complete)
+		  (constantp class)
+		  (constantp slot-name)
+		  (standard-class-p (eval class))
+		  (not (eq (eval class) *the-class-t*)))
+	     (let ((slotd (find-slot-definition (eval class) (eval slot-name))))
+	       (or (not slotd)
+		   (slot-definition-type slotd)))
+	     t))))
 
 (defmacro instance-writer (pv-offset
 			   parameter
@@ -751,20 +765,20 @@
     :instance))
 
 (defmacro instance-boundp-internal (pv slots pv-offset default
-				       &optional type)
-  (unless (member type '(nil :instance :class :default))
-    (error "illegal type argument to ~S: ~S" 'instance-boundp-internal type))
-  (if (eq type :default)
+				       &optional kind)
+  (unless (member kind '(nil :instance :class :default))
+    (error "illegal kind argument to ~S: ~S" 'instance-boundp-internal kind))
+  (if (eq kind :default)
       default
       (let* ((index (gensym)))
 	`(locally (declare #.*optimize-speed*)
 	  (let ((,index (pvref ,pv ,pv-offset)))
 	    (typecase ,index
-	      ,@(when (or (null type) (eq type :instance))
+	      ,@(when (or (null kind) (eq kind :instance))
 		  `((fixnum (not (and ,slots
                                       (eq (clos-slots-ref ,slots ,index)
                                           +slot-unbound+))))))
-	      ,@(when (or (null type) (eq type :class))
+	      ,@(when (or (null kind) (eq kind :class))
 		  `((cons (not (eq (cdr ,index) +slot-unbound+)))))
 	      (t ,default)))))))
 

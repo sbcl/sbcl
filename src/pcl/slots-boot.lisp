@@ -236,28 +236,51 @@
 (defun make-optimized-std-writer-method-function
     (fsc-p slotd slot-name location)
   (declare #.*optimize-speed*)
-  (set-fun-name
-   (etypecase location
-     (fixnum (if fsc-p
+  (let ((type (or (not slotd) (slot-definition-type slotd))))
+    (set-fun-name
+     (etypecase location
+       (fixnum (if fsc-p
+		   (if (eq type t)
+		       (lambda (nv instance)
+			 (check-obsolete-instance instance)
+			 (setf (clos-slots-ref (fsc-instance-slots instance)
+					       location)
+			       nv))
+		       (lambda (nv instance)
+			 (check-obsolete-instance instance)
+			 (unless (typep nv type)
+			   (error 'type-error :datum nv :expected-type type))
+			 (setf (clos-slots-ref (fsc-instance-slots instance)
+					       location)
+			       nv)))
+		   (if (eq type t)
+		       (lambda (nv instance)
+			 (check-obsolete-instance instance)
+			 (setf (clos-slots-ref (std-instance-slots instance)
+					       location)
+			       nv))
+		       (lambda (nv instance)
+			 (check-obsolete-instance instance)
+			 (unless (typep nv type)
+			   (error 'type-error :datum nv :expected-type type))
+			 (setf (clos-slots-ref (std-instance-slots instance)
+					       location)
+			       nv)))))
+       (cons (if (eq type t)
 		 (lambda (nv instance)
 		   (check-obsolete-instance instance)
-		   (setf (clos-slots-ref (fsc-instance-slots instance)
-					 location)
-			 nv))
+		   (setf (cdr location) nv))
 		 (lambda (nv instance)
 		   (check-obsolete-instance instance)
-		   (setf (clos-slots-ref (std-instance-slots instance)
-					 location)
-			 nv))))
-     (cons (lambda (nv instance)
-	     (check-obsolete-instance instance)
-	     (setf (cdr location) nv)))
-     (null
-      (lambda (nv instance)
-	(declare (ignore nv))
-	(instance-structure-protocol-error slotd
-					   '(setf slot-value-using-class)))))
-   `(writer ,slot-name)))
+		   (unless (typep nv type)
+		     (error 'type-error :datum nv :expected-type type))
+		   (setf (cdr location) nv))))
+       (null
+	(lambda (nv instance)
+	  (declare (ignore nv))
+	  (instance-structure-protocol-error slotd
+					     '(setf slot-value-using-class)))))
+     `(writer ,slot-name))))
 
 (defun make-optimized-std-boundp-method-function
     (fsc-p slotd slot-name location)
@@ -385,24 +408,51 @@
 (defun make-optimized-std-setf-slot-value-using-class-method-function
     (fsc-p slotd)
   (declare #.*optimize-speed*)
-  (let ((location (slot-definition-location slotd)))
+  (let ((location (slot-definition-location slotd))
+	(type (slot-definition-type slotd)))
     (etypecase location
       (fixnum
        (if fsc-p
-	   (lambda (nv class instance slotd)
-	     (declare (ignore class slotd))
-	     (check-obsolete-instance instance)
-	     (setf (clos-slots-ref (fsc-instance-slots instance) location)
-		   nv))
-	   (lambda (nv class instance slotd)
-	     (declare (ignore class slotd))
-	     (check-obsolete-instance instance)
-	     (setf (clos-slots-ref (std-instance-slots instance) location)
-		   nv))))
-      (cons (lambda (nv class instance slotd)
-	      (declare (ignore class slotd))
-	      (check-obsolete-instance instance)
-	      (setf (cdr location) nv)))
+	   (if (eq type t)
+	       (lambda (nv class instance slotd)
+		 (declare (ignore class slotd))
+		 (check-obsolete-instance instance)
+		 (setf (clos-slots-ref (fsc-instance-slots instance) location)
+		       nv))
+	       (lambda (nv class instance slotd)
+		 (declare (ignore class slotd))
+		 (check-obsolete-instance instance)
+		 ;; FIXME: this is going to make a mockery of the
+		 ;; "optimized" bit.  Full call to typep on every slot
+		 ;; write?  Still, let's see if it works...
+		 (unless (typep nv type)
+		   (error 'type-error :datum nv :expected-type type))
+		 (setf (clos-slots-ref (fsc-instance-slots instance) location)
+		       nv)))
+	   (if (eq type t)
+	       (lambda (nv class instance slotd)
+		 (declare (ignore class slotd))
+		 (check-obsolete-instance instance)
+		 (setf (clos-slots-ref (std-instance-slots instance) location)
+		       nv))
+	       (lambda (nv class instance slotd)
+		 (declare (ignore class slotd))
+		 (check-obsolete-instance instance)
+		 (unless (typep nv type)
+		   (error 'type-error :datum nv :expected-type type))
+		 (setf (clos-slots-ref (std-instance-slots instance) location)
+		       nv)))))
+      (cons (if (eq type t)
+		(lambda (nv class instance slotd)
+		  (declare (ignore class slotd))
+		  (check-obsolete-instance instance)
+		  (setf (cdr location) nv))
+		(lambda (nv class instance slotd)
+		  (declare (ignore class slotd))
+		  (check-obsolete-instance instance)
+		  (unless (typep nv type)
+		    (error 'type-error :datum nv :expected-type type))
+		  (setf (cdr location) nv))))
       (null (lambda (nv class instance slotd)
 	      (declare (ignore nv class instance))
 	      (instance-structure-protocol-error
@@ -499,15 +549,32 @@
 
 (defun make-std-writer-method-function (class-name slot-name)
   (let* ((pv-table-symbol (gensym))
+	 (type (or (not (eq *boot-state* 'complete))
+		   (let ((slotd (find-slot-definition (find-class class-name) slot-name)))
+		     (or (not slotd) (slot-definition-type slotd)))))
+	 ;; FIXME: how expensive is this?
+	 (typecheckfun (lambda (nv) (unless (typep nv type)
+				      (error 'type-error
+					     :datum nv :expected-type type))))
 	 (initargs (copy-tree
-		    (make-method-function
-		     (lambda (nv instance)
-		       (pv-binding1 (.pv. .calls.
-					  (symbol-value pv-table-symbol)
-					  (instance) (instance-slots))
-			 (instance-write-internal
-			  .pv. instance-slots 1 nv
-			  (setf (slot-value instance slot-name) nv))))))))
+		    (if (eq type t)
+			(make-method-function
+			 (lambda (nv instance)
+			   (pv-binding1 (.pv. .calls.
+					      (symbol-value pv-table-symbol)
+					      (instance) (instance-slots))
+					(instance-write-internal
+					 .pv. instance-slots 1 nv
+					 (setf (slot-value instance slot-name) nv)))))
+			(make-method-function
+			 (lambda (nv instance)
+			   (funcall typecheckfun nv)
+			   (pv-binding1 (.pv. .calls.
+					      (symbol-value pv-table-symbol)
+					      (instance) (instance-slots))
+					(instance-write-internal
+					 .pv. instance-slots 1 nv
+					 (setf (slot-value instance slot-name) nv)))))))))
     (setf (getf (getf initargs :plist) :slot-name-lists)
 	  (list nil (list nil slot-name)))
     (setf (getf (getf initargs :plist) :pv-table-symbol) pv-table-symbol)

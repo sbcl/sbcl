@@ -179,22 +179,30 @@
 		      (object std-object)
 		      (slotd standard-effective-slot-definition))
   (check-obsolete-instance object)
-  (let ((location (slot-definition-location slotd)))
-    (typecase location
-      (fixnum
-       (cond ((std-instance-p object)
-	      (setf (clos-slots-ref (std-instance-slots object) location)
-		    new-value))
-	     ((fsc-instance-p object)
-	      (setf (clos-slots-ref (fsc-instance-slots object) location)
-		    new-value))
-	     (t (bug "unrecognized instance type in ~S"
-		     '(setf slot-value-using-class)))))
-      (cons
-       (setf (cdr location) new-value))
-      (t
-       (instance-structure-protocol-error slotd
-					  '(setf slot-value-using-class))))))
+  (let ((location (slot-definition-location slotd))
+	(type (slot-definition-type slotd)))
+    (flet ((check (new-value type)
+	     (cond
+	       ((eq type t) new-value)
+	       (t (if (typep new-value type)
+		      new-value
+		      (error 'type-error
+			     :datum new-value :expected-type type))))))
+      (typecase location
+	(fixnum
+	 (cond ((std-instance-p object)
+		(setf (clos-slots-ref (std-instance-slots object) location)
+		      (check new-value type)))
+	       ((fsc-instance-p object)
+		(setf (clos-slots-ref (fsc-instance-slots object) location)
+		      (check new-value type)))
+		(t (bug "unrecognized instance type in ~S"
+			'(setf slot-value-using-class)))))
+	(cons
+	 (setf (cdr location) (check new-value type)))
+	(t
+	 (instance-structure-protocol-error
+	  slotd '(setf slot-value-using-class)))))))
 
 (defmethod slot-boundp-using-class
 	   ((class std-class)

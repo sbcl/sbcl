@@ -1184,9 +1184,10 @@
   (let ((method (get-method generic-function () (list class) nil)))
     (when method (remove-method generic-function method))))
 
-;;; MAKE-READER-METHOD-FUNCTION and MAKE-WRITE-METHOD function are NOT
-;;; part of the standard protocol. They are however useful, PCL makes
-;;; use of them internally and documents them for PCL users.
+;;; MAKE-READER-METHOD-FUNCTION and MAKE-WRITER-METHOD-FUNCTION
+;;; function are NOT part of the standard protocol. They are however
+;;; useful; PCL makes use of them internally and documents them for
+;;; PCL users.  (FIXME: but SBCL certainly doesn't)
 ;;;
 ;;; *** This needs work to make type testing by the writer functions which
 ;;; *** do type testing faster. The idea would be to have one constructor

@@ -493,14 +493,14 @@
 		 ((integerp location)
 		  (not (null (aref slot-vector location))))
 		 (t (bug "Weird location in ~S" 'slot-init-forms))))
-	     (class-init (location type val)
+	     (class-init (location kind val type)
 	       (aver (consp location))
 	       (unless (initializedp location)
-		 (push (list location type val) class-inits)))
-	     (instance-init (location type val)
+		 (push (list location kind val type) class-inits)))
+	     (instance-init (location kind val type)
 	       (aver (integerp location))
 	       (unless (initializedp location)
-		 (setf (aref slot-vector location) (list type val))))
+		 (setf (aref slot-vector location) (list kind val type))))
 	     (default-init-var-name (i)
 	       (let ((ps #(.d0. .d1. .d2. .d3. .d4. .d5.)))
 		 (if (array-in-bounds-p ps i)
@@ -509,16 +509,12 @@
       ;; Loop over supplied initargs and values and record which
       ;; instance and class slots they initialize.
       (loop for (key value) on initargs by #'cddr
-	    as locations = (initarg-locations key) do
-	      (if (constantp value)
-		  (dolist (location locations)
-		    (if (consp location)
-			(class-init location 'constant value)
-			(instance-init location 'constant value)))
-		  (dolist (location locations)
-		      (if (consp location)
-			  (class-init location 'param value)
-			  (instance-init location 'param value)))))
+	    as kind = (if (constantp value) 'constant 'param)
+	    as locations = (initarg-locations key)
+	    do (loop for (location . type) in locations
+		     do (if (consp location)
+			    (class-init location kind value type)
+			    (instance-init location kind value type))))
       ;; Loop over default initargs of the class, recording
       ;; initializations of slots that have not been initialized
       ;; above.  Default initargs which are not in the supplied
@@ -527,27 +523,28 @@
       ;; if not actually used for initializing a slot.
       (loop for (key initfn initform) in default-initargs and i from 0
 	    unless (member key initkeys :test #'eq) do
-	    (let* ((type (if (constantp initform) 'constant 'var))
-		   (init (if (eq type 'var) initfn initform)))
-              (ecase type
+	    (let* ((kind (if (constantp initform) 'constant 'var))
+		   (init (if (eq kind 'var) initfn initform)))
+              (ecase kind
                 (constant
                  (push key defaulting-initargs)
                  (push initform defaulting-initargs))
                 (var
                  (push key defaulting-initargs)
                  (push (default-init-var-name i) defaulting-initargs)))
-	      (when (eq type 'var)
+	      (when (eq kind 'var)
 		(let ((init-var (default-init-var-name i)))
 		  (setq init init-var)
 		  (push (cons init-var initfn) default-inits)))
-	      (dolist (location (initarg-locations key))
-		(if (consp location)
-		    (class-init location type init)
-		    (instance-init location type init)))))
+	      (loop for (location . type) in (initarg-locations key)
+		    do (if (consp location)
+			   (class-init location kind init type)
+			   (instance-init location kind init type)))))
       ;; Loop over all slots of the class, filling in the rest from
       ;; slot initforms.
       (loop for slotd in (class-slots class)
 	    as location = (slot-definition-location slotd)
+	    as type = (slot-definition-type slotd)
 	    as allocation = (slot-definition-allocation slotd)
 	    as initfn = (slot-definition-initfunction slotd)
 	    as initform = (slot-definition-initform slotd) do
@@ -555,45 +552,57 @@
 			  (null initfn)
 			  (initializedp location))
 		(if (constantp initform)
-		    (instance-init location 'initform initform)
-		    (instance-init location 'initform/initfn initfn))))
+		    (instance-init location 'initform initform type)
+		    (instance-init location 'initform/initfn initfn type))))
       ;; Generate the forms for initializing instance and class slots.
       (let ((instance-init-forms
 	     (loop for slot-entry across slot-vector and i from 0
-		   as (type value) = slot-entry collect
-		     (ecase type
+		   as (kind value type) = slot-entry collect
+		     (ecase kind
 		       ((nil)
 			(unless before-method-p
 			  `(setf (clos-slots-ref .slots. ,i) +slot-unbound+)))
 		       ((param var)
-			`(setf (clos-slots-ref .slots. ,i) ,value))
+			`(setf (clos-slots-ref .slots. ,i)
+			       (locally (declare (optimize (safety 3)))
+				 (the ,type ,value))))
 		       (initfn
-			`(setf (clos-slots-ref .slots. ,i) (funcall ,value)))
+			`(setf (clos-slots-ref .slots. ,i)
+			       (locally (declare (optimize (safety 3)))
+				 (the ,type (funcall ,value)))))
 		       (initform/initfn
 			(if before-method-p
 			    `(when (eq (clos-slots-ref .slots. ,i)
 				       +slot-unbound+)
 			       (setf (clos-slots-ref .slots. ,i)
-				     (funcall ,value)))
+				     (locally (declare (optimize (safety 3)))
+				       (the ,type (funcall ,value)))))
 			    `(setf (clos-slots-ref .slots. ,i)
-			           (funcall ,value))))
+			           (locally (declare (optimize (safety 3)))
+				     (the ,type (funcall ,value))))))
 		       (initform
 			(if before-method-p
 			    `(when (eq (clos-slots-ref .slots. ,i)
 				       +slot-unbound+)
 			       (setf (clos-slots-ref .slots. ,i)
-				     ',(eval value)))
+				     (locally (declare (optimize (safety 3)))
+				       (the ,type ',(eval value)))))
 			    `(setf (clos-slots-ref .slots. ,i)
-			           ',(eval value))))
+			           (locally (declare (optimize (safety 3)))
+				     (the ,type ',(eval value))))))
 		       (constant
-			`(setf (clos-slots-ref .slots. ,i) ',(eval value))))))
+			`(setf (clos-slots-ref .slots. ,i)
+			       (locally (declare (optimize (safety 3)))
+				 (the ,type ',(eval value))))))))
 	    (class-init-forms
-	     (loop for (location type value) in class-inits collect
+	     (loop for (location kind value type) in class-inits collect
 		     `(setf (cdr ',location)
-			    ,(ecase type
-			       (constant `',(eval value))
-			       ((param var) `,value)
-			       (initfn `(funcall ,value)))))))
+		            (locally (declare (optimize (safety 3)))
+			      (the ,type 
+				,(ecase kind
+				   (constant `',(eval value))
+				   ((param var) `,value)
+				   (initfn `(funcall ,value)))))))))
 	(multiple-value-bind (vars bindings)
 	    (loop for (var . initfn) in (nreverse default-inits)
 		  collect var into vars
@@ -603,15 +612,18 @@
                   `(,@(delete nil instance-init-forms)
                     ,@class-init-forms)))))))
 
-;;; Return an alist of lists (KEY LOCATION ...) telling, for each
-;;; key in INITKEYS, which locations the initarg initializes.
-;;; CLASS is the class of the instance being initialized.
+;;; Return an alist of lists (KEY (LOCATION . TYPE-SPECIFIER) ...)
+;;; telling, for each key in INITKEYS, which locations the initarg
+;;; initializes and the associated type with the location.  CLASS is
+;;; the class of the instance being initialized.
 (defun compute-initarg-locations (class initkeys)
   (loop with slots = (class-slots class)
 	for key in initkeys collect
 	  (loop for slot in slots
 		if (memq key (slot-definition-initargs slot))
-		  collect (slot-definition-location slot) into locations
+		  collect (cons (slot-definition-location slot)
+				(slot-definition-type slot))
+		          into locations
 		else
 		  collect slot into remaining-slots
 		finally

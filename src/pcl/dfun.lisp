@@ -906,7 +906,11 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
 		    (if (consp method)
 			(eq *the-class-standard-writer-method*
 			    (early-method-class method))
-			(standard-writer-method-p method)))
+			(and
+			 (standard-writer-method-p method)
+			 (eq (slot-definition-type
+			      (accessor-method-slot-definition method))
+			     t))))
 		  methods)
 	   'writer))))
 
@@ -1282,7 +1286,9 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
 			 (find-slot-definition accessor-class slot-name)))))
     (when (and slotd
 	       (or early-p
-		   (slot-accessor-std-p slotd accessor-type)))
+		   (slot-accessor-std-p slotd accessor-type))
+	       (or early-p
+		   (eq (slot-definition-type slotd) t)))
       (values (if early-p
 		  (early-slot-definition-location slotd)
 		  (slot-definition-location slotd))
