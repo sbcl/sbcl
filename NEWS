@@ -1958,6 +1958,8 @@ changes in sbcl-0.8.3 relative to sbcl-0.8.2:
     printable.  (reported by Eric Marsden)
   * bug fix in sb-posix: mmap() now works on systems with a 64-bit
     off_t, including Darwin and FreeBSD.  (thanks to Andreas Fuchs)
+  * bug fix in WITH-TIMEOUT: now the body can have more than one form.
+    (thanks to Stig Sandoe)
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** The system now obeys the constraint imposed by
        UPGRADED-ARRAY-ELEMENT-TYPE that the upgraded array element

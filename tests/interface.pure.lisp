@@ -98,3 +98,9 @@
 
 ;;; DECLARE should not be a special operator
 (assert (not (special-operator-p 'declare)))
+
+;;; WITH-TIMEOUT should accept more than one form in its body.
+(handler-bind ((sb-ext:timeout #'continue))
+  (sb-ext:with-timeout 3
+    (sleep 2)
+    (sleep 2)))

@@ -759,7 +759,7 @@
 			(slot (slot itvo 'it-value) 'tv-usec))
 		which (alien-sap (addr itvn))(alien-sap (addr itvo))))))
 
-(defmacro sb!ext::with-timeout (expires &body body)
+(defmacro sb!ext:with-timeout (expires &body body)
   "Execute the body, interrupting it with a SIGALRM after at least
 EXPIRES seconds have passed.  Uses Unix setitimer(), restoring any
 previous timer after the body has finished executing"
@@ -779,8 +779,8 @@ previous timer after the body has finished executing"
 		   (unix-setitimer :real 0 0 ,s ,u)
 		   ,@body)
 	      (unix-setitimer :real 0 0 ,saved-seconds ,saved-useconds))
-	    ,@body)))))
-
+	    (progn
+	      ,@body))))))
 
 
 (defconstant ENOENT 2) ; Unix error code, "No such file or directory"
