@@ -34,9 +34,11 @@ new_thread_trampoline(struct thread *th)
 {
     lispobj function = th->unbound_marker;
     th->unbound_marker = UNBOUND_MARKER_WIDETAG;
-
-    FSHOW((stderr, "/pausing 0x%lx(%d) before new_thread_trampoline(0x%lx)\n",
-	   (unsigned long)th,getpid(),(unsigned long)function));
+    /* wait here until our thread is linked into all_threads: see below */
+    while(th->pid<1) sched_yield();
+    
+    FSHOW((stderr, "/pausing 0x%lx(%d,%d) before new_thread_trampoline(0x%lx)\n",
+	   (unsigned long)th,th->pid,getpid(),(unsigned long)function));
     if(go==0) {
 	while(go==0) ;
 	FSHOW((stderr, "/continue\n"));
@@ -59,7 +61,8 @@ struct thread *create_thread(lispobj initial_function) {
     union per_thread_data *per_thread;
     struct thread *th=0;	/*  subdue gcc */
     void *spaces=0;
-    
+    pid_t kid_pid;
+
     /* may as well allocate all the spaces at once: it saves us from
      * having to decide what to do if only some of the allocations
      * succeed */
@@ -111,6 +114,7 @@ struct thread *create_thread(lispobj initial_function) {
 	(lispobj*)((void*)th->binding_stack_start+BINDING_STACK_SIZE);
     th->binding_stack_pointer=th->binding_stack_start;
     th->this=th;
+    th->pid=0;
 #ifdef LISP_FEATURE_STACK_GROWS_DOWNWARD_NOT_UPWARD
     th->alien_stack_pointer=((void *)th->alien_stack_start
 			     + ALIEN_STACK_SIZE-4); /* naked 4.  FIXME */
@@ -134,18 +138,19 @@ struct thread *create_thread(lispobj initial_function) {
 #if defined(LISP_FEATURE_X86) && defined (LISP_FEATURE_LINUX)
 
     th->unbound_marker=initial_function;
-    th->pid=
+    kid_pid=
 	clone(new_thread_trampoline,
 	      (((void*)th->control_stack_start)+THREAD_CONTROL_STACK_SIZE-4),
 	      (((getpid()!=parent_pid)?CLONE_PARENT:0)
 	       |CLONE_SIGHAND|CLONE_VM),th);
-    fprintf(stderr,"child pid is %d\n",th->pid);
-    if(th->pid<=0) goto cleanup;
-
+    fprintf(stderr,"child pid is %d\n",kid_pid);
+    if(kid_pid<=0) goto cleanup;
 #else
 #error this stuff presently only works on x86 Linux
 #endif
     all_threads=th;
+    fprintf(stderr,"all_threads,th = 0x%x, 0x%x\n",all_threads,th);
+    th->pid=kid_pid;		/* child will not start until this is set */
     return th;
  cleanup:
     /* if(th && th->tls_cookie>=0) os_free_tls_pointer(th); */

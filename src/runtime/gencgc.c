@@ -4159,8 +4159,11 @@ alloc(int nbytes)
     /* Check for alignment allocation problems. */
     gc_assert((((unsigned)region->free_pointer & 0x7) == 0)
 	      && ((nbytes & 0x7) == 0));
-
-    gc_assert(SymbolValue(PSEUDO_ATOMIC_ATOMIC,th));
+    if(all_threads)
+	/* there are a few places in the C code that allocate data in the
+	 * heap before Lisp starts.  This is before interrupts are enabled,
+	 * so we don't need to check for pseudo-atomic */
+	gc_assert(SymbolValue(PSEUDO_ATOMIC_ATOMIC,th));
 
     /* maybe we can do this quickly ... */
     new_free_pointer = region->free_pointer + nbytes;

@@ -238,7 +238,6 @@ interrupt_internal_error(int signal, siginfo_t *info, os_context_t *context,
     lispobj context_sap = 0;
 
     fake_foreign_function_call(context);
-    describe_internal_error(context);
 
     /* Allocate the SAP object while the interrupts are still
      * disabled. */
@@ -287,7 +286,6 @@ interrupt_handle_pending(os_context_t *context)
     SetSymbolValue(INTERRUPT_PENDING, NIL,thread);
 
     if (maybe_gc_pending) {
-	fprintf(stderr,"gc pending, %d thread waiting\n",thread->pid);
 #ifndef __i386__	
 	if (were_in_lisp)
 #endif

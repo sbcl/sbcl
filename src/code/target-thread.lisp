@@ -15,6 +15,33 @@
 (make-thread #'thread-nnop)
 |#
 
+(defun make-listener-thread (tty-name)
+  (assert (probe-file tty-name))
+  (let* ((in (sb!unix:unix-open (namestring tty-name) sb!unix:o_rdwr #o666))
+	 (out (sb!unix:unix-dup in))
+	 (err (sb!unix:unix-dup in))
+	 (sb!impl::*stdin* 
+	  (sb!sys:make-fd-stream in :input t :buffering :line))
+	 (sb!impl::*stdout* 
+	  (sb!sys:make-fd-stream out :output t :buffering :line))
+	 (sb!impl::*stderr* 
+	  (sb!sys:make-fd-stream err :output t :buffering :line))
+	 (sb!impl::*tty* 
+	  (sb!sys:make-fd-stream err :input t :output t :buffering :line)))
+    (labels ((thread-repl () 
+	       (with-simple-restart 
+		   (destroy-thread
+		    (format nil "~~@<Destroy this thread (~A)~~@:>"
+			    SB!VM::*CURRENT-THREAD*))
+		 (sb!impl::toplevel-repl nil))))
+      (make-thread #'thread-repl))))
+
+#|
+(make-listener-thread "/dev/pts/6")
+
+
+|#
+
 ;;;; mutex and read/write locks, originally inspired by CMUCL multi-proc.lisp
 
 (defun sleep-a-bit (timeout)
