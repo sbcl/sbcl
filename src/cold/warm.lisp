@@ -59,20 +59,6 @@
   (rename-package package
 		  (package-name package)
 		  (cons "SB-C-CALL" (package-nicknames package))))
-
-;;; KLUDGE: This is created here (instead of in package-data-list.lisp-expr)
-;;; because it doesn't have any symbols in it, so even if it's
-;;; present at cold load time, genesis thinks it's unimportant
-;;; and doesn't dump it. There's gotta be a better way, but for now
-;;; I'll just do it here. (As noted below, I'd just as soon have this
-;;; go away entirely, so I'm disinclined to fiddle with it too much.)
-;;; -- WHN 19991206
-;;;
-;;; FIXME: Why do slot accessor names need to be interned anywhere? For
-;;; low-level debugging? Perhaps this should go away, or at least
-;;; be optional, controlled by SB-SHOW or something.
-(defpackage "SB-SLOT-ACCESSOR-NAME"
-  (:use))
 
 ;;;; compiling and loading more of the system
 

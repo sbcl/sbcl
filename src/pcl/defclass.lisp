@@ -111,10 +111,10 @@
 			       *writers-for-this-defclass*)
                      ,@(mapcar (lambda (x)
                                  `(declaim (ftype (function (t) t)
-                                                  ,(slot-reader-symbol x)
-                                                  ,(slot-boundp-symbol x))
+                                                  ,(slot-reader-name x)
+                                                  ,(slot-boundp-name x))
                                            (ftype (function (t t) t)
-                                                  ,(slot-writer-symbol x))))
+                                                  ,(slot-writer-name x))))
                                *slot-names-for-this-defclass*)
 		     (let ,(mapcar #'cdr *initfunctions-for-this-defclass*)
 		       (load-defclass ',name

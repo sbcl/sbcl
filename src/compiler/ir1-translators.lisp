@@ -444,7 +444,7 @@
 			  thing
 			  :debug-name (debug-namify "#'~S" thing)
 			  :allow-debug-catch-tag t)))
-	((setf sb!pcl::class-predicate)
+	((setf sb!pcl::class-predicate sb!pcl::slot-accessor)
 	 (let ((var (find-lexically-apparent-fun
 		     thing "as the argument to FUNCTION")))
 	   (reference-leaf start cont var)))

@@ -39,7 +39,14 @@
 		       (emit-reader/writer-macro :writer 1 nil)))
 		(2 (if class-slot-p
 		       (emit-reader/writer-macro :writer 2 t)
-		       (emit-reader/writer-macro :writer 2 nil))))))
+		       (emit-reader/writer-macro :writer 2 nil)))))
+     (:boundp (ecase 1-or-2-class
+                (1 (if class-slot-p
+                       (emit-reader/writer-macro :boundp 1 t)
+                       (emit-reader/writer-macro :boundp 1 nil)))
+                (2 (if class-slot-p
+                       (emit-reader/writer-macro :boundp 2 t)
+                       (emit-reader/writer-macro :boundp 2 nil))))))
    nil))
 
 (defun emit-one-or-n-index-reader/writer-function
@@ -59,7 +66,14 @@
 		      (emit-one-or-n-index-reader/writer-macro :writer t nil))
 		  (if class-slot-p
 		      (emit-one-or-n-index-reader/writer-macro :writer nil t)
-		      (emit-one-or-n-index-reader/writer-macro :writer nil nil)))))
+		      (emit-one-or-n-index-reader/writer-macro :writer nil nil))))
+     (:boundp (if cached-index-p
+		  (if class-slot-p
+		      (emit-one-or-n-index-reader/writer-macro :boundp t t)
+		      (emit-one-or-n-index-reader/writer-macro :boundp t nil))
+		  (if class-slot-p
+		      (emit-one-or-n-index-reader/writer-macro :boundp nil t)
+		      (emit-one-or-n-index-reader/writer-macro :boundp nil nil)))))
    nil))
 
 (defun emit-checking-or-caching-function (cached-emf-p return-value-p metatypes applyp)

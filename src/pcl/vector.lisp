@@ -1155,52 +1155,24 @@
   (pv-table-lookup pv-table (pv-wrappers-from-pv-args pv-parameters)))
 
 (defun pv-wrappers-from-pv-args (&rest args)
-  (let* ((nkeys (length args))
-	 (pv-wrappers (make-list nkeys))
-	 w
-	 (w-t pv-wrappers))
-    (dolist (arg args)
-      (setq w (wrapper-of arg))
-      (when (invalid-wrapper-p w)
-	(setq w (check-wrapper-validity arg)))
-      (setf (car w-t) w))
-      (setq w-t (cdr w-t))
-      (when (= nkeys 1) (setq pv-wrappers (car pv-wrappers)))
-      pv-wrappers))
+  (let (wrappers)
+    (dolist (arg args (if (cdr wrappers) (nreverse wrappers) (car wrappers)))
+      (let ((wrapper (wrapper-of arg)))
+	(push (if (invalid-wrapper-p wrapper)
+		  (check-wrapper-validity wrapper)
+		  wrapper)
+	      wrappers)))))
 
 (defun pv-wrappers-from-all-args (pv-table args)
-  (let ((nkeys 0)
-	(slot-name-lists (pv-table-slot-name-lists pv-table)))
-    (dolist (sn slot-name-lists)
-      (when sn (incf nkeys)))
-    (let* ((pv-wrappers (make-list nkeys))
-	   (pv-w-t pv-wrappers))
-      (dolist (sn slot-name-lists)
-	(when sn
-	  (let* ((arg (car args))
-		 (w (wrapper-of arg)))
-	    (unless w ; CAN-OPTIMIZE-ACCESS prevents this from happening.
-	      (error "error in PV-WRAPPERS-FROM-ALL-ARGS"))
-	    (setf (car pv-w-t) w)
-	    (setq pv-w-t (cdr pv-w-t))))
-	(setq args (cdr args)))
-      (when (= nkeys 1) (setq pv-wrappers (car pv-wrappers)))
-      pv-wrappers)))
+  (loop for snl in (pv-table-slot-name-lists pv-table) and arg in args
+        when snl
+          collect (wrapper-of arg) into wrappers
+        finally (return (if (cdr wrappers) wrappers (car wrappers)))))
 
+;;; Return the subset of WRAPPERS which is used in the cache
+;;; of PV-TABLE.
 (defun pv-wrappers-from-all-wrappers (pv-table wrappers)
-  (let ((nkeys 0)
-	(slot-name-lists (pv-table-slot-name-lists pv-table)))
-    (dolist (sn slot-name-lists)
-      (when sn (incf nkeys)))
-    (let* ((pv-wrappers (make-list nkeys))
-	   (pv-w-t pv-wrappers))
-      (dolist (sn slot-name-lists)
-	(when sn
-	  (let ((w (car wrappers)))
-	    (unless w ; CAN-OPTIMIZE-ACCESS prevents this from happening.
-	      (error "error in PV-WRAPPERS-FROM-ALL-WRAPPERS"))
-	    (setf (car pv-w-t) w)
-	    (setq pv-w-t (cdr pv-w-t))))
-	(setq wrappers (cdr wrappers)))
-      (when (= nkeys 1) (setq pv-wrappers (car pv-wrappers)))
-      pv-wrappers)))
+  (loop for snl in (pv-table-slot-name-lists pv-table) and w in wrappers
+        when snl
+          collect w into result
+        finally (return (if (cdr result) result (car result)))))

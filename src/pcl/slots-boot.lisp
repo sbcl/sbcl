@@ -23,28 +23,79 @@
 
 (in-package "SB-PCL")
 
-(defmacro asv-funcall (sym slot-name type &rest args)
-  (declare (ignore type))
-  `(if (fboundp ',sym)
-       (,sym ,@args)
-       (no-slot ',sym ',slot-name)))
-
-(defun no-slot (sym slot-name)
-  (error "No class has a slot named ~S (~S has no function binding)."
-	 slot-name sym))
+(defun ensure-accessor (type fun-name slot-name)
+  (labels ((slot-missing-fun (slot-name type)
+	     (let* ((method-type (ecase type
+				   (slot-value 'reader-method)
+				   (setf 'writer-method)
+				   (slot-boundp 'boundp-method)))
+		    (initargs
+		     (copy-tree
+		      (ecase type
+			(slot-value
+			 (make-method-function
+			  (lambda (obj)
+			    (slot-missing (class-of obj) obj slot-name
+					  'slot-value))))
+			(slot-boundp
+			 (make-method-function
+			  (lambda (obj)
+			    (slot-missing (class-of obj) obj slot-name
+					  'slot-boundp))))
+			(setf
+			 (make-method-function
+			  (lambda (val obj)
+			    (declare (ignore val))
+			    (slot-missing (class-of obj) obj slot-name
+					  'setf))))))))
+	       (setf (getf (getf initargs :plist) :slot-name-lists)
+		     (list (list nil slot-name)))
+	       (setf (getf (getf initargs :plist) :pv-table-symbol)
+                     (gensym))
+	       (list* :method-spec (list method-type 'slot-object slot-name)
+                      initargs)))
+	   (add-slot-missing-method (gf slot-name type)
+	     (multiple-value-bind (class lambda-list specializers)
+                 (ecase type
+                   (slot-value
+                    (values 'standard-reader-method
+                            '(object)
+                            (list *the-class-slot-object*)))
+                   (slot-boundp
+                    (values 'standard-boundp-method
+                            '(object)
+                            (list *the-class-slot-object*)))
+                   (setf
+                    (values 'standard-writer-method
+                            '(new-value object)
+                            (list *the-class-t* *the-class-slot-object*))))
+               (add-method gf (make-a-method class
+                                             ()
+                                             lambda-list
+                                             specializers
+                                             (slot-missing-fun slot-name type)
+                                             "generated slot-missing method"
+                                             slot-name)))))
+        (unless (fboundp fun-name)
+      (let ((gf (ensure-generic-function fun-name)))
+        (ecase type
+          (reader (add-slot-missing-method gf slot-name 'slot-value))
+          (boundp (add-slot-missing-method gf slot-name 'slot-boundp))
+          (writer (add-slot-missing-method gf slot-name 'setf)))
+        (setf (plist-value gf 'slot-missing-method) t))
+      t)))
 
 (defmacro accessor-slot-value (object slot-name)
-  (unless (constantp slot-name)
-    (error "~S requires its slot-name argument to be a constant"
-	   'accessor-slot-value))
+  (aver (constantp slot-name))
   (let* ((slot-name (eval slot-name))
-	 (sym (slot-reader-symbol slot-name)))
-    `(asv-funcall ,sym ,slot-name reader ,object)))
+	 (reader-name (slot-reader-name slot-name)))
+    `(let ((.ignore. (load-time-value
+		      (ensure-accessor 'reader ',reader-name ',slot-name))))
+      (declare (ignore .ignore.))
+      (funcall #',reader-name ,object))))
 
 (defmacro accessor-set-slot-value (object slot-name new-value &environment env)
-  (unless (constantp slot-name)
-    (error "~S requires its slot-name argument to be a constant"
-	   'accessor-set-slot-value))
+  (aver (constantp slot-name))
   (setq object (macroexpand object env))
   (setq slot-name (macroexpand slot-name env))
   (let* ((slot-name (eval slot-name))
@@ -52,21 +103,31 @@
 		     (let ((object-var (gensym)))
 		       (prog1 `((,object-var ,object))
 			 (setq object object-var)))))
-	 (sym (slot-writer-symbol slot-name))
-	 (form `(asv-funcall ,sym ,slot-name writer ,new-value ,object)))
+	 (writer-name (slot-writer-name slot-name))
+	 (form
+	  `(let ((.ignore.
+		  (load-time-value
+		   (ensure-accessor 'writer ',writer-name ',slot-name))))
+	    (declare (ignore .ignore.))
+	    (funcall #',writer-name ,new-value ,object))))
     (if bindings
 	`(let ,bindings ,form)
 	form)))
 
 (defmacro accessor-slot-boundp (object slot-name)
-  (unless (constantp slot-name)
-    (error "~S requires its slot-name argument to be a constant"
-	   'accessor-slot-boundp))
-  (let ((slot-name (eval slot-name)))
-    `(slot-boundp-normal ,object ',slot-name)))
+  (aver (constantp slot-name))
+  (let* ((slot-name (eval slot-name))
+	 (boundp-name (slot-boundp-name slot-name)))
+    `(let ((.ignore. (load-time-value
+		      (ensure-accessor 'boundp ',boundp-name ',slot-name))))
+      (declare (ignore .ignore.))
+      (funcall #',boundp-name ,object))))
 
 (defun make-structure-slot-boundp-function (slotd)
-  (lambda (object) (declare (ignore object)) t))
+  (declare (ignore slotd))
+  (lambda (object)
+    (declare (ignore object))
+    t))
 
 (defun get-optimized-std-accessor-method-function (class slotd name)
   (if (structure-class-p class)
@@ -369,22 +430,15 @@
 	   initargs)))
 
 (defun initialize-internal-slot-gfs (slot-name &optional type)
-  (when (or (null type) (eq type 'reader))
-    (let* ((name (slot-reader-symbol slot-name))
-	   (gf (ensure-generic-function name)))
-      (unless (generic-function-methods gf)
-	(add-reader-method *the-class-slot-object* gf slot-name))))
-  (when (or (null type) (eq type 'writer))
-    (let* ((name (slot-writer-symbol slot-name))
-	   (gf (ensure-generic-function name)))
-      (unless (generic-function-methods gf)
-	(add-writer-method *the-class-slot-object* gf slot-name))))
-  nil)
-
-(defun initialize-internal-slot-gfs* (readers writers boundps)
-  (dolist (reader readers)
-    (initialize-internal-slot-gfs reader 'reader))
-  (dolist (writer writers)
-    (initialize-internal-slot-gfs writer 'writer))
-  (dolist (boundp boundps)
-    (initialize-internal-slot-gfs boundp 'boundp)))
+  (macrolet ((frob (type name-fun add-fun)
+	       `(when (or (null type) (eq type ',type))
+		 (let* ((name (,name-fun slot-name))
+			(gf (ensure-generic-function name))
+			(methods (generic-function-methods gf)))
+		   (when (or (null methods)
+			     (plist-value gf 'slot-missing-method))
+		     (setf (plist-value gf 'slot-missing-method) nil)
+		     (,add-fun *the-class-slot-object* gf slot-name))))))
+    (frob reader slot-reader-name add-reader-method)
+    (frob writer slot-writer-name add-writer-method)
+    (frob boundp slot-boundp-name add-boundp-method)))

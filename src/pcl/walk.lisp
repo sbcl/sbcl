@@ -487,10 +487,7 @@
 	(set
 	  (walk-form-internal form :set env))
 	((lambda call)
-	 (cond ((or (symbolp form)
-		    (and (listp form)
-			 (= (length form) 2)
-			 (eq (car form) 'setf)))
+	 (cond ((legal-fun-name-p form)
 		form)
 	       (t (walk-form-internal form context env)))))
       (case (car template)

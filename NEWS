@@ -1551,6 +1551,12 @@ changes in sbcl-0.7.13 relative to sbcl-0.7.12:
   * the compiler is now aware that SYMBOL-FUNCTION returns a FUNCTION
     and that READ-DELIMITED-LIST returns a LIST.  (thanks to Robert
     E. Brown and Tony Martinez respectively)
+  * PCL is now smarter about SLOT-VALUE, (SETF SLOT-VALUE) and
+    SLOT-BOUNDP: in particular, it is now able to optimize them much
+    better, and is now not vulnerable to having packages renamed.
+    Furthermore, a compliance bug has been fixed: SLOT-MISSING is now
+    always called when a slot is not present in an instance.  (thanks
+    to Gerd Moellmann)
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** ARRAY-IN-BOUNDS-P now allows arbitrary integers as arguments,
        not just nonnegative fixnums;

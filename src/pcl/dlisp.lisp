@@ -32,11 +32,17 @@
 (defun emit-one-class-reader (class-slot-p)
   (emit-reader/writer :reader 1 class-slot-p))
 
+(defun emit-one-class-boundp (class-slot-p)
+  (emit-reader/writer :boundp 1 class-slot-p))
+
 (defun emit-one-class-writer (class-slot-p)
   (emit-reader/writer :writer 1 class-slot-p))
 
 (defun emit-two-class-reader (class-slot-p)
   (emit-reader/writer :reader 2 class-slot-p))
+
+(defun emit-two-class-boundp (class-slot-p)
+  (emit-reader/writer :boundp 2 class-slot-p))
 
 (defun emit-two-class-writer (class-slot-p)
   (emit-reader/writer :writer 2 class-slot-p))
@@ -46,11 +52,17 @@
 (defun emit-one-index-readers (class-slot-p)
   (emit-one-or-n-index-reader/writer :reader nil class-slot-p))
 
+(defun emit-one-index-boundps (class-slot-p)
+  (emit-one-or-n-index-reader/writer :boundp nil class-slot-p))
+
 (defun emit-one-index-writers (class-slot-p)
   (emit-one-or-n-index-reader/writer :writer nil class-slot-p))
 
 (defun emit-n-n-readers ()
   (emit-one-or-n-index-reader/writer :reader t nil))
+
+(defun emit-n-n-boundp ()
+  (emit-one-or-n-index-reader/writer :boundp t nil))
 
 (defun emit-n-n-writers ()
   (emit-one-or-n-index-reader/writer :writer t nil))
@@ -75,10 +87,23 @@
 (defvar *precompiling-lap* nil)
 (defvar *emit-function-p* t)
 
+;;; FIXME: This variable is motivated by Gerd Moellman's observation,
+;;; in <867kga1wra.fsf@gerd.free-bsd.org> on cmucl-imp 2002-10-22,
+;;; that the functions returned from EMIT-xxx-FUNCTION can cause an
+;;; order-of-magnitude slowdown.  We include this variable for now,
+;;; but maybe its effect should rather be controlled by compilation
+;;; policy if there is a noticeable space difference between the
+;;; branches, or else maybe the EMIT-xxx-FUNCTION branches should be
+;;; deleted.  It's not clear to me how all of this works, though, so
+;;; until proper benchmarks are done it's probably safest simply to
+;;; have this pseudo-constant to hide code.  -- CSR, 2003-02-14
+(defvar *optimize-cache-functions-p* t)
+
 (defun emit-default-only (metatypes applyp)
-  (when (and (null *precompiling-lap*) *emit-function-p*)
-    (return-from emit-default-only
-      (emit-default-only-function metatypes applyp)))
+  (unless *optimize-cache-functions-p*
+    (when (and (null *precompiling-lap*) *emit-function-p*)
+      (return-from emit-default-only
+	(emit-default-only-function metatypes applyp))))
   (let* ((dlap-lambda-list (make-dlap-lambda-list metatypes applyp))
 	 (args (remove '&rest dlap-lambda-list))
 	 (restl (when applyp '(.lap-rest-arg.))))
@@ -115,19 +140,21 @@
 ;;; FSC-INSTANCE-P returns true on funcallable structures as well as
 ;;; PCL fins.
 (defun emit-reader/writer (reader/writer 1-or-2-class class-slot-p)
-  (when (and (null *precompiling-lap*) *emit-function-p*)
-    (return-from emit-reader/writer
-      (emit-reader/writer-function reader/writer 1-or-2-class class-slot-p)))
+  (unless *optimize-cache-functions-p*
+    (when (and (null *precompiling-lap*) *emit-function-p*)
+      (return-from emit-reader/writer
+	(emit-reader/writer-function
+	 reader/writer 1-or-2-class class-slot-p))))
   (let ((instance nil)
 	(arglist  ())
 	(closure-variables ())
 	(field +first-wrapper-cache-number-index+)
-	(readp (eq reader/writer :reader))
 	(read-form (emit-slot-read-form class-slot-p 'index 'slots)))
     ;;we need some field to do the fast obsolete check
     (ecase reader/writer
-      (:reader (setq instance (dfun-arg-symbol 0)
-		     arglist  (list instance)))
+      ((:reader :boundp)
+       (setq instance (dfun-arg-symbol 0)
+	     arglist  (list instance)))
       (:writer (setq instance (dfun-arg-symbol 1)
 		     arglist  (list (dfun-arg-symbol 0) instance))))
     (ecase 1-or-2-class
@@ -154,11 +181,16 @@
 			   `((eq wrapper wrapper-0))
 			   `((or (eq wrapper wrapper-0)
 				 (eq wrapper wrapper-1)))))
-	    ,@(if readp
-		  `((let ((value ,read-form))
-		      (unless (eq value +slot-unbound+)
-			(return-from access value))))
-		  `((return-from access (setf ,read-form ,(car arglist))))))
+	    ,@(ecase reader/writer
+		(:reader
+		 `((let ((value ,read-form))
+		     (unless (eq value +slot-unbound+)
+		       (return-from access value)))))
+		(:boundp
+		 `((let ((value ,read-form))
+                      (return-from access (not (eq value +slot-unbound+))))))
+		(:writer
+		 `((return-from access (setf ,read-form ,(car arglist)))))))
 	  (funcall miss-fn ,@arglist))))))
 
 (defun emit-slot-read-form (class-slot-p index slots)
@@ -166,29 +198,19 @@
       `(cdr ,index)
       `(clos-slots-ref ,slots ,index)))
 
-(defun emit-slot-write-form (class-slot-p index slots value)
-  (if class-slot-p
-      `(setf (cdr ,index) ,value)
-      `(and ,slots (setf (clos-slots-ref ,slots ,index) ,value))))
-
 (defun emit-boundp-check (value-form miss-fn arglist)
   `(let ((value ,value-form))
      (if (eq value +slot-unbound+)
 	 (funcall ,miss-fn ,@arglist)
 	 value)))
 
-(defun emit-slot-access (reader/writer
-			 class-slot-p
-			 slots
-			 index
-			 miss-fn
-			 arglist)
-  (let ((read-form (emit-slot-read-form class-slot-p index slots))
-        (write-form (emit-slot-write-form
-                     class-slot-p index slots (car arglist))))
+(defun emit-slot-access (reader/writer class-slot-p slots
+			 index miss-fn arglist)
+  (let ((read-form (emit-slot-read-form class-slot-p index slots)))
     (ecase reader/writer
       (:reader (emit-boundp-check read-form miss-fn arglist))
-      (:writer write-form))))
+      (:boundp `(not (eq ,read-form +slot-unbound+)))
+      (:writer `(setf ,read-form ,(car arglist))))))
 
 (defmacro emit-reader/writer-macro (reader/writer 1-or-2-class class-slot-p)
   (let ((*emit-function-p* nil)
@@ -199,14 +221,16 @@
 (defun emit-one-or-n-index-reader/writer (reader/writer
 					  cached-index-p
 					  class-slot-p)
-  (when (and (null *precompiling-lap*) *emit-function-p*)
-    (return-from emit-one-or-n-index-reader/writer
-      (emit-one-or-n-index-reader/writer-function
-       reader/writer cached-index-p class-slot-p)))
+  (unless *optimize-cache-functions-p*
+    (when (and (null *precompiling-lap*) *emit-function-p*)
+      (return-from emit-one-or-n-index-reader/writer
+	(emit-one-or-n-index-reader/writer-function
+	 reader/writer cached-index-p class-slot-p))))
   (multiple-value-bind (arglist metatypes)
       (ecase reader/writer
-	(:reader (values (list (dfun-arg-symbol 0))
-			 '(standard-instance)))
+	((:reader :boundp)
+	 (values (list (dfun-arg-symbol 0))
+		 '(standard-instance)))
 	(:writer (values (list (dfun-arg-symbol 0) (dfun-arg-symbol 1))
 			 '(t standard-instance))))
     (generating-lisp
@@ -237,10 +261,11 @@
 	`(funcall ,miss-fn ,@args ,@restl))))
 
 (defun emit-checking-or-caching (cached-emf-p return-value-p metatypes applyp)
-  (when (and (null *precompiling-lap*) *emit-function-p*)
-    (return-from emit-checking-or-caching
-      (emit-checking-or-caching-function
-       cached-emf-p return-value-p metatypes applyp)))
+  (unless *optimize-cache-functions-p*
+    (when (and (null *precompiling-lap*) *emit-function-p*)
+      (return-from emit-checking-or-caching
+	(emit-checking-or-caching-function
+	 cached-emf-p return-value-p metatypes applyp))))
   (let* ((dlap-lambda-list (make-dlap-lambda-list metatypes applyp))
 	 (args (remove '&rest dlap-lambda-list))
 	 (restl (when applyp '(.lap-rest-arg.))))

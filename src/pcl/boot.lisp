@@ -335,11 +335,6 @@ bootstrapping.
 	    (class-prototype (or (generic-function-method-class gf?)
 				 (find-class 'standard-method)))))))
 
-(defvar *optimize-asv-funcall-p* nil)
-(defvar *asv-readers*)
-(defvar *asv-writers*)
-(defvar *asv-boundps*)
-
 (defun expand-defmethod (name
 			 proto-gf
 			 proto-method
@@ -347,48 +342,43 @@ bootstrapping.
 			 lambda-list
 			 body
 			 env)
-  (let ((*optimize-asv-funcall-p* t)
-	(*asv-readers* nil) (*asv-writers* nil) (*asv-boundps* nil))
-    (multiple-value-bind (method-lambda unspecialized-lambda-list specializers)
-	(add-method-declarations name qualifiers lambda-list body env)
-      (multiple-value-bind (method-function-lambda initargs)
-	  (make-method-lambda proto-gf proto-method method-lambda env)
-	(let ((initargs-form (make-method-initargs-form proto-gf
-							proto-method
-							method-function-lambda
-							initargs
-							env)))
-	  `(progn
-	     ;; Note: We could DECLAIM the ftype of the generic
-	     ;; function here, since ANSI specifies that we create it
-	     ;; if it does not exist. However, I chose not to, because
-	     ;; I think it's more useful to support a style of
-	     ;; programming where every generic function has an
-	     ;; explicit DEFGENERIC and any typos in DEFMETHODs are
-	     ;; warned about. Otherwise
-	     ;;   (DEFGENERIC FOO-BAR-BLETCH ((X T)))
-	     ;;   (DEFMETHOD FOO-BAR-BLETCH ((X HASH-TABLE)) ..)
-	     ;;   (DEFMETHOD FOO-BRA-BLETCH ((X SIMPLE-VECTOR)) ..)
-	     ;;   (DEFMETHOD FOO-BAR-BLETCH ((X VECTOR)) ..)
-	     ;;   (DEFMETHOD FOO-BAR-BLETCH ((X ARRAY)) ..)
-	     ;;   (DEFMETHOD FOO-BAR-BLETCH ((X LIST)) ..)
-	     ;; compiles without raising an error and runs without
-	     ;; raising an error (since SIMPLE-VECTOR cases fall
-	     ;; through to VECTOR) but still doesn't do what was
-	     ;; intended. I hate that kind of bug (code which silently
-	     ;; gives the wrong answer), so we don't do a DECLAIM
-	     ;; here. -- WHN 20000229
-	     ,@(when (or *asv-readers* *asv-writers* *asv-boundps*)
-		 `((initialize-internal-slot-gfs*
-		    ',*asv-readers* ',*asv-writers* ',*asv-boundps*)))
-	     ,(make-defmethod-form name qualifiers specializers
-				   unspecialized-lambda-list
-				   (if proto-method
-				       (class-name (class-of proto-method))
-				       'standard-method)
-				   initargs-form
-				   (getf (getf initargs :plist)
-					 :pv-table-symbol))))))))
+  (multiple-value-bind (method-lambda unspecialized-lambda-list specializers)
+      (add-method-declarations name qualifiers lambda-list body env)
+    (multiple-value-bind (method-function-lambda initargs)
+	(make-method-lambda proto-gf proto-method method-lambda env)
+      (let ((initargs-form (make-method-initargs-form proto-gf
+						      proto-method
+						      method-function-lambda
+						      initargs
+						      env)))
+	`(progn
+	  ;; Note: We could DECLAIM the ftype of the generic function
+	  ;; here, since ANSI specifies that we create it if it does
+	  ;; not exist. However, I chose not to, because I think it's
+	  ;; more useful to support a style of programming where every
+	  ;; generic function has an explicit DEFGENERIC and any typos
+	  ;; in DEFMETHODs are warned about. Otherwise
+	  ;;
+	  ;;   (DEFGENERIC FOO-BAR-BLETCH ((X T)))
+	  ;;   (DEFMETHOD FOO-BAR-BLETCH ((X HASH-TABLE)) ..)
+	  ;;   (DEFMETHOD FOO-BRA-BLETCH ((X SIMPLE-VECTOR)) ..)
+	  ;;   (DEFMETHOD FOO-BAR-BLETCH ((X VECTOR)) ..)
+	  ;;   (DEFMETHOD FOO-BAR-BLETCH ((X ARRAY)) ..)
+	  ;;   (DEFMETHOD FOO-BAR-BLETCH ((X LIST)) ..)
+	  ;;
+	  ;; compiles without raising an error and runs without
+	  ;; raising an error (since SIMPLE-VECTOR cases fall through
+	  ;; to VECTOR) but still doesn't do what was intended. I hate
+	  ;; that kind of bug (code which silently gives the wrong
+	  ;; answer), so we don't do a DECLAIM here. -- WHN 20000229
+	  ,(make-defmethod-form name qualifiers specializers
+				unspecialized-lambda-list
+				(if proto-method
+				    (class-name (class-of proto-method))
+				    'standard-method)
+				initargs-form
+				(getf (getf initargs :plist)
+				      :pv-table-symbol)))))))
 
 (defun interned-symbol-p (x)
   (and (symbolp x) (symbol-package x)))
@@ -1229,13 +1219,6 @@ bootstrapping.
 		   ((generic-function-name-p (car form))
 		    (optimize-generic-function-call
 		     form required-parameters env slots calls))
-		   ((and (eq (car form) 'asv-funcall)
-			 *optimize-asv-funcall-p*)
-		    (case (fourth form)
-		      (reader (push (third form) *asv-readers*))
-		      (writer (push (third form) *asv-writers*))
-		      (boundp (push (third form) *asv-boundps*)))
-		    `(,(second form) ,@(cddddr form)))
 		   (t form))))
 
       (let ((walked-lambda (walk-form method-lambda env #'walk-function)))
@@ -1722,6 +1705,21 @@ bootstrapping.
 	     (let* ((sym (if (atom name) name (cadr name)))
 		    (pkg-list (cons *pcl-package*
 				    (package-use-list *pcl-package*))))
+	       ;; FIXME: given the presence of generalized function
+	       ;; names, this test is broken.  A little
+	       ;; reverse-engineering suggests that this was intended
+	       ;; to prevent precompilation of things on some
+	       ;; PCL-internal automatically-constructed functions
+	       ;; like the old "~A~A standard class ~A reader"
+	       ;; functions.  When the CADR of SB-PCL::SLOT-ACCESSOR
+	       ;; generalized functions was *, this test returned T,
+	       ;; not NIL, and an error was signalled in
+	       ;; MAKE-ACCESSOR-TABLE for (DEFUN FOO (X) (SLOT-VALUE X
+	       ;; 'ASLDKJ)).  Whether the right thing to do is to fix
+	       ;; MAKE-ACCESSOR-TABLE so that it can work in the
+	       ;; presence of slot names that have no classes, or to
+	       ;; restore this test to something more obvious, I don't
+	       ;; know.  -- CSR, 2003-02-14
 	       (and sym (symbolp sym)
 		    (not (null (memq (symbol-package sym) pkg-list)))
 		    (not (find #\space (symbol-name sym))))))))

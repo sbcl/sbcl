@@ -23,29 +23,12 @@
 
 (in-package "SB-PCL")
 
-(defmacro slot-symbol (slot-name type)
-  `(if (and (symbolp ,slot-name) (symbol-package ,slot-name))
-       (or (get ,slot-name ',(ecase type
-			       (reader 'reader-symbol)
-			       (writer 'writer-symbol)
-			       (boundp 'boundp-symbol)))
-	   (intern (format nil "~A ~A slot ~A"
-			   (package-name (symbol-package ,slot-name))
-			   (symbol-name ,slot-name)
-			   ,(symbol-name type))
-		   *slot-accessor-name-package*))
-       (progn
-	 (error "Non-symbol and non-interned symbol slot name accessors~
-		 are not yet implemented.")
-	 ;;(make-symbol (format nil "~A ~A" ,slot-name ,type))
-	 )))
+(defun slot-reader-name (slot-name)
+  (list 'slot-accessor :global slot-name 'reader))
 
-(defun slot-reader-symbol (slot-name)
-  (slot-symbol slot-name reader))
+(defun slot-writer-name (slot-name)
+  (list 'slot-accessor :global slot-name 'writer))
 
-(defun slot-writer-symbol (slot-name)
-  (slot-symbol slot-name writer))
-
-(defun slot-boundp-symbol (slot-name)
-  (slot-symbol slot-name boundp))
+(defun slot-boundp-name (slot-name)
+  (list 'slot-accessor :global slot-name 'boundp))
 

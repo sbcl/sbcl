@@ -302,7 +302,7 @@ And so, we are saved.
 
 (defun accessor-miss-function (gf dfun-info)
   (ecase (dfun-info-accessor-type dfun-info)
-    (reader
+    ((reader boundp)
      (lambda (arg)
        (accessor-miss gf nil arg dfun-info)))
     (writer
@@ -312,7 +312,10 @@ And so, we are saved.
 #-sb-fluid (declaim (sb-ext:freeze-type dfun-info))
 
 (defun make-one-class-accessor-dfun (gf type wrapper index)
-  (let ((emit (if (eq type 'reader) 'emit-one-class-reader 'emit-one-class-writer))
+  (let ((emit (ecase type
+		(reader 'emit-one-class-reader)
+		(boundp 'emit-one-class-boundp)
+		(writer 'emit-one-class-writer)))
 	(dfun-info (one-class-dfun-info type index wrapper)))
     (values
      (funcall (get-dfun-constructor emit (consp index))
@@ -322,7 +325,10 @@ And so, we are saved.
      dfun-info)))
 
 (defun make-two-class-accessor-dfun (gf type w0 w1 index)
-  (let ((emit (if (eq type 'reader) 'emit-two-class-reader 'emit-two-class-writer))
+  (let ((emit (ecase type
+		(reader 'emit-two-class-reader)
+		(boundp 'emit-two-class-boundp)
+		(writer 'emit-two-class-writer)))
 	(dfun-info (two-class-dfun-info type index w0 w1)))
     (values
      (funcall (get-dfun-constructor emit (consp index))
@@ -333,7 +339,10 @@ And so, we are saved.
 
 ;;; std accessors same index dfun
 (defun make-one-index-accessor-dfun (gf type index &optional cache)
-  (let* ((emit (if (eq type 'reader) 'emit-one-index-readers 'emit-one-index-writers))
+  (let* ((emit (ecase type
+		 (reader 'emit-one-index-readers)
+		 (boundp 'emit-one-index-boundps)
+		 (writer 'emit-one-index-writers)))
 	 (cache (or cache (get-cache 1 nil #'one-index-limit-fn 4)))
 	 (dfun-info (one-index-dfun-info type index cache)))
     (declare (type cache cache))
@@ -353,7 +362,10 @@ And so, we are saved.
   (default-limit-fn nlines))
 
 (defun make-n-n-accessor-dfun (gf type &optional cache)
-  (let* ((emit (if (eq type 'reader) 'emit-n-n-readers 'emit-n-n-writers))
+  (let* ((emit (ecase type
+		 (reader 'emit-n-n-readers)
+		 (boundp 'emit-n-n-boundps)
+		 (writer 'emit-n-n-writers)))
 	 (cache (or cache (get-cache 1 t #'n-n-accessors-limit-fn 2)))
 	 (dfun-info (n-n-dfun-info type cache)))
     (declare (type cache cache))
@@ -647,10 +659,19 @@ And so, we are saved.
        (cache-miss-values ,gf ,args ',(cond (caching-p 'caching)
 					    (type 'accessor)
 					    (t 'checking)))
-     (when (and ,applicable (not (memq ,gf *dfun-miss-gfs-on-stack*)))
-       (let ((*dfun-miss-gfs-on-stack* (cons ,gf *dfun-miss-gfs-on-stack*)))
-	 ,@body))
-     (invoke-emf ,nemf ,args)))
+    (when (and ,applicable (not (memq ,gf *dfun-miss-gfs-on-stack*)))
+      (let ((*dfun-miss-gfs-on-stack* (cons ,gf *dfun-miss-gfs-on-stack*)))
+	,@body))
+    ;; Create a FAST-INSTANCE-BOUNDP structure instance for a cached
+    ;; SLOT-BOUNDP so that INVOKE-EMF does the right thing, that is,
+    ;; does not signal a SLOT-UNBOUND error for a boundp test.
+    ,@(if type
+	  ;; FIXME: could the NEMF not be a CONS (for :CLASS-allocated
+	  ;; slots?)
+	  `((if (and (eq ,type 'boundp) (integerp ,nemf))
+		(invoke-emf (make-fast-instance-boundp :index ,nemf) ,args)
+		(invoke-emf ,nemf ,args)))
+	  `((invoke-emf ,nemf ,args)))))
 
 ;;; The dynamically adaptive method lookup algorithm is implemented is
 ;;; implemented as a kind of state machine. The kinds of
@@ -708,6 +729,12 @@ And so, we are saved.
 		  (let* ((class (class-of instance))
 			 (class-name (!bootstrap-get-slot 'class class 'name)))
 		    (!bootstrap-get-slot class-name instance slot-name))))
+      (boundp #'(sb-kernel:instance-lambda (instance)
+		  (let* ((class (class-of instance))
+			 (class-name (!bootstrap-get-slot 'class class 'name)))
+		    (not (eq +slot-unbound+
+			     (!bootstrap-get-slot class-name
+						  instance slot-name))))))
       (writer #'(sb-kernel:instance-lambda (new-value instance)
 		  (let* ((class (class-of instance))
 			 (class-name (!bootstrap-get-slot 'class class 'name)))
@@ -760,6 +787,13 @@ And so, we are saved.
 			(standard-reader-method-p method)))
 		  methods)
 	   'reader)
+	  ((every (lambda (method)
+		    (if (consp method)
+			(eq *the-class-standard-boundp-method*
+			    (early-method-class method))
+			(standard-boundp-method-p method)))
+		  methods)
+	   'boundp)
 	  ((every (lambda (method)
 		    (if (consp method)
 			(eq *the-class-standard-writer-method*
@@ -824,9 +858,11 @@ And so, we are saved.
   (let* ((ostate (type-of dfun-info))
 	 (otype (dfun-info-accessor-type dfun-info))
 	 oindex ow0 ow1 cache
-	 (args (ecase otype			; The congruence rules ensure
-		(reader (list object))		; that this is safe despite not
-		(writer (list new object)))))	; knowing the new type yet.
+	 (args (ecase otype
+		 ;; The congruence rules ensure that this is safe
+		 ;; despite not knowing the new type yet.
+		 ((reader boundp) (list object))
+		 (writer (list new object)))))	
     (dfun-miss (gf args wrappers invalidp nemf ntype nindex)
 
       ;; The following lexical functions change the state of the
@@ -1006,14 +1042,15 @@ And so, we are saved.
   (declare (ignore gf))
   (let* ((accessor-type (gf-info-simple-accessor-type arg-info))
 	 (accessor-class (case accessor-type
-			   (reader (car classes))
-			   (writer (cadr classes))
-			   (boundp (car classes)))))
+			   ((reader boundp) (car classes))
+			   (writer (cadr classes)))))
     (accessor-values-internal accessor-type accessor-class methods)))
 
 (defun accessor-values1 (gf accessor-type accessor-class)
   (let* ((type `(class-eq ,accessor-class))
-	 (types (if (eq accessor-type 'writer) `(t ,type) `(,type)))
+	 (types (ecase accessor-type
+		  ((reader boundp) `(,type))
+		  (writer `(t ,type))))
 	 (methods (compute-applicable-methods-using-types gf types)))
     (accessor-values-internal accessor-type accessor-class methods)))
 
@@ -1072,9 +1109,9 @@ And so, we are saved.
       (let* ((specializers (if (consp method)
 			       (early-method-specializers method t)
 			       (method-specializers method)))
-	     (specl (if (eq type 'reader)
-			(car specializers)
-			(cadr specializers)))
+	     (specl (ecase type
+		      ((reader boundp) (car specializers))
+		      (writer (cadr specializers))))
 	     (specl-cpl (if early-p
 			    (early-class-precedence-list specl)
 			    (and (class-finalized-p specl)

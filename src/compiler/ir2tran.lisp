@@ -1039,9 +1039,11 @@
 	(bug "full call to ~S" fname)))
 
     (when (consp fname)
-      (destructuring-bind (setf stem) fname
-	(aver (eq setf 'setf))
-	(setf (gethash stem *setf-assumed-fboundp*) t)))))
+      (destructuring-bind (setfoid &rest stem) fname
+	(aver (member setfoid
+		      '(setf sb!pcl::class-predicate sb!pcl::slot-accessor)))
+	(when (eq setfoid 'setf)
+	  (setf (gethash (car stem) *setf-assumed-fboundp*) t))))))
 
 ;;; If the call is in a tail recursive position and the return
 ;;; convention is standard, then do a tail full call. If one or fewer
