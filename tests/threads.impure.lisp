@@ -123,21 +123,32 @@
 		     (assert (eql (mutex-value lock) (current-thread-id))))
 		   (assert (not (eql (mutex-value lock) (current-thread-id)))))))
     ;;hold onto lock for long enough that child can't get it immediately
-    (sleep 5))
+    (sleep 20)
+    (interrupt-thread child (lambda () (format t "l ~A~%" (mutex-value lock))))
+    (format t "parent releasing lock~%"))
   (terminate-thread child))
 
 (defun alloc-stuff () (copy-list '(1 2 3 4 5)))
 (let ((c (test-interrupt (lambda () (loop (alloc-stuff))))))
   ;; NB this only works on x86
-  (dotimes (i 100)
+  (dotimes (i 70)
     (sleep (random 1d0))
     (interrupt-thread c
 		      (lambda ()
-			(assert (not SB-KERNEL:*PSEUDO-ATOMIC-ATOMIC*))))))
-  
+			(princ ".") (force-output)
+			(assert (zerop SB-KERNEL:*PSEUDO-ATOMIC-ATOMIC*)))))
+  (terminate-thread c))
+
+;; I'm not sure that this one is always successful.  Note race potential:
+;; I haven't checked if decf is atomic here
+(let ((done 2))
+  (make-thread (lambda () (dotimes (i 100) (sb-ext:gc)) (decf done)))
+  (make-thread (lambda () (dotimes (i 25) (sb-ext:gc :full t)) (decf done)))
+  (loop
+   (when (zerop done) (return))
+   (sleep 1)))
 
 ;; give the other thread time to die before we leave, otherwise the
 ;; overall exit status is 0, not 104
 (sleep 2) 
-
 (sb-ext:quit :unix-status 104)

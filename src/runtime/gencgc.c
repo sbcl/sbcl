@@ -4219,9 +4219,7 @@ alloc(int nbytes)
 	/* set things up so that GC happens when we finish the PA
 	 * section.  */
 	struct interrupt_data *data=th->interrupt_data;
-	os_context_t *context=get_interrupt_context_for_thread(th);
-	maybe_defer_handler
-	    (interrupt_maybe_gc_int,data,0,0,context);
+	maybe_defer_handler(interrupt_maybe_gc_int,data,0,0,0);
     }
     new_obj = gc_alloc_with_region(nbytes,0,region,0);
     return (new_obj);

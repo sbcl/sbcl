@@ -70,6 +70,18 @@ static void store_signal_data_for_later (struct interrupt_data *data,
 extern lispobj all_threads_lock;
 extern int countdown_to_gc;
 
+/*
+ * This is a workaround for some slightly silly Linux/GNU Libc
+ * behaviour: glibc defines sigset_t to support 1024 signals, which to
+ * is more than the kernel.  This is usually not a problem, but
+ * becomes one when we want to save a signal mask from a ucontext, and
+ * restore it later into another ucontext: the ucontext is allocated
+ * on the stack by the kernel, so copying a libc-sized sigset_t into
+ * it will overflow and cause other data on the stack to be
+ * corrupted */
+
+#define REAL_SIGSET_SIZE_BYTES ((NSIG/8))
+
 void sigaddset_blockable(sigset_t *s)
 {
     sigaddset(s, SIGHUP);
@@ -90,7 +102,8 @@ void sigaddset_blockable(sigset_t *s)
     sigaddset(s, SIGUSR1);
     sigaddset(s, SIGUSR2);
 #ifdef LISP_FEATURE_SB_THREAD
-    sigaddset(s, SIG_STOP_FOR_GC);
+    /* don't block STOP_FOR_GC, we need to be able to interrupt threads
+     * for GC purposes even when they are blocked on queues etc */
     sigaddset(s, SIG_INTERRUPT_THREAD);
 #endif
 }
@@ -201,6 +214,10 @@ fake_foreign_function_call(os_context_t *context)
     foreign_function_call_active = 1;
 }
 
+/* blocks all blockable signals.  If you are calling from a signal handler,
+ * the usual signal mask will be restored from the context when the handler 
+ * finishes.  Otherwise, be careful */
+
 void
 undo_fake_foreign_function_call(os_context_t *context)
 {
@@ -274,10 +291,15 @@ interrupt_handle_pending(os_context_t *context)
     data=thread->interrupt_data;
     SetSymbolValue(INTERRUPT_PENDING, NIL,thread);
 
-#if 0
-    memcpy(os_context_sigmask_addr(context), &pending_mask, 
-	   4 /* sizeof(sigset_t) */ );
-#endif
+    /* restore the saved signal mask from the original signal (the
+     * one that interrupted us during the critical section) into the
+     * os_context for the signal we're currently in the handler for.
+     * This should ensure that when we return from the handler the
+     * blocked signals are unblocked */
+
+    memcpy(os_context_sigmask_addr(context), &data->pending_mask, 
+	   REAL_SIGSET_SIZE_BYTES);
+
     sigemptyset(&data->pending_mask);
     /* This will break on sparc linux: the deferred handler really wants
      * to be called with a void_context */
@@ -348,10 +370,13 @@ interrupt_handle_now(int signal, siginfo_t *info, void *void_context)
 	 * be available; should we copy it or was nobody using it anyway?)
 	 * then we should convert this to return-elsewhere */
 
-        /* Allocate the SAPs while the interrupts are still disabled.
-	 * (FIXME: Why? This is the way it was done in CMU CL, and it
-	 * even had the comment noting that this is the way it was
-	 * done, but no motivation..) */
+        /* CMUCL comment said "Allocate the SAPs while the interrupts
+	 * are still disabled.".  I (dan, 2003.08.21) assume this is 
+	 * because we're not in pseudoatomic and allocation shouldn't
+	 * be interrupted.  In which case it's no longer an issue as
+	 * all our allocation from C now goes through a PA wrapper,
+	 * but still, doesn't hurt */
+
         lispobj info_sap,context_sap = alloc_sap(context);
         info_sap = alloc_sap(info);
         /* Allow signals again. */
@@ -413,6 +438,9 @@ maybe_defer_handler(void *handler, struct interrupt_data *data,
         SetSymbolValue(INTERRUPT_PENDING, T,thread);
 	return 1;
     } 
+    /* a slightly confusing test.  arch_pseudo_atomic_atomic() doesn't
+     * actually use its argument for anything on x86, so this branch
+     * may succeed even when context is null (gencgc alloc()) */
     if (
 #ifndef __i386__
 	(!foreign_function_call_active) &&
@@ -433,10 +461,25 @@ store_signal_data_for_later (struct interrupt_data *data, void *handler,
     data->pending_signal = signal;
     if(info)
 	memcpy(&(data->pending_info), info, sizeof(siginfo_t));
-    memcpy(&(data->pending_mask),
-	   os_context_sigmask_addr(context),
-	   sizeof(sigset_t));
-    sigaddset_blockable(os_context_sigmask_addr(context));
+    if(context) {
+	/* the signal mask in the context (from before we were
+	 * interrupted is copied to be restored when
+	 * run_deferred_handler happens.  Then the usually blocked
+	 * signals are added to the context so that we are running
+	 * with blocked signals when the handler returns */
+	sigemptyset(&(data->pending_mask));
+	memcpy(&(data->pending_mask),
+	       os_context_sigmask_addr(context),
+	       REAL_SIGSET_SIZE_BYTES);
+	sigaddset_blockable(os_context_sigmask_addr(context));
+    } else {
+	/* this may be called from gencgc alloc(), in which case there 
+	 * has been no signal and therefore no context. */
+	sigset_t new;
+	sigemptyset(&new);
+	sigaddset_blockable(&new);
+	sigprocmask(SIG_BLOCK,&new,&(data->pending_mask));
+    }
 }
 
 
