@@ -110,10 +110,11 @@
        (:results (result :scs ,scs))
        (:result-types ,element-type)))))
   (def-data-vector-frobs simple-base-string byte-index
-    base-char base-char-reg)
+    character character-reg)
+  (def-data-vector-frobs simple-character-string byte-index
+    character character-reg)
   (def-data-vector-frobs simple-vector word-index
     * descriptor-reg any-reg)
-
   (def-data-vector-frobs simple-array-unsigned-byte-7 byte-index
     positive-fixnum unsigned-reg)
   (def-data-vector-frobs simple-array-unsigned-byte-8 byte-index
@@ -133,7 +134,6 @@
     tagged-num any-reg)
   (def-data-vector-frobs simple-array-signed-byte-32 word-index
     signed-num signed-reg))
-
 
 ;;; Integer vectors whos elements are smaller than a byte.  I.e. bit, 2-bit,
 ;;; and 4-bit vectors.

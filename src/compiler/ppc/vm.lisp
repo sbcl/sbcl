@@ -141,7 +141,7 @@
   ;; The non-descriptor stacks.
   (signed-stack non-descriptor-stack) ; (signed-byte 32)
   (unsigned-stack non-descriptor-stack) ; (unsigned-byte 32)
-  (base-char-stack non-descriptor-stack) ; non-descriptor characters.
+  (character-stack non-descriptor-stack) ; non-descriptor characters.
   (sap-stack non-descriptor-stack) ; System area pointers.
   (single-stack non-descriptor-stack) ; single-floats
   (double-stack non-descriptor-stack
@@ -169,11 +169,11 @@
    :alternate-scs (control-stack))
 
   ;; Non-Descriptor characters
-  (base-char-reg registers
+  (character-reg registers
    :locations #.non-descriptor-regs
    :constant-scs (immediate)
    :save-p t
-   :alternate-scs (base-char-stack))
+   :alternate-scs (character-stack))
 
   ;; Non-Descriptor SAP's (arbitrary pointers into address space)
   (sap-reg registers
@@ -335,8 +335,10 @@
 ;;; occur in the symbol table.  This is ELF, so do nothing.
 
 (defun extern-alien-name (name)
-  (declare (type simple-base-string name))
-  ;; Darwin is non-ELF, and needs a _ prefix
-  #!+darwin (concatenate 'string "_" name)
-  ;; The other (ELF) ports currently don't need any prefix
-  #!-darwin name)
+  (declare (type simple-string name))
+  (coerce
+    ;; Darwin is non-ELF, and needs a _ prefix
+    #!+darwin (concatenate 'string "_" name)
+    ;; The other (ELF) ports currently don't need any prefix
+    #!-darwin name
+    'simple-base-string))

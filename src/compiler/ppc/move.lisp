@@ -17,15 +17,15 @@
        (load-symbol y val))
       (character
        (inst lr y (logior (ash (char-code val) n-widetag-bits)
-			  base-char-widetag))))))
+			  character-widetag))))))
 
 (define-move-fun (load-number 1) (vop x y)
   ((immediate zero)
    (signed-reg unsigned-reg))
   (inst lr y (tn-value x)))
 
-(define-move-fun (load-base-char 1) (vop x y)
-  ((immediate) (base-char-reg))
+(define-move-fun (load-character 1) (vop x y)
+  ((immediate) (character-reg))
   (inst li y (char-code (tn-value x))))
 
 (define-move-fun (load-system-area-pointer 1) (vop x y)
@@ -41,7 +41,7 @@
   (load-stack-tn y x))
 
 (define-move-fun (load-number-stack 5) (vop x y)
-  ((base-char-stack) (base-char-reg)
+  ((character-stack) (character-reg)
    (sap-stack) (sap-reg)
    (signed-stack) (signed-reg)
    (unsigned-stack) (unsigned-reg))
@@ -53,7 +53,7 @@
   (store-stack-tn y x))
 
 (define-move-fun (store-number-stack 5) (vop x y)
-  ((base-char-reg) (base-char-stack)
+  ((character-reg) (character-stack)
    (sap-reg) (sap-stack)
    (signed-reg) (signed-stack)
    (unsigned-reg) (unsigned-stack))
