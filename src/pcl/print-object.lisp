@@ -125,9 +125,8 @@
 (defmethod print-object ((constructor constructor) stream)
   (print-unreadable-object (constructor stream :type t :identity t)
     (format stream
-	    "~S (~S)"
-	    (slot-value-or-default constructor 'name)
-	    (slot-value-or-default constructor 'code-type))))
+	    "~S"
+	    (slot-value-or-default constructor 'name))))
 
 (defmethod print-object ((cache cache) stream)
   (print-unreadable-object (cache stream :type t :identity t)
