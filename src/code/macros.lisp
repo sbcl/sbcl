@@ -369,9 +369,10 @@
 						 ,(or start 0)
 						 ,end)))))
 	 ,@decls
-	 (unwind-protect
-	     (progn ,@forms)
-	   (close ,var)
+	 (multiple-value-prog1
+	     (unwind-protect
+		  (progn ,@forms)
+	       (close ,var))
 	   ,@(when index
 	       `((setf ,index (string-input-stream-current ,var)))))))))
 
