@@ -735,7 +735,11 @@ ptrans_code(lispobj thing)
     pscav_later(&new->debug_info, 1);
 
     /* FIXME: why would this be a fixnum? */
-    if (!(new->trace_table_offset & (EVEN_FIXNUM_LOWTAG|ODD_FIXNUM_LOWTAG)))
+    /* "why" is a hard word, but apparently for compiled functions the
+       trace_table_offset contains the length of the instructions, as
+       a fixnum.  See CODE-INST-AREA-LENGTH in
+       src/compiler/target-disassem.lisp.  -- CSR, 2004-01-08 */
+    if (!(fixnump(new->trace_table_offset)))
 #if 0
 	pscav(&new->trace_table_offset, 1, 0);
 #else

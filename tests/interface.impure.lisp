@@ -35,7 +35,13 @@
 		 "(class-predicate foo) documentation"))
 (assert (string= (documentation #'(sb-pcl::class-predicate foo) 'function)
 		 "(class-predicate foo) documentation"))
+
+;;; DISASSEMBLE shouldn't fail on closures or unpurified functions
+(defun disassemble-fun (x) x)
+(disassemble 'disassemble-fun)
 
+(let ((x 1)) (defun disassemble-closure (y) (if y (setq x y) x)))
+(disassemble 'disassemble-closure)
 
 ;;;; success
 (sb-ext:quit :unix-status 104)

@@ -128,3 +128,7 @@
   (test (* 86400 365) -1/3600 (1 0 0 1 1 1901 1 -1/3600))
   (test (* 86400 365) 0 (0 0 0 1 1 1901 1 0))
   (test (* 86400 365) 1/3600 (59 59 23 31 12 1900 0 1/3600)))
+
+;;; DISASSEMBLE shouldn't fail on purified functions
+(disassemble 'cl:+)
+(disassemble 'sb-ext:run-program)

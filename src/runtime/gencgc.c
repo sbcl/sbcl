@@ -3146,9 +3146,8 @@ verify_space(lispobj *start, size_t words)
 		}
 	    }
 	} else {
-	    if (thing & 0x3) { /* Skip fixnums. FIXME: There should be an
-				* is_fixnum for this. */
-
+	    if (!(fixnump(thing))) { 
+		/* skip fixnums */
 		switch(widetag_of(*start)) {
 
 		    /* boxed objects */
@@ -3195,7 +3194,7 @@ verify_space(lispobj *start, size_t words)
 			     * there's no byte compiler, but I've got
 			     * too much to worry about right now to try
 			     * to make sure. -- WHN 2001-10-06 */
-			    && !(code->trace_table_offset & 0x3)
+			    && fixnump(code->trace_table_offset)
 			    /* Only when enabled */
 			    && verify_dynamic_code_check) {
 			    FSHOW((stderr,
