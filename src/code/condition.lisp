@@ -875,10 +875,6 @@
               mailing lists, which you can find at ~
               <http://sbcl.sourceforge.net/>.~:@>"
 	     '((fmakunbound 'compile))))))
-(defun bug (format-control &rest format-arguments)
-  (error 'bug
-	 :format-control format-control
-	 :format-arguments format-arguments))
 
 ;;; a condition for use in stubs for operations which aren't supported
 ;;; on some platforms
