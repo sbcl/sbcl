@@ -262,8 +262,8 @@ function (which would be useful info anyway).
 
 (def!struct (debug-source #-sb-xc-host (:pure t))
   ;; This slot indicates where the definition came from:
-  ;;    :FILE - from a file (COMPILE-FILE)
-  ;;    :LISP - from Lisp (COMPILE)
+  ;;    :FILE - from a file (i.e. COMPILE-FILE)
+  ;;    :LISP - from Lisp (i.e. COMPILE)
   (from (required-argument) :type (member :file :lisp))
   ;; If :FILE, the file name, if :LISP or :STREAM, then a vector of
   ;; the top-level forms. When from COMPILE, form 0 is #'(LAMBDA ...).
@@ -279,7 +279,8 @@ function (which would be useful info anyway).
   (source-root 0 :type index)
   ;; The FILE-POSITIONs of the truly top-level forms read from this
   ;; file (if applicable). The vector element type will be chosen to
-  ;; hold the largest element. May be null to save space.
+  ;; hold the largest element. May be null to save space, or if
+  ;; :DEBUG-SOURCE-FORM is :LISP.
   (start-positions nil :type (or (simple-array * (*)) null))
   ;; If from :LISP, this is the function whose source is form 0.
   (info nil))

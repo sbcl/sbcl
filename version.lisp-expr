@@ -17,4 +17,5 @@
 ;;; but correspond only to CVS tags or snapshots. (And occasionally
 ;;; for internal versions, especially for internal versions off the
 ;;; main CVS branch, it gets hairier, e.g. "0.pre7.14.flaky4.13".)
-"0.pre7.18"
+
+"0.pre7.19"
