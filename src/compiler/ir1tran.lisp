@@ -1828,8 +1828,8 @@
 ;;; define. If the function has been forward referenced, then
 ;;; substitute for the previous references.
 (defun get-defined-fun (name)
-  (let* ((name (proclaim-as-fun-name name))
-	 (found (find-free-function name "shouldn't happen! (defined-fun)")))
+  (proclaim-as-fun-name name)
+  (let ((found (find-free-function name "shouldn't happen! (defined-fun)")))
     (note-name-defined name :function)
     (cond ((not (defined-fun-p found))
 	   (aver (not (info :function :inlinep name)))

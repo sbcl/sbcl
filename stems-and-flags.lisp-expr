@@ -345,23 +345,26 @@
  ;; the target version of "code/defstruct".
  ("src/code/target-defstruct" :not-host)
 
+ ;; defines IR1-ATTRIBUTES macro, needed by proclaim.lisp
+ ("src/compiler/knownfun")
+
  ;; stuff needed by "code/defstruct"
  ("src/code/cross-type" :not-target)
  ("src/compiler/generic/vm-type")
+ ("src/compiler/proclaim")
 
  ;; The DEFSTRUCT machinery needs SB!XC:SUBTYPEP, defined in 
  ;; "code/late-type", and SB!XC:TYPEP, defined in "code/cross-type",
- ;; and SPECIALIZE-ARRAY-TYPE, defined in "compiler/generic/vm-type".
+ ;; and SPECIALIZE-ARRAY-TYPE, defined in "compiler/generic/vm-type",
+ ;; and SB!XC:PROCLAIM, defined in "src/compiler/proclaim"
  ("src/code/defstruct")
 
  ;; ALIEN-VALUE has to be defined as a class (done by DEFSTRUCT
  ;; machinery) before we can set its superclasses here.
  ("src/code/alien-type")
 
- ("src/compiler/knownfun")
-
- ;; needs IR1-ATTRIBUTES macro, defined in knownfun.lisp
- ("src/compiler/proclaim")
+ ;; was here until sbcl-0.pre7.67
+ #+nil ("src/compiler/knownfun")
 
  ;; This needs not just the SB!XC:DEFSTRUCT machinery, but also
  ;; the TYPE= stuff defined in late-type.lisp, and the

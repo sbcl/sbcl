@@ -60,7 +60,7 @@
   ;; all the explicit :CONSTRUCTOR specs, with name defaulted
   (constructors () :type list)
   ;; name of copying function
-  (copier (symbolicate "COPY-" name) :type (or symbol null))
+  (copier-name (symbolicate "COPY-" name) :type (or symbol null))
   ;; name of type predicate
   (predicate-name (symbolicate name "-P") :type (or symbol null))
   ;; the arguments to the :INCLUDE option, or NIL if no included
@@ -404,9 +404,9 @@
 
 ;;; Return a list of forms to create a copier function of a typed DEFSTRUCT.
 (defun typed-copier-definitions (defstruct)
-  (when (dd-copier defstruct)
-    `((setf (fdefinition ',(dd-copier defstruct)) #'copy-seq)
-      (declaim (ftype function ,(dd-copier defstruct))))))
+  (when (dd-copier-name defstruct)
+    `((setf (fdefinition ',(dd-copier-name defstruct)) #'copy-seq)
+      (declaim (ftype function ,(dd-copier-name defstruct))))))
 
 ;;; Return a list of function definitions for accessing and setting the
 ;;; slots of a typed DEFSTRUCT. The functions are proclaimed to be inline,
@@ -461,7 +461,7 @@
       (:copier
        (destructuring-bind (&optional (copier (symbolicate "COPY-" name)))
 	   args
-	 (setf (dd-copier dd) copier)))
+	 (setf (dd-copier-name dd) copier)))
       (:predicate
        (destructuring-bind (&optional (predicate-name (symbolicate name "-P")))
 	   args
@@ -807,9 +807,9 @@
 		  (typep-to-layout object layout))))
       |#
 
-      (when (dd-copier info)
-	(protect-cl (dd-copier info))
-	(setf (symbol-function (dd-copier info))
+      (when (dd-copier-name info)
+	(protect-cl (dd-copier-name info))
+	(setf (symbol-function (dd-copier-name info))
 	      #'(lambda (structure)
 		  (declare (optimize (speed 3) (safety 0)))
 		  (flet ((layout-test (structure)
@@ -911,51 +911,42 @@
 
     (setf (info :type :compiler-layout (dd-name dd)) layout))
 
-  (ecase (dd-type dd)
-    ((vector list funcallable-structure)
-     ;; nothing extra to do in this case
-     )
-    ((structure)
-     (let* ((name (dd-name dd))
-	    (class (sb!xc:find-class name)))
+  (let* ((dd-name (dd-name dd))
+	 (class (sb!xc:find-class dd-name)))
 
-       (let ((copier (dd-copier dd)))
-	 (when copier
-	   (proclaim `(ftype (function (,name) ,name) ,copier))))
+    (let ((copier-name (dd-copier-name dd)))
+      (when copier-name
+	(sb!xc:proclaim `(ftype (function (,dd-name) ,dd-name) ,copier-name))))
 
-       (dolist (dsd (dd-slots dd))
-	 (let* ((accessor-name (dsd-accessor-name dsd)))
-	   (when accessor-name
-	     (multiple-value-bind (reader-designator writer-designator)
-		 (accessor-inline-expansion-designators dd dsd)
-	       (proclaim-as-defstruct-fun-name accessor-name)
-	       (setf (info :function
-			   :inline-expansion-designator
-			   accessor-name)
-		     reader-designator
-		     (info :function :inlinep accessor-name)
-		     :inline)
-	       (unless (dsd-read-only dsd)
-		 (proclaim-as-defstruct-fun-name `(setf ,accessor-name))
-		 (let ((setf-accessor-name `(setf ,accessor-name)))
-		   (setf (info :function
-			       :inline-expansion-designator
-			       setf-accessor-name)
-			 writer-designator
-			 (info :function :inlinep setf-accessor-name)
-			 :inline)))))))
+    (let ((predicate-name (dd-predicate-name dd)))
+      (when predicate-name
+	(sb!xc:proclaim `(ftype (function (t) t) ,predicate-name))))
 
-       ;; FIXME: Couldn't this logic be merged into
-       ;; PROCLAIM-AS-DEFSTRUCT-FUN-NAME?
-       (when (boundp 'sb!c:*free-functions*) ; when compiling
-	 (let ((free-functions sb!c:*free-functions*))
-	   (dolist (slot (dd-slots dd))
-	     (let ((accessor-name (dsd-accessor-name slot)))
-	       (remhash accessor-name free-functions)
-	       (unless (dsd-read-only slot)
-		 (remhash `(setf ,accessor-name) free-functions))))
-	   (remhash (dd-predicate-name dd) free-functions)
-	   (remhash (dd-copier dd) free-functions))))))
+    (dolist (dsd (dd-slots dd))
+      (let* ((accessor-name (dsd-accessor-name dsd))
+	     (dsd-type (dsd-type dsd)))
+	(when accessor-name
+	  (multiple-value-bind (reader-designator writer-designator)
+	      (accessor-inline-expansion-designators dd dsd)
+	    (sb!xc:proclaim `(ftype (function (,dd-name) ,dsd-type)
+				    ,accessor-name))
+	    (setf (info :function
+			:inline-expansion-designator
+			accessor-name)
+		  reader-designator
+		  (info :function :inlinep accessor-name)
+		  :inline)
+	    (unless (dsd-read-only dsd)
+	      (let ((setf-accessor-name `(setf ,accessor-name)))
+		(sb!xc:proclaim
+		 `(ftype (function (,dsd-type ,dd-name) ,dsd-type)
+			 ,setf-accessor-name))
+		(setf (info :function
+			    :inline-expansion-designator
+			    setf-accessor-name)
+		      writer-designator
+		      (info :function :inlinep setf-accessor-name)
+		      :inline))))))))
 
   (values))
 
@@ -1104,7 +1095,7 @@
     (when (defstruct-description-p info)
       (let ((type (dd-name info)))
 	(setf (info :type :compiler-layout type) nil)
-	(undefine-fun-name (dd-copier info))
+	(undefine-fun-name (dd-copier-name info))
 	(undefine-fun-name (dd-predicate-name info))
 	(dolist (slot (dd-slots info))
 	  (let ((fun (dsd-accessor-name slot)))
@@ -1406,21 +1397,6 @@
 	(res (create-boa-constructor defstruct boa creator)))
 
       (res))))
-
-;;;; compiler stuff
-
-;;; This is like PROCLAIM-AS-FUN-NAME, but we also set the kind to
-;;; :DECLARED and blow away any ASSUMED-TYPE. Also, if the thing is a
-;;; slot accessor currently, quietly unaccessorize it. And if there
-;;; are any undefined warnings, we nuke them.
-(defun proclaim-as-defstruct-fun-name (name)
-  (when name
-    (proclaim-as-fun-name name)
-    (note-name-defined name :function)
-    (setf (info :function :where-from name) :declared)
-    (when (info :function :assumed-type name)
-      (setf (info :function :assumed-type name) nil)))
-  (values))
 
 ;;;; finalizing bootstrapping
 

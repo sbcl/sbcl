@@ -554,7 +554,8 @@
       (when (or (atom def) (< (length def) 2))
 	(compiler-error "The ~S definition spec ~S is malformed." context def))
 
-      (let ((name (check-fun-name (first def))))
+      (let ((name (first def)))
+	(check-fun-name name)
 	(names name)
 	(multiple-value-bind (forms decls) (sb!sys:parse-body (cddr def))
 	  (defs `(lambda ,(second def)

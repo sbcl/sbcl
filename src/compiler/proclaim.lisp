@@ -151,9 +151,10 @@
 
 	     ;; Now references to this function shouldn't be warned
 	     ;; about as undefined, since even if we haven't seen a
-	     ;; definition yet, we know one is planned. (But if this
-	     ;; function name was already declared as a structure
-	     ;; accessor, then that was already been taken care of.)
+	     ;; definition yet, we know one is planned. 
+	     ;;
+	     ;; Other consequences of we-know-you're-a-function-now
+	     ;; are appropriate too, e.g. any MACRO-FUNCTION goes away.
 	     (proclaim-as-fun-name name)
 	     (note-name-defined name :function)
 
@@ -174,9 +175,7 @@
        (setq *policy* (process-optimize-decl form *policy*)))
       ((inline notinline maybe-inline)
        (dolist (name args)
-	 ;; (CMU CL did (PROCLAIM-AS-FUN-NAME NAME) here, but that
-	 ;; seems more likely to surprise the user than to help him, so
-	 ;; we don't do it.)
+	 (proclaim-as-fun-name name) ; since implicitly it is a function
 	 (setf (info :function :inlinep name)
 	       (ecase kind
 		 (inline :inline)

@@ -33,12 +33,15 @@
        (compiler-error "Special form is an illegal function name: ~S" name)))
     (t
      (compiler-error "illegal function name: ~S" name)))
-  name)
+  (values))
 
 ;;; Record a new function definition, and check its legality.
-(declaim (ftype (function ((or symbol cons)) t) proclaim-as-fun-name))
 (defun proclaim-as-fun-name (name)
+
+  ;; legal name?
   (check-fun-name name)
+
+  ;; scrubbing old data I: possible collision with old definition
   (when (fboundp name)
     (ecase (info :function :kind name)
       (:function) ; happy case
@@ -47,9 +50,21 @@
        (compiler-style-warning "~S was previously defined as a macro." name)
        (setf (info :function :where-from name) :assumed)
        (clear-info :function :macro-function name))))
+
+  ;; scrubbing old data II: dangling forward references
+  ;;
+  ;; (This could happen if someone does PROCLAIM FTYPE in macroexpansion,
+  ;; which is bad style, or at compile time, e.g. in EVAL-WHEN (:COMPILE)
+  ;; inside something like DEFSTRUCT, in which case it's reasonable style.
+  ;; Either way, it's no longer a free function.)
+  (when (boundp '*free-functions*) ; when compiling
+    (remhash name *free-functions*))
+
+  ;; recording the ordinary case
   (setf (info :function :kind name) :function)
   (note-if-setf-function-and-macro name)
-  name)
+
+  (values))
 
 ;;; This is called to do something about SETF functions that overlap
 ;;; with SETF macros. Perhaps we should interact with the user to see
