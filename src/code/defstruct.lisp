@@ -85,7 +85,7 @@
   ;; classes, CLASS-STRUCTURE-P = NIL)
   ;;
   ;; vector element type
-  (element-type 't)
+  (element-type t)
   ;; T if :NAMED was explicitly specified, NIL otherwise
   (named nil :type boolean)
   ;; any INITIAL-OFFSET option on this direct type
@@ -199,7 +199,7 @@
 			 (funcall #',(farg po) ,x ,s))))
 		    (t nil))))
 	,@(let ((pure (dd-pure defstruct)))
-	    (cond ((eq pure 't)
+	    (cond ((eq pure t)
 		   `((setf (layout-pure (class-layout
 					 (sb!xc:find-class ',name)))
 			   t)))
@@ -491,7 +491,7 @@
 	 (cond ((eq type 'funcallable-structure)
 		(setf (dd-type defstruct) type))
 	       ((member type '(list vector))
-		(setf (dd-element-type defstruct) 't)
+		(setf (dd-element-type defstruct) t)
 		(setf (dd-type defstruct) type))
 	       ((and (consp type) (eq (first type) 'vector))
 		(destructuring-bind (vector vtype) type
@@ -619,7 +619,7 @@
       (setf (dsd-default islot) default))
     (when type-p
       (setf (dsd-type islot)
-	    (if (eq (dsd-type islot) 't)
+	    (if (eq (dsd-type islot) t)
 		type
 		`(and ,(dsd-type islot) ,type))))
     (when ro-p
@@ -1166,7 +1166,7 @@
        (t
 	(dsd-index slot)))
      (cond
-      ((eq rtype 't) object)
+      ((eq rtype t) object)
       (data)
       (t
        `(truly-the (simple-array (unsigned-byte 32) (*))

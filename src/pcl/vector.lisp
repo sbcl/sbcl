@@ -520,7 +520,7 @@
 		     ,parameter)
 		    ,new-value))
 	    (:boundp
-	     'T)))
+	     t)))
 	(let* ((parameter-entry (assq parameter slots))
 	       (slot-entry      (assq slot-name (cdr parameter-entry)))
 	       (position (posq parameter-entry slots))

@@ -1591,7 +1591,7 @@ argument")
     (if function
 	(describe function)
 	(format t "can't figure out the function for this frame"))))
-<
+
 ;;;; debug loop command utilities
 
 (defun read-prompting-maybe (prompt &optional (in *standard-input*)

@@ -466,7 +466,7 @@
 ;;; than the precise result.
 ;;;
 ;;; The return convention seems to be analogous to
-;;; TYPES-INTERSECT. -- WHN 19990910.
+;;; TYPES-EQUAL-OR-INTERSECT. -- WHN 19990910.
 (defun-cached (values-type-union :hash-function type-cache-hash
 				 :hash-bits 8
 				 :default nil
@@ -493,22 +493,19 @@
 		       #'max
 		       (specifier-type 'null)))))
 
-;;; This is like TYPES-INTERSECT, except that it sort of works on
-;;; VALUES types. Note that due to the semantics of
+;;; This is like TYPES-EQUAL-OR-INTERSECT, except that it sort of
+;;; works on VALUES types. Note that due to the semantics of
 ;;; VALUES-TYPE-INTERSECTION, this might return (VALUES T T) when
-;;; there isn't really any intersection (?).
-;;;
-;;; The return convention seems to be analogous to
-;;; TYPES-INTERSECT. -- WHN 19990910.
-(defun values-types-intersect (type1 type2)
+;;; there isn't really any intersection.
+(defun values-types-equal-or-intersect (type1 type2)
   (cond ((or (eq type1 *empty-type*) (eq type2 *empty-type*))
-	 (values 't t))
+	 (values t t))
 	((or (values-type-p type1) (values-type-p type2))
 	 (multiple-value-bind (res win) (values-type-intersection type1 type2)
 	   (values (not (eq res *empty-type*))
 		   win)))
 	(t
-	 (types-intersect type1 type2))))
+	 (types-equal-or-intersect type1 type2))))
 
 ;;; a SUBTYPEP-like operation that can be used on any types, including
 ;;; VALUES types
@@ -522,7 +519,7 @@
   (cond ((eq type2 *wild-type*) (values t t))
 	((eq type1 *wild-type*)
 	 (values (eq type2 *universal-type*) t))
-	((not (values-types-intersect type1 type2))
+	((not (values-types-equal-or-intersect type1 type2))
 	 (values nil t))
 	(t
 	 (if (or (values-type-p type1) (values-type-p type2))
@@ -711,15 +708,15 @@
 	((hairy-type-p type1) type2)
 	(t type1)))
 
-;;; The first value is true unless the types don't intersect. The
-;;; second value is true if the first value is definitely correct. NIL
-;;; is considered to intersect with any type. If T is a subtype of
-;;; either type, then we also return T, T. This way we recognize
-;;; that hairy types might intersect with T.
+;;; a test useful for checking whether a derived type matches a
+;;; declared type
 ;;;
-;;; FIXME: It would be more accurate to call this TYPES-MIGHT-INTERSECT,
-;;; and rename VALUES-TYPES-INTERSECT the same way.
-(defun types-intersect (type1 type2)
+;;; The first value is true unless the types don't intersect and
+;;; aren't equal. The second value is true if the first value is
+;;; definitely correct. NIL is considered to intersect with any type.
+;;; If T is a subtype of either type, then we also return T, T. This
+;;; way we recognize that hairy types might intersect with T.
+(defun types-equal-or-intersect (type1 type2)
   (declare (type ctype type1 type2))
   (if (or (eq type1 *empty-type*) (eq type2 *empty-type*))
       (values t t)
@@ -915,9 +912,9 @@
   (aver (not (hairy-type-p type2))) 
   ;; Besides the old CMU CL assertion above, we also need to avoid
   ;; compound types, else we could get into trouble with
-  ;;   (SUBTYPEP 'T '(OR (SATISFIES FOO) (SATISFIES BAR)))
+  ;;   (SUBTYPEP T '(OR (SATISFIES FOO) (SATISFIES BAR)))
   ;; or
-  ;;   (SUBTYPEP 'T '(AND (SATISFIES FOO) (SATISFIES BAR))).
+  ;;   (SUBTYPEP T '(AND (SATISFIES FOO) (SATISFIES BAR))).
   (aver (not (compound-type-p type2))) 
   ;; Then, since TYPE2 is reasonably tractable, we're good to go.
   (values (eq type1 *empty-type*) t))
@@ -1492,7 +1489,7 @@
       nil))
 
 ;;; Handle the case of type intersection on two numeric types. We use
-;;; TYPES-INTERSECT to throw out the case of types with no
+;;; TYPES-EQUAL-OR-INTERSECT to throw out the case of types with no
 ;;; intersection. If an attribute in TYPE1 is unspecified, then we use
 ;;; TYPE2's attribute, which must be at least as restrictive. If the
 ;;; types intersect, then the only attributes that can be specified
@@ -1804,7 +1801,7 @@
 ;;; subtype of the MEMBER type.
 (!define-type-method (member :complex-subtypep-arg2) (type1 type2)
   (cond ((not (type-enumerable type1)) (values nil t))
-	((types-intersect type1 type2) (values nil nil))
+	((types-equal-or-intersect type1 type2) (values nil nil))
 	(t (values nil t))))
 
 (!define-type-method (member :simple-intersection2) (type1 type2)
@@ -2107,7 +2104,7 @@
 	      (multiple-value-bind (val win) (csubtypep x-type y-type)
 		(unless win (return-from type-difference nil))
 		(when val (return))
-		(when (types-intersect x-type y-type)
+		(when (types-equal-or-intersect x-type y-type)
 		  (return-from type-difference nil))))))
       (let ((y-mem (find-if #'member-type-p y-types)))
 	(when y-mem

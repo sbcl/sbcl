@@ -154,7 +154,7 @@
 	    (cond
 	     ,@(if more (butlast (entries)) (entries))
 	     ,@(when more
-		 `((,(if (zerop min) 't `(>= ,n-supplied ,max))
+		 `((,(if (zerop min) t `(>= ,n-supplied ,max))
 		    ,(let ((n-context (gensym))
 			   (n-count (gensym)))
 		       `(multiple-value-bind (,n-context ,n-count)

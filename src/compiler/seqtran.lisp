@@ -249,7 +249,7 @@
 		     `(if (funcall test e ',(car els))
 			  ',els
 			  ,(frob (cdr els)))
-		     'nil)))
+		     nil)))
 	(frob val)))))
 
 ;;; FIXME: Rewrite this so that these definitions of DELETE, ASSOC, and MEMBER
@@ -279,8 +279,8 @@
       (cond (test
 	     (unless (continuation-function-is test '(eq))
 	       (give-up-ir1-transform)))
-	    ((types-intersect (continuation-type item)
-			      (specifier-type 'number))
+	    ((types-equal-or-intersect (continuation-type item)
+				       (specifier-type 'number))
 	     (give-up-ir1-transform "Item might be a number.")))
       `(,eq-fun item list))))
 
@@ -620,7 +620,7 @@
 						     (- start2 start1))))))
 		    index)
 		   (t nil))
-	     ,(if equalp 'end1 'nil))))))
+	     ,(if equalp 'end1 nil))))))
 
 (dolist (stuff '((string=* not)
 		 (string/=* identity)))

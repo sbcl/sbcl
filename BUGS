@@ -811,13 +811,6 @@ Error in function C::GET-LAMBDA-TO-COMPILE:
   (I haven't tried to investigate this bug enough to guess whether
   there might be any user-level symptoms.)
 
-87:
-  Despite what the manual says, (DECLAIM (SPEED 0)) doesn't cause
-  things to be byte compiled. This seems to be true in cmucl-2.4.19,
-  too: (COMPILE-FILE .. :BYTE-COMPILE T) causes byte-compilation,
-  but ordinary COMPILE-FILE of a file containing (DECLAIM (SPEED 0))
-  does not.
-
 90: 
   a latent cross-compilation/bootstrapping bug: The cross-compilation
   host's CL:CHAR-CODE-LIMIT is used in target code in readtable.lisp
@@ -857,15 +850,33 @@ Error in function C::GET-LAMBDA-TO-COMPILE:
       (:LINUX :X86 :IEEE-FLOATING-POINT :SB-CONSTRAIN-FLOAT-TYPE :SB-TEST
        :SB-INTERPRETER :SB-DOC :UNIX ...) is not of type SYMBOL.
 
-94: 
-  As reported by Christophe Rhodes on sbcl-devel 2001-03-28, the
-  old declaration 
-   (declaim (ftype (function (list list symbol t) list) parse-deftransform))
-  above DEFUN PARSE-DEFTRANSFORM was incorrect. The bad declaration was
-  removed in sbcl-0.6.11.28, but the compiler problem remains: the compiler
-  should've complained about the mismatch between the declaration and the
-  definition, and didn't. (The compiler in cmucl-2.5.1 does detect the 
-  problem and complain.)
+94a: 
+  Inconsistencies between derived and declared VALUES return types for
+  DEFUN aren't checked very well. E.g. the logic which successfully
+  catches problems like
+    (declaim (ftype (function (fixnum) float) foo))
+    (defun foo (x)
+      (declare (type integer x))
+      (values x)) ; wrong return type, detected, gives warning, good!
+  fails to catch
+    (declaim (ftype (function (t) (values t t)) bar))
+    (defun bar (x)
+      (values x)) ; wrong number of return values, no warning, bad!
+  The cause of this is seems to be that (1) the internal function 
+  VALUES-TYPES-EQUAL-OR-INTERSECT used to make the check handles its
+  arguments symmetrically, and (2) when the type checking code was
+  written back when when SBCL's code was still CMU CL, the intent
+  was that this case
+    (declaim (ftype (function (t) t) bar))
+    (defun bar (x)
+      (values x x)) ; wrong number of return values; should give warning?
+  not be warned for, because a two-valued return value is considered
+  to be compatible with callers who expects a single value to be
+  returned. That intent is probably not appropriate for modern ANSI
+  Common Lisp, but fixing this might be complicated because of other
+  divergences between auld-style and new-style handling of
+  multiple-VALUES types. (Some issues related to this were discussed
+  on cmucl-imp at some length sometime in 2000.)
 
 
 KNOWN BUGS RELATED TO THE IR1 INTERPRETER

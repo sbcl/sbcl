@@ -43,7 +43,7 @@
     (cond
       ;; Flush tests whose result is known at compile time.
       ((csubtypep otype std-obj) t)
-      ((not (types-intersect otype std-obj)) nil)
+      ((not (types-equal-or-intersect otype std-obj)) nil)
       (t
        `(typep (sb-kernel:layout-of object) 'sb-pcl::wrapper)))))
 

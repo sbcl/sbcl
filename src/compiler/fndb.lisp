@@ -97,7 +97,7 @@
 
 ;;;; classes
 
-(sb!xc:deftype name-for-class () 't)
+(sb!xc:deftype name-for-class () t)
 (defknown class-name (sb!xc:class) name-for-class (flushable))
 (defknown find-class (name-for-class &optional t lexenv)
   (or sb!xc:class null) ())
@@ -893,7 +893,7 @@
   (movable foldable flushable))
 (defknown (output-stream-p input-stream-p) (stream) boolean
   (movable foldable flushable))
-(defknown close (stream &key (:abort t)) stream ())
+(defknown close (stream &key (:abort t)) (eql t) ())
 
 ;;;; from the "Input/Output" chapter:
 
@@ -919,7 +919,7 @@
 (defknown make-dispatch-macro-character (character &optional t readtable)
   (eql t) ())
 (defknown set-dispatch-macro-character
-  (character character callable &optional readtable) (eql t)
+  (character character callable &optional readtable) function
   (unsafe))
 (defknown get-dispatch-macro-character
   (character character &optional (or readtable null)) callable

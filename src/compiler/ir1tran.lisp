@@ -1596,7 +1596,7 @@
 
   (values))
 
-;;; This is called by IR1-Convert-Hairy-Args when we run into a &REST
+;;; This is called by IR1-CONVERT-HAIRY-ARGS when we run into a &REST
 ;;; or &KEY arg. The arguments are similar to that function, but we
 ;;; split off any &REST arg and pass it in separately. REST is the
 ;;; &REST arg var, or NIL if there is no &REST arg. KEYS is a list of
@@ -1691,29 +1691,30 @@
 ;;; arguments, analyzing the arglist on the way down and generating entry
 ;;; points on the way up.
 ;;;
-;;; Default-Vars is a reversed list of all the argument vars processed so
-;;; far, including supplied-p vars. Default-Vals is a list of the names of the
-;;; Default-Vars.
+;;; Default-Vars is a reversed list of all the argument vars processed
+;;; so far, including supplied-p vars. Default-Vals is a list of the
+;;; names of the Default-Vars.
 ;;;
-;;; Entry-Vars is a reversed list of processed argument vars, excluding
-;;; supplied-p vars. Entry-Vals is a list things that can be evaluated to get
-;;; the values for all the vars from the Entry-Vars. It has the var name for
-;;; each required or optional arg, and has T for each supplied-p arg.
+;;; Entry-Vars is a reversed list of processed argument vars,
+;;; excluding supplied-p vars. Entry-Vals is a list things that can be
+;;; evaluated to get the values for all the vars from the Entry-Vars.
+;;; It has the var name for each required or optional arg, and has T
+;;; for each supplied-p arg.
 ;;;
-;;; Vars is a list of the Lambda-Var structures for arguments that haven't
-;;; been processed yet. Supplied-p-p is true if a supplied-p argument has
-;;; already been processed; only in this case are the Default-XXX and Entry-XXX
-;;; different.
+;;; Vars is a list of the Lambda-Var structures for arguments that
+;;; haven't been processed yet. Supplied-p-p is true if a supplied-p
+;;; argument has already been processed; only in this case are the
+;;; Default-XXX and Entry-XXX different.
 ;;;
-;;; The result at each point is a lambda which should be called by the above
-;;; level to default the remaining arguments and evaluate the body. We cause
-;;; the body to be evaluated by converting it and returning it as the result
-;;; when the recursion bottoms out.
+;;; The result at each point is a lambda which should be called by the
+;;; above level to default the remaining arguments and evaluate the
+;;; body. We cause the body to be evaluated by converting it and
+;;; returning it as the result when the recursion bottoms out.
 ;;;
-;;; Each level in the recursion also adds its entry point function to the
-;;; result Optional-Dispatch. For most arguments, the defaulting function and
-;;; the entry point function will be the same, but when supplied-p args are
-;;; present they may be different.
+;;; Each level in the recursion also adds its entry point function to
+;;; the result Optional-Dispatch. For most arguments, the defaulting
+;;; function and the entry point function will be the same, but when
+;;; supplied-p args are present they may be different.
 ;;;
 ;;; When we run into a &REST or &KEY arg, we punt out to
 ;;; IR1-CONVERT-MORE, which finishes for us in this case.
@@ -1779,9 +1780,9 @@
 				aux-vals cont)))))))
 
 ;;; This function deals with the case where we have to make an
-;;; Optional-Dispatch to represent a lambda. We cons up the result and call
-;;; IR1-Convert-Hairy-Args to do the work. When it is done, we figure out the
-;;; min-args and max-args.
+;;; Optional-Dispatch to represent a lambda. We cons up the result and
+;;; call IR1-Convert-Hairy-Args to do the work. When it is done, we
+;;; figure out the min-args and max-args.
 (defun ir1-convert-hairy-lambda (body vars keyp allowp aux-vars aux-vals cont)
   (declare (list body vars aux-vars aux-vals) (type continuation cont))
   (let ((res (make-optional-dispatch :arglist vars
@@ -2586,7 +2587,7 @@
   (let* ((ctype (values-specifier-type type))
 	 (old-type (or (lexenv-find cont type-restrictions)
 		       *wild-type*))
-	 (intersects (values-types-intersect old-type ctype))
+	 (intersects (values-types-equal-or-intersect old-type ctype))
 	 (int (values-type-intersection old-type ctype))
 	 (new (if intersects int old-type)))
     (when (null (find-uses cont))
@@ -3115,9 +3116,6 @@
      ;; 3.2.2.3 of the spec) but at least as of sbcl-0.6.11, we don't
      ;; keep track of whether the mismatched data came from the same
      ;; compilation unit, so we can't do that. -- WHN 2001-02-11
-     ;;
-     ;; FIXME: Actually, I think we could issue a full WARNING if the
-     ;; new definition contradicts a DECLAIM FTYPE.
      :error-function #'compiler-style-warning
      :warning-function (cond (info #'compiler-style-warning)
 			     (for-real #'compiler-note)

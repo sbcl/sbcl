@@ -384,7 +384,7 @@
 			     (specifier-type
 			      (compute-alien-rep-type
 			       (local-alien-info-type info))))))))
-  'nil)
+  nil)
 
 (deftransform local-alien ((info var) * * :important t)
   (unless (constant-continuation-p info)

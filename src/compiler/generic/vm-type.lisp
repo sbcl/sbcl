@@ -133,8 +133,7 @@
 	  (if (eq eltype *wild-type*)
 	      *wild-type*
 	      (dolist (stype-name *specialized-array-element-types*
-				  ;; FIXME: Use *UNIVERSAL-TYPE* here?
-				  (specifier-type 't))
+				  *universal-type*)
 		;; FIXME: Mightn't it be better to have
 		;; *SPECIALIZED-ARRAY-ELEMENT-TYPES* be stored as precalculated
 		;; SPECIFIER-TYPE results, instead of having to calculate

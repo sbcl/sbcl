@@ -56,7 +56,8 @@
    forms (evaluated at load-time) when the :BYTE-COMPILE argument is :MAYBE
    (the default.)  When true, we decide to byte-compile.")
 
-;;; default value of the :BYTE-COMPILE argument to the compiler
+;;; the value of the :BYTE-COMPILE argument which was passed to the
+;;; compiler
 (defvar *byte-compile* :maybe)
 
 ;;; Bound by COMPILE-COMPONENT to T when byte-compiling, and NIL when
@@ -474,38 +475,52 @@
 (defun byte-compiling ()
   (if (eq *byte-compiling* :maybe)
       (or (eq *byte-compile* t)
+	  ;; FIXME: It's bad to share this expression between this
+	  ;; function and LAMBDA-IS-BYTE-COMPILABLE-P (and who knows
+	  ;; where else?), it should be factored out into some
+	  ;; common function.
 	  (policy nil (and (zerop speed) (<= debug 1))))
       (and *byte-compile* *byte-compiling*)))
 
 ;;; Delete components with no external entry points before we try to
 ;;; generate code. Unreachable closures can cause IR2 conversion to
 ;;; puke on itself, since it is the reference to the closure which
-;;; normally causes the components to be combined. This doesn't really
-;;; cover all cases...
+;;; normally causes the components to be combined.
+;;;
+;;; FIXME: The original CMU CL comment said "This doesn't really cover
+;;; all cases..." That's a little scary.
 (defun delete-if-no-entries (component)
   (dolist (fun (component-lambdas component)
 	       (delete-component component))
     (case (functional-kind fun)
       (:top-level (return))
       (:external
-       (unless (every #'(lambda (ref)
-			  (eq (block-component (node-block ref))
-			      component))
+       (unless (every (lambda (ref)
+			(eq (block-component (node-block ref))
+			    component))
 		      (leaf-refs fun))
 	 (return))))))
 
+(defun lambda-is-byte-compilable-p (lambda)
+  #|
+  (format t "~S SPEED=~S DEBUG=~S~%" ; REMOVEME
+          lambda
+          (policy (lambda-bind lambda) speed)
+          (policy (lambda-bind lambda) debug))
+  |#
+  (policy (lambda-bind lambda)
+	  (and (zerop speed) (<= debug 1))))  
+
+(defun byte-compile-this-component-p (component)
+  (ecase *byte-compile*
+    ((t) t)
+    ((nil) nil)
+    ((:maybe)
+     (every #'lambda-is-byte-compilable-p (component-lambdas component)))))
+
 (defun compile-component (component)
   (let* ((*component-being-compiled* component)
-	 (*byte-compiling*
-	  (ecase *byte-compile*
-	    ((t) t)
-	    ((nil) nil)
-	    (:maybe
-	     (dolist (fun (component-lambdas component) t)
-	       (unless (policy (lambda-bind fun)
-			       (and (zerop speed) (<= debug 1)))
-		 (return nil)))))))
-
+	 (*byte-compiling* (byte-compile-this-component-p component)))
     (when sb!xc:*compile-print*
       (compiler-mumble "~&; ~:[~;byte ~]compiling ~A: "
 		       *byte-compiling*

@@ -1273,7 +1273,8 @@
 	   (error "The dispatch character ~S already exists." char))
 	  (t
 	   (setf (dispatch-tables rt)
-		 (push (cons char (make-char-dispatch-table)) dalist))))))
+		 (push (cons char (make-char-dispatch-table)) dalist)))))
+  t)
 
 (defun set-dispatch-macro-character (disp-char sub-char function
                                                &optional (rt *readtable*))

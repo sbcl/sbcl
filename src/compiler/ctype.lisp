@@ -423,7 +423,8 @@
 			  (values boolean boolean))
 		valid-approximate-type))
 (defun valid-approximate-type (call-type type &optional
-					 (*test-function* #'types-intersect)
+					 (*test-function*
+					  #'types-equal-or-intersect)
 					 (*error-function*
 					  #'compiler-style-warning)
 					 (*warning-function* #'compiler-note))
@@ -730,7 +731,8 @@
 	     (atype (when return
 		      (continuation-asserted-type (return-result return)))))
 	(cond
-	 ((and atype (not (values-types-intersect atype type-returns)))
+	 ((and atype (not (values-types-equal-or-intersect atype
+							   type-returns)))
 	  (note-lossage
 	   "The result type from ~A:~%  ~S~@
 	   conflicts with the definition's result type assertion:~%  ~S"

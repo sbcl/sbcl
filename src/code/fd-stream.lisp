@@ -787,7 +787,7 @@
 			"could not restore ~S to its original contents: ~A"
 			      (fd-stream-file stream)
 			      (sb!unix:get-unix-error-msg err))))
-		  ;; We can't restore the orignal, so nuke that puppy.
+		  ;; We can't restore the original, so nuke that puppy.
 		  (multiple-value-bind (okay err)
 		      (sb!unix:unix-unlink (fd-stream-file stream))
 		    (unless okay

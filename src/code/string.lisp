@@ -94,8 +94,8 @@
 
 (eval-when (:compile-toplevel :execute)
 
-;;; Lessp is true if the desired expansion is for string<* or string<=*.
-;;; Equalp is true if the desired expansion is for string<=* or string>=*.
+;;; LESSP is true if the desired expansion is for STRING<* or STRING<=*.
+;;; EQUALP is true if the desired expansion is for STRING<=* or STRING>=*.
 (sb!xc:defmacro string<>=*-body (lessp equalp)
   (let ((offset1 (gensym)))
     `(with-two-strings string1 string2 start1 end1 ,offset1 start2 end2
@@ -116,7 +116,7 @@
 		     (schar string2 (+ (the fixnum index) (- start2 start1))))
 		    (- (the fixnum index) ,offset1))
 		   (t nil))
-	     ,(if equalp `(- (the fixnum end1) ,offset1) 'nil))))))
+	     ,(if equalp `(- (the fixnum end1) ,offset1) nil))))))
 ) ; EVAL-WHEN
 
 (defun string<* (string1 string2 start1 end1 start2 end2)

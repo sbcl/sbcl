@@ -327,13 +327,6 @@
     :use ("CL" "SB!ALIEN" "SB!BIGNUM" "SB!C-CALL" "SB!DEBUG" "SB!EXT"
           "SB!GRAY" "SB!INT" "SB!KERNEL" "SB!SYS"))
 
- ;; FIXME: It seems to me that this could go away, with its contents moved
- ;; into SB!KERNEL, like the implementation of the rest of the class system.
-;; #s(sb-cold:package-data
-;;    :name "SB!CONDITIONS"
-;;    :doc "private: the implementation of the condition system"
-;;    :use ("CL" "SB!EXT" "SB!INT" "SB!KERNEL"))
-
  #s(sb-cold:package-data
     :name "SB!DEBUG"
     :doc
@@ -475,12 +468,7 @@ like *STACK-TOP-HINT*"
     :doc "public: miscellaneous supported extensions to the ANSI Lisp spec"
     ;; FIXME: Why don't we just USE-PACKAGE %KERNEL here instead of importing?
     :use ("CL" "SB!ALIEN" "SB!C-CALL" "SB!INT" "SB!SYS" "SB!GRAY")
-    ;; FIXME: If we advertise these as extensions, they should be in the
-    ;; SB!EXT package (and perhaps re-exported from the %KERNEL
-    ;; package) rather than in some other package and reexported from
-    ;; SB!EXT.
-    :import-from (("SB!KERNEL" "WEAK-POINTER-P"))
-    :reexport ("LOAD-FOREIGN" "LOAD-1-FOREIGN" "WEAK-POINTER-P")
+    :reexport ("LOAD-FOREIGN" "LOAD-1-FOREIGN")
     :export (;; Information about how the program was invoked is
              ;; nonstandard but very useful.
              "*POSIX-ARGV*" "POSIX-GETENV" "POSIX-ENVIRON"
@@ -488,7 +476,6 @@ like *STACK-TOP-HINT*"
              ;; People have various good reasons to mess with the GC.
              "*AFTER-GC-HOOKS*" "*BEFORE-GC-HOOKS*"
              "*GC-NOTIFY-AFTER*" "*GC-NOTIFY-BEFORE*" "*GC-NOTIFY-STREAM*"
-             "*GC-VERBOSE*"
              "BYTES-CONSED-BETWEEN-GCS"
              "GC" "GC-OFF" "GC-ON" "GET-BYTES-CONSED"
              "*GC-RUN-TIME*"
@@ -545,10 +532,10 @@ like *STACK-TOP-HINT*"
              "INTERACTIVE-EVAL"
 
              ;; weak pointers and finalization
-             "FINALIZE" "CANCEL-FINALIZATION"
-             ;; FIXME: "WEAK-POINTER-P" here once it moves from SB!KERNEL
+             "CANCEL-FINALIZATION"
+             "FINALIZE"             
              "HASH-TABLE-WEAK-P" "MAKE-WEAK-POINTER"
-             "WEAK-POINTER" "WEAK-POINTER-VALUE"
+             "WEAK-POINTER" "WEAK-POINTER-P" "WEAK-POINTER-VALUE"
 
              ;; If the user knows we're doing IEEE, he might reasonably
              ;; want to do this stuff.
@@ -844,7 +831,7 @@ is a good idea, but see SB-SYS for blurring of boundaries."
     :use ("CL" "SB!ALIEN" "SB!ALIEN-INTERNALS" "SB!BIGNUM"
           "SB!EXT" "SB!INT" "SB!SYS" "SB!GRAY")
     :import-from (("SB!C-CALL" "VOID"))
-    :reexport ("DEF!STRUCT" "DEF!MACRO" "VOID")
+    :reexport ("DEF!STRUCT" "DEF!MACRO" "VOID" "WEAK-POINTER-P")
     :export ("%ACOS" "%ACOSH" "%ARRAY-AVAILABLE-ELEMENTS"
              "%ARRAY-DATA-VECTOR" "%ARRAY-DIMENSION"
              "%ARRAY-DISPLACED-P"
@@ -1124,9 +1111,9 @@ is a good idea, but see SB-SYS for blurring of boundaries."
              "TYPE-DIFFERENCE" "TYPE-EXPAND"
              "TYPE-INTERSECTION" "TYPE-INTERSECTION2"
              "TYPE-APPROX-INTERSECTION2"
-             "TYPE-SPECIFIER"
-             "TYPE-UNION" "TYPE/=" "TYPE="
-             "TYPES-INTERSECT" "UNBOUND-SYMBOL-ERROR" "UNBOXED-ARRAY"
+             "TYPE-SPECIFIER" "TYPE-UNION" "TYPE/=" "TYPE="
+             "TYPES-EQUAL-OR-INTERSECT"
+             "UNBOUND-SYMBOL-ERROR" "UNBOXED-ARRAY"
              "UNDEFINED-SYMBOL-ERROR" "UNION-TYPE" "UNION-TYPE-P"
              "UNION-TYPE-TYPES" "UNKNOWN-ERROR"
              "UNKNOWN-KEY-ARGUMENT-ERROR"
@@ -1139,7 +1126,7 @@ is a good idea, but see SB-SYS for blurring of boundaries."
              "VALUES-TYPE-KEYWORDS" "VALUES-TYPE-OPTIONAL"
              "VALUES-TYPE-P" "VALUES-TYPE-REQUIRED"
              "VALUES-TYPE-REST" "VALUES-TYPE-UNION"
-             "VALUES-TYPES" "VALUES-TYPES-INTERSECT" "VECTOR-T-P"
+             "VALUES-TYPES" "VALUES-TYPES-EQUAL-OR-INTERSECT" "VECTOR-T-P"
              "VECTOR-TO-VECTOR*" "VECTOR-TO-SIMPLE-STRING*"
              "VECTOR-TO-BIT-VECTOR*" "VECTOR-TO-SIMPLE-BIT-VECTOR*"
              "VECTOR-OF-CHECKED-LENGTH-GIVEN-LENGTH"
@@ -1165,7 +1152,7 @@ is a good idea, but see SB-SYS for blurring of boundaries."
              "DEFSTRUCT-DESCRIPTION" "UNDEFINE-STRUCTURE"
              "DD-COPIER" "UNDEFINE-FUNCTION-NAME" "DD-TYPE"
              "CLASS-STATE" "INSTANCE"
-             "*TYPE-SYSTEM-INITIALIZED*" "WEAK-POINTER-P" "FIND-LAYOUT"
+             "*TYPE-SYSTEM-INITIALIZED*" "FIND-LAYOUT"
              "DSD-NAME" "%TYPEP" "DD-RAW-INDEX"
              "DD-NAME" "CLASS-SUBCLASSES"
              "CLASS-LAYOUT" "CLASS-%NAME"

@@ -30,8 +30,8 @@
 	    (compiler-note "~@<unable to ~2I~_~A ~I~_because: ~2I~_~?~:>"
 			   note (first what) (rest what)))
 	   ((valid-function-use node what
-				:argument-test #'types-intersect
-				:result-test #'values-types-intersect)
+				:argument-test #'types-equal-or-intersect
+				:result-test #'values-types-equal-or-intersect)
 	    (collect ((messages))
 	      (flet ((frob (string &rest stuff)
 		       (messages string)
@@ -77,7 +77,21 @@
 	     (setf (info :function :type name) dtype)
 	     (setf (info :function :assumed-type name) nil))
 	   (setf (info :function :where-from name) :defined))
-	  (:declared); Just keep declared type.
+	  (:declared
+	   ;; Check that derived type matches declared type.
+	   (let ((type (info :function :type name)))
+             (when (and type (function-type-p dtype))
+               (let ((type-returns (function-type-returns type))
+                     (dtype-returns (function-type-returns dtype))
+                     (*error-function* #'compiler-warning))
+                 (unless (values-types-equal-or-intersect type-returns
+							  dtype-returns)
+                   (note-lossage "The result type from previous declaration:~%  ~S~@
+                                  conflicts with the result type:~%  ~S"
+                                 (type-specifier type-returns)
+                                 (type-specifier dtype-returns))))))
+	   ;; (Regardless of what happens, we keep the declared type.)
+	   )
 	  (:defined
            (when global-p
              (setf (info :function :type name) dtype)))))))

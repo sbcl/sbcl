@@ -273,21 +273,21 @@
   #!-sb-fluid (declare (inline node-home-lambda))
   (lambda-environment (node-home-lambda (block-last block))))
 
-;;; Return the Top Level Form number of path, i.e. the ordinal number of
-;;; its orignal source's top-level form in its compilation unit.
+;;; Return the Top Level Form number of path, i.e. the ordinal number
+;;; of its original source's top-level form in its compilation unit.
 (defun source-path-tlf-number (path)
   (declare (list path))
   (car (last path)))
 
-;;; Return the (reversed) list for the path in the orignal source (with the
-;;; TLF number last.)
+;;; Return the (reversed) list for the path in the original source
+;;; (with the Top Level Form number last).
 (defun source-path-original-source (path)
   (declare (list path) (inline member))
   (cddr (member 'original-source-start path :test #'eq)))
 
-;;; Return the Form Number of Path's orignal source inside the Top Level
-;;; Form that contains it. This is determined by the order that we walk the
-;;; subforms of the top level source form.
+;;; Return the Form Number of Path's original source inside the Top
+;;; Level Form that contains it. This is determined by the order that
+;;; we walk the subforms of the top level source form.
 (defun source-path-form-number (path)
   (declare (list path) (inline member))
   (cadr (member 'original-source-start path :test #'eq)))

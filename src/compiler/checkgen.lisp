@@ -484,8 +484,8 @@
 	    (unless (member type-check '(nil :error :deleted))
 	      (let ((atype (continuation-asserted-type cont)))
 		(do-uses (use cont)
-		  (unless (values-types-intersect (node-derived-type use)
-						  atype)
+		  (unless (values-types-equal-or-intersect
+			   (node-derived-type use) atype)
 		    (mark-error-continuation cont)
 		    (unless (policy node (= inhibit-warnings 3))
 		      (do-type-warning use))))))

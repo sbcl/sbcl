@@ -3067,9 +3067,10 @@
 					 :defun-only t
 					 :when :both)
   (cond ((same-leaf-ref-p x y)
-	 't)
-	((not (types-intersect (continuation-type x) (continuation-type y)))
-	 'nil)
+	 t)
+	((not (types-equal-or-intersect (continuation-type x)
+					(continuation-type y)))
+	 nil)
 	(t
 	 (give-up-ir1-transform))))
 
@@ -3096,14 +3097,14 @@
 	(char-type (specifier-type 'character))
 	(number-type (specifier-type 'number)))
     (cond ((same-leaf-ref-p x y)
-	   't)
-	  ((not (types-intersect x-type y-type))
-	   'nil)
+	   t)
+	  ((not (types-equal-or-intersect x-type y-type))
+	   nil)
 	  ((and (csubtypep x-type char-type)
 		(csubtypep y-type char-type))
 	   '(char= x y))
-	  ((or (not (types-intersect x-type number-type))
-	       (not (types-intersect y-type number-type)))
+	  ((or (not (types-equal-or-intersect x-type number-type))
+	       (not (types-equal-or-intersect y-type number-type)))
 	   '(eq x y))
 	  ((and (not (constant-continuation-p y))
 		(or (constant-continuation-p x)
@@ -3161,7 +3162,7 @@
 #!-sb-propagate-float-type
 (defun ir1-transform-< (x y first second inverse)
   (if (same-leaf-ref-p x y)
-      'nil
+      nil
       (let* ((x-type (numeric-type-or-lose x))
 	     (x-lo (numeric-type-low x-type))
 	     (x-hi (numeric-type-high x-type))
@@ -3180,7 +3181,7 @@
 #!+sb-propagate-float-type
 (defun ir1-transform-< (x y first second inverse)
   (if (same-leaf-ref-p x y)
-      'nil
+      nil
       (let ((xi (numeric-type->interval (numeric-type-or-lose x)))
 	    (yi (numeric-type->interval (numeric-type-or-lose y))))
 	(cond ((interval-< xi yi)
@@ -3236,11 +3237,11 @@
 		 (last nil current)
 		 (current (gensym) (gensym))
 		 (vars (list current) (cons current vars))
-		 (result 't (if not-p
-				`(if (,predicate ,current ,last)
-				     nil ,result)
-				`(if (,predicate ,current ,last)
-				     ,result nil))))
+		 (result t (if not-p
+			       `(if (,predicate ,current ,last)
+				    nil ,result)
+			       `(if (,predicate ,current ,last)
+				    ,result nil))))
 	       ((zerop i)
 		`((lambda ,vars ,result) . ,args)))))))
 
@@ -3285,7 +3286,7 @@
 	   (let ((vars (make-gensym-list nargs)))
 	     (do ((var vars next)
 		  (next (cdr vars) (cdr next))
-		  (result 't))
+		  (result t))
 		 ((null next)
 		  `((lambda ,vars ,result) . ,args))
 	       (let ((v1 (first var)))

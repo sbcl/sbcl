@@ -35,7 +35,7 @@
 ;;; FORMAT function.
 (defun valid-destination-p (destination)
   (or (not destination)
-      (eq destination 't)
+      (eq destination t)
       (streamp destination)
       (and (stringp destination)
 	   (array-has-fill-pointer-p destination))))

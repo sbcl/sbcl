@@ -1172,7 +1172,7 @@
   (make-array sc-number-limit :initial-element 0))
 
 (defparameter *no-loads*
-  (make-array sc-number-limit :initial-element 't))
+  (make-array sc-number-limit :initial-element t))
 
 ;;; Pick off the case of operands with no restrictions.
 (defun compute-loading-costs-if-any (op load-p)
@@ -1274,7 +1274,7 @@
 ;;; satisfy the first test, and omit the second.
 (defun check-operand-type-scs (parse op type load-p)
   (declare (type vop-parse parse) (type operand-parse op))
-  (let ((ptypes (if (eq type '*) (list 't) (rest type)))
+  (let ((ptypes (if (eq type '*) (list t) (rest type)))
 	(scs (operand-parse-scs op)))
     (when scs
       (multiple-value-bind (costs load-scs) (compute-loading-costs op load-p)

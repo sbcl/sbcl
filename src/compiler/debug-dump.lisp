@@ -252,7 +252,7 @@
 			  :compiled (source-info-start-time info)
 			  :source-root (file-info-source-root x)
 			  :start-positions
-			  (unless (eq *byte-compile* 't)
+			  (unless (eq *byte-compile* t)
 			    (coerce-to-smallest-eltype
 			     (file-info-positions x)))))
 		    (name (file-info-name x)))

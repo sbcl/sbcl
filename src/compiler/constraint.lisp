@@ -375,7 +375,7 @@
 		    (csubtypep (specifier-type 'null) not-res)
 		    (eq (continuation-asserted-type cont) *wild-type*))
 	       (setf (node-derived-type ref) *wild-type*)
-	       (change-ref-leaf ref (find-constant 't)))
+	       (change-ref-leaf ref (find-constant t)))
 	      (t
 	       (derive-node-type ref (or (type-difference res not-res)
 					 res)))))))

@@ -793,8 +793,9 @@
 			 (and (template-note try)
 			      (valid-function-use
 			       call (template-type try)
-			       :argument-test #'types-intersect
-			       :result-test #'values-types-intersect))))
+			       :argument-test #'types-equal-or-intersect
+			       :result-test
+			       #'values-types-equal-or-intersect))))
 	    (losers try)))))
 
     (when (losers)

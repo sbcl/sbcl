@@ -196,11 +196,12 @@
 		    (when (eq (info :function :where-from name) :declared)
 		      (let ((old-type (info :function :type name)))
 			(when (type/= type old-type)
-			  (style-warn "new FTYPE proclamation~@
-                                       ~S~@
-                                       for ~S does not match old FTYPE proclamation~@
-                                       ~S"
-				      (list type name old-type)))))
+			  (style-warn
+			   "new FTYPE proclamation~@
+                            ~S~@
+                            for ~S does not match old FTYPE proclamation~@
+                            ~S"
+			   (list type name old-type)))))
 
 		    (proclaim-as-function-name name)
 		    (note-name-defined name :function)
@@ -209,7 +210,7 @@
       (freeze-type
        (dolist (type args)
 	 (let ((class (specifier-type type)))
-	   (when (typep class 'class)
+	   (when (typep class 'sb!xc:class)
 	     (setf (class-state class) :sealed)
 	     (let ((subclasses (class-subclasses class)))
 	       (when subclasses

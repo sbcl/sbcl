@@ -969,7 +969,7 @@
 	   (output-object (aref vector i) stream)))
 	(t
 	 (when (and *print-readably*
-		    (not (eq (array-element-type vector) 't)))
+		    (not (eq (array-element-type vector) t)))
 	   (error 'print-not-readable :object vector))
 	 (descend-into (stream)
 		       (write-string "#(" stream)

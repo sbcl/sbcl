@@ -1092,15 +1092,15 @@
 				     '(t))))
 	x
       (declare (ignore codes state translation))
-      (let ((inherits-list (if (eq name 't)
-			     ()
-			     (cons 't (reverse inherits))))
+      (let ((inherits-list (if (eq name t)
+			       ()
+			       (cons t (reverse inherits))))
 	    (class (make-built-in-class
 		    :enumerable enumerable
 		    :name name
 		    :translation (if trans-p :initializing nil)
 		    :direct-superclasses
-		    (if (eq name 't)
+		    (if (eq name t)
 		      nil
 		      (mapcar #'sb!xc:find-class direct-superclasses)))))
 	(setf (info :type :kind name) :primitive

@@ -201,7 +201,7 @@
   (flet ((convert (types more-types)
 	   (flet ((frob (x)
 		    (if (eq x '*)
-			't
+			t
 			(ecase (first x)
 			  (:or `(or ,@(mapcar #'(lambda (type)
 						  (type-specifier

@@ -539,7 +539,7 @@
 		   (if (continuation-value test)
 		       (if-alternative node)
 		       (if-consequent node)))
-		  ((not (types-intersect type (specifier-type 'null)))
+		  ((not (types-equal-or-intersect type (specifier-type 'null)))
 		   (if-alternative node))
 		  ((type= type (specifier-type 'null))
 		   (if-consequent node)))))
@@ -985,8 +985,9 @@
 	  ((and flame
 		(valid-function-use node
 				    type
-				    :argument-test #'types-intersect
-				    :result-test #'values-types-intersect))
+				    :argument-test #'types-equal-or-intersect
+				    :result-test
+				    #'values-types-equal-or-intersect))
 	   (record-optimization-failure node transform type)
 	   t)
 	  (t
@@ -1522,4 +1523,4 @@
 	`(lambda (val ,@dummies)
 	   (declare (ignore ,@dummies))
 	   val))
-      'nil))
+      nil))

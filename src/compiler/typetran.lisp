@@ -71,7 +71,7 @@
 (defun ir1-transform-type-predicate (object type)
   (declare (type continuation object) (type ctype type))
   (let ((otype (continuation-type object)))
-    (cond ((not (types-intersect otype type))
+    (cond ((not (types-equal-or-intersect otype type))
 	   nil)
 	  ((csubtypep otype type)
 	   t)
@@ -407,14 +407,11 @@
 		   (if (and res (not (layout-invalid res)))
 		       res
 		       nil))))
-    (/noshow "entering DEFTRANSFORM %INSTANCE-TYPEP" otype spec class name layout)
     (cond
       ;; Flush tests whose result is known at compile time.
-      ((not (types-intersect otype class))
-       (/noshow "flushing constant NIL")
+      ((not (types-equal-or-intersect otype class))
        nil)
       ((csubtypep otype class)
-       (/noshow "flushing constant T")
        t)
       ;; If not properly named, error.
       ((not (and name (eq (sb!xc:find-class name) class)))
@@ -431,12 +428,10 @@
 	      (values '%instancep '%instance-layout))
 	     (t
 	      (values '(lambda (x) (declare (ignore x)) t) 'layout-of)))
-	 (/noshow pred get-layout)
 	 (cond
 	   ((and (eq (class-state class) :sealed) layout
 		 (not (class-subclasses class)))
 	    ;; Sealed and has no subclasses.
-	    (/noshow "sealed and has no subclasses")
 	    (let ((n-layout (gensym)))
 	      `(and (,pred object)
 		    (let ((,n-layout (,get-layout object)))
@@ -445,7 +440,6 @@
 				  (%layout-invalid-error object ',layout))))
 		      (eq ,n-layout ',layout)))))
 	   ((and (typep class 'basic-structure-class) layout)
-	    (/noshow "structure type tests; hierarchical layout depths")
 	    ;; structure type tests; hierarchical layout depths
 	    (let ((depthoid (layout-depthoid layout))
 		  (n-layout (gensym)))

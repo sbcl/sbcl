@@ -188,7 +188,7 @@
 (defmacro fast-read-byte (&optional (eof-error-p t) (eof-value ()) any-type)
   ;; KLUDGE: should use ONCE-ONLY on EOF-ERROR-P and EOF-VALUE -- WHN 19990825
   `(truly-the
-    ,(if (and (eq eof-error-p 't) (not any-type)) '(unsigned-byte 8) 't)
+    ,(if (and (eq eof-error-p t) (not any-type)) '(unsigned-byte 8) t)
     (cond
      ((not %frc-buffer%)
       (funcall %frc-method% %frc-stream% ,eof-error-p ,eof-value))

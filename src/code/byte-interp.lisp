@@ -27,19 +27,19 @@
    (etypecase x
      (simple-byte-function
       `(function ,(make-list (simple-byte-function-num-args x)
-			     :initial-element 't)
+			     :initial-element t)
 		 *))
      (hairy-byte-function
       (collect ((res))
 	(let ((min (hairy-byte-function-min-args x))
 	      (max (hairy-byte-function-max-args x)))
-	  (dotimes (i min) (res 't))
+	  (dotimes (i min) (res t))
 	  (when (> max min)
 	    (res '&optional)
 	    (dotimes (i (- max min))
-	      (res 't))))
+	      (res t))))
 	(when (hairy-byte-function-rest-arg-p x)
-	  (res '&rest 't))
+	  (res '&rest t))
 	(ecase (hairy-byte-function-keywords-p x)
 	  ((t :allow-others)
 	   (res '&key)

@@ -110,7 +110,7 @@
 
 ;;; something legal in an evaluated context
 ;;; FIXME: could probably go away
-(sb!xc:deftype form () 't)
+(sb!xc:deftype form () t)
 
 ;;; Maclisp compatibility...
 ;;; FIXME: should be STRING-DESIGNATOR (the term used in the ANSI spec)

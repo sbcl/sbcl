@@ -173,7 +173,7 @@
   ;; Following the introduced forms is a representation of the
   ;; location of the enclosing original source form. This transition
   ;; is indicated by the magic ORIGINAL-SOURCE-START marker. The first
-  ;; element of the orignal source is the "form number", which is the
+  ;; element of the original source is the "form number", which is the
   ;; ordinal number of this form in a depth-first, left-to-right walk
   ;; of the truly top-level form in which this appears.
   ;;
@@ -183,7 +183,7 @@
   ;;
   ;; The last element in the list is the top-level form number, which
   ;; is the ordinal number (in this call to the compiler) of the truly
-  ;; top-level form containing the orignal source.
+  ;; top-level form containing the original source.
   (source-path *current-path* :type list)
   ;; If this node is in a tail-recursive position, then this is set to
   ;; T. At the end of IR1 (in environment analysis) this is computed

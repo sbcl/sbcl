@@ -108,7 +108,7 @@
 		     (unsupplied-or-nil fill-pointer))))
     (specifier-type
      `(,(if simple 'simple-array 'array)
-       ,(cond ((not element-type) 't)
+       ,(cond ((not element-type) t)
 	      ((constant-continuation-p element-type)
 	       (continuation-value element-type))
 	      (t

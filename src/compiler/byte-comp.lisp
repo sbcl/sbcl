@@ -488,7 +488,7 @@
 		  (let ((leaf (ref-leaf (continuation-use fun))))
 		    (and (slot-accessor-p leaf)
 			 (or (policy call (zerop safety))
-			     (not (find 't args
+			     (not (find t args
 					:key #'continuation-type-check)))
 			 (if (consp name)
 			     (not (continuation-dest (node-cont call)))

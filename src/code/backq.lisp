@@ -133,7 +133,7 @@
   (cond ((atom code)
 	 (cond ((null code)
 		(values nil nil))
-	       ((or (numberp code) (eq code 't))
+	       ((or (numberp code) (eq code t))
 		(values t code))
 	       (t (values *bq-comma-flag* code))))
 	((eq (car code) 'quote)
