@@ -1190,7 +1190,7 @@ is a good idea, but see SB-SYS for blurring of boundaries."
              "NAMESTRING-PARSE-ERROR" "NAMESTRING-PARSE-ERROR-OFFSET"
              "DESCRIBE-CONDITION"
              
-	     "!COLD-INIT"
+	     "!COLD-INIT" "!UNINTERN-INIT-ONLY-STUFF"
              "!GLOBALDB-COLD-INIT" "!FDEFN-COLD-INIT"
              "!TYPE-CLASS-COLD-INIT" "!TYPEDEFS-COLD-INIT"
              "!ALIEN-TYPE-COLD-INIT" "!CLASSES-COLD-INIT"

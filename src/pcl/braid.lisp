@@ -417,7 +417,7 @@
       (if (find specls (early-gf-methods gf)
 		:key #'early-method-specializers
 		:test 'equal)
-	  (unless (assoc accessor-name *generic-function-fixups*
+	  (unless (assoc accessor-name *!generic-function-fixups*
 			 :test #'equal)
 	    (update-dfun gf))
 	  (add-method gf

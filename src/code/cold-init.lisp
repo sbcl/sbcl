@@ -214,8 +214,8 @@
   (show-and-call !class-finalize)
 
   ;; The reader and printer are initialized very late, so that they
-  ;; can even do hairy things like invoking the compiler as part of
-  ;; their initialization.
+  ;; can do hairy things like invoking the compiler as part of their
+  ;; initialization.
   (show-and-call !reader-cold-init)
   (let ((*readtable* *standard-readtable*))
     (show-and-call !sharpm-cold-init)
@@ -236,10 +236,6 @@
 
   (/show0 "done initializing")
   (setf *cold-init-complete-p* t)
-
-  ;; Unintern no-longer-needed stuff before we GC.
-  #!-sb-fluid
-  (!unintern-init-only-stuff)
 
   ;; The system is finally ready for GC.
   #!-gengc (setf *already-maybe-gcing* nil)

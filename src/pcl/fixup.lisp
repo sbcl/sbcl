@@ -23,7 +23,7 @@
 
 (in-package "SB-PCL")
 
-(fix-early-generic-functions)
+(!fix-early-generic-functions)
 (setq *boot-state* 'complete)
 
 (defun print-std-instance (instance stream depth)

@@ -24,52 +24,6 @@
 ;;;		Retain expansion, but only use it opportunistically.
 (deftype inlinep () '(member :inline :maybe-inline :notinline nil))
 
-;;;; the POLICY macro
-
-(eval-when (:compile-toplevel :load-toplevel :execute)
-
-;;; a helper function for the POLICY macro: Look up a named optimization
-;;; quality in POLICY.
-(declaim (ftype (function (policy symbol) policy-quality)))
-(defun policy-quality (policy quality-name)
-  (the policy-quality
-       (cdr (assoc quality-name policy))))
-
-;;; A helper function for the POLICY macro: Return a list of symbols
-;;; naming the qualities which appear in EXPR.
-(defun policy-qualities-used-by (expr)
-  (let ((result nil))
-    (labels ((recurse (x)
-	       (if (listp x)
-		   (map nil #'recurse x)
-		   (when (policy-quality-p x)
-		     (pushnew x result)))))
-      (recurse expr)
-      result)))
-
-) ; EVAL-WHEN
-
-;;; syntactic sugar for querying optimization policy qualities
-;;;
-;;; Evaluate EXPR in terms of the current optimization policy for
-;;; NODE, or if NODE is NIL, in terms of the current policy as defined
-;;; by *DEFAULT-POLICY* and *CURRENT-POLICY*. (Using NODE=NIL is only
-;;; well-defined during IR1 conversion.)
-;;;
-;;; EXPR is a form which accesses the policy values by referring to
-;;; them by name, e.g. (> SPEED SPACE).
-(defmacro policy (node expr)
-  (let* ((n-policy (gensym))
-	 (binds (mapcar (lambda (name)
-			  `(,name (policy-quality ,n-policy ',name)))
-			(policy-qualities-used-by expr))))
-    (/show "in POLICY" expr binds)
-    `(let* ((,n-policy (lexenv-policy ,(if node
-					   `(node-lexenv ,node)
-					   '*lexenv*)))
-	    ,@binds)
-       ,expr)))
-
 ;;;; source-hacking defining forms
 
 ;;; to be passed to PARSE-DEFMACRO when we want compiler errors

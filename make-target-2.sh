@@ -28,11 +28,19 @@ echo //doing warm init
 ./src/runtime/sbcl \
 --core output/cold-sbcl.core \
 --sysinit /dev/null --userinit /dev/null <<-'EOF' || exit 1
+
         (sb!int:/show "hello, world!")
+
+        ;; Do warm init.
 	(let ((*print-length* 5)
 	      (*print-level* 5))
           (sb!int:/show "about to LOAD warm.lisp")
 	  (load "src/cold/warm.lisp"))
+
+        ;; Unintern no-longer-needed stuff before the possible PURIFY
+        ;; in SAVE-LISP-AND-DIE.
+        #-sb-fluid (sb-impl::!unintern-init-only-stuff)
+
         (sb-int:/show "done with warm.lisp, about to SAVE-LISP-AND-DIE")
 	;; Even if /SHOW output was wanted during build, it's probably
 	;; not wanted by default after build is complete. (And if it's

@@ -258,10 +258,11 @@
  ("code/setf-funs" :not-host)
 
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
- ;;; compiler (and a few miscellaneous :NOT-HOST files whose
- ;;; dependencies make it convenient to stick them here)
+ ;;; compiler (and a few miscellaneous files whose dependencies make it
+ ;;; convenient to stick them here)
 
  ("compiler/early-c")
+ ("compiler/policy")
  ("code/numbers")
 
  ("code/typedefs")

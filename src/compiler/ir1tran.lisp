@@ -1023,8 +1023,6 @@
 			 (lexenv-interface-policy res))))
     (type
      (process-type-declaration (cdr spec) res vars))
-    (sb!pcl::class
-     (process-type-declaration (list (third spec) (second spec)) res vars))
     (values
      (if *suppress-values-declaration*
 	 res

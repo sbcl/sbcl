@@ -38,86 +38,6 @@
 
 ;;; the type of LAYOUT-DEPTHOID slot values
 (def!type sb!kernel::layout-depthoid () '(or index (integer -1 -1)))
-
-;;; a value for an optimization declaration
-(def!type policy-quality () '(or (rational 0 3) null))
-
-;;;; policy stuff
-
-;;; CMU CL used a special STRUCTURE-OBJECT type POLICY to represent
-;;; the state of optimization policy at any point in compilation. This
-;;; became a little unwieldy, especially because of cold init issues
-;;; for structures and structure accessors, so in SBCL we use an alist
-;;; instead.
-(deftype policy () 'list)
-
-;;; names of recognized optimization qualities which don't have
-;;; special defaulting behavior
-(defvar *policy-basic-qualities*)
-
-;;; FIXME: I'd like to get rid of DECLAIM OPTIMIZE-INTERFACE in favor
-;;; of e.g. (DECLAIM (OPTIMIZE (INTERFACE-SPEED 2) (INTERFACE-SAFETY 3))).
-#|
-;;; a list of conses (DEFAULTING-QUALITY . DEFAULT-QUALITY) of qualities
-;;; which default to other qualities when undefined, e.g. interface
-;;; speed defaulting to basic speed
-(defvar *policy-defaulting-qualities*)
-|#
-
-(defun optimization-quality-p (name)
-  (or (member name *policy-basic-qualities*)
-      ;; FIXME: Uncomment this when OPTIMIZE-INTERFACE goes away.
-      #|(member name *policy-defaulting-qualities* :key #'car)|#))
-
-;;; *DEFAULT-POLICY* holds the current global compiler policy
-;;; information, as an alist mapping from optimization quality name to
-;;; quality value. Inside the scope of declarations, new entries are
-;;; added at the head of the alist.
-;;;
-;;; *DEFAULT-INTERFACE-POLICY* holds any values specified by an
-;;; OPTIMIZE-INTERFACE declaration.
-(declaim (type policy *default-policy* *default-interface-policy*))
-(defvar *default-policy*)	   ; initialized in cold init
-(defvar *default-interface-policy*) ; initialized in cold init
-
-;;; This is to be called early in cold init to set things up, and may
-;;; also be called again later in cold init in order to reset default
-;;; optimization policy back to default values after toplevel PROCLAIM
-;;; OPTIMIZE forms have messed with it.
-(defun !policy-cold-init-or-resanify ()
-  (setf *policy-basic-qualities*
-	'(;; ANSI standard qualities
-	  compilation-speed
-	  debug
-	  safety
-	  space
-	  speed
-	  ;; SBCL extensions
-	  ;;
-	  ;; FIXME: INHIBIT-WARNINGS is a misleading name for this.
-	  ;; Perhaps BREVITY would be better. But the ideal name would
-	  ;; have connotations of suppressing not warnings but only
-	  ;; optimization-related notes, which is already mostly the
-	  ;; behavior, and should probably become the exact behavior.
-	  ;; Perhaps INHIBIT-NOTES?
-	  inhibit-warnings))
-  (setf *policy-defaulting-qualities*
-	'((interface-speed . speed)
-	  (interface-safety . safety)))
-  (setf *default-policy*
-	(mapcar (lambda (name)
-		  ;; CMU CL didn't use 1 as the default for everything,
-		  ;; but since ANSI says 1 is the ordinary value, we do.
-		  (cons name 1))
-		*policy-basic-qualities*))
-  (setf *default-interface-policy*
-	*default-policy*))
-;;; On the cross-compilation host, we initialize the compiler immediately.
-#+sb-xc-host (!policy-cold-init-or-resanify)
-
-;;; Is X the name of an optimization quality?
-(defun policy-quality-p (x)
-  (memq x *policy-basic-qualities*))
 
 ;;; possible values for the INLINE-ness of a function.
 (deftype inlinep ()
@@ -127,7 +47,7 @@
     (notinline . :notinline)
     (maybe-inline . :maybe-inline)))
 
-;;; The lexical environment we are currently converting in.
+;;; the lexical environment we are currently converting in
 (defvar *lexenv*)
 (declaim (type lexenv *lexenv*))
 

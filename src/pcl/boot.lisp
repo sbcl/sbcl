@@ -38,11 +38,11 @@ functions and the corresponding early methods and early method lookup
 are used to get enough of the system running that it is possible to
 create real generic functions and methods and implement real method
 lookup. At that point (done in the file FIXUP) the function
-fix-early-generic-functions is called to convert all the early generic
+!FIX-EARLY-GENERIC-FUNCTIONS is called to convert all the early generic
 functions to real generic functions.
 
 The cheap generic functions are built using the same
-funcallable-instance objects real generic-functions are made out of.
+FUNCALLABLE-INSTANCE objects that real generic functions are made out of.
 This means that as PCL is being bootstrapped, the cheap generic
 function objects which are being created are the same objects which
 will later be real generic functions. This is good because:
@@ -51,22 +51,32 @@ will later be real generic functions. This is good because:
     during booting because those pointers will still point to
     the right object after the generic functions are all fixed up.
 
-This file defines the defmethod macro and the mechanism used to expand
+This file defines the DEFMETHOD macro and the mechanism used to expand
 it. This includes the mechanism for processing the body of a method.
 DEFMETHOD basically expands into a call to LOAD-DEFMETHOD, which
-basically calls ADD-METHOD to add the method to the generic-function.
+basically calls ADD-METHOD to add the method to the generic function.
 These expansions can be loaded either during bootstrapping or when PCL
 is fully up and running.
 
 An important effect of this arrangement is it means we can compile
-files with defmethod forms in them in a completely running PCL, but
+files with DEFMETHOD forms in them in a completely running PCL, but
 then load those files back in during bootstrapping. This makes
 development easier. It also means there is only one set of code for
-processing defmethod. Bootstrapping works by being sure to have
-load-method be careful to call only primitives which work during
+processing DEFMETHOD. Bootstrapping works by being sure to have
+LOAD-METHOD be careful to call only primitives which work during
 bootstrapping.
 
 |#
+
+;;; FIXME: As of sbcl-0.6.9.10, PCL still uses this nonstandard type
+;;; of declaration internally. It would be good to figure out how to
+;;; get rid of it, or failing that, (1) document why it's needed and
+;;; (2) use a private symbol with a forbidding name which suggests
+;;; it's not to be messed with by the user (e.g. SB-PCL:%CLASS)
+;;; instead of the too-inviting CLASS. (I tried just deleting the
+;;; declarations in MAKE-METHOD-LAMBDA-INTERNAL ca. sbcl-0.6.9.10, but
+;;; then things break.)
+(declaim (declaration class))
 
 ;;; FIXME: SB-KERNEL::PCL-CHECK-WRAPPER-VALIDITY-HOOK shouldn't be a
 ;;; separate function. Instead, we should define a simple placeholder
@@ -84,7 +94,7 @@ bootstrapping.
 		    add-method
 		    remove-method))
 
-(defvar *early-functions*
+(defvar *!early-functions*
 	'((make-a-method early-make-a-method
 			 real-make-a-method)
 	  (add-named-method early-add-named-method
@@ -109,17 +119,17 @@ bootstrapping.
 	     (apply (the function (symbol-function early)) args))
 	 real)))
 
-(dolist (fns *early-functions*)
+(dolist (fns *!early-functions*)
   (let ((name (car fns))
 	(early-name (cadr fns)))
     (redirect-early-function-internal name early-name)))
 
 ) ; EVAL-WHEN
 
-;;; *GENERIC-FUNCTION-FIXUPS* is used by fix-early-generic-functions to
-;;; convert the few functions in the bootstrap which are supposed to be
-;;; generic functions but can't be early on.
-(defvar *generic-function-fixups*
+;;; *!GENERIC-FUNCTION-FIXUPS* is used by !FIX-EARLY-GENERIC-FUNCTIONS
+;;; to convert the few functions in the bootstrap which are supposed
+;;; to be generic functions but can't be early on.
+(defvar *!generic-function-fixups*
   '((add-method
      ((generic-function method)	 ;lambda-list
       (standard-generic-function method) ;specializers
@@ -507,9 +517,9 @@ bootstrapping.
 	       (calls (list nil))
 	       (class-declarations
 		`(declare
-		  ;; FIXME: Are these (DECLARE (SB-PCL::CLASS FOO BAR))
-		  ;; declarations used for anything any more?
-                  ;; WHN 2000-12-21: I think not, commented 'em out to see..
+		  ;; FIXME: These nonstandard (DECLARE (SB-PCL::CLASS FOO BAR))
+		  ;; declarations should go away but as of 0.6.9.10, it's not
+		  ;; as simple as just deleting them.
 		  ,@(remove nil
 			    (mapcar (lambda (a s) (and (symbolp s)
 						       (neq s 't)
@@ -1379,7 +1389,7 @@ bootstrapping.
 
 ;;;; early generic function support
 
-(defvar *early-generic-functions* ())
+(defvar *!early-generic-functions* ())
 
 (defun ensure-generic-function (function-name
 				&rest all-keys
@@ -1634,12 +1644,12 @@ bootstrapping.
 			       (class-name (cadr specls)))))))))
   arg-info)
 
-;;; This is the early definition of ensure-generic-function-using-class.
+;;; This is the early definition of ENSURE-GENERIC-FUNCTION-USING-CLASS.
 ;;;
-;;; The static-slots field of the funcallable instances used as early generic
-;;; functions is used to store the early methods and early discriminator code
-;;; for the early generic function. The static slots field of the fins
-;;; contains a list whose:
+;;; The STATIC-SLOTS field of the funcallable instances used as early
+;;; generic functions is used to store the early methods and early
+;;; discriminator code for the early generic function. The static
+;;; slots field of the fins contains a list whose:
 ;;;    CAR    -   a list of the early methods on this early gf
 ;;;    CADR   -   the early discriminator code for this method
 (defun ensure-generic-function-using-class (existing spec &rest keys
@@ -1648,16 +1658,16 @@ bootstrapping.
   (declare (ignore keys))
   (cond ((and existing (early-gf-p existing))
 	 existing)
-	((assoc spec *generic-function-fixups* :test #'equal)
+	((assoc spec *!generic-function-fixups* :test #'equal)
 	 (if existing
 	     (make-early-gf spec lambda-list lambda-list-p existing)
 	     (error "The function ~S is not already defined." spec)))
 	(existing
 	 (error "~S should be on the list ~S."
 		spec
-		'*generic-function-fixups*))
+		'*!generic-function-fixups*))
 	(t
-	 (pushnew spec *early-generic-functions* :test #'equal)
+	 (pushnew spec *!early-generic-functions* :test #'equal)
 	 (make-early-gf spec lambda-list lambda-list-p))))
 
 (defun make-early-gf (spec &optional lambda-list lambda-list-p function)
@@ -1919,21 +1929,22 @@ bootstrapping.
     (when existing (remove-method gf existing))
     (add-method gf new)))
 
-;;; This is the early version of add-method. Later this will become a
-;;; generic function. See fix-early-generic-functions which has special
-;;; knowledge about add-method.
+;;; This is the early version of ADD-METHOD. Later this will become a
+;;; generic function. See !FIX-EARLY-GENERIC-FUNCTIONS which has special
+;;; knowledge about ADD-METHOD.
 (defun add-method (generic-function method)
   (when (not (fsc-instance-p generic-function))
-    (error "Early add-method didn't get a funcallable instance."))
+    (error "Early ADD-METHOD didn't get a funcallable instance."))
   (when (not (and (listp method) (eq (car method) :early-method)))
-    (error "Early add-method didn't get an early method."))
+    (error "Early ADD-METHOD didn't get an early method."))
   (push method (early-gf-methods generic-function))
   (set-arg-info generic-function :new-method method)
-  (unless (assoc (early-gf-name generic-function) *generic-function-fixups*
+  (unless (assoc (early-gf-name generic-function) *!generic-function-fixups*
 		 :test #'equal)
     (update-dfun generic-function)))
 
-;;; This is the early version of REMOVE-METHOD..
+;;; This is the early version of REMOVE-METHOD. See comments on
+;;; the early version of ADD-METHOD.
 (defun remove-method (generic-function method)
   (when (not (fsc-instance-p generic-function))
     (error "An early remove-method didn't get a funcallable instance."))
@@ -1942,11 +1953,12 @@ bootstrapping.
   (setf (early-gf-methods generic-function)
 	(remove method (early-gf-methods generic-function)))
   (set-arg-info generic-function)
-  (unless (assoc (early-gf-name generic-function) *generic-function-fixups*
+  (unless (assoc (early-gf-name generic-function) *!generic-function-fixups*
 		 :test #'equal)
     (update-dfun generic-function)))
 
-;;; ..and the early version of GET-METHOD.
+;;; This is the early version of GET-METHOD. See comments on the early
+;;; version of ADD-METHOD.
 (defun get-method (generic-function qualifiers specializers
 				    &optional (errorp t))
   (if (early-gf-p generic-function)
@@ -1962,13 +1974,13 @@ bootstrapping.
 	      nil))
       (real-get-method generic-function qualifiers specializers errorp)))
 
-(defvar *fegf-debug-p* nil)
-
-(defun fix-early-generic-functions (&optional (noisyp *fegf-debug-p*))
+(defun !fix-early-generic-functions ()
+  (sb-int:/show "entering !FIX-EARLY-GENERIC-FUNCTIONS")
   (let ((accessors nil))
-    ;; Rearrange *EARLY-GENERIC-FUNCTIONS* to speed up
+    ;; Rearrange *!EARLY-GENERIC-FUNCTIONS* to speed up
     ;; FIX-EARLY-GENERIC-FUNCTIONS.
-    (dolist (early-gf-spec *early-generic-functions*)
+    (dolist (early-gf-spec *!early-generic-functions*)
+      (sb-int:/show early-gf-spec)
       (when (every #'early-method-standard-accessor-p
 		   (early-gf-methods (gdefinition early-gf-spec)))
 	(push early-gf-spec accessors)))
@@ -1991,11 +2003,13 @@ bootstrapping.
 			   standard-class-p
 			   funcallable-standard-class-p
 			   specializerp)))
-      (setq *early-generic-functions*
-	    (cons spec (delete spec *early-generic-functions* :test #'equal))))
+      (sb-int:/show spec)
+      (setq *!early-generic-functions*
+	    (cons spec
+		  (delete spec *!early-generic-functions* :test #'equal))))
 
-    (dolist (early-gf-spec *early-generic-functions*)
-      (when noisyp (format t "~&~S..." early-gf-spec))
+    (dolist (early-gf-spec *!early-generic-functions*)
+      (sb-int:/show early-gf-spec)
       (let* ((gf (gdefinition early-gf-spec))
 	     (methods (mapcar #'(lambda (early-method)
 				  (let ((args (copy-list (fifth
@@ -2010,10 +2024,12 @@ bootstrapping.
 	      *standard-method-combination*)
 	(set-methods gf methods)))
 
-    (dolist (fns *early-functions*)
-      (setf (gdefinition (car fns)) (symbol-function (caddr fns))))
+    (dolist (fn *!early-functions*)
+      (sb-int:/show fn)
+      (setf (gdefinition (car fn)) (symbol-function (caddr fn))))
 
-    (dolist (fixup *generic-function-fixups*)
+    (dolist (fixup *!generic-function-fixups*)
+      (sb-int:/show fixup)
       (let* ((fspec (car fixup))
 	     (gf (gdefinition fspec))
 	     (methods (mapcar #'(lambda (method)
@@ -2041,7 +2057,8 @@ bootstrapping.
 	(setf (generic-function-method-class gf) *the-class-standard-method*)
 	(setf (generic-function-method-combination gf)
 	      *standard-method-combination*)
-	(set-methods gf methods)))))
+	(set-methods gf methods))))
+  (sb-int:/show "leaving !FIX-EARLY-GENERIC-FUNCTIONS"))
 
 ;;; PARSE-DEFMETHOD is used by DEFMETHOD to parse the &REST argument into
 ;;; the 'real' arguments. This is where the syntax of DEFMETHOD is really
