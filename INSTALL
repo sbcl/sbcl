@@ -5,6 +5,9 @@ They are in
 	src/runtime/sbcl
 and
 	output/sbcl.core
+In addition, there are a number of modules that extend the basic sbcl
+functionality, in
+        contrib/
 
 sbcl is a standard executable, built by compiling and linking an
 ordinary C program. It provides the runtime environment for the
@@ -19,15 +22,17 @@ it can find sbcl.core. There are three ways for it to find
 sbcl.core:
 
   1. by default, in /usr/lib/sbcl/sbcl.core or /usr/local/lib/sbcl/sbcl.core
+     (depending on the SBCL_HOME C preproccessor #define at compile-time)
   2. by environment variable: 
-     $ export SBCL_HOME=/foo/bar/
+     $ export SBCL_HOME=/foo/bar/lib/sbcl
      $ sbcl
   3. by command line option:
      $ sbcl --core /foo/bar/sbcl.core"
-The usual, recommended approach is method #1. Method #2 is useful if
-you're installing SBCL on a system in your user account, instead of
-installing SBCL on an entire system. Method #3 is mostly useful for
-testing or other special cases.
+
+The usual, recommended approach is method #1.  Method #2 is useful if
+you're installing SBCL on a system in a non-standard location (e.g. in
+your user account), instead of installing SBCL on an entire system.
+Method #3 is mostly useful for testing or other special cases.
 
 So: the standard installation procedure is
   1. Copy sbcl.core to /usr/lib or /usr/local/lib.
@@ -43,10 +48,10 @@ variable to /usr or /usr/local as appropriate before starting
 install.sh: e.g.
 
    # INSTALL_ROOT=/usr/local sh install.sh
-
 or
-
    $ INSTALL_ROOT=/home/me/sbcl sh install.sh
+(if your INSTALL_ROOT is XYZ, SBCL_HOME should be set to
+XYZ/lib/sbcl).
 
 IF YOU HAVE A SOURCE DISTRIBUTION:
 
