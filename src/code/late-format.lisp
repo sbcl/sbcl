@@ -460,6 +460,7 @@
 			  :complaint "no previous argument"))
 		 (caar *simple-args*))
 		(t
+		 (/show0 "THROWing NEED-ORIG-ARGS from tilde-P")
 		 (throw 'need-orig-args nil)))))
       (if atsignp
 	  `(write-string (if (eql ,arg 1) "y" "ies") stream)
@@ -611,6 +612,7 @@
 		 "both colon and atsign modifiers used simultaneously")
 	  (expand-bind-defaults ((posn 0)) params
 	    (unless *orig-args-available*
+	      (/show0 "THROWing NEED-ORIG-ARGS from tilde-@*")
 	      (throw 'need-orig-args nil))
 	    `(if (<= 0 ,posn (length orig-args))
 		 (setf args (nthcdr ,posn orig-args))
@@ -622,6 +624,7 @@
       (if colonp
 	  (expand-bind-defaults ((n 1)) params
 	    (unless *orig-args-available*
+	      (/show0 "THROWing NEED-ORIG-ARGS from tilde-:*")
 	      (throw 'need-orig-args nil))
 	    `(do ((cur-posn 0 (1+ cur-posn))
 		  (arg-ptr orig-args (cdr arg-ptr)))

@@ -312,7 +312,7 @@
 ;;; IR2 conversion may need to compile a forward reference. In this
 ;;; case the slots aren't actually initialized until entry analysis runs.
 (defstruct (entry-info (:copier nil))
-  ;; true if this function has a non-null closure environment
+  ;; Does this function have a non-null closure environment?
   (closure-p nil :type boolean)
   ;; a label pointing to the entry vector for this function, or NIL
   ;; before ENTRY-ANALYZE runs
@@ -331,13 +331,13 @@
 ;;; An IR2-PHYSENV is used to annotate non-LET LAMBDAs with their
 ;;; passing locations. It is stored in the PHYSENV-INFO.
 (defstruct (ir2-physenv (:copier nil))
-  ;; the TNs that hold the passed environment within the function.
-  ;; This is an alist translating from the NLX-INFO or LAMBDA-VAR to
-  ;; the TN that holds the corresponding value within this function.
+  ;; TN info for closed-over things within the function: an alist
+  ;; mapping from NLX-INFOs and LAMBDA-VARs to TNs holding the
+  ;; corresponding thing within this function
   ;;
-  ;; The elements of this list correspond to the elements of the list
-  ;; in the CLOSURE slot of the ENVIRONMENT object that links to us:
-  ;; essentially this list is related to the CLOSURE list by MAPCAR.
+  ;; Elements of this list have a one-to-one correspondence with
+  ;; elements of the PHYSENV-CLOSURE list of the PHYSENV object that
+  ;; links to us.
   (environment (missing-arg) :type list :read-only t)
   ;; the TNs that hold the OLD-FP and RETURN-PC within the function.
   ;; We always save these so that the debugger can do a backtrace,
@@ -515,7 +515,7 @@
   ;;    the type constraint as a Lisp function type.
   ;;
   ;; If RESULT-TYPES is :CONDITIONAL, then this is an IF-FOO style
-  ;; conditional that yeilds its result as a control transfer. The
+  ;; conditional that yields its result as a control transfer. The
   ;; emit function takes two info arguments: the target label and a
   ;; boolean flag indicating whether to negate the sense of the test.
   (arg-types nil :type list)

@@ -655,8 +655,7 @@
 	  (t
 	   (/noshow0 "default case")
 	   (let ((file (concatenate 'string directory name)))
-	     (/noshow0 "computed basic FILE=..")
-	     (/primitive-print file)
+	     (/noshow "computed basic FILE")
 	     (unless (or (null type) (eq type :unspecific))
 	       (/noshow0 "tweaking FILE for more-or-less-:UNSPECIFIC case")
 	       (setf file (concatenate 'string file "." type)))
@@ -664,8 +663,7 @@
 	       (/noshow0 "tweaking FILE for more-or-less-:WILD case")
 	       (setf file (concatenate 'string file "."
 				       (quick-integer-to-string version))))
-	     (/noshow0 "finished possibly tweaking FILE=..")
-	     (/primitive-print file)
+	     (/noshow0 "finished possibly tweaking FILE")
 	     (when (or (not verify-existence)
 		       (sb!unix:unix-file-kind file t))
 	       (/noshow0 "calling FUNCTION on FILE")

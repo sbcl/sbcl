@@ -697,11 +697,11 @@
 (defun unix-resolve-links (pathname)
   (declare (type simple-string pathname))
   (aver (not (relative-unix-pathname? pathname)))
-  (/show "entering UNIX-RESOLVE-LINKS")
+  (/noshow "entering UNIX-RESOLVE-LINKS")
   (loop with previous-pathnames = nil do
-	(/show pathname previous-pathnames)
+	(/noshow pathname previous-pathnames)
 	(let ((link (unix-readlink pathname)))
-	  (/show link)
+	  (/noshow link)
 	  ;; Unlike the old CMU CL code, we handle a broken symlink by
 	  ;; returning the link itself. That way, CL:TRUENAME on a
 	  ;; broken link returns the link itself, so that CL:DIRECTORY
@@ -720,7 +720,7 @@
 							pathname
 							:from-end t)))
 				 (dir (subseq pathname 0 dir-len)))
-			    (/show dir)
+			    (/noshow dir)
 			    (concatenate 'string dir link))
 			  link))))
 		(if (unix-file-kind new-pathname)

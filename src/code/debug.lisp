@@ -692,28 +692,32 @@ reset to ~S."
 	 (internal-debug))))))
 
 (defun show-restarts (restarts s)
-  (when restarts
-    (format s "~&restarts:~%")
-    (let ((count 0)
-	  (names-used '(nil))
-	  (max-name-len 0))
-      (dolist (restart restarts)
-	(let ((name (restart-name restart)))
-	  (when name
-	    (let ((len (length (princ-to-string name))))
-	      (when (> len max-name-len)
-		(setf max-name-len len))))))
-      (unless (zerop max-name-len)
-	(incf max-name-len 3))
-      (dolist (restart restarts)
-	(let ((name (restart-name restart)))
-	  (cond ((member name names-used)
-		 (format s "~& ~2D: ~@VT~A~%" count max-name-len restart))
-		(t
-		 (format s "~& ~2D: [~VA] ~A~%"
-			 count (- max-name-len 3) name restart)
-		 (push name names-used))))
-	(incf count)))))
+  (cond ((null restarts)
+	 (format s
+		 "~&(no restarts: If you didn't do this on purpose, ~
+                  please report it as a bug.)~%"))
+	(t
+	 (format s "~&restarts:~%")
+	 (let ((count 0)
+	       (names-used '(nil))
+	       (max-name-len 0))
+	   (dolist (restart restarts)
+	     (let ((name (restart-name restart)))
+	       (when name
+		 (let ((len (length (princ-to-string name))))
+		   (when (> len max-name-len)
+		     (setf max-name-len len))))))
+	   (unless (zerop max-name-len)
+	     (incf max-name-len 3))
+	   (dolist (restart restarts)
+	     (let ((name (restart-name restart)))
+	       (cond ((member name names-used)
+		      (format s "~& ~2D: ~@VT~A~%" count max-name-len restart))
+		     (t
+		      (format s "~& ~2D: [~VA] ~A~%"
+			      count (- max-name-len 3) name restart)
+		      (push name names-used))))
+	     (incf count))))))
 
 ;;; This calls DEBUG-LOOP, performing some simple initializations
 ;;; before doing so. INVOKE-DEBUGGER calls this to actually get into
@@ -744,9 +748,11 @@ reset to ~S."
 	 (*stack-top* (or *stack-top-hint* *real-stack-top*))
 	 (*stack-top-hint* nil)
 	 (*current-frame* *stack-top*))
-    (handler-bind ((sb!di:debug-condition (lambda (condition)
-					    (princ condition *debug-io*)
-					    (throw 'debug-loop-catcher nil))))
+    (handler-bind ((sb!di:debug-condition
+		    (lambda (condition)
+		      (princ condition *debug-io*)
+		      (/show0 "handling d-c by THROWing DEBUG-LOOP-CATCHER")
+		      (throw 'debug-loop-catcher nil))))
       (fresh-line)
       (print-frame-call *current-frame* :verbosity 2)
       (loop
@@ -761,6 +767,7 @@ reset to ~S."
 					      "~&error flushed (because ~
 					       ~S is set)"
 					      '*flush-debug-errors*)
+				      (/show0 "throwing DEBUG-LOOP-CATCHER")
 				      (throw 'debug-loop-catcher nil)))))
 	    ;; We have to bind level for the restart function created by
 	    ;; WITH-SIMPLE-RESTART.
@@ -1054,7 +1061,7 @@ argument")
 		 (setf (car cmds) (caar cmds))))))))
 
 ;;; Return a list of debug commands (in the same format as
-;;; *debug-commands*) that invoke each active restart.
+;;; *DEBUG-COMMANDS*) that invoke each active restart.
 ;;;
 ;;; Two commands are made for each restart: one for the number, and
 ;;; one for the restart name (unless it's been shadowed by an earlier
@@ -1065,7 +1072,9 @@ argument")
     (dolist (restart restarts)
       (let ((name (string (restart-name restart))))
         (let ((restart-fun
-                #'(lambda () (invoke-restart-interactively restart))))
+                #'(lambda ()
+		    (/show0 "in restart-command closure, about to i-r-i")
+		    (invoke-restart-interactively restart))))
           (push (cons (format nil "~d" num) restart-fun) commands)
           (unless (or (null (restart-name restart)) 
                       (find name commands :key #'car :test #'string=))
@@ -1154,6 +1163,7 @@ argument")
 ;;;  (error "There is no restart named CONTINUE."))
 
 (!def-debug-command "RESTART" ()
+  (/show0 "doing RESTART debug-command")
   (let ((num (read-if-available :prompt)))
     (when (eq num :prompt)
       (show-restarts *debug-restarts* *debug-io*)
@@ -1171,6 +1181,7 @@ argument")
 		     (t
 		      (format t "~S is invalid as a restart name.~%" num)
 		      (return-from restart-debug-command nil)))))
+      (/show0 "got RESTART")
       (if restart
 	  (invoke-restart-interactively restart)
 	  ;; FIXME: Even if this isn't handled by WARN, it probably

@@ -844,7 +844,11 @@ changes in sbcl-0.7.0 relative to sbcl-0.6.13:
   introduced some new bugs, but since the new logic is simpler and
   more orthogonal, hopefully it will be easier to clean up bugs
   in the new code than it was in the old code.
-* The rewritten compiler is still a little unsteady on its feet.
+* Some obscure compiler bugs (notably a messy one involving closures
+  over variables when the closure relationship was stretched over
+  multiple compilation components) were exposed by the new way that
+  the compiler is used, and were fixed.
+* The revised compiler is still a little unsteady on its feet.
   In particular, the debugging information it produces is sometimes
   broken, and the support for inlining FOO when you
   (DECLAIM (INLINE FOO)) then do (DEFUN FOO ..) in a non-null

@@ -124,23 +124,6 @@
 	     ,@decls
 	     ,body))
 	 (setf (info :function :source-transform ',name) #',fn-name)))))
-
-;;; Define a function that converts a use of (%PRIMITIVE NAME ..)
-;;; into Lisp code. LAMBDA-LIST is a DEFMACRO-style lambda list.
-(defmacro def-primitive-translator (name lambda-list &body body)
-  (let ((fn-name (symbolicate "PRIMITIVE-TRANSLATE-" name))
-	(n-form (gensym))
-	(n-env (gensym)))
-    (multiple-value-bind (body decls)
-	(parse-defmacro lambda-list n-form body name "%primitive"
-			:environment n-env
-			:error-fun 'convert-condition-into-compiler-error)
-      `(progn
-	 (defun ,fn-name (,n-form)
-	   (let ((,n-env *lexenv*))
-	     ,@decls
-	     ,body))
-	 (setf (gethash ',name *primitive-translators*) ',fn-name)))))
 
 ;;;; boolean attribute utilities
 ;;;;

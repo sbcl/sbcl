@@ -409,8 +409,6 @@
 						   'string
 						   user-home
 						   "/.sbclrc"))))
-	(/show0 "assigned SYSINIT-TRUENAME and USERINIT-TRUENAME")
-
 
 	;; We wrap all the pre-REPL user/system customized startup code 
 	;; in a restart.
@@ -439,11 +437,14 @@
 		(eval eval)
 		(flush-standard-output-streams)))
 	  (continue ()
-		    :report "Continue anyway (skipping to toplevel read/eval/print loop)."
-		    (values)) ; (no-op, just fall through)
+	    :report
+	    "Continue anyway (skipping to toplevel read/eval/print loop)."
+	    (/show0 "CONTINUEing from pre-REPL RESTART-CASE")
+	    (values)) ; (no-op, just fall through)
 	  (quit ()
-		:report "Quit SBCL (calling #'QUIT, killing the process)."
-		(quit))))
+	    :report "Quit SBCL (calling #'QUIT, killing the process)."
+	    (/show0 "falling through to QUIT from pre-REPL RESTART-CASE")
+	    (quit))))
 
       ;; one more time for good measure, in case we fell out of the
       ;; RESTART-CASE above before one of the flushes in the ordinary
@@ -451,7 +452,9 @@
       (flush-standard-output-streams)
 
       (/show0 "falling into TOPLEVEL-REPL from TOPLEVEL-INIT")
-      (toplevel-repl noprint))))
+      (toplevel-repl noprint)
+      ;; (classic CMU CL error message: "You're certainly a clever child.":-)
+      (critically-unreachable "after TOPLEVEL-REPL"))))
 
 ;;; read-eval-print loop for the default system toplevel
 (defun toplevel-repl (noprint)
@@ -459,50 +462,63 @@
   (let ((* nil) (** nil) (*** nil)
 	(- nil)
 	(+ nil) (++ nil) (+++ nil)
-	(/// nil) (// nil) (/ nil)
-	(eof-marker (cons :eof nil)))
+	(/// nil) (// nil) (/ nil))
+    ;; WITH-SIMPLE-RESTART doesn't actually restart its body as some
+    ;; (like WHN for an embarrassingly long time ca. 2001-12-07) might
+    ;; think, but instead drops control back out at the end. So when a
+    ;; TOPLEVEL or outermost-ABORT restart happens, we need this outer
+    ;; LOOP wrapper to grab control and start over again. (And it also
+    ;; wraps CATCH 'TOPLEVEL-CATCHER for similar reasons.)
     (loop
-      (/show0 "at head of outer LOOP in TOPLEVEL-REPL")
-      ;; There should only be one TOPLEVEL restart, and it's here, so
-      ;; restarting at TOPLEVEL always bounces you all the way out here.
-      (with-simple-restart (toplevel
-			    "Restart at toplevel READ/EVAL/PRINT loop.")
-	;; We add a new ABORT restart for every debugger level, so 
-	;; restarting at ABORT in a nested debugger gets you out to the
-        ;; innermost enclosing debugger, and only when you're in the
-        ;; outermost, unnested debugger level does restarting at ABORT 
-	;; get you out to here.
-        (with-simple-restart (abort
-			      "Reduce debugger level (leaving debugger).")
-	  (catch 'toplevel-catcher
-	    (sb!unix:unix-sigsetmask 0)	; FIXME: What is this for?
-	    (/show0 "about to enter inner LOOP in TOPLEVEL-REPL")
-	    (loop ; FIXME: Do we need this inner LOOP?
-	     ;; FIXME: It seems bad to have GC behavior depend on scrubbing
-	     ;; the control stack before each interactive command. Isn't
-	     ;; there some way we can convince the GC to just ignore
-	     ;; dead areas of the control stack, so that we don't need to
-	     ;; rely on this half-measure?
-	     (scrub-control-stack)
-	     (unless noprint
-	       (fresh-line)
-	       (princ (if (functionp *prompt*)
-			  (funcall *prompt*)
-			  *prompt*))
-	       (flush-standard-output-streams))
-	     (let ((form (read *standard-input* nil eof-marker)))
-	       (if (eq form eof-marker)
-		   (quit)
-		   (let ((results
-			  (multiple-value-list (interactive-eval form))))
-		     (unless noprint
-		       (dolist (result results)
-			 (fresh-line)
-			 (prin1 result)))))))))))))
+     (/show0 "about to set up restarts in TOPLEVEL-REPL")
+     ;; There should only be one TOPLEVEL restart, and it's here, so
+     ;; restarting at TOPLEVEL always bounces you all the way out here.
+     (with-simple-restart (toplevel
+			   "Restart at toplevel READ/EVAL/PRINT loop.")
+       ;; We add a new ABORT restart for every debugger level, so 
+       ;; restarting at ABORT in a nested debugger gets you out to the
+       ;; innermost enclosing debugger, and only when you're in the
+       ;; outermost, unnested debugger level does restarting at ABORT 
+       ;; get you out to here.
+       (with-simple-restart
+	   (abort
+	    "Reduce debugger level (leaving debugger, returning to toplevel).")
+	 (catch 'toplevel-catcher
+	   (sb!unix:unix-sigsetmask 0)	; FIXME: What is this for?
+	   (repl noprint)
+	   (critically-unreachable "after REPL")))))))
+
+(defun repl (noprint)
+  (/show0 "entering REPL")
+  (let ((eof-marker (cons :eof nil)))
+    (loop
+     ;; FIXME: It seems bad to have GC behavior depend on scrubbing the
+     ;; control stack before each interactive command. Isn't there some
+     ;; way we can convince the GC to just ignore dead areas of the
+     ;; control stack, so that we don't need to rely on this
+     ;; half-measure?
+     (scrub-control-stack)
+     (unless noprint
+       (fresh-line)
+       (princ (if (functionp *prompt*)
+		  (funcall *prompt*)
+		  *prompt*))
+       (flush-standard-output-streams))
+     (let ((form (read *standard-input* nil eof-marker)))
+       (cond ((eq form eof-marker)
+	      (/show0 "doing QUIT for EOF in REPL")
+	      (quit))
+	     (t
+	      (let ((results (multiple-value-list (interactive-eval form))))
+		(unless noprint
+		  (dolist (result results)
+		    (fresh-line)
+		    (prin1 result))))))))))
 
 (defun noprogrammer-debugger-hook-fun (condition old-debugger-hook)
   (declare (ignore old-debugger-hook))
   (flet ((failure-quit (&key recklessly-p)
+           (/show0 "in FAILURE-QUIT (in noprogrammer debugger hook)")
 	   (quit :unix-status 1 :recklessly-p recklessly-p)))
     ;; This HANDLER-CASE is here mostly to stop output immediately
     ;; (and fall through to QUIT) when there's an I/O error. Thus,
@@ -512,12 +528,14 @@
     (handler-case
 	(progn
 	  (format *error-output*
-		  "~@<unhandled condition (of type ~S): ~2I~_~A~:>~2%"
+		  "~&~@<unhandled condition (of type ~S): ~2I~_~A~:>~2%"
 		  (type-of condition)
 		  condition)
 	  ;; Flush *ERROR-OUTPUT* even before the BACKTRACE, so that
-	  ;; even if we hit an error within BACKTRACE we'll at least
-	  ;; have the CONDITION printed out before we die.
+	  ;; even if we hit an error within BACKTRACE (e.g. a bug in
+	  ;; the debugger's own frame-walking code, or a bug in a user
+	  ;; PRINT-OBJECT method) we'll at least have the CONDITION
+	  ;; printed out before we die.
 	  (finish-output *error-output*)
 	  ;; (Where to truncate the BACKTRACE is of course arbitrary, but
 	  ;; it seems as though we should at least truncate it somewhere.)

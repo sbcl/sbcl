@@ -438,9 +438,11 @@ And so, we are saved.
 (defun make-caching-dfun (generic-function &optional cache)
   (unless cache
     (when (use-constant-value-dfun-p generic-function)
-      (return-from make-caching-dfun (make-constant-value-dfun generic-function)))
+      (return-from make-caching-dfun
+	(make-constant-value-dfun generic-function)))
     (when (use-dispatch-dfun-p generic-function)
-      (return-from make-caching-dfun (make-dispatch-dfun generic-function))))
+      (return-from make-caching-dfun
+	(make-dispatch-dfun generic-function))))
   (multiple-value-bind (nreq applyp metatypes nkeys)
       (get-generic-function-info generic-function)
     (declare (ignore nreq))

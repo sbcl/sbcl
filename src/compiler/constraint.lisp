@@ -443,7 +443,7 @@
 ;;; Our OUT is:
 ;;;     out U (in - kill)
 ;;;
-;;; BLOCK-KILL-LIST is just a list of the lambda-vars killed, so we must
+;;; BLOCK-KILL-LIST is just a list of the LAMBDA-VARs killed, so we must
 ;;; compute the kill set when there are any vars killed. We bum this a
 ;;; bit by special-casing when only one var is killed, and just using
 ;;; that var's constraints as the kill set. This set could possibly be

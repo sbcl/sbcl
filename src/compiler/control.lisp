@@ -59,8 +59,7 @@
     (cond
      ((and pred
 	   (not (physenv-nlx-info env))
-	   (not (eq (node-block (lambda-bind (block-home-lambda block)))
-		    block)))
+	   (not (eq (lambda-block (block-home-lambda block)) block)))
       (let ((current pred)
 	    (current-num (block-number pred)))
 	(block DONE

@@ -153,6 +153,7 @@
     (find-and-init-or-check-layout name length inherits depthoid)))
 
 (define-fop (fop-end-group 64 :nope)
+  (/show0 "THROWing FASL-GROUP-END")
   (throw 'fasl-group-end t))
 
 ;;; In the normal loader, we just ignore these. GENESIS overwrites

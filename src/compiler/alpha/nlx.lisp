@@ -1,4 +1,4 @@
-;;;; the definitions of VOPs used for non-local exit (throw, lexical
+;;;; the definitions of VOPs used for non-local exit (THROW, lexical
 ;;;; exit, etc.)
 
 ;;;; This software is part of the SBCL system. See the README file for

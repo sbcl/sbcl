@@ -497,7 +497,7 @@
 (defun ir1-optimize-return (node)
   (declare (type creturn node))
   (let* ((tails (lambda-tail-set (return-lambda node)))
-	 (funs (tail-set-functions tails)))
+	 (funs (tail-set-funs tails)))
     (collect ((res *empty-type* values-type-union))
       (dolist (fun funs)
 	(let ((return (lambda-return fun)))
@@ -509,7 +509,7 @@
 
       (when (type/= (res) (tail-set-type tails))
 	(setf (tail-set-type tails) (res))
-	(dolist (fun (tail-set-functions tails))
+	(dolist (fun (tail-set-funs tails))
 	  (dolist (ref (leaf-refs fun))
 	    (reoptimize-continuation (node-cont ref)))))))
 
@@ -687,8 +687,8 @@
 		    ;; cross-compiler doesn't know how to evaluate it.
 		    #+sb-xc-host
 		    (let* ((ref (continuation-use (combination-fun node)))
-			   (fun (leaf-name (ref-leaf ref))))
-		      (fboundp fun)))
+			   (fun-name (leaf-source-name (ref-leaf ref))))
+		      (fboundp fun-name)))
 	   (constant-fold-call node)
 	   (return-from ir1-optimize-combination)))
 
@@ -800,6 +800,10 @@
 	     (:inline t)
 	     (:no-chance nil)
 	     ((nil :maybe-inline) (policy call (zerop space))))
+	   ;; FIXME: In sbcl-0.pre7.87, it looks as though we'll
+	   ;; get here when LEAF is a GLOBAL-VAR (not a DEFINED-FUN)
+	   ;; whenever (ZEROP SPACE), in which case we'll die with
+	   ;; a type error when we try to access LEAF as a DEFINED-FUN.
 	   (defined-fun-inline-expansion leaf)
 	   (let ((fun (defined-fun-functional leaf)))
 	     (or (not fun)
@@ -816,15 +820,15 @@
 	    (frob)
 	    (with-ir1-environment call
 	      (frob)
-	      (local-call-analyze *current-component*))))
+	      (locall-analyze-component *current-component*))))
 
       (values (ref-leaf (continuation-use (basic-combination-fun call)))
 	      nil))
      (t
-      (let* ((name (leaf-name leaf))
+      (let* ((name (leaf-source-name leaf))
 	     (info (info :function :info
 			 (if (slot-accessor-p leaf)
-			     (if (consp name)
+			     (if (consp source-name) ; i.e. if SETF function
 				 '%slot-setter
 				 '%slot-accessor)
 			     name))))
@@ -875,7 +879,7 @@
 	 (values nil nil))))
 
 ;;; This is called by IR1-OPTIMIZE when the function for a call has
-;;; changed. If the call is local, we try to let-convert it, and
+;;; changed. If the call is local, we try to LET-convert it, and
 ;;; derive the result type. If it is a :FULL call, we validate it
 ;;; against the type, which recognizes known calls, does inline
 ;;; expansion, etc. If a call to a predicate in a non-conditional
@@ -900,19 +904,30 @@
 		 (continuation-use (basic-combination-fun call))
 		 call))
 	       ((not leaf))
-	       ((or (info :function :source-transform (leaf-name leaf))
+	       ((or (info :function :source-transform (leaf-source-name leaf))
 		    (and info
 			 (ir1-attributep (function-info-attributes info)
 					 predicate)
 			 (let ((dest (continuation-dest (node-cont call))))
 			   (and dest (not (if-p dest))))))
-		(let ((name (leaf-name leaf)))
-		  (when (symbolp name)
-		    (let ((dums (make-gensym-list (length
-						   (combination-args call)))))
-		      (transform-call call
-				      `(lambda ,dums
-					 (,name ,@dums))))))))))))
+		(when (and (leaf-has-source-name-p leaf)
+			   ;; FIXME: This SYMBOLP is part of a literal
+			   ;; translation of a test in the old CMU CL
+			   ;; source, and it's not quite clear what
+			   ;; the old source meant. Did it mean "has a
+			   ;; valid name"? Or did it mean "is an
+			   ;; ordinary function name, not a SETF
+			   ;; function"? Either way, the old CMU CL
+			   ;; code probably didn't deal with SETF
+			   ;; functions correctly, and neither does
+			   ;; this new SBCL code, and that should be fixed.
+			   (symbolp (leaf-source-name leaf)))
+		  (let ((dummies (make-gensym-list (length
+						    (combination-args call)))))
+		    (transform-call call
+				    `(lambda ,dummies
+				       (,(leaf-source-name leaf)
+					,@dummies)))))))))))
   (values))
 
 ;;;; known function optimization
@@ -1069,17 +1084,19 @@
 (defun transform-call (node res)
   (declare (type combination node) (list res))
   (with-ir1-environment node
-    (let ((new-fun (ir1-convert-inline-lambda res))
+    (let ((new-fun (ir1-convert-inline-lambda
+		    res
+		    :debug-name "<something inlined in TRANSFORM-CALL>"))
 	  (ref (continuation-use (combination-fun node))))
       (change-ref-leaf ref new-fun)
       (setf (combination-kind node) :full)
-      (local-call-analyze *current-component*)))
+      (locall-analyze-component *current-component*)))
   (values))
 
 ;;; Replace a call to a foldable function of constant arguments with
 ;;; the result of evaluating the form. We insert the resulting
 ;;; constant node after the call, stealing the call's continuation. We
-;;; give the call a continuation with no Dest, which should cause it
+;;; give the call a continuation with no DEST, which should cause it
 ;;; and its arguments to go away. If there is an error during the
 ;;; evaluation, we give a warning and leave the call alone, making the
 ;;; call a :ERROR call.
@@ -1090,10 +1107,10 @@
   (declare (type combination call))
   (let* ((args (mapcar #'continuation-value (combination-args call)))
 	 (ref (continuation-use (combination-fun call)))
-	 (fun (leaf-name (ref-leaf ref))))
+	 (fun-name (leaf-source-name (ref-leaf ref))))
 
     (multiple-value-bind (values win)
-	(careful-call fun args call "constant folding")
+	(careful-call fun-name args call "constant folding")
       (if (not win)
 	(setf (combination-kind call) :error)
 	(let ((dummies (make-gensym-list (length args))))
@@ -1225,7 +1242,7 @@
 ;;; changes. We look at each changed argument. If the corresponding
 ;;; variable is set, then we call PROPAGATE-FROM-SETS. Otherwise, we
 ;;; consider substituting for the variable, and also propagate
-;;; derived-type information for the arg to all the Var's refs.
+;;; derived-type information for the arg to all the VAR's refs.
 ;;;
 ;;; Substitution is inhibited when the arg leaf's derived type isn't a
 ;;; subtype of the argument's asserted type. This prevents type
@@ -1242,7 +1259,7 @@
 ;;; are done, then we delete the LET.
 ;;;
 ;;; Note that we are responsible for clearing the
-;;; Continuation-Reoptimize flags.
+;;; CONTINUATION-REOPTIMIZE flags.
 (defun propagate-let-args (call fun)
   (declare (type combination call) (type clambda fun))
   (loop for arg in (combination-args call)
@@ -1266,8 +1283,7 @@
 				  this-comp)
 			      t)
 			     (t
-			      (aver (eq (functional-kind (lambda-home fun))
-					:toplevel))
+			      (aver (lambda-toplevelish-p (lambda-home fun)))
 			      nil)))
 		   leaf var))
 		t)))))
@@ -1296,7 +1312,7 @@
 (defun propagate-local-call-args (call fun)
   (declare (type combination call) (type clambda fun))
 
-  (unless (or (functional-entry-function fun)
+  (unless (or (functional-entry-fun fun)
 	      (lambda-optional-dispatch fun))
     (let* ((vars (lambda-vars fun))
 	   (union (mapcar #'(lambda (arg var)
@@ -1474,7 +1490,7 @@
 			      (funcall ,(ref-leaf ref) ,@dums)))))
 		(change-ref-leaf ref fun)
 		(aver (eq (basic-combination-kind node) :full))
-		(local-call-analyze *current-component*)
+		(locall-analyze-component *current-component*)
 		(aver (eq (basic-combination-kind node) :local)))))))))
   (values))
 

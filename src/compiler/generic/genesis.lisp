@@ -1136,13 +1136,17 @@
 ;;; intern it.
 (defun finish-symbols ()
 
-  ;; FIXME: Why use SETQ (setting symbol value) instead of just using
-  ;; the function values for these things?? I.e. why do we need this
-  ;; section at all? Is it because all the FDEFINITION stuff gets in
-  ;; the way of reading function values and is too hairy to rely on at
-  ;; cold boot? FIXME: Most of these are in *STATIC-SYMBOLS* in
-  ;; parms.lisp, but %HANDLE-FUN-END-BREAKPOINT is not. Why?
-  ;; Explain.
+  ;; I think the point of setting these functions into SYMBOL-VALUEs
+  ;; here, instead of using SYMBOL-FUNCTION, is that in CMU CL
+  ;; SYMBOL-FUNCTION reduces to FDEFINITION, which is a pretty
+  ;; hairy operation (involving globaldb.lisp etc.) which we don't
+  ;; want to invoke early in cold init. -- WHN 2001-12-05
+  ;;
+  ;; FIXME: So OK, that's a reasonable reason to do something weird like
+  ;; this, but this is still a weird thing to do, and we should change
+  ;; the names to highlight that something weird is going on. Perhaps
+  ;; *MAYBE-GC-FUN*, *INTERNAL-ERROR-FUN*, *HANDLE-BREAKPOINT-FUN*,
+  ;; and *HANDLE-FUN-END-BREAKPOINT-FUN*...
   (macrolet ((frob (symbol)
 	       `(cold-set ',symbol
 			  (cold-fdefinition-object (cold-intern ',symbol)))))

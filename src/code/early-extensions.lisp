@@ -200,7 +200,7 @@
 ;;; the function is made the new value for the collection. As a
 ;;; totally magical special-case, FUNCTION may be COLLECT, which tells
 ;;; us to build a list in forward order; this is the default. If an
-;;; INITIAL-VALUE is supplied for Collect, the stuff will be RPLACD'd
+;;; INITIAL-VALUE is supplied for COLLECT, the stuff will be RPLACD'd
 ;;; onto the end. Note that FUNCTION may be anything that can appear
 ;;; in the functional position, including macros and lambdas.
 (defmacro collect (collections &body body)
@@ -208,7 +208,7 @@
 	(binds ()))
     (dolist (spec collections)
       (unless (proper-list-of-length-p spec 1 3)
-	(error "malformed collection specifier: ~S." spec))
+	(error "malformed collection specifier: ~S" spec))
       (let* ((name (first spec))
 	     (default (second spec))
 	     (kind (or (third spec) 'collect))
@@ -689,10 +689,10 @@
 ;;; error indicating that a required &KEY argument was not supplied.
 ;;; This function is also useful for DEFSTRUCT slot defaults
 ;;; corresponding to required arguments.
-(declaim (ftype (function () nil) required-arg))
-(defun required-arg ()
+(declaim (ftype (function () nil) missing-arg))
+(defun missing-arg ()
   #!+sb-doc
-  (/show0 "entering REQUIRED-ARG")
+  (/show0 "entering MISSING-ARG")
   (error "A required &KEY or &OPTIONAL argument was not supplied."))
 
 ;;; like CL:ASSERT and CL:CHECK-TYPE, but lighter-weight

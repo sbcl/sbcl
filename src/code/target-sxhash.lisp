@@ -117,7 +117,7 @@
 (defun sxhash (x)
   (labels ((sxhash-number (x)
 	     (etypecase x
-	       (fixnum (sxhash x)) ; through DEFTRANSFORM
+	       (fixnum (sxhash x))	; through DEFTRANSFORM
 	       (integer (sb!bignum:sxhash-bignum x))
 	       (single-float (sxhash x)) ; through DEFTRANSFORM
 	       (double-float (sxhash x)) ; through DEFTRANSFORM
@@ -147,7 +147,6 @@
 			     (class-name (layout-class (%instance-layout x)))))
 		    309518995))
 	       (symbol (sxhash x)) ; through DEFTRANSFORM
-	       (number (sxhash-number x))
 	       (array
 		(typecase x
 		  (simple-string (sxhash x)) ; through DEFTRANSFORM
@@ -161,6 +160,8 @@
 	       (character
 		(logxor 72185131
 			(sxhash (char-code x)))) ; through DEFTRANSFORM
+	       ;; general, inefficient case of NUMBER
+	       (number (sxhash-number x))
 	       (t 42))))
     (sxhash-recurse x)))
 

@@ -54,9 +54,9 @@
 ;;;; leaf reference
 
 ;;; Return the TN that holds the value of THING in the environment ENV.
+(declaim (ftype (function ((or nlx-info lambda-var) physenv) tn)
+		find-in-physenv))
 (defun find-in-physenv (thing physenv)
-  (declare (type (or nlx-info lambda-var) thing) (type physenv physenv)
-	   (values tn))
   (or (cdr (assoc thing (ir2-physenv-environment (physenv-info physenv))))
       (etypecase thing
 	(lambda-var
@@ -109,7 +109,6 @@
   (declare (type ref node) (type ir2-block block))
   (let* ((cont (node-cont node))
 	 (leaf (ref-leaf node))
-	 (name (leaf-name leaf))
 	 (locs (continuation-result-tns
 		cont (list (primitive-type (leaf-type leaf)))))
 	 (res (first locs)))
@@ -122,14 +121,16 @@
       (constant
        (if (legal-immediate-constant-p leaf)
 	   (emit-move node block (constant-tn leaf) res)
-	   (let ((name-tn (emit-constant name)))
+	   (let* ((name (leaf-source-name leaf))
+		  (name-tn (emit-constant name)))
 	     (if (policy node (zerop safety))
 		 (vop fast-symbol-value node block name-tn res)
 		 (vop symbol-value node block name-tn res)))))
       (functional
        (ir2-convert-closure node block leaf res))
       (global-var
-       (let ((unsafe (policy node (zerop safety))))
+       (let ((unsafe (policy node (zerop safety)))
+	     (name (leaf-source-name leaf)))
 	 (ecase (global-var-kind leaf)
 	   ((:special :global)
 	    (aver (symbolp name))
@@ -207,8 +208,8 @@
       (global-var
        (ecase (global-var-kind leaf)
 	 ((:special :global)
-	  (aver (symbolp (leaf-name leaf)))
-	  (vop set node block (emit-constant (leaf-name leaf)) val)))))
+	  (aver (symbolp (leaf-source-name leaf)))
+	  (vop set node block (emit-constant (leaf-source-name leaf)) val)))))
     (when locs
       (emit-move node block val (first locs))
       (move-continuation-result node block locs cont)))
@@ -389,7 +390,7 @@
 	  dest))
   (values))
 
-;;; If necessary, emit coercion code needed to deliver the Results to
+;;; If necessary, emit coercion code needed to deliver the RESULTS to
 ;;; the specified continuation. NODE and BLOCK provide context for
 ;;; emitting code. Although usually obtained from STANDARD-RESULT-TNs
 ;;; or CONTINUATION-RESULT-TNs, RESULTS my be a list of any type or
@@ -769,7 +770,7 @@
 	  ((node-tail-p node)
 	   (ir2-convert-tail-local-call node block fun))
 	  (t
-	   (let ((start (block-label (node-block (lambda-bind fun))))
+	   (let ((start (block-label (lambda-block fun)))
 		 (returns (tail-set-info (lambda-tail-set fun)))
 		 (cont (node-cont node)))
 	     (ecase (if returns
@@ -1014,7 +1015,7 @@
   (declare (type bind node) (type ir2-block block) (type clambda fun))
   (let ((start-label (entry-info-offset (leaf-info fun)))
 	(env (physenv-info (node-physenv node))))
-    (let ((ef (functional-entry-function fun)))
+    (let ((ef (functional-entry-fun fun)))
       (cond ((and (optional-dispatch-p ef) (optional-dispatch-more-entry ef))
 	     ;; Special case the xep-allocate-frame + copy-more-arg case.
 	     (vop xep-allocate-frame node block start-label t)
@@ -1142,10 +1143,10 @@
 ;;; stack. It returns the OLD-FP and RETURN-PC for the current
 ;;; function as multiple values.
 (defoptimizer (sb!kernel:%caller-frame-and-pc ir2-convert) (() node block)
-  (let ((env (physenv-info (node-physenv node))))
+  (let ((ir2-physenv (physenv-info (node-physenv node))))
     (move-continuation-result node block
-			      (list (ir2-physenv-old-fp env)
-				    (ir2-physenv-return-pc env))
+			      (list (ir2-physenv-old-fp ir2-physenv)
+				    (ir2-physenv-return-pc ir2-physenv))
 			      (node-cont node))))
 
 ;;;; multiple values
@@ -1261,7 +1262,7 @@
 ;;; This is trivial, given our assumption of a shallow-binding
 ;;; implementation.
 (defoptimizer (%special-bind ir2-convert) ((var value) node block)
-  (let ((name (leaf-name (continuation-value var))))
+  (let ((name (leaf-source-name (continuation-value var))))
     (vop bind node block (continuation-tn node block value)
 	 (emit-constant name))))
 (defoptimizer (%special-unbind ir2-convert) ((var) node block)
@@ -1329,7 +1330,6 @@
 	    (ir2-continuation-locs (continuation-info (second args)))
 	    nil))
 	  (nil)))
-
   (move-continuation-result node block () (node-cont node))
   (values))
 
@@ -1561,7 +1561,9 @@
 			  (eq (basic-combination-kind last) :full))
 		 (let* ((fun (basic-combination-fun last))
 			(use (continuation-use fun))
-			(name (and (ref-p use) (leaf-name (ref-leaf use)))))
+			(name (and (ref-p use)
+				   (leaf-has-source-name-p (ref-leaf use))
+				   (leaf-source-name (ref-leaf use)))))
 		   (unless (or (node-tail-p last)
 			       (info :function :info name)
 			       (policy last (zerop safety)))

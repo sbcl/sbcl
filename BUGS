@@ -1227,7 +1227,115 @@ Error in function C::GET-LAMBDA-TO-COMPILE:
   This function returns its argument. But after removing percents it
   does not work: "Result of (1- n) is not a function".
 
+131:
+  As of sbcl-0.pre7.86.flaky7.3, the cross-compiler, and probably 
+  the CL:COMPILE function (which is based on the same %COMPILE 
+  mechanism) get confused by 
+(defun sxhash (x)
+  (labels ((sxhash-number (x)
+	     (etypecase x
+	       (fixnum (sxhash x)) ; through DEFTRANSFORM
+	       (integer (sb!bignum:sxhash-bignum x))
+	       (single-float (sxhash x)) ; through DEFTRANSFORM
+	       (double-float (sxhash x)) ; through DEFTRANSFORM
+	       #!+long-float (long-float (error "stub: no LONG-FLOAT"))
+	       (ratio (let ((result 127810327))
+			(declare (type fixnum result))
+			(mixf result (sxhash-number (numerator x)))
+			(mixf result (sxhash-number (denominator x)))
+			result))
+	       (complex (let ((result 535698211))
+			  (declare (type fixnum result))
+			  (mixf result (sxhash-number (realpart x)))
+			  (mixf result (sxhash-number (imagpart x)))
+			  result))))
+	   (sxhash-recurse (x &optional (depthoid +max-hash-depthoid+))
+	     (declare (type index depthoid))
+	     (typecase x
+	       (list
+		(if (plusp depthoid)
+		    (mix (sxhash-recurse (car x) (1- depthoid))
+			 (sxhash-recurse (cdr x) (1- depthoid)))
+		    261835505))
+	       (instance
+		(if (typep x 'structure-object)
+		    (logxor 422371266
+			    (sxhash ; through DEFTRANSFORM
+			     (class-name (layout-class (%instance-layout x)))))
+		    309518995))
+	       (symbol (sxhash x)) ; through DEFTRANSFORM
+	       (number (sxhash-number x))
+	       (array
+		(typecase x
+		  (simple-string (sxhash x)) ; through DEFTRANSFORM
+		  (string (%sxhash-substring x))
+		  (bit-vector (let ((result 410823708))
+				(declare (type fixnum result))
+				(dotimes (i (min depthoid (length x)))
+				  (mixf result (aref x i)))
+				result))
+		  (t (logxor 191020317 (sxhash (array-rank x))))))
+	       (character
+		(logxor 72185131
+			(sxhash (char-code x)))) ; through DEFTRANSFORM
+	       (t 42))))
+    (sxhash-recurse x)))
+  complaining "function called with two arguments, but wants exactly
+  one" about SXHASH-RECURSE. (This might not be strictly a new bug, 
+  since IIRC post-fork CMU CL has also had problems with &OPTIONAL
+  arguments in FLET/LABELS: it might be an old Python bug which is 
+  only exercised by the new arrangement of the SBCL compiler.)
 
+132:
+  Trying to compile 
+    (DEFUN FOO () (CATCH 0 (PRINT 1331)))
+  gives an error
+    #<SB-C:TN '0!1> is not valid as the second argument to VOP:
+      SB-C:MAKE-CATCH-BLOCK,
+    since the TN's primitive type SB-VM::POSITIVE-FIXNUM doesn't allow
+    any of the SCs allowed by the operand restriction:
+     (SB-VM::DESCRIPTOR-REG)
+  The (CATCH 0 ...) construct is bad style (because of unportability
+  of EQ testing of numbers) but it is legal, and shouldn't cause an
+  internal compiler error. (This error occurs in sbcl-0.6.13 and in
+  0.pre7.86.flaky7.14.)
+
+133:
+  Trying to compile something like 
+    (sb!alien:def-alien-routine "breakpoint_remove" sb!c-call:void
+      (code-obj sb!c-call:unsigned-long)
+      (pc-offset sb!c-call:int)
+      (old-inst sb!c-call:unsigned-long))
+  in SBCL-0.pre7.86.flaky7.22 after warm init fails with an error
+    cannot use values types here
+  probably because the SB-C-CALL:VOID type gets translated to (VALUES).
+  It should be valid to use VOID for a function return type, so perhaps
+  instead of calling SPECIFIER-TYPE (which excludes all VALUES types
+  automatically) we should call VALUES-SPECIFIER-TYPE and handle VALUES
+  types manually, allowing the special case (VALUES) but still excluding
+  all more-complex VALUES types.
+
+134:
+  (reported by Alexey Dejneka sbcl-devel 2001-12-07)
+    (let ((s '((1 2 3))))
+      (eval (eval ``(vector ,@',@s))))
+      
+    should return #(1 2 3), instead of this it causes a reader error.
+      
+    Interior call of BACKQUOTIFY erroneously optimizes ,@': it immediately
+    splices the temporal representation of ,@S.
+    
+135:
+  Ideally, uninterning a symbol would allow it, and its associated
+  FDEFINITION and PROCLAIM data, to be reclaimed by the GC. However, 
+  at least as of sbcl-0.7.0, this isn't the case. Information about
+  FDEFINITIONs and PROCLAIMed properties is stored in globaldb.lisp
+  essentially in ordinary (non-weak) hash tables keyed by symbols.
+  Thus, once a system has an entry in this system, it tends to live
+  forever, even when it is uninterned and all other references to it
+  are lost. 
+
+    
 KNOWN BUGS RELATED TO THE IR1 INTERPRETER
 
 (Now that the IR1 interpreter has gone away, these should be 

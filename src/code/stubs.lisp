@@ -22,3 +22,6 @@
   (def-frob %funcallable-instance-layout)
   (def-frob %funcallable-instance-lexenv)
   (def-frob %set-funcallable-instance-fun (fin new-val)))
+
+(defun %caller-frame-and-pc ()
+  (%caller-frame-and-pc))

@@ -444,7 +444,7 @@
 	(*print-pretty*
 	 (%default-structure-pretty-print structure stream))
 	(t
-	 (%default-structure-ugly-print structure-stream))))
+	 (%default-structure-ugly-print structure stream))))
 (def!method print-object ((x structure-object) stream)
   (default-structure-print x stream *current-level*))
 

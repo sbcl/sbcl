@@ -39,7 +39,7 @@
 ;;; There are three internal functions which operate on the lambda argument
 ;;; to GET-FUNCTION:
 ;;;   compute-test converts the lambda into a key to be used for lookup,
-;;;   compute-code is used by get-new-function-generator-internal to
+;;;   compute-code is used by get-new-fun-generator-internal to
 ;;;		generate the actual lambda to be compiled, and
 ;;;   compute-constants is used to generate the argument list that is
 ;;;		to be passed to the compiled function.
@@ -113,17 +113,17 @@
 	 (fgen (lookup-fgen test)))
     (if fgen
 	(fgen-generator fgen)
-	(get-new-function-generator lambda test code-converter))))
+	(get-new-fun-generator lambda test code-converter))))
 
-(defun get-new-function-generator (lambda test code-converter)
+(defun get-new-fun-generator (lambda test code-converter)
   (multiple-value-bind (gensyms generator-lambda)
-      (get-new-function-generator-internal lambda code-converter)
+      (get-new-fun-generator-internal lambda code-converter)
     (let* ((generator (compile nil generator-lambda))
 	   (fgen (make-fgen test gensyms generator generator-lambda nil)))
       (store-fgen fgen)
       generator)))
 
-(defun get-new-function-generator-internal (lambda code-converter)
+(defun get-new-fun-generator-internal (lambda code-converter)
   (multiple-value-bind (code gensyms)
       (compute-code lambda code-converter)
     (values gensyms `(lambda ,gensyms (function ,code)))))

@@ -164,21 +164,21 @@
   (unless (gethash fun *seen-functions*)
     (barf "unseen function ~S in ~S" fun where)))
 
-;;; In a lambda, check that the associated nodes are in seen blocks. In an
-;;; optional dispatch, check that the entry points were seen. If the function
-;;; is deleted, ignore it.
+;;; In a CLAMBDA, check that the associated nodes are in seen blocks.
+;;; In an OPTIONAL-DISPATCH, check that the entry points were seen. If
+;;; the function is deleted, ignore it.
 (defun check-function-stuff (functional)
   (ecase (functional-kind functional)
     (:external
-     (let ((fun (functional-entry-function functional)))
+     (let ((fun (functional-entry-fun functional)))
        (check-function-reached fun functional)
        (when (functional-kind fun)
 	 (barf "The function for XEP ~S has kind." functional))
-       (unless (eq (functional-entry-function fun) functional)
+       (unless (eq (functional-entry-fun fun) functional)
 	 (barf "bad back-pointer in function for XEP ~S" functional))))
     ((:let :mv-let :assignment)
      (check-function-reached (lambda-home functional) functional)
-     (when (functional-entry-function functional)
+     (when (functional-entry-fun functional)
        (barf "The LET ~S has entry function." functional))
      (unless (member functional (lambda-lets (lambda-home functional)))
        (barf "The LET ~S is not in LETs for HOME." functional))
@@ -188,8 +188,8 @@
      (when (lambda-lets functional)
        (barf "LETs in a LET: ~S" functional)))
     (:optional
-     (when (functional-entry-function functional)
-       (barf ":OPTIONAL ~S has an ENTRY-FUNCTION." functional))
+     (when (functional-entry-fun functional)
+       (barf ":OPTIONAL ~S has an ENTRY-FUN." functional))
      (let ((ef (lambda-optional-dispatch functional)))
        (check-function-reached ef functional)
        (unless (or (member functional (optional-dispatch-entry-points ef))
@@ -198,16 +198,14 @@
 	 (barf ":OPTIONAL ~S is not an e-p for its OPTIONAL-DISPATCH ~S."
 	       functional ef))))
     (:toplevel
-     (unless (eq (functional-entry-function functional) functional)
-       (barf "The ENTRY-FUNCTION in ~S isn't a self-pointer." functional)))
+     (unless (eq (functional-entry-fun functional) functional)
+       (barf "The ENTRY-FUN in ~S isn't a self-pointer." functional)))
     ((nil :escape :cleanup)
-     (let ((ef (functional-entry-function functional)))
+     (let ((ef (functional-entry-fun functional)))
        (when ef
 	 (check-function-reached ef functional)
 	 (unless (eq (functional-kind ef) :external)
-	   (barf "The ENTRY-FUNCTION in ~S isn't an XEP: ~S."
-		 functional
-		 ef)))))
+	   (barf "The ENTRY-FUN in ~S isn't an XEP: ~S." functional ef)))))
     (:deleted
      (return-from check-function-stuff)))
 
@@ -245,11 +243,11 @@
 
 (defun check-function-consistency (components)
   (dolist (c components)
-    (dolist (fun (component-new-functions c))
-      (observe-functional fun))
+    (dolist (new-fun (component-new-funs c))
+      (observe-functional new-fun))
     (dolist (fun (component-lambdas c))
       (when (eq (functional-kind fun) :external)
-	(let ((ef (functional-entry-function fun)))
+	(let ((ef (functional-entry-fun fun)))
 	  (when (optional-dispatch-p ef)
 	    (observe-functional ef))))
       (observe-functional fun)
@@ -257,8 +255,8 @@
 	(observe-functional let))))
 
   (dolist (c components)
-    (dolist (fun (component-new-functions c))
-      (check-function-stuff fun))
+    (dolist (new-fun (component-new-funs c))
+      (check-function-stuff new-fun))
     (dolist (fun (component-lambdas c))
       (when (eq (functional-kind fun) :deleted)
 	(barf "deleted lambda ~S in Lambdas for ~S" fun c))
@@ -832,10 +830,7 @@
 	   (closure (ir2-physenv-environment 2env))
 	   (pc (ir2-physenv-return-pc-pass 2env))
 	   (fp (ir2-physenv-old-fp 2env))
-	   (2block (block-info
-		    (node-block
-		     (lambda-bind
-		      (physenv-function env))))))
+	   (2block (block-info (lambda-block (physenv-lambda env)))))
       (do ((conf (ir2-block-global-tns 2block)
 		 (global-conflicts-next conf)))
 	  ((null conf))
@@ -908,19 +903,12 @@
 (defun print-leaf (leaf &optional (stream *standard-output*))
   (declare (type leaf leaf) (type stream stream))
   (etypecase leaf
-    (lambda-var (prin1 (leaf-name leaf) stream))
+    (lambda-var (prin1 (leaf-debug-name leaf) stream))
     (constant (format stream "'~S" (constant-value leaf)))
     (global-var
-     (format stream "~S {~A}" (leaf-name leaf) (global-var-kind leaf)))
-    (clambda
-      (format stream "lambda ~S ~S" (leaf-name leaf)
-	      (mapcar #'leaf-name (lambda-vars leaf))))
-    (optional-dispatch
-     (format stream "optional-dispatch ~S" (leaf-name leaf)))
+     (format stream "~S {~A}" (leaf-debug-name leaf) (global-var-kind leaf)))
     (functional
-     (aver (eq (functional-kind leaf) :toplevel-xep))
-     (format stream "TL-XEP ~S"
-	     (entry-info-name (leaf-info leaf))))))
+     (format stream "~S ~S" (type-of leaf) (functional-debug-name leaf)))))
 
 ;;; Attempt to find a block given some thing that has to do with it.
 (declaim (ftype (function (t) cblock) block-or-lose))
@@ -935,7 +923,7 @@
     (component (component-head thing))
 #|    (cloop (loop-head thing))|#
     (integer (continuation-block (num-cont thing)))
-    (functional (node-block (lambda-bind (main-entry thing))))
+    (functional (lambda-block (main-entry thing)))
     (null (error "Bad thing: ~S." thing))
     (symbol (block-or-lose (gethash thing *free-functions*)))))
 
@@ -945,8 +933,8 @@
   (format t " c~D" (cont-num cont))
   (values))
 
-;;; Print out the nodes in Block in a format oriented toward representing
-;;; what the code does.
+;;; Print out the nodes in BLOCK in a format oriented toward
+;;; representing what the code does.
 (defun print-nodes (block)
   (setq block (block-or-lose block))
   (format t "~%block start c~D" (cont-num (block-start block)))

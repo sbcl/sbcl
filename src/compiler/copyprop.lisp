@@ -55,8 +55,8 @@
 ;;; The TN must be a :NORMAL TN. Other TNs might have hidden
 ;;; references or be otherwise bizarre.
 ;;;
-;;; A TN is also inelegible if it has interned name, policy is such
-;;; that we would dump it in the debug vars, and speed is not 3.
+;;; A TN is also inelegible if we want to preserve it to facilitate
+;;; debugging.
 ;;;
 ;;; The SCs of the TN's primitive types is a subset of the SCs of the
 ;;; copied TN. Moves between TNs of different primitive type SCs may
@@ -83,8 +83,10 @@
 				(primitive-type-scs
 				 (tn-primitive-type arg-tn)))
 		       (let ((leaf (tn-leaf tn)))
+			 ;; Do we not care about preserving this this
+			 ;; TN for debugging?
 			 (or (not leaf)
-			     (not (symbol-package (leaf-name leaf)))
+			     (not (symbol-package (leaf-debug-name leaf)))
 			     (policy (vop-node vop)
 				     (or (= speed 3) (< debug 2)))))
 		       arg-tn)))))))

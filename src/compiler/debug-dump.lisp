@@ -175,14 +175,14 @@
 
 ;;; Dump the successors of Block, being careful not to fly into space
 ;;; on weird successors.
-(defun dump-block-successors (block env)
-  (declare (type cblock block) (type physenv env))
+(defun dump-block-successors (block physenv)
+  (declare (type cblock block) (type physenv physenv))
   (let* ((tail (component-tail (block-component block)))
 	 (succ (block-succ block))
 	 (valid-succ
 	  (if (and succ
 		   (or (eq (car succ) tail)
-		       (not (eq (block-physenv (car succ)) env))))
+		       (not (eq (block-physenv (car succ)) physenv))))
 	      ()
 	      succ)))
     (vector-push-extend
@@ -190,7 +190,7 @@
      *byte-buffer*)
     (let ((base (block-number
 		 (node-block
-		  (lambda-bind (physenv-function env))))))
+		  (lambda-bind (physenv-lambda physenv))))))
       (dolist (b valid-succ)
 	(write-var-integer
 	 (the index (- (block-number b) base))
@@ -209,17 +209,17 @@
   (setf (fill-pointer *byte-buffer*) 0)
   (let ((*previous-location* 0)
 	(tlf-num (find-tlf-number fun))
-	(env (lambda-physenv fun))
+	(physenv (lambda-physenv fun))
 	(prev-locs nil)
 	(prev-block nil))
     (collect ((elsewhere))
-      (do-physenv-ir2-blocks (2block env)
+      (do-physenv-ir2-blocks (2block physenv)
 	(let ((block (ir2-block-block 2block)))
 	  (when (eq (block-info block) 2block)
 	    (when prev-block
 	      (dump-block-locations prev-block prev-locs tlf-num var-locs))
 	    (setq prev-block block  prev-locs ())
-	    (dump-block-successors block env)))
+	    (dump-block-successors block physenv)))
 	
 	(collect ((here prev-locs))
 	  (dolist (loc (ir2-block-locations 2block))
@@ -304,19 +304,19 @@
   (make-sc-offset (sc-number (tn-sc tn))
 		  (tn-offset tn)))
 
-;;; Dump info to represent Var's location being TN. ID is an integer
-;;; that makes Var's name unique in the function. Buffer is the vector
-;;; we stick the result in. If Minimal is true, we suppress name
-;;; dumping, and set the minimal flag.
+;;; Dump info to represent VAR's location being TN. ID is an integer
+;;; that makes VAR's name unique in the function. BUFFER is the vector
+;;; we stick the result in. If MINIMAL, we suppress name dumping, and
+;;; set the minimal flag.
 ;;;
-;;; The debug-var is only marked as always-live if the TN is
-;;; environment live and is an argument. If a :debug-environment TN,
+;;; The DEBUG-VAR is only marked as always-live if the TN is
+;;; environment live and is an argument. If a :DEBUG-ENVIRONMENT TN,
 ;;; then we also exclude set variables, since the variable is not
 ;;; guaranteed to be live everywhere in that case.
 (defun dump-1-variable (fun var tn id minimal buffer)
   (declare (type lambda-var var) (type (or tn null) tn) (type index id)
 	   (type clambda fun))
-  (let* ((name (leaf-name var))
+  (let* ((name (leaf-debug-name var))
 	 (save-tn (and tn (tn-save-tn tn)))
 	 (kind (and tn (tn-kind tn)))
 	 (flags 0))
@@ -350,14 +350,14 @@
 
 ;;; Return a vector suitable for use as the DEBUG-FUN-VARIABLES
 ;;; of FUN. LEVEL is the current DEBUG-INFO quality. VAR-LOCS is a
-;;; hashtable in which we enter the translation from LAMBDA-VARS to
+;;; hash table in which we enter the translation from LAMBDA-VARS to
 ;;; the relative position of that variable's location in the resulting
 ;;; vector.
 (defun compute-variables (fun level var-locs)
   (declare (type clambda fun) (type hash-table var-locs))
   (collect ((vars))
     (labels ((frob-leaf (leaf tn gensym-p)
-	       (let ((name (leaf-name leaf)))
+	       (let ((name (leaf-debug-name leaf)))
 		 (when (and name (leaf-refs leaf) (tn-offset tn)
 			    (or gensym-p (symbol-package name)))
 		   (vars (cons leaf tn)))))
@@ -377,7 +377,7 @@
 
     (let ((sorted (sort (vars) #'string<
 			:key #'(lambda (x)
-				 (symbol-name (leaf-name (car x))))))
+				 (symbol-name (leaf-debug-name (car x))))))
 	  (prev-name nil)
 	  (id 0)
 	  (i 0)
@@ -386,7 +386,7 @@
 	       (type index id i))
       (dolist (x sorted)
 	(let* ((var (car x))
-	       (name (symbol-name (leaf-name var))))
+	       (name (symbol-name (leaf-debug-name var))))
 	  (cond ((and prev-name (string= prev-name name))
 		 (incf id))
 		(t
@@ -476,13 +476,7 @@
 	 (main-p (and dispatch
 		      (eq fun (optional-dispatch-main-entry dispatch)))))
     (make-compiled-debug-fun
-     :name (cond ((leaf-name fun))
-		 ((let ((ef (functional-entry-function fun)))
-		    (and ef (leaf-name ef))))
-		 ((and main-p (leaf-name dispatch)))
-		 (t
-		  (component-name
-		   (block-component (node-block (lambda-bind fun))))))
+     :name (leaf-debug-name fun)
      :kind (if main-p nil (functional-kind fun))
      :return-pc (tn-sc-offset (ir2-physenv-return-pc 2env))
      :old-fp (tn-sc-offset (ir2-physenv-old-fp 2env))
@@ -560,8 +554,7 @@
 				     :adjustable t)))
       (dolist (fun (component-lambdas component))
 	(clrhash var-locs)
-	(dfuns (cons (label-position
-		      (block-label (node-block (lambda-bind fun))))
+	(dfuns (cons (label-position (block-label (lambda-block fun)))
 		     (compute-1-debug-fun fun var-locs))))
       (let* ((sorted (sort (dfuns) #'< :key #'car))
 	     (fun-map (compute-debug-fun-map sorted)))

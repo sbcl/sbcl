@@ -84,7 +84,7 @@
   ;; cached type of this continuation's value. If NIL, then this must
   ;; be recomputed: see CONTINUATION-DERIVED-TYPE.
   (%derived-type nil :type (or ctype null))
-  ;; Node where this continuation is used, if unique. This is always
+  ;; the node where this continuation is used, if unique. This is always
   ;; null in :DELETED and :UNUSED continuations, and is never null in
   ;; :INSIDE-BLOCK continuations. In a :BLOCK-START continuation, the
   ;; Block's START-USES indicate whether NIL means no uses or more
@@ -323,6 +323,14 @@
 ;;; A COMPONENT structure provides a handle on a connected piece of
 ;;; the flow graph. Most of the passes in the compiler operate on
 ;;; COMPONENTs rather than on the entire flow graph.
+;;;
+;;; According to the CMU CL internals/front.tex, the reason for
+;;; separating compilation into COMPONENTs is
+;;;   to increase the efficiency of large block compilations. In
+;;;   addition to improving locality of reference and reducing the
+;;;   size of flow analysis problems, this allows back-end data
+;;;   structures to be reclaimed after the compilation of each
+;;;   component.
 (defstruct (component (:copier nil))
   ;; the kind of component
   ;;
@@ -368,22 +376,22 @@
   ;; deleted or LET lambdas.
   ;;
   ;; Note that logical associations between CLAMBDAs and COMPONENTs
-  ;; seem to exist for a while before this is initialized. In
-  ;; particular, I got burned by writing some code to use this value
-  ;; to decide which components need LOCAL-CALL-ANALYZE, when it turns
-  ;; out that LOCAL-CALL-ANALYZE had a role in initializing this value
+  ;; seem to exist for a while before this is initialized. See e.g.
+  ;; the NEW-FUNS slot. In particular, I got burned by writing some
+  ;; code to use this value to decide which components need
+  ;; LOCALL-ANALYZE-COMPONENT, when it turns out that
+  ;; LOCALL-ANALYZE-COMPONENT had a role in initializing this value
   ;; (and DFO stuff does too, maybe). Also, even after it's
   ;; initialized, it might change as CLAMBDAs are deleted or merged.
   ;; -- WHN 2001-09-30
   (lambdas () :type list)
-  ;; a list of FUNCTIONAL structures for functions that are newly
-  ;; converted, and haven't been local-call analyzed yet. Initially
-  ;; functions are not in the LAMBDAS list. LOCAL-CALL-ANALYZE moves
-  ;; them there (possibly as LETs, or implicitly as XEPs if an
-  ;; OPTIONAL-DISPATCH.) Between runs of LOCAL-CALL-ANALYZE there may
-  ;; be some debris of converted or even deleted functions in this
-  ;; list.
-  (new-functions () :type list)
+  ;; a list of FUNCTIONALs for functions that are newly converted, and
+  ;; haven't been local-call analyzed yet. Initially functions are not
+  ;; in the LAMBDAS list. Local call analysis moves them there
+  ;; (possibly as LETs, or implicitly as XEPs if an OPTIONAL-DISPATCH.)
+  ;; Between runs of local call analysis there may be some debris of
+  ;; converted or even deleted functions in this list.
+  (new-funs () :type list)
   ;; If this is true, then there is stuff in this component that could
   ;; benefit from further IR1 optimization.
   (reoptimize t :type boolean)
@@ -408,11 +416,11 @@
   ;; arguments for the note, or the FUN-TYPE that would have
   ;; enabled the transformation but failed to match.
   (failed-optimizations (make-hash-table :test 'eq) :type hash-table)
-  ;; This is similar to NEW-FUNCTIONS, but is used when a function has
+  ;; This is similar to NEW-FUNS, but is used when a function has
   ;; already been analyzed, but new references have been added by
-  ;; inline expansion. Unlike NEW-FUNCTIONS, this is not disjoint from
+  ;; inline expansion. Unlike NEW-FUNS, this is not disjoint from
   ;; COMPONENT-LAMBDAS.
-  (reanalyze-functions nil :type list))
+  (reanalyze-funs nil :type list))
 (defprinter (component :identity t)
   name
   (reanalyze :test reanalyze))
@@ -488,7 +496,7 @@
 ;;; TNs, or eventually stack slots and registers). -- WHN 2001-09-29
 (defstruct (physenv (:copier nil))
   ;; the function that allocates this physical environment
-  (function (missing-arg) :type clambda)
+  (lambda (missing-arg) :type clambda :read-only t)
   #| ; seems not to be used as of sbcl-0.pre7.51
   ;; a list of all the lambdas that allocate variables in this
   ;; physical environment
@@ -508,7 +516,7 @@
   ;; some kind of info used by the back end
   (info nil))
 (defprinter (physenv :identity t)
-  function
+  lambda
   (closure :test closure)
   (nlx-info :test nlx-info))
 
@@ -527,7 +535,7 @@
 ;;; end up tail-recursive causes TAIL-SET merging.
 (defstruct (tail-set)
   ;; a list of all the LAMBDAs in this tail set
-  (functions nil :type list)
+  (funs nil :type list)
   ;; our current best guess of the type returned by these functions.
   ;; This is the union across all the functions of the return node's
   ;; RESULT-TYPE, excluding local calls.
@@ -535,7 +543,7 @@
   ;; some info used by the back end
   (info nil))
 (defprinter (tail-set :identity t)
-  functions
+  funs
   type
   (info :test info))
 
@@ -582,17 +590,25 @@
 ;;; hacking the flow graph.
 (def!struct (leaf (:make-load-form-fun ignore-it)
 		  (:constructor nil))
-  ;; some name for this leaf. The exact significance of the name
-  ;; depends on what kind of leaf it is. In a LAMBDA-VAR or
-  ;; GLOBAL-VAR, this is the symbol name of the variable. In a
-  ;; functional that is from a DEFUN, this is the defined name. In
-  ;; other functionals, this is a descriptive string.
+  ;; (For public access to this slot, use LEAF-SOURCE-NAME.)
   ;;
-  ;; KLUDGE: Note that at least for LAMBDA-VARs, this is important not
-  ;; just for debugging but for ordinary compilation as well. In
-  ;; particular, in RECOGNIZE-KNOWN-CALL function calls are compiled
-  ;; differently based on the LEAF-NAME.
-  (name nil :type t)
+  ;; the name of LEAF as it appears in the source, e.g. 'FOO or '(SETF
+  ;; FOO) or 'N or '*Z*, or the special .ANONYMOUS. value if there's
+  ;; no name for this thing in the source (as can happen for
+  ;; FUNCTIONALs, e.g. for anonymous LAMBDAs or for functions for
+  ;; top-level forms; and can also happen for anonymous constants) or
+  ;; perhaps also if the match between the name and the thing is
+  ;; skewed enough (e.g. for macro functions or method functions) that
+  ;; we don't want to have that name affect compilation
+  ;;
+  ;; The value of this slot in can affect ordinary runtime behavior,
+  ;; e.g. of special variables and known functions, not just debugging.
+  ;;
+  ;; See also the LEAF-DEBUG-NAME function and the
+  ;; FUNCTIONAL-%DEBUG-NAME slot.
+  (%source-name (missing-arg)
+		:type (or symbol (and cons (satisfies legal-fun-name-p)))
+		:read-only t)
   ;; the type which values of this leaf must have
   (type *universal-type* :type ctype)
   ;; where the TYPE information came from:
@@ -612,6 +628,28 @@
   ;; some kind of info used by the back end
   (info nil))
 
+;;; LEAF name operations
+;;;
+;;; KLUDGE: wants CLOS..
+(defun leaf-has-source-name-p (leaf)
+  (not (eq (leaf-%source-name leaf)
+	   '.anonymous.)))
+(defun leaf-source-name (leaf)
+  (aver (leaf-has-source-name-p leaf))
+  (leaf-%source-name leaf))
+(defun leaf-debug-name (leaf)
+  (if (functional-p leaf)
+      ;; FUNCTIONALs have additional %DEBUG-NAME behavior.
+      (functional-debug-name leaf)
+      ;; Other objects just use their source name.
+      ;;
+      ;; (As of sbcl-0.pre7.85, there are a few non-FUNCTIONAL
+      ;; anonymous objects, (anonymous constants..) and those would
+      ;; fail here if we ever tried to get debug names from them, but
+      ;; it looks as though it's never interesting to get debug names
+      ;; from them, so it's moot. -- WHN)
+      (leaf-source-name leaf)))
+
 ;;; The CONSTANT structure is used to represent known constant values.
 ;;; If NAME is not null, then it is the name of the named constant
 ;;; which this leaf corresponds to, otherwise this is an anonymous
@@ -620,12 +658,13 @@
   ;; the value of the constant
   (value nil :type t))
 (defprinter (constant :identity t)
-  (name :test name)
+  (%source-name :test %source-name)
   value)
 
 ;;; The BASIC-VAR structure represents information common to all
 ;;; variables which don't correspond to known local functions.
-(def!struct (basic-var (:include leaf) (:constructor nil))
+(def!struct (basic-var (:include leaf)
+		       (:constructor nil))
   ;; Lists of the set nodes for this variable.
   (sets () :type list))
 
@@ -637,7 +676,7 @@
   (kind (missing-arg)
 	:type (member :special :global-function :global)))
 (defprinter (global-var :identity t)
-  name
+  %source-name
   (type :test (not (eq type *universal-type*)))
   (where-from :test (not (eq where-from :assumed)))
   kind)
@@ -653,7 +692,7 @@
   ;; The slot description of the slot.
   (slot (missing-arg)))
 (defprinter (slot-accessor :identity t)
-  name
+  %source-name
   for
   slot)
 
@@ -675,7 +714,7 @@
   ;; LET-converted. Null if we haven't converted the expansion yet.
   (functional nil :type (or functional null)))
 (defprinter (defined-fun :identity t)
-  name
+  %source-name
   inlinep
   (functional :test functional))
 
@@ -685,8 +724,50 @@
 ;;; We don't normally manipulate function types for defined functions,
 ;;; but if someone wants to know, an approximation is there.
 (def!struct (functional (:include leaf
+				  (%source-name '.anonymous.)
 				  (where-from :defined)
 				  (type (specifier-type 'function))))
+  ;; (For public access to this slot, use LEAF-DEBUG-NAME.)
+  ;;
+  ;; the name of FUNCTIONAL for debugging purposes, or NIL if we
+  ;; should just let the SOURCE-NAME fall through
+  ;; 
+  ;; Unlike the SOURCE-NAME slot, this slot's value should never
+  ;; affect ordinary code behavior, only debugging/diagnostic behavior.
+  ;;
+  ;; The value of this slot can be anything, except that it shouldn't
+  ;; be a legal function name, since otherwise debugging gets
+  ;; confusing. (If a legal function name is a good name for the
+  ;; function, it should be in %SOURCE-NAME, and then we shouldn't
+  ;; need a %DEBUG-NAME.) In SBCL as of 0.pre7.87, it's always a
+  ;; string unless it's NIL, since that's how CMU CL represented debug
+  ;; names. However, eventually I (WHN) think it we should start using
+  ;; list values instead, since they have much nicer print properties
+  ;; (abbreviation, skipping package prefixes when unneeded, and
+  ;; renaming package prefixes when we do things like renaming SB!EXT
+  ;; to SB-EXT).
+  ;;
+  ;; E.g. for the function which implements (DEFUN FOO ...), we could
+  ;; have
+  ;;   %SOURCE-NAME=FOO
+  ;;   %DEBUG-NAME=NIL
+  ;; for the function which implements the top level form
+  ;; (IN-PACKAGE :FOO) we could have
+  ;;   %SOURCE-NAME=NIL
+  ;;   %DEBUG-NAME="top level form (IN-PACKAGE :FOO)"
+  ;; for the function which implements FOO in
+  ;;   (DEFUN BAR (...) (FLET ((FOO (...) ...)) ...))
+  ;; we could have
+  ;;   %SOURCE-NAME=FOO
+  ;;   %DEBUG-NAME="FLET FOO in BAR"
+  ;; and for the function which implements FOO in
+  ;;   (DEFMACRO FOO (...) ...)
+  ;; we could have
+  ;;   %SOURCE-NAME=FOO (or maybe .ANONYMOUS.?)
+  ;;   %DEBUG-NAME="DEFMACRO FOO"
+  (%debug-name nil
+	       :type (or null (not (satisfies legal-fun-name-p)))
+	       :read-only t)
   ;; some information about how this function is used. These values
   ;; are meaningful:
   ;;
@@ -715,13 +796,13 @@
   ;;
   ;;    :EXTERNAL
   ;;	an external entry point lambda. The function it is an entry
-  ;;	for is in the ENTRY-FUNCTION slot.
+  ;;	for is in the ENTRY-FUN slot.
   ;;
   ;;    :TOPLEVEL
   ;;	a top level lambda, holding a compiled top level form.
   ;;	Compiled very much like NIL, but provides an indication of
   ;;	top level context. A :TOPLEVEL lambda should have *no*
-  ;;	references. Its ENTRY-FUNCTION is a self-pointer.
+  ;;	references. Its ENTRY-FUN is a self-pointer.
   ;;
   ;;    :TOPLEVEL-XEP
   ;;	After a component is compiled, we clobber any top level code
@@ -765,7 +846,7 @@
   ;; :TOPLEVEL lambda (which is its own XEP) this is a self-pointer.
   ;;
   ;; With all other kinds, this is null.
-  (entry-function nil :type (or functional null))
+  (entry-fun nil :type (or functional null))
   ;; the value of any inline/notinline declaration for a local function
   (inlinep nil :type inlinep)
   ;; If we have a lambda that can be used as in inline expansion for
@@ -781,7 +862,23 @@
   ;; various rare miscellaneous info that drives code generation & stuff
   (plist () :type list))
 (defprinter (functional :identity t)
-  name)
+  %source-name
+  %debug-name)
+
+;;; FUNCTIONAL name operations
+(defun functional-debug-name (functional)
+  ;; FUNCTIONAL-%DEBUG-NAME takes precedence over FUNCTIONAL-SOURCE-NAME
+  ;; here because we want different debug names for the functions in
+  ;; DEFUN FOO and FLET FOO even though they have the same source name.
+  (or (functional-%debug-name functional)
+      ;; Note that this will cause an error if the function is
+      ;; anonymous. In SBCL (as opposed to CMU CL) we make all
+      ;; FUNCTIONALs have debug names. The CMU CL code didn't bother
+      ;; in many FUNCTIONALs, especially those which were likely to be
+      ;; optimized away before the user saw them. However, getting 
+      ;; that right requires a global understanding of the code,
+      ;; which seems bad, so we just require names for everything.
+      (leaf-source-name functional)))
 
 ;;; The CLAMBDA only deals with required lexical arguments. Special,
 ;;; optional, keyword and rest arguments are handled by transforming
@@ -791,8 +888,8 @@
 		     (:predicate lambda-p)
 		     (:constructor make-lambda)
 		     (:copier copy-lambda))
-  ;; list of LAMBDA-VAR descriptors for args
-  (vars nil :type list)
+  ;; list of LAMBDA-VAR descriptors for arguments
+  (vars nil :type list :read-only t)
   ;; If this function was ever a :OPTIONAL function (an entry-point
   ;; for an OPTIONAL-DISPATCH), then this is that OPTIONAL-DISPATCH.
   ;; The optional dispatch will be :DELETED if this function is no
@@ -814,17 +911,16 @@
   ;; If this CLAMBDA is a LET, then this slot holds the LAMBDA whose
   ;; LETS list we are in, otherwise it is a self-pointer.
   (home nil :type (or clambda null))
-  ;; a list of all the all the lambdas that have been LET-substituted
-  ;; in this lambda. This is only non-null in lambdas that aren't
-  ;; LETs.
-  (lets () :type list)
-  ;; a list of all the ENTRY nodes in this function and its LETs, or
-  ;; null in a LET
-  (entries () :type list)
-  ;; a list of all the functions directly called from this function
-  ;; (or one of its LETs) using a non-LET local call. This may include
-  ;; deleted functions because nobody bothers to clear them out.
-  (calls () :type list)
+  ;; all the lambdas that have been LET-substituted in this lambda.
+  ;; This is only non-null in lambdas that aren't LETs.
+  (lets nil :type list)
+  ;; all the ENTRY nodes in this function and its LETs, or null in a LET
+  (entries nil :type list)
+  ;; CLAMBDAs which are locally called by this lambda, and other
+  ;; objects (closed-over LAMBDA-VARs and XEPs) which this lambda
+  ;; depends on in such a way that DFO shouldn't put them in separate
+  ;; components.
+  (calls-or-closes nil :type list)
   ;; the TAIL-SET that this LAMBDA is in. This is null during creation.
   ;;
   ;; In CMU CL, and old SBCL, this was also NILed out when LET
@@ -846,10 +942,11 @@
   ;; in effect.
   (call-lexenv nil :type (or lexenv null)))
 (defprinter (clambda :conc-name lambda- :identity t)
-  name
+  %source-name
+  %debug-name
   (type :test (not (eq type *universal-type*)))
   (where-from :test (not (eq where-from :assumed)))
-  (vars :prin1 (mapcar #'leaf-name vars)))
+  (vars :prin1 (mapcar #'leaf-source-name vars)))
 
 ;;; The OPTIONAL-DISPATCH leaf is used to represent hairy lambdas. It
 ;;; is a FUNCTIONAL, like LAMBDA. Each legal number of arguments has a
@@ -905,7 +1002,8 @@
   ;; know what they are doing.
   (main-entry nil :type (or clambda null)))
 (defprinter (optional-dispatch :identity t)
-  name
+  %source-name
+  %debug-name
   (type :test (not (eq type *universal-type*)))
   (where-from :test (not (eq where-from :assumed)))
   arglist
@@ -937,8 +1035,8 @@
   ;; original Lisp code. This is set to NIL in &KEY arguments that are
   ;; defaulted using the SUPPLIED-P arg.
   (default nil :type t)
-  ;; the actual key for a &KEY argument. Note that in ANSI CL this is not
-  ;; necessarily a keyword: (DEFUN FOO (&KEY ((BAR BAR))) ..).
+  ;; the actual key for a &KEY argument. Note that in ANSI CL this is
+  ;; not necessarily a keyword: (DEFUN FOO (&KEY ((BAR BAR))) ...).
   (key nil :type symbol))
 (defprinter (arg-info :identity t)
   (specialp :test specialp)
@@ -955,8 +1053,8 @@
 ;;; LAMBDA-VARs with no REFs are considered to be deleted; physical
 ;;; environment analysis isn't done on these variables, so the back
 ;;; end must check for and ignore unreferenced variables. Note that a
-;;; deleted lambda-var may have sets; in this case the back end is
-;;; still responsible for propagating the Set-Value to the set's Cont.
+;;; deleted LAMBDA-VAR may have sets; in this case the back end is
+;;; still responsible for propagating the SET-VALUE to the set's CONT.
 (def!struct (lambda-var (:include basic-var))
   ;; true if this variable has been declared IGNORE
   (ignorep nil :type boolean)
@@ -982,7 +1080,7 @@
   ;; good subject for flow analysis.
   (constraints nil :type (or sset null)))
 (defprinter (lambda-var :identity t)
-  name
+  %source-name
   (type :test (not (eq type *universal-type*)))
   (where-from :test (not (eq where-from :assumed)))
   (ignorep :test ignorep)
@@ -1143,12 +1241,12 @@
 ;;; original exit continuation is the exit node's CONT.
 (defstruct (exit (:include node)
 		 (:copier nil))
-  ;; The Entry node that this is an exit for. If null, this is a
+  ;; the ENTRY node that this is an exit for. If null, this is a
   ;; degenerate exit. A degenerate exit is used to "fill" an empty
   ;; block (which isn't allowed in IR1.) In a degenerate exit, Value
   ;; is always also null.
   (entry nil :type (or entry null))
-  ;; The continuation yeilding the value we are to exit with. If NIL,
+  ;; the continuation yielding the value we are to exit with. If NIL,
   ;; then no value is desired (as in GO).
   (value nil :type (or continuation null)))
 (defprinter (exit :identity t)

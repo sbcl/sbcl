@@ -30,14 +30,12 @@
   (declare (type component component))
   (aver (every (lambda (x)
 		 (eq (functional-kind x) :deleted))
-	       (component-new-functions component)))
-  (setf (component-new-functions component) ())
+	       (component-new-funs component)))
+  (setf (component-new-funs component) ())
   (dolist (fun (component-lambdas component))
     (reinit-lambda-physenv fun))
-  (dolist (fun (component-lambdas component))
-    (compute-closure fun)
-    (dolist (let (lambda-lets fun))
-      (compute-closure let)))
+  (mapc #'add-lambda-vars-and-let-vars-to-closures
+	(component-lambdas component))
 
   (find-non-local-exits component)
   (find-cleanup-points component)
@@ -65,11 +63,8 @@
   (declare (type component component))
   (let ((found-it nil))
     (dolist (lambda (component-lambdas component))
-      (when (compute-closure lambda)
-	(setq found-it t))
-      (dolist (let (lambda-lets lambda))
-	(when (compute-closure let)
-	  (setq found-it t))))
+      (when (add-lambda-vars-and-let-vars-to-closures lambda)
+	(setq found-it t)))
     found-it))
 
 ;;; This is like old CMU CL PRE-ENVIRONMENT-ANALYZE-TOPLEVEL, except
@@ -90,34 +85,38 @@
 ;;;     post-pass will use the existing structure, rather than
 ;;;     allocating a new one. We return true if we discover any
 ;;;     possible closure vars.
-;;; But that doesn't seem to explain why it's important. I do observe
-;;; that when it's not done, compiler assertions occasionally fail. My
-;;; tentative hypothesis is that other environment analysis expects to
+;;; But that doesn't seem to explain either why it's important to do
+;;; this for top level lambdas, or why it's important to do it only
+;;; for top level lambdas instead of just doing it indiscriminately
+;;; for all lambdas. I do observe that when it's not done, compiler
+;;; assertions occasionally fail. My tentative hypothesis for why it's
+;;; important to do it is that other environment analysis expects to
 ;;; bottom out on the outermost enclosing thing, and (insert
 ;;; mysterious reason here) it's important to set up bottomed-out-here
-;;; environments before anything else. -- WHN 2001-09-30
+;;; environments before anything else. I haven't been able to guess
+;;; why it's important to do it selectively instead of
+;;; indiscriminately. -- WHN 2001-11-10
 (defun preallocate-physenvs-for-toplevelish-lambdas (component)
   (dolist (clambda (component-lambdas component))
     (when (lambda-toplevelish-p clambda)
-      (compute-closure clambda)))
+      (add-lambda-vars-and-let-vars-to-closures clambda)))
   (values))
 
-;;; If CLAMBDA has a PHYSENV , return it, otherwise assign an empty one.
+;;; If CLAMBDA has a PHYSENV, return it, otherwise assign an empty one
+;;; and return that.
 (defun get-lambda-physenv (clambda)
   (declare (type clambda clambda))
   (let ((homefun (lambda-home clambda)))
     (or (lambda-physenv homefun)
-	(let ((res (make-physenv :function homefun)))
+	(let ((res (make-physenv :lambda homefun)))
 	  (setf (lambda-physenv homefun) res)
+	  ;; All the LETLAMBDAs belong to HOMEFUN, and share the same
+	  ;; PHYSENV. Thus, (1) since HOMEFUN's PHYSENV was NIL,
+	  ;; theirs should be NIL too, and (2) since we're modifying
+	  ;; HOMEFUN's PHYSENV, we should modify theirs, too.
 	  (dolist (letlambda (lambda-lets homefun))
-	    ;; This assertion is to make explicit an
-	    ;; apparently-otherwise-undocumented property of existing
-	    ;; code: We never overwrite an old LAMBDA-PHYSENV.
-	    ;; -- WHN 2001-09-30
-	    (aver (null (lambda-physenv letlambda)))
-	    ;; I *think* this is true regardless of LAMBDA-KIND.
-	    ;; -- WHN 2001-09-30
 	    (aver (eql (lambda-home letlambda) homefun))
+	    (aver (null (lambda-physenv letlambda)))
 	    (setf (lambda-physenv letlambda) res))
 	  res))))
 
@@ -131,17 +130,16 @@
   (let ((old (lambda-physenv (lambda-home fun))))
     (cond (old
 	   (setf (physenv-closure old)
-		 (delete-if #'(lambda (x)
-				(and (lambda-var-p x)
-				     (null (leaf-refs x))))
+		 (delete-if (lambda (x)
+			      (and (lambda-var-p x)
+				   (null (leaf-refs x))))
 			    (physenv-closure old)))
 	   (flet ((clear (fun)
 		    (dolist (var (lambda-vars fun))
 		      (unless (lambda-var-sets var)
 			(setf (lambda-var-indirect var) nil)))))
 	     (clear fun)
-	     (dolist (let (lambda-lets fun))
-	       (clear let))))
+	     (map nil #'clear (lambda-lets fun))))
 	  (t
 	   (get-lambda-physenv fun))))
   (values))
@@ -151,45 +149,70 @@
   (declare (type node node))
   (get-lambda-physenv (node-home-lambda node)))
 
-;;; Find any variables in FUN with references outside of the home
-;;; environment and close over them. If a closed over variable is set,
-;;; then we set the INDIRECT flag so that we will know the closed over
-;;; value is really a pointer to the value cell. We also warn about
-;;; unreferenced variables here, just because it's a convenient place
-;;; to do it. We return true if we close over anything.
-(defun compute-closure (fun)
-  (declare (type clambda fun))
-  (let ((env (get-lambda-physenv fun))
+;;; private guts of ADD-LAMBDA-VARS-AND-LET-VARS-TO-CLOSURES
+;;;
+;;; This is the old CMU CL COMPUTE-CLOSURE, which only works on
+;;; LAMBDA-VARS directly, not on the LAMBDA-VARS of LAMBDA-LETS. It
+;;; seems never to be valid to use this operation alone, so in SBCL,
+;;; it's private, and the public interface,
+;;; ADD-LAMBDA-VARS-AND-LET-VARS-TO-CLOSURES, always runs over all the
+;;; variables, not only the LAMBDA-VARS of CLAMBDA itself but also
+;;; the LAMBDA-VARS of CLAMBDA's LAMBDA-LETS.
+(defun %add-lambda-vars-to-closures (clambda)
+  (let ((physenv (get-lambda-physenv clambda))
 	(did-something nil))
-    (note-unreferenced-vars fun)
-    (dolist (var (lambda-vars fun))
+    (note-unreferenced-vars clambda)
+    (dolist (var (lambda-vars clambda))
       (dolist (ref (leaf-refs var))
-	(let ((ref-env (get-node-physenv ref)))
-	  (unless (eq ref-env env)
+	(let ((ref-physenv (get-node-physenv ref)))
+	  (unless (eq ref-physenv physenv)
 	    (when (lambda-var-sets var)
 	      (setf (lambda-var-indirect var) t))
 	    (setq did-something t)
-	    (close-over var ref-env env))))
+	    (close-over var ref-physenv physenv))))
       (dolist (set (basic-var-sets var))
-	(let ((set-env (get-node-physenv set)))
-	  (unless (eq set-env env)
+	(let ((set-physenv (get-node-physenv set)))
+	  (unless (eq set-physenv physenv)
 	    (setq did-something t)
 	    (setf (lambda-var-indirect var) t)
-	    (close-over var set-env env)))))
+	    (close-over var set-physenv physenv)))))
     did-something))
 
-;;; Make sure that THING is closed over in REF-ENV and in all
-;;; environments for the functions that reference REF-ENV's function
-;;; (not just calls.) HOME-ENV is THING's home environment. When we
+;;; Find any variables in CLAMBDA -- either directly in LAMBDA-VARS or
+;;; in the LAMBDA-VARS of elements of LAMBDA-LETS -- with references
+;;; outside of the home environment and close over them. If a
+;;; closed-over variable is set, then we set the INDIRECT flag so that
+;;; we will know the closed over value is really a pointer to the
+;;; value cell. We also warn about unreferenced variables here, just
+;;; because it's a convenient place to do it. We return true if we
+;;; close over anything.
+(defun add-lambda-vars-and-let-vars-to-closures (clambda)
+  (declare (type clambda clambda))
+  (let ((did-something nil))
+    (when (%add-lambda-vars-to-closures clambda)
+      (setf did-something t))
+    (dolist (lambda-let (lambda-lets clambda))
+      ;; There's no need to recurse through full COMPUTE-CLOSURE
+      ;; here, since LETS only go one layer deep.
+      (aver (null (lambda-lets lambda-let)))
+      (when (%add-lambda-vars-to-closures lambda-let)
+	(setf did-something t)))
+    did-something))
+
+;;; Make sure that THING is closed over in REF-PHYSENV and in all
+;;; PHYSENVs for the functions that reference REF-PHYSENV's function
+;;; (not just calls). HOME-PHYSENV is THING's home environment. When we
 ;;; reach the home environment, we stop propagating the closure.
-(defun close-over (thing ref-env home-env)
-  (declare (type physenv ref-env home-env))
-  (cond ((eq ref-env home-env))
-	((member thing (physenv-closure ref-env)))
-	(t
-	 (push thing (physenv-closure ref-env))
-	 (dolist (call (leaf-refs (physenv-function ref-env)))
-	   (close-over thing (get-node-physenv call) home-env))))
+(defun close-over (thing ref-physenv home-physenv)
+  (declare (type physenv ref-physenv home-physenv))
+  (let ((flooded-physenvs nil))
+    (named-let flood ((flooded-physenv ref-physenv))
+      (unless (or (eql flooded-physenv home-physenv)
+		  (member flooded-physenv flooded-physenvs))
+	(push flooded-physenv flooded-physenvs)
+	(pushnew thing (physenv-closure flooded-physenv))
+	(dolist (ref (leaf-refs (physenv-lambda flooded-physenv)))
+	  (flood (get-node-physenv ref))))))
   (values))
 
 ;;;; non-local exit
@@ -243,8 +266,8 @@
 ;;; -- If there isn't any NLX-Info entry in the environment, make
 ;;;    an entry stub, otherwise just move the exit block link to
 ;;;    the component tail.
-;;; -- Close over the NLX-Info in the exit environment.
-;;; -- If the exit is from an :Escape function, then substitute a
+;;; -- Close over the NLX-INFO in the exit environment.
+;;; -- If the exit is from an :ESCAPE function, then substitute a
 ;;;    constant reference to NLX-Info structure for the escape
 ;;;    function reference. This will cause the escape function to
 ;;;    be deleted (although not removed from the DFO.)  The escape
@@ -257,14 +280,12 @@
   (let ((entry (exit-entry exit))
 	(cont (node-cont exit))
 	(exit-fun (node-home-lambda exit)))
-
     (if (find-nlx-info entry cont)
 	(let ((block (node-block exit)))
 	  (aver (= (length (block-succ block)) 1))
 	  (unlink-blocks block (first (block-succ block)))
 	  (link-blocks block (component-tail (block-component block))))
 	(insert-nlx-entry-stub exit env))
-
     (let ((info (find-nlx-info entry cont)))
       (aver info)
       (close-over info (node-physenv exit) env)
@@ -276,7 +297,6 @@
 	(let ((node (block-last (nlx-info-target info))))
 	  (delete-continuation-use node)
 	  (add-continuation-use node (nlx-info-continuation info))))))
-
   (values))
 
 ;;; Iterate over the EXITs in COMPONENT, calling NOTE-NON-LOCAL-EXIT
@@ -289,11 +309,10 @@
   (dolist (lambda (component-lambdas component))
     (dolist (entry (lambda-entries lambda))
       (dolist (exit (entry-exits entry))
-	(let ((target-env (node-physenv entry)))
-	  (if (eq (node-physenv exit) target-env)
+	(let ((target-physenv (node-physenv entry)))
+	  (if (eq (node-physenv exit) target-physenv)
 	      (maybe-delete-exit exit)
-	      (note-non-local-exit target-env exit))))))
-
+	      (note-non-local-exit target-physenv exit))))))
   (values))
 
 ;;;; cleanup emission
@@ -303,7 +322,10 @@
 ;;; in an implicit MV-PROG1. We have to force local call analysis of
 ;;; new references to UNWIND-PROTECT cleanup functions. If we don't
 ;;; actually have to do anything, then we don't insert any cleanup
-;;; code.
+;;; code. (FIXME: There's some confusion here, left over from CMU CL
+;;; comments. CLEANUP1 isn't mentioned in the code of this function.
+;;; It is in code elsewhere, but if the comments for this function
+;;; mention it they should explain the relationship to the other code.)
 ;;;
 ;;; If we do insert cleanup code, we check that BLOCK1 doesn't end in
 ;;; a "tail" local call.
@@ -342,7 +364,7 @@
 			     (block-last block1)
 			     `(progn ,@(code)))
 	(dolist (fun (reanalyze-funs))
-	  (local-call-analyze-1 fun)))))
+	  (locall-analyze-fun-1 fun)))))
 
   (values))
 

@@ -423,6 +423,12 @@
 	  (t
 	   (print-it stream)))))
 
+;;; a hack to work around recurring gotchas with printing while
+;;; DEFGENERIC PRINT-OBJECT is being built
+;;;
+;;; (hopefully will go away naturally when CLOS moves into cold init)
+(defvar *print-object-is-disabled-p*)
+
 ;;; Output OBJECT to STREAM observing all printer control variables
 ;;; except for *PRINT-PRETTY*. Note: if *PRINT-PRETTY* is non-NIL,
 ;;; then the pretty printer will be used for any components of OBJECT,
@@ -440,15 +446,15 @@
     ;;       a method on an external symbol in the CL package which is
     ;;       applicable to arg lists containing only direct instances of
     ;;       standardized classes.
-    ;; Thus, in order for the user to detect our sleaziness, he has to do
-    ;; something relatively obscure like
+    ;; Thus, in order for the user to detect our sleaziness in conforming
+    ;; code, he has to do something relatively obscure like
     ;;   (1) actually use tools like FIND-METHOD to look for PRINT-OBJECT
     ;;       methods, or
     ;;   (2) define a PRINT-OBJECT method which is specialized on the stream
     ;;       value (e.g. a Gray stream object).
     ;; As long as no one comes up with a non-obscure way of detecting this
     ;; sleaziness, fixing this nonconformity will probably have a low
-    ;; priority. -- WHN 20000121
+    ;; priority. -- WHN 2001-11-25
     (fixnum
      (output-integer object stream))
     (list
@@ -456,7 +462,13 @@
 	 (output-symbol object stream)
 	 (output-list object stream)))
     (instance
-     (print-object object stream))
+     (cond ((not (and (boundp '*print-object-is-disabled-p*)
+		      *print-object-is-disabled-p*))
+	    (print-object object stream))
+	   ((typep object 'structure-object)
+	    (default-structure-print object stream *current-level*))
+	   (t
+	    (write-string "#<INSTANCE but not STRUCTURE-OBJECT>" stream))))
     (function
      (unless (and (funcallable-instance-p object)
 		  (printed-as-funcallable-standard-class object stream))
@@ -496,8 +508,8 @@
 
 ;;;; symbols
 
-;;; Values of *PRINT-CASE* and (READTABLE-CASE *READTABLE*) the last
-;;; time the printer was called.
+;;; values of *PRINT-CASE* and (READTABLE-CASE *READTABLE*) the last
+;;; time the printer was called
 (defvar *previous-case* nil)
 (defvar *previous-readtable-case* nil)
 

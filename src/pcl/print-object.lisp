@@ -33,16 +33,21 @@
 ;;; by the printer doing bootstrapping, and immediately replace it
 ;;; with some new printing logic, so that the Lisp printer stays
 ;;; crippled only for the shortest necessary time.
+(/show0 "about to replace placeholder PRINT-OBJECT with DEFGENERIC")
 (let (;; (If we don't suppress /SHOW printing while the printer is
       ;; crippled here, it becomes really easy to crash the bootstrap
       ;; sequence by adding /SHOW statements e.g. to the compiler,
       ;; which kinda defeats the purpose of /SHOW being a harmless
       ;; tracing-style statement.)
-      #+sb-show (*/show* nil))
+      #+sb-show (*/show* nil)
+      ;; (another workaround for the problem of debugging while the
+      ;; printer is disabled here)
+      (sb-impl::*print-object-is-disabled-p* t))
   (fmakunbound 'print-object)
   (defgeneric print-object (object stream))
   (defmethod print-object ((x t) stream)
     (print-unreadable-object (x stream :type t :identity t))))
+(/show0 "done replacing placeholder PRINT-OBJECT with DEFGENERIC")
 
 ;;;; a hook called by the printer to take care of dispatching to PRINT-OBJECT
 ;;;; for appropriate FUNCALLABLE-INSTANCE objects

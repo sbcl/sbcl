@@ -203,13 +203,14 @@
     (:block-start
      (continuation-block cont))))
 
-;;; Ensure that Cont is the start of a block (or deleted) so that the use
-;;; set can be freely manipulated.
-;;; -- If the continuation is :Unused or is :Inside-Block and the Cont of Last
-;;;    in its block, then we make it the start of a new deleted block.
-;;; -- If the continuation is :Inside-Block inside a block, then we split the
-;;;    block using Node-Ends-Block, which makes the continuation be a
-;;;    :Block-Start.
+;;; Ensure that CONT is the start of a block (or deleted) so that
+;;; the use set can be freely manipulated.
+;;; -- If the continuation is :UNUSED or is :INSIDE-BLOCK and the
+;;;    CONT of LAST in its block, then we make it the start of a new
+;;;    deleted block.
+;;; -- If the continuation is :INSIDE-BLOCK inside a block, then we
+;;;    split the block using Node-Ends-Block, which makes the
+;;;    continuation be a :BLOCK-START.
 (defun ensure-block-start (cont)
   (declare (type continuation cont))
   (let ((kind (continuation-kind cont)))
@@ -234,7 +235,6 @@
 ;;; the LEXENV-LAMBDA may be deleted, we must chain up the
 ;;; LAMBDA-CALL-LEXENV thread until we find a CLAMBDA that isn't
 ;;; deleted, and then return its home.
-(declaim (maybe-inline node-home-lambda))
 (defun node-home-lambda (node)
   (declare (type node node))
   (do ((fun (lexenv-lambda (node-lexenv node))
@@ -244,18 +244,21 @@
     (when (eq (lambda-home fun) fun)
       (return fun))))
 
-#!-sb-fluid (declaim (inline node-block node-tlf-number))
-(declaim (maybe-inline node-physenv))
 (defun node-block (node)
   (declare (type node node))
   (the cblock (continuation-block (node-prev node))))
 (defun node-physenv (node)
   (declare (type node node))
-  #!-sb-fluid (declare (inline node-home-lambda))
   (the physenv (lambda-physenv (node-home-lambda node))))
 
-;;; Return the enclosing cleanup for environment of the first or last node
-;;; in BLOCK.
+(defun lambda-block (clambda)
+  (declare (type clambda clambda))
+  (node-block (lambda-bind clambda)))
+(defun lambda-component (clambda)
+  (block-component (lambda-block clambda)))
+
+;;; Return the enclosing cleanup for environment of the first or last
+;;; node in BLOCK.
 (defun block-start-cleanup (block)
   (declare (type cblock block))
   (node-enclosing-cleanup (continuation-next (block-start block))))
@@ -263,17 +266,53 @@
   (declare (type cblock block))
   (node-enclosing-cleanup (block-last block)))
 
+;;; Return the non-LET LAMBDA that holds BLOCK's code, or NIL
+;;; if there is none.
+;;;
+;;; There can legitimately be no home lambda in dead code early in the
+;;; IR1 conversion process, e.g. when IR1-converting the SETQ form in
+;;;   (BLOCK B (RETURN-FROM B) (SETQ X 3))
+;;; where the block is just a placeholder during parsing and doesn't
+;;; actually correspond to code which will be written anywhere.
+(defun block-home-lambda-or-null (block)
+  (declare (type cblock block))
+  (if (node-p (block-last block))
+      ;; This is the old CMU CL way of doing it.
+      (node-home-lambda (block-last block))
+      ;; Now that SBCL uses this operation more aggressively than CMU
+      ;; CL did, the old CMU CL way of doing it can fail in two ways.
+      ;;   1. It can fail in a few cases even when a meaningful home
+      ;;      lambda exists, e.g. in IR1-CONVERT of one of the legs of
+      ;;      an IF.
+      ;;   2. It can fail when converting a form which is born orphaned 
+      ;;      so that it never had a meaningful home lambda, e.g. a form
+      ;;      which follows a RETURN-FROM or GO form.
+      (let ((pred-list (block-pred block)))
+	;; To deal with case 1, we reason that
+	;; previous-in-target-execution-order blocks should be in the
+	;; same lambda, and that they seem in practice to be
+	;; previous-in-compilation-order blocks too, so we look back
+	;; to find one which is sufficiently initialized to tell us
+	;; what the home lambda is.
+	(if pred-list
+	    ;; We could get fancy about this, flooding through the
+	    ;; graph of all the previous blocks, but in practice it
+	    ;; seems to work just to grab the first previous block and
+	    ;; use it.
+	    (node-home-lambda (block-last (first pred-list)))
+	    ;; In case 2, we end up with an empty PRED-LIST and
+	    ;; have to punt: There's no home lambda.
+	    nil))))
+
 ;;; Return the non-LET LAMBDA that holds BLOCK's code.
 (defun block-home-lambda (block)
-  (declare (type cblock block))
-  #!-sb-fluid (declare (inline node-home-lambda))
-  (node-home-lambda (block-last block)))
+  (the clambda
+    (block-home-lambda-or-null block)))
 
 ;;; Return the IR1 physical environment for BLOCK.
 (defun block-physenv (block)
   (declare (type cblock block))
-  #!-sb-fluid (declare (inline node-home-lambda))
-  (lambda-physenv (node-home-lambda (block-last block))))
+  (lambda-physenv (block-home-lambda block)))
 
 ;;; Return the Top Level Form number of PATH, i.e. the ordinal number
 ;;; of its original source's top level form in its compilation unit.
@@ -316,6 +355,29 @@
     (if use
 	(values (node-source-form use) t)
 	(values nil nil))))
+
+;;; Return the LAMBDA that is CONT's home, or NIL if there is none.
+(defun continuation-home-lambda-or-null (cont)
+  ;; KLUDGE: This function is a post-CMU-CL hack by WHN, and this
+  ;; implementation might not be quite right, or might be uglier than
+  ;; necessary. It appears that the original Python never found a need
+  ;; to do this operation. The obvious things based on
+  ;; NODE-HOME-LAMBDA of CONTINUATION-USE usually work; then if that
+  ;; fails, BLOCK-HOME-LAMBDA of CONTINUATION-BLOCK works, given that
+  ;; we generalize it enough to grovel harder when the simple CMU CL
+  ;; approach fails, and furthermore realize that in some exceptional
+  ;; cases it might return NIL. -- WHN 2001-12-04
+  (cond ((continuation-use cont)
+	 (node-home-lambda (continuation-use cont)))
+	((continuation-block cont)
+	 (block-home-lambda-or-null (continuation-block cont)))
+	(t
+	 (error "internal error: confused about home lambda for ~S"))))
+
+;;; Return the LAMBDA that is CONT's home.
+(defun continuation-home-lambda (cont)
+  (the clambda
+    (continuation-home-lambda-or-null cont)))
 
 ;;; Return a new LEXENV just like DEFAULT except for the specified
 ;;; slot values. Values for the alist slots are NCONCed to the
@@ -343,7 +405,6 @@
 ;;;; flow/DFO/component hackery
 
 ;;; Join BLOCK1 and BLOCK2.
-#!-sb-fluid (declaim (inline link-blocks))
 (defun link-blocks (block1 block2)
   (declare (type cblock block1 block2))
   (setf (block-succ block1)
@@ -559,7 +620,7 @@
 ;;; DELETE-REF will handle the deletion.
 (defun delete-functional (fun)
   (aver (and (null (leaf-refs fun))
-	     (not (functional-entry-function fun))))
+	     (not (functional-entry-fun fun))))
   (etypecase fun
     (optional-dispatch (delete-optional-dispatch fun))
     (clambda (delete-lambda fun)))
@@ -578,8 +639,8 @@
 ;;; (it won't be there before local call analysis, but no matter.) If
 ;;; the lambda was never referenced, we give a note.
 ;;;
-;;; If the lambda is an XEP, then we null out the ENTRY-FUNCTION in its
-;;; ENTRY-FUNCTION so that people will know that it is not an entry point
+;;; If the lambda is an XEP, then we null out the ENTRY-FUN in its
+;;; ENTRY-FUN so that people will know that it is not an entry point
 ;;; anymore.
 (defun delete-lambda (leaf)
   (declare (type clambda leaf))
@@ -603,21 +664,21 @@
 	  (unless (leaf-ever-used leaf)
 	    (let ((*compiler-error-context* bind))
 	      (compiler-note "deleting unused function~:[.~;~:*~%  ~S~]"
-			     (leaf-name leaf))))
+			     (leaf-debug-name leaf))))
 	  (unlink-blocks (component-head component) bind-block)
 	  (when return
 	    (unlink-blocks (node-block return) (component-tail component)))
 	  (setf (component-reanalyze component) t)
 	  (let ((tails (lambda-tail-set leaf)))
-	    (setf (tail-set-functions tails)
-		  (delete leaf (tail-set-functions tails)))
+	    (setf (tail-set-funs tails)
+		  (delete leaf (tail-set-funs tails)))
 	    (setf (lambda-tail-set leaf) nil))
 	  (setf (component-lambdas component)
 		(delete leaf (component-lambdas component)))))
 
     (when (eq kind :external)
-      (let ((fun (functional-entry-function leaf)))
-	(setf (functional-entry-function fun) nil)
+      (let ((fun (functional-entry-fun leaf)))
+	(setf (functional-entry-fun fun) nil)
 	(when (optional-dispatch-p fun)
 	  (delete-optional-dispatch fun)))))
 
@@ -643,7 +704,7 @@
 ;;; or even converted to a let.
 (defun delete-optional-dispatch (leaf)
   (declare (type optional-dispatch leaf))
-  (let ((entry (functional-entry-function leaf)))
+  (let ((entry (functional-entry-fun leaf)))
     (unless (and entry (leaf-refs entry))
       (aver (or (not entry) (eq (functional-kind entry) :deleted)))
       (setf (functional-kind leaf) :deleted)
@@ -682,11 +743,12 @@
 
     (cond ((null refs)
 	   (typecase leaf
-	     (lambda-var (delete-lambda-var leaf))
+	     (lambda-var
+	      (delete-lambda-var leaf))
 	     (clambda
 	      (ecase (functional-kind leaf)
 		((nil :let :mv-let :assignment :escape :cleanup)
-		 (aver (not (functional-entry-function leaf)))
+		 (aver (not (functional-entry-fun leaf)))
 		 (delete-lambda leaf))
 		(:external
 		 (delete-lambda leaf))
@@ -882,10 +944,10 @@
       (let ((*compiler-error-context* (lambda-bind fun)))
 	(unless (policy *compiler-error-context* (= inhibit-warnings 3))
 	  ;; ANSI section "3.2.5 Exceptional Situations in the Compiler"
-	  ;; requires this to be a STYLE-WARNING.
+	  ;; requires this to be no more than a STYLE-WARNING.
 	  (compiler-style-warning "The variable ~S is defined but never used."
-				  (leaf-name var)))
-	(setf (leaf-ever-used var) t))))
+				  (leaf-debug-name var)))
+	(setf (leaf-ever-used var) t)))) ; to avoid repeated warnings? -- WHN
   (values))
 
 (defvar *deletion-ignored-objects* '(t nil))
@@ -1050,13 +1112,13 @@
 ;;; triggered by deletion.
 (defun delete-component (component)
   (declare (type component component))
-  (aver (null (component-new-functions component)))
+  (aver (null (component-new-funs component)))
   (setf (component-kind component) :deleted)
   (do-blocks (block component)
     (setf (block-delete-p block) t))
   (dolist (fun (component-lambdas component))
     (setf (functional-kind fun) nil)
-    (setf (functional-entry-function fun) nil)
+    (setf (functional-entry-fun fun) nil)
     (setf (leaf-refs fun) nil)
     (delete-functional fun))
   (do-blocks (block component)
@@ -1111,7 +1173,7 @@
 
 ;;;; leaf hackery
 
-;;; Change the Leaf that a Ref refers to.
+;;; Change the LEAF that a REF refers to.
 (defun change-ref-leaf (ref leaf)
   (declare (type ref ref) (type leaf leaf))
   (unless (eq (ref-leaf ref) leaf)
@@ -1132,7 +1194,7 @@
     (change-ref-leaf ref new-leaf))
   (values))
 
-;;; Like SUBSITUTE-LEAF, only there is a predicate on the Ref to tell
+;;; Like SUBSITUTE-LEAF, only there is a predicate on the REF to tell
 ;;; whether to substitute.
 (defun substitute-leaf-if (test new-leaf old-leaf)
   (declare (type leaf new-leaf old-leaf) (type function test))
@@ -1144,19 +1206,21 @@
 ;;; Return a LEAF which represents the specified constant object. If
 ;;; the object is not in *CONSTANTS*, then we create a new constant
 ;;; LEAF and enter it.
-#!-sb-fluid (declaim (maybe-inline find-constant))
 (defun find-constant (object)
-  (if (typep object '(or symbol number character instance))
-    (or (gethash object *constants*)
-	(setf (gethash object *constants*)
-	      (make-constant :value object
-			     :name nil
-			     :type (ctype-of object)
-			     :where-from :defined)))
-    (make-constant :value object
-		   :name nil
-		   :type (ctype-of object)
-		   :where-from :defined)))
+  (if (typep object
+	     ;; FIXME: What is the significance of this test? ("things
+	     ;; that are worth uniquifying"?)
+	     '(or symbol number character instance))
+      (or (gethash object *constants*)
+	  (setf (gethash object *constants*)
+		(make-constant :value object
+			       :%source-name '.anonymous.
+			       :type (ctype-of object)
+			       :where-from :defined)))
+      (make-constant :value object
+		     :%source-name '.anonymous.
+		     :type (ctype-of object)
+		     :where-from :defined)))
 
 ;;; If there is a non-local exit noted in ENTRY's environment that
 ;;; exits to CONT in that entry, then return it, otherwise return NIL.
@@ -1216,7 +1280,7 @@
 		   (or (not (defined-fun-p leaf))
 		       (not (eq (defined-fun-inlinep leaf) :notinline))
 		       notinline-ok))
-	      (leaf-name leaf)
+	      (leaf-source-name leaf)
 	      nil))
 	nil)))
 
@@ -1234,8 +1298,7 @@
     (elt (combination-args (let-combination fun))
 	 (position-or-lose var (lambda-vars fun)))))
 
-;;; Return the LAMBDA that is called by the local Call.
-#!-sb-fluid (declaim (inline combination-lambda))
+;;; Return the LAMBDA that is called by the local CALL.
 (defun combination-lambda (call)
   (declare (type basic-combination call))
   (aver (eq (basic-combination-kind call) :local))

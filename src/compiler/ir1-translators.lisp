@@ -45,15 +45,15 @@
       (continuation-starts-block cont)
 
       (link-blocks start-block then-block)
-      (link-blocks start-block else-block)
+      (link-blocks start-block else-block))
 
-      (ir1-convert then-cont cont then)
-      (ir1-convert else-cont cont else))))
+    (ir1-convert then-cont cont then)
+    (ir1-convert else-cont cont else)))
 
 ;;;; BLOCK and TAGBODY
 
-;;;; We make an Entry node to mark the start and a :Entry cleanup to
-;;;; mark its extent. When doing GO or RETURN-FROM, we emit an Exit
+;;;; We make an ENTRY node to mark the start and a :ENTRY cleanup to
+;;;; mark its extent. When doing GO or RETURN-FROM, we emit an EXIT
 ;;;; node.
 
 ;;; Make a :ENTRY cleanup and emit an ENTRY node, then convert the
@@ -85,16 +85,26 @@
       (ir1-convert-progn-body dummy cont forms))))
 
 
-;;; We make CONT start a block just so that it will have a block
-;;; assigned. People assume that when they pass a continuation into
-;;; IR1-CONVERT as CONT, it will have a block when it is done.
-(def-ir1-translator return-from ((name &optional value)
-				 start cont)
+(def-ir1-translator return-from ((name &optional value) start cont)
   #!+sb-doc
   "Return-From Block-Name Value-Form
   Evaluate the Value-Form, returning its values from the lexically enclosing
   BLOCK Block-Name. This is constrained to be used only within the dynamic
   extent of the BLOCK."
+  ;; CMU CL comment:
+  ;;   We make CONT start a block just so that it will have a block
+  ;;   assigned. People assume that when they pass a continuation into
+  ;;   IR1-CONVERT as CONT, it will have a block when it is done.
+  ;; KLUDGE: Note that this block is basically fictitious. In the code
+  ;;   (BLOCK B (RETURN-FROM B) (SETQ X 3))
+  ;; it's the block which answers the question "which block is
+  ;; the (SETQ X 3) in?" when the right answer is that (SETQ X 3) is
+  ;; dead code and so doesn't really have a block at all. The existence
+  ;; of this block, and that way that it doesn't explicitly say
+  ;; "I'm actually nowhere at all" makes some logic (e.g.
+  ;; BLOCK-HOME-LAMBDA-OR-NULL) more obscure, and it might be better
+  ;; to get rid of it, perhaps using a special placeholder value
+  ;; to indicate the orphanedness of the code.
   (continuation-starts-block cont)
   (let* ((found (or (lexenv-find name blocks)
 		    (compiler-error "return for unknown block: ~S" name)))
@@ -106,6 +116,9 @@
     (setf (continuation-dest value-cont) exit)
     (ir1-convert start value-cont value)
     (prev-link exit value-cont)
+    (let ((home-lambda (continuation-home-lambda-or-null start)))
+      (when home-lambda
+	(push entry (lambda-calls-or-closes home-lambda))))
     (use-continuation exit (second found))))
 
 ;;; Return a list of the segments of a TAGBODY. Each segment looks
@@ -186,11 +199,15 @@
   is constrained to be used only within the dynamic extent of the TAGBODY."
   (continuation-starts-block cont)
   (let* ((found (or (lexenv-find tag tags :test #'eql)
-		    (compiler-error "Go to nonexistent tag: ~S." tag)))
+		    (compiler-error "attempt to GO to nonexistent tag: ~S"
+				    tag)))
 	 (entry (first found))
 	 (exit (make-exit :entry entry)))
     (push exit (entry-exits entry))
     (prev-link exit start)
+    (let ((home-lambda (continuation-home-lambda-or-null start)))
+      (when home-lambda
+	(push entry (lambda-calls-or-closes home-lambda))))
     (use-continuation exit (second found))))
 
 ;;;; translators for compiler-magic special forms
@@ -323,13 +340,12 @@
       (compiler-error "Lisp error during evaluation of info args:~%~A"
 		      condition))))
 
-;;; If there is a primitive translator, then we expand the call.
-;;; Otherwise, we convert to the %%PRIMITIVE funny function. The first
-;;; argument is the template, the second is a list of the results of
-;;; any codegen-info args, and the remaining arguments are the runtime
+;;; Convert to the %%PRIMITIVE funny function. The first argument is
+;;; the template, the second is a list of the results of any
+;;; codegen-info args, and the remaining arguments are the runtime
 ;;; arguments.
 ;;;
-;;; We do a bunch of error checking now so that we don't bomb out with
+;;; We do various error checking now so that we don't bomb out with
 ;;; a fatal error during IR2 conversion.
 ;;;
 ;;; KLUDGE: It's confusing having multiple names floating around for
@@ -341,11 +357,10 @@
 ;;; FIXME: Look at doing this ^, it doesn't look too hard actually.
 (def-ir1-translator %primitive ((name &rest args) start cont)
   (unless (symbolp name)
-    (compiler-error "The primitive name ~S is not a symbol." name))
-
+    (compiler-error "internal error: Primitive name ~S is not a symbol." name))
   (let* ((template (or (gethash name *backend-template-names*)
 		       (compiler-error
-			"The primitive name ~A is not defined."
+			"internal error: Primitive name ~A is not defined."
 			name)))
 	 (required (length (template-arg-types template)))
 	 (info (template-info-arg-count template))
@@ -353,13 +368,15 @@
 	 (nargs (length args)))
     (if (template-more-args-type template)
 	(when (< nargs min)
-	  (compiler-error "Primitive ~A was called with ~R argument~:P, ~
+	  (compiler-error "internal error: Primitive ~A was called ~
+                           with ~R argument~:P, ~
 	    		   but wants at least ~R."
 			  name
 			  nargs
 			  min))
 	(unless (= nargs min)
-	  (compiler-error "Primitive ~A was called with ~R argument~:P, ~
+	  (compiler-error "internal error: Primitive ~A was called ~
+                           with ~R argument~:P, ~
 			   but wants exactly ~R."
 			  name
 			  nargs
@@ -397,13 +414,19 @@
   (if (consp thing)
       (case (car thing)
 	((lambda)
-	 (reference-leaf start cont (ir1-convert-lambda thing)))
+	 (reference-leaf start
+			 cont
+			 (ir1-convert-lambda thing
+					     :debug-name (debug-namify
+							  "#'~S" thing))))
 	((setf)
 	 (let ((var (find-lexically-apparent-function
 		     thing "as the argument to FUNCTION")))
 	   (reference-leaf start cont var)))
 	((instance-lambda)
-	 (let ((res (ir1-convert-lambda `(lambda ,@(cdr thing)))))
+	 (let ((res (ir1-convert-lambda `(lambda ,@(cdr thing))
+					:debug-name (debug-namify "#'~S"
+								  thing))))
 	   (setf (getf (functional-plist res) :fin-function) t)
 	   (reference-leaf start cont res)))
 	(t
@@ -501,7 +524,8 @@
     (multiple-value-bind (vars values) (extract-let-variables bindings 'let)
       (let* ((*lexenv* (process-decls decls vars nil cont))
 	     (fun-cont (make-continuation))
-	     (fun (ir1-convert-lambda-body forms vars)))
+	     (fun (ir1-convert-lambda-body
+		   forms vars :debug-name (debug-namify "LET ~S" bindings))))
 	(reference-leaf start fun-cont fun)
 	(ir1-convert-combination-args fun-cont cont values)))))
 
@@ -575,19 +599,16 @@
     (multiple-value-bind (names defs)
 	(extract-flet-variables definitions 'flet)
       (let* ((fvars (mapcar (lambda (n d)
-  			      (ir1-convert-lambda d n))
+  			      (ir1-convert-lambda d
+						  :source-name n
+						  :debug-name (debug-namify
+							       "FLET ~S" n)))
 			    names defs))
 	     (*lexenv* (make-lexenv
 			:default (process-decls decls nil fvars cont)
 			:functions (pairlis names fvars))))
 	(ir1-convert-progn-body start cont forms)))))
 
-;;; For LABELS, we have to create dummy function vars and add them to
-;;; the function namespace while converting the functions. We then
-;;; modify all the references to these leaves so that they point to
-;;; the real functional leaves. We also backpatch the FENV so that if
-;;; the lexical environment is used for inline expansion we will get
-;;; the right functions.
 (def-ir1-translator labels ((definitions &body body) start cont)
   #!+sb-doc
   "LABELS ({(Name Lambda-List Declaration* Form*)}*) Declaration* Body-Form*
@@ -597,36 +618,58 @@
   (multiple-value-bind (forms decls) (sb!sys:parse-body body nil)
     (multiple-value-bind (names defs)
 	(extract-flet-variables definitions 'labels)
-      (let* ((new-fenv (loop for name in names
-			     collect (cons name (make-functional :name name))))
+      (let* (;; dummy LABELS functions, to be used as placeholders
+             ;; during construction of real LABELS functions
+	     (placeholder-funs (mapcar (lambda (name)
+					 (make-functional
+					  :%source-name name
+					  :%debug-name (debug-namify
+							"LABELS placeholder ~S"
+							name)))
+				       names))
+	     ;; (like PAIRLIS but guaranteed to preserve ordering:)
+	     (placeholder-fenv (mapcar #'cons names placeholder-funs))
+             ;; the real LABELS functions, compiled in a LEXENV which
+             ;; includes the dummy LABELS functions
 	     (real-funs
-	      (let ((*lexenv* (make-lexenv :functions new-fenv)))
-		(mapcar (lambda (n d)
-			  (ir1-convert-lambda d n))
+	      (let ((*lexenv* (make-lexenv
+			       :functions placeholder-fenv)))
+		(mapcar (lambda (name def)
+			  (ir1-convert-lambda def
+					      :source-name name
+					      :debug-name (debug-namify
+							   "LABELS ~S" name)))
 			names defs))))
 
-	(loop for real in real-funs and env in new-fenv do
-	      (let ((dum (cdr env)))
-		(substitute-leaf real dum)
-		(setf (cdr env) real)))
+        ;; Modify all the references to the dummy function leaves so
+        ;; that they point to the real function leaves.
+	(loop for real-fun in real-funs and
+	      placeholder-cons in placeholder-fenv do
+	      (substitute-leaf real-fun (cdr placeholder-cons))
+	      (setf (cdr placeholder-cons) real-fun))
 
+        ;; Voila.
 	(let ((*lexenv* (make-lexenv
 			 :default (process-decls decls nil real-funs cont)
-			 :functions (pairlis names real-funs))))
+                         ;; Use a proper FENV here (not the
+                         ;; placeholder used earlier) so that if the
+                         ;; lexical environment is used for inline
+                         ;; expansion we'll get the right functions.
+                         :functions (pairlis names real-funs))))
 	  (ir1-convert-progn-body start cont forms))))))
 
-;;;; THE
+;;;; the THE special operator, and friends
 
 ;;; Do stuff to recognize a THE or VALUES declaration. CONT is the
 ;;; continuation that the assertion applies to, TYPE is the type
-;;; specifier and Lexenv is the current lexical environment. NAME is
+;;; specifier and LEXENV is the current lexical environment. NAME is
 ;;; the name of the declaration we are doing, for use in error
 ;;; messages.
 ;;;
 ;;; This is somewhat involved, since a type assertion may only be made
 ;;; on a continuation, not on a node. We can't just set the
 ;;; continuation asserted type and let it go at that, since there may
-;;; be parallel THE's for the same continuation, i.e.:
+;;; be parallel THE's for the same continuation, i.e.
 ;;;     (if ...
 ;;;	 (the foo ...)
 ;;;	 (the bar ...))
@@ -715,13 +758,16 @@
 	    (leaf
 	     (when (constant-p leaf)
 	       (compiler-error "~S is a constant and thus can't be set." name))
-	     (when (and (lambda-var-p leaf)
-			(lambda-var-ignorep leaf))
-	       ;; ANSI's definition of "Declaration IGNORE, IGNORABLE"
-	       ;; requires that this be a STYLE-WARNING, not a full warning.
-	       (compiler-style-warning
-		"~S is being set even though it was declared to be ignored."
-		name))
+	     (when (lambda-var-p leaf)
+	       (let ((home-lambda (continuation-home-lambda-or-null start)))
+		 (when home-lambda
+		   (pushnew leaf (lambda-calls-or-closes home-lambda))))
+	       (when (lambda-var-ignorep leaf)
+		 ;; ANSI's definition of "Declaration IGNORE, IGNORABLE"
+		 ;; requires that this be a STYLE-WARNING, not a full warning.
+		 (compiler-style-warning
+		  "~S is being set even though it was declared to be ignored."
+		  name)))
 	     (set-variable start cont leaf (second things)))
 	    (cons
 	     (aver (eq (car leaf) 'MACRO))
@@ -763,7 +809,7 @@
 	       `(multiple-value-call #'%throw ,tag ,result)))
 
 ;;; This is a special special form used to instantiate a cleanup as
-;;; the current cleanup within the body. KIND is a the kind of cleanup
+;;; the current cleanup within the body. KIND is the kind of cleanup
 ;;; to make, and MESS-UP is a form that does the mess-up action. We
 ;;; make the MESS-UP be the USE of the MESS-UP form's continuation,
 ;;; and introduce the cleanup into the lexical environment. We
@@ -785,7 +831,7 @@
 ;;; This is a special special form that makes an "escape function"
 ;;; which returns unknown values from named block. We convert the
 ;;; function, set its kind to :ESCAPE, and then reference it. The
-;;; :Escape kind indicates that this function's purpose is to
+;;; :ESCAPE kind indicates that this function's purpose is to
 ;;; represent a non-local control transfer, and that it might not
 ;;; actually have to be compiled.
 ;;;
@@ -794,7 +840,8 @@
 (def-ir1-translator %escape-function ((tag) start cont)
   (let ((fun (ir1-convert-lambda
 	      `(lambda ()
-		 (return-from ,tag (%unknown-values))))))
+		 (return-from ,tag (%unknown-values)))
+	      :debug-name (debug-namify "escape function for ~S" tag))))
     (setf (functional-kind fun) :escape)
     (reference-leaf start cont fun)))
 
@@ -826,11 +873,11 @@
 	    (%catch (%escape-function ,exit-block) ,tag)
 	  ,@body)))))
 
-;;; UNWIND-PROTECT is similar to CATCH, but more hairy. We make the
+;;; UNWIND-PROTECT is similar to CATCH, but hairier. We make the
 ;;; cleanup forms into a local function so that they can be referenced
 ;;; both in the case where we are unwound and in any local exits. We
 ;;; use %CLEANUP-FUNCTION on this to indicate that reference by
-;;; %UNWIND-PROTECT ISN'T "real", and thus doesn't cause creation of
+;;; %UNWIND-PROTECT isn't "real", and thus doesn't cause creation of
 ;;; an XEP.
 (def-ir1-translator unwind-protect ((protected &body cleanup) start cont)
   #!+sb-doc
@@ -1017,9 +1064,9 @@
 	  (info :function :macro-function name) (coerce def 'function))
 
     (let* ((*current-path* (revert-source-path 'defmacro))
-	   (fun (ir1-convert-lambda def name)))
-      (setf (leaf-name fun)
-	    (concatenate 'string "DEFMACRO " (symbol-name name)))
+	   (fun (ir1-convert-lambda def 
+				    :debug-name (debug-namify "DEFMACRO ~S"
+							      name))))
       (setf (functional-arg-documentation fun) (eval lambda-list))
 
       (ir1-convert start cont `(%%defmacro ',name ,fun ,doc)))
@@ -1058,10 +1105,10 @@
 	  (coerce def 'function))
 
     (let* ((*current-path* (revert-source-path 'define-compiler-macro))
-	   (fun (ir1-convert-lambda def name)))
-      (setf (leaf-name fun)
-	    (let ((*print-case* :upcase))
-	      (format nil "DEFINE-COMPILER-MACRO ~S" name)))
+	   (fun (ir1-convert-lambda def 
+				    :debug-name (debug-namify
+						 "DEFINE-COMPILER-MACRO ~S"
+						 name))))
       (setf (functional-arg-documentation fun) (eval lambda-list))
 
       (ir1-convert start cont `(%%define-compiler-macro ',name ,fun ,doc)))

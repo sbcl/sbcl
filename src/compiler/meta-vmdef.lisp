@@ -1921,9 +1921,7 @@
 (defmacro do-physenv-ir2-blocks ((block-var physenv &optional result)
 				 &body body)
   (once-only ((n-physenv physenv))
-    (once-only ((n-first `(node-block
-			   (lambda-bind
-			    (physenv-function ,n-physenv)))))
+    (once-only ((n-first `(lambda-block (physenv-lambda ,n-physenv))))
       (once-only ((n-tail `(block-info
 			    (component-tail
 			     (block-component ,n-first)))))

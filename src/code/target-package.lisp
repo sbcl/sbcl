@@ -834,7 +834,7 @@
 
 (defun unuse-package (packages-to-unuse &optional (package (sane-package)))
   #!+sb-doc
-  "Remove Packages-To-Unuse from the use list for Package."
+  "Remove PACKAGES-TO-UNUSE from the USE list for PACKAGE."
   (let ((package (find-undeleted-package-or-lose package)))
     (dolist (p (package-listify packages-to-unuse))
       (setf (package-%use-list package)

@@ -179,8 +179,8 @@
   tn)
 
 ;;; Create a constant TN. The implementation dependent
-;;; Immediate-Constant-SC function is used to determine whether the constant
-;;; has an immediate representation.
+;;; IMMEDIATE-CONSTANT-SC function is used to determine whether the
+;;; constant has an immediate representation.
 (defun make-constant-tn (constant)
   (declare (type constant constant))
   (let* ((component (component-info *component-being-compiled*))
@@ -218,9 +218,9 @@
 	     (ir2-component-alias-tns component))
     res))
 
-;;; Return a load-time constant TN with the specified Kind and Info. If the
-;;; desired Constants entry already exists, then reuse it, otherwise allocate a
-;;; new load-time constant slot.
+;;; Return a load-time constant TN with the specified KIND and INFO.
+;;; If the desired CONSTANTS entry already exists, then reuse it,
+;;; otherwise allocate a anew load-time constant slot.
 (defun make-load-time-constant-tn (kind info)
   (declare (type keyword kind))
   (let* ((component (component-info *component-being-compiled*))

@@ -45,7 +45,7 @@
 (defvar *only-simple-args*)
 
 ;;; Used by the expander stuff. We do an initial pass with this as NIL.
-;;; If someone doesn't like this, they (throw 'need-orig-args nil) and we try
+;;; If someone doesn't like this, they (THROW 'NEED-ORIG-ARGS NIL) and we try
 ;;; again with it bound to T. If this is T, we don't try to do anything
 ;;; fancy with args.
 (defvar *orig-args-available* nil)

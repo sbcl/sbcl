@@ -316,10 +316,10 @@
     (declare (special *constraint-number* *delayed-ir1-transforms*))
     (loop
       (ir1-optimize-until-done component)
-      (when (or (component-new-functions component)
-		(component-reanalyze-functions component))
+      (when (or (component-new-funs component)
+		(component-reanalyze-funs component))
 	(maybe-mumble "locall ")
-	(local-call-analyze component))
+	(locall-analyze-component component))
       (dfo-as-needed component)
       (when *constraint-propagate*
 	(maybe-mumble "constraint ")
@@ -331,15 +331,15 @@
       ;; confuse itself.
       (unless (and (or (component-reoptimize component)
 		       (component-reanalyze component)
-		       (component-new-functions component)
-		       (component-reanalyze-functions component))
+		       (component-new-funs component)
+		       (component-reanalyze-funs component))
 		   (< loop-count (- *reoptimize-after-type-check-max* 4)))
         (maybe-mumble "type ")
 	(generate-type-checks component)
 	(unless (or (component-reoptimize component)
 		    (component-reanalyze component)
-		    (component-new-functions component)
-		    (component-reanalyze-functions component))
+		    (component-new-funs component)
+		    (component-reanalyze-funs component))
 	  (return)))
       (when (>= loop-count *reoptimize-after-type-check-max*)
 	(maybe-mumble "[reoptimize limit]")
@@ -828,15 +828,13 @@
 
 
 ;;; utilities for extracting COMPONENTs of FUNCTIONALs
-(defun clambda-component (clambda)
-  (block-component (node-block (lambda-bind clambda))))
 (defun functional-components (f)
   (declare (type functional f))
   (etypecase f
-    (clambda (list (clambda-component f)))
+    (clambda (list (lambda-component f)))
     (optional-dispatch (let ((result nil))
 			 (labels ((frob (clambda)
-				    (pushnew (clambda-component clambda)
+				    (pushnew (lambda-component clambda)
 					     result))
 				  (maybe-frob (maybe-clambda)
 				    (when maybe-clambda
@@ -857,13 +855,17 @@
          (component (make-empty-component))
          (*current-component* component))
     (setf (component-name component)
-          (format nil "~S initial component" name))
+	  (debug-namify "~S initial component" name))
     (setf (component-kind component) :initial)
     (let* ((locall-fun (ir1-convert-lambda definition
-					   (let ((*package* *keyword-package*))
-					     (format nil "locall ~S" name))))
-           (fun (ir1-convert-lambda (make-xep-lambda locall-fun) name)))
-      (setf (functional-entry-function fun) locall-fun
+					   :debug-name (debug-namify
+							"top level locall ~S"
+							name)))
+           (fun (ir1-convert-lambda (make-xep-lambda-expression locall-fun)
+				    :source-name (or name '.anonymous.)
+				    :debug-name (unless name
+						  "top level form"))))
+      (setf (functional-entry-fun fun) locall-fun
             (functional-kind fun) :external
             (functional-has-external-references-p fun) t)
       fun)))
@@ -903,14 +905,19 @@
     ;; the :LOCALL-ONLY option to IR1-FOR-LAMBDA. Then maybe the
     ;; whole FUNCTIONAL-KIND=:TOPLEVEL case could go away..)
 
-    (local-call-analyze-until-done (list fun))
-
+    (locall-analyze-clambdas-until-done (list fun))
+    
     (multiple-value-bind (components-from-dfo top-components hairy-top)
         (find-initial-dfo (list fun))
 
       (let ((*all-components* (append components-from-dfo top-components)))
-	(mapc #'preallocate-physenvs-for-toplevelish-lambdas
-	      (append hairy-top top-components))
+	;; FIXME: This is more monkey see monkey do based on CMU CL
+	;; code. If anyone figures out why to only prescan HAIRY-TOP
+	;; and TOP-COMPONENTS here, instead of *ALL-COMPONENTS* or
+	;; some other combination of results from FIND-INITIAL-VALUES,
+	;; it'd be good to explain it.
+	(mapc #'preallocate-physenvs-for-toplevelish-lambdas hairy-top)
+	(mapc #'preallocate-physenvs-for-toplevelish-lambdas top-components)
         (dolist (component-from-dfo components-from-dfo)
           (compile-component component-from-dfo)
           (replace-toplevel-xeps component-from-dfo)))
@@ -1123,7 +1130,6 @@
   (with-ir1-namespace
    (let* ((*lexenv* (make-null-lexenv))
 	  (lambda (ir1-toplevel form *current-path* for-value)))
-     (setf (leaf-name lambda) name)
      (compile-toplevel (list lambda) t)
      lambda)))
 
@@ -1135,9 +1141,9 @@
 (defun compile-load-time-value-lambda (lambdas)
   (aver (null (cdr lambdas)))
   (let* ((lambda (car lambdas))
-	 (component (block-component (node-block (lambda-bind lambda)))))
+	 (component (lambda-component lambda)))
     (when (eql (component-kind component) :toplevel)
-      (setf (component-name component) (leaf-name lambda))
+      (setf (component-name component) (leaf-debug-name lambda))
       (compile-component component)
       (clear-ir1-info component))))
 
@@ -1237,7 +1243,7 @@
   (declare (list lambdas))
 
   (maybe-mumble "locall ")
-  (local-call-analyze-until-done lambdas)
+  (locall-analyze-clambdas-until-done lambdas)
 
   (maybe-mumble "IDFO ")
   (multiple-value-bind (components top-components hairy-top)

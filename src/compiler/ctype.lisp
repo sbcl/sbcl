@@ -552,8 +552,8 @@
 	       ((eq int *empty-type*)
 		(note-lossage
 		 "Definition's declared type for variable ~A:~%  ~S~@
-		   conflicts with this type from ~A:~%  ~S"
-		 (leaf-name var) (type-specifier vtype)
+		  conflicts with this type from ~A:~%  ~S"
+		 (leaf-debug-name var) (type-specifier vtype)
 		 where (type-specifier type))
 		(return-from try-type-intersections (values nil nil)))
 	       (t
@@ -753,7 +753,9 @@
 			      "Assignment to argument: ~S~%  ~
 			       prevents use of assertion from function ~
 			       type ~A:~%  ~S~%"
-			      (leaf-name var) where (type-specifier type))))
+			      (leaf-debug-name var)
+			      where
+			      (type-specifier type))))
 		  (t
 		   (setf (leaf-type var) type)
 		   (dolist (ref (leaf-refs var))

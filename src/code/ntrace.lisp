@@ -188,7 +188,7 @@
 	       *trace-indentation-step*)
 	    depth)))
 
-;;; Return true if one of the Names appears on the stack below Frame.
+;;; Return true if any of the NAMES appears on the stack below FRAME.
 (defun trace-wherein-p (frame names)
   (do ((frame (sb-di:frame-down frame) (sb-di:frame-down frame)))
       ((not frame) nil)
@@ -197,14 +197,14 @@
 		  :test #'equal)
       (return t))))
 
-;;; Handle print and print-after options.
+;;; Handle PRINT and PRINT-AFTER options.
 (defun trace-print (frame forms)
   (dolist (ele forms)
     (fresh-line)
     (print-trace-indentation)
     (format t "~S = ~S" (car ele) (funcall (cdr ele) frame))))
 
-;;; Test a break option, and break if true.
+;;; Test a BREAK option, and break if true.
 (defun trace-maybe-break (info break where frame)
   (when (and break (funcall (cdr break) frame))
     (sb-di:flush-frames-above frame)
@@ -213,9 +213,9 @@
 	     where
 	     (trace-info-what info)))))
 
-;;; This function discards any invalid cookies on our simulated stack.
-;;; Encapsulated entries are always valid, since we bind
-;;; *TRACED-ENTRIES* in the encapsulation.
+;;; Discard any invalid cookies on our simulated stack. Encapsulated
+;;; entries are always valid, since we bind *TRACED-ENTRIES* in the
+;;; encapsulation.
 (defun discard-invalid-entries (frame)
   (loop
     (when (or (null *traced-entries*)
@@ -302,8 +302,8 @@
 			     frame)))))
 
 ;;; This function is called by the trace encapsulation. It calls the
-;;; breakpoint hook functions with NIL for the breakpoint and cookie, which
-;;; we have cleverly contrived to work for our hook functions.
+;;; breakpoint hook functions with NIL for the breakpoint and cookie,
+;;; which we have cleverly contrived to work for our hook functions.
 (defun trace-call (info)
   (multiple-value-bind (start cookie) (trace-start-breakpoint-fun info)
     (let ((frame (sb-di:frame-down (sb-di:top-frame))))

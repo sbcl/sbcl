@@ -323,7 +323,7 @@
 		     t)))
 	(frob lambda)
 	(when tails
-	  (dolist (fun (tail-set-functions tails))
+	  (dolist (fun (tail-set-funs tails))
 	    (frob fun))))))
 
   (values))
@@ -336,7 +336,7 @@
   (let* ((actual (if (eq (tn-kind tn) :alias) (tn-save-tn tn) tn))
 	 (reads (tn-reads tn))
 	 (leaf (tn-leaf actual)))
-    (cond ((lambda-var-p leaf) (leaf-name leaf))
+    (cond ((lambda-var-p leaf) (leaf-source-name leaf))
 	  ((and (not arg-p) reads
 		(return-p (vop-node (tn-ref-vop reads))))
 	   "<return value>")
