@@ -613,6 +613,7 @@ one-past-the-end"
 		 (type array-range astart aend))
 	(let ((string (make-array 0 :adjustable t :fill-pointer 0 :element-type 'character)))
 	  (loop with pos = astart
+		while (< pos aend)
 		do (multiple-value-bind (bytes invalid)
 		       (,(make-od-name 'bytes-per-utf8-character accessor) array pos aend)
 		     (declare (type (or null string) invalid))
@@ -622,8 +623,7 @@ one-past-the-end"
 		       (t
 			(dotimes (i (length invalid))
 			  (vector-push-extend (char invalid i) string))))
-		     (incf pos bytes))
-		while (< pos aend))
+		     (incf pos bytes)))
 	  (coerce string 'simple-string))))))
 (instantiate-octets-definition define-utf8->string)
 
