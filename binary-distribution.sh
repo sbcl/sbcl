@@ -5,9 +5,14 @@
 # DocBook-to-HTML converter, should also be run to create the 
 # HTML version of the documentation.)
 
-tar cf ../sbcl-x.y.z-binary.tar \
-    output/sbcl.core src/runtime/sbcl \
-    BUGS COPYING CREDITS INSTALL NEWS README \
-    install.sh \
-    doc/sbcl.1 doc/cmucl/cmu-user doc/*.htm* \
-    pubring.pgp
+# (Before sbcl-0.6.10, this was run in the sbcl/ directory and created
+# a tar file with no directory prefixes. Since sbcl-0.6.10, we've
+# switched over to trying to do this the way everyone else does.)
+
+b=${1:?missing base directory name argument}
+tar cf $b-binary.tar \
+    $b/output/sbcl.core $b/src/runtime/sbcl \
+    $b/BUGS $b/COPYING $b/CREDITS $b/INSTALL $b/NEWS $b/README \
+    $b/install.sh \
+    $b/doc/sbcl.1 $b/doc/cmucl/cmu-user $b/doc/*.htm* \
+    $b/pubring.pgp
