@@ -380,7 +380,8 @@
              (derive-node-type ref
                                (make-single-value-type
                                 (or (type-difference res not-res)
-                                    res)))))))
+                                    res)))
+             (maybe-terminate-block ref nil)))))
 
   (values))
 
@@ -588,6 +589,7 @@
              (return))))))
 
   (do-blocks (block component)
-    (use-result-constraints block))
+    (unless (block-delete-p block)
+      (use-result-constraints block)))
 
   (values))

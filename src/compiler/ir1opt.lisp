@@ -742,7 +742,7 @@
 ;;;
 ;;; Why do we need to consider LVAR type? -- APD, 2003-07-30
 (defun maybe-terminate-block (node ir1-converting-not-optimizing-p)
-  (declare (type (or basic-combination cast) node))
+  (declare (type (or basic-combination cast ref) node))
   (let* ((block (node-block node))
 	 (lvar (node-lvar node))
          (ctran (node-next node))
@@ -766,13 +766,16 @@
 	      (t
 	       (node-ends-block node)))
 
-	(unlink-blocks block (first (block-succ block)))
-	(setf (component-reanalyze (block-component block)) t)
-	(aver (not (block-succ block)))
-	(link-blocks block tail)
-        (if ir1-converting-not-optimizing-p
-            (%delete-lvar-use node)
-            (delete-lvar-use node))
+        (let ((succ (first (block-succ block))))
+          (unlink-blocks block succ)
+          (setf (component-reanalyze (block-component block)) t)
+          (aver (not (block-succ block)))
+          (link-blocks block tail)
+          (cond (ir1-converting-not-optimizing-p
+                 (%delete-lvar-use node))
+                (t (delete-lvar-use node)
+                   (when (null (block-pred succ))
+                     (mark-for-deletion succ)))))
 	t))))
 
 ;;; This is called both by IR1 conversion and IR1 optimization when

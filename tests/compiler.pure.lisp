@@ -1495,3 +1495,44 @@
         (declare (dynamic-extent v5))
         v5))))
     17)))
+
+;;;  MISC.434
+(assert (zerop (funcall
+   (compile
+    nil
+    '(lambda (a b)
+       (declare (type (integer -8431780939320 1571817471932) a))
+       (declare (type (integer -4085 0) b))
+       (declare (ignorable a b))
+       (declare
+	(optimize (space 2)
+		  (compilation-speed 0)
+		  #+sbcl (sb-c:insert-step-conditions 0)
+		  (debug 2)
+		  (safety 0)
+		  (speed 3)))
+       (let ((*s5* 0))
+	 (dotimes (iv1 2 0)
+	   (let ((*s5*
+		  (elt '(1954479092053)
+		       (min 0
+			    (max 0
+				 (if (< iv1 iv1)
+				     (lognand iv1 (ash iv1 (min 53 iv1)))
+				   iv1))))))
+	     0)))))
+   -7639589303599 -1368)))
+
+(compile
+ nil
+ '(lambda (a b)
+   (declare (type (integer) a))
+   (declare (type (integer) b))
+   (declare (ignorable a b))
+   (declare (optimize (space 2) (compilation-speed 0)
+             (debug 0) (safety 0) (speed 3)))
+   (dotimes (iv1 2 0)
+     (when (< iv1 2) (print 'x)) ;; request for second constraint propagation pass
+     (print (if (< iv1 iv1)
+                (logand (ash iv1 iv1) 1)
+                iv1)))))
