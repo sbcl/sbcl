@@ -110,7 +110,13 @@ os_restore_fp_control(os_context_t *context)
        just guessing. The 255, on the other hand, is a valid constant
        -- it says "move everything in the upper word into the floating
        point control register. -- CSR, 2002-07-16 */
+
+    /* FIXME: it appears that the above text is quite accurate, in the
+       sense that this
+
     asm ("stw %0, 12(31); lfd 0, 8(31); mtfsf 255, 0" : : "r" (control) : "r31");
+
+    no longer works. */
 }
 
 void 
