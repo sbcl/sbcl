@@ -359,7 +359,7 @@
 					       (:big-endian
 						'(- sb!vm:n-word-bits extra))))
 				  (%raw-bits sequence index))))
-               (declare (type (mod #.sb!vm:n-word-bits)) extra)
+               (declare (type (mod #.sb!vm:n-word-bits) extra))
                (declare (type sb!vm:word mask bits))
                ;; could consider LOGNOT for the zero case instead of
                ;; doing the subtraction...
