@@ -1123,7 +1123,7 @@
     (let ((outside-non-tail-call nil)
 	  (outside-call nil))
       (when (and (dolist (ref (leaf-refs clambda) t)
-		   (let ((dest (lvar-dest (node-lvar ref))))
+		   (let ((dest (node-dest ref)))
 		     (when (or (not dest)
                                (block-delete-p (node-block dest)))
                        (return nil))

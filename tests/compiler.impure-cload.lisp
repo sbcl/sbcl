@@ -187,6 +187,19 @@
   (progn (truly-the integer x)
          (1+ x)))
 
+(defun #:foo (a b c)
+  (declare (type (integer -5498929 389890) a)
+           (type (integer -5029571274946 48793670) b)
+           (type (integer 9221496 260169518304) c)
+           (ignorable a b c)
+           (optimize (speed 3) (safety 1) (debug 1)))
+  (- (mod 1020122 (min -49 -420))
+     (logandc1
+      (block b2 (mod c (min -49 (if t (return-from b2 1582) b))))
+      (labels ((%f14 ()
+                 (mod a (max 76 8))))
+        b))))
+
 ;;; bug 291 reported by Nikodemus Siivola (modified version)
 (defstruct line
   (%chars ""))
