@@ -1163,8 +1163,10 @@ default-value-8
     (let ((err-lab
 	   (generate-error-code vop invalid-arg-count-error nargs)))
       (inst cmp nargs (fixnumize count))
-      ;; Assume we don't take the branch
-      (inst b :ne err-lab #!+sparc-v9 :pn)
+      (if (member :sparc-v9 *backend-subfeatures*)
+	  ;; Assume we don't take the branch
+	  (inst b :ne err-lab :pn)
+	  (inst b :ne err-lab))
       (inst nop))))
 
 ;;; Signal various errors.

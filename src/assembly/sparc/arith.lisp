@@ -38,8 +38,8 @@
   (inst b :vc done)
   (inst nop)
 
-  (inst sra temp x fixnum-tag-bits)
-  (inst sra temp2 y fixnum-tag-bits)
+  (inst sra temp x n-fixnum-tag-bits)
+  (inst sra temp2 y n-fixnum-tag-bits)
   (inst add temp2 temp)
   (with-fixed-allocation (res temp bignum-widetag (1+ bignum-digits-offset))
     (storew temp2 res bignum-digits-offset other-pointer-lowtag))
@@ -82,8 +82,8 @@
   (inst b :vc done)
   (inst nop)
 
-  (inst sra temp x fixnum-tag-bits)
-  (inst sra temp2 y fixnum-tag-bits)
+  (inst sra temp x n-fixnum-tag-bits)
+  (inst sra temp2 y n-fixnum-tag-bits)
   (inst sub temp2 temp temp2)
   (with-fixed-allocation (res temp bignum-widetag (1+ bignum-digits-offset))
     (storew temp2 res bignum-digits-offset other-pointer-lowtag))
@@ -131,46 +131,36 @@
 
   ;; Remove the tag from one arg so that the result will have the correct
   ;; fixnum tag.
-  (inst sra temp x fixnum-tag-bits)
+  (inst sra temp x n-fixnum-tag-bits)
   ;; Compute the produce temp * y and return the double-word product
   ;; in hi:lo.
-  ;;
-  ;; FIXME: Note that the below shebang read-time conditionals aren't
-  ;; actually shebang. This is because the assembly files are also
-  ;; built in warm-init, when #! is not a defined read-macro. This
-  ;; problem will actually go away when we rewrite these low-level
-  ;; bits and pieces to use the backend-subfeatures machinery, as we
-  ;; will then conditionalize at code-emission time or assembly time
-  ;; for the VOP and the assembly routine respectively. - CSR,
-  ;; 2002-02-11
-  #+:sparc-64
-  ;; Sign extend y to a full 64-bits.  temp was already
-  ;; sign-extended by the sra instruction above.
-  (progn 
-    (inst sra y 0)
-    (inst mulx hi temp y)
-    (inst move lo hi)
-    (inst srax hi 32))
-  #+(and (not :sparc-64) (or :sparc-v8 :sparc-v9))
-  (progn
-    (inst smul lo temp y)
-    (inst rdy hi))
-  #+(and (not :sparc-64) (not (or :sparc-v8 :sparc-v9)))
-  (let ((MULTIPLIER-POSITIVE (gen-label)))
-    (inst wry temp)
-    (inst andcc hi zero-tn)
-    (inst nop)
-    (inst nop)
-    (dotimes (i 32)
-      (inst mulscc hi y))
-    (inst mulscc hi zero-tn)
-    (inst cmp x)
-    (inst b :ge MULTIPLIER-POSITIVE)
-    (inst nop)
-    (inst sub hi y)
-    (emit-label MULTIPLIER-POSITIVE)
-    (inst rdy lo))
-
+  (cond
+    ((member :sparc-64 *backend-subfeatures*)
+     ;; Sign extend y to a full 64-bits.  temp was already
+     ;; sign-extended by the sra instruction above.
+     (inst sra y 0)
+     (inst mulx hi temp y)
+     (inst move lo hi)
+     (inst srax hi 32))
+    ((or (member :sparc-v8 *backend-subfeatures*)
+	 (member :sparc-v9 *backend-subfeatures*))
+     (inst smul lo temp y)
+     (inst rdy hi))
+    (t
+     (let ((MULTIPLIER-POSITIVE (gen-label)))
+       (inst wry temp)
+       (inst andcc hi zero-tn)
+       (inst nop)
+       (inst nop)
+       (dotimes (i 32)
+	 (inst mulscc hi y))
+       (inst mulscc hi zero-tn)
+       (inst cmp x)
+       (inst b :ge MULTIPLIER-POSITIVE)
+       (inst nop)
+       (inst sub hi y)
+       (emit-label MULTIPLIER-POSITIVE)
+       (inst rdy lo))))
   ;; Check to see if the result will fit in a fixnum.  (I.e. the high word
   ;; is just 32 copies of the sign bit of the low word).
   (inst sra temp lo 31)
@@ -178,27 +168,27 @@
   (inst b :eq LOW-FITS-IN-FIXNUM)
   ;; Shift the double word hi:lo down two bits to get rid of the fixnum tag.
   (inst sll temp hi 30)
-  (inst srl lo fixnum-tag-bits)
+  (inst srl lo n-fixnum-tag-bits)
   (inst or lo temp)
-  (inst sra hi fixnum-tag-bits)
+  (inst sra hi n-fixnum-tag-bits)
   ;; Allocate a BIGNUM for the result.
   #+nil
   (pseudo-atomic (:extra (pad-data-block (1+ bignum-digits-offset)))
-    (let ((one-word (gen-label)))
-      (inst or res alloc-tn other-pointer-lowtag)
-      ;; We start out assuming that we need one word.  Is that correct?
-      (inst sra temp lo 31)
-      (inst xorcc temp hi)
-      (inst b :eq one-word)
-      (inst li temp (logior (ash 1 n-widetag-bits) bignum-widetag))
-      ;; Nope, we need two, so allocate the addition space.
-      (inst add alloc-tn (- (pad-data-block (+ 2 bignum-digits-offset))
-			    (pad-data-block (1+ bignum-digits-offset))))
-      (inst li temp (logior (ash 2 n-widetag-bits) bignum-widetag))
-      (storew hi res (1+ bignum-digits-offset) other-pointer-lowtag)
-      (emit-label one-word)
-      (storew temp res 0 other-pointer-lowtag)
-      (storew lo res bignum-digits-offset other-pointer-lowtag)))
+		 (let ((one-word (gen-label)))
+		   (inst or res alloc-tn other-pointer-lowtag)
+		   ;; We start out assuming that we need one word.  Is that correct?
+		   (inst sra temp lo 31)
+		   (inst xorcc temp hi)
+		   (inst b :eq one-word)
+		   (inst li temp (logior (ash 1 n-widetag-bits) bignum-widetag))
+		   ;; Nope, we need two, so allocate the addition space.
+		   (inst add alloc-tn (- (pad-data-block (+ 2 bignum-digits-offset))
+					 (pad-data-block (1+ bignum-digits-offset))))
+		   (inst li temp (logior (ash 2 n-widetag-bits) bignum-widetag))
+		   (storew hi res (1+ bignum-digits-offset) other-pointer-lowtag)
+		   (emit-label one-word)
+		   (storew temp res 0 other-pointer-lowtag)
+		   (storew lo res bignum-digits-offset other-pointer-lowtag)))
   ;; Always allocate 2 words for the bignum result, even if we only
   ;; need one.  The copying GC will take care of the extra word if it
   ;; isn't needed.
@@ -220,7 +210,7 @@
       (storew lo res bignum-digits-offset other-pointer-lowtag)))
   ;; Out of here
   (lisp-return lra :offset 2)
-
+  
   DO-STATIC-FUN
   (inst ld code-tn null-tn (static-fun-offset 'two-arg-*))
   (inst li nargs (fixnumize 2))
@@ -247,24 +237,24 @@
 				  (:temp temp ,sc nl2-offset))
 	  ,@(when (eq type 'tagged-num)
 	      `((inst sra x 2)))
-	 #+:sparc-64
-	 ;; Sign extend, then multiply
-	 (progn
-	   (inst sra x 0)
-	   (inst sra y 0)
-	   (inst mulx res x y))
-	 #+(and (not :sparc-64) (or :sparc-v8 :sparc-v9))
-	 (inst smul res x y)
-	 #+(and (not :sparc-64) (not (or :sparc-v8 :sparc-v9)))
-	 (progn
-	   (inst wry x)
-	   (inst andcc temp zero-tn)
-	   (inst nop)
-	   (inst nop)
-	   (dotimes (i 32)
-	     (inst mulscc temp y))
-	   (inst mulscc temp zero-tn)
-	   (inst rdy res)))))
+	 (cond
+	   ((member :sparc-64 *backend-subfeatures*)
+	    ;; Sign extend, then multiply
+	    (inst sra x 0)
+	    (inst sra y 0)
+	    (inst mulx res x y))
+	   ((or (member :sparc-v8 *backend-subfeatures*)
+		(member :sparc-v9 *backend-subfeatures*))
+	    (inst smul res x y))
+	   (t
+	    (inst wry x)
+	    (inst andcc temp zero-tn)
+	    (inst nop)
+	    (inst nop)
+	    (dotimes (i 32)
+	      (inst mulscc temp y))
+	    (inst mulscc temp zero-tn)
+	   (inst rdy res))))))
   (frob unsigned-* "unsigned *" 40 unsigned-num unsigned-reg)
   (frob signed-* "unsigned *" 41 signed-num signed-reg)
   (frob fixnum-* "fixnum *" 30 tagged-num any-reg))

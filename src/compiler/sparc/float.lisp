@@ -37,24 +37,25 @@
 ;;; The offset may be an integer or a TN in which case it will be
 ;;; temporarily modified but is restored if restore-offset is true.
 (defun load-long-reg (reg base offset &optional (restore-offset t))
-  #!+:sparc-v9
-  (inst ldqf reg base offset)
-  #!-:sparc-v9
-  (let ((reg0 (make-random-tn :kind :normal
-			      :sc (sc-or-lose 'double-reg)
-			      :offset (tn-offset reg)))
-	(reg2 (make-random-tn :kind :normal
-			      :sc (sc-or-lose 'double-reg)
-			      :offset (+ 2 (tn-offset reg)))))
-    (cond ((integerp offset)
-	   (inst lddf reg0 base offset)
-	   (inst lddf reg2 base (+ offset (* 2 n-word-bytes))))
-	  (t
-	   (inst lddf reg0 base offset)
-	   (inst add offset (* 2 n-word-bytes))
-	   (inst lddf reg2 base offset)
-	   (when restore-offset
-	     (inst sub offset (* 2 n-word-bytes)))))))
+  (cond
+    ((member :sparc-v9 *backend-subfeatures*)
+     (inst ldqf reg base offset))
+    (t
+     (let ((reg0 (make-random-tn :kind :normal
+				 :sc (sc-or-lose 'double-reg)
+				 :offset (tn-offset reg)))
+	   (reg2 (make-random-tn :kind :normal
+				 :sc (sc-or-lose 'double-reg)
+				 :offset (+ 2 (tn-offset reg)))))
+       (cond ((integerp offset)
+	      (inst lddf reg0 base offset)
+	      (inst lddf reg2 base (+ offset (* 2 n-word-bytes))))
+	     (t
+	      (inst lddf reg0 base offset)
+	      (inst add offset (* 2 n-word-bytes))
+	      (inst lddf reg2 base offset)
+	      (when restore-offset
+		(inst sub offset (* 2 n-word-bytes)))))))))
 
 #!+long-float
 (define-move-fun (load-long 2) (vop x y)
@@ -66,24 +67,25 @@
 ;;; The offset may be an integer or a TN in which case it will be
 ;;; temporarily modified but is restored if restore-offset is true.
 (defun store-long-reg (reg base offset &optional (restore-offset t))
-  #!+:sparc-v9
-  (inst stqf reg base offset)
-  #!-:sparc-v9
-  (let ((reg0 (make-random-tn :kind :normal
-			      :sc (sc-or-lose 'double-reg)
-			      :offset (tn-offset reg)))
-	(reg2 (make-random-tn :kind :normal
-			      :sc (sc-or-lose 'double-reg)
-			      :offset (+ 2 (tn-offset reg)))))
-    (cond ((integerp offset)
-	   (inst stdf reg0 base offset)
-	   (inst stdf reg2 base (+ offset (* 2 n-word-bytes))))
-	  (t
-	   (inst stdf reg0 base offset)
-	   (inst add offset (* 2 n-word-bytes))
-	   (inst stdf reg2 base offset)
-	   (when restore-offset
-	     (inst sub offset (* 2 n-word-bytes)))))))
+  (cond
+    ((member :sparc-v9 *backend-subfeatures*)
+     (inst stqf reg base offset))
+    (t 
+     (let ((reg0 (make-random-tn :kind :normal
+				 :sc (sc-or-lose 'double-reg)
+				 :offset (tn-offset reg)))
+	   (reg2 (make-random-tn :kind :normal
+				 :sc (sc-or-lose 'double-reg)
+				 :offset (+ 2 (tn-offset reg)))))
+       (cond ((integerp offset)
+	      (inst stdf reg0 base offset)
+	      (inst stdf reg2 base (+ offset (* 2 n-word-bytes))))
+	     (t
+	      (inst stdf reg0 base offset)
+	      (inst add offset (* 2 n-word-bytes))
+	      (inst stdf reg2 base offset)
+	      (when restore-offset
+		(inst sub offset (* 2 n-word-bytes)))))))))
 
 #!+long-float
 (define-move-fun (store-long 2) (vop x y)
@@ -98,32 +100,34 @@
 ;;; Exploit the V9 double-float move instruction. This is conditional
 ;;; on the :sparc-v9 feature.
 (defun move-double-reg (dst src)
-  #!+:sparc-v9
-  (inst fmovd dst src)
-  #!-:sparc-v9
-  (dotimes (i 2)
-    (let ((dst (make-random-tn :kind :normal
-			       :sc (sc-or-lose 'single-reg)
-			       :offset (+ i (tn-offset dst))))
-	  (src (make-random-tn :kind :normal
-			       :sc (sc-or-lose 'single-reg)
-			       :offset (+ i (tn-offset src)))))
-      (inst fmovs dst src))))
+  (cond
+    ((member :sparc-v9 *backend-subfeatures*)
+     (inst fmovd dst src))
+    (t
+     (dotimes (i 2)
+       (let ((dst (make-random-tn :kind :normal
+				  :sc (sc-or-lose 'single-reg)
+				  :offset (+ i (tn-offset dst))))
+	     (src (make-random-tn :kind :normal
+				  :sc (sc-or-lose 'single-reg)
+				  :offset (+ i (tn-offset src)))))
+	 (inst fmovs dst src))))))
 
 ;;; Exploit the V9 long-float move instruction. This is conditional
 ;;; on the :sparc-v9 feature.
 (defun move-long-reg (dst src)
-  #!+:sparc-v9
-  (inst fmovq dst src)
-  #!-:sparc-v9
-  (dotimes (i 4)
-    (let ((dst (make-random-tn :kind :normal
-			       :sc (sc-or-lose 'single-reg)
-			       :offset (+ i (tn-offset dst))))
-	  (src (make-random-tn :kind :normal
-			       :sc (sc-or-lose 'single-reg)
-			       :offset (+ i (tn-offset src)))))
-      (inst fmovs dst src))))
+  (cond
+    ((member :sparc-v9 *backend-subfeatures*)
+     (inst fmovq dst src)
+    (t
+     (dotimes (i 4)
+       (let ((dst (make-random-tn :kind :normal
+				  :sc (sc-or-lose 'single-reg)
+				  :offset (+ i (tn-offset dst))))
+	     (src (make-random-tn :kind :normal
+				  :sc (sc-or-lose 'single-reg)
+				  :offset (+ i (tn-offset src)))))
+	 (inst fmovs dst src)))))))
 
 (macrolet ((frob (vop sc format)
 	     `(progn
@@ -662,34 +666,36 @@
   (frob %negate/single-float fnegs %negate single-reg single-float))
 
 (defun negate-double-reg (dst src)
-  #!+:sparc-v9
-  (inst fnegd dst src)
-  #!-:sparc-v9
-  ;; Negate the MS part of the numbers, then copy over the rest
-  ;; of the bits.
-  (inst fnegs dst src)
-  (let ((dst-odd (make-random-tn :kind :normal
-				 :sc (sc-or-lose 'single-reg)
-				 :offset (+ 1 (tn-offset dst))))
-	(src-odd (make-random-tn :kind :normal
-				 :sc (sc-or-lose 'single-reg)
-				 :offset (+ 1 (tn-offset src)))))
-    (inst fmovs dst-odd src-odd)))
+  (cond
+    ((member :sparc-v9 *backend-subfeatures*)
+     (inst fnegd dst src))
+    (t
+     ;; Negate the MS part of the numbers, then copy over the rest
+     ;; of the bits.
+     (inst fnegs dst src)
+     (let ((dst-odd (make-random-tn :kind :normal
+				    :sc (sc-or-lose 'single-reg)
+				    :offset (+ 1 (tn-offset dst))))
+	   (src-odd (make-random-tn :kind :normal
+				    :sc (sc-or-lose 'single-reg)
+				    :offset (+ 1 (tn-offset src)))))
+       (inst fmovs dst-odd src-odd)))))
 
 (defun abs-double-reg (dst src)
-  #!+:sparc-v9
-  (inst fabsd dst src)
-  #!-:sparc-v9
-  ;; Abs the MS part of the numbers, then copy over the rest
-  ;; of the bits.
-  (inst fabss dst src)
-  (let ((dst-2 (make-random-tn :kind :normal
-			       :sc (sc-or-lose 'single-reg)
-			       :offset (+ 1 (tn-offset dst))))
-	(src-2 (make-random-tn :kind :normal
-			       :sc (sc-or-lose 'single-reg)
-			       :offset (+ 1 (tn-offset src)))))
-    (inst fmovs dst-2 src-2)))
+  (cond
+    ((member :sparc-v9 *backend-subfeatures*)
+     (inst fabsd dst src))
+    (t
+     ;; Abs the MS part of the numbers, then copy over the rest
+     ;; of the bits.
+     (inst fabss dst src)
+     (let ((dst-2 (make-random-tn :kind :normal
+				  :sc (sc-or-lose 'single-reg)
+				  :offset (+ 1 (tn-offset dst))))
+	   (src-2 (make-random-tn :kind :normal
+				  :sc (sc-or-lose 'single-reg)
+				  :offset (+ 1 (tn-offset src)))))
+       (inst fmovs dst-2 src-2)))))
 
 (define-vop (abs/double-float)
   (:args (x :scs (double-reg)))
@@ -732,20 +738,21 @@
   (:save-p :compute-only)
   (:generator 1
     (note-this-location vop :internal-error)
-    #!+:sparc-v9
-    (inst fabsq y x)
-    #!-:sparc-v9
-    (inst fabss y x)
-    (dotimes (i 3)
-      (let ((y-odd (make-random-tn
-		    :kind :normal
-		    :sc (sc-or-lose 'single-reg)
-		    :offset (+ i 1 (tn-offset y))))
-	    (x-odd (make-random-tn
-		    :kind :normal
-		    :sc (sc-or-lose 'single-reg)
-		    :offset (+ i 1 (tn-offset x)))))
-	(inst fmovs y-odd x-odd)))))
+    (cond
+      ((member :sparc-v9 *backend-subfeatures*)
+       (inst fabsq y x))
+      (t
+       (inst fabss y x)
+       (dotimes (i 3)
+	 (let ((y-odd (make-random-tn
+		       :kind :normal
+		       :sc (sc-or-lose 'single-reg)
+		       :offset (+ i 1 (tn-offset y))))
+	       (x-odd (make-random-tn
+		       :kind :normal
+		       :sc (sc-or-lose 'single-reg)
+		       :offset (+ i 1 (tn-offset x)))))
+	   (inst fmovs y-odd x-odd)))))))
 
 #!+long-float
 (define-vop (%negate/long-float)
@@ -760,20 +767,21 @@
   (:save-p :compute-only)
   (:generator 1
     (note-this-location vop :internal-error)
-    #!+:sparc-v9
-    (inst fnegq y x)
-    #!-:sparc-v9
-    (inst fnegs y x)
-    (dotimes (i 3)
-      (let ((y-odd (make-random-tn
-		    :kind :normal
-		    :sc (sc-or-lose 'single-reg)
-		    :offset (+ i 1 (tn-offset y))))
-	    (x-odd (make-random-tn
-		    :kind :normal
-		    :sc (sc-or-lose 'single-reg)
-		    :offset (+ i 1 (tn-offset x)))))
-	(inst fmovs y-odd x-odd)))))
+    (cond
+      ((member :sparc-v9 *backend-subfeatures*)
+       (inst fnegq y x))
+      (t
+       (inst fnegs y x)
+       (dotimes (i 3)
+	 (let ((y-odd (make-random-tn
+		       :kind :normal
+		       :sc (sc-or-lose 'single-reg)
+		       :offset (+ i 1 (tn-offset y))))
+	       (x-odd (make-random-tn
+		       :kind :normal
+		       :sc (sc-or-lose 'single-reg)
+		       :offset (+ i 1 (tn-offset x)))))
+	   (inst fmovs y-odd x-odd)))))))
 
 
 ;;;; Comparison:
@@ -795,7 +803,8 @@
       (:long (inst fcmpq x y)))
     ;; The SPARC V9 doesn't need an instruction between a
     ;; floating-point compare and a floating-point branch.
-    #!-:sparc-v9 (inst nop)
+    (unless (member :sparc-v9 *backend-subfeatures*)
+      (inst nop))
     (inst fb (if not-p nope yep) target)
     (inst nop)))
 
@@ -1342,8 +1351,9 @@
   (:results (y :scs (double-reg)))
   (:translate %sqrt)
   (:policy :fast-safe)
-  (:guard #!+(or :sparc-v7 :sparc-v8 :sparc-v9) t
-	  #!-(or :sparc-v7 :sparc-v8 :sparc-v9) nil)
+  (:guard (or (member :sparc-v7 *backend-subfeatures*)
+	      (member :sparc-v8 *backend-subfeatures*)
+	      (member :sparc-v9 *backend-subfeatures*)))
   (:arg-types double-float)
   (:result-types double-float)
   (:note "inline float arithmetic")
@@ -1947,7 +1957,8 @@
 		(,@fabs ratio yr)
 		(,@fabs den yi)
 		(inst ,fcmp ratio den)
-		#!-:sparc-v9 (inst nop)
+		(unless (member :sparc-v9 *backend-subfeatures*)
+		  (inst nop))
 		(inst fb :ge bigger)
 		(inst nop)
 		;; The case of |yi| <= |yr|
@@ -2021,7 +2032,8 @@
 		(,@fabs ratio yr)
 		(,@fabs den yi)
 		(inst ,fcmp ratio den)
-		#!-:sparc-v9 (inst nop)
+		(unless (member :sparc-v9 *backend-subfeatures*)
+		  (inst nop))
 		(inst fb :ge bigger)
 		(inst nop)
 		;; The case of |yi| <= |yr|
@@ -2120,7 +2132,8 @@
 		(,@fabs ratio yr)
 		(,@fabs den yi)
 		(inst ,fcmp ratio den)
-		#!-:sparc-v9 (inst nop)
+		(unless (member :sparc-v9 *backend-subfeatures*)
+		  (inst nop))
 		(inst fb :ge bigger)
 		(inst nop)
 		;; The case of |yi| <= |yr|
@@ -2294,7 +2307,6 @@
 	    (:note "inline complex float comparison")
 	    (:vop-var vop)
 	    (:save-p :compute-only)
-	    (:guard #!-:sparc-v9 t #!+:sparc-v9 nil)
 	    (:generator 6
 	      (note-this-location vop :internal-error)
 	      (let ((xr (,real-part x))
@@ -2332,8 +2344,8 @@
 	    (:vop-var vop)
 	    (:save-p :compute-only)
 	    (:temporary (:sc descriptor-reg) true)
-	    (:guard #!+:sparc-v9 t #!-:sparc-v9 nil)
-	    (:generator 6
+	    (:guard (member :sparc-v9 *backend-subfeatures*))
+	    (:generator 5
 	      (note-this-location vop :internal-error)
 	      (let ((xr (,real-part x))
 		    (xi (,imag-part x))
@@ -2353,7 +2365,12 @@
 
 ) ; end progn complex-fp-vops
 
-#!+sparc-v9
+
+;;; XXX FIXME:
+;;;
+;;; The stuff below looks good, but we already have transforms for max
+;;; and min. How should we arrange that?
+#+nil
 (progn
 
 ;; Vops to take advantage of the conditional move instruction
@@ -2370,19 +2387,25 @@
       single-float double-float)
   (movable foldable flushable))
 
-;; We need these definitions for byte-compiled code
+;; We need these definitions for byte-compiled code 
+;;
+;; Well, we (SBCL) probably don't, having deleted the byte
+;; compiler. Let's see what happens if we comment out these
+;; definitions:
+#+nil
 (defun %%min (x y)
   (declare (type (or (unsigned-byte 32) (signed-byte 32)
 		     single-float double-float) x y))
   (if (< x y)
       x y))
 
+#+nil
 (defun %%max (x y)
   (declare (type (or (unsigned-byte 32) (signed-byte 32)
 		     single-float double-float) x y))
   (if (> x y)
       x y))
-  
+#+nil  
 (macrolet
     ((frob (name sc-type type compare cmov cost cc max min note)
        (let ((vop-name (symbolicate name "-" type "=>" type))
@@ -2396,7 +2419,7 @@
 	    (:policy :fast-safe)
 	    (:note ,note)
 	    (:translate ,trans-name)
-	    (:guard #!+:sparc-v9 t #!-:sparc-v9 nil)
+	    (:guard (member :sparc-v9 *backend-subfeatures*))
 	    (:generator ,cost
 	      (inst ,compare x y)
 	      (cond ((location= r x)
@@ -2477,26 +2500,30 @@
     
 ) ; PROGN
 
+#+nil
 (in-package "SB!C")
 ;;; FIXME
-#| #!+sparc-v9 |#
 #+nil
 (progn
 ;;; The sparc-v9 architecture has conditional move instructions that
 ;;; can be used.  This should be faster than using the obvious if
 ;;; expression since we don't have to do branches.
   
-(def-source-transform min (&rest args)
-  (case (length args)
-    ((0 2) (values nil t))
-    (1 `(values ,(first args)))
-    (t (sb!c::associate-arguments 'min (first args) (rest args)))))
+(define-source-transform min (&rest args)
+  (if (member :sparc-v9 sb!vm:*backend-subfeatures*)
+      (case (length args)
+	((0 2) (values nil t))
+	(1 `(values ,(first args)))
+	(t (sb!c::associate-arguments 'min (first args) (rest args))))
+      (values nil t)))
 
-(def-source-transform max (&rest args)
-  (case (length args)
-    ((0 2) (values nil t))
-    (1 `(values ,(first args)))
-    (t (sb!c::associate-arguments 'max (first args) (rest args)))))
+(define-source-transform max (&rest args)
+  (if (member :sparc-v9 sb!vm:*backend-subfeatures*)
+      (case (length args)
+	((0 2) (values nil t))
+	(1 `(values ,(first args)))
+	(t (sb!c::associate-arguments 'max (first args) (rest args))))
+      (values nil t)))
 
 ;; Derive the types of max and min
 (defoptimizer (max derive-type) ((x y))

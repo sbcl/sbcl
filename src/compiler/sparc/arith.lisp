@@ -228,8 +228,9 @@
   (:temporary (:scs (signed-reg)) y-int)
   (:vop-var vop)
   (:save-p :compute-only)
-  (:guard #!+(or :sparc-v8 (and :sparc-v9 (not :sparc-64))) t
-	  #!-(or :sparc-v8 (and :sparc-v9 (not :sparc-64))) nil)
+  (:guard (or (member :sparc-v8 *backend-subfeatures*)
+	      (and (member :sparc-v9 *backend-subfeatures*)
+		   (not (member :sparc-64 *backend-subfeatures*)))))
   (:generator 12
     (let ((zero (generate-error-code vop division-by-zero-error x y)))
       (inst cmp y zero-tn)
@@ -238,7 +239,7 @@
         (inst sra r x 31)
       (inst wry r)
       ;; Remove tag bits so Q and R will be tagged correctly.
-      (inst sra y-int y fixnum-tag-bits)
+      (inst sra y-int y n-fixnum-tag-bits)
       (inst nop)
       (inst nop)
 
@@ -262,14 +263,17 @@
   (:temporary (:scs (signed-reg)) r)
   (:vop-var vop)
   (:save-p :compute-only)
-  (:guard #!+(or :sparc-v8 (and :sparc-v9 (not :sparc-64))) t
-	  #!-(or :sparc-v8 (and :sparc-v9 (not :sparc-64))) nil)
+  (:guard (or (member :sparc-v8 *backend-subfeatures*)
+	      (and (member :sparc-v9 *backend-subfeatures*)
+		   (not (member :sparc-64 *backend-subfeatures*)))))
   (:generator 12
     (let ((zero (generate-error-code vop division-by-zero-error x y)))
       (inst cmp y zero-tn)
-      (inst b :eq zero #!+:sparc-v9 :pn)
+      (if (member :sparc-v9 *backend-subfeatures*)
+	  (inst b :eq zero :pn)
+	  (inst b :eq zero))
       ;; Extend the sign of X into the Y register
-        (inst sra r x 31)
+      (inst sra r x 31)
       (inst wry r)
       (inst nop)
       (inst nop)
@@ -295,13 +299,16 @@
   (:temporary (:scs (unsigned-reg)) r)
   (:vop-var vop)
   (:save-p :compute-only)
-  (:guard #!+(or :sparc-v8 (and :sparc-v9 (not :sparc-64))) t
-	  #!-(or :sparc-v8 (and :sparc-v9 (not :sparc-64))) nil)
+  (:guard (or (member :sparc-v8 *backend-subfeatures*)
+	      (and (member :sparc-v9 *backend-subfeatures*)
+		   (not (member :sparc-64 *backend-subfeatures*)))))
   (:generator 8
     (let ((zero (generate-error-code vop division-by-zero-error x y)))
       (inst cmp y zero-tn)
-      (inst b :eq zero #!+:sparc-v9 :pn)
-        (inst wry zero-tn)		; Clear out high part
+      (if (member :sparc-v9 *backend-subfeatures*)
+	  (inst b :eq zero :pn)
+	  (inst b :eq zero))
+      (inst wry zero-tn)		; Clear out high part
       (inst nop)
       (inst nop)
       (inst nop)
@@ -313,7 +320,6 @@
       (unless (location= quo q)
 	(inst move quo q)))))
 
-#!+:sparc-v9
 (define-vop (fast-v9-truncate/signed=>signed fast-safe-arith-op)
   (:translate truncate)
   (:args (x :scs (signed-reg))
@@ -327,13 +333,13 @@
   (:temporary (:scs (signed-reg)) r)
   (:vop-var vop)
   (:save-p :compute-only)
-  (:guard #!+:sparc-64 t #!-:sparc-64 nil)
+  (:guard (member :sparc-64 *backend-subfeatures*))
   (:generator 8
     (let ((zero (generate-error-code vop division-by-zero-error x y)))
       (inst cmp y zero-tn)
-      (inst b :eq zero #!+:sparc-v9 :pn)
+      (inst b :eq zero :pn)
       ;; Sign extend the numbers, just in case.
-        (inst sra x 0)
+      (inst sra x 0)
       (inst sra y 0)
       (inst sdivx q x y)
       ;; Compute remainder
@@ -355,13 +361,13 @@
   (:temporary (:scs (unsigned-reg)) r)
   (:vop-var vop)
   (:save-p :compute-only)
-  (:guard #!+:sparc-64 t #!-:sparc-64 nil)
+  (:guard (member :sparc-64 *backend-subfeatures*))
   (:generator 8
     (let ((zero (generate-error-code vop division-by-zero-error x y)))
       (inst cmp y zero-tn)
-      (inst b :eq zero #!+:sparc-v9 :pn)
+      (inst b :eq zero :pn)
       ;; Zap the higher 32 bits, just in case
-        (inst srl x 0)
+      (inst srl x 0)
       (inst srl y 0)
       (inst udivx q x y)
       ;; Compute remainder
@@ -386,42 +392,42 @@
 	  (:temporary (:sc non-descriptor-reg) ndesc)
 	  (:generator 5
 	    (sc-case amount
-	     #!+:sparc-v9
 	     (signed-reg
-	      (let ((done (gen-label))
-		    (positive (gen-label)))
-		(inst cmp amount)
-		(inst b :ge positive)
-		(inst neg ndesc amount)
-		;; ndesc = max(-amount, 31)
-		(inst cmp ndesc 31)
-		(inst cmove :ge ndesc 31)
-		(inst b done)
-		(inst ,shift-right-inst result number ndesc)
-		(emit-label positive)
-		;; The result-type assures us that this shift will not
-		;; overflow.
-		(inst sll result number amount)
-		;; We want a right shift of the appropriate size.
-		(emit-label done)))
-	     #!-:sparc-v9
-	     (signed-reg
-	      (let ((positive (gen-label))
-		    (done (gen-label)))
-		(inst cmp amount)
-		(inst b :ge positive)
-		(inst neg ndesc amount)
-		(inst cmp ndesc 31)
-		(inst b :le done)
-		(inst ,shift-right-inst result number ndesc)
-		(inst b done)
-		(inst ,shift-right-inst result number 31)
-		
-		(emit-label positive)
-		;; The result-type assures us that this shift will not overflow.
-		(inst sll result number amount)
-		
-		(emit-label done)))
+	      (cond
+		;; FIXME: These two don't look different enough.
+		((member :sparc-v9 *backend-subfeatures*)
+		 (let ((done (gen-label))
+		       (positive (gen-label)))
+		   (inst cmp amount)
+		   (inst b :ge positive)
+		   (inst neg ndesc amount)
+		   ;; ndesc = max(-amount, 31)
+		   (inst cmp ndesc 31)
+		   (inst cmove :ge ndesc 31)
+		   (inst b done)
+		   (inst ,shift-right-inst result number ndesc)
+		   (emit-label positive)
+		   ;; The result-type assures us that this shift will
+		   ;; not overflow.
+		   (inst sll result number amount)
+		   ;; We want a right shift of the appropriate size.
+		   (emit-label done)))
+		(t
+		 (let ((positive (gen-label))
+		       (done (gen-label)))
+		   (inst cmp amount)
+		   (inst b :ge positive)
+		   (inst neg ndesc amount)
+		   (inst cmp ndesc 31)
+		   (inst b :le done)
+		   (inst ,shift-right-inst result number ndesc)
+		   (inst b done)
+		   (inst ,shift-right-inst result number 31)
+		   (emit-label positive)
+		   ;; The result-type assures us that this shift will
+		   ;; not overflow.
+		   (inst sll result number amount)
+		   (emit-label done)))))
 	     (immediate
 	      (let ((amount (tn-value amount)))
 		(if (minusp amount)
@@ -575,27 +581,30 @@
 (define-vop (fast-v8-*/fixnum=>fixnum fast-fixnum-binop)
   (:temporary (:scs (non-descriptor-reg)) temp)
   (:translate *)
-  (:guard #!+(or :sparc-v8 (and :sparc-v9 (not :sparc-64))) t
-	  #!-(or :sparc-v8 (and :sparc-v9 (not :sparc-64))) nil)
+  (:guard (or (member :sparc-v8 *backend-subfeatures*)
+	      (and (member :sparc-v9 *backend-subfeatures*)
+		   (not (member :sparc-64 *backend-subfeatures*)))))
   (:generator 2
     ;; The cost here should be less than the cost for
     ;; */signed=>signed.  Why?  A fixnum product using signed=>signed
     ;; has to convert both args to signed-nums.  But using this, we
     ;; don't have to and that saves an instruction.
-    (inst sra temp y fixnum-tag-bits)
+    (inst sra temp y n-fixnum-tag-bits)
     (inst smul r x temp)))
 
 (define-vop (fast-v8-*/signed=>signed fast-signed-binop)
   (:translate *)
-  (:guard #!+(or :sparc-v8 (and :sparc-v9 (not :sparc-64))) t
-	  #!-(or :sparc-v8 (and :sparc-v9 (not :sparc-64))) nil)
+  (:guard (or (member :sparc-v8 *backend-subfeatures*)
+	      (and (member :sparc-v9 *backend-subfeatures*)
+		   (not (member :sparc-64 *backend-subfeatures*)))))
   (:generator 3
     (inst smul r x y)))
 
 (define-vop (fast-v8-*/unsigned=>unsigned fast-unsigned-binop)
   (:translate *)
-  (:guard #!+(or :sparc-v8 (and :sparc-v9 (not :sparc-64))) t
-	  #!-(or :sparc-v8 (and :sparc-v9 (not :sparc-64))) nil)
+  (:guard (or (member :sparc-v8 *backend-subfeatures*)
+	      (and (member :sparc-v9 *backend-subfeatures*)
+		   (not (member :sparc-64 *backend-subfeatures*)))))
   (:generator 3
     (inst umul r x y)))
 
@@ -604,20 +613,20 @@
 (define-vop (fast-v9-*/fixnum=>fixnum fast-fixnum-binop)
   (:temporary (:scs (non-descriptor-reg)) temp)
   (:translate *)
-  (:guard #!+:sparc-64 t #!-:sparc-64 nil)
+  (:guard (member :sparc-64 *backend-subfeatures*))
   (:generator 4
-    (inst sra temp y fixnum-tag-bits)
+    (inst sra temp y n-fixnum-tag-bits)
     (inst mulx r x temp)))
 
 (define-vop (fast-v9-*/signed=>signed fast-signed-binop)
   (:translate *)
-  (:guard #!+:sparc-64 t #!-:sparc-64 nil)
+  (:guard (member :sparc-64 *backend-subfeatures*))
   (:generator 3
     (inst mulx r x y)))
 
 (define-vop (fast-v9-*/unsigned=>unsigned fast-unsigned-binop)
   (:translate *)
-  (:guard #!+:sparc-64 t #!-:sparc-64 nil)
+  (:guard (member :sparc-64 *backend-subfeatures*))
   (:generator 3
     (inst mulx r x y)))
 
@@ -880,7 +889,7 @@
   (:args (digit :scs (unsigned-reg)))
   (:arg-types unsigned-num)
   (:results (result :scs (descriptor-reg)))
-  (:guard #!-:sparc-v9 t #!+:sparc-v9 nil)
+  (:guard (not (member :sparc-v9 *backend-subfeatures*)))
   (:generator 3
     (let ((done (gen-label)))
       (inst cmp digit)
@@ -895,7 +904,7 @@
   (:args (digit :scs (unsigned-reg)))
   (:arg-types unsigned-num)
   (:results (result :scs (descriptor-reg)))
-  (:guard #!+:sparc-v9 t #!-:sparc-v9 nil)
+  (:guard (member :sparc-v9 *backend-subfeatures*))
   (:generator 3
     (inst cmp digit)
     (load-symbol result t)
@@ -959,46 +968,46 @@
 	   (type (or tn (signed-byte 13)) multiplicand))
   ;; It seems that emit-multiply is only used to do an unsigned
   ;; multiply, so the code only does an unsigned multiply.
-  #!+:sparc-64
-  (progn
-    ;; Take advantage of V9's 64-bit multiplier.
-    ;;
-    ;; Make sure the multiplier and multiplicand are really
-    ;; unsigned 64-bit numbers.
-    (inst srl multiplier 0)
-    (inst srl multiplicand 0)
+  (cond
+    ((member :sparc-64 *backend-subfeatures*)
+     ;; Take advantage of V9's 64-bit multiplier.
+     ;;
+     ;; Make sure the multiplier and multiplicand are really
+     ;; unsigned 64-bit numbers.
+     (inst srl multiplier 0)
+     (inst srl multiplicand 0)
   
-    ;; Multiply the two numbers and put the result in
-    ;; result-high.  Copy the low 32-bits to result-low.  Then
-    ;; shift result-high so the high 32-bits end up in the low
-    ;; 32-bits.
-    (inst mulx result-high multiplier multiplicand)
-    (inst move result-low result-high)
-    (inst srax result-high 32))
-  #!+(and (not :sparc-64) (or :sparc-v8 :sparc-v9))
-  (progn
-    ;; V8 has a multiply instruction.  This should also work for
-    ;; the V9, but umul and the Y register is deprecated on the
-    ;; V9.
-    (inst umul result-low multiplier multiplicand)
-    (inst rdy result-high))
-  #!+(and (not :sparc-64) (not (or :sparc-v8 :sparc-v9)))
-  (let ((label (gen-label)))
-    (inst wry multiplier)
-    (inst andcc result-high zero-tn)
-    ;; Note: we can't use the Y register until three insts
-    ;; after it's written.
-    (inst nop)
-    (inst nop)
-    (dotimes (i 32)
-      (inst mulscc result-high multiplicand))
-    (inst mulscc result-high zero-tn)
-    (inst cmp multiplicand)
-    (inst b :ge label)
-    (inst nop)
-    (inst add result-high multiplier)
-    (emit-label label)
-    (inst rdy result-low)))
+     ;; Multiply the two numbers and put the result in
+     ;; result-high.  Copy the low 32-bits to result-low.  Then
+     ;; shift result-high so the high 32-bits end up in the low
+     ;; 32-bits.
+     (inst mulx result-high multiplier multiplicand)
+     (inst move result-low result-high)
+     (inst srax result-high 32))
+    ((or (member :sparc-v8 *backend-subfeatures*)
+	 (member :sparc-v9 *backend-subfeatures*))
+     ;; V8 has a multiply instruction.  This should also work for
+     ;; the V9, but umul and the Y register is deprecated on the
+     ;; V9.
+     (inst umul result-low multiplier multiplicand)
+     (inst rdy result-high))
+    (t
+     (let ((label (gen-label)))
+       (inst wry multiplier)
+       (inst andcc result-high zero-tn)
+       ;; Note: we can't use the Y register until three insts
+       ;; after it's written.
+       (inst nop)
+       (inst nop)
+       (dotimes (i 32)
+	 (inst mulscc result-high multiplicand))
+       (inst mulscc result-high zero-tn)
+       (inst cmp multiplicand)
+       (inst b :ge label)
+       (inst nop)
+       (inst add result-high multiplier)
+       (emit-label label)
+       (inst rdy result-low)))))
 
 (define-vop (bignum-mult-and-add-3-arg)
   (:translate sb!bignum::%multiply-and-add)
@@ -1063,7 +1072,7 @@
   (:results (digit :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
-    (inst sra digit fixnum fixnum-tag-bits)))
+    (inst sra digit fixnum n-fixnum-tag-bits)))
 
 (define-vop (bignum-floor)
   (:translate sb!bignum::%floor)
@@ -1075,8 +1084,6 @@
   (:results (quo :scs (unsigned-reg) :from (:argument 1))
 	    (rem :scs (unsigned-reg) :from (:argument 0)))
   (:result-types unsigned-num unsigned-num)
-  (:guard #!+(not (or :sparc-v8 :sparc-v9)) t
-	  #!-(not (or :sparc-v8 :sparc-v9)) nil)
   (:generator 300
     (move rem div-high)
     (move quo div-low)
@@ -1104,8 +1111,8 @@
   (:temporary (:scs (unsigned-reg) :target quo) q)
   ;; This vop is for a v8 or v9, provided we're also not using
   ;; sparc-64, for which there a special sparc-64 vop.
-  (:guard #!+(or :sparc-v8 (and :sparc-v9 (not :sparc-64))) t
-	  #!-(or :sparc-v8 (and :sparc-v9 (not :sparc-64))) nil)
+  (:guard (or (member :sparc-v8 *backend-subfeatures*)
+	      (member :sparc-v9 *backend-subfeatures*)))
   (:generator 15
     (inst wry div-high)
     (inst nop)
@@ -1131,7 +1138,7 @@
   (:results (quo :scs (unsigned-reg))
 	    (rem :scs (unsigned-reg)))
   (:result-types unsigned-num unsigned-num)
-  (:guard #!+:sparc-64 t #!-:sparc-64 nil)
+  (:guard (member :sparc-64 *backend-subfeatures*))
   (:generator 5
     ;; Set dividend to be div-high and div-low	      
     (inst sllx dividend div-high 32)
@@ -1152,7 +1159,7 @@
   (:generator 1
     (sc-case res
       (any-reg
-       (inst sll res digit fixnum-tag-bits))
+       (inst sll res digit n-fixnum-tag-bits))
       (signed-reg
        (move res digit)))))
 

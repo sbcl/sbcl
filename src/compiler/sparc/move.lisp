@@ -139,7 +139,7 @@
   (:arg-types tagged-num)
   (:note "fixnum untagging")
   (:generator 1
-    (inst sra y x fixnum-tag-bits)))
+    (inst sra y x n-fixnum-tag-bits)))
 
 (define-move-vop move-to-word/fixnum :move
   (any-reg descriptor-reg) (signed-reg unsigned-reg))
@@ -166,7 +166,7 @@
     (let ((done (gen-label)))
       (inst andcc temp x fixnum-tag-mask)
       (inst b :eq done)
-      (inst sra y x fixnum-tag-bits)
+      (inst sra y x n-fixnum-tag-bits)
       
       (loadw y x bignum-digits-offset other-pointer-lowtag)
       
@@ -183,7 +183,7 @@
   (:result-types tagged-num)
   (:note "fixnum tagging")
   (:generator 1
-    (inst sll y x fixnum-tag-bits)))
+    (inst sll y x n-fixnum-tag-bits)))
 
 (define-move-vop move-from-word/fixnum :move
   (signed-reg unsigned-reg) (any-reg descriptor-reg))
@@ -200,12 +200,12 @@
     (move x arg)
     (let ((fixnum (gen-label))
 	  (done (gen-label)))
-      (inst sra temp x positive-fixnum-bits)
+      (inst sra temp x n-positive-fixnum-bits)
       (inst cmp temp)
       (inst b :eq fixnum)
       (inst orncc temp zero-tn temp)
       (inst b :eq done)
-      (inst sll y x fixnum-tag-bits)
+      (inst sll y x n-fixnum-tag-bits)
       
       (with-fixed-allocation
 	(y temp bignum-widetag (1+ bignum-digits-offset))
@@ -214,7 +214,7 @@
       (inst nop)
       
       (emit-label fixnum)
-      (inst sll y x fixnum-tag-bits)
+      (inst sll y x n-fixnum-tag-bits)
       (emit-label done))))
 
 (define-move-vop move-from-signed :move
@@ -234,10 +234,10 @@
     (let ((done (gen-label))
 	  (one-word (gen-label))
 	  (initial-alloc (pad-data-block (1+ bignum-digits-offset))))
-      (inst sra temp x positive-fixnum-bits)
+      (inst sra temp x n-positive-fixnum-bits)
       (inst cmp temp)
       (inst b :eq done)
-      (inst sll y x fixnum-tag-bits)
+      (inst sll y x n-fixnum-tag-bits)
 
       ;; We always allocate 2 words even if we don't need it.  (The
       ;; copying GC will take care of freeing the unused extra word.)

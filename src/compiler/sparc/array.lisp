@@ -33,7 +33,7 @@
       (inst or ndescr ndescr type)
       ;; Remove the extraneous fixnum tag bits because TYPE and RANK
       ;; were fixnums
-      (inst srl ndescr ndescr fixnum-tag-bits)
+      (inst srl ndescr ndescr n-fixnum-tag-bits)
       (storew ndescr header 0 other-pointer-lowtag))
     (move result header)))
 
@@ -69,7 +69,7 @@
     (loadw temp x 0 other-pointer-lowtag)
     (inst sra temp n-widetag-bits)
     (inst sub temp (1- array-dimensions-offset))
-    (inst sll res temp fixnum-tag-bits)))
+    (inst sll res temp n-fixnum-tag-bits)))
 
 
 
@@ -168,7 +168,7 @@
 	 (:temporary (:scs (non-descriptor-reg) :to (:result 0)) temp result)
 	 (:generator 20
 	   (inst srl temp index ,bit-shift)
-	   (inst sll temp fixnum-tag-bits)
+	   (inst sll temp n-fixnum-tag-bits)
 	   (inst add temp (- (* vector-data-offset n-word-bytes)
 			     other-pointer-lowtag))
 	   (inst ld result object temp)
@@ -217,7 +217,7 @@
 	 (:temporary (:scs (non-descriptor-reg) :from (:argument 1)) shift)
 	 (:generator 25
 	   (inst srl offset index ,bit-shift)
-	   (inst sll offset fixnum-tag-bits)
+	   (inst sll offset n-fixnum-tag-bits)
 	   (inst add offset (- (* vector-data-offset n-word-bytes)
 			       other-pointer-lowtag))
 	   (inst ld old object offset)

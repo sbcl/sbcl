@@ -33,9 +33,7 @@
     (error "~S isn't a floating-point register." tn))
   (let ((offset (tn-offset tn)))
     (cond ((> offset 31)
-	   ;; Use the sparc v9 double float register encoding.
-	   #!-:sparc-v9 (error ":sparc-v9 should be on the target features")
-	   ;; (assert (backend-featurep :sparc-v9))
+	   (assert (member :sparc-v9 *backend-subfeatures*))
 	   ;; No single register encoding greater than reg 31.
 	   (assert (zerop (mod offset 2)))
 	   ;; Upper bit of the register number is encoded in the low bit.
@@ -360,9 +358,9 @@ about function addresses and register values.")
 (sb!disassem:define-arg-type relative-label
   :sign-extend t
   :use-label (lambda (value dstate)
-		 (declare (type (signed-byte 13) value)
-			  (type sb!disassem:disassem-state dstate))
-		 (+ (ash value 2) (sb!disassem:dstate-cur-addr dstate))))
+	       (declare (type (signed-byte 22) value)
+			(type sb!disassem:disassem-state dstate))
+	       (+ (ash value 2) (sb!disassem:dstate-cur-addr dstate))))
 
 (defconstant-eqx branch-conditions
   '(:f :eq :le :lt :leu :ltu :n :vs :t :ne :gt :ge :gtu :geu :p :vc)
@@ -1326,9 +1324,9 @@ about function addresses and register values.")
 	      (error "Offset of BA must be positive"))
 	    offset)))))
 
-#!+sparc-v9
 (defun emit-relative-branch-integer (segment a op2 cond-or-target target &optional (cc :icc) (pred :pt))
   (declare (type integer-condition-register cc))
+  (assert (member :sparc-v9 *backend-subfeatures*))
   (emit-back-patch segment 4
     (lambda (segment posn)
 	(unless target
@@ -1345,8 +1343,8 @@ about function addresses and register values.")
 	      (error "Offset of BA must be positive"))
 	    offset)))))
 
-#!+sparc-v9
 (defun emit-relative-branch-fp (segment a op2 cond-or-target target &optional (cc :fcc0) (pred :pt))
+  (assert (member :sparc-v9 *backend-subfeatures*))
   (emit-back-patch segment 4
     (lambda (segment posn)
 	(unless target
@@ -1368,19 +1366,24 @@ about function addresses and register values.")
 ;; just get translated to the branch with prediction
 ;; instructions. However, the disassembler uses the correct V9
 ;; mnemonic.
-#!-sparc-v9
-(define-instruction b (segment cond-or-target &optional target)
-  (:declare (type (or label branch-condition) cond-or-target)
-	    (type (or label null) target))
+(define-instruction b (segment cond-or-target &rest args)
+  (:declare (type (or label branch-condition) cond-or-target))
   (:printer format-2-branch ((op #b00) (op2 #b010)))
   (:attributes branch)
   (:dependencies (reads :psr))
   (:delay 1)
   (:emitter
-   (emit-relative-branch segment 0 #b010 cond-or-target target)))
+   (cond
+     ((member :sparc-v9 *backend-subfeatures*)
+      (destructuring-bind (&optional target pred cc) args
+	(declare (type (or label null) target))
+	(emit-relative-branch-integer segment 0 #b001 cond-or-target target (or cc :icc) (or pred :pt))))
+     (t
+      (destructuring-bind (&optional target) args
+	(declare (type (or label null) target))
+	(emit-relative-branch segment 0 #b010 cond-or-target target))))))
 
-#!+sparc-v9
-(define-instruction b (segment cond-or-target &optional target pred cc)
+(define-instruction bp (segment cond-or-target &optional target pred cc)
   (:declare (type (or label branch-condition) cond-or-target)
 	    (type (or label null) target))
   (:printer format-2-branch-pred ((op #b00) (op2 #b001))
@@ -1392,10 +1395,8 @@ about function addresses and register values.")
   (:emitter
    (emit-relative-branch-integer segment 0 #b001 cond-or-target target (or cc :icc) (or pred :pt))))
 
-#!-sparc-v9
-(define-instruction ba (segment cond-or-target &optional target)
-  (:declare (type (or label branch-condition) cond-or-target)
-	    (type (or label null) target))
+(define-instruction ba (segment cond-or-target &rest args)
+  (:declare (type (or label branch-condition) cond-or-target))
   (:printer format-2-branch ((op #b00) (op2 #b010) (a 1))
             nil
             :print-name 'b)
@@ -1403,10 +1404,17 @@ about function addresses and register values.")
   (:dependencies (reads :psr))
   (:delay 0)
   (:emitter
-   (emit-relative-branch segment 1 #b010 cond-or-target target)))
+   (cond
+     ((member :sparc-v9 *backend-subfeatures*)
+      (destructuring-bind (&optional target pred cc) args
+	(declare (type (or label null) target))
+	(emit-relative-branch-integer segment 1 #b001 cond-or-target target (or cc :icc) (or pred :pt))))
+     (t
+      (destructuring-bind (&optional target) args
+	(declare (type (or label null) target))
+	(emit-relative-branch segment 1 #b010 cond-or-target target))))))
 
-#!+sparc-v9
-(define-instruction ba (segment cond-or-target &optional target pred cc)
+(define-instruction bpa (segment cond-or-target &optional target pred cc)
   (:declare (type (or label branch-condition) cond-or-target)
 	    (type (or label null) target))
   (:printer format-2-branch ((op #b00) (op2 #b001) (a 1))
@@ -1424,10 +1432,11 @@ about function addresses and register values.")
 ;; Definition 2.4.1 says only trap numbers 16-31 are allowed for user
 ;; code.  All other trap numbers have other uses.  The restriction on
 ;; target will prevent us from using bad trap numbers by mistake.
-#!-sparc-v9
-(define-instruction t (segment condition target)
+
+(define-instruction t (segment condition target &optional cc)
   (:declare (type branch-condition condition)
-	    ;; KLUDGE
+	    ;; KLUDGE: see comments in vm.lisp regarding
+	    ;; pseudo-atomic-trap.
 	    #!-linux
 	    (type (integer 16 31) target))
   (:printer format-3-immed ((op #b10)
@@ -1438,12 +1447,30 @@ about function addresses and register values.")
   (:attributes branch)
   (:dependencies (reads :psr))
   (:delay 0)
-  (:emitter (emit-format-3-immed segment #b10 (branch-condition condition)
-				 #b111010 0 1 target)))
+  (:emitter 
+   (cond
+     ((member :sparc-v9 *backend-subfeatures*)
+      (unless cc
+	(setf cc :icc))
+      (emit-format-4-trap segment
+			  #b10
+			  (branch-condition condition)
+			  #b111010 0 1
+			  (integer-condition cc)
+			  target))
+     (t
+      (assert (null cc))
+      (emit-format-3-immed segment #b10 (branch-condition condition)
+			   #b111010 0 1 target)))))
 
-#!+sparc-v9
-(define-instruction t (segment condition target &optional (cc #!-sparc-64 :icc #!+sparc-64 :xcc))
+;;; KLUDGE: we leave this commented out, as these two (T and TCC)
+;;; operations are actually indistinguishable from their bitfields,
+;;; breaking the disassembler if these are left in. The printer isn't
+;;; terribly smart, but the emitted code is right. - CSR, 2002-08-04
+#+nil
+(define-instruction tcc (segment condition target &optional (cc #!-sparc-64 :icc #!+sparc-64 :xcc))
   (:declare (type branch-condition condition)
+	    ;; KLUDGE: see above.
 	    #!-linux
 	    (type (integer 16 31) target)
 	    (type integer-condition-register cc))
@@ -1464,8 +1491,8 @@ about function addresses and register values.")
 
 ;; Same as for the branch instructions.  On the Sparc V9, we will use
 ;; the FP branch with prediction instructions instead.
-#!-sparc-v9
-(define-instruction fb (segment condition target)
+
+(define-instruction fb (segment condition target &rest args)
   (:declare (type fp-branch-condition condition) (type label target))
   (:printer format-2-branch ((op #B00)
                              (cond nil :type 'branch-fp-condition)
@@ -1474,10 +1501,15 @@ about function addresses and register values.")
   (:dependencies (reads :fsr))
   (:delay 1)
   (:emitter
-   (emit-relative-branch segment 0 #b110 condition target t)))
+   (cond
+     ((member :sparc-v9 *backend-subfeatures*)
+      (destructuring-bind (&optional fcc pred) args
+	(emit-relative-branch-fp segment 0 #b101 condition target (or fcc :fcc0) (or pred :pt))))
+     (t 
+      (assert (null args))
+      (emit-relative-branch segment 0 #b110 condition target t)))))
 
-#!+sparc-v9
-(define-instruction fb (segment condition target &optional fcc pred)
+(define-instruction fbp (segment condition target &optional fcc pred)
   (:declare (type fp-branch-condition condition) (type label target))
   (:printer format-2-fp-branch-pred ((op #b00) (op2 #b101))
 	    fp-branch-pred-printer
@@ -1620,7 +1652,11 @@ about function addresses and register values.")
       (reads src2)
       (writes :fsr))
      ;; The Sparc V9 doesn't need a delay after a FP compare.
-     (:delay #!-sparc-v9 1 #!+sparc-v9 0)
+     ;;
+     ;; KLUDGE FIXME YAARGH -- how to express that? I guess for now we
+     ;; do the worst case, and hope to fix it.
+     ;; (:delay #-sparc-v9 1 #+sparc-v9 0)
+     (:delay 1)
        (:emitter
 	(emit-format-3-fpop2 segment #b10
 	                     (or (position fcc '(:fcc0 :fcc1 :fcc2 :fcc3))

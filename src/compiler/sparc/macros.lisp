@@ -371,10 +371,12 @@
      (when fixnump
        `((inst andcc zero-tn ,reg fixnum-tag-mask)
 	 ,(if (or lowtags hdrs)
-	      `(inst b :eq ,(if not-p not-target target)
-		#!+sparc-v9 ,(if not-p :pn :pt))
-	      `(inst b ,(if not-p :ne :eq) ,target
-		#!+sparc-v9 ,(if not-p :pn :pt)))))
+	      `(if (member :sparc-v9 *backend-subfeatures*)
+   		   (inst b :eq ,(if not-p not-target target) ,(if not-p :pn :pt))
+		   (inst b :eq ,(if not-p not-target target)))
+	      `(if (member :sparc-v9 *backend-subfeatures*)
+		   (inst b ,(if not-p :ne :eq) ,target ,(if not-p :pn :pt))
+		   (inst b ,(if not-p :ne :eq) ,target)))))
      (when (or lowtags hdrs)
        `((inst and ,temp ,reg lowtag-mask)))
      (when lowtags
@@ -389,8 +391,9 @@
 			   (1- lowtag-limit) lowtags)))
      (when hdrs
        `((inst cmp ,temp ,lowtag)
-	 (inst b :ne ,(if not-p target not-target)
-	  #!+sparc-v9 ,(if not-p :pn :pt))
+	 (if (member :sparc-v9 *backend-subfeatures*)
+	     (inst b :ne ,(if not-p target not-target) ,(if not-p :pn :pt))
+	     (inst b :ne ,(if not-p target not-target)))
 	 (inst nop)
 	 (load-type ,temp ,reg (- ,lowtag))
 	 ,@(gen-other-immediate-test temp target not-target not-p hdrs))))))
