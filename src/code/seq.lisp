@@ -1775,9 +1775,11 @@
     (declare (fixnum count))
     (if (listp sequence)
 	(if from-end
-	    (nreverse (nlist-substitute*
-		       new old (nreverse (the list sequence))
-		       test test-not start end count key))
+	    (let ((length (length sequence)))
+	      (nreverse (nlist-substitute*
+			 new old (nreverse (the list sequence))
+			 test test-not (- length end) (- length start)
+			 count key)))
 	    (nlist-substitute* new old sequence
 			       test test-not start end count key))
 	(if from-end
@@ -1825,9 +1827,10 @@
     (declare (fixnum end count))
     (if (listp sequence)
 	(if from-end
-	    (nreverse (nlist-substitute-if*
-		       new test (nreverse (the list sequence))
-		       start end count key))
+	    (let ((length (length sequence)))
+	      (nreverse (nlist-substitute-if*
+			 new test (nreverse (the list sequence))
+			 (- length end) (- length start) count key)))
 	    (nlist-substitute-if* new test sequence
 				  start end count key))
 	(if from-end
@@ -1865,9 +1868,10 @@
     (declare (fixnum end count))
     (if (listp sequence)
 	(if from-end
-	    (nreverse (nlist-substitute-if-not*
-		       new test (nreverse (the list sequence))
-		       start end count key))
+	    (let ((length (length sequence)))
+	      (nreverse (nlist-substitute-if-not*
+			 new test (nreverse (the list sequence))
+			 (- length end) (- length start) count key)))
 	    (nlist-substitute-if-not* new test sequence
 				      start end count key))
 	(if from-end
