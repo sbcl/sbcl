@@ -51,7 +51,9 @@
 
 (defun %data-vector-and-index (array index)
   (if (array-header-p array)
-      (%with-array-data array index nil)
+      (multiple-value-bind (vector index)
+          (%with-array-data array index nil)
+        (values vector index))
       (values array index)))
 
 ;;; It'd waste space to expand copies of error handling in every

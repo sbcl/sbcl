@@ -3431,7 +3431,7 @@
 		   (loop for i of-type index
 			 from (ash current-heap-size -1) downto 1 do
 			 (%heapify i))
-		   (loop 
+		   (loop
 		    (when (< current-heap-size 2)
 		      (return))
 		    (rotatef (%elt 1) (%elt current-heap-size))

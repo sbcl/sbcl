@@ -47,7 +47,7 @@
 
 ;;; Make the default keyword for a &KEY arg, checking that the keyword
 ;;; isn't already used by one of the VARS.
-(declaim (ftype (sfunction (symbol list t) keyword) make-keyword-for-arg))
+(declaim (ftype (sfunction (symbol list t) symbol) make-keyword-for-arg))
 (defun make-keyword-for-arg (symbol vars keywordify)
   (let ((key (if (and keywordify (not (keywordp symbol)))
 		 (keywordicate symbol)

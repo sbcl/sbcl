@@ -817,8 +817,7 @@ a host-structure or string."
 (defun namestring (pathname)
   #!+sb-doc
   "Construct the full (name)string form of the pathname."
-  (declare (type pathname-designator pathname)
-	   (values (or null simple-base-string)))
+  (declare (type pathname-designator pathname))
   (with-pathname (pathname pathname)
     (when pathname
       (let ((host (%pathname-host pathname)))
@@ -830,8 +829,7 @@ a host-structure or string."
 (defun host-namestring (pathname)
   #!+sb-doc
   "Return a string representation of the name of the host in the pathname."
-  (declare (type pathname-designator pathname)
-	   (values (or null simple-base-string)))
+  (declare (type pathname-designator pathname))
   (with-pathname (pathname pathname)
     (let ((host (%pathname-host pathname)))
       (if host
@@ -843,8 +841,7 @@ a host-structure or string."
 (defun directory-namestring (pathname)
   #!+sb-doc
   "Return a string representation of the directories used in the pathname."
-  (declare (type pathname-designator pathname)
-	   (values (or null simple-base-string)))
+  (declare (type pathname-designator pathname))
   (with-pathname (pathname pathname)
     (let ((host (%pathname-host pathname)))
       (if host
@@ -856,8 +853,7 @@ a host-structure or string."
 (defun file-namestring (pathname)
   #!+sb-doc
   "Return a string representation of the name used in the pathname."
-  (declare (type pathname-designator pathname)
-	   (values (or null simple-base-string)))
+  (declare (type pathname-designator pathname))
   (with-pathname (pathname pathname)
     (let ((host (%pathname-host pathname)))
       (if host
@@ -1429,11 +1425,12 @@ a host-structure or string."
                    ;; DEF-DIRECTORY is :ABSOLUTE, as handled above. so return
                    ;; the original directory.
                    path-directory))))
-    (make-pathname :host (pathname-host pathname)
-                   :directory enough-directory
-                   :name (pathname-name pathname)
-                   :type (pathname-type pathname)
-                   :version (pathname-version pathname))))
+    (unparse-logical-namestring
+     (make-pathname :host (pathname-host pathname)
+                    :directory enough-directory
+                    :name (pathname-name pathname)
+                    :type (pathname-type pathname)
+                    :version (pathname-version pathname)))))
 
 (defun unparse-logical-namestring (pathname)
   (declare (type logical-pathname pathname))

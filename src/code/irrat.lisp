@@ -296,7 +296,7 @@
   "Return the logarithm of NUMBER in the base BASE, which defaults to e."
   (if base-p
       (cond
-	((zerop base) base) ; ANSI spec
+	((zerop base) 0f0) ; FIXME: type
 	((and (typep number '(integer (0) *))
 	      (typep base '(integer (0) *)))
 	 (coerce (/ (log2 number) (log2 base)) 'single-float))

@@ -634,7 +634,8 @@
 (defknown (stable-sort sort) (sequence callable &key (:key callable)) sequence
   (call)
   :derive-type (sequence-result-nth-arg 1))
-(defknown sb!impl::sort-vector (vector index index function (or function null)) vector
+(defknown sb!impl::sort-vector (vector index index function (or function null))
+  * ; SORT-VECTOR works through side-effect
   (call))
 
 (defknown merge (type-specifier sequence sequence callable
@@ -1065,9 +1066,9 @@
 			   (member nil :host :device
 				   :directory :name
 				   :type :version))
-  boolean
+  t
   ())
-(defknown pathname-match-p (pathname-designator pathname-designator) boolean
+(defknown pathname-match-p (pathname-designator pathname-designator) t
   ())
 (defknown translate-pathname (pathname-designator
 			      pathname-designator
@@ -1131,7 +1132,7 @@
   pathname-version (flushable))
 
 (defknown (namestring file-namestring directory-namestring host-namestring)
-  (pathname-designator) simple-string
+  (pathname-designator) (or simple-string null)
   (unsafely-flushable))
 
 (defknown enough-namestring (pathname-designator &optional pathname-designator)

@@ -722,63 +722,6 @@ WORKAROUND:
           :ACCRUED-EXCEPTIONS (:INEXACT)
           :FAST-MODE NIL)
 
-187: "type inference confusion around DEFTRANSFORM time"
-  (reported even more verbosely on sbcl-devel 2002-06-28 as "strange
-  bug in DEFTRANSFORM")
-  After the file below is compiled and loaded in sbcl-0.7.5, executing
-    (TCX (MAKE-ARRAY 4 :FILL-POINTER 2) 0)
-  at the REPL returns an adjustable vector, which is wrong. Presumably
-  somehow the DERIVE-TYPE information for the output values of %WAD is
-  being mispropagated as a type constraint on the input values of %WAD,
-  and so causing the type test to be optimized away. It's unclear how
-  hand-expanding the DEFTRANSFORM would change this, but it suggests
-  the DEFTRANSFORM machinery (or at least the way DEFTRANSFORMs are
-  invoked at a particular phase) is involved.
-    (cl:in-package :sb-c)
-    (eval-when (:compile-toplevel)
-    ;;; standin for %DATA-VECTOR-AND-INDEX
-    (defknown %dvai (array index) 
-      (values t t) 
-      (foldable flushable))
-    (deftransform %dvai ((array index)
-                         (vector t)
-                         *
-                         :important t)
-      (let* ((atype (continuation-type array))
-             (eltype (array-type-specialized-element-type atype)))
-        (when (eq eltype *wild-type*)
-          (give-up-ir1-transform
-           "specialized array element type not known at compile-time"))
-        (when (not (array-type-complexp atype))
-          (give-up-ir1-transform "SIMPLE array!"))
-        `(if (array-header-p array)
-             (%wad array index nil)
-             (values array index))))
-    ;;; standin for %WITH-ARRAY-DATA
-    (defknown %wad (array index (or index null))
-      (values (simple-array * (*)) index index index)
-      (foldable flushable))
-    ;;; (Commenting out this optimizer causes the bug to go away.)
-    (defoptimizer (%wad derive-type) ((array start end))
-      (let ((atype (continuation-type array)))
-        (when (array-type-p atype)
-          (values-specifier-type
-           `(values (simple-array ,(type-specifier
-                                    (array-type-specialized-element-type atype))
-                                  (*))
-                    index index index)))))
-    ) ; EVAL-WHEN
-    (defun %wad (array start end)
-      (format t "~&in %WAD~%")
-      (%with-array-data array start end))
-    (cl:in-package :cl-user)
-    (defun tcx (v i)
-      (declare (type (vector t) v))
-      (declare (notinline sb-kernel::%with-array-data))
-      ;; (Hand-expending DEFTRANSFORM %DVAI here also causes the bug to
-      ;; go away.) 
-      (sb-c::%dvai v i))
-
 188: "compiler performance fiasco involving type inference and UNION-TYPE"
   (In sbcl-0.7.6.10, DEFTRANSFORM CONCATENATE was commented out until this
   bug could be fixed properly, so you won't see the bug unless you restore

@@ -725,23 +725,21 @@
 	       (find-lambda-types functional type where))))
       (let* ((type-returns (fun-type-returns type))
 	     (return (lambda-return (main-entry functional)))
-	     (atype (when return
-                      nil
-		      #+nil(continuation-derived-type (return-result return))))) ; !!
+	     (dtype (when return
+                      (continuation-derived-type (return-result return)))))
 	(cond
-	 ((and atype (not (values-types-equal-or-intersect atype
+	 ((and dtype (not (values-types-equal-or-intersect dtype
 							   type-returns)))
 	  (note-lossage
 	   "The result type from ~A:~%  ~S~@
-	   conflicts with the definition's result type assertion:~%  ~S"
-	   where (type-specifier type-returns) (type-specifier atype))
+	   conflicts with the definition's result type:~%  ~S"
+	   where (type-specifier type-returns) (type-specifier dtype))
 	  nil)
 	 (*lossage-detected* nil)
 	 ((not really-assert) t)
 	 (t
-	  (when atype
-	    (assert-continuation-type (return-result return) atype
-                                      (lexenv-policy (functional-lexenv functional))))
+	  (assert-continuation-type (return-result return) type-returns
+                                    (lexenv-policy (functional-lexenv functional)))
 	  (loop for var in vars and type in types do
 	    (cond ((basic-var-sets var)
 		   (when (and unwinnage-fun
