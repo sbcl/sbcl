@@ -332,10 +332,6 @@ WORKAROUND:
 	   blows up at the level of SPECIFIER-TYPE with
 	   "Lower bound (0) is greater than upper bound (0)." Probably
 	   SPECIFIER-TYPE should return NIL instead.
-	e: (TYPEP 0 '(COMPLEX (EQL 0)) fails with
-	   "Component type for Complex is not numeric: (EQL 0)."
-	   This might be easy to fix; the type system already knows
-	   that (SUBTYPEP '(EQL 0) 'NUMBER) is true.
 	g: The type system isn't all that smart about relationships
 	   between hairy types, as shown in the type.erg test results,
 	   e.g. (SUBTYPEP 'CONS '(NOT ATOM)) => NIL, NIL.
@@ -633,8 +629,8 @@ Error in function C::GET-LAMBDA-TO-COMPILE:
     (assert (not (eq type1 *wild-type*)))
   in the NAMED :SIMPLE-= type method.) '* isn't really a type, and
   in a type context should probably be translated to T, and so it's
-  probably to ask whether it's equal to the T type and then (using the
-  EQ type comparison in the NAMED :SIMPLE-= type method) return NIL.
+  probably wrong to ask whether it's equal to the T type and then (using
+  the EQ type comparison in the NAMED :SIMPLE-= type method) return NIL.
   (I haven't tried to investigate this bug enough to guess whether
   there might be any user-level symptoms.)
 
@@ -657,25 +653,6 @@ Error in function C::GET-LAMBDA-TO-COMPILE:
   awkward to generalize the fix to INTEGER and RATIONAL. It's not 
   clear what's the best fix. (See the "bug in type handling" discussion
   on cmucl-imp ca. 2001-03-22 and ca. 2001-02-12.)
-
-93:
-  In sbcl-0.6.11.26, (COMPILE 'IN-HOST-COMPILATION-MODE) in
-  src/cold/shared.lisp doesn't correctly translate the
-  interpreted function
-    (defun in-host-compilation-mode (fn)
-      (let ((*features* (cons :sb-xc-host *features*))
-            ;; the CROSS-FLOAT-INFINITY-KLUDGE, as documented in
-            ;; base-target-features.lisp-expr:
-            (*shebang-features* (set-difference *shebang-features*
-                                                '(:sb-propagate-float-type
-                                                  :sb-propagate-fun-type))))
-        (with-additional-nickname ("SB-XC" "SB!XC")
-          (funcall fn))))
-  No error is reported by the compiler, but when the function is executed,
-  it causes an error
-    TYPE-ERROR in SB-KERNEL::OBJECT-NOT-TYPE-ERROR-HANDLER:
-      (:LINUX :X86 :IEEE-FLOATING-POINT :SB-CONSTRAIN-FLOAT-TYPE :SB-TEST
-       :SB-INTERPRETER :SB-DOC :UNIX ...) is not of type SYMBOL.
 
 94a: 
   Inconsistencies between derived and declared VALUES return types for
@@ -780,11 +757,6 @@ Error in function C::GET-LAMBDA-TO-COMPILE:
 	  On Sat, May 26, 2001 09:45:57 AM CDT it was compiled from:
 	  /usr/stuff/sbcl/src/code/host-alieneval.lisp
 	    Created: Monday, March 12, 2001 07:47:43 AM CST
-
-106:
-  (reported by Eric Marsden on cmucl-imp 2001-06-15)
-  (and APD pointed out on sbcl-devel 2001-12-29 that it's the same
-  as bug 50e)
 
 108:
   (TIME (ROOM T)) reports more than 200 Mbytes consed even for
@@ -1266,6 +1238,14 @@ Error in function C::GET-LAMBDA-TO-COMPILE:
   interpreter is gone, the system's notion of what's a top-level form
   and what's not will remain too confused to fix this problem.]
 
+145:
+  ANSI allows types `(COMPLEX ,FOO) to use very hairy values for
+  FOO, e.g. (COMPLEX (AND REAL (SATISFIES ODDP))). The old CMU CL
+  COMPLEX implementation didn't deal with this, and hasn't been
+  upgraded to do so. (This doesn't seem to be a high priority
+  conformance problem, since seems hard to construct useful code
+  where it matters.)
+   
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:
     These numbers were used for bugs related to the old IR1
