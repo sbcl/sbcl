@@ -422,6 +422,7 @@ static void /* noreturn */ parent_loop(void)
 {
     struct sigaction sa;
     sigset_t sigset;
+    int status;
 
     sigemptyset(&sigset);
 
@@ -441,7 +442,6 @@ static void /* noreturn */ parent_loop(void)
     sigaction(SIGINT, &sa, 0);
 
     while(all_threads) {
-	int status;
 	pid_t pid=0;
 	while(pid=waitpid(-1,&status,__WALL|WUNTRACED)) {
 	    struct thread *th;
@@ -459,9 +459,10 @@ static void /* noreturn */ parent_loop(void)
 		destroy_thread(th);		
 		/* FIXME arrange to call or fake (free-mutex *session-lock*)
 		 * if necessary */
+		if(!all_threads) break;
 	    }
-	    status=0;
 	}
     }
+    exit(WEXITSTATUS(status));
 }
 

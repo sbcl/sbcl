@@ -990,6 +990,7 @@ gc_find_freeish_pages(int *restart_page_ptr, int nbytes, int unboxed, struct all
 		if((page_table[first_page].allocated ==
 		    (unboxed ? UNBOXED_PAGE : BOXED_PAGE)) &&
 		   (page_table[first_page].large_object == 0) &&
+		   (page_table[first_page].gen == 0) &&
 		   (page_table[first_page].gen == gc_alloc_generation) &&
 		   (page_table[first_page].bytes_used < (4096-32)) &&
 		   (page_table[first_page].write_protected == 0) &&
