@@ -76,7 +76,7 @@
 ;;; versions which break binary compatibility. But it certainly should
 ;;; be incremented for release versions which break binary
 ;;; compatibility.
-(def!constant +fasl-file-version+ 48)
+(def!constant +fasl-file-version+ 49)
 ;;; (record of versions before 2003 deleted in 2003-04-26/0.pre8.107 or so)
 ;;; 38: (2003-01-05) changed names of internal SORT machinery
 ;;; 39: (2003-02-20) in 0.7.12.1 a slot was added to
@@ -105,7 +105,8 @@
 ;;; 47: (2003-11-30) Static variables were rearranged in 0.8.6.11.
 ;;; 48: (2004-03-01) Renumbered all the widetags to allow for more
 ;;;     microefficiency in sbcl-0.8.8.10
-
+;;; 49: (2004-05-04) Changed implementation of DEFFOO macros and the
+;;;     functions they expand to.
 
 ;;; the conventional file extension for our fasl files
 (declaim (type simple-string *fasl-file-type*))

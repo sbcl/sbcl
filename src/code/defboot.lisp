@@ -151,7 +151,7 @@
   "Define a function at top level."
   #+sb-xc-host
   (unless (symbol-package (fun-name-block-name name))
-    (warn "DEFUN of uninterned symbol ~S (tricky for GENESIS)" name))
+    (warn "DEFUN of uninterned function name ~S (tricky for GENESIS)" name))
   (multiple-value-bind (forms decls doc) (parse-body body)
     (let* (;; stuff shared between LAMBDA and INLINE-LAMBDA and NAMED-LAMBDA
 	   (lambda-guts `(,args
@@ -159,7 +159,7 @@
 			  (block ,(fun-name-block-name name)
 			    ,@forms)))
 	   (lambda `(lambda ,@lambda-guts))
-           #-sb-xc-host
+	   #-sb-xc-host
 	   (named-lambda `(named-lambda ,name ,@lambda-guts))
 	   (inline-lambda
 	    (when (inline-fun-name-p name)
@@ -172,9 +172,8 @@
 		     name)
 		    nil)))))
       `(progn
-
-	 ;; In cross-compilation of toplevel DEFUNs, we arrange
-	 ;; for the LAMBDA to be statically linked by GENESIS.
+	 ;; In cross-compilation of toplevel DEFUNs, we arrange for
+	 ;; the LAMBDA to be statically linked by GENESIS.
 	 ;;
 	 ;; It may seem strangely inconsistent not to use NAMED-LAMBDA
 	 ;; here instead of LAMBDA. The reason is historical:
@@ -183,22 +182,25 @@
 	 #+sb-xc-host
 	 (cold-fset ,name ,lambda)
 
-	 (eval-when (:compile-toplevel :load-toplevel :execute)
+	 (eval-when (:compile-toplevel)
 	   (sb!c:%compiler-defun ',name ',inline-lambda))
+	 (eval-when (:load-toplevel :execute)
+	   (%defun ',name
+		   ;; In normal compilation (not for cold load) this is
+		   ;; where the compiled LAMBDA first appears. In
+		   ;; cross-compilation, we manipulate the
+		   ;; previously-statically-linked LAMBDA here.
+		   #-sb-xc-host ,named-lambda
+		   #+sb-xc-host (fdefinition ',name)
+		   ,doc
+		   ',inline-lambda))))))
 
-	 (%defun ',name
-		 ;; In normal compilation (not for cold load) this is
-		 ;; where the compiled LAMBDA first appears. In
-		 ;; cross-compilation, we manipulate the
-		 ;; previously-statically-linked LAMBDA here.
-		 #-sb-xc-host ,named-lambda
-		 #+sb-xc-host (fdefinition ',name)
-		 ,doc)))))
 #-sb-xc-host
-(defun %defun (name def doc)
+(defun %defun (name def doc inline-lambda)
   (declare (type function def))
   (declare (type (or null simple-string) doc))
   (aver (legal-fun-name-p name)) ; should've been checked by DEFMACRO DEFUN
+  (sb!c:%compiler-defun name inline-lambda)
   (when (fboundp name)
     (/show0 "redefining NAME in %DEFUN")
     (style-warn "redefining ~S in DEFUN" name))
@@ -223,13 +225,10 @@
   value, the old value is not clobbered. The third argument is an optional
   documentation string for the variable."
   `(progn
-     (declaim (special ,var))
-     ,@(when valp
-	 `((unless (boundp ',var)
-	     (set ',var ,val))))
-     ,@(when docp
-	 `((setf (fdocumentation ',var 'variable) ',doc )))
-     ',var))
+     (eval-when (:compile-toplevel)
+       (%compiler-defvar ',var))
+     (eval-when (:load-toplevel :execute)
+       (%defvar ',var (unless (boundp ',var) ,val) ',valp ,doc ',docp))))
 
 (defmacro-mundanely defparameter (var val &optional (doc nil docp))
   #!+sb-doc
@@ -239,11 +238,31 @@
   previous value. The third argument is an optional documentation
   string for the parameter."
   `(progn
-     (declaim (special ,var))
-     (set ',var ,val)
-     ,@(when docp
-	 `((setf (fdocumentation ',var 'variable) ',doc)))
-     ',var))
+     (eval-when (:compile-toplevel)
+       (%compiler-defvar ',var))
+     (eval-when (:load-toplevel :execute)
+       (%defparameter ',var ,val ,doc ',docp))))
+
+(defun %compiler-defvar (var)
+  (sb!xc:proclaim `(special ,var)))
+
+#-sb-xc-host
+(defun %defvar (var val valp doc docp)
+  (%compiler-defvar var)
+  (when valp
+    (unless (boundp var)
+      (set var val)))
+  (when docp
+    (setf (fdocumentation var 'variable) doc))
+  var)
+
+#-sb-xc-host
+(defun %defparameter (var val doc docp)
+  (%compiler-defvar var)
+  (set var val)
+  (when docp
+    (setf (fdocumentation var 'variable) doc))
+  var)
 
 ;;;; iteration constructs
 
@@ -632,8 +651,11 @@
 		        ;; functions appearing in fundamental defining
 		        ;; macro expansions:
 		        %compiler-deftype
+		        %compiler-defvar
 		        %defun
 		        %defsetf
+		        %defparameter
+		        %defvar
 		        sb!c:%compiler-defun
 		        sb!c::%define-symbol-macro
 		        sb!c::%defconstant

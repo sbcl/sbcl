@@ -272,7 +272,10 @@
 ;;;; DEFINE-CONDITION
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
-(defun %compiler-define-condition (name direct-supers layout)
+(defun %compiler-define-condition (name direct-supers layout
+				   all-readers all-writers)
+  (sb!xc:proclaim `(ftype (function (t) t) ,@all-readers))
+  (sb!xc:proclaim `(ftype (function (t t) t) ,@all-writers))
   (multiple-value-bind (class old-layout)
       (insured-find-classoid name
 			     #'condition-classoid-p
@@ -313,7 +316,6 @@
 	  (remove-if-not #'condition-classoid-p 
 			 (std-compute-class-precedence-list class))))
   (values))
-
 ) ; EVAL-WHEN
 
 ;;; Compute the effective slots of CLASS, copying inherited slots and
@@ -365,7 +367,9 @@
         (lambda (new-value condition)
           (condition-writer-function condition new-value slot-name))))
 
-(defun %define-condition (name slots documentation report default-initargs)
+(defun %define-condition (name parent-types layout slots documentation
+			  report default-initargs all-readers all-writers)
+  (%compiler-define-condition name parent-types layout all-readers all-writers)
   (let ((class (find-classoid name)))
     (setf (condition-classoid-slots class) slots)
     (setf (condition-classoid-report class) report)
@@ -522,17 +526,19 @@
 	   (error "unknown option: ~S" (first option)))))
 
       `(progn
-	 (eval-when (:compile-toplevel :load-toplevel :execute)
-	   (%compiler-define-condition ',name ',parent-types ',layout))
-
-	 (declaim (ftype (function (t) t) ,@(all-readers)))
-	 (declaim (ftype (function (t t) t) ,@(all-writers)))
-
-	 (%define-condition ',name
-			    (list ,@(slots))
-			    ,documentation
-			    ,report
-			    (list ,@default-initargs))))))
+	 (eval-when (:compile-toplevel)
+	   (%compiler-define-condition ',name ',parent-types ',layout
+				       ',(all-readers) ',(all-writers)))
+	 (eval-when (:load-toplevel :execute)
+	   (%define-condition ',name
+			      ',parent-types
+			      ',layout
+			      (list ,@(slots))
+			      ,documentation
+			      ,report
+			      (list ,@default-initargs)
+			      ',(all-readers)
+			      ',(all-writers)))))))
 
 ;;;; DESCRIBE on CONDITIONs
 

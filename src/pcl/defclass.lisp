@@ -99,20 +99,11 @@
                                         *the-class-structure-class*))))))
           (let ((defclass-form
 		  `(progn
-		     ,@(mapcar (lambda (x)
-				 `(declaim (ftype (function (t) t) ,x)))
-			       *readers-for-this-defclass*)
-		     ,@(mapcar (lambda (x)
-				 `(declaim (ftype (function (t t) t) ,x)))
-			       *writers-for-this-defclass*)
-                     ,@(mapcar (lambda (x)
-                                 `(declaim (ftype (function (t) t)
-                                                  ,(slot-reader-name x)
-                                                  ,(slot-boundp-name x))
-                                           (ftype (function (t t) t)
-                                                  ,(slot-writer-name x))))
-                               *slot-names-for-this-defclass*)
 		     (let ,(mapcar #'cdr *initfunctions-for-this-defclass*)
+		       (%compiler-defclass ',name
+					   ',*readers-for-this-defclass*
+					   ',*writers-for-this-defclass*
+					   ',*slot-names-for-this-defclass*)
 		       (load-defclass ',name
 				      ',metaclass
 				      ',supers
@@ -158,8 +149,21 @@
 		   ;; full-blown class, so the "a class of this name is
 		   ;; coming" note we write here would be irrelevant.
 		   (eval-when (:compile-toplevel)
-		     (preinform-compiler-about-class-type ',name))
-		   ,defclass-form))))))))
+		     (%compiler-defclass ',name
+					 ',*readers-for-this-defclass*
+					 ',*writers-for-this-defclass*
+					 ',*slot-names-for-this-defclass*))
+		   (eval-when (:load-toplevel :execute)
+		     ,defclass-form)))))))))
+
+(defun %compiler-defclass (name readers writers slot-names)
+  (preinform-compiler-about-class-type name)
+  (proclaim `(ftype (function (t) t)
+	      ,@readers
+	      ,@(mapcar #'slot-reader-name slot-names)
+	      ,@(mapcar #'slot-boundp-name slot-names)))
+  (proclaim `(ftype (function (t t) t)
+	      ,@writers ,@(mapcar #'slot-writer-name slot-names))))
 
 (defun make-initfunction (initform)
   (cond ((or (eq initform t)

@@ -2418,6 +2418,10 @@ changes in sbcl-0.8.11 relative to sbcl-0.8.10:
     *PRINT-READABLY* is true, signal PRINT-NOT-READABLE if the string
     does not have array-element-type equal to the most general string
     type.
+  * optimization: rearranged the expansion of various defining macros
+    so that each expands into only one top-level form in a
+    :LOAD-TOPLEVEL context; this appears to decrease fasl sizes by
+    approximately 10%.
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles

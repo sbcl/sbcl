@@ -112,7 +112,7 @@
     ;; an encapsulation that no longer exists.
     (let ((info (make-encapsulation-info type (fdefn-fun fdefn))))
       (setf (fdefn-fun fdefn)
-	    (named-lambda encapsulate (&rest arg-list)
+	    (named-lambda encapsulation (&rest arg-list)
 	      (declare (special arg-list))
 	      (let ((basic-definition (encapsulation-info-definition info)))
 		(declare (special basic-definition))
