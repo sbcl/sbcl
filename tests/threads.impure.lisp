@@ -131,8 +131,9 @@
 
 (defun alloc-stuff () (copy-list '(1 2 3 4 5)))
 (let ((c (test-interrupt (lambda () (loop (alloc-stuff))))))
-  ;; NB this only works on x86
-  (loop
+  ;; NB this only works on x86: other ports don't have a symbol for
+  ;; pseudo-atomic atomicity
+  (dotimes (i 100)
     (sleep (random 1d0))
     (interrupt-thread c
 		      (lambda ()

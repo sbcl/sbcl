@@ -24,7 +24,7 @@
 int dynamic_values_bytes=4096*sizeof(lispobj);	/* same for all threads */
 struct thread *all_threads;
 lispobj all_threads_lock;
-int countdown_to_gc;
+volatile int countdown_to_gc;
 extern struct interrupt_data * global_interrupt_data;
 
 void get_spinlock(lispobj *word,int value);

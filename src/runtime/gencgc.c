@@ -3671,28 +3671,42 @@ garbage_collect_generation(int generation, int raise)
     unprotect_oldspace();
 
     /* Scavenge the stacks' conservative roots. */
+
+    /* there are potentially two stacks for each thread: the main
+     * stack, which may contain Lisp pointers, and the alternate stack.
+     * We don't ever run Lisp code on the altstack, but it may 
+     * host a sigcontext with lisp objects in it */
+
+    /* what we need to do: (1) find the stack pointer for the main
+     * stack; scavenge it (2) find the interrupt context on the
+     * alternate stack that might contain lisp values, and scavenge
+     * that */
+
+    /* we assume that none of the preceding applies to the thread that
+     * initiates GC.  If you ever call GC from inside an altstack
+     * handler, you will lose. */
     for_each_thread(th) {
 	void **ptr;
 	void **esp= (void **) &raise;
-	int i=0,free;
+	int i,free;
 #ifdef LISP_FEATURE_SB_THREAD
 	if(th!=arch_os_get_current_thread()) {
-	    os_context_t *last_context=get_interrupt_context_for_thread(th);
-	    esp = (void **)*os_context_register_addr(last_context,reg_ESP);
+	    void **esp1;
+	    free=fixnum_value(SymbolValue(FREE_INTERRUPT_CONTEXT_INDEX,th));
+	    for(i=free-1;i>=0;i--) {
+		os_context_t *c=th->interrupt_contexts[i];
+		esp1 = (void **) *os_context_register_addr(c,reg_ESP);
+		if(esp1>=th->control_stack_start&& esp1<th->control_stack_end){
+		    if(esp1<esp) esp=esp1;
+		    for(ptr = (void **)(c+1); ptr>=(void **)c; ptr--) {
+			preserve_pointer(*ptr);
+		    }
+		}
+	    }
 	}
 #endif
 	for (ptr = (void **)th->control_stack_end; ptr > esp;  ptr--) {
 	    preserve_pointer(*ptr);
-	}
-	/* also need to check registers in any interrupt contexts on
-	 * an alternate signal stack */
-	free=fixnum_value(SymbolValue(FREE_INTERRUPT_CONTEXT_INDEX,th));
-	for(i=0;i<free;i++){
-	    os_context_t *c=th->interrupt_contexts[i];
-	    if(c>=th->control_stack_end && c<esp) continue;
-	    for(ptr = (void **)(c+1); ptr>=(void **)c; ptr--) {
-		preserve_pointer(*ptr);
-	    }
 	}
     }
 

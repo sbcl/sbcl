@@ -70,7 +70,7 @@ static void store_signal_data_for_later (struct interrupt_data *data,
 boolean interrupt_maybe_gc_int(int signal, siginfo_t *info, void *v_context);
 
 extern lispobj all_threads_lock;
-extern int countdown_to_gc;
+extern volatile int countdown_to_gc;
 
 /*
  * This is a workaround for some slightly silly Linux/GNU Libc
@@ -425,8 +425,6 @@ interrupt_handle_now(int signal, siginfo_t *info, void *void_context)
 
 void
 run_deferred_handler(struct interrupt_data *data, void *v_context) {
-    fprintf(stderr,"Running deferred handler for %d, 0x%x\n",
-	    data->pending_signal, data->pending_handler);
     (*(data->pending_handler))
 	(data->pending_signal,&(data->pending_info), v_context);
 }
