@@ -123,8 +123,8 @@
 		       (let ((initfn (slot-definition-initfunction slotd)))
 			 (when initfn
 			   (funcall initfn)))))
-	       (unless (or (slot-boundp-using-class class instance slotd)
-			   (null (slot-definition-initfunction slotd)))
+	       (unless (or (null (slot-definition-initfunction slotd))
+			   (slot-boundp-using-class class instance slotd))
 		 (setf (slot-value-using-class class instance slotd)
 		       (funcall (slot-definition-initfunction slotd)))))))
     (let* ((class (class-of instance))

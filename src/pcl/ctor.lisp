@@ -108,10 +108,8 @@
 (defun make-ctor-parameter-list (ctor)
   (plist-values (ctor-initargs ctor) :test (complement #'constantp)))
 
-;;;
 ;;; Reset CTOR to use a default function that will compute an
 ;;; optimized constructor function when called.
-;;;
 (defun install-initial-constructor (ctor &key force-p)
   (when (or force-p (ctor-class ctor))
     (setf (ctor-class ctor) nil)
@@ -122,9 +120,7 @@
     (setf (%funcallable-instance-info ctor 1)
 	  (ctor-function-name ctor))))
 
-;;;
 ;;; Keep this a separate function for testing.
-;;;
 (defun make-ctor-function-name (class-name initargs)
   (let ((*package* *pcl-package*)
 	(*print-case* :upcase)
@@ -136,16 +132,12 @@
 		   (plist-keys initargs)
 		   (plist-values initargs :test #'constantp))))
 
-;;;
 ;;; Keep this a separate function for testing.
-;;;
 (defun ensure-ctor (function-name class-name initargs)
   (unless (fboundp function-name)
     (make-ctor function-name class-name initargs)))
 
-;;;
 ;;; Keep this a separate function for testing.
-;;;
 (defun make-ctor (function-name class-name initargs)
   (without-package-locks ; for (setf symbol-function)
    (let ((ctor (%make-ctor function-name class-name nil initargs)))
@@ -265,10 +257,37 @@
 	  (compute-applicable-methods #'make-instance (list class)))
          (allocate-instance-methods
 	  (compute-applicable-methods #'allocate-instance (list class)))
+	 ;; I stared at this in confusion for a while, thinking
+	 ;; carefully about the possibility of the class prototype not
+	 ;; being of sufficient discrimiating power, given the
+	 ;; possibility of EQL-specialized methods on
+	 ;; INITIALIZE-INSTANCE or SHARED-INITIALIZE.  However, given
+	 ;; that this is a constructor optimization, the user doesn't
+	 ;; yet have the instance to create a method with such an EQL
+	 ;; specializer.
+	 ;;
+	 ;; There remains the (theoretical) possibility of someone
+	 ;; coming along with code of the form
+	 ;;
+	 ;; (defmethod initialize-instance :before ((o foo) ...)
+	 ;;   (eval `(defmethod shared-initialize :before ((o foo) ...) ...)))
+	 ;;
+	 ;; but probably we can afford not to worry about this too
+	 ;; much for now.  -- CSR, 2004-07-12
          (ii-methods
 	  (compute-applicable-methods #'initialize-instance (list proto)))
          (si-methods
-	  (compute-applicable-methods #'shared-initialize (list proto t))))
+	  (compute-applicable-methods #'shared-initialize (list proto t)))
+	 (setf-svuc-slots-methods
+	  (loop for slot in (class-slots class)
+		collect (compute-applicable-methods
+			 #'(setf slot-value-using-class)
+			 (list nil class proto slot))))
+	 (sbuc-slots-methods
+	  (loop for slot in (class-slots class)
+		collect (compute-applicable-methods
+			 #'slot-boundp-using-class
+			 (list class proto slot)))))
     ;; Cannot initialize these variables earlier because the generic
     ;; functions don't exist when PCL is built.
     (when (null *the-system-si-method*)
@@ -286,12 +305,23 @@
 	     (not (condition-class-p class))
 	     (null (cdr make-instance-methods))
 	     (null (cdr allocate-instance-methods))
+	     (every (lambda (x)
+		      (member (slot-definition-allocation x)
+			      '(:instance :class)))
+		    (class-slots class))
 	     (null (check-initargs-1 class (plist-keys (ctor-initargs ctor))
 				     (append ii-methods si-methods) nil nil))
 	     (not (around-or-nonstandard-primary-method-p
 		   ii-methods *the-system-ii-method*))
 	     (not (around-or-nonstandard-primary-method-p
 		   si-methods *the-system-si-method*))
+	     ;; the instance structure protocol goes through
+	     ;; slot-value(-using-class) and friends (actually just
+	     ;; (SETF SLOT-VALUE-USING-CLASS) and
+	     ;; SLOT-BOUNDP-USING-CLASS), so if there are non-standard
+	     ;; applicable methods we can't shortcircuit them.
+	     (every (lambda (x) (= (length x) 1)) setf-svuc-slots-methods)
+	     (every (lambda (x) (= (length x) 1)) sbuc-slots-methods)
 	     (optimizing-generator ctor ii-methods si-methods))
 	(fallback-generator ctor ii-methods si-methods))))
 
@@ -353,21 +383,17 @@
 	   ,body
 	   .instance.))))
 
-;;;
 ;;; Return a form for invoking METHOD with arguments from ARGS.  As
 ;;; can be seen in METHOD-FUNCTION-FROM-FAST-FUNCTION, method
 ;;; functions look like (LAMBDA (ARGS NEXT-METHODS) ...).  We could
 ;;; call fast method functions directly here, but benchmarks show that
 ;;; there's no speed to gain, so lets avoid the hair here.
-;;;
 (defmacro invoke-method (method args)
   `(funcall ,(method-function method) ,args ()))
 
-;;;
 ;;; Return a form that is sort of an effective method comprising all
 ;;; calls to INITIALIZE-INSTANCE and SHARED-INITIALIZE that would
 ;;; normally have taken place when calling MAKE-INSTANCE.
-;;;
 (defun fake-initialization-emf (ctor ii-methods si-methods)
   (multiple-value-bind (ii-around ii-before ii-primary ii-after)
       (standard-sort-methods ii-methods)
@@ -394,12 +420,10 @@
 		    collect `(invoke-method ,method .ii-args.)))
 	 (or ii-before si-before))))))
 
-;;;
 ;;; Return four values from APPLICABLE-METHODS: around methods, before
 ;;; methods, the applicable primary method, and applicable after
 ;;; methods.  Before and after methods are sorted in the order they
 ;;; must be called.
-;;;
 (defun standard-sort-methods (applicable-methods)
   (loop for method in applicable-methods
 	as qualifiers = (method-qualifiers method)
@@ -414,7 +438,6 @@
 	finally
 	  (return (values around before (first primary) (reverse after)))))
 
-;;;
 ;;; Return a form initializing instance and class slots of an object
 ;;; costructed by CTOR.  The variable .SLOTS. is assumed to bound to
 ;;; the instance's slot vector.  BEFORE-METHOD-P T means
@@ -422,7 +445,6 @@
 ;;; initialize instance slots to +SLOT-UNBOUND+ before the
 ;;; before-methods are run, and that we have to check if these
 ;;; before-methods have set slots.
-;;;
 (defun slot-init-forms (ctor before-method-p)
   (let* ((class (ctor-class ctor))
 	 (initargs (ctor-initargs ctor))
@@ -598,7 +620,15 @@
 	     initialize-instance shared-initialize)
 	    (reset (class-of-1st-method-param method) t t))
 	   ((reinitialize-instance)
-	    (reset (class-of-1st-method-param method) t nil))))))))
+	    (reset (class-of-1st-method-param method) t nil))
+	   (t (when (or (eq (generic-function-name generic-function)
+			    'slot-boundp-using-class)
+			(equal (generic-function-name generic-function)
+			       '(setf slot-value-using-class)))
+		;; this looks awfully expensive, but given that one
+		;; can specialize on the SLOTD argument, nothing is
+		;; safe.  -- CSR, 2004-07-12
+		(reset (find-class 'standard-object))))))))))
 
 (defun precompile-ctors ()
   (dolist (ctor *all-ctors*)

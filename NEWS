@@ -31,6 +31,10 @@ changes in sbcl-0.8.13 relative to sbcl-0.8.12:
   * fixed bug: it is now possible to have slots such that
     SB-MOP:SLOT-DEFINITION-ALLOCATION of the effective slot
     description is neither :INSTANCE nor :CLASS.
+  * fixed bug: the ctor optimization of MAKE-INSTANCE now respects
+    user-defined methods on SLOT-BOUNDP-USING-CLASS and (SETF
+    SLOT-VALUE-USING-CLASS), and no longer causes errors with
+    non-standard SLOT-DEFINITION-ALLOCATION values.
 
 changes in sbcl-0.8.12 relative to sbcl-0.8.11:
   * minor incompatible change: the system no longer provides

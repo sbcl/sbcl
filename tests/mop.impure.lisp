@@ -239,11 +239,52 @@
   (assert (eq nil (slot-value x 'x)))
   (assert (slot-boundp x 'y))
   (assert (= 1 (slot-value x 'y))))
-;; extra paranoia: check that we haven't broken the instance-slot class
+;;; extra paranoia: check that we haven't broken the instance-slot class
 (let ((x (make-instance 'class-to-add-instance-slot)))
   (assert (slot-boundp x 'x))
   (assert (eq t (slot-value x 'x)))
   (assert (not (slot-boundp x 'y))))
+
+;;;; the CTOR optimization was insufficiently careful about its
+;;;; assumptions: firstly, it failed with a failed AVER for
+;;;; non-standard-allocation slots:
+(defclass class-with-frob-slot ()
+  ((frob-slot :initarg :frob-slot :allocation :frob)))
+(handler-case
+    (funcall (compile nil '(lambda ()
+			    (make-instance 'class-with-frob-slot
+			     :frob-slot 1))))
+  (sb-int:bug (c) (error c))
+  (error () "Probably OK: haven't implemented SLOT-BOUNDP-USING-CLASS"))
+;;; secondly, it failed to take account of the fact that we might wish
+;;; to customize (setf slot-value-using-class)
+(defclass class-with-special-ssvuc ()
+  ((some-slot :initarg :some-slot)))
+(defvar *special-ssvuc-counter* 0)
+(defmethod (setf slot-value-using-class) :before
+    (new-value class (instance class-with-special-ssvuc) slotd)
+  (incf *special-ssvuc-counter*))
+(let ((fun (compile nil '(lambda () (make-instance 'class-with-special-ssvuc
+				     :some-slot 1)))))
+  (assert (= *special-ssvuc-counter* 0))
+  (funcall fun)
+  (assert (= *special-ssvuc-counter* 1))
+  (funcall fun)
+  (assert (= *special-ssvuc-counter* 2)))
+;;; and now with the customization after running the function once
+(defclass class-with-special-ssvuc-2 ()
+  ((some-slot :initarg :some-slot)))
+(defvar *special-ssvuc-counter-2* 0)
+(let ((fun (compile nil '(lambda () (make-instance 'class-with-special-ssvuc-2
+				     :some-slot 1)))))
+  (assert (= *special-ssvuc-counter-2* 0))
+  (funcall fun)
+  (assert (= *special-ssvuc-counter-2* 0))
+  (defmethod (setf slot-value-using-class) :before
+      (new-value class (instance class-with-special-ssvuc-2) slotd)
+    (incf *special-ssvuc-counter-2*))
+  (funcall fun)
+  (assert (= *special-ssvuc-counter-2* 1)))
 
 ;;;; success
 (sb-ext:quit :unix-status 104)
