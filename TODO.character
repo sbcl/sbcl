@@ -56,8 +56,8 @@ particularly appealing.)
 not just (:CONSTANT SIMPLE-BASE-STRING), coercing to base-string
 within the VOP implementation.  (Rationale: less use of #.(coerce
 "foo" 'base-string) throughout the code.)
-  -- done for x86;
-  -- TODO: ppc, sparc, mips, hppa, alpha.
+  -- done for x86, ppc (Eric Marsden);
+  -- TODO: sparc, mips, hppa, alpha.
 
 ** fix GENESIS to use SB!XC:CHAR-CODE always.  (Rationale: we should
 only use STANDARD-CHARs in our source; this may be hard to achieve,
@@ -80,12 +80,11 @@ decision allows for infrastructural progress).  This requires
 modification of the various CHAR-UPCASE/STRING-DOWNCASE/GRAPHIC-CHAR-P
 etc. functions, and will probably address the failing test FORMAT.C.4A
 from gcl/ansi-tests.
-  -- done, including a test case for ANSI consistency wrt
-     GRAPHIC-CHAR-P and CHAR-NAME.  The names of the characters
-     between #x80 and #xa0 might want to be revised.
-     (the inclusion of the binary data generated from the Unicode
-     data files might also be suboptimal in the long run.  Many other
-     possibilities exist.)
+  -- done (Teemu Kalvas), including a test case for ANSI consistency
+     wrt GRAPHIC-CHAR-P and CHAR-NAME.  The names of the characters
+     between #x80 and #xa0 might want to be revised. (the inclusion of
+     the binary data generated from the Unicode data files might also
+     be suboptimal in the long run.  Many other possibilities exist.)
 
 ** implement :UTF-8, :ISO-8859-1 and :POSIX external formats, and make
 :DEFAULT an alias for the approprate one based on nl_langinfo(CODESET)
@@ -95,9 +94,9 @@ Eventually other :ISO-8859-<N> external formats should be supported,
 even in 8-bit lisps, but attempts to print characters which are not
 representable in those formats should probably error, so it might not
 be terribly useful.
-  -- :UTF-8 external format partially done (easier than it seemed due
-     to a bug rendering FAST-READ-CHAR more-or-less exactly the same
-     as READ-CHAR).
+  -- :UTF-8 external format partially done (Teemu Kalvas) (easier than
+     it seemed due to a bug rendering FAST-READ-CHAR more-or-less
+     exactly the same as READ-CHAR).
   -- nl_langinfo(CODESET) :DEFAULT processing done.
   -- TODO: :ISO-8859-1, aliases
 
@@ -105,7 +104,7 @@ be terribly useful.
 not scale linearly in size with the number of characters in the
 system.  (Rationale: having a readtable with 2^21 entries would make
 even current bloated sbcl.core look tiny.)
-  -- done reader, symbol printer, format subsystem.
+  -- done reader, symbol printer (Teemu Kalvas), format subsystem.
      (Note that the symbol printer has multiple bugs in its logic
      which have not been fixed by this branch.)
 
@@ -117,7 +116,8 @@ as BASE-STRING, which allows for identical cold fasls and cores to be
 generated from lisps with different BASE-CHAR/CHARACTER distinctions.)
   -- done: the cross-compiler type system, the cross-compiler dumper
      and genesis cooperate to make every host string look like a
-     target base-string.
+     target base-string.  Including fixing for self-building (Eric
+     Marsden).
   -- (Note that dubious uses of CL:TYPE-OF in portions of the
      compiler such as CONVERT-MEMBER-TYPE, TWO-ARG-DERIVE-TYPE
      remain.)

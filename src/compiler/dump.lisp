@@ -910,14 +910,18 @@
   (dump-byte (char-code ch) file))
 
 (defun dump-base-chars-of-string (s fasl-output)
-  (declare (type base-string s) (type fasl-output fasl-output))
+  (declare #+sb-xc-host (type simple-string s)
+           #-sb-xc-host (type simple-base-string s)
+           (type fasl-output fasl-output))
   (dovector (c s)
     (dump-byte (sb!xc:char-code c) fasl-output))
   (values))
 
+
 ;;; Dump a SIMPLE-BASE-STRING.
 (defun dump-simple-base-string (s file)
-  (declare (type simple-base-string s))
+  #+sb-xc-host (declare (type simple-string s))
+  #-sb-xc-host (declare (type simple-base-string s))
   (dump-fop* (length s) fop-small-base-string fop-base-string file)
   (dump-base-chars-of-string s file)
   (values))
