@@ -9,9 +9,6 @@ for 0.7.0:
 		including the name BACKTRACE, not (as in 0.pre7.88)
 		just "0: (\"hairy arg processor\" ...)"
 * more renaming in global external names:
-	** used DEFINE-THE-FOO-THING and DEFFOO style consistently (and 
-		deprecated supported extensions named in the DEF-FOO
-		style, e.g. SB-ALIEN:DEF-ALIEN-ROUTINE)
 	** reserved DO-FOO-style names for iteration macros
 	** finished s/FUNCTION/FUN/
 	** s/VARIABLE/VAR/

@@ -25,7 +25,7 @@
 (defstruct (arg-state (:copier nil))
   (stack-frame-size 0))
 
-(def-alien-type-method (integer :arg-tn) (type state)
+(define-alien-type-method (integer :arg-tn) (type state)
   (let ((stack-frame-size (arg-state-stack-frame-size state)))
     (setf (arg-state-stack-frame-size state) (1+ stack-frame-size))
     (multiple-value-bind (ptype stack-sc)
@@ -34,7 +34,7 @@
 	    (values 'unsigned-byte-32 'unsigned-stack))
       (my-make-wired-tn ptype stack-sc stack-frame-size))))
 
-(def-alien-type-method (system-area-pointer :arg-tn) (type state)
+(define-alien-type-method (system-area-pointer :arg-tn) (type state)
   (declare (ignore type))
   (let ((stack-frame-size (arg-state-stack-frame-size state)))
     (setf (arg-state-stack-frame-size state) (1+ stack-frame-size))
@@ -43,19 +43,19 @@
 		      stack-frame-size)))
 
 #!+long-float
-(def-alien-type-method (long-float :arg-tn) (type state)
+(define-alien-type-method (long-float :arg-tn) (type state)
   (declare (ignore type))
   (let ((stack-frame-size (arg-state-stack-frame-size state)))
     (setf (arg-state-stack-frame-size state) (+ stack-frame-size 3))
     (my-make-wired-tn 'long-float 'long-stack stack-frame-size)))
 
-(def-alien-type-method (double-float :arg-tn) (type state)
+(define-alien-type-method (double-float :arg-tn) (type state)
   (declare (ignore type))
   (let ((stack-frame-size (arg-state-stack-frame-size state)))
     (setf (arg-state-stack-frame-size state) (+ stack-frame-size 2))
     (my-make-wired-tn 'double-float 'double-stack stack-frame-size)))
 
-(def-alien-type-method (single-float :arg-tn) (type state)
+(define-alien-type-method (single-float :arg-tn) (type state)
   (declare (ignore type))
   (let ((stack-frame-size (arg-state-stack-frame-size state)))
     (setf (arg-state-stack-frame-size state) (1+ stack-frame-size))
@@ -69,7 +69,7 @@
     (0 eax-offset)
     (1 edx-offset)))
 
-(def-alien-type-method (integer :result-tn) (type state)
+(define-alien-type-method (integer :result-tn) (type state)
   (let ((num-results (result-state-num-results state)))
     (setf (result-state-num-results state) (1+ num-results))
     (multiple-value-bind (ptype reg-sc)
@@ -78,7 +78,7 @@
 	    (values 'unsigned-byte-32 'unsigned-reg))
       (my-make-wired-tn ptype reg-sc (result-reg-offset num-results)))))
 
-(def-alien-type-method (system-area-pointer :result-tn) (type state)
+(define-alien-type-method (system-area-pointer :result-tn) (type state)
   (declare (ignore type))
   (let ((num-results (result-state-num-results state)))
     (setf (result-state-num-results state) (1+ num-results))
@@ -86,32 +86,32 @@
 		      (result-reg-offset num-results))))
 
 #!+long-float
-(def-alien-type-method (long-float :result-tn) (type state)
+(define-alien-type-method (long-float :result-tn) (type state)
   (declare (ignore type))
   (let ((num-results (result-state-num-results state)))
     (setf (result-state-num-results state) (1+ num-results))
     (my-make-wired-tn 'long-float 'long-reg (* num-results 2))))
 
-(def-alien-type-method (double-float :result-tn) (type state)
+(define-alien-type-method (double-float :result-tn) (type state)
   (declare (ignore type))
   (let ((num-results (result-state-num-results state)))
     (setf (result-state-num-results state) (1+ num-results))
     (my-make-wired-tn 'double-float 'double-reg (* num-results 2))))
 
-(def-alien-type-method (single-float :result-tn) (type state)
+(define-alien-type-method (single-float :result-tn) (type state)
   (declare (ignore type))
   (let ((num-results (result-state-num-results state)))
     (setf (result-state-num-results state) (1+ num-results))
     (my-make-wired-tn 'single-float 'single-reg (* num-results 2))))
 
 #+nil ;;pfw obsolete now?
-(def-alien-type-method (values :result-tn) (type state)
+(define-alien-type-method (values :result-tn) (type state)
   (mapcar #'(lambda (type)
 	      (invoke-alien-type-method :result-tn type state))
 	  (alien-values-type-values type)))
 
 ;;; pfw - from alpha
-(def-alien-type-method (values :result-tn) (type state)
+(define-alien-type-method (values :result-tn) (type state)
   (let ((values (alien-values-type-values type)))
     (when (cdr values)
       (error "Too many result values from c-call."))

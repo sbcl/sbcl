@@ -26,7 +26,7 @@
 #include <unistd.h>
 
 #define DEFTYPE(lispname,cname) { cname foo; \
-    printf("(def-alien-type "##lispname##" (%s %d))\n", (((foo=-1)<0) ? "sb!alien:signed" : "unsigned"), (8 * (sizeof foo))); }
+    printf("(define-alien-type "##lispname##" (%s %d))\n", (((foo=-1)<0) ? "sb!alien:signed" : "unsigned"), (8 * (sizeof foo))); }
 
 void
 defconstant(char* lisp_name, long unix_number)

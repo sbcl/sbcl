@@ -538,7 +538,7 @@
        (zerop (logand (sap-int x) #b11))))
 
 #!+x86
-(sb!alien:def-alien-routine component-ptr-from-pc (system-area-pointer)
+(sb!alien:define-alien-routine component-ptr-from-pc (system-area-pointer)
   (pc system-area-pointer))
 
 #!+x86
@@ -3049,19 +3049,19 @@
 ;;; returns the overwritten bits. You must call this in a context in
 ;;; which GC is disabled, so that Lisp doesn't move objects around
 ;;; that C is pointing to.
-(sb!alien:def-alien-routine "breakpoint_install" sb!c-call:unsigned-long
+(sb!alien:define-alien-routine "breakpoint_install" sb!c-call:unsigned-long
   (code-obj sb!c-call:unsigned-long)
   (pc-offset sb!c-call:int))
 
 ;;; This removes the break instruction and replaces the original
 ;;; instruction. You must call this in a context in which GC is disabled
 ;;; so Lisp doesn't move objects around that C is pointing to.
-(sb!alien:def-alien-routine "breakpoint_remove" sb!c-call:void
+(sb!alien:define-alien-routine "breakpoint_remove" sb!c-call:void
   (code-obj sb!c-call:unsigned-long)
   (pc-offset sb!c-call:int)
   (old-inst sb!c-call:unsigned-long))
 
-(sb!alien:def-alien-routine "breakpoint_do_displaced_inst" sb!c-call:void
+(sb!alien:define-alien-routine "breakpoint_do_displaced_inst" sb!c-call:void
   (scp (* os-context-t))
   (orig-inst sb!c-call:unsigned-long))
 

@@ -190,7 +190,7 @@
 
 (defun ctype-needs-to-be-interpreted-p (ctype)
   ;; What we should really do is factor out the code in
-  ;; (DEF-SOURCE-TRANSFORM TYPEP ..) so that it can be shared here.
+  ;; (DEFINE-SOURCE-TRANSFORM TYPEP ..) so that it can be shared here.
   ;; Until then this toy version should be good enough for some testing.
   (warn "FIXME: This is just a toy stub CTYPE-NEEDS-TO-BE-INTERPRETED-P.")
   (not (or (position (type-specifier ctype)

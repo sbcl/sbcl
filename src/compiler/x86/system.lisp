@@ -229,10 +229,10 @@
 ;;; The closure function slot is a pointer to raw code on X86 instead
 ;;; of a pointer to the code function object itself. This VOP is used
 ;;; to reference the function object given the closure object.
-(def-source-transform %closure-fun (closure)
+(define-source-transform %closure-fun (closure)
   `(%simple-fun-self ,closure))
 
-(def-source-transform %funcallable-instance-fun (fin)
+(define-source-transform %funcallable-instance-fun (fin)
   `(%simple-fun-self ,fin))
 
 (define-vop (%set-fun-self)

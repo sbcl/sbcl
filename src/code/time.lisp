@@ -82,7 +82,7 @@
 ;;; Returns two values:
 ;;;  - the minutes west of GMT.
 ;;;  - T if daylight savings is in effect, NIL if not.
-(sb!alien:def-alien-routine get-timezone sb!c-call:void
+(sb!alien:define-alien-routine get-timezone sb!c-call:void
   (when sb!c-call:long :in)
   (minutes-west sb!c-call:int :out)
   (daylight-savings-p sb!alien:boolean :out))

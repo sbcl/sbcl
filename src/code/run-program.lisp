@@ -45,7 +45,7 @@
 ;;;; which (at least in sbcl-0.6.10 on Red Hat Linux 6.2) is not
 ;;;; visible at GENESIS time.
 
-(def-alien-variable "environ" (* c-string))
+(define-alien-variable "environ" (* c-string))
 (push (lambda ()
 	;; We redo this here to protect ourselves from this scenario:
 	;;   * Build under one version of shared lib, save a core.
@@ -59,7 +59,7 @@
 	;; alien code be preserved across a save/load cycle, but this
 	;; problem with alien variables is only one of several
 	;; problems which'd need to be solved before that can happen.)
-        (def-alien-variable "environ" (* c-string)))
+        (define-alien-variable "environ" (* c-string)))
       *after-save-initializations*)
 
 (defun posix-environ ()
@@ -108,7 +108,7 @@
 
 ;;;; Import wait3(2) from Unix.
 
-(sb-alien:def-alien-routine ("wait3" c-wait3) sb-c-call:int
+(sb-alien:define-alien-routine ("wait3" c-wait3) sb-c-call:int
   (status sb-c-call:int :out)
   (options sb-c-call:int)
   (rusage sb-c-call:int))
@@ -305,7 +305,7 @@
 (defvar *handlers-installed* nil)
 
 #+FreeBSD
-(def-alien-type nil
+(define-alien-type nil
   (struct sgttyb
 	  (sg-ispeed sb-c-call:char)	; input speed
 	  (sg-ospeed sb-c-call:char)	; output speed
@@ -313,7 +313,7 @@
 	  (sg-kill sb-c-call:char)	; kill character
 	  (sg-flags sb-c-call:short)))	; mode flags
 #+OpenBSD
-(def-alien-type nil
+(define-alien-type nil
   (struct sgttyb
 	  (sg-four sb-c-call:int)
 	  (sg-chars (array sb-c-call:char 4))
@@ -435,7 +435,7 @@
 	     ,@body)
 	(sb-sys:deallocate-system-memory ,sap ,size)))))
 
-(sb-alien:def-alien-routine spawn sb-c-call:int
+(sb-alien:define-alien-routine spawn sb-c-call:int
   (program sb-c-call:c-string)
   (argv (* sb-c-call:c-string))
   (envp (* sb-c-call:c-string))

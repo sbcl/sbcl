@@ -85,7 +85,8 @@
 
 ;;; We define a keyword "BOA" constructor so that we can reference the
 ;;; slot names in init forms.
-(def!macro def-alien-type-class ((name &key include include-args) &rest slots)
+(def!macro define-alien-type-class ((name &key include include-args)
+				    &rest slots)
   (let ((defstruct-name (symbolicate "ALIEN-" name "-TYPE")))
     (multiple-value-bind (include include-defstruct overrides)
 	(etypecase include
@@ -117,7 +118,7 @@
 			       ,@include-args)))
 	   ,@slots)))))
 
-(def!macro def-alien-type-method ((class method) lambda-list &rest body)
+(def!macro define-alien-type-method ((class method) lambda-list &rest body)
   (let ((defun-name (symbolicate class "-" method "-METHOD")))
     `(progn
        (defun ,defun-name ,lambda-list
@@ -241,13 +242,13 @@
 
 ;;;; alien type defining stuff
 
-(def!macro def-alien-type-translator (name lambda-list &body body)
+(def!macro define-alien-type-translator (name lambda-list &body body)
   (let ((whole (gensym "WHOLE"))
 	(env (gensym "ENV"))
 	(defun-name (symbolicate "ALIEN-" name "-TYPE-TRANSLATOR")))
     (multiple-value-bind (body decls docs)
 	(sb!kernel:parse-defmacro lambda-list whole body name
-				  'def-alien-type-translator
+				  'define-alien-type-translator
 				  :environment env)
       `(eval-when (:compile-toplevel :load-toplevel :execute)
 	 (defun ,defun-name (,whole ,env)
@@ -255,10 +256,10 @@
 	   ,@decls
 	   (block ,name
 	     ,body))
-	 (%def-alien-type-translator ',name #',defun-name ,docs)))))
+	 (%define-alien-type-translator ',name #',defun-name ,docs)))))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  (defun %def-alien-type-translator (name translator docs)
+  (defun %define-alien-type-translator (name translator docs)
     (declare (ignore docs))
     (setf (info :alien-type :kind name) :primitive)
     (setf (info :alien-type :translator name) translator)
@@ -267,7 +268,7 @@
     (setf (fdocumentation name 'alien-type) docs)
     name))
 
-(def!macro def-alien-type (name type &environment env)
+(def!macro define-alien-type (name type &environment env)
   #!+sb-doc
   "Define the alien type NAME to be equivalent to TYPE. Name may be NIL for
    STRUCT and UNION types, in which case the name is taken from the type
@@ -278,7 +279,10 @@
 	 ,@(when *new-auxiliary-types*
 	     `((%def-auxiliary-alien-types ',*new-auxiliary-types*)))
 	 ,@(when name
-	     `((%def-alien-type ',name ',alien-type)))))))
+	     `((%define-alien-type ',name ',alien-type)))))))
+(def!macro def-alien-type (&rest rest)
+  (deprecation-warning 'def-alien-type 'define-alien-type)
+  `(define-alien-type ,@rest))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defun %def-auxiliary-alien-types (types)
@@ -295,7 +299,7 @@
 	    (:struct (frob :struct))
 	    (:union (frob :union))
 	    (:enum (frob :enum)))))))
-  (defun %def-alien-type (name new)
+  (defun %define-alien-type (name new)
     (ecase (info :alien-type :kind name)
       (:primitive
        (error "~S is a built-in alien type." name))
@@ -328,49 +332,49 @@
 
 ;;;; the SAP type
 
-(def-alien-type-class (system-area-pointer))
+(define-alien-type-class (system-area-pointer))
 
-(def-alien-type-translator system-area-pointer ()
+(define-alien-type-translator system-area-pointer ()
   (make-alien-system-area-pointer-type
    :bits #!-alpha sb!vm:n-word-bits #!+alpha 64))
 
-(def-alien-type-method (system-area-pointer :unparse) (type)
+(define-alien-type-method (system-area-pointer :unparse) (type)
   (declare (ignore type))
   'system-area-pointer)
 
-(def-alien-type-method (system-area-pointer :lisp-rep) (type)
+(define-alien-type-method (system-area-pointer :lisp-rep) (type)
   (declare (ignore type))
   'system-area-pointer)
 
-(def-alien-type-method (system-area-pointer :alien-rep) (type)
+(define-alien-type-method (system-area-pointer :alien-rep) (type)
   (declare (ignore type))
   'system-area-pointer)
 
-(def-alien-type-method (system-area-pointer :naturalize-gen) (type alien)
+(define-alien-type-method (system-area-pointer :naturalize-gen) (type alien)
   (declare (ignore type))
   alien)
 
-(def-alien-type-method (system-area-pointer :deport-gen) (type object)
+(define-alien-type-method (system-area-pointer :deport-gen) (type object)
   (declare (ignore type))
   (/noshow "doing alien type method SYSTEM-AREA-POINTER :DEPORT-GEN" object)
   object)
 
-(def-alien-type-method (system-area-pointer :extract-gen) (type sap offset)
+(define-alien-type-method (system-area-pointer :extract-gen) (type sap offset)
   (declare (ignore type))
   `(sap-ref-sap ,sap (/ ,offset sb!vm:n-byte-bits)))
 
 ;;;; the ALIEN-VALUE type
 
-(def-alien-type-class (alien-value :include system-area-pointer))
+(define-alien-type-class (alien-value :include system-area-pointer))
 
-(def-alien-type-method (alien-value :lisp-rep) (type)
+(define-alien-type-method (alien-value :lisp-rep) (type)
   (declare (ignore type))
   nil)
 
-(def-alien-type-method (alien-value :naturalize-gen) (type alien)
+(define-alien-type-method (alien-value :naturalize-gen) (type alien)
   `(%sap-alien ,alien ',type))
 
-(def-alien-type-method (alien-value :deport-gen) (type value)
+(define-alien-type-method (alien-value :deport-gen) (type value)
   (declare (ignore type))
   (/noshow "doing alien type method ALIEN-VALUE :DEPORT-GEN" value)
   `(alien-sap ,value))
@@ -461,90 +465,90 @@
 
 ;;;; default methods
 
-(def-alien-type-method (root :unparse) (type)
+(define-alien-type-method (root :unparse) (type)
   `(<unknown-alien-type> ,(type-of type)))
 
-(def-alien-type-method (root :type=) (type1 type2)
+(define-alien-type-method (root :type=) (type1 type2)
   (declare (ignore type1 type2))
   t)
 
-(def-alien-type-method (root :subtypep) (type1 type2)
+(define-alien-type-method (root :subtypep) (type1 type2)
   (alien-type-= type1 type2))
 
-(def-alien-type-method (root :lisp-rep) (type)
+(define-alien-type-method (root :lisp-rep) (type)
   (declare (ignore type))
   nil)
 
-(def-alien-type-method (root :alien-rep) (type)
+(define-alien-type-method (root :alien-rep) (type)
   (declare (ignore type))
   '*)
 
-(def-alien-type-method (root :naturalize-gen) (type alien)
+(define-alien-type-method (root :naturalize-gen) (type alien)
   (declare (ignore alien))
   (error "cannot represent ~S typed aliens" type))
 
-(def-alien-type-method (root :deport-gen) (type object)
+(define-alien-type-method (root :deport-gen) (type object)
   (declare (ignore object))
   (error "cannot represent ~S typed aliens" type))
 
-(def-alien-type-method (root :extract-gen) (type sap offset)
+(define-alien-type-method (root :extract-gen) (type sap offset)
   (declare (ignore sap offset))
   (error "cannot represent ~S typed aliens" type))
 
-(def-alien-type-method (root :deposit-gen) (type sap offset value)
+(define-alien-type-method (root :deposit-gen) (type sap offset value)
   `(setf ,(invoke-alien-type-method :extract-gen type sap offset) ,value))
 
-(def-alien-type-method (root :arg-tn) (type state)
+(define-alien-type-method (root :arg-tn) (type state)
   (declare (ignore state))
   (error "Aliens of type ~S cannot be passed as arguments to CALL-OUT."
 	 (unparse-alien-type type)))
 
-(def-alien-type-method (root :result-tn) (type state)
+(define-alien-type-method (root :result-tn) (type state)
   (declare (ignore state))
   (error "Aliens of type ~S cannot be returned from CALL-OUT."
 	 (unparse-alien-type type)))
 
 ;;;; the INTEGER type
 
-(def-alien-type-class (integer)
+(define-alien-type-class (integer)
   (signed t :type (member t nil)))
 
-(def-alien-type-translator signed (&optional (bits sb!vm:n-word-bits))
+(define-alien-type-translator signed (&optional (bits sb!vm:n-word-bits))
   (make-alien-integer-type :bits bits))
 
-(def-alien-type-translator integer (&optional (bits sb!vm:n-word-bits))
+(define-alien-type-translator integer (&optional (bits sb!vm:n-word-bits))
   (make-alien-integer-type :bits bits))
 
-(def-alien-type-translator unsigned (&optional (bits sb!vm:n-word-bits))
+(define-alien-type-translator unsigned (&optional (bits sb!vm:n-word-bits))
   (make-alien-integer-type :bits bits :signed nil))
 
-(def-alien-type-method (integer :unparse) (type)
+(define-alien-type-method (integer :unparse) (type)
   (list (if (alien-integer-type-signed type) 'signed 'unsigned)
 	(alien-integer-type-bits type)))
 
-(def-alien-type-method (integer :type=) (type1 type2)
+(define-alien-type-method (integer :type=) (type1 type2)
   (and (eq (alien-integer-type-signed type1)
 	   (alien-integer-type-signed type2))
        (= (alien-integer-type-bits type1)
 	  (alien-integer-type-bits type2))))
 
-(def-alien-type-method (integer :lisp-rep) (type)
+(define-alien-type-method (integer :lisp-rep) (type)
   (list (if (alien-integer-type-signed type) 'signed-byte 'unsigned-byte)
 	(alien-integer-type-bits type)))
 
-(def-alien-type-method (integer :alien-rep) (type)
+(define-alien-type-method (integer :alien-rep) (type)
   (list (if (alien-integer-type-signed type) 'signed-byte 'unsigned-byte)
 	(alien-integer-type-bits type)))
 
-(def-alien-type-method (integer :naturalize-gen) (type alien)
+(define-alien-type-method (integer :naturalize-gen) (type alien)
   (declare (ignore type))
   alien)
 
-(def-alien-type-method (integer :deport-gen) (type value)
+(define-alien-type-method (integer :deport-gen) (type value)
   (declare (ignore type))
   value)
 
-(def-alien-type-method (integer :extract-gen) (type sap offset)
+(define-alien-type-method (integer :extract-gen) (type sap offset)
   (declare (type alien-integer-type type))
   (let ((ref-fun
 	 (if (alien-integer-type-signed type)
@@ -565,39 +569,39 @@
 
 ;;;; the BOOLEAN type
 
-(def-alien-type-class (boolean :include integer :include-args (signed)))
+(define-alien-type-class (boolean :include integer :include-args (signed)))
 
 ;;; FIXME: Check to make sure that we aren't attaching user-readable
 ;;; stuff to CL:BOOLEAN in any way which impairs ANSI compliance.
-(def-alien-type-translator boolean (&optional (bits sb!vm:n-word-bits))
+(define-alien-type-translator boolean (&optional (bits sb!vm:n-word-bits))
   (make-alien-boolean-type :bits bits :signed nil))
 
-(def-alien-type-method (boolean :unparse) (type)
+(define-alien-type-method (boolean :unparse) (type)
   `(boolean ,(alien-boolean-type-bits type)))
 
-(def-alien-type-method (boolean :lisp-rep) (type)
+(define-alien-type-method (boolean :lisp-rep) (type)
   (declare (ignore type))
   `(member t nil))
 
-(def-alien-type-method (boolean :naturalize-gen) (type alien)
+(define-alien-type-method (boolean :naturalize-gen) (type alien)
   (declare (ignore type))
   `(not (zerop ,alien)))
 
-(def-alien-type-method (boolean :deport-gen) (type value)
+(define-alien-type-method (boolean :deport-gen) (type value)
   (declare (ignore type))
   `(if ,value 1 0))
 
 ;;;; the ENUM type
 
-(def-alien-type-class (enum :include (integer (:bits 32))
-			    :include-args (signed))
+(define-alien-type-class (enum :include (integer (:bits 32))
+			       :include-args (signed))
   name		; name of this enum (if any)
   from		; alist from keywords to integers.
   to		; alist or vector from integers to keywords.
   kind		; Kind of from mapping, :vector or :alist.
   offset)	; Offset to add to value for :vector from mapping.
 
-(def-alien-type-translator enum (&whole
+(define-alien-type-translator enum (&whole
 				 type name
 				 &rest mappings
 				 &environment env)
@@ -673,7 +677,7 @@
 					  from-alist)
 			      :kind :alist))))))
 
-(def-alien-type-method (enum :unparse) (type)
+(define-alien-type-method (enum :unparse) (type)
   `(enum ,(alien-enum-type-name type)
 	 ,@(let ((prev -1))
 	     (mapcar #'(lambda (mapping)
@@ -686,16 +690,16 @@
 			     (setf prev value))))
 		     (alien-enum-type-from type)))))
 
-(def-alien-type-method (enum :type=) (type1 type2)
+(define-alien-type-method (enum :type=) (type1 type2)
   (and (eq (alien-enum-type-name type1)
 	   (alien-enum-type-name type2))
        (equal (alien-enum-type-from type1)
 	      (alien-enum-type-from type2))))
 
-(def-alien-type-method (enum :lisp-rep) (type)
+(define-alien-type-method (enum :lisp-rep) (type)
   `(member ,@(mapcar #'car (alien-enum-type-from type))))
 
-(def-alien-type-method (enum :naturalize-gen) (type alien)
+(define-alien-type-method (enum :naturalize-gen) (type alien)
   (ecase (alien-enum-type-kind type)
     (:vector
      `(svref ',(alien-enum-type-to type)
@@ -706,7 +710,7 @@
 		      `(,(car mapping) ,(cdr mapping)))
 		  (alien-enum-type-to type))))))
 
-(def-alien-type-method (enum :deport-gen) (type value)
+(define-alien-type-method (enum :deport-gen) (type value)
   `(ecase ,value
      ,@(mapcar #'(lambda (mapping)
 		   `(,(car mapping) ,(cdr mapping)))
@@ -714,78 +718,78 @@
 
 ;;;; the FLOAT types
 
-(def-alien-type-class (float)
+(define-alien-type-class (float)
   (type (missing-arg) :type symbol))
 
-(def-alien-type-method (float :unparse) (type)
+(define-alien-type-method (float :unparse) (type)
   (alien-float-type-type type))
 
-(def-alien-type-method (float :lisp-rep) (type)
+(define-alien-type-method (float :lisp-rep) (type)
   (alien-float-type-type type))
 
-(def-alien-type-method (float :alien-rep) (type)
+(define-alien-type-method (float :alien-rep) (type)
   (alien-float-type-type type))
 
-(def-alien-type-method (float :naturalize-gen) (type alien)
+(define-alien-type-method (float :naturalize-gen) (type alien)
   (declare (ignore type))
   alien)
 
-(def-alien-type-method (float :deport-gen) (type value)
+(define-alien-type-method (float :deport-gen) (type value)
   (declare (ignore type))
   value)
 
-(def-alien-type-class (single-float :include (float (:bits 32))
-				    :include-args (type)))
+(define-alien-type-class (single-float :include (float (:bits 32))
+				       :include-args (type)))
 
-(def-alien-type-translator single-float ()
+(define-alien-type-translator single-float ()
   (make-alien-single-float-type :type 'single-float))
 
-(def-alien-type-method (single-float :extract-gen) (type sap offset)
+(define-alien-type-method (single-float :extract-gen) (type sap offset)
   (declare (ignore type))
   `(sap-ref-single ,sap (/ ,offset sb!vm:n-byte-bits)))
 
-(def-alien-type-class (double-float :include (float (:bits 64))
-				    :include-args (type)))
+(define-alien-type-class (double-float :include (float (:bits 64))
+				       :include-args (type)))
 
-(def-alien-type-translator double-float ()
+(define-alien-type-translator double-float ()
   (make-alien-double-float-type :type 'double-float))
 
-(def-alien-type-method (double-float :extract-gen) (type sap offset)
+(define-alien-type-method (double-float :extract-gen) (type sap offset)
   (declare (ignore type))
   `(sap-ref-double ,sap (/ ,offset sb!vm:n-byte-bits)))
 
 #!+long-float
-(def-alien-type-class (long-float :include (float (:bits #!+x86 96
-							  #!+sparc 128))
-				  :include-args (type)))
+(define-alien-type-class (long-float :include (float (:bits #!+x86 96
+							    #!+sparc 128))
+				     :include-args (type)))
 
 #!+long-float
-(def-alien-type-translator long-float ()
+(define-alien-type-translator long-float ()
   (make-alien-long-float-type :type 'long-float))
 
 #!+long-float
-(def-alien-type-method (long-float :extract-gen) (type sap offset)
+(define-alien-type-method (long-float :extract-gen) (type sap offset)
   (declare (ignore type))
   `(sap-ref-long ,sap (/ ,offset sb!vm:n-byte-bits)))
 
 ;;;; the POINTER type
 
-(def-alien-type-class (pointer :include (alien-value (:bits
-						      #!-alpha
-						      sb!vm:n-word-bits
-						      #!+alpha 64)))
+(define-alien-type-class (pointer :include (alien-value (:bits
+							 #!-alpha
+							 sb!vm:n-word-bits
+							 #!+alpha 64)))
   (to nil :type (or alien-type null)))
 
-(def-alien-type-translator * (to &environment env)
+(define-alien-type-translator * (to &environment env)
   (make-alien-pointer-type :to (if (eq to t) nil (parse-alien-type to env))))
 
-(def-alien-type-method (pointer :unparse) (type)
+(define-alien-type-method (pointer :unparse) (type)
   (let ((to (alien-pointer-type-to type)))
     `(* ,(if to
 	     (%unparse-alien-type to)
 	     t))))
 
-(def-alien-type-method (pointer :type=) (type1 type2)
+(define-alien-type-method (pointer :type=) (type1 type2)
   (let ((to1 (alien-pointer-type-to type1))
 	(to2 (alien-pointer-type-to type2)))
     (if to1
@@ -794,7 +798,7 @@
 	    nil)
 	(null to2))))
 
-(def-alien-type-method (pointer :subtypep) (type1 type2)
+(define-alien-type-method (pointer :subtypep) (type1 type2)
   (and (alien-pointer-type-p type2)
        (let ((to1 (alien-pointer-type-to type1))
 	     (to2 (alien-pointer-type-to type2)))
@@ -804,7 +808,7 @@
 		 t)
 	     (null to2)))))
 
-(def-alien-type-method (pointer :deport-gen) (type value)
+(define-alien-type-method (pointer :deport-gen) (type value)
   (/noshow "doing alien type method POINTER :DEPORT-GEN" type value)
   (values
    ;; FIXME: old version, highlighted a bug in xc optimization
@@ -828,13 +832,13 @@
 
 ;;;; the MEM-BLOCK type
 
-(def-alien-type-class (mem-block :include alien-value))
+(define-alien-type-class (mem-block :include alien-value))
 
-(def-alien-type-method (mem-block :extract-gen) (type sap offset)
+(define-alien-type-method (mem-block :extract-gen) (type sap offset)
   (declare (ignore type))
   `(sap+ ,sap (/ ,offset sb!vm:n-byte-bits)))
 
-(def-alien-type-method (mem-block :deposit-gen) (type sap offset value)
+(define-alien-type-method (mem-block :deposit-gen) (type sap offset value)
   (let ((bits (alien-mem-block-type-bits type)))
     (unless bits
       (error "can't deposit aliens of type ~S (unknown size)" type))
@@ -842,11 +846,11 @@
 
 ;;;; the ARRAY type
 
-(def-alien-type-class (array :include mem-block)
+(define-alien-type-class (array :include mem-block)
   (element-type (missing-arg) :type alien-type)
   (dimensions (missing-arg) :type list))
 
-(def-alien-type-translator array (ele-type &rest dims &environment env)
+(define-alien-type-translator array (ele-type &rest dims &environment env)
 
   (when dims
     (unless (typep (first dims) '(or index null))
@@ -868,17 +872,17 @@
 				(alien-type-alignment parsed-ele-type))
 		  (reduce #'* dims))))))
 
-(def-alien-type-method (array :unparse) (type)
+(define-alien-type-method (array :unparse) (type)
   `(array ,(%unparse-alien-type (alien-array-type-element-type type))
 	  ,@(alien-array-type-dimensions type)))
 
-(def-alien-type-method (array :type=) (type1 type2)
+(define-alien-type-method (array :type=) (type1 type2)
   (and (equal (alien-array-type-dimensions type1)
 	      (alien-array-type-dimensions type2))
        (alien-type-= (alien-array-type-element-type type1)
 		     (alien-array-type-element-type type2))))
 
-(def-alien-type-method (array :subtypep) (type1 type2)
+(define-alien-type-method (array :subtypep) (type1 type2)
   (and (alien-array-type-p type2)
        (let ((dim1 (alien-array-type-dimensions type1))
 	     (dim2 (alien-array-type-dimensions type2)))
@@ -906,15 +910,15 @@
 	    (alien-record-field-name field)
 	    (alien-record-field-bits field))))
 
-(def-alien-type-class (record :include mem-block)
+(define-alien-type-class (record :include mem-block)
   (kind :struct :type (member :struct :union))
   (name nil :type (or symbol null))
   (fields nil :type list))
 
-(def-alien-type-translator struct (name &rest fields &environment env)
+(define-alien-type-translator struct (name &rest fields &environment env)
   (parse-alien-record-type :struct name fields env))
 
-(def-alien-type-translator union (name &rest fields &environment env)
+(define-alien-type-translator union (name &rest fields &environment env)
   (parse-alien-record-type :union name fields env))
 
 (defun parse-alien-record-type (kind name fields env)
@@ -987,7 +991,7 @@
     (setf (alien-record-type-bits result)
 	  (align-offset total-bits overall-alignment))))
 
-(def-alien-type-method (record :unparse) (type)
+(define-alien-type-method (record :unparse) (type)
   `(,(case (alien-record-type-kind type)
        (:struct 'struct)
        (:union 'union)
@@ -1054,7 +1058,7 @@
 		       (type-= field1 field2 (1+ depth))))
 	  (return nil))))))
 
-(def-alien-type-method (record :type=) (type1 type2)
+(define-alien-type-method (record :type=) (type1 type2)
   (and (eq (alien-record-type-name type1)
 	   (alien-record-type-name type2))
        (eq (alien-record-type-kind type1)
@@ -1068,12 +1072,12 @@
 
 (defvar *values-type-okay* nil)
 
-(def-alien-type-class (fun :include mem-block)
+(define-alien-type-class (fun :include mem-block)
   (result-type (missing-arg) :type alien-type)
   (arg-types (missing-arg) :type list)
   (stub nil :type (or null function)))
 
-(def-alien-type-translator function (result-type &rest arg-types
+(define-alien-type-translator function (result-type &rest arg-types
 						 &environment env)
   (make-alien-fun-type
    :result-type (let ((*values-type-okay* t))
@@ -1081,12 +1085,12 @@
    :arg-types (mapcar (lambda (arg-type) (parse-alien-type arg-type env))
 		      arg-types)))
 
-(def-alien-type-method (fun :unparse) (type)
+(define-alien-type-method (fun :unparse) (type)
   `(function ,(%unparse-alien-type (alien-fun-type-result-type type))
 	     ,@(mapcar #'%unparse-alien-type
 		       (alien-fun-type-arg-types type))))
 
-(def-alien-type-method (fun :type=) (type1 type2)
+(define-alien-type-method (fun :type=) (type1 type2)
   (and (alien-type-= (alien-fun-type-result-type type1)
 		     (alien-fun-type-result-type type2))
        (= (length (alien-fun-type-arg-types type1))
@@ -1095,10 +1099,10 @@
 	      (alien-fun-type-arg-types type1)
 	      (alien-fun-type-arg-types type2))))
 
-(def-alien-type-class (values)
+(define-alien-type-class (values)
   (values (missing-arg) :type list))
 
-(def-alien-type-translator values (&rest values &environment env)
+(define-alien-type-translator values (&rest values &environment env)
   (unless *values-type-okay*
     (error "cannot use values types here"))
   (let ((*values-type-okay* nil))
@@ -1106,11 +1110,11 @@
      :values (mapcar (lambda (alien-type) (parse-alien-type alien-type env))
 		     values))))
 
-(def-alien-type-method (values :unparse) (type)
+(define-alien-type-method (values :unparse) (type)
   `(values ,@(mapcar #'%unparse-alien-type
 		     (alien-values-type-values type))))
 
-(def-alien-type-method (values :type=) (type1 type2)
+(define-alien-type-method (values :type=) (type1 type2)
   (and (= (length (alien-values-type-values type1))
 	  (length (alien-values-type-values type2)))
        (every #'alien-type-=

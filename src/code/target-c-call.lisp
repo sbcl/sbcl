@@ -14,20 +14,20 @@
 
 ;;;; extra types
 
-(def-alien-type char (integer 8))
-(def-alien-type short (integer 16))
-(def-alien-type int (integer 32))
-(def-alien-type long (integer #!-alpha 32 #!+alpha 64))
+(define-alien-type char (integer 8))
+(define-alien-type short (integer 16))
+(define-alien-type int (integer 32))
+(define-alien-type long (integer #!-alpha 32 #!+alpha 64))
 
-(def-alien-type unsigned-char (unsigned 8))
-(def-alien-type unsigned-short (unsigned 16))
-(def-alien-type unsigned-int (unsigned 32))
-(def-alien-type unsigned-long (unsigned #!-alpha 32 #!+alpha 64))
+(define-alien-type unsigned-char (unsigned 8))
+(define-alien-type unsigned-short (unsigned 16))
+(define-alien-type unsigned-int (unsigned 32))
+(define-alien-type unsigned-long (unsigned #!-alpha 32 #!+alpha 64))
 
-(def-alien-type float single-float)
-(def-alien-type double double-float)
+(define-alien-type float single-float)
+(define-alien-type double double-float)
 
-(def-alien-type-translator void ()
+(define-alien-type-translator void ()
   (parse-alien-type '(values) (sb!kernel:make-null-lexenv)))
 
 (defun %naturalize-c-string (sap)

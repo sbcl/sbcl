@@ -162,7 +162,7 @@
  ("src/code/target-c-call"    :not-host)
  ("src/code/target-allocate"  :not-host)
 
- ;; This needs DEF-ALIEN-ROUTINE from target-alieneval.
+ ;; This needs DEFINE-ALIEN-ROUTINE from target-alieneval.
  ("src/code/misc-aliens" :not-host)
 
  ("src/code/array"         :not-host)
@@ -317,7 +317,7 @@
  ;; for DEFSTRUCT ALIEN-TYPE, needed by host-type.lisp
  ("src/code/host-alieneval")
 
- ;; can't be done until definition of e.g. DEF-ALIEN-TYPE-CLASS in
+ ;; can't be done until definition of e.g. DEFINE-ALIEN-TYPE-CLASS in
  ;; host-alieneval.lisp
  ("src/code/host-c-call")
 

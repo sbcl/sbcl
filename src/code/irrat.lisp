@@ -25,7 +25,7 @@
   (let ((function (symbolicate "%" (string-upcase name))))
     `(progn
        (proclaim '(inline ,function))
-       (sb!alien:def-alien-routine (,name ,function) double-float
+       (sb!alien:define-alien-routine (,name ,function) double-float
          ,@(let ((results nil))
              (dotimes (i num-args (nreverse results))
                (push (list (intern (format nil "ARG-~D" i))

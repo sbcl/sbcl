@@ -323,7 +323,7 @@ _   \code{3}.  If null, the global values of \code{*print-level*} and
 _   \code{*print-length*} are used.
 _ \end{defvar}
 _ 
-_ \begin{defmac}{extensions:}{def-source-context}{%
+_ \begin{defmac}{extensions:}{define-source-context}{%
 _     \args{\var{name} \var{lambda-list} \mstar{form}}}
 _ 
 _   This macro defines how to extract an abbreviated source context from

@@ -21,29 +21,29 @@
 ;;; We need to define these predicates, since the TYPEP source
 ;;; transform picks whichever predicate was defined last when there
 ;;; are multiple predicates for equivalent types.
-(def-source-transform short-float-p (x) `(single-float-p ,x))
+(define-source-transform short-float-p (x) `(single-float-p ,x))
 #!-long-float
-(def-source-transform long-float-p (x) `(double-float-p ,x))
+(define-source-transform long-float-p (x) `(double-float-p ,x))
 
-(def-source-transform compiled-function-p (x)
+(define-source-transform compiled-function-p (x)
   `(functionp ,x))
 
-(def-source-transform char-int (x)
+(define-source-transform char-int (x)
   `(char-code ,x))
 
 (deftransform abs ((x) (rational))
   '(if (< x 0) (- x) x))
 
 ;;; The layout is stored in slot 0.
-(def-source-transform %instance-layout (x)
+(define-source-transform %instance-layout (x)
   `(truly-the layout (%instance-ref ,x 0)))
-(def-source-transform %set-instance-layout (x val)
+(define-source-transform %set-instance-layout (x val)
   `(%instance-set ,x 0 (the layout ,val)))
 
 ;;;; character support
 
 ;;; In our implementation there are really only BASE-CHARs.
-(def-source-transform characterp (obj)
+(define-source-transform characterp (obj)
   `(base-char-p ,obj))
 
 ;;;; simplifying HAIRY-DATA-VECTOR-REF and HAIRY-DATA-VECTOR-SET

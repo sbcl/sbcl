@@ -23,7 +23,7 @@ ${SBCL:-sbcl} <<EOF
   (unless (fboundp 'load-foreign) ; not necessarily supported on all OSes..
     (sb-ext:quit :unix-status 52)) ; successfully unsupported:-|
   (load-foreign '("$testfilestem.so"))
-  (def-alien-routine summish int (x int) (y int))
+  (define-alien-routine summish int (x int) (y int))
   (assert (= (summish 10 20) 31))
   (sb-ext:quit :unix-status 52) ; success convention for Lisp program
 EOF

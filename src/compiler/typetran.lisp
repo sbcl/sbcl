@@ -145,7 +145,7 @@
 ;;;;
 ;;;; See also VM dependent transforms.
 
-(def-source-transform atom (x)
+(define-source-transform atom (x)
   `(not (consp ,x)))
 
 ;;;; TYPEP source transform
@@ -485,7 +485,7 @@
 ;;; to that predicate. Otherwise, we dispatch off of the type's type.
 ;;; These transformations can increase space, but it is hard to tell
 ;;; when, so we ignore policy and always do them. 
-(def-source-transform typep (object spec)
+(define-source-transform typep (object spec)
   ;; KLUDGE: It looks bad to only do this on explicitly quoted forms,
   ;; since that would overlook other kinds of constants. But it turns
   ;; out that the DEFTRANSFORM for TYPEP detects any constant

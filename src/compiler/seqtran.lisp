@@ -48,22 +48,22 @@
 	      (do-anonymous ,(do-clauses)
 			    (,endtest ,n-first) ,call))))))))
 
-(def-source-transform mapc (function list &rest more-lists)
+(define-source-transform mapc (function list &rest more-lists)
   (mapfoo-transform function (cons list more-lists) nil t))
 
-(def-source-transform mapcar (function list &rest more-lists)
+(define-source-transform mapcar (function list &rest more-lists)
   (mapfoo-transform function (cons list more-lists) :list t))
 
-(def-source-transform mapcan (function list &rest more-lists)
+(define-source-transform mapcan (function list &rest more-lists)
   (mapfoo-transform function (cons list more-lists) :nconc t))
 
-(def-source-transform mapl (function list &rest more-lists)
+(define-source-transform mapl (function list &rest more-lists)
   (mapfoo-transform function (cons list more-lists) nil nil))
 
-(def-source-transform maplist (function list &rest more-lists)
+(define-source-transform maplist (function list &rest more-lists)
   (mapfoo-transform function (cons list more-lists) :list nil))
 
-(def-source-transform mapcon (function list &rest more-lists)
+(define-source-transform mapcon (function list &rest more-lists)
   (mapfoo-transform function (cons list more-lists) :nconc nil))
 
 ;;;; mapping onto sequences: the MAP function

@@ -141,7 +141,7 @@
 
 ;;; Convert VECTOR into a MAKE-ARRAY followed by SETFs of all the
 ;;; elements.
-(def-source-transform vector (&rest elements)
+(define-source-transform vector (&rest elements)
   (let ((len (length elements))
 	(n -1))
     (once-only ((n-vec `(make-array ,len)))
@@ -155,10 +155,10 @@
 	 ,n-vec))))
 
 ;;; Just convert it into a MAKE-ARRAY.
-(def-source-transform make-string (length &key
-					  (element-type ''base-char)
-					  (initial-element
-					   '#.*default-init-char-form*))
+(define-source-transform make-string (length &key
+					     (element-type ''base-char)
+					     (initial-element
+					      '#.*default-init-char-form*))
   `(make-array (the index ,length)
 	       :element-type ,element-type
 	       :initial-element ,initial-element))
@@ -595,9 +595,9 @@
 ;;; assertions on the array.
 (macrolet ((define-frob (reffer setter type)
 	     `(progn
-		(def-source-transform ,reffer (a &rest i)
+		(define-source-transform ,reffer (a &rest i)
 		  `(aref (the ,',type ,a) ,@i))
-		(def-source-transform ,setter (a &rest i)
+		(define-source-transform ,setter (a &rest i)
 		  `(%aset (the ,',type ,a) ,@i)))))
   (define-frob svref %svset simple-vector)
   (define-frob schar %scharset simple-string)

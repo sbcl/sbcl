@@ -13,7 +13,7 @@ difference is that the package names have changed from
 	     there's a builtin operator to do it, you don't need to
 	     do the nasty idiom the manual says you need to do. -->
 	<!-- FIXME: Also, the CMU CL alien documentation claims you
-	     can just do (DEF-ALIEN-VARIABLE "errno" INT), which fails
+	     can just do (DEFINE-ALIEN-VARIABLE "errno" INT), which fails
 	     with modern multithreading hacks. -->
 	<!-- FIXME: Also, LOAD-FOREIGN isn't implemented as of sbcl-0.6.7,
 	     but LOAD-1-FOREIGN is. -->

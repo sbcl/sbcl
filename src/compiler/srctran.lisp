@@ -15,22 +15,22 @@
 
 ;;; Convert into an IF so that IF optimizations will eliminate redundant
 ;;; negations.
-(def-source-transform not (x) `(if ,x nil t))
-(def-source-transform null (x) `(if ,x nil t))
+(define-source-transform not (x) `(if ,x nil t))
+(define-source-transform null (x) `(if ,x nil t))
 
 ;;; ENDP is just NULL with a LIST assertion. The assertion will be
 ;;; optimized away when SAFETY optimization is low; hopefully that
 ;;; is consistent with ANSI's "should return an error".
-(def-source-transform endp (x) `(null (the list ,x)))
+(define-source-transform endp (x) `(null (the list ,x)))
 
 ;;; We turn IDENTITY into PROG1 so that it is obvious that it just
 ;;; returns the first value of its argument. Ditto for VALUES with one
 ;;; arg.
-(def-source-transform identity (x) `(prog1 ,x))
-(def-source-transform values (x) `(prog1 ,x))
+(define-source-transform identity (x) `(prog1 ,x))
+(define-source-transform values (x) `(prog1 ,x))
 
 ;;; Bind the values and make a closure that returns them.
-(def-source-transform constantly (value)
+(define-source-transform constantly (value)
   (let ((rest (gensym "CONSTANTLY-REST-")))
     `(lambda (&rest ,rest)
        (declare (ignore ,rest))
@@ -97,31 +97,31 @@
 ;;; whatever is right for them is right for us. FIFTH..TENTH turn into
 ;;; Nth, which can be expanded into a CAR/CDR later on if policy
 ;;; favors it.
-(def-source-transform first (x) `(car ,x))
-(def-source-transform rest (x) `(cdr ,x))
-(def-source-transform second (x) `(cadr ,x))
-(def-source-transform third (x) `(caddr ,x))
-(def-source-transform fourth (x) `(cadddr ,x))
-(def-source-transform fifth (x) `(nth 4 ,x))
-(def-source-transform sixth (x) `(nth 5 ,x))
-(def-source-transform seventh (x) `(nth 6 ,x))
-(def-source-transform eighth (x) `(nth 7 ,x))
-(def-source-transform ninth (x) `(nth 8 ,x))
-(def-source-transform tenth (x) `(nth 9 ,x))
+(define-source-transform first (x) `(car ,x))
+(define-source-transform rest (x) `(cdr ,x))
+(define-source-transform second (x) `(cadr ,x))
+(define-source-transform third (x) `(caddr ,x))
+(define-source-transform fourth (x) `(cadddr ,x))
+(define-source-transform fifth (x) `(nth 4 ,x))
+(define-source-transform sixth (x) `(nth 5 ,x))
+(define-source-transform seventh (x) `(nth 6 ,x))
+(define-source-transform eighth (x) `(nth 7 ,x))
+(define-source-transform ninth (x) `(nth 8 ,x))
+(define-source-transform tenth (x) `(nth 9 ,x))
 
 ;;; Translate RPLACx to LET and SETF.
-(def-source-transform rplaca (x y)
+(define-source-transform rplaca (x y)
   (once-only ((n-x x))
     `(progn
        (setf (car ,n-x) ,y)
        ,n-x)))
-(def-source-transform rplacd (x y)
+(define-source-transform rplacd (x y)
   (once-only ((n-x x))
     `(progn
        (setf (cdr ,n-x) ,y)
        ,n-x)))
 
-(def-source-transform nth (n l) `(car (nthcdr ,n ,l)))
+(define-source-transform nth (n l) `(car (nthcdr ,n ,l)))
 
 (defvar *default-nthcdr-open-code-limit* 6)
 (defvar *extreme-nthcdr-open-code-limit* 20)
@@ -145,21 +145,21 @@
 
 ;;;; arithmetic and numerology
 
-(def-source-transform plusp (x) `(> ,x 0))
-(def-source-transform minusp (x) `(< ,x 0))
-(def-source-transform zerop (x) `(= ,x 0))
+(define-source-transform plusp (x) `(> ,x 0))
+(define-source-transform minusp (x) `(< ,x 0))
+(define-source-transform zerop (x) `(= ,x 0))
 
-(def-source-transform 1+ (x) `(+ ,x 1))
-(def-source-transform 1- (x) `(- ,x 1))
+(define-source-transform 1+ (x) `(+ ,x 1))
+(define-source-transform 1- (x) `(- ,x 1))
 
-(def-source-transform oddp (x) `(not (zerop (logand ,x 1))))
-(def-source-transform evenp (x) `(zerop (logand ,x 1)))
+(define-source-transform oddp (x) `(not (zerop (logand ,x 1))))
+(define-source-transform evenp (x) `(zerop (logand ,x 1)))
 
 ;;; Note that all the integer division functions are available for
 ;;; inline expansion.
 
 (macrolet ((deffrob (fun)
-	     `(def-source-transform ,fun (x &optional (y nil y-p))
+	     `(define-source-transform ,fun (x &optional (y nil y-p))
 		(declare (ignore y))
 		(if y-p
 		    (values nil t)
@@ -171,29 +171,29 @@
   #-sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
   (deffrob ceiling))
 
-(def-source-transform lognand (x y) `(lognot (logand ,x ,y)))
-(def-source-transform lognor (x y) `(lognot (logior ,x ,y)))
-(def-source-transform logandc1 (x y) `(logand (lognot ,x) ,y))
-(def-source-transform logandc2 (x y) `(logand ,x (lognot ,y)))
-(def-source-transform logorc1 (x y) `(logior (lognot ,x) ,y))
-(def-source-transform logorc2 (x y) `(logior ,x (lognot ,y)))
-(def-source-transform logtest (x y) `(not (zerop (logand ,x ,y))))
-(def-source-transform logbitp (index integer)
+(define-source-transform lognand (x y) `(lognot (logand ,x ,y)))
+(define-source-transform lognor (x y) `(lognot (logior ,x ,y)))
+(define-source-transform logandc1 (x y) `(logand (lognot ,x) ,y))
+(define-source-transform logandc2 (x y) `(logand ,x (lognot ,y)))
+(define-source-transform logorc1 (x y) `(logior (lognot ,x) ,y))
+(define-source-transform logorc2 (x y) `(logior ,x (lognot ,y)))
+(define-source-transform logtest (x y) `(not (zerop (logand ,x ,y))))
+(define-source-transform logbitp (index integer)
   `(not (zerop (logand (ash 1 ,index) ,integer))))
-(def-source-transform byte (size position) `(cons ,size ,position))
-(def-source-transform byte-size (spec) `(car ,spec))
-(def-source-transform byte-position (spec) `(cdr ,spec))
-(def-source-transform ldb-test (bytespec integer)
+(define-source-transform byte (size position) `(cons ,size ,position))
+(define-source-transform byte-size (spec) `(car ,spec))
+(define-source-transform byte-position (spec) `(cdr ,spec))
+(define-source-transform ldb-test (bytespec integer)
   `(not (zerop (mask-field ,bytespec ,integer))))
 
 ;;; With the ratio and complex accessors, we pick off the "identity"
 ;;; case, and use a primitive to handle the cell access case.
-(def-source-transform numerator (num)
+(define-source-transform numerator (num)
   (once-only ((n-num `(the rational ,num)))
     `(if (ratiop ,n-num)
 	 (%numerator ,n-num)
 	 ,n-num)))
-(def-source-transform denominator (num)
+(define-source-transform denominator (num)
   (once-only ((n-num `(the rational ,num)))
     `(if (ratiop ,n-num)
 	 (%denominator ,n-num)
@@ -2334,19 +2334,19 @@
 			  `(let ((,,temp ,,spec))
 			     ,,@body))))))
 
-  (def-source-transform ldb (spec int)
+  (define-source-transform ldb (spec int)
     (with-byte-specifier (size pos spec)
       `(%ldb ,size ,pos ,int)))
 
-  (def-source-transform dpb (newbyte spec int)
+  (define-source-transform dpb (newbyte spec int)
     (with-byte-specifier (size pos spec)
       `(%dpb ,newbyte ,size ,pos ,int)))
 
-  (def-source-transform mask-field (spec int)
+  (define-source-transform mask-field (spec int)
     (with-byte-specifier (size pos spec)
       `(%mask-field ,size ,pos ,int)))
 
-  (def-source-transform deposit-field (newbyte spec int)
+  (define-source-transform deposit-field (newbyte spec int)
     (with-byte-specifier (size pos spec)
       `(%deposit-field ,newbyte ,size ,pos ,int))))
 
@@ -3031,27 +3031,27 @@
 	       ((zerop i)
 		`((lambda ,vars ,result) . ,args)))))))
 
-(def-source-transform = (&rest args) (multi-compare '= args nil))
-(def-source-transform < (&rest args) (multi-compare '< args nil))
-(def-source-transform > (&rest args) (multi-compare '> args nil))
-(def-source-transform <= (&rest args) (multi-compare '> args t))
-(def-source-transform >= (&rest args) (multi-compare '< args t))
+(define-source-transform = (&rest args) (multi-compare '= args nil))
+(define-source-transform < (&rest args) (multi-compare '< args nil))
+(define-source-transform > (&rest args) (multi-compare '> args nil))
+(define-source-transform <= (&rest args) (multi-compare '> args t))
+(define-source-transform >= (&rest args) (multi-compare '< args t))
 
-(def-source-transform char= (&rest args) (multi-compare 'char= args nil))
-(def-source-transform char< (&rest args) (multi-compare 'char< args nil))
-(def-source-transform char> (&rest args) (multi-compare 'char> args nil))
-(def-source-transform char<= (&rest args) (multi-compare 'char> args t))
-(def-source-transform char>= (&rest args) (multi-compare 'char< args t))
+(define-source-transform char= (&rest args) (multi-compare 'char= args nil))
+(define-source-transform char< (&rest args) (multi-compare 'char< args nil))
+(define-source-transform char> (&rest args) (multi-compare 'char> args nil))
+(define-source-transform char<= (&rest args) (multi-compare 'char> args t))
+(define-source-transform char>= (&rest args) (multi-compare 'char< args t))
 
-(def-source-transform char-equal (&rest args)
+(define-source-transform char-equal (&rest args)
   (multi-compare 'char-equal args nil))
-(def-source-transform char-lessp (&rest args)
+(define-source-transform char-lessp (&rest args)
   (multi-compare 'char-lessp args nil))
-(def-source-transform char-greaterp (&rest args)
+(define-source-transform char-greaterp (&rest args)
   (multi-compare 'char-greaterp args nil))
-(def-source-transform char-not-greaterp (&rest args)
+(define-source-transform char-not-greaterp (&rest args)
   (multi-compare 'char-greaterp args t))
-(def-source-transform char-not-lessp (&rest args)
+(define-source-transform char-not-lessp (&rest args)
   (multi-compare 'char-lessp args t))
 
 ;;; This function does source transformation of N-arg inequality
@@ -3080,20 +3080,20 @@
 		 (dolist (v2 next)
 		   (setq result `(if (,predicate ,v1 ,v2) nil ,result))))))))))
 
-(def-source-transform /= (&rest args) (multi-not-equal '= args))
-(def-source-transform char/= (&rest args) (multi-not-equal 'char= args))
-(def-source-transform char-not-equal (&rest args)
+(define-source-transform /= (&rest args) (multi-not-equal '= args))
+(define-source-transform char/= (&rest args) (multi-not-equal 'char= args))
+(define-source-transform char-not-equal (&rest args)
   (multi-not-equal 'char-equal args))
 
 ;;; Expand MAX and MIN into the obvious comparisons.
-(def-source-transform max (arg &rest more-args)
+(define-source-transform max (arg &rest more-args)
   (if (null more-args)
       `(values ,arg)
       (once-only ((arg1 arg)
 		  (arg2 `(max ,@more-args)))
 	`(if (> ,arg1 ,arg2)
 	     ,arg1 ,arg2))))
-(def-source-transform min (arg &rest more-args)
+(define-source-transform min (arg &rest more-args)
   (if (null more-args)
       `(values ,arg)
       (once-only ((arg1 arg)
@@ -3130,16 +3130,18 @@
     (t
      (associate-arguments fun (first args) (rest args)))))
 
-(def-source-transform + (&rest args) (source-transform-transitive '+ args 0))
-(def-source-transform * (&rest args) (source-transform-transitive '* args 1))
-(def-source-transform logior (&rest args)
+(define-source-transform + (&rest args)
+  (source-transform-transitive '+ args 0))
+(define-source-transform * (&rest args)
+  (source-transform-transitive '* args 1))
+(define-source-transform logior (&rest args)
   (source-transform-transitive 'logior args 0))
-(def-source-transform logxor (&rest args)
+(define-source-transform logxor (&rest args)
   (source-transform-transitive 'logxor args 0))
-(def-source-transform logand (&rest args)
+(define-source-transform logand (&rest args)
   (source-transform-transitive 'logand args -1))
 
-(def-source-transform logeqv (&rest args)
+(define-source-transform logeqv (&rest args)
   (if (evenp (length args))
       `(lognot (logxor ,@args))
       `(logxor ,@args)))
@@ -3148,14 +3150,14 @@
 ;;; because when they are given one argument, they return its absolute
 ;;; value.
 
-(def-source-transform gcd (&rest args)
+(define-source-transform gcd (&rest args)
   (case (length args)
     (0 0)
     (1 `(abs (the integer ,(first args))))
     (2 (values nil t))
     (t (associate-arguments 'gcd (first args) (rest args)))))
 
-(def-source-transform lcm (&rest args)
+(define-source-transform lcm (&rest args)
   (case (length args)
     (0 1)
     (1 `(abs (the integer ,(first args))))
@@ -3172,9 +3174,9 @@
     (1 `(,@inverse ,(first args)))
     (t (associate-arguments function (first args) (rest args)))))
 
-(def-source-transform - (&rest args)
+(define-source-transform - (&rest args)
   (source-transform-intransitive '- args '(%negate)))
-(def-source-transform / (&rest args)
+(define-source-transform / (&rest args)
   (source-transform-intransitive '/ args '(/ 1)))
 
 ;;;; transforming APPLY
@@ -3182,7 +3184,7 @@
 ;;; We convert APPLY into MULTIPLE-VALUE-CALL so that the compiler
 ;;; only needs to understand one kind of variable-argument call. It is
 ;;; more efficient to convert APPLY to MV-CALL than MV-CALL to APPLY.
-(def-source-transform apply (fun arg &rest more-args)
+(define-source-transform apply (fun arg &rest more-args)
   (let ((args (cons arg more-args)))
     `(multiple-value-call ,fun
        ,@(mapcar #'(lambda (x)

@@ -90,7 +90,7 @@
 
 ;;;; hacking the Unix environment
 
-(def-alien-routine ("getenv" posix-getenv) c-string
+(define-alien-routine ("getenv" posix-getenv) c-string
   "Return the \"value\" part of the environment string \"name=value\" which
    corresponds to NAME, or NIL if there is none."
   (name c-string))
@@ -112,12 +112,12 @@
 ;;; is not extreme enough, since it doesn't need to be blindingly
 ;;; fast: we can just implement those functions in C as a wrapper
 ;;; layer.
-(def-alien-type fd-mask unsigned-long)
+(define-alien-type fd-mask unsigned-long)
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defconstant fd-setsize 1024))
 
-(def-alien-type nil
+(define-alien-type nil
   (struct fd-set
 	  (fds-bits (array fd-mask #.(/ fd-setsize 32)))))
 
@@ -152,7 +152,7 @@
 
 ;; A time value that is accurate to the nearest
 ;; microsecond but also has a range of years.
-(def-alien-type nil
+(define-alien-type nil
   (struct timeval
 	  (tv-sec time-t)		; seconds
 	  (tv-usec time-t)))		; and microseconds
@@ -163,7 +163,7 @@
 (defconstant rusage_children -1) ; terminated child processes
 (defconstant rusage_both -2)
 
-(def-alien-type nil
+(define-alien-type nil
   (struct rusage
     (ru-utime (struct timeval))	    ; user time used
     (ru-stime (struct timeval))	    ; system time used.
@@ -318,10 +318,10 @@
   (void-syscall ("exit" int) code))
 
 ;;; Return the process id of the current process.
-(def-alien-routine ("getpid" unix-getpid) int)
+(define-alien-routine ("getpid" unix-getpid) int)
 
 ;;; Return the real user-id associated with the current process.
-(def-alien-routine ("getuid" unix-getuid) int)
+(define-alien-routine ("getuid" unix-getuid) int)
 
 ;;; Invoke readlink(2) on the file name specified by PATH. Return
 ;;; (VALUES LINKSTRING NIL) on success, or (VALUES NIL ERRNO) on
@@ -512,7 +512,7 @@
 ;;; st_size is a long, not an off-t, because off-t is a 64-bit
 ;;; quantity on Alpha. And FIXME: "No one would want a file length
 ;;; longer than 32 bits anyway, right?":-|
-(def-alien-type nil
+(define-alien-type nil
   (struct wrapped_stat
     (st-dev unsigned-long)              ; would be dev-t in a real stat
     (st-ino ino-t)
@@ -587,13 +587,13 @@
 
 ;; the POSIX.4 structure for a time value. This is like a "struct
 ;; timeval" but has nanoseconds instead of microseconds.
-(def-alien-type nil
+(define-alien-type nil
     (struct timespec
 	    (tv-sec long)   ; seconds
 	    (tv-nsec long))) ; nanoseconds
 
 ;; used by other time functions
-(def-alien-type nil
+(define-alien-type nil
     (struct tm
 	    (tm-sec int)   ; Seconds.	[0-60] (1 leap second)
 	    (tm-min int)   ; Minutes.	[0-59]
@@ -607,7 +607,7 @@
 	    (tm-gmtoff long) ;  Seconds east of UTC.
 	    (tm-zone c-string))) ; Timezone abbreviation.
 
-(def-alien-routine get-timezone sb!c-call:void
+(define-alien-routine get-timezone sb!c-call:void
   (when sb!c-call:long :in)
   (minutes-west sb!c-call:int :out)
   (daylight-savings-p sb!alien:boolean :out))
@@ -627,7 +627,7 @@
 
 ;;; Structure crudely representing a timezone. KLUDGE: This is
 ;;; obsolete and should never be used.
-(def-alien-type nil
+(define-alien-type nil
   (struct timezone
     (tz-minuteswest int)		; minutes west of Greenwich
     (tz-dsttime	int)))			; type of dst correction

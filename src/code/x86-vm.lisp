@@ -32,7 +32,7 @@
 ;;; FIXME: Since SBCL, unlike CMU CL, uses this as an opaque type,
 ;;; it's no longer architecture-dependent, and probably belongs in
 ;;; some other package, perhaps SB-KERNEL.
-(def-alien-type os-context-t (struct os-context-t-struct))
+(define-alien-type os-context-t (struct os-context-t-struct))
 
 ;;;; MACHINE-TYPE and MACHINE-VERSION
 
@@ -183,7 +183,7 @@
 ;;;;      and internal error handling) the extra runtime cost should be
 ;;;;      negligible.
 
-(def-alien-routine ("os_context_pc_addr" context-pc-addr) (* unsigned-int)
+(define-alien-routine ("os_context_pc_addr" context-pc-addr) (* unsigned-int)
   ;; (Note: Just as in CONTEXT-REGISTER-ADDR, we intentionally use an
   ;; 'unsigned *' interpretation for the 32-bit word passed to us by
   ;; the C code, even though the C code may think it's an 'int *'.)
@@ -195,7 +195,7 @@
     (declare (type (alien (* unsigned-int)) addr))
     (int-sap (deref addr))))
 
-(def-alien-routine ("os_context_register_addr" context-register-addr)
+(define-alien-routine ("os_context_register_addr" context-register-addr)
   (* unsigned-int)
   ;; (Note the mismatch here between the 'int *' value that the C code
   ;; may think it's giving us and the 'unsigned *' value that we

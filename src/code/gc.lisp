@@ -239,13 +239,13 @@ function should notify the user that the system has finished GC'ing.")
 
 ;;;; internal GC
 
-(sb!alien:def-alien-routine collect-garbage sb!c-call:int
+(sb!alien:define-alien-routine collect-garbage sb!c-call:int
   #!+gencgc (last-gen sb!c-call:int))
 
-(sb!alien:def-alien-routine set-auto-gc-trigger sb!c-call:void
+(sb!alien:define-alien-routine set-auto-gc-trigger sb!c-call:void
   (dynamic-usage sb!c-call:unsigned-long))
 
-(sb!alien:def-alien-routine clear-auto-gc-trigger sb!c-call:void)
+(sb!alien:define-alien-routine clear-auto-gc-trigger sb!c-call:void)
 
 ;;; This variable contains the function that does the real GC. This is
 ;;; for low-level GC experimentation. Do not touch it if you do not

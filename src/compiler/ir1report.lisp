@@ -97,9 +97,9 @@
 ;;; it's a reasonable thing to put in SB-EXT in case some dedicated
 ;;; user wants to do some heavy tweaking to make SBCL give more
 ;;; informative output about his code.
-(defmacro def-source-context (name lambda-list &body body)
+(defmacro define-source-context (name lambda-list &body body)
   #!+sb-doc
-  "DEF-SOURCE-CONTEXT Name Lambda-List Form*
+  "DEFINE-SOURCE-CONTEXT Name Lambda-List Form*
    This macro defines how to extract an abbreviated source context from the
    Named form when it appears in the compiler input. Lambda-List is a DEFMACRO
    style lambda-list used to parse the arguments. The Body should return a
@@ -109,13 +109,17 @@
 	   #'(lambda (,n-whole)
 	       (destructuring-bind ,lambda-list ,n-whole ,@body)))))
 
-(def-source-context defstruct (name-or-options &rest slots)
+(defmacro def-source-context (&rest rest)
+  (deprecation-warning 'def-source-context 'define-source-context)
+  `(define-source-context ,@rest))
+
+(define-source-context defstruct (name-or-options &rest slots)
   (declare (ignore slots))
   `(defstruct ,(if (consp name-or-options)
 		   (car name-or-options)
 		   name-or-options)))
 
-(def-source-context function (thing)
+(define-source-context function (thing)
   (if (and (consp thing) (eq (first thing) 'lambda) (consp (rest thing)))
       `(lambda ,(second thing))
       `(function ,thing)))

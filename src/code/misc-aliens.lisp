@@ -12,12 +12,12 @@
 (in-package "SB!IMPL")
 
 (declaim (inline memmove))
-(def-alien-routine ("memmove" memmove) void
+(define-alien-routine ("memmove" memmove) void
   (dest (* char))
   (src (* char))
   (n unsigned-int))
 
-(def-alien-routine ("os_get_errno" get-errno) integer)
+(define-alien-routine ("os_get_errno" get-errno) integer)
 (setf (fdocumentation 'get-errno 'function)
       "Return the value of the C library pseudo-variable named \"errno\".")
 

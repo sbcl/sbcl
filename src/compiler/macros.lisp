@@ -100,7 +100,7 @@
 ;;; If the desirability of the transformation depends on the current
 ;;; OPTIMIZE parameters, then the POLICY macro should be used to
 ;;; determine when to pass.
-(defmacro def-source-transform (name lambda-list &body body)
+(defmacro define-source-transform (name lambda-list &body body)
   (let ((fn-name
 	 (if (listp name)
 	     (collect ((pieces))

@@ -30,8 +30,14 @@
                "VALUES" "*")
     :export ("ADDR" "ALIEN" "ALIEN-FUNCALL" "ALIEN-SAP" "ALIEN-SIZE" 
 	     "CAST"
-	     "DEF-ALIEN-ROUTINE" "DEF-ALIEN-TYPE"
-	     "DEF-ALIEN-VARIABLE" "DEF-BUILTIN-ALIEN-TYPE"
+	     "DEFINE-ALIEN-ROUTINE" "DEFINE-ALIEN-TYPE" "DEFINE-ALIEN-VARIABLE"
+
+	     ;; FIXME: These old names don't match the DEFFOO - vs. -
+	     ;; DEFINE-FOO convention used in the ANSI spec, and so
+	     ;; were deprecated in sbcl-0.pre7, ca. 2001-12-12. After
+	     ;; a year or so they can go away completely.
+	     "DEF-ALIEN-ROUTINE" "DEF-ALIEN-TYPE" "DEF-ALIEN-VARIABLE"
+
              "DEREF"
 	     "ENUM" "EXTERN-ALIEN"
 	     "FREE-ALIEN" 
@@ -74,8 +80,8 @@
              "ALIEN-VALUES-TYPE-VALUES" "ALIGN-OFFSET" "COMPUTE-ALIEN-REP-TYPE"
              "COMPUTE-DEPORT-LAMBDA" "COMPUTE-DEPOSIT-LAMBDA"
              "COMPUTE-EXTRACT-LAMBDA" "COMPUTE-LISP-REP-TYPE"
-             "COMPUTE-NATURALIZE-LAMBDA" "DEF-ALIEN-TYPE-CLASS"
-             "DEF-ALIEN-TYPE-METHOD" "DEF-ALIEN-TYPE-TRANSLATOR" "DEPORT"
+             "COMPUTE-NATURALIZE-LAMBDA" "DEFINE-ALIEN-TYPE-CLASS"
+             "DEFINE-ALIEN-TYPE-METHOD" "DEFINE-ALIEN-TYPE-TRANSLATOR" "DEPORT"
              "DEPOSIT-ALIEN-VALUE" "DISPOSE-LOCAL-ALIEN" "EXTRACT-ALIEN-VALUE"
              "HEAP-ALIEN-INFO" "HEAP-ALIEN-INFO-P" "HEAP-ALIEN-INFO-SAP-FORM"
              "HEAP-ALIEN-INFO-TYPE" "INVOKE-ALIEN-TYPE-METHOD" "LOCAL-ALIEN"
@@ -201,7 +207,7 @@
               "DEALLOC-NUMBER-STACK-SPACE" "DEF-BOOLEAN-ATTRIBUTE"
               "DEF-IR1-TRANSLATOR"
               "!DEF-PRIMITIVE-TYPE" "!DEF-PRIMITIVE-TYPE-ALIAS"
-              "DEF-SOURCE-TRANSFORM" "!DEF-VM-SUPPORT-ROUTINE"
+              "DEFINE-SOURCE-TRANSFORM" "!DEF-VM-SUPPORT-ROUTINE"
               "DEFINE-ASSEMBLY-ROUTINE" "DEFINE-MOVE-FUNCTION"
               "DEFINE-MOVE-VOP" "DEFINE-STORAGE-BASE"
               "DEFINE-STORAGE-CLASS" "DEFINE-VOP"
@@ -528,7 +534,13 @@ like *STACK-TOP-HINT*"
 
              ;; and for dedicated users who really want to customize
              ;; error reporting, we have
-             "DEF-SOURCE-CONTEXT"
+             "DEFINE-SOURCE-CONTEXT"
+
+	     ;; FIXME: This name doesn't match the DEFFOO - vs. -
+	     ;; DEFINE-FOO convention used in the ANSI spec, and so
+	     ;; was deprecated in sbcl-0.pre7, ca. 2001-12-12. After
+	     ;; a year or so it can go away completely.
+	     "DEF-SOURCE-CONTEXT"
 
              ;; FIXME: These seem like the right thing, but are they
              ;; consistent with ANSI? (And actually maybe they're not
@@ -726,6 +738,7 @@ retained, possibly temporariliy, because it might be used internally."
              "PSXHASH"
              "%BREAK"
 	     "NTH-BUT-WITH-SANE-ARG-ORDER"
+	     "DEPRECATION-WARNING"
 
              ;; ..and macros..
              "COLLECT"

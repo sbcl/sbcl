@@ -108,12 +108,12 @@
 (defvar *dso-linker-options* '("-G" "-o"))
 
 
-(sb-alien:def-alien-routine dlopen system-area-pointer
+(sb-alien:define-alien-routine dlopen system-area-pointer
   (file sb-c-call:c-string) (mode sb-c-call:int))
-(sb-alien:def-alien-routine dlsym system-area-pointer
+(sb-alien:define-alien-routine dlsym system-area-pointer
   (lib system-area-pointer)
   (name sb-c-call:c-string))
-(sb-alien:def-alien-routine dlerror sb-c-call:c-string)
+(sb-alien:define-alien-routine dlerror sb-c-call:c-string)
 
 ;;; Ensure that we've opened our own binary so we can dynamically resolve 
 ;;; symbols in the C runtime.  
@@ -146,7 +146,7 @@
     ld -shared -o /tmp/ffi-test.so /tmp/ffi-test.o
   then in SBCL do this:
     (LOAD-1-FOREIGN \"/tmp/ffi-test.so\")
-    (DEF-ALIEN-ROUTINE SUMMISH INT (X INT) (Y INT))
+    (DEFINE-ALIEN-ROUTINE SUMMISH INT (X INT) (Y INT))
   Now running (SUMMISH 10 20) should return 31.
 "
   (ensure-runtime-symbol-table-opened)

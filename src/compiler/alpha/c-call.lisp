@@ -19,7 +19,7 @@
 (defstruct arg-state
   (stack-frame-size 0))
 
-(def-alien-type-method (integer :arg-tn) (type state)
+(define-alien-type-method (integer :arg-tn) (type state)
   (let ((stack-frame-size (arg-state-stack-frame-size state)))
     (setf (arg-state-stack-frame-size state) (1+ stack-frame-size))
     (multiple-value-bind
@@ -31,7 +31,7 @@
 	  (my-make-wired-tn ptype reg-sc (+ stack-frame-size nl0-offset))
 	  (my-make-wired-tn ptype stack-sc (* 2 (- stack-frame-size 4)))))))
 
-(def-alien-type-method (system-area-pointer :arg-tn) (type state)
+(define-alien-type-method (system-area-pointer :arg-tn) (type state)
   (declare (ignore type))
   (let ((stack-frame-size (arg-state-stack-frame-size state)))
     (setf (arg-state-stack-frame-size state) (1+ stack-frame-size))
@@ -43,7 +43,7 @@
 			  'sap-stack
 			  (* 2 (- stack-frame-size 4))))))
 
-(def-alien-type-method (double-float :arg-tn) (type state)
+(define-alien-type-method (double-float :arg-tn) (type state)
   (declare (ignore type))
   (let ((stack-frame-size (arg-state-stack-frame-size state)))
     (setf (arg-state-stack-frame-size state) (1+ stack-frame-size))
@@ -55,7 +55,7 @@
 			  'double-stack
 			  (* 2 (- stack-frame-size 6))))))
 
-(def-alien-type-method (single-float :arg-tn) (type state)
+(define-alien-type-method (single-float :arg-tn) (type state)
   (declare (ignore type))
   (let ((stack-frame-size (arg-state-stack-frame-size state)))
     (setf (arg-state-stack-frame-size state) (1+ stack-frame-size))
@@ -69,7 +69,7 @@
 
 
 
-(def-alien-type-method (integer :result-tn) (type state)
+(define-alien-type-method (integer :result-tn) (type state)
   (declare (ignore state))
   (multiple-value-bind
       (ptype reg-sc)
@@ -78,19 +78,19 @@
 	  (values 'unsigned-byte-64 'unsigned-reg))
     (my-make-wired-tn ptype reg-sc lip-offset)))
 
-(def-alien-type-method (system-area-pointer :result-tn) (type state)
+(define-alien-type-method (system-area-pointer :result-tn) (type state)
   (declare (ignore type state))
   (my-make-wired-tn 'system-area-pointer 'sap-reg lip-offset))
     
-(def-alien-type-method (double-float :result-tn) (type state)
+(define-alien-type-method (double-float :result-tn) (type state)
   (declare (ignore type state))
   (my-make-wired-tn 'double-float 'double-reg lip-offset))
 
-(def-alien-type-method (single-float :result-tn) (type state)
+(define-alien-type-method (single-float :result-tn) (type state)
   (declare (ignore type state))
   (my-make-wired-tn 'single-float 'single-reg lip-offset))
 
-(def-alien-type-method (values :result-tn) (type state)
+(define-alien-type-method (values :result-tn) (type state)
   (let ((values (alien-values-type-values type)))
     (when (cdr values)
       (error "Too many result values from c-call."))

@@ -17,7 +17,7 @@
 
 ;;;; SAVE-LISP-AND-DIE itself
 
-(sb!alien:def-alien-routine "save" (sb!alien:boolean)
+(sb!alien:define-alien-routine "save" (sb!alien:boolean)
   (file sb!c-call:c-string)
   (initial-function (sb!alien:unsigned #.sb!vm:n-word-bits)))
 

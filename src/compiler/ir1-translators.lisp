@@ -459,7 +459,7 @@
 ;;; compiler. If the called function is a FUNCTION form, then convert
 ;;; directly to %FUNCALL, instead of waiting around for type
 ;;; inference.
-(def-source-transform funcall (function &rest args)
+(define-source-transform funcall (function &rest args)
   (if (and (consp function) (eq (car function) 'function))
       `(%funcall ,function ,@args)
       (values nil t)))

@@ -6,7 +6,7 @@
  * Thus, when their signature changes, they don't need updates in a .h
  * file somewhere, but they do need updates in the Lisp code. FIXME:
  * It would be nice to enforce this at compile time. It mighn't even
- * be all that hard: make the cross-compiler versions of DEF-ALIEN-FOO
+ * be all that hard: make the cross-compiler versions of DEFINE-ALIEN-FOO
  * macros accumulate strings in a list which then gets written out at
  * the end of sbcl2.h at the end of cross-compilation, then rerun
  * 'make' in src/runtime/ using the new sbcl2.h as sbcl.h (and make

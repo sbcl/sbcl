@@ -134,7 +134,7 @@
   ;; which are opaque at the Lisp level ca. sbcl-0.6.7. It needs to be
   ;; revived, which will require writing a C-level os-dependent
   ;; function to extract floating point modes, and a Lisp-level
-  ;; DEF-ALIEN-ROUTINE to get to the C-level os-dependent function.
+  ;; DEFINE-ALIEN-ROUTINE to get to the C-level os-dependent function.
   ;; Meanwhile we just say "something went wrong".
   (error 'floating-point-exception)
   #|

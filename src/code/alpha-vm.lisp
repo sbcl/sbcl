@@ -15,7 +15,7 @@
 (defvar *bits-per-word* 64)
 
 ;;; See x86-vm.lisp for a description of this.
-(def-alien-type os-context-t (struct os-context-t-struct))
+(define-alien-type os-context-t (struct os-context-t-struct))
 
 ;;;; MACHINE-TYPE and MACHINE-VERSION
 
@@ -37,7 +37,8 @@
 	(assert (zerop (ldb (byte 2 0) value)))
 	#+nil
 	(setf (sap-ref-16 sap offset)
-	      (logior (sap-ref-16 sap offset) (ldb (byte 14 0) (ash value -2)))))
+	      (logior (sap-ref-16 sap offset)
+		      (ldb (byte 14 0) (ash value -2)))))
        (:bits-63-48
 	(let* ((value (if (logbitp 15 value) (+ value (ash 1 16)) value))
 	       (value (if (logbitp 31 value) (+ value (ash 1 32)) value))
@@ -57,7 +58,7 @@
 	(setf (sap-ref-8 sap offset) (ldb (byte 8 0) value))
 	(setf (sap-ref-8 sap (1+ offset)) (ldb (byte 8 8) value)))))))
 
-;;;; "Sigcontext" access functions, cut & pasted from x86-vm.lisp then
+;;;; "sigcontext" access functions, cut & pasted from x86-vm.lisp then
 ;;;; hacked for types.
 ;;;;
 ;;;; KLUDGE: The alpha has 64-bit registers, so these potentially
@@ -71,14 +72,14 @@
 ;;;;
 ;;;; See also x86-vm for commentary on signed vs unsigned.
 
-(def-alien-routine ("os_context_pc_addr" context-pc-addr) (* unsigned-long)
+(define-alien-routine ("os_context_pc_addr" context-pc-addr) (* unsigned-long)
   (context (* os-context-t)))
 
 (defun context-pc (context)
   (declare (type (alien (* os-context-t)) context))
   (int-sap (deref (context-pc-addr context))))
 
-(def-alien-routine ("os_context_register_addr" context-register-addr)
+(define-alien-routine ("os_context_register_addr" context-register-addr)
   (* unsigned-long)
   (context (* os-context-t))
   (index int))
@@ -101,7 +102,8 @@
 
 ;;; FIXME: Whether COERCE actually knows how to make a float out of a
 ;;; long is another question. This stuff still needs testing.
-(def-alien-routine ("os_context_fpregister_addr" context-float-register-addr)
+(define-alien-routine ("os_context_fpregister_addr"
+		       context-float-register-addr)
   (* long)
   (context (* os-context-t))
   (index int))

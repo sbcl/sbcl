@@ -1004,7 +1004,7 @@
     (move r x)
     (inst and r y)))
 
-(def-source-transform 32bit-logical-nand (x y)
+(define-source-transform 32bit-logical-nand (x y)
   `(32bit-logical-not (32bit-logical-and ,x ,y)))
 
 (define-vop (32bit-logical-or 32bit-logical)
@@ -1013,7 +1013,7 @@
     (move r x)
     (inst or r y)))
 
-(def-source-transform 32bit-logical-nor (x y)
+(define-source-transform 32bit-logical-nor (x y)
   `(32bit-logical-not (32bit-logical-or ,x ,y)))
 
 (define-vop (32bit-logical-xor 32bit-logical)
@@ -1022,19 +1022,19 @@
     (move r x)
     (inst xor r y)))
 
-(def-source-transform 32bit-logical-eqv (x y)
+(define-source-transform 32bit-logical-eqv (x y)
   `(32bit-logical-not (32bit-logical-xor ,x ,y)))
 
-(def-source-transform 32bit-logical-orc1 (x y)
+(define-source-transform 32bit-logical-orc1 (x y)
   `(32bit-logical-or (32bit-logical-not ,x) ,y))
 
-(def-source-transform 32bit-logical-orc2 (x y)
+(define-source-transform 32bit-logical-orc2 (x y)
   `(32bit-logical-or ,x (32bit-logical-not ,y)))
 
-(def-source-transform 32bit-logical-andc1 (x y)
+(define-source-transform 32bit-logical-andc1 (x y)
   `(32bit-logical-and (32bit-logical-not ,x) ,y))
 
-(def-source-transform 32bit-logical-andc2 (x y)
+(define-source-transform 32bit-logical-andc2 (x y)
   `(32bit-logical-and ,x (32bit-logical-not ,y)))
 
 ;;; Only the lower 5 bits of the shift amount are significant.

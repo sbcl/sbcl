@@ -45,7 +45,7 @@
 	 (error "badly formed alien name"))
        (values (cadr name) (car name))))))
 
-(defmacro def-alien-variable (name type &environment env)
+(defmacro define-alien-variable (name type &environment env)
   #!+sb-doc
   "Define NAME as an external alien variable of type TYPE. NAME should be
    a list of a string holding the alien name and a symbol to use as the Lisp
@@ -57,13 +57,17 @@
 	`(eval-when (:compile-toplevel :load-toplevel :execute)
 	   ,@(when *new-auxiliary-types*
 	       `((%def-auxiliary-alien-types ',*new-auxiliary-types*)))
-	   (%def-alien-variable ',lisp-name
-				',alien-name
-				',alien-type))))))
+	   (%define-alien-variable ',lisp-name
+				   ',alien-name
+				   ',alien-type))))))
 
-;;; Do the actual work of DEF-ALIEN-VARIABLE.
+(defmacro def-alien-variable (&rest rest)
+  (deprecation-warning 'def-alien-variable 'define-alien-variable)
+  `(define-alien-variable ,@rest))
+
+;;; Do the actual work of DEFINE-ALIEN-VARIABLE.
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  (defun %def-alien-variable (lisp-name alien-name type)
+  (defun %define-alien-variable (lisp-name alien-name type)
     (setf (info :variable :kind lisp-name) :alien)
     (setf (info :variable :where-from lisp-name) :defined)
     (clear-info :variable :constant-value lisp-name)
@@ -547,7 +551,7 @@
   (funcall (coerce (compute-deposit-lambda type) 'function)
 	   sap offset type value))
 
-;;;; ALIEN-FUNCALL, DEF-ALIEN-ROUTINE
+;;;; ALIEN-FUNCALL, DEFINE-ALIEN-ROUTINE
 
 (defun alien-funcall (alien &rest args)
   #!+sb-doc
@@ -579,9 +583,11 @@
       (t
        (error "~S is not an alien function." alien)))))
 
-(defmacro def-alien-routine (name result-type &rest args &environment lexenv)
+(defmacro define-alien-routine (name result-type
+				     &rest args
+				     &environment lexenv)
   #!+sb-doc
-  "DEF-ALIEN-ROUTINE Name Result-Type {(Arg-Name Arg-Type [Style])}*
+  "DEFINE-ALIEN-ROUTINE Name Result-Type {(Arg-Name Arg-Type [Style])}*
 
   Define a foreign interface function for the routine with the specified NAME.
   Also automatically DECLAIM the FTYPE of the defined function.
@@ -672,6 +678,10 @@
 		      (values ,@temps ,@(results))))
 		 `(values (alien-funcall ,lisp-name ,@(alien-args))
 			  ,@(results)))))))))
+
+(defmacro def-alien-routine (&rest rest)
+  (deprecation-warning 'def-alien-routine 'define-alien-routine)
+  `(define-alien-routine ,@rest))
 
 (defun alien-typep (object type)
   #!+sb-doc

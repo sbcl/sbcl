@@ -47,7 +47,7 @@
       (t
        `(typep (sb-kernel:layout-of object) 'sb-pcl::wrapper)))))
 
-(def-source-context defmethod (name &rest stuff)
+(define-source-context defmethod (name &rest stuff)
   (let ((arg-pos (position-if #'listp stuff)))
     (if arg-pos
 	`(defmethod ,name ,@(subseq stuff 0 arg-pos)

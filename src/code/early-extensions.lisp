@@ -954,3 +954,8 @@
   (if (typep possibly-logical-pathname 'logical-pathname)
       (translate-logical-pathname possibly-logical-pathname)
       possibly-logical-pathname))
+
+(defun deprecation-warning (bad-name &optional good-name)
+  (warn "using deprecated ~S~@[, should use ~S instead~]"
+	bad-name
+	good-name))
