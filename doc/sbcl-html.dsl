@@ -101,6 +101,25 @@ what it would be. (WHN 2001-10-15)
 ;;; (The "token" element is handled in another section.)
 ;;; (The "type" element is handled in another section.)
 
+
+
+;; The extension to use on generated html files.
+(define %html-ext%  ".html")
+
+;; Generate a list of the html files created
+(define html-manifest #t)
+
+;; The filename of the root HTML document (e.g, "index").
+(define %root-filename%  "index")
+
+;; If true, chunks will be written to the 'output-dir' instead of
+;; the current directory.
+(define use-output-dir  #t)
+(define %output-dir% "html")
+
+;; Use ID attributes as name for component HTML files
+(define %use-id-as-filename%  #t)
+
 </style-specification-body>
 </style-specification>
 

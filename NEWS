@@ -1065,6 +1065,8 @@ changes in sbcl-0.7.2 relative to sbcl-0.7.1:
     Froyd porting CMU CL code)
   * The fasl file format has changed again, to allow the compiler's
     INFO database to support symbol macros.
+  * The user manual (in doc/) is formatted into HTML more nicely.
+    (thanks to coreythomas)
 
 planned incompatible changes in 0.7.x:
 * When the profiling interface settles down, maybe in 0.7.x, maybe

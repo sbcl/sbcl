@@ -18,14 +18,8 @@ else
     exit 1
 fi
 
-# Since Jade has strange ideas about the name of the top level output
-# file, use a symlink as a workaround to provide a reasonable entry
-# point.
-#
-# (KLUDGE: Why does the output always come out in book1.htm? According
-# to the docs of OpenJade 1.3, it should be coming out in
-# user-manual.htm by default, I think. And it should respect the -o
-# option. But experimentally that seems not to be. -- WHN 2002-01-15)
-rm -f book1.htm
+# Our hacked sbcl-html.dsl directs HTML output to html/. Make a clean slate.
+rm -rf html
+mkdir html
+
 $JADE -t sgml -ihtml -d sbcl-html.dsl\#html user-manual.sgml
-ln -sf book1.htm user-manual.html
