@@ -21,7 +21,7 @@
 ;;;; warranty about the software, its performance or its conformity to any
 ;;;; specification.
 
-(in-package "SB-PCL")
+(in-package "SB!PCL")
 
 (defun slot-reader-name (slot-name)
   (list 'slot-accessor :global slot-name 'reader))

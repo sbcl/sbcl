@@ -103,7 +103,7 @@
 		#+nil "src/pcl/macros"
                 #+nil "src/pcl/compiler-support"
 		#+nil "src/pcl/low"
-                "src/pcl/slot-name"
+                #+nil "src/pcl/slot-name"
 		"src/pcl/defclass"
 		"src/pcl/defs"
 		"src/pcl/fngen"
