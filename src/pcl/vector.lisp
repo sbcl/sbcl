@@ -987,20 +987,26 @@
 			(push declaration-name *var-declarations-without-arg*))
 		      (when arg-p
 			(setq dname (append dname (list (pop form)))))
-		      (dolist (var form)
-			(if (member var args)
-			    ;; Quietly remove IGNORE declarations on
-			    ;; args when a next-method is involved, to
-			    ;; prevent compiler warnings about ignored
-			    ;; args being read.
-			    (unless (and calls-next-method-p
-					 (eq (car dname) 'ignore))
-				(push var outers))
-			    (push var inners)))
-		      (when outers
-			(push `(declare (,@dname ,@outers)) outer-decls))
-		      (when inners
-			(push `(declare (,@dname ,@inners)) inner-decls)))))))
+		      (case (car dname)
+			(%class (push `(declare (,@dname ,@form)) inner-decls))
+			(t
+			 (dolist (var form)
+			   (if (member var args)
+			       ;; Quietly remove IGNORE declarations
+			       ;; on args when a next-method is
+			       ;; involved, to prevent compiler
+			       ;; warnings about ignored args being
+			       ;; read.
+			       (unless (and calls-next-method-p
+					    (eq (car dname) 'ignore))
+				 (push var outers))
+			       (push var inners)))
+			 (when outers
+			   (push `(declare (,@dname ,@outers)) outer-decls))
+			 (when inners
+			   (push
+			    `(declare (,@dname ,@inners))
+			    inner-decls)))))))))
 	  (setq body (cdr body)))
     (values outer-decls inner-decls body)))
 

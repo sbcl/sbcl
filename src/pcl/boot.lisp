@@ -932,7 +932,7 @@ bootstrapping.
 	       `(((typep ,emf 'fixnum)
 		  (let ((.new-value. ,(car required-args+rest-arg))
 			(.slots. (get-slots-or-nil
-				  ,(car required-args+rest-arg))))
+				  ,(cadr required-args+rest-arg))))
 		    (when .slots.
 		      (setf (clos-slots-ref .slots. ,emf) .new-value.))))))
 	   ;; (In cmucl-2.4.8 there was a commented-out third ,@(WHEN
