@@ -4,8 +4,8 @@ never going to want to distinguish the CHARACTERness vs BASE-CHARness
 of characters by their widetags, because we can do it based on their
 CHAR-CODE; thus, calling the primitive type and storage classes
 BASE-CHAR is unneccesarily confusing.)
-  -- done for x86;
-  -- TODO: sparc, mips, hppa, alpha, ppc.
+  -- done for x86, ppc;
+  -- TODO: sparc, mips, hppa, alpha.
 
 ** implement a CHARACTER-SET-TYPE representation for sets of
 characters in the CL type system.  (Rationale: we are going to need to
@@ -36,7 +36,7 @@ support the whole of Unicode; or (c) add an extra level of indirection
 for strings so that the storage compaction can be mutated on demand,
 with garbage collector support.  None of these strategies is
 particularly appealing.)
-  -- done for x86:
+  -- done for x86, ppc:
      >> cold init runs;
      >> warm load runs to completion;
      >> all contribs build and pass self-tests;
@@ -50,7 +50,7 @@ particularly appealing.)
         another set of portability problems, and prompting some KLUDGEs
         of the #.(coerce "foo" 'base-string) form that might
         eventually be reversed.)
-  -- TODO: sparc, mips, hppa, alpha, ppc.
+  -- TODO: sparc, mips, hppa, alpha.
 
 ** fix genesis to dump BASE-STRINGs always, and to use SB!XC:CHAR-CODE
 (which should error on non-STANDARD-CHAR).  (Rationale: SBCL aspires

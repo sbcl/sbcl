@@ -749,12 +749,8 @@
 ;;;   * :TEST 'CHAR= or :TEST #'CHAR=
 ;;;   * :TEST 'EQL   or :TEST #'EQL
 ;;;   * :FROM-END NIL (or :FROM-END non-NIL, with a little ingenuity)
-;;;
-;;; also, it should be noted that there's nothing much in this
-;;; transform (as opposed to the ones for REPLACE and CONCATENATE)
-;;; that particularly limits it to SIMPLE-BASE-STRINGs.
 (deftransform search ((pattern text &key (start1 0) (start2 0) end1 end2)
-		      (simple-base-string simple-base-string &rest t)
+		      (simple-string simple-string &rest t)
 		      *
 		      :policy (> speed (max space safety)))
   `(block search
