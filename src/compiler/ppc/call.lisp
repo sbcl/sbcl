@@ -103,7 +103,7 @@
 ;;; ../alpha/call.lisp
 (defun bytes-needed-for-non-descriptor-stack-frame ()
   (logandc2 (+ +stack-alignment-bytes+ number-stack-displacement
-	       (* (sb-allocated-size 'non-descriptor-stack) sb!vm:n-word-bytes))
+	       (* (sb-allocated-size 'non-descriptor-stack) n-word-bytes))
 	    +stack-alignment-bytes+))
 
 
@@ -139,7 +139,7 @@
     (emit-label start-lab)
     ;; Allocate function header.
     (inst simple-fun-header-word)
-    (dotimes (i (1- sb!vm:simple-fun-code-offset))
+    (dotimes (i (1- simple-fun-code-offset))
       (inst word 0))
     (let* ((entry-point (gen-label)))
       (emit-label entry-point)
@@ -776,10 +776,10 @@ default-value-8
 		      (do-next-filler))
 		     (constant
 		      (loadw lexenv code-tn (tn-offset arg-fun)
-			     sb!vm:other-pointer-lowtag)
+			     other-pointer-lowtag)
 		      (do-next-filler)))
-		   (loadw function lexenv sb!vm:closure-fun-slot
-		    sb!vm:fun-pointer-lowtag)
+		   (loadw function lexenv closure-fun-slot
+		    fun-pointer-lowtag)
 		   (do-next-filler)
 		   (inst addi entry-point function
 		    (- (ash simple-fun-code-offset word-shift)
@@ -1067,10 +1067,10 @@ default-value-8
 
       (emit-label loop)
       ;; *--dst = *--src, --count
-      (inst addi src src (- sb!vm:n-word-bytes))
+      (inst addi src src (- n-word-bytes))
       (inst addic. count count (- (fixnumize 1)))
       (loadw temp src)
-      (inst addi dst dst (- sb!vm:n-word-bytes))
+      (inst addi dst dst (- n-word-bytes))
       (storew temp dst)
       (inst bgt loop)
 

@@ -76,8 +76,8 @@
   "Jump to the lisp function FUNCTION.  LIP is an interior-reg temporary."
   `(progn
     ;; something is deeply bogus.  look at this
-    ;; (loadw ,lip ,function sb!vm:function-code-offset sb!vm:function-pointer-type)
-    (inst addi ,lip ,function (- (* n-word-bytes sb!vm:simple-fun-code-offset) sb!vm:fun-pointer-lowtag))
+    ;; (loadw ,lip ,function function-code-offset function-pointer-type)
+    (inst addi ,lip ,function (- (* n-word-bytes simple-fun-code-offset) fun-pointer-lowtag))
     (inst mtctr ,lip)
     (move code-tn ,function)
     (inst bctr)))

@@ -1,5 +1,15 @@
-;;; Written by Rob MacLachlan
-;;;
+;;;; the PPC definitions of VOPs used for non-local exit (throw,
+;;;; lexical exit, etc.)
+
+;;;; This software is part of the SBCL system. See the README file for
+;;;; more information.
+;;;;
+;;;; This software is derived from the CMU CL system, which was
+;;;; written at Carnegie Mellon University and released into the
+;;;; public domain. The software is in the public domain and is
+;;;; provided with absolutely no warranty. See the COPYING and CREDITS
+;;;; files for more information.
+
 (in-package "SB!VM")
 
 ;;; Make an environment-live stack TN for saving the SP for NLX entry.
@@ -70,13 +80,13 @@
   (:temporary (:scs (descriptor-reg)) temp)
   (:temporary (:scs (non-descriptor-reg)) ndescr)
   (:generator 22
-    (inst addi block cfp-tn (* (tn-offset tn) sb!vm:n-word-bytes))
+    (inst addi block cfp-tn (* (tn-offset tn) n-word-bytes))
     (load-symbol-value temp *current-unwind-protect-block*)
-    (storew temp block sb!vm:unwind-block-current-uwp-slot)
-    (storew cfp-tn block sb!vm:unwind-block-current-cont-slot)
-    (storew code-tn block sb!vm:unwind-block-current-code-slot)
+    (storew temp block unwind-block-current-uwp-slot)
+    (storew cfp-tn block unwind-block-current-cont-slot)
+    (storew code-tn block unwind-block-current-code-slot)
     (inst compute-lra-from-code temp code-tn entry-label ndescr)
-    (storew temp block sb!vm:catch-block-entry-pc-slot)))
+    (storew temp block catch-block-entry-pc-slot)))
 
 
 ;;; Like Make-Unwind-Block, except that we also store in the specified tag, and
@@ -91,17 +101,17 @@
   (:temporary (:scs (descriptor-reg) :target block :to (:result 0)) result)
   (:temporary (:scs (non-descriptor-reg)) ndescr)
   (:generator 44
-    (inst addi result cfp-tn (* (tn-offset tn) sb!vm:n-word-bytes))
+    (inst addi result cfp-tn (* (tn-offset tn) n-word-bytes))
     (load-symbol-value temp *current-unwind-protect-block*)
-    (storew temp result sb!vm:catch-block-current-uwp-slot)
-    (storew cfp-tn result sb!vm:catch-block-current-cont-slot)
-    (storew code-tn result sb!vm:catch-block-current-code-slot)
+    (storew temp result catch-block-current-uwp-slot)
+    (storew cfp-tn result catch-block-current-cont-slot)
+    (storew code-tn result catch-block-current-code-slot)
     (inst compute-lra-from-code temp code-tn entry-label ndescr)
-    (storew temp result sb!vm:catch-block-entry-pc-slot)
+    (storew temp result catch-block-entry-pc-slot)
 
-    (storew tag result sb!vm:catch-block-tag-slot)
+    (storew tag result catch-block-tag-slot)
     (load-symbol-value temp *current-catch-block*)
-    (storew temp result sb!vm:catch-block-previous-catch-slot)
+    (storew temp result catch-block-previous-catch-slot)
     (store-symbol-value result *current-catch-block*)
 
     (move block result)))
@@ -114,7 +124,7 @@
   (:args (tn))
   (:temporary (:scs (descriptor-reg)) new-uwp)
   (:generator 7
-    (inst addi new-uwp cfp-tn (* (tn-offset tn) sb!vm:n-word-bytes))
+    (inst addi new-uwp cfp-tn (* (tn-offset tn) n-word-bytes))
     (store-symbol-value new-uwp *current-unwind-protect-block*)))
 
 
@@ -124,7 +134,7 @@
   (:translate %catch-breakup)
   (:generator 17
     (load-symbol-value block *current-catch-block*)
-    (loadw block block sb!vm:catch-block-previous-catch-slot)
+    (loadw block block catch-block-previous-catch-slot)
     (store-symbol-value block *current-catch-block*)))
 
 (define-vop (unlink-unwind-protect)
@@ -133,7 +143,7 @@
   (:translate %unwind-protect-breakup)
   (:generator 17
     (load-symbol-value block *current-unwind-protect-block*)
-    (loadw block block sb!vm:unwind-block-current-uwp-slot)
+    (loadw block block unwind-block-current-uwp-slot)
     (store-symbol-value block *current-unwind-protect-block*)))
 
 

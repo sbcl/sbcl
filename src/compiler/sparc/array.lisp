@@ -39,28 +39,18 @@
 
 
 ;;;; Additional accessors and setters for the array header.
-
-(defknown sb!impl::%array-dimension (t fixnum) fixnum
-  (flushable))
-(defknown sb!impl::%set-array-dimension (t fixnum fixnum) fixnum
-  ())
-
 (define-vop (%array-dimension word-index-ref)
-  (:translate sb!impl::%array-dimension)
+  (:translate sb!kernel:%array-dimension)
   (:policy :fast-safe)
   (:variant array-dimensions-offset other-pointer-lowtag))
 
 (define-vop (%set-array-dimension word-index-set)
-  (:translate sb!impl::%set-array-dimension)
+  (:translate sb!kernel:%set-array-dimension)
   (:policy :fast-safe)
   (:variant array-dimensions-offset other-pointer-lowtag))
 
-
-
-(defknown sb!impl::%array-rank (t) fixnum (flushable))
-
 (define-vop (array-rank-vop)
-  (:translate sb!impl::%array-rank)
+  (:translate sb!kernel:%array-rank)
   (:policy :fast-safe)
   (:args (x :scs (descriptor-reg)))
   (:temporary (:scs (non-descriptor-reg)) temp)
@@ -70,12 +60,8 @@
     (inst sra temp n-widetag-bits)
     (inst sub temp (1- array-dimensions-offset))
     (inst sll res temp n-fixnum-tag-bits)))
-
-
 
 ;;;; Bounds checking routine.
-
-
 (define-vop (check-bound)
   (:translate %check-bound)
   (:policy :fast-safe)
@@ -92,8 +78,6 @@
       (inst b :geu error)
       (inst nop)
       (move result index))))
-
-
 
 ;;;; Accessors/Setters
 

@@ -90,11 +90,11 @@
     (let ((bogus (gen-label))
 	  (done (gen-label)))
       (loadw temp thing 0 lowtag)
-      (inst srl temp sb!vm:n-widetag-bits temp)
+      (inst srl temp n-widetag-bits temp)
       (inst beq temp bogus)
-      (inst sll temp (1- (integer-length sb!vm:n-word-bytes)) temp)
-      (unless (= lowtag sb!vm:other-pointer-lowtag)
-	(inst subq temp (- sb!vm:other-pointer-lowtag lowtag) temp))
+      (inst sll temp (1- (integer-length n-word-bytes)) temp)
+      (unless (= lowtag other-pointer-lowtag)
+	(inst subq temp (- other-pointer-lowtag lowtag) temp))
       (inst subq thing temp code)
       (emit-label done)
       (assemble (*elsewhere*)
@@ -104,11 +104,11 @@
 
 (define-vop (code-from-lra code-from-mumble)
   (:translate lra-code-header)
-  (:variant sb!vm:other-pointer-lowtag))
+  (:variant other-pointer-lowtag))
 
 (define-vop (code-from-function code-from-mumble)
   (:translate fun-code-header)
-  (:variant sb!vm:fun-pointer-lowtag))
+  (:variant fun-pointer-lowtag))
 
 (define-vop (make-lisp-obj)
   (:policy :fast-safe)
@@ -136,7 +136,7 @@
   (:result-types positive-fixnum)
   (:generator 5
     (loadw res fun 0 fun-pointer-lowtag)
-    (inst srl res sb!vm:n-widetag-bits res)))
+    (inst srl res n-widetag-bits res)))
 
 (defknown make-number-stack-pointer ((unsigned-byte 32)) system-area-pointer
   (movable foldable flushable))

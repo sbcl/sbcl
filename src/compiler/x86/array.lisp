@@ -40,24 +40,16 @@
      (storew header result 0 other-pointer-lowtag))))
 
 ;;;; additional accessors and setters for the array header
-
-(defknown sb!impl::%array-dimension (t index) index
-  (flushable))
-(defknown sb!impl::%set-array-dimension (t index index) index
-  ())
-
 (define-full-reffer %array-dimension *
   array-dimensions-offset other-pointer-lowtag
-  (any-reg) positive-fixnum sb!impl::%array-dimension)
+  (any-reg) positive-fixnum sb!kernel:%array-dimension)
 
 (define-full-setter %set-array-dimension *
   array-dimensions-offset other-pointer-lowtag
-  (any-reg) positive-fixnum sb!impl::%set-array-dimension)
-
-(defknown sb!impl::%array-rank (t) index (flushable))
+  (any-reg) positive-fixnum sb!kernel:%set-array-dimension)
 
 (define-vop (array-rank-vop)
-  (:translate sb!impl::%array-rank)
+  (:translate sb!kernel:%array-rank)
   (:policy :fast-safe)
   (:args (x :scs (descriptor-reg)))
   (:results (res :scs (unsigned-reg)))
@@ -160,7 +152,7 @@
 ;;;; bit, 2-bit, and 4-bit vectors
 
 (macrolet ((def-small-data-vector-frobs (type bits)
-	     (let* ((elements-per-word (floor sb!vm:n-word-bits bits))
+	     (let* ((elements-per-word (floor n-word-bits bits))
 		    (bit-shift (1- (integer-length elements-per-word))))
     `(progn
        (define-vop (,(symbolicate 'data-vector-ref/ type))
@@ -307,9 +299,9 @@
   (:generator 5
    (with-empty-tn@fp-top(value)
      (inst fld (make-ea	:dword :base object :index index :scale 1
-			:disp (- (* sb!vm:vector-data-offset
-				    sb!vm:n-word-bytes)
-				 sb!vm:other-pointer-lowtag))))))
+			:disp (- (* vector-data-offset
+				    n-word-bytes)
+				 other-pointer-lowtag))))))
 
 (define-vop (data-vector-ref-c/simple-array-single-float)
   (:note "inline array access")
@@ -323,10 +315,10 @@
   (:generator 4
    (with-empty-tn@fp-top(value)
      (inst fld (make-ea	:dword :base object
-			:disp (- (+ (* sb!vm:vector-data-offset
-				       sb!vm:n-word-bytes)
+			:disp (- (+ (* vector-data-offset
+				       n-word-bytes)
 				    (* 4 index))
-				 sb!vm:other-pointer-lowtag))))))
+				 other-pointer-lowtag))))))
 
 (define-vop (data-vector-set/simple-array-single-float)
   (:note "inline array store")
@@ -342,9 +334,9 @@
     (cond ((zerop (tn-offset value))
 	   ;; Value is in ST0.
 	   (inst fst (make-ea :dword :base object :index index :scale 1
-			      :disp (- (* sb!vm:vector-data-offset
-					  sb!vm:n-word-bytes)
-				       sb!vm:other-pointer-lowtag)))
+			      :disp (- (* vector-data-offset
+					  n-word-bytes)
+				       other-pointer-lowtag)))
 	   (unless (zerop (tn-offset result))
 		   ;; Value is in ST0 but not result.
 		   (inst fst result)))
@@ -352,9 +344,9 @@
 	   ;; Value is not in ST0.
 	   (inst fxch value)
 	   (inst fst (make-ea :dword :base object :index index :scale 1
-			      :disp (- (* sb!vm:vector-data-offset
-					  sb!vm:n-word-bytes)
-				       sb!vm:other-pointer-lowtag)))
+			      :disp (- (* vector-data-offset
+					  n-word-bytes)
+				       other-pointer-lowtag)))
 	   (cond ((zerop (tn-offset result))
 		  ;; The result is in ST0.
 		  (inst fst value))
@@ -379,10 +371,10 @@
     (cond ((zerop (tn-offset value))
 	   ;; Value is in ST0.
 	   (inst fst (make-ea :dword :base object
-			      :disp (- (+ (* sb!vm:vector-data-offset
-					     sb!vm:n-word-bytes)
+			      :disp (- (+ (* vector-data-offset
+					     n-word-bytes)
 					  (* 4 index))
-				       sb!vm:other-pointer-lowtag)))
+				       other-pointer-lowtag)))
 	   (unless (zerop (tn-offset result))
 		   ;; Value is in ST0 but not result.
 		   (inst fst result)))
@@ -390,10 +382,10 @@
 	   ;; Value is not in ST0.
 	   (inst fxch value)
 	   (inst fst (make-ea :dword :base object
-			      :disp (- (+ (* sb!vm:vector-data-offset
-					     sb!vm:n-word-bytes)
+			      :disp (- (+ (* vector-data-offset
+					     n-word-bytes)
 					  (* 4 index))
-				       sb!vm:other-pointer-lowtag)))
+				       other-pointer-lowtag)))
 	   (cond ((zerop (tn-offset result))
 		  ;; The result is in ST0.
 		  (inst fst value))
@@ -415,9 +407,9 @@
   (:generator 7
    (with-empty-tn@fp-top(value)
      (inst fldd (make-ea :dword :base object :index index :scale 2
-			 :disp (- (* sb!vm:vector-data-offset
-				     sb!vm:n-word-bytes)
-				  sb!vm:other-pointer-lowtag))))))
+			 :disp (- (* vector-data-offset
+				     n-word-bytes)
+				  other-pointer-lowtag))))))
 
 (define-vop (data-vector-ref-c/simple-array-double-float)
   (:note "inline array access")
@@ -431,10 +423,10 @@
   (:generator 6
    (with-empty-tn@fp-top(value)
      (inst fldd (make-ea :dword :base object
-			 :disp (- (+ (* sb!vm:vector-data-offset
-					sb!vm:n-word-bytes)
+			 :disp (- (+ (* vector-data-offset
+					n-word-bytes)
 				     (* 8 index))
-				  sb!vm:other-pointer-lowtag))))))
+				  other-pointer-lowtag))))))
 
 (define-vop (data-vector-set/simple-array-double-float)
   (:note "inline array store")
@@ -450,9 +442,9 @@
     (cond ((zerop (tn-offset value))
 	   ;; Value is in ST0.
 	   (inst fstd (make-ea :dword :base object :index index :scale 2
-			       :disp (- (* sb!vm:vector-data-offset
-					   sb!vm:n-word-bytes)
-					sb!vm:other-pointer-lowtag)))
+			       :disp (- (* vector-data-offset
+					   n-word-bytes)
+					other-pointer-lowtag)))
 	   (unless (zerop (tn-offset result))
 		   ;; Value is in ST0 but not result.
 		   (inst fstd result)))
@@ -460,9 +452,9 @@
 	   ;; Value is not in ST0.
 	   (inst fxch value)
 	   (inst fstd (make-ea :dword :base object :index index :scale 2
-			       :disp (- (* sb!vm:vector-data-offset
-					   sb!vm:n-word-bytes)
-					sb!vm:other-pointer-lowtag)))
+			       :disp (- (* vector-data-offset
+					   n-word-bytes)
+					other-pointer-lowtag)))
 	   (cond ((zerop (tn-offset result))
 		  ;; The result is in ST0.
 		  (inst fstd value))
@@ -487,10 +479,10 @@
     (cond ((zerop (tn-offset value))
 	   ;; Value is in ST0.
 	   (inst fstd (make-ea :dword :base object
-			       :disp (- (+ (* sb!vm:vector-data-offset
-					      sb!vm:n-word-bytes)
+			       :disp (- (+ (* vector-data-offset
+					      n-word-bytes)
 					   (* 8 index))
-					sb!vm:other-pointer-lowtag)))
+					other-pointer-lowtag)))
 	   (unless (zerop (tn-offset result))
 		   ;; Value is in ST0 but not result.
 		   (inst fstd result)))
@@ -498,10 +490,10 @@
 	   ;; Value is not in ST0.
 	   (inst fxch value)
 	   (inst fstd (make-ea :dword :base object
-			       :disp (- (+ (* sb!vm:vector-data-offset
-					      sb!vm:n-word-bytes)
+			       :disp (- (+ (* vector-data-offset
+					      n-word-bytes)
 					   (* 8 index))
-					sb!vm:other-pointer-lowtag)))
+					other-pointer-lowtag)))
 	   (cond ((zerop (tn-offset result))
 		  ;; The result is in ST0.
 		  (inst fstd value))
@@ -527,9 +519,9 @@
     (inst lea temp (make-ea :dword :base index :index index :scale 2))
     (with-empty-tn@fp-top(value)
       (inst fldl (make-ea :dword :base object :index temp :scale 1
-			  :disp (- (* sb!vm:vector-data-offset
-				      sb!vm:n-word-bytes)
-				   sb!vm:other-pointer-lowtag))))))
+			  :disp (- (* vector-data-offset
+				      n-word-bytes)
+				   other-pointer-lowtag))))))
 
 #!+long-float
 (define-vop (data-vector-ref-c/simple-array-long-float)
@@ -544,10 +536,10 @@
   (:generator 6
    (with-empty-tn@fp-top(value)
      (inst fldl (make-ea :dword :base object
-			 :disp (- (+ (* sb!vm:vector-data-offset
-					sb!vm:n-word-bytes)
+			 :disp (- (+ (* vector-data-offset
+					n-word-bytes)
 				     (* 12 index))
-				  sb!vm:other-pointer-lowtag))))))
+				  other-pointer-lowtag))))))
 
 #!+long-float
 (define-vop (data-vector-set/simple-array-long-float)
@@ -568,8 +560,8 @@
 	   ;; Value is in ST0.
 	   (store-long-float
 	    (make-ea :dword :base object :index temp :scale 1
-		     :disp (- (* sb!vm:vector-data-offset sb!vm:n-word-bytes)
-			      sb!vm:other-pointer-lowtag)))
+		     :disp (- (* vector-data-offset n-word-bytes)
+			      other-pointer-lowtag)))
 	   (unless (zerop (tn-offset result))
 		   ;; Value is in ST0 but not result.
 		   (inst fstd result)))
@@ -578,8 +570,8 @@
 	   (inst fxch value)
 	   (store-long-float
 	    (make-ea :dword :base object :index temp :scale 1
-		     :disp (- (* sb!vm:vector-data-offset sb!vm:n-word-bytes)
-			      sb!vm:other-pointer-lowtag)))
+		     :disp (- (* vector-data-offset n-word-bytes)
+			      other-pointer-lowtag)))
 	   (cond ((zerop (tn-offset result))
 		  ;; The result is in ST0.
 		  (inst fstd value))
@@ -604,10 +596,10 @@
     (cond ((zerop (tn-offset value))
 	   ;; Value is in ST0.
 	   (store-long-float (make-ea :dword :base object
-				      :disp (- (+ (* sb!vm:vector-data-offset
-						     sb!vm:n-word-bytes)
+				      :disp (- (+ (* vector-data-offset
+						     n-word-bytes)
 						  (* 12 index))
-					       sb!vm:other-pointer-lowtag)))
+					       other-pointer-lowtag)))
 	   (unless (zerop (tn-offset result))
 	     ;; Value is in ST0 but not result.
 	     (inst fstd result)))
@@ -615,10 +607,10 @@
 	   ;; Value is not in ST0.
 	   (inst fxch value)
 	   (store-long-float (make-ea :dword :base object
-				      :disp (- (+ (* sb!vm:vector-data-offset
-						     sb!vm:n-word-bytes)
+				      :disp (- (+ (* vector-data-offset
+						     n-word-bytes)
 						  (* 12 index))
-					       sb!vm:other-pointer-lowtag)))
+					       other-pointer-lowtag)))
 	   (cond ((zerop (tn-offset result))
 		  ;; The result is in ST0.
 		  (inst fstd value))
@@ -643,15 +635,15 @@
     (let ((real-tn (complex-single-reg-real-tn value)))
       (with-empty-tn@fp-top (real-tn)
 	(inst fld (make-ea :dword :base object :index index :scale 2
-			   :disp (- (* sb!vm:vector-data-offset
-				       sb!vm:n-word-bytes)
-				    sb!vm:other-pointer-lowtag)))))
+			   :disp (- (* vector-data-offset
+				       n-word-bytes)
+				    other-pointer-lowtag)))))
     (let ((imag-tn (complex-single-reg-imag-tn value)))
       (with-empty-tn@fp-top (imag-tn)
 	(inst fld (make-ea :dword :base object :index index :scale 2
-			   :disp (- (* (1+ sb!vm:vector-data-offset)
-				       sb!vm:n-word-bytes)
-				    sb!vm:other-pointer-lowtag)))))))
+			   :disp (- (* (1+ vector-data-offset)
+				       n-word-bytes)
+				    other-pointer-lowtag)))))))
 
 (define-vop (data-vector-ref-c/simple-array-complex-single-float)
   (:note "inline array access")
@@ -666,17 +658,17 @@
     (let ((real-tn (complex-single-reg-real-tn value)))
       (with-empty-tn@fp-top (real-tn)
 	(inst fld (make-ea :dword :base object
-			   :disp (- (+ (* sb!vm:vector-data-offset
-					  sb!vm:n-word-bytes)
+			   :disp (- (+ (* vector-data-offset
+					  n-word-bytes)
 				       (* 8 index))
-				    sb!vm:other-pointer-lowtag)))))
+				    other-pointer-lowtag)))))
     (let ((imag-tn (complex-single-reg-imag-tn value)))
       (with-empty-tn@fp-top (imag-tn)
 	(inst fld (make-ea :dword :base object
-			   :disp (- (+ (* sb!vm:vector-data-offset
-					  sb!vm:n-word-bytes)
+			   :disp (- (+ (* vector-data-offset
+					  n-word-bytes)
 				       (* 8 index) 4)
-				    sb!vm:other-pointer-lowtag)))))))
+				    other-pointer-lowtag)))))))
 
 (define-vop (data-vector-set/simple-array-complex-single-float)
   (:note "inline array store")
@@ -695,9 +687,9 @@
       (cond ((zerop (tn-offset value-real))
 	     ;; Value is in ST0.
 	     (inst fst (make-ea :dword :base object :index index :scale 2
-				:disp (- (* sb!vm:vector-data-offset
-					    sb!vm:n-word-bytes)
-					 sb!vm:other-pointer-lowtag)))
+				:disp (- (* vector-data-offset
+					    n-word-bytes)
+					 other-pointer-lowtag)))
 	     (unless (zerop (tn-offset result-real))
 	       ;; Value is in ST0 but not result.
 	       (inst fst result-real)))
@@ -705,9 +697,9 @@
 	     ;; Value is not in ST0.
 	     (inst fxch value-real)
 	     (inst fst (make-ea :dword :base object :index index :scale 2
-				:disp (- (* sb!vm:vector-data-offset
-					    sb!vm:n-word-bytes)
-					 sb!vm:other-pointer-lowtag)))
+				:disp (- (* vector-data-offset
+					    n-word-bytes)
+					 other-pointer-lowtag)))
 	     (cond ((zerop (tn-offset result-real))
 		    ;; The result is in ST0.
 		    (inst fst value-real))
@@ -720,10 +712,10 @@
 	  (result-imag (complex-single-reg-imag-tn result)))
       (inst fxch value-imag)
       (inst fst (make-ea :dword :base object :index index :scale 2
-			 :disp (- (+ (* sb!vm:vector-data-offset
-					sb!vm:n-word-bytes)
+			 :disp (- (+ (* vector-data-offset
+					n-word-bytes)
 				     4)
-				  sb!vm:other-pointer-lowtag)))
+				  other-pointer-lowtag)))
       (unless (location= value-imag result-imag)
 	(inst fst result-imag))
       (inst fxch value-imag))))
@@ -745,10 +737,10 @@
       (cond ((zerop (tn-offset value-real))
 	     ;; Value is in ST0.
 	     (inst fst (make-ea :dword :base object
-				:disp (- (+ (* sb!vm:vector-data-offset
-					       sb!vm:n-word-bytes)
+				:disp (- (+ (* vector-data-offset
+					       n-word-bytes)
 					    (* 8 index))
-					 sb!vm:other-pointer-lowtag)))
+					 other-pointer-lowtag)))
 	     (unless (zerop (tn-offset result-real))
 	       ;; Value is in ST0 but not result.
 	       (inst fst result-real)))
@@ -756,10 +748,10 @@
 	     ;; Value is not in ST0.
 	     (inst fxch value-real)
 	     (inst fst (make-ea :dword :base object
-				:disp (- (+ (* sb!vm:vector-data-offset
-					       sb!vm:n-word-bytes)
+				:disp (- (+ (* vector-data-offset
+					       n-word-bytes)
 					    (* 8 index))
-					 sb!vm:other-pointer-lowtag)))
+					 other-pointer-lowtag)))
 	     (cond ((zerop (tn-offset result-real))
 		    ;; The result is in ST0.
 		    (inst fst value-real))
@@ -772,10 +764,10 @@
 	  (result-imag (complex-single-reg-imag-tn result)))
       (inst fxch value-imag)
       (inst fst (make-ea :dword :base object
-			 :disp (- (+ (* sb!vm:vector-data-offset
-					sb!vm:n-word-bytes)
+			 :disp (- (+ (* vector-data-offset
+					n-word-bytes)
 				     (* 8 index) 4)
-				  sb!vm:other-pointer-lowtag)))
+				  other-pointer-lowtag)))
       (unless (location= value-imag result-imag)
 	(inst fst result-imag))
       (inst fxch value-imag))))
@@ -794,16 +786,16 @@
     (let ((real-tn (complex-double-reg-real-tn value)))
       (with-empty-tn@fp-top (real-tn)
 	(inst fldd (make-ea :dword :base object :index index :scale 4
-			    :disp (- (* sb!vm:vector-data-offset
-					sb!vm:n-word-bytes)
-				     sb!vm:other-pointer-lowtag)))))
+			    :disp (- (* vector-data-offset
+					n-word-bytes)
+				     other-pointer-lowtag)))))
     (let ((imag-tn (complex-double-reg-imag-tn value)))
       (with-empty-tn@fp-top (imag-tn)
 	(inst fldd (make-ea :dword :base object :index index :scale 4
-			    :disp (- (+ (* sb!vm:vector-data-offset
-					   sb!vm:n-word-bytes)
+			    :disp (- (+ (* vector-data-offset
+					   n-word-bytes)
 					8)
-				     sb!vm:other-pointer-lowtag)))))))
+				     other-pointer-lowtag)))))))
 
 (define-vop (data-vector-ref-c/simple-array-complex-double-float)
   (:note "inline array access")
@@ -818,17 +810,17 @@
     (let ((real-tn (complex-double-reg-real-tn value)))
       (with-empty-tn@fp-top (real-tn)
 	(inst fldd (make-ea :dword :base object
-			    :disp (- (+ (* sb!vm:vector-data-offset
-					   sb!vm:n-word-bytes)
+			    :disp (- (+ (* vector-data-offset
+					   n-word-bytes)
 					(* 16 index))
-				     sb!vm:other-pointer-lowtag)))))
+				     other-pointer-lowtag)))))
     (let ((imag-tn (complex-double-reg-imag-tn value)))
       (with-empty-tn@fp-top (imag-tn)
 	(inst fldd (make-ea :dword :base object
-			    :disp (- (+ (* sb!vm:vector-data-offset
-					   sb!vm:n-word-bytes)
+			    :disp (- (+ (* vector-data-offset
+					   n-word-bytes)
 					(* 16 index) 8)
-				     sb!vm:other-pointer-lowtag)))))))
+				     other-pointer-lowtag)))))))
 
 (define-vop (data-vector-set/simple-array-complex-double-float)
   (:note "inline array store")
@@ -847,9 +839,9 @@
       (cond ((zerop (tn-offset value-real))
 	     ;; Value is in ST0.
 	     (inst fstd (make-ea :dword :base object :index index :scale 4
-				 :disp (- (* sb!vm:vector-data-offset
-					     sb!vm:n-word-bytes)
-					  sb!vm:other-pointer-lowtag)))
+				 :disp (- (* vector-data-offset
+					     n-word-bytes)
+					  other-pointer-lowtag)))
 	     (unless (zerop (tn-offset result-real))
 	       ;; Value is in ST0 but not result.
 	       (inst fstd result-real)))
@@ -857,9 +849,9 @@
 	     ;; Value is not in ST0.
 	     (inst fxch value-real)
 	     (inst fstd (make-ea :dword :base object :index index :scale 4
-				 :disp (- (* sb!vm:vector-data-offset
-					     sb!vm:n-word-bytes)
-					  sb!vm:other-pointer-lowtag)))
+				 :disp (- (* vector-data-offset
+					     n-word-bytes)
+					  other-pointer-lowtag)))
 	     (cond ((zerop (tn-offset result-real))
 		    ;; The result is in ST0.
 		    (inst fstd value-real))
@@ -872,10 +864,10 @@
 	  (result-imag (complex-double-reg-imag-tn result)))
       (inst fxch value-imag)
       (inst fstd (make-ea :dword :base object :index index :scale 4
-			  :disp (- (+ (* sb!vm:vector-data-offset
-					 sb!vm:n-word-bytes)
+			  :disp (- (+ (* vector-data-offset
+					 n-word-bytes)
 				      8)
-				   sb!vm:other-pointer-lowtag)))
+				   other-pointer-lowtag)))
       (unless (location= value-imag result-imag)
 	(inst fstd result-imag))
       (inst fxch value-imag))))
@@ -897,10 +889,10 @@
       (cond ((zerop (tn-offset value-real))
 	     ;; Value is in ST0.
 	     (inst fstd (make-ea :dword :base object
-				 :disp (- (+ (* sb!vm:vector-data-offset
-						sb!vm:n-word-bytes)
+				 :disp (- (+ (* vector-data-offset
+						n-word-bytes)
 					     (* 16 index))
-					  sb!vm:other-pointer-lowtag)))
+					  other-pointer-lowtag)))
 	     (unless (zerop (tn-offset result-real))
 	       ;; Value is in ST0 but not result.
 	       (inst fstd result-real)))
@@ -908,10 +900,10 @@
 	     ;; Value is not in ST0.
 	     (inst fxch value-real)
 	     (inst fstd (make-ea :dword :base object
-				 :disp (- (+ (* sb!vm:vector-data-offset
-						sb!vm:n-word-bytes)
+				 :disp (- (+ (* vector-data-offset
+						n-word-bytes)
 					     (* 16 index))
-					  sb!vm:other-pointer-lowtag)))
+					  other-pointer-lowtag)))
 	     (cond ((zerop (tn-offset result-real))
 		    ;; The result is in ST0.
 		    (inst fstd value-real))
@@ -924,10 +916,10 @@
 	  (result-imag (complex-double-reg-imag-tn result)))
       (inst fxch value-imag)
       (inst fstd (make-ea :dword :base object
-			  :disp (- (+ (* sb!vm:vector-data-offset
-					 sb!vm:n-word-bytes)
+			  :disp (- (+ (* vector-data-offset
+					 n-word-bytes)
 				      (* 16 index) 8)
-				   sb!vm:other-pointer-lowtag)))
+				   other-pointer-lowtag)))
       (unless (location= value-imag result-imag)
 	(inst fstd result-imag))
       (inst fxch value-imag))))
@@ -950,16 +942,16 @@
     (let ((real-tn (complex-long-reg-real-tn value)))
       (with-empty-tn@fp-top (real-tn)
 	(inst fldl (make-ea :dword :base object :index temp :scale 2
-			    :disp (- (* sb!vm:vector-data-offset
-					sb!vm:n-word-bytes)
-				     sb!vm:other-pointer-lowtag)))))
+			    :disp (- (* vector-data-offset
+					n-word-bytes)
+				     other-pointer-lowtag)))))
     (let ((imag-tn (complex-long-reg-imag-tn value)))
       (with-empty-tn@fp-top (imag-tn)
 	(inst fldl (make-ea :dword :base object :index temp :scale 2
-			    :disp (- (+ (* sb!vm:vector-data-offset
-					   sb!vm:n-word-bytes)
+			    :disp (- (+ (* vector-data-offset
+					   n-word-bytes)
 					12)
-				     sb!vm:other-pointer-lowtag)))))))
+				     other-pointer-lowtag)))))))
 
 #!+long-float
 (define-vop (data-vector-ref-c/simple-array-complex-long-float)
@@ -975,17 +967,17 @@
     (let ((real-tn (complex-long-reg-real-tn value)))
       (with-empty-tn@fp-top (real-tn)
 	(inst fldl (make-ea :dword :base object
-			    :disp (- (+ (* sb!vm:vector-data-offset
-					   sb!vm:n-word-bytes)
+			    :disp (- (+ (* vector-data-offset
+					   n-word-bytes)
 					(* 24 index))
-				     sb!vm:other-pointer-lowtag)))))
+				     other-pointer-lowtag)))))
     (let ((imag-tn (complex-long-reg-imag-tn value)))
       (with-empty-tn@fp-top (imag-tn)
 	(inst fldl (make-ea :dword :base object
-			    :disp (- (+ (* sb!vm:vector-data-offset
-					   sb!vm:n-word-bytes)
+			    :disp (- (+ (* vector-data-offset
+					   n-word-bytes)
 					(* 24 index) 12)
-				     sb!vm:other-pointer-lowtag)))))))
+				     other-pointer-lowtag)))))))
 
 #!+long-float
 (define-vop (data-vector-set/simple-array-complex-long-float)
@@ -1009,8 +1001,8 @@
 	     ;; Value is in ST0.
 	     (store-long-float
 	      (make-ea :dword :base object :index temp :scale 2
-		       :disp (- (* sb!vm:vector-data-offset sb!vm:n-word-bytes)
-				sb!vm:other-pointer-lowtag)))
+		       :disp (- (* vector-data-offset n-word-bytes)
+				other-pointer-lowtag)))
 	     (unless (zerop (tn-offset result-real))
 	       ;; Value is in ST0 but not result.
 	       (inst fstd result-real)))
@@ -1019,8 +1011,8 @@
 	     (inst fxch value-real)
 	     (store-long-float
 	      (make-ea :dword :base object :index temp :scale 2
-		       :disp (- (* sb!vm:vector-data-offset sb!vm:n-word-bytes)
-				sb!vm:other-pointer-lowtag)))
+		       :disp (- (* vector-data-offset n-word-bytes)
+				other-pointer-lowtag)))
 	     (cond ((zerop (tn-offset result-real))
 		    ;; The result is in ST0.
 		    (inst fstd value-real))
@@ -1034,8 +1026,8 @@
       (inst fxch value-imag)
       (store-long-float
        (make-ea :dword :base object :index temp :scale 2
-		:disp (- (+ (* sb!vm:vector-data-offset sb!vm:n-word-bytes) 12)
-			 sb!vm:other-pointer-lowtag)))
+		:disp (- (+ (* vector-data-offset n-word-bytes) 12)
+			 other-pointer-lowtag)))
       (unless (location= value-imag result-imag)
 	(inst fstd result-imag))
       (inst fxch value-imag))))
@@ -1059,10 +1051,10 @@
 	     ;; Value is in ST0.
 	     (store-long-float
 	      (make-ea :dword :base object
-		       :disp (- (+ (* sb!vm:vector-data-offset
-				      sb!vm:n-word-bytes)
+		       :disp (- (+ (* vector-data-offset
+				      n-word-bytes)
 				   (* 24 index))
-				sb!vm:other-pointer-lowtag)))
+				other-pointer-lowtag)))
 	     (unless (zerop (tn-offset result-real))
 	       ;; Value is in ST0 but not result.
 	       (inst fstd result-real)))
@@ -1071,10 +1063,10 @@
 	     (inst fxch value-real)
 	     (store-long-float
 	      (make-ea :dword :base object
-		       :disp (- (+ (* sb!vm:vector-data-offset
-				      sb!vm:n-word-bytes)
+		       :disp (- (+ (* vector-data-offset
+				      n-word-bytes)
 				   (* 24 index))
-				sb!vm:other-pointer-lowtag)))
+				other-pointer-lowtag)))
 	     (cond ((zerop (tn-offset result-real))
 		    ;; The result is in ST0.
 		    (inst fstd value-real))
@@ -1088,15 +1080,15 @@
       (inst fxch value-imag)
       (store-long-float
        (make-ea :dword :base object
-		:disp (- (+ (* sb!vm:vector-data-offset
-			       sb!vm:n-word-bytes)
+		:disp (- (+ (* vector-data-offset
+			       n-word-bytes)
 			    ;; FIXME: There are so many of these bare constants
 			    ;; (24, 12..) in the LONG-FLOAT code that it's
 			    ;; ridiculous. I should probably just delete it all
 			    ;; instead of appearing to flirt with supporting
 			    ;; this maintenance nightmare.
 			    (* 24 index) 12)
-			 sb!vm:other-pointer-lowtag)))
+			 other-pointer-lowtag)))
       (unless (location= value-imag result-imag)
 	(inst fstd result-imag))
       (inst fxch value-imag))))

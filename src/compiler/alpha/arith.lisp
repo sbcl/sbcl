@@ -645,21 +645,21 @@
 ;;;; bignum stuff
 
 (define-vop (bignum-length get-header-data)
-  (:translate sb!bignum::%bignum-length)
+  (:translate sb!bignum:%bignum-length)
   (:policy :fast-safe))
 
 (define-vop (bignum-set-length set-header-data)
-  (:translate sb!bignum::%bignum-set-length)
+  (:translate sb!bignum:%bignum-set-length)
   (:policy :fast-safe))
 
 (define-full-reffer bignum-ref * bignum-digits-offset other-pointer-lowtag
-  (unsigned-reg) unsigned-num sb!bignum::%bignum-ref)
+  (unsigned-reg) unsigned-num sb!bignum:%bignum-ref)
 
 (define-full-setter bignum-set * bignum-digits-offset other-pointer-lowtag
-  (unsigned-reg) unsigned-num sb!bignum::%bignum-set #!+gengc nil)
+  (unsigned-reg) unsigned-num sb!bignum:%bignum-set #!+gengc nil)
 
 (define-vop (digit-0-or-plus)
-  (:translate sb!bignum::%digit-0-or-plusp)
+  (:translate sb!bignum:%digit-0-or-plusp)
   (:policy :fast-safe)
   (:args (digit :scs (unsigned-reg)))
   (:arg-types unsigned-num)
@@ -673,7 +673,7 @@
 	(inst bge temp target))))
 
 (define-vop (add-w/carry)
-  (:translate sb!bignum::%add-with-carry)
+  (:translate sb!bignum:%add-with-carry)
   (:policy :fast-safe)
   (:args (a :scs (unsigned-reg))
 	 (b :scs (unsigned-reg))
@@ -689,7 +689,7 @@
     (inst mskll result 4 result)))
 
 (define-vop (sub-w/borrow)
-  (:translate sb!bignum::%subtract-with-borrow)
+  (:translate sb!bignum:%subtract-with-borrow)
   (:policy :fast-safe)
   (:args (a :scs (unsigned-reg))
 	 (b :scs (unsigned-reg))
@@ -707,7 +707,7 @@
     (inst mskll result 4 result)))
 
 (define-vop (bignum-mult-and-add-3-arg)
-  (:translate sb!bignum::%multiply-and-add)
+  (:translate sb!bignum:%multiply-and-add)
   (:policy :fast-safe)
   (:args (x :scs (unsigned-reg))
 	 (y :scs (unsigned-reg))
@@ -724,7 +724,7 @@
 
 
 (define-vop (bignum-mult-and-add-4-arg)
-  (:translate sb!bignum::%multiply-and-add)
+  (:translate sb!bignum:%multiply-and-add)
   (:policy :fast-safe)
   (:args (x :scs (unsigned-reg))
 	 (y :scs (unsigned-reg))
@@ -742,7 +742,7 @@
     (inst mskll lo 4 lo)))
 
 (define-vop (bignum-mult)
-  (:translate sb!bignum::%multiply)
+  (:translate sb!bignum:%multiply)
   (:policy :fast-safe)
   (:args (x :scs (unsigned-reg))
 	 (y :scs (unsigned-reg)))
@@ -756,7 +756,7 @@
     (inst mskll lo 4 lo)))
 
 (define-vop (bignum-lognot)
-  (:translate sb!bignum::%lognot)
+  (:translate sb!bignum:%lognot)
   (:policy :fast-safe)
   (:args (x :scs (unsigned-reg)))
   (:arg-types unsigned-num)
@@ -767,7 +767,7 @@
     (inst mskll r 4 r)))
 
 (define-vop (fixnum-to-digit)
-  (:translate sb!bignum::%fixnum-to-digit)
+  (:translate sb!bignum:%fixnum-to-digit)
   (:policy :fast-safe)
   (:args (fixnum :scs (any-reg)))
   (:arg-types tagged-num)
@@ -777,7 +777,7 @@
     (inst sra fixnum 2 digit)))
 
 (define-vop (bignum-floor)
-  (:translate sb!bignum::%floor)
+  (:translate sb!bignum:%floor)
   (:policy :fast-safe)
   (:args (num-high :scs (unsigned-reg))
 	 (num-low :scs (unsigned-reg))
@@ -807,7 +807,7 @@
 	(emit-label shift2)))))
 
 (define-vop (signify-digit)
-  (:translate sb!bignum::%fixnum-digit-with-correct-sign)
+  (:translate sb!bignum:%fixnum-digit-with-correct-sign)
   (:policy :fast-safe)
   (:args (digit :scs (unsigned-reg) :target res))
   (:arg-types unsigned-num)
@@ -824,7 +824,7 @@
 
 
 (define-vop (digit-ashr)
-  (:translate sb!bignum::%ashr)
+  (:translate sb!bignum:%ashr)
   (:policy :fast-safe)
   (:args (digit :scs (unsigned-reg))
 	 (count :scs (unsigned-reg)))
@@ -837,12 +837,12 @@
     (inst srl result 32 result)))
 
 (define-vop (digit-lshr digit-ashr)
-  (:translate sb!bignum::%digit-logical-shift-right)
+  (:translate sb!bignum:%digit-logical-shift-right)
   (:generator 1
     (inst srl digit count result)))
 
 (define-vop (digit-ashl digit-ashr)
-  (:translate sb!bignum::%ashl)
+  (:translate sb!bignum:%ashl)
   (:generator 1
     (inst sll digit count result)))
 

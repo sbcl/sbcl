@@ -1,4 +1,4 @@
-;;;; the VM definition arithmetic VOPs for the x86
+;;;; the VM definition of arithmetic VOPs for the x86
 
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
@@ -1203,21 +1203,21 @@
 ;;;; bignum stuff
 
 (define-vop (bignum-length get-header-data)
-  (:translate sb!bignum::%bignum-length)
+  (:translate sb!bignum:%bignum-length)
   (:policy :fast-safe))
 
 (define-vop (bignum-set-length set-header-data)
-  (:translate sb!bignum::%bignum-set-length)
+  (:translate sb!bignum:%bignum-set-length)
   (:policy :fast-safe))
 
 (define-full-reffer bignum-ref * bignum-digits-offset other-pointer-lowtag
-  (unsigned-reg) unsigned-num sb!bignum::%bignum-ref)
+  (unsigned-reg) unsigned-num sb!bignum:%bignum-ref)
 
 (define-full-setter bignum-set * bignum-digits-offset other-pointer-lowtag
-  (unsigned-reg) unsigned-num sb!bignum::%bignum-set)
+  (unsigned-reg) unsigned-num sb!bignum:%bignum-set)
 
 (define-vop (digit-0-or-plus)
-  (:translate sb!bignum::%digit-0-or-plusp)
+  (:translate sb!bignum:%digit-0-or-plusp)
   (:policy :fast-safe)
   (:args (digit :scs (unsigned-reg)))
   (:arg-types unsigned-num)
@@ -1233,7 +1233,7 @@
 ;;; 4. This is easy to deal with and may save a fixnum-word
 ;;; conversion.
 (define-vop (add-w/carry)
-  (:translate sb!bignum::%add-with-carry)
+  (:translate sb!bignum:%add-with-carry)
   (:policy :fast-safe)
   (:args (a :scs (unsigned-reg) :target result)
 	 (b :scs (unsigned-reg unsigned-stack) :to :eval)
@@ -1254,7 +1254,7 @@
 ;;; Note: the borrow is the oppostite of the x86 convention - 1 for no
 ;;; borrow and 0 for a borrow.
 (define-vop (sub-w/borrow)
-  (:translate sb!bignum::%subtract-with-borrow)
+  (:translate sb!bignum:%subtract-with-borrow)
   (:policy :fast-safe)
   (:args (a :scs (unsigned-reg) :to :eval :target result)
 	 (b :scs (unsigned-reg unsigned-stack) :to :result)
@@ -1273,7 +1273,7 @@
 
 
 (define-vop (bignum-mult-and-add-3-arg)
-  (:translate sb!bignum::%multiply-and-add)
+  (:translate sb!bignum:%multiply-and-add)
   (:policy :fast-safe)
   (:args (x :scs (unsigned-reg) :target eax)
 	 (y :scs (unsigned-reg unsigned-stack))
@@ -1295,7 +1295,7 @@
     (move lo eax)))
 
 (define-vop (bignum-mult-and-add-4-arg)
-  (:translate sb!bignum::%multiply-and-add)
+  (:translate sb!bignum:%multiply-and-add)
   (:policy :fast-safe)
   (:args (x :scs (unsigned-reg) :target eax)
 	 (y :scs (unsigned-reg unsigned-stack))
@@ -1321,7 +1321,7 @@
 
 
 (define-vop (bignum-mult)
-  (:translate sb!bignum::%multiply)
+  (:translate sb!bignum:%multiply)
   (:policy :fast-safe)
   (:args (x :scs (unsigned-reg) :target eax)
 	 (y :scs (unsigned-reg unsigned-stack)))
@@ -1340,10 +1340,10 @@
     (move lo eax)))
 
 (define-vop (bignum-lognot lognot-mod32/unsigned=>unsigned)
-  (:translate sb!bignum::%lognot))
+  (:translate sb!bignum:%lognot))
 
 (define-vop (fixnum-to-digit)
-  (:translate sb!bignum::%fixnum-to-digit)
+  (:translate sb!bignum:%fixnum-to-digit)
   (:policy :fast-safe)
   (:args (fixnum :scs (any-reg control-stack) :target digit))
   (:arg-types tagged-num)
@@ -1357,7 +1357,7 @@
     (inst sar digit 2)))
 
 (define-vop (bignum-floor)
-  (:translate sb!bignum::%floor)
+  (:translate sb!bignum:%floor)
   (:policy :fast-safe)
   (:args (div-high :scs (unsigned-reg) :target edx)
 	 (div-low :scs (unsigned-reg) :target eax)
@@ -1378,7 +1378,7 @@
     (move rem edx)))
 
 (define-vop (signify-digit)
-  (:translate sb!bignum::%fixnum-digit-with-correct-sign)
+  (:translate sb!bignum:%fixnum-digit-with-correct-sign)
   (:policy :fast-safe)
   (:args (digit :scs (unsigned-reg unsigned-stack) :target res))
   (:arg-types unsigned-num)
@@ -1393,7 +1393,7 @@
       (inst shl res 2))))
 
 (define-vop (digit-ashr)
-  (:translate sb!bignum::%ashr)
+  (:translate sb!bignum:%ashr)
   (:policy :fast-safe)
   (:args (digit :scs (unsigned-reg unsigned-stack) :target result)
 	 (count :scs (unsigned-reg) :target ecx))
@@ -1409,14 +1409,14 @@
     (inst sar result :cl)))
 
 (define-vop (digit-lshr digit-ashr)
-  (:translate sb!bignum::%digit-logical-shift-right)
+  (:translate sb!bignum:%digit-logical-shift-right)
   (:generator 1
     (move result digit)
     (move ecx count)
     (inst shr result :cl)))
 
 (define-vop (digit-ashl digit-ashr)
-  (:translate sb!bignum::%ashl)
+  (:translate sb!bignum:%ashl)
   (:generator 1
     (move result digit)
     (move ecx count)

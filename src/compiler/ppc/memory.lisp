@@ -1,12 +1,17 @@
-;;; reference VOPs inherited by basic memory reference operations.
-;;;
-;;; Written by Rob MacLachlan
-;;;
-;;; Converted by William Lott.
-;;; 
+;;;; the PPC definitions of some general purpose memory reference VOPs
+;;;; inherited by basic memory reference operations
+
+;;;; This software is part of the SBCL system. See the README file for
+;;;; more information.
+;;;;
+;;;; This software is derived from the CMU CL system, which was
+;;;; written at Carnegie Mellon University and released into the
+;;;; public domain. The software is in the public domain and is
+;;;; provided with absolutely no warranty. See the COPYING and CREDITS
+;;;; files for more information.
 
 (in-package "SB!VM")
-
+
 ;;; Cell-Ref and Cell-Set are used to define VOPs like CAR, where the offset to
 ;;; be read or written is a property of the VOP used.
 ;;;
@@ -70,8 +75,8 @@
 	  (let ((offset (- (+ (if (sc-is index zero)
 				  0
 				  (ash (tn-value index)
-				       (- sb!vm:word-shift ,shift)))
-			      (ash offset sb!vm:word-shift))
+				       (- word-shift ,shift)))
+			      (ash offset word-shift))
 			   lowtag)))
 	    (etypecase offset
 	      ((signed-byte 16)
@@ -83,7 +88,7 @@
 	  ,@(unless (zerop shift)
 	      `((inst srwi temp index ,shift)))
 	  (inst addi temp ,(if (zerop shift) 'index 'temp)
-		(- (ash offset sb!vm:word-shift) lowtag))
+		(- (ash offset word-shift) lowtag))
 	  (inst ,rr-op value object temp)))
        ,@(when sign-extend-byte
            `((inst extsb value value)))

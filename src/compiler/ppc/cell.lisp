@@ -1,9 +1,14 @@
-;;; VOPs for the PPC.
-;;;
-;;; Written by Rob MacLachlan
-;;;
-;;; Converted by William Lott.
-;;; 
+;;;; the VM definition of various primitive memory access VOPs for the
+;;;; PPC
+
+;;;; This software is part of the SBCL system. See the README file for
+;;;; more information.
+;;;;
+;;;; This software is derived from the CMU CL system, which was
+;;;; written at Carnegie Mellon University and released into the
+;;;; public domain. The software is in the public domain and is
+;;;; provided with absolutely no warranty. See the COPYING and CREDITS
+;;;; files for more information.
 
 (in-package "SB!VM")
 
@@ -53,9 +58,9 @@
   (:translate symbol-value)
   (:generator 9
     (move obj-temp object)
-    (loadw value obj-temp sb!vm:symbol-value-slot sb!vm:other-pointer-lowtag)
+    (loadw value obj-temp symbol-value-slot other-pointer-lowtag)
     (let ((err-lab (generate-error-code vop unbound-symbol-error obj-temp)))
-      (inst cmpwi value sb!vm:unbound-marker-widetag)
+      (inst cmpwi value unbound-marker-widetag)
       (inst beq err-lab))))
 
 ;;; Like CHECKED-CELL-REF, only we are a predicate to see if the cell is bound.
@@ -69,12 +74,12 @@
 (define-vop (boundp boundp-frob)
   (:translate boundp)
   (:generator 9
-    (loadw value object sb!vm:symbol-value-slot sb!vm:other-pointer-lowtag)
-    (inst cmpwi value sb!vm:unbound-marker-widetag)
+    (loadw value object symbol-value-slot other-pointer-lowtag)
+    (inst cmpwi value unbound-marker-widetag)
     (inst b? (if not-p :eq :ne) target)))
 
 (define-vop (fast-symbol-value cell-ref)
-  (:variant sb!vm:symbol-value-slot sb!vm:other-pointer-lowtag)
+  (:variant symbol-value-slot other-pointer-lowtag)
   (:policy :fast)
   (:translate symbol-value))
 
@@ -144,21 +149,21 @@
 	 (symbol :scs (descriptor-reg)))
   (:temporary (:scs (descriptor-reg)) temp)
   (:generator 5
-    (loadw temp symbol sb!vm:symbol-value-slot sb!vm:other-pointer-lowtag)
-    (inst addi bsp-tn bsp-tn (* 2 sb!vm:n-word-bytes))
-    (storew temp bsp-tn (- sb!vm:binding-value-slot sb!vm:binding-size))
-    (storew symbol bsp-tn (- sb!vm:binding-symbol-slot sb!vm:binding-size))
-    (storew val symbol sb!vm:symbol-value-slot sb!vm:other-pointer-lowtag)))
+    (loadw temp symbol symbol-value-slot other-pointer-lowtag)
+    (inst addi bsp-tn bsp-tn (* 2 n-word-bytes))
+    (storew temp bsp-tn (- binding-value-slot binding-size))
+    (storew symbol bsp-tn (- binding-symbol-slot binding-size))
+    (storew val symbol symbol-value-slot other-pointer-lowtag)))
 
 
 (define-vop (unbind)
   (:temporary (:scs (descriptor-reg)) symbol value)
   (:generator 0
-    (loadw symbol bsp-tn (- sb!vm:binding-symbol-slot sb!vm:binding-size))
-    (loadw value bsp-tn (- sb!vm:binding-value-slot sb!vm:binding-size))
-    (storew value symbol sb!vm:symbol-value-slot sb!vm:other-pointer-lowtag)
-    (storew zero-tn bsp-tn (- sb!vm:binding-symbol-slot sb!vm:binding-size))
-    (inst subi bsp-tn bsp-tn (* 2 sb!vm:n-word-bytes))))
+    (loadw symbol bsp-tn (- binding-symbol-slot binding-size))
+    (loadw value bsp-tn (- binding-value-slot binding-size))
+    (storew value symbol symbol-value-slot other-pointer-lowtag)
+    (storew zero-tn bsp-tn (- binding-symbol-slot binding-size))
+    (inst subi bsp-tn bsp-tn (* 2 n-word-bytes))))
 
 
 (define-vop (unbind-to-here)
@@ -174,15 +179,15 @@
       (inst beq done)
 
       (emit-label loop)
-      (loadw symbol bsp-tn (- sb!vm:binding-symbol-slot sb!vm:binding-size))
+      (loadw symbol bsp-tn (- binding-symbol-slot binding-size))
       (inst cmpwi symbol 0)
       (inst beq skip)
-      (loadw value bsp-tn (- sb!vm:binding-value-slot sb!vm:binding-size))
-      (storew value symbol sb!vm:symbol-value-slot sb!vm:other-pointer-lowtag)
-      (storew zero-tn bsp-tn (- sb!vm:binding-symbol-slot sb!vm:binding-size))
+      (loadw value bsp-tn (- binding-value-slot binding-size))
+      (storew value symbol symbol-value-slot other-pointer-lowtag)
+      (storew zero-tn bsp-tn (- binding-symbol-slot binding-size))
 
       (emit-label skip)
-      (inst subi bsp-tn bsp-tn (* 2 sb!vm:n-word-bytes))
+      (inst subi bsp-tn bsp-tn (* 2 n-word-bytes))
       (inst cmpw where bsp-tn)
       (inst bne loop)
 
@@ -193,11 +198,11 @@
 ;;;; Closure indexing.
 
 (define-vop (closure-index-ref word-index-ref)
-  (:variant sb!vm:closure-info-offset sb!vm:fun-pointer-lowtag)
+  (:variant closure-info-offset fun-pointer-lowtag)
   (:translate %closure-index-ref))
 
 (define-vop (funcallable-instance-info word-index-ref)
-  (:variant funcallable-instance-info-offset sb!vm:fun-pointer-lowtag)
+  (:variant funcallable-instance-info-offset fun-pointer-lowtag)
   (:translate %funcallable-instance-info))
 
 (define-vop (set-funcallable-instance-info word-index-set)
@@ -236,7 +241,7 @@
   (:result-types positive-fixnum)
   (:generator 4
     (loadw temp struct 0 instance-pointer-lowtag)
-    (inst srwi res temp sb!vm:n-widetag-bits)))
+    (inst srwi res temp n-widetag-bits)))
 
 (define-vop (instance-ref slot-ref)
   (:variant instance-slots-offset instance-pointer-lowtag)

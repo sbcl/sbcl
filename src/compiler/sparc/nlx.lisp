@@ -1,5 +1,5 @@
-;;;; the definitions of VOPs used for non-local exit (throw, lexical
-;;;; exit, etc.)
+;;;; the SPARC definitions of VOPs used for non-local exit (throw,
+;;;; lexical exit, etc.)
 
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.

@@ -118,7 +118,7 @@
 ;;; and seems to be working so far    -dan
 ;;;
 ;;; arbitrarily taken for alpha, too. - Christophe
-(def!constant sb!vm::kludge-nondeterministic-catch-block-size 7)
+(def!constant kludge-nondeterministic-catch-block-size 7)
 
 (!define-storage-classes
 
@@ -270,7 +270,7 @@
 
 
   ;; A catch or unwind block.
-  (catch-block control-stack :element-size sb!vm::kludge-nondeterministic-catch-block-size))
+  (catch-block control-stack :element-size kludge-nondeterministic-catch-block-size))
 
 ;;;; Make some miscellaneous TNs for important registers.
 (macrolet ((defregtn (name sc)

@@ -2,6 +2,14 @@
 ;;;; attributes for the PPC.  This file is separate from other stuff so 
 ;;;; that it can be compiled and loaded earlier. 
 
+;;;; This software is part of the SBCL system. See the README file for
+;;;; more information.
+;;;;
+;;;; This software is derived from the CMU CL system, which was
+;;;; written at Carnegie Mellon University and released into the
+;;;; public domain. The software is in the public domain and is
+;;;; provided with absolutely no warranty. See the COPYING and CREDITS
+;;;; files for more information.
 
 (in-package "SB!VM")
 
@@ -88,13 +96,10 @@
 (def!constant number-stack-displacement
   (* #!-darwin 2
      #!+darwin 8
-     sb!vm:n-word-bytes))
-
+     n-word-bytes))
 
 
-
 ;;; Where to put the different spaces.
-;;; 
 
 (def!constant read-only-space-start #x01000000)
 (def!constant read-only-space-end   #x04ff8000)

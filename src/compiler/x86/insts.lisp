@@ -637,7 +637,7 @@
   (let ((offset (fixup-offset fixup)))
     (if (label-p offset)
 	(emit-back-patch segment
-			 4 ; FIXME: sb!vm:n-word-bytes
+			 4 ; FIXME: n-word-bytes
 			 (lambda (segment posn)
 			   (declare (ignore posn))
 			   (emit-dword segment

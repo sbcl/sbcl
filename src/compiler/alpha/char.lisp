@@ -18,7 +18,7 @@
   (:args (x :scs (any-reg descriptor-reg)))
   (:results (y :scs (base-char-reg)))
   (:generator 1
-    (inst srl x sb!vm:n-widetag-bits y)))
+    (inst srl x n-widetag-bits y)))
 ;;;
 (define-move-vop move-to-base-char :move
   (any-reg descriptor-reg) (base-char-reg))
@@ -28,8 +28,8 @@
   (:args (x :scs (base-char-reg)))
   (:results (y :scs (any-reg descriptor-reg)))
   (:generator 1
-    (inst sll x sb!vm:n-widetag-bits y)
-    (inst bis y sb!vm:base-char-widetag y)))
+    (inst sll x n-widetag-bits y)
+    (inst bis y base-char-widetag y)))
 ;;;
 (define-move-vop move-from-base-char :move
   (base-char-reg) (any-reg descriptor-reg))

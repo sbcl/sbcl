@@ -1,4 +1,14 @@
-;;;
+;;;; miscellaneous VM definition noise for the PPC
+
+;;;; This software is part of the SBCL system. See the README file for
+;;;; more information.
+;;;;
+;;;; This software is derived from the CMU CL system, which was
+;;;; written at Carnegie Mellon University and released into the
+;;;; public domain. The software is in the public domain and is
+;;;; provided with absolutely no warranty. See the COPYING and CREDITS
+;;;; files for more information.
+
 (in-package "SB!VM")
 
 
@@ -98,9 +108,7 @@
       ((null classes)
        (nreverse forms))))
 
-;; XXX this is most likely wrong.  Check with Eric Marsden next time you
-;; see him
-(def!constant sb!vm::kludge-nondeterministic-catch-block-size 7)
+(def!constant kludge-nondeterministic-catch-block-size 7)
 
 (define-storage-classes
 
@@ -221,9 +229,7 @@
 
   ;; A catch or unwind block.
   (catch-block control-stack
-               :element-size sb!vm::kludge-nondeterministic-catch-block-size))
-
-
+               :element-size kludge-nondeterministic-catch-block-size))
 
 ;;;; Make some random tns for important registers.
 

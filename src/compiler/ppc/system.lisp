@@ -1,11 +1,15 @@
-;;;
-;;; Written by Rob MacLachlan
-;;;
-;;; Mips conversion by William Lott and Christopher Hoover.
-;;;
+;;;; PPC VM definitions of various system hacking operations
+
+;;;; This software is part of the SBCL system. See the README file for
+;;;; more information.
+;;;;
+;;;; This software is derived from the CMU CL system, which was
+;;;; written at Carnegie Mellon University and released into the
+;;;; public domain. The software is in the public domain and is
+;;;; provided with absolutely no warranty. See the COPYING and CREDITS
+;;;; files for more information.
+
 (in-package "SB!VM")
-
-
 
 ;;;; Type frobbing VOPs
 
@@ -16,7 +20,7 @@
   (:results (result :scs (unsigned-reg)))
   (:result-types positive-fixnum)
   (:generator 1
-    (inst andi. result object sb!vm:lowtag-mask)))
+    (inst andi. result object lowtag-mask)))
 
 (define-vop (widetag-of)
   (:translate widetag-of)
@@ -61,7 +65,7 @@
   (:results (result :scs (unsigned-reg)))
   (:result-types positive-fixnum)
   (:generator 6
-    (load-type result function (- sb!vm:fun-pointer-lowtag))))
+    (load-type result function (- fun-pointer-lowtag))))
 
 (define-vop (set-fun-subtype)
   (:translate (setf fun-subtype))
@@ -82,8 +86,8 @@
   (:results (res :scs (unsigned-reg)))
   (:result-types positive-fixnum)
   (:generator 6
-    (loadw res x 0 sb!vm:other-pointer-lowtag)
-    (inst srwi res res sb!vm:n-widetag-bits)))
+    (loadw res x 0 other-pointer-lowtag)
+    (inst srwi res res n-widetag-bits)))
 
 (define-vop (get-closure-length)
   (:translate get-closure-length)
@@ -92,8 +96,8 @@
   (:results (res :scs (unsigned-reg)))
   (:result-types positive-fixnum)
   (:generator 6
-    (loadw res x 0 sb!vm:fun-pointer-lowtag)
-    (inst srwi res res sb!vm:n-widetag-bits)))
+    (loadw res x 0 fun-pointer-lowtag)
+    (inst srwi res res n-widetag-bits)))
 
 (define-vop (set-header-data)
   (:translate set-header-data)
@@ -104,16 +108,16 @@
   (:results (res :scs (descriptor-reg)))
   (:temporary (:scs (non-descriptor-reg)) t1 t2)
   (:generator 6
-    (loadw t1 x 0 sb!vm:other-pointer-lowtag)
-    (inst andi. t1 t1 sb!vm:widetag-mask)
+    (loadw t1 x 0 other-pointer-lowtag)
+    (inst andi. t1 t1 widetag-mask)
     (sc-case data
       (any-reg
-       (inst slwi t2 data (- sb!vm:n-widetag-bits 2))
+       (inst slwi t2 data (- n-widetag-bits 2))
        (inst or t1 t1 t2))
       (immediate
-       (inst ori t1 t1 (ash (tn-value data) sb!vm:n-widetag-bits)))
+       (inst ori t1 t1 (ash (tn-value data) n-widetag-bits)))
       (zero))
-    (storew t1 x 0 sb!vm:other-pointer-lowtag)
+    (storew t1 x 0 other-pointer-lowtag)
     (move res x)))
 
 
@@ -136,11 +140,11 @@
   (:generator 2
     (sc-case type
       (immediate
-       (inst slwi temp val sb!vm:n-widetag-bits)
+       (inst slwi temp val n-widetag-bits)
        (inst ori res temp (tn-value type)))
       (t
        (inst srawi temp type 2)
-       (inst slwi res val (- sb!vm:n-widetag-bits 2))
+       (inst slwi res val (- n-widetag-bits 2))
        (inst or res res temp)))))
 
 
@@ -181,10 +185,10 @@
   (:results (sap :scs (sap-reg)))
   (:result-types system-area-pointer)
   (:generator 10
-    (loadw ndescr code 0 sb!vm:other-pointer-lowtag)
-    (inst srwi ndescr ndescr sb!vm:n-widetag-bits)
-    (inst slwi ndescr ndescr sb!vm:word-shift)
-    (inst subi ndescr ndescr sb!vm:other-pointer-lowtag)
+    (loadw ndescr code 0 other-pointer-lowtag)
+    (inst srwi ndescr ndescr n-widetag-bits)
+    (inst slwi ndescr ndescr word-shift)
+    (inst subi ndescr ndescr other-pointer-lowtag)
     (inst add sap code ndescr)))
 
 (define-vop (compute-fun)
@@ -194,11 +198,11 @@
   (:results (func :scs (descriptor-reg)))
   (:temporary (:scs (non-descriptor-reg)) ndescr)
   (:generator 10
-    (loadw ndescr code 0 sb!vm:other-pointer-lowtag)
-    (inst srwi ndescr ndescr sb!vm:n-widetag-bits)
-    (inst slwi ndescr ndescr sb!vm:word-shift)
+    (loadw ndescr code 0 other-pointer-lowtag)
+    (inst srwi ndescr ndescr n-widetag-bits)
+    (inst slwi ndescr ndescr word-shift)
     (inst add ndescr ndescr offset)
-    (inst addi ndescr ndescr (- sb!vm:fun-pointer-lowtag sb!vm:other-pointer-lowtag))
+    (inst addi ndescr ndescr (- fun-pointer-lowtag other-pointer-lowtag))
     (inst add func code ndescr)))
 
 

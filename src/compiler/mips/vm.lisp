@@ -1,3 +1,14 @@
+;;;; miscellaneous VM definition noise for MIPS
+
+;;;; This software is part of the SBCL system. See the README file for
+;;;; more information.
+;;;;
+;;;; This software is derived from the CMU CL system, which was
+;;;; written at Carnegie Mellon University and released into the
+;;;; public domain. The software is in the public domain and is
+;;;; provided with absolutely no warranty. See the COPYING and CREDITS
+;;;; files for more information.
+
 (in-package "SB!VM")
 
 
@@ -93,7 +104,7 @@
       ((null classes)
        (nreverse forms))))
 
-(def!constant sb!vm::kludge-nondeterministic-catch-block-size 7)
+(def!constant kludge-nondeterministic-catch-block-size 7)
 
 (!define-storage-classes
 
@@ -220,7 +231,7 @@
    :alternate-scs (complex-double-stack))
 
   ;; A catch or unwind block.
-  (catch-block control-stack :element-size sb!vm::kludge-nondeterministic-catch-block-size)
+  (catch-block control-stack :element-size kludge-nondeterministic-catch-block-size)
 
   ;; floating point numbers temporarily stuck in integer registers for c-call
   (single-int-carg-reg registers

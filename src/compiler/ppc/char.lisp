@@ -19,7 +19,7 @@
   (:results (y :scs (base-char-reg)))
   (:note "character untagging")
   (:generator 1
-    (inst srwi y x sb!vm:n-widetag-bits)))
+    (inst srwi y x n-widetag-bits)))
 
 (define-move-vop move-to-base-char :move
   (any-reg descriptor-reg) (base-char-reg))
@@ -31,8 +31,8 @@
   (:results (y :scs (any-reg descriptor-reg)))
   (:note "character tagging")
   (:generator 1
-    (inst slwi y x sb!vm:n-widetag-bits)
-    (inst ori y y sb!vm:base-char-widetag)))
+    (inst slwi y x n-widetag-bits)
+    (inst ori y y base-char-widetag)))
 
 (define-move-vop move-from-base-char :move
   (base-char-reg) (any-reg descriptor-reg))

@@ -27,51 +27,39 @@
   (:generator 0
     (pseudo-atomic (pa-flag)
       (inst ori header alloc-tn other-pointer-lowtag)
-      (inst addi ndescr rank (* (1+ array-dimensions-offset) sb!vm:n-word-bytes))
+      (inst addi ndescr rank (* (1+ array-dimensions-offset) n-word-bytes))
       (inst clrrwi ndescr ndescr n-lowtag-bits)
       (inst add alloc-tn alloc-tn ndescr)
-      (inst addi ndescr rank (fixnumize (1- sb!vm:array-dimensions-offset)))
-      (inst slwi ndescr ndescr sb!vm:n-widetag-bits)
+      (inst addi ndescr rank (fixnumize (1- array-dimensions-offset)))
+      (inst slwi ndescr ndescr n-widetag-bits)
       (inst or ndescr ndescr type)
       (inst srwi ndescr ndescr 2)
-      (storew ndescr header 0 sb!vm:other-pointer-lowtag))
+      (storew ndescr header 0 other-pointer-lowtag))
     (move result header)))
 
 
 ;;;; Additional accessors and setters for the array header.
-
-(defknown sb!impl::%array-dimension (t fixnum) fixnum
-  (flushable))
-(defknown sb!impl::%set-array-dimension (t fixnum fixnum) fixnum
-  ())
-
 (define-vop (%array-dimension word-index-ref)
-  (:translate sb!impl::%array-dimension)
+  (:translate sb!kernel:%array-dimension)
   (:policy :fast-safe)
-  (:variant sb!vm:array-dimensions-offset sb!vm:other-pointer-lowtag))
+  (:variant array-dimensions-offset other-pointer-lowtag))
 
 (define-vop (%set-array-dimension word-index-set)
-  (:translate sb!impl::%set-array-dimension)
+  (:translate sb!kernel:%set-array-dimension)
   (:policy :fast-safe)
-  (:variant sb!vm:array-dimensions-offset sb!vm:other-pointer-lowtag))
-
-
-
-(defknown sb!impl::%array-rank (t) fixnum (flushable))
+  (:variant array-dimensions-offset other-pointer-lowtag))
 
 (define-vop (array-rank-vop)
-  (:translate sb!impl::%array-rank)
+  (:translate sb!kernel:%array-rank)
   (:policy :fast-safe)
   (:args (x :scs (descriptor-reg)))
   (:temporary (:scs (non-descriptor-reg)) temp)
   (:results (res :scs (any-reg descriptor-reg)))
   (:generator 6
-    (loadw temp x 0 sb!vm:other-pointer-lowtag)
-    (inst srawi temp temp sb!vm:n-widetag-bits)
-    (inst subi temp temp (1- sb!vm:array-dimensions-offset))
+    (loadw temp x 0 other-pointer-lowtag)
+    (inst srawi temp temp n-widetag-bits)
+    (inst subi temp temp (1- array-dimensions-offset))
     (inst slwi res temp 2)))
-
-
 
 ;;;; Bounds checking routine.
 
@@ -105,7 +93,7 @@
      (define-vop (,(symbolicate "DATA-VECTOR-REF/" (string type))
 		  ,(symbolicate (string variant) "-REF"))
        (:note "inline array access")
-       (:variant sb!vm:vector-data-offset sb!vm:other-pointer-lowtag)
+       (:variant vector-data-offset other-pointer-lowtag)
        (:translate data-vector-ref)
        (:arg-types ,type positive-fixnum)
        (:results (value :scs ,scs))
@@ -113,7 +101,7 @@
      (define-vop (,(symbolicate "DATA-VECTOR-SET/" (string type))
 		  ,(symbolicate (string variant) "-SET"))
        (:note "inline array store")
-       (:variant sb!vm:vector-data-offset sb!vm:other-pointer-lowtag)
+       (:variant vector-data-offset other-pointer-lowtag)
        (:translate data-vector-set)
        (:arg-types ,type positive-fixnum ,element-type)
        (:args (object :scs (descriptor-reg))
@@ -152,7 +140,7 @@
 ;;; 
 
 (macrolet ((def-small-data-vector-frobs (type bits)
-  (let* ((elements-per-word (floor sb!vm:n-word-bits bits))
+  (let* ((elements-per-word (floor n-word-bits bits))
 	 (bit-shift (1- (integer-length elements-per-word))))
     `(progn
        (define-vop (,(symbolicate 'data-vector-ref/ type))
@@ -168,8 +156,8 @@
 	 (:generator 20
 	   (inst srwi temp index ,bit-shift)
 	   (inst slwi temp temp 2)
-	   (inst addi temp temp (- (* sb!vm:vector-data-offset sb!vm:n-word-bytes)
-			           sb!vm:other-pointer-lowtag))
+	   (inst addi temp temp (- (* vector-data-offset n-word-bytes)
+			           other-pointer-lowtag))
 	   (inst lwzx result object temp)
 	   (inst andi. temp index ,(1- elements-per-word))
 	   (inst xori temp temp ,(1- elements-per-word))
@@ -191,9 +179,9 @@
 	   (multiple-value-bind (word extra)
 	       (floor index ,elements-per-word)
 	     (setf extra (logxor extra (1- ,elements-per-word)))
-	     (let ((offset (- (* (+ word sb!vm:vector-data-offset)
-				 sb!vm:n-word-bytes)
-			      sb!vm:other-pointer-lowtag)))
+	     (let ((offset (- (* (+ word vector-data-offset)
+				 n-word-bytes)
+			      other-pointer-lowtag)))
 	       (cond ((typep offset '(signed-byte 16))
 		      (inst lwz result object offset))
 		     (t
@@ -218,8 +206,8 @@
 	 (:generator 25
 	   (inst srwi offset index ,bit-shift)
 	   (inst slwi offset offset 2)
-	   (inst addi offset offset (- (* sb!vm:vector-data-offset sb!vm:n-word-bytes)
-			               sb!vm:other-pointer-lowtag))
+	   (inst addi offset offset (- (* vector-data-offset n-word-bytes)
+			               other-pointer-lowtag))
 	   (inst lwzx old object offset)
 	   (inst andi. shift index ,(1- elements-per-word))
 	   (inst xori shift shift ,(1- elements-per-word))
@@ -259,8 +247,8 @@
 	 (:temporary (:scs (non-descriptor-reg)) offset-reg temp old)
 	 (:generator 20
 	   (multiple-value-bind (word extra) (floor index ,elements-per-word)
-	     (let ((offset (- (* (+ word sb!vm:vector-data-offset) sb!vm:n-word-bytes)
-			      sb!vm:other-pointer-lowtag)))
+	     (let ((offset (- (* (+ word vector-data-offset) n-word-bytes)
+			      other-pointer-lowtag)))
 	       (cond ((typep offset '(signed-byte 16))
 		      (inst lwz old object offset))
 		     (t
@@ -322,8 +310,8 @@
   (:temporary (:scs (non-descriptor-reg)) offset)
   (:result-types single-float)
   (:generator 5
-    (inst addi offset index (- (* sb!vm:vector-data-offset sb!vm:n-word-bytes)
-			      sb!vm:other-pointer-lowtag))
+    (inst addi offset index (- (* vector-data-offset n-word-bytes)
+			      other-pointer-lowtag))
     (inst lfsx value object offset)))
 
 
@@ -340,8 +328,8 @@
   (:temporary (:scs (non-descriptor-reg)) offset)
   (:generator 5
     (inst addi offset index
-	  (- (* sb!vm:vector-data-offset sb!vm:n-word-bytes)
-	     sb!vm:other-pointer-lowtag))
+	  (- (* vector-data-offset n-word-bytes)
+	     other-pointer-lowtag))
     (inst stfsx value object offset)
     (unless (location= result value)
       (inst frsp result value))))
@@ -358,8 +346,8 @@
   (:temporary (:scs (non-descriptor-reg)) offset)
   (:generator 7
     (inst slwi offset index 1)
-    (inst addi offset offset (- (* sb!vm:vector-data-offset sb!vm:n-word-bytes)
-				sb!vm:other-pointer-lowtag))
+    (inst addi offset offset (- (* vector-data-offset n-word-bytes)
+				other-pointer-lowtag))
     (inst lfdx value object offset)))
 
 (define-vop (data-vector-set/simple-array-double-float)
@@ -375,8 +363,8 @@
   (:temporary (:scs (non-descriptor-reg)) offset)
   (:generator 20
     (inst slwi offset index 1)
-    (inst addi offset offset (- (* sb!vm:vector-data-offset sb!vm:n-word-bytes)
-			sb!vm:other-pointer-lowtag))
+    (inst addi offset offset (- (* vector-data-offset n-word-bytes)
+			other-pointer-lowtag))
     (inst stfdx value object offset)
     (unless (location= result value)
       (inst fmr result value))))
@@ -397,11 +385,11 @@
   (:generator 5
     (let ((real-tn (complex-single-reg-real-tn value)))
       (inst slwi offset index 1)
-      (inst addi offset offset (- (* sb!vm:vector-data-offset sb!vm:n-word-bytes)
-				  sb!vm:other-pointer-lowtag))
+      (inst addi offset offset (- (* vector-data-offset n-word-bytes)
+				  other-pointer-lowtag))
       (inst lfsx real-tn object offset))
     (let ((imag-tn (complex-single-reg-imag-tn value)))
-      (inst addi offset offset sb!vm:n-word-bytes)
+      (inst addi offset offset n-word-bytes)
       (inst lfsx imag-tn object offset))))
 
 (define-vop (data-vector-set/simple-array-complex-single-float)
@@ -420,14 +408,14 @@
     (let ((value-real (complex-single-reg-real-tn value))
 	  (result-real (complex-single-reg-real-tn result)))
       (inst slwi offset index 1)
-      (inst addi offset offset (- (* sb!vm:vector-data-offset sb!vm:n-word-bytes)
-				  sb!vm:other-pointer-lowtag))
+      (inst addi offset offset (- (* vector-data-offset n-word-bytes)
+				  other-pointer-lowtag))
       (inst stfsx value-real object offset)
       (unless (location= result-real value-real)
 	(inst frsp result-real value-real)))
     (let ((value-imag (complex-single-reg-imag-tn value))
 	  (result-imag (complex-single-reg-imag-tn result)))
-      (inst addi offset offset sb!vm:n-word-bytes)
+      (inst addi offset offset n-word-bytes)
       (inst stfsx value-imag object offset)
       (unless (location= result-imag value-imag)
 	(inst frsp result-imag value-imag)))))
@@ -446,11 +434,11 @@
   (:generator 7
     (let ((real-tn (complex-double-reg-real-tn value)))
       (inst slwi offset index 2)
-      (inst addi offset offset (- (* sb!vm:vector-data-offset sb!vm:n-word-bytes)
-				  sb!vm:other-pointer-lowtag))
+      (inst addi offset offset (- (* vector-data-offset n-word-bytes)
+				  other-pointer-lowtag))
       (inst lfdx real-tn object offset))
     (let ((imag-tn (complex-double-reg-imag-tn value)))
-      (inst addi offset offset (* 2 sb!vm:n-word-bytes))
+      (inst addi offset offset (* 2 n-word-bytes))
       (inst lfdx imag-tn object offset))))
 
 (define-vop (data-vector-set/simple-array-complex-double-float)
@@ -469,14 +457,14 @@
     (let ((value-real (complex-double-reg-real-tn value))
 	  (result-real (complex-double-reg-real-tn result)))
       (inst slwi offset index 2)
-      (inst addi offset offset (- (* sb!vm:vector-data-offset sb!vm:n-word-bytes)
-				  sb!vm:other-pointer-lowtag))
+      (inst addi offset offset (- (* vector-data-offset n-word-bytes)
+				  other-pointer-lowtag))
       (inst stfdx value-real object offset)
       (unless (location= result-real value-real)
 	(inst fmr result-real value-real)))
     (let ((value-imag (complex-double-reg-imag-tn value))
 	  (result-imag (complex-double-reg-imag-tn result)))
-      (inst addi offset offset (* 2 sb!vm:n-word-bytes))
+      (inst addi offset offset (* 2 n-word-bytes))
       (inst stfdx value-imag object offset)
       (unless (location= result-imag value-imag)
 	(inst fmr result-imag value-imag)))))
@@ -533,7 +521,7 @@
   (:translate %raw-bits)
   (:results (value :scs (unsigned-reg)))
   (:result-types unsigned-num)
-  (:variant 0 sb!vm:other-pointer-lowtag))
+  (:variant 0 other-pointer-lowtag))
 
 (define-vop (set-raw-bits word-index-set)
   (:note "setf raw-bits VOP")
@@ -544,7 +532,7 @@
   (:arg-types * positive-fixnum unsigned-num)
   (:results (result :scs (unsigned-reg)))
   (:result-types unsigned-num)
-  (:variant 0 sb!vm:other-pointer-lowtag))
+  (:variant 0 other-pointer-lowtag))
 
 
 
@@ -567,7 +555,7 @@
 
 (define-vop (data-vector-ref/simple-array-signed-byte-8 signed-byte-index-ref)
   (:note "inline array access")
-  (:variant sb!vm:vector-data-offset sb!vm:other-pointer-lowtag)
+  (:variant vector-data-offset other-pointer-lowtag)
   (:translate data-vector-ref)
   (:arg-types simple-array-signed-byte-8 positive-fixnum)
   (:results (value :scs (signed-reg)))
@@ -575,7 +563,7 @@
 
 (define-vop (data-vector-set/simple-array-signed-byte-8 byte-index-set)
   (:note "inline array store")
-  (:variant sb!vm:vector-data-offset sb!vm:other-pointer-lowtag)
+  (:variant vector-data-offset other-pointer-lowtag)
   (:translate data-vector-set)
   (:arg-types simple-array-signed-byte-8 positive-fixnum tagged-num)
   (:args (object :scs (descriptor-reg))
@@ -587,7 +575,7 @@
 (define-vop (data-vector-ref/simple-array-signed-byte-16
 	     signed-halfword-index-ref)
   (:note "inline array access")
-  (:variant sb!vm:vector-data-offset sb!vm:other-pointer-lowtag)
+  (:variant vector-data-offset other-pointer-lowtag)
   (:translate data-vector-ref)
   (:arg-types simple-array-signed-byte-16 positive-fixnum)
   (:results (value :scs (signed-reg)))
@@ -595,7 +583,7 @@
 
 (define-vop (data-vector-set/simple-array-signed-byte-16 halfword-index-set)
   (:note "inline array store")
-  (:variant sb!vm:vector-data-offset sb!vm:other-pointer-lowtag)
+  (:variant vector-data-offset other-pointer-lowtag)
   (:translate data-vector-set)
   (:arg-types simple-array-signed-byte-16 positive-fixnum tagged-num)
   (:args (object :scs (descriptor-reg))

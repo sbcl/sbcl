@@ -70,6 +70,12 @@
 (defknown set-header-data (t (unsigned-byte 24)) t
   (unsafe))
 
+(defknown %array-dimension (t index) index
+  (flushable))
+(defknown %set-array-dimension (t index index) index
+  ())
+(defknown %array-rank (t) index
+  (flushable))
 
 (defknown %make-instance (index) instance
   (unsafe))

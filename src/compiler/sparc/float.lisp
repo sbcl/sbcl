@@ -2510,7 +2510,7 @@
 ;;; expression since we don't have to do branches.
   
 (define-source-transform min (&rest args)
-  (if (member :sparc-v9 sb!vm:*backend-subfeatures*)
+  (if (member :sparc-v9 *backend-subfeatures*)
       (case (length args)
 	((0 2) (values nil t))
 	(1 `(values ,(first args)))
@@ -2518,7 +2518,7 @@
       (values nil t)))
 
 (define-source-transform max (&rest args)
-  (if (member :sparc-v9 sb!vm:*backend-subfeatures*)
+  (if (member :sparc-v9 *backend-subfeatures*)
       (case (length args)
 	((0 2) (values nil t))
 	(1 `(values ,(first args)))
@@ -2551,8 +2551,8 @@
 (deftransform max ((x y) (number number) *)
   (let ((x-type (lvar-type x))
 	(y-type (lvar-type y))
-	(signed (specifier-type '(signed-byte #.sb!vm:n-word-bits)))
-	(unsigned (specifier-type '(unsigned-byte #.sb!vm:n-word-bits)))
+	(signed (specifier-type '(signed-byte #.n-word-bits)))
+	(unsigned (specifier-type '(unsigned-byte #.n-word-bits)))
 	(d-float (specifier-type 'double-float))
 	(s-float (specifier-type 'single-float)))
     ;; Use %%max if both args are good types of the same type.  As a
@@ -2581,8 +2581,8 @@
 (deftransform min ((x y) (real real) *)
   (let ((x-type (lvar-type x))
 	(y-type (lvar-type y))
-	(signed (specifier-type '(signed-byte #.sb!vm:n-word-bits)))
-	(unsigned (specifier-type '(unsigned-byte #.sb!vm:n-word-bits)))
+	(signed (specifier-type '(signed-byte #.n-word-bits)))
+	(unsigned (specifier-type '(unsigned-byte #.n-word-bits)))
 	(d-float (specifier-type 'double-float))
 	(s-float (specifier-type 'single-float)))
     (cond ((and (csubtypep x-type signed)

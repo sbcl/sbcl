@@ -1,10 +1,18 @@
+;;;; the instruction set definition for HPPA
+
+;;;; This software is part of the SBCL system. See the README file for
+;;;; more information.
+;;;;
+;;;; This software is derived from the CMU CL system, which was
+;;;; written at Carnegie Mellon University and released into the
+;;;; public domain. The software is in the public domain and is
+;;;; provided with absolutely no warranty. See the COPYING and CREDITS
+;;;; files for more information.
+
 (in-package "SB!VM")
 
-;;; (def-assembler-params
-;;;  :scheduler-p nil)
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (setf sb!assem:*assem-scheduler-p* nil))
-
 
 ;;;; Utility functions.
 
@@ -415,19 +423,19 @@
   (declare (ignore inst))
   (flet ((nt (x) (if stream (sb!disassem:note x dstate))))
     (case (break-im5 chunk dstate)
-      (#.sb!vm:error-trap
+      (#.error-trap
        (nt "Error trap")
        (sb!disassem:handle-break-args #'snarf-error-junk stream dstate))
-      (#.sb!vm:cerror-trap
+      (#.cerror-trap
        (nt "Cerror trap")
        (sb!disassem:handle-break-args #'snarf-error-junk stream dstate))
-      (#.sb!vm:breakpoint-trap
+      (#.breakpoint-trap
        (nt "Breakpoint trap"))
-      (#.sb!vm:pending-interrupt-trap
+      (#.pending-interrupt-trap
        (nt "Pending interrupt trap"))
-      (#.sb!vm:halt-trap
+      (#.halt-trap
        (nt "Halt trap"))
-      (#.sb!vm:fun-end-breakpoint-trap
+      (#.fun-end-breakpoint-trap
        (nt "Function end breakpoint trap"))
     )))
 

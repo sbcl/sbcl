@@ -1,6 +1,14 @@
-;;;
-;;; Written by William Lott.
-;;; 
+;;;; PPC compiler support for the debugger
+
+;;;; This software is part of the SBCL system. See the README file for
+;;;; more information.
+;;;;
+;;;; This software is derived from the CMU CL system, which was
+;;;; written at Carnegie Mellon University and released into the
+;;;; public domain. The software is in the public domain and is
+;;;; provided with absolutely no warranty. See the COPYING and CREDITS
+;;;; files for more information.
+
 (in-package "SB!VM")
 
 (define-vop (debug-cur-sp)
@@ -53,12 +61,12 @@
     (let ((bogus (gen-label))
 	  (done (gen-label)))
       (loadw temp thing 0 lowtag)
-      (inst srwi temp temp sb!vm:n-widetag-bits)
+      (inst srwi temp temp n-widetag-bits)
       (inst cmpwi temp 0)
-      (inst slwi temp temp (1- (integer-length sb!vm:n-word-bytes)))
+      (inst slwi temp temp (1- (integer-length n-word-bytes)))
       (inst beq bogus)
-      (unless (= lowtag sb!vm:other-pointer-lowtag)
-	(inst addi temp temp (- lowtag sb!vm:other-pointer-lowtag)))
+      (unless (= lowtag other-pointer-lowtag)
+	(inst addi temp temp (- lowtag other-pointer-lowtag)))
       (inst sub code thing temp)
       (emit-label done)
       (assemble (*elsewhere*)
@@ -68,11 +76,11 @@
 
 (define-vop (code-from-lra code-from-mumble)
   (:translate sb!di::lra-code-header)
-  (:variant sb!vm:other-pointer-lowtag))
+  (:variant other-pointer-lowtag))
 
 (define-vop (code-from-fun code-from-mumble)
   (:translate sb!di::fun-code-header)
-  (:variant sb!vm:fun-pointer-lowtag))
+  (:variant fun-pointer-lowtag))
 
 (define-vop (make-lisp-obj)
   (:policy :fast-safe)
@@ -101,4 +109,4 @@
   (:result-types positive-fixnum)
   (:generator 5
     (loadw res fun 0 fun-pointer-lowtag)
-    (inst srwi res res sb!vm:n-widetag-bits)))
+    (inst srwi res res n-widetag-bits)))

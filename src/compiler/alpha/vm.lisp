@@ -117,10 +117,7 @@
       ((null classes)
        (nreverse forms))))
 
-;;; see comment in ../x86/vm.lisp.  The value of 7 was taken from
-;;; vm:catch-block-size in a cmucl that I happened to have around
-;;; and seems to be working so far    -dan
-(def!constant sb!vm::kludge-nondeterministic-catch-block-size 7)
+(def!constant kludge-nondeterministic-catch-block-size 7)
 
 (!define-storage-classes
 
@@ -243,7 +240,7 @@
 
   ;; A catch or unwind block.
   (catch-block control-stack
-               :element-size sb!vm::kludge-nondeterministic-catch-block-size))
+               :element-size kludge-nondeterministic-catch-block-size))
 
 ;;; Make some random tns for important registers.
 (macrolet ((defregtn (name sc)

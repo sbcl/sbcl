@@ -40,25 +40,16 @@
 
 
 ;;;; additional accessors and setters for the array header
-
-(defknown sb!impl::%array-dimension (t index) index
-  (flushable))
-(defknown sb!impl::%set-array-dimension (t index index) index
-  ())
-
 (define-full-reffer %array-dimension *
   array-dimensions-offset other-pointer-lowtag
-  (any-reg) positive-fixnum sb!impl::%array-dimension)
+  (any-reg) positive-fixnum sb!kernel:%array-dimension)
 
 (define-full-setter %set-array-dimension *
   array-dimensions-offset other-pointer-lowtag
-  (any-reg) positive-fixnum sb!impl::%set-array-dimension #!+gengc nil)
-
-
-(defknown sb!impl::%array-rank (t) index (flushable))
+  (any-reg) positive-fixnum sb!kernel:%set-array-dimension #!+gengc nil)
 
 (define-vop (array-rank-vop)
-  (:translate sb!impl::%array-rank)
+  (:translate sb!kernel:%array-rank)
   (:policy :fast-safe)
   (:args (x :scs (descriptor-reg)))
   (:temporary (:scs (non-descriptor-reg)) temp)
@@ -68,8 +59,6 @@
     (inst sra temp n-widetag-bits temp)
     (inst subq temp (1- array-dimensions-offset) temp)
     (inst sll temp 2 res)))
-
-
 
 ;;;; bounds checking routine
 

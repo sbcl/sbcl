@@ -232,10 +232,10 @@
     (cond (length-only
            (values 0 (1+ length) nil nil))
           (t
-           (sb!kernel:copy-from-system-area sap (* sb!vm:n-byte-bits (1+ offset))
-                                         vector (* sb!vm:n-word-bits
-                                                   sb!vm:vector-data-offset)
-                                         (* length sb!vm:n-byte-bits))
+           (sb!kernel:copy-from-system-area sap (* n-byte-bits (1+ offset))
+                                         vector (* n-word-bits
+                                                   vector-data-offset)
+                                         (* length n-byte-bits))
            (collect ((sc-offsets)
                      (lengths))
              (lengths 1)                ; the length byte
@@ -623,23 +623,23 @@
   (declare (ignore inst))
   (flet ((nt (x) (if stream (sb!disassem:note x dstate))))
     (case (xinstr-data chunk dstate)
-      (#.sb!vm:error-trap
+      (#.error-trap
        (nt "Error trap")
        (sb!disassem:handle-break-args #'snarf-error-junk stream dstate))
-      (#.sb!vm:cerror-trap
+      (#.cerror-trap
        (nt "Cerror trap")
        (sb!disassem:handle-break-args #'snarf-error-junk stream dstate))
-      (#.sb!vm:object-not-list-trap
+      (#.object-not-list-trap
        (nt "Object not list trap"))
-      (#.sb!vm:breakpoint-trap
+      (#.breakpoint-trap
        (nt "Breakpoint trap"))
-      (#.sb!vm:pending-interrupt-trap
+      (#.pending-interrupt-trap
        (nt "Pending interrupt trap"))
-      (#.sb!vm:halt-trap
+      (#.halt-trap
        (nt "Halt trap"))
-      (#.sb!vm:fun-end-breakpoint-trap
+      (#.fun-end-breakpoint-trap
        (nt "Function end breakpoint trap"))
-      (#.sb!vm:object-not-instance-trap
+      (#.object-not-instance-trap
        (nt "Object not instance trap"))
     )))
 
