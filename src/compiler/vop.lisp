@@ -150,8 +150,8 @@
   (local-tns (make-array local-tn-limit) :type local-tn-vector)
   ;; Bit-vectors used during lifetime analysis to keep track of
   ;; references to local TNs. When indexed by the LTN number, the
-  ;; index for a TN is non-zero in Written if it is ever written in
-  ;; the block, and in Live-Out if the first reference is a read.
+  ;; index for a TN is non-zero in WRITTEN if it is ever written in
+  ;; the block, and in LIVE-OUT if the first reference is a read.
   (written (make-array local-tn-limit :element-type 'bit
 		       :initial-element 0)
 	   :type local-tn-bit-vector)

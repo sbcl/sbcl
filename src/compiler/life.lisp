@@ -124,7 +124,7 @@
 		  (unless (tn-global-conflicts tn)
 		    (convert-to-global tn))
 		  (add-global-conflict :read-only tn block ltn-num))
-		
+
 		(setf (tn-local tn) block)
 		(setf (tn-local-number tn) ltn-num)
 		(setf (svref tns ltn-num) tn)
@@ -217,7 +217,7 @@
 ;;; local when we scan the block again.
 ;;;
 ;;; If there are conflicts, then we set LOCAL to one of the
-;;; conflicting blocks. This ensures that Local doesn't hold over
+;;; conflicting blocks. This ensures that LOCAL doesn't hold over
 ;;; BLOCK as its value, causing the subsequent reanalysis to think
 ;;; that the TN has already been seen in that block.
 ;;;
@@ -444,14 +444,16 @@
 (defun convert-to-environment-tn (tn tn-physenv)
   (declare (type tn tn) (type physenv tn-physenv))
   (aver (member (tn-kind tn) '(:normal :debug-environment)))
-  (when (eq (tn-kind tn) :debug-environment)
-    (aver (eq (tn-physenv tn) tn-physenv))
-    (let ((2env (physenv-info tn-physenv)))
-      (setf (ir2-physenv-debug-live-tns 2env)
-	    (delete tn (ir2-physenv-debug-live-tns 2env)))))
+  (ecase (tn-kind tn)
+    (:debug-environment
+     (setq tn-physenv (tn-physenv tn))
+     (let* ((2env (physenv-info tn-physenv)))
+       (setf (ir2-physenv-debug-live-tns 2env)
+             (delete tn (ir2-physenv-debug-live-tns 2env)))))
+    (:normal
+     (setf (tn-local tn) nil)
+     (setf (tn-local-number tn) nil)))
   (setup-environment-tn-conflicts *component-being-compiled* tn tn-physenv nil)
-  (setf (tn-local tn) nil)
-  (setf (tn-local-number tn) nil)
   (setf (tn-kind tn) :environment)
   (setf (tn-physenv tn) tn-physenv)
   (push tn (ir2-physenv-live-tns (physenv-info tn-physenv)))
