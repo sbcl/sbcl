@@ -487,14 +487,56 @@
 	    (defknown ,name (integer (integer 0)) (unsigned-byte ,width)
 		      (foldable flushable movable))
 	    (define-modular-fun-optimizer ash ((integer count) :width width)
-	      (when (and (<= width 32)
+	      (when (and (<= width ,width)
 			 (constant-lvar-p count) ;?
 			 (plusp (lvar-value count)))
 		(cut-to-width integer width)
 		',name))
 	    (setf (gethash ',name *modular-versions*) `(ash ,',width)))))
-  #!-alpha (def sb!vm::ash-left-mod32 32)
-  #!+alpha (def sb!vm::ash-left-mod64 64))
+  #!+#.(cl:if (cl:= 32 sb!vm:n-word-bits) '(and) '(or))
+  (def sb!vm::ash-left-mod32 32)
+  #!+#.(cl:if (cl:= 64 sb!vm:n-word-bits) '(and) '(or))
+  (def sb!vm::ash-left-mod64 64))
+
+
+;;;; word-wise logical operations
+
+;;; These transforms assume the presence of modular arithmetic to
+;;; generate efficient code.
+
+(define-source-transform word-logical-not (x)
+  `(logand (lognot (the sb!vm:word ,x) #.(1- (ash 1 sb!vm:n-word-bits)))))
+
+(deftransform word-logical-and ((x y))
+  '(logand x y))
+
+(deftransform word-logical-nand ((x y))
+  '(logand (lognand x y) #.(1- (ash 1 sb!vm:n-word-bits))))
+
+(deftransform word-logical-or ((x y))
+  '(logior x y))
+
+(deftransform word-logical-nor ((x y))
+  '(logand (lognor x y) #.(1- (ash 1 sb!vm:n-word-bits))))
+
+(deftransform word-logical-xor ((x y))
+  '(logxor x y))
+
+(deftransform word-logical-eqv ((x y))
+  '(logand (logeqv x y) #.(1- (ash 1 sb!vm:n-word-bits))))
+
+(deftransform word-logical-orc1 ((x y))
+  '(logand (logorc1 x y) #.(1- (ash 1 sb!vm:n-word-bits))))
+
+(deftransform word-logical-orc2 ((x y))
+  '(logand (logorc2 x y) #.(1- (ash 1 sb!vm:n-word-bits))))
+
+(deftransform word-logical-andc1 ((x y))
+  '(logand (logandc1 x y) #.(1- (ash 1 sb!vm:n-word-bits))))
+
+(deftransform word-logical-andc2 ((x y))
+  '(logand (logandc2 x y) #.(1- (ash 1 sb!vm:n-word-bits))))
+
 
 ;;; There are two different ways the multiplier can be recoded. The
 ;;; more obvious is to shift X by the correct amount for each bit set

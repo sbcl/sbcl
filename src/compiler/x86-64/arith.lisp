@@ -1206,39 +1206,6 @@
     (move result prev)
     (inst shrd result next :cl)))
 
-(define-source-transform word-logical-not (x)
-  `(logand (lognot (the (unsigned-byte 64) ,x)) #.(1- (ash 1 64))))
-
-(deftransform word-logical-and ((x y))
-  '(logand x y))
-
-(define-source-transform word-logical-nand (x y)
-  `(word-logical-not (word-logical-and ,x ,y)))
-
-(deftransform word-logical-or ((x y))
-  '(logior x y))
-
-(define-source-transform word-logical-nor (x y)
-  `(word-logical-not (word-logical-or ,x ,y)))
-
-(deftransform word-logical-xor ((x y))
-  '(logxor x y))
-
-(define-source-transform word-logical-eqv (x y)
-  `(word-logical-not (word-logical-xor ,x ,y)))
-
-(define-source-transform word-logical-orc1 (x y)
-  `(word-logical-or (word-logical-not ,x) ,y))
-
-(define-source-transform word-logical-orc2 (x y)
-  `(word-logical-or ,x (word-logical-not ,y)))
-
-(define-source-transform word-logical-andc1 (x y)
-  `(word-logical-and (word-logical-not ,x) ,y))
-
-(define-source-transform word-logical-andc2 (x y)
-  `(word-logical-and ,x (word-logical-not ,y)))
-
 ;;; Only the lower 6 bits of the shift amount are significant.
 (define-vop (shift-towards-someplace)
   (:policy :fast-safe)

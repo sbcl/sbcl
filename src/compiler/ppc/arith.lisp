@@ -703,39 +703,6 @@
       (emit-label done)
       (move result res))))
 
-(define-source-transform word-logical-not (x)
-  `(logand (lognot (the (unsigned-byte 32) ,x)) #.(1- (ash 1 32))))
-
-(deftransform word-logical-and ((x y))
-  '(logand x y))
-
-(deftransform word-logical-nand ((x y))
-  '(logand (lognand x y) #.(1- (ash 1 32))))
-
-(deftransform word-logical-or ((x y))
-  '(logior x y))
-
-(deftransform word-logical-nor ((x y))
-  '(logand (lognor x y) #.(1- (ash 1 32))))
-
-(deftransform word-logical-xor ((x y))
-  '(logxor x y))
-
-(deftransform word-logical-eqv ((x y))
-  '(logand (logeqv x y) #.(1- (ash 1 32))))
-
-(deftransform word-logical-orc1 ((x y))
-  '(logand (logorc1 x y) #.(1- (ash 1 32))))
-
-(deftransform word-logical-orc2 ((x y))
-  '(logand (logorc2 x y) #.(1- (ash 1 32))))
-
-(deftransform word-logical-andc1 ((x y))
-  '(logand (logandc1 x y) #.(1- (ash 1 32))))
-
-(deftransform word-logical-andc2 ((x y))
-  '(logand (logandc2 x y) #.(1- (ash 1 32))))
-
 (define-vop (shift-towards-someplace)
   (:policy :fast-safe)
   (:args (num :scs (unsigned-reg))

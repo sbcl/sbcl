@@ -33,14 +33,13 @@
 		(remove-keywords (cddr options) keywords)))))
 
 (def!struct (prim-object-slot
-	     (:constructor make-slot (name docs rest-p offset length options))
+	     (:constructor make-slot (name docs rest-p offset options))
 	     (:make-load-form-fun just-dump-it-normally)
 	     (:conc-name slot-))
   (name nil :type symbol)
   (docs nil :type (or null simple-string))
   (rest-p nil :type (member t nil))
   (offset 0 :type fixnum)
-  (length 1 :type fixnum)
   (options nil :type list))
 
 (def!struct (primitive-object (:make-load-form-fun just-dump-it-normally))
@@ -79,7 +78,7 @@
 		       (set-known nil set-known-p) set-trans
 		       &allow-other-keys)
 	    (if (atom spec) (list spec) spec)
-	  (slots (make-slot slot-name docs rest-p offset length
+	  (slots (make-slot slot-name docs rest-p offset
 			    (remove-keywords options
 					     '(:docs :rest-p :length))))
 	  (let ((offset-sym (symbolicate name "-" slot-name

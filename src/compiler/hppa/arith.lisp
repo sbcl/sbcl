@@ -631,42 +631,6 @@
 (define-source-transform lognor (x y)
   `(lognot (logior ,x y)))
    
-;;;; 32-bit logical operations
-
-(define-source-transform word-logical-not (x)
-  `(logand (lognot (the (unsigned-byte 32) ,x)) #.(1- (ash 1 32))))
-
-(deftransform word-logical-and ((x y))
-  '(logand x y))
-
-(define-source-transform word-logical-nand (x y)
-  `(word-logical-not (word-logical-and ,x ,y)))
-
-(deftransform word-logical-or ((x y))
-  '(logior x y))
-
-(define-source-transform word-logical-nor (x y)
-  `(logand (lognor (the (unsigned-byte 32) ,x) (the (unsigned-byte 32) ,y))
-           #.(1- (ash 1 32))))
-
-(deftransform word-logical-xor ((x y))
-  '(logxor x y))
-
-(define-source-transform word-logical-eqv (x y)
-  `(word-logical-not (word-logical-xor ,x ,y)))
-
-(define-source-transform word-logical-orc1 (x y)
-  `(word-logical-or (word-logical-not ,x) ,y))
-
-(define-source-transform word-logical-orc2 (x y)
-  `(word-logical-or ,x (word-logical-not ,y)))
-
-(deftransform word-logical-andc1 (x y)
-  '(logandc1 x y))
-
-(deftransform word-logical-andc2 (x y)
-  '(logandc2 x y))
-
 (define-vop (shift-towards-someplace)
   (:policy :fast-safe)
   (:args (num :scs (unsigned-reg))
