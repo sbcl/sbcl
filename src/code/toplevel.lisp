@@ -65,7 +65,8 @@
      (/show0 "back from INFINITE-ERROR-PROTECTOR")
      (let ((*current-error-depth* (1+ *current-error-depth*)))
        (/show0 "in INFINITE-ERROR-PROTECT, incremented error depth")
-       #+sb-show (sb-debug:backtrace)
+       ;; arbitrary truncation
+       #!+sb-show (sb!debug:backtrace 8)
        ,@forms)))
 
 ;;; a helper function for INFINITE-ERROR-PROTECT
