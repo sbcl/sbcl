@@ -111,6 +111,7 @@
     (inst mov (make-ea :dword :scale 1 :index ,temp) ,reg)))
 #!-sb-thread
 (defmacro store-tl-symbol-value (reg symbol temp)
+  (declare (ignore temp))
   `(store-symbol-value ,reg ,symbol))
   
 (defmacro load-type (target source &optional (offset 0))
@@ -169,6 +170,9 @@
 ;;; formalized, in documentation and in macro definition,
 ;;; with the macro becoming e.g. PSEUDO-ATOMIC-ALLOCATION.
 (defun allocation (alloc-tn size &optional inline)
+  ;; FIXME: since it appears that inline allocation is gone, we should
+  ;; remove the INLINE parameter, and all the above comments.
+  (declare (ignore inline))  
   (flet ((load-size (dst-tn size)
 	   (unless (and (tn-p size) (location= alloc-tn size))
 	     (inst mov dst-tn size))))

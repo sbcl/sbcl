@@ -799,6 +799,6 @@
             (dtype (continuation-value dtype)))
       (unless (eq atype nil)
         (compiler-warn
-         "Asserted type ~S conflicts with derived type ~S."
+         "~@<Asserted type ~S conflicts with derived type ~S.~@:>"
          atype dtype))))
     (ir2-convert-full-call node block)))

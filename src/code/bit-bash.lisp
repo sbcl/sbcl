@@ -17,7 +17,7 @@
 (defconstant unit-bits n-word-bits)
 
 ;;; the maximum number of bits that can be dealt with in a single call
-(defconstant max-bits (ash most-positive-fixnum -2))
+(defconstant max-bits (ash sb!xc:most-positive-fixnum -2))
 
 (deftype unit ()
   `(unsigned-byte ,unit-bits))

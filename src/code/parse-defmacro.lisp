@@ -87,6 +87,7 @@
 	 (maximum 0)
 	 (minimum 0)
 	 (keys ())
+	 (key-seen nil)
 	 ;; ANSI specifies that dotted lists are "treated exactly as if the
 	 ;; parameter name that ends the list had appeared preceded by &rest."
 	 ;; We force this behavior by transforming dotted lists into ordinary
@@ -188,6 +189,7 @@
                 (setq rest-name (gensym "KEYWORDS-"))
                 (push rest-name *ignorable-vars*)
                 (setq restp t)
+		(setq key-seen t)
                 (push-let-binding rest-name path t))
                (&allow-other-keys
                 (setq allow-other-keys-p t))
@@ -242,7 +244,7 @@
                                    :minimum ,minimum
                                    :maximum ,explicit-maximum)))
               *arg-tests*))
-      (when keys
+      (when key-seen
 	(let ((problem (gensym "KEY-PROBLEM-"))
 	      (info (gensym "INFO-")))
 	  (push `(multiple-value-bind (,problem ,info)

@@ -604,23 +604,27 @@
 							   :index 0
 							   :type t)))
   (multiple-value-bind (name default default-p type type-p read-only ro-p)
-      (cond
-       ((listp spec)
-	(destructuring-bind
-	    (name
-	     &optional (default nil default-p)
-	     &key (type nil type-p) (read-only nil ro-p))
-	    spec
-	  (values name
-		  default default-p
-		  (uncross type) type-p
-		  read-only ro-p)))
-       (t
-	(when (keywordp spec)
-	  (style-warn "Keyword slot name indicates probable syntax ~
-		       error in DEFSTRUCT: ~S."
-		      spec))
-	spec))
+      (typecase spec
+	(symbol
+	 (when (keywordp spec)
+	   (style-warn "Keyword slot name indicates probable syntax ~
+		        error in DEFSTRUCT: ~S."
+		       spec))
+	 spec)
+	(cons
+	 (destructuring-bind
+	       (name
+		&optional (default nil default-p)
+		&key (type nil type-p) (read-only nil ro-p))
+	     spec
+	   (values name
+		   default default-p
+		   (uncross type) type-p
+		   read-only ro-p)))
+	(t (error 'simple-program-error
+		  :format-control "in DEFSTRUCT, ~S is not a legal slot ~
+                                   description."
+		  :format-arguments (list spec))))
 
     (when (find name (dd-slots defstruct)
 		:test #'string=
