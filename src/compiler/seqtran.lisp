@@ -812,17 +812,21 @@
   (loop for rest-seqs on sequences
         for n-seq = (gensym "N-SEQ")
         for n-length = (gensym "N-LENGTH")
-        for start = vector-data-bit-offset then next-start
+        for start = 0 then next-start
         for next-start = (gensym "NEXT-START")
         collect n-seq into args
-        collect `(,n-length (* (length ,n-seq) sb!vm:n-byte-bits)) into lets
+        collect `(,n-length (length ,n-seq)) into lets
         collect n-length into all-lengths
         collect next-start into starts
         collect `(if (and (typep ,n-seq '(simple-array nil (*)))
 		          (> ,n-length 0))
 		     (error 'nil-array-accessed-error)
-		     (bit-bash-copy ,n-seq ,vector-data-bit-offset
-		                    res ,start ,n-length))
+                     (#.(let* ((i (position 'character sb!kernel::*specialized-array-element-types*))
+                               (saetp (aref sb!vm:*specialized-array-element-type-properties* i))
+                               (n-bits (sb!vm:saetp-n-bits saetp)))
+                          (intern (format nil "UB~D-BASH-COPY" n-bits)
+                                  "SB!KERNEL"))
+                        ,n-seq 0 res ,start ,n-length))
                 into forms
         collect `(setq ,next-start (+ ,start ,n-length)) into forms
         finally
@@ -830,9 +834,8 @@
           `(lambda (rtype ,@args)
              (declare (ignore rtype))
              (let* (,@lets
-                      (res (make-string (truncate (the index (+ ,@all-lengths))
-                                                  sb!vm:n-byte-bits)
-                                        :element-type 'base-char)))
+                    (res (make-string (the index (+ ,@all-lengths))
+                                      :element-type 'base-char)))
                (declare (type index ,@all-lengths))
                (let (,@(mapcar (lambda (name) `(,name 0)) starts))
                  (declare (type index ,@starts))

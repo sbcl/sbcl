@@ -115,5 +115,15 @@
                                      (deref integer-array 1)))
     (assert (eql (deref enum-array 2) 'k-two))))
 
+;;; As reported by Baughn on #lisp, ALIEN-FUNCALL loops forever when
+;;; compiled with (DEBUG 3).
+(sb-kernel::values-specifier-type-cache-clear)
+(proclaim '(optimize (debug 3)))
+(let ((f (compile nil '(lambda (v)
+                        (sb-alien:alien-funcall (sb-alien:extern-alien "getenv"
+                                                 (function (c-string) c-string))
+                         v)))))
+  (assert (typep (funcall f "HOME") '(or string null))))
+
 ;;; success
 (quit :unix-status 104)
