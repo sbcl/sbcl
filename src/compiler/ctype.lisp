@@ -782,7 +782,10 @@
 
 (defun %compile-time-type-error (values atype dtype)
   (declare (ignore dtype))
-  (error 'values-type-error :datum values :expected-type atype))
+  (if (and (consp atype)
+           (eq (car atype) 'values))
+      (error 'values-type-error :datum values :expected-type atype)
+      (error 'type-error :datum (car values) :expected-type atype)))
 
 (defoptimizer (%compile-time-type-error ir2-convert)
     ((objects atype dtype) node block)

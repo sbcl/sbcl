@@ -1747,7 +1747,7 @@
          value
          ;; FIXME: Derived type.
          `(%compile-time-type-error 'dummy
-                                    ',(type-specifier (coerce-to-values atype))
+                                    ',(type-specifier atype)
                                     ',(type-specifier value-type)))
         ;; KLUDGE: FILTER-CONTINUATION does not work for
         ;; non-returning functions, so we declare the return type of
