@@ -203,7 +203,7 @@ time we reacquire LOCK and return to the caller."
 ;;;; job control
 
 (defvar *background-threads-wait-for-debugger* t)
-;;; may be T, NIL, or a function called with an fd-stream and thread id 
+;;; may be T, NIL, or a function called with a stream and thread id 
 ;;; as its two arguments, returning NIl or T
 
 ;;; called from top of invoke-debugger
@@ -213,12 +213,11 @@ already the foreground thread, or transfers control to the first applicable
 restart if *BACKGROUND-THREADS-WAIT-FOR-DEBUGGER* says to do that instead"
   (let* ((wait-p *background-threads-wait-for-debugger*)
 	 (*background-threads-wait-for-debugger* nil)
-	 (fd-stream (sb!impl::get-underlying-stream stream :input))
 	 (lock *session-lock*))
     (when (not (eql (mutex-value lock)   (CURRENT-THREAD-ID)))
       (when (functionp wait-p) 
 	(setf wait-p 
-	      (funcall wait-p fd-stream (CURRENT-THREAD-ID))))
+	      (funcall wait-p stream (CURRENT-THREAD-ID))))
       (cond (wait-p (get-foreground))
 	    (t  (invoke-restart (car (compute-restarts))))))))
 

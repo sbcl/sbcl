@@ -84,7 +84,7 @@ int arch_os_thread_init(struct thread *thread) {
     if (__modify_ldt (1, &ldt_entry, sizeof (ldt_entry)) != 0) 
 	/* modify_ldt call failed: something magical is not happening */
 	return -1;
-    __asm__ __volatile__ ("movw %w0, %%gs" : : "q" 
+    __asm__ __volatile__ ("movw %w0, %%fs" : : "q" 
 			  ((n << 3) /* selector number */
 			   + (1 << 2) /* TI set = LDT */
 			   + 3)); /* privilege level */
@@ -111,7 +111,7 @@ struct thread *arch_os_get_current_thread() {
 #ifdef LISP_FEATURE_SB_THREAD
     register struct thread *me=0;
     if(all_threads)
-	__asm__ ("movl %%gs:%c1,%0" : "=r" (me)
+	__asm__ ("movl %%fs:%c1,%0" : "=r" (me)
 		 : "i" (offsetof (struct thread,this)));
     return me;
 #else

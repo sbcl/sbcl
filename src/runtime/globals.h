@@ -35,6 +35,7 @@ extern lispobj *current_auto_gc_trigger;
 
 extern lispobj *current_dynamic_space;
 extern pid_t parent_pid;
+extern boolean stop_the_world;
 
 extern void globals_init(void);
 
