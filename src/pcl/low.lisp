@@ -282,7 +282,7 @@
       (std-instance-slots instance)
       (fsc-instance-slots instance)))
 (defun get-slots-or-nil (instance)
-  ;; Supress a code-deletion note.  FIXME: doing the FIXME above,
+  ;; Suppress a code-deletion note.  FIXME: doing the FIXME above,
   ;; integrating PCL more with the compiler, would remove the need for
   ;; this icky stuff.
   (declare (optimize (inhibit-warnings 3)))

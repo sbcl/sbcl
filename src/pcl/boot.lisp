@@ -1064,7 +1064,7 @@ bootstrapping.
                             ,call)
                            ,call))))
 		 ,(locally
-		   ;; As above, this declaration supresses code
+		   ;; As above, this declaration suppresses code
 		   ;; deletion notes.
 		   (declare (optimize (inhibit-warnings 3)))
 		   (if (and (null ',rest-arg)
