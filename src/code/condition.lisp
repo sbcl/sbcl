@@ -72,7 +72,9 @@
   ;; allocation of this slot, or NIL until defaulted
   (allocation nil :type (member :instance :class nil))
   ;; If ALLOCATION is :CLASS, this is a cons whose car holds the value.
-  (cell nil :type (or cons null)))
+  (cell nil :type (or cons null))
+  ;; slot documentation
+  (documentation nil :type (or string null)))
 
 ;;; KLUDGE: It's not clear to me why CONDITION-CLASS has itself listed
 ;;; in its CPL, while other classes derived from CONDITION-CLASS don't
@@ -428,6 +430,7 @@
 	       (slot-name (first spec))
 	       (allocation :instance)
 	       (initform-p nil)
+	       documentation
 	       initform)
 	  (collect ((initargs)
 		    (readers)
@@ -451,6 +454,13 @@
 		  (:initarg (initargs arg))
 		  (:allocation
 		   (setq allocation arg))
+		  (:documentation
+		   (when documentation
+		     (error "more than one :DOCUMENTATION in ~S" spec))
+		   (unless (stringp arg)
+		     (error "slot :DOCUMENTATION argument is not a string: ~S"
+			    arg))
+		   (setq documentation arg))
 		  (:type)
 		  (t
 		   (error "unknown slot option:~%  ~S" (first options))))))
@@ -463,6 +473,7 @@
 		     :readers ',(readers)
 		     :writers ',(writers)
 		     :initform-p ',initform-p
+		     :documentation ',documentation
 		     :initform
 		     ,(if (constantp initform)
 			  `',(eval initform)

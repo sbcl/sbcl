@@ -120,6 +120,7 @@
 	 slot-class-wrapper slot-class
 	 built-in-class-wrapper built-in-class
 	 structure-class-wrapper structure-class
+	 condition-class-wrapper condition-class
 	 standard-direct-slot-definition-wrapper
 	 standard-direct-slot-definition
 	 standard-effective-slot-definition-wrapper
@@ -128,7 +129,7 @@
 	 standard-generic-function-wrapper standard-generic-function)
     (!initial-classes-and-wrappers
      standard-class funcallable-standard-class
-     slot-class built-in-class structure-class std-class
+     slot-class built-in-class structure-class condition-class std-class
      standard-direct-slot-definition standard-effective-slot-definition
      class-eq-specializer standard-generic-function)
     ;; First, make a class metaobject for each of the early classes. For
@@ -144,7 +145,8 @@
 			(funcallable-standard-class
 			 funcallable-standard-class-wrapper)
 			(built-in-class built-in-class-wrapper)
-			(structure-class structure-class-wrapper)))
+			(structure-class structure-class-wrapper)
+			(condition-class condition-class-wrapper)))
 	     (class (or (find-class name nil)
 			(allocate-standard-instance wrapper))))
 	(setf (find-class name) class)))
@@ -177,6 +179,8 @@
 				   built-in-class-wrapper)
 				  ((eq class structure-class)
 				   structure-class-wrapper)
+				  ((eq class condition-class)
+				   condition-class-wrapper)
 				  ((eq class class-eq-specializer)
 				   class-eq-specializer-wrapper)
 				  ((eq class standard-generic-function)
@@ -229,6 +233,11 @@
 		  class name class-eq-specializer-wrapper source
 		  direct-supers direct-subclasses cpl wrapper proto))
 		(structure-class	; *the-class-structure-object*
+		 (!bootstrap-initialize-class
+		  meta
+		  class name class-eq-specializer-wrapper source
+		  direct-supers direct-subclasses cpl wrapper))
+		(condition-class
 		 (!bootstrap-initialize-class
 		  meta
 		  class name class-eq-specializer-wrapper source
@@ -292,7 +301,8 @@
 		,@(and default-initargs
 		       `(default-initargs ,default-initargs))))
     (when (memq metaclass-name '(standard-class funcallable-standard-class
-				 structure-class slot-class std-class))
+				 structure-class condition-class
+				 slot-class std-class))
       (set-slot 'direct-slots direct-slots)
       (set-slot 'slots slots)
       (set-slot 'initialize-info nil))
@@ -312,21 +322,25 @@
 	       (!bootstrap-set-slot metaclass-name super 'direct-subclasses
 				    (cons class subclasses))))))
 
-    (if (eq metaclass-name 'structure-class)
-	(let ((constructor-sym '|STRUCTURE-OBJECT class constructor|))
-	  (set-slot 'predicate-name (or (cadr (assoc name
-						     *early-class-predicates*))
-					(make-class-predicate-name name)))
-	  (set-slot 'defstruct-form
-		    `(defstruct (structure-object (:constructor
-						   ,constructor-sym)
-						  (:copier nil))))
-	  (set-slot 'defstruct-constructor constructor-sym)
-	  (set-slot 'from-defclass-p t)
-	  (set-slot 'plist nil)
-	  (set-slot 'prototype (funcall constructor-sym)))
-	(set-slot 'prototype
-		  (if proto-p proto (allocate-standard-instance wrapper))))
+    (case metaclass-name
+      (structure-class
+       (let ((constructor-sym '|STRUCTURE-OBJECT class constructor|))
+	 (set-slot 'predicate-name (or (cadr (assoc name
+						    *early-class-predicates*))
+				       (make-class-predicate-name name)))
+	 (set-slot 'defstruct-form
+		   `(defstruct (structure-object (:constructor
+						  ,constructor-sym)
+				                 (:copier nil))))
+	 (set-slot 'defstruct-constructor constructor-sym)
+	 (set-slot 'from-defclass-p t)
+	 (set-slot 'plist nil)
+	 (set-slot 'prototype (funcall constructor-sym))))
+      (condition-class
+       (set-slot 'prototype (make-condition name)))
+      (t
+       (set-slot 'prototype
+		 (if proto-p proto (allocate-standard-instance wrapper)))))
     class))
 
 (defun !bootstrap-make-slot-definitions (name class slots wrapper effective-p)
@@ -553,13 +567,28 @@
 		   ,(structure-slotd-writer-function slotd)))
 	     :type ,(or (structure-slotd-type slotd) t)
 	     :initform ,(structure-slotd-init-form slotd)
-	     :initfunction ,(eval-form (structure-slotd-init-form slotd))))))
+	     :initfunction ,(eval-form (structure-slotd-init-form slotd)))))
+       (slot-initargs-from-condition-slot (slot)
+	 `(:name ,(condition-slot-name slot)
+	   :initargs ,(condition-slot-initargs slot)
+	   :readers ,(condition-slot-readers slot)
+	   :writers ,(condition-slot-writers slot)
+	   ,@(when (condition-slot-initform-p slot)
+	       (let ((form-or-fun (condition-slot-initform slot)))
+		 (if (functionp form-or-fun)
+		     `(:initfunction ,form-or-fun)
+		     `(:initform ,form-or-fun
+		       :initfunction ,(lambda () form-or-fun)))))
+	   :allocation (condition-slot-allocation slot)
+	   :documentation (condition-slot-documentation slot))))
     (cond ((structure-type-p name)
 	   (ensure 'structure-class
 		   (mapcar #'slot-initargs-from-structure-slotd
 			   (structure-type-slot-description-list name))))
 	  ((condition-type-p name)
-	   (ensure 'condition-class))
+	   (ensure 'condition-class
+		   (mapcar #'slot-initargs-from-condition-slot
+			   (condition-classoid-slots (find-classoid name)))))
 	  (t
 	   (error "~@<~S is not the name of a class.~@:>" name)))))
 

@@ -606,12 +606,15 @@
 		    (apply #'update-dependent class dependent initargs))))
 
 (defmethod shared-initialize :after ((class condition-class) slot-names
-				     &key direct-superclasses)
+				     &key direct-slots direct-superclasses)
   (declare (ignore slot-names))
   (let ((classoid (find-classoid (class-name class))))
     (with-slots (wrapper class-precedence-list prototype predicate-name
 			 (direct-supers direct-superclasses))
 	class
+      (setf (slot-value class 'direct-slots)
+	    (mapcar (lambda (pl) (make-direct-slotd class pl))
+		    direct-slots))
       (setf (slot-value class 'finalized-p) t)
       (setf (classoid-pcl-class classoid) class)
       (setq direct-supers direct-superclasses)
@@ -620,7 +623,62 @@
       (setq prototype (make-condition (class-name class)))
       (add-direct-subclasses class direct-superclasses)
       (setq predicate-name (make-class-predicate-name (class-name class)))
-      (make-class-predicate class predicate-name))))
+      (make-class-predicate class predicate-name)
+      (setf (slot-value class 'slots) (compute-slots class))))
+  ;; Comment from Gerd's PCL, 2003-05-15:
+  ;;
+  ;; We don't ADD-SLOT-ACCESSORS here because we don't want to
+  ;; override condition accessors with generic functions.  We do this
+  ;; differently.
+  (update-pv-table-cache-info class))
+
+(defmethod direct-slot-definition-class ((class condition-class)
+					 &rest initargs)
+  (declare (ignore initargs))
+  (find-class 'condition-direct-slot-definition))
+
+(defmethod effective-slot-definition-class ((class condition-class)
+					    &rest initargs)
+  (declare (ignore initargs))
+  (find-class 'condition-effective-slot-definition))
+
+(defmethod finalize-inheritance ((class condition-class))
+  (aver (slot-value class 'finalized-p))
+  nil)
+
+(defmethod compute-effective-slot-definition
+    ((class condition-class) slot-name dslotds)
+  (let ((slotd (call-next-method)))
+    (setf (slot-definition-reader-function slotd)
+	  (lambda (x)
+	    (handler-case (condition-reader-function x slot-name)
+	      ;; FIXME: FIND-SLOT-DEFAULT throws an error if the slot
+	      ;; is unbound; maybe it should be a CELL-ERROR of some
+	      ;; sort?
+	      (error () (slot-unbound class x slot-name)))))
+    (setf (slot-definition-writer-function slotd)
+	  (lambda (v x)
+	    (condition-writer-function x v slot-name)))
+    (setf (slot-definition-boundp-function slotd)
+	  (lambda (x)
+	    (multiple-value-bind (v c)
+		(ignore-errors (condition-reader-function x slot-name))
+	      (declare (ignore v))
+	      (null c))))
+    slotd))
+
+(defmethod compute-slots ((class condition-class))
+  (mapcan (lambda (superclass)
+	    (mapcar (lambda (dslotd)
+		      (compute-effective-slot-definition
+		       class (slot-definition-name dslotd) (list dslotd)))
+		    (class-direct-slots superclass)))
+	  (reverse (slot-value class 'class-precedence-list))))
+
+(defmethod compute-slots :around ((class condition-class))
+  (let ((eslotds (call-next-method)))
+    (mapc #'initialize-internal-slot-functions eslotds)
+    eslotds))
 
 (defmethod shared-initialize :after
     ((slotd structure-slot-definition) slot-names &key

@@ -1720,6 +1720,13 @@ changes in sbcl-0.8.0 relative to sbcl-0.8alpha.0
     no longer has any effect, as the code controlled by this feature
     has been deleted.  (As far as we know, no-one has ever built using
     this feature, and its semantics were confused in any case).
+  * minor incompatible change: as a consequence of making
+    SLOT-EXISTS-P work on conditions (as required by the ANSI
+    specification), SLOT-VALUE, (SETF SLOT-VALUE) and SLOT-BOUNDP
+    likewise have the expected behaviour on conditions.  Users should
+    note, however, that such behaviour is not required by the ANSI
+    specification, and so use of this behaviour may render their code
+    unportable.
   * SB-MOP:DIRECT-SLOT-DEFINITION-CLASS and
     SB-MOP:EFFECTIVE-SLOT-DEFINITION-CLASS now have the
     specified-by-AMOP lambda list of (CLASS &REST INITARGS).
@@ -1742,6 +1749,8 @@ changes in sbcl-0.8.0 relative to sbcl-0.8alpha.0
     ** ALLOCATE-INSTANCE now works on structure classes defined via
        DEFSTRUCT (and not just by those from DEFCLASS :METACLASS
        STRUCTURE-CLASS).
+    ** SLOT-EXISTS-P now works on conditions, as well as structures
+       and CLOS instances.
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles

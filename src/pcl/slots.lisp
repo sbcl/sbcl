@@ -270,6 +270,35 @@
   object)
 
 (defmethod slot-value-using-class
+    ((class condition-class)
+     (object condition)
+     (slotd condition-effective-slot-definition))
+  (let ((fun (slot-definition-reader-function slotd)))
+    (declare (type function fun))
+    (funcall fun object)))
+
+(defmethod (setf slot-value-using-class)
+    (new-value
+     (class condition-class)
+     (object condition)
+     (slotd condition-effective-slot-definition))
+  (let ((fun (slot-definition-writer-function slotd)))
+    (declare (type function fun))
+    (funcall fun new-value object)))
+
+(defmethod slot-boundp-using-class
+    ((class condition-class)
+     (object condition)
+     (slotd condition-effective-slot-definition))
+  (let ((fun (slot-definition-boundp-function slotd)))
+    (declare (type function fun))
+    (funcall fun object)))
+
+(defmethod slot-makunbound-using-class ((class condition-class) object slot)
+  (error "attempt to unbind slot ~S in condition object ~S."
+	 slot object))
+
+(defmethod slot-value-using-class
     ((class structure-class)
      (object structure-object)
      (slotd structure-effective-slot-definition))
@@ -337,3 +366,7 @@
     (if constructor
 	(funcall constructor)
 	(error "can't allocate an instance of class ~S" (class-name class)))))
+
+(defmethod allocate-instance ((class condition-class) &rest initargs)
+  (declare (ignore initargs))
+  (make-condition (class-name class)))

@@ -14,6 +14,8 @@
 
 (defgeneric classp (object))
 
+(defgeneric condition-class-p (object))
+
 (defgeneric eql-specializer-p (object))
 
 (defgeneric exact-class-specializer-p (object))

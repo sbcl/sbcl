@@ -102,6 +102,7 @@
 		  *the-class-generic-function*
 		  *the-class-built-in-class*
 		  *the-class-slot-class*
+		  *the-class-condition-class*
 		  *the-class-structure-class*
 		  *the-class-std-class*
 		  *the-class-standard-class*
@@ -447,6 +448,9 @@
 (defclass slot-object (t) ()
   (:metaclass slot-class))
 
+(defclass condition (slot-object instance) ()
+  (:metaclass condition-class))
+
 (defclass structure-object (slot-object instance) ()
   (:metaclass structure-class))
 
@@ -576,7 +580,7 @@
 
 (defclass built-in-class (pcl-class) ())
 
-(defclass condition-class (pcl-class) ())
+(defclass condition-class (slot-class) ())
 
 (defclass structure-class (slot-class)
   ((defstruct-form
@@ -664,6 +668,16 @@
     :initarg :allocation-class
     :accessor slot-definition-allocation-class)))
 
+(defclass condition-slot-definition (slot-definition)
+  ((allocation
+    :initform :instance
+    :initarg :allocation
+    :accessor slot-definition-allocation)
+   (allocation-class
+    :initform nil
+    :initarg :allocation-class
+    :accessor slot-definition-allocation-class)))
+
 (defclass structure-slot-definition (slot-definition)
   ((defstruct-accessor-symbol
      :initform nil
@@ -700,6 +714,14 @@
   ((location ; nil, a fixnum, a cons: (slot-name . value)
     :initform nil
     :accessor slot-definition-location)))
+
+(defclass condition-direct-slot-definition (condition-slot-definition
+					    direct-slot-definition)
+  ())
+
+(defclass condition-effective-slot-definition (condition-slot-definition
+					       effective-slot-definition)
+  ())
 
 (defclass structure-direct-slot-definition (structure-slot-definition
 					    direct-slot-definition)
@@ -835,6 +857,7 @@
     (std-class std-class-p)
     (standard-class standard-class-p)
     (funcallable-standard-class funcallable-standard-class-p)
+    (condition-class condition-class-p)
     (structure-class structure-class-p)
     (forward-referenced-class forward-referenced-class-p)
     (method method-p)
