@@ -1,0 +1,25 @@
+@node Function Index, Concept Index, The Foreign Function Interface, Top
+@comment  node-name,  next,  previous,  up
+@appendix Function Index
+     
+@printindex fn
+
+@node Concept Index, Colophon, Function Index, Top
+@comment  node-name,  next,  previous,  up
+@appendix Concept Index
+
+@printindex cp
+
+@node Colophon,  , Concept Index, Top
+@comment  node-name,  next,  previous,  up
+@unnumbered Colophon
+
+This manual is maintained in Texinfo, and automatically translated
+into other forms (e.g. HTML or pdf). If you're @emph{reading} this
+manual in one of these non-Texinfo translated forms, that's fine, but
+if you want to @emph{modify} this manual, you are strongly advised to
+seek out a Texinfo version and modify that instead of modifying a
+translated version. Even better might be to seek out @emph{the}
+Texinfo version (maintained at the time of this writing as part of the
+SBCL project at @uref{http://sbcl.sourceforge.net/}) and submit a
+patch.

@@ -1,0 +1,1019 @@
+@node  The Compiler, The Debugger, Introduction, Top
+@comment  node-name,  next,  previous,  up
+@chapter The Compiler
+
+This chapter will discuss most compiler issues other than
+efficiency, including compiler error messages, the SBCL compiler's
+unusual approach to type safety in the presence of type declarations,
+the effects of various compiler optimization policies, and the way
+that inlining and open coding may cause optimized code to differ from
+a naive translation. Efficiency issues are sufficiently varied and
+separate that they have their own chapter, @ref{Efficiency}.
+
+@menu
+* Error Messages::              
+* Handling of Types::           
+* Compiler Policy::             
+* Open Coding and Inline Expansion::  
+@end menu
+
+@node  Error Messages, Handling of Types, The Compiler, The Compiler
+@comment  node-name,  next,  previous,  up
+@section Error Messages
+@cindex Error messages, Compiler
+@cindex Compiler error messages
+
+The compiler supplies a large amount of source location information in
+error messages. The error messages contain a lot of detail in a terse
+format, so they may be confusing at first. Error messages will be
+illustrated using this example program:
+
+@lisp
+(defmacro zoq (x)
+  `(roq (ploq (+ ,x 3))))
+
+(defun foo (y)
+  (declare (symbol y))
+  (zoq y))
+@end lisp
+
+The main problem with this program is that it is trying to add
+@code{3} to a symbol. Note also that the functions @code{roq} and
+@code{ploq} aren't defined anywhere.
+
+
+@menu
+* The Parts of the Error Message::  
+* The Original and Actual Source::  
+* Error Severity::              
+* Errors During Macroexpansion::  
+* Read Errors::                 
+@end menu
+
+@node  The Parts of the Error Message, The Original and Actual Source, Error Messages, Error Messages
+@comment  node-name,  next,  previous,  up
+@subsection The Parts of the Error Message
+
+When processing this program, the compiler will produce this warning:
+
+@example
+file: /tmp/foo.lisp
+
+in: DEFUN FOO
+(ZOQ Y)
+--> ROQ PLOQ + 
+==>
+Y
+caught WARNING:
+Result is a SYMBOL, not a NUMBER.
+@end example
+
+In this example we see each of the six possible parts of a compiler
+error message:
+
+@enumerate
+
+@item
+@samp{File: /tmp/foo.lisp} This is the name of the file that the
+compiler read the relevant code from.  The file name is displayed
+because it may not be immediately obvious when there is an error
+during compilation of a large system, especially when
+@code{with-compilation-unit} is used to delay undefined warnings.
+
+@item
+@samp{in: DEFUN FOO} This is the definition top level form responsible
+for the error. It is obtained by taking the first two elements of the
+enclosing form whose first element is a symbol beginning with
+``@samp{def}''.  If there is no such enclosing ``@samp{def}'' form,
+then the outermost form is used.  If there are multiple @samp{def}
+forms, then they are all printed from the outside in, separated by
+@samp{=>}'s.  In this example, the problem was in the @code{defun} for
+@code{foo}.
+
+@item
+@samp{(ZOQ Y)} This is the @dfn{original source} form responsible for
+the error.  Original source means that the form directly appeared in
+the original input to the compiler, i.e. in the lambda passed to
+@code{compile} or in the top level form read from the source file. In
+this example, the expansion of the @code{zoq} macro was responsible
+for the error.
+
+@item
+@samp{--> ROQ PLOQ +} This is the @dfn{processing path} that the
+compiler used to produce the errorful code.  The processing path is a
+representation of the evaluated forms enclosing the actual source that
+the compiler encountered when processing the original source.  The
+path is the first element of each form, or the form itself if the form
+is not a list.  These forms result from the expansion of macros or
+source-to-source transformation done by the compiler.  In this
+example, the enclosing evaluated forms are the calls to @code{roq},
+@code{ploq} and @code{+}.  These calls resulted from the expansion of
+the @code{zoq} macro.
+
+@item
+@samp{==> Y} This is the @dfn{actual source} responsible for the
+error. If the actual source appears in the explanation, then we print
+the next enclosing evaluated form, instead of printing the actual
+source twice.  (This is the form that would otherwise have been the
+last form of the processing path.) In this example, the problem is
+with the evaluation of the reference to the variable @code{y}.
+
+@item
+@samp{caught WARNING: Result is a SYMBOL, not a NUMBER.}  This is the
+@dfn{explanation} of the problem. In this example, the problem is that
+@code{y} evaluates to a symbol, but is in a context where a number is
+required (the argument to @code{+}).
+
+@end enumerate
+
+Note that each part of the error message is distinctively marked:
+
+@itemize
+
+@item
+ @samp{file:} and @samp{in:} mark the file and definition,
+respectively.
+
+@item
+The original source is an indented form with no prefix.
+
+@item
+Each line of the processing path is prefixed with @samp{-->}
+
+@item
+The actual source form is indented like the original source, but is
+marked by a preceding @samp{==>} line.
+  
+
+@item
+The explanation is prefixed with the error severity, which can be
+@samp{caught ERROR:}, @samp{caught WARNING:}, @samp{caught
+STYLE-WARNING:}, or @samp{note:}.
+
+@end itemize
+
+Each part of the error message is more specific than the preceding
+one.  If consecutive error messages are for nearby locations, then the
+front part of the error messages would be the same.  In this case, the
+compiler omits as much of the second message as in common with the
+first.  For example:
+
+@example
+file: /tmp/foo.lisp
+
+in: DEFUN FOO
+(ZOQ Y)
+--> ROQ
+==>
+(PLOQ (+ Y 3))
+caught STYLE-WARNING:
+undefined function: PLOQ
+
+==>
+(ROQ (PLOQ (+ Y 3)))
+caught STYLE-WARNING:
+undefined function: ROQ
+@end example
+
+In this example, the file, definition and original source are
+identical for the two messages, so the compiler omits them in the
+second message.  If consecutive messages are entirely identical, then
+the compiler prints only the first message, followed by: @samp{[Last
+message occurs @var{repeats} times]} where @var{repeats} is the number
+of times the message was given.
+
+If the source was not from a file, then no file line is printed.  If
+the actual source is the same as the original source, then the
+processing path and actual source will be omitted. If no forms
+intervene between the original source and the actual source, then the
+processing path will also be omitted.
+
+
+@node  The Original and Actual Source, Error Severity, The Parts of the Error Message, Error Messages
+@comment  node-name,  next,  previous,  up
+@subsection The Original and Actual Source
+
+The @emph{original source} displayed will almost always be a list. If
+the actual source for an error message is a symbol, the original
+source will be the immediately enclosing evaluated list form.  So even
+if the offending symbol does appear in the original source, the
+compiler will print the enclosing list and then print the symbol as
+the actual source (as though the symbol were introduced by a macro.)
+
+When the @emph{actual source} is displayed (and is not a symbol), it
+will always be code that resulted from the expansion of a macro or a
+source-to-source compiler optimization.  This is code that did not
+appear in the original source program; it was introduced by the
+compiler.
+
+Keep in mind that when the compiler displays a source form in an error
+message, it always displays the most specific (innermost) responsible
+form.  For example, compiling this function
+
+@lisp
+(defun bar (x)
+  (let (a)
+    (declare (fixnum a))
+    (setq a (foo x))
+    a))
+@end lisp
+
+gives this error message
+
+@example
+in: DEFUN BAR
+(LET (A) (DECLARE (FIXNUM A)) (SETQ A (FOO X)) A)
+caught WARNING: The binding of A is not a FIXNUM:
+NIL
+@end example
+
+This error message is not saying ``there is a problem somewhere in
+this @code{let}'' -- it is saying that there is a problem with the
+@code{let} itself. In this example, the problem is that @code{a}'s
+@code{nil} initial value is not a @code{fixnum}.
+
+
+@subsection The Processing Path
+@cindex Processing path
+@cindex Macroexpansion
+@cindex Source-to-source transformation
+
+The processing path is mainly useful for debugging macros, so if you
+don't write macros, you can probably ignore it. Consider this example:
+
+@lisp
+(defun foo (n)
+  (dotimes (i n *undefined*)))
+@end lisp
+
+Compiling results in this error message:
+
+@example
+in: DEFUN FOO
+(DOTIMES (I N *UNDEFINED*))
+--> DO BLOCK LET TAGBODY RETURN-FROM
+==>
+(PROGN *UNDEFINED*)
+caught STYLE-WARNING:
+undefined variable: *UNDEFINED*
+@end example
+
+Note that @code{do} appears in the processing path. This is because
+@code{dotimes} expands into:
+
+@lisp
+(do ((i 0 (1+ i)) (#:g1 n))
+    ((>= i #:g1) *undefined*)
+  (declare (type unsigned-byte i)))
+@end lisp
+
+The rest of the processing path results from the expansion of
+@code{do}:
+
+@lisp
+(block nil
+  (let ((i 0) (#:g1 n))
+    (declare (type unsigned-byte i))
+    (tagbody (go #:g3)
+      #:g2    (psetq i (1+ i))
+      #:g3    (unless (>= i #:g1) (go #:g2))
+      (return-from nil (progn *undefined*)))))
+@end lisp
+
+In this example, the compiler descended into the @code{block},
+@code{let}, @code{tagbody} and @code{return-from} to
+reach the @code{progn} printed as the actual source. This is a
+place where the ``actual source appears in explanation'' rule
+was applied. The innermost actual source form was the symbol
+@code{*undefined*} itself, but that also appeared in the
+explanation, so the compiler backed out one level.
+
+
+@node  Error Severity, Errors During Macroexpansion, The Original and Actual Source, Error Messages
+@comment  node-name,  next,  previous,  up
+@subsection Error Severity
+@cindex Severity of compiler errors
+@cindex compiler error severity
+
+There are four levels of compiler error severity: @emph{error},
+@emph{warning}, @emph{style warning}, and @emph{note}. The first three
+levels correspond to condition classes which are defined in the ANSI
+standard for Common Lisp and which have special significance to the
+@code{compile} and @code{compile-file} functions. These levels of
+compiler error severity occur when the compiler handles conditions of
+these classes. The fourth level of compiler error severity,
+@emph{note}, is used for problems which are too mild for the standard
+condition classes, typically hints about how efficiency might be
+improved.
+
+
+@node  Errors During Macroexpansion, Read Errors, Error Severity, Error Messages
+@comment  node-name,  next,  previous,  up
+@subsection Errors During Macroexpansion
+@cindex Macroexpansion, errors during
+
+The compiler handles errors that happen during macroexpansion, turning
+them into compiler errors. If you want to debug the error (to debug a
+macro), you can set @code{*break-on-signals*} to @code{error}. For
+example, this definition:
+
+@lisp
+(defun foo (e l)
+  (do ((current l (cdr current))
+       ((atom current) nil))
+      (when (eq (car current) e) (return current))))
+@end lisp
+
+gives this error:
+
+@example
+in: DEFUN FOO
+(DO ((CURRENT L #) (# NIL)) (WHEN (EQ # E) (RETURN CURRENT)) )
+caught ERROR: 
+(in macroexpansion of (DO # #))
+(hint: For more precise location, try *BREAK-ON-SIGNALS*.)
+DO step variable is not a symbol: (ATOM CURRENT)
+@end example
+
+
+@node  Read Errors,  , Errors During Macroexpansion, Error Messages
+@comment  node-name,  next,  previous,  up
+@subsection Read Errors
+@cindex Read errors, compiler
+
+SBCL's compiler (unlike CMUCL's) does not attempt to recover from read
+errors when reading a source file, but instead just reports the
+offending character position and gives up on the entire source file.
+
+
+@c <!-- FIXME: How much control over error messages is in SBCL?
+@c      _     How much should be? How much of this documentation should
+@c      _     we save or adapt? 
+@c      _ 
+@c      _ %%\node Error Message Parameterization,  , Read Errors, Interpreting Error Messages
+@c      _ \subsection{Error Message Parameterization}
+@c      _ \cpsubindex{error messages}{verbosity}
+@c      _ \cpsubindex{verbosity}{of error messages}
+@c      _ 
+@c      _ There is some control over the verbosity of error messages.  See also
+@c      _ \varref{undefined-warning-limit}, \code{*efficiency-note-limit*} and
+@c      _ \varref{efficiency-note-cost-threshold}.
+@c      _ 
+@c      _ \begin{defvar}{}{enclosing-source-cutoff}
+@c      _ 
+@c      _   This variable specifies the number of enclosing actual source forms
+@c      _   that are printed in full, rather than in the abbreviated processing
+@c      _   path format.  Increasing the value from its default of \code{1}
+@c      _   allows you to see more of the guts of the macroexpanded source,
+@c      _   which is useful when debugging macros.
+@c      _ \end{defvar}
+@c      _ 
+@c      _ \begin{defvar}{}{error-print-length}
+@c      _   \defvarx{error-print-level}
+@c      _ 
+@c      _   These variables are the print level and print length used in
+@c      _   printing error messages.  The default values are \code{5} and
+@c      _   \code{3}.  If null, the global values of \code{*print-level*} and
+@c      _   \code{*print-length*} are used.
+@c      _ \end{defvar}
+@c      _ 
+@c      _ \begin{defmac}{extensions:}{define-source-context}{%
+@c      _     \args{\var{name} \var{lambda-list} \mstar{form}}}
+@c      _ 
+@c      _   This macro defines how to extract an abbreviated source context from
+@c      _   the \var{name}d form when it appears in the compiler input.
+@c      _   \var{lambda-list} is a \code{defmacro} style lambda-list used to
+@c      _   parse the arguments.  The \var{body} should return a list of
+@c      _   subforms that can be printed on about one line.  There are
+@c      _   predefined methods for \code{defstruct}, \code{defmethod}, etc.  If
+@c      _   no method is defined, then the first two subforms are returned.
+@c      _   Note that this facility implicitly determines the string name
+@c      _   associated with anonymous functions.
+@c      _ \end{defmac}
+@c      _ 
+@c      _ -->
+
+
+@node  Handling of Types, Compiler Policy, Error Messages, The Compiler
+@comment  node-name,  next,  previous,  up
+@section The Compiler's Handling of Types
+
+The most unusual features of the SBCL compiler (which is very similar
+to the original CMUCL compiler, also known as @dfn{Python}) is its
+unusually sophisticated understanding of the Common Lisp type system
+and its unusually conservative approach to the implementation of type
+declarations. These two features reward the use of type declarations
+throughout development, even when high performance is not a
+concern. Also, as discussed in the chapter on performance
+(@pxref{Efficiency}), the use of appropriate type declarations can be
+very important for performance as well.
+
+The SBCL compiler, like the related compiler in CMUCL, treats type
+declarations much differently than other Lisp compilers.  By default
+(@emph{i.e.}, at ordinary levels of the @code{safety} compiler
+optimization parameter), the compiler doesn't blindly believe most
+type declarations; it considers them assertions about the program that
+should be checked.
+
+The SBCL compiler also has a greater knowledge of the
+Common Lisp type system than other compilers.  Support is incomplete
+only for the @code{not}, @code{and} and @code{satisfies}
+types.
+
+@c <!-- FIXME: See also sections \ref{advanced-type-stuff}
+@c      and \ref{type-inference}, once we snarf them from the
+@c      CMU CL manual. -->
+
+
+@menu
+* Implementation Limitations::  
+* Type Errors at Compile Time::  
+* Precise Type Checking::       
+* Weakened Type Checking::      
+* Getting Existing Programs to Run::  
+@end menu
+
+@node  Implementation Limitations, Type Errors at Compile Time, Handling of Types, Handling of Types
+@comment  node-name,  next,  previous,  up
+@subsection Implementation Limitations
+
+
+Ideally, the compiler would consider @emph{all} type declarations to
+be assertions, so that adding type declarations to a program, no
+matter how incorrect they might be, would @emph{never} cause undefined
+behavior. As of SBCL version 0.8.1, the compiler is known to fall
+short of this goal in two areas:
+
+  @itemize
+
+@item
+@code{Proclaim}ed constraints on argument and result types of a
+function are supposed to be checked by the function. If the function
+type is proclaimed before function definition, type checks are
+inserted by the compiler, but the standard allows the reversed order,
+in which case the compiler will trust the declaration.
+
+@item
+The compiler cannot check types of an unknown number of values; if the
+number of generated values is unknown, but the number of consumed is
+known, only consumed values are checked.
+
+@item
+There are a few poorly characterized but apparently very uncommon
+situations where a type declaration in an unexpected location will be
+trusted and never checked by the compiler.
+
+@end itemize
+
+These are important bugs, but are not necessarily easy to fix, so they
+may, alas, remain in the system for a while.
+
+
+@node  Type Errors at Compile Time, Precise Type Checking, Implementation Limitations, Handling of Types
+@comment  node-name,  next,  previous,  up
+@subsection Type Errors at Compile Time
+@cindex Compile time type errors
+@cindex Type checking, at compile time
+
+If the compiler can prove at compile time that some portion of the
+program cannot be executed without a type error, then it will give a
+warning at compile time. It is possible that the offending code would
+never actually be executed at run-time due to some higher level
+consistency constraint unknown to the compiler, so a type warning
+doesn't always indicate an incorrect program. For example, consider
+this code fragment:
+
+
+@lisp
+(defun raz (foo)
+  (let ((x (case foo
+              (:this 13)
+              (:that 9)
+              (:the-other 42))))
+    (declare (fixnum x))
+    (foo x)))
+@end lisp
+
+Compilation produces this warning:
+
+@example
+in: DEFUN RAZ
+(CASE FOO (:THIS 13) (:THAT 9) (:THE-OTHER 42))
+--> LET COND IF COND IF COND IF
+==>
+(COND)
+caught WARNING: This is not a FIXNUM:
+NIL
+@end example
+
+In this case, the warning means that if @code{foo} isn't any of
+@code{:this}, @code{:that} or @code{:the-other}, then @code{x} will be
+initialized to @code{nil}, which the @code{fixnum} declaration makes
+illegal. The warning will go away if @code{ecase} is used instead of
+@code{case}, or if @code{:the-other} is changed to @code{t}.
+
+This sort of spurious type warning happens moderately often in the
+expansion of complex macros and in inline functions. In such cases,
+there may be dead code that is impossible to correctly execute.  The
+compiler can't always prove this code is dead (could never be
+executed), so it compiles the erroneous code (which will always signal
+an error if it is executed) and gives a warning.
+
+
+Type warnings are inhibited when the @code{sb-ext:inhibit-warnings}
+optimization quality is @code{3}. @xref{Compiler Policy}.  This
+can be used in a local declaration to inhibit type warnings in a code
+fragment that has spurious warnings.
+
+
+@node  Precise Type Checking, Weakened Type Checking, Type Errors at Compile Time, Handling of Types
+@comment  node-name,  next,  previous,  up
+@subsection Precise Type Checking
+@cindex Precise type checking
+@cindex Type checking, precise
+
+With the default compilation policy, all type declarations are
+precisely checked, except in a few situations where they are simply
+ignored instead. Precise checking means that the check is done as
+though @code{typep} had been called with the exact type specifier that
+appeared in the declaration. In SBCL, adding type declarations makes
+code safer.  (Except that remaining bugs in the compiler's handling of
+types unfortunately provide some exceptions to this rule, see
+@ref{Implementation Limitations}).
+
+If a variable is declared to be @code{(integer 3 17)} then its value
+must always be an integer between @code{3} and @code{17}. If multiple
+type declarations apply to a single variable, then all the
+declarations must be correct; it is as though all the types were
+intersected producing a single @code{and} type specifier.
+
+Argument and result type declarations are automatically enforced. If
+you declare the type of a function argument, a type check will be done
+when that function is called. In a function call, the called function
+does the argument type checking.
+
+The types of structure slots are also checked. The value of a
+structure slot must always be of the type indicated in any
+@code{:type} slot option.
+
+In traditional Common Lisp compilers, not all type assertions are
+checked, and type checks are not precise. Traditional compilers
+blindly trust explicit type declarations, but may check the argument
+type assertions for built-in functions. Type checking is not precise,
+since the argument type checks will be for the most general type legal
+for that argument. In many systems, type declarations suppress what
+little type checking is being done, so adding type declarations makes
+code unsafe. This is a problem since it discourages writing type
+declarations during initial coding. In addition to being more error
+prone, adding type declarations during tuning also loses all the
+benefits of debugging with checked type assertions.
+
+To gain maximum benefit from the compiler's type checking, you should
+always declare the types of function arguments and structure slots as
+precisely as possible. This often involves the use of @code{or},
+@code{member}, and other list-style type specifiers.
+
+
+@node Weakened Type Checking, Getting Existing Programs to Run, Precise Type Checking, Handling of Types
+@comment  node-name,  next,  previous,  up
+@subsection Weakened Type Checking
+@cindex Weakened type checking
+@cindex Type checking, weakened
+
+At one time, CMUCL supported another level of type checking,
+``weakened type checking'', when the value for the @code{speed}
+optimization quality is greater than @code{safety}, and @code{safety}
+is not @code{0}.  The CMUCL manual still has a description of it, but
+even the CMU CL code no longer corresponds to the manual. Some of this
+partial safety checking lingers on in SBCL, but it's not a supported
+feature, and should not be relied on. If you ask the compiler to
+optimize @code{speed} to a higher level than @code{safety}, your
+program is performing without a safety net, because SBCL may at its
+option believe any or all type declarations with either partial or
+nonexistent runtime checking.
+
+
+@node  Getting Existing Programs to Run,  , Weakened Type Checking, Handling of Types
+@comment  node-name,  next,  previous,  up
+@subsection Getting Existing Programs to Run
+@cindex Existing programs, to run
+@cindex Types, portability
+@cindex Compatibility with other Lisps
+@c     (should also have an entry in the non-ANSI-isms section)-->
+
+Since SBCL's compiler, like CMUCL's compiler, does much more
+comprehensive type checking than most Lisp compilers, SBCL may detect
+type errors in programs that have been debugged using other
+compilers. These errors are mostly incorrect declarations, although
+compile-time type errors can find actual bugs if parts of the program
+have never been tested.
+
+Some incorrect declarations can only be detected by run-time type
+checking. It is very important to initially compile a program with
+full type checks (high @code{safety} optimization) and then test this
+safe version. After the checking version has been tested, then you can
+consider weakening or eliminating type checks.  @emph{This applies
+even to previously debugged programs,} because the SBCL compiler does
+much more type inference than other Common Lisp compilers, so an
+incorrect declaration can do more damage.
+
+The most common problem is with variables whose constant initial value
+doesn't match the type declaration. Incorrect constant initial values
+will always be flagged by a compile-time type error, and they are
+simple to fix once located. Consider this code fragment:
+
+@lisp
+(prog (foo)
+  (declare (fixnum foo))
+  (setq foo ...)
+  ...)
+@end lisp
+
+Here @code{foo} is given an initial value of @code{nil}, but is
+declared to be a @code{fixnum}.  Even if it is never read, the initial
+value of a variable must match the declared type.  There are two ways
+to fix this problem. Change the declaration
+
+@lisp
+(prog (foo)
+  (declare (type (or fixnum null) foo))
+  (setq foo ...)
+  ...)
+@end lisp
+
+or change the initial value
+
+@lisp
+(prog ((foo 0))
+  (declare (fixnum foo))
+  (setq foo ...)
+  ...)
+@end lisp
+
+It is generally preferable to change to a legal initial value rather
+than to weaken the declaration, but sometimes it is simpler to weaken
+the declaration than to try to make an initial value of the
+appropriate type.
+
+Another declaration problem occasionally encountered is incorrect
+declarations on @code{defmacro} arguments. This can happen when a
+function is converted into a macro. Consider this macro:
+
+@lisp
+(defmacro my-1+ (x)
+  (declare (fixnum x))
+  `(the fixnum (1+ ,x)))
+@end lisp
+
+Although legal and well-defined Common Lisp code, this meaning of this
+definition is almost certainly not what the writer intended. For
+example, this call is illegal:
+
+@lisp
+(my-1+ (+ 4 5))
+@end lisp
+
+This call is illegal because the argument to the macro is @code{(+ 4
+5)}, which is a @code{list}, not a @code{fixnum}.  Because of macro
+semantics, it is hardly ever useful to declare the types of macro
+arguments.  If you really want to assert something about the type of
+the result of evaluating a macro argument, then put a @code{the} in
+the expansion:
+
+@lisp
+(defmacro my-1+ (x)
+  `(the fixnum (1+ (the fixnum ,x))))
+@end lisp
+
+In this case, it would be stylistically preferable to change this
+macro back to a function and declare it inline. 
+@c <!--FIXME: <xref>inline-expansion, once we crib the 
+@c      relevant text from the CMU CL manual.-->
+
+Some more subtle problems are caused by incorrect declarations that
+can't be detected at compile time.  Consider this code:
+  
+@lisp
+(do ((pos 0 (position #\a string :start (1+ pos))))
+  ((null pos))
+  (declare (fixnum pos))
+  ...)
+@end lisp
+
+Although @code{pos} is almost always a @code{fixnum}, it is @code{nil}
+at the end of the loop. If this example is compiled with full type
+checks (the default), then running it will signal a type error at the
+end of the loop. If compiled without type checks, the program will go
+into an infinite loop (or perhaps @code{position} will complain
+because @code{(1+ nil)} isn't a sensible start.) Why? Because if you
+compile without type checks, the compiler just quietly believes the
+type declaration. Since the compiler believes that @code{pos} is
+always a @code{fixnum}, it believes that @code{pos} is never
+@code{nil}, so @code{(null pos)} is never true, and the loop exit test
+is optimized away. Such errors are sometimes flagged by unreachable
+code notes, but it is still important to initially compile and test
+any system with full type checks, even if the system works fine when
+compiled using other compilers.
+
+In this case, the fix is to weaken the type declaration to @code{(or
+fixnum null)} @footnote{Actually, this declaration is unnecessary in
+SBCL, since it already knows that @code{position} returns a
+non-negative @code{fixnum} or @code{nil}.}.
+
+Note that there is usually little performance penalty for weakening a
+declaration in this way. Any numeric operations in the body can still
+assume that the variable is a @code{fixnum}, since @code{nil} is not a
+legal numeric argument. Another possible fix would be to say:
+
+@lisp
+(do ((pos 0 (position #\a string :start (1+ pos))))
+    ((null pos))
+  (let ((pos pos))
+    (declare (fixnum pos))
+    ...))
+@end lisp
+
+This would be preferable in some circumstances, since it would allow a
+non-standard representation to be used for the local @code{pos}
+variable in the loop body.
+@c <!-- FIXME: <xref>ND-variables, once we crib the text from the 
+@c      CMU CL manual. -->
+
+
+@node Compiler Policy, Open Coding and Inline Expansion, Handling of Types, The Compiler
+@comment  node-name,  next,  previous,  up
+@section Compiler Policy
+
+As of version 0.6.4, SBCL still uses most of the CMUCL code for
+compiler policy. The CMUCL code has many features and high-quality
+documentation, but the two unfortunately do not match. So this area of
+the compiler and its interface needs to be cleaned up. Meanwhile, here
+is some rudimentary documentation on the current behavior of the
+system.
+
+Compiler policy is controlled by the @code{optimize} declaration. The
+compiler supports the ANSI optimization qualities, and also an
+extension @code{sb-ext:inhibit-warnings}.
+
+Ordinarily, when the @code{speed} quality is high, the compiler emits
+notes to notify the programmer about its inability to apply various
+optimizations. Setting @code{sb-ext:inhibit-warnings} to a value at
+least as large as the @code{speed} quality inhibits this
+notification. This can be useful to suppress notes about code which is
+known to be unavoidably inefficient. (For example, the compiler issues
+notes about having to use generic arithmetic instead of fixnum
+arithmetic, which is not helpful for code which by design supports
+arbitrary-sized integers instead of being limited to fixnums.)
+
+@quotation
+Note: The basic functionality of the @code{optimize
+inhibit-warnings} extension will probably be supported in all future
+versions of the system, but it will probably be renamed when the
+compiler and its interface are cleaned up. The current name is
+misleading, because it mostly inhibits optimization notes, not
+warnings. And making it an optimization quality is misleading, because
+it shouldn't affect the resulting code at all. It may become a
+declaration identifier with a name like
+@code{sb-ext:inhibit-notes}, so that what's currently written.
+
+@lisp
+(declaim (optimize (sb-ext:inhibit-warnings 2)))
+@end lisp
+
+would become something like
+
+@lisp
+(declaim (sb-ext:inhibit-notes 2))
+@end lisp
+
+@end quotation
+
+In early versions of SBCL, a @code{speed} value of zero was used to
+enable byte compilation, but since version 0.7.0, SBCL only supports
+native compilation.
+
+When @code{safety} is zero, almost all runtime checking of types,
+array bounds, and so forth is suppressed.
+
+When @code{safety} is less than @code{speed}, any and all type checks
+may be suppressed. At some point in the past, CMUCL had a more nuanced
+interpretation of this (@pxref{Weakened Type Checking}). However, SBCL
+doesn't support that interpretation, and setting @code{safety} less
+than @code{speed} may have roughly the same effect as setting
+@code{safety} to zero.
+
+The value of @code{space} mostly influences the compiler's decision
+whether to inline operations, which tend to increase the size of
+programs. Use the value @code{0} with caution, since it can cause the
+compiler to inline operations so indiscriminately that the net effect
+is to slow the program by causing cache misses or swapping.
+
+@c <!-- FIXME: old CMU CL compiler policy, should perhaps be adapted
+@c      _    for SBCL. (Unfortunately, the CMU CL docs are out of sync with the
+@c      _    CMU CL code, so adapting this requires not only reformatting
+@c      _    the documentation, but rooting out code rot.)
+@c      _
+@c      _<sect2 id="compiler-policy"><title>Compiler Policy</1000
+@c      _  INDEX {policy}{compiler}
+@c      _  INDEX compiler policy
+@c      _
+@c      _<para>The policy is what tells the compiler <emphasis>how</emphasis> to
+@c      _compile a program. This is logically (and often textually) distinct
+@c      _from the program itself. Broad control of policy is provided by the
+@c      _<parameter>optimize</parameter> declaration; other declarations and variables
+@c      _control more specific aspects of compilation.
+@c      _
+@c      _\begin{comment}
+@c      _* The Optimize Declaration::
+@c      _* The Optimize-Interface Declaration::
+@c      _\end{comment}
+@c      _
+@c      _%%\node The Optimize Declaration, The Optimize-Interface Declaration, Compiler Policy, Compiler Policy
+@c      _\subsection{The Optimize Declaration}
+@c      _\label{optimize-declaration}
+@c      _\cindex{optimize declaration}
+@c      _\cpsubindex{declarations}{\code{optimize}}
+@c      _
+@c      _The \code{optimize} declaration recognizes six different
+@c      _\var{qualities}.  The qualities are conceptually independent aspects
+@c      _of program performance.  In reality, increasing one quality tends to
+@c      _have adverse effects on other qualities.  The compiler compares the
+@c      _relative values of qualities when it needs to make a trade-off; i.e.,
+@c      _if \code{speed} is greater than \code{safety}, then improve speed at
+@c      _the cost of safety.
+@c      _
+@c      _The default for all qualities (except \code{debug}) is \code{1}.
+@c      _Whenever qualities are equal, ties are broken according to a broad
+@c      _idea of what a good default environment is supposed to be.  Generally
+@c      _this downplays \code{speed}, \code{compile-speed} and \code{space} in
+@c      _favor of \code{safety} and \code{debug}.  Novice and casual users
+@c      _should stick to the default policy.  Advanced users often want to
+@c      _improve speed and memory usage at the cost of safety and
+@c      _debuggability.
+@c      _
+@c      _If the value for a quality is \code{0} or \code{3}, then it may have a
+@c      _special interpretation.  A value of \code{0} means ``totally
+@c      _unimportant'', and a \code{3} means ``ultimately important.''  These
+@c      _extreme optimization values enable ``heroic'' compilation strategies
+@c      _that are not always desirable and sometimes self-defeating.
+@c      _Specifying more than one quality as \code{3} is not desirable, since
+@c      _it doesn't tell the compiler which quality is most important.
+@c      _
+@c      _
+@c      _These are the optimization qualities:
+@c      _\begin{Lentry}
+@c      _
+@c      _\item[\code{speed}] \cindex{speed optimization quality}How fast the
+@c      _  program should is run.  \code{speed 3} enables some optimizations
+@c      _  that hurt debuggability.
+@c      _
+@c      _\item[\code{compilation-speed}] \cindex{compilation-speed optimization
+@c      _    quality}How fast the compiler should run.  Note that increasing
+@c      _  this above \code{safety} weakens type checking.
+@c      _
+@c      _\item[\code{space}] \cindex{space optimization quality}How much space
+@c      _  the compiled code should take up.  Inline expansion is mostly
+@c      _  inhibited when \code{space} is greater than \code{speed}.  A value
+@c      _  of \code{0} enables indiscriminate inline expansion.  Wide use of a
+@c      _  \code{0} value is not recommended, as it may waste so much space
+@c      _  that run time is slowed.  \xlref{inline-expansion} for a discussion
+@c      _  of inline expansion.
+@c      _
+@c      _\item[\code{debug}] \cindex{debug optimization quality}How debuggable
+@c      _  the program should be.  The quality is treated differently from the
+@c      _  other qualities: each value indicates a particular level of debugger
+@c      _  information; it is not compared with the other qualities.
+@c      _  \xlref{debugger-policy} for more details.
+@c      _
+@c      _\item[\code{safety}] \cindex{safety optimization quality}How much
+@c      _  error checking should be done.  If \code{speed}, \code{space} or
+@c      _  \code{compilation-speed} is more important than \code{safety}, then
+@c      _  type checking is weakened (\pxlref{weakened-type-checks}).  If
+@c      _  \code{safety} if \code{0}, then no run time error checking is done.
+@c      _  In addition to suppressing type checks, \code{0} also suppresses
+@c      _  argument count checking, unbound-symbol checking and array bounds
+@c      _  checks.
+@c      _
+@c      _\item[\code{extensions:inhibit-warnings}] \cindex{inhibit-warnings
+@c      _    optimization quality}This is a CMU extension that determines how
+@c      _  little (or how much) diagnostic output should be printed during
+@c      _  compilation.  This quality is compared to other qualities to
+@c      _  determine whether to print style notes and warnings concerning those
+@c      _  qualities.  If \code{speed} is greater than \code{inhibit-warnings},
+@c      _  then notes about how to improve speed will be printed, etc.  The
+@c      _  default value is \code{1}, so raising the value for any standard
+@c      _  quality above its default enables notes for that quality.  If
+@c      _  \code{inhibit-warnings} is \code{3}, then all notes and most
+@c      _  non-serious warnings are inhibited.  This is useful with
+@c      _  \code{declare} to suppress warnings about unavoidable problems.
+@c      _\end{Lentry}
+@c      _
+@c      _%%\node The Optimize-Interface Declaration,  , The Optimize Declaration, Compiler Policy
+@c      _\subsection{The Optimize-Interface Declaration}
+@c      _\label{optimize-interface-declaration}
+@c      _\cindex{optimize-interface declaration}
+@c      _\cpsubindex{declarations}{\code{optimize-interface}}
+@c      _
+@c      _The \code{extensions:optimize-interface} declaration is identical in
+@c      _syntax to the \code{optimize} declaration, but it specifies the policy
+@c      _used during compilation of code the compiler automatically generates
+@c      _to check the number and type of arguments supplied to a function.  It
+@c      _is useful to specify this policy separately, since even thoroughly
+@c      _debugged functions are vulnerable to being passed the wrong arguments.
+@c      _The \code{optimize-interface} declaration can specify that arguments
+@c      _should be checked even when the general \code{optimize} policy is
+@c      _unsafe.
+@c      _
+@c      _Note that this argument checking is the checking of user-supplied
+@c      _arguments to any functions defined within the scope of the
+@c      _declaration, \code{not} the checking of arguments to \llisp{}
+@c      _primitives that appear in those definitions.
+@c      _
+@c      _The idea behind this declaration is that it allows the definition of
+@c      _functions that appear fully safe to other callers, but that do no
+@c      _internal error checking.  Of course, it is possible that arguments may
+@c      _be invalid in ways other than having incorrect type.  Functions
+@c      _compiled unsafely must still protect themselves against things like
+@c      _user-supplied array indices that are out of bounds and improper lists.
+@c      _See also the \kwd{context-declarations} option to
+@c      _\macref{with-compilation-unit}.
+@c      _
+@c      _(end of section on compiler policy)
+@c      _-->
+
+
+@node  Open Coding and Inline Expansion,  , Compiler Policy, The Compiler
+@comment  node-name,  next,  previous,  up
+@section Open Coding and Inline Expansion
+@cindex Open-coding
+@cindex inline expansion
+@cindex static functions
+
+Since Common Lisp forbids the redefinition of standard functions, the
+compiler can have special knowledge of these standard functions
+embedded in it. This special knowledge is used in various ways (open
+coding, inline expansion, source transformation), but the implications
+to the user are basically the same:
+
+@itemize
+
+@item
+Attempts to redefine standard functions may be frustrated, since the
+function may never be called. Although it is technically illegal to
+redefine standard functions, users sometimes want to implicitly
+redefine these functions when they are debugging using the
+@code{trace} macro.  Special-casing of standard functions can be
+inhibited using the @code{notinline} declaration.
+
+@item
+The compiler can have multiple alternate implementations of standard
+functions that implement different trade-offs of speed, space and
+safety.  This selection is based on the compiler policy, @ref{Compiler
+Policy}.
+
+@end itemize
+
+When a function call is @emph{open coded}, inline code whose effect is
+equivalent to the function call is substituted for that function
+call. When a function call is @emph{closed coded}, it is usually left
+as is, although it might be turned into a call to a different function
+with different arguments. As an example, if @code{nthcdr} were to be
+open coded, then
+
+@lisp
+(nthcdr 4 foobar)
+@end lisp
+
+might turn into
+
+@lisp
+(cdr (cdr (cdr (cdr foobar))))
+@end lisp
+
+or even
+
+@lisp
+(do ((i 0 (1+ i))
+  (list foobar (cdr foobar)))
+  ((= i 4) list))
+@end lisp
+
+If @code{nth} is closed coded, then
+
+@lisp
+(nth x l)
+@end lisp
+
+might stay the same, or turn into something like
+
+@lisp
+(car (nthcdr x l))
+@end lisp
+
+In general, open coding sacrifices space for speed, but some functions
+(such as @code{car}) are so simple that they are always
+open-coded. Even when not open-coded, a call to a standard function
+may be transformed into a different function call (as in the last
+example) or compiled as @emph{static call}. Static function call uses
+a more efficient calling convention that forbids redefinition.
+

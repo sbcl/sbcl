@@ -1,0 +1,1167 @@
+@node  The Debugger, Efficiency, The Compiler, Top
+@comment  node-name,  next,  previous,  up
+@chapter The Debugger
+@cindex Debugger
+
+The SBCL debugger (as the CMUCL debugger it was derived from) has very
+good support for source-level debugging of compiled code.  Although
+some other debuggers allow access of variables by name, this seems to
+be the first Lisp debugger that:
+
+@itemize
+
+@item
+Tells you when a variable doesn't have a value because it hasn't been
+initialized yet or has already been deallocated, or
+
+@item
+Can display the precise source location corresponding to a code
+location in the debugged program.
+
+@end itemize
+
+These features allow the debugging of compiled code to be made almost
+indistinguishable from interpreted code debugging.
+
+
+@menu
+* Starting the Debugger::       
+* The Debugger Command Loop::   
+* Controlling Printing in the Debugger::  
+* Stack Frames::                
+* Variable Access::             
+* Source Location Printing::    
+* Debugger Policy Control::     
+* Exiting Commands::            
+* Information Commands::        
+* Function Tracing::            
+@end menu
+
+@node  Starting the Debugger, The Debugger Command Loop, The Debugger, The Debugger
+@comment  node-name,  next,  previous,  up
+@section Starting the Debugger
+
+The debugger is an interactive command loop that allows a user to examine
+the function call stack.  The debugger is invoked when:
+
+@itemize
+
+@item
+A @code{serious-condition} is signaled, and it is not handled, or
+
+@item
+@code{error} is called, and the condition it signals is not handled,
+or
+
+@item
+the debugger is explicitly entered with the Lisp @code{break} or
+@code{debug} functions.
+
+@end itemize
+
+When you enter the TTY debugger, it looks something like this:
+
+@example
+debugger invoked on a TYPE-ERROR in thread 11184:
+  The value 3 is not of type LIST.
+restarts (invokable by number or by possibly-abbreviated name):
+  0: [ABORT   ] Reduce debugger level (leaving debugger, returning to toplevel).
+  1: [TOPLEVEL] Restart at toplevel READ/EVAL/PRINT loop.
+(CAR 1 3)[:EXTERNAL]
+0]
+@end example
+
+The first group of lines describe what the error was that put us in
+the debugger.  In this case @code{car} was called on @code{3}.  After
+@samp{restarts} is a list of all the ways that we can restart
+execution after this error.  In this case, both options return to
+top-level.  After printing its banner, the debugger prints the current
+frame and the debugger prompt.
+
+
+@node  The Debugger Command Loop, Controlling Printing in the Debugger, Starting the Debugger, The Debugger
+@comment  node-name,  next,  previous,  up
+@section The Debugger Command Loop
+@cindex Evaluation, in the debugger
+
+The debugger is an interactive read-eval-print loop much like the normal
+top-level, but some symbols are interpreted as debugger commands instead
+of being evaluated.  A debugger command starts with the symbol name of
+the command, possibly followed by some arguments on the same line.  Some
+commands prompt for additional input.  Debugger commands can be
+abbreviated by any unambiguous prefix: @command{help} can be typed as
+@samp{h}, @samp{he}, etc.  For convenience, some commands have
+ambiguous one-letter abbreviations: @samp{f} for @command{frame}.
+
+The package is not significant in debugger commands; any symbol with the
+name of a debugger command will work.  If you want to show the value of
+a variable that happens also to be the name of a debugger command, you
+can use the @command{list-locals} command or the @code{sb-debug:var}
+function, or you can wrap the variable in a @code{progn} to hide it from
+the command loop.
+
+The debugger prompt is ``@code{@var{frame}]}'', where @var{frame} is
+the number of the current frame.  Frames are numbered starting from
+zero at the top (most recent call), increasing down to the bottom.
+The current frame is the frame that commands refer to.  The current
+frame also provides the lexical environment for evaluation of
+non-command forms.
+
+ The debugger evaluates forms in the lexical environment of the
+functions being debugged.  The debugger can only access variables.
+You can't @code{go} or @code{return-from} into a function, and you
+can't call local functions.  Special variable references are evaluated
+with their current value (the innermost binding around the debugger
+invocation) -- you don't get the value that the special had in the
+current frame.  For more information on debugger variable access, see
+@ref{Variable Access}.
+
+
+@node Controlling Printing in the Debugger, Stack Frames, The Debugger Command Loop, The Debugger
+@comment  node-name,  next,  previous,  up
+@section Controlling Printing in the Debugger
+
+In the debugger, it is possible to override the printing behaviour of
+the REPL.
+
+@defvr {Variable} *debug-print-variable-alist*
+
+An association list describing new bindings for special variables
+(typically *PRINT-FOO* variables) to be used within the debugger, e.g.
+@lisp
+((*PRINT-LENGTH* . 10) (*PRINT-LEVEL* . 6) (*PRINT-PRETTY* . NIL))
+@end lisp
+The variables in the @code{car} position are bound to the values in
+the @code{cdr} during the execution of some debug commands.  When
+evaluating arbitrary expressions in the debugger, the normal values of
+the printer control variables are in effect. @c FIXME: is this correct?
+@code{*debug-print-variable-alist*} does not contain any bindings
+initially.
+
+@end defvr
+
+@node  Stack Frames, Variable Access, Controlling Printing in the Debugger, The Debugger
+@comment  node-name,  next,  previous,  up
+@section Stack Frames
+@cindex Stack frames
+
+A @dfn{stack frame} is the run-time representation of a call to a
+function; the frame stores the state that a function needs to remember
+what it is doing.  Frames have:
+
+@itemize
+
+@item
+@dfn{Variables} (@pxref{Variable Access}), which are the values being operated
+on, and
+
+@item
+@dfn{Arguments} to the call (which are really just particularly
+interesting variables), and
+
+@item
+A current location (@pxref{Source Location Printing}), which is the place in
+the program where the function was running when it stopped to call
+another function, or because of an interrupt or error.
+
+@end itemize
+
+
+@menu
+* Stack Motion::                
+* How Arguments are Printed::   
+* Function Names::              
+* Funny Frames::                
+* Debug Tail Recursion::        
+* Unknown Locations and Interrupts::  
+@end menu
+
+@node  Stack Motion, How Arguments are Printed, Stack Frames, Stack Frames
+@comment  node-name,  next,  previous,  up
+@subsection Stack Motion
+
+These commands move to a new stack frame and print the name of the
+function and the values of its arguments in the style of a Lisp
+function call:
+
+@deffn {Debugger Command} up
+Move up to the next higher frame.  More recent function calls are
+considered to be higher on the stack.
+@end deffn
+
+@deffn {Debugger Command} down
+Move down to the next lower frame.
+@end deffn
+
+@deffn {Debugger Command} top
+Move to the highest frame, that is, the frame where the debugger was
+entered.
+@end deffn
+
+@deffn {Debugger Command} bottom
+Move to the lowest frame.
+@end deffn
+
+@deffn {Debugger Command} frame [@var{n}]
+Move to the frame with the specified number.  Prompts for the number if not
+supplied.  The frame with number 0 is the frame where the debugger
+was entered.
+@end deffn
+
+
+@node  How Arguments are Printed, Function Names, Stack Motion, Stack Frames
+@comment  node-name,  next,  previous,  up
+@subsection How Arguments are Printed
+
+A frame is printed to look like a function call, but with the actual
+argument values in the argument positions.  So the frame for this call
+in the source:
+
+@lisp
+(myfun (+ 3 4) 'a)
+@end lisp
+
+would look like this:
+
+@example
+(MYFUN 7 A)
+@end example
+
+All keyword and optional arguments are displayed with their actual
+values; if the corresponding argument was not supplied, the value will
+be the default.  So this call:
+
+@lisp
+(subseq "foo" 1)
+@end lisp
+
+would look like this:
+
+@example
+(SUBSEQ "foo" 1 3)
+@end example
+
+And this call:
+
+@lisp
+(string-upcase "test case")
+@end lisp
+
+would look like this:
+
+@example
+(STRING-UPCASE "test case" :START 0 :END NIL)
+@end example
+
+The arguments to a function call are displayed by accessing the
+argument variables.  Although those variables are initialized to the
+actual argument values, they can be set inside the function; in this
+case the new value will be displayed.
+
+@code{&rest} arguments are handled somewhat differently.  The value of
+the rest argument variable is displayed as the spread-out arguments to
+the call, so:
+
+@lisp
+(format t "~A is a ~A." "This" 'test)
+@end lisp
+
+would look like this:
+
+@example
+(FORMAT T "~A is a ~A." "This" 'TEST)
+@end example
+
+Rest arguments cause an exception to the normal display of keyword
+arguments in functions that have both @code{&rest} and @code{&key}
+arguments.  In this case, the keyword argument variables are not
+displayed at all; the rest arg is displayed instead.  So for these
+functions, only the keywords actually supplied will be shown, and the
+values displayed will be the argument values, not values of the
+(possibly modified) variables.
+
+If the variable for an argument is never referenced by the function,
+it will be deleted.  The variable value is then unavailable, so the
+debugger prints @samp{#<unused-arg>} instead of the value.  Similarly,
+if for any of a number of reasons the value of the variable is
+unavailable or not known to be available (@pxref{Variable Access}),
+then @samp{#<unavailable-arg>} will be printed instead of the argument
+value.
+
+Printing of argument values is controlled by
+@code{*debug-print-variable-alist*}.  @xref{Controlling Printing in
+the Debugger}.
+
+
+@node  Function Names, Funny Frames, How Arguments are Printed, Stack Frames
+@comment  node-name,  next,  previous,  up
+@subsection Function Names
+
+If a function is defined by @code{defun}, @code{labels}, or
+@code{flet}, then the debugger will print the actual function name
+after the open parenthesis, like:
+
+@example
+(STRING-UPCASE "test case" :START 0 :END NIL)
+((SETF AREF) #\a "for" 1)
+@end example
+
+Otherwise, the function name is a string, and will be printed in
+quotes:
+
+@example
+("DEFUN MYFUN" BAR)
+("DEFMACRO DO" (DO ((I 0 (1+ I))) ((= I 13))) NIL)
+("SETQ *GC-NOTIFY-BEFORE*")
+@end example
+
+This string name is derived from the @code{def@var{mumble}} form
+that encloses or expanded into the lambda, or the outermost enclosing
+form if there is no @code{def@var{mumble}}.
+
+
+@node  Funny Frames, Debug Tail Recursion, Function Names, Stack Frames
+@comment  node-name,  next,  previous,  up
+@subsection Funny Frames
+@cindex External entry points
+@cindex Entry points, external
+@cindex Block compilation, debugger implications
+@cindex External, stack frame kind
+@cindex Optional, stack frame kind
+@cindex Cleanup, stack frame kind
+
+Sometimes the evaluator introduces new functions that are used to
+implement a user function, but are not directly specified in the
+source.  The main place this is done is for checking argument type and
+syntax.  Usually these functions do their thing and then go away, and
+thus are not seen on the stack in the debugger.  But when you get some
+sort of error during lambda-list processing, you end up in the
+debugger on one of these funny frames.
+
+These funny frames are flagged by printing
+``@code{[@var{keyword}]}'' after the parentheses.  For example,
+this call:
+
+@lisp
+(car 'a 'b)
+@end lisp
+
+will look like this:
+
+@example
+(CAR 2 A)[:EXTERNAL]
+@end example
+
+And this call:
+
+@lisp
+(string-upcase "test case" :end)
+@end lisp
+
+would look like this:
+
+@example
+("SB!INT:&MORE processing" "test case" 1053984 1)[:OPTIONAL]
+@end example
+
+As you can see, these frames have only a vague resemblance to the
+original call.  Fortunately, the error message displayed when you
+enter the debugger will usually tell you what problem is (in these
+cases, too many arguments and odd keyword arguments.)  Also, if you go
+down the stack to the frame for the calling function, you can display
+the original source.  @xref{Source Location Printing}.
+
+@c FIXME: is the block-compilation part correct for SBCL?
+
+With recursive or block compiled functions, an @code{:EXTERNAL} frame
+may appear before the frame representing the first call to the
+recursive function or entry to the compiled block. This is a
+consequence of the way the compiler does block compilation: there is
+nothing odd with your program. You will also see @code{:CLEANUP}
+frames during the execution of @code{unwind-protect} cleanup
+code. Note that inline expansion and open-coding affect what frames
+are present in the debugger, see @ref{Debugger Policy Control}.
+@comment FIXME: link here to section about open coding once it exists.
+@c @ref{open-coding}
+
+
+@node  Debug Tail Recursion, Unknown Locations and Interrupts, Funny Frames, Stack Frames
+@comment  node-name,  next,  previous,  up
+@subsection Debug Tail Recursion
+@cindex Tail recursion
+@cindex Recursion, tail
+
+Both the compiler and the interpreter are ``properly tail recursive.''
+If a function call is in a tail-recursive position, the stack frame
+will be deallocated @emph{at the time of the call}, rather than after
+the call returns.  Consider this backtrace:
+
+@example
+(BAR ...) 
+(FOO ...)
+@end example
+
+Because of tail recursion, it is not necessarily the case that
+@code{FOO} directly called @code{BAR}.  It may be that @code{FOO}
+called some other function @code{FOO2} which then called @code{BAR}
+tail-recursively, as in this example:
+
+@lisp
+(defun foo ()
+  ...
+  (foo2 ...)
+  ...)
+
+(defun foo2 (...)
+  ...
+  (bar ...))
+
+(defun bar (...)
+  ...)
+@end lisp
+
+Usually the elimination of tail-recursive frames makes debugging more
+pleasant, since theses frames are mostly uninformative.  If there is
+any doubt about how one function called another, it can usually be
+eliminated by finding the source location in the calling frame.
+@xref{Source Location Printing}.
+
+The elimination of tail-recursive frames can be prevented by disabling
+tail-recursion optimization, which happens when the @code{debug}
+optimization quality is greater than @code{2}.  
+@xref{Debugger Policy Control}.
+
+@comment FIXME: reinstate this link once the chapter is in the manual.
+@c For a more thorough discussion of tail recursion, @ref{tail-recursion}.
+
+
+@node Unknown Locations and Interrupts,  , Debug Tail Recursion, Stack Frames
+@comment  node-name,  next,  previous,  up
+@subsection Unknown Locations and Interrupts
+@cindex Unknown code locations
+@cindex Locations, unknown
+@cindex Interrupts
+@cindex Errors, run-time
+
+The debugger operates using special debugging information attached to
+the compiled code.  This debug information tells the debugger what it
+needs to know about the locations in the code where the debugger can
+be invoked.  If the debugger somehow encounters a location not
+described in the debug information, then it is said to be
+@dfn{unknown}.  If the code location for a frame is unknown, then some
+variables may be inaccessible, and the source location cannot be
+precisely displayed.
+
+There are three reasons why a code location could be unknown:
+
+@itemize
+
+@item
+There is inadequate debug information due to the value of the @code{debug}
+optimization quality.  @xref{Debugger Policy Control}.
+
+@item
+The debugger was entered because of an interrupt such as @key{C-c}.
+
+@item
+A hardware error such as ``@samp{bus error}'' occurred in code that was
+compiled unsafely due to the value of the @code{safety} optimization
+quality.
+@comment FIXME: reinstate link when section on optimize qualities exists.
+@c  @xref{optimize-declaration}.
+
+@end itemize
+
+In the last two cases, the values of argument variables are
+accessible, but may be incorrect.  For more details on when variable
+values are accessible, @ref{Variable Value Availability}.
+
+It is possible for an interrupt to happen when a function call or
+return is in progress.  The debugger may then flame out with some
+obscure error or insist that the bottom of the stack has been reached,
+when the real problem is that the current stack frame can't be
+located.  If this happens, return from the interrupt and try again.
+
+
+@node Variable Access, Source Location Printing, Stack Frames, The Debugger
+@comment  node-name,  next,  previous,  up
+@section Variable Access
+@cindex Debug variables
+@cindex Variables, debugger access
+
+There are two ways to access the current frame's local variables in
+the debugger: @command{list-locals} and @code{sb-debug:var}.
+
+The debugger doesn't really understand lexical scoping; it has just
+one namespace for all the variables in the current stack frame.  If a
+symbol is the name of multiple variables in the same function, then
+the reference appears ambiguous, even though lexical scoping specifies
+which value is visible at any given source location.  If the scopes of
+the two variables are not nested, then the debugger can resolve the
+ambiguity by observing that only one variable is accessible.
+
+When there are ambiguous variables, the evaluator assigns each one a
+small integer identifier.  The @code{sb-debug:var} function uses this
+identifier to distinguish between ambiguous variables.  The
+@command{list-locals} command prints the identifier.  In the
+following example, there are two variables named @code{X}.  The first
+one has identifier 0 (which is not printed), the second one has
+identifier 1.
+
+@example
+X  =  1
+X#1  =  2
+@end example
+
+@deffn {Debugger Command} list-locals [@var{prefix}]
+This command prints the name and value of all variables in the current
+frame whose name has the specified @var{prefix}.  @var{prefix} may be
+a string or a symbol.  If no @var{prefix} is given, then all available
+variables are printed.  If a variable has a potentially ambiguous
+name, then the name is printed with a ``@code{#@var{identifier}}''
+suffix, where @var{identifier} is the small integer used to make the
+name unique.
+@end deffn
+
+@defun sb-debug:var @var{name} &optional @var{identifier}
+This function returns the value of the variable in the current frame
+with the specified @var{name}.  If supplied, @var{identifier}
+determines which value to return when there are ambiguous variables.
+  
+When @var{name} is a symbol, it is interpreted as the symbol name of
+the variable, i.e. the package is significant.  If @var{name} is an
+uninterned symbol (gensym), then return the value of the uninterned
+variable with the same name.  If @var{name} is a string,
+@code{sb-debug:var} interprets it as the prefix of a variable name
+that must unambiguously complete to the name of a valid variable.
+
+@var{identifier} is used to disambiguate the variable name; use
+@command{list-locals} to find out the identifiers.
+@end defun
+
+
+@menu
+* Variable Value Availability::  
+* Note On Lexical Variable Access::  
+@end menu
+
+@node Variable Value Availability, Note On Lexical Variable Access, Variable Access, Variable Access
+@comment  node-name,  next,  previous,  up
+@subsection Variable Value Availability
+@cindex Availability of debug variables
+@cindex Validity of debug variables
+@cindex Debug optimization quality
+
+The value of a variable may be unavailable to the debugger in portions
+of the program where Lisp says that the variable is defined.  If a
+variable value is not available, the debugger will not let you read or
+write that variable.  With one exception, the debugger will never
+display an incorrect value for a variable.  Rather than displaying
+incorrect values, the debugger tells you the value is unavailable.
+
+The one exception is this: if you interrupt (e.g., with @key{C-c}) or
+if there is an unexpected hardware error such as ``@samp{bus error}''
+(which should only happen in unsafe code), then the values displayed
+for arguments to the interrupted frame might be
+incorrect.@footnote{Since the location of an interrupt or hardware
+error will always be an unknown location, non-argument variable values
+will never be available in the interrupted frame.  @xref{Unknown
+Locations and Interrupts}.}  This exception applies only to the
+interrupted frame: any frame farther down the stack will be fine.
+
+The value of a variable may be unavailable for these reasons:
+
+@itemize
+
+@item
+The value of the @code{debug} optimization quality may have omitted debug
+information needed to determine whether the variable is available.
+Unless a variable is an argument, its value will only be available when
+@code{debug} is at least @code{2}.
+
+@item
+The compiler did lifetime analysis and determined that the value was no longer
+needed, even though its scope had not been exited.  Lifetime analysis is
+inhibited when the @code{debug} optimization quality is @code{3}.
+
+@item
+The variable's name is an uninterned symbol (gensym).  To save space, the
+compiler only dumps debug information about uninterned variables when the
+@code{debug} optimization quality is @code{3}.
+
+@item
+The frame's location is unknown (@pxref{Unknown Locations and
+Interrupts}) because the debugger was entered due to an interrupt or
+unexpected hardware error.  Under these conditions the values of
+arguments will be available, but might be incorrect.  This is the
+exception mentioned above.
+
+@item
+The variable (or the code referencing it) was optimized out
+of existence.  Variables with no reads are always optimized away.  The
+degree to which the compiler deletes variables will depend on the
+value of the @code{compilation-speed} optimization quality, but most
+source-level optimizations are done under all compilation policies.
+
+@item
+The variable is never set and its definition looks like
+@lisp
+(LET ((var1 var2))
+   ...)
+@end lisp
+In this case, @code{var1} is substituted with @code{var2}.
+
+@item 
+The variable is never set and is referenced exactly once.  In this
+case, the reference is substituted with the variable initial value.
+
+@end itemize
+
+Since it is especially useful to be able to get the arguments to a
+function, argument variables are treated specially when the
+@code{speed} optimization quality is less than @code{3} and the
+@code{debug} quality is at least @code{1}.  With this compilation
+policy, the values of argument variables are almost always available
+everywhere in the function, even at unknown locations.  For
+non-argument variables, @code{debug} must be at least @code{2} for
+values to be available, and even then, values are only available at
+known locations.
+
+
+@node  Note On Lexical Variable Access,  , Variable Value Availability, Variable Access
+@comment  node-name,  next,  previous,  up
+@subsection Note On Lexical Variable Access
+
+When the debugger command loop establishes variable bindings for
+available variables, these variable bindings have lexical scope and
+dynamic extent.@footnote{The variable bindings are actually created
+using the Lisp @code{symbol-macrolet} special form.}  You can close
+over them, but such closures can't be used as upward funargs.
+
+You can also set local variables using @code{setq}, but if the
+variable was closed over in the original source and never set, then
+setting the variable in the debugger may not change the value in all
+the functions the variable is defined in.  Another risk of setting
+variables is that you may assign a value of a type that the compiler
+proved the variable could never take on.  This may result in bad
+things happening.
+
+
+@node Source Location Printing, Debugger Policy Control, Variable Access, The Debugger
+@comment  node-name,  next,  previous,  up
+@section Source Location Printing
+@cindex Source location printing, debugger
+
+One of the debugger's capabilities is source level debugging of
+compiled code.  These commands display the source location for the
+current frame:
+
+@deffn {Debugger Command} source [@var{context}]
+This command displays the file that the current frame's function was
+defined from (if it was defined from a file), and then the source form
+responsible for generating the code that the current frame was
+executing.  If @var{context} is specified, then it is an integer
+specifying the number of enclosing levels of list structure to print.
+@end deffn
+
+The source form for a location in the code is the innermost list present
+in the original source that encloses the form responsible for generating
+that code.  If the actual source form is not a list, then some enclosing
+list will be printed.  For example, if the source form was a reference
+to the variable @code{*some-random-special*}, then the innermost
+enclosing evaluated form will be printed.  Here are some possible
+enclosing forms:
+
+@lisp
+(let ((a *some-random-special*))
+  ...)
+
+(+ *some-random-special* ...)
+@end lisp
+
+If the code at a location was generated from the expansion of a macro
+or a source-level compiler optimization, then the form in the original
+source that expanded into that code will be printed.  Suppose the file
+@file{/usr/me/mystuff.lisp} looked like this:
+
+@lisp
+(defmacro mymac ()
+  '(myfun))
+
+(defun foo ()
+  (mymac)
+  ...)
+@end lisp
+
+If @code{foo} has called @code{myfun}, and is waiting for it to
+return, then the @command{source} command would print:
+
+@example
+; File: /usr/me/mystuff.lisp
+
+(MYMAC)
+@end example
+
+Note that the macro use was printed, not the actual function call form,
+@code{(myfun)}.
+
+If enclosing source is printed by giving an argument to
+@command{source} or @command{vsource}, then the actual source form is
+marked by wrapping it in a list whose first element is
+@samp{#:***HERE***}.  In the previous example, @code{source 1} would
+print:
+
+@example
+; File: /usr/me/mystuff.lisp
+
+(DEFUN FOO ()
+  (#:***HERE***
+   (MYMAC))
+  ...)
+@end example
+
+
+@menu
+* How the Source is Found::     
+* Source Location Availability::  
+@end menu
+
+@node  How the Source is Found, Source Location Availability, Source Location Printing, Source Location Printing
+@comment  node-name,  next,  previous,  up
+@subsection How the Source is Found
+
+If the code was defined from Lisp by @code{compile} or
+@code{eval}, then the source can always be reliably located.  If the
+code was defined from a @file{fasl} file created by
+@code{compile-file}, then the debugger gets the source forms it
+prints by reading them from the original source file.  This is a
+potential problem, since the source file might have moved or changed
+since the time it was compiled.
+
+The source file is opened using the @code{truename} of the source file
+pathname originally given to the compiler.  This is an absolute pathname
+with all logical names and symbolic links expanded.  If the file can't
+be located using this name, then the debugger gives up and signals an
+error.
+
+If the source file can be found, but has been modified since the time it was
+compiled, the debugger prints this warning:
+
+@example
+; File has been modified since compilation:
+;   @var{filename}
+; Using form offset instead of character position.
+@end example
+
+where @var{filename} is the name of the source file.  It then proceeds
+using a robust but not foolproof heuristic for locating the source.
+This heuristic works if:
+
+@itemize
+
+@item
+No top-level forms before the top-level form containing the source
+have been added or deleted, and
+
+@item
+The top-level form containing the source has not been modified much.
+(More precisely, none of the list forms beginning before the source
+form have been added or deleted.)
+
+@end itemize
+
+If the heuristic doesn't work, the displayed source will be wrong, but will
+probably be near the actual source.  If the ``shape'' of the top-level form in
+the source file is too different from the original form, then an error will be
+signaled.  When the heuristic is used, the the source location commands are
+noticeably slowed.
+
+Source location printing can also be confused if (after the source was
+compiled) a read-macro you used in the code was redefined to expand
+into something different, or if a read-macro ever returns the same
+@code{eq} list twice.  If you don't define read macros and don't use
+@code{##} in perverted ways, you don't need to worry about this.
+
+
+@node  Source Location Availability,  , How the Source is Found, Source Location Printing
+@comment  node-name,  next,  previous,  up
+@subsection Source Location Availability
+@cindex Debug optimization quality
+@cindex Block, basic
+@cindex Block, start location
+
+Source location information is only available when the @code{debug}
+optimization quality is at least @code{2}.  If source location
+information is unavailable, the source commands will give an error
+message.
+
+If source location information is available, but the source location
+is unknown because of an interrupt or unexpected hardware error
+(@pxref{Unknown Locations and Interrupts}), then the command will
+print:
+
+@example
+Unknown location: using block start.
+@end example
+
+and then proceed to print the source location for the start of the
+@emph{basic block} enclosing the code location.  It's a bit
+complicated to explain exactly what a basic block is, but here are
+some properties of the block start location:
+
+@itemize
+
+@item The block start location may be the same as the true location.
+
+@item The block start location will never be later in the the
+program's flow of control than the true location.
+
+@item No conditional control structures (such as @code{if},
+@code{cond}, @code{or}) will intervene between the block start and the
+true location (but note that some conditionals present in the original
+source could be optimized away.)  Function calls @emph{do not} end
+basic blocks.
+
+@item The head of a loop will be the start of a block.
+
+@item The programming language concept of ``block structure'' and the
+Lisp @code{block} special form are totally unrelated to the compiler's
+basic block.
+
+@end itemize
+
+In other words, the true location lies between the printed location and the
+next conditional (but watch out because the compiler may have changed the
+program on you.)
+
+
+@node Debugger Policy Control, Exiting Commands, Source Location Printing, The Debugger
+@comment  node-name,  next,  previous,  up
+@section Debugger Policy Control
+@cindex Policy, debugger
+@cindex Debug optimization quality
+@cindex Optimize declaration
+@cindex Inline expansion
+@cindex Semi-inline expansion
+
+The compilation policy specified by @code{optimize} declarations
+affects the behavior seen in the debugger.  The @code{debug} quality
+directly affects the debugger by controlling the amount of debugger
+information dumped.  Other optimization qualities have indirect but
+observable effects due to changes in the way compilation is done.
+
+Unlike the other optimization qualities (which are compared in relative value
+to evaluate tradeoffs), the @code{debug} optimization quality is directly
+translated to a level of debug information.  This absolute interpretation
+allows the user to count on a particular amount of debug information being
+available even when the values of the other qualities are changed during
+compilation.  These are the levels of debug information that correspond to the
+values of the @code{debug} quality:
+
+@table @code
+
+@item 0
+Only the function name and enough information to allow the stack to
+be parsed.
+
+@item > 0
+Any level greater than @code{0} gives level @code{0} plus all argument
+variables.  Values will only be accessible if the argument variable is
+never set and @code{speed} is not @code{3}.  SBCL allows any real
+value for optimization qualities.  It may be useful to specify
+@code{0.5} to get backtrace argument display without argument
+documentation.
+
+@item 1
+Level @code{1} provides argument documentation (printed arglists) and
+derived argument/result type information.  This makes @code{describe}
+more informative, and allows the compiler to do compile-time argument
+count and type checking for any calls compiled at run-time.  This is
+the default.
+
+@item 2
+Level @code{1} plus all interned local variables, source location
+information, and lifetime information that tells the debugger when
+arguments are available (even when @code{speed} is @code{3} or the
+argument is set).
+
+@item > 2
+Any level greater than @code{2} gives level @code{2} and in addition
+disables tail-call optimization, so that the backtrace will contain
+frames for all invoked functions, even those in tail positions.
+
+@item 3
+Level @code{2} plus all uninterned variables.  In addition, lifetime
+analysis is disabled (even when @code{speed} is @code{3}), ensuring
+that all variable values are available at any known location within
+the scope of the binding.  This has a speed penalty in addition to the
+obvious space penalty.
+
+@item > (max speed space)
+If @code{debug} is greater than both @code{speed} and @code{space},
+the command @command{return} can be used to continue execution by
+returning a value from the current stack frame.
+
+@end table
+
+As you can see, if the @code{speed} quality is @code{3}, debugger performance is
+degraded.  This effect comes from the elimination of argument variable
+special-casing (@pxref{Variable Value Availability}).  Some degree of
+speed/debuggability tradeoff is unavoidable, but the effect is not too drastic
+when @code{debug} is at least @code{2}.
+
+In addition to @code{inline} and @code{notinline} declarations, the
+relative values of the @code{speed} and @code{space} qualities also
+change whether functions are inline expanded.
+@comment FIXME: link to section about inline expansion when it exists
+@c (\pxlref{inline-expansion}.)
+If a function is inline expanded, then
+there will be no frame to represent the call, and the arguments will
+be treated like any other local variable.  Functions may also be
+``semi-inline'', in which case there is a frame to represent the call,
+but the call is to an optimized local version of the function, not to
+the original function.
+
+
+@node  Exiting Commands, Information Commands, Debugger Policy Control, The Debugger
+@comment  node-name,  next,  previous,  up
+@section Exiting Commands
+
+These commands get you out of the debugger.
+
+@deffn {Debugger Command} toplevel
+Throw to top level.
+@end deffn
+
+@deffn {Debugger Command} restart [@var{n}]
+Invokes the @var{n}th restart case as displayed by the @code{error}
+command.  If @var{n} is not specified, the available restart cases are
+reported.
+@end deffn
+
+@deffn {Debugger Command} continue
+Calls @code{continue} on the condition given to @code{debug}.  If there is no
+restart case named @var{continue}, then an error is signaled.
+@end deffn
+
+@deffn {Debugger Command} abort
+Calls @code{abort} on the condition given to @code{debug}.  This is
+useful for popping debug command loop levels or aborting to top level,
+as the case may be.
+@end deffn
+
+@deffn {Debugger Command} return @var{value}
+Returns @var{value} from the current stack frame.  This command is
+available when the @code{debug} optimization quality is greater than
+both @code{speed} and @code{space}.  Care must be taken that the value
+is of the same type as SBCL expects the stack frame to return.
+@end deffn
+
+
+@node  Information Commands, Function Tracing, Exiting Commands, The Debugger
+@comment  node-name,  next,  previous,  up
+@section Information Commands
+
+Most of these commands print information about the current frame or
+function, but a few show general information.
+
+@deffn {Debugger Command} help
+@deffnx {Debugger Command} ?
+Displays a synopsis of debugger commands.
+@end deffn
+
+@deffn {Debugger Command} describe
+Calls @code{describe} on the current function and displays the number of
+local variables.
+@end deffn
+
+@deffn {Debugger Command} print
+Displays the current function call as it would be displayed by moving to
+this frame.
+@end deffn
+
+@deffn {Debugger Command} error
+Prints the condition given to @code{invoke-debugger} and the active
+proceed cases.
+@end deffn
+
+@deffn {Debugger Command} backtrace [@var{n}]
+Displays all the frames from the current to the bottom.  Only shows
+@var{n} frames if specified.  The printing is controlled by @code{*debug-print-variable-alist*}.
+@end deffn
+
+@comment  FIXME (rudi 2004-03-31): sbcl doesn't support breakpoints
+@comment  and stepping as of version 0.8.9.  The `list-locations'
+@comment  command works, but executing a function leads to an error
+@comment  when a breakpoint is hit.  When stepping works, the
+@comment  commented-out section below should be reinstated and the
+@comment  example output updated to correspont to sbcl's behaviour.
+
+@c @node  Breakpoint Commands, , Information Commands, The Debugger
+@c @comment  node-name,  next,  previous,  up
+@c @section Breakpoint Commands
+@c @cindex Breakpoints
+
+@c SBCL supports setting of breakpoints inside compiled functions and
+@c stepping of compiled code.  Breakpoints can only be set at at known
+@c locations (@pxref{Unknown Locations and Interrupts}), so these
+@c commands are largely useless unless the @code{debug} optimize quality
+@c is at least @code{2} (@pxref{Debugger Policy Control}).  These
+@c commands manipulate breakpoints:
+
+@c @deffn {Debugger Command} breakpoint @var{location} [@var{option} @var{value}]*
+@c Set a breakpoint in some function.  @var{location} may be an integer
+@c code location number (as displayed by @command{list-locations}) or a
+@c keyword.  The keyword can be used to indicate setting a breakpoint at
+@c the function start (@code{:start}, @code{:s}) or function end
+@c (@code{:end}, @code{:e}).  The @command{breakpoint} command has
+@c @code{:condition}, @code{:break}, @code{:print} and @code{:function}
+@c options which work similarly to the @code{trace} options.
+@c @end deffn
+
+@c @deffn {Debugger Command} list-locations [@var{function}]
+@c @deffnx {Debugger Command} ll  [@var{function}]
+@c List all the code locations in the current frame's function, or in
+@c @var{function} if it is supplied.  The display format is the code
+@c location number, a colon and then the source form for that location:
+
+@c @example
+@c 3: (1- N)
+@c @end example
+
+@c If consecutive locations have the same source, then a numeric range
+@c like @code{3-5:} will be printed.  For example, a default function
+@c call has a known location both immediately before and after the call,
+@c which would result in two code locations with the same source.  The
+@c listed function becomes the new default function for breakpoint
+@c setting (via the @command{breakpoint}) command.
+@c @end deffn
+
+@c @deffn {Debugger Command} list-breakpoints
+@c @deffnx {Debugger Command} lb
+@c List all currently active breakpoints with their breakpoint number.
+@c @end deffn
+
+@c @deffn {Debugger Command} delete-breakpoint [@var{number}]
+@c @deffnx {Debugger Command} db  [@var{number}]
+@c Delete a breakpoint specified by its breakpoint number.  If no number
+@c is specified, delete all breakpoints.
+@c @end deffn
+
+@c @deffn {Debugger Command} step
+@c Step to the next possible breakpoint location in the current function.
+@c This always steps over function calls, instead of stepping into them.
+@c @end deffn
+
+
+@c @menu
+@c * Breakpoint Example::          
+@c @end menu
+
+@c @node  Breakpoint Example,  , Breakpoint Commands, Breakpoint Commands
+@c @comment  node-name,  next,  previous,  up
+@c @subsection Breakpoint Example
+
+@c Consider this definition of the factorial function:
+
+@c @lisp
+@c (defun ! (n)
+@c   (if (zerop n)
+@c       1
+@c       (* n (! (1- n)))))
+@c @end lisp
+
+@c This debugger session demonstrates the use of breakpoints:
+
+@c @example
+@c * (break)  ; invoke debugger
+
+@c debugger invoked on a SIMPLE-CONDITION in thread 11184: break
+
+@c restarts (invokable by number or by possibly-abbreviated name):
+@c   0: [CONTINUE] Return from BREAK.
+@c   1: [ABORT   ] Reduce debugger level (leaving debugger, returning to toplevel).
+@c   2: [TOPLEVEL] Restart at toplevel READ/EVAL/PRINT loop.
+@c ("varargs entry for top level local call BREAK" "break")
+@c 0] ll #'!
+
+@c 0-1: (SB-INT:NAMED-LAMBDA ! (N) (BLOCK ! (IF (ZEROP N) 1 (* N (! #)))))
+@c 2: (BLOCK ! (IF (ZEROP N) 1 (* N (! (1- N)))))
+@c 3: (ZEROP N)
+@c 4: (* N (! (1- N)))
+@c 5: (1- N)
+@c 6: (! (1- N))
+@c 7-8: (* N (! (1- N)))
+@c 9-10: (IF (ZEROP N) 1 (* N (! (1- N))))
+@c 0] br 4
+
+@c (* N (! (1- N)))
+@c 1: 4 in !
+@c added
+@c 0] toplevel
+
+@c FIXME: SBCL errored out, and not in the expected way ... Copying the
+@c output verbatim from the CMUCL manual for now.
+
+@c common-lisp-user> (! 10) ; Call the function
+
+@c *Breakpoint hit*
+
+@c Restarts:
+@c   0: [CONTINUE] Return from BREAK.
+@c   1: [ABORT   ] Return to Top-Level.
+
+@c Debug  (type H for help)
+
+@c (! 10) ; We are now in first call (arg 10) before the multiply
+@c Source: (* N (! (1- N)))
+@c 3] st
+
+@c *Step*
+
+@c (! 10) ; We have finished evaluation of (1- n)
+@c Source: (1- N)
+@c 3] st
+
+@c *Breakpoint hit*
+
+@c Restarts:
+@c   0: [CONTINUE] Return from BREAK.
+@c   1: [ABORT   ] Return to Top-Level.
+
+@c Debug  (type H for help)
+
+@c (! 9) ; We hit the breakpoint in the recursive call
+@c Source: (* N (! (1- N)))
+@c 3] 
+@c @end example
+
+
+@node  Function Tracing,  , Information Commands, The Debugger
+@comment  node-name,  next,  previous,  up
+@section Function Tracing
+@cindex Tracing
+@cindex Function, tracing
+
+The tracer causes selected functions to print their arguments and
+their results whenever they are called.  Options allow conditional
+printing of the trace information and conditional breakpoints on
+function entry or exit.
+
+@comment rudi 2004-03-26: The docstring for `trace' is quite comprehensive,
+@comment so refer to it (see also ``OAOO'')
+The docstrings for @code{trace} and @code{untrace} explain SBCL's
+tracing facility.
+
+@comment FIXME rudi 2004-03-26: revive the documentation of variables
+@comment describing trace behaviour: *trace-encapsulate-default*,
+@comment *max-trace-indentation* and friends.  Some of these are
+@comment mentioned (perhaps under different names) in the cmucl
+@comment manual.
+
+@comment FIXME rudi 2004-03-26: encapsulate is (per TODO file as of
+@comment 0.8.9) in a state of flux.  When it's sorted out, revive the
+@comment cmucl documentation.
+
+
+

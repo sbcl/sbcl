@@ -1,0 +1,197 @@
+\input texinfo   @c -*-texinfo-*-
+@c %**start of header
+@setfilename sbcl.info
+@settitle SBCL User Manual
+@c %**end of header
+
+
+@set EDITION 0.1
+@set VERSION 0.8.9
+@set UPDATED 24 March 2004
+@set UPDATE-MONTH March 2004
+     
+
+@copying
+
+@quotation
+This manual is part of the SBCL software system. See the @file{README} file
+for more information.
+
+This manual is largely derived from the manual for the CMUCL system,
+which was produced at Carnegie Mellon University and later released
+into the public domain. This manual is in the public domain and is
+provided with absolutely no warranty. See the @file{COPYING} and
+@file{CREDITS} files for more information.
+@end quotation
+
+@end copying
+
+@titlepage
+
+@title SBCL User Manual
+@subtitle SBCL Version @value{VERSION}
+@subtitle @value{UPDATE-MONTH}
+@c @author The CMUCL and SBCL teams
+
+
+@c The following two commands start the copyright page.
+@page
+@vskip 0pt plus 1filll
+@insertcopying
+
+@end titlepage
+
+@contents
+
+@ifnottex
+
+@node Top, Introduction, (dir), (dir)
+@comment  node-name,  next,  previous,  up
+@top SBCL
+
+@insertcopying
+
+@menu
+* Introduction::                
+* The Compiler::                
+* The Debugger::                
+* Efficiency::                  
+* Beyond The ANSI Standard::    
+* The Foreign Function Interface::  
+* Function Index::              
+* Concept Index::
+* Colophon::
+
+@detailmenu
+ --- The Detailed Node Listing ---
+
+Introduction
+
+* More Common Lisp Information::  
+* More SBCL Information::       
+* Overview::                    
+
+The Compiler
+
+* Error Messages::              
+* Handling of Types::           
+* Compiler Policy::             
+* Open Coding and Inline Expansion::  
+
+Error Messages
+
+* The Parts of the Error Message::  
+* The Original and Actual Source::  
+* Error Severity::              
+* Errors During Macroexpansion::  
+* Read Errors::                 
+
+The Compiler's Handling of Types
+
+* Implementation Limitations::  
+* Type Errors at Compile Time::  
+* Precise Type Checking::       
+* Weakened Type Checking::      
+* Getting Existing Programs to Run::  
+
+The Debugger
+
+* Starting the Debugger::       
+* The Debugger Command Loop::   
+* Controlling Printing in the Debugger::  
+* Stack Frames::                
+* Variable Access::             
+* Source Location Printing::    
+* Debugger Policy Control::     
+* Exiting Commands::            
+* Information Commands::        
+* Function Tracing::            
+
+Stack Frames
+
+* Stack Motion::                
+* How Arguments are Printed::   
+* Function Names::              
+* Funny Frames::                
+* Debug Tail Recursion::        
+* Unknown Locations and Interrupts::  
+
+Variable Access
+
+* Variable Value Availability::  
+* Note On Lexical Variable Access::  
+
+Source Location Printing
+
+* How the Source is Found::     
+* Source Location Availability::  
+
+Efficiency
+
+* Modular arithmetic::          
+
+Beyond The ANSI Standard
+
+* Non-Conformance With The ANSI Standard::  
+* Idiosyncrasies::              
+* Extensions::                  
+
+Extensions
+
+* Things Which Might Be In The Next ANSI Standard::  
+* Threading::                   
+* Support For Unix::            
+* Customization Hooks for Users::  
+* Tools To Help Developers::    
+* Interface To Low-Level SBCL Implementation::  
+* Efficiency Hacks::            
+
+The Foreign Function Interface
+
+* Introduction to the Foreign Function Interface::  
+* Foreign Types::               
+* Operations On Foreign Values::  
+* Foreign Variables::           
+* Foreign Data Structure Examples::  
+* Loading Unix Object Files::   
+* Foreign Function Calls::      
+* Step-By-Step Example of the Foreign Function Interface::  
+
+Foreign Types
+
+* Defining Foreign Types::      
+* Foreign Types and Lisp Types::  
+* Foreign Type Specifiers::     
+
+Operations On Foreign Values
+
+* Accessing Foreign Values::    
+* Coercing Foreign Values::     
+* Foreign Dynamic Allocation::  
+
+Foreign Variables
+
+* Local Foreign Variables::     
+* External Foreign Variables::  
+
+Foreign Function Calls
+
+* The alien-funcall Primitive::  
+* The define-alien-routine Macro::  
+* define-alien-routine Example::  
+* Calling Lisp From C::         
+
+@end detailmenu
+@end menu
+
+@end ifnottex
+
+@include intro.texinfo
+@include compiler.texinfo
+@include debugger.texinfo
+@include efficiency.texinfo
+@include beyond-ansi.texinfo
+@include ffi.texinfo
+@include backmatter.texinfo
+
+@bye

@@ -1,0 +1,1246 @@
+@node    The Foreign Function Interface, Function Index, Beyond The ANSI Standard, Top
+@comment  node-name,  next,  previous,  up
+@chapter The Foreign Function Interface
+
+This chapter describes SBCL's interface to C programs and
+libraries (and, since C interfaces are a sort of @emph{ingua
+franca} of the Unix world, to other programs and libraries in
+general.)
+
+@quotation
+Note: In the modern Lisp world, the usual term for this functionality
+is Foreign Function Interface, or @acronym{FFI}, where despite the
+mention of ``function'' in this term, @acronym{FFI} also
+refers to direct manipulation of C data structures as well as
+functions. The traditional CMUCL terminology is Alien Interface, and
+while that older terminology is no longer used much in the system
+documentation, it still reflected in names in the implementation,
+notably in the name of the @code{SB-ALIEN} package.
+@end quotation
+
+@menu
+* Introduction to the Foreign Function Interface::  
+* Foreign Types::               
+* Operations On Foreign Values::  
+* Foreign Variables::           
+* Foreign Data Structure Examples::  
+* Loading Unix Object Files::   
+* Foreign Function Calls::      
+* Step-By-Step Example of the Foreign Function Interface::  
+@end menu
+
+@node  Introduction to the Foreign Function Interface, Foreign Types, The Foreign Function Interface, The Foreign Function Interface
+@comment  node-name,  next,  previous,  up
+@section Introduction to the Foreign Function Interface
+@c AKA "Introduction to Aliens" in the CMU CL manual
+
+Because of Lisp's emphasis on dynamic memory allocation and garbage
+collection, Lisp implementations use non-C-like memory representations
+for objects.  This representation mismatch creates friction when a Lisp
+program must share objects with programs which expect C data.  There
+are three common approaches to establishing communication:
+
+@itemize
+@item
+The burden can be placed on the foreign program (and programmer) by
+requiring the knowledge and use of the representations used internally
+by the Lisp implementation.  This can require a considerable amount of
+``glue'' code on the C side, and that code tends to be sensitively
+dependent on the internal implementation details of the Lisp system.
+
+@item
+The Lisp system can automatically convert objects back and forth
+between the Lisp and foreign representations.  This is convenient, but
+translation becomes prohibitively slow when large or complex data
+structures must be shared. This approach is supported by the SBCL
+@acronym{FFI}, and used automatically by the when passing integers and
+strings.
+
+@item
+The Lisp program can directly manipulate foreign objects through the
+use of extensions to the Lisp language.
+
+@end itemize
+
+SBCL, like CMUCL before it, relies primarily on the automatic
+conversion and direct manipulation approaches. The @code{SB-ALIEN}
+package provices a facility wherein foreign values of simple scalar
+types are automatically converted and complex types are directly
+manipulated in their foreign representation.  Additionally the
+lower-level System Area Pointers (or @acronym{SAP}s) can be used where
+necessary to provide untyped access to foreign memory.
+
+Any foreign objects that can't automatically be converted into Lisp
+values are represented by objects of type @code{alien-value}.  Since
+Lisp is a dynamically typed language, even foreign objects must have a
+run-time type; this type information is provided by encapsulating the
+raw pointer to the foreign data within an @code{alien-value} object.
+
+The type language and operations on foreign types are
+intentionally similar to those of the C language.
+
+@node  Foreign Types, Operations On Foreign Values, Introduction to the Foreign Function Interface, The Foreign Function Interface
+@comment  node-name,  next,  previous,  up
+@section Foreign Types
+@c AKA "Alien Types" in the CMU CL manual
+
+Alien types have a description language based on nested list
+structure. For example the C type
+
+@example
+struct foo @{
+    int a;
+    struct foo *b[100];
+@};
+@end example
+
+has the corresponding SBCL @acronym{FFI} type
+
+@lisp
+(struct foo
+  (a int)
+  (b (array (* (struct foo)) 100)))
+@end lisp
+
+
+@menu
+* Defining Foreign Types::      
+* Foreign Types and Lisp Types::  
+* Foreign Type Specifiers::     
+@end menu
+
+@node  Defining Foreign Types, Foreign Types and Lisp Types, Foreign Types, Foreign Types
+@comment  node-name,  next,  previous,  up
+@subsection Defining Foreign Types
+
+Types may be either named or anonymous.  With structure and union
+types, the name is part of the type specifier, allowing recursively
+defined types such as:
+
+@lisp
+(struct foo (a (* (struct foo))))
+@end lisp
+
+An anonymous structure or union type is specified by using the name
+@code{nil}.  The @code{with-alien} macro defines a local scope which
+``captures'' any named type definitions.  Other types are not
+inherently named, but can be given named abbreviations using the
+@code{define-alien-type} macro.
+
+@node  Foreign Types and Lisp Types, Foreign Type Specifiers, Defining Foreign Types, Foreign Types
+@comment  node-name,  next,  previous,  up
+@subsection Foreign Types and Lisp Types
+
+The foreign types form a subsystem of the SBCL type system.  An
+@code{alien} type specifier provides a way to use any foreign type as a
+Lisp type specifier.  For example,
+
+@lisp
+(typep @var{foo} '(alien (* int)))
+@end lisp
+
+can be used to determine whether @var{foo} is a pointer to a foreign
+@code{int}. @code{alien} type specifiers can be used in the same ways
+as ordinary Lisp type specifiers (like @code{string}.) Alien type
+declarations are subject to the same precise type checking as any
+other declaration.  @xref{Precise Type Checking}.
+
+Note that the type identifiers used in the foreign type system overlap
+with native Lisp type specifiers in some cases.  For example, the type
+specifier @code{(alien single-float)} is identical to
+@code{single-float}, since foreign floats are automatically converted
+to Lisp floats.  When @code{type-of} is called on an alien value that
+is not automatically converted to a Lisp value, then it will return an
+@code{alien} type specifier.
+
+@node  Foreign Type Specifiers,  , Foreign Types and Lisp Types, Foreign Types
+@comment  node-name,  next,  previous,  up
+@subsection Foreign Type Specifiers
+
+Note: All foreign type names are exported from the @code{sb-alien}
+package. Some foreign type names are also symbols in
+the @code{common-lisp} package, in which case they are
+reexported from the @code{sb-alien} package, so that
+e.g. it is legal to refer to @code{sb-alien:single-float}.
+
+These are the basic foreign type specifiers: 
+
+@itemize
+@item
+The foreign type specifier @code{(* @var{foo})} describes a pointer to
+an object of type @var{foo}.  A pointed-to type @var{foo} of @code{t}
+indicates a pointer to anything, similar to @code{void *} in
+ANSI C. A null alien pointer can be detected with the
+@code{sb-alien:null-alien} function.
+
+@item
+The foreign type specifier @code{(array @var{foo} &optional
+dimensions)} describes array of the specified @code{dimensions},
+holding elements of type @var{foo}. Note that (unlike in C) @code{(*
+@var{foo})} and @code{(array @var{foo})} are considered to be
+different types when type checking is done. If equivalence of pointer
+and array types is desired, it may be explicitly coerced using
+@code{sb-alien:cast}.
+
+Arrays are accessed using @code{sb-alien:deref}, passing the indices
+as additional arguments.  Elements are stored in column-major order
+(as in C), so the first dimension determines only the size of the
+memory block, and not the layout of the higher dimensions.  An array
+whose first dimension is variable may be specified by using @code{nil}
+as the first dimension.  Fixed-size arrays can be allocated as array
+elements, structure slots or @code{sb-alien:with-alien}
+variables. Dynamic arrays can only be allocated using
+@code{sb-alien:make-alien}.
+
+@item
+The foreign type specifier @code{(sb-alien:struct @var{name} &rest
+@var{fields})} describes a structure type with the specified
+@var{name} and @var{fields}. Fields are allocated at the same offsets
+used by the implementation's C compiler. If @var{name} is @code{nil}
+then the structure is anonymous.
+
+If a named foreign @code{struct} specifier is passed to
+@code{define-alien-type} or @code{with-alien}, then this defines,
+respectively, a new global or local foreign structure type.  If no
+@var{fields} are specified, then the fields are taken
+from the current (local or global) alien structure type definition of
+@var{name}.
+
+@item
+The foreign type specifier @code{(sb-alien:union @var{name} &rest
+@var{fields})} is similar to @code{sb-alien:struct}, but describes a
+union type.  All fields are allocated at the same offset, and the size
+of the union is the size of the largest field.  The programmer must
+determine which field is active from context.
+
+@item
+The foreign type specifier @code{(sb-alien:enum @var{name} &rest
+@var{specs})} describes an enumeration type that maps between integer
+values and keywords. If @var{name} is @code{nil}, then the type is
+anonymous.  Each element of the @var{specs} list is either a Lisp
+keyword, or a list @code{(@var{keyword} @var{value})}.  @var{value} is
+an integer. If @var{value} is not supplied, then it defaults to one
+greater than the value for the preceding spec (or to zero if it is the
+first spec).
+
+@item
+The foreign type specifier @code{(sb-alien:signed &optional
+@var{bits})} specifies a signed integer with the specified number of
+@var{bits} precision. The upper limit on integer
+precision is determined by the machine's word size. If
+@var{bits} is not specified, the maximum size will be
+used.
+
+@item
+The foreign type specifier @code{(integer &optional @var{bits})}
+is equivalent to the corresponding type specifier using
+@code{sb-alien:signed} instead of @code{integer}.
+
+@item
+The foreign type specifier @code{(sb-alien:unsigned &optional
+@var{bits})} is like corresponding type specifier using
+@code{sb-alien:signed} except that the variable is treated as an
+unsigned integer.
+
+@item
+The foreign type specifier @code{(boolean &optional @var{bits})} is
+similar to an enumeration type, but maps from Lisp @code{nil} and
+@code{t} to C @code{0} and @code{1} respectively. @var{bits}
+determines the amount of storage allocated to hold the truth value.
+
+@item
+The foreign type specifier @code{single-float} describes a
+floating-point number in IEEE single-precision format.
+
+@item
+The foreign type specifier @code{double-float} describes a
+floating-point number in IEEE double-precision format.
+
+@item
+The foreign type specifier @code{(function @var{result-type} &rest
+@var{arg-types})} describes a foreign function that takes arguments of
+the specified @var{arg-types} and returns a result of type
+@var{result-type}.  Note that the only context where a foreign
+@code{function} type is directly specified is in the argument to
+@code{sb-alien:alien-funcall}.  In all other contexts, foreign
+functions are represented by foreign function pointer types: @code{(*
+(function @dots{}))}.
+
+@item
+The foreign type specifier @code{sb-alien:system-area-pointer}
+describes a pointer which is represented in Lisp as a
+@code{system-area-pointer} object.  SBCL exports this type from
+@code{sb-alien} because CMUCL did, but tentatively (as of the first
+draft of this section of the manual, SBCL 0.7.6) it is deprecated,
+since it doesn't seem to be required by user code.
+
+@item
+The foreign type specifier @code{sb-alien:void} is used in function
+types to declare that no useful value is returned.  Using
+@code{alien-funcall} to call a @code{void} foreign function will
+return zero values.
+
+@item
+The foreign type specifier @code{sb-alien:c-string} is similar to
+@code{(* char)}, but is interpreted as a null-terminated string, and
+is automatically converted into a Lisp string when accessed; or if the
+pointer is C @code{NULL} or @code{0}, then accessing it gives Lisp
+@code{nil}.  Lisp strings are stored with a trailing NUL
+termination, so no copying (either by the user or the implementation)
+is necessary when passing them to foreign code.
+
+Assigning a Lisp string to a @code{c-string} structure field or
+variable stores the contents of the string to the memory already
+pointed to by that variable.  When a foreign object of type @code{(*
+char)} is assigned to a @code{c-string}, then the
+@code{c-string} pointer is assigned to.  This allows
+@code{c-string} pointers to be initialized.  For example:
+
+@lisp
+(cl:in-package "CL-USER") ; which USEs package "SB-ALIEN"
+
+(define-alien-type nil (struct foo (str c-string)))
+
+(defun make-foo (str)
+  (let ((my-foo (make-alien (struct foo))))
+    (setf (slot my-foo 'str) (make-alien char (length str))
+          (slot my-foo 'str) str)
+    my-foo))
+@end lisp
+
+Storing Lisp @code{NIL} in a @code{c-string} writes C @code{NULL} to
+the variable.
+
+@item
+@code{sb-alien} also exports translations of these C type
+specifiers as foreign type specifiers: @code{sb-alien:char},
+@code{sb-alien:short}, @code{sb-alien:int},
+@code{sb-alien:long}, @code{sb-alien:unsigned-char},
+@code{sb-alien:unsigned-short},
+@code{sb-alien:unsigned-int},
+@code{sb-alien:unsigned-long}, @code{sb-alien:float}, and
+@code{sb-alien:double}.
+
+@end itemize
+
+@node  Operations On Foreign Values, Foreign Variables, Foreign Types, The Foreign Function Interface
+@comment  node-name,  next,  previous,  up
+@section Operations On Foreign Values
+@c AKA "Alien Operations" in the CMU CL manual
+
+This section describes how to read foreign values as Lisp values, how
+to coerce foreign values to different kinds of foreign values, and how
+to dynamically allocate and free foreign variables.
+
+@menu
+* Accessing Foreign Values::    
+* Coercing Foreign Values::     
+* Foreign Dynamic Allocation::  
+@end menu
+
+@node  Accessing Foreign Values, Coercing Foreign Values, Operations On Foreign Values, Operations On Foreign Values
+@comment  node-name,  next,  previous,  up
+@subsection Accessing Foreign Values
+
+@defun sb-alien:deref @var{pointer-or-array} &rest @var{indices}
+
+The @code{sb-alien:deref} function returns the value pointed to by a
+foreign pointer, or the value of a foreign array element. When
+dereferencing a pointer, an optional single index can be specified to
+give the equivalent of C pointer arithmetic; this index is scaled by
+the size of the type pointed to. When dereferencing an array, the
+number of indices must be the same as the number of dimensions in the
+array type. @code{deref} can be set with @code{setf} to assign a new
+value.
+
+@end defun
+
+@defun sb-alien:slot @var{struct-or-union} &rest @var{slot-names}
+  
+The @code{sb-alien:slot} function extracts the value of the slot named
+@var{slot-name} from a foreign @code{struct} or @code{union}. If
+@var{struct-or-union} is a pointer to a structure or union, then it is
+automatically dereferenced.  @code{sb-alien:slot} can be set with
+@code{setf} to assign a new value. Note that @var{slot-name} is
+evaluated, and need not be a compile-time constant (but only constant
+slot accesses are efficiently compiled).
+@end defun
+
+
+@subsubsection Untyped memory
+
+As noted at the beginning of the chapter, the System Area Pointer
+facilities allow untyped access to foreign memory.  @acronym{SAP}s can
+be converted to and from the usual typed foreign values using
+@code{sap-alien} and @code{alien-sap} (described elsewhere), and also
+to and from integers - raw machine addresses.  They should thus be
+used with caution; corrupting the Lisp heap or other memory with
+@acronym{SAP}s is trivial.
+
+@defun sb-sys:int-sap @var{machine-address}
+
+Creates a @acronym{SAP} pointing at the virtual address
+@var{machine-address}.
+@end defun
+
+@defun sb-sys:sap-ref-32 @var{sap} @var{offset}
+
+Access the value of the memory location at @var{offset} bytes from
+@var{sap}.  This form may also be used with @code{setf} to alter the
+memory at that location.
+@end defun
+
+@defun sb-sys:sap= @var{sap1} @var{sap2}
+
+Compare @var{sap1} and @var{sap2} for equality.
+@end defun
+
+Similarly named functions exist for accessing other sizes of word,
+other comparisons, and other conversions.  The reader is invited to
+use @code{apropos} and @code{describe} for more details
+
+@lisp
+(apropos "sap" :sb-sys)
+@end lisp
+
+
+@node  Coercing Foreign Values, Foreign Dynamic Allocation, Accessing Foreign Values, Operations On Foreign Values
+@comment  node-name,  next,  previous,  up
+@subsection Coercing Foreign Values
+
+@defun sb-alien:addr @var{alien-expr}
+  
+The @code{sb-alien:addr} macro returns a pointer to the location
+specified by @var{alien-expr}, which must be either a foreign
+variable, a use of @code{sb-alien:deref}, a use of
+@code{sb-alien:slot}, or a use of @code{sb-alien:extern-alien}.
+@end defun
+
+@defun sb-alien:cast @var{foreign-value} @var{new-type}
+  
+The @code{sb-alien:cast} macro converts @var{foreign-value} to a new
+foreign value with the specified @var{new-type}. Both types, old and
+new, must be foreign pointer, array or function types.  Note that the
+resulting Lisp foreign variable object is not @code{eq} to the
+argument, but it does refer to the same foreign data bits.
+@end defun
+
+@defun sb-alien:sap-alien @var{sap} @var{type}
+  
+The @code{sb-alien:sap-alien} function converts @var{sap} (a system
+area pointer) to a foreign value with the specified
+@var{type}. @var{type} is not evaluated.  </para>
+
+The @var{type} must be some foreign pointer, array, or record type.
+@end defun
+
+@defun sb-alien:alien-sap @var{foreign-value} @var{type}
+
+The @code{sb-alien:alien-sap} function returns the @acronym{SAP} which
+points to @var{alien-value}'s data.
+
+The @var{foreign-value} must be of some foreign pointer, array, or
+record type.
+@end defun
+
+
+@node  Foreign Dynamic Allocation,  , Coercing Foreign Values, Operations On Foreign Values
+@comment  node-name,  next,  previous,  up
+@subsection Foreign Dynamic Allocation
+
+Lisp code can call the C standard library functions @code{malloc} and
+@code{free} to dynamically allocate and deallocate foreign
+variables. The Lisp code shares the same allocator with foreign C
+code, so it's OK for foreign code to call @code{free} on the result of
+Lisp @code{sb-alien:make-alien}, or for Lisp code to call
+@code{sb-alien:free-alien} on foreign objects allocated by C
+code.
+
+@defmac sb-alien:make-alien @var{type} @var{size}
+  
+The @code{sb-alien:make-alien} macro
+returns a dynamically allocated foreign value of the specified
+@var{type} (which is not evaluated.)  The allocated memory is not
+initialized, and may contain arbitrary junk.  If supplied,
+@var{size} is an expression to evaluate to compute the size of the
+allocated object.  There are two major cases:
+
+@itemize
+@item
+When @var{type} is a foreign array type, an array of that type is
+allocated and a pointer to it is returned.  Note that you must use
+@code{deref} to change the result to an array before you can use
+@code{deref} to read or write elements:
+
+@lisp
+(cl:in-package "CL-USER") ; which USEs package "SB-ALIEN"
+(defvar *foo* (make-alien (array char 10)))
+(type-of *foo*) @result{} (alien (* (array (signed 8) 10)))
+(setf (deref (deref foo) 0) 10) @result{} 10
+@end lisp
+
+If supplied, @var{size} is used as the first dimension for the
+    array.
+
+@item
+When @var{type} is any other foreign type, then an object for that
+type is allocated, and a pointer to it is returned.  So
+@code{(make-alien int)} returns a @code{(* int)}.  If @var{size} is
+specified, then a block of that many objects is allocated, with the
+result pointing to the first one.
+
+@end itemize
+
+@end defmac
+
+@defun sb-alien:free-alien @var{foreign-value}
+
+The @code{sb-alien:free-alien} function
+frees the storage for @var{foreign-value}, 
+which must have been allocated with Lisp @code{make-alien}
+or C @code{malloc}.
+
+See also the @code{sb-alien:with-alien} macro, which allocates foreign
+values on the stack.
+@end defun
+
+@node  Foreign Variables, Foreign Data Structure Examples, Operations On Foreign Values, The Foreign Function Interface
+@comment  node-name,  next,  previous,  up
+@section Foreign Variables
+@c AKA "Alien Variables" in the CMU CL manual
+
+Both local (stack allocated) and external (C global) foreign variables
+are supported.
+
+@menu
+* Local Foreign Variables::     
+* External Foreign Variables::  
+@end menu
+
+@node  Local Foreign Variables, External Foreign Variables, Foreign Variables, Foreign Variables
+@comment  node-name,  next,  previous,  up
+@subsection Local Foreign Variables
+
+@defmac sb-alien:with-alien @var{var-definitions} &body @var{body}
+
+The @code{with-alien} macro establishes local foreign variables with
+the specified alien types and names.  This form is analogous to
+defining a local variable in C: additional storage is allocated, and
+the initial value is copied.  This form is less analogous to
+@code{LET}-allocated Lisp variables, since the variables can't be
+captured in closures: they live only for the dynamic extent of the
+body, and referring to them outside is a gruesome error.
+
+The @var{var-definitions} argument is a list of 
+variable definitions, each of the form
+@lisp
+(@var{name} @var{type} &optional @var{initial-value})
+@end lisp
+
+The names of the variables are established as symbol-macros; the
+bindings have lexical scope, and may be assigned with @code{setq} or
+@code{setf}.
+ 
+The @code{with-alien} macro also establishes a new scope for named
+structures and unions.  Any @var{type} specified for a variable may
+contain named structure or union types with the slots specified.
+Within the lexical scope of the binding specifiers and body, a locally
+defined foreign structure type @var{foo} can be referenced by its name
+using @code{(struct @var{foo})}.
+@end defmac
+
+@node  External Foreign Variables,  , Local Foreign Variables, Foreign Variables
+@comment  node-name,  next,  previous,  up
+@subsection External Foreign Variables
+
+External foreign names are strings, and Lisp names are symbols. When
+an external foreign value is represented using a Lisp variable, there
+must be a way to convert from one name syntax into the other. The
+macros @code{extern-alien}, @code{define-alien-variable} and
+@code{define-alien-routine} use this conversion heuristic:
+
+@itemize
+
+@item
+Alien names are converted to Lisp names by uppercasing and replacing
+underscores with hyphens.
+
+@item
+Conversely, Lisp names are converted to alien names by lowercasing and
+replacing hyphens with underscores.
+
+@item
+Both the Lisp symbol and alien string names may be separately
+specified by using a list of the form
+
+@lisp
+(alien-string lisp-symbol)
+@end lisp
+
+@end itemize
+
+@defmac sb-alien:define-alien-variable @var{name} @var{type}
+
+The @code{define-alien-variable} macro defines @var{name} as an
+external foreign variable of the specified foreign @code{type}.
+@var{name} and @code{type} are not evaluated.  The Lisp name of the
+variable (see above) becomes a global alien variable.  Global alien
+variables are effectively ``global symbol macros''; a reference to the
+variable fetches the contents of the external variable.  Similarly,
+setting the variable stores new contents -- the new contents must be
+of the declared @code{type}. Someday, they may well be implemented
+using the @acronym{ANSI} @code{define-symbol-macro} mechanism, but as
+of SBCL 0.7.5, they are still implemented using an older more-or-less
+parallel mechanism inherited from CMUCL.
+  
+For example, to access a C-level counter @var{foo}, one could write
+
+@lisp
+(define-alien-variable "foo" int)
+;; Now it is possible to get the value of the C variable foo simply by
+;; referencing that Lisp variable:
+(print foo)
+(setf foo 14)
+(incf foo)
+@end lisp
+@end defmac
+
+@defun sb-alien:get-errno
+
+Since in modern C libraries, the @code{errno} ``variable'' is typically
+no longer a variable, but some bizarre artificial construct
+which behaves superficially like a variable within a given thread,
+it can no longer reliably be accessed through the ordinary 
+@code{define-alien-variable} mechanism. Instead, SBCL provides
+the operator @code{sb-alien:get-errno} to allow Lisp code to read it.
+@end defun
+
+@defmac sb-alien:extern-alien @var{name} @var{type}
+
+The @code{extern-alien} macro returns an alien with the specified
+@var{type} which points to an externally defined value.  @var{name} is
+not evaluated, and may be either a string or a symbol.  @var{type} is
+an unevaluated alien type specifier.
+@end defmac
+
+@node  Foreign Data Structure Examples, Loading Unix Object Files, Foreign Variables, The Foreign Function Interface
+@comment  node-name,  next,  previous,  up
+@section Foreign Data Structure Examples
+@c AKA "Alien Data Structure Example" in the CMU CL manual
+
+Now that we have alien types, operations and variables, we can
+manipulate foreign data structures.  This C declaration
+
+@example
+struct foo @{
+    int a;
+    struct foo *b[100];
+@};
+@end example
+
+can be translated into the following alien type:
+
+@lisp
+(define-alien-type nil
+  (struct foo
+    (a int)
+    (b (array (* (struct foo)) 100))))
+@end lisp
+
+Once the @code{foo} alien type has been defined as above, the C
+expression
+
+@example
+struct foo f;
+f.b[7].a;
+@end example
+
+can be translated in this way:
+
+@lisp
+(with-alien ((f (struct foo)))
+  (slot (deref (slot f 'b) 7) 'a)
+  ;;
+  ;; Do something with f...
+  )
+@end lisp
+
+Or consider this example of an external C variable and some accesses:
+
+@example
+struct c_struct @{
+        short x, y;
+        char a, b;
+        int z;
+        c_struct *n;
+@};
+extern struct c_struct *my_struct;
+my_struct->x++;
+my_struct->a = 5;
+my_struct = my_struct->n;
+@end example
+
+which can be manipulated in Lisp like this:
+
+@lisp
+(define-alien-type nil
+  (struct c-struct
+          (x short)
+          (y short)
+          (a char)
+          (b char)
+          (z int)
+          (n (* c-struct))))
+(define-alien-variable "my_struct" (* c-struct))
+(incf (slot my-struct 'x))
+(setf (slot my-struct 'a) 5)
+(setq my-struct (slot my-struct 'n))
+@end lisp
+
+@node  Loading Unix Object Files, Foreign Function Calls, Foreign Data Structure Examples, The Foreign Function Interface
+@comment  node-name,  next,  previous,  up
+@section Loading Unix Object Files
+
+Foreign object files can be loaded into the running Lisp process by
+calling the functions @code{load-foreign} or @code{load-1-foreign}.
+
+The @code{sb-alien:load-1-foreign} function is the more primitive of
+the two operations. It loads a single object file into the currently
+running Lisp. The external symbols defining routines and variables are
+made available for future external references (e.g. by
+@code{extern-alien}). Forward references to foreign symbols aren't
+supported: @code{load-1-foreign} must be run before any of the defined
+symbols are referenced.
+
+@code{sb-alien:load-foreign} is built in terms of
+@code{load-1-foreign} and some other machinery like
+@code{sb-ext:run-program}.  It accepts a list of files and libraries,
+and runs the linker on the files and libraries, creating an absolute
+Unix object file which is then processed by @code{load-1-foreign}.
+
+@quotation
+Note: As of SBCL 0.7.5, all foreign code (code loaded with
+@code{load-1-function} or @code{load-function}) is lost when a Lisp
+core is saved with @code{sb-ext:save-lisp-and-die}, and no attempt is
+made to restore it when the core is loaded. Historically this has been
+an annoyance both for SBCL users and for CMUCL users.  It's hard to
+solve this problem completely cleanly, but some generally-reliable
+partial solution might be useful. Once someone in either camp gets
+sufficiently annoyed to create it, SBCL is likely to adopt some
+mechanism for automatically restoring foreign code when a saved core
+is loaded.
+@end quotation
+
+
+@node  Foreign Function Calls, Step-By-Step Example of the Foreign Function Interface, Loading Unix Object Files, The Foreign Function Interface
+@comment  node-name,  next,  previous,  up
+@section Foreign Function Calls
+
+The foreign function call interface allows a Lisp program to call
+many functions written in languages that use the C calling convention.
+
+Lisp sets up various signal handling routines and other environment
+information when it first starts up, and expects these to be in place
+at all times. The C functions called by Lisp should not change the
+environment, especially the signal handlers: the signal handlers
+installed by Lisp typically have interesting flags set (e.g to request
+machine context information, or for signal delivery on an alternate
+stack) which the Lisp runtime relies on for correct operation.
+Precise details of how this works may change without notice between
+versions; the source, or the brain of a friendly SBCL developer, is
+the only documentation.  Users of a Lisp built with the
+@code{:sb-thread} feature should also read the section about threads,
+@ref{Threading}.
+
+@menu
+* The alien-funcall Primitive::  
+* The define-alien-routine Macro::  
+* define-alien-routine Example::  
+* Calling Lisp From C::         
+@end menu
+
+@node  The alien-funcall Primitive, The define-alien-routine Macro, Foreign Function Calls, Foreign Function Calls
+@comment  node-name,  next,  previous,  up
+@subsection The @code{alien-funcall} Primitive
+
+@defun sb-alien:alien-funcall @var{alien-function} &rest @var{arguments}
+
+The @code{alien-funcall} function is the foreign function call
+primitive: @var{alien-function} is called with the supplied
+@var{arguments} and its C return value is returned as a Lisp value.
+The @var{alien-function} is an arbitrary run-time expression; to refer
+to a constant function, use @code{extern-alien} or a value defined by
+@code{define-alien-routine}.
+  
+The type of @code{alien-function} must be @code{(alien (function
+...))}  or @code{(alien (* (function ...)))}.  The function type is
+used to determine how to call the function (as though it was declared
+with a prototype.)  The type need not be known at compile time, but
+only known-type calls are efficiently compiled.  Limitations:
+
+@itemize
+
+@item
+Structure type return values are not implemented.
+
+@item
+Passing of structures by value is not implemented.
+
+@end itemize
+
+@end defun
+
+Here is an example which allocates a @code{(struct foo)}, calls a
+foreign function to initialize it, then returns a Lisp vector of all
+the @code{(* (struct foo))} objects filled in by the foreign call:
+
+@lisp
+;; Allocate a foo on the stack.
+(with-alien ((f (struct foo)))
+  ;; Call some C function to fill in foo fields.
+  (alien-funcall (extern-alien "mangle_foo" (function void (* foo)))
+                 (addr f))
+  ;; Find how many foos to use by getting the A field.
+  (let* ((num (slot f 'a))
+         (result (make-array num)))
+    ;; Get a pointer to the array so that we don't have to keep extracting it:
+    (with-alien ((a (* (array (* (struct foo)) 100)) (addr (slot f 'b))))
+      ;; Loop over the first N elements and stash them in the result vector.
+      (dotimes (i num)
+        (setf (svref result i) (deref (deref a) i)))
+      ;; Voila.
+      result)))
+@end lisp
+
+@node  The define-alien-routine Macro, define-alien-routine Example, The alien-funcall Primitive, Foreign Function Calls
+@comment  node-name,  next,  previous,  up
+@subsection The @code{define-alien-routine} Macro
+
+@defmac sb-alien:define-alien-routine @var{name} @var{result-type} &rest @var{arg-specifiers}
+
+The @code{define-alien-routine} macro is a convenience for
+automatically generating Lisp interfaces to simple foreign functions.
+The primary feature is the parameter style specification, which
+translates the C pass-by-reference idiom into additional return
+values.
+
+@var{name} is usually a string external symbol, but may also be a
+symbol Lisp name or a list of the foreign name and the Lisp name.  If
+only one name is specified, the other is automatically derived as for
+@code{extern-alien}.  @var{result-type} is the alien type of the
+return value.
+
+Each element of the @var{arg-specifiers} list 
+specifies an argument to the foreign function, and is
+of the form
+@lisp
+(aname atype &amp;optional style)
+@end lisp
+
+@var{aname} is the symbol name of the argument to the constructed
+function (for documentation). @var{atype} is the alien type of
+corresponding foreign argument.  The semantics of the actual call are
+the same as for @code{alien-funcall}. @var{style} specifies how this
+argument should be handled at call and return time, and should be one
+of the following:
+
+@itemize
+
+@item
+@code{:in} specifies that the argument is passed by value. This is the
+default. @code{:in} arguments have no corresponding return value from
+the Lisp function.
+
+@item
+@code{:copy} is similar to @code{:in}, but the argument is copied to a
+pre-allocated object and a pointer to this object is passed to the
+foreign routine.
+
+@item
+@code{:out} specifies a pass-by-reference output value.  The type of
+the argument must be a pointer to a fixed-sized object (such as an
+integer or pointer).  @code{:out} and @code{:in-out} style cannot be
+used with pointers to arrays, records or functions.  An object of the
+correct size is allocated on the stack, and its address is passed to
+the foreign function.  When the function returns, the contents of this
+location are returned as one of the values of the Lisp function (and
+the location is automatically deallocated).
+
+@item
+@code{:in-out} is a combination of @code{:copy} and @code{:out}.  The
+argument is copied to a pre-allocated object and a pointer to this
+object is passed to the foreign routine.  On return, the contents of
+this location is returned as an additional value.
+
+@end itemize
+
+@quotation
+Note: Any efficiency-critical foreign interface function should be inline
+expanded, which can be done by preceding the
+@code{define-alien-routine} call with:
+
+@lisp
+(declaim (inline lisp-name))
+@end lisp
+
+In addition to avoiding the Lisp call overhead, this allows
+pointers, word-integers and floats to be passed using non-descriptor
+representations, avoiding consing.)
+@end quotation
+
+@end defmac
+
+@node  define-alien-routine Example, Calling Lisp From C, The define-alien-routine Macro, Foreign Function Calls
+@comment  node-name,  next,  previous,  up
+@subsection @code{define-alien-routine} Example
+
+Consider the C function @code{cfoo} with the following calling
+convention:
+
+@example
+void
+cfoo (str, a, i)
+    char *str;
+    char *a; /* update */
+    int *i; /* out */
+@{
+  /* body of cfoo(...) */
+@}
+@end example
+
+This can be described by the following call to
+@code{define-alien-routine}:
+
+@lisp
+(define-alien-routine "cfoo" void
+  (str c-string)
+  (a char :in-out)
+  (i int :out))
+@end lisp
+
+The Lisp function @code{cfoo} will have two arguments (@var{str} and
+@var{a}) and two return values (@var{a} and @var{i}).
+
+@node  Calling Lisp From C,  , define-alien-routine Example, Foreign Function Calls
+@comment  node-name,  next,  previous,  up
+@subsection Calling Lisp From C
+
+Calling Lisp functions from C is sometimes possible, but is extremely
+hackish and poorly supported as of SBCL 0.7.5.  See @code{funcall0}
+@dots{} @code{funcall3} in the runtime system. The arguments must be
+valid SBCL object descriptors (so that e.g. fixnums must be
+left-shifted by 2.) As of SBCL 0.7.5, the format of object descriptors
+is documented only by the source code and, in parts, by the old CMUCL
+@file{INTERNALS} documentation.
+
+Note that the garbage collector moves objects, and won't be
+able to fix up any references in C variables.  There are three
+mechanisms for coping with this: 
+
+@enumerate
+@item
+The @code{sb-ext:purify} moves all live Lisp
+data into static or read-only areas such that it will never be moved
+(or freed) again in the life of the Lisp session
+
+@item
+@code{sb-sys:with-pinned-objects} is a macro which arranges for some
+set of objects to be pinned in memory for the dynamic extent of its
+body forms.  On ports which use the generational garbage collector (as
+of SBCL 0.8.3, only the x86) this has a page granularity - i.e. the
+entire 4k page or pages containing the objects will be locked down. On
+other ports it is implemented by turning off GC for the duration (so
+could be said to have a whole-world granularity).
+
+@item
+Disable GC, using the @code{without-gcing} macro or @code{gc-off}
+call.
+@end enumerate
+
+@c <!-- FIXME: This is a "changebar" section from the CMU CL manual.
+@c      I (WHN 2002-07-14) am not very familiar with this content, so 
+@c      I'm not immediately prepared to try to update it for SBCL, and
+@c      I'm not feeling masochistic enough to work to encourage this
+@c      kind of low-level hack anyway. However, I acknowledge that callbacks
+@c      are sometimes really really necessary, so I include the original
+@c      text in case someone is hard-core enough to benefit from it. If
+@c      anyone brings the information up to date for SBCL, it belong
+@c      either in the main manual or on a CLiki SBCL Internals page.
+@c LaTeX \subsection{Accessing Lisp Arrays}
+@c LaTeX 
+@c LaTeX Due to the way \cmucl{} manages memory, the amount of memory that can
+@c LaTeX be dynamically allocated by \code{malloc} or \funref{make-alien} is
+@c LaTeX limited\footnote{\cmucl{} mmaps a large piece of memory for it's own
+@c LaTeX   use and this memory is typically about 8 MB above the start of the C
+@c LaTeX   heap.  Thus, only about 8 MB of memory can be dynamically
+@c LaTeX   allocated.}.
+
+@c Empirically determined to be considerably >8Mb on this x86 linux
+@c machine, but I don't know what the actual values are - dan 2003.09.01
+
+@c Note that this technique is used in SB-GROVEL in the SBCL contrib
+
+@c LaTeX 
+@c LaTeX To overcome this limitation, it is possible to access the content of
+@c LaTeX Lisp arrays which are limited only by the amount of physical memory
+@c LaTeX and swap space available.  However, this technique is only useful if
+@c LaTeX the foreign function takes pointers to memory instead of allocating
+@c LaTeX memory for itself.  In latter case, you will have to modify the
+@c LaTeX foreign functions.
+@c LaTeX 
+@c LaTeX This technique takes advantage of the fact that \cmucl{} has
+@c LaTeX specialized array types (\pxlref{specialized-array-types}) that match
+@c LaTeX a typical C array.  For example, a \code{(simple-array double-float
+@c LaTeX   (100))} is stored in memory in essentially the same way as the C
+@c LaTeX array \code{double x[100]} would be.  The following function allows us
+@c LaTeX to get the physical address of such a Lisp array:
+@c LaTeX \begin{example}
+@c LaTeX (defun array-data-address (array)
+@c LaTeX   "Return the physical address of where the actual data of an array is
+@c LaTeX stored.
+@c LaTeX 
+@c LaTeX ARRAY must be a specialized array type in CMU Lisp.  This means ARRAY
+@c LaTeX must be an array of one of the following types:
+@c LaTeX 
+@c LaTeX                   double-float
+@c LaTeX                   single-float
+@c LaTeX                   (unsigned-byte 32)
+@c LaTeX                   (unsigned-byte 16)
+@c LaTeX                   (unsigned-byte  8)
+@c LaTeX                   (signed-byte 32)
+@c LaTeX                   (signed-byte 16)
+@c LaTeX                   (signed-byte  8)
+@c LaTeX "
+@c LaTeX   (declare (type (or #+signed-array (array (signed-byte 8))
+@c LaTeX                      #+signed-array (array (signed-byte 16))
+@c LaTeX                      #+signed-array (array (signed-byte 32))
+@c LaTeX                      (array (unsigned-byte 8))
+@c LaTeX                      (array (unsigned-byte 16))
+@c LaTeX                      (array (unsigned-byte 32))
+@c LaTeX                      (array single-float)
+@c LaTeX                      (array double-float))
+@c LaTeX                  array)
+@c LaTeX            (optimize (speed 3) (safety 0))
+@c LaTeX            (ext:optimize-interface (safety 3)))
+@c LaTeX   ;; with-array-data will get us to the actual data.  However, because
+@c LaTeX   ;; the array could have been displaced, we need to know where the
+@c LaTeX   ;; data starts.
+@c LaTeX   (lisp::with-array-data ((data array)
+@c LaTeX                           (start)
+@c LaTeX                           (end))
+@c LaTeX     (declare (ignore end))
+@c LaTeX     ;; DATA is a specialized simple-array.  Memory is laid out like this:
+@c LaTeX     ;;
+@c LaTeX     ;;   byte offset    Value
+@c LaTeX     ;;        0         type code (should be 70 for double-float vector)
+@c LaTeX     ;;        4         4 * number of elements in vector
+@c LaTeX     ;;        8         1st element of vector
+@c LaTeX     ;;      ...         ...
+@c LaTeX     ;;
+@c LaTeX     (let ((addr (+ 8 (logandc1 7 (kernel:get-lisp-obj-address data))))
+@c LaTeX           (type-size (let ((type (array-element-type data)))
+@c LaTeX                        (cond ((or (equal type '(signed-byte 8))
+@c LaTeX                                   (equal type '(unsigned-byte 8)))
+@c LaTeX                               1)
+@c LaTeX                              ((or (equal type '(signed-byte 16))
+@c LaTeX                                   (equal type '(unsigned-byte 16)))
+@c LaTeX                               2)
+@c LaTeX                              ((or (equal type '(signed-byte 32))
+@c LaTeX                                   (equal type '(unsigned-byte 32)))
+@c LaTeX                               4)
+@c LaTeX                              ((equal type 'single-float)
+@c LaTeX                               4)
+@c LaTeX                              ((equal type 'double-float)
+@c LaTeX                               8)
+@c LaTeX                              (t
+@c LaTeX                               (error "Unknown specialized array element type"))))))
+@c LaTeX       (declare (type (unsigned-byte 32) addr)
+@c LaTeX                (optimize (speed 3) (safety 0) (ext:inhibit-warnings 3)))
+@c LaTeX       (system:int-sap (the (unsigned-byte 32)
+@c LaTeX                         (+ addr (* type-size start)))))))
+@c LaTeX \end{example}
+@c LaTeX 
+@c LaTeX Assume we have the C function below that we wish to use:
+@c LaTeX \begin{example}
+@c LaTeX   double dotprod(double* x, double* y, int n)
+@c LaTeX   \{
+@c LaTeX     int k;
+@c LaTeX     double sum = 0;
+@c LaTeX 
+@c LaTeX     for (k = 0; k < n; ++k) \{
+@c LaTeX       sum += x[k] * y[k];
+@c LaTeX     \}
+@c LaTeX   \}
+@c LaTeX \end{example}
+@c LaTeX The following example generates two large arrays in Lisp, and calls the C
+@c LaTeX function to do the desired computation.  This would not have been
+@c LaTeX possible using \code{malloc} or \code{make-alien} since we need about
+@c LaTeX 16 MB of memory to hold the two arrays.
+@c LaTeX \begin{example}
+@c LaTeX   (define-alien-routine "dotprod" double
+@c LaTeX     (x (* double-float) :in)
+@c LaTeX     (y (* double-float) :in)
+@c LaTeX     (n int :in))
+@c LaTeX     
+@c LaTeX   (let ((x (make-array 1000000 :element-type 'double-float))
+@c LaTeX         (y (make-array 1000000 :element-type 'double-float)))
+@c LaTeX     ;; Initialize X and Y somehow
+@c LaTeX     (let ((x-addr (system:int-sap (array-data-address x)))
+@c LaTeX           (y-addr (system:int-sap (array-data-address y))))
+@c LaTeX       (dotprod x-addr y-addr 1000000)))    
+@c LaTeX \end{example}
+@c LaTeX In this example, it may be useful to wrap the inner \code{let}
+@c LaTeX expression in an \code{unwind-protect} that first turns off garbage
+@c LaTeX collection and then turns garbage collection on afterwards.  This will
+@c LaTeX prevent garbage collection from moving \code{x} and \code{y} after we
+@c LaTeX have obtained the (now erroneous) addresses but before the call to
+@c LaTeX \code{dotprod} is made.
+@c LaTeX 
+@c -->
+
+
+@node  Step-By-Step Example of the Foreign Function Interface,  , Foreign Function Calls, The Foreign Function Interface
+@comment  node-name,  next,  previous,  up
+@section Step-By-Step Example of the Foreign Function Interface
+
+This section presents a complete example of an interface to a somewhat
+complicated C function.
+
+Suppose you have the following C function which you want to be able to
+call from Lisp in the file @file{test.c}
+
+@example
+struct c_struct
+@{
+  int x;
+  char *s;
+@};
+ 
+struct c_struct *c_function (i, s, r, a)
+    int i;
+    char *s;
+    struct c_struct *r;
+    int a[10];
+@{
+  int j;
+  struct c_struct *r2;
+ 
+  printf("i = %d\n", i);
+  printf("s = %s\n", s);
+  printf("r->x = %d\n", r->x);
+  printf("r->s = %s\n", r->s);
+  for (j = 0; j &lt; 10; j++) printf("a[%d] = %d.\n", j, a[j]);
+  r2 = (struct c_struct *) malloc (sizeof(struct c_struct));
+  r2->x = i + 5;
+  r2->s = "a C string";
+  return(r2);
+@};
+@end example
+
+It is possible to call this C function from Lisp using the file
+@file{test.lisp} containing
+
+@lisp
+(cl:defpackage "TEST-C-CALL" (:use "CL" "SB-ALIEN" "SB-C-CALL"))
+(cl:in-package "TEST-C-CALL")
+
+;;; Define the record C-STRUCT in Lisp.
+(define-alien-type nil
+    (struct c-struct
+            (x int)
+            (s c-string)))
+
+;;; Define the Lisp function interface to the C routine.  It returns a
+;;; pointer to a record of type C-STRUCT.  It accepts four parameters:
+;;; I, an int; S, a pointer to a string; R, a pointer to a C-STRUCT
+;;; record; and A, a pointer to the array of 10 ints.
+;;;
+;;; The INLINE declaration eliminates some efficiency notes about heap
+;;; allocation of alien values.
+(declaim (inline c-function))
+(define-alien-routine c-function
+    (* (struct c-struct))
+  (i int)
+  (s c-string)
+  (r (* (struct c-struct)))
+  (a (array int 10)))
+
+;;; a function which sets up the parameters to the C function and
+;;; actually calls it
+(defun call-cfun ()
+  (with-alien ((ar (array int 10))
+               (c-struct (struct c-struct)))
+    (dotimes (i 10)                     ; Fill array.
+      (setf (deref ar i) i))
+    (setf (slot c-struct 'x) 20)
+    (setf (slot c-struct 's) "a Lisp string")
+
+    (with-alien ((res (* (struct c-struct))
+                      (c-function 5 "another Lisp string" (addr c-struct) ar)))
+      (format t "~&amp;back from C function~%")
+      (multiple-value-prog1
+          (values (slot res 'x)
+                  (slot res 's))
+
+        ;; Deallocate result. (after we are done referring to it:
+        ;; "Pillage, *then* burn.")
+        (free-alien res)))))
+@end lisp
+
+To execute the above example, it is necessary to compile the C
+routine, e.g.: @samp{cc -c test.c} (In order to enable incremental
+loading with some linkers, you may need to say @samp{cc -G 0 -c
+test.c})
+
+Once the C code has been compiled, you can start up Lisp and load it
+in: @samp{sbcl} Lisp should start up with its normal prompt.
+
+Within Lisp, compile the Lisp file. (This step can be done
+separately. You don't have to recompile every time.)
+@samp{(compile-file "test.lisp")}
+
+Within Lisp, load the foreign object file to define the necessary
+symbols: @samp{(load-foreign "test.o")}.  This must be done before
+loading any code that refers to these symbols.
+
+Now you can load the compiled Lisp (``fasl'') file into Lisp:
+@samp{(load "test.fasl")}
+And once the Lisp file is loaded, you can call the 
+Lisp routine that sets up the parameters and calls the C
+function:
+@samp{(test-c-call::call-cfun)}
+
+The C routine should print the following information to standard output:
+
+@example
+i = 5
+s = another Lisp string
+r->x = 20
+r->s = a Lisp string
+a[0] = 0.
+a[1] = 1.
+a[2] = 2.
+a[3] = 3.
+a[4] = 4.
+a[5] = 5.
+a[6] = 6.
+a[7] = 7.
+a[8] = 8.
+a[9] = 9.
+@end example
+
+After return from the C function,
+the Lisp wrapper function should print the following output:
+
+@example
+back from C function
+@end example
+
+And upon return from the Lisp wrapper function,
+before the next prompt is printed, the
+Lisp read-eval-print loop should print the following return values:
+
+@example
+10
+"a C string"
+@end example
