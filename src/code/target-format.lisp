@@ -229,7 +229,10 @@
     (cond (name
 	   (write-string (string-capitalize name) stream))
 	  ((<= 0 (char-code char) 31)
-	   ;; Print control characters as "^"<char>
+	   ;; Print control characters as "^"<char>. (This seems to be
+	   ;; old pre-ANSI behavior, but ANSI just says that the "#^"
+	   ;; sequence is undefined and not reserved for the user, so
+	   ;; this behavior should be ANSI-compliant.)
 	   (write-char #\^ stream)
 	   (write-char (code-char (+ 64 (char-code char))) stream))
 	  (t

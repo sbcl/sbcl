@@ -425,13 +425,19 @@
 
 ;;;; array accessors
 
+;;; FIXME: This was commented out in sbcl-0.6.9.21 since it was
+;;; causing a problem in a CHAR form in HEXSTR. It's still important
+;;; to be able to inline this, so something along these lines
+;;; will probably be back, but it might be different in detail, e.g.
+;;; (DECLAIM (MAYBE-INLINE %WITH-ARRAY-DATA)).
+#|
 ;;; Handle the 1-dimensional case of %WITH-ARRAY-DATA specially. It's
 ;;; important to do this efficiently if we want people to be able to
 ;;; use vectors with fill pointers anywhere near inner loops, and
 ;;; hence it's important to do this efficiently if we want people to
 ;;; be able to use sequence functions anywhere near inner loops.
 (deftransform %with-array-data ((array start end)
-				(vector index index)
+				(vector index (or index null))
 				*
 				:important t
 				:node node
@@ -441,11 +447,6 @@
 	 (element-type-specifier (type-specifier element-ctype))
 	 (simple-array-type `(simple-array ,element-type-specifier 1)))
     (declare (type ctype element-ctype))
-    #|
-    (when (eq element-type-specifier '*)
-      (give-up-ir1-transform
-       "upgraded array element type not known at compile time"))
-    |#
     `(let* (;; FIXME: Instead of doing this hairy expression for SIZE,
 	    ;; it should just be (ARRAY-DIMENSION ARRAY 0), and there
 	    ;; should be a DEFTRANSFORM for ARRAY-DIMENSION which
@@ -477,6 +478,7 @@
   (error "The start of vector data was out of range."))
 (defun vector-data-end-out-of-range ()
   (error "The end of vector data was out of range."))
+|#
 
 ;;; We convert all typed array accessors into AREF and %ASET with type
 ;;; assertions on the array.

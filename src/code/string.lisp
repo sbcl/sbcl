@@ -27,38 +27,25 @@
 		:format-control "~S cannot be coerced to a string."
 		:format-arguments (list x)))))
 
-;;; With-One-String is used to set up some string hacking things. The keywords
-;;; are parsed, and the string is hacked into a simple-string.
-
 (eval-when (:compile-toplevel)
-
-(sb!xc:defmacro with-one-string (string start end cum-offset &rest forms)
+;;; WITH-ONE-STRING is used to set up some string hacking things. The
+;;; keywords are parsed, and the string is hacked into a
+;;; simple-string.
+(sb!xc:defmacro with-one-string ((string start end) &body forms)
   `(let ((,string (if (stringp ,string) ,string (string ,string))))
-     (with-array-data ((,string ,string :offset-var ,cum-offset)
+     (with-array-data ((,string ,string)
 		       (,start ,start)
 		       (,end (or ,end (length (the vector ,string)))))
        ,@forms)))
-
-) ; EVAN-WHEN
-
-;;; With-String is like With-One-String, but doesn't parse keywords.
-
-(eval-when (:compile-toplevel)
-
+;;; WITH-STRING is like WITH-ONE-STRING, but doesn't parse keywords.
 (sb!xc:defmacro with-string (string &rest forms)
   `(let ((,string (if (stringp ,string) ,string (string ,string))))
      (with-array-data ((,string ,string)
 		       (start)
 		       (end (length (the vector ,string))))
        ,@forms)))
-
-) ; EVAL-WHEN
-
-;;; With-Two-Strings is used to set up string comparison operations. The
-;;; keywords are parsed, and the strings are hacked into simple-strings.
-
-(eval-when (:compile-toplevel)
-
+;;; WITH-TWO-STRINGS is used to set up string comparison operations. The
+;;; keywords are parsed, and the strings are hacked into SIMPLE-STRINGs.
 (sb!xc:defmacro with-two-strings (string1 string2 start1 end1 cum-offset-1
 					    start2 end2 &rest forms)
   `(let ((,string1 (if (stringp ,string1) ,string1 (string ,string1)))
@@ -70,7 +57,6 @@
 			 (,start2 ,start2)
 			 (,end2 (or ,end2 (length (the vector ,string2)))))
 	 ,@forms))))
-
 ) ; EVAL-WHEN
 
 (defun char (string index)
@@ -131,7 +117,7 @@
 		    (- (the fixnum index) ,offset1))
 		   (t nil))
 	     ,(if equalp `(- (the fixnum end1) ,offset1) 'nil))))))
-) ; eval-when
+) ; EVAL-WHEN
 
 (defun string<* (string1 string2 start1 end1 start2 end2)
   (declare (fixnum start1 start2))
@@ -252,7 +238,7 @@
 	  (slen2 (- end2 start2)))
       (declare (fixnum slen1 slen2))
       (if (or (minusp slen1) (minusp slen2))
-	  ;;prevent endless looping later.
+	  ;; Prevent endless looping later.
 	  (error "Improper bounds for string comparison."))
       (cond ((or (minusp slen1) (or (minusp slen2)))
 	     (error "Improper substring for comparison."))
@@ -366,166 +352,64 @@
 	(setf (schar string i) fill-char))
       (make-string count)))
 
+(flet ((frob (string start end)
+	 (declare (string string) (index start) (type (or index null end)))
+	 (let ((save-header string))
+	   (with-one-string (string start end)
+	     (do ((index start (1+ index)))
+		 ((= index (the fixnum end)))
+	       (declare (fixnum index))
+	       (setf (schar string index) (char-upcase (schar string index)))))
+	   save-header)))
 (defun string-upcase (string &key (start 0) end)
-  #!+sb-doc
-  "Given a string, returns a new string that is a copy of it with
-  all lower case alphabetic characters converted to uppercase."
-  (declare (fixnum start))
-  (let* ((string (if (stringp string) string (string string)))
-	 (slen (length string)))
-    (declare (fixnum slen))
-    (with-one-string string start end offset
-      (let ((offset-slen (+ slen offset))
-	    (newstring (make-string slen)))
-	(declare (fixnum offset-slen))
-	(do ((index offset (1+ index))
-	     (new-index 0 (1+ new-index)))
-	    ((= index start))
-	  (declare (fixnum index new-index))
-	  (setf (schar newstring new-index) (schar string index)))
-	(do ((index start (1+ index))
-	     (new-index (- start offset) (1+ new-index)))
-	    ((= index (the fixnum end)))
-	  (declare (fixnum index new-index))
-	  (setf (schar newstring new-index)
-		(char-upcase (schar string index))))
-	(do ((index end (1+ index))
-	     (new-index (- (the fixnum end) offset) (1+ new-index)))
-	    ((= index offset-slen))
-	  (declare (fixnum index new-index))
-	  (setf (schar newstring new-index) (schar string index)))
-	newstring))))
-
-(defun string-downcase (string &key (start 0) end)
-  #!+sb-doc
-  "Given a string, returns a new string that is a copy of it with
-  all upper case alphabetic characters converted to lowercase."
-  (declare (fixnum start))
-  (let* ((string (if (stringp string) string (string string)))
-	 (slen (length string)))
-    (declare (fixnum slen))
-    (with-one-string string start end offset
-      (let ((offset-slen (+ slen offset))
-	    (newstring (make-string slen)))
-	(declare (fixnum offset-slen))
-	(do ((index offset (1+ index))
-	     (new-index 0 (1+ new-index)))
-	    ((= index start))
-	  (declare (fixnum index new-index))
-	  (setf (schar newstring new-index) (schar string index)))
-	(do ((index start (1+ index))
-	     (new-index (- start offset) (1+ new-index)))
-	    ((= index (the fixnum end)))
-	  (declare (fixnum index new-index))
-	  (setf (schar newstring new-index)
-		(char-downcase (schar string index))))
-	(do ((index end (1+ index))
-	     (new-index (- (the fixnum end) offset) (1+ new-index)))
-	    ((= index offset-slen))
-	  (declare (fixnum index new-index))
-	  (setf (schar newstring new-index) (schar string index)))
-	newstring))))
-
-(defun string-capitalize (string &key (start 0) end)
-  #!+sb-doc
-  "Given a string, returns a copy of the string with the first
-  character of each ``word'' converted to upper-case, and remaining
-  chars in the word converted to lower case. A ``word'' is defined
-  to be a string of case-modifiable characters delimited by
-  non-case-modifiable chars."
-  (declare (fixnum start))
-  (let* ((string (if (stringp string) string (string string)))
-	 (slen (length string)))
-    (declare (fixnum slen))
-    (with-one-string string start end offset
-      (let ((offset-slen (+ slen offset))
-	    (newstring (make-string slen)))
-	(declare (fixnum offset-slen))
-	(do ((index offset (1+ index))
-	     (new-index 0 (1+ new-index)))
-	    ((= index start))
-	  (declare (fixnum index new-index))
-	  (setf (schar newstring new-index) (schar string index)))
-	(do ((index start (1+ index))
-	     (new-index (- start offset) (1+ new-index))
-	     (newword t)
-	     (char ()))
-	    ((= index (the fixnum end)))
-	  (declare (fixnum index new-index))
-	  (setq char (schar string index))
-	  (cond ((not (alphanumericp char))
-		 (setq newword t))
-		(newword
-		 ;;char is first case-modifiable after non-case-modifiable
-		 (setq char (char-upcase char))
-		 (setq newword ()))
-		;;char is case-modifiable, but not first
-		(t (setq char (char-downcase char))))
-	  (setf (schar newstring new-index) char))
-	(do ((index end (1+ index))
-	     (new-index (- (the fixnum end) offset) (1+ new-index)))
-	    ((= index offset-slen))
-	  (declare (fixnum index new-index))
-	  (setf (schar newstring new-index) (schar string index)))
-	newstring))))
-
+  (frob (copy-seq string) start end))
 (defun nstring-upcase (string &key (start 0) end)
-  #!+sb-doc
-  "Given a string, returns that string with all lower case alphabetic
-  characters converted to uppercase."
-  (declare (fixnum start))
-  (let ((save-header string))
-    (with-one-string string start end offset
-      (do ((index start (1+ index)))
-	  ((= index (the fixnum end)))
-	(declare (fixnum index))
-	(setf (schar string index) (char-upcase (schar string index)))))
-    save-header))
+  (frob string start end))
+) ; FLET
 
+(flet ((frob (string start end)
+	 (declare (string string) (index start) (type (or index null end)))
+	 (let ((save-header string))
+	   (with-one-string (string start end)
+	     (do ((index start (1+ index)))
+		 ((= index (the fixnum end)))
+	       (declare (fixnum index))
+	       (setf (schar string index)
+		     (char-downcase (schar string index)))))
+	   save-header)))
+(defun string-downcase (string &key (start 0) end)
+  (frob (copy-seq string) start end))
 (defun nstring-downcase (string &key (start 0) end)
-  #!+sb-doc
-  "Given a string, returns that string with all upper case alphabetic
-  characters converted to lowercase."
-  (declare (fixnum start))
-  (let ((save-header string))
-    (with-one-string string start end offset
-      (do ((index start (1+ index)))
-	  ((= index (the fixnum end)))
-	(declare (fixnum index))
-	(setf (schar string index) (char-downcase (schar string index)))))
-    save-header))
+  (frob string start end))
+) ; FLET
 
+(flet ((frob (string start end)
+	 (declare (string string) (index start) (type (or index null end)))
+	 (let ((save-header string))
+           (with-one-string (string start end)
+             (do ((index start (1+ index))
+		  (newword t)
+		  (char ()))
+		 ((= index (the fixnum end)))
+	       (declare (fixnum index))
+	       (setq char (schar string index))
+	       (cond ((not (alphanumericp char))
+		      (setq newword t))
+	       (newword
+		;; CHAR is the first case-modifiable character after
+		;; a sequence of non-case-modifiable characters.
+		(setf (schar string index) (char-upcase char))
+		(setq newword ()))
+	       (t
+		(setf (schar string index) (char-downcase char))))))
+	   save-header)))
+(defun string-capitalize (string &key (start 0) end)
+  (frob (copy-seq string) start end))
 (defun nstring-capitalize (string &key (start 0) end)
-  #!+sb-doc
-  "Given a string, returns that string with the first
-  character of each ``word'' converted to upper-case, and remaining
-  chars in the word converted to lower case. A ``word'' is defined
-  to be a string of case-modifiable characters delimited by
-  non-case-modifiable chars."
-  (declare (fixnum start))
-  (let ((save-header string))
-    (with-one-string string start end offset
-      (do ((index start (1+ index))
-	   (newword t)
-	   (char ()))
-	  ((= index (the fixnum end)))
-	(declare (fixnum index))
-	(setq char (schar string index))
-	(cond ((not (alphanumericp char))
-	       (setq newword t))
-	      (newword
-	       ;;char is first case-modifiable after non-case-modifiable
-	       (setf (schar string index) (char-upcase char))
-	       (setq newword ()))
-	      (t
-	       (setf (schar string index) (char-downcase char))))))
-    save-header))
+  (frob string start end))
+) ; FLET
 
 (defun string-left-trim (char-bag string)
-  #!+sb-doc
-  "Given a set of characters (a list or string) and a string, returns
-  a copy of the string with the characters in the set removed from the
-  left end."
   (with-string string
     (do ((index start (1+ index)))
 	((or (= index (the fixnum end))
@@ -534,10 +418,6 @@
       (declare (fixnum index)))))
 
 (defun string-right-trim (char-bag string)
-  #!+sb-doc
-  "Given a set of characters (a list or string) and a string, returns
-  a copy of the string with the characters in the set removed from the
-  right end."
   (with-string string
     (do ((index (1- (the fixnum end)) (1- index)))
 	((or (< index start)
@@ -546,10 +426,6 @@
       (declare (fixnum index)))))
 
 (defun string-trim (char-bag string)
-  #!+sb-doc
-  "Given a set of characters (a list or string) and a string, returns a
-  copy of the string with the characters in the set removed from both
-  ends."
   (with-string string
     (let* ((left-end (do ((index start (1+ index)))
 			 ((or (= index (the fixnum end))

@@ -78,9 +78,9 @@
   (cell nil :type (or cons null)))
 
 (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
-  ;; the appropriate initialization value for the CPL slot of a CONDITION,
-  ;; calculated by looking at the INHERITS information in the LAYOUT
-  ;; of the CONDITION
+  ;; the appropriate initialization value for the CPL slot of a
+  ;; CONDITION, calculated by looking at the INHERITS information in
+  ;; the LAYOUT of the CONDITION
   (defun condition-class-cpl-from-layout (condition)
     (declare (type condition condition))
     (let* ((class (sb!xc:find-class condition))
@@ -166,7 +166,7 @@
 
 ;;;; slots of CONDITION objects
 
-(defvar *empty-slot* '(empty))
+(defvar *empty-condition-slot* '(empty))
 
 (defun find-slot-default (class slot)
   (let ((initargs (condition-slot-initargs slot))
@@ -174,8 +174,8 @@
     (dolist (class cpl)
       (let ((default-initargs (condition-class-default-initargs class)))
 	(dolist (initarg initargs)
-	  (let ((val (getf default-initargs initarg *empty-slot*)))
-	    (unless (eq val *empty-slot*)
+	  (let ((val (getf default-initargs initarg *empty-condition-slot*)))
+	    (unless (eq val *empty-condition-slot*)
 	      (return-from find-slot-default
 			   (if (functionp val)
 			       (funcall val)
@@ -188,11 +188,14 @@
 	      initform))
 	(error "unbound condition slot: ~S" (condition-slot-name slot)))))
 
-(defun find-slot (classes name)
-  (dolist (sclass classes nil)
+(defun find-condition-class-slot (condition-class slot-name)
+  (dolist (sclass
+	   (condition-class-cpl condition-class)
+	   (error "There is no slot named ~S in ~S."
+		  slot-name condition-class))
     (dolist (slot (condition-class-slots sclass))
-      (when (eq (condition-slot-name slot) name)
-	(return-from find-slot slot)))))
+      (when (eq (condition-slot-name slot) slot-name)
+	(return-from find-condition-class-slot slot)))))
 
 (defun condition-writer-function (condition new-value name)
   (dolist (cslot (condition-class-class-slots
@@ -210,13 +213,15 @@
 		     (car (condition-slot-cell cslot)))))
 
     (let ((val (getf (condition-assigned-slots condition) name
-		     *empty-slot*)))
-      (if (eq val *empty-slot*)
+		     *empty-condition-slot*)))
+      (if (eq val *empty-condition-slot*)
 	  (let ((actual-initargs (condition-actual-initargs condition))
-		(slot (find-slot (condition-class-cpl class) name)))
+		(slot (find-condition-class-slot class name)))
 	    (dolist (initarg (condition-slot-initargs slot))
-	      (let ((val (getf actual-initargs initarg *empty-slot*)))
-		(unless (eq val *empty-slot*)
+	      (let ((val (getf actual-initargs
+			       initarg
+			       *empty-condition-slot*)))
+		(unless (eq val *empty-condition-slot*)
 		  (return-from condition-reader-function
 			       (setf (getf (condition-assigned-slots condition)
 					   name)
@@ -254,13 +259,14 @@
     ;; Set any class slots with initargs present in this call.
     (dolist (cslot (condition-class-class-slots class))
       (dolist (initarg (condition-slot-initargs cslot))
-	(let ((val (getf args initarg *empty-slot*)))
-	  (unless (eq val *empty-slot*)
+	(let ((val (getf args initarg *empty-condition-slot*)))
+	  (unless (eq val *empty-condition-slot*)
 	    (setf (car (condition-slot-cell cslot)) val)))))
     ;; Default any slots with non-constant defaults now.
     (dolist (hslot (condition-class-hairy-slots class))
       (when (dolist (initarg (condition-slot-initargs hslot) t)
-	      (unless (eq (getf args initarg *empty-slot*) *empty-slot*)
+	      (unless (eq (getf args initarg *empty-condition-slot*)
+			  *empty-condition-slot*)
 		(return nil)))
 	(setf (getf (condition-assigned-slots res) (condition-slot-name hslot))
 	      (find-slot-default class hslot))))
@@ -365,8 +371,8 @@
 		#'(lambda (new-value condition)
 		    (condition-writer-function condition new-value name))))))
 
-    ;; Compute effective slots and set up the class and hairy slots (subsets of
-    ;; the effective slots.)
+    ;; Compute effective slots and set up the class and hairy slots
+    ;; (subsets of the effective slots.)
     (let ((eslots (compute-effective-slots class))
 	  (e-def-initargs
 	   (reduce #'append
@@ -382,7 +388,7 @@
 			       (if (functionp initform)
 				   (funcall initform)
 				   initform))
-			     *empty-slot*))))
+			     *empty-condition-slot*))))
 	   (push slot (condition-class-class-slots class)))
 	  ((:instance nil)
 	   (setf (condition-slot-allocation slot) :instance)
@@ -537,8 +543,6 @@
 (define-condition style-warning (warning) ())
 
 (defun simple-condition-printer (condition stream)
-  ;; FIXME: Why use APPLY instead of an ordinary form? To stop the optimizer
-  ;; from doing something?
   (apply #'format stream (simple-condition-format-control condition)
 	 		 (simple-condition-format-arguments condition)))
 
@@ -566,9 +570,9 @@
 
 (define-condition storage-condition (serious-condition) ())
 
-;;; FIXME: Should we really be reporting CONDITION-FUNCTION-NAME data on an
-;;; ad hoc basis, for some conditions and not others? Why not standardize
-;;; it somehow? perhaps by making the debugger report it?
+;;; FIXME: Should we really be reporting CONDITION-FUNCTION-NAME data
+;;; on an ad hoc basis, for some conditions and not others? Why not
+;;; standardize it somehow? perhaps by making the debugger report it?
 
 (define-condition type-error (error)
   ((datum :reader type-error-datum :initarg :datum)
@@ -763,8 +767,9 @@
   "Transfer control to a restart named ABORT, signalling a CONTROL-ERROR if
    none exists."
   (invoke-restart (find-restart 'abort condition))
-  ;; ABORT signals an error in case there was a restart named ABORT that did
-  ;; not transfer control dynamically. This could happen with RESTART-BIND.
+  ;; ABORT signals an error in case there was a restart named ABORT
+  ;; that did not transfer control dynamically. This could happen with
+  ;; RESTART-BIND.
   (error 'abort-failure))
 
 (defun muffle-warning (&optional condition)

@@ -17,8 +17,8 @@
 
 ;;;; miscellaneous accessor functions
 
-;;; These functions are needed by the interpreter, 'cause the compiler inlines
-;;; them.
+;;; These functions are needed by the interpreter, 'cause the compiler
+;;; inlines them.
 (macrolet ((def-frob (name)
 	     `(progn
 		(defun ,name (array)
@@ -46,9 +46,8 @@
 	   (fixnum index))
   (%check-bound array bound index))
 
-;;; The guts of the WITH-ARRAY-DATA macro. Note that this function is
-;;; only called if we have an array header or an error, so it doesn't
-;;; have to be too tense.
+;;; the guts of the WITH-ARRAY-DATA macro (except when DEFTRANSFORM
+;;; %WITH-ARRAY-DATA takes over)
 (defun %with-array-data (array start end)
   (declare (array array) (type index start) (type (or index null) end))
   ;; FIXME: The VALUES declaration here is correct, but as of SBCL
@@ -97,11 +96,11 @@
 
 ;;; These functions are used in the implementation of MAKE-ARRAY for
 ;;; complex arrays. There are lots of transforms to simplify
-;;; MAKE-ARRAY is transformed away for various easy cases, but not for
-;;; all reasonable cases, so e.g. as of sbcl-0.6.6 we still make full
-;;; calls to MAKE-ARRAY for any non-simple array. Thus, there's some
-;;; value to making this somewhat efficient, at least not doing full
-;;; calls to SUBTYPEP in the easy cases.
+;;; MAKE-ARRAY for various easy cases, but not for all reasonable
+;;; cases, so e.g. as of sbcl-0.6.6 we still make full calls to
+;;; MAKE-ARRAY for any non-simple array. Thus, there's some value to
+;;; making this somewhat efficient, at least not doing full calls to
+;;; SUBTYPEP in the easy cases.
 (defun %vector-type-code (type)
   (case type
     ;; Pick off some easy common cases.
@@ -175,8 +174,6 @@
 			      (initial-element nil initial-element-p)
 			      initial-contents adjustable fill-pointer
 			      displaced-to displaced-index-offset)
-  #!+sb-doc
-  "Creates an array of the specified Dimensions. See manual for details."
   (let* ((dimensions (if (listp dimensions) dimensions (list dimensions)))
 	 (array-rank (length (the list dimensions)))
 	 (simple (and (null fill-pointer)
@@ -668,8 +665,8 @@
 			   &optional
 			   (extension (1+ (length vector))))
   #!+sb-doc
-  "Like Vector-Push except that if the fill pointer gets too large, the
-   Vector is extended rather than Nil being returned."
+  "This is like Vector-Push except that if the fill pointer gets too
+   large, the Vector is extended rather than Nil being returned."
   (declare (vector vector) (fixnum extension))
   (let ((fill-pointer (fill-pointer vector)))
     (declare (fixnum fill-pointer))
@@ -714,9 +711,9 @@
       (when (and fill-pointer (> array-rank 1))
 	(error "Multidimensional arrays can't have fill pointers."))
       (cond (initial-contents
-	     ;; Array former contents replaced by initial-contents.
+	     ;; array former contents replaced by INITIAL-CONTENTS
 	     (if (or initial-element-p displaced-to)
-		 (error "Initial contents may not be specified with ~
+		 (error "INITIAL-CONTENTS may not be specified with ~
 		 the :INITIAL-ELEMENT or :DISPLACED-TO option."))
 	     (let* ((array-size (apply #'* dimensions))
 		    (array-data (data-vector-from-inits
@@ -729,13 +726,13 @@
 						       fill-pointer)
 				 0 dimensions nil)
 		   (if (array-header-p array)
-		       ;; Simple multidimensional or single dimensional array.
+		       ;; simple multidimensional or single dimensional array
 		       (make-array dimensions
 				   :element-type element-type
 				   :initial-contents initial-contents)
 		       array-data))))
 	    (displaced-to
-	     ;; No initial-contents supplied is already established.
+	     ;; We already established that no INITIAL-CONTENTS was supplied.
 	     (when initial-element
 	       (error "The :INITIAL-ELEMENT option may not be specified ~
 	              with :DISPLACED-TO."))
@@ -901,7 +898,7 @@
 
 ;;;; ZAP-ARRAY-DATA for ADJUST-ARRAY
 
-;;; Make a temporary to be used when old-data and new-data are EQ.
+;;; a temporary to be used when OLD-DATA and NEW-DATA are EQ.
 ;;; KLUDGE: Boy, DYNAMIC-EXTENT would be nice.
 (defvar *zap-array-data-temp* (make-array 1000 :initial-element t))
 
@@ -919,14 +916,15 @@
 	  :end length))
   *zap-array-data-temp*)
 
-;;; This does the grinding work for ADJUST-ARRAY. It zaps the data from the
-;;; Old-Data in an arrangement specified by the Old-Dims to the New-Data in an
-;;; arrangement specified by the New-Dims. Offset is a displaced offset to be
-;;; added to computed indexes of Old-Data. New-Length, Element-Type,
-;;; Initial-Element, and Initial-Element-P are used when Old-Data and New-Data
-;;; are EQ; in this case, a temporary must be used and filled appropriately.
-;;; When Old-Data and New-Data are not EQ, New-Data has already been filled
-;;; with any specified initial-element.
+;;; This does the grinding work for ADJUST-ARRAY. It zaps the data
+;;; from the OLD-DATA in an arrangement specified by the OLD-DIMS to
+;;; the NEW-DATA in an arrangement specified by the NEW-DIMS. OFFSET
+;;; is a displaced offset to be added to computed indices of OLD-DATA.
+;;; NEW-LENGTH, ELEMENT-TYPE, INITIAL-ELEMENT, and INITIAL-ELEMENT-P
+;;; are used when OLD-DATA and NEW-DATA are EQ; in this case, a
+;;; temporary must be used and filled appropriately. When OLD-DATA and
+;;; NEW-DATA are not EQ, NEW-DATA has already been filled with any
+;;; specified initial-element.
 (defun zap-array-data (old-data old-dims offset new-data new-dims new-length
 		       element-type initial-element initial-element-p)
   (declare (list old-dims new-dims))
@@ -964,9 +962,9 @@
 		       offset)))))))
 
 ;;; Figure out the row-major-order index of an array reference from a
-;;; list of subscripts and a list of dimensions. This is for internal calls
-;;; only, and the subscripts and dim-list variables are assumed to be reversed
-;;; from what the user supplied.
+;;; list of subscripts and a list of dimensions. This is for internal
+;;; calls only, and the subscripts and dim-list variables are assumed
+;;; to be reversed from what the user supplied.
 (defun row-major-index-from-dims (rev-subscripts rev-dim-list)
   (do ((rev-subscripts rev-subscripts (cdr rev-subscripts))
        (rev-dim-list rev-dim-list (cdr rev-dim-list))

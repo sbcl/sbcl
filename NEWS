@@ -647,3 +647,7 @@ planned incompatible changes in 0.7.x:
   instead of the old "5]", "5]]", "5]]]" sequence. (I was motivated
   to do this when ILISP and SBCL got into arguments which left me
   deeply nested in the debugger.)
+* When the profiling interface settles down, it might impact TRACE.
+  They both encapsulate functions, and it's not clear yet how
+  e.g. UNPROFILE will interact with TRACE and UNTRACE. (This shouldn't
+  matter, though, unless you are using profiling.)

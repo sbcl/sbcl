@@ -142,11 +142,17 @@
   ;; fixups be done separately? Wouldn't that be clearer and better?
   ;; -- WHN 19991204
   (/show0 "doing cold toplevel forms and fixups")
-  (/show0 "(LENGTH *!REVERSED-COLD-TOPLEVELS*)=..")
+  (/show0 "(LISTP *!REVERSED-COLD-TOPLEVELS*)=..")
   #!+sb-show (%primitive print
-			 (sb!impl::hexstr (length *!reversed-cold-toplevels*)))
-  (let (#!+sb-show (index-in-cold-toplevels 0)
-	#!+sb-show (filename-in-cold-toplevels nil))
+			 (if (listp *!reversed-cold-toplevels*) "true" "NIL"))
+  (/show0 "about to calculate (LENGTH *!REVERSED-COLD-TOPLEVELS*)")
+  (/show0 "(LENGTH *!REVERSED-COLD-TOPLEVELS*)=..")
+  #!+sb-show (let ((r-c-tl-length (length *!reversed-cold-toplevels*)))
+	       (/show0 "(length calculated..)")
+	       (let ((hexstr (sb!impl::hexstr r-c-tl-length)))
+		 (/show0 "(hexstr calculated..)")
+		 (%primitive print hexstr)))
+  (let (#!+sb-show (index-in-cold-toplevels 0))
     #!+sb-show (declare (type fixnum index-in-cold-toplevels))
     (dolist (toplevel-thing (prog1
 				(nreverse *!reversed-cold-toplevels*)
@@ -280,13 +286,17 @@ instead (which is another name for the same thing)."))
       (gc-cold-init-or-reinit)
       (setf (sb!alien:extern-alien "internal_errors_enabled" boolean) t)
       (set-floating-point-modes :traps
-				;; PRINT seems to not like x86 NPX denormal
-				;; floats like LEAST-NEGATIVE-SINGLE-FLOAT, so
-				;; the :UNDERFLOW exceptions are disabled by
-				;; default. Joe User can explicitly enable them
-				;; if desired.
-				'(:overflow #!-x86 :underflow :invalid
-					    :divide-by-zero))
+				'(:overflow
+				  :invalid
+				  :divide-by-zero
+				  ;; PRINT seems not to like x86 NPX
+				  ;; denormal floats like
+				  ;; LEAST-NEGATIVE-SINGLE-FLOAT, so
+				  ;; the :UNDERFLOW exceptions are
+				  ;; disabled by default. Joe User can
+				  ;; explicitly enable them if
+				  ;; desired.
+				  #!-x86 :underflow))
       ;; Clear pseudo atomic in case this core wasn't compiled with
       ;; support.
       ;;
@@ -301,19 +311,24 @@ instead (which is another name for the same thing)."))
 ;;;; some support for any hapless wretches who end up debugging cold
 ;;;; init code
 
-;;; Decode THING into hex using only machinery available early in cold
-;;; init.
+;;; Decode THING into hexadecimal notation using only machinery
+;;; available early in cold init.
 #!+sb-show
 (defun hexstr (thing)
+  (/show0 "entering HEXSTR")
   (let ((addr (sb!kernel:get-lisp-obj-address thing))
 	(str (make-string 10)))
+    (/show0 "ADDR and STR calculated")
     (setf (char str 0) #\0
 	  (char str 1) #\x)
+    (/show0 "CHARs 0 and 1 set")
     (dotimes (i 8)
+      (/show0 "at head of DOTIMES loop")
       (let* ((nibble (ldb (byte 4 0) addr))
 	     (chr (char "0123456789abcdef" nibble)))
 	(declare (type (unsigned-byte 4) nibble)
 		 (base-char chr))
+	(/show0 "NIBBLE and CHR calculated")
 	(setf (char str (- 9 i)) chr
 	      addr (ash addr -4))))
     str))

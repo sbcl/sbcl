@@ -888,9 +888,11 @@
       (when (and rejected
 		 (policy call (> speed inhibit-warnings)))
 	(note-rejected-templates call ltn-policy template))
-      ;; If we are forced to do a full call, we check to see whether the
-      ;; function called is the same as the current function. If so, we
-      ;; give a warning, as this is probably a botched interpreter stub.
+      ;; If we are forced to do a full call, we check to see whether
+      ;; the function called is the same as the current function. If
+      ;; so, we give a warning, as this is probably a botched attempt
+      ;; to implement an out-of-line version in terms of inline
+      ;; transforms or VOPs or whatever.
       (unless template
 	(when (and (eq (continuation-function-name (combination-fun call))
 		       (leaf-name
@@ -901,7 +903,12 @@
 			      (ir1-attributep (function-info-attributes info)
 					      recursive)))))
 	  (let ((*compiler-error-context* call))
-	    (compiler-warning "recursive known function definition")))
+	    (compiler-warning "recursion in known function definition~2I ~
+                               ~_arg types=~S"
+			      (mapcar (lambda (arg)
+					(type-specifier (continuation-type
+							 arg)))
+				      args))))
 	(ltn-default-call call ltn-policy)
 	(return-from ltn-analyze-known-call (values)))
       (setf (basic-combination-info call) template)

@@ -23,24 +23,32 @@
 ;;; bindings of START-VAR and END-VAR. OFFSET-VAR is the cumulative
 ;;; offset of all displacements encountered, and does not include
 ;;; SVALUE.
-(defmacro with-array-data (((data-var array &key (offset-var (gensym)))
+(defmacro with-array-data (((data-var array &key offset-var)
 			    (start-var &optional (svalue 0))
 			    (end-var &optional (evalue nil)))
 			   &body forms)
   (once-only ((n-array array)
 	      (n-svalue `(the index ,svalue))
 	      (n-evalue `(the (or index null) ,evalue)))
-    `(multiple-value-bind (,data-var ,start-var ,end-var ,offset-var)
+    `(multiple-value-bind (,data-var
+			   ,start-var
+			   ,end-var
+			   ,@(when offset-var `(,offset-var)))
 	 (if (not (array-header-p ,n-array))
 	     (let ((,n-array ,n-array))
 	       (declare (type (simple-array * (*)) ,n-array))
 	       ,(once-only ((n-len `(length ,n-array))
 			    (n-end `(or ,n-evalue ,n-len)))
 		  `(if (<= ,n-svalue ,n-end ,n-len)
+		       ;; success
 		       (values ,n-array ,n-svalue ,n-end 0)
-		       (%with-array-data ,n-array ,n-svalue ,n-evalue))))
+		       ;; failure: Make a NOTINLINE call to
+		       ;; %WITH-ARRAY-DATA with our bad data
+		       ;; to cause the error to be signalled.
+		       (locally
+			 (declare (notinline %with-array-data))
+			 (%with-array-data ,n-array ,n-svalue ,n-evalue)))))
 	     (%with-array-data ,n-array ,n-svalue ,n-evalue))
-       (declare (ignorable ,offset-var))
        ,@forms)))
 
 #!-gengc

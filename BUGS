@@ -173,10 +173,6 @@ WORKAROUND:
   (Also, when this is fixed, we can enable the code in PROCLAIM which 
   checks for incompatible FTYPE redeclarations.)
 
-16:
-  The ANSI spec says that CONS can be a compound type spec, e.g.
-  (CONS FIXNUM REAL). SBCL doesn't support this.
-
 18:
   from DTC on the CMU CL mailing list 25 Feb 2000:
 ;;; Compiler fails when this file is compiled.
@@ -340,6 +336,11 @@ returning an array as first value always.
   also report on closures, telling about the values of the bound variables.
 
 34:
+  WHN test case: Compile this file:
+    (eval-when (:compile-toplevel :load-toplevel :execute)
+      (defclass a-class () (a)))
+    (defconstant +a-constant+ (make-instance 'a-class))
+    (defconstant +another-constant+ (vector +a-constant+))
   as reported by Robert Strandh on the CMU CL mailing list 12 Jun 2000:
     $ cat xx.lisp
     (defconstant +a-constant+ (make-instance 'a-class))
