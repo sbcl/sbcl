@@ -61,6 +61,18 @@
 	      '((start end length sequence)
 		(start1 end1 length1 sequence1)
 		(start2 end2 length2 sequence2)))
+    (key nil
+         nil
+         (and key (%coerce-callable-to-fun key))
+         (or null function))
+    (test #'eql
+          nil
+          (%coerce-callable-to-fun test)
+          function)
+    (test-not nil
+              nil
+              (and test-not (%coerce-callable-to-fun test-not))
+              (or null function))
     ))
 
 (sb!xc:defmacro define-sequence-traverser (name args &body body)
@@ -606,14 +618,14 @@
 
 (sb!xc:defmacro vector-nreverse (sequence)
   `(let ((length (length (the vector ,sequence))))
-     (declare (fixnum length))
-     (do ((left-index 0 (1+ left-index))
-	  (right-index (1- length) (1- right-index))
-	  (half-length (truncate length 2)))
-	 ((= left-index half-length) ,sequence)
-       (declare (fixnum left-index right-index half-length))
-       (rotatef (aref ,sequence left-index)
-		(aref ,sequence right-index)))))
+     (when (>= length 2)
+       (do ((left-index 0 (1+ left-index))
+            (right-index (1- length) (1- right-index)))
+           ((<= right-index left-index))
+         (declare (type index left-index right-index))
+         (rotatef (aref ,sequence left-index)
+                  (aref ,sequence right-index))))
+     ,sequence))
 
 (sb!xc:defmacro list-nreverse-macro (list)
   `(do ((1st (cdr ,list) (if (endp 1st) 1st (cdr 1st)))
@@ -1234,7 +1246,7 @@
 ) ; EVAL-WHEN
 
 (define-sequence-traverser delete
-    (item sequence &key from-end (test #'eql) test-not start
+    (item sequence &key from-end test test-not start
           end count key)
   #!+sb-doc
   "Return a sequence formed by destructively removing the specified ITEM from
@@ -1453,7 +1465,7 @@
 ) ; EVAL-WHEN
 
 (define-sequence-traverser remove
-    (item sequence &key from-end (test #'eql) test-not start
+    (item sequence &key from-end test test-not start
           end count key)
   #!+sb-doc
   "Return a copy of SEQUENCE with elements satisfying the test (default is
@@ -1594,7 +1606,7 @@
     (shrink-vector result jndex)))
 
 (define-sequence-traverser remove-duplicates
-    (sequence &key (test #'eql) test-not (start 0) end from-end key)
+    (sequence &key test test-not start end from-end key)
   #!+sb-doc
   "The elements of SEQUENCE are compared pairwise, and if any two match,
    the one occurring earlier is discarded, unless FROM-END is true, in
@@ -1663,7 +1675,7 @@
       (setq jndex (1+ jndex)))))
 
 (define-sequence-traverser delete-duplicates
-    (sequence &key (test #'eql) test-not (start 0) end from-end key)
+    (sequence &key test test-not start end from-end key)
   #!+sb-doc
   "The elements of SEQUENCE are examined, and if any two match, one is
    discarded. The resulting sequence, which may be formed by destroying the
@@ -1774,7 +1786,7 @@
 ) ; EVAL-WHEN
 
 (define-sequence-traverser substitute
-    (new old sequence &key from-end (test #'eql) test-not
+    (new old sequence &key from-end test test-not
          start count end key)
   #!+sb-doc
   "Return a sequence of the same kind as SEQUENCE with the same elements,
@@ -1788,26 +1800,28 @@
 ;;;; SUBSTITUTE-IF, SUBSTITUTE-IF-NOT
 
 (define-sequence-traverser substitute-if
-    (new test sequence &key from-end start end count key)
+    (new pred sequence &key from-end start end count key)
   #!+sb-doc
   "Return a sequence of the same kind as SEQUENCE with the same elements
-  except that all elements satisfying the TEST are replaced with NEW. See
+  except that all elements satisfying the PRED are replaced with NEW. See
   manual for details."
   (declare (fixnum start))
   (let ((end (or end length))
+        (test pred)
 	test-not
 	old)
     (declare (type index length end))
     (subst-dispatch 'if)))
 
 (define-sequence-traverser substitute-if-not
-    (new test sequence &key from-end start end count key)
+    (new pred sequence &key from-end start end count key)
   #!+sb-doc
   "Return a sequence of the same kind as SEQUENCE with the same elements
-  except that all elements not satisfying the TEST are replaced with NEW.
+  except that all elements not satisfying the PRED are replaced with NEW.
   See manual for details."
   (declare (fixnum start))
   (let ((end (or end length))
+        (test pred)
 	test-not
 	old)
     (declare (type index length end))
@@ -1816,7 +1830,7 @@
 ;;;; NSUBSTITUTE
 
 (define-sequence-traverser nsubstitute
-    (new old sequence &key from-end (test #'eql) test-not
+    (new old sequence &key from-end test test-not
          end count key start)
   #!+sb-doc
   "Return a sequence of the same kind as SEQUENCE with the same elements
@@ -1868,10 +1882,10 @@
 ;;;; NSUBSTITUTE-IF, NSUBSTITUTE-IF-NOT
 
 (define-sequence-traverser nsubstitute-if
-    (new test sequence &key from-end start end count key)
+    (new pred sequence &key from-end start end count key)
   #!+sb-doc
   "Return a sequence of the same kind as SEQUENCE with the same elements
-   except that all elements satisfying the TEST are replaced with NEW. 
+   except that all elements satisfying the PRED are replaced with NEW. 
    SEQUENCE may be destructively modified. See manual for details."
   (declare (fixnum start))
   (let ((end (or end length)))
@@ -1880,14 +1894,14 @@
 	(if from-end
 	    (let ((length (length sequence)))
 	      (nreverse (nlist-substitute-if*
-			 new test (nreverse (the list sequence))
+			 new pred (nreverse (the list sequence))
 			 (- length end) (- length start) count key)))
-	    (nlist-substitute-if* new test sequence
+	    (nlist-substitute-if* new pred sequence
 				  start end count key))
 	(if from-end
-	    (nvector-substitute-if* new test sequence -1
+	    (nvector-substitute-if* new pred sequence -1
 				    (1- end) (1- start) count key)
-	    (nvector-substitute-if* new test sequence 1
+	    (nvector-substitute-if* new pred sequence 1
 				    start end count key)))))
 
 (defun nlist-substitute-if* (new test sequence start end count key)
@@ -1908,7 +1922,7 @@
       (setq count (1- count)))))
 
 (define-sequence-traverser nsubstitute-if-not
-    (new test sequence &key from-end start end count key)
+    (new pred sequence &key from-end start end count key)
   #!+sb-doc
   "Return a sequence of the same kind as SEQUENCE with the same elements
    except that all elements not satisfying the TEST are replaced with NEW.
@@ -1920,14 +1934,14 @@
 	(if from-end
 	    (let ((length (length sequence)))
 	      (nreverse (nlist-substitute-if-not*
-			 new test (nreverse (the list sequence))
+			 new pred (nreverse (the list sequence))
 			 (- length end) (- length start) count key)))
-	    (nlist-substitute-if-not* new test sequence
+	    (nlist-substitute-if-not* new pred sequence
 				      start end count key))
 	(if from-end
-	    (nvector-substitute-if-not* new test sequence -1
+	    (nvector-substitute-if-not* new pred sequence -1
 					(1- end) (1- start) count key)
-	    (nvector-substitute-if-not* new test sequence 1
+	    (nvector-substitute-if-not* new pred sequence 1
 					start end count key)))))
 
 (defun nlist-substitute-if-not* (new test sequence start end count key)
@@ -2059,22 +2073,22 @@
 
 ) ; EVAL-WHEN
 
-(define-sequence-traverser count-if (test sequence &key from-end start end key)
+(define-sequence-traverser count-if (pred sequence &key from-end start end key)
   #!+sb-doc
-  "Return the number of elements in SEQUENCE satisfying TEST(el)."
+  "Return the number of elements in SEQUENCE satisfying PRED(el)."
   (declare (fixnum start))
   (let ((end (or end length)))
     (declare (type index end))
     (seq-dispatch sequence
 		  (if from-end
-		      (list-count-if nil t test sequence)
-		      (list-count-if nil nil test sequence))
+		      (list-count-if nil t pred sequence)
+		      (list-count-if nil nil pred sequence))
 		  (if from-end
-		      (vector-count-if nil t test sequence)
-		      (vector-count-if nil nil test sequence)))))
+		      (vector-count-if nil t pred sequence)
+		      (vector-count-if nil nil pred sequence)))))
 
 (define-sequence-traverser count-if-not
-    (test sequence &key from-end start end key)
+    (pred sequence &key from-end start end key)
   #!+sb-doc
   "Return the number of elements in SEQUENCE not satisfying TEST(el)."
   (declare (fixnum start))
@@ -2082,11 +2096,11 @@
     (declare (type index end))
     (seq-dispatch sequence
 		  (if from-end
-		      (list-count-if t t test sequence)
-		      (list-count-if t nil test sequence))
+		      (list-count-if t t pred sequence)
+		      (list-count-if t nil pred sequence))
 		  (if from-end
-		      (vector-count-if t t test sequence)
-		      (vector-count-if t nil test sequence)))))
+		      (vector-count-if t t pred sequence)
+		      (vector-count-if t nil pred sequence)))))
 
 (define-sequence-traverser count
     (item sequence &key from-end start end
@@ -2192,7 +2206,7 @@
 
 (define-sequence-traverser mismatch
     (sequence1 sequence2
-	       &key from-end (test #'eql) test-not
+	       &key from-end test test-not
 	       start1 end1 start2 end2 key)
   #!+sb-doc
   "The specified subsequences of SEQUENCE1 and SEQUENCE2 are compared
@@ -2237,31 +2251,29 @@
   `(do ((main ,main (cdr main))
 	(jndex start1 (1+ jndex))
 	(sub (nthcdr start1 ,sub) (cdr sub)))
-       ((or (null main) (null sub) (= (the fixnum end1) jndex))
+       ((or (endp main) (endp sub) (<= end1 jndex))
 	t)
-     (declare (fixnum jndex))
+     (declare (type (integer 0) jndex))
      (compare-elements (car sub) (car main))))
 
 (sb!xc:defmacro search-compare-list-vector (main sub)
   `(do ((main ,main (cdr main))
 	(index start1 (1+ index)))
-       ((or (null main) (= index (the fixnum end1))) t)
-     (declare (fixnum index))
+       ((or (endp main) (= index end1)) t)
      (compare-elements (aref ,sub index) (car main))))
 
 (sb!xc:defmacro search-compare-vector-list (main sub index)
   `(do ((sub (nthcdr start1 ,sub) (cdr sub))
 	(jndex start1 (1+ jndex))
 	(index ,index (1+ index)))
-       ((or (= (the fixnum end1) jndex) (null sub)) t)
-     (declare (fixnum jndex index))
+       ((or (<= end1 jndex) (endp sub)) t)
+     (declare (type (integer 0) jndex))
      (compare-elements (car sub) (aref ,main index))))
 
 (sb!xc:defmacro search-compare-vector-vector (main sub index)
   `(do ((index ,index (1+ index))
 	(sub-index start1 (1+ sub-index)))
-       ((= sub-index (the fixnum end1)) t)
-     (declare (fixnum sub-index index))
+       ((= sub-index end1) t)
      (compare-elements (aref ,sub sub-index) (aref ,main index))))
 
 (sb!xc:defmacro search-compare (main-type main sub index)
@@ -2282,12 +2294,10 @@
 (sb!xc:defmacro list-search (main sub)
   `(do ((main (nthcdr start2 ,main) (cdr main))
 	(index2 start2 (1+ index2))
-	(terminus (- (the fixnum end2)
-		     (the fixnum (- (the fixnum end1)
-				    (the fixnum start1)))))
+	(terminus (- end2 (the (integer 0) (- end1 start1))))
 	(last-match ()))
        ((> index2 terminus) last-match)
-     (declare (fixnum index2 terminus))
+     (declare (type (integer 0) index2))
      (if (search-compare list main ,sub index2)
 	 (if from-end
 	     (setq last-match index2)
@@ -2295,12 +2305,10 @@
 
 (sb!xc:defmacro vector-search (main sub)
   `(do ((index2 start2 (1+ index2))
-	(terminus (- (the fixnum end2)
-		     (the fixnum (- (the fixnum end1)
-				    (the fixnum start1)))))
+	(terminus (- end2 (the (integer 0) (- end1 start1))))
 	(last-match ()))
        ((> index2 terminus) last-match)
-     (declare (fixnum index2 terminus))
+     (declare (type (integer 0) index2))
      (if (search-compare vector ,main ,sub index2)
 	 (if from-end
 	     (setq last-match index2)
@@ -2310,7 +2318,7 @@
 
 (define-sequence-traverser search
     (sequence1 sequence2
-	       &key from-end (test #'eql) test-not
+	       &key from-end test test-not
 	       start1 end1 start2 end2 key)
   (declare (fixnum start1 start2))
   (let ((end1 (or end1 length1))
