@@ -86,8 +86,7 @@
                   (type-specifier declared-ftype)
                   (type-specifier defined-ftype)))))
 	    (:defined
-	     (when global-p
-	       (setf (info :function :type source-name) defined-ftype))))))))
+	     (setf (info :function :type source-name) defined-ftype)))))))
   (values))
 
 ;;; Find all calls in COMPONENT to assumed functions and update the
