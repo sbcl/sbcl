@@ -103,7 +103,7 @@ Tests are in the file <tt>tests.lisp</tt> and also make good examples.
       (setf (elt buffer i) c))))
 
 ;;; these require that the echo services are turned on in inetd
-
+#+internet-available
 (deftest simple-tcp-client
     (let ((s (make-instance 'inet-socket :type :stream :protocol :tcp))
 	  (data (make-string 200)))
@@ -115,6 +115,7 @@ Tests are in the file <tt>tests.lisp</tt> and also make good examples.
 	  (> (length data) 0))))
   t)
 
+#+internet-available
 (deftest simple-udp-client
   (let ((s (make-instance 'inet-socket :type :datagram :protocol (get-protocol-by-name "udp")))
         (data (make-string 200)))
@@ -148,11 +149,13 @@ message.  Priority 7 is kern.debug; you'll probably want to look at
 
 ;;; these require that the internet (or bits of it, atleast) is available
 
+#+internet-available
 (deftest get-host-by-name
   (equalp (car (host-ent-addresses (get-host-by-name "a.root-servers.net")))
           #(198 41 0 4))
   t)
 
+#+internet-available
 (deftest get-host-by-address
     (host-ent-name (get-host-by-address #(198 41 0 4)))
   "a.root-servers.net")
@@ -172,6 +175,7 @@ message.  Priority 7 is kern.debug; you'll probably want to look at
       (format stream "~A HTTP/1.0~%~%" request))
     s))
 
+#+internet-available
 (deftest simple-http-client-1
     (handler-case
 	(let ((s (http-stream "ww.telent.net" 80 "HEAD /")))
@@ -185,6 +189,7 @@ message.  Priority 7 is kern.debug; you'll probably want to look at
   t)
 
 
+#+internet-available
 (deftest sockopt-receive-buffer
     ;; on Linux x86, the receive buffer size appears to be doubled in the
     ;; kernel: we set a size of x and then getsockopt() returns 2x.

@@ -24,8 +24,9 @@
     (princ (list filename output-file real-output-file
 		 tmp-c-source tmp-a-dot-out tmp-constants))
     (terpri)
-    (funcall (intern "C-CONSTANTS-EXTRACT" (find-package "BSD-SOCKETS-SYSTEM"))
-	     filename tmp-c-source :bsd-sockets-internal)
+    (funcall (intern "C-CONSTANTS-EXTRACT"
+		     (find-package "SB-BSD-SOCKETS-SYSTEM"))
+	     filename tmp-c-source :sb-bsd-sockets-internal)
     (and
      (= (run-shell-command
 	 "/usr/bin/gcc -o ~S ~S" (namestring tmp-a-dot-out)
@@ -91,7 +92,7 @@
       #+cmu (ext:load-foreign filename)
       #+sbcl (sb-alien:load-1-foreign filename))))
 
-(defsystem bsd-sockets
+(defsystem sb-bsd-sockets
     :version "0.58"
     :components ((:file "defpackage" :depends-on ("rt"))
 		 (:file "split" :depends-on ("defpackage"))
