@@ -1273,7 +1273,6 @@ Error in function C::GET-LAMBDA-TO-COMPILE:
   But other, non-#\Space values of INITIAL-ELEMENT work OK.
 
 
-
 KNOWN BUGS RELATED TO THE IR1 INTERPRETER
 
 (Now that the IR1 interpreter has gone away, these should be 

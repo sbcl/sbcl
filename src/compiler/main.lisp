@@ -1229,7 +1229,7 @@
   (aver (null (cdr lambdas)))
   (let* ((lambda (car lambdas))
 	 (component (block-component (node-block (lambda-bind lambda)))))
-    (when (eq (component-kind component) :top-level)
+    (when (eql (component-kind component) :top-level)
       (setf (component-name component) (leaf-name lambda))
       (compile-component component)
       (clear-ir1-info component))))

@@ -334,7 +334,6 @@
   ;; toplevel stub whose sole purpose was to return an :EXTERNAL
   ;; function.)
   ;;
-  ;;
   ;; The possibilities are:
   ;;   NIL
   ;;     an ordinary component, containing non-top-level code
@@ -350,6 +349,8 @@
   ;;     analysis has not been done
   ;;   :DELETED
   ;;     debris left over from component analysis
+  ;;
+  ;; See also COMPONENT-TOP-LEVELISH-P.
   (kind nil :type (member nil :top-level :complex-top-level :initial :deleted))
   ;; the blocks that are the dummy head and tail of the DFO
   ;;
@@ -406,6 +407,22 @@
 (defprinter (component :identity t)
   name
   (reanalyze :test reanalyze))
+
+;;; Before sbcl-0.7.0, there were :TOP-LEVEL things which were magical
+;;; in multiple ways. That's since been refactored into the orthogonal
+;;; properties "optimized for locall with no arguments" and "externally
+;;; visible/referenced (so don't delete it)". The code <0.7.0 did a lot
+;;; of tests a la (EQ KIND :TOP_LEVEL) in the "don't delete it?" sense;
+;;; this function is a sort of literal translation of those tests into
+;;; the new world.
+;;;
+;;; FIXME: After things settle down, bare :TOP-LEVEL might go away, at
+;;; which time it might be possible to replace the COMPONENT-KIND
+;;; :TOP-LEVEL mess with a flag COMPONENT-HAS-EXTERNAL-REFERENCES-P
+;;; along the lines of FUNCTIONAL-HAS-EXTERNAL-REFERENCES-P.
+(defun component-top-levelish-p (component)
+  (member (component-kind component)
+	  '(:top-level :complex-top-level)))
 
 ;;; A CLEANUP structure represents some dynamic binding action. Blocks
 ;;; are annotated with the current CLEANUP so that dynamic bindings

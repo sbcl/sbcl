@@ -99,8 +99,7 @@
 	     (dolist (ref (leaf-refs lambda))
 	       (let ((ref-component (block-component (node-block ref))))
 		 (cond ((eq ref-component component))
-		       ((or (not (member (component-kind ref-component)
-					 '(:top-level :complex-top-level)))
+		       ((or (not (component-top-levelish-p ref-component))
 			    closure)
 			(setq res t))
 		       (t
