@@ -25,4 +25,5 @@ extern void collect_garbage(unsigned last_gen);
 extern void set_auto_gc_trigger(os_vm_size_t usage);
 extern void clear_auto_gc_trigger(void);
 
+extern boolean maybe_gc_pending;
 #endif /* _GC_H_ */

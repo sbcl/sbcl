@@ -25,6 +25,8 @@
 #include "interr.h"
 #include "print.h"
 #include "lispregs.h"
+#include "genesis/static-symbols.h"
+#include "genesis/vector.h"
 
 /* the way that we shut down the system on a fatal error */
 
@@ -44,7 +46,7 @@ never_returns
 lose(char *fmt, ...)
 {
     va_list ap;
-    fprintf(stderr, "fatal error encountered in SBCL runtime system");
+    fprintf(stderr, "fatal error encountered in SBCL pid %d\n",getpid());
     if (fmt) {
 	fprintf(stderr, ":\n");
 	va_start(ap, fmt);

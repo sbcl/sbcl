@@ -21,6 +21,10 @@
 #include "globals.h"
 #include "alloc.h"
 #include "breakpoint.h"
+#include "genesis/code.h"
+#include "genesis/fdefn.h"
+#include "genesis/symbol.h"
+#include "genesis/static-symbols.h"
 
 #define REAL_LRA_SLOT 0
 #ifndef __i386__

@@ -33,6 +33,8 @@
 #include "arch.h"
 #include "interr.h"
 #include "sbcl.h"
+#include "genesis/symbol.h"
+#include "genesis/static-symbols.h"
 
 unsigned char build_id[] =
 #include "../../output/build-id.tmp"

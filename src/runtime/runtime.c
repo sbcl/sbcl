@@ -45,6 +45,10 @@
 #include "save.h"
 #include "lispregs.h"
 
+#include "genesis/static-symbols.h"
+#include "genesis/symbol.h"
+
+
 #ifdef irix
 #include <string.h>
 #include "interr.h"

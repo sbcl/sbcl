@@ -25,6 +25,9 @@
 #include "breakpoint.h"
 #include "monitor.h"
 
+#include "genesis/static-symbols.h"
+#include "genesis/symbol.h"
+
 #define BREAKPOINT_INST 0xcc	/* INT3 */
 
 unsigned long fast_random_state = 1;

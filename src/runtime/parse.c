@@ -30,6 +30,11 @@
 #include "arch.h"
 #include "search.h"
 
+#include "genesis/simple-fun.h"
+#include "genesis/fdefn.h"
+#include "genesis/symbol.h"
+#include "genesis/static-symbols.h"
+
 static void skip_ws(char **ptr)
 {
     while (**ptr <= ' ' && **ptr != '\0')
