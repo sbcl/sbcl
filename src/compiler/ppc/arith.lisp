@@ -18,7 +18,6 @@
   (:effects)
   (:affected))
 
-
 (define-vop (fixnum-unop fast-safe-arith-op)
   (:args (x :scs (any-reg)))
   (:results (res :scs (any-reg)))
@@ -52,8 +51,6 @@
   (:translate lognot)
   (:generator 1
     (inst not res x)))
-
-
 
 ;;;; Binary fixnum operations.
 
@@ -82,7 +79,6 @@
   (:results (r :scs (signed-reg)))
   (:result-types signed-num)
   (:note "inline (signed-byte 32) arithmetic"))
-
 
 (define-vop (fast-fixnum-binop-c fast-safe-arith-op)
   (:args (x :target r :scs (any-reg zero)))
@@ -272,7 +268,7 @@
 	 (inst cmpwi ndesc 31)
 	 (inst srw result number ndesc)
 	 (inst ble done)
-	 (inst srwi result number 31)
+	 (move result zero-tn)
 	 (inst b done)
 
 	 (emit-label positive)
@@ -280,14 +276,12 @@
 	 (inst slw result number amount)
 
 	 (emit-label done)))
-
       (immediate
        (let ((amount (tn-value amount)))
-	 (if (minusp amount)
-	     (let ((amount (min 31 (- amount))))
-	       (inst srwi result number amount))
-	     (inst slwi result number amount)))))))
-
+	 (cond
+	  ((and (minusp amount) (< amount -31)) (move result zero-tn))
+	  ((minusp amount) (inst srwi result number (- amount)))
+	  (t (inst slwi result number amount))))))))
 
 (define-vop (fast-ash/signed=>signed)
   (:note "inline ASH")

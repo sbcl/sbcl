@@ -2016,6 +2016,8 @@ changes in sbcl-0.8.4 relative to sbcl-0.8.3:
   * bug fix: ROUND and TRUNCATE could, under certain circumstances on
     the PPC platform, lead to stack corruption; this has been fixed.
     (reported by Rainer Joswig)
+  * bug fix: ASH on an (UNSIGNED-BYTE 32) with a shift of -32 or lower
+    no longer ever returns 1 instead of 0.  (thanks to Lars Brinkhoff)
   * optimization: restored some effective method precomputation in
     CLOS (turned off by an ANSI fix in sbcl-0.8.3); the amount of
     precomputation is now tunable.
