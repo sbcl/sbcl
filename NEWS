@@ -847,6 +847,10 @@ changes in sbcl-0.7.0 relative to sbcl-0.6.13:
              (print (aref possiblybigthings i) stream)))))
   should truncate the logical block only at 50 lines, instead of 
   often truncating it at 8 lines.
+* :SB-CONSTRAIN-FLOAT-TYPE, :SB-PROPAGATE-FLOAT-TYPE, and
+  :SB-PROPAGATE-FUN-TYPE are no longer considered to be optional
+  features. Instead, the code that they used to control is always
+  built into the system.
 ?? lots of tidying up internally: renaming things so that names are
   more systematic and consistent, converting C macros to inline
   functions, systematizing indentation

@@ -70,31 +70,6 @@
  ;; you are a developer.
  :sb-test
 
- ;; :SB-PROPAGATE-FLOAT-TYPE and :SB-PROPAGATE-FUN-TYPE enable
- ;; some numeric optimizer code in the target compiler. They 
- ;; correspond to the :PROPAGATE-FLOAT-TYPE and :PROPAGATE-FUN-TYPE
- ;; features in the original CMU CL code, and while documentation 
- ;; existed for those, it seemed a little inconsistent. Despite the
- ;; name, :SB-PROPAGATE-FLOAT-TYPE seems to control not only
- ;; floating point optimizations, but some integer optimizations as
- ;; well.
- ;; 
- ;; CROSS-FLOAT-INFINITY-KLUDGE:
- ;;   * Even when these target features are enabled, the optimizations 
- ;;     aren't enabled in the cross-compiler, because some of them
- ;;     depend on floating point infinities, which aren't in general
- ;;     supported on the cross-compilation host.
- ;;   * This is supported by hacking the features out of the 
- ;;     *SHEBANG-FEATURES* list while we're building the cross-compiler.
- ;;     This is ugly and confusing and weird, but all the alternatives
- ;;     that I could think of seem messy and error-prone. That doesn't
- ;;     mean there's not a better way, though. Suggestions are welcome;
- ;;     or if you'd like to submit patches to make this code work
- ;;     without requiring floating point infinities, so that the entire
- ;;     problem goes away, that might be even better! -- WHN 2001-03-22
- :sb-propagate-float-type
- :sb-propagate-fun-type
-
  ;; Make more debugging information available (for debugging SBCL
  ;; itself). If you aren't hacking or troubleshooting SBCL itself,
  ;; you probably don't want this set.

@@ -167,9 +167,9 @@
 		    `(,',fun ,x 1)))))
   (frob truncate)
   (frob round)
-  #!+sb-propagate-float-type
+  #-sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
   (frob floor)
-  #!+sb-propagate-float-type
+  #-sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
   (frob ceiling))
 
 (def-source-transform lognand (x y) `(lognot (logand ,x ,y)))
@@ -218,7 +218,7 @@
 ;;;; numeric-type has everything we want to know. Reason 2 wins for
 ;;;; now.
 
-#!+sb-propagate-float-type
+#-sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
 (progn
 
 ;;; The basic interval type. It can handle open and closed intervals.
@@ -771,7 +771,7 @@
 			     :high high))
 	(numeric-contagion x y))))
 
-#!+(or sb-propagate-float-type sb-propagate-fun-type)
+#-sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
 (progn
 
 ;;; simple utility to flatten a list
@@ -1165,7 +1165,7 @@
 
 ) ; PROGN
 
-#!-sb-propagate-float-type
+#+sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
 (progn
 (defoptimizer (+ derive-type) ((x y))
   (derive-integer-type
@@ -1216,7 +1216,7 @@
 
 ) ; PROGN
 
-#!+sb-propagate-float-type
+#-sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
 (progn
 (defun +-derive-type-aux (x y same-arg)
   (if (and (numeric-type-real-p x)
@@ -1356,7 +1356,7 @@
 ;;; and it's hard to avoid that calculation in here.
 #-(and cmu sb-xc-host)
 (progn
-#!-sb-propagate-fun-type
+#+sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
 (defoptimizer (ash derive-type) ((n shift))
   ;; Large resulting bounds are easy to generate but are not
   ;; particularly useful, so an open outer bound is returned for a
@@ -1439,7 +1439,7 @@
 					     :complexp :real)))))))))
       *universal-type*))
 
-#!+sb-propagate-fun-type
+#-sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
 (defun ash-derive-type-aux (n-type shift same-arg)
   (declare (ignore same-arg))
   (flet ((ash-outer (n s)
@@ -1472,12 +1472,12 @@
                                             (ash-outer n-high s-high))))))
 	*universal-type*)))
 
-#!+sb-propagate-fun-type
+#-sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
 (defoptimizer (ash derive-type) ((n shift))
   (two-arg-derive-type n shift #'ash-derive-type-aux #'ash))
 ) ; PROGN
 
-#!-sb-propagate-float-type
+#+sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
 (macrolet ((frob (fun)
 	     `#'(lambda (type type2)
 		  (declare (ignore type2))
@@ -1491,7 +1491,7 @@
   (defoptimizer (lognot derive-type) ((int))
     (derive-integer-type int int (frob lognot))))
 
-#!+sb-propagate-float-type
+#-sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
 (defoptimizer (lognot derive-type) ((int))
   (derive-integer-type int int
 		       (lambda (type type2)
@@ -1503,7 +1503,7 @@
 				   (numeric-type-class type)
 				   (numeric-type-format type))))))
 
-#!+sb-propagate-float-type
+#-sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
 (defoptimizer (%negate derive-type) ((num))
   (flet ((negate-bound (b)
            (and b
@@ -1517,7 +1517,7 @@
 			    :high (negate-bound (numeric-type-low type))))
 			 #'-)))
 
-#!-sb-propagate-float-type
+#+sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
 (defoptimizer (abs derive-type) ((num))
   (let ((type (continuation-type num)))
     (if (and (numeric-type-p type)
@@ -1537,7 +1537,7 @@
 				       nil)))
 	(numeric-contagion type type))))
 
-#!+sb-propagate-float-type
+#-sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
 (defun abs-derive-type-aux (type)
   (cond ((eq (numeric-type-complexp type) :complex)
 	 ;; The absolute value of a complex number is always a
@@ -1566,11 +1566,11 @@
 	    :high (coerce-numeric-bound
 		   (interval-high abs-bnd) bound-type))))))
 
-#!+sb-propagate-float-type
+#-sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
 (defoptimizer (abs derive-type) ((num))
   (one-arg-derive-type num #'abs-derive-type-aux #'abs))
 
-#!-sb-propagate-float-type
+#+sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
 (defoptimizer (truncate derive-type) ((number divisor))
   (let ((number-type (continuation-type number))
 	(divisor-type (continuation-type divisor))
@@ -1590,7 +1590,7 @@
 					      divisor-low divisor-high))))
 	*universal-type*)))
 
-#!+sb-propagate-float-type
+#-sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
 (progn
 
 (defun rem-result-type (number-type divisor-type)
@@ -2168,7 +2168,7 @@
 	     ;; anything about the result.
 	     `integer)))))
 
-#!-sb-propagate-float-type
+#+sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
 (defun integer-rem-derive-type
        (number-low number-high divisor-low divisor-high)
   (if (and divisor-low divisor-high)
@@ -2198,7 +2198,7 @@
 		     0
 		     '*))))
 
-#!-sb-propagate-float-type
+#+sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
 (defoptimizer (random derive-type) ((bound &optional state))
   (let ((type (continuation-type bound)))
     (when (numeric-type-p type)
@@ -2214,7 +2214,7 @@
 		     ((or (consp high) (zerop high)) high)
 		     (t `(,high))))))))
 
-#!+sb-propagate-float-type
+#-sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
 (defun random-derive-type-aux (type)
   (let ((class (numeric-type-class type))
 	(high (numeric-type-high type))
@@ -2228,7 +2228,7 @@
 		     ((or (consp high) (zerop high)) high)
 		     (t `(,high))))))
 
-#!+sb-propagate-float-type
+#-sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
 (defoptimizer (random derive-type) ((bound &optional state))
   (one-arg-derive-type bound #'random-derive-type-aux nil))
 
@@ -2247,7 +2247,7 @@
 		(or (null min) (minusp min))))
       (values nil t t)))
 
-#!-sb-propagate-fun-type
+#+sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
 (progn
 
 (defoptimizer (logand derive-type) ((x y))
@@ -2361,7 +2361,7 @@
 
 ) ; PROGN
 
-#!+sb-propagate-fun-type
+#-sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
 (progn
 
 (defun logand-derive-type-aux (x y &optional same-leaf)
@@ -3159,7 +3159,7 @@
 ;;;
 ;;; FIXME: Why should constant argument be second? It would be nice to
 ;;; find out and explain.
-#!-sb-propagate-float-type
+#+sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
 (defun ir1-transform-< (x y first second inverse)
   (if (same-leaf-ref-p x y)
       nil
@@ -3178,7 +3178,7 @@
 	       `(,inverse y x))
 	      (t
 	       (give-up-ir1-transform))))))
-#!+sb-propagate-float-type
+#-sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
 (defun ir1-transform-< (x y first second inverse)
   (if (same-leaf-ref-p x y)
       nil
@@ -3200,11 +3200,11 @@
 (deftransform > ((x y) (integer integer) * :when :both)
   (ir1-transform-< y x x y '<))
 
-#!+sb-propagate-float-type
+#-sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
 (deftransform < ((x y) (float float) * :when :both)
   (ir1-transform-< x y x y '>))
 
-#!+sb-propagate-float-type
+#-sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
 (deftransform > ((x y) (float float) * :when :both)
   (ir1-transform-< y x x y '<))
 

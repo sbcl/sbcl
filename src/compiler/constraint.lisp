@@ -266,18 +266,12 @@
 ;;; Exactly the same as CONSTRAIN-INTEGER-TYPE, but for float numbers.
 (defun constrain-float-type (x y greater or-equal)
   (declare (type numeric-type x y))
-  ;; FIXME: The comment here used to say
-  ;;   Unless #!+SB-PROPAGATE-FLOAT-TYPE, then SB!C::BOUND-VALUE (used in
-  ;;   the code below) is not defined, so we just return X without
-  ;;   trying to calculate additional constraints.
-  ;; But as of sbcl-0.6.11.26, SB!C::BOUND-VALUE has been renamed to
-  ;; SB!INT:TYPE-BOUND-NUMBER and is always defined, so probably the
-  ;; conditionalization should go away.
-  #!-sb-propagate-float-type (declare (ignore greater or-equal))
+  (declare (ignorable x y)) ; for CROSS-FLOAT-INFINITY-KLUDGE
   (aver (eql (numeric-type-class x) 'float))
   (aver (eql (numeric-type-class y) 'float))
-  #!-sb-propagate-float-type x
-  #!+sb-propagate-float-type
+  #+sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
+  x
+  #-sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
   (labels ((exclude (x)
 	     (cond ((not x) nil)
 		   (or-equal x)

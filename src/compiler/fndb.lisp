@@ -249,12 +249,12 @@
 (defknown lcm (&rest integer) unsigned-byte
   (movable foldable flushable explicit-check))
 
-#!-sb-propagate-fun-type
+#+sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
 (defknown exp (number) irrational
   (movable foldable flushable explicit-check recursive)
   :derive-type #'result-type-float-contagion)
 
-#!+sb-propagate-fun-type
+#-sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
 (defknown exp (number) irrational
   (movable foldable flushable explicit-check recursive))
 
@@ -272,7 +272,7 @@
 (defknown cis (real) (complex float)
   (movable foldable flushable explicit-check))
 
-#!-sb-propagate-fun-type
+#+sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
 (progn
 (defknown (sin cos) (number)
   (or (float -1.0 1.0) (complex float))
@@ -289,7 +289,7 @@
   :derive-type #'result-type-float-contagion)
 ) ; PROGN
 
-#!+sb-propagate-fun-type
+#-sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
 (progn
 (defknown (sin cos) (number)
   (or (float -1.0 1.0) (complex float))

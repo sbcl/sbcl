@@ -166,9 +166,43 @@
       '(%scalbn f ex)
       '(scale-double-float f ex)))
 
+;;; What is the CROSS-FLOAT-INFINITY-KLUDGE?
+;;;
+;;; SBCL's own implementation of floating point supports floating
+;;; point infinities. Some of the old CMU CL :PROPAGATE-FLOAT-TYPE and
+;;; :PROPAGATE-FUN-TYPE code, like the DEFOPTIMIZERs below, uses this
+;;; floating point support. Thus, we have to avoid running it on the
+;;; cross-compilation host, since we're not guaranteed that the
+;;; cross-compilation host will support floating point infinities.
+;;;
+;;; If we wanted to live dangerously, we could conditionalize the code
+;;; with #+(OR SBCL SB-XC) instead. That way, if the cross-compilation
+;;; host happened to be SBCL, we'd be able to run the infinity-using
+;;; code. Pro:
+;;;   * SBCL itself gets built with more complete optimization.
+;;; Con:
+;;;   * You get a different SBCL depending on what your cross-compilation
+;;;     host is.
+;;; So far the pros and cons seem seem to be mostly academic, since
+;;; AFAIK (WHN 2001-08-28) the propagate-foo-type optimizations aren't
+;;; actually important in compiling SBCL itself. If this changes, then
+;;; we have to decide:
+;;;   * Go for simplicity, leaving things as they are.
+;;;   * Go for performance at the expense of conceptual clarity,
+;;;     using #+(OR SBCL SB-XC) and otherwise leaving the build
+;;;     process as is.
+;;;   * Go for performance at the expense of build time, using
+;;;     #+(OR SBCL SB-XC) and also making SBCL do not just
+;;;     make-host-1.sh and make-host-2.sh, but a third step
+;;;     make-host-3.sh where it builds itself under itself. (Such a
+;;;     3-step build process could also help with other things, e.g.
+;;;     using specialized arrays to represent debug information.)
+;;;   * Rewrite the code so that it doesn't depend on unportable
+;;;     floating point infinities.
+
 ;;; optimizers for SCALE-FLOAT. If the float has bounds, new bounds
 ;;; are computed for the result, if possible.
-#!+sb-propagate-float-type
+#-sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
 (progn
 
 (defun scale-float-derive-type-aux (f ex same-arg)
@@ -278,7 +312,7 @@
 
 ;;; Derive the result to be float for argument types in the
 ;;; appropriate domain.
-#!-sb-propagate-fun-type
+#+sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
 (dolist (stuff '((asin (real -1.0 1.0))
 		 (acos (real -1.0 1.0))
 		 (acosh (real 1.0))
@@ -294,7 +328,7 @@
 			       type)
 		(specifier-type 'float)))))))
 
-#!-sb-propagate-fun-type
+#+sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
 (defoptimizer (log derive-type) ((x &optional y))
   (when (and (csubtypep (continuation-type x)
 			(specifier-type '(real 0.0)))
@@ -455,11 +489,7 @@
        (float pi x)
        (float 0 x)))
 
-;; #!+(or propagate-float-type propagate-fun-type)
-(progn
-
 ;;; The number is of type REAL.
-#!-sb-fluid (declaim (inline numeric-type-real-p))
 (defun numeric-type-real-p (type)
   (and (numeric-type-p type)
        (eq (numeric-type-complexp type) :real)))
@@ -472,9 +502,7 @@
 	(list (coerce (car bound) type))
 	(coerce bound type))))
 
-) ; PROGN
-
-#!+sb-propagate-fun-type
+#-sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
 (progn
 
 ;;;; optimizers for elementary functions
@@ -1009,7 +1037,7 @@
 			      :complexp :real
 			      :low (numeric-type-low type)
 			      :high (numeric-type-high type))))))
-#!+(or sb-propagate-fun-type sb-propagate-float-type)
+#-sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
 (defoptimizer (realpart derive-type) ((num))
   (one-arg-derive-type num #'realpart-derive-type-aux #'realpart))
 (defun imagpart-derive-type-aux (type)
@@ -1033,7 +1061,7 @@
 			      :complexp :real
 			      :low (numeric-type-low type)
 			      :high (numeric-type-high type))))))
-#!+(or sb-propagate-fun-type sb-propagate-float-type)
+#-sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
 (defoptimizer (imagpart derive-type) ((num))
   (one-arg-derive-type num #'imagpart-derive-type-aux #'imagpart))
 
@@ -1075,7 +1103,7 @@
 					     :complex))))
       (specifier-type 'complex)))
 
-#!+(or sb-propagate-fun-type sb-propagate-float-type)
+#-sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
 (defoptimizer (complex derive-type) ((re &optional im))
   (if im
       (two-arg-derive-type re im #'complex-derive-type-aux-2 #'complex)
@@ -1158,7 +1186,7 @@
 ;;; possible answer. This gets around the problem of doing range
 ;;; reduction correctly but still provides useful results when the
 ;;; inputs are union types.
-#!+sb-propagate-fun-type
+#-sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
 (progn
 (defun trig-derive-type-aux (arg domain fcn
 				 &optional def-lo def-hi (increasingp t))
