@@ -1206,21 +1206,7 @@ WORKAROUND:
   (see usage of CONTINUATION-ASSERTED-TYPE in USE-RESULT-CONSTRAINTS)
 
 234:
-  clocc-ansi-test :EXCEPSIT-LEGACY-1277 fails in sbcl-0.7.10.33
-
-  In sbcl-0.7.10.33 (but not ca. 0.7.10.29), 
-    (defclass foo54 () ())
-    (reinitialize-instance (make-instance 'foo54) :dummy 0)
-  does not signal an error. ANSI's definition of REINITIALIZE-INSTANCE
-  says
-    The system-supplied primary method for REINITIALIZE-INSTANCE signals
-    an error if an initarg is supplied that is not declared as valid.
-  and defines what that means in 
-    7.1.2 Declaring the Validity of Initialization Arguments
-  In effect, even though the signature shown for the REINITIALIZE-INSTANCE
-  gf in its ANSI definition page is &ALLOW-OTHER-KEYS, and that might
-  make it look as though anything goes, the gf+methods ensemble is required
-  to have more complicated &KEY-checking behavior than that.
+  (fixed in sbcl-0.7.10.36)
 
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:

@@ -287,8 +287,8 @@
     (or (and (not (structure-class-p class))
 	     (null (cdr make-instance-methods))
 	     (null (cdr allocate-instance-methods))
-	     (check-initargs-1 class (plist-keys (ctor-initargs ctor))
-			       (append ii-methods si-methods) nil nil)
+	     (null (check-initargs-1 class (plist-keys (ctor-initargs ctor))
+				     (append ii-methods si-methods) nil nil))
 	     (not (around-or-nonstandard-primary-method-p
 		   ii-methods *the-system-ii-method*))
 	     (not (around-or-nonstandard-primary-method-p
@@ -556,30 +556,38 @@
 ;;; *******************************
 
 (defun update-ctors (reason &key class name generic-function method)
-  (flet ((reset-class-ctors (class)
-	   (loop for ctor in (plist-value class 'ctors) do
-		   (install-initial-constructor ctor))))
+  (labels ((reset (class &optional ri-cache-p (ctorsp t))
+	     (when ctorsp
+	       (dolist (ctor (plist-value class 'ctors))
+		 (install-initial-constructor ctor)))
+	     (when ri-cache-p
+	       (setf (plist-value class 'ri-initargs) ()))
+	     (dolist (subclass (class-direct-subclasses class))
+	       (reset subclass ri-cache-p ctorsp))))
     (ecase reason
       ;;
       ;; CLASS must have been specified.
       (finalize-inheritance
-       (reset-class-ctors class))
+       (reset class t))
       ;;
       ;; NAME must have been specified.
       (setf-find-class
        (loop for ctor in *all-ctors*
 	     when (eq (ctor-class-name ctor) name) do
 	     (when (ctor-class ctor)
-	       (reset-class-ctors (ctor-class ctor)))
+	       (reset (ctor-class ctor)))
 	     (loop-finish)))
       ;;
       ;; GENERIC-FUNCTION and METHOD must have been specified.
       ((add-method remove-method)
-       (case (generic-function-name generic-function)
-	 ((make-instance allocate-instance initialize-instance
-			 shared-initialize)
-	  (let ((type (first (method-specializers method))))
-	    (reset-class-ctors (type-class type)))))))))
+       (flet ((class-of-1st-method-param (method)
+		(type-class (first (method-specializers method)))))
+	 (case (generic-function-name generic-function)
+	   ((make-instance allocate-instance
+	     initialize-instance shared-initialize)
+	    (reset (class-of-1st-method-param method) t t))
+	   ((reinitialize-instance)
+	    (reset (class-of-1st-method-param method) t nil))))))))
 
 (defun precompile-ctors ()
   (dolist (ctor *all-ctors*)
@@ -587,5 +595,28 @@
       (let ((class (find-class (ctor-class-name ctor) nil)))
 	(when (and class (class-finalized-p class))
 	  (install-optimized-constructor ctor))))))
+
+(defun check-ri-initargs (instance initargs)
+  (let* ((class (class-of instance))
+	 (keys (plist-keys initargs))
+	 (cached (assoc keys (plist-value class 'ri-initargs)
+			:test #'equal))
+	 (invalid-keys
+	  (if (consp cached)
+	      (cdr cached)
+	      (let ((invalid
+		     ;; FIXME: give CHECK-INITARGS-1 and friends a
+		     ;; more mnemonic name and (possibly) a nicer,
+		     ;; more orthogonal interface.
+		     (check-initargs-1
+		      class initargs
+		      (list (list* 'reinitialize-instance instance initargs)
+			    (list* 'shared-initialize instance nil initargs))
+		      t nil)))
+		(setf (plist-value class 'ri-initargs)
+		      (acons keys invalid cached))
+		invalid))))
+    (when invalid-keys
+      (error 'initarg-error :class class :initargs invalid-keys))))
 
 ;;; end of ctor.lisp

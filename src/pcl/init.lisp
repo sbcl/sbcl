@@ -62,6 +62,9 @@
   (apply #'shared-initialize instance t initargs))
 
 (defmethod reinitialize-instance ((instance slot-object) &rest initargs)
+  ;; the ctor machinery allows us to track when memoization of
+  ;; validity of initargs should be cleared.
+  (check-ri-initargs instance initargs)
   (apply #'shared-initialize instance nil initargs)
   instance)
 
@@ -171,29 +174,37 @@
 	(setq legal (append keys legal))))
     (values legal nil)))
 
+(define-condition initarg-error (program-error)
+  ((class :reader initarg-error-class :initarg :class)
+   (initargs :reader initarg-error-initargs :initarg :initargs))
+  (:report (lambda (condition stream)
+	     (format stream "~@<Invalid initialization argument~P:~2I~_~
+                             ~<~{~S~^, ~}~@:>~I~_in call for class ~S.~:>"
+		     (length (initarg-error-initargs condition))
+		     (list (initarg-error-initargs condition))
+		     (initarg-error-class condition)))))
+
 (defun check-initargs-2-plist (initargs class legal &optional (error-p t))
-  (unless (getf initargs :allow-other-keys)
-    ;; Now check the supplied-initarg-names and the default initargs
-    ;; against the total set that we know are legal.
-    (doplist (key val) initargs
-      (unless (memq key legal)
-	(if error-p
-	    (error 'simple-program-error
-		   :format-control "Invalid initialization argument ~S for class ~S"
-		   :format-arguments (list key (class-name class)))
-	    (return-from check-initargs-2-plist nil)))))
-  t)
+  (let ((invalid-keys ()))
+    (unless (getf initargs :allow-other-keys)
+      ;; Now check the supplied-initarg-names and the default initargs
+      ;; against the total set that we know are legal.
+      (doplist (key val) initargs
+	(unless (memq key legal)
+	  (push key invalid-keys)))
+      (when (and invalid-keys error-p)
+	(error 'initarg-error :class class :initargs invalid-keys)))
+    invalid-keys))
 
 (defun check-initargs-2-list (initkeys class legal &optional (error-p t))
-  (unless (memq :allow-other-keys initkeys)
-    ;; Now check the supplied-initarg-names and the default initargs
-    ;; against the total set that we know are legal.
-    (dolist (key initkeys)
-      (unless (memq key legal)
-	(if error-p
-	    (error 'simple-program-error
-		   :format-control "Invalid initialization argument ~S for class ~S"
-		   :format-arguments (list key (class-name class)))
-	    (return-from check-initargs-2-list nil)))))
-  t)
+  (let ((invalid-keys ()))
+    (unless (memq :allow-other-keys initkeys)
+      ;; Now check the supplied-initarg-names and the default initargs
+      ;; against the total set that we know are legal.
+      (dolist (key initkeys)
+	(unless (memq key legal)
+	  (push key invalid-keys)))
+      (when (and invalid-keys error-p)
+	(error 'initarg-error :class class :initargs invalid-keys)))
+    invalid-keys))
 

@@ -11,9 +11,11 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-(defpackage "FOO"
-  (:use "CL"))
-(in-package "FOO")
+(load "assertoid.lisp")
+
+(defpackage "CLOS-IMPURE"
+  (:use "CL" "ASSERTOID"))
+(in-package "CLOS-IMPURE")
 
 ;;; It should be possible to do DEFGENERIC and DEFMETHOD referring to
 ;;; structure types defined earlier in the file.
@@ -517,6 +519,39 @@
   (assert (= (bug222-b t x) 3))
   ;; specified.
   (assert (char= (char (get-output-stream-string x) 0) #\1)))
+
+;;; REINITIALIZE-INSTANCE, in the ctor optimization, wasn't checking
+;;; for invalid initargs where it should:
+(defclass class234 () ())
+(defclass subclass234 (class234) ())
+(defvar *bug234* 0)
+(defun bug-234 ()
+  (reinitialize-instance (make-instance 'class234) :dummy 0))
+(defun subbug-234 ()
+  (reinitialize-instance (make-instance 'subclass234) :dummy 0))
+(assert (raises-error? (bug-234) program-error))
+(defmethod shared-initialize :after ((i class234) slots &key dummy)
+  (incf *bug234*))
+(assert (typep (subbug-234) 'subclass234))
+(assert (= *bug234*
+	   ;; once for MAKE-INSTANCE, once for REINITIALIZE-INSTANCE
+	   2))
+
+;;; also, some combinations of MAKE-INSTANCE and subclassing missed
+;;; new methods (Gerd Moellmann sbcl-devel 2002-12-29):
+(defclass class234-b1 () ())
+(defclass class234-b2 (class234-b1) ())
+(defvar *bug234-b* 0)
+(defun bug234-b ()
+  (make-instance 'class234-b2))
+(compile 'bug234-b)
+(bug234-b)
+(assert (= *bug234-b* 0))
+(defmethod initialize-instance :before ((x class234-b1) &rest args)
+  (declare (ignore args))
+  (incf *bug234-b*))
+(bug234-b)
+(assert (= *bug234-b* 1))
 
 ;;;; success
 (sb-ext:quit :unix-status 104)

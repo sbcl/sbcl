@@ -822,7 +822,7 @@
 
 (defknown adjust-array
   (array (or index list) &key (:element-type type-specifier)
-	 (:initial-element t) (:initial-contents list)
+	 (:initial-element t) (:initial-contents t)
 	 (:fill-pointer t) (:displaced-to (or array null))
 	 (:displaced-index-offset index))
   array (unsafe))
