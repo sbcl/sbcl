@@ -119,3 +119,20 @@
 (assert (equal (remove 1 '(1 2 3 1) :count 1) '(2 3 1)))
 (assert (equal (remove 1 '(1 2 3 1) :count (* 2 most-positive-fixnum)) '(2 3)))
 (assert (equal (remove 1 '(1 2 3 1) :count (* -2 most-positive-fixnum)) '(1 2 3 1)))
+
+;;; bug reported by Wolfgang Jenkner on sbcl-devel 2003-01-04:
+;;; embedded calls of SORT do not work
+(assert (equal (sort (list 0 0 0) (lambda (x y) (sort (list 0 0 0) #'<) nil))
+               '(0 0 0)))
+(assert (equal (sort (list 0 0 0 0 0)
+                     (lambda (x y)
+                       (declare (ignore x y))
+                       (block compare
+                         (sort (make-list 11 :initial-element 1)
+                               (let ((counter 7))
+                                 (lambda (x y)
+                                   (declare (ignore x y))
+                                   (when (= (decf counter) 0)
+                                     (return-from compare nil))
+                                   t))))))
+               '(0 0 0 0 0)))

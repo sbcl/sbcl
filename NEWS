@@ -1485,6 +1485,8 @@ changes in sbcl-0.7.11 relative to sbcl-0.7.10:
 
 changes in sbcl-0.7.12 relative to sbcl-0.7.11:
   * fixed bug 62: constraints were not propagated into a loop.
+  * fixed bug in embedded calls of SORT (reported and investigated by
+    Wolfgang Jenkner).
 
 planned incompatible changes in 0.7.x:
   * (not done yet, but planned:) When the profiling interface settles

@@ -140,25 +140,28 @@
 ;;; list, elements of list-2 are guaranteed to come after equal elements
 ;;; of list-1.
 (defun merge-lists* (list-1 list-2 pred key)
-  (do* ((result *merge-lists-header*)
-	(P result))		     ; points to last cell of result
-       ((or (null list-1) (null list-2)) ; done when either list used up
-	(if (null list-1)	       ; in which case, append the
-	    (rplacd p list-2)	   ;   other list
-	    (rplacd p list-1))
-	(do ((drag p lead)
-	     (lead (cdr p) (cdr lead)))
-	    ((null lead)
-	     (values (prog1 (cdr result) ; Return the result sans header
-			    (rplacd result nil)) ; (free memory, be careful)
-		     drag))))	   ;   and return pointer to last element.
-    (cond ((apply-pred (car list-2) (car list-1) pred key)
-	   (rplacd p list-2)	   ; Append the lesser list to last cell of
-	   (setq p (cdr p))	    ;   result. Note: test must be done for
-	   (pop list-2))	       ;   LIST-2 < LIST-1 so merge will be
-	  (T (rplacd p list-1)	 ;   stable for LIST-1.
-	     (setq p (cdr p))
-	     (pop list-1)))))
+  (let* ((result *merge-lists-header*)
+         (merge-lists-trailer (cdr *merge-lists-header*)))
+    (unwind-protect
+         (do ((P result))             ; points to last cell of result
+             ((or (null list-1) (null list-2)) ; done when either list used up
+              (if (null list-1)        ; in which case, append the
+                  (rplacd p list-2)    ;   other list
+                  (rplacd p list-1))
+              (do ((drag p lead)
+                   (lead (cdr p) (cdr lead)))
+                  ((null lead)
+                   (values (cdr result) ; Return the result sans header
+                           drag)))) ; and return pointer to last element.
+           (cond ((apply-pred (car list-2) (car list-1) pred key)
+                  (rplacd p list-2) ; Append the lesser list to last cell of
+                  (setq p (cdr p)) ; result. Note: test must be done for
+                  (pop list-2))     ; LIST-2 < LIST-1 so merge will be
+                 (T (rplacd p list-1)   ; stable for LIST-1.
+                    (setq p (cdr p))
+                    (pop list-1))))
+      (setf (cdr result) merge-lists-trailer) ; (free memory, be careful)
+      )))
 
 ;;; stable sort of vectors
 
