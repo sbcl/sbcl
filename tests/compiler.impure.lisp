@@ -702,6 +702,24 @@ BUG 48c, not yet fixed:
 (do-optimizations
   (compile nil '(lambda (x) (let ((y (error ""))) (list x y)))))
 
+;;; bug 223: invalid moving of global function name referencing
+(defun bug223-int (n)
+  `(int ,n))
+
+(defun bug223-wrap ()
+  (let ((old #'bug223-int))
+    (setf (fdefinition 'bug223-int)
+          (lambda (n)
+            (assert (> n 0))
+            `(ext ,@(funcall old (1- n)))))))
+(compile 'bug223-wrap)
+
+(assert (equal (bug223-int 4) '(int 4)))
+(bug223-wrap)
+(assert (equal (bug223-int 4) '(ext int 3)))
+(bug223-wrap)
+(assert (equal (bug223-int 4) '(ext ext int 2)))
+
 
 ;;;; tests not in the problem domain, but of the consistency of the
 ;;;; compiler machinery itself

@@ -702,8 +702,7 @@
   (sets () :type list))
 
 ;;; The GLOBAL-VAR structure represents a value hung off of the symbol
-;;; NAME. We use a :CONSTANT VAR when we know that the thing is a
-;;; constant, but don't know what the value is at compile time.
+;;; NAME.
 (def!struct (global-var (:include basic-var))
   ;; kind of variable described
   (kind (missing-arg)
