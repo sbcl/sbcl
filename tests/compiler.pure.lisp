@@ -704,3 +704,33 @@
                          (declare (type (integer 4303063 101130078) a))
                          (mask-field (byte 18 2) (ash a 77))))
               57132532)))
+
+;;; MISC.101 and MISC.103: FLUSH-DEST did not mark the USE's block for
+;;; type check regeneration
+(assert (eql (funcall
+              (compile nil '(lambda (a c)
+                             (declare (type (integer 185501219873 303014665162) a))
+                             (declare (type (integer -160758 255724) c))
+                             (declare (optimize (speed 3)))
+                             (let ((v8
+                                    (- -554046873252388011622614991634432
+                                       (ignore-errors c)
+                                       (unwind-protect 2791485))))
+                               (max (ignore-errors a)
+                                    (let ((v6 (- v8 (restart-case 980))))
+                                      (min v8 v6))))))
+              259448422916 173715)
+             259448422916))
+(assert (eql (funcall
+              (compile nil '(lambda (a b)
+                             (min -80
+                              (abs
+                               (ignore-errors
+                                 (+
+                                  (logeqv b
+                                          (block b6
+                                            (return-from b6
+                                              (load-time-value -6876935))))
+                                  (if (logbitp 1 a) b (setq a -1522022182249))))))))
+              -1802767029877 -12374959963)
+             -80))

@@ -2180,6 +2180,7 @@ changes in sbcl-0.8.6 relative to sbcl-0.8.5:
        constant 0.
     ** implementation of ASH-MOD32 on X86 did not work for the shift
        greater than 32.
+    ** FLUSH-DEST did not mark blocks for type check regeneration.
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles
