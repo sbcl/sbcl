@@ -1,6 +1,8 @@
 changes in sbcl-0.8.18 relative to sbcl-0.8.17:
   * new feature: reloading changed shared object files with
     LOAD-SHARED-OBJECT now causes the new definitions to take effect.
+  * fixed bug #331: structure-class instances corresponding to
+    DEFSTRUCT forms are now created eagerly.
 
 changes in sbcl-0.8.17 relative to sbcl-0.8.16:
   * new feature: a build-time option (controlled by the :SB-UNICODE

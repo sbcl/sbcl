@@ -376,6 +376,13 @@
 (defclass tomato () ())
 (assert (null (sb-mop:class-direct-subclasses (find-class 'vegetable))))
 
+;;; bug 331: lazy creation of clos classes for defstructs
+(defstruct bug-331-super)
+(defstruct (bug-331-sub (:include bug-331-super)))
+(let ((subs (sb-mop:class-direct-subclasses (find-class 'bug-331-super))))
+  (assert (= 1 (length subs)))
+  (assert (eq (car subs) (find-class 'bug-331-sub))))
+
 
 ;;;; success
 (sb-ext:quit :unix-status 104)

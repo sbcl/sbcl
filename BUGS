@@ -1305,12 +1305,6 @@ WORKAROUND:
      in the wrapper, and then to update the instance just run through
      all the old wrappers in order from oldest to newest.
 
-331: "lazy creation of CLOS classes for user-defined conditions"
-    (defstruct foo)
-    (defstruct (bar (:include foo)))
-    (sb-mop:class-direct-subclasses (find-class 'foo))
-  returns NIL, rather than a singleton list containing the BAR class.
-
 332: "fasl stack inconsistency in structure redefinition"
   (reported by Tim Daly Jr sbcl-devel 2004-05-06)
   Even though structure redefinition is undefined by the standard, the
