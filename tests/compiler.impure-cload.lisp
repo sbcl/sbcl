@@ -361,6 +361,19 @@
   (assert (= (length list) 8))
   (assert (null (nth 7 list))))
 
+;;; failed on Alpha prior to sbcl-0.8.10.30
+(defun lotso-values ()
+  (values 0 1 2 3 4 5 6 7 8 9
+	  0 1 2 3 4 5 6 7 8 9
+	  0 1 2 3 4 5 6 7 8 9
+	  0 1 2 3 4 5 6 7 8 9
+	  0 1 2 3 4 5 6 7 8 9
+	  0 1 2 3 4 5 6 7 8 9
+	  0 1 2 3 4 5 6 7 8 9
+	  0 1 2 3 4 5 6 7 8 9
+	  0 1 2 3 4 5 6 7 8 9
+	  0 1 2 3 4 5 6 7 8 9))
+
 ;;; bug 313: source transforms were "lisp-1"
 (defun srctran-lisp1-1 (cadr) (if (functionp cadr) (funcall cadr 1) nil))
 (assert (eql (funcall (eval #'srctran-lisp1-1) #'identity) 1))

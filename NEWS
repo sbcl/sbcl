@@ -2453,6 +2453,9 @@ changes in sbcl-0.8.11 relative to sbcl-0.8.10:
     ** SXHASH is specified (infelicitously) to respect similarity,
        which means that (SXHASH 0.0) must equal (SXHASH -0.0).  Make
        it so.  (thanks to Markus Ziegler)
+    ** on the Alpha, the compiler succeeds in compiling functions
+       returning a known number of arguments greater than 63.
+
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles

@@ -946,7 +946,12 @@ default-value-8
     ;; restore the frame pointer and clear as much of the control
     ;; stack as possible.
     (move ocfp cfp-tn)
-    (inst addq val-ptr (* nvals n-word-bytes) csp-tn)
+    ;; ADDQ only accepts immediates of type (UNSIGNED-BYTE 8).  Here,
+    ;; instead of adding (* NVALS N-WORD-BYTES), we use NARGS that
+    ;; we've carefully set up, but protect ourselves by averring that
+    ;; FIXNUMIZEation and multiplication by N-WORD-BYTES is the same.
+    (aver (= (* nvals n-word-bytes) (fixnumize nvals)))
+    (inst addq val-ptr nargs csp-tn)
     ;; pre-default any argument register that need it.
     (when (< nvals register-arg-count)
       (dolist (reg (subseq (list a0 a1 a2 a3 a4 a5) nvals))
