@@ -24,9 +24,9 @@
 
 ;;;; implementation-dependent DEFTYPEs
 
-;;; Make DOUBLE-FLOAT a synonym for LONG-FLOAT, SINGLE-FLOAT for SHORT-FLOAT.
-;;; This is expanded before the translator gets a chance, so we will get
-;;; precedence.
+;;; Make DOUBLE-FLOAT a synonym for LONG-FLOAT, SINGLE-FLOAT for
+;;; SHORT-FLOAT. This is expanded before the translator gets a chance,
+;;; so we will get precedence.
 #!-long-float
 (setf (info :type :kind 'long-float) :defined)
 #!-long-float

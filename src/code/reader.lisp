@@ -178,7 +178,7 @@
   FROM-TABLE defaults to the standard Lisp readtable when NIL."
   (let ((really-from-readtable (or from-readtable *standard-readtable*)))
     ;; Copy FROM-CHAR entries to TO-CHAR entries, but make sure that if
-    ;; from char is a constituent you don't copy non-movable secondary
+    ;; FROM-CHAR is a constituent you don't copy non-movable secondary
     ;; attributes (constituent types), and that said attributes magically
     ;; appear if you transform a non-constituent to a constituent.
     (let ((att (get-cat-entry from-char really-from-readtable)))
@@ -203,7 +203,7 @@
         (set-cat-entry char (get-secondary-attribute char) rt)
         (set-cat-entry char +char-attr-terminating-macro+ rt))
     (set-cmt-entry char function rt)
-    T))
+    t))
 
 (defun get-macro-character (char &optional (rt *readtable*))
   #!+sb-doc
@@ -1172,7 +1172,7 @@
 		((not dig)
 		 (setq exponent (if negative-exponent (- exponent) exponent)))
 	     (setq exponent (+ (* exponent 10) dig)))
-	   ;; Generate and return the float, depending on float-char:
+	   ;; Generate and return the float, depending on FLOAT-CHAR:
 	   (let* ((float-format (case (char-upcase float-char)
 				  (#\E *read-default-float-format*)
 				  (#\S 'short-float)

@@ -24,7 +24,7 @@
 (defstruct (hairy-type (:include ctype
 				 (class-info (type-class-or-lose 'hairy))
 				 (enumerable t)
-				 (might-contain-other-types? t))
+				 (might-contain-other-types-p t))
 		       (:copier nil)
 		       #!+cmu (:pure nil))
   ;; the Common Lisp type-specifier of the type we represent
@@ -232,7 +232,7 @@
 ;;; A COMPOUND-TYPE is a type defined out of a set of types, the
 ;;; common parent of UNION-TYPE and INTERSECTION-TYPE.
 (defstruct (compound-type (:include ctype
-				    (might-contain-other-types? t))
+				    (might-contain-other-types-p t))
 			  (:constructor nil)
 			  (:copier nil))
   (types nil :type list :read-only t))

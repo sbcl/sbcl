@@ -38,7 +38,7 @@ done
 # Within all directories, remove things which don't look like source
 # files. Some explanations:
 #   (symlinks)
-#     are never in the sources; they must've been created
+#     are never in the sources, so must've been created
 #   sbcl
 #     the runtime environment, created by compiling C code
 #   sbcl.h 
@@ -55,22 +55,27 @@ done
 #   *.core, *.map
 #     looks like SBCL SAVE-LISP-AND-DIE or GENESIS output, and
 #     certainly not source
-#   *~, #*#, TAGS
+#   *~, #*#
 #     common names for editor temporary files
-#   .#*
+#   TAGS, tags
+#     files created by GNU etags and ctags
+#   .#*, *.orig, .*.orig
 #     rubbish left behind by CVS updates
 #   *.htm, *.html
 #     The system doc sources are SGML, any HTML is
 #     automatically-generated output.
 #   depend
 #     made by "make depend" (or "gmake depend" or some such thing)
-#   *.x86f, *.axpf, *.lbytef, *.fasl
-#     typical extensions for fasl files
+#   *.lisp-obj, *.fasl, *.x86f, *.axpf, *.lbytef, *.lib
+#     typical extensions for fasl files (not just from SBCL, but
+#     from other Lisp systems which might be used as xc hosts)
 find . \( \
 	-type l -o \
 	-name '*~' -o \
 	-name '#*#' -o \
 	-name '.#*' -o \
+	-name '*.orig' -o \
+	-name '.*.orig' -o \
 	-name '?*.x86f' -o \
 	-name '?*.axpf' -o \
 	-name '?*.lbytef' -o \
@@ -91,4 +96,5 @@ find . \( \
 	-name '*.htm' -o \
 	-name '*.html' -o \
 	-name 'TAGS' -o \
+	-name 'tags' -o \
 	-name 'local-target-features.lisp-expr' \) -print | xargs rm -f

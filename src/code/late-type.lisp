@@ -68,7 +68,7 @@
 (defun !has-superclasses-complex-subtypep-arg1 (type1 type2 info)
   ;; If TYPE2 might be concealing something related to our class
   ;; hierarchy
-  (if (type-might-contain-other-types? type2)
+  (if (type-might-contain-other-types-p type2)
       ;; too confusing, gotta punt 
       (values nil nil)
       ;; ordinary case expected by old CMU CL code, where the taxonomy
@@ -929,7 +929,7 @@
   (cond ((eq type1 *empty-type*)
 	 t)
 	(;; When TYPE2 might be the universal type in disguise
-	 (type-might-contain-other-types? type2)
+	 (type-might-contain-other-types-p type2)
 	 ;; Now that the UNION and HAIRY COMPLEX-SUBTYPEP-ARG2 methods
 	 ;; can delegate to us (more or less as CALL-NEXT-METHOD) when
 	 ;; they're uncertain, we can't just barf on COMPOUND-TYPE and
@@ -1054,8 +1054,8 @@
 		;; changes in internal representation in the type
 		;; system could make it start confidently returning
 		;; incorrect results.) -- WHN 2002-03-08
-		(unless (or (type-might-contain-other-types? complement-type1)
-			    (type-might-contain-other-types? type2))
+		(unless (or (type-might-contain-other-types-p complement-type1)
+			    (type-might-contain-other-types-p type2))
 		  ;; Because of the way our types which don't contain
 		  ;; other types are disjoint subsets of the space of
 		  ;; possible values, (SUBTYPEP '(NOT AA) 'B)=NIL when

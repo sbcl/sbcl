@@ -1,3 +1,5 @@
+GENERAL INFORMATION
+
 Welcome to SBCL.
 
 To find out more about who created the system, see the "CREDITS" file.
@@ -20,3 +22,16 @@ If you'd like to make suggestions, report a bug, or help to improve the
 system, please send mail to one of the mailing lists:
   sbcl-help@lists.sourceforge.net
   sbcl-devel@lists.sourceforge.net
+
+
+SYSTEM-SPECIFIC HINTS
+
+for OpenBSD:
+  It's reported for CMU CL (by Darren Bane on the comp.lang.lisp newsgroup,
+  2002-04-22) that OpenBSD 3.0 has stricter ulimit values, and/or enforces
+  them more strictly, than its predecessors, and so CMU CL's initial mmap()
+  won't work unless you increase the limit on the data segment, e.g. with
+    ulimit -S -d 524288
+  before you run CMU CL. The same is probably true of SBCL, but hasn't been
+  tested yet. (As of sbcl-0.7.3, SBCL has only been tested on OpenBSD 2.9
+  and earlier.)
