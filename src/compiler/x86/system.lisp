@@ -214,9 +214,6 @@
 		   :disp (- function-pointer-type other-pointer-type)))
     (inst add func code)))
 
-;;; REMOVEME
-(defknown %function-self (function) function (flushable))
-
 (define-vop (%function-self)
   (:policy :fast-safe)
   (:translate %function-self)
@@ -237,9 +234,6 @@
 
 (def-source-transform %funcallable-instance-function (fin)
   `(%function-self ,fin))
-
-;;; REMOVEME
-(defknown (setf %function-self) (function function) function  (unsafe))
 
 (define-vop (%set-function-self)
   (:policy :fast-safe)

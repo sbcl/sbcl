@@ -1331,23 +1331,3 @@
   ())
 (defknown %setnth (index list t) t (unsafe))
 (defknown %set-fill-pointer (vector index) index (unsafe))
-
-;;;; internal type predicates
-
-;;; Simple TYPEP uses that don't have any standard predicate are
-;;; translated into non-standard unary predicates.
-(defknown (fixnump bignump ratiop short-float-p single-float-p double-float-p
-	   long-float-p base-char-p %standard-char-p %instancep
-	   array-header-p)
-  (t) boolean (movable foldable flushable))
-
-;;; REMOVEME
-#|
-
-;;;; miscellaneous "sub-primitives"
-
-(defknown %sp-string-compare
-  (simple-string index index simple-string index index)
-  (or index null)
-  (foldable flushable))
-|#

@@ -139,7 +139,24 @@
 (define-primitive-object (function :type function
 				   :lowtag function-pointer-type
 				   :header function-header-type)
-  #!-gengc (self :ref-trans %function-self :set-trans (setf %function-self))
+  #!-(or gengc x86) (self :ref-trans %function-self
+			  :set-trans (setf %function-self))
+  #!+x86 (self
+	  ;; KLUDGE: There's no :SET-KNOWN, :SET-TRANS, :REF-KNOWN, or
+	  ;; :REF-TRANS here in this case. Instead, there's separate
+	  ;; DEFKNOWN/DEFINE-VOP/DEFTRANSFORM stuff in
+	  ;; compiler/x86/system.lisp to define and declare them by
+	  ;; hand. I don't know why this is, but that's (basically)
+	  ;; the way it was done in CMU CL, and it works. (It's not
+	  ;; exactly the same way it was done in CMU CL in that CMU
+	  ;; CL's allows duplicate DEFKNOWNs, blithely overwriting any
+	  ;; previous data associated with the previous DEFKNOWN, and
+	  ;; that property was used to mask the definitions here. In
+	  ;; SBCL as of 0.6.12.64 that's not allowed -- too confusing!
+	  ;; -- so we have to explicitly suppress the DEFKNOWNish
+	  ;; stuff here in order to allow this old hack to work in the
+	  ;; new world. -- WHN 2001-08-82
+	  )
   #!+gengc (entry-point :c-type "char *")
   (next :type (or function null)
 	:ref-known (flushable)
