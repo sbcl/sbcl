@@ -1897,23 +1897,10 @@
 
 ;;;; FIND, POSITION, and their -IF and -IF-NOT variants
 
-;;; logic to unravel :TEST, :TEST-NOT, and :KEY options in FIND,
-;;; POSITION-IF, etc.
-(declaim (inline effective-find-position-test effective-find-position-key))
 (defun effective-find-position-test (test test-not)
-  (cond ((and test test-not)
-	 (error "can't specify both :TEST and :TEST-NOT"))
-	(test (%coerce-callable-to-fun test))
-	(test-not
-	 ;; (Without DYNAMIC-EXTENT, this is potentially horribly
-	 ;; inefficient, but since the TEST-NOT option is deprecated
-	 ;; anyway, we don't care.)
-	 (complement (%coerce-callable-to-fun test-not)))
-	(t #'eql)))
+  (effective-find-position-test test test-not))
 (defun effective-find-position-key (key)
-  (if key
-      (%coerce-callable-to-fun key)
-      #'identity))
+  (effective-find-position-key key))
 
 ;;; shared guts of out-of-line FIND, POSITION, FIND-IF, and POSITION-IF
 (macrolet (;; shared logic for defining %FIND-POSITION and
@@ -1961,76 +1948,31 @@
 						  from-end start end key)))
       (frobs))))
 
-;;; the user interface to FIND and POSITION: Get all our ducks in a
-;;; row, then call %FIND-POSITION.
-(declaim (inline find position))
-(defmacro !def-find-position (fun-name values-index)
-  `(defun ,fun-name (item sequence &key
-		     from-end (start 0) end
-		     key test test-not)
-    (nth-value
-     ,values-index
-     (%find-position item sequence
-                     from-end start
-                     end (effective-find-position-key key)
-                     (effective-find-position-test test test-not)))))
-(!def-find-position find 0)
-(!def-find-position position 1)
+;;; the user interface to FIND and POSITION: just interpreter stubs,
+;;; nowadays.
+(defun find (item sequence &key from-end (start 0) end key test test-not)
+  ;; FIXME: this can't be the way to go, surely?
+  (find item sequence :from-end from-end :start start :end end :key key
+	:test test :test-not test-not))
+(defun position (item sequence &key from-end (start 0) end key test test-not)
+  (position item sequence :from-end from-end :start start :end end :key key
+	    :test test :test-not test-not))
 
 ;;; the user interface to FIND-IF and POSITION-IF, entirely analogous
 ;;; to the interface to FIND and POSITION
-(declaim (inline find-if position-if))
-(defmacro !def-find-position-if (fun-name values-index)
-  `(defun ,fun-name (predicate sequence
-		     &key from-end (start 0) end key)
-    (nth-value
-     ,values-index
-     (%find-position-if (%coerce-callable-to-fun predicate)
-                        sequence
-                        from-end
-                        start
-                        end
-                        (effective-find-position-key key)))))
+(defun find-if (predicate sequence &key from-end (start 0) end key)
+  (find-if predicate sequence :from-end from-end :start start
+	   :end end :key key))
+(defun position-if (predicate sequence &key from-end (start 0) end key)
+  (position-if predicate sequence :from-end from-end :start start
+	       :end end :key key))
 
-(!def-find-position-if find-if 0)
-(!def-find-position-if position-if 1)
-
-;;; the deprecated functions FIND-IF-NOT and POSITION-IF-NOT. We
-;;; didn't bother to worry about optimizing them, except note that on
-;;; Sat, Oct 06, 2001 at 04:22:38PM +0100, Christophe Rhodes wrote on
-;;; sbcl-devel
-;;;
-;;;     My understanding is that while the :test-not argument is
-;;;     deprecated in favour of :test (complement #'foo) because of
-;;;     semantic difficulties (what happens if both :test and :test-not
-;;;     are supplied, etc) the -if-not variants, while officially
-;;;     deprecated, would be undeprecated were X3J13 actually to produce
-;;;     a revised standard, as there are perfectly legitimate idiomatic
-;;;     reasons for allowing the -if-not versions equal status,
-;;;     particularly remove-if-not (== filter).
-;;;
-;;;     This is only an informal understanding, I grant you, but
-;;;     perhaps it's worth optimizing the -if-not versions in the same
-;;;     way as the others?
-;;;
-;;; FIXME: Maybe remove uses of these deprecated functions (and
-;;; definitely of :TEST-NOT) within the implementation of SBCL.
-(declaim (inline find-if-not position-if-not))
-(defmacro !def-find-position-if-not (fun-name values-index)
-  `(defun ,fun-name (predicate sequence
-		     &key from-end (start 0) end key)
-    (nth-value
-     ,values-index
-     (%find-position-if-not (%coerce-callable-to-fun predicate)
-                            sequence
-                            from-end
-                            start
-                            end
-                            (effective-find-position-key key)))))
-
-(!def-find-position-if-not find-if-not 0)
-(!def-find-position-if-not position-if-not 1)
-
+(defun find-if-not (predicate sequence &key from-end (start 0) end key)
+  (find-if-not predicate sequence :from-end from-end :start start
+	   :end end :key key))
+(defun position-if-not (predicate sequence &key from-end (start 0) end key)
+  (position-if-not predicate sequence :from-end from-end :start start
+	       :end end :key key))
 
 ;;;; COUNT-IF, COUNT-IF-NOT, and COUNT
 

@@ -76,21 +76,81 @@
     (null (make-null-lexenv))
     (lexenv x)))
 
-;;; Is it safe to just grab the lambda expression LAMBDA in isolation,
-;;; ignoring the LEXENV?
-;;;
-;;; Note: The corresponding CMU CL code did something hairier so that
-;;; it could save inline definitions of DEFUNs in nontrivial lexical
-;;; environments. If it's ever important to try to do that, take a
-;;; look at the old CMU CL #'INLINE-SYNTACTIC-CLOSURE.
-(defun lambda-independent-of-lexenv-p (lambda lexenv)
+(defun maybe-inline-syntactic-closure (lambda lexenv)
   (declare (type list lambda) (type lexenv lexenv))
-  (aver (eql (first lambda) 'lambda)) ; basic sanity check
-  ;; This is a trivial implementation that just makes sure that LEXENV
-  ;; doesn't have anything interesting in it. A more sophisticated
-  ;; implementation could skip things in LEXENV which aren't captured
-  ;; by LAMBDA, but this implementation doesn't try.
-  (and (null (lexenv-blocks lexenv))
-       (null (lexenv-tags lexenv))
-       (null (lexenv-vars lexenv))
-       (null (lexenv-funs lexenv))))
+  (aver (eql (first lambda) 'lambda))
+  ;; We used to have a trivial implementation, verifying that lexenv
+  ;; was effectively null. However, this fails to take account of the
+  ;; idiom
+  ;;
+  ;; (declaim (inline foo))
+  ;; (macrolet ((def (x) `(defun ,x () ...)))
+  ;;   (def foo))
+  ;;
+  ;; which, while too complicated for the cross-compiler to handle in
+  ;; unfriendly foreign lisp environments, would be good to support in
+  ;; the target compiler. -- CSR, 2002-05-13 and 2002-11-02
+  (let ((vars (lexenv-vars lexenv))
+	(funs (lexenv-funs lexenv)))
+    (collect ((decls) (macros) (symbol-macros))
+      (cond
+	((or (lexenv-blocks lexenv) (lexenv-tags lexenv)) nil)
+	((and (null vars) (null funs)) `(lambda-with-lexenv
+					 nil nil nil
+					 ,@(cdr lambda)))
+	((dolist (x vars nil)
+	   #+sb-xc-host
+	   ;; KLUDGE: too complicated for cross-compilation
+	   (return t)
+	   #-sb-xc-host
+	   (let ((name (car x))
+		 (what (cdr x)))
+	     ;; only worry about the innermost binding
+	     (when (eq x (assoc name vars :test #'eq))
+	       (typecase what
+		 (cons
+		  (aver (eq (car what) 'macro))
+		  (symbol-macros x))
+		 (global-var
+		  ;; A global should not appear in the lexical
+		  ;; environment? Is this true? FIXME!
+		  (aver (eq (global-var-kind what) :special))
+		  (decls `(special ,name)))
+		 (t
+		  ;; we can't inline in the presence of this object
+		  (return t))))))
+	 nil)
+	((dolist (x funs nil)
+	   #+sb-xc-host
+	   ;; KLUDGE: too complicated for cross-compilation (and
+	   ;; failure of OAOO in comments, *sigh*)
+	   (return t)
+	   #-sb-xc-host
+	   (let ((name (car x))
+		 (what (cdr x)))
+	     ;; again, only worry about the innermost binding, but
+	     ;; functions can have name (SETF FOO) so we need to use
+	     ;; EQUAL for the test.
+	     (when (eq x (assoc name funs :test #'equal))
+	       (typecase what
+		 (cons
+		  (macros (cons name (function-lambda-expression (cdr what)))))
+		 ;; FIXME: Is there a good reason for this not to be
+		 ;; DEFINED-FUN (which :INCLUDEs GLOBAL-VAR, in case
+		 ;; you're wondering how this ever worked :-)? Maybe
+		 ;; in conjunction with an AVERrance that it's not an
+		 ;; (AND GLOBAL-VAR (NOT GLOBAL-FUN))? -- CSR,
+		 ;; 2002-07-08
+		 (global-var
+		  (when (defined-fun-p what)
+		    (decls `(,(car (rassoc (defined-fun-inlinep what)
+					   *inlinep-translations*))
+                              ,name))))
+		 (t (return t))))))
+	 nil)
+	(t
+	 ;; if we get this far, we've successfully dealt with
+	 ;; everything in FUNS and VARS, so:
+	 `(lambda-with-lexenv ,(decls) ,(macros) ,(symbol-macros)
+	                      ,@(cdr lambda)))))))
+

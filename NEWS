@@ -1436,6 +1436,8 @@ changes in sbcl-0.7.11 relative to sbcl-0.7.10:
     accessors that are related by inheritance, as specified in the
     :CONC-NAME section of the specification of DEFSTRUCT.  (thanks to
     Valtteri Vuorikoski)
+  * the compiler is now able to inline functions that were defined in
+    a complex lexical environment (e.g. inside a MACROLET).
   * fixed some more bugs revealed by Paul Dietz' test suite:
     ** As required by ANSI, LOOP now disallows anonymous collection
        clauses such as COLLECT I in conjunction with aggregate boolean

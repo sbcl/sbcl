@@ -304,9 +304,9 @@
 	     ;; elements before he reads elements (or to read manuals
 	     ;; before he writes code:-), we'll signal a STYLE-WARNING
 	     ;; in case he didn't realize this.
-	     (compiler-note "The default initial element ~S is not a ~S."
-			    (saetp-initial-element-default saetp)
-			    eltype))
+	     (compiler-style-warn "The default initial element ~S is not a ~S."
+				  (saetp-initial-element-default saetp)
+				  eltype))
 	   creation-form)
 	  (t
 	   `(let ((array ,creation-form))

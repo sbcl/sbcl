@@ -615,6 +615,27 @@ BUG 48c, not yet fixed:
 (assert (typep (check-embedded-thes 3 3  2 3.5f0) 'type-error))
 
 
+;;; INLINE inside MACROLET
+(declaim (inline to-be-inlined))
+(macrolet ((def (x) `(defun ,x (y) (+ y 1))))
+  (def to-be-inlined))
+(defun call-inlined (z)
+  (to-be-inlined z))
+(assert (= (call-inlined 3) 4))
+(macrolet ((frob (x) `(+ ,x 3)))
+  (defun to-be-inlined (y)
+    (frob y)))
+(assert (= (call-inlined 3)
+	   ;; we should have inlined the previous definition, so the
+	   ;; new one won't show up yet.
+	   4))
+(defun call-inlined (z)
+  (to-be-inlined z))
+(assert (= (call-inlined 3) 6))
+(defun to-be-inlined (y)
+  (+ y 5))
+(assert (= (call-inlined 3) 6))
+
 ;;;; tests not in the problem domain, but of the consistency of the
 ;;;; compiler machinery itself
 

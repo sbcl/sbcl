@@ -1040,6 +1040,8 @@ WORKAROUND:
      lexical environment.
   b. The body of (EVAL-WHEN (:COMPILE-TOPLEVEL) ...) is evaluated in
      the null lexical environment.
+  c. The cross-compiler cannot inline functions defined in a non-null
+     lexical environment.
 
 206: ":SB-FLUID feature broken"
   (reported by Antonio Martinez-Shotton sbcl-devel 2002-10-07)

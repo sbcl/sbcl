@@ -1,11 +1,8 @@
-for early 0.7.x:
+for late 0.7.x:
 
-* urgent EVAL/EVAL-WHEN/%COMPILE/DEFUN/DEFSTRUCT cleanup:
-	** made inlining DEFUN inside MACROLET work again
-	** (also, while working on INLINE anyway, it might be easy
-		to flush the old MAYBE-INLINE cruft entirely, 
-		including e.g. on the man page)
 * test file reworking
+	** *.pure.lisp tests run with assertoid.lisp loaded; assertoid
+		is moved to its own package, for use in *.impure.lisp.
 	** non-x86 ports now pass irrat.pure.lisp
 	** sparc and ppc now pass bit-vector.impure-cload.lisp
 * faster bootstrapping (both make.sh and slam.sh)
@@ -42,7 +39,8 @@ for early 0.7.x:
 		not quite ready for prime time..) of the system after
 		cold init
 * fixups now feasible because of pre7 changes
-	** ANSIfied DECLAIM INLINE stuff (deprecating MAYBE-INLINE)
+	** ANSIfied DECLAIM INLINE stuff (deprecating MAYBE-INLINE,
+		including e.g. on the man page)
 * miscellaneous simple refactoring
 	* belated renaming:
 		** renamed %PRIMITIVE to %VOP

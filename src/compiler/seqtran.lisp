@@ -927,3 +927,80 @@
   (check-inlineability-of-find-position-if sequence from-end)
   '(%find-position-vector-macro item sequence
 				from-end start end key test))
+
+;;; logic to unravel :TEST, :TEST-NOT, and :KEY options in FIND,
+;;; POSITION-IF, etc.
+(define-source-transform effective-find-position-test (test test-not)
+  `(cond
+    ((and ,test ,test-not)
+     (error "can't specify both :TEST and :TEST-NOT"))
+    (,test (%coerce-callable-to-fun ,test))
+    (,test-not
+     ;; (Without DYNAMIC-EXTENT, this is potentially horribly
+     ;; inefficient, but since the TEST-NOT option is deprecated
+     ;; anyway, we don't care.)
+     (complement (%coerce-callable-to-fun ,test-not)))
+    (t #'eql)))
+(define-source-transform effective-find-position-key (key)
+  `(if ,key
+       (%coerce-callable-to-fun ,key)
+       #'identity))
+
+(macrolet ((define-find-position (fun-name values-index)
+	       `(define-source-transform ,fun-name (item sequence &key
+						    from-end (start 0) end
+						    key test test-not)
+		 `(nth-value ,,values-index
+		   (%find-position ,item ,sequence
+		    ,from-end ,start
+		    ,end
+		    (effective-find-position-key ,key)
+		    (effective-find-position-test ,test ,test-not))))))
+  (define-find-position find 0)
+  (define-find-position position 1))
+
+(macrolet ((define-find-position-if (fun-name values-index)
+	       `(define-source-transform ,fun-name (predicate sequence &key
+						    from-end (start 0)
+						    end key)
+		 `(nth-value
+		   ,,values-index
+		   (%find-position-if (%coerce-callable-to-fun ,predicate)
+		    ,sequence ,from-end
+		    ,start ,end
+		    (effective-find-position-key ,key))))))
+  (define-find-position-if find-if 0)
+  (define-find-position-if position-if 1))
+
+;;; the deprecated functions FIND-IF-NOT and POSITION-IF-NOT. We
+;;; didn't bother to worry about optimizing them, except note that on
+;;; Sat, Oct 06, 2001 at 04:22:38PM +0100, Christophe Rhodes wrote on
+;;; sbcl-devel
+;;;
+;;;     My understanding is that while the :test-not argument is
+;;;     deprecated in favour of :test (complement #'foo) because of
+;;;     semantic difficulties (what happens if both :test and :test-not
+;;;     are supplied, etc) the -if-not variants, while officially
+;;;     deprecated, would be undeprecated were X3J13 actually to produce
+;;;     a revised standard, as there are perfectly legitimate idiomatic
+;;;     reasons for allowing the -if-not versions equal status,
+;;;     particularly remove-if-not (== filter).
+;;;
+;;;     This is only an informal understanding, I grant you, but
+;;;     perhaps it's worth optimizing the -if-not versions in the same
+;;;     way as the others?
+;;;
+;;; FIXME: Maybe remove uses of these deprecated functions (and
+;;; definitely of :TEST-NOT) within the implementation of SBCL.
+(macrolet ((define-find-position-if-not (fun-name values-index)
+	       `(define-source-transform ,fun-name (predicate sequence &key
+						    from-end (start 0)
+						    end key)
+		 `(nth-value
+		   ,,values-index
+		   (%find-position-if-not (%coerce-callable-to-fun ,predicate)
+		    ,sequence ,from-end
+		    ,start ,end
+		    (effective-find-position-key ,key))))))
+  (define-find-position-if-not find-if-not 0)
+  (define-find-position-if-not position-if-not 1))

@@ -184,7 +184,12 @@ Lisp filename syntax idiosyncrasies)."
   (need-match "animal/vertebrate/mammal/../**/robot/*.*" nil)
   (need-match "animal/vertebrate/mammal/robot/../**/../**/*.*" nil))
 (need-matches)
+(sb-ext:quit :unix-status 52)
 EOF
+if [ $? != 52 ]; then
+    echo DIRECTORY/TRUENAME test part 1 failed, unexpected SBCL return code=$?
+    exit 1
+fi
 cd ..
 rm -r $testdir
 

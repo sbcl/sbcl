@@ -685,19 +685,20 @@
 	(+ rem divisor)
 	rem)))
 
-(macrolet ((def (name op doc)
-	     `(defun ,name (number &optional (divisor 1))
-		,doc
-		(multiple-value-bind (res rem) (,op number divisor)
-		  (values (float res (if (floatp rem) rem 1.0)) rem)))))
-  (def ffloor floor
-    "Same as FLOOR, but returns first value as a float.")
-  (def fceiling ceiling
-    "Same as CEILING, but returns first value as a float." )
-  (def ftruncate truncate
-    "Same as TRUNCATE, but returns first value as a float.")
-  (def fround round
-    "Same as ROUND, but returns first value as a float."))
+(defmacro !define-float-rounding-function (name op doc)
+  `(defun ,name (number &optional (divisor 1))
+    ,doc
+    (multiple-value-bind (res rem) (,op number divisor)
+      (values (float res (if (floatp rem) rem 1.0)) rem))))
+
+(!define-float-rounding-function ffloor floor
+  "Same as FLOOR, but returns first value as a float.")
+(!define-float-rounding-function fceiling ceiling
+  "Same as CEILING, but returns first value as a float." )
+(!define-float-rounding-function ftruncate truncate
+  "Same as TRUNCATE, but returns first value as a float.")
+(!define-float-rounding-function fround round
+  "Same as ROUND, but returns first value as a float.")
 
 ;;;; comparisons
 

@@ -164,29 +164,15 @@
            #-sb-xc-host
 	   (named-lambda `(named-lambda ,name ,@lambda-guts))
 	   (inline-lambda
-	    (cond (;; Does the user not even want to inline?
-		   (not (inline-fun-name-p name))
-		   nil)
-		  (;; Does inlining look too hairy to handle?
-		   (not (sb!c:lambda-independent-of-lexenv-p lambda env))
-		   (sb!c:maybe-compiler-note
-		    "lexical environment too hairy, can't inline DEFUN ~S"
-		    name)
-		   nil)
-		  (t
-		   ;; FIXME: The only reason that we return
-		   ;; LAMBDA-WITH-LEXENV instead of returning bare
-		   ;; LAMBDA is to avoid modifying downstream code
-		   ;; which expects LAMBDA-WITH-LEXENV. But the code
-		   ;; here is the only code which feeds into the
-		   ;; downstream code, and the generality of the
-		   ;; interface is no longer used, so it'd make sense
-		   ;; to simplify the interface instead of using the
-		   ;; old general LAMBDA-WITH-LEXENV interface in this
-		   ;; simplified way.
-		   `(sb!c:lambda-with-lexenv
-		     nil nil nil ; i.e. no DECLS, no MACROS, no SYMMACS
-		     ,@lambda-guts)))))
+	    (when (inline-fun-name-p name)
+	      ;; we want to attempt to inline, so complain if we can't
+	      (or (sb!c:maybe-inline-syntactic-closure lambda env)
+		  (progn
+		    (#+sb-xc-host warn
+		     #-sb-xc-host sb!c:maybe-compiler-note
+		     "lexical environment too hairy, can't inline DEFUN ~S"
+		     name)
+		    nil)))))
       `(progn
 
 	 ;; In cross-compilation of toplevel DEFUNs, we arrange

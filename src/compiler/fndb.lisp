@@ -614,6 +614,8 @@
 (defknown (stable-sort sort) (sequence callable &key (:key callable)) sequence
   (call)
   :derive-type (sequence-result-nth-arg 1))
+(defknown sb!impl::sort-vector (vector index index function (or function null)) vector
+  (call))
 
 (defknown merge (type-specifier sequence sequence callable
 				&key (:key callable))
@@ -1316,6 +1318,13 @@
   (function sequence t index sequence-end function)
   (values t (or index null))
   (call))
+(defknown effective-find-position-test (callable callable)
+  function
+  (flushable foldable))
+(defknown effective-find-position-key (callable)
+  function
+  (flushable foldable))
+
 
 (defknown sb!kernel::arg-count-error (t t t t t t) nil (unsafe))
 

@@ -68,6 +68,8 @@
   (:generator 6
     (load-type result function (- fun-pointer-lowtag))))
 
+;;; Is this VOP dead? I can't see anywhere that it is used... -- CSR,
+;;; 2002-06-21
 (define-vop (set-fun-subtype)
   (:translate (setf fun-subtype))
   (:policy :fast-safe)
