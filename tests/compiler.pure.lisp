@@ -462,3 +462,7 @@
   (compile nil '(lambda (x)
 		 (declare (type (simple-array (simple-string 3) (5)) x))
 		 (aref (aref x 0) 0))))
+
+;; compiler failure
+(let ((f (compile nil '(lambda (x) (typep x '(not (member 0d0)))))))
+  (assert (funcall f 1d0)))

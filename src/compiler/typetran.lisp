@@ -245,17 +245,20 @@
 ;;; trying to optimize it.
 (defun source-transform-union-typep (object type)
   (let* ((types (union-type-types type))
-	 (ltype (specifier-type 'list))
-	 (mtype (find-if #'member-type-p types)))
-    (if (and mtype (csubtypep ltype type))
-	(let ((members (member-type-members mtype)))
-	  (once-only ((n-obj object))
-	    `(or (listp ,n-obj)
-		 (typep ,n-obj
-			'(or ,@(mapcar #'type-specifier
-				       (remove (specifier-type 'cons)
-					       (remove mtype types)))
-			     (member ,@(remove nil members)))))))
+	 (type-list (specifier-type 'list))
+         (type-cons (specifier-type 'cons))
+	 (mtype (find-if #'member-type-p types))
+         (members (when mtype (member-type-members mtype))))
+    (if (and mtype
+             (memq nil members)
+             (memq type-cons types))
+	(once-only ((n-obj object))
+          `(or (listp ,n-obj)
+               (typep ,n-obj
+                      '(or ,@(mapcar #'type-specifier
+                                     (remove type-cons
+                                             (remove mtype types)))
+                        (member ,@(remove nil members))))))
 	(once-only ((n-obj object))
 	  `(or ,@(mapcar (lambda (x)
 			   `(typep ,n-obj ',(type-specifier x)))
