@@ -1920,6 +1920,10 @@ changes in sbcl-0.8.2 relative to sbcl-0.8.1:
     of ARRAY-DIMENSION-LIMIT and ARRAY-TOTAL-SIZE-LIMIT no longer leak
     into the newly-built SBCL. (reported by Eric Marsden on #lisp,
     test case from Patrik Nordebo)
+  * improved the ability of the disassembler on the PPC platform to
+    provide helpful disassembly notes.
+  * SB-MOP:CLASS-PROTOTYPE on built-in-classes returns an instance of
+    the class in more cases than previously.
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** LAST and [N]BUTLAST should accept a bignum.
     ** condition slot accessors are methods.

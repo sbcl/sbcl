@@ -928,25 +928,32 @@
   (setq
    *built-in-classes*
    '((t :state :read-only :translation t)
-     (character :enumerable t :translation base-char)
+     (character :enumerable t :translation base-char
+                :prototype-form (code-char 42))
      (base-char :enumerable t
 		:inherits (character)
-		:codes (#.sb!vm:base-char-widetag))
-     (symbol :codes (#.sb!vm:symbol-header-widetag))
+		:codes (#.sb!vm:base-char-widetag)
+                :prototype-form (code-char 42))
+     (symbol :codes (#.sb!vm:symbol-header-widetag)
+             :prototype-form '#:mu)
 
      (instance :state :read-only)
 
-     (system-area-pointer :codes (#.sb!vm:sap-widetag))
-     (weak-pointer :codes (#.sb!vm:weak-pointer-widetag))
+     (system-area-pointer :codes (#.sb!vm:sap-widetag)
+                          :prototype-form (sb!sys:int-sap 42))
+     (weak-pointer :codes (#.sb!vm:weak-pointer-widetag)
+      :prototype-form (sb!ext:make-weak-pointer (find-package "CL")))
      (code-component :codes (#.sb!vm:code-header-widetag))
      (lra :codes (#.sb!vm:return-pc-header-widetag))
-     (fdefn :codes (#.sb!vm:fdefn-widetag))
+     (fdefn :codes (#.sb!vm:fdefn-widetag)
+            :prototype-form (sb!kernel:make-fdefn "42"))
      (random-class) ; used for unknown type codes
 
      (function
       :codes (#.sb!vm:closure-header-widetag
 	      #.sb!vm:simple-fun-header-widetag)
-      :state :read-only)
+      :state :read-only
+      :prototype-form (function (lambda () 42)))
      (funcallable-instance
       :inherits (function)
       :state :read-only)
@@ -955,20 +962,24 @@
      (complex
       :translation complex
       :inherits (number)
-      :codes (#.sb!vm:complex-widetag))
+      :codes (#.sb!vm:complex-widetag)
+      :prototype-form (complex 42 42))
      (complex-single-float
       :translation (complex single-float)
       :inherits (complex number)
-      :codes (#.sb!vm:complex-single-float-widetag))
+      :codes (#.sb!vm:complex-single-float-widetag)
+      :prototype-form (complex 42f0 42f0))
      (complex-double-float
       :translation (complex double-float)
       :inherits (complex number)
-      :codes (#.sb!vm:complex-double-float-widetag))
+      :codes (#.sb!vm:complex-double-float-widetag)
+      :prototype-form (complex 42d0 42d0))
      #!+long-float
      (complex-long-float
       :translation (complex long-float)
       :inherits (complex number)
-      :codes (#.sb!vm:complex-long-float-widetag))
+      :codes (#.sb!vm:complex-long-float-widetag)
+      :prototype-form (complex 42l0 42l0))
      (real :translation real :inherits (number))
      (float
       :translation float
@@ -976,23 +987,27 @@
      (single-float
       :translation single-float
       :inherits (float real number)
-      :codes (#.sb!vm:single-float-widetag))
+      :codes (#.sb!vm:single-float-widetag)
+      :prototype-form 42f0)
      (double-float
       :translation double-float
       :inherits (float real number)
-      :codes (#.sb!vm:double-float-widetag))
+      :codes (#.sb!vm:double-float-widetag)
+      :prototype-form 42d0)
      #!+long-float
      (long-float
       :translation long-float
       :inherits (float real number)
-      :codes (#.sb!vm:long-float-widetag))
+      :codes (#.sb!vm:long-float-widetag)
+      :prototype-form 42l0)
      (rational
       :translation rational
       :inherits (real number))
      (ratio
       :translation (and rational (not integer))
       :inherits (rational real number)
-      :codes (#.sb!vm:ratio-widetag))
+      :codes (#.sb!vm:ratio-widetag)
+      :prototype-form 1/42)
      (integer
       :translation integer
       :inherits (rational real number))
@@ -1000,17 +1015,22 @@
       :translation (integer #.sb!xc:most-negative-fixnum
 		    #.sb!xc:most-positive-fixnum)
       :inherits (integer rational real number)
-      :codes (#.sb!vm:even-fixnum-lowtag #.sb!vm:odd-fixnum-lowtag))
+      :codes (#.sb!vm:even-fixnum-lowtag #.sb!vm:odd-fixnum-lowtag)
+      :prototype-form 42)
      (bignum
       :translation (and integer (not fixnum))
       :inherits (integer rational real number)
-      :codes (#.sb!vm:bignum-widetag))
+      :codes (#.sb!vm:bignum-widetag)
+      ;; FIXME: wrong for 64-bit!
+      :prototype-form (expt 2 42))
 
      (array :translation array :codes (#.sb!vm:complex-array-widetag)
-            :hierarchical-p nil)
+            :hierarchical-p nil
+            :prototype-form (make-array nil :adjustable t))
      (simple-array
       :translation simple-array :codes (#.sb!vm:simple-array-widetag)
-      :inherits (array))
+      :inherits (array)
+      :prototype-form (make-array nil))
      (sequence
       :translation (or cons (member nil) vector))
      (vector
@@ -1020,92 +1040,110 @@
      (simple-vector
       :translation simple-vector :codes (#.sb!vm:simple-vector-widetag)
       :direct-superclasses (vector simple-array)
-      :inherits (vector simple-array array sequence))
+      :inherits (vector simple-array array sequence)
+      :prototype-form (make-array 0))
      (bit-vector
       :translation bit-vector :codes (#.sb!vm:complex-bit-vector-widetag)
-      :inherits (vector array sequence))
+      :inherits (vector array sequence)
+      :prototype-form (make-array 0 :element-type 'bit :fill-pointer t))
      (simple-bit-vector
       :translation simple-bit-vector :codes (#.sb!vm:simple-bit-vector-widetag)
       :direct-superclasses (bit-vector simple-array)
       :inherits (bit-vector vector simple-array
-		 array sequence))
+		 array sequence)
+      :prototype-form (make-array 0 :element-type 'bit))
      (simple-array-unsigned-byte-2
       :translation (simple-array (unsigned-byte 2) (*))
       :codes (#.sb!vm:simple-array-unsigned-byte-2-widetag)
       :direct-superclasses (vector simple-array)
-      :inherits (vector simple-array array sequence))
+      :inherits (vector simple-array array sequence)
+      :prototype-form (make-array 0 :element-type '(unsigned-byte 2)))
      (simple-array-unsigned-byte-4
       :translation (simple-array (unsigned-byte 4) (*))
       :codes (#.sb!vm:simple-array-unsigned-byte-4-widetag)
       :direct-superclasses (vector simple-array)
-      :inherits (vector simple-array array sequence))
+      :inherits (vector simple-array array sequence)
+      :prototype-form (make-array 0 :element-type '(unsigned-byte 4)))
      (simple-array-unsigned-byte-8
       :translation (simple-array (unsigned-byte 8) (*))
       :codes (#.sb!vm:simple-array-unsigned-byte-8-widetag)
       :direct-superclasses (vector simple-array)
-      :inherits (vector simple-array array sequence))
+      :inherits (vector simple-array array sequence)
+      :prototype-form (make-array 0 :element-type '(unsigned-byte 8)))
      (simple-array-unsigned-byte-16
       :translation (simple-array (unsigned-byte 16) (*))
       :codes (#.sb!vm:simple-array-unsigned-byte-16-widetag)
       :direct-superclasses (vector simple-array)
-      :inherits (vector simple-array array sequence))
+      :inherits (vector simple-array array sequence)
+      :prototype-form (make-array 0 :element-type '(unsigned-byte 16)))
      (simple-array-unsigned-byte-32
       :translation (simple-array (unsigned-byte 32) (*))
       :codes (#.sb!vm:simple-array-unsigned-byte-32-widetag)
       :direct-superclasses (vector simple-array)
-      :inherits (vector simple-array array sequence))
+      :inherits (vector simple-array array sequence)
+      :prototype-form (make-array 0 :element-type '(unsigned-byte 32)))
      (simple-array-signed-byte-8
       :translation (simple-array (signed-byte 8) (*))
       :codes (#.sb!vm:simple-array-signed-byte-8-widetag)
       :direct-superclasses (vector simple-array)
-      :inherits (vector simple-array array sequence))
+      :inherits (vector simple-array array sequence)
+      :prototype-form (make-array 0 :element-type '(signed-byte 8)))
      (simple-array-signed-byte-16
       :translation (simple-array (signed-byte 16) (*))
       :codes (#.sb!vm:simple-array-signed-byte-16-widetag)
       :direct-superclasses (vector simple-array)
-      :inherits (vector simple-array array sequence))
+      :inherits (vector simple-array array sequence)
+      :prototype-form (make-array 0 :element-type '(signed-byte 16)))
      (simple-array-signed-byte-30
       :translation (simple-array (signed-byte 30) (*))
       :codes (#.sb!vm:simple-array-signed-byte-30-widetag)
       :direct-superclasses (vector simple-array)
-      :inherits (vector simple-array array sequence))
+      :inherits (vector simple-array array sequence)
+      :prototype-form (make-array 0 :element-type '(signed-byte 30)))
      (simple-array-signed-byte-32
       :translation (simple-array (signed-byte 32) (*))
       :codes (#.sb!vm:simple-array-signed-byte-32-widetag)
       :direct-superclasses (vector simple-array)
-      :inherits (vector simple-array array sequence))
+      :inherits (vector simple-array array sequence)
+      :prototype-form (make-array 0 :element-type '(signed-byte 32)))
      (simple-array-single-float
       :translation (simple-array single-float (*))
       :codes (#.sb!vm:simple-array-single-float-widetag)
       :direct-superclasses (vector simple-array)
-      :inherits (vector simple-array array sequence))
+      :inherits (vector simple-array array sequence)
+      :prototype-form (make-array 0 :element-type 'single-float))
      (simple-array-double-float
       :translation (simple-array double-float (*))
       :codes (#.sb!vm:simple-array-double-float-widetag)
       :direct-superclasses (vector simple-array)
-      :inherits (vector simple-array array sequence))
+      :inherits (vector simple-array array sequence)
+      :prototype-form (make-array 0 :element-type 'double-float))
      #!+long-float
      (simple-array-long-float
       :translation (simple-array long-float (*))
       :codes (#.sb!vm:simple-array-long-float-widetag)
       :direct-superclasses (vector simple-array)
-      :inherits (vector simple-array array sequence))
+      :inherits (vector simple-array array sequence)
+      :prototype-form (make-array 0 :element-type 'long-float))
      (simple-array-complex-single-float
       :translation (simple-array (complex single-float) (*))
       :codes (#.sb!vm:simple-array-complex-single-float-widetag)
       :direct-superclasses (vector simple-array)
-      :inherits (vector simple-array array sequence))
+      :inherits (vector simple-array array sequence)
+      :prototype-form (make-array 0 :element-type '(complex single-float)))
      (simple-array-complex-double-float
       :translation (simple-array (complex double-float) (*))
       :codes (#.sb!vm:simple-array-complex-double-float-widetag)
       :direct-superclasses (vector simple-array)
-      :inherits (vector simple-array array sequence))
+      :inherits (vector simple-array array sequence)
+      :prototype-form (make-array 0 :element-type '(complex double-float)))
      #!+long-float
      (simple-array-complex-long-float
       :translation (simple-array (complex long-float) (*))
       :codes (#.sb!vm:simple-array-complex-long-float-widetag)
       :direct-superclasses (vector simple-array)
-      :inherits (vector simple-array array sequence))
+      :inherits (vector simple-array array sequence)
+      :prototype-form (make-array 0 :element-type '(complex long-float)))
      (string
       :translation string
       :direct-superclasses (vector)
@@ -1115,43 +1153,50 @@
       :direct-superclasses (string simple-array)
       :inherits (string vector simple-array array sequence))
      (vector-nil
-      ;; FIXME: Should this be (AND (VECTOR NIL) (NOT (SIMPLE-ARRAY NIL (*))))?
       :translation (vector nil)
       :codes (#.sb!vm:complex-vector-nil-widetag)
       :direct-superclasses (string)
-      :inherits (string vector array sequence))
+      :inherits (string vector array sequence)
+      :prototype-form (make-array 0 :element-type 'nil :fill-pointer t))
      (simple-array-nil
       :translation (simple-array nil (*))
       :codes (#.sb!vm:simple-array-nil-widetag)
       :direct-superclasses (vector-nil simple-string)
-      :inherits (vector-nil simple-string string vector simple-array array sequence))
+      :inherits (vector-nil simple-string string vector simple-array
+		 array sequence)
+      :prototype-form (make-array 0 :element-type 'nil))
      (base-string
       :translation base-string
       :codes (#.sb!vm:complex-base-string-widetag)
       :direct-superclasses (string)
-      :inherits (string vector array sequence))
+      :inherits (string vector array sequence)
+      :prototype-form (make-array 0 :element-type 'base-char :fill-pointer t))
      (simple-base-string
       :translation simple-base-string
       :codes (#.sb!vm:simple-base-string-widetag)
       :direct-superclasses (base-string simple-string)
       :inherits (base-string simple-string string vector simple-array
-		 array sequence))
+		 array sequence)
+      :prototype-form (make-array 0 :element-type 'base-char))
      (list
       :translation (or cons (member nil))
       :inherits (sequence))
      (cons
       :codes (#.sb!vm:list-pointer-lowtag)
       :translation cons
-      :inherits (list sequence))
+      :inherits (list sequence)
+      :prototype-form (cons nil nil))
      (null
       :translation (member nil)
       :inherits (symbol list sequence)
-      :direct-superclasses (symbol list))
+      :direct-superclasses (symbol list)
+      :prototype-form 'nil)
      
      (stream
       :state :read-only
       :depth 3
-      :inherits (instance)))))
+      :inherits (instance)
+      :prototype-form (make-broadcast-stream)))))
 
 ;;; See also src/code/class-init.lisp where we finish setting up the
 ;;; translations for built-in types.
@@ -1166,12 +1211,13 @@
 	      enumerable
 	      state
               depth
+	      prototype-form
 	      (hierarchical-p t) ; might be modified below
 	      (direct-superclasses (if inherits
 				     (list (car inherits))
 				     '(t))))
 	x
-      (declare (ignore codes state translation))
+      (declare (ignore codes state translation prototype-form))
       (let ((inherits-list (if (eq name t)
 			       ()
 			       (cons t (reverse inherits))))

@@ -302,58 +302,6 @@
 
 ;;;; built-in classes
 
-;;; FIXME: This was the portable PCL way of setting up
-;;; *BUILT-IN-CLASSES*, but in SBCL (as in CMU CL) it's almost
-;;; entirely wasted motion, since it's immediately overwritten by a
-;;; result mostly derived from SB-KERNEL::*BUILT-IN-CLASSES*. However,
-;;; we can't just delete it, since the fifth element from each entry
-;;; (a prototype of the class) is still in the final result. It would
-;;; be nice to clean this up so that the other, never-used stuff is
-;;; gone, perhaps finding a tidier way to represent examples of each
-;;; class, too.
-;;;
-;;; FIXME: This can probably be blown away after bootstrapping.
-;;; And SB-KERNEL::*BUILT-IN-CLASSES*, too..
-#|
-(defvar *built-in-classes*
-  ;; name       supers     subs		     cdr of cpl
-  ;; prototype
-  '(;(t	 ()	 (number sequence array character symbol) ())
-    (number     (t)	(complex float rational) (t))
-    (complex    (number)   ()		       (number t)
-     #c(1 1))
-    (float      (number)   ()		       (number t)
-     1.0)
-    (rational   (number)   (integer ratio)	  (number t))
-    (integer    (rational) ()		       (rational number t)
-     1)
-    (ratio      (rational) ()		       (rational number t)
-     1/2)
-
-    (sequence   (t)	(list vector)	    (t))
-    (list       (sequence) (cons null)	      (sequence t))
-    (cons       (list)     ()		       (list sequence t)
-     (nil))
-
-    (array      (t)	(vector)		 (t)
-     #2A((nil)))
-    (vector     (array
-		 sequence) (string bit-vector)      (array sequence t)
-     #())
-    (string     (vector)   ()		       (vector array sequence t)
-     "")
-    (bit-vector (vector)   ()		       (vector array sequence t)
-     #*1)
-    (character  (t)	()		       (t)
-     #\c)
-
-    (symbol     (t)	(null)		   (t)
-     symbol)
-    (null       (symbol
-		 list)     ()		       (symbol list sequence t)
-     nil)))
-|#
-
 ;;; Grovel over SB-KERNEL::*BUILT-IN-CLASSES* in order to set
 ;;; SB-PCL:*BUILT-IN-CLASSES*.
 (/show "about to set up SB-PCL::*BUILT-IN-CLASSES*")
@@ -377,34 +325,13 @@
 		     (/noshow sub)
 		     (when (member class (direct-supers sub))
 		       (res sub)))))
-	       (res)))
-	   (prototype (class-name)
-	     (let ((assoc (assoc class-name
-				 '((complex    . #c(1 1))
-				   (float      . 1.0)
-				   (integer    . 1)
-				   (ratio      . 1/2)
-				   (sequence   . nil)
-				   (list       . nil)
-				   (cons       . (nil))
-				   (array      . #2a((nil)))
-				   (vector     . #())
-				   (string     . "")
-				   (bit-vector . #*1)
-				   (character  . #\c)
-				   (symbol     . symbol)
-				   (null       . nil)))))
-	       (if assoc
-		   (cdr assoc)
-		   ;; This is the default prototype value which was
-		   ;; used, without explanation, by the CMU CL code
-		   ;; we're derived from. Evidently it's safe in all
-		   ;; relevant cases.
-		   42))))
+	       (res))))
     (mapcar (lambda (kernel-bic-entry)
 	      (/noshow "setting up" kernel-bic-entry)
 	      (let* ((name (car kernel-bic-entry))
-		     (class (find-classoid name)))
+		     (class (find-classoid name))
+		     (prototype-form
+		      (getf (cdr kernel-bic-entry) :prototype-form)))
 		(/noshow name class)
 		`(,name
 		  ,(mapcar #'classoid-name (direct-supers class))
@@ -416,7 +343,13 @@
 			(reverse
 			 (layout-inherits
 			  (classoid-layout class))))
-		  ,(prototype name))))
+		  ,(if prototype-form
+		       (eval prototype-form)
+		       ;; This is the default prototype value which
+		       ;; was used, without explanation, by the CMU CL
+		       ;; code we're derived from. Evidently it's safe
+		       ;; in all relevant cases.
+		       42))))
 	    (remove-if (lambda (kernel-bic-entry)
 			 (member (first kernel-bic-entry)
 				 ;; I'm not sure why these are removed from
