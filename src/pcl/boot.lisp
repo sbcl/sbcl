@@ -78,15 +78,6 @@ bootstrapping.
 ;;; then things break.)
 (declaim (declaration class))
 
-;;; FIXME: SB-KERNEL::PCL-CHECK-WRAPPER-VALIDITY-HOOK shouldn't be a
-;;; separate function. Instead, we should define a simple placeholder
-;;; version of SB-PCL:CHECK-WRAPPER-VALIDITY where
-;;; SB-KERNEL::PCL-CHECK-WRAPPER-VALIDITY is defined now, then just
-;;; let the later real PCL DEFUN of SB-PCL:CHECK-WRAPPER-VALIDITY
-;;; overwrite it.
-(setf (symbol-function 'sb-kernel::pcl-check-wrapper-validity-hook)
-      #'check-wrapper-validity)
-
 (declaim (notinline make-a-method
 		    add-named-method
 		    ensure-generic-function-using-class

@@ -196,7 +196,7 @@
   (declare (optimize speed))
   (when (layout-invalid obj-layout)
     (if (and (typep (sb!xc:class-of object) 'sb!xc:standard-class) object)
-	(setq obj-layout (pcl-check-wrapper-validity-hook object))
+	(setq obj-layout (sb!pcl::check-wrapper-validity object))
 	(error "TYPEP was called on an obsolete object (was class ~S)."
 	       (class-proper-name (layout-class obj-layout)))))
   (let ((layout (class-layout class))
@@ -208,8 +208,7 @@
 	  (when (eq (svref obj-inherits i) layout)
 	    (return t))))))
 
-;;; to be redefined as PCL::CHECK-WRAPPER-VALIDITY when PCL is loaded
-;;;
-;;; FIXME: should probably be renamed SB!PCL:CHECK-WRAPPER-VALIDITY
-(defun pcl-check-wrapper-validity-hook (object)
+;;; This implementation is a placeholder to use until PCL is set up,
+;;; at which time it will be overwritten by a real implementation.
+(defun sb!pcl::check-wrapper-validity (object)
   object)
