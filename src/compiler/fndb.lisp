@@ -1143,7 +1143,12 @@
 					   :rename-and-delete :overwrite
 					   :append :supersede nil))
 		       (:if-does-not-exist (member :error :create nil))
-		       (:external-format (member :default)))
+		       (:external-format
+			;; FIXME: This is logically (MEMBER :DEFAULT),
+			;; but as a workaround for bug 244, we don't
+			;; declare it (to keep the compiler from trusting
+			;; the declaration unchecked).
+			t))
   (or stream null))
 
 (defknown rename-file (pathname-designator filename)
@@ -1166,7 +1171,11 @@
    (:verbose t)
    (:print t)
    (:if-does-not-exist (member :error :create nil))
-   (:external-format (member :default)))
+   (:external-format
+    ;; FIXME: This is logically (MEMBER :DEFAULT), but as a workaround
+    ;; for bug 244, we don't declare it (to keep the compiler from
+    ;; trusting the declaration unchecked).
+    t))
   t)
 
 (defknown directory (pathname-designator &key)

@@ -153,6 +153,7 @@
   #!+sb-doc
   "Load the file given by FILESPEC into the Lisp environment, returning
    T on success."
+
   (unless (eq external-format :default)
     (error "Non-:DEFAULT EXTERNAL-FORMAT values are not supported."))
 
