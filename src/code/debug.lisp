@@ -247,7 +247,7 @@ Function and macro commands:
 ;;;; the BREAKPOINT-INFO structure
 
 ;;; info about a made breakpoint
-(defstruct breakpoint-info
+(defstruct (breakpoint-info (:copier nil))
   ;; where we are going to stop
   (place (required-argument)
 	 :type (or sb!di:code-location sb!di:debug-function))
@@ -486,7 +486,8 @@ Function and macro commands:
 	    (:print-object (lambda (x s)
 			     (print-unreadable-object (x s :type t)
 			       (write-string (unprintable-object-string x)
-					     s)))))
+					     s))))
+	    (:copier nil))
   string)
 
 ;;; Print FRAME with verbosity level 1. If we hit a &REST arg, then

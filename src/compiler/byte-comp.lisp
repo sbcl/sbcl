@@ -194,7 +194,7 @@
 ;;; number of bits devoted to coding byte-inline functions.
 (eval-when (:compile-toplevel :load-toplevel :execute)
 
-  (defstruct inline-function-info
+  (defstruct (inline-function-info (:copier nil))
     ;; the name of the function that we convert into calls to this
     (function (required-argument) :type symbol)
     ;; the name of the function that the interpreter should call to
@@ -269,10 +269,10 @@
 
 ;;;; annotations hung off the IR1 while compiling
 
-(defstruct byte-component-info
+(defstruct (byte-component-info (:copier nil))
   (constants (make-array 10 :adjustable t :fill-pointer 0)))
 
-(defstruct byte-lambda-info
+(defstruct (byte-lambda-info (:copier nil))
   (label nil :type (or null label))
   (stack-size 0 :type index)
   ;; FIXME: should be INTERESTING-P T :TYPE BOOLEAN
@@ -281,16 +281,17 @@
 (defun block-interesting (block)
   (byte-lambda-info-interesting (lambda-info (block-home-lambda block))))
 
-(defstruct byte-lambda-var-info
+(defstruct (byte-lambda-var-info (:copier nil))
   (argp nil :type (member t nil))
   (offset 0 :type index))
 
-(defstruct byte-nlx-info
+(defstruct (byte-nlx-info (:copier nil))
   (stack-slot nil :type (or null index))
   (label (sb!assem:gen-label) :type sb!assem:label)
   (duplicate nil :type (member t nil)))
 
 (defstruct (byte-block-info
+	    (:copier nil)
 	    (:include block-annotation)
 	    (:constructor make-byte-block-info
 			  (block &key produces produces-sset consumes
@@ -337,7 +338,8 @@
 (defstruct (byte-continuation-info
 	    (:include sset-element)
 	    (:constructor make-byte-continuation-info
-			  (continuation results placeholders)))
+			  (continuation results placeholders))
+	    (:copier nil))
   (continuation (required-argument) :type continuation)
   (results (required-argument)
 	   :type (or (member :fdefinition :eq-test :unknown) index))

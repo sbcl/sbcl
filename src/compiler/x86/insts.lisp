@@ -639,7 +639,8 @@
     (logior (ash (logand offset 1) 2)
 	    (ash offset -1))))
 
-(defstruct (ea (:constructor make-ea (size &key base index scale disp)))
+(defstruct (ea (:constructor make-ea (size &key base index scale disp))
+	       (:copier nil))
   (size nil :type (member :byte :word :dword))
   (base nil :type (or tn null))
   (index nil :type (or tn null))

@@ -12,30 +12,21 @@
 
 (in-package "SB!C")
 
-;;; FIXUP -- A fixup of some kind.
+;;; a fixup of some kind
 (defstruct (fixup
-	    (:constructor make-fixup (name flavor &optional offset)))
-  ;; The name and flavor of the fixup. The assembler makes no assumptions
-  ;; about the contents of these fields; their semantics are imposed by the
-  ;; dumper.
+	    (:constructor make-fixup (name flavor &optional offset))
+	    (:copier nil))
+  ;; the name and flavor of the fixup. The assembler makes no
+  ;; assumptions about the contents of these fields; their semantics
+  ;; are imposed by the dumper.
   name
   flavor
-  ;; OFFSET is an optional offset from whatever external label this fixup
-  ;; refers to. Or in the case of the :CODE-OBJECT flavor of fixups on the :X86
-  ;; architecture, NAME is always NIL, so this fixup doesn't refer to an
-  ;; external label, and OFFSET is an offset from the beginning of the
-  ;; current code block.
+  ;; OFFSET is an optional offset from whatever external label this
+  ;; fixup refers to. Or in the case of the :CODE-OBJECT flavor of
+  ;; fixups on the :X86 architecture, NAME is always NIL, so this
+  ;; fixup doesn't refer to an external label, and OFFSET is an offset
+  ;; from the beginning of the current code block.
   offset)
-
-;;; were done with another flavor
-
-(def!method print-object ((fixup fixup) stream)
-  (print-unreadable-object (fixup stream :type t)
-    (format stream
-	    ":FLAVOR ~S :NAME ~S :OFFSET ~S"
-	    (fixup-flavor fixup)
-	    (fixup-name fixup)
-	    (fixup-offset fixup))))
 
 ;;; KLUDGE: Despite its name, this is not a list of FIXUP objects, but rather a
 ;;; list of `(,KIND ,FIXUP ,POSN). Perhaps this non-mnemonicity could be

@@ -92,7 +92,8 @@
 ;;;; annotating IR1 for interpretation
 
 (defstruct (lambda-eval-info (:constructor make-lambda-eval-info
-					   (frame-size args-passed entries)))
+					   (frame-size args-passed entries))
+			     (:copier nil))
   frame-size		; number of stack locations needed to hold locals
   args-passed		; number of referenced arguments passed to lambda
   entries		; a-list mapping entry nodes to stack locations
@@ -101,7 +102,8 @@
   (print-unreadable-object (obj str :type t)))
 
 (defstruct (entry-node-info (:constructor make-entry-node-info
-					  (st-top nlx-tag)))
+					  (st-top nlx-tag))
+			    (:copier nil))
   st-top	; stack top when we encounter the entry node
   nlx-tag)	; tag to which to throw to get back entry node's context
 (def!method print-object ((obj entry-node-info) str)

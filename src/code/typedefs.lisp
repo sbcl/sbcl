@@ -41,8 +41,8 @@
   ;;   package!)
   (multiple-value-bind (whole wholeless-arglist)
       (if (eq '&whole (car arglist))
-	(values (cadr arglist) (cddr arglist))
-	(values (gensym) arglist))
+	  (values (cadr arglist) (cddr arglist))
+	  (values (gensym) arglist))
     (multiple-value-bind (forms decls) (parse-body body nil)
       `(progn
 	 (!cold-init-forms
@@ -58,8 +58,7 @@
 ;;; DEFVARs for these come later, after we have enough stuff defined.
 (declaim (special *wild-type* *universal-type* *empty-type*))
 
-;;; The XXX-Type structures include the CTYPE structure for some slots that
-;;; apply to all types.
+;;; the base class for the internal representation of types
 (def!struct (ctype (:conc-name type-)
 		   (:constructor nil)
 		   (:make-load-form-fun make-type-load-form)

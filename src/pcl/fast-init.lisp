@@ -178,7 +178,7 @@
 				     'initialize-info name)))
 		 *initialize-info-cached-slots*)))
     `(progn
-       (defstruct initialize-info
+       (defstruct (initialize-info (:copier nil))
 	 key wrapper
 	 ,@(mapcar #'(lambda (name)
 		       `(,name :unknown))

@@ -79,7 +79,8 @@
 
 ;;; a GENESIS-time representation of a memory space (e.g. read-only space,
 ;;; dynamic space, or static space)
-(defstruct (gspace (:constructor %make-gspace))
+(defstruct (gspace (:constructor %make-gspace)
+		   (:copier nil))
   ;; name and identifier for this GSPACE
   (name (required-argument) :type symbol :read-only t)
   (identifier (required-argument) :type fixnum :read-only t)
@@ -129,7 +130,8 @@
 
 (defstruct (descriptor
 	    (:constructor make-descriptor
-			  (high low &optional gspace word-offset)))
+			  (high low &optional gspace word-offset))
+	    (:copier nil))
   ;; the GSPACE that this descriptor is allocated in, or NIL if not set yet.
   (gspace nil :type (or gspace null))
   ;; the offset in words from the start of GSPACE, or NIL if not set yet

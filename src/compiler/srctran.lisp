@@ -217,8 +217,8 @@
 ;;; The basic interval type. It can handle open and closed intervals.
 ;;; A bound is open if it is a list containing a number, just like
 ;;; Lisp says. NIL means unbounded.
-(defstruct (interval
-	     (:constructor %make-interval))
+(defstruct (interval (:constructor %make-interval)
+		     (:copier nil))
   low high)
 
 (defun make-interval (&key low high)

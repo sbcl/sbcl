@@ -121,7 +121,8 @@
 	    #-no-ansi-print-object
 	    (:print-object (lambda (x s)
 			     (print-unreadable-object (x s :type t)
-			       (prin1 (class-info-name x))))))
+			       (prin1 (class-info-name x)))))
+	    (:copier nil))
   ;; name of this class
   (name nil :type keyword :read-only t)
   ;; List of Type-Info structures for each type in this class.
@@ -147,7 +148,8 @@
 				       "~S ~S, Number = ~D"
 				       (class-info-name (type-info-class x))
 				       (type-info-name x)
-				       (type-info-number x))))))
+				       (type-info-number x)))))
+	    (:copier nil))
   ;; the name of this type
   (name (required-argument) :type keyword)
   ;; this type's class
@@ -310,7 +312,8 @@
 ;;; type, then the inline type check will win. If the inline check
 ;;; didn't win, we would try to use the type system before it was
 ;;; properly initialized.
-(defstruct (info-env (:constructor nil))
+(defstruct (info-env (:constructor nil)
+		     (:copier nil))
   ;; some string describing what is in this environment, for
   ;; printing/debugging purposes only
   (name (required-argument) :type string))
@@ -468,7 +471,8 @@
 ;;; indirect through a parallel vector to find the index in the
 ;;; ENTRIES at which the entries for a given name starts.
 (defstruct (compact-info-env (:include info-env)
-			     #-sb-xc-host (:pure :substructure))
+			     #-sb-xc-host (:pure :substructure)
+			     (:copier nil))
   ;; If this value is EQ to the name we want to look up, then the
   ;; cache hit function can be called instead of the lookup function.
   (cache-name 0)
@@ -635,22 +639,23 @@
 
 ;;;; volatile environments
 
-;;; This is a closed hashtable, with the bucket being computed by taking the
-;;; GLOBALDB-SXHASHOID of the Name mod the table size.
-(defstruct (volatile-info-env (:include info-env))
-  ;; If this value is EQ to the name we want to look up, then the cache hit
-  ;; function can be called instead of the lookup function.
+;;; This is a closed hashtable, with the bucket being computed by
+;;; taking the GLOBALDB-SXHASHOID of the NAME modulo the table size.
+(defstruct (volatile-info-env (:include info-env)
+			      (:copier nil))
+  ;; If this value is EQ to the name we want to look up, then the
+  ;; cache hit function can be called instead of the lookup function.
   (cache-name 0)
-  ;; The alist translating type numbers to values for the currently cached
-  ;; name.
+  ;; the alist translating type numbers to values for the currently
+  ;; cached name
   (cache-types nil :type list)
-  ;; Vector of alists of alists of the form:
+  ;; vector of alists of alists of the form:
   ;;    ((Name . ((Type-Number . Value) ...) ...)
   (table (required-argument) :type simple-vector)
-  ;; The number of distinct names currently in this table (each name may have
-  ;; multiple entries, since there can be many types of info.
+  ;; the number of distinct names currently in this table. Each name
+  ;; may have multiple entries, since there can be many types of info.
   (count 0 :type index)
-  ;; The number of names at which we should grow the table and rehash.
+  ;; the number of names at which we should grow the table and rehash
   (threshold 0 :type index))
 
 ;;; Just like COMPACT-INFO-CACHE-HIT, only do it on a volatile environment.

@@ -142,7 +142,8 @@
 (def!method print-object ((x continuation) stream)
   (print-unreadable-object (x stream :type t :identity t)))
 
-(defstruct (node (:constructor nil))
+(defstruct (node (:constructor nil)
+		 (:copier nil))
   ;; the bottom-up derived type for this node. This does not take into
   ;; consideration output type assertions on this node (actually on its CONT).
   (derived-type *wild-type* :type ctype)
@@ -296,7 +297,8 @@
 ;;; The Block-Annotation structure is shared (via :INCLUDE) by
 ;;; different block-info annotation structures so that code
 ;;; (specifically control analysis) can be shared.
-(defstruct (block-annotation (:constructor nil))
+(defstruct (block-annotation (:constructor nil)
+			     (:copier nil))
   ;; The IR1 block that this block is in the INFO for.
   (block (required-argument) :type cblock)
   ;; the next and previous block in emission order (not DFO). This
@@ -309,7 +311,7 @@
 ;;; The Component structure provides a handle on a connected piece of
 ;;; the flow graph. Most of the passes in the compiler operate on
 ;;; components rather than on the entire flow graph.
-(defstruct component
+(defstruct (component (:copier nil))
   ;; The kind of component:
   ;;
   ;; NIL
@@ -383,7 +385,7 @@
   name
   (reanalyze :test reanalyze))
 
-;;; The Cleanup structure represents some dynamic binding action.
+;;; The CLEANUP structure represents some dynamic binding action.
 ;;; Blocks are annotated with the current cleanup so that dynamic
 ;;; bindings can be removed when control is transferred out of the
 ;;; binding environment. We arrange for changes in dynamic bindings to
@@ -395,7 +397,7 @@
 ;;; by requiring that the exit continuations initially head their
 ;;; blocks, and then by not merging blocks when there is a cleanup
 ;;; change.
-(defstruct cleanup
+(defstruct (cleanup (:copier nil))
   ;; The kind of thing that has to be cleaned up.
   (kind (required-argument)
 	:type (member :special-bind :catch :unwind-protect :block :tagbody))
@@ -412,7 +414,7 @@
   (nlx-info :test nlx-info))
 
 ;;; The ENVIRONMENT structure represents the result of environment analysis.
-(defstruct environment
+(defstruct (environment (:copier nil))
   ;; the function that allocates this environment
   (function (required-argument) :type clambda)
   ;; a list of all the lambdas that allocate variables in this environment
@@ -443,7 +445,7 @@
 ;;; The tail set is somewhat approximate, because it is too early to
 ;;; be sure which calls will be TR. Any call that *might* end up TR
 ;;; causes tail-set merging.
-(defstruct tail-set
+(defstruct (tail-set (:copier nil))
   ;; a list of all the lambdas in this tail set
   (functions nil :type list)
   ;; our current best guess of the type returned by these functions.
@@ -888,7 +890,8 @@
 ;;; initially (and forever) NIL, since REFs don't receive any values
 ;;; and don't have any IR1 optimizer.
 (defstruct (ref (:include node (:reoptimize nil))
-		(:constructor make-ref (derived-type leaf)))
+		(:constructor make-ref (derived-type leaf))
+		(:copier nil))
   ;; The leaf referenced.
   (leaf nil :type leaf))
 (defprinter (ref)
@@ -933,7 +936,8 @@
 ;;; function appears as the successor. The NODE-CONT remains the
 ;;; continuation which receives the value of the call.
 (defstruct (basic-combination (:include node)
-			      (:constructor nil))
+			      (:constructor nil)
+			      (:copier nil))
   ;; continuation for the function
   (fun (required-argument) :type continuation)
   ;; list of CONTINUATIONs for the args. In a local call, an argument
@@ -957,7 +961,8 @@
 ;;; including FUNCALL. This is distinct from BASIC-COMBINATION so that
 ;;; an MV-COMBINATION isn't COMBINATION-P.
 (defstruct (combination (:include basic-combination)
-			(:constructor make-combination (fun))))
+			(:constructor make-combination (fun))
+			(:copier nil)))
 (defprinter (combination)
   (fun :prin1 (continuation-use fun))
   (args :prin1 (mapcar (lambda (x)
@@ -970,23 +975,25 @@
 ;;; FUNCALL. This is used to implement all the multiple-value
 ;;; receiving forms.
 (defstruct (mv-combination (:include basic-combination)
-			   (:constructor make-mv-combination (fun))))
+			   (:constructor make-mv-combination (fun))
+			   (:copier nil)))
 (defprinter (mv-combination)
   (fun :prin1 (continuation-use fun))
   (args :prin1 (mapcar #'continuation-use args)))
 
-;;; The Bind node marks the beginning of a lambda body and represents
+;;; The BIND node marks the beginning of a lambda body and represents
 ;;; the creation and initialization of the variables.
-(defstruct (bind (:include node))
+(defstruct (bind (:include node)
+		 (:copier nil))
   ;; the lambda we are binding variables for. Null when we are
   ;; creating the LAMBDA during IR1 translation.
   (lambda nil :type (or clambda null)))
 (defprinter (bind)
   lambda)
 
-;;; The Return node marks the end of a lambda body. It collects the
+;;; The RETURN node marks the end of a lambda body. It collects the
 ;;; return values and represents the control transfer on return. This
-;;; is also where we stick information used for Tail-Set type
+;;; is also where we stick information used for TAIL-SET type
 ;;; inference.
 (defstruct (creturn (:include node)
 		    (:conc-name return-)
@@ -1015,7 +1022,8 @@
 ;;; The ENTRY node serves to mark the start of the dynamic extent of a
 ;;; lexical exit. It is the mess-up node for the corresponding :Entry
 ;;; cleanup.
-(defstruct (entry (:include node))
+(defstruct (entry (:include node)
+		  (:copier nil))
   ;; All of the Exit nodes for potential non-local exits to this point.
   (exits nil :type list)
   ;; The cleanup for this entry. NULL only temporarily.
@@ -1028,7 +1036,8 @@
 ;;; the returned value being delivered directly to the exit
 ;;; continuation, it is delivered to our VALUE continuation. The
 ;;; original exit continuation is the exit node's CONT.
-(defstruct (exit (:include node))
+(defstruct (exit (:include node)
+		 (:copier nil))
   ;; The Entry node that this is an exit for. If null, this is a
   ;; degenerate exit. A degenerate exit is used to "fill" an empty
   ;; block (which isn't allowed in IR1.) In a degenerate exit, Value
@@ -1047,14 +1056,15 @@
 	    #-no-ansi-print-object
 	    (:print-object (lambda (x s)
 			     (print-unreadable-object (x s :type t)
-			       (prin1 (undefined-warning-name x) s)))))
-  ;; The name of the unknown thing.
+			       (prin1 (undefined-warning-name x) s))))
+	    (:copier nil))
+  ;; the name of the unknown thing
   (name nil :type (or symbol list))
-  ;; The kind of reference to Name.
+  ;; the kind of reference to NAME
   (kind (required-argument) :type (member :function :type :variable))
-  ;; The number of times this thing was used.
+  ;; the number of times this thing was used
   (count 0 :type unsigned-byte)
-  ;; A list of COMPILER-ERROR-CONTEXT structures describing places
+  ;; a list of COMPILER-ERROR-CONTEXT structures describing places
   ;; where this thing was used. Note that we only record the first
   ;; *UNDEFINED-WARNING-LIMIT* calls.
   (warnings () :type list))

@@ -34,12 +34,12 @@
 
 ;;;; PRIMITIVE-TYPEs
 
-;;; The primitive type is used to represent the aspects of type
+;;; A PRIMITIVE-TYPE is used to represent the aspects of type
 ;;; interesting to the VM. Selection of IR2 translation templates is
 ;;; done on the basis of the primitive types of the operands, and the
 ;;; primitive type of a value is used to constrain the possible
 ;;; representations of that value.
-(defstruct primitive-type
+(defstruct (primitive-type (:copier nil))
   ;; the name of this PRIMITIVE-TYPE
   (name nil :type symbol)
   ;; a list of the SC numbers for all the SCs that a TN of this type
@@ -106,7 +106,8 @@
 ;;; and after IR2 conversion. It is stored in the BLOCK-INFO slot for
 ;;; the associated block.
 (defstruct (ir2-block (:include block-annotation)
-		      (:constructor make-ir2-block (block)))
+		      (:constructor make-ir2-block (block))
+		      (:copier nil))
   ;; the IR2-Block's number, which differs from Block's Block-Number
   ;; if any blocks are split. This is assigned by lifetime analysis.
   (number nil :type (or index null))
@@ -180,10 +181,11 @@
   (local-tn-count :test (not (zerop local-tn-count)))
   (%label :test %label))
 
-;;; An IR2-Continuation structure is used to annotate continuations
+;;; An IR2-CONTINUATION structure is used to annotate continuations
 ;;; that are used as a function result continuation or that receive MVs.
 (defstruct (ir2-continuation
-	    (:constructor make-ir2-continuation (primitive-type)))
+	    (:constructor make-ir2-continuation (primitive-type))
+	    (:copier nil))
   ;; If this is :DELAYED, then this is a single value continuation for
   ;; which the evaluation of the use is to be postponed until the
   ;; evaluation of destination. This can be done for ref nodes or
@@ -222,9 +224,9 @@
   primitive-type
   locs)
 
-;;; The IR2-Component serves mostly to accumulate non-code information
+;;; An IR2-COMPONENT serves mostly to accumulate non-code information
 ;;; about the component being compiled.
-(defstruct ir2-component
+(defstruct (ir2-component (:copier nil))
   ;; the counter used to allocate global TN numbers
   (global-tn-counter 0 :type index)
   ;; NORMAL-TNS is the head of the list of all the normal TNs that
@@ -309,7 +311,7 @@
 ;;; structures are somtimes created before they are initialized, since
 ;;; IR2 conversion may need to compile a forward reference. In this
 ;;; case the slots aren't actually initialized until entry analysis runs.
-(defstruct entry-info
+(defstruct (entry-info (:copier nil))
   ;; true if this function has a non-null closure environment
   (closure-p nil :type boolean)
   ;; a label pointing to the entry vector for this function, or NIL
@@ -328,7 +330,7 @@
 
 ;;; An IR2-ENVIRONMENT is used to annotate non-LET lambdas with their
 ;;; passing locations. It is stored in the Environment-Info.
-(defstruct ir2-environment
+(defstruct (ir2-environment (:copier nil))
   ;; the TNs that hold the passed environment within the function.
   ;; This is an alist translating from the NLX-Info or lambda-var to
   ;; the TN that holds the corresponding value within this function.
@@ -371,7 +373,7 @@
 ;;; A RETURN-INFO is used by GTN to represent the return strategy and
 ;;; locations for all the functions in a given TAIL-SET. It is stored
 ;;; in the TAIL-SET-INFO.
-(defstruct return-info
+(defstruct (return-info (:copier nil))
   ;; The return convention used:
   ;; -- If :UNKNOWN, we use the standard return convention.
   ;; -- If :FIXED, we use the known-values convention.
@@ -392,7 +394,7 @@
   types
   locations)
 
-(defstruct ir2-nlx-info
+(defstruct (ir2-nlx-info (:copier nil))
   ;; If the kind is :ENTRY (a lexical exit), then in the home
   ;; environment, this holds a VALUE-CELL object containing the unwind
   ;; block pointer. In the other cases nobody directly references the
@@ -410,53 +412,13 @@
   home
   save-sp
   dynamic-state)
-
-;;; FIXME: Delete? (was commented out in CMU CL)
-#|
-;;; The Loop structure holds information about a loop.
-(defstruct (cloop (:conc-name loop-)
-		  (:predicate loop-p)
-		  (:constructor make-loop)
-		  (:copier copy-loop))
-  ;; The kind of loop that this is. These values are legal:
-  ;;
-  ;;    :Outer
-  ;;	This is the outermost loop structure, and represents all the
-  ;;	code in a component.
-  ;;
-  ;;    :Natural
-  ;;	A normal loop with only one entry.
-  ;;
-  ;;    :Strange
-  ;;	A segment of a "strange loop" in a non-reducible flow graph.
-  (kind (required-argument) :type (member :outer :natural :strange))
-  ;; The first and last blocks in the loop. There may be more than one tail,
-  ;; since there may be multiple back branches to the same head.
-  (head nil :type (or cblock null))
-  (tail nil :type list)
-  ;; A list of all the blocks in this loop or its inferiors that have a
-  ;; successor outside of the loop.
-  (exits nil :type list)
-  ;; The loop that this loop is nested within. This is null in the outermost
-  ;; loop structure.
-  (superior nil :type (or cloop null))
-  ;; A list of the loops nested directly within this one.
-  (inferiors nil :type list)
-  ;; The head of the list of blocks directly within this loop. We must recurse
-  ;; on Inferiors to find all the blocks.
-  (blocks nil :type (or null cblock)))
-(defprinter (loop)
-  kind
-  head
-  tail
-  exits)
-|#
 
 ;;;; VOPs and templates
 
 ;;; A VOP is a Virtual Operation. It represents an operation and the
 ;;; operands to the operation.
-(defstruct (vop (:constructor make-vop (block node info args results)))
+(defstruct (vop (:constructor make-vop (block node info args results))
+		(:copier nil))
   ;; VOP-Info structure containing static info about the operation.
   (info nil :type (or vop-info null))
   ;; The IR2-Block this VOP is in.
@@ -495,7 +457,8 @@
 ;;; A TN-REF object contains information about a particular reference
 ;;; to a TN. The information in TN-REFs largely determines how TNs are
 ;;; packed.
-(defstruct (tn-ref (:constructor make-tn-ref (tn write-p)))
+(defstruct (tn-ref (:constructor make-tn-ref (tn write-p))
+		   (:copier nil))
   ;; the TN referenced
   (tn (required-argument) :type tn)
   ;; Is this is a write reference? (as opposed to a read reference)
@@ -776,7 +739,7 @@
 
 ;;; the SC structure holds the storage base that storage is allocated
 ;;; in and information used to select locations within the SB.
-(defstruct sc
+(defstruct (sc (:copier nil))
   ;; Name, for printing and reference.
   (name nil :type symbol)
   ;; The number used to index SC cost vectors.
@@ -850,7 +813,8 @@
 
 (defstruct (tn (:include sset-element)
 	       (:constructor make-random-tn)
-	       (:constructor make-tn (number kind primitive-type sc)))
+	       (:constructor make-tn (number kind primitive-type sc))
+	       (:copier nil))
   ;; The kind of TN this is:
   ;;
   ;;   :NORMAL
@@ -972,7 +936,8 @@
 ;;; lifetime analysis to represent the set of TNs live at the start of
 ;;; the IR2 block.
 (defstruct (global-conflicts
-	    (:constructor make-global-conflicts (kind tn block number)))
+	    (:constructor make-global-conflicts (kind tn block number))
+	    (:copier nil))
   ;; The IR2-Block that this structure represents the conflicts for.
   (block (required-argument) :type ir2-block)
   ;; Thread running through all the Global-Conflict for Block. This

@@ -215,9 +215,9 @@
 ;;;; we don't need to do horrible things like hand-copying the
 ;;;; direntry struct slot types into an alien struct.
 
-;;; FIXME: DIRECTORY is an external symbol of package CL, so we should use some
-;;; other name for this low-level implementation type.
-(defstruct directory
+;;; FIXME: DIRECTORY is an external symbol of package CL, so we should
+;;; use some other name for this low-level implementation type.
+(defstruct (directory (:copier nil))
   name
   (dir-struct (required-argument) :type system-area-pointer))
 (/show0 "unix.lisp 304")

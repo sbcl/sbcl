@@ -15,14 +15,15 @@
 
 (defstruct (constraint
 	    (:include sset-element)
-	    (:constructor make-constraint (number kind x y not-p)))
-  ;; The kind of constraint we have:
+	    (:constructor make-constraint (number kind x y not-p))
+	    (:copier nil))
+  ;; the kind of constraint we have:
   ;;
   ;; TYPEP
   ;;     X is a LAMBDA-VAR and Y is a CTYPE. The value of X is 
   ;;     constrained to be of type Y.
   ;;
-  ;; >, <
+  ;; > or <
   ;;     X is a lambda-var and Y is a CTYPE. The relation holds 
   ;;     between X and some object of type Y.
   ;;

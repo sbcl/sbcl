@@ -193,7 +193,8 @@
 
 ;;; These exist for caching data stored in packed binary form in
 ;;; compiler debug-functions. Debug-functions store these.
-(defstruct (debug-var (:constructor nil))
+(defstruct (debug-var (:constructor nil)
+		      (:copier nil))
   ;; the name of the variable
   (symbol (required-argument) :type symbol)
   ;; a unique integer identification relative to other variables with the same
@@ -216,7 +217,8 @@
 (defstruct (compiled-debug-var
 	    (:include debug-var)
 	    (:constructor make-compiled-debug-var
-			  (symbol id alive-p sc-offset save-sc-offset)))
+			  (symbol id alive-p sc-offset save-sc-offset))
+	    (:copier nil))
   ;; Storage class and offset. (unexported).
   (sc-offset nil :type sb!c::sc-offset)
   ;; Storage class and offset when saved somewhere.
@@ -224,14 +226,16 @@
 
 (defstruct (interpreted-debug-var
 	    (:include debug-var (alive-p t))
-	    (:constructor make-interpreted-debug-var (symbol ir1-var)))
+	    (:constructor make-interpreted-debug-var (symbol ir1-var))
+	    (:copier nil))
   ;; This is the IR1 structure that holds information about interpreted vars.
   (ir1-var nil :type sb!c::lambda-var))
 
 ;;;; frames
 
 ;;; These represent call-frames on the stack.
-(defstruct (frame (:constructor nil))
+(defstruct (frame (:constructor nil)
+		  (:copier nil))
   ;; the next frame up, or NIL when top frame
   (up nil :type (or frame null))
   ;; the previous frame down, or NIL when the bottom frame. Before
@@ -273,7 +277,8 @@
 	    (:constructor make-compiled-frame
 			  (pointer up debug-function code-location number
 				   #!+gengc saved-state-chain
-				   &optional escaped)))
+				   &optional escaped))
+	    (:copier nil))
   ;; This indicates whether someone interrupted the frame.
   ;; (unexported). If escaped, this is a pointer to the state that was
   ;; saved when we were interrupted. On the non-gengc system, this is
@@ -296,7 +301,8 @@
 	    (:include frame)
 	    (:constructor make-interpreted-frame
 			  (pointer up debug-function code-location number
-			   real-frame closure)))
+			   real-frame closure))
+	    (:copier nil))
   ;; This points to the compiled-frame for SB!EVAL:INTERNAL-APPLY-LOOP.
   (real-frame nil :type compiled-frame)
   ;; This is the closed over data used by the interpreter.
@@ -314,7 +320,7 @@
 ;;; code-locations and other objects that reference DEBUG-FUNCTIONs
 ;;; point to unique objects. This is due to the overhead in cached
 ;;; information.
-(defstruct debug-function
+(defstruct (debug-function (:copier nil))
   ;; Some representation of the function arguments. See
   ;; DEBUG-FUNCTION-LAMBDA-LIST.
   ;; NOTE: must parse vars before parsing arg list stuff.
@@ -334,7 +340,8 @@
 (defstruct (compiled-debug-function
 	    (:include debug-function)
 	    (:constructor %make-compiled-debug-function
-			  (compiler-debug-fun component)))
+			  (compiler-debug-fun component))
+	    (:copier nil))
   ;; Compiler's dumped debug-function information. (unexported).
   (compiler-debug-fun nil :type sb!c::compiled-debug-function)
   ;; Code object. (unexported).
@@ -360,7 +367,8 @@
 
 (defstruct (interpreted-debug-function
 	    (:include debug-function)
-	    (:constructor %make-interpreted-debug-function (ir1-lambda)))
+	    (:constructor %make-interpreted-debug-function (ir1-lambda))
+	    (:copier nil))
   ;; This is the IR1 lambda that this debug-function represents.
   (ir1-lambda nil :type sb!c::clambda))
 
@@ -368,7 +376,8 @@
 	    (:include debug-function)
 	    (:constructor make-bogus-debug-function
 			  (%name &aux (%lambda-list nil) (%debug-vars nil)
-				 (blocks nil) (%function nil))))
+				 (blocks nil) (%function nil)))
+	    (:copier nil))
   %name)
 
 (defvar *ir1-lambda-debug-function* (make-hash-table :test 'eq))
@@ -382,8 +391,9 @@
 ;;;; DEBUG-BLOCKs
 
 ;;; These exist for caching data stored in packed binary form in compiler
-;;; debug-blocks.
-(defstruct (debug-block (:constructor nil))
+;;; DEBUG-BLOCKs.
+(defstruct (debug-block (:constructor nil)
+			(:copier nil))
   ;; Code-locations where execution continues after this block.
   (successors nil :type list)
   ;; This indicates whether the block is a special glob of code shared by
@@ -408,14 +418,16 @@
 (defstruct (compiled-debug-block (:include debug-block)
 				 (:constructor
 				  make-compiled-debug-block
-				  (code-locations successors elsewhere-p)))
-  ;; Code-location information for the block.
+				  (code-locations successors elsewhere-p))
+				 (:copier nil))
+  ;; code-location information for the block
   (code-locations nil :type simple-vector))
 
 (defstruct (interpreted-debug-block (:include debug-block
 					      (elsewhere-p nil))
 				    (:constructor %make-interpreted-debug-block
-						  (ir1-block)))
+						  (ir1-block))
+				    (:copier nil))
   ;; This is the IR1 block this debug-block represents.
   (ir1-block nil :type sb!c::cblock)
   ;; Code-location information for the block.
@@ -466,7 +478,8 @@
 ;;; This is an internal structure that manages information about a
 ;;; breakpoint locations. See *COMPONENT-BREAKPOINT-OFFSETS*.
 (defstruct (breakpoint-data (:constructor make-breakpoint-data
-					  (component offset)))
+					  (component offset))
+			    (:copier nil))
   ;; This is the component in which the breakpoint lies.
   component
   ;; This is the byte offset into the component.
@@ -484,7 +497,8 @@
 	    (breakpoint-data-offset obj))))
 
 (defstruct (breakpoint (:constructor %make-breakpoint
-				     (hook-function what kind %info)))
+				     (hook-function what kind %info))
+		       (:copier nil))
   ;; This is the function invoked when execution encounters the
   ;; breakpoint. It takes a frame, the breakpoint, and optionally a
   ;; list of values. Values are supplied for :FUNCTION-END breakpoints
@@ -551,7 +565,8 @@
 
 ;;;; CODE-LOCATIONs
 
-(defstruct (code-location (:constructor nil))
+(defstruct (code-location (:constructor nil)
+			  (:copier nil))
   ;; This is the debug-function containing code-location.
   (debug-function nil :type debug-function)
   ;; This is initially :UNSURE. Upon first trying to access an
@@ -587,7 +602,8 @@
 	    (:constructor make-known-code-location
 			  (pc debug-function %tlf-offset %form-number
 			      %live-set kind &aux (%unknown-p nil)))
-	    (:constructor make-compiled-code-location (pc debug-function)))
+	    (:constructor make-compiled-code-location (pc debug-function))
+	    (:copier nil))
   ;; This is an index into debug-function's component slot.
   (pc nil :type sb!c::index)
   ;; This is a bit-vector indexed by a variable's position in
@@ -602,7 +618,8 @@
 	    (:include code-location
 		      (%unknown-p nil))
 	    (:constructor make-interpreted-code-location
-			  (ir1-node debug-function)))
+			  (ir1-node debug-function))
+	    (:copier nil))
   ;; This is an index into debug-function's component slot.
   (ir1-node nil :type sb!c::node))
 
@@ -3215,10 +3232,11 @@
 (defstruct (function-end-cookie
 	    (:print-object (lambda (obj str)
 			     (print-unreadable-object (obj str :type t))))
-	    (:constructor make-function-end-cookie (bogus-lra debug-fun)))
-  ;; This is a pointer to the bogus-lra created for :function-end bpts.
+	    (:constructor make-function-end-cookie (bogus-lra debug-fun))
+	    (:copier nil))
+  ;; a pointer to the bogus-lra created for :FUNCTION-END breakpoints
   bogus-lra
-  ;; This is the debug-function associated with the cookie.
+  ;; the debug-function associated with the cookie
   debug-fun)
 
 ;;; This maps bogus-lra-components to cookies, so that

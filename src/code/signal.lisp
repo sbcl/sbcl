@@ -104,7 +104,8 @@
 ;;;; utilities for dealing with signal names and numbers
 
 (defstruct (unix-signal
-	    (:constructor make-unix-signal (%name %number %description)))
+	    (:constructor make-unix-signal (%name %number %description))
+	    (:copier nil))
   %name				    ; signal keyword
   (%number nil :type integer)       ; UNIX signal number
   (%description nil :type string))  ; documentation

@@ -60,7 +60,7 @@
   ;; defaulted after creation
   (assigned-slots () :type list))
 
-(defstruct condition-slot
+(defstruct (condition-slot (:copier nil))
   (name (required-argument) :type symbol)
   ;; list of all applicable initargs
   (initargs (required-argument) :type list)

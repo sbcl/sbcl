@@ -258,13 +258,14 @@
 
 (defconstant lra-size (words-to-bytes 1))
 
-(defstruct offs-hook
+(defstruct (offs-hook (:copier nil))
   (offset 0 :type offset)
   (function (required-argument) :type function)
   (before-address nil :type (member t nil)))
 
 (defstruct (segment (:conc-name seg-)
-		    (:constructor %make-segment))
+		    (:constructor %make-segment)
+		    (:copier nil))
   (sap-maker (required-argument)
 	     :type (function () sb!sys:system-area-pointer))
   (length 0 :type length)
@@ -286,7 +287,8 @@
 ;;; information so that we can allow garbage collect during disassembly and
 ;;; not get tripped up by a code block being moved...
 (defstruct (disassem-state (:conc-name dstate-)
-			   (:constructor %make-dstate))
+			   (:constructor %make-dstate)
+			   (:copier nil))
   (cur-offs 0 :type offset)		; offset of current pos in segment
   (next-offs 0 :type offset)		; offset of next position
 
@@ -982,14 +984,14 @@
 
 ;;; getting at the source code...
 
-(defstruct (source-form-cache (:conc-name sfcache-))
+(defstruct (source-form-cache (:conc-name sfcache-)
+			      (:copier nil))
   (debug-source nil :type (or null sb!di:debug-source))
   (top-level-form-index -1 :type fixnum)
   (top-level-form nil :type list)
   (form-number-mapping-table nil :type (or null (vector list)))
   (last-location-retrieved nil :type (or null sb!di:code-location))
-  (last-form-retrieved -1 :type fixnum)
-  )
+  (last-form-retrieved -1 :type fixnum))
 
 (defun get-top-level-form (debug-source tlf-index)
   (let ((name (sb!di:debug-source-name debug-source)))
@@ -1092,11 +1094,10 @@
   (declare (type sb!kernel:code-component code))
   (sb!di::get-debug-info-function-map (sb!kernel:%code-debug-info code)))
 
-(defstruct location-group
-  (locations #() :type (vector (or list fixnum)))
-  )
+(defstruct (location-group (:copier nil))
+  (locations #() :type (vector (or list fixnum))))
 
-(defstruct storage-info
+(defstruct (storage-info (:copier nil))
   (groups nil :type list)		; alist of (name . location-group)
   (debug-vars #() :type vector))
 

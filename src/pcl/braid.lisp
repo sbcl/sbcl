@@ -317,7 +317,8 @@
 					(make-class-predicate-name name)))
 	  (set-slot 'defstruct-form
 		    `(defstruct (structure-object (:constructor
-						   ,constructor-sym))))
+						   ,constructor-sym)
+						  (:copier nil))))
 	  (set-slot 'defstruct-constructor constructor-sym)
 	  (set-slot 'from-defclass-p t)
 	  (set-slot 'plist nil)

@@ -215,8 +215,9 @@
 
   (values))
 
-;;; Do copy propagation on Component by initializing the flow analysis sets,
-;;; doing flow analysis, and then propagating copies using the results.
+;;; Do copy propagation on COMPONENT by initializing the flow analysis
+;;; sets, doing flow analysis, and then propagating copies using the
+;;; results.
 (defun copy-propagate (component)
   (setf (block-out (component-head component)) (make-sset))
   (do-blocks (block component)

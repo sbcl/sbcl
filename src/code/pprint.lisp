@@ -32,7 +32,8 @@
 				    (:out #'pretty-out)
 				    (:sout #'pretty-sout)
 				    (:misc #'pretty-misc))
-			  (:constructor make-pretty-stream (target)))
+			  (:constructor make-pretty-stream (target))
+			  (:copier nil))
   ;; Where the output is going to finally go.
   (target (required-argument) :type stream)
   ;; Line length we should format to. Cached here so we don't have to keep
@@ -152,7 +153,7 @@
 
 ;;;; logical blocks
 
-(defstruct logical-block
+(defstruct (logical-block (:copier nil))
   ;; The column this logical block started in.
   (start-column 0 :type column)
   ;; The column the current section started in.
@@ -240,7 +241,8 @@
 
 ;;;; the pending operation queue
 
-(defstruct (queued-op (:constructor nil))
+(defstruct (queued-op (:constructor nil)
+		      (:copier nil))
   (posn 0 :type posn))
 
 (defmacro enqueue (stream type &rest args)
@@ -262,12 +264,13 @@
 	 ,entry))))
 
 (defstruct (section-start (:include queued-op)
-			  (:constructor nil))
+			  (:constructor nil)
+			  (:copier nil))
   (depth 0 :type index)
   (section-end nil :type (or null newline block-end)))
 
-(defstruct (newline
-	    (:include section-start))
+(defstruct (newline (:include section-start)
+		    (:copier nil))
   (kind (required-argument)
 	:type (member :linear :fill :miser :literal :mandatory)))
 
@@ -282,16 +285,16 @@
 	(setf (section-start-section-end entry) newline))))
   (maybe-output stream (or (eq kind :literal) (eq kind :mandatory))))
 
-(defstruct (indentation
-	    (:include queued-op))
+(defstruct (indentation (:include queued-op)
+			(:copier nil))
   (kind (required-argument) :type (member :block :current))
   (amount 0 :type fixnum))
 
 (defun enqueue-indent (stream kind amount)
   (enqueue stream indentation :kind kind :amount amount))
 
-(defstruct (block-start
-	    (:include section-start))
+(defstruct (block-start (:include section-start)
+			(:copier nil))
   (block-end nil :type (or null block-end))
   (prefix nil :type (or null simple-string))
   (suffix nil :type (or null simple-string)))
@@ -314,8 +317,8 @@
     (setf (pretty-stream-pending-blocks stream)
 	  (cons start pending-blocks))))
 
-(defstruct (block-end
-	    (:include queued-op))
+(defstruct (block-end (:include queued-op)
+		      (:copier nil))
   (suffix nil :type (or null simple-string)))
 
 (defun end-logical-block (stream)
@@ -326,8 +329,8 @@
       (pretty-sout stream suffix 0 (length suffix)))
     (setf (block-start-block-end start) end)))
 
-(defstruct (tab
-	    (:include queued-op))
+(defstruct (tab (:include queued-op)
+		(:copier nil))
   (sectionp nil :type (member t nil))
   (relativep nil :type (member t nil))
   (colnum 0 :type column)
@@ -771,7 +774,7 @@
 (defvar *initial-pprint-dispatch*)
 (defvar *building-initial-table* nil)
 
-(defstruct pprint-dispatch-entry
+(defstruct (pprint-dispatch-entry (:copier nil))
   ;; The type specifier for this entry.
   (type (required-argument) :type t)
   ;; A function to test to see whether an object is of this time. Pretty must
@@ -793,7 +796,7 @@
 	    (pprint-dispatch-entry-priority entry)
 	    (pprint-dispatch-entry-initial-p entry))))
 
-(defstruct pprint-dispatch-table
+(defstruct (pprint-dispatch-table (:copier nil))
   ;; A list of all the entries (except for CONS entries below) in highest
   ;; to lowest priority.
   (entries nil :type list)

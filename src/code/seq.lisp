@@ -81,7 +81,7 @@
 		  :datum type
 		  :expected-type '(or vector cons)
 		  :format-control
-		  "NIL output type invalid for this sequence function."
+		  "A NIL output type is invalid for this sequence function."
 		  :format-arguments ())))
       ((dolist (seq-type '(list string simple-vector bit-vector))
 	 (when (csubtypep type (specifier-type seq-type))

@@ -323,7 +323,7 @@
 ;;;; proclamation, we can check the actual type for compatibity with the
 ;;;; previous uses.
 
-(defstruct (approximate-function-type)
+(defstruct (approximate-function-type (:copier nil))
   ;; The smallest and largest numbers of arguments that this function has been
   ;; called with.
   (min-args call-arguments-limit :type fixnum)
@@ -336,7 +336,7 @@
   ;; describing each argument position in which the keyword appeared.
   (keys () :type list))
 
-(defstruct (approximate-key-info)
+(defstruct (approximate-key-info (:copier nil))
   ;; The keyword name of this argument. Although keyword names don't have to
   ;; be keywords, we only match on keywords when figuring an approximate type.
   (name (required-argument) :type keyword)

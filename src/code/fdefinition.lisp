@@ -175,7 +175,8 @@
 ;;;; definition encapsulation
 
 (defstruct (encapsulation-info (:constructor make-encapsulation-info
-					     (type definition)))
+					     (type definition))
+			       (:copier nil))
   ;; This is definition's encapsulation type. The encapsulated
   ;; definition is in the previous encapsulation-info element or
   ;; installed as the global definition of some function name.

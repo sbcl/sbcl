@@ -745,7 +745,7 @@
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
 
-(defstruct event-info
+(defstruct (event-info (:copier nil))
   ;; The name of this event.
   (name (required-argument) :type symbol)
   ;; The string rescribing this event.

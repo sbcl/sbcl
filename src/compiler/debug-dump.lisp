@@ -25,7 +25,8 @@
 ;;; The LOCATION-INFO structure holds the information what we need
 ;;; about locations which code generation decided were "interesting".
 (defstruct (location-info
-	    (:constructor make-location-info (kind label vop)))
+	    (:constructor make-location-info (kind label vop))
+	    (:copier nil))
   ;; The kind of location noted.
   (kind nil :type location-kind)
   ;; The label pointing to the interesting code location.

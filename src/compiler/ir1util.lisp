@@ -1311,7 +1311,8 @@
 (defstruct (compiler-error-context
 	    #-no-ansi-print-object
 	    (:print-object (lambda (x stream)
-			     (print-unreadable-object (x stream :type t)))))
+			     (print-unreadable-object (x stream :type t))))
+	    (:copier nil))
   ;; A list of the stringified CARs of the enclosing non-original source forms
   ;; exceeding the *enclosing-source-cutoff*.
   (enclosing-source nil :type list)

@@ -12,7 +12,7 @@
 
 (in-package "SB!VM")
 
-;; The move-argument vop is going to store args on the stack for
+;; The MOVE-ARGUMENT vop is going to store args on the stack for
 ;; call-out. These tn's will be used for that. move-arg is normally
 ;; used for things going down the stack but C wants to have args
 ;; indexed in the positive direction.
@@ -22,7 +22,7 @@
 		 (sc-number-or-lose sc-name)
 		 offset))
 
-(defstruct arg-state
+(defstruct (arg-state (:copier nil))
   (stack-frame-size 0))
 
 (def-alien-type-method (integer :arg-tn) (type state)
@@ -61,7 +61,7 @@
     (setf (arg-state-stack-frame-size state) (1+ stack-frame-size))
     (my-make-wired-tn 'single-float 'single-stack stack-frame-size)))
 
-(defstruct result-state
+(defstruct (result-state (:copier nil))
   (num-results 0))
 
 (defun result-reg-offset (slot)

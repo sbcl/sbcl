@@ -103,7 +103,7 @@
 
 ;;;; cached functions
 
-(defstruct function-cache
+(defstruct (function-cache (:copier nil))
   (printers nil :type list)
   (labellers nil :type list)
   (prefilters nil :type list))
@@ -221,7 +221,8 @@
 					   length
 					   mask id
 					   printer
-					   labeller prefilter control)))
+					   labeller prefilter control))
+			(:copier nil))
   (name nil :type (or symbol string))
   (format-name nil :type (or symbol string))
 
@@ -248,23 +249,25 @@
 ;;;; an instruction space holds all known machine instructions in a form that
 ;;;; can be easily searched
 
-(defstruct (inst-space (:conc-name ispace-))
+(defstruct (inst-space (:conc-name ispace-)
+		       (:copier nil))
   (valid-mask dchunk-zero :type dchunk)	; applies to *children*
   (choices nil :type list))
 (def!method print-object ((ispace inst-space) stream)
   (print-unreadable-object (ispace stream :type t :identity t)))
 
-(defstruct (inst-space-choice (:conc-name ischoice-))
+(defstruct (inst-space-choice (:conc-name ischoice-)
+			      (:copier nil))
   (common-id dchunk-zero :type dchunk)	; applies to *parent's* mask
   (subspace (required-argument) :type (or inst-space instruction)))
 
 ;;;; These are the kind of values we can compute for an argument, and
-;;;; how to compute them. The :checker functions make sure that a given
+;;;; how to compute them. The :CHECKER functions make sure that a given
 ;;;; argument is compatible with another argument for a given use.
 
 (defvar *arg-form-kinds* nil)
 
-(defstruct arg-form-kind
+(defstruct (arg-form-kind (:copier nil))
   (names nil :type list)
   (producer (required-argument) :type function)
   (checker (required-argument) :type function))
@@ -306,7 +309,8 @@
   (prefilter nil)
   (use-label nil))
 
-(defstruct (instruction-format (:conc-name format-))
+(defstruct (instruction-format (:conc-name format-)
+			       (:copier nil))
   (name nil)
   (args nil :type list)
 
@@ -316,7 +320,9 @@
 
 ;;; A FUNSTATE holds the state of any arguments used in a disassembly
 ;;; function.
-(defstruct (funstate (:conc-name funstate-) (:constructor %make-funstate))
+(defstruct (funstate (:conc-name funstate-)
+		     (:constructor %make-funstate)
+		     (:copier nil))
   (args nil :type list)
   (arg-temps nil :type list))		; See below.
 
@@ -351,7 +357,8 @@
 ;;;; (notably functions), we sometimes use a VALSRC structure to keep track of
 ;;;; the source from which they were derived.
 
-(defstruct (valsrc (:constructor %make-valsrc))
+(defstruct (valsrc (:constructor %make-valsrc)
+		   (:copier nil))
   (value nil)
   (source nil))
 
@@ -968,7 +975,8 @@
       (valsrc-value thing)
       thing))
 
-(defstruct (cached-function (:conc-name cached-fun-))
+(defstruct (cached-function (:conc-name cached-fun-)
+			    (:copier nil))
   (funstate nil :type (or null funstate))
   (constraint nil :type list)
   (name nil :type (or null symbol)))

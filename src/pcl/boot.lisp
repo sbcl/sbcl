@@ -707,7 +707,7 @@ bootstrapping.
 		`(not (null .next-method.))))
      ,@body))
 
-(defstruct method-call
+(defstruct (method-call (:copier nil))
   (function #'identity :type function)
   call-method-args)
 
@@ -728,7 +728,7 @@ bootstrapping.
 			     `(list ,@required-args+rest-arg))
 			(method-call-call-method-args ,method-call)))
 
-(defstruct fast-method-call
+(defstruct (fast-method-call (:copier nil))
   (function #'identity :type function)
   pv-cell
   next-method-call
@@ -745,7 +745,7 @@ bootstrapping.
 		(fast-method-call-next-method-call ,method-call)
 		,@required-args+rest-arg))
 
-(defstruct fast-instance-boundp
+(defstruct (fast-instance-boundp (:copier nil))
   (index 0 :type fixnum))
 
 #-sb-fluid (declaim (sb-ext:freeze-type fast-instance-boundp))
@@ -1426,7 +1426,8 @@ bootstrapping.
 
 (defstruct (arg-info
 	     (:conc-name nil)
-	     (:constructor make-arg-info ()))
+	     (:constructor make-arg-info ())
+	     (:copier nil))
   (arg-info-lambda-list :no-lambda-list)
   arg-info-precedence
   arg-info-metatypes

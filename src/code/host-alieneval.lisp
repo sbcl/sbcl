@@ -30,7 +30,7 @@
 
 (eval-when (:compile-toplevel :execute :load-toplevel)
 
-(defstruct alien-type-class
+(defstruct (alien-type-class (:copier nil))
   (name nil :type symbol)
   (include nil :type (or null alien-type-class))
   (unparse nil :type (or null function))
@@ -109,8 +109,8 @@
 			(:constructor
 			 ,(symbolicate "MAKE-" defstruct-name)
 			 (&key class bits alignment
-			       ,@(mapcar #'(lambda (x)
-					     (if (atom x) x (car x)))
+			       ,@(mapcar (lambda (x)
+					   (if (atom x) x (car x)))
 					 slots)
 			       ,@include-args)))
 	   ,@slots)))))

@@ -15,8 +15,7 @@
   '(simple-array (unsigned-byte 8) (#.char-code-limit)))
 
 (sb!xc:defstruct (readtable (:conc-name nil)
-			    (:predicate readtablep)
-			    (:copier nil))
+			    (:predicate readtablep))
   #!+sb-doc
   "Readtable is a data structure that maps characters into syntax
    types for the Common Lisp expression reader."

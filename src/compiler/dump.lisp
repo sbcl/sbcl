@@ -25,7 +25,8 @@
 	    #-no-ansi-print-object
 	    (:print-object (lambda (x s)
 			     (print-unreadable-object (x s :type t)
-			       (prin1 (namestring (fasl-file-stream x)) s)))))
+			       (prin1 (namestring (fasl-file-stream x)) s))))
+	    (:copier nil))
   ;; the stream we dump to
   (stream (required-argument) :type stream)
   ;; hashtables we use to keep track of dumped constants so that we
@@ -69,7 +70,7 @@
   (valid-structures (make-hash-table :test 'eq) :type hash-table))
 
 ;;; This structure holds information about a circularity.
-(defstruct circularity
+(defstruct (circularity (:copier nil))
   ;; the kind of modification to make to create circularity
   (type (required-argument) :type (member :rplaca :rplacd :svset :struct-set))
   ;; the object containing circularity

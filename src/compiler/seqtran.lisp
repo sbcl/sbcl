@@ -384,7 +384,8 @@
 ;;; the arguments to IR1 transforms. It bundles together the name of
 ;;; the argument (which should be referenced in any expansion), and
 ;;; the continuation for that argument (or NIL if unsupplied.)
-(defstruct (arg (:constructor %make-arg (name cont)))
+(defstruct (arg (:constructor %make-arg (name cont))
+		(:copier nil))
   (name nil :type symbol)
   (cont nil :type (or continuation null)))
 (defmacro make-arg (name)
@@ -421,7 +422,7 @@
 	     (eql (continuation-value cont) x)))
       (eql default x)))
 
-(defstruct iterator
+(defstruct (iterator (:copier nil))
   ;; The kind of iterator.
   (kind nil (member :normal :result))
   ;; A list of LET* bindings to create the initial state.

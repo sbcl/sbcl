@@ -13,6 +13,8 @@
 
 ;;; FIXME: It might make sense to replace this with something
 ;;; with finer resolution, e.g. milliseconds or microseconds.
+;;; For that matter, maybe we should boost the internal clock
+;;; up to something faster, like milliseconds.
 
 (defconstant +ticks-per-second+ internal-time-units-per-second)
 
@@ -21,18 +23,18 @@
 
 ;;;; PCOUNTER
 
-;;; a PCOUNTER is used to represent an integer quantity which can grow
-;;; bigger than a fixnum, but typically does so, if at all, in many
-;;; small steps, where we don't want to cons on every step. (Total
-;;; system consing, time spent in a profiled function, and bytes
-;;; consed in a profiled function are all examples of such
+;;; a PCOUNTER is used to represent an unsigned integer quantity which
+;;; can grow bigger than a fixnum, but typically does so, if at all,
+;;; in many small steps, where we don't want to cons on every step.
+;;; (Total system consing, time spent in a profiled function, and
+;;; bytes consed in a profiled function are all examples of such
 ;;; quantities.)
 (defstruct (pcounter (:copier nil))
-  (integer 0 :type integer)
-  (fixnum 0 :type fixnum))
+  (integer 0 :type unsigned-byte)
+  (fixnum 0 :type (and fixnum unsigned-byte)))
 
 (declaim (ftype (function (pcounter integer) pcounter) incf-pcounter))
-(declaim (inline incf-pcounter))
+;;;(declaim (inline incf-pcounter)) ; FIXME: maybe inline when more stable
 (defun incf-pcounter (pcounter delta)
   (let ((sum (+ (pcounter-fixnum pcounter) delta)))
     (cond ((typep sum 'fixnum)
@@ -43,7 +45,7 @@
   pcounter)
 
 (declaim (ftype (function (pcounter) integer) pcounter->integer))
-(declaim (inline pcounter->integer))
+;;;(declaim (inline pcounter->integer)) ; FIXME: maybe inline when more stable
 (defun pcounter->integer (pcounter)
   (+ (pcounter-integer pcounter)
      (pcounter-fixnum pcounter)))
@@ -55,7 +57,7 @@
 ;;;; FIXNUM overflows.
 
 (declaim (ftype (function ((or pcounter fixnum) integer) (or pcounter fixnum)) %incf-pcounter-or-fixnum))
-(declaim (inline %incf-pcounter-or-fixnum))
+;;;(declaim (inline %incf-pcounter-or-fixnum)) ; FIXME: maybe inline when more stable
 (defun %incf-pcounter-or-fixnum (x delta)
   (etypecase x
     (fixnum
@@ -111,7 +113,7 @@
 ;;; name. This holds the functions that we call to manipulate the
 ;;; closure which implements the encapsulation.
 (defvar *profiled-function-name->info* (make-hash-table))
-(defstruct profile-info
+(defstruct (profile-info (:copier nil))
   (name              (required-argument) :read-only t)
   (encapsulated-fun  (required-argument) :type function :read-only t)
   (encapsulation-fun (required-argument) :type function :read-only t)
@@ -139,7 +141,7 @@
 (declaim (type (or pcounter fixnum) *enclosed-profiles*))
 
 ;;; the components of profiling overhead
-(defstruct overhead
+(defstruct (overhead (:copier nil))
   ;; the number of ticks a bare function call takes. This is
   ;; factored into the other overheads, but not used for itself.
   (call (required-argument) :type single-float :read-only t)
@@ -364,7 +366,7 @@
 
 ;;;; reporting results
 
-(defstruct time-info
+(defstruct (time-info (:copier nil))
   name
   calls
   seconds

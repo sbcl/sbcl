@@ -663,7 +663,9 @@
 			     (:constructor #!-high-security-support
 					   make-broadcast-stream
 					   #!+high-security-support
-					   %make-broadcast-stream (&rest streams)))
+					   %make-broadcast-stream (&rest
+								   streams))
+			     (:copier nil))
   ;; a list of all the streams we broadcast to
   (streams () :type list :read-only t))
 
@@ -726,7 +728,8 @@
 				     (bout #'synonym-bout)
 				     (sout #'synonym-sout)
 				     (misc #'synonym-misc))
-			   (:constructor make-synonym-stream (symbol)))
+			   (:constructor make-synonym-stream (symbol))
+			   (:copier nil))
   ;; This is the symbol, the value of which is the stream we are synonym to.
   (symbol nil :type symbol :read-only t))
 (def!method print-object ((x synonym-stream) stream)
@@ -786,7 +789,8 @@
 	    (:constructor #!-high-security-support
 			  make-two-way-stream
 			  #!+high-security-support
-			  %make-two-way-stream (input-stream output-stream)))
+			  %make-two-way-stream (input-stream output-stream))
+	    (:copier nil))
   (input-stream (required-argument) :type stream :read-only t)
   (output-stream (required-argument) :type stream :read-only t))
 (def!method print-object ((x two-way-stream) stream)
@@ -886,7 +890,8 @@
 	    (:constructor
 	     #!-high-security-support make-concatenated-stream
 	     #!+high-security-support %make-concatenated-stream
-		 (&rest streams &aux (current streams))))
+		 (&rest streams &aux (current streams)))
+	    (:copier nil))
   ;; The car of this is the stream we are reading from now.
   current
   ;; This is a list of all the streams. We need to remember them so that
@@ -976,7 +981,8 @@
 		      (bin #'echo-bin)
 		      (misc #'echo-misc)
 		      (n-bin #'ill-bin))
-	    (:constructor make-echo-stream (input-stream output-stream)))
+	    (:constructor make-echo-stream (input-stream output-stream))
+	    (:copier nil))
   unread-stuff)
 (def!method print-object ((x echo-stream) stream)
   (print-unreadable-object (x stream :type t :identity t)
@@ -1041,7 +1047,8 @@
 		       (n-bin #'string-stream-read-n-bytes)
 		       (misc #'string-in-misc))
 	     (:constructor internal-make-string-input-stream
-			   (string current end)))
+			   (string current end))
+	     (:copier nil))
   (string nil :type simple-string)
   (current nil :type index)
   (end nil :type index))
@@ -1130,7 +1137,8 @@
 		      (out #'string-ouch)
 		      (sout #'string-sout)
 		      (misc #'string-out-misc))
-	    (:constructor make-string-output-stream ()))
+	    (:constructor make-string-output-stream ())
+	    (:copier nil))
   ;; The string we throw stuff in.
   (string (make-string 40) :type simple-string)
   ;; Index of the next location to use.
@@ -1191,10 +1199,9 @@
 	   (return count))))
     (:element-type 'base-char)))
 
+;;; Return a string of all the characters sent to a stream made by
+;;; MAKE-STRING-OUTPUT-STREAM since the last call to this function.
 (defun get-output-stream-string (stream)
-  #!+sb-doc
-  "Returns a string of all the characters sent to a stream made by
-   Make-String-Output-Stream since the last call to this function."
   (declare (type string-output-stream stream))
   (let* ((length (string-output-stream-index stream))
 	 (result (make-string length)))
@@ -1202,26 +1209,27 @@
     (setf (string-output-stream-index stream) 0)
     result))
 
+;;; Dump the characters buffer up in IN-STREAM to OUT-STREAM as
+;;; GET-OUTPUT-STREAM-STRING would return them.
 (defun dump-output-stream-string (in-stream out-stream)
-  #!+sb-doc
-  "Dumps the characters buffer up in the In-Stream to the Out-Stream as
-  Get-Output-Stream-String would return them."
   (write-string* (string-output-stream-string in-stream) out-stream
 		 0 (string-output-stream-index in-stream))
   (setf (string-output-stream-index in-stream) 0))
 
 ;;;; fill-pointer streams
 
-;;; Fill pointer string output streams are not explicitly mentioned in the CLM,
-;;; but they are required for the implementation of With-Output-To-String.
+;;; Fill pointer STRING-OUTPUT-STREAMs are not explicitly mentioned in
+;;; the CLM, but they are required for the implementation of
+;;; WITH-OUTPUT-TO-STRING.
 
 (defstruct (fill-pointer-output-stream
  	    (:include lisp-stream
 		      (out #'fill-pointer-ouch)
 		      (sout #'fill-pointer-sout)
 		      (misc #'fill-pointer-misc))
-	    (:constructor make-fill-pointer-output-stream (string)))
-  ;; The string we throw stuff in.
+	    (:constructor make-fill-pointer-output-stream (string))
+	    (:copier nil))
+  ;; the string we throw stuff in
   string)
 
 (defun fill-pointer-ouch (stream character)
@@ -1313,7 +1321,8 @@
 				       (out #'indenting-out)
 				       (sout #'indenting-sout)
 				       (misc #'indenting-misc))
-			     (:constructor make-indenting-stream (stream)))
+			     (:constructor make-indenting-stream (stream))
+			     (:copier nil))
   ;; the stream we're based on
   stream
   ;; how much we indent on each line
@@ -1396,7 +1405,8 @@
 (defstruct (case-frob-stream
 	    (:include lisp-stream
 		      (:misc #'case-frob-misc))
-	    (:constructor %make-case-frob-stream (target out sout)))
+	    (:constructor %make-case-frob-stream (target out sout))
+	    (:copier nil))
   (target (required-argument) :type stream))
 
 (defun make-case-frob-stream (target kind)
@@ -1628,7 +1638,8 @@
 ;;;; public interface from "EXTENSIONS" package
 
 (defstruct (stream-command (:constructor make-stream-command
-					 (name &optional args)))
+					 (name &optional args))
+			   (:copier nil))
   (name nil :type symbol)
   (args nil :type list))
 (def!method print-object ((obj stream-command) str)

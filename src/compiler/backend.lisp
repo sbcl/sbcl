@@ -168,7 +168,7 @@
 	     `(progn
 		(eval-when (:compile-toplevel :load-toplevel :execute)
 		  (defparameter *vm-support-routines* ',routines))
-		(defstruct vm-support-routines
+		(defstruct (vm-support-routines (:copier nil))
 		  ,@(mapcar #'(lambda (routine)
 				`(,routine nil :type (or function null)))
 			    routines))

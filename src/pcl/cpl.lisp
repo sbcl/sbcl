@@ -78,11 +78,12 @@
   (compute-std-cpl root (class-direct-superclasses root)))
 
 (defstruct (class-precedence-description
-	     (:conc-name nil)
-	     (:print-object (lambda (obj str)
-			      (print-unreadable-object (obj str :type t)
-				(format str "~D" (cpd-count obj)))))
-	     (:constructor make-cpd ()))
+	    (:conc-name nil)
+	    (:print-object (lambda (obj str)
+			     (print-unreadable-object (obj str :type t)
+			       (format str "~D" (cpd-count obj)))))
+	    (:constructor make-cpd ())
+	    (:copier nil))
   (cpd-class  nil)
   (cpd-supers ())
   (cpd-after  ())

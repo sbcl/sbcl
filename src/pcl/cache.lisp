@@ -271,7 +271,8 @@
 		      ;; default here. -- WHN 19991204
 		      (invalid nil))
 	    (:conc-name %wrapper-)
-	    (:constructor make-wrapper-internal))
+	    (:constructor make-wrapper-internal)
+	    (:copier nil))
   (instance-slots-layout nil :type list)
   (class-slots nil :type list))
 #-sb-fluid (declaim (sb-ext:freeze-type wrapper))

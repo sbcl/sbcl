@@ -46,7 +46,8 @@
 	     (lambda (x stream)
 	       (print-unreadable-object (x stream :type t :identity t)
 		 (prin1 (byte-function-name (byte-closure-function x))
-			stream)))))
+			stream))))
+	    (:copier nil))
   ;; the byte function that we call
   (function (required-argument) :type byte-function)
   ;; the closure data vector
@@ -56,7 +57,8 @@
 ;;; object for a closure)
 (defstruct (byte-function (:include byte-function-or-closure)
 			  (:type funcallable-structure)
-			  (:constructor nil))
+			  (:constructor nil)
+			  (:copier nil))
   ;; The component that this XEP is an entry point into. NIL until
   ;; LOAD or MAKE-CORE-BYTE-COMPONENT fills it in. They count on this
   ;; being the first slot.
@@ -73,7 +75,8 @@
 
 ;;; fixed-argument byte function
 (defstruct (simple-byte-function (:include byte-function)
-				 (:type funcallable-structure))
+				 (:type funcallable-structure)
+				 (:copier nil))
   ;; The number of arguments expected.
   (num-args 0 :type (integer 0 #.call-arguments-limit))
   ;; The start of the function.
@@ -81,7 +84,8 @@
 
 ;;; variable-arg-count byte function
 (defstruct (hairy-byte-function (:include byte-function)
-				(:type funcallable-structure))
+				(:type funcallable-structure)
+				(:copier nil))
   ;; The minimum and maximum number of args, ignoring &REST and &KEY.
   (min-args 0 :type (integer 0 #.call-arguments-limit))
   (max-args 0 :type (integer 0 #.call-arguments-limit))

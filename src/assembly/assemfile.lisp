@@ -63,7 +63,7 @@
       (close-fasl-file *lap-output-file* (not won)))
     won))
 
-(defstruct reg-spec
+(defstruct (reg-spec (:copier nil))
   (kind :temp :type (member :arg :temp :res))
   (name nil :type symbol)
   (temp nil :type symbol)

@@ -104,7 +104,10 @@ WORKAROUND:
   The situation is complicated by the presence of Common Lisp types
   like UNSIGNED-BYTE (which can either be used in list form or alone)
   so I'm not 100% sure that the behavior above is actually illegal.
-  But I'm 90+% sure, and someday perhaps I'll be motivated to look it up..
+  But I'm 90+% sure, and the following related behavior,
+	(TYPEP 11 'AND) => T
+  treating the bare symbol AND as equivalent to '(AND), is specifically
+  forbidden (by the ANSI specification of the AND type).
 
 11:
   It would be nice if the
@@ -801,6 +804,13 @@ Error in function C::GET-LAMBDA-TO-COMPILE:
   them as methods, and identified their generic functions and
   specializers.
 
+83:
+  RANDOM-INTEGER-EXTRA-BITS=10 may not be large enough for the RANDOM
+  RNG to be high quality near RANDOM-FIXNUM-MAX; it looks as though
+  the mean of the distribution can be systematically O(0.1%) wrong.
+  Just increasing R-I-E-B is probably not a good solution, since
+  it would decrease efficiency more than is probably necessary. Perhaps
+  using some sort of accept/reject method would be better.
 
 KNOWN BUGS RELATED TO THE IR1 INTERPRETER
 

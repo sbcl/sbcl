@@ -25,7 +25,7 @@
 ;;;; the SEGMENT structure
 
 ;;; This structure holds the state of the assembler.
-(defstruct segment
+(defstruct (segment (:copier nil))
   ;; the name of this segment (for debugging output and stuff)
   (name "Unnamed" :type simple-base-string)
   ;; Ordinarily this is a vector where instructions are written. If
@@ -146,7 +146,8 @@
 (defstruct (instruction
 	    (:include sset-element)
 	    (:conc-name inst-)
-	    (:constructor make-instruction (number emitter attributes delay)))
+	    (:constructor make-instruction (number emitter attributes delay))
+	    (:copier nil))
   ;; The function to envoke to actually emit this instruction. Gets called
   ;; with the segment as its one argument.
   (emitter (required-argument) :type (or null function))
@@ -627,14 +628,16 @@ p	    ;; the branch has two dependents and one of them dpends on
 ;;;; structure used during output emission
 
 ;;; common supertype for all the different kinds of annotations
-(defstruct (annotation (:constructor nil))
+(defstruct (annotation (:constructor nil)
+		       (:copier nil))
   ;; Where in the raw output stream was this annotation emitted.
   (index 0 :type index)
   ;; What position does that correspond to.
   (posn nil :type (or index null)))
 
 (defstruct (label (:include annotation)
-		  (:constructor gen-label ()))
+		  (:constructor gen-label ())
+		  (:copier nil))
   ;; (doesn't need any additional information beyond what is in the
   ;; annotation structure)
   )
@@ -649,7 +652,8 @@ p	    ;; the branch has two dependents and one of them dpends on
 	    (:include annotation)
 	    (:conc-name alignment-)
 	    (:predicate alignment-p)
-	    (:constructor make-alignment (bits size fill-byte)))
+	    (:constructor make-alignment (bits size fill-byte))
+	    (:copier nil))
   ;; The minimum number of low-order bits that must be zero.
   (bits 0 :type alignment)
   ;; The amount of filler we are assuming this alignment op will take.
@@ -661,7 +665,8 @@ p	    ;; the branch has two dependents and one of them dpends on
 ;;; we actually know what label positions, etc. are
 (defstruct (back-patch
 	    (:include annotation)
-	    (:constructor make-back-patch (size function)))
+	    (:constructor make-back-patch (size function))
+	    (:copier nil))
   ;; The area effected by this back-patch.
   (size 0 :type index)
   ;; The function to use to generate the real data
@@ -674,31 +679,34 @@ p	    ;; the branch has two dependents and one of them dpends on
 (defstruct (chooser
 	    (:include annotation)
 	    (:constructor make-chooser
-			  (size alignment maybe-shrink worst-case-fun)))
-  ;; the worst case size for this chooser. There is this much space allocated
-  ;; in the output buffer.
+			  (size alignment maybe-shrink worst-case-fun))
+	    (:copier nil))
+  ;; the worst case size for this chooser. There is this much space
+  ;; allocated in the output buffer.
   (size 0 :type index)
   ;; the worst case alignment this chooser is guaranteed to preserve
   (alignment 0 :type alignment)
-  ;; the function to call to determine of we can use a shorter sequence. It
-  ;; returns NIL if nothing shorter can be used, or emits that sequence and
-  ;; returns T.
+  ;; the function to call to determine of we can use a shorter
+  ;; sequence. It returns NIL if nothing shorter can be used, or emits
+  ;; that sequence and returns T.
   (maybe-shrink nil :type function)
-  ;; the function to call to generate the worst case sequence. This is used
-  ;; when nothing else can be condensed.
+  ;; the function to call to generate the worst case sequence. This is
+  ;; used when nothing else can be condensed.
   (worst-case-fun nil :type function))
 
-;;; This is used internally when we figure out a chooser or alignment doesn't
-;;; really need as much space as we initially gave it.
+;;; This is used internally when we figure out a chooser or alignment
+;;; doesn't really need as much space as we initially gave it.
 (defstruct (filler
 	    (:include annotation)
-	    (:constructor make-filler (bytes)))
+	    (:constructor make-filler (bytes))
+	    (:copier nil))
   ;; the number of bytes of filler here
   (bytes 0 :type index))
 
 ;;;; output functions
 
-;;; interface: Emit the supplied BYTE to SEGMENT, growing SEGMENT if necessary.
+;;; interface: Emit the supplied BYTE to SEGMENT, growing SEGMENT if
+;;; necessary.
 (defun emit-byte (segment byte)
   (declare (type segment segment))
   ;; We could use DECLARE instead of CHECK-TYPE here, but (1) CMU CL's

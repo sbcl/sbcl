@@ -201,28 +201,29 @@ And so, we are saved.
 ;;;     slot index. A cache vector stores the wrappers and corresponding
 ;;;     slot indexes. Because each cache line is more than one element
 ;;;     long, a cache lock count is used.
-(defstruct (dfun-info (:constructor nil))
+(defstruct (dfun-info (:constructor nil)
+		      (:copier nil))
   (cache nil))
 
-(defstruct (no-methods
-	     (:constructor no-methods-dfun-info ())
-	     (:include dfun-info)))
+(defstruct (no-methods (:constructor no-methods-dfun-info ())
+		       (:include dfun-info)
+		       (:copier nil)))
 
-(defstruct (initial
-	     (:constructor initial-dfun-info ())
-	     (:include dfun-info)))
+(defstruct (initial (:constructor initial-dfun-info ())
+		    (:include dfun-info)
+		    (:copier nil)))
 
-(defstruct (initial-dispatch
-	     (:constructor initial-dispatch-dfun-info ())
-	     (:include dfun-info)))
+(defstruct (initial-dispatch (:constructor initial-dispatch-dfun-info ())
+			     (:include dfun-info)
+			     (:copier nil)))
 
-(defstruct (dispatch
-	     (:constructor dispatch-dfun-info ())
-	     (:include dfun-info)))
+(defstruct (dispatch (:constructor dispatch-dfun-info ())
+		     (:include dfun-info)
+		     (:copier nil)))
 
-(defstruct (default-method-only
-	     (:constructor default-method-only-dfun-info ())
-	     (:include dfun-info)))
+(defstruct (default-method-only (:constructor default-method-only-dfun-info ())
+	                        (:include dfun-info)
+				(:copier nil)))
 
 ;without caching:
 ;  dispatch one-class two-class default-method-only
@@ -232,62 +233,64 @@ And so, we are saved.
 
 ;accessor:
 ;  one-class two-class one-index n-n
-(defstruct (accessor-dfun-info
-	     (:constructor nil)
-	     (:include dfun-info))
+(defstruct (accessor-dfun-info (:constructor nil)
+			       (:include dfun-info)
+			       (:copier nil))
   accessor-type) ; (member reader writer)
 
 (defmacro dfun-info-accessor-type (di)
   `(accessor-dfun-info-accessor-type ,di))
 
-(defstruct (one-index-dfun-info
-	     (:constructor nil)
-	     (:include accessor-dfun-info))
+(defstruct (one-index-dfun-info (:constructor nil)
+				(:include accessor-dfun-info)
+				(:copier nil))
   index)
 
 (defmacro dfun-info-index (di)
   `(one-index-dfun-info-index ,di))
 
-(defstruct (n-n
-	     (:constructor n-n-dfun-info (accessor-type cache))
-	     (:include accessor-dfun-info)))
+(defstruct (n-n (:constructor n-n-dfun-info (accessor-type cache))
+		(:include accessor-dfun-info)
+		(:copier nil)))
 
-(defstruct (one-class
-	     (:constructor one-class-dfun-info (accessor-type index wrapper0))
-	     (:include one-index-dfun-info))
+(defstruct (one-class (:constructor one-class-dfun-info
+				    (accessor-type index wrapper0))
+		      (:include one-index-dfun-info)
+		      (:copier nil))
   wrapper0)
 
 (defmacro dfun-info-wrapper0 (di)
   `(one-class-wrapper0 ,di))
 
-(defstruct (two-class
-	     (:constructor two-class-dfun-info (accessor-type index wrapper0 wrapper1))
-	     (:include one-class))
+(defstruct (two-class (:constructor two-class-dfun-info
+				    (accessor-type index wrapper0 wrapper1))
+		      (:include one-class)
+		      (:copier nil))
   wrapper1)
 
 (defmacro dfun-info-wrapper1 (di)
   `(two-class-wrapper1 ,di))
 
-(defstruct (one-index
-	     (:constructor one-index-dfun-info
-			   (accessor-type index cache))
-	     (:include one-index-dfun-info)))
+(defstruct (one-index (:constructor one-index-dfun-info
+				    (accessor-type index cache))
+		      (:include one-index-dfun-info)
+		      (:copier nil)))
 
-(defstruct (checking
-	     (:constructor checking-dfun-info (function cache))
-	     (:include dfun-info))
+(defstruct (checking (:constructor checking-dfun-info (function cache))
+		     (:include dfun-info)
+		     (:copier nil))
   function)
 
 (defmacro dfun-info-function (di)
   `(checking-function ,di))
 
-(defstruct (caching
-	     (:constructor caching-dfun-info (cache))
-	     (:include dfun-info)))
+(defstruct (caching (:constructor caching-dfun-info (cache))
+		    (:include dfun-info)
+		    (:copier nil)))
 
-(defstruct (constant-value
-	     (:constructor constant-value-dfun-info (cache))
-	     (:include dfun-info)))
+(defstruct (constant-value (:constructor constant-value-dfun-info (cache))
+			   (:include dfun-info)
+			   (:copier nil)))
 
 (defmacro dfun-update (generic-function function &rest args)
   `(multiple-value-bind (dfun cache info)

@@ -303,6 +303,7 @@
 (defun source-transform-intersection-typep (object type)
   ;; FIXME: This is just a placeholder; we should define a better
   ;; version by analogy with SOURCE-TRANSFORM-UNION-TYPEP.
+  (declare (ignore object type))
   nil)
 
 ;;; If necessary recurse to check the cons type.

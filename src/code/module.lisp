@@ -90,5 +90,5 @@
     (t (error 'simple-type-error
 	      :datum name
 	      :expected-type '(or string symbol)
-	      :format-control "Module name must be a string or symbol -- ~S."
+	      :format-control "Module name must be a string or symbol: ~S"
 	      :format-arguments (list name)))))

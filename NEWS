@@ -722,3 +722,4 @@ planned incompatible changes in 0.7.x:
   which, unlike e.g. #\Newline, don't have names defined in the 
   ANSI Common Lisp standard, may change to their ASCII symbolic
   names: #\Nul, #\Soh, #\Stx, etc.
+* INTERNAL-TIME-UNITS-PER-SECOND might increase, e.g. to 1000.

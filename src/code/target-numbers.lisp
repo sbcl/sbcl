@@ -116,7 +116,7 @@
 		    (error 'simple-type-error :datum ,var
 			   :expected-type ',type
 			   :format-control
-			   "Argument ~A is not a ~S: ~S."
+			   "~@<Argument ~A is not a ~S: ~2I~_~S~:>"
 			   :format-arguments
 			   (list ',var ',type ,var))))))
 

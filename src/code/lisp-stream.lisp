@@ -23,7 +23,8 @@
 (deftype in-buffer-type ()
   `(simple-array (unsigned-byte 8) (,in-buffer-length)))
 
-(defstruct (lisp-stream (:constructor nil))
+(defstruct (lisp-stream (:constructor nil)
+			(:copier nil))
   ;; Buffered input.
   (in-buffer nil :type (or in-buffer-type null))
   (in-index in-buffer-length :type index)	; index into IN-BUFFER

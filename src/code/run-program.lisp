@@ -147,7 +147,7 @@
 (defvar *active-processes* nil
   "List of process structures for all active processes.")
 
-(defstruct (process)
+(defstruct (process (:copier nil))
   pid		      ; PID of child process
   %status             ; either :RUNNING, :STOPPED, :EXITED, or :SIGNALED
   exit-code	      ; either exit code or signal

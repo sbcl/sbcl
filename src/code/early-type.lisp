@@ -49,7 +49,8 @@
 		(or (built-in-class-translation spec) spec)
 		spec))
 	   (t
-	    (let* ((lspec (if (atom spec) (list spec) spec))
+	    (let* (;; FIXME: This 
+		   (lspec (if (atom spec) (list spec) spec))
 		   (fun (info :type :translator (car lspec))))
 	      (cond (fun (funcall fun lspec))
 		    ((or (and (consp spec) (symbolp (car spec)))
@@ -90,6 +91,7 @@
 (defstruct (hairy-type (:include ctype
 				 (class-info (type-class-or-lose 'hairy))
 				 (enumerable t))
+		       (:copier nil)
 		       #!+cmu (:pure nil))
   ;; the Common Lisp type-specifier
   (specifier nil :type t))
@@ -99,12 +101,14 @@
 ;;; An UNKNOWN-TYPE is a type not known to the type system (not yet
 ;;; defined). We make this distinction since we don't want to complain
 ;;; about types that are hairy but defined.
-(defstruct (unknown-type (:include hairy-type)))
+(defstruct (unknown-type (:include hairy-type)
+			 (:copier nil)))
 
 ;;; ARGS-TYPE objects are used both to represent VALUES types and
 ;;; to represent FUNCTION types.
 (defstruct (args-type (:include ctype)
-		      (:constructor nil))
+		      (:constructor nil)
+		      (:copier nil))
   ;; Lists of the type for each required and optional argument.
   (required nil :type list)
   (optional nil :type list)
@@ -119,7 +123,8 @@
 
 (defstruct (values-type
 	    (:include args-type
-		      (class-info (type-class-or-lose 'values)))))
+		      (class-info (type-class-or-lose 'values)))
+	    (:copier nil)))
 
 (!define-type-class values)
 
@@ -138,20 +143,22 @@
 ;;; represents something that the compiler knows to be a constant.)
 (defstruct (constant-type
 	    (:include ctype
-		      (class-info (type-class-or-lose 'constant))))
+		      (class-info (type-class-or-lose 'constant)))
+	    (:copier nil))
   ;; The type which the argument must be a constant instance of for this type
   ;; specifier to win.
   (type (required-argument) :type ctype))
 
 ;;; The NAMED-TYPE is used to represent *, T and NIL. These types must be
-;;; super or sub types of all types, not just classes and * & NIL aren't
+;;; super- or sub-types of all types, not just classes and * and NIL aren't
 ;;; classes anyway, so it wouldn't make much sense to make them built-in
 ;;; classes.
 (defstruct (named-type (:include ctype
-				 (class-info (type-class-or-lose 'named))))
+				 (class-info (type-class-or-lose 'named)))
+		       (:copier nil))
   (name nil :type symbol))
 
-;;; The Numeric-Type is used to represent all numeric types, including things
+;;; A NUMERIC-TYPE represents any numeric type, including things
 ;;; such as FIXNUM.
 (defstruct (numeric-type (:include ctype
 				   (class-info (type-class-or-lose
@@ -185,7 +192,8 @@
 ;;; The Array-Type is used to represent all array types, including
 ;;; things such as SIMPLE-STRING.
 (defstruct (array-type (:include ctype
-				 (class-info (type-class-or-lose 'array))))
+				 (class-info (type-class-or-lose 'array)))
+		       (:copier nil))
   ;; the dimensions of the array, or * if unspecified. If a dimension
   ;; is unspecified, it is *.
   (dimensions '* :type (or list (member *)))
@@ -202,6 +210,7 @@
 (defstruct (member-type (:include ctype
 				  (class-info (type-class-or-lose 'member))
 				  (enumerable t))
+			(:copier nil)
 			#-sb-xc-host (:pure nil))
   ;; the things in the set, with no duplications
   (members nil :type list))
@@ -209,7 +218,8 @@
 ;;; A COMPOUND-TYPE is a type defined out of a set of types, 
 ;;; the common parent of UNION-TYPE and INTERSECTION-TYPE.
 (defstruct (compound-type (:include ctype)
-			  (:constructor nil))
+			  (:constructor nil)
+			  (:copier nil))
   (types nil :type list :read-only t))
 
 ;;; A UNION-TYPE represents a use of the OR type specifier which can't
@@ -218,7 +228,8 @@
 ;;;   2. There are never any UNION-TYPE components.
 (defstruct (union-type (:include compound-type
 				 (class-info (type-class-or-lose 'union)))
-		       (:constructor %make-union-type (enumerable types))))
+		       (:constructor %make-union-type (enumerable types))
+		       (:copier nil)))
 
 ;;; An INTERSECTION-TYPE represents a use of the AND type specifier
 ;;; which can't be canonicalized to something simpler. Canonical form:
@@ -228,7 +239,8 @@
 					(class-info (type-class-or-lose
 						     'intersection)))
 			      (:constructor %make-intersection-type
-					    (enumerable types))))
+					    (enumerable types))
+			      (:copier nil)))
 
 ;;; Return TYPE converted to canonical form for a situation where the
 ;;; "type" '* (which SBCL still represents as a type even though ANSI
@@ -253,7 +265,8 @@
 				       cdr-raw-type
 				       &aux
 				       (car-type (type-*-to-t car-raw-type))
-				       (cdr-type (type-*-to-t cdr-raw-type)))))
+				       (cdr-type (type-*-to-t cdr-raw-type))))
+		      (:copier nil))
   ;; the CAR and CDR element types (to support ANSI (CONS FOO BAR) types)
   ;;
   ;; FIXME: Most or all other type structure slots could also be :READ-ONLY.

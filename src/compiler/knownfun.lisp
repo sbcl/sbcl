@@ -116,8 +116,8 @@
 
 ;;;; interfaces to defining macros
 
-;;; The TRANSFORM structure represents an IR1 transform.
-(defstruct transform
+;;; an IR1 transform
+(defstruct (transform (:copier nil))
   ;; the function-type which enables this transform
   (type (required-argument) :type ctype)
   ;; the transformation function. Takes the COMBINATION node and returns a

@@ -249,25 +249,23 @@
       (declare (fixnum count)))))
 
 (defun random (arg &optional (state *random-state*))
-  #!+sb-doc
-  "Generate a uniformly distributed pseudo-random number between zero
-  and Arg. State, if supplied, is the random state to use."
   (declare (inline %random-single-float %random-double-float
 		   #!+long-float %long-float))
   (cond
-    ((and (fixnump arg) (<= arg random-fixnum-max) #!+high-security (> arg 0))
+    ((and (fixnump arg) (<= arg random-fixnum-max) (> arg 0))
      (rem (random-chunk state) arg))
-    ((and (typep arg 'single-float) #!+high-security (> arg 0.0S0))
+    ((and (typep arg 'single-float) (> arg 0.0S0))
      (%random-single-float arg state))
-    ((and (typep arg 'double-float) #!+high-security (> arg 0.0D0))
+    ((and (typep arg 'double-float) (> arg 0.0D0))
      (%random-double-float arg state))
     #!+long-float
-    ((and (typep arg 'long-float) #!+high-security (> arg 0.0L0))
+    ((and (typep arg 'long-float) (> arg 0.0L0))
      (%random-long-float arg state))
-    ((and (integerp arg) #!+high-security (> arg 0))
+    ((and (integerp arg) (> arg 0))
      (%random-integer arg state))
     (t
      (error 'simple-type-error
 	    :expected-type '(or (integer 1) (float (0))) :datum arg
-	    :format-control "Argument is not a positive integer or a positive float: ~S"
+	    :format-control "~@<Argument is neither a positive integer nor a ~
+                             positive float: ~2I~_~S~:>"
 	    :format-arguments (list arg)))))

@@ -128,7 +128,8 @@
 ;;;;    also be annotated with function or values types.
 
 ;;; the description of a keyword argument
-(defstruct (key-info #-sb-xc-host (:pure t))
+(defstruct (key-info #-sb-xc-host (:pure t)
+		     (:copier nil))
   ;; the keyword
   (name (required-argument) :type keyword)
   ;; the type of the argument value
@@ -772,10 +773,24 @@
 
 (!def-type-translator not (&whole whole type)
   (declare (ignore type))
+  ;; Check legality of arguments.
+  (destructuring-bind (not typespec) whole
+    (declare (ignore not))
+    (specifier-type typespec)) ; must be legal typespec
+  ;; Create object.
   (make-hairy-type :specifier whole))
 
 (!def-type-translator satisfies (&whole whole fun)
   (declare (ignore fun))
+  ;; Check legality of arguments of arguments.
+  (destructuring-bind (satisfies predicate-name) whole
+    (declare (ignore satisfies))
+    (unless (symbolp predicate-name)
+      (error 'simple-type-error
+	     :datum predicate-name
+	     :expected-type symbol
+	     :format-control "~S is not a symbol."
+	     :format-arguments (list predicate-name))))
   (make-hairy-type :specifier whole))
 
 ;;;; numeric types

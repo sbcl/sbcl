@@ -76,5 +76,14 @@
 (assert-nil-nil (subtypep '(vector utype-1) '(vector t)))
 (assert-nil-nil (subtypep '(vector t) '(vector utype-2)))
 
+;;; ANSI specifically disallows bare AND and OR symbols as type specs.
+#| ; Alas, this is part of bug 10, still unfixed as of sbcl-0.6.11.10.
+(assert (raises-error? (typep 11 'and)))
+(assert (raises-error? (typep 11 'or)))
+|#
+;;; Of course empty lists of subtypes are still OK.
+(assert (typep 11 '(and)))
+(assert (not (typep 11 '(or))))
+
 ;;; success
 (quit :unix-status 104)

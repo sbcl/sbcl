@@ -36,10 +36,10 @@
 (defun pv-cache-limit-fn (nlines)
   (default-limit-fn nlines))
 
-(defstruct (pv-table
-	     (:predicate pv-tablep)
-	     (:constructor make-pv-table-internal
-			   (slot-name-lists call-list)))
+(defstruct (pv-table (:predicate pv-tablep)
+		     (:constructor make-pv-table-internal
+				   (slot-name-lists call-list))
+		     (:copier nil))
   (cache nil :type (or cache null))
   (pv-size 0 :type fixnum)
   (slot-name-lists nil :type list)

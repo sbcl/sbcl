@@ -18,7 +18,8 @@
 (defstruct (alien-type-type
 	    (:include ctype
 		      (class-info (type-class-or-lose 'alien)))
-	    (:constructor %make-alien-type-type (alien-type)))
+	    (:constructor %make-alien-type-type (alien-type))
+	    (:copier nil))
   (alien-type nil :type alien-type))
 
 (!define-type-class alien)

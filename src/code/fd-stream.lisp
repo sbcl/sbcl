@@ -44,7 +44,8 @@
 (defstruct (fd-stream
 	    (:constructor %make-fd-stream)
 	    (:include lisp-stream
-		      (misc #'fd-stream-misc-routine)))
+		      (misc #'fd-stream-misc-routine))
+	    (:copier nil))
 
   ;; the name of this stream
   (name nil)

@@ -138,13 +138,15 @@
     (hairy-type
      ;; Now the tricky stuff.
      (let* ((hairy-spec (hairy-type-specifier type))
-	    (symbol (if (consp hairy-spec) (car hairy-spec) hairy-spec)))
+	    (symbol (car hairy-spec)))
        (ecase symbol
 	 (and
-	  (or (atom hairy-spec)
-	      (dolist (spec (cdr hairy-spec) t)
-		(unless (%%typep object (specifier-type spec))
-		  (return nil)))))
+	  (every (lambda (spec) (%%typep object (specifier-type spec)))
+		 (rest hairy-spec)))
+	 ;; Note: it should be safe to skip OR here, because union
+	 ;; types can always be represented as UNION-TYPE in general
+	 ;; or other CTYPEs in special cases; we never need to use
+	 ;; HAIRY-TYPE for them.
 	 (not
 	  (unless (proper-list-of-length-p hairy-spec 2)
 	    (error "invalid type specifier: ~S" hairy-spec))
@@ -152,15 +154,7 @@
 	 (satisfies
 	  (unless (proper-list-of-length-p hairy-spec 2)
 	    (error "invalid type specifier: ~S" hairy-spec))
-	  (let ((fn (cadr hairy-spec)))
-	    (if (funcall (typecase fn
-			   (function fn)
-			   (symbol (symbol-function fn))
-			   (t
-			    (coerce fn 'function)))
-			 object)
-		t
-		nil))))))
+	  (values (funcall (symbol-function (cadr hairy-spec)) object))))))
     (alien-type-type
      (sb!alien-internals:alien-typep object (alien-type-type-alien-type type)))
     (function-type

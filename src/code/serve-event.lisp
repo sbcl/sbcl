@@ -21,7 +21,8 @@
 				(default-handler #'default-default-handler)))
 	    (:print-object
 	     (lambda (s stream)
-	       (format stream "#<Object Set ~S>" (object-set-name s)))))
+	       (format stream "#<Object Set ~S>" (object-set-name s))))
+	    (:copier nil))
   name					; Name, for descriptive purposes.
   (table (make-hash-table :test 'eq))   ; Message-ID or
 					;   xevent-type --> handler fun.
@@ -56,7 +57,8 @@
 ;;;; file descriptor I/O noise
 
 (defstruct (handler
-	    (:constructor make-handler (direction descriptor function)))
+	    (:constructor make-handler (direction descriptor function))
+	    (:copier nil))
   ;; Reading or writing...
   (direction nil :type (member :input :output))
   ;; File descriptor this handler is tied to.

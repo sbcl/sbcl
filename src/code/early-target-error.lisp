@@ -43,7 +43,7 @@
 	    (res restart))))
       (res))))
 
-(defstruct restart
+(defstruct (restart (:copier nil))
   name
   function
   report-function

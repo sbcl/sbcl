@@ -551,7 +551,8 @@
   (:metaclass structure-class))
 
 (defstruct (dead-beef-structure-object
-	    (:constructor |STRUCTURE-OBJECT class constructor|)))
+	    (:constructor |STRUCTURE-OBJECT class constructor|)
+	    (:copier nil)))
 
 (defclass std-object (slot-object) ()
   (:metaclass std-class))
