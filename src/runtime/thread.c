@@ -13,13 +13,19 @@
 #include "target-arch-os.h"
 #include "os.h"
 #include "globals.h"
+#ifdef LISP_FEATURE_GENCGC
+#include "gencgc.h"
+#endif
+#include "dynbind.h"
 #include "genesis/cons.h"
 #define ALIEN_STACK_SIZE (1*1024*1024) /* 1Mb size chosen at random */
+
 int dynamic_values_bytes=4096*sizeof(lispobj);	/* same for all threads */
 struct thread *all_threads;
-
+lispobj all_threads_lock;
 extern struct interrupt_data * global_interrupt_data;
 
+void get_spinlock(lispobj *word,int value);
 
 /* this is the first thing that clone() runs in the child (which is
  * why the silly calling convention).  Basically it calls the user's
@@ -56,10 +62,7 @@ new_thread_trampoline(struct thread *th)
  * thread 
  */
 
-struct thread *create_thread(lispobj initial_function) {
-    /* XXX This function or some of it needs to lock all_threads
-     */
-    /* lispobj trampoline_argv[2]; */
+pid_t create_thread(lispobj initial_function) {
     union per_thread_data *per_thread;
     struct thread *th=0;	/*  subdue gcc */
     void *spaces=0;
@@ -135,7 +138,6 @@ struct thread *create_thread(lispobj initial_function) {
     bind_variable(INTERRUPT_PENDING, NIL,th);
     bind_variable(INTERRUPTS_ENABLED,T,th);
 
-    th->next=all_threads;
     th->interrupt_data=malloc(sizeof (struct interrupt_data));
     if(all_threads) 
 	memcpy(th->interrupt_data,arch_os_get_current_thread()->interrupt_data,
@@ -146,24 +148,26 @@ struct thread *create_thread(lispobj initial_function) {
 
 
 #if defined(LISP_FEATURE_X86) && defined (LISP_FEATURE_LINUX)
-
     th->unbound_marker=initial_function;
     kid_pid=
 	clone(new_thread_trampoline,
 	      (((void*)th->control_stack_start)+THREAD_CONTROL_STACK_SIZE-4),
 	      (((getpid()!=parent_pid)?(CLONE_PARENT):0)
 	       |SIGALRM|CLONE_VM),th);
-    if(kid_pid<=0) goto cleanup;
+    if(kid_pid<=0) 
+	goto cleanup;
 #else
 #error this stuff presently only works on x86 Linux
 #endif
+
+    get_spinlock(&all_threads_lock,kid_pid);
+    th->next=all_threads;
     all_threads=th;
-    /* note that th->pid is 0 at this time.  If this function is
-     * called >once simultaneously, we may end up write-protecting
-     * one thread twice and the other not at all.  That would be bad.
-     * (Access to this function is supposed to be serialised anyway
-     * though, for the all_threads manipulation) */
+    /* note that th->pid is 0 at this time.  We rely on all_threads_lock
+     * to ensure that we don't have >1 thread with pid=0 on the list at once
+     */
     protect_control_stack_guard_page(th->pid,1);
+    all_threads_lock=0;
     th->pid=kid_pid;		/* child will not start until this is set */
     return th->pid;
  cleanup:
@@ -179,6 +183,7 @@ void destroy_thread (struct thread *th)
     /* precondition: the unix task has already been killed and exited.
      * This is called by the parent */
     gc_alloc_update_page_tables(0, &th->alloc_region);
+    get_spinlock(&all_threads_lock,th->pid);
     if(th==all_threads) 
 	all_threads=th->next;
     else {
@@ -186,8 +191,9 @@ void destroy_thread (struct thread *th)
 	while(th1->next!=th) th1=th1->next;
 	th1->next=th->next;	/* unlink */
     }
+    all_threads_lock=0;
     /* if(th && th->tls_cookie>=0) os_free_tls_pointer(th); */
-    os_invalidate(th->control_stack_start,
+    os_invalidate((os_vm_address_t) th->control_stack_start,
 		  THREAD_CONTROL_STACK_SIZE+BINDING_STACK_SIZE+
 		  ALIEN_STACK_SIZE+dynamic_values_bytes+
 		  32*SIGSTKSZ);
@@ -204,10 +210,10 @@ struct thread *find_thread_by_pid(pid_t pid)
 
 
 struct mutex {
-    lispobj header,type,*name,*value,*queuelock, *queue;
+    lispobj header,type,*name,*value,queuelock, *queue;
 };
 
-void spinlock_get(lispobj *word,int value)
+void get_spinlock(lispobj *word,int value)
 {
     u32 new_val=0;
     do {
@@ -221,13 +227,13 @@ void spinlock_get(lispobj *word,int value)
 void add_thread_to_queue(int pid, lispobj mutex_p)
 {
     sigset_t oldset,newset;
-    struct mutex *mutex=native_pointer(mutex_p);
+    struct mutex *mutex=(struct mutex *)native_pointer(mutex_p);
     struct cons *cons;
     sigemptyset(&newset);
     sigaddset(&newset,SIGALRM);
     sigprocmask(SIG_BLOCK, &newset, &oldset);
     
-    spinlock_get(&(mutex->queuelock),pid);
+    get_spinlock(&(mutex->queuelock),pid);
     cons=alloc_cons(make_fixnum(pid),mutex->queue);
     mutex->queue=cons;
     mutex->queuelock=0;

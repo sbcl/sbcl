@@ -385,8 +385,7 @@ static void /* noreturn */ parent_loop(void)
 	    if(!th) continue;
 	    if(WIFEXITED(status) || WIFSIGNALED(status)) {
 		fprintf(stderr,"waitpid : child %d %x exited \n", pid,th);
-		destroy_thread(th);		/* FIXME lock all_threads */
-
+		destroy_thread(th);		
 		/* FIXME arrange to call or fake (free-mutex *session-lock*)
 		 * if necessary */
 	    }

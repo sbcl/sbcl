@@ -15,6 +15,8 @@
 
 #ifndef _GENCGC_H_
 #define _GENCGC_H_
+    
+#include "genesis/code.h"
 
 void gc_free_heap(void);
 inline int find_page_index(void *);
@@ -81,30 +83,14 @@ struct page {
 #define NUM_PAGES ((DYNAMIC_SPACE_SIZE+4095)/4096)
 extern struct page page_table[NUM_PAGES];
 
-/* Abstract out the data for an allocation region allowing a single
- * routine to be used for allocation and closing. */
-struct alloc_region {
 
-    /* These two are needed for quick allocation. */
-    void  *free_pointer;
-    void  *end_addr; /* pointer to the byte after the last usable byte */
-
-    /* These are needed when closing the region. */
-    int  first_page;
-    int  last_page;
-    void  *start_addr;
-};
-
-extern struct alloc_region  boxed_region;
-extern struct alloc_region  unboxed_region;
-
-void  gencgc_pickup_dynamic(void);
+void gencgc_pickup_dynamic(void);
 
 void sniff_code_object(struct code *code, unsigned displacement);
 
 int  update_x86_dynamic_space_free_pointer(void);
-void  gc_alloc_update_page_tables(int unboxed,
+void gc_alloc_update_page_tables(int unboxed,
 				  struct alloc_region *alloc_region);
-void  gc_alloc_update_all_page_tables(void);
-
+void gc_alloc_update_all_page_tables(void);
+void gc_set_region_empty(struct alloc_region *region);
 #endif _GENCGC_H_
