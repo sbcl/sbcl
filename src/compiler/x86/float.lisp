@@ -745,16 +745,16 @@
 ;;; 22-Jul-97: descriptor args lose in some simple cases when
 ;;; a function result computed in a loop. Then Python insists
 ;;; on consing the intermediate values! For example
-#|
-(defun test(a n)
-  (declare (type (simple-array double-float (*)) a)
-	   (fixnum n))
-  (let ((sum 0d0))
-    (declare (type double-float sum))
-  (dotimes (i n)
-    (incf sum (* (aref a i)(aref a i))))
-    sum))
-|#
+;;;
+;;; (defun test(a n)
+;;;   (declare (type (simple-array double-float (*)) a)
+;;; 	   (fixnum n))
+;;;   (let ((sum 0d0))
+;;;     (declare (type double-float sum))
+;;;   (dotimes (i n)
+;;;     (incf sum (* (aref a i)(aref a i))))
+;;;     sum))
+;;;
 ;;; So, disabling descriptor args until this can be fixed elsewhere.
 (macrolet
     ((frob (op fop-sti fopr-sti
@@ -2156,114 +2156,9 @@
 	(inst fxch fr1)
 	(inst fstd y)))))
 
-;;; These versions of fsin, fcos, and ftan try to use argument
-;;; reduction but to do this accurately requires greater precision and
-;;; it is hopelessly inaccurate.
-#+nil
-(macrolet ((frob (func trans op)
-	     `(define-vop (,func)
-		(:translate ,trans)
-		(:args (x :scs (double-reg) :target fr0))
-		(:temporary (:sc unsigned-reg :offset eax-offset
-				 :from :eval :to :result) eax)
-		(:temporary (:sc unsigned-reg :offset fr0-offset
-				 :from :argument :to :result) fr0)
-		(:temporary (:sc unsigned-reg :offset fr1-offset
-				 :from :argument :to :result) fr1)
-		(:results (y :scs (double-reg)))
-		(:arg-types double-float)
-		(:result-types double-float)
-		(:policy :fast-safe)
-		(:note "inline sin/cos function")
-		(:vop-var vop)
-		(:save-p :compute-only)
-		(:ignore eax)
-		(:generator 5
-		  (note-this-location vop :internal-error)
-		  (unless (zerop (tn-offset x))
-			  (inst fxch x)		 ; x to top of stack
-			  (unless (location= x y)
-				  (inst fst x))) ; maybe save it
-		  (inst ,op)
-		  (inst fnstsw)			 ; status word to ax
-		  (inst and ah-tn #x04)		 ; C2
-		  (inst jmp :z DONE)
-		  ;; Else x was out of range so reduce it; ST0 is unchanged.
-		  (inst fstp fr1) 		; Load 2*PI
-		  (inst fldpi)
-		  (inst fadd fr0)
-		  (inst fxch fr1)
-		  LOOP
-		  (inst fprem1)
-		  (inst fnstsw)		; status word to ax
-		  (inst and ah-tn #x04)	; C2
-		  (inst jmp :nz LOOP)
-		  (inst ,op)
-		  DONE
-		  (unless (zerop (tn-offset y))
-			  (inst fstd y))))))
-	  (frob fsin  %sin fsin)
-	  (frob fcos  %cos fcos))
-
-#+nil
-(define-vop (ftan)
-  (:translate %tan)
-  (:args (x :scs (double-reg) :target fr0))
-  (:temporary (:sc unsigned-reg :offset eax-offset
-		   :from :argument :to :result) eax)
-  (:temporary (:sc double-reg :offset fr0-offset
-		   :from :argument :to :result) fr0)
-  (:temporary (:sc double-reg :offset fr1-offset
-		   :from :argument :to :result) fr1)
-  (:results (y :scs (double-reg)))
-  (:arg-types double-float)
-  (:result-types double-float)
-  (:policy :fast-safe)
-  (:note "inline tan function")
-  (:vop-var vop)
-  (:save-p :compute-only)
-  (:ignore eax)
-  (:generator 5
-    (note-this-location vop :internal-error)
-    (case (tn-offset x)
-       (0
-	(inst fstp fr1))
-       (1
-	(inst fstp fr0))
-       (t
-	(inst fstp fr0)
-	(inst fstp fr0)
-	(inst fldd (make-random-tn :kind :normal
-				   :sc (sc-or-lose 'double-reg)
-				   :offset (- (tn-offset x) 2)))))
-    (inst fptan)
-    (inst fnstsw)			 ; status word to ax
-    (inst and ah-tn #x04)		 ; C2
-    (inst jmp :z DONE)
-    ;; Else x was out of range so reduce it; ST0 is unchanged.
-    (inst fldpi)			 ; Load 2*PI
-    (inst fadd fr0)
-    (inst fxch fr1)
-    LOOP
-    (inst fprem1)
-    (inst fnstsw)			 ; status word to ax
-    (inst and ah-tn #x04)		 ; C2
-    (inst jmp :nz LOOP)
-    (inst fstp fr1)
-    (inst fptan)
-    DONE
-    ;; Result is in fr1
-    (case (tn-offset y)
-       (0
-	(inst fxch fr1))
-       (1)
-       (t
-	(inst fxch fr1)
-	(inst fstd y)))))
-
-;;; These versions of fsin, fcos, and ftan simply load a 0.0 result if
-;;; the argument is out of range 2^63 and would thus be hopelessly
-;;; inaccurate.
+;;; KLUDGE: these versions of fsin, fcos, and ftan simply load a 0.0
+;;; result if the argument is out of range 2^63 and would thus be
+;;; hopelessly inaccurate.
 (macrolet ((frob (func trans op)
 	     `(define-vop (,func)
 		(:translate ,trans)
@@ -2334,8 +2229,7 @@
     (inst fnstsw)			 ; status word to ax
     (inst and ah-tn #x04)		 ; C2
     (inst jmp :z DONE)
-    ;; Else x was out of range so reduce it; ST0 is unchanged.
-    (inst fldz)			 ; Load 0.0
+    ;; Else x was out of range so load 0.0
     (inst fxch fr1)
     DONE
     ;; Result is in fr1
@@ -2347,59 +2241,8 @@
 	(inst fxch fr1)
 	(inst fstd y)))))
 
-#+nil
-(define-vop (fexp)
-  (:translate %exp)
-  (:args (x :scs (double-reg double-stack descriptor-reg) :target fr0))
-  (:temporary (:sc double-reg :offset fr0-offset
-		   :from :argument :to :result) fr0)
-  (:temporary (:sc double-reg :offset fr1-offset
-		   :from :argument :to :result) fr1)
-  (:temporary (:sc double-reg :offset fr2-offset
-		   :from :argument :to :result) fr2)
-  (:results (y :scs (double-reg)))
-  (:arg-types double-float)
-  (:result-types double-float)
-  (:policy :fast-safe)
-  (:note "inline exp function")
-  (:vop-var vop)
-  (:save-p :compute-only)
-  (:generator 5
-     (note-this-location vop :internal-error)
-     (sc-case x
-	(double-reg
-	 (cond ((zerop (tn-offset x))
-		;; x is in fr0
-		(inst fstp fr1)
-		(inst fldl2e)
-		(inst fmul fr1))
-	       (t
-		;; x is in a FP reg, not fr0
-		(inst fstp fr0)
-		(inst fldl2e)
-		(inst fmul x))))
-	((double-stack descriptor-reg)
-	 (inst fstp fr0)
-	 (inst fldl2e)
-	 (if (sc-is x double-stack)
-	     (inst fmuld (ea-for-df-stack x))
-	   (inst fmuld (ea-for-df-desc x)))))
-     ;; Now fr0=x log2(e)
-     (inst fst fr1)
-     (inst frndint)
-     (inst fst fr2)
-     (inst fsubp-sti fr1)
-     (inst f2xm1)
-     (inst fld1)
-     (inst faddp-sti fr1)
-     (inst fscale)
-     (inst fld fr0)
-     (case (tn-offset y)
-       ((0 1))
-       (t (inst fstd y)))))
-
-;;; Modified exp that handles the following special cases:
-;;; exp(+Inf) is +Inf; exp(-Inf) is 0; exp(NaN) is NaN.
+;;; %exp that handles the following special cases: exp(+Inf) is +Inf;
+;;; exp(-Inf) is 0; exp(NaN) is NaN.
 (define-vop (fexp)
   (:translate %exp)
   (:args (x :scs (double-reg) :target fr0))
@@ -3281,111 +3124,6 @@
 				   :sc (sc-or-lose 'double-reg)
 				   :offset (- (tn-offset x) 2)))))
     (inst fptan)
-    ;; Result is in fr1
-    (case (tn-offset y)
-       (0
-	(inst fxch fr1))
-       (1)
-       (t
-	(inst fxch fr1)
-	(inst fstd y)))))
-
-;;; These versions of fsin, fcos, and ftan try to use argument
-;;; reduction but to do this accurately requires greater precision and
-;;; it is hopelessly inaccurate.
-#+nil
-(macrolet ((frob (func trans op)
-	     `(define-vop (,func)
-		(:translate ,trans)
-		(:args (x :scs (long-reg) :target fr0))
-		(:temporary (:sc unsigned-reg :offset eax-offset
-				 :from :eval :to :result) eax)
-		(:temporary (:sc long-reg :offset fr0-offset
-				 :from :argument :to :result) fr0)
-		(:temporary (:sc long-reg :offset fr1-offset
-				 :from :argument :to :result) fr1)
-		(:results (y :scs (long-reg)))
-		(:arg-types long-float)
-		(:result-types long-float)
-		(:policy :fast-safe)
-		(:note "inline sin/cos function")
-		(:vop-var vop)
-		(:save-p :compute-only)
-		(:ignore eax)
-		(:generator 5
-		  (note-this-location vop :internal-error)
-		  (unless (zerop (tn-offset x))
-			  (inst fxch x)		 ; x to top of stack
-			  (unless (location= x y)
-				  (inst fst x))) ; maybe save it
-		  (inst ,op)
-		  (inst fnstsw)			 ; status word to ax
-		  (inst and ah-tn #x04)		 ; C2
-		  (inst jmp :z DONE)
-		  ;; Else x was out of range so reduce it; ST0 is unchanged.
-		  (inst fstp fr1) 		; Load 2*PI
-		  (inst fldpi)
-		  (inst fadd fr0)
-		  (inst fxch fr1)
-		  LOOP
-		  (inst fprem1)
-		  (inst fnstsw)		; status word to ax
-		  (inst and ah-tn #x04)	; C2
-		  (inst jmp :nz LOOP)
-		  (inst ,op)
-		  DONE
-		  (unless (zerop (tn-offset y))
-			  (inst fstd y))))))
-	  (frob fsin  %sin fsin)
-	  (frob fcos  %cos fcos))
-
-#+nil
-(define-vop (ftan)
-  (:translate %tan)
-  (:args (x :scs (long-reg) :target fr0))
-  (:temporary (:sc unsigned-reg :offset eax-offset
-		   :from :argument :to :result) eax)
-  (:temporary (:sc long-reg :offset fr0-offset
-		   :from :argument :to :result) fr0)
-  (:temporary (:sc long-reg :offset fr1-offset
-		   :from :argument :to :result) fr1)
-  (:results (y :scs (long-reg)))
-  (:arg-types long-float)
-  (:result-types long-float)
-  (:policy :fast-safe)
-  (:note "inline tan function")
-  (:vop-var vop)
-  (:save-p :compute-only)
-  (:ignore eax)
-  (:generator 5
-    (note-this-location vop :internal-error)
-    (case (tn-offset x)
-       (0
-	(inst fstp fr1))
-       (1
-	(inst fstp fr0))
-       (t
-	(inst fstp fr0)
-	(inst fstp fr0)
-	(inst fldd (make-random-tn :kind :normal
-				   :sc (sc-or-lose 'double-reg)
-				   :offset (- (tn-offset x) 2)))))
-    (inst fptan)
-    (inst fnstsw)			 ; status word to ax
-    (inst and ah-tn #x04)		 ; C2
-    (inst jmp :z DONE)
-    ;; Else x was out of range so reduce it; ST0 is unchanged.
-    (inst fldpi)			 ; Load 2*PI
-    (inst fadd fr0)
-    (inst fxch fr1)
-    LOOP
-    (inst fprem1)
-    (inst fnstsw)			 ; status word to ax
-    (inst and ah-tn #x04)		 ; C2
-    (inst jmp :nz LOOP)
-    (inst fstp fr1)
-    (inst fptan)
-    DONE
     ;; Result is in fr1
     (case (tn-offset y)
        (0
