@@ -655,13 +655,13 @@ void arrange_return_to_lisp_function(os_context_t *context, lispobj function)
 }
 
 #ifdef LISP_FEATURE_SB_THREAD
-void handle_rt_signal(int num, siginfo_t *info, void *v_context)
+void interrupt_thread_handler(int num, siginfo_t *info, void *v_context)
 {
     os_context_t *context = (os_context_t*)arch_os_get_context(&v_context);
     struct thread *th=arch_os_get_current_thread();
     struct interrupt_data *data=
 	th ? th->interrupt_data : global_interrupt_data;
-    if(maybe_defer_handler(handle_rt_signal,data,num,info,context)){
+    if(maybe_defer_handler(interrupt_thread_handler,data,num,info,context)){
 	return ;
     }
     arrange_return_to_lisp_function(context,info->si_value.sival_int);

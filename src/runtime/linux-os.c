@@ -91,7 +91,7 @@ void os_init(void)
 	lose("linux kernel version too old: major version=%d (can't run in version < 2.0.0)",
 	     major_version);
     }
-    if (!(major_version>2 || minor_version > 4)) {
+    if (!(major_version>2 || minor_version >= 4)) {
 #ifdef LISP_FEATURE_SB_THREAD
 	lose("linux kernel 2.4 required for thread-enabled SBCL");
 #endif
@@ -277,7 +277,7 @@ os_install_interrupt_handlers(void)
 						 sigsegv_handler);
 #ifdef LISP_FEATURE_SB_THREAD
     undoably_install_low_level_interrupt_handler(SIG_INTERRUPT_THREAD,
-						 handle_rt_signal);
+						 interrupt_thread_handler);
     undoably_install_low_level_interrupt_handler(SIG_STOP_FOR_GC,
 						 sig_stop_for_gc_handler);
     if(!linux_supports_futex)

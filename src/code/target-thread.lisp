@@ -297,13 +297,16 @@ time we reacquire LOCK and return to the caller."
     (setf (waitqueue-data queue) me)
     (futex-wake (waitqueue-data-address queue) 1)))
 
-;; FIXME need non-futex variant of this too
 #!+sb-futex
-(defun condition-broadcast (queue)
-  "Notify all of the processes waiting on QUEUE."
+(defun condition-broadcast/futex (queue)
   (let ((me (current-thread-id)))
     (setf (waitqueue-data queue) me)
     (futex-wake (waitqueue-data-address queue) (ash 1 30))))
+
+(defun condition-broadcast (queue)
+  "Notify all of the processes waiting on QUEUE."
+  (with-spinlock (queue)
+    (map nil #'signal-thread-to-dequeue (waitqueue-data queue))))
 
 ;;; Futexes may be available at compile time but not runtime, so we
 ;;; default to not using them unless os_init says they're available
@@ -313,6 +316,7 @@ time we reacquire LOCK and return to the caller."
     (setf (fdefinition 'get-mutex) #'get-mutex/futex
 	  (fdefinition 'release-mutex) #'release-mutex/futex
 	  (fdefinition 'condition-wait) #'condition-wait/futex
+	  (fdefinition 'condition-broadcast) #'condition-broadcast/futex
 	  (fdefinition 'condition-notify) #'condition-notify/futex)
     t))
 
@@ -350,22 +354,52 @@ time we reacquire LOCK and return to the caller."
   
 ;;;; job control
 
+
+(defvar *interactive-threads-lock* 
+  (make-mutex :name "*interactive-threads* lock"))
+(defvar *interactive-threads* nil)
+(defvar *interactive-threads-queue*
+  (make-waitqueue :name "All threads that need the terminal.  First ID on this list is running, the others are waiting"))
+
+(defun init-job-control ()
+  (with-mutex (*interactive-threads-lock*)
+    (setf *interactive-threads* (list (current-thread-id)))
+    (return-from init-job-control t)))
+
 ;;; called from top of invoke-debugger
 (defun debugger-wait-until-foreground-thread (stream)
   "Returns T if thread had been running in background, NIL if it was
-already the foreground thread."
-  (let ((lock *session-lock*))
-    (when (not (eql (mutex-value lock)   (CURRENT-THREAD-ID)))
-      (get-foreground))))
+interactive."
+  (prog1
+      (with-mutex (*interactive-threads-lock*)
+	(not (member (current-thread-id) *interactive-threads*)))
+    (get-foreground)))
 
-;;; note that this is broken in a futex world as no way to find out
-;;; which threads are on a kernel queue
 (defun thread-repl-prompt-fun (out-stream)
-  (let ((lock *session-lock*))
-    (get-foreground)
-    (let ((stopped-threads (waitqueue-data lock)))
-      (when stopped-threads
-	(format out-stream "~{~&Thread ~A suspended~}~%" stopped-threads))
-      (sb!impl::repl-prompt-fun out-stream))))
+  (get-foreground)
+  (let ((stopped-threads (cdr *interactive-threads*)))
+    (when stopped-threads
+      (format out-stream "~{~&Thread ~A suspended~}~%" stopped-threads))
+    (sb!impl::repl-prompt-fun out-stream)))
 
+(defun get-foreground ()
+  (loop
+   (with-mutex (*interactive-threads-lock*)
+     (let ((tid (current-thread-id)))
+       (when (eql (car *interactive-threads*) tid)
+	 (sb!sys:enable-interrupt sb!unix:sigint #'sb!unix::sigint-handler)
+	 (return-from get-foreground t))
+       (unless (member tid *interactive-threads*)
+	 (setf (cdr (last *interactive-threads*)) (list tid)))
+       (condition-wait
+	*interactive-threads-queue* *interactive-threads-lock* )))))
 
+(defun release-foreground (&optional next)
+  "Background this thread.  If NEXT is supplied, arrange for it to have the foreground next"
+  (with-mutex (*interactive-threads-lock*)
+    (let ((tid (current-thread-id)))
+      (setf *interactive-threads* (delete tid *interactive-threads*))
+      (sb!sys:enable-interrupt sb!unix:sigint :ignore)
+      (when next (setf *interactive-threads*
+		       (list* next (delete next *interactive-threads*))))
+      (condition-broadcast *interactive-threads-queue*))))
