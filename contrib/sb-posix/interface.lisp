@@ -128,7 +128,7 @@
       (fcntl-without-arg fd cmd)))
 
 (define-call "opendir" (* t) null-alien (pathname filename))
-(define-call "readdir" sb-posix::dirent
+(define-call "readdir" (* sb-posix::dirent)
   ;; readdir() has the worst error convention in the world.  It's just
   ;; too painful to support.  (return is NULL _and_ errno "unchanged"
   ;; is not an error, it's EOF).

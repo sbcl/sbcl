@@ -359,3 +359,21 @@
   (let ((fd (sb-posix:open "/dev/null" sb-posix::o-nonblock)))
     (= (sb-posix:fcntl fd sb-posix::f-getfl) sb-posix::o-nonblock))
   t)
+
+
+(deftest opendir.1
+  (let ((dir (sb-posix:opendir "/")))
+    (sb-alien:null-alien dir))
+  nil)
+
+(deftest readdir.1
+  (let ((dir (sb-posix:opendir "/")))
+    (unwind-protect
+       (block dir-loop
+         (loop for dirent = (sb-posix:readdir dir)
+               until (sb-alien:null-alien dirent)
+               when (not (stringp (sb-posix:dirent-name dirent)))
+                 do (return-from dir-loop nil)
+               finally (return t)))
+      (sb-posix:closedir dir)))
+  t)
