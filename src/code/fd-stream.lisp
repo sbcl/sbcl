@@ -1107,7 +1107,7 @@
 (define-external-format (:latin-1 :latin1 :iso-8859-1
                          ;; FIXME: shouldn't ASCII-like things have an
                          ;; extra typecheck for 7-bitness?
-                         :ascii :ansi_x3.4-1968)
+                         :ascii :us-ascii :ansi_x3.4-1968)
     1
   (setf (sap-ref-8 sap tail) bits)
   (code-char byte))

@@ -126,7 +126,7 @@ generated from lisps with different BASE-CHAR/CHARACTER distinctions.)
 support people other than simply those living in non-Eurozone Western
 Europe or the United States of America.)  This requires at minimum
 adjusting the dumper/fop code and the low-level memory accessors.
-  -- in progress for x86:
+  -- in progress for x86, ppc (Eric Marsden):
      >> rewrote SYMBOLICATE to avoid needing the type system (or a
         transformed to low-level bit-bashing CONCATENATE) early in
         cold-init.
