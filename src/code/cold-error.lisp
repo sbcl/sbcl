@@ -150,7 +150,7 @@
       (sb!kernel:infinite-error-protect
        (let ((condition (coerce-to-condition datum arguments
 					     'simple-warning 'warn)))
-	 (check-type condition warning "a warning condition")
+	 (enforce-type condition warning)
 	 (restart-case (signal condition)
 	   (muffle-warning ()
 	     :report "Skip warning."

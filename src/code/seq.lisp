@@ -607,8 +607,7 @@
 		    bit-vector simple-bit-vector base-string
 		    simple-base-string) ; FIXME: unifying principle here?
      (let ((result (apply #'concat-to-simple* output-type-spec sequences)))
-       #!+high-security
-       (check-type-var result output-type-spec)
+       #!+high-security (aver (typep result output-type-spec))
        result))
     (list (apply #'concat-to-list* sequences))
     (t

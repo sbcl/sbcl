@@ -378,19 +378,31 @@
   (lambda (x y)
     (funcall fun y x)))
 
-;;; like CL:ASSERT, but lighter-weight
+;;; like CL:ASSERT and CL:CHECK-TYPE, but lighter-weight
 ;;;
-;;; (As of sbcl-0.6.11.20, we were using some 400 calls to CL:ASSERT
-;;; in SBCL. The CL:ASSERT restarts and whatnot expand into a
-;;; significant amount of code when you multiply them by 400, so
-;;; replacing them with this should reduce the size of the system
-;;; by enough to be worthwhile.)
+;;; (As of sbcl-0.6.11.20, we were using some 400 calls to CL:ASSERT.
+;;; The CL:ASSERT restarts and whatnot expand into a significant
+;;; amount of code when you multiply them by 400, so replacing them
+;;; with this should reduce the size of the system by enough to be
+;;; worthwhile. ENFORCE-TYPE is much less common, but might still be
+;;; worthwhile, and since I don't really like CERROR stuff deep in the
+;;; guts of complex systems anyway, I replaced it too.)
 (defmacro aver (expr)
   `(unless ,expr
      (%failed-aver ,(let ((*package* (find-package :keyword)))
 		      (format nil "~S" expr)))))
 (defun %failed-aver (expr-as-string)
-  (error "~@<failed AVER: ~2I~_~S~:>" expr-as-string))
+  (error "~@<internal error, failed AVER: ~2I~_~S~:>" expr-as-string))
+(defmacro enforce-type (value type)
+  (once-only ((value value))
+    `(unless (typep ,value ',type)
+       (%failed-aver-type ,value ',type))))
+(defun %failed-enforce-type (value type)
+  (error 'simple-type-error
+	 :value value
+	 :expected-type type
+	 :format-string "~@<~S ~_is not a ~_~S~:>"
+	 :format-arguments (list value type)))
 
 ;;; Return the numeric value of a type bound, i.e. an interval bound
 ;;; more or less in the format of bounds in ANSI's type specifiers,

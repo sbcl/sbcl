@@ -1758,7 +1758,7 @@
 ;;;   (2) stores its definition in the *COLD-FOP-FUNCTIONS* vector,
 ;;;       instead of storing in the *FOP-FUNCTIONS* vector.
 (defmacro define-cold-fop ((name &optional (pushp t)) &rest forms)
-  (check-type pushp (member nil t :nope))
+  (aver (member pushp '(nil t :nope)))
   (let ((code (get name 'fop-code))
 	(fname (symbolicate "COLD-" name)))
     (unless code
@@ -1771,7 +1771,7 @@
        (setf (svref *cold-fop-functions* ,code) #',fname))))
 
 (defmacro clone-cold-fop ((name &optional (pushp t)) (small-name) &rest forms)
-  (check-type pushp (member nil t :nope))
+  (aver (member pushp '(nil t :nope)))
   `(progn
     (macrolet ((clone-arg () '(read-arg 4)))
       (define-cold-fop (,name ,pushp) ,@forms))

@@ -709,14 +709,7 @@ p	    ;; the branch has two dependents and one of them dpends on
 ;;; necessary.
 (defun emit-byte (segment byte)
   (declare (type segment segment))
-  ;; We could use DECLARE instead of CHECK-TYPE here, but (1) CMU CL's
-  ;; inspired decision to treat DECLARE as ASSERT by default has not
-  ;; been copied by other compilers, and this code runs in the
-  ;; cross-compilation host Common Lisp, not just CMU CL, and (2)
-  ;; classic CMU CL allowed more things here than this, and I haven't
-  ;; tried to proof-read all the calls to EMIT-BYTE to ensure that
-  ;; they're passing appropriate. -- WHN 19990323
-  (check-type byte possibly-signed-assembly-unit)
+  (declare (type possibly-signed-assembly-unit byte))
   (vector-push-extend (logand byte assembly-unit-mask)
 		      (segment-buffer segment))
   (incf (segment-current-posn segment))

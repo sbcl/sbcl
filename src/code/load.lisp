@@ -190,14 +190,12 @@
 
 ;;;; the fop stack
 
-;;; (This is in a simple-vector, but it grows down, since it is
+;;; (This is in a SIMPLE-VECTOR, but it grows down, since it is
 ;;; somewhat cheaper to test for overflow that way.)
-(defvar *fop-stack* (make-array 100)
-  #!+sb-doc
-  "The fop stack (we only need one!).")
+(defvar *fop-stack* (make-array 100))
 (declaim (simple-vector *fop-stack*))
 
-;;; the index of the most recently pushed item on the fop-stack
+;;; the index of the most recently pushed item on the fop stack
 (defvar *fop-stack-pointer* 100)
 
 ;;; the current index into the fop stack when we last recursively
@@ -215,11 +213,11 @@
     (setq *fop-stack-pointer* size)
     (setq *fop-stack* new-stack)))
 
-;;; Cache information about the fop-stack in local variables. Define a
+;;; Cache information about the fop stack in local variables. Define a
 ;;; local macro to pop from the stack. Push the result of evaluation
 ;;; if specified.
 (defmacro with-fop-stack (pushp &body forms)
-  (check-type pushp (member nil t :nope))
+  (aver (member pushp '(nil t :nope)))
   (let ((n-stack (gensym))
 	(n-index (gensym))
 	(n-res (gensym)))

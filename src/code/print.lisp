@@ -275,7 +275,6 @@
 ;;;; WHITESPACE-CHAR-P
 
 ;;; This is used in other files, but is defined in this one for some reason.
-
 (defun whitespace-char-p (char)
   #!+sb-doc
   "Determines whether or not the character is considered whitespace."

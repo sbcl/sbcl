@@ -255,7 +255,7 @@
   (:info target not-p)
   (:policy :fast-safe))
 
-;;; Simpler VOP that don't need a temporary register.
+;;; simpler VOP that don't need a temporary register
 (define-vop (simple-check-type)
   (:args (value :target result :scs (any-reg descriptor-reg)))
   (:results (result :scs (any-reg descriptor-reg)
@@ -617,9 +617,9 @@
     YEP
     (move result value)))
 
-;;; An (unsigned-byte 32) can be represented with either a positive fixnum, a
-;;; bignum with exactly one positive digit, or a bignum with exactly two digits
-;;; and the second digit all zeros.
+;;; An (unsigned-byte 32) can be represented with either a positive
+;;; fixnum, a bignum with exactly one positive digit, or a bignum with
+;;; exactly two digits and the second digit all zeros.
 
 (define-vop (unsigned-byte-32-p type-predicate)
   (:translate unsigned-byte-32-p)

@@ -27,7 +27,7 @@
 ;;; Define the translation from a type-specifier to a type structure for
 ;;; some particular type. Syntax is identical to DEFTYPE.
 (defmacro !def-type-translator (name arglist &body body)
-  (check-type name symbol)
+  (declare (type symbol name))
   ;; FIXME: Now that the T%CL hack is ancient history and we just use CL
   ;; instead, we can probably return to using PARSE-DEFMACRO here.
   ;;

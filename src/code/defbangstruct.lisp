@@ -71,7 +71,7 @@
   (defun (setf def!struct-type-make-load-form-fun) (new-value type)
     (when #+sb-xc-host t #-sb-xc-host *type-system-initialized*
       (aver (subtypep type 'structure!object))
-      (check-type new-value def!struct-type-make-load-form-fun))
+      (aver (typep new-value 'def!struct-type-make-load-form-fun)))
     (setf (gethash type *def!struct-type-make-load-form-fun*) new-value)))
 
 ;;; the simplest, most vanilla MAKE-LOAD-FORM function for DEF!STRUCT
@@ -146,10 +146,10 @@
 #+sb-xc-host
 (progn
   (defun %instance-length (instance)
-    (check-type instance structure!object)
+    (aver (typep instance 'structure!object))
     (layout-length (class-layout (sb!xc:find-class (type-of instance)))))
   (defun %instance-ref (instance index)
-    (check-type instance structure!object)
+    (aver (typep instance 'structure!object))
     (let* ((class (sb!xc:find-class (type-of instance)))
 	   (layout (class-layout class)))
       (if (zerop index)
@@ -160,7 +160,7 @@
 	    (declare (type symbol accessor))
 	    (funcall accessor instance)))))
   (defun %instance-set (instance index new-value)
-    (check-type instance structure!object)
+    (aver (typep instance 'structure!object))
     (let* ((class (sb!xc:find-class (type-of instance)))
 	   (layout (class-layout class)))
       (if (zerop index)

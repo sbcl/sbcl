@@ -56,37 +56,25 @@
 ;;;
 ;;; FIXME: In reality, this restart cruft is needed hardly anywhere in
 ;;; the system. Write NEED and NEED-TYPE to replace ASSERT and
-;;; CHECK-TYPE inside the system.
+;;; CHECK-TYPE inside the system. (CL:CHECK-TYPE must still be
+;;; defined, since it's specified by ANSI and it is sometimes nice for
+;;; whipping up little things. But as far as I can tell it's not
+;;; usually very helpful deep inside the guts of a complex system like
+;;; SBCL.)
 ;;;
 ;;; CHECK-TYPE-ERROR isn't defined until a later file because it uses
 ;;; the macro RESTART-CASE, which isn't defined until a later file.
 (defmacro-mundanely check-type (place type &optional type-string)
   #!+sb-doc
-  "Signals a restartable error of type TYPE-ERROR if the value of PLACE is
+  "Signal a restartable error of type TYPE-ERROR if the value of PLACE is
   not of the specified type. If an error is signalled and the restart is
-  used to return, the
-  return if the
-   STORE-VALUE is invoked. It will store into PLACE and start over."
+  used to return, this can only return if the STORE-VALUE restart is
+  invoked. In that case it will store into PLACE and start over."
   (let ((place-value (gensym)))
-    `(do ((,place-value ,place))
+    `(do ((,place-value ,place ,place))
 	 ((typep ,place-value ',type))
        (setf ,place
 	     (check-type-error ',place ,place-value ',type ,type-string)))))
-
-#!+high-security-support
-(defmacro-mundanely check-type-var (place type-var &optional type-string)
-  #!+sb-doc
-  "Signals an error of type TYPE-ERROR if the contents of PLACE are not of the
-   specified type to which the TYPE-VAR evaluates. If an error is signaled,
-   this can only return if STORE-VALUE is invoked. It will store into PLACE
-   and start over."
-  (let ((place-value (gensym))
-	(type-value (gensym)))
-    `(do ((,place-value ,place)
-	  (,type-value  ,type-var))
-	 ((typep ,place-value ,type-value))
-       (setf ,place
-	     (check-type-error ',place ,place-value ,type-value ,type-string)))))
 
 ;;;; DEFCONSTANT
 

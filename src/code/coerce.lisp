@@ -136,15 +136,14 @@
 ;;; old working version
 (defun coerce (object output-type-spec)
   #!+sb-doc
-  "Coerces the Object to an object of type Output-Type-Spec."
+  "Coerce the Object to an object of type Output-Type-Spec."
   (flet ((coerce-error ()
 	   (/show0 "entering COERCE-ERROR")
 	   (error 'simple-type-error
 		  :format-control "~S can't be converted to type ~S."
 		  :format-arguments (list object output-type-spec)))
 	 (check-result (result)
-	   #!+high-security
-	   (check-type-var result output-type-spec)
+	   #!+high-security (aver (typep result output-type-spec))
 	   result))
     (let ((type (specifier-type output-type-spec)))
       (cond
@@ -256,8 +255,7 @@
 		  :format-control "~S can't be converted to type ~S."
 		  :format-arguments (list object output-type-spec)))
 	 (check-result (result)
-	   #!+high-security
-	   (check-type-var result output-type-spec)
+	   #!+high-security (aver (typep result output-type-spec))
 	   result))
     (let ((type (specifier-type output-type-spec)))
       (cond

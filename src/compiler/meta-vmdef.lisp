@@ -20,21 +20,17 @@
 
 ;;;; storage class and storage base definition
 
-;;; Enter the basic structure at meta-compile time, and then fill in the
-;;; missing slots at load time.
+;;; Define a storage base having the specified NAME. KIND may be :FINITE,
+;;; :UNBOUNDED or :NON-PACKED. The following keywords are legal:
+;;;    :SIZE specifies the number of locations in a :FINITE SB or
+;;;          the initial size of an :UNBOUNDED SB.
+;;;
+;;; We enter the basic structure at meta-compile time, and then fill
+;;; in the missing slots at load time.
 (defmacro define-storage-base (name kind &key size)
-  #!+sb-doc
-  "Define-Storage-Base Name Kind {Key Value}*
-  Define a storage base having the specified Name. Kind may be :Finite,
-  :Unbounded or :Non-Packed. The following keywords are legal:
 
-  :Size <Size>
-      Specify the number of locations in a :Finite SB or the initial size of a
-      :Unbounded SB."
-
-  ;; FIXME: Replace with DECLARE.
-  (check-type name symbol)
-  (check-type kind (member :finite :unbounded :non-packed))
+  (declare (type symbol name))
+  (declare (type (member :finite :unbounded :non-packed) kind))
 
   ;; SIZE is either mandatory or forbidden.
   (ecase kind
@@ -43,7 +39,7 @@
        (error "A size specification is meaningless in a ~S SB." kind)))
     ((:finite :unbounded)
      (unless size (error "Size is not specified in a ~S SB." kind))
-     (check-type size unsigned-byte)))
+     (aver (typep size 'unsigned-byte))))
 
   (let ((res (if (eq kind :non-packed)
 		 (make-sb :name name :kind kind)
@@ -87,54 +83,48 @@
        (/show0 "finished with DEFINE-STORAGE-BASE expansion")
        ',name)))
 
+;;; Define a storage class Name that uses the named Storage-Base. Number is a 
+;;; small, non-negative integer that is used as an alias. The following
+;;; keywords are defined:
+;;;
+;;; :Element-Size Size
+;;;   The size of objects in this SC in whatever units the SB uses. This
+;;;   defaults to 1.
+;;;
+;;; :Alignment Size
+;;;   The alignment restrictions for this SC. TNs will only be allocated at
+;;;   offsets that are an even multiple of this number. Defaults to 1.
+;;;
+;;; :Locations (Location*)
+;;;   If the SB is :Finite, then this is a list of the offsets within the SB
+;;;   that are in this SC.
+;;;
+;;; :Reserve-Locations (Location*)
+;;;   A subset of the Locations that the register allocator should try to
+;;;   reserve for operand loading (instead of to hold variable values.)
+;;;
+;;; :Save-P {T | NIL}
+;;;   If T, then values stored in this SC must be saved in one of the
+;;;   non-save-p :Alternate-SCs across calls.
+;;;
+;;; :Alternate-SCs (SC*)
+;;;   Indicates other SCs that can be used to hold values from this SC across
+;;;   calls or when storage in this SC is exhausted. The SCs should be
+;;;   specified in order of decreasing \"goodness\". There must be at least
+;;;   one SC in an unbounded SB, unless this SC is only used for restricted or
+;;;   wired TNs.
+;;;
+;;; :Constant-SCs (SC*)
+;;;   A list of the names of all the constant SCs that can be loaded into this
+;;;   SC by a move function.
 (defmacro define-storage-class (name number sb-name &key (element-size '1)
 				     (alignment '1) locations reserve-locations
 				     save-p alternate-scs constant-scs)
-  #!+sb-doc
-  "Define-Storage-Class Name Number Storage-Base {Key Value}*
-  Define a storage class Name that uses the named Storage-Base. Number is a
-  small, non-negative integer that is used as an alias. The following
-  keywords are defined:
-
-  :Element-Size Size
-      The size of objects in this SC in whatever units the SB uses. This
-      defaults to 1.
-
-  :Alignment Size
-      The alignment restrictions for this SC. TNs will only be allocated at
-      offsets that are an even multiple of this number. Defaults to 1.
-
-  :Locations (Location*)
-      If the SB is :Finite, then this is a list of the offsets within the SB
-      that are in this SC.
-
-  :Reserve-Locations (Location*)
-      A subset of the Locations that the register allocator should try to
-      reserve for operand loading (instead of to hold variable values.)
-
-  :Save-P {T | NIL}
-      If T, then values stored in this SC must be saved in one of the
-      non-save-p :Alternate-SCs across calls.
-
-  :Alternate-SCs (SC*)
-      Indicates other SCs that can be used to hold values from this SC across
-      calls or when storage in this SC is exhausted. The SCs should be
-      specified in order of decreasing \"goodness\". There must be at least
-      one SC in an unbounded SB, unless this SC is only used for restricted or
-      wired TNs.
-
-  :Constant-SCs (SC*)
-      A list of the names of all the constant SCs that can be loaded into this
-      SC by a move function."
-
-  (check-type name symbol)
-  (check-type number sc-number)
-  (check-type sb-name symbol)
-  (check-type locations list)
-  (check-type reserve-locations list)
-  (check-type save-p boolean)
-  (check-type alternate-scs list)
-  (check-type constant-scs list)
+  (declare (type symbol name))
+  (declare (type sc-number number))
+  (declare (type symbol sb-name))
+  (declare (type list locations reserve-locations alternate-scs constant-scs))
+  (declare (type boolean save-p))
   (unless (= (logcount alignment) 1)
     (error "alignment not a power of two: ~D" alignment))
 
@@ -142,9 +132,9 @@
     (if (eq (sb-kind sb) :finite)
 	(let ((size (sb-size sb))
 	      (element-size (eval element-size)))
-	  (check-type element-size unsigned-byte)
+	  (declare (type unsigned-byte element-size))
 	  (dolist (el locations)
-	    (check-type el unsigned-byte)
+	    (declare (type unsigned-byte el))
 	    (unless (<= 1 (+ el element-size) size)
 	      (error "SC element ~D out of bounds for ~S" el sb))))
 	(when locations
@@ -210,18 +200,17 @@
 	   (let ((,to-sc-var (meta-sc-or-lose to)))
 	     ,@body))))))
 
+;;; Define the function NAME and note it as the function used for
+;;; moving operands from the From-SCs to the To-SCs. Cost is the cost
+;;; of this move operation. The function is called with three
+;;; arguments: the VOP (for context), and the source and destination
+;;; TNs. An ASSEMBLE form is wrapped around the body. All uses of
+;;; DEFINE-MOVE-FUNCTION should be compiled before any uses of
+;;; DEFINE-VOP.
 (defmacro define-move-function ((name cost) lambda-list scs &body body)
-  #!+sb-doc
-  "Define-Move-Function (Name Cost) lambda-list ({(From-SC*) (To-SC*)}*) form*
-  Define the function Name and note it as the function used for moving operands
-  from the From-SCs to the To-SCs. Cost is the cost of this move operation.
-  The function is called with three arguments: the VOP (for context), and the
-  source and destination TNs. An ASSEMBLE form is wrapped around the body.
-  All uses of DEFINE-MOVE-FUNCTION should be compiled before any uses of
-  DEFINE-VOP."
+  (declare (type index cost))
   (when (or (oddp (length scs)) (null scs))
     (error "malformed SCs spec: ~S" scs))
-  (check-type cost index)
   `(progn
      (eval-when (:compile-toplevel :load-toplevel :execute)
        (do-sc-pairs (from-sc to-sc ',scs)
@@ -283,8 +272,7 @@
 ;;; class that values of this type may be allocated in. TYPE is the
 ;;; type descriptor for the Lisp type that is equivalent to this type.
 (defmacro !def-primitive-type (name scs &key (type name))
-  (check-type name symbol)
-  (check-type scs list)
+  (declare (type symbol name) (type list scs))
   (let ((scns (mapcar #'meta-sc-number-or-lose scs))
 	(get-type `(specifier-type ',type)))
     `(progn
@@ -888,7 +876,7 @@
 ;;; operands, and a single OPERAND-PARSE describing any more operand.
 ;;; If we are inheriting a VOP, we default attributes to the inherited
 ;;; operand of the same name.
-(defun parse-operands (parse specs kind)
+(defun !parse-vop-operands (parse specs kind)
   (declare (list specs)
 	   (type (member :argument :result) kind))
   (let ((num -1)
@@ -935,21 +923,21 @@
 	    (let ((value (second key)))
 	      (case (first key)
 		(:scs
-		 (check-type value list)
+		 (aver (typep value 'list))
 		 (setf (operand-parse-scs res) (remove-duplicates value)))
 		(:load-tn
-		 (check-type value symbol)
+		 (aver (typep value 'symbol))
 		 (setf (operand-parse-load-tn res) value))
 		(:load-if
 		 (setf (operand-parse-load res) value))
 		(:more
-		 (check-type value boolean)
+		 (aver (typep value 'boolean))
 		 (setf (operand-parse-kind res)
 		       (if (eq kind :argument) :more-argument :more-result))
 		 (setf (operand-parse-load res) nil)
 		 (setq more res))
 		(:target
-		 (check-type value symbol)
+		 (aver (typep value 'symbol))
 		 (setf (operand-parse-target res) value))
 		(:from
 		 (unless (eq kind :result)
@@ -1003,13 +991,13 @@
 		   (vop-spec-arg opt 'symbol 1 nil)))
 	    (:offset
 	     (let ((offset (eval (second opt))))
-	       (check-type offset unsigned-byte)
+	       (aver (typep offset 'unsigned-byte))
 	       (setf (operand-parse-offset res) offset)))
 	    (:from
 	     (setf (operand-parse-born res) (parse-time-spec (second opt))))
 	    (:to
 	     (setf (operand-parse-dies res) (parse-time-spec (second opt))))
-	    ;; Backward compatibility...
+	    ;; backward compatibility...
 	    (:scs
 	     (let ((scs (vop-spec-arg opt 'list 1 nil)))
 	       (unless (= (length scs) 1)
@@ -1044,12 +1032,12 @@
     (case (first spec)
       (:args
        (multiple-value-bind (fixed more)
-	   (parse-operands parse (rest spec) :argument)
+	   (!parse-vop-operands parse (rest spec) :argument)
 	 (setf (vop-parse-args parse) fixed)
 	 (setf (vop-parse-more-args parse) more)))
       (:results
        (multiple-value-bind (fixed more)
-	   (parse-operands parse (rest spec) :result)
+	   (!parse-vop-operands parse (rest spec) :result)
 	 (setf (vop-parse-results parse) fixed)
 	 (setf (vop-parse-more-results parse) more))
        (setf (vop-parse-conditional-p parse) nil))
@@ -1093,10 +1081,10 @@
        (setf (vop-parse-note parse) (vop-spec-arg spec '(or string null))))
       (:arg-types
        (setf (vop-parse-arg-types parse)
-	     (parse-operand-types (rest spec) t)))
+	     (!parse-vop-operand-types (rest spec) t)))
       (:result-types
        (setf (vop-parse-result-types parse)
-	     (parse-operand-types (rest spec) nil)))
+	     (!parse-vop-operand-types (rest spec) nil)))
       (:translate
        (setf (vop-parse-translate parse) (rest spec)))
       (:guard
@@ -1216,9 +1204,9 @@
 
 ;;;; operand checking and stuff
 
-;;; Given a list of arg/result restrictions, check for valid syntax and
-;;; convert to canonical form.
-(defun parse-operand-types (specs args-p)
+;;; Given a list of arg/result restrictions, check for valid syntax
+;;; and convert to canonical form.
+(defun !parse-vop-operand-types (specs args-p)
   (declare (list specs))
   (labels ((parse-operand-type (spec)
 	     (cond ((eq spec '*) spec)
@@ -1343,7 +1331,7 @@
 
 ;;; Compute stuff that can only be computed after we are done parsing
 ;;; everying. We set the VOP-Parse-Operands, and do various error checks.
-(defun grovel-operands (parse)
+(defun !grovel-vop-operands (parse)
   (declare (type vop-parse parse))
 
   (setf (vop-parse-operands parse)
@@ -1655,11 +1643,11 @@
 ;;;     Indicates if and how the more args should be moved into a
 ;;;     different frame.
 (def!macro define-vop ((name &optional inherits) &rest specs)
+  (declare (type symbol name))
   ;; Parse the syntax into a VOP-PARSE structure, and then expand into
   ;; code that creates the appropriate VOP-INFO structure at load time.
   ;; We implement inheritance by copying the VOP-PARSE structure for
   ;; the inherited structure.
-  (check-type name symbol)
   (let* ((inherited-parse (when inherits
 			    (vop-parse-or-lose inherits)))
 	 (parse (if inherits
@@ -1670,7 +1658,7 @@
     (setf (vop-parse-inherits parse) inherits)
 
     (parse-define-vop parse specs)
-    (grovel-operands parse)
+    (!grovel-vop-operands parse)
 
     `(progn
        (eval-when (:compile-toplevel :load-toplevel :execute)
@@ -1717,11 +1705,11 @@
 
       (values (forms) (binds) n-head))))
 
+;;; Emit-Template Node Block Template Args Results [Info]
+;;;
+;;; Call the emit function for Template, linking the result in at the
+;;; end of Block.
 (defmacro emit-template (node block template args results &optional info)
-  #!+sb-doc
-  "Emit-Template Node Block Template Args Results [Info]
-  Call the emit function for Template, linking the result in at the end of
-  Block."
   (let ((n-first (gensym))
 	(n-last (gensym)))
     (once-only ((n-node node)
@@ -1733,20 +1721,21 @@
 		    ,@(when info `(,info)))
 	 (insert-vop-sequence ,n-first ,n-last ,n-block nil)))))
 
+;;; VOP Name Node Block Arg* Info* Result*
+;;;
+;;; Emit the VOP (or other template) Name at the end of the IR2-Block
+;;; Block, using Node for the source context. The interpretation of
+;;; the remaining arguments depends on the number of operands of
+;;; various kinds that are declared in the template definition. VOP
+;;; cannot be used for templates that have more-args or more-results,
+;;; since the number of arguments and results is indeterminate for
+;;; these templates. Use VOP* instead.
+;;;
+;;; Args and Results are the TNs that are to be referenced by the
+;;; template as arguments and results. If the template has
+;;; codegen-info arguments, then the appropriate number of Info forms
+;;; following the Arguments are used for codegen info.
 (defmacro vop (name node block &rest operands)
-  #!+sb-doc
-  "VOP Name Node Block Arg* Info* Result*
-  Emit the VOP (or other template) Name at the end of the IR2-Block Block,
-  using Node for the source context. The interpretation of the remaining
-  arguments depends on the number of operands of various kinds that are
-  declared in the template definition. VOP cannot be used for templates that
-  have more-args or more-results, since the number of arguments and results is
-  indeterminate for these templates. Use VOP* instead.
-
-  Args and Results are the TNs that are to be referenced by the template
-  as arguments and results. If the template has codegen-info arguments, then
-  the appropriate number of Info forms following the Arguments are used for
-  codegen info."
   (let* ((parse (vop-parse-or-lose name))
 	 (arg-count (length (vop-parse-args parse)))
 	 (result-count (length (vop-parse-results parse)))
@@ -1788,22 +1777,23 @@
 				`((list ,@(ivars)))))
 	     (values)))))))
 
+;;; VOP* Name Node Block (Arg* More-Args) (Result* More-Results) Info*
+;;;
+;;; This is like VOP, but allows for emission of templates with
+;;; arbitrary numbers of arguments, and for emission of templates
+;;; using already-created TN-Ref lists.
+;;;
+;;; The Arguments and Results are TNs to be referenced as the first
+;;; arguments and results to the template. More-Args and More-Results
+;;; are heads of TN-Ref lists that are added onto the end of the
+;;; TN-Refs for the explicitly supplied operand TNs. The TN-Refs for
+;;; the more operands must have the TN and Write-P slots correctly
+;;; initialized.
+;;;
+;;; As with VOP, the Info forms are evaluated and passed as codegen
+;;; info arguments.
 (defmacro vop* (name node block args results &rest info)
-  #!+sb-doc
-  "VOP* Name Node Block (Arg* More-Args) (Result* More-Results) Info*
-  Like VOP, but allows for emission of templates with arbitrary numbers of
-  arguments, and for emission of templates using already-created TN-Ref lists.
-
-  The Arguments and Results are TNs to be referenced as the first arguments
-  and results to the template. More-Args and More-Results are heads of TN-Ref
-  lists that are added onto the end of the TN-Refs for the explicitly supplied
-  operand TNs. The TN-Refs for the more operands must have the TN and Write-P
-  slots correctly initialized.
-
-  As with VOP, the Info forms are evaluated and passed as codegen info
-  arguments."
-  (check-type args cons)
-  (check-type results cons)
+  (declare (type cons args results))
   (let* ((parse (vop-parse-or-lose name))
 	 (arg-count (length (vop-parse-args parse)))
 	 (result-count (length (vop-parse-results parse)))
@@ -1842,13 +1832,14 @@
 
 ;;;; miscellaneous macros
 
+;;; SC-Case TN {({(SC-Name*) | SC-Name | T} Form*)}*
+;;;
+;;; Case off of TN's SC. The first clause containing TN's SC is
+;;; evaluated, returning the values of the last form. A clause
+;;; beginning with T specifies a default. If it appears, it must be
+;;; last. If no default is specified, and no clause matches, then an
+;;; error is signalled.
 (def!macro sc-case (tn &rest forms)
-  #!+sb-doc
-  "SC-Case TN {({(SC-Name*) | SC-Name | T} Form*)}*
-  Case off of TN's SC. The first clause containing TN's SC is evaluated,
-  returning the values of the last form. A clause beginning with T specifies a
-  default. If it appears, it must be last. If no default is specified, and no
-  clause matches, then an error is signalled."
   (let ((n-sc (gensym))
 	(n-tn (gensym)))
     (collect ((clauses))
@@ -1875,30 +1866,25 @@
 	      (,n-sc (sc-number (tn-sc ,n-tn))))
 	 (cond ,@(clauses))))))
 
+;;; Return true if TNs SC is any of the named SCs, false otherwise.
 (defmacro sc-is (tn &rest scs)
-  #!+sb-doc
-  "SC-Is TN SC*
-  Returns true if TNs SC is any of the named SCs, false otherwise."
   (once-only ((n-sc `(sc-number (tn-sc ,tn))))
     `(or ,@(mapcar #'(lambda (x)
 		       `(eql ,n-sc ,(meta-sc-number-or-lose x)))
 		   scs))))
 
+;;; Iterate over the IR2 blocks in component, in emission order.
 (defmacro do-ir2-blocks ((block-var component &optional result)
 			 &body forms)
-  #!+sb-doc
-  "Do-IR2-Blocks (Block-Var Component [Result]) Form*
-  Iterate over the IR2 blocks in component, in emission order."
   `(do ((,block-var (block-info (component-head ,component))
 		    (ir2-block-next ,block-var)))
        ((null ,block-var) ,result)
      ,@forms))
 
+;;; Iterate over all the TNs live at some point, with the live set
+;;; represented by a local conflicts bit-vector and the IR2-Block
+;;; containing the location.
 (defmacro do-live-tns ((tn-var live block &optional result) &body body)
-  #!+sb-doc
-  "DO-LIVE-TNS (TN-Var Live Block [Result]) Form*
-  Iterate over all the TNs live at some point, with the live set represented by
-  a local conflicts bit-vector and the IR2-Block containing the location."
   (let ((n-conf (gensym))
 	(n-bod (gensym))
 	(i (gensym))
@@ -1931,11 +1917,9 @@
 		   (when (and ,tn-var (not (eq ,tn-var :more)))
 		     (,n-bod ,tn-var)))))))))))
 
+;;; Iterate over all the IR2 blocks in the environment Env, in emit order.
 (defmacro do-environment-ir2-blocks ((block-var env &optional result)
 				     &body body)
-  #!+sb-doc
-  "DO-ENVIRONMENT-IR2-BLOCKS (Block-Var Env [Result]) Form*
-  Iterate over all the IR2 blocks in the environment Env, in emit order."
   (once-only ((n-env env))
     (once-only ((n-first `(node-block
 			   (lambda-bind

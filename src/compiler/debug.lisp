@@ -316,9 +316,9 @@
 
 |#
 
-;;; Check a block for consistency at the general flow-graph level, and call
-;;; Check-Node-Consistency on each node to locally check for semantic
-;;; consistency.
+;;; Check a block for consistency at the general flow-graph level, and
+;;; call CHECK-NODE-CONSISTENCY on each node to locally check for
+;;; semantic consistency.
 (declaim (ftype (function (cblock) (values)) check-block-consistency))
 (defun check-block-consistency (block)
 
@@ -499,13 +499,20 @@
 		   (combination-p node)))
 	 (barf "flushed arg not in local call: ~S" node))
 	(t
-	 (let ((fun (ref-leaf (continuation-use
-			       (basic-combination-fun node))))
-	       (pos (position arg (basic-combination-args node))))
-	   (check-type pos fixnum) ; to suppress warning -- WHN 19990311
-	   (when (leaf-refs (elt (lambda-vars fun) pos))
-	     (barf "flushed arg for referenced var in ~S" node))))))
-
+	 (locally
+	   ;; KLUDGE: In sbcl-0.6.11.37, the compiler doesn't like
+	   ;; (DECLARE (TYPE INDEX POS)) after the inline expansion of
+	   ;; POSITION. It compiles it correctly, but it issues a type
+	   ;; mismatch warning because it can't eliminate the
+	   ;; possibility that control will flow through the
+	   ;; NIL-returning branch. So we punt here. -- WHN 2001-04-15
+	   (declare (notinline position))
+	   (let ((fun (ref-leaf (continuation-use
+				 (basic-combination-fun node))))
+		 (pos (position arg (basic-combination-args node))))
+	     (declare (type index pos))
+	     (when (leaf-refs (elt (lambda-vars fun) pos))
+	       (barf "flushed arg for referenced var in ~S" node)))))))
      (let ((dest (continuation-dest (node-cont node))))
        (when (and (return-p dest)
 		  (eq (basic-combination-kind node) :local)

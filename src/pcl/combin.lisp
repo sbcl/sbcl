@@ -341,10 +341,11 @@
 				  (make-method ,main-effective-method)))
 		 main-effective-method))))))
 
-;;;; the STANDARD method combination type. This is coded by hand (rather than
-;;;; with define-method-combination) for bootstrapping and efficiency reasons.
-;;;; Note that the definition of the find-method-combination-method appears in
-;;;; the file defcombin.lisp. This is because EQL methods can't appear in the
+;;;; the STANDARD method combination type. This is coded by hand
+;;;; (rather than with DEFINE-METHOD-COMBINATION) for bootstrapping
+;;;; and efficiency reasons. Note that the definition of the
+;;;; FIND-METHOD-COMBINATION-METHOD appears in the file
+;;;; defcombin.lisp. This is because EQL methods can't appear in the
 ;;;; bootstrap.
 ;;;;
 ;;;; The DEFCLASS for the METHOD-COMBINATION and
@@ -357,52 +358,13 @@
 				     combin
 				     applicable-methods))
 
-;;; FIXME: As of sbcl-0.6.10, the bindings of *INVALID-METHOD-ERROR*
-;;; and *METHOD-COMBINATION-ERROR* are never changed, even within the
-;;; dynamic scope of method combination functions.
-(defvar *invalid-method-error*
-	#'(lambda (&rest args)
-	    (declare (ignore args))
-	    (error
-	      "INVALID-METHOD-ERROR was called outside the dynamic scope~%~
-	       of a method combination function (inside the body of~%~
-	       DEFINE-METHOD-COMBINATION or a method on the generic~%~
-	       function COMPUTE-EFFECTIVE-METHOD).")))
-(defvar *method-combination-error*
-	#'(lambda (&rest args)
-	    (declare (ignore args))
-	    (error
-	      "METHOD-COMBINATION-ERROR was called outside the dynamic scope~%~
-	       of a method combination function (inside the body of~%~
-	       DEFINE-METHOD-COMBINATION or a method on the generic~%~
-	       function COMPUTE-EFFECTIVE-METHOD).")))
+(defun invalid-method-error (method format-control &rest format-arguments)
+  (error "~@<invalid method error for ~2I_~S ~I~_method: ~2I~_~?~:>"
+	 method
+	 format-control
+	 format-arguments))
 
-;(defmethod compute-effective-method :around	;issue with magic
-;	   ((generic-function generic-function)     ;generic functions
-;	    (method-combination method-combination)
-;	    applicable-methods)
-;  (declare (ignore applicable-methods))
-;  (flet ((real-invalid-method-error (method format-string &rest args)
-;	   (declare (ignore method))
-;	   (apply #'error format-string args))
-;	 (real-method-combination-error (format-string &rest args)
-;	   (apply #'error format-string args)))
-;    (let ((*invalid-method-error* #'real-invalid-method-error)
-;	  (*method-combination-error* #'real-method-combination-error))
-;      (call-next-method))))
-
-(defun invalid-method-error (&rest args)
-  (apply *invalid-method-error* args))
-
-(defun method-combination-error (&rest args)
-  (apply *method-combination-error* args))
-
-;This definition now appears in defcombin.lisp.
-;
-;(defmethod find-method-combination ((generic-function generic-function)
-;				     (type (eql 'standard))
-;				     options)
-;  (when options
-;    (method-combination-error
-;      "The method combination type STANDARD accepts no options."))
-;  *standard-method-combination*)
+(defun method-combination-error (format-control &rest format-arguments)
+  (error "~@<method combination error in CLOS dispatch: ~2I~_~?~:>"
+	 format-control
+	 format-arguments))

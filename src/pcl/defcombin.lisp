@@ -32,15 +32,12 @@
 
 ;;;; standard method combination
 
-;;; The STANDARD method combination type is implemented directly by the class
-;;; STANDARD-METHOD-COMBINATION. The method on COMPUTE-EFFECTIVE-METHOD does
-;;; standard method combination directly and is defined by hand in the file
-;;; combin.lisp. The method for FIND-METHOD-COMBINATION must appear in this
-;;; file for bootstrapping reasons.
-;;;
-;;; A commented out copy of this definition appears in combin.lisp.
-;;; If you change this definition here, be sure to change it there
-;;; also.
+;;; The STANDARD method combination type is implemented directly by
+;;; the class STANDARD-METHOD-COMBINATION. The method on
+;;; COMPUTE-EFFECTIVE-METHOD does standard method combination directly
+;;; and is defined by hand in the file combin.lisp. The method for
+;;; FIND-METHOD-COMBINATION must appear in this file for bootstrapping
+;;; reasons.
 (defmethod find-method-combination ((generic-function generic-function)
 				    (type (eql 'standard))
 				    options)
@@ -109,10 +106,10 @@
 	((equal options '(:most-specific-last)))
 	(t
 	 (method-combination-error
-	   "Illegal options to a short method combination type.~%~
-	    The method combination type ~S accepts one option which~%~
-	    must be either :MOST-SPECIFIC-FIRST or :MOST-SPECIFIC-LAST."
-	   type)))
+	  "Illegal options to a short method combination type.~%~
+	   The method combination type ~S accepts one option which~%~
+	   must be either :MOST-SPECIFIC-FIRST or :MOST-SPECIFIC-LAST."
+	  type)))
   (make-instance 'short-method-combination
 		 :type type
 		 :options options

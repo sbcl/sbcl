@@ -67,13 +67,13 @@
   "Executes the forms in the body without doing a garbage collection."
   `(without-interrupts ,@body))
 
-;;; Eof-Or-Lose is a useful macro that handles EOF.
+;;; EOF-OR-LOSE is a useful macro that handles EOF.
 (defmacro eof-or-lose (stream eof-error-p eof-value)
   `(if ,eof-error-p
        (error 'end-of-file :stream ,stream)
        ,eof-value))
 
-;;; These macros handle the special cases of t and nil for input and
+;;; These macros handle the special cases of T and NIL for input and
 ;;; output streams.
 ;;;
 ;;; FIXME: Shouldn't these be functions instead of macros?
@@ -82,7 +82,7 @@
     `(let ((,svar ,stream))
        (cond ((null ,svar) *standard-input*)
 	     ((eq ,svar t) *terminal-io*)
-	     (T ,@(if check-type `((check-type ,svar ,check-type)))
+	     (T ,@(when check-type `((enforce-type ,svar ,check-type)))
 		#!+high-security
 		(unless (input-stream-p ,svar)
 		  (error 'simple-type-error
@@ -96,7 +96,7 @@
     `(let ((,svar ,stream))
        (cond ((null ,svar) *standard-output*)
 	     ((eq ,svar t) *terminal-io*)
-	     (T ,@(if check-type `((check-type ,svar ,check-type)))
+	     (T ,@(when check-type `((check-type ,svar ,check-type)))
 		#!+high-security
 		(unless (output-stream-p ,svar)
 		  (error 'simple-type-error
@@ -106,9 +106,9 @@
 			 :format-arguments ,(list  svar)))
 		,svar)))))
 
-;;; With-Mumble-Stream calls the function in the given Slot of the
-;;; Stream with the Args for lisp-streams, or the Function with the
-;;; Args for fundamental-streams.
+;;; WITH-mumble-STREAM calls the function in the given SLOT of the
+;;; STREAM with the ARGS for LISP-STREAMs, or the FUNCTION with the
+;;; ARGS for FUNDAMENTAL-STREAMs.
 (defmacro with-in-stream (stream (slot &rest args) &optional stream-dispatch)
   `(let ((stream (in-synonym-of ,stream)))
     ,(if stream-dispatch

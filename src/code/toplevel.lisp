@@ -491,7 +491,7 @@
     (handler-case
 	(progn
 	  (format *error-output*
-		  "~@<unhandled CONDITION (of type ~S): ~2I~_~A~:>~2%"
+		  "~@<unhandled condition (of type ~S): ~2I~_~A~:>~2%"
 		  (type-of condition)
 		  condition)
 	  ;; Flush *ERROR-OUTPUT* even before the BACKTRACE, so that
@@ -503,7 +503,7 @@
 	  (sb!debug:backtrace 128 *error-output*)
 	  (finish-output *error-output*)
 	  (format *error-output*
-		  "~%unhandled CONDITION in --noprogrammer mode, quitting~%")
+		  "~%unhandled condition in --noprogrammer mode, quitting~%")
 	  (failure-quit))
       (condition ()
         (%primitive print "Argh! error within --noprogrammer error handling")

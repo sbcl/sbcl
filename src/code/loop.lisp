@@ -6,12 +6,13 @@
 ;;;; This code was modified by William Harold Newman beginning
 ;;;; 19981106, originally to conform to the new SBCL bootstrap package
 ;;;; system and then subsequently to address other cross-compiling
-;;;; bootstrap issues. Whether or not it then supported all the
-;;;; environments implied by the reader conditionals in the source
-;;;; code (e.g. #!+CLOE-RUNTIME) before that modification, it sure
-;;;; doesn't now: it might be appropriate for CMU-CL-derived systems
-;;;; in general but only claims to be appropriate for the particular
-;;;; branch I was working on.
+;;;; bootstrap issues, SBCLification (e.g. DECLARE used to check
+;;;; argument types), and other maintenance. Whether or not it then
+;;;; supported all the environments implied by the reader conditionals
+;;;; in the source code (e.g. #!+CLOE-RUNTIME) before that
+;;;; modification, it sure doesn't now. It might perhaps, by blind
+;;;; luck, be appropriate for some other CMU-CL-derived system, but
+;;;; really it only attempts to be appropriate for SBCL.
 
 ;;;; This software is derived from software originally released by the
 ;;;; Massachusetts Institute of Technology and Symbolics, Inc. Copyright and
@@ -340,21 +341,21 @@ code to be loaded.
 (defstruct (loop-universe
 	     (:copier nil)
 	     (:predicate nil))
-  keywords	       ; hash table, value = (fn-name . extra-data)
-  iteration-keywords     ; hash table, value = (fn-name . extra-data)
-  for-keywords	   ; hash table, value = (fn-name . extra-data)
-  path-keywords	  ; hash table, value = (fn-name . extra-data)
-  type-symbols	   ; hash table of type SYMBOLS, test EQ,
-			 ; value = CL type specifier
-  type-keywords	  ; hash table of type STRINGS, test EQUAL,
-			 ; value = CL type spec
-  ansi		   ; NIL, T, or :EXTENDED
+  keywords             ; hash table, value = (fn-name . extra-data)
+  iteration-keywords   ; hash table, value = (fn-name . extra-data)
+  for-keywords         ; hash table, value = (fn-name . extra-data)
+  path-keywords        ; hash table, value = (fn-name . extra-data)
+  type-symbols         ; hash table of type SYMBOLS, test EQ,
+                       ; value = CL type specifier
+  type-keywords        ; hash table of type STRINGS, test EQUAL,
+                       ; value = CL type spec
+  ansi                 ; NIL, T, or :EXTENDED
   implicit-for-required) ; see loop-hack-iteration
 (sb!int:def!method print-object ((u loop-universe) stream)
   (let ((string (case (loop-universe-ansi u)
-		  ((nil) "Non-ANSI")
+		  ((nil) "non-ANSI")
 		  ((t) "ANSI")
-		  (:extended "Extended-ANSI")
+		  (:extended "extended-ANSI")
 		  (t (loop-universe-ansi u)))))
     (print-unreadable-object (u stream :type t)
       (write-string string stream))))
@@ -366,7 +367,7 @@ code to be loaded.
 (defun make-standard-loop-universe (&key keywords for-keywords
 					 iteration-keywords path-keywords
 					 type-keywords type-symbols ansi)
-  (check-type ansi (member nil t :extended))
+  (declare (type (member nil t :extended) ansi))
   (flet ((maketable (entries)
 	   (let* ((size (length entries))
 		  (ht (make-hash-table :size (if (< size 10) 10 size)
@@ -1586,8 +1587,9 @@ a LET-like macro, and a SETQ-like macro, which perform LOOP-style destructuring.
 
 (defun add-loop-path (names function universe
 		      &key preposition-groups inclusive-permitted user-data)
-  (unless (listp names) (setq names (list names)))
-  (check-type universe loop-universe)
+  (declare (type loop-universe universe))
+  (unless (listp names)
+    (setq names (list names)))
   (let ((ht (loop-universe-path-keywords universe))
 	(lp (make-loop-path
 	      :names (mapcar #'symbol-name names)
@@ -1865,10 +1867,10 @@ a LET-like macro, and a SETQ-like macro, which perform LOOP-style destructuring.
 ||#
 
 (defun loop-hash-table-iteration-path (variable data-type prep-phrases
-				       &key which)
-  (check-type which (member hash-key hash-value))
+				       &key (which (required-argument)))
+  (declare (type (member :hash-key :hash-value) which))
   (cond ((or (cdr prep-phrases) (not (member (caar prep-phrases) '(:in :of))))
-	 (loop-error "Too many prepositions!"))
+	 (loop-error "too many prepositions!"))
 	((null prep-phrases)
 	 (loop-error "missing OF or IN in ~S iteration path")))
   (let ((ht-var (loop-gentemp 'loop-hashtab-))
@@ -1997,11 +1999,11 @@ a LET-like macro, and a SETQ-like macro, which perform LOOP-style destructuring.
     (add-loop-path '(hash-key hash-keys) 'loop-hash-table-iteration-path w
 		   :preposition-groups '((:of :in))
 		   :inclusive-permitted nil
-		   :user-data '(:which hash-key))
+		   :user-data '(:which :hash-key))
     (add-loop-path '(hash-value hash-values) 'loop-hash-table-iteration-path w
 		   :preposition-groups '((:of :in))
 		   :inclusive-permitted nil
-		   :user-data '(:which hash-value))
+		   :user-data '(:which :hash-value))
     (add-loop-path '(symbol symbols) 'loop-package-symbols-iteration-path w
 		   :preposition-groups '((:of :in))
 		   :inclusive-permitted nil

@@ -65,7 +65,7 @@
 ;;; know both the 1-byte-arg and the 4-byte-arg fop names. -- WHN 19990902
 (defmacro define-cloned-fops ((name code &optional (pushp t))
 			      (small-name small-code) &rest forms)
-  (check-type pushp (member nil t :nope))
+  (aver (member pushp '(nil t :nope)))
   `(progn
      (macrolet ((clone-arg () '(read-arg 4)))
        (define-fop (,name ,code ,pushp) ,@forms))

@@ -391,7 +391,7 @@
 	(vec-bytes (* #-alpha 4 #+alpha 8 (+ (length string-list) 2))))
     (declare (fixnum string-bytes vec-bytes))
     (dolist (s string-list)
-      (check-type s simple-string)
+      (enforce-type s simple-string)
       (incf string-bytes (round-bytes-to-words (1+ (length s)))))
     ;; Now allocate the memory and fill it in.
     (let* ((total-bytes (+ string-bytes vec-bytes))

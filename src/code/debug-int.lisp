@@ -446,7 +446,7 @@
 ;;; lists of DEBUG-BLOCKs. Then look up our argument IR1-BLOCK to find
 ;;; its DEBUG-BLOCK since we know we have it now.
 (defun make-interpreted-debug-block (ir1-block)
-  (check-type ir1-block sb!c::cblock)
+  (declare (type sb!c::cblock ir1-block))
   (let ((res (gethash ir1-block *ir1-block-debug-block*)))
     (or res
 	(let ((lambda (sb!c::block-home-lambda ir1-block)))
@@ -2437,13 +2437,13 @@
    invalid. This is SETF'able."
   (etypecase debug-var
     (compiled-debug-var
-     (check-type frame compiled-frame)
+     (aver (typep frame 'compiled-frame))
      (let ((res (access-compiled-debug-var-slot debug-var frame)))
        (if (indirect-value-cell-p res)
 	   (sb!c:value-cell-ref res)
 	   res)))
     (interpreted-debug-var
-     (check-type frame interpreted-frame)
+     (aver (typep frame 'interpreted-frame))
      (sb!eval::leaf-value-lambda-var
       (interpreted-code-location-ir1-node (frame-code-location frame))
       (interpreted-debug-var-ir1-var debug-var)
@@ -2643,13 +2643,13 @@
 (defun %set-debug-var-value (debug-var frame value)
   (etypecase debug-var
     (compiled-debug-var
-     (check-type frame compiled-frame)
+     (aver (typep frame 'compiled-frame))
      (let ((current-value (access-compiled-debug-var-slot debug-var frame)))
        (if (indirect-value-cell-p current-value)
 	   (sb!c:value-cell-set current-value value)
 	   (set-compiled-debug-var-slot debug-var frame value))))
     (interpreted-debug-var
-     (check-type frame interpreted-frame)
+     (aver (typep frame 'interpreted-frame))
      (sb!eval::set-leaf-value-lambda-var
       (interpreted-code-location-ir1-node (frame-code-location frame))
       (interpreted-debug-var-ir1-var debug-var)
@@ -2950,7 +2950,7 @@
     (compiled-debug-var
      (compiled-debug-var-validity debug-var basic-code-location))
     (interpreted-debug-var
-     (check-type basic-code-location interpreted-code-location)
+     (aver (typep basic-code-location 'interpreted-code-location))
      (let ((validp (rassoc (interpreted-debug-var-ir1-var debug-var)
 			   (sb!c::lexenv-variables
 			    (sb!c::node-lexenv
@@ -2961,7 +2961,7 @@
 ;;; This is the method for DEBUG-VAR-VALIDITY for COMPILED-DEBUG-VARs.
 ;;; For safety, make sure basic-code-location is what we think.
 (defun compiled-debug-var-validity (debug-var basic-code-location)
-  (check-type basic-code-location compiled-code-location)
+  (declare (type compiled-code-location basic-code-location))
   (cond ((debug-var-alive-p debug-var)
 	 (let ((debug-fun (code-location-debug-function basic-code-location)))
 	   (if (>= (compiled-code-location-pc basic-code-location)
@@ -2973,14 +2973,16 @@
 	(t
 	 (let ((pos (position debug-var
 			      (debug-function-debug-vars
-			       (code-location-debug-function basic-code-location)))))
+			       (code-location-debug-function
+				basic-code-location)))))
 	   (unless pos
 	     (error 'unknown-debug-var
 		    :debug-var debug-var
 		    :debug-function
 		    (code-location-debug-function basic-code-location)))
 	   ;; There must be live-set info since basic-code-location is known.
-	   (if (zerop (sbit (compiled-code-location-live-set basic-code-location)
+	   (if (zerop (sbit (compiled-code-location-live-set
+			     basic-code-location)
 			    pos))
 	       :invalid
 	       :valid)))))
@@ -3004,21 +3006,21 @@
 ;;; Given the DEFUN, 3 gets you the LET, 1 gets you the bindings, 0
 ;;; gets the first binding, and 1 gets the AREF form.
 
-;;; Temporary buffer used to build form-number => source-path translation in
-;;; FORM-NUMBER-TRANSLATIONS.
+;;; temporary buffer used to build form-number => source-path translation in
+;;; FORM-NUMBER-TRANSLATIONS
 (defvar *form-number-temp* (make-array 10 :fill-pointer 0 :adjustable t))
 
-;;; Table used to detect CAR circularities in FORM-NUMBER-TRANSLATIONS.
+;;; table used to detect CAR circularities in FORM-NUMBER-TRANSLATIONS
 (defvar *form-number-circularity-table* (make-hash-table :test 'eq))
 
+;;; This returns a table mapping form numbers to source-paths. A source-path
+;;; indicates a descent into the top-level-form form, going directly to the
+;;; subform corressponding to the form number.
+;;;
 ;;; The vector elements are in the same format as the compiler's
-;;; NODE-SOUCE-PATH; that is, the first element is the form number and the last
-;;; is the top-level-form number.
+;;; NODE-SOURCE-PATH; that is, the first element is the form number and
+;;; the last is the top-level-form number.
 (defun form-number-translations (form tlf-number)
-  #!+sb-doc
-  "This returns a table mapping form numbers to source-paths. A source-path
-   indicates a descent into the top-level-form form, going directly to the
-   subform corressponding to the form number."
   (clrhash *form-number-circularity-table*)
   (setf (fill-pointer *form-number-temp*) 0)
   (sub-translate-form-numbers form (list tlf-number))
@@ -3046,13 +3048,13 @@
 	  (frob)
 	  (setq trail (cdr trail)))))))
 
+;;; FORM is a top-level form, and path is a source-path into it. This
+;;; returns the form indicated by the source-path. Context is the
+;;; number of enclosing forms to return instead of directly returning
+;;; the source-path form. When context is non-zero, the form returned
+;;; contains a marker, #:****HERE****, immediately before the form
+;;; indicated by path.
 (defun source-path-context (form path context)
-  #!+sb-doc
-  "Form is a top-level form, and path is a source-path into it. This returns
-   the form indicated by the source-path. Context is the number of enclosing
-   forms to return instead of directly returning the source-path form. When
-   context is non-zero, the form returned contains a marker, #:****HERE****,
-   immediately before the form indicated by path."
   (declare (type unsigned-byte context))
   ;; Get to the form indicated by path or the enclosing form indicated
   ;; by context and path.
@@ -3084,17 +3086,15 @@
 
 ;;;; PREPROCESS-FOR-EVAL and EVAL-IN-FRAME
 
-;;; Create a SYMBOL-MACROLET for each variable valid at the location which
-;;; accesses that variable from the frame argument.
+;;; Return a function of one argument that evaluates form in the
+;;; lexical context of the basic-code-location loc.
+;;; PREPROCESS-FOR-EVAL signals a no-debug-vars condition when the
+;;; loc's debug-function has no debug-var information available. The
+;;; returned function takes the frame to get values from as its
+;;; argument, and it returns the values of form. The returned function
+;;; signals the following conditions: invalid-value,
+;;; ambiguous-variable-name, and frame-function-mismatch.
 (defun preprocess-for-eval (form loc)
-  #!+sb-doc
-  "Return a function of one argument that evaluates form in the lexical
-   context of the basic-code-location loc. PREPROCESS-FOR-EVAL signals a
-   no-debug-vars condition when the loc's debug-function has no
-   debug-var information available. The returned function takes the frame
-   to get values from as its argument, and it returns the values of form.
-   The returned function signals the following conditions: invalid-value,
-   ambiguous-variable-name, and frame-function-mismatch"
   (declare (type code-location loc))
   (let ((n-frame (gensym))
 	(fun (code-location-debug-function loc)))

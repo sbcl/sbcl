@@ -277,7 +277,7 @@
 ;;; If there is a conflict then give the user a chance to do
 ;;; something about it.
 (defun enter-new-nicknames (package nicknames)
-  (check-type nicknames list)
+  (declare (type list nicknames))
   (dolist (n nicknames)
     (let* ((n (package-namify n))
 	   (found (gethash n *package-names*)))

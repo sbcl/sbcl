@@ -411,8 +411,8 @@
 
 (defun merge (result-type sequence1 sequence2 predicate &key key)
   #!+sb-doc
-  "The sequences Sequence1 and Sequence2 are destructively merged into
-   a sequence of type Result-Type using the Predicate to order the elements."
+  "The sequences SEQUENCE1 and SEQUENCE2 are destructively merged into
+   a sequence of type RESULT-TYPE using PREDICATE to order the elements."
   (if (eq result-type 'list)
       (let ((result (merge-lists* (coerce sequence1 'list)
 				  (coerce sequence2 'list)
@@ -422,12 +422,12 @@
 	     (vector-2 (coerce sequence2 'vector))
 	     (length-1 (length vector-1))
 	     (length-2 (length vector-2))
-	     (result (make-sequence-of-type result-type (+ length-1 length-2))))
+	     (result (make-sequence-of-type result-type
+					    (+ length-1 length-2))))
 	(declare (vector vector-1 vector-2)
 		 (fixnum length-1 length-2))
 
-	#!+high-security
-	(check-type-var result result-type)
+	#!+high-security (aver (typep result result-type))
 	(if (and (simple-vector-p result)
 		 (simple-vector-p vector-1)
 		 (simple-vector-p vector-2))

@@ -37,14 +37,21 @@
 ;;; nestedness inside debugger command loops
 (defvar *debug-command-level* 0)
 
-(defvar *stack-top-hint* nil
-  #!+sb-doc
-  "If this is bound before the debugger is invoked, it is used as the stack
-   top by the debugger.")
+;;; If this is bound before the debugger is invoked, it is used as the
+;;; stack top by the debugger.
+(defvar *stack-top-hint* nil)
+
 (defvar *stack-top* nil)
 (defvar *real-stack-top* nil)
 
 (defvar *current-frame* nil)
+
+;;; Beginner-oriented help messages are important because you end up
+;;; in the debugger whenever something bad happens, or if you try to
+;;; get out of the system with Ctrl-C or (EXIT) or EXIT or whatever.
+;;; But after memorizing them the wasted screen space gets annoying..
+(defvar *debug-beginner-help-p* t
+  "Should the debugger display beginner-oriented help messages?")
 
 (defun debug-prompt (stream)
 
@@ -673,15 +680,17 @@ reset to ~S."
 	     ;; that file, and right to send them to *DEBUG-IO*.
 	     (*error-output* *debug-io*))
 	 (unless (typep condition 'step-condition)
-	   (format *debug-io*
-		   "~%~@<Within the debugger, you can type HELP for help. At ~
-                   any command prompt (within the debugger or not) you can ~
-                   type (SB-EXT:QUIT) to terminate the SBCL executable. ~
-                   The condition which caused the debugger to be entered ~
-                   is bound to ~S.~:@>~2%"
-		   '*debug-condition*)
-	   (show-restarts *debug-restarts* *debug-io*)
-	   (terpri *debug-io*))
+	   (when *debug-beginner-help-p*
+	     (format *debug-io*
+		     "~%~@<Within the debugger, you can type HELP for help. ~
+                      At any command prompt (within the debugger or not) you ~
+                      can type (SB-EXT:QUIT) to terminate the SBCL ~
+                      executable. The condition which caused the debugger to ~
+                      be entered is bound to ~S. You can suppress this ~
+                      message by clearing ~S.~:@>~2%"
+		     '*debug-condition*
+		     '*debug-beginner-help-p*))
+	   (show-restarts *debug-restarts* *debug-io*))
 	 (internal-debug))))))
 
 (defun show-restarts (restarts s)

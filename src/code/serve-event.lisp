@@ -42,14 +42,14 @@
   #!+sb-doc
   "Return the handler function in Object-Set for the operation specified by
    Message-ID, if none, NIL is returned."
-  (check-type object-set object-set)
-  (check-type message-id fixnum)
+  (enforce-type object-set object-set)
+  (enforce-type message-id fixnum)
   (values (gethash message-id (object-set-table object-set))))
 
 ;;; The setf inverse for Object-Set-Operation.
 (defun %set-object-set-operation (object-set message-id new-value)
-  (check-type object-set object-set)
-  (check-type message-id fixnum)
+  (enforce-type object-set object-set)
+  (enforce-type message-id fixnum)
   (setf (gethash message-id (object-set-table object-set)) new-value))
 
 |#

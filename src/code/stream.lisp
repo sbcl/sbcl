@@ -201,7 +201,7 @@
 
 ;;;; file position and file length
 
-;;; Call the misc method with the :file-position operation.
+;;; Call the MISC method with the :FILE-POSITION operation.
 (defun file-position (stream &optional position)
   (declare (type stream stream))
   (declare (type (or index (member nil :start :end)) position))
@@ -214,25 +214,42 @@
       (when res
 	(- res (- +in-buffer-length+ (lisp-stream-in-index stream))))))))
 
-;;; declaration test functions
+;;; This is a literal translation of the ANSI glossary entry "stream
+;;; associated with a file".
+;;;
+;;; KLUDGE: Note that since Unix famously thinks "everything is a
+;;; file", and in particular stdin, stdout, and stderr are files, we
+;;; end up with this test being satisfied for weird things like
+;;; *STANDARD-OUTPUT* (to a tty). That seems unlikely to be what the
+;;; ANSI spec really had in mind, especially since this is used as a
+;;; qualification for operations like FILE-LENGTH (so that ANSI was
+;;; probably thinking of something like what Unix calls block devices)
+;;; but I can't see any better way to do it. -- WHN 2001-04-14
+(defun stream-associated-with-file-p (x)
+  "Test for the ANSI concept \"stream associated with a file\"."
+  (or (typep x 'file-stream)
+      (and (synonym-stream-p x)
+	   (stream-associated-with-file-p (symbol-value
+					   (synonym-stream-symbol x))))))
 
-#!+high-security
-(defun stream-associated-with-file (stream)
-  #!+sb-doc
-  "Tests if the stream is associated with a file"
-  (or (typep stream 'file-stream)
-      (and (synonym-stream-p stream)
-	   (typep (symbol-value (synonym-stream-symbol stream))
-		  'file-stream))))
+(defun stream-must-be-associated-with-file (stream)
+  (declare (type stream stream))
+  (unless (stream-associated-with-file-p stream)
+    (error 'simple-type-error
+	   ;; KLUDGE: The ANSI spec for FILE-LENGTH specifically says
+	   ;; this should be TYPE-ERROR. But what then can we use for
+	   ;; EXPECTED-TYPE? This SATISFIES type (with a nonstandard
+	   ;; private predicate function..) is ugly and confusing, but
+	   ;; I can't see any other way. -- WHN 2001-04-14
+	   :expected-type '(satisfies stream-associated-with-file-p)
+	   :format-string
+	   "~@<The stream ~2I~_~S ~I~_isn't associated with a file.~:>"
+	   :format-arguments (list stream))))
 
-;;; Like File-Position, only use :file-length.
+;;; like FILE-POSITION, only using :FILE-LENGTH
 (defun file-length (stream)
   (declare (type (or file-stream synonym-stream) stream))
-
-  #!+high-security
-  (check-type-var stream '(satisfies stream-associated-with-file)
-		  "a stream associated with a file")
-
+  (stream-must-be-associated-with-file stream)
   (funcall (lisp-stream-misc stream) stream :file-length))
 
 ;;;; input functions
@@ -798,21 +815,16 @@
 	    (:copier nil))
   (input-stream (required-argument) :type stream :read-only t)
   (output-stream (required-argument) :type stream :read-only t))
-(def!method print-object ((x two-way-stream) stream)
-  (print-unreadable-object (x stream :type t :identity t)
-    (format stream
-	    ":INPUT-STREAM ~S :OUTPUT-STREAM ~S"
-	    (two-way-stream-input-stream x)
-	    (two-way-stream-output-stream x))))
+(defprinter (two-way-stream) input-stream output-stream)
 
 #!-high-security-support
 (setf (fdocumentation 'make-two-way-stream 'function)
-  "Returns a bidirectional stream which gets its input from Input-Stream and
+  "Return a bidirectional stream which gets its input from Input-Stream and
    sends its output to Output-Stream.")
 #!+high-security-support
 (defun make-two-way-stream (input-stream output-stream)
   #!+sb-doc
-  "Returns a bidirectional stream which gets its input from Input-Stream and
+  "Return a bidirectional stream which gets its input from Input-Stream and
    sends its output to Output-Stream."
   ;; FIXME: This idiom of the-real-stream-of-a-possibly-synonym-stream
   ;; should be encapsulated in a function, and used here and most of

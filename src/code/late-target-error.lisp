@@ -592,7 +592,8 @@
   (:report
    (lambda (condition stream)
      (format stream
-	     "~@<TYPE-ERROR in ~S: ~2I~:_~S is not of type ~S~:>."
+	     "~@<TYPE-ERROR in ~S: ~
+              ~2I~_The value ~4I~:_~S ~2I~_is not of type ~4I~_~S.~:>"
 	     (condition-function-name condition)
 	     (type-error-datum condition)
 	     (type-error-expected-type condition)))))

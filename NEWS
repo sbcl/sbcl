@@ -692,10 +692,9 @@ changes in sbcl-0.6.12 relative to sbcl-0.6.11:
   half a dozen bug fixes in pretty-printing and the debugger, and
   half a dozen others elsewhere
 * fixed bug 13: Floating point infinities are now supported again.
-* fixed bug 45a: Various internal functions required to support
-  complex special functions have been merged from CMU CL sources.
-  (When I was first setting up SBCL, I misunderstood a compile-time
-  conditional #-OLD-SPECFUN, and so accidentally deleted them.)
+  They might still be a little bit flaky, but thanks to bug reports
+  from Nathan Froyd and CMU CL patches from Raymond Toy they're not
+  as flaky as they were.
 * The --noprogrammer command line option is now supported. (Its
   behavior is slightly different in detail from what the old man
   page claimed it would do, but it's still appropriate under the
@@ -705,20 +704,34 @@ changes in sbcl-0.6.12 relative to sbcl-0.6.11:
   handle many floating point and complex operations much less
   inefficiently. (Thus e.g. you can implement a complex FFT
   without consing!)
-* improved support for type intersection and union, fixing bug 12
-  (e.g., now (SUBTYPEP 'KEYWORD 'SYMBOL)=>T,T) and some other
-  more obscure bugs as well
+* The compiler now detects type mismatches between DECLAIM FTYPE 
+  and DEFUN better, and implements CHECK-TYPE more correctly, and
+  SBCL builds under CMU CL again despite its non-ANSI EVAL-WHEN,
+  thanks to patches from Martin Atzmueller.
 * various fixes to make the cross-compiler more portable to
   ANSI-conforming-but-different cross-compilation hosts (notably
   Lispworks for Windows, following bug reports from Arthur Lemmens)
-* a new workaround to make the cross-compiler portable to CMU CL
-  again despite its non-ANSI EVAL-WHEN, thanks to Martin Atzmueller
-* The compiler now detects type mismatches between DECLAIM FTYPE 
-  and DEFUN better, thanks to patches from Martin Atzmueller.
-* A bug in READ-SEQUENCE for CONCATENATED-STREAM has been fixed
-  thanks to Pierre Mai's CMU CL patch.
-* new fasl file format version number (because of changes in byte
-  code opcodes and in internal representation of (OR ..) types)
+* A bug in READ-SEQUENCE for CONCATENATED-STREAM, and a gross
+  ANSI noncompliance in DEFMACRO &KEY argument parsing, have been
+  fixed thanks to Pierre Mai's CMU CL patches.
+* fixes to keep the system from overflowing internal counters when
+  it tries to use i/o buffers larger than 16M bytes
+* fixed bug 45a: Various internal functions required to support
+  complex special functions have been merged from CMU CL sources.
+  (When I was first setting up SBCL, I misunderstood a compile-time
+  conditional #-OLD-SPECFUN, and so accidentally deleted them.)
+* improved support for type intersection and union, fixing bug 12
+  (e.g., now (SUBTYPEP 'KEYWORD 'SYMBOL)=>T,T) and some other
+  more obscure bugs as well
+* Christophe Rhodes has made some debian packages of sbcl at
+  <http://www-jcsu.jesus.cam.ac.uk/ftp/pub/debian/lisp>.
+  From his sbcl-devel e-mail of 2001-04-08 they're not completely
+  stable, but are nonetheless usable. When he's ready, I'd be happy
+  to add them to the SourceForge "File Releases" section. (And if
+  anyone wants to do RPMs or *BSD packages, they'd be welcome too.)
+* new fasl file format version number (because of changes in 
+  internal representation of (OR ..) types to accommodate the new
+  support for (AND ..) types, among other things)
 
 planned incompatible changes in 0.7.x:
 * The debugger prompt sequence now goes "5]", "5[2]", "5[3]", etc.
