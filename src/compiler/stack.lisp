@@ -142,7 +142,8 @@
             (let ((pred (find-if #'block-flag (block-pred block))))
               (when (and (eq pred head)
                          (not (bind-p (block-start-node block))))
-                (setq pred (nle-block-entry-block block)))
+                (let ((entry (nle-block-entry-block block)))
+                  (setq pred (if (block-flag entry) entry nil))))
               (cond (pred
                      (setf (block-flag block) t)
                      (order-block-uvl-sets block pred))
@@ -186,11 +187,11 @@
                                          repeat preserved-count
                                          collect `',moved))))
                 (t
-                 (aver (tailp block2-stack block1-stack))
-                 (let ((last-popped (elt block1-stack
-                                         (- (length block1-stack)
-                                            (length block2-stack)
-                                            1))))
+                 (let* ((n-popped (- (length block1-stack)
+                                     (length block2-stack)))
+                       (last-popped (elt block1-stack (1- n-popped))))
+                   (when *check-consistency*
+                     (aver (equal block2-stack (nthcdr n-popped block1-stack))))
                    `(%pop-values ',last-popped))))))
     (when cleanup-code
       (let* ((block (insert-cleanup-code block1 block2

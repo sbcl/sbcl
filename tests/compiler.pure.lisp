@@ -1133,6 +1133,17 @@
                 :good
                 (values result1 result2))))
          :good))
+
+;;; MISC.290
+(assert (zerop
+         (funcall
+          (compile
+           nil
+           '(lambda ()
+             (declare
+              (optimize (speed 3) (space 3) (safety 1)
+               (debug 2) (compilation-speed 0)))
+             (apply (constantly 0) (catch 'ct2 0) 0 (catch 'ct2 0) nil))))))
 
 ;;; MISC.275
 (assert
