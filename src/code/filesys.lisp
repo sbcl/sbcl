@@ -1025,7 +1025,10 @@
 
 (defun default-directory ()
   #!+sb-doc
-  "Return the pathname for the default directory. This is the place where
+  "This is deprecated as of sbcl-0.6.12.18. The ANSI-supported way to do
+  this kind of thing is to use *DEFAULT-PATHNAME-DEFAULTS*.
+
+  Return the pathname for the default directory. This is the place where
   a file will be written if no directory is specified. This may be changed
   with SETF."
   (multiple-value-bind (gr dir-or-error) (sb!unix:unix-current-directory)
@@ -1039,20 +1042,21 @@
     (unless namestring
       (error "~S doesn't exist." new-val))
     (multiple-value-bind (gr error) (sb!unix:unix-chdir namestring)
-      (if gr
-	  (setf (search-list "default:") (default-directory))
-	  (simple-file-perror "couldn't set default directory to ~S"
-			      new-val
-			      error)))
+      (unless gr
+	(simple-file-perror "couldn't set default directory to ~S"
+			    new-val
+			    error)))
     new-val))
 
 (/show0 "filesys.lisp 934")
 
-(/show0 "entering what used to be !FILESYS-COLD-INIT")
+;;; FIXME/REMOVEME: We shouldn't need to do this here, since
+;;; *DEFAULT-PATHNAME-DEFAULTS* is now initialized in
+;;; OS-COLD-INIT-OR-REINIT. But in sbcl-0.6.12.19 someone is using
+;;; this too early for it to be deleted here. I'd like to fix the
+;;; #!+:SB-SHOW stuff, then come back to this. -- WHN 2001-05-29
 (defvar *default-pathname-defaults*
   (%make-pathname *unix-host* nil nil nil nil :newest))
-(setf (search-list "default:") (default-directory))
-(/show0 "leaving what used to be !FILESYS-COLD-INIT")
 
 (defun ensure-directories-exist (pathspec &key verbose (mode #o777))
   #!+sb-doc

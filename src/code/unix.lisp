@@ -107,23 +107,11 @@
 
 (/show0 "unix.lisp 220")
 
-;;; FIXME: Isn't there some way to use a C wrapper to avoid this hand-copying?
-(defconstant +max-s-long+ 2147483647)
-(defconstant +max-u-long+ 4294967295)
-(def-alien-type quad-t #+nil long-long #-nil (array long 2))
-(def-alien-type uquad-t #+nil unsigned-long-long
-		#-nil (array unsigned-long 2))
-(def-alien-type qaddr-t (* quad-t))
-(def-alien-type daddr-t int)
-(def-alien-type caddr-t (* char))
-(def-alien-type swblk-t long)
-(def-alien-type size-t unsigned-int)
-(def-alien-type ssize-t int)
-
-;;; FIXME: We shouldn't hand-copy types from header files into Lisp like this
-;;; unless we have extreme provocation. Reading directories is not extreme
-;;; enough, since it doesn't need to be blindingly fast: we can just implement
-;;; those functions in C as a wrapper layer.
+;;; FIXME: We shouldn't hand-copy types from header files into Lisp
+;;; like this unless we have extreme provocation. Reading directories
+;;; is not extreme enough, since it doesn't need to be blindingly
+;;; fast: we can just implement those functions in C as a wrapper
+;;; layer.
 (def-alien-type fd-mask unsigned-long)
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
