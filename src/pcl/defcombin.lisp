@@ -161,8 +161,29 @@
 		`(,operator ,@(mapcar (lambda (m) `(call-method ,m ()))
 				      primary)))))
       (cond ((null primary)
-	     `(error "No ~S methods for the generic function ~S."
-		     ',type ',generic-function))
+	     ;; FIXME(?): NO-APPLICABLE-METHOD seems more appropriate
+	     ;; here, but
+	     ;;   (1) discussion with CSR on #lisp reminded me that it's
+	     ;;       a vexed question whether we can validly call
+	     ;;       N-A-M when an :AROUND method exists (and the
+	     ;;       definition of NO-NEXT-METHOD seems to discourage
+	     ;;       us from calling NO-NEXT-METHOD directly in that
+	     ;;       case, since it's supposed to be called from a
+	     ;;       CALL-NEXT-METHOD form), and
+	     ;;   (2) a call to N-A-M would require &REST FUN-ARGS, and
+	     ;;       we don't seem to have FUN-ARGS here.
+	     ;; I think ideally failures in short method combination
+	     ;; would end up either in NO-APPLICABLE-METHOD or
+	     ;; NO-NEXT-METHOD, and I expect that's what ANSI
+	     ;; generally intended, but it's not clear to me whether
+	     ;; the details of what they actually specified let us
+	     ;; make that happen. So for now I've just tried to
+	     ;; clarify the error message text but left the general
+	     ;; logic alone (and raised the question on sbcl-devel).
+	     ;; -- WHN 2003-06-16
+	     `(error "no ~S methods for ~S on these arguments"
+		     ',type
+		     ',generic-function))
 	    ((null around) main-method)
 	    (t
 	     `(call-method ,(car around)

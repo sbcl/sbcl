@@ -344,18 +344,29 @@ WORKAROUND:
   so the compiler doesn't compile the type test into code, but
   instead just saves the type in a lexical closure and interprets it
   at runtime.
-    A proper solution involves deciding whether it's really worth
-  saving space by implementing structure slot accessors as closures.
-  (If it's not worth it, the problem vanishes automatically. If it
-  is worth it, there are hacks we could use to force type tests to
-  be compiled anyway, and even shared. E.g. we could implement
-  an EQUAL hash table mapping from types to compiled type tests, 
-  and save the appropriate compiled type test as part of each lexical
-  closure; or we could make the lexical closures be placeholders
-  which overwrite their old definition as a lexical closure with
-  a new compiled definition the first time that they're called.)
-    As a workaround for the problem, #'(SETF FOO) expressions can
-  be replaced with (EFFICIENT-SETF-FUNCTION FOO), where
+    To exercise the problem, compile and load
+      (cl:in-package :cl-user)
+      (defstruct foo
+        (bar (error "missing") :type bar))
+      (defvar *foo*)
+      (defun wastrel1 (x)
+        (loop (setf (foo-bar *foo*) x)))
+      (defstruct bar)
+      (defvar *bar* (make-bar))
+      (defvar *foo* (make-foo :bar *bar*))
+      (defvar *setf-foo-bar* #'(setf foo-bar))
+      (defun wastrel2 (x)
+        (loop (funcall *setf-foo-bar* x *foo*)))
+  then run (WASTREL1 *BAR*) or (WASTREL2 *BAR*), hit Ctrl-C, and
+  use BACKTRACE, to see it's spending all essentially all its time
+  in %TYPEP and VALUES-SPECIFIER-TYPE and so forth.
+    One possible solution would be simply to give up on 
+  representing structure slot accessors as functions, and represent
+  them as macroexpansions instead. This can be inconvenient for users,
+  but it's not clear that it's worse than trying to help by expanding
+  into a horribly inefficient implementation.
+    As a workaround for the problem, #'(SETF FOO) expressions
+  can be replaced with (EFFICIENT-SETF-FUNCTION FOO), where
 (defmacro efficient-setf-function (place-function-name)
   (or #+sbcl (and (sb-int:info :function :accessor-for place-function-name)
 		  ;; a workaround for the problem, encouraging the

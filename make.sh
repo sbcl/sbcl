@@ -70,15 +70,11 @@ if [ "$GNUMAKE" != "" ] ; then
 elif [ -x "`which gmake`" ] ; then
   # "gmake" is the preferred name in *BSD.
   GNUMAKE=gmake
-else
-  # FIXME: Now that we do this early, maybe prompt the user rather
-  # than guessing?  I'd still be annoyed, though... -- CSR,
-  # 2003-05-16.
-  #
-  # All the world's a Linux, and all its users weary of cautious
-  # BSDish worries that "make" might not be GNU make; so just guess
-  # that "make" is GNU make and hope for the best.
+elif [ "GNU Make" = "`make -v | head -n 1 | cut -b 0-8`" ]; then
   GNUMAKE=make
+else
+  echo "GNU Make not found. Try setting the environment variable GNUMAKE."
+  exit 1
 fi
 
 export GNUMAKE
