@@ -372,18 +372,20 @@
 ;;; comparison function Test.  Assume each element to sort consists of
 ;;; Element-Size array slots, and that the slot Key-Offset contains
 ;;; the sort key.
-(defun qsort (vec &key (test #'<) (element-size 1) (key-offset 0)
+(defun qsort (vec &key (element-size 1) (key-offset 0)
 	      (from 0) (to (- (length vec) element-size)))
-  (declare (fixnum to from element-size)
-	   (function test))
+  (declare (type fixnum to from element-size key-offset))
+  (declare (type (simple-array address) vec))
   (labels ((rotate (i j)
+	     (declare (fixnum i j))
 	     (loop repeat element-size
 		   for i from i and j from j do
 		     (rotatef (aref vec i) (aref vec j))))
 	   (key (i)
 	     (aref vec (+ i key-offset)))
 	   (rec-sort (from to)
-	     (when (> to from) 
+	     (declare (fixnum to from))
+	     (when (> to from)
 	       (let* ((mid (* element-size
 			      (round (+ (/ from element-size)
 					(/ to element-size))
@@ -391,15 +393,25 @@
 		      (i from)
 		      (j (+ to element-size))
 		      (p (key mid)))
-		 (declare (fixnum i j))
+		 (declare (fixnum mid i j))
 		 (rotate mid from)
 		 (loop
 		    (loop do (incf i element-size)
 			  until (or (> i to)
-				    (funcall test p (key i))))
+				    ;; QSORT used to take a test
+				    ;; parameter which was funcalled
+				    ;; here. This caused some consing,
+				    ;; which is problematic since
+				    ;; QSORT is indirectly called in
+				    ;; an after-gc-hook. So just
+				    ;; hardcode >, which would've been
+				    ;; used for the test anyway.
+				    ;; --JES, 2004-07-09
+				    (> p (key i))))
 		    (loop do (decf j element-size)
 			  until (or (<= j from)
-				    (funcall test (key j) p)))
+				    ;; As above.
+				    (> (key j) p)))
 		    (when (< j i) (return))
 		    (rotate i j))
 		 (rotate from j)
@@ -543,7 +555,7 @@
   `(let ((*sampling* ,on))
      ,@body))
 
-(defun sort-samples (&key test (key :pc))
+(defun sort-samples (&key (key :pc))
   "Sort *Samples* using comparison Test.  Key must be one of
    :Pc or :Return-Pc for sorting by pc or return pc."
   (declare (type (member :pc :return-pc) key))
@@ -551,7 +563,6 @@
     (qsort *samples*
 	   :from 0
 	   :to (- *samples-index* +sample-size+)
-	   :test test
 	   :element-size +sample-size+
 	   :key-offset (if (eq key :pc) 0 1))))
 
@@ -574,7 +585,7 @@
 		(fp (sb-vm::context-register scp #.sb-vm::ebp-offset))
 		(ra (sap-ref-32 (int-sap fp)
 				(- (* (1+ sb-vm::return-pc-save-offset)
-				     sb-vm::n-word-bytes)))))
+				      sb-vm::n-word-bytes)))))
 	   (record (sap-int pc-ptr))
 	   (record ra)))))))
 
@@ -630,7 +641,7 @@
 ;;; dynamic-space code objects.  KEY being :PC means adjust pcs.
 (defun adjust-samples (key)
   (declare (type (member :pc :return-pc) key))
-  (sort-samples :test #'> :key key)
+  (sort-samples :key key)
   (let ((sidx 0)
 	(offset (if (eq key :pc) 0 1)))
     (declare (type sb-impl::index sidx))
@@ -663,8 +674,9 @@
    (dolist (info *dynamic-space-code-info*)
      (setf (dyninfo-new-start info)
 	   (code-start (dyninfo-code info))))
-   (adjust-samples :pc)
-   (adjust-samples :return-pc)
+   (progn
+     (adjust-samples :pc)
+     (adjust-samples :return-pc))
    (dolist (info *dynamic-space-code-info*)
      (let ((size (- (dyninfo-end info) (dyninfo-start info))))
        (setf (dyninfo-start info) (dyninfo-new-start info))
