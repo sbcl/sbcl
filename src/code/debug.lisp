@@ -632,10 +632,6 @@ reset to ~S."
 	    (*print-pretty* t)
 	    (*package* original-package))
 
-       ;; REMOVEME (In the flaky7 branch, I've been having 
-       ;; problems with the pretty printer...)
-       (setf *print-pretty* nil)
-
        ;; Before we start our own output, finish any pending output.
        ;; Otherwise, if the user tried to track the progress of
        ;; his program using PRINT statements, he'd tend to lose

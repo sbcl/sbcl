@@ -459,6 +459,7 @@
        (/hexstr arguments)
 
        ;; REMOVEME
+       #|
        (/show0 "cold/low (LENGTH ARGUMENTS)=..")
        (/hexstr (length arguments))
        (dolist (argument arguments)
@@ -476,6 +477,7 @@
 		      (/primitive-print "Argument type is a LIST."))
 		     (t
 		      (/primitive-print "Argument type is not a SYMBOL or LIST."))))))
+       |#
 
        (multiple-value-bind (name sb!debug:*stack-top-hint*)
 	   (find-interrupted-name)

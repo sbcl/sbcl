@@ -481,11 +481,6 @@
 
 (defun repl (noprint)
   (/show0 "entering REPL")
-
-
-  ;; REMOVEME after debugging
-  (setf *print-pretty* nil)
-
   (let ((eof-marker (cons :eof nil)))
     (loop
      ;; FIXME: It seems bad to have GC behavior depend on scrubbing the
