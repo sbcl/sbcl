@@ -50,33 +50,6 @@
     (/noshow0 "returning from SIGNAL")
     nil))
 
-;;; a utility for SIGNAL, ERROR, CERROR, WARN, and INVOKE-DEBUGGER:
-;;; Parse the hairy argument conventions into a single argument that's
-;;; directly usable by all the other routines.
-(defun coerce-to-condition (datum arguments default-type fun-name)
-  (cond ((typep datum 'condition)
-	 (if arguments
-	     (cerror "Ignore the additional arguments."
-		     'simple-type-error
-		     :datum arguments
-		     :expected-type 'null
-		     :format-control "You may not supply additional arguments ~
-				     when giving ~S to ~S."
-		     :format-arguments (list datum fun-name)))
-	 datum)
-	((symbolp datum) ; roughly, (SUBTYPEP DATUM 'CONDITION)
-	 (apply #'make-condition datum arguments))
-	((or (stringp datum) (functionp datum))
-	 (make-condition default-type
-			 :format-control datum
-			 :format-arguments arguments))
-	(t
-	 (error 'simple-type-error
-		:datum datum
-		:expected-type '(or symbol string)
-		:format-control "bad argument to ~S: ~S"
-		:format-arguments (list fun-name datum)))))
-
 ;;; a shared idiom in ERROR, CERROR, and BREAK: The user probably
 ;;; doesn't want to hear that the error "occurred in" one of these
 ;;; functions, so we try to point the top of the stack to our caller

@@ -23,6 +23,33 @@
 	:format-control format-control
 	:format-arguments format-arguments))
 
+;;; a utility for SIGNAL, ERROR, CERROR, WARN, COMPILER-NOTIFY and
+;;; INVOKE-DEBUGGER: Parse the hairy argument conventions into a
+;;; single argument that's directly usable by all the other routines.
+(defun coerce-to-condition (datum arguments default-type fun-name)
+  (cond ((typep datum 'condition)
+	 (if arguments
+	     (cerror "Ignore the additional arguments."
+		     'simple-type-error
+		     :datum arguments
+		     :expected-type 'null
+		     :format-control "You may not supply additional arguments ~
+				     when giving ~S to ~S."
+		     :format-arguments (list datum fun-name)))
+	 datum)
+	((symbolp datum) ; roughly, (SUBTYPEP DATUM 'CONDITION)
+	 (apply #'make-condition datum arguments))
+	((or (stringp datum) (functionp datum))
+	 (make-condition default-type
+			 :format-control datum
+			 :format-arguments arguments))
+	(t
+	 (error 'simple-type-error
+		:datum datum
+		:expected-type '(or symbol string)
+		:format-control "bad argument to ~S: ~S"
+		:format-arguments (list fun-name datum)))))
+
 (define-condition layout-invalid (type-error)
   ()
   (:report

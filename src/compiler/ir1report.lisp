@@ -375,6 +375,8 @@
 
     (setq *last-error-context* context)
 
+    ;; FIXME: this testing for effective equality of compiler messages
+    ;; is ugly, and really ought to be done at a higher level.
     (unless (and (equal format-string *last-format-string*)
 		 (tree-equal format-args *last-format-args*))
       (note-message-repeats nil)
@@ -408,11 +410,9 @@
 	    (values "~A"
 		    (list (with-output-to-string (s)
 			    (princ condition s)))))
-      (print-compiler-message (format nil
-				      "caught ~S:~%  ~A"
-				      what
-				      format-string)
-			      format-args)))
+      (print-compiler-message
+       (format nil "caught ~S:~%  ~A" what format-string)
+       format-args)))
   (values))
 
 ;;; The act of signalling one of these beasts must not cause WARNINGSP
@@ -422,24 +422,38 @@
 ;;; FIXME: the handling of compiler-notes could be unified with
 ;;; warnings and style-warnings (see the various handler functions
 ;;; below).
-(define-condition compiler-note (condition) ())
+(define-condition compiler-note (condition) ()
+  (:documentation
+   "Root of the hierarchy of conditions representing information discovered
+by the compiler that the user might wish to know, but which does not merit
+a STYLE-WARNING (or any more serious condition)."))
 (define-condition simple-compiler-note (simple-condition compiler-note) ())
+(define-condition code-deletion-note (simple-compiler-note) ()
+  (:documentation
+   "A condition type signalled when the compiler deletes code that the user
+has written, having proved that it is unreachable."))
 
-(defun compiler-notify (format-string &rest format-args)
-  ;; FORMAT-STRING and FORMAT-ARGS might well end up turning into
-  ;; DATUM and REST, and COERCE-TO-CONDITION will be used.
+(defun compiler-notify (datum &rest args)
   (unless (if *compiler-error-context*
 	      (policy *compiler-error-context* (= inhibit-warnings 3))
 	      (policy *lexenv* (= inhibit-warnings 3)))
-    (restart-case
-	(signal (make-condition 'simple-compiler-note
-				:format-control format-string
-				:format-arguments format-args))
-      (muffle-warning ()
-	(return-from compiler-notify (values))))
-    (incf *compiler-note-count*)
-    (print-compiler-message (format nil "note: ~A" format-string)
-			    format-args))
+    (let ((condition
+	   (coerce-to-condition datum args
+				'simple-compiler-note 'compiler-notify)))
+      (restart-case
+	  (signal condition)
+	(muffle-warning ()
+	  (return-from compiler-notify (values))))
+      (incf *compiler-note-count*)
+      (multiple-value-bind (format-string format-args)
+	  (if (typep condition 'simple-condition)
+	      (values (simple-condition-format-control condition)
+		      (simple-condition-format-arguments condition))
+	      (values "~A"
+		      (list (with-output-to-string (s)
+			      (princ condition s)))))
+	(print-compiler-message (format nil "note: ~A" format-string)
+				format-args))))
   (values))
 
 ;;; Issue a note when we might or might not be in the compiler.
@@ -447,19 +461,21 @@
   (if (boundp '*lexenv*) ; if we're in the compiler
       (apply #'compiler-notify rest)
       (progn
-	(restart-case
-	    (signal (make-condition 'simple-compiler-note
-				    :format-control (car rest)
-				    :format-arguments (cdr rest)))
-	  (muffle-warning ()
-	    (return-from maybe-compiler-notify (values))))
-	(let ((stream *error-output*))
-	  (pprint-logical-block (stream nil :per-line-prefix ";")
-	    (format stream " note: ~3I~_")
-	    (pprint-logical-block (stream nil)
-	      (apply #'format stream rest)))
-	  ;; (outside logical block, no per-line-prefix)
-	  (fresh-line stream))
+	(let ((condition
+	       (coerce-to-condition (car rest) (cdr rest)
+				    'simple-compiler-note
+				    'maybe-compiler-notify)))
+	  (restart-case
+	      (signal condition)
+	    (muffle-warning ()
+	      (return-from maybe-compiler-notify (values))))
+	  (let ((stream *error-output*))
+	    (pprint-logical-block (stream nil :per-line-prefix ";")
+	      (format stream " note: ~3I~_")
+	      (pprint-logical-block (stream nil)
+		(format stream "~A" condition)))
+	    ;; (outside logical block, no per-line-prefix)
+	    (fresh-line stream)))
 	(values))))
 
 ;;; The politically correct way to print out progress messages and

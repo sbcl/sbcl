@@ -862,8 +862,9 @@
                (return-block (and return (node-block return))))
 	  (unless (leaf-ever-used clambda)
 	    (let ((*compiler-error-context* bind))
-	      (compiler-notify "deleting unused function~:[.~;~:*~%  ~S~]"
-			       (leaf-debug-name clambda))))
+	      (compiler-notify 'code-deletion-note
+			       :format-control "deleting unused function~:[.~;~:*~%  ~S~]"
+			       :format-arguments (list (leaf-debug-name clambda)))))
           (unless (block-delete-p bind-block)
             (unlink-blocks (component-head component) bind-block))
 	  (when (and return-block (not (block-delete-p return-block)))
@@ -1245,7 +1246,9 @@
 					  0)))
 	    (unless (return-p node)
 	      (let ((*compiler-error-context* node))
-		(compiler-notify "deleting unreachable code")))
+		(compiler-notify 'code-deletion-note
+				 :format-control "deleting unreachable code"
+				 :format-arguments nil)))
 	    (return))))))
   (values))
 

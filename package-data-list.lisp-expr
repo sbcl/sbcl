@@ -552,7 +552,7 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
 
 	     ;; conditions that can be handled to reduce compiler
 	     ;; verbosity
-	     "COMPILER-NOTE"
+	     "CODE-DELETION-NOTE" "COMPILER-NOTE"
 
 	     ;; FIXME: This name doesn't match the DEFFOO - vs. -
 	     ;; DEFINE-FOO convention used in the ANSI spec, and so
