@@ -8,7 +8,7 @@
 # binary-distribution.sh.)
 
 b=${1:?missing base directory name argument}
-tar cf $b-html.tar
-    `find $b -name '*.htm*'`
+tar cf $b-html.tar \
+    `find $b -name '*.htm*'` \
     $b/COPYING $b/CREDITS $b/README \
     $b/pubring.pgp
