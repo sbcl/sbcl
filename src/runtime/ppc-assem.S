@@ -515,9 +515,8 @@ lra:
 	.byte 0,0,0,SIMPLE_FUN_HEADER_WIDETAG
 	.byte 18<<2
 CSYMBOL(undefined_tramp):	
-	.byte 0,0,24
+	.byte 0,0,48
 	.long CSYMBOL(undefined_tramp)
-	.long NIL
 	.long NIL
 	.long NIL
 	.long NIL
@@ -530,7 +529,9 @@ CSYMBOL(undefined_tramp):
 	la reg_LIP,SIMPLE_FUN_CODE_OFFSET(reg_CODE)
 	mtctr reg_LIP
 	bctr
-	
+	mr reg_CSP,reg_CFP
+	b 1b
+
 	SET_SIZE(xundefined_tramp)
 
 	GFUNCDEF(xclosure_tramp)

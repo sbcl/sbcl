@@ -86,6 +86,13 @@
   (declare (type (alien (* os-context-t)) context))
   (deref (context-register-addr context index)))
 
+(define-alien-routine ("os_context_lr_addr" context-lr-addr) (* unsigned-long)
+  (context (* os-context-t)))
+
+(defun context-lr (context)
+  (declare (type (alien (* os-context-t)) context))
+  (int-sap (deref (context-lr-addr context))))
+
 (defun %set-context-register (context index new)
 (declare (type (alien (* os-context-t)) context))
 (setf (deref (context-register-addr context index))

@@ -58,5 +58,80 @@
   (assert (eql &rest-sym '&rest))
   (assert (symbolp format-args-sym)))
 
+;;; Check for backtraces generally being correct.  Ensure that the
+;;; actual backtrace finishes (doesn't signal any errors on its own),
+;;; and that it contains the frames we expect, doesn't contain any
+;;; "bogus stack frame"s, and contains the appropriate toplevel call
+;;; and hasn't been cut off anywhere.
+(defun verify-backtrace (test-function frame-name
+                         &key (key #'first) (test #'eql)
+                         (allow-bogus-frames nil))
+  (let ((result nil)
+        (return-value nil))
+    (block outer-handler
+      (handler-bind
+          ((error #'(lambda (condition)
+                      (let ((backtrace (ignore-errors
+                                         (sb-debug:backtrace-as-list))))
+                        ;; Make sure we find what we're looking for.
+                        (when (member frame-name backtrace
+                                      :key key :test test)
+                          (setf result (list :error condition)))
+                        ;; Make sure there's no bogus stack frames
+                        ;; unless they're explicitly allowed.
+                        (when (and (not allow-bogus-frames)
+                                   (member "bogus stack frame" backtrace
+                                           :key #'first :test #'equal))
+                          (setf result nil))
+                        ;; Make sure the backtrace isn't stunted in
+                        ;; any way.  (Depends on running in the main
+                        ;; thread.)
+                        (unless (member 'sb-impl::toplevel-init backtrace
+                                        :key #'first :test #'equal)
+                          (setf result nil)))
+                      (return-from outer-handler))))
+        (funcall test-function)))
+    (values result return-value)))
+
+;;; Test for "undefined function" (undefined_tramp) working properly.
+;;; Try it with and without tail call elimination, since they can have
+;;; different effects.  (Specifically, if undefined_tramp is incorrect
+;;; a stunted stack can result from the tail call variant.)
+#-x86 ; bug 345
+(progn
+  (flet ((test-function ()
+	   (declare (optimize (speed 2) (debug 1))) ; tail call elimination
+	   (#:undefined-function 42)))
+    (assert (verify-backtrace #'test-function "undefined function"
+			      :test #'equal)))
+  
+  (flet ((test-function ()
+	   (declare (optimize (speed 1) (debug 2))) ; no tail call elimination
+	   (#:undefined-function 42)))
+    (assert (verify-backtrace #'test-function "undefined function"
+			      :test #'equal))))
+
+;;; Division by zero was a common error on PPC.  It depended on the
+;;; return function either being before INTEGER-/-INTEGER in memory,
+;;; or more than MOST-POSITIVE-FIXNUM bytes ahead.  It also depends on
+;;; INTEGER-/-INTEGER calling SIGNED-TRUNCATE.  I believe Raymond Toy
+;;; says that the Sparc backend (at least for CMUCL) inlines this, so
+;;; if SBCL does the same this test is probably not good for the
+;;; Sparc.
+;;;
+;;; Disabling tail call elimination on this will probably ensure that
+;;; the return value (to the flet or the enclosing top level form) is
+;;; more than MOST-POSITIVE-FIXNUM with the current spaces on OS X.
+;;; Enabling it might catch other problems, so do it anyway.
+(flet ((test-function ()
+         (declare (optimize (speed 1) (debug 2))) ; tail call elimination
+         (/ 42 0)))
+  (assert (verify-backtrace #'test-function '/)))
+
+(flet ((test-function ()
+         (declare (optimize (speed 1) (debug 2))) ; no tail call elimination
+         (/ 42 0)))
+  (assert (verify-backtrace #'test-function '/)))
+
 ;;; success
 (quit :unix-status 104)

@@ -1569,3 +1569,15 @@ WORKAROUND:
   it; this time around (before sbcl-0.8.13 release) I (WHN) just
   commented out the SB!VM:MEMORY-USAGE calls until someone figures
   out how to make them work reliably with the rest of the GC.
+
+  (Note: there's at least one dubious thing in room.lisp: see the
+  comment in VALID-OBJ)
+
+345: backtrace on x86 undefined function
+  In sbcl-0.8.13 (and probably earlier versions), code of the form
+    (flet ((test () (#:undefined-fun 42)))
+      (funcall #'test))
+  yields the debugger with a poorly-functioning backtrace.  Brian
+  Downing fixed most of the problems on non-x86 architectures, but on
+  the x86 the backtrace from this evaluation does not reveal anything
+  about the problem.  (See tests in debug.impure.lisp)

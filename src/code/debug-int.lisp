@@ -948,24 +948,42 @@
 	   (let* ((code-header-len (* (get-header-data code)
 				      sb!vm:n-word-bytes))
 		  (pc-offset
-                    (- (sap-int (sb!vm:context-pc scp))
-                       (- (get-lisp-obj-address code)
-                          sb!vm:other-pointer-lowtag)
-                       code-header-len)))
+                   (- (sap-int (sb!vm:context-pc scp))
+                      (- (get-lisp-obj-address code)
+                         sb!vm:other-pointer-lowtag)
+                      code-header-len)))
 	     ;; Check to see whether we were executing in a branch
 	     ;; delay slot.
-	     #!+(or pmax sgi) ; pmax only (and broken anyway)
+	     #!+(or pmax sgi)          ; pmax only (and broken anyway)
 	     (when (logbitp 31 (sb!alien:slot scp '%mips::sc-cause))
 	       (incf pc-offset sb!vm:n-word-bytes))
-	     (unless (<= 0 pc-offset
-			 (* (code-header-ref code sb!vm:code-code-size-slot)
-			    sb!vm:n-word-bytes))
-	       ;; We were in an assembly routine. Therefore, use the
-	       ;; LRA as the pc.
-	       (setf pc-offset
-		     (- (sb!vm:context-register scp sb!vm::lra-offset)
-			(get-lisp-obj-address code)
-			code-header-len)))
+	     (let ((code-size (* (code-header-ref code 
+                                                  sb!vm:code-code-size-slot)
+                                 sb!vm:n-word-bytes)))
+               (unless (<= 0 pc-offset code-size)
+                 ;; We were in an assembly routine.
+                 (multiple-value-bind (new-pc-offset computed-return)
+                     (find-pc-from-assembly-fun code scp)
+                   (setf pc-offset new-pc-offset)
+                   (unless (<= 0 pc-offset code-size)
+                     (cerror
+		      "Set PC-OFFSET to zero and continue backtrace."
+		      'bug
+		      :format-control
+		      "~@<PC-OFFSET (~D) not in code object. Frame details:~
+                       ~2I~:@_PC: #X~X~:@_CODE: ~S~:@_CODE FUN: ~S~:@_LRA: ~
+                       #X~X~:@_COMPUTED RETURN: #X~X.~:>"
+		      :format-arguments
+		      (list pc-offset
+			    (sap-int (sb!vm:context-pc scp))
+			    code
+			    (%code-entry-points code)
+			    (sb!vm:context-register scp sb!vm::lra-offset)
+			    computed-return))
+                     ;; We failed to pinpoint where PC is, but set
+                     ;; pc-offset to 0 to keep the backtrace from
+                     ;; exploding.
+		     (setf pc-offset 0)))))
 	     (return
 	       (if (eq (%code-debug-info code) :bogus-lra)
 		   (let ((real-lra (code-header-ref code
@@ -974,6 +992,25 @@
 			     (get-header-data real-lra)
 			     nil))
 		   (values code pc-offset scp))))))))))
+
+#!-x86
+(defun find-pc-from-assembly-fun (code scp)
+  "Finds the PC for the return from an assembly routine properly.
+For some architectures (such as PPC) this will not be the $LRA
+register."
+  (let ((return-machine-address
+         ;; This conditional logic should probably go into
+         ;; architecture specific files somehow.
+         #!+ppc (sap-int (sb!vm::context-lr scp))
+         #!-(or ppc) (- (sb!vm:context-register scp sb!vm::lra-offset)
+                        sb!vm:other-pointer-lowtag))
+        (code-header-len (* (get-header-data code)
+                            sb!vm:n-word-bytes)))
+  (values (- return-machine-address
+             (- (get-lisp-obj-address code)
+                sb!vm:other-pointer-lowtag) 
+             code-header-len)
+          return-machine-address)))
 
 ;;; Find the code object corresponding to the object represented by
 ;;; bits and return it. We assume bogus functions correspond to the
