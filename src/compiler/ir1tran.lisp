@@ -1652,7 +1652,8 @@
                                       (setq ,n-value ,n-value-temp))))))
 		(when (and (not allowp) (eq keyword :allow-other-keys))
                   (setq found-allow-p t)
-                  (setq clause (append clause `((setq ,n-allowp ,n-value-temp)))))
+                  (setq clause
+			(append clause `((setq ,n-allowp ,n-value-temp)))))
 
                 (temps `(,n-value ,default))
 		(tests clause)))

@@ -64,3 +64,53 @@
 				     (make-list (- 10 j)
 						:initial-element 'a))))))))
 
+;;; tests of COUNT
+(assert (= 1 (count 1 '(1 2 3))))
+(assert (= 2 (count 'z #(z 1 2 3 z))))
+(assert (= 0 (count 'y '(z 1 2 3 z))))
+
+;;; tests of COUNT-IF and COUNT-IF-NOT
+(macrolet (;; the guts of CCI, abstracted over whether we're testing
+	   ;; COUNT-IF or COUNT-IF-NOT
+	   (%cci (expected count-if test sequence-as-list &rest keys)
+             `(let* ((list ',sequence-as-list)
+		     (simple-vector (coerce list 'simple-vector))
+		     (length (length list))
+		     (vector (make-array (* 2 length) :fill-pointer length)))
+		(replace vector list :end1 length)
+		(dolist (seq (list list simple-vector vector))
+		  (assert (= ,expected (,count-if ,test seq ,@keys))))))
+	   ;; "Check COUNT-IF"
+	   (cci (expected test sequence-as-list &rest keys) 
+	     `(progn
+                (format t "~&SEQUENCE-AS-LIST=~S~%" ',sequence-as-list)
+		(%cci ,expected
+		      count-if
+		      ,test
+		      ,sequence-as-list
+		      ,@keys)
+		(%cci ,expected
+		      count-if-not
+		      (complement ,test)
+		      ,sequence-as-list
+		      ,@keys))))
+  (cci 1 #'consp (1 (12) 1))
+  (cci 3 #'consp (1 (2) 3 (4) (5) 6))
+  (cci 3 #'consp (1 (2) 3 (4) (5) 6) :from-end t)
+  (cci 2 #'consp (1 (2) 3 (4) (5) 6) :start 2)
+  (cci 0 #'consp (1 (2) 3 (4) (5) 6) :start 2 :end 3)
+  (cci 1 #'consp (1 (2) 3 (4) (5) 6) :start 1 :end 3)
+  (cci 1 #'consp (1 (2) 3 (4) (5) 6) :start 1 :end 2)
+  (cci 0 #'consp (1 (2) 3 (4) (5) 6) :start 2 :end 2)
+  (cci 2 #'zerop (0 10 0 11 12))
+  (cci 1 #'zerop (0 10 0 11 12) :start 1)
+  (cci 2 #'minusp (0 10 0 11 12) :key #'1-)
+  (cci 1 #'minusp (0 10 0 11 12) :key #'1- :end 2))
+(multiple-value-bind (v e)
+    (ignore-errors (count-if #'zerop '(0 a 0 b c) :start 1))
+  (declare (ignore v))
+  (assert (eql (type-error-datum e) 'a)))
+(multiple-value-bind (v e)
+    (ignore-errors (count-if #'zerop #(0 a 0 b c) :start 1 :from-end 11))
+  (declare (ignore v))
+  (assert (eql (type-error-datum e) 'c)))

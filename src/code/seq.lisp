@@ -2042,112 +2042,96 @@
   
   (def-find-position-if-not find-if-not 0)
   (def-find-position-if-not position-if-not 1))
+
 
-;;;; COUNT
+;;;; COUNT-IF, COUNT-IF-NOT, and COUNT
 
 (eval-when (:compile-toplevel :execute)
 
-(sb!xc:defmacro vector-count (item sequence)
-  `(do ((index start (1+ index))
-	(count 0))
-       ((= index (the fixnum end)) count)
-     (declare (fixnum index count))
-     (if test-not
-	 (unless (funcall test-not ,item
-			  (apply-key key (aref ,sequence index)))
-	   (setq count (1+ count)))
-	 (when (funcall test ,item (apply-key key (aref ,sequence index)))
-	   (setq count (1+ count))))))
+(sb!xc:defmacro vector-count-if (notp from-end-p predicate sequence)
+  (let ((next-index (if from-end-p '(1- index) '(1+ index)))
+	(pred `(funcall ,predicate (apply-key key (aref ,sequence index)))))
+    `(let ((%start ,(if from-end-p '(1- end) 'start))
+	   (%end ,(if from-end-p '(1- start) 'end)))
+      (do ((index %start ,next-index)
+	   (count 0))
+	  ((= index (the fixnum %end)) count)
+	(declare (fixnum index count))
+	(,(if notp 'unless 'when) ,pred
+	  (setq count (1+ count)))))))
 
-(sb!xc:defmacro list-count (item sequence)
-  `(do ((sequence (nthcdr start ,sequence))
-	(index start (1+ index))
-	(count 0))
-       ((or (= index (the fixnum end)) (null sequence)) count)
-     (declare (fixnum index count))
-     (if test-not
-	 (unless (funcall test-not ,item (apply-key key (pop sequence)))
-	   (setq count (1+ count)))
-	 (when (funcall test ,item (apply-key key (pop sequence)))
-	   (setq count (1+ count))))))
+(sb!xc:defmacro list-count-if (notp from-end-p predicate sequence)
+  (let ((pred `(funcall ,predicate (apply-key key (pop sequence)))))
+    `(let ((%start ,(if from-end-p '(- length end) 'start))
+	   (%end ,(if from-end-p '(- length start) 'end))
+	   (sequence ,(if from-end-p '(reverse sequence) 'sequence)))
+      (do ((sequence (nthcdr %start ,sequence))
+	   (index %start (1+ index))
+	   (count 0))
+	  ((or (= index (the fixnum %end)) (null sequence)) count)
+	(declare (fixnum index count))
+	(,(if notp 'unless 'when) ,pred
+	  (setq count (1+ count)))))))
 
-) ; EVAL-WHEN
-
-(defun count (item sequence &key from-end (test #'eql) test-not (start 0)
-		end key)
-  #!+sb-doc
-  "Return the number of elements in SEQUENCE satisfying a test with ITEM,
-   which defaults to EQL."
-  (declare (ignore from-end) (fixnum start))
-  (let ((end (or end (length sequence))))
-    (declare (type index end))
-    (seq-dispatch sequence
-		  (list-count item sequence)
-		  (vector-count item sequence))))
-
-;;;; COUNT-IF and COUNT-IF-NOT
-
-(eval-when (:compile-toplevel :execute)
-
-(sb!xc:defmacro vector-count-if (predicate sequence)
-  `(do ((index start (1+ index))
-	(count 0))
-       ((= index (the fixnum end)) count)
-     (declare (fixnum index count))
-     (if (funcall ,predicate (apply-key key (aref ,sequence index)))
-	 (setq count (1+ count)))))
-
-(sb!xc:defmacro list-count-if (predicate sequence)
-  `(do ((sequence (nthcdr start ,sequence))
-	(index start (1+ index))
-	(count 0))
-       ((or (= index (the fixnum end)) (null sequence)) count)
-     (declare (fixnum index count))
-     (if (funcall ,predicate (apply-key key (pop sequence)))
-	 (setq count (1+ count)))))
 
 ) ; EVAL-WHEN
 
 (defun count-if (test sequence &key from-end (start 0) end key)
   #!+sb-doc
   "Return the number of elements in SEQUENCE satisfying TEST(el)."
-  (declare (ignore from-end) (fixnum start))
-  (let ((end (or end (length sequence))))
+  (declare (fixnum start))
+  (let* ((length (length sequence))
+	 (end (or end length)))
     (declare (type index end))
     (seq-dispatch sequence
-		  (list-count-if test sequence)
-		  (vector-count-if test sequence))))
-
-(eval-when (:compile-toplevel :execute)
-
-(sb!xc:defmacro vector-count-if-not (predicate sequence)
-  `(do ((index start (1+ index))
-	(count 0))
-       ((= index (the fixnum end)) count)
-     (declare (fixnum index count))
-     (if (not (funcall ,predicate (apply-key key (aref ,sequence index))))
-	 (setq count (1+ count)))))
-
-(sb!xc:defmacro list-count-if-not (predicate sequence)
-  `(do ((sequence (nthcdr start ,sequence))
-	(index start (1+ index))
-	(count 0))
-       ((or (= index (the fixnum end)) (null sequence)) count)
-     (declare (fixnum index count))
-     (if (not (funcall ,predicate (apply-key key (pop sequence))))
-	 (setq count (1+ count)))))
-
-) ; EVAL-WHEN
-
+		  (if from-end
+		      (list-count-if nil t test sequence)
+		      (list-count-if nil nil test sequence))
+		  (if from-end
+		      (vector-count-if nil t test sequence)
+		      (vector-count-if nil nil test sequence)))))
+		      
 (defun count-if-not (test sequence &key from-end (start 0) end key)
   #!+sb-doc
   "Return the number of elements in SEQUENCE not satisfying TEST(el)."
-  (declare (ignore from-end) (fixnum start))
-  (let ((end (or end (length sequence))))
+  (declare (fixnum start))
+  (let* ((length (length sequence))
+	 (end (or end length)))
     (declare (type index end))
     (seq-dispatch sequence
-		  (list-count-if-not test sequence)
-		  (vector-count-if-not test sequence))))
+		  (if from-end
+		      (list-count-if t t test sequence)
+		      (list-count-if t nil test sequence))
+		  (if from-end 
+		      (vector-count-if t t test sequence)
+		      (vector-count-if t nil test sequence)))))
+
+(defun count (item sequence &key from-end (start 0) end key (test #'eql test-p) (test-not nil test-not-p))
+  #!+sb-doc
+  "Return the number of elements in SEQUENCE satisfying a test with ITEM,
+   which defaults to EQL."
+  (declare (fixnum start))
+  (when (and test-p test-not-p)
+    ;; ANSI Common Lisp has left the behavior in this situation unspecified.
+    ;; (CLHS 17.2.1)
+    (error ":TEST and :TEST-NOT are both present."))
+  (let* ((length (length sequence))
+	 (end (or end length)))
+    (declare (type index end))
+    (let ((%test (if test-not-p
+		     (lambda (x)
+		       (not (funcall test-not item x)))
+		     (lambda (x)
+		       (funcall test item x)))))
+      (seq-dispatch sequence
+		    (if from-end
+			(list-count-if nil t %test sequence)
+			(list-count-if nil nil %test sequence))
+		    (if from-end
+			(vector-count-if nil t %test sequence)
+			(vector-count-if nil nil %test sequence))))))
+
+
 
 ;;;; MISMATCH
 
@@ -2228,7 +2212,7 @@
   #!+sb-doc
   "The specified subsequences of SEQUENCE1 and SEQUENCE2 are compared
    element-wise. If they are of equal length and match in every element, the
-   result is Nil. Otherwise, the result is a non-negative integer, the index
+   result is NIL. Otherwise, the result is a non-negative integer, the index
    within SEQUENCE1 of the leftmost position at which they fail to match; or,
    if one is shorter than and a matching prefix of the other, the index within
    SEQUENCE1 beyond the last position tested is returned. If a non-NIL

@@ -1,4 +1,7 @@
-;;;; Test of EVAL-WHEN inside a local environment
+;;;; a test of EVAL-WHEN inside a local environment (which will be
+;;;; compiled and loaded, and have its side effects checked, by some
+;;;; other file which runs automatically as part of the test suite)
+
 (cl:in-package :cl-user)
 
 (macrolet ((def (x)
