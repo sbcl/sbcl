@@ -1521,7 +1521,7 @@ changes in sbcl-0.7.13 relative to sbcl-0.7.12:
   * fixed a bug in DEFCLASS: classes named by symbols with no or
     unprintable packages can now be defined.
   * fixed a bug in RESTART-BIND: The :TEST-FUNCTION option had been
-    carelessly renamed to :TEST-FUN. (thanks to Robert E. Brown)
+    carelessly renamed to :TEST-FUN.  (thanks to Robert E. Brown)
   * fixed compiler failure related to checking types of functions.
     (reported by Robert E. Brown)
   * the compiler is now much more consistent in its error-checking
@@ -1531,6 +1531,10 @@ changes in sbcl-0.7.13 relative to sbcl-0.7.12:
     by ANSI to operate on sequences.
   * fixed a bug in the build procedure: documentation of SBCL-specific
     packages is now preserved and available in the final Lisp image.
+  * lifted FDEFINITION lookup out of loops in the implementation of
+    many list operations.  (thanks to Robert E. Brown)
+  * fixed a bug in the reader: the #n# reader macro now works for
+    objects of type STANDARD-OBJECT.  (reported by Tony Martinez)
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** ARRAY-IN-BOUNDS-P now allows arbitrary integers as arguments,
        not just nonnegative fixnums;
@@ -1539,8 +1543,6 @@ changes in sbcl-0.7.13 relative to sbcl-0.7.12:
        freshly-consed result bit-array);
     ** ELT now signals an error on an invalid sequence index in safe
        code;
-  * lifted FDEFINITION lookup out of loops in the implementation of
-    many list operations (thanks to Robert E. Brown)
 
 planned incompatible changes in 0.7.x:
   * (not done yet, but planned:) When the profiling interface settles

@@ -41,5 +41,23 @@
 (assert (raises-error? (read-from-string "1e1000") reader-error))
 (assert (raises-error? (read-from-string "1/0") reader-error))
 
+;;; Bug reported by Antonio Martinez on comp.lang.lisp 2003-02-03 in
+;;; message <b32da960.0302030640.7d6fc610@posting.google.com>: reading
+;;; circular instances of CLOS classes didn't work:
+(defclass box ()
+  ((value :initarg :value :reader value)))
+(defun read-box (stream char)
+  (declare (ignore char))
+  (let ((objects (read-delimited-list #\] stream t)))
+    (unless (= 1 (length objects))
+      (error "Unknown box reader syntax"))
+    (make-instance 'box :value (first objects))))
+(set-macro-character #\[ 'read-box)
+(set-syntax-from-char #\] #\))
+(multiple-value-bind (res pos)
+    (read-from-string "#1=[#1#]")
+  (assert (eq (value res) res))
+  (assert (= pos 8)))
+
 ;;; success
 (quit :unix-status 104)
