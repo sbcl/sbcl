@@ -1022,10 +1022,9 @@
 		  (if member-fun
 		      (with-float-traps-masked
 			  (:underflow :overflow :divide-by-zero)
-			(make-member-type
-			 :members (list
-				   (funcall member-fun
-					    (first (member-type-members x))))))
+			(specifier-type
+			 `(eql ,(funcall member-fun
+					 (first (member-type-members x))))))
 		      ;; Otherwise convert to a numeric type.
 		      (let ((result-type-list
 			     (funcall derive-fun (convert-member-type x))))
@@ -1075,7 +1074,7 @@
 					      :format (type-of result)
 					      :complexp :real))
 			  (t
-			   (make-member-type :members (list result))))))
+			   (specifier-type `(eql ,result))))))
 		 ((and (member-type-p x) (numeric-type-p y))
 		  (let* ((x (convert-member-type x))
 			 (y (if convert-type (convert-numeric-type y) y))
@@ -2301,6 +2300,45 @@
 
 (defoptimizer (values derive-type) ((&rest values))
   (make-values-type :required (mapcar #'lvar-type values)))
+
+(defun signum-derive-type-aux (type)
+  (if (eq (numeric-type-complexp type) :complex)
+      (let* ((format (case (numeric-type-class type)
+			  ((integer rational) 'single-float)
+			  (t (numeric-type-format type))))
+		(bound-format (or format 'float)))
+	   (make-numeric-type :class 'float
+			      :format format
+			      :complexp :complex
+			      :low (coerce -1 bound-format)
+			      :high (coerce 1 bound-format)))
+      (let* ((interval (numeric-type->interval type))
+	     (range-info (interval-range-info interval))
+	     (contains-0-p (interval-contains-p 0 interval))
+	     (class (numeric-type-class type))
+	     (format (numeric-type-format type))
+	     (one (coerce 1 (or format class 'real)))
+	     (zero (coerce 0 (or format class 'real)))
+	     (minus-one (coerce -1 (or format class 'real)))
+	     (plus (make-numeric-type :class class :format format
+				      :low one :high one))
+	     (minus (make-numeric-type :class class :format format
+				       :low minus-one :high minus-one))
+	     ;; KLUDGE: here we have a fairly horrible hack to deal
+	     ;; with the schizophrenia in the type derivation engine.
+	     ;; The problem is that the type derivers reinterpret
+	     ;; numeric types as being exact; so (DOUBLE-FLOAT 0d0
+	     ;; 0d0) within the derivation mechanism doesn't include
+	     ;; -0d0.  Ugh.  So force it in here, instead.
+	     (zero (make-numeric-type :class class :format format
+				      :low (- zero) :high zero)))
+	(case range-info
+	  (+ (if contains-0-p (type-union plus zero) plus))
+	  (- (if contains-0-p (type-union minus zero) minus))
+	  (t (type-union minus zero plus))))))
+
+(defoptimizer (signum derive-type) ((num))
+  (one-arg-derive-type num #'signum-derive-type-aux nil))
 
 ;;;; byte operations
 ;;;;

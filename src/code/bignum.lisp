@@ -749,7 +749,7 @@
 				       (%normalize-bignum res res-len))
 				      res)))))
 	  ((> count bignum-len)
-	   0)
+	   (if (%bignum-0-or-plusp bignum bignum-len) 0 -1))
 	   ;; Since a FIXNUM should be big enough to address anything in
 	   ;; memory, including arrays of bits, and since arrays of bits
 	   ;; take up about the same space as corresponding fixnums, there

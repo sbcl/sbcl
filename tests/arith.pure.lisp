@@ -199,3 +199,7 @@
             ((89 125 16) (ASH A (MIN 18 -706)))
             (T (DPB -3 (BYTE 30 30) -1)))))))
   (assert (= (funcall fn 1227072 -529823 -18 -792831) -2147483649)))
+
+;;; ASH of a negative bignum by a bignum count would erroneously
+;;; return 0 prior to sbcl-0.8.4.4
+(assert (= (ash (1- most-negative-fixnum) (1- most-negative-fixnum)) -1))

@@ -2117,12 +2117,16 @@ changes in sbcl-0.8.5 relative to sbcl-0.8.4:
   * fix bug 214: algorithm for noting rejected templates is now more
     similar to that of template seletion. (also reported by rydis on
     #lisp)
+  * compiler enhancement: SIGNUM is now better able to derive the type
+    of its result.
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** incorrect optimization of TRUNCATE for a positive first
        argument and negative second.
     ** compiler failure in let-convertion during flushing dead code.
     ** compiler failure while deriving type of TRUNCATE on an
        interval, containing 0.
+    ** ASH of a negative bignum by a negative bignum count now returns
+       -1, not 0.
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles
