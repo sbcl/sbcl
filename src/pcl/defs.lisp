@@ -53,17 +53,16 @@
 		       (non-setf-var . non-setf-case))
   `(let ((,non-setf-var ,spec)) ,@non-setf-case))
 
-;;; If symbol names a function which is traced or advised, return the
-;;; unadvised, traced etc. definition. This lets me get at the generic
-;;; function object even when it is traced.
+;;; If symbol names a function which is traced, return the untraced
+;;; definition. This lets us get at the generic function object even
+;;; when it is traced.
 (defun unencapsulated-fdefinition (symbol)
   (fdefinition symbol))
 
-;;; If symbol names a function which is traced or advised, redefine
-;;; the `real' definition without affecting the advise.
+;;; If symbol names a function which is traced, redefine the `real'
+;;; definition without affecting the trace.
 (defun fdefine-carefully (name new-definition)
   (progn
-    (sb-c::%%defun name new-definition nil)
     (sb-c::note-name-defined name :function)
     new-definition)
   (setf (fdefinition name) new-definition))
@@ -406,22 +405,22 @@
 (/show "about to set up SB-PCL::*BUILT-IN-CLASSES*")
 (defvar *built-in-classes*
   (labels ((direct-supers (class)
-	     (/show "entering DIRECT-SUPERS" (sb-kernel::class-name class))
+	     (/noshow "entering DIRECT-SUPERS" (sb-kernel::class-name class))
 	     (if (typep class 'cl:built-in-class)
 		 (sb-kernel:built-in-class-direct-superclasses class)
 		 (let ((inherits (sb-kernel:layout-inherits
 				  (sb-kernel:class-layout class))))
-		   (/show inherits)
+		   (/noshow inherits)
 		   (list (svref inherits (1- (length inherits)))))))
 	   (direct-subs (class)
-	     (/show "entering DIRECT-SUBS" (sb-kernel::class-name class))
+	     (/noshow "entering DIRECT-SUBS" (sb-kernel::class-name class))
 	     (collect ((res))
 	       (let ((subs (sb-kernel:class-subclasses class)))
-		 (/show subs)
+		 (/noshow subs)
 		 (when subs
 		   (dohash (sub v subs)
 		     (declare (ignore v))
-		     (/show sub)
+		     (/noshow sub)
 		     (when (member class (direct-supers sub))
 		       (res sub)))))
 	       (res)))
@@ -449,10 +448,10 @@
 		   ;; relevant cases.
 		   42))))
     (mapcar (lambda (kernel-bic-entry)
-	      (/show "setting up" kernel-bic-entry)
+	      (/noshow "setting up" kernel-bic-entry)
 	      (let* ((name (car kernel-bic-entry))
 		     (class (cl:find-class name)))
-		(/show name class)
+		(/noshow name class)
 		`(,name
 		  ,(mapcar #'cl:class-name (direct-supers class))
 		  ,(mapcar #'cl:class-name (direct-subs class))
@@ -472,7 +471,7 @@
 				     sb-kernel:funcallable-instance
 				     function stream)))
 		       sb-kernel::*built-in-classes*))))
-(/show "done setting up SB-PCL::*BUILT-IN-CLASSES*")
+(/noshow "done setting up SB-PCL::*BUILT-IN-CLASSES*")
 
 ;;;; the classes that define the kernel of the metabraid
 

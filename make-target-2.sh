@@ -40,7 +40,7 @@ echo //doing warm init
 
         ;; Do warm init.
         #+sb-show (print "/about to LOAD warm.lisp")
-	(load "src/cold/warm.lisp"))
+	(load "src/cold/warm.lisp")
 
         ;; Unintern no-longer-needed stuff before the possible PURIFY
         ;; in SAVE-LISP-AND-DIE.

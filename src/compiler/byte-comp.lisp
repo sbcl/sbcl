@@ -141,10 +141,9 @@
     (def-system-constant 12 '(%fdefinition-marker% . %typep))
     (def-system-constant 13 '(%fdefinition-marker% . eql))
     (def-system-constant 14 '(%fdefinition-marker% . %negate))
-    (def-system-constant 15 '(%fdefinition-marker% . %%defun))
+    ;; (15 was %%DEFUN, no longer used as of sbcl-0.pre7.)
     (def-system-constant 16 '(%fdefinition-marker% . %%defmacro))
-    ;; no longer used as of sbcl-0.pre7:
-    #+nil (def-system-constant 17 '(%fdefinition-marker% . %%defconstant))
+    ;; (17 was %%DEFCONSTANT, no longer used as of sbcl-0.pre7.)
     (def-system-constant 18 '(%fdefinition-marker% . length))
     (def-system-constant 19 '(%fdefinition-marker% . equal))
     (def-system-constant 20 '(%fdefinition-marker% . append))

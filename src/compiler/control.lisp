@@ -202,7 +202,7 @@
 
   (let ((2comp (component-info component)))
     (when (ir2-component-p 2comp)
-      ;; If it's not an ir2-component, don't worry about it.
+      ;; If it's not an IR2-COMPONENT, don't worry about it.
       (setf (ir2-component-values-receivers 2comp)
 	    (delete-if-not #'block-component
 			   (ir2-component-values-receivers 2comp)))))

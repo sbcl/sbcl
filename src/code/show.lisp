@@ -85,7 +85,8 @@
 ;;; a disabled-at-compile-time /SHOW, implemented as a macro instead
 ;;; of a function so that leaving occasionally-useful /SHOWs in place
 ;;; but disabled incurs no run-time overhead and works even when the
-;;; arguments can't be evaluated due to code flux
+;;; arguments can't be evaluated (e.g. because they're only meaningful
+;;; in a debugging version of the system, or just due to bit rot..)
 (defmacro /noshow (&rest rest)
   (declare (ignore rest)))
 
@@ -126,9 +127,6 @@
   (progn
     #+sb-xc-host `(/show "(/primitive-print)" ,thing)
     #-sb-xc-host `(sb!sys:%primitive print (the simple-string ,thing))))
-
-(defmacro /nohexstr (thing)
-  (declare (ignore thing)))
 
 ;;; low-level display of a system word, works even early in cold init
 (defmacro /hexstr (thing)
