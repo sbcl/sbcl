@@ -376,6 +376,50 @@ BUG 48c, not yet fixed:
     (ignore-errors (the-in-arguments-2 1))
   (assert (null result))
   (assert (typep condition 'type-error)))
+
+;;; bug 153: a hole in a structure slot type checking
+(declaim (optimize safety))
+(defstruct foo153
+  (bla 0 :type fixnum))
+(defun bug153-1 ()
+  (let ((foo (make-foo153)))
+    (setf (foo153-bla foo) '(1 . 1))
+    (format t "Is ~a of type ~a a cons? => ~a~%"
+            (foo153-bla foo)
+            (type-of (foo153-bla foo))
+            (consp (foo153-bla foo)))))
+(defun bug153-2 (x)
+  (let ((foo (make-foo153)))
+    (setf (foo153-bla foo) x)
+    (format t "Is ~a of type ~a a cons? => ~a~%"
+            (foo153-bla foo)
+            (type-of (foo153-bla foo))
+            (consp (foo153-bla foo)))))
+
+(multiple-value-bind (result condition)
+    (ignore-errors (bug153-1))
+  (declare (ignore result))
+  (assert (typep condition 'type-error)))
+(multiple-value-bind (result condition)
+    (ignore-errors (bug153-2 '(1 . 1)))
+  (declare (ignore result))
+  (assert (typep condition 'type-error)))
+
+;;; bug 110: the compiler flushed the argument type test and the default
+;;; case in the cond.
+
+(defun bug110 (x)
+  (declare (optimize (safety 2) (speed 3)))
+  (declare (type (or string stream) x))
+  (cond ((typep x 'string) 'string)
+        ((typep x 'stream) 'stream)
+        (t
+         'none)))
+
+(multiple-value-bind (result condition)
+    (ignore-errors (bug110 0))
+  (declare (ignore result))
+  (assert (typep condition 'type-error)))
 
 ;;;; tests not in the problem domain, but of the consistency of the
 ;;;; compiler machinery itself

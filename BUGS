@@ -184,7 +184,6 @@ WORKAROUND:
     (FOO 1.5)
   will cause the INTEGERP case to be selected, giving bogus output a la
     exactly 2.5
-  (or (FOO 1000.5), "exactly 1001.5")
   This violates the "declarations are assertions" principle.
   According to the ANSI spec, in the section "System Class FUNCTION",
   this is a case of "lying to the compiler", but the lying is done
@@ -555,24 +554,6 @@ WORKAROUND:
   time trying to GC afterwards. Surely there's some more economical
   way to implement (ROOM T).
 
-110:
-  reported by Martin Atzmueller 2001-06-25; originally from CMU CL bugs
-  collection:
-    ;;; The compiler is flushing the argument type test, and the default
-    ;;; case in the cond, so that calling with say a fixnum 0 causes a
-    ;;; SIGBUS.
-    (declaim (optimize (safety 2) (speed 3)))
-    (defun tst (x)
-      (declare (type (or string stream) x))
-      (cond ((typep x 'string) 'string)
-            ((typep x 'stream) 'stream)
-            (t
-             'none)))
-  The symptom in sbcl-0.6.12.42 on OpenBSD is actually (TST 0)=>STREAM
-  (not the SIGBUS reported in the comment) but that's broken too; 
-  type declarations are supposed to be treated as assertions unless
-  SAFETY 0, so we should be getting a TYPE-ERROR.
-
 115:
   reported by Martin Atzmueller 2001-06-25; originally from CMU CL bugs
   collection:
@@ -870,25 +851,6 @@ WORKAROUND:
   The location of this failure has moved around as various related
   issues were cleaned up. As of sbcl-0.7.1.9, it occurs in 
   NODE-BLOCK called by LAMBDA-COMPONENT called by IR2-CONVERT-CLOSURE.
-
-153:
-  (essentially the same problem as a CMU CL bug reported by Martin
-  Cracauer on cmucl-imp 2002-02-19)
-  There is a hole in structure slot type checking. Compiling and LOADing
-    (declaim (optimize safety))
-    (defstruct foo
-      (bla 0 :type fixnum))
-    (defun f ()
-      (let ((foo (make-foo)))
-        (setf (foo-bla foo) '(1 . 1))
-        (format t "Is ~a of type ~a a cons? => ~a~%"
-                (foo-bla foo)
-                (type-of (foo-bla foo))
-                (consp (foo-bla foo)))))
-    (f)
-  should signal an error, but in sbcl-0.7.1.21 instead gives the output
-    Is (1 . 1) of type CONS a cons? => NIL
-  without signalling an error.
 
 157:
   Functions SUBTYPEP, TYPEP, UPGRADED-ARRAY-ELEMENT-TYPE, and 
