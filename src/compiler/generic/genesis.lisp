@@ -2707,17 +2707,7 @@ initially undefined function references:~2%")
 
       (setf undefs (sort undefs #'string< :key #'fun-name-block-name))
       (dolist (name undefs)
-        (format t "~S" name)
-	;; FIXME: This ACCESSOR-FOR stuff should go away when the
-	;; code has stabilized. (It's only here to help me
-	;; categorize the flood of undefined functions caused by
-	;; completely rewriting the bootstrap process. Hopefully any
-	;; future maintainers will mostly have small numbers of
-	;; undefined functions..)
-	(let ((accessor-for (info :function :accessor-for name)))
-	  (when accessor-for
-	    (format t " (accessor for ~S)" accessor-for)))
-	(format t "~%")))
+        (format t "~S~%" name)))
 
     (format t "~%~|~%layout names:~2%")
     (collect ((stuff))

@@ -339,11 +339,6 @@ GET-SETF-EXPANSION directly."
 	  ((not (fboundp `(setf ,name)))
 	   ;; All is well, we don't need any warnings.
 	   (values))
-	  ((info :function :accessor-for name)
-	   (warn "defining SETF macro for DEFSTRUCT slot ~
-		 accessor; redefining as a normal function: ~S"
-		 name)
-	   (proclaim-as-fun-name name))
 	  ((not (eq (symbol-package name) (symbol-package 'aref)))
 	   (style-warn "defining setf macro for ~S when ~S is fbound"
 		       name `(setf ,name))))

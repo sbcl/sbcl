@@ -41,22 +41,12 @@
   (check-fun-name name)
   (when (fboundp name)
     (ecase (info :function :kind name)
-      (:function
-       (let ((accessor-for (info :function :accessor-for name)))
-	 (when accessor-for
-	   (compiler-style-warning
-	    "~@<The function ~
-           ~2I~_~S ~
-           ~I~_was previously defined as a slot accessor for ~
-           ~2I~_~S.~:>"
-	    name
-	    accessor-for)
-	   (clear-info :function :accessor-for name))))
-      (:macro
+      (:function) ; happy case
+      ((nil)) ; another happy case
+      (:macro ; maybe-not-so-good case
        (compiler-style-warning "~S was previously defined as a macro." name)
        (setf (info :function :where-from name) :assumed)
-       (clear-info :function :macro-function name))
-      ((nil))))
+       (clear-info :function :macro-function name))))
   (setf (info :function :kind name) :function)
   (note-if-setf-function-and-macro name)
   name)
@@ -89,7 +79,6 @@
       (frob :where-from :assumed)
       (frob :inlinep)
       (frob :kind)
-      (frob :accessor-for)
       (frob :inline-expansion-designator)
       (frob :source-transform)
       (frob :assumed-type)))

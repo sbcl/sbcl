@@ -129,22 +129,7 @@
 		      :inlinep inlinep
 		      :where-from (info :function :where-from name)
 		      :type (info :function :type name))
-		     (let ((info (info :function :accessor-for name)))
-		       (when info
-			 (error "no expansion for ~S even though :ACCESSOR-FOR"
-				name))
-		       (etypecase info
-			 (null
-			  (find-free-really-function name))
-			 (sb!xc:structure-class
-			  (find-structure-slot-accessor info name))
-			 (sb!xc:class
-			  (if (typep (layout-info (info :type :compiler-layout
-							(sb!xc:class-name
-							 info)))
-				     'defstruct-description)
-			      (find-structure-slot-accessor info name)
-			      (find-free-really-function name))))))))))))
+		     (find-free-really-function name))))))))
 
 ;;; Return the LEAF structure for the lexically apparent function
 ;;; definition of NAME.

@@ -154,9 +154,8 @@
 	     ;; definition yet, we know one is planned. (But if this
 	     ;; function name was already declared as a structure
 	     ;; accessor, then that was already been taken care of.)
-	     (unless (info :function :accessor-for name)
-	       (proclaim-as-fun-name name)
-	       (note-name-defined name :function))
+	     (proclaim-as-fun-name name)
+	     (note-name-defined name :function)
 
 	     ;; the actual type declaration
 	     (setf (info :function :type name) type

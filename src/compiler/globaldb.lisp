@@ -1135,14 +1135,6 @@
   :type :ir1-transform
   :type-spec (or function null))
 
-;;; If a function is a slot accessor or setter, then this is the class
-;;; that it accesses slots of.
-(define-info-type
-  :class :function
-  :type :accessor-for
-  :type-spec (or sb!xc:class null)
-  :default nil)
-
 ;;; If a function is "known" to the compiler, then this is a
 ;;; FUNCTION-INFO structure containing the info used to special-case
 ;;; compilation.

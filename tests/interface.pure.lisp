@@ -49,9 +49,6 @@
 	       ;; though, and I haven't figured out what does work
 	       ;; right. For now we just punt.
 	       (values))
-	      #+nil 
-	      ((sb-int:info :function :accessor-for ext-sym)
-	       (values))
 	      ((typep fun 'generic-function)
                 (sb-pcl::generic-function-pretty-arglist fun))
 	      (t

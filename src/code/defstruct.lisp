@@ -926,10 +926,9 @@
        (dolist (dsd (dd-slots dd))
 	 (let* ((accessor-name (dsd-accessor-name dsd)))
 	   (when accessor-name
-
-	     ;; new implementation sbcl-0.pre7.64
 	     (multiple-value-bind (reader-designator writer-designator)
 		 (accessor-inline-expansion-designators dd dsd)
+	       (proclaim-as-defstruct-fun-name accessor-name)
 	       (setf (info :function
 			   :inline-expansion-designator
 			   accessor-name)
@@ -937,23 +936,14 @@
 		     (info :function :inlinep accessor-name)
 		     :inline)
 	       (unless (dsd-read-only dsd)
+		 (proclaim-as-defstruct-fun-name `(setf ,accessor-name))
 		 (let ((setf-accessor-name `(setf ,accessor-name)))
 		   (setf (info :function
 			       :inline-expansion-designator
 			       setf-accessor-name)
 			 writer-designator
 			 (info :function :inlinep setf-accessor-name)
-			 :inline))))
-
-	     ;; old code from before sbcl-0.pre7.64, will hopefully
-	     ;; fade away and/or merge into new code above
-	     (when (eq (dsd-raw-type dsd) t) ; when not raw slot
-	       (proclaim-as-defstruct-fun-name accessor-name)
-	       (setf (info :function :accessor-for accessor-name) class)
-	       (unless (dsd-read-only dsd)
-		 (proclaim-as-defstruct-fun-name `(setf ,accessor-name))
-		 (setf (info :function :accessor-for `(setf ,accessor-name))
-		       class))))))
+			 :inline)))))))
 
        ;; FIXME: Couldn't this logic be merged into
        ;; PROCLAIM-AS-DEFSTRUCT-FUN-NAME?
@@ -1425,8 +1415,6 @@
 ;;; are any undefined warnings, we nuke them.
 (defun proclaim-as-defstruct-fun-name (name)
   (when name
-    (when (info :function :accessor-for name)
-      (setf (info :function :accessor-for name) nil))
     (proclaim-as-fun-name name)
     (note-name-defined name :function)
     (setf (info :function :where-from name) :declared)
