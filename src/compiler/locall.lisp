@@ -632,7 +632,7 @@
 			   (progn
 			     (ignores dummy val)
                              (unless (eq name :allow-other-keys)
-                               (setq loser name))))
+                               (setq loser (list name)))))
 		(let ((info (lambda-var-arg-info var)))
 		  (when (eq (arg-info-key info) name)
 		    (ignores dummy)
@@ -641,7 +641,7 @@
 
 	(when (and loser (not (optional-dispatch-allowp fun)) (not allowp))
 	  (compiler-warn "function called with unknown argument keyword ~S"
-			 loser)
+			 (car loser))
 	  (setf (basic-combination-kind call) :error)
 	  (return-from convert-more-call)))
 

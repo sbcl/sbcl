@@ -893,7 +893,7 @@
 
 ;;;; MUFFLE-CONDITIONS test (corresponds to the test in the manual)
 (defvar *compiler-note-count* 0)
-#-alpha ; KLUDGE
+#-alpha ; FIXME: make a better test!
 (handler-bind ((sb-ext:compiler-note (lambda (c)
 				       (declare (ignore c))
 				       (incf *compiler-note-count*))))
@@ -909,6 +909,15 @@
 		       (* x -5)))))))
     (assert (= *compiler-note-count* 1))
     (assert (equal (multiple-value-list (funcall fun 1)) '(5 -5)))))
+
+(handler-case
+    (eval '(flet ((%f (&key) nil)) (%f nil nil)))
+  (error (c) :good)
+  (:no-error (val) (error "no error: ~S" val)))
+(handler-case
+    (eval '(labels ((%f (&key x) x)) (%f nil nil)))
+  (error (c) :good)
+  (:no-error (val) (error "no error: ~S" val)))
 
 ;;;; tests not in the problem domain, but of the consistency of the
 ;;;; compiler machinery itself
