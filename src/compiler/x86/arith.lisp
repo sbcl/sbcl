@@ -1073,10 +1073,10 @@
   (:translate sb!bignum::%bignum-set-length)
   (:policy :fast-safe))
 
-(define-full-reffer bignum-ref * bignum-digits-offset other-pointer-type
+(define-full-reffer bignum-ref * bignum-digits-offset other-pointer-lowtag
   (unsigned-reg) unsigned-num sb!bignum::%bignum-ref)
 
-(define-full-setter bignum-set * bignum-digits-offset other-pointer-type
+(define-full-setter bignum-set * bignum-digits-offset other-pointer-lowtag
   (unsigned-reg) unsigned-num sb!bignum::%bignum-set)
 
 (define-vop (digit-0-or-plus)
@@ -1334,7 +1334,7 @@
     (inst mov k (make-ea :dword :base state
 			 :disp (- (* (+ 2 sb!vm:vector-data-offset)
 				     sb!vm:word-bytes)
-				  sb!vm:other-pointer-type)))
+				  sb!vm:other-pointer-lowtag)))
     (inst cmp k 624)
     (inst jmp :ne no-update)
     (inst mov tmp state)	; The state is passed in EAX.
@@ -1346,13 +1346,13 @@
     (inst mov y (make-ea :dword :base state :index k :scale 4
 			 :disp (- (* (+ 3 sb!vm:vector-data-offset)
 				     sb!vm:word-bytes)
-				  sb!vm:other-pointer-type)))
+				  sb!vm:other-pointer-lowtag)))
     ;; y ^= (y >> 11);
     (inst shr y 11)
     (inst xor y (make-ea :dword :base state :index k :scale 4
 			 :disp (- (* (+ 3 sb!vm:vector-data-offset)
 				     sb!vm:word-bytes)
-				  sb!vm:other-pointer-type)))
+				  sb!vm:other-pointer-lowtag)))
     ;; y ^= (y << 7) & #x9d2c5680
     (inst mov tmp y)
     (inst inc k)
@@ -1360,7 +1360,7 @@
     (inst mov (make-ea :dword :base state
 		       :disp (- (* (+ 2 sb!vm:vector-data-offset)
 				   sb!vm:word-bytes)
-				sb!vm:other-pointer-type))
+				sb!vm:other-pointer-lowtag))
 	  k)
     (inst and tmp #x9d2c5680)
     (inst xor y tmp)

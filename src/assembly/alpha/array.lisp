@@ -34,10 +34,10 @@
   (inst srl type word-shift ndescr)
 
   (pseudo-atomic ()
-    (inst bis alloc-tn other-pointer-type result)
+    (inst bis alloc-tn other-pointer-lowtag result)
     (inst addq alloc-tn words alloc-tn)
-    (storew ndescr result 0 other-pointer-type)
-    (storew length result vector-length-slot other-pointer-type)))
+    (storew ndescr result 0 other-pointer-lowtag)
+    (storew length result vector-length-slot other-pointer-lowtag)))
 
 ;;;; hash primitives
 #|
@@ -61,7 +61,7 @@
   (progn result lip accum data byte  retaddr)
 
   (inst li (make-fixup 'sxhash-simple-substring :assembly-routine) temp1)
-  (loadw length string vector-length-slot other-pointer-type)
+  (loadw length string vector-length-slot other-pointer-lowtag)
   (inst jmp zero-tn temp1
 	(make-fixup 'sxhash-simple-substring :assembly-routine)))
 
@@ -85,7 +85,7 @@
 
   ;; Get a pointer to the data.
   (inst addq string
-	(- (* vector-data-offset word-bytes) other-pointer-type)
+	(- (* vector-data-offset word-bytes) other-pointer-lowtag)
 	lip)
   (move zero-tn accum)
   (inst br zero-tn test)

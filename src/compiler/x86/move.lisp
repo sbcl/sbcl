@@ -218,7 +218,7 @@
     (move eax x)
     (inst test al-tn 3)
     (inst jmp :z fixnum)
-    (loadw y eax bignum-digits-offset other-pointer-type)
+    (loadw y eax bignum-digits-offset other-pointer-lowtag)
     (inst jmp done)
     FIXNUM
     (inst sar eax 2)
@@ -307,7 +307,7 @@
 	  (emit-label bignum)
 	  (with-fixed-allocation
 	      (y bignum-type (+ bignum-digits-offset 1) node)
-	    (storew x y bignum-digits-offset other-pointer-type))
+	    (storew x y bignum-digits-offset other-pointer-lowtag))
 	  (inst jmp done)))))
 (define-move-vop move-from-signed :move
   (signed-reg) (descriptor-reg))
@@ -376,8 +376,8 @@
 	 (pseudo-atomic
 	  (allocation alloc (pad-data-block (+ bignum-digits-offset 2)) node)
 	  (storew y alloc)
-	  (inst lea y (make-ea :byte :base alloc :disp other-pointer-type))
-	  (storew x y bignum-digits-offset other-pointer-type))
+	  (inst lea y (make-ea :byte :base alloc :disp other-pointer-lowtag))
+	  (storew x y bignum-digits-offset other-pointer-lowtag))
 	 (inst jmp done)))))
 (define-move-vop move-from-unsigned :move
   (unsigned-reg) (descriptor-reg))

@@ -93,8 +93,8 @@
       (inst srl temp sb!vm:type-bits temp)
       (inst beq temp bogus)
       (inst sll temp (1- (integer-length sb!vm:word-bytes)) temp)
-      (unless (= lowtag sb!vm:other-pointer-type)
-	(inst subq temp (- sb!vm:other-pointer-type lowtag) temp))
+      (unless (= lowtag sb!vm:other-pointer-lowtag)
+	(inst subq temp (- sb!vm:other-pointer-lowtag lowtag) temp))
       (inst subq thing temp code)
       (emit-label done)
       (assemble (*elsewhere*)
@@ -104,11 +104,11 @@
 
 (define-vop (code-from-lra code-from-mumble)
   (:translate lra-code-header)
-  (:variant sb!vm:other-pointer-type))
+  (:variant sb!vm:other-pointer-lowtag))
 
 (define-vop (code-from-function code-from-mumble)
   (:translate fun-code-header)
-  (:variant sb!vm:fun-pointer-type))
+  (:variant sb!vm:fun-pointer-lowtag))
 
 (define-vop (make-lisp-obj)
   (:policy :fast-safe)
@@ -135,7 +135,7 @@
   (:results (res :scs (unsigned-reg)))
   (:result-types positive-fixnum)
   (:generator 5
-    (loadw res fun 0 fun-pointer-type)
+    (loadw res fun 0 fun-pointer-lowtag)
     (inst srl res sb!vm:type-bits res)))
 
 (defknown make-number-stack-pointer ((unsigned-byte 32)) system-area-pointer

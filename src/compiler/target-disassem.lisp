@@ -351,7 +351,7 @@
 
 (defun fun-address (function)
   (declare (type compiled-function function))
-  (- (sb!kernel:get-lisp-obj-address function) sb!vm:fun-pointer-type))
+  (- (sb!kernel:get-lisp-obj-address function) sb!vm:fun-pointer-lowtag))
 
 ;;; the offset of FUNCTION from the start of its code-component's
 ;;; instruction area
@@ -1752,7 +1752,7 @@
 	       (maybe-symbol-addr (- address slot-offset))
 	       (maybe-symbol
 		(sb!kernel:make-lisp-obj
-		 (+ maybe-symbol-addr sb!vm:other-pointer-type))))
+		 (+ maybe-symbol-addr sb!vm:other-pointer-lowtag))))
 	  (when (symbolp maybe-symbol)
 	    (return (values maybe-symbol (cdr field))))))))
 
@@ -1783,7 +1783,7 @@
 	(values
 	 (sb!kernel:code-header-ref code
 				    (ash (+ byte-offset
-					    sb!vm:other-pointer-type)
+					    sb!vm:other-pointer-lowtag)
 					 (- sb!vm:word-shift)))
 	 t)
 	(values nil nil))))
@@ -1797,7 +1797,7 @@
     (let ((code-size (ash (sb!kernel:get-header-data code) sb!vm:word-shift)))
       (sb!sys:without-gcing
        (let ((code-addr (- (sb!kernel:get-lisp-obj-address code)
-			   sb!vm:other-pointer-type)))
+			   sb!vm:other-pointer-lowtag)))
 	 (if (or (< addr code-addr) (>= addr (+ code-addr code-size)))
            (values nil nil)
            (values (sb!kernel:code-header-ref

@@ -294,7 +294,7 @@ static void brief_list(lispobj obj)
         printf("NIL");
     else {
         putchar('(');
-        while (LowtagOf(obj) == type_ListPointer) {
+        while (lowtagof(obj) == LIST_POINTER_LOWTAG) {
             struct cons *cons = (struct cons *)native_pointer(obj);
 
             if (space)
@@ -450,7 +450,8 @@ static void print_otherptr(lispobj obj)
 	type = TypeOf(header);
 
         print_obj("header: ", header);
-        if (LowtagOf(header) != type_OtherImmediate0 && LowtagOf(header) != type_OtherImmediate1) {
+        if (lowtagof(header) != OTHER_IMMEDIATE_0_LOWTAG &&
+	    lowtagof(header) != OTHER_IMMEDIATE_1_LOWTAG) {
             NEWLINE_OR_RETURN;
             printf("(invalid header object)");
             return;
@@ -654,7 +655,7 @@ static void print_obj(char *prefix, lispobj obj)
     static void (*brief_fns[])(lispobj obj)
 	= {brief_fixnum, brief_otherptr, brief_otherimm, brief_list,
 	   brief_fixnum, brief_struct, brief_otherimm, brief_otherptr};
-    int type = LowtagOf(obj);
+    int type = lowtagof(obj);
     struct var *var = lookup_by_obj(obj);
     char buffer[256];
     boolean verbose = cur_depth < brief_depth;
@@ -667,7 +668,7 @@ static void print_obj(char *prefix, lispobj obj)
 
     if (var == NULL &&
 	/* FIXME: What does this "x & y & z & .." expression mean? */
-	(obj & type_FunPointer & type_ListPointer & type_InstancePointer & type_OtherPointer) != 0)
+	(obj & FUN_POINTER_LOWTAG & LIST_POINTER_LOWTAG & INSTANCE_POINTER_LOWTAG & OTHER_POINTER_LOWTAG) != 0)
         var = define_var(NULL, obj, 0);
 
     if (var != NULL)

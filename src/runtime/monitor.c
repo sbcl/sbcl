@@ -247,10 +247,10 @@ search_cmd(char **ptr)
         addr = end;
         end += 2;
         if (TypeOf(obj) == type_SimpleFunHeader) {
-            print((long)addr | type_FunPointer);
-        } else if (LowtagOf(obj) == type_OtherImmediate0 ||
-		   LowtagOf(obj) == type_OtherImmediate1) {
-            print((lispobj)addr | type_OtherPointer);
+            print((long)addr | FUN_POINTER_LOWTAG);
+        } else if (lowtagof(obj) == OTHER_IMMEDIATE_0_LOWTAG ||
+		   lowtagof(obj) == OTHER_IMMEDIATE_1_LOWTAG) {
+            print((lispobj)addr | OTHER_POINTER_LOWTAG);
         } else {
             print((lispobj)addr);
         } if (count == -1) {
@@ -265,8 +265,8 @@ call_cmd(char **ptr)
     lispobj thing = parse_lispobj(ptr), function, result = 0, cons, args[3];
     int numargs;
 
-    if (LowtagOf(thing) == type_OtherPointer) {
-	switch (TypeOf(*(lispobj *)(thing-type_OtherPointer))) {
+    if (lowtagof(thing) == OTHER_POINTER_LOWTAG) {
+	switch (TypeOf(*(lispobj *)(thing-OTHER_POINTER_LOWTAG))) {
 	  case type_SymbolHeader:
 	    for (cons = SymbolValue(INITIAL_FDEFN_OBJECTS);
 		 cons != NIL;
@@ -294,7 +294,7 @@ call_cmd(char **ptr)
 	    return;
 	}
     }
-    else if (LowtagOf(thing) != type_FunPointer) {
+    else if (lowtagof(thing) != FUN_POINTER_LOWTAG) {
         printf("0x%08lx is not a function pointer, symbol, or fdefn object.\n",
 	       (long unsigned)thing);
         return;
@@ -459,7 +459,7 @@ catchers_cmd(char **ptr)
 		   (unsigned long)catch, (unsigned long)(catch->current_uwp),
 		   (unsigned long)(catch->current_cont),
 		   (unsigned long)component_ptr_from_pc((void*)catch->entry_pc) +
-		   type_OtherPointer,
+		   OTHER_POINTER_LOWTAG,
 		   (unsigned long)catch->entry_pc);
 #endif
             brief_print((lispobj)catch->tag);

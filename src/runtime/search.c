@@ -40,7 +40,7 @@ boolean search_for_symbol(char *name, lispobj **start, int *count)
 
     while (search_for_type(type_SymbolHeader, start, count)) {
         symbol = (struct symbol *)native_pointer((lispobj)*start);
-	if (LowtagOf(symbol->name) == type_OtherPointer) {
+	if (lowtagof(symbol->name) == OTHER_POINTER_LOWTAG) {
             symbol_name = (struct vector *)native_pointer(symbol->name);
             if (is_valid_lisp_addr((os_vm_address_t)symbol_name) &&
 		TypeOf(symbol_name->header) == type_SimpleString &&

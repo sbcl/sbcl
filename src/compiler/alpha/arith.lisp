@@ -568,10 +568,10 @@
   (:translate sb!bignum::%bignum-set-length)
   (:policy :fast-safe))
 
-(define-full-reffer bignum-ref * bignum-digits-offset other-pointer-type
+(define-full-reffer bignum-ref * bignum-digits-offset other-pointer-lowtag
   (unsigned-reg) unsigned-num sb!bignum::%bignum-ref)
 
-(define-full-setter bignum-set * bignum-digits-offset other-pointer-type
+(define-full-setter bignum-set * bignum-digits-offset other-pointer-lowtag
   (unsigned-reg) unsigned-num sb!bignum::%bignum-set #+gengc nil)
 
 (define-vop (digit-0-or-plus)

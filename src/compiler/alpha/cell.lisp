@@ -40,7 +40,7 @@
 
 ;;; The compiler likes to be able to directly SET symbols.
 (define-vop (set cell-set)
-  (:variant symbol-value-slot other-pointer-type))
+  (:variant symbol-value-slot other-pointer-lowtag))
 
 ;;; Do a cell ref with an error check for being unbound.
 (define-vop (checked-cell-ref)
@@ -58,7 +58,7 @@
   (:translate symbol-value)
   (:generator 9
     (move object obj-temp)
-    (loadw value obj-temp symbol-value-slot other-pointer-type)
+    (loadw value obj-temp symbol-value-slot other-pointer-lowtag)
     (let ((err-lab (generate-error-code vop unbound-symbol-error obj-temp)))
       (inst xor value unbound-marker-type temp)
       (inst beq temp err-lab))))
@@ -76,14 +76,14 @@
 (define-vop (boundp boundp-frob)
   (:translate boundp)
   (:generator 9
-    (loadw value object symbol-value-slot other-pointer-type)
+    (loadw value object symbol-value-slot other-pointer-lowtag)
     (inst xor value unbound-marker-type temp)
     (if not-p
 	(inst beq temp target)
 	(inst bne temp target))))
 
 (define-vop (fast-symbol-value cell-ref)
-  (:variant symbol-value-slot other-pointer-type)
+  (:variant symbol-value-slot other-pointer-lowtag)
   (:policy :fast)
   (:translate symbol-value))
 
@@ -92,7 +92,7 @@
 ;;;; fdefinition (FDEFN) objects
 
 (define-vop (fdefn-fun cell-ref)
-  (:variant fdefn-fun-slot other-pointer-type))
+  (:variant fdefn-fun-slot other-pointer-lowtag))
 
 (define-vop (safe-fdefn-fun)
   (:args (object :scs (descriptor-reg) :target obj-temp))
@@ -103,7 +103,7 @@
   (:temporary (:scs (non-descriptor-reg)) temp)
   (:generator 10
     (move object obj-temp)
-    (loadw value obj-temp fdefn-fun-slot other-pointer-type)
+    (loadw value obj-temp fdefn-fun-slot other-pointer-lowtag)
     (let ((err-lab (generate-error-code vop undefined-symbol-error obj-temp)))
       (inst cmpeq value null-tn temp)
       (inst bne temp err-lab))))
@@ -118,16 +118,16 @@
   (:results (result :scs (descriptor-reg)))
   (:generator 38
     (let ((normal-fn (gen-label)))
-      (load-type type function (- fun-pointer-type))
+      (load-type type function (- fun-pointer-lowtag))
       (inst xor type simple-fun-header-type type)
       (inst addq function
-	    (- (ash simple-fun-code-offset word-shift) fun-pointer-type)
+	    (- (ash simple-fun-code-offset word-shift) fun-pointer-lowtag)
 	    lip)
       (inst beq type normal-fn)
       (inst li (make-fixup "closure_tramp" :foreign) lip)
       (emit-label normal-fn)
-      (storew lip fdefn fdefn-raw-addr-slot other-pointer-type)
-      (storew function fdefn fdefn-fun-slot other-pointer-type)
+      (storew lip fdefn fdefn-raw-addr-slot other-pointer-lowtag)
+      (storew function fdefn fdefn-fun-slot other-pointer-lowtag)
       (move function result))))
           
 
@@ -138,10 +138,10 @@
   (:temporary (:scs (non-descriptor-reg)) temp)
   (:results (result :scs (descriptor-reg)))
   (:generator 38
-    (storew null-tn fdefn fdefn-fun-slot other-pointer-type)
+    (storew null-tn fdefn fdefn-fun-slot other-pointer-lowtag)
     (inst li (make-fixup "undefined_tramp" :foreign) temp)
     (move fdefn result)
-    (storew temp fdefn fdefn-raw-addr-slot other-pointer-type)))
+    (storew temp fdefn fdefn-raw-addr-slot other-pointer-lowtag)))
 
 ;;;; binding and Unbinding
 
@@ -152,12 +152,12 @@
 	 (symbol :scs (descriptor-reg)))
   (:temporary (:scs (descriptor-reg)) temp)
   (:generator 5
-    (loadw temp symbol symbol-value-slot other-pointer-type)
+    (loadw temp symbol symbol-value-slot other-pointer-lowtag)
     (inst addq bsp-tn (* 2 word-bytes) bsp-tn)
     (storew temp bsp-tn (- binding-value-slot binding-size))
     (storew symbol bsp-tn (- binding-symbol-slot binding-size))
     (#+gengc storew-and-remember-slot #-gengc storew
-	     val symbol symbol-value-slot other-pointer-type)))
+	     val symbol symbol-value-slot other-pointer-lowtag)))
 
 
 (define-vop (unbind)
@@ -166,7 +166,7 @@
     (loadw symbol bsp-tn (- binding-symbol-slot binding-size))
     (loadw value bsp-tn (- binding-value-slot binding-size))
     (#+gengc storew-and-remember-slot #-gengc storew
-	     value symbol symbol-value-slot other-pointer-type)
+	     value symbol symbol-value-slot other-pointer-lowtag)
     (storew zero-tn bsp-tn (- binding-symbol-slot binding-size))
     (inst subq bsp-tn (* 2 word-bytes) bsp-tn)))
 
@@ -189,7 +189,7 @@
       (loadw value bsp-tn (- binding-value-slot binding-size))
       (inst beq symbol skip)
       (#+gengc storew-and-remember-slot #-gengc storew
-	       value symbol symbol-value-slot other-pointer-type)
+	       value symbol symbol-value-slot other-pointer-lowtag)
       (storew zero-tn bsp-tn (- binding-symbol-slot binding-size))
 
       (emit-label skip)
@@ -202,33 +202,33 @@
 ;;;; closure indexing
 
 (define-full-reffer closure-index-ref *
-  closure-info-offset fun-pointer-type
+  closure-info-offset fun-pointer-lowtag
   (descriptor-reg any-reg) * %closure-index-ref)
 
 (define-full-setter set-funcallable-instance-info *
-  funcallable-instance-info-offset fun-pointer-type
+  funcallable-instance-info-offset fun-pointer-lowtag
   (descriptor-reg any-reg null zero) * %set-funcallable-instance-info)
 
 (define-full-reffer funcallable-instance-info *
-  funcallable-instance-info-offset fun-pointer-type
+  funcallable-instance-info-offset fun-pointer-lowtag
   (descriptor-reg any-reg) * %funcallable-instance-info)
 
 (define-vop (funcallable-instance-lexenv cell-ref)
-  (:variant funcallable-instance-lexenv-slot fun-pointer-type))
+  (:variant funcallable-instance-lexenv-slot fun-pointer-lowtag))
 
 (define-vop (closure-ref slot-ref)
-  (:variant closure-info-offset fun-pointer-type))
+  (:variant closure-info-offset fun-pointer-lowtag))
 
 (define-vop (closure-init slot-set)
-  (:variant closure-info-offset fun-pointer-type))
+  (:variant closure-info-offset fun-pointer-lowtag))
 
 ;;;; value cell hackery
 
 (define-vop (value-cell-ref cell-ref)
-  (:variant value-cell-value-slot other-pointer-type))
+  (:variant value-cell-value-slot other-pointer-lowtag))
 
 (define-vop (value-cell-set cell-set)
-  (:variant value-cell-value-slot other-pointer-type))
+  (:variant value-cell-value-slot other-pointer-lowtag))
 
 ;;;; instance hackery
 
@@ -239,11 +239,11 @@
   (:results (res :scs (unsigned-reg)))
   (:result-types positive-fixnum)
   (:generator 4
-    (loadw res struct 0 instance-pointer-type)
+    (loadw res struct 0 instance-pointer-lowtag)
     (inst srl res type-bits res)))
 
 (define-vop (instance-ref slot-ref)
-  (:variant instance-slots-offset instance-pointer-type)
+  (:variant instance-slots-offset instance-pointer-lowtag)
   (:policy :fast-safe)
   (:translate %instance-ref)
   (:arg-types instance (:constant index)))
@@ -251,21 +251,21 @@
 (define-vop (instance-set slot-set)
   (:policy :fast-safe)
   (:translate %instance-set)
-  (:variant instance-slots-offset instance-pointer-type)
+  (:variant instance-slots-offset instance-pointer-lowtag)
   (:arg-types instance (:constant index) *))
 
 (define-full-reffer instance-index-ref * instance-slots-offset
-  instance-pointer-type (descriptor-reg any-reg) * %instance-ref)
+  instance-pointer-lowtag (descriptor-reg any-reg) * %instance-ref)
 
 (define-full-setter instance-index-set * instance-slots-offset
-  instance-pointer-type (descriptor-reg any-reg null zero) * %instance-set)
+  instance-pointer-lowtag (descriptor-reg any-reg null zero) * %instance-set)
 
 ;;;; code object frobbing
 
-(define-full-reffer code-header-ref * 0 other-pointer-type
+(define-full-reffer code-header-ref * 0 other-pointer-lowtag
   (descriptor-reg any-reg) * code-header-ref)
 
-(define-full-setter code-header-set * 0 other-pointer-type
+(define-full-setter code-header-set * 0 other-pointer-lowtag
   (descriptor-reg any-reg null zero) * code-header-set)
 
 ;;;; mutator accessing

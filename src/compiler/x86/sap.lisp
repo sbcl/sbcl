@@ -19,7 +19,7 @@
   (:results (y :scs (sap-reg)))
   (:note "pointer to SAP coercion")
   (:generator 1
-    (loadw y x sap-pointer-slot other-pointer-type)))
+    (loadw y x sap-pointer-slot other-pointer-lowtag)))
 (define-move-vop move-to-sap :move
   (descriptor-reg) (sap-reg))
 
@@ -31,7 +31,7 @@
   (:node-var node)
   (:generator 20
     (with-fixed-allocation (res sap-type sap-size node)
-      (storew sap res sap-pointer-slot other-pointer-type))))
+      (storew sap res sap-pointer-slot other-pointer-lowtag))))
 (define-move-vop move-from-sap :move
   (sap-reg) (descriptor-reg))
 
@@ -496,4 +496,4 @@
   (:result-types system-area-pointer)
   (:generator 2
     (move sap vector)
-    (inst add sap (- (* vector-data-offset word-bytes) other-pointer-type))))
+    (inst add sap (- (* vector-data-offset word-bytes) other-pointer-lowtag))))

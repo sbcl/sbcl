@@ -73,7 +73,7 @@
 		  :disp (+ nil-value
 			   (static-symbol-offset ',symbol)
 			   (ash symbol-value-slot word-shift)
-			   (- other-pointer-type)))))
+			   (- other-pointer-lowtag)))))
 
 (defmacro store-symbol-value (reg symbol)
   `(inst mov
@@ -81,7 +81,7 @@
 		  :disp (+ nil-value
 			   (static-symbol-offset ',symbol)
 			   (ash symbol-value-slot word-shift)
-			   (- other-pointer-type)))
+			   (- other-pointer-lowtag)))
 	 ,reg))
 
 
@@ -267,7 +267,7 @@
     (allocation ,result-tn (pad-data-block ,size) ,inline)
     (storew (logior (ash (1- ,size) sb!vm:type-bits) ,type-code) ,result-tn)
     (inst lea ,result-tn
-     (make-ea :byte :base ,result-tn :disp other-pointer-type))
+     (make-ea :byte :base ,result-tn :disp other-pointer-lowtag))
     ,@forms))
 
 ;;;; error code
@@ -386,13 +386,13 @@
 					   (ash symbol-value-slot word-shift)
 					   ;; FIXME: Use mask, not minus, to
 					   ;; take out type bits.
-					   (- other-pointer-type)))
+					   (- other-pointer-lowtag)))
 	       0)
 	 (inst mov (make-ea :byte :disp (+ nil-value
 					   (static-symbol-offset
 					    '*pseudo-atomic-atomic*)
 					   (ash symbol-value-slot word-shift)
-					   (- other-pointer-type)))
+					   (- other-pointer-lowtag)))
 	       (fixnumize 1)))
        ,@forms
        (when *enable-pseudo-atomic*
@@ -400,7 +400,7 @@
 					   (static-symbol-offset
 					    '*pseudo-atomic-atomic*)
 					   (ash symbol-value-slot word-shift)
-					   (- other-pointer-type)))
+					   (- other-pointer-lowtag)))
 	       0)
 	 ;; KLUDGE: Is there any requirement for interrupts to be
 	 ;; handled in order? It seems as though an interrupt coming
@@ -413,7 +413,7 @@
 				     (static-symbol-offset
 				      '*pseudo-atomic-interrupted*)
 				     (ash symbol-value-slot word-shift)
-				     (- other-pointer-type)))
+				     (- other-pointer-lowtag)))
 	       0)
 	 (inst jmp :eq ,label)
 	 (inst break pending-interrupt-trap)

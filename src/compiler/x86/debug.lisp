@@ -102,8 +102,8 @@
       (inst shr temp type-bits)
       (inst jmp :z bogus)
       (inst shl temp (1- (integer-length word-bytes)))
-      (unless (= lowtag other-pointer-type)
-	(inst add temp (- lowtag other-pointer-type)))
+      (unless (= lowtag other-pointer-lowtag)
+	(inst add temp (- lowtag other-pointer-lowtag)))
       (move code thing)
       (inst sub code temp)
       (emit-label done)
@@ -114,11 +114,11 @@
 
 (define-vop (code-from-lra code-from-mumble)
   (:translate sb!di::lra-code-header)
-  (:variant other-pointer-type))
+  (:variant other-pointer-lowtag))
 
 (define-vop (code-from-function code-from-mumble)
   (:translate sb!di::fun-code-header)
-  (:variant fun-pointer-type))
+  (:variant fun-pointer-lowtag))
 
 (define-vop (make-lisp-obj)
   (:policy :fast-safe)
@@ -150,5 +150,5 @@
   (:results (res :scs (unsigned-reg)))
   (:result-types positive-fixnum)
   (:generator 5
-    (loadw res fun 0 fun-pointer-type)
+    (loadw res fun 0 fun-pointer-lowtag)
     (inst shr res type-bits)))

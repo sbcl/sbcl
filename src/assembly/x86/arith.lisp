@@ -66,7 +66,7 @@
     (move ecx res)
 
     (with-fixed-allocation (res bignum-type (1+ bignum-digits-offset))
-      (storew ecx res bignum-digits-offset other-pointer-type))
+      (storew ecx res bignum-digits-offset other-pointer-lowtag))
 
     OKAY)
 
@@ -86,7 +86,7 @@
     (move ecx res)
 
     (with-fixed-allocation (res bignum-type (1+ bignum-digits-offset))
-      (storew ecx res bignum-digits-offset other-pointer-type))
+      (storew ecx res bignum-digits-offset other-pointer-lowtag))
     OKAY)
 
   (define-generic-arith-routine (* 30)
@@ -107,14 +107,14 @@
     (inst jmp :e SINGLE-WORD-BIGNUM)
 
     (with-fixed-allocation (res bignum-type (+ bignum-digits-offset 2))
-      (storew eax res bignum-digits-offset other-pointer-type)
-      (storew ecx res (1+ bignum-digits-offset) other-pointer-type))
+      (storew eax res bignum-digits-offset other-pointer-lowtag)
+      (storew ecx res (1+ bignum-digits-offset) other-pointer-lowtag))
     (inst jmp DONE)
 
     SINGLE-WORD-BIGNUM
 
     (with-fixed-allocation (res bignum-type (1+ bignum-digits-offset))
-      (storew eax res bignum-digits-offset other-pointer-type))
+      (storew eax res bignum-digits-offset other-pointer-lowtag))
     (inst jmp DONE)
 
     OKAY
@@ -154,7 +154,7 @@
   (move ecx res)
 
   (with-fixed-allocation (res bignum-type (1+ bignum-digits-offset))
-    (storew ecx res bignum-digits-offset other-pointer-type))
+    (storew ecx res bignum-digits-offset other-pointer-lowtag))
 
   OKAY)
 
@@ -335,11 +335,11 @@
   (inst mov y (make-ea :dword :base state :index k :scale 4
 		       :disp (- (* (+ 3 sb!vm:vector-data-offset)
 				   sb!vm:word-bytes)
-				sb!vm:other-pointer-type)))
+				sb!vm:other-pointer-lowtag)))
   (inst mov tmp (make-ea :dword :base state :index k :scale 4
 			 :disp (- (* (+ 1 3 sb!vm:vector-data-offset)
 				     sb!vm:word-bytes)
-				  sb!vm:other-pointer-type)))
+				  sb!vm:other-pointer-lowtag)))
   (inst and y #x80000000)
   (inst and tmp #x7fffffff)
   (inst or y tmp)
@@ -350,11 +350,11 @@
   (inst xor y (make-ea :dword :base state :index k :scale 4
 		       :disp (- (* (+ 397 3 sb!vm:vector-data-offset)
 				   sb!vm:word-bytes)
-				sb!vm:other-pointer-type)))
+				sb!vm:other-pointer-lowtag)))
   (inst mov (make-ea :dword :base state :index k :scale 4
 		     :disp (- (* (+ 3 sb!vm:vector-data-offset)
 				 sb!vm:word-bytes)
-			      sb!vm:other-pointer-type))
+			      sb!vm:other-pointer-lowtag))
 	y)
   (inst inc k)
   (inst cmp k (- 624 397))
@@ -363,11 +363,11 @@
   (inst mov y (make-ea :dword :base state :index k :scale 4
 		       :disp (- (* (+ 3 sb!vm:vector-data-offset)
 				   sb!vm:word-bytes)
-				sb!vm:other-pointer-type)))
+				sb!vm:other-pointer-lowtag)))
   (inst mov tmp (make-ea :dword :base state :index k :scale 4
 			 :disp (- (* (+ 1 3 sb!vm:vector-data-offset)
 				     sb!vm:word-bytes)
-				  sb!vm:other-pointer-type)))
+				  sb!vm:other-pointer-lowtag)))
   (inst and y #x80000000)
   (inst and tmp #x7fffffff)
   (inst or y tmp)
@@ -378,11 +378,11 @@
   (inst xor y (make-ea :dword :base state :index k :scale 4
 		       :disp (- (* (+ (- 397 624) 3 sb!vm:vector-data-offset)
 				   sb!vm:word-bytes)
-				sb!vm:other-pointer-type)))
+				sb!vm:other-pointer-lowtag)))
   (inst mov (make-ea :dword :base state :index k :scale 4
 		     :disp (- (* (+ 3 sb!vm:vector-data-offset)
 				 sb!vm:word-bytes)
-			      sb!vm:other-pointer-type))
+			      sb!vm:other-pointer-lowtag))
 	y)
   (inst inc k)
   (inst cmp k (- 624 1))
@@ -391,11 +391,11 @@
   (inst mov y (make-ea :dword :base state
 		       :disp (- (* (+ (- 624 1) 3 sb!vm:vector-data-offset)
 				   sb!vm:word-bytes)
-				sb!vm:other-pointer-type)))
+				sb!vm:other-pointer-lowtag)))
   (inst mov tmp (make-ea :dword :base state
 			 :disp (- (* (+ 0 3 sb!vm:vector-data-offset)
 				     sb!vm:word-bytes)
-				  sb!vm:other-pointer-type)))
+				  sb!vm:other-pointer-lowtag)))
   (inst and y #x80000000)
   (inst and tmp #x7fffffff)
   (inst or y tmp)
@@ -406,11 +406,11 @@
   (inst xor y (make-ea :dword :base state
 		       :disp (- (* (+ (- 397 1) 3 sb!vm:vector-data-offset)
 				   sb!vm:word-bytes)
-				sb!vm:other-pointer-type)))
+				sb!vm:other-pointer-lowtag)))
   (inst mov (make-ea :dword :base state
 		     :disp (- (* (+ (- 624 1) 3 sb!vm:vector-data-offset)
 				 sb!vm:word-bytes)
-			      sb!vm:other-pointer-type))
+			      sb!vm:other-pointer-lowtag))
 	y)
 
   ;; Restore the temporary registers and return.

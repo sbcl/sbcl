@@ -140,8 +140,8 @@ fake_foreign_function_call(os_context_t *context)
 	== current_control_frame_pointer) {
         /* There is a small window during call where the callee's
          * frame isn't built yet. */
-        if (LowtagOf(*os_context_register_addr(context, reg_CODE))
-	    == type_FunPointer) {
+        if (lowtagof(*os_context_register_addr(context, reg_CODE))
+	    == FUN_POINTER_LOWTAG) {
             /* We have called, but not built the new frame, so
              * build it for them. */
             current_control_frame_pointer[0] =
@@ -391,7 +391,7 @@ interrupt_handle_now(int signal, siginfo_t *info, void *void_context)
 	 * support decides to pass on it. */
 	lose("no handler for signal %d in interrupt_handle_now(..)", signal);
 
-    } else if (LowtagOf(handler.lisp) == type_FunPointer) {
+    } else if (lowtagof(handler.lisp) == FUN_POINTER_LOWTAG) {
 
         /* Allocate the SAPs while the interrupts are still disabled.
 	 * (FIXME: Why? This is the way it was done in CMU CL, and it

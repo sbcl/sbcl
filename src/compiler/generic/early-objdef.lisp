@@ -14,21 +14,21 @@
 ;;; FIXME: It's clever using :SUFFIX -TYPE for these things, but it's
 ;;; a pain for people just learning to find their way around the code
 ;;; who want to use lexical search to figure out where things like
-;;; EVEN-FIXNUM-TYPE are defined. Remove the :SUFFIXes and just expand
-;;; out the full names. Or even define them in DEF-FROB EVEN-FIXNUM-TYPE
-;;; style so searches like 'def.*even-fixnum-type' can find them.
+;;; EVEN-FIXNUM-LOWTAG are defined. Remove the :SUFFIXes and just expand
+;;; out the full names. Or even define them in DEF-FROB EVEN-FIXNUM-LOWTAG
+;;; style so searches like 'def.*even-fixnum-lowtag' can find them.
 
-;;; the main types. These types are represented by the low three bits
-;;; of the pointer or immediate object.
+;;; tags for the main low-level types, to be stored in the low three
+;;; bits to identify the type of a machine word 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   ;; The EVAL-WHEN is necessary (at least for Lispworks), because the
-  ;; second DEFENUM uses the value of OTHER-IMMEDIATE-0-TYPE, which is
+  ;; second DEFENUM uses the value of OTHER-IMMEDIATE-0-LOWTAG, which is
   ;; defined in the first DEFENUM. -- AL 20000216
-  (defenum (:suffix -type)
+  (defenum (:suffix -lowtag)
     even-fixnum
-    ;; Note: CMU CL, and SBCL < 0.pre7.39, had FUN-POINTER-TYPE
-    ;; here. We swapped FUN-POINTER-TYPE and
-    ;; INSTANCE-POINTER-TYPE in sbcl-0.pre7.39 in order to help with a
+    ;; Note: CMU CL, and SBCL < 0.pre7.39, had FUN-POINTER-LOWTAG
+    ;; here. We swapped FUN-POINTER-LOWTAG and
+    ;; INSTANCE-POINTER-LOWTAG in sbcl-0.pre7.39 in order to help with a
     ;; low-level pun in the function call sequence on the PPC port.
     ;; For more information, see the PPC port code. -- WHN 2001-10-03
     instance-pointer
@@ -39,10 +39,11 @@
     other-immediate-1
     other-pointer))
 
-;;; the heap types. Each of these types is in the header of objects in
-;;; the heap.
+;;; the heap types, stored in 8 bits of the header of an object on the
+;;; heap, to identify the type of the heap object (which'll be at
+;;; least two machine words, often more)
 (defenum (:suffix -type
-	  :start (+ (ash 1 lowtag-bits) other-immediate-0-type)
+	  :start (+ (ash 1 lowtag-bits) other-immediate-0-lowtag)
 	  :step (ash 1 (1- lowtag-bits)))
   bignum
   ratio

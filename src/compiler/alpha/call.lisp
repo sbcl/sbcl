@@ -543,7 +543,7 @@ default-value-8
       (when cur-nfp
 	(inst addq cur-nfp (bytes-needed-for-non-descriptor-stack-frame)
 	      nsp-tn)))
-    (inst subq return-pc-temp (- other-pointer-type word-bytes) lip)
+    (inst subq return-pc-temp (- other-pointer-lowtag word-bytes) lip)
     (move ocfp-temp cfp-tn)
     (inst ret zero-tn lip 1)
     (trace-table-entry trace-table-normal)))
@@ -760,11 +760,11 @@ default-value-8
 		     (constant
 		      (inst ldl name-pass
 			    (- (ash (tn-offset name) word-shift)
-			       other-pointer-type) code-tn)
+			       other-pointer-lowtag) code-tn)
 		      (do-next-filler)))
 		   (inst ldl entry-point
 			 (- (ash fdefn-raw-addr-slot word-shift)
-			    other-pointer-type) name-pass)
+			    other-pointer-lowtag) name-pass)
 		   (do-next-filler))
 		 `((sc-case arg-fun
 		     (descriptor-reg (move arg-fun lexenv))
@@ -775,22 +775,22 @@ default-value-8
 		     (constant
 		      (inst ldl lexenv
 			    (- (ash (tn-offset arg-fun) word-shift)
-			       other-pointer-type) code-tn)
+			       other-pointer-lowtag) code-tn)
 		      (do-next-filler)))
 		   #!-gengc
 		   (inst ldl function
 			 (- (ash closure-fun-slot word-shift)
-			    fun-pointer-type) lexenv)
+			    fun-pointer-lowtag) lexenv)
 		   #!-gengc
 		   (do-next-filler)
 		   #!-gengc
 		   (inst addq function
 			 (- (ash simple-fun-code-offset word-shift)
-			    fun-pointer-type) entry-point)
+			    fun-pointer-lowtag) entry-point)
 		   #!+gengc
 		   (inst ldl entry-point
 			 (- (ash closure-entry-point-slot word-shift)
-			    fun-pointer-type) lexenv)
+			    fun-pointer-lowtag) lexenv)
 		   #!+gengc
 		   (do-next-filler)))
 	   (loop
@@ -1119,7 +1119,7 @@ default-value-8
       ;; We need to do this atomically.
       (pseudo-atomic ()
 	;; Allocate a cons (2 words) for each item.
-	(inst bis alloc-tn list-pointer-type result)
+	(inst bis alloc-tn list-pointer-lowtag result)
 	(move result dst)
 	(inst sll count 1 temp)
 	(inst addq alloc-tn temp alloc-tn)
@@ -1128,7 +1128,7 @@ default-value-8
 	;; Store the current cons in the cdr of the previous cons.
 	(emit-label loop)
 	(inst addq dst (* 2 word-bytes) dst)
-	(storew dst dst -1 list-pointer-type)
+	(storew dst dst -1 list-pointer-lowtag)
 
 	(emit-label enter)
 	;; Grab one value.
@@ -1136,14 +1136,14 @@ default-value-8
 	(inst addq context word-bytes context)
 
 	;; Store the value in the car (in delay slot)
-	(storew temp dst 0 list-pointer-type)
+	(storew temp dst 0 list-pointer-lowtag)
 
 	;; Decrement count, and if != zero, go back for more.
 	(inst subq count (fixnumize 1) count)
 	(inst bne count loop)
 
 	;; NIL out the last cons.
-	(storew null-tn dst 1 list-pointer-type))
+	(storew null-tn dst 1 list-pointer-lowtag))
       (emit-label done))))
 
 ;;; Return the location and size of the &MORE arg glob created by

@@ -545,7 +545,7 @@
 (defun component-from-component-ptr (component-ptr)
   (declare (type system-area-pointer component-ptr))
   (make-lisp-obj (logior (sap-int component-ptr)
-			 sb!vm:other-pointer-type)))
+			 sb!vm:other-pointer-lowtag)))
 
 ;;;; X86 support
 
@@ -560,7 +560,7 @@
 	      (code-header-len (* (get-header-data code) sb!vm:word-bytes))
 	      (pc-offset (- (sap-int pc)
 			    (- (get-lisp-obj-address code)
-			       sb!vm:other-pointer-type)
+			       sb!vm:other-pointer-lowtag)
 			    code-header-len)))
 ;	 (format t "c-lra-fpc ~A ~A ~A~%" pc code pc-offset)
 	 (values pc-offset code)))))
@@ -906,7 +906,7 @@
 		    (pc-offset
 		     (- (sap-int (sb!vm:context-pc context))
 			(- (get-lisp-obj-address code)
-			   sb!vm:other-pointer-type)
+			   sb!vm:other-pointer-lowtag)
 			code-header-len)))
 	       (/show "got PC-OFFSET")
 	       (unless (<= 0 pc-offset
@@ -941,7 +941,7 @@
                    (pc-offset
                     (- (sap-int (sb!vm:context-pc scp))
                        (- (get-lisp-obj-address code)
-                          sb!vm:other-pointer-type)
+                          sb!vm:other-pointer-lowtag)
                        code-header-len)))
               ;; Check to see whether we were executing in a branch
               ;; delay slot.
@@ -976,7 +976,7 @@
 	(or (fun-code-header object)
 	    :undefined-function)
 	(let ((lowtag (get-lowtag object)))
-	  (if (= lowtag sb!vm:other-pointer-type)
+	  (if (= lowtag sb!vm:other-pointer-lowtag)
 	      (let ((type (get-type object)))
 		(cond ((= type sb!vm:code-header-type)
 		       object)
@@ -1078,7 +1078,7 @@
 		#!+x86
 		(- (sap-int ra)
 		   (- (get-lisp-obj-address component)
-		      sb!vm:other-pointer-type)
+		      sb!vm:other-pointer-lowtag)
 		   (* (get-header-data component) sb!vm:word-bytes))))
 	  (push (cons #!-x86
 		      (stack-ref catch sb!vm:catch-block-tag-slot)
@@ -2545,7 +2545,7 @@
 ;;; this to determine if the value stored is the actual value or an
 ;;; indirection cell.
 (defun indirect-value-cell-p (x)
-  (and (= (get-lowtag x) sb!vm:other-pointer-type)
+  (and (= (get-lowtag x) sb!vm:other-pointer-lowtag)
        (= (get-type x) sb!vm:value-cell-header-type)))
 
 ;;; Return three values reflecting the validity of DEBUG-VAR's value
@@ -3296,7 +3296,7 @@
      (values dst-start code-object (sap- trap-loc src-start))
      #!-x86
      (let ((new-lra (make-lisp-obj (+ (sap-int dst-start)
-				      sb!vm:other-pointer-type))))
+				      sb!vm:other-pointer-lowtag))))
        (set-header-data
 	new-lra
 	(logandc2 (+ sb!vm:code-constants-offset bogus-lra-constants 1)

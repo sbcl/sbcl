@@ -73,12 +73,12 @@
     LOOP
     (inst cmpeq list null-tn temp)
     (inst bne temp done)
-    (loadw temp list cons-car-slot list-pointer-type)
-    (loadw list list cons-cdr-slot list-pointer-type)
+    (loadw temp list cons-car-slot list-pointer-lowtag)
+    (loadw list list cons-cdr-slot list-pointer-lowtag)
     (inst lda csp-tn word-bytes csp-tn)
     (storew temp csp-tn -1)
     (inst and list lowtag-mask ndescr)
-    (inst xor ndescr list-pointer-type ndescr)
+    (inst xor ndescr list-pointer-lowtag ndescr)
     (inst beq ndescr loop)
     (error-call vop bogus-argument-to-values-list-error list)
     

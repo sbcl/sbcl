@@ -28,7 +28,7 @@
   (collect ((results))
     (let ((start nil)
 	  (prev nil)
-	  (delta (- other-immediate-1-type other-immediate-0-type)))
+	  (delta (- other-immediate-1-lowtag other-immediate-0-lowtag)))
       (flet ((emit-test ()
 	       (results (if (= start prev)
 			    start
@@ -51,8 +51,8 @@
 (macrolet ((test-type (value target not-p &rest type-codes)
   ;; Determine what interesting combinations we need to test for.
   (let* ((type-codes (mapcar #'eval type-codes))
-	 (fixnump (and (member even-fixnum-type type-codes)
-		       (member odd-fixnum-type type-codes)
+	 (fixnump (and (member even-fixnum-lowtag type-codes)
+		       (member odd-fixnum-lowtag type-codes)
 		       t))
 	 (lowtags (remove lowtag-limit type-codes :test #'<))
 	 (extended (remove lowtag-limit type-codes :test #'>))
@@ -69,8 +69,8 @@
     (cond
      (fixnump
       (when (remove-if #'(lambda (x)
-			   (or (= x even-fixnum-type)
-			       (= x odd-fixnum-type)))
+			   (or (= x even-fixnum-lowtag)
+			       (= x odd-fixnum-lowtag)))
 		       lowtags)
 	(error "can't mix fixnum testing with other lowtags"))
       (when function-p
@@ -163,7 +163,7 @@
 
 (defun %test-headers (value target not-p function-p headers
 			    &optional (drop-through (gen-label)) al-loaded)
-  (let ((lowtag (if function-p fun-pointer-type other-pointer-type)))
+  (let ((lowtag (if function-p fun-pointer-lowtag other-pointer-lowtag)))
     (multiple-value-bind (equal less-or-equal when-true when-false)
 	;; EQUAL and LESS-OR-EQUAL are the conditions for branching to TARGET.
 	;; WHEN-TRUE and WHEN-FALSE are the labels to branch to when we know
@@ -201,7 +201,7 @@
 #+nil
 (defun %test-headers (value target not-p function-p headers
 			    &optional (drop-through (gen-label)) al-loaded)
-  (let ((lowtag (if function-p fun-pointer-type other-pointer-type)))
+  (let ((lowtag (if function-p fun-pointer-lowtag other-pointer-lowtag)))
     (multiple-value-bind (equal less-or-equal when-true when-false)
 	;; EQUAL and LESS-OR-EQUAL are the conditions for branching to TARGET.
 	;; WHEN-TRUE and WHEN-FALSE are the labels to branch to when we know
@@ -321,16 +321,16 @@
 	   `((primitive-type-vop ,check-name (:check) ,ptype))))))
 
 (def-simple-type-vops fixnump check-fixnum fixnum object-not-fixnum-error
-  even-fixnum-type odd-fixnum-type)
+  even-fixnum-lowtag odd-fixnum-lowtag)
 
 (def-type-vops functionp check-function function
-  object-not-function-error fun-pointer-type)
+  object-not-function-error fun-pointer-lowtag)
 
 (def-type-vops listp check-list list object-not-list-error
-  list-pointer-type)
+  list-pointer-lowtag)
 
 (def-type-vops %instancep check-instance instance object-not-instance-error
-  instance-pointer-type)
+  instance-pointer-lowtag)
 
 (def-type-vops bignump check-bignum bignum
   object-not-bignum-error bignum-type)
@@ -555,22 +555,22 @@
   complex-array-type)
 
 (def-type-vops numberp check-number nil object-not-number-error
-  even-fixnum-type odd-fixnum-type bignum-type ratio-type
+  even-fixnum-lowtag odd-fixnum-lowtag bignum-type ratio-type
   single-float-type double-float-type #!+long-float long-float-type complex-type
   complex-single-float-type complex-double-float-type
   #!+long-float complex-long-float-type)
 
 (def-type-vops rationalp check-rational nil object-not-rational-error
-  even-fixnum-type odd-fixnum-type ratio-type bignum-type)
+  even-fixnum-lowtag odd-fixnum-lowtag ratio-type bignum-type)
 
 (def-type-vops integerp check-integer nil object-not-integer-error
-  even-fixnum-type odd-fixnum-type bignum-type)
+  even-fixnum-lowtag odd-fixnum-lowtag bignum-type)
 
 (def-type-vops floatp check-float nil object-not-float-error
   single-float-type double-float-type #!+long-float long-float-type)
 
 (def-type-vops realp check-real nil object-not-real-error
-  even-fixnum-type odd-fixnum-type ratio-type bignum-type
+  even-fixnum-lowtag odd-fixnum-lowtag ratio-type bignum-type
   single-float-type double-float-type #!+long-float long-float-type)
 
 ;;;; other integer ranges
@@ -589,9 +589,9 @@
       (inst jmp :e yep)
       (move eax-tn value)
       (inst and al-tn lowtag-mask)
-      (inst cmp al-tn other-pointer-type)
+      (inst cmp al-tn other-pointer-lowtag)
       (inst jmp :ne nope)
-      (loadw eax-tn value 0 other-pointer-type)
+      (loadw eax-tn value 0 other-pointer-lowtag)
       (inst cmp eax-tn (+ (ash 1 type-bits) bignum-type))
       (inst jmp (if not-p :ne :e) target))
     NOT-TARGET))
@@ -605,9 +605,9 @@
       (inst jmp :e yep)
       (move eax-tn value)
       (inst and al-tn lowtag-mask)
-      (inst cmp al-tn other-pointer-type)
+      (inst cmp al-tn other-pointer-lowtag)
       (inst jmp :ne nope)
-      (loadw eax-tn value 0 other-pointer-type)
+      (loadw eax-tn value 0 other-pointer-lowtag)
       (inst cmp eax-tn (+ (ash 1 type-bits) bignum-type))
       (inst jmp :ne nope))
     YEP
@@ -633,10 +633,10 @@
 
 	;; If not, is it an other pointer?
 	(inst and al-tn lowtag-mask)
-	(inst cmp al-tn other-pointer-type)
+	(inst cmp al-tn other-pointer-lowtag)
 	(inst jmp :ne nope)
 	;; Get the header.
-	(loadw eax-tn value 0 other-pointer-type)
+	(loadw eax-tn value 0 other-pointer-lowtag)
 	;; Is it one?
 	(inst cmp eax-tn (+ (ash 1 type-bits) bignum-type))
 	(inst jmp :e single-word)
@@ -644,7 +644,7 @@
 	(inst cmp eax-tn (+ (ash 2 type-bits) bignum-type))
 	(inst jmp :ne nope)
 	;; Get the second digit.
-	(loadw eax-tn value (1+ bignum-digits-offset) other-pointer-type)
+	(loadw eax-tn value (1+ bignum-digits-offset) other-pointer-lowtag)
 	;; All zeros, its an (unsigned-byte 32).
 	(inst or eax-tn eax-tn)
 	(inst jmp :z yep)
@@ -652,7 +652,7 @@
 	
 	(emit-label single-word)
 	;; Get the single digit.
-	(loadw eax-tn value bignum-digits-offset other-pointer-type)
+	(loadw eax-tn value bignum-digits-offset other-pointer-lowtag)
 
 	;; positive implies (unsigned-byte 32).
 	(emit-label fixnum)
@@ -676,10 +676,10 @@
 
       ;; If not, is it an other pointer?
       (inst and al-tn lowtag-mask)
-      (inst cmp al-tn other-pointer-type)
+      (inst cmp al-tn other-pointer-lowtag)
       (inst jmp :ne nope)
       ;; Get the header.
-      (loadw eax-tn value 0 other-pointer-type)
+      (loadw eax-tn value 0 other-pointer-lowtag)
       ;; Is it one?
       (inst cmp eax-tn (+ (ash 1 type-bits) bignum-type))
       (inst jmp :e single-word)
@@ -687,7 +687,7 @@
       (inst cmp eax-tn (+ (ash 2 type-bits) bignum-type))
       (inst jmp :ne nope)
       ;; Get the second digit.
-      (loadw eax-tn value (1+ bignum-digits-offset) other-pointer-type)
+      (loadw eax-tn value (1+ bignum-digits-offset) other-pointer-lowtag)
       ;; All zeros, its an (unsigned-byte 32).
       (inst or eax-tn eax-tn)
       (inst jmp :z yep)
@@ -695,7 +695,7 @@
 	
       (emit-label single-word)
       ;; Get the single digit.
-      (loadw eax-tn value bignum-digits-offset other-pointer-type)
+      (loadw eax-tn value bignum-digits-offset other-pointer-lowtag)
 
       ;; positive implies (unsigned-byte 32).
       (emit-label fixnum)
@@ -734,7 +734,7 @@
     (let ((is-not-cons-label (if not-p target drop-thru)))
       (inst cmp value nil-value)
       (inst jmp :e is-not-cons-label)
-      (test-type value target not-p list-pointer-type))
+      (test-type value target not-p list-pointer-lowtag))
     DROP-THRU))
 
 (define-vop (check-cons check-type)
@@ -742,7 +742,7 @@
     (let ((error (generate-error-code vop object-not-cons-error value)))
       (inst cmp value nil-value)
       (inst jmp :e error)
-      (test-type value error t list-pointer-type)
+      (test-type value error t list-pointer-lowtag)
       (move result value))))
 
 ) ; MACROLET

@@ -32,8 +32,8 @@
 	(unless posn (error "~S is not a static symbol." symbol))
 	(+ (* posn (pad-data-block symbol-size))
 	   (pad-data-block (1- symbol-size))
-	   other-pointer-type
-	   (- list-pointer-type)))
+	   other-pointer-lowtag
+	   (- list-pointer-lowtag)))
       0))
 
 (defun offset-static-symbol (offset)
@@ -42,7 +42,7 @@
   (if (zerop offset)
       nil
       (multiple-value-bind (n rem)
-	  (truncate (+ offset list-pointer-type (- other-pointer-type)
+	  (truncate (+ offset list-pointer-lowtag (- other-pointer-lowtag)
 		       (- (pad-data-block (1- symbol-size))))
 		    (pad-data-block symbol-size))
 	(unless (and (zerop rem) (<= 0 n (1- (length *static-symbols*))))
@@ -59,6 +59,6 @@
       (error "~S isn't a static function." name))
     (+ (* static-syms (pad-data-block symbol-size))
        (pad-data-block (1- symbol-size))
-       (- list-pointer-type)
+       (- list-pointer-lowtag)
        (* static-function-index (pad-data-block fdefn-size))
        (* fdefn-raw-addr-slot word-bytes))))

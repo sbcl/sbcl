@@ -36,7 +36,7 @@
     ;; list, because this is a :fast-safe vop.
     LOOP
     ;; Get the CDR and boost the count.
-    (loadw ptr ptr cons-cdr-slot list-pointer-type)
+    (loadw ptr ptr cons-cdr-slot list-pointer-lowtag)
     (inst add count (fixnumize 1))
     ;; If we hit NIL, then we are done.
     (inst cmp ptr nil-value)
@@ -45,7 +45,7 @@
     ;; not, loop back for more.
     (move eax ptr)
     (inst and al-tn lowtag-mask)
-    (inst cmp al-tn list-pointer-type)
+    (inst cmp al-tn list-pointer-lowtag)
     (inst jmp :e loop)
     ;; It's dotted all right. Flame out.
     (error-call vop object-not-list-error ptr)
@@ -72,7 +72,7 @@
     (inst jmp :e done)
     ;; Indirect the next cons cell, and boost the count.
     LOOP
-    (loadw ptr ptr cons-cdr-slot list-pointer-type)
+    (loadw ptr ptr cons-cdr-slot list-pointer-lowtag)
     (inst add count (fixnumize 1))
     ;; If we aren't done, go back for more.
     (inst cmp ptr nil-value)

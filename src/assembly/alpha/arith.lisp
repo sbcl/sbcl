@@ -52,11 +52,11 @@
   (inst bis temp2 bignum-type temp2)
   
   (pseudo-atomic (:extra (pad-data-block (+ bignum-digits-offset 3)))
-    (inst bis alloc-tn other-pointer-type res)
-    (storew temp2 res 0 other-pointer-type)
-    (storew temp3 res bignum-digits-offset other-pointer-type)
+    (inst bis alloc-tn other-pointer-lowtag res)
+    (storew temp2 res 0 other-pointer-lowtag)
+    (storew temp3 res bignum-digits-offset other-pointer-lowtag)
     (inst srl temp3 32 temp)
-    (storew temp res (1+ bignum-digits-offset) other-pointer-type))
+    (storew temp res (1+ bignum-digits-offset) other-pointer-lowtag))
   DONE
   (lisp-return lra lip :offset 2)
 
@@ -109,11 +109,11 @@
   (inst bis temp2 bignum-type temp2)
   
   (pseudo-atomic (:extra (pad-data-block (+ bignum-digits-offset 3)))
-    (inst bis alloc-tn other-pointer-type res)
-    (storew temp2 res 0 other-pointer-type)
-    (storew temp3 res bignum-digits-offset other-pointer-type)
+    (inst bis alloc-tn other-pointer-lowtag res)
+    (storew temp2 res 0 other-pointer-lowtag)
+    (storew temp3 res bignum-digits-offset other-pointer-lowtag)
     (inst srl temp3 32 temp)
-    (storew temp res (1+ bignum-digits-offset) other-pointer-type))
+    (storew temp res (1+ bignum-digits-offset) other-pointer-lowtag))
   DONE
   (lisp-return lra lip :offset 2)
 
@@ -177,21 +177,21 @@
   (inst li (logior (ash 1 type-bits) bignum-type) temp2)
   ;; Allocate one word.
   (pseudo-atomic (:extra (pad-data-block (1+ bignum-digits-offset)))
-    (inst bis alloc-tn other-pointer-type res)
-    (storew temp2 res 0 other-pointer-type))
+    (inst bis alloc-tn other-pointer-lowtag res)
+    (storew temp2 res 0 other-pointer-lowtag))
   ;; Store one word
-  (storew lo res bignum-digits-offset other-pointer-type)
+  (storew lo res bignum-digits-offset other-pointer-lowtag)
   ;; Out of here
   (lisp-return lra lip :offset 2)
 
   TWO-WORDS
   ;; Allocate two words.
   (pseudo-atomic (:extra (pad-data-block (+ 2 bignum-digits-offset)))
-    (inst bis alloc-tn other-pointer-type res)
-    (storew temp2 res 0 other-pointer-type))
+    (inst bis alloc-tn other-pointer-lowtag res)
+    (storew temp2 res 0 other-pointer-lowtag))
   ;; Store two words.
-  (storew lo res bignum-digits-offset other-pointer-type)
-  (storew hi res (1+ bignum-digits-offset) other-pointer-type)
+  (storew lo res bignum-digits-offset other-pointer-lowtag)
+  (storew hi res (1+ bignum-digits-offset) other-pointer-lowtag)
   ;; out of here
   (lisp-return lra lip :offset 2)
 

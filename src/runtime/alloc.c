@@ -27,7 +27,7 @@
 #define SET_GC_TRIGGER(new_value) \
     clear_auto_gc_trigger(); set_auto_gc_trigger(new_value);
 
-#define ALIGNED_SIZE(n) (n+lowtag_Mask) & ~lowtag_Mask
+#define ALIGNED_SIZE(n) (n+LOWTAG_MASK) & ~LOWTAG_MASK
 
 #if defined GENCGC
 extern lispobj *alloc(int bytes);
@@ -38,7 +38,7 @@ alloc(int bytes)
     lispobj *result;
 
     /* Round to dual word boundary. */
-    bytes = (bytes + lowtag_Mask) & ~lowtag_Mask;
+    bytes = (bytes + LOWTAG_MASK) & ~LOWTAG_MASK;
 
     result = GET_FREE_POINTER();
 
@@ -58,7 +58,7 @@ alloc_unboxed(int type, int words)
     lispobj *result;
 
     result = alloc(ALIGNED_SIZE((1 + words) * sizeof(lispobj)));
-    *result = (lispobj) (words << type_Bits) | type;
+    *result = (lispobj) (words << N_TYPE_BITS) | type;
     return result;
 }
 
@@ -73,7 +73,7 @@ alloc_vector(int type, int length, int size)
     result->header = type;
     result->length = make_fixnum(length);
 
-    return ((lispobj)result)|type_OtherPointer;
+    return ((lispobj)result)|OTHER_POINTER_LOWTAG;
 }
 
 lispobj
@@ -84,7 +84,7 @@ alloc_cons(lispobj car, lispobj cdr)
     ptr->car = car;
     ptr->cdr = cdr;
 
-    return (lispobj)ptr | type_ListPointer;
+    return (lispobj)ptr | LIST_POINTER_LOWTAG;
 }
 
 lispobj
@@ -99,7 +99,7 @@ alloc_number(long n)
 
         ptr->digits[0] = n;
 
-	return (lispobj) ptr | type_OtherPointer;
+	return (lispobj) ptr | OTHER_POINTER_LOWTAG;
     }
 }
 
@@ -124,5 +124,5 @@ alloc_sap(void *ptr)
     struct sap *sap =
 	(struct sap *)alloc_unboxed((int)type_Sap, n_words_to_alloc);
     sap->pointer = ptr;
-    return (lispobj) sap | type_OtherPointer;
+    return (lispobj) sap | OTHER_POINTER_LOWTAG;
 }

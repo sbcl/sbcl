@@ -36,26 +36,21 @@
  * problem.. */
 #define QSHOW_SIGNALS 0
 
-/* FIXME: There seems to be no reason that LowtagOf can't be defined
- * as a (possibly inline) function instead of a macro. It would also
- * be reasonable to rename the constants in ALL CAPS. */
-
-#define lowtag_Bits 3
-#define lowtag_Mask ((1<<lowtag_Bits)-1)
-#define LowtagOf(obj) ((obj)&lowtag_Mask)
-#define type_Bits 8
-#define type_Mask ((1<<type_Bits)-1)
+#define N_LOWTAG_BITS 3
+#define LOWTAG_MASK ((1<<N_LOWTAG_BITS)-1)
+#define N_TYPE_BITS 8
+#define TYPE_MASK ((1<<N_TYPE_BITS)-1)
 
 /* FIXME: There seems to be no reason that TypeOf, HeaderValue, CONS,
  * SYMBOL, and FDEFN can't be defined as (possibly inline) functions
  * instead of macros. */
 
-#define TypeOf(obj) ((obj)&type_Mask)
-#define HeaderValue(obj) ((unsigned long) ((obj)>>type_Bits))
+#define TypeOf(obj) ((obj)&TYPE_MASK)
+#define HeaderValue(obj) ((unsigned long) ((obj)>>N_TYPE_BITS))
 
-#define CONS(obj) ((struct cons *)((obj)-type_ListPointer))
-#define SYMBOL(obj) ((struct symbol *)((obj)-type_OtherPointer))
-#define FDEFN(obj) ((struct fdefn *)((obj)-type_OtherPointer))
+#define CONS(obj) ((struct cons *)((obj)-LIST_POINTER_LOWTAG))
+#define SYMBOL(obj) ((struct symbol *)((obj)-OTHER_POINTER_LOWTAG))
+#define FDEFN(obj) ((struct fdefn *)((obj)-OTHER_POINTER_LOWTAG))
 
 /* KLUDGE: These are in theory machine-dependent and OS-dependent, but
  * in practice the "foo int" definitions work for all the machines
@@ -73,6 +68,11 @@ typedef signed int s32;
 
 typedef u32 lispobj;
 
+static inline int
+lowtagof(lispobj obj) {
+    return obj & LOWTAG_MASK;
+}
+
 /* Is the Lisp object obj something with pointer nature (as opposed to
  * e.g. a fixnum or character or unbound marker)? */
 static inline int
@@ -86,7 +86,7 @@ is_lisp_pointer(lispobj obj)
 static inline lispobj
 native_pointer(lispobj obj)
 {
-    return obj & ~lowtag_Mask;
+    return obj & ~LOWTAG_MASK;
 }
 
 /* FIXME: There seems to be no reason that make_fixnum and fixnum_value
@@ -102,14 +102,14 @@ typedef int boolean;
  * instead of macros. */
 
 #define SymbolValue(sym) \
-    (((struct symbol *)((sym)-type_OtherPointer))->value)
+    (((struct symbol *)((sym)-OTHER_POINTER_LOWTAG))->value)
 #define SetSymbolValue(sym,val) \
-    (((struct symbol *)((sym)-type_OtherPointer))->value = (val))
+    (((struct symbol *)((sym)-OTHER_POINTER_LOWTAG))->value = (val))
 
 /* This only works for static symbols. */
 /* FIXME: should be called StaticSymbolFunction, right? */
 #define SymbolFunction(sym) \
-    (((struct fdefn *)(SymbolValue(sym)-type_OtherPointer))->fun)
+    (((struct fdefn *)(SymbolValue(sym)-OTHER_POINTER_LOWTAG))->fun)
 
 /* KLUDGE: As far as I can tell there's no ANSI C way of saying
  * "this function never returns". This is the way that you do it

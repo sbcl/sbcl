@@ -179,13 +179,13 @@
 	      (let ((size (* cons-size word-bytes)))
 		(funcall fun
 			 (make-lisp-obj (logior (sap-int current)
-						list-pointer-type))
-			 list-pointer-type
+						list-pointer-lowtag))
+			 list-pointer-lowtag
 			 size)
 		(setq current (sap+ current size))))
 	     ((eql header-type closure-header-type)
 	      (let* ((obj (make-lisp-obj (logior (sap-int current)
-						 fun-pointer-type)))
+						 fun-pointer-lowtag)))
 		     (size (round-to-dualword
 			    (* (the fixnum (1+ (get-closure-length obj)))
 			       word-bytes))))
@@ -193,7 +193,7 @@
 		(setq current (sap+ current size))))
 	     ((eq (room-info-kind info) :instance)
 	      (let* ((obj (make-lisp-obj
-			   (logior (sap-int current) instance-pointer-type)))
+			   (logior (sap-int current) instance-pointer-lowtag)))
 		     (size (round-to-dualword
 			    (* (+ (%instance-length obj) 1) word-bytes))))
 		(declare (fixnum size))
@@ -206,7 +206,7 @@
 		(setq current (sap+ current size))))
 	     (t
 	      (let* ((obj (make-lisp-obj
-			   (logior (sap-int current) other-pointer-type)))
+			   (logior (sap-int current) other-pointer-lowtag)))
 		     (size (ecase (room-info-kind info)
 			     (:fixed
 			      (aver (or (eql (room-info-length info)
@@ -446,8 +446,8 @@
 	       #.simple-array-complex-double-float-type)
 	      (incf non-descriptor-headers)
 	      (incf non-descriptor-bytes (- size word-bytes)))
-	     ((#.list-pointer-type
-	       #.instance-pointer-type
+	     ((#.list-pointer-lowtag
+	       #.instance-pointer-lowtag
 	       #.ratio-type
 	       #.complex-type
 	       #.simple-array-type
@@ -618,7 +618,7 @@
 				    "No debug info."))))
 		     (#.symbol-header-type
 		      (format stream "~&~S~%" obj))
-		     (#.list-pointer-type
+		     (#.list-pointer-lowtag
 		      (unless (gethash obj printed-conses)
 			(note-conses obj)
 			(let ((*print-circle* t)

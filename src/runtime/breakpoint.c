@@ -75,10 +75,10 @@ static lispobj find_code(os_context_t *context)
     lispobj code = *os_context_register_addr(context, reg_CODE);
     lispobj header;
 
-    if (LowtagOf(code) != type_OtherPointer)
+    if (lowtagof(code) != OTHER_POINTER_LOWTAG)
 	return NIL;
 
-    header = *(lispobj *)(code-type_OtherPointer);
+    header = *(lispobj *)(code-OTHER_POINTER_LOWTAG);
 
     if (TypeOf(header) == type_CodeHeader)
 	return code;
@@ -99,7 +99,7 @@ static lispobj find_code(os_context_t *context)
   if (codeptr == 0) {
       return NIL;
   } else {
-      return codeptr + type_OtherPointer;
+      return codeptr + OTHER_POINTER_LOWTAG;
   }
 }
 #endif
@@ -196,7 +196,7 @@ void *handle_fun_end_breakpoint(int signal, siginfo_t *info,
     }
 #endif
     undo_fake_foreign_function_call(context);
-    return (void *)(lra-type_OtherPointer+sizeof(lispobj));
+    return (void *)(lra-OTHER_POINTER_LOWTAG+sizeof(lispobj));
 }
 #else
 void *handle_fun_end_breakpoint(int signal, siginfo_t *info,

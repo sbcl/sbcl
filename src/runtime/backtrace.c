@@ -113,8 +113,8 @@ call_info_from_context(struct call_info *info, os_context_t *context)
     unsigned long pc;
 
     info->interrupted = 1;
-    if (LowtagOf(*os_context_register_addr(context, reg_CODE))
-	== type_FunPointer) {
+    if (lowtagof(*os_context_register_addr(context, reg_CODE))
+	== FUN_POINTER_LOWTAG) {
         /* We tried to call a function, but crapped out before $CODE could
          * be fixed up. Probably an undefined function. */
         info->frame =
@@ -207,7 +207,7 @@ backtrace(int nframes)
         if (info.code != (struct code *) 0) {
             lispobj function;
 
-            printf("CODE: 0x%08X, ", (unsigned long) info.code | type_OtherPointer);
+            printf("CODE: 0x%08X, ", (unsigned long) info.code | OTHER_POINTER_LOWTAG);
 
 #ifndef alpha
             function = info.code->entry_points;
@@ -221,7 +221,7 @@ backtrace(int nframes)
                 header = (struct simple_fun *) native_pointer(function);
                 name = header->name;
 
-                if (LowtagOf(name) == type_OtherPointer) {
+                if (lowtagof(name) == OTHER_POINTER_LOWTAG) {
                     lispobj *object;
 
                     object = (lispobj *) native_pointer(name);

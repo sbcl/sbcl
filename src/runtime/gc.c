@@ -127,7 +127,7 @@ copy_object(lispobj object, int nwords)
 	gc_assert((nwords & 0x01) == 0);
 
 	/* get tag of object */
-	tag = LowtagOf(object);
+	tag = lowtagof(object);
 
 	/* allocate space */
 	new = new_space_free_pointer;
@@ -495,7 +495,7 @@ scavenge_interrupt_context(os_context_t *context)
 		index = boxed_registers[i];
 		reg = *os_context_register_addr(context, index);
 		/* would be using PTR if not for integer length issues */
-		if ((reg & ~((1L<<lowtag_Bits)-1)) <= lip) {
+		if ((reg & ~((1L<<N_LOWTAG_BITS)-1)) <= lip) {
 			offset = lip - reg;
 			if (offset < lip_offset) {
 				lip_offset = offset;
@@ -584,20 +584,20 @@ print_garbage(lispobj *from_space, lispobj *from_space_free_pointer)
 			int tag;
 			lispobj *pointer;
 
-			tag = LowtagOf(object);
+			tag = lowtagof(object);
 
 			switch (tag) {
-			case type_ListPointer:
+			case LIST_POINTER_LOWTAG:
 				nwords = 2;
 				break;
-			case type_InstancePointer:
+			case INSTANCE_POINTER_LOWTAG:
 				printf("Don't know about instances yet!\n");
 				nwords = 1;
 				break;
-			case type_FunPointer:
+			case FUN_POINTER_LOWTAG:
 				nwords = 1;
 				break;
-			case type_OtherPointer:
+			case OTHER_POINTER_LOWTAG:
 				pointer = (lispobj *) native_pointer(object);
 				header = *pointer;
 				type = TypeOf(header);
@@ -620,10 +620,8 @@ print_garbage(lispobj *from_space, lispobj *from_space_free_pointer)
 
 /* code and code-related objects */
 
-/* FIXME: (1) Shouldn't this be defined in sbcl.h? (2) Shouldn't it
- * be in the same units as FDEFN_RAW_ADDR_OFFSET? (This is measured
- * in words, that's measured in bytes. Gotta love CMU CL..) */
-#define FUN_RAW_ADDR_OFFSET (6*sizeof(lispobj) - type_FunPointer)
+/* FIXME: Shouldn't this be defined in sbcl.h? */
+#define FUN_RAW_ADDR_OFFSET (6*sizeof(lispobj) - FUN_POINTER_LOWTAG)
 
 static lispobj trans_fun_header(lispobj object);
 static lispobj trans_boxed(lispobj object);
@@ -692,7 +690,7 @@ trans_code(struct code *code)
 	gc_assert(TypeOf(first) == type_CodeHeader);
 
 	/* prepare to transport the code vector */
-	l_code = (lispobj) LOW_WORD(code) | type_OtherPointer;
+	l_code = (lispobj) LOW_WORD(code) | OTHER_POINTER_LOWTAG;
 
 	ncode_words = fixnum_value(code->code_size);
 	nheader_words = HeaderValue(code->header);
@@ -806,7 +804,7 @@ trans_code_header(lispobj object)
 	struct code *ncode;
 
 	ncode = trans_code((struct code *) native_pointer(object));
-	return (lispobj) LOW_WORD(ncode) | type_OtherPointer;
+	return (lispobj) LOW_WORD(ncode) | OTHER_POINTER_LOWTAG;
 }
 
 static int
@@ -855,7 +853,7 @@ trans_return_pc_header(lispobj object)
 	if(object==0x304748d7) {
 	    /* monitor_or_something(); */
 	}
-	ret= ((lispobj) LOW_WORD(ncode) + offset) | type_OtherPointer;
+	ret= ((lispobj) LOW_WORD(ncode) + offset) | OTHER_POINTER_LOWTAG;
 #ifdef DEBUG_CODE_GC
 	printf("trans_return_pc_header returning %x\n",ret);
 #endif
@@ -908,7 +906,7 @@ trans_fun_header(lispobj object)
 	code = (struct code *) ((unsigned long) fheader - offset);
 	ncode = trans_code(code);
 
-	return ((lispobj) LOW_WORD(ncode) + offset) | type_FunPointer;
+	return ((lispobj) LOW_WORD(ncode) + offset) | FUN_POINTER_LOWTAG;
 }
 
 
@@ -975,7 +973,7 @@ trans_list(lispobj object)
 
 		cdr = cons->cdr;
 
-                if (LowtagOf(cdr) != type_ListPointer ||
+                if (lowtagof(cdr) != LIST_POINTER_LOWTAG ||
                     !from_space_p(cdr) ||
                     (is_lisp_pointer(first = *(lispobj *)native_pointer(cdr))
 		     && new_space_p(first)))
@@ -1208,7 +1206,7 @@ static int
 scav_vector(lispobj *where, lispobj object)
 {
     if (HeaderValue(object) == subtype_VectorValidHashing)
-        *where = (subtype_VectorMustRehash<<type_Bits) | type_SimpleVector;
+        *where = (subtype_VectorMustRehash<<N_TYPE_BITS) | type_SimpleVector;
 
     return 1;
 }
@@ -1901,14 +1899,14 @@ gc_init(void)
 	/* scavtab[i] = scav_immediate; */
 
 	for (i = 0; i < 32; i++) {
-		scavtab[type_EvenFixnum|(i<<3)] = scav_immediate;
-		scavtab[type_FunPointer|(i<<3)] = scav_fun_pointer;
-		/* OtherImmediate0 */
-		scavtab[type_ListPointer|(i<<3)] = scav_list_pointer;
-		scavtab[type_OddFixnum|(i<<3)] = scav_immediate;
-		scavtab[type_InstancePointer|(i<<3)] = scav_instance_pointer;
-		/* OtherImmediate1 */
-		scavtab[type_OtherPointer|(i<<3)] = scav_other_pointer;
+		scavtab[EVEN_FIXNUM_LOWTAG|(i<<3)] = scav_immediate;
+		scavtab[FUN_POINTER_LOWTAG|(i<<3)] = scav_fun_pointer;
+		/* skipping OTHER_IMMEDIATE_0_LOWTAG */
+		scavtab[LIST_POINTER_LOWTAG|(i<<3)] = scav_list_pointer;
+		scavtab[ODD_FIXNUM_LOWTAG|(i<<3)] = scav_immediate;
+		scavtab[INSTANCE_POINTER_LOWTAG|(i<<3)] =scav_instance_pointer;
+		/* skipping OTHER_IMMEDIATE_1_LOWTAG */
+		scavtab[OTHER_POINTER_LOWTAG|(i<<3)] = scav_other_pointer;
 	}
 
 	scavtab[type_Bignum] = scav_unboxed;
@@ -2072,14 +2070,14 @@ gc_init(void)
 		sizetab[i] = size_lose;
 
 	for (i = 0; i < 32; i++) {
-		sizetab[type_EvenFixnum|(i<<3)] = size_immediate;
-		sizetab[type_FunPointer|(i<<3)] = size_pointer;
-		/* OtherImmediate0 */
-		sizetab[type_ListPointer|(i<<3)] = size_pointer;
-		sizetab[type_OddFixnum|(i<<3)] = size_immediate;
-		sizetab[type_InstancePointer|(i<<3)] = size_pointer;
-		/* OtherImmediate1 */
-		sizetab[type_OtherPointer|(i<<3)] = size_pointer;
+		sizetab[EVEN_FIXNUM_LOWTAG|(i<<3)] = size_immediate;
+		sizetab[FUN_POINTER_LOWTAG|(i<<3)] = size_pointer;
+		/* skipping OTHER_IMMEDIATE_0_LOWTAG */
+		sizetab[LIST_POINTER_LOWTAG|(i<<3)] = size_pointer;
+		sizetab[ODD_FIXNUM_LOWTAG|(i<<3)] = size_immediate;
+		sizetab[INSTANCE_POINTER_LOWTAG|(i<<3)] = size_pointer;
+		/* skipping OTHER_IMMEDIATE_1_LOWTAG */
+		sizetab[OTHER_POINTER_LOWTAG|(i<<3)] = size_pointer;
 	}
 
 	sizetab[type_Bignum] = size_unboxed;

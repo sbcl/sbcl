@@ -73,7 +73,7 @@
 ;;;      meaning of FOP-FSET, and changed the layouts of various
 ;;;      internal compiler structures (e.g. DEFSTRUCT CLAMBDA)
 ;;; 18 = sbcl-0.pre7.39 swapped FUNCTION-POINTER-TYPE and
-;;;      INSTANCE-POINTER-TYPE low-level type codes to help with
+;;;      INSTANCE-POINTER-LOWTAG low-level type codes to help with
 ;;;      the PPC port
 ;;; (In 0.pre7.48, the low-level object layout of SYMBOL on the
 ;;; non-X86 ports changed. I forgot to bump the fasl version number:

@@ -29,7 +29,7 @@
   BIGNUM
 
   (with-fixed-allocation (ebx bignum-type (+ bignum-digits-offset 1))
-    (storew eax ebx bignum-digits-offset other-pointer-type))
+    (storew eax ebx bignum-digits-offset other-pointer-lowtag))
 
   (inst ret))
 
@@ -58,10 +58,10 @@
 
   ;; Two word bignum
   (with-fixed-allocation (ebx bignum-type (+ bignum-digits-offset 2))
-    (storew eax ebx bignum-digits-offset other-pointer-type))
+    (storew eax ebx bignum-digits-offset other-pointer-lowtag))
   (inst ret)
 
   ONE-WORD-BIGNUM
   (with-fixed-allocation (ebx bignum-type (+ bignum-digits-offset 1))
-    (storew eax ebx bignum-digits-offset other-pointer-type))
+    (storew eax ebx bignum-digits-offset other-pointer-lowtag))
   (inst ret))

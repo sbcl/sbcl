@@ -911,9 +911,9 @@
 		     (make-ea :dword :base eax
 			      :disp ,(if named
 					 '(- (* fdefn-raw-addr-slot word-bytes)
-					     other-pointer-type)
+					     other-pointer-lowtag)
 				       '(- (* closure-fun-slot word-bytes)
-					   fun-pointer-type))))
+					   fun-pointer-lowtag))))
 	       ,@(ecase return
 		   (:fixed
 		    '((default-unknown-values vop values nvals)))
@@ -1305,7 +1305,7 @@
       (inst lea dst (make-ea :dword :index ecx :scale 2))
       (pseudo-atomic
        (allocation dst dst node)
-       (inst lea dst (make-ea :byte :base dst :disp list-pointer-type))
+       (inst lea dst (make-ea :byte :base dst :disp list-pointer-lowtag))
        ;; Convert the count into a raw value, so that we can use the LOOP inst.
        (inst shr ecx 2)
        ;; Set decrement mode (successive args at lower addresses)
@@ -1319,26 +1319,27 @@
        ;; Compute a pointer to the next cons.
        (inst add dst (* cons-size word-bytes))
        ;; Store a pointer to this cons in the CDR of the previous cons.
-       (storew dst dst -1 list-pointer-type)
+       (storew dst dst -1 list-pointer-lowtag)
        (emit-label enter)
        ;; Grab one value and stash it in the car of this cons.
        (inst lods eax)
-       (storew eax dst 0 list-pointer-type)
+       (storew eax dst 0 list-pointer-lowtag)
        ;; Go back for more.
        (inst loop loop)
        ;; NIL out the last cons.
-       (storew nil-value dst 1 sb!vm:list-pointer-type))
+       (storew nil-value dst 1 sb!vm:list-pointer-lowtag))
       (emit-label done))))
 
-;;; Return the location and size of the more arg glob created by Copy-More-Arg.
-;;; Supplied is the total number of arguments supplied (originally passed in
-;;; ECX.)  Fixed is the number of non-rest arguments.
+;;; Return the location and size of the &MORE arg glob created by
+;;; COPY-MORE-Arg. SUPPLIED is the total number of arguments supplied
+;;; (originally passed in ECX). FIXED is the number of non-rest
+;;; arguments.
 ;;;
-;;; We must duplicate some of the work done by Copy-More-Arg, since at that
-;;; time the environment is in a pretty brain-damaged state, preventing this
-;;; info from being returned as values. What we do is compute
-;;; supplied - fixed, and return a pointer that many words below the current
-;;; stack top.
+;;; We must duplicate some of the work done by COPY-MORE-ARG, since at
+;;; that time the environment is in a pretty brain-damaged state,
+;;; preventing this info from being returned as values. What we do is
+;;; compute supplied - fixed, and return a pointer that many words
+;;; below the current stack top.
 (define-vop (more-arg-context)
   (:policy :fast-safe)
   (:translate sb!c::%more-arg-context)
@@ -1359,7 +1360,7 @@
     (unless (zerop fixed)
       (inst sub count (fixnumize fixed)))))
 
-;;; Signal wrong argument count error if Nargs isn't = to Count.
+;;; Signal wrong argument count error if NARGS isn't equal to COUNT.
 (define-vop (verify-argument-count)
   (:policy :fast-safe)
   (:translate sb!c::%verify-argument-count)

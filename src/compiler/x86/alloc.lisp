@@ -37,26 +37,26 @@
 			    ((control-stack)
 			     (move temp ,tn)
 			     temp))))
-		     (storew reg ,list ,slot sb!vm:list-pointer-type))))
+		     (storew reg ,list ,slot sb!vm:list-pointer-lowtag))))
 	     (let ((cons-cells (if star (1- num) num)))
 	       (pseudo-atomic
 		(allocation res (* (pad-data-block cons-size) cons-cells) node)
 		(inst lea res
-		      (make-ea :byte :base res :disp list-pointer-type))
+		      (make-ea :byte :base res :disp list-pointer-lowtag))
 		(move ptr res)
 		(dotimes (i (1- cons-cells))
 		  (store-car (tn-ref-tn things) ptr)
 		  (setf things (tn-ref-across things))
 		  (inst add ptr (pad-data-block cons-size))
 		  (storew ptr ptr (- cons-cdr-slot cons-size)
-			  list-pointer-type))
+			  list-pointer-lowtag))
 		(store-car (tn-ref-tn things) ptr)
 		(cond (star
 		       (setf things (tn-ref-across things))
 		       (store-car (tn-ref-tn things) ptr cons-cdr-slot))
 		      (t
 		       (storew nil-value ptr cons-cdr-slot
-			       list-pointer-type)))
+			       list-pointer-lowtag)))
 		(aver (null (tn-ref-across things)))))
 	     (move result res))))))
 
@@ -99,17 +99,17 @@
      ;;
      ;; FIXME: should have a check for overflow of static space
      (load-symbol-value temp sb!vm:*static-space-free-pointer*)
-     (inst lea result (make-ea :byte :base temp :disp other-pointer-type))
+     (inst lea result (make-ea :byte :base temp :disp other-pointer-lowtag))
      (inst add temp boxed)
      (inst add temp unboxed)
      (store-symbol-value temp sb!vm:*static-space-free-pointer*)
      (inst shl boxed (- type-bits word-shift))
      (inst or boxed code-header-type)
-     (storew boxed result 0 other-pointer-type)
-     (storew unboxed result code-code-size-slot other-pointer-type)
+     (storew boxed result 0 other-pointer-lowtag)
+     (storew unboxed result code-code-size-slot other-pointer-lowtag)
      (inst mov temp nil-value)
-     (storew temp result code-entry-points-slot other-pointer-type))
-    (storew temp result code-debug-info-slot other-pointer-type)))
+     (storew temp result code-entry-points-slot other-pointer-lowtag))
+    (storew temp result code-debug-info-slot other-pointer-lowtag)))
 
 (define-vop (allocate-dynamic-code-object)
   (:args (boxed-arg :scs (any-reg) :target boxed)
@@ -130,13 +130,13 @@
     (inst add result unboxed)
     (pseudo-atomic
      (allocation result result node)
-     (inst lea result (make-ea :byte :base result :disp other-pointer-type))
+     (inst lea result (make-ea :byte :base result :disp other-pointer-lowtag))
      (inst shl boxed (- type-bits word-shift))
      (inst or boxed code-header-type)
-     (storew boxed result 0 other-pointer-type)
-     (storew unboxed result code-code-size-slot other-pointer-type)
-     (storew nil-value result code-entry-points-slot other-pointer-type))
-    (storew nil-value result code-debug-info-slot other-pointer-type)))
+     (storew boxed result 0 other-pointer-lowtag)
+     (storew unboxed result code-code-size-slot other-pointer-lowtag)
+     (storew nil-value result code-entry-points-slot other-pointer-lowtag))
+    (storew nil-value result code-debug-info-slot other-pointer-lowtag)))
 
 (define-vop (make-fdefn)
   (:policy :fast-safe)
@@ -146,10 +146,10 @@
   (:node-var node)
   (:generator 37
     (with-fixed-allocation (result fdefn-type fdefn-size node)
-      (storew name result fdefn-name-slot other-pointer-type)
-      (storew nil-value result fdefn-fun-slot other-pointer-type)
+      (storew name result fdefn-name-slot other-pointer-lowtag)
+      (storew nil-value result fdefn-fun-slot other-pointer-lowtag)
       (storew (make-fixup (extern-alien-name "undefined_tramp") :foreign)
-	      result fdefn-raw-addr-slot other-pointer-type))))
+	      result fdefn-raw-addr-slot other-pointer-lowtag))))
 
 (define-vop (make-closure)
   (:args (function :to :save :scs (descriptor-reg)))
@@ -162,11 +162,11 @@
     (let ((size (+ length closure-info-offset)))
       (allocation result (pad-data-block size) node)
       (inst lea result
-	    (make-ea :byte :base result :disp fun-pointer-type))
+	    (make-ea :byte :base result :disp fun-pointer-lowtag))
       (storew (logior (ash (1- size) type-bits) closure-header-type)
-	      result 0 fun-pointer-type))
-    (loadw temp function closure-fun-slot fun-pointer-type)
-    (storew temp result closure-fun-slot fun-pointer-type))))
+	      result 0 fun-pointer-lowtag))
+    (loadw temp function closure-fun-slot fun-pointer-lowtag)
+    (storew temp result closure-fun-slot fun-pointer-lowtag))))
 
 ;;; The compiler likes to be able to directly make value cells.
 (define-vop (make-value-cell)
@@ -176,7 +176,7 @@
   (:generator 10
     (with-fixed-allocation
 	(result value-cell-header-type value-cell-size node))
-    (storew value result value-cell-value-slot other-pointer-type)))
+    (storew value result value-cell-value-slot other-pointer-lowtag)))
 
 ;;;; automatic allocators for primitive objects
 
@@ -231,8 +231,8 @@
   (:node-var node)
   (:generator 37
     (with-fixed-allocation (result symbol-header-type symbol-size node)
-      (storew name result symbol-name-slot other-pointer-type)
-      (storew unbound-marker-type result symbol-value-slot other-pointer-type)
+      (storew name result symbol-name-slot other-pointer-lowtag)
+      (storew unbound-marker-type result symbol-value-slot other-pointer-lowtag)
       ;; Set up a random hash value for the symbol. Perhaps the object
       ;; address could be used for even faster and smaller code!
       ;; FIXME: We don't mind the symbol hash not being repeatable, so
@@ -247,6 +247,6 @@
       ;; We want a positive fixnum for the hash value, so discard the LS bits.
       (inst shr temp 1)
       (inst and temp #xfffffffc)
-      (storew temp result symbol-hash-slot other-pointer-type)
-      (storew nil-value result symbol-plist-slot other-pointer-type)
-      (storew nil-value result symbol-package-slot other-pointer-type))))
+      (storew temp result symbol-hash-slot other-pointer-lowtag)
+      (storew nil-value result symbol-plist-slot other-pointer-lowtag)
+      (storew nil-value result symbol-package-slot other-pointer-lowtag))))

@@ -35,10 +35,10 @@
     (inst bne temp done)
     
     (inst and ptr lowtag-mask temp)
-    (inst xor temp list-pointer-type temp)
+    (inst xor temp list-pointer-lowtag temp)
     (inst bne temp not-list)
     
-    (loadw ptr ptr cons-cdr-slot list-pointer-type)
+    (loadw ptr ptr cons-cdr-slot list-pointer-lowtag)
     (inst addq count (fixnumize 1) count)
     (inst br zero-tn loop)
     

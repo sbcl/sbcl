@@ -75,13 +75,11 @@ static int later_count = 0;
 #define CEILING(x,y) (((x) + ((y) - 1)) & (~((y) - 1)))
 #define NWORDS(x,y) (CEILING((x),(y)) / (y))
 
-/* FIXME: (1) Shouldn't this be defined in sbcl.h? (2) Shouldn't it
- * be in the same units as FDEFN_RAW_ADDR_OFFSET? (This is measured
- * in words, that's measured in bytes. Gotta love CMU CL..) */
+/* FIXME: (1) Shouldn't this be defined in sbcl.h? */
 #ifdef sparc
 #define FUN_RAW_ADDR_OFFSET 0
 #else
-#define FUN_RAW_ADDR_OFFSET (6*sizeof(lispobj) - type_FunPointer)
+#define FUN_RAW_ADDR_OFFSET (6*sizeof(lispobj) - FUN_POINTER_LOWTAG)
 #endif
 
 static boolean
@@ -149,8 +147,8 @@ valid_dynamic_space_pointer(lispobj *pointer, lispobj *start_addr)
 
     /* Check that the object pointed to is consistent with the pointer
      * low tag. */
-    switch (LowtagOf((lispobj)pointer)) {
-    case type_FunPointer:
+    switch (lowtagof((lispobj)pointer)) {
+    case FUN_POINTER_LOWTAG:
 	/* Start_addr should be the enclosing code object, or a closure
 	 * header. */
 	switch (TypeOf(*start_addr)) {
@@ -159,7 +157,7 @@ valid_dynamic_space_pointer(lispobj *pointer, lispobj *start_addr)
 	    break;
 	case type_ClosureHeader:
 	case type_FuncallableInstanceHeader:
-	    if ((int)pointer != ((int)start_addr+type_FunPointer)) {
+	    if ((int)pointer != ((int)start_addr+FUN_POINTER_LOWTAG)) {
 		if (pointer_filter_verbose) {
 		    fprintf(stderr,"*Wf2: %x %x %x\n", (unsigned int) pointer, 
 			    (unsigned int) start_addr, *start_addr);
@@ -175,8 +173,8 @@ valid_dynamic_space_pointer(lispobj *pointer, lispobj *start_addr)
 	    return 0;
 	}
 	break;
-    case type_ListPointer:
-	if ((int)pointer != ((int)start_addr+type_ListPointer)) {
+    case LIST_POINTER_LOWTAG:
+	if ((int)pointer != ((int)start_addr+LIST_POINTER_LOWTAG)) {
 	    if (pointer_filter_verbose)
 		fprintf(stderr,"*Wl1: %x %x %x\n", (unsigned int) pointer, 
 			(unsigned int) start_addr, *start_addr);
@@ -199,8 +197,8 @@ valid_dynamic_space_pointer(lispobj *pointer, lispobj *start_addr)
 	    }
 	    return 0;
 	}
-    case type_InstancePointer:
-	if ((int)pointer != ((int)start_addr+type_InstancePointer)) {
+    case INSTANCE_POINTER_LOWTAG:
+	if ((int)pointer != ((int)start_addr+INSTANCE_POINTER_LOWTAG)) {
 	    if (pointer_filter_verbose) {
 		fprintf(stderr,"*Wi1: %x %x %x\n", (unsigned int) pointer, 
 			(unsigned int) start_addr, *start_addr);
@@ -215,8 +213,8 @@ valid_dynamic_space_pointer(lispobj *pointer, lispobj *start_addr)
 	    return 0;
 	}
 	break;
-    case type_OtherPointer:
-	if ((int)pointer != ((int)start_addr+type_OtherPointer)) {
+    case OTHER_POINTER_LOWTAG:
+	if ((int)pointer != ((int)start_addr+OTHER_POINTER_LOWTAG)) {
 	    if (pointer_filter_verbose) {
 		fprintf(stderr,"*Wo1: %x %x %x\n", (unsigned int) pointer, 
 			(unsigned int) start_addr, *start_addr);
@@ -370,7 +368,7 @@ setup_i386_stack_scav(lispobj *lowaddr, lispobj *base)
 			  MAX_STACK_RETURN_ADDRESSES);
 		valid_stack_ra_locations[num_valid_stack_ra_locations] = sp;
 		valid_stack_ra_code_objects[num_valid_stack_ra_locations++] =
-		    (lispobj *)((int)start_addr + type_OtherPointer);
+		    (lispobj *)((int)start_addr + OTHER_POINTER_LOWTAG);
 	    } else {
 		if (valid_dynamic_space_pointer((void *)thing, start_addr)) {
 		    gc_assert(num_valid_stack_locations < MAX_STACK_POINTERS);
@@ -466,7 +464,7 @@ ptrans_boxed(lispobj thing, lispobj header, boolean constant)
     bcopy(old, new, nwords * sizeof(lispobj));
 
     /* Deposit forwarding pointer. */
-    result = (lispobj)new | LowtagOf(thing);
+    result = (lispobj)new | lowtagof(thing);
     *old = result;
 
     /* Scavenge it. */
@@ -510,7 +508,7 @@ ptrans_instance(lispobj thing, lispobj header, boolean constant)
 	    bcopy(old, new, nwords * sizeof(lispobj));
 
 	    /* Deposit forwarding pointer. */
-	    result = (lispobj)new | LowtagOf(thing);
+	    result = (lispobj)new | lowtagof(thing);
 	    *old = result;
 
 	    /* Scavenge it. */
@@ -542,7 +540,7 @@ ptrans_fdefn(lispobj thing, lispobj header)
     bcopy(old, new, nwords * sizeof(lispobj));
 
     /* Deposit forwarding pointer. */
-    result = (lispobj)new | LowtagOf(thing);
+    result = (lispobj)new | lowtagof(thing);
     *old = result;
 
     /* Scavenge the function. */
@@ -572,7 +570,7 @@ ptrans_unboxed(lispobj thing, lispobj header)
     bcopy(old, new, nwords * sizeof(lispobj));
 
     /* Deposit forwarding pointer. */
-    result = (lispobj)new | LowtagOf(thing);
+    result = (lispobj)new | lowtagof(thing);
     *old = result;
 
     return result;
@@ -600,7 +598,7 @@ ptrans_vector(lispobj thing, int bits, int extra,
 
     bcopy(vector, new, nwords * sizeof(lispobj));
 
-    result = (lispobj)new | LowtagOf(thing);
+    result = (lispobj)new | lowtagof(thing);
     vector->header = result;
 
     if (boxed)
@@ -709,7 +707,7 @@ ptrans_code(lispobj thing)
     apply_code_fixups_during_purify(code,new);
 #endif
 
-    result = (lispobj)new | type_OtherPointer;
+    result = (lispobj)new | OTHER_POINTER_LOWTAG;
 
     /* Stick in a forwarding pointer for the code object. */
     *(lispobj *)code = result;
@@ -719,7 +717,7 @@ ptrans_code(lispobj thing)
          func != NIL;
          func = ((struct simple_fun *)native_pointer(func))->next) {
 
-        gc_assert(LowtagOf(func) == type_FunPointer);
+        gc_assert(lowtagof(func) == FUN_POINTER_LOWTAG);
 
         *(lispobj *)native_pointer(func) = result + (func - thing);
     }
@@ -742,7 +740,7 @@ ptrans_code(lispobj thing)
     for (func = new->entry_points;
          func != NIL;
          func = ((struct simple_fun *)native_pointer(func))->next) {
-        gc_assert(LowtagOf(func) == type_FunPointer);
+        gc_assert(lowtagof(func) == FUN_POINTER_LOWTAG);
         gc_assert(!dynamic_pointer_p(func));
 
 #ifdef __i386__
@@ -785,7 +783,7 @@ ptrans_func(lispobj thing, lispobj header)
         code =
 	    (native_pointer(thing) -
 	     (HeaderValue(function->header)*sizeof(lispobj))) |
-            type_OtherPointer;
+            OTHER_POINTER_LOWTAG;
 
         /* This will cause the function's header to be replaced with a 
          * forwarding pointer. */
@@ -816,7 +814,7 @@ ptrans_func(lispobj thing, lispobj header)
         bcopy(old, new, nwords * sizeof(lispobj));
 
         /* Deposit forwarding pointer. */
-        result = (lispobj)new | LowtagOf(thing);
+        result = (lispobj)new | lowtagof(thing);
         *old = result;
 
         /* Scavenge it. */
@@ -874,18 +872,18 @@ ptrans_list(lispobj thing, boolean constant)
         thing = new->cdr = old->cdr;
 
         /* Set up the forwarding pointer. */
-        *(lispobj *)old = ((lispobj)new) | type_ListPointer;
+        *(lispobj *)old = ((lispobj)new) | LIST_POINTER_LOWTAG;
 
         /* And count this cell. */
         length++;
-    } while (LowtagOf(thing) == type_ListPointer &&
+    } while (lowtagof(thing) == LIST_POINTER_LOWTAG &&
              dynamic_pointer_p(thing) &&
              !(forwarding_pointer_p(*(lispobj *)native_pointer(thing))));
 
     /* Scavenge the list we just copied. */
     pscav((lispobj *)orig, length * WORDS_PER_CONS, constant);
 
-    return ((lispobj)orig) | type_ListPointer;
+    return ((lispobj)orig) | LIST_POINTER_LOWTAG;
 }
 
 static lispobj
@@ -1046,7 +1044,7 @@ pscav_code(struct code*code)
     for (func = code->entry_points;
          func != NIL;
          func = ((struct simple_fun *)native_pointer(func))->next) {
-        gc_assert(LowtagOf(func) == type_FunPointer);
+        gc_assert(lowtagof(func) == FUN_POINTER_LOWTAG);
         gc_assert(!dynamic_pointer_p(func));
 
 #ifdef __i386__
@@ -1087,20 +1085,20 @@ pscav(lispobj *addr, int nwords, boolean constant)
                     thing = header;
                 else {
                     /* Nope, copy the object. */
-                    switch (LowtagOf(thing)) {
-                      case type_FunPointer:
+                    switch (lowtagof(thing)) {
+                      case FUN_POINTER_LOWTAG:
                         thing = ptrans_func(thing, header);
                         break;
 
-                      case type_ListPointer:
+                      case LIST_POINTER_LOWTAG:
                         thing = ptrans_list(thing, constant);
                         break;
 
-                      case type_InstancePointer:
+                      case INSTANCE_POINTER_LOWTAG:
                         thing = ptrans_instance(thing, header, constant);
                         break;
 
-                      case type_OtherPointer:
+                      case OTHER_POINTER_LOWTAG:
                         thing = ptrans_otherptr(thing, header, constant);
                         break;
 
@@ -1130,7 +1128,7 @@ pscav(lispobj *addr, int nwords, boolean constant)
 
               case type_SimpleVector:
                 if (HeaderValue(thing) == subtype_VectorValidHashing)
-                    *addr = (subtype_VectorMustRehash<<type_Bits) |
+                    *addr = (subtype_VectorMustRehash<<N_TYPE_BITS) |
                         type_SimpleVector;
                 count = 1;
                 break;

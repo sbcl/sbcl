@@ -618,7 +618,7 @@
 					 (- (+ (component-header-length)
 					       (or (label-position offset)
 						   0))
-					    other-pointer-type))))
+					    other-pointer-lowtag))))
 	(emit-dword segment (or offset 0)))))
 
 (defun emit-relative-fixup (segment fixup)
@@ -694,7 +694,7 @@
 			     (make-fixup nil
 					 :code-object
 					 (- (* (tn-offset thing) word-bytes)
-					    other-pointer-type))))))
+					    other-pointer-lowtag))))))
     (ea
      (let* ((base (ea-base thing))
 	    (index (ea-index thing))

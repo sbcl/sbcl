@@ -34,9 +34,9 @@
   (:generator 6
     (inst mov eax object)
     (inst and al-tn lowtag-mask)
-    (inst cmp al-tn other-pointer-type)
+    (inst cmp al-tn other-pointer-lowtag)
     (inst jmp :e other-ptr)
-    (inst cmp al-tn fun-pointer-type)
+    (inst cmp al-tn fun-pointer-lowtag)
     (inst jmp :e function-ptr)
 
     ;; Pick off structures and list pointers.
@@ -52,11 +52,11 @@
     (inst jmp done)
 
     FUNCTION-PTR
-    (load-type al-tn object (- sb!vm:fun-pointer-type))
+    (load-type al-tn object (- sb!vm:fun-pointer-lowtag))
     (inst jmp done)
 
     OTHER-PTR
-    (load-type al-tn object (- sb!vm:other-pointer-type))
+    (load-type al-tn object (- sb!vm:other-pointer-lowtag))
 
     DONE
     (inst movzx result al-tn)))
@@ -69,7 +69,7 @@
   (:results (result :scs (unsigned-reg)))
   (:result-types positive-fixnum)
   (:generator 6
-    (load-type temp function (- sb!vm:fun-pointer-type))
+    (load-type temp function (- sb!vm:fun-pointer-lowtag))
     (inst movzx result temp)))
 
 (define-vop (set-function-subtype)
@@ -86,7 +86,7 @@
   (:generator 6
     (move eax type)
     (inst mov
-	  (make-ea :byte :base function :disp (- fun-pointer-type))
+	  (make-ea :byte :base function :disp (- fun-pointer-lowtag))
 	  al-tn)
     (move result eax)))
 
@@ -97,7 +97,7 @@
   (:results (res :scs (unsigned-reg)))
   (:result-types positive-fixnum)
   (:generator 6
-    (loadw res x 0 other-pointer-type)
+    (loadw res x 0 other-pointer-lowtag)
     (inst shr res type-bits)))
 
 (define-vop (get-closure-length)
@@ -107,7 +107,7 @@
   (:results (res :scs (unsigned-reg)))
   (:result-types positive-fixnum)
   (:generator 6
-    (loadw res x 0 fun-pointer-type)
+    (loadw res x 0 fun-pointer-lowtag)
     (inst shr res type-bits)))
 
 (define-vop (set-header-data)
@@ -122,8 +122,8 @@
   (:generator 6
     (move eax data)
     (inst shl eax (- type-bits 2))
-    (inst mov al-tn (make-ea :byte :base x :disp (- other-pointer-type)))
-    (storew eax x 0 other-pointer-type)
+    (inst mov al-tn (make-ea :byte :base x :disp (- other-pointer-lowtag)))
+    (storew eax x 0 other-pointer-lowtag)
     (move res x)))
 
 (define-vop (make-fixnum)
@@ -196,10 +196,10 @@
   (:results (sap :scs (sap-reg) :from (:argument 0)))
   (:result-types system-area-pointer)
   (:generator 10
-    (loadw sap code 0 other-pointer-type)
+    (loadw sap code 0 other-pointer-lowtag)
     (inst shr sap type-bits)
     (inst lea sap (make-ea :byte :base code :index sap :scale 4
-			   :disp (- other-pointer-type)))))
+			   :disp (- other-pointer-lowtag)))))
 
 (define-vop (compute-function)
   (:args (code :scs (descriptor-reg) :to (:result 0))
@@ -207,11 +207,11 @@
   (:arg-types * positive-fixnum)
   (:results (func :scs (descriptor-reg) :from (:argument 0)))
   (:generator 10
-    (loadw func code 0 other-pointer-type)
+    (loadw func code 0 other-pointer-lowtag)
     (inst shr func type-bits)
     (inst lea func
 	  (make-ea :byte :base offset :index func :scale 4
-		   :disp (- fun-pointer-type other-pointer-type)))
+		   :disp (- fun-pointer-lowtag other-pointer-lowtag)))
     (inst add func code)))
 
 (define-vop (%simple-fun-self)
@@ -220,10 +220,10 @@
   (:args (function :scs (descriptor-reg)))
   (:results (result :scs (descriptor-reg)))
   (:generator 3
-    (loadw result function simple-fun-self-slot fun-pointer-type)
+    (loadw result function simple-fun-self-slot fun-pointer-lowtag)
     (inst lea result
 	  (make-ea :byte :base result
-		   :disp (- fun-pointer-type
+		   :disp (- fun-pointer-lowtag
 			    (* simple-fun-code-offset word-bytes))))))
 
 ;;; The closure function slot is a pointer to raw code on X86 instead
@@ -246,8 +246,8 @@
     (inst lea temp
 	  (make-ea :byte :base new-self
 		   :disp (- (ash simple-fun-code-offset word-shift)
-			    fun-pointer-type)))
-    (storew temp function simple-fun-self-slot fun-pointer-type)
+			    fun-pointer-lowtag)))
+    (storew temp function simple-fun-self-slot fun-pointer-lowtag)
     (move result new-self)))
 
 ;;; KLUDGE: This seems to be some kind of weird override of the way
@@ -296,4 +296,4 @@
   (:generator 0
     (inst inc (make-ea :dword :base count-vector
 		       :disp (- (* (+ vector-data-offset index) word-bytes)
-				other-pointer-type)))))
+				other-pointer-lowtag)))))

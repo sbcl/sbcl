@@ -30,9 +30,9 @@
   (inst and result (lognot sb!vm:lowtag-mask))
   (pseudo-atomic
    (allocation result result)
-   (inst lea result (make-ea :byte :base result :disp other-pointer-type))
-   (storew type result 0 other-pointer-type)
-   (storew length result vector-length-slot other-pointer-type))
+   (inst lea result (make-ea :byte :base result :disp other-pointer-lowtag))
+   (storew type result 0 other-pointer-lowtag)
+   (storew length result vector-length-slot other-pointer-lowtag))
   (inst ret))
 
 ;;;; Note: CMU CL had assembly language primitives for hashing strings,

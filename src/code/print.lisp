@@ -1574,7 +1574,7 @@
   (print-unreadable-object (object stream :identity t)
     (let ((lowtag (get-lowtag object)))
       (case lowtag
-	(#.sb!vm:other-pointer-type
+	(#.sb!vm:other-pointer-lowtag
 	  (let ((type (get-type object)))
 	    (case type
 	      (#.sb!vm:value-cell-header-type
@@ -1584,9 +1584,9 @@
 	       (write-string "unknown pointer object, type=" stream)
 	       (let ((*print-base* 16) (*print-radix* t))
 		 (output-integer type stream))))))
-	((#.sb!vm:fun-pointer-type
-	  #.sb!vm:instance-pointer-type
-	  #.sb!vm:list-pointer-type)
+	((#.sb!vm:fun-pointer-lowtag
+	  #.sb!vm:instance-pointer-lowtag
+	  #.sb!vm:list-pointer-lowtag)
 	 (write-string "unknown pointer object, type=" stream))
 	(t
 	 (case (get-type object)

@@ -61,14 +61,14 @@
   `(inst ldl ,reg
 	 (+ (static-symbol-offset ',symbol)
 	    (ash symbol-value-slot word-shift)
-	    (- other-pointer-type))
+	    (- other-pointer-lowtag))
 	 null-tn))
 
 (defmacro store-symbol-value (reg symbol)
   `(inst stl ,reg
 	 (+ (static-symbol-offset ',symbol)
 	    (ash symbol-value-slot word-shift)
-	    (- other-pointer-type))
+	    (- other-pointer-lowtag))
 	 null-tn))
 
 (defmacro load-type (target source &optional (offset 0))
@@ -88,7 +88,7 @@
   "Jump to the lisp function FUNCTION.  LIP is an interior-reg temporary."
   `(progn
      (inst lda ,lip (- (ash sb!vm:simple-fun-code-offset sb!vm:word-shift)
-			     sb!vm:fun-pointer-type)
+		       sb!vm:fun-pointer-lowtag)
 	    ,function)
      (move ,function code-tn)
      (inst jsr zero-tn ,lip 1)))
@@ -97,7 +97,7 @@
   "Return to RETURN-PC.  LIP is an interior-reg temporary."
   `(progn
      (inst lda ,lip  
-	   (- (* (1+ ,offset) word-bytes) other-pointer-type)
+	   (- (* (1+ ,offset) word-bytes) other-pointer-lowtag)
 	    ,return-pc)
      ,@(when frob-code
 	 `((move ,return-pc code-tn)))
@@ -170,9 +170,9 @@
 (defmacro with-fixed-allocation ((result-tn temp-tn type-code size)
 				 &body body)
   `(pseudo-atomic (:extra (pad-data-block ,size))
-     (inst bis alloc-tn other-pointer-type ,result-tn)
+     (inst bis alloc-tn other-pointer-lowtag ,result-tn)
      (inst li (logior (ash (1- ,size) type-bits) ,type-code) ,temp-tn)
-     (storew ,temp-tn ,result-tn 0 other-pointer-type)
+     (storew ,temp-tn ,result-tn 0 other-pointer-lowtag)
      ,@body))
 
 

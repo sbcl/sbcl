@@ -152,8 +152,8 @@
 (def!method print-object ((des descriptor) stream)
   (let ((lowtag (descriptor-lowtag des)))
     (print-unreadable-object (des stream :type t)
-      (cond ((or (= lowtag sb!vm:even-fixnum-type)
-		 (= lowtag sb!vm:odd-fixnum-type))
+      (cond ((or (= lowtag sb!vm:even-fixnum-lowtag)
+		 (= lowtag sb!vm:odd-fixnum-lowtag))
 	     (let ((unsigned (logior (ash (descriptor-high des)
 					  (1+ (- descriptor-low-bits
 						 sb!vm:lowtag-bits)))
@@ -164,8 +164,8 @@
 		       (if (> unsigned #x1FFFFFFF)
 			   (- unsigned #x40000000)
 			   unsigned))))
-	    ((or (= lowtag sb!vm:other-immediate-0-type)
-		 (= lowtag sb!vm:other-immediate-1-type))
+	    ((or (= lowtag sb!vm:other-immediate-0-lowtag)
+		 (= lowtag sb!vm:other-immediate-1-lowtag))
 	     (format stream
 		     "for other immediate: #X~X, type #b~8,'0B"
 		     (ash (descriptor-bits des) (- sb!vm:type-bits))
@@ -251,14 +251,14 @@
     (let ((lowtag (descriptor-lowtag des))
 	  (high (descriptor-high des))
 	  (low (descriptor-low des)))
-      (if (or (eql lowtag sb!vm:fun-pointer-type)
-	      (eql lowtag sb!vm:instance-pointer-type)
-	      (eql lowtag sb!vm:list-pointer-type)
-	      (eql lowtag sb!vm:other-pointer-type))
+      (if (or (eql lowtag sb!vm:fun-pointer-lowtag)
+	      (eql lowtag sb!vm:instance-pointer-lowtag)
+	      (eql lowtag sb!vm:list-pointer-lowtag)
+	      (eql lowtag sb!vm:other-pointer-lowtag))
 	(dolist (gspace (list *dynamic* *static* *read-only*)
 			(error "couldn't find a GSPACE for ~S" des))
-	  ;; This code relies on the fact that GSPACEs are aligned such that
-	  ;; the descriptor-low-bits low bits are zero.
+	  ;; This code relies on the fact that GSPACEs are aligned
+	  ;; such that the descriptor-low-bits low bits are zero.
 	  (when (and (>= high (ash (gspace-word-address gspace)
 				   (- sb!vm:word-shift descriptor-low-bits)))
 		     (<= high (ash (+ (gspace-word-address gspace)
@@ -523,7 +523,7 @@
   (let* ((bytes (/ (* element-bits length) sb!vm:byte-bits))
 	 (des (allocate-cold-descriptor gspace
 					(+ bytes sb!vm:word-bytes)
-					sb!vm:other-pointer-type)))
+					sb!vm:other-pointer-lowtag)))
     (write-memory des
 		  (make-other-immediate-descriptor (ash bytes
 							(- sb!vm:word-shift))
@@ -539,7 +539,7 @@
   (let* ((bytes (/ (* element-bits length) sb!vm:byte-bits))
 	 (des (allocate-cold-descriptor gspace
 					(+ bytes (* 2 sb!vm:word-bytes))
-					sb!vm:other-pointer-type)))
+					sb!vm:other-pointer-lowtag)))
     (write-memory des (make-other-immediate-descriptor 0 type))
     (write-wordindexed des
 		       sb!vm:vector-length-slot
@@ -725,7 +725,7 @@
 
 ;;; Allocate a cons cell in GSPACE and fill it in with CAR and CDR.
 (defun cold-cons (car cdr &optional (gspace *dynamic*))
-  (let ((dest (allocate-boxed-object gspace 2 sb!vm:list-pointer-type)))
+  (let ((dest (allocate-boxed-object gspace 2 sb!vm:list-pointer-lowtag)))
     (write-memory dest car)
     (write-wordindexed dest 1 cdr)
     dest))
@@ -830,7 +830,7 @@
   (let ((result (allocate-boxed-object *dynamic*
 				       ;; KLUDGE: Why 1+? -- WHN 19990901
 				       (1+ target-layout-length)
-				       sb!vm:instance-pointer-type)))
+				       sb!vm:instance-pointer-lowtag)))
     (write-memory result
 		  (make-other-immediate-descriptor target-layout-length
 						   sb!vm:instance-header-type))
@@ -1062,8 +1062,8 @@
 	 (result (make-descriptor (descriptor-high des)
 				  (+ (descriptor-low des)
 				     (* 2 sb!vm:word-bytes)
-				     (- sb!vm:list-pointer-type
-					sb!vm:other-pointer-type)))))
+				     (- sb!vm:list-pointer-lowtag
+					sb!vm:other-pointer-lowtag)))))
     (write-wordindexed des
 		       1
 		       (make-other-immediate-descriptor
@@ -1324,10 +1324,10 @@
   
 ;;; like CL:CAR, CL:CDR, and CL:NULL but for cold values
 (defun cold-car (des)
-  (aver (= (descriptor-lowtag des) sb!vm:list-pointer-type))
+  (aver (= (descriptor-lowtag des) sb!vm:list-pointer-lowtag))
   (read-wordindexed des sb!vm:cons-car-slot))
 (defun cold-cdr (des)
-  (aver (= (descriptor-lowtag des) sb!vm:list-pointer-type))
+  (aver (= (descriptor-lowtag des) sb!vm:list-pointer-lowtag))
   (read-wordindexed des sb!vm:cons-cdr-slot))
 (defun cold-null (des)
   (= (descriptor-bits des)
@@ -1339,7 +1339,7 @@
 (defun warm-fun-name (des)
   (let ((result
 	 (ecase (descriptor-lowtag des)
-	   (#.sb!vm:list-pointer-type
+	   (#.sb!vm:list-pointer-lowtag
 	    (aver (not (cold-null des))) ; function named NIL? please no..
 	    ;; Do cold (DESTRUCTURING-BIND (COLD-CAR COLD-CADR) DES ..).
 	    (let* ((car-des (cold-car des))
@@ -1349,7 +1349,7 @@
 	      (aver (cold-null cddr-des))
 	      (list (warm-symbol car-des)
 		    (warm-symbol cadr-des))))
-	   (#.sb!vm:other-pointer-type
+	   (#.sb!vm:other-pointer-lowtag
 	    (warm-symbol des)))))
     (unless (legal-function-name-p result)
       (error "not a legal function name: ~S" result))
@@ -1361,7 +1361,7 @@
     (or (gethash warm-name *cold-fdefn-objects*)
 	(let ((fdefn (allocate-boxed-object (or *cold-fdefn-gspace* *dynamic*)
 					    (1- sb!vm:fdefn-size)
-					    sb!vm:other-pointer-type)))
+					    sb!vm:other-pointer-lowtag)))
 
 	  (setf (gethash warm-name *cold-fdefn-objects*) fdefn)
 	  (write-memory fdefn (make-other-immediate-descriptor
@@ -1406,7 +1406,7 @@
     (dolist (sym sb!vm:*static-functions*)
       (let* ((fdefn (cold-fdefinition-object (cold-intern sym)))
 	     (offset (- (+ (- (descriptor-low fdefn)
-			      sb!vm:other-pointer-type)
+			      sb!vm:other-pointer-lowtag)
 			   (* sb!vm:fdefn-raw-addr-slot sb!vm:word-bytes))
 			(descriptor-low *nil-descriptor*)))
 	     (desired (sb!vm:static-function-offset sym)))
@@ -1765,7 +1765,7 @@
   (let* ((size (clone-arg))
 	 (result (allocate-boxed-object *dynamic*
 					(1+ size)
-					sb!vm:instance-pointer-type)))
+					sb!vm:instance-pointer-lowtag)))
     (write-memory result (make-other-immediate-descriptor
 			  size
 			  sb!vm:instance-header-type))
@@ -1986,7 +1986,7 @@
 	 (data-vector (pop-stack))
 	 (result (allocate-boxed-object *dynamic*
 					(+ sb!vm:array-dimensions-offset rank)
-					sb!vm:other-pointer-type)))
+					sb!vm:other-pointer-lowtag)))
     (write-memory result
 		  (make-other-immediate-descriptor rank
 						   sb!vm:simple-array-type))
@@ -1997,8 +1997,8 @@
     (let ((total-elements 1))
       (dotimes (axis rank)
 	(let ((dim (pop-stack)))
-	  (unless (or (= (descriptor-lowtag dim) sb!vm:even-fixnum-type)
-		      (= (descriptor-lowtag dim) sb!vm:odd-fixnum-type))
+	  (unless (or (= (descriptor-lowtag dim) sb!vm:even-fixnum-lowtag)
+		      (= (descriptor-lowtag dim) sb!vm:odd-fixnum-lowtag))
 	    (error "non-fixnum dimension? (~S)" dim))
 	  (setf total-elements
 		(* total-elements
@@ -2208,8 +2208,8 @@
     (write-wordindexed obj
 		   (+ idx
 		      (ecase (descriptor-lowtag obj)
-			(#.sb!vm:instance-pointer-type 1)
-			(#.sb!vm:other-pointer-type 2)))
+			(#.sb!vm:instance-pointer-lowtag 1)
+			(#.sb!vm:other-pointer-lowtag 2)))
 		   (pop-stack))))
 
 (define-cold-fop (fop-structset nil)
@@ -2272,7 +2272,7 @@
 					   (+ (ash header-n-words
 						   sb!vm:word-shift)
 					      code-size)
-					   sb!vm:other-pointer-type)))
+					   sb!vm:other-pointer-lowtag)))
        (write-memory des
 		     (make-other-immediate-descriptor header-n-words
 						      sb!vm:code-header-type))
@@ -2330,7 +2330,7 @@
 	 (offset (calc-offset code-object (read-arg 4)))
 	 (fn (descriptor-beyond code-object
 				offset
-				sb!vm:fun-pointer-type))
+				sb!vm:fun-pointer-lowtag))
 	 (next (read-wordindexed code-object sb!vm:code-entry-points-slot)))
     (unless (zerop (logand offset sb!vm:lowtag-mask))
       ;; FIXME: This should probably become a fatal error.
@@ -2377,7 +2377,7 @@
 			      ;; FIXME: We should mask out the type
 			      ;; bits, not assume we know what they
 			      ;; are and subtract them out this way.
-			      sb!vm:fun-pointer-type))))
+			      sb!vm:fun-pointer-lowtag))))
     (write-wordindexed fn sb!vm:simple-fun-next-slot next)
     (write-wordindexed fn sb!vm:simple-fun-name-slot name)
     (write-wordindexed fn sb!vm:simple-fun-arglist-slot arglist)
@@ -2405,7 +2405,7 @@
 					(+ (ash header-n-words
 						sb!vm:word-shift)
 					   length)
-					sb!vm:other-pointer-type)))
+					sb!vm:other-pointer-lowtag)))
     (write-memory des
 		  (make-other-immediate-descriptor header-n-words
 						   sb!vm:code-header-type))
@@ -2453,13 +2453,9 @@
 
 ;;;; emitting C header file
 
-(defun tail-comp (string tail)
+(defun tailwise-equal (string tail)
   (and (>= (length string) (length tail))
        (string= string tail :start1 (- (length string) (length tail)))))
-
-(defun head-comp (string head)
-  (and (>= (length string) (length head))
-       (string= string head :end1 (length head))))
 
 (defun write-c-header ()
 
@@ -2521,42 +2517,40 @@
 				 (symbol-value symbol)
 				 (documentation symbol 'variable))
 			   constants))
-		   ;; machinery for old-style CMU CL Lisp-to-C naming
+		   ;; machinery for old-style CMU CL Lisp-to-C
+		   ;; arbitrary renaming, being phased out in favor of
+		   ;; the newer systematic RECORD-WITH-TRANSLATED-NAME
+		   ;; renaming
 		   (record-with-munged-name (prefix string priority)
 		     (record (concatenate
 			      'simple-string
 			      prefix
 			      (delete #\- (string-capitalize string)))
 			     priority))
-		   (test-tail (tail prefix priority)
-		     (when (tail-comp name tail)
+		   (maybe-record-with-munged-name (tail prefix priority)
+		     (when (tailwise-equal name tail)
 		       (record-with-munged-name prefix
 						(subseq name 0
 							(- (length name)
 							   (length tail)))
 						priority)))
-		   (test-head (head prefix priority)
-		     (when (head-comp name head)
-		       (record-with-munged-name prefix
-						(subseq name (length head))
-						priority)))
 		   ;; machinery for new-style SBCL Lisp-to-C naming
 		   (record-with-translated-name (priority)
 		     (record (substitute #\_ #\- name)
-			     priority)))
-	    ;; This style of munging of names is used in the code
-	    ;; inherited from CMU CL.
-	    (test-tail "-TYPE" "type_" 0)
-	    (test-tail "-FLAG" "flag_" 1)
-	    (test-tail "-TRAP" "trap_" 2)
-	    (test-tail "-SUBTYPE" "subtype_" 3)
-	    (test-head "TRACE-TABLE-" "tracetab_" 4)
-	    (test-tail "-SC-NUMBER" "sc_" 5)
-	    ;; This simpler style of translation of names seems less
-	    ;; confusing, and is used for newer code.
-	    (when (some (lambda (suffix) (tail-comp name suffix))
-			#("-START" "-END"))
-	      (record-with-translated-name 6))))))
+			     priority))
+		   (maybe-record-with-translated-name (suffixes priority)
+                     (when (some (lambda (suffix)
+				   (tailwise-equal name suffix))
+				 suffixes)
+		       (record-with-translated-name priority))))
+
+	    (maybe-record-with-translated-name '("-LOWTAG") 0)
+	    (maybe-record-with-munged-name "-TYPE" "type_" 1)
+	    (maybe-record-with-munged-name "-FLAG" "flag_" 2)
+	    (maybe-record-with-munged-name "-TRAP" "trap_" 3)
+	    (maybe-record-with-munged-name "-SUBTYPE" "subtype_" 4)
+	    (maybe-record-with-munged-name "-SC-NUMBER" "sc_" 5)
+	    (maybe-record-with-translated-name '("-START" "-END") 6)))))
     (setf constants
 	  (sort constants
 		#'(lambda (const1 const2)
@@ -2658,7 +2652,7 @@
 	      ;; We didn't run GENESIS, so guess at the address.
 	      (+ sb!vm:static-space-start
 		 sb!vm:word-bytes
-		 sb!vm:other-pointer-type
+		 sb!vm:other-pointer-lowtag
 		 (if symbol (sb!vm:static-symbol-offset symbol) 0)))))
 
   ;; Voila.
@@ -3044,15 +3038,15 @@ initially undefined function references:~2%")
       (cold-set 'sb!vm:*read-only-space-free-pointer*
 		(allocate-cold-descriptor *read-only*
 					  0
-					  sb!vm:even-fixnum-type))
+					  sb!vm:even-fixnum-lowtag))
       (cold-set 'sb!vm:*static-space-free-pointer*
 		(allocate-cold-descriptor *static*
 					  0
-					  sb!vm:even-fixnum-type))
+					  sb!vm:even-fixnum-lowtag))
       (cold-set 'sb!vm:*initial-dynamic-space-free-pointer*
 		(allocate-cold-descriptor *dynamic*
 					  0
-					  sb!vm:even-fixnum-type))
+					  sb!vm:even-fixnum-lowtag))
       (/show "done setting free pointers")
 
       ;; Write results to files.

@@ -592,7 +592,7 @@
   (:emitter
    (emit-compute-inst segment vop dst src label temp
 		      #'(lambda (label posn delta-if-after)
-			  (- other-pointer-type
+			  (- other-pointer-lowtag
 			     (label-position label posn delta-if-after)
 			     (component-header-length))))))
 

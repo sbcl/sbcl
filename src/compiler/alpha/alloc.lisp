@@ -39,11 +39,11 @@
 			    (control-stack
 			     (load-stack-tn temp ,tn)
 			     temp))))
-		     (storew reg ,list ,slot list-pointer-type))))
+		     (storew reg ,list ,slot list-pointer-lowtag))))
 	     (let ((cons-cells (if star (1- num) num)))
 	       (pseudo-atomic (:extra (* (pad-data-block cons-size)
 					 cons-cells))
-		 (inst bis alloc-tn list-pointer-type res)
+		 (inst bis alloc-tn list-pointer-lowtag res)
 		 (move res ptr)
 		 (dotimes (i (1- cons-cells))
 		   (store-car (tn-ref-tn things) ptr)
@@ -51,14 +51,14 @@
 		   (inst lda ptr (pad-data-block cons-size) ptr)
 		   (storew ptr ptr
 			   (- cons-cdr-slot cons-size)
-			   list-pointer-type))
+			   list-pointer-lowtag))
 		 (store-car (tn-ref-tn things) ptr)
 		 (cond (star
 			(setf things (tn-ref-across things))
 			(store-car (tn-ref-tn things) ptr cons-cdr-slot))
 		       (t
 			(storew null-tn ptr
-				cons-cdr-slot list-pointer-type)))
+				cons-cdr-slot list-pointer-lowtag)))
 		 (assert (null (tn-ref-across things)))
 		 (move res result))))))))
 
@@ -89,14 +89,14 @@
     (inst bis ndescr code-header-type ndescr)
     
     (pseudo-atomic ()
-      (inst bis alloc-tn other-pointer-type result)
-      (storew ndescr result 0 other-pointer-type)
-      (storew unboxed result code-code-size-slot other-pointer-type)
-      (storew null-tn result code-entry-points-slot other-pointer-type)
+      (inst bis alloc-tn other-pointer-lowtag result)
+      (storew ndescr result 0 other-pointer-lowtag)
+      (storew unboxed result code-code-size-slot other-pointer-lowtag)
+      (storew null-tn result code-entry-points-slot other-pointer-lowtag)
       (inst addq alloc-tn boxed alloc-tn)
       (inst addq alloc-tn unboxed alloc-tn))
 
-    (storew null-tn result code-debug-info-slot other-pointer-type)))
+    (storew null-tn result code-debug-info-slot other-pointer-lowtag)))
 
 (define-vop (make-fdefn)
   (:policy :fast-safe)
@@ -106,10 +106,10 @@
   (:results (result :scs (descriptor-reg) :from :argument))
   (:generator 37
     (with-fixed-allocation (result temp fdefn-type fdefn-size)
-      (storew name result fdefn-name-slot other-pointer-type)
-      (storew null-tn result fdefn-fun-slot other-pointer-type)
+      (storew name result fdefn-name-slot other-pointer-lowtag)
+      (storew null-tn result fdefn-fun-slot other-pointer-lowtag)
       (inst li (make-fixup "undefined_tramp" :foreign) temp)
-      (storew temp result fdefn-raw-addr-slot other-pointer-type))))
+      (storew temp result fdefn-raw-addr-slot other-pointer-lowtag))))
 
 (define-vop (make-closure)
   (:args (function :to :save :scs (descriptor-reg)))
@@ -120,9 +120,9 @@
     (let ((size (+ length closure-info-offset)))
       (inst li (logior (ash (1- size) type-bits) closure-header-type) temp)
       (pseudo-atomic (:extra (pad-data-block size))
-	(inst bis alloc-tn fun-pointer-type result)
-	(storew temp result 0 fun-pointer-type))
-      (storew function result closure-fun-slot fun-pointer-type))))
+	(inst bis alloc-tn fun-pointer-lowtag result)
+	(storew temp result 0 fun-pointer-lowtag))
+      (storew function result closure-fun-slot fun-pointer-lowtag))))
 
 ;;; The compiler likes to be able to directly make value cells.
 ;;; 
@@ -133,7 +133,7 @@
   (:generator 10
     (with-fixed-allocation
 	(result temp value-cell-header-type value-cell-size))
-    (storew value result value-cell-value-slot other-pointer-type)))
+    (storew value result value-cell-value-slot other-pointer-lowtag)))
 
 
 ;;;; automatic allocators for primitive objects

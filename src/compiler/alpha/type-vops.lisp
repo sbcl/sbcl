@@ -28,7 +28,7 @@
   (collect ((results))
     (let ((start nil)
 	  (prev nil)
-	  (delta (- other-immediate-1-type other-immediate-0-type)))
+	  (delta (- other-immediate-1-lowtag other-immediate-0-lowtag)))
       (flet ((emit-test ()
 	       (results (if (= start prev)
 			    start
@@ -51,8 +51,8 @@
 (macrolet ((test-type (value temp target not-p &rest type-codes)
   ;; Determine what interesting combinations we need to test for.
   (let* ((type-codes (mapcar #'eval type-codes))
-	 (fixnump (and (member even-fixnum-type type-codes)
-		       (member odd-fixnum-type type-codes)
+	 (fixnump (and (member even-fixnum-lowtag type-codes)
+		       (member odd-fixnum-lowtag type-codes)
 		       t))
 	 (lowtags (remove lowtag-limit type-codes :test #'<))
 	 (extended (remove lowtag-limit type-codes :test #'>))
@@ -69,8 +69,8 @@
     (cond
      (fixnump
       (when (remove-if #'(lambda (x)
-			   (or (= x even-fixnum-type)
-			       (= x odd-fixnum-type)))
+			   (or (= x even-fixnum-lowtag)
+			       (= x odd-fixnum-lowtag)))
 		       lowtags)
 	(error "Can't mix fixnum testing with other lowtags."))
       (when function-p
@@ -141,7 +141,7 @@
 
 (defun %test-headers (value temp target not-p function-p headers
 			    &optional (drop-through (gen-label)))
-  (let ((lowtag (if function-p fun-pointer-type other-pointer-type)))
+  (let ((lowtag (if function-p fun-pointer-lowtag other-pointer-lowtag)))
     (multiple-value-bind
 	(when-true when-false)
 	;; WHEN-TRUE and WHEN-FALSE are the labels to branch to when
@@ -231,16 +231,16 @@
 
 
 (def-type-vops fixnump check-fixnum fixnum object-not-fixnum-error
-  even-fixnum-type odd-fixnum-type)
+  even-fixnum-lowtag odd-fixnum-lowtag)
 
 (def-type-vops functionp check-function function
-  object-not-function-error fun-pointer-type)
+  object-not-function-error fun-pointer-lowtag)
 
 (def-type-vops listp check-list list object-not-list-error
-  list-pointer-type)
+  list-pointer-lowtag)
 
 (def-type-vops %instancep check-instance instance object-not-instance-error
-  instance-pointer-type)
+  instance-pointer-lowtag)
 
 (def-type-vops bignump check-bignum bignum
   object-not-bignum-error bignum-type)
@@ -436,21 +436,21 @@
   complex-array-type)
 
 (def-type-vops numberp check-number nil object-not-number-error
-  even-fixnum-type odd-fixnum-type bignum-type ratio-type
+  even-fixnum-lowtag odd-fixnum-lowtag bignum-type ratio-type
   single-float-type double-float-type complex-type
   complex-single-float-type complex-double-float-type)
 
 (def-type-vops rationalp check-rational nil object-not-rational-error
-  even-fixnum-type odd-fixnum-type ratio-type bignum-type)
+  even-fixnum-lowtag odd-fixnum-lowtag ratio-type bignum-type)
 
 (def-type-vops integerp check-integer nil object-not-integer-error
-  even-fixnum-type odd-fixnum-type bignum-type)
+  even-fixnum-lowtag odd-fixnum-lowtag bignum-type)
 
 (def-type-vops floatp check-float nil object-not-float-error
   single-float-type double-float-type)
 
 (def-type-vops realp check-real nil object-not-real-error
-  even-fixnum-type odd-fixnum-type ratio-type bignum-type
+  even-fixnum-lowtag odd-fixnum-lowtag ratio-type bignum-type
   single-float-type double-float-type)
 
 
@@ -470,9 +470,9 @@
       (inst and value 3 temp)
       (inst beq temp yep)
       (inst and value lowtag-mask temp)
-      (inst xor temp other-pointer-type temp)
+      (inst xor temp other-pointer-lowtag temp)
       (inst bne temp nope)
-      (loadw temp value 0 other-pointer-type)
+      (loadw temp value 0 other-pointer-lowtag)
       (inst li (+ (ash 1 type-bits) bignum-type) temp1)
       (inst xor temp temp1 temp)
       (if not-p
@@ -513,10 +513,10 @@
 
       ;; If not, is it an other pointer?
       (inst and value lowtag-mask temp)
-      (inst xor temp other-pointer-type temp)
+      (inst xor temp other-pointer-lowtag temp)
       (inst bne temp nope)
       ;; Get the header.
-      (loadw temp value 0 other-pointer-type)
+      (loadw temp value 0 other-pointer-lowtag)
       ;; Is it one?
       (inst li  (+ (ash 1 type-bits) bignum-type) temp1)
       (inst xor temp temp1 temp)
@@ -528,14 +528,14 @@
       (inst xor temp temp1 temp)
       (inst bne temp nope)
       ;; Get the second digit.
-      (loadw temp value (1+ bignum-digits-offset) other-pointer-type)
+      (loadw temp value (1+ bignum-digits-offset) other-pointer-lowtag)
       ;; All zeros, its an (unsigned-byte 32).
       (inst beq temp yep)
       (inst br zero-tn nope)
 	
       SINGLE-WORD
       ;; Get the single digit.
-      (loadw temp value bignum-digits-offset other-pointer-type)
+      (loadw temp value bignum-digits-offset other-pointer-lowtag)
 
       ;; positive implies (unsigned-byte 32).
       FIXNUM
@@ -592,7 +592,7 @@
   (:generator 8
     (inst cmpeq value null-tn temp)
     (inst bne temp (if not-p target drop-thru))
-    (test-type value temp target not-p list-pointer-type)
+    (test-type value temp target not-p list-pointer-lowtag)
     DROP-THRU))
 
 (define-vop (check-cons check-type)
@@ -601,7 +601,7 @@
     (let ((error (generate-error-code vop object-not-cons-error value)))
       (inst cmpeq value null-tn temp)
       (inst bne temp error)
-      (test-type value temp error t list-pointer-type))
+      (test-type value temp error t list-pointer-lowtag))
     (move value result)))
 
 ) ; MACROLET

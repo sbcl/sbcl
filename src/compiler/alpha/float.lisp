@@ -67,8 +67,8 @@
   (:generator 13
     (with-fixed-allocation (y ndescr type size)
       (if double-p
-	  (inst stt x (- (* data word-bytes) other-pointer-type) y)
-	  (inst sts x (- (* data word-bytes) other-pointer-type) y)))))
+	  (inst stt x (- (* data word-bytes) other-pointer-lowtag) y)
+	  (inst sts x (- (* data word-bytes) other-pointer-lowtag) y)))))
 
 (macrolet ((frob (name sc &rest args)
 	     `(progn
@@ -91,10 +91,10 @@
 		  (:generator 2
                     ,@(if double-p
 			  `((inst ldt y (- (* ,value word-bytes)
-					   other-pointer-type)
+					   other-pointer-lowtag)
 				  x))
 			  `((inst lds y (- (* ,value word-bytes)
-					  other-pointer-type)
+					  other-pointer-lowtag)
 				 x)))))
 		(define-move-vop ,name :move (descriptor-reg) (,sc)))))
   (frob move-to-single single-reg nil single-float-value-slot)
@@ -234,12 +234,12 @@
        (let ((real-tn (complex-single-reg-real-tn x)))
 	 (inst sts real-tn (- (* sb!vm:complex-single-float-real-slot
 				 sb!vm:word-bytes)
-			      sb!vm:other-pointer-type)
+			      sb!vm:other-pointer-lowtag)
 	       y))
        (let ((imag-tn (complex-single-reg-imag-tn x)))
 	 (inst sts imag-tn (- (* sb!vm:complex-single-float-imag-slot
 				 sb!vm:word-bytes)
-			      sb!vm:other-pointer-type)
+			      sb!vm:other-pointer-lowtag)
 	       y)))))
 ;;;
 (define-move-vop move-from-complex-single :move
@@ -256,12 +256,12 @@
        (let ((real-tn (complex-double-reg-real-tn x)))
 	 (inst stt real-tn (- (* sb!vm:complex-double-float-real-slot
 				 sb!vm:word-bytes)
-			      sb!vm:other-pointer-type)
+			      sb!vm:other-pointer-lowtag)
 	       y))
        (let ((imag-tn (complex-double-reg-imag-tn x)))
 	 (inst stt imag-tn (- (* sb!vm:complex-double-float-imag-slot
 				 sb!vm:word-bytes)
-			      sb!vm:other-pointer-type)
+			      sb!vm:other-pointer-lowtag)
 	       y)))))
 ;;;
 (define-move-vop move-from-complex-double :move
@@ -277,11 +277,11 @@
   (:generator 2
     (let ((real-tn (complex-single-reg-real-tn y)))
       (inst lds real-tn (- (* complex-single-float-real-slot sb!vm:word-bytes)
-			   sb!vm:other-pointer-type)
+			   sb!vm:other-pointer-lowtag)
 	    x))
     (let ((imag-tn (complex-single-reg-imag-tn y)))
       (inst lds imag-tn (- (* complex-single-float-imag-slot sb!vm:word-bytes)
-			   sb!vm:other-pointer-type)
+			   sb!vm:other-pointer-lowtag)
 	    x))))
 (define-move-vop move-to-complex-single :move
   (descriptor-reg) (complex-single-reg))
@@ -293,11 +293,11 @@
   (:generator 2
     (let ((real-tn (complex-double-reg-real-tn y)))
       (inst ldt real-tn (- (* complex-double-float-real-slot sb!vm:word-bytes)
-			   sb!vm:other-pointer-type)
+			   sb!vm:other-pointer-lowtag)
 	    x))
     (let ((imag-tn (complex-double-reg-imag-tn y)))
       (inst ldt imag-tn (- (* complex-double-float-imag-slot sb!vm:word-bytes)
-			   sb!vm:other-pointer-type)
+			   sb!vm:other-pointer-lowtag)
 	    x))))
 (define-move-vop move-to-complex-double :move
   (descriptor-reg) (complex-double-reg))
@@ -661,7 +661,8 @@
 		(* (tn-offset float) sb!vm:word-bytes)
 		(current-nfp-tn vop)))
 	 (descriptor-reg
-	  (loadw bits float sb!vm:single-float-value-slot sb!vm:other-pointer-type))))
+	  (loadw bits float sb!vm:single-float-value-slot
+		 sb!vm:other-pointer-lowtag))))
       (signed-stack
        (sc-case float
 	 (single-reg
@@ -694,7 +695,7 @@
 	      (current-nfp-tn vop)))
       (descriptor-reg
         (loadw hi-bits float (1+ sb!vm:double-float-value-slot)
-	       sb!vm:other-pointer-type)))))
+	       sb!vm:other-pointer-lowtag)))))
 
 (define-vop (double-float-low-bits)
   (:args (float :scs (double-reg descriptor-reg)
@@ -721,7 +722,7 @@
 	     (current-nfp-tn vop)))
       (descriptor-reg
        (loadw lo-bits float sb!vm:double-float-value-slot
-	      sb!vm:other-pointer-type)))
+	      sb!vm:other-pointer-lowtag)))
     (inst mskll lo-bits 4 lo-bits)))
 
 

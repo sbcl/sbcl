@@ -82,11 +82,11 @@ call_into_lisp:
 	ldl	reg_A5,20(reg_CFP)
 
 	/* This call will 'return' into the LRA page below */
-	lda	reg_LRA,call_into_lisp_LRA_page+type_OtherPointer
+	lda	reg_LRA,call_into_lisp_LRA_page+OTHER_POINTER_LOWTAG
 
 	/* Indirect the closure */
 	ldl	reg_CODE, CLOSURE_FUN_OFFSET(reg_LEXENV)
-	addl	reg_CODE,6*4-type_FunPointer, reg_LIP
+	addl	reg_CODE,6*4-FUN_POINTER_LOWTAG, reg_LIP
 
 	/* And into lisp we go. */
 	jsr	reg_ZERO,(reg_LIP)
@@ -157,7 +157,7 @@ call_into_c:
 	addq	reg_CFP, 32, reg_CSP
 	stl	reg_OCFP, 0(reg_CFP)
 	subl	reg_LIP, reg_CODE, reg_L1
-	addl	reg_L1, type_OtherPointer, reg_L1
+	addl	reg_L1, OTHER_POINTER_LOWTAG, reg_L1
 	stl	reg_L1, 4(reg_CFP)
 	stl	reg_CODE, 8(reg_CFP)
 	stl	reg_NULL, 12(reg_CFP)
@@ -233,7 +233,7 @@ call_into_c:
 	/* can you see anything here which touches LRA?  I can't ...*/
 	ldl	reg_CODE, 8(reg_CFP)
 	ldl	reg_NL0, 4(reg_CFP)
-	subq	reg_NL0, type_OtherPointer, reg_NL0
+	subq	reg_NL0, OTHER_POINTER_LOWTAG, reg_NL0
 	addq	reg_CODE, reg_NL0, reg_NL0
 
 	mov	reg_CFP, reg_CSP

@@ -41,7 +41,7 @@
 
 (define-move-function (load-constant 5) (vop x y)
   ((constant) (descriptor-reg any-reg))
-  (loadw y code-tn (tn-offset x) other-pointer-type))
+  (loadw y code-tn (tn-offset x) other-pointer-lowtag))
 
 (define-move-function (load-stack 5) (vop x y)
   ((control-stack) (any-reg descriptor-reg))
@@ -179,12 +179,12 @@
     (inst sra x 2 y)
     (inst beq temp done)
 
-    (loadw header x 0 other-pointer-type)
+    (loadw header x 0 other-pointer-lowtag)
     (inst srl header (1+ type-bits) header)
-    (loadw y x bignum-digits-offset other-pointer-type)
+    (loadw y x bignum-digits-offset other-pointer-lowtag)
     (inst beq header one)
 
-    (loadw header x (1+ bignum-digits-offset) other-pointer-type)
+    (loadw header x (1+ bignum-digits-offset) other-pointer-lowtag)
     (inst sll header 32 header)
     (inst mskll y 4 y)
     (inst bis header y y)
@@ -236,11 +236,11 @@
     (inst bis header bignum-type header)
       
     (pseudo-atomic (:extra (pad-data-block (+ bignum-digits-offset 3)))
-      (inst bis alloc-tn other-pointer-type y)
-      (storew header y 0 other-pointer-type)
-      (storew x y bignum-digits-offset other-pointer-type)
+      (inst bis alloc-tn other-pointer-lowtag y)
+      (storew header y 0 other-pointer-lowtag)
+      (storew x y bignum-digits-offset other-pointer-lowtag)
       (inst srl x 32 temp)
-      (storew temp y (1+ bignum-digits-offset) other-pointer-type))
+      (storew temp y (1+ bignum-digits-offset) other-pointer-lowtag))
     DONE))
       
 ;;;
@@ -270,11 +270,11 @@
     (inst bis temp bignum-type temp)
 
     (pseudo-atomic (:extra (pad-data-block (+ bignum-digits-offset 3)))
-      (inst bis alloc-tn other-pointer-type y)
-      (storew temp y 0 other-pointer-type)
-      (storew x y bignum-digits-offset other-pointer-type)
+      (inst bis alloc-tn other-pointer-lowtag y)
+      (storew temp y 0 other-pointer-lowtag)
+      (storew x y bignum-digits-offset other-pointer-lowtag)
       (inst srl x 32 temp)
-      (storew temp y (1+ bignum-digits-offset) other-pointer-type))
+      (storew temp y (1+ bignum-digits-offset) other-pointer-lowtag))
     DONE))
 
 ;;;

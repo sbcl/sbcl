@@ -57,11 +57,11 @@
     LOOP
     (inst cmp list nil-temp)
     (inst jmp :e done)
-    (pushw list cons-car-slot list-pointer-type)
-    (loadw list list cons-cdr-slot list-pointer-type)
+    (pushw list cons-car-slot list-pointer-lowtag)
+    (loadw list list cons-cdr-slot list-pointer-lowtag)
     (inst mov eax list)
     (inst and al-tn lowtag-mask)
-    (inst cmp al-tn list-pointer-type)
+    (inst cmp al-tn list-pointer-lowtag)
     (inst jmp :e loop)
     (error-call vop bogus-argument-to-values-list-error list)
 

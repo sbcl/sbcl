@@ -1124,7 +1124,7 @@
      :inherits (sequence mutable-sequence mutable-collection
 		generic-sequence collection))
     (cons
-     :codes (#.sb!vm:list-pointer-type)
+     :codes (#.sb!vm:list-pointer-lowtag)
      :translation cons
      :inherits (list sequence
 		mutable-sequence mutable-collection
@@ -1186,7 +1186,7 @@
 			   #.sb!vm:*target-most-positive-fixnum*)
      :inherits (integer rational real number
 		generic-number)
-     :codes (#.sb!vm:even-fixnum-type #.sb!vm:odd-fixnum-type))
+     :codes (#.sb!vm:even-fixnum-lowtag #.sb!vm:odd-fixnum-lowtag))
     (bignum
      :translation (and integer (not fixnum))
      :inherits (integer rational real number

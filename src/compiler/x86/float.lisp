@@ -14,7 +14,8 @@
 (macrolet ((ea-for-xf-desc (tn slot)
 	     `(make-ea
 	       :dword :base ,tn
-	       :disp (- (* ,slot sb!vm:word-bytes) sb!vm:other-pointer-type))))
+	       :disp (- (* ,slot sb!vm:word-bytes)
+			sb!vm:other-pointer-lowtag))))
   (defun ea-for-sf-desc (tn)
     (ea-for-xf-desc tn sb!vm:single-float-value-slot))
   (defun ea-for-df-desc (tn)
@@ -1895,7 +1896,7 @@
 	 (descriptor-reg
 	  (loadw
 	   bits float sb!vm:single-float-value-slot
-	   sb!vm:other-pointer-type))))
+	   sb!vm:other-pointer-lowtag))))
       (signed-stack
        (sc-case float
 	 (single-reg
@@ -1925,7 +1926,7 @@
 	(loadw hi-bits ebp-tn (- (1+ (tn-offset float)))))
        (descriptor-reg
 	(loadw hi-bits float (1+ sb!vm:double-float-value-slot)
-	       sb!vm:other-pointer-type)))))
+	       sb!vm:other-pointer-lowtag)))))
 
 (define-vop (double-float-low-bits)
   (:args (float :scs (double-reg descriptor-reg)
@@ -1950,7 +1951,7 @@
 	(loadw lo-bits ebp-tn (- (+ 2 (tn-offset float)))))
        (descriptor-reg
 	(loadw lo-bits float sb!vm:double-float-value-slot
-	       sb!vm:other-pointer-type)))))
+	       sb!vm:other-pointer-lowtag)))))
 
 #!+long-float
 (define-vop (long-float-exp-bits)
@@ -1983,7 +1984,7 @@
 	      (make-ea :word :base float
 		       :disp (- (* (+ 2 sb!vm:long-float-value-slot)
 				   word-bytes)
-				sb!vm:other-pointer-type)))))))
+				sb!vm:other-pointer-lowtag)))))))
 
 #!+long-float
 (define-vop (long-float-high-bits)
@@ -2009,7 +2010,7 @@
 	(loadw hi-bits ebp-tn (- (+ (tn-offset float) 2))))
        (descriptor-reg
 	(loadw hi-bits float (1+ sb!vm:long-float-value-slot)
-	       sb!vm:other-pointer-type)))))
+	       sb!vm:other-pointer-lowtag)))))
 
 #!+long-float
 (define-vop (long-float-low-bits)
@@ -2035,7 +2036,7 @@
 	(loadw lo-bits ebp-tn (- (+ (tn-offset float) 3))))
        (descriptor-reg
 	(loadw lo-bits float sb!vm:long-float-value-slot
-	       sb!vm:other-pointer-type)))))
+	       sb!vm:other-pointer-lowtag)))))
 
 ;;;; float mode hackery
 

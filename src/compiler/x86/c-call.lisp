@@ -218,7 +218,7 @@
 			   :disp (+ nil-value
 				    (static-symbol-offset '*alien-stack*)
 				    (ash symbol-value-slot word-shift)
-				    (- other-pointer-type)))
+				    (- other-pointer-lowtag)))
 	      delta)))
     (load-symbol-value result *alien-stack*)))
 
@@ -231,5 +231,5 @@
 			   :disp (+ nil-value
 				    (static-symbol-offset '*alien-stack*)
 				    (ash symbol-value-slot word-shift)
-				    (- other-pointer-type)))
+				    (- other-pointer-lowtag)))
 	      delta)))))

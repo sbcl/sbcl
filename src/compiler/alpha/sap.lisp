@@ -19,7 +19,7 @@
   (:results (y :scs (sap-reg)))
   (:note "system area pointer indirection")
   (:generator 1
-    (loadq y x sap-pointer-slot other-pointer-type)))
+    (loadq y x sap-pointer-slot other-pointer-lowtag)))
 (define-move-vop move-to-sap :move
   (descriptor-reg) (sap-reg))
 
@@ -33,7 +33,7 @@
   (:generator 20
     (move x sap)
     (with-fixed-allocation (y ndescr sap-type sap-size)
-      (storeq sap y sap-pointer-slot other-pointer-type))))
+      (storeq sap y sap-pointer-slot other-pointer-lowtag))))
 (define-move-vop move-from-sap :move
   (sap-reg) (descriptor-reg))
 
@@ -351,5 +351,5 @@
   (:result-types system-area-pointer)
   (:generator 2
     (inst lda sap
-	  (- (* vector-data-offset word-bytes) other-pointer-type)
+	  (- (* vector-data-offset word-bytes) other-pointer-lowtag)
 	  vector)))

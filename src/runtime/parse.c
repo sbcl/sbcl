@@ -246,7 +246,7 @@ static boolean lookup_symbol(char *name, lispobj *result)
 	(lispobj *)SymbolValue(STATIC_SPACE_FREE_POINTER) -
 	(lispobj *)STATIC_SPACE_START;
     if (search_for_symbol(name, &headerptr, &count)) {
-        *result = (lispobj)headerptr | type_OtherPointer;
+        *result = (lispobj)headerptr | OTHER_POINTER_LOWTAG;
         return 1;
     }
 
@@ -262,7 +262,7 @@ static boolean lookup_symbol(char *name, lispobj *result)
 	(lispobj *)DYNAMIC_SPACE_START;
 #endif
     if (search_for_symbol(name, &headerptr, &count)) {
-        *result = (lispobj)headerptr | type_OtherPointer;
+        *result = (lispobj)headerptr | OTHER_POINTER_LOWTAG;
         return 1;
     }
 
