@@ -73,7 +73,9 @@
        (move y x))
       (base-char-stack
        (inst mov
-	     (make-ea :byte :base fp :disp (- (* (1+ (tn-offset y)) 4)))
+	     ;; FIXME: naked 8 (should be... what?  n-register-bytes?
+	     ;; n-word-bytes?  Dunno.
+	     (make-ea :byte :base fp :disp (- (* (1+ (tn-offset y)) 8)))
 	     x)))))
 (define-move-vop move-base-char-arg :move-arg
   (any-reg base-char-reg) (base-char-reg))
