@@ -1751,23 +1751,28 @@
 	     (type-components type2)))))
 
 (!def-type-translator and (&whole whole &rest type-specifiers)
-  ;; Note: Between the behavior of SIMPLIFY-INTERSECTION-TYPE (which
-  ;; will reduce to a 1-element list any list of types which CMU CL
-  ;; could've represented) and MAKE-INTERSECTION-TYPE-OR-SOMETHING
-  ;; (which knows to treat a 1-element intersection as the element
-  ;; itself) we should recover CMU CL's behavior for anything which it
-  ;; could handle usefully (i.e. could without punting to HAIRY-TYPE).
+
   (/show0 "entering type translator for AND")
-  (if *xtype?* 
-      (make-intersection-type-or-something
-       (mapcar #'specifier-type type-specifiers))
-      (let ((res *wild-type*))
-	(dolist (type-specifier type-specifiers res)
-	  (let ((ctype (specifier-type type-specifier)))
-	    (multiple-value-bind (int win) (type-intersection res ctype)
-	      (unless win
-		(return (make-hairy-type :specifier whole)))
-	      (setq res int)))))))
+
+  ;; FIXME: doesn't work (causes cold boot to fail), should probably
+  ;; be replaced by something based on simplification of all possible
+  ;; pairs
+  #|
+  (make-intersection-type-or-something
+   (mapcar #'specifier-type type-specifiers))
+  |#
+
+  ;; substantially the old CMU CL code
+  ;;
+  ;; FIXME: should be replaced by something based on simplification
+  ;; of all pairs, not just adjacent pairs
+  (let ((res *wild-type*))
+    (dolist (type-specifier type-specifiers res)
+      (let ((ctype (specifier-type type-specifier)))
+	(multiple-value-bind (int win) (type-intersection res ctype)
+	  (unless win
+	    (return (make-hairy-type :specifier whole)))
+	  (setq res int))))))
 
 ;;;; union types
 

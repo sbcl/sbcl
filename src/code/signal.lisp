@@ -104,123 +104,145 @@
 ;;;; utilities for dealing with signal names and numbers
 
 (defstruct (unix-signal
-	    (:constructor make-unix-signal (%name %number %description))
+	    (:constructor make-unix-signal (%name %number))
 	    (:copier nil))
-  %name				    ; signal keyword
-  (%number nil :type integer)       ; UNIX signal number
-  (%description nil :type string))  ; documentation
+  ;; signal keyword (e.g. :SIGINT for the Unix SIGINT signal)
+  (%name   (required-argument) :type keyword :read-only t)
+  ;; signal number
+  (%number (required-argument) :type integer :read-only t))
 
-(defvar *unix-signals* nil
-  #!+sb-doc
-  "A list of Unix signal structures.")
+;;; list of all defined UNIX-SIGNALs
+(defvar *unix-signals* nil)
 
-(defmacro def-unix-signal (name number description)
-  (let ((symbol (intern (symbol-name name))))
-    `(progn
-       ;; KLUDGE: This PUSH should be probably be something like PUSHNEW if we
-       ;; want to be able to cleanly reload this file. (Or perhaps
-       ;; *UNIX-SIGNALS* should be a hash table keyed by signal name, or a
-       ;; vector keyed by signal number?)
-       (push (make-unix-signal ,name ,number ,description) *unix-signals*)
-       ;; This is to make the new signal lookup stuff compatible with
-       ;; old code which expects the symbol with the same print name as
-       ;; our keywords to be a constant with a value equal to the signal
-       ;; number.
-       (defconstant ,symbol ,number ,description))))
+(defmacro !def-unix-signal (name number)
+  (declare (type keyword name))
+  (declare (type (and fixnum unsigned-byte) number))
+  `(push (make-unix-signal ,name ,number) *unix-signals*))
 
-(defun unix-signal-or-lose (arg)
-  (let ((signal (find arg *unix-signals*
-		      :key (etypecase arg
-			     (symbol #'unix-signal-%name)
-			     (number #'unix-signal-%number)))))
-    (unless signal
-      (error "~S is not a valid signal name or number." arg))
-    signal))
+(/show0 "signal.lisp 131")
 
-(defun unix-signal-name (signal)
-  #!+sb-doc
-  "Return the name of the signal as a string. Signal should be a valid
-  signal number or a keyword of the standard UNIX signal name."
-  (symbol-name (unix-signal-%name (unix-signal-or-lose signal))))
+(defun unix-signal-or-lose (designator)
+  (or (find designator (the list *unix-signals*)
+	    :key (etypecase designator
+		   (symbol #'unix-signal-%name)
+		   (number #'unix-signal-%number)))
+      (error "not a valid signal name or number: ~S" designator)))
 
-(defun unix-signal-description (signal)
-  #!+sb-doc
-  "Return a string describing signal. Signal should be a valid signal
-  number or a keyword of the standard UNIX signal name."
-  (unix-signal-%description (unix-signal-or-lose signal)))
+(/show0 "signal.lisp 142")
 
-(defun unix-signal-number (signal)
-  #!+sb-doc
-  "Return the number of the given signal. Signal should be a valid
-  signal number or a keyword of the standard UNIX signal name."
-  (unix-signal-%number (unix-signal-or-lose signal)))
+;;; Return the name of the designated signal.
+(defun unix-signal-name (designator)
+  (symbol-name (unix-signal-%name (unix-signal-or-lose designator))))
+
+(/show0 "signal.lisp 150")
+
+;;; Return the number of the designated signal.
+(defun unix-signal-number (designator)
+  (unix-signal-%number (unix-signal-or-lose designator)))
+
+(/show0 "signal.lisp 168")
 
 ;;; known signals
-(def-unix-signal :CHECK 0 "Check")
-(def-unix-signal :SIGHUP 1 "Hangup")
-(def-unix-signal :SIGINT 2 "Interrupt")
-(def-unix-signal :SIGQUIT 3 "Quit")
-(def-unix-signal :SIGILL 4 "Illegal instruction")
-(def-unix-signal :SIGTRAP 5 "Trace trap")
-(def-unix-signal :SIGIOT 6 "Iot instruction")
+(/show0 "defining Unix signals")
+(!def-unix-signal :CHECK 0) ; check
+(/show0 "done defining CHECK")
+(!def-unix-signal :SIGHUP 1) ; hangup
+(/show0 "done defining SIGHUP")
+(!def-unix-signal :SIGINT 2) ; interrupt
+(/show0 "done defining SIGINT")
+(!def-unix-signal :SIGQUIT 3) ; quit
+(!def-unix-signal :SIGILL 4) ; illegal instruction
+(!def-unix-signal :SIGTRAP 5) ; trace trap
+(!def-unix-signal :SIGIOT 6) ; IOT instruction
 #!-linux
-(def-unix-signal :SIGEMT 7 "Emt instruction")
-(def-unix-signal :SIGFPE 8 "Floating point exception")
-(def-unix-signal :SIGKILL 9 "Kill")
-(def-unix-signal :SIGBUS #!-linux 10 #!+linux 7 "Bus error")
-(def-unix-signal :SIGSEGV 11 "Segmentation violation")
+(!def-unix-signal :SIGEMT 7) ; EMT instruction
+(!def-unix-signal :SIGFPE 8) ; floating point exception
+(!def-unix-signal :SIGKILL 9) ; kill
+(!def-unix-signal :SIGBUS #!-linux 10 #!+linux 7) ; bus error
+(!def-unix-signal :SIGSEGV 11) ; segmentation violation
 #!-linux
-(def-unix-signal :SIGSYS 12 "Bad argument to system call")
-(def-unix-signal :SIGPIPE 13 "Write on a pipe with no one to read it")
-(def-unix-signal :SIGALRM 14 "Alarm clock")
-(def-unix-signal :SIGTERM 15 "Software termination signal")
+(!def-unix-signal :SIGSYS 12) ; bad argument to system call
+(!def-unix-signal :SIGPIPE 13) ; write on a pipe with no one to read it
+(!def-unix-signal :SIGALRM 14) ; alarm clock
+(!def-unix-signal :SIGTERM 15) ; software termination signal
 #!+linux
-(def-unix-signal :SIGSTKFLT 16 "Stack fault on coprocessor")
-(def-unix-signal :SIGURG #!+svr4 21 #!-(or hpux svr4 linux) 16 #!+hpux 29
-  #!+linux 23 "Urgent condition present on socket")
-(def-unix-signal :SIGSTOP #!-(or hpux svr4 linux) 17 #!+hpux 24 #!+svr4 23
-  #!+linux 19 "Stop")
-(def-unix-signal :SIGTSTP #!-(or hpux svr4 linux) 18 #!+hpux 25 #!+svr4 24
-  #!+linux 20 "Stop signal generated from keyboard")
-(def-unix-signal :SIGCONT #!-(or hpux svr4 linux) 19 #!+hpux 26 #!+svr4 25
-  #!+linux 18 "Continue after stop")
-(def-unix-signal :SIGCHLD #!-(or linux hpux) 20
-  #!+hpux 18 #!+linux 17 "Child status has changed")
-(def-unix-signal :SIGTTIN #!-(or hpux svr4) 21 #!+hpux 27 #!+svr4 26
-  "Background read attempted from control terminal")
-(def-unix-signal :SIGTTOU #!-(or hpux svr4) 22 #!+hpux 28 #!+svr4 27
-  "Background write attempted to control terminal")
-(def-unix-signal :SIGIO #!-(or hpux irix linux) 23 #!+(or hpux irix) 22
-  #!+linux 29
-  "I/O is possible on a descriptor")
+(!def-unix-signal :SIGSTKFLT 16) ; stack fault on coprocessor
+(!def-unix-signal :SIGURG ; urgent condition present on socket
+  #!+svr4 21
+  #!-(or hpux svr4 linux) 16
+  #!+hpux 29
+  #!+linux 23)
+(!def-unix-signal :SIGSTOP ; stop
+  #!-(or hpux svr4 linux) 17
+  #!+hpux 24
+  #!+svr4 23
+  #!+linux 19)
+(!def-unix-signal :SIGTSTP ;  stop signal generated from keyboard
+  #!-(or hpux svr4 linux) 18
+  #!+hpux 25
+  #!+svr4 24
+  #!+linux 20)
+(!def-unix-signal :SIGCONT ; continue after stop
+  #!-(or hpux svr4 linux) 19
+  #!+hpux 26
+  #!+svr4 25
+  #!+linux 18)
+(!def-unix-signal :SIGCHLD ; Child status has changed.
+  #!-(or linux hpux) 20
+  #!+hpux 18
+  #!+linux 17)
+(!def-unix-signal :SIGTTIN ; background read attempted from control terminal
+  #!-(or hpux svr4) 21
+  #!+hpux 27
+  #!+svr4 26)
+(!def-unix-signal :SIGTTOU ; background write attempted to control terminal
+  #!-(or hpux svr4) 22
+  #!+hpux 28
+  #!+svr4 27)
+(!def-unix-signal :SIGIO ; I/O is possible on a descriptor.
+  #!-(or hpux irix linux) 23
+  #!+(or hpux irix) 22
+  #!+linux 29)
 #!-hpux
-(def-unix-signal :SIGXCPU #!-svr4 24 #!+svr4 30  "Cpu time limit exceeded")
+(!def-unix-signal :SIGXCPU ; CPU time limit exceeded
+  #!-svr4 24
+  #!+svr4 30)
 #!-hpux
-(def-unix-signal :SIGXFSZ #!-svr4 25 #!+svr4 31 "File size limit exceeded")
-(def-unix-signal :SIGVTALRM #!-(or hpux svr4) 26 #!+hpux 20 #!+svr4 28
-    "Virtual time alarm")
-(def-unix-signal :SIGPROF #!-(or hpux svr4 linux) 27 #!+hpux 21 #!+svr4 29
-  #!+linux 30 "Profiling timer alarm")
-(def-unix-signal :SIGWINCH #!-(or hpux svr4) 28 #!+hpux 23 #!+svr4 20
-    "Window size change")
-(def-unix-signal :SIGUSR1 #!-(or hpux svr4 linux) 30 #!+(or hpux svr4) 16
-  #!+linux 10 "User defined signal 1")
-(def-unix-signal :SIGUSR2 #!-(or hpux svr4 linux) 31 #!+(or hpux svr4) 17
-  #!+linux 12 "User defined signal 2")
-
-#!+mach
-(def-unix-signal :SIGEMSG 30 "Mach Emergency message")
-#!+mach
-(def-unix-signal :SIGMSG 31 "Mach message")
+(!def-unix-signal :SIGXFSZ ;  file size limit exceeded
+  #!-svr4 25
+  #!+svr4 31)
+(!def-unix-signal :SIGVTALRM ; virtual time alarm
+  #!-(or hpux svr4) 26
+  #!+hpux 20
+  #!+svr4 28)
+(!def-unix-signal :SIGPROF ;  profiling timer alarm
+  #!-(or hpux svr4 linux) 27
+  #!+hpux 21
+  #!+svr4 29
+  #!+linux 30)
+(!def-unix-signal :SIGWINCH ; window size change
+  #!-(or hpux svr4) 28
+  #!+hpux 23
+  #!+svr4 20)
+(!def-unix-signal :SIGUSR1 ;  user-defined signal 1
+  #!-(or hpux svr4 linux) 30
+  #!+(or hpux svr4) 16
+  #!+linux 10)
+(!def-unix-signal :SIGUSR2 ; user-defined signal 2
+  #!-(or hpux svr4 linux) 31
+  #!+(or hpux svr4) 17
+  #!+linux 12)
 
 ;;; SVR4 (or Solaris?) specific signals
 #!+svr4
-(def-unix-signal :SIGWAITING 32 "Process's lwps are blocked")
+(!def-unix-signal :SIGWAITING 32) ; Process's LWPs are blocked.
 
 (sb!xc:defmacro sigmask (&rest signals)
   #!+sb-doc
   "Returns a mask given a set of signals."
   (apply #'logior
-	 (mapcar #'(lambda (signal)
-		     (ash 1 (1- (unix-signal-number signal))))
+	 (mapcar (lambda (signal)
+		   (ash 1 (1- (unix-signal-number signal))))
 		 signals)))
+
+(/show0 "done with signal.lisp")

@@ -66,7 +66,7 @@ echo //running '*.test.sh' tests
 for f in *.test.sh; do
     if [ -f $f ]; then
 	echo //running $f test
-	sh $f ; tenfour
+	sh $f "$sbcl"; tenfour
     fi
 done
 

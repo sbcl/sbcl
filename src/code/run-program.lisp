@@ -133,10 +133,12 @@
 	  (t
 	   (let ((signal (ldb (byte 7 0) status)))
 	     (values pid
-		     (if (or (eql signal sb-unix:sigstop)
-			     (eql signal sb-unix:sigtstp)
-			     (eql signal sb-unix:sigttin)
-			     (eql signal sb-unix:sigttou))
+		     (if (position signal
+				   #.(vector
+				      (sb-unix:unix-signal-number :sigstop)
+				      (sb-unix:unix-signal-number :sigtstp)
+				      (sb-unix:unix-signal-number :sigttin)
+				      (sb-unix:unix-signal-number :sigttou)))
 			 :stopped
 			 :signaled)
 		     signal
@@ -230,7 +232,8 @@
       (cond ((not okay)
 	     (values nil errno))
 	    ((and (eql pid (process-pid proc))
-		  (= (sb-unix:unix-signal-number signal) sb-unix:sigcont))
+		  (= (sb-unix:unix-signal-number signal)
+		     (sb-unix:unix-signal-number :sigcont)))
 	     (setf (process-%status proc) :running)
 	     (setf (process-exit-code proc) nil)
 	     (when (process-status-hook proc)
@@ -259,7 +262,7 @@
    (setf *active-processes* (delete proc *active-processes*)))
   proc)
 
-;;; the handler for sigchld signals that RUN-PROGRAM establishes
+;;; the handler for SIGCHLD signals that RUN-PROGRAM establishes
 (defun sigchld-handler (ignore1 ignore2 ignore3)
   (declare (ignore ignore1 ignore2 ignore3))
   (get-processes-status-changes))
@@ -277,20 +280,21 @@
 	    (setf (process-core-dumped proc) core)
 	    (when (process-status-hook proc)
 	      (funcall (process-status-hook proc) proc))
-	    (when (or (eq what :exited)
-		      (eq what :signaled))
+	    (when (position what #(:exited :signaled))
 	      (sb-sys:without-interrupts
 	       (setf *active-processes*
 		     (delete proc *active-processes*)))))))))
 
 ;;;; RUN-PROGRAM and close friends
 
-(defvar *close-on-error* nil
-  "List of file descriptors to close when RUN-PROGRAM exits due to an error.")
-(defvar *close-in-parent* nil
-  "List of file descriptors to close when RUN-PROGRAM returns in the parent.")
-(defvar *handlers-installed* nil
-  "List of handlers installed by RUN-PROGRAM.")
+;;; list of file descriptors to close when RUN-PROGRAM exits due to an error
+(defvar *close-on-error* nil)
+
+;;; list of file descriptors to close when RUN-PROGRAM returns in the parent
+(defvar *close-in-parent* nil)
+
+;;; list of handlers installed by RUN-PROGRAM
+(defvar *handlers-installed* nil)
 
 #+FreeBSD
 (def-alien-type nil
@@ -307,10 +311,9 @@
 	  (sg-chars (array sb-c-call:char 4))
 	  (sg-flags sb-c-call:int)))
 
-;;; Find a pty that is not in use. Return three values: the file
-;;; descriptor for the master side of the pty, the file descriptor for
-;;; the slave side of the pty, and the name of the tty device for the
-;;; slave side.
+;;; Find an unused pty. Return three values: the file descriptor for
+;;; the master side of the pty, the file descriptor for the slave side
+;;; of the pty, and the name of the tty device for the slave side.
 (defun find-a-pty ()
   (dolist (char '(#\p #\q))
     (dotimes (digit 16)
@@ -564,10 +567,7 @@
   (when (and env-p environment-p)
     (error "can't specify :ENV and :ENVIRONMENT simultaneously"))
   ;; Make sure that the interrupt handler is installed.
-  (sb-sys:enable-interrupt sb-unix:sigchld #'sigchld-handler)
-  ;; Make sure that all the args are okay.
-  (unless (every #'simple-string-p args)
-    (error "All arguments to program must be simple strings: ~S" args))
+  (sb-sys:enable-interrupt :sigchld #'sigchld-handler)
   ;; Prepend the program to the argument list.
   (push (namestring program) args)
   (let (;; Clear various specials used by GET-DESCRIPTOR-FOR to
@@ -576,7 +576,10 @@
 	*close-in-parent*
 	*handlers-installed*
 	;; Establish PROC at this level so that we can return it.
-	proc)
+	proc
+	;; It's friendly to allow the caller to pass any string
+	;; designator, but internally we'd like SIMPLE-STRINGs.
+	(simple-args (mapcar (lambda (x) (coerce x 'simple-string)) args)))
     (unwind-protect
 	 (let (;; FIXME: The old code here used to do
 	       ;;   (MERGE-PATHNAMES PROGRAM "path:"),
@@ -593,15 +596,18 @@
 	   (unless pfile
 	     (error "no such program: ~S" program))
 	   (multiple-value-bind (stdin input-stream)
-	       (get-descriptor-for input cookie :direction :input
+	       (get-descriptor-for input cookie
+				   :direction :input
 				   :if-does-not-exist if-input-does-not-exist)
 	     (multiple-value-bind (stdout output-stream)
-		 (get-descriptor-for output cookie :direction :output
+		 (get-descriptor-for output cookie
+				     :direction :output
 				     :if-exists if-output-exists)
 	       (multiple-value-bind (stderr error-stream)
 		   (if (eq error :output)
 		       (values stdout output-stream)
-		       (get-descriptor-for error cookie :direction :output
+		       (get-descriptor-for error cookie
+					   :direction :output
 					   :if-exists if-error-exists))
 		 (multiple-value-bind (pty-name pty-stream)
 		     (open-pty pty cookie)
@@ -609,7 +615,7 @@
 		   ;; death before we have installed the PROCESS
 		   ;; structure in *ACTIVE-PROCESSES*.
 		   (sb-sys:without-interrupts
-		    (with-c-strvec (args-vec args)
+		    (with-c-strvec (args-vec simple-args)
 		      (with-c-strvec (environment-vec environment)
 			(let ((child-pid
 			       (without-gcing

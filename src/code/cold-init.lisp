@@ -111,6 +111,8 @@
   ;; this to be initialized, so we initialize it right away.
   (show-and-call !random-cold-init)
 
+  (show-and-call !package-cold-init)
+
   ;; All sorts of things need INFO and/or (SETF INFO).
   (/show0 "about to SHOW-AND-CALL !GLOBALDB-COLD-INIT")
   (show-and-call !globaldb-cold-init)
@@ -134,7 +136,7 @@
   ;; functions are called in the same relative order as the toplevel
   ;; forms of the corresponding source files.
 
-  (show-and-call !package-cold-init)
+  ;;(show-and-call !package-cold-init)
   (show-and-call !policy-cold-init-or-resanify)
   (/show0 "back from !POLICY-COLD-INIT-OR-RESANIFY")
 

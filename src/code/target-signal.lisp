@@ -72,10 +72,10 @@
 
 ;;;; interface to enabling and disabling signal handlers
 
-(defun enable-interrupt (signal handler)
+(defun enable-interrupt (signal-designator handler)
   (declare (type (or function (member :default :ignore)) handler))
   (without-gcing
-   (let ((result (install-handler (unix-signal-number signal)
+   (let ((result (install-handler (unix-signal-number signal-designator)
 				  (case handler
 				    (:default sig_dfl)
 				    (:ignore sig_ign)

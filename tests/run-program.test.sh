@@ -17,7 +17,9 @@
 # one of the tests below).
 export SOMETHING_IN_THE_ENVIRONMENT='yes there is'
 
-sbcl --noinform --noprint --sysinit /dev/null --userinit /dev/null <<EOF
+sbcl="$1"
+
+$sbcl <<EOF
   (let ((string (with-output-to-string (stream)
                   (sb-ext:run-program "/bin/echo"
                                       '("foo" "bar")
