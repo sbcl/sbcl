@@ -1068,15 +1068,19 @@ bootstrapping.
                                        ,cnm-args)
                             ,call)
                            ,call))))
-		 ,(if (and (null ',rest-arg)
-			   (consp cnm-args)
-			   (eq (car cnm-args) 'list))
-		      `(call-no-next-method ',method-name-declaration
-			                    ,@(cdr cnm-args))
-		      `(call-no-next-method ',method-name-declaration
-			                    ,@',args
-			                    ,@',(when rest-arg
-						      `(,rest-arg))))))
+		 ,(locally
+		   ;; As above, this declaration supresses code
+		   ;; deletion notes.
+		   (declare (optimize (inhibit-warnings 3)))
+		   (if (and (null ',rest-arg)
+			    (consp cnm-args)
+			    (eq (car cnm-args) 'list))
+		       `(call-no-next-method ',method-name-declaration
+			                     ,@(cdr cnm-args))
+		       `(call-no-next-method ',method-name-declaration
+			                     ,@',args
+			                     ,@',(when rest-arg
+						       `(,rest-arg)))))))
 	      (next-method-p-body ()
                `(not (null ,',next-method-call))))
     ,@body))
