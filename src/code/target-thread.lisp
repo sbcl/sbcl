@@ -21,22 +21,23 @@
   (assert (probe-file tty-name))
   (let* ((in (sb!unix:unix-open (namestring tty-name) sb!unix:o_rdwr #o666))
 	 (out (sb!unix:unix-dup in))
-	 (err (sb!unix:unix-dup in))
-	 (sb!impl::*stdin* 
-	  (sb!sys:make-fd-stream in :input t :buffering :line))
-	 (sb!impl::*stdout* 
-	  (sb!sys:make-fd-stream out :output t :buffering :line))
-	 (sb!impl::*stderr* 
-	  (sb!sys:make-fd-stream err :output t :buffering :line))
-	 (sb!impl::*tty* 
-	  (sb!sys:make-fd-stream err :input t :output t :buffering :line)))
+	 (err (sb!unix:unix-dup in)))
     (labels ((thread-repl () 
-	       (sb!impl::handling-end-of-the-world
-		(with-simple-restart 
-		    (destroy-thread
-		     (format nil "~~@<Destroy this thread (~A)~~@:>"
-			     (current-thread-id)))
-		  (sb!impl::toplevel-repl nil)))))
+	       (let* ((sb!impl::*stdin* 
+		       (sb!sys:make-fd-stream in :input t :buffering :line))
+		      (sb!impl::*stdout* 
+		       (sb!sys:make-fd-stream out :output t :buffering :line))
+		      (sb!impl::*stderr* 
+		       (sb!sys:make-fd-stream err :output t :buffering :line))
+		      (sb!impl::*tty* 
+		       (sb!sys:make-fd-stream err :input t :output t :buffering :line))
+		      (sb!impl::*descriptor-handlers* nil))
+		 (sb!impl::handling-end-of-the-world
+		  (with-simple-restart 
+		      (destroy-thread
+		       (format nil "~~@<Destroy this thread (~A)~~@:>"
+			       (current-thread-id)))
+		    (sb!impl::toplevel-repl nil))))))
       (make-thread #'thread-repl))))
 
 ;;;; mutex and read/write locks, originally inspired by CMUCL multi-proc.lisp

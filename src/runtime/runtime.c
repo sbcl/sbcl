@@ -363,6 +363,8 @@ static void /* noreturn */ parent_loop(void)
     sigaction(SIGALRM, &sa, 0);
     sigaction(SIGCHLD, &sa, 0);
 
+    /* renounce sin, the world, and a controlling tty */
+    setsid();			
     while(all_threads) {
 	int status;
 	pid_t pid=0;

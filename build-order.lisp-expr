@@ -429,8 +429,9 @@
  ;; about undefined types). 
  ("src/compiler/generic/core")
 
+ ("src/code/thread")
  ("src/code/load")
-
+ 
  ("src/code/fop") ; needs macros from code/load.lisp
 
  ("src/compiler/ctype")

@@ -15,8 +15,12 @@
  */
 
 #include <stdio.h>
+#include <stddef.h>
 #include <sys/param.h>
 #include <sys/file.h>
+#include <sys/types.h>
+#include <unistd.h>
+
 #include "./signal.h"
 #include "os.h"
 #include "arch.h"
@@ -99,8 +103,16 @@ int arch_os_thread_init(struct thread *thread) {
     return (n>=0);
 }
 
+/* if you can't do something like this (maybe because you're using a 
+ * register for thread base that is only available in Lisp code)
+ * you'll just have to find_thread_by_pid(getpid())
+ */
 struct thread *arch_os_get_current_thread() {
-    return find_thread_by_pid(getpid());
+    register struct thread *me=0;
+    if(all_threads)
+	__asm__ ("movl %%gs:%c1,%0" : "=r" (me)
+		 : "i" (offsetof (struct thread,this)));
+    return me;
 }
 
 

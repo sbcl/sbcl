@@ -279,11 +279,9 @@
 
 ;;; When a *periodic-polling-function* is defined the server will not
 ;;; block for more than the maximum event timeout and will call the
-;;; polling function if it does time out. One important use of this
-;;; is to periodically call process-yield.
+;;; polling function if it does time out.
 (declaim (type (or null function) *periodic-polling-function*))
-(defvar *periodic-polling-function*
-  #!-mp nil #!+mp #'sb!mp:process-yield)
+(defvar *periodic-polling-function* nil)
 (declaim (type (unsigned-byte 29) *max-event-to-sec* *max-event-to-usec*))
 (defvar *max-event-to-sec* 1)
 (defvar *max-event-to-usec* 0)
