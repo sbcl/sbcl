@@ -2327,6 +2327,9 @@ changes in sbcl-0.8.9 relative to sbcl-0.8.8:
     WARNINGs, not just STYLE-WARNINGs, on the assumption that this is
     more often programmer error than deliberate exploitation of undefined
     behaviour.
+  * optimization: the hash algorithm for strings has changed to one
+    that is less vulnerable to spurious collisions.  (thanks to Juho
+    Snellman)
   * optimization: implemented multiplication as a modular
     (UNSIGNED-BYTE 32) operation on the PPC backend.
   * fixed some bugs revealed by Paul Dietz' test suite:
