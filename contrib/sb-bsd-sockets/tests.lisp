@@ -153,7 +153,7 @@ Tests are in the file <tt>tests.lisp</tt> and also make good examples.
   t)
 
 
-;;; these require that the internet (or bits of it, atleast) is available
+;;; these require that the internet (or bits of it, at least) is available
 
 #+internet-available
 (deftest get-host-by-name

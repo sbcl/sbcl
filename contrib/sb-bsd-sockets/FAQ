@@ -43,5 +43,5 @@ constants.lisp-temp
 Q4) Is this compatible with ACL?  With CMUCL's internet.lisp?
 
 A4) No.  This is a sufficiently low-level interface that either could
-be built on top of it, though.  Actually, theq ACL-COMPAT library that
+be built on top of it, though.  Actually, the ACL-COMPAT library that
 comes with Portable Allegroserve may already have this.

@@ -94,7 +94,6 @@
 
 ;;; Bug reported by Paul Dietz: CONSTANTP on a self-evaluating object
 ;;; must return T
-
 (assert (constantp (find-class 'symbol)))
 (assert (constantp #p""))
 
@@ -106,6 +105,5 @@
                               ,var))
                  '(1 2))))
 
-
 ;;; success
 (sb-ext:quit :unix-status 104)

@@ -36,3 +36,6 @@
   (setf (code-msg code) 2)
   (assert (eql (code-msg code) 2))
   (assert (eql (%code-msg code) 1)))
+
+;;; success
+(sb-ext:quit :unix-status 104)
