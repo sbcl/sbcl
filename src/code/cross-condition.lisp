@@ -31,6 +31,15 @@
 (define-condition reference-condition ()
   ((references :initarg :references :reader reference-condition-references)))
 
+;;; KLUDGE: yet another OAOOM.
+;;;
+;;; FIXME: This is clearly one OAOOM KLUDGE too many in a row. When tempted
+;;; to add another one invent DEF!CONDITION or whatever seems necessary,
+;;; and replace these.
+(define-condition type-warning (reference-condition simple-warning)
+  ()
+  (:default-initargs :references (list '(:sbcl :node "Handling of Types"))))
+
 (define-condition bug (simple-error)
   ()
   (:report

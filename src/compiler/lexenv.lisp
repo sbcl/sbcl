@@ -15,7 +15,8 @@
 ;;; (This is also what shows up as an ENVIRONMENT value in macroexpansion.)
 #!-sb-fluid (declaim (inline internal-make-lexenv)) ; only called in one place
 (def!struct (lexenv
-	     (:constructor make-null-lexenv ())
+	     (:print-function print-lexenv)
+	     (:constructor make-null-lexenv ())	     
 	     (:constructor internal-make-lexenv
 			   (funs vars blocks tags
                                  type-restrictions
@@ -68,6 +69,15 @@
   (etypecase x
     (null (make-null-lexenv))
     (lexenv x)))
+
+(defun null-lexenv-p (lexenv)
+  (equalp (coerce-to-lexenv lexenv) (make-null-lexenv)))
+
+(defun print-lexenv (lexenv stream level)
+  (if (null-lexenv-p lexenv)
+      (print-unreadable-object (lexenv stream)
+	(write-string "NULL-LEXENV" stream))
+      (default-structure-print lexenv stream level)))
 
 (defun maybe-inline-syntactic-closure (lambda lexenv)
   (declare (type list lambda) (type lexenv lexenv))

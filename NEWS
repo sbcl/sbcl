@@ -2,6 +2,8 @@ changes in sbcl-0.8.22 relative to sbcl-0.8.21:
   * incompatible change: the --noprogrammer option, deprecated since
     version 0.7.5, has been removed.  Please use the equivalent
     --disable-debugger option instead.
+  * Null lexical environments are now printed as #<NULL-LEXENV>, 
+    significantly reducing the amount of clutter in typical backtraces.
   * improved the startup banner.  (thanks to Brian Mastenbrook and
     Teemu Kalvas)
   * optimization: REPLACE on declared (UNSIGNED-BYTE 8) vectors, as well
