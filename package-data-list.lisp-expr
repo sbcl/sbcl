@@ -1176,10 +1176,11 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
                "ANSI-STREAM-OUT" "ANSI-STREAM-SOUT"
                "ANSI-STREAM-OUTPUT-STREAM-P" "LIST-TO-VECTOR*"
                "LOGICAL-HOST" "LOGICAL-HOST-DESIGNATOR"
-               #!+long-float "LONG-FLOAT-EXPONENT" !+long-float
-               #"LONG-FLOAT-EXP-BITS" !+long-float
-               #"LONG-FLOAT-HIGH-BITS" !+long-float
-               #"LONG-FLOAT-LOW-BITS" !+long-float "LONG-FLOAT-MID-BITS"
+               #!+long-float "LONG-FLOAT-EXPONENT"
+               #!+long-float "LONG-FLOAT-EXP-BITS"
+               #!+long-float "LONG-FLOAT-HIGH-BITS"
+               #!+long-float "LONG-FLOAT-LOW-BITS"
+               #!+long-float "LONG-FLOAT-MID-BITS"
                "LONG-WORDS" "LRA" "LRA-CODE-HEADER" "LRA-P"
                "MAKE-ALIEN-TYPE-TYPE" "MAKE-ARGS-TYPE"
                "MAKE-ARRAY-HEADER" "MAKE-ARRAY-TYPE" "MAKE-CONS-TYPE"
@@ -1227,7 +1228,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
                "OBJECT-NOT-SIGNED-BYTE-64-ERROR"
                "OBJECT-NOT-SIMPLE-ARRAY-COMPLEX-DOUBLE-FLOAT-ERROR"
                #!+long-float
-               #"OBJECT-NOT-SIMPLE-ARRAY-COMPLEX-LONG-FLOAT-ERROR"
+               "OBJECT-NOT-SIMPLE-ARRAY-COMPLEX-LONG-FLOAT-ERROR"
                "OBJECT-NOT-SIMPLE-ARRAY-COMPLEX-SINGLE-FLOAT-ERROR"
                "OBJECT-NOT-SIMPLE-ARRAY-DOUBLE-FLOAT-ERROR"
                "OBJECT-NOT-SIMPLE-ARRAY-ERROR"
@@ -1285,8 +1286,8 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
                "PACKAGE-INTERNAL-SYMBOLS" "PACKAGE-EXTERNAL-SYMBOLS"
                "PARSE-DEFMACRO" "PARSE-UNKNOWN-TYPE"
                "PARSE-UNKNOWN-TYPE-SPECIFIER" "PATHNAME-DESIGNATOR"
-               #!+x86 "*PSEUDO-ATOMIC-ATOMIC*" !+x86
-               #"*PSEUDO-ATOMIC-INTERRUPTED*"
+               #!+x86 "*PSEUDO-ATOMIC-ATOMIC*"
+               #!+x86 "*PSEUDO-ATOMIC-INTERRUPTED*"
                "PUNT-PRINT-IF-TOO-LONG" "READER-IMPOSSIBLE-NUMBER-ERROR"
                "READER-PACKAGE-ERROR" "READER-EOF-ERROR"
                "RESTART-DESIGNATOR" "SCALE-DOUBLE-FLOAT"
@@ -1425,56 +1426,56 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
                "NAMESTRING-PARSE-ERROR" "NAMESTRING-PARSE-ERROR-OFFSET"
                "DESCRIBE-CONDITION" "MAKE-RESTART" "COERCE-TO-CONDITION"
 
-                        "CONDITION-READER-FUNCTION"
-                        "CONDITION-WRITER-FUNCTION"
+               "CONDITION-READER-FUNCTION"
+               "CONDITION-WRITER-FUNCTION"
 	     
-                        "CONDITION-SLOT-ALLOCATION"
-                        "CONDITION-SLOT-DOCUMENTATION"
-                        "CONDITION-SLOT-INITARGS"
-                        "CONDITION-SLOT-INITFORM"
-                        "CONDITION-SLOT-INITFORM-P"
-                        "CONDITION-SLOT-NAME" "CONDITION-SLOT-READERS"
-                        "CONDITION-SLOT-WRITERS"
+               "CONDITION-SLOT-ALLOCATION"
+               "CONDITION-SLOT-DOCUMENTATION"
+               "CONDITION-SLOT-INITARGS"
+               "CONDITION-SLOT-INITFORM"
+               "CONDITION-SLOT-INITFORM-P"
+               "CONDITION-SLOT-NAME" "CONDITION-SLOT-READERS"
+               "CONDITION-SLOT-WRITERS"
 	     
-                        "!COLD-INIT" "!UNINTERN-INIT-ONLY-STUFF"
-                        "!GLOBALDB-COLD-INIT" "!FDEFN-COLD-INIT"
-                        "!FUNCTION-NAMES-COLD-INIT"
-                        "!TYPE-CLASS-COLD-INIT" "!TYPEDEFS-COLD-INIT"
-                        "!ALIEN-TYPE-COLD-INIT" "!CLASSES-COLD-INIT"
-                        "!EARLY-TYPE-COLD-INIT" "!LATE-TYPE-COLD-INIT"
-                        "!FIXUP-TYPE-COLD-INIT" "!TARGET-TYPE-COLD-INIT"
-                        "!RANDOM-COLD-INIT" "!READER-COLD-INIT"
-                        "!TYPECHECKFUNS-COLD-INIT"
-                        "STREAM-COLD-INIT-OR-RESET" "!LOADER-COLD-INIT"
-                        "!EXHAUST-COLD-INIT" "!PACKAGE-COLD-INIT"
-                        "SIGNAL-COLD-INIT-OR-REINIT"
-                        "!POLICY-COLD-INIT-OR-RESANIFY"
-                        "!VM-TYPE-COLD-INIT" "!BACKQ-COLD-INIT"
-                        "!SHARPM-COLD-INIT" "!EARLY-PROCLAIM-COLD-INIT"
-                        "!LATE-PROCLAIM-COLD-INIT" "!CLASS-FINALIZE"
-                        "GC-REINIT"
+               "!COLD-INIT" "!UNINTERN-INIT-ONLY-STUFF"
+               "!GLOBALDB-COLD-INIT" "!FDEFN-COLD-INIT"
+               "!FUNCTION-NAMES-COLD-INIT"
+               "!TYPE-CLASS-COLD-INIT" "!TYPEDEFS-COLD-INIT"
+               "!ALIEN-TYPE-COLD-INIT" "!CLASSES-COLD-INIT"
+               "!EARLY-TYPE-COLD-INIT" "!LATE-TYPE-COLD-INIT"
+               "!FIXUP-TYPE-COLD-INIT" "!TARGET-TYPE-COLD-INIT"
+               "!RANDOM-COLD-INIT" "!READER-COLD-INIT"
+               "!TYPECHECKFUNS-COLD-INIT"
+               "STREAM-COLD-INIT-OR-RESET" "!LOADER-COLD-INIT"
+               "!EXHAUST-COLD-INIT" "!PACKAGE-COLD-INIT"
+               "SIGNAL-COLD-INIT-OR-REINIT"
+               "!POLICY-COLD-INIT-OR-RESANIFY"
+               "!VM-TYPE-COLD-INIT" "!BACKQ-COLD-INIT"
+               "!SHARPM-COLD-INIT" "!EARLY-PROCLAIM-COLD-INIT"
+               "!LATE-PROCLAIM-COLD-INIT" "!CLASS-FINALIZE"
+               "GC-REINIT"
 
-                        ;; Note: These are out of lexicographical order
-                        ;; because in CMU CL they were defined as
-                        ;; internal symbols in package "CL" imported
-                        ;; into package "C", as opposed to what we're
-                        ;; doing here, defining them as external symbols
-                        ;; in a package which is used by both "SB!C" and
-                        ;; "SB!IMPL". (SBCL's "SB!C" is directly
-                        ;; analogous to CMU CL's "C"; and for this
-                        ;; purpose, SBCL's "SB!IMPL" is analogous to CMU
-                        ;; CL's "CL".) As far as I know there's nothing
-                        ;; special about them, so they could be merged
-                        ;; into the same order as everything else in the
-                        ;; in this package. -- WHN 19990911
-                        "STRING>=*" "STRING>*" "STRING=*" "STRING<=*"
-                        "STRING<*" "STRING/=*" "%SVSET"
-                        "%SP-STRING-COMPARE" "%SETNTH" "%SETELT"
-                        "%SET-ROW-MAJOR-AREF" "%SET-FILL-POINTER"
-                        "%SET-FDEFINITION" "%SCHARSET" "%SBITSET"
-                        "%RPLACD" "%RPLACA" "%PUT" "%CHARSET" "%BITSET"
-                        "%ASET" "%ARRAY-TYPEP"
-                        "%SET-SAP-REF-DESCRIPTOR"))
+               ;; Note: These are out of lexicographical order
+               ;; because in CMU CL they were defined as
+               ;; internal symbols in package "CL" imported
+               ;; into package "C", as opposed to what we're
+               ;; doing here, defining them as external symbols
+               ;; in a package which is used by both "SB!C" and
+               ;; "SB!IMPL". (SBCL's "SB!C" is directly
+               ;; analogous to CMU CL's "C"; and for this
+               ;; purpose, SBCL's "SB!IMPL" is analogous to CMU
+               ;; CL's "CL".) As far as I know there's nothing
+               ;; special about them, so they could be merged
+               ;; into the same order as everything else in the
+               ;; in this package. -- WHN 19990911
+               "STRING>=*" "STRING>*" "STRING=*" "STRING<=*"
+               "STRING<*" "STRING/=*" "%SVSET"
+               "%SP-STRING-COMPARE" "%SETNTH" "%SETELT"
+               "%SET-ROW-MAJOR-AREF" "%SET-FILL-POINTER"
+               "%SET-FDEFINITION" "%SCHARSET" "%SBITSET"
+               "%RPLACD" "%RPLACA" "%PUT" "%CHARSET" "%BITSET"
+               "%ASET" "%ARRAY-TYPEP"
+               "%SET-SAP-REF-DESCRIPTOR"))
 
    #s(sb-cold:package-data
       :name "SB!THREAD"
