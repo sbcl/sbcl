@@ -124,5 +124,15 @@
 				  0))
 		    collect x)))
 
+;;; make sure that ENSURE-CLASS-USING-CLASS's arguments are the right
+;;; way round (!)
+(defvar *e-c-u-c-arg-order* nil)
+(defmethod ensure-class-using-class :after
+    (class (name (eql 'e-c-u-c-arg-order)) &key &allow-other-keys)
+  (setf *e-c-u-c-arg-order* t))
+(defclass e-c-u-c-arg-orderoid () ())
+(assert (null *e-c-u-c-arg-order*))
+(defclass e-c-u-c-arg-order () ())
+(assert (eq *e-c-u-c-arg-order* t))
 ;;;; success
 (sb-ext:quit :unix-status 104)

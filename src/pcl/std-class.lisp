@@ -327,9 +327,9 @@
 (setf (gdefinition 'load-defclass) #'real-load-defclass)
 
 (defun ensure-class (name &rest all)
-  (apply #'ensure-class-using-class name (find-class name nil) all))
+  (apply #'ensure-class-using-class (find-class name nil) name all))
 
-(defmethod ensure-class-using-class (name (class null) &rest args &key)
+(defmethod ensure-class-using-class ((class null) name &rest args &key)
   (multiple-value-bind (meta initargs)
       (ensure-class-values class args)
     (set-class-type-translation (class-prototype meta) name)
@@ -338,7 +338,7 @@
     (set-class-type-translation class name)
     class))
 
-(defmethod ensure-class-using-class (name (class pcl-class) &rest args &key)
+(defmethod ensure-class-using-class ((class pcl-class) name &rest args &key)
   (multiple-value-bind (meta initargs)
       (ensure-class-values class args)
     (unless (eq (class-of class) meta) (change-class class meta))

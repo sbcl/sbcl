@@ -476,8 +476,8 @@
 
 (defgeneric allocate-instance (class &rest initargs))
 
-(defgeneric ensure-class-using-class (name
-				      class
+(defgeneric ensure-class-using-class (class
+				      name
 				      &rest args
 				      &key &allow-other-keys))
 

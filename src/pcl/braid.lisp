@@ -543,11 +543,11 @@
 		(mapcar #'classoid-name (classoid-direct-superclasses
 					 (find-classoid name)))))
 	   (if slotsp
-	       (ensure-class-using-class name nil
+	       (ensure-class-using-class nil name
 					 :metaclass metaclass :name name
 					 :direct-superclasses supers
 					 :direct-slots slots)
-	       (ensure-class-using-class name nil
+	       (ensure-class-using-class nil name
 					 :metaclass metaclass :name name
 					 :direct-superclasses supers)))))
     (cond ((structure-type-p name)
