@@ -102,7 +102,7 @@
 (def!constant dynamic-1-space-start #x48000000)
 (def!constant dynamic-1-space-end   #x4ffff000)
 
-#+darwin
+#!+darwin
 (progn
   (def!constant linkage-table-space-start #x50000000)
   (def!constant linkage-table-space-end   #x51000000)
