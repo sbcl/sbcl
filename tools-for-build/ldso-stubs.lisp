@@ -32,13 +32,13 @@
 #!+sparc 
 (defun ldso-stubify (fct str)
   (apply #'format str "
-.globl ldso_stub__~A ;                          \
-	FUNCDEF(ldso_stub__~A) ;                \
-ldso_stub__~A: ;                                \
-	sethi %hi(~A),%g1	;		\
-	jmpl %g1+%lo(~A),%g0	;		\
-	nop /* delay slot*/	;		\
-.L~Ae1: ;                                       \
+.globl ldso_stub__~A ;                          \\
+	FUNCDEF(ldso_stub__~A) ;                \\
+ldso_stub__~A: ;                                \\
+	sethi %hi(~A),%g1	;		\\
+	jmpl %g1+%lo(~A),%g0	;		\\
+	nop /* delay slot*/	;		\\
+.L~Ae1: ;                                       \\
 	.size	 ldso_stub__~A,.L~Ae1-ldso_stub__~A ;~%"
           (make-list 9 :initial-element fct)))
 
@@ -56,58 +56,58 @@ ldso_stub__~A: ;                                \
         .text"
 
 #!+x86 "
-#define LDSO_STUBIFY(fct)                       \
-	.align 16 ;                             \
-.globl ldso_stub__ ## fct ;                     \
-	.type	 ldso_stub__ ## fct,@function ; \
-ldso_stub__ ## fct: ;                           \
-	jmp fct ;                               \
-.L ## fct ## e1: ;                              \
+#define LDSO_STUBIFY(fct)                       \\
+	.align 16 ;                             \\
+.globl ldso_stub__ ## fct ;                     \\
+	.type	 ldso_stub__ ## fct,@function ; \\
+ldso_stub__ ## fct: ;                           \\
+	jmp fct ;                               \\
+.L ## fct ## e1: ;                              \\
 	.size	 ldso_stub__ ## fct,.L ## fct ## e1-ldso_stub__ ## fct ;"
 
 ;;; osf1 has ancient cpp that doesn't do ##
 #!+(and osf1 alpha) "
-#define LDSO_STUBIFY(fct)                       \
-.globl ldso_stub__/**/fct ;                     \
-ldso_stub__/**/fct: ;                           \
-	jmp fct ;                               \
+#define LDSO_STUBIFY(fct)                       \\
+.globl ldso_stub__/**/fct ;                     \\
+ldso_stub__/**/fct: ;                           \\
+	jmp fct ;                               \\
 .L/**/fct/**/e1: ;"
 
 ;;; but there's no reason we need to put up with that on modern (Linux) OSes
 #!+(and linux alpha) "
-#define LDSO_STUBIFY(fct)                       \
-.globl ldso_stub__ ## fct ;                     \
-	.type	 ldso_stub__ ## fct,@function ; \
-ldso_stub__ ## fct: ;                           \
-	jmp fct ;                               \
-.L ## fct ## e1: ;                              \
+#define LDSO_STUBIFY(fct)                       \\
+.globl ldso_stub__ ## fct ;                     \\
+	.type	 ldso_stub__ ## fct,@function ; \\
+ldso_stub__ ## fct: ;                           \\
+	jmp fct ;                               \\
+.L ## fct ## e1: ;                              \\
 	.size	 ldso_stub__ ## fct,.L ## fct ## e1-ldso_stub__ ## fct ;"
 
 #!+(and linux ppc) "
-#define LDSO_STUBIFY(fct)                       \
-.globl ldso_stub__ ## fct ;                     \
-	.type    ldso_stub__ ## fct,@function ; \
-ldso_stub__ ## fct: ;                           \
-        b fct ;                                 \
-.L ## fct ## e1: ;                              \
+#define LDSO_STUBIFY(fct)                       \\
+.globl ldso_stub__ ## fct ;                     \\
+	.type    ldso_stub__ ## fct,@function ; \\
+ldso_stub__ ## fct: ;                           \\
+        b fct ;                                 \\
+.L ## fct ## e1: ;                              \\
         .size    ldso_stub__ ## fct,.L ## fct ## e1-ldso_stub__ ## fct ;"
 
 #!+(and darwin ppc) "
-#define LDSO_STUBIFY(fct)			@\
-.text                                           @\
-.globl  ldso_stub___ ## fct			@\
-ldso_stub___ ## fct:				@\
-	b ldso_stub__ ## fct ## stub		@\
-.symbol_stub ldso_stub__ ## fct ## stub:	@\
-.indirect_symbol _ ## fct			@\
-	lis	r11,ha16(ldso_stub__ ## fct ## $lazy_ptr)	@\
-	lwz	r12,lo16(ldso_stub__ ## fct ## $lazy_ptr)(r11)	@\
-	mtctr	r12				@\
-	addi	r11,r11,lo16(ldso_stub__ ## fct ## $lazy_ptr)	@\
-	bctr					@\
-.lazy_symbol_pointer				@\
-ldso_stub__ ## fct ## $lazy_ptr:		@\
-	.indirect_symbol _ ## fct		@\
+#define LDSO_STUBIFY(fct)			@\\
+.text                                           @\\
+.globl  ldso_stub___ ## fct			@\\
+ldso_stub___ ## fct:				@\\
+	b ldso_stub__ ## fct ## stub		@\\
+.symbol_stub ldso_stub__ ## fct ## stub:	@\\
+.indirect_symbol _ ## fct			@\\
+	lis	r11,ha16(ldso_stub__ ## fct ## $lazy_ptr)	@\\
+	lwz	r12,lo16(ldso_stub__ ## fct ## $lazy_ptr)(r11)	@\\
+	mtctr	r12				@\\
+	addi	r11,r11,lo16(ldso_stub__ ## fct ## $lazy_ptr)	@\\
+	bctr					@\\
+.lazy_symbol_pointer				@\\
+ldso_stub__ ## fct ## $lazy_ptr:		@\\
+	.indirect_symbol _ ## fct		@\\
 	.long dyld_stub_binding_helper"
 	
 ;;; KLUDGE: set up the vital fifth argument, passed on the 
@@ -117,22 +117,22 @@ ldso_stub__ ## fct ## $lazy_ptr:		@\
 ;;; and we apparently don't ever need to pass six arguments to a
 ;;; libc function.  -- CSR, 2003-10-29
 #!+mips "
-#define LDSO_STUBIFY(fct)                       \
-.globl ldso_stub__ ## fct ;                     \
-	.type	 ldso_stub__ ## fct,@function ; \
-ldso_stub__ ## fct: ;                           \
-	addiu $29,-48 		; \
-	sw $28,40($29)		; \
-	sw $31,44($29) 		; \
-	lw $25,64($29)		; \
-	sw $25,16($29)		; \
-	la $25,	fct	;		\
-	jalr $25	;				\
-	lw $31,44($29) 		; \
-	lw $28,40($29)		; \
-	addiu $29,48  		; \
-	jr $31 			; \
-.L ## fct ## e1: ;                              \
+#define LDSO_STUBIFY(fct)                       \\
+.globl ldso_stub__ ## fct ;                     \\
+	.type	 ldso_stub__ ## fct,@function ; \\
+ldso_stub__ ## fct: ;                           \\
+	addiu $29,-48 		; \\
+	sw $28,40($29)		; \\
+	sw $31,44($29) 		; \\
+	lw $25,64($29)		; \\
+	sw $25,16($29)		; \\
+	la $25,	fct	;		\\
+	jalr $25	;				\\
+	lw $31,44($29) 		; \\
+	lw $28,40($29)		; \\
+	addiu $29,48  		; \\
+	jr $31 			; \\
+.L ## fct ## e1: ;                              \\
 	.size	 ldso_stub__ ## fct,.L ## fct ## e1-ldso_stub__ ## fct ;"))
 
 (defvar *stubs* (append
