@@ -417,13 +417,6 @@ steppers to maintain contextual information.")
 		      ((string= option "--noprint")
 		       (pop-option)
 		       (setf noprint t))
-		      ;; FIXME: --noprogrammer was deprecated in 0.7.5, and
-		      ;; in a year or so this backwards compatibility can
-		      ;; go away.
-		      ((string= option "--noprogrammer")
-		       (warn "treating deprecated --noprogrammer as --disable-debugger")
-		       (pop-option)
-		       (push "(|DISABLE-DEBUGGER|)" reversed-evals))
 		      ((string= option "--disable-debugger")
 		       (pop-option)
 		       (push "(|DISABLE-DEBUGGER|)" reversed-evals))

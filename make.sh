@@ -51,18 +51,11 @@
 # require a second pass, just testing at build-the-cross-compiler time
 # whether the cross-compilation host returns suitable values from 
 # UPGRADED-ARRAY-ELEMENT-TYPE?)
-# FIXME: --noprogrammer was deprecated in sbcl-0.7.5, replaced by 
-# --disable-debugger. We still use the old form here because the
-# change was not preannounced, and it would be rude to make our new
-# version of SBCL unbootstrappable by immediately prior versions.
-# But in a year or so the --noprogrammer here can change to
-# --disable-debugger (and the deprecated --noprogrammer support can
-# go away completely).
 
 build_started=`date`
 echo "//starting build: $build_started"
 
-SBCL_XC_HOST="${1:-sbcl --noprogrammer}"
+SBCL_XC_HOST="${1:-sbcl --disable-debugger}"
 export SBCL_XC_HOST
 echo //SBCL_XC_HOST=\"$SBCL_XC_HOST\"
 

@@ -1,4 +1,7 @@
 changes in sbcl-0.8.22 relative to sbcl-0.8.21:
+  * incompatible change: the --noprogrammer option, deprecated since
+    version 0.7.5.  Please use the equivalent --disable-debugger
+    option instead.
   * fixed inference of the upper bound of an iteration variable.
     (reported by Rajat Datta).
   * fixed bug 376: CONJUGATE type deriver.
