@@ -894,7 +894,7 @@
     (multiple-value-bind (count err)
 	(sb!unix:unix-read (fd-stream-fd stream)
 			   (sap+ sap new-head)
-			   (fd-stream-ibuf-length stream))
+			   (- (fd-stream-ibuf-length stream) new-head))
       (declare (type (or index null) count))
       (when (null count)
 	(simple-stream-perror "couldn't read from ~S" stream err))
