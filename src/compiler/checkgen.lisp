@@ -253,7 +253,11 @@
     (not (or (values-subtypep (continuation-proven-type cont)
                               (continuation-type-to-check cont))
              (and (combination-p dest)
-                  (eq (combination-kind dest) :full)
+                  (let ((kind (combination-kind dest)))
+                    (or (eq kind :full)
+                        (and (fun-info-p kind)
+                             (null (fun-info-templates kind))
+                             (not (fun-info-ir2-convert kind)))))
                   ;; The theory is that the type assertion is from a
                   ;; declaration in (or on) the callee, so the callee
                   ;; should be able to do the check. We want to let

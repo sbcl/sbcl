@@ -1619,10 +1619,13 @@ changes in sbcl-0.8.0 relative to sbcl-0.7.14
     CLOS classes.
   * an interface to the MetaObject Protocol, as described in Kiczales,
     des Rivieres and Bobrow's "The Art of the Metaobject Protocol",
-    MIT Press, 1991, is available from the SB-MOP package.  
+    MIT Press, 1991, is available from the SB-MOP package.
   * incompatible change: the SB-PCL package should now be considered a
     private implementation detail, and no longer a semi-private MOP
     interface.
+  * known functions, which cannot be open coded by backend, are
+    considered to be able to check types of their arguments. (reported
+    by Nathan J. Froyd)
 
 planned incompatible changes in 0.7.x:
   * (not done yet, but planned:) When the profiling interface settles
