@@ -1808,6 +1808,8 @@ bootstrapping.
 					    &allow-other-keys)
   (declare (ignore keys))
   (cond ((and existing (early-gf-p existing))
+	 (when lambda-list-p
+	   (set-arg-info existing :lambda-list lambda-list))
 	 existing)
 	((assoc spec *!generic-function-fixups* :test #'equal)
 	 (if existing
