@@ -1256,6 +1256,28 @@ WORKAROUND:
 
     (FOO ' (1 . 2)) => "NIL IS INTEGER, Y = 1"
 
+202:
+  In 0.6.12.43 compilation of a function definition, contradicting its
+  FTYPE proclamation, causes an error, e.g. COMPILE-FILE on
+
+    (declaim (ftype (function () null) foo))
+    (defun foo () t)
+
+  fails with
+
+    debugger invoked on condition of type UNBOUND-VARIABLE:
+    The variable SB-C::*ERROR-FUNCTION* is unbound.
+
+  in
+
+    (SB-C::NOTE-LOSSAGE
+       "~@<The previously declared FTYPE~2I ~_~S~I ~_~
+                              conflicts with the definition type ~2I~_~S~:>"
+       (FUNCTION NIL NULL)
+       (FUNCTION NIL #))
+
+  (In 0.7.0 the variable was renamed to SB-C::*LOSSAGE-FUN*.)
+
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:
     These labels were used for bugs related to the old IR1 interpreter.
