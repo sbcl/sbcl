@@ -271,10 +271,11 @@
 	       (unsigned-reg
 		(let ((shift (* extra ,bits)))
 		  (unless (zerop shift)
-		    (inst ror old shift)
-		    (inst and old (lognot ,(1- (ash 1 bits))))
-		    (inst or old value)
-		    (inst rol old shift)))))
+		    (inst ror old shift))
+                  (inst and old (lognot ,(1- (ash 1 bits))))
+                  (inst or old value)
+		  (unless (zerop shift)
+                    (inst rol old shift)))))
 	     (inst mov (make-ea :dword :base object
 				:disp (- (* (+ word vector-data-offset)
 					    n-word-bytes)

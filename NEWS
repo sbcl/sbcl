@@ -1873,6 +1873,7 @@ changes in sbcl-0.8.1 relative to sbcl-0.8.0:
        otherwise, it creates a new class.
     ** SLOT-UNBOUND now correctly initalizes the CELL-ERROR-NAME slot
        of the UNBOUND-SLOT condition to the name of the slot.
+    ** (SETF (AREF bv 0) ...) did not work for bit vectors.
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles

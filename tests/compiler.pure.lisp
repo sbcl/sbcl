@@ -445,3 +445,14 @@
                               '(lambda ()
                                 (declare (notinline mapcar))
                                 (1+ (mapcar #'print '(1 2 3)))))))
+
+;; bug found by Paul Dietz: (SETF AREF) for bit vectors with constant
+;; index was effectless
+(let ((f (compile nil '(lambda (a v)
+                        (declare (type simple-bit-vector a) (type bit v))
+                        (declare (optimize (speed 3) (safety 0)))
+                        (setf (aref a 0) v)
+                        a))))
+  (let ((y (make-array 2 :element-type 'bit :initial-element 0)))
+    (assert (equal y #*00))
+    (funcall f y 1)
