@@ -948,7 +948,7 @@
 		     (throw 'need-orig-args nil))
 		 (let ((*up-up-and-out-allowed* colonp))
 		   (expand-directive-list (subseq directives 0 posn)))))
-	   (compute-loop-aux (count)
+	   (compute-loop (count)
 	     (when atsignp
 	       (setf *only-simple-args* nil))
 	     `(loop
@@ -972,30 +972,31 @@
 		,@(when closed-with-colon
 		    '((when (null args)
 			(return))))))
-	   (compute-loop ()
-	     (if params
-		 (expand-bind-defaults ((count nil)) params
-		   (compute-loop-aux count))
-		 (compute-loop-aux nil)))
-	   (compute-block ()
+	   (compute-block (count)
 	     (if colonp
 		 `(block outside-loop
-		    ,(compute-loop))
-		 (compute-loop)))
-	   (compute-bindings ()
+		    ,(compute-loop count))
+		 (compute-loop count)))
+	   (compute-bindings (count)
 	     (if atsignp
-		 (compute-block)
-		 `(let* ((orig-args ,(expand-next-arg))
-			 (args orig-args))
-		    (declare (ignorable orig-args args))
-		    ,(let ((*expander-next-arg-macro* 'expander-next-arg)
-			   (*only-simple-args* nil)
-			   (*orig-args-available* t))
-		       (compute-block))))))
-	(values (if (zerop posn)
-		    `(let ((inside-string ,(expand-next-arg)))
-		       ,(compute-bindings))
-		    (compute-bindings))
+                 (compute-block count)
+                 `(let* ((orig-args ,(expand-next-arg))
+                         (args orig-args))
+                   (declare (ignorable orig-args args))
+                   ,(let ((*expander-next-arg-macro* 'expander-next-arg)
+                          (*only-simple-args* nil)
+                          (*orig-args-available* t))
+                      (compute-block count))))))
+	(values (if params
+                    (expand-bind-defaults ((count nil)) params
+                      (if (zerop posn)
+                          `(let ((inside-string ,(expand-next-arg)))
+                            ,(compute-bindings count))
+                          (compute-bindings count)))
+                    (if (zerop posn)
+                        `(let ((inside-string ,(expand-next-arg)))
+                          ,(compute-bindings nil))
+                        (compute-bindings nil)))
 		(nthcdr (1+ posn) directives))))))
 
 (def-complex-format-directive #\} ()
