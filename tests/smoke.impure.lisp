@@ -15,9 +15,9 @@
 (cl:in-package :cl-user)
 
 ;;; ROOM should run without signalling an error. (bug 247)
-#+nil (room)
-#+nil (room t)
-#+nil (room nil)
+(room)
+(room t)
+(room nil)
 
 ;;; DESCRIBE should run without signalling an error.
 (defstruct to-be-described a b)
