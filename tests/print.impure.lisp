@@ -231,5 +231,13 @@
 		     (multiple-value-list (integer-decode-float x2)))
 	      (string/= (prin1-to-string x1) (prin1-to-string x2)))))
 
+;;; readable printing of arrays with *print-radix* t
+(let ((*print-radix* t) 
+      (*print-readably* t)
+      (*print-pretty* nil))
+  (let ((output (with-output-to-string (s)
+		  (write #2a((t t) (nil nil)) :stream s))))
+    (assert (equalp (read-from-string output) #2a((t t) (nil nil))))))
+
 ;;; success
 (quit :unix-status 104)

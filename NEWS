@@ -2488,6 +2488,8 @@ changes in sbcl-0.8.11 relative to sbcl-0.8.10:
        returning a known number of arguments greater than 63.
     ** fixed handling of invalid NIL arguments in keyword position
        in local calls.
+    ** fixed non-pretty printing of arrays with *PRINT-RADIX* being
+       true.
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles
