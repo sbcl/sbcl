@@ -314,8 +314,9 @@
 		      (integer-length denominator))
 		   (coerce (%log1p (coerce (- number 1) 'double-float))
 			   'single-float)
-		   (coerce (- (log numerator) (log denominator))
-			      'single-float)))))
+		   (coerce (/ (- (log2 numerator) (log2 denominator))
+			      (log (exp 1.0d0) 2.0d0))
+			   'single-float)))))
 	(((foreach single-float double-float))
 	 ;; Is (log -0) -infinity (libm.a) or -infinity + i*pi (Kahan)?
 	 ;; Since this doesn't seem to be an implementation issue
