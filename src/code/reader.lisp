@@ -993,7 +993,7 @@
       (casify-read-buffer escapes)
       (let ((found (if package-designator
 		       (find-package package-designator)
-		       *package*)))
+		       (sane-package))))
 	(unless found
 	  (error 'reader-package-error :stream stream
 		 :format-arguments (list package-designator)

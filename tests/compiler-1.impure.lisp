@@ -29,4 +29,10 @@
     (+ i f)))
 (assert (= (exercise-valuesify 1.25) 2.25))
 
+;;; A bug inherited from CMU CL screwed up special variable bindings
+;;; inside closures. This was fixed in sbcl-0.6.8.10 by applying the
+;;; patches Douglas Crosher posted to cmucl-imp@cons.org 2000-03-10
+;;; (split across two different messages).
+;;; FIXME: I'd like to find a test case for this..
+
 (sb-ext:quit :unix-status 104) ; success

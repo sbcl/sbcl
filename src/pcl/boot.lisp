@@ -1007,14 +1007,14 @@ bootstrapping.
 						      ,(cadr var)))))))
 		   (rest `((,var ,args-tail)))
 		   (key (cond ((not (consp var))
-			       `((,var (get-key-arg ,(make-keyword var)
+			       `((,var (get-key-arg ,(sb-int:keywordicate var)
 						    ,args-tail))))
 			      ((null (cddr var))
 			       (multiple-value-bind (keyword variable)
 				   (if (consp (car var))
 				       (values (caar var)
 					       (cadar var))
-				       (values (make-keyword (car var))
+				       (values (sb-int:keywordicate (car var))
 					       (car var)))
                                  ;; MNA: non-self-eval-keyword patch
 				 `((,key (get-key-arg1 ',keyword ,args-tail))
@@ -1026,7 +1026,7 @@ bootstrapping.
 				   (if (consp (car var))
 				       (values (caar var)
 					       (cadar var))
-				       (values (make-keyword (car var))
+				       (values (sb-int:keywordicate (car var))
 					       (car var)))
                                  ;; MNA: non-self-eval-keyword patch
 				 `((,key (get-key-arg1 ',keyword ,args-tail))
@@ -1313,14 +1313,13 @@ bootstrapping.
 	  (or mf (method-function-from-fast-function mff)))))))
 
 (defun analyze-lambda-list (lambda-list)
-  ;;(declare (values nrequired noptional keysp restp allow-other-keys-p
-  ;;		 keywords keyword-parameters))
-  (flet ((parse-keyword-argument (arg)
+  (flet (;; FIXME: Is this redundant with SB-C::MAKE-KEYWORD-FOR-ARG?
+	 (parse-keyword-argument (arg)
 	   (if (listp arg)
 	       (if (listp (car arg))
 		   (caar arg)
-		   (make-keyword (car arg)))
-	       (make-keyword arg))))
+		   (sb-int:keywordicate (car arg)))
+	       (sb-int:keywordicate arg))))
     (let ((nrequired 0)
 	  (noptional 0)
 	  (keysp nil)
@@ -1354,7 +1353,7 @@ bootstrapping.
 (defun keyword-spec-name (x)
   (let ((key (if (atom x) x (car x))))
     (if (atom key)
-	(intern (symbol-name key) *keyword-package*)
+	(intern (symbol-name key) sb-int:*keyword-package*)
 	(car key))))
 
 (defun ftype-declaration-from-lambda-list (lambda-list name)

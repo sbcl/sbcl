@@ -548,8 +548,7 @@ changes in sbcl-0.6.9 relative to sbcl-0.6.8:
   ** The TOP debugger command is also gone, since it's redundant with the
      FRAME 0 command, and since it interfered with abbreviations for the
      TOPLEVEL restart.
-* DEFCONSTANT has been made more ANSI-compatible (completely ANSI-compatible,
-  as far as I know):
+* fixed bugs in DEFCONSTANT ANSI-compatibility:
   ** DEFCONSTANT now tests reassignments using EQL, not EQUAL, in order to 
      warn about behavior which is undefined under the ANSI spec. Note: This
      is specified by ANSI, but it's not very popular with programmers.
@@ -560,14 +559,15 @@ changes in sbcl-0.6.9 relative to sbcl-0.6.8:
      pre-ANSI IR1 translation magic, so it does the ANSI-specified thing
      when it's used as a non-toplevel form. (This is required in order
      to implement the DEFCONSTANT-EQX macro.)
-?? fixed bug: (DEFCONSTANT X 1) (DEFVAR X) (SETF X 2) no longer "works".
-?? fixed bug 21, a compiler bug re. special variables in closures. One
-  consequence of this is that ILISP should work better, because idioms like
-  (LET ((*PACKAGE* ..)) (DO-SOMETHING)) no longer have screwy side-effects.
+  ** (DEFCONSTANT X 1) (DEFVAR X) (SETF X 2) no longer "works".
+  ** Unfortunately, non-toplevel DEFCONSTANT forms can still do some
+     funny things, due to bugs in the implementation of EVAL-WHEN
+     (bug #IR1-3). This probably won't be fixed until 0.7.x. (Fortunately,
+     non-toplevel DEFCONSTANTs are uncommon.)
 * The core file version number and fasl file version number have been 
   incremented, because the old noncompliant DEFCONSTANT behavior involved
   calling functions which no longer exist.
-
-?? signal handling reliability
-?? fixed some bugs mentioned in the man page:
-  ?? DEFUN-vs.-DECLAIM
+* removed bug 21 from BUGS, since Martin Atzmueller points out that 
+  it doesn't seem to affect SBCL after all
+* The system now recovers better from non-PACKAGE values of the *PACKAGE*
+  variable.

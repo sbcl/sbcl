@@ -676,6 +676,7 @@ retained, possibly temporariliy, because it might be used internally."
              ;; useful but non-standard user-level functions..
              "ASSQ" "DELQ" "MEMQ"
 	     "%FIND-PACKAGE-OR-LOSE" "FIND-UNDELETED-PACKAGE-OR-LOSE"
+             "SANE-PACKAGE"
 
 	     ;; ..and macros
              "COLLECT"

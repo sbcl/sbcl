@@ -206,13 +206,15 @@
 						 ,n-size
 						 ,n-package)))))))))
 
-  ;; Note: CMU CL had FOP-SYMBOL-SAVE and FOP-SMALL-SYMBOL-SAVE, but since they
-  ;; made the behavior of the fasloader depend on the *PACKAGE* variable, not
-  ;; only were they a pain to support (because they required various hacks to
-  ;; handle *PACKAGE*-manipulation forms) they were basically broken by design,
-  ;; because ANSI gives the user so much flexibility in manipulating *PACKAGE*
-  ;; at load-time that no reasonable hacks could possibly make things work
-  ;; right. The ones used in CMU CL certainly didn't, as shown by e.g.
+  ;; Note: CMU CL had FOP-SYMBOL-SAVE and FOP-SMALL-SYMBOL-SAVE, but
+  ;; since they made the behavior of the fasloader depend on the
+  ;; *PACKAGE* variable, not only were they a pain to support (because
+  ;; they required various hacks to handle *PACKAGE*-manipulation
+  ;; forms) they were basically broken by design, because ANSI gives
+  ;; the user so much flexibility in manipulating *PACKAGE* at
+  ;; load-time that no reasonable hacks could possibly make things
+  ;; work right. The ones used in CMU CL certainly didn't, as shown by
+  ;; e.g.
   ;;   (IN-PACKAGE :CL-USER)
   ;;     (DEFVAR CL::*FOO* 'FOO-VALUE)
   ;;     (EVAL-WHEN (:COMPILE-TOPLEVEL :LOAD-TOPLEVEL :EXECUTE)

@@ -138,28 +138,6 @@
       (when (and (consp form) (eq (car form) name))
 	(return-from get-declaration (cdr form))))))
 
-;;; FIXME: This duplicates SB-EXT:*KEYWORD-PACKAGE*.
-(defvar *keyword-package* (find-package 'keyword))
-
-;;; FIXME: This duplicates some of the functionality of SB-EXT:KEYWORDICATE.
-(defun make-keyword (symbol)
-  (intern (symbol-name symbol) *keyword-package*))
-
-(eval-when (:compile-toplevel :load-toplevel :execute)
-
-(defun string-append (&rest strings)
-  (setq strings (copy-list strings))		;The TI Explorer can't even
-						;RPLACA a &REST arg?
-  (do ((string-loc strings (cdr string-loc)))
-      ((null string-loc)
-       (apply #'concatenate 'string strings))
-    (rplaca string-loc (string (car string-loc)))))
-
-) ; EVAL-WHEN
-
-(defun symbol-append (sym1 sym2 &optional (package *package*))
-  (intern (string-append sym1 sym2) package))
-
 (defmacro collecting-once (&key initial-value)
    `(let* ((head ,initial-value)
 	   (tail ,(and initial-value `(last head))))
@@ -180,7 +158,7 @@
        (loop (when (null .plist-tail.) (return nil))
 	     (setq ,key (pop .plist-tail.))
 	     (when (null .plist-tail.)
-	       (error "malformed plist in doplist, odd number of elements"))
+	       (error "malformed plist, odd number of elements"))
 	     (setq ,val (pop .plist-tail.))
 	     (progn ,@bod)))))
 

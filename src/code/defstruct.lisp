@@ -150,7 +150,7 @@
   (intern (string (dsd-%name dsd))
 	  (if (dsd-accessor dsd)
 	      (symbol-package (dsd-accessor dsd))
-	      *package*)))
+	      (sane-package))))
 
 ;;;; typed (non-class) structures
 

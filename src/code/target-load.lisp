@@ -187,7 +187,7 @@
 
   (let ((sb!c::*default-cookie* sb!c::*default-cookie*)
 	(sb!c::*default-interface-cookie* sb!c::*default-interface-cookie*)
-	(*package* *package*)
+	(*package* (sane-package))
 	(*readtable* *readtable*)
 	(*load-depth* (1+ *load-depth*))
 	;; The old CMU CL LOAD function used an IF-DOES-NOT-EXIST argument of

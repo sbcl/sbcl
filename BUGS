@@ -253,15 +253,6 @@ becomes FASL:
   DTC's recommended workaround from the mailing list 3 Mar 2000:
 	(setf (pcl::find-class 'ccc1) (pcl::find-class 'ccc))
 
-21:
-  There's probably a bug in the compiler handling of special variables
-  in closures, inherited from the CMU CL code, as reported on the
-  CMU CL mailing list. There's a patch for this on the CMU CL
-  mailing list too:
-    Message-ID: <38C8E188.A1E38B5E@jeack.com.au>
-    Date: Fri, 10 Mar 2000 22:50:32 +1100
-    From: "Douglas T. Crosher" <dtc@jeack.com.au>
-
 22:
   The ANSI spec, in section "22.3.5.2 Tilde Less-Than-Sign: Logical Block",
   says that an error is signalled if ~W, ~_, ~<...~:>, ~I, or ~:T is used

@@ -107,34 +107,10 @@
   (defun package-external-symbol-count (package)
     (stuff (package-external-symbols package))))
 
-(defvar *package* () ; actually initialized in cold load
+(defvar *package* (error "*PACKAGE* should be initialized in cold load!") 
   #!+sb-doc "the current package")
 ;;; FIXME: should be declared of type PACKAGE, with no NIL init form,
 ;;; after I get around to cleaning up DOCUMENTATION
-;;;
-;;; FIXME: Setting *PACKAGE* to a non-PACKAGE value (even a plausible
-;;; one, like :CL-USER) makes the system fairly unusable, without
-;;; generating useful diagnostics. Is it possible to handle this
-;;; situation more gracefully by replacing references to *PACKAGE*
-;;; with references to (DEFAULT-PACKAGE) and implementing
-;;; DEFAULT-PACKAGE so that it checks for the PACKAGEness of *PACKAGE*
-;;; and helps the user to fix any problem (perhaps going through
-;;; CERROR)?
-;;;   Error: An attempt was made to use the *PACKAGE* variable when it was
-;;;	  bound to the illegal (non-PACKAGE) value ~S. This is
-;;;	  forbidden by the ANSI specification and could have made
-;;;	  the system very confused. The *PACKAGE* variable has been
-;;;	  temporarily reset to #<PACKAGE "COMMON-LISP-USER">. How
-;;;	  would you like to proceed?
-;;;	    NAMED Set *PACKAGE* to ~S (which is the package which is
-;;;		  named by the old illegal ~S value of *PACKAGE*, and
-;;;		  is thus very likely the intended value) and continue
-;;;		  without signalling an error.
-;;;	    ERROR Leave *PACKAGE* set to #<PACKAGE "COMMON-LISP-USER">
-;;;		  and signal PACKAGE-ERROR to the code which tried to
-;;;		  use the old illegal value of *PACKAGE*.
-;;;	    CONTINUE Leave *PACKAGE* set to #<PACKAGE "COMMON-LISP-USER">
-;;;		  and continue without signalling an error.
 
 ;;; a map from package names to packages
 (defvar *package-names*)
@@ -456,7 +432,7 @@
 	     *package-names*)
     res))
 
-(defun intern (name &optional (package *package*))
+(defun intern (name &optional (package (sane-package)))
   #!+sb-doc
   "Returns a symbol having the specified name, creating it if necessary."
   ;; We just simple-stringify the name and call INTERN*, where the real
@@ -469,7 +445,7 @@
 	     (length name)
 	     (find-undeleted-package-or-lose package))))
 
-(defun find-symbol (name &optional (package *package*))
+(defun find-symbol (name &optional (package (sane-package)))
   #!+sb-doc
   "Returns the symbol named String in Package. If such a symbol is found
   then the second value is :internal, :external or :inherited to indicate
@@ -541,7 +517,7 @@
 
 ;;; If we are uninterning a shadowing symbol, then a name conflict can
 ;;; result, otherwise just nuke the symbol.
-(defun unintern (symbol &optional (package *package*))
+(defun unintern (symbol &optional (package (sane-package)))
   #!+sb-doc
   "Makes Symbol no longer present in Package. If Symbol was present
   then T is returned, otherwise NIL. If Package is Symbol's home
@@ -617,7 +593,7 @@
 		    (unintern symbol q)
 		    (return t))))))))))
 
-(defun export (symbols &optional (package *package*))
+(defun export (symbols &optional (package (sane-package)))
   #!+sb-doc
   "Exports Symbols from Package, checking that no name conflicts result."
   (let ((package (find-undeleted-package-or-lose package))
@@ -692,7 +668,7 @@
     t))
 
 ;;; Check that all symbols are accessible, then move from external to internal.
-(defun unexport (symbols &optional (package *package*))
+(defun unexport (symbols &optional (package (sane-package)))
   #!+sb-doc
   "Makes Symbols no longer exported from Package."
   (let ((package (find-undeleted-package-or-lose package))
@@ -715,7 +691,7 @@
 
 ;;; Check for name conflict caused by the import and let the user
 ;;; shadowing-import if there is.
-(defun import (symbols &optional (package *package*))
+(defun import (symbols &optional (package (sane-package)))
   #!+sb-doc
   "Make Symbols accessible as internal symbols in Package. If a symbol
   is already accessible then it has no effect. If a name conflict
@@ -755,7 +731,7 @@
 
 ;;; If a conflicting symbol is present, unintern it, otherwise just
 ;;; stick the symbol in.
-(defun shadowing-import (symbols &optional (package *package*))
+(defun shadowing-import (symbols &optional (package (sane-package)))
   #!+sb-doc
   "Import Symbols into package, disregarding any name conflict. If
   a symbol of the same name is present, then it is uninterned.
@@ -774,7 +750,7 @@
 	(pushnew sym (package-%shadowing-symbols package)))))
   t)
 
-(defun shadow (symbols &optional (package *package*))
+(defun shadow (symbols &optional (package (sane-package)))
   #!+sb-doc
   "Make an internal symbol in Package with the same name as each of the
   specified symbols, adding the new symbols to the Package-Shadowing-Symbols.
@@ -794,7 +770,7 @@
   t)
 
 ;;; Do stuff to use a package, with all kinds of fun name-conflict checking.
-(defun use-package (packages-to-use &optional (package *package*))
+(defun use-package (packages-to-use &optional (package (sane-package)))
   #!+sb-doc
   "Add all the Packages-To-Use to the use list for Package so that
   the external symbols of the used packages are accessible as internal
@@ -855,7 +831,7 @@
 	(push package (package-%used-by-list pkg)))))
   t)
 
-(defun unuse-package (packages-to-unuse &optional (package *package*))
+(defun unuse-package (packages-to-unuse &optional (package (sane-package)))
   #!+sb-doc
   "Remove Packages-To-Unuse from the use list for Package."
   (let ((package (find-undeleted-package-or-lose package)))

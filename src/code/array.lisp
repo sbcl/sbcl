@@ -616,13 +616,13 @@
 
 (defun array-has-fill-pointer-p (array)
   #!+sb-doc
-  "Returns T if the given Array has a fill pointer, or Nil otherwise."
+  "Return T if the given ARRAY has a fill pointer, or NIL otherwise."
   (declare (array array))
   (and (array-header-p array) (%array-fill-pointer-p array)))
 
 (defun fill-pointer (vector)
   #!+sb-doc
-  "Returns the Fill-Pointer of the given Vector."
+  "Return the FILL-POINTER of the given VECTOR."
   (declare (vector vector))
   (if (and (array-header-p vector) (%array-fill-pointer-p vector))
       (%array-fill-pointer vector)
@@ -637,8 +637,9 @@
   (declare (vector vector) (fixnum new))
   (if (and (array-header-p vector) (%array-fill-pointer-p vector))
       (if (> new (%array-available-elements vector))
-	(error "New fill pointer, ~S, is larger than the length of the vector."
-	       new)
+	(error
+	 "The new fill pointer, ~S, is larger than the length of the vector."
+	 new)
 	(setf (%array-fill-pointer vector) new))
       (error 'simple-type-error
 	     :datum vector
@@ -648,9 +649,9 @@
 
 (defun vector-push (new-el array)
   #!+sb-doc
-  "Attempts to set the element of Array designated by the fill pointer
-   to New-El and increment fill pointer by one. If the fill pointer is
-   too large, Nil is returned, otherwise the index of the pushed element is
+  "Attempt to set the element of ARRAY designated by its fill pointer
+   to NEW-EL, and increment the fill pointer by one. If the fill pointer is
+   too large, NIL is returned, otherwise the index of the pushed element is
    returned."
   (declare (vector array))
   (let ((fill-pointer (fill-pointer array)))

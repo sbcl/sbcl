@@ -11,7 +11,6 @@
 ;;;; files for more information.
 
 (in-package "SB!INT")
-
 
 ;;;; DO-related stuff which needs to be visible on the cross-compilation host
 
@@ -93,6 +92,37 @@
 (defun keywordicate (&rest things)
   (let ((*package* *keyword-package*))
     (apply #'symbolicate things)))
+
+;;; Access *PACKAGE* in a way which lets us recover if someone has
+;;; done something silly like (SETF *PACKAGE* :CL-USER). (Such an
+;;; assignment is undefined behavior, so it's sort of reasonable for it
+;;; to cause the system to go totally insane afterwards, but it's
+;;; a fairly easy mistake to make, so let's try to recover gracefully
+;;; instead.)
+(defun sane-package ()
+  (let ((maybe-package *package*))
+    (cond ((and (packagep maybe-package)
+		;; For good measure, we also catch the problem of
+		;; *PACKAGE* being bound to a deleted package.
+		;; Technically, this is not undefined behavior in itself,
+		;; but it will immediately lead to undefined to behavior,
+		;; since almost any operation on a deleted package is
+		;; undefined.
+		(package-name maybe-package))
+	   maybe-package)
+	  (t
+	   ;; We're in the undefined behavior zone. First, munge the
+	   ;; system back into a defined state.
+	   (let ((really-package (find-package :cl-user)))
+	     (setf *package* really-package)
+	     ;; Then complain.
+	     (error 'simple-type-error
+		    :datum maybe-package
+		    :expected-type 'package
+		    :format-control
+		    "~S can't be a ~S:~%  ~S has been reset to ~S"
+		    :format-arguments (list '*package* (type-of maybe-package)
+					    '*package* really-package)))))))
 
 ;;; Give names to elements of a numeric sequence.
 (defmacro defenum ((&key (prefix "") (suffix "") (start 0) (step 1))

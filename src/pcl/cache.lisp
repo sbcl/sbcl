@@ -36,6 +36,13 @@
 ;;; be resolved by renaming SB-INT:ITERATE to SB-INT:NAMED-LET, or
 ;;; with more gruntwork by punting the SB-ITERATE package and
 ;;; replacing calls to SB-ITERATE:ITERATE with calls to CL:LOOP.
+;;; So perhaps:
+;;;   * Do some sort of automated check for overlap of symbols to make
+;;;     sure there wouldn't be any other clashes.
+;;;   * Rename SB-INT:ITERATE to SB-INT:NAMED-LET.
+;;;   * Make SB-PCL use SB-INT and SB-EXT.
+;;;   * Grep for SB-INT: and SB-EXT: prefixes in the pcl/ directory
+;;;     and delete them.
 
 ;;; The caching algorithm implemented:
 ;;;

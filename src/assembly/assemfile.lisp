@@ -48,7 +48,8 @@
 	(let ((*features* (cons :sb-assembling *features*)))
 	  (init-assembler)
 	  (load (merge-pathnames name (make-pathname :type "lisp")))
-	  (fasl-dump-cold-load-form `(in-package ,(package-name *package*))
+	  (fasl-dump-cold-load-form `(in-package ,(package-name
+						   (sane-package)))
 				    *lap-output-file*)
 	  (sb!assem:append-segment *code-segment* *elsewhere*)
 	  (setf *elsewhere* nil)

@@ -23,7 +23,7 @@
   ;; of the system running to finish processing it
   (defstruct delayed-def!macro
     (args (required-argument) :type cons)
-    (package *package* :type package))
+    (package (sane-package) :type package))
   ;; a list of DELAYED-DEF!MACROs stored until we get DEF!MACRO working fully
   ;; so that we can apply it to them. After DEF!MACRO is made to work, this
   ;; list is processed, and then should no longer be used; it's made unbound in

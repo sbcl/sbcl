@@ -595,7 +595,19 @@ Function and macro commands:
       (let ((*debugger-hook* nil))
 	(funcall hook condition hook))))
   (sb!unix:unix-sigsetmask 0)
-  (let ((original-package *package*)) ; protected from WITH-STANDARD-IO-SYNTAX
+
+  ;; Elsewhere in the system, we use the SANE-PACKAGE function for
+  ;; this, but here causing an exception just as we're trying to handle
+  ;; an exception would be confusing, so instead we use a special hack.
+  (unless (and (packagep *package*)
+	       (package-name *package*))
+    (setf *package* (find-package :cl-user))
+    (format *error-output*
+	    "The value of ~S was not an undeleted PACKAGE. It has been
+reset to ~S."
+	    '*package* *package*))
+  (let (;; Save *PACKAGE* to protect it from WITH-STANDARD-IO-SYNTAX.
+	(original-package *package*))
     (with-standard-io-syntax
      (let* ((*debug-condition* condition)
 	    (*debug-restarts* (compute-restarts condition))

@@ -556,13 +556,14 @@
 	  (write-char #\: stream))
 	 ;; Otherwise, if the symbol's home package is the current
 	 ;; one, then a prefix is never necessary.
-	 ((eq package *package*))
+	 ((eq package (sane-package)))
 	 ;; Uninterned symbols print with a leading #:.
 	 ((null package)
 	  (when (or *print-gensym* *print-readably*)
 	    (write-string "#:" stream)))
 	 (t
-	  (multiple-value-bind (symbol accessible) (find-symbol name *package*)
+	  (multiple-value-bind (symbol accessible)
+	      (find-symbol name (sane-package))
 	    ;; If we can find the symbol by looking it up, it need not
 	    ;; be qualified. This can happen if the symbol has been
 	    ;; inherited from a package other than its home package.
@@ -1034,8 +1035,8 @@
 
 (defun output-integer (integer stream)
   ;; FIXME: This UNLESS form should be pulled out into something like
-  ;; GET-REASONABLE-PRINT-BASE, along the lines of GET-REASONABLE-PACKAGE
-  ;; for the *PACKAGE* variable.
+  ;; (SANE-PRINT-BASE), along the lines of (SANE-PACKAGE) for the
+  ;; *PACKAGE* variable.
   (unless (and (fixnump *print-base*)
 	       (< 1 *print-base* 37))
     (let ((obase *print-base*))

@@ -238,9 +238,9 @@
 (defvar *gentemp-counter* 0)
 (declaim (type unsigned-byte *gentemp-counter*))
 
-(defun gentemp (&optional (prefix "T") (package *package*))
+(defun gentemp (&optional (prefix "T") (package (sane-package)))
   #!+sb-doc
-  "Creates a new symbol interned in package Package with the given Prefix."
+  "Creates a new symbol interned in package PACKAGE with the given PREFIX."
   (declare (type string prefix))
   (loop
     (let ((*print-base* 10)

@@ -564,7 +564,7 @@
 		 minimal-debug-function-name-component)
 		((not pkg)
 		 minimal-debug-function-name-uninterned)
-		((eq pkg *package*)
+		((eq pkg (sane-package))
 		 minimal-debug-function-name-symbol)
 		(t
 		 minimal-debug-function-name-packaged))))
