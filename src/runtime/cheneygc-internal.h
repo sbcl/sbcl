@@ -6,8 +6,8 @@ extern lispobj *new_space_free_pointer;
 
 
 /* predicates */
-#if defined(DEBUG_SPACE_PREDICATES)
-
+/* #if defined(DEBUG_SPACE_PREDICATES) */
+#if 0
 boolean
 from_space_p(lispobj object)
 {
@@ -28,7 +28,7 @@ new_space_p(lispobj object)
 {
     lispobj *ptr;
 
-    gc_assert(is_lisp_pointer(object));
+    /*    gc_assert(is_lisp_pointer(object)); */
 
     ptr = (lispobj *) native_pointer(object);
 		
@@ -39,12 +39,12 @@ new_space_p(lispobj object)
 #else
 
 #define from_space_p(ptr) \
-	((from_space <= ((lispobj *) ptr)) && \
-	 (((lispobj *) ptr) < from_space_free_pointer))
+	((from_space <= ((lispobj *) ((pointer_sized_uint_t) ptr))) && \
+	 (((lispobj *) ((pointer_sized_uint_t) ptr))< from_space_free_pointer))
 
 #define new_space_p(ptr) \
-	((new_space <= ((lispobj *) ptr)) && \
-	 (((lispobj *) ptr) < new_space_free_pointer))
+	((new_space <= ((lispobj *) ((pointer_sized_uint_t) ptr))) && \
+	 (((lispobj *) ((pointer_sized_uint_t) ptr)) < new_space_free_pointer))
 
 #endif
 

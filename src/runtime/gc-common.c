@@ -68,17 +68,17 @@ forwarding_pointer_p(lispobj *pointer) {
 #ifdef LISP_FEATURE_GENCGC
     return (first_word == 0x01);
 #else
-    return (is_lisp_pointer((lispobj *)first_word)
-	    && new_space_p((lispobj *)first_word));
+    return (is_lisp_pointer(first_word)
+	    && new_space_p(first_word));
 #endif
 }
 
-static inline lispobj 
+static inline lispobj *
 forwarding_pointer_value(lispobj *pointer) {
 #ifdef LISP_FEATURE_GENCGC
-    return pointer[1];
+    return (lispobj *) ((pointer_sized_uint_t) pointer[1]);
 #else
-    return pointer[0];
+    return (lispobj *) ((pointer_sized_uint_t) pointer[0]);
 #endif
 }
 static inline lispobj
@@ -131,8 +131,7 @@ copy_object(lispobj object, int nwords)
 	nwords -= 2;
     }
 
-    /* Return Lisp pointer of new object. */
-    return ((lispobj) new) | tag;
+    return make_lispobj(new,tag);
 }
 
 static int scav_lose(lispobj *where, lispobj object); /* forward decl */
@@ -153,17 +152,17 @@ scavenge(lispobj *start, long n_words)
 	 object_ptr += n_words_scavenged) {
 
 	lispobj object = *object_ptr;
-	
+#ifdef LISP_FEATURE_GENCGC
 	gc_assert(!forwarding_pointer_p(object_ptr));
-
+#endif
 	if (is_lisp_pointer(object)) {
 	    if (from_space_p(object)) {
 		/* It currently points to old space. Check for a
 		 * forwarding pointer. */
-		lispobj *ptr = (lispobj *)native_pointer(object);
+		lispobj *ptr = native_pointer(object);
 		if (forwarding_pointer_p(ptr)) {
 		    /* Yes, there's a forwarding pointer. */
-		    *object_ptr = forwarding_pointer_value(ptr);
+		    *object_ptr = LOW_WORD(forwarding_pointer_value(ptr));
 		    n_words_scavenged = 1;
 		} else {
 		    /* Scavenge that pointer. */
@@ -266,7 +265,8 @@ trans_code(struct code *code)
 #ifdef DEBUG_CODE_GC
 	printf("Was already transported\n");
 #endif
-	return (struct code *) forwarding_pointer_value((lispobj *)code);
+	return (struct code *) forwarding_pointer_value
+	    ((lispobj *)((pointer_sized_uint_t) code));
     }
 	
     gc_assert(widetag_of(first) == CODE_HEADER_WIDETAG);
@@ -295,7 +295,6 @@ trans_code(struct code *code)
 
     displacement = l_new_code - l_code;
 
-    /* set forwarding pointer */
     set_forwarding_pointer((lispobj *)code, l_new_code);
 	
     /* set forwarding pointers for all the function headers in the */
@@ -551,7 +550,7 @@ trans_list(lispobj object)
 	gc_general_alloc(sizeof(struct cons),ALLOC_BOXED,ALLOC_QUICK);
     new_cons->car = cons->car;
     new_cons->cdr = cons->cdr; /* updated later */
-    new_list_pointer = (lispobj)new_cons | lowtag_of(object);
+    new_list_pointer = make_lispobj(new_cons,lowtag_of(object));
 
     /* Grab the cdr: set_forwarding_pointer will clobber it in GENCGC  */
     cdr = cons->cdr;
@@ -576,7 +575,7 @@ trans_list(lispobj object)
 	    gc_general_alloc(sizeof(struct cons),ALLOC_BOXED,ALLOC_QUICK);
 	new_cdr_cons->car = cdr_cons->car;
 	new_cdr_cons->cdr = cdr_cons->cdr;
-	new_cdr = (lispobj)new_cdr_cons | lowtag_of(cdr);
+	new_cdr = make_lispobj(new_cdr_cons, lowtag_of(cdr));
 
 	/* Grab the cdr before it is clobbered. */
 	cdr = cdr_cons->cdr;
@@ -1375,7 +1374,7 @@ trans_weak_pointer(lispobj object)
 #ifndef LISP_FEATURE_GENCGC
     wp = (struct weak_pointer *) native_pointer(copy);
 	
-
+    gc_assert(widetag_of(wp->header)==WEAK_POINTER_WIDETAG);
     /* Push the weak pointer onto the list of weak pointers. */
     wp->next = LOW_WORD(weak_pointers);
     weak_pointers = wp;
@@ -1393,10 +1392,11 @@ size_weak_pointer(lispobj *where)
 void scan_weak_pointers(void)
 {
     struct weak_pointer *wp;
-    for (wp = weak_pointers; wp != NULL; wp = wp->next) {
+    for (wp = weak_pointers; wp != NULL; 
+	 wp=(struct weak_pointer *)native_pointer(wp->next)) {
 	lispobj value = wp->value;
 	lispobj *first_pointer;
-
+	gc_assert(widetag_of(wp->header)==WEAK_POINTER_WIDETAG);
 	if (!(is_lisp_pointer(value) && from_space_p(value)))
 	    continue;
 
@@ -1408,7 +1408,8 @@ void scan_weak_pointers(void)
 	first_pointer = (lispobj *)native_pointer(value);
 	
 	if (forwarding_pointer_p(first_pointer)) {
-	    wp->value=forwarding_pointer_value(first_pointer);
+	    wp->value=
+		(lispobj)LOW_WORD(forwarding_pointer_value(first_pointer));
 	} else {
 	    /* Break it. */
 	    wp->value = NIL;
@@ -1446,7 +1447,7 @@ size_lose(lispobj *where)
 {
     lose("no size function for object at 0x%08x (widetag 0x%x)",
 	 (unsigned long)where,
-	 widetag_of(where));
+	 widetag_of(LOW_WORD(where)));
     return 1; /* bogus return value to satisfy static type checking */
 }
 

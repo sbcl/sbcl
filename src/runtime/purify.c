@@ -75,7 +75,7 @@ static int later_count = 0;
 #define CEILING(x,y) (((x) + ((y) - 1)) & (~((y) - 1)))
 #define NWORDS(x,y) (CEILING((x),(y)) / (y))
 
-/* FIXME: (1) Shouldn't this be defined in sbcl.h? */
+/* FIXME: Shouldn't this be defined in sbcl.h? */
 #ifdef sparc
 #define FUN_RAW_ADDR_OFFSET 0
 #else
@@ -85,9 +85,7 @@ static int later_count = 0;
 static boolean
 forwarding_pointer_p(lispobj obj)
 {
-    lispobj *ptr;
-
-    ptr = (lispobj *)obj;
+    lispobj *ptr = native_pointer(obj);
 
     return ((static_end <= ptr && ptr <= static_free) ||
             (read_only_end <= ptr && ptr <= read_only_free));
@@ -462,7 +460,7 @@ ptrans_boxed(lispobj thing, lispobj header, boolean constant)
     bcopy(old, new, nwords * sizeof(lispobj));
 
     /* Deposit forwarding pointer. */
-    result = (lispobj)new | lowtag_of(thing);
+    result = make_lispobj(new, lowtag_of(thing));
     *old = result;
 
     /* Scavenge it. */
@@ -506,7 +504,7 @@ ptrans_instance(lispobj thing, lispobj header, boolean constant)
 	    bcopy(old, new, nwords * sizeof(lispobj));
 
 	    /* Deposit forwarding pointer. */
-	    result = (lispobj)new | lowtag_of(thing);
+	    result = make_lispobj(new, lowtag_of(thing));
 	    *old = result;
 
 	    /* Scavenge it. */
@@ -538,7 +536,7 @@ ptrans_fdefn(lispobj thing, lispobj header)
     bcopy(old, new, nwords * sizeof(lispobj));
 
     /* Deposit forwarding pointer. */
-    result = (lispobj)new | lowtag_of(thing);
+    result = make_lispobj(new, lowtag_of(thing));
     *old = result;
 
     /* Scavenge the function. */
@@ -556,19 +554,19 @@ ptrans_unboxed(lispobj thing, lispobj header)
 {
     int nwords;
     lispobj result, *new, *old;
-
+    
     nwords = 1 + HeaderValue(header);
-
+    
     /* Allocate it */
     old = (lispobj *)native_pointer(thing);
     new = read_only_free;
     read_only_free += CEILING(nwords, 2);
-
+    
     /* Copy it. */
     bcopy(old, new, nwords * sizeof(lispobj));
-
+    
     /* Deposit forwarding pointer. */
-    result = (lispobj)new | lowtag_of(thing);
+    result = make_lispobj(new , lowtag_of(thing));
     *old = result;
 
     return result;
@@ -596,7 +594,7 @@ ptrans_vector(lispobj thing, int bits, int extra,
 
     bcopy(vector, new, nwords * sizeof(lispobj));
 
-    result = (lispobj)new | lowtag_of(thing);
+    result = make_lispobj(new, lowtag_of(thing));
     vector->header = result;
 
     if (boxed)
@@ -704,11 +702,11 @@ ptrans_code(lispobj thing)
 
     bcopy(code, new, nwords * sizeof(lispobj));
 
-#ifdef __i386__
+#ifdef LISP_FEATURE_X86
     apply_code_fixups_during_purify(code,new);
 #endif
 
-    result = (lispobj)new | OTHER_POINTER_LOWTAG;
+    result = make_lispobj(new, OTHER_POINTER_LOWTAG);
 
     /* Stick in a forwarding pointer for the code object. */
     *(lispobj *)code = result;
@@ -782,12 +780,13 @@ ptrans_func(lispobj thing, lispobj header)
 
         function = (struct simple_fun *)native_pointer(thing);
         code =
-	    (native_pointer(thing) -
-	     (HeaderValue(function->header)*sizeof(lispobj))) |
-            OTHER_POINTER_LOWTAG;
-
+	    make_lispobj
+	    ((native_pointer(thing) -
+	      (HeaderValue(function->header))), OTHER_POINTER_LOWTAG);
+	
         /* This will cause the function's header to be replaced with a 
          * forwarding pointer. */
+
         ptrans_code(code);
 
         /* So we can just return that. */
@@ -815,7 +814,7 @@ ptrans_func(lispobj thing, lispobj header)
         bcopy(old, new, nwords * sizeof(lispobj));
 
         /* Deposit forwarding pointer. */
-        result = (lispobj)new | lowtag_of(thing);
+        result = make_lispobj(new, lowtag_of(thing));
         *old = result;
 
         /* Scavenge it. */
@@ -873,7 +872,7 @@ ptrans_list(lispobj thing, boolean constant)
         thing = new->cdr = old->cdr;
 
         /* Set up the forwarding pointer. */
-        *(lispobj *)old = ((lispobj)new) | LIST_POINTER_LOWTAG;
+        *(lispobj *)old = make_lispobj(new, LIST_POINTER_LOWTAG);
 
         /* And count this cell. */
         length++;
@@ -884,7 +883,7 @@ ptrans_list(lispobj thing, boolean constant)
     /* Scavenge the list we just copied. */
     pscav((lispobj *)orig, length * WORDS_PER_CONS, constant);
 
-    return ((lispobj)orig) | LIST_POINTER_LOWTAG;
+    return make_lispobj(orig, LIST_POINTER_LOWTAG);
 }
 
 static lispobj

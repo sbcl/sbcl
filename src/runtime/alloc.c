@@ -74,7 +74,7 @@ alloc_vector(int type, int length, int size)
     result->header = type;
     result->length = make_fixnum(length);
 
-    return ((lispobj)result)|OTHER_POINTER_LOWTAG;
+    return make_lispobj(result,OTHER_POINTER_LOWTAG);
 }
 
 lispobj
@@ -85,7 +85,7 @@ alloc_cons(lispobj car, lispobj cdr)
     ptr->car = car;
     ptr->cdr = cdr;
 
-    return (lispobj)ptr | LIST_POINTER_LOWTAG;
+    return make_lispobj(ptr, LIST_POINTER_LOWTAG);
 }
 
 lispobj
@@ -100,7 +100,7 @@ alloc_number(long n)
 
         ptr->digits[0] = n;
 
-	return (lispobj) ptr | OTHER_POINTER_LOWTAG;
+	return make_lispobj(ptr, OTHER_POINTER_LOWTAG);
     }
 }
 
@@ -124,5 +124,5 @@ alloc_sap(void *ptr)
     sap=(struct sap *)
 	alloc_unboxed((int)SAP_WIDETAG, sizeof(struct sap)/sizeof(lispobj) -1);
     sap->pointer = ptr;
-    return (lispobj) sap | OTHER_POINTER_LOWTAG;
+    return make_lispobj(sap,OTHER_POINTER_LOWTAG);
 }

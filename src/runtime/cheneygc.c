@@ -43,8 +43,6 @@ lispobj *from_space_free_pointer;
 lispobj *new_space;
 lispobj *new_space_free_pointer;
 
-static struct weak_pointer *weak_pointers;
-
 static void scavenge_newspace(void);
 static void scavenge_interrupt_contexts(void);
 

@@ -24,4 +24,4 @@ OS_SRC = sunos-os.c sparc-sunos-os.c os-common.c
 LINKFLAGS+= 
 OS_LIBS= -ldl -lsocket -lnsl 
 
-GC_SRC= gc.c
+GC_SRC= cheneygc.c

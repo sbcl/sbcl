@@ -68,6 +68,6 @@ void globals_init(void)
 
     current_control_frame_pointer = (lispobj *)0;
 #ifndef BINDING_STACK_POINTER
-    current_binding_stack_pointer = BINDING_STACK_START;
+    current_binding_stack_pointer = native_pointer(BINDING_STACK_START);
 #endif
 }

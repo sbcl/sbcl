@@ -288,7 +288,7 @@ static void brief_list(lispobj obj)
     int space = 0;
     int length = 0;
 
-    if (!is_valid_lisp_addr((os_vm_address_t)obj))
+    if (!is_valid_lisp_addr((os_vm_address_t)native_pointer(obj)))
 	printf("(invalid Lisp-level address)");
     else if (obj == NIL)
         printf("NIL");
@@ -320,7 +320,7 @@ static void brief_list(lispobj obj)
 
 static void print_list(lispobj obj)
 {
-    if (!is_valid_lisp_addr((os_vm_address_t)obj)) {
+    if (!is_valid_lisp_addr((os_vm_address_t)native_pointer(obj))) {
 	printf("(invalid address)");
     } else if (obj == NIL) {
         printf(" (NIL)");

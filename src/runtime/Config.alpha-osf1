@@ -27,4 +27,4 @@ ARCH_SRC = alpha-arch.c undefineds.c
 OS_SRC = osf1-os.c  alpha-osf1-os.c os-common.c 
 OS_LIBS= #-ldl
 
-GC_SRC= gc.c
+GC_SRC= cheneygc.c

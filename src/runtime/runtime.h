@@ -59,7 +59,8 @@
 typedef unsigned int u32;
 typedef signed int s32;
 #define LOW_WORD(c) ((long)(c) & 0xFFFFFFFFL)
-
+/* this is an integral type the same length as a machine pointer */
+typedef unsigned long pointer_sized_uint_t ;
 
 typedef u32 lispobj;
 
@@ -83,11 +84,15 @@ is_lisp_pointer(lispobj obj)
 
 /* Convert from a lispobj with type bits to a native (ordinary
  * C/assembly) pointer to the beginning of the object. */
-static inline lispobj
+static inline lispobj *
 native_pointer(lispobj obj)
 {
-    return obj & ~LOWTAG_MASK;
+    return (lispobj *) ((pointer_sized_uint_t) (obj & ~LOWTAG_MASK));
 }
+/* inverse operation: create a suitably tagged lispobj from a native
+ * pointer or integer.  Needs to be a macro due to the tedious C type
+ * system */
+#define make_lispobj(o,low_tag) ((lispobj)(LOW_WORD(o)|low_tag))
 
 /* FIXME: There seems to be no reason that make_fixnum and fixnum_value
  * can't be implemented as (possibly inline) functions. */
@@ -109,7 +114,7 @@ typedef int boolean;
 /* This only works for static symbols. */
 /* FIXME: should be called StaticSymbolFunction, right? */
 #define SymbolFunction(sym) \
-    (((struct fdefn *)(SymbolValue(sym)-OTHER_POINTER_LOWTAG))->fun)
+    (((struct fdefn *)(native_pointer(SymbolValue(sym))))->fun)
 
 /* KLUDGE: As far as I can tell there's no ANSI C way of saying
  * "this function never returns". This is the way that you do it

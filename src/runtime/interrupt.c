@@ -523,8 +523,8 @@ boolean handle_control_stack_guard_triggered(os_context_t *context,void *addr)
 {
     /* note the os_context hackery here.  When the signal handler returns, 
      * it won't go back to what it was doing ... */
-    if(addr>=CONTROL_STACK_GUARD_PAGE && 
-       addr<(CONTROL_STACK_GUARD_PAGE+os_vm_page_size)) {
+    if(addr>=(void *)CONTROL_STACK_GUARD_PAGE && 
+       addr<(void *)(CONTROL_STACK_GUARD_PAGE+os_vm_page_size)) {
 	void *fun;
 	void *code;
 	
@@ -532,7 +532,8 @@ boolean handle_control_stack_guard_triggered(os_context_t *context,void *addr)
 	 * temporarily so the error handler has some headroom */
 	protect_control_stack_guard_page(0);
 	
-	fun = native_pointer(SymbolFunction(CONTROL_STACK_EXHAUSTED_ERROR));
+	fun = (void *)
+	    native_pointer((lispobj) SymbolFunction(CONTROL_STACK_EXHAUSTED_ERROR));
 	code = &(((struct simple_fun *) fun)->code);
 
 	/* Build a stack frame showing `interrupted' so that the
