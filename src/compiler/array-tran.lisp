@@ -303,8 +303,7 @@
 	   (when (constant-continuation-p initial-element)
 	     (let ((value (continuation-value initial-element)))
 	       (cond
-		 ((not (csubtypep (ctype-of value)
-				  (saetp-ctype saetp)))
+		 ((not (ctypep value (saetp-ctype saetp)))
 		  ;; this case will cause an error at runtime, so we'd
 		  ;; better WARN about it now.
 		  (compiler-warn "~@<~S is not a ~S (which is the ~
@@ -312,7 +311,7 @@
 				 value
 				 (type-specifier (saetp-ctype saetp))
 				 eltype))
-		 ((not (csubtypep (ctype-of value) eltype-type))
+		 ((not (ctypep value eltype-type))
 		  ;; this case will not cause an error at runtime, but
 		  ;; it's still worth STYLE-WARNing about.
 		  (compiler-style-warn "~S is not a ~S."

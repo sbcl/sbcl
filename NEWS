@@ -1834,6 +1834,8 @@ changes in sbcl-0.8.1 relative to sbcl-0.8.0:
     ** FIND-METHOD signals an error if the lengths of the specializers
        is incompatible with the generic function, even if the ERRORP
        argument is true.
+    ** TYPE-OF returns recognizeable subtypes of all built-in-types of
+       which its argument is a member.
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles

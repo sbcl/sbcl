@@ -348,7 +348,7 @@
       (memmove (sap+ (sapify dst) dst-start)
 	       (sap+ (sapify src) src-start)
 	       (- dst-end dst-start)))
-     nil))
+     (values)))
 
 ;;;; transforms for EQL of floating point values
 

@@ -240,23 +240,23 @@
 
 (defknown copy-to-system-area
 	  ((simple-unboxed-array (*)) index system-area-pointer index index)
-  null
+  (values)
   ())
 
 (defknown copy-from-system-area
 	  (system-area-pointer index (simple-unboxed-array (*)) index index)
-  null
+  (values)
   ())
 
 (defknown system-area-copy
 	  (system-area-pointer index system-area-pointer index index)
-  null
+  (values)
   ())
 
 (defknown bit-bash-copy
 	  ((simple-unboxed-array (*)) index
 	   (simple-unboxed-array (*)) index index)
-  null
+  (values)
   ())
 
 ;;; (not really a bit-bashing routine, but starting to take over from
@@ -264,7 +264,7 @@
 (defknown %byte-blt
   ((or (simple-unboxed-array (*)) system-area-pointer) index
    (or (simple-unboxed-array (*)) system-area-pointer) index index)
-  null
+  (values)
   ())
 
 ;;;; code/function/fdefn object manipulation routines

@@ -155,7 +155,8 @@ cat > $tmpfilename <<EOF
 EOF
 expect_clean_compile $tmpfilename
 
-# This in an ideal world would fail, but at present it doesn't.
+# This in an ideal world would fail (that is, return with FAILURE-P
+# set), but at present it doesn't.
 cat > $tmpfilename <<EOF
     (in-package :cl-user)
     (defun foo (x) (list x))
@@ -166,6 +167,24 @@ cat > $tmpfilename <<EOF
         (1+ (foo x))))
 EOF
 # expect_failed_compile $tmpfilename
+
+# This used to not warn, because the VALUES derive-type optimizer was
+# insufficiently precise.
+cat > $tmpfilename <<EOF
+    (in-package :cl-user)
+    (defun foo (x) (declare (ignore x)) (values))
+    (defun bar (x) (1+ (foo x)))
+EOF
+expect_failed_compile $tmpfilename
+
+# Even after making the VALUES derive-type optimizer more precise, the
+# following should still be clean.
+cat > $tmpfilename <<EOF
+    (in-package :cl-user)
+    (defun foo (x) (declare (ignore x)) (values))
+    (defun bar (x) (car x))
+EOF
+expect_clean_compile $tmpfilename
 
 rm $tmpfilename
 rm $compiled_tmpfilename

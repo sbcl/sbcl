@@ -167,10 +167,6 @@
 					   (addr (* t))
 					   (len integer)
 					   (af integer)))
- (:structure hostent ("struct hostent"
-                      ((* t) name "char *" "h_name")
-                      (integer length "int" "h_length")))
-
  (:function setsockopt ("setsockopt" integer
                         (socket integer)
                         (level integer)

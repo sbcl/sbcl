@@ -2265,7 +2265,8 @@
   (values-specifier-type
    `(values ,@(mapcar (lambda (x)
 			(type-specifier (continuation-type x)))
-		      values))))
+		      values)
+            &optional)))
 
 ;;;; byte operations
 ;;;;

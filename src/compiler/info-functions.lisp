@@ -258,7 +258,7 @@
        (typecase x
 	 (structure-class (values (info :type :documentation (class-name x))))
 	 (t (and (typep x 'symbol) (values (info :type :documentation x))))))
-      (setf (info :setf :documentation x))
+      (setf (values (info :setf :documentation x)))
       ((t)
        (typecase x
 	 (function (%fun-doc x))
