@@ -4,4 +4,5 @@ ppc-linux-mcontext.h
 sbcl
 sbcl.h
 sbcl.nm
+sparc-funcdef.h
 trymap

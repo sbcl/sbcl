@@ -1,6 +1,6 @@
 #define _ASM
 
-#define FUNCDEF(x)	.type x,@function
+#include "sparc-funcdef.h"
 
 #define LANGUAGE_ASSEMBLY
 #include "lispregs.h"

@@ -186,11 +186,17 @@ elif [ "$sbcl_arch" = "ppc" -a "$sbcl_os" = "darwin" ]; then
         echo "See the limit(1) or ulimit(1) commands and the README file."
         exit 1
     fi
+elif [ "$sbcl_arch" = "sparc" ]; then
+    # Test the compiler in order to see if we are building on Sun 
+    # toolchain as opposed to GNU binutils, and write the appropriate
+    # FUNCDEF macro for assembler. No harm in running this on sparc-linux 
+    # as well.
+    sh tools-for-build/sparc-funcdef.sh > src/runtime/sparc-funcdef.h
 else
     # Nothing need be done in this case, but sh syntax wants a placeholder.
     echo > /dev/null
 fi
-			    
+
 echo //finishing $ltf
 echo ')' >> $ltf
 

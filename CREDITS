@@ -647,6 +647,10 @@ Stig Erik Sandoe:
   He showed how to convince the GNU toolchain to build SBCL in a way
   which supports callbacks from C code into SBCL.
 
+Nikodemus Siivola:
+  He provided build fixes, in particular to tame the SunOS toolchain,
+  and has fixed many (stream-related and other) bugs besides.
+
 Brian Spilsbury:
   He wrote Unicode-capable versions of SBCL's character, string, and
   stream types and operations on them.
