@@ -178,8 +178,8 @@ Lstack:
 	fnsave	(%esp)		# save and reset NPX
 
 	movl	(%esp),%eax	# Load NPX control word.
-	andl	$0xfffff3ff,%eax	# Set rounding mode to nearest.
-	orl	$0x00000300,%eax	# Set precision to 64 bits.
+	andl	$0xfffff2ff,%eax	# Set rounding mode to nearest.
+	orl	$0x00000200,%eax	# Set precision to 64 bits.  (53-bit mantissa)
 	pushl	%eax
 	fldcw	(%esp)		# Recover modes.
 	popl	%eax

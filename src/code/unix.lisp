@@ -64,21 +64,25 @@
 ;;; implemented using SB!XC:DEFMACRO wrapped in EVAL-WHEN.
 
 (defmacro syscall ((name &rest arg-types) success-form &rest args)
-  `(let ((result (alien-funcall (extern-alien ,name (function int ,@arg-types))
+  `(locally
+    (declare (optimize (sb!c::float-accuracy 0)))
+    (let ((result (alien-funcall (extern-alien ,name (function int ,@arg-types))
 				,@args)))
-     (if (minusp result)
-	 (values nil (get-errno))
-        ,success-form)))
+      (if (minusp result)
+	  (values nil (get-errno))
+	  ,success-form))))
 
 ;;; This is like SYSCALL, but if it fails, signal an error instead of
 ;;; returning error codes. Should only be used for syscalls that will
 ;;; never really get an error.
 (defmacro syscall* ((name &rest arg-types) success-form &rest args)
-  `(let ((result (alien-funcall (extern-alien ,name (function int ,@arg-types))
-				,@args)))
-     (if (minusp result)
-	 (error "Syscall ~A failed: ~A" ,name (strerror))
-	 ,success-form)))
+  `(locally
+    (declare (optimize (sb!c::float-accuracy 0)))
+    (let ((result (alien-funcall (extern-alien ,name (function int ,@arg-types))
+				 ,@args)))
+      (if (minusp result)
+	  (error "Syscall ~A failed: ~A" ,name (strerror))
+	  ,success-form))))
 
 (/show0 "unix.lisp 109")
 

@@ -2522,6 +2522,9 @@ changes in sbcl-0.8.12 relative to sbcl-0.8.11:
   * the behaviour of the standard function ED is now customizeable by
     third parties through a hook variable: see ED's documentation
     string for information on the protocol.
+  * fixed bugs 45d and 118: DOUBLE-FLOAT[-NEGATIVE]-EPSILON now
+    exhibit the required behaviour on the x86 platform.  (thanks to
+    Peter van Eynde, Eric Marsden and Bruno Haible)
   * fixed bug 335: ATANH now computes the inverse hyperbolic tangent
     even for difficult arguments.  (reported by Peter Graves)
   * fixed a bug in backquote printing: no more modification of the

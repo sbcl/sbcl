@@ -1,7 +1,6 @@
 for early 0.8.x:
 
 * test file reworking
-	** non-x86 ports now pass irrat.pure.lisp
 	** ports with less than 256Mb of heap (sparc, ppc and mips)
 		now don't fail bit-vector.impure-cload.lisp
 * faster bootstrapping (both make.sh and slam.sh)

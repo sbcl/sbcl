@@ -30,6 +30,12 @@
 	(cons :positive-infinity float-round-to-positive)
 	(cons :negative-infinity float-round-to-negative)))
 
+#!+x86
+(defparameter *precision-mode-alist*
+  (list (cons :24-bit float-precision-24-bit)
+	(cons :53-bit float-precision-53-bit)
+	(cons :64-bit float-precision-64-bit)))
+
 ;;; Return a mask with all the specified float trap bits set.
 (defun float-trap-mask (names)
   (reduce #'logior
@@ -74,6 +80,9 @@
 ;;;    have this feature, and some SBCL ports don't implement it anyway
 ;;;    -- in such cases the value is always NIL.
 ;;;
+;;;:PRECISION (x86 only) :24-bit, :53-bit and :64-bit, for the
+;;;internal precision of the mantissa.
+;;;
 ;;; GET-FLOATING-POINT-MODES may be used to find the floating point modes
 ;;; currently in effect.    See cold-init.lisp for the list of initially
 ;;; enabled traps
@@ -82,7 +91,8 @@
 				      (rounding-mode nil round-p)
 				      (current-exceptions nil current-x-p)
 				      (accrued-exceptions nil accrued-x-p)
-				      (fast-mode nil fast-mode-p))
+				      (fast-mode nil fast-mode-p)
+				 #!+x86 (precision nil precisionp))
   (let ((modes (floating-point-modes)))
     (when traps-p
       (setf (ldb float-traps-byte modes) (float-trap-mask traps)))
@@ -100,6 +110,11 @@
       (if fast-mode
 	  (setq modes (logior float-fast-bit modes))
 	  (setq modes (logand (lognot float-fast-bit) modes))))
+    #!+x86
+    (when precisionp
+      (setf (ldb float-precision-control modes)
+	    (or (cdr (assoc precision *precision-mode-alist*))
+		(error "unknown precision mode: ~S" precision))))
     ;; FIXME: This apparently doesn't work on Darwin
     #!-darwin (setf (floating-point-modes) modes))
 
@@ -127,7 +142,10 @@
 				     *rounding-mode-alist*))
 	:current-exceptions ,(exc-keys (ldb float-exceptions-byte modes))
 	:accrued-exceptions ,(exc-keys (ldb float-sticky-bits modes))
-	:fast-mode ,(logtest float-fast-bit modes)))))
+	:fast-mode ,(logtest float-fast-bit modes)
+	#!+x86 :precision
+	#!+x86 ,(car (rassoc (ldb float-precision-control modes)
+			     *precision-mode-alist*))))))
 
 ;;; Return true if any of the named traps are currently trapped, false
 ;;; otherwise.

@@ -156,25 +156,6 @@ WORKAROUND:
   so they could be supported after all. Very likely 
   SIGCONTEXT-FLOATING-POINT-MODES could now be supported, too.
 
-45:
-  a slew of floating-point-related errors reported by Peter Van Eynde
-  on July 25, 2000:
-	c: Many expressions generate floating infinity on x86/Linux:
-		(/ 1 0.0)
-		(/ 1 0.0d0)
-		(EXPT 10.0 1000)
-		(EXPT 10.0d0 1000)
-	   PVE's regression tests want them to raise errors. sbcl-0.7.0.5
-	   on x86/Linux generates the infinities instead. That might or
-	   might not be conforming behavior, but it's also inconsistent,
-           which is almost certainly wrong. (Inconsistency: (/ 1 0.0)
-	   should give the same result as (/ 1.0 0.0), but instead (/ 1 0.0)
-	   generates SINGLE-FLOAT-POSITIVE-INFINITY and (/ 1.0 0.0)
-	   signals an error.
-	d: (in section12.erg) various forms a la 
-		(FLOAT 1 DOUBLE-FLOAT-EPSILON)
-	   don't give the right behavior.
-
 60:
   The debugger LIST-LOCATIONS command doesn't work properly.
   (How should it work properly?)
@@ -358,34 +339,6 @@ WORKAROUND:
     #+sbcl (declaim (notinline find position find-if position-if)) ; bug 117..
 
   (see also bug 279)
-
-118:
-   as reported by Eric Marsden on cmucl-imp@cons.org 2001-08-14:
-     (= (FLOAT 1 DOUBLE-FLOAT-EPSILON)
-        (+ (FLOAT 1 DOUBLE-FLOAT-EPSILON) DOUBLE-FLOAT-EPSILON)) => T
-   when of course it should be NIL. (He says it only fails for X86,
-   not SPARC; dunno about Alpha.)
-
-   Also, "the same problem exists for LONG-FLOAT-EPSILON,
-   DOUBLE-FLOAT-NEGATIVE-EPSILON, LONG-FLOAT-NEGATIVE-EPSILON (though
-   for the -negative- the + is replaced by a - in the test)."
-
-   Raymond Toy comments that this is tricky on the X86 since its FPU
-   uses 80-bit precision internally.
-
-   Bruno Haible comments:
-     The values are those that are expected for an IEEE double-float
-     arithmetic. The problem appears to be that the rounding is not
-     IEEE on x86 compliant: namely, values are first rounded to 64
-     bits mantissa precision, then only to 53 bits mantissa
-     precision. This gives different results than rounding to 53 bits
-     mantissa precision in a single step.
-
-     The quick "fix", to permanently change the FPU control word from
-     0x037f to 0x027f, will give problems with the fdlibm code that is
-     used for computing transcendental functions like sinh() etc.
-   so maybe we need to change the FPU control word to that for Lisp
-   code, and adjust it to the safe 0x037f for calls to C?
 
 124:
    As of version 0.pre7.14, SBCL's implementation of MACROLET makes

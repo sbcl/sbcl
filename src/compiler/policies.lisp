@@ -56,3 +56,7 @@
 	3
 	0)
   ("no" "maybe" "yes" "yes"))
+
+(define-optimization-quality float-accuracy
+    3
+  ("degraded" "full" "full" "full"))

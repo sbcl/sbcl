@@ -96,6 +96,10 @@
 (def!constant float-round-to-positive 2)
 (def!constant float-round-to-zero     3)
 
+(def!constant float-precision-24-bit 0)
+(def!constant float-precision-53-bit 2)
+(def!constant float-precision-64-bit 3)
+
 (defconstant-eqx float-rounding-mode     (byte 2 10) #'equalp)
 (defconstant-eqx float-sticky-bits       (byte 6 16) #'equalp)
 (defconstant-eqx float-traps-byte        (byte 6  0) #'equalp)
