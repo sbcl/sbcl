@@ -3661,28 +3661,15 @@ garbage_collect_generation(int generation, int raise)
     /* Scavenge the stacks' conservative roots. */
     for_each_thread(th) {
 	void **ptr;
+	void **esp= (void **) &raise;
 #ifdef LISP_FEATURE_SB_THREAD
-	struct user_regs_struct regs;
-	if(ptrace(PTRACE_GETREGS,th->pid,0,&regs)){
-	    /* probably doesn't exist any more. */
-	    fprintf(stderr,"child pid %d, %s\n",th->pid,strerror(errno));
-	    perror("PTRACE_GETREGS");
+	if(th!=arch_os_get_current_thread()) {
+	    os_context_t *last_context=th->interrupt_contexts
+		[fixnum_value(SymbolValue(FREE_INTERRUPT_CONTEXT_INDEX,th))];
+	    esp = *os_context_register_addr(last_context,reg_ESP);
 	}
-	preserve_pointer(regs.ebx);
-	preserve_pointer(regs.ecx);
-	preserve_pointer(regs.edx);
-	preserve_pointer(regs.esi);
-	preserve_pointer(regs.edi);
-	preserve_pointer(regs.ebp);
-	preserve_pointer(regs.eax);
 #endif
-	for (ptr = th->control_stack_end;
-#ifdef LISP_FEATURE_SB_THREAD
-	     ptr > regs.esp;
-#else
-	     ptr > (void **)&raise;
-#endif
-	     ptr--) {
+	for (ptr = th->control_stack_end; ptr > esp;  ptr--) {
 	    preserve_pointer(*ptr);
 	}
     }
@@ -4167,7 +4154,7 @@ gc_initialize_pointers(void)
 
 
 
-extern boolean maybe_gc_pending ;
+boolean maybe_gc_pending ;
 /* alloc(..) is the external interface for memory allocation. It
  * allocates to generation 0. It is not called from within the garbage
  * collector as it is only external uses that need the check for heap

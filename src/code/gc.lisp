@@ -204,9 +204,14 @@ and submit it as a patch."
   (#!+gencgc last-gen #!-gencgc ignore sb!alien:int))
 
 #!+sb-thread
-(def-c-var-frob gc-thread-pid "gc_thread_pid")
+(progn
+  (sb!alien:define-alien-routine gc-stop-the-world sb!alien:void)
+  (sb!alien:define-alien-routine gc-start-the-world sb!alien:void))
+#!-sb-thread
+(progn
+  (defun gc-stop-the-world ())
+  (defun gc-start-the-world ()))
 
-	
 
 ;;;; SUB-GC
 
@@ -232,36 +237,21 @@ and submit it as a patch."
 
 ;;; For GENCGC all generations < GEN will be GC'ed.
 
-#!+sb-thread
-(defun sub-gc (&key (gen 0) &aux (pre-gc-dynamic-usage (dynamic-usage)))
-  (setf *need-to-collect-garbage* t)
-  (when (zerop *gc-inhibit*)
-    (setf (sb!alien:extern-alien "maybe_gc_pending" (sb!alien:unsigned 32))
-	  (1+ gen))
-    (if (zerop (sb!alien:extern-alien "stop_the_world" (sb!alien:unsigned 32)))
-	(sb!unix:unix-kill (gc-thread-pid) :SIGALRM))
-    (loop
-     (when (zerop
-	    (sb!alien:extern-alien "maybe_gc_pending" (sb!alien:unsigned 32)))
-       (return nil)))
-    (incf *n-bytes-freed-or-purified*
-	  (max 0 (- pre-gc-dynamic-usage (dynamic-usage))))
-    (setf *need-to-collect-garbage* nil)
-    (scrub-control-stack))
-  (values))
-
-#!-sb-thread
 (defvar *already-in-gc* nil "System is running SUB-GC")
-#!-sb-thread
+
 (defun sub-gc (&key (gen 0) &aux (pre-gc-dynamic-usage (dynamic-usage)))
   (when *already-in-gc* (return-from sub-gc nil))
   (setf *need-to-collect-garbage* t)
   (when (zerop *gc-inhibit*)
     (let ((*already-in-gc* t))
+      (gc-stop-the-world)
+      ;; XXX run before-gc-hooks
       (without-interrupts (collect-garbage gen))
       (incf *n-bytes-freed-or-purified*
 	    (max 0 (- pre-gc-dynamic-usage (dynamic-usage))))
-      (setf *need-to-collect-garbage* nil))
+      (setf *need-to-collect-garbage* nil)
+      ;; XXX run after-gc-hooks
+      (gc-start-the-world))
     (scrub-control-stack))
   (values))
        

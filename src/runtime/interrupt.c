@@ -104,7 +104,6 @@ boolean internal_errors_enabled = 0;
 
 struct interrupt_data * global_interrupt_data;
 
-boolean maybe_gc_pending = 0;
 
 /*
  * utility routines used by various signal handlers
@@ -280,7 +279,9 @@ interrupt_handle_pending(os_context_t *context)
 	   4 /* sizeof(sigset_t) */ );
 #endif
     sigemptyset(&data->pending_mask);
-    run_deferred_handler(data,(void *)context);	/* XXX */
+    /* This will break on sparc linux: the deferred handler really wants
+     * to be called with a void_context */
+    run_deferred_handler(data,(void *)context);	
 }
 
 /*

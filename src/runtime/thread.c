@@ -298,7 +298,6 @@ void gc_stop_the_world()
 {
     /* stop all other threads by sending them SIG_STOP_FOR_GC */
     struct thread *p,*th=arch_os_get_current_thread();
-    int countdown_to_gc=0;
     struct thread *tail=0;
     int finished=0;
     do {
@@ -330,6 +329,6 @@ void gc_start_the_world()
 	if(p==th) continue;
 	kill(p->pid,SIGCONT);
     }
+    release_spinlock(&all_threads_lock);
 }
-
 #endif
