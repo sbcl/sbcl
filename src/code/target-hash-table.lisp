@@ -597,21 +597,18 @@
   #!+sb-doc
   "This removes all the entries from HASH-TABLE and returns the hash table
    itself."
+  (declare (optimize speed))
   (let* ((kv-vector (hash-table-table hash-table))
-	 (kv-length (length kv-vector))
 	 (next-vector (hash-table-next-vector hash-table))
 	 (hash-vector (hash-table-hash-vector hash-table))
 	 (size (length next-vector))
-	 (index-vector (hash-table-index-vector hash-table))
-	 (length (length index-vector)))
+	 (index-vector (hash-table-index-vector hash-table)))
     ;; Disable GC tricks.
     (set-header-data kv-vector sb!vm:vector-normal-subtype)
     ;; Mark all slots as empty by setting all keys and values to magic
     ;; tag.
-    (do ((i 2 (1+ i)))
-	((>= i kv-length))
-      (setf (aref kv-vector i) +empty-ht-slot+))
     (aver (eq (aref kv-vector 0) hash-table))
+    (fill kv-vector +empty-ht-slot+ :start 2)
     ;; Set up the free list, all free.
     (do ((i 1 (1+ i)))
 	((>= i (1- size)))
@@ -620,12 +617,10 @@
     (setf (hash-table-next-free-kv hash-table) 1)
     (setf (hash-table-needing-rehash hash-table) 0)
     ;; Clear the index-vector.
-    (dotimes (i length)
-      (setf (aref index-vector i) 0))
+    (fill index-vector 0)
     ;; Clear the hash-vector.
     (when hash-vector
-      (dotimes (i size)
-	(setf (aref hash-vector i) +magic-hash-vector-value+))))
+      (fill hash-vector +magic-hash-vector-value+)))
   (setf (hash-table-number-entries hash-table) 0)
   hash-table)
 
