@@ -94,12 +94,12 @@
 (define-vop (fast-signed-c-binop fast-signed-binop)
   (:args (x :target r :scs (signed-reg)))
   (:info y)
-  (:arg-types tagged-num (:constant integer)))
+  (:arg-types signed-num (:constant integer)))
 
 (define-vop (fast-unsigned-c-binop fast-unsigned-binop)
   (:args (x :target r :scs (unsigned-reg)))
   (:info y)
-  (:arg-types tagged-num (:constant integer)))
+  (:arg-types unsigned-num (:constant integer)))
 
 (defmacro define-binop (translate cost untagged-cost op 
 		        tagged-type untagged-type
@@ -207,10 +207,10 @@
     (inst bne temp done)
     (move zero-tn result)
     (inst br zero-tn done)
-      
+
     POSITIVE
     (inst sll number amount result)
-      
+
     DONE))
 
 (define-vop (fast-ash/signed=>signed)
@@ -232,10 +232,10 @@
     (inst bne temp done)
     (inst sra number 63 result)
     (inst br zero-tn done)
-      
+
     POSITIVE
     (inst sll number amount result)
-      
+
     DONE))
 
 (define-vop (fast-ash-c/signed=>signed)
