@@ -2,7 +2,11 @@
 
 #include "sbcl.h"	
 #include "lispregs.h"
-	
+#include "genesis/fdefn.h"
+#include "genesis/closure.h"
+#include "genesis/simple-fun.h"
+#include "genesis/static-symbols.h"
+		
 #define zero $0
 #define at $1
 #define v0 $2
