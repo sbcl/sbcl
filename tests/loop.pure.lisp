@@ -83,3 +83,12 @@
 
 (let ((*package* (find-package :cl)))
   (assert (= (loop for x being each external-symbol count t) 978)))
+
+(assert (eq (loop for a = (return t) return nil) t))
+
+(multiple-value-bind (result error)
+    (ignore-errors
+      (loop for nil being the external-symbols of :nonexistent-package
+	    count t))
+  (assert (null result))
+  (assert (typep error 'package-error)))

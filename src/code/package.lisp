@@ -231,7 +231,13 @@
 	    (,packages `,(mapcar (lambda (package)
 				   (if (packagep package)
 				       package
-				       (find-package package)))
+				       ;; Maybe FIND-PACKAGE-OR-DIE?
+				       (or (find-package package)
+					   (error 'simple-package-error
+						  ;; could be a character
+						  :name (string package)
+						  :format-control "~@<~S does not name a package ~:>"
+						  :format-arguments (list package)))))
 				 (if (consp ,these-packages)
 				     ,these-packages
 				     (list ,these-packages))))
@@ -244,6 +250,7 @@
 	    `(setf ,package-use-list (package-%use-list (car ,packages)))
 	    `(declare (ignore ,package-use-list)))
        (macrolet ((,init-macro (next-kind)
+	 (declare (optimize (inhibit-warnings 3)))
  	 (let ((symbols (gensym)))
 	   `(progn
 	      (setf ,',kind ,next-kind)
@@ -295,6 +302,7 @@
 	   (flet ((,real-symbol-p (number)
 		    (> number 1)))
 	     (macrolet ((,mname ()
+	      (declare (optimize (inhibit-warnings 3)))
 	      `(block ,',BLOCK
 		 (loop
 		   (case ,',kind

@@ -800,9 +800,6 @@ code to be loaded.
 		     ,(nreverse *loop-after-body*)
 		     ,(nreconc *loop-epilogue*
 			       (nreverse *loop-after-epilogue*)))))
-      (do () (nil)
-	(setq answer `(block ,(pop *loop-names*) ,answer))
-	(unless *loop-names* (return nil)))
       (dolist (entry *loop-bind-stack*)
 	(let ((vars (first entry))
 	      (dcls (second entry))
@@ -818,6 +815,9 @@ code to be loaded.
 			     ,vars
 			     ,@(loop-build-destructuring-bindings crocks
 								  forms)))))))
+      (do () (nil)
+	(setq answer `(block ,(pop *loop-names*) ,answer))
+	(unless *loop-names* (return nil)))
       answer)))
 
 (defun loop-iteration-driver ()
