@@ -194,7 +194,7 @@ Function and macro commands:
 	(setf next-list (next-code-locations (first next-list))))
       next-list)))
 
-;;; Returns a list of code-locations of the possible breakpoints of the
+;;; Return a list of code-locations of the possible breakpoints of the
 ;;; debug-function passed.
 (defun possible-breakpoints (debug-function)
   (let ((possible-breakpoints nil))
@@ -208,7 +208,7 @@ Function and macro commands:
 		(push code-location possible-breakpoints))))))
     (nreverse possible-breakpoints)))
 
-;;; Searches the info-list for the item passed (code-location,
+;;; Search the info-list for the item passed (code-location,
 ;;; debug-function, or breakpoint-info). If the item passed is a debug
 ;;; function then kind will be compared if it was specified. The kind
 ;;; if also compared if a breakpoint-info is passed since it's in the

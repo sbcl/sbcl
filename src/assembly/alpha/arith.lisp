@@ -1,4 +1,4 @@
-;;;; Stuff to handle simple cases for generic arithmetic.
+;;;; stuff to handle simple cases for generic arithmetic
 
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.

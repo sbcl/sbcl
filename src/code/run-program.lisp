@@ -601,9 +601,9 @@
 	       ;; "path:" defined in sbcl-0.6.10. It would probably be 
 	       ;; reasonable to restore Unix PATH searching in SBCL, e.g.
 	       ;; with a function FIND-EXECUTABLE-FILE-IN-POSIX-PATH.
-	       ;; (I don't want to do it with search lists the way
-	       ;; that CMU CL did, because those are a non-ANSI
-	       ;; extension which I'd like to get rid of. -- WHN)
+	       ;; CMU CL did it with a "PATH:" search list, but CMU CL
+	       ;; search lists are a non-ANSI extension that SBCL
+	       ;; doesn't support. -- WHN)
 	       (pfile (unix-namestring program t))
 	       (cookie (list 0)))
 	   (unless pfile

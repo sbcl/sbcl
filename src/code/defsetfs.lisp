@@ -111,7 +111,6 @@
 #-sb-xc-host (defsetf symbol-plist %set-symbol-plist)
 #-sb-xc-host (defsetf nth %setnth)
 #-sb-xc-host (defsetf fill-pointer %set-fill-pointer)
-(defsetf search-list %set-search-list)
 (defsetf sap-ref-8 %set-sap-ref-8)
 (defsetf signed-sap-ref-8 %set-signed-sap-ref-8)
 (defsetf sap-ref-16 %set-sap-ref-16)

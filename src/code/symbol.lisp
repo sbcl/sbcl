@@ -151,9 +151,8 @@
 
 (defun getf (place indicator &optional (default ()))
   #!+sb-doc
-  "Searches the property list stored in Place for an indicator EQ to Indicator.
-  If one is found, the corresponding value is returned, else the Default is
-  returned."
+  "Search the property list stored in Place for an indicator EQ to INDICATOR.
+  If one is found, return the corresponding value, else return DEFAULT."
   (do ((plist place (cddr plist)))
       ((null plist) default)
     (cond ((atom (cdr plist))
@@ -173,8 +172,8 @@
 
 (defun get-properties (place indicator-list)
   #!+sb-doc
-  "Like GETF, except that Indicator-List is a list of indicators which will
-  be looked for in the property list stored in Place. Three values are
+  "Like GETF, except that INDICATOR-LIST is a list of indicators which will
+  be looked for in the property list stored in PLACE. Three values are
   returned, see manual for details."
   (do ((plist place (cddr plist)))
       ((null plist) (values nil nil nil))

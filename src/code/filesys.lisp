@@ -16,13 +16,10 @@
 ;;; Unix namestrings have the following format:
 ;;;
 ;;; namestring := [ directory ] [ file [ type [ version ]]]
-;;; directory := [ "/" | search-list ] { file "/" }*
-;;; search-list := [^:/]*:
+;;; directory := [ "/" ] { file "/" }*
 ;;; file := [^/]*
 ;;; type := "." [^/.]*
 ;;; version := "." ([0-9]+ | "*")
-;;;
-;;; FIXME: Search lists are no longer supported.
 ;;;
 ;;; Note: this grammar is ambiguous. The string foo.bar.5 can be
 ;;; parsed as either just the file specified or as specifying the
@@ -218,7 +215,17 @@
 	  (setf start (1+ slash))))
       (values absolute (pieces)))))
 
-(defun maybe-extract-search-list (namestr start end)
+;;; the thing before a colon in a logical path
+(def!struct (logical-hostname (:make-load-form-fun
+			       (lambda (x)
+				 (values `(make-logical-hostname
+					   ,(logical-hostname-name x))
+					 nil)))
+			      (:copier nil)
+			      (:constructor make-logical-hostname (name)))
+  (name (required-argument) :type simple-string))
+
+(defun maybe-extract-logical-hostname (namestr start end)
   (declare (type simple-base-string namestr)
 	   (type index start end))
   (let ((quoted nil))
@@ -231,69 +238,77 @@
 	    (#\\
 	     (setf quoted t))
 	    (#\:
-	     (return (values (remove-backslashes namestr start index)
+	     (return (values (make-logical-hostname
+			      (remove-backslashes namestr start index))
 			     (1+ index)))))))))
 
 (defun parse-unix-namestring (namestr start end)
   (declare (type simple-base-string namestr)
-	   (type index start end))
+           (type index start end))
   (multiple-value-bind (absolute pieces) (split-at-slashes namestr start end)
-    (let ((search-list (if absolute
-			   nil
-			   (let ((first (car pieces)))
-			     (multiple-value-bind (search-list new-start)
-				 (maybe-extract-search-list namestr
-							    (car first)
-							    (cdr first))
-			       (when search-list
-				 (setf absolute t)
-				 (setf (car first) new-start))
-			       search-list)))))
+    (let ((logical-hostname
+	   (if absolute
+	       nil
+	       (let ((first (car pieces)))
+		 (multiple-value-bind (logical-hostname new-start)
+		     (maybe-extract-logical-hostname namestr
+						     (car first)
+						     (cdr first))
+		   (when logical-hostname
+		     (setf absolute t)
+		     (setf (car first) new-start))
+		   logical-hostname)))))
+      (declare (type (or null logical-hostname) logical-hostname))
       (multiple-value-bind (name type version)
-	  (let* ((tail (car (last pieces)))
-		 (tail-start (car tail))
-		 (tail-end (cdr tail)))
-	    (unless (= tail-start tail-end)
-	      (setf pieces (butlast pieces))
-	      (extract-name-type-and-version namestr tail-start tail-end)))
-	;; PVE: make sure there are no illegal characters in
-	;; the name, illegal being (code-char 0) and #\/
-	#!+high-security
-	(when (and (stringp name)
-		   (find-if #'(lambda (x) (or (char= x (code-char 0))
-					      (char= x #\/)))
-			    name))
-	  (error 'parse-error))
-	
-	;; Now we have everything we want. So return it.
-	(values nil ; no host for unix namestrings.
-		nil ; no devices for unix namestrings.
-		(collect ((dirs))
-		  (when search-list
-		    (dirs (intern-search-list search-list)))
-		  (dolist (piece pieces)
-		    (let ((piece-start (car piece))
-			  (piece-end (cdr piece)))
-		      (unless (= piece-start piece-end)
-			(cond ((string= namestr ".." :start1 piece-start
-					:end1 piece-end)
-			       (dirs :up))
-			      ((string= namestr "**" :start1 piece-start
-					:end1 piece-end)
-			       (dirs :wild-inferiors))
-			      (t
-			       (dirs (maybe-make-pattern namestr
-							 piece-start
-							 piece-end)))))))
-		  (cond (absolute
-			 (cons :absolute (dirs)))
-			((dirs)
-			 (cons :relative (dirs)))
-			(t
-			 nil)))
-		name
-		type
-		version)))))
+          (let* ((tail (car (last pieces)))
+                 (tail-start (car tail))
+                 (tail-end (cdr tail)))
+            (unless (= tail-start tail-end)
+              (setf pieces (butlast pieces))
+              (extract-name-type-and-version namestr tail-start tail-end)))
+
+	(when (stringp name)
+	  (let ((position (position-if (lambda (char)
+					 (or (char= char (code-char 0))
+					     (char= char #\/)))
+				       name)))
+	    (when position
+	      (error 'namestring-parse-error
+		     :complaint "can't embed #\\Nul or #\\/ in Unix namestring"
+		     :namestring namestr
+		     :offset position))))
+        
+        ;; Now we have everything we want. So return it.
+        (values nil ; no host for Unix namestrings
+                nil ; no device for Unix namestrings
+                (collect ((dirs))
+                  (when logical-hostname
+                    (dirs logical-hostname))
+                  (dolist (piece pieces)
+                    (let ((piece-start (car piece))
+                          (piece-end (cdr piece)))
+                      (unless (= piece-start piece-end)
+                        (cond ((string= namestr ".."
+					:start1 piece-start
+                                        :end1 piece-end)
+                               (dirs :up))
+                              ((string= namestr "**"
+					:start1 piece-start
+                                        :end1 piece-end)
+                               (dirs :wild-inferiors))
+                              (t
+                               (dirs (maybe-make-pattern namestr
+                                                         piece-start
+                                                         piece-end)))))))
+                  (cond (absolute
+                         (cons :absolute (dirs)))
+                        ((dirs)
+                         (cons :relative (dirs)))
+                        (t
+                         nil)))
+                name
+                type
+                version)))))
 
 (/show0 "filesys.lisp 300")
 
@@ -353,8 +368,14 @@
     (when directory
       (ecase (pop directory)
 	(:absolute
-	 (cond ((search-list-p (car directory))
-		(pieces (search-list-name (pop directory)))
+	 (cond ((logical-hostname-p (car directory))
+		;; FIXME: The old CMU CL "search list" extension is
+		;; gone, but the old machinery is still being used
+		;; clumsily here and elsewhere, to represent anything
+		;; which belongs before a colon prefix in the ANSI
+		;; pathname machinery. This should be cleaned up,
+		;; using simpler machinery with more mnemonic names.
+		(pieces (logical-hostname-name (pop directory)))
 		(pieces ":"))
 	       (t
 		(pieces "/"))))
@@ -727,8 +748,7 @@
       ))
 
 ;;; Convert PATHNAME into a string that can be used with UNIX system
-;;; calls, or return NIL if no match is found. Search-lists and
-;;; wild-cards are expanded.
+;;; calls, or return NIL if no match is found. Wild-cards are expanded.
 (defun unix-namestring (pathname-spec &optional (for-input t))
   ;; The ordinary rules of converting Lispy paths to Unix paths break
   ;; down for the current working directory, which Lisp thinks of as
@@ -915,18 +935,17 @@
    TRUENAMEing and the semantics of the Unix filesystem (symbolic links..)
    means this function can sometimes return files which don't have the same
    directory as PATHNAME."
-  (let ((truenames nil))
-    (enumerate-search-list
-	(pathname (merge-pathnames pathname
-				   (make-pathname :name :wild
-						  :type :wild
-						  :version :wild)))
-      (enumerate-matches (match pathname)
-	(let ((*ignore-wildcards* t))
-	  (push (truename (if (eq (sb!unix:unix-file-kind match) :directory)
-			      (concatenate 'string match "/")
-			      match))
-		truenames))))
+  (let ((truenames nil)
+	(merged-pathname (merge-pathnames pathname
+					  (make-pathname :name :wild
+							 :type :wild
+							 :version :wild))))
+    (enumerate-matches (match merged-pathname)
+      (let ((*ignore-wildcards* t))
+	(push (truename (if (eq (sb!unix:unix-file-kind match) :directory)
+			    (concatenate 'string match "/")
+			    match))
+	      truenames)))
     ;; FIXME: The DELETE-DUPLICATES here requires quadratic time,
     ;; which is unnecessarily slow. That might not be an issue,
     ;; though, since the time constant for doing TRUENAME on every
@@ -1028,27 +1047,25 @@
       (error 'simple-file-error
 	     :format-control "bad place for a wild pathname"
 	     :pathname pathspec))
-    (enumerate-search-list (pathname pathname)
-       (let ((dir (pathname-directory pathname)))
-	 (loop for i from 1 upto (length dir)
-	       do (let ((newpath (make-pathname
-				  :host (pathname-host pathname)
-				  :device (pathname-device pathname)
-				  :directory (subseq dir 0 i))))
-		    (unless (probe-file newpath)
-		      (let ((namestring (namestring newpath)))
-			(when verbose
-			  (format *standard-output*
-				  "~&creating directory: ~A~%"
-				  namestring))
-			(sb!unix:unix-mkdir namestring mode)
-			(unless (probe-file namestring)
-			  (error 'simple-file-error
-				 :pathname pathspec
-				 :format-control "can't create directory ~A"
-				 :format-arguments (list namestring)))
-			(setf created-p t)))))
-	 ;; Only the first path in a search-list is considered.
-	 (return (values pathname created-p))))))
+    (let ((dir (pathname-directory pathname)))
+      (loop for i from 1 upto (length dir)
+	    do (let ((newpath (make-pathname
+			       :host (pathname-host pathname)
+			       :device (pathname-device pathname)
+			       :directory (subseq dir 0 i))))
+		 (unless (probe-file newpath)
+		   (let ((namestring (namestring newpath)))
+		     (when verbose
+		       (format *standard-output*
+			       "~&creating directory: ~A~%"
+			       namestring))
+		     (sb!unix:unix-mkdir namestring mode)
+		     (unless (probe-file namestring)
+		       (error 'simple-file-error
+			      :pathname pathspec
+			      :format-control "can't create directory ~A"
+			      :format-arguments (list namestring)))
+		     (setf created-p t)))))
+      (values pathname created-p))))
 
 (/show0 "filesys.lisp 1000")

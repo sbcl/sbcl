@@ -754,12 +754,6 @@ retained, possibly temporariliy, because it might be used internally."
              ;; symbol-hacking idioms
              "KEYWORDICATE" "SYMBOLICATE"
 
-             ;; search lists (FIXME: should go away)
-             "ENUMERATE-SEARCH-LIST"
-             "CLEAR-SEARCH-LIST"
-             "SEARCH-LIST"
-             "SEARCH-LIST-DEFINED-P"
-
              ;; certainly doesn't belong in public extensions
              ;; FIXME: maybe belongs in %KERNEL with other typesystem stuff?
              "CONSTANT-ARGUMENT"

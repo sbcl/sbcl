@@ -400,13 +400,13 @@
   ;; block pointer. In the other cases nobody directly references the
   ;; unwind-block, so we leave this slot null.
   (home nil :type (or tn null))
-  ;; The saved control stack pointer.
+  ;; the saved control stack pointer
   (save-sp (required-argument) :type tn)
-  ;; The list of dynamic state save TNs.
+  ;; the list of dynamic state save TNs
   (dynamic-state (list* (make-stack-pointer-tn)
 			(make-dynamic-state-tns))
 		 :type list)
-  ;; The target label for NLX entry.
+  ;; the target label for NLX entry
   (target (gen-label) :type label))
 (defprinter (ir2-nlx-info)
   home
@@ -419,30 +419,30 @@
 ;;; operands to the operation.
 (defstruct (vop (:constructor make-vop (block node info args results))
 		(:copier nil))
-  ;; VOP-Info structure containing static info about the operation.
+  ;; VOP-Info structure containing static info about the operation
   (info nil :type (or vop-info null))
-  ;; The IR2-Block this VOP is in.
+  ;; the IR2-Block this VOP is in
   (block (required-argument) :type ir2-block)
   ;; VOPs evaluated after and before this one. Null at the
   ;; beginning/end of the block, and temporarily during IR2
   ;; translation.
   (next nil :type (or vop null))
   (prev nil :type (or vop null))
-  ;; Heads of the TN-Ref lists for operand TNs, linked using the
-  ;; Across slot.
+  ;; heads of the TN-Ref lists for operand TNs, linked using the
+  ;; Across slot
   (args nil :type (or tn-ref null))
   (results nil :type (or tn-ref null))
-  ;; Head of the list of write refs for each explicitly allocated
-  ;; temporary, linked together using the Across slot.
+  ;; head of the list of write refs for each explicitly allocated
+  ;; temporary, linked together using the Across slot
   (temps nil :type (or tn-ref null))
-  ;; Head of the list of all TN-refs for references in this VOP,
+  ;; head of the list of all TN-refs for references in this VOP,
   ;; linked by the Next-Ref slot. There will be one entry for each
   ;; operand and two (a read and a write) for each temporary.
   (refs nil :type (or tn-ref null))
-  ;; Stuff that is passed uninterpreted from IR2 conversion to
+  ;; stuff that is passed uninterpreted from IR2 conversion to
   ;; codegen. The meaning of this slot is totally dependent on the VOP.
   codegen-info
-  ;; Node that generated this VOP, for keeping track of debug info.
+  ;; the node that generated this VOP, for keeping track of debug info
   (node nil :type (or node null))
   ;; Local-TN bit vector representing the set of TNs live after args
   ;; are read and before results are written. This is only filled in
@@ -539,7 +539,7 @@
   ;; this VOP "does", i.e. the implementation strategy. This is for
   ;; use in efficiency notes.
   (note nil :type (or string null))
-  ;; The number of trailing arguments to VOP or %PRIMITIVE that we
+  ;; the number of trailing arguments to VOP or %PRIMITIVE that we
   ;; bundle into a list and pass into the emit function. This provides
   ;; a way to pass uninterpreted stuff directly to the code generator.
   (info-arg-count 0 :type index)
@@ -696,42 +696,42 @@
 ;;; The SB structure represents the global information associated with
 ;;; a storage base.
 (def!struct (sb (:make-load-form-fun just-dump-it-normally))
-  ;; Name, for printing and reference.
+  ;; name, for printing and reference
   (name nil :type symbol)
-  ;; The kind of storage base (which determines the packing
-  ;; algorithm).
+  ;; the kind of storage base (which determines the packing
+  ;; algorithm)
   (kind :non-packed :type (member :finite :unbounded :non-packed))
-  ;; The number of elements in the SB. If finite, this is the total
+  ;; the number of elements in the SB. If finite, this is the total
   ;; size. If unbounded, this is the size that the SB is initially
   ;; allocated at.
   (size 0 :type index))
 (defprinter (sb)
   name)
 
-;;; The Finite-SB structure holds information needed by the packing
-;;; algorithm for finite SBs.
+;;; A FINITE-SB holds information needed by the packing algorithm for
+;;; finite SBs.
 (def!struct (finite-sb (:include sb))
-  ;; The number of locations currently allocated in this SB.
+  ;; the number of locations currently allocated in this SB
   (current-size 0 :type index)
-  ;; The last location packed in, used by pack to scatter TNs to
+  ;; the last location packed in, used by pack to scatter TNs to
   ;; prevent a few locations from getting all the TNs, and thus
   ;; getting overcrowded, reducing the possibilities for targeting.
   (last-offset 0 :type index)
-  ;; A vector containing, for each location in this SB, a vector
+  ;; a vector containing, for each location in this SB, a vector
   ;; indexed by IR2 block numbers, holding local conflict bit vectors.
   ;; A TN must not be packed in a given location within a particular
   ;; block if the LTN number for that TN in that block corresponds to
   ;; a set bit in the bit-vector.
   (conflicts '#() :type simple-vector)
-  ;; A vector containing, for each location in this SB, a bit-vector
+  ;; a vector containing, for each location in this SB, a bit-vector
   ;; indexed by IR2 block numbers. If the bit corresponding to a block
   ;; is set, then the location is in use somewhere in the block, and
   ;; thus has a conflict for always-live TNs.
   (always-live '#() :type simple-vector)
-  ;; A vector containing the TN currently live in each location in the
+  ;; a vector containing the TN currently live in each location in the
   ;; SB, or NIL if the location is unused. This is used during load-tn pack.
   (live-tns '#() :type simple-vector)
-  ;; The number of blocks for which the ALWAYS-LIVE and CONFLICTS
+  ;; the number of blocks for which the ALWAYS-LIVE and CONFLICTS
   ;; might not be virgin, and thus must be reinitialized when PACK
   ;; starts. Less then the length of those vectors when not all of the
   ;; length was used on the previously packed component.
@@ -873,20 +873,20 @@
 	:type (member :normal :environment :debug-environment
 		      :save :save-once :specified-save :load :constant
 		      :component :alias))
-  ;; The primitive-type for this TN's value. Null in restricted or
+  ;; the primitive-type for this TN's value. Null in restricted or
   ;; wired TNs.
   (primitive-type nil :type (or primitive-type null))
   ;; If this TN represents a variable or constant, then this is the
   ;; corresponding Leaf.
   (leaf nil :type (or leaf null))
-  ;; Thread that links TNs together so that we can find them.
+  ;; thread that links TNs together so that we can find them
   (next nil :type (or tn null))
-  ;; Head of TN-Ref lists for reads and writes of this TN.
+  ;; head of TN-Ref lists for reads and writes of this TN
   (reads nil :type (or tn-ref null))
   (writes nil :type (or tn-ref null))
-  ;; A link we use when building various temporary TN lists.
+  ;; a link we use when building various temporary TN lists
   (next* nil :type (or tn null))
-  ;; Some block that contains a reference to this TN, or Nil if we
+  ;; some block that contains a reference to this TN, or Nil if we
   ;; haven't seen any reference yet. If the TN is local, then this is
   ;; the block it is local to.
   (local nil :type (or ir2-block null))
@@ -895,18 +895,18 @@
   ;; number during the conflicts analysis of that block. If the TN has
   ;; no local number within the block, then this is Nil.
   (local-number nil :type (or local-tn-number null))
-  ;; If a local TN, a bit-vector with 1 for the local-number of every
-  ;; TN that we conflict with.
+  ;; If this object is a local TN, this slot is a bit-vector with 1
+  ;; for the local-number of every TN that we conflict with.
   (local-conflicts (make-array local-tn-limit :element-type 'bit
 			       :initial-element 0)
 		   :type local-tn-bit-vector)
-  ;; Head of the list of Global-Conflicts structures for a global TN.
+  ;; head of the list of Global-Conflicts structures for a global TN.
   ;; This list is sorted by block number (i.e. reverse DFO), allowing
   ;; the intersection between the lifetimes for two global TNs to be
   ;; easily found. If null, then this TN is a local TN.
   (global-conflicts nil :type (or global-conflicts null))
-  ;; During lifetime analysis, this is used as a pointer into the
-  ;; conflicts chain, for scanning through blocks in reverse DFO.
+  ;; during lifetime analysis, this is used as a pointer into the
+  ;; conflicts chain, for scanning through blocks in reverse DFO
   (current-conflict nil)
   ;; In a :SAVE TN, this is the TN saved. In a :NORMAL or :ENVIRONMENT
   ;; TN, this is the associated save TN. In TNs with no save TN, this
@@ -915,13 +915,13 @@
   ;; After pack, the SC we packed into. Beforehand, the SC we want to
   ;; pack into, or null if we don't know.
   (sc nil :type (or sc null))
-  ;; The offset within the SB that this TN is packed into. This is what
-  ;; indicates that the TN is packed.
+  ;; the offset within the SB that this TN is packed into. This is what
+  ;; indicates that the TN is packed
   (offset nil :type (or index null))
-  ;; Some kind of info about how important this TN is.
+  ;; some kind of info about how important this TN is
   (cost 0 :type fixnum)
-  ;; If a :ENVIRONMENT or :DEBUG-ENVIRONMENT TN, this is the environment that
-  ;; the TN is live throughout.
+  ;; If a :ENVIRONMENT or :DEBUG-ENVIRONMENT TN, this is the
+  ;; environment that the TN is live throughout.
   (environment nil :type (or environment null)))
 (def!method print-object ((tn tn) stream)
   (print-unreadable-object (tn stream :type t)
@@ -938,12 +938,12 @@
 (defstruct (global-conflicts
 	    (:constructor make-global-conflicts (kind tn block number))
 	    (:copier nil))
-  ;; The IR2-Block that this structure represents the conflicts for.
+  ;; the IR2-Block that this structure represents the conflicts for
   (block (required-argument) :type ir2-block)
-  ;; Thread running through all the Global-Conflict for Block. This
-  ;; thread is sorted by TN number.
+  ;; thread running through all the Global-Conflict for Block. This
+  ;; thread is sorted by TN number
   (next nil :type (or global-conflicts null))
-  ;; The way that TN is used by Block:
+  ;; the way that TN is used by Block
   ;;
   ;;    :READ
   ;;	The TN is read before it is written. It starts the block live,
@@ -961,7 +961,7 @@
   ;;    :LIVE
   ;;	The TN is not referenced. It is live everywhere in the block.
   (kind :read-only :type (member :read :write :read-only :live))
-  ;; A local conflicts vector representing conflicts with TNs live in
+  ;; a local conflicts vector representing conflicts with TNs live in
   ;; Block. The index for the local TN number of each TN we conflict
   ;; with in this block is 1. To find the full conflict set, the :Live
   ;; TNs for Block must also be included. This slot is not meaningful
@@ -970,9 +970,9 @@
 			 :element-type 'bit
 			 :initial-element 0)
 	     :type local-tn-bit-vector)
-  ;; The TN we are recording conflicts for.
+  ;; the TN we are recording conflicts for.
   (tn (required-argument) :type tn)
-  ;; Thread through all the Global-Conflicts for TN.
+  ;; thread through all the Global-Conflicts for TN
   (tn-next nil :type (or global-conflicts null))
   ;; TN's local TN number in Block. :Live TNs don't have local numbers.
   (number nil :type (or local-tn-number null)))

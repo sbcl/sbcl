@@ -25,12 +25,10 @@
 		      (error nil))))
     (if namestring
 	(format stream "#P~S" namestring)
-	;; FIXME: This code was rewritten and should be tested. (How does
-	;; control get to this case anyhow? Perhaps we could just punt it?)
 	(print-unreadable-object (pathname stream :type t)
 	  (format stream
-		  "(with no namestring) :HOST ~S :DEVICE ~S :DIRECTORY ~S ~
-		  :NAME ~S :TYPE ~S :VERSION ~S"
+		  "~@<(with no namestring) ~_:HOST ~S ~_:DEVICE ~S ~_:DIRECTORY ~S ~
+		  ~_:NAME ~S ~_:TYPE ~S ~_:VERSION ~S~:>"
 		  (%pathname-host pathname)
 		  (%pathname-device pathname)
 		  (%pathname-directory pathname)
@@ -417,13 +415,7 @@
     ((member :unspecific) '(:relative))
     (list
      (collect ((results))
-       (ecase (pop directory)
-	 (:absolute
-	  (results :absolute)
-	  (when (search-list-p (car directory))
-	    (results (pop directory))))
-	 (:relative
-	  (results :relative)))
+       (results (pop directory))
        (dolist (piece directory)
 	 (cond ((member piece '(:wild :wild-inferiors :up :back))
 		(results piece))
@@ -1054,168 +1046,6 @@ a host-structure or string."
 	       (frob %pathname-name)
 	       (frob %pathname-type)
 	       (frob %pathname-version))))))))
-
-;;;; search lists
-
-(def!struct (search-list (:make-load-form-fun
-			  (lambda (s)
-			    (values `(intern-search-list
-				      ',(search-list-name s))
-				    nil))))
-  ;; The name of this search-list. Always stored in lowercase.
-  (name (required-argument) :type simple-string)
-  ;; T if this search-list has been defined. Otherwise NIL.
-  (defined nil :type (member t nil))
-  ;; the list of expansions for this search-list. Each expansion is
-  ;; the list of directory components to use in place of this
-  ;; search-list.
-  (expansions nil :type list))
-(def!method print-object ((sl search-list) stream)
-  (print-unreadable-object (sl stream :type t)
-    (write-string (search-list-name sl) stream)))
-
-;;; a hash table mapping search-list names to search-list structures
-(defvar *search-lists* (make-hash-table :test 'equal))
-
-;;; When search-lists are encountered in namestrings, they are
-;;; converted to search-list structures right then, instead of waiting
-;;; until the search list used. This allows us to verify ahead of time
-;;; that there are no circularities and makes expansion much quicker.
-(defun intern-search-list (name)
-  (let ((name (string-downcase name)))
-    (or (gethash name *search-lists*)
-	(let ((new (make-search-list :name name)))
-	  (setf (gethash name *search-lists*) new)
-	  new))))
-
-;;; Clear the definition. Note: we can't remove it from the hash-table
-;;; because there may be pathnames still refering to it. So we just
-;;; clear out the expansions and ste defined to NIL.
-(defun clear-search-list (name)
-  #!+sb-doc
-  "Clear the current definition for the search-list NAME. Returns T if such
-   a definition existed, and NIL if not."
-  (let* ((name (string-downcase name))
-	 (search-list (gethash name *search-lists*)))
-    (when (and search-list (search-list-defined search-list))
-      (setf (search-list-defined search-list) nil)
-      (setf (search-list-expansions search-list) nil)
-      t)))
-
-;;; As in CLEAR-SEARCH-LIST, we can't actually remove the entries from
-;;; the hash-table, so we just mark them as being undefined.
-(defun clear-all-search-lists ()
-  #!+sb-doc
-  "Clear the definition for all search-lists. Only use this if you know
-   what you are doing."
-  (maphash #'(lambda (name search-list)
-	       (declare (ignore name))
-	       (setf (search-list-defined search-list) nil)
-	       (setf (search-list-expansions search-list) nil))
-	   *search-lists*)
-  nil)
-
-;;; Extract the search-list from PATHNAME and return it. If PATHNAME
-;;; doesn't start with a search-list, then either error (if
-;;; FLAME-IF-NONE is true) or return NIL (if FLAME-IF-NONE is false).
-(defun extract-search-list (pathname flame-if-none)
-  (with-pathname (pathname pathname)
-    (let* ((directory (%pathname-directory pathname))
-	   (search-list (cadr directory)))
-      (cond ((search-list-p search-list)
-	     search-list)
-	    (flame-if-none
-	     (error "~S doesn't start with a search-list." pathname))
-	    (t
-	     nil)))))
-
-;;; We have to convert the internal form of the search-list back into
-;;; a bunch of pathnames.
-(defun search-list (pathname)
-  #!+sb-doc
-  "Return the expansions for the search-list starting PATHNAME. If PATHNAME
-   does not start with a search-list, then an error is signaled. If
-   the search-list has not been defined yet, then an error is signaled.
-   The expansion for a search-list can be set with SETF."
-  (with-pathname (pathname pathname)
-    (let ((search-list (extract-search-list pathname t))
-	  (host (pathname-host pathname)))
-      (if (search-list-defined search-list)
-	  (mapcar #'(lambda (directory)
-		      (make-pathname :host host
-				     :directory (cons :absolute directory)))
-		  (search-list-expansions search-list))
-	  (error "Search list ~S has not been defined yet." pathname)))))
-
-(defun search-list-defined-p (pathname)
-  #!+sb-doc
-  "Returns T if the search-list starting PATHNAME is currently defined, and
-   NIL otherwise. An error is signaled if PATHNAME does not start with a
-   search-list."
-  (with-pathname (pathname pathname)
-    (search-list-defined (extract-search-list pathname t))))
-
-;;; Set the expansion for the search list in PATHNAME. If this would
-;;; result in any circularities, we flame out. If anything goes wrong,
-;;; we leave the old definition intact.
-(defun %set-search-list (pathname values)
-  (let ((search-list (extract-search-list pathname t)))
-    (labels
-	((check (target-list path)
-	   (when (eq search-list target-list)
-	     (error "That would result in a circularity:~%  ~
-		     ~A~{ -> ~A~} -> ~A"
-		    (search-list-name search-list)
-		    (reverse path)
-		    (search-list-name target-list)))
-	   (when (search-list-p target-list)
-	     (push (search-list-name target-list) path)
-	     (dolist (expansion (search-list-expansions target-list))
-	       (check (car expansion) path))))
-	 (convert (pathname)
-	   (with-pathname (pathname pathname)
-	     (when (or (pathname-name pathname)
-		       (pathname-type pathname)
-		       (pathname-version pathname))
-	       (error "Search-lists cannot expand into pathnames that have ~
-		       a name, type, or ~%version specified:~%  ~S"
-		      pathname))
-	     (let ((directory (pathname-directory pathname)))
-	       (let ((expansion
-		      (if directory
-			  (ecase (car directory)
-			    (:absolute (cdr directory))
-			    (:relative (cons (intern-search-list "default")
-					     (cdr directory))))
-			  (list (intern-search-list "default")))))
-		 (check (car expansion) nil)
-		 expansion)))))
-      (setf (search-list-expansions search-list)
-	    (if (listp values)
-	      (mapcar #'convert values)
-	      (list (convert values)))))
-    (setf (search-list-defined search-list) t))
-  values)
-
-(defun %enumerate-search-list (pathname function)
-  (let* ((pathname (physicalize-pathname pathname))
-	 (search-list (extract-search-list pathname nil)))
-    (cond
-     ((not search-list)
-      (funcall function pathname))
-     ((not (search-list-defined search-list))
-      (error "undefined search list: ~A"
-	     (search-list-name search-list)))
-     (t
-      (let ((tail (cddr (pathname-directory pathname))))
-	(dolist (expansion
-		 (search-list-expansions search-list))
-	  (%enumerate-search-list (make-pathname :defaults pathname
-						 :directory
-						 (cons :absolute
-						       (append expansion
-							       tail)))
-				  function)))))))
 
 ;;;;  logical pathname support. ANSI 92-102 specification.
 ;;;;

@@ -118,19 +118,3 @@
 						  name
 						  type
 						  version))))
-
-(defmacro-mundanely enumerate-search-list ((var pathname &optional result)
-					   &body body)
-  #!+sb-doc
-  "Execute BODY with VAR bound to each successive possible expansion for
-   PATHNAME and then return RESULT. Note: if PATHNAME does not contain a
-   search-list, then BODY is executed exactly once. Everything is wrapped
-   in a block named NIL, so RETURN can be used to terminate early. Note:
-   VAR is *not* bound inside of RESULT."
-  (let ((body-name (gensym)))
-    `(block nil
-       (flet ((,body-name (,var)
-		,@body))
-	 (%enumerate-search-list ,pathname #',body-name)
-	 ,result))))
-
