@@ -362,22 +362,32 @@ deeply nested structures."
 	 (sb-alien:define-alien-type ,@(first struct-elements)))
        ,@accessors
        (defmacro ,(intern (format nil "WITH-~A" name)) (var (&rest field-values) &body body)
-	(labels ((field-name (x)
-			     (intern (concatenate 'string
-						  (symbol-name ',name) "-"
-						  (symbol-name x))
-				     ,(symbol-package name))))
-	  `(let ((,var ,'(,(intern (format nil "ALLOCATE-~A" name)))))
-	     (unwind-protect
-		 (progn
-		   (progn ,@(mapcar (lambda (pair)
-				      `(setf (,(field-name (first pair)) ,var) ,(second pair)))
-				    field-values))
-		   ,@body)
-	       (funcall ',',(intern (format nil "FREE-~A" name)) ,var)))))
+	 (labels ((field-name (x)
+		    (intern (concatenate 'string
+					 (symbol-name ',name) "-"
+					 (symbol-name x))
+			    ,(symbol-package name))))
+	   `(let ((,var ,'(,(intern (format nil "ALLOCATE-~A" name)))))
+	      (unwind-protect
+		  (progn
+		    (progn ,@(mapcar (lambda (pair)
+				       `(setf (,(field-name (first pair)) ,var) ,(second pair)))
+				     field-values))
+		    ,@body)
+		(funcall ',',(intern (format nil "FREE-~A" name)) ,var)))))
        (defconstant ,(intern (format nil "SIZE-OF-~A" name)) ,size)
        (defun ,(intern (format nil "ALLOCATE-~A" name)) ()
-	 (sb-alien:make-alien ,name))
+	 (let* ((o (sb-alien:make-alien ,name))
+		(c-o (cast o (* (unsigned 8)))))
+	   ;; we have to initialize the object to all-0 before we can
+	   ;; expect to make sensible use of it - the object returned
+	   ;; by make-alien is initialized to all-D0 bytes.
+          
+	   ;; FIXME: This should be fixed in sb-alien, where better
+	   ;; optimizations might be possible.
+	   (loop for i from 0 below ,size 
+		 do (setf (deref c-o i) 0))
+	   o))
        (defun ,(intern (format nil "FREE-~A" name)) (o)
 	 (sb-alien:free-alien o)))))
 
