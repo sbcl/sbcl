@@ -12,7 +12,7 @@
 (in-package "SB!IMPL")
 
 (sb!xc:deftype attribute-table ()
-  '(simple-array (unsigned-byte 8) (#.sb!xc:char-code-limit)))
+  '(simple-array (unsigned-byte 8) (#.base-char-code-limit)))
 
 ;;; constants for readtable character attributes. These are all as in
 ;;; the manual.
@@ -58,20 +58,22 @@
   ;; In order to make READ-TOKEN fast, all this information is stored
   ;; in the character attribute table by having different varieties of
   ;; constituents.
-  (character-attribute-table
-   (make-array sb!xc:char-code-limit
+  (character-attribute-array
+   (make-array base-char-code-limit
 	       :element-type '(unsigned-byte 8)
 	       :initial-element +char-attr-constituent+)
    :type attribute-table)
+  (character-attribute-hash-table (make-hash-table) :type hash-table)
   ;; The CHARACTER-MACRO-TABLE is a vector of CHAR-CODE-LIMIT
   ;; functions. One of these functions called with appropriate
   ;; arguments whenever any non-WHITESPACE character is encountered
   ;; inside READ-PRESERVING-WHITESPACE. These functions are used to
   ;; implement user-defined read-macros, system read-macros, and the
   ;; number-symbol reader.
-  (character-macro-table
-   (make-array sb!xc:char-code-limit :initial-element #'undefined-macro-char)
-   :type (simple-vector #.sb!xc:char-code-limit))
+  (character-macro-array
+   (make-array base-char-code-limit :initial-element #'undefined-macro-char)
+   :type (simple-vector #.base-char-code-limit))
+  (character-macro-hash-table (make-hash-table) :type hash-table)
   ;; an alist from dispatch characters to vectors of CHAR-CODE-LIMIT
   ;; functions, for use in defining dispatching macros (like #-macro)
   (dispatch-tables () :type list)
