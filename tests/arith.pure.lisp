@@ -54,12 +54,6 @@
 ;;; ANSI says MIN and MAX should signal TYPE-ERROR if any argument
 ;;; isn't REAL. SBCL 0.7.7 didn't in the 1-arg case. (reported as a
 ;;; bug in CMU CL on #lisp IRC by lrasinen 2002-09-01)
-#||
-
-FIXME: These tests would be good to have. But although, in
-sbcl-0.7.7.2x, (NULL (IGNORE-ERRORS (MIN 1 #(1 2 3)))) returns T, the
-ASSERTion fails, probably in something related to bug #194.
-
 (assert (null (ignore-errors (min '(1 2 3)))))
 (assert (= (min -1) -1))
 (assert (null (ignore-errors (min 1 #(1 2 3)))))
@@ -72,7 +66,6 @@ ASSERTion fails, probably in something related to bug #194.
 (assert (= (max -1 10.0) 10.0))
 (assert (null (ignore-errors (max 3 #'max))))
 (assert (= (max -3 0) 0))
-||#
 
 ;;; (CEILING x 2^k) was optimized incorrectly
 (loop for divisor in '(-4 4)
@@ -87,3 +80,6 @@ ASSERTion fails, probably in something related to bug #194.
               (assert (= (+ (* q divisor) r) i))
               (assert (<= exact-q q))
               (assert (< q (1+ exact-q))))))
+
+;; CEILING had a corner case, spotted by Paul Dietz
+(assert (= (ceiling most-negative-fixnum (1+ most-positive-fixnum)) -1))

@@ -1968,6 +1968,9 @@ changes in sbcl-0.8.3 relative to sbcl-0.8.2:
   * x86 bug fix in control stack exhaustion checking: now shows backtrace
   * bug fix in WITH-TIMEOUT: now the body can have more than one form.
     (thanks to Stig Sandoe)
+  * bug fix in READ-SEQUENCE: READ-SEQUENCE following PEEK-CHAR or
+    UNREAD-CHAR now correctly includes the unread character in the
+    target sequence.  (thanks to Gerd Moellmann)
   * new optimization: inside a named function any reference to a
     function with the same name is considered to be a self-reference;
     this behaviour is controlled with SB-C::RECOGNIZE-SELF-CALLS
@@ -1981,6 +1984,8 @@ changes in sbcl-0.8.3 relative to sbcl-0.8.2:
        types form a lattice under type intersection.
     ** FFLOOR, FTRUNCATE, FCEILING and FROUND work with integers.
     ** ASSOC now ignores NIL elements in an alist.
+    ** CEILING now gives the right answer with MOST-NEGATIVE-FIXNUM
+       and (1+ MOST-POSITIVE-FIXNUM) answers.
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles

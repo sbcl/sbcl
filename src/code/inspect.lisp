@@ -155,7 +155,7 @@ evaluated expressions.
 (defgeneric inspected-parts (object))
 
 (defmethod inspected-parts ((object symbol))
-  (values (format nil "The object is a SYMBOL.~%" object)
+  (values (format nil "The object is a SYMBOL.~%")
 	  t
 	  (list (cons "Name" (symbol-name object))
 		(cons "Package" (symbol-package object))

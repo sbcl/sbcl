@@ -591,12 +591,28 @@
 ;;; Note that this blocks in UNIX-READ. It is generally used where
 ;;; there is a definite amount of reading to be done, so blocking
 ;;; isn't too problematical.
-(defun fd-stream-read-n-bytes (stream buffer start requested eof-error-p)
+(defun fd-stream-read-n-bytes (stream buffer start requested eof-error-p
+			       &aux (total-copied 0))
   (declare (type file-stream stream))
-  (declare (type index start requested))
-  (do ((total-copied 0))
+  (declare (type index start requested total-copied))
+  (let ((unread (fd-stream-unread stream)))
+    (when unread
+      ;; AVERs designed to fail when we have more complicated
+      ;; character representations.
+      (aver (typep unread 'base-char))
+      (aver (= (fd-stream-element-size stream) 1))
+      ;; KLUDGE: this is a slightly-unrolled-and-inlined version of
+      ;; %BYTE-BLT
+      (etypecase buffer
+	(system-area-pointer
+	 (setf (sap-ref-8 buffer start) (char-code unread)))
+	((simple-unboxed-array (*))
+	 (setf (aref buffer start) unread)))
+      (setf (fd-stream-unread stream) nil)
+      (setf (fd-stream-listen stream) nil)
+      (incf total-copied)))
+  (do ()
       (nil)
-    (declare (type index total-copied))
     (let* ((remaining-request (- requested total-copied))
 	   (head (fd-stream-ibuf-head stream))
 	   (tail (fd-stream-ibuf-tail stream))

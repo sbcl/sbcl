@@ -60,3 +60,15 @@
 	    (expect #\z))
 	  (expect nil))))) ; i.e. end of file
   (delete-file *scratch-file-name*))
+
+(with-open-file (s *scratch-file-name* :direction :output)
+  (format s "1234~%"))
+(assert
+ (string=
+  (with-open-file (s *scratch-file-name* :direction :input)
+    (let* ((b (make-string 10)))
+      (peek-char nil s)
+      (read-sequence b s)
+      b))
+  (format nil "1234")
+  :end1 4))

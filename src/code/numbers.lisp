@@ -578,7 +578,7 @@
 			  (numerator divisor))))
 	 (values q (- number (* q divisor)))))
       ((fixnum bignum)
-       (values 0 number))
+       (bignum-truncate (make-small-bignum number) divisor))
       ((ratio (or float rational))
        (let ((q (truncate (numerator number)
 			  (* (denominator number) divisor))))
