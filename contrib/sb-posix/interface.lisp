@@ -25,6 +25,8 @@
 (define-call "fchown" int minusp (fd file-descriptor)
 	     (owner sb-posix::uid-t)  (group sb-posix::gid-t))
 (define-call "link" int minusp (oldpath filename) (newpath filename))
+;; no lchown on Darwin
+#-darwin 
 (define-call "lchown" int minusp (pathname filename)
 	     (owner sb-posix::uid-t)  (group sb-posix::gid-t))
 (define-call "mkdir" int minusp (pathname filename) (mode sb-posix::mode-t))

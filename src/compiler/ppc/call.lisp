@@ -99,20 +99,12 @@
 
 ;;;; Frame hackery:
 
-;;; Return the number of bytes needed for the current non-descriptor stack
-;;; frame.  Non-descriptor stack frames must be multiples of 16 bytes under
-;;; the PPC SVr4 ABI (though the EABI may be less restrictive.)  Two words
-;;; are reserved for the stack backlink and saved LR (see SB!VM::NUMBER-STACK-
-;;; DISPLACEMENT.)
-;;;
-;;; Duh.  PPC Linux (and VxWorks) adhere to the EABI.
-
 ;;; this is the first function in this file that differs materially from 
 ;;; ../alpha/call.lisp
 (defun bytes-needed-for-non-descriptor-stack-frame ()
-  (logandc2 (+ 7 number-stack-displacement
+  (logandc2 (+ +stack-alignment-bytes+ number-stack-displacement
 	       (* (sb-allocated-size 'non-descriptor-stack) sb!vm:n-word-bytes))
-	    7))
+	    +stack-alignment-bytes+))
 
 
 ;;; Used for setting up the Old-FP in local call.

@@ -26,6 +26,7 @@
  */
 #define LANGUAGE_ASSEMBLY
 #include "sbcl.h"
+
         .text
 
 #if defined LISP_FEATURE_X86
@@ -58,7 +59,7 @@ ldso_stub__ ## fct: ;                           \
 .L ## fct ## e1: ;                              \
 	.size	 ldso_stub__ ## fct,.L ## fct ## e1-ldso_stub__ ## fct ;
 
-#elif defined LISP_FEATURE_PPC
+#elif ((defined LISP_FEATURE_PPC) && (defined LISP_FEATURE_LINUX))
 #define LDSO_STUBIFY(fct)                       \
 .globl ldso_stub__ ## fct ;                     \
 	.type    ldso_stub__ ## fct,@function ; \
@@ -66,6 +67,24 @@ ldso_stub__ ## fct: ;                           \
         b fct ;                                 \
 .L ## fct ## e1: ;                              \
         .size    ldso_stub__ ## fct,.L ## fct ## e1-ldso_stub__ ## fct ;
+
+#elif ((defined LISP_FEATURE_PPC) && (defined LISP_FEATURE_DARWIN))
+#define LDSO_STUBIFY(fct)			@\
+.text                                           @\
+.globl  ldso_stub___ ## fct			@\
+ldso_stub___ ## fct:				@\
+	b ldso_stub__ ## fct ## stub		@\
+.symbol_stub ldso_stub__ ## fct ## stub:	@\
+.indirect_symbol _ ## fct			@\
+	lis	r11,ha16(ldso_stub__ ## fct ## $lazy_ptr)	@\
+	lwz	r12,lo16(ldso_stub__ ## fct ## $lazy_ptr)(r11)	@\
+	mtctr	r12				@\
+	addi	r11,r11,lo16(ldso_stub__ ## fct ## $lazy_ptr)	@\
+	bctr					@\
+.lazy_symbol_pointer				@\
+ldso_stub__ ## fct ## $lazy_ptr:		@\
+	.indirect_symbol _ ## fct		@\
+	.long dyld_stub_binding_helper
 	
 #elif defined LISP_FEATURE_SPARC
 	

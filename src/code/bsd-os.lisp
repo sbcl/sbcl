@@ -16,7 +16,8 @@
   "Return a string describing the supporting software."
   (the string ; (to force error in case of unsupported BSD variant)
        #!+FreeBSD "FreeBSD"
-       #!+OpenBSD "OpenBSD"))
+       #!+OpenBSD "OpenBSD"
+       #!+Darwin "Darwin"))
 
 (defvar *software-version* nil)
 

@@ -1938,6 +1938,9 @@ changes in sbcl-0.8.2 relative to sbcl-0.8.1:
     ** (VECTOR NIL) is a subtype of STRING.
 
 changes in sbcl-0.8.3 relative to sbcl-0.8.2:
+  * SBCL now builds and runs on MacOS X (version 10.2), or perhaps
+    more accurately, on the Darwin kernel running on PowerPC hardware.
+    (thanks to Brian Mastenbrook, Pierre Mai and Patrik Nordebo)
   * bug fix: WITH-OUTPUT-TO-STRING (and MAKE-STRING-OUTPUT-STREAM) now
     accept and act upon their :ELEMENT-TYPE keyword argument.
     (reported by Edi Weitz)

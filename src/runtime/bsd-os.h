@@ -48,6 +48,17 @@ typedef ucontext_t os_context_t;
 #elif defined __OpenBSD__
 typedef struct sigcontext os_context_t;
 #define SIG_MEMORY_FAULT SIGSEGV
+#elif defined DARWIN
+  /* man pages claim that the third argument is a sigcontext struct,
+     but ucontext_t is defined, matches sigcontext where sensible,
+     offers better access to mcontext, and is of course the SUSv2-
+     mandated type of the third argument, so we use that instead.
+     If Apple is going to break ucontext_t out of spite, I'm going
+     to be cross with them ;) -- PRM */
+
+#include <ucontext.h>
+typedef ucontext_t os_context_t;
+#define SIG_MEMORY_FAULT SIGBUS
 #else
 #error unsupported BSD variant
 #endif

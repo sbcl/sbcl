@@ -100,7 +100,8 @@
       (if fast-mode
 	  (setq modes (logior float-fast-bit modes))
 	  (setq modes (logand (lognot float-fast-bit) modes))))
-    (setf (floating-point-modes) modes))
+    ;; FIXME: This apparently doesn't work on Darwin
+    #!-darwin (setf (floating-point-modes) modes))
 
   (values))
 

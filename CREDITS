@@ -578,7 +578,8 @@ Robert MacLachlan:
 Pierre Mai:
   He has continued to work on CMU CL since the SBCL fork, and also
   patched code to SBCL to enable dynamic loading of object files 
-  under OpenBSD.
+  under OpenBSD.  He contributed to the port of SBCL to MacOS X,
+  implementing the Lisp side of the PowerOpen ABI.
 
 Eric Marsden:
   Some of his fixes to CMU CL since the SBCL fork have been ported
@@ -586,6 +587,9 @@ Eric Marsden:
 
 Antonio Martinez-Shotton:
   He has contributed a number of bug fixes and bug reports to SBCL.
+
+Brian Mastenbrook:
+  He contributed to the port of SBCL to MacOS X.
 
 Dave McDonald:
   He made a lot of progress toward getting SBCL to be bootstrappable
@@ -605,6 +609,10 @@ William ("Bill") Newman:
   some areas (especially sequence functions and non-simple vectors),
   updating documentation, and even, for better or worse, getting
   rid of various functionality (e.g. the byte interpreter).
+
+Patrik Nordebo:
+  He contributed to the port of SBCL to MacOS X, finding solutions for
+  ABI and assembly syntax differences between Darwin and Linux.
 
 Kevin M. Rosenberg:
   He provided the ACL-style toplevel, and a number of MOP-related bug
@@ -662,6 +670,7 @@ APD  Alexey Dejneka
 NJF  Nathan Froyd
 AL   Arthur Lemmens
 RAM  Robert MacLachlan
+PRM  Pierre Mai
 WHN  William ("Bill") Newman
 CSR  Christophe Rhodes
 PVE  Peter Van Eynde

@@ -30,7 +30,8 @@
     (unless (zerop
 	     (run-shell-command
 	      #+sunos "gcc -shared -lresolv -lsocket -lnsl -o ~S ~{~S ~}"
-	      #-sunos "gcc -shared -o ~S ~{~S ~} "
+	      #+darwin "gcc -bundle -o ~S ~{~S ~}"
+	      #-(or darwin sunos) "gcc -shared -o ~S ~{~S ~} "
 	      dso-name
 	      (mapcar #'unix-name
 		      (mapcan (lambda (c)

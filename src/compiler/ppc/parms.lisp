@@ -83,10 +83,12 @@
 ;;;
 ;;; The number of bytes reserved above the number stack pointer.  These
 ;;; slots are required by architecture, mostly (?) to make C backtrace
-;;; work.
+;;; work. This must be a power of 2 - see BYTES-REQUIRED-FOR-NUMBER-STACK.
 ;;; 
 (def!constant number-stack-displacement
-  (* 2 sb!vm:n-word-bytes))
+  (* #!-darwin 2
+     #!+darwin 8
+     sb!vm:n-word-bytes))
 
 
 

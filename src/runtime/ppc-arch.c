@@ -31,16 +31,13 @@
 #define PT_DSISR	42
 #endif
 
-void arch_init()
-{
+void arch_init() {
 }
 
 os_vm_address_t 
 arch_get_bad_addr(int sig, siginfo_t *code, os_context_t *context)
 {
-    unsigned long badinstr;
     unsigned int *pc =  (unsigned int *)(*os_context_pc_addr(context));
-    int instclass;
     os_vm_address_t addr;
     
     
@@ -133,7 +130,6 @@ arch_do_displaced_inst(os_context_t *context,unsigned int orig_inst)
 static void 
 sigtrap_handler(int signal, siginfo_t *siginfo, os_context_t *context)
 {
-    int badinst;
     u32 code;
     sigset_t *mask;
 #ifdef LISP_FEATURE_LINUX
@@ -155,7 +151,7 @@ sigtrap_handler(int signal, siginfo_t *siginfo, os_context_t *context)
     }
     if ((code >> 16) == ((3 << 10) | (6 << 5))) {
 	/* twllei reg_ZERO,N will always trap if reg_ZERO = 0 */
-	int trap = code & 0x1f, extra = (code >> 5) & 0x1f;
+	int trap = code & 0x1f;
 	
 	switch (trap) {
 	case trap_Halt:

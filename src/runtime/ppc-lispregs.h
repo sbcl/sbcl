@@ -1,4 +1,13 @@
+#if defined DARWIN
+#if defined LANGUAGE_ASSEMBLY
+#define REG(num) r##num
+#else
 #define REG(num) num
+#endif
+#else
+#define REG(num) num
+#endif
+
 #define NREGS 32
 
 #define reg_ZERO      REG(0)	/* Should always contain 0 in lisp */
@@ -13,8 +22,13 @@
 #define reg_NL6       REG(9) 	/* Last (7th) FF param */
 #define reg_FDEFN     REG(10)   /* was NL7 until recently -dan */
 #define reg_NARGS     REG(11)
+#ifdef DARWIN
+#define reg_CFUNC     REG(12)	/* Silly to blow a reg on FF-name */
+#define reg_NFP       REG(13)	/* Lisp may save around FF-call */
+#else
 #define reg_NFP       REG(12)	/* Lisp may save around FF-call */
 #define reg_CFUNC     REG(13)	/* Silly to blow a reg on FF-name */
+#endif
 #define reg_BSP       REG(14)   /* Binding stack pointer */
 #define reg_CFP       REG(15)	/* Control/value stack frame pointer */
 #define reg_CSP       REG(16)	/* Control/value stack top */
@@ -38,7 +52,7 @@
         "ZERO",		"NSP",	        "???",		"NL0", \
 	"NL1",		"NL2",		"NL3P",		"NL4", \
         "NL5",		"NL6",		"FDEFN",	"NARGS", \
-        "NFP",		"CFUNC"		"BSP",		"CFP", \
+        "NFP",		"CFUNC",	"BSP",		"CFP", \
         "CSP",		"ALLOC",	"NULL",		"CODE", \
         "CNAME",	"LEXENV",	"OCFP",		"LRA", \
         "A0",	        "A1",	        "A2",		"A3", \

@@ -52,7 +52,7 @@
 ;;; On any OS where we don't support foreign object file loading, any
 ;;; query of a foreign symbol value is answered with "no definition
 ;;; known", i.e. NIL.
-#-(or linux sunos FreeBSD OpenBSD)
+#-(or linux sunos FreeBSD OpenBSD darwin)
 (defun get-dynamic-foreign-symbol-address (symbol)
   (declare (type simple-string symbol) (ignore symbol))
   nil)
@@ -62,7 +62,7 @@
 ;;; work on any ELF system with dlopen(3) and dlsym(3)
 ;;; It also works on OpenBSD, which isn't ELF, but is otherwise modern
 ;;; enough to have a fairly well working dlopen/dlsym implementation.
-#-(or linux sunos FreeBSD OpenBSD)
+#-(or linux sunos FreeBSD OpenBSD darwin)
 (macrolet ((define-unsupported-fun (fun-name)
 	     `(defun ,fun-name (&rest rest)
 		"unsupported on this system"
@@ -70,7 +70,7 @@
 		(error 'unsupported-operator :name ',fun-name))))
   (define-unsupported-fun load-1-foreign)
   (define-unsupported-fun load-foreign))
-#+(or linux sunos FreeBSD OpenBSD)
+#+(or linux sunos FreeBSD OpenBSD darwin)
 (progn
 
 ;;; flags for dlopen()
@@ -112,7 +112,9 @@
       *after-save-initializations*)
 
 (defvar *dso-linker* "/usr/bin/ld")
-(defvar *dso-linker-options* '("-shared" "-o"))
+(defvar *dso-linker-options*
+  #-darwin '("-shared" "-o")
+  #+darwin '("-bundle" "-o"))
 
 (sb-alien:define-alien-routine dlopen system-area-pointer
   (file sb-alien:c-string) (mode sb-alien:int))

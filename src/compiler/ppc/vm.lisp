@@ -31,8 +31,13 @@
   (defreg nl6 9)
   (defreg fdefn 10)			; was nl7
   (defreg nargs 11)
-  (defreg nfp 12)
-  (defreg cfunc 13)
+  ;; FIXME: some kind of comment here would be nice.
+  ;;
+  ;; FIXME II: this also reveals the need to autogenerate lispregs.h
+  #!+darwin  (defreg cfunc 12)
+  #!-darwin  (defreg nfp 12)
+  #!+darwin  (defreg nfp 13)
+  #!-darwin  (defreg cfunc 13)
   (defreg bsp 14)
   (defreg cfp 15)
   (defreg csp 16)
@@ -315,4 +320,7 @@
 
 (defun extern-alien-name (name)
   (declare (type simple-base-string name))
-  name)
+  ;; Darwin is non-ELF, and needs a _ prefix
+  #!+darwin (concatenate 'string "_" name)
+  ;; The other (ELF) ports currently don't need any prefix
+  #!-darwin name)

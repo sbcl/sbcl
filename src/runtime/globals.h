@@ -59,7 +59,11 @@ extern void globals_init(void);
 #endif
 #endif
 #ifdef ppc
+#ifdef DARWIN
+#define EXTERN(name,bytes) .globl _/**/name
+#else
 #define EXTERN(name,bytes) .globl name 
+#endif
 #endif
 #ifdef __i386__
 #ifdef __linux__

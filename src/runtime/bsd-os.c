@@ -35,74 +35,26 @@
 #include <signal.h>
 /* #include <sys/sysinfo.h> */
 #include "validate.h"
+
+
 vm_size_t os_vm_page_size;
 
-
-/* The different BSD variants have diverged in exactly where they
- * store signal context information, but at least they tend to use the
- * same stems to name the structure fields, so by using this macro we
- * can share a fair amount of code between different variants. */
-#if defined __FreeBSD__
-#define CONTEXT_ADDR_FROM_STEM(stem) &context->uc_mcontext.mc_ ## stem
-#elif defined __OpenBSD__
-#define CONTEXT_ADDR_FROM_STEM(stem) &context->sc_ ## stem
-#else
-#error unsupported BSD variant
-#endif
-
-void
-os_init(void)
+void os_init(void)
 {
     os_vm_page_size = getpagesize();
 }
 
-/* KLUDGE: There is strong family resemblance in the signal context
- * stuff in FreeBSD and OpenBSD, but in detail they're different in
- * almost every line of code. It would be nice to find some way to
- * factor out the commonality better; failing that, it might be best
- * just to split this generic-BSD code into one variant for each BSD. */
-   
-int *
-os_context_register_addr(os_context_t *context, int offset)
-{
-    switch(offset) {
-    case  0:
-	return CONTEXT_ADDR_FROM_STEM(eax);
-    case  2:
-	return CONTEXT_ADDR_FROM_STEM(ecx);
-    case  4:
-	return CONTEXT_ADDR_FROM_STEM(edx);
-    case  6:
-	return CONTEXT_ADDR_FROM_STEM(ebx);
-    case  8:
-	return CONTEXT_ADDR_FROM_STEM(esp);
-    case 10:
-	return CONTEXT_ADDR_FROM_STEM(ebp);
-    case 12:
-	return CONTEXT_ADDR_FROM_STEM(esi);
-    case 14:
-	return CONTEXT_ADDR_FROM_STEM(edi);
-    default:
-	return 0;
-    }
-}
-
-int *
-os_context_pc_addr(os_context_t *context)
+int *os_context_pc_addr(os_context_t *context)
 {
 #if defined __FreeBSD__
     return CONTEXT_ADDR_FROM_STEM(eip);
 #elif defined __OpenBSD__
     return CONTEXT_ADDR_FROM_STEM(pc);
+#elif defined DARWIN
+    return &context->uc_mcontext->ss.srr0;
 #else
 #error unsupported BSD variant
 #endif
-}
-
-int *
-os_context_sp_addr(os_context_t *context)
-{
-    return CONTEXT_ADDR_FROM_STEM(esp);
 }
 
 sigset_t *
@@ -111,7 +63,7 @@ os_context_sigmask_addr(os_context_t *context)
     /* (Unlike most of the other context fields that we access, the
      * signal mask field is a field of the basic, outermost context
      * struct itself both in FreeBSD 4.0 and in OpenBSD 2.6.) */
-#if defined __FreeBSD__
+#if defined __FreeBSD__ || defined DARWIN
     return &context->uc_sigmask;
 #elif defined __OpenBSD__
     return &context->sc_mask;
@@ -159,15 +111,6 @@ os_map(int fd, int offset, os_vm_address_t addr, os_vm_size_t len)
     }
 
     return addr;
-}
-
-/* FIXME: If this can be a no-op on BSD/x86, then it 
- * deserves a more precise name.
- *
- * (Perhaps os_prepare_data_area_to_be_executed()?) */
-void
-os_flush_icache(os_vm_address_t address, os_vm_size_t length)
-{
 }
 
 void
@@ -223,11 +166,13 @@ memory_fault_handler(int signal, siginfo_t *siginfo, void *void_context)
     void *fault_addr = siginfo->si_addr;
 #elif defined __OpenBSD__
     void *fault_addr = siginfo->si_addr;
+#elif defined DARWIN
+    void *fault_addr = siginfo->si_addr;
 #else
 #error unsupported BSD variant
 #endif
     os_context_t *context = arch_os_get_context(&void_context);
-   if (!gencgc_handle_wp_violation(fault_addr)) 
+    if (!gencgc_handle_wp_violation(fault_addr)) 
         if(!handle_control_stack_guard_triggered(context,fault_addr))
 	    /* FIXME is this context or void_context?  not that it */
 	    /* makes a difference currently except on linux/sparc */
@@ -242,12 +187,27 @@ os_install_interrupt_handlers(void)
     SHOW("leaving os_install_interrupt_handlers()");
 }
 
-#else
-/* As of 2002.07.31, this configuration has never been tested */
+#else /* Currently Darwin only */
+
+static void
+sigsegv_handler(int signal, siginfo_t *info, void* void_context)
+{
+    os_context_t *context = arch_os_get_context(&void_context);
+    unsigned int pc =  (unsigned int *)(*os_context_pc_addr(context));
+    os_vm_address_t addr;
+    
+    addr = arch_get_bad_addr(signal,info,context);
+    if(!interrupt_maybe_gc(signal, info, context))
+	if(!handle_control_stack_guard_triggered(context,addr))
+	    interrupt_handle_now(signal, info, context);
+}
+
 void
 os_install_interrupt_handlers(void)
 {
     SHOW("os_install_interrupt_handlers()/bsd-os/!defined(GENCGC)");
+    undoably_install_low_level_interrupt_handler(SIG_MEMORY_FAULT,
+						 sigsegv_handler);
 }
 
 #endif /* defined GENCGC */

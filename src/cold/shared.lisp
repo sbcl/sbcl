@@ -46,7 +46,8 @@
    ;; that we never explicitly refer to host object file suffixes,
    ;; only to the result of CL:COMPILE-FILE-PATHNAME.
    #+lispworks ".ufsl" ; as per Lieven Marchand sbcl-devel 2002-02-01
-   #+openmcl ".pfsl"
+   #+(and openmcl (not darwin)) ".pfsl"
+   #+(and openmcl darwin) ".dfsl"
    ;; On most xc hosts, any old extension works, so we use an
    ;; arbitrary one.
    ".lisp-obj"))

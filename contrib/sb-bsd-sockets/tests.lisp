@@ -133,7 +133,7 @@ Tests are in the file <tt>tests.lisp</tt> and also make good examples.
 ;;; to look at /etc/syslog.conf or local equivalent to find out where
 ;;; the message ended up
 
-#-sunos
+#-(or sunos darwin)
 (deftest simple-local-client
     (let ((s (make-instance 'local-socket :type :datagram)))
       (format t "Connecting ~A... " s)

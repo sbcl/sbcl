@@ -12,7 +12,7 @@
 ASSEM_SRC = x86-assem.S 
 ARCH_SRC = x86-arch.c
 
-OS_SRC = bsd-os.c os-common.c undefineds.c
+OS_SRC = bsd-os.c os-common.c undefineds.c x86-bsd-os.c
 OS_LIBS = -lm # -ldl
 
 GC_SRC = gencgc.c

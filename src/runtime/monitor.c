@@ -326,6 +326,10 @@ print_context(os_context_t *context)
 	brief_print((lispobj)(*os_context_register_addr(context,i)));
 #endif
     }
+#ifdef DARWIN
+    printf("DAR:\t\t 0x%08lx\n", (unsigned long)(*os_context_register_addr(context, 41)));
+    printf("DSISR:\t\t 0x%08lx\n", (unsigned long)(*os_context_register_addr(context, 42)));
+#endif
     printf("PC:\t\t  0x%08lx\n",
 	   (unsigned long)(*os_context_pc_addr(context)));
 }

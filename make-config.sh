@@ -35,6 +35,7 @@ case `uname -m` in
     sparc*) guessed_sbcl_arch=sparc ;;
     sun*) guessed_sbcl_arch=sparc ;;
     ppc) guessed_sbcl_arch=ppc ;;
+    Power*Macintosh) guessed_sbcl_arch=ppc ;;
     parisc) guessed_sbcl_arch=hppa ;;
     mips) guessed_sbcl_arch=mips ;;
     *)
@@ -125,6 +126,13 @@ case `uname` in
 		exit 1
 		;;
 	esac
+	;;
+    Darwin)
+	printf ' :bsd' >> $ltf
+	ln -s $sbcl_arch-darwin-os.h target-arch-os.h
+	ln -s bsd-os.h target-os.h
+	printf ' :darwin' >> $ltf
+	ln -s Config.$sbcl_arch-darwin Config
 	;;
     SunOS)
         printf ' :sunos' >> $ltf
