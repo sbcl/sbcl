@@ -448,10 +448,17 @@
      (/show0 "about to bind ERROR-NUMBER and ARGUMENTS")
      (multiple-value-bind (error-number arguments)
 	 (sb!vm:internal-error-args alien-context)
+
+       ;; There's a limit to how much error reporting we can usefully
+       ;; do before initialization is complete, but try to be a little
+       ;; bit helpful before we die.
        (/show0 "back from INTERNAL-ERROR-ARGS, ERROR-NUMBER=..")
        (/hexstr error-number)
        (/show0 "cold/low ARGUMENTS=..")
        (/hexstr arguments)
+       (unless *cold-init-complete-p*
+	 (%primitive print "can't recover from error in cold init, halting")
+	 (%primitive sb!c:halt))
 
        (multiple-value-bind (name sb!debug:*stack-top-hint*)
 	   (find-interrupted-name)

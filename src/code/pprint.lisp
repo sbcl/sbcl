@@ -928,6 +928,8 @@
   (declare (type (or null function) function)
 	   (type real priority)
 	   (type pprint-dispatch-table table))
+  (/show0 "entering SET-PPRINT-DISPATCH, TYPE=...")
+  (/hexstr type)
   (if function
       (if (cons-type-specifier-p type)
 	  (setf (gethash (second (second type))
@@ -962,6 +964,7 @@
 		(delete type (pprint-dispatch-table-entries table)
 			:key #'pprint-dispatch-entry-type
 			:test #'equal))))
+  (/show0 "about to return NIL from SET-PPRINT-DISPATCH")
   nil)
 
 ;;;; standard pretty-printing routines

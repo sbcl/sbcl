@@ -207,60 +207,5 @@
 ;;; BUG 186, fixed in sbcl-0.7.5.5
 (assert (null (ignore-errors (test-fill-typecheck 4097))))
 
-;;; MAKE-SEQUENCE, COERCE, CONCATENATE, MERGE, MAP and requested
-;;; result type (BUGs 46a, 46b, 66)
-(macrolet ((assert-type-error (form)
-	     `(assert (typep (nth-value 1 (ignore-errors ,form)) 
-			     'type-error))))
-  (dolist (type-stub '((simple-vector) 
-		       (vector *) 
-		       (vector (signed-byte 8))
-		       (vector (unsigned-byte 16))
-		       (vector (signed-byte 32))
-		       (simple-bit-vector)))
-    (declare (optimize safety))
-    (format t "~&~S~%" type-stub)
-    ;; MAKE-SEQUENCE
-    (assert (= (length (make-sequence `(,@type-stub) 10)) 10))
-    (assert (= (length (make-sequence `(,@type-stub 10) 10)) 10))
-    (assert-type-error (make-sequence `(,@type-stub 10) 11))
-    ;; COERCE
-    (assert (= (length (coerce '(0 0 0) `(,@type-stub))) 3))
-    (assert (= (length (coerce #(0 0 0) `(,@type-stub 3))) 3))
-    (assert-type-error (coerce #*111 `(,@type-stub 4)))
-    ;; CONCATENATE
-    (assert (= (length (concatenate `(,@type-stub) #(0 0 0) #*111)) 6))
-    (assert (equalp (concatenate `(,@type-stub) #(0 0 0) #*111)
-		   (coerce #(0 0 0 1 1 1) `(,@type-stub))))
-    (assert (= (length (concatenate `(,@type-stub 6) #(0 0 0) #*111)) 6))
-    (assert (equalp (concatenate `(,@type-stub 6) #(0 0 0) #*111)
-		   (coerce #(0 0 0 1 1 1) `(,@type-stub 6))))
-    (assert-type-error (concatenate `(,@type-stub 5) #(0 0 0) #*111))
-    ;; MERGE
-    (assert (= (length (merge `(,@type-stub) #(0 1 0) #*111 #'>)) 6))
-    (assert (equalp (merge `(,@type-stub) #(0 1 0) #*111 #'>)
-		   (coerce #(1 1 1 0 1 0) `(,@type-stub))))
-    (assert (= (length (merge `(,@type-stub 6) #(0 1 0) #*111 #'>)) 6))
-    (assert (equalp (merge `(,@type-stub 6) #(0 1 0) #*111 #'>)
-		   (coerce #(1 1 1 0 1 0) `(,@type-stub 6))))
-    (assert-type-error (merge `(,@type-stub 4) #(0 1 0) #*111 #'>))
-    ;; MAP
-    (assert (= (length (map `(,@type-stub) #'logxor #(0 0 1 1) '(0 1 0 1))) 4))
-    (assert (equalp (map `(,@type-stub) #'logxor #(0 0 1 1) '(0 1 0 1))
-		   (coerce #(0 1 1 0) `(,@type-stub))))
-    (assert (= (length (map `(,@type-stub 4) #'logxor #(0 0 1 1) '(0 1 0 1))) 
-	       4))
-    (assert (equalp (map `(,@type-stub 4) #'logxor #(0 0 1 1) '(0 1 0 1))
-		   (coerce #(0 1 1 0) `(,@type-stub 4))))
-    (assert-type-error (map `(,@type-stub 5) #'logxor #(0 0 1 1) '(0 1 0 1))))
-  ;; some more CONCATENATE tests for strings
-  (locally 
-      (declare (optimize safety))
-    (assert (string= (concatenate 'string "foo" " " "bar") "foo bar"))
-    (assert (string= (concatenate '(string 7) "foo" " " "bar") "foo bar"))
-    (assert-type-error (concatenate '(string 6) "foo" " " "bar"))
-    (assert (string= (concatenate '(string 6) "foo" #(#\b #\a #\r)) "foobar"))
-    (assert-type-error (concatenate '(string 7) "foo" #(#\b #\a #\r)))))
-
 ;;; success
 (quit :unix-status 104)

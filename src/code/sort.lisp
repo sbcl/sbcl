@@ -431,8 +431,8 @@
 	     (vector-2 (coerce sequence2 'vector))
 	     (length-1 (length vector-1))
 	     (length-2 (length vector-2))
-	     (result (make-sequence result-type
-				    (+ length-1 length-2))))
+	     (result (make-sequence-of-type result-type
+					    (+ length-1 length-2))))
 	(declare (vector vector-1 vector-2)
 		 (fixnum length-1 length-2))
 
