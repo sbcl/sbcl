@@ -208,9 +208,10 @@
 			 (declare (ignore nms cm-args))
 			 (apply
 			  (lambda (generic-function type options)
-			    (declare (ignore generic-function options))
+			    (declare (ignore generic-function))
 			    (make-instance 'long-method-combination
 					   :type type
+					   :options options
 					   :documentation doc))
 			  args))
 	     :definition-source `((define-method-combination ,type)

@@ -1,7 +1,0 @@
-describe.fasl
-force-delayed-defbangmethods.fasl
-foreign.fasl
-inspect.fasl
-ntrace.fasl
-profile.fasl
-run-program.fasl

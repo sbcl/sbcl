@@ -45,6 +45,28 @@ EOF
     fi
 }
 
+# Test that a file compiles cleanly, with no ERRORs, WARNINGs or
+# STYLE-WARNINGs.
+#
+# Maybe this wants to be in a compiler.test.sh script?  This function
+# was originally written to test APD's patch for slot readers and
+# writers not being known to the compiler. -- CSR, 2002-08-14
+expect_clean_compile () 
+{
+    $SBCL <<EOF
+        (multiple-value-bind (pathname warnings-p failure-p)
+            (compile-file "$1")
+          (declare (ignore pathname))
+          (assert (not warnings-p))
+          (assert (not failure-p))
+          (sb-ext:quit :unix-status 52))
+EOF
+    if [ $? != 52 ]; then
+        echo clean-compile $1 test failed: $?
+        exit 1
+    fi
+}
+
 base_tmpfilename="clos-test-$$-tmp"
 tmpfilename="$base_tmpfilename.lisp"
 compiled_tmpfilename="$base_tmpfilename.fasl"
@@ -83,6 +105,20 @@ cat > $tmpfilename <<EOF
     (defmethod zut progn :around ((x integer)) (print "integer"))
 EOF
 expect_load_error $tmpfilename
+
+# Until sbcl-0.7.6.21, PCL signalled spurious STYLE-WARNINGs on
+# compilation of this form; the report (bug #191a.) and a patch
+# suppressing these were provided by Alexey Dejenka in quick
+# succession.
+cat > $tmpfilename <<EOF
+    (in-package :cl-user)
+    (defclass another-class-with-slots () 
+      (a-new-slot-name))
+    (defun foo (x)
+      (values (setf (slot-value x 'a-new-slot-name) 2)
+              (slot-value x 'a-new-slot-name)))
+EOF
+expect_clean_compile $tmpfilename
 
 rm $tmpfilename
 rm $compiled_tmpfilename

@@ -48,6 +48,7 @@
 (defvar *initfunctions-for-this-defclass*)
 (defvar *readers-for-this-defclass*)
 (defvar *writers-for-this-defclass*)
+(defvar *slot-names-for-this-defclass*)
 
 ;;; Like the DEFMETHOD macro, the expansion of the DEFCLASS macro is
 ;;; fixed. DEFCLASS always expands into a call to LOAD-DEFCLASS. Until
@@ -81,7 +82,8 @@
 
       (let ((*initfunctions-for-this-defclass* ())
             (*readers-for-this-defclass* ()) ;Truly a crock, but we got
-            (*writers-for-this-defclass* ())) ;to have it to live nicely.
+            (*writers-for-this-defclass* ()) ;to have it to live nicely.
+            (*slot-names-for-this-defclass* ()))
         (let ((canonical-slots
                 (mapcar (lambda (spec)
 			  (canonicalize-slot-specification name spec))
@@ -107,6 +109,13 @@
 		     ,@(mapcar (lambda (x)
 				 `(declaim (ftype (function (t t) t) ,x)))
 			       *writers-for-this-defclass*)
+                     ,@(mapcar (lambda (x)
+                                 `(declaim (ftype (function (t) t)
+                                                  ,(slot-reader-symbol x)
+                                                  ,(slot-boundp-symbol x))
+                                           (ftype (function (t t) t)
+                                                  ,(slot-writer-symbol x))))
+                               *slot-names-for-this-defclass*)
 		     (let ,(mapcar #'cdr *initfunctions-for-this-defclass*)
 		       (load-defclass ',name
 				      ',metaclass
@@ -180,10 +189,12 @@
   (cond ((and (symbolp spec)
 	      (not (keywordp spec))
 	      (not (memq spec '(t nil))))
+         (push spec *slot-names-for-this-defclass*)
 	 `'(:name ,spec))
 	((not (consp spec))
 	 (error "~S is not a legal slot specification." spec))
 	((null (cdr spec))
+         (push (car spec) *slot-names-for-this-defclass*)
 	 `'(:name ,(car spec)))
 	((null (cddr spec))
 	 (error "In DEFCLASS ~S, the slot specification ~S is obsolete.~%~
@@ -196,6 +207,7 @@
 		(initargs ())
 		(unsupplied (list nil))
 		(initform (getf spec :initform unsupplied)))
+           (push name *slot-names-for-this-defclass*)
 	   (doplist (key val) spec
 	     (case key
 	       (:accessor (push val readers)
@@ -219,7 +231,7 @@
 	   (if (eq initform unsupplied)
 	       `(list* ,@spec)
 	       `(list* :initfunction ,(make-initfunction initform) ,@spec))))))
-						
+
 (defun canonicalize-defclass-option (class-name option)
   (declare (ignore class-name))
   (case (car option)

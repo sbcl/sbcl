@@ -212,6 +212,20 @@
 (assert (eq (ffin *cod*) 'almost-triang-fin))
 (assert (equalp #((:before cod) (cod)) *clos-dispatch-side-fx*))
 
+;;; Until sbcl-0.7.6.21, the long form of DEFINE-METHOD-COMBINATION
+;;; ignored its options; Gerd Moellmann found and fixed the problem
+;;; for cmucl (cmucl-imp 2002-06-18).
+(define-method-combination test-mc (x)
+  ;; X above being a method-group-specifier
+  ((primary () :required t))
+  `(call-method ,(first primary)))
+
+(defgeneric gf (obj)
+  (:method-combination test-mc 1))
+
+(defmethod gf (obj)
+  obj)
+
 ;;;; success
 
 (sb-ext:quit :unix-status 104)

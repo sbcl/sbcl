@@ -176,6 +176,7 @@
 		"src/pcl/macros"
                 "src/pcl/compiler-support"
 		"src/pcl/low"
+                "src/pcl/slot-name"
 		"src/pcl/defclass"
 		"src/pcl/defs"
 		"src/pcl/fngen"
