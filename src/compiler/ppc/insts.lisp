@@ -281,12 +281,14 @@
 				     aa-bit lk-bit)))
 	       t)))
        #'(lambda (segment posn)
+	   (declare (ignore posn))
 	   (let ((bo (logxor 8 bo))) ;; invert the test
 	     (emit-b-form-inst segment 16 bo bi
 			       2 ; skip over next instruction
 			       0 0)
 	     (emit-back-patch segment 4
 			      #'(lambda (segment posn)
+				  (declare (ignore posn))
 				  (emit-i-form-branch segment target lk-p)))))
        ))))
 	     

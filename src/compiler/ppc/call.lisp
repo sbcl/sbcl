@@ -662,9 +662,9 @@ default-value-8
 			    :from (:argument ,(if (eq return :tail) 0 1))
 			    :to :eval)
 		       lexenv))
-     ;; alpha code suggests that function tn is not needed for named call
-     (:temporary (:scs (descriptor-reg) :from (:argument 0) :to :eval)
-		 function)
+     ,@(unless named
+	 '((:temporary (:scs (descriptor-reg) :from (:argument 0) :to :eval)
+	               function)))
      (:temporary (:sc any-reg :offset nargs-offset :to :eval)
 		 nargs-pass)
 
