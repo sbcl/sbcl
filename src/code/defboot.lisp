@@ -229,7 +229,7 @@
 (defun %defun (name def doc)
   (declare (type function def))
   (declare (type (or null simple-string doc)))
-  (aver (legal-fun-name-p name))
+  (aver (legal-fun-name-p name)) ; should've been checked by DEFMACRO DEFUN
   (when (fboundp name)
     (/show0 "redefining NAME in %DEFUN")
     (style-warn "redefining ~S in DEFUN" name))

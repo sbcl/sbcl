@@ -78,22 +78,24 @@
 	  *debug-command-level*))
   
 (defparameter *debug-help-string*
-"The prompt is right square brackets, the number indicating how many
-  recursive command loops you are in. 
-Any command may be uniquely abbreviated.
+"The prompt is square brackets, with number(s) indicating the current control
+  stack level and, if you've entered the debugger recursively, how deeply
+  recursed you are.
+Any command -- including the name of a restart -- may be uniquely abbreviated.
 The debugger rebinds various special variables for controlling i/o, sometimes
   to defaults (much like WITH-STANDARD-IO-SYNTAX does) and sometimes to 
   its own special values, e.g. SB-DEBUG:*DEBUG-PRINT-LEVEL*.
-Debug commands do not affect * and friends, but evaluation in the debug loop
-  does affect these variables.
+Debug commands do not affect *, //, and similar variables, but evaluation in
+  the debug loop does affect these variables.
 SB-DEBUG:*FLUSH-DEBUG-ERRORS* controls whether errors at the debug prompt
-  drop you into deeper into the debugger.
+  drop you deeper into the debugger.
 
 Getting in and out of the debugger:
   RESTART  invokes restart numbered as shown (prompt if not given).
   ERROR    prints the error condition and restart cases.
-  The name of any restart, or its number, is a valid command, and is the same
-    as using RESTART to invoke that restart.
+  The number of any restart, or its name, or a unique abbreviation for its
+    name, is a valid command, and is the same as using RESTART to invoke that
+    restart.
 
 Changing frames:
   U      up frame     D    down frame
@@ -266,30 +268,32 @@ Other commands:
 ;;;; the BREAKPOINT-INFO structure
 
 ;;; info about a made breakpoint
-(defstruct (breakpoint-info (:copier nil))
+(defstruct (breakpoint-info (:copier nil)
+			    (:constructor %make-breakpoint-info))
   ;; where we are going to stop
-  (place (missing-arg)	 :type (or sb!di:code-location sb!di:debug-fun))
-  ;; the breakpoint returned by sb!di:make-breakpoint
-  (breakpoint (missing-arg) :type sb!di:breakpoint)
+  (place (missing-arg)
+	 :type (or sb!di:code-location sb!di:debug-fun)
+	 :read-only t)
+  ;; the breakpoint returned by SB!DI:MAKE-BREAKPOINT
+  (breakpoint (missing-arg) :type sb!di:breakpoint :read-only t)
   ;; the function returned from SB!DI:PREPROCESS-FOR-EVAL. If result is
   ;; non-NIL, drop into the debugger.
-  (break #'identity :type function)
-  ;; the function returned from sb!di:preprocess-for-eval. If result is
+  (break #'identity :type function :read-only t)
+  ;; the function returned from SB!DI:PREPROCESS-FOR-EVAL. If result is
   ;; non-NIL, eval (each) print and print results.
-  (condition #'identity :type function)
-  ;; the list of functions from sb!di:preprocess-for-eval to evaluate.
-  ;; Results are conditionally printed. Car of each element is the
-  ;; function, cdr is the form it goes with.
-  (print nil :type list)
+  (condition #'identity :type function :read-only t)
+  ;; the list of functions from SB!DI:PREPROCESS-FOR-EVAL to evaluate.
+  ;; Results are conditionally printed. CAR of each element is the
+  ;; function, CDR is the form it goes with.
+  (print nil :type list :read-only t)
   ;; the number used when listing the possible breakpoints within a
-  ;; function. Could also be a symbol such as start or end.
-  (code-location-number (missing-arg) :type (or symbol integer))
-  ;; the number used when listing the breakpoints active and to delete
-  ;; breakpoints
-  (breakpoint-number (missing-arg) :type integer))
+  ;; function; or could also be a symbol such as START or END
+  (code-location-selector (missing-arg) :type (or symbol integer) :read-only t)
+  ;; the number used when listing the active breakpoints, and when
+  ;; deleting breakpoints
+  (breakpoint-number (missing-arg) :type integer) :read-only t)
 
-;;; Return a new BREAKPOINT-INFO structure with the info passed.
-(defun create-breakpoint-info (place breakpoint code-location-number
+(defun create-breakpoint-info (place breakpoint code-location-selector
 				     &key (break #'identity)
 				     (condition #'identity) (print nil))
   (setf *breakpoints*
@@ -301,25 +305,25 @@ Other commands:
 			     (first breakpoints)))))
 
 	      i))))
-    (make-breakpoint-info :place place :breakpoint breakpoint
-			  :code-location-number code-location-number
-			  :breakpoint-number breakpoint-number
-			  :break break :condition condition :print print)))
+    (%make-breakpoint-info :place place
+			   :breakpoint breakpoint
+			   :code-location-selector code-location-selector
+			   :breakpoint-number breakpoint-number
+			   :break break
+			   :condition condition
+			   :print print)))
 
-;;; Print the breakpoint info for the breakpoint-info structure passed.
 (defun print-breakpoint-info (breakpoint-info)
   (let ((place (breakpoint-info-place breakpoint-info))
-	(bp-number (breakpoint-info-breakpoint-number breakpoint-info))
-	(loc-number (breakpoint-info-code-location-number breakpoint-info)))
+	(bp-number (breakpoint-info-breakpoint-number breakpoint-info)))
     (case (sb!di:breakpoint-kind (breakpoint-info-breakpoint breakpoint-info))
       (:code-location
        (print-code-location-source-form place 0)
        (format t
 	       "~&~S: ~S in ~S"
 	       bp-number
-	       loc-number
-	       (sb!di:debug-fun-name (sb!di:code-location-debug-fun
-				      place))))
+	       (breakpoint-info-code-location-selector breakpoint-info)
+	       (sb!di:debug-fun-name (sb!di:code-location-debug-fun place))))
       (:fun-start
        (format t "~&~S: FUN-START in ~S" bp-number
 	       (sb!di:debug-fun-name place)))

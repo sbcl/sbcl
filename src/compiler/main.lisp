@@ -903,8 +903,8 @@
 		  ;; nice default for things where we don't have a
 		  ;; real source path (as in e.g. inside CL:COMPILE).
 		  '(original-source-start 0 0)))
-  (unless (or (null name) (legal-fun-name-p name))
-    (error "not a legal function name: ~S" name))
+  (when name
+    (legal-fun-name-or-type-error name))
   (let* ((*lexenv* (make-lexenv :policy *policy*))
          (fun (make-functional-from-toplevel-lambda lambda-expression
 						    :name name
@@ -974,8 +974,7 @@
 (defun process-toplevel-cold-fset (name lambda-expression path)
   (unless (producing-fasl-file)
     (error "can't COLD-FSET except in a fasl file"))
-  (unless (legal-fun-name-p name)
-    (error "not a legal function name: ~S" name))
+  (legal-fun-name-or-type-error name)
   (fasl-dump-cold-fset name
                        (%compile lambda-expression
                                  *compile-object*

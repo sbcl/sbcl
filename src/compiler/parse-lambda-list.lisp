@@ -14,9 +14,9 @@
 ;;; Break a lambda list into its component parts. We return eleven
 ;;; values:
 ;;;  1. a list of the required args;
-;;;  2. a list of the optional arg specs;
-;;;  3. true if a rest arg was specified;
-;;;  4. the &rest arg;
+;;;  2. a list of the &OPTIONAL arg specs;
+;;;  3. true if a &REST arg was specified;
+;;;  4. the &REST arg;
 ;;;  5. true if &KEY args are present;
 ;;;  6. a list of the &KEY arg specs;
 ;;;  7. true if &ALLOW-OTHER-KEYS was specified.;

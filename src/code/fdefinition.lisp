@@ -54,12 +54,7 @@
 ;;; CREATE is non-NIL, create a new (unbound) one.
 (defun fdefinition-object (name create)
   (declare (values (or fdefn null)))
-  (unless (legal-fun-name-p name)
-    (error 'simple-type-error
-	   :datum name
-	   :expected-type '(or symbol list)
-	   :format-control "invalid function name: ~S"
-	   :format-arguments (list name)))
+  (legal-fun-name-or-type-error name)
   (let ((fdefn (info :function :definition name)))
     (if (and (null fdefn) create)
 	(setf (info :function :definition name) (make-fdefn name))

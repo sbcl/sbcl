@@ -189,22 +189,23 @@
 
 (defun sb!xc:compiler-macro-function (name &optional env)
   #!+sb-doc
-  "If NAME names a compiler-macro, return the expansion function, else
-   return NIL. Note: if the name is shadowed in ENV by a local definition,
-   or declared NOTINLINE, NIL is returned. Can be set with SETF."
-  (let ((found (and env
-		    (cdr (assoc name (sb!c::lexenv-funs env)
-				:test #'equal)))))
-    (unless (eq (cond ((sb!c::defined-fun-p found)
-		       (sb!c::defined-fun-inlinep found))
-		      (found :notinline)
-		      (t
-		       (info :function :inlinep name)))
-		:notinline)
-      (values (info :function :compiler-macro-function name)))))
-(defun (setf sb!xc:compiler-macro-function) (function name)
+  "If NAME names a compiler-macro in ENV, return the expansion function, else
+   return NIL. Can be set with SETF when ENV is NIL."
+  (legal-fun-name-or-type-error name)
+  ;; Note: CMU CL used to return NIL here when a NOTINLINE declaration
+  ;; was in force. That's fairly logical, given the specified effect
+  ;; of NOTINLINE declarations on compiler-macro expansion. However,
+  ;; (1) it doesn't seem to be consistent with the ANSI spec for
+  ;; COMPILER-MACRO-FUNCTION, and (2) it would give surprising
+  ;; behavior for (SETF (COMPILER-MACRO-FUNCTION FOO) ...) in the
+  ;; presence of a (PROCLAIM '(NOTINLINE FOO)). So we don't do it.
+  (values (info :function :compiler-macro-function name)))
+(defun (setf sb!xc:compiler-macro-function) (function name &optional env)
   (declare (type (or symbol list) name)
 	   (type (or function null) function))
+  (when env
+    ;; ANSI says this operation is undefined.
+    (error "can't SETF COMPILER-MACRO-FUNCTION when ENV is non-NIL"))
   (when (eq (info :function :kind name) :special-form)
     (error "~S names a special form." name))
   (setf (info :function :compiler-macro-function name) function)

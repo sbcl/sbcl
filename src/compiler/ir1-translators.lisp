@@ -729,6 +729,8 @@
     (when (null (find-uses cont))
       (setf (continuation-asserted-type cont) new))
     (when (and (not intersects)
+	       ;; FIXME: Is it really right to look at *LEXENV* here,
+	       ;; instead of looking at the LEXENV argument? Why?
 	       (not (policy *lexenv*
 			    (= inhibit-warnings 3)))) ;FIXME: really OK to suppress?
       (compiler-warn

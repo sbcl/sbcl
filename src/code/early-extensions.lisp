@@ -588,6 +588,15 @@
            (symbolp (cadr name))
            (null (cddr name)))))
 
+;;; Signal an error unless NAME is a legal function name.
+(defun legal-fun-name-or-type-error (name)
+  (unless (legal-fun-name-p name)
+    (error 'simple-type-error
+	   :datum name
+	   :expected-type '(or symbol list)
+	   :format-control "invalid function name: ~S"
+	   :format-arguments (list name))))
+
 ;;; Given a function name, return the name for the BLOCK which
 ;;; encloses its body (e.g. in DEFUN, DEFINE-COMPILER-MACRO, or FLET).
 (declaim (ftype (function ((or symbol cons)) symbol) fun-name-block-name))

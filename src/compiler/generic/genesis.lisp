@@ -1453,8 +1453,7 @@
 		    (warm-symbol cadr-des))))
 	   (#.sb!vm:other-pointer-lowtag
 	    (warm-symbol des)))))
-    (unless (legal-fun-name-p result)
-      (error "not a legal function name: ~S" result))
+    (legal-fun-name-or-type-error result)
     result))
 
 (defun cold-fdefinition-object (cold-name &optional leave-fn-raw)

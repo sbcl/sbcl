@@ -157,10 +157,7 @@ bootstrapping.
 
 (defmacro defgeneric (fun-name lambda-list &body options)
   (declare (type list lambda-list))
-  (unless (legal-fun-name-p fun-name)
-    (error 'simple-program-error
-	   :format-control "illegal generic function name ~S"
-	   :format-arguments (list fun-name)))
+  (legal-fun-name-or-type-error fun-name)
   (let ((initargs ())
 	(methods ()))
     (flet ((duplicate-option (name)

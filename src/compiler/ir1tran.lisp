@@ -586,22 +586,31 @@
   (values))
 
 ;;; Convert anything that looks like a special form, global function
-;;; or macro call.
+;;; or compiler-macro call.
 (defun ir1-convert-global-functoid (start cont form)
   (declare (type continuation start cont) (list form))
-  (let* ((fun (first form))
-	 (translator (info :function :ir1-convert fun))
-	 (cmacro (info :function :compiler-macro-function fun)))
-    (cond (translator (funcall translator start cont form))
-	  ((and cmacro
-		(not (eq (info :function :inlinep fun)
-			 :notinline)))
-	   (let ((res (careful-expand-macro cmacro form)))
+  (let* ((fun-name (first form))
+	 (translator (info :function :ir1-convert fun-name))
+	 (cmacro-fun (sb!xc:compiler-macro-function fun-name *lexenv*)))
+    (cond (translator
+	   (when cmacro-fun
+	     (compiler-warn "ignoring compiler macro for special form"))
+	   (funcall translator start cont form))
+	  ((and cmacro-fun
+		;; gotcha: If you look up the DEFINE-COMPILER-MACRO
+		;; macro in the ANSI spec, you might think that
+		;; suppressing compiler-macro expansion when NOTINLINE
+		;; is some pre-ANSI hack. However, if you look up the
+		;; NOTINLINE declaration, you'll find that ANSI
+		;; requires this behavior after all.
+		(not (eq (info :function :inlinep fun-name) :notinline)))
+	   (let ((res (careful-expand-macro cmacro-fun form)))
 	     (if (eq res form)
-		 (ir1-convert-global-functoid-no-cmacro start cont form fun)
+		 (ir1-convert-global-functoid-no-cmacro
+		  start cont form fun-name)
 		 (ir1-convert start cont res))))
 	  (t
-	   (ir1-convert-global-functoid-no-cmacro start cont form fun)))))
+	   (ir1-convert-global-functoid-no-cmacro start cont form fun-name)))))
 
 ;;; Handle the case of where the call was not a compiler macro, or was
 ;;; a compiler macro and passed.
@@ -1988,9 +1997,9 @@
 			  :source-name source-name
 			  :debug-name debug-name))))
 
-;;; Get a DEFINED-FUN object for a function we are about to
-;;; define. If the function has been forward referenced, then
-;;; substitute for the previous references.
+;;; Get a DEFINED-FUN object for a function we are about to define. If
+;;; the function has been forward referenced, then substitute for the
+;;; previous references.
 (defun get-defined-fun (name)
   (proclaim-as-fun-name name)
   (let ((found (find-free-fun name "shouldn't happen! (defined-fun)")))

@@ -176,6 +176,14 @@
 		   :hash-vector (unless (eq test 'eq)
 				  (make-array size+1
 					      :element-type '(unsigned-byte 32)
+					      ;; as explained by pmai on
+					      ;; openprojects #lisp IRC
+					      ;; 2002-07-30: #x80000000 is
+					      ;; bigger than any possible nonEQ
+					      ;; hash value, and thus indicates
+					      ;; an empty slot; and EQ hash
+					      ;; tables don't use
+					      ;; HASH-TABLE-HASH-VECTOR
 					      :initial-element #x80000000)))))
       (declare (type index size+1 scaled-size length))
       ;; Set up the free list, all free. These lists are 0 terminated.

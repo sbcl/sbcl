@@ -826,7 +826,7 @@ retained, possibly temporariliy, because it might be used internally."
              "C-STRINGS->STRING-LIST"
 
              ;; misc. utilities used internally
-             "LEGAL-FUN-NAME-P"
+             "LEGAL-FUN-NAME-P" "LEGAL-FUN-NAME-OR-TYPE-ERROR"
              "FUN-NAME-BLOCK-NAME"
 	     "FUN-NAME-INLINE-EXPANSION"
              "WHITESPACE-CHAR-P"
