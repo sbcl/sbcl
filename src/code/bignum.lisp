@@ -1761,274 +1761,303 @@ IS LESS EFFICIENT BUT EASIER TO MAINTAIN. BILL SAYS THIS CODE CERTAINLY WORKS!
 ;;;
 ;;; Normalize quotient and remainder. Cons result if necessary.
 
-;;; These are used by BIGNUM-TRUNCATE and friends in the general case.
-(defvar *truncate-x*)
-(defvar *truncate-y*)
 
-;;; Divide X by Y returning the quotient and remainder. In the
-;;; general case, we shift Y to set up for the algorithm, and we use
-;;; two buffers to save consing intermediate values. X gets
-;;; destructively modified to become the remainder, and we have to
-;;; shift it to account for the initial Y shift. After we multiple
-;;; bind q and r, we first fix up the signs and then return the
-;;; normalized results.
+;;; This used to be split into multiple functions, which shared state
+;;; in special variables *TRUNCATE-X* and *TRUNCATE-Y*. Having so many
+;;; special variable accesses in tight inner loops was having a large
+;;; effect on performance, so the helper functions have now been
+;;; refactored into local functions and the special variables into
+;;; lexicals.  There was also a lot of boxing and unboxing of
+;;; (UNSIGNED-BYTE 32)'s going on, which this refactoring
+;;; eliminated. This improves the performance on some CL-BENCH tests
+;;; by up to 50%, which is probably signigicant enough to justify the
+;;; reduction in readability that was introduced. --JES, 2004-08-07
 (defun bignum-truncate (x y)
   (declare (type bignum-type x y))
-  (let* ((x-plusp (%bignum-0-or-plusp x (%bignum-length x)))
-	 (y-plusp (%bignum-0-or-plusp y (%bignum-length y)))
-	 (x (if x-plusp x (negate-bignum x nil)))
-	 (y (if y-plusp y (negate-bignum y nil)))
-	 (len-x (%bignum-length x))
-	 (len-y (%bignum-length y)))
-    (multiple-value-bind (q r)
-	(cond ((< len-y 2)
-	       (bignum-truncate-single-digit x len-x y))
-	      ((plusp (bignum-compare y x))
-	       (let ((res (%allocate-bignum len-x)))
-		 (dotimes (i len-x)
-		   (setf (%bignum-ref res i) (%bignum-ref x i)))
-		 (values 0 res)))
-	      (t
-	       (let ((len-x+1 (1+ len-x)))
-		 (with-bignum-buffers ((*truncate-x* len-x+1)
-				       (*truncate-y* (1+ len-y)))
-		   (let ((y-shift (shift-y-for-truncate y)))
-		     (shift-and-store-truncate-buffers x len-x y len-y y-shift)
-		     (values (return-quotient-leaving-remainder len-x+1 len-y)
-			     ;; Now that RETURN-QUOTIENT-LEAVING-REMAINDER
-			     ;; has executed, we just tidy up the remainder
-			     ;; (in *TRUNCATE-X*) and return it.
-			     (cond
-			      ((zerop y-shift)
-			       (let ((res (%allocate-bignum len-y)))
-				 (declare (type bignum-type res))
-				 (bignum-replace res *truncate-x* :end2 len-y)
-				 (%normalize-bignum res len-y)))
-			      (t
-			       (shift-right-unaligned
-				*truncate-x* 0 y-shift len-y
-				((= j res-len-1)
-				 (setf (%bignum-ref res j)
-				       (%ashr (%bignum-ref *truncate-x* i)
-					      y-shift))
-				 (%normalize-bignum res res-len))
-				res)))))))))
-      (let ((quotient (cond ((eq x-plusp y-plusp) q)
-			    ((typep q 'fixnum) (the fixnum (- q)))
-			    (t (negate-bignum-in-place q))))
-	    (rem (cond (x-plusp r)
-		       ((typep r 'fixnum) (the fixnum (- r)))
-		       (t (negate-bignum-in-place r)))))
-	(values (if (typep quotient 'fixnum)
-		    quotient
-		    (%normalize-bignum quotient (%bignum-length quotient)))
-		(if (typep rem 'fixnum)
-		    rem
-		    (%normalize-bignum rem (%bignum-length rem))))))))
-
-;;; Divide X by Y when Y is a single bignum digit. BIGNUM-TRUNCATE
-;;; fixes up the quotient and remainder with respect to sign and
-;;; normalization.
-;;;
-;;; We don't have to worry about shifting Y to make its most
-;;; significant digit sufficiently large for %FLOOR to return digit-size
-;;; quantities for the q-digit and r-digit. If Y is a single digit
-;;; bignum, it is already large enough for %FLOOR. That is, it has
-;;; some bits on pretty high in the digit.
-(defun bignum-truncate-single-digit (x len-x y)
-  (declare (type bignum-index len-x))
-  (let ((q (%allocate-bignum len-x))
-	(r 0)
-	(y (%bignum-ref y 0)))
-    (declare (type bignum-element-type r y))
-    (do ((i (1- len-x) (1- i)))
-	((minusp i))
-      (multiple-value-bind (q-digit r-digit) (%floor r (%bignum-ref x i) y)
-	(declare (type bignum-element-type q-digit r-digit))
-	(setf (%bignum-ref q i) q-digit)
-	(setf r r-digit)))
-    (let ((rem (%allocate-bignum 1)))
-      (setf (%bignum-ref rem 0) r)
-      (values q rem))))
-
-;;; a helper function for BIGNUM-TRUNCATE
-;;;
-;;; Divide *TRUNCATE-X* by *TRUNCATE-Y*, returning the quotient
-;;; and destructively modifying *TRUNCATE-X* so that it holds
-;;; the remainder.
-;;;
-;;; LEN-X and LEN-Y tell us how much of the buffers we care about.
-;;;
-;;; *TRUNCATE-X* definitely has at least three digits, and it has one
-;;; more than *TRUNCATE-Y*. This keeps i, i-1, i-2, and low-x-digit
-;;; happy. Thanks to SHIFT-AND-STORE-TRUNCATE-BUFFERS.
-(defun return-quotient-leaving-remainder (len-x len-y)
-  (declare (type bignum-index len-x len-y))
-  (let* ((len-q (- len-x len-y))
-	 ;; Add one for extra sign digit in case high bit is on.
-	 (q (%allocate-bignum (1+ len-q)))
-	 (k (1- len-q))
-	 (y1 (%bignum-ref *truncate-y* (1- len-y)))
-	 (y2 (%bignum-ref *truncate-y* (- len-y 2)))
-	 (i (1- len-x))
-	 (i-1 (1- i))
-	 (i-2 (1- i-1))
-	 (low-x-digit (- i len-y)))
-    (declare (type bignum-index len-q k i i-1 i-2 low-x-digit)
-	     (type bignum-element-type y1 y2))
-    (loop
-      (setf (%bignum-ref q k)
-	    (try-bignum-truncate-guess
-	     ;; This modifies *TRUNCATE-X*. Must access elements each pass.
-	     (bignum-truncate-guess y1 y2
-				    (%bignum-ref *truncate-x* i)
-				    (%bignum-ref *truncate-x* i-1)
-				    (%bignum-ref *truncate-x* i-2))
-	     len-y low-x-digit))
-      (cond ((zerop k) (return))
-	    (t (decf k)
-	       (decf low-x-digit)
-	       (shiftf i i-1 i-2 (1- i-2)))))
-    q))
-
-;;; This takes a digit guess, multiplies it by *TRUNCATE-Y* for a
-;;; result one greater in length than LEN-Y, and subtracts this result
-;;; from *TRUNCATE-X*. LOW-X-DIGIT is the first digit of X to start
-;;; the subtraction, and we know X is long enough to subtract a LEN-Y
-;;; plus one length bignum from it. Next we check the result of the
-;;; subtraction, and if the high digit in X became negative, then our
-;;; guess was one too big. In this case, return one less than GUESS
-;;; passed in, and add one value of Y back into X to account for
-;;; subtracting one too many. Knuth shows that the guess is wrong on
-;;; the order of 3/b, where b is the base (2 to the digit-size power)
-;;; -- pretty rarely.
-(defun try-bignum-truncate-guess (guess len-y low-x-digit)
-  (declare (type bignum-index low-x-digit len-y)
-	   (type bignum-element-type guess))
-  (let ((carry-digit 0)
-	(borrow 1)
-	(i low-x-digit))
-    (declare (type bignum-element-type carry-digit)
-	     (type bignum-index i)
-	     (fixnum borrow))
-    ;; Multiply guess and divisor, subtracting from dividend simultaneously.
-    (dotimes (j len-y)
-      (multiple-value-bind (high-digit low-digit)
-	  (%multiply-and-add guess
-			     (%bignum-ref *truncate-y* j)
-			     carry-digit)
-	(declare (type bignum-element-type high-digit low-digit))
-	(setf carry-digit high-digit)
-	(multiple-value-bind (x temp-borrow)
-	    (%subtract-with-borrow (%bignum-ref *truncate-x* i)
-				   low-digit
-				   borrow)
-	  (declare (type bignum-element-type x)
-		   (fixnum temp-borrow))
-	  (setf (%bignum-ref *truncate-x* i) x)
-	  (setf borrow temp-borrow)))
-      (incf i))
-    (setf (%bignum-ref *truncate-x* i)
-	  (%subtract-with-borrow (%bignum-ref *truncate-x* i)
-				 carry-digit borrow))
-    ;; See whether guess is off by one, adding one Y back in if necessary.
-    (cond ((%digit-0-or-plusp (%bignum-ref *truncate-x* i))
-	   guess)
-	  (t
-	   ;; If subtraction has negative result, add one divisor value back
-	   ;; in. The guess was one too large in magnitude.
-	   (let ((i low-x-digit)
-		 (carry 0))
+  (let (truncate-x truncate-y)
+    (labels	       
+        ;;; Divide X by Y when Y is a single bignum digit. BIGNUM-TRUNCATE
+        ;;; fixes up the quotient and remainder with respect to sign and
+        ;;; normalization.
+	;;;
+	;;; We don't have to worry about shifting Y to make its most
+	;;; significant digit sufficiently large for %FLOOR to return
+	;;; digit-size quantities for the q-digit and r-digit. If Y is
+	;;; a single digit bignum, it is already large enough for
+	;;; %FLOOR. That is, it has some bits on pretty high in the
+	;;; digit.
+	((bignum-truncate-single-digit (x len-x y)
+	   (declare (type bignum-index len-x))
+	   (let ((q (%allocate-bignum len-x))
+		 (r 0)
+		 (y (%bignum-ref y 0)))
+	     (declare (type bignum-element-type r y))
+	     (do ((i (1- len-x) (1- i)))
+		 ((minusp i))
+	       (multiple-value-bind (q-digit r-digit)
+		   (%floor r (%bignum-ref x i) y)
+		 (declare (type bignum-element-type q-digit r-digit))
+		 (setf (%bignum-ref q i) q-digit)
+		 (setf r r-digit)))
+	     (let ((rem (%allocate-bignum 1)))
+	       (setf (%bignum-ref rem 0) r)
+	       (values q rem))))	 
+	;;; This returns a guess for the next division step. Y1 is the
+	;;; highest y digit, and y2 is the second to highest y
+	;;; digit. The x... variables are the three highest x digits
+	;;; for the next division step.
+	;;;
+	;;; From Knuth, our guess is either all ones or x-i and x-i-1
+	;;; divided by y1, depending on whether x-i and y1 are the
+	;;; same. We test this guess by determining whether guess*y2
+	;;; is greater than the three high digits of x minus guess*y1
+	;;; shifted left one digit:
+	;;;    ------------------------------
+	;;;   |    x-i    |   x-i-1  | x-i-2 |
+	;;;    ------------------------------
+	;;;    ------------------------------
+	;;; - | g*y1 high | g*y1 low |   0   |
+	;;;    ------------------------------
+	;;;		...		  <   guess*y2     ???	 
+	;;; If guess*y2 is greater, then we decrement our guess by one
+	;;; and try again.  This returns a guess that is either
+	;;; correct or one too large.
+	 (bignum-truncate-guess (y1 y2 x-i x-i-1 x-i-2)
+	   (declare (type bignum-element-type y1 y2 x-i x-i-1 x-i-2))
+	   (let ((guess (if (%digit-compare x-i y1)
+			    all-ones-digit
+			    (%floor x-i x-i-1 y1))))
+	     (declare (type bignum-element-type guess))
+	     (loop
+		 (multiple-value-bind (high-guess*y1 low-guess*y1)
+		     (%multiply guess y1)
+		   (declare (type bignum-element-type low-guess*y1
+				  high-guess*y1))
+		   (multiple-value-bind (high-guess*y2 low-guess*y2)
+		       (%multiply guess y2)
+		     (declare (type bignum-element-type high-guess*y2
+				    low-guess*y2))
+		     (multiple-value-bind (middle-digit borrow)
+			 (%subtract-with-borrow x-i-1 low-guess*y1 1)
+		       (declare (type bignum-element-type middle-digit)
+				(fixnum borrow))
+		       ;; Supplying borrow of 1 means there was no
+		       ;; borrow, and we know x-i-2 minus 0 requires
+		       ;; no borrow.
+		       (let ((high-digit (%subtract-with-borrow x-i
+								high-guess*y1
+								borrow)))
+			 (declare (type bignum-element-type high-digit))
+			 (if (and (%digit-compare high-digit 0)
+				  (or (%digit-greater high-guess*y2
+						      middle-digit)
+				      (and (%digit-compare middle-digit
+							   high-guess*y2)
+					   (%digit-greater low-guess*y2
+							   x-i-2))))
+			     (setf guess (%subtract-with-borrow guess 1 1))
+			     (return guess)))))))))
+	;;; Divide TRUNCATE-X by TRUNCATE-Y, returning the quotient
+	;;; and destructively modifying TRUNCATE-X so that it holds
+	;;; the remainder.
+	;;;
+	;;; LEN-X and LEN-Y tell us how much of the buffers we care about.
+	;;;
+	;;; TRUNCATE-X definitely has at least three digits, and it has one
+	;;; more than TRUNCATE-Y. This keeps i, i-1, i-2, and low-x-digit
+	;;; happy. Thanks to SHIFT-AND-STORE-TRUNCATE-BUFFERS.
+	 (return-quotient-leaving-remainder (len-x len-y)
+	   (declare (type bignum-index len-x len-y))
+	   (let* ((len-q (- len-x len-y))
+		  ;; Add one for extra sign digit in case high bit is on.
+		  (q (%allocate-bignum (1+ len-q)))
+		  (k (1- len-q))
+		  (y1 (%bignum-ref truncate-y (1- len-y)))
+		  (y2 (%bignum-ref truncate-y (- len-y 2)))
+		  (i (1- len-x))
+		  (i-1 (1- i))
+		  (i-2 (1- i-1))
+		  (low-x-digit (- i len-y)))
+	     (declare (type bignum-index len-q k i i-1 i-2 low-x-digit)
+		      (type bignum-element-type y1 y2))
+	     (loop
+		 (setf (%bignum-ref q k)
+		       (try-bignum-truncate-guess
+			;; This modifies TRUNCATE-X. Must access
+			;; elements each pass.
+			(bignum-truncate-guess y1 y2
+					       (%bignum-ref truncate-x i)
+					       (%bignum-ref truncate-x i-1)
+					       (%bignum-ref truncate-x i-2))
+			len-y low-x-digit))
+		 (cond ((zerop k) (return))
+		       (t (decf k)
+			  (decf low-x-digit)
+			  (shiftf i i-1 i-2 (1- i-2)))))
+	     q))
+	;;; This takes a digit guess, multiplies it by TRUNCATE-Y for a
+	;;; result one greater in length than LEN-Y, and subtracts this result
+	;;; from TRUNCATE-X. LOW-X-DIGIT is the first digit of X to start
+	;;; the subtraction, and we know X is long enough to subtract a LEN-Y
+	;;; plus one length bignum from it. Next we check the result of the
+	;;; subtraction, and if the high digit in X became negative, then our
+	;;; guess was one too big. In this case, return one less than GUESS
+	;;; passed in, and add one value of Y back into X to account for
+	;;; subtracting one too many. Knuth shows that the guess is wrong on
+	;;; the order of 3/b, where b is the base (2 to the digit-size power)
+	;;; -- pretty rarely.
+	 (try-bignum-truncate-guess (guess len-y low-x-digit)
+	   (declare (type bignum-index low-x-digit len-y)
+		    (type bignum-element-type guess))
+	   (let ((carry-digit 0)
+		 (borrow 1)
+		 (i low-x-digit))
+	     (declare (type bignum-element-type carry-digit)
+		      (type bignum-index i)
+		      (fixnum borrow))
+	     ;; Multiply guess and divisor, subtracting from dividend
+	     ;; simultaneously.
 	     (dotimes (j len-y)
-	       (multiple-value-bind (v k)
-		   (%add-with-carry (%bignum-ref *truncate-y* j)
-				    (%bignum-ref *truncate-x* i)
-				    carry)
-		 (declare (type bignum-element-type v))
-		 (setf (%bignum-ref *truncate-x* i) v)
-		 (setf carry k))
+	       (multiple-value-bind (high-digit low-digit)
+		   (%multiply-and-add guess
+				      (%bignum-ref truncate-y j)
+				      carry-digit)
+		 (declare (type bignum-element-type high-digit low-digit))
+		 (setf carry-digit high-digit)
+		 (multiple-value-bind (x temp-borrow)
+		     (%subtract-with-borrow (%bignum-ref truncate-x i)
+					    low-digit
+					    borrow)
+		   (declare (type bignum-element-type x)
+			    (fixnum temp-borrow))
+		   (setf (%bignum-ref truncate-x i) x)
+		   (setf borrow temp-borrow)))
 	       (incf i))
-	     (setf (%bignum-ref *truncate-x* i)
-		   (%add-with-carry (%bignum-ref *truncate-x* i) 0 carry)))
-	   (%subtract-with-borrow guess 1 1)))))
+	     (setf (%bignum-ref truncate-x i)
+		   (%subtract-with-borrow (%bignum-ref truncate-x i)
+					  carry-digit borrow))
+	     ;; See whether guess is off by one, adding one
+	     ;; Y back in if necessary.
+	     (cond ((%digit-0-or-plusp (%bignum-ref truncate-x i))
+		    guess)
+		   (t
+		    ;; If subtraction has negative result, add one
+		    ;; divisor value back in. The guess was one too
+		    ;; large in magnitude.
+		    (let ((i low-x-digit)
+			  (carry 0))
+		      (dotimes (j len-y)
+			(multiple-value-bind (v k)
+			    (%add-with-carry (%bignum-ref truncate-y j)
+					     (%bignum-ref truncate-x i)
+					     carry)
+			  (declare (type bignum-element-type v))
+			  (setf (%bignum-ref truncate-x i) v)
+			  (setf carry k))
+			(incf i))
+		      (setf (%bignum-ref truncate-x i)
+			    (%add-with-carry (%bignum-ref truncate-x i)
+					     0 carry)))
+		    (%subtract-with-borrow guess 1 1)))))
+	;;; This returns the amount to shift y to place a one in the
+	;;; second highest bit. Y must be positive. If the last digit
+	;;; of y is zero, then y has a one in the previous digit's
+	;;; sign bit, so we know it will take one less than digit-size
+	;;; to get a one where we want. Otherwise, we count how many
+	;;; right shifts it takes to get zero; subtracting this value
+	;;; from digit-size tells us how many high zeros there are
+	;;; which is one more than the shift amount sought.
+	;;;
+	;;; Note: This is exactly the same as one less than the
+	;;; integer-length of the last digit subtracted from the
+	;;; digit-size.
+	;;;
+	;;; We shift y to make it sufficiently large that doing the
+	;;; 2*digit-size by digit-size %FLOOR calls ensures the quotient and
+	;;; remainder fit in digit-size.
+	 (shift-y-for-truncate (y)
+	   (let* ((len (%bignum-length y))
+		  (last (%bignum-ref y (1- len))))
+	     (declare (type bignum-index len)
+		      (type bignum-element-type last))
+	     (- digit-size (integer-length last) 1)))
+	 ;;; Stores two bignums into the truncation bignum buffers,
+	 ;;; shifting them on the way in. This assumes x and y are
+	 ;;; positive and at least two in length, and it assumes
+	 ;;; truncate-x and truncate-y are one digit longer than x and
+	 ;;; y.
+	 (shift-and-store-truncate-buffers (x len-x y len-y shift)
+	   (declare (type bignum-index len-x len-y)
+		    (type (integer 0 (#.digit-size)) shift))
+	   (cond ((zerop shift)
+		  (bignum-replace truncate-x x :end1 len-x)
+		  (bignum-replace truncate-y y :end1 len-y))
+		 (t
+		  (bignum-ashift-left-unaligned x 0 shift (1+ len-x)
+						truncate-x)
+		  (bignum-ashift-left-unaligned y 0 shift (1+ len-y)
+						truncate-y))))) ;; LABELS
+      ;;; Divide X by Y returning the quotient and remainder. In the
+      ;;; general case, we shift Y to set up for the algorithm, and we
+      ;;; use two buffers to save consing intermediate values. X gets
+      ;;; destructively modified to become the remainder, and we have
+      ;;; to shift it to account for the initial Y shift. After we
+      ;;; multiple bind q and r, we first fix up the signs and then
+      ;;; return the normalized results.
+      (let* ((x-plusp (%bignum-0-or-plusp x (%bignum-length x)))
+	     (y-plusp (%bignum-0-or-plusp y (%bignum-length y)))
+	     (x (if x-plusp x (negate-bignum x nil)))
+	     (y (if y-plusp y (negate-bignum y nil)))
+	     (len-x (%bignum-length x))
+	     (len-y (%bignum-length y)))
+	(multiple-value-bind (q r)
+	    (cond ((< len-y 2)
+		   (bignum-truncate-single-digit x len-x y))
+		  ((plusp (bignum-compare y x))
+		   (let ((res (%allocate-bignum len-x)))
+		     (dotimes (i len-x)
+		       (setf (%bignum-ref res i) (%bignum-ref x i)))
+		     (values 0 res)))
+		  (t
+		   (let ((len-x+1 (1+ len-x)))
+		     (setf truncate-x (%allocate-bignum len-x+1))
+		     (setf truncate-y (%allocate-bignum (1+ len-y)))
+		     (let ((y-shift (shift-y-for-truncate y)))
+		       (shift-and-store-truncate-buffers x len-x y
+							 len-y y-shift)
+		       (values (return-quotient-leaving-remainder len-x+1
+								  len-y)
+			       ;; Now that RETURN-QUOTIENT-LEAVING-REMAINDER
+			       ;; has executed, we just tidy up the remainder
+			       ;; (in TRUNCATE-X) and return it.
+			       (cond
+				 ((zerop y-shift)
+				  (let ((res (%allocate-bignum len-y)))
+				    (declare (type bignum-type res))
+				    (bignum-replace res truncate-x :end2 len-y)
+				    (%normalize-bignum res len-y)))
+				 (t
+				  (shift-right-unaligned
+				   truncate-x 0 y-shift len-y
+				   ((= j res-len-1)
+				    (setf (%bignum-ref res j)
+					  (%ashr (%bignum-ref truncate-x i)
+						 y-shift))
+				    (%normalize-bignum res res-len))
+				   res))))))))
+	  (let ((quotient (cond ((eq x-plusp y-plusp) q)
+				((typep q 'fixnum) (the fixnum (- q)))
+				(t (negate-bignum-in-place q))))
+		(rem (cond (x-plusp r)
+			   ((typep r 'fixnum) (the fixnum (- r)))
+			   (t (negate-bignum-in-place r)))))
+	    (values (if (typep quotient 'fixnum)
+			quotient
+			(%normalize-bignum quotient (%bignum-length quotient)))
+		    (if (typep rem 'fixnum)
+			rem
+			(%normalize-bignum rem (%bignum-length rem))))))))))
 
-;;; This returns a guess for the next division step. Y1 is the highest y
-;;; digit, and y2 is the second to highest y digit. The x... variables are
-;;; the three highest x digits for the next division step.
-;;;
-;;; From Knuth, our guess is either all ones or x-i and x-i-1 divided by y1,
-;;; depending on whether x-i and y1 are the same. We test this guess by
-;;; determining whether guess*y2 is greater than the three high digits of x
-;;; minus guess*y1 shifted left one digit:
-;;;    ------------------------------
-;;;   |    x-i    |   x-i-1  | x-i-2 |
-;;;    ------------------------------
-;;;    ------------------------------
-;;; - | g*y1 high | g*y1 low |   0   |
-;;;    ------------------------------
-;;;		...		  <   guess*y2     ???
-;;; If guess*y2 is greater, then we decrement our guess by one and try again.
-;;; This returns a guess that is either correct or one too large.
-(defun bignum-truncate-guess (y1 y2 x-i x-i-1 x-i-2)
-  (declare (type bignum-element-type y1 y2 x-i x-i-1 x-i-2))
-  (let ((guess (if (%digit-compare x-i y1)
-		   all-ones-digit
-		   (%floor x-i x-i-1 y1))))
-    (declare (type bignum-element-type guess))
-    (loop
-      (multiple-value-bind (high-guess*y1 low-guess*y1) (%multiply guess y1)
-	(declare (type bignum-element-type low-guess*y1 high-guess*y1))
-	(multiple-value-bind (high-guess*y2 low-guess*y2)
-	    (%multiply guess y2)
-	  (declare (type bignum-element-type high-guess*y2 low-guess*y2))
-	  (multiple-value-bind (middle-digit borrow)
-	      (%subtract-with-borrow x-i-1 low-guess*y1 1)
-	    (declare (type bignum-element-type middle-digit)
-		     (fixnum borrow))
-	    ;; Supplying borrow of 1 means there was no borrow, and we know
-	    ;; x-i-2 minus 0 requires no borrow.
-	    (let ((high-digit (%subtract-with-borrow x-i high-guess*y1 borrow)))
-	      (declare (type bignum-element-type high-digit))
-	      (if (and (%digit-compare high-digit 0)
-		       (or (%digit-greater high-guess*y2 middle-digit)
-			   (and (%digit-compare middle-digit high-guess*y2)
-				(%digit-greater low-guess*y2 x-i-2))))
-		  (setf guess (%subtract-with-borrow guess 1 1))
-		  (return guess)))))))))
-
-;;; This returns the amount to shift y to place a one in the second highest
-;;; bit. Y must be positive. If the last digit of y is zero, then y has a
-;;; one in the previous digit's sign bit, so we know it will take one less
-;;; than digit-size to get a one where we want. Otherwise, we count how many
-;;; right shifts it takes to get zero; subtracting this value from digit-size
-;;; tells us how many high zeros there are which is one more than the shift
-;;; amount sought.
-;;;
-;;; Note: This is exactly the same as one less than the integer-length of the
-;;; last digit subtracted from the digit-size.
-;;;
-;;; We shift y to make it sufficiently large that doing the 2*digit-size
-;;; by digit-size %FLOOR calls ensures the quotient and remainder fit in
-;;; digit-size.
-(defun shift-y-for-truncate (y)
-  (let* ((len (%bignum-length y))
-	 (last (%bignum-ref y (1- len))))
-    (declare (type bignum-index len)
-	     (type bignum-element-type last))
-    (- digit-size (integer-length last) 1)))
-
-;;; Stores two bignums into the truncation bignum buffers, shifting them on the
-;;; way in. This assumes x and y are positive and at least two in length, and
-;;; it assumes *truncate-x* and *truncate-y* are one digit longer than x and y.
-(defun shift-and-store-truncate-buffers (x len-x y len-y shift)
-  (declare (type bignum-index len-x len-y)
-	   (type (integer 0 (#.digit-size)) shift))
-  (cond ((zerop shift)
-	 (bignum-replace *truncate-x* x :end1 len-x)
-	 (bignum-replace *truncate-y* y :end1 len-y))
-	(t
-	 (bignum-ashift-left-unaligned x 0 shift (1+ len-x) *truncate-x*)
-	 (bignum-ashift-left-unaligned y 0 shift (1+ len-y) *truncate-y*))))
 
 ;;;; %FLOOR primitive for BIGNUM-TRUNCATE
 

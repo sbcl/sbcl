@@ -1102,9 +1102,6 @@ SB-IMPL::*PREVIOUS-CASE* ; FIXME: printer not threadsafe
 *MACROEXPAND-HOOK* 
 *RANDOM-STATE* 
 
-SB-BIGNUM::*TRUNCATE-Y*
-SB-BIGNUM::*TRUNCATE-X*
-
 SB-INT:*CL-PACKAGE*                     ; readonly
 SB-INT:*KEYWORD-PACKAGE*                ; readonly
 SB-INT:*SETF-FDEFINITION-HOOK* 

@@ -675,9 +675,10 @@ Nikodemus Siivola:
 
 Juho Snellman:
   He provided several performance enhancements, including a better hash
-  function on strings, and removal of unneccessary bounds checks.  He
-  ported and enhanced the statistical profiler written by Gerd
-  Moellmann for CMU CL.
+  function on strings, removal of unneccessary bounds checks, and
+  multiple improvements to performance of common operations on
+  bignums.  He ported and enhanced the statistical profiler written by
+  Gerd Moellmann for CMU CL.
 
 Brian Spilsbury:
   He wrote Unicode-capable versions of SBCL's character, string, and
