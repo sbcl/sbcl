@@ -1928,6 +1928,8 @@ changes in sbcl-0.8.2 relative to sbcl-0.8.1:
     STRING-INPUT-STREAMs.  (thanks to Nikodemus Siivola)
   * bug fix: (SIGNED-BYTE 8) streams no longer return (UNSIGNED-BYTE
     8) data.  (thanks to David Lichteblau)
+  * bug fix: it is possible to add a method to a generic function
+    without lambda list.
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** LAST and [N]BUTLAST should accept a bignum.
     ** condition slot accessors are methods.

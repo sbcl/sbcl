@@ -276,34 +276,6 @@ WORKAROUND:
   holding... * is not equivalent to T in many cases, such as 
     (VECTOR *) /= (VECTOR T).
 
-94a: 
-  Inconsistencies between derived and declared VALUES return types for
-  DEFUN aren't checked very well. E.g. the logic which successfully
-  catches problems like
-    (declaim (ftype (function (fixnum) float) foo))
-    (defun foo (x)
-      (declare (type integer x))
-      (values x)) ; wrong return type, detected, gives warning, good!
-  fails to catch
-    (declaim (ftype (function (t) (values t t)) bar))
-    (defun bar (x)
-      (values x)) ; wrong number of return values, no warning, bad!
-  The cause of this is seems to be that (1) the internal function 
-  VALUES-TYPES-EQUAL-OR-INTERSECT used to make the check handles its
-  arguments symmetrically, and (2) when the type checking code was
-  written back when when SBCL's code was still CMU CL, the intent
-  was that this case
-    (declaim (ftype (function (t) t) bar))
-    (defun bar (x)
-      (values x x)) ; wrong number of return values; should give warning?
-  not be warned for, because a two-valued return value is considered
-  to be compatible with callers who expects a single value to be
-  returned. That intent is probably not appropriate for modern ANSI
-  Common Lisp, but fixing this might be complicated because of other
-  divergences between auld-style and new-style handling of
-  multiple-VALUES types. (Some issues related to this were discussed
-  on cmucl-imp at some length sometime in 2000.)
-
 95:
   The facility for dumping a running Lisp image to disk gets confused
   when run without the PURIFY option, and creates an unnecessarily large
@@ -846,22 +818,7 @@ WORKAROUND:
    Then (FOO #\1 *STANDARD-OUTPUT*) signals type error.
 
   (In 0.7.9.1 the result type is (FUNCTION * *), so Python does not
-  produce invalid code, but type checking is not accurate. Similar
-  problems exist with VALUES-TYPE-INTERSECTION.)
-
-220:
-  Sbcl 0.7.9 fails to compile
-
-  (multiple-value-call #'list
-    (the integer (helper))
-    nil)
-
-  Type check for INTEGER, the result of which serves as the first
-  argument of M-V-C, is inserted after evaluation of NIL. So arguments
-  of M-V-C are pushed in the wrong order. As a temporary workaround
-  type checking was disabled for M-V-Cs in 0.7.9.13. A better solution
-  would be to put the check between evaluation of arguments, but it
-  could be tricky to check result types of PROG1, IF etc.
+  produce invalid code, but type checking is not accurate.)
 
 233: bugs in constraint propagation
   a.

@@ -62,11 +62,6 @@ VOP DATA-VECTOR-SET/SIMPLE-STRING V2!14[EDI] t32[EAX] t30[S2]>t33[CL]
 
 * And why two moves?
 --------------------------------------------------------------------------------
-#5
-(loop repeat 1.5)
-
-uses generic arithmetic
---------------------------------------------------------------------------------
 #6
 09:49:05 <jtra> I have found a case in those where suboptimal code is
   generate with nested loops, it might be moderately easy to fix that
