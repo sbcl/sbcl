@@ -94,7 +94,11 @@ unsigned large_object_size = 4 * PAGE_BYTES;
 
 /* the verbosity level. All non-error messages are disabled at level 0;
  * and only a few rare messages are printed at level 1. */
-unsigned gencgc_verbose = (QSHOW ? 1 : 0);
+#ifdef QSHOW
+unsigned gencgc_verbose = 1;
+#else
+unsigned gencgc_verbose = 0;
+#endif
 
 /* FIXME: At some point enable the various error-checking things below
  * and see what they say. */
@@ -295,7 +299,7 @@ count_generation_pages(int generation)
     return count;
 }
 
-#if QSHOW
+#ifdef QSHOW
 static int
 count_dont_move_pages(void)
 {
@@ -1429,7 +1433,7 @@ sniff_code_object(struct code *code, unsigned displacement)
 	unsigned d2 = *((unsigned char *)p - 2);
 	unsigned d3 = *((unsigned char *)p - 3);
 	unsigned d4 = *((unsigned char *)p - 4);
-#if QSHOW
+#ifdef QSHOW
 	unsigned d5 = *((unsigned char *)p - 5);
 	unsigned d6 = *((unsigned char *)p - 6);
 #endif
@@ -3535,7 +3539,7 @@ garbage_collect_generation(int generation, int raise)
 	}
     }
 
-#if QSHOW
+#ifdef QSHOW
     if (gencgc_verbose > 1) {
 	int num_dont_move_pages = count_dont_move_pages();
 	fprintf(stderr,
@@ -4128,7 +4132,7 @@ gencgc_handle_wp_violation(void* fault_addr)
 {
     int  page_index = find_page_index(fault_addr);
 
-#if defined QSHOW_SIGNALS
+#ifdef QSHOW_SIGNALS
     FSHOW((stderr, "heap WP violation? fault_addr=%x, page_index=%d\n",
 	   fault_addr, page_index));
 #endif
