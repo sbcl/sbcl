@@ -138,7 +138,7 @@
   (:translate foreign-symbol-address)
   (:policy :fast-safe)
   (:args)
-  (:arg-types (:constant simple-string))
+  (:arg-types (:constant simple-base-string))
   (:info foreign-symbol)
   (:results (res :scs (sap-reg)))
   (:result-types system-area-pointer)
