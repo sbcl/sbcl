@@ -362,7 +362,7 @@
 		 ~S second~:P of system run time~%  ~
 ~@[                 [Run times include ~S second~:P GC run time.]~%  ~]~
 		 ~S page fault~:P and~%  ~
-		 ~S bytes consed.~%"
+		 ~:D bytes consed.~%"
 		(max (/ (- new-real-time old-real-time)
 			(float sb!xc:internal-time-units-per-second))
 		     0.0)
