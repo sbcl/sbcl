@@ -323,9 +323,11 @@
 	     `(defun ,op (&rest args)
 		#!+sb-doc ,doc
 		(if (null args) ,init
-		  (do ((args (cdr args) (cdr args))
-		       (res (car args) (,op res (car args))))
-		      ((null args) res))))))
+		    (do ((args (cdr args) (cdr args))
+			 (result (car args) (,op result (car args))))
+			((null args) result)
+		      ;; to signal TYPE-ERROR when exactly 1 arg of wrong type:
+		      (declare (type number result)))))))
   (define-arith + 0
     "Return the sum of its arguments. With no args, returns 0.")
   (define-arith * 1

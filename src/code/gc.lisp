@@ -33,9 +33,9 @@
 
 #!-sb-fluid
 (declaim (inline dynamic-usage)) ; to reduce PROFILEd call overhead
-#!+(or cgc gencgc)
+#!+gencgc
 (def-c-var-frob dynamic-usage "bytes_allocated")
-#!-(or cgc gencgc)
+#!-gencgc
 (defun dynamic-usage ()
   (the (unsigned-byte 32)
        (- (sb!sys:sap-int (sb!c::dynamic-space-free-pointer))

@@ -2092,11 +2092,11 @@ scav_vector(lispobj *where, lispobj object)
  * weak pointers
  */
 
-/* XX This is a hack adapted from cgc.c. These don't work too well with the
- * gencgc as a list of the weak pointers is maintained within the
- * objects which causes writes to the pages. A limited attempt is made
- * to avoid unnecessary writes, but this needs a re-think. */
-
+/* XX This is a hack adapted from cgc.c. These don't work too
+ * efficiently with the gencgc as a list of the weak pointers is
+ * maintained within the objects which causes writes to the pages. A
+ * limited attempt is made to avoid unnecessary writes, but this needs
+ * a re-think. */
 #define WEAK_POINTER_NWORDS \
     CEILING((sizeof(struct weak_pointer) / sizeof(lispobj)), 2)
 
