@@ -779,6 +779,56 @@ trans_base_string(lispobj object)
 }
 
 static int
+size_character_string(lispobj *where)
+{
+    struct vector *vector;
+    int length, nwords;
+
+    /* NOTE: A string contains one more byte of data (a terminating
+     * '\0' to help when interfacing with C functions) than indicated
+     * by the length slot. */
+
+    vector = (struct vector *) where;
+    length = fixnum_value(vector->length) + 1;
+    nwords = CEILING(NWORDS(length, 32) + 2, 2);
+
+    return nwords;
+}
+
+scav_character_string(lispobj *where, lispobj object)
+{
+    struct vector *vector;
+    int length, nwords;
+
+    /* NOTE: Strings contain one more byte of data than the length */
+    /* slot indicates. */
+
+    vector = (struct vector *) where;
+    length = fixnum_value(vector->length) + 1;
+    nwords = CEILING(NWORDS(length, 32) + 2, 2);
+
+    return nwords;
+}
+static lispobj
+trans_character_string(lispobj object)
+{
+    struct vector *vector;
+    int length, nwords;
+
+    gc_assert(is_lisp_pointer(object));
+
+    /* NOTE: A string contains one more byte of data (a terminating
+     * '\0' to help when interfacing with C functions) than indicated
+     * by the length slot. */
+
+    vector = (struct vector *) native_pointer(object);
+    length = fixnum_value(vector->length) + 1;
+    nwords = CEILING(NWORDS(length, 32) + 2, 2);
+
+    return copy_large_unboxed_object(object, nwords);
+}
+
+static int
 size_base_string(lispobj *where)
 {
     struct vector *vector;
@@ -1550,6 +1600,9 @@ gc_init_tables(void)
 #endif
     scavtab[SIMPLE_ARRAY_WIDETAG] = scav_boxed;
     scavtab[SIMPLE_BASE_STRING_WIDETAG] = scav_base_string;
+#ifdef SIMPLE_CHARACTER_STRING_WIDETAG
+    scavtab[SIMPLE_CHARACTER_STRING_WIDETAG] = scav_character_string;
+#endif
     scavtab[SIMPLE_BIT_VECTOR_WIDETAG] = scav_vector_bit;
     scavtab[SIMPLE_ARRAY_NIL_WIDETAG] = scav_vector_nil;
     scavtab[SIMPLE_ARRAY_UNSIGNED_BYTE_2_WIDETAG] =
@@ -1625,6 +1678,9 @@ gc_init_tables(void)
 	scav_vector_complex_long_float;
 #endif
     scavtab[COMPLEX_BASE_STRING_WIDETAG] = scav_boxed;
+#ifdef COMPLEX_CHARACTER_STRING_WIDETAG
+    scavtab[COMPLEX_CHARACTER_STRING_WIDETAG] = scav_boxed;
+#endif
     scavtab[COMPLEX_VECTOR_NIL_WIDETAG] = scav_boxed;
     scavtab[COMPLEX_BIT_VECTOR_WIDETAG] = scav_boxed;
     scavtab[COMPLEX_VECTOR_WIDETAG] = scav_boxed;
@@ -1675,6 +1731,9 @@ gc_init_tables(void)
 #endif
     transother[SIMPLE_ARRAY_WIDETAG] = trans_boxed; /* but not GENCGC */
     transother[SIMPLE_BASE_STRING_WIDETAG] = trans_base_string;
+#ifdef SIMPLE_CHARACTER_STRING_WIDETAG
+    transother[SIMPLE_CHARACTER_STRING_WIDETAG] = trans_character_string;
+#endif
     transother[SIMPLE_BIT_VECTOR_WIDETAG] = trans_vector_bit;
     transother[SIMPLE_VECTOR_WIDETAG] = trans_vector;
     transother[SIMPLE_ARRAY_NIL_WIDETAG] = trans_vector_nil;
@@ -1755,6 +1814,9 @@ gc_init_tables(void)
 	trans_vector_complex_long_float;
 #endif
     transother[COMPLEX_BASE_STRING_WIDETAG] = trans_boxed;
+#ifdef COMPLEX_CHARACTER_STRING_WIDETAG
+    transother[COMPLEX_CHARACTER_STRING_WIDETAG] = trans_boxed;
+#endif
     transother[COMPLEX_BIT_VECTOR_WIDETAG] = trans_boxed;
     transother[COMPLEX_VECTOR_NIL_WIDETAG] = trans_boxed;
     transother[COMPLEX_VECTOR_WIDETAG] = trans_boxed;
@@ -1805,6 +1867,9 @@ gc_init_tables(void)
 #endif
     sizetab[SIMPLE_ARRAY_WIDETAG] = size_boxed;
     sizetab[SIMPLE_BASE_STRING_WIDETAG] = size_base_string;
+#ifdef SIMPLE_CHARACTER_STRING_WIDETAG
+    sizetab[SIMPLE_CHARACTER_STRING_WIDETAG] = size_character_string;
+#endif
     sizetab[SIMPLE_BIT_VECTOR_WIDETAG] = size_vector_bit;
     sizetab[SIMPLE_VECTOR_WIDETAG] = size_vector;
     sizetab[SIMPLE_ARRAY_NIL_WIDETAG] = size_vector_nil;
@@ -1881,6 +1946,9 @@ gc_init_tables(void)
 	size_vector_complex_long_float;
 #endif
     sizetab[COMPLEX_BASE_STRING_WIDETAG] = size_boxed;
+#ifdef COMPLEX_CHARACTER_STRING_WIDETAG
+    sizetab[COMPLEX_CHARACTER_STRING_WIDETAG] = size_boxed;
+#endif
     sizetab[COMPLEX_VECTOR_NIL_WIDETAG] = size_boxed;
     sizetab[COMPLEX_BIT_VECTOR_WIDETAG] = size_boxed;
     sizetab[COMPLEX_VECTOR_WIDETAG] = size_boxed;

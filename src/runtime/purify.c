@@ -285,6 +285,9 @@ valid_dynamic_space_pointer(lispobj *pointer, lispobj *start_addr)
 #endif
 	case SIMPLE_ARRAY_WIDETAG:
 	case COMPLEX_BASE_STRING_WIDETAG:
+#ifdef COMPLEX_CHARACTER_STRING_WIDETAG
+	case COMPLEX_CHARACTER_STRING_WIDETAG:
+#endif
 	case COMPLEX_VECTOR_NIL_WIDETAG:
 	case COMPLEX_BIT_VECTOR_WIDETAG:
 	case COMPLEX_VECTOR_WIDETAG:
@@ -301,6 +304,9 @@ valid_dynamic_space_pointer(lispobj *pointer, lispobj *start_addr)
 #endif
 	case SIMPLE_ARRAY_NIL_WIDETAG:
 	case SIMPLE_BASE_STRING_WIDETAG:
+#ifdef SIMPLE_CHARACTER_STRING_WIDETAG
+	case SIMPLE_CHARACTER_STRING_WIDETAG:
+#endif
 	case SIMPLE_BIT_VECTOR_WIDETAG:
 	case SIMPLE_ARRAY_UNSIGNED_BYTE_2_WIDETAG:
 	case SIMPLE_ARRAY_UNSIGNED_BYTE_4_WIDETAG:
@@ -912,6 +918,9 @@ ptrans_otherptr(lispobj thing, lispobj header, boolean constant)
       case COMPLEX_WIDETAG:
       case SIMPLE_ARRAY_WIDETAG:
       case COMPLEX_BASE_STRING_WIDETAG:
+#ifdef COMPLEX_CHARACTER_STRING_WIDETAG
+    case COMPLEX_CHARACTER_STRING_WIDETAG:
+#endif
       case COMPLEX_BIT_VECTOR_WIDETAG:
       case COMPLEX_VECTOR_NIL_WIDETAG:
       case COMPLEX_VECTOR_WIDETAG:
@@ -930,6 +939,11 @@ ptrans_otherptr(lispobj thing, lispobj header, boolean constant)
 
       case SIMPLE_BASE_STRING_WIDETAG:
         return ptrans_vector(thing, 8, 1, 0, constant);
+
+#ifdef SIMPLE_CHARACTER_STRING_WIDETAG
+    case SIMPLE_CHARACTER_STRING_WIDETAG:
+	return ptrans_vector(thing, 32, 1, 0, constant);
+#endif
 
       case SIMPLE_BIT_VECTOR_WIDETAG:
         return ptrans_vector(thing, 1, 0, 0, constant);
@@ -1151,6 +1165,13 @@ pscav(lispobj *addr, int nwords, boolean constant)
                 vector = (struct vector *)addr;
                 count = CEILING(NWORDS(fixnum_value(vector->length)+1,8)+2,2);
                 break;
+
+#ifdef SIMPLE_CHARACTER_STRING_WIDETAG
+	    case SIMPLE_CHARACTER_STRING_WIDETAG:
+		vector = (struct vector *)addr;
+		count = CEILING(NWORDS(fixnum_value(vector->length)+1,32)+2,2);
+		break;
+#endif
 
               case SIMPLE_BIT_VECTOR_WIDETAG:
                 vector = (struct vector *)addr;

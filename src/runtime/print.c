@@ -536,6 +536,9 @@ static void print_otherptr(lispobj obj)
 #endif
 
             case SIMPLE_BASE_STRING_WIDETAG:
+#ifdef SIMPLE_CHARACTER_STRING_WIDETAG
+	case SIMPLE_CHARACTER_STRING_WIDETAG: /* FIXME */
+#endif
                 NEWLINE_OR_RETURN;
                 cptr = (char *)(ptr+1);
                 putchar('"');
@@ -599,6 +602,9 @@ static void print_otherptr(lispobj obj)
 	    case SIMPLE_ARRAY_COMPLEX_LONG_FLOAT_WIDETAG:
 #endif
             case COMPLEX_BASE_STRING_WIDETAG:
+#ifdef COMPLEX_CHARACTER_STRING_WIDETAG
+	case COMPLEX_CHARACTER_STRING_WIDETAG:
+#endif
             case COMPLEX_VECTOR_NIL_WIDETAG:
             case COMPLEX_BIT_VECTOR_WIDETAG:
             case COMPLEX_VECTOR_WIDETAG:

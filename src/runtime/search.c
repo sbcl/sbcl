@@ -47,6 +47,8 @@ boolean search_for_symbol(char *name, lispobj **start, int *count)
 	if (lowtag_of(symbol->name) == OTHER_POINTER_LOWTAG) {
             symbol_name = (struct vector *)native_pointer(symbol->name);
             if (is_valid_lisp_addr((os_vm_address_t)symbol_name) &&
+		/* FIXME: Broken with more than one type of string
+		   (i.e. even broken given (VECTOR NIL) */
 		widetag_of(symbol_name->header) == SIMPLE_BASE_STRING_WIDETAG &&
 		strcmp((char *)symbol_name->data, name) == 0)
                 return 1;
