@@ -167,6 +167,12 @@ WORKAROUND:
   then requesting a BACKTRACE at the debugger prompt gives no information
   about where in the user program the problem occurred.
 
+  (this is apparently mostly fixed on the SPARC and PPC architectures:
+  while giving the backtrace the system complains about "unknown
+  source location: using block start", but apart from that the
+  backtrace seems reasonable.  See tests/debug.impure.lisp for a test
+  case)
+
 64:
   Using the pretty-printer from the command prompt gives funny
   results, apparently because the pretty-printer doesn't know
@@ -1581,3 +1587,7 @@ WORKAROUND:
   Downing fixed most of the problems on non-x86 architectures, but on
   the x86 the backtrace from this evaluation does not reveal anything
   about the problem.  (See tests in debug.impure.lisp)
+
+346: alpha backtrace
+  In sbcl-0.8.13, all backtraces from errors caused by internal errors
+  on the alpha seem to have a "bogus stack frame".

@@ -97,7 +97,7 @@
 ;;; Try it with and without tail call elimination, since they can have
 ;;; different effects.  (Specifically, if undefined_tramp is incorrect
 ;;; a stunted stack can result from the tail call variant.)
-#-x86 ; bug 345
+#-(or alpha x86) ; bug 345
 (progn
   (flet ((test-function ()
 	   (declare (optimize (speed 2) (debug 1))) ; tail call elimination
@@ -123,15 +123,22 @@
 ;;; the return value (to the flet or the enclosing top level form) is
 ;;; more than MOST-POSITIVE-FIXNUM with the current spaces on OS X.
 ;;; Enabling it might catch other problems, so do it anyway.
-(flet ((test-function ()
-         (declare (optimize (speed 1) (debug 2))) ; tail call elimination
-         (/ 42 0)))
-  (assert (verify-backtrace #'test-function '/)))
+#-alpha ; bug 346
+(progn
+  (flet ((test-function ()
+	   (declare (optimize (speed 1) (debug 2))) ; tail call elimination
+	   (/ 42 0)))
+    (assert (verify-backtrace #'test-function '/)))
 
-(flet ((test-function ()
-         (declare (optimize (speed 1) (debug 2))) ; no tail call elimination
-         (/ 42 0)))
-  (assert (verify-backtrace #'test-function '/)))
+  (flet ((test-function ()
+	   (declare (optimize (speed 1) (debug 2))) ; no tail call elimination
+	   (/ 42 0)))
+    (assert (verify-backtrace #'test-function '/))))
+
+#-(or x86 alpha) ; bug 61
+(defun throw-test ()
+  (throw 'no-such-tag t))
+(assert (verify-backtrace #'throw-test 'throw-test))
 
 ;;; success
 (quit :unix-status 104)

@@ -139,6 +139,8 @@
      ,@(when (and tagged-type (not arg-swap))
 	 `((define-vop (,(symbolicate "FAST-" translate "-C/FIXNUM=>FIXNUM")
 			fast-fixnum-c-binop)
+	     (:args (x ,@(unless restore-fixnum-mask `(:target r)) 
+		       :scs (any-reg)))
 	     (:arg-types tagged-num (:constant ,tagged-type))
 	     ,@(when restore-fixnum-mask
 		 `((:temporary (:sc non-descriptor-reg) temp)))

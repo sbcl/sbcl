@@ -13,7 +13,7 @@
 
 (!def-vm-support-routine generate-call-sequence (name style vop)
   (ecase style
-    (:raw
+    ((:raw :none)
      (values
       `((inst li (make-fixup ',name :assembly-routine) temp)
 	(inst jsr lip-tn temp))
@@ -50,13 +50,7 @@
 	  (:temporary (:scs (control-stack) :offset nfp-save-offset)
 		      ,nfp-save)
 	  (:temporary (:scs (non-descriptor-reg)) temp1)
-	  (:save-p t)))))
-    (:none
-     (values
-      `((inst li (make-fixup ',name :assembly-routine) temp)
-	(inst jsr lip-tn temp (make-fixup ',name :assembly-routine)))
-      '((:temporary (:scs (non-descriptor-reg)) temp))
-      nil))))
+	  (:save-p t)))))))
 
 (!def-vm-support-routine generate-return-sequence (style)
   (ecase style
@@ -69,3 +63,6 @@
 				    :offset lra-offset)
 		    lip-tn :offset 2)))
     (:none)))
+
+(defun return-machine-address (scp)
+  (context-register scp lip-offset))

@@ -11,7 +11,7 @@
 
 (!def-vm-support-routine generate-call-sequence (name style vop)
   (ecase style
-    (:raw
+    ((:raw :none)
      (values
       `((inst call (make-fixup ',name :assembly-routine)))
       nil))
@@ -21,11 +21,7 @@
 	(inst call (make-fixup ',name :assembly-routine))
 	(note-this-location ,vop :single-value-return)
 	(move esp-tn ebx-tn))
-      '((:save-p :compute-only))))
-    (:none
-     (values
-      `((inst jmp (make-fixup ',name :assembly-routine)))
-      nil))))
+      '((:save-p :compute-only))))))
 
 (!def-vm-support-routine generate-return-sequence (style)
   (ecase style

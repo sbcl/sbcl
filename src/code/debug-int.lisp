@@ -1002,20 +1002,13 @@
   "Finds the PC for the return from an assembly routine properly.
 For some architectures (such as PPC) this will not be the $LRA
 register."
-  (let ((return-machine-address
-         ;; This conditional logic should probably go into
-         ;; architecture specific files somehow.
-         #!+ppc (sap-int (sb!vm::context-lr scp))
-         #!+sparc (+ (sb!vm:context-register scp sb!vm::lip-offset) 8)
-         #!-(or ppc sparc) (- (sb!vm:context-register scp sb!vm::lra-offset)
-                              sb!vm:other-pointer-lowtag))
-        (code-header-len (* (get-header-data code)
-                            sb!vm:n-word-bytes)))
-  (values (- return-machine-address
-             (- (get-lisp-obj-address code)
-                sb!vm:other-pointer-lowtag) 
-             code-header-len)
-          return-machine-address)))
+  (let ((return-machine-address (sb!vm::return-machine-address scp))
+        (code-header-len (* (get-header-data code) sb!vm:n-word-bytes)))
+    (values (- return-machine-address
+	       (- (get-lisp-obj-address code)
+		  sb!vm:other-pointer-lowtag) 
+	       code-header-len)
+	    return-machine-address)))
 
 ;;; Find the code object corresponding to the object represented by
 ;;; bits and return it. We assume bogus functions correspond to the
