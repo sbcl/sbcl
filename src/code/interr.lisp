@@ -418,37 +418,47 @@
 		  nil)))))
 
 (defun find-interrupted-name ()
+  (/show0 "entering FIND-INTERRUPTED-NAME")
   (if *finding-name*
       (values "<error finding interrupted name -- already finding name>" nil)
       (handler-case
 	  (let ((*finding-name* t))
+	    (/show0 "in ordinary case")
 	    (do ((frame (sb!di:top-frame) (sb!di:frame-down frame)))
 		((null frame)
+		 (/show0 "null frame")
 		 (values "<error finding interrupted name -- null frame>" nil))
+	      (/show0 "at head of DO loop")
 	      (when (and (sb!di::compiled-frame-p frame)
 			 (sb!di::compiled-frame-escaped frame))
 		(sb!di:flush-frames-above frame)
+		(/show0 "returning from within DO loop")
 		(return (values (sb!di:debug-function-name
 				 (sb!di:frame-debug-function frame))
 				frame)))))
 	(error ()
+	  (/show0 "trapped ERROR")
 	  (values "<error finding interrupted name -- trapped error>" nil))
 	(sb!di:debug-condition ()
+	  (/show0 "trapped DEBUG-CONDITION")
 	  (values "<error finding interrupted name -- trapped debug-condition>"
 		  nil)))))
 
 ;;;; INTERNAL-ERROR signal handler
 
 (defun internal-error (context continuable)
-  (declare (type system-area-pointer context) (ignore continuable))
+  (declare (type system-area-pointer context))
+  (declare (ignore continuable))
   (/show0 "entering INTERNAL-ERROR, CONTEXT=..")
   (/hexstr context)
   (infinite-error-protect
-   (let ((context (locally
-		    (declare (optimize (inhibit-warnings 3)))
-		    (sb!alien:sap-alien context (* os-context-t)))))
+   (/show0 "about to bind ALIEN-CONTEXT")
+   (let ((alien-context (locally
+			  (declare (optimize (inhibit-warnings 3)))
+			  (sb!alien:sap-alien context (* os-context-t)))))
+     (/show0 "about to bind ERROR-NUMBER and ARGUMENTS")
      (multiple-value-bind (error-number arguments)
-	 (sb!vm:internal-error-arguments context)
+	 (sb!vm:internal-error-arguments alien-context)
        (/show0 "back from INTERNAL-ERROR-ARGUMENTS, ERROR-NUMBER=..")
        (/hexstr error-number)
        (/show0 "ARGUMENTS=..")
@@ -456,7 +466,7 @@
        (multiple-value-bind (name sb!debug:*stack-top-hint*)
 	   (find-interrupted-name)
 	 (/show0 "back from FIND-INTERRUPTED-NAME")
-	 (let ((fp (int-sap (sb!vm:context-register context
+	 (let ((fp (int-sap (sb!vm:context-register alien-context
 						    sb!vm::cfp-offset)))
 	       (handler (and (< -1 error-number (length *internal-errors*))
 			     (svref *internal-errors* error-number))))
@@ -468,7 +478,7 @@
 			 (list error-number
 			       (mapcar #'(lambda (sc-offset)
 					   (sb!di::sub-access-debug-var-slot
-					    fp sc-offset context))
+					    fp sc-offset alien-context))
 				       arguments))))
 		 ((not (functionp handler))
 		  (error 'simple-error
@@ -478,7 +488,7 @@
 			       handler
 			       (mapcar #'(lambda (sc-offset)
 					   (sb!di::sub-access-debug-var-slot
-					    fp sc-offset context))
+					    fp sc-offset alien-context))
 				       arguments))))
 		 (t
-		  (funcall handler name fp context arguments)))))))))
+		  (funcall handler name fp alien-context arguments)))))))))

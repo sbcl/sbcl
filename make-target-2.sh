@@ -33,15 +33,23 @@ echo //doing warm init
 	;; interpreted /SHOW doesn't work until later in init.
         #+sb-show (print "/hello, world!")
 
+        ;; Until PRINT-OBJECT and other machinery is set up,
+	;; we want limits on printing to avoid infinite output.
+        (setq *print-length* 10)
+	(setq *print-level* 5)
+
         ;; Do warm init.
-	(let ((*print-length* 10)
-	      (*print-level* 5))
-          #+sb-show (print "/about to LOAD warm.lisp")
-	  (load "src/cold/warm.lisp"))
+        #+sb-show (print "/about to LOAD warm.lisp")
+	(load "src/cold/warm.lisp"))
 
         ;; Unintern no-longer-needed stuff before the possible PURIFY
         ;; in SAVE-LISP-AND-DIE.
         #-sb-fluid (sb-impl::!unintern-init-only-stuff)
+
+        ;; Now that the whole system is built, we don't need to 
+        ;; hobble the printer any more.
+        (setq *print-length* nil)
+	(setq *print-level* nil)
 
 	;; FIXME: Why is it that, at least on x86 sbcl-0.6.12.46,
 	;; GC :FULL T isn't nearly as effective as PURIFY here?

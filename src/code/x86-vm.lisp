@@ -191,7 +191,9 @@
 
 (defun context-pc (context)
   (declare (type (alien (* os-context-t)) context))
-  (int-sap (deref (context-pc-addr context))))
+  (let ((addr (context-pc-addr context)))
+    (declare (type (alien (* unsigned-int)) addr))
+    (int-sap (deref addr))))
 
 (def-alien-routine ("os_context_register_addr" context-register-addr)
   (* unsigned-int)
@@ -263,8 +265,10 @@
   (/hexstr context)
   (let ((pc (context-pc context)))
     (declare (type system-area-pointer pc))
+    (/show0 "got PC")
     ;; using INT3 the pc is .. INT3 <here> code length bytes...
     (let* ((length (sap-ref-8 pc 1))
+	   (removeme (/show0 "got LENGTH")) ; REMOVEME
 	   (vector (make-array length :element-type '(unsigned-byte 8))))
       (declare (type (unsigned-byte 8) length)
 	       (type (simple-array (unsigned-byte 8) (*)) vector))
@@ -311,7 +315,7 @@
 (defvar *fp-constant-1s0*)
 (defvar *fp-constant-0d0*)
 (defvar *fp-constant-1d0*)
-;;; The long-float constants.
+;;; the long-float constants
 (defvar *fp-constant-0l0*)
 (defvar *fp-constant-1l0*)
 (defvar *fp-constant-pi*)
@@ -320,7 +324,7 @@
 (defvar *fp-constant-lg2*)
 (defvar *fp-constant-ln2*)
 
-;;; The current alien stack pointer; saved/restored for non-local exits.
+;;; the current alien stack pointer; saved/restored for non-local exits
 (defvar *alien-stack*)
 
 (defun sb!kernel::%instance-set-conditional (object slot test-value new-value)
@@ -333,8 +337,8 @@
 
 ;;; Support for the MT19937 random number generator. The update
 ;;; function is implemented as an assembly routine. This definition is
-;;; transformed to a call to the assembly routine allowing its use in byte
-;;; compiled code.
+;;; transformed to a call to the assembly routine allowing its use in
+;;; byte compiled code.
 (defun random-mt19937 (state)
   (declare (type (simple-array (unsigned-byte 32) (627)) state))
   (random-mt19937 state))

@@ -450,6 +450,11 @@
 ;;; precomputed, but it would have to be invalidated whenever any
 ;;; constraint is added, which would be a pain.
 (defun flow-propagate-constraints (block)
+
+  ;; REMOVEME
+  #+sb-xc
+  (/show "entering FLOW-PROPAGATE-CONSTRAINTS" block)
+
   (let* ((pred (block-pred block))
 	 (in (cond (pred
 		    (let ((res (copy-sset (block-out (first pred)))))
@@ -468,9 +473,19 @@
 
     (setf (block-in block) in)
     (cond ((null kill-list)
+
+	   ;; REMOVEME
+	   #+sb-xc
+	   (/show "leaving through NULL KILL-LIST clause" (block-out block) in)
+
 	   (sset-union (block-out block) in))
 	  ((null (rest kill-list))
 	   (let ((con (lambda-var-constraints (first kill-list))))
+
+	     ;; REMOVEME
+	     #+sb-xc
+	     (/show "leaving through NULL (REST KILL-LIST) clause" out in con)
+
 	     (if con
 		 (sset-union-of-difference out in con)
 		 (sset-union out in))))
@@ -479,7 +494,15 @@
 	     (dolist (var kill-list)
 	       (let ((con (lambda-var-constraints var)))
 		 (when con
-		   (sset-union kill-set con))))
+		   (sset-union kill-set con))
+
+		 ;; REMOVEME
+		 #+sb-xc
+		 (/show var con "new" kill-set)))
+
+	     ;; REMOVEME
+	     #+sb-xc
+	     (/show "leaving through T clause")
 	     (sset-union-of-difference (block-out block) in kill-set))))))
 
 (defun constraint-propagate (component)
@@ -499,14 +522,20 @@
 
   (setf (block-out (component-head component)) (make-sset))
 
-  (let ((did-something nil))
-    (loop
-      (do-blocks (block component)
+  ;; REMOVEME
+  #+sb-xc
+  (/show "in CONSTRAINT-PROPAGATE" component "before LOOP")
+
+  (loop
+   (let ((did-something nil))
+     (do-blocks (block component)
 	(when (flow-propagate-constraints block)
 	  (setq did-something t)))
+      (unless did-something (return))))
 
-      (unless did-something (return))
-      (setq did-something nil)))
+  ;; REMOVEME
+  #+sb-xc
+  (/show "in CONSTRAINT-PROPAGATE, back from LOOP")
 
   (do-blocks (block component)
     (use-result-constraints block))

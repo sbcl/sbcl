@@ -929,8 +929,8 @@
 
 (defun assoc-if-not (predicate alist &key key)
   #!+sb-doc
-  "Returns the first cons in alist whose car does not satisfiy the Predicate.
-  If key is supplied, apply it to the car of each cons before testing."
+  "Returns the first cons in ALIST whose car does not satisfy the PREDICATE.
+  If KEY is supplied, apply it to the car of each cons before testing."
   (if key
       (assoc-guts (not (funcall predicate (funcall key (caar alist)))))
       (assoc-guts (not (funcall predicate (caar alist))))))
@@ -938,8 +938,8 @@
 (defun rassoc (item alist &key key test test-not)
   (declare (list alist))
   #!+sb-doc
-  "Returns the cons in alist whose cdr is equal (by a given test or EQL) to
-   the Item."
+  "Returns the cons in ALIST whose cdr is equal (by a given test or EQL) to
+   the ITEM."
   (cond (test
 	 (if key
 	     (assoc-guts (funcall test item (funcall key (cdar alist))))

@@ -861,6 +861,18 @@ changes in sbcl-0.7.0 relative to sbcl-0.6.13:
   :SB-PROPAGATE-FUN-TYPE are no longer considered to be optional
   features. Instead, the code that they used to control is always
   built into the system.
+?? Old operator names in the style DEF-FOO are now deprecated in favor
+  of new corresponding names DEFINE-FOO, for consistency with the
+  naming convention used in the ANSI standard). This mostly affects
+  internal symbols, but a few external symbols like
+  SB-ALIEN:DEF-ALIEN-FUNCTION are also affected.
+* minor incompatible change: DEFINE-ALIEN-FUNCTION (also known by 
+  the old deprecated name DEF-ALIEN-FUNCTION) now does DECLAIM FTYPE
+  for the defined function, since declaiming return types involving
+  aliens is (1) annoyingly messy to do by hand and (2) vital 
+  to efficient compilation of code which calls such functions (and
+  since people writing calls-to-C code aren't likely to be bothered
+  by implicit assumptions of static typing).
 * The doc/cmucl/ directory, containing old CMU CL documentation,
   is no longer part of the base system. The files which used to 
   be in the doc/cmucl/ directory are now available as

@@ -626,13 +626,13 @@
   (arg-load-scs nil :type list)
   (result-load-scs nil :type list)
   ;; if true, a function that is called with the VOP to do operand
-  ;; targeting. This is done by modifiying the TN-Ref-Target slots in
-  ;; the TN-Refs so that they point to other TN-Refs in the same VOP.
+  ;; targeting. This is done by modifying the TN-REF-TARGET slots in
+  ;; the TN-REFS so that they point to other TN-REFS in the same VOP.
   (target-function nil :type (or null function))
   ;; a function that emits assembly code for a use of this VOP when it
-  ;; is called with the VOP structure. Null if this VOP has no
-  ;; specified generator (i.e. it exists only to be inherited by other
-  ;; VOPs.)
+  ;; is called with the VOP structure. This is null if this VOP has no
+  ;; specified generator (i.e. if it exists only to be inherited by
+  ;; other VOPs).
   (generator-function nil :type (or function null))
   ;; a list of things that are used to parameterize an inherited
   ;; generator. This allows the same generator function to be used for

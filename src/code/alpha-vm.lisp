@@ -145,7 +145,6 @@
 ;;; to replicate)
 (defun internal-error-arguments (context)
   (declare (type (alien (* os-context-t)) context))
-  (sb!int::/show0 "entering INTERNAL-ERROR-ARGUMENTS")
   (let ((pc (context-pc context)))
     (declare (type system-area-pointer pc))
     ;; pc is a SAP pointing at - or actually, shortly after -
