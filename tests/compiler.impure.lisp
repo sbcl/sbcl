@@ -159,6 +159,43 @@
    (logand a0 a10)
    ;; a call to prevent the other arguments from being optimized away
    (logand a1 a2 a3 a4 a5 a6 a7 a8 a9)))
+
+;;; bug 192, reported by Einar Floystad Dorum: Compiling this in 0.7.6
+;;; caused the compiler to try to constant-fold DATA-VECTOR-REF, which
+;;; is OK, except that there was no non-VOP definition of
+;;; DATA-VECTOR-REF, so it would fail.
+(defun bug192 ()
+      (funcall 
+       (LAMBDA (TEXT I L )
+         (LABELS ((G908 (I)
+                    (LET ((INDEX
+                           (OR
+                            (IF (= I L)
+                                NIL
+                                (LET ((S TEXT)
+                                      (E (ELT TEXT I)))
+                                  (DECLARE (IGNORABLE S E))
+                                  (WHEN (EQL #\a E)
+                                    (G909 (1+ I))))))))
+                      INDEX))
+                  (G909 (I)
+                    (OR
+                     (IF (= I L)
+                         NIL
+                         (LET ((S TEXT)
+                               (E (ELT TEXT I)))
+                           (DECLARE (IGNORABLE S E))
+                           (WHEN (EQL #\b E) (G910 (1+ I)))))))
+                  (G910 (I)
+                    (LET ((INDEX
+                           (OR
+                            (IF NIL
+                                NIL
+                                (LET ((S TEXT))
+                                  (DECLARE (IGNORABLE S))
+                                  (WHEN T I))))))
+                      INDEX)))
+           (G908 I))) "abcdefg" 0 (length "abcdefg")))
 
 ;;; BUG 48a. and b. (symbol-macrolet handling), fixed by Eric Marsden
 ;;; and Raymond Toy for CMUCL, fix ported for sbcl-0.7.6.18.

@@ -1226,7 +1226,10 @@ changes in sbcl-0.7.7 relative to sbcl-0.7.6:
   * Bug fix: changed encoding of PCL's internal MAKE-INSTANCE
     functions so that EXPORTing the name of the class doesn't cause
     MAKE-INSTANCE functions from earlier DEFCLASSes to get lost (thanks
-    to Antonio Martinez)
+    to Antonio Martinez for reporting this)
+  * Bug 192 fixed: The internal primitive DATA-VECTOR-REF can now be
+    constant-folded without failing an assertion. (thanks to Einar
+    Floystad Dorum for reporting this)
   * Minor incompatible change: COMPILE-FILE-PATHNAME now merges its
     OUTPUT-FILE argument with its INPUT-FILE argument, resulting in
     behaviour analogous to RENAME-FILE.  This puts its behaviour more

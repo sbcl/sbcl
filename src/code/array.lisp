@@ -333,6 +333,12 @@
 						index))))
 			 *specialized-array-element-types*))))
 
+;;; (Ordinary DATA-VECTOR-REF usage compiles into a vop, but
+;;; DATA-VECTOR-REF is also FOLDABLE, and this ordinary function
+;;; definition is needed for the compiler to use in constant folding.)
+(defun data-vector-ref (array index)
+  (hairy-data-vector-ref array index))
+
 (defun hairy-data-vector-set (array index new-value)
   (with-array-data ((vector array) (index index) (end))
     (declare (ignore end))

@@ -35,12 +35,8 @@
 #   "lisp -noinit -batch" 
 #                 to use an existing CMU CL binary as a cross-compilation host
 #                 when you have weird things in your .cmucl-init file
-# Someday any sufficiently ANSI Common Lisp, perhaps CLISP and/or
-# OpenMCL should work
-#   "clisp"
-#   "??"
-# but not yet as of sbcl-0.7.4. (There are still some weird dependencies
-# on idiosyncrasies of the way CMU CL implements Common Lisp.)
+#   "openmcl --batch"
+#                 to use an OpenMCL binary as a cross-compilation host
 #
 # FIXME: Make a more sophisticated command line parser, probably
 # accepting "sh make.sh --xc-host foolisp" instead of the

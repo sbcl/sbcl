@@ -1,4 +1,23 @@
 ;;;; code to detect whether a package has changed
+;;;;
+;;;; This is really old code which was most useful when first
+;;;; bootstrapping SBCL when only CMU CL was available as an XC host.
+;;;; Its main purpose was to check that legacy code like DEFMACRO
+;;;; DOLIST and DEFUN IR1-OPTIMIZE-UNTIL-DONE was all correctly
+;;;; converted from code which mutated the XC host into code which
+;;;; built things for the target.
+;;;;
+;;;; These days, things like DEFUN IR1-OPTIMIZE-UNTIL-DONE can't very
+;;;; well be mutating the cross-compiler host because we can build
+;;;; successfully under OpenMCL, which shouldn't have the same
+;;;; packages or symbols. So we don't need to worry very much about
+;;;; modifying the XC host's private packages. However, it's still
+;;;; conceivable that something affecting the XC host's CL package
+;;;; (maybe DEFMACRO DOLIST?) could be written in such a way that it
+;;;; would silently compile under SBCL, CMU CL, and even OpenMCL, and
+;;;; still be fundamentally wrong. Since it'd be good to prevent such
+;;;; modifications of the XC host's CL package, this code is still
+;;;; retained despite being a little strange.
 
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
