@@ -422,6 +422,10 @@ WORKAROUND:
   (I haven't tried to investigate this bug enough to guess whether
   there might be any user-level symptoms.)
 
+  In fact, the type system is likely to depend on this inequality not
+  holding... * is not equivalent to T in many cases, such as 
+    (VECTOR *) /= (VECTOR T).
+
 94a: 
   Inconsistencies between derived and declared VALUES return types for
   DEFUN aren't checked very well. E.g. the logic which successfully

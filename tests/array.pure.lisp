@@ -62,8 +62,24 @@
 							 (aref x 12))))))
 	  (error "error not thrown in COMPILED-DECLARED-AREF ~S" form))))))
 
-;;; On the SPARC, until sbcl-0.7.7.20, there was a bug in array references 
-;;; for small vector elements (spotted by Raymond Toy).
+;;; On the SPARC, until sbcl-0.7.7.20, there was a bug in array
+;;; references for small vector elements (spotted by Raymond Toy); the
+;;; bug persisted on the PPC until sbcl-0.7.8.20.
+(let (vector)
+  (loop for i below 64
+	for list = (make-list 64 :initial-element 1)
+	do (setf (nth i list) 0)
+	do (setf vector (make-array 64 :element-type 'bit 
+				       :initial-contents list))
+	do (assert (= (funcall 
+		       (compile nil 
+				`(lambda (rmdr)
+				  (declare (type (simple-array bit (*)) rmdr)
+				           (optimize (speed 3) (safety 0)))
+				  (aref rmdr ,i)))
+		       vector)
+		      0))))
+#|
 (assert (= (funcall 
             (lambda (rmdr) 
               (declare (type (simple-array bit (*)) rmdr)
@@ -71,3 +87,4 @@
               (aref rmdr 0))
             #*00000000000000000000000000000001000000000)
            0))
+|#

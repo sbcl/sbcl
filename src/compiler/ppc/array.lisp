@@ -1,6 +1,14 @@
-;;;
-;;; Written by William Lott
-;;;
+;;;; array operations for the PPC VM
+
+;;;; This software is part of the SBCL system. See the README file for
+;;;; more information.
+;;;;
+;;;; This software is derived from the CMU CL system, which was
+;;;; written at Carnegie Mellon University and released into the
+;;;; public domain. The software is in the public domain and is
+;;;; provided with absolutely no warranty. See the COPYING and CREDITS
+;;;; files for more information.
+
 (in-package "SB!VM")
 
 
@@ -180,9 +188,11 @@
 	 (:result-types positive-fixnum)
 	 (:temporary (:scs (non-descriptor-reg)) temp)
 	 (:generator 15
-	   (multiple-value-bind (word extra) (floor index ,elements-per-word)
+	   (multiple-value-bind (word extra)
+	       (floor index ,elements-per-word)
 	     (setf extra (logxor extra (1- ,elements-per-word)))
-	     (let ((offset (- (* (+ word sb!vm:vector-data-offset) sb!vm:n-word-bytes)
+	     (let ((offset (- (* (+ word sb!vm:vector-data-offset)
+				 sb!vm:n-word-bytes)
 			      sb!vm:other-pointer-lowtag)))
 	       (cond ((typep offset '(signed-byte 16))
 		      (inst lwz result object offset))
@@ -190,8 +200,7 @@
 		      (inst lr temp offset)
 		      (inst lwzx result object temp))))
 	     (unless (zerop extra)
-	       (inst srwi result result
-		     (logxor (* extra ,bits) ,(1- elements-per-word))))
+	       (inst srwi result result (* ,bits extra)))
 	     (unless (= extra ,(1- elements-per-word))
 	       (inst andi. result result ,(1- (ash 1 bits)))))))
        (define-vop (,(symbolicate 'data-vector-set/ type))
