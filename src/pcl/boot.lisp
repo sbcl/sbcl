@@ -190,11 +190,32 @@ bootstrapping.
                                          is not allowed inside DEFGENERIC."
 			:format-arguments (list (cadr option))))
 	       (push (cadr option) (initarg :declarations)))
-	      ((:argument-precedence-order :method-combination)
-	       (if (initarg car-option)
-		   (duplicate-option car-option)
-		   (setf (initarg car-option)
-			 `',(cdr option))))
+	      (:method-combination
+	       (when (initarg car-option)
+		 (duplicate-option car-option))
+	       (unless (symbolp (cadr option))
+		 (error 'simple-program-error
+			:format-control "METHOD-COMBINATION name not a ~
+                                         symbol: ~S"
+			:format-arguments (list (cadr option))))
+	       (setf (initarg car-option)
+		     `',(cdr option)))
+	      (:argument-precedence-order
+	       (let* ((required (parse-lambda-list lambda-list))
+		      (supplied (cdr option)))
+		 (unless (= (length required) (length supplied))
+		   (error 'simple-program-error
+			  :format-control "argument count discrepancy in ~
+                                           :ARGUMENT-PRECEDENCE-ORDER clause."
+			  :format-arguments nil))
+		 (when (set-difference required supplied)
+		   (error 'simple-program-error
+			  :format-control "unequal sets for ~
+                                           :ARGUMENT-PRECEDENCE-ORDER clause: ~
+                                           ~S and ~S"
+			  :format-arguments (list required supplied)))
+		 (setf (initarg car-option)
+		       `',(cdr option))))
 	      ((:documentation :generic-function-class :method-class)
 	       (unless (proper-list-of-length-p option 2)
 		 (error "bad list length for ~S" option))
@@ -1173,8 +1194,14 @@ bootstrapping.
 		   (aux `(,var))))))
       (let ((bindings (mapcan #'process-var lambda-list)))
 	`(let* ((,args-tail ,args)
-		,@bindings)
-	   (declare (ignorable ,args-tail))
+		,@bindings
+		(.dummy0.
+		 ,@(when (eq state 'optional)
+		     `((unless (null ,args-tail)
+			 (error 'simple-program-error
+				:format-control "surplus arguments: ~S"
+				:format-arguments (list ,args-tail)))))))
+	   (declare (ignorable ,args-tail .dummy0.))
 	   ,@body)))))
 
 (defun get-key-arg-tail (keyword list)

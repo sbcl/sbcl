@@ -1755,6 +1755,11 @@ changes in sbcl-0.8.0 relative to sbcl-0.8alpha.0
        STRUCTURE-OBJECT, CONDITION and STANDARD-OBJECT.
     ** MAKE-LOAD-FORM-SAVING-SLOTS no longer returns a special
        keyword, and now implements the SLOT-NAMES argument.
+    ** methods with &OPTIONAL arguments no longer allow too many
+       arguments to be passed in the call without error.
+    ** DEFGENERIC now checks that the :ARGUMENT-PRECEDENCE-ORDER
+       option is consistent with the required arguments of the generic
+       function lambda list.
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles
