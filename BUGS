@@ -1621,9 +1621,11 @@ WORKAROUND:
     * (PRINT *BIG*)
     Argh! gc_find_freeish_pages failed (restart_page), nbytes=110152.
   It should be straightforward to push the heap overflow threshold
-  up to much larger bignums; CSR pointed out it would help to use a 
-  bignum-printing algorithm which bisected the printed number,
-  rather than stripping off digits one by one.
+  up to much larger bignums; Paul Dietz pointed out it would help to 
+  use a bignum-printing algorithm which bisected the printed number,
+  rather than stripping off digits one by one, and CSR suggested using
+  iteration rather than recursion to encourage intermediate results
+  to be GCed.
 
 351: suboptimal error handling/reporting when compiling (PUSH (LET ...)) 
   In sbcl-0.8.15.18,
@@ -1638,7 +1640,7 @@ WORKAROUND:
   Since the (LET ...) expression is being misused in PUSH as a 
   SETFable place, it would be more helpful to fail as in 
     * (defun oops2 () (setf (let ((b *b*)) (aref b 1)) *b*))
-  with compiler conditions errors like 
+  with compilation errors and warnings like 
     ; in: LAMBDA NIL
     ;     ((B *B*))
     ; caught ERROR:
