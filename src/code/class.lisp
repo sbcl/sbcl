@@ -1130,10 +1130,10 @@
 		generic-sequence collection))
     (null
      :translation (member nil)
-     :inherits (list sequence
+     :inherits (symbol list sequence
 		mutable-sequence mutable-collection
-		generic-sequence collection symbol)
-     :direct-superclasses (list symbol))
+		generic-sequence collection)
+     :direct-superclasses (symbol list))
     (generic-number :state :read-only)
     (number :translation number :inherits (generic-number))
     (complex

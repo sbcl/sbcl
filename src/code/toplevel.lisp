@@ -140,15 +140,17 @@
   be any non-negative, non-complex number."
   (when (or (not (realp n))
 	    (minusp n))
-    (error "Invalid argument to SLEEP: ~S.~%~
-	    Must be a non-negative, non-complex number."
-	   n))
+    (error 'simple-type-error
+           :format-control "invalid argument to SLEEP: ~S"
+           :format-arguments (list n)
+           :datum n
+           :expected-type '(real 0)))
   (multiple-value-bind (sec usec)
       (if (integerp n)
 	  (values n 0)
 	  (multiple-value-bind (sec frac)
 	      (truncate n)
-	    (values sec(truncate frac 1e-6))))
+	    (values sec (truncate frac 1e-6))))
     (sb!unix:unix-select 0 0 0 0 sec usec))
   nil)
 

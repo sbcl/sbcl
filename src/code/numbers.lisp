@@ -1214,7 +1214,7 @@
     (13 (boole 13 integer1 integer2))
     (14 (boole 14 integer1 integer2))
     (15 (boole 15 integer1 integer2))
-    (t (error "~S is not of type (mod 16)." op))))
+    (t (error 'type-error :datum op :expected-type '(mod 16)))))
 
 ;;;; GCD and LCM
 

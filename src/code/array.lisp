@@ -539,7 +539,7 @@
 	  (declare (ignore start end))
 	  (array-element-type array)))
        (t
-	(error "~S is not an array." array))))))
+	(error 'type-error :datum array :expected-type 'array))))))
 
 (defun array-rank (array)
   #!+sb-doc

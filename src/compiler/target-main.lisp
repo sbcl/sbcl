@@ -89,7 +89,8 @@
 	  (values definition nil nil)
 	  (actually-compile name definition))
     (cond (name
-	   (if (macro-function name)
+	   (if (and (symbolp name)
+                    (macro-function name))
 	       (setf (macro-function name) compiled-definition)
 	       (setf (fdefinition name) compiled-definition))
 	   (values name warnings-p failure-p))
