@@ -18,7 +18,7 @@
    env))
 
 ;;; Make a TN for the argument count passing location for a non-local entry.
-(!def-vm-support-routine make-nlx-entry-argument-start-location ()
+(!def-vm-support-routine make-nlx-entry-arg-start-location ()
   (make-wired-tn *fixnum-primitive-type* any-reg-sc-number ebx-offset))
 
 (defun catch-block-ea (tn)

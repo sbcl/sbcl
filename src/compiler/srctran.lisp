@@ -3112,13 +3112,13 @@
 ;;;; versions, and degenerate cases are flushed.
 
 ;;; Left-associate FIRST-ARG and MORE-ARGS using FUNCTION.
-(declaim (ftype (function (symbol t list) list) associate-arguments))
-(defun associate-arguments (function first-arg more-args)
+(declaim (ftype (function (symbol t list) list) associate-args))
+(defun associate-args (function first-arg more-args)
   (let ((next (rest more-args))
 	(arg (first more-args)))
     (if (null next)
 	`(,function ,first-arg ,arg)
-	(associate-arguments function `(,function ,first-arg ,arg) next))))
+	(associate-args function `(,function ,first-arg ,arg) next))))
 
 ;;; Do source transformations for transitive functions such as +.
 ;;; One-arg cases are replaced with the arg and zero arg cases with
@@ -3133,7 +3133,7 @@
 	   `(,leaf-fun ,(first args) ,(second args))
 	   (values nil t)))
     (t
-     (associate-arguments fun (first args) (rest args)))))
+     (associate-args fun (first args) (rest args)))))
 
 (define-source-transform + (&rest args)
   (source-transform-transitive '+ args 0))
@@ -3160,14 +3160,14 @@
     (0 0)
     (1 `(abs (the integer ,(first args))))
     (2 (values nil t))
-    (t (associate-arguments 'gcd (first args) (rest args)))))
+    (t (associate-args 'gcd (first args) (rest args)))))
 
 (define-source-transform lcm (&rest args)
   (case (length args)
     (0 1)
     (1 `(abs (the integer ,(first args))))
     (2 (values nil t))
-    (t (associate-arguments 'lcm (first args) (rest args)))))
+    (t (associate-args 'lcm (first args) (rest args)))))
 
 ;;; Do source transformations for intransitive n-arg functions such as
 ;;; /. With one arg, we form the inverse. With two args we pass.
@@ -3177,7 +3177,7 @@
   (case (length args)
     ((0 2) (values nil t))
     (1 `(,@inverse ,(first args)))
-    (t (associate-arguments function (first args) (rest args)))))
+    (t (associate-args function (first args) (rest args)))))
 
 (define-source-transform - (&rest args)
   (source-transform-intransitive '- args '(%negate)))

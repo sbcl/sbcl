@@ -417,14 +417,14 @@
 
 ;;;; arguments/returns
 
-;;; Return a vector to be used as the
-;;; COMPILED-DEBUG-FUN-ARGUMENTS for Fun. If fun is the
-;;; MAIN-ENTRY for an optional dispatch, then look at the ARGLIST to
-;;; determine the syntax, otherwise pretend all arguments are fixed.
+;;; Return a vector to be used as the COMPILED-DEBUG-FUN-ARGS for FUN.
+;;; If FUN is the MAIN-ENTRY for an optional dispatch, then look at
+;;; the ARGLIST to determine the syntax, otherwise pretend all
+;;; arguments are fixed.
 ;;;
 ;;; ### This assumption breaks down in EPs other than the main-entry,
 ;;; since they may or may not have supplied-p vars, etc.
-(defun compute-arguments (fun var-locs)
+(defun compute-args (fun var-locs)
   (declare (type clambda fun) (type hash-table var-locs))
   (collect ((res))
     (let ((od (lambda-optional-dispatch fun)))
@@ -505,7 +505,7 @@
 	   (setf (compiled-debug-fun-vars dfun)
 		 (compute-vars fun level var-locs))
 	   (setf (compiled-debug-fun-arguments dfun)
-		 (compute-arguments fun var-locs))))
+		 (compute-args fun var-locs))))
 
     (when (>= level 2)
       (multiple-value-bind (blocks tlf-num) (compute-debug-blocks fun var-locs)

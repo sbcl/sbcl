@@ -195,7 +195,7 @@
     ;; from nlx.lisp
     make-nlx-sp-tn
     make-dynamic-state-tns
-    make-nlx-entry-argument-start-location
+    make-nlx-entry-arg-start-location
 
     ;; from support.lisp
     generate-call-sequence

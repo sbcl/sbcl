@@ -926,6 +926,11 @@ changes in sbcl-0.7.0 relative to sbcl-0.6.13:
   DEFINE-CONDITION, DEFINE-MODIFY-MACRO..). This mostly affects
   internal symbols, but a few supported extensions like
   SB-ALIEN:DEF-ALIEN-FUNCTION are also affected.
+?? minor incompatible change: SB-C-CALL and SB-ALIEN no longer exist
+  as separate packages. The external symbols of both packages have
+  moved into a new SB-FFI package. Almost all old code should still
+  continue to work without immediate update, as SB-C-CALL and SB-ALIEN
+  names will be retained as nicknames for that package for some time.
 * minor incompatible change (part of a bug fix by Christophe Rhodes
   to DIRECTORY behavior): DIRECTORY no longer implicitly promotes
   NIL slots of its pathname argument to :WILD, and in particular

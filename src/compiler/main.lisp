@@ -40,13 +40,11 @@
 ;;; :BLOCK-COMPILE and :ENTRY-POINTS arguments that COMPILE-FILE was
 ;;; called with.
 ;;;
-;;; *BLOCK-COMPILE-ARGUMENT* holds the original value of the
-;;; :BLOCK-COMPILE argument, which overrides any internal
-;;; declarations.
+;;; *BLOCK-COMPILE-ARG* holds the original value of the :BLOCK-COMPILE
+;;; argument, which overrides any internal declarations.
 (defvar *block-compile*)
-(defvar *block-compile-argument*)
-(declaim (type (member nil t :specified)
-	       *block-compile* *block-compile-argument*))
+(defvar *block-compile-arg*)
+(declaim (type (member nil t :specified) *block-compile* *block-compile-arg*))
 (defvar *entry-points*)
 (declaim (list *entry-points*))
 
@@ -1302,7 +1300,7 @@
 ;;; Return (VALUES NIL WARNINGS-P FAILURE-P).
 (defun sub-compile-file (info)
   (declare (type source-info info))
-  (let* ((*block-compile* *block-compile-argument*)
+  (let* ((*block-compile* *block-compile-arg*)
 	 (*package* (sane-package))
 	 (*policy* *policy*)
 	 (*lexenv* (make-null-lexenv))
@@ -1415,7 +1413,7 @@
 
      ;; extensions
      (trace-file nil) 
-     ((:block-compile *block-compile-argument*) nil))
+     ((:block-compile *block-compile-arg*) nil))
 
   #!+sb-doc
   "Compile INPUT-FILE, producing a corresponding fasl file and returning

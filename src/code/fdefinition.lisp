@@ -97,8 +97,8 @@
   (definition nil :type function))
 
 ;;; Replace the definition of NAME with a function that binds NAME's
-;;; arguments a variable named argument-list, binds name's definition
-;;; to a variable named basic-definition, and evaluates BODY in that
+;;; arguments to a variable named ARG-LIST, binds name's definition
+;;; to a variable named BASIC-DEFINITION, and evaluates BODY in that
 ;;; context. TYPE is whatever you would like to associate with this
 ;;; encapsulation for identification in case you need multiple
 ;;; encapsulations of the same name.
@@ -117,8 +117,8 @@
     ;; an encapsulation that no longer exists.
     (let ((info (make-encapsulation-info type (fdefn-fun fdefn))))
       (setf (fdefn-fun fdefn)
-	    (lambda (&rest argument-list)
-	      (declare (special argument-list))
+	    (lambda (&rest arg-list)
+	      (declare (special arg-list))
 	      (let ((basic-definition (encapsulation-info-definition info)))
 		(declare (special basic-definition))
 		(eval body)))))))

@@ -162,8 +162,8 @@
 			((nil) exp)
 			(:encapsulated
 			 `(flet ((sb-debug:arg (n)
-				   (declare (special argument-list))
-				   (elt argument-list n)))
+				   (declare (special arg-list))
+				   (elt arg-list n)))
 			    (declare (ignorable #'sb-debug:arg))
 			    ,exp))))
 		 (fun (coerce `(lambda () ,bod) 'function)))
@@ -254,8 +254,12 @@
 	   (fresh-line)
 	   (print-trace-indentation)
 	   (if (trace-info-encapsulated info)
-	       (locally (declare (special basic-definition argument-list))
-			(prin1 `(,(trace-info-what info) ,@argument-list)))
+	       ;; FIXME: These special variables should be given
+	       ;; *FOO*-style names, and probably declared globally
+	       ;; with DEFVAR.
+	       (locally
+		 (declare (special basic-definition arg-list))
+		 (prin1 `(,(trace-info-what info) ,@arg-list)))
 	       (print-frame-call frame))
 	   (terpri)
 	   (trace-print frame (trace-info-print info)))
@@ -310,11 +314,11 @@
     (let ((frame (sb-di:frame-down (sb-di:top-frame))))
       (funcall start frame nil)
       (let ((*traced-entries* *traced-entries*))
-	(declare (special basic-definition argument-list))
+	(declare (special basic-definition arg-list))
 	(funcall cookie frame nil)
 	(let ((vals
 	       (multiple-value-list
-		(apply basic-definition argument-list))))
+		(apply basic-definition arg-list))))
 	  (funcall (trace-end-breakpoint-fun info) frame nil vals nil)
 	  (values-list vals))))))
 

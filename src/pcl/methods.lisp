@@ -508,19 +508,19 @@
 (defun compute-applicable-methods-function (generic-function arguments)
   (values (compute-applicable-methods-using-types
 	   generic-function
-	   (types-from-arguments generic-function arguments 'eql))))
+	   (types-from-args generic-function arguments 'eql))))
 
 (defmethod compute-applicable-methods
     ((generic-function generic-function) arguments)
   (values (compute-applicable-methods-using-types
 	   generic-function
-	   (types-from-arguments generic-function arguments 'eql))))
+	   (types-from-args generic-function arguments 'eql))))
 
 (defmethod compute-applicable-methods-using-classes
     ((generic-function generic-function) classes)
   (compute-applicable-methods-using-types
    generic-function
-   (types-from-arguments generic-function classes 'class-eq)))
+   (types-from-args generic-function classes 'class-eq)))
 
 (defun proclaim-incompatible-superclasses (classes)
   (setq classes (mapcar (lambda (class)
@@ -595,8 +595,7 @@
 	 function
 	 n))
 
-(defun types-from-arguments (generic-function arguments
-			     &optional type-modifier)
+(defun types-from-args (generic-function arguments &optional type-modifier)
   (multiple-value-bind (nreq applyp metatypes nkeys arg-info)
       (get-generic-fun-info generic-function)
     (declare (ignore applyp metatypes nkeys))
@@ -1301,7 +1300,7 @@
     (format t "~&make-unordered-methods-emf ~S~%"
 	    (generic-function-name generic-function)))
   (lambda (&rest args)
-    (let* ((types (types-from-arguments generic-function args 'eql))
+    (let* ((types (types-from-args generic-function args 'eql))
 	   (smethods (sort-applicable-methods generic-function
 					      methods
 					      types))

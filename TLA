@@ -1,0 +1,33 @@
+(TLA = "three letter acronym/abbreviation":-)
+
+abbreviations we try to use pervasively in the system
+
+As Dan Barlow pointed out long ago on the mailing list, unabbreviated
+names are easier to deal with than abbreviated names, because you
+never need to remember what abbreviation to use. That's true, but in a
+language like Lisp which depends on compound names for important
+things like structure accessors, that can lead to painful names like
+MAKE-EXTERNAL-ENTRY-POINT-LAMBDA-EXPRESSION and associated indenting
+confusion.
+
+In an effort to have some of the best of both worlds, I've attempted
+to impose standard abbreviations for some things. Ideally, you don't
+need to remember whether to abbreviate it, or what abbreviation to
+use, because it's always the same abbreviation.
+
+Some of these already were used pretty consistently in CMU CL.
+Others not so much, but in sbcl-0.7.0 I put some effort into
+making them more consistent.
+	ARG	argument
+	FUN	function
+	GC	garbage collect(ion)
+	N	new: number, as in e.g. N-PASSES or N-WORD-BITS
+		old: conventional prefix for temporary variables used to
+			implement evaluate-only-once semantics in macros
+	SB	storage base (in compiler IR2)
+	SC	storage class (in compiler IR2)
+	TN	temporary name (?) (in compiler IR2)
+	VAR	variable
+	XEP	external entry point
+Making them even more consistent (within the limits of ANSI and 
+MOP compatibility) would probably be good.

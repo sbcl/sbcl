@@ -305,7 +305,7 @@
               "VM-SUPPORT-ROUTINES-SELECT-COMPONENT-FORMAT"
               "VM-SUPPORT-ROUTINES-MAKE-NLX-SP-TN"
               "VM-SUPPORT-ROUTINES-MAKE-DYNAMIC-STATE-TNS"
-              "VM-SUPPORT-ROUTINES-MAKE-NLX-ENTRY-ARGUMENT-START-LOCATION"
+              "VM-SUPPORT-ROUTINES-MAKE-NLX-ENTRY-ARG-START-LOCATION"
               "VM-SUPPORT-ROUTINES-GENERATE-CALL-SEQUENCE"
               "VM-SUPPORT-ROUTINES-GENERATE-RETURN-SEQUENCE"
               "VM-SUPPORT-ROUTINES-EMIT-NOP"
@@ -752,7 +752,7 @@ retained, possibly temporariliy, because it might be used internally."
              "RATIOP" 
 
              ;; encapsulation
-             "ARGUMENT-LIST"
+             "ARG-LIST"
              "BASIC-DEFINITION"
              "ENCAPSULATE" "ENCAPSULATED-P"
              "UNENCAPSULATE"

@@ -10,6 +10,8 @@ for 0.7.0:
 	** perhaps s/DEF-FROB/DEF/ or s/DEF-FROB/DEFINE/
 	** merged SB-C-CALL into SB-ALIEN
 * Perhaps rename "cold" stuff (e.g. SB-COLD and src/cold/) to "boot".
+* fixed CREDITS, since it's gone pretty stale
+* reviewed NEWS
 * pending patches and bug reports that go in (or else get handled
 	somehow, rejected/logged/whatever) before 0.7.0:
 =======================================================================

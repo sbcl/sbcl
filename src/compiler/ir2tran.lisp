@@ -472,7 +472,7 @@
 ;;; arguments are returned in the second value as a list rather than
 ;;; being accessed as a normal argument. NODE and BLOCK provide the
 ;;; context for emitting any necessary type-checking code.
-(defun reference-arguments (node block args template)
+(defun reference-args (node block args template)
   (declare (type node node) (type ir2-block block) (list args)
 	   (type template template))
   (collect ((info-args))
@@ -593,7 +593,7 @@
 	 (cont (node-cont call))
 	 (rtypes (template-result-types template)))
     (multiple-value-bind (args info-args)
-	(reference-arguments call block (combination-args call) template)
+	(reference-args call block (combination-args call) template)
       (aver (not (template-more-results-type template)))
       (if (eq rtypes :conditional)
 	  (ir2-convert-conditional call block template args info-args
@@ -620,8 +620,7 @@
 	 (results (make-template-result-tns call cont template rtypes))
 	 (r-refs (reference-tn-list results t)))
     (multiple-value-bind (args info-args)
-	(reference-arguments call block (cddr (combination-args call))
-			     template)
+	(reference-args call block (cddr (combination-args call)) template)
       (aver (not (template-more-results-type template)))
       (aver (not (eq rtypes :conditional)))
       (aver (null info-args))
@@ -1459,7 +1458,7 @@
 	 (2cont (continuation-info cont))
 	 (2info (nlx-info-info info))
 	 (top-loc (ir2-nlx-info-save-sp 2info))
-	 (start-loc (make-nlx-entry-argument-start-location))
+	 (start-loc (make-nlx-entry-arg-start-location))
 	 (count-loc (make-arg-count-location))
 	 (target (ir2-nlx-info-target 2info)))
 
