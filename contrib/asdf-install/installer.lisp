@@ -252,17 +252,24 @@ and doesn't begin with one of the prefixes in *SAFE-URL-PREFIXES*")
 				      do (format t "Installing ~A in ~A,~A~%"
 						 p source system)
 				      append (install-package source system p)))
-			(handler-case
-			    (asdf:operate 'asdf:load-op asd)
-			  (asdf:missing-dependency (c)
-			    (format t
-				    "Downloading package ~A, required by ~A~%"
-				    (asdf::missing-requires c)
-				    (asdf:component-name
-				     (asdf::missing-required-by c)))
-			    (one-iter (list
-				       (symbol-name
-					(asdf::missing-requires c)))))))))
+			(handler-bind
+			    ((asdf:missing-dependency
+			      (lambda (c) 
+				(format t
+					"Downloading package ~A, required by ~A~%"
+					(asdf::missing-requires c)
+					(asdf:component-name
+					 (asdf::missing-required-by c)))
+				(one-iter (list
+					   (symbol-name
+					    (asdf::missing-requires c))))
+				(invoke-restart 'retry))))
+			  (loop
+			   (multiple-value-bind (ret restart-p)
+			       (with-simple-restart
+				   (retry "Retry installation")
+				 (asdf:operate 'asdf:load-op asd))
+			     (unless restart-p (return))))))))
 	     (one-iter packages)))
       (dolist (l *temporary-files*)
-	    (when (probe-file l) (delete-file l))))))
+	(when (probe-file l) (delete-file l))))))

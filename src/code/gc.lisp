@@ -143,19 +143,14 @@ and submit it as a patch."
 (defvar *before-gc-hooks* nil ; actually initialized in cold init
   #!+sb-doc
   "A list of functions that are called before garbage collection occurs.
-  The functions should take no arguments.")
+  The functions are run with interrupts disabled and all other threads
+  paused.  They should take no arguments.")
 
 (defvar *after-gc-hooks* nil ; actually initialized in cold init
   #!+sb-doc
   "A list of functions that are called after garbage collection occurs.
-  The functions should take no arguments.")
-
-(defvar *gc-notify-stream* nil ; (actually initialized in cold init)
-  #!+sb-doc
-  "When non-NIL, this must be a STREAM; and the functions bound to
-  *GC-NOTIFY-BEFORE* and *GC-NOTIFY-AFTER* are called with the
-  STREAM value before and after a garbage collection occurs
-  respectively.")
+  The functions are run with interrupts disabled and all other threads
+  paused.  They should take no arguments.")
 
 (defvar *gc-run-time* 0
   #!+sb-doc
@@ -249,12 +244,14 @@ and submit it as a patch."
       (let ((*already-in-gc* t))
 	(without-interrupts
 	 (gc-stop-the-world)
-	 ;; XXX run before-gc-hooks
+	 (dolist (h *before-gc-hooks*)
+	   (carefully-funcall h))
 	 (collect-garbage gen)
 	 (incf *n-bytes-freed-or-purified*
 	       (max 0 (- pre-gc-dynamic-usage (dynamic-usage))))
 	 (setf *need-to-collect-garbage* nil)
-	 ;; XXX run after-gc-hooks
+	 (dolist (h *after-gc-hooks*)
+	   (carefully-funcall h))
 	 (gc-start-the-world)))
       (scrub-control-stack)))
   (values))

@@ -121,7 +121,8 @@
 		 (lambda ()
 		   (with-mutex (lock)
 		     (assert (eql (mutex-value lock) (current-thread-id))))
-		   (assert (not (eql (mutex-value lock) (current-thread-id)))))))
+		   (assert (not (eql (mutex-value lock) (current-thread-id))))
+		   (sleep 60))))
     ;;hold onto lock for long enough that child can't get it immediately
     (sleep 20)
     (interrupt-thread child (lambda () (format t "l ~A~%" (mutex-value lock))))
@@ -131,7 +132,7 @@
 (defun alloc-stuff () (copy-list '(1 2 3 4 5)))
 (let ((c (test-interrupt (lambda () (loop (alloc-stuff))))))
   ;; NB this only works on x86
-  (dotimes (i 70)
+  (loop
     (sleep (random 1d0))
     (interrupt-thread c
 		      (lambda ()
@@ -152,4 +153,4 @@
 ;; overall exit status is 0, not 104
 (sleep 2) 
 
-(sb-ext:quit :unix-status 104)
+;(sb-ext:quit :unix-status 104)

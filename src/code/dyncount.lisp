@@ -531,8 +531,7 @@ comments from CMU CL:
 	     classes)))
 	 (compared (if compare
 		       (compare-stats compensated compare)
-		       compensated))
-	 (*gc-notify-stream* nil))
+		       compensated)))
     (multiple-value-bind (total-count total-cost) (cost-summary compensated)
       (multiple-value-bind (compare-total-count compare-total-cost)
 	  (when compare (cost-summary compare))
