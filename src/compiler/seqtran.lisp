@@ -712,6 +712,7 @@
 			    sb!vm:n-byte-bits)))
      string1))
 
+#+nil
 (deftransform replace ((string1 string2 &key (start1 0) (start2 0)
 				end1 end2)
 		       ((simple-array character (*))
@@ -731,18 +732,18 @@
      (declare (optimize (safety 0)))
      (bit-bash-copy string2
 		    (the index
-			 (+ (the index (* start2 sb!vm:n-byte-bits))
+			 (+ (the index (* start2 sb!vm:n-word-bits))
 			    ,vector-data-bit-offset))
 		    string1
 		    (the index
-			 (+ (the index (* start1 sb!vm:n-byte-bits))
+			 (+ (the index (* start1 sb!vm:n-word-bits))
 			    ,vector-data-bit-offset))
 		    (the index
 			 (* (min (the index (- (or end1 (length string1))
 					       start1))
 				 (the index (- (or end2 (length string2))
 					       start2)))
-			    sb!vm:n-byte-bits)))
+			    sb!vm:n-word-bits)))
      string1))
 
 ;;; FIXME: this would be a valid transform for certain excluded cases:
@@ -774,8 +775,7 @@
 ;;;
 ;;; FIXME: currently KLUDGEed because of bug 188
 (deftransform concatenate ((rtype &rest sequences)
-			   (t &rest (or (simple-array character (*))
-					simple-base-string
+			   (t &rest (or simple-base-string
 					(simple-array nil (*))))
 			   (simple-array character (*))
 			   :policy (< safety 3))

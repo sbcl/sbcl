@@ -122,6 +122,15 @@ generated from lisps with different BASE-CHAR/CHARACTER distinctions.)
      compiler such as CONVERT-MEMBER-TYPE, TWO-ARG-DERIVE-TYPE
      remain.)
 
+** increase CHAR-CODE-LIMIT to something larger than 256.  (Rationale:
+support people other than simply those living in non-Eurozone Western
+Europe or the United States of America.)  This requires at minimum
+adjusting the dumper/fop code and the low-level memory accessors.
+  -- in progress for x86:
+     >> rewrote SYMBOLICATE to avoid needing the type system (or a
+        transformed to low-level bit-bashing CONCATENATE) early in
+        cold-init.
+
 ** implement an SB-ALIEN:UTF8-STRING parallel to SB-ALIEN:C-STRING.
 (Rationale: for calling out to Pango or similar.  Actually, a valid
 use might be in Unix libc/kernel functions: at least under Linux, I
@@ -129,11 +138,6 @@ believe that the kernel understands utf-8 for directory entries and
 the like.  Someone Who Knows might want to check this.)  This might
 make the #.(coerce "foo" 'base-string) in the filesystem / SB-UNIX
 layer go away.
-
-** increase CHAR-CODE-LIMIT to something larger than 256.  (Rationale:
-support people other than simply those living in non-Eurozone Western
-Europe or the United States of America.)  This requires at minimum
-adjusting the dumper/fop code and the low-level memory accessors.
 
 ** possibly retain a CHAR-CODE-LIMIT = 256 build option, with
 character point encoding dependent on locale.  This requires
