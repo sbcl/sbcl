@@ -345,13 +345,12 @@
   (declare (type lexenv lexenv))
   (let ((ipolicy (lexenv-interface-policy lexenv))
 	(policy (lexenv-policy lexenv)))
-    (make-policy
-     :speed (or (policy-speed ipolicy) (policy-speed policy))
-     :space (or (policy-space ipolicy) (policy-space policy))
-     :safety (or (policy-safety ipolicy) (policy-safety policy))
-     :cspeed (or (policy-cspeed ipolicy) (policy-cspeed policy))
-     :brevity (or (policy-brevity ipolicy) (policy-brevity policy))
-     :debug (or (policy-debug ipolicy) (policy-debug policy)))))
+    (let ((result policy))
+      (dolist (quality '(speed safety space))
+	(let ((iquality-entry (assoc quality ipolicy)))
+	  (when iquality-entry
+	    (push iquality-entry result))))
+      result)))
 
 ;;;; flow/DFO/component hackery
 
@@ -890,7 +889,7 @@
     (unless (or (leaf-ever-used var)
 		(lambda-var-ignorep var))
       (let ((*compiler-error-context* (lambda-bind fun)))
-	(unless (policy *compiler-error-context* (= brevity 3))
+	(unless (policy *compiler-error-context* (= inhibit-warnings 3))
 	  ;; ANSI section "3.2.5 Exceptional Situations in the Compiler"
 	  ;; requires this to be a STYLE-WARNING.
 	  (compiler-style-warning "The variable ~S is defined but never used."
@@ -1637,8 +1636,8 @@
 ;;; out how to compile something as efficiently as it liked.)
 (defun compiler-note (format-string &rest format-args)
   (unless (if *compiler-error-context*
-	      (policy *compiler-error-context* (= brevity 3))
-	      (policy nil (= brevity 3)))
+	      (policy *compiler-error-context* (= inhibit-warnings 3))
+	      (policy nil (= inhibit-warnings 3)))
     (incf *compiler-note-count*)
     (print-compiler-message (format nil "note: ~A" format-string)
 			    format-args))
@@ -1730,7 +1729,7 @@
   problem is a missing definition (as opposed to a typo in the use.)")
 
 ;;; Make an entry in the *UNDEFINED-WARNINGS* describing a reference
-;;; to Name of the specified Kind. If we have exceeded the warning
+;;; to NAME of the specified KIND. If we have exceeded the warning
 ;;; limit, then just increment the count, otherwise note the current
 ;;; error context.
 ;;;
@@ -1738,14 +1737,18 @@
 ;;; WITH-COMPILATION-UNIT, which can potentially be invoked outside
 ;;; the compiler, hence the BOUNDP check.
 (defun note-undefined-reference (name kind)
-  (unless (and (boundp '*lexenv*)
-	       ;; FIXME: I'm pretty sure the BREVITY test below isn't
-	       ;; a good idea; we should have BREVITY affect compiler
-	       ;; notes, not STYLE-WARNINGs. And I'm not sure what the
-	       ;; BOUNDP '*LEXENV* test above is for; it's likely
-	       ;; a good idea, but it probably deserves an explanatory
-	       ;; comment.
-	       (policy nil (= brevity 3)))
+  (unless (and
+	   ;; (POLICY NIL ..) isn't well-defined except in IR1
+	   ;; conversion. This BOUNDP test seems to be a test for
+	   ;; whether IR1 conversion is going on.
+	   (boundp '*lexenv*)
+	   ;; FIXME: I'm pretty sure the INHIBIT-WARNINGS test below
+	   ;; isn't a good idea; we should have INHIBIT-WARNINGS
+	   ;; affect compiler notes, not STYLE-WARNINGs. And I'm not
+	   ;; sure what the BOUNDP '*LEXENV* test above is for; it's
+	   ;; likely a good idea, but it probably deserves an
+	   ;; explanatory comment.
+	   (policy nil (= inhibit-warnings 3)))
     (let* ((found (dolist (warning *undefined-warnings* nil)
 		    (when (and (equal (undefined-warning-name warning) name)
 			       (eq (undefined-warning-kind warning) kind))
@@ -1827,8 +1830,8 @@
   (incf (event-info-count info))
   (when (and (>= (event-info-level info) *event-note-threshold*)
 	     (if node
-		 (policy node (= brevity 0))
-		 (policy nil (= brevity 0))))
+		 (policy node (= inhibit-warnings 0))
+		 (policy nil (= inhibit-warnings 0))))
     (let ((*compiler-error-context* node))
       (compiler-note (event-info-description info))))
 

@@ -34,20 +34,21 @@
 
 ;;;; PRIMITIVE-TYPEs
 
-;;;    The primitive type is used to represent the aspects of type interesting
-;;; to the VM. Selection of IR2 translation templates is done on the basis of
-;;; the primitive types of the operands, and the primitive type of a value
-;;; is used to constrain the possible representations of that value.
+;;; The primitive type is used to represent the aspects of type
+;;; interesting to the VM. Selection of IR2 translation templates is
+;;; done on the basis of the primitive types of the operands, and the
+;;; primitive type of a value is used to constrain the possible
+;;; representations of that value.
 (defstruct primitive-type
-  ;; The name of this primitive-type.
+  ;; the name of this PRIMITIVE-TYPE
   (name nil :type symbol)
-  ;; A list the SC numbers for all the SCs that a TN of this type can be
-  ;; allocated in.
+  ;; a list of the SC numbers for all the SCs that a TN of this type
+  ;; can be allocated in
   (scs nil :type list)
-  ;; The Lisp type equivalent to this type. If this type could never be
-  ;; returned by Primitive-Type, then this is the NIL (or empty) type.
+  ;; the Lisp type equivalent to this type. If this type could never be
+  ;; returned by PRIMITIVE-TYPE, then this is the NIL (or empty) type
   (type (required-argument) :type ctype)
-  ;; The template used to check that an object is of this type. This is a
+  ;; the template used to check that an object is of this type. This is a
   ;; template of one argument and one result, both of primitive-type T. If
   ;; the argument is of the correct type, then it is delivered into the
   ;; result. If the type is incorrect, then an error is signalled.
@@ -59,21 +60,22 @@
 ;;;; IR1 annotations used for IR2 conversion
 
 ;;; Block-Info
-;;;    Holds the IR2-Block structure. If there are overflow blocks, then this
-;;;    points to the first IR2-Block. The Block-Info of the dummy component
-;;;    head and tail are dummy IR2 blocks that begin and end the emission order
-;;;    thread.
+;;;    Holds the IR2-Block structure. If there are overflow blocks,
+;;;    then this points to the first IR2-Block. The Block-Info of the
+;;;    dummy component head and tail are dummy IR2 blocks that begin
+;;;    and end the emission order thread.
 ;;;
 ;;; Component-Info
 ;;;    Holds the IR2-Component structure.
 ;;;
 ;;; Continuation-Info
-;;;    Holds the IR2-Continuation structure. Continuations whose values aren't
-;;;    used won't have any.
+;;;    Holds the IR2-Continuation structure. Continuations whose
+;;;    values aren't used won't have any.
 ;;;
 ;;; Cleanup-Info
-;;;    If non-null, then a TN in which the affected dynamic environment pointer
-;;;    should be saved after the binding is instantiated.
+;;;    If non-null, then a TN in which the affected dynamic
+;;;    environment pointer should be saved after the binding is
+;;;    instantiated.
 ;;;
 ;;; Environment-Info
 ;;;    Holds the IR2-Environment structure.
@@ -85,9 +87,10 @@
 ;;;    Holds the IR2-NLX-Info structure.
 ;;;
 ;;; Leaf-Info
-;;;    If a non-set lexical variable, the TN that holds the value in the home
-;;;    environment. If a constant, then the corresponding constant TN.
-;;;    If an XEP lambda, then the corresponding Entry-Info structure.
+;;;    If a non-set lexical variable, the TN that holds the value in
+;;;    the home environment. If a constant, then the corresponding
+;;;    constant TN. If an XEP lambda, then the corresponding
+;;;    Entry-Info structure.
 ;;;
 ;;; Basic-Combination-Info
 ;;;    The template chosen by LTN, or
@@ -99,70 +102,74 @@
 ;;;    After LTN analysis, this is true only in combination nodes that are
 ;;;    truly tail recursive.
 
-;;; The IR2-Block structure holds information about a block that is used during
-;;; and after IR2 conversion. It is stored in the Block-Info slot for the
-;;; associated block.
+;;; An IR2-BLOCK holds information about a block that is used during
+;;; and after IR2 conversion. It is stored in the BLOCK-INFO slot for
+;;; the associated block.
 (defstruct (ir2-block (:include block-annotation)
 		      (:constructor make-ir2-block (block)))
-  ;; The IR2-Block's number, which differs from Block's Block-Number if any
-  ;; blocks are split. This is assigned by lifetime analysis.
+  ;; the IR2-Block's number, which differs from Block's Block-Number
+  ;; if any blocks are split. This is assigned by lifetime analysis.
   (number nil :type (or index null))
-  ;; Information about unknown-values continuations that is used by stack
-  ;; analysis to do stack simulation. A unknown-values continuation is Pushed
-  ;; if its Dest is in another block. Similarly, a continuation is Popped if
-  ;; its Dest is in this block but has its uses elsewhere. The continuations
-  ;; are in the order that are pushed/popped in the block. Note that the args
-  ;; to a single MV-Combination appear reversed in Popped, since we must
-  ;; effectively pop the last argument first. All pops must come before all
-  ;; pushes (although internal MV uses may be interleaved.)  Popped is computed
-  ;; by LTN, and Pushed is computed by stack analysis.
+  ;; information about unknown-values continuations that is used by
+  ;; stack analysis to do stack simulation. An UNKNOWN-VALUES
+  ;; continuation is PUSHED if its DEST is in another block.
+  ;; Similarly, a continuation is POPPED if its DEST is in this block
+  ;; but has its uses elsewhere. The continuations are in the order
+  ;; that are pushed/popped in the block. Note that the args to a
+  ;; single MV-Combination appear reversed in POPPED, since we must
+  ;; effectively pop the last argument first. All pops must come
+  ;; before all pushes (although internal MV uses may be interleaved.)
+  ;; POPPED is computed by LTN, and PUSHED is computed by stack
+  ;; analysis.
   (pushed () :type list)
   (popped () :type list)
-  ;; The result of stack analysis: lists of all the unknown-values
+  ;; the result of stack analysis: lists of all the unknown-values
   ;; continuations on the stack at the block start and end, topmost
   ;; continuation first.
   (start-stack () :type list)
   (end-stack () :type list)
-  ;; The first and last VOP in this block. If there are none, both slots are
-  ;; null.
+  ;; the first and last VOP in this block. If there are none, both
+  ;; slots are null.
   (start-vop nil :type (or vop null))
   (last-vop nil :type (or vop null))
-  ;; Number of local TNs actually allocated.
+  ;; the number of local TNs actually allocated
   (local-tn-count 0 :type local-tn-count)
-  ;; A vector that maps local TN numbers to TNs. Some entries may be NIL,
-  ;; indicating that that number is unused. (This allows us to delete local
-  ;; conflict information without compressing the LTN numbers.)
+  ;; a vector that maps local TN numbers to TNs. Some entries may be
+  ;; NIL, indicating that that number is unused. (This allows us to
+  ;; delete local conflict information without compressing the LTN
+  ;; numbers.)
   ;;
-  ;; If an entry is :More, then this block contains only a single VOP. This
-  ;; VOP has so many more arguments and/or results that they cannot all be
-  ;; assigned distinct LTN numbers. In this case, we assign all the more args
-  ;; one LTN number, and all the more results another LTN number. We can do
-  ;; this, since more operands are referenced simultaneously as far as conflict
-  ;; analysis is concerned. Note that all these :More TNs will be global TNs.
+  ;; If an entry is :MORE, then this block contains only a single VOP.
+  ;; This VOP has so many more arguments and/or results that they
+  ;; cannot all be assigned distinct LTN numbers. In this case, we
+  ;; assign all the more args one LTN number, and all the more results
+  ;; another LTN number. We can do this, since more operands are
+  ;; referenced simultaneously as far as conflict analysis is
+  ;; concerned. Note that all these :More TNs will be global TNs.
   (local-tns (make-array local-tn-limit) :type local-tn-vector)
-  ;; Bit-vectors used during lifetime analysis to keep track of references to
-  ;; local TNs. When indexed by the LTN number, the index for a TN is non-zero
-  ;; in Written if it is ever written in the block, and in Live-Out if
-  ;; the first reference is a read.
+  ;; Bit-vectors used during lifetime analysis to keep track of
+  ;; references to local TNs. When indexed by the LTN number, the
+  ;; index for a TN is non-zero in Written if it is ever written in
+  ;; the block, and in Live-Out if the first reference is a read.
   (written (make-array local-tn-limit :element-type 'bit
 		       :initial-element 0)
 	   :type local-tn-bit-vector)
   (live-out (make-array local-tn-limit :element-type 'bit)
 	    :type local-tn-bit-vector)
-  ;; Similar to the above, but is updated by lifetime flow analysis to have a 1
-  ;; for LTN numbers of TNs live at the end of the block. This takes into
-  ;; account all TNs that aren't :Live.
+  ;; This is similar to the above, but is updated by lifetime flow
+  ;; analysis to have a 1 for LTN numbers of TNs live at the end of
+  ;; the block. This takes into account all TNs that aren't :Live.
   (live-in (make-array local-tn-limit :element-type 'bit
 		       :initial-element 0)
 	   :type local-tn-bit-vector)
-  ;; A thread running through the global-conflicts structures for this block,
-  ;; sorted by TN number.
+  ;; a thread running through the global-conflicts structures for this
+  ;; block, sorted by TN number
   (global-tns nil :type (or global-conflicts null))
-  ;; The assembler label that points to the beginning of the code for this
-  ;; block. Null when we haven't assigned a label yet.
+  ;; the assembler label that points to the beginning of the code for
+  ;; this block, or NIL when we haven't assigned a label yet
   (%label nil)
-  ;; List of Location-Info structures describing all the interesting (to the
-  ;; debugger) locations in this block.
+  ;; list of Location-Info structures describing all the interesting
+  ;; (to the debugger) locations in this block
   (locations nil :type list))
 
 (defprinter (ir2-block)
@@ -173,38 +180,41 @@
   (local-tn-count :test (not (zerop local-tn-count)))
   (%label :test %label))
 
-;;; The IR2-Continuation structure is used to annotate continuations that are
-;;; used as a function result continuation or that receive MVs.
+;;; An IR2-Continuation structure is used to annotate continuations
+;;; that are used as a function result continuation or that receive MVs.
 (defstruct (ir2-continuation
 	    (:constructor make-ir2-continuation (primitive-type)))
-  ;; If this is :Delayed, then this is a single value continuation for which
-  ;; the evaluation of the use is to be postponed until the evaluation of
-  ;; destination. This can be done for ref nodes or predicates whose
-  ;; destination is an IF.
+  ;; If this is :DELAYED, then this is a single value continuation for
+  ;; which the evaluation of the use is to be postponed until the
+  ;; evaluation of destination. This can be done for ref nodes or
+  ;; predicates whose destination is an IF.
   ;;
-  ;; If this is :Fixed, then this continuation has a fixed number of values,
-  ;; with the TNs in Locs.
+  ;; If this is :FIXED, then this continuation has a fixed number of
+  ;; values, with the TNs in LOCS.
   ;;
-  ;; If this is :Unknown, then this is an unknown-values continuation, using
-  ;; the passing locations in Locs.
+  ;; If this is :UNKNOWN, then this is an unknown-values continuation,
+  ;; using the passing locations in LOCS.
   ;;
-  ;; If this is :Unused, then this continuation should never actually be used
-  ;; as the destination of a value: it is only used tail-recursively.
+  ;; If this is :UNUSED, then this continuation should never actually
+  ;; be used as the destination of a value: it is only used
+  ;; tail-recursively.
   (kind :fixed :type (member :delayed :fixed :unknown :unused))
-  ;; The primitive-type of the first value of this continuation. This is
-  ;; primarily for internal use during LTN, but it also records the type
-  ;; restriction on delayed references. In multiple-value contexts, this is
-  ;; null to indicate that it is meaningless. This is always (primitive-type
-  ;; (continuation-type cont)), which may be more restrictive than the
-  ;; tn-primitive-type of the value TN. This is becase the value TN must hold
-  ;; any possible type that could be computed (before type checking.)
+  ;; The primitive-type of the first value of this continuation. This
+  ;; is primarily for internal use during LTN, but it also records the
+  ;; type restriction on delayed references. In multiple-value
+  ;; contexts, this is null to indicate that it is meaningless. This
+  ;; is always (primitive-type (continuation-type cont)), which may be
+  ;; more restrictive than the tn-primitive-type of the value TN. This
+  ;; is becase the value TN must hold any possible type that could be
+  ;; computed (before type checking.)
   (primitive-type nil :type (or primitive-type null))
-  ;; Locations used to hold the values of the continuation. If the number
-  ;; of values if fixed, then there is one TN per value. If the number of
-  ;; values is unknown, then this is a two-list of TNs holding the start of the
-  ;; values glob and the number of values. Note that since type checking is
-  ;; the responsibility of the values receiver, these TNs primitive type is
-  ;; only based on the proven type information.
+  ;; Locations used to hold the values of the continuation. If the
+  ;; number of values if fixed, then there is one TN per value. If the
+  ;; number of values is unknown, then this is a two-list of TNs
+  ;; holding the start of the values glob and the number of values.
+  ;; Note that since type checking is the responsibility of the values
+  ;; receiver, these TNs primitive type is only based on the proven
+  ;; type information.
   (locs nil :type list))
 
 (defprinter (ir2-continuation)
@@ -212,141 +222,145 @@
   primitive-type
   locs)
 
-;;; The IR2-Component serves mostly to accumulate non-code information about
-;;; the component being compiled.
+;;; The IR2-Component serves mostly to accumulate non-code information
+;;; about the component being compiled.
 (defstruct ir2-component
-  ;; The counter used to allocate global TN numbers.
+  ;; the counter used to allocate global TN numbers
   (global-tn-counter 0 :type index)
-  ;; Normal-TNs is the head of the list of all the normal TNs that need to be
-  ;; packed, linked through the Next slot. We place TNs on this list when we
-  ;; allocate them so that Pack can find them.
+  ;; NORMAL-TNS is the head of the list of all the normal TNs that
+  ;; need to be packed, linked through the Next slot. We place TNs on
+  ;; this list when we allocate them so that Pack can find them.
   ;;
-  ;; Restricted-TNs are TNs that must be packed within a finite SC. We pack
-  ;; these TNs first to ensure that the restrictions will be satisfied (if
-  ;; possible).
+  ;; RESTRICTED-TNS are TNs that must be packed within a finite SC. We
+  ;; pack these TNs first to ensure that the restrictions will be
+  ;; satisfied (if possible).
   ;;
-  ;; Wired-TNs are TNs that must be packed at a specific location. The SC
-  ;; and Offset are already filled in.
+  ;; WIRED-TNs are TNs that must be packed at a specific location. The
+  ;; SC and OFFSET are already filled in.
   ;;
-  ;; Constant-TNs are non-packed TNs that represent constants. :Constant TNs
-  ;; may eventually be converted to :Cached-Constant normal TNs.
+  ;; CONSTANT-TNs are non-packed TNs that represent constants.
+  ;; :CONSTANT TNs may eventually be converted to :CACHED-CONSTANT
+  ;; normal TNs.
   (normal-tns nil :type (or tn null))
   (restricted-tns nil :type (or tn null))
   (wired-tns nil :type (or tn null))
   (constant-tns nil :type (or tn null))
-  ;; A list of all the :COMPONENT TNs (live throughout the component.)  These
-  ;; TNs will also appear in the {NORMAL,RESTRICTED,WIRED} TNs as appropriate
-  ;; to their location.
+  ;; a list of all the :COMPONENT TNs (live throughout the component).
+  ;; These TNs will also appear in the {NORMAL,RESTRICTED,WIRED} TNs
+  ;; as appropriate to their location.
   (component-tns () :type list)
   ;; If this component has a NFP, then this is it.
   (nfp nil :type (or tn null))
-  ;; A list of the explicitly specified save TNs (kind :SPECIFIED-SAVE). These
-  ;; TNs will also appear in the {NORMAL,RESTRICTED,WIRED} TNs as appropriate
-  ;; to their location.
+  ;; a list of the explicitly specified save TNs (kind
+  ;; :SPECIFIED-SAVE). These TNs will also appear in the
+  ;; {NORMAL,RESTRICTED,WIRED} TNs as appropriate to their location.
   (specified-save-tns () :type list)
-  ;; Values-Receivers is a list of all the blocks whose ir2-block has a
-  ;; non-null value for Popped. This slot is initialized by LTN-Analyze as an
-  ;; input to Stack-Analyze.
+  ;; a list of all the blocks whose IR2-BLOCK has a non-null value for
+  ;; POPPED. This slot is initialized by LTN-ANALYZE as an input to
+  ;; STACK-ANALYZE.
   (values-receivers nil :type list)
-  ;; An adjustable vector that records all the constants in the constant pool.
-  ;; A non-immediate :Constant TN with offset 0 refers to the constant in
-  ;; element 0, etc. Normal constants are represented by the placing the
-  ;; Constant leaf in this vector. A load-time constant is distinguished by
-  ;; being a cons (Kind . What). Kind is a keyword indicating how the constant
-  ;; is computed, and What is some context.
+  ;; an adjustable vector that records all the constants in the
+  ;; constant pool. A non-immediate :CONSTANT TN with offset 0 refers
+  ;; to the constant in element 0, etc. Normal constants are
+  ;; represented by the placing the CONSTANT leaf in this vector. A
+  ;; load-time constant is distinguished by being a cons (KIND .
+  ;; WHAT). KIND is a keyword indicating how the constant is computed,
+  ;; and WHAT is some context.
   ;;
   ;; These load-time constants are recognized:
   ;;
   ;; (:entry . <function>)
-  ;;    Is replaced by the code pointer for the specified function. This is
-  ;; 	how compiled code (including DEFUN) gets its hands on a function.
-  ;; 	<function> is the XEP lambda for the called function; its Leaf-Info
-  ;; 	should be an Entry-Info structure.
+  ;;    Is replaced by the code pointer for the specified function.
+  ;;    This is how compiled code (including DEFUN) gets its hands on
+  ;;    a function. <function> is the XEP lambda for the called
+  ;;    function; its LEAF-INFO	should be an ENTRY-INFO structure.
   ;;
   ;; (:label . <label>)
-  ;;    Is replaced with the byte offset of that label from the start of the
-  ;;    code vector (including the header length.)
+  ;;    Is replaced with the byte offset of that label from the start
+  ;;    of the code vector (including the header length.)
   ;;
-  ;; A null entry in this vector is a placeholder for implementation overhead
-  ;; that is eventually stuffed in somehow.
+  ;; A null entry in this vector is a placeholder for implementation
+  ;; overhead that is eventually stuffed in somehow.
   (constants (make-array 10 :fill-pointer 0 :adjustable t) :type vector)
-  ;; Some kind of info about the component's run-time representation. This is
-  ;; filled in by the VM supplied Select-Component-Format function.
+  ;; some kind of info about the component's run-time representation.
+  ;; This is filled in by the VM supplied Select-Component-Format function.
   format
-  ;; A list of the Entry-Info structures describing all of the entries into
-  ;; this component. Filled in by entry analysis.
+  ;; a list of the ENTRY-INFO structures describing all of the entries
+  ;; into this component. Filled in by entry analysis.
   (entries nil :type list)
   ;; Head of the list of :ALIAS TNs in this component, threaded by TN-NEXT.
   (alias-tns nil :type (or tn null))
-  ;; Spilled-VOPs is a hashtable translating from "interesting" VOPs to a list
-  ;; of the TNs spilled at that VOP. This is used when computing debug info so
-  ;; that we don't consider the TN's value to be valid when it is in fact
-  ;; somewhere else. Spilled-TNs has T for every "interesting" TN that is ever
-  ;; spilled, providing a representation that is more convenient some places.
+  ;; SPILLED-VOPS is a hashtable translating from "interesting" VOPs
+  ;; to a list of the TNs spilled at that VOP. This is used when
+  ;; computing debug info so that we don't consider the TN's value to
+  ;; be valid when it is in fact somewhere else. SPILLED-TNS has T for
+  ;; every "interesting" TN that is ever spilled, providing a
+  ;; representation that is more convenient some places.
   (spilled-vops (make-hash-table :test 'eq) :type hash-table)
   (spilled-tns (make-hash-table :test 'eq) :type hash-table)
-  ;; Dynamic vop count info. This is needed by both ir2-convert and
+  ;; dynamic vop count info. This is needed by both ir2-convert and
   ;; setup-dynamic-count-info. (But only if we are generating code to
   ;; collect dynamic statistics.)
   #!+sb-dyncount
   (dyncount-info nil :type (or null dyncount-info)))
 
-;;; The Entry-Info structure condenses all the information that the dumper
-;;; needs to create each XEP's function entry data structure. The Entry-Info
-;;; structures are somtimes created before they are initialized, since ir2
-;;; conversion may need to compile a forward reference. In this case
-;;; the slots aren't actually initialized until entry analysis runs.
+;;; An ENTRY-INFO condenses all the information that the dumper needs
+;;; to create each XEP's function entry data structure. ENTRY-INFO
+;;; structures are somtimes created before they are initialized, since
+;;; IR2 conversion may need to compile a forward reference. In this
+;;; case the slots aren't actually initialized until entry analysis runs.
 (defstruct entry-info
-  ;; True if this function has a non-null closure environment.
+  ;; true if this function has a non-null closure environment
   (closure-p nil :type boolean)
-  ;; A label pointing to the entry vector for this function. Null until
-  ;; ENTRY-ANALYZE runs.
+  ;; a label pointing to the entry vector for this function, or NIL
+  ;; before ENTRY-ANALYZE runs
   (offset nil :type (or label null))
-  ;; If this function was defined using DEFUN, then this is the name of the
-  ;; function, a symbol or (SETF <symbol>). Otherwise, this is some string
-  ;; that is intended to be informative.
+  ;; If this function was defined using DEFUN, then this is the name
+  ;; of the function, a symbol or (SETF <symbol>). Otherwise, this is
+  ;; some string that is intended to be informative.
   (name "<not computed>" :type (or simple-string list symbol))
-  ;; A string representing the argument list that the function was defined
-  ;; with.
+  ;; a string representing the argument list that the function was
+  ;; defined with
   (arguments nil :type (or simple-string null))
-  ;; A function type specifier representing the arguments and results of this
-  ;; function.
+  ;; a function type specifier representing the arguments and results
+  ;; of this function
   (type 'function :type (or list (member function))))
 
-;;; An IR2-ENVIRONMENT is used to annotate non-LET lambdas with their passing
-;;; locations. It is stored in the Environment-Info.
+;;; An IR2-ENVIRONMENT is used to annotate non-LET lambdas with their
+;;; passing locations. It is stored in the Environment-Info.
 (defstruct ir2-environment
-  ;; The TNs that hold the passed environment within the function. This is an
-  ;; alist translating from the NLX-Info or lambda-var to the TN that holds
-  ;; the corresponding value within this function. This list is in the same
-  ;; order as the ENVIRONMENT-CLOSURE.
+  ;; the TNs that hold the passed environment within the function.
+  ;; This is an alist translating from the NLX-Info or lambda-var to
+  ;; the TN that holds the corresponding value within this function.
+  ;; This list is in the same order as the ENVIRONMENT-CLOSURE.
   (environment nil :type list)
-  ;; The TNs that hold the Old-Fp and Return-PC within the function. We
-  ;; always save these so that the debugger can do a backtrace, even if the
-  ;; function has no return (and thus never uses them). Null only temporarily.
+  ;; the TNs that hold the OLD-FP and RETURN-PC within the function.
+  ;; We always save these so that the debugger can do a backtrace,
+  ;; even if the function has no return (and thus never uses them).
+  ;; Null only temporarily.
   (old-fp nil :type (or tn null))
   (return-pc nil :type (or tn null))
   ;; The passing location for the Return-PC. The return PC is treated
-  ;; differently from the other arguments, since in some implementations we may
-  ;; use a call instruction that requires the return PC to be passed in a
-  ;; particular place.
+  ;; differently from the other arguments, since in some
+  ;; implementations we may use a call instruction that requires the
+  ;; return PC to be passed in a particular place.
   (return-pc-pass (required-argument) :type tn)
-  ;; True if this function has a frame on the number stack. This is set by
-  ;; representation selection whenever it is possible that some function in
-  ;; our tail set will make use of the number stack.
+  ;; True if this function has a frame on the number stack. This is
+  ;; set by representation selection whenever it is possible that some
+  ;; function in our tail set will make use of the number stack.
   (number-stack-p nil :type boolean)
-  ;; A list of all the :Environment TNs live in this environment.
+  ;; a list of all the :ENVIRONMENT TNs live in this environment
   (live-tns nil :type list)
-  ;; A list of all the :Debug-Environment TNs live in this environment.
+  ;; a list of all the :DEBUG-ENVIRONMENT TNs live in this environment
   (debug-live-tns nil :type list)
-  ;; A label that marks the start of elsewhere code for this function. Null
-  ;; until this label is assigned by codegen. Used for maintaining the debug
-  ;; source map.
+  ;; a label that marks the start of elsewhere code for this function.
+  ;; Null until this label is assigned by codegen. Used for
+  ;; maintaining the debug source map.
   (elsewhere-start nil :type (or label null))
-  ;; A label that marks the first location in this function at which the
-  ;; environment is properly initialized, i.e. arguments moved from their
-  ;; passing locations, etc. This is the start of the function as far as the
-  ;; debugger is concerned.
+  ;; a label that marks the first location in this function at which
+  ;; the environment is properly initialized, i.e. arguments moved
+  ;; from their passing locations, etc. This is the start of the
+  ;; function as far as the debugger is concerned.
   (environment-start nil :type (or label null)))
 (defprinter (ir2-environment)
   environment
@@ -354,23 +368,23 @@
   return-pc
   return-pc-pass)
 
-;;; The RETURN-INFO structure is used by GTN to represent the return
-;;; strategy and locations for all the functions in a given TAIL-SET.
-;;; It is stored in the TAIL-SET-INFO.
+;;; A RETURN-INFO is used by GTN to represent the return strategy and
+;;; locations for all the functions in a given TAIL-SET. It is stored
+;;; in the TAIL-SET-INFO.
 (defstruct return-info
   ;; The return convention used:
-  ;; -- If :Unknown, we use the standard return convention.
-  ;; -- If :Fixed, we use the known-values convention.
+  ;; -- If :UNKNOWN, we use the standard return convention.
+  ;; -- If :FIXED, we use the known-values convention.
   (kind (required-argument) :type (member :fixed :unknown))
-  ;; The number of values returned, or :Unknown if we don't know. Count may be
-  ;; known when Kind is :Unknown, since we may choose the standard return
-  ;; convention for other reasons.
+  ;; the number of values returned, or :UNKNOWN if we don't know.
+  ;; COUNT may be known when KIND is :UNKNOWN, since we may choose the
+  ;; standard return convention for other reasons.
   (count (required-argument) :type (or index (member :unknown)))
-  ;; If count isn't :Unknown, then this is a list of the primitive-types of
-  ;; each value.
+  ;; If count isn't :UNKNOWN, then this is a list of the
+  ;; primitive-types of each value.
   (types () :type list)
-  ;; If kind is :Fixed, then this is the list of the TNs that we return the
-  ;; values in.
+  ;; If kind is :FIXED, then this is the list of the TNs that we
+  ;; return the values in.
   (locations () :type list))
 (defprinter (return-info)
   kind

@@ -35,6 +35,7 @@
     :doc "private: stuff for implementing ALIENs and friends"
     :use ("CL")
     :export ("%CAST" "%DEREF-ADDR" "%HEAP-ALIEN" "%HEAP-ALIEN-ADDR"
+
              "%LOCAL-ALIEN-ADDR" "%LOCAL-ALIEN-FORCED-TO-MEMORY-P" "%SAP-ALIEN"
              "%SET-DEREF" "%SET-HEAP-ALIEN" "%SET-LOCAL-ALIEN" "%SET-SLOT"
              "%SLOT-ADDR" "*VALUES-TYPE-OKAY*" "ALIEN-ARRAY-TYPE"
@@ -1183,7 +1184,7 @@ is a good idea, but see SB-SYS for blurring of boundaries."
              "SIMPLE-CONTROL-ERROR" "SIMPLE-FILE-ERROR"
              "SIMPLE-PROGRAM-ERROR" "SIMPLE-STYLE-WARNING" "STYLE-WARN"
 
-             ;; newly exported from former SB!CONDITIONS
+             ;; symbols from former SB!CONDITIONS
              "*HANDLER-CLUSTERS*" "*RESTART-CLUSTERS*"
              "SHOW-CONDITION" "CASE-FAILURE"
              "NAMESTRING-PARSE-ERROR" "NAMESTRING-PARSE-ERROR-OFFSET"
@@ -1198,7 +1199,7 @@ is a good idea, but see SB-SYS for blurring of boundaries."
              "!READER-COLD-INIT"
              "STREAM-COLD-INIT-OR-RESET" "!LOADER-COLD-INIT"
              "!PACKAGE-COLD-INIT" "SIGNAL-COLD-INIT-OR-REINIT"
-             "!SET-SANE-POLICY-DEFAULTS" "!VM-TYPE-COLD-INIT"
+   	     "!POLICY-COLD-INIT-OR-RESANIFY" "!VM-TYPE-COLD-INIT"
              "!BACKQ-COLD-INIT" "!SHARPM-COLD-INIT"
 	     "!CLASS-FINALIZE" "GC-COLD-INIT-OR-REINIT"
 

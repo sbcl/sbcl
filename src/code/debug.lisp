@@ -648,8 +648,6 @@ reset to ~S."
        ;; and when people redirect *ERROR-OUTPUT*, they could
        ;; reasonably expect to see error messages logged there,
        ;; regardless of what the debugger does afterwards.
-       #!+sb-show (sb!kernel:show-condition *debug-condition*
-						 *error-output*)
        (format *error-output*
 	       "~2&debugger invoked on condition of type ~S:~%  "
 	       (type-of *debug-condition*))

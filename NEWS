@@ -632,6 +632,8 @@ changes in sbcl-0.6.10 relative to sbcl-0.6.9:
   thanks to a patch from Martin Atzmueller.
 * More compiler warnings in src/runtime/ are gone, thanks to 
   patches from Martin Atzmueller.
+* Martin Atzmueller pointed out that bug 37 was fixed by his patches
+  some time ago.
 
 planned incompatible changes in 0.7.x:
 * The debugger prompt sequence now goes "5]", "5[2]", "5[3]", etc.

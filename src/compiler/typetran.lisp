@@ -148,9 +148,10 @@
 
 ;;;; TYPEP source transform
 
-;;; Return a form that tests the variable N-Object for being in the binds
-;;; specified by Type. Base is the name of the base type, for declaration. We
-;;; make safety locally 0 to inhibit any checking of this assertion.
+;;; Return a form that tests the variable N-OBJECT for being in the
+;;; binds specified by TYPE. BASE is the name of the base type, for
+;;; declaration. We make SAFETY locally 0 to inhibit any checking of
+;;; this assertion.
 #!-negative-zero-is-not-zero
 (defun transform-numeric-bound-test (n-object type base)
   (declare (type numeric-type type))
@@ -259,7 +260,7 @@
   (declare (type hairy-type type))
   (let ((spec (hairy-type-specifier type)))
     (cond ((unknown-type-p type)
-	   (when (policy nil (> speed brevity))
+	   (when (policy nil (> speed inhibit-warnings))
 	     (compiler-note "can't open-code test of unknown type ~S"
 			    (type-specifier type)))
 	   `(%typep ,object ',spec))
@@ -272,7 +273,7 @@
 					      `(typep ,n-obj ',x))
 					  (rest spec))))))))))
 
-;;; Do source transformation for Typep of a known union type. If a
+;;; Do source transformation for TYPEP of a known union type. If a
 ;;; union type contains LIST, then we pull that out and make it into a
 ;;; single LISTP call. Note that if SYMBOL is in the union, then LIST
 ;;; will be a subtype even without there being any (member NIL). We

@@ -92,7 +92,7 @@
   (cond ((policy (continuation-dest cont)
 		 (and (<= speed safety)
 		      (<= space safety)
-		      (<= cspeed safety)))
+		      (<= compilation-speed safety)))
 	 type)
 	(t
 	 (let ((min-cost (type-test-cost type))
@@ -488,7 +488,7 @@
 		  (unless (values-types-intersect (node-derived-type use)
 						  atype)
 		    (mark-error-continuation cont)
-		    (unless (policy node (= brevity 3))
+		    (unless (policy node (= inhibit-warnings 3))
 		      (do-type-warning use))))))
 	    (when (and (eq type-check t)
 		       (not *byte-compiling*))
@@ -506,7 +506,7 @@
 	  (:too-hairy
 	   (let* ((context (continuation-dest cont))
 		  (*compiler-error-context* context))
-	     (when (policy context (>= safety brevity))
+	     (when (policy context (>= safety inhibit-warnings))
 	       (compiler-note
 		"type assertion too complex to check:~% ~S."
 		(type-specifier (continuation-asserted-type cont)))))

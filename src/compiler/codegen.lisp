@@ -100,7 +100,7 @@
 	(policy (lambda-bind
 		 (block-home-lambda
 		  (block-next (component-head *component-being-compiled*))))
-		(or (> speed cspeed) (> space cspeed)))))
+		(or (> speed compilation-speed) (> space compilation-speed)))))
 (defun default-segment-inst-hook ()
   #!+sb-show
   (and *compiler-trace-output* #'trace-instruction))

@@ -280,13 +280,13 @@
 
   (values))
 
-;;; If policy is auspicious, Call is not in an XEP, and we don't seem
+;;; If policy is auspicious, CALL is not in an XEP, and we don't seem
 ;;; to be in an infinite recursive loop, then change the reference to
 ;;; reference a fresh copy. We return whichever function we decide to
 ;;; reference.
 (defun maybe-expand-local-inline (fun ref call)
   (if (and (policy call
-		   (and (>= speed space) (>= speed cspeed)))
+		   (and (>= speed space) (>= speed compilation-speed)))
 	   (not (eq (functional-kind (node-home-lambda call)) :external))
 	   (not *converting-for-interpreter*)
 	   (inline-expansion-ok call))
@@ -519,7 +519,8 @@
 	 (arglist (optional-dispatch-arglist fun))
 	 (args (combination-args call))
 	 (more (nthcdr max args))
-	 (flame (policy call (or (> speed brevity) (> space brevity))))
+	 (flame (policy call (or (> speed inhibit-warnings)
+				 (> space inhibit-warnings))))
 	 (loser nil)
 	 (temps (make-gensym-list max))
 	 (more-temps (make-gensym-list (length more))))

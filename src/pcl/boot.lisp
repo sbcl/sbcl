@@ -509,6 +509,7 @@ bootstrapping.
 		`(declare
 		  ;; FIXME: Are these (DECLARE (SB-PCL::CLASS FOO BAR))
 		  ;; declarations used for anything any more?
+                  ;; WHN 2000-12-21: I think not, commented 'em out to see..
 		  ,@(remove nil
 			    (mapcar (lambda (a s) (and (symbolp s)
 						       (neq s 't)

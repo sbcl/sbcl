@@ -819,7 +819,7 @@
 			     type
 			     (type-intersection old-type type))))
 	       (cond ((eq int *empty-type*)
-		      (unless (policy nil (= brevity 3))
+		      (unless (policy nil (= inhibit-warnings 3))
 			(compiler-warning
 			 "The type declarations ~S and ~S for ~S conflict."
 			 (type-specifier old-type) (type-specifier type)
@@ -927,7 +927,7 @@
 		    name "in an inline or notinline declaration")))
 	      (etypecase found
 		(functional
-		 (when (policy nil (>= speed brevity))
+		 (when (policy nil (>= speed inhibit-warnings))
 		   (compiler-note "ignoring ~A declaration not at ~
 				   definition of local function:~%  ~S"
 				  sense name)))
@@ -994,7 +994,7 @@
     (special (process-special-declaration spec res vars))
     (ftype
      (unless (cdr spec)
-       (compiler-error "No type specified in FTYPE declaration: ~S." spec))
+       (compiler-error "No type specified in FTYPE declaration: ~S" spec))
      (process-ftype-declaration (second spec) res (cddr spec) fvars))
     (function
      ;; Handle old style FUNCTION declaration, which is an abbreviation for
@@ -1034,7 +1034,7 @@
 			     `(values ,@types))
 			 cont res 'values))))
     (dynamic-extent
-     (when (policy nil (> speed brevity))
+     (when (policy nil (> speed inhibit-warnings))
        (compiler-note
 	"The DYNAMIC-EXTENT declaration is not implemented (ignored)."))
      res)
@@ -1053,15 +1053,15 @@
 	      (compiler-warning "unrecognized declaration ~S" spec)
 	      res))))))
 
-;;; Use a list of DECLARE forms to annotate the lists of LAMBDA-VAR and
-;;; Functional structures which are being bound. In addition to filling in
-;;; slots in the leaf structures, we return a new LEXENV which reflects
-;;; pervasive special and function type declarations, (NOT)INLINE declarations
-;;; and OPTIMIZE declarations. CONT is the continuation affected by VALUES
-;;; declarations.
+;;; Use a list of DECLARE forms to annotate the lists of LAMBDA-VAR
+;;; and FUNCTIONAL structures which are being bound. In addition to
+;;; filling in slots in the leaf structures, we return a new LEXENV
+;;; which reflects pervasive special and function type declarations,
+;;; (NOT)INLINE declarations and OPTIMIZE declarations. CONT is the
+;;; continuation affected by VALUES declarations.
 ;;;
-;;; This is also called in main.lisp when PROCESS-FORM handles a use of
-;;; LOCALLY.
+;;; This is also called in main.lisp when PROCESS-FORM handles a use
+;;; of LOCALLY.
 (defun process-decls (decls vars fvars cont &optional (env *lexenv*))
   (declare (list decls vars fvars) (type continuation cont))
   (dolist (decl decls)
@@ -2555,9 +2555,9 @@
 
 ;;;; THE
 
-;;; Do stuff to recognize a THE or VALUES declaration. Cont is the
-;;; continuation that the assertion applies to, Type is the type
-;;; specifier and Lexenv is the current lexical environment. Name is
+;;; Do stuff to recognize a THE or VALUES declaration. CONT is the
+;;; continuation that the assertion applies to, TYPE is the type
+;;; specifier and Lexenv is the current lexical environment. NAME is
 ;;; the name of the declaration we are doing, for use in error
 ;;; messages.
 ;;;
@@ -2576,8 +2576,8 @@
 ;;; we union) and nested ones (which we intersect).
 ;;;
 ;;; We represent the scoping by throwing our innermost (intersected)
-;;; assertion on Cont into the TYPE-RESTRICTIONS. As we go down, we
-;;; intersect our assertions together. If Cont has no uses yet, we
+;;; assertion on CONT into the TYPE-RESTRICTIONS. As we go down, we
+;;; intersect our assertions together. If CONT has no uses yet, we
 ;;; have not yet bottomed out on the first COND branch; in this case
 ;;; we optimistically assume that this type will be the one we end up
 ;;; with, and set the ASSERTED-TYPE to it. We can never get better
@@ -2598,7 +2598,7 @@
     (when (null (find-uses cont))
       (setf (continuation-asserted-type cont) new))
     (when (and (not intersects)
-	       (not (policy nil (= brevity 3)))) ;FIXME: really OK to suppress?
+	       (not (policy nil (= inhibit-warnings 3)))) ;FIXME: really OK to suppress?
       (compiler-warning
        "The type ~S in ~S declaration conflicts with an enclosing assertion:~%   ~S"
        (type-specifier ctype)
@@ -2607,26 +2607,26 @@
     (make-lexenv :type-restrictions `((,cont . ,new))
 		 :default lexenv)))
 
+;;; Assert that FORM evaluates to the specified type (which may be a
+;;; VALUES type).
+;;;
 ;;; FIXME: In a version of CMU CL that I used at Cadabra ca. 20000101,
 ;;; this didn't seem to expand into an assertion, at least for ALIEN
 ;;; values. Check that SBCL doesn't have this problem.
 (def-ir1-translator the ((type value) start cont)
-  #!+sb-doc
-  "THE Type Form
-  Assert that Form evaluates to the specified type (which may be a VALUES
-  type.)"
   (let ((*lexenv* (do-the-stuff type cont *lexenv* 'the)))
     (ir1-convert start cont value)))
 
+;;; This is like the THE special form, except that it believes
+;;; whatever you tell it. It will never generate a type check, but
+;;; will cause a warning if the compiler can prove the assertion is
+;;; wrong.
+;;;
 ;;; Since the CONTINUATION-DERIVED-TYPE is computed as the union of
 ;;; its uses's types, setting it won't work. Instead we must intersect
 ;;; the type with the uses's DERIVED-TYPE.
 (def-ir1-translator truly-the ((type value) start cont)
   #!+sb-doc
-  "Truly-The Type Value
-  Like the THE special form, except that it believes whatever you tell it. It
-  will never generate a type check, but will cause a warning if the compiler
-  can prove the assertion is wrong."
   (declare (inline member))
   (let ((type (values-specifier-type type))
 	(old (find-uses cont)))
@@ -2641,11 +2641,6 @@
 ;;; otherwise look at the global information. If the name is for a
 ;;; constant, then error out.
 (def-ir1-translator setq ((&whole source &rest things) start cont)
-  #!+sb-doc
-  "SETQ {Var Value}*
-  Set the variables to the values. If more than one pair is supplied, the
-  assignments are done sequentially. If Var names a symbol macro, SETF the
-  expansion."
   (let ((len (length things)))
     (when (oddp len)
       (compiler-error "odd number of args to SETQ: ~S" source))
@@ -2679,8 +2674,8 @@
 	       (ir1-convert-progn-body start cont (sets)))
 	    (sets `(setq ,(first thing) ,(second thing))))))))
 
-;;; Kind of like Reference-Leaf, but we generate a Set node. This
-;;; should only need to be called in Setq.
+;;; This is kind of like REFERENCE-LEAF, but we generate a SET node.
+;;; This should only need to be called in SETQ.
 (defun set-variable (start cont var value)
   (declare (type continuation start cont) (type basic-var var))
   (let ((dest (make-continuation)))

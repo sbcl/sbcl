@@ -366,8 +366,10 @@
 		(eq (global-var-kind leaf) :global-function)
 		(not (null (member (leaf-name leaf) names :test #'equal))))))))
 
-;;; If Cont is a constant continuation, the return the constant value. If
-;;; it is null, then return default, otherwise quietly GIVE-UP.
+;;; If CONT is a constant continuation, the return the constant value.
+;;; If it is null, then return default, otherwise quietly give up the
+;;; IR1 transform.
+;;;
 ;;; ### Probably should take an ARG and flame using the NAME.
 (defun constant-value-or-lose (cont &optional default)
   (declare (type (or continuation null) cont))
@@ -378,10 +380,10 @@
 	 (give-up-ir1-transform))))
 
 #|
-;;; This is a frob whose job it is to make it easier to pass around the
-;;; arguments to IR1 transforms. It bundles together the name of the argument
-;;; (which should be referenced in any expansion), and the continuation for
-;;; that argument (or NIL if unsupplied.)
+;;; This is a frob whose job it is to make it easier to pass around
+;;; the arguments to IR1 transforms. It bundles together the name of
+;;; the argument (which should be referenced in any expansion), and
+;;; the continuation for that argument (or NIL if unsupplied.)
 (defstruct (arg (:constructor %make-arg (name cont)))
   (name nil :type symbol)
   (cont nil :type (or continuation null)))
@@ -539,7 +541,8 @@
 		   ,body))
 	       ((not (csubtypep (continuation-type fun-cont)
 				(specifier-type 'function)))
-		(when (policy *compiler-error-context* (> speed brevity))
+		(when (policy *compiler-error-context*
+			      (> speed inhibit-warnings))
 		  (compiler-note
 		   "~S may not be a function, so must coerce at run-time."
 		   n-fun))

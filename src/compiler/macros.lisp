@@ -26,20 +26,28 @@
 
 ;;;; the POLICY macro
 
-;;; a helper function for the POLICY macro: Return a list of
-;;; POLICY-QUALITY-SLOT objects corresponding to the qualities which
-;;; appear in EXPR.
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  (defun policy-quality-slots-used-by (expr)
-    (let ((result nil))
-      (labels ((recurse (x)
-	         (if (listp x)
-		     (map nil #'recurse x)
-		     (let ((pqs (named-policy-quality-slot x)))
-		       (when pqs
-			 (pushnew pqs result))))))
-	(recurse expr)
-	result))))
+
+;;; a helper function for the POLICY macro: Look up a named optimization
+;;; quality in POLICY.
+(declaim (ftype (function (policy symbol) policy-quality)))
+(defun policy-quality (policy quality-name)
+  (the policy-quality
+       (cdr (assoc quality-name policy))))
+
+;;; A helper function for the POLICY macro: Return a list of symbols
+;;; naming the qualities which appear in EXPR.
+(defun policy-qualities-used-by (expr)
+  (let ((result nil))
+    (labels ((recurse (x)
+	       (if (listp x)
+		   (map nil #'recurse x)
+		   (when (policy-quality-p x)
+		     (pushnew x result)))))
+      (recurse expr)
+      result)))
+
+) ; EVAL-WHEN
 
 ;;; syntactic sugar for querying optimization policy qualities
 ;;;
@@ -49,19 +57,16 @@
 ;;; well-defined during IR1 conversion.)
 ;;;
 ;;; EXPR is a form which accesses the policy values by referring to
-;;; them by name, e.g. SPEED.
+;;; them by name, e.g. (> SPEED SPACE).
 (defmacro policy (node expr)
   (let* ((n-policy (gensym))
-	 (binds (mapcar
-		 (lambda (pqs)
-		   `(,(policy-quality-slot-quality pqs)
-		     (,(policy-quality-slot-accessor pqs) ,n-policy)))
-		 (policy-quality-slots-used-by expr))))
+	 (binds (mapcar (lambda (name)
+			  `(,name (policy-quality ,n-policy ',name)))
+			(policy-qualities-used-by expr))))
     (/show "in POLICY" expr binds)
-    `(let* ((,n-policy (lexenv-policy
-			,(if node
-			     `(node-lexenv ,node)
-			     '*lexenv*)))
+    `(let* ((,n-policy (lexenv-policy ,(if node
+					   `(node-lexenv ,node)
+					   '*lexenv*)))
 	    ,@binds)
        ,expr)))
 
@@ -389,75 +394,71 @@
 
 ;;;; DEFTRANSFORM
 
-;;; Parse the lambda-list and generate code to test the policy and
-;;; automatically create the result lambda.
+;;; Define an IR1 transformation for NAME. An IR1 transformation
+;;; computes a lambda that replaces the function variable reference
+;;; for the call. A transform may pass (decide not to transform the
+;;; call) by calling the GIVE-UP-IR1-TRANSFORM function. LAMBDA-LIST
+;;; both determines how the current call is parsed and specifies the
+;;; LAMBDA-LIST for the resulting lambda.
+;;;
+;;; We parse the call and bind each of the lambda-list variables to
+;;; the continuation which represents the value of the argument. When
+;;; parsing the call, we ignore the defaults, and always bind the
+;;; variables for unsupplied arguments to NIL. If a required argument
+;;; is missing, an unknown keyword is supplied, or an argument keyword
+;;; is not a constant, then the transform automatically passes. The
+;;; DECLARATIONS apply to the bindings made by DEFTRANSFORM at
+;;; transformation time, rather than to the variables of the resulting
+;;; lambda. Bound-but-not-referenced warnings are suppressed for the
+;;; lambda-list variables. The DOC-STRING is used when printing
+;;; efficiency notes about the defined transform.
+;;;
+;;; Normally, the body evaluates to a form which becomes the body of
+;;; an automatically constructed lambda. We make LAMBDA-LIST the
+;;; lambda-list for the lambda, and automatically insert declarations
+;;; of the argument and result types. If the second value of the body
+;;; is non-null, then it is a list of declarations which are to be
+;;; inserted at the head of the lambda. Automatic lambda generation
+;;; may be inhibited by explicitly returning a lambda from the body.
+;;;
+;;; The ARG-TYPES and RESULT-TYPE are used to create a function type
+;;; which the call must satisfy before transformation is attempted.
+;;; The function type specifier is constructed by wrapping (FUNCTION
+;;; ...) around these values, so the lack of a restriction may be
+;;; specified by omitting the argument or supplying *. The argument
+;;; syntax specified in the ARG-TYPES need not be the same as that in
+;;; the LAMBDA-LIST, but the transform will never happen if the
+;;; syntaxes can't be satisfied simultaneously. If there is an
+;;; existing transform for the same function that has the same type,
+;;; then it is replaced with the new definition.
+;;;
+;;; These are the legal keyword options:
+;;;   :RESULT - A variable which is bound to the result continuation.
+;;;   :NODE   - A variable which is bound to the combination node for the call.
+;;;   :POLICY - A form which is supplied to the POLICY macro to determine
+;;;             whether this transformation is appropriate. If the result
+;;;             is false, then the transform automatically gives up.
+;;;   :EVAL-NAME
+;;;           - The name and argument/result types are actually forms to be
+;;;             evaluated. Useful for getting closures that transform similar
+;;;             functions.
+;;;   :DEFUN-ONLY
+;;;           - Don't actually instantiate a transform, instead just DEFUN
+;;;             Name with the specified transform definition function. This
+;;;             may be later instantiated with %DEFTRANSFORM.
+;;;   :IMPORTANT
+;;;           - If supplied and non-NIL, note this transform as ``important,''
+;;;             which means efficiency notes will be generated when this
+;;;             transform fails even if INHIBIT-WARNINGS=SPEED (but not if
+;;;             INHIBIT-WARNINGS>SPEED).
+;;;   :WHEN {:NATIVE | :BYTE | :BOTH}
+;;;           - Indicates whether this transform applies to native code,
+;;;             byte-code or both (default :native.)
 (defmacro deftransform (name (lambda-list &optional (arg-types '*)
 					  (result-type '*)
 					  &key result policy node defun-only
 					  eval-name important (when :native))
 			     &body body-decls-doc)
-  #!+sb-doc
-  "Deftransform Name (Lambda-List [Arg-Types] [Result-Type] {Key Value}*)
-	       Declaration* [Doc-String] Form*
-  Define an IR1 transformation for NAME. An IR1 transformation computes a
-  lambda that replaces the function variable reference for the call. A
-  transform may pass (decide not to transform the call) by calling the
-  GIVE-UP-IR1-TRANSFORM function. LAMBDA-LIST both determines how the
-  current call is parsed and specifies the LAMBDA-LIST for the resulting
-  lambda.
-
-  We parse the call and bind each of the lambda-list variables to the
-  continuation which represents the value of the argument. When parsing
-  the call, we ignore the defaults, and always bind the variables for
-  unsupplied arguments to NIL. If a required argument is missing, an
-  unknown keyword is supplied, or an argument keyword is not a constant,
-  then the transform automatically passes. The DECLARATIONS apply to the
-  bindings made by DEFTRANSFORM at transformation time, rather than to
-  the variables of the resulting lambda. Bound-but-not-referenced
-  warnings are suppressed for the lambda-list variables. The DOC-STRING
-  is used when printing efficiency notes about the defined transform.
-
-  Normally, the body evaluates to a form which becomes the body of an
-  automatically constructed lambda. We make LAMBDA-LIST the lambda-list
-  for the lambda, and automatically insert declarations of the argument
-  and result types. If the second value of the body is non-null, then it
-  is a list of declarations which are to be inserted at the head of the
-  lambda. Automatic lambda generation may be inhibited by explicitly
-  returning a lambda from the body.
-
-  The ARG-TYPES and RESULT-TYPE are used to create a function type
-  which the call must satisfy before transformation is attempted. The
-  function type specifier is constructed by wrapping (FUNCTION ...)
-  around these values, so the lack of a restriction may be specified by
-  omitting the argument or supplying *. The argument syntax specified in
-  the ARG-TYPES need not be the same as that in the LAMBDA-LIST, but the
-  transform will never happen if the syntaxes can't be satisfied
-  simultaneously. If there is an existing transform for the same
-  function that has the same type, then it is replaced with the new
-  definition.
-
-  These are the legal keyword options:
-    :Result - A variable which is bound to the result continuation.
-    :Node   - A variable which is bound to the combination node for the call.
-    :Policy - A form which is supplied to the POLICY macro to determine whether
-	      this transformation is appropriate. If the result is false, then
-	      the transform automatically passes.
-    :Eval-Name
-    	    - The name and argument/result types are actually forms to be
-	      evaluated. Useful for getting closures that transform similar
-	      functions.
-    :Defun-Only
-	    - Don't actually instantiate a transform, instead just DEFUN
-	      Name with the specified transform definition function. This may
-	      be later instantiated with %DEFTRANSFORM.
-    :Important
-	    - If supplied and non-NIL, note this transform as ``important,''
-	      which means efficiency notes will be generated when this
-	      transform fails even if brevity=speed (but not if brevity>speed)
-    :When {:Native | :Byte | :Both}
-	    - Indicates whether this transform applies to native code,
-	      byte-code or both (default :native.)"
-
   (when (and eval-name defun-only)
     (error "can't specify both DEFUN-ONLY and EVAL-NAME"))
   (multiple-value-bind (body decls doc) (parse-body body-decls-doc)
@@ -511,56 +512,58 @@
 ;;;
 ;;; FIXME: DEFKNOWN is needed only at build-the-system time. Figure
 ;;; out some way to keep it from appearing in the target system.
+;;;
+;;; Declare the function NAME to be a known function. We construct a
+;;; type specifier for the function by wrapping (FUNCTION ...) around
+;;; the ARG-TYPES and RESULT-TYPE. ATTRIBUTES is an unevaluated list
+;;; of boolean attributes of the function. These attributes are
+;;; meaningful here:
+;;;
+;;;     CALL
+;;;        May call functions that are passed as arguments. In order
+;;;        to determine what other effects are present, we must find
+;;;        the effects of all arguments that may be functions.
+;;;
+;;;     UNSAFE
+;;;        May incorporate arguments in the result or somehow pass
+;;;        them upward.
+;;;
+;;;     UNWIND
+;;;        May fail to return during correct execution. Errors
+;;;        are O.K.
+;;;
+;;;     ANY
+;;;        The (default) worst case. Includes all the other bad
+;;;        things, plus any other possible bad thing.
+;;;
+;;;     FOLDABLE
+;;;        May be constant-folded. The function has no side effects,
+;;;        but may be affected by side effects on the arguments. E.g.
+;;;        SVREF, MAPC.
+;;;
+;;;     FLUSHABLE
+;;;        May be eliminated if value is unused. The function has
+;;;        no side effects except possibly CONS. If a function is
+;;;        defined to signal errors, then it is not flushable even
+;;;        if it is movable or foldable.
+;;;
+;;;     MOVABLE
+;;;        May be moved with impunity. Has no side effects except
+;;;        possibly CONS, and is affected only by its arguments.
+;;;
+;;;     PREDICATE
+;;;         A true predicate likely to be open-coded. This is a
+;;;         hint to IR1 conversion that it should ensure calls always
+;;;         appear as an IF test. Not usually specified to DEFKNOWN,
+;;;         since this is implementation dependent, and is usually
+;;;         automatically set by the DEFINE-VOP :CONDITIONAL option.
+;;;
+;;; NAME may also be a list of names, in which case the same
+;;; information is given to all the names. The keywords specify the
+;;; initial values for various optimizers that the function might
+;;; have.
 (defmacro defknown (name arg-types result-type &optional (attributes '(any))
 			 &rest keys)
-  #!+sb-doc
-  "Defknown Name Arg-Types Result-Type [Attributes] {Key Value}*
-  Declare the function Name to be a known function. We construct a type
-  specifier for the function by wrapping (FUNCTION ...) around the Arg-Types
-  and Result-Type. Attributes is an unevaluated list of boolean
-  attributes of the function. These attributes are meaningful here:
-      call
-	 May call functions that are passed as arguments. In order
-	 to determine what other effects are present, we must find
-	 the effects of all arguments that may be functions.
-
-      unsafe
-	 May incorporate arguments in the result or somehow pass
-	 them upward.
-
-      unwind
-	 May fail to return during correct execution. Errors
-	 are O.K.
-
-      any
-	 The (default) worst case. Includes all the other bad
-	 things, plus any other possible bad thing.
-
-      foldable
-	 May be constant-folded. The function has no side effects,
-	 but may be affected by side effects on the arguments. E.g.
-	 SVREF, MAPC.
-
-      flushable
-	 May be eliminated if value is unused. The function has
-	 no side effects except possibly CONS. If a function is
-	 defined to signal errors, then it is not flushable even
-	 if it is movable or foldable.
-
-      movable
-	 May be moved with impunity. Has no side effects except
-	 possibly CONS,and is affected only by its arguments.
-
-      predicate
-	  A true predicate likely to be open-coded. This is a
-	  hint to IR1 conversion that it should ensure calls always
-	  appear as an IF test. Not usually specified to Defknown,
-	  since this is implementation dependent, and is usually
-	  automatically set by the Define-VOP :Conditional option.
-
-  Name may also be a list of names, in which case the same information
-  is given to all the names. The keywords specify the initial values
-  for various optimizers that the function might have."
   (when (and (intersection attributes '(any call unwind))
 	     (intersection attributes '(movable)))
     (error "function cannot have both good and bad attributes: ~S" attributes))
@@ -575,31 +578,30 @@
 				    attributes))
 	      ,@keys))
 
-;;; Create a function which parses combination args according to 
-;;; LAMBDA-LIST, optionally storing it in a FUNCTION-INFO slot.
+;;; Create a function which parses combination args according to WHAT
+;;; and LAMBDA-LIST, where WHAT is either a function name or a list
+;;; (FUNCTION-NAME KIND) and does some KIND of optimization.
+;;;
+;;; The FUNCTION-NAME must name a known function. LAMBDA-LIST is used
+;;; to parse the arguments to the combination as in DEFTRANSFORM. If
+;;; the argument syntax is invalid or there are non-constant keys,
+;;; then we simply return NIL.
+;;;
+;;; The function is DEFUN'ed as FUNCTION-KIND-OPTIMIZER. Possible
+;;; kinds are DERIVE-TYPE, OPTIMIZER, LTN-ANNOTATE and IR2-CONVERT. If
+;;; a symbol is specified instead of a (FUNCTION KIND) list, then we
+;;; just do a DEFUN with the symbol as its name, and don't do anything
+;;; with the definition. This is useful for creating optimizers to be
+;;; passed by name to DEFKNOWN.
+;;;
+;;; If supplied, NODE-VAR is bound to the combination node being
+;;; optimized. If additional VARS are supplied, then they are used as
+;;; the rest of the optimizer function's lambda-list. LTN-ANNOTATE
+;;; methods are passed an additional POLICY argument, and IR2-CONVERT
+;;; methods are passed an additional IR2-BLOCK argument.
 (defmacro defoptimizer (what (lambda-list &optional (n-node (gensym))
 					  &rest vars)
 			     &body body)
-  #!+sb-doc
-  "Defoptimizer (Function Kind) (Lambda-List [Node-Var] Var*)
-		Declaration* Form*
-  Define some Kind of optimizer for the named Function. Function must be a
-  known function. Lambda-List is used to parse the arguments to the
-  combination as in Deftransform. If the argument syntax is invalid or there
-  are non-constant keys, then we simply return NIL.
-
-  The function is DEFUN'ed as Function-Kind-OPTIMIZER. Possible kinds are
-  DERIVE-TYPE, OPTIMIZER, LTN-ANNOTATE and IR2-CONVERT. If a symbol is
-  specified instead of a (Function Kind) list, then we just do a DEFUN with the
-  symbol as its name, and don't do anything with the definition. This is
-  useful for creating optimizers to be passed by name to DEFKNOWN.
-
-  If supplied, Node-Var is bound to the combination node being optimized. If
-  additional Vars are supplied, then they are used as the rest of the optimizer
-  function's lambda-list. LTN-ANNOTATE methods are passed an additional POLICY
-  argument, and IR2-CONVERT methods are passed an additional IR2-BLOCK
-  argument."
-
   (let ((name (if (symbolp what) what
 		  (symbolicate (first what) "-" (second what) "-OPTIMIZER"))))
 
@@ -616,18 +618,17 @@
 
 ;;;; IR groveling macros
 
+;;; Iterate over the blocks in a component, binding BLOCK-VAR to each
+;;; block in turn. The value of ENDS determines whether to iterate
+;;; over dummy head and tail blocks:
+;;;    NIL  -- Skip Head and Tail (the default)
+;;;   :HEAD -- Do head but skip tail
+;;;   :TAIL -- Do tail but skip head
+;;;   :BOTH -- Do both head and tail
+;;;
+;;; If supplied, RESULT-FORM is the value to return.
 (defmacro do-blocks ((block-var component &optional ends result) &body body)
   #!+sb-doc
-  "Do-Blocks (Block-Var Component [Ends] [Result-Form]) {Declaration}* {Form}*
-  Iterate over the blocks in a component, binding Block-Var to each block in
-  turn. The value of Ends determines whether to iterate over dummy head and
-  tail blocks:
-    NIL   -- Skip Head and Tail (the default)
-    :Head -- Do head but skip tail
-    :Tail -- Do tail but skip head
-    :Both -- Do both head and tail
-
-  If supplied, Result-Form is the value to return."
   (unless (member ends '(nil :head :tail :both))
     (error "losing ENDS value: ~S" ends))
   (let ((n-component (gensym))
@@ -1114,4 +1115,4 @@
 
 (defmacro position-or-lose (&rest args)
   `(or (position ,@args)
-       (error "Shouldn't happen?")))
+       (error "shouldn't happen?")))

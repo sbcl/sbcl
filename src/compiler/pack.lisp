@@ -1419,7 +1419,8 @@
 (defun pack (component)
   (assert (not *in-pack*))
   (let ((*in-pack* t)
-	(optimize (policy nil (or (>= speed cspeed) (>= space cspeed))))
+	(optimize (policy nil (or (>= speed compilation-speed)
+				  (>= space compilation-speed))))
 	(2comp (component-info component)))
     (init-sb-vectors component)
 

@@ -384,7 +384,7 @@
 	  (entry-analyze component)
 	  (ir2-convert component)
 
-	  (when (policy nil (>= speed cspeed))
+	  (when (policy nil (>= speed compilation-speed))
 	    (maybe-mumble "copy ")
 	    (copy-propagate component))
 
@@ -812,10 +812,9 @@
   (declare (type source-info info))
   (cond ((source-info-stream info))
 	(t
-	 (setq *package* *initial-package*)
-	 (setq *default-policy* (copy-policy *initial-policy*))
-	 (setq *default-interface-policy*
-	       (copy-policy *initial-interface-policy*))
+	 (setf *package* *initial-package*
+	       *default-policy* *initial-policy*
+	       *default-interface-policy* *initial-interface-policy*)
 	 (let* ((finfo (first (source-info-current-file info)))
 		(name (file-info-name finfo)))
 	   (setq sb!xc:*compile-file-truename* name)
@@ -1360,8 +1359,8 @@
 	 (*initial-package* (sane-package))
 	 (*initial-policy* *default-policy*)
 	 (*initial-interface-policy* *default-interface-policy*)
-	 (*default-policy* (copy-policy *initial-policy*))
-	 (*default-interface-policy* (copy-policy *initial-interface-policy*))
+	 (*default-policy* *initial-policy*)
+	 (*default-interface-policy* *initial-interface-policy*)
 	 (*lexenv* (make-null-lexenv))
 	 (*converting-for-interpreter* nil)
 	 (*source-info* info)

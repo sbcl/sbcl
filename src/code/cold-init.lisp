@@ -135,9 +135,8 @@
   ;; forms of the corresponding source files.
 
   (show-and-call !package-cold-init)
-
-  ;; Set sane values for our toplevel forms.
-  (show-and-call !set-sane-policy-defaults)
+  (show-and-call !policy-cold-init-or-resanify)
+  (/show0 "back from !POLICY-COLD-INIT-OR-RESANIFY")
 
   ;; KLUDGE: Why are fixups mixed up with toplevel forms? Couldn't
   ;; fixups be done separately? Wouldn't that be clearer and better?
@@ -191,10 +190,10 @@
   (/show0 "done with loop over cold toplevel forms and fixups")
 
   ;; Set sane values again, so that the user sees sane values instead of
-  ;; whatever is left over from the last DECLAIM.
-  (show-and-call !set-sane-policy-defaults)
+  ;; whatever is left over from the last DECLAIM/PROCLAIM.
+  (show-and-call !policy-cold-init-or-resanify)
 
-  ;; Only do this after top level forms have run, 'cause that's where
+  ;; Only do this after toplevel forms have run, 'cause that's where
   ;; DEFTYPEs are.
   (setf *type-system-initialized* t)
 

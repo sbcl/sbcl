@@ -18,24 +18,27 @@
 ;;; Return the policies keyword indicated by the node policy.
 (defun translation-policy (node)
   (declare (type node node))
-  (let* ((policy (lexenv-policy (node-lexenv node)))
-	 (safety (policy-safety policy))
-	 (space (max (policy-space policy)
-		     (policy-cspeed policy)))
-	 (speed (policy-speed policy)))
-    (if (zerop safety)
-	(if (>= speed space) :fast :small)
-	(if (>= speed space) :fast-safe :safe))))
+  (policy node
+	  (let ((eff-space (max space
+				;; on the theory that if the code is
+				;; smaller, it will take less time to
+				;; compile (could lose if the smallest
+				;; case is out of line, and must
+				;; allocate many linkage registers):
+				compilation-speed)))
+	    (if (zerop safety)
+		(if (>= speed eff-space) :fast :small)
+		(if (>= speed eff-space) :fast-safe :safe)))))
 
-;;; Return true if Policy is a safe policy.
+;;; Return true if POLICY is a safe policy.
 #!-sb-fluid (declaim (inline policy-safe-p))
 (defun policy-safe-p (policy)
   (declare (type policies policy))
   (or (eq policy :safe) (eq policy :fast-safe)))
 
-;;; Called when an unsafe policy indicates that no type check should be done
-;;; on CONT. We delete the type check unless it is :ERROR (indicating a
-;;; compile-time type error.)
+;;; Called when an unsafe policy indicates that no type check should
+;;; be done on CONT. We delete the type check unless it is :ERROR
+;;; (indicating a compile-time type error.)
 #!-sb-fluid (declaim (inline flush-type-check))
 (defun flush-type-check (cont)
   (declare (type continuation cont))
@@ -49,9 +52,9 @@
   (declare (type continuation cont))
   (ir2-continuation-primitive-type (continuation-info cont)))
 
-;;; Return true if a constant Leaf is of a type which we can legally
-;;; directly reference in code. Named constants with arbitrary pointer values
-;;; cannot, since we must preserve EQLness.
+;;; Return true if a constant LEAF is of a type which we can legally
+;;; directly reference in code. Named constants with arbitrary pointer
+;;; values cannot, since we must preserve EQLness.
 (defun legal-immediate-constant-p (leaf)
   (declare (type constant leaf))
   (or (null (leaf-name leaf))
@@ -60,8 +63,8 @@
 	(symbol (symbol-package (constant-value leaf)))
 	(t nil))))
 
-;;; If Cont is used only by a Ref to a leaf that can be delayed, then return
-;;; the leaf, otherwise return NIL.
+;;; If CONT is used only by a REF to a leaf that can be delayed, then
+;;; return the leaf, otherwise return NIL.
 (defun continuation-delayed-leaf (cont)
   (declare (type continuation cont))
   (let ((use (continuation-use cont)))
@@ -72,12 +75,12 @@
 	     (constant (if (legal-immediate-constant-p leaf) leaf nil))
 	     ((or functional global-var) nil))))))
 
-;;; Annotate a normal single-value continuation. If its only use is a ref
-;;; that we are allowed to delay the evaluation of, then we mark the
-;;; continuation for delayed evaluation, otherwise we assign a TN to hold the
-;;; continuation's value. If the continuation has a type check, we make the TN
-;;; according to the proven type to ensure that the possibly erroneous value
-;;; can be represented.
+;;; Annotate a normal single-value continuation. If its only use is a
+;;; ref that we are allowed to delay the evaluation of, then we mark
+;;; the continuation for delayed evaluation, otherwise we assign a TN
+;;; to hold the continuation's value. If the continuation has a type
+;;; check, we make the TN according to the proven type to ensure that
+;;; the possibly erroneous value can be represented.
 (defun annotate-1-value-continuation (cont)
   (declare (type continuation cont))
   (let ((info (continuation-info cont)))
@@ -95,16 +98,17 @@
 		    (single-value-type (continuation-proven-type cont)))))))))
   (values))
 
-;;; Make an IR2-Continuation corresponding to the continuation type and then
-;;; do Annotate-1-Value-Continuation. If Policy isn't a safe policy, then we
-;;; clear the type-check flag.
-(defun annotate-ordinary-continuation (cont policy)
+;;; Make an IR2-CONTINUATION corresponding to the continuation type
+;;; and then do ANNOTATE-1-VALUE-CONTINUATION. If POLICY-KEYWORD isn't
+;;; a safe policy keyword, then we clear the TYPE-CHECK flag.
+(defun annotate-ordinary-continuation (cont policy-keyword)
   (declare (type continuation cont)
-	   (type policies policy))
+	   (type policies policy-keyword))
   (let ((info (make-ir2-continuation
 	       (primitive-type (continuation-type cont)))))
     (setf (continuation-info cont) info)
-    (unless (policy-safe-p policy) (flush-type-check cont))
+    (unless (policy-safe-p policy-keyword)
+      (flush-type-check cont))
     (annotate-1-value-continuation cont))
   (values))
 
@@ -112,12 +116,13 @@
 ;;; reference is to a global function and Delay is true, then we delay
 ;;; the reference, otherwise we annotate for a single value.
 ;;;
-;;; Unlike for an argument, we only clear the type check flag when the policy
-;;; is unsafe, since the check for a valid function object must be done before
-;;; the call.
+;;; Unlike for an argument, we only clear the type check flag when the
+;;; policy is unsafe, since the check for a valid function object must
+;;; be done before the call.
 (defun annotate-function-continuation (cont policy &optional (delay t))
   (declare (type continuation cont) (type policies policy))
-  (unless (policy-safe-p policy) (flush-type-check cont))
+  (unless (policy-safe-p policy)
+    (flush-type-check cont))
   (let* ((ptype (primitive-type (continuation-type cont)))
 	 (tn-ptype (if (member (continuation-type-check cont) '(:deleted nil))
 		       ptype
@@ -217,7 +222,7 @@
     (let* ((dest (continuation-dest cont))
 	   (*compiler-error-context* dest))
       (when (and (policy-safe-p policy)
-		 (policy dest (>= safety brevity)))
+		 (policy dest (>= safety inhibit-warnings)))
 	(compiler-note "unable to check type assertion in unknown-values ~
 			context:~% ~S"
 		       (continuation-asserted-type cont))))
@@ -739,7 +744,7 @@
 
   (collect ((losers))
     (let ((safe-p (policy-safe-p policy))
-	  (verbose-p (policy call (= brevity 0)))
+	  (verbose-p (policy call (= inhibit-warnings 0)))
 	  (max-cost (- (template-cost
 			(or template
 			    (template-or-lose 'call-named)))
@@ -846,7 +851,7 @@
       ;; restrictions and our policy enables efficiency notes, then we call
       ;; Note-Rejected-Templates.
       (when (and rejected
-		 (policy call (> speed brevity)))
+		 (policy call (> speed inhibit-warnings)))
 	(note-rejected-templates call policy template))
       ;; If we are forced to do a full call, we check to see whether the
       ;; function called is the same as the current function. If so, we

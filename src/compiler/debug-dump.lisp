@@ -498,8 +498,7 @@
 (defun compute-1-debug-function (fun var-locs)
   (declare (type clambda fun) (type hash-table var-locs))
   (let* ((dfun (dfun-from-fun fun))
-	 (actual-level
-	  (policy-debug (lexenv-policy (node-lexenv (lambda-bind fun)))))
+	 (actual-level (policy (lambda-bind fun) debug))
 	 (level (if #!+sb-dyncount *collect-dynamic-statistics*
 		    #!-sb-dyncount nil
 		    (max actual-level 2)

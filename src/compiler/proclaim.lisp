@@ -14,36 +14,15 @@
 
 (in-package "SB!C")
 
-;;; !COLD-INIT calls this twice to initialize policy, once before
-;;; any toplevel forms are executed, then again to undo any lingering
-;;; effects of toplevel DECLAIMs.
-(!begin-collecting-cold-init-forms)
-(!cold-init-forms
-  (setf *default-policy*
-	(make-policy :safety 1
-		     :speed 1
-		     :space 1
-		     :cspeed 1
-		     :brevity 1
-		     ;; Note: CMU CL had a default of 2 for DEBUG and 1 for all
-		     ;; the other qualities. SBCL uses a default of 1 for every
-		     ;; quality, because the ANSI documentation for the
-		     ;; OPTIMIZE declaration says that 1 is "the neutral
-		     ;; value", and it seems natural for the neutral value to
-		     ;; be the default.
-		     :debug 1))
-  (setf *default-interface-policy*
-	(make-policy)))
-(!defun-from-collected-cold-init-forms !set-sane-policy-defaults)
-
 ;;; A list of UNDEFINED-WARNING structures representing references to unknown
 ;;; stuff which came up in a compilation unit.
 (defvar *undefined-warnings*)
 (declaim (list *undefined-warnings*))
 
-;;; Check that Name is a valid function name, returning the name if OK, and
-;;; doing an error if not. In addition to checking for basic well-formedness,
-;;; we also check that symbol names are not NIL or the name of a special form.
+;;; Check that NAME is a valid function name, returning the name if
+;;; OK, and doing an error if not. In addition to checking for basic
+;;; well-formedness, we also check that symbol names are not NIL or
+;;; the name of a special form.
 (defun check-function-name (name)
   (typecase name
     (list
@@ -59,12 +38,12 @@
     (t
      (compiler-error "illegal function name: ~S" name))))
 
-;;; Called to do something about SETF functions that overlap with SETF
-;;; macros. Perhaps we should interact with the user to see whether
-;;; the macro should be blown away, but for now just give a warning.
-;;; Due to the weak semantics of the (SETF FUNCTION) name, we can't
-;;; assume that they aren't just naming a function (SETF FOO) for the
-;;; heck of it. NAME is already known to be well-formed.
+;;; This is called to do something about SETF functions that overlap
+;;; with SETF macros. Perhaps we should interact with the user to see
+;;; whether the macro should be blown away, but for now just give a
+;;; warning. Due to the weak semantics of the (SETF FUNCTION) name, we
+;;; can't assume that they aren't just naming a function (SETF FOO)
+;;; for the heck of it. NAME is already known to be well-formed.
 (defun note-if-setf-function-and-macro (name)
   (when (consp name)
     (when (or (info :setf :inverse name)
@@ -92,33 +71,24 @@
 ;;; defaulted from the POLICY argument.
 (declaim (ftype (function (list policy) policy) process-optimize-declaration))
 (defun process-optimize-declaration (spec policy)
-  (let ((res (copy-policy policy)))
-    (dolist (quality (cdr spec))
-      (let ((quality (if (atom quality) (list quality 3) quality)))
-	(if (and (consp (cdr quality)) (null (cddr quality))
-		 (typep (second quality) 'real) (<= 0 (second quality) 3))
-	    (let ((value (rational (second quality))))
-	      (case (first quality)
-		(speed (setf (policy-speed res) value))
-		(space (setf (policy-space res) value))
-		(safety (setf (policy-safety res) value))
-		(compilation-speed (setf (policy-cspeed res) value))
-		;; FIXME: BREVITY is an undocumented name for it,
-		;; should go away. And INHIBIT-WARNINGS is a
-		;; misleading name for it. Perhaps BREVITY would be
-		;; better. But the ideal name would have connotations
-		;; of suppressing only optimization-related notes,
-		;; which I think is the behavior. Perhaps
-		;; INHIBIT-NOTES?
-		((inhibit-warnings brevity) (setf (policy-brevity res) value))
-		((debug-info debug) (setf (policy-debug res) value))
-		(t
-		 (compiler-warning "unknown optimization quality ~S in ~S"
-				   (car quality) spec))))
-	    (compiler-warning
-	     "malformed optimization quality specifier ~S in ~S"
-	     quality spec))))
-    res))
+  (let ((result policy)) ; may have new entries pushed on it below
+    (dolist (q-and-v-or-just-q (cdr spec))
+      (multiple-value-bind (quality raw-value)
+	  (if (atom q-and-v-or-just-q)
+	      (values q-and-v-or-just-q 3)
+	      (destructuring-bind (quality raw-value) q-and-v-or-just-q
+		(values quality raw-value)))
+	(cond ((not (policy-quality-p quality))
+	       (compiler-warning "ignoring unknown optimization quality ~
+                                 ~S in ~S"
+				 quality spec))
+	      ((not (and (typep raw-value 'real) (<= 0 raw-value 3)))
+	       (compiler-warning "ignoring bad optimization value ~S in ~S"
+				 raw-value spec))
+	      (t
+	       (push (cons quality (rational raw-value))
+		     result)))))
+    result))
 
 (defun sb!xc:proclaim (form)
   (unless (consp form)
@@ -250,15 +220,7 @@
 	 (setf (info :declaration :recognized decl) t)))
       (t
        (cond ((member kind *standard-type-names*)
-	      (sb!xc:proclaim `(type . ,form))) ; FIXME: ,@ instead of . ,
+	      (sb!xc:proclaim `(type ,@form))) ; FIXME: ,@ instead of . ,
 	     ((not (info :declaration :recognized kind))
 	      (warn "unrecognized proclamation: ~S" form))))))
   (values))
-
-;;; Keep the compiler from issuing warnings about SB!C::%%DEFMACRO
-;;; when it compiles code which expands into calls to the function
-;;; before it's actually compiled the function.
-;;; 
-;;; (This can't be done in defmacro.lisp because PROCLAIM isn't
-;;; defined when defmacro.lisp is loaded.)
-#+sb-xc-host (sb!xc:proclaim '(ftype function sb!c::%%defmacro))

@@ -72,12 +72,9 @@
   #!+sb-doc
   "Invoke the signal facility on a condition formed from datum and arguments.
    If the condition is not handled, the debugger is invoked."
-  (/show0 "entering ERROR")
-  #!+sb-show
-  (unless *cold-init-complete-p*
-    (/show0 "ERROR in cold init, arguments=..")
-    #!+sb-show (dolist (argument arguments)
-		 (sb!impl::cold-print argument)))
+  (/show0 "entering ERROR, arguments=..")
+  #!+sb-show (dolist (argument arguments)
+	       (sb!impl::cold-print argument))
   (sb!kernel:infinite-error-protect
     (let ((condition (coerce-to-condition datum arguments
 					  'simple-error 'error))

@@ -32,6 +32,8 @@
   ;;	       lets us preserve distinctions which might not even exist
   ;;           on the cross-compilation host (because ANSI doesn't
   ;;	       guarantee that specialized array types exist there).
+  ;; FIXME: It's actually not clear that COERCE on non-NUMBER types
+  ;; is FOLDABLE at all. Check this.
   (movable #-sb-xc-host foldable)
   :derive-type (result-type-specifier-nth-arg 2))
 (defknown list-to-simple-string* (list) simple-string)

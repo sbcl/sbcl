@@ -920,8 +920,8 @@
 	 (constrained (function-type-p type))
 	 (table (component-failed-optimizations *component-being-compiled*))
 	 (flame (if (transform-important transform)
-		    (policy node (>= speed brevity))
-		    (policy node (> speed brevity))))
+		    (policy node (>= speed inhibit-warnings))
+		    (policy node (> speed inhibit-warnings))))
 	 (*compiler-error-context* node))
     (cond ((not (member (transform-when transform)
 			(if *byte-compiling*

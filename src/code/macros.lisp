@@ -100,9 +100,6 @@
   `(eval-when (:compile-toplevel :load-toplevel :execute)
      (sb!c::%defconstant ',name ,value ',documentation)))
 
-;;; (to avoid "undefined function" warnings when cross-compiling)
-(sb!xc:proclaim '(ftype function sb!c::%defconstant))
-
 ;;; the guts of DEFCONSTANT
 (defun sb!c::%defconstant (name value doc)
   (/show "doing %DEFCONSTANT" name value doc)

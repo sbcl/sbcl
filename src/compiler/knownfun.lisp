@@ -118,16 +118,16 @@
 
 ;;; The TRANSFORM structure represents an IR1 transform.
 (defstruct transform
-  ;; The function-type which enables this transform.
+  ;; the function-type which enables this transform
   (type (required-argument) :type ctype)
-  ;; The transformation function. Takes the Combination node and Returns a
+  ;; the transformation function. Takes the COMBINATION node and returns a
   ;; lambda, or throws out.
   (function (required-argument) :type function)
-  ;; String used in efficency notes.
+  ;; string used in efficency notes
   (note (required-argument) :type string)
-  ;; T if we should spew a failure note even if speed=brevity.
+  ;; T if we should emit a failure note even if SPEED=INHIBIT-WARNINGS.
   (important nil :type (member t nil))
-  ;; Usable for byte code, native code, or both.
+  ;; usable for byte code, native code, or both
   (when :native :type (member :byte :native :both)))
 
 (defprinter (transform) type note important when)

@@ -3262,7 +3262,8 @@
 	  ((= nargs 1) `(progn ,@args t))
 	  ((= nargs 2)
 	   `(if (,predicate ,(first args) ,(second args)) nil t))
-	  ((not (policy nil (and (>= speed space) (>= speed cspeed))))
+	  ((not (policy nil (and (>= speed space)
+				 (>= speed compilation-speed))))
 	   (values nil t))
 	  (t
 	   (let ((vars (make-gensym-list nargs)))

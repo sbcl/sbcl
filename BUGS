@@ -411,61 +411,6 @@ returning an array as first value always.
   FD-STREAM-MISC-ROUTINE is broken for large files: it says
   (THE INDEX SIZE) even though SIZE can be larger than INDEX.
 
-37:
-  In SBCL 0.6.5 (and CMU CL 18b) compiling and loading
-	(in-package :cl-user)
-	(declaim (optimize (safety 3)
-			   (debug 3)
-			   (compilation-speed 2)
-			   (space 1)
-			   (speed 2)
-			   #+nil (sb-ext:inhibit-warnings 2)))
-	(declaim (ftype (function * (values)) emptyvalues))
-	(defun emptyvalues (&rest rest) (declare (ignore rest)) (values))
-	(defstruct foo x y)
-	(defgeneric assertoid ((x t)))
-	(defmethod assertoid ((x t)) "just a placeholder")
-	(defun bar (ht)
-	  (declare (type hash-table ht))
-	  (let ((res
-	         (block blockname
-	           (progn
-	            (prog1
-			(emptyvalues)
-	              (assertoid (hash-table-count ht)))))))
-	    (unless (typep res 'foo)
-	      (locally
-	       (common-lisp-user::bad-result-from-assertive-typed-fun
-	        'bar
-	        res)))))
-  then executing
-	(bar (make-hash-table))
-  causes the failure
-	Error in KERNEL::UNDEFINED-SYMBOL-ERROR-HANDLER:
-	  the function C::%INSTANCE-TYPEP is undefined.
-  %INSTANCE-TYPEP is always supposed to be IR1-transformed away, but for
-  some reason -- the (VALUES) return value declaration? -- the optimizer is
-  confused and compiles a full call to %INSTANCE-TYPEP (which doesn't exist
-  as a function) instead.
-
-37a:
-  The %INSTANCE-TYPEP problem in bug 37 comes up also when compiling
-  and loading
-	(IN-PACKAGE :CL-USER)
-	(LOCALLY
-	  (DECLARE (OPTIMIZE (SAFETY 3) (SPEED 2) (SPACE 2)))
-	  (DECLAIM (FTYPE (FUNCTION (&REST T) (VALUES)) EMPTYVALUES))
-	  (DEFUN EMPTYVALUES (&REST REST)
-	    (DECLARE (IGNORE REST))
-	    (VALUES))
-	  (DEFSTRUCT DUMMYSTRUCT X Y)
-	  (DEFUN FROB-EMPTYVALUES (X)
-	    (LET ((RES (EMPTYVALUES X X X)))
-	      (UNLESS (TYPEP RES 'DUMMYSTRUCT)
-		'EXPECTED-RETURN-VALUE))))
-	(ASSERT (EQ (FROB-EMPTYVALUES 11) 'EXPECTED-RETURN-VALUE))
-
-
 38:
   DEFMETHOD doesn't check the syntax of &REST argument lists properly,
   accepting &REST even when it's not followed by an argument name:
@@ -762,6 +707,7 @@ Error in function C::GET-LAMBDA-TO-COMPILE:
   rightward of the correct location.
 
 65:
+  (probably related to bug #70)
   As reported by Carl Witty on submit@bugs.debian.org 1999-05-08,
   compiling this file
 (in-package "CL-USER")
@@ -858,6 +804,7 @@ Error in function C::GET-LAMBDA-TO-COMPILE:
   or at least issue a warning.
 
 70:
+  (probably related to bug #65)
   The compiler doesn't like &OPTIONAL arguments in LABELS and FLET
   forms. E.g.
     (DEFUN FIND-BEFORE (ITEM SEQUENCE &KEY (TEST #'EQL))
@@ -884,7 +831,39 @@ Error in function C::GET-LAMBDA-TO-COMPILE:
   0.6.9.x in a general cleanup of optimization policy.
 
 72:
-  (DECLAIM (OPTIMIZE ..)) doesn't work inside LOCALLY.
+  (DECLAIM (OPTIMIZE ..)) doesn't work properly inside LOCALLY forms.
+
+73:
+  PROCLAIM and DECLAIM don't recognize the ANSI abbreviated type
+  declaration syntax for user-defined types, although DECLARE does.
+  E.g.
+	(deftype foo () '(integer 3 19))
+	(defvar *foo*)
+	(declaim (foo *foo*)) ; generates warning
+	(defun foo+ (x y)
+	  (declare (foo x y)) ; works OK
+	  (+ x y))
+
+74:
+  As noted in the ANSI specification for COERCE, (COERCE 3 'COMPLEX)
+  gives a result which isn't COMPLEX. The result type optimizer
+  for COERCE doesn't know this, perhaps because it was written before
+  ANSI threw this curveball: the optimizer thinks that COERCE always
+  returns a result of the specified type. Thus while the interpreted
+  function
+     (DEFUN TRICKY (X) (TYPEP (COERCE X 'COMPLEX) 'COMPLEX))
+  returns the correct result,
+     (TRICKY 3) => NIL
+  the compiled function
+     (COMPILE 'TRICKY)
+  does not:
+     (TRICKY 3) => T
+
+75:
+  As reported by Martin Atzmueller on sbcl-devel 26 Dec 2000,
+  ANSI says that WITH-OUTPUT-TO-STRING should have a keyword
+  :ELEMENT-TYPE, but in sbcl-0.6.9 this is not defined for
+  WITH-OUTPUT-TO-STRING.
 
 
 KNOWN BUGS RELATED TO THE IR1 INTERPRETER
