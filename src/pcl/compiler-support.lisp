@@ -59,9 +59,9 @@
 
 (defvar sb-pcl::*internal-pcl-generalized-fun-name-symbols* nil)
 
-(defmacro define-internal-pcl-function-name-syntax (name &rest rest)
+(defmacro define-internal-pcl-function-name-syntax (name &body body)
   `(progn
-     (define-function-name-syntax ,name ,@rest)
+     (define-function-name-syntax ,name ,@body)
      (pushnew ',name sb-pcl::*internal-pcl-generalized-fun-name-symbols*)))
 
 (define-internal-pcl-function-name-syntax sb-pcl::class-predicate (list)
@@ -78,6 +78,15 @@
 		 (symbolp slot)
 		 (symbolp class))
 	(values t slot)))))
+
+(define-internal-pcl-function-name-syntax sb-pcl::fast-method (list)
+  (valid-function-name-p (cadr list)))
+
+;;; FIXME: I don't like this name, because though it looks nice and
+;;; internal, it is in fact CL:METHOD, and as such has a slight
+;;; implication of supportedness.
+(define-internal-pcl-function-name-syntax sb-pcl::method (list)
+  (valid-function-name-p (cadr list)))
 
 (defun sb-pcl::random-documentation (name type)
   (cdr (assoc type (info :random-documentation :stuff name))))

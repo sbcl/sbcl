@@ -1044,7 +1044,7 @@
 (defun name-method-lambda (method-lambda)
   (let ((method-name (body-method-name (cddr method-lambda))))
     (if method-name
-	`(named-lambda ,method-name ,(rest method-lambda))
+	`(named-lambda (method ,method-name) ,(rest method-lambda))
 	method-lambda)))
 
 (defun make-method-initargs-form-internal (method-lambda initargs env)
@@ -1093,7 +1093,8 @@
 	:fast-function
 	(,(if (body-method-name body) 'named-lambda 'lambda)
 	  ,@(when (body-method-name body)
-		  (list (body-method-name body))) ; function name
+                  ;; function name
+		  (list (cons 'fast-method (body-method-name body))))
 	  (.pv-cell. .next-method-call. ,@args+rest-arg) ; function args
 	  ;; body of the function
 	  (declare (ignorable .pv-cell. .next-method-call.))

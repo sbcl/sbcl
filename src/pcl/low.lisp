@@ -165,13 +165,6 @@
 (defmacro std-instance-class (instance)
   `(wrapper-class* (std-instance-wrapper ,instance)))
 
-;;; When given a function should give this function the name
-;;; NEW-NAME. Note that NEW-NAME is sometimes a list. Some lisps
-;;; get the upset in the tummy when they start thinking about
-;;; functions which have lists as names. To deal with that there is
-;;; SET-FUN-NAME-INTERN which takes a list spec for a function
-;;; name and turns it into a symbol if need be.
-;;;
 ;;; When given a funcallable instance, SET-FUN-NAME *must* side-effect
 ;;; that FIN to give it the name. When given any other kind of
 ;;; function SET-FUN-NAME is allowed to return a new function which is
@@ -180,51 +173,25 @@
 ;;; In all cases, SET-FUN-NAME must return the new (or same)
 ;;; function. (Unlike other functions to set stuff, it does not return
 ;;; the new value.)
-(defun set-fun-name (fcn new-name)
+(defun set-fun-name (fun new-name)
   #+sb-doc
   "Set the name of a compiled function object. Return the function."
   (declare (special *boot-state* *the-class-standard-generic-function*))
-  (cond ((symbolp fcn)
-	 (set-fun-name (symbol-function fcn) new-name))
-	((funcallable-instance-p fcn)
-	 (if (if (eq *boot-state* 'complete)
-		 (typep fcn 'generic-function)
-		 (eq (class-of fcn) *the-class-standard-generic-function*))
-	     (setf (%funcallable-instance-info fcn 1) new-name)
-	     (bug "unanticipated function type"))
-	 fcn)
-	(t
-	 ;; pw-- This seems wrong and causes trouble. Tests show
-	 ;; that loading CL-HTTP resulted in ~5400 closures being
-	 ;; passed through this code of which ~4000 of them pointed
-	 ;; to but 16 closure-functions, including 1015 each of
-	 ;; DEFUN MAKE-OPTIMIZED-STD-WRITER-METHOD-FUNCTION
-	 ;; DEFUN MAKE-OPTIMIZED-STD-READER-METHOD-FUNCTION
-	 ;; DEFUN MAKE-OPTIMIZED-STD-BOUNDP-METHOD-FUNCTION.
-	 ;; Since the actual functions have been moved by PURIFY
-	 ;; to memory not seen by GC, changing a pointer there
-	 ;; not only clobbers the last change but leaves a dangling
-	 ;; pointer invalid  after the next GC. Comments in low.lisp
-	 ;; indicate this code need do nothing. Setting the
-	 ;; function-name to NIL loses some info, and not changing
-	 ;; it loses some info of potential hacking value. So,
-	 ;; lets not do this...
-	 #+nil
-	 (let ((header (%closure-fun fcn)))
-	   (setf (%simple-fun-name header) new-name))
-
-	 ;; XXX Maybe add better scheme here someday.
-	 fcn)))
-
-(defun intern-fun-name (name)
-  (cond ((symbolp name) name)
-	((listp name)
-	 (let ((*package* *pcl-package*)
-	       (*print-case* :upcase)
-	       (*print-pretty* nil)
-	       (*print-gensym* t))
-	   (format-symbol *pcl-package* "~S" name)))))
-
+  (when (valid-function-name-p fun)
+    (setq fun (fdefinition fun)))
+  (when (funcallable-instance-p fun)
+    (if (if (eq *boot-state* 'complete)
+		 (typep fun 'generic-function)
+		 (eq (class-of fun) *the-class-standard-generic-function*))
+	     (setf (%funcallable-instance-info fun 1) new-name)
+	     (bug "unanticipated function type")))
+  ;; Fixup name-to-function mappings in cases where the function
+  ;; hasn't been defined by DEFUN.  (FIXME: is this right?  This logic
+  ;; comes from CMUCL).  -- CSR, 2004-12-31
+  (when (and (consp new-name)
+             (member (car new-name) '(method fast-method slot-accessor)))
+    (setf (fdefinition new-name) fun))
+  fun)
 
 ;;; FIXME: probably no longer needed after init
 (defmacro precompile-random-code-segments (&optional system)

@@ -436,23 +436,15 @@ bootstrapping.
 			       specializers))
 	       (mname `(,(if (eq (cadr initargs-form) :function)
 			     'method 'fast-method)
-			,name ,@qualifiers ,specls))
-	       (mname-sym (let ((*print-pretty* nil)
-				;; (We bind *PACKAGE* to KEYWORD here
-				;; as a way to force symbols to be
-				;; printed with explicit package
-				;; prefixes.)
-				(target *package*)
-				(*package* *keyword-package*))
-			    (format-symbol target "~S" mname))))
+			,name ,@qualifiers ,specls)))
 	  `(progn
-	     (defun ,mname-sym ,(cadr fn-lambda)
+	     (defun ,mname ,(cadr fn-lambda)
 	       ,@(cddr fn-lambda))
 	     ,(make-defmethod-form-internal
 	       name qualifiers `',specls
 	       unspecialized-lambda-list method-class-name
 	       `(list* ,(cadr initargs-form)
-		       #',mname-sym
+		       #',mname
 		       ,@(cdddr initargs-form))
 	       pv-table-symbol)))
 	(make-defmethod-form-internal
@@ -1437,20 +1429,7 @@ bootstrapping.
 	(when mf
 	  (setq mf (set-fun-name mf method-spec)))
 	(when mff
-	  (let ((name `(,(or (get (car method-spec) 'fast-sym)
-			     (setf (get (car method-spec) 'fast-sym)
-				   ;; KLUDGE: If we're going to be
-				   ;; interning private symbols in our
-				   ;; a this way, it would be cleanest
-				   ;; to use a separate package
-				   ;; %PCL-PRIVATE or something, and
-				   ;; failing that, to use a special
-				   ;; symbol prefix denoting privateness.
-				   ;; -- WHN 19991201
-				   (format-symbol *pcl-package*
-						  "FAST-~A" 
-						  (car method-spec))))
-			,@(cdr method-spec))))
+	  (let ((name `(fast-method ,@(cdr method-spec))))
 	    (set-fun-name mff name)
 	    (unless mf
 	      (set-mf-property :name name)))))
@@ -2311,11 +2290,10 @@ bootstrapping.
 	      gf (method-generic-function method)
 	      temp (and gf (generic-function-name gf))
 	      name (if temp
-		       (intern-fun-name
-			 (make-method-spec temp
-					   (method-qualifiers method)
-					   (unparse-specializers
-					     (method-specializers method))))
+                       (make-method-spec temp
+                                         (method-qualifiers method)
+                                         (unparse-specializers
+                                          (method-specializers method)))
 		       (make-symbol (format nil "~S" method))))
 	(multiple-value-bind (gf-spec quals specls)
 	    (parse-defmethod spec)
@@ -2329,9 +2307,8 @@ bootstrapping.
 		 (and
 		   (setq method (get-method gf quals specls errorp))
 		   (setq name
-			 (intern-fun-name (make-method-spec gf-spec
-							    quals
-							    specls))))))))
+                         (make-method-spec
+                          gf-spec quals (unparse-specializers specls))))))))
     (values gf method name)))
 
 (defun extract-parameters (specialized-lambda-list)
