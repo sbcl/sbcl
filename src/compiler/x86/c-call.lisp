@@ -199,41 +199,33 @@
   (:args (function :scs (sap-reg))
 	 (args :more t))
   (:results (results :more t))
-  ;; eax is already wired
-  (:temporary (:sc unsigned-reg :offset ecx-offset) ecx)
-  (:temporary (:sc unsigned-reg :offset edx-offset) edx)
+  (:temporary (:sc unsigned-reg :offset eax-offset
+		   :from :eval :to :result) eax)
+  (:temporary (:sc unsigned-reg :offset ecx-offset
+		   :from :eval :to :result) ecx)
+  (:temporary (:sc unsigned-reg :offset edx-offset
+		   :from :eval :to :result) edx)
   (:node-var node)
   (:vop-var vop)
   (:save-p t)
   (:ignore args ecx edx)
   (:generator 0
     (cond ((policy node (> space speed))
-	   (move eax-tn function)
+	   (move eax function)
 	   (inst call (make-fixup (extern-alien-name "call_into_c") :foreign)))
 	  (t
 	   ;; Setup the NPX for C; all the FP registers need to be
 	   ;; empty; pop them all.
-	   (inst fstp fr0-tn)
-	   (inst fstp fr0-tn)
-	   (inst fstp fr0-tn)
-	   (inst fstp fr0-tn)
-	   (inst fstp fr0-tn)
-	   (inst fstp fr0-tn)
-	   (inst fstp fr0-tn)
-	   (inst fstp fr0-tn)
+	   (dotimes (i 8)
+	     (inst fstp fr0-tn))
 
 	   (inst call function)
 	   ;; To give the debugger a clue. XX not really internal-error?
 	   (note-this-location vop :internal-error)
 
-	   ;; Restore the NPX for lisp.
-	   (inst fldz) ; insure no regs are empty
-	   (inst fldz)
-	   (inst fldz)
-	   (inst fldz)
-	   (inst fldz)
-	   (inst fldz)
-	   (inst fldz)
+	   ;; Restore the NPX for lisp; ensure no regs are empty
+	   (dotimes (i 7)
+	     (inst fldz))
 
 	   (if (and results
 		    (location= (tn-ref-tn results) fr0-tn))
