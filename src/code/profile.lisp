@@ -47,7 +47,11 @@
 ;;; We associate a PROFILE-INFO structure with each profiled function
 ;;; name. This holds the functions that we call to manipulate the
 ;;; closure which implements the encapsulation.
-(defvar *profiled-fun-name->info* (make-hash-table))
+(defvar *profiled-fun-name->info*
+  (make-hash-table
+   ;; EQL testing isn't good enough for generalized function names
+   ;; like (SETF FOO).
+   :test 'equal))
 (defstruct (profile-info (:copier nil))
   (name              (missing-arg) :read-only t)
   (encapsulated-fun  (missing-arg) :type function :read-only t)

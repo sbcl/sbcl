@@ -32,7 +32,7 @@
 	  (*break-on-signals* nil))
       (when (typep condition old-bos)
 	(/noshow0 "doing BREAK in because of *BREAK-ON-SIGNALS*")
-	(break "~A~%BREAK was entered because of *BREAK-ON-SIGNALS* (now NIL)."
+	(break "~A~%BREAK was entered because of *BREAK-ON-SIGNALS* (now rebound to NIL)."
 	       condition)))
     (loop
       (unless *handler-clusters*

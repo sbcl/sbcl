@@ -397,16 +397,16 @@
                  (check-for-circularity object t)
                ;; initialization of the circulation detect noise ...
 	       (if (eq initiate :initiate)
-                 (let ((*circularity-hash-table*
-			 (make-hash-table :test 'eq)))
-                   (check-it (make-broadcast-stream))
-                   (let ((*circularity-counter* 0))
-                     (check-it stream)))
-                 ;; otherwise
-                 (if marker
-                   (when (handle-circularity marker stream)
-                     (print-it stream))
-                   (print-it stream))))))
+		   (let ((*circularity-hash-table*
+			  (make-hash-table :test 'eq)))
+		     (check-it (make-broadcast-stream))
+		     (let ((*circularity-counter* 0))
+		       (check-it stream)))
+		   ;; otherwise
+		   (if marker
+		       (when (handle-circularity marker stream)
+			 (print-it stream))
+		       (print-it stream))))))
     (cond (;; Maybe we don't need to bother with circularity detection.
 	   (or (not *print-circle*)
 	       (uniquely-identified-by-print-p object))
@@ -682,7 +682,6 @@
 	      :initial-element 36))
 (declaim (type (simple-array (unsigned-byte 8) (#.char-code-limit))
 	       *digit-bases*))
-
 (dotimes (i 36)
   (let ((char (digit-char i 36)))
     (setf (aref *digit-bases* (char-code char)) i)))
@@ -830,6 +829,9 @@
       (return t)
 
      MARKER ; number marker in a numeric number...
+      ;; ("What," you may ask, "is a 'number marker'?" It's something
+      ;; that a conforming implementation might use in number syntax.
+      ;; See ANSI 2.3.1.1 "Potential Numbers as Tokens".)
       (when (test letter) (advance OTHER nil))
       (go DIGIT))))
 

@@ -15,7 +15,7 @@
 
 (defun sb!xc:special-operator-p (symbol)
   #!+sb-doc
-  "If the symbol globally names a special form, returns T, otherwise NIL."
+  "If the symbol globally names a special form, return T, otherwise NIL."
   (declare (symbol symbol))
   (eq (info :function :kind symbol) :special-form))
 
@@ -31,7 +31,7 @@
 (declaim (ftype (function (t &optional (or null sb!c::lexenv))) sb!xc:macroexpand-1))
 (defun sb!xc:macroexpand-1 (form &optional env)
   #!+sb-doc
-  "If form is a macro (or symbol macro), expands it once. Returns two values,
+  "If form is a macro (or symbol macro), expand it once. Return two values,
    the expanded form and a T-or-NIL flag indicating whether the form was, in
    fact, a macro. ENV is the lexical environment to expand in, which defaults
    to the null environment."
