@@ -2,4 +2,4 @@ MODULE=sb-introspect
 include ../vanilla-module.mk
 
 test::
-	true
+	$(SBCL) --disable-debugger --load test-driver.lisp
