@@ -186,12 +186,12 @@
 	  (res home))))
     (res)))
 
-;;; If FUN is not already in COMPONENT, just return that component.
-;;; Otherwise, move the code for FUN and all functions it physically
-;;; depends on (either because of calls or because of closure
-;;; relationships) into COMPONENT, or possibly into another COMPONENT
-;;; that we find to be related. Return whatever COMPONENT we actually
-;;; merged into.
+;;; If CLAMBDA is not already in COMPONENT, just return that
+;;; component. Otherwise, move the code for CLAMBDA and all lambdas it
+;;; physically depends on (either because of calls or because of
+;;; closure relationships) into COMPONENT, or possibly into another
+;;; COMPONENT that we find to be related. Return whatever COMPONENT we
+;;; actually merged into.
 ;;;
 ;;; (Note: The analogous CMU CL code only scavenged call-based
 ;;; dependencies, not closure dependencies. That seems to've been by
@@ -211,16 +211,16 @@
 ;;; unreachable) because if the return is unreachable it (and its
 ;;; successor link) will be deleted in the post-deletion pass.
 ;;;
-;;; We then do a FIND-DFO-AUX starting at the head of FUN. If this
+;;; We then do a FIND-DFO-AUX starting at the head of CLAMBDA. If this
 ;;; flow-graph walk encounters another component (which can only
 ;;; happen due to a non-local exit), then we move code into that
 ;;; component instead. We then recurse on all functions called from
-;;; FUN, moving code into whichever component the preceding call
+;;; CLAMBDA, moving code into whichever component the preceding call
 ;;; returned.
 ;;;
-;;; If FUN is in the initial component, but the BLOCK-FLAG is set in
-;;; the bind block, then we just return COMPONENT, since we must have
-;;; already reached this function in the current walk (or the
+;;; If CLAMBDA is in the initial component, but the BLOCK-FLAG is set
+;;; in the bind block, then we just return COMPONENT, since we must
+;;; have already reached this function in the current walk (or the
 ;;; component would have been changed).
 ;;;
 ;;; If the function is an XEP, then we also walk all functions that
@@ -229,11 +229,12 @@
 ;;; ensures that conversion of a full call to a local call won't
 ;;; result in a need to join components, since the components will
 ;;; already be one.
-(defun dfo-scavenge-dependency-graph (fun component)
-  (declare (type clambda fun) (type component component))
-  (let* ((bind-block (node-block (lambda-bind fun)))
+(defun dfo-scavenge-dependency-graph (clambda component)
+  (declare (type clambda clambda) (type component component))
+  (assert (not (eql (lambda-kind clambda) :deleted)))
+  (let* ((bind-block (node-block (lambda-bind clambda)))
 	 (old-lambda-component (block-component bind-block))
-	 (return (lambda-return fun)))
+	 (return (lambda-return clambda)))
     (cond
      ((eq old-lambda-component component)
       component)
@@ -243,9 +244,9 @@
      ((block-flag bind-block)
       component)
      (t
-      (push fun (component-lambdas component))
+      (push clambda (component-lambdas component))
       (setf (component-lambdas old-lambda-component)
-	    (delete fun (component-lambdas old-lambda-component)))
+	    (delete clambda (component-lambdas old-lambda-component)))
       (link-blocks (component-head component) bind-block)
       (unlink-blocks (component-head old-lambda-component) bind-block)
       (when return
@@ -255,23 +256,24 @@
       (let ((res (find-initial-dfo-aux bind-block component)))
 	(declare (type component res))
 	;; Scavenge call relationships.
-	(let ((calls (if (eq (functional-kind fun) :external)
-			 (append (find-reference-funs fun)
-				 (lambda-calls fun))
-			 (lambda-calls fun))))
+	(let ((calls (if (eq (lambda-kind clambda) :external)
+			 (append (find-reference-funs clambda)
+				 (lambda-calls clambda))
+			 (lambda-calls clambda))))
 	  (dolist (call calls)
-	    (setf res (dfo-scavenge-dependency-graph call res))))
+	    (let ((call-home (lambda-home call)))
+	      (setf res (dfo-scavenge-dependency-graph call-home res)))))
 	;; TO DO: Scavenge closure-over relationships.
 	(values)
 	;; Voila.
 	res)))))
 
-;;; Return true if FUN either is an XEP or has EXITS to some of its
+;;; Return true if CLAMBDA either is an XEP or has EXITS to some of its
 ;;; ENTRIES.
-(defun has-xep-or-nlx (fun)
-  (declare (type clambda fun))
-  (or (eq (functional-kind fun) :external)
-      (let ((entries (lambda-entries fun)))
+(defun has-xep-or-nlx (clambda)
+  (declare (type clambda clambda))
+  (or (eq (functional-kind clambda) :external)
+      (let ((entries (lambda-entries clambda)))
 	(and entries
 	     (find-if #'entry-exits entries)))))
 
