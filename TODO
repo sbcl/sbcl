@@ -6,8 +6,8 @@ for 0.7.0:
 	EVAL/EVAL-WHEN/%COMPILE/DEFUN/DEFSTRUCT cleanup:
 * more renaming in global external names:
 	** reserved DO-FOO-style names for iteration macros
-	** finished s/FUNCTION/FUN/
 	** s/VARIABLE/VAR/
+	** s/ARGUMENT/ARG/
 	** perhaps s/DEF-FROB/DEF/ or s/DEF-FROB/DEFINE/
 * Perhaps rename "cold" stuff (e.g. SB-COLD and src/cold/) to "boot".
 * pending patches and bug reports that go in (or else get handled
@@ -26,6 +26,9 @@ for early 0.7.x:
 	besides CLISPiosyncrasies, I'm reasonably motivated to do it.
 * urgent EVAL/EVAL-WHEN/%COMPILE/DEFUN/DEFSTRUCT cleanup:
 	** made inlining DEFUN inside MACROLET work again
+	** (also, while working on INLINE anyway, it should be easy
+		to flush the old MAYBE-INLINE cruft entirely, 
+		including e.g. on the man page)
 	** fixed bug 137 (more)
 * faster bootstrapping (both make.sh and slam.sh)
 	** added mechanisms for automatically finding dead code, and

@@ -75,13 +75,12 @@
 
 ;;; In SBCL, as in CMU CL before it, the environment is represented
 ;;; with a structure that holds alists for the functional things,
-;;; variables, blocks, etc.
-;;; Except for SYMBOL-MACROLET, only the SB-C::LEXENV-FUNCTIONS slot
-;;; is relevant. It holds: Alist (Name . What), where What is either
-;;; a functional (a local function) or a list (MACRO . <function>) (a
-;;; local macro, with the specifier expander.) Note that Name may be a
-;;; (SETF <name>) function.
-;;; Accessors are defined below, eg (ENV-WALK-FUNCTION ENV).
+;;; variables, blocks, etc. Except for SYMBOL-MACROLET, only the
+;;; SB-C::LEXENV-FUNS slot is relevant. It holds: Alist (Name . What),
+;;; where What is either a functional (a local function) or a list
+;;; (MACRO . <function>) (a local macro, with the specifier expander.)
+;;; Note that Name may be a (SETF <name>) function. Accessors are
+;;; defined below, eg (ENV-WALK-FUNCTION ENV).
 ;;;
 ;;; If WITH-AUGMENTED-ENVIRONMENT is called from WALKER-ENVIRONMENT-BIND
 ;;; this code hides the WALKER version of an environment
@@ -138,7 +137,7 @@
   (declare (type function bogo-fun))
   (funcall bogo-fun *bogo-fun-magic-tag*))
    
-(defun with-augmented-environment-internal (env functions macros)
+(defun with-augmented-environment-internal (env funs macros)
   ;; Note: In order to record the correct function definition, we
   ;; would have to create an interpreted closure, but the
   ;; WITH-NEW-DEFINITION macro down below makes no distinction between
@@ -149,28 +148,29 @@
   (let ((lexenv (sb-kernel::coerce-to-lexenv env)))
     (sb-c::make-lexenv
       :default lexenv
-      :functions
-      (append (mapcar (lambda (f)
-			(cons (car f) (sb-c::make-functional :lexenv lexenv)))
-		      functions)
-	      (mapcar (lambda (m)
-			(list* (car m)
-			       'sb-c::macro
-                               (if (eq (car m) *key-to-walker-environment*)
-				   (walker-info-to-bogo-fun (cadr m))
-				   (coerce (cadr m) 'function))))
-                      macros)))))
+      :funs (append (mapcar (lambda (f)
+			      (cons (car f)
+				    (sb-c::make-functional :lexenv lexenv)))
+			    funs)
+		    (mapcar (lambda (m)
+			      (list* (car m)
+				     'sb-c::macro
+				     (if (eq (car m)
+					     *key-to-walker-environment*)
+					 (walker-info-to-bogo-fun (cadr m))
+					 (coerce (cadr m) 'function))))
+			    macros)))))
 
 (defun environment-function (env fn)
   (when env
-    (let ((entry (assoc fn (sb-c::lexenv-functions env) :test #'equal)))
+    (let ((entry (assoc fn (sb-c::lexenv-funs env) :test #'equal)))
       (and entry
 	   (sb-c::functional-p (cdr entry))
 	   (cdr entry)))))
 
 (defun environment-macro (env macro)
   (when env
-    (let ((entry (assoc macro (sb-c::lexenv-functions env) :test #'eq)))
+    (let ((entry (assoc macro (sb-c::lexenv-funs env) :test #'eq)))
       (and entry
 	   (eq (cadr entry) 'sb-c::macro)
            (if (eq macro *key-to-walker-environment*)

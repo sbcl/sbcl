@@ -31,7 +31,7 @@
 
 ;;; FIXME: old CMU CL representation follows:
 ;;;    Compiled debug variables are in a packed binary representation in the
-;;; DEBUG-FUN-VARIABLES:
+;;; DEBUG-FUN-VARS:
 ;;;    single byte of boolean flags:
 ;;;	uninterned name
 ;;;	   packaged name
@@ -118,7 +118,7 @@
   ;;   * the variable ID, when it has one
   ;;   * SC-offset of primary location, if it has one
   ;;   * SC-offset of save location, if it has one
-  (variables nil :type (or simple-vector null))
+  (vars nil :type (or simple-vector null))
   ;; a vector of the packed binary representation of the
   ;; COMPILED-DEBUG-BLOCKs in this function, in the order that the
   ;; blocks were emitted. The first block is the start of the

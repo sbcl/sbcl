@@ -423,36 +423,36 @@ code to be loaded.
 (defvar *loop-macro-environment*)
 
 ;;; This holds variable names specified with the USING clause.
-;;; See LOOP-NAMED-VARIABLE.
-(defvar *loop-named-variables*)
+;;; See LOOP-NAMED-VAR.
+(defvar *loop-named-vars*)
 
 ;;; LETlist-like list being accumulated for one group of parallel bindings.
-(defvar *loop-variables*)
+(defvar *loop-vars*)
 
-;;; list of declarations being accumulated in parallel with *LOOP-VARIABLES*
+;;; list of declarations being accumulated in parallel with *LOOP-VARS*
 (defvar *loop-declarations*)
 
 ;;; This is used by LOOP for destructuring binding, if it is doing
-;;; that itself. See LOOP-MAKE-VARIABLE.
+;;; that itself. See LOOP-MAKE-VAR.
 (defvar *loop-desetq-crocks*)
 
 ;;; list of wrapping forms, innermost first, which go immediately
 ;;; inside the current set of parallel bindings being accumulated in
-;;; *LOOP-VARIABLES*. The wrappers are appended onto a body. E.g.,
+;;; *LOOP-VARS*. The wrappers are appended onto a body. E.g.,
 ;;; this list could conceivably have as its value
 ;;;   ((WITH-OPEN-FILE (G0001 G0002 ...))),
-;;; with G0002 being one of the bindings in *LOOP-VARIABLES* (This is
+;;; with G0002 being one of the bindings in *LOOP-VARS* (This is
 ;;; why the wrappers go inside of the variable bindings).
 (defvar *loop-wrappers*)
 
-;;; This accumulates lists of previous values of *LOOP-VARIABLES* and
+;;; This accumulates lists of previous values of *LOOP-VARS* and
 ;;; the other lists above, for each new nesting of bindings. See
 ;;; LOOP-BIND-BLOCK.
 (defvar *loop-bind-stack*)
 
 ;;; This is simply a list of LOOP iteration variables, used for
 ;;; checking for duplications.
-(defvar *loop-iteration-variables*)
+(defvar *loop-iteration-vars*)
 
 ;;; list of prologue forms of the loop, accumulated in reverse order
 (defvar *loop-prologue*)
@@ -490,14 +490,14 @@ code to be loaded.
 ;;; If not NIL, this is a temporary bound around the loop for holding
 ;;; the temporary value for "it" in things like "when (f) collect it".
 ;;; It may be used as a supertemporary by some other things.
-(defvar *loop-when-it-variable*)
+(defvar *loop-when-it-var*)
 
 ;;; Sometimes we decide we need to fold together parts of the loop,
 ;;; but some part of the generated iteration code is different for the
 ;;; first and remaining iterations. This variable will be the
 ;;; temporary which is the flag used in the loop to tell whether we
 ;;; are in the first or remaining iterations.
-(defvar *loop-never-stepped-variable*)
+(defvar *loop-never-stepped-var*)
 
 ;;; list of all the value-accumulation descriptor structures in the
 ;;; loop. See LOOP-GET-COLLECTION-INFO.
@@ -524,7 +524,7 @@ code to be loaded.
 (defvar *loop-duplicate-code*
 	nil)
 
-(defvar *loop-iteration-flag-variable*
+(defvar *loop-iteration-flag-var*
 	(make-symbol "LOOP-NOT-FIRST-TIME"))
 
 (defun loop-code-duplication-threshold (env)
@@ -613,7 +613,7 @@ code to be loaded.
 		   (push (pop rafter) then)
 		   (when (eq rbefore (cdr lastdiff)) (return)))
 		 (unless flagvar
-		   (push `(setq ,(setq flagvar *loop-iteration-flag-variable*)
+		   (push `(setq ,(setq flagvar *loop-iteration-flag-var*)
 				t)
 			 else))
 		 (push `(if ,flagvar ,(pify (psimp then)) ,(pify (psimp else)))
@@ -772,9 +772,9 @@ code to be loaded.
 		       *loop-universe*)
   (let ((*loop-original-source-code* *loop-source-code*)
 	(*loop-source-context* nil)
-	(*loop-iteration-variables* nil)
-	(*loop-variables* nil)
-	(*loop-named-variables* nil)
+	(*loop-iteration-vars* nil)
+	(*loop-vars* nil)
+	(*loop-named-vars* nil)
 	(*loop-declarations* nil)
 	(*loop-desetq-crocks* nil)
 	(*loop-bind-stack* nil)
@@ -788,8 +788,8 @@ code to be loaded.
 	(*loop-after-epilogue* nil)
 	(*loop-final-value-culprit* nil)
 	(*loop-inside-conditional* nil)
-	(*loop-when-it-variable* nil)
-	(*loop-never-stepped-variable* nil)
+	(*loop-when-it-var* nil)
+	(*loop-never-stepped-var* nil)
 	(*loop-names* nil)
 	(*loop-collection-cruft* nil))
     (loop-iteration-driver)
@@ -976,58 +976,57 @@ code to be loaded.
 ;;;; loop variables
 
 (defun loop-bind-block ()
-  (when (or *loop-variables* *loop-declarations* *loop-wrappers*)
-    (push (list (nreverse *loop-variables*)
+  (when (or *loop-vars* *loop-declarations* *loop-wrappers*)
+    (push (list (nreverse *loop-vars*)
 		*loop-declarations*
 		*loop-desetq-crocks*
 		*loop-wrappers*)
 	  *loop-bind-stack*)
-    (setq *loop-variables* nil
+    (setq *loop-vars* nil
 	  *loop-declarations* nil
 	  *loop-desetq-crocks* nil
 	  *loop-wrappers* nil)))
 
-(defun loop-make-variable (name initialization dtype
-			   &optional iteration-variable-p)
+(defun loop-make-var (name initialization dtype &optional iteration-var-p)
   (cond ((null name)
 	 (cond ((not (null initialization))
 		(push (list (setq name (gensym "LOOP-IGNORE-"))
 			    initialization)
-		      *loop-variables*)
+		      *loop-vars*)
 		(push `(ignore ,name) *loop-declarations*))))
 	((atom name)
-	 (cond (iteration-variable-p
-		(if (member name *loop-iteration-variables*)
+	 (cond (iteration-var-p
+		(if (member name *loop-iteration-vars*)
 		    (loop-error "duplicated LOOP iteration variable ~S" name)
-		    (push name *loop-iteration-variables*)))
-	       ((assoc name *loop-variables*)
+		    (push name *loop-iteration-vars*)))
+	       ((assoc name *loop-vars*)
 		(loop-error "duplicated variable ~S in LOOP parallel binding"
 			    name)))
 	 (unless (symbolp name)
 	   (loop-error "bad variable ~S somewhere in LOOP" name))
-	 (loop-declare-variable name dtype)
+	 (loop-declare-var name dtype)
 	 ;; We use ASSOC on this list to check for duplications (above),
 	 ;; so don't optimize out this list:
 	 (push (list name (or initialization (loop-typed-init dtype)))
-	       *loop-variables*))
+	       *loop-vars*))
 	(initialization
 	 (let ((newvar (gensym "LOOP-DESTRUCTURE-")))
-           (loop-declare-variable name dtype)
-           (push (list newvar initialization) *loop-variables*)
+           (loop-declare-var name dtype)
+           (push (list newvar initialization) *loop-vars*)
            ;; *LOOP-DESETQ-CROCKS* gathered in reverse order.
            (setq *loop-desetq-crocks*
                  (list* name newvar *loop-desetq-crocks*))))
 	(t (let ((tcar nil) (tcdr nil))
 	     (if (atom dtype) (setq tcar (setq tcdr dtype))
 		 (setq tcar (car dtype) tcdr (cdr dtype)))
-	     (loop-make-variable (car name) nil tcar iteration-variable-p)
-	     (loop-make-variable (cdr name) nil tcdr iteration-variable-p))))
+	     (loop-make-var (car name) nil tcar iteration-var-p)
+	     (loop-make-var (cdr name) nil tcdr iteration-var-p))))
   name)
 
-(defun loop-make-iteration-variable (name initialization dtype)
-  (loop-make-variable name initialization dtype t))
+(defun loop-make-iteration-var (name initialization dtype)
+  (loop-make-var name initialization dtype t))
 
-(defun loop-declare-variable (name dtype)
+(defun loop-declare-var (name dtype)
   (cond ((or (null name) (null dtype) (eq dtype t)) nil)
 	((symbolp name)
 	 (unless (sb!xc:subtypep t dtype)
@@ -1038,16 +1037,16 @@ code to be loaded.
 	     (push `(type ,dtype ,name) *loop-declarations*))))
 	((consp name)
 	 (cond ((consp dtype)
-		(loop-declare-variable (car name) (car dtype))
-		(loop-declare-variable (cdr name) (cdr dtype)))
-	       (t (loop-declare-variable (car name) dtype)
-		  (loop-declare-variable (cdr name) dtype))))
+		(loop-declare-var (car name) (car dtype))
+		(loop-declare-var (cdr name) (cdr dtype)))
+	       (t (loop-declare-var (car name) dtype)
+		  (loop-declare-var (cdr name) dtype))))
 	(t (error "invalid LOOP variable passed in: ~S" name))))
 
 (defun loop-maybe-bind-form (form data-type)
   (if (loop-constantp form)
       form
-      (loop-make-variable (gensym "LOOP-BIND-") form data-type)))
+      (loop-make-var (gensym "LOOP-BIND-") form data-type)))
 
 (defun loop-do-if (for negatep)
   (let ((form (loop-get-form)) (*loop-inside-conditional* t) (it-p nil))
@@ -1064,7 +1063,7 @@ code to be loaded.
 			    (setq *loop-source-code*
 				  (cons (or it-p
 					    (setq it-p
-						  (loop-when-it-variable)))
+						  (loop-when-it-var)))
 					(cdr *loop-source-code*))))
 			  (cond ((or (not (setq data (loop-lookup-keyword
 						       key (loop-universe-keywords *loop-universe*))))
@@ -1191,7 +1190,7 @@ code to be loaded.
     (let ((tempvars (loop-collector-tempvars lc)))
       (unless tempvars
 	(setf (loop-collector-tempvars lc)
-	      (setq tempvars (list (loop-make-variable
+	      (setq tempvars (list (loop-make-var
 				     (or (loop-collector-name lc)
 					 (gensym "LOOP-SUM-"))
 				     nil (loop-collector-dtype lc)))))
@@ -1242,8 +1241,8 @@ code to be loaded.
 ;;; Under ANSI this is not permitted to appear under conditionalization.
 (defun loop-do-thereis (restrictive)
   (when restrictive (loop-disallow-conditional))
-  (loop-emit-body `(when (setq ,(loop-when-it-variable) ,(loop-get-form))
-		     ,(loop-construct-return *loop-when-it-variable*))))
+  (loop-emit-body `(when (setq ,(loop-when-it-var) ,(loop-get-form))
+		     ,(loop-construct-return *loop-when-it-var*))))
 
 (defun loop-do-while (negate kwd &aux (form (loop-get-form)))
   (loop-disallow-conditional kwd)
@@ -1258,7 +1257,7 @@ code to be loaded.
 		     (loop-pop-source)
 		     (loop-get-form))
 		    (t nil)))
-    (loop-make-variable var val dtype)
+    (loop-make-var var val dtype)
     (if (loop-tequal (car *loop-source-code*) :and)
 	(loop-pop-source)
 	(return (loop-bind-block)))))
@@ -1361,19 +1360,17 @@ code to be loaded.
     (multiple-value-bind (number constantp value)
 	(loop-constant-fold-if-possible form type)
       (cond ((and constantp (<= value 1)) `(t () () () ,(<= value 0) () () ()))
-	    (t (let ((var (loop-make-variable (gensym "LOOP-REPEAT-")
-					      number
-					      type)))
+	    (t (let ((var (loop-make-var (gensym "LOOP-REPEAT-") number type)))
 		 (if constantp
 		     `((not (plusp (setq ,var (1- ,var))))
 		       () () () () () () ())
 		     `((minusp (setq ,var (1- ,var)))
 		       () () ()))))))))
 
-(defun loop-when-it-variable ()
-  (or *loop-when-it-variable*
-      (setq *loop-when-it-variable*
-	    (loop-make-variable (gensym "LOOP-IT-") nil nil))))
+(defun loop-when-it-var ()
+  (or *loop-when-it-var*
+      (setq *loop-when-it-var*
+	    (loop-make-var (gensym "LOOP-IT-") nil nil))))
 
 ;;;; various FOR/AS subdispatches
 
@@ -1383,7 +1380,7 @@ code to be loaded.
 ;;; is present. I.e., the first initialization occurs in the loop body
 ;;; (first-step), not in the variable binding phase.
 (defun loop-ansi-for-equals (var val data-type)
-  (loop-make-iteration-variable var nil data-type)
+  (loop-make-iteration-var var nil data-type)
   (cond ((loop-tequal (car *loop-source-code*) :then)
 	 ;; Then we are the same as "FOR x FIRST y THEN z".
 	 (loop-pop-source)
@@ -1393,23 +1390,23 @@ code to be loaded.
 	 `(() (,var ,val) () ()))))
 
 (defun loop-for-across (var val data-type)
-  (loop-make-iteration-variable var nil data-type)
+  (loop-make-iteration-var var nil data-type)
   (let ((vector-var (gensym "LOOP-ACROSS-VECTOR-"))
 	(index-var (gensym "LOOP-ACROSS-INDEX-")))
     (multiple-value-bind (vector-form constantp vector-value)
 	(loop-constant-fold-if-possible val 'vector)
-      (loop-make-variable
+      (loop-make-var
 	vector-var vector-form
 	(if (and (consp vector-form) (eq (car vector-form) 'the))
 	    (cadr vector-form)
 	    'vector))
-      (loop-make-variable index-var 0 'fixnum)
+      (loop-make-var index-var 0 'fixnum)
       (let* ((length 0)
 	     (length-form (cond ((not constantp)
 				 (let ((v (gensym "LOOP-ACROSS-LIMIT-")))
 				   (push `(setq ,v (length ,vector-var))
 					 *loop-prologue*)
-				   (loop-make-variable v 0 'fixnum)))
+				   (loop-make-var v 0 'fixnum)))
 				(t (setq length (length vector-value)))))
 	     (first-test `(>= ,index-var ,length-form))
 	     (other-test first-test)
@@ -1444,9 +1441,7 @@ code to be loaded.
 	  ((and (consp stepper) (eq (car stepper) 'function))
 	   (list (cadr stepper) listvar))
 	  (t
-	   `(funcall ,(loop-make-variable (gensym "LOOP-FN-")
-					  stepper
-					  'function)
+	   `(funcall ,(loop-make-var (gensym "LOOP-FN-") stepper 'function)
 		     ,listvar)))))
 
 (defun loop-for-on (var val data-type)
@@ -1454,9 +1449,9 @@ code to be loaded.
       (loop-constant-fold-if-possible val)
     (let ((listvar var))
       (cond ((and var (symbolp var))
-	     (loop-make-iteration-variable var list data-type))
-	    (t (loop-make-variable (setq listvar (gensym)) list 'list)
-	       (loop-make-iteration-variable var nil data-type)))
+	     (loop-make-iteration-var var list data-type))
+	    (t (loop-make-var (setq listvar (gensym)) list 'list)
+	       (loop-make-iteration-var var nil data-type)))
       (let ((list-step (loop-list-step listvar)))
 	(let* ((first-endtest
 		;; mysterious comment from original CMU CL sources:
@@ -1481,8 +1476,8 @@ code to be loaded.
   (multiple-value-bind (list constantp list-value)
       (loop-constant-fold-if-possible val)
     (let ((listvar (gensym "LOOP-LIST-")))
-      (loop-make-iteration-variable var nil data-type)
-      (loop-make-variable listvar list 'list)
+      (loop-make-iteration-var var nil data-type)
+      (loop-make-var listvar list 'list)
       (let ((list-step (loop-list-step listvar)))
 	(let* ((first-endtest `(endp ,listvar))
 	       (other-endtest first-endtest)
@@ -1523,7 +1518,7 @@ code to be loaded.
       (setf (gethash (symbol-name name) ht) lp))
     lp))
 
-;;; Note:  path functions are allowed to use loop-make-variable, hack
+;;; Note: Path functions are allowed to use LOOP-MAKE-VAR, hack
 ;;; the prologue, etc.
 (defun loop-for-being (var val data-type)
   ;; FOR var BEING each/the pathname prep-phrases using-stuff... each/the =
@@ -1563,8 +1558,8 @@ code to be loaded.
       (setq stuff (if inclusive
 		      (apply fun var data-type preps :inclusive t user-data)
 		      (apply fun var data-type preps user-data))))
-    (when *loop-named-variables*
-      (loop-error "Unused USING variables: ~S." *loop-named-variables*))
+    (when *loop-named-vars*
+      (loop-error "Unused USING vars: ~S." *loop-named-vars*))
     ;; STUFF is now (bindings prologue-forms . stuff-to-pass-back).
     ;; Protect the system from the user and the user from himself.
     (unless (member (length stuff) '(6 10))
@@ -1572,21 +1567,21 @@ code to be loaded.
 		  path))
     (do ((l (car stuff) (cdr l)) (x)) ((null l))
       (if (atom (setq x (car l)))
-	  (loop-make-iteration-variable x nil nil)
-	  (loop-make-iteration-variable (car x) (cadr x) (caddr x))))
+	  (loop-make-iteration-var x nil nil)
+	  (loop-make-iteration-var (car x) (cadr x) (caddr x))))
     (setq *loop-prologue* (nconc (reverse (cadr stuff)) *loop-prologue*))
     (cddr stuff)))
 
-(defun named-variable (name)
-  (let ((tem (loop-tassoc name *loop-named-variables*)))
+(defun loop-named-var (name)
+  (let ((tem (loop-tassoc name *loop-named-vars*)))
     (declare (list tem))
     (cond ((null tem) (values (gensym) nil))
-	  (t (setq *loop-named-variables* (delete tem *loop-named-variables*))
+	  (t (setq *loop-named-vars* (delete tem *loop-named-vars*))
 	     (values (cdr tem) t)))))
 
 (defun loop-collect-prepositional-phrases (preposition-groups
 					   &optional
-					   USING-allowed
+					   using-allowed
 					   initial-phrases)
   (flet ((in-group-p (x group) (car (loop-tmember x group))))
     (do ((token nil)
@@ -1617,7 +1612,7 @@ code to be loaded.
 					 (cons this-group used-prepositions)))
 	     (loop-pop-source)
 	     (push (list this-prep (loop-get-form)) prepositional-phrases))
-	    ((and USING-allowed (loop-tequal token 'using))
+	    ((and using-allowed (loop-tequal token 'using))
 	     (loop-pop-source)
 	     (do ((z (loop-pop-source) (loop-pop-source)) (tem)) (nil)
 	       (when (or (atom z)
@@ -1627,12 +1622,12 @@ code to be loaded.
 			 (and (cadr z) (not (symbolp (cadr z)))))
 		 (loop-error "~S bad variable pair in path USING phrase" z))
 	       (when (cadr z)
-		 (if (setq tem (loop-tassoc (car z) *loop-named-variables*))
+		 (if (setq tem (loop-tassoc (car z) *loop-named-vars*))
 		     (loop-error
 		       "The variable substitution for ~S occurs twice in a USING phrase,~@
 			with ~S and ~S."
 		       (car z) (cadr z) (cadr tem))
-		     (push (cons (car z) (cadr z)) *loop-named-variables*)))
+		     (push (cons (car z) (cadr z)) *loop-named-vars*)))
 	       (when (or (null *loop-source-code*)
 			 (symbolp (car *loop-source-code*)))
 		 (return nil))))
@@ -1645,7 +1640,7 @@ code to be loaded.
 		       sequence-variable sequence-type
 		       step-hack default-top
 		       prep-phrases)
-   (let ((endform nil) ; Form (constant or variable) with limit value
+   (let ((endform nil) ; form (constant or variable) with limit value
 	 (sequencep nil) ; T if sequence arg has been provided
 	 (testfn nil) ; endtest function
 	 (test nil) ; endtest form
@@ -1661,20 +1656,20 @@ code to be loaded.
 	 (limit-constantp nil)
 	 (limit-value nil)
 	 )
-     (when variable (loop-make-iteration-variable variable nil variable-type))
+     (when variable (loop-make-iteration-var variable nil variable-type))
      (do ((l prep-phrases (cdr l)) (prep) (form) (odir)) ((null l))
        (setq prep (caar l) form (cadar l))
        (case prep
 	 ((:of :in)
 	  (setq sequencep t)
-	  (loop-make-variable sequence-variable form sequence-type))
+	  (loop-make-var sequence-variable form sequence-type))
 	 ((:from :downfrom :upfrom)
 	  (setq start-given t)
 	  (cond ((eq prep :downfrom) (setq dir ':down))
 		((eq prep :upfrom) (setq dir ':up)))
 	  (multiple-value-setq (form start-constantp start-value)
 	    (loop-constant-fold-if-possible form indexv-type))
-	  (loop-make-iteration-variable indexv form indexv-type))
+	  (loop-make-iteration-var indexv form indexv-type))
 	 ((:upto :to :downto :above :below)
 	  (cond ((loop-tequal prep :upto) (setq inclusive-iteration
 						(setq dir ':up)))
@@ -1688,15 +1683,15 @@ code to be loaded.
 	    (loop-constant-fold-if-possible form indexv-type))
 	  (setq endform (if limit-constantp
 			    `',limit-value
-			    (loop-make-variable
+			    (loop-make-var
 			      (gensym "LOOP-LIMIT-") form indexv-type))))
 	 (:by
 	   (multiple-value-setq (form stepby-constantp stepby)
 	     (loop-constant-fold-if-possible form indexv-type))
 	   (unless stepby-constantp
-	     (loop-make-variable (setq stepby (gensym "LOOP-STEP-BY-"))
-				 form
-				 indexv-type)))
+	     (loop-make-var (setq stepby (gensym "LOOP-STEP-BY-"))
+			    form
+			    indexv-type)))
 	 (t (loop-error
 	      "~S invalid preposition in sequencing or sequence path;~@
 	       maybe invalid prepositions were specified in iteration path descriptor?"
@@ -1708,7 +1703,7 @@ code to be loaded.
        (loop-error "missing OF or IN phrase in sequence path"))
      ;; Now fill in the defaults.
      (unless start-given
-       (loop-make-iteration-variable
+       (loop-make-iteration-var
 	 indexv
 	 (setq start-constantp t
 	       start-value (or (loop-typed-init indexv-type) 0))
@@ -1716,9 +1711,9 @@ code to be loaded.
      (cond ((member dir '(nil :up))
 	    (when (or limit-given default-top)
 	      (unless limit-given
-		(loop-make-variable (setq endform
-					  (gensym "LOOP-SEQ-LIMIT-"))
-				    nil indexv-type)
+		(loop-make-var (setq endform (gensym "LOOP-SEQ-LIMIT-"))
+			       nil
+			       indexv-type)
 		(push `(setq ,endform ,default-top) *loop-prologue*))
 	      (setq testfn (if inclusive-iteration '> '>=)))
 	    (setq step (if (eql stepby 1) `(1+ ,indexv) `(+ ,indexv ,stepby))))
@@ -1764,8 +1759,8 @@ code to be loaded.
 				    size-function
 				    sequence-type
 				    element-type)
-  (multiple-value-bind (indexv) (named-variable 'index)
-    (let ((sequencev (named-variable 'sequence)))
+  (multiple-value-bind (indexv) (loop-named-var 'index)
+    (let ((sequencev (named-var 'sequence)))
       (list* nil nil				; dummy bindings and prologue
 	     (loop-sequencer
 	      indexv 'fixnum 
@@ -1796,16 +1791,16 @@ code to be loaded.
 	(dummy-predicate-var nil)
 	(post-steps nil))
     (multiple-value-bind (other-var other-p)
-	(named-variable (ecase which
+	(loop-named-var (ecase which
 			  (:hash-key 'hash-value)
 			  (:hash-value 'hash-key)))
-      ;; @@@@ NAMED-VARIABLE returns a second value of T if the name
+      ;; @@@@ LOOP-NAMED-VAR returns a second value of T if the name
       ;; was actually specified, so clever code can throw away the
       ;; GENSYM'ed-up variable if it isn't really needed. The
       ;; following is for those implementations in which we cannot put
       ;; dummy NILs into MULTIPLE-VALUE-SETQ variable lists.
       (setq other-p t
-	    dummy-predicate-var (loop-when-it-variable))
+	    dummy-predicate-var (loop-when-it-var))
       (let ((key-var nil)
 	    (val-var nil)
 	    (bindings `((,variable nil ,data-type)
@@ -1851,7 +1846,7 @@ code to be loaded.
       ()
       ()
       ()
-      (not (multiple-value-setq (,(loop-when-it-variable)
+      (not (multiple-value-setq (,(loop-when-it-var)
 				 ,variable)
 	     (,next-fn)))
       ())))

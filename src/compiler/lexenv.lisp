@@ -19,14 +19,14 @@
 (def!struct (lexenv
 	     (:constructor make-null-lexenv ())
 	     (:constructor internal-make-lexenv
-			   (functions variables blocks tags type-restrictions
-				      lambda cleanup policy options)))
+			   (funs vars blocks tags type-restrictions
+				 lambda cleanup policy options)))
   ;; an alist of (NAME . WHAT), where WHAT is either a FUNCTIONAL (a
   ;; local function), a DEFINED-FUN, representing an
   ;; INLINE/NOTINLINE declaration, or a list (MACRO . <function>) (a
   ;; local macro, with the specifier expander). Note that NAME may be
   ;; a (SETF <name>) list, not necessarily a single symbol.
-  (functions nil :type list)
+  (funs nil :type list)
   ;; an alist translating variable names to LEAF structures. A special
   ;; binding is indicated by a :SPECIAL GLOBAL-VAR leaf. Each special
   ;; binding within the code gets a distinct leaf structure, as does
@@ -36,7 +36,7 @@
   ;;
   ;; If the CDR is (MACRO . <exp>), then <exp> is the expansion of a
   ;; symbol macro.
-  (variables nil :type list)
+  (vars nil :type list)
   ;; BLOCKS and TAGS are alists from block and go-tag names to 2-lists
   ;; of the form (<entry> <continuation>), where <continuation> is the
   ;; continuation to exit to, and <entry> is the corresponding ENTRY node.
@@ -85,5 +85,5 @@
   ;; by LAMBDA, but this implementation doesn't try.
   (and (null (lexenv-blocks lexenv))
        (null (lexenv-tags lexenv))
-       (null (lexenv-variables lexenv))
-       (null (lexenv-functions lexenv))))
+       (null (lexenv-vars lexenv))
+       (null (lexenv-funs lexenv))))

@@ -694,7 +694,7 @@
 ;;; Bind the hashtables used for keeping track of global variables,
 ;;; functions, etc. Also establish condition handlers.
 (defmacro with-ir1-namespace (&body forms)
-  `(let ((*free-variables* (make-hash-table :test 'eq))
+  `(let ((*free-vars* (make-hash-table :test 'eq))
 	 (*free-funs* (make-hash-table :test 'equal))
 	 (*constants* (make-hash-table :test 'equal))
 	 (*source-paths* (make-hash-table :test 'eq)))

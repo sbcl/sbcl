@@ -54,7 +54,7 @@
 		       t)
 	       (values form nil))))
 	((symbolp form)
-	 (let* ((venv (when env (sb!c::lexenv-variables env)))
+	 (let* ((venv (when env (sb!c::lexenv-vars env)))
 		(local-def (cdr (assoc form venv))))
 	   (if (and (consp local-def)
 		    (eq (car local-def) 'macro))

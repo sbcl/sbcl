@@ -70,8 +70,7 @@
 ;;; Check everything that we can think of for consistency. When a
 ;;; definite inconsistency is detected, we BARF. Possible problems
 ;;; just cause us to BURP. Our argument is a list of components, but
-;;; we also look at the *FREE-VARIABLES*, *FREE-FUNS* and
-;;; *CONSTANTS*.
+;;; we also look at the *FREE-VARS*, *FREE-FUNS* and *CONSTANTS*.
 ;;;
 ;;; First we do a pre-pass which finds all the CBLOCKs and CLAMBDAs,
 ;;; testing that they are linked together properly and entering them
@@ -123,13 +122,13 @@
 			 (and (global-var-p v)
 			      (member (global-var-kind v)
 				      '(:global :special))))
-	       (barf "strange *FREE-VARIABLES* entry: ~S" v))
+	       (barf "strange *FREE-VARS* entry: ~S" v))
 	     (dolist (n (leaf-refs v))
 	       (check-node-reached n))
 	     (when (basic-var-p v)
 	       (dolist (n (basic-var-sets v))
 		 (check-node-reached n))))
-	   *free-variables*)
+	   *free-vars*)
 
   (maphash (lambda (k v)
 	     (declare (ignore k))

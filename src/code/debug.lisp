@@ -828,7 +828,7 @@ reset to ~S."
 
 (sb!xc:defmacro define-var-operation (ref-or-set &optional value-var)
   `(let* ((temp (etypecase name
-		  (symbol (sb!di:debug-fun-symbol-variables
+		  (symbol (sb!di:debug-fun-symbol-vars
 			   (sb!di:frame-debug-fun *current-frame*)
 			   name))
 		  (simple-string (sb!di:ambiguous-debug-vars

@@ -154,7 +154,7 @@
 ;;; definition of NAME.
 (declaim (ftype (function (t string) leaf) find-lexically-apparent-fun))
 (defun find-lexically-apparent-fun (name context)
-  (let ((var (lexenv-find name functions :test #'equal)))
+  (let ((var (lexenv-find name funs :test #'equal)))
     (cond (var
 	   (unless (leaf-p var)
 	     (aver (and (consp var) (eq (car var) 'macro)))
@@ -164,22 +164,21 @@
 	   (find-free-fun name context)))))
 
 ;;; Return the LEAF node for a global variable reference to NAME. If
-;;; NAME is already entered in *FREE-VARIABLES*, then we just return
-;;; the corresponding value. Otherwise, we make a new leaf using
+;;; NAME is already entered in *FREE-VARS*, then we just return the
+;;; corresponding value. Otherwise, we make a new leaf using
 ;;; information from the global environment and enter it in
-;;; *FREE-VARIABLES*. If the variable is unknown, then we emit a
-;;; warning.
-(defun find-free-variable (name)
+;;; *FREE-VARS*. If the variable is unknown, then we emit a warning.
+(defun find-free-var (name)
   (declare (values (or leaf heap-alien-info)))
   (unless (symbolp name)
     (compiler-error "Variable name is not a symbol: ~S." name))
-  (or (gethash name *free-variables*)
+  (or (gethash name *free-vars*)
       (let ((kind (info :variable :kind name))
 	    (type (info :variable :type name))
 	    (where-from (info :variable :where-from name)))
 	(when (and (eq where-from :assumed) (eq kind :global))
 	  (note-undefined-reference name :variable))
-	(setf (gethash name *free-variables*)
+	(setf (gethash name *free-vars*)
 	      (case kind
 		(:alien
 		 (info :variable :alien-info name))
@@ -448,14 +447,14 @@
 				(cons form *current-path*))))
 	(if (atom form)
 	    (cond ((and (symbolp form) (not (keywordp form)))
-		   (ir1-convert-variable start cont form))
+		   (ir1-convert-var start cont form))
 		  ((leaf-p form)
 		   (reference-leaf start cont form))
 		  (t
 		   (reference-constant start cont form)))
 	    (let ((opname (car form)))
 	      (cond ((symbolp opname)
-		     (let ((lexical-def (lexenv-find opname functions)))
+		     (let ((lexical-def (lexenv-find opname funs)))
 		       (typecase lexical-def
 			 (null (ir1-convert-global-functoid start cont form))
 			 (functional
@@ -547,12 +546,12 @@
     (use-continuation res cont)))
 
 ;;; Convert a reference to a symbolic constant or variable. If the
-;;; symbol is entered in the LEXENV-VARIABLES we use that definition,
+;;; symbol is entered in the LEXENV-VARS we use that definition,
 ;;; otherwise we find the current global definition. This is also
 ;;; where we pick off symbol macro and alien variable references.
-(defun ir1-convert-variable (start cont name)
+(defun ir1-convert-var (start cont name)
   (declare (type continuation start cont) (symbol name))
-  (let ((var (or (lexenv-find name variables) (find-free-variable name))))
+  (let ((var (or (lexenv-find name vars) (find-free-var name))))
     (etypecase var
       (leaf
        (when (lambda-var-p var)
@@ -853,8 +852,8 @@
       (dolist (var-name (rest decl))
 	(let* ((bound-var (find-in-bindings vars var-name))
 	       (var (or bound-var
-			(lexenv-find var-name variables)
-			(find-free-variable var-name))))
+			(lexenv-find var-name vars)
+			(find-free-var var-name))))
 	  (etypecase var
 	    (leaf
 	     (let* ((old-type (or (lexenv-find var type-restrictions)
@@ -885,7 +884,7 @@
       (if (or (restr) (new-vars))
 	  (make-lexenv :default res
 		       :type-restrictions (restr)
-		       :variables (new-vars))
+		       :vars (new-vars))
 	  res))))
 
 ;;; This is somewhat similar to PROCESS-TYPE-DECL, but handles
@@ -942,7 +941,7 @@
 	   (unless (assoc name (new-venv) :test #'eq)
 	     (new-venv (cons name (specvar-for-binding name))))))))
     (if (new-venv)
-	(make-lexenv :default res :variables (new-venv))
+	(make-lexenv :default res :vars (new-venv))
 	res)))
 
 ;;; Return a DEFINED-FUN which copies a GLOBAL-VAR but for its INLINEP.
@@ -985,7 +984,7 @@
 		       new-fenv)))))))
 
     (if new-fenv
-	(make-lexenv :default res :functions new-fenv)
+	(make-lexenv :default res :funs new-fenv)
 	res)))
 
 ;;; Like FIND-IN-BINDINGS, but looks for #'foo in the fvars.
@@ -1104,7 +1103,7 @@
 ;;; anonymous GLOBAL-VAR.
 (defun specvar-for-binding (name)
   (cond ((not (eq (info :variable :where-from name) :assumed))
-	 (let ((found (find-free-variable name)))
+	 (let ((found (find-free-var name)))
 	   (when (heap-alien-info-p found)
 	     (compiler-error
 	      "~S is an alien variable and so can't be declared special."
@@ -1143,7 +1142,7 @@
       (compiler-error "The name of the lambda-variable ~S is a constant."
 		      name))
     (cond ((eq kind :special)
-	   (let ((specvar (find-free-variable name)))
+	   (let ((specvar (find-free-var name)))
 	     (make-lambda-var :%source-name name
 			      :type (leaf-type specvar)
 			      :where-from (leaf-where-from specvar)
@@ -1361,8 +1360,8 @@
 
 ;;; Create a lambda node out of some code, returning the result. The
 ;;; bindings are specified by the list of VAR structures VARS. We deal
-;;; with adding the names to the LEXENV-VARIABLES for the conversion.
-;;; The result is added to the NEW-FUNS in the *CURRENT-COMPONENT* and
+;;; with adding the names to the LEXENV-VARS for the conversion. The
+;;; result is added to the NEW-FUNS in the *CURRENT-COMPONENT* and
 ;;; linked to the component head and tail.
 ;;;
 ;;; We detect special bindings here, replacing the original VAR in the
@@ -1422,7 +1421,7 @@
 		 (note-lexical-binding (leaf-source-name var))
 		 (new-venv (cons (leaf-source-name var) var))))))
 
-      (let ((*lexenv* (make-lexenv :variables (new-venv)
+      (let ((*lexenv* (make-lexenv :vars (new-venv)
 				   :lambda lambda
 				   :cleanup nil)))
 	(setf (bind-lambda bind) lambda)
@@ -1940,12 +1939,11 @@
 		     :default (process-decls decls nil nil
 					     (make-continuation)
 					     (make-null-lexenv))
-		     :variables (copy-list symbol-macros)
-		     :functions
-		     (mapcar (lambda (x)
-			       `(,(car x) .
-				 (macro . ,(coerce (cdr x) 'function))))
-			     macros)
+		     :vars (copy-list symbol-macros)
+		     :funs (mapcar (lambda (x)
+				     `(,(car x) .
+				       (macro . ,(coerce (cdr x) 'function))))
+				   macros)
 		     :policy (lexenv-policy *lexenv*))))
       (ir1-convert-lambda `(lambda ,@body)
 			  :source-name source-name

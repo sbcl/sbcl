@@ -73,12 +73,12 @@
 (defvar *lexenv*)
 (declaim (type lexenv *lexenv*))
 
-;;; *FREE-VARIABLES* translates from the names of variables referenced
+;;; *FREE-VARS* translates from the names of variables referenced
 ;;; globally to the LEAF structures for them. *FREE-FUNS* is like
-;;; *FREE-VARIABLES*, only it deals with function names.
-(defvar *free-variables*)
+;;; *FREE-VARS*, only it deals with function names.
+(defvar *free-vars*)
 (defvar *free-funs*)
-(declaim (type hash-table *free-variables* *free-funs*))
+(declaim (type hash-table *free-vars* *free-funs*))
 
 ;;; We use the same CONSTANT structure to represent all equal anonymous
 ;;; constants. This hashtable translates from constants to the LEAFs that

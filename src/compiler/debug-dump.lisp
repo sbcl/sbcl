@@ -71,7 +71,7 @@
 	(when (and (lambda-var-p leaf)
 		   (or (not (member (tn-kind tn)
 				    '(:environment :debug-environment)))
-		       (rassoc leaf (lexenv-variables (node-lexenv node))))
+		       (rassoc leaf (lexenv-vars (node-lexenv node))))
 		   (or (null spilled)
 		       (not (member tn spilled))))
 	  (let ((num (gethash leaf var-locs)))
@@ -313,7 +313,7 @@
 ;;; environment live and is an argument. If a :DEBUG-ENVIRONMENT TN,
 ;;; then we also exclude set variables, since the variable is not
 ;;; guaranteed to be live everywhere in that case.
-(defun dump-1-variable (fun var tn id minimal buffer)
+(defun dump-1-var (fun var tn id minimal buffer)
   (declare (type lambda-var var) (type (or tn null) tn) (type index id)
 	   (type clambda fun))
   (let* ((name (leaf-debug-name var))
@@ -348,12 +348,12 @@
       (vector-push-extend (tn-sc-offset save-tn) buffer)))
   (values))
 
-;;; Return a vector suitable for use as the DEBUG-FUN-VARIABLES
+;;; Return a vector suitable for use as the DEBUG-FUN-VARS
 ;;; of FUN. LEVEL is the current DEBUG-INFO quality. VAR-LOCS is a
 ;;; hash table in which we enter the translation from LAMBDA-VARS to
 ;;; the relative position of that variable's location in the resulting
 ;;; vector.
-(defun compute-variables (fun level var-locs)
+(defun compute-vars (fun level var-locs)
   (declare (type clambda fun) (type hash-table var-locs))
   (collect ((vars))
     (labels ((frob-leaf (leaf tn gensym-p)
@@ -390,18 +390,18 @@
 		 (incf id))
 		(t
 		 (setq id 0  prev-name name)))
-	  (dump-1-variable fun var (cdr x) id nil buffer)
+	  (dump-1-var fun var (cdr x) id nil buffer)
 	  (setf (gethash var var-locs) i))
 	(incf i))
       (coerce buffer 'simple-vector))))
 
-;;; Return a vector suitable for use as the DEBUG-FUN-VARIABLES of
+;;; Return a vector suitable for use as the DEBUG-FUN-VARS of
 ;;; FUN, representing the arguments to FUN in minimal variable format.
-(defun compute-minimal-variables (fun)
+(defun compute-minimal-vars (fun)
   (declare (type clambda fun))
   (let ((buffer (make-array 0 :fill-pointer 0 :adjustable t)))
     (dolist (var (lambda-vars fun))
-      (dump-1-variable fun var (leaf-info var) 0 t buffer))
+      (dump-1-var fun var (leaf-info var) 0 t buffer))
     (coerce buffer 'simple-vector)))
 
 ;;; Return VAR's relative position in the function's variables (determined
@@ -498,12 +498,12 @@
 		(let ((od (lambda-optional-dispatch fun)))
 		  (or (not od)
 		      (not (eq (optional-dispatch-main-entry od) fun)))))
-	   (setf (compiled-debug-fun-variables dfun)
-		 (compute-minimal-variables fun))
+	   (setf (compiled-debug-fun-vars dfun)
+		 (compute-minimal-vars fun))
 	   (setf (compiled-debug-fun-arguments dfun) :minimal))
 	  (t
-	   (setf (compiled-debug-fun-variables dfun)
-		 (compute-variables fun level var-locs))
+	   (setf (compiled-debug-fun-vars dfun)
+		 (compute-vars fun level var-locs))
 	   (setf (compiled-debug-fun-arguments dfun)
 		 (compute-arguments fun var-locs))))
 

@@ -386,8 +386,7 @@
 ;;; slot values. Values for the alist slots are NCONCed to the
 ;;; beginning of the current value, rather than replacing it entirely.
 (defun make-lexenv (&key (default *lexenv*)
-			 functions variables blocks tags type-restrictions
-			 options
+			 funs vars blocks tags type-restrictions options
 			 (lambda (lexenv-lambda default))
 			 (cleanup (lexenv-cleanup default))
 			 (policy (lexenv-policy default)))
@@ -397,8 +396,8 @@
 		      (nconc ,var old)
 		      old))))
     (internal-make-lexenv
-     (frob functions lexenv-functions)
-     (frob variables lexenv-variables)
+     (frob funs lexenv-funs)
+     (frob vars lexenv-vars)
      (frob blocks lexenv-blocks)
      (frob tags lexenv-tags)
      (frob type-restrictions lexenv-type-restrictions)

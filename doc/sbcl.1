@@ -25,6 +25,179 @@ the free CMU CL programming environment. (The name is intended to
 acknowledge the connection: steel and banking are the industries where
 Carnegie and Mellon made the big bucks.)
 
+It is free software, mostly in the public domain, but with some
+subsystems under BSD-style licenses which allow modification and
+reuse as long as credit is given. It is provided "as is", with no
+warranty of any kind.
+
+For more information about license issues, see the COPYING file in
+the distribution. For more information about history, see the 
+CREDITS file in the distribution.
+
+.SH RUNNING SBCL
+
+To run SBCL, type "sbcl" at the command line with no arguments. (SBCL
+understands command line arguments, but you probably won't need to use
+them unless you're a fairly advanced user, in which case you should
+read the COMMAND LINE SYNTAX section, below.) You should see some
+startup messages, then a prompt ("*"). Type a Lisp expression at the
+prompt, and SBCL will read it, execute it, print the result, 
+give you another prompt, and wait for your next input. E.g.
+  * (+ 1 2 3)
+  6
+  *
+
+Many people like to run SBCL, like other Lisp systems, as a subprocess
+under Emacs. The Emacs "ilisp" mode provides many convenient features,
+like command line editing, tab completion, and various kinds of
+coupling between Common Lisp source files and the interactive SBCL
+subprocess.
+
+.SH OVERVIEW
+
+SBCL aims for but has not reached ANSI compliance.
+
+SBCL compiles Common Lisp to native code, and is essentially a
+"compiler-only" implementation of the ANSI standard. (Unlike earlier
+versions of SBCL, byte compilation is no longer supported, and there
+is only a vestigial interpreter. Thus, in particular,
+COMPILED-FUNCTION-P is always equal to FUNCTIONP.)
+
+SBCL uses a generational conservative garbage collector for some ports,
+and a simple stop-and-copy garbage collector for other ports.
+
+SBCL also includes some non-ANSI extensions, notably
+  * Lispy extensions:
+    ** CMU-CL-style safe implementation of type declarations:
+       "Declarations are assertions."
+    ** source level debugger
+    ** profiler
+    ** saving the state of the running SBCL process, producing a
+       "core" file which can be restarted later
+    ** Gray streams (overloadable CLOS classes whose instances can
+       be used wherever ANSI streams can be used)
+    ** weak pointers and finalization (which have unfortunately
+       suffered from at least some code rot, e.g. weak hash tables
+       don't work)
+  * system interface extensions:
+    ** calling out to C code (a.k.a. FFI, foreign function interface)
+    ** some simple support for operations with a "scripting language" 
+       flavor, e.g. reading POSIX argc and argv, or executing a 
+       subprogram
+
+.SH DIFFERENCES FROM CMU CL
+
+SBCL can be built from scratch using a plain vanilla ANSI Common Lisp
+system and a C compiler, and all of its properties are specified by
+the version of the source code that it was created from. (This clean
+bootstrappability was the immediate motivation for forking off of the
+CMU CL development tree.) A variety of internal implementation
+differences are motivated by this.
+
+Maintenance work in SBCL since the fork has diverged in various
+details from the maintenance work in CMU CL. E.g. as of 2001-04-12,
+SBCL was more ANSI-compliant than CMU CL in various details such as
+support for PRINT-OBJECT and DESCRIBE-OBJECT, and SBCL's compiler was
+substantially better than CMU CL's at optimizing operations on
+non-simple vectors.
+
+Most extensions supported by CMU CL are not supported in SBCL,
+including Motif support, the Hemlock editor, search paths, the
+low-level Unix interface, the WIRE protocol, multithreading support,
+various user-level macros and functions (e.g. LETF, ITERATE, MEMQ,
+REQUIRED-ARGUMENT), and many others.
+
+SBCL has retained some extensions from parent CMU CL. Many of the
+retained extensions are in these categories:
+.TP 3
+\--
+things which might be in the new ANSI spec, e.g. weak pointers,
+finalization, foreign function interface to C, and Gray streams
+.TP 3
+\--
+things which are universally available in Unix scripting languages,
+e.g. RUN-PROGRAM and POSIX argv and getenv
+.TP 3
+\--
+hooks into the low level workings of the system which can be useful
+for debugging, e.g. a list of functions to be run whenever GC occurs,
+or parameters to modify compiler diagnostic output
+.TP 3
+\--
+unportable performance hacks, e.g. TRULY-THE, FREEZE-TYPE, and PURIFY
+.PP
+
+There are also a few retained extensions which don't fall into
+any particular category, e.g.
+.TP 3
+\--
+the ability to save running Lisp images as executable files
+.PP
+
+Some of the retained extensions have new names and/or different
+options than their CMU CL counterparts. For example, the SBCL function
+which saves a Lisp image to disk and kills it is called
+SAVE-LISP-AND-DIE instead of SAVE-LISP, and it supports fewer keyword
+options than CMU CL's SAVE-LISP.
+
+(Why doesn't SBCL support more extensions? Why the hell did I (WHN)
+drop all those nice extensions from CMU CL when the code already
+exists? This is a frequently asked question on the mailing list. The
+answer is that they're hard to maintain, and I have enough on my hands
+already. Also, in the case of some big and unquestionably useful
+extensions, like sockets and Motif, I think that SBCL has done its job
+by supplying the FFI, and that people who need, and understand, and
+are motivated to maintain the functionality should supply it as a
+separate library, which I'd be happy to distribute or link to on the
+SBCL home page. Finally, in the case of multithreading, I do think it
+belongs in the new ANSI spec, and it'd be a good feature to have, but
+I didn't think the CMU CL implementation was sufficiently mature, and
+it's such a complicated and far-reaching extension that I thought that
+trying to fix it would interfere with the more urgent task of getting
+basic ANSI support up to speed.)
+
+.SH THE COMPILER
+
+As noted above, SBCL is essentially a compiler-only implementation of
+Lisp, with all nontrivial code being implemented by compilation, even
+when you type it interactively at the "interpreter" prompt.
+
+SBCL inherits from CMU CL the "Python" native code compiler. (Though
+we've essentially dropped the name to avoid confusion with the
+scripting language also called Python.) This compiler is very clever
+about understanding the type system of Common Lisp and using it to
+optimize code, and about producing notes to let the user know when the
+compiler doesn't have enough type information to produce efficient
+code. It also tries (almost always successfully) to follow the unusual
+but very useful principle that "declarations are assertions", i.e.
+type declarations should be checked at runtime unless the user
+explicitly tells the system that speed is more important than safety.
+
+The CMU CL version of this compiler reportedly produces pretty good
+code for modern CPU architectures which have lots of registers, but
+its code for the X86 is marred by a lot of extra loads and stores to
+stack-based temporary variables. Because of this, and because of the
+extra levels of indirection in Common Lisp relative to C, the
+performance of SBCL isn't going to impress people who are impressed by
+small constant factors. However, even on the X86 it tends to be faster
+than byte interpreted languages (and can be a lot faster).
+
+For more information about the compiler, see the user manual.
+
+.SH DOCUMENTATION
+
+Currently, the documentation for the system is
+.TP 3
+\--
+this man page
+.TP 3
+\--
+the user manual
+.TP 3
+\--
+doc strings and online help built into the SBCL executable
+.PP
+
 .SH COMMAND LINE SYNTAX
 
 Command line syntax can be considered an advanced topic; for ordinary
@@ -132,134 +305,14 @@ involved) toplevel options and any --end-toplevel-options option are
 stripped out of the command line argument list before user code gets a
 chance to see it.
 
-.SH OVERVIEW
-
-SBCL aims for but has not reached ANSI compliance.
-
-SBCL compiles Lisp to native code. (Unlike earlier versions of SBCL,
-byte compilation is no longer supported.)
-
-SBCL uses a generational conservative garbage collector for some ports,
-and a simple stop-and-copy garbage collector for other ports.
-
-SBCL includes a source level debugger, as well as the ANSI TRACE
-facility and a profiler.
-
-.SH DIFFERENCES FROM CMU CL
-
-SBCL can be built from scratch using a plain vanilla ANSI Common Lisp
-system and a C compiler, and all of its properties are specified by
-the version of the source code that it was created from. (This clean
-bootstrappability was the immediate motivation for forking off of the
-CMU CL development tree.) A variety of internal implementation
-differences are motivated by this.
-
-Maintenance work in SBCL since the fork has diverged in various
-details from the maintenance work in CMU CL. E.g. as of 2001-04-12,
-SBCL was more ANSI-compliant than CMU CL in various details such as
-support for PRINT-OBJECT and DESCRIBE-OBJECT, and SBCL's compiler was
-substantially better than CMU CL's at optimizing operations on
-non-simple vectors.
-
-Most extensions supported by CMU CL are not supported in SBCL,
-including Motif support, the Hemlock editor, search paths, the
-low-level Unix interface, the WIRE protocol, multithreading support,
-various user-level macros and functions (e.g. LETF, ITERATE, MEMQ,
-REQUIRED-ARGUMENT), and many others.
-
-SBCL has retained some extensions from parent CMU CL. Many of the
-retained extensions are in these categories:
-.TP 3
-\--
-things which might be in the new ANSI spec, e.g. weak pointers,
-finalization, foreign function interface to C, and Gray streams
-.TP 3
-\--
-things which are universally available in Unix scripting languages,
-e.g. RUN-PROGRAM and POSIX argv and getenv
-.TP 3
-\--
-hooks into the low level workings of the system which can be useful
-for debugging, e.g. a list of functions to be run whenever GC occurs,
-or parameters to modify compiler diagnostic output
-.TP 3
-\--
-unportable performance hacks, e.g. TRULY-THE, FREEZE-TYPE, and PURIFY
-.PP
-
-There are also a few retained extensions which don't fall into
-any particular category, e.g.
-.TP 3
-\--
-the ability to save running Lisp images as executable files
-.PP
-
-Some of the retained extensions have new names and/or different
-options than their CMU CL counterparts. For example, the SBCL function
-which saves a Lisp image to disk and kills it is called
-SAVE-LISP-AND-DIE instead of SAVE-LISP, and it supports fewer keyword
-options than CMU CL's SAVE-LISP.
-
-(Why doesn't SBCL support more extensions? Why the hell did I (WHN)
-drop all those nice extensions from CMU CL when the code already
-exists? This is a frequently asked question on the mailing list. The
-answer is that they're hard to maintain, and I have enough on my hands
-already. Also, in the case of some big and unquestionably useful
-extensions, like sockets and Motif, I think that SBCL has done its job
-by supplying the FFI, and that people who need, and understand, and
-are motivated to maintain the functionality should supply it as a
-separate library, which I'd be happy to distribute or link to on the
-SBCL home page. Finally, in the case of multithreading, I do think it
-belongs in the new ANSI spec, and it'd be a good feature to have, but
-I didn't think the CMU CL implementation was sufficiently mature, and
-it's such a complicated and far-reaching extension that I thought that
-trying to fix it would interfere with the more urgent task of getting
-basic ANSI support up to speed.)
-
-.SH THE COMPILER
-
-SBCL inherits from CMU CL the "Python" native code compiler. This
-compiler is very clever about understanding the type system of Common
-Lisp and using it to produce efficient code, and about producing notes
-to let the user know when the compiler doesn't have enough type
-information to produce efficient code. It also tries (almost always
-successfully) to follow the unusual but very useful principle that
-type declarations should be checked at runtime unless the user
-explicitly tells the system that speed is more important than safety.
-
-The CMU CL version of this compiler reportedly produces pretty good
-code for modern machines which have lots of registers, but its code
-for the X86 is marred by a lot of extra loads and stores to
-stack-based temporary variables. Because of this, and because of the
-extra levels of indirection in Common Lisp relative to C, we find a
-typical performance decrease by a factor of perhaps 2 to 5 for small
-programs coded in SBCL instead of GCC.
-
-For more information about the compiler, see the user manual.
-
-.SH DOCUMENTATION
-
-Currently, the documentation for the system is
-.TP 3
-\--
-the user manual
-.TP 3
-\--
-this man page
-.TP 3
-\--
-doc strings and online help built into the SBCL executable
-.PP
-
 .SH SYSTEM REQUIREMENTS
 
-Unlike its distinguished ancestor CMU CL, SBCL is currently on X86
-(Linux, FreeBSD, and OpenBSD) and Alpha (Linux). It would probably be
-straightforward to port the CMU CL support for SPARC, or to port to
-NetBSD.
+Unlike its distinguished ancestor CMU CL, SBCL currently runs only on X86
+(Linux, FreeBSD, and OpenBSD) and Alpha (Linux). For information on 
+other ongoing ports, see the sbcl-devel mailing list, and/or the
+web site.
 
-As of version 0.6.13, SBCL requires on the order of 16Mb RAM to run
-on X86 systems. 
+SBCL requires on the order of 16Mb RAM to run on X86 systems. 
 
 .SH ENVIRONMENT
 
@@ -284,23 +337,15 @@ variable.
 system-wide SBCL initialization files, unless overridden by the
 SBCL_HOME variable or the --sysinit command line option.
 
-
 $HOME/.sbclrc is the standard location for a user's SBCL
 initialization file, unless overridden by the --userinit
 command line option.
 
-.SH BUGS
+.SH KNOWN BUGS
 
-To report a bug, please send mail to sbcl-help@lists.sourceforge.net
-or sbcl-devel@lists.sourceforge.net. As with any software bug report,
-it's most helpful if you remember to describe the environment where
-the problem occurs (machine type, O/S name and version, etc.) and if
-you can provide enough information to reproduce the problem,
-preferably in compact form.
-
-This section attempts to list the most serious and long-standing bugs
-or surprising performance hits. For more detailed and current
-information on bugs, see the BUGS file in the distribution.
+This section attempts to list the most serious and long-standing bugs.
+For more detailed and current information on bugs, see the BUGS file
+in the distribution.
 
 It is possible to get in deep trouble by exhausting
 memory. To plagiarize a sadly apt description of a language not
@@ -319,15 +364,6 @@ turns out to use more virtual memory than the system has available for
 it, other processes tend to be killed randomly (!).
 .PP
 
-The compiler is overaggressive about static typing, assuming that a
-function's return type never changes. Thus compiling and loading a
-file containing
-(DEFUN FOO (X) NIL)
-(DEFUN BAR (X) (IF (FOO X) 1 2))
-(DEFUN FOO (X) (PLUSP X))
-then running (FOO 1) gives 2 (because the compiler "knew"
-that FOO's return type is NULL).
-
 The compiler's handling of function return values unnecessarily
 violates the "declarations are assertions" principle that it otherwise
 adheres to. Using PROCLAIM or DECLAIM to specify the return type of a
@@ -339,24 +375,48 @@ compiling a file containing
 then running (FOO 1) gives NOT-THIS-TIME, because the
 never compiled code to check the declaration.
 
-The implementation of multidimensional arrays, especially
-multidimensional arrays of floating point numbers, is very
-inefficient.
+Some things are implemented very inefficiently.
+.TP 3
+\--
+Multidimensional arrays are inefficient, especially
+multidimensional arrays of floating point numbers
+.TP 3
+\--
+The DYNAMIC-EXTENT declaration isn't implemented at all, not even
+for &REST lists or upward closures, so such constructs always allocate
+their temporary storage from the heap, causing GC overhead.
+.TP 3
+\--
+CLOS isn't particularly efficient. (In part, CLOS is so dynamic
+that it's slow for fundamental reasons, but beyond that, the
+SBCL implementation of CLOS doesn't do some important known
+optimizations.)
+.TP 3
+\--
+SBCL, like most implementations of Common Lisp, has trouble
+passing floating point numbers around efficiently, because
+they're larger than a machine word. (Thus, they get "boxed" in
+heap-allocated storage, causing GC overhead.) Within
+a single compilation unit,
+or when doing built-in operations like SQRT and AREF,
+or some special operations like structure slot accesses,
+this is avoidable: see the user manual for some
+efficiency hints. But for general function calls across
+the boundaries of compilation units, passing a floating point
+number as a function argument (or returning a floating point
+number as a function value) is a fundamentally slow operation.
+.PP
 
-SYMBOL-FUNCTION is much slower than you might expect, being
-implemented not as a slot access but as a search through the
-compiler/kernel "globaldb" database.
-
-CLOS (based on the PCL reference implementation) is somewhat
-inefficient.
-
-There are many nagging pre-ANSIisms, e.g.
+There are still some nagging pre-ANSIisms, notably
 .TP 3
 \--
 CLOS (based on the PCL reference implementation) is incompletely
 integrated into the system, so that e.g. SB-PCL::FIND-CLASS is a
-different function than CL::FIND-CLASS. (This is less of a problem in
-practice than the speed, but it's still distasteful.)
+different function than CL::FIND-CLASS. (In practice, you need to
+be a pretty advanced user before this is a serious problem, and
+by then you can usually work around it, but it's still distasteful.
+It's arguably the outstanding "This should be fixed by version 1.0"
+issue.)
 .TP 3
 --
 The ANSI-recommended idiom for creating a function which is only
@@ -368,22 +428,28 @@ doesn't do what you'd expect. (Instead, you have to declare the
 function as SB-EXT:MAYBE-INLINE to get the desired effect.)
 .TP 3
 \--
-The DYNAMIC-EXTENT declaration is not implemented, and is simply
-ignored. (This is allowed by the ANSI spec, but can have a large
-efficiency cost in some kinds of code, e.g. code which uses a lot
-of upward closures or &REST lists.)
-.TP 3
---
-Compiling DEFSTRUCT in strange places (e.g. inside a DEFUN) doesn't
-do anything like what it should.
-.TP 3
-\--
-The symbol * is the name of a type similar to T. (It's used as part of
-the implementation of compound types like (ARRAY * 1) and (CONS * *).
-In a strict ANSI implementation, * would not be the name of a type,
-but instead just a symbol which is recognized and handled specially by
-certain type expanders.)
+There are several nonconforming bits of type syntax. E.g. (1) The type
+FOO is strictly equivalent to (FOO), so e.g. the type OR is treated as
+the type (OR), i.e. the empty type. This is the way that the ancestral
+code worked, and even though ANSI specifically forbids it, it hasn't
+been fixed yet. (2) The symbol * is the name of a type similar to T.
+(It's used as part of the implementation of compound types like (ARRAY
+* 1) and (CONS * *). In a strict ANSI implementation, * would not be
+the name of a type, but instead just a symbol which is recognized and
+handled specially by certain type expanders.)
 .PP
+
+.SH REPORTING BUGS
+
+To report a bug, please send mail to sbcl-help@lists.sourceforge.net
+or sbcl-devel@lists.sourceforge.net.
+
+As with any software bug report, it's most helpful if you can provide
+enough information to reproduce the symptoms reliably, and if you say
+clearly what the symptoms are. E.g. "There seems to be something wrong
+with TAN of very small negative arguments. When I execute
+(TAN LEAST-NEGATIVE-SINGLE-FLOAT) interactively on sbcl-1.2.3 on my Linux
+4.5 X86 box, I get an UNBOUND-VARIABLE error."
 
 .SH SUPPORT
 
@@ -391,12 +457,8 @@ Various information about SBCL is available at
 <http://sbcl.sourceforge.net/>. The mailing lists there are the
 recommended place to look for support.
 
-.SH DISTRIBUTION
+.SH AUTHORS
 
-SBCL is a free implementation of Common Lisp derived from CMU CL. Both
-sources and executables are freely available; this software is "as
-is", and has no warranty of any kind. CMU and the authors assume no
-responsibility for the consequences of any use of this software. See
-the CREDITS file in the distribution for more information about
-history, contributors and permissions.
-
+Dozens of people have made substantial contributions to SBCL and its
+subsystems, and to the CMU CL system on which it was based, over the
+years. See the CREDITS file in the distribution.

@@ -244,7 +244,7 @@
 				       definitions
 				       fun)
   (declare (type function definitionize-fun fun))
-  (declare (type (member :variables :functions) definitionize-keyword))
+  (declare (type (member :vars :funs) definitionize-keyword))
   (declare (type list definitions))
   (unless (= (length definitions)
              (length (remove-duplicates definitions :key #'first)))
@@ -278,7 +278,7 @@
 			     `(lambda (,whole ,environment)
 				,@local-decls
 				(block ,name ,body))))))))
-   :functions
+   :funs
    definitions
    fun))
 
@@ -304,7 +304,7 @@
           "The local symbol macro name ~S is not a symbol."
           name))
        `(,name . (MACRO . ,expansion))))
-   :variables
+   :vars
    definitions
    fun))
   
@@ -514,8 +514,8 @@
 ;;; variables are marked as such. Context is the name of the form, for
 ;;; error reporting purposes.
 (declaim (ftype (function (list symbol) (values list list list))
-		extract-let-variables))
-(defun extract-let-variables (bindings context)
+		extract-let-vars))
+(defun extract-let-vars (bindings context)
   (collect ((vars)
 	    (vals)
 	    (names))
@@ -551,7 +551,7 @@
   Value forms. The variables are bound in parallel after all of the Values are
   evaluated."
   (multiple-value-bind (forms decls) (sb!sys:parse-body body nil)
-    (multiple-value-bind (vars values) (extract-let-variables bindings 'let)
+    (multiple-value-bind (vars values) (extract-let-vars bindings 'let)
       (let* ((*lexenv* (process-decls decls vars nil cont))
 	     (fun-cont (make-continuation))
 	     (fun (ir1-convert-lambda-body
@@ -566,7 +566,7 @@
   Similar to LET, but the variables are bound sequentially, allowing each Value
   form to reference any of the previous Vars."
   (multiple-value-bind (forms decls) (sb!sys:parse-body body nil)
-    (multiple-value-bind (vars values) (extract-let-variables bindings 'let*)
+    (multiple-value-bind (vars values) (extract-let-vars bindings 'let*)
       (let ((*lexenv* (process-decls decls vars nil cont)))
 	(ir1-convert-aux-bindings start cont forms vars values)))))
 
@@ -599,9 +599,8 @@
 ;;;
 ;;; The function names are checked for legality. CONTEXT is the name
 ;;; of the form, for error reporting.
-(declaim (ftype (function (list symbol) (values list list))
-		extract-flet-variables))
-(defun extract-flet-variables (definitions context)
+(declaim (ftype (function (list symbol) (values list list)) extract-flet-vars))
+(defun extract-flet-vars (definitions context)
   (collect ((names)
 	    (defs))
     (dolist (def definitions)
@@ -627,7 +626,7 @@
   the lexically apparent function definition in the enclosing environment."
   (multiple-value-bind (forms decls) (sb!sys:parse-body body nil)
     (multiple-value-bind (names defs)
-	(extract-flet-variables definitions 'flet)
+	(extract-flet-vars definitions 'flet)
       (let* ((fvars (mapcar (lambda (n d)
   			      (ir1-convert-lambda d
 						  :source-name n
@@ -636,7 +635,7 @@
 			    names defs))
 	     (*lexenv* (make-lexenv
 			:default (process-decls decls nil fvars cont)
-			:functions (pairlis names fvars))))
+			:funs (pairlis names fvars))))
 	(ir1-convert-progn-body start cont forms)))))
 
 (def-ir1-translator labels ((definitions &body body) start cont)
@@ -647,7 +646,7 @@
   each other."
   (multiple-value-bind (forms decls) (sb!sys:parse-body body nil)
     (multiple-value-bind (names defs)
-	(extract-flet-variables definitions 'labels)
+	(extract-flet-vars definitions 'labels)
       (let* (;; dummy LABELS functions, to be used as placeholders
              ;; during construction of real LABELS functions
 	     (placeholder-funs (mapcar (lambda (name)
@@ -662,8 +661,7 @@
              ;; the real LABELS functions, compiled in a LEXENV which
              ;; includes the dummy LABELS functions
 	     (real-funs
-	      (let ((*lexenv* (make-lexenv
-			       :functions placeholder-fenv)))
+	      (let ((*lexenv* (make-lexenv :funs placeholder-fenv)))
 		(mapcar (lambda (name def)
 			  (ir1-convert-lambda def
 					      :source-name name
@@ -685,7 +683,7 @@
                          ;; placeholder used earlier) so that if the
                          ;; lexical environment is used for inline
                          ;; expansion we'll get the right functions.
-                         :functions (pairlis names real-funs))))
+                         :funs (pairlis names real-funs))))
 	  (ir1-convert-progn-body start cont forms))))))
 
 ;;;; the THE special operator, and friends
@@ -774,17 +772,17 @@
 
 ;;;; SETQ
 
-;;; If there is a definition in LEXENV-VARIABLES, just set that,
-;;; otherwise look at the global information. If the name is for a
-;;; constant, then error out.
+;;; If there is a definition in LEXENV-VARS, just set that, otherwise
+;;; look at the global information. If the name is for a constant,
+;;; then error out.
 (def-ir1-translator setq ((&whole source &rest things) start cont)
   (let ((len (length things)))
     (when (oddp len)
       (compiler-error "odd number of args to SETQ: ~S" source))
     (if (= len 2)
 	(let* ((name (first things))
-	       (leaf (or (lexenv-find name variables)
-			 (find-free-variable name))))
+	       (leaf (or (lexenv-find name vars)
+			 (find-free-var name))))
 	  (etypecase leaf
 	    (leaf
 	     (when (constant-p leaf)
@@ -799,7 +797,7 @@
 		 (compiler-style-warn
 		  "~S is being set even though it was declared to be ignored."
 		  name)))
-	     (set-variable start cont leaf (second things)))
+	     (setq-var start cont leaf (second things)))
 	    (cons
 	     (aver (eq (car leaf) 'MACRO))
 	     (ir1-convert start cont `(setf ,(cdr leaf) ,(second things))))
@@ -814,7 +812,7 @@
 
 ;;; This is kind of like REFERENCE-LEAF, but we generate a SET node.
 ;;; This should only need to be called in SETQ.
-(defun set-variable (start cont var value)
+(defun setq-var (start cont var value)
   (declare (type continuation start cont) (type basic-var var))
   (let ((dest (make-continuation)))
     (setf (continuation-asserted-type dest) (leaf-type var))
@@ -880,7 +878,7 @@
 ;;; function and smashes it to a :CLEANUP function, as well as
 ;;; referencing it.
 (def-ir1-translator %cleanup-fun ((name) start cont)
-  (let ((fun (lexenv-find name functions)))
+  (let ((fun (lexenv-find name funs)))
     (aver (lambda-p fun))
     (setf (functional-kind fun) :cleanup)
     (reference-leaf start cont fun)))

@@ -151,7 +151,7 @@
    else returns NIL. If ENV is unspecified or NIL, use the global
    environment only."
   (declare (symbol symbol))
-  (let* ((fenv (when env (sb!c::lexenv-functions env)))
+  (let* ((fenv (when env (sb!c::lexenv-funs env)))
 	 (local-def (cdr (assoc symbol fenv))))
     (cond (local-def
 	   (if (and (consp local-def) (eq (car local-def) 'MACRO))
@@ -194,7 +194,7 @@
    definition, or declared NOTINLINE, NIL is returned. Can be
    set with SETF."
   (let ((found (and env
-		    (cdr (assoc name (sb!c::lexenv-functions env)
+		    (cdr (assoc name (sb!c::lexenv-funs env)
 				:test #'equal)))))
     (unless (eq (cond ((sb!c::defined-fun-p found)
 		       (sb!c::defined-fun-inlinep found))

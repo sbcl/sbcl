@@ -14,7 +14,7 @@
 (in-package "SB!C")
 
 ;;; FIXME: Doesn't this belong somewhere else, like early-c.lisp?
-(declaim (special *constants* *free-variables* *component-being-compiled*
+(declaim (special *constants* *free-vars* *component-being-compiled*
 		  *code-vector* *next-location* *result-fixups*
 		  *free-funs* *source-paths*
 		  *seen-blocks* *seen-funs* *list-conflicts-table*
@@ -507,7 +507,7 @@
 ;;;; global data structures entirely when possible and consing up the
 ;;;; others from scratch instead of clearing and reusing them?
 
-;;; Clear the INFO in constants in the *FREE-VARIABLES*, etc. In
+;;; Clear the INFO in constants in the *FREE-VARS*, etc. In
 ;;; addition to allowing stuff to be reclaimed, this is required for
 ;;; correct assignment of constant offsets, since we need to assign a
 ;;; new offset for each component. We don't clear the FUNCTIONAL-INFO
@@ -522,7 +522,7 @@
 	     (declare (ignore k))
 	     (when (constant-p v)
 	       (setf (leaf-info v) nil)))
-	   *free-variables*)
+	   *free-vars*)
   (values))
 
 ;;; Blow away the REFS for all global variables, and let COMPONENT
@@ -541,7 +541,7 @@
 		      x))
 	   (here-p (x)
 	     (eq (node-component x) component)))
-    (blast *free-variables*)
+    (blast *free-vars*)
     (blast *free-funs*)
     (blast *constants*))
   (values))
@@ -557,7 +557,7 @@
   ;; Clear global tables.
   (when (boundp '*free-funs*)
     (clrhash *free-funs*)
-    (clrhash *free-variables*)
+    (clrhash *free-vars*)
     (clrhash *constants*))
 
   ;; Clear debug counters and tables.

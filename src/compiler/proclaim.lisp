@@ -19,7 +19,7 @@
 (defvar *undefined-warnings*)
 (declaim (list *undefined-warnings*))
 
-;;; Look up some symbols in *FREE-VARIABLES*, returning the var
+;;; Look up some symbols in *FREE-VARS*, returning the var
 ;;; structures for any which exist. If any of the names aren't
 ;;; symbols, we complain.
 (declaim (ftype (function (list) list) get-old-vars))
@@ -28,7 +28,7 @@
     (dolist (name names (vars))
       (unless (symbolp name)
 	(compiler-error "The name ~S is not a symbol." name))
-      (let ((old (gethash name *free-variables*)))
+      (let ((old (gethash name *free-vars*)))
 	(when old (vars old))))))
 
 ;;; Return a new POLICY containing the policy information represented

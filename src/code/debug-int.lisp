@@ -1123,8 +1123,7 @@
 ;;; nil). This may iterate over only some of DEBUG-FUN's variables or
 ;;; none depending on debug policy; for example, possibly the
 ;;; compilation only preserved argument information.
-(defmacro do-debug-fun-variables ((var debug-fun &optional result)
-				       &body body)
+(defmacro do-debug-fun-vars ((var debug-fun &optional result) &body body)
   (let ((vars (gensym))
 	(i (gensym)))
     `(let ((,vars (debug-fun-debug-vars ,debug-fun)))
@@ -1227,7 +1226,7 @@
 ;;; as symbol. The result of this function is limited to the
 ;;; availability of variable information in DEBUG-FUN; for
 ;;; example, possibly DEBUG-FUN only knows about its arguments.
-(defun debug-fun-symbol-variables (debug-fun symbol)
+(defun debug-fun-symbol-vars (debug-fun symbol)
   (let ((vars (ambiguous-debug-vars debug-fun (symbol-name symbol)))
 	(package (and (symbol-package symbol)
 		      (package-name (symbol-package symbol)))))
@@ -1252,7 +1251,7 @@
     (if variables
 	(let* ((len (length variables))
 	       (prefix-len (length name-prefix-string))
-	       (pos (find-variable name-prefix-string variables len))
+	       (pos (find-var name-prefix-string variables len))
 	       (res nil))
 	  (when pos
 	    ;; Find names from pos to variable's len that contain prefix.
@@ -1271,9 +1270,9 @@
 	    (setq res (nreverse res)))
 	  res))))
 
-;;; This returns a position in variables for one containing name as an
-;;; initial substring. End is the length of variables if supplied.
-(defun find-variable (name variables &optional end)
+;;; This returns a position in VARIABLES for one containing NAME as an
+;;; initial substring. END is the length of VARIABLES if supplied.
+(defun find-var (name variables &optional end)
   (declare (simple-vector variables)
 	   (simple-string name))
   (let ((name-len (length name)))
@@ -1596,7 +1595,7 @@
 (defun parse-compiled-debug-vars (debug-fun)
   (let* ((cdebug-fun (compiled-debug-fun-compiler-debug-fun
 		      debug-fun))
-	 (packed-vars (sb!c::compiled-debug-fun-variables cdebug-fun))
+	 (packed-vars (sb!c::compiled-debug-fun-vars cdebug-fun))
 	 (args-minimal (eq (sb!c::compiled-debug-fun-arguments cdebug-fun)
 			   :minimal)))
     (when packed-vars
@@ -2671,7 +2670,7 @@
       (debug-signal 'no-debug-vars :debug-fun fun))
     (sb!int:collect ((binds)
 		     (specs))
-      (do-debug-fun-variables (var fun)
+      (do-debug-fun-vars (var fun)
 	(let ((validity (debug-var-validity var loc)))
 	  (unless (eq validity :invalid)
 	    (let* ((sym (debug-var-symbol var))

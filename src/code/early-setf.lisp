@@ -47,7 +47,7 @@
 	  ;; Local functions inhibit global SETF methods.
 	  ((and environment
 		(let ((name (car form)))
-		  (dolist (x (sb!c::lexenv-functions environment))
+		  (dolist (x (sb!c::lexenv-funs environment))
 		    (when (and (eq (car x) name)
 			       (not (sb!c::defined-fun-p (cdr x))))
 		      (return t)))))

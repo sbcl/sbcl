@@ -1233,6 +1233,14 @@ Error in function C::GET-LAMBDA-TO-COMPILE:
   T
   T
 
+141: 
+  Pretty-printing nested backquotes doesn't work right, as 
+  reported by Alexey Dejneka sbcl-devel 2002-01-13:
+  * '``(FOO ,@',@S)
+  ``(FOO SB-IMPL::BACKQ-COMMA-AT S)
+  * (lisp-implementation-version)
+  "0.pre7.129"
+
 
 KNOWN BUGS RELATED TO THE IR1 INTERPRETER
 
