@@ -285,8 +285,7 @@ interrupt_handle_pending(os_context_t *context)
 #ifndef __i386__
     boolean were_in_lisp = !foreign_function_call_active;
 #endif
-    while(stop_the_world)
-	sched_yield();
+    while(stop_the_world) kill(getpid(),SIGALRM);
 
     thread=arch_os_get_current_thread();
     SetSymbolValue(INTERRUPT_PENDING, NIL,thread);

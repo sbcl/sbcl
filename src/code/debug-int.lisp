@@ -934,7 +934,7 @@
 	     (return
 	       (values code pc-offset context)))))))))
 
-#-x86
+#!-x86
 (defun find-escaped-frame (frame-pointer)
   (error "find-escaped-frame non-x86 version was stale, restore from HEAD"))
 

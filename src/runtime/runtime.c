@@ -299,47 +299,46 @@ static void parent_sighandler(int signum)
 
 static void parent_do_garbage_collect(void)
 {    
-    int pa_threads,waiting_threads;
+    int waiting_threads=0;
     struct thread *th;
     int status,p;
 
+    for_each_thread(th) {
+	fprintf(stderr,"attaching to %d ...",th->pid); 
+	if(ptrace(PTRACE_ATTACH,th->pid,0,0))
+	    perror("PTRACE_ATTACH");
+	else waiting_threads++;
+    }
     stop_the_world=1;
-    /* first, we mark all threads interrupted.  This has no bad effect
-     * on non-PA threads, and saves doing the atomic
-     * test-one-location-and-set-another we'd otherwise have to do */
-    for_each_thread(th) 
-	SetTlSymbolValue(PSEUDO_ATOMIC_INTERRUPTED, make_fixnum(1),th);
 
-    /* Any PA threads running at this point will eventually get to the
-     * end of their PA section and pause at the top of
-     * interrupt_handle_pending.  So, now we know that no thread can
-     * turn its PA bit on behind our back */
     do {
-	pa_threads=0; waiting_threads=0;
-	for_each_thread(th) {
-	    if(SymbolTlValue(PSEUDO_ATOMIC_ATOMIC,th)) pa_threads++;
-	    else {
-		fprintf(stderr,"attaching to %d ...",th->pid); 
-		if(ptrace(PTRACE_ATTACH,th->pid,0,0))
-		    perror("PTRACE_ATTACH");
-		else waiting_threads++;
-	    }
-	}
+	/* not sure if we have to wait for PTRACE_ATTACH to finish
+	 * before we can send PTRACE_CONT, so let's play it safe
+	 */
 	while(waiting_threads>0) {
 	    if((p=waitpid(-1,&status, WUNTRACED|__WALL))>0) {
 		if(WIFEXITED(status) || WIFSIGNALED(status)) 
-		    /* either this is a thread we haven't yet ptraced
-		     * (e.g. someone killed a PA thread from another
-		     * process) or the PTRACE_ATTACH failed for some
-		     * thread.  I don't think we can get a thread 
-		     * exiting _after_ it's received the ATTACH, so
-		     * don't count this reap towards our total */
 		    destroy_thread(find_thread_by_pid(p));
-		else
+		else {
+		    fprintf(stderr, "wait returned pid %d\n",p);
 		    waiting_threads--;
+		}
 	    }
 	}
-    } while(pa_threads>0);
+	for_each_thread(th) {
+	    if(SymbolTlValue(PSEUDO_ATOMIC_ATOMIC,th)) {
+		/* restart the child, sending it a signal that will cause it 
+		 * to go into interrupt_handle_pending as soon as it's
+		 * finished being pseudo_atomic */
+		fprintf(stderr, "%d was pseudo-atomic, letting it resume\n",
+			th->pid);
+		if(ptrace(PTRACE_CONT,th->pid,0,SIGCONT))
+		    perror("PTRACE_CONT");
+		waiting_threads++;
+	    }
+	}
+    } while (waiting_threads>0);
+		
     collect_garbage(maybe_gc_pending-1);
     maybe_gc_pending=0;
     stop_the_world=0;
