@@ -140,7 +140,7 @@ Tests are in the file <tt>tests.lisp</tt> and also make good examples.
       (finish-output)
       (handler-case
           (socket-connect s "/dev/log")
-        (socket-error ()
+        (sb-bsd-sockets::socket-error ()
           (setq s (make-instance 'local-socket :type :stream))
           (format t "failed~%Retrying with ~A... " s)
           (finish-output)
