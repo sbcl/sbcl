@@ -222,7 +222,7 @@ void
 sigsegv_handler(int signal, siginfo_t *info, void* void_context)
 {
     os_context_t *context = arch_os_get_context(&void_context);
-    void* fault_addr = (void*)context->uc_mcontext.cr2;
+    void* fault_addr = (void*)info->si_addr;
     if (!gencgc_handle_wp_violation(fault_addr)) 
 	if(!handle_control_stack_guard_triggered(context,fault_addr))
 	    interrupt_handle_now(signal, info, void_context);

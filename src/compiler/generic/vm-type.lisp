@@ -33,7 +33,7 @@
   `(single-float ,low ,high))
 
 ;;; an index into an integer
-(sb!xc:deftype bit-index () `(integer 0 ,most-positive-fixnum))
+(sb!xc:deftype bit-index () `(integer 0 ,sb!xc:most-positive-fixnum))
 
 ;;; worst-case values for float attributes
 (sb!xc:deftype float-exponent ()

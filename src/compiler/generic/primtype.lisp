@@ -86,17 +86,14 @@
 (!def-primitive-type single-float (single-reg descriptor-reg))
 (/show0 "about to !DEF-PRIMITIVE-TYPE DOUBLE-FLOAT")
 (!def-primitive-type double-float (double-reg descriptor-reg))
-#!+long-float
-(!def-primitive-type long-float (long-reg descriptor-reg))
+
 (/show0 "about to !DEF-PRIMITIVE-TYPE COMPLEX-SINGLE-FLOAT")
 (!def-primitive-type complex-single-float (complex-single-reg descriptor-reg)
   :type (complex single-float))
 (/show0 "about to !DEF-PRIMITIVE-TYPE COMPLEX-DOUBLE-FLOAT")
 (!def-primitive-type complex-double-float (complex-double-reg descriptor-reg)
   :type (complex double-float))
-#!+long-float
-(!def-primitive-type complex-long-float (complex-long-reg descriptor-reg)
-  :type (complex long-float))
+
 
 ;;; primitive other-pointer array types
 (/show0 "primtype.lisp 96")
@@ -228,8 +225,8 @@
 			      (return (values
 				       (primitive-type-or-lose type)
 				       (and (= lo min) (= hi max))))))))
-		       ((or (and hi (< hi most-negative-fixnum))
-			    (and lo (> lo most-positive-fixnum)))
+		       ((or (and hi (< hi sb!xc:most-negative-fixnum))
+			    (and lo (> lo sb!xc:most-positive-fixnum)))
 			(part-of bignum))
 		       (t
 			(any))))
@@ -239,12 +236,8 @@
 		     ((short-float single-float)
 		      (values (primitive-type-or-lose 'single-float)
 			      exact))
-		     ((double-float #!-long-float long-float)
+		     ((double-float)
 		      (values (primitive-type-or-lose 'double-float)
-			      exact))
-		     #!+long-float
-		     (long-float
-		      (values (primitive-type-or-lose 'long-float)
 			      exact))
 		     (t
 		      (any)))))
@@ -257,12 +250,8 @@
 		      ((short-float single-float)
 		       (values (primitive-type-or-lose 'complex-single-float)
 			       exact))
-		      ((double-float #!-long-float long-float)
+		      ((double-float long-float)
 		       (values (primitive-type-or-lose 'complex-double-float)
-			       exact))
-		      #!+long-float
-		      (long-float
-		       (values (primitive-type-or-lose 'complex-long-float)
 			       exact))
 		      (t
 		       (part-of complex))))

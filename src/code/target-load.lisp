@@ -261,7 +261,7 @@
 		      tto)
               (format t "   loading to the dynamic space~%"))
 
-	(let ((code (%primitive sb!c:allocate-dynamic-code-object
+	(let ((code (%primitive sb!c:allocate-code-object
                                 box-num
                                 code-length))
 	      (index (+ sb!vm:code-trace-table-offset-slot box-num)))

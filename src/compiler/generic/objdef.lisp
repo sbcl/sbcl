@@ -355,14 +355,6 @@
   (real :c-type "double" :length 2)
   (imag :c-type "double" :length 2))
 
-#!+long-float
-(define-primitive-object (complex-long-float
-			  :lowtag other-pointer-lowtag
-			  :widetag complex-long-float-widetag)
-  #!+sparc (filler)
-  (real :c-type "long double" :length #!+x86 3 #!+sparc 4)
-  (imag :c-type "long double" :length #!+x86 3 #!+sparc 4))
-
 ;;; this isn't actually a lisp object at all, it's a c structure that lives
 ;;; in c-land.  However, we need sight of so many parts of it from Lisp that
 ;;; it makes sense to define it here anyway, so that the GENESIS machinery

@@ -113,19 +113,14 @@
   (foldable flushable))
 (defknown %raw-ref-complex-double (raw-vector index) (complex double-float)
   (foldable flushable))
-#!+long-float
-(defknown %raw-ref-complex-long (raw-vector index) (complex long-float)
-  (foldable flushable))
+
 (defknown %raw-set-complex-single (raw-vector index (complex single-float))
   (complex single-float)
   (unsafe))
 (defknown %raw-set-complex-double (raw-vector index (complex double-float))
   (complex double-float)
   (unsafe))
-#!+long-float
-(defknown %raw-set-complex-long (raw-vector index (complex long-float))
-  (complex long-float)
-  (unsafe))
+
 
 (defknown %raw-bits (t fixnum) (unsigned-byte 32)
   (foldable flushable))

@@ -160,8 +160,7 @@ main(int argc, char *argv[])
     DEFSIGNAL(SIGBUS);
     DEFSIGNAL(SIGCHLD);
     DEFSIGNAL(SIGCONT);
-/* FIXME: Maybe #ifdef SIGEMT would be a smarter conditional? */
-#if (!(defined LISP_FEATURE_LINUX) || !((defined LISP_FEATURE_PPC) || (defined LISP_FEATURE_X86)))
+#ifdef SIGEMT
     DEFSIGNAL(SIGEMT);
 #endif
     DEFSIGNAL(SIGFPE);

@@ -14,8 +14,8 @@
 
 ;;; Make a fixnum out of NUM. (I.e. shift by two bits if it will fit.)
 (defun fixnumize (num)
-  (if (<= #x-20000000 num #x1fffffff)
-      (ash num 2)
+  (if (fixnump num)
+      (ash num (1- n-lowtag-bits))
       (error "~W is too big for a fixnum." num)))
 
 ;;;; routines for dealing with static symbols

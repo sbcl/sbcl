@@ -100,9 +100,9 @@
 
  ;; for various constants e.g. SB!XC:MOST-POSITIVE-FIXNUM and
  ;; SB!VM:N-LOWTAG-BITS, needed by "early-objdef" and others
+ ("src/compiler/target/parms")
  ("src/compiler/generic/early-vm")
  ("src/compiler/generic/early-objdef")
- ("src/compiler/target/parms")
  ("src/code/early-array") ; needs "early-vm" numbers
 
  ("src/code/early-extensions") ; on host for COLLECT, SYMBOLICATE, etc.
@@ -227,6 +227,7 @@
  #!+sparc ("src/code/sparc-vm" :not-host)
  #!+hppa  ("src/code/hppa-vm"  :not-host)
  #!+x86   ("src/code/x86-vm"   :not-host)
+ #!+x86-64("src/code/x86-64-vm"   :not-host)
  #!+ppc   ("src/code/ppc-vm"   :not-host)
  #!+alpha ("src/code/alpha-vm" :not-host)
  #!+mips  ("src/code/mips-vm"  :not-host)

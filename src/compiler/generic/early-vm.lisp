@@ -11,7 +11,7 @@
 
 ;;; the number of bits at the low end of a pointer used for type
 ;;; information
-(def!constant n-lowtag-bits 3)
+(def!constant n-lowtag-bits #!+x86-64 4 #!-x86-64 3)
 ;;; a mask to extract the low tag bits from a pointer
 (def!constant lowtag-mask (1- (ash 1 n-lowtag-bits)))
 ;;; the exclusive upper bound on the value of the low tag bits from a
@@ -24,9 +24,11 @@
 ;;; a mask to extract the type from a data block header word
 (def!constant widetag-mask (1- (ash 1 n-widetag-bits)))
 
-(def!constant sb!xc:most-positive-fixnum (1- (ash 1 29))
+(def!constant sb!xc:most-positive-fixnum  
+    (1- (ash 1 (- n-word-bits n-lowtag-bits)))
   #!+sb-doc
   "the fixnum closest in value to positive infinity")
-(def!constant sb!xc:most-negative-fixnum (ash -1 29)
+(def!constant sb!xc:most-negative-fixnum
+    (ash -1 (- n-word-bits n-lowtag-bits))
   #!+sb-doc
   "the fixnum closest in value to negative infinity")

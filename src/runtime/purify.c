@@ -35,9 +35,12 @@
 
 #define PRINTNOISE
 
-#if defined(LISP_FEATURE_X86)
-/* again, what's so special about the x86 that this is differently
- * visible there than on other platforms? -dan 20010125 
+#if defined(LISP_FEATURE_GENCGC)
+/* this is another artifact of the poor integration between gencgc and
+ * the rest of the runtime: on cheney gc there is a global
+ * dynamic_space_free_pointer which is valid whenever foreign function
+ * call is active, but in gencgc there's no such variable and we have
+ * to keep our own
  */
 static lispobj *dynamic_space_free_pointer;
 #endif
@@ -1480,7 +1483,7 @@ purify(lispobj static_roots, lispobj read_only_roots)
     SetSymbolValue(READ_ONLY_SPACE_FREE_POINTER, (lispobj)read_only_free,0);
     SetSymbolValue(STATIC_SPACE_FREE_POINTER, (lispobj)static_free,0);
 
-#if !defined(LISP_FEATURE_X86)
+#if !defined(ALLOCATION_POINTER)
     dynamic_space_free_pointer = current_dynamic_space;
     set_auto_gc_trigger(bytes_consed_between_gcs);
 #else

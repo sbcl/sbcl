@@ -760,19 +760,6 @@
   (declare (ignore type))
   `(sap-ref-double ,sap (/ ,offset sb!vm:n-byte-bits)))
 
-#!+long-float
-(define-alien-type-class (long-float :include (float (bits #!+x86 96
-							   #!+sparc 128))
-				     :include-args (type)))
-
-#!+long-float
-(define-alien-type-translator long-float ()
-  (make-alien-long-float-type :type 'long-float))
-
-#!+long-float
-(define-alien-type-method (long-float :extract-gen) (type sap offset)
-  (declare (ignore type))
-  `(sap-ref-long ,sap (/ ,offset sb!vm:n-byte-bits)))
 
 ;;;; the POINTER type
 

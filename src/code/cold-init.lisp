@@ -289,17 +289,7 @@ instead (which is another name for the same thing)."))
       ;; disabled by default. Joe User can explicitly enable them if
       ;; desired.
       (set-floating-point-modes :traps '(:overflow :invalid :divide-by-zero))
-      (sb!thread::maybe-install-futex-functions)
-
-      ;; Clear pseudo atomic in case this core wasn't compiled with
-      ;; support.
-      ;;
-      ;; FIXME: In SBCL our cores are always compiled with support. So
-      ;; we don't need to do this, do we? At least not for this
-      ;; reason.. (Perhaps we should do it anyway in case someone
-      ;; manages to save an image from within a pseudo-atomic-atomic
-      ;; operation?)
-      #!+x86 (setf *pseudo-atomic-atomic* 0)))
+      (sb!thread::maybe-install-futex-functions)))
   (gc-on)
   (gc))
 

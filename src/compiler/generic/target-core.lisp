@@ -53,10 +53,8 @@
 	   (code-obj
 	    ;; FIXME: In CMU CL the X86 behavior here depended on
 	    ;; *ENABLE-DYNAMIC-SPACE-CODE*, but in SBCL we always use
-	    ;; dynamic space code, so we could make
-	    ;; ALLOCATE-DYNAMIC-CODE-OBJECT more parallel with
-	    ;; ALLOCATE-CODE-OBJECT and remove this confusing
-	    ;; read-macro conditionalization.
+	    ;; dynamic space code, so we shoudl just rename the
+	    ;; allocate-dynamic-code-object vop and lose this #+ stuff
 	    #!+x86
 	    (%primitive allocate-dynamic-code-object box-num total-length)
 	    #!-x86

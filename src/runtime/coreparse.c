@@ -90,10 +90,7 @@ process_directory(int fd, u32 *ptr, int count)
 		lose("warning: core/runtime address mismatch: DYNAMIC_SPACE_START");
 	    }
 #endif
-/* FIXME: Should the conditional here be reg_ALLOC instead of
- *   defined(LISP_FEATURE_X86)
- * ? */
-#if defined(LISP_FEATURE_X86)
+#if defined(ALLOCATION_POINTER)
 	    SetSymbolValue(ALLOCATION_POINTER, (lispobj)free_pointer,0);
 #else
 	    dynamic_space_free_pointer = free_pointer;
@@ -127,7 +124,7 @@ process_directory(int fd, u32 *ptr, int count)
 lispobj
 load_core_file(char *file)
 {
-    u32 *header, val, len, *ptr, remaining_len;
+    lispobj *header, val, len, *ptr, remaining_len;
     int fd = open(file, O_RDONLY), count;
 
     lispobj initial_function = NIL;

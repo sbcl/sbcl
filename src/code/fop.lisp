@@ -292,14 +292,7 @@
              '(make-single-float (fast-read-s-integer 4)))
            (fast-read-double-float ()
              '(let ((lo (fast-read-u-integer 4)))
-               (make-double-float (fast-read-s-integer 4) lo)))
-           #!+long-float
-           (fast-read-long-float ()
-             '(let ((lo (fast-read-u-integer 4))
-                    #!+sparc (mid (fast-read-u-integer 4))
-                    (hi (fast-read-u-integer 4)) ; XXX
-                    (exp (fast-read-s-integer #!+x86 2 #!+sparc 4)))
-               (make-long-float exp hi #!+sparc mid lo))))
+               (make-double-float (fast-read-s-integer 4) lo))))
   (macrolet ((define-complex-fop (name fop-code type)
                (let ((reader (symbolicate "FAST-READ-" type)))
                  `(define-fop (,name ,fop-code)
@@ -404,16 +397,6 @@
     (read-n-bytes *fasl-input-stream* result 0 (* length sb!vm:n-word-bytes 2))
     result))
 
-#!+long-float
-(define-fop (fop-long-float-vector 88)
-  (let* ((length (read-arg 4))
-	 (result (make-array length :element-type 'long-float)))
-    (read-n-bytes *fasl-input-stream*
-		  result
-		  0
-		  (* length sb!vm:n-word-bytes #!+x86 3 #!+sparc 4))
-    result))
-
 (define-fop (fop-complex-single-float-vector 86)
   (let* ((length (read-arg 4))
 	 (result (make-array length :element-type '(complex single-float))))
@@ -427,14 +410,6 @@
 		  result
 		  0
 		  (* length sb!vm:n-word-bytes 2 2))
-    result))
-
-#!+long-float
-(define-fop (fop-complex-long-float-vector 89)
-  (let* ((length (read-arg 4))
-	 (result (make-array length :element-type '(complex long-float))))
-    (read-n-bytes *fasl-input-stream* result 0
-		  (* length sb!vm:n-word-bytes #!+x86 3 #!+sparc 4 2))
     result))
 
 ;;; CMU CL comment:

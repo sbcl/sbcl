@@ -75,9 +75,6 @@
 	  :importance 6)
 	 (double-float 0.0d0 64 simple-array-double-float
 	  :importance 5)
-	 #!+long-float
-	 (long-float 0.0l0 #!+x86 96 #!+sparc 128 simple-array-long-float
-	  :importance 4)
 	 (bit 0 1 simple-bit-vector
 	      :complex-typecode #.sb!vm:complex-bit-vector-widetag
 	      :importance 16)

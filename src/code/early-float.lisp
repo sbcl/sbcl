@@ -103,21 +103,13 @@
 (defconstant most-positive-double-float
   (double-from-bits 0 sb!vm:double-float-normal-exponent-max
 		    (ldb (byte sb!vm:double-float-digits 0) -1)))
-#!-long-float
+
 (defconstant most-positive-long-float most-positive-double-float)
-#!+(and long-float x86)
-(defconstant most-positive-long-float
-  (long-from-bits 0 sb!vm:long-float-normal-exponent-max
-		  (ldb (byte sb!vm:long-float-digits 0) -1)))
+
 (defconstant most-negative-double-float
   (double-from-bits 1 sb!vm:double-float-normal-exponent-max
 		    (ldb (byte sb!vm:double-float-digits 0) -1)))
-#!-long-float
 (defconstant most-negative-long-float most-negative-double-float)
-#!+(and long-float x86)
-(defconstant most-negative-long-float
-  (long-from-bits 1 sb!vm:long-float-normal-exponent-max
-		  (ldb (byte sb!vm:long-float-digits 0) -1)))
 
 ;;; We don't want to do these DEFCONSTANTs at cross-compilation time,
 ;;; because the cross-compilation host might not support floating

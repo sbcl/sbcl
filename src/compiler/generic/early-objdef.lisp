@@ -18,20 +18,22 @@
 ;;; out the full names. Or even define them in DEF EVEN-FIXNUM-LOWTAG
 ;;; style so searches like 'def.*even-fixnum-lowtag' can find them.
 
-;;; Tags for the main low-level types are stored in the low three
+;;; Tags for the main low-level types are stored in the low n (usually three)
 ;;; bits to identify the type of a machine word.  Certain constraints 
 ;;; apply:
 ;;;   * EVEN-FIXNUM-LOWTAG and ODD-FIXNUM-LOWTAG must be 0 and 4: code
 ;;;     which shifts left two places to convert raw integers to tagged
 ;;;     fixnums is ubiquitous.
-;;;   * LIST-POINTER-LOWTAG + 4 = OTHER-POINTER-LOWTAG: NIL is both a
-;;;     cons and a symbol (at the same address) and depends on this.
+;;;   * LIST-POINTER-LOWTAG + N-WORD-BYTES = OTHER-POINTER-LOWTAG: NIL 
+;;;     is both a cons and a symbol (at the same address) and depends on this.
 ;;;     See the definition of SYMBOL in objdef.lisp
 ;;;   * OTHER-POINTER-LOWTAG > 4: Some code in the SPARC backend,
 ;;;     which uses bit 2 of the ALLOC register to indicate that
 ;;;     PSEUDO-ATOMIC is on, doesn't strip the low bits of reg_ALLOC
 ;;;     before ORing in OTHER-POINTER-LOWTAG within a PSEUDO-ATOMIC
 ;;;     section.
+;;;   * OTHER-IMMEDIATE-0-LOWTAG are spaced 4 apart: various code wants to 
+;;;     iterate through these
 ;;; (These are just the ones we know about as of sbcl-0.7.1.22. There
 ;;; might easily be more, since these values have stayed highly
 ;;; constrained for more than a decade, an inviting target for
@@ -40,13 +42,23 @@
   ;; The EVAL-WHEN is necessary (at least for Lispworks), because the
   ;; second DEFENUM uses the value of OTHER-IMMEDIATE-0-LOWTAG, which is
   ;; defined in the first DEFENUM. -- AL 20000216
+  #!+x86-64
   (defenum (:suffix -lowtag)
     even-fixnum
-    ;; Note: CMU CL, and SBCL < 0.pre7.39, had FUN-POINTER-LOWTAG
-    ;; here. We swapped FUN-POINTER-LOWTAG and
-    ;; INSTANCE-POINTER-LOWTAG in sbcl-0.pre7.39 in order to help with a
-    ;; low-level pun in the function call sequence on the PPC port.
-    ;; For more information, see the PPC port code. -- WHN 2001-10-03
+    instance-pointer
+    other-immediate-0
+    pad0 pad1 pad2
+    other-immediate-1
+    list-pointer
+    odd-fixnum
+    fun-pointer
+    other-immediate-2
+    pad3 pad4 pad5
+    other-immediate-3
+    other-pointer)
+  #!-x86-64
+  (defenum (:suffix -lowtag)
+    even-fixnum
     instance-pointer
     other-immediate-0
     list-pointer
@@ -54,6 +66,9 @@
     fun-pointer
     other-immediate-1
     other-pointer))
+
+(def!constant nil-value
+    (+ static-space-start n-word-bytes other-pointer-lowtag))
 
 ;;; the heap types, stored in 8 bits of the header of an object on the
 ;;; heap, to identify the type of the heap object (which'll be at
@@ -95,16 +110,14 @@
 ;;; rather than two separate tests and jumps 
 (defenum (:suffix -widetag
 	  :start (+ (ash 1 n-lowtag-bits) other-immediate-0-lowtag)
-	  :step (ash 1 (1- n-lowtag-bits)))
+	  :step 4)
   bignum
   ratio
   single-float
   double-float
-  #!+long-float long-float
   complex
   complex-single-float
   complex-double-float
-  #!+long-float complex-long-float
 
   code-header
   simple-fun-header
@@ -129,13 +142,11 @@
   unused05
   unused06
   unused07
-  #!-long-float unused08
-  #!-long-float unused09
+  unused08
+  unused09
   
-  #!+long-float simple-array-long-float
-  #!+long-float simple-array-complex-long-float
-  #!-long-float unused10
-  #!-long-float unused11
+  unused10
+  unused11
 
   simple-array-unsigned-byte-2
   simple-array-unsigned-byte-4

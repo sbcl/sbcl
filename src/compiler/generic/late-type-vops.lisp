@@ -16,7 +16,7 @@
   :variant simple
   ;; we can save a couple of instructions and a branch on the ppc.
   ;; FIXME: make this be FIXNUM-MASK
-  :mask 3)
+  :mask  (ash lowtag-mask -1))
 
 (!define-type-vops functionp check-fun function object-not-fun-error
   (fun-pointer-lowtag)
@@ -57,11 +57,6 @@
     object-not-complex-double-float-error
   (complex-double-float-widetag))
 
-#!+long-float
-(!define-type-vops complex-long-float-p check-complex-long-float complex-long-float
-    object-not-complex-long-float-error
-  (complex-long-float-widetag))
-
 (!define-type-vops single-float-p check-single-float single-float
     object-not-single-float-error
   (single-float-widetag))
@@ -69,11 +64,6 @@
 (!define-type-vops double-float-p check-double-float double-float
     object-not-double-float-error
   (double-float-widetag))
-
-#!+long-float
-(!define-type-vops long-float-p check-long-float long-float
-    object-not-long-float-error
-  (long-float-widetag))
 
 (!define-type-vops simple-string-p check-simple-string nil
     object-not-simple-string-error

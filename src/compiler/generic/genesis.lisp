@@ -186,20 +186,26 @@
 			    (ldb (byte 8 ,(- n 8 (* i 8))) new-value)))))
               `(progn
                  (defun ,name (bigvec byte-index)
-		   (aver (= sb!vm:n-word-bits 32))
-		   (aver (= sb!vm:n-byte-bits 8))
 		   (logior ,@(ecase sb!c:*backend-byte-order*
 			       (:little-endian ash-list-le)
 			       (:big-endian ash-list-be))))
 		 (defun (setf ,name) (new-value bigvec byte-index)
-		   (aver (= sb!vm:n-word-bits 32))
-		   (aver (= sb!vm:n-byte-bits 8))
 		   (setf ,@(ecase sb!c:*backend-byte-order*
 			     (:little-endian setf-list-le)
 			     (:big-endian setf-list-be))))))))
   (make-bvref-n 8)
   (make-bvref-n 16)
-  (make-bvref-n 32))
+  (make-bvref-n 32)
+  (make-bvref-n 64))
+
+;; lispobj-sized word, whatever that may be
+(defun bvref-word (bytes index)
+  #!+x86-64 (bvref-64 bytes index)
+  #!-x86-64 (bvref-32 bytes index))
+
+(defun (setf bvref-word) (new-val bytes index)
+  #!+x86-64 (setf (bvref-64 bytes index) new-val)
+  #!-x86-64 (setf (bvref-32 bytes index) new-val))
 
 ;;;; representation of spaces in the core
 
@@ -356,8 +362,9 @@
       ;; it's hard to see how it could have been wrong, since CMU CL
       ;; genesis worked. It would be nice to understand how this came
       ;; to be.. -- WHN 19990901
-      (logior (ash bits -2) (ash -1 (- sb!vm:n-word-bits 2)))
-      (ash bits -2))))
+      (logior (ash bits (- 1 sb!vm:n-lowtag-bits)) 
+	      (ash -1 (- sb!vm:n-word-bits (1- sb!vm:n-lowtag-bits))))
+      (ash bits  (- 1 sb!vm:n-lowtag-bits)))))
 
 ;;; common idioms
 (defun descriptor-bytes (des)
@@ -490,7 +497,7 @@
 	 (bytes (gspace-bytes gspace))
 	 (byte-index (ash (+ index (descriptor-word-offset address))
 			  sb!vm:word-shift))
-	 (value (bvref-32 bytes byte-index)))
+	 (value (bvref-word bytes byte-index)))
     (make-random-descriptor value)))
 
 (declaim (ftype (function (descriptor) descriptor) read-memory))
@@ -533,7 +540,7 @@
     (let* ((bytes (gspace-bytes (descriptor-intuit-gspace address)))
 	   (byte-index (ash (+ index (descriptor-word-offset address))
 			       sb!vm:word-shift)))
-      (setf (bvref-32 bytes byte-index)
+      (setf (bvref-word bytes byte-index)
 	    (descriptor-bits value)))))
 
 (declaim (ftype (function (descriptor descriptor)) write-memory))
@@ -675,23 +682,6 @@
 	 (:big-endian
 	  (write-wordindexed des sb!vm:double-float-value-slot high-bits)
 	  (write-wordindexed des (1+ sb!vm:double-float-value-slot) low-bits)))
-       des))
-    #!+(and long-float x86)
-    (long-float
-     (let ((des (allocate-unboxed-object *dynamic*
-					 sb!vm:n-word-bits
-					 (1- sb!vm:long-float-size)
-					 sb!vm:long-float-widetag))
-	   (exp-bits (make-random-descriptor (long-float-exp-bits x)))
-	   (high-bits (make-random-descriptor (long-float-high-bits x)))
-	   (low-bits (make-random-descriptor (long-float-low-bits x))))
-       (ecase sb!c:*backend-byte-order*
-	 (:little-endian
-	  (write-wordindexed des sb!vm:long-float-value-slot low-bits)
-	  (write-wordindexed des (1+ sb!vm:long-float-value-slot) high-bits)
-	  (write-wordindexed des (+ 2 sb!vm:long-float-value-slot) exp-bits))
-	 (:big-endian
-	  (error "LONG-FLOAT is not supported for big-endian byte order.")))
        des))))
 
 (defun complex-single-float-to-core (num)
@@ -747,7 +737,8 @@
 ;;; Copy the given number to the core.
 (defun number-to-core (number)
   (typecase number
-    (integer (if (< (integer-length number) 30)
+    (integer (if (< (integer-length number) 
+		    (- (1+ sb!vm:n-word-bits) sb!vm:n-lowtag-bits))
 		 (make-fixnum-descriptor number)
 		 (bignum-to-core number)))
     (ratio (number-pair-to-core (number-to-core (numerator number))
@@ -1350,26 +1341,12 @@
 
   (cold-set '*!reversed-cold-toplevels* *current-reversed-cold-toplevels*)
 
-  #!+x86
+  #!+(or x86 x86-64)
   (progn
     (cold-set 'sb!vm::*fp-constant-0d0* (number-to-core 0d0))
     (cold-set 'sb!vm::*fp-constant-1d0* (number-to-core 1d0))
     (cold-set 'sb!vm::*fp-constant-0f0* (number-to-core 0f0))
-    (cold-set 'sb!vm::*fp-constant-1f0* (number-to-core 1f0))
-    #!+long-float
-    (progn
-      (cold-set 'sb!vm::*fp-constant-0l0* (number-to-core 0L0))
-      (cold-set 'sb!vm::*fp-constant-1l0* (number-to-core 1L0))
-      ;; FIXME: Why is initialization of PI conditional on LONG-FLOAT?
-      ;; (ditto LG2, LN2, L2E, etc.)
-      (cold-set 'sb!vm::*fp-constant-pi* (number-to-core pi))
-      (cold-set 'sb!vm::*fp-constant-l2t* (number-to-core (log 10L0 2L0)))
-      (cold-set 'sb!vm::*fp-constant-l2e*
-	    (number-to-core (log 2.718281828459045235360287471352662L0 2L0)))
-      (cold-set 'sb!vm::*fp-constant-lg2* (number-to-core (log 2L0 10L0)))
-      (cold-set 'sb!vm::*fp-constant-ln2*
-	    (number-to-core
-	     (log 2L0 2.718281828459045235360287471352662L0))))))
+    (cold-set 'sb!vm::*fp-constant-1f0* (number-to-core 1f0))))
 
 ;;; Make a cold list that can be used as the arg list to MAKE-PACKAGE in order
 ;;; to make a package that is similar to PKG.
@@ -1641,10 +1618,10 @@
 ;;; The x86 port needs to store code fixups along with code objects if
 ;;; they are to be moved, so fixups for code objects in the dynamic
 ;;; heap need to be noted.
-#!+x86
+#!+(or x86 x86-64)
 (defvar *load-time-code-fixups*)
 
-#!+x86
+#!+(or x86 x86-64)
 (defun note-load-time-code-fixup (code-object offset value kind)
   ;; If CODE-OBJECT might be moved
   (when (= (gspace-identifier (descriptor-intuit-gspace code-object))
@@ -1653,7 +1630,7 @@
     (push (list code-object offset value kind) *load-time-code-fixups*))
   (values))
 
-#!+x86
+#!+(or x86 x86-64)
 (defun output-load-time-code-fixups ()
   (dolist (fixups *load-time-code-fixups*)
     (let ((code-object (first fixups))
@@ -1809,8 +1786,8 @@
 		(dpb (ldb (byte 10 0) value)
 		     (byte 10 0)
 		     (bvref-32 gspace-bytes gspace-byte-offset))))))
-      (:x86
-       (let* ((un-fixed-up (bvref-32 gspace-bytes
+      ((:x86 :x86-64)
+       (let* ((un-fixed-up (bvref-word gspace-bytes
 					       gspace-byte-offset))
 	      (code-object-start-addr (logandc2 (descriptor-bits code-object)
 						sb!vm:lowtag-mask)))
@@ -1840,7 +1817,7 @@
 	    (let ((fixed-up (- (+ value un-fixed-up)
 			       gspace-byte-address
 			       gspace-byte-offset
-			       sb!vm:n-word-bytes))) ; length of CALL argument
+			       4))) ; "length of CALL argument"
 	      (setf (bvref-32 gspace-bytes gspace-byte-offset)
 		    fixed-up)
 	      ;; Note relative fixups that point outside the code
@@ -2243,117 +2220,6 @@
 (define-cold-number-fop fop-byte-integer)
 (define-cold-number-fop fop-complex-single-float)
 (define-cold-number-fop fop-complex-double-float)
-
-#!+long-float
-(define-cold-fop (fop-long-float)
-  (ecase +backend-fasl-file-implementation+
-    (:x86 ; (which has 80-bit long-float format)
-     (prepare-for-fast-read-byte *fasl-input-stream*
-       (let* ((des (allocate-unboxed-object *dynamic* sb!vm:n-word-bits
-					    (1- sb!vm:long-float-size)
-					    sb!vm:long-float-widetag))
-	      (low-bits (make-random-descriptor (fast-read-u-integer 4)))
-	      (high-bits (make-random-descriptor (fast-read-u-integer 4)))
-	      (exp-bits (make-random-descriptor (fast-read-s-integer 2))))
-	 (done-with-fast-read-byte)
-	 (write-wordindexed des sb!vm:long-float-value-slot low-bits)
-	 (write-wordindexed des (1+ sb!vm:long-float-value-slot) high-bits)
-	 (write-wordindexed des (+ 2 sb!vm:long-float-value-slot) exp-bits)
-	 des)))
-    ;; This was supported in CMU CL, but isn't currently supported in
-    ;; SBCL.
-    #+nil
-    (#.sb!c:sparc-fasl-file-implementation ; 128 bit long-float format
-     (prepare-for-fast-read-byte *fasl-input-stream*
-       (let* ((des (allocate-unboxed-object *dynamic* sb!vm:n-word-bits
-					    (1- sb!vm:long-float-size)
-					    sb!vm:long-float-widetag))
-	      (low-bits (make-random-descriptor (fast-read-u-integer 4)))
-	      (mid-bits (make-random-descriptor (fast-read-u-integer 4)))
-	      (high-bits (make-random-descriptor (fast-read-u-integer 4)))
-	      (exp-bits (make-random-descriptor (fast-read-s-integer 4))))
-	 (done-with-fast-read-byte)
-	 (write-wordindexed des sb!vm:long-float-value-slot exp-bits)
-	 (write-wordindexed des (1+ sb!vm:long-float-value-slot) high-bits)
-	 (write-wordindexed des (+ 2 sb!vm:long-float-value-slot) mid-bits)
-	 (write-wordindexed des (+ 3 sb!vm:long-float-value-slot) low-bits)
-	 des)))))
-
-#!+long-float
-(define-cold-fop (fop-complex-long-float)
-  (ecase +backend-fasl-file-implementation+
-    (:x86 ; (which has 80-bit long-float format)
-     (prepare-for-fast-read-byte *fasl-input-stream*
-       (let* ((des (allocate-unboxed-object *dynamic* sb!vm:n-word-bits
-					    (1- sb!vm:complex-long-float-size)
-					    sb!vm:complex-long-float-widetag))
-	      (real-low-bits (make-random-descriptor (fast-read-u-integer 4)))
-	      (real-high-bits (make-random-descriptor (fast-read-u-integer 4)))
-	      (real-exp-bits (make-random-descriptor (fast-read-s-integer 2)))
-	      (imag-low-bits (make-random-descriptor (fast-read-u-integer 4)))
-	      (imag-high-bits (make-random-descriptor (fast-read-u-integer 4)))
-	      (imag-exp-bits (make-random-descriptor (fast-read-s-integer 2))))
-	 (done-with-fast-read-byte)
-	 (write-wordindexed des
-			    sb!vm:complex-long-float-real-slot
-			    real-low-bits)
-	 (write-wordindexed des
-			    (1+ sb!vm:complex-long-float-real-slot)
-			    real-high-bits)
-	 (write-wordindexed des
-			    (+ 2 sb!vm:complex-long-float-real-slot)
-			    real-exp-bits)
-	 (write-wordindexed des
-			    sb!vm:complex-long-float-imag-slot
-			    imag-low-bits)
-	 (write-wordindexed des
-			    (1+ sb!vm:complex-long-float-imag-slot)
-			    imag-high-bits)
-	 (write-wordindexed des
-			    (+ 2 sb!vm:complex-long-float-imag-slot)
-			    imag-exp-bits)
-	 des)))
-    ;; This was supported in CMU CL, but isn't currently supported in SBCL.
-    #+nil
-    (#.sb!c:sparc-fasl-file-implementation ; 128 bit long-float format
-     (prepare-for-fast-read-byte *fasl-input-stream*
-       (let* ((des (allocate-unboxed-object *dynamic* sb!vm:n-word-bits
-					    (1- sb!vm:complex-long-float-size)
-					    sb!vm:complex-long-float-widetag))
-	      (real-low-bits (make-random-descriptor (fast-read-u-integer 4)))
-	      (real-mid-bits (make-random-descriptor (fast-read-u-integer 4)))
-	      (real-high-bits (make-random-descriptor (fast-read-u-integer 4)))
-	      (real-exp-bits (make-random-descriptor (fast-read-s-integer 4)))
-	      (imag-low-bits (make-random-descriptor (fast-read-u-integer 4)))
-	      (imag-mid-bits (make-random-descriptor (fast-read-u-integer 4)))
-	      (imag-high-bits (make-random-descriptor (fast-read-u-integer 4)))
-	      (imag-exp-bits (make-random-descriptor (fast-read-s-integer 4))))
-	 (done-with-fast-read-byte)
-	 (write-wordindexed des
-			    sb!vm:complex-long-float-real-slot
-			    real-exp-bits)
-	 (write-wordindexed des
-			    (1+ sb!vm:complex-long-float-real-slot)
-			    real-high-bits)
-	 (write-wordindexed des
-			    (+ 2 sb!vm:complex-long-float-real-slot)
-			    real-mid-bits)
-	 (write-wordindexed des
-			    (+ 3 sb!vm:complex-long-float-real-slot)
-			    real-low-bits)
-	 (write-wordindexed des
-			    sb!vm:complex-long-float-real-slot
-			    imag-exp-bits)
-	 (write-wordindexed des
-			    (1+ sb!vm:complex-long-float-real-slot)
-			    imag-high-bits)
-	 (write-wordindexed des
-			    (+ 2 sb!vm:complex-long-float-real-slot)
-			    imag-mid-bits)
-	 (write-wordindexed des
-			    (+ 3 sb!vm:complex-long-float-real-slot)
-			    imag-low-bits)
-	 des)))))
 
 (define-cold-fop (fop-ratio)
   (let ((den (pop-stack)))
@@ -2973,11 +2839,12 @@ initially undefined function references:~2%")
 (defun write-word (num)
   (ecase sb!c:*backend-byte-order*
     (:little-endian
-     (dotimes (i 4)
+     (dotimes (i sb!vm:n-word-bytes)
        (write-byte (ldb (byte 8 (* i 8)) num) *core-file*)))
     (:big-endian
-     (dotimes (i 4)
-       (write-byte (ldb (byte 8 (* (- 3 i) 8)) num) *core-file*))))
+     (dotimes (i sb!vm:n-word-bytes)
+       (write-byte (ldb (byte 8 (* (- (1- sb!vm:n-word-bytes) i) 8)) num) 
+		   *core-file*))))
   num)
 
 (defun advance-to-page ()

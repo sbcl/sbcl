@@ -61,7 +61,7 @@
   of the default random state. If STATE is a random state, then return a
   copy of it. If STATE is T then return a random state generated from
   the universal time."
-  (/show0 "entering !RANDOM-COLD-INIT")
+  (/show0 "entering MAKE-RANDOM-STATE")
   (flet ((copy-random-state (state)
 	   (/show0 "entering COPY-RANDOM-STATE")
 	   (let ((state (random-state-state state))
@@ -213,35 +213,6 @@
 	   (sb!vm::random-mt19937 state-vector))
 	  1d0))))
 
-#!+long-float
-(declaim #!-sb-fluid (inline %random-long-float))
-#!+long-float
-(declaim (ftype (function ((long-float (0l0)) random-state) (long-float 0l0))
-		%random-long-float))
-
-;;; using a faster inline VOP
-#!+(and long-float x86)
-(defun %random-long-float (arg state)
-  (declare (type (long-float (0l0)) arg)
-	   (type random-state state))
-  (let ((state-vector (random-state-state state)))
-    (* arg
-       (- (sb!impl::make-long-float
-	   (sb!impl::long-float-exp-bits 1l0)
-	   (logior (sb!vm::random-mt19937 state-vector)
-		   sb!vm:long-float-hidden-bit)
-	   (sb!vm::random-mt19937 state-vector))
-	  1l0))))
-
-#!+(and long-float sparc)
-(defun %random-long-float (arg state)
-  (declare (type (long-float (0l0)) arg)
-	   (type random-state state))
-  (* arg
-     (- (sb!impl::make-long-float
-	 (sb!impl::long-float-exp-bits 1l0)	; X needs more work
-	 (random-chunk state) (random-chunk state) (random-chunk state))
-	1l0)))
 
 ;;;; random integers
 
