@@ -354,7 +354,6 @@
 	    (if (typep spec 'built-in-classoid)
 		(or (built-in-classoid-translation spec) spec)
 		spec))
-	   ;; FIXME: CL:CLASS objects are type specifiers.
 	   (t
 	    (let* (;; FIXME: This automatic promotion of FOO-style
 		   ;; specs to (FOO)-style specs violates the ANSI
