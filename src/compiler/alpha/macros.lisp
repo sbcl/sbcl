@@ -108,7 +108,7 @@
   "Emit a return-pc header word.  LABEL is the label to use for this
    return-pc."
   `(progn
-     (align lowtag-bits)
+     (align n-lowtag-bits)
      (emit-label ,label)
      (inst lra-header-word)))
 
@@ -161,24 +161,21 @@
 
 ;;;; storage allocation
 
-;;; Do stuff to allocate an other-pointer object of fixed Size with a
-;;; single word header having the specified Type-Code. The result is
-;;; placed in Result-TN, Flag-Tn must be wired to NL3-OFFSET, and
+;;; Do stuff to allocate an other-pointer object of fixed SIZE with a
+;;; single word header having the specified WIDETAG value. The result is
+;;; placed in RESULT-TN, Flag-Tn must be wired to NL3-OFFSET, and
 ;;; Temp-TN is a non- descriptor temp (which may be randomly used by
 ;;; the body.) The body is placed inside the PSEUDO-ATOMIC, and
 ;;; presumably initializes the object.
-(defmacro with-fixed-allocation ((result-tn temp-tn type-code size)
+(defmacro with-fixed-allocation ((result-tn temp-tn widetagsize)
 				 &body body)
   `(pseudo-atomic (:extra (pad-data-block ,size))
      (inst bis alloc-tn other-pointer-lowtag ,result-tn)
-     (inst li (logior (ash (1- ,size) type-bits) ,type-code) ,temp-tn)
+     (inst li (logior (ash (1- ,size) n-widetag-bits) ,widetag) ,temp-tn)
      (storew ,temp-tn ,result-tn 0 other-pointer-lowtag)
      ,@body))
-
-
 
-;;;; Error Code
-
+;;;; error code
 
 (defvar *adjustable-vectors* nil)
 

@@ -90,7 +90,7 @@
     (let ((bogus (gen-label))
 	  (done (gen-label)))
       (loadw temp thing 0 lowtag)
-      (inst srl temp sb!vm:type-bits temp)
+      (inst srl temp sb!vm:n-widetag-bits temp)
       (inst beq temp bogus)
       (inst sll temp (1- (integer-length sb!vm:word-bytes)) temp)
       (unless (= lowtag sb!vm:other-pointer-lowtag)
@@ -136,7 +136,7 @@
   (:result-types positive-fixnum)
   (:generator 5
     (loadw res fun 0 fun-pointer-lowtag)
-    (inst srl res sb!vm:type-bits res)))
+    (inst srl res sb!vm:n-widetag-bits res)))
 
 (defknown make-number-stack-pointer ((unsigned-byte 32)) system-area-pointer
   (movable foldable flushable))

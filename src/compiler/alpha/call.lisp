@@ -131,7 +131,7 @@
   (:generator 1
     ;; Make sure the function is aligned, and drop a label pointing to
     ;; this function header.
-    (align lowtag-bits)
+    (align n-lowtag-bits)
     (trace-table-entry trace-table-function-prologue)
     (emit-label start-lab)
     ;; Allocate function header.

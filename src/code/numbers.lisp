@@ -227,7 +227,7 @@
 
 (defun complex (realpart &optional (imagpart 0))
   #!+sb-doc
-  "Builds a complex number from the specified components."
+  "Return a complex number with the specified real and imaginary components."
   (flet ((%%make-complex (realpart imagpart)
 	   (cond #!+long-float
 		 ((and (typep realpart 'long-float)
@@ -251,7 +251,7 @@
 
 (defun realpart (number)
   #!+sb-doc
-  "Extracts the real part of a number."
+  "Extract the real part of a number."
   (typecase number
     #!+long-float
     ((complex long-float)
@@ -267,7 +267,7 @@
 
 (defun imagpart (number)
   #!+sb-doc
-  "Extracts the imaginary part of a number."
+  "Extract the imaginary part of a number."
   (typecase number
     #!+long-float
     ((complex long-float)
@@ -329,8 +329,8 @@
 
 (defun - (number &rest more-numbers)
   #!+sb-doc
-  "Subtracts the second and all subsequent arguments from the first.
-  With one arg, negates it."
+  "Subtract the second and all subsequent arguments from the first; 
+  or with one argument, negate the first argument."
   (if more-numbers
       (do ((nlist more-numbers (cdr nlist))
 	   (result number))

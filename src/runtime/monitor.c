@@ -246,10 +246,10 @@ search_cmd(char **ptr)
         obj = *end;
         addr = end;
         end += 2;
-        if (TypeOf(obj) == type_SimpleFunHeader) {
+        if (widetag_of(obj) == SIMPLE_FUN_HEADER_WIDETAG) {
             print((long)addr | FUN_POINTER_LOWTAG);
-        } else if (lowtagof(obj) == OTHER_IMMEDIATE_0_LOWTAG ||
-		   lowtagof(obj) == OTHER_IMMEDIATE_1_LOWTAG) {
+        } else if (lowtag_of(obj) == OTHER_IMMEDIATE_0_LOWTAG ||
+		   lowtag_of(obj) == OTHER_IMMEDIATE_1_LOWTAG) {
             print((lispobj)addr | OTHER_POINTER_LOWTAG);
         } else {
             print((lispobj)addr);
@@ -265,9 +265,9 @@ call_cmd(char **ptr)
     lispobj thing = parse_lispobj(ptr), function, result = 0, cons, args[3];
     int numargs;
 
-    if (lowtagof(thing) == OTHER_POINTER_LOWTAG) {
-	switch (TypeOf(*(lispobj *)(thing-OTHER_POINTER_LOWTAG))) {
-	  case type_SymbolHeader:
+    if (lowtag_of(thing) == OTHER_POINTER_LOWTAG) {
+	switch (widetag_of(*(lispobj *)(thing-OTHER_POINTER_LOWTAG))) {
+	  case SYMBOL_HEADER_WIDETAG:
 	    for (cons = SymbolValue(INITIAL_FDEFN_OBJECTS);
 		 cons != NIL;
 		 cons = CONS(cons)->cdr) {
@@ -279,7 +279,7 @@ call_cmd(char **ptr)
 	    printf("Symbol 0x%08lx is undefined.\n", (long unsigned)thing);
 	    return;
 
-	  case type_Fdefn:
+	  case FDEFN_WIDETAG:
 	  fdefn:
 	    function = FDEFN(thing)->fun;
 	    if (function == NIL) {
@@ -294,7 +294,7 @@ call_cmd(char **ptr)
 	    return;
 	}
     }
-    else if (lowtagof(thing) != FUN_POINTER_LOWTAG) {
+    else if (lowtag_of(thing) != FUN_POINTER_LOWTAG) {
         printf("0x%08lx is not a function pointer, symbol, or fdefn object.\n",
 	       (long unsigned)thing);
         return;

@@ -388,7 +388,7 @@
   (:note "float to pointer coercion")
   (:generator 13
      (with-fixed-allocation (y
-			     sb!vm:single-float-type
+			     sb!vm:single-float-widetag
 			     sb!vm:single-float-size node)
        (with-tn@fp-top(x)
 	 (inst fst (ea-for-sf-desc y))))))
@@ -402,7 +402,7 @@
   (:note "float to pointer coercion")
   (:generator 13
      (with-fixed-allocation (y
-			     sb!vm:double-float-type
+			     sb!vm:double-float-widetag
 			     sb!vm:double-float-size
 			     node)
        (with-tn@fp-top(x)
@@ -418,7 +418,7 @@
   (:note "float to pointer coercion")
   (:generator 13
      (with-fixed-allocation (y
-			     sb!vm:long-float-type
+			     sb!vm:long-float-widetag
 			     sb!vm:long-float-size
 			     node)
        (with-tn@fp-top(x)
@@ -494,8 +494,9 @@
   (:note "complex float to pointer coercion")
   (:generator 13
      (with-fixed-allocation (y
-			     sb!vm:complex-single-float-type
-			     sb!vm:complex-single-float-size node)
+			     sb!vm:complex-single-float-widetag
+			     sb!vm:complex-single-float-size
+			     node)
        (let ((real-tn (complex-single-reg-real-tn x)))
 	 (with-tn@fp-top(real-tn)
 	   (inst fst (ea-for-csf-real-desc y))))
@@ -512,7 +513,7 @@
   (:note "complex float to pointer coercion")
   (:generator 13
      (with-fixed-allocation (y
-			     sb!vm:complex-double-float-type
+			     sb!vm:complex-double-float-widetag
 			     sb!vm:complex-double-float-size
 			     node)
        (let ((real-tn (complex-double-reg-real-tn x)))
@@ -532,7 +533,7 @@
   (:note "complex float to pointer coercion")
   (:generator 13
      (with-fixed-allocation (y
-			     sb!vm:complex-long-float-type
+			     sb!vm:complex-long-float-widetag
 			     sb!vm:complex-long-float-size
 			     node)
        (let ((real-tn (complex-long-reg-real-tn x)))

@@ -58,7 +58,7 @@ alloc_unboxed(int type, int words)
     lispobj *result;
 
     result = alloc(ALIGNED_SIZE((1 + words) * sizeof(lispobj)));
-    *result = (lispobj) (words << N_TYPE_BITS) | type;
+    *result = (lispobj) (words << N_WIDETAG_BITS) | type;
     return result;
 }
 
@@ -95,7 +95,7 @@ alloc_number(long n)
     if (-0x20000000 < n && n < 0x20000000)
         return make_fixnum(n);
     else {
-        ptr = (struct bignum *)alloc_unboxed(type_Bignum, 1);
+        ptr = (struct bignum *)alloc_unboxed(BIGNUM_WIDETAG, 1);
 
         ptr->digits[0] = n;
 
@@ -107,7 +107,7 @@ lispobj
 alloc_string(char *str)
 {
     int len = strlen(str);
-    lispobj result = alloc_vector(type_SimpleString, len+1, 8);
+    lispobj result = alloc_vector(SIMPLE_STRING_WIDETAG, len+1, 8);
     struct vector *vec = (struct vector *)native_pointer(result);
 
     vec->length = make_fixnum(len);
@@ -122,7 +122,7 @@ alloc_sap(void *ptr)
     int n_words_to_alloc =
 	(sizeof(struct sap) - sizeof(lispobj)) / sizeof(u32);
     struct sap *sap =
-	(struct sap *)alloc_unboxed((int)type_Sap, n_words_to_alloc);
+	(struct sap *)alloc_unboxed((int)SAP_WIDETAG, n_words_to_alloc);
     sap->pointer = ptr;
     return (lispobj) sap | OTHER_POINTER_LOWTAG;
 }

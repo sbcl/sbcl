@@ -147,16 +147,16 @@ valid_dynamic_space_pointer(lispobj *pointer, lispobj *start_addr)
 
     /* Check that the object pointed to is consistent with the pointer
      * low tag. */
-    switch (lowtagof((lispobj)pointer)) {
+    switch (lowtag_of((lispobj)pointer)) {
     case FUN_POINTER_LOWTAG:
 	/* Start_addr should be the enclosing code object, or a closure
 	 * header. */
-	switch (TypeOf(*start_addr)) {
-	case type_CodeHeader:
+	switch (widetag_of(*start_addr)) {
+	case CODE_HEADER_WIDETAG:
 	    /* This case is probably caught above. */
 	    break;
-	case type_ClosureHeader:
-	case type_FuncallableInstanceHeader:
+	case CLOSURE_HEADER_WIDETAG:
+	case FUNCALLABLE_INSTANCE_HEADER_WIDETAG:
 	    if ((int)pointer != ((int)start_addr+FUN_POINTER_LOWTAG)) {
 		if (pointer_filter_verbose) {
 		    fprintf(stderr,"*Wf2: %x %x %x\n", (unsigned int) pointer, 
@@ -183,12 +183,12 @@ valid_dynamic_space_pointer(lispobj *pointer, lispobj *start_addr)
 	/* Is it plausible cons? */
 	if((is_lisp_pointer(start_addr[0])
 	    || ((start_addr[0] & 3) == 0) /* fixnum */
-	    || (TypeOf(start_addr[0]) == type_BaseChar)
-	    || (TypeOf(start_addr[0]) == type_UnboundMarker))
+	    || (widetag_of(start_addr[0]) == BASE_CHAR_WIDETAG)
+	    || (widetag_of(start_addr[0]) == UNBOUND_MARKER_WIDETAG))
 	   && (is_lisp_pointer(start_addr[1])
 	       || ((start_addr[1] & 3) == 0) /* fixnum */
-	       || (TypeOf(start_addr[1]) == type_BaseChar)
-	       || (TypeOf(start_addr[1]) == type_UnboundMarker))) {
+	       || (widetag_of(start_addr[1]) == BASE_CHAR_WIDETAG)
+	       || (widetag_of(start_addr[1]) == UNBOUND_MARKER_WIDETAG))) {
 	    break;
 	} else {
 	    if (pointer_filter_verbose) {
@@ -205,7 +205,7 @@ valid_dynamic_space_pointer(lispobj *pointer, lispobj *start_addr)
 	    }
 	    return 0;
 	}
-	if (TypeOf(start_addr[0]) != type_InstanceHeader) {
+	if (widetag_of(start_addr[0]) != INSTANCE_HEADER_WIDETAG) {
 	    if (pointer_filter_verbose) {
 		fprintf(stderr,"*Wi2: %x %x %x\n", (unsigned int) pointer, 
 			(unsigned int) start_addr, *start_addr);
@@ -229,9 +229,9 @@ valid_dynamic_space_pointer(lispobj *pointer, lispobj *start_addr)
 	    }
 	    return 0;
 	}
-	switch (TypeOf(start_addr[0])) {
-	case type_UnboundMarker:
-	case type_BaseChar:
+	switch (widetag_of(start_addr[0])) {
+	case UNBOUND_MARKER_WIDETAG:
+	case BASE_CHAR_WIDETAG:
 	    if (pointer_filter_verbose) {
 		fprintf(stderr,"*Wo3: %x %x %x\n", (unsigned int) pointer, 
 			(unsigned int) start_addr, *start_addr);
@@ -239,15 +239,15 @@ valid_dynamic_space_pointer(lispobj *pointer, lispobj *start_addr)
 	    return 0;
 
 	    /* only pointed to by function pointers? */
-	case type_ClosureHeader:
-	case type_FuncallableInstanceHeader:
+	case CLOSURE_HEADER_WIDETAG:
+	case FUNCALLABLE_INSTANCE_HEADER_WIDETAG:
 	    if (pointer_filter_verbose) {
 		fprintf(stderr,"*Wo4: %x %x %x\n", (unsigned int) pointer, 
 			(unsigned int) start_addr, *start_addr);
 	    }
 	    return 0;
 
-	case type_InstanceHeader:
+	case INSTANCE_HEADER_WIDETAG:
 	    if (pointer_filter_verbose) {
 		fprintf(stderr,"*Wo5: %x %x %x\n", (unsigned int) pointer, 
 			(unsigned int) start_addr, *start_addr);
@@ -255,68 +255,68 @@ valid_dynamic_space_pointer(lispobj *pointer, lispobj *start_addr)
 	    return 0;
 
 	    /* the valid other immediate pointer objects */
-	case type_SimpleVector:
-	case type_Ratio:
-	case type_Complex:
-#ifdef type_ComplexSingleFloat
-	case type_ComplexSingleFloat:
+	case SIMPLE_VECTOR_WIDETAG:
+	case RATIO_WIDETAG:
+	case COMPLEX_WIDETAG:
+#ifdef COMPLEX_SINGLE_FLOAT_WIDETAG
+	case COMPLEX_SINGLE_FLOAT_WIDETAG:
 #endif
-#ifdef type_ComplexDoubleFloat
-	case type_ComplexDoubleFloat:
+#ifdef COMPLEX_DOUBLE_FLOAT_WIDETAG
+	case COMPLEX_DOUBLE_FLOAT_WIDETAG:
 #endif
-#ifdef type_ComplexLongFloat
-	case type_ComplexLongFloat:
+#ifdef COMPLEX_LONG_FLOAT_WIDETAG
+	case COMPLEX_LONG_FLOAT_WIDETAG:
 #endif
-	case type_SimpleArray:
-	case type_ComplexString:
-	case type_ComplexBitVector:
-	case type_ComplexVector:
-	case type_ComplexArray:
-	case type_ValueCellHeader:
-	case type_SymbolHeader:
-	case type_Fdefn:
-	case type_CodeHeader:
-	case type_Bignum:
-	case type_SingleFloat:
-	case type_DoubleFloat:
-#ifdef type_LongFloat
-	case type_LongFloat:
+	case SIMPLE_ARRAY_WIDETAG:
+	case COMPLEX_STRING_WIDETAG:
+	case COMPLEX_BIT_VECTOR_WIDETAG:
+	case COMPLEX_VECTOR_WIDETAG:
+	case COMPLEX_ARRAY_WIDETAG:
+	case VALUE_CELL_HEADER_WIDETAG:
+	case SYMBOL_HEADER_WIDETAG:
+	case FDEFN_WIDETAG:
+	case CODE_HEADER_WIDETAG:
+	case BIGNUM_WIDETAG:
+	case SINGLE_FLOAT_WIDETAG:
+	case DOUBLE_FLOAT_WIDETAG:
+#ifdef LONG_FLOAT_WIDETAG
+	case LONG_FLOAT_WIDETAG:
 #endif
-	case type_SimpleString:
-	case type_SimpleBitVector:
-	case type_SimpleArrayUnsignedByte2:
-	case type_SimpleArrayUnsignedByte4:
-	case type_SimpleArrayUnsignedByte8:
-	case type_SimpleArrayUnsignedByte16:
-	case type_SimpleArrayUnsignedByte32:
-#ifdef type_SimpleArraySignedByte8
-	case type_SimpleArraySignedByte8:
+	case SIMPLE_STRING_WIDETAG:
+	case SIMPLE_BIT_VECTOR_WIDETAG:
+	case SIMPLE_ARRAY_UNSIGNED_BYTE_2_WIDETAG:
+	case SIMPLE_ARRAY_UNSIGNED_BYTE_4_WIDETAG:
+	case SIMPLE_ARRAY_UNSIGNED_BYTE_8_WIDETAG:
+	case SIMPLE_ARRAY_UNSIGNED_BYTE_16_WIDETAG:
+	case SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG:
+#ifdef SIMPLE_ARRAY_SIGNED_BYTE_8_WIDETAG
+	case SIMPLE_ARRAY_SIGNED_BYTE_8_WIDETAG:
 #endif
-#ifdef type_SimpleArraySignedByte16
-	case type_SimpleArraySignedByte16:
+#ifdef SIMPLE_ARRAY_SIGNED_BYTE_16_WIDETAG
+	case SIMPLE_ARRAY_SIGNED_BYTE_16_WIDETAG:
 #endif
-#ifdef type_SimpleArraySignedByte30
-	case type_SimpleArraySignedByte30:
+#ifdef SIMPLE_ARRAY_SIGNED_BYTE_30_WIDETAG
+	case SIMPLE_ARRAY_SIGNED_BYTE_30_WIDETAG:
 #endif
-#ifdef type_SimpleArraySignedByte32
-	case type_SimpleArraySignedByte32:
+#ifdef SIMPLE_ARRAY_SIGNED_BYTE_32_WIDETAG
+	case SIMPLE_ARRAY_SIGNED_BYTE_32_WIDETAG:
 #endif
-	case type_SimpleArraySingleFloat:
-	case type_SimpleArrayDoubleFloat:
-#ifdef type_SimpleArrayLongFloat
-	case type_SimpleArrayLongFloat:
+	case SIMPLE_ARRAY_SINGLE_FLOAT_WIDETAG:
+	case SIMPLE_ARRAY_DOUBLE_FLOAT_WIDETAG:
+#ifdef SIMPLE_ARRAY_LONG_FLOAT_WIDETAG
+	case SIMPLE_ARRAY_LONG_FLOAT_WIDETAG:
 #endif
-#ifdef type_SimpleArrayComplexSingleFloat
-	case type_SimpleArrayComplexSingleFloat:
+#ifdef SIMPLE_ARRAY_COMPLEX_SINGLE_FLOAT_WIDETAG
+	case SIMPLE_ARRAY_COMPLEX_SINGLE_FLOAT_WIDETAG:
 #endif
-#ifdef type_SimpleArrayComplexDoubleFloat
-	case type_SimpleArrayComplexDoubleFloat:
+#ifdef SIMPLE_ARRAY_COMPLEX_DOUBLE_FLOAT_WIDETAG
+	case SIMPLE_ARRAY_COMPLEX_DOUBLE_FLOAT_WIDETAG:
 #endif
-#ifdef type_SimpleArrayComplexLongFloat
-	case type_SimpleArrayComplexLongFloat:
+#ifdef SIMPLE_ARRAY_COMPLEX_LONG_FLOAT_WIDETAG
+	case SIMPLE_ARRAY_COMPLEX_LONG_FLOAT_WIDETAG:
 #endif
-	case type_Sap:
-	case type_WeakPointer:
+	case SAP_WIDETAG:
+	case WEAK_POINTER_WIDETAG:
 	    break;
 
 	default:
@@ -363,7 +363,7 @@ setup_i386_stack_scav(lispobj *lowaddr, lispobj *base)
 	    /* We need to allow raw pointers into Code objects for
 	     * return addresses. This will also pick up pointers to
 	     * functions in code objects. */
-	    if (TypeOf(*start_addr) == type_CodeHeader) {
+	    if (widetag_of(*start_addr) == CODE_HEADER_WIDETAG) {
 		gc_assert(num_valid_stack_ra_locations <
 			  MAX_STACK_RETURN_ADDRESSES);
 		valid_stack_ra_locations[num_valid_stack_ra_locations] = sp;
@@ -464,7 +464,7 @@ ptrans_boxed(lispobj thing, lispobj header, boolean constant)
     bcopy(old, new, nwords * sizeof(lispobj));
 
     /* Deposit forwarding pointer. */
-    result = (lispobj)new | lowtagof(thing);
+    result = (lispobj)new | lowtag_of(thing);
     *old = result;
 
     /* Scavenge it. */
@@ -508,7 +508,7 @@ ptrans_instance(lispobj thing, lispobj header, boolean constant)
 	    bcopy(old, new, nwords * sizeof(lispobj));
 
 	    /* Deposit forwarding pointer. */
-	    result = (lispobj)new | lowtagof(thing);
+	    result = (lispobj)new | lowtag_of(thing);
 	    *old = result;
 
 	    /* Scavenge it. */
@@ -540,7 +540,7 @@ ptrans_fdefn(lispobj thing, lispobj header)
     bcopy(old, new, nwords * sizeof(lispobj));
 
     /* Deposit forwarding pointer. */
-    result = (lispobj)new | lowtagof(thing);
+    result = (lispobj)new | lowtag_of(thing);
     *old = result;
 
     /* Scavenge the function. */
@@ -570,7 +570,7 @@ ptrans_unboxed(lispobj thing, lispobj header)
     bcopy(old, new, nwords * sizeof(lispobj));
 
     /* Deposit forwarding pointer. */
-    result = (lispobj)new | lowtagof(thing);
+    result = (lispobj)new | lowtag_of(thing);
     *old = result;
 
     return result;
@@ -598,7 +598,7 @@ ptrans_vector(lispobj thing, int bits, int extra,
 
     bcopy(vector, new, nwords * sizeof(lispobj));
 
-    result = (lispobj)new | lowtagof(thing);
+    result = (lispobj)new | lowtag_of(thing);
     vector->header = result;
 
     if (boxed)
@@ -634,7 +634,7 @@ apply_code_fixups_during_purify(struct code *old_code, struct code *new_code)
   /* It will be 0 or the unbound-marker if there are no fixups, and
    * will be an other-pointer to a vector if it is valid. */
   if ((fixups==0) ||
-      (fixups==type_UnboundMarker) ||
+      (fixups==UNBOUND_MARKER_WIDETAG) ||
       !is_lisp_pointer(fixups)) {
 #ifdef GENCGC
     /* Check for a possible errors. */
@@ -652,7 +652,8 @@ apply_code_fixups_during_purify(struct code *old_code, struct code *new_code)
     fixups_vector = (struct vector *)native_pointer(*(lispobj *)fixups_vector);
   }
 
-  if (TypeOf(fixups_vector->header) == type_SimpleArrayUnsignedByte32) {
+  if (widetag_of(fixups_vector->header) ==
+      SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG) {
     /* We got the fixups for the code block. Now work through the vector,
      * and apply a fixup at each address. */
     int length = fixnum_value(fixups_vector->length);
@@ -717,7 +718,7 @@ ptrans_code(lispobj thing)
          func != NIL;
          func = ((struct simple_fun *)native_pointer(func))->next) {
 
-        gc_assert(lowtagof(func) == FUN_POINTER_LOWTAG);
+        gc_assert(lowtag_of(func) == FUN_POINTER_LOWTAG);
 
         *(lispobj *)native_pointer(func) = result + (func - thing);
     }
@@ -740,7 +741,7 @@ ptrans_code(lispobj thing)
     for (func = new->entry_points;
          func != NIL;
          func = ((struct simple_fun *)native_pointer(func))->next) {
-        gc_assert(lowtagof(func) == FUN_POINTER_LOWTAG);
+        gc_assert(lowtag_of(func) == FUN_POINTER_LOWTAG);
         gc_assert(!dynamic_pointer_p(func));
 
 #ifdef __i386__
@@ -772,8 +773,8 @@ ptrans_func(lispobj thing, lispobj header)
      * Otherwise we have to do something strange, 'cause it is buried
      * inside a code object. */
 
-    if (TypeOf(header) == type_SimpleFunHeader ||
-        TypeOf(header) == type_ClosureFunHeader) {
+    if (widetag_of(header) == SIMPLE_FUN_HEADER_WIDETAG ||
+        widetag_of(header) == CLOSURE_FUN_HEADER_WIDETAG) {
 
 	/* We can only end up here if the code object has not been
          * scavenged, because if it had been scavenged, forwarding pointers
@@ -798,7 +799,7 @@ ptrans_func(lispobj thing, lispobj header)
         old = (lispobj *)native_pointer(thing);
 
 	/* Allocate the new one. */
-	if (TypeOf(header) == type_FuncallableInstanceHeader) {
+	if (widetag_of(header) == FUNCALLABLE_INSTANCE_HEADER_WIDETAG) {
 	    /* FINs *must* not go in read_only space. */
 	    new = static_free;
 	    static_free += CEILING(nwords, 2);
@@ -814,7 +815,7 @@ ptrans_func(lispobj thing, lispobj header)
         bcopy(old, new, nwords * sizeof(lispobj));
 
         /* Deposit forwarding pointer. */
-        result = (lispobj)new | lowtagof(thing);
+        result = (lispobj)new | lowtag_of(thing);
         *old = result;
 
         /* Scavenge it. */
@@ -876,7 +877,7 @@ ptrans_list(lispobj thing, boolean constant)
 
         /* And count this cell. */
         length++;
-    } while (lowtagof(thing) == LIST_POINTER_LOWTAG &&
+    } while (lowtag_of(thing) == LIST_POINTER_LOWTAG &&
              dynamic_pointer_p(thing) &&
              !(forwarding_pointer_p(*(lispobj *)native_pointer(thing))));
 
@@ -889,84 +890,84 @@ ptrans_list(lispobj thing, boolean constant)
 static lispobj
 ptrans_otherptr(lispobj thing, lispobj header, boolean constant)
 {
-    switch (TypeOf(header)) {
-      case type_Bignum:
-      case type_SingleFloat:
-      case type_DoubleFloat:
-#ifdef type_LongFloat
-      case type_LongFloat:
+    switch (widetag_of(header)) {
+      case BIGNUM_WIDETAG:
+      case SINGLE_FLOAT_WIDETAG:
+      case DOUBLE_FLOAT_WIDETAG:
+#ifdef LONG_FLOAT_WIDETAG
+      case LONG_FLOAT_WIDETAG:
 #endif
-#ifdef type_ComplexSingleFloat
-      case type_ComplexSingleFloat:
+#ifdef COMPLEX_SINGLE_FLOAT_WIDETAG
+      case COMPLEX_SINGLE_FLOAT_WIDETAG:
 #endif
-#ifdef type_ComplexDoubleFloat
-      case type_ComplexDoubleFloat:
+#ifdef COMPLEX_DOUBLE_FLOAT_WIDETAG
+      case COMPLEX_DOUBLE_FLOAT_WIDETAG:
 #endif
-#ifdef type_ComplexLongFloat
-      case type_ComplexLongFloat:
+#ifdef COMPLEX_LONG_FLOAT_WIDETAG
+      case COMPLEX_LONG_FLOAT_WIDETAG:
 #endif
-      case type_Sap:
+      case SAP_WIDETAG:
         return ptrans_unboxed(thing, header);
 
-      case type_Ratio:
-      case type_Complex:
-      case type_SimpleArray:
-      case type_ComplexString:
-      case type_ComplexVector:
-      case type_ComplexArray:
+      case RATIO_WIDETAG:
+      case COMPLEX_WIDETAG:
+      case SIMPLE_ARRAY_WIDETAG:
+      case COMPLEX_STRING_WIDETAG:
+      case COMPLEX_VECTOR_WIDETAG:
+      case COMPLEX_ARRAY_WIDETAG:
         return ptrans_boxed(thing, header, constant);
 	
-      case type_ValueCellHeader:
-      case type_WeakPointer:
+      case VALUE_CELL_HEADER_WIDETAG:
+      case WEAK_POINTER_WIDETAG:
         return ptrans_boxed(thing, header, 0);
 
-      case type_SymbolHeader:
+      case SYMBOL_HEADER_WIDETAG:
         return ptrans_boxed(thing, header, 0);
 
-      case type_SimpleString:
+      case SIMPLE_STRING_WIDETAG:
         return ptrans_vector(thing, 8, 1, 0, constant);
 
-      case type_SimpleBitVector:
+      case SIMPLE_BIT_VECTOR_WIDETAG:
         return ptrans_vector(thing, 1, 0, 0, constant);
 
-      case type_SimpleVector:
+      case SIMPLE_VECTOR_WIDETAG:
         return ptrans_vector(thing, 32, 0, 1, constant);
 
-      case type_SimpleArrayUnsignedByte2:
+      case SIMPLE_ARRAY_UNSIGNED_BYTE_2_WIDETAG:
         return ptrans_vector(thing, 2, 0, 0, constant);
 
-      case type_SimpleArrayUnsignedByte4:
+      case SIMPLE_ARRAY_UNSIGNED_BYTE_4_WIDETAG:
         return ptrans_vector(thing, 4, 0, 0, constant);
 
-      case type_SimpleArrayUnsignedByte8:
-#ifdef type_SimpleArraySignedByte8
-      case type_SimpleArraySignedByte8:
+      case SIMPLE_ARRAY_UNSIGNED_BYTE_8_WIDETAG:
+#ifdef SIMPLE_ARRAY_SIGNED_BYTE_8_WIDETAG
+      case SIMPLE_ARRAY_SIGNED_BYTE_8_WIDETAG:
 #endif
         return ptrans_vector(thing, 8, 0, 0, constant);
 
-      case type_SimpleArrayUnsignedByte16:
-#ifdef type_SimpleArraySignedByte16
-      case type_SimpleArraySignedByte16:
+      case SIMPLE_ARRAY_UNSIGNED_BYTE_16_WIDETAG:
+#ifdef SIMPLE_ARRAY_SIGNED_BYTE_16_WIDETAG
+      case SIMPLE_ARRAY_SIGNED_BYTE_16_WIDETAG:
 #endif
         return ptrans_vector(thing, 16, 0, 0, constant);
 
-      case type_SimpleArrayUnsignedByte32:
-#ifdef type_SimpleArraySignedByte30
-      case type_SimpleArraySignedByte30:
+      case SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG:
+#ifdef SIMPLE_ARRAY_SIGNED_BYTE_30_WIDETAG
+      case SIMPLE_ARRAY_SIGNED_BYTE_30_WIDETAG:
 #endif
-#ifdef type_SimpleArraySignedByte32
-      case type_SimpleArraySignedByte32:
+#ifdef SIMPLE_ARRAY_SIGNED_BYTE_32_WIDETAG
+      case SIMPLE_ARRAY_SIGNED_BYTE_32_WIDETAG:
 #endif
         return ptrans_vector(thing, 32, 0, 0, constant);
 
-      case type_SimpleArraySingleFloat:
+      case SIMPLE_ARRAY_SINGLE_FLOAT_WIDETAG:
         return ptrans_vector(thing, 32, 0, 0, constant);
 
-      case type_SimpleArrayDoubleFloat:
+      case SIMPLE_ARRAY_DOUBLE_FLOAT_WIDETAG:
         return ptrans_vector(thing, 64, 0, 0, constant);
 
-#ifdef type_SimpleArrayLongFloat
-      case type_SimpleArrayLongFloat:
+#ifdef SIMPLE_ARRAY_LONG_FLOAT_WIDETAG
+      case SIMPLE_ARRAY_LONG_FLOAT_WIDETAG:
 #ifdef __i386__
         return ptrans_vector(thing, 96, 0, 0, constant);
 #endif
@@ -975,18 +976,18 @@ ptrans_otherptr(lispobj thing, lispobj header, boolean constant)
 #endif
 #endif
 
-#ifdef type_SimpleArrayComplexSingleFloat
-      case type_SimpleArrayComplexSingleFloat:
+#ifdef SIMPLE_ARRAY_COMPLEX_SINGLE_FLOAT_WIDETAG
+      case SIMPLE_ARRAY_COMPLEX_SINGLE_FLOAT_WIDETAG:
         return ptrans_vector(thing, 64, 0, 0, constant);
 #endif
 
-#ifdef type_SimpleArrayComplexDoubleFloat
-      case type_SimpleArrayComplexDoubleFloat:
+#ifdef SIMPLE_ARRAY_COMPLEX_DOUBLE_FLOAT_WIDETAG
+      case SIMPLE_ARRAY_COMPLEX_DOUBLE_FLOAT_WIDETAG:
         return ptrans_vector(thing, 128, 0, 0, constant);
 #endif
 
-#ifdef type_SimpleArrayComplexLongFloat
-      case type_SimpleArrayComplexLongFloat:
+#ifdef SIMPLE_ARRAY_COMPLEX_LONG_FLOAT_WIDETAG
+      case SIMPLE_ARRAY_COMPLEX_LONG_FLOAT_WIDETAG:
 #ifdef __i386__
         return ptrans_vector(thing, 192, 0, 0, constant);
 #endif
@@ -995,13 +996,13 @@ ptrans_otherptr(lispobj thing, lispobj header, boolean constant)
 #endif
 #endif
 
-      case type_CodeHeader:
+      case CODE_HEADER_WIDETAG:
         return ptrans_code(thing);
 
-      case type_ReturnPcHeader:
+      case RETURN_PC_HEADER_WIDETAG:
         return ptrans_returnpc(thing, header);
 
-      case type_Fdefn:
+      case FDEFN_WIDETAG:
 	return ptrans_fdefn(thing, header);
 
       default:
@@ -1044,7 +1045,7 @@ pscav_code(struct code*code)
     for (func = code->entry_points;
          func != NIL;
          func = ((struct simple_fun *)native_pointer(func))->next) {
-        gc_assert(lowtagof(func) == FUN_POINTER_LOWTAG);
+        gc_assert(lowtag_of(func) == FUN_POINTER_LOWTAG);
         gc_assert(!dynamic_pointer_p(func));
 
 #ifdef __i386__
@@ -1085,7 +1086,7 @@ pscav(lispobj *addr, int nwords, boolean constant)
                     thing = header;
                 else {
                     /* Nope, copy the object. */
-                    switch (lowtagof(thing)) {
+                    switch (lowtag_of(thing)) {
                       case FUN_POINTER_LOWTAG:
                         thing = ptrans_func(thing, header);
                         break;
@@ -1114,87 +1115,88 @@ pscav(lispobj *addr, int nwords, boolean constant)
         else if (thing & 3) {
             /* It's an other immediate. Maybe the header for an unboxed */
             /* object. */
-            switch (TypeOf(thing)) {
-              case type_Bignum:
-              case type_SingleFloat:
-              case type_DoubleFloat:
-#ifdef type_LongFloat
-              case type_LongFloat:
+            switch (widetag_of(thing)) {
+              case BIGNUM_WIDETAG:
+              case SINGLE_FLOAT_WIDETAG:
+              case DOUBLE_FLOAT_WIDETAG:
+#ifdef LONG_FLOAT_WIDETAG
+              case LONG_FLOAT_WIDETAG:
 #endif
-              case type_Sap:
+              case SAP_WIDETAG:
                 /* It's an unboxed simple object. */
                 count = HeaderValue(thing)+1;
                 break;
 
-              case type_SimpleVector:
-                if (HeaderValue(thing) == subtype_VectorValidHashing)
-                    *addr = (subtype_VectorMustRehash<<N_TYPE_BITS) |
-                        type_SimpleVector;
+              case SIMPLE_VECTOR_WIDETAG:
+		  if (HeaderValue(thing) == subtype_VectorValidHashing) {
+                    *addr = (subtype_VectorMustRehash << N_WIDETAG_BITS) |
+                        SIMPLE_VECTOR_WIDETAG;
+		  }
                 count = 1;
                 break;
 
-              case type_SimpleString:
+              case SIMPLE_STRING_WIDETAG:
                 vector = (struct vector *)addr;
                 count = CEILING(NWORDS(fixnum_value(vector->length)+1,4)+2,2);
                 break;
 
-              case type_SimpleBitVector:
+              case SIMPLE_BIT_VECTOR_WIDETAG:
                 vector = (struct vector *)addr;
                 count = CEILING(NWORDS(fixnum_value(vector->length),32)+2,2);
                 break;
 
-              case type_SimpleArrayUnsignedByte2:
+              case SIMPLE_ARRAY_UNSIGNED_BYTE_2_WIDETAG:
                 vector = (struct vector *)addr;
                 count = CEILING(NWORDS(fixnum_value(vector->length),16)+2,2);
                 break;
 
-              case type_SimpleArrayUnsignedByte4:
+              case SIMPLE_ARRAY_UNSIGNED_BYTE_4_WIDETAG:
                 vector = (struct vector *)addr;
                 count = CEILING(NWORDS(fixnum_value(vector->length),8)+2,2);
                 break;
 
-              case type_SimpleArrayUnsignedByte8:
-#ifdef type_SimpleArraySignedByte8
-              case type_SimpleArraySignedByte8:
+              case SIMPLE_ARRAY_UNSIGNED_BYTE_8_WIDETAG:
+#ifdef SIMPLE_ARRAY_SIGNED_BYTE_8_WIDETAG
+              case SIMPLE_ARRAY_SIGNED_BYTE_8_WIDETAG:
 #endif
                 vector = (struct vector *)addr;
                 count = CEILING(NWORDS(fixnum_value(vector->length),4)+2,2);
                 break;
 
-              case type_SimpleArrayUnsignedByte16:
-#ifdef type_SimpleArraySignedByte16
-              case type_SimpleArraySignedByte16:
+              case SIMPLE_ARRAY_UNSIGNED_BYTE_16_WIDETAG:
+#ifdef SIMPLE_ARRAY_SIGNED_BYTE_16_WIDETAG
+              case SIMPLE_ARRAY_SIGNED_BYTE_16_WIDETAG:
 #endif
                 vector = (struct vector *)addr;
                 count = CEILING(NWORDS(fixnum_value(vector->length),2)+2,2);
                 break;
 
-              case type_SimpleArrayUnsignedByte32:
-#ifdef type_SimpleArraySignedByte30
-              case type_SimpleArraySignedByte30:
+              case SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG:
+#ifdef SIMPLE_ARRAY_SIGNED_BYTE_30_WIDETAG
+              case SIMPLE_ARRAY_SIGNED_BYTE_30_WIDETAG:
 #endif
-#ifdef type_SimpleArraySignedByte32
-              case type_SimpleArraySignedByte32:
+#ifdef SIMPLE_ARRAY_SIGNED_BYTE_32_WIDETAG
+              case SIMPLE_ARRAY_SIGNED_BYTE_32_WIDETAG:
 #endif
                 vector = (struct vector *)addr;
                 count = CEILING(fixnum_value(vector->length)+2,2);
                 break;
 
-              case type_SimpleArraySingleFloat:
+              case SIMPLE_ARRAY_SINGLE_FLOAT_WIDETAG:
                 vector = (struct vector *)addr;
                 count = CEILING(fixnum_value(vector->length)+2,2);
                 break;
 
-              case type_SimpleArrayDoubleFloat:
-#ifdef type_SimpleArrayComplexSingleFloat
-              case type_SimpleArrayComplexSingleFloat:
+              case SIMPLE_ARRAY_DOUBLE_FLOAT_WIDETAG:
+#ifdef SIMPLE_ARRAY_COMPLEX_SINGLE_FLOAT_WIDETAG
+              case SIMPLE_ARRAY_COMPLEX_SINGLE_FLOAT_WIDETAG:
 #endif
                 vector = (struct vector *)addr;
                 count = fixnum_value(vector->length)*2+2;
                 break;
 
-#ifdef type_SimpleArrayLongFloat
-              case type_SimpleArrayLongFloat:
+#ifdef SIMPLE_ARRAY_LONG_FLOAT_WIDETAG
+              case SIMPLE_ARRAY_LONG_FLOAT_WIDETAG:
                 vector = (struct vector *)addr;
 #ifdef __i386__
                 count = fixnum_value(vector->length)*3+2;
@@ -1205,15 +1207,15 @@ pscav(lispobj *addr, int nwords, boolean constant)
                 break;
 #endif
 
-#ifdef type_SimpleArrayComplexDoubleFloat
-              case type_SimpleArrayComplexDoubleFloat:
+#ifdef SIMPLE_ARRAY_COMPLEX_DOUBLE_FLOAT_WIDETAG
+              case SIMPLE_ARRAY_COMPLEX_DOUBLE_FLOAT_WIDETAG:
                 vector = (struct vector *)addr;
                 count = fixnum_value(vector->length)*4+2;
                 break;
 #endif
 
-#ifdef type_SimpleArrayComplexLongFloat
-              case type_SimpleArrayComplexLongFloat:
+#ifdef SIMPLE_ARRAY_COMPLEX_LONG_FLOAT_WIDETAG
+              case SIMPLE_ARRAY_COMPLEX_LONG_FLOAT_WIDETAG:
                 vector = (struct vector *)addr;
 #ifdef __i386__
                 count = fixnum_value(vector->length)*6+2;
@@ -1224,7 +1226,7 @@ pscav(lispobj *addr, int nwords, boolean constant)
                 break;
 #endif
 
-              case type_CodeHeader:
+              case CODE_HEADER_WIDETAG:
 #ifndef __i386__
                 gc_abort(); /* no code headers in static space */
 #else
@@ -1232,17 +1234,17 @@ pscav(lispobj *addr, int nwords, boolean constant)
 #endif
                 break;
 
-              case type_SimpleFunHeader:
-              case type_ClosureFunHeader:
-              case type_ReturnPcHeader:
+              case SIMPLE_FUN_HEADER_WIDETAG:
+              case CLOSURE_FUN_HEADER_WIDETAG:
+              case RETURN_PC_HEADER_WIDETAG:
                 /* We should never hit any of these, 'cause they occur
                  * buried in the middle of code objects. */
                 gc_abort();
 		break;
 
 #ifdef __i386__
-	      case type_ClosureHeader:
-	      case type_FuncallableInstanceHeader:
+	      case CLOSURE_HEADER_WIDETAG:
+	      case FUNCALLABLE_INSTANCE_HEADER_WIDETAG:
 		/* The function self pointer needs special care on the
 		 * x86 because it is the real entry point. */
 		{
@@ -1255,14 +1257,14 @@ pscav(lispobj *addr, int nwords, boolean constant)
 		break;
 #endif
 
-              case type_WeakPointer:
+              case WEAK_POINTER_WIDETAG:
                 /* Weak pointers get preserved during purify, 'cause I
 		 * don't feel like figuring out how to break them. */
                 pscav(addr+1, 2, constant);
                 count = 4;
                 break;
 
-	      case type_Fdefn:
+	      case FDEFN_WIDETAG:
 		/* We have to handle fdefn objects specially, so we
 		 * can fix up the raw function address. */
 		count = pscav_fdefn((struct fdefn *)addr);
@@ -1374,7 +1376,7 @@ purify(lispobj static_roots, lispobj read_only_roots)
      * want/need this functionality, and can test and document it,
      * please submit a patch. */
 #if 0
-    if (SymbolValue(SCAVENGE_READ_ONLY_SPACE) != type_UnboundMarker
+    if (SymbolValue(SCAVENGE_READ_ONLY_SPACE) != UNBOUND_MARKER_WIDETAG
 	&& SymbolValue(SCAVENGE_READ_ONLY_SPACE) != NIL) {
       unsigned  read_only_space_size =
 	  (lispobj *)SymbolValue(READ_ONLY_SPACE_FREE_POINTER) -

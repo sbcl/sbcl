@@ -25,7 +25,7 @@ boolean search_for_type(int type, lispobj **start, int *count)
         if (*count != -1)
             *count -= 2;
 
-        if (TypeOf(obj) == type)
+        if (widetag_of(obj) == type)
             return 1;
 
         (*start) += 2;
@@ -38,12 +38,12 @@ boolean search_for_symbol(char *name, lispobj **start, int *count)
     struct symbol *symbol;
     struct vector *symbol_name;
 
-    while (search_for_type(type_SymbolHeader, start, count)) {
+    while (search_for_type(SYMBOL_HEADER_WIDETAG, start, count)) {
         symbol = (struct symbol *)native_pointer((lispobj)*start);
-	if (lowtagof(symbol->name) == OTHER_POINTER_LOWTAG) {
+	if (lowtag_of(symbol->name) == OTHER_POINTER_LOWTAG) {
             symbol_name = (struct vector *)native_pointer(symbol->name);
             if (is_valid_lisp_addr((os_vm_address_t)symbol_name) &&
-		TypeOf(symbol_name->header) == type_SimpleString &&
+		widetag_of(symbol_name->header) == SIMPLE_STRING_WIDETAG &&
 		strcmp((char *)symbol_name->data, name) == 0)
                 return 1;
 	}

@@ -78,9 +78,9 @@
 		  (:variant ,@args))
 		(define-move-vop ,name :move (,sc) (descriptor-reg)))))
   (frob move-from-single single-reg
-    nil single-float-size single-float-type single-float-value-slot)
+    nil single-float-size single-float-widetag single-float-value-slot)
   (frob move-from-double double-reg
-    t double-float-size double-float-type double-float-value-slot))
+    t double-float-size double-float-widetag double-float-value-slot))
 
 (macrolet ((frob (name sc double-p value)
 	     `(progn
@@ -229,7 +229,7 @@
   (:temporary (:scs (non-descriptor-reg)) ndescr)
   (:note "complex single float to pointer coercion")
   (:generator 13
-     (with-fixed-allocation (y ndescr sb!vm:complex-single-float-type
+     (with-fixed-allocation (y ndescr sb!vm:complex-single-float-widetag
 			       sb!vm:complex-single-float-size)
        (let ((real-tn (complex-single-reg-real-tn x)))
 	 (inst sts real-tn (- (* sb!vm:complex-single-float-real-slot
@@ -251,7 +251,7 @@
   (:temporary (:scs (non-descriptor-reg)) ndescr)
   (:note "complex double float to pointer coercion")
   (:generator 13
-     (with-fixed-allocation (y ndescr sb!vm:complex-double-float-type
+     (with-fixed-allocation (y ndescr sb!vm:complex-double-float-widetag
 			       sb!vm:complex-double-float-size)
        (let ((real-tn (complex-double-reg-real-tn x)))
 	 (inst stt real-tn (- (* sb!vm:complex-double-float-real-slot

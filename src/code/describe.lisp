@@ -195,16 +195,16 @@
     (:function (format s "Function: ~S" x))
     ((nil) (format s "~S is a function." x)))
   (case (get-type x)
-    (#.sb-vm:closure-header-type
+    (#.sb-vm:closure-header-widetag
      (%describe-function-compiled (%closure-fun x) s kind name)
      (format s "~@:_Its closure environment is:")
      (pprint-logical-block (s nil)
        (pprint-indent :current 8)
        (dotimes (i (- (get-closure-length x) (1- sb-vm:closure-info-offset)))
 	 (format s "~@:_~S: ~S" i (%closure-index-ref x i)))))
-    ((#.sb-vm:simple-fun-header-type #.sb-vm:closure-fun-header-type)
+    ((#.sb-vm:simple-fun-header-widetag #.sb-vm:closure-fun-header-widetag)
      (%describe-function-compiled x s kind name))
-    (#.sb-vm:funcallable-instance-header-type
+    (#.sb-vm:funcallable-instance-header-widetag
      (typecase x
        (standard-generic-function
 	;; There should be a special method for this case; we'll

@@ -32,7 +32,7 @@
   (:note "system area pointer allocation")
   (:generator 20
     (move x sap)
-    (with-fixed-allocation (y ndescr sap-type sap-size)
+    (with-fixed-allocation (y ndescr sap-widetag sap-size)
       (storeq sap y sap-pointer-slot other-pointer-lowtag))))
 (define-move-vop move-from-sap :move
   (sap-reg) (descriptor-reg))

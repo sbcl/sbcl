@@ -126,11 +126,11 @@
 	(function x)
 	(t (values (fdefinition x) t)))
     (case (sb-kernel:get-type res)
-      (#.sb-vm:closure-header-type
+      (#.sb-vm:closure-header-widetag
        (values (sb-kernel:%closure-fun res)
 	       named-p
 	       :compiled-closure))
-      (#.sb-vm:funcallable-instance-header-type
+      (#.sb-vm:funcallable-instance-header-widetag
        (values res named-p :funcallable-instance))
       (t (values res named-p :compiled)))))
 

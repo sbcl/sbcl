@@ -156,9 +156,9 @@
 		 (= lowtag sb!vm:odd-fixnum-lowtag))
 	     (let ((unsigned (logior (ash (descriptor-high des)
 					  (1+ (- descriptor-low-bits
-						 sb!vm:lowtag-bits)))
+						 sb!vm:n-lowtag-bits)))
 				     (ash (descriptor-low des)
-					  (- 1 sb!vm:lowtag-bits)))))
+					  (- 1 sb!vm:n-lowtag-bits)))))
 	       (format stream
 		       "for fixnum: ~D"
 		       (if (> unsigned #x1FFFFFFF)
@@ -168,8 +168,8 @@
 		 (= lowtag sb!vm:other-immediate-1-lowtag))
 	     (format stream
 		     "for other immediate: #X~X, type #b~8,'0B"
-		     (ash (descriptor-bits des) (- sb!vm:type-bits))
-		     (logand (descriptor-low des) sb!vm:type-mask)))
+		     (ash (descriptor-bits des) (- sb!vm:n-widetag-bits))
+		     (logand (descriptor-low des) sb!vm:widetag-mask)))
 	    (t
 	     (format stream
 		     "for pointer: #X~X, lowtag #b~3,'0B, ~A"
@@ -186,7 +186,7 @@
 ;;; is needed, we grow the GSPACE. The descriptor returned is a
 ;;; pointer of type LOWTAG.
 (defun allocate-cold-descriptor (gspace length lowtag)
-  (let* ((bytes (round-up length (ash 1 sb!vm:lowtag-bits)))
+  (let* ((bytes (round-up length (ash 1 sb!vm:n-lowtag-bits)))
 	 (old-free-word-index (gspace-free-word-index gspace))
 	 (new-free-word-index (+ old-free-word-index
 				 (ash bytes (- sb!vm:word-shift)))))
@@ -283,19 +283,19 @@
 
 (defun make-fixnum-descriptor (num)
   (when (>= (integer-length num)
-	    (1+ (- sb!vm:word-bits sb!vm:lowtag-bits)))
+	    (1+ (- sb!vm:word-bits sb!vm:n-lowtag-bits)))
     (error "~D is too big for a fixnum." num))
-  (make-random-descriptor (ash num (1- sb!vm:lowtag-bits))))
+  (make-random-descriptor (ash num (1- sb!vm:n-lowtag-bits))))
 
 (defun make-other-immediate-descriptor (data type)
-  (make-descriptor (ash data (- sb!vm:type-bits descriptor-low-bits))
+  (make-descriptor (ash data (- sb!vm:n-widetag-bits descriptor-low-bits))
 		   (logior (logand (ash data (- descriptor-low-bits
-						sb!vm:type-bits))
+						sb!vm:n-widetag-bits))
 				   (1- (ash 1 descriptor-low-bits)))
 			   type)))
 
 (defun make-character-descriptor (data)
-  (make-other-immediate-descriptor data sb!vm:base-char-type))
+  (make-other-immediate-descriptor data sb!vm:base-char-widetag))
 
 (defun descriptor-beyond (des offset type)
   (let* ((low (logior (+ (logandc2 (descriptor-low des) sb!vm:lowtag-mask)
@@ -325,7 +325,7 @@
 
 ;;; a handle on the trap object
 (defvar *unbound-marker*)
-;; was:  (make-other-immediate-descriptor 0 sb!vm:unbound-marker-type)
+;; was:  (make-other-immediate-descriptor 0 sb!vm:unbound-marker-widetag)
 
 ;;; a handle on the NIL object
 (defvar *nil-descriptor*)
@@ -557,7 +557,7 @@
 	 (des (allocate-vector-object gspace
 				      sb!vm:byte-bits
 				      (1+ length)
-				      sb!vm:simple-string-type))
+				      sb!vm:simple-string-widetag))
 	 (bytes (gspace-bytes gspace))
 	 (offset (+ (* sb!vm:vector-data-offset sb!vm:word-bytes)
 		    (descriptor-byte-offset des))))
@@ -585,7 +585,7 @@
 	 (handle (allocate-unboxed-object *dynamic*
 					  sb!vm:word-bits
 					  words
-					  sb!vm:bignum-type)))
+					  sb!vm:bignum-widetag)))
     (declare (fixnum words))
     (do ((index 1 (1+ index))
 	 (remainder n (ash remainder (- sb!vm:word-bits))))
@@ -615,7 +615,7 @@
      (let ((des (allocate-unboxed-object *dynamic*
 					 sb!vm:word-bits
 					 (1- sb!vm:single-float-size)
-					 sb!vm:single-float-type)))
+					 sb!vm:single-float-widetag)))
        (write-wordindexed des
 			  sb!vm:single-float-value-slot
 			  (make-random-descriptor (single-float-bits x)))
@@ -624,7 +624,7 @@
      (let ((des (allocate-unboxed-object *dynamic*
 					 sb!vm:word-bits
 					 (1- sb!vm:double-float-size)
-					 sb!vm:double-float-type))
+					 sb!vm:double-float-widetag))
 	   (high-bits (make-random-descriptor (double-float-high-bits x)))
 	   (low-bits (make-random-descriptor (double-float-low-bits x))))
        (ecase sb!c:*backend-byte-order*
@@ -640,7 +640,7 @@
      (let ((des (allocate-unboxed-object *dynamic*
 					 sb!vm:word-bits
 					 (1- sb!vm:long-float-size)
-					 sb!vm:long-float-type))
+					 sb!vm:long-float-widetag))
 	   (exp-bits (make-random-descriptor (long-float-exp-bits x)))
 	   (high-bits (make-random-descriptor (long-float-high-bits x)))
 	   (low-bits (make-random-descriptor (long-float-low-bits x))))
@@ -657,7 +657,7 @@
   (declare (type (complex single-float) num))
   (let ((des (allocate-unboxed-object *dynamic* sb!vm:word-bits
 				      (1- sb!vm:complex-single-float-size)
-				      sb!vm:complex-single-float-type)))
+				      sb!vm:complex-single-float-widetag)))
     (write-wordindexed des sb!vm:complex-single-float-real-slot
 		   (make-random-descriptor (single-float-bits (realpart num))))
     (write-wordindexed des sb!vm:complex-single-float-imag-slot
@@ -668,7 +668,7 @@
   (declare (type (complex double-float) num))
   (let ((des (allocate-unboxed-object *dynamic* sb!vm:word-bits
 				      (1- sb!vm:complex-double-float-size)
-				      sb!vm:complex-double-float-type)))
+				      sb!vm:complex-double-float-widetag)))
     (let* ((real (realpart num))
 	   (high-bits (make-random-descriptor (double-float-high-bits real)))
 	   (low-bits (make-random-descriptor (double-float-low-bits real))))
@@ -700,7 +700,7 @@
 		 (bignum-to-core number)))
     (ratio (number-pair-to-core (number-to-core (numerator number))
 				(number-to-core (denominator number))
-				sb!vm:ratio-type))
+				sb!vm:ratio-widetag))
     ((complex single-float) (complex-single-float-to-core number))
     ((complex double-float) (complex-double-float-to-core number))
     #!+long-float
@@ -708,7 +708,7 @@
      (error "~S isn't a cold-loadable number at all!" number))
     (complex (number-pair-to-core (number-to-core (realpart number))
 				  (number-to-core (imagpart number))
-				  sb!vm:complex-type))
+				  sb!vm:complex-widetag))
     (float (float-to-core number))
     (t (error "~S isn't a cold-loadable number at all!" number))))
 
@@ -717,7 +717,7 @@
   (let ((des (allocate-unboxed-object *dynamic*
 				      sb!vm:word-bits
 				      (1- sb!vm:sap-size)
-				      sb!vm:sap-type)))
+				      sb!vm:sap-widetag)))
     (write-wordindexed des
 		       sb!vm:sap-pointer-slot
 		       (make-random-descriptor sapint))
@@ -735,7 +735,7 @@
 (defun vector-in-core (&rest objects)
   (let* ((size (length objects))
 	 (result (allocate-vector-object *dynamic* sb!vm:word-bits size
-					 sb!vm:simple-vector-type)))
+					 sb!vm:simple-vector-widetag)))
     (dotimes (index size)
       (write-wordindexed result (+ index sb!vm:vector-data-offset)
 			 (pop objects)))
@@ -753,7 +753,7 @@
 					     *dynamic*)
 					 sb!vm:word-bits
 					 (1- sb!vm:symbol-size)
-					 sb!vm:symbol-header-type)))
+					 sb!vm:symbol-header-widetag)))
     (write-wordindexed symbol sb!vm:symbol-value-slot *unbound-marker*)
     #!+x86
     (write-wordindexed symbol
@@ -832,8 +832,8 @@
 				       (1+ target-layout-length)
 				       sb!vm:instance-pointer-lowtag)))
     (write-memory result
-		  (make-other-immediate-descriptor target-layout-length
-						   sb!vm:instance-header-type))
+		  (make-other-immediate-descriptor
+		   target-layout-length sb!vm:instance-header-widetag))
 
     ;; KLUDGE: The offsets into LAYOUT below should probably be pulled out
     ;; of the cross-compiler's tables at genesis time instead of inserted
@@ -1068,7 +1068,7 @@
 		       1
 		       (make-other-immediate-descriptor
 			0
-			sb!vm:symbol-header-type))
+			sb!vm:symbol-header-widetag))
     (write-wordindexed des
 		       (+ 1 sb!vm:symbol-value-slot)
 		       result)
@@ -1365,7 +1365,7 @@
 
 	  (setf (gethash warm-name *cold-fdefn-objects*) fdefn)
 	  (write-memory fdefn (make-other-immediate-descriptor
-			       (1- sb!vm:fdefn-size) sb!vm:fdefn-type))
+			       (1- sb!vm:fdefn-size) sb!vm:fdefn-widetag))
 	  (write-wordindexed fdefn sb!vm:fdefn-name-slot cold-name)
 	  (unless leave-fn-raw
 	    (write-wordindexed fdefn sb!vm:fdefn-fun-slot
@@ -1382,12 +1382,12 @@
 (defun static-fset (cold-name defn)
   (declare (type descriptor cold-name))
   (let ((fdefn (cold-fdefinition-object cold-name t))
-	(type (logand (descriptor-low (read-memory defn)) sb!vm:type-mask)))
+	(type (logand (descriptor-low (read-memory defn)) sb!vm:widetag-mask)))
     (write-wordindexed fdefn sb!vm:fdefn-fun-slot defn)
     (write-wordindexed fdefn
 		       sb!vm:fdefn-raw-addr-slot
 		       (ecase type
-			 (#.sb!vm:simple-fun-header-type
+			 (#.sb!vm:simple-fun-header-widetag
 			  #!+sparc
 			  defn
 			  #!-sparc
@@ -1396,7 +1396,7 @@
 					sb!vm:lowtag-mask)
 			      (ash sb!vm:simple-fun-code-offset
 				   sb!vm:word-shift))))
-			 (#.sb!vm:closure-header-type
+			 (#.sb!vm:closure-header-widetag
 			  (make-random-descriptor
 			   (cold-foreign-symbol-address-as-integer "closure_tramp")))))
     fdefn))
@@ -1559,7 +1559,8 @@
 (declaim (ftype (function (descriptor sb!vm:word)) calc-offset))
 (defun calc-offset (code-object offset-from-tail-of-header)
   (let* ((header (read-memory code-object))
-	 (header-n-words (ash (descriptor-bits header) (- sb!vm:type-bits)))
+	 (header-n-words (ash (descriptor-bits header)
+			      (- sb!vm:n-widetag-bits)))
 	 (header-n-bytes (ash header-n-words sb!vm:word-shift))
 	 (result (+ offset-from-tail-of-header header-n-bytes)))
     result))
@@ -1767,8 +1768,7 @@
 					(1+ size)
 					sb!vm:instance-pointer-lowtag)))
     (write-memory result (make-other-immediate-descriptor
-			  size
-			  sb!vm:instance-header-type))
+			  size sb!vm:instance-header-widetag))
     (do ((index (1- size) (1- index)))
 	((minusp index))
       (declare (fixnum index))
@@ -1928,7 +1928,7 @@
 	 (result (allocate-vector-object *dynamic*
 					 sb!vm:word-bits
 					 size
-					 sb!vm:simple-vector-type)))
+					 sb!vm:simple-vector-widetag)))
     (do ((index (1- size) (1- index)))
 	((minusp index))
       (declare (fixnum index))
@@ -1941,12 +1941,12 @@
   (let* ((len (read-arg 4))
 	 (sizebits (read-arg 1))
 	 (type (case sizebits
-		 (1 sb!vm:simple-bit-vector-type)
-		 (2 sb!vm:simple-array-unsigned-byte-2-type)
-		 (4 sb!vm:simple-array-unsigned-byte-4-type)
-		 (8 sb!vm:simple-array-unsigned-byte-8-type)
-		 (16 sb!vm:simple-array-unsigned-byte-16-type)
-		 (32 sb!vm:simple-array-unsigned-byte-32-type)
+		 (1 sb!vm:simple-bit-vector-widetag)
+		 (2 sb!vm:simple-array-unsigned-byte-2-widetag)
+		 (4 sb!vm:simple-array-unsigned-byte-4-widetag)
+		 (8 sb!vm:simple-array-unsigned-byte-8-widetag)
+		 (16 sb!vm:simple-array-unsigned-byte-16-widetag)
+		 (32 sb!vm:simple-array-unsigned-byte-32-widetag)
 		 (t (error "losing element size: ~D" sizebits))))
 	 (result (allocate-vector-object *dynamic* sizebits len type))
 	 (start (+ (descriptor-byte-offset result)
@@ -1962,10 +1962,11 @@
 
 (define-cold-fop (fop-single-float-vector)
   (let* ((len (read-arg 4))
-	 (result (allocate-vector-object *dynamic*
-					 sb!vm:word-bits
-					 len
-					 sb!vm:simple-array-single-float-type))
+	 (result (allocate-vector-object
+		  *dynamic*
+		  sb!vm:word-bits
+		  len
+		  sb!vm:simple-array-single-float-widetag))
 	 (start (+ (descriptor-byte-offset result)
 		   (ash sb!vm:vector-data-offset sb!vm:word-shift)))
 	 (end (+ start (* len sb!vm:word-bytes))))
@@ -1989,7 +1990,7 @@
 					sb!vm:other-pointer-lowtag)))
     (write-memory result
 		  (make-other-immediate-descriptor rank
-						   sb!vm:simple-array-type))
+						   sb!vm:simple-array-widetag))
     (write-wordindexed result sb!vm:array-fill-pointer-slot *nil-descriptor*)
     (write-wordindexed result sb!vm:array-data-slot data-vector)
     (write-wordindexed result sb!vm:array-displacement-slot *nil-descriptor*)
@@ -2003,9 +2004,10 @@
 	  (setf total-elements
 		(* total-elements
 		   (logior (ash (descriptor-high dim)
-				(- descriptor-low-bits (1- sb!vm:lowtag-bits)))
+				(- descriptor-low-bits
+				   (1- sb!vm:n-lowtag-bits)))
 			   (ash (descriptor-low dim)
-				(- 1 sb!vm:lowtag-bits)))))
+				(- 1 sb!vm:n-lowtag-bits)))))
 	  (write-wordindexed result
 			     (+ sb!vm:array-dimensions-offset axis)
 			     dim)))
@@ -2043,7 +2045,7 @@
      (prepare-for-fast-read-byte *fasl-input-stream*
        (let* ((des (allocate-unboxed-object *dynamic* sb!vm:word-bits
 					    (1- sb!vm:long-float-size)
-					    sb!vm:long-float-type))
+					    sb!vm:long-float-widetag))
 	      (low-bits (make-random-descriptor (fast-read-u-integer 4)))
 	      (high-bits (make-random-descriptor (fast-read-u-integer 4)))
 	      (exp-bits (make-random-descriptor (fast-read-s-integer 2))))
@@ -2059,7 +2061,7 @@
      (prepare-for-fast-read-byte *fasl-input-stream*
        (let* ((des (allocate-unboxed-object *dynamic* sb!vm:word-bits
 					    (1- sb!vm:long-float-size)
-					    sb!vm:long-float-type))
+					    sb!vm:long-float-widetag))
 	      (low-bits (make-random-descriptor (fast-read-u-integer 4)))
 	      (mid-bits (make-random-descriptor (fast-read-u-integer 4)))
 	      (high-bits (make-random-descriptor (fast-read-u-integer 4)))
@@ -2078,7 +2080,7 @@
      (prepare-for-fast-read-byte *fasl-input-stream*
        (let* ((des (allocate-unboxed-object *dynamic* sb!vm:word-bits
 					    (1- sb!vm:complex-long-float-size)
-					    sb!vm:complex-long-float-type))
+					    sb!vm:complex-long-float-widetag))
 	      (real-low-bits (make-random-descriptor (fast-read-u-integer 4)))
 	      (real-high-bits (make-random-descriptor (fast-read-u-integer 4)))
 	      (real-exp-bits (make-random-descriptor (fast-read-s-integer 2)))
@@ -2111,7 +2113,7 @@
      (prepare-for-fast-read-byte *fasl-input-stream*
        (let* ((des (allocate-unboxed-object *dynamic* sb!vm:word-bits
 					    (1- sb!vm:complex-long-float-size)
-					    sb!vm:complex-long-float-type))
+					    sb!vm:complex-long-float-widetag))
 	      (real-low-bits (make-random-descriptor (fast-read-u-integer 4)))
 	      (real-mid-bits (make-random-descriptor (fast-read-u-integer 4)))
 	      (real-high-bits (make-random-descriptor (fast-read-u-integer 4)))
@@ -2149,11 +2151,11 @@
 
 (define-cold-fop (fop-ratio)
   (let ((den (pop-stack)))
-    (number-pair-to-core (pop-stack) den sb!vm:ratio-type)))
+    (number-pair-to-core (pop-stack) den sb!vm:ratio-widetag)))
 
 (define-cold-fop (fop-complex)
   (let ((im (pop-stack)))
-    (number-pair-to-core (pop-stack) im sb!vm:complex-type)))
+    (number-pair-to-core (pop-stack) im sb!vm:complex-widetag)))
 
 ;;;; cold fops for calling (or not calling)
 
@@ -2182,7 +2184,7 @@
 	    (allocate-vector-object *dynamic*
 				    sb!vm:word-bits
 				    *load-time-value-counter*
-				    sb!vm:simple-vector-type)))
+				    sb!vm:simple-vector-widetag)))
 
 (define-cold-fop (fop-funcall-for-effect nil)
   (if (= (read-arg 1) 0)
@@ -2274,8 +2276,8 @@
 					      code-size)
 					   sb!vm:other-pointer-lowtag)))
        (write-memory des
-		     (make-other-immediate-descriptor header-n-words
-						      sb!vm:code-header-type))
+		     (make-other-immediate-descriptor
+		      header-n-words sb!vm:code-header-widetag))
        (write-wordindexed des
 			  sb!vm:code-code-size-slot
 			  (make-fixnum-descriptor
@@ -2339,7 +2341,7 @@
     (write-memory fn
 		  (make-other-immediate-descriptor
 		   (ash offset (- sb!vm:word-shift))
-		   sb!vm:simple-fun-header-type))
+		   sb!vm:simple-fun-header-widetag))
     (write-wordindexed fn
 		       sb!vm:simple-fun-self-slot
 		       ;; KLUDGE: Wiring decisions like this in at
@@ -2407,8 +2409,8 @@
 					   length)
 					sb!vm:other-pointer-lowtag)))
     (write-memory des
-		  (make-other-immediate-descriptor header-n-words
-						   sb!vm:code-header-type))
+		  (make-other-immediate-descriptor
+		   header-n-words sb!vm:code-header-widetag))
     (write-wordindexed des
 		       sb!vm:code-code-size-slot
 		       (make-fixnum-descriptor
@@ -2545,7 +2547,7 @@
 		       (record-with-translated-name priority))))
 
 	    (maybe-record-with-translated-name '("-LOWTAG") 0)
-	    (maybe-record-with-munged-name "-TYPE" "type_" 1)
+	    (maybe-record-with-translated-name '("-WIDETAG") 1)
 	    (maybe-record-with-munged-name "-FLAG" "flag_" 2)
 	    (maybe-record-with-munged-name "-TRAP" "trap_" 3)
 	    (maybe-record-with-munged-name "-SUBTYPE" "subtype_" 4)
@@ -2958,7 +2960,7 @@ initially undefined function references:~2%")
 	   (*current-reversed-cold-toplevels* *nil-descriptor*)
 	   (*unbound-marker* (make-other-immediate-descriptor
 			      0
-			      sb!vm:unbound-marker-type))
+			      sb!vm:unbound-marker-widetag))
 	   *cold-assembler-fixups*
 	   *cold-assembler-routines*
 	   #!+x86 *load-time-code-fixups*)

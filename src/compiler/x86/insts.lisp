@@ -1923,16 +1923,16 @@
 				 (logior type
 					 (ash (+ posn
 						 (component-header-length))
-					      (- type-bits
+					      (- n-widetag-bits
 						 word-shift)))))))
 
 (define-instruction simple-fun-header-word (segment)
   (:emitter
-   (emit-header-data segment simple-fun-header-type)))
+   (emit-header-data segment simple-fun-header-widetag)))
 
 (define-instruction lra-header-word (segment)
   (:emitter
-   (emit-header-data segment return-pc-header-type)))
+   (emit-header-data segment return-pc-header-widetag)))
 
 ;;;; fp instructions
 ;;;;

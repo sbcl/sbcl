@@ -45,7 +45,7 @@
     (inst beq result done)
 
     ;; Must be an other immediate.
-    (inst and object type-mask result)
+    (inst and object widetag-mask result)
     (inst br zero-tn done)
 
     FUNCTION-PTR
@@ -91,7 +91,7 @@
   (:result-types positive-fixnum)
   (:generator 6
     (loadw res x 0 other-pointer-lowtag)
-    (inst srl res type-bits res)))
+    (inst srl res n-widetag-bits res)))
 
 (define-vop (get-closure-length)
   (:translate get-closure-length)
@@ -101,7 +101,7 @@
   (:result-types positive-fixnum)
   (:generator 6
     (loadw res x 0 fun-pointer-lowtag)
-    (inst srl res type-bits res)))
+    (inst srl res n-widetag-bits res)))
 
 (define-vop (set-header-data)
   (:translate set-header-data)
@@ -113,13 +113,13 @@
   (:temporary (:scs (non-descriptor-reg)) t1 t2)
   (:generator 6
     (loadw t1 x 0 other-pointer-lowtag)
-    (inst and t1 type-mask t1)
+    (inst and t1 widetag-mask t1)
     (sc-case data
       (any-reg
-       (inst sll data (- type-bits 2) t2)
+       (inst sll data (- n-widetag-bits 2) t2)
        (inst bis t1 t2 t1))
       (immediate
-       (let ((c (ash (tn-value data) type-bits)))
+       (let ((c (ash (tn-value data) n-widetag-bits)))
 	 (cond ((<= 0 c (1- (ash 1 8)))
 		(inst bis t1 c t1))
 	       (t
@@ -148,11 +148,11 @@
   (:generator 2
     (sc-case type
       ((immediate)
-       (inst sll val type-bits temp)
+       (inst sll val n-widetag-bits temp)
        (inst bis temp (tn-value type) res))
       (t
        (inst sra type 2 temp)
-       (inst sll val (- type-bits 2) res)
+       (inst sll val (- n-widetag-bits 2) res)
        (inst bis res temp res)))))
 
 
@@ -194,7 +194,7 @@
   (:result-types system-area-pointer)
   (:generator 10
     (loadw ndescr code 0 other-pointer-lowtag)
-    (inst srl ndescr type-bits ndescr)
+    (inst srl ndescr n-widetag-bits ndescr)
     (inst sll ndescr word-shift ndescr)
     (inst subq ndescr other-pointer-lowtag ndescr)
     (inst addq code ndescr sap)))
@@ -207,7 +207,7 @@
   (:temporary (:scs (non-descriptor-reg)) ndescr)
   (:generator 10
     (loadw ndescr code 0 other-pointer-lowtag)
-    (inst srl ndescr type-bits ndescr)
+    (inst srl ndescr n-widetag-bits ndescr)
     (inst sll ndescr word-shift ndescr)
     (inst addq ndescr offset ndescr)
     (inst subq ndescr (- other-pointer-lowtag fun-pointer-lowtag) ndescr)

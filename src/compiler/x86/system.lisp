@@ -98,7 +98,7 @@
   (:result-types positive-fixnum)
   (:generator 6
     (loadw res x 0 other-pointer-lowtag)
-    (inst shr res type-bits)))
+    (inst shr res n-widetag-bits)))
 
 (define-vop (get-closure-length)
   (:translate get-closure-length)
@@ -108,7 +108,7 @@
   (:result-types positive-fixnum)
   (:generator 6
     (loadw res x 0 fun-pointer-lowtag)
-    (inst shr res type-bits)))
+    (inst shr res n-widetag-bits)))
 
 (define-vop (set-header-data)
   (:translate set-header-data)
@@ -121,7 +121,7 @@
 		   :from (:argument 1) :to (:result 0)) eax)
   (:generator 6
     (move eax data)
-    (inst shl eax (- type-bits 2))
+    (inst shl eax (- n-widetag-bits 2))
     (inst mov al-tn (make-ea :byte :base x :disp (- other-pointer-lowtag)))
     (storew eax x 0 other-pointer-lowtag)
     (move res x)))
@@ -142,7 +142,7 @@
   (:results (res :scs (any-reg descriptor-reg) :from (:argument 0)))
   (:generator 2
     (move res val)
-    (inst shl res (- type-bits 2))
+    (inst shl res (- n-widetag-bits 2))
     (inst or res (sc-case type
 		   (unsigned-reg type)
 		   (immediate (tn-value type))))))
@@ -197,7 +197,7 @@
   (:result-types system-area-pointer)
   (:generator 10
     (loadw sap code 0 other-pointer-lowtag)
-    (inst shr sap type-bits)
+    (inst shr sap n-widetag-bits)
     (inst lea sap (make-ea :byte :base code :index sap :scale 4
 			   :disp (- other-pointer-lowtag)))))
 
@@ -208,7 +208,7 @@
   (:results (func :scs (descriptor-reg) :from (:argument 0)))
   (:generator 10
     (loadw func code 0 other-pointer-lowtag)
-    (inst shr func type-bits)
+    (inst shr func n-widetag-bits)
     (inst lea func
 	  (make-ea :byte :base offset :index func :scale 4
 		   :disp (- fun-pointer-lowtag other-pointer-lowtag)))

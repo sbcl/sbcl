@@ -224,3 +224,12 @@
 ;;; the VM support routines
 (defvar *backend-support-routines* (make-vm-support-routines))
 (declaim (type vm-support-routines *backend-support-routines*))
+
+;;; This is a prototype interface to support Christophe Rhodes' new
+;;; (sbcl-0.pre7.57) VOP :GUARD clauses for implementations which
+;;; depend on CPU variants, e.g. the differences between I486,
+;;; Pentium, and Pentium Pro, or the differences between different
+;;; SPARC versions.
+;;;
+;;; The default value of NIL means use only unguarded VOPs.
+(defvar *backend-subfeatures* nil)

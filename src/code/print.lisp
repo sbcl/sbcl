@@ -1555,8 +1555,8 @@
 	 ;; FIXME: This find-the-function-name idiom ought to be
 	 ;; pulled out in a function somewhere.
 	 (name (case (function-subtype object)
-		 (#.sb!vm:closure-header-type "CLOSURE")
-		 (#.sb!vm:simple-fun-header-type (%simple-fun-name object))
+		 (#.sb!vm:closure-header-widetag "CLOSURE")
+		 (#.sb!vm:simple-fun-header-widetag (%simple-fun-name object))
 		 (t 'no-name-available)))
 	 (identified-by-name-p (and (symbolp name)
 				    (fboundp name)
@@ -1577,7 +1577,7 @@
 	(#.sb!vm:other-pointer-lowtag
 	  (let ((type (get-type object)))
 	    (case type
-	      (#.sb!vm:value-cell-header-type
+	      (#.sb!vm:value-cell-header-widetag
 	       (write-string "value cell " stream)
 	       (output-object (value-cell-ref object) stream))
 	      (t
@@ -1590,7 +1590,7 @@
 	 (write-string "unknown pointer object, type=" stream))
 	(t
 	 (case (get-type object)
-	   (#.sb!vm:unbound-marker-type
+	   (#.sb!vm:unbound-marker-widetag
 	    (write-string "unbound marker" stream))
 	   (t
 	    (write-string "unknown immediate object, lowtag=" stream)

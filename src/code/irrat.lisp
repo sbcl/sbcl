@@ -869,7 +869,8 @@
 	      #-(or linux hpux) #.(/ (asinh most-positive-double-float) 4d0)
 	      ;; This is more accurate under linux.
 	      #+(or linux hpux) #.(/ (+ (log 2.0d0)
-                                          (log most-positive-double-float)) 4d0))
+					(log most-positive-double-float))
+				     4d0))
               (coerce-to-complex-type (float-sign x)
                                       (float-sign y) z))
 	  (t

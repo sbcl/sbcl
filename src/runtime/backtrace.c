@@ -66,14 +66,14 @@ code_pointer(lispobj object)
 
     headerp = (lispobj *) native_pointer(object);
     header = *headerp;
-    type = TypeOf(header);
+    type = widetag_of(header);
 
     switch (type) {
-        case type_CodeHeader:
+        case CODE_HEADER_WIDETAG:
             break;
-        case type_ReturnPcHeader:
-        case type_SimpleFunHeader:
-        case type_ClosureFunHeader:
+        case RETURN_PC_HEADER_WIDETAG:
+        case SIMPLE_FUN_HEADER_WIDETAG:
+        case CLOSURE_FUN_HEADER_WIDETAG:
             len = HEADER_LENGTH(header);
             if (len == 0)
                 headerp = NULL;
@@ -113,7 +113,7 @@ call_info_from_context(struct call_info *info, os_context_t *context)
     unsigned long pc;
 
     info->interrupted = 1;
-    if (lowtagof(*os_context_register_addr(context, reg_CODE))
+    if (lowtag_of(*os_context_register_addr(context, reg_CODE))
 	== FUN_POINTER_LOWTAG) {
         /* We tried to call a function, but crapped out before $CODE could
          * be fixed up. Probably an undefined function. */
@@ -221,18 +221,18 @@ backtrace(int nframes)
                 header = (struct simple_fun *) native_pointer(function);
                 name = header->name;
 
-                if (lowtagof(name) == OTHER_POINTER_LOWTAG) {
+                if (lowtag_of(name) == OTHER_POINTER_LOWTAG) {
                     lispobj *object;
 
                     object = (lispobj *) native_pointer(name);
 
-                    if (TypeOf(*object) == type_SymbolHeader) {
+                    if (widetag_of(*object) == SYMBOL_HEADER_WIDETAG) {
                         struct symbol *symbol;
 
                         symbol = (struct symbol *) object;
                         object = (lispobj *) native_pointer(symbol->name);
                     }
-                    if (TypeOf(*object) == type_SimpleString) {
+                    if (widetag_of(*object) == SIMPLE_STRING_WIDETAG) {
                         struct vector *string;
 
                         string = (struct vector *) object;

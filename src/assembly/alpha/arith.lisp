@@ -48,8 +48,8 @@
   (inst cmoveq temp 1 temp2)
   (inst not temp temp)
   (inst cmoveq temp 1 temp2)
-  (inst sll temp2 type-bits temp2)
-  (inst bis temp2 bignum-type temp2)
+  (inst sll temp2 n-widetag-bits temp2)
+  (inst bis temp2 bignum-widetag temp2)
   
   (pseudo-atomic (:extra (pad-data-block (+ bignum-digits-offset 3)))
     (inst bis alloc-tn other-pointer-lowtag res)
@@ -105,8 +105,8 @@
   (inst cmoveq temp 1 temp2)
   (inst not temp temp)
   (inst cmoveq temp 1 temp2)
-  (inst sll temp2 type-bits temp2)
-  (inst bis temp2 bignum-type temp2)
+  (inst sll temp2 n-widetag-bits temp2)
+  (inst bis temp2 bignum-widetag temp2)
   
   (pseudo-atomic (:extra (pad-data-block (+ bignum-digits-offset 3)))
     (inst bis alloc-tn other-pointer-lowtag res)
@@ -168,13 +168,13 @@
   (inst sra lo 32 hi)
 
   ;; Do we need one word or two?  Assume two.
-  (inst li (logior (ash 2 type-bits) bignum-type) temp2)
+  (inst li (logior (ash 2 n-widetag-bits) bignum-widetag) temp2)
   (inst sra lo 31 temp)
   (inst xor temp hi temp)
   (inst bne temp two-words)
 
   ;; Only need one word, fix the header.
-  (inst li (logior (ash 1 type-bits) bignum-type) temp2)
+  (inst li (logior (ash 1 n-widetag-bits) bignum-widetag) temp2)
   ;; Allocate one word.
   (pseudo-atomic (:extra (pad-data-block (1+ bignum-digits-offset)))
     (inst bis alloc-tn other-pointer-lowtag res)

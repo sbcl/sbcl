@@ -257,15 +257,15 @@
 				       :foreign)))))))))
   (values))
 
-(defmacro with-fixed-allocation ((result-tn type-code size &optional inline)
+;;; Allocate an other-pointer object of fixed SIZE with a single word
+;;; header having the specified WIDETAG value. The result is placed in
+;;; RESULT-TN.
+(defmacro with-fixed-allocation ((result-tn widetag size &optional inline)
 				 &rest forms)
-  #!+sb-doc
-  "Allocate an other-pointer object of fixed Size with a single
-   word header having the specified Type-Code. The result is placed in
-   Result-TN."
   `(pseudo-atomic
     (allocation ,result-tn (pad-data-block ,size) ,inline)
-    (storew (logior (ash (1- ,size) sb!vm:type-bits) ,type-code) ,result-tn)
+    (storew (logior (ash (1- ,size) sb!vm:n-widetag-bits) ,widetag)
+	    ,result-tn)
     (inst lea ,result-tn
      (make-ea :byte :base ,result-tn :disp other-pointer-lowtag))
     ,@forms))

@@ -429,7 +429,7 @@
 				      (dstate-cur-offs dstate)
 				      (+ (dstate-cur-offs dstate)
 					 (1- lra-size))))
-		sb!vm:return-pc-header-type))
+		sb!vm:return-pc-header-widetag))
     (unless (null stream)
       (princ '.lra stream))
     (incf (dstate-next-offs dstate) lra-size))

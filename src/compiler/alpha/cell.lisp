@@ -60,7 +60,7 @@
     (move object obj-temp)
     (loadw value obj-temp symbol-value-slot other-pointer-lowtag)
     (let ((err-lab (generate-error-code vop unbound-symbol-error obj-temp)))
-      (inst xor value unbound-marker-type temp)
+      (inst xor value unbound-marker-widetag temp)
       (inst beq temp err-lab))))
 
 ;;; Like CHECKED-CELL-REF, only we are a predicate to see if the cell
@@ -77,7 +77,7 @@
   (:translate boundp)
   (:generator 9
     (loadw value object symbol-value-slot other-pointer-lowtag)
-    (inst xor value unbound-marker-type temp)
+    (inst xor value unbound-marker-widetag temp)
     (if not-p
 	(inst beq temp target)
 	(inst bne temp target))))
@@ -119,7 +119,7 @@
   (:generator 38
     (let ((normal-fn (gen-label)))
       (load-type type function (- fun-pointer-lowtag))
-      (inst xor type simple-fun-header-type type)
+      (inst xor type simple-fun-header-widetag type)
       (inst addq function
 	    (- (ash simple-fun-code-offset word-shift) fun-pointer-lowtag)
 	    lip)
@@ -240,7 +240,7 @@
   (:result-types positive-fixnum)
   (:generator 4
     (loadw res struct 0 instance-pointer-lowtag)
-    (inst srl res type-bits res)))
+    (inst srl res n-widetag-bits res)))
 
 (define-vop (instance-ref slot-ref)
   (:variant instance-slots-offset instance-pointer-lowtag)

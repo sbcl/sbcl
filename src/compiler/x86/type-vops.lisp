@@ -16,13 +16,13 @@
 (eval-when (:compile-toplevel :execute)
 
 (defparameter *immediate-types*
-  (list unbound-marker-type base-char-type))
+  (list unbound-marker-widetag base-char-widetag))
 
-(defparameter *fun-header-types*
-  (list funcallable-instance-header-type
-	simple-fun-header-type
-	closure-fun-header-type
-	closure-header-type))
+(defparameter *fun-header-widetags*
+  (list funcallable-instance-header-widetag
+	simple-fun-header-widetag
+	closure-fun-header-widetag
+	closure-header-widetag))
 
 (defun canonicalize-headers (headers)
   (collect ((results))
@@ -58,8 +58,8 @@
 	 (extended (remove lowtag-limit type-codes :test #'>))
 	 (immediates (intersection extended *immediate-types* :test #'eql))
 	 (headers (set-difference extended *immediate-types* :test #'eql))
-	 (function-p (if (intersection headers *fun-header-types*)
-			 (if (subsetp headers *fun-header-types*)
+	 (function-p (if (intersection headers *fun-header-widetags*)
+			 (if (subsetp headers *fun-header-widetags*)
 			     t
 			     (error "can't test for mix of function subtypes ~
 				     and normal header types"))
@@ -186,7 +186,7 @@
 	   (t
 	     (let ((start (car header))
 		   (end (cdr header)))
-	       (unless (= start bignum-type)
+	       (unless (= start bignum-widetag)
 		 (inst cmp al-tn start)
 		 (inst jmp :b when-false)) ; was :l
 	       (inst cmp al-tn end)
@@ -226,7 +226,7 @@
 	      (t
 	       (let ((start (car header))
 		     (end (cdr header)))
-		 (unless (= start bignum-type)
+		 (unless (= start bignum-widetag)
 		   (inst sub al-tn (- start delta))
 		   (setf delta start)
 		   (inst jmp :l when-false))
@@ -333,185 +333,185 @@
   instance-pointer-lowtag)
 
 (def-type-vops bignump check-bignum bignum
-  object-not-bignum-error bignum-type)
+  object-not-bignum-error bignum-widetag)
 
 (def-type-vops ratiop check-ratio ratio
-  object-not-ratio-error ratio-type)
+  object-not-ratio-error ratio-widetag)
 
 (def-type-vops complexp check-complex complex object-not-complex-error
-  complex-type complex-single-float-type complex-double-float-type
-  #!+long-float complex-long-float-type)
+  complex-widetag complex-single-float-widetag complex-double-float-widetag
+  #!+long-float complex-long-float-widetag)
 
 (def-type-vops complex-rational-p check-complex-rational nil
-  object-not-complex-rational-error complex-type)
+  object-not-complex-rational-error complex-widetag)
 
 (def-type-vops complex-float-p check-complex-float nil
   object-not-complex-float-error
-  complex-single-float-type complex-double-float-type
-  #!+long-float complex-long-float-type)
+  complex-single-float-widetag complex-double-float-widetag
+  #!+long-float complex-long-float-widetag)
 
 (def-type-vops complex-single-float-p check-complex-single-float
   complex-single-float object-not-complex-single-float-error
-  complex-single-float-type)
+  complex-single-float-widetag)
 
 (def-type-vops complex-double-float-p check-complex-double-float
   complex-double-float object-not-complex-double-float-error
-  complex-double-float-type)
+  complex-double-float-widetag)
 
 #!+long-float
 (def-type-vops complex-long-float-p check-complex-long-float
   complex-long-float object-not-complex-long-float-error
-  complex-long-float-type)
+  complex-long-float-widetag)
 
 (def-type-vops single-float-p check-single-float single-float
-  object-not-single-float-error single-float-type)
+  object-not-single-float-error single-float-widetag)
 
 (def-type-vops double-float-p check-double-float double-float
-  object-not-double-float-error double-float-type)
+  object-not-double-float-error double-float-widetag)
 
 #!+long-float
 (def-type-vops long-float-p check-long-float long-float
-  object-not-long-float-error long-float-type)
+  object-not-long-float-error long-float-widetag)
 
 (def-type-vops simple-string-p check-simple-string simple-string
-  object-not-simple-string-error simple-string-type)
+  object-not-simple-string-error simple-string-widetag)
 
 (def-type-vops simple-bit-vector-p check-simple-bit-vector simple-bit-vector
-  object-not-simple-bit-vector-error simple-bit-vector-type)
+  object-not-simple-bit-vector-error simple-bit-vector-widetag)
 
 (def-type-vops simple-vector-p check-simple-vector simple-vector
-  object-not-simple-vector-error simple-vector-type)
+  object-not-simple-vector-error simple-vector-widetag)
 
 (def-type-vops simple-array-unsigned-byte-2-p
   check-simple-array-unsigned-byte-2
   simple-array-unsigned-byte-2
   object-not-simple-array-unsigned-byte-2-error
-  simple-array-unsigned-byte-2-type)
+  simple-array-unsigned-byte-2-widetag)
 
 (def-type-vops simple-array-unsigned-byte-4-p
   check-simple-array-unsigned-byte-4
   simple-array-unsigned-byte-4
   object-not-simple-array-unsigned-byte-4-error
-  simple-array-unsigned-byte-4-type)
+  simple-array-unsigned-byte-4-widetag)
 
 (def-type-vops simple-array-unsigned-byte-8-p
   check-simple-array-unsigned-byte-8
   simple-array-unsigned-byte-8
   object-not-simple-array-unsigned-byte-8-error
-  simple-array-unsigned-byte-8-type)
+  simple-array-unsigned-byte-8-widetag)
 
 (def-type-vops simple-array-unsigned-byte-16-p
   check-simple-array-unsigned-byte-16
   simple-array-unsigned-byte-16
   object-not-simple-array-unsigned-byte-16-error
-  simple-array-unsigned-byte-16-type)
+  simple-array-unsigned-byte-16-widetag)
 
 (def-type-vops simple-array-unsigned-byte-32-p
   check-simple-array-unsigned-byte-32
   simple-array-unsigned-byte-32
   object-not-simple-array-unsigned-byte-32-error
-  simple-array-unsigned-byte-32-type)
+  simple-array-unsigned-byte-32-widetag)
 
 (def-type-vops simple-array-signed-byte-8-p
   check-simple-array-signed-byte-8
   simple-array-signed-byte-8
   object-not-simple-array-signed-byte-8-error
-  simple-array-signed-byte-8-type)
+  simple-array-signed-byte-8-widetag)
 
 (def-type-vops simple-array-signed-byte-16-p
   check-simple-array-signed-byte-16
   simple-array-signed-byte-16
   object-not-simple-array-signed-byte-16-error
-  simple-array-signed-byte-16-type)
+  simple-array-signed-byte-16-widetag)
 
 (def-type-vops simple-array-signed-byte-30-p
   check-simple-array-signed-byte-30
   simple-array-signed-byte-30
   object-not-simple-array-signed-byte-30-error
-  simple-array-signed-byte-30-type)
+  simple-array-signed-byte-30-widetag)
 
 (def-type-vops simple-array-signed-byte-32-p
   check-simple-array-signed-byte-32
   simple-array-signed-byte-32
   object-not-simple-array-signed-byte-32-error
-  simple-array-signed-byte-32-type)
+  simple-array-signed-byte-32-widetag)
 
 (def-type-vops simple-array-single-float-p check-simple-array-single-float
   simple-array-single-float object-not-simple-array-single-float-error
-  simple-array-single-float-type)
+  simple-array-single-float-widetag)
 
 (def-type-vops simple-array-double-float-p check-simple-array-double-float
   simple-array-double-float object-not-simple-array-double-float-error
-  simple-array-double-float-type)
+  simple-array-double-float-widetag)
 
 #!+long-float
 (def-type-vops simple-array-long-float-p check-simple-array-long-float
   simple-array-long-float object-not-simple-array-long-float-error
-  simple-array-long-float-type)
+  simple-array-long-float-widetag)
 
 (def-type-vops simple-array-complex-single-float-p
   check-simple-array-complex-single-float
   simple-array-complex-single-float
   object-not-simple-array-complex-single-float-error
-  simple-array-complex-single-float-type)
+  simple-array-complex-single-float-widetag)
 
 (def-type-vops simple-array-complex-double-float-p
   check-simple-array-complex-double-float
   simple-array-complex-double-float
   object-not-simple-array-complex-double-float-error
-  simple-array-complex-double-float-type)
+  simple-array-complex-double-float-widetag)
 
 #!+long-float
 (def-type-vops simple-array-complex-long-float-p
   check-simple-array-complex-long-float
   simple-array-complex-long-float
   object-not-simple-array-complex-long-float-error
-  simple-array-complex-long-float-type)
+  simple-array-complex-long-float-widetag)
 
 (def-type-vops base-char-p check-base-char base-char
-  object-not-base-char-error base-char-type)
+  object-not-base-char-error base-char-widetag)
 
 (def-type-vops system-area-pointer-p check-system-area-pointer
-  system-area-pointer object-not-sap-error sap-type)
+  system-area-pointer object-not-sap-error sap-widetag)
 
 (def-type-vops weak-pointer-p check-weak-pointer weak-pointer
-  object-not-weak-pointer-error weak-pointer-type)
+  object-not-weak-pointer-error weak-pointer-widetag)
 
 (def-type-vops code-component-p nil nil nil
-  code-header-type)
+  code-header-widetag)
 
 (def-type-vops lra-p nil nil nil
-  return-pc-header-type)
+  return-pc-header-widetag)
 
 (def-type-vops fdefn-p nil nil nil
-  fdefn-type)
+  fdefn-widetag)
 
 (def-type-vops funcallable-instance-p nil nil nil
-  funcallable-instance-header-type)
+  funcallable-instance-header-widetag)
 
 (def-type-vops array-header-p nil nil nil
-  simple-array-type complex-string-type complex-bit-vector-type
-  complex-vector-type complex-array-type)
+  simple-array-widetag complex-string-widetag complex-bit-vector-widetag
+  complex-vector-widetag complex-array-widetag)
 
 (def-type-vops stringp check-string nil object-not-string-error
-  simple-string-type complex-string-type)
+  simple-string-widetag complex-string-widetag)
 
 (def-type-vops bit-vector-p check-bit-vector nil object-not-bit-vector-error
-  simple-bit-vector-type complex-bit-vector-type)
+  simple-bit-vector-widetag complex-bit-vector-widetag)
 
 (def-type-vops vectorp check-vector nil object-not-vector-error
-  simple-string-type simple-bit-vector-type simple-vector-type
-  simple-array-unsigned-byte-2-type simple-array-unsigned-byte-4-type
-  simple-array-unsigned-byte-8-type simple-array-unsigned-byte-16-type
-  simple-array-unsigned-byte-32-type
-  simple-array-signed-byte-8-type simple-array-signed-byte-16-type
-  simple-array-signed-byte-30-type simple-array-signed-byte-32-type
-  simple-array-single-float-type simple-array-double-float-type
-  #!+long-float simple-array-long-float-type
-  simple-array-complex-single-float-type
-  simple-array-complex-double-float-type
-  #!+long-float simple-array-complex-long-float-type
-  complex-string-type complex-bit-vector-type complex-vector-type)
+  simple-string-widetag simple-bit-vector-widetag simple-vector-widetag
+  simple-array-unsigned-byte-2-widetag simple-array-unsigned-byte-4-widetag
+  simple-array-unsigned-byte-8-widetag simple-array-unsigned-byte-16-widetag
+  simple-array-unsigned-byte-32-widetag
+  simple-array-signed-byte-8-widetag simple-array-signed-byte-16-widetag
+  simple-array-signed-byte-30-widetag simple-array-signed-byte-32-widetag
+  simple-array-single-float-widetag simple-array-double-float-widetag
+  #!+long-float simple-array-long-float-widetag
+  simple-array-complex-single-float-widetag
+  simple-array-complex-double-float-widetag
+  #!+long-float simple-array-complex-long-float-widetag
+  complex-string-widetag complex-bit-vector-widetag complex-vector-widetag)
 
 ;;; Note that this "type VOP" is sort of an oddball; it doesn't so
 ;;; much test for a Lisp-level type as just expose a low-level type
@@ -524,54 +524,55 @@
 ;;; associated backend type predicates and so forth as we do for
 ;;; ordinary type VOPs.
 (def-type-vops complex-vector-p check-complex-vector nil object-not-complex-vector-error
-  complex-vector-type)
+  complex-vector-widetag)
 
 (def-type-vops simple-array-p check-simple-array nil object-not-simple-array-error
-  simple-array-type simple-string-type simple-bit-vector-type
-  simple-vector-type simple-array-unsigned-byte-2-type
-  simple-array-unsigned-byte-4-type simple-array-unsigned-byte-8-type
-  simple-array-unsigned-byte-16-type simple-array-unsigned-byte-32-type
-  simple-array-signed-byte-8-type simple-array-signed-byte-16-type
-  simple-array-signed-byte-30-type simple-array-signed-byte-32-type
-  simple-array-single-float-type simple-array-double-float-type
-  #!+long-float simple-array-long-float-type
-  simple-array-complex-single-float-type
-  simple-array-complex-double-float-type
-  #!+long-float simple-array-complex-long-float-type)
+  simple-array-widetag simple-string-widetag simple-bit-vector-widetag
+  simple-vector-widetag simple-array-unsigned-byte-2-widetag
+  simple-array-unsigned-byte-4-widetag simple-array-unsigned-byte-8-widetag
+  simple-array-unsigned-byte-16-widetag simple-array-unsigned-byte-32-widetag
+  simple-array-signed-byte-8-widetag simple-array-signed-byte-16-widetag
+  simple-array-signed-byte-30-widetag simple-array-signed-byte-32-widetag
+  simple-array-single-float-widetag simple-array-double-float-widetag
+  #!+long-float simple-array-long-float-widetag
+  simple-array-complex-single-float-widetag
+  simple-array-complex-double-float-widetag
+  #!+long-float simple-array-complex-long-float-widetag)
 
 (def-type-vops arrayp check-array nil object-not-array-error
-  simple-array-type simple-string-type simple-bit-vector-type
-  simple-vector-type simple-array-unsigned-byte-2-type
-  simple-array-unsigned-byte-4-type simple-array-unsigned-byte-8-type
-  simple-array-unsigned-byte-16-type simple-array-unsigned-byte-32-type
-  simple-array-signed-byte-8-type simple-array-signed-byte-16-type
-  simple-array-signed-byte-30-type simple-array-signed-byte-32-type
-  simple-array-single-float-type simple-array-double-float-type
-  #!+long-float simple-array-long-float-type
-  simple-array-complex-single-float-type
-  simple-array-complex-double-float-type
-  #!+long-float simple-array-complex-long-float-type
-  complex-string-type complex-bit-vector-type complex-vector-type
-  complex-array-type)
+  simple-array-widetag simple-string-widetag simple-bit-vector-widetag
+  simple-vector-widetag simple-array-unsigned-byte-2-widetag
+  simple-array-unsigned-byte-4-widetag simple-array-unsigned-byte-8-widetag
+  simple-array-unsigned-byte-16-widetag simple-array-unsigned-byte-32-widetag
+  simple-array-signed-byte-8-widetag simple-array-signed-byte-16-widetag
+  simple-array-signed-byte-30-widetag simple-array-signed-byte-32-widetag
+  simple-array-single-float-widetag simple-array-double-float-widetag
+  #!+long-float simple-array-long-float-widetag
+  simple-array-complex-single-float-widetag
+  simple-array-complex-double-float-widetag
+  #!+long-float simple-array-complex-long-float-widetag
+  complex-string-widetag complex-bit-vector-widetag complex-vector-widetag
+  complex-array-widetag)
 
 (def-type-vops numberp check-number nil object-not-number-error
-  even-fixnum-lowtag odd-fixnum-lowtag bignum-type ratio-type
-  single-float-type double-float-type #!+long-float long-float-type complex-type
-  complex-single-float-type complex-double-float-type
-  #!+long-float complex-long-float-type)
+  even-fixnum-lowtag odd-fixnum-lowtag bignum-widetag ratio-widetag
+  single-float-widetag double-float-widetag
+  #!+long-float long-float-widetag
+  complex-widetag complex-single-float-widetag complex-double-float-widetag
+  #!+long-float complex-long-float-widetag)
 
 (def-type-vops rationalp check-rational nil object-not-rational-error
-  even-fixnum-lowtag odd-fixnum-lowtag ratio-type bignum-type)
+  even-fixnum-lowtag odd-fixnum-lowtag ratio-widetag bignum-widetag)
 
 (def-type-vops integerp check-integer nil object-not-integer-error
-  even-fixnum-lowtag odd-fixnum-lowtag bignum-type)
+  even-fixnum-lowtag odd-fixnum-lowtag bignum-widetag)
 
 (def-type-vops floatp check-float nil object-not-float-error
-  single-float-type double-float-type #!+long-float long-float-type)
+  single-float-widetag double-float-widetag #!+long-float long-float-widetag)
 
 (def-type-vops realp check-real nil object-not-real-error
-  even-fixnum-lowtag odd-fixnum-lowtag ratio-type bignum-type
-  single-float-type double-float-type #!+long-float long-float-type)
+  even-fixnum-lowtag odd-fixnum-lowtag ratio-widetag bignum-widetag
+  single-float-widetag double-float-widetag #!+long-float long-float-widetag)
 
 ;;;; other integer ranges
 
@@ -592,7 +593,7 @@
       (inst cmp al-tn other-pointer-lowtag)
       (inst jmp :ne nope)
       (loadw eax-tn value 0 other-pointer-lowtag)
-      (inst cmp eax-tn (+ (ash 1 type-bits) bignum-type))
+      (inst cmp eax-tn (+ (ash 1 n-widetag-bits) bignum-widetag))
       (inst jmp (if not-p :ne :e) target))
     NOT-TARGET))
 
@@ -608,7 +609,7 @@
       (inst cmp al-tn other-pointer-lowtag)
       (inst jmp :ne nope)
       (loadw eax-tn value 0 other-pointer-lowtag)
-      (inst cmp eax-tn (+ (ash 1 type-bits) bignum-type))
+      (inst cmp eax-tn (+ (ash 1 n-widetag-bits) bignum-widetag))
       (inst jmp :ne nope))
     YEP
     (move result value)))
@@ -638,10 +639,10 @@
 	;; Get the header.
 	(loadw eax-tn value 0 other-pointer-lowtag)
 	;; Is it one?
-	(inst cmp eax-tn (+ (ash 1 type-bits) bignum-type))
+	(inst cmp eax-tn (+ (ash 1 n-widetag-bits) bignum-widetag))
 	(inst jmp :e single-word)
 	;; If it's other than two, we can't be an (unsigned-byte 32)
-	(inst cmp eax-tn (+ (ash 2 type-bits) bignum-type))
+	(inst cmp eax-tn (+ (ash 2 n-widetag-bits) bignum-widetag))
 	(inst jmp :ne nope)
 	;; Get the second digit.
 	(loadw eax-tn value (1+ bignum-digits-offset) other-pointer-lowtag)
@@ -681,10 +682,10 @@
       ;; Get the header.
       (loadw eax-tn value 0 other-pointer-lowtag)
       ;; Is it one?
-      (inst cmp eax-tn (+ (ash 1 type-bits) bignum-type))
+      (inst cmp eax-tn (+ (ash 1 n-widetag-bits) bignum-widetag))
       (inst jmp :e single-word)
       ;; If it's other than two, we can't be an (unsigned-byte 32)
-      (inst cmp eax-tn (+ (ash 2 type-bits) bignum-type))
+      (inst cmp eax-tn (+ (ash 2 n-widetag-bits) bignum-widetag))
       (inst jmp :ne nope)
       ;; Get the second digit.
       (loadw eax-tn value (1+ bignum-digits-offset) other-pointer-lowtag)
@@ -716,7 +717,7 @@
     (let ((is-symbol-label (if not-p drop-thru target)))
       (inst cmp value nil-value)
       (inst jmp :e is-symbol-label)
-      (test-type value target not-p symbol-header-type))
+      (test-type value target not-p symbol-header-widetag))
     DROP-THRU))
 
 (define-vop (check-symbol check-type)
@@ -724,7 +725,7 @@
     (let ((error (generate-error-code vop object-not-symbol-error value)))
       (inst cmp value nil-value)
       (inst jmp :e drop-thru)
-      (test-type value error t symbol-header-type))
+      (test-type value error t symbol-header-widetag))
     DROP-THRU
     (move result value)))
 

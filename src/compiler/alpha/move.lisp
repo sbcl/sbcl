@@ -23,7 +23,7 @@
       (symbol
        (load-symbol y val))
       (character
-       (inst li (logior (ash (char-code val) type-bits) base-char-type)
+       (inst li (logior (ash (char-code val) n-widetag-bits) base-char-widetag)
 	     y)))))
 
 (define-move-function (load-number 1) (vop x y)
@@ -180,7 +180,7 @@
     (inst beq temp done)
 
     (loadw header x 0 other-pointer-lowtag)
-    (inst srl header (1+ type-bits) header)
+    (inst srl header (1+ n-widetag-bits) header)
     (loadw y x bignum-digits-offset other-pointer-lowtag)
     (inst beq header one)
 
@@ -232,8 +232,8 @@
     (inst cmoveq temp 1 header)
     (inst not temp temp)
     (inst cmoveq temp 1 header)
-    (inst sll header type-bits header)
-    (inst bis header bignum-type header)
+    (inst sll header n-widetag-bits header)
+    (inst bis header bignum-widetag header)
       
     (pseudo-atomic (:extra (pad-data-block (+ bignum-digits-offset 3)))
       (inst bis alloc-tn other-pointer-lowtag y)
@@ -266,8 +266,8 @@
     (inst cmovge x 2 temp)
     (inst srl x 31 temp1)
     (inst cmoveq temp1 1 temp)
-    (inst sll temp type-bits temp)
-    (inst bis temp bignum-type temp)
+    (inst sll temp n-widetag-bits temp)
+    (inst bis temp bignum-widetag temp)
 
     (pseudo-atomic (:extra (pad-data-block (+ bignum-digits-offset 3)))
       (inst bis alloc-tn other-pointer-lowtag y)

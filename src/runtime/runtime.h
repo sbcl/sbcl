@@ -38,15 +38,13 @@
 
 #define N_LOWTAG_BITS 3
 #define LOWTAG_MASK ((1<<N_LOWTAG_BITS)-1)
-#define N_TYPE_BITS 8
-#define TYPE_MASK ((1<<N_TYPE_BITS)-1)
+#define N_WIDETAG_BITS 8
+#define WIDETAG_MASK ((1<<N_WIDETAG_BITS)-1)
 
-/* FIXME: There seems to be no reason that TypeOf, HeaderValue, CONS,
- * SYMBOL, and FDEFN can't be defined as (possibly inline) functions
- * instead of macros. */
+/* FIXME: Make HeaderValue, CONS, SYMBOL, and FDEFN into inline
+ * functions instead of macros. */
 
-#define TypeOf(obj) ((obj)&TYPE_MASK)
-#define HeaderValue(obj) ((unsigned long) ((obj)>>N_TYPE_BITS))
+#define HeaderValue(obj) ((unsigned long) ((obj) >> N_WIDETAG_BITS))
 
 #define CONS(obj) ((struct cons *)((obj)-LIST_POINTER_LOWTAG))
 #define SYMBOL(obj) ((struct symbol *)((obj)-OTHER_POINTER_LOWTAG))
@@ -69,8 +67,13 @@ typedef signed int s32;
 typedef u32 lispobj;
 
 static inline int
-lowtagof(lispobj obj) {
+lowtag_of(lispobj obj) {
     return obj & LOWTAG_MASK;
+}
+
+static inline int
+widetag_of(lispobj obj) {
+    return obj & WIDETAG_MASK;
 }
 
 /* Is the Lisp object obj something with pointer nature (as opposed to

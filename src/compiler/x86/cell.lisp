@@ -45,8 +45,8 @@
 	       (inst mov
 		     (make-ea :dword :base object
 			      :disp (- (* offset word-bytes) lowtag))
-		     (logior (ash (char-code val) type-bits)
-			     base-char-type)))))
+		     (logior (ash (char-code val) n-widetag-bits)
+			     base-char-widetag)))))
        ;; Else, value not immediate.
        (storew value object offset lowtag))))
 
@@ -80,7 +80,7 @@
   (:generator 9
     (let ((err-lab (generate-error-code vop unbound-symbol-error object)))
       (loadw value object symbol-value-slot other-pointer-lowtag)
-      (inst cmp value unbound-marker-type)
+      (inst cmp value unbound-marker-widetag)
       (inst jmp :e err-lab))))
 
 (define-vop (fast-symbol-value cell-ref)
@@ -104,7 +104,7 @@
   (:temporary (:sc descriptor-reg :from (:argument 0)) value)
   (:generator 9
     (loadw value object symbol-value-slot other-pointer-lowtag)
-    (inst cmp value unbound-marker-type)
+    (inst cmp value unbound-marker-widetag)
     (inst jmp (if not-p :e :ne) target)))
 
 (define-vop (symbol-hash)
@@ -159,7 +159,7 @@
 	  (make-ea :byte :base function
 		   :disp (- (* simple-fun-code-offset word-bytes)
 			    fun-pointer-lowtag)))
-    (inst cmp type simple-fun-header-type)
+    (inst cmp type simple-fun-header-widetag)
     (inst jmp :e normal-fn)
     (inst lea raw (make-fixup (extern-alien-name "closure_tramp") :foreign))
     NORMAL-FN
@@ -273,7 +273,7 @@
   (:result-types positive-fixnum)
   (:generator 4
     (loadw res struct 0 instance-pointer-lowtag)
-    (inst shr res type-bits)))
+    (inst shr res n-widetag-bits)))
 
 (define-vop (instance-ref slot-ref)
   (:variant instance-slots-offset instance-pointer-lowtag)

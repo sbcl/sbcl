@@ -262,7 +262,7 @@ GNAME(undefined_tramp):
 	int3
 	.byte	trap_Error
         .byte   2
-#ifdef type_LongFloat
+#ifdef LONG_FLOAT_WIDETAG
         .byte   24
 #else
         .byte   23

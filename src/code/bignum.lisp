@@ -110,7 +110,7 @@
 
 (defconstant digit-size 32)
 
-(defconstant maximum-bignum-length (1- (ash 1 (- 32 sb!vm:type-bits))))
+(defconstant maximum-bignum-length (1- (ash 1 (- 32 sb!vm:n-widetag-bits))))
 
 ;;;; internal inline routines
 

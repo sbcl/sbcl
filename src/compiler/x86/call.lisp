@@ -26,89 +26,46 @@
 ;;;
 ;;; Always wire the return PC location to the stack in its standard
 ;;; location.
-;;;
-;;; No problems.
-;#+nil
 (!def-vm-support-routine make-return-pc-passing-location (standard)
   (declare (ignore standard))
   (make-wired-tn (primitive-type-or-lose 'system-area-pointer)
 		 sap-stack-sc-number return-pc-save-offset))
-;;; If STANDARD is true, then use the standard (full call) location,
-;;; otherwise use any legal location.
-;;;
-;;; No problems.
-#+nil
-(!def-vm-support-routine make-return-pc-passing-location (standard)
-  (let ((ptype (primitive-type-or-lose 'system-area-pointer)))
-    (if standard
-	(make-wired-tn ptype sap-stack-sc-number return-pc-save-offset)
-	(make-normal-tn ptype))))
 
-;;; Similar to Make-Return-PC-Passing-Location, but makes a location to pass
-;;; Old-FP in.
+;;; Similar to Make-Return-PC-Passing-Location, but makes a location
+;;; to pass Old-FP in.
 ;;;
-;;; This is wired in both the standard and the local-call
-;;; conventions, because we want to be able to assume it's always there.
-;;; Besides, the x86 doesn't have enough registers to really make it
-;;; profitable to pass it in a register.
-;;;
-;;; No problems
-;#+nil
+;;; This is wired in both the standard and the local-call conventions,
+;;; because we want to be able to assume it's always there. Besides,
+;;; the x86 doesn't have enough registers to really make it profitable
+;;; to pass it in a register.
 (!def-vm-support-routine make-old-fp-passing-location (standard)
   (declare (ignore standard))
   (make-wired-tn *fixnum-primitive-type* control-stack-sc-number
 		 ocfp-save-offset))
-;;; If standard is true, then use the standard (full call) location,
-;;; otherwise use any legal location.
-;;;
-;;; No problems.
-#+nil
-(!def-vm-support-routine make-old-fp-passing-location (standard)
-  (if standard
-      (make-wired-tn *fixnum-primitive-type* control-stack-sc-number
-		     ocfp-save-offset)
-      (make-normal-tn *fixnum-primitive-type*)))
 
 ;;; Make the TNs used to hold Old-FP and Return-PC within the current
 ;;; function. We treat these specially so that the debugger can find
 ;;; them at a known location.
 ;;;
 ;;; Without using a save-tn - which does not make much sense if it is
-;;; wire to the stack? No problems.
+;;; wire to the stack? 
 (!def-vm-support-routine make-old-fp-save-location (env)
   (physenv-debug-live-tn (make-wired-tn *fixnum-primitive-type*
 					control-stack-sc-number
 					ocfp-save-offset)
 			 env))
-;;; Using a save-tn. No problems.
-#+nil
-(!def-vm-support-routine make-old-fp-save-location (env)
-  (specify-save-tn
-   (physenv-debug-live-tn (make-normal-tn *fixnum-primitive-type*) env)
-   (make-wired-tn *fixnum-primitive-type* control-stack-sc-number
-		  ocfp-save-offset)))
 
-;;; Without using a save-tn - which does not make much sense if it is
-;;; wire to the stack? No problems.
 (!def-vm-support-routine make-return-pc-save-location (env)
   (physenv-debug-live-tn
    (make-wired-tn (primitive-type-or-lose 'system-area-pointer)
 		  sap-stack-sc-number return-pc-save-offset)
    env))
-;;; Using a save-tn. No problems.
-#+nil
-(!def-vm-support-routine make-return-pc-save-location (env)
-  (let ((ptype (primitive-type-or-lose 'system-area-pointer)))
-    (specify-save-tn
-     (physenv-debug-live-tn (make-normal-tn ptype) env)
-     (make-wired-tn ptype sap-stack-sc-number return-pc-save-offset))))
 
 ;;; Make a TN for the standard argument count passing location. We only
 ;;; need to make the standard location, since a count is never passed when we
 ;;; are using non-standard conventions.
 (!def-vm-support-routine make-argument-count-location ()
   (make-wired-tn *fixnum-primitive-type* any-reg-sc-number ecx-offset))
-
 
 ;;; Make a TN to hold the number-stack frame pointer. This is allocated
 ;;; once per component, and is component-live.
@@ -127,14 +84,13 @@
   (list (make-stack-pointer-tn)
 	(make-normal-tn *fixnum-primitive-type*)))
 
-
 ;;; This function is called by the Entry-Analyze phase, allowing
-;;; VM-dependent initialization of the IR2-Component structure. We push
-;;; placeholder entries in the Constants to leave room for additional
-;;; noise in the code object header.
+;;; VM-dependent initialization of the IR2-COMPONENT structure. We
+;;; push placeholder entries in the Constants to leave room for
+;;; additional noise in the code object header.
 ;;;
 ;;; For the x86 the first constant is a pointer to a list of fixups,
-;;; or nil if the code object has none.
+;;; or NIL if the code object has none.
 (!def-vm-support-routine select-component-format (component)
   (declare (type component component))
   (dotimes (i (1+ code-constants-offset))
@@ -144,7 +100,7 @@
 
 ;;;; frame hackery
 
-;;; Used for setting up the Old-FP in local call.
+;;; This is used for setting up the Old-FP in local call.
 (define-vop (current-fp)
   (:results (val :scs (any-reg control-stack)))
   (:generator 1
@@ -157,14 +113,11 @@
   (:generator 1
     nil))
 
-
 (define-vop (xep-allocate-frame)
   (:info start-lab copy-more-arg-follows)
   (:vop-var vop)
   (:generator 1
-    ;; Make sure the function is aligned, and drop a label pointing to this
-    ;; function header.
-    (align lowtag-bits)
+    (align n-lowtag-bits)
     (trace-table-entry trace-table-function-prologue)
     (emit-label start-lab)
     ;; Skip space for the function header.
@@ -200,40 +153,41 @@
     (move res esp-tn)
     (inst sub esp-tn (* sb!vm:word-bytes (sb-allocated-size 'stack)))))
 
-;;; Allocate a partial frame for passing stack arguments in a full call. Nargs
-;;; is the number of arguments passed. We allocate at least 3 slots, because
-;;; the XEP noise is going to want to use them before it can extend the stack.
+;;; Allocate a partial frame for passing stack arguments in a full
+;;; call. NARGS is the number of arguments passed. We allocate at
+;;; least 3 slots, because the XEP noise is going to want to use them
+;;; before it can extend the stack.
 (define-vop (allocate-full-call-frame)
   (:info nargs)
   (:results (res :scs (any-reg control-stack)))
   (:generator 2
     (move res esp-tn)
     (inst sub esp-tn (* (max nargs 3) sb!vm:word-bytes))))
-
-
 
-;;; Emit code needed at the return-point from an unknown-values call for a
-;;; fixed number of values. Values is the head of the TN-Ref list for the
-;;; locations that the values are to be received into. Nvals is the number of
-;;; values that are to be received (should equal the length of Values).
+;;; Emit code needed at the return-point from an unknown-values call
+;;; for a fixed number of values. Values is the head of the TN-Ref
+;;; list for the locations that the values are to be received into.
+;;; Nvals is the number of values that are to be received (should
+;;; equal the length of Values).
 ;;;
 ;;; Move-Temp is a Descriptor-Reg TN used as a temporary.
 ;;;
-;;; This code exploits the fact that in the unknown-values convention, a
-;;; single value return returns at the return PC + 2, whereas a return of other
-;;; than one value returns directly at the return PC.
+;;; This code exploits the fact that in the unknown-values convention,
+;;; a single value return returns at the return PC + 2, whereas a
+;;; return of other than one value returns directly at the return PC.
 ;;;
-;;; If 0 or 1 values are expected, then we just emit an instruction to reset
-;;; the SP (which will only be executed when other than 1 value is returned.)
+;;; If 0 or 1 values are expected, then we just emit an instruction to
+;;; reset the SP (which will only be executed when other than 1 value
+;;; is returned.)
 ;;;
 ;;; In the general case we have to do three things:
-;;;  -- Default unsupplied register values. This need only be done when a
-;;;     single value is returned, since register values are defaulted by the
-;;;     called in the non-single case.
-;;;  -- Default unsupplied stack values. This needs to be done whenever there
-;;;     are stack values.
-;;;  -- Reset SP. This must be done whenever other than 1 value is returned,
-;;;     regardless of the number of values desired.
+;;;  -- Default unsupplied register values. This need only be done
+;;;     when a single value is returned, since register values are
+;;;     defaulted by the called in the non-single case.
+;;;  -- Default unsupplied stack values. This needs to be done whenever
+;;;     there are stack values.
+;;;  -- Reset SP. This must be done whenever other than 1 value is
+;;;     returned, regardless of the number of values desired.
 (defun default-unknown-values (vop values nvals)
   (declare (type (or tn-ref null) values)
 	   (type unsigned-byte nvals))
@@ -259,10 +213,10 @@
       (emit-label regs-defaulted)
       (inst mov esp-tn ebx-tn)))
    ((<= nvals 7)
-    ;; Number of bytes depends on the relative jump instructions. Best
-    ;; case is 31+(n-3)*14, worst case is 35+(n-3)*18. For nvals=6
-    ;; that is 73/89 bytes, and for nvals=7 that is 87/107 bytes which
-    ;; is likely better than using the blt below.
+    ;; The number of bytes depends on the relative jump instructions.
+    ;; Best case is 31+(n-3)*14, worst case is 35+(n-3)*18. For
+    ;; NVALS=6 that is 73/89 bytes, and for NVALS=7 that is 87/107
+    ;; bytes which is likely better than using the blt below.
     (let ((regs-defaulted (gen-label))
 	  (defaulting-done (gen-label))
 	  (default-stack-slots (gen-label)))
@@ -328,8 +282,8 @@
       ;; Branch off to the MV case.
       (inst jmp-short regs-defaulted)
 
-      ;; Default the register args, and set up the stack as if we entered
-      ;; the MV return point.
+      ;; Default the register args, and set up the stack as if we
+      ;; entered the MV return point.
       (inst mov ebx-tn esp-tn)
       (inst push edx-tn)
       (inst mov edi-tn nil-value)
@@ -340,8 +294,8 @@
       (inst lea edi-tn
 	    (make-ea :dword :base ebp-tn
 		     :disp (* (- (1+ register-arg-count)) word-bytes)))
-      ;; Load EAX with NIL so we can quickly store it, and set up stuff
-      ;; for the loop.
+      ;; Load EAX with NIL so we can quickly store it, and set up
+      ;; stuff for the loop.
       (inst mov eax-tn nil-value)
       (inst std)
       (inst mov ecx-tn (- nvals register-arg-count))
@@ -353,8 +307,8 @@
       (emit-label regs-defaulted)
       ;; Save EDI.
       (storew edi-tn ebx-tn (- (1+ 1)))
-      ;; Compute the number of stack arguments, and if it's zero or less,
-      ;; don't copy any stack arguments.
+      ;; Compute the number of stack arguments, and if it's zero or
+      ;; less, don't copy any stack arguments.
       (inst sub ecx-tn (fixnumize register-arg-count))
       (inst jmp :le no-stack-args)
 
@@ -402,22 +356,23 @@
 
 ;;;; unknown values receiving
 
-;;; Emit code needed at the return point for an unknown-values call for an
-;;; arbitrary number of values.
+;;; Emit code needed at the return point for an unknown-values call
+;;; for an arbitrary number of values.
 ;;;
-;;; We do the single and non-single cases with no shared code: there doesn't
-;;; seem to be any potential overlap, and receiving a single value is more
-;;; important efficiency-wise.
+;;; We do the single and non-single cases with no shared code: there
+;;; doesn't seem to be any potential overlap, and receiving a single
+;;; value is more important efficiency-wise.
 ;;;
-;;; When there is a single value, we just push it on the stack, returning
-;;; the old SP and 1.
+;;; When there is a single value, we just push it on the stack,
+;;; returning the old SP and 1.
 ;;;
-;;; When there is a variable number of values, we move all of the argument
-;;; registers onto the stack, and return Args and Nargs.
+;;; When there is a variable number of values, we move all of the
+;;; argument registers onto the stack, and return ARGS and NARGS.
 ;;;
-;;; Args and Nargs are TNs wired to the named locations. We must
-;;; explicitly allocate these TNs, since their lifetimes overlap with the
-;;; results Start and Count (also, it's nice to be able to target them).
+;;; ARGS and NARGS are TNs wired to the named locations. We must
+;;; explicitly allocate these TNs, since their lifetimes overlap with
+;;; the results start and count. (Also, it's nice to be able to target
+;;; them.)
 (defun receive-unknown-values (args nargs start count)
   (declare (type tn args nargs start count))
   (let ((variable-values (gen-label))
@@ -457,24 +412,25 @@
 
 ;;;; local call with unknown values convention return
 
-;;; Non-TR local call for a fixed number of values passed according to the
-;;; unknown values convention.
+;;; Non-TR local call for a fixed number of values passed according to
+;;; the unknown values convention.
 ;;;
 ;;; FP is the frame pointer in install before doing the call.
 ;;;
-;;; NFP would be the number-stack frame pointer if we had a separate number
-;;; stack.
+;;; NFP would be the number-stack frame pointer if we had a separate
+;;; number stack.
 ;;;
-;;; Args are the argument passing locations, which are specified only to
-;;; terminate their lifetimes in the caller.
+;;; Args are the argument passing locations, which are specified only
+;;; to terminate their lifetimes in the caller.
 ;;;
-;;; Values are the return value locations (wired to the standard passing
-;;; locations).
-;;; Nvals is the number of values received.
+;;; VALUES are the return value locations (wired to the standard
+;;; passing locations). NVALS is the number of values received.
 ;;;
-;;; Save is the save info, which we can ignore since saving has been done.
+;;; Save is the save info, which we can ignore since saving has been
+;;; done.
 ;;;
-;;; Target is a continuation pointing to the start of the called function.
+;;; TARGET is a continuation pointing to the start of the called
+;;; function.
 (define-vop (call-local)
   (:args (fp)
 	 (nfp)
@@ -554,12 +510,12 @@
 
 ;;;; local call with known values return
 
-;;; Non-TR local call with known return locations. Known-value return works
-;;; just like argument passing in local call.
+;;; Non-TR local call with known return locations. Known-value return
+;;; works just like argument passing in local call.
 ;;;
-;;; Note: we can't use normal load-tn allocation for the fixed args, since all
-;;; registers may be tied up by the more operand. Instead, we use
-;;; MAYBE-LOAD-STACK-TN.
+;;; Note: we can't use normal load-tn allocation for the fixed args,
+;;; since all registers may be tied up by the more operand. Instead,
+;;; we use MAYBE-LOAD-STACK-TN.
 (define-vop (known-call-local)
   (:args (fp)
 	 (nfp)
@@ -618,8 +574,9 @@
   (:vop-var vop)
   (:generator 6
     (trace-table-entry trace-table-function-epilogue)
-    ;; Save the return-pc in a register 'cause the frame-pointer is going away.
-    ;; Note this not in the usual stack location so we can't use RET
+    ;; Save the return-pc in a register 'cause the frame-pointer is
+    ;; going away. Note this not in the usual stack location so we
+    ;; can't use RET
     (move rpc return-pc)
     ;; Restore the stack.
     (move esp-tn ebp-tn)
@@ -712,41 +669,42 @@
 
 ;;;; full call
 ;;;
-;;;    There is something of a cross-product effect with full calls. Different
-;;; versions are used depending on whether we know the number of arguments or
-;;; the name of the called function, and whether we want fixed values, unknown
-;;; values, or a tail call.
+;;; There is something of a cross-product effect with full calls.
+;;; Different versions are used depending on whether we know the
+;;; number of arguments or the name of the called function, and
+;;; whether we want fixed values, unknown values, or a tail call.
 ;;;
-;;; In full call, the arguments are passed creating a partial frame on the
-;;; stack top and storing stack arguments into that frame. On entry to the
-;;; callee, this partial frame is pointed to by FP.
+;;; In full call, the arguments are passed creating a partial frame on
+;;; the stack top and storing stack arguments into that frame. On
+;;; entry to the callee, this partial frame is pointed to by FP.
 
-;;; This macro helps in the definition of full call VOPs by avoiding code
-;;; replication in defining the cross-product VOPs.
+;;; This macro helps in the definition of full call VOPs by avoiding
+;;; code replication in defining the cross-product VOPs.
 ;;;
-;;; Name is the name of the VOP to define.
+;;; NAME is the name of the VOP to define.
 ;;;
-;;; Named is true if the first argument is an fdefinition object whose
+;;; NAMED is true if the first argument is an fdefinition object whose
 ;;; definition is to be called.
 ;;;
-;;; Return is either :Fixed, :Unknown or :Tail:
-;;; -- If :Fixed, then the call is for a fixed number of values, returned in
+;;; RETURN is either :FIXED, :UNKNOWN or :TAIL:
+;;; -- If :FIXED, then the call is for a fixed number of values, returned in
 ;;;    the standard passing locations (passed as result operands).
-;;; -- If :Unknown, then the result values are pushed on the stack, and the
+;;; -- If :UNKNOWN, then the result values are pushed on the stack, and the
 ;;;    result values are specified by the Start and Count as in the
 ;;;    unknown-values continuation representation.
-;;; -- If :Tail, then do a tail-recursive call. No values are returned.
+;;; -- If :TAIL, then do a tail-recursive call. No values are returned.
 ;;;    The Old-Fp and Return-PC are passed as the second and third arguments.
 ;;;
-;;; In non-tail calls, the pointer to the stack arguments is passed as the last
-;;; fixed argument. If Variable is false, then the passing locations are
-;;; passed as a more arg. Variable is true if there are a variable number of
-;;; arguments passed on the stack. Variable cannot be specified with :Tail
-;;; return. TR variable argument call is implemented separately.
+;;; In non-tail calls, the pointer to the stack arguments is passed as
+;;; the last fixed argument. If Variable is false, then the passing
+;;; locations are passed as a more arg. Variable is true if there are
+;;; a variable number of arguments passed on the stack. Variable
+;;; cannot be specified with :Tail return. TR variable argument call
+;;; is implemented separately.
 ;;;
-;;; In tail call with fixed arguments, the passing locations are passed as a
-;;; more arg, but there is no new-FP, since the arguments have been set up in
-;;; the current frame.
+;;; In tail call with fixed arguments, the passing locations are
+;;; passed as a more arg, but there is no new-FP, since the arguments
+;;; have been set up in the current frame.
 (macrolet ((define-full-call (name named return variable)
 	    (aver (not (and variable (eq return :tail))))
 	    `(define-vop (,name
@@ -783,21 +741,26 @@
 	       ,@(unless (or variable (eq return :tail)) '(arg-locs))
 	       ,@(unless variable '(args)))
 
-	       ;; We pass either the fdefn object (for named call) or the actual
-	       ;; function object (for unnamed call) in EAX. With named call,
-	       ;; closure-tramp will replace it with the real function and invoke
-	       ;; the real function for closures. Non-closures do not need this
-	       ;; value, so don't care what shows up in it.
+	       ;; We pass either the fdefn object (for named call) or
+	       ;; the actual function object (for unnamed call) in
+	       ;; EAX. With named call, closure-tramp will replace it
+	       ;; with the real function and invoke the real function
+	       ;; for closures. Non-closures do not need this value,
+	       ;; so don't care what shows up in it.
 	       (:temporary
-	       (:sc descriptor-reg :offset eax-offset :from (:argument 0) :to :eval)
+	       (:sc descriptor-reg
+		    :offset eax-offset
+		    :from (:argument 0)
+		    :to :eval)
 	       eax)
 
 	       ;; We pass the number of arguments in ECX.
 	       (:temporary (:sc unsigned-reg :offset ecx-offset :to :eval) ecx)
 
-	       ;; With variable call, we have to load the register-args out
-	       ;; of the (new) stack frame before doing the call. Therefore,
-	       ;; we have to tell the lifetime stuff that we need to use them.
+	       ;; With variable call, we have to load the
+	       ;; register-args out of the (new) stack frame before
+	       ;; doing the call. Therefore, we have to tell the
+	       ;; lifetime stuff that we need to use them.
 	       ,@(when variable
 		   (mapcar #'(lambda (name offset)
 			       `(:temporary (:sc descriptor-reg
@@ -820,8 +783,9 @@
 			       (if (eq return :unknown) 25 0))
 	       (trace-table-entry trace-table-call-site)
 
-	       ;; This has to be done before the frame pointer is changed!
-	       ;; eax stores the 'lexical environment' needed for closures
+	       ;; This has to be done before the frame pointer is
+	       ;; changed! EAX stores the 'lexical environment' needed
+	       ;; for closures.
 	       (move eax fun)
 
 
@@ -933,9 +897,9 @@
   (define-full-call call-variable nil :fixed t)
   (define-full-call multiple-call-variable nil :unknown t))
 
-;;; This is defined separately, since it needs special code that BLT's the
-;;; arguments down. All the real work is done in the assembly routine. We just
-;;; set things up so that it can find what it needs.
+;;; This is defined separately, since it needs special code that BLT's
+;;; the arguments down. All the real work is done in the assembly
+;;; routine. We just set things up so that it can find what it needs.
 (define-vop (tail-call-variable)
   (:args (args :scs (any-reg control-stack) :target esi)
 	 (function :scs (descriptor-reg control-stack) :target eax)
@@ -993,13 +957,13 @@
     ;; Out of here.
     (inst jmp ret)))
 
-;;; Do unknown-values return of a fixed (other than 1) number of values. The
-;;; Values are required to be set up in the standard passing locations. Nvals
-;;; is the number of values returned.
+;;; Do unknown-values return of a fixed (other than 1) number of
+;;; values. The VALUES are required to be set up in the standard
+;;; passing locations. NVALS is the number of values returned.
 ;;;
-;;; Basically, we just load ECX with the number of values returned and EBX
-;;; with a pointer to the values, set ESP to point to the end of the values,
-;;; and jump directly to return-pc.
+;;; Basically, we just load ECX with the number of values returned and
+;;; EBX with a pointer to the values, set ESP to point to the end of
+;;; the values, and jump directly to return-pc.
 (define-vop (return)
   (:args (old-fp)
 	 (return-pc :to (:eval 1))
@@ -1007,8 +971,8 @@
   (:ignore values)
   (:info nvals)
 
-  ;; In the case of other than one value, we need these registers to tell
-  ;; the caller where they are and how many there are.
+  ;; In the case of other than one value, we need these registers to
+  ;; tell the caller where they are and how many there are.
   (:temporary (:sc unsigned-reg :offset ebx-offset) ebx)
   (:temporary (:sc unsigned-reg :offset ecx-offset) ecx)
 
@@ -1059,10 +1023,11 @@
 
     (trace-table-entry trace-table-normal)))
 
-;;; Do unknown-values return of an arbitrary number of values (passed on the
-;;; stack.)  We check for the common case of a single return value, and do that
-;;; inline using the normal single value return convention. Otherwise, we
-;;; branch off to code that calls an assembly-routine.
+;;; Do unknown-values return of an arbitrary number of values (passed
+;;; on the stack.) We check for the common case of a single return
+;;; value, and do that inline using the normal single value return
+;;; convention. Otherwise, we branch off to code that calls an
+;;; assembly-routine.
 ;;;
 ;;; The assembly routine takes the following args:
 ;;;  EAX -- the return-pc to finally jump to.
@@ -1134,13 +1099,13 @@
     ;; Get result.
     (move closure eax-tn)))
 
-;;; Copy a more arg from the argument area to the end of the current frame.
-;;; Fixed is the number of non-more arguments.
+;;; Copy a &MORE arg from the argument area to the end of the current
+;;; frame. FIXED is the number of non-&MORE arguments.
 ;;;
 ;;; The tricky part is doing this without trashing any of the calling
-;;; convention registers that are still needed. This vop is emitted directly
-;;; after the xep-allocate frame. That means the registers are in use as
-;;; follows:
+;;; convention registers that are still needed. This vop is emitted
+;;; directly after the xep-allocate frame. That means the registers
+;;; are in use as follows:
 ;;;
 ;;;  EAX -- The lexenv.
 ;;;  EBX -- Available.
@@ -1151,8 +1116,9 @@
 ;;;
 ;;; So basically, we have one register available for our use: EBX.
 ;;;
-;;; What we can do is push the other regs onto the stack, and then restore
-;;; their values by looking directly below where we put the more-args.
+;;; What we can do is push the other regs onto the stack, and then
+;;; restore their values by looking directly below where we put the
+;;; more-args.
 (define-vop (copy-more-arg)
   (:info fixed)
   (:generator 20
@@ -1251,8 +1217,9 @@
 
     DONE))
 
-;;; More args are stored contiguously on the stack, starting immediately at the
-;;; context pointer. The context pointer is not typed, so the lowtag is 0.
+;;; &MORE args are stored contiguously on the stack, starting
+;;; immediately at the context pointer. The context pointer is not
+;;; typed, so the lowtag is 0.
 (define-vop (more-arg)
   (:translate %more-arg)
   (:policy :fast-safe)
@@ -1306,7 +1273,8 @@
       (pseudo-atomic
        (allocation dst dst node)
        (inst lea dst (make-ea :byte :base dst :disp list-pointer-lowtag))
-       ;; Convert the count into a raw value, so that we can use the LOOP inst.
+       ;; Convert the count into a raw value, so that we can use the
+       ;; LOOP instruction.
        (inst shr ecx 2)
        ;; Set decrement mode (successive args at lower addresses)
        (inst std)
@@ -1331,7 +1299,7 @@
       (emit-label done))))
 
 ;;; Return the location and size of the &MORE arg glob created by
-;;; COPY-MORE-Arg. SUPPLIED is the total number of arguments supplied
+;;; COPY-MORE-ARG. SUPPLIED is the total number of arguments supplied
 ;;; (originally passed in ECX). FIXED is the number of non-rest
 ;;; arguments.
 ;;;

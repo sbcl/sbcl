@@ -13,9 +13,9 @@
 
 /*
  * FIXME:
- *   Some of the code in here (subtype_Names[] and the various
- *   foo_slots[], at least) is deeply broken, depending on fixed
- *   (and already out-of-date) values in sbcl.h.
+ *   Some of the code in here (the various
+ *   foo_slots[], at least) is deeply broken, depending on guessing
+ *   already out-of-date values instead of getting them from sbcl.h.
  */
 
 #include <stdio.h>
@@ -64,17 +64,17 @@ char *subtype_Names[] = {
     "ratio",
     "single float",
     "double float",
-#ifdef type_LongFloat
+#ifdef LONG_FLOAT_WIDETAG
     "long float",
 #endif
     "complex",
-#ifdef type_ComplexSingleFloat
+#ifdef COMPLEX_SINGLE_FLOAT_WIDETAG
     "complex single float",
 #endif
-#ifdef type_ComplexDoubleFloat
+#ifdef COMPLEX_DOUBLE_FLOAT_WIDETAG
     "complex double float",
 #endif
-#ifdef type_ComplexLongFloat
+#ifdef COMPLEX_LONG_FLOAT_WIDETAG
     "complex long float",
 #endif
     "simple-array",
@@ -86,30 +86,30 @@ char *subtype_Names[] = {
     "(simple-array (unsigned-byte 8) (*))",
     "(simple-array (unsigned-byte 16) (*))",
     "(simple-array (unsigned-byte 32) (*))",
-#ifdef type_SimpleArraySignedByte8
+#ifdef SIMPLE_ARRAY_SIGNED_BYTE_8_WIDETAG
     "(simple-array (signed-byte 8) (*))",
 #endif
-#ifdef type_SimpleArraySignedByte16
+#ifdef SIMPLE_ARRAY_SIGNED_BYTE_16_WIDETAG
     "(simple-array (signed-byte 16) (*))",
 #endif
-#ifdef type_SimpleArraySignedByte30
+#ifdef SIMPLE_ARRAY_SIGNED_BYTE_30_WIDETAG
     "(simple-array fixnum (*))",
 #endif
-#ifdef type_SimpleArraySignedByte32
+#ifdef SIMPLE_ARRAY_SIGNED_BYTE_32_WIDETAG
     "(simple-array (signed-byte 32) (*))",
 #endif
     "(simple-array single-float (*))",
     "(simple-array double-float (*))",
-#ifdef type_SimpleArrayLongFloat
+#ifdef SIMPLE_ARRAY_LONG_FLOAT_WIDETAG
     "(simple-array long-float (*))",
 #endif
-#ifdef type_SimpleArrayComplexSingleFloat
+#ifdef SIMPLE_ARRAY_COMPLEX_SINGLE_FLOAT_WIDETAG
     "(simple-array (complex single-float) (*))",
 #endif
-#ifdef type_SimpleArrayComplexDoubleFloat
+#ifdef SIMPLE_ARRAY_COMPLEX_DOUBLE_FLOAT_WIDETAG
     "(simple-array (complex double-float) (*))",
 #endif
-#ifdef type_SimpleArrayComplexLongFloat
+#ifdef SIMPLE_ARRAY_COMPLEX_LONG_FLOAT_WIDETAG
     "(simple-array (complex long-float) (*))",
 #endif
     "complex-string",
@@ -209,9 +209,9 @@ static void brief_otherimm(lispobj obj)
     int type, c, idx;
     char buffer[10];
 
-    type = TypeOf(obj);
+    type = widetag_of(obj);
     switch (type) {
-        case type_BaseChar:
+        case BASE_CHAR_WIDETAG:
             c = (obj>>8)&0xff;
             switch (c) {
                 case '\0':
@@ -241,14 +241,14 @@ static void brief_otherimm(lispobj obj)
             }
             break;
 
-        case type_UnboundMarker:
+        case UNBOUND_MARKER_WIDETAG:
             printf("<unbound marker>");
             break;
 
         default:
 	    idx = type >> 2;
-	    if (idx < (sizeof(subtype_Names) / sizeof(char *)))
-		    printf("%s", subtype_Names[idx]);
+	    if (idx < (sizeof(SUBNAMES_WIDETAG) / sizeof(char *)))
+		    printf("%s", SUBNAMES_WIDETAG[idx]);
 	    else
 		    printf("unknown type (0x%0x)", type);
             break;
@@ -259,22 +259,22 @@ static void print_otherimm(lispobj obj)
 {
     int type, idx;
 
-    type = TypeOf(obj);
+    type = widetag_of(obj);
     idx = type >> 2;
 
-    if (idx < (sizeof(subtype_Names) / sizeof(char *)))
-	    printf(", %s", subtype_Names[idx]);
+    if (idx < (sizeof(SUBNAMES_WIDETAG) / sizeof(char *)))
+	    printf(", %s", SUBNAMES_WIDETAG[idx]);
     else
 	    printf(", unknown type (0x%0x)", type);
 
-    switch (TypeOf(obj)) {
-        case type_BaseChar:
+    switch (widetag_of(obj)) {
+        case BASE_CHAR_WIDETAG:
             printf(": ");
             brief_otherimm(obj);
             break;
 
-        case type_Sap:
-        case type_UnboundMarker:
+        case SAP_WIDETAG:
+        case UNBOUND_MARKER_WIDETAG:
             break;
 
         default:
@@ -294,7 +294,7 @@ static void brief_list(lispobj obj)
         printf("NIL");
     else {
         putchar('(');
-        while (lowtagof(obj) == LIST_POINTER_LOWTAG) {
+        while (lowtag_of(obj) == LIST_POINTER_LOWTAG) {
             struct cons *cons = (struct cons *)native_pointer(obj);
 
             if (space)
@@ -366,9 +366,9 @@ static void brief_otherptr(lispobj obj)
     }
 
     header = *ptr;
-    type = TypeOf(header);
+    type = widetag_of(header);
     switch (type) {
-        case type_SymbolHeader:
+        case SYMBOL_HEADER_WIDETAG:
             symbol = (struct symbol *)ptr;
             vector = (struct vector *)native_pointer(symbol->name);
             for (charptr = (char *)vector->data; *charptr != '\0'; charptr++) {
@@ -378,7 +378,7 @@ static void brief_otherptr(lispobj obj)
             }
             break;
 
-        case type_SimpleString:
+        case SIMPLE_STRING_WIDETAG:
             vector = (struct vector *)ptr;
             putchar('"');
             for (charptr = (char *)vector->data; *charptr != '\0'; charptr++) {
@@ -407,7 +407,7 @@ static void print_slots(char **slots, int count, lispobj *ptr)
     }
 }
 
-/* FIXME: Yikes again! This, like subtype_Names[], needs to depend
+/* FIXME: Yikes again! This, like SUBNAMES_WIDETAG[], needs to depend
  * on the values in sbcl.h. */
 static char *symbol_slots[] = {"value: ", "unused: ",
     "plist: ", "name: ", "package: ", NULL};
@@ -447,18 +447,18 @@ static void print_otherptr(lispobj obj)
 	header = *ptr++;
 	length = (*ptr) >> 2;
 	count = header>>8;
-	type = TypeOf(header);
+	type = widetag_of(header);
 
         print_obj("header: ", header);
-        if (lowtagof(header) != OTHER_IMMEDIATE_0_LOWTAG &&
-	    lowtagof(header) != OTHER_IMMEDIATE_1_LOWTAG) {
+        if (lowtag_of(header) != OTHER_IMMEDIATE_0_LOWTAG &&
+	    lowtag_of(header) != OTHER_IMMEDIATE_1_LOWTAG) {
             NEWLINE_OR_RETURN;
             printf("(invalid header object)");
             return;
         }
 
         switch (type) {
-            case type_Bignum:
+            case BIGNUM_WIDETAG:
                 ptr += count;
                 NEWLINE_OR_RETURN;
                 printf("0x");
@@ -466,37 +466,37 @@ static void print_otherptr(lispobj obj)
                     printf("%08lx", (unsigned long) *--ptr);
                 break;
 
-            case type_Ratio:
+            case RATIO_WIDETAG:
                 print_slots(ratio_slots, count, ptr);
                 break;
 
-            case type_Complex:
+            case COMPLEX_WIDETAG:
                 print_slots(complex_slots, count, ptr);
                 break;
 
-            case type_SymbolHeader:
+            case SYMBOL_HEADER_WIDETAG:
                 print_slots(symbol_slots, count, ptr);
                 break;
 
-            case type_SingleFloat:
+            case SINGLE_FLOAT_WIDETAG:
                 NEWLINE_OR_RETURN;
                 printf("%g", ((struct single_float *)native_pointer(obj))->value);
                 break;
 
-            case type_DoubleFloat:
+            case DOUBLE_FLOAT_WIDETAG:
                 NEWLINE_OR_RETURN;
                 printf("%g", ((struct double_float *)native_pointer(obj))->value);
                 break;
 
-#ifdef type_LongFloat
-            case type_LongFloat:
+#ifdef LONG_FLOAT_WIDETAG
+            case LONG_FLOAT_WIDETAG:
                 NEWLINE_OR_RETURN;
                 printf("%Lg", ((struct long_float *)native_pointer(obj))->value);
                 break;
 #endif
 
-#ifdef type_ComplexSingleFloat
-            case type_ComplexSingleFloat:
+#ifdef COMPLEX_SINGLE_FLOAT_WIDETAG
+            case COMPLEX_SINGLE_FLOAT_WIDETAG:
                 NEWLINE_OR_RETURN;
                 printf("%g", ((struct complex_single_float *)native_pointer(obj))->real);
                 NEWLINE_OR_RETURN;
@@ -504,8 +504,8 @@ static void print_otherptr(lispobj obj)
                 break;
 #endif
 
-#ifdef type_ComplexDoubleFloat
-            case type_ComplexDoubleFloat:
+#ifdef COMPLEX_DOUBLE_FLOAT_WIDETAG
+            case COMPLEX_DOUBLE_FLOAT_WIDETAG:
                 NEWLINE_OR_RETURN;
                 printf("%g", ((struct complex_double_float *)native_pointer(obj))->real);
                 NEWLINE_OR_RETURN;
@@ -513,8 +513,8 @@ static void print_otherptr(lispobj obj)
                 break;
 #endif
 
-#ifdef type_ComplexLongFloat
-            case type_ComplexLongFloat:
+#ifdef COMPLEX_LONG_FLOAT_WIDETAG
+            case COMPLEX_LONG_FLOAT_WIDETAG:
                 NEWLINE_OR_RETURN;
                 printf("%Lg", ((struct complex_long_float *)native_pointer(obj))->real);
                 NEWLINE_OR_RETURN;
@@ -522,7 +522,7 @@ static void print_otherptr(lispobj obj)
                 break;
 #endif
 
-            case type_SimpleString:
+            case SIMPLE_STRING_WIDETAG:
                 NEWLINE_OR_RETURN;
                 cptr = (char *)(ptr+1);
                 putchar('"');
@@ -531,7 +531,7 @@ static void print_otherptr(lispobj obj)
                 putchar('"');
                 break;
 
-            case type_SimpleVector:
+            case SIMPLE_VECTOR_WIDETAG:
                 NEWLINE_OR_RETURN;
                 printf("length = %ld", length);
                 ptr++;
@@ -542,7 +542,7 @@ static void print_otherptr(lispobj obj)
                 }
                 break;
 
-            case type_InstanceHeader:
+            case INSTANCE_HEADER_WIDETAG:
                 NEWLINE_OR_RETURN;
                 printf("length = %ld", (long) count);
                 index = 0;
@@ -552,71 +552,71 @@ static void print_otherptr(lispobj obj)
                 }
                 break;
 
-            case type_SimpleArray:
-            case type_SimpleBitVector:
-            case type_SimpleArrayUnsignedByte2:
-            case type_SimpleArrayUnsignedByte4:
-            case type_SimpleArrayUnsignedByte8:
-            case type_SimpleArrayUnsignedByte16:
-            case type_SimpleArrayUnsignedByte32:
-#ifdef type_SimpleArraySignedByte8
-	    case type_SimpleArraySignedByte8:
+            case SIMPLE_ARRAY_WIDETAG:
+            case SIMPLE_BIT_VECTOR_WIDETAG:
+            case SIMPLE_ARRAY_UNSIGNED_BYTE_2_WIDETAG:
+            case SIMPLE_ARRAY_UNSIGNED_BYTE_4_WIDETAG:
+            case SIMPLE_ARRAY_UNSIGNED_BYTE_8_WIDETAG:
+            case SIMPLE_ARRAY_UNSIGNED_BYTE_16_WIDETAG:
+            case SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG:
+#ifdef SIMPLE_ARRAY_SIGNED_BYTE_8_WIDETAG
+	    case SIMPLE_ARRAY_SIGNED_BYTE_8_WIDETAG:
 #endif
-#ifdef type_SimpleArraySignedByte16
-	    case type_SimpleArraySignedByte16:
+#ifdef SIMPLE_ARRAY_SIGNED_BYTE_16_WIDETAG
+	    case SIMPLE_ARRAY_SIGNED_BYTE_16_WIDETAG:
 #endif
-#ifdef type_SimpleArraySignedByte30
-	    case type_SimpleArraySignedByte30:
+#ifdef SIMPLE_ARRAY_SIGNED_BYTE_30_WIDETAG
+	    case SIMPLE_ARRAY_SIGNED_BYTE_30_WIDETAG:
 #endif
-#ifdef type_SimpleArraySignedByte32
-	    case type_SimpleArraySignedByte32:
+#ifdef SIMPLE_ARRAY_SIGNED_BYTE_32_WIDETAG
+	    case SIMPLE_ARRAY_SIGNED_BYTE_32_WIDETAG:
 #endif
-            case type_SimpleArraySingleFloat:
-            case type_SimpleArrayDoubleFloat:
-#ifdef type_SimpleArrayLongFloat
-            case type_SimpleArrayLongFloat:
+            case SIMPLE_ARRAY_SINGLE_FLOAT_WIDETAG:
+            case SIMPLE_ARRAY_DOUBLE_FLOAT_WIDETAG:
+#ifdef SIMPLE_ARRAY_LONG_FLOAT_WIDETAG
+            case SIMPLE_ARRAY_LONG_FLOAT_WIDETAG:
 #endif
-#ifdef type_SimpleArrayComplexSingleFloat
-	    case type_SimpleArrayComplexSingleFloat:
+#ifdef SIMPLE_ARRAY_COMPLEX_SINGLE_FLOAT_WIDETAG
+	    case SIMPLE_ARRAY_COMPLEX_SINGLE_FLOAT_WIDETAG:
 #endif
-#ifdef type_SimpleArrayComplexDoubleFloat
-	    case type_SimpleArrayComplexDoubleFloat:
+#ifdef SIMPLE_ARRAY_COMPLEX_DOUBLE_FLOAT_WIDETAG
+	    case SIMPLE_ARRAY_COMPLEX_DOUBLE_FLOAT_WIDETAG:
 #endif
-#ifdef type_SimpleArrayComplexLongFloat
-	    case type_SimpleArrayComplexLongFloat:
+#ifdef SIMPLE_ARRAY_COMPLEX_LONG_FLOAT_WIDETAG
+	    case SIMPLE_ARRAY_COMPLEX_LONG_FLOAT_WIDETAG:
 #endif
-            case type_ComplexString:
-            case type_ComplexBitVector:
-            case type_ComplexVector:
-            case type_ComplexArray:
+            case COMPLEX_STRING_WIDETAG:
+            case COMPLEX_BIT_VECTOR_WIDETAG:
+            case COMPLEX_VECTOR_WIDETAG:
+            case COMPLEX_ARRAY_WIDETAG:
                 break;
 
-            case type_CodeHeader:
+            case CODE_HEADER_WIDETAG:
                 print_slots(code_slots, count-1, ptr);
                 break;
 
-            case type_SimpleFunHeader:
-            case type_ClosureFunHeader:
+            case SIMPLE_FUN_HEADER_WIDETAG:
+            case CLOSURE_FUN_HEADER_WIDETAG:
                 print_slots(fn_slots, 5, ptr);
                 break;
 
-            case type_ReturnPcHeader:
+            case RETURN_PC_HEADER_WIDETAG:
                 print_obj("code: ", obj - (count * 4));
                 break;
 
-            case type_ClosureHeader:
+            case CLOSURE_HEADER_WIDETAG:
                 print_slots(closure_slots, count, ptr);
                 break;
 
-            case type_FuncallableInstanceHeader:
+            case FUNCALLABLE_INSTANCE_HEADER_WIDETAG:
                 print_slots(funcallable_instance_slots, count, ptr);
                 break;
 
-            case type_ValueCellHeader:
+            case VALUE_CELL_HEADER_WIDETAG:
 		print_slots(value_cell_slots, 1, ptr);
                 break;
 
-            case type_Sap:
+            case SAP_WIDETAG:
                 NEWLINE_OR_RETURN;
 #ifndef alpha
                 printf("0x%08lx", (unsigned long) *ptr);
@@ -625,17 +625,17 @@ static void print_otherptr(lispobj obj)
 #endif
                 break;
 
-            case type_WeakPointer:
+            case WEAK_POINTER_WIDETAG:
 		print_slots(weak_pointer_slots, 1, ptr);
                 break;
 
-            case type_BaseChar:
-            case type_UnboundMarker:
+            case BASE_CHAR_WIDETAG:
+            case UNBOUND_MARKER_WIDETAG:
                 NEWLINE_OR_RETURN;
                 printf("pointer to an immediate?");
                 break;
 
-	    case type_Fdefn:
+	    case FDEFN_WIDETAG:
 		print_slots(fdefn_slots, count, ptr);
 		break;
 		
@@ -655,7 +655,7 @@ static void print_obj(char *prefix, lispobj obj)
     static void (*brief_fns[])(lispobj obj)
 	= {brief_fixnum, brief_otherptr, brief_otherimm, brief_list,
 	   brief_fixnum, brief_struct, brief_otherimm, brief_otherptr};
-    int type = lowtagof(obj);
+    int type = lowtag_of(obj);
     struct var *var = lookup_by_obj(obj);
     char buffer[256];
     boolean verbose = cur_depth < brief_depth;

@@ -84,66 +84,67 @@
     ;; on smarter compiler transforms which do the calculation once
     ;; and for all in any reasonable user programs.)
     ((t)
-     (values #.sb!vm:simple-vector-type #.sb!vm:word-bits))
+     (values #.sb!vm:simple-vector-widetag #.sb!vm:word-bits))
     ((character base-char standard-char)
-     (values #.sb!vm:simple-string-type #.sb!vm:byte-bits))
+     (values #.sb!vm:simple-string-widetag #.sb!vm:byte-bits))
     ((bit)
-     (values #.sb!vm:simple-bit-vector-type 1))
+     (values #.sb!vm:simple-bit-vector-widetag 1))
     ;; OK, we have to wade into SUBTYPEPing after all.
     (t
      ;; FIXME: The data here are redundant with
      ;; *SPECIALIZED-ARRAY-ELEMENT-TYPE-PROPERTIES*.
      (pick-vector-type type
-       (base-char (values #.sb!vm:simple-string-type #.sb!vm:byte-bits))
-       (bit (values #.sb!vm:simple-bit-vector-type 1))
+       (base-char (values #.sb!vm:simple-string-widetag #.sb!vm:byte-bits))
+       (bit (values #.sb!vm:simple-bit-vector-widetag 1))
        ((unsigned-byte 2)
-	(values #.sb!vm:simple-array-unsigned-byte-2-type 2))
+	(values #.sb!vm:simple-array-unsigned-byte-2-widetag 2))
        ((unsigned-byte 4)
-	(values #.sb!vm:simple-array-unsigned-byte-4-type 4))
+	(values #.sb!vm:simple-array-unsigned-byte-4-widetag 4))
        ((unsigned-byte 8)
-	(values #.sb!vm:simple-array-unsigned-byte-8-type 8))
+	(values #.sb!vm:simple-array-unsigned-byte-8-widetag 8))
        ((unsigned-byte 16)
-	(values #.sb!vm:simple-array-unsigned-byte-16-type 16))
+	(values #.sb!vm:simple-array-unsigned-byte-16-widetag 16))
        ((unsigned-byte 32)
-	(values #.sb!vm:simple-array-unsigned-byte-32-type 32))
+	(values #.sb!vm:simple-array-unsigned-byte-32-widetag 32))
        ((signed-byte 8)
-	(values #.sb!vm:simple-array-signed-byte-8-type 8))
+	(values #.sb!vm:simple-array-signed-byte-8-widetag 8))
        ((signed-byte 16)
-	(values #.sb!vm:simple-array-signed-byte-16-type 16))
+	(values #.sb!vm:simple-array-signed-byte-16-widetag 16))
        ((signed-byte 30)
-	(values #.sb!vm:simple-array-signed-byte-30-type 32))
+	(values #.sb!vm:simple-array-signed-byte-30-widetag 32))
        ((signed-byte 32)
-	(values #.sb!vm:simple-array-signed-byte-32-type 32))
-       (single-float (values #.sb!vm:simple-array-single-float-type 32))
-       (double-float (values #.sb!vm:simple-array-double-float-type 64))
+	(values #.sb!vm:simple-array-signed-byte-32-widetag 32))
+       (single-float (values #.sb!vm:simple-array-single-float-widetag 32))
+       (double-float (values #.sb!vm:simple-array-double-float-widetag 64))
        #!+long-float
        (long-float
-	(values #.sb!vm:simple-array-long-float-type #!+x86 96 #!+sparc 128))
+	(values #.sb!vm:simple-array-long-float-widetag
+		#!+x86 96 #!+sparc 128))
        ((complex single-float)
-	(values #.sb!vm:simple-array-complex-single-float-type 64))
+	(values #.sb!vm:simple-array-complex-single-float-widetag 64))
        ((complex double-float)
-	(values #.sb!vm:simple-array-complex-double-float-type 128))
+	(values #.sb!vm:simple-array-complex-double-float-widetag 128))
        #!+long-float
        ((complex long-float)
-	(values #.sb!vm:simple-array-complex-long-float-type
+	(values #.sb!vm:simple-array-complex-long-float-widetag
 		#!+x86 192
 		#!+sparc 256))
-       (t (values #.sb!vm:simple-vector-type #.sb!vm:word-bits))))))
+       (t (values #.sb!vm:simple-vector-widetag #.sb!vm:word-bits))))))
 (defun %complex-vector-type-code (type)
   (case type
     ;; Pick off some easy common cases.
     ((t)
-     #.sb!vm:complex-vector-type)
+     #.sb!vm:complex-vector-widetag)
     ((character base-char)
-     #.sb!vm:complex-string-type) 
+     #.sb!vm:complex-string-widetag) 
     ((bit)
-     #.sb!vm:complex-bit-vector-type)
+     #.sb!vm:complex-bit-vector-widetag)
     ;; OK, we have to wade into SUBTYPEPing after all.
     (t
      (pick-vector-type type
-       (base-char #.sb!vm:complex-string-type)
-       (bit #.sb!vm:complex-bit-vector-type)
-       (t #.sb!vm:complex-vector-type)))))
+       (base-char #.sb!vm:complex-string-widetag)
+       (bit #.sb!vm:complex-bit-vector-widetag)
+       (t #.sb!vm:complex-vector-widetag)))))
 
 (defun make-array (dimensions &key
 			      (element-type t)
@@ -167,7 +168,7 @@
 		 (array (allocate-vector
 			 type
 			 length
-			 (ceiling (* (if (= type sb!vm:simple-string-type)
+			 (ceiling (* (if (= type sb!vm:simple-string-widetag)
 					 (1+ length)
 					 length)
 				     bits)
@@ -195,8 +196,8 @@
 	       (array (make-array-header
 		       (cond ((= array-rank 1)
 			      (%complex-vector-type-code element-type))
-			     (simple sb!vm:simple-array-type)
-			     (t sb!vm:complex-array-type))
+			     (simple sb!vm:simple-array-widetag)
+			     (t sb!vm:complex-array-widetag))
 		       array-rank)))
 	  (cond (fill-pointer
 		 (unless (= array-rank 1)
@@ -506,28 +507,32 @@
       ;; FIXME: The data here are redundant with
       ;; *SPECIALIZED-ARRAY-ELEMENT-TYPE-PROPERTIES*.
       (pick-element-type
-       ((sb!vm:simple-string-type sb!vm:complex-string-type) 'base-char)
-       ((sb!vm:simple-bit-vector-type sb!vm:complex-bit-vector-type) 'bit)
-       (sb!vm:simple-vector-type t)
-       (sb!vm:simple-array-unsigned-byte-2-type '(unsigned-byte 2))
-       (sb!vm:simple-array-unsigned-byte-4-type '(unsigned-byte 4))
-       (sb!vm:simple-array-unsigned-byte-8-type '(unsigned-byte 8))
-       (sb!vm:simple-array-unsigned-byte-16-type '(unsigned-byte 16))
-       (sb!vm:simple-array-unsigned-byte-32-type '(unsigned-byte 32))
-       (sb!vm:simple-array-signed-byte-8-type '(signed-byte 8))
-       (sb!vm:simple-array-signed-byte-16-type '(signed-byte 16))
-       (sb!vm:simple-array-signed-byte-30-type '(signed-byte 30))
-       (sb!vm:simple-array-signed-byte-32-type '(signed-byte 32))
-       (sb!vm:simple-array-single-float-type 'single-float)
-       (sb!vm:simple-array-double-float-type 'double-float)
+       ((sb!vm:simple-string-widetag sb!vm:complex-string-widetag) 'base-char)
+       ((sb!vm:simple-bit-vector-widetag
+	 sb!vm:complex-bit-vector-widetag) 'bit)
+       (sb!vm:simple-vector-widetag t)
+       (sb!vm:simple-array-unsigned-byte-2-widetag '(unsigned-byte 2))
+       (sb!vm:simple-array-unsigned-byte-4-widetag '(unsigned-byte 4))
+       (sb!vm:simple-array-unsigned-byte-8-widetag '(unsigned-byte 8))
+       (sb!vm:simple-array-unsigned-byte-16-widetag '(unsigned-byte 16))
+       (sb!vm:simple-array-unsigned-byte-32-widetag '(unsigned-byte 32))
+       (sb!vm:simple-array-signed-byte-8-widetag '(signed-byte 8))
+       (sb!vm:simple-array-signed-byte-16-widetag '(signed-byte 16))
+       (sb!vm:simple-array-signed-byte-30-widetag '(signed-byte 30))
+       (sb!vm:simple-array-signed-byte-32-widetag '(signed-byte 32))
+       (sb!vm:simple-array-single-float-widetag 'single-float)
+       (sb!vm:simple-array-double-float-widetag 'double-float)
        #!+long-float
-       (sb!vm:simple-array-long-float-type 'long-float)
-       (sb!vm:simple-array-complex-single-float-type '(complex single-float))
-       (sb!vm:simple-array-complex-double-float-type '(complex double-float))
+       (sb!vm:simple-array-long-float-widetag 'long-float)
+       (sb!vm:simple-array-complex-single-float-widetag
+	'(complex single-float))
+       (sb!vm:simple-array-complex-double-float-widetag
+	'(complex double-float))
        #!+long-float
-       (sb!vm:simple-array-complex-long-float-type '(complex long-float))
-       ((sb!vm:simple-array-type sb!vm:complex-vector-type
-				 sb!vm:complex-array-type)
+       (sb!vm:simple-array-complex-long-float-widetag '(complex long-float))
+       ((sb!vm:simple-array-widetag
+	 sb!vm:complex-vector-widetag
+	 sb!vm:complex-array-widetag)
 	(with-array-data ((array array) (start) (end))
 	  (declare (ignore start end))
 	  (array-element-type array)))

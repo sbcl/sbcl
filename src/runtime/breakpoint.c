@@ -75,12 +75,12 @@ static lispobj find_code(os_context_t *context)
     lispobj code = *os_context_register_addr(context, reg_CODE);
     lispobj header;
 
-    if (lowtagof(code) != OTHER_POINTER_LOWTAG)
+    if (lowtag_of(code) != OTHER_POINTER_LOWTAG)
 	return NIL;
 
     header = *(lispobj *)(code-OTHER_POINTER_LOWTAG);
 
-    if (TypeOf(header) == type_CodeHeader)
+    if (widetag_of(header) == CODE_HEADER_WIDETAG)
 	return code;
     else
 	return code - HeaderValue(header)*sizeof(lispobj);

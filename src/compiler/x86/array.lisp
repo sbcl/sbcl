@@ -31,7 +31,7 @@
     (inst and bytes (lognot lowtag-mask))
     (inst lea header (make-ea :dword :base rank
 			      :disp (fixnumize (1- array-dimensions-offset))))
-    (inst shl header type-bits)
+    (inst shl header n-widetag-bits)
     (inst or  header type)
     (inst shr header 2)
     (pseudo-atomic
@@ -64,7 +64,7 @@
   (:result-types positive-fixnum)
   (:generator 6
     (loadw res x 0 other-pointer-lowtag)
-    (inst shr res type-bits)
+    (inst shr res n-widetag-bits)
     (inst sub res (1- array-dimensions-offset))))
 
 ;;;; bounds checking routine

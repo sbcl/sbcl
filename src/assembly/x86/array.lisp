@@ -24,7 +24,7 @@
 			  (:arg length any-reg ebx-offset)
 			  (:arg words any-reg ecx-offset)
 			  (:res result descriptor-reg edx-offset))
-  (inst mov result (+ (1- (ash 1 lowtag-bits))
+  (inst mov result (+ (1- (ash 1 n-lowtag-bits))
 		      (* vector-data-offset word-bytes)))
   (inst add result words)
   (inst and result (lognot sb!vm:lowtag-mask))

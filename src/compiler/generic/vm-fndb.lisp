@@ -55,9 +55,9 @@
 (defknown vector-sap ((simple-unboxed-array (*))) system-area-pointer
   (flushable))
 
-(defknown get-lowtag (t) (unsigned-byte #.sb!vm:lowtag-bits)
+(defknown get-lowtag (t) (unsigned-byte #.sb!vm:n-lowtag-bits)
   (flushable movable))
-(defknown get-type (t) (unsigned-byte #.sb!vm:type-bits)
+(defknown get-type (t) (unsigned-byte #.sb!vm:n-widetag-bits)
   (flushable movable))
 
 (defknown (get-header-data get-closure-length) (t) (unsigned-byte 24)
@@ -179,19 +179,19 @@
 
 ;;;; bignum operations
 
-(defknown %allocate-bignum (bignum-index) bignum-type
+(defknown %allocate-bignum (bignum-index) bignum-widetag
   (flushable))
 
-(defknown %bignum-length (bignum-type) bignum-index
+(defknown %bignum-length (bignum-widetag) bignum-index
   (foldable flushable movable))
 
-(defknown %bignum-set-length (bignum-type bignum-index) bignum-type
+(defknown %bignum-set-length (bignum-widetag bignum-index) bignum-widetag
   (unsafe))
 
-(defknown %bignum-ref (bignum-type bignum-index) bignum-element-type
+(defknown %bignum-ref (bignum-widetag bignum-index) bignum-element-type
   (flushable))
 
-(defknown %bignum-set (bignum-type bignum-index bignum-element-type)
+(defknown %bignum-set (bignum-widetag bignum-index bignum-element-type)
   bignum-element-type
   (unsafe))
 
@@ -272,11 +272,11 @@
 (defknown code-header-ref (t index) t (flushable))
 (defknown code-header-set (t index t) t ())
 
-(defknown function-subtype (function) (unsigned-byte #.sb!vm:type-bits)
+(defknown function-subtype (function) (unsigned-byte #.sb!vm:n-widetag-bits)
   (flushable))
 (defknown ((setf function-subtype))
-	  ((unsigned-byte #.sb!vm:type-bits) function)
-  (unsigned-byte #.sb!vm:type-bits)
+	  ((unsigned-byte #.sb!vm:n-widetag-bits) function)
+  (unsigned-byte #.sb!vm:n-widetag-bits)
   ())
 
 (defknown make-fdefn (t) fdefn (flushable movable))

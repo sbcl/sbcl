@@ -29,7 +29,7 @@
     (inst li (lognot lowtag-mask) header)
     (inst and bytes header bytes)
     (inst addq rank (fixnumize (1- array-dimensions-offset)) header)
-    (inst sll header type-bits header)
+    (inst sll header n-widetag-bits header)
     (inst bis header type header)
     (inst srl header 2 header)
     (pseudo-atomic ()
@@ -65,7 +65,7 @@
   (:results (res :scs (any-reg descriptor-reg)))
   (:generator 6
     (loadw temp x 0 other-pointer-lowtag)
-    (inst sra temp type-bits temp)
+    (inst sra temp n-widetag-bits temp)
     (inst subq temp (1- array-dimensions-offset) temp)
     (inst sll temp 2 res)))
 

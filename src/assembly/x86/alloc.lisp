@@ -28,7 +28,7 @@
   (inst ret)
   BIGNUM
 
-  (with-fixed-allocation (ebx bignum-type (+ bignum-digits-offset 1))
+  (with-fixed-allocation (ebx bignum-widetag (+ bignum-digits-offset 1))
     (storew eax ebx bignum-digits-offset other-pointer-lowtag))
 
   (inst ret))
@@ -57,11 +57,11 @@
   (inst mov ebx eax)
 
   ;; Two word bignum
-  (with-fixed-allocation (ebx bignum-type (+ bignum-digits-offset 2))
+  (with-fixed-allocation (ebx bignum-widetag (+ bignum-digits-offset 2))
     (storew eax ebx bignum-digits-offset other-pointer-lowtag))
   (inst ret)
 
   ONE-WORD-BIGNUM
-  (with-fixed-allocation (ebx bignum-type (+ bignum-digits-offset 1))
+  (with-fixed-allocation (ebx bignum-widetag (+ bignum-digits-offset 1))
     (storew eax ebx bignum-digits-offset other-pointer-lowtag))
   (inst ret))

@@ -85,8 +85,8 @@
     (inst srl unboxed-arg word-shift unboxed)
     (inst lda unboxed lowtag-mask unboxed)
     (inst and unboxed ndescr unboxed)
-    (inst sll boxed (- type-bits word-shift) ndescr)
-    (inst bis ndescr code-header-type ndescr)
+    (inst sll boxed (- n-widetag-bits word-shift) ndescr)
+    (inst bis ndescr code-header-widetag ndescr)
     
     (pseudo-atomic ()
       (inst bis alloc-tn other-pointer-lowtag result)
@@ -105,7 +105,7 @@
   (:temporary (:scs (non-descriptor-reg)) temp)
   (:results (result :scs (descriptor-reg) :from :argument))
   (:generator 37
-    (with-fixed-allocation (result temp fdefn-type fdefn-size)
+    (with-fixed-allocation (result temp fdefn-widetag fdefn-size)
       (storew name result fdefn-name-slot other-pointer-lowtag)
       (storew null-tn result fdefn-fun-slot other-pointer-lowtag)
       (inst li (make-fixup "undefined_tramp" :foreign) temp)
@@ -118,7 +118,9 @@
   (:results (result :scs (descriptor-reg)))
   (:generator 10
     (let ((size (+ length closure-info-offset)))
-      (inst li (logior (ash (1- size) type-bits) closure-header-type) temp)
+      (inst li
+	    (logior (ash (1- size) n-widetag-bits) closure-header-widetag)
+	    temp)
       (pseudo-atomic (:extra (pad-data-block size))
 	(inst bis alloc-tn fun-pointer-lowtag result)
 	(storew temp result 0 fun-pointer-lowtag))
@@ -132,7 +134,7 @@
   (:results (result :scs (descriptor-reg)))
   (:generator 10
     (with-fixed-allocation
-	(result temp value-cell-header-type value-cell-size))
+	(result temp value-cell-header-widetag value-cell-size))
     (storew value result value-cell-value-slot other-pointer-lowtag)))
 
 
@@ -142,7 +144,7 @@
   (:args)
   (:results (result :scs (any-reg)))
   (:generator 1
-    (inst li unbound-marker-type result)))
+    (inst li unbound-marker-widetag result)))
 
 (define-vop (fixed-alloc)
   (:args)
@@ -154,7 +156,7 @@
     (pseudo-atomic (:extra (pad-data-block words))
       (inst bis alloc-tn lowtag result)
       (when type
-	(inst li (logior (ash (1- words) type-bits) type) temp)
+	(inst li (logior (ash (1- words) n-widetag-bits) type) temp)
 	(storew temp result 0 lowtag)))))
 
 (define-vop (var-alloc)
@@ -167,10 +169,10 @@
   (:temporary (:scs (non-descriptor-reg)) bytes)
   (:generator 6
     (inst lda bytes (* (1+ words) word-bytes) extra)
-    (inst sll bytes (- type-bits 2) header)
-    (inst lda header (+ (ash -2 type-bits) type) header)
-    (inst srl bytes lowtag-bits bytes)
-    (inst sll bytes lowtag-bits bytes)
+    (inst sll bytes (- n-widetag-bits 2) header)
+    (inst lda header (+ (ash -2 n-widetag-bits) type) header)
+    (inst srl bytes n-lowtag-bits bytes)
+    (inst sll bytes n-lowtag-bits bytes)
     (pseudo-atomic ()
       (inst bis alloc-tn lowtag result)
       (storew header result 0 lowtag)

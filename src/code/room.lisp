@@ -50,36 +50,36 @@
 			    :kind :fixed
 			    :length size))))))
 
-(dolist (code (list complex-string-type simple-array-type
-		    complex-bit-vector-type complex-vector-type
-		    complex-array-type))
+(dolist (code (list complex-string-widetag simple-array-widetag
+		    complex-bit-vector-widetag complex-vector-widetag
+		    complex-array-widetag))
   (setf (svref *meta-room-info* code)
 	(make-room-info :name 'array-header
 			:kind :header)))
 
-(setf (svref *meta-room-info* bignum-type)
+(setf (svref *meta-room-info* bignum-widetag)
       (make-room-info :name 'bignum
 		      :kind :header))
 
-(setf (svref *meta-room-info* closure-header-type)
+(setf (svref *meta-room-info* closure-header-widetag)
       (make-room-info :name 'closure
 		      :kind :closure))
 
-(dolist (stuff '((simple-bit-vector-type . -3)
-		 (simple-vector-type . 2)
-		 (simple-array-unsigned-byte-2-type . -2)
-		 (simple-array-unsigned-byte-4-type . -1)
-		 (simple-array-unsigned-byte-8-type . 0)
-		 (simple-array-unsigned-byte-16-type . 1)
-		 (simple-array-unsigned-byte-32-type . 2)
-		 (simple-array-signed-byte-8-type . 0)
-		 (simple-array-signed-byte-16-type . 1)
-		 (simple-array-signed-byte-30-type . 2)
-		 (simple-array-signed-byte-32-type . 2)
-		 (simple-array-single-float-type . 2)
-		 (simple-array-double-float-type . 3)
-		 (simple-array-complex-single-float-type . 3)
-		 (simple-array-complex-double-float-type . 4)))
+(dolist (stuff '((simple-bit-vector-widetag . -3)
+		 (simple-vector-widetag . 2)
+		 (simple-array-unsigned-byte-2-widetag . -2)
+		 (simple-array-unsigned-byte-4-widetag . -1)
+		 (simple-array-unsigned-byte-8-widetag . 0)
+		 (simple-array-unsigned-byte-16-widetag . 1)
+		 (simple-array-unsigned-byte-32-widetag . 2)
+		 (simple-array-signed-byte-8-widetag . 0)
+		 (simple-array-signed-byte-16-widetag . 1)
+		 (simple-array-signed-byte-30-widetag . 2)
+		 (simple-array-signed-byte-32-widetag . 2)
+		 (simple-array-single-float-widetag . 2)
+		 (simple-array-double-float-widetag . 3)
+		 (simple-array-complex-single-float-widetag . 3)
+		 (simple-array-complex-double-float-widetag . 4)))
   (let ((name (car stuff))
 	(size (cdr stuff)))
     (setf (svref *meta-room-info* (symbol-value name))
@@ -87,16 +87,16 @@
 			  :kind :vector
 			  :length size))))
 
-(setf (svref *meta-room-info* simple-string-type)
-      (make-room-info :name 'simple-string-type
+(setf (svref *meta-room-info* simple-string-widetag)
+      (make-room-info :name 'simple-string-widetag
 		      :kind :string
 		      :length 0))
 
-(setf (svref *meta-room-info* code-header-type)
+(setf (svref *meta-room-info* code-header-widetag)
       (make-room-info :name 'code
 		      :kind :code))
 
-(setf (svref *meta-room-info* instance-header-type)
+(setf (svref *meta-room-info* instance-header-widetag)
       (make-room-info :name 'instance
 		      :kind :instance))
 
@@ -171,8 +171,8 @@
 	    (prev nil))
 	(loop
 	  (let* ((header (sap-ref-32 current 0))
-		 (header-type (logand header #xFF))
-		 (info (svref *room-info* header-type)))
+		 (header-widetag (logand header #xFF))
+		 (info (svref *room-info* header-widetag)))
 	    (cond
 	     ((or (not info)
 		  (eq (room-info-kind info) :lowtag))
@@ -183,13 +183,13 @@
 			 list-pointer-lowtag
 			 size)
 		(setq current (sap+ current size))))
-	     ((eql header-type closure-header-type)
+	     ((eql header-widetag closure-header-widetag)
 	      (let* ((obj (make-lisp-obj (logior (sap-int current)
 						 fun-pointer-lowtag)))
 		     (size (round-to-dualword
 			    (* (the fixnum (1+ (get-closure-length obj)))
 			       word-bytes))))
-		(funcall fun obj header-type size)
+		(funcall fun obj header-widetag size)
 		(setq current (sap+ current size))))
 	     ((eq (room-info-kind info) :instance)
 	      (let* ((obj (make-lisp-obj
@@ -197,7 +197,7 @@
 		     (size (round-to-dualword
 			    (* (+ (%instance-length obj) 1) word-bytes))))
 		(declare (fixnum size))
-		(funcall fun obj header-type size)
+		(funcall fun obj header-widetag size)
 		(aver (zerop (logand size lowtag-mask)))
 		#+nil
 		(when (> size 200000) (break "implausible size, prev ~S" prev))
@@ -226,7 +226,7 @@
 				  (* (the fixnum (%code-code-size obj))
 				     word-bytes)))))))
 		(declare (fixnum size))
-		(funcall fun obj header-type size)
+		(funcall fun obj header-widetag size)
 		(aver (zerop (logand size lowtag-mask)))
 		#+nil
 		(when (> size 200000)
@@ -390,7 +390,7 @@
     (map-allocated-objects
      #'(lambda (obj type size)
  	 (declare (fixnum size) (optimize (safety 0)))
-	 (when (eql type code-header-type)
+	 (when (eql type code-header-widetag)
 	   (incf total-bytes size)
 	   (let ((words (truly-the fixnum (%code-code-size obj)))
 		 (sap (truly-the system-area-pointer
@@ -420,49 +420,49 @@
        #'(lambda (obj type size)
 	   (declare (fixnum size) (optimize (safety 0)))
 	   (case type
-	     (#.code-header-type
+	     (#.code-header-widetag
 	      (let ((inst-words (truly-the fixnum (%code-code-size obj))))
 		(declare (type fixnum inst-words))
 		(incf non-descriptor-bytes (* inst-words word-bytes))
 		(incf descriptor-words
 		      (- (truncate size word-bytes) inst-words))))
-	     ((#.bignum-type
-	       #.single-float-type
-	       #.double-float-type
-	       #.simple-string-type
-	       #.simple-bit-vector-type
-	       #.simple-array-unsigned-byte-2-type
-	       #.simple-array-unsigned-byte-4-type
-	       #.simple-array-unsigned-byte-8-type
-	       #.simple-array-unsigned-byte-16-type
-	       #.simple-array-unsigned-byte-32-type
-	       #.simple-array-signed-byte-8-type
-	       #.simple-array-signed-byte-16-type
-	       #.simple-array-signed-byte-30-type
-	       #.simple-array-signed-byte-32-type
-	       #.simple-array-single-float-type
-	       #.simple-array-double-float-type
-	       #.simple-array-complex-single-float-type
-	       #.simple-array-complex-double-float-type)
+	     ((#.bignum-widetag
+	       #.single-float-widetag
+	       #.double-float-widetag
+	       #.simple-string-widetag
+	       #.simple-bit-vector-widetag
+	       #.simple-array-unsigned-byte-2-widetag
+	       #.simple-array-unsigned-byte-4-widetag
+	       #.simple-array-unsigned-byte-8-widetag
+	       #.simple-array-unsigned-byte-16-widetag
+	       #.simple-array-unsigned-byte-32-widetag
+	       #.simple-array-signed-byte-8-widetag
+	       #.simple-array-signed-byte-16-widetag
+	       #.simple-array-signed-byte-30-widetag
+	       #.simple-array-signed-byte-32-widetag
+	       #.simple-array-single-float-widetag
+	       #.simple-array-double-float-widetag
+	       #.simple-array-complex-single-float-widetag
+	       #.simple-array-complex-double-float-widetag)
 	      (incf non-descriptor-headers)
 	      (incf non-descriptor-bytes (- size word-bytes)))
 	     ((#.list-pointer-lowtag
 	       #.instance-pointer-lowtag
-	       #.ratio-type
-	       #.complex-type
-	       #.simple-array-type
-	       #.simple-vector-type
-	       #.complex-string-type
-	       #.complex-bit-vector-type
-	       #.complex-vector-type
-	       #.complex-array-type
-	       #.closure-header-type
-	       #.funcallable-instance-header-type
-	       #.value-cell-header-type
-	       #.symbol-header-type
-	       #.sap-type
-	       #.weak-pointer-type
-	       #.instance-header-type)
+	       #.ratio-widetag
+	       #.complex-widetag
+	       #.simple-array-widetag
+	       #.simple-vector-widetag
+	       #.complex-string-widetag
+	       #.complex-bit-vector-widetag
+	       #.complex-vector-widetag
+	       #.complex-array-widetag
+	       #.closure-header-widetag
+	       #.funcallable-instance-header-widetag
+	       #.value-cell-header-widetag
+	       #.symbol-header-widetag
+	       #.sap-widetag
+	       #.weak-pointer-widetag
+	       #.instance-header-widetag)
 	      (incf descriptor-words (truncate size word-bytes)))
 	     (t
 	      (error "Bogus type: ~D" type))))
@@ -486,7 +486,7 @@
     (map-allocated-objects
      #'(lambda (obj type size)
 	 (declare (fixnum size) (optimize (speed 3) (safety 0)))
-	 (when (eql type instance-header-type)
+	 (when (eql type instance-header-widetag)
 	   (incf total-objects)
 	   (incf total-bytes size)
 	   (let* ((class (layout-class (%instance-ref obj 0)))
@@ -610,13 +610,13 @@
 			    (or (not larger) (>= size larger)))
 		   (incf count-so-far)
 		   (case type
-		     (#.code-header-type
+		     (#.code-header-widetag
 		      (let ((dinfo (%code-debug-info obj)))
 			(format stream "~&Code object: ~S~%"
 				(if dinfo
 				    (sb!c::compiled-debug-info-name dinfo)
 				    "No debug info."))))
-		     (#.symbol-header-type
+		     (#.symbol-header-widetag
 		      (format stream "~&~S~%" obj))
 		     (#.list-pointer-lowtag
 		      (unless (gethash obj printed-conses)
@@ -629,7 +629,7 @@
 		      (fresh-line stream)
 		      (let ((str (write-to-string obj :level 5 :length 10
 						  :pretty nil)))
-			(unless (eql type instance-header-type)
+			(unless (eql type instance-header-widetag)
 			  (format stream "~S: " (type-of obj)))
 			(format stream "~A~%"
 				(subseq str 0 (min (length str) 60))))))))))

@@ -115,8 +115,8 @@
 	      (inst mov
 		    (make-ea :dword :base object
 			     :disp (- (* (+ base offset) word-bytes) lowtag))
-		    (logior (ash (char-code val) type-bits)
-			    base-char-type)))))
+		    (logior (ash (char-code val) n-widetag-bits)
+			    base-char-widetag)))))
 	 ;; Else, value not immediate.
 	 (storew value object (+ base offset) lowtag))))
 

@@ -99,7 +99,7 @@
     (let ((bogus (gen-label))
 	  (done (gen-label)))
       (loadw temp thing 0 lowtag)
-      (inst shr temp type-bits)
+      (inst shr temp n-widetag-bits)
       (inst jmp :z bogus)
       (inst shl temp (1- (integer-length word-bytes)))
       (unless (= lowtag other-pointer-lowtag)
@@ -151,4 +151,4 @@
   (:result-types positive-fixnum)
   (:generator 5
     (loadw res fun 0 fun-pointer-lowtag)
-    (inst shr res type-bits)))
+    (inst shr res n-widetag-bits)))

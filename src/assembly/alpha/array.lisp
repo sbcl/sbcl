@@ -26,7 +26,7 @@
 			  (:temp ndescr non-descriptor-reg nl0-offset))
   ;; This is kinda sleezy, changing words like this.  But we can because
   ;; the vop thinks it is temporary.
-  (inst addq words (+ (1- (ash 1 lowtag-bits))
+  (inst addq words (+ (1- (ash 1 n-lowtag-bits))
 		      (* vector-data-offset word-bytes))
 	words)
   (inst li (lognot lowtag-mask) ndescr)

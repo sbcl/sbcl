@@ -914,21 +914,21 @@
      (character :enumerable t :translation base-char)
      (base-char :enumerable t
 		:inherits (character)
-		:codes (#.sb!vm:base-char-type))
-     (symbol :codes (#.sb!vm:symbol-header-type))
+		:codes (#.sb!vm:base-char-widetag))
+     (symbol :codes (#.sb!vm:symbol-header-widetag))
 
      (instance :state :read-only)
 
-     (system-area-pointer :codes (#.sb!vm:sap-type))
-     (weak-pointer :codes (#.sb!vm:weak-pointer-type))
-     (code-component :codes (#.sb!vm:code-header-type))
-     (lra :codes (#.sb!vm:return-pc-header-type))
-     (fdefn :codes (#.sb!vm:fdefn-type))
+     (system-area-pointer :codes (#.sb!vm:sap-widetag))
+     (weak-pointer :codes (#.sb!vm:weak-pointer-widetag))
+     (code-component :codes (#.sb!vm:code-header-widetag))
+     (lra :codes (#.sb!vm:return-pc-header-widetag))
+     (fdefn :codes (#.sb!vm:fdefn-widetag))
      (random-class) ; used for unknown type codes
 
      (function
-      :codes (#.sb!vm:closure-header-type
-	      #.sb!vm:simple-fun-header-type)
+      :codes (#.sb!vm:closure-header-widetag
+	      #.sb!vm:simple-fun-header-widetag)
       :state :read-only)
      (funcallable-instance
       :inherits (function)
@@ -956,11 +956,11 @@
 		     :inherits (generic-array
 				mutable-sequence mutable-collection
 				generic-sequence collection))
-     (array :translation array :codes (#.sb!vm:complex-array-type)
+     (array :translation array :codes (#.sb!vm:complex-array-widetag)
 	    :inherits (generic-array mutable-sequence mutable-collection
 				     generic-sequence collection))
      (simple-array
-      :translation simple-array :codes (#.sb!vm:simple-array-type)
+      :translation simple-array :codes (#.sb!vm:simple-array-widetag)
       :inherits (array generic-array mutable-sequence mutable-collection
 		 generic-sequence collection))
      (sequence
@@ -968,25 +968,25 @@
       :inherits (mutable-sequence mutable-collection generic-sequence
 		 collection))
      (vector
-      :translation vector :codes (#.sb!vm:complex-vector-type)
+      :translation vector :codes (#.sb!vm:complex-vector-widetag)
       :direct-superclasses (array sequence generic-vector)
       :inherits (array sequence generic-vector generic-array
 		 mutable-sequence mutable-collection generic-sequence
 		 collection))
      (simple-vector
-      :translation simple-vector :codes (#.sb!vm:simple-vector-type)
+      :translation simple-vector :codes (#.sb!vm:simple-vector-widetag)
       :direct-superclasses (vector simple-array)
       :inherits (vector simple-array array
 		 sequence generic-vector generic-array
 		 mutable-sequence mutable-collection
 		 generic-sequence collection))
      (bit-vector
-      :translation bit-vector :codes (#.sb!vm:complex-bit-vector-type)
+      :translation bit-vector :codes (#.sb!vm:complex-bit-vector-widetag)
       :inherits (vector array sequence
 		 generic-vector generic-array mutable-sequence
 		 mutable-collection generic-sequence collection))
      (simple-bit-vector
-      :translation simple-bit-vector :codes (#.sb!vm:simple-bit-vector-type)
+      :translation simple-bit-vector :codes (#.sb!vm:simple-bit-vector-widetag)
       :direct-superclasses (bit-vector simple-array)
       :inherits (bit-vector vector simple-array
 		 array sequence
@@ -994,77 +994,77 @@
 		 mutable-collection generic-sequence collection))
      (simple-array-unsigned-byte-2
       :translation (simple-array (unsigned-byte 2) (*))
-      :codes (#.sb!vm:simple-array-unsigned-byte-2-type)
+      :codes (#.sb!vm:simple-array-unsigned-byte-2-widetag)
       :direct-superclasses (vector simple-array)
       :inherits (vector simple-array array sequence
 		 generic-vector generic-array mutable-sequence
 		 mutable-collection generic-sequence collection))
      (simple-array-unsigned-byte-4
       :translation (simple-array (unsigned-byte 4) (*))
-      :codes (#.sb!vm:simple-array-unsigned-byte-4-type)
+      :codes (#.sb!vm:simple-array-unsigned-byte-4-widetag)
       :direct-superclasses (vector simple-array)
       :inherits (vector simple-array array sequence
 		 generic-vector generic-array mutable-sequence
 		 mutable-collection generic-sequence collection))
      (simple-array-unsigned-byte-8
       :translation (simple-array (unsigned-byte 8) (*))
-      :codes (#.sb!vm:simple-array-unsigned-byte-8-type)
+      :codes (#.sb!vm:simple-array-unsigned-byte-8-widetag)
       :direct-superclasses (vector simple-array)
       :inherits (vector simple-array array sequence
 		 generic-vector generic-array mutable-sequence
 		 mutable-collection generic-sequence collection))
      (simple-array-unsigned-byte-16
      :translation (simple-array (unsigned-byte 16) (*))
-     :codes (#.sb!vm:simple-array-unsigned-byte-16-type)
+     :codes (#.sb!vm:simple-array-unsigned-byte-16-widetag)
      :direct-superclasses (vector simple-array)
      :inherits (vector simple-array array sequence
 		generic-vector generic-array mutable-sequence
 		mutable-collection generic-sequence collection))
      (simple-array-unsigned-byte-32
      :translation (simple-array (unsigned-byte 32) (*))
-     :codes (#.sb!vm:simple-array-unsigned-byte-32-type)
+     :codes (#.sb!vm:simple-array-unsigned-byte-32-widetag)
      :direct-superclasses (vector simple-array)
      :inherits (vector simple-array array sequence
 		generic-vector generic-array mutable-sequence
 		mutable-collection generic-sequence collection))
      (simple-array-signed-byte-8
      :translation (simple-array (signed-byte 8) (*))
-     :codes (#.sb!vm:simple-array-signed-byte-8-type)
+     :codes (#.sb!vm:simple-array-signed-byte-8-widetag)
      :direct-superclasses (vector simple-array)
      :inherits (vector simple-array array sequence
 		generic-vector generic-array mutable-sequence
 		mutable-collection generic-sequence collection))
      (simple-array-signed-byte-16
      :translation (simple-array (signed-byte 16) (*))
-     :codes (#.sb!vm:simple-array-signed-byte-16-type)
+     :codes (#.sb!vm:simple-array-signed-byte-16-widetag)
      :direct-superclasses (vector simple-array)
      :inherits (vector simple-array array sequence
 		generic-vector generic-array mutable-sequence
 		mutable-collection generic-sequence collection))
      (simple-array-signed-byte-30
      :translation (simple-array (signed-byte 30) (*))
-     :codes (#.sb!vm:simple-array-signed-byte-30-type)
+     :codes (#.sb!vm:simple-array-signed-byte-30-widetag)
      :direct-superclasses (vector simple-array)
      :inherits (vector simple-array array sequence
 		generic-vector generic-array mutable-sequence
 		mutable-collection generic-sequence collection))
      (simple-array-signed-byte-32
      :translation (simple-array (signed-byte 32) (*))
-     :codes (#.sb!vm:simple-array-signed-byte-32-type)
+     :codes (#.sb!vm:simple-array-signed-byte-32-widetag)
      :direct-superclasses (vector simple-array)
      :inherits (vector simple-array array sequence
 		generic-vector generic-array mutable-sequence
 		mutable-collection generic-sequence collection))
      (simple-array-single-float
      :translation (simple-array single-float (*))
-     :codes (#.sb!vm:simple-array-single-float-type)
+     :codes (#.sb!vm:simple-array-single-float-widetag)
      :direct-superclasses (vector simple-array)
      :inherits (vector simple-array array sequence
 		generic-vector generic-array mutable-sequence
 		mutable-collection generic-sequence collection))
      (simple-array-double-float
      :translation (simple-array double-float (*))
-     :codes (#.sb!vm:simple-array-double-float-type)
+     :codes (#.sb!vm:simple-array-double-float-widetag)
      :direct-superclasses (vector simple-array)
      :inherits (vector simple-array array sequence
 		generic-vector generic-array mutable-sequence
@@ -1072,21 +1072,21 @@
     #!+long-float
     (simple-array-long-float
      :translation (simple-array long-float (*))
-     :codes (#.sb!vm:simple-array-long-float-type)
+     :codes (#.sb!vm:simple-array-long-float-widetag)
      :direct-superclasses (vector simple-array)
      :inherits (vector simple-array array sequence
 		generic-vector generic-array mutable-sequence
 		mutable-collection generic-sequence collection))
     (simple-array-complex-single-float
      :translation (simple-array (complex single-float) (*))
-     :codes (#.sb!vm:simple-array-complex-single-float-type)
+     :codes (#.sb!vm:simple-array-complex-single-float-widetag)
      :direct-superclasses (vector simple-array)
      :inherits (vector simple-array array sequence
 		generic-vector generic-array mutable-sequence
 		mutable-collection generic-sequence collection))
     (simple-array-complex-double-float
      :translation (simple-array (complex double-float) (*))
-     :codes (#.sb!vm:simple-array-complex-double-float-type)
+     :codes (#.sb!vm:simple-array-complex-double-float-widetag)
      :direct-superclasses (vector simple-array)
      :inherits (vector simple-array array sequence
 		generic-vector generic-array mutable-sequence
@@ -1094,7 +1094,7 @@
     #!+long-float
     (simple-array-complex-long-float
      :translation (simple-array (complex long-float) (*))
-     :codes (#.sb!vm:simple-array-complex-long-float-type)
+     :codes (#.sb!vm:simple-array-complex-long-float-widetag)
      :direct-superclasses (vector simple-array)
      :inherits (vector simple-array array sequence
 		generic-vector generic-array mutable-sequence
@@ -1105,7 +1105,7 @@
 		collection))
     (string
      :translation string
-     :codes (#.sb!vm:complex-string-type)
+     :codes (#.sb!vm:complex-string-widetag)
      :direct-superclasses (vector generic-string)
      :inherits (vector array sequence
 		generic-vector generic-array generic-string
@@ -1113,7 +1113,7 @@
 		generic-sequence collection))
     (simple-string
      :translation simple-string
-     :codes (#.sb!vm:simple-string-type)
+     :codes (#.sb!vm:simple-string-widetag)
      :direct-superclasses (string simple-array)
      :inherits (string vector simple-array
 		array sequence
@@ -1140,20 +1140,20 @@
     (complex
      :translation complex
      :inherits (number generic-number)
-     :codes (#.sb!vm:complex-type))
+     :codes (#.sb!vm:complex-widetag))
     (complex-single-float
      :translation (complex single-float)
      :inherits (complex number generic-number)
-     :codes (#.sb!vm:complex-single-float-type))
+     :codes (#.sb!vm:complex-single-float-widetag))
     (complex-double-float
      :translation (complex double-float)
      :inherits (complex number generic-number)
-     :codes (#.sb!vm:complex-double-float-type))
+     :codes (#.sb!vm:complex-double-float-widetag))
     #!+long-float
     (complex-long-float
      :translation (complex long-float)
      :inherits (complex number generic-number)
-     :codes (#.sb!vm:complex-long-float-type))
+     :codes (#.sb!vm:complex-long-float-widetag))
     (real :translation real :inherits (number generic-number))
     (float
      :translation float
@@ -1161,23 +1161,23 @@
     (single-float
      :translation single-float
      :inherits (float real number generic-number)
-     :codes (#.sb!vm:single-float-type))
+     :codes (#.sb!vm:single-float-widetag))
     (double-float
      :translation double-float
      :inherits (float real number generic-number)
-     :codes (#.sb!vm:double-float-type))
+     :codes (#.sb!vm:double-float-widetag))
     #!+long-float
     (long-float
      :translation long-float
      :inherits (float real number generic-number)
-     :codes (#.sb!vm:long-float-type))
+     :codes (#.sb!vm:long-float-widetag))
     (rational
      :translation rational
      :inherits (real number generic-number))
     (ratio
      :translation (and rational (not integer))
      :inherits (rational real number generic-number)
-     :codes (#.sb!vm:ratio-type))
+     :codes (#.sb!vm:ratio-widetag))
     (integer
      :translation integer
      :inherits (rational real number generic-number))
@@ -1191,7 +1191,7 @@
      :translation (and integer (not fixnum))
      :inherits (integer rational real number
 		generic-number)
-     :codes (#.sb!vm:bignum-type))
+     :codes (#.sb!vm:bignum-widetag))
     (stream
      :state :read-only
      :depth 3

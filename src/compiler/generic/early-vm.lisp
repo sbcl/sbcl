@@ -11,18 +11,18 @@
 
 ;;; the number of bits at the low end of a pointer used for type
 ;;; information
-(defconstant lowtag-bits 3)
+(defconstant n-lowtag-bits 3)
 ;;; a mask to extract the low tag bits from a pointer
-(defconstant lowtag-mask (1- (ash 1 lowtag-bits)))
+(defconstant lowtag-mask (1- (ash 1 n-lowtag-bits)))
 ;;; the exclusive upper bound on the value of the low tag bits from a
 ;;; pointer
-(defconstant lowtag-limit (ash 1 lowtag-bits))
+(defconstant lowtag-limit (ash 1 n-lowtag-bits))
 
 ;;; the number of bits used in the header word of a data block to store
 ;;; the type
-(defconstant type-bits 8)
+(defconstant n-widetag-bits 8)
 ;;; a mask to extract the type from a data block header word
-(defconstant type-mask (1- (ash 1 type-bits)))
+(defconstant widetag-mask (1- (ash 1 n-widetag-bits)))
 
 ;;; FIXME: Couldn't/shouldn't these be DEFCONSTANT instead of
 ;;; DEFPARAMETER? (It might seem even more tempting to make them

@@ -218,7 +218,7 @@
 ;;; Find the encapsulation info that has been closed over.
 (defun encapsulation-info (fun)
   (and (functionp fun)
-       (= (get-type fun) sb!vm:closure-header-type)
+       (= (get-type fun) sb!vm:closure-header-widetag)
        (find-if-in-closure #'encapsulation-info-p fun)))
 
 ;;; When removing an encapsulation, we must remember that

@@ -40,7 +40,7 @@
   (:note "character tagging")
   (:generator 1
     (move ah x)				; Maybe move char byte.
-    (inst mov al base-char-type)	; x86 to type bits
+    (inst mov al base-char-widetag)	; x86 to type bits
     (inst and eax-tn #xffff)		; Remove any junk bits.
     (move y eax-tn)))
 (define-move-vop move-from-base-char :move

@@ -103,8 +103,8 @@
      (inst add temp boxed)
      (inst add temp unboxed)
      (store-symbol-value temp sb!vm:*static-space-free-pointer*)
-     (inst shl boxed (- type-bits word-shift))
-     (inst or boxed code-header-type)
+     (inst shl boxed (- n-widetag-bits word-shift))
+     (inst or boxed code-header-widetag)
      (storew boxed result 0 other-pointer-lowtag)
      (storew unboxed result code-code-size-slot other-pointer-lowtag)
      (inst mov temp nil-value)
@@ -131,8 +131,8 @@
     (pseudo-atomic
      (allocation result result node)
      (inst lea result (make-ea :byte :base result :disp other-pointer-lowtag))
-     (inst shl boxed (- type-bits word-shift))
-     (inst or boxed code-header-type)
+     (inst shl boxed (- n-widetag-bits word-shift))
+     (inst or boxed code-header-widetag)
      (storew boxed result 0 other-pointer-lowtag)
      (storew unboxed result code-code-size-slot other-pointer-lowtag)
      (storew nil-value result code-entry-points-slot other-pointer-lowtag))
@@ -145,7 +145,7 @@
   (:results (result :scs (descriptor-reg) :from :argument))
   (:node-var node)
   (:generator 37
-    (with-fixed-allocation (result fdefn-type fdefn-size node)
+    (with-fixed-allocation (result fdefn-widetag fdefn-size node)
       (storew name result fdefn-name-slot other-pointer-lowtag)
       (storew nil-value result fdefn-fun-slot other-pointer-lowtag)
       (storew (make-fixup (extern-alien-name "undefined_tramp") :foreign)
@@ -163,7 +163,7 @@
       (allocation result (pad-data-block size) node)
       (inst lea result
 	    (make-ea :byte :base result :disp fun-pointer-lowtag))
-      (storew (logior (ash (1- size) type-bits) closure-header-type)
+      (storew (logior (ash (1- size) n-widetag-bits) closure-header-widetag)
 	      result 0 fun-pointer-lowtag))
     (loadw temp function closure-fun-slot fun-pointer-lowtag)
     (storew temp result closure-fun-slot fun-pointer-lowtag))))
@@ -175,7 +175,7 @@
   (:node-var node)
   (:generator 10
     (with-fixed-allocation
-	(result value-cell-header-type value-cell-size node))
+	(result value-cell-header-widetag value-cell-size node))
     (storew value result value-cell-value-slot other-pointer-lowtag)))
 
 ;;;; automatic allocators for primitive objects
@@ -184,7 +184,7 @@
   (:args)
   (:results (result :scs (any-reg)))
   (:generator 1
-    (inst mov result unbound-marker-type)))
+    (inst mov result unbound-marker-widetag)))
 
 (define-vop (fixed-alloc)
   (:args)
@@ -197,7 +197,10 @@
      (allocation result (pad-data-block words) node)
      (inst lea result (make-ea :byte :base result :disp lowtag))
      (when type
-       (storew (logior (ash (1- words) type-bits) type) result 0 lowtag)))))
+       (storew (logior (ash (1- words) n-widetag-bits) type)
+	       result
+	       0
+	       lowtag)))))
 
 (define-vop (var-alloc)
   (:args (extra :scs (any-reg)))
@@ -212,10 +215,9 @@
     (inst lea bytes
 	  (make-ea :dword :base extra :disp (* (1+ words) word-bytes)))
     (inst mov header bytes)
-    (inst shl header (- type-bits 2))	; w+1 to length field
-
+    (inst shl header (- n-widetag-bits 2)) ; w+1 to length field
     (inst lea header			; (w-1 << 8) | type
-	  (make-ea :dword :base header :disp (+ (ash -2 type-bits) type)))
+	  (make-ea :dword :base header :disp (+ (ash -2 n-widetag-bits) type)))
     (inst and bytes (lognot lowtag-mask))
     (pseudo-atomic
      (allocation result bytes node)
@@ -230,9 +232,12 @@
   (:results (result :scs (descriptor-reg) :from :argument))
   (:node-var node)
   (:generator 37
-    (with-fixed-allocation (result symbol-header-type symbol-size node)
+    (with-fixed-allocation (result symbol-header-widetag symbol-size node)
       (storew name result symbol-name-slot other-pointer-lowtag)
-      (storew unbound-marker-type result symbol-value-slot other-pointer-lowtag)
+      (storew unbound-marker-widetag
+	      result
+	      symbol-value-slot
+	      other-pointer-lowtag)
       ;; Set up a random hash value for the symbol. Perhaps the object
       ;; address could be used for even faster and smaller code!
       ;; FIXME: We don't mind the symbol hash not being repeatable, so

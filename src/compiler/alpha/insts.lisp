@@ -537,17 +537,17 @@
        (emit-lword segment
 		  (logior type
 			  (ash (+ posn (component-header-length))
-			       (- type-bits word-shift)))))))
+			       (- n-widetag-bits word-shift)))))))
 
 (define-instruction simple-fun-header-word (segment)
   (:cost 0)
   (:emitter
-   (emit-header-data segment simple-fun-header-type)))
+   (emit-header-data segment simple-fun-header-widetag)))
 
 (define-instruction lra-header-word (segment)
   (:cost 0)
   (:emitter
-   (emit-header-data segment return-pc-header-type)))
+   (emit-header-data segment return-pc-header-widetag)))
 
 (defun emit-compute-inst (segment vop dst src label temp calc)
   (declare (ignore temp))

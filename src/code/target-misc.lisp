@@ -18,11 +18,12 @@
 (defun function-doc (x)
   (let ((name
 	 (case (get-type x)
-	   (#.sb!vm:closure-header-type
+	   (#.sb!vm:closure-header-widetag
 	    (%simple-fun-name (%closure-fun x)))
-	   ((#.sb!vm:simple-fun-header-type #.sb!vm:closure-fun-header-type)
+	   ((#.sb!vm:simple-fun-header-widetag
+	     #.sb!vm:closure-fun-header-widetag)
 	    (%simple-fun-name x))
-	   (#.sb!vm:funcallable-instance-header-type
+	   (#.sb!vm:funcallable-instance-header-widetag
 	    (%simple-fun-name
 	     (funcallable-instance-fun x))))))
     (when (and name (typep name '(or symbol cons)))

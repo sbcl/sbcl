@@ -42,9 +42,9 @@
 ;;; the heap types, stored in 8 bits of the header of an object on the
 ;;; heap, to identify the type of the heap object (which'll be at
 ;;; least two machine words, often more)
-(defenum (:suffix -type
-	  :start (+ (ash 1 lowtag-bits) other-immediate-0-lowtag)
-	  :step (ash 1 (1- lowtag-bits)))
+(defenum (:suffix -widetag
+	  :start (+ (ash 1 n-lowtag-bits) other-immediate-0-lowtag)
+	  :step (ash 1 (1- n-lowtag-bits)))
   bignum
   ratio
   single-float

@@ -23,8 +23,8 @@
       (symbol
        (load-symbol y val))
       (character
-       (inst mov y (logior (ash (char-code val) type-bits)
-			   base-char-type))))))
+       (inst mov y (logior (ash (char-code val) n-widetag-bits)
+			   base-char-widetag))))))
 
 (define-move-function (load-number 1) (vop x y)
   ((immediate) (signed-reg unsigned-reg))
@@ -81,8 +81,8 @@
 	    (symbol
 	     (inst mov y (+ nil-value (static-symbol-offset val))))
 	    (character
-	     (inst mov y (logior (ash (char-code val) type-bits)
-				 base-char-type)))))
+	     (inst mov y (logior (ash (char-code val) n-widetag-bits)
+				 base-char-widetag)))))
       (move y x))))
 
 (define-move-vop move :move
@@ -120,8 +120,8 @@
 	      (symbol
 	       (load-symbol y val))
 	      (character
-	       (inst mov y (logior (ash (char-code val) type-bits)
-				   base-char-type)))))
+	       (inst mov y (logior (ash (char-code val) n-widetag-bits)
+				   base-char-widetag)))))
 	 (move y x)))
       ((control-stack)
        (if (sc-is x immediate)
@@ -135,8 +135,8 @@
 		    (storew (+ nil-value (static-symbol-offset val))
 			    fp (tn-offset y)))
 		   (character
-		    (storew (logior (ash (char-code val) type-bits)
-				    base-char-type)
+		    (storew (logior (ash (char-code val) n-widetag-bits)
+				    base-char-widetag)
 			    fp (tn-offset y))))
 	       ;; Lisp stack
 	       (etypecase val
@@ -146,8 +146,8 @@
 		  (storew (+ nil-value (static-symbol-offset val))
 			  fp (- (1+ (tn-offset y)))))
 		 (character
-		  (storew (logior (ash (char-code val) type-bits)
-				  base-char-type)
+		  (storew (logior (ash (char-code val) n-widetag-bits)
+				  base-char-widetag)
 			  fp (- (1+ (tn-offset y))))))))
 	 (if (= (tn-offset fp) esp-offset)
 	     ;; C-call
@@ -306,7 +306,7 @@
        (assemble (*elsewhere*)
 	  (emit-label bignum)
 	  (with-fixed-allocation
-	      (y bignum-type (+ bignum-digits-offset 1) node)
+	      (y bignum-widetag (+ bignum-digits-offset 1) node)
 	    (storew x y bignum-digits-offset other-pointer-lowtag))
 	  (inst jmp done)))))
 (define-move-vop move-from-signed :move
@@ -363,15 +363,15 @@
 	 ;; always allocated and the header size is set to either one
 	 ;; or two words as appropriate.
 	 (inst jmp :ns one-word-bignum)
-	 ;; Two word bignum.
+	 ;; two word bignum
 	 (inst mov y (logior (ash (1- (+ bignum-digits-offset 2))
-				  sb!vm:type-bits)
-			     bignum-type))
+				  sb!vm:n-widetag-bits)
+			     bignum-widetag))
 	 (inst jmp L1)
 	 (emit-label one-word-bignum)
 	 (inst mov y (logior (ash (1- (+ bignum-digits-offset 1))
-				  sb!vm:type-bits)
-			     bignum-type))
+				  sb!vm:n-widetag-bits)
+			     bignum-widetag))
 	 (emit-label L1)
 	 (pseudo-atomic
 	  (allocation alloc (pad-data-block (+ bignum-digits-offset 2)) node)

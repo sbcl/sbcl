@@ -195,7 +195,7 @@ evaluated expressions.
 
 (defmethod inspected-parts ((object function))
   (let* ((type (sb-kernel:get-type object))
-	 (object (if (= type sb-vm:closure-header-type)
+	 (object (if (= type sb-vm:closure-header-widetag)
 		     (sb-kernel:%closure-fun object)
 		     object)))
     (values (format nil "FUNCTION ~S.~@[~%Argument List: ~A~]." object

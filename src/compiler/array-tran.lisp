@@ -195,32 +195,32 @@
 	 (destructuring-bind (type-spec &rest rest) args
 	   (let ((ctype (specifier-type type-spec)))
 	     (apply #'!make-saetp ctype rest))))
-       `((base-char ,(code-char 0) 8 ,sb!vm:simple-string-type
+       `((base-char ,(code-char 0) 8 ,sb!vm:simple-string-widetag
 		    ;; (SIMPLE-STRINGs are stored with an extra trailing
 		    ;; #\NULL for convenience in calling out to C.)
 		    :n-pad-elements 1)
-	 (single-float 0.0s0 32 ,sb!vm:simple-array-single-float-type)
-	 (double-float 0.0d0 64 ,sb!vm:simple-array-double-float-type)
+	 (single-float 0.0s0 32 ,sb!vm:simple-array-single-float-widetag)
+	 (double-float 0.0d0 64 ,sb!vm:simple-array-double-float-widetag)
 	 #!+long-float (long-float 0.0L0 #!+x86 96 #!+sparc 128
-				   ,sb!vm:simple-array-long-float-type)
-	 (bit 0 1 ,sb!vm:simple-bit-vector-type)
-	 ((unsigned-byte 2) 0 2 ,sb!vm:simple-array-unsigned-byte-2-type)
-	 ((unsigned-byte 4) 0 4 ,sb!vm:simple-array-unsigned-byte-4-type)
-	 ((unsigned-byte 8) 0 8 ,sb!vm:simple-array-unsigned-byte-8-type)
-	 ((unsigned-byte 16) 0 16 ,sb!vm:simple-array-unsigned-byte-16-type)
-	 ((unsigned-byte 32) 0 32 ,sb!vm:simple-array-unsigned-byte-32-type)
-	 ((signed-byte 8) 0 8 ,sb!vm:simple-array-signed-byte-8-type)
-	 ((signed-byte 16) 0 16 ,sb!vm:simple-array-signed-byte-16-type)
-	 ((signed-byte 30) 0 32 ,sb!vm:simple-array-signed-byte-30-type)
-	 ((signed-byte 32) 0 32 ,sb!vm:simple-array-signed-byte-32-type)
+				   ,sb!vm:simple-array-long-float-widetag)
+	 (bit 0 1 ,sb!vm:simple-bit-vector-widetag)
+	 ((unsigned-byte 2) 0 2 ,sb!vm:simple-array-unsigned-byte-2-widetag)
+	 ((unsigned-byte 4) 0 4 ,sb!vm:simple-array-unsigned-byte-4-widetag)
+	 ((unsigned-byte 8) 0 8 ,sb!vm:simple-array-unsigned-byte-8-widetag)
+	 ((unsigned-byte 16) 0 16 ,sb!vm:simple-array-unsigned-byte-16-widetag)
+	 ((unsigned-byte 32) 0 32 ,sb!vm:simple-array-unsigned-byte-32-widetag)
+	 ((signed-byte 8) 0 8 ,sb!vm:simple-array-signed-byte-8-widetag)
+	 ((signed-byte 16) 0 16 ,sb!vm:simple-array-signed-byte-16-widetag)
+	 ((signed-byte 30) 0 32 ,sb!vm:simple-array-signed-byte-30-widetag)
+	 ((signed-byte 32) 0 32 ,sb!vm:simple-array-signed-byte-32-widetag)
 	 ((complex single-float) #C(0.0s0 0.0s0) 64
-	  ,sb!vm:simple-array-complex-single-float-type)
+	  ,sb!vm:simple-array-complex-single-float-widetag)
 	 ((complex double-float) #C(0.0d0 0.0d0) 128
-	  ,sb!vm:simple-array-complex-double-float-type)
+	  ,sb!vm:simple-array-complex-double-float-widetag)
 	 #!+long-float ((complex long-float) #C(0.0L0 0.0L0)
 			#!+x86 192 #!+sparc 256
-			,sb!vm:simple-array-complex-long-float-type)
-	 (t 0 32 ,sb!vm:simple-vector-type))))
+			,sb!vm:simple-array-complex-long-float-widetag)
+	 (t 0 32 ,sb!vm:simple-vector-widetag))))
 
 ;;; The integer type restriction on the length ensures that it will be
 ;;; a vector. The lack of :ADJUSTABLE, :FILL-POINTER, and
@@ -327,7 +327,7 @@
 			       (continuation-value element-type))
 			      (t '*))
 			   ,(make-list rank :initial-element '*))))
-	  `(let ((header (make-array-header sb!vm:simple-array-type ,rank)))
+	  `(let ((header (make-array-header sb!vm:simple-array-widetag ,rank)))
 	     (setf (%array-fill-pointer header) ,total-size)
 	     (setf (%array-fill-pointer-p header) nil)
 	     (setf (%array-available-elements header) ,total-size)

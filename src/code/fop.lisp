@@ -125,7 +125,7 @@
   #+sb-xc-host ; since xc host doesn't know how to compile %PRIMITIVE
   (error "FOP-MISC-TRAP can't be defined without %PRIMITIVE.")
   #-sb-xc-host
-  (%primitive sb!c:make-other-immediate-type 0 sb!vm:unbound-marker-type))
+  (%primitive sb!c:make-other-immediate-type 0 sb!vm:unbound-marker-widetag))
 
 (define-fop (fop-character 68)
   (code-char (read-arg 3)))
@@ -409,7 +409,7 @@
   (let* ((rank (read-arg 4))
 	 (vec (pop-stack))
 	 (length (length vec))
-	 (res (make-array-header sb!vm:simple-array-type rank)))
+	 (res (make-array-header sb!vm:simple-array-widetag rank)))
     (declare (simple-array vec)
 	     (type (unsigned-byte 24) rank))
     (set-array-header res vec length length 0

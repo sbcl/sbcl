@@ -978,9 +978,9 @@
 	(let ((lowtag (get-lowtag object)))
 	  (if (= lowtag sb!vm:other-pointer-lowtag)
 	      (let ((type (get-type object)))
-		(cond ((= type sb!vm:code-header-type)
+		(cond ((= type sb!vm:code-header-widetag)
 		       object)
-		      ((= type sb!vm:return-pc-header-type)
+		      ((= type sb!vm:return-pc-header-widetag)
 		       (lra-code-header object))
 		      (t
 		       nil))))))))
@@ -1174,12 +1174,12 @@
 (defun fun-debug-fun (fun)
   (declare (type function fun))
   (ecase (get-type fun)
-    (#.sb!vm:closure-header-type
+    (#.sb!vm:closure-header-widetag
      (fun-debug-fun (%closure-fun fun)))
-    (#.sb!vm:funcallable-instance-header-type
+    (#.sb!vm:funcallable-instance-header-widetag
      (fun-debug-fun (funcallable-instance-fun fun)))
-    ((#.sb!vm:simple-fun-header-type
-      #.sb!vm:closure-fun-header-type)
+    ((#.sb!vm:simple-fun-header-widetag
+      #.sb!vm:closure-fun-header-widetag)
       (let* ((name (%simple-fun-name fun))
 	     (component (fun-code-header fun))
 	     (res (find-if
@@ -1968,9 +1968,9 @@
        (zerop (logand val 3))
        ;; character
        (and (zerop (logand val #xffff0000)) ; Top bits zero
-	    (= (logand val #xff) sb!vm:base-char-type)) ; Char tag
+	    (= (logand val #xff) sb!vm:base-char-widetag)) ; char tag
        ;; unbound marker
-       (= val sb!vm:unbound-marker-type)
+       (= val sb!vm:unbound-marker-widetag)
        ;; pointer
        (and (logand val 1)
 	    ;; Check that the pointer is valid. XXX Could do a better
@@ -2546,7 +2546,7 @@
 ;;; indirection cell.
 (defun indirect-value-cell-p (x)
   (and (= (get-lowtag x) sb!vm:other-pointer-lowtag)
-       (= (get-type x) sb!vm:value-cell-header-type)))
+       (= (get-type x) sb!vm:value-cell-header-widetag)))
 
 ;;; Return three values reflecting the validity of DEBUG-VAR's value
 ;;; at BASIC-CODE-LOCATION:

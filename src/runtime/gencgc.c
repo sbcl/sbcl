@@ -1414,7 +1414,7 @@ copy_object(lispobj object, int nwords)
     gc_assert((nwords & 0x01) == 0);
 
     /* Get tag of object. */
-    tag = lowtagof(object);
+    tag = lowtag_of(object);
 
     /* Allocate space. */
     new = gc_quick_alloc(nwords*4);
@@ -1549,7 +1549,7 @@ copy_large_object(lispobj object, int nwords)
 	return(object);
     } else {
 	/* Get tag of object. */
-	tag = lowtagof(object);
+	tag = lowtag_of(object);
 
 	/* Allocate space. */
 	new = gc_quick_alloc_large(nwords*4);
@@ -1584,7 +1584,7 @@ copy_unboxed_object(lispobj object, int nwords)
     gc_assert((nwords & 0x01) == 0);
 
     /* Get tag of object. */
-    tag = lowtagof(object);
+    tag = lowtag_of(object);
 
     /* Allocate space. */
     new = gc_quick_alloc_unboxed(nwords*4);
@@ -1713,7 +1713,7 @@ copy_large_unboxed_object(lispobj object, int nwords)
     }
     else {
 	/* Get tag of object. */
-	tag = lowtagof(object);
+	tag = lowtag_of(object);
 
 	/* Allocate space. */
 	new = gc_quick_alloc_large_unboxed(nwords*4);
@@ -1770,7 +1770,7 @@ scavenge(lispobj *start, long n_words)
 		} else {
 		    /* Scavenge that pointer. */
 		    n_words_scavenged =
-			(scavtab[TypeOf(object)])(object_ptr, object);
+			(scavtab[widetag_of(object)])(object_ptr, object);
 		}
 	    } else {
 		/* It points somewhere other than oldspace. Leave it
@@ -1783,7 +1783,7 @@ scavenge(lispobj *start, long n_words)
 	} else {
 	    /* It's some sort of header object or another. */
 	    n_words_scavenged =
-		(scavtab[TypeOf(object)])(object_ptr, object);
+		(scavtab[widetag_of(object)])(object_ptr, object);
 	}
     }
     gc_assert(object_ptr == end);
@@ -1813,9 +1813,9 @@ scav_fun_pointer(lispobj *where, lispobj object)
     /* must transport object -- object may point to either a function
      * header, a closure function header, or to a closure header. */
 
-    switch (TypeOf(*first_pointer)) {
-    case type_SimpleFunHeader:
-    case type_ClosureFunHeader:
+    switch (widetag_of(*first_pointer)) {
+    case SIMPLE_FUN_HEADER_WIDETAG:
+    case CLOSURE_FUN_HEADER_WIDETAG:
 	copy = trans_fun_header(object);
 	break;
     default:
@@ -2051,7 +2051,7 @@ apply_code_fixups(struct code *old_code, struct code *new_code)
 
     /* It will be 0 or the unbound-marker if there are no fixups, and
      * will be an other pointer if it is valid. */
-    if ((fixups == 0) || (fixups == type_UnboundMarker) ||
+    if ((fixups == 0) || (fixups == UNBOUND_MARKER_WIDETAG) ||
 	!is_lisp_pointer(fixups)) {
 	/* Check for possible errors. */
 	if (check_code_fixups)
@@ -2079,7 +2079,8 @@ apply_code_fixups(struct code *old_code, struct code *new_code)
 
     /*SHOW("got fixups");*/
 
-    if (TypeOf(fixups_vector->header) == type_SimpleArrayUnsignedByte32) {
+    if (widetag_of(fixups_vector->header) ==
+	SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG) {
 	/* Got the fixups for the code block. Now work through the vector,
 	   and apply a fixup at each address. */
 	int length = fixnum_value(fixups_vector->length);
@@ -2129,7 +2130,7 @@ trans_code(struct code *code)
     if (*((lispobj *)code) == 0x01)
 	return (struct code*)(((lispobj *)code)[1]);
 
-    gc_assert(TypeOf(code->header) == type_CodeHeader);
+    gc_assert(widetag_of(code->header) == CODE_HEADER_WIDETAG);
 
     /* Prepare to transport the code vector. */
     l_code = (lispobj) code | OTHER_POINTER_LOWTAG;
@@ -2171,7 +2172,7 @@ trans_code(struct code *code)
 	lispobj nfheaderl;
 
 	fheaderp = (struct simple_fun *) native_pointer(fheaderl);
-	gc_assert(TypeOf(fheaderp->header) == type_SimpleFunHeader);
+	gc_assert(widetag_of(fheaderp->header) == SIMPLE_FUN_HEADER_WIDETAG);
 
 	/* Calculate the new function pointer and the new */
 	/* function header. */
@@ -2223,7 +2224,7 @@ scav_code_header(lispobj *where, lispobj object)
 	gc_assert(is_lisp_pointer(entry_point));
 
 	function_ptr = (struct simple_fun *) native_pointer(entry_point);
-	gc_assert(TypeOf(function_ptr->header) == type_SimpleFunHeader);
+	gc_assert(widetag_of(function_ptr->header) == SIMPLE_FUN_HEADER_WIDETAG);
 
 	scavenge(&function_ptr->name, 1);
 	scavenge(&function_ptr->arglist, 1);
@@ -2402,7 +2403,7 @@ trans_list(lispobj object)
     new_cons = (struct cons *) gc_quick_alloc(sizeof(struct cons));
     new_cons->car = cons->car;
     new_cons->cdr = cons->cdr; /* updated later */
-    new_list_pointer = (lispobj)new_cons | lowtagof(object);
+    new_list_pointer = (lispobj)new_cons | lowtag_of(object);
 
     /* Grab the cdr before it is clobbered. */
     cdr = cons->cdr;
@@ -2417,7 +2418,7 @@ trans_list(lispobj object)
 	lispobj  new_cdr;
 	struct cons *cdr_cons, *new_cdr_cons;
 
-	if (lowtagof(cdr) != LIST_POINTER_LOWTAG || !from_space_p(cdr)
+	if (lowtag_of(cdr) != LIST_POINTER_LOWTAG || !from_space_p(cdr)
 	    || (*((lispobj *)native_pointer(cdr)) == 0x01))
 	    break;
 
@@ -2427,7 +2428,7 @@ trans_list(lispobj object)
 	new_cdr_cons = (struct cons*) gc_quick_alloc(sizeof(struct cons));
 	new_cdr_cons->car = cdr_cons->car;
 	new_cdr_cons->cdr = cdr_cons->cdr;
-	new_cdr = (lispobj)new_cdr_cons | lowtagof(cdr);
+	new_cdr = (lispobj)new_cdr_cons | lowtag_of(cdr);
 
 	/* Grab the cdr before it is clobbered. */
 	cdr = cdr_cons->cdr;
@@ -2461,7 +2462,7 @@ scav_other_pointer(lispobj *where, lispobj object)
     /* Object is a pointer into from space - not FP. */
     first_pointer = (lispobj *) native_pointer(object);
 
-    first = (transother[TypeOf(*first_pointer)])(object);
+    first = (transother[widetag_of(*first_pointer)])(object);
 
     if (first != object) {
 	/* Set forwarding pointer. */
@@ -2718,7 +2719,8 @@ scav_vector(lispobj *where, lispobj object)
     if (!gencgc_hash) {
 	/* This is set for backward compatibility. FIXME: Do we need
 	 * this any more? */
-	*where = (subtype_VectorMustRehash << N_TYPE_BITS) | type_SimpleVector;
+	*where =
+	    (subtype_VectorMustRehash<<N_WIDETAG_BITS) | SIMPLE_VECTOR_WIDETAG;
 	return 1;
     }
 
@@ -2733,7 +2735,7 @@ scav_vector(lispobj *where, lispobj object)
     }
     hash_table = (lispobj *)native_pointer(where[2]);
     /*FSHOW((stderr,"/hash_table = %x\n", hash_table));*/
-    if (TypeOf(hash_table[0]) != type_InstanceHeader) {
+    if (widetag_of(hash_table[0]) != INSTANCE_HEADER_WIDETAG) {
 	lose("hash table not instance (%x at %x)", hash_table[0], hash_table);
     }
 
@@ -2745,7 +2747,8 @@ scav_vector(lispobj *where, lispobj object)
     }
     empty_symbol = where[3];
     /* fprintf(stderr,"* empty_symbol = %x\n", empty_symbol);*/
-    if (TypeOf(*(lispobj *)native_pointer(empty_symbol)) != type_SymbolHeader) {
+    if (widetag_of(*(lispobj *)native_pointer(empty_symbol)) !=
+	SYMBOL_HEADER_WIDETAG) {
 	lose("not a symbol where empty-hash-table-slot symbol expected: %x",
 	     *(lispobj *)native_pointer(empty_symbol));
     }
@@ -2767,7 +2770,8 @@ scav_vector(lispobj *where, lispobj object)
 	lispobj index_vector_obj = hash_table[13];
 
 	if (is_lisp_pointer(index_vector_obj) &&
-	    (TypeOf(*(lispobj *)native_pointer(index_vector_obj)) == type_SimpleArrayUnsignedByte32)) {
+	    (widetag_of(*(lispobj *)native_pointer(index_vector_obj)) ==
+	     SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG)) {
 	    index_vector = ((unsigned int *)native_pointer(index_vector_obj)) + 2;
 	    /*FSHOW((stderr, "/index_vector = %x\n",index_vector));*/
 	    length = fixnum_value(((unsigned int *)native_pointer(index_vector_obj))[1]);
@@ -2782,7 +2786,8 @@ scav_vector(lispobj *where, lispobj object)
 	lispobj next_vector_obj = hash_table[14];
 
 	if (is_lisp_pointer(next_vector_obj) &&
-	    (TypeOf(*(lispobj *)native_pointer(next_vector_obj)) == type_SimpleArrayUnsignedByte32)) {
+	    (widetag_of(*(lispobj *)native_pointer(next_vector_obj)) ==
+	     SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG)) {
 	    next_vector = ((unsigned int *)native_pointer(next_vector_obj)) + 2;
 	    /*FSHOW((stderr, "/next_vector = %x\n", next_vector));*/
 	    next_vector_length = fixnum_value(((unsigned int *)native_pointer(next_vector_obj))[1]);
@@ -2801,8 +2806,8 @@ scav_vector(lispobj *where, lispobj object)
 	lispobj hash_vector_obj = hash_table[15];
 
 	if (is_lisp_pointer(hash_vector_obj) &&
-	    (TypeOf(*(lispobj *)native_pointer(hash_vector_obj))
-	     == type_SimpleArrayUnsignedByte32)) {
+	    (widetag_of(*(lispobj *)native_pointer(hash_vector_obj))
+	     == SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG)) {
 	    hash_vector = ((unsigned int *)native_pointer(hash_vector_obj)) + 2;
 	    /*FSHOW((stderr, "/hash_vector = %x\n", hash_vector));*/
 	    gc_assert(fixnum_value(((unsigned int *)native_pointer(hash_vector_obj))[1])
@@ -3247,7 +3252,7 @@ size_vector_double_float(lispobj *where)
     return nwords;
 }
 
-#ifdef type_SimpleArrayLongFloat
+#ifdef SIMPLE_ARRAY_LONG_FLOAT_WIDETAG
 static int
 scav_vector_long_float(lispobj *where, lispobj object)
 {
@@ -3291,7 +3296,7 @@ size_vector_long_float(lispobj *where)
 #endif
 
 
-#ifdef type_SimpleArrayComplexSingleFloat
+#ifdef SIMPLE_ARRAY_COMPLEX_SINGLE_FLOAT_WIDETAG
 static int
 scav_vector_complex_single_float(lispobj *where, lispobj object)
 {
@@ -3334,7 +3339,7 @@ size_vector_complex_single_float(lispobj *where)
 }
 #endif
 
-#ifdef type_SimpleArrayComplexDoubleFloat
+#ifdef SIMPLE_ARRAY_COMPLEX_DOUBLE_FLOAT_WIDETAG
 static int
 scav_vector_complex_double_float(lispobj *where, lispobj object)
 {
@@ -3378,7 +3383,7 @@ size_vector_complex_double_float(lispobj *where)
 #endif
 
 
-#ifdef type_SimpleArrayComplexLongFloat
+#ifdef SIMPLE_ARRAY_COMPLEX_LONG_FLOAT_WIDETAG
 static int
 scav_vector_complex_long_float(lispobj *where, lispobj object)
 {
@@ -3509,11 +3514,6 @@ void scan_weak_pointers(void)
 
 	first_pointer = (lispobj *)native_pointer(value);
 
-	/*
-	FSHOW((stderr, "/weak pointer at 0x%08x\n", (unsigned long) wp));
-	FSHOW((stderr, "/value: 0x%08x\n", (unsigned long) value));
-	*/
-
 	if (is_lisp_pointer(value) && from_space_p(value)) {
 	    /* Now, we need to check whether the object has been forwarded. If
 	     * it has been, the weak pointer is still good and needs to be
@@ -3523,7 +3523,6 @@ void scan_weak_pointers(void)
 		wp->value = first_pointer[1];
 	    } else {
 		/* Break it. */
-		SHOW("broken");
 		wp->value = NIL;
 		wp->broken = T;
 	    }
@@ -3538,21 +3537,27 @@ void scan_weak_pointers(void)
 static int
 scav_lose(lispobj *where, lispobj object)
 {
-    lose("no scavenge function for object 0x%08x", (unsigned long) object);
+    lose("no scavenge function for object 0x%08x (widetag 0x%x)",
+	 (unsigned long)object,
+	 widetag_of(*(lispobj*)native_pointer(object)));
     return 0; /* bogus return value to satisfy static type checking */
 }
 
 static lispobj
 trans_lose(lispobj object)
 {
-    lose("no transport function for object 0x%08x", (unsigned long) object);
+    lose("no transport function for object 0x%08x (widetag 0x%x)",
+	 (unsigned long)object,
+	 widetag_of(*(lispobj*)native_pointer(object)));
     return NIL; /* bogus return value to satisfy static type checking */
 }
 
 static int
 size_lose(lispobj *where)
 {
-    lose("no size function for object at 0x%08x", (unsigned long) where);
+    lose("no size function for object at 0x%08x (widetag 0x%x)",
+	 (unsigned long)where,
+	 widetag_of(where));
     return 1; /* bogus return value to satisfy static type checking */
 }
 
@@ -3566,10 +3571,12 @@ gc_init_tables(void)
 	scavtab[i] = scav_lose;
     }
 
-    /* For each type which can be selected by the low 3 bits of the tag
-     * alone, set multiple entries in our 8-bit scavenge table (one for each
-     * possible value of the high 5 bits). */
-    for (i = 0; i < 32; i++) { /* FIXME: bare constant length, ick! */
+    /* For each type which can be selected by the lowtag alone, set
+     * multiple entries in our widetag scavenge table (one for each
+     * possible value of the high bits).
+     *
+     * FIXME: bare constant 32 and 3 here, ick! */
+    for (i = 0; i < 32; i++) {
 	scavtab[EVEN_FIXNUM_LOWTAG|(i<<3)] = scav_immediate;
 	scavtab[FUN_POINTER_LOWTAG|(i<<3)] = scav_fun_pointer;
 	/* skipping OTHER_IMMEDIATE_0_LOWTAG */
@@ -3580,157 +3587,183 @@ gc_init_tables(void)
 	scavtab[OTHER_POINTER_LOWTAG|(i<<3)] = scav_other_pointer;
     }
 
-    /* Other-pointer types (those selected by all eight bits of the tag) get
-     * one entry each in the scavenge table. */
-    scavtab[type_Bignum] = scav_unboxed;
-    scavtab[type_Ratio] = scav_boxed;
-    scavtab[type_SingleFloat] = scav_unboxed;
-    scavtab[type_DoubleFloat] = scav_unboxed;
-#ifdef type_LongFloat
-    scavtab[type_LongFloat] = scav_unboxed;
+    /* Other-pointer types (those selected by all eight bits of the
+     * tag) get one entry each in the scavenge table. */
+    scavtab[BIGNUM_WIDETAG] = scav_unboxed;
+    scavtab[RATIO_WIDETAG] = scav_boxed;
+    scavtab[SINGLE_FLOAT_WIDETAG] = scav_unboxed;
+    scavtab[DOUBLE_FLOAT_WIDETAG] = scav_unboxed;
+#ifdef LONG_FLOAT_WIDETAG
+    scavtab[LONG_FLOAT_WIDETAG] = scav_unboxed;
 #endif
-    scavtab[type_Complex] = scav_boxed;
-#ifdef type_ComplexSingleFloat
-    scavtab[type_ComplexSingleFloat] = scav_unboxed;
+    scavtab[COMPLEX_WIDETAG] = scav_boxed;
+#ifdef COMPLEX_SINGLE_FLOAT_WIDETAG
+    scavtab[COMPLEX_SINGLE_FLOAT_WIDETAG] = scav_unboxed;
 #endif
-#ifdef type_ComplexDoubleFloat
-    scavtab[type_ComplexDoubleFloat] = scav_unboxed;
+#ifdef COMPLEX_DOUBLE_FLOAT_WIDETAG
+    scavtab[COMPLEX_DOUBLE_FLOAT_WIDETAG] = scav_unboxed;
 #endif
-#ifdef type_ComplexLongFloat
-    scavtab[type_ComplexLongFloat] = scav_unboxed;
+#ifdef COMPLEX_LONG_FLOAT_WIDETAG
+    scavtab[COMPLEX_LONG_FLOAT_WIDETAG] = scav_unboxed;
 #endif
-    scavtab[type_SimpleArray] = scav_boxed;
-    scavtab[type_SimpleString] = scav_string;
-    scavtab[type_SimpleBitVector] = scav_vector_bit;
-    scavtab[type_SimpleVector] = scav_vector;
-    scavtab[type_SimpleArrayUnsignedByte2] = scav_vector_unsigned_byte_2;
-    scavtab[type_SimpleArrayUnsignedByte4] = scav_vector_unsigned_byte_4;
-    scavtab[type_SimpleArrayUnsignedByte8] = scav_vector_unsigned_byte_8;
-    scavtab[type_SimpleArrayUnsignedByte16] = scav_vector_unsigned_byte_16;
-    scavtab[type_SimpleArrayUnsignedByte32] = scav_vector_unsigned_byte_32;
-#ifdef type_SimpleArraySignedByte8
-    scavtab[type_SimpleArraySignedByte8] = scav_vector_unsigned_byte_8;
+    scavtab[SIMPLE_ARRAY_WIDETAG] = scav_boxed;
+    scavtab[SIMPLE_STRING_WIDETAG] = scav_string;
+    scavtab[SIMPLE_BIT_VECTOR_WIDETAG] = scav_vector_bit;
+    scavtab[SIMPLE_VECTOR_WIDETAG] = scav_vector;
+    scavtab[SIMPLE_ARRAY_UNSIGNED_BYTE_2_WIDETAG] =
+	scav_vector_unsigned_byte_2;
+    scavtab[SIMPLE_ARRAY_UNSIGNED_BYTE_4_WIDETAG] =
+	scav_vector_unsigned_byte_4;
+    scavtab[SIMPLE_ARRAY_UNSIGNED_BYTE_8_WIDETAG] =
+	scav_vector_unsigned_byte_8;
+    scavtab[SIMPLE_ARRAY_UNSIGNED_BYTE_16_WIDETAG] =
+	scav_vector_unsigned_byte_16;
+    scavtab[SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG] =
+	scav_vector_unsigned_byte_32;
+#ifdef SIMPLE_ARRAY_SIGNED_BYTE_8_WIDETAG
+    scavtab[SIMPLE_ARRAY_SIGNED_BYTE_8_WIDETAG] = scav_vector_unsigned_byte_8;
 #endif
-#ifdef type_SimpleArraySignedByte16
-    scavtab[type_SimpleArraySignedByte16] = scav_vector_unsigned_byte_16;
+#ifdef SIMPLE_ARRAY_SIGNED_BYTE_16_WIDETAG
+    scavtab[SIMPLE_ARRAY_SIGNED_BYTE_16_WIDETAG] =
+	scav_vector_unsigned_byte_16;
 #endif
-#ifdef type_SimpleArraySignedByte30
-    scavtab[type_SimpleArraySignedByte30] = scav_vector_unsigned_byte_32;
+#ifdef SIMPLE_ARRAY_SIGNED_BYTE_30_WIDETAG
+    scavtab[SIMPLE_ARRAY_SIGNED_BYTE_30_WIDETAG] =
+	scav_vector_unsigned_byte_32;
 #endif
-#ifdef type_SimpleArraySignedByte32
-    scavtab[type_SimpleArraySignedByte32] = scav_vector_unsigned_byte_32;
+#ifdef SIMPLE_ARRAY_SIGNED_BYTE_32_WIDETAG
+    scavtab[SIMPLE_ARRAY_SIGNED_BYTE_32_WIDETAG] =
+	scav_vector_unsigned_byte_32;
 #endif
-    scavtab[type_SimpleArraySingleFloat] = scav_vector_single_float;
-    scavtab[type_SimpleArrayDoubleFloat] = scav_vector_double_float;
-#ifdef type_SimpleArrayLongFloat
-    scavtab[type_SimpleArrayLongFloat] = scav_vector_long_float;
+    scavtab[SIMPLE_ARRAY_SINGLE_FLOAT_WIDETAG] = scav_vector_single_float;
+    scavtab[SIMPLE_ARRAY_DOUBLE_FLOAT_WIDETAG] = scav_vector_double_float;
+#ifdef SIMPLE_ARRAY_LONG_FLOAT_WIDETAG
+    scavtab[SIMPLE_ARRAY_LONG_FLOAT_WIDETAG] = scav_vector_long_float;
 #endif
-#ifdef type_SimpleArrayComplexSingleFloat
-    scavtab[type_SimpleArrayComplexSingleFloat] = scav_vector_complex_single_float;
+#ifdef SIMPLE_ARRAY_COMPLEX_SINGLE_FLOAT_WIDETAG
+    scavtab[SIMPLE_ARRAY_COMPLEX_SINGLE_FLOAT_WIDETAG] =
+	scav_vector_complex_single_float;
 #endif
-#ifdef type_SimpleArrayComplexDoubleFloat
-    scavtab[type_SimpleArrayComplexDoubleFloat] = scav_vector_complex_double_float;
+#ifdef SIMPLE_ARRAY_COMPLEX_DOUBLE_FLOAT_WIDETAG
+    scavtab[SIMPLE_ARRAY_COMPLEX_DOUBLE_FLOAT_WIDETAG] =
+	scav_vector_complex_double_float;
 #endif
-#ifdef type_SimpleArrayComplexLongFloat
-    scavtab[type_SimpleArrayComplexLongFloat] = scav_vector_complex_long_float;
+#ifdef SIMPLE_ARRAY_COMPLEX_LONG_FLOAT_WIDETAG
+    scavtab[SIMPLE_ARRAY_COMPLEX_LONG_FLOAT_WIDETAG] =
+	scav_vector_complex_long_float;
 #endif
-    scavtab[type_ComplexString] = scav_boxed;
-    scavtab[type_ComplexBitVector] = scav_boxed;
-    scavtab[type_ComplexVector] = scav_boxed;
-    scavtab[type_ComplexArray] = scav_boxed;
-    scavtab[type_CodeHeader] = scav_code_header;
-    /*scavtab[type_SimpleFunHeader] = scav_fun_header;*/
-    /*scavtab[type_ClosureFunHeader] = scav_fun_header;*/
-    /*scavtab[type_ReturnPcHeader] = scav_return_pc_header;*/
+    scavtab[COMPLEX_STRING_WIDETAG] = scav_boxed;
+    scavtab[COMPLEX_BIT_VECTOR_WIDETAG] = scav_boxed;
+    scavtab[COMPLEX_VECTOR_WIDETAG] = scav_boxed;
+    scavtab[COMPLEX_ARRAY_WIDETAG] = scav_boxed;
+    scavtab[CODE_HEADER_WIDETAG] = scav_code_header;
+    /*scavtab[SIMPLE_FUN_HEADER_WIDETAG] = scav_fun_header;*/
+    /*scavtab[CLOSURE_FUN_HEADER_WIDETAG] = scav_fun_header;*/
+    /*scavtab[RETURN_PC_HEADER_WIDETAG] = scav_return_pc_header;*/
 #ifdef __i386__
-    scavtab[type_ClosureHeader] = scav_closure_header;
-    scavtab[type_FuncallableInstanceHeader] = scav_closure_header;
+    scavtab[CLOSURE_HEADER_WIDETAG] = scav_closure_header;
+    scavtab[FUNCALLABLE_INSTANCE_HEADER_WIDETAG] = scav_closure_header;
 #else
-    scavtab[type_ClosureHeader] = scav_boxed;
-    scavtab[type_FuncallableInstanceHeader] = scav_boxed;
+    scavtab[CLOSURE_HEADER_WIDETAG] = scav_boxed;
+    scavtab[FUNCALLABLE_INSTANCE_HEADER_WIDETAG] = scav_boxed;
 #endif
-    scavtab[type_ValueCellHeader] = scav_boxed;
-    scavtab[type_SymbolHeader] = scav_boxed;
-    scavtab[type_BaseChar] = scav_immediate;
-    scavtab[type_Sap] = scav_unboxed;
-    scavtab[type_UnboundMarker] = scav_immediate;
-    scavtab[type_WeakPointer] = scav_weak_pointer;
-    scavtab[type_InstanceHeader] = scav_boxed;
-    scavtab[type_Fdefn] = scav_fdefn;
+    scavtab[VALUE_CELL_HEADER_WIDETAG] = scav_boxed;
+    scavtab[SYMBOL_HEADER_WIDETAG] = scav_boxed;
+    scavtab[BASE_CHAR_WIDETAG] = scav_immediate;
+    scavtab[SAP_WIDETAG] = scav_unboxed;
+    scavtab[UNBOUND_MARKER_WIDETAG] = scav_immediate;
+    scavtab[WEAK_POINTER_WIDETAG] = scav_weak_pointer;
+    scavtab[INSTANCE_HEADER_WIDETAG] = scav_boxed;
+    scavtab[FDEFN_WIDETAG] = scav_fdefn;
 
     /* transport other table, initialized same way as scavtab */
     for (i = 0; i < 256; i++)
 	transother[i] = trans_lose;
-    transother[type_Bignum] = trans_unboxed;
-    transother[type_Ratio] = trans_boxed;
-    transother[type_SingleFloat] = trans_unboxed;
-    transother[type_DoubleFloat] = trans_unboxed;
-#ifdef type_LongFloat
-    transother[type_LongFloat] = trans_unboxed;
+    transother[BIGNUM_WIDETAG] = trans_unboxed;
+    transother[RATIO_WIDETAG] = trans_boxed;
+    transother[SINGLE_FLOAT_WIDETAG] = trans_unboxed;
+    transother[DOUBLE_FLOAT_WIDETAG] = trans_unboxed;
+#ifdef LONG_FLOAT_WIDETAG
+    transother[LONG_FLOAT_WIDETAG] = trans_unboxed;
 #endif
-    transother[type_Complex] = trans_boxed;
-#ifdef type_ComplexSingleFloat
-    transother[type_ComplexSingleFloat] = trans_unboxed;
+    transother[COMPLEX_WIDETAG] = trans_boxed;
+#ifdef COMPLEX_SINGLE_FLOAT_WIDETAG
+    transother[COMPLEX_SINGLE_FLOAT_WIDETAG] = trans_unboxed;
 #endif
-#ifdef type_ComplexDoubleFloat
-    transother[type_ComplexDoubleFloat] = trans_unboxed;
+#ifdef COMPLEX_DOUBLE_FLOAT_WIDETAG
+    transother[COMPLEX_DOUBLE_FLOAT_WIDETAG] = trans_unboxed;
 #endif
-#ifdef type_ComplexLongFloat
-    transother[type_ComplexLongFloat] = trans_unboxed;
+#ifdef COMPLEX_LONG_FLOAT_WIDETAG
+    transother[COMPLEX_LONG_FLOAT_WIDETAG] = trans_unboxed;
 #endif
-    transother[type_SimpleArray] = trans_boxed_large;
-    transother[type_SimpleString] = trans_string;
-    transother[type_SimpleBitVector] = trans_vector_bit;
-    transother[type_SimpleVector] = trans_vector;
-    transother[type_SimpleArrayUnsignedByte2] = trans_vector_unsigned_byte_2;
-    transother[type_SimpleArrayUnsignedByte4] = trans_vector_unsigned_byte_4;
-    transother[type_SimpleArrayUnsignedByte8] = trans_vector_unsigned_byte_8;
-    transother[type_SimpleArrayUnsignedByte16] = trans_vector_unsigned_byte_16;
-    transother[type_SimpleArrayUnsignedByte32] = trans_vector_unsigned_byte_32;
-#ifdef type_SimpleArraySignedByte8
-    transother[type_SimpleArraySignedByte8] = trans_vector_unsigned_byte_8;
+    transother[SIMPLE_ARRAY_WIDETAG] = trans_boxed_large;
+    transother[SIMPLE_STRING_WIDETAG] = trans_string;
+    transother[SIMPLE_BIT_VECTOR_WIDETAG] = trans_vector_bit;
+    transother[SIMPLE_VECTOR_WIDETAG] = trans_vector;
+    transother[SIMPLE_ARRAY_UNSIGNED_BYTE_2_WIDETAG] =
+	trans_vector_unsigned_byte_2;
+    transother[SIMPLE_ARRAY_UNSIGNED_BYTE_4_WIDETAG] =
+	trans_vector_unsigned_byte_4;
+    transother[SIMPLE_ARRAY_UNSIGNED_BYTE_8_WIDETAG] =
+	trans_vector_unsigned_byte_8;
+    transother[SIMPLE_ARRAY_UNSIGNED_BYTE_16_WIDETAG] =
+	trans_vector_unsigned_byte_16;
+    transother[SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG] =
+	trans_vector_unsigned_byte_32;
+#ifdef SIMPLE_ARRAY_SIGNED_BYTE_8_WIDETAG
+    transother[SIMPLE_ARRAY_SIGNED_BYTE_8_WIDETAG] =
+	trans_vector_unsigned_byte_8;
 #endif
-#ifdef type_SimpleArraySignedByte16
-    transother[type_SimpleArraySignedByte16] = trans_vector_unsigned_byte_16;
+#ifdef SIMPLE_ARRAY_SIGNED_BYTE_16_WIDETAG
+    transother[SIMPLE_ARRAY_SIGNED_BYTE_16_WIDETAG] =
+	trans_vector_unsigned_byte_16;
 #endif
-#ifdef type_SimpleArraySignedByte30
-    transother[type_SimpleArraySignedByte30] = trans_vector_unsigned_byte_32;
+#ifdef SIMPLE_ARRAY_SIGNED_BYTE_30_WIDETAG
+    transother[SIMPLE_ARRAY_SIGNED_BYTE_30_WIDETAG] =
+	trans_vector_unsigned_byte_32;
 #endif
-#ifdef type_SimpleArraySignedByte32
-    transother[type_SimpleArraySignedByte32] = trans_vector_unsigned_byte_32;
+#ifdef SIMPLE_ARRAY_SIGNED_BYTE_32_WIDETAG
+    transother[SIMPLE_ARRAY_SIGNED_BYTE_32_WIDETAG] =
+	trans_vector_unsigned_byte_32;
 #endif
-    transother[type_SimpleArraySingleFloat] = trans_vector_single_float;
-    transother[type_SimpleArrayDoubleFloat] = trans_vector_double_float;
-#ifdef type_SimpleArrayLongFloat
-    transother[type_SimpleArrayLongFloat] = trans_vector_long_float;
+    transother[SIMPLE_ARRAY_SINGLE_FLOAT_WIDETAG] =
+	trans_vector_single_float;
+    transother[SIMPLE_ARRAY_DOUBLE_FLOAT_WIDETAG] =
+	trans_vector_double_float;
+#ifdef SIMPLE_ARRAY_LONG_FLOAT_WIDETAG
+    transother[SIMPLE_ARRAY_LONG_FLOAT_WIDETAG] =
+	trans_vector_long_float;
 #endif
-#ifdef type_SimpleArrayComplexSingleFloat
-    transother[type_SimpleArrayComplexSingleFloat] = trans_vector_complex_single_float;
+#ifdef SIMPLE_ARRAY_COMPLEX_SINGLE_FLOAT_WIDETAG
+    transother[SIMPLE_ARRAY_COMPLEX_SINGLE_FLOAT_WIDETAG] =
+	trans_vector_complex_single_float;
 #endif
-#ifdef type_SimpleArrayComplexDoubleFloat
-    transother[type_SimpleArrayComplexDoubleFloat] = trans_vector_complex_double_float;
+#ifdef SIMPLE_ARRAY_COMPLEX_DOUBLE_FLOAT_WIDETAG
+    transother[SIMPLE_ARRAY_COMPLEX_DOUBLE_FLOAT_WIDETAG] =
+	trans_vector_complex_double_float;
 #endif
-#ifdef type_SimpleArrayComplexLongFloat
-    transother[type_SimpleArrayComplexLongFloat] = trans_vector_complex_long_float;
+#ifdef SIMPLE_ARRAY_COMPLEX_LONG_FLOAT_WIDETAG
+    transother[SIMPLE_ARRAY_COMPLEX_LONG_FLOAT_WIDETAG] =
+	trans_vector_complex_long_float;
 #endif
-    transother[type_ComplexString] = trans_boxed;
-    transother[type_ComplexBitVector] = trans_boxed;
-    transother[type_ComplexVector] = trans_boxed;
-    transother[type_ComplexArray] = trans_boxed;
-    transother[type_CodeHeader] = trans_code_header;
-    transother[type_SimpleFunHeader] = trans_fun_header;
-    transother[type_ClosureFunHeader] = trans_fun_header;
-    transother[type_ReturnPcHeader] = trans_return_pc_header;
-    transother[type_ClosureHeader] = trans_boxed;
-    transother[type_FuncallableInstanceHeader] = trans_boxed;
-    transother[type_ValueCellHeader] = trans_boxed;
-    transother[type_SymbolHeader] = trans_boxed;
-    transother[type_BaseChar] = trans_immediate;
-    transother[type_Sap] = trans_unboxed;
-    transother[type_UnboundMarker] = trans_immediate;
-    transother[type_WeakPointer] = trans_weak_pointer;
-    transother[type_InstanceHeader] = trans_boxed;
-    transother[type_Fdefn] = trans_boxed;
+    transother[COMPLEX_STRING_WIDETAG] = trans_boxed;
+    transother[COMPLEX_BIT_VECTOR_WIDETAG] = trans_boxed;
+    transother[COMPLEX_VECTOR_WIDETAG] = trans_boxed;
+    transother[COMPLEX_ARRAY_WIDETAG] = trans_boxed;
+    transother[CODE_HEADER_WIDETAG] = trans_code_header;
+    transother[SIMPLE_FUN_HEADER_WIDETAG] = trans_fun_header;
+    transother[CLOSURE_FUN_HEADER_WIDETAG] = trans_fun_header;
+    transother[RETURN_PC_HEADER_WIDETAG] = trans_return_pc_header;
+    transother[CLOSURE_HEADER_WIDETAG] = trans_boxed;
+    transother[FUNCALLABLE_INSTANCE_HEADER_WIDETAG] = trans_boxed;
+    transother[VALUE_CELL_HEADER_WIDETAG] = trans_boxed;
+    transother[SYMBOL_HEADER_WIDETAG] = trans_boxed;
+    transother[BASE_CHAR_WIDETAG] = trans_immediate;
+    transother[SAP_WIDETAG] = trans_unboxed;
+    transother[UNBOUND_MARKER_WIDETAG] = trans_immediate;
+    transother[WEAK_POINTER_WIDETAG] = trans_weak_pointer;
+    transother[INSTANCE_HEADER_WIDETAG] = trans_boxed;
+    transother[FDEFN_WIDETAG] = trans_boxed;
 
     /* size table, initialized the same way as scavtab */
     for (i = 0; i < 256; i++)
@@ -3745,79 +3778,90 @@ gc_init_tables(void)
 	/* skipping OTHER_IMMEDIATE_1_LOWTAG */
 	sizetab[OTHER_POINTER_LOWTAG|(i<<3)] = size_pointer;
     }
-    sizetab[type_Bignum] = size_unboxed;
-    sizetab[type_Ratio] = size_boxed;
-    sizetab[type_SingleFloat] = size_unboxed;
-    sizetab[type_DoubleFloat] = size_unboxed;
-#ifdef type_LongFloat
-    sizetab[type_LongFloat] = size_unboxed;
+    sizetab[BIGNUM_WIDETAG] = size_unboxed;
+    sizetab[RATIO_WIDETAG] = size_boxed;
+    sizetab[SINGLE_FLOAT_WIDETAG] = size_unboxed;
+    sizetab[DOUBLE_FLOAT_WIDETAG] = size_unboxed;
+#ifdef LONG_FLOAT_WIDETAG
+    sizetab[LONG_FLOAT_WIDETAG] = size_unboxed;
 #endif
-    sizetab[type_Complex] = size_boxed;
-#ifdef type_ComplexSingleFloat
-    sizetab[type_ComplexSingleFloat] = size_unboxed;
+    sizetab[COMPLEX_WIDETAG] = size_boxed;
+#ifdef COMPLEX_SINGLE_FLOAT_WIDETAG
+    sizetab[COMPLEX_SINGLE_FLOAT_WIDETAG] = size_unboxed;
 #endif
-#ifdef type_ComplexDoubleFloat
-    sizetab[type_ComplexDoubleFloat] = size_unboxed;
+#ifdef COMPLEX_DOUBLE_FLOAT_WIDETAG
+    sizetab[COMPLEX_DOUBLE_FLOAT_WIDETAG] = size_unboxed;
 #endif
-#ifdef type_ComplexLongFloat
-    sizetab[type_ComplexLongFloat] = size_unboxed;
+#ifdef COMPLEX_LONG_FLOAT_WIDETAG
+    sizetab[COMPLEX_LONG_FLOAT_WIDETAG] = size_unboxed;
 #endif
-    sizetab[type_SimpleArray] = size_boxed;
-    sizetab[type_SimpleString] = size_string;
-    sizetab[type_SimpleBitVector] = size_vector_bit;
-    sizetab[type_SimpleVector] = size_vector;
-    sizetab[type_SimpleArrayUnsignedByte2] = size_vector_unsigned_byte_2;
-    sizetab[type_SimpleArrayUnsignedByte4] = size_vector_unsigned_byte_4;
-    sizetab[type_SimpleArrayUnsignedByte8] = size_vector_unsigned_byte_8;
-    sizetab[type_SimpleArrayUnsignedByte16] = size_vector_unsigned_byte_16;
-    sizetab[type_SimpleArrayUnsignedByte32] = size_vector_unsigned_byte_32;
-#ifdef type_SimpleArraySignedByte8
-    sizetab[type_SimpleArraySignedByte8] = size_vector_unsigned_byte_8;
+    sizetab[SIMPLE_ARRAY_WIDETAG] = size_boxed;
+    sizetab[SIMPLE_STRING_WIDETAG] = size_string;
+    sizetab[SIMPLE_BIT_VECTOR_WIDETAG] = size_vector_bit;
+    sizetab[SIMPLE_VECTOR_WIDETAG] = size_vector;
+    sizetab[SIMPLE_ARRAY_UNSIGNED_BYTE_2_WIDETAG] =
+	size_vector_unsigned_byte_2;
+    sizetab[SIMPLE_ARRAY_UNSIGNED_BYTE_4_WIDETAG] =
+	size_vector_unsigned_byte_4;
+    sizetab[SIMPLE_ARRAY_UNSIGNED_BYTE_8_WIDETAG] =
+	size_vector_unsigned_byte_8;
+    sizetab[SIMPLE_ARRAY_UNSIGNED_BYTE_16_WIDETAG] =
+	size_vector_unsigned_byte_16;
+    sizetab[SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG] =
+	size_vector_unsigned_byte_32;
+#ifdef SIMPLE_ARRAY_SIGNED_BYTE_8_WIDETAG
+    sizetab[SIMPLE_ARRAY_SIGNED_BYTE_8_WIDETAG] = size_vector_unsigned_byte_8;
 #endif
-#ifdef type_SimpleArraySignedByte16
-    sizetab[type_SimpleArraySignedByte16] = size_vector_unsigned_byte_16;
+#ifdef SIMPLE_ARRAY_SIGNED_BYTE_16_WIDETAG
+    sizetab[SIMPLE_ARRAY_SIGNED_BYTE_16_WIDETAG] =
+	size_vector_unsigned_byte_16;
 #endif
-#ifdef type_SimpleArraySignedByte30
-    sizetab[type_SimpleArraySignedByte30] = size_vector_unsigned_byte_32;
+#ifdef SIMPLE_ARRAY_SIGNED_BYTE_30_WIDETAG
+    sizetab[SIMPLE_ARRAY_SIGNED_BYTE_30_WIDETAG] =
+	size_vector_unsigned_byte_32;
 #endif
-#ifdef type_SimpleArraySignedByte32
-    sizetab[type_SimpleArraySignedByte32] = size_vector_unsigned_byte_32;
+#ifdef SIMPLE_ARRAY_SIGNED_BYTE_32_WIDETAG
+    sizetab[SIMPLE_ARRAY_SIGNED_BYTE_32_WIDETAG] =
+	size_vector_unsigned_byte_32;
 #endif
-    sizetab[type_SimpleArraySingleFloat] = size_vector_single_float;
-    sizetab[type_SimpleArrayDoubleFloat] = size_vector_double_float;
-#ifdef type_SimpleArrayLongFloat
-    sizetab[type_SimpleArrayLongFloat] = size_vector_long_float;
+    sizetab[SIMPLE_ARRAY_SINGLE_FLOAT_WIDETAG] = size_vector_single_float;
+    sizetab[SIMPLE_ARRAY_DOUBLE_FLOAT_WIDETAG] = size_vector_double_float;
+#ifdef SIMPLE_ARRAY_LONG_FLOAT_WIDETAG
+    sizetab[SIMPLE_ARRAY_LONG_FLOAT_WIDETAG] = size_vector_long_float;
 #endif
-#ifdef type_SimpleArrayComplexSingleFloat
-    sizetab[type_SimpleArrayComplexSingleFloat] = size_vector_complex_single_float;
+#ifdef SIMPLE_ARRAY_COMPLEX_SINGLE_FLOAT_WIDETAG
+    sizetab[SIMPLE_ARRAY_COMPLEX_SINGLE_FLOAT_WIDETAG] =
+	size_vector_complex_single_float;
 #endif
-#ifdef type_SimpleArrayComplexDoubleFloat
-    sizetab[type_SimpleArrayComplexDoubleFloat] = size_vector_complex_double_float;
+#ifdef SIMPLE_ARRAY_COMPLEX_DOUBLE_FLOAT_WIDETAG
+    sizetab[SIMPLE_ARRAY_COMPLEX_DOUBLE_FLOAT_WIDETAG] =
+	size_vector_complex_double_float;
 #endif
-#ifdef type_SimpleArrayComplexLongFloat
-    sizetab[type_SimpleArrayComplexLongFloat] = size_vector_complex_long_float;
+#ifdef SIMPLE_ARRAY_COMPLEX_LONG_FLOAT_WIDETAG
+    sizetab[SIMPLE_ARRAY_COMPLEX_LONG_FLOAT_WIDETAG] =
+	size_vector_complex_long_float;
 #endif
-    sizetab[type_ComplexString] = size_boxed;
-    sizetab[type_ComplexBitVector] = size_boxed;
-    sizetab[type_ComplexVector] = size_boxed;
-    sizetab[type_ComplexArray] = size_boxed;
-    sizetab[type_CodeHeader] = size_code_header;
+    sizetab[COMPLEX_STRING_WIDETAG] = size_boxed;
+    sizetab[COMPLEX_BIT_VECTOR_WIDETAG] = size_boxed;
+    sizetab[COMPLEX_VECTOR_WIDETAG] = size_boxed;
+    sizetab[COMPLEX_ARRAY_WIDETAG] = size_boxed;
+    sizetab[CODE_HEADER_WIDETAG] = size_code_header;
 #if 0
     /* We shouldn't see these, so just lose if it happens. */
-    sizetab[type_SimpleFunHeader] = size_function_header;
-    sizetab[type_ClosureFunHeader] = size_function_header;
-    sizetab[type_ReturnPcHeader] = size_return_pc_header;
+    sizetab[SIMPLE_FUN_HEADER_WIDETAG] = size_function_header;
+    sizetab[CLOSURE_FUN_HEADER_WIDETAG] = size_function_header;
+    sizetab[RETURN_PC_HEADER_WIDETAG] = size_return_pc_header;
 #endif
-    sizetab[type_ClosureHeader] = size_boxed;
-    sizetab[type_FuncallableInstanceHeader] = size_boxed;
-    sizetab[type_ValueCellHeader] = size_boxed;
-    sizetab[type_SymbolHeader] = size_boxed;
-    sizetab[type_BaseChar] = size_immediate;
-    sizetab[type_Sap] = size_unboxed;
-    sizetab[type_UnboundMarker] = size_immediate;
-    sizetab[type_WeakPointer] = size_weak_pointer;
-    sizetab[type_InstanceHeader] = size_boxed;
-    sizetab[type_Fdefn] = size_boxed;
+    sizetab[CLOSURE_HEADER_WIDETAG] = size_boxed;
+    sizetab[FUNCALLABLE_INSTANCE_HEADER_WIDETAG] = size_boxed;
+    sizetab[VALUE_CELL_HEADER_WIDETAG] = size_boxed;
+    sizetab[SYMBOL_HEADER_WIDETAG] = size_boxed;
+    sizetab[BASE_CHAR_WIDETAG] = size_immediate;
+    sizetab[SAP_WIDETAG] = size_unboxed;
+    sizetab[UNBOUND_MARKER_WIDETAG] = size_immediate;
+    sizetab[WEAK_POINTER_WIDETAG] = size_weak_pointer;
+    sizetab[INSTANCE_HEADER_WIDETAG] = size_boxed;
+    sizetab[FDEFN_WIDETAG] = size_boxed;
 }
 
 /* Scan an area looking for an object which encloses the given pointer.
@@ -3832,11 +3876,11 @@ search_space(lispobj *start, size_t words, lispobj *pointer)
 	/* If thing is an immediate then this is a cons. */
 	if (is_lisp_pointer(thing)
 	    || ((thing & 3) == 0) /* fixnum */
-	    || (TypeOf(thing) == type_BaseChar)
-	    || (TypeOf(thing) == type_UnboundMarker))
+	    || (widetag_of(thing) == BASE_CHAR_WIDETAG)
+	    || (widetag_of(thing) == UNBOUND_MARKER_WIDETAG))
 	    count = 2;
 	else
-	    count = (sizetab[TypeOf(thing)])(start);
+	    count = (sizetab[widetag_of(thing)])(start);
 
 	/* Check whether the pointer is within this object. */
 	if ((pointer >= start) && (pointer < (start+count))) {
@@ -3906,7 +3950,7 @@ possibly_valid_dynamic_space_pointer(lispobj *pointer)
     /* We need to allow raw pointers into Code objects for return
      * addresses. This will also pick up pointers to functions in code
      * objects. */
-    if (TypeOf(*start_addr) == type_CodeHeader) {
+    if (widetag_of(*start_addr) == CODE_HEADER_WIDETAG) {
 	/* XXX could do some further checks here */
 	return 1;
     }
@@ -3934,16 +3978,16 @@ possibly_valid_dynamic_space_pointer(lispobj *pointer)
      *       recording the result of the last call to allocate-lisp-memory,
      *       and returning true from this function when *pointer is
      *       a reference to that result. */
-    switch (lowtagof((lispobj)pointer)) {
+    switch (lowtag_of((lispobj)pointer)) {
     case FUN_POINTER_LOWTAG:
 	/* Start_addr should be the enclosing code object, or a closure
 	 * header. */
-	switch (TypeOf(*start_addr)) {
-	case type_CodeHeader:
+	switch (widetag_of(*start_addr)) {
+	case CODE_HEADER_WIDETAG:
 	    /* This case is probably caught above. */
 	    break;
-	case type_ClosureHeader:
-	case type_FuncallableInstanceHeader:
+	case CLOSURE_HEADER_WIDETAG:
+	case FUNCALLABLE_INSTANCE_HEADER_WIDETAG:
 	    if ((unsigned)pointer !=
 		((unsigned)start_addr+FUN_POINTER_LOWTAG)) {
 		if (gencgc_verbose)
@@ -3973,12 +4017,12 @@ possibly_valid_dynamic_space_pointer(lispobj *pointer)
 	/* Is it plausible cons? */
 	if ((is_lisp_pointer(start_addr[0])
 	    || ((start_addr[0] & 3) == 0) /* fixnum */
-	    || (TypeOf(start_addr[0]) == type_BaseChar)
-	    || (TypeOf(start_addr[0]) == type_UnboundMarker))
+	    || (widetag_of(start_addr[0]) == BASE_CHAR_WIDETAG)
+	    || (widetag_of(start_addr[0]) == UNBOUND_MARKER_WIDETAG))
 	   && (is_lisp_pointer(start_addr[1])
 	       || ((start_addr[1] & 3) == 0) /* fixnum */
-	       || (TypeOf(start_addr[1]) == type_BaseChar)
-	       || (TypeOf(start_addr[1]) == type_UnboundMarker)))
+	       || (widetag_of(start_addr[1]) == BASE_CHAR_WIDETAG)
+	       || (widetag_of(start_addr[1]) == UNBOUND_MARKER_WIDETAG)))
 	    break;
 	else {
 	    if (gencgc_verbose)
@@ -3996,7 +4040,7 @@ possibly_valid_dynamic_space_pointer(lispobj *pointer)
 		       pointer, start_addr, *start_addr));
 	    return 0;
 	}
-	if (TypeOf(start_addr[0]) != type_InstanceHeader) {
+	if (widetag_of(start_addr[0]) != INSTANCE_HEADER_WIDETAG) {
 	    if (gencgc_verbose)
 		FSHOW((stderr,
 		       "/Wi2: %x %x %x\n",
@@ -4021,9 +4065,9 @@ possibly_valid_dynamic_space_pointer(lispobj *pointer)
 		       pointer, start_addr, *start_addr));
 	    return 0;
 	}
-	switch (TypeOf(start_addr[0])) {
-	case type_UnboundMarker:
-	case type_BaseChar:
+	switch (widetag_of(start_addr[0])) {
+	case UNBOUND_MARKER_WIDETAG:
+	case BASE_CHAR_WIDETAG:
 	    if (gencgc_verbose)
 		FSHOW((stderr,
 		       "*Wo3: %x %x %x\n",
@@ -4031,15 +4075,15 @@ possibly_valid_dynamic_space_pointer(lispobj *pointer)
 	    return 0;
 
 	    /* only pointed to by function pointers? */
-	case type_ClosureHeader:
-	case type_FuncallableInstanceHeader:
+	case CLOSURE_HEADER_WIDETAG:
+	case FUNCALLABLE_INSTANCE_HEADER_WIDETAG:
 	    if (gencgc_verbose)
 		FSHOW((stderr,
 		       "*Wo4: %x %x %x\n",
 		       pointer, start_addr, *start_addr));
 	    return 0;
 
-	case type_InstanceHeader:
+	case INSTANCE_HEADER_WIDETAG:
 	    if (gencgc_verbose)
 		FSHOW((stderr,
 		       "*Wo5: %x %x %x\n",
@@ -4047,68 +4091,68 @@ possibly_valid_dynamic_space_pointer(lispobj *pointer)
 	    return 0;
 
 	    /* the valid other immediate pointer objects */
-	case type_SimpleVector:
-	case type_Ratio:
-	case type_Complex:
-#ifdef type_ComplexSingleFloat
-	case type_ComplexSingleFloat:
+	case SIMPLE_VECTOR_WIDETAG:
+	case RATIO_WIDETAG:
+	case COMPLEX_WIDETAG:
+#ifdef COMPLEX_SINGLE_FLOAT_WIDETAG
+	case COMPLEX_SINGLE_FLOAT_WIDETAG:
 #endif
-#ifdef type_ComplexDoubleFloat
-	case type_ComplexDoubleFloat:
+#ifdef COMPLEX_DOUBLE_FLOAT_WIDETAG
+	case COMPLEX_DOUBLE_FLOAT_WIDETAG:
 #endif
-#ifdef type_ComplexLongFloat
-	case type_ComplexLongFloat:
+#ifdef COMPLEX_LONG_FLOAT_WIDETAG
+	case COMPLEX_LONG_FLOAT_WIDETAG:
 #endif
-	case type_SimpleArray:
-	case type_ComplexString:
-	case type_ComplexBitVector:
-	case type_ComplexVector:
-	case type_ComplexArray:
-	case type_ValueCellHeader:
-	case type_SymbolHeader:
-	case type_Fdefn:
-	case type_CodeHeader:
-	case type_Bignum:
-	case type_SingleFloat:
-	case type_DoubleFloat:
-#ifdef type_LongFloat
-	case type_LongFloat:
+	case SIMPLE_ARRAY_WIDETAG:
+	case COMPLEX_STRING_WIDETAG:
+	case COMPLEX_BIT_VECTOR_WIDETAG:
+	case COMPLEX_VECTOR_WIDETAG:
+	case COMPLEX_ARRAY_WIDETAG:
+	case VALUE_CELL_HEADER_WIDETAG:
+	case SYMBOL_HEADER_WIDETAG:
+	case FDEFN_WIDETAG:
+	case CODE_HEADER_WIDETAG:
+	case BIGNUM_WIDETAG:
+	case SINGLE_FLOAT_WIDETAG:
+	case DOUBLE_FLOAT_WIDETAG:
+#ifdef LONG_FLOAT_WIDETAG
+	case LONG_FLOAT_WIDETAG:
 #endif
-	case type_SimpleString:
-	case type_SimpleBitVector:
-	case type_SimpleArrayUnsignedByte2:
-	case type_SimpleArrayUnsignedByte4:
-	case type_SimpleArrayUnsignedByte8:
-	case type_SimpleArrayUnsignedByte16:
-	case type_SimpleArrayUnsignedByte32:
-#ifdef type_SimpleArraySignedByte8
-	case type_SimpleArraySignedByte8:
+	case SIMPLE_STRING_WIDETAG:
+	case SIMPLE_BIT_VECTOR_WIDETAG:
+	case SIMPLE_ARRAY_UNSIGNED_BYTE_2_WIDETAG:
+	case SIMPLE_ARRAY_UNSIGNED_BYTE_4_WIDETAG:
+	case SIMPLE_ARRAY_UNSIGNED_BYTE_8_WIDETAG:
+	case SIMPLE_ARRAY_UNSIGNED_BYTE_16_WIDETAG:
+	case SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG:
+#ifdef SIMPLE_ARRAY_SIGNED_BYTE_8_WIDETAG
+	case SIMPLE_ARRAY_SIGNED_BYTE_8_WIDETAG:
 #endif
-#ifdef type_SimpleArraySignedByte16
-	case type_SimpleArraySignedByte16:
+#ifdef SIMPLE_ARRAY_SIGNED_BYTE_16_WIDETAG
+	case SIMPLE_ARRAY_SIGNED_BYTE_16_WIDETAG:
 #endif
-#ifdef type_SimpleArraySignedByte30
-	case type_SimpleArraySignedByte30:
+#ifdef SIMPLE_ARRAY_SIGNED_BYTE_30_WIDETAG
+	case SIMPLE_ARRAY_SIGNED_BYTE_30_WIDETAG:
 #endif
-#ifdef type_SimpleArraySignedByte32
-	case type_SimpleArraySignedByte32:
+#ifdef SIMPLE_ARRAY_SIGNED_BYTE_32_WIDETAG
+	case SIMPLE_ARRAY_SIGNED_BYTE_32_WIDETAG:
 #endif
-	case type_SimpleArraySingleFloat:
-	case type_SimpleArrayDoubleFloat:
-#ifdef type_SimpleArrayLongFloat
-	case type_SimpleArrayLongFloat:
+	case SIMPLE_ARRAY_SINGLE_FLOAT_WIDETAG:
+	case SIMPLE_ARRAY_DOUBLE_FLOAT_WIDETAG:
+#ifdef SIMPLE_ARRAY_LONG_FLOAT_WIDETAG
+	case SIMPLE_ARRAY_LONG_FLOAT_WIDETAG:
 #endif
-#ifdef type_SimpleArrayComplexSingleFloat
-	case type_SimpleArrayComplexSingleFloat:
+#ifdef SIMPLE_ARRAY_COMPLEX_SINGLE_FLOAT_WIDETAG
+	case SIMPLE_ARRAY_COMPLEX_SINGLE_FLOAT_WIDETAG:
 #endif
-#ifdef type_SimpleArrayComplexDoubleFloat
-	case type_SimpleArrayComplexDoubleFloat:
+#ifdef SIMPLE_ARRAY_COMPLEX_DOUBLE_FLOAT_WIDETAG
+	case SIMPLE_ARRAY_COMPLEX_DOUBLE_FLOAT_WIDETAG:
 #endif
-#ifdef type_SimpleArrayComplexLongFloat
-	case type_SimpleArrayComplexLongFloat:
+#ifdef SIMPLE_ARRAY_COMPLEX_LONG_FLOAT_WIDETAG
+	case SIMPLE_ARRAY_COMPLEX_LONG_FLOAT_WIDETAG:
 #endif
-	case type_Sap:
-	case type_WeakPointer:
+	case SAP_WIDETAG:
+	case WEAK_POINTER_WIDETAG:
 	    break;
 
 	default:
@@ -4152,43 +4196,43 @@ maybe_adjust_large_object(lispobj *where)
     int boxed;
 
     /* Check whether it's a vector or bignum object. */
-    switch (TypeOf(where[0])) {
-    case type_SimpleVector:
+    switch (widetag_of(where[0])) {
+    case SIMPLE_VECTOR_WIDETAG:
 	boxed = BOXED_PAGE;
 	break;
-    case type_Bignum:
-    case type_SimpleString:
-    case type_SimpleBitVector:
-    case type_SimpleArrayUnsignedByte2:
-    case type_SimpleArrayUnsignedByte4:
-    case type_SimpleArrayUnsignedByte8:
-    case type_SimpleArrayUnsignedByte16:
-    case type_SimpleArrayUnsignedByte32:
-#ifdef type_SimpleArraySignedByte8
-    case type_SimpleArraySignedByte8:
+    case BIGNUM_WIDETAG:
+    case SIMPLE_STRING_WIDETAG:
+    case SIMPLE_BIT_VECTOR_WIDETAG:
+    case SIMPLE_ARRAY_UNSIGNED_BYTE_2_WIDETAG:
+    case SIMPLE_ARRAY_UNSIGNED_BYTE_4_WIDETAG:
+    case SIMPLE_ARRAY_UNSIGNED_BYTE_8_WIDETAG:
+    case SIMPLE_ARRAY_UNSIGNED_BYTE_16_WIDETAG:
+    case SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG:
+#ifdef SIMPLE_ARRAY_SIGNED_BYTE_8_WIDETAG
+    case SIMPLE_ARRAY_SIGNED_BYTE_8_WIDETAG:
 #endif
-#ifdef type_SimpleArraySignedByte16
-    case type_SimpleArraySignedByte16:
+#ifdef SIMPLE_ARRAY_SIGNED_BYTE_16_WIDETAG
+    case SIMPLE_ARRAY_SIGNED_BYTE_16_WIDETAG:
 #endif
-#ifdef type_SimpleArraySignedByte30
-    case type_SimpleArraySignedByte30:
+#ifdef SIMPLE_ARRAY_SIGNED_BYTE_30_WIDETAG
+    case SIMPLE_ARRAY_SIGNED_BYTE_30_WIDETAG:
 #endif
-#ifdef type_SimpleArraySignedByte32
-    case type_SimpleArraySignedByte32:
+#ifdef SIMPLE_ARRAY_SIGNED_BYTE_32_WIDETAG
+    case SIMPLE_ARRAY_SIGNED_BYTE_32_WIDETAG:
 #endif
-    case type_SimpleArraySingleFloat:
-    case type_SimpleArrayDoubleFloat:
-#ifdef type_SimpleArrayLongFloat
-    case type_SimpleArrayLongFloat:
+    case SIMPLE_ARRAY_SINGLE_FLOAT_WIDETAG:
+    case SIMPLE_ARRAY_DOUBLE_FLOAT_WIDETAG:
+#ifdef SIMPLE_ARRAY_LONG_FLOAT_WIDETAG
+    case SIMPLE_ARRAY_LONG_FLOAT_WIDETAG:
 #endif
-#ifdef type_SimpleArrayComplexSingleFloat
-    case type_SimpleArrayComplexSingleFloat:
+#ifdef SIMPLE_ARRAY_COMPLEX_SINGLE_FLOAT_WIDETAG
+    case SIMPLE_ARRAY_COMPLEX_SINGLE_FLOAT_WIDETAG:
 #endif
-#ifdef type_SimpleArrayComplexDoubleFloat
-    case type_SimpleArrayComplexDoubleFloat:
+#ifdef SIMPLE_ARRAY_COMPLEX_DOUBLE_FLOAT_WIDETAG
+    case SIMPLE_ARRAY_COMPLEX_DOUBLE_FLOAT_WIDETAG:
 #endif
-#ifdef type_SimpleArrayComplexLongFloat
-    case type_SimpleArrayComplexLongFloat:
+#ifdef SIMPLE_ARRAY_COMPLEX_LONG_FLOAT_WIDETAG
+    case SIMPLE_ARRAY_COMPLEX_LONG_FLOAT_WIDETAG:
 #endif
 	boxed = UNBOXED_PAGE;
 	break;
@@ -4197,7 +4241,7 @@ maybe_adjust_large_object(lispobj *where)
     }
 
     /* Find its current size. */
-    nwords = (sizetab[TypeOf(where[0])])(where);
+    nwords = (sizetab[widetag_of(where[0])])(where);
 
     first_page = find_page_index((void *)where);
     gc_assert(first_page >= 0);
@@ -5046,29 +5090,29 @@ verify_space(lispobj *start, size_t words)
 	    if (thing & 0x3) { /* Skip fixnums. FIXME: There should be an
 				* is_fixnum for this. */
 
-		switch(TypeOf(*start)) {
+		switch(widetag_of(*start)) {
 
 		    /* boxed objects */
-		case type_SimpleVector:
-		case type_Ratio:
-		case type_Complex:
-		case type_SimpleArray:
-		case type_ComplexString:
-		case type_ComplexBitVector:
-		case type_ComplexVector:
-		case type_ComplexArray:
-		case type_ClosureHeader:
-		case type_FuncallableInstanceHeader:
-		case type_ValueCellHeader:
-		case type_SymbolHeader:
-		case type_BaseChar:
-		case type_UnboundMarker:
-		case type_InstanceHeader:
-		case type_Fdefn:
+		case SIMPLE_VECTOR_WIDETAG:
+		case RATIO_WIDETAG:
+		case COMPLEX_WIDETAG:
+		case SIMPLE_ARRAY_WIDETAG:
+		case COMPLEX_STRING_WIDETAG:
+		case COMPLEX_BIT_VECTOR_WIDETAG:
+		case COMPLEX_VECTOR_WIDETAG:
+		case COMPLEX_ARRAY_WIDETAG:
+		case CLOSURE_HEADER_WIDETAG:
+		case FUNCALLABLE_INSTANCE_HEADER_WIDETAG:
+		case VALUE_CELL_HEADER_WIDETAG:
+		case SYMBOL_HEADER_WIDETAG:
+		case BASE_CHAR_WIDETAG:
+		case UNBOUND_MARKER_WIDETAG:
+		case INSTANCE_HEADER_WIDETAG:
+		case FDEFN_WIDETAG:
 		    count = 1;
 		    break;
 
-		case type_CodeHeader:
+		case CODE_HEADER_WIDETAG:
 		    {
 			lispobj object = *start;
 			struct code *code;
@@ -5112,7 +5156,7 @@ verify_space(lispobj *start, size_t words)
 			while (fheaderl != NIL) {
 			    fheaderp =
 				(struct simple_fun *) native_pointer(fheaderl);
-			    gc_assert(TypeOf(fheaderp->header) == type_SimpleFunHeader);
+			    gc_assert(widetag_of(fheaderp->header) == SIMPLE_FUN_HEADER_WIDETAG);
 			    verify_space(&fheaderp->name, 1);
 			    verify_space(&fheaderp->arglist, 1);
 			    verify_space(&fheaderp->type, 1);
@@ -5123,57 +5167,57 @@ verify_space(lispobj *start, size_t words)
 		    }
 	
 		    /* unboxed objects */
-		case type_Bignum:
-		case type_SingleFloat:
-		case type_DoubleFloat:
-#ifdef type_ComplexLongFloat
-		case type_LongFloat:
+		case BIGNUM_WIDETAG:
+		case SINGLE_FLOAT_WIDETAG:
+		case DOUBLE_FLOAT_WIDETAG:
+#ifdef COMPLEX_LONG_FLOAT_WIDETAG
+		case LONG_FLOAT_WIDETAG:
 #endif
-#ifdef type_ComplexSingleFloat
-		case type_ComplexSingleFloat:
+#ifdef COMPLEX_SINGLE_FLOAT_WIDETAG
+		case COMPLEX_SINGLE_FLOAT_WIDETAG:
 #endif
-#ifdef type_ComplexDoubleFloat
-		case type_ComplexDoubleFloat:
+#ifdef COMPLEX_DOUBLE_FLOAT_WIDETAG
+		case COMPLEX_DOUBLE_FLOAT_WIDETAG:
 #endif
-#ifdef type_ComplexLongFloat
-		case type_ComplexLongFloat:
+#ifdef COMPLEX_LONG_FLOAT_WIDETAG
+		case COMPLEX_LONG_FLOAT_WIDETAG:
 #endif
-		case type_SimpleString:
-		case type_SimpleBitVector:
-		case type_SimpleArrayUnsignedByte2:
-		case type_SimpleArrayUnsignedByte4:
-		case type_SimpleArrayUnsignedByte8:
-		case type_SimpleArrayUnsignedByte16:
-		case type_SimpleArrayUnsignedByte32:
-#ifdef type_SimpleArraySignedByte8
-		case type_SimpleArraySignedByte8:
+		case SIMPLE_STRING_WIDETAG:
+		case SIMPLE_BIT_VECTOR_WIDETAG:
+		case SIMPLE_ARRAY_UNSIGNED_BYTE_2_WIDETAG:
+		case SIMPLE_ARRAY_UNSIGNED_BYTE_4_WIDETAG:
+		case SIMPLE_ARRAY_UNSIGNED_BYTE_8_WIDETAG:
+		case SIMPLE_ARRAY_UNSIGNED_BYTE_16_WIDETAG:
+		case SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG:
+#ifdef SIMPLE_ARRAY_SIGNED_BYTE_8_WIDETAG
+		case SIMPLE_ARRAY_SIGNED_BYTE_8_WIDETAG:
 #endif
-#ifdef type_SimpleArraySignedByte16
-		case type_SimpleArraySignedByte16:
+#ifdef SIMPLE_ARRAY_SIGNED_BYTE_16_WIDETAG
+		case SIMPLE_ARRAY_SIGNED_BYTE_16_WIDETAG:
 #endif
-#ifdef type_SimpleArraySignedByte30
-		case type_SimpleArraySignedByte30:
+#ifdef SIMPLE_ARRAY_SIGNED_BYTE_30_WIDETAG
+		case SIMPLE_ARRAY_SIGNED_BYTE_30_WIDETAG:
 #endif
-#ifdef type_SimpleArraySignedByte32
-		case type_SimpleArraySignedByte32:
+#ifdef SIMPLE_ARRAY_SIGNED_BYTE_32_WIDETAG
+		case SIMPLE_ARRAY_SIGNED_BYTE_32_WIDETAG:
 #endif
-		case type_SimpleArraySingleFloat:
-		case type_SimpleArrayDoubleFloat:
-#ifdef type_SimpleArrayComplexLongFloat
-		case type_SimpleArrayLongFloat:
+		case SIMPLE_ARRAY_SINGLE_FLOAT_WIDETAG:
+		case SIMPLE_ARRAY_DOUBLE_FLOAT_WIDETAG:
+#ifdef SIMPLE_ARRAY_COMPLEX_LONG_FLOAT_WIDETAG
+		case SIMPLE_ARRAY_LONG_FLOAT_WIDETAG:
 #endif
-#ifdef type_SimpleArrayComplexSingleFloat
-		case type_SimpleArrayComplexSingleFloat:
+#ifdef SIMPLE_ARRAY_COMPLEX_SINGLE_FLOAT_WIDETAG
+		case SIMPLE_ARRAY_COMPLEX_SINGLE_FLOAT_WIDETAG:
 #endif
-#ifdef type_SimpleArrayComplexDoubleFloat
-		case type_SimpleArrayComplexDoubleFloat:
+#ifdef SIMPLE_ARRAY_COMPLEX_DOUBLE_FLOAT_WIDETAG
+		case SIMPLE_ARRAY_COMPLEX_DOUBLE_FLOAT_WIDETAG:
 #endif
-#ifdef type_SimpleArrayComplexLongFloat
-		case type_SimpleArrayComplexLongFloat:
+#ifdef SIMPLE_ARRAY_COMPLEX_LONG_FLOAT_WIDETAG
+		case SIMPLE_ARRAY_COMPLEX_LONG_FLOAT_WIDETAG:
 #endif
-		case type_Sap:
-		case type_WeakPointer:
-		    count = (sizetab[TypeOf(*start)])(start);
+		case SAP_WIDETAG:
+		case WEAK_POINTER_WIDETAG:
+		    count = (sizetab[widetag_of(*start)])(start);
 		    break;
 
 		default:
@@ -6083,7 +6127,7 @@ component_ptr_from_pc(lispobj *pc)
 	object = search_dynamic_space(pc);
 
     if (object) /* if we found something */
-	if (TypeOf(*object) == type_CodeHeader) /* if it's a code object */
+	if (widetag_of(*object) == CODE_HEADER_WIDETAG) /* if it's a code object */
 	    return(object);
 
     return (NULL);

@@ -46,7 +46,9 @@
   "VARIABLE must evaluate to a symbol. This symbol is made unbound,
   removing any value it may currently have."
   (set variable
-       (%primitive sb!c:make-other-immediate-type 0 sb!vm:unbound-marker-type))
+       (%primitive sb!c:make-other-immediate-type
+		   0
+		   sb!vm:unbound-marker-widetag))
   variable)
 
 #!+(or x86 mips) ;; only backends for which a symbol-hash vop exists
