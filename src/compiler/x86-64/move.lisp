@@ -280,29 +280,6 @@
 
 ;;; Result may be a bignum, so we have to check. Use a worst-case cost
 ;;; to make sure people know they may be number consing.
-;;;
-;;; KLUDGE: I assume this is suppressed in favor of the "faster inline
-;;; version" below. (See also mysterious comment "we don't want a VOP
-;;; on this one" on DEFINE-ASSEMBLY-ROUTINE (MOVE-FROM-SIGNED) in
-;;; "src/assembly/x86/alloc.lisp".) -- WHN 19990916
-#+nil
-(define-vop (move-from-signed)
-  (:args (x :scs (signed-reg unsigned-reg) :target eax))
-  (:temporary (:sc unsigned-reg :offset eax-offset :from (:argument 0)) eax)
-  (:temporary (:sc unsigned-reg :offset ebx-offset :to (:result 0) :target y)
-	      ebx)
-  (:temporary (:sc unsigned-reg :offset ecx-offset
-		   :from (:argument 0) :to (:result 0)) ecx)
-  (:ignore ecx)
-  (:results (y :scs (any-reg descriptor-reg)))
-  (:note "signed word to integer coercion")
-  (:generator 20
-    (move eax x)
-    (inst call (make-fixup 'move-from-signed :assembly-routine))
-    (move y ebx)))
-;;; Faster inline version,
-;;; KLUDGE: Do we really want the faster inline version? It's sorta big.
-;;; It is nice that it doesn't use any temporaries, though. -- WHN 19990916
 (define-vop (move-from-signed)
   (:args (x :scs (signed-reg unsigned-reg) :to :result))
   (:results (y :scs (any-reg descriptor-reg) :from :argument))

@@ -71,6 +71,7 @@
 		    static-fun-template)
 	(:args ,@(args))
 	,@(temps)
+	(:temporary (:sc unsigned-reg) call-target)
 	(:results ,@(results))
 	(:generator ,(+ 50 num-args num-results)
 	 ,@(moves (temp-names) (arg-names))
@@ -111,9 +112,14 @@
 	 ;; longer executed? Does it not depend on the
 	 ;; 1+3=4=fdefn_raw_address_offset relationship above?
 	 ;; Is something else going on?)
-	 (inst call (make-ea :qword
-			     :disp (+ nil-value
-				      (static-fun-offset function))))
+
+	 ;; Need to load the target address into a register, since
+	 ;; immediate call arguments are just a 32-bit displacement,
+	 ;; which obviously can't work with >4G spaces.
+	 (inst mov call-target
+	       (make-ea :qword
+			:disp (+ nil-value (static-fun-offset function))))
+	 (inst call call-target)
 	 ,(collect ((bindings) (links))
 		   (do ((temp (temp-names) (cdr temp))
 			(name 'values (gensym))

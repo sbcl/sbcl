@@ -99,20 +99,19 @@
 
 ;;;; description of the target address space
 
-;;; where to put the different spaces.  untested (copied from x86, in fact)
+;;; where to put the different spaces.
 
+(def!constant read-only-space-start     #x20000000)
+(def!constant read-only-space-end       #x27ff0000)
 
-(def!constant read-only-space-start #x01000000)
-(def!constant read-only-space-end   #x037ff000)
+(def!constant static-space-start        #x40000000)
+(def!constant static-space-end          #x47fff000)
 
-(def!constant static-space-start    #x05000000)
-(def!constant static-space-end      #x07fff000)
+(def!constant dynamic-space-start   #x1000000000)
+(def!constant dynamic-space-end     #x11ffff0000)
 
-(def!constant dynamic-space-start   #x09000000)
-(def!constant dynamic-space-end     #x79000000)
-
-(def!constant linkage-table-space-start #x08000000)
-(def!constant linkage-table-space-end   #x08fff000)
+(def!constant linkage-table-space-start #x60000000)
+(def!constant linkage-table-space-end   #x63fff000)
 
 (def!constant linkage-table-entry-size 16)
 

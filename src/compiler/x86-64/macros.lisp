@@ -156,7 +156,10 @@
 (defun allocation (alloc-tn size &optional ignored)
   (declare (ignore ignored))
   (inst push size)
-  (inst call (make-fixup (extern-alien-name "alloc_tramp") :foreign))
+  (inst lea r13-tn (make-ea :qword
+			    :disp (make-fixup (extern-alien-name "alloc_tramp")
+					      :foreign)))
+  (inst call r13-tn)
   (inst pop alloc-tn)
   (values))
 
@@ -170,7 +173,7 @@
     (storew (logior (ash (1- ,size) n-widetag-bits) ,widetag)
 	    ,result-tn)
     (inst lea ,result-tn
-     (make-ea :byte :base ,result-tn :disp other-pointer-lowtag))
+	  (make-ea :qword :base ,result-tn :disp other-pointer-lowtag))
     ,@forms))
 
 ;;;; error code

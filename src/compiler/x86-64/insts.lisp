@@ -842,6 +842,7 @@
 (defun emit-relative-fixup (segment fixup)
   (note-fixup segment :relative fixup)
   (emit-dword segment (or (fixup-offset fixup) 0)))
+
 
 ;;;; the effective-address (ea) structure
 
@@ -897,6 +898,48 @@
 	    (format stream "+~A" (ea-disp ea))))
 	 (write-char #\] stream))))
 
+(defun emit-constant-tn-rip (segment constant-tn reg)
+  ;; AMD64 doesn't currently have a code object register to use as a
+  ;; base register for constant access. Instead we use RIP-relative
+  ;; addressing. The offset from the SIMPLE-FUN-HEADER to the instruction
+  ;; is passed to the backpatch callback. In addition we need the offset
+  ;; from the start of the function header to the slot in the CODE-HEADER
+  ;; that stores the constant. Since we don't know where the code header
+  ;; starts, instead count backwards from the function header.
+  (let* ((2comp (component-info *component-being-compiled*))
+	 (constants (ir2-component-constants 2comp))
+	 (len (length constants))
+	 ;; Both CODE-HEADER and SIMPLE-FUN-HEADER are 16-byte aligned.
+	 ;; If there are an even amount of constants, there will be
+	 ;; an extra qword of padding before the function header, which
+	 ;; needs to be adjusted for. XXX: This will break if new slots
+	 ;; are added to the code header.
+	 (offset (* (- (+ len (if (evenp len)
+				  1
+				  2))
+		       (tn-offset constant-tn))
+		    n-word-bytes)))
+    ;; RIP-relative addressing
+    (emit-mod-reg-r/m-byte segment #b00 reg #b101)
+    (emit-back-patch segment
+		     4
+		     (lambda (segment posn)
+		       ;; The addressing is relative to end of instruction,
+		       ;; i.e. the end of this dword. Hence the + 4.
+		       (emit-dword segment (+ 4 (- (+ offset posn)))))))
+  (values))
+
+(defun emit-label-rip (segment fixup reg)
+  (let ((label (fixup-offset fixup)))
+    ;; RIP-relative addressing
+    (emit-mod-reg-r/m-byte segment #b00 reg #b101)
+    (emit-back-patch segment
+		     4
+		     (lambda (segment posn)
+		       (emit-dword segment (- (label-position label)
+					      (+ posn 4))))))
+  (values))
+
 (defun emit-ea (segment thing reg &optional allow-constants)
   (etypecase thing
     (tn
@@ -916,15 +959,10 @@
 		 (emit-dword segment disp)))))
        (constant
 	(unless allow-constants
+	  ;; Why?
 	  (error
 	   "Constant TNs can only be directly used in MOV, PUSH, and CMP."))
-	(emit-mod-reg-r/m-byte segment #b00 reg #b100)
-	(emit-sib-byte segment 1 4 5)	;no base, no index
-	(emit-absolute-fixup segment
-			     (make-fixup nil
-					 :code-object
-					 (- (* (tn-offset thing) n-word-bytes)
-					    other-pointer-lowtag))))))
+	(emit-constant-tn-rip segment thing reg))))
     (ea
      (let* ((base (ea-base thing))
 	    (index (ea-index thing))
@@ -964,9 +1002,13 @@
 		  (emit-absolute-fixup segment disp)
 		  (emit-dword segment disp))))))
     (fixup
-     (emit-mod-reg-r/m-byte segment #b00 reg #b100)
-     (emit-sib-byte segment 0 #b100 #b101)
-     (emit-absolute-fixup segment thing))))
+     (typecase (fixup-offset thing)
+       (label
+	(emit-label-rip segment thing reg))
+       (t
+	(emit-mod-reg-r/m-byte segment #b00 reg #b100)
+	(emit-sib-byte segment 0 #b100 #b101)
+	(emit-absolute-fixup segment thing))))))
 
 (defun fp-reg-tn-p (thing)
   (and (tn-p thing)
@@ -1164,14 +1206,6 @@
 					   #b10111)
 				       (reg-tn-encoding dst))
 		   (emit-sized-immediate segment size src (eq size :qword)))
-		  ((and (fixup-p src) (accumulator-p dst))
-		   (maybe-emit-rex-prefix segment (operand-size src)
-					  nil nil nil)
-		   (emit-byte segment
-			      (if (eq size :byte)
-				  #b10100000
-				  #b10100001))
-		   (emit-absolute-fixup segment src (eq size :qword)))
 		  (t
 		   (maybe-emit-rex-for-ea segment src dst)
 		   (emit-byte segment
@@ -1179,10 +1213,6 @@
 				  #b10001010
 				  #b10001011))
 		   (emit-ea segment src (reg-tn-encoding dst) t))))
-	   ((and (fixup-p dst) (accumulator-p src))
-	    (maybe-emit-rex-prefix segment size nil nil nil)
-	    (emit-byte segment (if (eq size :byte) #b10100010 #b10100011))
-	    (emit-absolute-fixup segment dst (eq size :qword)))
 	   ((integerp src)
 	    ;; C7 only deals with 32 bit immediates even if register is 
 	    ;; 64 bit: only b8-bf use 64 bit immediates
@@ -1201,6 +1231,15 @@
 	    (emit-byte segment (if (eq size :byte) #b10001000 #b10001001))
 	    (emit-ea segment dst (reg-tn-encoding src)))
 	   ((fixup-p src)
+	    ;; Generally we can't MOV a fixupped value into an EA, since
+	    ;; MOV on non-registers can only take a 32-bit immediate arg.
+	    ;; Make an exception for :FOREIGN fixups (pretty much just
+	    ;; the runtime asm, since other foreign calls go through the
+	    ;; the linkage table) and for linkage table references, since
+	    ;; these should always end up in low memory.
+	    (aver (or (eq (fixup-flavor src) :foreign)
+		      (eq (fixup-flavor src) :foreign-dataref)
+		      (eq (ea-size dst) :dword)))
 	    (maybe-emit-rex-for-ea segment dst nil)
 	    (emit-byte segment #b11000111)
 	    (emit-ea segment dst #b000)
@@ -1289,10 +1328,6 @@
 		 ;; whether it expects 32 or 64 bit immediate here
 		 (emit-byte segment #b01101000)
 		 (emit-dword segment src))))
-	 ((fixup-p src)
-	  ;; Interpret the fixup as an immediate dword to push.
-	  (emit-byte segment #b01101000)
-	  (emit-absolute-fixup segment src))
 	 (t
 	  (let ((size (operand-size src)))
 	    (aver (not (eq size :byte)))
@@ -1364,8 +1399,9 @@
   (:printer rex-reg-reg/mem ((op #b10001101)))
   (:printer reg-reg/mem ((op #b1000110) (width 1)))
   (:emitter
-   (aver (or  (dword-reg-p dst)  (qword-reg-p dst)))
-   (maybe-emit-rex-for-ea segment src dst)
+   (aver (or (dword-reg-p dst) (qword-reg-p dst)))
+   (maybe-emit-rex-for-ea segment src dst
+			  :operand-size :qword)
    (emit-byte segment #b10001101)
    (emit-ea segment src (reg-tn-encoding dst))))
 
@@ -2110,6 +2146,7 @@
 	 (t
 	  (unless (or (ea-p where) (tn-p where))
 		  (error "don't know what to do with ~A" where))
+	  (maybe-emit-rex-for-ea segment where nil)
 	  (emit-byte segment #b11111111)
 	  (emit-ea segment where #b100)))))
 
