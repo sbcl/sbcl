@@ -13,9 +13,8 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-(in-package :cl-user)
-
 (load "assertoid.lisp")
+(use-package "ASSERTOID")
 
 ;;; Bug 30, involving mistakes in binding the read table, made this
 ;;; code fail.

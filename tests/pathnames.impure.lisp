@@ -14,9 +14,8 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-(in-package "CL-USER")
-
 (load "assertoid.lisp")
+(use-package "ASSERTOID")
 
 (setf (logical-pathname-translations "demo0")
       '(("**;*.*.*" "/tmp/")))

@@ -12,6 +12,7 @@
 ;;;; more information.
 
 (load "assertoid.lisp")
+(use-package "ASSERTOID")
 
 (defmacro define-compiled-fun (fun name)
   `(progn

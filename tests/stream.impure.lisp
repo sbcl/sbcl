@@ -11,9 +11,8 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-(in-package :cl-user)
-
 (load "assertoid.lisp")
+(use-package "ASSERTOID")
 
 ;;; type errors for inappropriate stream arguments, fixed in
 ;;; sbcl-0.7.8.19

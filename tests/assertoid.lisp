@@ -12,7 +12,11 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-(cl:in-package :cl-user)
+(cl:defpackage "ASSERTOID"
+  (:use "CL")
+  (:export "GRAB-CONDITION" "RAISES-ERROR?" "ASSERTOID"))
+
+(cl:in-package "ASSERTOID")
 
 (defmacro grab-condition (&body body)
   `(nth-value 1

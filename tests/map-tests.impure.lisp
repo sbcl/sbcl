@@ -11,9 +11,8 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-(cl:in-package :cl-user)
-
 (load "assertoid.lisp")
+(use-package "ASSERTOID")
 
 ;;; tests of MAP
 ;;; FIXME: Move these into their own file.

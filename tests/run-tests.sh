@@ -58,6 +58,8 @@ echo //running '*.pure.lisp' tests
 echo //i.e. *.pure.lisp
 (
 echo "(progn"
+echo "  (progn (format t \"//loading assertoid.lisp~%\") (load \"assertoid.lisp\"))"
+echo "  (use-package \"ASSERTOID\")"
 for f in *.pure.lisp; do
     if [ -f $f ]; then
         echo "  (progn (format t \"//running $f test~%\") (load \"$f\"))"

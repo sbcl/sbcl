@@ -15,9 +15,8 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-(cl:in-package :cl-user)
-
 (load "assertoid.lisp")
+(use-package "ASSERTOID")
 
 ;;; Old CMU CL code assumed that the names of "keyword" arguments are
 ;;; necessarily self-evaluating symbols, but ANSI Common Lisp allows

@@ -1,10 +1,9 @@
 for late 0.7.x:
 
 * test file reworking
-	** *.pure.lisp tests run with assertoid.lisp loaded; assertoid
-		is moved to its own package, for use in *.impure.lisp.
 	** non-x86 ports now pass irrat.pure.lisp
-	** sparc and ppc now pass bit-vector.impure-cload.lisp
+	** ports with less than 256Mb of heap (sparc, ppc and mips)
+		now don't fail bit-vector.impure-cload.lisp
 * faster bootstrapping (both make.sh and slam.sh)
 	** added mechanisms for automatically finding dead code, and
 		used them to remove dead code

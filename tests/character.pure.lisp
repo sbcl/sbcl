@@ -13,8 +13,6 @@
 
 (cl:in-package :cl-user)
 
-(load "assertoid.lisp")
-
 ;;; ANSI's specification of #'CHAR-NAME imposes these constraints.
 ;;;
 ;;; (Obviously, the numeric values in this test implicitly assume
