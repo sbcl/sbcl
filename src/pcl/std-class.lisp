@@ -336,8 +336,14 @@
 
 (setf (gdefinition 'load-defclass) #'real-load-defclass)
 
-(defun ensure-class (name &rest all)
-  (apply #'ensure-class-using-class (find-class name nil) name all))
+(defun ensure-class (name &rest args)
+  (apply #'ensure-class-using-class
+	 (let ((class (find-class name nil)))
+	   (when (and class (eq name (class-name class)))
+	     ;; NAME is the proper name of CLASS, so redefine it
+	     class))
+	 name
+	 args))
 
 (defmethod ensure-class-using-class ((class null) name &rest args &key)
   (multiple-value-bind (meta initargs)

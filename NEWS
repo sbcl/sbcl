@@ -1836,6 +1836,9 @@ changes in sbcl-0.8.1 relative to sbcl-0.8.0:
        argument is true.
     ** TYPE-OF returns recognizeable subtypes of all built-in-types of
        which its argument is a member.
+    ** DEFCLASS only redefines the class named by its class-name
+       argument if that name is the proper name of the class;
+       otherwise, it creates a new class.
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles
