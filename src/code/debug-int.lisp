@@ -1064,27 +1064,22 @@
 #!+x86
 (defun compute-calling-frame (caller ra up-frame)
   (declare (type system-area-pointer caller ra))
-;  (format t "ccf: ~A ~A ~A~%" caller ra up-frame)
   (when (cstack-pointer-valid-p caller)
-;    (format t "ccf2~%")
     ;; First check for an escaped frame.
     (multiple-value-bind (code pc-offset escaped) (find-escaped-frame caller)
 	(cond (code
 	       ;; If it's escaped it may be a function end breakpoint trap.
-;	       (format t "ccf2: escaped ~S ~S~%" code pc-offset)
 	       (when (and (code-component-p code)
 			  (eq (%code-debug-info code) :bogus-lra))
 		 ;; If :bogus-lra grab the real lra.
 		 (setq pc-offset (code-header-ref
 				  code (1+ real-lra-slot)))
 		 (setq code (code-header-ref code real-lra-slot))
-;		 (format t "ccf3 :bogus-lra ~S ~S~%" code pc-offset)
 		 (aver code)))
 	      (t
-	       ;; Not escaped
+	       ;; not escaped
 	       (multiple-value-setq (pc-offset code)
 		 (compute-lra-data-from-pc ra))
-;	       (format t "ccf4 ~S ~S~%" code pc-offset)
 	       (unless code
 		 (setf code :foreign-function
 		       pc-offset 0
@@ -1111,6 +1106,13 @@
 #!+x86
 (defun find-escaped-frame (frame-pointer)
   (declare (type system-area-pointer frame-pointer))
+
+  ;; FIXME: These conditionals are a hack to get the system to
+  ;; bootstrap itself despite a byte interpreter/compiler bug. Without
+  ;; it, the byte interpreter blows up when trying to cross-compile
+  ;; this function, hitting #:UNINITIALIZED-EVAL-STACK-ELEMENT while
+  ;; executing (SB-XC:MACRO-FUNCTION 'SB!EXT:WITH-ALIEN).
+  #+sb-xc (values nil 0 nil) #-sb-xc ; REMOVEME
   (dotimes (index *free-interrupt-context-index* (values nil 0 nil))
     (sb!alien:with-alien
 	((lisp-interrupt-contexts (array (* os-context-t) nil)

@@ -346,26 +346,6 @@
   (declare (type unix-pathname name))
   (void-syscall ("unlink" c-string) name))
 
-;;; Set the tty-process-group for the unix file-descriptor FD to PGRP.
-;;; If not supplied, FD defaults to "/dev/tty".
-(defun %set-tty-process-group (pgrp &optional fd)
-  (let ((old-sigs (unix-sigblock (sigmask :sigttou
-					  :sigttin
-					  :sigtstp
-					  :sigchld))))
-    (declare (type (unsigned-byte 32) old-sigs))
-    (unwind-protect
-	(if fd
-	    (tcsetpgrp fd pgrp)
-	    (multiple-value-bind (tty-fd errno) (unix-open "/dev/tty" o_rdwr 0)
-	      (cond (tty-fd
-		     (multiple-value-prog1
-			 (tcsetpgrp tty-fd pgrp)
-		       (unix-close tty-fd)))
-		    (t
-		     (values nil errno)))))
-      (unix-sigsetmask old-sigs))))
-
 ;;; Return the name of the host machine as a string.
 (defun unix-gethostname ()
   (with-alien ((buf (array char 256)))

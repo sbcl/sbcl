@@ -529,7 +529,7 @@
 
 ;;; Call FUNCTION on matches.
 (defun %enumerate-matches (pathname verify-existence follow-links function)
-  (/show0 "entering %ENUMERATE-MATCHES")
+  (/noshow0 "entering %ENUMERATE-MATCHES")
   (when (pathname-type pathname)
     (unless (pathname-name pathname)
       (error "cannot supply a type without a name:~%  ~S" pathname)))
@@ -537,16 +537,16 @@
 	     (member (pathname-type pathname) '(nil :unspecific)))
     (error "cannot supply a version without a type:~%  ~S" pathname))
   (let ((directory (pathname-directory pathname)))
-    (/show0 "computed DIRECTORY")
+    (/noshow0 "computed DIRECTORY")
     (if directory
 	(ecase (car directory)
 	  (:absolute
-	   (/show0 "absolute directory")
+	   (/noshow0 "absolute directory")
 	   (%enumerate-directories "/" (cdr directory) pathname
 				   verify-existence follow-links
 				   nil function))
 	  (:relative
-	   (/show0 "relative directory")
+	   (/noshow0 "relative directory")
 	   (%enumerate-directories "" (cdr directory) pathname
 				   verify-existence follow-links
 				   nil function)))
@@ -624,13 +624,13 @@
 ;;; Call FUNCTION on files.
 (defun %enumerate-files (directory pathname verify-existence function)
   (declare (simple-string directory))
-  (/show0 "entering %ENUMERATE-FILES")
+  (/noshow0 "entering %ENUMERATE-FILES")
   (let ((name (%pathname-name pathname))
 	(type (%pathname-type pathname))
 	(version (%pathname-version pathname)))
-    (/show0 "computed NAME, TYPE, and VERSION")
+    (/noshow0 "computed NAME, TYPE, and VERSION")
     (cond ((member name '(nil :unspecific))
-	   (/show0 "UNSPECIFIC, more or less")
+	   (/noshow0 "UNSPECIFIC, more or less")
 	   (when (or (not verify-existence)
 		     (sb!unix:unix-file-kind directory))
 	     (funcall function directory)))
@@ -638,7 +638,7 @@
 	       (pattern-p type)
 	       (eq name :wild)
 	       (eq type :wild))
-	   (/show0 "WILD, more or less")
+	   (/noshow0 "WILD, more or less")
 	   ;; I IGNORE-ERRORS here just because the original CMU CL
 	   ;; code did. I think the intent is that it's not an error
 	   ;; to request matches to a wild pattern when no matches
@@ -661,25 +661,25 @@
 				       directory
 				       complete-filename))))))
 	  (t
-	   (/show0 "default case")
+	   (/noshow0 "default case")
 	   (let ((file (concatenate 'string directory name)))
-	     (/show0 "computed basic FILE=..")
+	     (/noshow0 "computed basic FILE=..")
 	     (/primitive-print file)
 	     (unless (or (null type) (eq type :unspecific))
-	       (/show0 "tweaking FILE for more-or-less-:UNSPECIFIC case")
+	       (/noshow0 "tweaking FILE for more-or-less-:UNSPECIFIC case")
 	       (setf file (concatenate 'string file "." type)))
 	     (unless (member version '(nil :newest :wild))
-	       (/show0 "tweaking FILE for more-or-less-:WILD case")
+	       (/noshow0 "tweaking FILE for more-or-less-:WILD case")
 	       (setf file (concatenate 'string file "."
 				       (quick-integer-to-string version))))
-	     (/show0 "finished possibly tweaking FILE=..")
+	     (/noshow0 "finished possibly tweaking FILE=..")
 	     (/primitive-print file)
 	     (when (or (not verify-existence)
 		       (sb!unix:unix-file-kind file t))
-	       (/show0 "calling FUNCTION on FILE")
+	       (/noshow0 "calling FUNCTION on FILE")
 	       (funcall function file)))))))
 
-(/show0 "filesys.lisp 603")
+(/noshow0 "filesys.lisp 603")
 
 ;;; FIXME: Why do we need this?
 (defun quick-integer-to-string (n)

@@ -143,14 +143,6 @@
   #!+sb-doc
   "Set the handler function for an object set operation.")
 
-;;; from unix.lisp
-(in-package "SB!UNIX")
-(defsetf tty-process-group (&optional fd) (pgrp)
-  #!+sb-doc
-  "Set the tty-process-group for the unix file-descriptor FD to PGRP. If not
-  supplied, FD defaults to /dev/tty."
-  `(%set-tty-process-group ,pgrp ,fd))
-
 ;;; from x86-vm.lisp
 (in-package "SB!VM")
 (defsetf context-register %set-context-register)
