@@ -792,6 +792,13 @@
 ;;; FIXME: this is not the right place for this.
 (defun print-reference (reference stream)
   (ecase (car reference)
+    (:amop
+     (format stream "AMOP")
+     (format stream ", ")
+     (destructuring-bind (type data) (cdr reference)
+       (ecase type
+	 (:generic-function (format stream "Generic Function ~S" data))
+	 (:section (format stream "Section ~{~D~^.~}" data)))))
     (:ansi-cl
      (format stream "The ANSI Standard")
      (format stream ", ")

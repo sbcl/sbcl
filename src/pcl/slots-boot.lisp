@@ -138,6 +138,30 @@
     (declare (ignore object))
     t))
 
+(define-condition instance-structure-protocol-error
+    (reference-condition error)
+  ((slotd :initarg :slotd :reader instance-structure-protocol-error-slotd)
+   (fun :initarg :fun :reader instance-structure-protocol-error-fun))
+  (:report
+   (lambda (c s)
+     (format s "~@<The slot ~S has neither ~S nor ~S ~
+                allocation, so it can't be ~A by the default ~
+                ~S method.~@:>"
+	     (instance-structure-protocol-error-slotd c)
+	     :instance :class
+	     (cond
+	       ((member (instance-structure-protocol-error-fun c)
+			'(slot-value-using-class slot-boundp-using-class))
+		"read")
+	       (t "written"))
+	     (instance-structure-protocol-error-fun c)))))
+
+(defun instance-structure-protocol-error (slotd fun)
+  (error 'instance-structure-protocol-error
+	 :slotd slotd :fun fun
+	 :references (list `(:amop :generic-function ,fun)
+			   '(:amop :section (5 5 3)))))
+
 (defun get-optimized-std-accessor-method-function (class slotd name)
   (cond
     ((structure-class-p class)
@@ -161,31 +185,38 @@
 			  nil)
 			 (t (error "~S is not a STANDARD-CLASS." class))))
 	    (slot-name (slot-definition-name slotd))
-	    (index (slot-definition-location slotd))
+	    (location (slot-definition-location slotd))
 	    (function (ecase name
 			(reader #'make-optimized-std-reader-method-function)
 			(writer #'make-optimized-std-writer-method-function)
 			(boundp #'make-optimized-std-boundp-method-function)))
-	    (value (funcall function fsc-p slot-name index)))
+	    ;; KLUDGE: we need this slightly hacky calling convention
+	    ;; for these functions for bootstrapping reasons: see
+	    ;; !BOOTSTRAP-MAKE-SLOT-DEFINITION in braid.lisp.  -- CSR,
+	    ;; 2004-07-12
+	    (value (funcall function fsc-p slotd slot-name location)))
        (declare (type function function))
-       (values value index)))))
+       (values value (slot-definition-location slotd))))))
 
-(defun make-optimized-std-reader-method-function (fsc-p slot-name index)
+(defun make-optimized-std-reader-method-function
+    (fsc-p slotd slot-name location)
   (declare #.*optimize-speed*)
   (set-fun-name
-   (etypecase index
+   (etypecase location
      (fixnum
       (if fsc-p
 	  (lambda (instance)
 	    (check-obsolete-instance instance)
-	    (let ((value (clos-slots-ref (fsc-instance-slots instance) index)))
+	    (let ((value (clos-slots-ref (fsc-instance-slots instance)
+					 location)))
 	      (if (eq value +slot-unbound+)
 		  (values
 		   (slot-unbound (class-of instance) instance slot-name))
 		  value)))
 	  (lambda (instance)
 	    (check-obsolete-instance instance)
-	    (let ((value (clos-slots-ref (std-instance-slots instance) index)))
+	    (let ((value (clos-slots-ref (std-instance-slots instance)
+					 location)))
 	      (if (eq value +slot-unbound+)
 		  (values
 		   (slot-unbound (class-of instance) instance slot-name))
@@ -193,74 +224,74 @@
      (cons
       (lambda (instance)
 	(check-obsolete-instance instance)
-	(let ((value (cdr index)))
+	(let ((value (cdr location)))
 	  (if (eq value +slot-unbound+)
 	      (values (slot-unbound (class-of instance) instance slot-name))
 	      value))))
      (null
       (lambda (instance)
-	;; maybe MOP-ERROR?  You get here by making effective slot
-	;; definitions with :ALLOCATION not :INSTANCE or :CLASS, and
-	;; not defining any methods on SLOT-VALUE-USING-CLASS.
-	(error "~S called on ~S for the slot ~S (with no location information)"
-	       'slot-value instance slot-name))))
+	(instance-structure-protocol-error slotd 'slot-value-using-class))))
    `(reader ,slot-name)))
 
-(defun make-optimized-std-writer-method-function (fsc-p slot-name index)
+(defun make-optimized-std-writer-method-function
+    (fsc-p slotd slot-name location)
   (declare #.*optimize-speed*)
   (set-fun-name
-   (etypecase index
+   (etypecase location
      (fixnum (if fsc-p
 		 (lambda (nv instance)
 		   (check-obsolete-instance instance)
-		   (setf (clos-slots-ref (fsc-instance-slots instance) index)
+		   (setf (clos-slots-ref (fsc-instance-slots instance)
+					 location)
 			 nv))
 		 (lambda (nv instance)
 		   (check-obsolete-instance instance)
-		   (setf (clos-slots-ref (std-instance-slots instance) index)
+		   (setf (clos-slots-ref (std-instance-slots instance)
+					 location)
 			 nv))))
-     (cons   (lambda (nv instance)
-	       (check-obsolete-instance instance)
-	       (setf (cdr index) nv)))
+     (cons (lambda (nv instance)
+	     (check-obsolete-instance instance)
+	     (setf (cdr location) nv)))
      (null
       (lambda (nv instance)
 	(declare (ignore nv))
-	;; again, maybe MOP-ERROR (see above)
-	(error "~S called on ~S for the slot ~S (with no location information)"
-	       '(setf slot-value) instance slot-name))))
+	(instance-structure-protocol-error slotd
+					   '(setf slot-value-using-class)))))
    `(writer ,slot-name)))
 
-(defun make-optimized-std-boundp-method-function (fsc-p slot-name index)
+(defun make-optimized-std-boundp-method-function
+    (fsc-p slotd slot-name location)
   (declare #.*optimize-speed*)
   (set-fun-name
-   (etypecase index
+   (etypecase location
      (fixnum (if fsc-p
 		 (lambda (instance)
 		   (check-obsolete-instance instance)
 		   (not (eq (clos-slots-ref (fsc-instance-slots instance)
-					    index)
+					    location)
 			    +slot-unbound+)))
 		 (lambda (instance)
 		   (check-obsolete-instance instance)
 		   (not (eq (clos-slots-ref (std-instance-slots instance)
-					    index)
+					    location)
 			    +slot-unbound+)))))
      (cons (lambda (instance)
 	     (check-obsolete-instance instance)
-	     (not (eq (cdr index) +slot-unbound+))))
+	     (not (eq (cdr location) +slot-unbound+))))
      (null
       (lambda (instance)
-	(error "~S called on ~S for the slot ~S (with no location information)"
-	       'slot-boundp instance slot-name))))
+	(instance-structure-protocol-error slotd 'slot-boundp-using-class))))
    `(boundp ,slot-name)))
 
-(defun make-optimized-structure-slot-value-using-class-method-function (function)
+(defun make-optimized-structure-slot-value-using-class-method-function
+    (function)
   (declare (type function function))
   (lambda (class object slotd)
     (declare (ignore class slotd))
     (funcall function object)))
 
-(defun make-optimized-structure-setf-slot-value-using-class-method-function (function)
+(defun make-optimized-structure-setf-slot-value-using-class-method-function
+    (function)
   (declare (type function function))
   (lambda (nv class object slotd)
     (declare (ignore class slotd))
@@ -305,8 +336,6 @@
      (let* ((fsc-p (cond ((standard-class-p class) nil)
 			 ((funcallable-standard-class-p class) t)
 			 (t (error "~S is not a standard-class" class))))
-	    (slot-name (slot-definition-name slotd))
-	    (index (slot-definition-location slotd))
 	    (function
 	     (ecase name
 	       (reader
@@ -316,90 +345,95 @@
 	       (boundp
 		#'make-optimized-std-slot-boundp-using-class-method-function))))
        (declare (type function function))
-       (values (funcall function fsc-p slot-name index) index)))))
+       (values (funcall function fsc-p slotd)
+	       (slot-definition-location slotd))))))
 
-(defun make-optimized-std-slot-value-using-class-method-function
-    (fsc-p slot-name index)
+(defun make-optimized-std-slot-value-using-class-method-function (fsc-p slotd)
   (declare #.*optimize-speed*)
-  (etypecase index
-    (fixnum (if fsc-p
-		(lambda (class instance slotd)
-		  (declare (ignore slotd))
-		  (check-obsolete-instance instance)
-		  (let ((value (clos-slots-ref (fsc-instance-slots instance)
-					       index)))
-		    (if (eq value +slot-unbound+)
-			(values (slot-unbound class instance slot-name))
-			value)))
-		(lambda (class instance slotd)
-		  (declare (ignore slotd))
-		  (check-obsolete-instance instance)
-		  (let ((value (clos-slots-ref (std-instance-slots instance)
-					       index)))
-		    (if (eq value +slot-unbound+)
-			(values (slot-unbound class instance slot-name))
-			value)))))
-    (cons   (lambda (class instance slotd)
+  (let ((location (slot-definition-location slotd))
+	(slot-name (slot-definition-name slotd)))
+    (etypecase location
+      (fixnum (if fsc-p
+		  (lambda (class instance slotd)
+		    (declare (ignore slotd))
+		    (check-obsolete-instance instance)
+		    (let ((value (clos-slots-ref (fsc-instance-slots instance)
+						 location)))
+		      (if (eq value +slot-unbound+)
+			  (values (slot-unbound class instance slot-name))
+			  value)))
+		  (lambda (class instance slotd)
+		    (declare (ignore slotd))
+		    (check-obsolete-instance instance)
+		    (let ((value (clos-slots-ref (std-instance-slots instance)
+						 location)))
+		      (if (eq value +slot-unbound+)
+			  (values (slot-unbound class instance slot-name))
+			  value)))))
+      (cons (lambda (class instance slotd)
 	      (declare (ignore slotd))
 	      (check-obsolete-instance instance)
-	      (let ((value (cdr index)))
+	      (let ((value (cdr location)))
 		(if (eq value +slot-unbound+)
 		    (values (slot-unbound class instance slot-name))
 		    value))))
-    (null
-     (lambda (class instance slotd)
-       ;; FIXME: MOP-ERROR
-       (error "Standard ~S method called on arguments ~S."
-	      'slot-value-using-class (list class instance slotd))))))
+      (null
+       (lambda (class instance slotd)
+	 (declare (ignore class instance))
+	 (instance-structure-protocol-error slotd 'slot-value-using-class))))))
 
 (defun make-optimized-std-setf-slot-value-using-class-method-function
-    (fsc-p slot-name index)
+    (fsc-p slotd)
   (declare #.*optimize-speed*)
-  (declare (ignore slot-name))
-  (etypecase index
-    (fixnum (if fsc-p
-		(lambda (nv class instance slotd)
-		  (declare (ignore class slotd))
-		  (check-obsolete-instance instance)
-		  (setf (clos-slots-ref (fsc-instance-slots instance) index)
-			nv))
-		(lambda (nv class instance slotd)
-		  (declare (ignore class slotd))
-		  (check-obsolete-instance instance)
-		  (setf (clos-slots-ref (std-instance-slots instance) index)
-			nv))))
-    (cons  (lambda (nv class instance slotd)
+  (let ((location (slot-definition-location slotd)))
+    (etypecase location
+      (fixnum
+       (if fsc-p
+	   (lambda (nv class instance slotd)
 	     (declare (ignore class slotd))
 	     (check-obsolete-instance instance)
-	     (setf (cdr index) nv)))
-    (null (lambda (nv class instance slotd)
-	    (error "Standard ~S method called on arguments ~S."
-		   '(setf slot-value-using-class)
-		   (list nv class instance slotd))))))
-
-(defun make-optimized-std-slot-boundp-using-class-method-function
-    (fsc-p slot-name index)
-  (declare #.*optimize-speed*)
-  (declare (ignore slot-name))
-  (etypecase index
-    (fixnum (if fsc-p
-		(lambda (class instance slotd)
-		  (declare (ignore class slotd))
-		  (check-obsolete-instance instance)
-		  (not (eq (clos-slots-ref (fsc-instance-slots instance) index)
-			   +slot-unbound+)))
-		(lambda (class instance slotd)
-		  (declare (ignore class slotd))
-		  (check-obsolete-instance instance)
-		  (not (eq (clos-slots-ref (std-instance-slots instance) index)
-			   +slot-unbound+)))))
-    (cons   (lambda (class instance slotd)
+	     (setf (clos-slots-ref (fsc-instance-slots instance) location)
+		   nv))
+	   (lambda (nv class instance slotd)
+	     (declare (ignore class slotd))
+	     (check-obsolete-instance instance)
+	     (setf (clos-slots-ref (std-instance-slots instance) location)
+		   nv))))
+      (cons (lambda (nv class instance slotd)
 	      (declare (ignore class slotd))
 	      (check-obsolete-instance instance)
-	      (not (eq (cdr index) +slot-unbound+))))
-    (null (lambda (class instance slotd)
-	    (error "Standard ~S method called on arguments ~S."
-		   'slot-boundp-using-class (list class instance slotd))))))
+	      (setf (cdr location) nv)))
+      (null (lambda (nv class instance slotd)
+	      (declare (ignore nv class instance))
+	      (instance-structure-protocol-error
+	       slotd '(setf slot-value-using-class)))))))
+
+(defun make-optimized-std-slot-boundp-using-class-method-function
+    (fsc-p slotd)
+  (declare #.*optimize-speed*)
+  (let ((location (slot-definition-location slotd)))
+    (etypecase location
+      (fixnum
+       (if fsc-p
+	   (lambda (class instance slotd)
+	     (declare (ignore class slotd))
+	     (check-obsolete-instance instance)
+	     (not (eq (clos-slots-ref (fsc-instance-slots instance) location)
+		      +slot-unbound+)))
+	   (lambda (class instance slotd)
+	     (declare (ignore class slotd))
+	     (check-obsolete-instance instance)
+	     (not (eq (clos-slots-ref (std-instance-slots instance) location)
+		      +slot-unbound+)))))
+      (cons (lambda (class instance slotd)
+	      (declare (ignore class slotd))
+	      (check-obsolete-instance instance)
+	      (not (eq (cdr location) +slot-unbound+))))
+      (null
+       (lambda (class instance slotd)
+	 (declare (ignore class instance))
+	 (instance-structure-protocol-error slotd
+					    'slot-boundp-using-class))))))
 
 (defun get-accessor-from-svuc-method-function (class slotd sdfun name)
   (macrolet ((emf-funcall (emf &rest args)

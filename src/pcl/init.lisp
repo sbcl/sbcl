@@ -178,12 +178,13 @@
 	(setq legal (append keys legal))))
     (values legal nil)))
 
-(define-condition initarg-error (program-error)
+(define-condition initarg-error (reference-condition program-error)
   ((class :reader initarg-error-class :initarg :class)
    (initargs :reader initarg-error-initargs :initarg :initargs))
+  (:default-initargs :references (list '(:ansi-cl :section (7 1 2))))
   (:report (lambda (condition stream)
-	     (format stream "~@<Invalid initialization argument~P:~2I~_~
-                             ~<~{~S~^, ~}~@:>~I~_in call for class ~S.~:>"
+	     (format stream "~@<Invalid initialization argument~P: ~2I~_~
+                             ~<~{~S~^, ~} ~@:>~I~_in call for class ~S.~:>"
 		     (length (initarg-error-initargs condition))
 		     (list (initarg-error-initargs condition))
 		     (initarg-error-class condition)))))

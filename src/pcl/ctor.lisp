@@ -175,13 +175,11 @@
 	       (if (array-in-bounds-p ps i)
 		   (aref ps i)
 		   (format-symbol *pcl-package* ".P~D." i))))
-	   ;;
 	   ;; Check if CLASS-NAME is a constant symbol.  Give up if
 	   ;; not.
 	   (check-class ()
 	     (unless (and class-name (constant-symbol-p class-name))
 	       (return-from make-instance->constructor-call nil)))
-	   ;;
 	   ;; Check if ARGS are suitable for an optimized constructor.
 	   ;; Return NIL from the outer function if not.
 	   (check-args ()
@@ -192,7 +190,6 @@
 		       (return-from make-instance->constructor-call nil)))))
       (check-class)
       (check-args)
-      ;;
       ;; Collect a plist of initargs and constant values/parameter names
       ;; in INITARGS.  Collect non-constant initialization forms in
       ;; VALUE-FORMS.
@@ -208,7 +205,6 @@
 		  (return (values initargs value-forms)))
 	(let* ((class-name (eval class-name))
 	       (function-name (make-ctor-function-name class-name initargs)))
-	  ;;
 	  ;; Prevent compiler warnings for calling the ctor.
 	  (proclaim-as-fun-name function-name)
 	  (note-name-defined function-name :function)
@@ -216,7 +212,6 @@
 	    (setf (info :function :where-from function-name) :defined)
 	    (when (info :function :assumed-type function-name)
 	      (setf (info :function :assumed-type function-name) nil)))
-	  ;;
 	  ;; Return code constructing a ctor at load time, which, when
 	  ;; called, will set its funcallable instance function to an
 	  ;; optimized constructor function.
@@ -239,12 +234,10 @@
 ;;; Load-Time Constructor Function Generation  *******
 ;;; **************************************************
 
-;;;
 ;;; The system-supplied primary INITIALIZE-INSTANCE and
-;;; SHARED-INITIALIZE methods.  One cannot initialized these variables
+;;; SHARED-INITIALIZE methods.  One cannot initialize these variables
 ;;; to the right values here because said functions don't exist yet
 ;;; when this file is first loaded.
-;;;
 (defvar *the-system-ii-method* nil)
 (defvar *the-system-si-method* nil)
 
@@ -260,6 +253,9 @@
 	  ;; deal with INSTANCE-LAMBDA expressions, only with LAMBDA
 	  ;; expressions.  The below should be equivalent, since we
 	  ;; have a compiler-only implementation.
+	  ;;
+	  ;; (except maybe for optimization qualities? -- CSR,
+	  ;; 2004-07-12)
 	  (eval `(function ,(constructor-function-form ctor))))))
 	      
 (defun constructor-function-form (ctor)
@@ -316,6 +312,11 @@
 (defun fallback-generator (ctor ii-methods si-methods)
   (declare (ignore ii-methods si-methods))
   `(instance-lambda ,(make-ctor-parameter-list ctor)
+     ;; The CTOR MAKE-INSTANCE optimization only kicks in when the
+     ;; first argument to MAKE-INSTANCE is a constant symbol: by
+     ;; calling it with a class, as here, we inhibit the optimization,
+     ;; so removing the possibility of endless recursion.  -- CSR,
+     ;; 2004-07-12
      (make-instance ,(ctor-class ctor) ,@(ctor-initargs ctor))))
 
 (defun optimizing-generator (ctor ii-methods si-methods)
@@ -325,14 +326,12 @@
        (declare #.*optimize-speed*)
        ,(wrap-in-allocate-forms ctor body before-method-p))))
 
-;;;
 ;;; Return a form wrapped around BODY that allocates an instance
 ;;; constructed by CTOR.  BEFORE-METHOD-P set means we have to run
 ;;; before-methods, in which case we initialize instance slots to
 ;;; +SLOT-UNBOUND+.  The resulting form binds the local variables
 ;;; .INSTANCE. to the instance, and .SLOTS. to the instance's slot
 ;;; vector around BODY.
-;;;
 (defun wrap-in-allocate-forms (ctor body before-method-p)
   (let* ((class (ctor-class ctor))
 	 (wrapper (class-wrapper class))
@@ -468,18 +467,16 @@
 		    (if (consp location)
 			(class-init location 'constant value)
 			(instance-init location 'constant value)))
-		    (dolist (location locations)
+		  (dolist (location locations)
 		      (if (consp location)
 			  (class-init location 'param value)
 			  (instance-init location 'param value)))))
-      ;;
       ;; Loop over default initargs of the class, recording
       ;; initializations of slots that have not been initialized
       ;; above.  Default initargs which are not in the supplied
       ;; initargs are treated as if they were appended to supplied
       ;; initargs, that is, their values must be evaluated even
       ;; if not actually used for initializing a slot.
-      ;;
       (loop for (key initfn initform) in default-initargs and i from 0
 	    unless (member key initkeys :test #'eq) do
 	    (let* ((type (if (constantp initform) 'constant 'var))
@@ -552,11 +549,9 @@
 	     ,@(delete nil instance-init-forms)
 	     ,@class-init-forms))))))
 
-;;;
 ;;; Return an alist of lists (KEY LOCATION ...) telling, for each
 ;;; key in INITKEYS, which locations the initarg initializes.
 ;;; CLASS is the class of the instance being initialized.
-;;;
 (defun compute-initarg-locations (class initkeys)
   (loop with slots = (class-slots class)
 	for key in initkeys collect
@@ -584,11 +579,9 @@
 	     (dolist (subclass (class-direct-subclasses class))
 	       (reset subclass ri-cache-p ctorsp))))
     (ecase reason
-      ;;
       ;; CLASS must have been specified.
       (finalize-inheritance
        (reset class t))
-      ;;
       ;; NAME must have been specified.
       (setf-find-class
        (loop for ctor in *all-ctors*
@@ -596,7 +589,6 @@
 	     (when (ctor-class ctor)
 	       (reset (ctor-class ctor)))
 	     (loop-finish)))
-      ;;
       ;; GENERIC-FUNCTION and METHOD must have been specified.
       ((add-method remove-method)
        (flet ((class-of-1st-method-param (method)

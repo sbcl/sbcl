@@ -373,11 +373,11 @@
 	(set-val 'location index)
 	(let ((fsc-p nil))
 	  (set-val 'reader-function (make-optimized-std-reader-method-function
-				     fsc-p slot-name index))
+				     fsc-p nil slot-name index))
 	  (set-val 'writer-function (make-optimized-std-writer-method-function
-				     fsc-p slot-name index))
+				     fsc-p nil slot-name index))
 	  (set-val 'boundp-function (make-optimized-std-boundp-method-function
-				     fsc-p slot-name index)))
+				     fsc-p nil slot-name index)))
 	(set-val 'accessor-flags 7)
 	(let ((table (or (gethash slot-name *name->class->slotd-table*)
 			 (setf (gethash slot-name *name->class->slotd-table*)

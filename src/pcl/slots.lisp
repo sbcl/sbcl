@@ -154,22 +154,22 @@
 				   (slotd standard-effective-slot-definition))
   (check-obsolete-instance object)
   (let* ((location (slot-definition-location slotd))
-	 (value (typecase location
-		  (fixnum
-		   (cond ((std-instance-p object)
-			  (clos-slots-ref (std-instance-slots object)
-					  location))
-			 ((fsc-instance-p object)
-			  (clos-slots-ref (fsc-instance-slots object)
-					  location))
-			 (t (error "unrecognized instance type"))))
-		  (cons
-		   (cdr location))
-		  (t
-		   (error "~@<The slot ~S has neither :INSTANCE nor :CLASS ~
-                           allocation, so it can't be read by the default ~
-                           ~S method.~@:>"
-			  slotd 'slot-value-using-class)))))
+	 (value
+	  (typecase location
+	    (fixnum
+	     (cond ((std-instance-p object)
+		    (clos-slots-ref (std-instance-slots object)
+				    location))
+		   ((fsc-instance-p object)
+		    (clos-slots-ref (fsc-instance-slots object)
+				    location))
+		   (t (bug "unrecognized instance type in ~S"
+			   'slot-value-using-class))))
+	    (cons
+	     (cdr location))
+	    (t
+	     (instance-structure-protocol-error slotd
+						'slot-value-using-class)))))
     (if (eq value +slot-unbound+)
 	(values (slot-unbound class object (slot-definition-name slotd)))
 	value)))
@@ -188,13 +188,13 @@
 	     ((fsc-instance-p object)
 	      (setf (clos-slots-ref (fsc-instance-slots object) location)
 		    new-value))
-	     (t (error "unrecognized instance type"))))
+	     (t (bug "unrecognized instance type in ~S"
+		     '(setf slot-value-using-class)))))
       (cons
        (setf (cdr location) new-value))
       (t
-       (error "~@<The slot ~S has neither :INSTANCE nor :CLASS allocation, ~
-		   so it can't be written by the default ~S method.~:@>"
-	      slotd '(setf slot-value-using-class))))))
+       (instance-structure-protocol-error slotd
+					  '(setf slot-value-using-class))))))
 
 (defmethod slot-boundp-using-class
 	   ((class std-class)
@@ -202,22 +202,22 @@
 	    (slotd standard-effective-slot-definition))
   (check-obsolete-instance object)
   (let* ((location (slot-definition-location slotd))
-	 (value (typecase location
-		  (fixnum
-		   (cond ((std-instance-p object)
+	 (value
+	  (typecase location
+	    (fixnum
+	     (cond ((std-instance-p object)
 			  (clos-slots-ref (std-instance-slots object)
 					  location))
-			 ((fsc-instance-p object)
-			  (clos-slots-ref (fsc-instance-slots object)
-					  location))
-			 (t (error "unrecognized instance type"))))
-		  (cons
-		   (cdr location))
-		  (t
-		   (error "~@<The slot ~S has neither :INSTANCE nor :CLASS ~
-                           allocation, so it can't be read by the default ~S ~
-                           method.~@:>"
-			  slotd 'slot-boundp-using-class)))))
+		   ((fsc-instance-p object)
+		    (clos-slots-ref (fsc-instance-slots object)
+				    location))
+		   (t (bug "unrecognized instance type in ~S"
+			   'slot-boundp-using-class))))
+	    (cons
+	     (cdr location))
+	    (t
+	     (instance-structure-protocol-error slotd
+						'slot-boundp-using-class)))))
     (not (eq value +slot-unbound+))))
 
 (defmethod slot-makunbound-using-class
@@ -234,13 +234,13 @@
 	     ((fsc-instance-p object)
 	      (setf (clos-slots-ref (fsc-instance-slots object) location)
 		    +slot-unbound+))
-	     (t (error "unrecognized instance type"))))
+	     (t (bug "unrecognized instance type in ~S"
+		     'slot-makunbound-using-class))))
       (cons
        (setf (cdr location) +slot-unbound+))
       (t
-       (error "~@<The slot ~S has neither :INSTANCE nor :CLASS allocation, ~
-	       so it can't be written by the default ~S method.~@:>"
-	      slotd 'slot-makunbound-using-class))))
+       (instance-structure-protocol-error slotd
+					  'slot-makunbound-using-class))))
   object)
 
 (defmethod slot-value-using-class
