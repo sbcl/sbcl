@@ -1,4 +1,10 @@
-README,v 1.35 2003/08/05 23:00:32 kevinrosenberg Exp         -*- Text -*-
+$Id$         -*- Text -*-
+
+The canonical documentation for asdf is in the file asdf.texinfo.  
+The significant overlap between this file and that will one day be
+resolved by deleting text from this file; in the meantime, please look
+there before here.
+
 
 
 asdf: another system definition facility          
@@ -609,15 +615,16 @@ this pathname information will not be overwritten with
 if the user loads up the .asd file into his editor and
 interactively re-evaluates that form
 
-* Error handling
+ * Error handling
 
 It is an error to define a system incorrectly: an implementation may
 detect this and signal a generalised instance of
-SYSTEM-DEFINITION-ERROR
+SYSTEM-DEFINITION-ERROR.
 
 Operations may go wrong (for example when source files contain
 errors).  These are signalled using generalised instances of
-OPERATION-ERROR
+OPERATION-ERROR, with condition readers ERROR-COMPONENT and
+ERROR-OPERATION for the component and operation which erred.
 
 * Compilation error and warning handling
 
@@ -674,6 +681,11 @@ A "dry run" of an operation can be made with the following form:
 
 This uses unexported symbols.  What would be a nice interface for this
 functionality?
+
+** patches
+
+Sometimes one wants to 
+
 
 * missing bits in implementation
 
