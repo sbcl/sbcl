@@ -1,9 +1,16 @@
-;;;; the specifications of SBCL-specific packages, except..
+;;;; -*- Lisp -*-
+
+;;;; the specifications of target packages, except for a few things
+;;;; which are handled elsewhere by other mechanisms:
 ;;;;   * the creation of the trivial SB-SLOT-ACCESSOR-NAME package
 ;;;;   * any SHADOWing hackery
-;;;; The standard, non-SBCL-specific packages COMMON-LISP,
-;;;; COMMON-LISP-USER, and KEYWORD are also handled through other
-;;;; mechanisms.
+;;;;   * the standard, non-SBCL-specific packages COMMON-LISP,
+;;;;     COMMON-LISP-USER, and KEYWORD
+;;;;
+;;;; The packages are named SB!FOO here and elsewhere in
+;;;; cross-compilation, in order to avoid collision with corresponding
+;;;; SB-FOO packages in the cross-compilation host. They're renamed to
+;;;; SB-FOO later, after the danger of collision has passed.
 
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.

@@ -585,7 +585,8 @@
   (muffle-warning)
   (error "internal error -- no MUFFLE-WARNING restart"))
 
-;;; Trap errors during the macroexpansion.
+;;; Expand FORM using the macro whose MACRO-FUNCTION is FUN, trapping
+;;; errors which occur during the macroexpansion.
 (defun careful-expand-macro (fun form)
   (handler-bind (;; When cross-compiling, we can get style warnings
 		 ;; about e.g. undefined functions. An unhandled
@@ -2831,6 +2832,8 @@
 	       (aver (proper-list-of-length-p qdef 2))
 	       (second qdef))))
 
+    (/show "doing IR1 translator for %DEFMACRO" name)
+
     (unless (symbolp name)
       (compiler-error "The macro name ~S is not a symbol." name))
 
@@ -2840,7 +2843,8 @@
        (remhash name *free-functions*)
        (undefine-function-name name)
        (compiler-warning
-	"~S is being redefined as a macro when it was previously ~(~A~) to be a function."
+	"~S is being redefined as a macro when it was ~
+         previously ~(~A~) to be a function."
 	name
 	(info :function :where-from name)))
       (:macro)

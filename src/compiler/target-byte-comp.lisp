@@ -114,19 +114,22 @@
 ;;; Disassemble byte code from a SAP and constants vector.
 (defun disassem-byte-sap (sap bytes constants eps)
   (declare (optimize (inhibit-warnings 3)))
+  (/show "entering DISASSEM-BYTE-SAP" bytes constants eps)
   (let ((index 0))
     (labels ((newline ()
 	       (format t "~&~4D:" index))
 	     (next-byte ()
 	       (let ((byte (sap-ref-8 sap index)))
-		 (format t " ~2,'0X " byte)
+		 (format t " ~2,'0X" byte)
 		 (incf index)
 		 byte))
 	     (extract-24-bits ()
+	       (/show "in EXTRACT-24-BITS")
 	       (logior (ash (next-byte) 16)
 		       (ash (next-byte) 8)
 		       (next-byte)))
 	     (extract-extended-op ()
+	       (/show "in EXTRACT-EXTENDED-OP")
 	       (let ((byte (next-byte)))
 		 (if (= byte 255)
 		     (extract-24-bits)
@@ -142,6 +145,7 @@
 		     :var
 		     3-bits)))
 	     (extract-branch-target (byte)
+	       (/show "in EXTRACT-BRANCH-TARGET")
 	       (if (logbitp 0 byte)
 		   (let ((disp (next-byte)))
 		     (if (logbitp 7 disp)
@@ -155,10 +159,12 @@
 		   (aref constants index)
 		   "<bogus index>")))
       (loop
+        (/show "at head of LOOP" index bytes)
 	(unless (< index bytes)
 	  (return))
 
 	(when (eql index (first eps))
+	  (/show "in EQL INDEX (FIRST EPS) case")
 	  (newline)
 	  (pop eps)
 	  (let ((frame-size
@@ -172,6 +178,7 @@
 
 	(newline)
 	(let ((byte (next-byte)))
+	  (/show "at head of DISPATCH" index byte)
 	  (macrolet ((dispatch (&rest clauses)
 		       `(cond ,@(mapcar #'(lambda (clause)
 					    `((= (logand byte ,(caar clause))
@@ -251,6 +258,7 @@
 	      ;; if-eq
 	      (note "if-eq ~D" (extract-branch-target byte)))
 	     ((#b11111000 #b11011000)
+	      (/show "in XOP case")
 	      ;; XOP
 	      (let* ((low-3-bits (extract-3-bit-op byte))
 		     (xop (nth (if (eq low-3-bits :var) (next-byte) low-3-bits)

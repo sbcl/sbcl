@@ -499,21 +499,24 @@
 				   (element-type '*)
 				   unsafe?
 				   fail-inline?)
+  (/show "in %WITH-ARRAY-DATA-MACRO, yes.." array start end)
   (let ((size (gensym "SIZE-"))
+	(defaulted-end (gensym "DEFAULTED-END-"))
 	(data (gensym "DATA-"))
 	(cumulative-offset (gensym "CUMULATIVE-OFFSET-")))
     `(let* ((,size (array-total-size ,array))
-	    (,end (cond (,end
-			 (unless (or ,unsafe? (<= ,end ,size))
-			   ,(if fail-inline?
-				`(error "End ~D is greater than total size ~D."
-					,end ,size)
-				`(failed-%with-array-data ,array ,start ,end)))
-			 ,end)
-			(t ,size))))
-       (unless (or ,unsafe? (<= ,start ,end))
+	    (,defaulted-end
+	      (cond (,end
+		     (unless (or ,unsafe? (<= ,end ,size))
+		       ,(if fail-inline?
+			    `(error "End ~D is greater than total size ~D."
+				    ,end ,size)
+			    `(failed-%with-array-data ,array ,start ,end)))
+		     ,end)
+		    (t ,size))))
+       (unless (or ,unsafe? (<= ,start ,defaulted-end))
 	 ,(if fail-inline?
-	      `(error "Start ~D is greater than end ~D." ,start ,end)
+	      `(error "Start ~D is greater than end ~D." ,start ,defaulted-end)
 	      `(failed-%with-array-data ,array ,start ,end)))
        (do ((,data ,array (%array-data-vector ,data))
 	    (,cumulative-offset 0
@@ -522,7 +525,7 @@
 	   ((not (array-header-p ,data))
 	    (values (the (simple-array ,element-type 1) ,data)
 		    (the index (+ ,cumulative-offset ,start))
-		    (the index (+ ,cumulative-offset ,end))
+		    (the index (+ ,cumulative-offset ,defaulted-end))
 		    (the index ,cumulative-offset)))
 	 (declare (type index ,cumulative-offset))))))
 
@@ -584,10 +587,10 @@
 		`(lambda (,',array ,@n-indices
 				   ,@',(when new-value (list new-value)))
 		   (let* (,@(let ((,index -1))
-			      (mapcar #'(lambda (name)
-					  `(,name (array-dimension
-						   ,',array
-						   ,(incf ,index))))
+			      (mapcar (lambda (name)
+					`(,name (array-dimension
+						 ,',array
+						 ,(incf ,index))))
 				      dims))
 			    (,',index
 			     ,(if (null dims)

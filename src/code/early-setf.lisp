@@ -524,7 +524,7 @@ GET-SETF-EXPANSION directly."
 (sb!xc:define-setf-expander ldb (bytespec place &environment env)
   #!+sb-doc
   "The first argument is a byte specifier. The second is any place form
-  acceptable to SETF. Replaces the specified byte of the number in this
+  acceptable to SETF. Replace the specified byte of the number in this
   place with bits from the low-order end of the new value."
   (declare (type sb!c::lexenv env))
   (multiple-value-bind (dummies vals newval setter getter)

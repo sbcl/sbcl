@@ -575,11 +575,13 @@
                                       ;   from "code/pathname"
  ("src/code/sharpm"            :not-host) ; uses stuff from "code/reader"
 
- ;; stuff for byte compilation. Note that although byte code is
+ ;; stuff for byte compilation
+ ;;
+ ;; This is mostly :NOT-HOST because even though byte code is
  ;; "portable", it'd be hard to make it work on the cross-compilation
  ;; host, because fundamental BYTE-FUNCTION-OR-CLOSURE types are
- ;; implemented as FUNCALLABLE-INSTANCEs, and it's not obvious
- ;; how to emulate those in a vanilla ANSI Common Lisp.
+ ;; implemented as FUNCALLABLE-INSTANCEs, and it's not obvious how to
+ ;; emulate those in a vanilla ANSI Common Lisp.
  ("src/code/byte-types" :not-host)
  ("src/compiler/byte-comp")
  ("src/compiler/target-byte-comp" :not-host)
@@ -609,7 +611,23 @@
  ;; FIXME: Does this really need stuff from compiler/dump.lisp?
  ("src/compiler/target-dump" :not-host) ; needs stuff from compiler/dump.lisp
 
- ("src/code/cold-init" :not-host) ; needs (SETF EXTERN-ALIEN) macroexpansion
+ ("src/code/cold-init" :not-host ; needs (SETF EXTERN-ALIEN) macroexpansion
+  ;; FIXME: When building sbcl-0.pre7.14.flaky4.5 under sbcl-0.6.12.1
+  ;; with :SB-SHOW on the target *FEATURES* list, cross-compilation of
+  ;; this file gives a WARNING in HEXSTR,
+  ;;   Lisp error during constant folding:
+  ;;   Argument X is not a REAL: NIL
+  ;; This seems to come from DEF!MACRO %WITH-ARRAY-DATA-MACRO code
+  ;; which looks like
+  ;;     (cond (,end
+  ;;            (unless (or ,unsafe? (<= ,end ,size))
+  ;;		  ..))
+  ;;           ..)
+  ;; where the system is trying to constant-fold the <= form when the
+  ;; ,END binding is known to be NIL at compile time. Since the <= form 
+  ;; is unreachable in that case, this shouldn't be signalling a WARNING;
+  ;; but as long as it is, we have to ignore it in order to go on.
+  :ignore-failure-p)
 
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;; target macros and DECLAIMs installed at build-the-cross-compiler time

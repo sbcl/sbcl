@@ -46,12 +46,16 @@
   ;; (Hopefully this will go away as we move the files above into cold load.)
   ;; -- WHN 19991214
   (let ((fullname (concatenate 'string stem ".lisp")))
-    (sb!int:/show "about to compile" fullname)
+    ;; (Now that we use the byte compiler for interpretation,
+    ;; /SHOW doesn't get compiled properly until the src/assembly
+    ;; files have been loaded.)
+    #+sb-show (print "/about to compile src/assembly file")
+    #+sb-show (print fullname)
     (multiple-value-bind
 	(compiled-truename compilation-warnings-p compilation-failure-p)
 	(compile-file fullname)
       (declare (ignore compilation-warnings-p))
-      (sb!int:/show "done compiling" fullname)
+      #+sb-show (print "/done compiling src/assembly file")
       (if compilation-failure-p
 	  (error "COMPILE-FILE of ~S failed." fullname)
 	  (unless (load compiled-truename)

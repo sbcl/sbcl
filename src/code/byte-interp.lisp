@@ -615,9 +615,9 @@
 	   (type pc pc))
   pc)
 
-;;; This is exactly like THROW, except that the tag is the last thing on
-;;; the stack instead of the first. This is used for RETURN-FROM (hence the
-;;; name).
+;;; This is exactly like THROW, except that the tag is the last thing
+;;; on the stack instead of the first. This is used for RETURN-FROM
+;;; (hence the name).
 (define-xop return-from (component old-pc pc fp)
   (declare (type code-component component)
 	   (type pc old-pc)

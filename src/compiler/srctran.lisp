@@ -2706,7 +2706,7 @@
 
 (dolist (x '(= char= + * logior logand logxor))
   (%deftransform x '(function * *) #'commutative-arg-swap
-		 "place constant arg last."))
+		 "place constant arg last"))
 
 ;;; Handle the case of a constant BOOLE-CODE.
 (deftransform boole ((op x y) * * :when :both)
@@ -3439,8 +3439,6 @@
 (defoptimizer (coerce derive-type) ((value type))
   (let ((value-type (continuation-type value))
         (type-type (continuation-type type)))
-    #!+sb-show (format t "~&coerce-derive-type value-type ~A type-type ~A~%"
-                       value-type type-type)
     (labels
         ((good-cons-type-p (cons-type)
            ;; Make sure the cons-type we're looking at is something
