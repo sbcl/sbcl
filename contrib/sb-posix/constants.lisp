@@ -10,7 +10,7 @@
  
  "sys/socket.h" "sys/un.h" "netinet/in.h" "netinet/in_systm.h"
  "netinet/ip.h" "net/if.h" "netdb.h" "errno.h" "netinet/tcp.h"
- "fcntl.h" )
+ "fcntl.h" "sys/mman.h")
 
 ;;; then the stuff we're looking for
 ((:integer af-inet "AF_INET" "IP Protocol family")
@@ -43,4 +43,13 @@
  (:integer w-ok "W_OK")
  (:integer x-ok "X_OK")
  (:integer f-ok "F_OK")
+
+ ;; mmap()
+ (:integer prot-none "PROT_NONE" "mmap: no protection")
+ (:integer prot-read "PROT_READ" "mmap: read protection")
+ (:integer prot-write "PROT_WRITE" "mmap: write protection")
+ (:integer prot-exec "PROT_EXEC" "mmap: execute protection")
+ (:integer map-shared "MAP_SHARED" "mmap: shared memory")
+ (:integer map-private "MAP_PRIVATE" "mmap: private mapping")
+ (:integer map-fixed "MAP_FIXED" "mmap: map at given location")
  )

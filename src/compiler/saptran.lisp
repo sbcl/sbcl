@@ -48,10 +48,11 @@
   (unsigned-byte 32)
   ())
 
-#!+alpha
+;; FIXME These are supported natively on alpha and using deftransforms
+;; in compiler/x86/sap.lisp, which in OAO$n$ style need copying to
+;; other 32 bit systems
 (defknown sap-ref-64 (system-area-pointer fixnum) (unsigned-byte 64)
   (flushable))
-#!+alpha
 (defknown %set-sap-ref-64 (system-area-pointer fixnum (unsigned-byte 64))
   (unsigned-byte 64)
   ())
@@ -74,10 +75,8 @@
   (signed-byte 32)
   ())
 
-#!+alpha
 (defknown signed-sap-ref-64 (system-area-pointer fixnum) (signed-byte 64)
   (flushable))
-#!+alpha
 (defknown %set-signed-sap-ref-64 (system-area-pointer fixnum (signed-byte 64))
   (signed-byte 64)
   ())
@@ -146,6 +145,10 @@
   (def %set-sap-ref-32)
   (def signed-sap-ref-32)
   (def %set-signed-sap-ref-32)
+  (def sap-ref-64)
+  (def %set-sap-ref-64)
+  (def signed-sap-ref-64)
+  (def %set-signed-sap-ref-64)
   (def sap-ref-sap)
   (def %set-sap-ref-sap)
   (def sap-ref-single)

@@ -216,15 +216,8 @@
 ;;;  L_XTND    Extend the file size.
 (defun unix-lseek (fd offset whence)
   (declare (type unix-fd fd)
-	   (type (unsigned-byte 32) offset)
 	   (type (integer 0 2) whence))
-  #!-(and x86 bsd)
-  (int-syscall ("lseek" int off-t int) fd offset whence)
-  ;; Need a 64-bit return value type for this. TBD. For now,
-  ;; don't use this with any 2G+ partitions.
-  #!+(and x86 bsd)
-  (int-syscall ("lseek" int unsigned-long unsigned-long int)
-	       fd offset 0 whence))
+  (int-syscall ("lseek" int off-t int) fd offset whence))
 
 ;;; UNIX-READ accepts a file descriptor, a buffer, and the length to read.
 ;;; It attempts to read len bytes from the device associated with fd
@@ -407,8 +400,8 @@
 ;;; information.
 (defun unix-ioctl (fd cmd arg)
   (declare (type unix-fd fd)
-	   (type (unsigned-byte 32) cmd))
-  (void-syscall ("ioctl" int unsigned-int (* char)) fd cmd arg))
+	   (type (signed-byte 32) cmd))
+  (void-syscall ("ioctl" int signed-int (* char)) fd cmd arg))
 
 ;;;; sys/resource.h
 

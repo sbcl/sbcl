@@ -8,7 +8,7 @@
 		       errno (sb-int:strerror errno))))))
 
 (defun syscall-error ()
-  (error 'sb-posix::syscall-error :errno (get-errno)))
+  (error 'sb-posix:syscall-error :errno (get-errno)))
 
 ;;; filesystem access
 
@@ -73,3 +73,18 @@
 (define-call "setpgid" int minusp
 	     (pid sb-posix::pid-t) (pgid sb-posix::pid-t))
 (define-call "setpgrp" int minusp)
+
+;;; mmap
+(define-call "mmap" sb-sys:system-area-pointer
+  ;; KLUDGE: #XFFFFFFFF is (void *)-1, which is the charming return
+  ;; value of mmap on failure.  Except on 64 bit systems ...
+  (lambda (res)
+    (= (sb-sys:sap-int res) #-alpha #XFFFFFFFF #+alpha #xffffffffffffffff))
+  (addr sap-or-nil) (length unsigned) (prot unsigned)
+  (flags unsigned) (fd file-descriptor) (offset int))
+
+(define-call "munmap" int minusp
+  (start sb-sys:system-area-pointer) (length unsigned))
+
+(define-call "getpagesize" int minusp)
+

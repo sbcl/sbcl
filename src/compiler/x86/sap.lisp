@@ -499,3 +499,23 @@
     (inst add
 	  sap
 	  (- (* vector-data-offset n-word-bytes) other-pointer-lowtag))))
+
+;;; Transforms for 64-bit SAP accessors.
+
+(deftransform sap-ref-64 ((sap offset) (* *))
+  '(logior (sap-ref-32 sap offset)
+           (ash (sap-ref-32 sap (+ offset 4)) 32)))
+
+(deftransform signed-sap-ref-64 ((sap offset) (* *))
+  '(logior (sap-ref-32 sap offset)
+           (ash (signed-sap-ref-32 sap (+ offset 4)) 32)))
+
+(deftransform %set-sap-ref-64 ((sap offset value) (* * *))
+  '(progn
+     (%set-sap-ref-32 sap offset (logand value #xffffffff))
+     (%set-sap-ref-32 sap (+ offset 4) (ash value -32))))
+
+(deftransform %set-signed-sap-ref-64 ((sap offset value) (* * *))
+  '(progn
+     (%set-sap-ref-32 sap offset (logand value #xffffffff))
+     (%set-signed-sap-ref-32 sap (+ offset 4) (ash value -32))))

@@ -11,12 +11,12 @@ FD_CLR FD_ISSET FD_SET FD_ZERO accept acct adjtime adjtimex bdflush
 bind break brk cacheflush capget capset chroot clone connect creat
 create_module delete_module execve exit fcntl fdatasync flock fork
 fstat fstatfs fsync ftime ftruncate getcontext getdents getdomainname
-getdtablesize getgroups gethostid gethostname getitimer getpagesize
+getdtablesize getgroups gethostid gethostname getitimer 
 getpeername getpriority getrlimit getrusage getsockname getsockopt
 gettimeofday gtty idle init_module ioctl ioctl_list ioperm iopl listen
-llseek lock lseek lstat madvise mincore mknod mlock mlockall mmap
+llseek lock lseek lstat madvise mincore mknod mlock mlockall 
 modify_ldt mount mprotect mpx mremap msgctl msgget msgop msgrcv msgsnd
-msync munlock munlockall munmap nanosleep nice open pause pipe poll
+msync munlock munlockall nanosleep nice open pause pipe poll
 prctl pread prof profil pselect ptrace pwrite query_module quotactl
 read readdir readlink readv reboot recv recvfrom recvmsg rename rmdir
 sbrk sched_get_priority_max sched_get_priority_min sched_getparam

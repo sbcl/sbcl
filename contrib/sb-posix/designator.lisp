@@ -22,3 +22,6 @@
   (sb-impl::file-stream (sb-impl::fd-stream-fd file-descriptor))
   (fixnum file-descriptor))
 
+(define-designator sap-or-nil sb-sys:system-area-pointer
+  (null (sb-sys:int-sap 0))
+  (sb-sys:system-area-pointer sap-or-nil))

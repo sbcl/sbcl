@@ -558,12 +558,12 @@
 	    (8 'signed-sap-ref-8)
 	    (16 'signed-sap-ref-16)
 	    (32 'signed-sap-ref-32)
-	    #!+alpha (64 'signed-sap-ref-64))
+	    (64 'signed-sap-ref-64))
 	  (case (alien-integer-type-bits type)
 	    (8 'sap-ref-8)
 	    (16 'sap-ref-16)
 	    (32 'sap-ref-32)
-	    #!+alpha (64 'sap-ref-64)))))
+	    (64 'sap-ref-64)))))
     (if ref-fun
 	`(,ref-fun ,sap (/ ,offset sb!vm:n-byte-bits))
 	(error "cannot extract ~W-bit integers"
