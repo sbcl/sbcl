@@ -49,7 +49,7 @@
 		(let ((name (car form)))
 		  (dolist (x (sb!c::lexenv-functions environment))
 		    (when (and (eq (car x) name)
-			       (not (sb!c::defined-function-p (cdr x))))
+			       (not (sb!c::defined-fun-p (cdr x))))
 		      (return t)))))
 	   (expand-or-get-setf-inverse form environment))
 	  ((setq temp (info :setf :inverse (car form)))

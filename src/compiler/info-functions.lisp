@@ -180,8 +180,8 @@
   (let ((found (and env
 		    (cdr (assoc name (sb!c::lexenv-functions env)
 				:test #'equal)))))
-    (unless (eq (cond ((sb!c::defined-function-p found)
-		       (sb!c::defined-function-inlinep found))
+    (unless (eq (cond ((sb!c::defined-fun-p found)
+		       (sb!c::defined-fun-inlinep found))
 		      (found :notinline)
 		      (t
 		       (info :function :inlinep name)))

@@ -123,13 +123,16 @@
 	       (inlinep (info :function :inlinep name)))
 	   (setf (gethash name *free-functions*)
 		 (if (or expansion inlinep)
-		     (make-defined-function
+		     (make-defined-fun
 		      :name name
 		      :inline-expansion expansion
 		      :inlinep inlinep
 		      :where-from (info :function :where-from name)
 		      :type (info :function :type name))
 		     (let ((info (info :function :accessor-for name)))
+		       (when info
+			 (error "no expansion for ~S even though :ACCESSOR-FOR"
+				name))
 		       (etypecase info
 			 (null
 			  (find-free-really-function name))
@@ -507,10 +510,10 @@
 ;;; functional instead.
 (defun reference-leaf (start cont leaf)
   (declare (type continuation start cont) (type leaf leaf))
-  (let* ((leaf (or (and (defined-function-p leaf)
-			(not (eq (defined-function-inlinep leaf)
+  (let* ((leaf (or (and (defined-fun-p leaf)
+			(not (eq (defined-fun-inlinep leaf)
 				 :notinline))
-			(let ((fun (defined-function-functional leaf)))
+			(let ((fun (defined-fun-functional leaf)))
 			  (when (and fun (not (functional-kind fun)))
 			    (maybe-reanalyze-function fun))))
 		   leaf))
@@ -576,7 +579,11 @@
 		  (careful-expand-macro (info :function :macro-function fun)
 					form)))
     ((nil :function)
-     (ir1-convert-srctran start cont (find-free-function fun "Eh?") form))))
+     (ir1-convert-srctran start
+			  cont
+			  (find-free-function fun
+					      "shouldn't happen! (no-cmacro)")
+			  form))))
 
 (defun muffle-warning-or-die ()
   (muffle-warning)
@@ -704,8 +711,8 @@
 ;;; go to ok-combination conversion.
 (defun ir1-convert-srctran (start cont var form)
   (declare (type continuation start cont) (type global-var var))
-  (let ((inlinep (when (defined-function-p var)
-		   (defined-function-inlinep var))))
+  (let ((inlinep (when (defined-fun-p var)
+		   (defined-fun-inlinep var))))
     (if (eq inlinep :notinline)
 	(ir1-convert-combination start cont form var)
 	(let ((transform (info :function :source-transform (leaf-name var))))
@@ -893,19 +900,19 @@
 	(make-lexenv :default res :variables (new-venv))
 	res)))
 
-;;; Return a DEFINED-FUNCTION which copies a global-var but for its inlinep.
+;;; Return a DEFINED-FUN which copies a GLOBAL-VAR but for its INLINEP.
 (defun make-new-inlinep (var inlinep)
   (declare (type global-var var) (type inlinep inlinep))
-  (let ((res (make-defined-function
+  (let ((res (make-defined-fun
 	      :name (leaf-name var)
 	      :where-from (leaf-where-from var)
 	      :type (leaf-type var)
 	      :inlinep inlinep)))
-    (when (defined-function-p var)
-      (setf (defined-function-inline-expansion res)
-	    (defined-function-inline-expansion var))
-      (setf (defined-function-functional res)
-	    (defined-function-functional var)))
+    (when (defined-fun-p var)
+      (setf (defined-fun-inline-expansion res)
+	    (defined-fun-inline-expansion var))
+      (setf (defined-fun-functional res)
+	    (defined-fun-functional var)))
     res))
 
 ;;; Parse an inline/notinline declaration. If it's a local function we're
@@ -1832,17 +1839,17 @@
 		     :policy (lexenv-policy *lexenv*))))
       (ir1-convert-lambda `(lambda ,@body) name))))
 
-;;; Get a DEFINED-FUNCTION object for a function we are about to
+;;; Get a DEFINED-FUN object for a function we are about to
 ;;; define. If the function has been forward referenced, then
 ;;; substitute for the previous references.
-(defun get-defined-function (name)
+(defun get-defined-fun (name)
   (let* ((name (proclaim-as-fun-name name))
-	 (found (find-free-function name "Eh?")))
+	 (found (find-free-function name "shouldn't happen! (defined-fun)")))
     (note-name-defined name :function)
-    (cond ((not (defined-function-p found))
+    (cond ((not (defined-fun-p found))
 	   (aver (not (info :function :inlinep name)))
 	   (let* ((where-from (leaf-where-from found))
-		  (res (make-defined-function
+		  (res (make-defined-fun
 			:name name
 			:where-from (if (eq where-from :declared)
 					:declared :defined)
@@ -1851,9 +1858,9 @@
 	     (setf (gethash name *free-functions*) res)))
 	  ;; If *FREE-FUNCTIONS* has a previously converted definition
 	  ;; for this name, then blow it away and try again.
-	  ((defined-function-functional found)
+	  ((defined-fun-functional found)
 	   (remhash name *free-functions*)
-	   (get-defined-function name))
+	   (get-defined-fun name))
 	  (t found))))
 
 ;;; Check a new global function definition for consistency with
@@ -1899,19 +1906,19 @@
 ;;; expansion. This prevents recursive inline expansion of
 ;;; opportunistic pseudo-inlines.
 (defun ir1-convert-lambda-for-defun (lambda var expansion converter)
-  (declare (cons lambda) (function converter) (type defined-function var))
-  (let ((var-expansion (defined-function-inline-expansion var)))
-    (unless (eq (defined-function-inlinep var) :inline)
-      (setf (defined-function-inline-expansion var) nil))
+  (declare (cons lambda) (function converter) (type defined-fun var))
+  (let ((var-expansion (defined-fun-inline-expansion var)))
+    (unless (eq (defined-fun-inlinep var) :inline)
+      (setf (defined-fun-inline-expansion var) nil))
     (let* ((name (leaf-name var))
 	   (fun (funcall converter lambda name))
 	   (function-info (info :function :info name)))
-      (setf (functional-inlinep fun) (defined-function-inlinep var))
+      (setf (functional-inlinep fun) (defined-fun-inlinep var))
       (assert-new-definition var fun)
-      (setf (defined-function-inline-expansion var) var-expansion)
+      (setf (defined-fun-inline-expansion var) var-expansion)
       ;; If definitely not an interpreter stub, then substitute for any
       ;; old references.
-      (unless (or (eq (defined-function-inlinep var) :notinline)
+      (unless (or (eq (defined-fun-inlinep var) :notinline)
 		  (not *block-compile*)
 		  (and function-info
 		       (or (function-info-transforms function-info)
@@ -1920,7 +1927,7 @@
 	(substitute-leaf fun var)
 	;; If in a simple environment, then we can allow backward
 	;; references to this function from following top-level forms.
-	(when expansion (setf (defined-function-functional var) fun)))
+	(when expansion (setf (defined-fun-functional var) fun)))
       fun)))
 
 ;;; the even-at-compile-time part of DEFUN
@@ -1929,22 +1936,21 @@
 ;;; no inline expansion.
 (defun %compiler-defun (name lambda-with-lexenv)
 
-  (let ((defined-function nil)) ; will be set below if we're in the compiler
+  (let ((defined-fun nil)) ; will be set below if we're in the compiler
     
-    ;; when in the compiler
-    (when (boundp '*lexenv*) 
+    (when (boundp '*lexenv*) ; when in the compiler
       (when sb!xc:*compile-print*
 	(compiler-mumble "~&; recognizing DEFUN ~S~%" name))
       (remhash name *free-functions*)
-      (setf defined-function (get-defined-function name)))
+      (setf defined-fun (get-defined-fun name)))
 
     (become-defined-fun-name name)
 
     (cond (lambda-with-lexenv
 	   (setf (info :function :inline-expansion-designator name)
 		 lambda-with-lexenv)
-	   (when defined-function 
-	     (setf (defined-function-inline-expansion defined-function)
+	   (when defined-fun 
+	     (setf (defined-fun-inline-expansion defined-fun)
 		   lambda-with-lexenv)))
 	  (t
 	   (clear-info :function :inline-expansion-designator name)))
@@ -1952,9 +1958,9 @@
     ;; old CMU CL comment:
     ;;   If there is a type from a previous definition, blast it,
     ;;   since it is obsolete.
-    (when (and defined-function
-	       (eq (leaf-where-from defined-function) :defined))
-      (setf (leaf-type defined-function)
+    (when (and defined-fun
+	       (eq (leaf-where-from defined-fun) :defined))
+      (setf (leaf-type defined-fun)
 	    ;; FIXME: If this is a block compilation thing, shouldn't
 	    ;; we be setting the type to the full derived type for the
 	    ;; definition, instead of this most general function type?

@@ -99,8 +99,10 @@
   ;; option was given with no argument, or 0 if no PRINT-OBJECT option
   ;; was given
   (print-object 0 :type (or cons symbol (member 0)))
-  ;; the index of the raw data vector and the number of words in it.
-  ;; NIL and 0 if not allocated yet.
+  ;; the index of the raw data vector and the number of words in it,
+  ;; or NIL and 0 if not allocated (either because this structure
+  ;; has no raw slots, or because we're still parsing it and haven't
+  ;; run across any raw slots yet)
   (raw-index nil :type (or index null))
   (raw-length 0 :type index)
   ;; the value of the :PURE option, or :UNSPECIFIED. This is only
@@ -665,29 +667,29 @@
 	(t
 	 (values nil nil nil))))
 
-;;; Allocate storage for a DSD in DEFSTRUCT. This is where we decide
-;;; whether a slot is raw or not. If raw, and we haven't allocated a
-;;; raw-index yet for the raw data vector, then do it. Raw objects are
-;;; aligned on the unit of their size.
-(defun allocate-1-slot (defstruct dsd)
+;;; Allocate storage for a DSD in DD. This is where we decide whether
+;;; a slot is raw or not. If raw, and we haven't allocated a raw-index
+;;; yet for the raw data vector, then do it. Raw objects are aligned
+;;; on the unit of their size.
+(defun allocate-1-slot (dd dsd)
   (multiple-value-bind (raw? raw-type words)
-      (if (eq (dd-type defstruct) 'structure)
+      (if (eq (dd-type dd) 'structure)
 	  (structure-raw-slot-type-and-size (dsd-type dsd))
 	  (values nil nil nil))
     (/noshow "ALLOCATE-1-SLOT" dsd raw? raw-type words)
     (cond ((not raw?)
-	   (setf (dsd-index dsd) (dd-length defstruct))
-	   (incf (dd-length defstruct)))
+	   (setf (dsd-index dsd) (dd-length dd))
+	   (incf (dd-length dd)))
 	  (t
-	   (unless (dd-raw-index defstruct)
-	     (setf (dd-raw-index defstruct) (dd-length defstruct))
-	     (incf (dd-length defstruct)))
-	   (let ((off (rem (dd-raw-length defstruct) words)))
+	   (unless (dd-raw-index dd)
+	     (setf (dd-raw-index dd) (dd-length dd))
+	     (incf (dd-length dd)))
+	   (let ((off (rem (dd-raw-length dd) words)))
 	     (unless (zerop off)
-	       (incf (dd-raw-length defstruct) (- words off))))
+	       (incf (dd-raw-length dd) (- words off))))
 	   (setf (dsd-raw-type dsd) raw-type)
-	   (setf (dsd-index dsd) (dd-raw-length defstruct))
-	   (incf (dd-raw-length defstruct) words))))
+	   (setf (dsd-index dsd) (dd-raw-length dd))
+	   (incf (dd-raw-length dd) words))))
   (values))
 
 (defun typed-structure-info-or-lose (name)
@@ -828,6 +830,56 @@
 
   (values))
 
+;;; Return a form describing the writable place used for this slot
+;;; in the instance named INSTANCE-NAME.
+(defun %accessor-place-form (dd dsd instance-name)
+  (let (;; the operator that we'll use to access a typed slot or, in
+	;; the case of a raw slot, to read the vector of raw slots
+	(ref (ecase (dd-type dd)
+	       (structure '%instance-ref)
+	       (funcallable-structure '%funcallable-instance-info)
+	       (list 'nth-but-with-sane-arg-order)
+	       (vector 'aref)))
+	(raw-type (dsd-raw-type dsd)))
+    (if (eq raw-type t) ; if not raw slot
+	`(,ref ,instance-name ,(dsd-index dsd))
+	(let (;; the operator that we'll use to access one value in
+	      ;; the raw data vector
+	      (rawref (ecase raw-type
+			;; The compiler thinks that the raw data
+			;; vector is a vector of unsigned bytes, so if
+			;; the slot we want to access actually *is* an
+			;; unsigned byte, it'll access the slot for
+			;; us even if we don't lie to it at all.
+			(unsigned-byte 'aref)
+			;; "A lie can travel halfway round the world while
+			;; the truth is putting on its shoes." -- Mark Twain
+			(single-float '%raw-ref-single)
+			(double-float '%raw-ref-double)
+			#!+long-float (long-float '%raw-ref-long)
+			(complex-single-float '%raw-ref-complex-single)
+			(complex-double-float '%raw-ref-complex-double)
+			#!+long-float (complex-long-float
+				       '%raw-ref-complex-long))))
+	  `(,rawref (,ref ,instance-name ,(dd-raw-index dd))
+		    ,(dsd-index dsd))))))
+
+;;; Return inline expansion designators (i.e. values suitable for
+;;; (INFO :FUNCTION :INLINE-EXPANSSION-DESIGNATOR ..)) for the reader
+;;; and writer functions of the slot described by DSD.
+(defun accessor-inline-expansion-designators (dd dsd)
+  ;; ordinary tagged non-raw slot case
+  (values (lambda ()
+	    `(lambda (instance)
+	       (declare (type ,(dd-name dd) instance))
+	       (truly-the ,(dsd-type dsd)
+			  ,(%accessor-place-form dd dsd 'instance))))
+	  (lambda ()
+	    `(lambda (new-value instance)
+	       (declare (type ,(dsd-type dsd) new-value))
+	       (declare (type ,(dd-name dd) structure-object))
+	       (setf ,(%accessor-place-form dd dsd 'instance) new-value)))))
+
 ;;; Do (COMPILE LOAD EVAL)-time actions for the defstruct described by DD.
 (defun %compiler-defstruct (dd inherits)
   (declare (type defstruct-description dd))
@@ -849,7 +901,7 @@
 			(undefine-structure class)
 			(subs (class-proper-name class)))
 		      (when (subs)
-			(warn "Removing old subclasses of ~S:~%  ~S"
+			(warn "removing old subclasses of ~S:~%  ~S"
 			      (sb!xc:class-name class)
 			      (subs))))))
 	  (t
@@ -871,18 +923,40 @@
 	 (when copier
 	   (proclaim `(ftype (function (,name) ,name) ,copier))))
 
-       (dolist (slot (dd-slots dd))
-	 (let* ((fun (dsd-accessor-name slot))
-		(setf-fun `(setf ,fun)))
-	   (when (and fun (eq (dsd-raw-type slot) t))
-	     (proclaim-as-defstruct-fun-name fun)
-	     (setf (info :function :accessor-for fun) class)
-	     (unless (dsd-read-only slot)
-	       (proclaim-as-defstruct-fun-name setf-fun)
-	       (setf (info :function :accessor-for setf-fun) class)))))
+       (dolist (dsd (dd-slots dd))
+	 (let* ((accessor-name (dsd-accessor-name dsd)))
+	   (when accessor-name
+
+	     ;; new implementation sbcl-0.pre7.64
+	     (multiple-value-bind (reader-designator writer-designator)
+		 (accessor-inline-expansion-designators dd dsd)
+	       (setf (info :function
+			   :inline-expansion-designator
+			   accessor-name)
+		     reader-designator
+		     (info :function :inlinep accessor-name)
+		     :inline)
+	       (unless (dsd-read-only dsd)
+		 (let ((setf-accessor-name `(setf ,accessor-name)))
+		   (setf (info :function
+			       :inline-expansion-designator
+			       setf-accessor-name)
+			 writer-designator
+			 (info :function :inlinep setf-accessor-name)
+			 :inline))))
+
+	     ;; old code from before sbcl-0.pre7.64, will hopefully
+	     ;; fade away and/or merge into new code above
+	     (when (eq (dsd-raw-type dsd) t) ; when not raw slot
+	       (proclaim-as-defstruct-fun-name accessor-name)
+	       (setf (info :function :accessor-for accessor-name) class)
+	       (unless (dsd-read-only dsd)
+		 (proclaim-as-defstruct-fun-name `(setf ,accessor-name))
+		 (setf (info :function :accessor-for `(setf ,accessor-name))
+		       class))))))
 
        ;; FIXME: Couldn't this logic be merged into
-       ;; PROCLAIM-AS-DEFSTRUCT-FUNCTION?
+       ;; PROCLAIM-AS-DEFSTRUCT-FUN-NAME?
        (when (boundp 'sb!c:*free-functions*) ; when compiling
 	 (let ((free-functions sb!c:*free-functions*))
 	   (dolist (slot (dd-slots dd))
@@ -1077,9 +1151,9 @@
 ;;;; slot accessors for raw slots
 
 ;;; Return info about how to read/write a slot in the value stored in
-;;; OBJECT. This is also used by constructors (we can't use the
-;;; accessor function, since some slots are read-only.) If supplied,
-;;; DATA is a variable holding the raw-data vector.
+;;; OBJECT. This is also used by constructors (since we can't safely
+;;; use the accessor function, since some slots are read-only). If
+;;; supplied, DATA is a variable holding the raw-data vector.
 ;;;
 ;;; returned values:
 ;;; 1. accessor function name (SETFable)

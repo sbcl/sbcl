@@ -64,7 +64,7 @@
       (let* ((where (info :function :where-from name))
 	     (*compiler-error-context* (lambda-bind (main-entry leaf)))
 	     (global-def (gethash name *free-functions*))
-	     (global-p (defined-function-p global-def)))
+	     (global-p (defined-fun-p global-def)))
 	(note-name-defined name :function)
 	(when global-p
 	  (remhash name *free-functions*))
@@ -95,8 +95,8 @@
 ;;; types.
 (defun note-assumed-types (component name var)
   (when (and (eq (leaf-where-from var) :assumed)
-	     (not (and (defined-function-p var)
-		       (eq (defined-function-inlinep var) :notinline)))
+	     (not (and (defined-fun-p var)
+		       (eq (defined-fun-inlinep var) :notinline)))
 	     (eq (info :function :where-from name) :assumed)
 	     (eq (info :function :kind name) :function))
     (let ((atype (info :function :assumed-type name)))

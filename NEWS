@@ -869,6 +869,15 @@ changes in sbcl-0.7.0 relative to sbcl-0.6.13:
   advantage of the new EVAL-WHEN stuff and to clean them up in 
   general, and they are now more ANSI-compliant in a number of
   ways. Martin Atzmueller is responsible for a lot of this.
+?? Inlining can now be controlled the ANSI way, without
+  MAYBE-INLINE, since the idiom
+	(DECLAIM (INLINE FOO))
+	(DEFUN FOO (..) ..)
+	(DECLAIM (NOTINLINE FOO))
+	(DEFUN BAR (..) (FOO ..))
+	(DEFUN BLETCH (..) (DECLARE (INLINE FOO)) (FOO ..))
+  now does what ANSI says it should. The CMU-CL-style 
+  SB-EXT:MAYBE-INLINE declaration is now deprecated and ignored.
 * A bug in LOOP operations on hash tables has been fixed, thanks
   to a bug report and patch from Alexey Dejneka.
 * PPRINT-LOGICAL-BLOCK now copies the *PRINT-LINES* value on entry

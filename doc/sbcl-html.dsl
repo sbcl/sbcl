@@ -19,11 +19,16 @@ at Carnegie Mellon University and released into the public domain. The
 software is in the public domain and is provided with absolutely no
 warranty. See the COPYING and CREDITS files for more information.
 
+KLUDGE: The ENTITY docbook.dsl command is hardwired to the appropriate
+location for my OpenBSD 2.9 system. There's got to be a more flexible
+way to do it, but I'm not enough of an SGML guru to begin to guess
+what it would be. (WHN 2001-10-15)
+
 --
 
  [<!ENTITY docbook.dsl
            SYSTEM
-	   "/usr/lib/sgml/stylesheets/nwalsh-modular/html/docbook.dsl"
+	   "/usr/local/share/sgml/docbook/dsssl/modular/html/docbook.dsl"
 	   CDATA
 	   dsssl>]>
 

@@ -22,7 +22,7 @@
 			   (functions variables blocks tags type-restrictions
 				      lambda cleanup policy options)))
   ;; an alist of (NAME . WHAT), where WHAT is either a FUNCTIONAL (a
-  ;; local function), a DEFINED-FUNCTION, representing an
+  ;; local function), a DEFINED-FUN, representing an
   ;; INLINE/NOTINLINE declaration, or a list (MACRO . <function>) (a
   ;; local macro, with the specifier expander). Note that NAME may be
   ;; a (SETF <name>) list, not necessarily a single symbol.

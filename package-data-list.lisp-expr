@@ -721,6 +721,7 @@ retained, possibly temporariliy, because it might be used internally."
              "CONSTANTLY-T" "CONSTANTLY-NIL" "CONSTANTLY-0"
              "PSXHASH"
              "%BREAK"
+	     "NTH-BUT-WITH-SANE-ARG-ORDER"
 
              ;; ..and macros..
              "COLLECT"

@@ -767,7 +767,7 @@
 ;;; wondering if something should be done to special-case the call. If
 ;;; CALL is a call to a global function, then see whether it defined
 ;;; or known:
-;;; -- If a DEFINED-FUNCTION should be inline expanded, then convert
+;;; -- If a DEFINED-FUN should be inline expanded, then convert
 ;;;    the expansion and change the call to call it. Expansion is
 ;;;    enabled if :INLINE or if SPACE=0. If the FUNCTIONAL slot is
 ;;;    true, we never expand, since this function has already been
@@ -788,8 +788,8 @@
   (declare (type combination call))
   (let* ((ref (continuation-use (basic-combination-fun call)))
 	 (leaf (when (ref-p ref) (ref-leaf ref)))
-	 (inlinep (if (defined-function-p leaf)
-		      (defined-function-inlinep leaf)
+	 (inlinep (if (defined-fun-p leaf)
+		      (defined-fun-inlinep leaf)
 		      :no-chance)))
     (cond
      ((eq inlinep :notinline) (values nil nil))
@@ -800,17 +800,17 @@
 	     (:inline t)
 	     (:no-chance nil)
 	     ((nil :maybe-inline) (policy call (zerop space))))
-	   (defined-function-inline-expansion leaf)
-	   (let ((fun (defined-function-functional leaf)))
+	   (defined-fun-inline-expansion leaf)
+	   (let ((fun (defined-fun-functional leaf)))
 	     (or (not fun)
 		 (and (eq inlinep :inline) (functional-kind fun))))
 	   (inline-expansion-ok call))
       (flet ((frob ()
 	       (let ((res (ir1-convert-lambda-for-defun
-			   (defined-function-inline-expansion leaf)
+			   (defined-fun-inline-expansion leaf)
 			   leaf t
 			   #'ir1-convert-inline-lambda)))
-		 (setf (defined-function-functional leaf) res)
+		 (setf (defined-fun-functional leaf) res)
 		 (change-ref-leaf ref res))))
 	(if ir1-p
 	    (frob)
@@ -1158,8 +1158,8 @@
       ((or constant functional) t)
       (lambda-var
        (null (lambda-var-sets leaf)))
-      (defined-function
-       (not (eq (defined-function-inlinep leaf) :notinline)))
+      (defined-fun
+       (not (eq (defined-fun-inlinep leaf) :notinline)))
       (global-var
        (case (global-var-kind leaf)
 	 (:global-function t)

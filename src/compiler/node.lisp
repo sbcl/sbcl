@@ -652,24 +652,24 @@
   for
   slot)
 
-;;; The DEFINED-FUNCTION structure represents functions that are
-;;; defined in the same compilation block, or that have inline
-;;; expansions, or have a non-NIL INLINEP value. Whenever we change
-;;; the INLINEP state (i.e. an inline proclamation) we copy the
-;;; structure so that former INLINEP values are preserved.
-(def!struct (defined-function (:include global-var
-					(where-from :defined)
-					(kind :global-function)))
+;;; A DEFINED-FUN represents a function that is defined in the same
+;;; compilation block, or that has an inline expansion, or that has a
+;;; non-NIL INLINEP value. Whenever we change the INLINEP state (i.e.
+;;; an inline proclamation) we copy the structure so that former
+;;; INLINEP values are preserved.
+(def!struct (defined-fun (:include global-var
+				   (where-from :defined)
+				   (kind :global-function)))
   ;; The values of INLINEP and INLINE-EXPANSION initialized from the
   ;; global environment.
   (inlinep nil :type inlinep)
   (inline-expansion nil :type (or cons null))
-  ;; The block-local definition of this function (either because it
-  ;; was semi-inline, or because it was defined in this block.) If
+  ;; the block-local definition of this function (either because it
+  ;; was semi-inline, or because it was defined in this block). If
   ;; this function is not an entry point, then this may be deleted or
-  ;; let-converted. Null if we haven't converted the expansion yet.
+  ;; LET-converted. Null if we haven't converted the expansion yet.
   (functional nil :type (or functional null)))
-(defprinter (defined-function :identity t)
+(defprinter (defined-fun :identity t)
   name
   inlinep
   (functional :test functional))
@@ -682,8 +682,8 @@
 (def!struct (functional (:include leaf
 				  (where-from :defined)
 				  (type (specifier-type 'function))))
-  ;; Some information about how this function is used. These values are
-  ;; meaningful:
+  ;; some information about how this function is used. These values
+  ;; are meaningful:
   ;;
   ;;    NIL
   ;;	an ordinary function, callable using local call
