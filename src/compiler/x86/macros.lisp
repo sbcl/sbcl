@@ -278,17 +278,6 @@
   (cons 'progn
 	(emit-error-break vop error-trap error-code values)))
 
-;;; not used in SBCL
-#|
-(defmacro cerror-call (vop label error-code &rest values)
-  #!+sb-doc
-  "Cause a continuable error. If the error is continued, execution resumes
-  at LABEL."
-  `(progn
-     ,@(emit-error-break vop cerror-trap error-code values)
-     (inst jmp ,label)))
-|#
-
 (defmacro generate-error-code (vop error-code &rest values)
   #!+sb-doc
   "Generate-Error-Code Error-code Value*
@@ -299,24 +288,6 @@
        (error-call ,vop ,error-code ,@values)
        start-lab)))
 
-;;; not used in SBCL
-#|
-(defmacro generate-cerror-code (vop error-code &rest values)
-  #!+sb-doc
-  "Generate-CError-Code Error-code Value*
-  Emit code for a continuable error with the specified Error-Code and
-  context Values. If the error is continued, execution resumes after
-  the GENERATE-CERROR-CODE form."
-  (let ((continue (gensym "CONTINUE-LABEL-"))
-	(error (gensym "ERROR-LABEL-")))
-    `(let ((,continue (gen-label))
-	   (,error (gen-label)))
-       (emit-label ,continue)
-       (assemble (*elsewhere*)
-	 (emit-label ,error)
-	 (cerror-call ,vop ,continue ,error-code ,@values))
-       ,error)))
-|#
 
 ;;;; PSEUDO-ATOMIC
 

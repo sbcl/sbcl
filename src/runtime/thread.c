@@ -234,10 +234,24 @@ void add_thread_to_queue(int pid, lispobj mutex_p)
     sigprocmask(SIG_BLOCK, &newset, &oldset);
     
     get_spinlock(&(mutex->queuelock),pid);
+    /* we may get woken from our sleep by the garbage collector and
+     * therefore be in a state where we are both running and queued.
+     * Don't put ourselves on the queue more than once */
+
+#define CAR(cons) (((struct cons *)(native_pointer(cons)))->car)
+#define CDR(cons) (((struct cons *)(native_pointer(cons)))->cdr)
+
+    for(cons=mutex->queue;cons != NIL; cons=CDR(cons))
+	if(CAR(cons)==make_fixnum(pid)) 
+	    goto end;
+	
     cons=alloc_cons(make_fixnum(pid),mutex->queue);
     mutex->queue=cons;
+ end:
     mutex->queuelock=0;
     sigwaitinfo(&newset,0);
     sigprocmask(SIG_SETMASK,&oldset,0);
+#undef CAR
+#undef CDR
 }
 

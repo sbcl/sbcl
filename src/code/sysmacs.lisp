@@ -11,6 +11,27 @@
 
 (in-package "SB!IMPL")
 
+
+;;; FIXME Not the most sensible way to do this: we could just use
+;;; LOCK ADD, given that we don't need the old version.  This will
+;;; do until we get around to writing new VOPs
+;;; FIXME in fact we're not SMP-safe without LOCK anyway, but
+;;; this will do us for UP systems
+
+#-sb-xc-host
+(defmacro atomic-incf (symbol-name &optional (delta 1))
+  `(locally
+    (declare (optimize (safety 0) (speed 3)))
+    (sb!vm::fast-symbol-global-value-xadd ',symbol-name ,delta)
+    ,symbol-name))
+
+#+sb-xc-host
+(defmacro atomic-incf (symbol-name &optional (delta 1))
+  `(incf ,symbol-name ,delta))
+
+(defmacro atomic-decf (place &optional (delta 1))
+  `(atomic-incf ,place ,(- delta)))
+
 (defmacro without-gcing (&rest body)
   #!+sb-doc
   "Executes the forms in the body without doing a garbage collection."
@@ -19,6 +40,18 @@
 	 ,@body)
      (when (and *need-to-collect-garbage* (not *gc-inhibit*))
        (maybe-gc nil))))
+
+(defmacro without-gcing (&rest body)
+  #!+sb-doc
+  "Executes the forms in the body without doing a garbage collection."
+  `(unwind-protect
+    (progn
+      (atomic-incf *gc-inhibit*)
+      ,@body)
+    (atomic-decf *gc-inhibit*)
+    (when (and *need-to-collect-garbage* (zerop *gc-inhibit*))
+      (maybe-gc nil))))
+
 
 ;;; EOF-OR-LOSE is a useful macro that handles EOF.
 (defmacro eof-or-lose (stream eof-error-p eof-value)

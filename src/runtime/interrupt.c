@@ -277,8 +277,8 @@ interrupt_handle_pending(os_context_t *context)
 #ifndef __i386__
     boolean were_in_lisp = !foreign_function_call_active;
 #endif
-    while(stop_the_world) kill(getpid(),SIGALRM);
-
+    while(stop_the_world) kill(getpid(),SIGSTOP);
+	
     thread=arch_os_get_current_thread();
     data=thread->interrupt_data;
     SetSymbolValue(INTERRUPT_PENDING, NIL,thread);
@@ -440,6 +440,19 @@ interrupt_handle_now(int signal, siginfo_t *info, void *void_context)
 #endif
 }
 
+static void 
+store_signal_data_for_later (struct interrupt_data *data, int signal, 
+			     siginfo_t *info, os_context_t *context)
+{
+    data->pending_signal = signal;
+    memcpy(&(data->pending_info), info, sizeof(siginfo_t));
+    memcpy(&(data->pending_mask),
+	   os_context_sigmask_addr(context),
+	   sizeof(sigset_t));
+    sigaddset_blockable(os_context_sigmask_addr(context));
+}
+
+
 static void
 maybe_now_maybe_later(int signal, siginfo_t *info, void *void_context)
 {
@@ -449,43 +462,19 @@ maybe_now_maybe_later(int signal, siginfo_t *info, void *void_context)
 #ifdef LISP_FEATURE_LINUX
     os_restore_fp_control(context);
 #endif 
-    
     /* see comments at top of code/signal.lisp for what's going on here
      * with INTERRUPTS_ENABLED/INTERRUPT_HANDLE_NOW 
      */
     if (SymbolValue(INTERRUPTS_ENABLED,thread) == NIL) {
-
-	/* FIXME: This code is exactly the same as the code in the
-	 * other leg of the if(..), and should be factored out into
-	 * a shared function. */
-        data->pending_signal = signal;
-	memcpy(&(data->pending_info), info, sizeof(siginfo_t));
-        memcpy(&(data->pending_mask),
-	       os_context_sigmask_addr(context),
-	       sizeof(sigset_t));
-	sigaddset_blockable(os_context_sigmask_addr(context));
+	store_signal_data_for_later(data,signal,info,context);
         SetSymbolValue(INTERRUPT_PENDING, T,thread);
-
     } else if (
 #ifndef __i386__
 	       (!foreign_function_call_active) &&
 #endif
 	       arch_pseudo_atomic_atomic(context)) {
-
-	/* FIXME: It would probably be good to replace these bare
-	 * memcpy(..) calls with calls to cpy_siginfo_t and
-	 * cpy_sigset_t, so that we only have to get the sizeof
-	 * expressions right in one place, and after that static type
-	 * checking takes over. */
-        data->pending_signal = signal;
-	memcpy(&(data->pending_info), info, sizeof(siginfo_t));
-	memcpy(&(data->pending_mask),
-	       os_context_sigmask_addr(context),
-	       sizeof(sigset_t));
-	sigaddset_blockable(os_context_sigmask_addr(context));
-
+	store_signal_data_for_later(data,signal,info,context);
 	arch_set_pseudo_atomic_interrupted(context);
-
     } else {
         interrupt_handle_now(signal, info, context);
     }

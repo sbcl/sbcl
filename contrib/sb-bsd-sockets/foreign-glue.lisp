@@ -49,10 +49,14 @@
       `(progn
 	;;(declaim (inline ,el (setf ,el)))
 	(defun ,el (ptr &optional (index 0))
-	  ,(template 'prog1 nil))
+	  (declare (optimize (speed 3)))
+	  (sb-sys:without-gcing 
+	   ,(template 'prog1 nil)))
 	(defconstant ,(intern (format nil "OFFSET-OF-~A" el)) ,offset)
 	(defun (setf ,el) (newval ptr &optional (index 0))
-	  ,(template 'setf 'newval))))))
+	  (declare (optimize (speed 3)))
+	  (sb-sys:without-gcing 
+	   ,(template 'setf 'newval)))))))
 
 
 ;;; make memory allocator for appropriately-sized block of memory, and

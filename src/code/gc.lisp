@@ -59,7 +59,7 @@
   (format t "Dunno Control stack usage~%")
   (format t "Dunno Binding stack usage~%")
   (format t "Garbage collection is currently ~:[enabled~;DISABLED~].~%"
-	  *gc-inhibit*))
+	  (> *gc-inhibit* 0)))
 
 (defun room-intermediate-info ()
   (room-minimal-info)
@@ -212,7 +212,7 @@ and submit it as a patch."
 (declaim (type (or index null) *gc-trigger*))
 (defvar *gc-trigger* nil)
 
-;;; When non-NIL, inhibits garbage collection.
+;;; When >0, inhibits garbage collection.
 (defvar *gc-inhibit*) ; initialized in cold init
 
 ;;; This flag is used to prevent recursive entry into the garbage
@@ -326,7 +326,7 @@ function should notify the user that the system has finished GC'ing.")
       (when (and *gc-trigger* (> pre-gc-dynamic-usage *gc-trigger*))
 	(setf *need-to-collect-garbage* t))
       (when (or force-p
-		(and *need-to-collect-garbage* (not *gc-inhibit*)))
+		(and *need-to-collect-garbage* (zerop *gc-inhibit*)))
 	;; KLUDGE: Wow, we really mask interrupts all the time we're
 	;; collecting garbage? That seems like a long time.. -- WHN 19991129
 	(without-interrupts
@@ -455,7 +455,7 @@ function should notify the user that the system has finished GC'ing.")
 (defun gc-on ()
   #!+sb-doc
   "Enable the garbage collector."
-  (setq *gc-inhibit* nil)
+  (setq *gc-inhibit* 0)
   (when *need-to-collect-garbage*
     (sub-gc))
   nil)
@@ -463,7 +463,7 @@ function should notify the user that the system has finished GC'ing.")
 (defun gc-off ()
   #!+sb-doc
   "Disable the garbage collector."
-  (setq *gc-inhibit* t)
+  (setq *gc-inhibit* 1)
   nil)
 
 ;;;; initialization stuff

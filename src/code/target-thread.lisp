@@ -11,7 +11,9 @@
       (lambda ()
 	;; in time we'll move some of the binding presently done in C
 	;; here too
-	(let ((sb!kernel::*restart-clusters* nil))
+	(let ((sb!kernel::*restart-clusters* nil)
+	      (sb!impl::*descriptor-handlers* nil); serve-event
+	      (sb!impl::*available-buffers* nil)) ;for fd-stream
 	  ;; can't use handling-end-of-the-world, because that flushes
 	  ;; output streams, and we don't necessarily have any (or we
 	  ;; could be sharing them)
@@ -24,6 +26,7 @@
 			  (current-thread-id)))
 	       (funcall real-function))
 	     0))))))))
+
 
 
 (defun destroy-thread (thread-id)

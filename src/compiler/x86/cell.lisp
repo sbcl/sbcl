@@ -133,14 +133,12 @@
   (:policy :fast)
   (:translate symbol-value))
 
-;;; like to know where this is useed too
-#+nil
-(defknown fast-symbol-value-xadd (symbol fixnum) fixnum ())
-#+nil
-(define-vop (fast-symbol-value-xadd cell-xadd)
+(defknown fast-symbol-global-value-xadd (symbol fixnum) fixnum ())
+
+(define-vop (fast-symbol-global-value-xadd cell-xadd)
   (:variant symbol-value-slot other-pointer-lowtag)
   (:policy :fast)
-  (:translate fast-symbol-value-xadd)
+  (:translate fast-symbol-global-value-xadd)
   (:arg-types * tagged-num))
 
 (define-vop (boundp)

@@ -362,10 +362,13 @@ main(int argc, char *argv[], char *envp[])
     parent_loop();
 }
 
-static void parent_sighandler(int signum) 
+static void parent_sighandler(int signum,siginfo_t *info, void *void_context) 
 {
-    fprintf(stderr,"parent thread got signal %d , maybe_gc_pending=%d\n",
-	    signum, maybe_gc_pending);
+    os_context_t *context = (os_context_t*)void_context;
+    fprintf(stderr,
+	    "parent thread got signal %d from %d, maybe_gc_pending=%d\n",
+	    signum, info->si_pid,
+	    maybe_gc_pending);
 }
 
 static void parent_do_garbage_collect(void)
@@ -391,19 +394,27 @@ static void parent_do_garbage_collect(void)
 		if(WIFEXITED(status) || WIFSIGNALED(status)) 
 		    destroy_thread(find_thread_by_pid(p));
 		else {
-		    fprintf(stderr, "wait returned pid %d\n",p);
-		    waiting_threads--;
+		    fprintf(stderr, "wait returned pid %d signal %x\n",
+			    p,WSTOPSIG(status));
+		    if(WSTOPSIG(status)==SIGTRAP) {
+			if(ptrace(PTRACE_CONT,p,0,SIGTRAP))
+			    perror("PTRACE_CONT");
+		    }
+		    else waiting_threads--; 
 		}
 	    }
 	}
 	for_each_thread(th) {
 	    if(SymbolTlValue(PSEUDO_ATOMIC_ATOMIC,th)) {
-		/* restart the child, sending it a signal that will cause it 
+		/* restart the child, setting *p-a-i* which will cause it 
 		 * to go into interrupt_handle_pending as soon as it's
-		 * finished being pseudo_atomic */
-		fprintf(stderr, "%d was pseudo-atomic, letting it resume\n",
+		 * finished being pseudo_atomic.  once there it will
+		 * signal itself SIGSTOP, which will give us another 
+		 * event to wait for */
+		fprintf(stderr, "%d was pseudo-atomic, letting it resume \n",
 			th->pid);
-		if(ptrace(PTRACE_CONT,th->pid,0,SIGCONT))
+		SetTlSymbolValue(PSEUDO_ATOMIC_INTERRUPTED,1,th) ;
+		if(ptrace(PTRACE_CONT,th->pid,0,0))
 		    perror("PTRACE_CONT");
 		waiting_threads++;
 	    }
@@ -413,6 +424,7 @@ static void parent_do_garbage_collect(void)
     collect_garbage(maybe_gc_pending-1);
     maybe_gc_pending=0;
     stop_the_world=0;
+    fprintf(stderr, "gc done\n");
     for_each_thread(th) 
 	if(ptrace(PTRACE_DETACH,th->pid,0,0))
 	    perror("PTRACE_DETACH");
@@ -431,7 +443,7 @@ static void /* noreturn */ parent_loop(void)
     sigprocmask(SIG_UNBLOCK,&sigset,0);
     sa.sa_handler=parent_sighandler;
     sa.sa_mask=sigset;
-    sa.sa_flags=0;
+    sa.sa_flags=SA_SIGINFO;
     sigaction(SIGALRM, &sa, 0);
     sigaction(SIGCHLD, &sa, 0);
 
@@ -445,6 +457,7 @@ static void /* noreturn */ parent_loop(void)
 	pid_t pid=0;
 	while(pid=waitpid(-1,&status,__WALL|WUNTRACED)) {
 	    struct thread *th;
+	    fprintf(stderr,"waitpid pid %d\n",pid);
 	    if(maybe_gc_pending) parent_do_garbage_collect();
 	    if(pid==-1) {
 		if(errno == EINTR) continue;
