@@ -384,6 +384,13 @@
   #!+sb-doc
   "Evaluate FORM and return the Nth value (zero based). This involves no
   consing when N is a trivial constant integer."
+  ;; FIXME: The above is true, if slightly misleading.  The
+  ;; MULTIPLE-VALUE-BIND idiom [ as opposed to MULTIPLE-VALUE-CALL
+  ;; (LAMBDA (&REST VALUES) (NTH N VALUES)) ] does indeed not cons at
+  ;; runtime.  However, for large N (say N = 200), COMPILE on such a
+  ;; form will take longer than can be described as adequate, as the
+  ;; optional dispatch mechanism for the M-V-B gets increasingly
+  ;; hairy.
   (if (integerp n)
       (let ((dummy-list nil)
 	    (keeper (gensym "KEEPER-")))

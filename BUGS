@@ -1300,6 +1300,14 @@ WORKAROUND:
   On X86 IMUL instruction with an immediate operand is printed
   incorrectly.
 
+246: "NTH-VALUE scaling problem"
+  NTH-VALUE's current implementation for constant integers scales in
+  compile-time as O(n^4), as indeed must the optional dispatch
+  mechanism on which it is implemented.  While it is unlikely to
+  matter in real user code, it's still unpleasant to observe that
+  (NTH-VALUE 1000 (VALUES-LIST (MAKE-LIST 1001))) takes several hours
+  to compile.
+
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:
     These labels were used for bugs related to the old IR1 interpreter.
