@@ -389,6 +389,31 @@
   (lambda (x y)
     (funcall fun y x)))
 
+;;;; utilities for two-VALUES predicates
+
+;;; sort of like ANY and EVERY, except:
+;;;   * We handle two-VALUES predicate functions like SUBTYPEP. (And
+;;;     if the result is uncertain, then we return (VALUES NIL NIL),
+;;;     just like SUBTYPEP.)
+;;;   * THING is just an atom, and we apply OP (an arity-2 function)
+;;;     successively to THING and each element of LIST.
+(defun any/type (op thing list)
+  (declare (type function op))
+  (let ((certain? t))
+    (dolist (i list (values nil certain?))
+      (multiple-value-bind (sub-value sub-certain?) (funcall op thing i)
+	(if sub-certain?
+	    (when sub-value (return (values t t)))
+	    (setf certain? nil))))))
+(defun every/type (op thing list)
+  (declare (type function op))
+  (let ((certain? t))
+    (dolist (i list (if certain? (values t t) (values nil nil)))
+      (multiple-value-bind (sub-value sub-certain?) (funcall op thing i)
+	(if sub-certain?
+	    (unless sub-value (return (values nil t)))
+	    (setf certain? nil))))))
+
 ;;;; DEFPRINTER
 
 ;;; These functions are called by the expansion of the DEFPRINTER

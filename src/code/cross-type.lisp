@@ -109,9 +109,10 @@
 	 (warn-about-possible-float-info-loss ()
 	   (warn-possible-cross-type-float-info-loss
 	    `(cross-typep ,host-object ,target-type))))
-    (cond (;; Handle various SBCL-specific types which can't exist on the
-	   ;; ANSI cross-compilation host. KLUDGE: This code will need to be
-	   ;; tweaked by hand if the names of these types ever change, ugh!
+    (cond (;; Handle various SBCL-specific types which can't exist on
+	   ;; the ANSI cross-compilation host. KLUDGE: This code will
+	   ;; need to be tweaked by hand if the names of these types
+	   ;; ever change, ugh!
 	   (if (consp target-type)
 	       (member (car target-type)
 		       '(sb!alien:alien))
@@ -120,11 +121,11 @@
 			 funcallable-instance
 			 sb!alien-internals:alien-value)))
 	   (values nil t))
-	  (;; special case when TARGET-TYPE isn't a type spec, but instead
-	   ;; a CLASS object
+	  (;; special case when TARGET-TYPE isn't a type spec, but
+	   ;; instead a CLASS object
 	   (typep target-type 'sb!xc::structure-class)
-	   ;; SBCL-specific types which have an analogue specially created
-	   ;; on the host system
+	   ;; SBCL-specific types which have an analogue specially
+	   ;; created on the host system
 	   (if (sb!xc:subtypep (sb!xc:class-name target-type)
 			       'sb!kernel::structure!object)
 	       (values (typep host-object (sb!xc:class-name target-type)) t)
@@ -162,31 +163,18 @@
 	       ;; between any host ANSI Common Lisp and the target SBCL.
 	       ((integer member mod rational real signed-byte unsigned-byte)
 		(values (typep host-object target-type) t))
-	       ;; Floating point types are guaranteed to correspond, too, but
-	       ;; less exactly.
+	       ;; Floating point types are guaranteed to correspond,
+	       ;; too, but less exactly.
 	       ((single-float double-float)
 		(cond ((floatp host-object)
 		       (warn-about-possible-float-info-loss)
 		       (values (typep host-object target-type) t))
 		      (t
 		       (values nil t))))
-	       ;; Some complex types have translations that are less trivial.
-	       (and
-		;; Note: This could be implemented as a real test, just the way
-		;; that OR is; I just haven't bothered. -- WHN 19990706
-		(warn-and-give-up))
-	       (or (let ((opinion nil)
-			 (certain-p t))
-		     (dolist (i rest)
-		       (multiple-value-bind (sub-opinion sub-certain-p)
-			   (cross-typep host-object i)
-			 (cond (sub-opinion (setf opinion t
-						  certain-p t)
-					    (return))
-			       ((not sub-certain-p) (setf certain-p nil))))
-		       (if certain-p
-			   (values opinion t)
-			   (warn-and-give-up)))))
+	       ;; Some complex types have translations that are less
+	       ;; trivial.
+	       (and (every/type #'cross-typep host-object rest))
+	       (or  (any/type   #'cross-typep host-object rest))
 	       ;; Some complex types are too hard to handle in the positive
 	       ;; case, but at least we can be confident in a large fraction of
 	       ;; the negative cases..
@@ -206,8 +194,8 @@
 		(if (functionp host-object)
 		    (warn-and-give-up)
 		    (values nil t)))
-	       ;; And the Common Lisp type system is complicated, and we don't
-	       ;; try to implement everything.
+	       ;; And the Common Lisp type system is complicated, and
+	       ;; we don't try to implement everything.
 	       (otherwise (warn-and-give-up)))))
 	  (t
 	   (case target-type
@@ -228,11 +216,12 @@
 	     ;; between any host ANSI Common Lisp and the target
 	     ;; Common Lisp. (Some array types are too, but they
 	     ;; were picked off earlier.)
-	     ((bit character complex cons float function integer list nil
-	       null number rational real signed-byte symbol t unsigned-byte)
+	     ((bit character complex cons float function integer keyword
+	       list nil null number rational real signed-byte symbol t
+	       unsigned-byte)
 	      (values (typep host-object target-type) t))
-	     ;; Floating point types are guaranteed to correspond, too, but
-	     ;; less exactly.
+	     ;; Floating point types are guaranteed to correspond,
+	     ;; too, but less exactly.
 	     ((single-float double-float)
 	      (cond ((floatp host-object)
 		     (warn-about-possible-float-info-loss)
@@ -243,9 +232,9 @@
 	     ;; host Common Lisp and the target SBCL.
 	     (sb!xc:class (values (typep host-object 'sb!xc:class) t))
 	     (fixnum (values (fixnump host-object) t))
-	     ;; Some types are too hard to handle in the positive case, but at
-	     ;; least we can be confident in a large fraction of the negative
-	     ;; cases..
+	     ;; Some types are too hard to handle in the positive
+	     ;; case, but at least we can be confident in a large
+	     ;; fraction of the negative cases..
 	     ((base-string simple-base-string simple-string)
 	      (if (stringp host-object)
 		  (warn-and-give-up)
@@ -258,19 +247,21 @@
 		    (t
 		     (warn-and-give-up))))
 	     ((stream instance)
-	      ;; Neither target CL:STREAM nor target SB!KERNEL:INSTANCE is
-	      ;; implemented as a STRUCTURE-OBJECT, so they'll fall through the
-	      ;; tests above. We don't want to assume too much about them here,
-	      ;; but at least we know enough about them to say that neither T
-	      ;; nor NIL nor indeed any other symbol in the cross-compilation
-	      ;; host is one. That knowledge suffices to answer so many of the
-	      ;; questions that the cross-compiler asks that it's well worth
+	      ;; Neither target CL:STREAM nor target
+	      ;; SB!KERNEL:INSTANCE is implemented as a
+	      ;; STRUCTURE-OBJECT, so they'll fall through the tests
+	      ;; above. We don't want to assume too much about them
+	      ;; here, but at least we know enough about them to say
+	      ;; that neither T nor NIL nor indeed any other symbol in
+	      ;; the cross-compilation host is one. That knowledge
+	      ;; suffices to answer so many of the questions that the
+	      ;; cross-compiler asks that it's well worth
 	      ;; special-casing it here.
 	      (if (symbolp host-object)
 		  (values nil t)
 		  (warn-and-give-up)))
-	     ;; And the Common Lisp type system is complicated, and we don't
-	     ;; try to implement everything.
+	     ;; And the Common Lisp type system is complicated, and we
+	     ;; don't try to implement everything.
 	     (otherwise (warn-and-give-up)))))))
 
 ;;; An incomplete TYPEP which runs at cross-compile time to tell whether OBJECT

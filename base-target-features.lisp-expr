@@ -2,6 +2,10 @@
 ;;;; CL:*FEATURES* in the target SBCL, plus some comments about other
 ;;;; CL:*FEATURES* tags which have special meaning to SBCL or which
 ;;;; have a special conventional meaning
+;;;;
+;;;; Note that the preferred way to customize the features of a local
+;;;; build of SBCL is not to edit this file, but to tweak
+;;;; customize-target-features.lisp.
 
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.

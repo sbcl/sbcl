@@ -681,6 +681,7 @@ retained, possibly temporariliy, because it might be used internally."
              "SANE-PACKAGE"
              "CIRCULAR-LIST-P"
              "SWAPPED-ARGS-FUN"
+             "ANY/TYPE" "EVERY/TYPE"
 
 	     ;; ..and macros..
              "COLLECT"

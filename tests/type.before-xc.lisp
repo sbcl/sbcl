@@ -182,14 +182,22 @@
 (assert (null (type-intersection2 (specifier-type 'symbol)
 				  (specifier-type '(satisfies foo)))))
 (assert (intersection-type-p (specifier-type '(and symbol (satisfies foo)))))
-;; FIXME: As of sbcl-0.6.11.17, the system doesn't know how to do the
-;; type simplifications which would let these tests work. (bug 88)
-#|
 (let* ((type1 (specifier-type '(member :x86)))
        (type2 (specifier-type '(or keyword null)))
        (isect (type-intersection type1 type2)))
-  (assert (type= isect (type-intersection type2 type1)))
   (assert (type= isect type1))
+  (assert (type= isect (type-intersection type2 type1)))
+  (assert (type= isect (type-intersection type2 type1 type2)))
+  (assert (type= isect (type-intersection type1 type1 type2 type1)))
+  (assert (type= isect (type-intersection type1 type2 type1 type2))))
+;;; FIXME: As of sbcl-0.6.11.19, the system doesn't know how to do the
+;;; type simplifications which would let these tests work. (bug 89)
+#|
+(let* ((type1 (specifier-type 'keyword))
+       (type2 (specifier-type '(or keyword null)))
+       (isect (type-intersection type1 type2)))
+  (assert (type= isect type1))
+  (assert (type= isect (type-intersection type2 type1)))
   (assert (type= isect (type-intersection type2 type1 type2)))
   (assert (type= isect (type-intersection type1 type1 type2 type1)))
   (assert (type= isect (type-intersection type1 type2 type1 type2))))
