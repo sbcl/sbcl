@@ -21,11 +21,6 @@
 	 '((:args ((1 2 3 4 5))   :result (1 2 3 4))
 	   (:args ((1 2 3 4 5) 6) :result nil)
 	   (:args (nil)           :result nil)
-	   (:args (t)             :result nil)
-	   (:args (foosymbol 0)   :result foosymbol)
-	   (:args (foosymbol)     :result nil)
-	   (:args (foosymbol 1)   :result nil)
-	   (:args (foosymbol 2)   :result nil)
 	   (:args ((1 2 3) 0)     :result (1 2 3))
 	   (:args ((1 2 3) 1)     :result (1 2))
 	   (:args ((1 2 3))       :result (1 2))
@@ -51,3 +46,12 @@
 	     (actual-result (apply #'nbutlast copied-list rest)))
 	(unless (equal actual-result result)
 	  (error "failed NBUTLAST for ~S" args))))))
+
+(multiple-value-bind (result error)
+    (ignore-errors (apply #'butlast (list t)))
+  (assert (null result))
+  (assert (typep error 'type-error)))
+
+;;; reported by Paul Dietz on cmucl-imp: LDIFF does not check type of
+;;; its first argument
+(assert (not (ignore-errors (ldiff 1 2))))

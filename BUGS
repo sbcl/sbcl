@@ -1268,6 +1268,14 @@ WORKAROUND:
 210: "unsafe evaluation of DEFSTRUCT slot initforms in BOA constructors"
   (fixed in sbcl-0.7.8.35)
 
+211: "keywords processing"
+  a. :ALLOW-OTHER-KEYS T should allow a function to receive an odd
+     number of keyword arguments.
+  b. Compiling of a local call with an unknown key and
+     :ALLOW-OTHER-KEYS T should not cause a WARNING.
+  c. Compiler should not warn on an unknown key :ALLOW-OTHER-KEYS.
+  d. :ALLOW-OTHER-KEYS should be allowed as an ordinary key parameter.
+
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:
     These labels were used for bugs related to the old IR1 interpreter.

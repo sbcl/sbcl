@@ -672,7 +672,7 @@
 
       (try-type-intersections (vars) (res) where))))
 
-;;; Check that Type doesn't specify any funny args, and do the
+;;; Check that TYPE doesn't specify any funny args, and do the
 ;;; intersection.
 (defun find-lambda-types (lambda type where)
   (declare (type clambda lambda) (type fun-type type) (string where))
@@ -760,6 +760,17 @@
 		     (derive-node-type ref type)))))
 	  t))))))
 
+(defun assert-global-function-definition-type (name fun)
+  (declare (type functional fun))
+  (let ((type (info :function :type name))
+        (where (info :function :where-from name)))
+    (when (eq where :declared)
+      (setf (leaf-type fun) type)
+      (assert-definition-type fun type
+                              :unwinnage-fun #'compiler-note
+                              :where "proclamation"))))
+
+;;;;
 (defun check-catch-tag-type (tag)
   (declare (type continuation tag))
   (let ((ctype (continuation-type tag)))

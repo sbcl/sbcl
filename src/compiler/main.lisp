@@ -871,13 +871,15 @@
 	  (debug-namify "~S initial component" name))
     (setf (component-kind component) :initial)
     (let* ((locall-fun (ir1-convert-lambda
-			definition
-			:debug-name (debug-namify "top level local call ~S"
-						  name)))
+                        definition
+                        :debug-name (debug-namify "top level local call ~S"
+                                                  name)))
            (fun (ir1-convert-lambda (make-xep-lambda-expression locall-fun)
 				    :source-name (or name '.anonymous.)
 				    :debug-name (unless name
 						  "top level form"))))
+      (when name
+        (assert-global-function-definition-type name locall-fun))
       (setf (functional-entry-fun fun) locall-fun
             (functional-kind fun) :external
             (functional-has-external-references-p fun) t)

@@ -461,13 +461,15 @@
 ;;; for the function used to implement
 ;;;   (DEFMETHOD PRINT-OBJECT :AROUND ((SS STARSHIP) STREAM) ...).
 (def-ir1-translator named-lambda ((name &rest rest) start cont)
-  (reference-leaf start
-		  cont
-		  (if (legal-fun-name-p name)
-		      (ir1-convert-lambda `(lambda ,@rest)
-					  :source-name name)
-		      (ir1-convert-lambda `(lambda ,@rest)
-					  :debug-name name))))
+  (let* ((fun (if (legal-fun-name-p name)
+                  (ir1-convert-lambda `(lambda ,@rest)
+                                      :source-name name)
+                  (ir1-convert-lambda `(lambda ,@rest)
+                                      :debug-name name)))
+         (leaf (reference-leaf start cont fun)))
+    (when (legal-fun-name-p name)
+      (assert-global-function-definition-type name fun))
+    leaf))
 
 ;;;; FUNCALL
 
