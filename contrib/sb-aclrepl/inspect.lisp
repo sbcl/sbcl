@@ -389,12 +389,15 @@ POSITION is NIL if the id is invalid or not found."
 	 position)))))
 
 (defun label-at-maybe-with-index (parts position)
+  "Helper function for inspected-elements. Conses the
+position with the label is the label is a string."
   (let ((label (label-at parts position)))
     (if (stringp label)
 	(cons position label)
 	label)))
 
 (defun array-index-string (index parts)
+  "Formats an array index in row major format."
   (let ((rev-dimensions (parts-seq-hint parts)))
     (if (null rev-dimensions)
 	"[]"

@@ -490,16 +490,43 @@
   (format *repl-output* "~&Threads are not supported in this version of sbcl")
   (values))
 
-(defun kill-cmd (selected-pid)
+(defun kill-cmd (&rest selected-pids)
   #+sb-thread
   (let ((pids (thread-pids)))
-    (if (find selected-pid pids :test #'eql)
-	(progn
-	  (sb-thread:destroy-thread selected-pid)
-	  (format *repl-output* "Thread ~D destroyed" selected-pid))
-	(format *repl-output* "No thread ~D exists" selected-pid)))
+    (dolist (selected-pid selected-pids) 
+      (if (find selected-pid pids :test #'eql)
+	  (progn
+	    (sb-thread:destroy-thread selected-pid)
+	    (format *repl-output* "~&Thread ~A destroyed" selected-pid))
+	  (format *repl-output* "~&No thread ~A exists" selected-pid))))
   #-sb-thread
-  (declare (ignore selected-pid))
+  (declare (ignore selected-pids))
+  #-sb-thread
+  (format *repl-output* "~&Threads are not supported in this version of sbcl")
+  (values))
+
+(defun signal-cmd (signal &rest selected-pids)
+  #+sb-thread
+  (let ((pids (thread-pids)))
+    (dolist (selected-pid selected-pids)
+      (if (find selected-pid pids :test #'eql)
+	  (progn
+	    (sb-unix:unix-kill selected-pid signal)
+	    (format *repl-output* "~&Signal ~A sent to thread ~A"
+		    signal selected-pid))
+	  (format *repl-output* "~&No thread ~A exists" selected-pid))))
+  #-sb-thread
+  (declare (ignore selected-pids))
+  #-sb-thread
+  (format *repl-output* "~&Threads are not supported in this version of sbcl")
+  (values))
+
+(defun release-foreground-cmd ()
+  #+sb-thread
+  (progn
+    (sb-thread:release-foreground)
+    (sleep 1))
+  #-sb-thread
   #-sb-thread
   (format *repl-output* "~&Threads are not supported in this version of sbcl")
   (values))
@@ -536,7 +563,9 @@
 	 ("history" 3 history-cmd "print the recent history")
 	 ("inspect" 2 inspect-cmd "inspect an object")
 	 ("istep" 1 istep-cmd "navigate within inspection of a lisp object" :parsing :string)
-	 #+sb-thread ("kill" 2 kill-cmd "kill a process")
+	 #+sb-thread ("kill" 2 kill-cmd "kill (destroy) processes")
+	 #+sb-thread ("signal" 2 signal-cmd "send a signal to processes")
+	 #+sb-thread ("rf" 2 release-foreground-cmd "release foreground")
 	 #+aclrepl-debugger("local" 3 local-cmd "print the value of a local variable")
 	 ("pwd" 3 pwd-cmd "print current directory")
 	 ("pushd" 2 pushd-cmd "push directory on stack" :parsing :string)
@@ -641,11 +670,18 @@
 
 ;;;; linking into SBCL hooks
 
+
 (defun repl-prompt-fun (stream)
   (let* ((break-data (car *break-stack*))
 	 (break-level (break-data-level break-data)))
     (when (zerop break-level)
       (setq break-level nil))
+    #+sb-thread
+    (let ((lock sb-thread::*session-lock*))
+      (sb-thread::get-foreground)
+      (let ((stopped-threads (sb-thread::waitqueue-data lock)))
+	(when stopped-threads
+	  (format stream "~{~&Thread ~A suspended~}~%" stopped-threads))))
     (if (functionp *prompt*)
 	(write-string (funcall *prompt* break-level
 			       (break-data-inspect-initiated break-data)
