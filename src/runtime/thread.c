@@ -123,7 +123,7 @@ pid_t create_thread(lispobj initial_function) {
     th->control_stack_start = spaces;
     th->binding_stack_start=
 	(lispobj*)((void*)th->control_stack_start+THREAD_CONTROL_STACK_SIZE);
-    th->control_stack_end = th->binding_stack_start-1;
+    th->control_stack_end = th->binding_stack_start;
     th->alien_stack_start=
 	(lispobj*)((void*)th->binding_stack_start+BINDING_STACK_SIZE);
     th->binding_stack_pointer=th->binding_stack_start;
