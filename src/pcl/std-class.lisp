@@ -228,9 +228,12 @@
   (with-slots (direct-methods) specializer
     (or (cdr direct-methods)
 	(setf (cdr direct-methods)
-	      (gathering1 (collecting-once)
+	      (let (collect)
 		(dolist (m (car direct-methods))
-		  (gather1 (method-generic-function m))))))))
+                  ;; the old PCL code used COLLECTING-ONCE which used
+                  ;; #'EQ to check for newness
+		  (pushnew (method-generic-function m) collect :test #'eq))
+                (nreverse collect))))))
 
 ;;; This hash table is used to store the direct methods and direct generic
 ;;; functions of EQL specializers. Each value in the table is the cons.
@@ -276,9 +279,10 @@
     (when entry
       (or (cdr entry)
 	  (setf (cdr entry)
-		(gathering1 (collecting-once)
+		(let (collect)
 		  (dolist (m (car entry))
-		    (gather1 (method-generic-function m)))))))))
+		    (pushnew (method-generic-function m) collect :test #'eq))
+                  (nreverse collect)))))))
 
 (defun map-specializers (function)
   (map-all-classes #'(lambda (class)
@@ -425,14 +429,16 @@
       (setq direct-default-initargs
 	    (plist-value class 'direct-default-initargs)))
   (setf (plist-value class 'class-slot-cells)
-	(gathering1 (collecting)
+	(let (collect)
 	  (dolist (dslotd direct-slots)
 	    (when (eq (slot-definition-allocation dslotd) class)
 	      (let ((initfunction (slot-definition-initfunction dslotd)))
-		(gather1 (cons (slot-definition-name dslotd)
+		(push (cons (slot-definition-name dslotd)
 			       (if initfunction
 				   (funcall initfunction)
-				   +slot-unbound+))))))))
+				   +slot-unbound+))
+                      collect))))
+          (nreverse collect)))
   (setq predicate-name (if predicate-name-p
 			   (setf (slot-value class 'predicate-name)
 				 (car predicate-name))
@@ -703,9 +709,9 @@
 		   (make-wrapper nslots class))
 		  ((and (equal nlayout olayout)
 			(not
-			 (iterate ((o (list-elements owrapper-class-slots))
-				   (n (list-elements nwrapper-class-slots)))
-				  (unless (eq (car o) (car n)) (return t)))))
+                         (loop for o in owrapper-class-slots
+                               for n in nwrapper-class-slots
+                               do (unless (eq (car o) (car n)) (return t)))))
 		   owrapper)
 		  (t
 		   ;; This will initialize the new wrapper to have the
@@ -728,18 +734,20 @@
 	(update-pv-table-cache-info class)))))
 
 (defun compute-class-slots (eslotds)
-  (gathering1 (collecting)
+  (let (collect)
     (dolist (eslotd eslotds)
-      (gather1
-	(assoc (slot-definition-name eslotd)
-	       (class-slot-cells (slot-definition-allocation eslotd)))))))
+      (push (assoc (slot-definition-name eslotd)
+                   (class-slot-cells (slot-definition-allocation eslotd)))
+            collect))
+    (nreverse collect)))
 
 (defun compute-layout (cpl instance-eslotds)
   (let* ((names
-	   (gathering1 (collecting)
+	   (let (collect)
 	     (dolist (eslotd instance-eslotds)
 	       (when (eq (slot-definition-allocation eslotd) :instance)
-		 (gather1 (slot-definition-name eslotd))))))
+		 (push (slot-definition-name eslotd) collect)))
+             (nreverse collect)))
 	 (order ()))
     (labels ((rwalk (tail)
 	       (when tail
@@ -1126,19 +1134,20 @@
 	;;  --    --> shared	--
 
 	;; Go through all the old local slots.
-	(iterate ((name (list-elements olayout))
-		  (opos (interval :from 0)))
-	  (let ((npos (posq name nlayout)))
-	    (if npos
-		(setf (clos-slots-ref nslots npos)
-		      (clos-slots-ref oslots opos))
-		(progn
-		  (push name discarded)
-		  (unless (eq (clos-slots-ref oslots opos) +slot-unbound+)
-		    (setf (getf plist name) (clos-slots-ref oslots opos)))))))
+        (let ((opos 0))
+          (dolist (name olayout)
+            (let ((npos (posq name nlayout)))
+              (if npos
+                  (setf (clos-slots-ref nslots npos)
+                        (clos-slots-ref oslots opos))
+                  (progn
+                    (push name discarded)
+                    (unless (eq (clos-slots-ref oslots opos) +slot-unbound+)
+                      (setf (getf plist name) (clos-slots-ref oslots opos))))))
+            (incf opos)))
 
 	;; Go through all the old shared slots.
-	(iterate ((oclass-slot-and-val (list-elements oclass-slots)))
+        (dolist (oclass-slot-and-val oclass-slots)
 	  (let ((name (car oclass-slot-and-val))
 		(val (cdr oclass-slot-and-val)))
 	    (let ((npos (posq name nlayout)))
@@ -1187,16 +1196,16 @@
     ;; "The values of local slots specified by both the class CTO and
     ;; CFROM are retained. If such a local slot was unbound, it
     ;; remains unbound."
-    (iterate ((new-slot (list-elements new-layout))
-	      (new-position (interval :from 0)))
-      (let ((old-position (posq new-slot old-layout)))
-	(when old-position
-	  (setf (clos-slots-ref new-slots new-position)
-		(clos-slots-ref old-slots old-position)))))
+    (let ((new-position 0))
+      (dolist (new-slot new-layout)
+        (let ((old-position (posq new-slot old-layout)))
+          (when old-position
+            (setf (clos-slots-ref new-slots new-position)
+                  (clos-slots-ref old-slots old-position))))))
 
     ;; "The values of slots specified as shared in the class CFROM and
     ;; as local in the class CTO are retained."
-    (iterate ((slot-and-val (list-elements old-class-slots)))
+    (dolist (slot-and-val old-class-slots)
       (let ((position (posq (car slot-and-val) new-layout)))
 	(when position
 	  (setf (clos-slots-ref new-slots position) (cdr slot-and-val)))))

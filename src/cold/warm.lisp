@@ -159,7 +159,7 @@
 		;; dependencies from the old PCL defsys.lisp
 		;; dependency database.
 		"src/pcl/walk"
-		"src/pcl/iterate"
+                ;; "src/pcl/iterate" removed 2001-12-20 njf
 		"src/pcl/early-low"
 		"src/pcl/macros"
                 "src/pcl/compiler-support"

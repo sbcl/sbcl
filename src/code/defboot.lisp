@@ -227,7 +227,13 @@
     (/show0 "redefining NAME in %DEFUN")
     (style-warn "redefining ~S in DEFUN" name))
   (setf (sb!xc:fdefinition name) def)
-  (setf (%fun-name def) name)
+  
+  ;; FIXME: I want to do this here (and fix bug 137), but until the
+  ;; breathtaking CMU CL function name architecture is converted into
+  ;; something sane, (1) doing so doesn't really fix the bug, and 
+  ;; (2) doing probably isn't even really safe.
+  #+nil (setf (%fun-name def) name)
+
   (when doc
     ;; FIXME: This should use shared SETF-name-parsing logic.
     (if (and (consp name) (eq (first name) 'setf))

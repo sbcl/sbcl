@@ -85,19 +85,6 @@
 
 (/show "pcl/macros.lisp 85")
 
-(defmacro collecting-once (&key initial-value)
-   `(let* ((head ,initial-value)
-	   (tail ,(and initial-value `(last head))))
-	  (values #'(lambda (value)
-			   (if (null head)
-			       (setq head (setq tail (list value)))
-			       (unless (memq value head)
-				 (setq tail
-				       (cdr (rplacd tail (list value)))))))
-		  #'(lambda nil head))))
-
-(/show "pcl/macros.lisp 98")
-
 (defmacro doplist ((key val) plist &body body &environment env)
   (multiple-value-bind (doc decls bod)
       (extract-declarations body env)
@@ -111,7 +98,7 @@
 	     (setq ,val (pop .plist-tail.))
 	     (progn ,@bod)))))
 
-(/show "pcl/macros.lisp 113")
+(/show "pcl/macros.lisp 101")
 
 (defmacro dolist-carefully ((var list improper-list-handler) &body body)
   `(let ((,var nil)
@@ -129,7 +116,7 @@
 ;;;; SBCL deviates from the spec by having CL:FIND-CLASS distinct from
 ;;;; PCL:FIND-CLASS, alas.
 
-(/show "pcl/macros.lisp 132")
+(/show "pcl/macros.lisp 119")
 
 (defvar *find-class* (make-hash-table :test 'eq))
 
@@ -197,7 +184,7 @@
 ;;;   (DECLAIM (TYPE (MEMBER NIL :EARLY :BRAID :COMPLETE) *BOOT-STATE*))
 (defvar *boot-state* nil)
 
-(/show "pcl/macros.lisp 199")
+(/show "pcl/macros.lisp 187")
 
 ;;; Note that in SBCL as in CMU CL,
 ;;;   COMMON-LISP:FIND-CLASS /= SB-PCL:FIND-CLASS.
@@ -240,7 +227,7 @@
 	new-value)
       (error "~S is not a legal class name." symbol)))
 
-(/show "pcl/macros.lisp 242")
+(/show "pcl/macros.lisp 230")
 
 (defun (setf find-class-predicate)
        (new-value symbol)
@@ -251,44 +238,7 @@
 (defun find-wrapper (symbol)
   (class-wrapper (find-class symbol)))
 
-(defmacro gathering1 (gatherer &body body)
-  `(gathering ((.gathering1. ,gatherer))
-     (macrolet ((gather1 (x) `(gather ,x .gathering1.)))
-       ,@body)))
-
-(defmacro vectorizing (&key (size 0))
-  `(let* ((limit ,size)
-	  (result (make-array limit))
-	  (index 0))
-     (values #'(lambda (value)
-		 (if (= index limit)
-		     (error "vectorizing more elements than promised")
-		     (progn
-		       (setf (svref result index) value)
-		       (incf index)
-		       value)))
-	     #'(lambda () result))))
-
-(/show "pcl/macros.lisp 271")
-
-;;; These are augmented definitions of LIST-ELEMENTS and LIST-TAILS from
-;;; iterate.lisp. These versions provide the extra :BY keyword which can
-;;; be used to specify the step function through the list.
-(defmacro *list-elements (list &key (by #'cdr))
-  `(let ((tail ,list))
-     #'(lambda (finish)
-	 (if (endp tail)
-	     (funcall finish)
-	     (prog1 (car tail)
-		    (setq tail (funcall ,by tail)))))))
-
-(defmacro *list-tails (list &key (by #'cdr))
-   `(let ((tail ,list))
-      #'(lambda (finish)
-	  (prog1 (if (endp tail)
-		     (funcall finish)
-		     tail)
-		 (setq tail (funcall ,by tail))))))
+(/show "pcl/macros.lisp 241")
 
 (defmacro function-funcall (form &rest args)
   `(funcall (the function ,form) ,@args))
@@ -296,7 +246,7 @@
 (defmacro function-apply (form &rest args)
   `(apply (the function ,form) ,@args))
 
-(/show "pcl/macros.lisp 299")
+(/show "pcl/macros.lisp 249")
 
 (defun get-setf-fun-name (name)
   `(setf ,name))

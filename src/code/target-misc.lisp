@@ -62,6 +62,7 @@
       (funcallable-instance-fun fun)))))
 
 (defun (setf %fun-name) (new-name fun)
+  (aver nil) ; since this is unsafe 'til bug 137 is fixed
   (let ((widetag (widetag-of fun)))
     (case widetag
       ((#.sb!vm:simple-fun-header-widetag

@@ -257,19 +257,19 @@
 
 (defun wrap-method-group-specifier-bindings
        (method-group-specifiers declarations real-body)
-  (with-gathering ((names (collecting))
-		   (specializer-caches (collecting))
-		   (cond-clauses (collecting))
-		   (required-checks (collecting))
-		   (order-cleanups (collecting)))
+  (let (names
+        specializer-caches
+        cond-clauses
+        required-checks
+        order-cleanups)
       (dolist (method-group-specifier method-group-specifiers)
 	(multiple-value-bind (name tests description order required)
 	    (parse-method-group-specifier method-group-specifier)
 	  (declare (ignore description))
 	  (let ((specializer-cache (gensym)))
-	    (gather name names)
-	    (gather specializer-cache specializer-caches)
-	    (gather `((or ,@tests)
+	    (push name names)
+	    (push specializer-cache specializer-caches)
+	    (push `((or ,@tests)
 		      (if  (equal ,specializer-cache .specializers.)
 			   (return-from .long-method-combination-function.
 			     '(error "More than one method of type ~S ~
@@ -279,14 +279,14 @@
 		      (push .method. ,name))
 		    cond-clauses)
 	    (when required
-	      (gather `(when (null ,name)
+	      (push `(when (null ,name)
 			 (return-from .long-method-combination-function.
 			   '(error "No ~S methods." ',name)))
 		      required-checks))
 	    (loop (unless (and (constantp order)
 			       (neq order (setq order (eval order))))
 		    (return t)))
-	    (gather (cond ((eq order :most-specific-first)
+	    (push (cond ((eq order :most-specific-first)
 			   `(setq ,name (nreverse ,name)))
 			  ((eq order :most-specific-last) ())
 			  (t
@@ -295,15 +295,15 @@
 				(setq ,name (nreverse ,name)))
 			      (:most-specific-last))))
 		    order-cleanups))))
-   `(let (,@names ,@specializer-caches)
+   `(let (,@(nreverse names) ,@(nreverse specializer-caches))
       ,@declarations
       (dolist (.method. .applicable-methods.)
 	(let ((.qualifiers. (method-qualifiers .method.))
 	      (.specializers. (method-specializers .method.)))
 	  (progn .qualifiers. .specializers.)
-	  (cond ,@cond-clauses)))
-      ,@required-checks
-      ,@order-cleanups
+	  (cond ,@(nreverse cond-clauses))))
+      ,@(nreverse required-checks)
+      ,@(nreverse order-cleanups)
       ,@real-body)))
 
 (defun parse-method-group-specifier (method-group-specifier)
@@ -311,7 +311,7 @@
   (let* ((name (pop method-group-specifier))
 	 (patterns ())
 	 (tests
-	   (gathering1 (collecting)
+	   (let (collect)
 	     (block collect-tests
 	       (loop
 		 (if (or (null method-group-specifier)
@@ -320,7 +320,9 @@
 		     (return-from collect-tests t)
 		     (let ((pattern (pop method-group-specifier)))
 		       (push pattern patterns)
-		       (gather1 (parse-qualifier-pattern name pattern)))))))))
+		       (push (parse-qualifier-pattern name pattern)
+                             collect)))))
+             (nreverse collect))))
     (values name
 	    tests
 	    (getf method-group-specifier :description
@@ -365,18 +367,17 @@
 ;;; option are bound to the symbols in the intercept lambda list.
 (defun deal-with-arguments-option (wrapped-body arguments-option)
   (let* ((intercept-lambda-list
-	   (gathering1 (collecting)
+	   (let (collect)
 	     (dolist (arg arguments-option)
 	       (if (memq arg lambda-list-keywords)
-		   (gather1 arg)
-		   (gather1 (gensym))))))
+		   (push arg collect)
+		   (push (gensym) collect)))
+             (nreverse collect)))
 	 (intercept-rebindings
-	   (gathering1 (collecting)
-	     (iterate ((arg (list-elements arguments-option))
-		       (int (list-elements intercept-lambda-list)))
-	       (unless (memq arg lambda-list-keywords)
-		 (gather1 `(,arg ',int)))))))
-
+           (loop for arg in arguments-option
+                 for int in intercept-lambda-list
+                 unless (memq arg lambda-list-keywords)
+                 collect `(,arg ',int))))
     (setf (cadr wrapped-body)
 	  (append intercept-rebindings (cadr wrapped-body)))
 

@@ -9,6 +9,8 @@
 ;;;; public domain. The software is in the public domain and is
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
+
+;;;; CLISP issues
 
 #+clisp
 (locally
@@ -29,11 +31,18 @@
   (export 'boolean "LISP")
   |#
 
-  ;; I gave up on using CLISP-1999-01-08 as a cross-compilation host because of
-  ;; problems that I don't have workarounds for:
-  (error "can't use CLISP -- no MAKE-LOAD-FORM")
-  (error "can't use CLISP -- no (FUNCTION (SETF SYMBOL-FUNCTION))")
-  )
+  ;; apparently fixed sometime in 2001, hurray!
+  #| (error "can't use CLISP -- no MAKE-LOAD-FORM") |#
+
+  ;; CLISP is still unsupported as a cross-compilation host because of
+  ;; these known problems:
+  (flet ((clisp-ouch (s) (error "can't bootstrap with CLISP: ~A" s)))
+    ;; These problems don't seem deep, and could probably be worked
+    ;; around.
+    #+nil (clisp-ouch "no (DOCUMENTATION X) when X is a PACKAGE")
+    #+nil (clisp-ouch "no (FUNCTION (SETF SYMBOL-FUNCTION))")))
+
+;;;; CMU CL issues
 
 ;;; CMU CL, at least as of 18b, doesn't support PRINT-OBJECT. In
 ;;; particular, it refuses to compile :PRINT-OBJECT options to
@@ -62,6 +71,14 @@
 (progn
   (warn "CMU CL has a broken implementation of READ-SEQUENCE.")
   (pushnew :no-ansi-read-sequence *features*))
+
+#+(and cmu alpha)
+(unless (ignore-errors (read-from-string "1.0l0"))
+  (error "CMUCL on Alpha can't read floats in the format \"1.0l0\".  Patch your core file~%~%"))
+
+;;;; general non-ANSI-ness
+
+(in-package :sb-cold)
 
 ;;; Do the exports of COMMON-LISP conform to the standard? If not, try
 ;;; to make them conform. (Of course, ANSI says that bashing symbols
@@ -121,8 +138,3 @@
 		       cl)
 		 (kernel:%set-symbol-package symbol cl))))
 	   standard-ht))
-
-#+(and cmu alpha)
-(unless (ignore-errors (read-from-string "1.0l0"))
-  (error "CMUCL on Alpha can't read floats in the format \"1.0l0\".  Patch your core file~%~%"))
-

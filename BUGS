@@ -1344,6 +1344,45 @@ Error in function C::GET-LAMBDA-TO-COMPILE:
         (call-next-method)))
   Now (FOO 3) should return 3, but instead it returns 4.
     
+137:
+  (SB-DEBUG:BACKTRACE) output should start with something
+  including the name BACKTRACE, not (as in 0.pre7.88)
+  just "0: (\"hairy arg processor\" ...)". In general
+  the names in BACKTRACE are all screwed up compared to
+  the nice useful names in 0.6.13.
+
+  Note for those who observe that this is an annoying
+  bug and doesn't belong in a release: See the "note for the 
+  ambitious", below.
+
+  Note for the ambitious: This is an important bug and I'd
+  really like to fix it and spent many hours on it. The 
+  obvious ways to fix it are hard, because the underlying
+  infrastructure seems to be rather broken.
+  * There are two mostly-separate systems for storing names,
+    the in-the-function-object system used by e.g.
+    CL:FUNCTION-LAMBDA-EXPRESSION and the
+    in-the-DEBUG-FUN-object system used by e.g. BACKTRACE.
+    The code as of sbcl-0.pre7.94 is smart enough to set
+    up the first value, but not the second (because I naively
+    assumed that one mechanism is enough, and didn't proof
+    read the entire system to see whether there might be
+    another mechanism?! argh...)
+  * The systems are not quite separate, but instead weirdly and
+     fragilely coupled by the FUN-DEBUG-FUN algorithm.
+  * If you try to refactor this dain bramage away, reducing
+    things to a single system -- I tried to add a
+    %SIMPLE-FUN-DEBUG-FUN slot, planning eventually to get
+    rid of the old %SIMPLE-FUN-NAME slot in favor of indirection
+    through the new slot -- you get torpedoed by the fragility
+    of the SIMPLE-FUN primitive object. Just adding the
+    new slot, without making any other changes in the system,
+    is enough to make the system fail with what look like
+    memory corruption problems in warm init.
+  But please do fix some or all of the problem, I'm tired
+  of messing with it. -- WHN 2001-12-22
+
+
 KNOWN BUGS RELATED TO THE IR1 INTERPRETER
 
 (Now that the IR1 interpreter has gone away, these should be 

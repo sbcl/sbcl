@@ -104,9 +104,8 @@
 (defun expand-defconstructor (class-name name lambda-list supplied-initargs)
   (let ((class (find-class class-name nil))
 	(supplied-initarg-names
-	  (gathering1 (collecting)
-	    (iterate ((name (*list-elements supplied-initargs :by #'cddr)))
-	      (gather1 name)))))
+          (loop for name in supplied-initargs by #'cddr
+                collect name)))
     (when (null class)
       (error "defconstructor form being compiled (or evaluated) before~@
 	      class ~S is defined."
@@ -217,9 +216,10 @@
 	    Other possible code types are ~S."
 	  constructor (constructor-class constructor)
 	  (constructor-code-type constructor)
-	  (gathering1 (collecting)
+          (let ((collect nil))
 	    (doplist (key val) (constructor-code-generators constructor)
-	      (gather1 key)))))
+              (push key collect))
+            (nreverse collect))))
 
 ;;; I am not in a hairy enough mood to make this implementation be
 ;;; metacircular enough that it can support a defconstructor for
@@ -375,15 +375,16 @@
 	   ((class slot-class)
 	    name lambda-list supplied-initarg-names supplied-initargs)
   (cons 'list
-	(gathering1 (collecting)
+        (let ((collect nil))
 	  (dolist (entry *constructor-code-types*)
 	    (let ((generator
 		    (funcall (cadr entry) class name lambda-list
 					  supplied-initarg-names
 					  supplied-initargs)))
 	      (when generator
-		(gather1 `',(car entry))
-		(gather1 generator)))))))
+		(push `',(car entry) collect)
+		(push generator collect))))
+          (nreverse collect))))
 
 (defmethod compute-constructor-code ((class slot-class)
 				     (constructor constructor))
@@ -547,10 +548,9 @@
 (defun compute-initarg-positions (class initarg-names)
   (let* ((layout (wrapper-instance-slots-layout (class-wrapper class)))
 	 (positions
-	   (gathering1 (collecting)
-	     (iterate ((slot-name (list-elements layout))
-		       (position (interval :from 0)))
-	       (gather1 (cons slot-name position)))))
+           (loop for slot-name in layout
+                 for position from 0
+                 collect (cons slot-name position)))
 	 (slot-initargs
 	   (mapcar #'(lambda (slotd)
 		       (list (slot-definition-initargs slotd)
@@ -567,14 +567,16 @@
 		     (not (null slot-initargs))
 		     (memq initarg slot-initargs))
 	    (setf (car slot-entry) initarg)))))
-    (gathering1 (collecting)
+    (let (collect)
       (dolist (initarg initarg-names)
-	(let ((positions (gathering1 (collecting)
+	(let ((positions (let (collect)
 			   (dolist (slot-entry slot-initargs)
 			     (when (eq (car slot-entry) initarg)
-			       (gather1 (cadr slot-entry)))))))
+			       (push (cadr slot-entry) collect)))
+                           (nreverse collect))))
 	  (when positions
-	    (gather1 (cons initarg positions))))))))
+	    (push (cons initarg positions) collect))))
+      (nreverse collect))))
 
 ;;; The FALLBACK case allows anything. This always works, and always appears
 ;;; as the last of the generators for a constructor. It does a full call to
@@ -589,10 +591,11 @@
 	 (sb-kernel:instance-lambda ,arglist
 	   (make-instance
 	     ',(class-name class)
-	     ,@(gathering1 (collecting)
-		 (iterate ((tail (*list-tails supplied-initargs :by #'cddr)))
-		   (gather1 `',(car tail))
-		   (gather1 (cadr tail))))))))))
+	     ,@(let (collect)
+                 (loop for tail on supplied-initargs by #'cddr
+                       do (push `',(car tail) collect)
+                          (push (cadr tail) collect))
+                 (nreverse collect))))))))
 
 ;;; The GENERAL case allows:
 ;;;   constant, unsupplied or non-constant initforms
@@ -643,15 +646,17 @@
                        (dolist (pos (cddr entry))
                          (setf (clos-slots-ref .slots. pos) val))))
 
-		   ,@(gathering1 (collecting)
+		   ,@(let (collect)
                        (doplist (initarg value) supplied-initargs
 			 (unless (constantp value)
-			   (gather1 `(let ((.value. ,value))
-				       (push .value. .initargs.)
-				       (push ',initarg .initargs.)
-				       (dolist (.p. (pop .positions.))
-					 (setf (clos-slots-ref .slots. .p.)
-					       .value.)))))))
+			   (push `(let ((.value. ,value))
+                                   (push .value. .initargs.)
+                                   (push ',initarg .initargs.)
+                                   (dolist (.p. (pop .positions.))
+                                     (setf (clos-slots-ref .slots. .p.)
+                                           .value.)))
+                                 collect)))
+                       (nreverse collect))
 
 		   (dolist (fn .shared-initfns.)
 		     (apply fn .instance. t .initargs.))
@@ -790,14 +795,16 @@
 		       (dolist (pos (cdr entry))
 			 (setf (clos-slots-ref .slots. pos) val))))
 
-		   ,@(gathering1 (collecting)
+		   ,@(let (collect)
 		       (doplist (initarg value) supplied-initargs
 			 (unless (constantp value)
-			   (gather1
+			   (push
 			     `(let ((.value. ,value))
 				(dolist (.p. (pop .positions.))
 				  (setf (clos-slots-ref .slots. .p.)
-					.value.)))))))
+					.value.)))
+                             collect)))
+                       (nreverse collect))
 
 		   .instance.))))))))
 
@@ -913,14 +920,16 @@
 			  (.positions. .supplied-initarg-positions.))
 		     .positions.
 
-		     ,@(gathering1 (collecting)
+		     ,@(let (collect)
 			 (doplist (initarg value) supplied-initargs
 			   (unless (constantp value)
-			     (gather1
+			     (push
 			       `(let ((.value. ,value))
 				  (dolist (.p. (pop .positions.))
 				    (setf (clos-slots-ref .slots. .p.)
-					  .value.)))))))
+					  .value.)))
+                               collect)))
+                         (nreverse collect))
 
 		     .instance.))))))))))
 

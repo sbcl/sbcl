@@ -160,18 +160,23 @@
   (unless (listp wrappers) (setq wrappers (list wrappers)))
   (let* ((not-simple-p-cell (list nil))
 	 (elements
-	  (gathering1 (collecting)
-	    (iterate ((slot-names (list-elements slot-name-lists)))
+          (let ((elements nil))
+            (dolist (slot-names slot-name-lists)
 	      (when slot-names
 		(let* ((wrapper     (pop wrappers))
 		       (std-p (typep wrapper 'wrapper))
 		       (class       (wrapper-class* wrapper))
 		       (class-slots (and std-p (wrapper-class-slots wrapper))))
 		  (dolist (slot-name (cdr slot-names))
-		    (gather1
-		     (when std-p
-		       (compute-pv-slot slot-name wrapper class
-					class-slots not-simple-p-cell))))))))))
+                    ;; Original PCL code had this idiom.  why not:
+                    ;;
+                    ;; (WHEN STD-P
+                    ;;   (PUSH ...)) ?
+                    (push (when std-p
+                            (compute-pv-slot slot-name wrapper class
+                                             class-slots not-simple-p-cell))
+                          elements)))))
+            (nreverse elements))))
     (if (car not-simple-p-cell)
 	(make-permutation-vector (cons t elements))
 	(or (gethash elements *pvs*)
@@ -874,15 +879,15 @@
 
 (defmacro pv-binding ((required-parameters slot-name-lists pv-table-symbol)
 		      &body body)
-  (with-gathering ((slot-vars (collecting))
-		   (pv-parameters (collecting)))
-    (iterate ((slots (list-elements slot-name-lists))
-	      (required-parameter (list-elements required-parameters))
-	      (i (interval :from 0)))
-      (when slots
-	(gather required-parameter pv-parameters)
-	(gather (slot-vector-symbol i) slot-vars)))
-    `(pv-binding1 (.pv. .calls. ,pv-table-symbol ,pv-parameters ,slot-vars)
+  (let (slot-vars pv-parameters)
+    (loop for slots in slot-name-lists
+          for required-parameter in required-parameters
+          for i from 0
+          do (when slots
+               (push required-parameter pv-parameters)
+               (push (slot-vector-symbol i) slot-vars)))
+    `(pv-binding1 (.pv. .calls. ,pv-table-symbol
+                   ,(nreverse pv-parameters) ,(nreverse slot-vars))
        ,@body)))
 
 (defmacro pv-binding1 ((pv calls pv-table-symbol pv-parameters slot-vars)

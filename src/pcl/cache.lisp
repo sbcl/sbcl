@@ -757,32 +757,49 @@
   (or (nth arg-number (the list *slot-vector-symbols*))
       (intern (format nil ".SLOTS~A." arg-number) *pcl-package*)))
 
+;; FIXME: There ought to be a good way to factor out the idiom:
+;;
+;; (dotimes (i (length metatypes))
+;;   (push (dfun-arg-symbol i) lambda-list))
+;;
+;; used in the following six functions into common code that we can
+;; declare inline or something.  --njf 2001-12-20
 (defun make-dfun-lambda-list (metatypes applyp)
-  (gathering1 (collecting)
-    (iterate ((i (interval :from 0))
-	      (s (list-elements metatypes)))
-      (progn s)
-      (gather1 (dfun-arg-symbol i)))
+  (let ((lambda-list nil))
+    (dotimes (i (length metatypes))
+      (push (dfun-arg-symbol i) lambda-list))
     (when applyp
-      (gather1 '&rest)
-      (gather1 '.dfun-rest-arg.))))
+      (push '&rest lambda-list)
+      (push '.dfun-rest-arg. lambda-list))
+    (nreverse lambda-list)))
 
 (defun make-dlap-lambda-list (metatypes applyp)
-  (gathering1 (collecting)
-    (iterate ((i (interval :from 0))
-	      (s (list-elements metatypes)))
-      (progn s)
-      (gather1 (dfun-arg-symbol i)))
+  (let ((lambda-list nil))
+    (dotimes (i (length metatypes))
+      (push (dfun-arg-symbol i) lambda-list))
+    ;; FIXME: This is translated directly from the old PCL code.
+    ;; It didn't have a (PUSH '.DFUN-REST-ARG. LAMBDA-LIST) or
+    ;; something similar, so we don't either.  It's hard to see how
+    ;; this could be correct, since &REST wants an argument after
+    ;; it.  This function works correctly because the caller
+    ;; magically tacks on something after &REST.  The calling functions
+    ;; (in dlisp.lisp) should be fixed and this function rewritten.
+    ;; --njf 2001-12-20
     (when applyp
-      (gather1 '&rest))))
+      (push '&rest lambda-list))
+    (nreverse lambda-list)))
 
+;; FIXME: The next four functions suffer from having a `.DFUN-REST-ARG.'
+;; in their lambda lists, but no corresponding `&REST' symbol.  We assume
+;; this should be the case by analogy with the previous two functions.
+;; It works, and I don't know why.  Check the calling functions and
+;; fix these too.  --njf 2001-12-20
 (defun make-emf-call (metatypes applyp fn-variable &optional emf-type)
   (let ((required
-	 (gathering1 (collecting)
-	    (iterate ((i (interval :from 0))
-		      (s (list-elements metatypes)))
-	      (progn s)
-	      (gather1 (dfun-arg-symbol i))))))
+         (let ((required nil))
+           (dotimes (i (length metatypes))
+             (push (dfun-arg-symbol i) required))
+           (nreverse required))))
     `(,(if (eq emf-type 'fast-method-call)
 	   'invoke-effective-method-function-fast
 	   'invoke-effective-method-function)
@@ -790,36 +807,34 @@
 
 (defun make-dfun-call (metatypes applyp fn-variable)
   (let ((required
-	  (gathering1 (collecting)
-	    (iterate ((i (interval :from 0))
-		      (s (list-elements metatypes)))
-	      (progn s)
-	      (gather1 (dfun-arg-symbol i))))))
+         (let ((required nil))
+           (dotimes (i (length metatypes))
+             (push (dfun-arg-symbol i) required))
+           (nreverse required))))
     (if applyp
 	`(function-apply   ,fn-variable ,@required .dfun-rest-arg.)
 	`(function-funcall ,fn-variable ,@required))))
 
 (defun make-dfun-arg-list (metatypes applyp)
   (let ((required
-	  (gathering1 (collecting)
-	    (iterate ((i (interval :from 0))
-		      (s (list-elements metatypes)))
-	      (progn s)
-	      (gather1 (dfun-arg-symbol i))))))
+         (let ((required nil))
+           (dotimes (i (length metatypes))
+             (push (dfun-arg-symbol i) required))
+           (nreverse required))))
     (if applyp
 	`(list* ,@required .dfun-rest-arg.)
 	`(list ,@required))))
 
 (defun make-fast-method-call-lambda-list (metatypes applyp)
-  (gathering1 (collecting)
-    (gather1 '.pv-cell.)
-    (gather1 '.next-method-call.)
-    (iterate ((i (interval :from 0))
-	      (s (list-elements metatypes)))
-      (progn s)
-      (gather1 (dfun-arg-symbol i)))
+  (let ((lambda-list nil))
+    (push '.pv-cell. lambda-list)
+    (push '.next-method-call. lambda-list)
+    (dotimes (i (length metatypes))
+      (push (dfun-arg-symbol i) lambda-list))
     (when applyp
-      (gather1 '.dfun-rest-arg.))))
+      (push '.dfun-rest-arg. lambda-list))
+    (nreverse lambda-list)))
+
 
 ;;;; a comment from some PCL implementor:
 ;;;;     Its too bad Common Lisp compilers freak out when you have a

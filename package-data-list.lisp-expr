@@ -887,17 +887,6 @@ retained, possibly temporariliy, because it might be used internally."
 	     "COLD-FSET"
              "!DEFUN-FROM-COLLECTED-COLD-INIT-FORMS"))
 
- #s(sb-cold:package-data
-    :name "SB!ITERATE"
-    :doc "private: an iteration facility used to implement PCL"
-    :use ("CL" "SB!WALKER" "SB!INT" "SB!EXT")
-    :export ("ITERATE" "ITERATE*" "GATHERING" "GATHER"
-             "WITH-GATHERING" "INTERVAL" "ELEMENTS"
-             "LIST-ELEMENTS" "LIST-TAILS" "PLIST-ELEMENTS"
-             "EACHTIME" "WHILE" "UNTIL" "COLLECTING" "JOINING"
-             "MAXIMIZING" "MINIMIZING" "SUMMING"
-             "*ITERATE-WARNINGS*"))
-
  ;; FIXME: This package is awfully huge. It'd probably be good to
  ;; split it. There's at least one natural way to split it: the
  ;; implementation of the Lisp type system (e.g. TYPE-INTERSECTION and
@@ -1379,7 +1368,7 @@ definitely not guaranteed to be present in later versions of SBCL."
     ;; this until the duplicate SB-PCL:CLASS/CL:CLASS hierarchy kludge
     ;; is unscrewed, since until it is there are too many things which
     ;; conflict between the two packages.
-    :use ("CL" "SB!ITERATE" "SB!WALKER" "SB!INT" "SB!EXT")
+    :use ("CL" "SB!INT" "SB!EXT" "SB!WALKER")
     :import-from (("SB!KERNEL" "FUNCALLABLE-INSTANCE-P" "%FUN-DOC"
                    "PACKAGE-DOC-STRING"
                    "PACKAGE-HASHTABLE-SIZE" "PACKAGE-HASHTABLE-FREE"

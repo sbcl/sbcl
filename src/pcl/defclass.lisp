@@ -274,10 +274,11 @@
     (values (early-collect-slots cpl)
 	    cpl
 	    (early-collect-default-initargs cpl)
-	    (gathering1 (collecting)
+	    (let (collect)
 	      (dolist (definition *early-class-definitions*)
 		(when (memq class-name (ecd-superclass-names definition))
-		  (gather1 (ecd-class-name definition))))))))
+		  (push (ecd-class-name definition) collect)))
+              (nreverse collect)))))
 
 (defun early-collect-slots (cpl)
   (let* ((definitions (mapcar #'early-class-definition cpl))

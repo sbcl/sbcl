@@ -746,17 +746,18 @@
 
 (defmacro precompile-iis-functions (&optional system)
   `(progn
-    ,@(gathering1 (collecting)
-                  (dolist (iis-entry *initialize-instance-simple-alist*)
-                    (when (or (null (caddr iis-entry))
-                              (eq (caddr iis-entry) system))
-                      (when system (setf (caddr iis-entry) system))
-                      (gather1
-                       `(load-precompiled-iis-entry
-                         ',(car iis-entry)
-                         #',(car iis-entry)
-                         ',system
-                         ',(cdddr iis-entry))))))))
+    ,@(let (collect)
+        (dolist (iis-entry *initialize-instance-simple-alist*)
+          (when (or (null (caddr iis-entry))
+                    (eq (caddr iis-entry) system))
+            (when system (setf (caddr iis-entry) system))
+            (push `(load-precompiled-iis-entry
+                    ',(car iis-entry)
+                    #',(car iis-entry)
+                    ',system
+                    ',(cdddr iis-entry))
+                  collect)))
+        (nreverse collect))))
 
 (defun compile-iis-functions (after-p)
   (let ((*compile-make-instance-functions-p* t)

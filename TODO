@@ -5,9 +5,6 @@ for 0.7.0:
 	leaving some filing for later:-) from the monster
 	EVAL/EVAL-WHEN/%COMPILE/DEFUN/DEFSTRUCT cleanup:
 	** made inlining DEFUN inside MACROLET work again
-	** (SB-DEBUG:BACKTRACE) output should start with something
-		including the name BACKTRACE, not (as in 0.pre7.88)
-		just "0: (\"hairy arg processor\" ...)"
 * more renaming in global external names:
 	** reserved DO-FOO-style names for iteration macros
 	** finished s/FUNCTION/FUN/
@@ -17,13 +14,16 @@ for 0.7.0:
 	** s/#'(lambda/(lambda/
 	** four-space indentation in C
 * pending patches that go in (or else get rejected) before 0.7.0:
-	** Nathan Froyd "Goodbye ITERATE" 2001-12-15
+	** Alexey Dejneka "BUG in nested backquotes processing"
+		sbcl-devel 2001-12-21
 =======================================================================
 for early 0.7.x:
 
 * patches postponed until after 0.7.0:
 	** Christophe Rhodes "rough patch to fix bug 106" 2001-10-28
 * building with CLISP (or explaining why not)
+* urgent EVAL/EVAL-WHEN/%COMPILE/DEFUN/DEFSTRUCT cleanup:
+	** fixed bug 137
 * faster bootstrapping (both make.sh and slam.sh)
 	** added mechanisms for automatically finding dead code, and
 		used them to remove dead code

@@ -95,6 +95,12 @@
 ;;; able to get rid of this function and use plain RENAME-FILE in the
 ;;; COMPILE-STEM function above. -- WHN 19990321
 (defun rename-file-a-la-unix (x y)
+
+  ;; CLISP signals an error when the target file exists, which
+  ;; seems unjustified by the ANSI definition of RENAME-FILE.
+  ;; Work around it.
+  #+clisp (ignore-errors (delete-file y))
+
   (rename-file x
 	       ;; (Note that the TRUENAME expression here is lifted
 	       ;; from an example in the ANSI spec for TRUENAME.)

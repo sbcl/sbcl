@@ -176,6 +176,12 @@
 	:ref-trans %simple-fun-type
 	:set-known (unsafe)
 	:set-trans (setf %simple-fun-type))
+  ;; the SB!C::DEBUG-FUN object corresponding to this object, or NIL for none
+  #+nil ; FIXME: doesn't work (gotcha, lowly maintenoid!) See notes on bug 137.
+  (debug-fun :ref-known (flushable)
+             :ref-trans %simple-fun-debug-fun
+             :set-known (unsafe)
+             :set-trans (setf %simple-fun-debug-fun))
   (code :rest-p t :c-type "unsigned char"))
 
 (define-primitive-object (return-pc :lowtag other-pointer-lowtag :widetag t)

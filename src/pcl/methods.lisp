@@ -380,10 +380,11 @@
     ;; in the usual sort of way. For efficiency don't bother to
     ;; keep specialized-argument-positions sorted, rather depend
     ;; on our caller to do that.
-    (iterate ((type-spec (list-elements (method-specializers method)))
-	      (pos (interval :from 0)))
-      (unless (eq type-spec *the-class-t*)
-	(pushnew pos specialized-argument-positions)))
+    (let ((pos 0))
+      (dolist (type-spec (method-specializers method))
+        (unless (eq type-spec *the-class-t*)
+          (pushnew pos specialized-argument-positions))
+        (incf pos)))
     ;; Finally merge the values for this method into the values
     ;; for the exisiting methods and return them. Note that if
     ;; num-of-requireds is NIL it means this is the first method
@@ -394,10 +395,11 @@
 	    specialized-argument-positions)))
 
 (defun make-discriminating-function-arglist (number-required-arguments restp)
-  (nconc (gathering ((args (collecting)))
-	   (iterate ((i (interval :from 0 :below number-required-arguments)))
-	     (gather (intern (format nil "Discriminating Function Arg ~D" i))
-		     args)))
+  (nconc (let ((args nil))
+           (dotimes (i number-required-arguments)
+             (push (intern (format nil "Discriminating Function Arg ~D" i))
+                   args))
+           (nreverse args))
 	 (when restp
 	       `(&rest ,(intern "Discriminating Function &rest Arg")))))
 

@@ -156,19 +156,20 @@ And so, we are saved.
 (defmacro precompile-dfun-constructors (&optional system)
   (let ((*precompiling-lap* t))
     `(progn
-       ,@(gathering1 (collecting)
+       ,@(let (collect)
 	   (dolist (generator-entry *dfun-constructors*)
 	     (dolist (args-entry (cdr generator-entry))
 	       (when (or (null (caddr args-entry))
 			 (eq (caddr args-entry) system))
 		 (when system (setf (caddr args-entry) system))
-		 (gather1
-                  `(load-precompiled-dfun-constructor
-                    ',(car generator-entry)
-                    ',(car args-entry)
-                    ',system
-                    ,(apply (fdefinition (car generator-entry))
-                            (car args-entry)))))))))))
+		 (push `(load-precompiled-dfun-constructor
+                         ',(car generator-entry)
+                         ',(car args-entry)
+                         ',system
+                         ,(apply (fdefinition (car generator-entry))
+                                 (car args-entry)))
+                       collect))))
+           (nreverse collect)))))
 
 ;;; When all the methods of a generic function are automatically
 ;;; generated reader or writer methods a number of special

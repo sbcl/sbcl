@@ -155,37 +155,37 @@
 	      gensyms)))
 
 (defun compute-constants (lambda constant-converter)
-  (let ((*walk-form-expand-macros-p* t)) ; doesn't matter here.
-    (macrolet ((appending ()
-		 `(let ((result ()))
-		   (values #'(lambda (value) (setq result (append result value)))
-		    #'(lambda ()result)))))
-      (gathering1 (appending)
-		  (walk-form lambda
-			     nil
-			     #'(lambda (f c e)
-				 (declare (ignore e))
-				 (if (neq c :eval)
-				     f
-				     (let ((consts (funcall constant-converter f)))
-				       (if consts
-					   (progn (gather1 consts) (values f t))
-					   f)))))))))
+  (let ((*walk-form-expand-macros-p* t) ; doesn't matter here.
+        collect)
+    (walk-form lambda
+               nil
+               #'(lambda (f c e)
+                   (declare (ignore e))
+                   (if (neq c :eval)
+                       f
+                       (let ((consts (funcall constant-converter f)))
+                         (if consts
+                             (progn
+                               (setq collect (nconc collect consts))
+                               (values f t))
+                             f)))))
+    collect))
 
 (defmacro precompile-function-generators (&optional system)
   `(progn
-    ,@(gathering1 (collecting)
-                  (dolist (fgen *fgens*)
-                    (when (or (null (fgen-system fgen))
-                              (eq (fgen-system fgen) system))
-                      (when system (setf (svref fgen 4) system))
-                      (gather1
-                       `(load-function-generator
-                         ',(fgen-test fgen)
-                         ',(fgen-gensyms fgen)
-                         (function ,(fgen-generator-lambda fgen))
-                         ',(fgen-generator-lambda fgen)
-                         ',system)))))))
+    ,@(let (collect)
+        (dolist (fgen *fgens*)
+          (when (or (null (fgen-system fgen))
+                    (eq (fgen-system fgen) system))
+            (when system (setf (svref fgen 4) system))
+            (push `(load-function-generator
+                    ',(fgen-test fgen)
+                    ',(fgen-gensyms fgen)
+                    (function ,(fgen-generator-lambda fgen))
+                    ',(fgen-generator-lambda fgen)
+                    ',system)
+                  collect)))
+        (nreverse collect))))
 
 (defun load-function-generator (test gensyms generator generator-lambda system)
   (store-fgen (make-fgen test gensyms generator generator-lambda system)))

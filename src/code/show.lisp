@@ -48,6 +48,7 @@
 ;;; Note that despite the connoting-no-side-effects-pure-predicate
 ;;; name, we emit some error output if we're called at a point where
 ;;; /SHOW is inherently invalid.
+#!+sb-show
 (defun suppress-/show-p ()
   (cond (;; protection against /SHOW too early in cold init for
 	 ;; (FORMAT *TRACE-OUTPUT* ..) to work, part I: Obviously
