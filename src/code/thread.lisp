@@ -1,4 +1,6 @@
-(in-package :sb!thread)
+(in-package "SB!THREAD")
+
+(defvar *session-lock*)
 
 (sb!xc:defmacro with-recursive-lock ((mutex) &body body)
   #!+sb-thread

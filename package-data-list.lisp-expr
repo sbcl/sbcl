@@ -1395,7 +1395,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
 
  #s(sb-cold:package-data
     :name "SB!THREAD"
-    :use ("CL" "SB!ALIEN")
+    :use ("CL" "SB!ALIEN" "SB!INT")
     :doc "public (but low-level): native thread support"
     :export ("MAKE-THREAD"
 	     "MAKE-LISTENER-THREAD" "DESTROY-THREAD" "WITH-RECURSIVE-LOCK"

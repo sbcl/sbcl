@@ -468,13 +468,14 @@ static void /* noreturn */ parent_loop(void)
     maybe_gc_pending=0;
     while(all_threads && (pid=waitpid(-1,&status,__WALL|WUNTRACED))) {
 	struct thread *th;
+	int real_errno=errno;
 	while(maybe_gc_pending) parent_do_garbage_collect();
 	if(pid==-1) {
-	    if(errno == EINTR) {
+	    if(real_errno == EINTR) {
 		continue;
 	    }
-	    if(errno == ECHILD) break;
-	    fprintf(stderr,"waitpid: %s\n",strerror(errno));
+	    if(real_errno == ECHILD) break;
+	    fprintf(stderr,"waitpid: %s\n",strerror(real_errno));
 	    continue;
 	}
 	th=find_thread_by_pid(pid);
