@@ -203,8 +203,6 @@
 			      ;; This seems silly, is there something better?
 			      '(integer 0 (0))))))
 
-(declaim (ftype (function (sequence index index) nil)
-		signal-bounding-indices-bad-error))
 (defun signal-bounding-indices-bad-error (sequence start end)
   (let ((length (length sequence)))
     (error 'bounding-indices-bad-error

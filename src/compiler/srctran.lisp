@@ -2589,7 +2589,8 @@
     (or result 0)))
 
 ;;; If arg is a constant power of two, turn FLOOR into a shift and
-;;; mask. If CEILING, add in (1- (ABS Y)) and then do FLOOR.
+;;; mask. If CEILING, add in (1- (ABS Y)), do FLOOR and correct a
+;;; remainder.
 (flet ((frob (y ceil-p)
 	 (unless (constant-continuation-p y)
 	   (give-up-ir1-transform))
@@ -2599,13 +2600,14 @@
 	   (unless (= y-abs (ash 1 len))
 	     (give-up-ir1-transform))
 	   (let ((shift (- len))
-		 (mask (1- y-abs)))
-	     `(let ,(when ceil-p `((x (+ x ,(1- y-abs)))))
+		 (mask (1- y-abs))
+                 (delta (if ceil-p (* (signum y) (1- y-abs)) 0)))
+	     `(let ((x (+ x ,delta)))
 		,(if (minusp y)
 		     `(values (ash (- x) ,shift)
-			      (- (logand (- x) ,mask)))
+			      (- (- (logand (- x) ,mask)) ,delta))
 		     `(values (ash x ,shift)
-			      (logand x ,mask))))))))
+			      (- (logand x ,mask) ,delta))))))))
   (deftransform floor ((x y) (integer integer) *)
     "convert division by 2^k to shift"
     (frob y nil))

@@ -73,3 +73,17 @@ ASSERTion fails, probably in something related to bug #194.
 (assert (null (ignore-errors (max 3 #'max))))
 (assert (= (max -3 0) 0))
 ||#
+
+;;; (CEILING x 2^k) was optimized incorrectly
+(loop for divisor in '(-4 4)
+   for ceiler = (compile nil `(lambda (x)
+                                (declare (fixnum x))
+                                (declare (optimize (speed 3)))
+                                (ceiling x ,divisor)))
+   do (loop for i from -5 to 5
+         for exact-q = (/ i divisor)
+         do (multiple-value-bind (q r)
+                (funcall ceiler i)
+              (assert (= (+ (* q divisor) r) i))
+              (assert (<= exact-q q))
+              (assert (< q (1+ exact-q))))))

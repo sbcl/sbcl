@@ -1352,7 +1352,8 @@
 ;;; get efficient compilation of the inline expansion of
 ;;; %FIND-POSITION-IF, so it should maybe be in a more
 ;;; compiler-friendly package (SB-INT?)
-(defknown sb!impl::signal-bounding-indices-bad-error (sequence index index)
+(defknown sb!impl::signal-bounding-indices-bad-error
+    (sequence index sequence-end)
   nil) ; never returns
   
 
