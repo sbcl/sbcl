@@ -33,3 +33,11 @@
 (describe #0a0)
 (describe #(1 2 3))
 (describe #2a((1 2) (3 4)))
+
+;;; TYPEP, SUBTYPEP, UPGRADED-ARRAY-ELEMENT-TYPE and
+;;; UPGRADED-COMPLEX-PART-TYPE should be able to deal with NIL as an
+;;; environment argument
+(typep 1 'fixnum nil)
+(subtypep 'fixnum 'integer nil)
+(upgraded-array-element-type '(mod 5) nil)
+(upgraded-complex-part-type '(single-float 0.0 1.0) nil)

@@ -13,9 +13,10 @@
 ;;; test that the host Lisp object OBJECT translates to a target SBCL
 ;;; type TYPE. This behavior is needed e.g. to test for the validity
 ;;; of numeric subtype bounds read when cross-compiling.)
-(defun typep (object type)
+(defun typep (object type &optional environment)
   #!+sb-doc
   "Is OBJECT of type TYPE?"
+  (declare (ignore environment))
   ;; Actually interpreting types at runtime is done by %TYPEP. The
   ;; cost of the extra function call here should be negligible
   ;; compared to the cost of interpreting types. (And the compiler

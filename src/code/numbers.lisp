@@ -211,10 +211,11 @@
 
 ;;;; COMPLEXes
 
-(defun upgraded-complex-part-type (spec)
+(defun upgraded-complex-part-type (spec &optional environment)
   #!+sb-doc
   "Return the element type of the most specialized COMPLEX number type that
    can hold parts of type SPEC."
+  (declare (ignore environment))
   (cond ((unknown-type-p (specifier-type spec))
 	 (error "undefined type: ~S" spec))
 	((subtypep spec 'single-float)

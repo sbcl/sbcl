@@ -45,7 +45,7 @@
 
 ;;; These can be affected by type definitions, so they're not FOLDABLE.
 (defknown (upgraded-complex-part-type upgraded-array-element-type)
-	  (type-specifier) type-specifier
+	  (type-specifier &optional lexenv-designator) type-specifier
   (unsafely-flushable))
 
 ;;;; from the "Predicates" chapter:
@@ -56,7 +56,7 @@
 ;;; FIXNUMness) might be different between host and target. Perhaps
 ;;; this property should be protected by #-SB-XC-HOST? Perhaps we need
 ;;; 3-stage bootstrapping after all? (Ugh! It's *so* slow already!)
-(defknown typep (t type-specifier) t
+(defknown typep (t type-specifier &optional lexenv-designator) t
    ;; Unlike SUBTYPEP or UPGRADED-ARRAY-ELEMENT-TYPE and friends, this
    ;; seems to be FOLDABLE. Like SUBTYPEP, it's affected by type
    ;; definitions, but unlike SUBTYPEP, there should be no way to make
@@ -75,7 +75,8 @@
    ;; (UPGRADED-ARRAY-ELEMENT-TYPE and UPGRADED-COMPLEX-PART-TYPE have
    ;; behavior like SUBTYPEP in this respect, not like TYPEP.)
    (foldable))
-(defknown subtypep (type-specifier type-specifier) (values boolean boolean)
+(defknown subtypep (type-specifier type-specifier &optional lexenv-designator)
+  (values boolean boolean)
   ;; This is not FOLDABLE because its value is affected by type
   ;; definitions.
   ;;
@@ -96,7 +97,7 @@
 
 (sb!xc:deftype name-for-class () t)
 (defknown class-name (sb!xc:class) name-for-class (flushable))
-(defknown find-class (name-for-class &optional t lexenv)
+(defknown find-class (name-for-class &optional t lexenv-designator)
   (or sb!xc:class null) ())
 (defknown class-of (t) sb!xc:class (flushable))
 (defknown layout-of (t) layout (flushable))
@@ -123,7 +124,7 @@
 (defknown fmakunbound ((or symbol cons)) (or symbol cons)
   (unsafe explicit-check))
 (defknown (get-setf-method get-setf-method-multiple-value)
-  ((or list symbol) &optional lexenv)
+  ((or list symbol) &optional lexenv-designator)
   (values list list list form form)
   (flushable))
 (defknown apply (callable t &rest t) *) ; ### Last arg must be List...
@@ -142,13 +143,13 @@
 
 ;;;; from the "Macros" chapter:
 
-(defknown macro-function (symbol &optional lexenv)
+(defknown macro-function (symbol &optional lexenv-designator)
   (or function null)
   (flushable))
-(defknown (macroexpand macroexpand-1) (t &optional lexenv)
+(defknown (macroexpand macroexpand-1) (t &optional lexenv-designator)
   (values form &optional boolean))
 
-(defknown compiler-macro-function (t &optional lexenv)
+(defknown compiler-macro-function (t &optional lexenv-designator)
   (or function null)
   (flushable))
 
@@ -882,7 +883,7 @@
 ;;;; from the "Eval" chapter:
 
 (defknown eval (t) * (recursive))
-(defknown constantp (t &optional lexenv) boolean
+(defknown constantp (t &optional lexenv-designator) boolean
   (foldable flushable))
 
 ;;;; from the "Streams" chapter:

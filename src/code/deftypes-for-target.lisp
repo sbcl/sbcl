@@ -150,6 +150,10 @@
 ;;; used in the ANSI spec (if this is in fact exactly the same thing)
 (sb!xc:deftype streamlike () '(or stream (member nil t)))
 
+;;; an object suitable for input to standard functions that accept
+;;; "environment objects" (of the ANSI glossary)
+(sb!xc:deftype lexenv-designator () '(or lexenv null))
+
 ;;; a thing that can be passed to FUNCALL & friends
 ;;;
 ;;; FIXME: should be FUNCTION-DESIGNATOR?

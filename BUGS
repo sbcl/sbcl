@@ -626,7 +626,6 @@ WORKAROUND:
 
   (note the space between the comma and the point)
 
-
 143:
   (reported by Jesse Bouwman 2001-10-24 through the unfortunately
   prominent SourceForge web/db bug tracking system, which is 
@@ -716,11 +715,6 @@ WORKAROUND:
   of KIDIFY1, which already does not exist. So it gives up on
   expansion, leaving garbage consisting of infinished blocks of the
   partially converted function.)
-
-157:
-  Functions SUBTYPEP, TYPEP, UPGRADED-ARRAY-ELEMENT-TYPE, and 
-  UPGRADED-COMPLEX-PART-TYPE should have an optional environment argument.
-  (reported by Alexey Dejneka sbcl-devel 2002-04-12)
 
 162:
   (reported by Robert E. Brown 2002-04-16) 
@@ -1252,6 +1246,16 @@ WORKAROUND:
   should be valid immediately. (See also bug 233a.)
 
   The similar problem exists for TRULY-THE.
+
+237: "Environment arguments to type functions"
+  a. Functions SUBTYPEP, TYPEP, UPGRADED-ARRAY-ELEMENT-TYPE, and 
+     UPGRADED-COMPLEX-PART-TYPE now have an optional environment
+     argument, but they ignore it completely.  This is almost 
+     certainly not correct.
+  b. Also, the compiler's optimizers for TYPEP have not been informed
+     about the new argument; consequently, they will not transform
+     calls of the form (TYPEP 1 'INTEGER NIL), even though this is
+     just as optimizeable as (TYPEP 1 'INTEGER).
 
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:

@@ -1505,6 +1505,12 @@ changes in sbcl-0.7.13 relative to sbcl-0.7.12:
   * fixed a bug in LOG, so that LOG of a rational argument near 1 now
     gives a closer approximation to the right answer than previously.
     (thanks to Raymond Toy)
+  * fixed bug 157: TYPEP, SUBTYPEP, UPGRADED-ARRAY-ELEMENT-TYPE and
+    UPGRADED-COMPLEX-PART-TYPE now take (ignored, in all situations)
+    optional environment arguments, as required by ANSI.
+  * fixed bugs in other functions taking environment objects, allowing
+    calls with an explicit NIL environment argument to be compiled
+    without error.
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** ARRAY-IN-BOUNDS-P now allows arbitrary integers as arguments,
        not just nonnegative fixnums;

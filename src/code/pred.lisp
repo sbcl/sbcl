@@ -127,16 +127,6 @@
 	 (class-proper-name class)))
       name))))
 
-;;; FIXME: This belongs somewhere else, perhaps in code/array.lisp.
-(defun upgraded-array-element-type (spec)
-  #!+sb-doc
-  "Return the element type that will actually be used to implement an array
-   with the specifier :ELEMENT-TYPE Spec."
-  (if (unknown-type-p (specifier-type spec))
-      (error "undefined type: ~S" spec)
-      (type-specifier (array-type-specialized-element-type
-		       (specifier-type `(array ,spec))))))
-
 ;;;; equality predicates
 
 ;;; This is real simple, 'cause the compiler takes care of it.
