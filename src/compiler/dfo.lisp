@@ -488,12 +488,9 @@
     ;; is always a preceding REF NIL node in top level lambdas.
     (let ((return (lambda-return lambda)))
       (when return
-	(let ((return-block (node-block return))
-	      (result (return-result return)))
-	  (setf (block-last return-block) (continuation-use result))
-	  (flush-dest result)
-	  (delete-continuation result)
-	  (link-blocks return-block result-return-block))))))
+	(link-blocks (node-block return) result-return-block)
+        (flush-dest (return-result return))
+        (unlink-node return)))))
 
 ;;; Given a non-empty list of top level LAMBDAs, smash them into a
 ;;; top level lambda and component, returning these as values. We use

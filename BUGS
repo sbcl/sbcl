@@ -1180,6 +1180,18 @@ WORKAROUND:
   does not cause a warning. (BTW: old SBCL issued a warning, but for a
   function, which was never called!)
 
+252:
+  (reported by Eric Marsden on sbcl-devel 2003-06-02)
+  Block-compiling (using the :block-compile argument to COMPILE-FILE)
+  causes an internal error on a simple file containing
+
+    (defun foo (x)
+      (list x))
+    (defun bar (x)
+      (+ x (foo x)))
+
+  (fixed in 0.8.0.27)
+
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:
     These labels were used for bugs related to the old IR1 interpreter.
