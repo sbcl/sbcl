@@ -75,7 +75,7 @@
 (defun read-string-as-bytes (stream string &optional (length (length string)))
   (dotimes (i length)
     (setf (aref string i)
-	  (code-char (read-byte stream))))
+	  (sb!xc:code-char (read-byte stream))))
   ;; FIXME: The classic CMU CL code to do this was
   ;;   (READ-N-BYTES FILE STRING START END).
   ;; It was changed for SBCL because we needed a portable version for

@@ -421,7 +421,7 @@
   (movable foldable flushable))
 (defknown name-char (string-designator) (or character null)
   (movable foldable flushable))
-(defknown code-char (char-code) base-char
+(defknown code-char (char-code) character
   ;; By suppressing constant folding on CODE-CHAR when the
   ;; cross-compiler is running in the cross-compilation host vanilla
   ;; ANSI Common Lisp, we can use CODE-CHAR expressions to delay until

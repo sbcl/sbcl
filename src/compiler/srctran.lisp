@@ -2996,21 +2996,18 @@
 ;;; then the result is definitely false.
 (deftransform simple-equality-transform ((x y) * *
 					 :defun-only t)
-  (cond ((same-leaf-ref-p x y)
-	 t)
-	((not (types-equal-or-intersect (lvar-type x)
-					(lvar-type y)))
+  (cond
+    ((same-leaf-ref-p x y) t)
+    ((not (types-equal-or-intersect (lvar-type x) (lvar-type y)))
 	 nil)
-	(t
-	 (give-up-ir1-transform))))
+    (t (give-up-ir1-transform))))
 
 (macrolet ((def (x)
              `(%deftransform ',x '(function * *) #'simple-equality-transform)))
   (def eq)
-  (def char=)
-  (def equal))
+  (def char=))
 
-;;; This is similar to SIMPLE-EQUALITY-PREDICATE, except that we also
+;;; This is similar to SIMPLE-EQUALITY-TRANSFORM, except that we also
 ;;; try to convert to a type-specific predicate or EQ:
 ;;; -- If both args are characters, convert to CHAR=. This is better than
 ;;;    just converting to EQ, since CHAR= may have special compilation
@@ -3029,8 +3026,8 @@
 	(y-type (lvar-type y))
 	(char-type (specifier-type 'character))
 	(number-type (specifier-type 'number)))
-    (cond ((same-leaf-ref-p x y)
-	   t)
+    (cond
+      ((same-leaf-ref-p x y) t)
 	  ((not (types-equal-or-intersect x-type y-type))
 	   nil)
 	  ((and (csubtypep x-type char-type)
@@ -3046,6 +3043,25 @@
 	   '(eql y x))
 	  (t
 	   (give-up-ir1-transform)))))
+
+;;; similarly to the EQL transform above, we attempt to constant-fold
+;;; or convert to a simpler predicate: mostly we have to be careful
+;;; with strings.
+(deftransform equal ((x y) * *)
+  "convert to simpler equality predicate"
+  (let ((x-type (lvar-type x))
+	(y-type (lvar-type y))
+	(string-type (specifier-type 'string)))
+    (cond
+      ((same-leaf-ref-p x y) t)
+      ((and (csubtypep x-type string-type)
+	    (csubtypep y-type string-type))
+       '(string= x y))
+      ((and (or (not (types-equal-or-intersect x-type string-type))
+		(not (types-equal-or-intersect y-type string-type)))
+	    (not (types-equal-or-intersect x-type y-type)))
+       nil)
+      (t (give-up-ir1-transform)))))
 
 ;;; Convert to EQL if both args are rational and complexp is specified
 ;;; and the same for both.

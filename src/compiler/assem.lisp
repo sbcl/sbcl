@@ -27,7 +27,7 @@
 ;;; This structure holds the state of the assembler.
 (defstruct (segment (:copier nil))
   ;; the name of this segment (for debugging output and stuff)
-  (name "unnamed" :type simple-base-string)
+  (name "unnamed" :type simple-string)
   ;; Ordinarily this is a vector where instructions are written. If
   ;; the segment is made invalid (e.g. by APPEND-SEGMENT) then the
   ;; vector can be replaced by NIL.

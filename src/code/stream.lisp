@@ -1028,7 +1028,7 @@
 	     (:include string-stream
 		       (in #'string-inch)
 		       (bin #'ill-bin)
-		       (n-bin #'string-stream-read-n-bytes)
+		       (n-bin #'ill-bin)
 		       (misc #'string-in-misc)
                        (string (missing-arg) :type simple-string))
 	     (:constructor internal-make-string-input-stream
@@ -1525,7 +1525,7 @@
 
 (defun case-frob-upcase-sout (stream str start end)
   (declare (type case-frob-stream stream)
-	   (type simple-base-string str)
+	   (type simple-string str)
 	   (type index start)
 	   (type (or index null) end))
   (let* ((target (case-frob-stream-target stream))
@@ -1550,7 +1550,7 @@
 
 (defun case-frob-downcase-sout (stream str start end)
   (declare (type case-frob-stream stream)
-	   (type simple-base-string str)
+	   (type simple-string str)
 	   (type index start)
 	   (type (or index null) end))
   (let* ((target (case-frob-stream-target stream))
@@ -1583,7 +1583,7 @@
 
 (defun case-frob-capitalize-sout (stream str start end)
   (declare (type case-frob-stream stream)
-	   (type simple-base-string str)
+	   (type simple-string str)
 	   (type index start)
 	   (type (or index null) end))
   (let* ((target (case-frob-stream-target stream))
@@ -1628,7 +1628,7 @@
 
 (defun case-frob-capitalize-aux-sout (stream str start end)
   (declare (type case-frob-stream stream)
-	   (type simple-base-string str)
+	   (type simple-string str)
 	   (type index start)
 	   (type (or index null) end))
   (let* ((target (case-frob-stream-target stream))
@@ -1673,7 +1673,7 @@
 
 (defun case-frob-capitalize-first-sout (stream str start end)
   (declare (type case-frob-stream stream)
-	   (type simple-base-string str)
+	   (type simple-string str)
 	   (type index start)
 	   (type (or index null) end))
   (let* ((target (case-frob-stream-target stream))

@@ -382,6 +382,7 @@
 ;;; Is UNIX-FILENAME the name of a file that we can execute?
 (defun unix-filename-is-executable-p (unix-filename)
   (declare (type simple-string unix-filename))
+  (setf unix-filename (coerce unix-filename 'base-string))
   (values (and (eq (sb-unix:unix-file-kind unix-filename) :file)
 	       (sb-unix:unix-access unix-filename sb-unix:x_ok))))
 

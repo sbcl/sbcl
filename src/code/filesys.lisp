@@ -192,8 +192,9 @@
       (values absolute (pieces)))))
 
 (defun parse-unix-namestring (namestr start end)
-  (declare (type simple-base-string namestr)
+  (declare (type simple-string namestr)
            (type index start end))
+  (setf namestr (coerce namestr 'simple-base-string))
   (multiple-value-bind (absolute pieces) (split-at-slashes namestr start end)
     (multiple-value-bind (name type version)
 	(let* ((tail (car (last pieces)))
@@ -296,7 +297,7 @@
 	      (t
 	       (error "invalid pattern piece: ~S" piece))))))
        (apply #'concatenate
-	      'simple-string
+	      'simple-base-string
 	      (strings))))))
 
 (defun unparse-unix-directory-list (directory)
@@ -322,7 +323,7 @@
 	   (pieces "/"))
 	  (t
 	   (error "invalid directory component: ~S" dir)))))
-    (apply #'concatenate 'simple-string (pieces))))
+    (apply #'concatenate 'simple-base-string (pieces))))
 
 (defun unparse-unix-directory (pathname)
   (declare (type pathname pathname))
@@ -350,18 +351,18 @@
       (when type-supplied
 	(unless name
 	  (error "cannot specify the type without a file: ~S" pathname))
-	(when (typep type 'simple-base-string)
+	(when (typep type 'simple-string)
 	  (when (position #\. type)
 	    (error "type component can't have a #\. inside: ~S" pathname)))
 	(strings ".")
 	(strings (unparse-unix-piece type))))
-    (apply #'concatenate 'simple-string (strings))))
+    (apply #'concatenate 'simple-base-string (strings))))
 
 (/show0 "filesys.lisp 406")
 
 (defun unparse-unix-namestring (pathname)
   (declare (type pathname pathname))
-  (concatenate 'simple-string
+  (concatenate 'simple-base-string
 	       (unparse-unix-directory pathname)
 	       (unparse-unix-file pathname)))
 
@@ -583,9 +584,10 @@
     (/noshow0 "computed NAME, TYPE, and VERSION")
     (cond ((member name '(nil :unspecific))
 	   (/noshow0 "UNSPECIFIC, more or less")
-	   (when (or (not verify-existence)
-		     (sb!unix:unix-file-kind directory))
-	     (funcall function directory)))
+           (let ((directory (coerce directory 'base-string)))
+             (when (or (not verify-existence)
+                       (sb!unix:unix-file-kind directory))
+               (funcall function directory))))
 	  ((or (pattern-p name)
 	       (pattern-p type)
 	       (eq name :wild)
@@ -1040,7 +1042,7 @@
 			       :device (pathname-device pathname)
 			       :directory (subseq dir 0 i))))
 		 (unless (probe-file newpath)
-		   (let ((namestring (namestring newpath)))
+		   (let ((namestring (coerce (namestring newpath) 'base-string)))
 		     (when verbose
 		       (format *standard-output*
 			       "~&creating directory: ~A~%"

@@ -14,9 +14,8 @@
 (define-alien-type-class (c-string :include pointer :include-args (to)))
 
 (define-alien-type-translator c-string ()
-  (make-alien-c-string-type :to
-			    (parse-alien-type 'char
-					      (sb!kernel::make-null-lexenv))))
+  (make-alien-c-string-type
+   :to (parse-alien-type 'char (sb!kernel:make-null-lexenv))))
 
 (define-alien-type-method (c-string :unparse) (type)
   (declare (ignore type))
@@ -24,7 +23,7 @@
 
 (define-alien-type-method (c-string :lisp-rep) (type)
   (declare (ignore type))
-  '(or simple-base-string null (alien (* char))))
+  '(or simple-string null (alien (* char))))
 
 (define-alien-type-method (c-string :naturalize-gen) (type alien)
   (declare (ignore type))
@@ -37,7 +36,8 @@
   `(etypecase ,value
      (null (int-sap 0))
      ((alien (* char)) (alien-sap ,value))
-     (simple-base-string (vector-sap ,value))))
+     (simple-base-string (vector-sap ,value))
+     (simple-string (vector-sap (coerce ,value 'simple-base-string)))))
 
 (/show0 "host-c-call.lisp 42")
 

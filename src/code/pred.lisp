@@ -128,6 +128,8 @@
 	 '(integer #.(1+ sb!xc:most-positive-fixnum))
 	 'bignum))
     (standard-char 'standard-char)
+    (base-char 'base-char)
+    (extended-char 'extended-char)
     ((member t) 'boolean)
     (keyword 'keyword)
     ((or array complex) (type-specifier (ctype-of object)))

@@ -192,11 +192,19 @@
   (declare (type fasl-output fasl-output))
   (unless *cold-load-dump*
     (let ((handle (gethash x (fasl-output-equal-table fasl-output))))
-      (cond (handle
-	     (dump-push handle fasl-output)
-	     t)
-	    (t
-	     nil)))))
+      (cond
+        (handle (dump-push handle fasl-output) t)
+        (t nil)))))
+(defun string-check-table (x fasl-output)
+  (declare (type fasl-output fasl-output)
+           (type string x))
+  (unless *cold-load-dump*
+    (let ((handle (cdr (assoc
+                        (array-element-type x)
+                        (gethash x (fasl-output-equal-table fasl-output))))))
+      (cond
+        (handle (dump-push handle fasl-output) t)
+        (t nil)))))
 
 ;;; These functions are called after dumping an object to save the
 ;;; object in the table. The object (also passed in as X) must already
@@ -217,7 +225,16 @@
       (setf (gethash x (fasl-output-eq-table fasl-output)) handle)
       (dump-push handle fasl-output)))
   (values))
-
+(defun string-save-object (x fasl-output)
+  (declare (type fasl-output fasl-output)
+           (type string x))
+  (unless *cold-load-dump*
+    (let ((handle (dump-pop fasl-output)))
+      (push (cons (array-element-type x) handle)
+            (gethash x (fasl-output-equal-table fasl-output)))
+      (setf (gethash x (fasl-output-eq-table fasl-output)) handle)
+      (dump-push handle fasl-output)))
+  (values))
 ;;; Record X in File's CIRCULARITY-TABLE unless *COLD-LOAD-DUMP* is
 ;;; true. This is called on objects that we are about to dump might
 ;;; have a circular path through them.
@@ -370,11 +387,8 @@
 	      (dump-structure x file)
 	      (eq-save-object x file))
 	     (array
-	      ;; FIXME: The comment at the head of
-	      ;; DUMP-NON-IMMEDIATE-OBJECT says it's for objects which
-	      ;; we want to save, instead of repeatedly dumping them.
-	      ;; But then we dump arrays here without doing anything
-	      ;; like EQUAL-SAVE-OBJECT. What gives?
+              ;; DUMP-ARRAY (and its callees) are responsible for
+              ;; updating the EQ and EQUAL hash tables.
 	      (dump-array x file))
 	     (number
 	      (unless (equal-check-table x file)

@@ -811,7 +811,7 @@ previous timer after the body has finished executing"
 ;;; paths have been converted to absolute paths, so we don't need to
 ;;; try to handle any more generality than that.
 (defun unix-resolve-links (pathname)
-  (declare (type simple-string pathname))
+  (declare (type simple-base-string pathname))
   (aver (not (relative-unix-pathname? pathname)))
   (/noshow "entering UNIX-RESOLVE-LINKS")
   (loop with previous-pathnames = nil do
@@ -837,7 +837,7 @@ previous timer after the body has finished executing"
 							:from-end t)))
 				 (dir (subseq pathname 0 dir-len)))
 			    (/noshow dir)
-			    (concatenate 'string dir link))
+			    (concatenate 'base-string dir link))
 			  link))))
 		(if (unix-file-kind new-pathname)
 		    (setf pathname new-pathname)
@@ -853,9 +853,9 @@ previous timer after the body has finished executing"
 	    (push pathname previous-pathnames))))
 
 (defun unix-simplify-pathname (src)
-  (declare (type simple-string src))
+  (declare (type simple-base-string src))
   (let* ((src-len (length src))
-	 (dst (make-string src-len))
+	 (dst (make-string src-len :element-type 'base-char))
 	 (dst-len 0)
 	 (dots 0)
 	 (last-slash nil))
@@ -929,7 +929,8 @@ previous timer after the body has finished executing"
 		  (position #\/ dst :end last-slash :from-end t)))
 	     (if prev-prev-slash
 		 (setf dst-len (1+ prev-prev-slash))
-		 (return-from unix-simplify-pathname "./")))))))
+		 (return-from unix-simplify-pathname
+		   (coerce "./" 'simple-base-string))))))))
     (cond ((zerop dst-len)
 	   "./")
 	  ((= dst-len src-len)

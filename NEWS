@@ -29,6 +29,9 @@ changes in sbcl-0.8.17 relative to sbcl-0.8.16:
     name conflict situations in CLHS 11.1.1.2.5, and provide a restart
     permitting resolution in favour of any of the conflicting symbols.
     (reported by Bruno Haible for CMUCL)
+  * bug fix: EQUAL compiler optimizations is less aggressive on
+    strings which can potentially compare true despite having distinct
+    specialized array element types.
   * FORMAT compile-time argument count checking has been enhanced.
     (report from Bruno Haible for CMUCL)
   * fixed some bugs revealed by Paul Dietz' test suite:

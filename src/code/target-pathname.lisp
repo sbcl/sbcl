@@ -202,12 +202,12 @@
   (or (eq thing wild)
       (eq wild :wild)
       (typecase thing
-	(simple-base-string
+	(simple-string
 	 ;; String is matched by itself, a matching pattern or :WILD.
 	 (typecase wild
 	   (pattern
 	    (values (pattern-matches wild thing)))
-	   (simple-base-string
+	   (simple-string
 	    (string= thing wild))))
 	(pattern
 	 ;; A pattern is only matched by an identical pattern.
@@ -308,7 +308,7 @@
 		    (dolist (x in)
 		      (when (check-for pred x)
 			(return t))))
-		   (simple-base-string
+		   (simple-string
 		    (dotimes (i (length in))
 		      (when (funcall pred (schar in i))
 			(return t))))
@@ -319,7 +319,7 @@
 		    (make-pattern
 		     (mapcar (lambda (piece)
 			       (typecase piece
-				 (simple-base-string
+				 (simple-string
 				  (funcall fun piece))
 				 (cons
 				  (case (car piece)
@@ -333,7 +333,7 @@
 			     (pattern-pieces thing))))
 		   (list
 		    (mapcar fun thing))
-		   (simple-base-string
+		   (simple-string
 		    (funcall fun thing))
 		   (t
 		    thing))))
@@ -702,7 +702,7 @@ a host-structure or string."
 ;;; If NAMESTR begins with a colon-terminated, defined, logical host,
 ;;; then return that host, otherwise return NIL.
 (defun extract-logical-host-prefix (namestr start end)
-  (declare (type simple-base-string namestr)
+  (declare (type simple-string namestr)
 	   (type index start end)
 	   (values (or logical-host null)))
   (let ((colon-pos (position #\: namestr :start start :end end)))
@@ -924,7 +924,7 @@ a host-structure or string."
 (defun substitute-into (pattern subs diddle-case)
   (declare (type pattern pattern)
 	   (type list subs)
-	   (values (or simple-base-string pattern) list))
+	   (values (or simple-string pattern) list))
   (let ((in-wildcard nil)
 	(pieces nil)
 	(strings nil))
@@ -1157,13 +1157,14 @@ a host-structure or string."
   (let ((word (string-upcase word)))
     (dotimes (i (length word))
       (let ((ch (schar word i)))
-	(unless (or (alpha-char-p ch) (digit-char-p ch) (char= ch #\-))
+	(unless (and (typep ch 'standard-char)
+		     (or (alpha-char-p ch) (digit-char-p ch) (char= ch #\-)))
 	  (error 'namestring-parse-error
 		 :complaint "logical namestring character which ~
                              is not alphanumeric or hyphen:~%  ~S"
 		 :args (list ch)
 		 :namestring word :offset i))))
-    word))
+    (coerce word 'base-string)))
 
 ;;; Given a logical host or string, return a logical host. If ERROR-P
 ;;; is NIL, then return NIL when no such host exists.
@@ -1257,7 +1258,7 @@ a host-structure or string."
 ;;; Break up a logical-namestring, always a string, into its
 ;;; constituent parts.
 (defun parse-logical-namestring (namestr start end)
-  (declare (type simple-base-string namestr)
+  (declare (type simple-string namestr)
 	   (type index start end))
   (collect ((directory))
     (let ((host nil)
@@ -1418,7 +1419,7 @@ a host-structure or string."
       (when type-supplied
 	(unless name
 	  (error "cannot specify the type without a file: ~S" pathname))
-	(when (typep type 'simple-base-string)
+	(when (typep type 'simple-string)
 	  (when (position #\. type)
 	    (error "type component can't have a #\. inside: ~S" pathname)))
 	(strings ".")
@@ -1524,12 +1525,9 @@ a host-structure or string."
     (t (translate-logical-pathname (pathname pathname)))))
 
 (defvar *logical-pathname-defaults*
-  (%make-logical-pathname (make-logical-host :name "BOGUS")
-			  :unspecific
-			  nil
-			  nil
-			  nil
-			  nil))
+  (%make-logical-pathname
+   (make-logical-host :name (logical-word-or-lose "BOGUS"))
+   :unspecific nil nil nil nil))
 
 (defun load-logical-pathname-translations (host)
   #!+sb-doc

@@ -360,6 +360,11 @@
      (make-member-type :members (list x)))
     (number
      (ctype-of-number x))
+    (string
+     (make-array-type :dimensions (array-dimensions x)
+                      :complexp (not (typep x 'simple-array))
+                      :element-type (specifier-type 'base-char)
+                      :specialized-element-type (specifier-type 'base-char)))
     (array
      (let ((etype (specifier-type (array-element-type x))))
        (make-array-type :dimensions (array-dimensions x)

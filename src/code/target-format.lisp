@@ -76,8 +76,11 @@
 	   (multiple-value-bind (new-directives new-args)
 	       (let* ((character (format-directive-character directive))
 		      (function
+                       (typecase character
+                         (base-char 
 		       (svref *format-directive-interpreters*
 			      (char-code character)))
+                         (character nil)))
 		      (*default-format-error-offset*
 		       (1- (format-directive-end directive))))
 		 (unless function
