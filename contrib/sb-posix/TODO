@@ -51,4 +51,9 @@ than going thru an exception mechanism that will be invoked everytime.
 
 9) proper alien definitions of structures [ possibly an sb-grovel
 problem, but the way we define calls exposes the problem -- see
-readdir() ]
+readdir() ] [ isn't this done? ]
+
+10) some functions (e.g. fdatasync, putenv) have a return value which
+is purely an error indicator.  Currently we're returning the 0 on
+success, but maybe it would make more sense for them to return
+(values).

@@ -326,3 +326,15 @@
 	(syscall-error))
       (setf termios (alien-to-termios a-termios termios))))
   termios)
+
+;;; environment
+
+(export 'sb-posix::getenv :sb-posix)
+(defun sb-posix::getenv (name)
+  (let ((r (alien-funcall
+	    (extern-alien "getenv" (function (* char) c-string))
+	    name)))
+    (declare (type (alien (* char)) r))
+    (unless (null-alien r)
+      (cast r c-string))))
+(define-call "putenv" int minusp (string c-string))
