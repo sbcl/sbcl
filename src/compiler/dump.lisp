@@ -391,7 +391,7 @@
 
 ;;; Dump an object of any type by dispatching to the correct
 ;;; type-specific dumping function. We pick off immediate objects,
-;;; symbols and and magic lists here. Other objects are handled by
+;;; symbols and magic lists here. Other objects are handled by
 ;;; DUMP-NON-IMMEDIATE-OBJECT.
 ;;;
 ;;; This is the function used for recursive calls to the fasl dumper.

@@ -513,7 +513,7 @@
     (values)))
 
 ;;; Print a breakdown by instance type of all the instances allocated
-;;; in SPACE. If TOP-N is true, print only information for the the
+;;; in SPACE. If TOP-N is true, print only information for the 
 ;;; TOP-N types with largest usage.
 (defun instance-usage (space &key (top-n 15))
   (declare (type spaces space) (type (or fixnum null) top-n))

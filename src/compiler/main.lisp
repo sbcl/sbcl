@@ -196,7 +196,7 @@
 		    (t
 		     (compiler-warn
 		      "~@<The ~(~A~) ~S is undefined, and its name is ~
-                       reserved by ANSI CL so that even if it it were ~
+                       reserved by ANSI CL so that even if it were ~
                        defined later, the code doing so would not be ~
                        portable.~:@>"
 		      kind name)))

@@ -75,7 +75,7 @@
   ;; CMU CL, there are two distinct -- but coupled -- mechanisms to
   ;; finding the name of a function. The slot here is one mechanism
   ;; (used in CMU CL to look up names in the debugger, e.g. in
-  ;; BACKTRACE). The other mechanism is the the NAME slot in function
+  ;; BACKTRACE). The other mechanism is the NAME slot in function
   ;; primitive objects (used in CMU CL to look up names elsewhere,
   ;; e.g. in CL:FUNCTION-LAMBDA-EXPRESSION and in CL:DESCRIBE).
   ;;

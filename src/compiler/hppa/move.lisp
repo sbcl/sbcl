@@ -225,13 +225,13 @@
       ;; Create the result pointer.
       (inst move alloc-tn y)
       (inst dep other-pointer-lowtag 31 3 y)
-      ;; Check the high bit, and skip the next instruction it it's 0.
+      ;; Check the high bit, and skip the next instruction if it's 0.
       (inst comclr x zero-tn zero-tn :>=)
       ;; The high bit is set, so allocate enough space for a two-word bignum.
       ;; We always skip the following instruction, so it is only executed
       ;; when we want one word.
       (inst addi (pad-data-block 1) alloc-tn alloc-tn :tr)
-      ;; Set up the header for one word.  Use addi instead of li so we can
+      ;; Set up the header for one word.  Use ADDI instead of LI so we can
       ;; skip the next instruction.
       (inst addi (logior (ash 1 n-widetag-bits) bignum-widetag) zero-tn temp :tr)
       ;; Set up the header for two words.

@@ -241,7 +241,7 @@
 
 ;;; UNIX-WRITE accepts a file descriptor, a buffer, an offset, and the
 ;;; length to write. It attempts to write len bytes to the device
-;;; associated with fd from the the buffer starting at offset. It returns
+;;; associated with fd from the buffer starting at offset. It returns
 ;;; the actual number of bytes written.
 (defun unix-write (fd buf offset len)
   (declare (type unix-fd fd)

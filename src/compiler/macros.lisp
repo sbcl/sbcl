@@ -259,14 +259,14 @@
 
 ;;; Given a DEFTRANSFORM-style lambda-list, generate code that parses
 ;;; the arguments of a combination with respect to that
-;;; lambda-list. BODY is the the list of forms which are to be
+;;; lambda-list. BODY is the list of forms which are to be
 ;;; evaluated within the bindings. ARGS is the variable that holds
 ;;; list of argument lvars. ERROR-FORM is a form which is evaluated
 ;;; when the syntax of the supplied arguments is incorrect or a
 ;;; non-constant argument keyword is supplied. Defaults and other gunk
 ;;; are ignored. The second value is a list of all the arguments
 ;;; bound. We make the variables IGNORABLE so that we don't have to
-;;; manually declare them Ignore if their only purpose is to make the
+;;; manually declare them IGNORE if their only purpose is to make the
 ;;; syntax work.
 (defun parse-deftransform (lambda-list body args error-form)
   (multiple-value-bind (req opt restp rest keyp keys allowp)

@@ -678,7 +678,7 @@
 	   ;; given a set of indices. We wrap each index with a call
 	   ;; to %CHECK-BOUND to ensure that everything works out
 	   ;; correctly. We can wrap all the interior arithmetic with
-	   ;; TRULY-THE INDEX because we know the the resultant
+	   ;; TRULY-THE INDEX because we know the resultant
 	   ;; row-major index must be an index.
 	   (with-row-major-index ((array indices index &optional new-value)
 				  &rest body)

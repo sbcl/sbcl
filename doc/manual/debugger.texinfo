@@ -790,7 +790,7 @@ form have been added or deleted.)
 If the heuristic doesn't work, the displayed source will be wrong, but will
 probably be near the actual source.  If the ``shape'' of the top-level form in
 the source file is too different from the original form, then an error will be
-signaled.  When the heuristic is used, the the source location commands are
+signaled.  When the heuristic is used, the source location commands are
 noticeably slowed.
 
 Source location printing can also be confused if (after the source was
@@ -830,7 +830,7 @@ some properties of the block start location:
 
 @item The block start location may be the same as the true location.
 
-@item The block start location will never be later in the the
+@item The block start location will never be later in the 
 program's flow of control than the true location.
 
 @item No conditional control structures (such as @code{if},
@@ -1023,7 +1023,7 @@ Selects the @code{continue} restart if one exists and starts single stepping.
 @c @cindex Breakpoints
 
 @c SBCL supports setting of breakpoints inside compiled functions and
-@c stepping of compiled code.  Breakpoints can only be set at at known
+@c stepping of compiled code.  Breakpoints can only be set at known
 @c locations (@pxref{Unknown Locations and Interrupts}), so these
 @c commands are largely useless unless the @code{debug} optimize quality
 @c is at least @code{2} (@pxref{Debugger Policy Control}).  These

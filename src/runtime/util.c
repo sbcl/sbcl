@@ -69,7 +69,7 @@ void**
 voidacc_give_away_result(struct voidacc *va)
 {
     /* (We could do realloc(3) here to try to shrink the result down
-     * to minimum size, but that's not really needed for the the
+     * to minimum size, but that's not really needed for the
      * directory-iteration application this was originally written
      * for, so for now we just do the simplest thing which could
      * possibly work.) */

@@ -1314,7 +1314,7 @@
 	;; high 32 bits of the FSR, which contain the additional
 	;; %fcc's on the sparc V9.  If not, we don't need this, but we
 	;; do need to make sure that the unused bits are written as
-	;; zeroes, according the the V9 architecture manual.
+	;; zeroes, according the V9 architecture manual.
 	(inst sra new 0)
 	(inst srlx my-fsr 32)
 	(inst sllx my-fsr 32)
