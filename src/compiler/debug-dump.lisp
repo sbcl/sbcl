@@ -198,7 +198,7 @@
   (values))
 
 ;;; Return a vector and an integer (or null) suitable for use as the
-;;; BLOCKS and TLF-NUMBER in FUN's debug-function. This requires two
+;;; BLOCKS and TLF-NUMBER in FUN's DEBUG-FUN. This requires two
 ;;; passes to compute:
 ;;; -- Scan all blocks, dumping the header and successors followed
 ;;;    by all the non-elsewhere locations.
@@ -348,7 +348,7 @@
       (vector-push-extend (tn-sc-offset save-tn) buffer)))
   (values))
 
-;;; Return a vector suitable for use as the DEBUG-FUNCTION-VARIABLES
+;;; Return a vector suitable for use as the DEBUG-FUN-VARIABLES
 ;;; of FUN. LEVEL is the current DEBUG-INFO quality. VAR-LOCS is a
 ;;; hashtable in which we enter the translation from LAMBDA-VARS to
 ;;; the relative position of that variable's location in the resulting
@@ -396,7 +396,7 @@
 	(incf i))
       (coerce buffer 'simple-vector))))
 
-;;; Return a vector suitable for use as the DEBUG-FUNCTION-VARIABLES of
+;;; Return a vector suitable for use as the DEBUG-FUN-VARIABLES of
 ;;; FUN, representing the arguments to FUN in minimal variable format.
 (defun compute-minimal-variables (fun)
   (declare (type clambda fun))
@@ -419,7 +419,7 @@
 ;;;; arguments/returns
 
 ;;; Return a vector to be used as the
-;;; COMPILED-DEBUG-FUNCTION-ARGUMENTS for Fun. If fun is the
+;;; COMPILED-DEBUG-FUN-ARGUMENTS for Fun. If fun is the
 ;;; MAIN-ENTRY for an optional dispatch, then look at the ARGLIST to
 ;;; determine the syntax, otherwise pretend all arguments are fixed.
 ;;;
@@ -475,7 +475,7 @@
 	 (dispatch (lambda-optional-dispatch fun))
 	 (main-p (and dispatch
 		      (eq fun (optional-dispatch-main-entry dispatch)))))
-    (make-compiled-debug-function
+    (make-compiled-debug-fun
      :name (cond ((leaf-name fun))
 		 ((let ((ef (functional-entry-function fun)))
 		    (and ef (leaf-name ef))))
@@ -489,10 +489,10 @@
      :start-pc (label-position (ir2-physenv-environment-start 2env))
      :elsewhere-pc (label-position (ir2-physenv-elsewhere-start 2env)))))
 
-;;; Return a complete C-D-F structure for Fun. This involves
+;;; Return a complete C-D-F structure for FUN. This involves
 ;;; determining the DEBUG-INFO level and filling in optional slots as
 ;;; appropriate.
-(defun compute-1-debug-function (fun var-locs)
+(defun compute-1-debug-fun (fun var-locs)
   (declare (type clambda fun) (type hash-table var-locs))
   (let* ((dfun (dfun-from-fun fun))
 	 (actual-level (policy (lambda-bind fun) debug))
@@ -505,50 +505,50 @@
 		(let ((od (lambda-optional-dispatch fun)))
 		  (or (not od)
 		      (not (eq (optional-dispatch-main-entry od) fun)))))
-	   (setf (compiled-debug-function-variables dfun)
+	   (setf (compiled-debug-fun-variables dfun)
 		 (compute-minimal-variables fun))
-	   (setf (compiled-debug-function-arguments dfun) :minimal))
+	   (setf (compiled-debug-fun-arguments dfun) :minimal))
 	  (t
-	   (setf (compiled-debug-function-variables dfun)
+	   (setf (compiled-debug-fun-variables dfun)
 		 (compute-variables fun level var-locs))
-	   (setf (compiled-debug-function-arguments dfun)
+	   (setf (compiled-debug-fun-arguments dfun)
 		 (compute-arguments fun var-locs))))
 
     (when (>= level 2)
       (multiple-value-bind (blocks tlf-num) (compute-debug-blocks fun var-locs)
-	(setf (compiled-debug-function-tlf-number dfun) tlf-num)
-	(setf (compiled-debug-function-blocks dfun) blocks)))
+	(setf (compiled-debug-fun-tlf-number dfun) tlf-num)
+	(setf (compiled-debug-fun-blocks dfun) blocks)))
 
     (if (external-entry-point-p fun)
-	(setf (compiled-debug-function-returns dfun) :standard)
+	(setf (compiled-debug-fun-returns dfun) :standard)
 	(let ((info (tail-set-info (lambda-tail-set fun))))
 	  (when info
 	    (cond ((eq (return-info-kind info) :unknown)
-		   (setf (compiled-debug-function-returns dfun)
+		   (setf (compiled-debug-fun-returns dfun)
 			 :standard))
 		  ((/= level 0)
-		   (setf (compiled-debug-function-returns dfun)
+		   (setf (compiled-debug-fun-returns dfun)
 			 (compute-debug-returns fun)))))))
     dfun))
 
-;;;; minimal debug functions
+;;;; MINIMAL-DEBUG-FUNs
 
-;;; Return true if DFUN can be represented as a minimal debug
-;;; function. DFUN is a cons (<start offset> . C-D-F).
-(defun debug-function-minimal-p (dfun)
+;;; Return true if DFUN can be represented as a MINIMAL-DEBUG-FUN.
+;;; DFUN is a cons (<start offset> . C-D-F).
+(defun debug-fun-minimal-p (dfun)
   (declare (type cons dfun))
   (let ((dfun (cdr dfun)))
-    (and (member (compiled-debug-function-arguments dfun) '(:minimal nil))
-	 (null (compiled-debug-function-blocks dfun)))))
+    (and (member (compiled-debug-fun-arguments dfun) '(:minimal nil))
+	 (null (compiled-debug-fun-blocks dfun)))))
 
 ;;; Dump a packed binary representation of a DFUN into *BYTE-BUFFER*.
 ;;; PREV-START and START are the byte offsets in the code where the
 ;;; previous function started and where this one starts.
 ;;; PREV-ELSEWHERE is the previous function's elsewhere PC.
 (defun dump-1-minimal-dfun (dfun prev-start start prev-elsewhere)
-  (declare (type compiled-debug-function dfun)
+  (declare (type compiled-debug-fun dfun)
 	   (type index prev-start start prev-elsewhere))
-  (let* ((name (compiled-debug-function-name dfun))
+  (let* ((name (compiled-debug-fun-name dfun))
 	 (setf-p (and (consp name) (eq (car name) 'setf)
 		      (consp (cdr name)) (symbolp (cadr name))))
 	 (base-name (if setf-p (cadr name) name))
@@ -556,78 +556,78 @@
 		(symbol-package base-name)))
 	 (name-rep
 	  (cond ((stringp base-name)
-		 minimal-debug-function-name-component)
+		 minimal-debug-fun-name-component)
 		((not pkg)
-		 minimal-debug-function-name-uninterned)
+		 minimal-debug-fun-name-uninterned)
 		((eq pkg (sane-package))
-		 minimal-debug-function-name-symbol)
+		 minimal-debug-fun-name-symbol)
 		(t
-		 minimal-debug-function-name-packaged))))
+		 minimal-debug-fun-name-packaged))))
     (aver (or (atom name) setf-p))
     (let ((options 0))
-      (setf (ldb minimal-debug-function-name-style-byte options) name-rep)
-      (setf (ldb minimal-debug-function-kind-byte options)
-	    (position-or-lose (compiled-debug-function-kind dfun)
-			      *minimal-debug-function-kinds*))
-      (setf (ldb minimal-debug-function-returns-byte options)
-	    (etypecase (compiled-debug-function-returns dfun)
-	      ((member :standard) minimal-debug-function-returns-standard)
-	      ((member :fixed) minimal-debug-function-returns-fixed)
-	      (vector minimal-debug-function-returns-specified)))
+      (setf (ldb minimal-debug-fun-name-style-byte options) name-rep)
+      (setf (ldb minimal-debug-fun-kind-byte options)
+	    (position-or-lose (compiled-debug-fun-kind dfun)
+			      *minimal-debug-fun-kinds*))
+      (setf (ldb minimal-debug-fun-returns-byte options)
+	    (etypecase (compiled-debug-fun-returns dfun)
+	      ((member :standard) minimal-debug-fun-returns-standard)
+	      ((member :fixed) minimal-debug-fun-returns-fixed)
+	      (vector minimal-debug-fun-returns-specified)))
       (vector-push-extend options *byte-buffer*))
 
     (let ((flags 0))
       (when setf-p
-	(setq flags (logior flags minimal-debug-function-setf-bit)))
-      (when (compiled-debug-function-nfp dfun)
-	(setq flags (logior flags minimal-debug-function-nfp-bit)))
-      (when (compiled-debug-function-variables dfun)
-	(setq flags (logior flags minimal-debug-function-variables-bit)))
+	(setq flags (logior flags minimal-debug-fun-setf-bit)))
+      (when (compiled-debug-fun-nfp dfun)
+	(setq flags (logior flags minimal-debug-fun-nfp-bit)))
+      (when (compiled-debug-fun-variables dfun)
+	(setq flags (logior flags minimal-debug-fun-variables-bit)))
       (vector-push-extend flags *byte-buffer*))
 
-    (when (eql name-rep minimal-debug-function-name-packaged)
+    (when (eql name-rep minimal-debug-fun-name-packaged)
       (write-var-string (package-name pkg) *byte-buffer*))
     (unless (stringp base-name)
       (write-var-string (symbol-name base-name) *byte-buffer*))
 
-    (let ((vars (compiled-debug-function-variables dfun)))
+    (let ((vars (compiled-debug-fun-variables dfun)))
       (when vars
 	(let ((len (length vars)))
 	  (write-var-integer len *byte-buffer*)
 	  (dotimes (i len)
 	    (vector-push-extend (aref vars i) *byte-buffer*)))))
 
-    (let ((returns (compiled-debug-function-returns dfun)))
+    (let ((returns (compiled-debug-fun-returns dfun)))
       (when (vectorp returns)
 	(let ((len (length returns)))
 	  (write-var-integer len *byte-buffer*)
 	  (dotimes (i len)
 	    (write-var-integer (aref returns i) *byte-buffer*)))))
 
-    (write-var-integer (compiled-debug-function-return-pc dfun)
+    (write-var-integer (compiled-debug-fun-return-pc dfun)
 		       *byte-buffer*)
-    (write-var-integer (compiled-debug-function-old-fp dfun)
+    (write-var-integer (compiled-debug-fun-old-fp dfun)
 		       *byte-buffer*)
-    (when (compiled-debug-function-nfp dfun)
-      (write-var-integer (compiled-debug-function-nfp dfun)
+    (when (compiled-debug-fun-nfp dfun)
+      (write-var-integer (compiled-debug-fun-nfp dfun)
 			 *byte-buffer*))
     (write-var-integer (- start prev-start) *byte-buffer*)
-    (write-var-integer (- (compiled-debug-function-start-pc dfun) start)
+    (write-var-integer (- (compiled-debug-fun-start-pc dfun) start)
 		       *byte-buffer*)
-    (write-var-integer (- (compiled-debug-function-elsewhere-pc dfun)
+    (write-var-integer (- (compiled-debug-fun-elsewhere-pc dfun)
 			  prev-elsewhere)
 		       *byte-buffer*)))
 
 ;;; Return a byte-vector holding all the debug functions for a
-;;; component in the packed binary minimal-debug-function format.
-(defun compute-minimal-debug-functions (dfuns)
+;;; component in the packed binary MINIMAL-DEBUG-FUN format.
+(defun compute-minimal-debug-funs (dfuns)
   (declare (list dfuns))
   (setf (fill-pointer *byte-buffer*) 0)
   (let ((prev-start 0)
 	(prev-elsewhere 0))
     (dolist (dfun dfuns)
       (let ((start (car dfun))
-	    (elsewhere (compiled-debug-function-elsewhere-pc (cdr dfun))))
+	    (elsewhere (compiled-debug-fun-elsewhere-pc (cdr dfun))))
 	(dump-1-minimal-dfun (cdr dfun) prev-start start prev-elsewhere)
 	(setq prev-start start  prev-elsewhere elsewhere))))
   (copy-seq *byte-buffer*))
@@ -635,7 +635,7 @@
 ;;;; full component dumping
 
 ;;; Compute the full form (simple-vector) function map.
-(defun compute-debug-function-map (sorted)
+(defun compute-debug-fun-map (sorted)
   (declare (list sorted))
   (let* ((len (1- (* (length sorted) 2)))
 	 (funs-vec (make-array len)))
@@ -656,7 +656,7 @@
   (collect ((dfuns))
     (let ((var-locs (make-hash-table :test 'eq))
 	  ;; FIXME: What is *BYTE-BUFFER* for? Has it become dead code
-	  ;; now that we no longer use minimal-debug-function
+	  ;; now that we no longer use MINIMAL-DEBUG-FUN
 	  ;; representation?
 	  (*byte-buffer* (make-array 10
 				     :element-type '(unsigned-byte 8)
@@ -666,19 +666,19 @@
 	(clrhash var-locs)
 	(dfuns (cons (label-position
 		      (block-label (node-block (lambda-bind fun))))
-		     (compute-1-debug-function fun var-locs))))
+		     (compute-1-debug-fun fun var-locs))))
       (let* ((sorted (sort (dfuns) #'< :key #'car))
 	     ;; FIXME: CMU CL had
-	     ;;    (IF (EVERY #'DEBUG-FUNCTION-MINIMAL-P SORTED)
-	     ;;	       (COMPUTE-MINIMAL-DEBUG-FUNCTIONS SORTED)
-	     ;;	       (COMPUTE-DEBUG-FUNCTION-MAP SORTED))
-	     ;; here. We've gotten rid of the minimal-debug-function
+	     ;;    (IF (EVERY #'DEBUG-FUN-MINIMAL-P SORTED)
+	     ;;	       (COMPUTE-MINIMAL-DEBUG-FUNS SORTED)
+	     ;;	       (COMPUTE-DEBUG-FUN-MAP SORTED))
+	     ;; here. We've gotten rid of the MINIMAL-DEBUG-FUN
 	     ;; case in SBCL because the minimal representation
 	     ;; couldn't be made to transform properly under package
 	     ;; renaming. Now that that case is gone, a lot of code is
 	     ;; dead, and once everything is known to work, the dead
 	     ;; code should be deleted.
-	     (function-map (compute-debug-function-map sorted)))
+	     (function-map (compute-debug-fun-map sorted)))
 	(make-compiled-debug-info :name (component-name component)
 				  :function-map function-map)))))
 

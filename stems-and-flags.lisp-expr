@@ -575,7 +575,7 @@
                                           ;   from "code/pathname"
  ("src/code/sharpm"            :not-host) ; uses stuff from "code/reader"
 
- ;; defines SB!DI:DO-DEBUG-FUNCTION-BLOCKS, needed by target-disassem.lisp
+ ;; defines SB!DI:DO-DEBUG-FUN-BLOCKS, needed by target-disassem.lisp
  ("src/code/debug-int" :not-host)
 
  ;; target-only assemblerish stuff

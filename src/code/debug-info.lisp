@@ -31,7 +31,7 @@
 
 ;;; FIXME: old CMU CL representation follows:
 ;;;    Compiled debug variables are in a packed binary representation in the
-;;; DEBUG-FUNCTION-VARIABLES:
+;;; DEBUG-FUN-VARIABLES:
 ;;;    single byte of boolean flags:
 ;;;	uninterned name
 ;;;	   packaged name
@@ -60,7 +60,7 @@
 ;;;; compiled debug blocks
 ;;;;
 ;;;;    Compiled debug blocks are in a packed binary representation in the
-;;;; DEBUG-FUNCTION-BLOCKS:
+;;;; DEBUG-FUN-BLOCKS:
 ;;;;    number of successors + bit flags (single byte)
 ;;;;	elsewhere-p
 ;;;;    ...ordinal number of each successor in the function's blocks vector...
@@ -81,12 +81,12 @@
   #(:unknown-return :known-return :internal-error :non-local-exit
     :block-start :call-site :single-value-return :non-local-entry))
 
-;;;; DEBUG-FUNCTION objects
+;;;; DEBUG-FUN objects
 
-(def!struct (debug-function (:constructor nil)))
+(def!struct (debug-fun (:constructor nil)))
 
-(def!struct (compiled-debug-function (:include debug-function)
-				     #-sb-xc-host (:pure t))
+(def!struct (compiled-debug-fun (:include debug-fun)
+				#-sb-xc-host (:pure t))
   ;; The name of this function. If from a DEFUN, etc., then this is the
   ;; function name, otherwise it is a descriptive string.
   (name (required-argument) :type (or simple-string cons symbol))
@@ -102,7 +102,7 @@
   ;;
   ;; Each entry is:
   ;;   * a FLAGS value, which is a FIXNUM with various
-  ;;     COMPILED-DEBUG-FUNCTION-FOO bits set
+  ;;     COMPILED-DEBUG-FUN-FOO bits set
   ;;   * the symbol which names this variable, unless debug info is minimal
   ;;   * the variable ID, when it has one
   ;;   * SC-offset of primary location, if it has one
@@ -236,27 +236,27 @@ function (which would be useful info anyway).
 
 ;;; The following are definitions of bit-fields in the first byte of
 ;;; the minimal debug function:
-(defconstant minimal-debug-function-name-symbol 0)
-(defconstant minimal-debug-function-name-packaged 1)
-(defconstant minimal-debug-function-name-uninterned 2)
-(defconstant minimal-debug-function-name-component 3)
-(defconstant-eqx minimal-debug-function-name-style-byte (byte 2 0) #'equalp)
-(defconstant-eqx minimal-debug-function-kind-byte (byte 3 2) #'equalp)
-(defparameter *minimal-debug-function-kinds*
+(defconstant minimal-debug-fun-name-symbol 0)
+(defconstant minimal-debug-fun-name-packaged 1)
+(defconstant minimal-debug-fun-name-uninterned 2)
+(defconstant minimal-debug-fun-name-component 3)
+(defconstant-eqx minimal-debug-fun-name-style-byte (byte 2 0) #'equalp)
+(defconstant-eqx minimal-debug-fun-kind-byte (byte 3 2) #'equalp)
+(defparameter *minimal-debug-fun-kinds*
   #(nil :optional :external :top-level :cleanup))
-(defconstant minimal-debug-function-returns-standard 0)
-(defconstant minimal-debug-function-returns-specified 1)
-(defconstant minimal-debug-function-returns-fixed 2)
-(defconstant-eqx minimal-debug-function-returns-byte (byte 2 5) #'equalp)
+(defconstant minimal-debug-fun-returns-standard 0)
+(defconstant minimal-debug-fun-returns-specified 1)
+(defconstant minimal-debug-fun-returns-fixed 2)
+(defconstant-eqx minimal-debug-fun-returns-byte (byte 2 5) #'equalp)
 
 ;;; The following are bit-flags in the second byte of the minimal debug
 ;;; function:
 ;;;   * If true, wrap (SETF ...) around the name.
-(defconstant minimal-debug-function-setf-bit (ash 1 0))
+(defconstant minimal-debug-fun-setf-bit (ash 1 0))
 ;;;   * If true, there is a NFP.
-(defconstant minimal-debug-function-nfp-bit (ash 1 1))
+(defconstant minimal-debug-fun-nfp-bit (ash 1 1))
 ;;;   * If true, variables (hence arguments) have been dumped.
-(defconstant minimal-debug-function-variables-bit (ash 1 2))
+(defconstant minimal-debug-fun-variables-bit (ash 1 2))
 
 ;;;; debug source
 
@@ -302,7 +302,7 @@ function (which would be useful info anyway).
 (def!struct (compiled-debug-info
 	     (:include debug-info)
 	     #-sb-xc-host (:pure t))
-  ;; a simple-vector of alternating DEBUG-FUNCTION objects and fixnum
+  ;; a simple-vector of alternating DEBUG-FUN objects and fixnum
   ;; PCs, used to map PCs to functions, so that we can figure out what
   ;; function we were running in. Each function is valid between the
   ;; PC before it (inclusive) and the PC after it (exclusive). The PCs

@@ -192,8 +192,7 @@
 (defun trace-wherein-p (frame names)
   (do ((frame (sb-di:frame-down frame) (sb-di:frame-down frame)))
       ((not frame) nil)
-    (when (member (sb-di:debug-function-name (sb-di:frame-debug-function
-					      frame))
+    (when (member (sb-di:debug-fun-name (sb-di:frame-debug-fun frame))
 		  names
 		  :test #'equal)
       (return t))))
@@ -334,14 +333,14 @@
       (warn "~S is already TRACE'd, untracing it." function-or-name)
       (untrace-1 fun))
 
-    (let* ((debug-fun (sb-di:function-debug-function fun))
+    (let* ((debug-fun (sb-di:fun-debug-fun fun))
 	   (encapsulated
 	    (if (eq (trace-info-encapsulated info) :default)
 		(ecase kind
 		  (:compiled nil)
 		  (:compiled-closure
 		   (unless (functionp function-or-name)
-		     (warn "Tracing shared code for ~S:~%  ~S"
+		     (warn "tracing shared code for ~S:~%  ~S"
 			   function-or-name
 			   fun))
 		   nil)
@@ -350,7 +349,7 @@
 		(trace-info-encapsulated info)))
 	   (loc (if encapsulated
 		    :encapsulated
-		    (sb-di:debug-function-start-location debug-fun)))
+		    (sb-di:debug-fun-start-location debug-fun)))
 	   (info (make-trace-info
 		  :what function-or-name
 		  :named named

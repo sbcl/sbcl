@@ -41,8 +41,8 @@
     nil))
 
 ;;; COERCE-TO-CONDITION is used in SIGNAL, ERROR, CERROR, WARN, and
-;;; INVOKE-DEBUGGER for parsing the hairy argument conventions into a single
-;;; argument that's directly usable by all the other routines.
+;;; INVOKE-DEBUGGER for parsing the hairy argument conventions into a
+;;; single argument that's directly usable by all the other routines.
 (defun coerce-to-condition (datum arguments default-type function-name)
   (cond ((typep datum 'condition)
 	 (if arguments

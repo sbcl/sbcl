@@ -149,7 +149,8 @@
 			      (eq (transform-when x) when)))
 		       (function-info-transforms info))))
     (if old
-	(setf (transform-function old) fun (transform-note old) note)
+	(setf (transform-function old) fun
+	      (transform-note old) note)
 	(push (make-transform :type ctype :function fun :note note
 			      :important important :when when)
 	      (function-info-transforms info)))

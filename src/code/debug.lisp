@@ -157,8 +157,8 @@ Function and macro commands:
 (declaim (type integer *number-of-steps*))
 
 ;;; This is used when listing and setting breakpoints.
-(defvar *default-breakpoint-debug-function* nil)
-(declaim (type (or list sb!di:debug-function) *default-breakpoint-debug-function*))
+(defvar *default-breakpoint-debug-fun* nil)
+(declaim (type (or list sb!di:debug-fun) *default-breakpoint-debug-fun*))
 
 ;;;; code location utilities
 
@@ -194,11 +194,10 @@ Function and macro commands:
 	(setf next-list (next-code-locations (first next-list))))
       next-list)))
 
-;;; Return a list of code-locations of the possible breakpoints of the
-;;; debug-function passed.
-(defun possible-breakpoints (debug-function)
+;;; Return a list of code-locations of the possible breakpoints of DEBUG-FUN.
+(defun possible-breakpoints (debug-fun)
   (let ((possible-breakpoints nil))
-    (sb!di:do-debug-function-blocks (debug-block debug-function)
+    (sb!di:do-debug-fun-blocks (debug-block debug-fun)
       (unless (sb!di:debug-block-elsewhere-p debug-block)
 	(if *only-block-start-locations*
 	    (push (first-code-location debug-block) possible-breakpoints)
@@ -208,8 +207,8 @@ Function and macro commands:
 		(push code-location possible-breakpoints))))))
     (nreverse possible-breakpoints)))
 
-;;; Search the info-list for the item passed (code-location,
-;;; debug-function, or breakpoint-info). If the item passed is a debug
+;;; Search the info-list for the item passed (CODE-LOCATION,
+;;; DEBUG-FUN, or BREAKPOINT-INFO). If the item passed is a debug
 ;;; function then kind will be compared if it was specified. The kind
 ;;; if also compared if a breakpoint-info is passed since it's in the
 ;;; breakpoint. The info structure is returned if found.
@@ -224,12 +223,12 @@ Function and macro commands:
 					  (sb!di:code-location= x y)))))
 	(t
 	 (find place info-list
-	       :test #'(lambda (x-debug-function y-info)
+	       :test #'(lambda (x-debug-fun y-info)
 			 (let ((y-place (breakpoint-info-place y-info))
 			       (y-breakpoint (breakpoint-info-breakpoint
 					      y-info)))
-			   (and (sb!di:debug-function-p y-place)
-				(eq x-debug-function y-place)
+			   (and (sb!di:debug-fun-p y-place)
+				(eq x-debug-fun y-place)
 				(or (not kind)
 				    (eq kind (sb!di:breakpoint-kind
 					      y-breakpoint))))))))))
@@ -257,7 +256,7 @@ Function and macro commands:
 (defstruct (breakpoint-info (:copier nil))
   ;; where we are going to stop
   (place (required-argument)
-	 :type (or sb!di:code-location sb!di:debug-function))
+	 :type (or sb!di:code-location sb!di:debug-fun))
   ;; the breakpoint returned by sb!di:make-breakpoint
   (breakpoint (required-argument) :type sb!di:breakpoint)
   ;; the function returned from SB!DI:PREPROCESS-FOR-EVAL. If result is
@@ -307,14 +306,14 @@ Function and macro commands:
 	       "~&~S: ~S in ~S"
 	       bp-number
 	       loc-number
-	       (sb!di:debug-function-name (sb!di:code-location-debug-function
-					   place))))
+	       (sb!di:debug-fun-name (sb!di:code-location-debug-fun
+				      place))))
       (:function-start
        (format t "~&~S: FUNCTION-START in ~S" bp-number
-	       (sb!di:debug-function-name place)))
+	       (sb!di:debug-fun-name place)))
       (:function-end
        (format t "~&~S: FUNCTION-END in ~S" bp-number
-	       (sb!di:debug-function-name place))))))
+	       (sb!di:debug-fun-name place))))))
 
 ;;;; MAIN-HOOK-FUNCTION for steps and breakpoints
 
@@ -322,8 +321,8 @@ Function and macro commands:
 ;;; STEP breakpoints are.
 (defun main-hook-function (current-frame breakpoint &optional return-vals
 					 function-end-cookie)
-  (setf *default-breakpoint-debug-function*
-	(sb!di:frame-debug-function current-frame))
+  (setf *default-breakpoint-debug-fun*
+	(sb!di:frame-debug-fun current-frame))
   (dolist (step-info *step-breakpoints*)
     (sb!di:delete-breakpoint (breakpoint-info-breakpoint step-info))
     (let ((bp-info (location-in-list step-info *breakpoints*)))
@@ -416,11 +415,11 @@ Function and macro commands:
 	    (push (create-breakpoint-info code-location bp 0)
 		  *step-breakpoints*))))
        (t
-	(let* ((debug-function (sb!di:frame-debug-function *current-frame*))
-	       (bp (sb!di:make-breakpoint #'main-hook-function debug-function
+	(let* ((debug-fun (sb!di:frame-debug-fun *current-frame*))
+	       (bp (sb!di:make-breakpoint #'main-hook-function debug-fun
 					  :kind :function-end)))
 	  (sb!di:activate-breakpoint bp)
-	  (push (create-breakpoint-info debug-function bp 0)
+	  (push (create-breakpoint-info debug-fun bp 0)
 		*step-breakpoints*))))))))
 
 ;;;; STEP
@@ -502,11 +501,11 @@ Function and macro commands:
 ;;; lambda-list variables since any other arguments will be in the
 ;;; &REST arg's list of values.
 (defun print-frame-call-1 (frame)
-  (let* ((d-fun (sb!di:frame-debug-function frame))
+  (let* ((d-fun (sb!di:frame-debug-fun frame))
 	 (loc (sb!di:frame-code-location frame))
-	 (results (list (sb!di:debug-function-name d-fun))))
+	 (results (list (sb!di:debug-fun-name d-fun))))
     (handler-case
-	(dolist (ele (sb!di:debug-function-lambda-list d-fun))
+	(dolist (ele (sb!di:debug-fun-lambda-list d-fun))
 	  (lambda-list-element-dispatch ele
 	    :required ((push (frame-call-arg ele loc frame) results))
 	    :optional ((push (frame-call-arg (second ele) loc frame) results))
@@ -530,9 +529,9 @@ Function and macro commands:
     (pprint-logical-block (*standard-output* nil)
       (let ((x (nreverse (mapcar #'ensure-printable-object results))))
 	(format t "(~@<~S~{ ~_~S~}~:>)" (first x) (rest x))))
-    (when (sb!di:debug-function-kind d-fun)
+    (when (sb!di:debug-fun-kind d-fun)
       (write-char #\[)
-      (prin1 (sb!di:debug-function-kind d-fun))
+      (prin1 (sb!di:debug-fun-kind d-fun))
       (write-char #\]))))
 
 (defun ensure-printable-object (object)
@@ -552,7 +551,7 @@ Function and macro commands:
 
 ;;; Prints a representation of the function call causing FRAME to
 ;;; exist. VERBOSITY indicates the level of information to output;
-;;; zero indicates just printing the debug-function's name, and one
+;;; zero indicates just printing the DEBUG-FUN's name, and one
 ;;; indicates displaying call-like, one-liner format with argument
 ;;; values.
 (defun print-frame-call (frame &key (verbosity 1) (number nil))
@@ -832,11 +831,11 @@ reset to ~S."
 
 (sb!xc:defmacro define-var-operation (ref-or-set &optional value-var)
   `(let* ((temp (etypecase name
-		  (symbol (sb!di:debug-function-symbol-variables
-			   (sb!di:frame-debug-function *current-frame*)
+		  (symbol (sb!di:debug-fun-symbol-variables
+			   (sb!di:frame-debug-fun *current-frame*)
 			   name))
 		  (simple-string (sb!di:ambiguous-debug-vars
-				  (sb!di:frame-debug-function *current-frame*)
+				  (sb!di:frame-debug-fun *current-frame*)
 				  name))))
 	  (location (sb!di:frame-code-location *current-frame*))
 	  ;; Let's only deal with valid variables.
@@ -938,7 +937,7 @@ reset to ~S."
   (define-var-operation :set value))
 
 ;;; This returns the COUNT'th arg as the user sees it from args, the
-;;; result of SB!DI:DEBUG-FUNCTION-LAMBDA-LIST. If this returns a
+;;; result of SB!DI:DEBUG-FUN-LAMBDA-LIST. If this returns a
 ;;; potential DEBUG-VAR from the lambda-list, then the second value is
 ;;; T. If this returns a keyword symbol or a value from a rest arg,
 ;;; then the second value is NIL.
@@ -977,8 +976,8 @@ argument")
    argument in a frame's default printed representation. Count keyword/value
    pairs as separate arguments."
   (multiple-value-bind (var lambda-var-p)
-      (nth-arg n (handler-case (sb!di:debug-function-lambda-list
-				(sb!di:frame-debug-function *current-frame*))
+      (nth-arg n (handler-case (sb!di:debug-fun-lambda-list
+				(sb!di:frame-debug-fun *current-frame*))
 		   (sb!di:lambda-list-unavailable ()
 		     (error "No argument values are available."))))
     (if lambda-var-p
@@ -1209,7 +1208,7 @@ argument")
 (!def-debug-command-alias "P" "PRINT")
 
 (!def-debug-command "LIST-LOCALS" ()
-  (let ((d-fun (sb!di:frame-debug-function *current-frame*)))
+  (let ((d-fun (sb!di:frame-debug-fun *current-frame*)))
     (if (sb!di:debug-var-info-available d-fun)
 	(let ((*standard-output* *debug-io*)
 	      (location (sb!di:frame-code-location *current-frame*))
@@ -1376,21 +1375,21 @@ argument")
 ;;; *POSSIBLE-BREAKPOINTS* to the code-locations which can then be
 ;;; used by sbreakpoint.
 (!def-debug-command "LIST-LOCATIONS" ()
-  (let ((df (read-if-available *default-breakpoint-debug-function*)))
+  (let ((df (read-if-available *default-breakpoint-debug-fun*)))
     (cond ((consp df)
-	   (setf df (sb!di:function-debug-function (eval df)))
-	   (setf *default-breakpoint-debug-function* df))
+	   (setf df (sb!di:fun-debug-fun (eval df)))
+	   (setf *default-breakpoint-debug-fun* df))
 	  ((or (eq ':c df)
-	       (not *default-breakpoint-debug-function*))
-	   (setf df (sb!di:frame-debug-function *current-frame*))
-	   (setf *default-breakpoint-debug-function* df)))
+	       (not *default-breakpoint-debug-fun*))
+	   (setf df (sb!di:frame-debug-fun *current-frame*))
+	   (setf *default-breakpoint-debug-fun* df)))
     (setf *possible-breakpoints* (possible-breakpoints df)))
   (let ((continue-at (sb!di:frame-code-location *current-frame*)))
-    (let ((active (location-in-list *default-breakpoint-debug-function*
+    (let ((active (location-in-list *default-breakpoint-debug-fun*
 				    *breakpoints* :function-start))
 	  (here (sb!di:code-location=
-		 (sb!di:debug-function-start-location
-		  *default-breakpoint-debug-function*) continue-at)))
+		 (sb!di:debug-fun-start-location
+		  *default-breakpoint-debug-fun*) continue-at)))
       (when (or active here)
 	(format t "::FUNCTION-START ")
 	(when active (format t " *Active*"))
@@ -1431,7 +1430,7 @@ argument")
 
 	  (incf this-num))))
 
-    (when (location-in-list *default-breakpoint-debug-function*
+    (when (location-in-list *default-breakpoint-debug-fun*
 			    *breakpoints*
 			    :function-end)
       (format t "~&::FUNCTION-END *Active* "))))
@@ -1447,7 +1446,7 @@ argument")
 	(print-functions nil)
 	(function nil)
 	(bp)
-	(place *default-breakpoint-debug-function*))
+	(place *default-breakpoint-debug-fun*))
     (flet ((get-command-line ()
 	     (let ((command-line nil)
 		   (unique '(nil)))
@@ -1465,14 +1464,14 @@ argument")
 		 (:break (setf break (pop command-line)))
 		 (:function
 		  (setf function (eval (pop command-line)))
-		  (setf *default-breakpoint-debug-function*
-			(sb!di:function-debug-function function))
-		  (setf place *default-breakpoint-debug-function*)
+		  (setf *default-breakpoint-debug-fun*
+			(sb!di:fun-debug-fun function))
+		  (setf place *default-breakpoint-debug-fun*)
 		  (setf *possible-breakpoints*
 			(possible-breakpoints
-			 *default-breakpoint-debug-function*))))))
+			 *default-breakpoint-debug-fun*))))))
 	   (setup-function-start ()
-	     (let ((code-loc (sb!di:debug-function-start-location place)))
+	     (let ((code-loc (sb!di:debug-fun-start-location place)))
 	       (setf bp (sb!di:make-breakpoint #'main-hook-function
 					       place
 					       :kind :function-start))
@@ -1571,8 +1570,8 @@ argument")
 
 (!def-debug-command "DESCRIBE" ()
   (let* ((curloc (sb!di:frame-code-location *current-frame*))
-	 (debug-fun (sb!di:code-location-debug-function curloc))
-	 (function (sb!di:debug-function-function debug-fun)))
+	 (debug-fun (sb!di:code-location-debug-fun curloc))
+	 (function (sb!di:debug-fun-fun debug-fun)))
     (if function
 	(describe function)
 	(format t "can't figure out the function for this frame"))))

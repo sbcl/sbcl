@@ -891,18 +891,18 @@
 ;;; SAP-MAKER and LENGTH bytes long in the disassem-state object DSTATE.
 ;;;
 ;;; &KEY arguments include :VIRTUAL-LOCATION (by default the same as
-;;; the address), :DEBUG-FUNCTION, :SOURCE-FORM-CACHE (a
+;;; the address), :DEBUG-FUN, :SOURCE-FORM-CACHE (a
 ;;; SOURCE-FORM-CACHE object), and :HOOKS (a list of OFFS-HOOK
 ;;; objects).
 (defun make-segment (sap-maker length
 		     &key
 		     code virtual-location
-		     debug-function source-form-cache
+		     debug-fun source-form-cache
 		     hooks)
   (declare (type (function () sb!sys:system-area-pointer) sap-maker)
 	   (type length length)
 	   (type (or null address) virtual-location)
-	   (type (or null sb!di:debug-function) debug-function)
+	   (type (or null sb!di:debug-fun) debug-fun)
 	   (type (or null source-form-cache) source-form-cache))
   (let* ((segment
 	  (%make-segment
@@ -912,7 +912,7 @@
 				 (sb!sys:sap-int (funcall sap-maker)))
 	   :hooks hooks
 	   :code code)))
-    (add-debugging-hooks segment debug-function source-form-cache)
+    (add-debugging-hooks segment debug-fun source-form-cache)
     (add-fun-header-hooks segment)
     segment))
 
@@ -1144,13 +1144,13 @@
     new))
 
 ;;; Return a STORAGE-INFO struction describing the object-to-source
-;;; variable mappings from DEBUG-FUNCTION.
-(defun storage-info-for-debug-function (debug-function)
-  (declare (type sb!di:debug-function debug-function))
+;;; variable mappings from DEBUG-FUN.
+(defun storage-info-for-debug-fun (debug-fun)
+  (declare (type sb!di:debug-fun debug-fun))
   (let ((sc-vec sb!c::*backend-sc-numbers*)
 	(groups nil)
-	(debug-vars (sb!di::debug-function-debug-vars
-		     debug-function)))
+	(debug-vars (sb!di::debug-fun-debug-vars
+		     debug-fun)))
     (and debug-vars
 	 (dotimes (debug-var-offset
 		   (length debug-vars)
@@ -1198,9 +1198,9 @@
 		       )))))))
 	 )))
 
-(defun source-available-p (debug-function)
+(defun source-available-p (debug-fun)
   (handler-case
-      (sb!di:do-debug-function-blocks (block debug-function)
+      (sb!di:do-debug-fun-blocks (block debug-fun)
 	(declare (ignore block))
 	(return t))
     (sb!di:no-debug-blocks () nil)))
@@ -1217,9 +1217,9 @@
 ;;; disassembly. SFCACHE can be either NIL or it can be a
 ;;; SOURCE-FORM-CACHE structure, in which case it is used to cache
 ;;; forms from files.
-(defun add-source-tracking-hooks (segment debug-function &optional sfcache)
+(defun add-source-tracking-hooks (segment debug-fun &optional sfcache)
   (declare (type segment segment)
-	   (type (or null sb!di:debug-function) debug-function)
+	   (type (or null sb!di:debug-fun) debug-fun)
 	   (type (or null source-form-cache) sfcache))
   (let ((last-block-pc -1))
     (flet ((add-hook (pc fun &optional before-address)
@@ -1229,7 +1229,7 @@
 		    :before-address before-address)
 		   (seg-hooks segment))))
       (handler-case
-	  (sb!di:do-debug-function-blocks (block debug-function)
+	  (sb!di:do-debug-fun-blocks (block debug-fun)
 	    (let ((first-location-in-block-p t))
 	      (sb!di:do-debug-block-locations (loc block)
 		(let ((pc (sb!di::compiled-code-location-pc loc)))
@@ -1285,12 +1285,12 @@
 		  ))))
 	(sb!di:no-debug-blocks () nil)))))
 
-(defun add-debugging-hooks (segment debug-function &optional sfcache)
-  (when debug-function
+(defun add-debugging-hooks (segment debug-fun &optional sfcache)
+  (when debug-fun
     (setf (seg-storage-info segment)
-	  (storage-info-for-debug-function debug-function))
-    (add-source-tracking-hooks segment debug-function sfcache)
-    (let ((kind (sb!di:debug-function-kind debug-function)))
+	  (storage-info-for-debug-fun debug-fun))
+    (add-source-tracking-hooks segment debug-fun sfcache)
+    (let ((kind (sb!di:debug-fun-kind debug-fun)))
       (flet ((anh (n)
 	       (push (make-offs-hook
 		      :offset 0
@@ -1317,12 +1317,12 @@
     (let ((first-block-seen-p nil)
 	  (nil-block-seen-p nil)
 	  (last-offset 0)
-	  (last-debug-function nil)
+	  (last-debug-fun nil)
 	  (segments nil))
       (flet ((add-seg (offs len df)
 	       (when (> len 0)
 		 (push (make-code-segment code offs len
-					  :debug-function df
+					  :debug-fun df
 					  :source-form-cache sfcache)
 		       segments))))
 	(dotimes (fmap-index (length function-map))
@@ -1332,17 +1332,17 @@
 	       (when first-block-seen-p
 		 (add-seg last-offset
 			  (- fmap-entry last-offset)
-			  last-debug-function)
-		 (setf last-debug-function nil))
+			  last-debug-fun)
+		 (setf last-debug-fun nil))
 	       (setf last-offset fmap-entry))
-	      (sb!c::compiled-debug-function
-	       (let ((name (sb!c::compiled-debug-function-name fmap-entry))
-		     (kind (sb!c::compiled-debug-function-kind fmap-entry)))
+	      (sb!c::compiled-debug-fun
+	       (let ((name (sb!c::compiled-debug-fun-name fmap-entry))
+		     (kind (sb!c::compiled-debug-fun-kind fmap-entry)))
 		 #+nil
 		 (format t ";;; SAW ~S ~S ~S,~S ~D,~D~%"
 			 name kind first-block-seen-p nil-block-seen-p
 			 last-offset
-			 (sb!c::compiled-debug-function-start-pc fmap-entry))
+			 (sb!c::compiled-debug-fun-start-pc fmap-entry))
 		 (cond (#+nil (eq last-offset fun-offset)
 			      (and (equal name fname) (not first-block-seen-p))
 			      (setf first-block-seen-p t))
@@ -1354,14 +1354,14 @@
 			  (return))
 			(when first-block-seen-p
 			  (setf nil-block-seen-p t))))
-		 (setf last-debug-function
-		       (sb!di::make-compiled-debug-function fmap-entry code))
+		 (setf last-debug-fun
+		       (sb!di::make-compiled-debug-fun fmap-entry code))
 		 )))))
 	(let ((max-offset (code-inst-area-length code)))
-	  (when (and first-block-seen-p last-debug-function)
+	  (when (and first-block-seen-p last-debug-fun)
 	    (add-seg last-offset
 		     (- max-offset last-offset)
-		     last-debug-function))
+		     last-debug-fun))
 	  (if (null segments)
 	      (let ((offs (fun-insts-offset function)))
 		(make-code-segment code offs (- max-offset offs)))
@@ -1383,7 +1383,7 @@
       (let ((function-map (code-function-map code))
 	    (sfcache (make-source-form-cache)))
 	(let ((last-offset 0)
-	      (last-debug-function nil))
+	      (last-debug-fun nil))
 	  (flet ((add-seg (offs len df)
 		   (let* ((restricted-offs
 			   (min (max start-offset offs)
@@ -1395,7 +1395,7 @@
 		     (when (> restricted-len 0)
 		       (push (make-code-segment code
 						restricted-offs restricted-len
-						:debug-function df
+						:debug-fun df
 						:source-form-cache sfcache)
 			     segments)))))
 	    (dotimes (fmap-index (length function-map))
@@ -1403,17 +1403,17 @@
 		(etypecase fmap-entry
 		  (integer
 		   (add-seg last-offset (- fmap-entry last-offset)
-			    last-debug-function)
-		   (setf last-debug-function nil)
+			    last-debug-fun)
+		   (setf last-debug-fun nil)
 		   (setf last-offset fmap-entry))
-		  (sb!c::compiled-debug-function
-		   (setf last-debug-function
-			 (sb!di::make-compiled-debug-function fmap-entry
+		  (sb!c::compiled-debug-fun
+		   (setf last-debug-fun
+			 (sb!di::make-compiled-debug-fun fmap-entry
 							      code))))))
-	    (when last-debug-function
+	    (when last-debug-fun
 	      (add-seg last-offset
 		       (- (code-inst-area-length code) last-offset)
-		       last-debug-function))))))
+		       last-debug-fun))))))
     (if (null segments)
 	(make-code-segment code start-offset length)
 	(nreverse segments))))

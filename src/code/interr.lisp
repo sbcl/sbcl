@@ -404,8 +404,8 @@
       (handler-case
 	  (let* ((*finding-name* t)
 		 (frame (sb!di:frame-down (sb!di:frame-down (sb!di:top-frame))))
-		 (name (sb!di:debug-function-name
-			(sb!di:frame-debug-function frame))))
+		 (name (sb!di:debug-fun-name
+			(sb!di:frame-debug-fun frame))))
 	    (sb!di:flush-frames-above frame)
 	    (values name frame))
 	(error ()
@@ -430,8 +430,8 @@
 			 (sb!di::compiled-frame-escaped frame))
 		(sb!di:flush-frames-above frame)
 		(/show0 "returning from within DO loop")
-		(return (values (sb!di:debug-function-name
-				 (sb!di:frame-debug-function frame))
+		(return (values (sb!di:debug-fun-name
+				 (sb!di:frame-debug-fun frame))
 				frame)))))
 	(error ()
 	  (/show0 "trapped ERROR")

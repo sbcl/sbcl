@@ -117,11 +117,12 @@ GET-SETF-EXPANSION directly."
 
 ;;;; SETF itself
 
-;;; Except for atoms, we always call GET-SETF-EXPANSION, since it has some
-;;; non-trivial semantics. But when there is a setf inverse, and G-S-E uses
-;;; it, then we return a call to the inverse, rather than returning a hairy let
-;;; form. This is probably important mainly as a convenience in allowing the
-;;; use of SETF inverses without the full interpreter.
+;;; Except for atoms, we always call GET-SETF-EXPANSION, since it has
+;;; some non-trivial semantics. But when there is a setf inverse, and
+;;; G-S-E uses it, then we return a call to the inverse, rather than
+;;; returning a hairy LET form. This is probably important mainly as a
+;;; convenience in allowing the use of SETF inverses without the full
+;;; interpreter.
 (defmacro-mundanely setf (&rest args &environment env)
   #!+sb-doc
   "Takes pairs of arguments like SETQ. The first is a place and the second
