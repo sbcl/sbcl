@@ -59,7 +59,7 @@ done
 #     common names for editor temporary files
 #   TAGS, tags
 #     files created by GNU etags and ctags
-#   .#*, *.orig, .*.orig
+#   .#*, *.orig, .*.orig, *.rej
 #     rubbish left behind by CVS updates
 #   *.htm, *.html
 #     The system doc sources are SGML, any HTML is
@@ -76,6 +76,7 @@ find . \( \
 	-name '.#*' -o \
 	-name '*.orig' -o \
 	-name '.*.orig' -o \
+        -name '*.rej' -o \
 	-name '?*.x86f' -o \
 	-name '?*.axpf' -o \
 	-name '?*.lbytef' -o \

@@ -154,9 +154,6 @@
   "Load the file given by FILESPEC into the Lisp environment, returning
    T on success."
 
-  (unless (eq external-format :default)
-    (error "Non-:DEFAULT EXTERNAL-FORMAT values are not supported."))
-
   (let ((*load-depth* (1+ *load-depth*))
 	;; KLUDGE: I can't find in the ANSI spec where it says that
 	;; DECLAIM/PROCLAIM of optimization policy should have file

@@ -391,3 +391,12 @@
 (assert (typep (eval `(the arithmetic-error
 		           ',(make-condition 'arithmetic-error)))
 	       'arithmetic-error))
+
+(assert (not (nth-value
+              2 (compile nil '(lambda ()
+                               (make-array nil :initial-element 11))))))
+
+(assert (raises-error? (funcall (eval #'open) "assertoid.lisp"
+                                :external-format '#:nonsense)))
+(assert (raises-error? (funcall (eval #'load) "assertoid.lisp"
+                                :external-format '#:nonsense)))

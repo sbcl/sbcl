@@ -1187,15 +1187,6 @@ WORKAROUND:
   ; caught STYLE-WARNING:
   ;   The variable Y is defined but never used.
 
-244: "optimizing away tests for &KEY args of type declared in DEFKNOWN"
-  (caught by clocc-ansi-test :EXCEPSIT-LEGACY-1050)
-  In sbcl-0.pre8.44, (OPEN "foo" :DIRECTION :INPUT :EXTERNAL-FORMAT 'FOO)
-  succeeds with no error (ignoring the bogus :EXTERNAL-FORMAT argument)
-  apparently because the test is optimized away. The problem doesn't 
-  exist in sbcl-0.pre8.19. Deleting the (MEMBER :DEFAULT) declaration
-  for :EXTERNAL-FORMAT in DEFKNOWN OPEN (and LOAD) is a workaround for
-  the problem (and should be removed when the problem is fixed).
-
 245: bugs in disassembler
   a. On X86 an immediate operand for IMUL is printed incorrectly.
   b. On X86 operand size prefix is not recognized.
@@ -1211,9 +1202,6 @@ WORKAROUND:
 248: "reporting errors in type specifier syntax"
   (TYPEP 1 '(SYMBOL NIL)) says something about "unknown type
   specifier".
-
-250:
-  (make-array nil :initial-element 11) causes a warning.
 
 251:
   (defun foo (&key (a :x))

@@ -1063,14 +1063,6 @@
    :IF-DOES-NOT-EXIST - one of :ERROR, :CREATE or NIL
   See the manual for details."
 
-  (unless (eq external-format :default)
-    (error "Any external format other than :DEFAULT isn't recognized."))
-
-  ;; First, make sure that DIRECTION is valid.
-  (ensure-one-of direction
-		 '(:input :output :io :probe)
-		 :direction)
-
   ;; Calculate useful stuff.
   (multiple-value-bind (input output mask)
       (case direction
@@ -1169,7 +1161,7 @@
 		      (logior (logandc2 mask sb!unix:o_creat)
 			      sb!unix:o_trunc)))
 	      (setf if-exists :supersede))))
-	
+
 	;; Now we can try the actual Unix open(2).
 	(multiple-value-bind (fd errno)
 	    (if namestring

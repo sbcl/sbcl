@@ -253,7 +253,7 @@
 	      (setf (%array-dimension array axis) dim)
 	      (incf axis)))
 	  array))))
-	
+
 ;;; DATA-VECTOR-FROM-INITS returns a simple vector that has the
 ;;; specified array characteristics. Dimensions is only used to pass
 ;;; to FILL-DATA-VECTOR for error checking on the structure of

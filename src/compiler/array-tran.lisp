@@ -821,7 +821,7 @@
       (cond ((csubtypep type (specifier-type '(simple-array * (*))))
 	     ;; no array header
 	     nil)
-	    ((and (listp dims) (> (length dims) 1))
+	    ((and (listp dims) (/= (length dims) 1))
 	     ;; multi-dimensional array, will have a header
 	     t)
 	    (t
