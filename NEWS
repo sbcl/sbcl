@@ -1633,6 +1633,8 @@ changes in sbcl-0.8.0 relative to sbcl-0.7.14
     Baumann)
   * SB-MOP:ENSURE-CLASS-USING-CLASS now takes its arguments in the
     specified-by-AMOP order of (CLASS NAME &REST ARGS &KEY).
+  * fixed bug 20: DEFMETHOD can define methods using names that are
+    not the proper names of classes to designate class specializers.
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** COPY-ALIST now signals an error if its argument is a dotted
        list;

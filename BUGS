@@ -144,16 +144,6 @@ WORKAROUND:
     (FORMAT NIL  "~,1G" 1.4) => "1.    "
     (FORMAT NIL "~3,1G" 1.4) => "1.    "
 
-20:
-  from Marco Antoniotti on cmucl-imp mailing list 1 Mar 2000:
-	(defclass ccc () ())
-	(setf (find-class 'ccc1) (find-class 'ccc))
-	(defmethod zut ((c ccc1)) 123)
-  In sbcl-0.7.1.13, this gives an error, 
-	There is no class named CCC1.
-  In sbcl-0.pre8.20, this works, but prints style warnings about
-  undefined types.
-
 27:
   Sometimes (SB-EXT:QUIT) fails with 
 	Argh! maximum interrupt nesting depth (4096) exceeded, exiting

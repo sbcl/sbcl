@@ -571,5 +571,14 @@
 		     (make-instance 'class-with-all-slots-missing))
 	    'setf))
 
+;;; we should be able to specialize on anything that names a class.
+(defclass name-for-class () ())
+(defmethod something-that-specializes ((x name-for-class)) 1)
+(setf (find-class 'other-name-for-class) (find-class 'name-for-class))
+(defmethod something-that-specializes ((x other-name-for-class)) 2)
+(assert (= (something-that-specializes (make-instance 'name-for-class)) 2))
+(assert (= (something-that-specializes (make-instance 'other-name-for-class))
+	   2))
+
 ;;;; success
 (sb-ext:quit :unix-status 104)

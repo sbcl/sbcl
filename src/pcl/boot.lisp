@@ -588,7 +588,12 @@ bootstrapping.
 	 '(ignorable))
 	(t
 	 ;; Otherwise, we can make Python very happy.
-	 `(type ,specializer ,parameter))))
+	 (let ((type (info :type :kind specializer)))
+	   (ecase type
+	     ((:primitive :defined :instance :forthcoming-defclass-type)
+	      `(type ,specializer ,parameter))
+	     ((nil)
+	      `(type ,(class-name (find-class specializer)) ,parameter)))))))
 
 (defun make-method-lambda-internal (method-lambda &optional env)
   (unless (and (consp method-lambda) (eq (car method-lambda) 'lambda))
