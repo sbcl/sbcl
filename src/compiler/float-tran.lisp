@@ -1396,19 +1396,6 @@
 (macrolet
     ((def (float-type fun)
 	 `(deftransform %unary-ftruncate ((x) (,float-type))
-	   (let ((x-type (lvar-type x))
-		 ;; these bounds may look wrong, but in fact they're
-		 ;; right: floats within these bounds are those which
-		 ;; TRUNCATE to a (SIGNED-BYTE 32).  ROUND would be
-		 ;; different.
-		 (low-bound (coerce (- (ash 1 31)) ',float-type))
-		 (high-bound (coerce (ash 1 31) ',float-type)))
-	     (if (csubtypep x-type
-			    (specifier-type
-			     `(,',float-type (,low-bound) (,high-bound))))
-		 '(coerce (%unary-truncate x) ',float-type)
-		 `(if (< ,low-bound x ,high-bound)
-		      (coerce (%unary-truncate x) ',',float-type)
-		      (,',fun x)))))))
+	    '(,fun x))))
   (def single-float %unary-ftruncate/single)
   (def double-float %unary-ftruncate/double))
