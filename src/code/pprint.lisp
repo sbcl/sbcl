@@ -44,7 +44,7 @@
 	       :type column)
   ;; A simple string holding all the text that has been output but not yet
   ;; printed.
-  (buffer (make-string initial-buffer-size) :type simple-string)
+  (buffer (make-string initial-buffer-size) :type (simple-array character (*)))
   ;; The index into BUFFER where more text should be put.
   (buffer-fill-pointer 0 :type index)
   ;; Whenever we output stuff from the buffer, we shift the remaining noise
@@ -75,12 +75,12 @@
   ;; Buffer holding the per-line prefix active at the buffer start.
   ;; Indentation is included in this. The length of this is stored
   ;; in the logical block stack.
-  (prefix (make-string initial-buffer-size) :type simple-string)
+  (prefix (make-string initial-buffer-size) :type (simple-array character (*)))
   ;; Buffer holding the total remaining suffix active at the buffer start.
   ;; The characters are right-justified in the buffer to make it easier
   ;; to output the buffer. The length is stored in the logical block
   ;; stack.
-  (suffix (make-string initial-buffer-size) :type simple-string)
+  (suffix (make-string initial-buffer-size) :type (simple-array character (*)))
   ;; Queue of pending operations. When empty, HEAD=TAIL=NIL. Otherwise,
   ;; TAIL holds the first (oldest) cons and HEAD holds the last (newest)
   ;; cons. Adding things to the queue is basically (setf (cdr head) (list
@@ -134,7 +134,10 @@
 	   (type simple-string string)
 	   (type index start)
 	   (type (or index null) end))
-  (let ((end (or end (length string))))
+  (let* ((string (if (typep string '(simple-array character (*)))
+		     string
+		     (coerce string '(simple-array character (*)))))
+	 (end (or end (length string))))
     (unless (= start end)
       (let ((newline (position #\newline string :start start :end end)))
 	(cond
@@ -307,8 +310,8 @@
 (defstruct (block-start (:include section-start)
 			(:copier nil))
   (block-end nil :type (or null block-end))
-  (prefix nil :type (or null simple-string))
-  (suffix nil :type (or null simple-string)))
+  (prefix nil :type (or null (simple-array character (*))))
+  (suffix nil :type (or null (simple-array character (*)))))
 
 (defun start-logical-block (stream prefix per-line-p suffix)
   ;; (In the PPRINT-LOGICAL-BLOCK form which calls us,
@@ -319,19 +322,19 @@
   ;; trivial, so it should always be a string.)
   (declare (type string suffix))
   (when prefix
-    (setq prefix (coerce prefix 'simple-string))
+    (setq prefix (coerce prefix '(simple-array character (*))))
     (pretty-sout stream prefix 0 (length prefix)))
   (let* ((pending-blocks (pretty-stream-pending-blocks stream))
 	 (start (enqueue stream block-start
 			 :prefix (and per-line-p prefix)
-			 :suffix (coerce suffix 'simple-string)
+			 :suffix (coerce suffix '(simple-array character (*)))
 			 :depth (length pending-blocks))))
     (setf (pretty-stream-pending-blocks stream)
 	  (cons start pending-blocks))))
 
 (defstruct (block-end (:include queued-op)
 		      (:copier nil))
-  (suffix nil :type (or null simple-string)))
+  (suffix nil :type (or null (simple-array character (*)))))
 
 (defun end-logical-block (stream)
   (let* ((start (pop (pretty-stream-pending-blocks stream)))
