@@ -23,7 +23,7 @@
 #include "breakpoint.h"
 #include "monitor.h"
 
-#ifdef linux
+#ifdef LISP_FEATURE_LINUX
 extern int early_kernel;
 #endif
 
@@ -188,7 +188,7 @@ static void sigill_handler(int signal, siginfo_t *siginfo, void *void_context)
   sigprocmask(SIG_SETMASK, os_context_sigmask_addr(context), 0);
 
   if ((siginfo->si_code) == ILL_ILLOPC
-#ifdef linux
+#ifdef LISP_FEATURE_LINUX
       || (early_kernel && (siginfo->si_code == 2))
 #endif
       ) {
@@ -237,7 +237,7 @@ static void sigill_handler(int signal, siginfo_t *siginfo, void *void_context)
     }
   }
   else if ((siginfo->si_code) == ILL_ILLTRP
-#ifdef linux
+#ifdef LISP_FEATURE_LINUX
 	   || (early_kernel && (siginfo->si_code) == 192)
 #endif
 	   ) {

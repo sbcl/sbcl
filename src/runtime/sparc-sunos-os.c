@@ -77,6 +77,12 @@ os_context_sigmask_addr(os_context_t *context)
     return &(context->uc_sigmask);
 }
 
+unsigned long
+os_context_fp_control(os_context_t *context)
+{
+    return (context->uc_mcontext.fpregs.fpu_fsr);
+}
+
 void os_flush_icache(os_vm_address_t address, os_vm_size_t length)
 {
     /* see sparc-assem.S */

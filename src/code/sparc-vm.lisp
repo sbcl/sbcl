@@ -95,23 +95,17 @@
 
 ;;; Given a signal context, return the floating point modes word in
 ;;; the same format as returned by FLOATING-POINT-MODES.
-(defun context-floating-point-modes (context)
-  ;; FIXME: As of sbcl-0.6.7 and the big rewrite of signal handling for
-  ;; POSIXness and (at the Lisp level) opaque signal contexts,
-  ;; this is stubified. It needs to be rewritten as an
-  ;; alien function.
-  (warn "stub CONTEXT-FLOATING-POINT-MODES")
-  ;; old code for Linux:
-  #+nil
-  (let ((cw (slot (deref (slot context 'fpstate) 0) 'cw))
-	(sw (slot (deref (slot context 'fpstate) 0) 'sw)))
-    ;;(format t "cw = ~4X~%sw = ~4X~%" cw sw)
-    ;; NOT TESTED -- Clear sticky bits to clear interrupt condition.
-    (setf (slot (deref (slot context 'fpstate) 0) 'sw) (logandc2 sw #x3f))
-    ;;(format t "new sw = ~X~%" (slot (deref (slot context 'fpstate) 0) 'sw))
-    ;; Simulate floating-point-modes VOP.
-    (logior (ash (logand sw #xffff) 16) (logxor (logand cw #xffff) #x3f)))
 
+;;; Under SunOS, we have a straightforward implementation in C:
+#!+sunos
+(define-alien-routine ("os_context_fp_control" context-floating-point-modes)
+    (sb!alien:unsigned 32)
+  (context (* os-context-t)))
+
+;;; Under Linux, we have to contend with utterly broken signal handling.
+#!+linux
+(defun context-floating-point-modes (context)
+  (warn "stub CONTEXT-FLOATING-POINT-MODES")
   0)
 
 ;;;; INTERNAL-ERROR-ARGS.

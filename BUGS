@@ -973,6 +973,36 @@ WORKAROUND:
         (call-next-method)))
   Now (FOO 3) should return 3, but instead it returns 4.
 
+140:
+  (reported by Alexey Dejneka sbcl-devel 2002-01-03)
+
+  SUBTYPEP does not work well with redefined classes:
+  ---
+  * (defclass a () ())
+  #<STANDARD-CLASS A>
+  * (defclass b () ())
+  #<STANDARD-CLASS B>
+  * (subtypep 'b 'a)
+  NIL
+  T
+  * (defclass b (a) ())
+  #<STANDARD-CLASS B>
+  * (subtypep 'b 'a)
+  T
+  T
+  * (defclass b () ())
+  #<STANDARD-CLASS B>
+   
+  ;;; And now...
+  * (subtypep 'b 'a)
+  T
+  T
+
+  This bug was fixed in sbcl-0.7.4.1 by invalidating the PCL wrapper
+  class upon redefinition. Unfortunately, doing so causes bug #176 to
+  appear.  Pending further investication, one or other of these bugs
+  might be present at any given time.
+
 141: 
   Pretty-printing nested backquotes doesn't work right, as 
   reported by Alexey Dejneka sbcl-devel 2002-01-13:
@@ -1276,6 +1306,8 @@ WORKAROUND:
     (defclass c0 (b) ())
     (make-instance 'c19)
 
+  See also bug #140.
+
 178: "AVER failure compiling confused THEs in FUNCALL"
   In sbcl-0.7.4.24, compiling
     (defun bug178 (x)
@@ -1299,7 +1331,37 @@ WORKAROUND:
   the compiler handle the error, convert it into a COMPILER-ERROR, and
   continue compiling) which seems wrong.
 
-  
+182: "SPARC/Linux floating point"
+  Evaluating (/ 1.0 0.0) at the prompt causes a Bus error and complete
+  death of the environment. Other floating point operations sometimes
+  return infinities when they should raise traps (e.g. the test case
+  for bug #146, (expt 2.0 12777)).
+
+183: "IEEE floating point issues"
+  Even where floating point handling is being dealt with relatively
+  well (as of sbcl-0.7.5, on sparc/sunos and alpha; see bug #146), the
+  accrued-exceptions and current-exceptions part of the fp control
+  word don't seem to bear much relation to reality. E.g. on
+  SPARC/SunOS:
+  * (/ 1.0 0.0)
+
+  debugger invoked on condition of type DIVISION-BY-ZERO:
+    arithmetic error DIVISION-BY-ZERO signalled
+  0] (sb-vm::get-floating-point-modes)
+
+  (:TRAPS (:OVERFLOW :INVALID :DIVIDE-BY-ZERO)
+          :ROUNDING-MODE :NEAREST
+          :CURRENT-EXCEPTIONS NIL
+          :ACCRUED-EXCEPTIONS (:INEXACT)
+          :FAST-MODE NIL)
+  0] abort
+  * (sb-vm::get-floating-point-modes)
+  (:TRAPS (:OVERFLOW :INVALID :DIVIDE-BY-ZERO)
+          :ROUNDING-MODE :NEAREST
+          :CURRENT-EXCEPTIONS (:INEXACT)
+          :ACCRUED-EXCEPTIONS (:INEXACT)
+          :FAST-MODE NIL)
+
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:
     These labels were used for bugs related to the old IR1 interpreter.
