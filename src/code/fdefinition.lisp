@@ -55,13 +55,7 @@
   "Return the fdefn object for NAME. If it doesn't already exist and CREATE
    is non-NIL, create a new (unbound) one."
   (declare (values (or fdefn null)))
-  (unless (or (symbolp name)
-	      (and (consp name)
-		   (eq (car name) 'setf)
-		   (let ((cdr (cdr name)))
-		     (and (consp cdr)
-			  (symbolp (car cdr))
-			  (null (cdr cdr))))))
+  (unless (legal-function-name-p name)
     (error 'simple-type-error
 	   :datum name
 	   :expected-type '(or symbol list)

@@ -1631,8 +1631,11 @@
 	 (first types))
 	(;; if potentially too hairy
 	 (some (lambda (type)
-		 (or (union-type-p type)
-		     (hairy-type-p type)))
+		 ;; Allowing irreducible union types into intersection
+		 ;; types leads to issues of canonicalization. Those might
+		 ;; be soluble but it would be nicer just to avoid them
+		 ;; entirely by punting to HAIRY-TYPE. -- WHN 2001-03-02
+		 (union-type-p type))
 	       types)
 	 ;; (CMU CL punted to HAIRY-TYPE like this for all AND-based
 	 ;; types. We don't want to do that for simple intersection
@@ -1747,26 +1750,24 @@
      (append (type-components type1)
 	     (type-components type2)))))
 
-(!def-type-translator foo-type (&rest type-specifiers)
+(!def-type-translator and (&whole whole &rest type-specifiers)
   ;; Note: Between the behavior of SIMPLIFY-INTERSECTION-TYPE (which
   ;; will reduce to a 1-element list any list of types which CMU CL
   ;; could've represented) and MAKE-INTERSECTION-TYPE-OR-SOMETHING
   ;; (which knows to treat a 1-element intersection as the element
   ;; itself) we should recover CMU CL's behavior for anything which it
   ;; could handle usefully (i.e. could without punting to HAIRY-TYPE).
-  (/show0 "entering type translator for AND/FOO-TYPE")
-  (make-intersection-type-or-something
-   (mapcar #'specifier-type type-specifiers)))
-;;; (REMOVEME once INTERSECTION-TYPE works.)
-
-(!def-type-translator and (&whole spec &rest types)
-  (let ((res *wild-type*))
-    (dolist (type types res)
-      (let ((ctype (specifier-type type)))
-        (multiple-value-bind (int win) (type-intersection res ctype)
-          (unless win
-            (return (make-hairy-type :specifier spec)))
-          (setq res int))))))
+  (/show0 "entering type translator for AND")
+  (if *xtype?* 
+      (make-intersection-type-or-something
+       (mapcar #'specifier-type type-specifiers))
+      (let ((res *wild-type*))
+	(dolist (type-specifier type-specifiers res)
+	  (let ((ctype (specifier-type type-specifier)))
+	    (multiple-value-bind (int win) (type-intersection res ctype)
+	      (unless win
+		(return (make-hairy-type :specifier whole)))
+	      (setq res int)))))))
 
 ;;;; union types
 

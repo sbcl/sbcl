@@ -61,21 +61,30 @@
   of the default random state. If STATE is a random state, then return a
   copy of it. If STATE is T then return a random state generated from
   the universal time."
+  (/show0 "entering !RANDOM-COLD-INIT")
   (flet ((copy-random-state (state)
+	   (/show0 "entering COPY-RANDOM-STATE")
 	   (let ((state (random-state-state state))
 		 (new-state
 		  (make-array 627 :element-type '(unsigned-byte 32))))
+	     (/show0 "made NEW-STATE, about to DOTIMES")
 	     (dotimes (i 627)
 	       (setf (aref new-state i) (aref state i)))
+	     (/show0 "falling through to %MAKE-RANDOM-STATE")
 	     (%make-random-state :state new-state))))
-    (cond ((not state) (copy-random-state *random-state*))
-	  ((random-state-p state) (copy-random-state state))
-	  ((eq state t)
-	   (%make-random-state :state (init-random-state
-				       (logand (get-universal-time)
-					       #xffffffff))))
-	  ;; FIXME: should be TYPE-ERROR?
-	  (t (error "Argument is not a RANDOM-STATE, T or NIL: ~S" state)))))
+    (/show0 "at head of ETYPECASE in MAKE-RANDOM-STATE")
+    (etypecase state
+      (null
+       (/show0 "NULL case")
+       (copy-random-state *random-state*))
+      (random-state
+       (/show0 "RANDOM-STATE-P clause")
+       (copy-random-state state))
+      ((member t)
+       (/show0 "T clause")
+       (%make-random-state :state (init-random-state
+				   (logand (get-universal-time)
+					   #xffffffff)))))))
 
 ;;;; random entries
 

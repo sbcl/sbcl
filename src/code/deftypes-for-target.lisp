@@ -67,12 +67,9 @@
     #\n #\o #\p #\q #\r #\s #\t #\u #\v #\w #\x #\y #\z #\{
     #\| #\} #\~))
 
-;;; FIXME: Would type inference be able to get more traction on this
-;;; if it were defined as (AND SYMBOL (SATISFIES KEYWORDP))?
 (sb!xc:deftype keyword ()
-  #!+sb-doc
-  "Type for any keyword symbol."
-  '(satisfies keywordp))
+  ;; Defining this as (AND SYMBOL ..) lets (SUBTYPEP 'KEYWORD 'SYMBOL)=>T,T.
+  '(and symbol (satisfies keywordp)))
 
 (sb!xc:deftype eql (n) `(member ,n))
 

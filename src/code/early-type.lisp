@@ -14,6 +14,13 @@
 ;;; Has the type system been properly initialized? (I.e. is it OK to
 ;;; use it?)
 (defvar *type-system-initialized* #+sb-xc-host nil) ; (set in cold load)
+
+;;; Use experimental type functionality?
+;;;
+;;; REMOVEME: Eventually the new type functionality should be stable
+;;; enough that nothing depends on this, and we can remove it again.
+(defvar *xtype?*)
+(!cold-init-forms (setf *xtype?* nil))
 
 ;;; Return the type structure corresponding to a type specifier. We
 ;;; pick off structure types as a special case.

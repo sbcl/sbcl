@@ -12,6 +12,9 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
+;;; FIXME: Many of the functions in this file could probably be
+;;; byte-compiled, since they're one-pass, cons-heavy code.
+
 (in-package "SB!C")
 
 ;;;; type predicate translation
@@ -295,16 +298,16 @@
 				(member ,@(remove nil members))))))))
 	  (t
 	   (once-only ((n-obj object))
-	     `(or ,@(mapcar #'(lambda (x)
-				`(typep ,n-obj ',(type-specifier x)))
+	     `(or ,@(mapcar (lambda (x)
+			      `(typep ,n-obj ',(type-specifier x)))
 			    types)))))))
 
 ;;; Do source transformation for TYPEP of a known intersection type.
 (defun source-transform-intersection-typep (object type)
-  ;; FIXME: This is just a placeholder; we should define a better
-  ;; version by analogy with SOURCE-TRANSFORM-UNION-TYPEP.
-  (declare (ignore object type))
-  nil)
+  (once-only ((n-obj object))
+    `(and ,@(mapcar (lambda (x)
+		      `(typep ,n-obj ',(type-specifier x)))
+		    (intersection-type-types type)))))
 
 ;;; If necessary recurse to check the cons type.
 (defun source-transform-cons-typep (object type)
