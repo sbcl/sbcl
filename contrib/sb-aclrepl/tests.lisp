@@ -52,6 +52,7 @@
 (defparameter *complex* #c(1 2))
 (defparameter *ratio* 22/7)
 (defparameter *double* 5.5d0)
+(defparameter *bignum* 1234567890123456789)
 (defparameter *array* (make-array '(3 3 2) :initial-element nil))
 (defparameter *vector* (make-array '(20):initial-contents
 			     '(0 1 2 3 4 5 6 7 8 9
@@ -186,6 +187,9 @@
 (def-elements-tests *complex* 2 #(1 2) #((0 . "real") (1 . "imag")))
 (def-elements-tests *ratio* 2 #(22 7)
 		#((0 . "numerator") (1 . "denominator")))
+(def-elements-tests *bignum* 2
+  #(2112454933 287445236)
+  #((0 . :HEX32) (1 . :HEX32)))
 (def-elements-tests *vector* 20
 		#(0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19)
 		#(0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19))
@@ -310,6 +314,11 @@
    ...
    2 REALLY-LONG-STRUCT-SLOT-NAME -> a simple-string (4) \"defg\""
   nil 2)
+
+(def-display-test *bignum*
+"bignum 1234567890123456789 with 2 32-bit words
+   0-> #x7DE98115
+   1-> #x112210F4")
 
 (def-display-test *vector*
   "a simple T vector (20)

@@ -7,6 +7,10 @@
 ;;;; any given time, for this functionality is on the ACL website:
 ;;;;   <http://www.franz.com/support/documentation/6.2/doc/top-level.htm>.
 
+(cl:defpackage :sb-aclrepl
+  (:use :cl :sb-ext))
+
+
 (cl:in-package :sb-aclrepl)
 
 (defstruct user-cmd
@@ -45,6 +49,9 @@
   "History list")
 (defparameter *cmd-number* 1
   "Number of the next command")
+
+(defvar *input*)
+(defvar *output*)
 
 (declaim (type list *history*))
 
@@ -430,48 +437,78 @@
   (values))
 
 (defun pop-cmd (&optional (n 1))
-  #+ignore
-  (let ((new-level (- (length *break-stack*) n 1)))
-    (when (minusp new-level)
-      (setq new-level 0))
-    (dotimes (i (- (length *break-stack*) new-level 1))
-      (pop *break-stack*)))
   ;; Find inspector 
-  #+ignore
-  (do* ((i (1- (length *break-stack*)) (1- i))
-	(found nil))
-       ((or found (minusp i)))
-    (let ((inspect (break-data-inspect (nth i *break-stack*))))
-      (when inspect
-	(set-current-inspect inspect)
-	(setq found t))))
-  (when *inspect-reason*
+  (when sb-impl::*inspect-break*
       (throw 'inspect-quit nil))
   (values))
 
-(defun continue-cmd (&optional (n 0))
-  (let ((restarts (compute-restarts)))
-    (if restarts
-	(if (< -1 n (length restarts))
-	    (invoke-restart-interactively (nth n restarts))
-	    (format *output* "~&There is no such restart"))
-	(format *output* "~&There are no restarts"))))
-
-(defun error-cmd ()
-  (print-restarts))
+(defun bt-cmd (&optional (n most-positive-fixnum))
+  (sb-debug::backtrace n))
 
 (defun current-cmd ()
-  )
+  (sb-debug::describe-debug-command))
+
+(defun top-cmd ()
+  (sb-debug::frame-debug-command 0))
+
+(defun bottom-cmd ()
+  (sb-debug::bottom-debug-command))
+
+(defun up-cmd (&optional (n 1))
+  (dotimes (i n)
+    (if (and sb-debug::*current-frame*
+	     (sb-di:frame-up sb-debug::*current-frame*))
+	(sb-debug::up-debug-command)
+	(progn
+	  (format *output* "Top of the stack")
+	  (return-from up-cmd)))))
+
+(defun dn-cmd (&optional (n 1))
+  (dotimes (i n)
+    (if (and sb-debug::*current-frame*
+	     (sb-di:frame-down sb-debug::*current-frame*))
+	(sb-debug::down-debug-command)
+	(progn
+	  (format *output* "Bottom of the stack")
+	  (return-from dn-cmd)))))
+
+(defun continue-cmd (&optional (num 0))
+  ;; don't look at first restart
+  (let ((restarts (cdr (compute-restarts))))
+    (if restarts
+	(let ((restart
+	       (typecase num
+		 (unsigned-byte
+		  (if (< -1 num (length restarts))
+		      (nth num restarts)
+		      (progn
+			(format *output* "There is no such restart")
+			(return-from continue-cmd))))
+		 (symbol
+		  (find num (the list restarts)
+			:key #'restart-name
+			:test (lambda (sym1 sym2)
+				(string= (symbol-name sym1)
+					 (symbol-name sym2)))))
+		 (t
+		  (format *output* "~S is invalid as a restart name.")
+		  (return-from continue-cmd nil)))))
+	  (when restart
+	    (invoke-restart-interactively restart)))
+    (format *output* "~&There are no restarts"))))
+
+(defun error-cmd ()
+  (sb-debug::error-debug-command))
 
 (defun frame-cmd ()
-  )
+  (sb-debug::print-frame-call sb-debug::*current-frame*))
 
 (defun zoom-cmd ()
   )
 
 (defun local-cmd (&optional var)
   (declare (ignore var))
-  )
+  (sb-debug::list-locals-debug-command))
 
 (defun processes-cmd ()
   #+sb-thread
@@ -546,6 +583,11 @@
 (let ((cmd-table
        '(("aliases" 3 alias-cmd "show aliases")
 	 ("apropos" 2 apropos-cmd "show apropos" :parsing :string)
+	 ("bottom" 3 bottom-cmd "move to bottom stack frame")
+	 ("top" 3 top-cmd "move to top stack frame")
+	 ("bt" 2 bt-cmd "backtrace `n' stack frames, default all")
+	 ("up" 2 up-cmd "move up `n' stack frames, default 1")
+	 ("dn" 2 dn-cmd "move down `n' stack frames, default 1")
 	 ("cd" 2 cd-cmd "change default diretory" :parsing :string)
 	 ("ld" 2 ld-cmd "load a file" :parsing :string)
 	 ("cf" 2 cf-cmd "compile file" :parsing :string)
@@ -678,8 +720,8 @@
 
 
 (defun repl-prompt-fun (stream)
-  (let ((break-level
-	 (if (zerop *break-level*) nil  *break-level*)))
+  (let ((break-level (if (zerop sb-impl::*break-level*)
+			 nil sb-impl::*break-level*)))
     #+sb-thread
     (let ((lock sb-thread::*session-lock*))
       (sb-thread::get-foreground)
@@ -688,14 +730,14 @@
 	  (format stream "~{~&Thread ~A suspended~}~%" stopped-threads))))
     (if (functionp *prompt*)
 	(write-string (funcall *prompt*
-			       *inspect-reason*
-			       *continuable-reason*
+			       sb-impl::*inspect-break*
+			       sb-impl::*continuable-break*
 			       (prompt-package-name) *cmd-number*)
 		      stream)
 	(handler-case 
 	    (format nil *prompt* break-level
-		    *inspect-reason*
-		    *continuable-reason*
+		    sb-impl::*inspect-break*
+		    sb-impl::*continuable-break*
 		    (prompt-package-name) *cmd-number*)
 	  (error ()
 	    (format stream "~&Prompt error>  "))

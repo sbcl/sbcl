@@ -521,7 +521,7 @@
 	   ;; have unwound enough stack by the time we get here that this
 	   ;; is now possible
 	   (sb!kernel::protect-control-stack-guard-page 1)
-	   (repl noprint)
+	   (repl :noprint noprint :break-level 0)
 	   (critically-unreachable "after REPL")))))))
 
 ;;; Our default REPL prompt is the minimal traditional one.
@@ -539,6 +539,7 @@
 	(quit)
 	form)))
 
+  
 ;;; hooks to support customized toplevels like ACL-style toplevel
 ;;; from KMR on sbcl-devel 2002-12-21
 (defvar *repl-read-form-fun* #'repl-read-form-fun
@@ -551,28 +552,41 @@
   "a function of one argument STREAM for the toplevel REPL to call: Prompt
   the user for input.")
 
-(defun repl (noprint)
-  (/show0 "entering REPL")
-  (loop
-   ;; (See comment preceding the definition of SCRUB-CONTROL-STACK.)
-   (scrub-control-stack)
-   (unless noprint
-     (funcall *repl-prompt-fun* *standard-output*)
-     ;; (Should *REPL-PROMPT-FUN* be responsible for doing its own
-     ;; FORCE-OUTPUT? I can't imagine a valid reason for it not to
-     ;; be done here, so leaving it up to *REPL-PROMPT-FUN* seems
-     ;; odd. But maybe there *is* a valid reason in some
-     ;; circumstances? perhaps some deadlock issue when being driven
-     ;; by another process or something...)
-     (force-output *standard-output*))
-   (let* ((form (funcall *repl-read-form-fun*
-			 *standard-input*
-			 *standard-output*))
-	  (results (multiple-value-list (interactive-eval form))))
-     (unless noprint
-       (dolist (result results)
-	 (fresh-line)
-	 (prin1 result))))))
+(defvar *noprint* nil "boolean: T if don't print prompt and output")
+(defvar *break-level* 0 "current break level")
+(defvar *inspect-break* nil "boolean: T if break caused by inspect")
+(defvar *continuable-break* nil "boolean: T if break caused by continuable error")
+
+(defun repl (&key
+	     (break-level (1+ *break-level*))
+	     (noprint *noprint*)
+	     (inspect nil)
+	     (continuable nil))
+  (let ((*noprint* noprint)
+	(*break-level* break-level)
+	(*inspect-break* inspect)
+	(*continuable-break* continuable))
+    (/show0 "entering REPL")
+    (loop
+     ;; (See comment preceding the definition of SCRUB-CONTROL-STACK.)
+     (scrub-control-stack)
+     (unless *noprint*
+       (funcall *repl-prompt-fun* *standard-output*)
+       ;; (Should *REPL-PROMPT-FUN* be responsible for doing its own
+       ;; FORCE-OUTPUT? I can't imagine a valid reason for it not to
+       ;; be done here, so leaving it up to *REPL-PROMPT-FUN* seems
+       ;; odd. But maybe there *is* a valid reason in some
+       ;; circumstances? perhaps some deadlock issue when being driven
+       ;; by another process or something...)
+       (force-output *standard-output*))
+     (let* ((form (funcall *repl-read-form-fun*
+			   *standard-input*
+			   *standard-output*))
+	    (results (multiple-value-list (interactive-eval form))))
+       (unless *noprint*
+	 (dolist (result results)
+	   (fresh-line)
+	   (prin1 result)))))))
 
 ;;; suitable value for *DEBUGGER-HOOK* for a noninteractive Unix-y program
 (defun noprogrammer-debugger-hook-fun (condition old-debugger-hook)

@@ -825,7 +825,7 @@ reset to ~S."
 	(*read-suppress* nil))
     (unless (typep *debug-condition* 'step-condition)
       (clear-input *debug-io*))
-    (debug-loop)))
+    (funcall *debug-loop-fun*)))
 
 ;;;; DEBUG-LOOP
 
@@ -836,7 +836,7 @@ reset to ~S."
   "When set, avoid calling INVOKE-DEBUGGER recursively when errors occur while
    executing in the debugger.")
 
-(defun debug-loop ()
+(defun debug-loop-fun ()
   (let* ((*debug-command-level* (1+ *debug-command-level*))
 	 (*real-stack-top* (sb!di:top-frame))
 	 (*stack-top* (or *stack-top-hint* *real-stack-top*))
@@ -883,6 +883,9 @@ reset to ~S."
 			   (format t "   ~A~%" ele)))
 			(t
 			 (funcall cmd-fun))))))))))))
+
+(defvar *debug-loop-fun* #'debug-loop-fun
+  "a function taking no parameters that starts the low-level debug loop")
 
 ;;; FIXME: We could probably use INTERACTIVE-EVAL for much of this logic.
 (defun debug-eval-print (expr)

@@ -67,8 +67,10 @@ The commands are:
     (setq *current-inspect* (make-inspect))
     (reset-stack object "(inspect ...)")
     (redisplay output-stream)
-    (catch 'inspect-quit
-      (aclrepl :inspect t))
+    (let ((*input* input-stream)
+	  (*output* output-stream))
+      (catch 'inspect-quit
+	(sb-impl::repl :inspect t)))
     (values)))
 
 (setq sb-impl::*inspect-fun* #'inspector)

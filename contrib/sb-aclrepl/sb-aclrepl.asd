@@ -6,8 +6,7 @@
 (defsystem sb-aclrepl
     :author "Kevin Rosenberg <kevin@rosenberg.net>"
     :description "An AllegroCL compatible REPL"
-    :components ((:file "toplevel")
-		 (:file "repl" :depends-on ("toplevel"))
+    :components ((:file "repl")
 		 (:file "inspect" :depends-on ("repl"))
 		 (:file "debug" :depends-on ("repl"))))
 
