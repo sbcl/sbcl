@@ -1,14 +1,19 @@
-;;;
-;;; Written by William Lott
-;;;
+;;;; the instruction set definition for the PPC
+
+;;;; This software is part of the SBCL system. See the README file for
+;;;; more information.
+;;;;
+;;;; This software is derived from the CMU CL system, which was
+;;;; written at Carnegie Mellon University and released into the
+;;;; public domain. The software is in the public domain and is
+;;;; provided with absolutely no warranty. See the COPYING and CREDITS
+;;;; files for more information.
 
 (in-package "SB!VM")
 
 ;(def-assembler-params
 ;    :scheduler-p nil ; t when we trust the scheduler not to "fill delay slots"
 ;  :max-locations 70)
-
-
 
 ;;;; Constants, types, conversion functions, some disassembler stuff.
 
@@ -1799,6 +1804,12 @@
   (define-instruction-macro rotlw. (ra rs rb)
     `(inst rlwnm. ,ra ,rs ,rb 0 31))
   
+  (define-instruction-macro rotlwi (ra rs n)
+    `(inst rlwinm ,ra ,rs ,n 0 31))
+
+  (define-instruction-macro rotrwi (ra rs n)
+    `(inst rlwinm ,ra ,rs (- 32 ,n) 0 31))
+
   (define-instruction-macro slwi (ra rs n)
     `(inst rlwinm ,ra ,rs ,n 0 (- 31 ,n)))
 

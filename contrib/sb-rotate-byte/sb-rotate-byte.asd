@@ -6,15 +6,19 @@
 
 (defsystem sb-rotate-byte
   :version "0.1"
-  :components ((:file "package")
-	       (:file "compiler" :depends-on ("package"))
-	       (:module "vm"
-			:depends-on ("compiler")
-			:components ((:file "x86-vm"
-					    :in-order-to ((compile-op (feature :x86)))))
-			:pathname #.(make-pathname :directory '(:relative))
-			:if-component-dep-fails :ignore)
-	       (:file "rotate-byte" :depends-on ("compiler"))))
+  :components 
+  ((:file "package")
+   (:file "compiler" :depends-on ("package"))
+   (:module "vm"
+	    :depends-on ("compiler")
+	    :components 
+	    ((:file "x86-vm"
+		    :in-order-to ((compile-op (feature :x86))))
+	     (:file "ppc-vm"
+		    :in-order-to ((compile-op (feature :ppc)))))
+	    :pathname #.(make-pathname :directory '(:relative))
+	    :if-component-dep-fails :ignore)
+   (:file "rotate-byte" :depends-on ("compiler"))))
 
 (defmethod perform :after ((o load-op) (c (eql (find-system :sb-rotate-byte))))
   (provide 'sb-rotate-byte))
