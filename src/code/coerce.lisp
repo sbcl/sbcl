@@ -116,7 +116,6 @@
 	((csubtypep type (specifier-type 'character))
 	 (character object))
 	((csubtypep type (specifier-type 'function))
-	 #!+high-security
 	 (when (and (legal-fun-name-p object)
 		    (not (fboundp object)))
 	   (error 'simple-type-error
@@ -129,7 +128,6 @@
 		  :expected-type '(satisfies fboundp)
 	       :format-control "~S isn't fbound."
 	       :format-arguments (list object)))
-	 #!+high-security
 	 (when (and (symbolp object)
 		    (sb!xc:macro-function object))
 	   (error 'simple-type-error
@@ -137,7 +135,6 @@
 		  :expected-type '(not (satisfies sb!xc:macro-function))
 		  :format-control "~S is a macro."
 		  :format-arguments (list object)))
-	 #!+high-security
 	 (when (and (symbolp object)
 		    (special-operator-p object))
 	   (error 'simple-type-error

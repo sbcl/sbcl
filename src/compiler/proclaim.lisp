@@ -121,33 +121,19 @@
 	     (unless (csubtypep ctype (specifier-type 'function))
 	       (error "not a function type: ~S" (first args)))
 	     (dolist (name (rest args))
-	       
-	       ;; KLUDGE: Something like the commented-out TYPE/=
-	       ;; check here would be nice, but it has been
-	       ;; commented out because TYPE/= doesn't support
-	       ;; function types. It could probably be made to do
-	       ;; so, but it might take some time, since function
-	       ;; types involve values types, which aren't
-	       ;; supported, and since the SUBTYPEP operator for
-	       ;; FUNCTION types is rather broken, e.g.
-	       ;;   (SUBTYPEP '(FUNCTION (T BOOLEAN) NIL)
-	       ;;             '(FUNCTION (FIXNUM FIXNUM) NIL)) => T, T
-	       ;; -- WHN 20000229
-	       #|
-	     (when (eq (info :function :where-from name) :declared)
-	       (let ((old-type (info :function :type name)))
-		 (when (type/= ctype old-type)
-		   (style-warn
-		    "new FTYPE proclamation~@
-                     ~S~@
-                     for ~S does not match old FTYPE proclamation~@
-                     ~S"
-		    (list ctype name old-type)))))
-	       |#
+               (when (eq (info :function :where-from name) :declared)
+                 (let ((old-type (info :function :type name)))
+                   (when (type/= ctype old-type)
+                     (style-warn
+                      "new FTYPE proclamation~@
+                       ~S~@
+                       for ~S does not match old FTYPE proclamation~@
+                       ~S"
+                      ctype name old-type))))
 
 	       ;; Now references to this function shouldn't be warned
 	       ;; about as undefined, since even if we haven't seen a
-	       ;; definition yet, we know one is planned. 
+	       ;; definition yet, we know one is planned.
 	       ;;
 	       ;; Other consequences of we-know-you're-a-function-now
 	       ;; are appropriate too, e.g. any MACRO-FUNCTION goes away.

@@ -117,12 +117,6 @@ WORKAROUND:
 	  (during macroexpansion of IN-PACKAGE,
 	  during macroexpansion of DEFFOO)
 
-15:
-  (SUBTYPEP '(FUNCTION (T BOOLEAN) NIL)
-            '(FUNCTION (FIXNUM FIXNUM) NIL)) => T, T
-  (Also, when this is fixed, we can enable the code in PROCLAIM which 
-  checks for incompatible FTYPE redeclarations.)
-
 19:
   (I *think* this is a bug. It certainly seems like strange behavior. But
   the ANSI spec is scary, dark, and deep.. -- WHN)
@@ -217,14 +211,13 @@ WORKAROUND:
 
 46:
   type safety errors reported by Peter Van Eynde July 25, 2000:
-	c: (COERCE 'AND 'FUNCTION) returns something related to
-	   (MACRO-FUNCTION 'AND), but ANSI says it should raise an error.
 	k: READ-BYTE is supposed to signal TYPE-ERROR when its argument is 
 	   not a binary input stream, but instead cheerfully reads from
 	   character streams, e.g. (MAKE-STRING-INPUT-STREAM "abc").
 
 60:
   The debugger LIST-LOCATIONS command doesn't work properly.
+  (How should it work properly?)
 
 61:
   Compiling and loading
@@ -703,6 +696,17 @@ WORKAROUND:
                (print (incf start 22))
                (print (incf start 26))))))
 
+  This example could be solved with clever enough constraint
+  propagation or with SSA, but consider
+
+    (let ((x 0))
+      (loop (if (random-boolean)
+                (incf x 2)
+                (incf x 5))))
+
+  The careful type of X is {2k+5n} :-(. Is it really important to be
+  able to work with unions of many intervals?
+
 190: "PPC/Linux pipe? buffer? bug"
   In sbcl-0.7.6, the run-program.test.sh test script sometimes hangs
   on the PPC/Linux platform, waiting for a zombie env process.  This
@@ -730,7 +734,6 @@ WORKAROUND:
      won't get the corresponding STYLE-WARNING.
   c. the examples in CLHS 7.6.5.1 (regarding generic function lambda
      lists and &KEY arguments) do not signal errors when they should.
-
 
 201: "Incautious type inference from compound types"
   a. (reported by APD sbcl-devel 2002-09-17)

@@ -202,3 +202,7 @@
 
 (assert (not (nth-value 1 (subtypep '(and null some-unknown-type)
                                     'another-unknown-type))))
+
+;;; bug 46c
+(dolist (fun '(and if))
+  (assert (raises-error? (coerce fun 'function) type-error)))

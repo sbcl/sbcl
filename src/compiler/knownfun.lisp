@@ -161,12 +161,14 @@
 			      (string-equal (transform-note x) note)
 			      (eq (transform-important x) important)))
 		       (fun-info-transforms info))))
-    (if old
-	(setf (transform-function old) fun
-	      (transform-note old) note)
-	(push (make-transform :type ctype :function fun :note note
-			      :important important)
-	      (fun-info-transforms info)))
+    (cond (old
+           (style-warn "Overwriting ~S" old)
+           (setf (transform-function old) fun
+                 (transform-note old) note))
+          (t
+           (push (make-transform :type ctype :function fun :note note
+                                 :important important)
+                 (fun-info-transforms info))))
     name))
 
 ;;; Make a FUN-INFO structure with the specified type, attributes

@@ -440,3 +440,8 @@
   (assert (nth-value 2 (compile nil
                                 `(lambda (x)
                                    (1+ (,fun #'print x)))))))
+
+(assert (nth-value 2 (compile nil
+                              '(lambda ()
+                                (declare (notinline mapcar))
+                                (1+ (mapcar #'print '(1 2 3)))))))

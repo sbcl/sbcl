@@ -279,10 +279,41 @@
     ((type= type1 (specifier-type 'function)) type1)
     (t nil)))
 
-;;; ### Not very real, but good enough for redefining transforms
-;;; according to type:
 (!define-type-method (function :simple-=) (type1 type2)
-  (values (equalp type1 type2) t))
+  (macrolet ((compare (comparator field)
+               (let ((reader (symbolicate '#:fun-type- field)))
+                 `(,comparator (,reader type1) (,reader type2)))))
+    (and/type (compare type= returns)
+              (cond ((neq (fun-type-wild-args type1) (fun-type-wild-args type2))
+                     (values nil t))
+                    ((eq (fun-type-wild-args type1) t)
+                     (values t t))
+                    (t (and/type
+                        (cond ((null (fun-type-rest type1))
+                               (values (null (fun-type-rest type2)) t))
+                              ((null (fun-type-rest type2))
+                               (values nil t))
+                              (t
+                               (compare type= rest)))
+                        (labels ((type-list-= (l1 l2)
+                                   (cond ((null l1)
+                                          (values (null l2) t))
+                                         ((null l2)
+                                          (values nil t))
+                                         (t (multiple-value-bind (res winp)
+                                                (type= (first l1) (first l2))
+                                              (cond ((not winp)
+                                                     (values nil nil))
+                                                    ((not res)
+                                                     (values nil t))
+                                                    (t
+                                                     (type-list-= (rest l1)
+                                                                  (rest l2)))))))))
+                          (and/type (and/type (compare type-list-= required)
+                                              (compare type-list-= optional))
+                              (if (or (fun-type-keyp type1) (fun-type-keyp type2))
+                                  (values nil nil)
+                                  (values t t))))))))))
 
 (!define-type-class constant :inherits values)
 
@@ -402,7 +433,7 @@
 
 ;;; If COUNT values are supplied, which types should they have?
 (defun values-type-start (type count)
-  (declare (ctype type) (unsigned-byte count))
+  (declare (type ctype type) (type unsigned-byte count))
   (if (eq type *wild-type*)
       (make-list count :initial-element *universal-type*)
       (collect ((res))

@@ -558,14 +558,14 @@
 ;;; Primitive used to verify indices into arrays. If we can tell at
 ;;; compile-time or we are generating unsafe code, don't bother with
 ;;; the VOP.
-(deftransform %check-bound ((array dimension index))
-  (unless (constant-continuation-p dimension)
-    (give-up-ir1-transform))
-  (let ((dim (continuation-value dimension)))
-    `(the (integer 0 ,dim) index)))
-(deftransform %check-bound ((array dimension index) * *
-			    :policy (and (> speed safety) (= safety 0)))
-  'index)
+(deftransform %check-bound ((array dimension index) * * :node node)
+  (cond ((policy node (and (> speed safety) (= safety 0)))
+         'index)
+        ((not (constant-continuation-p dimension))
+         (give-up-ir1-transform))
+        (t
+         (let ((dim (continuation-value dimension)))
+           `(the (integer 0 ,dim) index)))))
 
 ;;;; WITH-ARRAY-DATA
 
