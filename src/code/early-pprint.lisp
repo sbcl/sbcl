@@ -36,7 +36,8 @@
 				 (prefix nil prefixp)
 				 (per-line-prefix nil per-line-prefix-p)
 				 (suffix "" suffixp))
-				&body body)
+				&body body
+                                &environment env)
   #!+sb-doc
   "Group some output into a logical block. STREAM-SYMBOL should be either a
    stream, T (for *TERMINAL-IO*), or NIL (for *STANDARD-OUTPUT*). The printer
@@ -74,12 +75,18 @@
 	    `(descend-into (,stream-var)
 	       (let ((,count-name 0))
 		 (declare (type index ,count-name) (ignorable ,count-name))
-		 ,@(when (or prefixp per-line-prefix-p)
+		 ,@(when (and (or prefixp per-line-prefix-p)
+                              (not (and (sb!xc:constantp (or prefix per-line-prefix) env)
+                                        ;; KLUDGE: EVAL-IN-ENV would
+                                        ;; be useful here.
+                                        (typep (eval (or prefix per-line-prefix)) 'string))))
  		     `((unless (typep ,(or prefix per-line-prefix) 'string)
 			 (error 'type-error
 				:datum ,(or prefix per-line-prefix)
 				:expected-type 'string))))
-		 ,@(when suffixp
+		 ,@(when (and suffixp
+                              (not (and (sb!xc:constantp suffix env)
+                                        (typep (eval suffix) 'string))))
 		     `((unless (typep ,suffix 'string)
 			 (error 'type-error
 				:datum ,suffix
@@ -112,6 +119,7 @@
 			    (incf ,count-name)
 			    ,@(when object
 				`((pop ,object-var)))))
+                     (declare (ignorable (function ,pp-pop-name)))
 		     (locally
 			 (declare (disable-package-locks 
 				   pprint-pop pprint-exit-if-list-exhausted))

@@ -1460,3 +1460,16 @@
      (PROGN
        (TAGBODY (THE INTEGER (CATCH 'CT4 (LOGORC1 C -15950))) 1)
        B))))
+
+;;; check that constant string prefix and suffix don't cause the
+;;; compiler to emit code deletion notes.
+(handler-bind ((sb-ext:code-deletion-note #'error))
+  (compile nil '(lambda (s x)
+                 (pprint-logical-block (s x :prefix "(")
+                   (print x s))))
+  (compile nil '(lambda (s x)
+                 (pprint-logical-block (s x :per-line-prefix ";")
+                   (print x s))))
+  (compile nil '(lambda (s x)
+                 (pprint-logical-block (s x :suffix ">")
+                   (print x s)))))
