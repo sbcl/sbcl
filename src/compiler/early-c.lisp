@@ -56,13 +56,13 @@
 ;;; *FREE-VARIABLES*, only it deals with function names.
 (defvar *free-variables*)
 (defvar *free-functions*)
-(declaim (hash-table *free-variables* *free-functions*))
+(declaim (type hash-table *free-variables* *free-functions*))
 
-;;; We use the same Constant structure to represent all equal anonymous
-;;; constants. This hashtable translates from constants to the Leafs that
+;;; We use the same CONSTANT structure to represent all equal anonymous
+;;; constants. This hashtable translates from constants to the LEAFs that
 ;;; represent them.
 (defvar *constants*)
-(declaim (hash-table *constants*))
+(declaim (type hash-table *constants*))
 
 ;;; miscellaneous forward declarations
 (defvar *code-segment*)

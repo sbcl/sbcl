@@ -11,8 +11,9 @@
 ;;; we control the build, we can always assign an appropriate and
 ;;; relevant result, so this must be a string, not NIL.
 ;;;
-;;; Conventionally a string like "0.6.6" is used for released
-;;; versions, and a string like "0.6.5.12" is used for versions which
-;;; aren't released but correspond only to CVS tags or snapshots.
+;;; Conventionally a string like "0.6.6", with three numeric fields,
+;;; is used for released versions, and a string like "0.6.5.12", with
+;;; four numeric fields, is used for versions which aren't released
+;;; but correspond only to CVS tags or snapshots.
 
-"0.6.12.36"
+"0.6.12.37"

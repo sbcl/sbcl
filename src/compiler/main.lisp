@@ -745,7 +745,7 @@
 				:forms (vector form)
 				:positions '#(0)))))
 
-;;; Return a SOURCE-INFO which will read from Stream.
+;;; Return a SOURCE-INFO which will read from STREAM.
 (defun make-stream-source-info (stream)
   (let ((files (list (make-file-info :name :stream))))
     (make-source-info
@@ -753,88 +753,28 @@
      :current-file files
      :stream stream)))
 
-;;; Print an error message for a non-EOF error on STREAM. OLD-POS is a
-;;; preceding file position that hopefully comes before the beginning
-;;; of the line. Of course, this only works on streams that support
-;;; the file-position operation.
-(defun normal-read-error (stream old-pos condition)
-  (declare (type stream stream) (type unsigned-byte old-pos))
-  (let ((pos (file-position stream)))
-    (file-position stream old-pos)
-    (let ((start old-pos))
-      (loop
-	(let ((line (read-line stream nil))
-	      (end (file-position stream)))
-	  (when (>= end pos)
-	    ;; FIXME: READER-ERROR also prints the file position. Do we really
-	    ;; need to try to give position information here?
-	    (compiler-abort "read error at ~D:~% \"~A/\\~A\"~%~A"
-			    pos
-			    (string-left-trim " 	"
-					      (subseq line 0 (- pos start)))
-			    (subseq line (- pos start))
-			    condition)
-	    (return))
-	  (setq start end)))))
-  (values))
-
-;;; Back STREAM up to the position Pos, then read a form with
-;;; *READ-SUPPRESS* on, discarding the result. If an error happens
-;;; during this read, then bail out using COMPILER-ERROR (fatal in
-;;; this context).
-(defun ignore-error-form (stream pos)
-  (declare (type stream stream) (type unsigned-byte pos))
-  (file-position stream pos)
-  (handler-case (let ((*read-suppress* t))
-		  (read stream))
-    (error (condition)
-      (declare (ignore condition))
-      (compiler-error "unable to recover from read error"))))
-
-;;; Print an error message giving some context for an EOF error. We
-;;; print the first line after POS that contains #\" or #\(, or
-;;; lacking that, the first non-empty line.
-(defun unexpected-eof-error (stream pos condition)
-  (declare (type stream stream) (type unsigned-byte pos))
-  (let ((res nil))
-    (file-position stream pos)
-    (loop
-      (let ((line (read-line stream nil nil)))
-	(unless line (return))
-	(when (or (find #\" line) (find #\( line))
-	  (setq res line)
-	  (return))
-	(unless (or res (zerop (length line)))
-	  (setq res line))))
-    (compiler-abort "read error in form starting at ~D:~%~@[ \"~A\"~%~]~A"
-		    pos
-		    res
-		    condition))
-  (file-position stream (file-length stream))
-  (values))
-
-;;; Read a form from STREAM, returning EOF at EOF. If a read error
-;;; happens, then attempt to recover if possible, returning a proxy
-;;; error form.
-;;;
-;;; FIXME: This seems like quite a lot of complexity, and it seems
-;;; impossible to get it quite right. (E.g. the `(CERROR ..) form
-;;; returned here won't do the right thing if it's not in a position
-;;; for an executable form.) I think it might be better to just stop
-;;; trying to recover from read errors, punting all this noise
-;;; (including UNEXPECTED-EOF-ERROR and IGNORE-ERROR-FORM) and doing a
-;;; COMPILER-ABORT instead.
-(defun careful-read (stream eof pos)
-  (handler-case (read stream nil eof)
-    (error (condition)
-      (let ((new-pos (file-position stream)))
-	(cond ((= new-pos (file-length stream))
-	       (unexpected-eof-error stream pos condition))
-	      (t
-	       (normal-read-error stream pos condition)
-	       (ignore-error-form stream pos))))
-      '(cerror "Skip this form."
-	       "compile-time read error"))))
+;;; Read a form from STREAM; or for EOF, use the trick popularized by
+;;; Kent Pitman of returning STREAM itself. If an error happens, then
+;;; convert it to standard abort-the-compilation error condition
+;;; (possibly recording some extra location information).
+(defun read-for-compile-file (stream position)
+  (handler-case (read stream nil stream)
+    (reader-error (condition)
+     (error 'input-error-in-compile-file
+	    :error condition
+	    ;; We don't need to supply :POSITION here because
+	    ;; READER-ERRORs already know their position in the file.
+	    ))
+    ;; ANSI, in its wisdom, says that READ should return END-OF-FILE
+    ;; (and that this is not a READER-ERROR) when it encounters end of
+    ;; file in the middle of something it's trying to read.
+    (end-of-file (condition)
+     (error 'input-error-in-compile-file
+	    :error condition
+	    ;; We need to supply :POSITION here because the END-OF-FILE
+	    ;; condition doesn't carry the position that the user
+	    ;; probably cares about, where the failed READ began.
+	    :position position))))
 
 ;;; If STREAM is present, return it, otherwise open a stream to the
 ;;; current file. There must be a current file. When we open a new
@@ -884,23 +824,26 @@
 	 (stream (get-source-stream info)))
     (loop
      (let* ((pos (file-position stream))
-	    (eof '(*eof*))
-	    (form (careful-read stream eof pos)))
-       (if (eq form eof)
-	 (return)
-	 (let* ((forms (file-info-forms file))
-		(current-idx (+ (fill-pointer forms)
-				(file-info-source-root file))))
-	   (vector-push-extend form forms)
-	   (vector-push-extend pos (file-info-positions file))
-	   (clrhash *source-paths*)
-	   (find-source-paths form current-idx)
-	   (process-top-level-form form
-				   `(original-source-start 0 ,current-idx))))))
+	    (form (read-for-compile-file stream pos)))
+       (if (eq form stream) ; i.e., if EOF
+	   (return)
+	   (let* ((forms (file-info-forms file))
+		  (current-idx (+ (fill-pointer forms)
+				  (file-info-source-root file))))
+	     (vector-push-extend form forms)
+	     (vector-push-extend pos (file-info-positions file))
+	     (clrhash *source-paths*)
+	     (find-source-paths form current-idx)
+	     (process-top-level-form form
+				     `(original-source-start 0
+							     ,current-idx))))))
     (when (advance-source-file info)
       (process-sources info))))
 
 ;;; Return the FILE-INFO describing the INDEX'th form.
+;;;
+;;; FIXME: This is unnecessarily general cruft now that we only read
+;;; a single file in COMPILE-FILE.
 (defun find-file-info (index info)
   (declare (type index index) (type source-info info))
   (dolist (file (source-info-files info))
@@ -911,6 +854,9 @@
 
 ;;; Return the INDEX'th source form read from INFO and the position
 ;;; where it was read.
+;;;
+;;; FIXME: This is unnecessarily general cruft now that we only read
+;;; a single file in COMPILE-FILE.
 (defun find-source-root (index info)
   (declare (type source-info info) (type index index))
   (let* ((file (find-file-info index info))
@@ -979,8 +925,6 @@
        (convert-and-maybe-compile form path)))
     (when eval
       (eval form))))
-
-(declaim (special *compiler-error-bailout*))
 
 ;;; Process a top-level FORM with the specified source PATH.
 ;;;  * If this is a magic top-level form, then do stuff.
@@ -1290,20 +1234,29 @@
 	 (*info-environment* (or *backend-info-environment*
 				 *info-environment*))
 	 (*gensym-counter* 0))
-    (with-compilation-values
-      (sb!xc:with-compilation-unit ()
-        (clear-stuff)
+    (handler-case
+	(with-compilation-values
+	 (sb!xc:with-compilation-unit ()
+	   (clear-stuff)
 
-	(process-sources info)
+	   (process-sources info)
 
-	(finish-block-compilation)
-	(compile-top-level-lambdas () t)
-	(let ((object *compile-object*))
-	  (etypecase object
-	    (fasl-output (fasl-dump-source-info info object))
-	    (core-object (fix-core-source-info info object d-s-info))
-	    (null)))
-	nil))))
+	   (finish-block-compilation)
+	   (compile-top-level-lambdas () t)
+	   (let ((object *compile-object*))
+	     (etypecase object
+	       (fasl-output (fasl-dump-source-info info object))
+	       (core-object (fix-core-source-info info object d-s-info))
+	       (null)))
+	   nil))
+      ;; Some errors are sufficiently bewildering that we just fail
+      ;; immediately, without trying to recover and compile more of
+      ;; the input file.
+      (input-error-in-compile-file (condition)
+       (format *error-output*
+	       "~@<compilation aborted because of input error: ~2I~_~A~:>"
+	       condition)
+       (values nil t t)))))
 
 ;;; Return a list of pathnames for the named files. All the files must
 ;;; exist.
@@ -1346,7 +1299,6 @@
 						   :print-weekday nil
 						   :print-timezone nil)))
   (values))
-
 (defun finish-error-output (source-info won)
   (declare (type source-info source-info))
   (compiler-mumble "~&; compilation ~:[aborted after~;finished in~] ~A~&"
@@ -1441,8 +1393,8 @@
 		   (trace-file-pathname
 		    (if (eql trace-file t)
 			default-trace-file-pathname
-			(make-pathname trace-file
-				       default-trace-file-pathname))))
+			(merge-pathnames trace-file
+					 default-trace-file-pathname))))
 	      (setf *compiler-trace-output*
 		    (open trace-file-pathname
 			  :if-exists :supersede

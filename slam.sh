@@ -1,19 +1,20 @@
 #!/bin/sh
 
+# ("smooth duct tape: the mark of a true craftsman":-)
+
 # a quick and dirty way of partially rebuilding the system after a
 # change
 #
 # This script is not a reliable way to build the system, but it is
 # fast.:-| It can be useful if you are trying to debug a low-level
-# problem, e.g. a problem in src/runtime/*.c or in src/code/unix.lisp,
-# and you find yourself wanting to make a small change and test it
-# without going through the entire build-the-system-from-scratch
-# cycle.
+# problem, e.g. a problem in src/runtime/*.c or in
+# src/code/cold-init.lisp, and you find yourself wanting to make a
+# small change and test it without going through the entire
+# build-the-system-from-scratch cycle.
 #
 # You probably don't want to be using this script unless you
-# understand the system build process to be able to guess when it
-# won't work.
-
+# understand the system build process well enough to be able to guess
+# when it won't work.
 
 # This software is part of the SBCL system. See the README file for
 # more information.
@@ -24,6 +25,10 @@
 # provided with absolutely no warranty. See the COPYING and CREDITS
 # files for more information.
 
+if [ "" != "$*" ]; then
+    echo no command line arguments supported in this version of slam
+    exit 1
+fi
 
 # We don't try to be general about this in this script the way we are
 # in make.sh, since (1) we use our command line args as names of files
@@ -40,17 +45,18 @@ export SBCL_XC_HOST='sbcl --noprogrammer'
 sh make-target-1.sh || exit 1
 
 # Instead of doing the full make-host-2.sh, we (1) use after-xc.core
-# to rebuild only the specifically-requested Lisp files (or skip
-# after-xc.core completely if no Lisp files are specifically
-# requested), then (2) run GENESIS.
+# to rebuild only obviously-out-of-date Lisp files, then (2) run
+# GENESIS.
+sbcl --core output/after-xc.core <<'EOF' || exit 1
+  (load "src/cold/slam.lisp")
+EOF
+# (This ^ used to be
+#   for f in $*; do echo "(target-compile-stem \"$f\")"; done \
+#     | sbcl --core output/after-xc.core || exit 1
+# and perhaps we do something like this again, allowing explicit
+# rebuild-this-stem requests on the command line to supplement
+# the rebuild-obviously-outdated-stems logic above.)
 #
-# Our command line arguments are the stems that we'll use
-# after-xc.core to recompile. If there are no command line arguments,
-# though, make a point of not calling after-xc.core, since it might
-# not exist, and there's no point in causing a fatal failure (by
-# unsuccessfully trying to execute it) unnecessarily.
-for f in $*; do echo "(target-compile-stem \"$f\")"; done \
-  | sbcl --core output/after-xc.core || exit 1
 sh make-genesis-2.sh || exit 1 
 
 sh make-target-2.sh || exit 1

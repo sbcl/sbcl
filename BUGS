@@ -189,13 +189,6 @@ WORKAROUND:
 	error in function OPEN: error opening #P"/tmp/foo.lisp": NIL
   instead of saying that too many files are open.
 
-24:
-  Right now, when COMPILE-FILE has a read error, it actually pops
-  you into the debugger before giving up on the file. It should
-  instead handle the error, perhaps issuing (and handling)
-  a secondary error "caught ERROR: unrecoverable error during compilation"
-  and then return with FAILURE-P true,
-
 26:
   reported by Sam Steingold on the cmucl-imp mailing list 12 May 2000:
     Also, there is another bug: `array-displacement' should return an
@@ -988,6 +981,12 @@ Error in function C::GET-LAMBDA-TO-COMPILE:
     #*101
     * 
   
+108:
+  (TIME (ROOM T)) reports more than 200 Mbytes consed even for
+  a clean, just-started SBCL system. And it seems to be right:
+  (ROOM T) can bring a small computer to its knees for a *long*
+  time trying to GC afterwards. Surely there's some more economical
+  way to implement (ROOM T).
 
 KNOWN BUGS RELATED TO THE IR1 INTERPRETER
 

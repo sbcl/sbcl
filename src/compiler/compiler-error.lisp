@@ -1,5 +1,10 @@
-;;;; the bare essentials of compiler error handling (FIXME: to be
-;;;; moved to early-c.lisp when stable)
+;;;; the bare essentials of compiler error handling
+;;;;
+;;;; (Logically, this might belong in early-c.lisp, since it's stuff
+;;;; which might as well be visible to all compiler code. However,
+;;;; physically its DEFINE-CONDITION forms depend on the condition
+;;;; system being set up before it can be cold loaded, so we keep it
+;;;; in this separate, loaded-later file instead of in early-c.lisp.)
 
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
@@ -11,6 +16,9 @@
 ;;;; files for more information.
 
 (in-package "SB!C")
+
+;;;; error-handling definitions which are easy to define early and
+;;;; which are nice to have visible everywhere
 
 ;;; a function that is called to unwind out of COMPILER-ERROR
 (declaim (type (function () nil) *compiler-error-bailout*))
@@ -48,3 +56,36 @@
 (defun compiler-style-warning (format-string &rest format-args)
   (apply #'style-warn format-string format-args)
   (values))
+
+;;; the condition of COMPILE-FILE being unable to READ from the
+;;; source file
+;;;
+;;; This is not a COMPILER-ERROR, since we don't try to recover from
+;;; it and keep chugging along, but instead immediately bail out of
+;;; the entire COMPILE-FILE.
+;;;
+;;; (The old CMU CL code did try to recover from this condition, but
+;;; the code for doing that was messy and didn't always work right.
+;;; Since in Common Lisp the simple act of reading and compiling code
+;;; (even without ever loading the compiled result) can have side
+;;; effects, it's a little scary to go on reading code when you're
+;;; deeply confused, so we violate what'd otherwise be good compiler
+;;; practice by not trying to recover from this error and bailing out
+;;; instead.)
+(define-condition input-error-in-compile-file (error)
+  (;; the original error which was trapped to produce this condition
+   (error :reader input-error-in-compile-file-error
+	  :initarg :error)
+   ;; the position where the bad READ began, or NIL if unavailable,
+   ;; redundant, or irrelevant
+   (position :reader input-error-in-compile-file-position
+	     :initarg :position
+	     :initform nil))
+  (:report
+   (lambda (condition stream)
+     (format stream
+	     "~@<~S failure in ~S~@[ at character ~D~]: ~2I~_~A~:>"
+	     'read
+	     'compile-file
+	     (input-error-in-compile-file-position condition)
+	     (input-error-in-compile-file-error condition)))))
