@@ -46,6 +46,32 @@
 	(eval-in-lexenv (first i) lexenv)
 	(return (eval-in-lexenv (first i) lexenv)))))
 
+(defun eval-locally (exp lexenv &optional vars)
+  (multiple-value-bind (body decls) (parse-body (rest exp) nil)
+    (let ((lexenv
+           ;; KLUDGE: Uh, yeah.  I'm not anticipating
+           ;; winning any prizes for this code, which was
+           ;; written on a "let's get it to work" basis.
+           ;; These seem to be the variables that need
+           ;; bindings for PROCESS-DECLS to work
+           ;; (*FREE-FUNS* and *FREE-VARS* so that
+           ;; references to free functions and variables
+           ;; in the declarations can be noted;
+           ;; *UNDEFINED-WARNINGS* so that warnings about
+           ;; undefined things can be accumulated [and
+           ;; then thrown away, as it happens]). -- CSR,
+           ;; 2002-10-24
+           (let ((sb!c:*lexenv* lexenv)
+                 (sb!c::*free-funs* (make-hash-table :test 'equal))
+                 (sb!c::*free-vars* (make-hash-table :test 'eq))
+                 (sb!c::*undefined-warnings* nil))
+             (sb!c::process-decls decls
+                                  vars
+                                  nil
+                                  (sb!c::make-continuation)
+                                  lexenv))))
+      (eval-progn-body body lexenv))))
+
 (defun eval (original-exp)
   #!+sb-doc
   "Evaluate the argument in a null lexical environment, returning the
@@ -157,76 +183,37 @@
 		  (when e
 		    (eval-progn-body body lexenv)))))
 	     ((locally)
-	      (multiple-value-bind (body decls) (parse-body (rest exp) nil)
-		(let ((lexenv
-		       ;; KLUDGE: Uh, yeah.  I'm not anticipating
-		       ;; winning any prizes for this code, which was
-		       ;; written on a "let's get it to work" basis.
-		       ;; These seem to be the variables that need
-		       ;; bindings for PROCESS-DECLS to work
-		       ;; (*FREE-FUNS* and *FREE-VARS* so that
-		       ;; references to free functions and variables
-		       ;; in the declarations can be noted;
-		       ;; *UNDEFINED-WARNINGS* so that warnings about
-		       ;; undefined things can be accumulated [and
-		       ;; then thrown away, as it happens]). -- CSR,
-		       ;; 2002-10-24
-		       (let ((sb!c:*lexenv* lexenv)
-			     (sb!c::*free-funs* (make-hash-table :test 'equal))
-			     (sb!c::*free-vars* (make-hash-table :test 'eq))
-			     (sb!c::*undefined-warnings* nil))
-			 (sb!c::process-decls decls
-					      nil nil
-					      (sb!c::make-continuation)
-					      lexenv))))
-		  (eval-progn-body body lexenv))))
+	      (eval-locally exp lexenv))
 	     ((macrolet)
 	      (destructuring-bind (definitions &rest body)
 		  (rest exp)
-		;; FIXME: shared code with
-		;; FUNCALL-IN-FOOMACROLET-LEXENV
-		(declare (type list definitions))
-		(unless (= (length definitions)
-			   (length (remove-duplicates definitions
-						      :key #'first)))
-		  (style-warn "duplicate definitions in ~S" definitions))
 		(let ((lexenv
-		       (sb!c::make-lexenv
-			:default lexenv
-			:funs (mapcar
-			       (sb!c::macrolet-definitionize-fun
-				:eval
-				;; I'm not sure that this is the
-				;; correct LEXENV to be compiling
-				;; local macros in...
-				lexenv)
-			       definitions))))
-		  (eval-in-lexenv `(locally ,@body) lexenv))))
+                       (let ((sb!c:*lexenv* lexenv))
+                         (sb!c::funcall-in-macrolet-lexenv
+                          definitions
+                          (lambda (&key funs)
+                            (declare (ignore funs))
+                            sb!c:*lexenv*)
+                          :eval))))
+                  (eval-locally `(locally ,@body) lexenv))))
 	     ((symbol-macrolet)
 	      (destructuring-bind (definitions &rest body)
 		  (rest exp)
-		;; FIXME: shared code with
-		;; FUNCALL-IN-FOOMACROLET-LEXENV
-		(declare (type list definitions))
-		(unless (= (length definitions)
-			   (length (remove-duplicates definitions
-						      :key #'first)))
-		  (style-warn "duplicate definitions in ~S" definitions))
-		(let ((lexenv
-		       (sb!c::make-lexenv
-			:default lexenv
-			:vars (mapcar
-			       (sb!c::symbol-macrolet-definitionize-fun
-				:eval)
-			       definitions))))
-		  (eval-in-lexenv `(locally ,@body) lexenv))))
+                (multiple-value-bind (lexenv vars)
+                    (let ((sb!c:*lexenv* lexenv))
+                      (sb!c::funcall-in-symbol-macrolet-lexenv
+                       definitions
+                       (lambda (&key vars)
+                         (values sb!c:*lexenv* vars))
+                       :eval))
+                  (eval-locally `(locally ,@body) lexenv vars))))
 	     (t
 	      (if (and (symbolp name)
 		       (eq (info :function :kind name) :function))
 		  (collect ((args))
-			   (dolist (arg (rest exp))
-			     (args (eval-in-lexenv arg lexenv)))
-			   (apply (symbol-function name) (args)))
+                    (dolist (arg (rest exp))
+                      (args (eval-in-lexenv arg lexenv)))
+                    (apply (symbol-function name) (args)))
 		  (%eval exp lexenv))))))
 	(t
 	 exp)))))

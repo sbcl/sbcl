@@ -261,40 +261,38 @@
 ;;; shared by the special-case top level MACROLET processing code, and
 ;;; further split so that the special-case MACROLET processing code in
 ;;; EVAL can likewise make use of it.
-(defmacro macrolet-definitionize-fun (context lexenv)
-  (flet ((make-error-form (control &rest args)
+(defun macrolet-definitionize-fun (context lexenv)
+  (flet ((fail (control &rest args)
 	   (ecase context
-	     (:compile `(compiler-error ,control ,@args))
-	     (:eval `(error 'simple-program-error
-		      :format-control ,control
-		      :format-arguments (list ,@args))))))
-    `(lambda (definition)
+	     (:compile (apply #'compiler-error control args))
+	     (:eval (error 'simple-program-error
+                           :format-control control
+                           :format-arguments args)))))
+    (lambda (definition)
       (unless (list-of-length-at-least-p definition 2)
-	,(make-error-form
-	  "The list ~S is too short to be a legal local macro definition."
-	  'definition))
+        (fail "The list ~S is too short to be a legal local macro definition."
+              definition))
       (destructuring-bind (name arglist &body body) definition
-	(unless (symbolp name)
-	  ,(make-error-form "The local macro name ~S is not a symbol." 'name))
-	(unless (listp arglist)
-	  ,(make-error-form
-	    "The local macro argument list ~S is not a list."
-	    'arglist))
-	(with-unique-names (whole environment)
-	  (multiple-value-bind (body local-decls)
-	      (parse-defmacro arglist whole body name 'macrolet
-			      :environment environment)
-	    `(,name macro .
-	      ,(compile-in-lexenv
-		nil
-		`(lambda (,whole ,environment)
-		  ,@local-decls
-                  ,body)
-		,lexenv))))))))
+        (unless (symbolp name)
+          (fail "The local macro name ~S is not a symbol." name))
+        (unless (listp arglist)
+          (fail "The local macro argument list ~S is not a list."
+                arglist))
+        (with-unique-names (whole environment)
+          (multiple-value-bind (body local-decls)
+              (parse-defmacro arglist whole body name 'macrolet
+                              :environment environment)
+            `(,name macro .
+                    ,(compile-in-lexenv
+                      nil
+                      `(lambda (,whole ,environment)
+                         ,@local-decls
+                         ,body)
+                      lexenv))))))))
 
-(defun funcall-in-macrolet-lexenv (definitions fun)
+(defun funcall-in-macrolet-lexenv (definitions fun context)
   (%funcall-in-foomacrolet-lexenv
-   (macrolet-definitionize-fun :compile (make-restricted-lexenv *lexenv*))
+   (macrolet-definitionize-fun context (make-restricted-lexenv *lexenv*))
    :funs
    definitions
    fun))
@@ -309,33 +307,31 @@
    definitions
    (lambda (&key funs)
      (declare (ignore funs))
-     (ir1-translate-locally body start cont))))
+     (ir1-translate-locally body start cont))
+   :compile))
 
-(defmacro symbol-macrolet-definitionize-fun (context)
-  (flet ((make-error-form (control &rest args)
+(defun symbol-macrolet-definitionize-fun (context)
+  (flet ((fail (control &rest args)
 	   (ecase context
-	     (:compile `(compiler-error ,control ,@args))
-	     (:eval `(error 'simple-program-error
-		      :format-control ,control
-		      :format-arguments (list ,@args))))))
-    `(lambda (definition)
+	     (:compile (apply #'compiler-error control args))
+	     (:eval (error 'simple-program-error
+                           :format-control control
+                           :format-arguments args)))))
+    (lambda (definition)
       (unless (proper-list-of-length-p definition 2)
-       ,(make-error-form "malformed symbol/expansion pair: ~S" 'definition))
-     (destructuring-bind (name expansion) definition
-       (unless (symbolp name)
-         ,(make-error-form
-	   "The local symbol macro name ~S is not a symbol."
-	   'name))
-       (let ((kind (info :variable :kind name)))
-	 (when (member kind '(:special :constant))
-	   ,(make-error-form
-	     "Attempt to bind a ~(~A~) variable with SYMBOL-MACROLET: ~S"
-	     'kind 'name)))
-       `(,name . (MACRO . ,expansion))))))1
+        (fail "malformed symbol/expansion pair: ~S" definition))
+      (destructuring-bind (name expansion) definition
+        (unless (symbolp name)
+          (fail "The local symbol macro name ~S is not a symbol." name))
+        (let ((kind (info :variable :kind name)))
+          (when (member kind '(:special :constant))
+            (fail "Attempt to bind a ~(~A~) variable with SYMBOL-MACROLET: ~S"
+                  kind name)))
+        `(,name . (MACRO . ,expansion))))))
 
-(defun funcall-in-symbol-macrolet-lexenv (definitions fun)
+(defun funcall-in-symbol-macrolet-lexenv (definitions fun context)
   (%funcall-in-foomacrolet-lexenv
-   (symbol-macrolet-definitionize-fun :compile)
+   (symbol-macrolet-definitionize-fun context)
    :vars
    definitions
    fun))
@@ -348,7 +344,8 @@
   (funcall-in-symbol-macrolet-lexenv
    macrobindings
    (lambda (&key vars)
-     (ir1-translate-locally body start cont :vars vars))))
+     (ir1-translate-locally body start cont :vars vars))
+   :compile))
 
 ;;;; %PRIMITIVE
 ;;;;

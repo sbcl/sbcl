@@ -1172,7 +1172,8 @@
                          (declare (ignore funs))
                          (process-toplevel-locally body
                                                    path
-                                                   compile-time-too))))
+                                                   compile-time-too))
+                       :compile))
                      ((symbol-macrolet)
                       (funcall-in-symbol-macrolet-lexenv
                        magic
@@ -1180,7 +1181,8 @@
                          (process-toplevel-locally body
                                                    path
                                                    compile-time-too
-                                                   :vars vars)))))))
+                                                   :vars vars))
+                       :compile)))))
                 ((locally)
                  (process-toplevel-locally (rest form) path compile-time-too))
                 ((progn)

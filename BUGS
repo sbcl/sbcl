@@ -1090,6 +1090,8 @@ WORKAROUND:
 
   does not signal an error.
 
+  (fixed in 0.8.1.37)
+
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:
     These labels were used for bugs related to the old IR1 interpreter.

@@ -18,6 +18,9 @@
 
 (cl:in-package :cl-user)
 
+(load "assertoid.lisp")
+(use-package "ASSERTOID")
+
 ;;; Until sbcl-0.7.9.x, EVAL was not correctly treating LOCALLY,
 ;;; MACROLET and SYMBOL-MACROLET, which should preserve top-levelness
 ;;; of their body forms:
@@ -104,6 +107,14 @@
                                 ,var)
                               ,var))
                  '(1 2))))
+
+;;; Bug 264: SYMBOL-MACROLET did not check for a bound SPECIAL
+;;; declaration
+(assert (raises-error? (progv '(foo) '(1)
+                         (eval '(symbol-macrolet ((foo 3))
+                                 (declare (special foo))
+                                 foo)))
+                       error))
 
 ;;; success
 (sb-ext:quit :unix-status 104)
