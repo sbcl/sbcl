@@ -244,8 +244,74 @@
 			  fixnum-additive-overflow-trap))
       (emit-label no-overflow))))
 
+(define-vop (fast-*/fixnum=>fixnum fast-fixnum-binop)
+  (:temporary (:scs (non-descriptor-reg)) temp)
+  (:translate *)
+  (:generator 2
+    (inst srawi temp y 2)
+    (inst mullw r x temp)))
 
+(define-vop (fast-*-c/fixnum=>fixnum fast-fixnum-binop-c)
+  (:translate *)
+  (:arg-types tagged-num 
+	      (:constant (and (signed-byte 16) (not (integer 0 0)))))
+  (:generator 1
+    (inst mulli r x y)))
+
+(define-vop (fast-*-bigc/fixnum=>fixnum fast-fixnum-binop-c)
+  (:translate *)
+  (:arg-types tagged-num
+	      (:constant (and fixnum (not (signed-byte 16)))))
+  (:temporary (:scs (non-descriptor-reg)) temp)
+  (:generator 1
+    (inst lr temp y)
+    (inst mullw r x temp)))
+
+(define-vop (fast-*/signed=>signed fast-signed-binop)
+  (:translate *)
+  (:generator 4
+    (inst mullw r x y)))
+
+(define-vop (fast-*-c/signed=>signed fast-signed-binop-c)
+  (:translate *)
+  (:generator 3
+    (inst mulli r x y)))
+
+(define-vop (fast-*/unsigned=>unsigned fast-unsigned-binop)
+  (:translate *)
+  (:generator 4
+    (inst mullw r x y)))
+
+(define-vop (fast-*-c/unsigned=>unsigned fast-unsigned-binop-c)
+  (:translate *)
+  (:generator 3
+    (inst mulli r x y)))
+
 ;;; Shifting
+
+(macrolet ((def (name sc-type type result-type cost)
+	     `(define-vop (,name)
+		(:note "inline ASH")
+		(:translate ash)
+		(:args (number :scs (,sc-type))
+		       (amount :scs (signed-reg unsigned-reg immediate)))
+		(:arg-types ,type positive-fixnum)
+		(:results (result :scs (,result-type)))
+		(:result-types ,type)
+		(:policy :fast-safe)
+		(:generator ,cost
+		   (sc-case amount
+		     ((signed-reg unsigned-reg) 
+		      (inst slw result number amount))
+		     (immediate
+		      (let ((amount (tn-value amount)))
+			(aver (> amount 0))
+			(inst slwi result number amount))))))))
+  ;; FIXME: There's the opportunity for a sneaky optimization here, I
+  ;; think: a FAST-ASH-LEFT-C/FIXNUM=>SIGNED vop.  -- CSR, 2003-09-03
+  (def fast-ash-left/fixnum=>fixnum any-reg tagged-num any-reg 2)
+  (def fast-ash-left/signed=>signed signed-reg signed-num signed-reg 3)
+  (def fast-ash-left/unsigned=>unsigned unsigned-reg unsigned-num unsigned-reg 3))
 
 (define-vop (fast-ash/unsigned=>unsigned)
   (:note "inline ASH")
@@ -913,3 +979,25 @@
 (define-static-fun two-arg-and (x y) :translate logand)
 (define-static-fun two-arg-ior (x y) :translate logior)
 (define-static-fun two-arg-xor (x y) :translate logxor)
+
+(in-package "SB!C")
+
+(deftransform * ((x y)
+		 ((unsigned-byte 32) (constant-arg (unsigned-byte 32)))
+		 (unsigned-byte 32))
+  "recode as shifts and adds"
+  (let ((y (continuation-value y)))
+    (multiple-value-bind (result adds shifts)
+	(ub32-strength-reduce-constant-multiply 'x y)
+      (cond
+       ((typep y '(signed-byte 16))
+	;; a mulli instruction has a latency of 5.
+	(when (> (+ adds shifts) 4)
+	  (give-up-ir1-transform)))
+       (t
+	;; a mullw instruction also has a latency of 5, plus two
+	;; instructions (in general) to load the immediate into a
+	;; register.
+	(when (> (+ adds shifts) 6)
+	  (give-up-ir1-transform))))
+      (or result 0))))
