@@ -71,7 +71,7 @@
 
 (declaim (type list *history*))
 
-(defvar *eof-marker* (cons :eof nil))
+(defvar *eof-marker* :eof)
 (defvar *eof-cmd* (make-user-cmd :func :eof))
 (defvar *null-cmd* (make-user-cmd :func :null-cmd))
 
@@ -110,9 +110,10 @@
 		  nil
 		  (list args-string)))
  	     (t
-	      (let ((string-stream (make-string-input-stream args-string)))
-		(loop as arg = (read string-stream nil *eof-marker*)
-		      until (eq arg *eof-marker*)
+	      (let ((string-stream (make-string-input-stream args-string))
+		    (eof (cons nil *eof-marker*))) ;new cons for eq uniqueness
+		(loop as arg = (read string-stream nil eof)
+		      until (eq arg eof)
 		      collect arg))))))
     (let ((next-char (peek-char-non-whitespace input-stream)))
       (cond
@@ -149,8 +150,9 @@
 	 (read-char input-stream)
 	 *null-cmd*)
       (t
-       (let ((form (read input-stream nil *eof-marker*)))
-	 (if (eq form *eof-marker*)
+       (let* ((eof (cons nil *eof-marker*))
+	      (form (read input-stream nil eof)))
+	 (if (eq form eof)
 	     *eof-cmd*
 	     (make-user-cmd :input form :func nil :hnum *cmd-number*))))))))
 
