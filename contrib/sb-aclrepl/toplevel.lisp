@@ -21,7 +21,11 @@
   (let ((*noprint* noprint)
 	(*break-level* break-level)
 	(*inspect-break* inspect)
-	(*continuable-break* continuable))
+	(*continuable-break* continuable)
+	(*dir-stack* nil)
+	(*history* nil)
+	(*cmd-number* 1)
+	(*package* *package*))
     (sb-int:/show0 "entering REPL")
     (loop
      (multiple-value-bind (reason reason-param)
@@ -55,8 +59,11 @@
 	 (results (multiple-value-list (sb-impl::interactive-eval form))))
     (unless *noprint*
       (dolist (result results)
-	;; Don't fresh-line before a result, since newline was entered by user
-	;; in *repl-read-form-fun*
+	;; FIXME: Calling fresh-line before a result ensures the result starts
+	;; on a newline, but it usually generates an empty line.
+	;; One solution would be to have the newline's entered on the
+	;; input stream inform the output stream that the column should be
+	;; reset to the beginning of the line.
 	(fresh-line *standard-output*)
 	(prin1 result *standard-output*)))))
 
