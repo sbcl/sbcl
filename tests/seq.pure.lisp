@@ -155,3 +155,4 @@
 	       '(1 2 3 10 12 13)))
 (assert (equal (stable-sort (list 1 2 3 -3 -2 -1) '< :key 'abs)
 	       '(1 -1 2 -2 3 -3)))
+

@@ -629,14 +629,21 @@
 	      (cond (,end
 		     (unless (or ,unsafe? (<= ,end ,size))
 		       ,(if fail-inline?
-			    `(error "End ~W is greater than total size ~W."
-				    ,end ,size)
+			    `(error 'bounding-indices-bad-error
+			      :datum (cons ,start ,end)
+			      :expected-type `(cons (integer 0 ,',size)
+					            (integer ,',start ,',size))
+			      :object ,array)
 			    `(failed-%with-array-data ,array ,start ,end)))
 		     ,end)
 		    (t ,size))))
        (unless (or ,unsafe? (<= ,start ,defaulted-end))
 	 ,(if fail-inline?
-	      `(error "Start ~W is greater than end ~W." ,start ,defaulted-end)
+	      `(error 'bounding-indices-bad-error
+		:datum (cons ,start ,end)
+		:expected-type `(cons (integer 0 ,',size)
+				      (integer ,',start ,',size))
+		:object ,array)
 	      `(failed-%with-array-data ,array ,start ,end)))
        (do ((,data ,array (%array-data-vector ,data))
 	    (,cumulative-offset 0

@@ -15,6 +15,9 @@
 
 (in-package :cl-user)
 
+(load "assertoid.lisp")
+(use-package "ASSERTOID")
+
 ;;; helper functions for exercising SEQUENCE code on data of many
 ;;; specialized types, and in many different optimization scenarios
 (defun for-every-seq-1 (base-seq snippet)
@@ -330,11 +333,523 @@
 ;;; argument isn't a valid sequence index for sequence:
 (defun test-elt-signal (x)
   (elt x 3))
-(multiple-value-bind (result error)
-    (ignore-errors (test-elt-signal "foo"))
-  (assert (null result))
-  (assert (typep error 'type-error)))
+(assert (raises-error? (test-elt-signal "foo") type-error))
 (assert (eql (test-elt-signal "foob") #\b))
+(locally
+  (declare (optimize (safety 3)))
+  (assert (raises-error? (elt (list 1 2 3) 3) type-error)))
+
+;;; checks for uniform bounding index handling under SAFETY 3 code.
+;;;
+;;; KLUDGE: not all in one big form because that causes SBCL to spend
+;;; an absolute age trying to compile it.
+(defmacro sequence-bounding-indices-test (&body body)
+  `(locally
+    ;; See Issues 332 [and 333(!)] in the CLHS
+    (declare (optimize (safety 3)))
+    (let ((string (make-array 10
+			      :fill-pointer 5
+			      :initial-element #\a
+			      :element-type 'base-char)))
+      (flet ((reset ()
+	       (setf (fill-pointer string) 10)
+	       (fill string #\a)
+	       (setf (fill-pointer string) 5)))
+	(declare (ignorable #'reset))
+	,@body))))
+
+;;; Accessor SUBSEQ
+(sequence-bounding-indices-test
+ (format t "~&/Accessor SUBSEQ~%")
+ (assert (string= (subseq string 0 5) "aaaaa"))
+ (assert (raises-error? (subseq string 0 6)))
+ (assert (raises-error? (subseq string -1 5)))
+ (assert (raises-error? (subseq string 4 2)))
+ (assert (raises-error? (subseq string 6)))
+ (assert (string= (setf (subseq string 0 5) "abcde") "abcde"))
+ (assert (string= (subseq string 0 5) "abcde"))
+ (reset)
+ (assert (raises-error? (setf (subseq string 0 6) "abcdef")))
+ (assert (raises-error? (setf (subseq string -1 5) "abcdef")))
+ (assert (raises-error? (setf (subseq string 4 2) "")))
+ (assert (raises-error? (setf (subseq string 6) "ghij"))))
+
+;;; Function COUNT, COUNT-IF, COUNT-IF-NOT
+(sequence-bounding-indices-test
+ (format t "~&/Function COUNT, COUNT-IF, COUNT-IF-NOT")
+ (assert (= (count #\a string :start 0 :end nil) 5))
+ (assert (= (count #\a string :start 0 :end 5) 5))
+ (assert (raises-error? (count #\a string :start 0 :end 6)))
+ (assert (raises-error? (count #\a string :start -1 :end 5)))
+ (assert (raises-error? (count #\a string :start 4 :end 2)))
+ (assert (raises-error? (count #\a string :start 6 :end 9)))
+ (assert (= (count-if #'alpha-char-p string :start 0 :end nil) 5))
+ (assert (= (count-if #'alpha-char-p string :start 0 :end 5) 5))
+ (assert (raises-error?
+	  (count-if #'alpha-char-p string :start 0 :end 6)))
+ (assert (raises-error?
+	  (count-if #'alpha-char-p string :start -1 :end 5)))
+ (assert (raises-error?
+	  (count-if #'alpha-char-p string :start 4 :end 2)))
+ (assert (raises-error?
+	  (count-if #'alpha-char-p string :start 6 :end 9)))
+ (assert (= (count-if-not #'alpha-char-p string :start 0 :end nil) 0))
+ (assert (= (count-if-not #'alpha-char-p string :start 0 :end 5) 0))
+ (assert (raises-error?
+	  (count-if-not #'alpha-char-p string :start 0 :end 6)))
+ (assert (raises-error?
+	  (count-if-not #'alpha-char-p string :start -1 :end 5)))
+ (assert (raises-error?
+	  (count-if-not #'alpha-char-p string :start 4 :end 2)))
+ (assert (raises-error?
+	  (count-if-not #'alpha-char-p string :start 6 :end 9))))
+
+;;; Function FILL
+(sequence-bounding-indices-test
+ (format t "~&/Function FILL~%")
+ (assert (string= (fill string #\b :start 0 :end 5) "bbbbb"))
+ (assert (string= (fill string #\c :start 0 :end nil) "ccccc"))
+ (assert (raises-error? (fill string #\d :start 0 :end 6)))
+ (assert (raises-error? (fill string #\d :start -1 :end 5)))
+ (assert (raises-error? (fill string #\d :start 4 :end 2)))
+ (assert (raises-error? (fill string #\d :start 6 :end 9))))
+
+;;; Function FIND, FIND-IF, FIND-IF-NOT
+(sequence-bounding-indices-test
+ (format t "~&/Function FIND, FIND-IF, FIND-IF-NOT~%")
+ (assert (char= (find #\a string :start 0 :end nil) #\a))
+ (assert (char= (find #\a string :start 0 :end 5) #\a))
+ (assert (raises-error? (find #\a string :start 0 :end 6)))
+ (assert (raises-error? (find #\a string :start -1 :end 5)))
+ (assert (raises-error? (find #\a string :start 4 :end 2)))
+ (assert (raises-error? (find #\a string :start 6 :end 9)))
+ (assert (char= (find-if #'alpha-char-p string :start 0 :end nil) #\a))
+ (assert (char= (find-if #'alpha-char-p string :start 0 :end 5) #\a))
+ (assert (raises-error?
+	  (find-if #'alpha-char-p string :start 0 :end 6)))
+ (assert (raises-error?
+	  (find-if #'alpha-char-p string :start -1 :end 5)))
+ (assert (raises-error?
+	  (find-if #'alpha-char-p string :start 4 :end 2)))
+ (assert (raises-error?
+	  (find-if #'alpha-char-p string :start 6 :end 9)))
+ (assert (eq (find-if-not #'alpha-char-p string :start 0 :end nil) nil))
+ (assert (eq (find-if-not #'alpha-char-p string :start 0 :end 5) nil))
+ (assert (raises-error?
+	  (find-if-not #'alpha-char-p string :start 0 :end 6)))
+ (assert (raises-error?
+	  (find-if-not #'alpha-char-p string :start -1 :end 5)))
+ (assert (raises-error?
+	  (find-if-not #'alpha-char-p string :start 4 :end 2)))
+ (assert (raises-error?
+	  (find-if-not #'alpha-char-p string :start 6 :end 9))))
+
+;;; Function MISMATCH
+(sequence-bounding-indices-test
+ (format t "~&/Function MISMATCH~%")
+ (assert (null (mismatch string "aaaaa" :start1 0 :end1 nil)))
+ (assert (= (mismatch "aaab" string :start2 0 :end2 4) 3))
+ (assert (raises-error? (mismatch "aaaaaa" string :start2 0 :end2 6)))
+ (assert (raises-error? (mismatch string "aaaaaa" :start1 -1 :end1 5)))
+ (assert (raises-error? (mismatch string "" :start1 4 :end1 2)))
+ (assert (raises-error? (mismatch "aaaa" string :start2 6 :end2 9))))
+
+;;; Function PARSE-INTEGER
+(sequence-bounding-indices-test
+ (format t "~&/Function PARSE-INTEGER~%")
+ (setf (fill-pointer string) 10)
+ (setf (subseq string 0 10) "1234567890")
+ (setf (fill-pointer string) 5)
+ (assert (= (parse-integer string :start 0 :end 5) 12345))
+ (assert (= (parse-integer string :start 0 :end nil) 12345))
+ (assert (raises-error? (parse-integer string :start 0 :end 6)))
+ (assert (raises-error? (parse-integer string :start -1 :end 5)))
+ (assert (raises-error? (parse-integer string :start 4 :end 2)))
+ (assert (raises-error? (parse-integer string :start 6 :end 9))))
+
+;;; Function PARSE-NAMESTRING
+(sequence-bounding-indices-test
+ (format t "~&/Function PARSE-NAMESTRING~%")
+ (setf (fill-pointer string) 10)
+ (setf (subseq string 0 10) "/dev/ /tmp")
+ (setf (fill-pointer string) 5)
+ (assert (truename (parse-namestring string nil *default-pathname-defaults*
+				     :start 0 :end 5)))
+ (assert (truename (parse-namestring string nil *default-pathname-defaults*
+				     :start 0 :end nil)))
+ (assert (raises-error? (parse-namestring string nil
+					  *default-pathname-defaults*
+					  :start 0 :end 6)))
+ (assert (raises-error? (parse-namestring string nil
+					  *default-pathname-defaults*
+					  :start -1 :end 5)))
+ (assert (raises-error? (parse-namestring string nil
+					  *default-pathname-defaults*
+					  :start 4 :end 2)))
+ (assert (raises-error? (parse-namestring string nil
+					  *default-pathname-defaults*
+					  :start 6 :end 9))))
+
+;;; Function POSITION, POSITION-IF, POSITION-IF-NOT
+(sequence-bounding-indices-test
+ (format t "~&/Function POSITION, POSITION-IF, POSITION-IF-NOT~%")
+ (assert (= (position #\a string :start 0 :end nil) 0))
+ (assert (= (position #\a string :start 0 :end 5) 0))
+ (assert (raises-error? (position #\a string :start 0 :end 6)))
+ (assert (raises-error? (position #\a string :start -1 :end 5)))
+ (assert (raises-error? (position #\a string :start 4 :end 2)))
+ (assert (raises-error? (position #\a string :start 6 :end 9)))
+ (assert (= (position-if #'alpha-char-p string :start 0 :end nil) 0))
+ (assert (= (position-if #'alpha-char-p string :start 0 :end 5) 0))
+ (assert (raises-error?
+	  (position-if #'alpha-char-p string :start 0 :end 6)))
+ (assert (raises-error?
+	  (position-if #'alpha-char-p string :start -1 :end 5)))
+ (assert (raises-error?
+	  (position-if #'alpha-char-p string :start 4 :end 2)))
+ (assert (raises-error?
+	  (position-if #'alpha-char-p string :start 6 :end 9)))
+ (assert (eq (position-if-not #'alpha-char-p string :start 0 :end nil) nil))
+ (assert (eq (position-if-not #'alpha-char-p string :start 0 :end 5) nil))
+ (assert (raises-error?
+	  (position-if-not #'alpha-char-p string :start 0 :end 6)))
+ (assert (raises-error?
+	  (position-if-not #'alpha-char-p string :start -1 :end 5)))
+ (assert (raises-error?
+	  (position-if-not #'alpha-char-p string :start 4 :end 2)))
+ (assert (raises-error?
+	  (position-if-not #'alpha-char-p string :start 6 :end 9))))
+
+;;; Function READ-FROM-STRING
+(sequence-bounding-indices-test
+ (format t "~&/Function READ-FROM-STRING~%")
+ (setf (subseq string 0 5) "(a b)")
+ (assert (equal (read-from-string string nil nil :start 0 :end 5) '(a b)))
+ (assert (equal (read-from-string string nil nil :start 0 :end nil) '(a b)))
+ (assert (raises-error? (read-from-string string nil nil :start 0 :end 6)))
+ (assert (raises-error? (read-from-string string nil nil :start -1 :end 5)))
+ (assert (raises-error? (read-from-string string nil nil :start 4 :end 2)))
+ (assert (raises-error? (read-from-string string nil nil :start 6 :end 9))))
+
+;;; Function REDUCE
+(sequence-bounding-indices-test
+ (format t "~&/Function REDUCE~%")
+ (setf (subseq string 0 5) "abcde")
+ (assert (equal (reduce #'list* string :from-end t :start 0 :end nil)
+		'(#\a #\b #\c #\d . #\e)))
+ (assert (equal (reduce #'list* string :from-end t :start 0 :end 5)
+		'(#\a #\b #\c #\d . #\e)))
+ (assert (raises-error? (reduce #'list* string :start 0 :end 6)))
+ (assert (raises-error? (reduce #'list* string :start -1 :end 5)))
+ (assert (raises-error? (reduce #'list* string :start 4 :end 2)))
+ (assert (raises-error? (reduce #'list* string :start 6 :end 9))))
+
+;;; Function REMOVE, REMOVE-IF, REMOVE-IF-NOT, DELETE, DELETE-IF,
+;;; DELETE-IF-NOT
+(sequence-bounding-indices-test
+ (format t "~&/Function REMOVE, REMOVE-IF, REMOVE-IF-NOT, ...~%")
+ (assert (equal (remove #\a string :start 0 :end nil) ""))
+ (assert (equal (remove #\a string :start 0 :end 5) ""))
+ (assert (raises-error? (remove #\a string :start 0 :end 6)))
+ (assert (raises-error? (remove #\a string :start -1 :end 5)))
+ (assert (raises-error? (remove #\a string :start 4 :end 2)))
+ (assert (raises-error? (remove #\a string :start 6 :end 9)))
+ (assert (equal (remove-if #'alpha-char-p string :start 0 :end nil) ""))
+ (assert (equal (remove-if #'alpha-char-p string :start 0 :end 5) ""))
+ (assert (raises-error?
+	  (remove-if #'alpha-char-p string :start 0 :end 6)))
+ (assert (raises-error?
+	  (remove-if #'alpha-char-p string :start -1 :end 5)))
+ (assert (raises-error?
+	  (remove-if #'alpha-char-p string :start 4 :end 2)))
+ (assert (raises-error?
+	  (remove-if #'alpha-char-p string :start 6 :end 9)))
+ (assert (equal (remove-if-not #'alpha-char-p string :start 0 :end nil)
+		"aaaaa"))
+ (assert (equal (remove-if-not #'alpha-char-p string :start 0 :end 5)
+		"aaaaa"))
+ (assert (raises-error?
+	  (remove-if-not #'alpha-char-p string :start 0 :end 6)))
+ (assert (raises-error?
+	  (remove-if-not #'alpha-char-p string :start -1 :end 5)))
+ (assert (raises-error?
+	  (remove-if-not #'alpha-char-p string :start 4 :end 2)))
+ (assert (raises-error?
+	  (remove-if-not #'alpha-char-p string :start 6 :end 9)))
+ (format t "~&/... DELETE, DELETE-IF, DELETE-IF-NOT")
+ (assert (equal (delete #\a string :start 0 :end nil) ""))
+ (reset)
+ (assert (equal (delete #\a string :start 0 :end 5) ""))
+ (reset)
+ (assert (raises-error? (delete #\a string :start 0 :end 6)))
+ (reset)
+ (assert (raises-error? (delete #\a string :start -1 :end 5)))
+ (reset)
+ (assert (raises-error? (delete #\a string :start 4 :end 2)))
+ (reset)
+ (assert (raises-error? (delete #\a string :start 6 :end 9)))
+ (reset)
+ (assert (equal (delete-if #'alpha-char-p string :start 0 :end nil) ""))
+ (reset)
+ (assert (equal (delete-if #'alpha-char-p string :start 0 :end 5) ""))
+ (reset)
+ (assert (raises-error?
+	  (delete-if #'alpha-char-p string :start 0 :end 6)))
+ (reset)
+ (assert (raises-error?
+	  (delete-if #'alpha-char-p string :start -1 :end 5)))
+ (reset)
+ (assert (raises-error?
+	  (delete-if #'alpha-char-p string :start 4 :end 2)))
+ (reset)
+ (assert (raises-error?
+	  (delete-if #'alpha-char-p string :start 6 :end 9)))
+ (reset)
+ (assert (equal (delete-if-not #'alpha-char-p string :start 0 :end nil)
+		"aaaaa"))
+ (reset)
+ (assert (equal (delete-if-not #'alpha-char-p string :start 0 :end 5)
+		"aaaaa"))
+ (reset)
+ (assert (raises-error?
+	  (delete-if-not #'alpha-char-p string :start 0 :end 6)))
+ (reset)
+ (assert (raises-error?
+	  (delete-if-not #'alpha-char-p string :start -1 :end 5)))
+ (reset)
+ (assert (raises-error?
+	  (delete-if-not #'alpha-char-p string :start 4 :end 2)))
+ (reset)
+ (assert (raises-error?
+	  (delete-if-not #'alpha-char-p string :start 6 :end 9))))
+
+;;; Function REMOVE-DUPLICATES, DELETE-DUPLICATES
+(sequence-bounding-indices-test
+ (format t "~&/Function REMOVE-DUPLICATES, DELETE-DUPLICATES~%")
+ (assert (string= (remove-duplicates string :start 0 :end 5) "a"))
+ (assert (string= (remove-duplicates string :start 0 :end nil) "a"))
+ (assert (raises-error? (remove-duplicates string :start 0 :end 6)))
+ (assert (raises-error? (remove-duplicates string :start -1 :end 5)))
+ (assert (raises-error? (remove-duplicates string :start 4 :end 2)))
+ (assert (raises-error? (remove-duplicates string :start 6 :end 9)))
+ (assert (string= (delete-duplicates string :start 0 :end 5) "a"))
+ (reset)
+ (assert (string= (delete-duplicates string :start 0 :end nil) "a"))
+ (reset)
+ (assert (raises-error? (delete-duplicates string :start 0 :end 6)))
+ (reset)
+ (assert (raises-error? (delete-duplicates string :start -1 :end 5)))
+ (reset)
+ (assert (raises-error? (delete-duplicates string :start 4 :end 2)))
+ (reset)
+ (assert (raises-error? (delete-duplicates string :start 6 :end 9))))
+
+;;; Function REPLACE
+(sequence-bounding-indices-test
+ (format t "~&/Function REPLACE~%")
+ (assert (string= (replace string "bbbbb" :start1 0 :end1 5) "bbbbb"))
+ (assert (string= (replace (copy-seq "ccccc")
+			   string
+			   :start2 0 :end2 nil) "bbbbb"))
+ (assert (raises-error? (replace string "ccccc" :start1 0 :end1 6)))
+ (assert (raises-error? (replace string "ccccc" :start2 -1 :end2 5)))
+ (assert (raises-error? (replace string "ccccc" :start1 4 :end1 2)))
+ (assert (raises-error? (replace string "ccccc" :start1 6 :end1 9))))
+
+;;; Function SEARCH
+(sequence-bounding-indices-test
+ (format t "~&/Function SEARCH~%")
+ (assert (= (search "aa" string :start2 0 :end2 5) 0))
+ (assert (null (search string "aa" :start1 0 :end2 nil)))
+ (assert (raises-error? (search "aa" string :start2 0 :end2 6)))
+ (assert (raises-error? (search "aa" string :start2 -1 :end2 5)))
+ (assert (raises-error? (search "aa" string :start2 4 :end2 2)))
+ (assert (raises-error? (search "aa" string :start2 6 :end2 9))))
+
+;;; Function STRING-UPCASE, STRING-DOWNCASE, STRING-CAPITALIZE,
+;;; NSTRING-UPCASE, NSTRING-DOWNCASE, NSTRING-CAPITALIZE
+(sequence-bounding-indices-test
+ (macrolet ((frob (fn)
+	      `(progn
+		(assert (raises-error? (,fn string :start 0 :end 6)))
+		(assert (raises-error? (,fn string :start -1 :end 5)))
+		(assert (raises-error? (,fn string :start 4 :end 2)))
+		(assert (raises-error? (,fn string :start 6 :end 9))))))
+   (format t "~&/Function STRING-UPCASE, STRING-DOWNCASE, STRING-CAPITALIZE, ...~%")
+   (frob string-upcase)
+   (frob string-downcase)
+   (frob string-capitalize)
+   (format t "~&/... NSTRING-UPCASE, NSTRING-DOWNCASE, NSTRING-CAPITALIZE~%")
+   (frob nstring-upcase)
+   (frob nstring-downcase)
+   (frob nstring-capitalize)))
+ 
+;;; Function STRING=, STRING/=, STRING<, STRING>, STRING<=, STRING>=,
+;;; STRING-EQUAL, STRING-NOT-EQUAL, STRING-LESSP, STRING-GREATERP,
+;;; STRING-NOT-GREATERP, STRING-NOT-LESSP
+(sequence-bounding-indices-test
+ (macrolet ((frob (fn)
+	      `(progn
+		(,fn string "abcde" :start1 0 :end1 5)
+		(,fn "fghij" string :start2 0 :end2 nil)
+		(assert (raises-error? (,fn string "klmno"
+					    :start1 0 :end1 6)))
+		(assert (raises-error? (,fn "pqrst" string
+					    :start2 -1 :end2 5)))
+		(assert (raises-error? (,fn "uvwxy" string
+					    :start1 4 :end1 2)))
+		(assert (raises-error? (,fn string "z" :start2 6 :end2 9))))))
+   (format t "~&/Function STRING=, STRING/=, STRING<, STRING>, STRING<=, STRING>=, ...")
+   (frob string=)
+   (frob string/=)
+   (frob string<)
+   (frob string>)
+   (frob string<=)
+   (frob string>=)
+   (format t "~&/... STRING-EQUAL, STRING-NOT-EQUAL, STRING-LESSP, ...~%")
+   (frob string-equal)
+   (frob string-not-equal)
+   (frob string-lessp)
+   (format t "~&/... STRING-GREATERP, STRING-NOT-GREATERP, STRING-NOT-LESSP~%")
+   (frob string-greaterp)
+   (frob string-not-greaterp)
+   (frob string-not-lessp)))
+
+;;; Function SUBSTITUTE, SUBSTITUTE-IF, SUBSTITUTE-IF-NOT,
+;;; NSUBSTITUTE, NSUBSTITUTE-IF, NSUBSTITUTE-IF-NOT
+(sequence-bounding-indices-test
+ (format t "~&/Function SUBSTITUTE, SUBSTITUTE-IF, SUBSTITUTE-IF-NOT, ...~%")
+ (assert (string= (substitute #\b #\a string :start 0 :end 5) "bbbbb"))
+ (assert (string= (substitute #\c #\a string :start 0 :end nil)
+		  "ccccc"))
+ (assert (raises-error? (substitute #\b #\a string :start 0 :end 6)))
+ (assert (raises-error? (substitute #\b #\a string :start -1 :end 5)))
+ (assert (raises-error? (substitute #\b #\a string :start 4 :end 2)))
+ (assert (raises-error? (substitute #\b #\a string :start 6 :end 9)))
+ (assert (string= (substitute-if #\b #'alpha-char-p string
+				 :start 0 :end 5)
+		  "bbbbb"))
+ (assert (string= (substitute-if #\c #'alpha-char-p string
+				 :start 0 :end nil)
+		  "ccccc"))
+ (assert (raises-error? (substitute-if #\b #'alpha-char-p string
+				       :start 0 :end 6)))
+ (assert (raises-error? (substitute-if #\b #'alpha-char-p string
+				       :start -1 :end 5)))
+ (assert (raises-error? (substitute-if #\b #'alpha-char-p string
+				       :start 4 :end 2)))
+ (assert (raises-error? (substitute-if #\b #'alpha-char-p string
+				       :start 6 :end 9)))
+ (assert (string= (substitute-if-not #\b #'alpha-char-p string
+				     :start 0 :end 5)
+		  "aaaaa"))
+ (assert (string= (substitute-if-not #\c #'alpha-char-p string
+				     :start 0 :end nil)
+		  "aaaaa"))
+ (assert (raises-error? (substitute-if-not #\b #'alpha-char-p string
+					   :start 0 :end 6)))
+ (assert (raises-error? (substitute-if-not #\b #'alpha-char-p string
+					   :start -1 :end 5)))
+ (assert (raises-error? (substitute-if-not #\b #'alpha-char-p string
+					   :start 4 :end 2)))
+ (assert (raises-error? (substitute-if-not #\b #'alpha-char-p string
+					   :start 6 :end 9)))
+ (format t "~&/... NSUBSTITUTE, NSUBSTITUTE-IF, NSUBSTITUTE-IF-NOT~%")
+ (assert (string= (nsubstitute #\b #\a string :start 0 :end 5) "bbbbb"))
+ (reset)
+ (assert (string= (nsubstitute #\c #\a string :start 0 :end nil)
+		  "ccccc"))
+ (reset)
+ (assert (raises-error? (nsubstitute #\b #\a string :start 0 :end 6)))
+ (reset)
+ (assert (raises-error? (nsubstitute #\b #\a string :start -1 :end 5)))
+ (reset)
+ (assert (raises-error? (nsubstitute #\b #\a string :start 4 :end 2)))
+ (reset)
+ (assert (raises-error? (nsubstitute #\b #\a string :start 6 :end 9)))
+ (reset)
+ (assert (string= (nsubstitute-if #\b #'alpha-char-p string
+				  :start 0 :end 5)
+		  "bbbbb"))
+ (reset)
+ (assert (string= (nsubstitute-if #\c #'alpha-char-p string
+				  :start 0 :end nil)
+		  "ccccc"))
+ (reset)
+ (assert (raises-error? (nsubstitute-if #\b #'alpha-char-p string
+					:start 0 :end 6)))
+ (reset)
+ (assert (raises-error? (nsubstitute-if #\b #'alpha-char-p string
+					:start -1 :end 5)))
+ (reset)
+ (assert (raises-error? (nsubstitute-if #\b #'alpha-char-p string
+					:start 4 :end 2)))
+ (reset)
+ (assert (raises-error? (nsubstitute-if #\b #'alpha-char-p string
+					:start 6 :end 9)))
+ (reset)
+ (assert (string= (nsubstitute-if-not #\b #'alpha-char-p string
+				      :start 0 :end 5)
+		  "aaaaa"))
+ (reset)
+ (assert (string= (nsubstitute-if-not #\c #'alpha-char-p string
+				      :start 0 :end nil)
+		  "aaaaa"))
+ (reset)
+ (assert (raises-error? (nsubstitute-if-not #\b #'alpha-char-p string
+					    :start 0 :end 6)))
+ (reset)
+ (assert (raises-error? (nsubstitute-if-not #\b #'alpha-char-p string
+					    :start -1 :end 5)))
+ (reset)
+ (assert (raises-error? (nsubstitute-if-not #\b #'alpha-char-p string
+					    :start 4 :end 2)))
+ (reset)
+ (assert (raises-error? (nsubstitute-if-not #\b #'alpha-char-p string
+					    :start 6 :end 9))))
+;;; Function WRITE-STRING, WRITE-LINE
+(sequence-bounding-indices-test
+ (format t "~&/Function WRITE-STRING, WRITE-LINE~%")
+ (write-string string *standard-output* :start 0 :end 5)
+ (write-string string *standard-output* :start 0 :end nil)
+ (assert (raises-error? (write-string string *standard-output*
+				      :start 0 :end 6)))
+ (assert (raises-error? (write-string string *standard-output*
+				      :start -1 :end 5)))
+ (assert (raises-error? (write-string string *standard-output*
+				      :start 4 :end 2)))
+ (assert (raises-error? (write-string string *standard-output*
+				      :start 6 :end 9)))
+ (write-line string *standard-output* :start 0 :end 5)
+ (write-line string *standard-output* :start 0 :end nil)
+ (assert (raises-error? (write-line string *standard-output*
+				      :start 0 :end 6)))
+ (assert (raises-error? (write-line string *standard-output*
+				      :start -1 :end 5)))
+ (assert (raises-error? (write-line string *standard-output*
+				      :start 4 :end 2)))
+ (assert (raises-error? (write-line string *standard-output*
+				      :start 6 :end 9))))
+
+;;; Macro WITH-INPUT-FROM-STRING
+(sequence-bounding-indices-test
+ (format t "~&/Macro WITH-INPUT-FROM-STRING~%")
+ (with-input-from-string (s string :start 0 :end 5)
+   (assert (char= (read-char s) #\a)))
+ (with-input-from-string (s string :start 0 :end nil)
+   (assert (char= (read-char s) #\a)))
+ (assert (raises-error?
+	  (with-input-from-string (s string :start 0 :end 6)
+	    (read-char s))))
+ (assert (raises-error?
+	  (with-input-from-string (s string :start -1 :end 5)
+	    (read-char s))))
+ (assert (raises-error?
+	  (with-input-from-string (s string :start 4 :end 2)
+	    (read-char s))))
+ (assert (raises-error?
+	  (with-input-from-string (s string :start 6 :end 9)
+	    (read-char s)))))
 
 ;;; success
 (quit :unix-status 104)

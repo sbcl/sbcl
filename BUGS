@@ -1259,6 +1259,20 @@ WORKAROUND:
      calls of the form (TYPEP 1 'INTEGER NIL), even though this is
      just as optimizeable as (TYPEP 1 'INTEGER).
 
+238: "REPL compiler overenthusiasm for CLOS code"
+  From the REPL,
+    * (defclass foo () ())
+    * (defmethod bar ((x foo) (foo foo)) (call-next-method))
+  causes approximately 100 lines of code deletion notes.  Some
+  discussion on this issue happened under the title 'Three "interesting"
+  bugs in PCL', resulting in a fix for this oververbosity from the
+  compiler proper; however, the problem persists in the interactor
+  because the notion of original source is not preserved: for the
+  compiler, the original source of the above expression is (DEFMETHOD
+  BAR ((X FOO) (FOO FOO)) (CALL-NEXT-METHOD)), while by the time the
+  compiler gets its hands on the code needing compilation from the REPL,
+  it has been macroexpanded several times.
+
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:
     These labels were used for bugs related to the old IR1 interpreter.

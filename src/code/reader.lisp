@@ -1400,9 +1400,10 @@
    and the lisp object built by the reader is returned. Macro chars
    will take effect."
   (declare (string string))
+  
   (with-array-data ((string string)
 		    (start start)
-		    (end (or end (length string))))
+		    (end (%check-vector-sequence-bounds string start end)))
     (unless *read-from-string-spares*
       (push (internal-make-string-input-stream "" 0 0)
 	    *read-from-string-spares*))
@@ -1431,7 +1432,7 @@
 		       :format-arguments (list string))))
     (with-array-data ((string string)
 		      (start start)
-		      (end (or end (length string))))
+		      (end (%check-vector-sequence-bounds string start end)))
       (let ((index (do ((i start (1+ i)))
 		       ((= i end)
 			(if junk-allowed

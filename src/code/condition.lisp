@@ -696,20 +696,24 @@
 	     "The index ~S is too large."
 	     (type-error-datum condition)))))
 
-;;; Out-of-range &KEY END arguments are similar to, but off by one
-;;; from out-of-range indices into the sequence.
-;;;
-;;; FIXME: Uh, but it isn't used for &KEY END things -- in fact, this
-;;; is only used in one place, in SUBSEQ.  Is it really necessary?  Is
-;;; it here so that we can actually go round seq.lisp decorating all
-;;; the sequence functions with extra checks?  -- CSR, 2002-11-01
-(define-condition end-too-large-error (type-error)
-  ()
+(define-condition bounding-indices-bad-error (type-error)
+  ((object :reader bounding-indices-bad-object :initarg :object))
   (:report
    (lambda (condition stream)
-     (format stream
-	     "The end-of-sequence specifier ~S is too large."
-	     (type-error-datum condition)))))
+     (let* ((datum (type-error-datum condition))
+	    (start (car datum))
+	    (end (cdr datum))
+	    (object (bounding-indices-bad-object condition)))
+       (etypecase object
+	 (sequence
+	  (format stream
+		  "The bounding indices ~S and ~S are bad for a sequence of length ~S."
+		  start end (length object)))
+	 (array
+	  ;; from WITH-ARRAY-DATA
+	  (format stream
+		  "The START and END parameters ~S and ~S are bad for an array of total size ~S."
+		  start end (array-total-size object))))))))
 
 (define-condition io-timeout (stream-error)
   ((direction :reader io-timeout-direction :initarg :direction))

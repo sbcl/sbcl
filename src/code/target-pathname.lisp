@@ -649,69 +649,71 @@ a host-structure or string."
 	   (type string namestr)
 	   (type index start)
 	   (type (or index null) end))
-  (if junk-allowed
-      (handler-case
-	  (%parse-namestring namestr host defaults start end nil)
-	(namestring-parse-error (condition)
-	  (values nil (namestring-parse-error-offset condition))))
-      (let* ((end (or end (length namestr))))
-	(multiple-value-bind (new-host device directory file type version)
-	    ;; Comments below are quotes from the HyperSpec
-	    ;; PARSE-NAMESTRING entry, reproduced here to demonstrate
-	    ;; that we actually have to do things this way rather than
-	    ;; some possibly more logical way. - CSR, 2002-04-18
-	    (cond
-	      ;; "If host is a logical host then thing is parsed as a
-	      ;; logical pathname namestring on the host."
-	      (host (funcall (host-parse host) namestr start end))
-	      ;; "If host is nil and thing is a syntactically valid
-	      ;; logical pathname namestring containing an explicit
-	      ;; host, then it is parsed as a logical pathname
-	      ;; namestring."
-	      ((parseable-logical-namestring-p namestr start end)
-	       (parse-logical-namestring namestr start end))
-	      ;; "If host is nil, default-pathname is a logical
-	      ;; pathname, and thing is a syntactically valid logical
-	      ;; pathname namestring without an explicit host, then it
-	      ;; is parsed as a logical pathname namestring on the
-	      ;; host that is the host component of default-pathname."
-	      ;;
-	      ;; "Otherwise, the parsing of thing is
-	      ;; implementation-defined."
-	      ;;
-	      ;; Both clauses are handled here, as the default
-	      ;; *DEFAULT-PATHNAME-DEFAULTS has a SB-IMPL::UNIX-HOST
-	      ;; for a host.
-	      ((pathname-host defaults)
-	       (funcall (host-parse (pathname-host defaults))
-			namestr
-			start
-			end))
-	      ;; I don't think we should ever get here, as the default
-	      ;; host will always have a non-null HOST, given that we
-	      ;; can't create a new pathname without going through
-	      ;; *DEFAULT-PATHNAME-DEFAULTS*, which has a non-null
-	      ;; host...
-	      (t (bug "Fallen through COND in %PARSE-NAMESTRING")))
-	  (when (and host new-host (not (eq new-host host)))
-	    (error 'simple-type-error
-		   :datum new-host
-		   ;; Note: ANSI requires that this be a TYPE-ERROR,
-		   ;; but there seems to be no completely correct
-		   ;; value to use for TYPE-ERROR-EXPECTED-TYPE.
-		   ;; Instead, we return a sort of "type error allowed
-		   ;; type", trying to say "it would be OK if you
-		   ;; passed NIL as the host value" but not mentioning
-		   ;; that a matching string would be OK too.
-		   :expected-type 'null
-		   :format-control
-		   "The host in the namestring, ~S,~@
+  (cond
+    (junk-allowed
+     (handler-case
+	 (%parse-namestring namestr host defaults start end nil)
+       (namestring-parse-error (condition)
+	 (values nil (namestring-parse-error-offset condition)))))
+    (t
+     (let* ((end (%check-vector-sequence-bounds namestr start end)))
+       (multiple-value-bind (new-host device directory file type version)
+	   ;; Comments below are quotes from the HyperSpec
+	   ;; PARSE-NAMESTRING entry, reproduced here to demonstrate
+	   ;; that we actually have to do things this way rather than
+	   ;; some possibly more logical way. - CSR, 2002-04-18
+	   (cond
+	     ;; "If host is a logical host then thing is parsed as a
+	     ;; logical pathname namestring on the host."
+	     (host (funcall (host-parse host) namestr start end))
+	     ;; "If host is nil and thing is a syntactically valid
+	     ;; logical pathname namestring containing an explicit
+	     ;; host, then it is parsed as a logical pathname
+	     ;; namestring."
+	     ((parseable-logical-namestring-p namestr start end)
+	      (parse-logical-namestring namestr start end))
+	     ;; "If host is nil, default-pathname is a logical
+	     ;; pathname, and thing is a syntactically valid logical
+	     ;; pathname namestring without an explicit host, then it
+	     ;; is parsed as a logical pathname namestring on the
+	     ;; host that is the host component of default-pathname."
+	     ;;
+	     ;; "Otherwise, the parsing of thing is
+	     ;; implementation-defined."
+	     ;;
+	     ;; Both clauses are handled here, as the default
+	     ;; *DEFAULT-PATHNAME-DEFAULTS has a SB-IMPL::UNIX-HOST
+	     ;; for a host.
+	     ((pathname-host defaults)
+	      (funcall (host-parse (pathname-host defaults))
+		       namestr
+		       start
+		       end))
+	     ;; I don't think we should ever get here, as the default
+	     ;; host will always have a non-null HOST, given that we
+	     ;; can't create a new pathname without going through
+	     ;; *DEFAULT-PATHNAME-DEFAULTS*, which has a non-null
+	     ;; host...
+	     (t (bug "Fallen through COND in %PARSE-NAMESTRING")))
+	 (when (and host new-host (not (eq new-host host)))
+	   (error 'simple-type-error
+		  :datum new-host
+		  ;; Note: ANSI requires that this be a TYPE-ERROR,
+		  ;; but there seems to be no completely correct
+		  ;; value to use for TYPE-ERROR-EXPECTED-TYPE.
+		  ;; Instead, we return a sort of "type error allowed
+		  ;; type", trying to say "it would be OK if you
+		  ;; passed NIL as the host value" but not mentioning
+		  ;; that a matching string would be OK too.
+		  :expected-type 'null
+		  :format-control
+		  "The host in the namestring, ~S,~@
 		    does not match the explicit HOST argument, ~S."
-		   :format-arguments (list new-host host)))
-	  (let ((pn-host (or new-host host (pathname-host defaults))))
-	    (values (%make-maybe-logical-pathname
-		     pn-host device directory file type version)
-		    end))))))
+		  :format-arguments (list new-host host)))
+	 (let ((pn-host (or new-host host (pathname-host defaults))))
+	   (values (%make-maybe-logical-pathname
+		    pn-host device directory file type version)
+		   end)))))))
 
 ;;; If NAMESTR begins with a colon-terminated, defined, logical host,
 ;;; then return that host, otherwise return NIL.

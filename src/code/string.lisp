@@ -27,15 +27,34 @@
 		:format-control "~S cannot be coerced to a string."
 		:format-arguments (list x)))))
 
+;;; %CHECK-VECTOR-SEQUENCE-BOUNDS is used to verify that the START and
+;;; END arguments are valid bounding indices.
+;;;
+;;; FIXME: This causes a certain amount of double checking that could
+;;; be avoided, as if the string passes this (more stringent) test it
+;;; will automatically pass the tests in WITH-ARRAY-DATA.  Fixing this
+;;; would necessitate rearranging the transforms (maybe converting to
+;;; strings in the unasterisked versions and using this in the
+;;; transforms conditional on SAFETY>SPEED,SPACE).
+(defun %check-vector-sequence-bounds (vector start end)
+  (declare (type vector vector)
+	   (type index start)
+	   (type (or index null) end))
+  (let ((length (length vector)))
+    (if (<= 0 start (or end length) length)
+	(or end length)
+	(signal-bounding-indices-bad-error string start end))))
+
 (eval-when (:compile-toplevel)
 ;;; WITH-ONE-STRING is used to set up some string hacking things. The
 ;;; keywords are parsed, and the string is hacked into a
 ;;; simple-string.
 (sb!xc:defmacro with-one-string ((string start end) &body forms)
-  `(let ((,string (if (stringp ,string) ,string (string ,string))))
+  `(let* ((,string (if (stringp ,string) ,string (string ,string))))
      (with-array-data ((,string ,string)
-		       (,start ,start)
-		       (,end (or ,end (length (the vector ,string)))))
+	 	       (,start ,start)
+		       (,end
+		        (%check-vector-sequence-bounds ,string ,start ,end)))
        ,@forms)))
 ;;; WITH-STRING is like WITH-ONE-STRING, but doesn't parse keywords.
 (sb!xc:defmacro with-string (string &rest forms)
@@ -52,10 +71,12 @@
 	 (,string2 (if (stringp ,string2) ,string2 (string ,string2))))
      (with-array-data ((,string1 ,string1 :offset-var ,cum-offset-1)
 		       (,start1 ,start1)
-		       (,end1 (or ,end1 (length (the vector ,string1)))))
+		       (,end1 (%check-vector-sequence-bounds
+			       ,string1 ,start1 ,end1)))
        (with-array-data ((,string2 ,string2)
 			 (,start2 ,start2)
-			 (,end2 (or ,end2 (length (the vector ,string2)))))
+			 (,end2 (%check-vector-sequence-bounds
+				 ,string2 ,start2 ,end2)))
 	 ,@forms))))
 ) ; EVAL-WHEN
 
@@ -221,9 +242,6 @@
     (let ((slen1 (- (the fixnum end1) start1))
 	  (slen2 (- (the fixnum end2) start2)))
       (declare (fixnum slen1 slen2))
-      (if (or (minusp slen1) (minusp slen2))
-	  ;;prevent endless looping later.
-	  (error "Improper bounds for string comparison."))
       (if (= slen1 slen2)
 	  ;;return () immediately if lengths aren't equal.
 	  (string-not-equal-loop 1 t nil)))))
@@ -237,12 +255,7 @@
     (let ((slen1 (- end1 start1))
 	  (slen2 (- end2 start2)))
       (declare (fixnum slen1 slen2))
-      (if (or (minusp slen1) (minusp slen2))
-	  ;; Prevent endless looping later.
-	  (error "Improper bounds for string comparison."))
-      (cond ((or (minusp slen1) (or (minusp slen2)))
-	     (error "Improper substring for comparison."))
-	    ((= slen1 slen2)
+      (cond ((= slen1 slen2)
 	     (string-not-equal-loop 1 nil (- index1 offset1)))
 	    ((< slen1 slen2)
 	     (string-not-equal-loop 1 (- index1 offset1)))
@@ -274,9 +287,6 @@
        (let ((slen1 (- (the fixnum end1) start1))
 	     (slen2 (- (the fixnum end2) start2)))
 	 (declare (fixnum slen1 slen2))
-	 (if (or (minusp slen1) (minusp slen2))
-	     ;;prevent endless looping later.
-	     (error "Improper bounds for string comparison."))
 	 (do ((index1 start1 (1+ index1))
 	      (index2 start2 (1+ index2))
 	      (char1)

@@ -1522,14 +1522,19 @@ changes in sbcl-0.7.13 relative to sbcl-0.7.12:
     unprintable packages can now be defined.
   * fixed a bug in RESTART-BIND: The :TEST-FUNCTION option had been
     carelessly renamed to :TEST-FUN. (thanks to Robert E. Brown)
+  * fixed compiler failure related to checking types of functions.
+    (reported by Robert E. Brown)
+  * the compiler is now much more consistent in its error-checking
+    treatment of bounding index arguments to sequence functions: in
+    (SAFETY 3) code, errors will be signalled in almost all cases if
+    invalid sequence bounding indices are passed to functions defined
+    by ANSI to operate on sequences.
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** ARRAY-IN-BOUNDS-P now allows arbitrary integers as arguments,
        not just nonnegative fixnums;
     ** the logical bit-array operators such as BIT-AND now accept an
        explicit NIL for their "opt-arg" argument (to indicate a
        freshly-consed result bit-array);
-  * fixed compiler failure related to checking types of functions
-    (reported by Robert E. Brown);
 
 planned incompatible changes in 0.7.x:
   * (not done yet, but planned:) When the profiling interface settles

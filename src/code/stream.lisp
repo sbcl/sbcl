@@ -515,29 +515,23 @@
 	(stream-fresh-line stream))))
 
 (defun write-string (string &optional (stream *standard-output*)
-			    &key (start 0) (end nil))
-  (%write-string string stream start (or end (length string)))
+			    &key (start 0) end)
+  (declare (type string string))
+  ;; Note that even though you might expect, based on the behavior of
+  ;; things like AREF, that the correct upper bound here is
+  ;; (ARRAY-DIMENSION STRING 0), the ANSI glossary definitions for
+  ;; "bounding index" and "length" indicate that in this case (i.e.
+  ;; for the ANSI-specified functions WRITE-STRING [and WRITE-LINE]),
+  ;; (LENGTH STRING) is the required upper bound. A foolish
+  ;; consistency is the hobgoblin of lesser languages..
+  (%write-string string stream start (%check-vector-sequence-bounds
+				      string start end))
   string)
 
 (defun %write-string (string stream start end)
   (declare (type string string))
   (declare (type streamlike stream))
   (declare (type index start end))
-
-  ;; Note that even though you might expect, based on the behavior of
-  ;; things like AREF, that the correct upper bound here is
-  ;; (ARRAY-DIMENSION STRING 0), the ANSI glossary definitions for
-  ;; "bounding index" and "length" indicate that in this case (i.e.
-  ;; for the ANSI-specified functions WRITE-STRING and WRITE-LINE
-  ;; which are implemented in terms of this function), (LENGTH STRING)
-  ;; is the required upper bound. A foolish consistency is the
-  ;; hobgoblin of lesser languages..
-  (unless (<= 0 start end (length string))
-    (error "~@<bad bounding indices START=~W END=~W for ~2I~_~S~:>"
-	   start
-	   end
-	   string))
-
   (let ((stream (out-synonym-of stream)))
     (cond ((ansi-stream-p stream)
 	   (if (array-header-p string)
@@ -551,10 +545,13 @@
 	   (stream-write-string stream string start end)))))
 
 (defun write-line (string &optional (stream *standard-output*)
-			  &key (start 0) (end nil))
-  (let ((defaulted-stream (out-synonym-of stream))
-	(defaulted-end (or end (length string))))
-    (%write-string string defaulted-stream start defaulted-end)
+			  &key (start 0) end)
+  (declare (type string string))
+  ;; FIXME: Why is there this difference between the treatments of the
+  ;; STREAM argument in WRITE-STRING and WRITE-LINE?
+  (let ((defaulted-stream (out-synonym-of stream)))
+    (%write-string string defaulted-stream start (%check-vector-sequence-bounds
+						  string start end))
     (write-char #\newline defaulted-stream))
   string)
 
@@ -1137,22 +1134,18 @@
     (:element-type 'base-char)))
 
 (defun make-string-input-stream (string &optional
-					(start 0) (end (length string)))
+					(start 0) end)
   #!+sb-doc
   "Return an input stream which will supply the characters of STRING between
   START and END in order."
   (declare (type string string)
 	   (type index start)
 	   (type (or index null) end))
-
-  #!+high-security
-  (when (> end (length string))
-    (cerror "Continue with end changed from ~S to ~S"
-	    "Write-string: end (~S) is larger then the length of the string (~S)"
-	    end (1- (length string))))
-
-  (internal-make-string-input-stream (coerce string 'simple-string)
-				     start end))
+  
+  (internal-make-string-input-stream
+   (coerce string 'simple-string)
+   start
+   (%check-vector-sequence-bounds string start end)))
 
 ;;;; STRING-OUTPUT-STREAM stuff
 
@@ -1689,7 +1682,7 @@
 
 ;;;; READ-SEQUENCE
 
-(defun read-sequence (seq stream &key (start 0) (end nil))
+(defun read-sequence (seq stream &key (start 0) end)
   #!+sb-doc
   "Destructively modify SEQ by reading elements from STREAM.
   That part of SEQ bounded by START and END is destructively modified by

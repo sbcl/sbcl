@@ -227,17 +227,30 @@
 		      (declare (ignorable dacc))
 		      ,push-dacc))))))))))
 
+;;; FIXME: once the confusion over doing transforms with known-complex
+;;; arrays is over, we should also transform the calls to (AND (ARRAY
+;;; * (*)) (NOT (SIMPLE-ARRAY * (*)))) objects.
 (deftransform elt ((s i) ((simple-array * (*)) *) *)
   '(aref s i))
 
-(deftransform elt ((s i) (list *) *)
+(deftransform elt ((s i) (list *) * :policy (< safety 3))
   '(nth i s))
 
 (deftransform %setelt ((s i v) ((simple-array * (*)) * *) *)
   '(%aset s i v))
 
-(deftransform %setelt ((s i v) (list * *))
+(deftransform %setelt ((s i v) (list * *) * :policy (< safety 3))
   '(setf (car (nthcdr i s)) v))
+
+(deftransform %check-vector-sequence-bounds ((vector start end)
+					     (vector * *) *
+					     :node node)
+  (if (policy node (< safety speed))
+      '(or end (length vector))
+      '(let ((length (length vector)))
+	(if (<= 0 start (or end length) length)
+	    (or end length)
+	    (sb!impl::signal-bounding-indices-bad-error vector start end)))))
 
 (macrolet ((def (name)
              `(deftransform ,name ((e l &key (test #'eql)) * *
@@ -625,24 +638,24 @@
 
 ;;; Moved here from generic/vm-tran.lisp to satisfy clisp
 ;;;
-;;; FIXME: It would be good to implement SB!XC:DEFCONSTANT, and use
-;;; use that here, so that the compiler is born knowing this value.
 ;;; FIXME: Add a comment telling whether this holds for all vectors
 ;;; or only for vectors based on simple arrays (non-adjustable, etc.).
 (def!constant vector-data-bit-offset
   (* sb!vm:vector-data-offset sb!vm:n-word-bits))
 
-;;; FIXME: Shouldn't we be testing for legality of
-;;;   * START1, START2, END1, and END2 indices?
-;;;   * size of copied string relative to destination string?
-;;; (Either there should be tests conditional on SAFETY>=SPEED, or
-;;; the transform should be conditional on SPEED>SAFETY.)
-;;;
-;;; FIXME: Also, the transform should probably be dependent on
-;;; SPEED>SPACE.
 (deftransform replace ((string1 string2 &key (start1 0) (start2 0)
 				end1 end2)
-		       (simple-string simple-string &rest t))
+		       (simple-string simple-string &rest t)
+		       *
+		       ;; FIXME: consider replacing this policy test
+		       ;; with some tests for the STARTx and ENDx
+		       ;; indices being valid, conditional on high
+		       ;; SAFETY code.
+		       ;;
+		       ;; FIXME: It turns out that this transform is
+		       ;; critical for the performance of string
+		       ;; streams.  Make this more explicit.
+		       :policy (< (max safety space) 3))
   `(locally
      (declare (optimize (safety 0)))
      (bit-bash-copy string2
@@ -750,7 +763,11 @@
 		       (find nil)
 		       (position nil))
 		   (declare (type index index))
-		   (dolist (i sequence (values find position))
+		   (dolist (i sequence
+			    (if (and end (> end index))
+				(sb!impl::signal-bounding-indices-bad-error
+				 sequence start end)
+				(values find position)))
 		     (let ((key-i (funcall key i)))
 		       (when (and end (>= index end))
 			 (return (values find position)))
@@ -839,7 +856,8 @@
 	   (,n-end ,end-arg))
        (with-array-data ((,sequence ,n-sequence :offset-var ,offset)
 			 (,start ,start)
-			 (,end (or ,n-end (length ,n-sequence))))
+			 (,end (%check-vector-sequence-bounds
+				,n-sequence ,start ,n-end)))
          (block ,block
 	   (macrolet ((maybe-return ()
 			'(let ((,element (aref ,sequence ,index)))

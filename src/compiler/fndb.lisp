@@ -1337,6 +1337,16 @@
   function
   (flushable foldable))
 
+(defknown %check-vector-sequence-bounds (vector index sequence-end)
+  index
+  (unwind))
+;;; FIXME: including this information here is probably necessary to
+;;; get efficient compilation of the inline expansion of
+;;; %FIND-POSITION-IF, so it should maybe be in a more
+;;; compiler-friendly package (SB-INT?)
+(defknown sb!impl::signal-bounding-indices-bad-error (sequence index index)
+  nil) ; never returns
+  
 
 (defknown arg-count-error (t t t t t t) nil (unsafe))
 
