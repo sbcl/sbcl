@@ -777,8 +777,8 @@
 ;;; This returns a frame for the one existing in time immediately
 ;;; prior to the frame referenced by current-fp. This is current-fp's
 ;;; caller or the next frame down the control stack. If there is no
-;;; down frame, this returns nil for the bottom of the stack. Up-frame
-;;; is the up link for the resulting frame object, and it is nil when
+;;; down frame, this returns NIL for the bottom of the stack. UP-FRAME
+;;; is the up link for the resulting frame object, and it is null when
 ;;; we call this to get the top of the stack.
 ;;;
 ;;; The current frame contains the pointer to the temporally previous
@@ -831,7 +831,6 @@
 							escaped)
 				 (if up-frame (1+ (frame-number up-frame)) 0)
 				 escaped))))))
-
 #!+x86
 (defun compute-calling-frame (caller ra up-frame)
   (declare (type system-area-pointer caller ra))

@@ -390,7 +390,7 @@
 	  dest))
   (values))
 
-;;; If necessary, emit coercion code needed to deliver the Results to
+;;; If necessary, emit coercion code needed to deliver the RESULTS to
 ;;; the specified continuation. NODE and BLOCK provide context for
 ;;; emitting code. Although usually obtained from STANDARD-RESULT-TNs
 ;;; or CONTINUATION-RESULT-TNs, RESULTS my be a list of any type or
@@ -1143,10 +1143,10 @@
 ;;; stack. It returns the OLD-FP and RETURN-PC for the current
 ;;; function as multiple values.
 (defoptimizer (sb!kernel:%caller-frame-and-pc ir2-convert) (() node block)
-  (let ((env (physenv-info (node-physenv node))))
+  (let ((ir2-physenv (physenv-info (node-physenv node))))
     (move-continuation-result node block
-			      (list (ir2-physenv-old-fp env)
-				    (ir2-physenv-return-pc env))
+			      (list (ir2-physenv-old-fp ir2-physenv)
+				    (ir2-physenv-return-pc ir2-physenv))
 			      (node-cont node))))
 
 ;;;; multiple values

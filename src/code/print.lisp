@@ -463,6 +463,7 @@
 	 (output-symbol object stream)
 	 (output-list object stream)))
     (instance
+     (/show0 "in PRINT-OBJECT case")
      (print-object object stream))
     (function
      (unless (and (funcallable-instance-p object)
@@ -1045,6 +1046,7 @@
 ;;; use until CLOS is set up (at which time it will be replaced with
 ;;; the real generic function implementation)
 (defun print-object (instance stream)
+  (/show0 "in pre-CLOS PRINT-OBJECT placeholder")
   (default-structure-print instance stream *current-level*))
 
 ;;;; integer, ratio, and complex printing (i.e. everything but floats)
