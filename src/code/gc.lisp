@@ -49,17 +49,6 @@
   (- (* sb!vm::*read-only-space-free-pointer* sb!vm:n-word-bytes)
      sb!vm:read-only-space-start))
 
-(defun control-stack-usage ()
-  #!-stack-grows-downward-not-upward
-  (- (sb!sys:sap-int (sb!c::control-stack-pointer-sap))
-     sb!vm:control-stack-start)
-  #!+stack-grows-downward-not-upward
-  (- sb!vm:control-stack-end
-     (sb!sys:sap-int (sb!c::control-stack-pointer-sap))))
-
-(defun binding-stack-usage ()
-  (- (sb!sys:sap-int (sb!c::binding-stack-pointer-sap))
-     sb!vm:binding-stack-start))
 
 ;;;; ROOM
 
@@ -67,8 +56,8 @@
   (format t "Dynamic space usage is:   ~10:D bytes.~%" (dynamic-usage))
   (format t "Read-only space usage is: ~10:D bytes.~%" (read-only-space-usage))
   (format t "Static space usage is:    ~10:D bytes.~%" (static-space-usage))
-  (format t "Control stack usage is:   ~10:D bytes.~%" (control-stack-usage))
-  (format t "Binding stack usage is:   ~10:D bytes.~%" (binding-stack-usage))
+  (format t "Dunno Control stack usage~%")
+  (format t "Dunno Binding stack usage~%")
   (format t "Garbage collection is currently ~:[enabled~;DISABLED~].~%"
 	  *gc-inhibit*))
 

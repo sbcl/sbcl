@@ -262,10 +262,6 @@ More information about SBCL is available at <http://sbcl.sourceforge.net/>.\n\
 
     gc_initialize_pointers();
 
-#ifdef BINDING_STACK_POINTER
-    SetSymbolValue(BINDING_STACK_POINTER, BINDING_STACK_START);
-#endif
-
     interrupt_init();
 
     arch_install_interrupt_handlers();
@@ -287,7 +283,11 @@ More information about SBCL is available at <http://sbcl.sourceforge.net/>.\n\
     sigint_init();
 
     FSHOW((stderr, "/funcalling initial_function=0x%lx\n", initial_function));
-    funcall0(initial_function);
+    init_thread(initial_function);
+    fprintf(stderr,"started lisp thread\n");
+    while(pause()) 
+	fprintf(stderr,"parent thread caught a signal\n");
+
 
     /* initial_function() is not supposed to return. */
     lose("Lisp initial_function gave up control.");

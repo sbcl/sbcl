@@ -37,7 +37,7 @@
 #include "arch.h"
 #include "gc.h"
 #include "gc-internal.h"
-
+#include "thread.h"
 /* assembly language stub that executes trap_PendingInterrupt */
 void do_pending_interrupt(void);
 
@@ -3516,13 +3516,17 @@ verify_gc(void)
     int static_space_size =
 	(lispobj*)SymbolValue(STATIC_SPACE_FREE_POINTER)
 	- (lispobj*)STATIC_SPACE_START;
-    int binding_stack_size =
-	(lispobj*)SymbolValue(BINDING_STACK_POINTER)
-	- (lispobj*)BINDING_STACK_START;
-
+    struct thread *th;
+    for_each_thread(th) {
+	/* XXX this needs to be a per-process special and accessed 
+	 * appropriately for such */
+	int binding_stack_size =
+	    (lispobj*)SymbolValue(BINDING_STACK_POINTER)
+	    - (lispobj*)th->binding_stack_start;
+	verify_space(th->binding_stack_start, binding_stack_size);
+    }
     verify_space((lispobj*)READ_ONLY_SPACE_START, read_only_space_size);
     verify_space((lispobj*)STATIC_SPACE_START   , static_space_size);
-    verify_space((lispobj*)BINDING_STACK_START  , binding_stack_size);
 }
 
 static void
@@ -3708,8 +3712,14 @@ garbage_collect_generation(int generation, int raise)
 
     /* Scavenge the stack's conservative roots. */
     {
+	/* XXXX this really is not going to work as soon as we have >1
+	 * thread
+	 */
 	void **ptr;
-	for (ptr = (void **)CONTROL_STACK_END - 1;
+	for (ptr = ((void **)
+		    ((void *)all_threads->control_stack_start
+		     + THREAD_CONTROL_STACK_SIZE)
+		    -1);
 	     ptr > (void **)&raise;
 	     ptr--) {
 	    preserve_pointer(*ptr);
@@ -3740,10 +3750,16 @@ garbage_collect_generation(int generation, int raise)
 	}
     }
 
-    /* Scavenge the binding stack. */
-    scavenge((lispobj *) BINDING_STACK_START,
-	     (lispobj *)SymbolValue(BINDING_STACK_POINTER) -
-	     (lispobj *)BINDING_STACK_START);
+    /* Scavenge the binding stacks. */
+ {
+     struct thread *th;
+     /* XXX this would be better if it looked up the appropriate 
+      * per-thread value of BINDING_STACK_POINTER */
+     for(th=all_threads;th;th=th->next)
+	 scavenge((lispobj *) th->binding_stack_start,
+		  (lispobj *)SymbolValue(BINDING_STACK_POINTER) -
+		  (lispobj *)th->binding_stack_start);
+ }
 
     /* The original CMU CL code had scavenge-read-only-space code
      * controlled by the Lisp-level variable
@@ -4005,10 +4021,6 @@ collect_garbage(unsigned last_gen)
 
     update_x86_dynamic_space_free_pointer();
 
-    /* This is now done by Lisp SCRUB-CONTROL-STACK in Lisp SUB-GC, so
-     * we needn't do it here: */
-    /*  zero_stack();*/
-
     current_region_free_pointer = boxed_region.free_pointer;
     current_region_end_addr = boxed_region.end_addr;
 
@@ -4098,10 +4110,6 @@ gc_free_heap(void)
     unboxed_region.start_addr = page_address(0);
     unboxed_region.free_pointer = page_address(0);
     unboxed_region.end_addr = page_address(0);
-
-#if 0 /* Lisp PURIFY is currently running on the C stack so don't do this. */
-    zero_stack();
-#endif
 
     last_free_page = 0;
     SetSymbolValue(ALLOCATION_POINTER, (lispobj)((char *)heap_base));

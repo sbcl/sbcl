@@ -173,15 +173,6 @@ GNAME(call_into_lisp):
 	movl	%eax, GNAME(foreign_function_call_active)
 
 	movl	%esp,%ebx	# remember current stack
-	cmpl	$CONTROL_STACK_START,%esp
-	jbe	ChangeToLispStack
-	cmpl	$CONTROL_STACK_END,%esp
-	jbe	OnLispStack
-ChangeToLispStack:
-	/* Setup the *alien-stack* pointer */
-	movl	%esp,ALIEN_STACK + SYMBOL_VALUE_OFFSET
-	movl	$CONTROL_STACK_END,%esp		# new stack
-OnLispStack:
 	pushl	%ebx		# Save entry stack on (maybe) new stack.
 
 	/* Establish Lisp args. */

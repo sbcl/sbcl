@@ -41,21 +41,8 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#include <asm/ldt.h>
-#include <linux/unistd.h>
-
-#include <unistd.h>
-#include <sys/mman.h>
-
-_syscall3(int, modify_ldt, int, func, void *, ptr, unsigned long, bytecount );
-
-static struct modify_ldt_ldt_s ldt_entry = {
-    1, 0, 0, /* index, address, length filled in later */
-    1, MODIFY_LDT_CONTENTS_DATA, 0, 0, 0, 1
-}; 
-u32 local_ldt_copy[LDT_ENTRIES*LDT_ENTRY_SIZE/sizeof(u32)];
-
 #include "validate.h"
+#include "thread.h"
 size_t os_vm_page_size;
 
 #include "gc.h"
@@ -66,8 +53,6 @@ int early_kernel = 0;
 #endif
 void os_init(void)
 {
-    lispobj *tls_vector=
-	mmap(0,4096,PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,-1,0);
     /* Early versions of Linux don't support the mmap(..) functionality
      * that we need. */
     {
@@ -102,52 +87,8 @@ void os_init(void)
        something?) Find out what this was meant to do, and reenable it
        or delete it if possible. -- CSR, 2002-07-15 */
     /* SET_FPU_CONTROL_WORD(0x1372|4|8|16|32);  no interrupts */
-
-    printf("vector is at 0x%x\n",tls_vector);
- { 
-     /* find index of get next free ldt entry */
-     int n=__modify_ldt(0,local_ldt_copy,sizeof local_ldt_copy)
-	 /LDT_ENTRY_SIZE;
-	   
-     ldt_entry.entry_number=n;
-     ldt_entry.base_addr=(unsigned long) tls_vector;
-     ldt_entry.limit=1000;
-     ldt_entry.limit_in_pages=1;
-     tls_vector[0]=UNBOUND_MARKER_WIDETAG;
-     tls_vector[1]=UNBOUND_MARKER_WIDETAG;
-     tls_vector[2]=2<<2;
-     if (__modify_ldt (1, &ldt_entry, sizeof (ldt_entry)) != 0)
-	 lose("modify_ldt call failed: something magical is not happening");
-     __asm__ __volatile__ ("movw %w0, %%gs" : : "q" 
-			   ((n << 3) /* selector number */
-			    + (1 << 2) /* TI set = LDT */
-			    + 3)); /* privilege level */
-     printf("ldt entry is 0x%x 0x%x\n",
-	    (ldt_entry.base_addr & 0xff000000) |
-	    ((ldt_entry.base_addr & 0x00ff0000) >> 16) |
-	    (ldt_entry.limit & 0xf0000) |
-	    ((ldt_entry.read_exec_only ^ 1) << 9) |
-	    (ldt_entry.contents << 10) |
-	    ((ldt_entry.seg_not_present ^ 1) << 15) |
-	    (ldt_entry.seg_32bit << 22) |
-	    (ldt_entry.limit_in_pages << 23) |
-	    0x7000,
-	    
-	    ((ldt_entry.base_addr & 0x0000ffff) << 16) |
-	    (ldt_entry.limit & 0x0ffff));
-
-     
-     
- }
 #endif
 }
-
-void debug_get_ldt()
-{ 
-    int n=__modify_ldt (0, local_ldt_copy, sizeof local_ldt_copy);
-    printf("%d bytes in ldt: print/x local_ldt_copy\n", n);
-}
-
 
 /* In Debian CMU CL ca. 2.4.9, it was possible to get an infinite
  * cascade of errors from do_mmap(..). This variable is a counter to
@@ -292,8 +233,11 @@ is_valid_lisp_addr(os_vm_address_t addr)
 	in_range_p(addr, READ_ONLY_SPACE_START, READ_ONLY_SPACE_SIZE) ||
 	in_range_p(addr, STATIC_SPACE_START   , STATIC_SPACE_SIZE) ||
 	in_range_p(addr, DYNAMIC_SPACE_START  , DYNAMIC_SPACE_SIZE) ||
-	in_range_p(addr, CONTROL_STACK_START  , CONTROL_STACK_SIZE) ||
-	in_range_p(addr, BINDING_STACK_START  , BINDING_STACK_SIZE);
+	/* XXX >1 thread? */
+	in_range_p(addr, all_threads->control_stack_start,
+		   THREAD_CONTROL_STACK_SIZE) ||
+	in_range_p(addr, all_threads->binding_stack_start,
+		   BINDING_STACK_SIZE);
 }
 
 /*

@@ -521,56 +521,9 @@ gc_trigger_hit(int signal, siginfo_t *info, os_context_t *context)
 
 boolean handle_control_stack_guard_triggered(os_context_t *context,void *addr)
 {
-    /* note the os_context hackery here.  When the signal handler returns, 
-     * it won't go back to what it was doing ... */
-    if(addr>=(void *)CONTROL_STACK_GUARD_PAGE && 
-       addr<(void *)(CONTROL_STACK_GUARD_PAGE+os_vm_page_size)) {
-	void *fun;
-	void *code;
-	
-	/* we hit the end of the control stack.  disable protection
-	 * temporarily so the error handler has some headroom */
-	protect_control_stack_guard_page(0);
-	
-	fun = (void *)
-	    native_pointer((lispobj) SymbolFunction(CONTROL_STACK_EXHAUSTED_ERROR));
-	code = &(((struct simple_fun *) fun)->code);
-
-	/* Build a stack frame showing `interrupted' so that the
-	 * user's backtrace makes (as much) sense (as usual) */
-	build_fake_control_stack_frames(context);
-	/* signal handler will "return" to this error-causing function */
-	*os_context_pc_addr(context) = code;
-#ifdef LISP_FEATURE_X86
-	*os_context_register_addr(context,reg_ECX) = 0; 
-#else
-	/* this much of the calling convention is common to all
-	   non-x86 ports */
-	*os_context_register_addr(context,reg_NARGS) = 0; 
-	*os_context_register_addr(context,reg_LIP) = code;
-	*os_context_register_addr(context,reg_CFP) = 
-	    current_control_frame_pointer;
-#endif
-#ifdef ARCH_HAS_NPC_REGISTER
-	*os_context_npc_addr(context) =
-	    4 + *os_context_pc_addr(context);
-#endif
-#ifdef LISP_FEATURE_SPARC
-	/* Bletch.  This is a feature of the SPARC calling convention,
-	   which sadly I'm not going to go into in large detail here,
-	   as I don't know it well enough.  Suffice to say that if the
-	   line 
-
-	   (INST MOVE CODE-TN FUNCTION) 
-
-	   in compiler/sparc/call.lisp is changed, then this bit can
-	   probably go away.  -- CSR, 2002-07-24 */
-	*os_context_register_addr(context,reg_CODE) = 
-	    fun + FUN_POINTER_LOWTAG;
-#endif
-	return 1;
-    }
-    else return 0;
+    /* not thinking too hard about this just now */
+    /* FIXME so think! */
+    return 0;
 }
 
 #ifndef LISP_FEATURE_X86
@@ -698,14 +651,7 @@ undoably_install_low_level_interrupt_handler (int signal,
     /* Signal handlers are run on the control stack, so if it is exhausted
      * we had better use an alternate stack for whatever signal tells us
      * we've exhausted it */
-    if(signal==SIG_MEMORY_FAULT) {
-	stack_t sigstack;
-	sigstack.ss_sp=(void *) ALTERNATE_SIGNAL_STACK_START;
-	sigstack.ss_flags=0;
-	sigstack.ss_size = SIGSTKSZ;
-	sigaltstack(&sigstack,0);
-	sa.sa_flags|=SA_ONSTACK;
-    }
+    /* XXX this bit got untimely ripped out in pursuit of threads */
 #endif
     
     /* In the case of interrupt handlers which are modified more than

@@ -167,79 +167,7 @@
 ;;; a chance of clearing more of it: callers are currently (2002.07.18)
 ;;; REPL and SUB-GC
 
-(defun scrub-control-stack ()
-  (declare (optimize (speed 3) (safety 0))
-	   (values (unsigned-byte 20))) ; FIXME: DECLARE VALUES?
-
-  #!-stack-grows-downward-not-upward
-  (let* ((csp (sap-int (sb!c::control-stack-pointer-sap)))
-	 (initial-offset (logand csp (1- bytes-per-scrub-unit)))
-	 (end-of-stack
-	  (- sb!vm:control-stack-end sb!c:*backend-page-size*)))
-    (labels
-	((scrub (ptr offset count)
-	   (declare (type system-area-pointer ptr)
-		    (type (unsigned-byte 16) offset)
-		    (type (unsigned-byte 20) count)
-		    (values (unsigned-byte 20)))
-	   (cond ((>= (sap-int ptr) end-of-stack) 0)
-		 ((= offset bytes-per-scrub-unit)
-		  (look (sap+ ptr bytes-per-scrub-unit) 0 count))
-		 (t
-		  (setf (sap-ref-32 ptr offset) 0)
-		  (scrub ptr (+ offset sb!vm:n-word-bytes) count))))
-	 (look (ptr offset count)
-	   (declare (type system-area-pointer ptr)
-		    (type (unsigned-byte 16) offset)
-		    (type (unsigned-byte 20) count)
-		    (values (unsigned-byte 20)))
-	   (cond ((>= (sap-int ptr) end-of-stack) 0)
-		 ((= offset bytes-per-scrub-unit)
-		  count)
-		 ((zerop (sap-ref-32 ptr offset))
-		  (look ptr (+ offset sb!vm:n-word-bytes) count))
-		 (t
-		  (scrub ptr offset (+ count sb!vm:n-word-bytes))))))
-      (declare (type (unsigned-byte 32) csp))
-      (scrub (int-sap (- csp initial-offset))
-	     (* (floor initial-offset sb!vm:n-word-bytes) sb!vm:n-word-bytes)
-	     0)))
-
-  #!+stack-grows-downward-not-upward
-  (let* ((csp (sap-int (sb!c::control-stack-pointer-sap)))
-	 (end-of-stack (+ sb!vm:control-stack-start sb!c:*backend-page-size*))
-	 (initial-offset (logand csp (1- bytes-per-scrub-unit))))
-    (labels
-	((scrub (ptr offset count)
-	   (declare (type system-area-pointer ptr)
-		    (type (unsigned-byte 16) offset)
-		    (type (unsigned-byte 20) count)
-		    (values (unsigned-byte 20)))
-	   (let ((loc (int-sap (- (sap-int ptr) (+ offset sb!vm:n-word-bytes)))))
-	     (cond ((< (sap-int loc) end-of-stack) 0)
-		   ((= offset bytes-per-scrub-unit)
-		    (look (int-sap (- (sap-int ptr) bytes-per-scrub-unit))
-			  0 count))
-		   (t ;; need to fix bug in %SET-STACK-REF
-		    (setf (sap-ref-32 loc 0) 0)
-		    (scrub ptr (+ offset sb!vm:n-word-bytes) count)))))
-	 (look (ptr offset count)
-	   (declare (type system-area-pointer ptr)
-		    (type (unsigned-byte 16) offset)
-		    (type (unsigned-byte 20) count)
-		    (values (unsigned-byte 20)))
-	   (let ((loc (int-sap (- (sap-int ptr) offset))))
-	     (cond ((< (sap-int loc) end-of-stack) 0)
-		   ((= offset bytes-per-scrub-unit)
-		    count)
-		   ((zerop (sb!kernel::get-lisp-obj-address (stack-ref loc 0)))
-		    (look ptr (+ offset sb!vm:n-word-bytes) count))
-		   (t
-		    (scrub ptr offset (+ count sb!vm:n-word-bytes)))))))
-      (declare (type (unsigned-byte 32) csp))
-      (scrub (int-sap (+ csp initial-offset))
-	     (* (floor initial-offset sb!vm:n-word-bytes) sb!vm:n-word-bytes)
-	     0))))
+(defun scrub-control-stack ()  )
 
 ;;;; the default toplevel function
 

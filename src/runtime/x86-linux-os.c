@@ -34,10 +34,54 @@
 #include <sys/time.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <asm/ldt.h>
+#include <linux/unistd.h>
+#include <sys/mman.h>
+#include "thread.h"		/* dynamic_values_bytes */
+
+_syscall3(int, modify_ldt, int, func, void *, ptr, unsigned long, bytecount );
 
 #include "validate.h"
 size_t os_vm_page_size;
 
+u32 local_ldt_copy[LDT_ENTRIES*LDT_ENTRY_SIZE/sizeof(u32)];
+
+/* XXX this could be conditionally compiled based on some
+ * "debug-friendly" flag.  But it doesn't really make stuff slowed,
+ * just the runtime gets fractionally larger */
+
+void debug_get_ldt()
+{ 
+    int n=__modify_ldt (0, local_ldt_copy, sizeof local_ldt_copy);
+    printf("%d bytes in ldt: print/x local_ldt_copy\n", n);
+}
+
+int os_set_tls_pointer(struct thread *thread) {
+    /* this must be called from a function that has an exclusive lock
+     * on all_threads
+     */
+    struct modify_ldt_ldt_s ldt_entry = {
+	1, 0, 0, /* index, address, length filled in later */
+	1, MODIFY_LDT_CONTENTS_DATA, 0, 0, 0, 1
+    }; 
+    /* find index of get next free ldt entry */
+    int n=__modify_ldt(0,local_ldt_copy,sizeof local_ldt_copy)
+	/LDT_ENTRY_SIZE;
+
+    ldt_entry.entry_number=n;
+    ldt_entry.base_addr=(unsigned long) (thread->dynamic_values_start);
+    ldt_entry.limit=dynamic_values_bytes;
+    ldt_entry.limit_in_pages=0;
+    if (__modify_ldt (1, &ldt_entry, sizeof (ldt_entry)) != 0) 
+	/* modify_ldt call failed: something magical is not happening */
+	return -1;
+    __asm__ __volatile__ ("movw %w0, %%gs" : : "q" 
+			  ((n << 3) /* selector number */
+			   + (1 << 2) /* TI set = LDT */
+			   + 3)); /* privilege level */
+    return n;
+}
+    
 
 /* KLUDGE: As of kernel 2.2.14 on Red Hat 6.2, there's code in the
  * <sys/ucontext.h> file to define symbolic names for offsets into

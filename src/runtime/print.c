@@ -411,7 +411,7 @@ static void print_slots(char **slots, int count, lispobj *ptr)
  * on the values in sbcl.h (or perhaps be generated automatically
  * by GENESIS as part of sbcl.h). */
 static char *symbol_slots[] = {"value: ", "unused: ",
-    "plist: ", "name: ", "package: ", NULL};
+    "plist: ", "name: ", "package: ", "tls-index: " , NULL};
 static char *ratio_slots[] = {"numer: ", "denom: ", NULL};
 static char *complex_slots[] = {"real: ", "imag: ", NULL};
 static char *code_slots[] = {"words: ", "entry: ", "debug: ", NULL};

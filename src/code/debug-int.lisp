@@ -527,15 +527,19 @@
 #!-sb-fluid (declaim (inline control-stack-pointer-valid-p))
 (defun control-stack-pointer-valid-p (x)
   (declare (type system-area-pointer x))
-  #!-stack-grows-downward-not-upward
-  (and (sap< x (current-sp))
-       (sap<= (int-sap control-stack-start)
-	      x)
-       (zerop (logand (sap-int x) #b11)))
-  #!+stack-grows-downward-not-upward
-  (and (sap>= x (current-sp))
-       (sap> (int-sap control-stack-end) x)
-       (zerop (logand (sap-int x) #b11))))
+  (let* ((control-stack-start (logand (sap-int (current-sp))
+				      ;; XXX THREAD_CONTROL_STACK_SIZE
+				      (lognot (1- (* 2 1024 1024)))))
+	 (control-stack-end (+ control-stack-start (* 2 1024 1024))))
+    #!-stack-grows-downward-not-upward
+    (and (sap< x (current-sp))
+	 (sap<= (int-sap control-stack-start)
+		x)
+	 (zerop (logand (sap-int x) #b11)))
+    #!+stack-grows-downward-not-upward
+    (and (sap>= x (current-sp))
+	 (sap> (int-sap control-stack-end) x)
+	 (zerop (logand (sap-int x) #b11)))))
 
 #!+x86
 (sb!alien:define-alien-routine component-ptr-from-pc (system-area-pointer)

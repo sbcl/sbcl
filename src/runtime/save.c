@@ -24,6 +24,7 @@
 #include "lispregs.h"
 #include "validate.h"
 #include "gc-internal.h"
+#include "thread.h"
 
 static long
 write_bytes(FILE *file, char *addr, long bytes)
@@ -80,6 +81,7 @@ boolean
 save(char *filename, lispobj init_function)
 {
     FILE *file;
+    struct thread *th;
 
     /* Open the output file. We don't actually need the file yet, but
      * the fopen() might fail for some reason, and we want to detect
@@ -96,7 +98,8 @@ save(char *filename, lispobj init_function)
      * being SAVE-LISP-AND-DIE instead of SAVE-LISP-AND-GO-ON). */
     printf("[undoing binding stack and other enclosing state... ");
     fflush(stdout);
-    unbind_to_here((lispobj *)BINDING_STACK_START);
+    for_each_thread(th)		/* XXX really? */
+	unbind_to_here((lispobj *)th->binding_stack_start);
     SetSymbolValue(CURRENT_CATCH_BLOCK, 0);
     SetSymbolValue(CURRENT_UNWIND_PROTECT_BLOCK, 0);
     printf("done]\n");

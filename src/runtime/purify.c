@@ -28,6 +28,7 @@
 #include "interr.h"
 #include "gc.h"
 #include "gc-internal.h"
+#include "thread.h"
 
 #define PRINTNOISE
 
@@ -1325,8 +1326,10 @@ purify(lispobj static_roots, lispobj read_only_roots)
 #endif
 
 #ifdef LISP_FEATURE_GENCGC
-    gc_assert((lispobj *)CONTROL_STACK_END > ((&read_only_roots)+1));
-    setup_i386_stack_scav(((&static_roots)-2), (lispobj *)CONTROL_STACK_END);
+    setup_i386_stack_scav(((&static_roots)-2),
+			  ((void *)all_threads->control_stack_start)
+			  +THREAD_CONTROL_STACK_SIZE);
+    
 #endif
 
     pscav(&static_roots, 1, 0);
@@ -1363,9 +1366,9 @@ purify(lispobj static_roots, lispobj read_only_roots)
 	  (lispobj *)current_binding_stack_pointer - (lispobj *)BINDING_STACK_START,
 	  0);
 #else
-    pscav( (lispobj *)BINDING_STACK_START,
+    pscav( (lispobj *)all_threads->binding_stack_start,
 	  (lispobj *)SymbolValue(BINDING_STACK_POINTER) -
-	  (lispobj *)BINDING_STACK_START,
+	  (lispobj *)all_threads->binding_stack_start,
 	  0);
 #endif
 

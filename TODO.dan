@@ -1,5 +1,3 @@
-1) fill tlv with unbound markers
-
 2) grow tlv when full
 
 3) implement bind vop
@@ -8,11 +6,38 @@
 
 5) implement set-symbol-value
 
-6) figure out all the places using fast variants of symbol values
+6) figure out all the places using set directly, fast variants of
+   symbol-value, etc, and how to fix them
 
-7) work out what to do with static symbols, some of which
- may have bindings that are expected to be visible across thread switches
- (e.g. without-preemption)
+7) some static symbols need attention
 
-8) reintroduce per-thread stacks and stuff from the last time we did
-   this
+    ;; these are per-thread indexes into binding stack, I think
+    *current-catch-block*
+    *current-unwind-protect-block*
+    *binding-stack-pointer*
+
+    ;; interrupt handling.  these all need attention
+    *pseudo-atomic-atomic*
+    *pseudo-atomic-interrupted*
+    sb!unix::*interrupt-pending*
+    *free-interrupt-context-index*
+    sb!unix::*interrupts-enabled*
+
+    ;; either we have to lock around this, or provide each thread its
+    ;; own region
+    *allocation-pointer*
+
+8) after doing 7, fix up the things that are expected to happen
+   per-thread (e.g. binding stack scavenging)
+
+9) when creating a new thread, initialise dynamic bindings from
+   current thread, not from initial thread
+
+10) locking
+
+11) THREAD_CONTROL_STACK_SIZE value is hardcoded in debug-int.lisp
+
+12) fix ROOM
+
+13) fix other runtime stuff that has been temporarily ripped out
+ - control stack scrubbing and bounds checking

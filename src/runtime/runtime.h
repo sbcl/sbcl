@@ -15,7 +15,7 @@
 #ifndef _SBCL_RUNTIME_H_
 #define _SBCL_RUNTIME_H_
 
-#define QSHOW 0 /* Enable low-level debugging output? */
+#define QSHOW 1 /* Enable low-level debugging output? */
 #if QSHOW
 #define FSHOW(args) fprintf args
 #define SHOW(string) FSHOW((stderr, "/%s\n", string))

@@ -144,11 +144,6 @@
   (def!constant dynamic-space-start   #x09000000)
   (def!constant dynamic-space-end     #x29000000)
 
-  (def!constant control-stack-start   #x50000000)
-  (def!constant control-stack-end     #x57fff000)
-
-  (def!constant binding-stack-start   #x60000000)
-  (def!constant binding-stack-end     #x67fff000)
   (def!constant alternate-signal-stack-start #x58000000))
 
 #!+bsd
@@ -162,15 +157,6 @@
     #!+openbsd #x28000000)
   (def!constant static-space-end      #x37fff000)
 
-  (def!constant binding-stack-start   #x38000000)
-  (def!constant binding-stack-end     #x3ffff000)
-
-  (def!constant control-stack-start
-    #!+freebsd #x40000000
-    #!+openbsd #x48000000)
-  (def!constant control-stack-end
-    #!+freebsd #x43fff000
-    #!+openbsd #x4bfff000)
   (def!constant dynamic-space-start
     #!+freebsd                             #x48000000
     #!+openbsd                             #x50000000)

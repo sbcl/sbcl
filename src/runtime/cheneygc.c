@@ -27,6 +27,7 @@
 #include "validate.h"
 #include "lispregs.h"
 #include "interr.h"
+#include "thread.h"
 
 /* So you need to debug? */
 #if 0
@@ -117,6 +118,7 @@ collect_garbage(unsigned ignore)
     lispobj *current_static_space_free_pointer;
     unsigned long static_space_size; 
     unsigned long control_stack_size, binding_stack_size; 
+    struct thread *th;
     sigset_t tmp, old;
 
 #ifdef PRINTNOISE
@@ -171,6 +173,7 @@ collect_garbage(unsigned ignore)
 	     sizeof(interrupt_handlers) / sizeof(lispobj));
 	
     /* _size quantities are in units of sizeof(lispobj) - i.e. 4 */
+    
     control_stack_size = 
 	current_control_stack_pointer-
 	(lispobj *)CONTROL_STACK_START;
@@ -185,6 +188,7 @@ collect_garbage(unsigned ignore)
     binding_stack_size = 
 	current_binding_stack_pointer - 
 	(lispobj *)BINDING_STACK_START;
+
 #ifdef PRINTNOISE
     printf("Scavenging the binding stack %x - %x (%d words) ...\n",
 	   BINDING_STACK_START,current_binding_stack_pointer,
