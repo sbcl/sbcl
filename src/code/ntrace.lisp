@@ -204,9 +204,10 @@
   (dolist (ele forms)
     (fresh-line)
     (print-trace-indentation)
-    (format t "~@<~S ~_= ~S~:>" (car ele) (funcall (cdr ele) frame))))
+    (format t "~@<~S ~_= ~S~:>" (car ele) (funcall (cdr ele) frame))
+    (terpri)))
 
-;;; Test a BREAK option, and break if true.
+;;; Test a BREAK option, and if true, break.
 (defun trace-maybe-break (info break where frame)
   (when (and break (funcall (cdr break) frame))
     (sb-di:flush-frames-above frame)
