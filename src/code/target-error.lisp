@@ -87,7 +87,7 @@
 (defun find-restart-or-control-error (identifier &optional condition)
   (or (find-restart identifier condition)
       (error 'simple-control-error
-	     :format-control "No restart ~S is active ~{for ~S~}."
+	     :format-control "No restart ~S is active~@[ for ~S~]."
 	     :format-arguments (list identifier condition))))
 
 (defun invoke-restart (restart &rest values)

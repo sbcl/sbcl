@@ -106,3 +106,11 @@
 ;;; indeed, only declarations)
 (assert 
  (null (handler-case (error "foo") (error () (declare (optimize speed))))))
+
+(handler-case
+    (handler-bind ((warning #'muffle-warning))
+      (signal 'warning))
+  ;; if it's a control error, it had better be printable
+  (control-error (c) (format nil "~A" c))
+  ;; there had better be an error
+  (:no-error (&rest args) (error "No error: ~S" args)))

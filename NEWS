@@ -2479,6 +2479,9 @@ changes in sbcl-0.8.11 relative to sbcl-0.8.10:
   * fixed bug 327: system subclasses of STRUCTURE-OBJECT or CONDITION
     have CLOS classes; this appears also to have fixed reported
     instability in stack exhaustion detection.
+  * fixed bug: the CONTROL-ERROR from ABORT, CONTINUE and
+    MUFFLE-WARNING when no associated restart is present is now
+    printable.
   * optimization: rearranged the expansion of various defining macros
     so that each expands into only one top-level form in a
     :LOAD-TOPLEVEL context; this appears to decrease fasl sizes by
