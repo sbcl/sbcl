@@ -18,5 +18,5 @@ find_gnumake() {
     exit 1
   fi
   export GNUMAKE
-  echo "//GNUMAKE=\"$GNUMAKE\""
+  #echo "//GNUMAKE=\"$GNUMAKE\""
 }
