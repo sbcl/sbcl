@@ -1673,7 +1673,7 @@ changes in sbcl-0.8.0 relative to sbcl-0.7.14
     TYPEP the latter but not the former.
   * compiler issues a full WARNING on calling of an undefined function
     with a name from the CL package.
-  * MAP-INTO for a vector destination is open coded. (reported by
+  * MAP-INTO for a vector destination is open coded.  (reported by
     Brian Downing on c.l.l)
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** COPY-ALIST now signals an error if its argument is a dotted
@@ -1700,6 +1700,7 @@ changes in sbcl-0.8.0 relative to sbcl-0.7.14
        in question is unbound;
     ** optimized MAKE-INSTANCE functions no longer cause internal
        assertion failures in the presence of duplicate initargs;
+    ** SLOT-MAKUNBOUND returns the instance acted upon, not NIL;
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles

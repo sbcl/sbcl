@@ -689,11 +689,17 @@
 		  `(aref (the ,',type ,a) ,@i))
 		(define-source-transform ,setter (a &rest i)
 		  `(%aset (the ,',type ,a) ,@i)))))
-  (define-frob svref %svset simple-vector)
-  (define-frob schar %scharset simple-string)
-  (define-frob char %charset string)
   (define-frob sbit %sbitset (simple-array bit))
   (define-frob bit %bitset (array bit)))
+(macrolet ((define-frob (reffer setter type)
+	     `(progn
+		(define-source-transform ,reffer (a i)
+		  `(aref (the ,',type ,a) ,i))
+	        (define-source-transform ,setter (a i v)
+		  `(%aset (the ,',type ,a) ,i ,v)))))
+  (define-frob svref %svset simple-vector)
+  (define-frob schar %scharset simple-string)
+  (define-frob char %charset string))
 
 (macrolet (;; This is a handy macro for computing the row-major index
 	   ;; given a set of indices. We wrap each index with a call
