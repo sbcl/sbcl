@@ -140,12 +140,13 @@
      (setf old-value t1))))
 
 (defmacro with-mutex ((mutex &key value (wait-p t))  &body body)
-  (let ((block (gensym "NIL")))
-    `(unwind-protect
-      (block ,block
-	(unless (get-mutex ,mutex ,value ,wait-p) (return-from ,block nil))
-	,@body)
-      (release-mutex ,mutex))))
+  (let ((block (gensym "NIL"))
+	(got (gensym "GOT")))
+    `(let ((,got (get-mutex ,mutex ,value ,wait-p)))
+      (when ,got
+	(unwind-protect
+	     (progn ,@body)
+	  (release-mutex ,mutex))))))
 
 
 ;;;; condition variables
