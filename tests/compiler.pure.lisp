@@ -1728,3 +1728,14 @@
 		  (type number p2))
 	 (eql (the (complex double-float) p1) p2)))
      c0 #c(12 612/979)))))
+
+;;; reported by Lutz Euler: we shouldn't signal a compiler note for
+;;; simple-bit-vector functions.
+(handler-bind ((sb-ext:compiler-note #'error))
+  (compile nil '(lambda (x)
+		 (declare (type simple-bit-vector x))
+		 (count 1 x))))
+(handler-bind ((sb-ext:compiler-note #'error))
+  (compile nil '(lambda (x y)
+		 (declare (type simple-bit-vector x y))
+		 (equal x y))))

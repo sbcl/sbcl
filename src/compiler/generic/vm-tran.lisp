@@ -318,7 +318,8 @@
 			      (floor (1- length) sb!vm:n-word-bits))))
 		   ((= i end-1)
 		    (let* ((extra (1+ (mod (1- length) sb!vm:n-word-bits)))
-			   (mask (1- (ash 1 extra)))
+			   (mask (ash #.(1- (ash 1 sb!vm:n-word-bits))
+				      (- extra sb!vm:n-word-bits)))
 			   (numx
 			    (logand
 			     (ash mask
@@ -357,7 +358,8 @@
                                  sb!vm:n-word-bits))))
             ((= index end-1)
              (let* ((extra (1+ (mod (1- length) sb!vm:n-word-bits)))
-		    (mask (1- (ash 1 extra)))
+		    (mask (ash #.(1- (ash 1 sb!vm:n-word-bits))
+			       (- extra sb!vm:n-word-bits)))
 		    (bits (logand (ash mask
 				       ,(ecase sb!c:*backend-byte-order*
 					       (:little-endian 0)

@@ -1261,8 +1261,6 @@
   ;; (no -C variant as x86 MUL instruction doesn't take an immediate)
   (def * nil))
 
-;;; (no -C variant as x86 MUL instruction doesn't take an immediate)
-
 (define-vop (fast-ash-left-mod64-c/unsigned=>unsigned
              fast-ash-c/unsigned=>unsigned)
   (:translate ash-left-mod64))

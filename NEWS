@@ -10,6 +10,9 @@ changes in sbcl-0.8.21 (0.9alpha.1?) relative to sbcl-0.8.20:
      are now more amenable to inspection by INSPECT.
   * workaround for bug 354: XEPs no longer appear in backtraces unless
      explicitly requested.
+  * fixed bug: COUNT and EQUAL no longer issue compiler efficiency
+    notes when operating on objects known to be SIMPLE-BIT-VECTORs.
+    (reported by Lutz Euler)
 
 changes in sbcl-0.8.20 (0.9alpha.0?) relative to sbcl-0.8.19:
   * fixed inspection of specialized arrays. (thanks to Simon Alexander)
