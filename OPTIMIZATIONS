@@ -151,3 +151,8 @@ tests lowtag.
 FAST-+/FIXNUM and similar should accept unboxed arguments in interests
 of representation selection. Problem: inter-TN dependencies.
 --------------------------------------------------------------------------------
+#14
+The derived type of (/ (THE (DOUBLE-FLOAT (0D0)) X) (THE (DOUBLE-FLOAT
+1D0) Y)) is (DOUBLE-FLOAT 0.0d0). While it might be reasonable, it is
+better to derive (DOUBLE-FLOAT (-0.0d0)).
+--------------------------------------------------------------------------------

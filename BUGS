@@ -490,12 +490,25 @@ WORKAROUND:
   it took more than two minutes (but less than five) for me.
 
 145:
+  a.
   ANSI allows types `(COMPLEX ,FOO) to use very hairy values for
   FOO, e.g. (COMPLEX (AND REAL (SATISFIES ODDP))). The old CMU CL
   COMPLEX implementation didn't deal with this, and hasn't been
   upgraded to do so. (This doesn't seem to be a high priority
   conformance problem, since seems hard to construct useful code
   where it matters.)
+
+  b.
+  * (defun foo (x)
+      (declare (type (double-float -0d0) x))
+      (declare (optimize speed))
+      (+ x (sqrt (log (random 1d0)))))
+  debugger invoked on condition of type SIMPLE-ERROR:
+    bad thing to be a type specifier: ((COMPLEX
+                                        (DOUBLE-FLOAT 0.0d0
+                                                      #.SB-EXT:DOUBLE-FLOAT-POSITIVE-INFINITY))
+                                       #C(0.0d0 #.SB-EXT:DOUBLE-FLOAT-POSITIVE-INFINITY)
+                                       #C(0.0d0 #.SB-EXT:DOUBLE-FLOAT-POSITIVE-INFINITY))
 
 146:
   Floating point errors are reported poorly. E.g. on x86 OpenBSD
@@ -1088,6 +1101,10 @@ WORKAROUND:
     (fee 1) => type error
 
   (taken from CLOCC)
+
+277:
+  IGNORE/IGNORABLE declarations should be acceptable for symbol
+  macros.
 
 
 DEFUNCT CATEGORIES OF BUGS
