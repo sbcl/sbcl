@@ -453,7 +453,7 @@
 (defun reset-constructors ()
   (multiple-value-bind (nclass ncons)
       (map-constructors #'install-lazy-constructor-installer )
-    (format t "~&~D classes, ~D constructors." nclass ncons)))
+    (format t "~&~W classes, ~W constructors." nclass ncons)))
 
 (defun disable-constructors ()
   (multiple-value-bind (nclass ncons)
@@ -467,7 +467,7 @@
 						 (constructor-class c)
 						 () () () ())
 					'fallback)))))
-    (format t "~&~D classes, ~D constructors." nclass ncons)))
+    (format t "~&~W classes, ~W constructors." nclass ncons)))
 
 (defun enable-constructors ()
   (reset-constructors))

@@ -99,7 +99,7 @@
 ;;;	     (unless (string= (gethash hash ht) string)
 ;;;	       (format t "collision: ~S ~S~%" string (gethash hash ht)))
 ;;;	     (setf (gethash hash ht) string))))
-;;;     (format t "final count=~D~%" (hash-table-count ht)))
+;;;     (format t "final count=~W~%" (hash-table-count ht)))
 
 (defun %sxhash-simple-string (x)
   (declare (optimize speed))

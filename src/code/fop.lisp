@@ -110,7 +110,7 @@
     (declare (ignorable arg))
     #!+sb-show
     (when *show-fop-nop4-p*
-      (format *debug-io* "~&/FOP-NOP4 ARG=~D=#X~X~%" arg arg))))
+      (format *debug-io* "~&/FOP-NOP4 ARG=~W=#X~X~%" arg arg))))
 
 (define-fop (fop-nop 0 :nope))
 (define-fop (fop-pop 1 nil) (push-fop-table (pop-stack)))

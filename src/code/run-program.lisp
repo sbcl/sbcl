@@ -174,7 +174,7 @@
 (defmethod print-object ((process process) stream)
   (print-unreadable-object (process stream :type t)
     (format stream
-	    "~D ~S"
+	    "~W ~S"
 	    (process-pid process)
 	    (process-status process)))
   process)
@@ -380,7 +380,7 @@
       (when (streamp pty)
 	(multiple-value-bind (new-fd errno) (sb-unix:unix-dup master)
 	  (unless new-fd
-	    (error "couldn't SB-UNIX:UNIX-DUP ~D: ~A" master (strerror errno)))
+	    (error "couldn't SB-UNIX:UNIX-DUP ~W: ~A" master (strerror errno)))
 	  (push new-fd *close-on-error*)
 	  (copy-descriptor-to-stream new-fd pty cookie)))
       (values name

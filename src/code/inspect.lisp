@@ -76,7 +76,7 @@ evaluated expressions.
 		      (format s "~%The object contains nothing to inspect.~%")
 		      (return-from %inspect (reread)))
 		     (t
-		      (format s "~%Enter a valid index (~:[0-~D~;0~]).~%"
+		      (format s "~%Enter a valid index (~:[0-~W~;0~]).~%"
 			      (= elements-length 1) (1- elements-length))
 		      (return-from %inspect (reread))))))
 	    (symbol
@@ -211,7 +211,7 @@ evaluated expressions.
 
 (defmethod inspected-parts ((object vector))
   (values (format nil
-		  "The object is a ~:[~;displaced ~]VECTOR of length ~D.~%"
+		  "The object is a ~:[~;displaced ~]VECTOR of length ~W.~%"
 		  (and (array-header-p object)
 		       (%array-displaced-p object))
 		  (length object))
@@ -228,7 +228,7 @@ evaluated expressions.
 	  (multiple-value-bind (q r) (floor index dim)
 	    (setq index q)
 	    (push r list)))
-	(format nil "[~D~{,~D~}]" (car list) (cdr list)))))
+	(format nil "[~W~{,~W~}]" (car list) (cdr list)))))
 
 (defmethod inspected-parts ((object array))
   (let* ((length (min (array-total-size object) *inspect-length*))

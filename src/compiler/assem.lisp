@@ -192,7 +192,7 @@
 		    name)
 		  '<flushed>)))
     (when (inst-depth inst)
-      (format stream ", depth=~D" (inst-depth inst)))))
+      (format stream ", depth=~W" (inst-depth inst)))))
 
 #!+sb-show-assem
 (defun reset-inst-ids ()
@@ -230,7 +230,7 @@
   (multiple-value-bind (loc-num size)
       (sb!c:location-number read)
     #!+sb-show-assem (format *trace-output*
-			     "~&~S reads ~S[~D for ~D]~%"
+			     "~&~S reads ~S[~W for ~W]~%"
 			     inst read loc-num size)
     (when loc-num
       ;; Iterate over all the locations for this TN.
@@ -267,7 +267,7 @@
   (multiple-value-bind (loc-num size)
       (sb!c:location-number write)
     #!+sb-show-assem (format *trace-output*
-			     "~&~S writes ~S[~D for ~D]~%"
+			     "~&~S writes ~S[~W for ~W]~%"
 			     inst write loc-num size)
     (when loc-num
       ;; Iterate over all the locations for this TN.
@@ -908,13 +908,13 @@ p	    ;; the branch has two dependents and one of them dpends on
 				 (chooser-index note)))
 		    (old-size (chooser-size note)))
 		(when (> new-size old-size)
-		  (error "~S emitted ~D bytes, but claimed its max was ~D."
+		  (error "~S emitted ~W bytes, but claimed its max was ~W."
 			 note new-size old-size))
 		(let ((additional-delta (- old-size new-size)))
 		  (when (< (find-alignment additional-delta)
 			   (chooser-alignment note))
-		    (error "~S shrunk by ~D bytes, but claimed that it ~
-			    preserve ~D bits of alignment."
+		    (error "~S shrunk by ~W bytes, but claimed that it ~
+			    preserves ~W bits of alignment."
 			   note additional-delta (chooser-alignment note)))
 		  (incf delta additional-delta)
 		  (emit-filler segment additional-delta))
@@ -927,7 +927,7 @@ p	    ;; the branch has two dependents and one of them dpends on
 	      ;; The chooser passed on shrinking. Make sure it didn't emit
 	      ;; anything.
 	      (unless (= (segment-current-index segment) (chooser-index note))
-		(error "Chooser ~S passed, but not before emitting ~D bytes."
+		(error "Chooser ~S passed, but not before emitting ~W bytes."
 		       note
 		       (- (segment-current-index segment)
 			  (chooser-index note))))
@@ -955,8 +955,8 @@ p	    ;; the branch has two dependents and one of them dpends on
 		       (old-size (alignment-size note))
 		       (additional-delta (- old-size size)))
 		  (when (minusp additional-delta)
-		    (error "Alignment ~S needs more space now?  It was ~D, ~
-			    and is ~D now."
+		    (error "Alignment ~S needs more space now?  It was ~W, ~
+			    and is ~W now."
 			   note old-size size))
 		  (when (plusp additional-delta)
 		    (emit-filler segment additional-delta)
@@ -1027,7 +1027,7 @@ p	    ;; the branch has two dependents and one of them dpends on
 		 (funcall function segment posn)
 		 (let ((new-size (- (segment-current-index segment) index)))
 		   (unless (= new-size old-size)
-		     (error "~S emitted ~D bytes, but claimed it was ~D."
+		     (error "~S emitted ~W bytes, but claimed it was ~W."
 			    note new-size old-size)))
 		 (let ((tail (segment-last-annotation segment)))
 		   (if tail
@@ -1316,7 +1316,7 @@ p	    ;; the branch has two dependents and one of them dpends on
 	   (num-bytes (multiple-value-bind (quo rem)
 			  (truncate total-bits assembly-unit-bits)
 			(unless (zerop rem)
-			  (error "~D isn't an even multiple of ~D."
+			  (error "~W isn't an even multiple of ~W."
 				 total-bits assembly-unit-bits))
 			quo))
 	   (bytes (make-array num-bytes :initial-element nil))

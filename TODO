@@ -6,12 +6,8 @@ for 0.7.0:
 	EVAL/EVAL-WHEN/%COMPILE/DEFUN/DEFSTRUCT cleanup:
 	** made inlining DEFUN inside MACROLET work again
 * incompatible changes listed in NEWS:
-	** changed debugger prompt to "5]", "5[2]", "5[3]", etc.
 	** changed default output representation of *PRINT-ESCAPE*-ed
 		unprintable ASCII characters to #\Nul, #\Soh, etc.
-* some easy FIXMEs with high disruptive potential:
-	** Search lists go away.
-	** Grep for ~D and and change most of them to ~S.
 * more renaming in global external names:
 	** used DEFINE-THE-FOO-THING and DEFFOO style consistently (and 
 		deprecated supported extensions named in the DEF-FOO

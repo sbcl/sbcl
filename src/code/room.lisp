@@ -316,7 +316,7 @@
 	      (format t "~%~A:~%    ~:D bytes, ~:D object~:P"
 		      name total-bytes total-objects)
 	      (dolist (space (spaces))
-		(format t ", ~D% ~(~A~)"
+		(format t ", ~W% ~(~A~)"
 			(round (* (cdr space) 100) total-bytes)
 			(car space)))
 	      (format t ".~%")
@@ -465,7 +465,7 @@
 	       #.instance-header-widetag)
 	      (incf descriptor-words (truncate size n-word-bytes)))
 	     (t
-	      (error "bogus type: ~D" type))))
+	      (error "bogus widetag: ~W" type))))
        space))
     (format t "~:D words allocated for descriptor objects.~%"
 	    descriptor-words)
@@ -478,7 +478,7 @@
 ;;; TOP-N types with largest usage.
 (defun instance-usage (space &key (top-n 15))
   (declare (type spaces space) (type (or fixnum null) top-n))
-  (format t "~2&~@[Top ~D ~]~(~A~) instance types:~%" top-n space)
+  (format t "~2&~@[Top ~W ~]~(~A~) instance types:~%" top-n space)
   (let ((totals (make-hash-table :test 'eq))
 	(total-objects 0)
 	(total-bytes 0))
@@ -515,13 +515,13 @@
 		(objects (cadr what)))
 	    (incf printed-bytes bytes)
 	    (incf printed-objects objects)
-	    (format t "  ~A: ~:D bytes, ~D object~:P.~%" (car what)
+	    (format t "  ~A: ~:D bytes, ~:D object~:P.~%" (car what)
 		    bytes objects)))
 
 	(let ((residual-objects (- total-objects printed-objects))
 	      (residual-bytes (- total-bytes printed-bytes)))
 	  (unless (zerop residual-objects)
-	    (format t "  Other types: ~:D bytes, ~D object~:P.~%"
+	    (format t "  Other types: ~:D bytes, ~:D object~:P.~%"
 		    residual-bytes residual-objects))))
 
       (format t "  ~:(~A~) instance total: ~:D bytes, ~:D object~:P.~%"
@@ -548,11 +548,11 @@
 		   (setf start-addr (sb!di::get-lisp-obj-address object)
 			 total-bytes bytes))
 	       (when start-addr
-		 (format t "~D bytes at #X~X~%" total-bytes start-addr)
+		 (format t "~:D bytes at #X~X~%" total-bytes start-addr)
 		 (setf start-addr nil))))
        space)
       (when start-addr
-	(format t "~D bytes at #X~X~%" total-bytes start-addr))))
+	(format t "~:D bytes at #X~X~%" total-bytes start-addr))))
   (values))
 
 ;;;; PRINT-ALLOCATED-OBJECTS
@@ -600,7 +600,7 @@
 			 ;; FIXME: What is this? (ERROR "Argh..")? or
 			 ;; a warning? or code that can be removed
 			 ;; once the system is stable? or what?
-			 (format stream "~2&**** Page ~D, address ~X:~%"
+			 (format stream "~2&**** Page ~W, address ~X:~%"
 				 pages-so-far addr))
 		       (setq last-page this-page)
 		       (incf pages-so-far))))

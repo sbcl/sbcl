@@ -39,7 +39,7 @@
 (defun static-fun-template-vop (num-args num-results)
   (unless (and (<= num-args register-arg-count)
 	       (<= num-results register-arg-count))
-    (error "either too many args (~D) or too many results (~D); max = ~D"
+    (error "either too many args (~W) or too many results (~W); max = ~W"
 	   num-args num-results register-arg-count))
   (let ((num-temps (max num-args num-results)))
     (collect ((temp-names) (temps) (arg-names) (args) (result-names) (results))

@@ -341,7 +341,7 @@
     (etypecase type
       (alien-pointer-type
        (when (cdr indices)
-	 (error "too many indices when derefing ~S: ~D"
+	 (error "too many indices when DEREF'ing ~S: ~W"
 		type
 		(length indices)))
        (let ((element-type (alien-pointer-type-to type)))
@@ -353,7 +353,7 @@
 		     0))))
       (alien-array-type
        (unless (= (length indices) (length (alien-array-type-dimensions type)))
-	 (error "incorrect number of indices when derefing ~S: ~D"
+	 (error "incorrect number of indices when DEREF'ing ~S: ~W"
 		type (length indices)))
        (labels ((frob (dims indices offset)
 		  (if (null dims)
@@ -561,7 +561,7 @@
       (alien-fun-type
        (unless (= (length (alien-fun-type-arg-types type))
 		  (length args))
-	 (error "wrong number of arguments for ~S~%expected ~D, got ~D"
+	 (error "wrong number of arguments for ~S~%expected ~W, got ~W"
 		type
 		(length (alien-fun-type-arg-types type))
 		(length args)))

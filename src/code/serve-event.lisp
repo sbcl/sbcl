@@ -70,7 +70,7 @@
 (def!method print-object ((handler handler) stream)
   (print-unreadable-object (handler stream :type t)
     (format stream
-	    "~A on ~:[~;BOGUS ~]descriptor ~D: ~S"
+	    "~A on ~:[~;BOGUS ~]descriptor ~W: ~S"
 	    (handler-direction handler)
 	    (handler-bogus handler)
 	    (handler-descriptor handler)

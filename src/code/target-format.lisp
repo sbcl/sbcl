@@ -21,13 +21,12 @@
   generally expand into additional text to be output, usually consuming one
   or more of the FORMAT-ARGUMENTS in the process. A few useful directives
   are:
-	~A or ~nA     Prints one argument as if by PRINC
-	~S or ~nS     Prints one argument as if by PRIN1
-	~D or ~nD     Prints one argument as a decimal integer
-	~%	    Does a TERPRI
-	~&	    Does a FRESH-LINE
-
-	 where n is the width of the field in which the object is printed.
+        ~A or ~nA   Prints one argument as if by PRINC
+        ~S or ~nS   Prints one argument as if by PRIN1
+        ~D or ~nD   Prints one argument as a decimal integer
+        ~%          Does a TERPRI
+        ~&          Does a FRESH-LINE
+  where n is the width of the field in which the object is printed.
 
   DESTINATION controls where the result will go. If DESTINATION is T, then
   the output is sent to the standard output stream. If it is NIL, then the
@@ -153,7 +152,7 @@
 	 (when ,params
 	   (error 'format-error
 		  :complaint
-		  "too many parameters, expected no more than ~D"
+		  "too many parameters, expected no more than ~W"
 		  :arguments (list ,(length specs))
 		  :offset (caar ,params)))
 	 ,@body))))
@@ -833,8 +832,8 @@
 	    (if (<= 0 posn (length orig-args))
 		(setf args (nthcdr posn orig-args))
 		(error 'format-error
-		       :complaint "Index ~D is out of bounds. (It should ~
-				   have been between 0 and ~D.)"
+		       :complaint "Index ~W is out of bounds. (It should ~
+				   have been between 0 and ~W.)"
 		       :arguments (list posn (length orig-args))))))
       (if colonp
 	  (interpret-bind-defaults ((n 1)) params
@@ -846,8 +845,8 @@
 		       (setf args (nthcdr new-posn orig-args))
 		       (error 'format-error
 			      :complaint
-			      "Index ~D is out of bounds. (It should 
-			       have been between 0 and ~D.)"
+			      "Index ~W is out of bounds. (It should 
+			       have been between 0 and ~W.)"
 			      :arguments
 			      (list new-posn (length orig-args))))))))
 	  (interpret-bind-defaults ((n 1)) params

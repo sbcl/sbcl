@@ -54,17 +54,8 @@
   "Should the debugger display beginner-oriented help messages?")
 
 (defun debug-prompt (stream)
-
-  ;; old behavior, will probably go away in sbcl-0.7.x
-  (format stream "~%~D" (sb!di:frame-number *current-frame*))
-  (dotimes (i *debug-command-level*)
-    (write-char #\] stream))
-  (write-char #\space stream)
-
-  ;; planned new behavior, delayed since it will break ILISP
-  #+nil 
   (format stream
-	  "~%~D~:[~;[~D~]] "
+	  "~%~W~:[~;[~W~]] "
 	  (sb!di:frame-number *current-frame*)
 	  (> *debug-command-level* 1)
 	  *debug-command-level*))
@@ -774,7 +765,7 @@ reset to ~S."
 	    (let ((level *debug-command-level*)
 		  (restart-commands (make-restart-commands)))
 	      (with-simple-restart (abort
-				   "Reduce debugger level (to debug level ~D)."
+				   "Reduce debugger level (to debug level ~W)."
 				    level)
 		(debug-prompt *debug-io*)
 		(force-output *debug-io*)
@@ -903,7 +894,7 @@ reset to ~S."
 		(let ((v (find id vars :key #'sb!di:debug-var-id)))
 		  (unless v
 		    (error
-		     "invalid variable ID, ~D: should have been one of ~S"
+		     "invalid variable ID, ~W: should have been one of ~S"
 		     id
 		     (mapcar #'sb!di:debug-var-id vars)))
 		  ,(ecase ref-or-set
@@ -1029,7 +1020,7 @@ argument")
       (let* ((name
 	      (if (symbolp form)
 		  (symbol-name form)
-		  (format nil "~D" form)))
+		  (format nil "~W" form)))
 	     (len (length name))
 	     (res nil))
 	(declare (simple-string name)
@@ -1075,7 +1066,7 @@ argument")
                 #'(lambda ()
 		    (/show0 "in restart-command closure, about to i-r-i")
 		    (invoke-restart-interactively restart))))
-          (push (cons (format nil "~d" num) restart-fun) commands)
+          (push (cons (prin1-to-string num) restart-fun) commands)
           (unless (or (null (restart-name restart)) 
                       (find name commands :key #'car :test #'string=))
             (push (cons name restart-fun) commands))))
@@ -1231,7 +1222,7 @@ argument")
 	    (setf any-p t)
 	    (when (eq (sb!di:debug-var-validity v location) :valid)
 	      (setf any-valid-p t)
-	      (format t "~S~:[#~D~;~*~]  =  ~S~%"
+	      (format t "~S~:[#~W~;~*~]  =  ~S~%"
 		      (sb!di:debug-var-symbol v)
 		      (zerop (sb!di:debug-var-id v))
 		      (sb!di:debug-var-id v)
@@ -1412,8 +1403,8 @@ argument")
 	       (when prev-location
 		 (let ((this-num (1- this-num)))
 		   (if (= prev-num this-num)
-		       (format t "~&~D: " prev-num)
-		       (format t "~&~D-~D: " prev-num this-num)))
+		       (format t "~&~W: " prev-num)
+		       (format t "~&~W-~W: " prev-num this-num)))
 		 (print-code-location-source-form prev-location 0)
 		 (when *print-location-kind*
 		   (format t "~S " (sb!di:code-location-kind prev-location)))

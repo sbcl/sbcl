@@ -285,7 +285,7 @@ function should notify the user that the system has finished GC'ing.")
 				  *soft-heap-limit*)))
       (when soft-heap-limit-exceeded?
 	(cerror "Continue with GC."
-		"soft heap limit exceeded (temporary new limit=~D)"
+		"soft heap limit exceeded (temporary new limit=~W)"
 		*soft-heap-limit*))
       (when (and *gc-trigger* (> pre-gc-dynamic-usage *gc-trigger*))
 	(setf *need-to-collect-garbage* t))

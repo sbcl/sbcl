@@ -440,7 +440,7 @@
 		  (< -1 offset (length name-vec))
 		  (svref name-vec offset))
 	     ;; FIXME: Shouldn't this be an ERROR?
-	     (format nil "<unknown reg: off=~D, sc=~A>" offset sc-name))))
+	     (format nil "<unknown reg: off=~W, sc=~A>" offset sc-name))))
       (float-registers (format nil "FR~D" offset))
       (stack (format nil "S~D" offset))
       (constant (format nil "Const~D" offset))

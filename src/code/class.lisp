@@ -394,8 +394,8 @@
 	(let ((old-length (layout-length old-layout)))
 	  (unless (= old-length length)
 	    (warn "change in instance length of class ~S:~%  ~
-		   ~A length: ~D~%  ~
-		   ~A length: ~D"
+		   ~A length: ~W~%  ~
+		   ~A length: ~W"
 		  name
 		  old-context old-length
 		  context length)

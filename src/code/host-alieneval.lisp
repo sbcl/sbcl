@@ -560,7 +560,7 @@
 	    #!+alpha (64 'sap-ref-64)))))
     (if ref-fun
 	`(,ref-fun ,sap (/ ,offset sb!vm:n-byte-bits))
-	(error "cannot extract ~D bit integers"
+	(error "cannot extract ~W-bit integers"
 	       (alien-integer-type-bits type)))))
 
 ;;;; the BOOLEAN type

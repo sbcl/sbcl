@@ -115,7 +115,7 @@
 	    (ft "It has no name (the name is NIL).~%")))
       (ft "The direct superclasses are: ~:S, and the direct~%~
 	   subclasses are: ~:S. The class precedence list is:~%~S~%~
-	   There are ~D methods specialized for this class."
+	   There are ~W methods specialized for this class."
 	  (mapcar #'pretty-class (class-direct-superclasses class))
 	  (mapcar #'pretty-class (class-direct-subclasses class))
 	  (mapcar #'pretty-class (class-precedence-list class))

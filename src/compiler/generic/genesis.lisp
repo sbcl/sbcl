@@ -160,7 +160,7 @@
 				     (ash (descriptor-low des)
 					  (- 1 sb!vm:n-lowtag-bits)))))
 	       (format stream
-		       "for fixnum: ~D"
+		       "for fixnum: ~W"
 		       (if (> unsigned #x1FFFFFFF)
 			   (- unsigned #x40000000)
 			   unsigned))))
@@ -285,7 +285,7 @@
 (defun make-fixnum-descriptor (num)
   (when (>= (integer-length num)
 	    (1+ (- sb!vm:n-word-bits sb!vm:n-lowtag-bits)))
-    (error "~D is too big for a fixnum." num))
+    (error "~W is too big for a fixnum." num))
   (make-random-descriptor (ash num (1- sb!vm:n-lowtag-bits))))
 
 (defun make-other-immediate-descriptor (data type)
@@ -593,7 +593,7 @@
 	((> index words)
 	 (unless (zerop (integer-length remainder))
 	   ;; FIXME: Shouldn't this be a fatal error?
-	   (warn "~D words of ~D were written, but ~D bits were left over."
+	   (warn "~W words of ~W were written, but ~W bits were left over."
 		 words n remainder)))
       (let ((word (ldb (byte sb!vm:n-word-bits 0) remainder)))
 	(write-wordindexed handle index
@@ -1108,7 +1108,7 @@
 			      (descriptor-low *nil-descriptor*))))
 	(unless (= offset-wanted offset-found)
 	  ;; FIXME: should be fatal
-	  (warn "Offset from ~S to ~S is ~D, not ~D"
+	  (warn "Offset from ~S to ~S is ~W, not ~W"
 		symbol
 		nil
 		offset-found
@@ -1417,7 +1417,7 @@
 	     (desired (sb!vm:static-fun-offset sym)))
 	(unless (= offset desired)
 	  ;; FIXME: should be fatal
-	  (warn "Offset from FDEFN ~S to ~S is ~D, not ~D."
+	  (warn "Offset from FDEFN ~S to ~S is ~W, not ~W."
 		sym nil offset desired))))))
 
 (defun list-all-fdefn-objects ()
@@ -1952,7 +1952,7 @@
 		 (8 sb!vm:simple-array-unsigned-byte-8-widetag)
 		 (16 sb!vm:simple-array-unsigned-byte-16-widetag)
 		 (32 sb!vm:simple-array-unsigned-byte-32-widetag)
-		 (t (error "losing element size: ~D" sizebits))))
+		 (t (error "losing element size: ~W" sizebits))))
 	 (result (allocate-vector-object *dynamic* sizebits len type))
 	 (start (+ (descriptor-byte-offset result)
 		   (ash sb!vm:vector-data-offset sb!vm:word-shift)))
@@ -2307,7 +2307,7 @@
 	 #!+sb-show
 	 (when *show-pre-fixup-code-p*
 	   (format *trace-output*
-		   "~&/raw code from code-fop ~D ~D:~%"
+		   "~&/raw code from code-fop ~W ~W:~%"
 		   nconst
 		   code-size)
 	   (do ((i start (+ i sb!vm:n-word-bytes)))

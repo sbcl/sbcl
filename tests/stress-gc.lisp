@@ -36,7 +36,7 @@
     result))
 
 (defun stress-gc (n-passes &optional (size 3000))
-  (format t "~&beginning STRESS-GC N-PASSES=~D SIZE=~D~%" n-passes size)
+  (format t "~&beginning STRESS-GC N-PASSES=~W SIZE=~W~%" n-passes size)
   (let ((generations (make-array (isqrt size) :initial-element nil))
 	;; We allocate on the order of MOST-POSITIVE-FIXNUM things
 	;; before doing a full GC.
@@ -69,7 +69,7 @@
 	  (assert-generation i-generation generation-i))
 	(setf (aref generations i-generation)
 	      generation-i))))
-  (format t "~&done with STRESS-GC N-PASSES=~D SIZE=~D~%" n-passes size))
+  (format t "~&done with STRESS-GC N-PASSES=~W SIZE=~W~%" n-passes size))
 
 (defvar *expected*)
 (defvar *got*)
@@ -84,7 +84,7 @@
 	;; wimpy to inspect lexical variables.
 	(let ((*expected* (funcall repr index-within-generation))
 	      (*got* element-of-generation))
-	  (error "bad element #~D in generation #~D:~%  expected ~S~%  from ~S,~%  got ~S"
+	  (error "bad element #~W in generation #~D:~%  expected ~S~%  from ~S,~%  got ~S"
 		 index-within-generation
 		 index-of-generation
 		 *expected*

@@ -338,7 +338,7 @@
   ;; Elements of this list have a one-to-one correspondence with
   ;; elements of the PHYSENV-CLOSURE list of the PHYSENV object that
   ;; links to us.
-  (environment (missing-arg) :type list :read-only t)
+  (closure (missing-arg) :type list :read-only t)
   ;; the TNs that hold the OLD-FP and RETURN-PC within the function.
   ;; We always save these so that the debugger can do a backtrace,
   ;; even if the function has no return (and thus never uses them).

@@ -366,8 +366,7 @@
 		 (frob-leaf leaf (leaf-info leaf) gensym-p))))
       (frob-lambda fun t)
       (when (>= level 2)
-	(dolist (x (ir2-physenv-environment
-		    (physenv-info (lambda-physenv fun))))
+	(dolist (x (ir2-physenv-closure (physenv-info (lambda-physenv fun))))
 	  (let ((thing (car x)))
 	    (when (lambda-var-p thing)
 	      (frob-leaf thing (cdr x) (= level 3)))))

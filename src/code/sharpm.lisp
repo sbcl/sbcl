@@ -14,7 +14,7 @@
 ;;; FIXME: Is it standard to ignore numeric args instead of raising errors?
 (defun ignore-numarg (sub-char numarg)
   (when numarg
-    (warn "A numeric argument was ignored in #~D~A." numarg sub-char)))
+    (warn "A numeric argument was ignored in #~W~A." numarg sub-char)))
 
 ;;;; reading arrays and vectors: the #(, #*, and #A readmacros
 
@@ -92,14 +92,14 @@
 		     (make-array (dims) :initial-contents contents))
 	(unless (typep seq 'sequence)
 	  (%reader-error stream
-			 "#~DA axis ~D is not a sequence:~%  ~S"
+			 "#~WA axis ~W is not a sequence:~%  ~S"
 			 dimensions axis seq))
 	(let ((len (length seq)))
 	  (dims len)
 	  (unless (= axis (1- dimensions))
 	    (when (zerop len)
 	      (%reader-error stream
-			     "#~DA axis ~D is empty, but is not ~
+			     "#~WA axis ~W is empty, but is not ~
 			      the last dimension."
 			     dimensions axis))
 	    (setq seq (elt seq 0))))))))
@@ -157,13 +157,13 @@
 	((not radix)
 	 (%reader-error stream "radix missing in #R"))
 	((not (<= 2 radix 36))
-	 (%reader-error stream "illegal radix for #R: ~D" radix))
+	 (%reader-error stream "illegal radix for #R: ~D." radix))
 	(t
 	 (let ((res (let ((*read-base* radix))
 		      (read stream t nil t))))
 	   (unless (typep res 'rational)
 	     (%reader-error stream
-			    "#~A (base ~D) value is not a rational: ~S."
+			    "#~A (base ~D.) value is not a rational: ~S."
 			    sub-char
 			    radix
 			    res))

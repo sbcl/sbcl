@@ -204,7 +204,7 @@
 (def!method print-object ((debug-var debug-var) stream)
   (print-unreadable-object (debug-var stream :type t :identity t)
     (format stream
-	    "~S ~D"
+	    "~S ~W"
 	    (debug-var-symbol debug-var)
 	    (debug-var-id debug-var))))
 
@@ -1568,7 +1568,7 @@
 (defun assign-minimal-var-names (vars)
   (declare (simple-vector vars))
   (let* ((len (length vars))
-	 (width (length (format nil "~D" (1- len)))))
+	 (width (length (format nil "~W" (1- len)))))
     (dotimes (i len)
       (setf (compiled-debug-var-symbol (svref vars i))
 	    (intern (format nil "ARG-~V,'0D" width i)
@@ -3300,7 +3300,7 @@
     (do-debug-fun-blocks (block debug-fun)
       (do-debug-block-locations (loc block)
 	(fill-in-code-location loc)
-	(format t "~S code location at ~D"
+	(format t "~S code location at ~W"
 		(compiled-code-location-kind loc)
 		(compiled-code-location-pc loc))
 	(sb!debug::print-code-location-source-form loc 0)

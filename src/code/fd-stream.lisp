@@ -985,7 +985,7 @@
 		       input-buffer-p
 		       (name (if file
 				 (format nil "file ~S" file)
-				 (format nil "descriptor ~D" fd)))
+				 (format nil "descriptor ~W" fd)))
 		       auto-close)
   (declare (type index fd) (type (or index null) timeout)
 	   (type (member :none :line :full) buffering))
@@ -1007,7 +1007,7 @@
 		(lambda ()
 		  (sb!unix:unix-close fd)
 		  #!+sb-show
-		  (format *terminal-io* "** closed file descriptor ~D **~%"
+		  (format *terminal-io* "** closed file descriptor ~W **~%"
 			  fd))))
     stream))
 

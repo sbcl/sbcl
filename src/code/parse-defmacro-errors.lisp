@@ -65,17 +65,17 @@
 	     (arg-count-error-argument condition)
 	     (arg-count-error-lambda-list condition))
      (cond ((null (arg-count-error-maximum condition))
-	    (format stream "at least ~D expected"
+	    (format stream "at least ~W expected"
 		    (arg-count-error-minimum condition)))
 	   ((= (arg-count-error-minimum condition)
 	       (arg-count-error-maximum condition))
-	    (format stream "exactly ~D expected"
+	    (format stream "exactly ~W expected"
 		    (arg-count-error-minimum condition)))
 	   (t
-	    (format stream "between ~D and ~D expected"
+	    (format stream "between ~W and ~W expected"
 		    (arg-count-error-minimum condition)
 		    (arg-count-error-maximum condition))))
-     (format stream ", but ~D found"
+     (format stream ", but ~W found"
 	     (length (arg-count-error-argument condition))))))
 
 (define-condition defmacro-ll-broken-key-list-error

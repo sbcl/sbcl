@@ -182,7 +182,7 @@
     (dolist (entry *traced-entries*)
       (when (cdr entry) (incf depth)))
     (format t
-	    "~@V,0T~D: "
+	    "~@V,0T~W: "
 	    (+ (mod (* depth *trace-indentation-step*)
 		    (- *max-trace-indentation* *trace-indentation-step*))
 	       *trace-indentation-step*)

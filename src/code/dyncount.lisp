@@ -430,7 +430,7 @@ comments from CMU CL:
 		     cost)
 		 total-cost))
       (when (zerop (decf counter))
-	(format t "[End of top ~D]~%" cut-off))))))
+	(format t "[End of top ~W]~%" cut-off))))))
 
 ;;; Divide SORTED into two lists, the first CUT-OFF elements long. Any VOP
 ;;; names that match one of the report strings are moved into the REPORT list

@@ -29,7 +29,7 @@
 (defvar *scratch-file-stream*)
 (dolist (scratch-file-length '(1 ; everyone's favorite corner case
 			       200123)) ; hopefully much bigger than buffer
-  (format t "/SCRATCH-FILE-LENGTH=~D~%" scratch-file-length)
+  (format t "/SCRATCH-FILE-LENGTH=~W~%" scratch-file-length)
   (with-open-file (s *scratch-file-name* :direction :output)
     (dotimes (i scratch-file-length)
       (write-char #\x s)))

@@ -659,7 +659,7 @@
   (:report
    (lambda (condition stream)
      (let ((error-stream (stream-error-stream condition)))
-       (format stream "READER-ERROR ~@[at ~D ~]on ~S:~%~?"
+       (format stream "READER-ERROR ~@[at ~W ~]on ~S:~%~?"
 	       (file-position error-stream) error-stream
 	       (reader-error-format-control condition)
 	       (reader-error-format-arguments condition))))))

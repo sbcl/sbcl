@@ -257,7 +257,7 @@
 (deferr invalid-array-index-error (array bound index)
   (error 'simple-error
 	 :format-control
-	 "invalid array index ~D for ~S (should be nonnegative and <~D)"
+	 "invalid array index ~W for ~S (should be nonnegative and <~W)"
 	 :format-arguments (list index array bound)))
 
 (deferr object-not-simple-array-error (object)
@@ -468,7 +468,7 @@
 	   (cond ((null handler)
 		  (error 'simple-error
 			 :format-control
-			 "unknown internal error, ~D? args=~S"
+			 "unknown internal error, ~D, args=~S"
 			 :format-arguments
 			 (list error-number
 			       (mapcar #'(lambda (sc-offset)

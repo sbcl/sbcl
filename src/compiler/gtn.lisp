@@ -73,7 +73,7 @@
 	      reversed-ir2-physenv-alist)))
 
     (let ((res (make-ir2-physenv
-		:environment (nreverse reversed-ir2-physenv-alist)
+		:closure (nreverse reversed-ir2-physenv-alist)
 		:return-pc-pass (make-return-pc-passing-location
 				 (external-entry-point-p clambda)))))
       (setf (physenv-info lambda-physenv) res)

@@ -697,7 +697,7 @@
                                  format-length)
                           (error "~@<in arg ~S: ~3I~:_~
                                      The field ~S doesn't fit in an ~
-                                     instruction-format ~D bits wide.~:>"
+                                     instruction-format ~W bits wide.~:>"
                                  arg-name
                                  bytespec
                                  format-length))
@@ -1513,7 +1513,7 @@
   (multiple-value-bind (bytes rbits)
       (truncate bits sb!vm:n-byte-bits)
     (when (not (zerop rbits))
-      (error "~D bits is not a byte-multiple." bits))
+      (error "~W bits is not a byte-multiple." bits))
     bytes))
 
 (defun sign-extend (int size)

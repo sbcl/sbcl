@@ -268,7 +268,7 @@
 (def!method print-object ((seg segment) stream)
   (print-unreadable-object (seg stream :type t)
     (let ((addr (sb!sys:sap-int (funcall (seg-sap-maker seg)))))
-      (format stream "#X~X[~D]~:[ (#X~X)~;~*~]~@[ in ~S~]"
+      (format stream "#X~X[~W]~:[ (#X~X)~;~*~]~@[ in ~S~]"
 	      addr
 	      (seg-length seg)
 	      (= (seg-virtual-location seg) addr)
@@ -326,7 +326,7 @@
 (def!method print-object ((dstate disassem-state) stream)
   (print-unreadable-object (dstate stream :type t)
     (format stream
-	    "+~D~@[ in ~S~]"
+	    "+~W~@[ in ~S~]"
 	    (dstate-cur-offs dstate)
 	    (dstate-segment dstate))))
 
@@ -481,7 +481,7 @@
 	(alignment (dstate-alignment dstate)))
     (unless (aligned-p location alignment)
       (when stream
-	(format stream "~A~Vt~D~%" '.align
+	(format stream "~A~Vt~W~%" '.align
 		(dstate-argument-column dstate)
 		alignment))
       (incf(dstate-next-offs dstate)
@@ -647,7 +647,7 @@
 	    (incf max)
 	    (setf (cdr label) max)
 	    (setf (gethash (car label) label-hash)
-		  (format nil "L~D" max)))))
+		  (format nil "L~W" max)))))
       (setf (dstate-labels dstate) labels))))
 
 ;;; Get the instruction-space, creating it if necessary.
@@ -750,7 +750,7 @@
 	(when (or (null label-location) (> label-location location))
 	  (return))
 	(unless (< label-location location)
-	  (format stream " L~D:" (cdr next-label)))
+	  (format stream " L~W:" (cdr next-label)))
 	(pop (dstate-cur-labels dstate))))
 
     ;; move to the instruction column
@@ -958,7 +958,7 @@
       (let ((fun-offset (sb!kernel:get-closure-length fun)))
 	;; There is function header fun-offset words from the
 	;; code header.
-	(format t "Fun-header ~S at offset ~D (words): ~S~A => ~S~%"
+	(format t "Fun-header ~S at offset ~W (words): ~S~A => ~S~%"
 		fun
 		fun-offset
 		(sb!kernel:code-header-ref
@@ -1167,7 +1167,7 @@
 				      :debug-vars debug-vars))
 	   (let ((debug-var (aref debug-vars debug-var-offset)))
 	     #+nil
-	     (format t ";;; At offset ~D: ~S~%" debug-var-offset debug-var)
+	     (format t ";;; At offset ~W: ~S~%" debug-var-offset debug-var)
 	     (let* ((sc-offset
 		     (sb!di::compiled-debug-var-sc-offset debug-var))
 		    (sb-name
@@ -1175,7 +1175,7 @@
 		      (sb!c:sc-sb (aref sc-vec
 					(sb!c:sc-offset-scn sc-offset))))))
 	       #+nil
-	       (format t ";;; SET: ~S[~D]~%"
+	       (format t ";;; SET: ~S[~W]~%"
 		       sb-name (sb!c:sc-offset-offset sc-offset))
 	       (unless (null sb-name)
 		 (let ((group (cdr (assoc sb-name groups))))
@@ -1267,7 +1267,7 @@
 			      (when stream
 				(unless at-block-begin
 				  (terpri stream))
-				(format stream ";;; [~D] "
+				(format stream ";;; [~W] "
 					(sb!di:code-location-form-number
 					 loc))
 				(prin1-short form stream)
@@ -1348,7 +1348,7 @@
 	       (let ((name (sb!c::compiled-debug-fun-name fmap-entry))
 		     (kind (sb!c::compiled-debug-fun-kind fmap-entry)))
 		 #+nil
-		 (format t ";;; SAW ~S ~S ~S,~S ~D,~D~%"
+		 (format t ";;; SAW ~S ~S ~S,~S ~W,~W~%"
 			 name kind first-block-seen-p nil-block-seen-p
 			 last-offset
 			 (sb!c::compiled-debug-fun-start-pc fmap-entry))

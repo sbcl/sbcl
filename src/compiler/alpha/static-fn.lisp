@@ -42,7 +42,7 @@
   (assert (and (<= num-args register-arg-count)
 	       (<= num-results register-arg-count))
 	  (num-args num-results)
-	  "Either too many args (~D) or too many results (~D).  Max = ~D"
+	  "Either too many args (~W) or too many results (~W).  Max = ~W"
 	  num-args num-results register-arg-count)
   (let ((num-temps (max num-args num-results)))
     (collect ((temp-names) (temps) (arg-names) (args) (result-names) (results))

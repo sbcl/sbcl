@@ -1329,7 +1329,7 @@
 	   ;; compiler to be able to use WITH-COMPILATION-UNIT on
 	   ;; arbitrarily huge blocks of code. -- WHN)
 	   (let ((*compiler-error-context* node))
-	     (compiler-note "*INLINE-EXPANSION-LIMIT* (~D) was exceeded, ~
+	     (compiler-note "*INLINE-EXPANSION-LIMIT* (~W) was exceeded, ~
 			     probably trying to~%  ~
 			     inline a recursive function."
 			    *inline-expansion-limit*))

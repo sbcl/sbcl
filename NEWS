@@ -907,7 +907,7 @@ changes in sbcl-0.7.0 relative to sbcl-0.6.13:
   :SB-PROPAGATE-FUN-TYPE are no longer considered to be optional
   features. Instead, the code that they used to control is always
   built into the system.
-?? minor incompatible change: The debugger prompt sequence now goes
+* minor incompatible change: The debugger prompt sequence now goes
   "5]", "5[2]", "5[3]", etc. as you get deeper into recursive calls
   to the debugger command loop, instead of the old "5]", "5]]",
   "5]]]" sequence. (I was motivated to do this when squabbles between
@@ -922,7 +922,7 @@ changes in sbcl-0.7.0 relative to sbcl-0.6.13:
   favor of new corresponding names DEFINE-FOO, for consistency with
   the naming convention used in the ANSI standard (DEFSTRUCT, DEFVAR,
   DEFINE-CONDITION, DEFINE-MODIFY-MACRO..). This mostly affects
-  internal symbols, but a few external symbols like
+  internal symbols, but a few supported extensions like
   SB-ALIEN:DEF-ALIEN-FUNCTION are also affected.
 * minor incompatible change: DEFINE-ALIEN-FUNCTION (also known by 
   the old deprecated name DEF-ALIEN-FUNCTION) now does DECLAIM FTYPE

@@ -403,7 +403,7 @@
 	 (n-cache (gensym)))
 
     (unless (= (length default-values) values)
-      (error "The number of default values ~S differs from :VALUES ~D."
+      (error "The number of default values ~S differs from :VALUES ~W."
 	     default values))
 
     (collect ((inlines)

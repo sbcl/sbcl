@@ -898,7 +898,7 @@
     ;; argument and the number of bytes actually written. I added this
     ;; assertion while trying to debug portable genesis. -- WHN 19990902
     (unless (= code-length nwritten)
-      (error "internal error, code-length=~D, nwritten=~D"
+      (error "internal error, code-length=~W, nwritten=~W"
 	     code-length
 	     nwritten)))
   (values))

@@ -186,7 +186,7 @@
     (typecase alien-type
       (alien-pointer-type
        (when (cdr indices)
-	 (abort-ir1-transform "too many indices for pointer deref: ~D"
+	 (abort-ir1-transform "too many indices for pointer deref: ~W"
 			      (length indices)))
        (let ((element-type (alien-pointer-type-to alien-type)))
 	 (if indices
@@ -607,7 +607,7 @@
       (let ((arg-types (alien-fun-type-arg-types alien-type)))
 	(unless (= (length args) (length arg-types))
 	  (abort-ir1-transform
-	   "wrong number of arguments; expected ~D, got ~D"
+	   "wrong number of arguments; expected ~W, got ~W"
 	   (length arg-types)
 	   (length args)))
 	(collect ((params) (deports))

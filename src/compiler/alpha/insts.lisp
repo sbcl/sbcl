@@ -67,7 +67,7 @@
 
 (defparameter float-reg-symbols
   (coerce
-   (loop for n from 0 to 31 collect (make-symbol (format nil "~d" n)))
+   (loop for n from 0 to 31 collect (make-symbol (format nil "~D" n)))
    'vector))
 
 (sb!disassem:define-argument-type fp-reg

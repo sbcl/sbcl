@@ -567,10 +567,10 @@
 	 (num 0 (1+ num)))
 	((null ref)
 	 (when (< num count)
-	   (barf "There should be at least ~D ~A in ~S, but are only ~D."
+	   (barf "There should be at least ~W ~A in ~S, but there are only ~W."
 		 count what vop num))
 	 (when (and (not more-p) (> num count))
-	   (barf "There should be ~D ~A in ~S, but are ~D."
+	   (barf "There should be ~W ~A in ~S, but are ~W."
 		 count what vop num)))
       (unless (eq (tn-ref-vop ref) vop)
 	(barf "VOP is ~S isn't ~S." ref vop))
@@ -713,8 +713,8 @@
       (incf const))
 
     (format stream
-     "~%TNs: ~D local, ~D temps, ~D constant, ~D env, ~D comp, ~D global.~@
-       Wired: ~D, Unused: ~D. ~D block~:P, ~D global conflict~:P.~%"
+     "~%TNs: ~W local, ~W temps, ~W constant, ~W env, ~W comp, ~W global.~@
+       Wired: ~W, Unused: ~W. ~W block~:P, ~W global conflict~:P.~%"
        local temps const environment comp global wired unused
        (ir2-block-count component)
        confs))
@@ -819,15 +819,15 @@
 	    (barf "strange TN ~S in LTN map for ~S" tn block)))))))
 
 ;;; All TNs live at the beginning of an environment must be passing
-;;; locations associated with that environment. We make an exception for wired
-;;; TNs in XEP functions, since we randomly reference wired TNs to access the
-;;; full call passing locations.
+;;; locations associated with that environment. We make an exception
+;;; for wired TNs in XEP functions, since we randomly reference wired
+;;; TNs to access the full call passing locations.
 (defun check-environment-lifetimes (component)
   (dolist (fun (component-lambdas component))
     (let* ((env (lambda-physenv fun))
 	   (2env (physenv-info env))
 	   (vars (lambda-vars fun))
-	   (closure (ir2-physenv-environment 2env))
+	   (closure (ir2-physenv-closure 2env))
 	   (pc (ir2-physenv-return-pc-pass 2env))
 	   (fp (ir2-physenv-old-fp 2env))
 	   (2block (block-info (lambda-block (physenv-lambda env)))))
@@ -846,8 +846,9 @@
 	    (barf "strange TN live at head of ~S: ~S" env tn))))))
   (values))
 
-;;; Check for some basic sanity in the TN conflict data structures, and also
-;;; check that no TNs are unexpectedly live at environment entry.
+;;; Check for some basic sanity in the TN conflict data structures,
+;;; and also check that no TNs are unexpectedly live at environment
+;;; entry.
 (defun check-life-consistency (component)
   (check-tn-conflicts component)
   (check-block-conflicts component)
@@ -1057,7 +1058,7 @@
 	    (vop-next vop))
        (number 0 (1+ number)))
       ((null vop))
-    (format t "~D: " number)
+    (format t "~W: " number)
     (print-vop vop)))
 
 ;;; This is like PRINT-NODES, but dumps the IR2 representation of the

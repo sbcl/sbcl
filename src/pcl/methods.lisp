@@ -589,7 +589,7 @@
 
 
 (defun error-need-at-least-n-args (function n)
-  (error "~@<The function ~2I~_~S ~I~_requires at least ~D argument~:P.~:>"
+  (error "~@<The function ~2I~_~S ~I~_requires at least ~W argument~:P.~:>"
 	 function
 	 n))
 

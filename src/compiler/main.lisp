@@ -179,7 +179,7 @@
 	      (when (and warnings (> undefined-warning-count warn-count))
 		(let ((more (- undefined-warning-count warn-count)))
 		  (compiler-style-warning
-		   "~D more use~:P of undefined ~(~A~) ~S"
+		   "~W more use~:P of undefined ~(~A~) ~S"
 		   more kind name))))))
 	
 	(dolist (kind '(:variable :function :type))
@@ -201,11 +201,11 @@
     (format *error-output* "~&")
     (pprint-logical-block (*error-output* nil :per-line-prefix "; ")
       (compiler-mumble "compilation unit ~:[finished~;aborted~]~
-                       ~[~:;~:*~&  caught ~D fatal ERROR condition~:P~]~
-                       ~[~:;~:*~&  caught ~D ERROR condition~:P~]~
-                       ~[~:;~:*~&  caught ~D WARNING condition~:P~]~
-                       ~[~:;~:*~&  caught ~D STYLE-WARNING condition~:P~]~
-                       ~[~:;~:*~&  printed ~D note~:P~]"
+                       ~[~:;~:*~&  caught ~W fatal ERROR condition~:P~]~
+                       ~[~:;~:*~&  caught ~W ERROR condition~:P~]~
+                       ~[~:;~:*~&  caught ~W WARNING condition~:P~]~
+                       ~[~:;~:*~&  caught ~W STYLE-WARNING condition~:P~]~
+                       ~[~:;~:*~&  printed ~W note~:P~]"
 		       abort-p
 		       *aborted-compilation-unit-count*
 		       *compiler-error-count*

@@ -1578,7 +1578,7 @@ And so, we are saved.
 		  (sort (third type+count+sizes) #'< :key #'car)))
 	*dfun-count*)
   (mapc #'(lambda (type+count+sizes)
-	    (format t "~&There are ~D dfuns of type ~S."
+	    (format t "~&There are ~W dfuns of type ~S."
 		    (cadr type+count+sizes) (car type+count+sizes))
 	    (format t "~%   ~S~%" (caddr type+count+sizes)))
 	*dfun-count*)

@@ -84,7 +84,7 @@
   (:report
    (lambda (condition stream)
      (format stream
-	     "~@<~S failure in ~S~@[ at character ~D~]: ~2I~_~A~:>"
+	     "~@<~S failure in ~S~@[ at character ~W~]: ~2I~_~A~:>"
 	     'read
 	     'compile-file
 	     (input-error-in-compile-file-position condition)

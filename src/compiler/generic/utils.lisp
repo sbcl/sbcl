@@ -15,7 +15,7 @@
 (defun fixnumize (num)
   (if (<= #x-20000000 num #x1fffffff)
       (ash num 2)
-      (error "~D is too big for a fixnum." num)))
+      (error "~W is too big for a fixnum." num)))
 
 ;;;; routines for dealing with static symbols
 
@@ -43,7 +43,7 @@
 		       (- (pad-data-block (1- symbol-size))))
 		    (pad-data-block symbol-size))
 	(unless (and (zerop rem) (<= 0 n (1- (length *static-symbols*))))
-	  (error "The byte offset ~D is not valid." offset))
+	  (error "The byte offset ~W is not valid." offset))
 	(elt *static-symbols* n))))
 
 ;;; Return the (byte) offset from NIL to the start of the fdefn object

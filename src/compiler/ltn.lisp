@@ -813,7 +813,7 @@
 		   (valid (valid-function-use call type))
 		   (strict-valid (valid-function-use call type
 						     :strict-result t)))
-	      (frob "unable to do ~A (cost ~D) because:"
+	      (frob "unable to do ~A (cost ~W) because:"
 		    (or (template-note loser) (template-name loser))
 		    (template-cost loser))
 	      (cond
@@ -831,7 +831,7 @@
 	(let ((*compiler-error-context* call))
 	  (compiler-note "~{~?~^~&~6T~}"
 			 (if template
-			     `("forced to do ~A (cost ~D)"
+			     `("forced to do ~A (cost ~W)"
 			       (,(or (template-note template)
 				     (template-name template))
 				,(template-cost template))

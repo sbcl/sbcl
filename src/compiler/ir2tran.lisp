@@ -57,7 +57,7 @@
 (declaim (ftype (function ((or nlx-info lambda-var) physenv) tn)
 		find-in-physenv))
 (defun find-in-physenv (thing physenv)
-  (or (cdr (assoc thing (ir2-physenv-environment (physenv-info physenv))))
+  (or (cdr (assoc thing (ir2-physenv-closure (physenv-info physenv))))
       (etypecase thing
 	(lambda-var
 	 ;; I think that a failure of this assertion means that we're
@@ -649,7 +649,7 @@
 	    (locs loc))))
 
       (when old-fp
-	(dolist (thing (ir2-physenv-environment called-env))
+	(dolist (thing (ir2-physenv-closure called-env))
 	  (temps (find-in-physenv (car thing) this-1env))
 	  (locs (cdr thing)))
 	
@@ -1023,13 +1023,13 @@
 	    (t
 	     ;; No more args, so normal entry.
 	     (vop xep-allocate-frame node block start-label nil)))
-      (if (ir2-physenv-environment env)
+      (if (ir2-physenv-closure env)
 	  (let ((closure (make-normal-tn *backend-t-primitive-type*)))
 	    (vop setup-closure-environment node block start-label closure)
 	    (when (getf (functional-plist ef) :fin-function)
 	      (vop funcallable-instance-lexenv node block closure closure))
 	    (let ((n -1))
-	      (dolist (loc (ir2-physenv-environment env))
+	      (dolist (loc (ir2-physenv-closure env))
 		(vop closure-ref node block closure (incf n) (cdr loc)))))
 	  (vop setup-environment node block start-label)))
 

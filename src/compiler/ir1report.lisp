@@ -277,7 +277,7 @@
   (cond ((= *last-message-count* 1)
 	 (when terpri (terpri *error-output*)))
 	((> *last-message-count* 1)
-          (format *error-output* "~&; [Last message occurs ~D times.]~2%"
+          (format *error-output* "~&; [Last message occurs ~W times.]~2%"
 		 *last-message-count*)))
   (setq *last-message-count* 0))
 

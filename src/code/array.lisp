@@ -182,8 +182,8 @@
 		(error "can't specify both :INITIAL-ELEMENT and ~
 		:INITIAL-CONTENTS"))
 	      (unless (= length (length initial-contents))
-		(error "There are ~D elements in the :INITIAL-CONTENTS, but ~
-		       the vector length is ~D."
+		(error "There are ~W elements in the :INITIAL-CONTENTS, but ~
+		       the vector length is ~W."
 		       (length initial-contents)
 		       length))
 	      (replace array initial-contents))
@@ -212,8 +212,9 @@
 			    (unless (and (fixnump fill-pointer)
 					 (>= fill-pointer 0)
 					 (<= fill-pointer length))
-				    (error "invalid fill-pointer ~D"
-					   fill-pointer))
+			      ;; FIXME: should be TYPE-ERROR?
+			      (error "invalid fill-pointer ~W"
+				     fill-pointer))
 			    fill-pointer))))
 		 (setf (%array-fill-pointer-p array) t))
 		(t
@@ -274,12 +275,12 @@
 		     (t
 		      (unless (typep contents 'sequence)
 			(error "malformed :INITIAL-CONTENTS: ~S is not a ~
-				sequence, but ~D more layer~:P needed."
+				sequence, but ~W more layer~:P needed."
 			       contents
 			       (- (length dimensions) axis)))
 		      (unless (= (length contents) (car dims))
 			(error "malformed :INITIAL-CONTENTS: Dimension of ~
-				axis ~D is ~D, but ~S is ~D long."
+				axis ~W is ~W, but ~S is ~W long."
 			       axis (car dims) contents (length contents)))
 		      (if (listp contents)
 			  (dolist (content contents)
@@ -346,7 +347,7 @@
 	   (list subscripts))
   (let ((rank (array-rank array)))
     (unless (= rank (length subscripts))
-      (error "wrong number of subscripts, ~D, for array of rank ~D"
+      (error "wrong number of subscripts, ~W, for array of rank ~W"
 	     (length subscripts) rank))
     (if (array-header-p array)
 	(do ((subs (nreverse subscripts) (cdr subs))
@@ -360,7 +361,7 @@
 	    (declare (fixnum index dim))
 	    (unless (< -1 index dim)
 	      (if invalid-index-error-p
-		  (error "invalid index ~D~[~;~:; on axis ~:*~D~] in ~S"
+		  (error "invalid index ~W~[~;~:; on axis ~:*~W~] in ~S"
 			 index axis array)
 		  (return-from %array-row-major-index nil)))
 	    (incf result (* chunk-size index))
@@ -368,7 +369,7 @@
 	(let ((index (first subscripts)))
 	  (unless (< -1 index (length (the (simple-array * (*)) array)))
 	    (if invalid-index-error-p
-		(error "invalid index ~D in ~S" index array)
+		(error "invalid index ~W in ~S" index array)
 		(return-from %array-row-major-index nil)))
 	  index))))
 
@@ -556,7 +557,7 @@
 	   (error "Vector axis is not zero: ~S" axis-number))
 	 (length (the (simple-array * (*)) array)))
 	((>= axis-number (%array-rank array))
-	 (error "~D is too big; ~S only has ~D dimension~:P."
+	 (error "Axis number ~W is too big; ~S only has ~D dimension~:P."
 		axis-number array (%array-rank array)))
 	(t
 	 (%array-dimension array axis-number))))

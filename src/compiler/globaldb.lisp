@@ -152,7 +152,7 @@
 	    (:print-object (lambda (x s)
 			     (print-unreadable-object (x s)
 			       (format s
-				       "~S ~S, Number = ~D"
+				       "~S ~S, Number = ~W"
 				       (class-info-name (type-info-class x))
 				       (type-info-name x)
 				       (type-info-number x)))))

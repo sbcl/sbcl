@@ -56,7 +56,7 @@
 	     :datum vector
 	     :expected-type `(vector ,declared-length)
 	     :format-control
-	     "Vector length (~D) doesn't match declared length (~D)."
+	     "Vector length (~W) doesn't match declared length (~W)."
 	     :format-arguments (list actual-length declared-length))))
   vector)
 (defun sequence-of-checked-length-given-type (sequence result-type)

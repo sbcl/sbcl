@@ -132,7 +132,7 @@
 (defmethod print-object ((cache cache) stream)
   (print-unreadable-object (cache stream :type t :identity t)
     (format stream
-	    "~D ~S ~D"
+	    "~W ~S ~W"
 	    (cache-nkeys cache)
 	    (cache-valuep cache)
 	    (cache-nlines cache))))

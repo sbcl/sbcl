@@ -201,7 +201,7 @@
 	      (setq head (cache-vector-ref head 0))
 	      (incf free))
 	(format t
-		"~&There  ~4D are caches of size ~4D. (~D free  ~3D%)"
+		"~&There are  ~4D caches of size  ~4D. (~D free  ~3D%)"
 		allocated
 		size
 		free
@@ -1068,7 +1068,7 @@
 		 (sep (when home (line-separation home i))))
 	    (when (and sep (> sep limit))
 	      (error "bad cache ~S ~@
-		      value at location ~D: ~D lines from its home. The limit is ~D."
+		      value at location ~W: ~W lines from its home. The limit is ~W."
 		     cache location sep limit))))
 	(setq location (next-location location))))))
 

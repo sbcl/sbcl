@@ -263,7 +263,7 @@
 			     (error
 			      'format-error
 			      :complaint
-			      "too many parameters, expected no more than ~D"
+			      "too many parameters, expected no more than ~W"
 			      :arguments (list ,(length specs))
 			      :offset (caar ,params)))
 		       ,,@body)))
@@ -617,8 +617,8 @@
 	    `(if (<= 0 ,posn (length orig-args))
 		 (setf args (nthcdr ,posn orig-args))
 		 (error 'format-error
-			:complaint "Index ~D out of bounds. Should have been ~
-				    between 0 and ~D."
+			:complaint "Index ~W out of bounds. Should have been ~
+				    between 0 and ~W."
 			:arguments (list ,posn (length orig-args))
 			:offset ,(1- end)))))
       (if colonp
@@ -634,8 +634,8 @@
 			(setf args (nthcdr new-posn orig-args))
 			(error 'format-error
 			       :complaint
-			       "Index ~D is out of bounds; should have been ~
-				between 0 and ~D."
+			       "Index ~W is out of bounds; should have been ~
+				between 0 and ~W."
 			       :arguments
 			       (list new-posn (length orig-args))
 			       :offset ,(1- end)))))))

@@ -379,7 +379,7 @@
 	(give-up-ir1-transform
 	 "The array dimensions are unknown; must call ARRAY-DIMENSION at runtime."))
       (unless (> (length dims) axis)
-	(abort-ir1-transform "The array has dimensions ~S, ~D is too large."
+	(abort-ir1-transform "The array has dimensions ~S, ~W is too large."
 			     dims
 			     axis))
       (let ((dim (nth axis dims)))
@@ -548,14 +548,14 @@
 	      (cond (,end
 		     (unless (or ,unsafe? (<= ,end ,size))
 		       ,(if fail-inline?
-			    `(error "End ~D is greater than total size ~D."
+			    `(error "End ~W is greater than total size ~W."
 				    ,end ,size)
 			    `(failed-%with-array-data ,array ,start ,end)))
 		     ,end)
 		    (t ,size))))
        (unless (or ,unsafe? (<= ,start ,defaulted-end))
 	 ,(if fail-inline?
-	      `(error "Start ~D is greater than end ~D." ,start ,defaulted-end)
+	      `(error "Start ~W is greater than end ~W." ,start ,defaulted-end)
 	      `(failed-%with-array-data ,array ,start ,end)))
        (do ((,data ,array (%array-data-vector ,data))
 	    (,cumulative-offset 0

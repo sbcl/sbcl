@@ -126,7 +126,7 @@
   (declare (type list locations reserve-locations alternate-scs constant-scs))
   (declare (type boolean save-p))
   (unless (= (logcount alignment) 1)
-    (error "alignment not a power of two: ~D" alignment))
+    (error "alignment not a power of two: ~W" alignment))
 
   (let ((sb (meta-sb-or-lose sb-name)))
     (if (eq (sb-kind sb) :finite)
@@ -136,7 +136,7 @@
 	  (dolist (el locations)
 	    (declare (type unsigned-byte el))
 	    (unless (<= 1 (+ el element-size) size)
-	      (error "SC element ~D out of bounds for ~S" el sb))))
+	      (error "SC element ~W out of bounds for ~S" el sb))))
 	(when locations
 	  (error ":LOCATIONS is meaningless in a ~S SB." (sb-kind sb))))
 
@@ -176,7 +176,7 @@
 
        (let ((old (svref *backend-sc-numbers* ',number)))
 	 (when (and old (not (eq (sc-name old) ',name)))
-	   (warn "redefining SC number ~D from ~S to ~S" ',number
+	   (warn "redefining SC number ~W from ~S to ~S" ',number
 		 (sc-name old) ',name)))
 
        (setf (svref *backend-sc-numbers* ',number)
@@ -1309,7 +1309,7 @@
 					(eq (car x) :constant)))
 			       types)
 		 num)
-	(error "expected ~D ~:[result~;argument~] type~P: ~S"
+	(error "expected ~W ~:[result~;argument~] type~P: ~S"
 	       num load-p types num)))
 
     (when more-op
@@ -1462,7 +1462,7 @@
 
     (let ((nvars (length (vop-parse-variant-vars parse))))
       (unless (= (length variant) nvars)
-	(error "expected ~D variant values: ~S" nvars variant)))
+	(error "expected ~W variant values: ~S" nvars variant)))
 
     `(make-vop-info
       :name ',(vop-parse-name parse)
@@ -1748,7 +1748,7 @@
     (when (or (vop-parse-more-args parse) (vop-parse-more-results parse))
       (error "cannot use VOP with variable operand count templates"))
     (unless (= noperands (length operands))
-      (error "called with ~D operands, but was expecting ~D"
+      (error "called with ~W operands, but was expecting ~W"
 	     (length operands) noperands))
 
     (multiple-value-bind (acode abinds n-args)
@@ -1811,7 +1811,7 @@
 		(<= (length fixed-results) result-count))
       (error "too many fixed results"))
     (unless (= (length info) info-count)
-      (error "expected ~D info args" info-count))
+      (error "expected ~W info args" info-count))
 
     (multiple-value-bind (acode abinds n-args)
 	(make-operand-list fixed-args (car (last args)) nil)
