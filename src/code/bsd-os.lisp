@@ -34,7 +34,7 @@
 (defun os-cold-init-or-reinit ()
   (setf *software-version* nil)
   (setf *default-pathname-defaults*
-	(pathname (sb!ext::default-directory))))
+	(pathname (sb!unix:posix-getcwd/))))
 
 ;;; Return system time, user time and number of page faults.
 (defun get-system-info ()
@@ -43,7 +43,7 @@
 		       (sb!unix:unix-getrusage sb!unix:rusage_self)
     (declare (ignore maxrss ixrss idrss isrss minflt))
     (unless err?
-      (simple-perror "Unix system call getrusage failed" :errno utime))
+      (simple-perror "Unix system call getrusage() failed" :errno utime))
     
     (values utime stime majflt)))
 

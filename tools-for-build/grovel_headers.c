@@ -54,15 +54,16 @@ main(int argc, char *argv[])
     printf("(in-package \"SB!UNIX\")\n\n");
 
     printf(";;; types, types, types\n");
+    DEFTYPE("clock-t", clock_t);
     DEFTYPE("dev-t",   dev_t);
+    DEFTYPE("gid-t",   gid_t);
     DEFTYPE("ino-t",   ino_t);
     DEFTYPE("mode-t",  mode_t);
     DEFTYPE("nlink-t", nlink_t);
-    DEFTYPE("uid-t",   uid_t);
-    DEFTYPE("gid-t",   gid_t);
-    DEFTYPE("clock-t", clock_t);
     DEFTYPE("off-t",   off_t);
+    DEFTYPE("size-t",  size_t);
     DEFTYPE("time-t",  time_t);
+    DEFTYPE("uid-t",   uid_t);
     printf("\n");
 
     printf(";;; fcntl.h (or unistd.h on OpenBSD)\n");
@@ -83,16 +84,16 @@ main(int argc, char *argv[])
     defconstant("o_trunc",   O_TRUNC);
     defconstant("o_append",  O_APPEND);
     printf(";;;\n");
-    defconstant( "s-ifmt",  S_IFMT);
-    defconstant( "s-ififo", S_IFIFO);
-    defconstant( "s-ifchr", S_IFCHR);
-    defconstant( "s-ifdir", S_IFDIR);
-    defconstant( "s-ifblk", S_IFBLK);
-    defconstant( "s-ifreg", S_IFREG);
+    defconstant("s-ifmt",  S_IFMT);
+    defconstant("s-ififo", S_IFIFO);
+    defconstant("s-ifchr", S_IFCHR);
+    defconstant("s-ifdir", S_IFDIR);
+    defconstant("s-ifblk", S_IFBLK);
+    defconstant("s-ifreg", S_IFREG);
     printf("\n");
   
-    defconstant( "s-iflnk",  S_IFLNK);
-    defconstant( "s-ifsock", S_IFSOCK);
+    defconstant("s-iflnk",  S_IFLNK);
+    defconstant("s-ifsock", S_IFSOCK);
     printf("\n");
 
     return 0;

@@ -202,7 +202,7 @@ F(wait3)
 F(write)
 F(writev)
 
-/* Math routines. */
+/* math routines */
 F(cos)
 F(sin)
 F(tan)
@@ -234,11 +234,11 @@ F(sqrt)
 #endif
 F(hypot)
 
-/* Network support. */
+/* network support */
 F(gethostbyname)
 F(gethostbyaddr)
 
-/* Other miscellaneous things. */
+/* other miscellaneous things */
 #if defined(SVR4) || defined(__FreeBSD__)
 F(setpgid)
 F(getpgid)
@@ -249,9 +249,7 @@ D(daylight)
 #endif
 D(tzname)
 #endif
-#if !defined (SOLARIS) ||  defined(SOLARIS25)
-F(getwd)
-#endif
+F(getcwd)
 F(ttyname)
 
 #ifdef irix

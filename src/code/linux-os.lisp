@@ -38,7 +38,7 @@
   (sb!sys:allocate-system-memory-at (sb!sys:int-sap #x20000000) #xc0000000)
   (setf *software-version* nil)
   (setf *default-pathname-defaults*
-	(pathname (sb!ext::default-directory))))
+	(pathname (sb!unix:posix-getcwd/))))
 
 ;;; Return system time, user time and number of page faults.
 (defun get-system-info ()

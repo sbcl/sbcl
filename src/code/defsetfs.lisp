@@ -132,10 +132,6 @@
 (in-package "SB!IMPL")
 #-sb-xc-host (defsetf fdefinition %set-fdefinition)
 
-;;; from filesys.lisp
-(in-package "SB!IMPL")
-(defsetf default-directory %set-default-directory)
-
 ;;; from kernel.lisp
 (in-package "SB!KERNEL")
 (defsetf code-header-ref code-header-set)

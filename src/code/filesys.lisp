@@ -1016,40 +1016,6 @@
 		(t t)))
 	xn)))
 
-;;;; DEFAULT-DIRECTORY stuff
-;;;;
-;;;; FIXME: *DEFAULT-DIRECTORY-DEFAULTS* seems to be the ANSI way to
-;;;; deal with this, so we should beef up *DEFAULT-DIRECTORY-DEFAULTS*
-;;;; and make all the old DEFAULT-DIRECTORY stuff go away. (At that
-;;;; time the need for UNIX-CHDIR will go away too, I think.)
-
-(defun default-directory ()
-  #!+sb-doc
-  "This is deprecated as of sbcl-0.6.12.18. The ANSI-supported way to do
-  this kind of thing is to use *DEFAULT-PATHNAME-DEFAULTS*.
-
-  Return the pathname for the default directory. This is the place where
-  a file will be written if no directory is specified. This may be changed
-  with SETF."
-  (multiple-value-bind (gr dir-or-error) (sb!unix:unix-current-directory)
-    (if gr
-	(let ((*ignore-wildcards* t))
-	  (pathname (concatenate 'simple-string dir-or-error "/")))
-	(error dir-or-error))))
-
-(defun %set-default-directory (new-val)
-  (let ((namestring (unix-namestring new-val t)))
-    (unless namestring
-      (error "~S doesn't exist." new-val))
-    (multiple-value-bind (gr error) (sb!unix:unix-chdir namestring)
-      (unless gr
-	(simple-file-perror "couldn't set default directory to ~S"
-			    new-val
-			    error)))
-    new-val))
-
-(/show0 "filesys.lisp 934")
-
 ;;; FIXME/REMOVEME: We shouldn't need to do this here, since
 ;;; *DEFAULT-PATHNAME-DEFAULTS* is now initialized in
 ;;; OS-COLD-INIT-OR-REINIT. But in sbcl-0.6.12.19 someone is using

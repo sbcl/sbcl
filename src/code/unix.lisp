@@ -259,29 +259,49 @@
 	     (values (deref fds 0) (deref fds 1))
 	     (cast fds (* int)))))
 
-;;; UNIX-CHDIR accepts a directory name and makes that the
-;;; current working directory.
-(defun unix-chdir (path)
-  (declare (type unix-pathname path))
-  (void-syscall ("chdir" c-string) path))
-
 (defun unix-mkdir (name mode)
   (declare (type unix-pathname name)
 	   (type unix-file-mode mode))
   (void-syscall ("mkdir" c-string int) name mode))
 
-;;; Return the current directory as a SIMPLE-STRING.
-(defun unix-current-directory ()
-  ;; FIXME: Gcc justifiably complains that getwd is dangerous and should
-  ;; not be used; especially with a hardwired 1024 buffer size, yecch.
-  ;; This should be rewritten to use getcwd(3), perhaps by writing
-  ;; a C service routine to do the actual call to getcwd(3) and check
-  ;; of return values.
-  (with-alien ((buf (array char 1024)))
-    (values (not (zerop (alien-funcall (extern-alien "getwd"
-						     (function int (* char)))
-				       (cast buf (* char)))))
-	    (cast buf c-string))))
+;;; Return the Unix current directory as a SIMPLE-STRING, in the
+;;; style returned by getcwd() (no trailing slash character). 
+(defun posix-getcwd ()
+  ;; This implementation relies on a BSD/Linux extension to getcwd()
+  ;; behavior, automatically allocating memory when a null buffer
+  ;; pointer is used. On a system which doesn't support that
+  ;; extension, it'll have to be rewritten somehow.
+  #!-(or linux openbsd freebsd) (,stub,)
+  (let* ((raw-char-ptr (alien-funcall (extern-alien "getcwd"
+						    (function (* char)
+							      (* char) size-t))
+				      nil 0)))
+    (if (null-alien raw-char-ptr)
+	(simple-perror "getcwd")
+	(prog1
+	    (cast raw-char-ptr c-string)
+	  (free-alien raw-char-ptr)))))
+
+;;; Return the Unix current directory as a SIMPLE-STRING terminated
+;;; by a slash character.
+(defun posix-getcwd/ ()
+  (concatenate 'string (posix-getcwd) "/"))
+
+;;; Convert at the UNIX level from a possibly relative filename to
+;;; an absolute filename.
+;;;
+;;; FIXME: Do we still need this even as we switch to
+;;; *DEFAULT-PATHNAME-DEFAULTS*? I think maybe we do, since it seems
+;;; to be valid for the user to set *DEFAULT-PATHNAME-DEFAULTS* to
+;;; have a NIL directory component, and then this'd be the only way to
+;;; interpret a relative directory specification. But I don't find the
+;;; ANSI pathname documentation to be a model of clarity. Maybe
+;;; someone who understands it better can take a look at this.. -- WHN
+(defun unix-maybe-prepend-current-directory (name)
+  (declare (simple-string name))
+  (if (and (> (length name) 0) (char= (schar name 0) #\/))
+      name
+      (concatenate 'simple-string (posix-getcwd/) name)))
 
 ;;; Duplicate an existing file descriptor (given as the argument) and
 ;;; return it. If FD is not a valid file descriptor, NIL and an error
@@ -680,15 +700,6 @@
 	      ((eql kind s-ifreg) :file)
 	      ((eql kind s-iflnk) :link)
 	      (t :special))))))
-
-(defun unix-maybe-prepend-current-directory (name)
-  (declare (simple-string name))
-  (if (and (> (length name) 0) (char= (schar name 0) #\/))
-      name
-      (multiple-value-bind (win dir) (unix-current-directory)
-	(if win
-	    (concatenate 'simple-string dir "/" name)
-	    name))))
 
 ;;; Return the pathname with all symbolic links resolved.
 ;;;
