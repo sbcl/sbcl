@@ -97,7 +97,7 @@
   (let ((result 0))
     (declare (type fixnum result))
     (do-external-symbols (i package)
-      (declare (ignore i))
+      (declare (ignorable i))
       (incf result))
     result))
 

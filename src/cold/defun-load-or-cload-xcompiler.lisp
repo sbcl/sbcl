@@ -89,6 +89,7 @@
 		    ;; everything else which needs a separate
                     ;; existence in xc and target
 		    "BUILT-IN-CLASS"
+		    "BYTE" "BYTE-POSITION" "BYTE-SIZE"
 		    "CLASS" "CLASS-NAME" "CLASS-OF"
 		    "COMPILE-FILE"
 		    "COMPILE-FILE-PATHNAME"
@@ -102,14 +103,17 @@
 		    "DEFINE-MODIFY-MACRO"
 		    "DEFINE-SETF-EXPANDER"
 		    "DEFMACRO" "DEFSETF" "DEFSTRUCT" "DEFTYPE"
+		    "DEPOSIT-FIELD" "DPB"
 		    "FBOUNDP" "FDEFINITION" "FMAKUNBOUND"
 		    "FIND-CLASS"
 		    "GET-SETF-EXPANSION"
+		    "LDB" "LDB-TEST"
 		    "LISP-IMPLEMENTATION-TYPE" "LISP-IMPLEMENTATION-VERSION"
 		    "MACRO-FUNCTION"
 		    "MACROEXPAND" "MACROEXPAND-1" "*MACROEXPAND-HOOK*"
 		    "MAKE-LOAD-FORM"
 		    "MAKE-LOAD-FORM-SAVING-SLOTS"
+		    "MASK-FIELD"
 		    "PACKAGE" "PACKAGEP"
 		    "PROCLAIM"
 		    "SPECIAL-OPERATOR-P"
@@ -119,6 +123,37 @@
 		    "TYPE-OF" "TYPEP"
 		    "WITH-COMPILATION-UNIT"))
       (export (intern name package-name) package-name)))
+  ;; don't watch:
+  (dolist (package-name '("SB!ALIEN"
+			  "SB!ALIEN-INTERNALS"
+			  "SB!ASSEM"
+			  "SB!BIGNUM"
+			  "SB!C"
+			  "SB!DEBUG"
+			  "SB!DI"
+			  "SB!DISASSEM"
+			  #!+sb-dyncount "SB!DYNCOUNT"
+			  "SB!FASL"
+			  "SB!IMPL"
+			  "SB!EXT"
+			  "SB!FORMAT"
+			  "SB!GRAY"
+			  "SB!INT"
+			  "SB!KERNEL"
+			  "SB!LOOP"
+			  #!+mp "SB!MP"
+			  "SB!PCL"
+			  "SB!PRETTY"
+			  "SB!PROFILE"
+			  "SB!SYS"
+			  "SB!UNIX"
+			  "SB!VM"
+			  "SB!WALKER"))
+    (shadowing-import (mapcar (lambda (name) (find-symbol name "SB-XC"))
+			      '("BYTE" "BYTE-POSITION" "BYTE-SIZE"
+				"DPB" "LDB" "LDB-TEST"
+				"DEPOSIT-FIELD" "MASK-FIELD"))
+		      package-name))
 
   ;; Build a version of Python to run in the host Common Lisp, to be
   ;; used only in cross-compilation.

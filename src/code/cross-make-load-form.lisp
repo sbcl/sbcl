@@ -31,6 +31,9 @@
 ;;;
 ;;; Also, something along these lines can remove the special case in
 ;;; EMIT-MAKE-LOAD-FORM in src/compiler/main.lisp.
+
+(in-package "SB!INT")
+
 (defun sb!xc:make-load-form-saving-slots (object &rest args
 					  &key slot-names environment)
   (declare (ignore environment))

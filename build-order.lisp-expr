@@ -65,6 +65,7 @@
  ;;; supplied by basic machinery
 
  ("src/code/cross-misc"  :not-target)
+ ("src/code/cross-byte"  :not-target)
  ("src/code/cross-float" :not-target)
  ("src/code/cross-io"    :not-target)
  ("src/code/cross-sap"   :not-target)
