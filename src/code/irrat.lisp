@@ -619,7 +619,6 @@
 
 ;;; HP-UX does not supply a C version of log1p, so
 ;;; use the definition.
-
 #!+hpux
 #!-sb-fluid (declaim (inline %log1p))
 #!+hpux
@@ -627,4 +626,438 @@
   (declare (double-float number)
 	   (optimize (speed 3) (safety 0)))
   (the double-float (log (the (double-float 0d0) (+ number 1d0)))))
+
+;;;; OLD-SPECFUN stuff
+;;;;
+;;;; (This was conditional on #-OLD-SPECFUN in the CMU CL sources,
+;;;; but OLD-SPECFUN was mentioned nowhere else, so it seems to be
+;;;; the standard special function system.)
+;;;;
+;;;; This is a set of routines that implement many elementary
+;;;; transcendental functions as specified by ANSI Common Lisp.  The
+;;;; implementation is based on Kahan's paper.
+;;;;
+;;;; I believe I have accurately implemented the routines and are
+;;;; correct, but you may want to check for your self.
+;;;;
+;;;; These functions are written for CMU Lisp and take advantage of
+;;;; some of the features available there.  It may be possible,
+;;;; however, to port this to other Lisps.
+;;;;
+;;;; Some functions are significantly more accurate than the original
+;;;; definitions in CMU Lisp.  In fact, some functions in CMU Lisp
+;;;; give the wrong answer like (acos #c(-2.0 0.0)), where the true
+;;;; answer is pi + i*log(2-sqrt(3)).
+;;;;
+;;;; All of the implemented functions will take any number for an
+;;;; input, but the result will always be a either a complex
+;;;; single-float or a complex double-float.
+;;;;
+;;;; general functions:
+;;;;   complex-sqrt
+;;;;   complex-log
+;;;;   complex-atanh
+;;;;   complex-tanh
+;;;;   complex-acos
+;;;;   complex-acosh
+;;;;   complex-asin
+;;;;   complex-asinh
+;;;;   complex-atan
+;;;;   complex-tan
+;;;;
+;;;; utility functions:
+;;;;   scalb logb
+;;;;
+;;;; internal functions:
+;;;;    square coerce-to-complex-type cssqs complex-log-scaled
+;;;;
+;;;; references:
+;;;;   Kahan, W. "Branch Cuts for Complex Elementary Functions, or Much
+;;;;   Ado About Nothing's Sign Bit" in Iserles and Powell (eds.) "The
+;;;;   State of the Art in Numerical Analysis", pp. 165-211, Clarendon
+;;;;   Press, 1987
+;;;;
+;;;; The original CMU CL code requested:
+;;;;   Please send any bug reports, comments, or improvements to
+;;;;   Raymond Toy at toy@rtp.ericsson.se.
 
+;;; FIXME: In SBCL, the floating point infinity constants like
+;;; SB!EXT:DOUBLE-FLOAT-POSITIVE-INFINITY aren't available as
+;;; constants at cross-compile time, because the cross-compilation
+;;; host might not have support for floating point infinities. Thus,
+;;; they're effectively implemented as special variable references,
+;;; and the code below which uses them might be unnecessarily
+;;; inefficient. Perhaps some sort of MAKE-LOAD-TIME-VALUE hackery
+;;; should be used instead?
+
+(declaim (inline square))
+(declaim (ftype (function (double-float) (double-float 0d0)) square))
+(defun square (x)
+  (declare (double-float x)
+	   (values (double-float 0d0)))
+  (* x x))
+
+;;; original CMU CL comment, apparently re. SCALB and LOGB and
+;;; perhaps CSSQS:
+;;;   If you have these functions in libm, perhaps they should be used
+;;;   instead of these Lisp versions. These versions are probably good
+;;;   enough, especially since they are portable.
+
+;;; Compute 2^N * X without computing 2^N first. (Use properties of
+;;; the underlying floating-point format.)
+(declaim (inline scalb))
+(defun scalb (x n)
+  (declare (type double-float x)
+	   (type double-float-exponent n))
+  (scale-float x n))
+
+;;; Compute an integer N such that 1 <= |2^N * x| < 2.
+;;; For the special cases, the following values are used:
+;;;    x             logb
+;;;   NaN            NaN
+;;;   +/- infinity   +infinity
+;;;   0              -infinity
+(defun logb (x)
+  (declare (type double-float x))
+  (cond ((float-nan-p x)
+	 x)
+	((float-infinity-p x)
+	 sb!ext:double-float-positive-infinity)
+	((zerop x)
+	 ;; The answer is negative infinity, but we are supposed to
+	 ;; signal divide-by-zero.
+	 ;; (error 'division-by-zero :operation 'logb :operands (list x))
+	 (/ -1.0d0 x)
+	 )
+	(t
+	 (multiple-value-bind (signif expon sign)
+	     (decode-float x)
+	   (declare (ignore signif sign))
+	   ;; DECODE-FLOAT is almost right, except that the exponent
+	   ;; is off by one.
+	   (1- expon)))))
+
+;;; This function is used to create a complex number of the
+;;; appropriate type:
+;;;   Create complex number with real part X and imaginary part Y
+;;;   such that has the same type as Z.  If Z has type (complex
+;;;   rational), the X and Y are coerced to single-float.
+#!+long-float (eval-when (:compile-toplevel :load-toplevel :execute)
+		(error "needs work for long float support"))
+(declaim (inline coerce-to-complex-type))
+(defun coerce-to-complex-type (x y z)
+  (declare (double-float x y)
+	   (number z))
+  (if (subtypep (type-of (realpart z)) 'double-float)
+      (complex x y)
+      ;; Convert anything that's not a DOUBLE-FLOAT to a SINGLE-FLOAT.
+      (complex (float x 1.0)
+	       (float y 1.0))))
+
+;;; Compute |(x+i*y)/2^k|^2 scaled to avoid over/underflow. The
+;;; result is r + i*k, where k is an integer.
+#!+long-float (eval-when (:compile-toplevel :load-toplevel :execute)
+		(error "needs work for long float support"))
+(defun cssqs (z)
+  ;; Save all FP flags
+  (let ((x (float (realpart z) 1d0))
+	(y (float (imagpart z) 1d0))
+	(k 0)
+	(rho 0d0))
+    (declare (double-float x y)
+	     (type (double-float 0d0) rho)
+	     (fixnum k))
+    ;; Would this be better handled using an exception handler to
+    ;; catch the overflow or underflow signal?  For now, we turn all
+    ;; traps off and look at the accrued exceptions to see if any
+    ;; signal would have been raised.
+    (with-float-traps-masked (:underflow :overflow)
+      (setf rho (+ (square x) (square y)))
+      (cond ((and (or (float-nan-p rho)
+		      (float-infinity-p rho))
+		  (or (float-infinity-p (abs x))
+		      (float-infinity-p (abs y))))
+	     (setf rho sb!ext:double-float-positive-infinity))
+	    ((let ((threshold #.(/ least-positive-double-float
+				   double-float-epsilon))
+		   (traps (ldb sb!vm::float-sticky-bits
+			       (sb!vm:floating-point-modes))))
+	       ;; overflow raised or (underflow raised and rho < lambda/eps)
+	       (or (not (zerop (logand sb!vm:float-overflow-trap-bit traps)))
+		   (and (not (zerop (logand sb!vm:float-underflow-trap-bit
+					    traps)))
+			(< rho threshold))))
+	     (setf k (logb (max (abs x) (abs y))))
+	     (setf rho (+ (square (scalb x (- k)))
+			  (square (scalb y (- k))))))))
+    (values rho k)))
+
+;;; principal square root of Z
+;;;
+;;; Z may be any NUMBER, but the result is always a COMPLEX.
+(defun complex-sqrt (z)
+  (declare (number z))
+  (multiple-value-bind (rho k)
+      (cssqs z)
+    (declare (type (double-float 0d0) rho)
+	     (fixnum k))
+    (let ((x (float (realpart z) 1.0d0))
+	  (y (float (imagpart z) 1.0d0))
+	  (eta 0d0)
+	  (nu 0d0))
+      (declare (double-float x y eta nu))
+
+      (if (not (float-nan-p x))
+	  (setf rho (+ (scalb (abs x) (- k)) (sqrt rho))))
+
+      (cond ((oddp k)
+	     (setf k (ash k -1)))
+	    (t
+	     (setf k (1- (ash k -1)))
+	     (setf rho (+ rho rho))))
+
+      (setf rho (scalb (sqrt rho) k))
+
+      (setf eta rho)
+      (setf nu y)
+
+      (when (/= rho 0d0)
+	    (when (not (float-infinity-p (abs nu)))
+		  (setf nu (/ (/ nu rho) 2d0)))
+	    (when (< x 0d0)
+		  (setf eta (abs nu))
+		  (setf nu (float-sign y rho))))
+      (coerce-to-complex-type eta nu z))))
+    
+;;; Compute log(2^j*z).
+;;;
+;;; This is for use with J /= 0 only when |z| is huge.
+(defun complex-log-scaled (z j)
+  (declare (number z)
+	   (fixnum j))
+  ;; The constants t0, t1, t2 should be evaluated to machine
+  ;; precision.  In addition, Kahan says the accuracy of log1p
+  ;; influences the choices of these constants but doesn't say how to
+  ;; choose them.  We'll just assume his choices matches our
+  ;; implementation of log1p.
+  (let ((t0 #.(/ 1 (sqrt 2.0d0)))
+	(t1 1.2d0)
+	(t2 3d0)
+	(ln2 #.(log 2d0))
+	(x (float (realpart z) 1.0d0))
+	(y (float (imagpart z) 1.0d0)))
+    (multiple-value-bind (rho k)
+	(cssqs z)
+      (declare (type (double-float 0d0) rho)
+	       (fixnum k))
+      (let ((beta (max (abs x) (abs y)))
+	    (theta (min (abs x) (abs y))))
+	(declare (type (double-float 0d0) beta theta))
+	(if (and (zerop k)
+		 (< t0 beta)
+		 (or (<= beta t1)
+		     (< rho t2)))
+	    (setf rho (/ (%log1p (+ (* (- beta 1.0d0)
+				       (+ beta 1.0d0))
+				    (* theta theta)))
+			 2d0))
+	    (setf rho (+ (/ (log rho) 2d0)
+			 (* (+ k j) ln2))))
+	(setf theta (atan y x))
+	(coerce-to-complex-type rho theta z)))))
+
+;;; log of Z = log |Z| + i * arg Z
+;;;
+;;; Z may be any number, but the result is always a complex.
+(defun complex-log (z)
+  (declare (number z))
+  (complex-log-scaled z 0))
+	       
+;;; KLUDGE: Let us note the following "strange" behavior. atanh 1.0d0
+;;; is +infinity, but the following code returns approx 176 + i*pi/4.
+;;; The reason for the imaginary part is caused by the fact that arg
+;;; i*y is never 0 since we have positive and negative zeroes. -- rtoy
+;;; Compute atanh z = (log(1+z) - log(1-z))/2.
+(defun complex-atanh (z)
+  (declare (number z))
+  (let* (;; constants
+	 (theta #.(/ (sqrt most-positive-double-float) 4.0d0))
+	 (rho #.(/ 4.0d0 (sqrt most-positive-double-float)))
+	 (half-pi #.(/ pi 2.0d0))
+	 (rp (float (realpart z) 1.0d0))
+	 (beta (float-sign rp 1.0d0))
+	 (x (* beta rp))
+	 (y (* beta (- (float (imagpart z) 1.0d0))))
+	 (eta 0.0d0)
+	 (nu 0.0d0))
+    (declare (double-float theta rho half-pi rp beta y eta nu)
+	     (type (double-float 0d0) x))
+    (cond ((or (> x theta)
+	       (> (abs y) theta))
+	   ;; to avoid overflow...
+	   (setf eta (float-sign y half-pi))
+	   ;; nu is real part of 1/(x + iy).  This is x/(x^2+y^2),
+	   ;; which can cause overflow.  Arrange this computation so
+	   ;; that it won't overflow.
+	   (setf nu (let* ((x-bigger (> x (abs y)))
+			   (r (if x-bigger (/ y x) (/ x y)))
+			   (d (+ 1.0d0 (* r r))))
+		      (declare (double-float r d))
+		      (if x-bigger
+			  (/ (/ x) d)
+			  (/ (/ r y) d)))))
+	  ((= x 1.0d0)
+	   ;; Should this be changed so that if y is zero, eta is set
+	   ;; to +infinity instead of approx 176?  In any case
+	   ;; tanh(176) is 1.0d0 within working precision.
+	   (let ((t1 (+ 4d0 (square y)))
+		 (t2 (+ (abs y) rho)))
+	     (declare (type (double-float 0d0) t1 t2))
+	     #+nil
+	     (setf eta (log (/ (sqrt (sqrt t1)))
+			    (sqrt t2)))
+	     (setf eta (* 0.5d0 (log (the (double-float 0.0d0)
+					  (/ (sqrt t1) t2)))))
+	     (setf nu (* 0.5d0
+			 (float-sign y
+				     (+ half-pi (atan (* 0.5d0 t2))))))))
+	  (t
+	   (let ((t1 (+ (abs y) rho)))
+	     (declare (double-float t1))
+	     ;; normal case using log1p(x) = log(1 + x)
+	     (setf eta (* 0.25d0
+			  (%log1p (/ (* 4.0d0 x)
+				     (+ (square (- 1.0d0 x))
+					(square t1))))))
+	     (setf nu (* 0.5d0
+			 (atan (* 2.0d0 y)
+			       (- (* (- 1.0d0 x)
+				     (+ 1.0d0 x))
+				  (square t1))))))))
+    (coerce-to-complex-type (* beta eta)
+			    (- (* beta nu))
+			    z)))
+
+;;; Compute tanh z = sinh z / cosh z.
+(defun complex-tanh (z)
+  (declare (number z))
+  (let ((x (float (realpart z) 1.0d0))
+	(y (float (imagpart z) 1.0d0)))
+    (declare (double-float x y))
+    (cond ((> (abs x)
+	      #-(or linux hpux) #.(/ (asinh most-positive-double-float) 4d0)
+	      ;; This is more accurate under linux.
+	      #+(or linux hpux) #.(/ (+ (log 2.0d0)
+					(log most-positive-double-float))
+				     4d0))
+	   (complex (float-sign x)
+		    (float-sign y 0.0d0)))
+	  (t
+	   (let* ((tv (%tan y))
+		  (beta (+ 1.0d0 (* tv tv)))
+		  (s (sinh x))
+		  (rho (sqrt (+ 1.0d0 (* s s)))))
+	     (declare (double-float tv s)
+		      (type (double-float 0.0d0) beta rho))
+	     (if (float-infinity-p (abs tv))
+		 (coerce-to-complex-type (/ rho s)
+					 (/ tv)
+					 z)
+		 (let ((den (+ 1.0d0 (* beta s s))))
+		   (coerce-to-complex-type (/ (* beta rho s)
+					      den)
+					   (/ tv den)
+					   z))))))))
+
+;;; Compute acos z = pi/2 - asin z.
+;;;
+;;; Z may be any NUMBER, but the result is always a COMPLEX.
+(defun complex-acos (z)
+  ;; Kahan says we should only compute the parts needed.  Thus, the
+  ;; REALPART's below should only compute the real part, not the whole
+  ;; complex expression.  Doing this can be important because we may get
+  ;; spurious signals that occur in the part that we are not using.
+  ;;
+  ;; However, we take a pragmatic approach and just use the whole
+  ;; expression.
+  ;;
+  ;; NOTE: The formula given by Kahan is somewhat ambiguous in whether
+  ;; it's the conjugate of the square root or the square root of the
+  ;; conjugate.  This needs to be checked.
+  ;;
+  ;; I checked.  It doesn't matter because (conjugate (sqrt z)) is the
+  ;; same as (sqrt (conjugate z)) for all z.  This follows because
+  ;;
+  ;; (conjugate (sqrt z)) = exp(0.5*log |z|)*exp(-0.5*j*arg z).
+  ;;
+  ;; (sqrt (conjugate z)) = exp(0.5*log|z|)*exp(0.5*j*arg conj z)
+  ;;
+  ;; and these two expressions are equal if and only if arg conj z =
+  ;; -arg z, which is clearly true for all z.
+  (declare (number z))
+  (let ((sqrt-1+z (complex-sqrt (+ 1 z)))
+	(sqrt-1-z (complex-sqrt (- 1 z))))
+    (with-float-traps-masked (:divide-by-zero)
+      (complex (* 2 (atan (/ (realpart sqrt-1-z)
+			     (realpart sqrt-1+z))))
+	       (asinh (imagpart (* (conjugate sqrt-1+z)
+				   sqrt-1-z)))))))
+
+;;; Compute acosh z = 2 * log(sqrt((z+1)/2) + sqrt((z-1)/2))
+;;;
+;;; Z may be any NUMBER, but the result is always a COMPLEX.
+(defun complex-acosh (z)
+  (declare (number z))
+  (let ((sqrt-z-1 (complex-sqrt (- z 1)))
+	(sqrt-z+1 (complex-sqrt (+ z 1))))
+    (with-float-traps-masked (:divide-by-zero)
+      (complex (asinh (realpart (* (conjugate sqrt-z-1)
+				   sqrt-z+1)))
+	       (* 2 (atan (/ (imagpart sqrt-z-1)
+			     (realpart sqrt-z+1))))))))
+
+;;; Compute asin z = asinh(i*z)/i.
+;;;
+;;; Z may be any NUMBER, but the result is always a COMPLEX.
+(defun complex-asin (z)
+  (declare (number z))
+  (let ((sqrt-1-z (complex-sqrt (- 1 z)))
+	(sqrt-1+z (complex-sqrt (+ 1 z))))
+    (with-float-traps-masked (:divide-by-zero)
+      (complex (atan (/ (realpart z)
+			(realpart (* sqrt-1-z sqrt-1+z))))
+	       (asinh (imagpart (* (conjugate sqrt-1-z)
+				   sqrt-1+z)))))))
+
+;;; Compute asinh z = log(z + sqrt(1 + z*z)).
+;;;
+;;; Z may be any number, but the result is always a complex.
+(defun complex-asinh (z)
+  (declare (number z))
+  ;; asinh z = -i * asin (i*z)
+  (let* ((iz (complex (- (imagpart z)) (realpart z)))
+	 (result (complex-asin iz)))
+    (complex (imagpart result)
+	     (- (realpart result)))))
+	 
+;;; Compute atan z = atanh (i*z) / i.
+;;;
+;;; Z may be any number, but the result is always a complex.
+(defun complex-atan (z)
+  (declare (number z))
+  ;; atan z = -i * atanh (i*z)
+  (let* ((iz (complex (- (imagpart z)) (realpart z)))
+	 (result (complex-atanh iz)))
+    (complex (imagpart result)
+	     (- (realpart result)))))
+
+;;; Compute tan z = -i * tanh(i * z)
+;;;
+;;; Z may be any number, but the result is always a complex.
+(defun complex-tan (z)
+  (declare (number z))
+  ;; tan z = -i * tanh(i*z)
+  (let* ((iz (complex (- (imagpart z)) (realpart z)))
+	 (result (complex-tanh iz)))
+    (complex (imagpart result)
+	     (- (realpart result)))))

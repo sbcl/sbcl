@@ -356,9 +356,7 @@ returning an array as first value always.
 45:
   a slew of floating-point-related errors reported by Peter Van Eynde
   on July 25, 2000:
-	a: (SQRT -9.0) fails, because SB-KERNEL::COMPLEX-SQRT is undefined.
-	   Similarly, COMPLEX-ASIN, COMPLEX-ACOS, COMPLEX-ACOSH, and others
-	   aren't found.
+	a: (fixed in sbcl-0.6.11.25)
 	b: SBCL's value for LEAST-POSITIVE-SHORT-FLOAT is bogus, and 
 	   should probably be 1.4012985e-45. In SBCL,
 	   (/ LEAST-POSITIVE-SHORT-FLOAT 2) returns a number smaller
@@ -372,10 +370,7 @@ returning an array as first value always.
 		(EXPT 10.0d0 1000)
 	   PVE's regression tests want them to raise errors. SBCL
 	   generates the infinities instead, which may or may not be
-	   conforming behavior, but then blow it by being unable to
-	   output the infinities, since support for infinities is generally
-	   broken, and in particular SB-IMPL::OUTPUT-FLOAT-INFINITY is
-	   undefined.
+	   conforming behavior.
 	d: (in section12.erg) various forms a la 
 		(FLOAT 1 DOUBLE-FLOAT-EPSILON)
 	   don't give the right behavior.
@@ -830,6 +825,25 @@ Error in function C::GET-LAMBDA-TO-COMPILE:
   CHAR-CODE-LIMIT. This will probably cause problems if we try to 
   bootstrap on a system which uses a different value of CHAR-CODE-LIMIT
   than SBCL does.
+
+91:
+  (subtypep '(or (integer -1 1)
+                 unsigned-byte)
+            '(or (rational -1 7)
+                 unsigned-byte
+                 (integer -1 1))) => NIL,T
+  An analogous problem with SINGLE-FLOAT and REAL types was fixed in 
+  sbcl-0.6.11.22, but some peculiarites of the RATIO type makes it 
+  awkward to generalize the fix to INTEGER and RATIONAL. It's not 
+  clear what's the best fix. (See the "bug in type handling" discussion
+  on cmucl-imp ca. 2001-03-22 and ca. 2001-02-12.)
+
+92:
+  (< SB-EXT:SINGLE-FLOAT-POSITIVE-INFINITY 100) signals an error:
+    error in function SB-KERNEL:INTEGER-DECODE-SINGLE-FLOAT:
+      can't decode NaN or infinity: #.EXT:SINGLE-FLOAT-POSITIVE-INFINITY
+  This is a bug in the original CMU CL code. I reported it to cmucl-imp
+  2001-03-22 in hopes that they'll fix it for us.
 
 
 KNOWN BUGS RELATED TO THE IR1 INTERPRETER

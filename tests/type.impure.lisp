@@ -13,7 +13,13 @@
 	       integer fixnum (integer 0 10)
 	       single-float (single-float -1.0 1.0) (single-float 0.1)
 	       (real 4 8) (real -1 7) (real 2 11)
-	       (member #\a #\b #\c) (member 1 #\a) (member 3.0 3.3))))
+	       (member #\a #\b #\c) (member 1 #\a) (member 3.0 3.3)
+	       ;; FIXME: When bug 91 is fixed, add these to the list:
+	       ;;   (INTEGER -1 1)
+	       ;;   UNSIGNED-BYTE
+	       ;;   (RATIONAL -1 7) (RATIONAL -2 4)
+	       ;;   RATIO
+	       )))
   (dolist (i types)
     (format t "type I=~S~%" i)
     (dolist (j types)

@@ -685,16 +685,19 @@ changes in sbcl-0.6.12 relative to sbcl-0.6.11:
 * many patches ported from CMU CL by Martin Atzmueller, with 
   half a dozen bug fixes in pretty-printing and the debugger, and
   half a dozen others elsewhere
-* improved support for type intersection and union, fixing bug 12
-  (e.g., now (SUBTYPEP 'KEYWORD 'SYMBOL)=>T,T) and some other
-  smaller bugs as well
+* fixed bug 13: Floating point infinities are now supported again.
+* fixed bug 45a: Various internal functions required to support
+  complex special functions have been merged from CMU CL sources.
+  (When I was first setting up SBCL, I misunderstood a compile-time
+  conditional #-OLD-SPECFUN, and so accidentally deleted them.)
 ?? The :PROPAGATE-FLOAT-TYPE and :PROPAGATE-FUN-TYPE features
   are now supported, and enabled by default. Thus, the compiler can
   handle many floating point and complex operations much less
   inefficiently. (Thus e.g. you can implement a complex FFT
   without consing!)
-?? unscrewed floating point infinities (bug 13) in order to support
-  :PROPAGATE-FLOAT-TYPE and :PROPAGATE-FUN-TYPE features
+* improved support for type intersection and union, fixing bug 12
+  (e.g., now (SUBTYPEP 'KEYWORD 'SYMBOL)=>T,T) and some other
+  more obscure bugs as well
 * various fixes to make the cross-compiler more portable to
   ANSI-conforming-but-different cross-compilation hosts (notably
   Lispworks for Windows, following bug reports from Arthur Lemmens)
