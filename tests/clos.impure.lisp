@@ -115,7 +115,7 @@
 (defgeneric born-to-be-redefined (x))
 (assert (eq (born-to-be-redefined 1) 'int))
 
-;;; in the removal of ITERATE from SB-PCL, a bug was introduced
+;;; In the removal of ITERATE from SB-PCL, a bug was introduced
 ;;; preventing forward-references and also change-class (which
 ;;; forward-references used interally) from working properly.  One
 ;;; symptom was reported by Brian Spilsbury (sbcl-devel 2002-04-08),
@@ -139,6 +139,47 @@
     (assert (= (a-slot bar) 1))
     (assert (= (b-slot bar) 2))
     (assert (= (c-slot bar) 3))))
+
+;;; some more change-class testing, now that we have an ANSI-compliant
+;;; version (thanks to Espen Johnsen):
+(defclass from-class ()
+  ((foo :initarg :foo :accessor foo)))
+
+(defclass to-class ()
+  ((foo :initarg :foo :accessor foo)
+   (bar :initarg :bar :accessor bar)))
+
+(let* ((from (make-instance 'from-class :foo 1))
+       (to (change-class from 'to-class :bar 2)))
+  (assert (= (foo to) 1))
+  (assert (= (bar to) 2)))
+
+;;; printing a structure class should not loop indefinitely (or cause
+;;; a stack overflow):
+(defclass test-printing-structure-class ()
+  ((slot :initarg :slot))
+  (:metaclass structure-class))
+
+(print (make-instance 'test-printing-structure-class :slot 2))
+
+;;; structure-classes should behave nicely when subclassed
+(defclass super-structure ()
+  ((a :initarg :a :accessor a-accessor)
+   (b :initform 2 :reader b-reader))
+  (:metaclass structure-class))
+
+(defclass sub-structure (super-structure)
+  ((c :initarg :c :writer c-writer :accessor c-accessor))
+  (:metaclass structure-class))
+
+(let ((foo (make-instance 'sub-structure :a 1 :c 3)))
+  (assert (= (a-accessor foo) 1))
+  (assert (= (b-reader foo) 2))
+  (assert (= (c-accessor foo) 3))
+  (setf (a-accessor foo) 4)
+  (c-writer 5 foo)
+  (assert (= (a-accessor foo) 4))
+  (assert (= (c-accessor foo) 5)))
 
 ;;;; success
 

@@ -1258,18 +1258,7 @@ WORKAROUND:
   cmucl-help 2002-05-31)
 
 175:
-  sbcl's CHANGE-CLASS does not accept and use initargs, so that e.g.:
-    (defclass foo () ((a :accessor a :initarg :a)))
-    (defclass bar () ((a :accessor a :initarg :a)
-                      (b :accessor b :initarg :b)))
-    (change-class (make-instance 'foo :a 1) 'bar :b 2)
-  should return an instance of class BAR with its A slot-value being 1
-  and its B slot-value being 2; at present (sbcl-0.7.4.8), it signals
-  an error. There's some code by Espen S. Johnsen at 
-  <http://cvs.sourceforge.net/cgi-bin/viewcvs.cgi/clg/clg/glib/pcl.lisp>
-  to patch around this (and some related things? not sure -- WHN) which 
-  might be usable to fix it in the main SBCL CVS.
-
+  (fixed in sbcl-0.7.4.14)
 
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:

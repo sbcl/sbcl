@@ -481,11 +481,10 @@
 
 (defun make-structure-class-defstruct-form (name direct-slots include)
   (let* ((conc-name (intern (format nil "~S structure class " name)))
-         (constructor (intern (format nil "~A constructor" conc-name)))
+         (constructor (intern (format nil "~Aconstructor" conc-name)))
          (defstruct `(defstruct (,name
                                  ,@(when include
                                          `((:include ,(class-name include))))
-                                 (:print-function print-std-instance)
                                  (:predicate nil)
                                  (:conc-name ,conc-name)
                                  (:constructor ,constructor ())
@@ -1151,7 +1150,7 @@
 					     plist)
 	nwrapper)))
 
-(defun change-class-internal (instance new-class)
+(defun change-class-internal (instance new-class initargs)
   (let* ((old-class (class-of instance))
 	 (copy (allocate-instance new-class))
 	 (new-wrapper (get-wrapper copy))
@@ -1184,31 +1183,37 @@
     ;; old instance point to the new storage.
     (swap-wrappers-and-slots instance copy)
 
-    (update-instance-for-different-class copy instance)
+    (apply #'update-instance-for-different-class copy instance initargs)
     instance))
 
 (defmethod change-class ((instance standard-object)
-			 (new-class standard-class))
-  (change-class-internal instance new-class))
+			 (new-class standard-class)
+			 &rest initargs)
+  (change-class-internal instance new-class initargs))
 
 (defmethod change-class ((instance funcallable-standard-object)
-			 (new-class funcallable-standard-class))
-  (change-class-internal instance new-class))
+			 (new-class funcallable-standard-class)
+			 &rest initargs)
+  (change-class-internal instance new-class initargs))
 
 (defmethod change-class ((instance standard-object)
-			 (new-class funcallable-standard-class))
+			 (new-class funcallable-standard-class)
+			 &rest initargs)
+  (declare (ignore initargs))
   (error "You can't change the class of ~S to ~S~@
 	  because it isn't already an instance with metaclass ~S."
 	 instance new-class 'standard-class))
 
 (defmethod change-class ((instance funcallable-standard-object)
-			 (new-class standard-class))
+			 (new-class standard-class)
+			 &rest initargs)
+  (declare (ignore initargs))
   (error "You can't change the class of ~S to ~S~@
 	  because it isn't already an instance with metaclass ~S."
 	 instance new-class 'funcallable-standard-class))
 
-(defmethod change-class ((instance t) (new-class-name symbol))
-  (change-class instance (find-class new-class-name)))
+(defmethod change-class ((instance t) (new-class-name symbol) &rest initargs)
+  (apply #'change-class instance (find-class new-class-name) initargs))
 
 ;;;; The metaclass BUILT-IN-CLASS
 ;;;;

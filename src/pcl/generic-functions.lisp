@@ -312,8 +312,6 @@
 
 (defgeneric add-method (generic-function method))
 
-(defgeneric change-class (instance new-class-name))
-
 (defgeneric class-slot-value (class slot-name))
 
 (defgeneric compatible-meta-class-change-p (class proto-new-class))
@@ -474,7 +472,9 @@
 
 (defgeneric initialize-instance (gf &key &allow-other-keys))
 
-(defgeneric make-instance (class &rest initargs))
+(defgeneric make-instance (class &rest initargs &key &allow-other-keys))
+
+(defgeneric change-class (instance new-class-name &rest initargs &key &allow-other-keys))
 
 (defgeneric no-applicable-method (generic-function &rest args))
 

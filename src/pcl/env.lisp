@@ -142,8 +142,8 @@
 
 (defmethod make-instance ((class cl:class) &rest stuff)
   (apply #'make-instance (coerce-to-pcl-class class) stuff))
-(defmethod change-class (instance (class cl:class))
-  (apply #'change-class instance (coerce-to-pcl-class class)))
+(defmethod change-class (instance (class cl:class) &rest initargs)
+  (apply #'change-class instance (coerce-to-pcl-class class) initargs))
 
 (macrolet ((frob (&rest names)
 	     `(progn

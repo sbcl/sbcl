@@ -1135,8 +1135,12 @@ changes in sbcl-0.7.5 relative to sbcl-0.7.4:
   * bug 169 fixed: no more bogus warnings about using lexical bindings
     despite the presence of perfectly good SPECIAL declarations. (thanks
     to David Lichteblau)
+  * bug 175 fixed: more-closely-ANSI CHANGE-CLASS function, now
+    accepting initargs. (thanks to Espen Johnsen and Pierre Mai)
   * bug fix: Structure type predicate functions now check their argument
     count as they should.
+  * bug fix: classes with :METACLASS STRUCTURE-CLASS now print
+    correctly. (thanks to Pierre Mai)
   * minor incompatible change: The LOAD function no longer, when given
     a wild pathname to load, loads all files matching that pathname;
     instead, an error of type FILE-ERROR is signalled.

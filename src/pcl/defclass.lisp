@@ -117,17 +117,30 @@
 						       '(:from-defclass-p t))
 						     other-initargs)))))))
             (if defstruct-p
-		(let* ((include (or (and supers
-					 (fix-super (car supers)))
-				    (and (not (eq name 'structure-object))
-					 *the-class-structure-object*)))
-		       (defstruct-form (make-structure-class-defstruct-form
-					name slots include)))
-		  `(progn
-		     (eval-when (:compile-toplevel :load-toplevel :execute)
-		       ,defstruct-form) ; really compile the defstruct-form
-		     (eval-when (:compile-toplevel :load-toplevel :execute)
-		       ,defclass-form)))
+		(progn
+		  ;; FIXME: (YUK!) Why do we do this? Because in order
+		  ;; to make the defstruct form, we need to know what
+		  ;; the accessors for the slots are, so we need
+		  ;; already to have hooked into the CLOS machinery.
+		  ;;
+		  ;; There may be a better way to do this: it would
+		  ;; involve knowing enough about PCL to ask "what
+		  ;; will my slot names and accessors be"; failing
+		  ;; this, we currently just evaluate the whole
+		  ;; kaboodle, and then use CLASS-DIRECT-SLOTS. --
+		  ;; CSR, 2002-06-07
+		  (eval defclass-form)
+		  (let* ((include (or (and supers
+					   (fix-super (car supers)))
+				      (and (not (eq name 'structure-object))
+					   *the-class-structure-object*)))
+			 (defstruct-form (make-structure-class-defstruct-form
+					  name (class-direct-slots (find-class name)) include)))
+		    `(progn
+		      (eval-when (:compile-toplevel :load-toplevel :execute)
+			,defstruct-form) ; really compile the defstruct-form
+		      (eval-when (:compile-toplevel :load-toplevel :execute)
+			,defclass-form))))
 		`(progn
 		   ;; By telling the type system at compile time about
 		   ;; the existence of a class named NAME, we can avoid
