@@ -1373,6 +1373,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
     :doc "public (but low-level): native thread support"
     :export ("MAKE-THREAD" "MAKE-LISTENER-THREAD" "DESTROY-THREAD"
 			   "WITH-RECURSIVE-LOCK" "MAKE-MUTEX"
+			   "GET-MUTEX" "FREE-MUTEX"
 			   "CURRENT-THREAD-ID"))
  
  #s(sb-cold:package-data

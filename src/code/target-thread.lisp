@@ -5,17 +5,36 @@
   (lisp-fun-address sb!alien:unsigned-long))
 
 (defun make-thread (function)
-  (%create-thread
-   (sb!kernel:get-lisp-obj-address (coerce function 'function))))
+  (let ((real-function (coerce function 'function)))
+    (%create-thread
+     (sb!kernel:get-lisp-obj-address
+      (lambda ()
+	;; in time we'll move some of the binding presently done in C
+	;; here too
+	(let ((sb!kernel::*restart-clusters* nil))
+	  ;; can't use handling-end-of-the-world, because that flushes
+	  ;; output streams, and we don't necessarily have any (or we
+	  ;; could be sharing them)
+	  (sb!unix:unix-exit
+	   (catch 'sb!impl::%end-of-the-world 
+	     (with-simple-restart 
+		 (destroy-thread
+		  (format nil "~~@<Destroy this thread (~A)~~@:>"
+			  (current-thread-id)))
+	       (funcall real-function))
+	     0))))))))
+
 
 (defun destroy-thread (thread-id)
   (sb!unix:unix-kill thread-id :sigterm)
-  ;; may have been stopped on tty io, so now wake it up to deliver the TERM
+  ;; may have been stopped for some reason, so now wake it up to
+  ;; deliver the TERM
   (sb!unix:unix-kill thread-id :sigcont))
 
+;; Conventional wisdom says that it's a bad idea to use these unless
+;; you really need to.  Use a lock instead
 (defun suspend-thread (thread-id)
   (sb!unix:unix-kill thread-id :sigstop))
-
 (defun resume-thread (thread-id)
   (sb!unix:unix-kill thread-id :sigcont))
 
@@ -33,7 +52,7 @@
 	  until (sb!sys:sap= thread (sb!sys:int-sap 0))
 	  collect (funcall function thread))))
 
-;;;; mutex and read/write locks, originally inspired by CMUCL multi-proc.lisp
+;;;; mutex and read/write locks
 
 ;;; in true OOAOM style, this is also defined in C.  Don't change this
 ;;; defn without referring also to add_thread_to_queue
@@ -48,6 +67,8 @@
 (sb!alien:define-alien-routine
     ("add_thread_to_queue" add-thread-to-queue) void
   (pid int) (mutex system-area-pointer))
+
+(defvar *session-lock* nil)
 
 ;; spinlocks use 0 as "free" value: higher-level locks use NIL
 (defun get-spinlock (lock offset new-value)
@@ -92,6 +113,34 @@
        (return t))
      (setf old-value t1))))
 
+;;;; multiple independent listeners
+
+(defun make-listener-thread (tty-name)  
+  (assert (probe-file tty-name))
+  ;; FIXME probably still need to do some tty stuff to get signals
+  ;; delivered correctly.
+  ;; FIXME 
+  (let* ((in (sb!unix:unix-open (namestring tty-name) sb!unix:o_rdwr #o666))
+	 (out (sb!unix:unix-dup in))
+	 (err (sb!unix:unix-dup in)))
+    (labels ((thread-repl () 
+	       (let* ((*session-lock*
+		       (make-mutex :name (format nil "lock for ~A" tty-name)))
+		      (sb!impl::*stdin* 
+		       (sb!sys:make-fd-stream in :input t :buffering :line))
+		      (sb!impl::*stdout* 
+		       (sb!sys:make-fd-stream out :output t :buffering :line))
+		      (sb!impl::*stderr* 
+		       (sb!sys:make-fd-stream err :output t :buffering :line))
+		      (sb!impl::*tty* 
+		       (sb!sys:make-fd-stream err :input t :output t :buffering :line))
+		      (sb!impl::*descriptor-handlers* nil))
+		 (get-mutex *session-lock*)
+		 (unwind-protect
+		      (sb!impl::toplevel-repl nil)
+		   (sb!int:flush-standard-output-streams)))))
+      (make-thread #'thread-repl))))
+
 ;;;; job control
 
 (defvar *background-threads-wait-for-debugger* t)
@@ -105,15 +154,14 @@ already the foreground thread, or transfers control to the first applicable
 restart if *BACKGROUND-THREADS-WAIT-FOR-DEBUGGER* says to do that instead"
   (let* ((wait-p *background-threads-wait-for-debugger*)
 	 (*background-threads-wait-for-debugger* nil)
-	 (fd-stream (sb!impl::get-underlying-stream stream :input)))
-    (when (not (eql (mutex-value
-		     (sb!impl::fd-stream-owner-thread fd-stream))
-		    (CURRENT-THREAD-ID)))
+	 (fd-stream (sb!impl::get-underlying-stream stream :input))
+	 (lock *session-lock*))
+    (when (not (eql (mutex-value lock)   (CURRENT-THREAD-ID)))
       (when (functionp wait-p) 
 	(setf wait-p 
 	      (funcall wait-p fd-stream (CURRENT-THREAD-ID))))
       (cond (wait-p
-	     (get-mutex (sb!impl::fd-stream-owner-thread fd-stream))
+	     (get-mutex lock)
 	     #+nil
 	     (sb!sys:enable-interrupt :sigint *sigint-handler*)
 	     t)
@@ -121,13 +169,12 @@ restart if *BACKGROUND-THREADS-WAIT-FOR-DEBUGGER* says to do that instead"
 	     (invoke-restart (car (compute-restarts))))))))
 
 (defun thread-repl-prompt-fun (in-stream out-stream)
-  (let* ((stream (sb!impl::get-underlying-stream in-stream :input))
-	 (lock (sb!impl::fd-stream-owner-thread stream)))
+  (let ((lock *session-lock*))
     (unless (eql (mutex-value lock) (current-thread-id))
       (get-mutex lock))
     (let ((stopped (mutex-queue lock)))
       (when stopped
-	(format stream "~{~&Thread ~A suspended~}~%" stopped))
+	(format out-stream "~{~&Thread ~A suspended~}~%" stopped))
       (sb!impl::repl-prompt-fun in-stream out-stream))))
 
 ;;; install this with (setf SB!INT:*REPL-PROMPT-FUN* #'thread-prompt-fun)
@@ -262,28 +309,5 @@ restart if *BACKGROUND-THREADS-WAIT-FOR-DEBUGGER* says to do that instead"
 	  #-i486 (when (eq (lock-process ,lock) *current-process*)
 		   (setf (lock-process ,lock) nil)))))))
 
-#+nil
-(defun make-listener-thread (tty-name)
-  (assert (probe-file tty-name))
-  (let* ((in (sb!unix:unix-open (namestring tty-name) sb!unix:o_rdwr #o666))
-	 (out (sb!unix:unix-dup in))
-	 (err (sb!unix:unix-dup in)))
-    (labels ((thread-repl () 
-	       ;;; XXX also need to set up new *foreground-thread-stack*
-	       (let* ((sb!impl::*stdin* 
-		       (sb!sys:make-fd-stream in :input t :buffering :line))
-		      (sb!impl::*stdout* 
-		       (sb!sys:make-fd-stream out :output t :buffering :line))
-		      (sb!impl::*stderr* 
-		       (sb!sys:make-fd-stream err :output t :buffering :line))
-		      (sb!impl::*tty* 
-		       (sb!sys:make-fd-stream err :input t :output t :buffering :line))
-		      (sb!impl::*descriptor-handlers* nil))
-		 (sb!impl::handling-end-of-the-world
-		  (with-simple-restart 
-		      (destroy-thread
-		       (format nil "~~@<Destroy this thread (~A)~~@:>"
-			       (current-thread-id)))
-		    (sb!impl::toplevel-repl nil))))))
-      (make-thread #'thread-repl))))
+
 
