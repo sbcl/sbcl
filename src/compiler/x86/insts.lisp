@@ -1896,10 +1896,8 @@
     (cond (length-only
 	   (values 0 (1+ length) nil nil))
 	  (t
-	   (sb!kernel:copy-from-system-area sap (* n-byte-bits (1+ offset))
-					    vector (* n-word-bits
-						      vector-data-offset)
-					    (* length n-byte-bits))
+	   (sb!kernel:copy-ub8-from-system-area sap (1+ offset)
+                                                vector 0 length)
 	   (collect ((sc-offsets)
 		     (lengths))
 	     (lengths 1)		; the length byte

@@ -138,10 +138,7 @@
     (declare (type system-area-pointer pc)
 	     (type (unsigned-byte 8) length)
 	     (type (simple-array (unsigned-byte 8) (*)) vector))
-    (copy-from-system-area pc (* n-byte-bits 5)
-			   vector (* n-word-bits
-				     vector-data-offset)
-			   (* length n-byte-bits))
+    (copy-ub8-from-system-area pc 5 vector 0 length)
     (let* ((index 0)
 	   (error-number (sb!c:read-var-integer vector index)))
       (collect ((sc-offsets))

@@ -897,5 +897,101 @@
 	  (with-input-from-string (s string :start 6 :end 9)
 	    (read-char s)))))
 
+;;; testing bit-bashing according to _The Practice of Programming_
+(defun fill-bytes-for-testing (bitsize)
+  "Return a list of 'bytes' of type (MOD BITSIZE)."
+  (remove-duplicates (list 0
+                           (1- (ash 1 (1- bitsize)))
+                           (ash 1 (1- bitsize))
+                           (1- (ash 1 bitsize)))))
+
+(defun fill-with-known-value (value size &rest vectors)
+  (dolist (vec vectors)
+    (dotimes (i size)
+      (setf (aref vec i) value))))
+
+(defun collect-fill-amounts (n-power)
+  (remove-duplicates
+   (loop for i from 0 upto n-power
+         collect (1- (expt 2 i))
+         collect (expt 2 i)
+         collect (1+ (expt 2 i)))))
+
+(defun test-fill-bashing (bitsize padding-amount n-power)
+  (let* ((size (+ (* padding-amount 2) (expt 2 n-power) (* padding-amount 2)))
+         (standard (make-array size :element-type `(unsigned-byte ,bitsize)))
+         (bashed (make-array size :element-type `(unsigned-byte ,bitsize)))
+         (fill-amounts (collect-fill-amounts n-power))
+         (bash-function (intern (format nil "UB~A-BASH-FILL" bitsize)
+                                (find-package "SB-KERNEL"))))
+    (loop for offset from padding-amount below (* 2 padding-amount) do
+          (dolist (c (fill-bytes-for-testing bitsize))
+            (dolist (n fill-amounts)
+              (fill-with-known-value (mod (lognot c) (ash 1 bitsize)) n
+                                     standard bashed)
+              ;; fill vectors
+              ;; a) the standard slow way
+              (fill standard c :start offset :end (+ offset n))
+              ;; b) the blazingly fast way
+              (let ((value (loop for i from 0 by bitsize
+                                 until (= i sb-vm:n-word-bits)
+                                 sum (ash c i))))
+                (funcall bash-function value bashed offset n))
+              ;; check for errors
+              (when (mismatch standard bashed)
+                (format t "Test with offset ~A, fill ~A and length ~A failed.~%"
+                        offset c n)
+                (format t "Mismatch: ~A ~A~%"
+                        (subseq standard 0 (+ offset n 1))
+                        (subseq bashed 0 (+ offset n 1)))
+                (return-from test-fill-bashing nil))))
+          finally (return t))))
+
+(defun test-copy-bashing (bitsize padding-amount n-power)
+  (let* ((size (+ (* padding-amount 2) (expt 2 n-power) (* padding-amount 2)))
+         (standard-dst (make-array size :element-type `(unsigned-byte ,bitsize)))
+         (bashed-dst (make-array size :element-type `(unsigned-byte ,bitsize)))
+         (source (make-array size :element-type `(unsigned-byte ,bitsize)))
+         (fill-amounts (collect-fill-amounts n-power))
+         (bash-function (intern (format nil "UB~A-BASH-COPY" bitsize)
+                                (find-package "SB-KERNEL"))))
+    (do ((source-offset padding-amount (1+ source-offset)))
+        ((>= source-offset (* padding-amount 2))
+         ;; success!
+         t)
+     (do ((target-offset padding-amount (1+ target-offset)))
+         ((>= target-offset (* padding-amount 2)))
+       (dolist (c (fill-bytes-for-testing bitsize))
+         (dolist (n fill-amounts)
+           (fill-with-known-value (mod (lognot c) (ash 1 bitsize)) size
+                                  source standard-dst bashed-dst)
+           ;; fill with test data
+           (fill source c :start source-offset :end (+ source-offset n))
+           ;; copy filled test data to test vectors
+           ;; a) the slow way
+           (replace standard-dst source
+                    :start1 target-offset :end1 (+ target-offset n)
+                    :start2 source-offset :end2 (+ source-offset n))
+           ;; b) the blazingly fast way
+           (funcall bash-function source source-offset
+                    bashed-dst target-offset n)
+           ;; check for errors
+           (when (mismatch standard-dst bashed-dst)
+             (format t "Test with target-offset ~A, source-offset ~A, fill ~A, and length ~A failed.~%"
+                     target-offset source-offset c n)
+             (format t "Mismatch:~% correct ~A~% actual  ~A~%"
+                     standard-dst
+                     bashed-dst)
+             (return-from test-copy-bashing nil))))))))
+
+(loop for i = 1 then (* i 2) do
+     ;; the bare '32' here is fairly arbitrary; '8' provides a good
+     ;; range of lengths over which to fill and copy, which should tease
+     ;; out most errors in the code (if any exist).  (It also makes this
+     ;; part of the test suite finish reasonably quickly.)
+     (assert (test-fill-bashing i 32 8))
+     (assert (test-copy-bashing i 32 8))
+     until (= i sb-vm:n-word-bits))
+
 ;;; success
 (sb-ext:quit :unix-status 104)

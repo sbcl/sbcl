@@ -47,10 +47,7 @@
                         until (zerop (sap-ref-8 sap offset))
                         finally (return offset))))
       (let ((result (make-string length :element-type 'base-char)))
-	(sb!kernel:copy-from-system-area sap 0
-                                         result (* sb!vm:vector-data-offset
-                                                   sb!vm:n-word-bits)
-                                         (* length sb!vm:n-byte-bits))
+	(sb!kernel:copy-ub8-from-system-area sap 0 result 0 length)
 	result))))
 
 (defun %naturalize-utf8-string (sap)

@@ -104,6 +104,7 @@
 #-sb-xc-host (defsetf sbit %sbitset)
 (defsetf %array-dimension %set-array-dimension)
 (defsetf sb!kernel:%raw-bits sb!kernel:%set-raw-bits)
+(defsetf sb!kernel:%vector-raw-bits sb!kernel:%set-vector-raw-bits)
 #-sb-xc-host (defsetf symbol-value set)
 #-sb-xc-host (defsetf symbol-plist %set-symbol-plist)
 #-sb-xc-host (defsetf nth %setnth)

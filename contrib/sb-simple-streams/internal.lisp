@@ -43,9 +43,9 @@
   (declare (type simple-stream-buffer src dst)
 	   (type fixnum soff doff length))
   (sb-sys:without-gcing ;; is this necessary??
-   (sb-kernel:system-area-copy (buffer-sap src) (* soff 8)
-                               (buffer-sap dst) (* doff 8)
-                               (* length 8))))
+   (sb-kernel:system-area-ub8-copy (buffer-sap src) soff
+                                   (buffer-sap dst) doff
+                                   length)))
 
 (defun allocate-buffer (size)
   (if (= size sb-impl::bytes-per-buffer)

@@ -166,6 +166,11 @@
   (foldable flushable))
 (defknown (%set-raw-bits) (t fixnum sb!vm:word) sb!vm:word
   (unsafe))
+;; These two are mostly used for bit-bashing operations.
+(defknown %vector-raw-bits (t fixnum) sb!vm:word
+  (foldable flushable))
+(defknown (%set-vector-raw-bits) (t fixnum sb!vm:word) sb!vm:word
+  (unsafe))
 
 
 (defknown allocate-vector ((unsigned-byte 8) index index) (simple-array * (*))
@@ -283,26 +288,34 @@
 
 ;;;; bit-bashing routines
 
-(defknown copy-to-system-area
-	  ((simple-unboxed-array (*)) index system-area-pointer index index)
-  (values)
-  ())
-
-(defknown copy-from-system-area
-	  (system-area-pointer index (simple-unboxed-array (*)) index index)
-  (values)
-  ())
-
-(defknown system-area-copy
-	  (system-area-pointer index system-area-pointer index index)
-  (values)
-  ())
-
-(defknown bit-bash-copy
-	  ((simple-unboxed-array (*)) index
-	   (simple-unboxed-array (*)) index index)
-  (values)
-  ())
+;;; FIXME: there's some ugly duplication between the (INTERN (FORMAT ...))
+;;; magic here and the same magic in src/code/bit-bash.lisp.  I don't know
+;;; of any good way to clean it up, but it's definitely violating OAOO.
+(macrolet ((define-known-copiers ()
+            `(progn
+              ,@(loop for i = 1 then (* i 2)
+                      collect `(defknown ,(intern (format nil "UB~A-BASH-COPY" i)
+                                                  (find-package "SB!KERNEL"))
+                                ((simple-unboxed-array (*)) index (simple-unboxed-array (*)) index index)
+                                (values)
+                                ())
+                      collect `(defknown ,(intern (format nil "SYSTEM-AREA-UB~A-COPY" i)
+                                                  (find-package "SB!KERNEL"))
+                                (system-area-pointer index system-area-pointer index index)
+                                (values)
+                                ())
+                      collect `(defknown ,(intern (format nil "COPY-UB~A-TO-SYSTEM-AREA" i)
+                                                  (find-package "SB!KERNEL"))
+                                ((simple-unboxed-array (*)) index system-area-pointer index index)
+                                (values)
+                                ())
+                      collect `(defknown ,(intern (format nil "COPY-UB~A-FROM-SYSTEM-AREA" i)
+                                                  (find-package "SB!KERNEL"))
+                                (system-area-pointer index (simple-unboxed-array (*)) index index)
+                                (values)
+                                ())
+                      until (= i sb!vm:n-word-bits)))))
+  (define-known-copiers))
 
 ;;; (not really a bit-bashing routine, but starting to take over from
 ;;; bit-bashing routines in byte-sized copies as of sbcl-0.6.12.29:)

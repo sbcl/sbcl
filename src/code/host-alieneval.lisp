@@ -837,10 +837,10 @@
   `(sap+ ,sap (/ ,offset sb!vm:n-byte-bits)))
 
 (define-alien-type-method (mem-block :deposit-gen) (type sap offset value)
-  (let ((bits (alien-mem-block-type-bits type)))
-    (unless bits
+  (let ((bytes (truncate (alien-mem-block-type-bits type) sb!vm:n-byte-bits)))
+    (unless bytes
       (error "can't deposit aliens of type ~S (unknown size)" type))
-    `(sb!kernel:system-area-copy ,value 0 ,sap ,offset ',bits)))
+    `(sb!kernel:system-area-ub8-copy ,value 0 ,sap ,offset ',bytes)))
 
 ;;;; the ARRAY type
 

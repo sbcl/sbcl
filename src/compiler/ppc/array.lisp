@@ -534,7 +534,23 @@
   (:result-types unsigned-num)
   (:variant 0 other-pointer-lowtag))
 
+(define-vop (vector-raw-bits word-index-ref)
+  (:note "vector-raw-bits VOP")
+  (:translate %vector-raw-bits)
+  (:results (value :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:variant vector-data-offset other-pointer-lowtag))
 
+(define-vop (set-vector-raw-bits word-index-set)
+  (:note "setf vector-raw-bits VOP")
+  (:translate %set-vector-raw-bits)
+  (:args (object :scs (descriptor-reg))
+	 (index :scs (any-reg zero immediate))
+	 (value :scs (unsigned-reg)))
+  (:arg-types * positive-fixnum unsigned-num)
+  (:results (result :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:variant vector-data-offset other-pointer-lowtag))
 
 ;;;; Misc. Array VOPs.
 

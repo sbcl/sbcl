@@ -3286,7 +3286,7 @@ register."
        (setf (code-header-ref code-object (1+ real-lra-slot)) offset))
      (setf (code-header-ref code-object known-return-p-slot)
 	   known-return-p)
-     (system-area-copy src-start 0 dst-start 0 (* length sb!vm:n-byte-bits))
+     (system-area-ub8-copy src-start 0 dst-start 0 length)
      (sb!vm:sanctify-for-execution code-object)
      #!+(or x86 x86-64)
      (values dst-start code-object (sap- trap-loc src-start))

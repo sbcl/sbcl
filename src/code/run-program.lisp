@@ -348,13 +348,12 @@
 	(declare (simple-string s))
 	(let ((n (length s)))
 	  ;; Blast the string into place.
-	  (sb-kernel:copy-to-system-area (the simple-base-string
-                                           ;; FIXME
-                                           (coerce s 'simple-base-string))
-					 (* sb-vm:vector-data-offset
-					    sb-vm:n-word-bits)
-					 string-sap 0
-					 (* (1+ n) sb-vm:n-byte-bits))
+	  (sb-kernel:copy-ub8-to-system-area (the simple-base-string
+                                               ;; FIXME
+                                               (coerce s 'simple-base-string))
+                                             0
+                                             string-sap 0
+                                             (1+ n))
 	  ;; Blast the pointer to the string into place.
 	  (setf (sap-ref-sap vec-sap i) string-sap)
 	  (setf string-sap (sap+ string-sap (round-bytes-to-words (1+ n))))
@@ -666,11 +665,10 @@
                                      ~2I~_~A~:>"
 				 (strerror errno)))
 			       (t
-				(sb-kernel:copy-from-system-area
+				(sb-kernel:copy-ub8-from-system-area
 				 (alien-sap buf) 0
-				 string (* sb-vm:vector-data-offset
-					   sb-vm:n-word-bits)
-				 (* count sb-vm:n-byte-bits))
+				 string 0
+                                 count)
 				(write-string string stream
 					      :end count)))))))))))
 

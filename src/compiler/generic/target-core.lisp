@@ -75,11 +75,17 @@
 
       (setf (code-header-ref code-obj sb!vm:code-trace-table-offset-slot)
 	    length)
-      (copy-to-system-area trace-table
-			   (* sb!vm:vector-data-offset sb!vm:n-word-bits)
-			   fill-ptr
-			   0
-			   trace-table-bits)
+      ;; KLUDGE: the "old" COPY-TO-SYSTEM-AREA automagically worked if
+      ;; somebody changed the number of bytes in a trace table entry.
+      ;; This version is a bit more fragile; if only there were some way
+      ;; to insulate ourselves against changes like that...
+      ;;
+      ;; Then again, PACK-TRACE-TABLE in src/compiler/trace-table.lisp
+      ;; doesn't appear to do anything interesting, returning a 0-length
+      ;; array.  So it seemingly doesn't matter what we do here.  Is this
+      ;; stale code?
+      ;;   --njf, 2005-03-23
+      (copy-ub16-to-system-area trace-table 0 fill-ptr 0 trace-table-len)
 
       (do ((index sb!vm:code-constants-offset (1+ index)))
 	  ((>= index (length constants)))

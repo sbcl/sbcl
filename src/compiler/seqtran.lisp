@@ -671,10 +671,6 @@
 ;;;; type dispatch in AREF. The exception is CONCATENATE, since
 ;;;; a full call to CONCATENATE would have to look up the sequence
 ;;;; type, which can be really slow.
-;;;;
-;;;; FIXME: It would be nicer for these transforms to work for any
-;;;; calls when all arguments are vectors with the same element type,
-;;;; rather than restricting them to STRINGs only.
 
 ;;; Moved here from generic/vm-tran.lisp to satisfy clisp
 ;;;
@@ -683,59 +679,99 @@
 (def!constant vector-data-bit-offset
   (* sb!vm:vector-data-offset sb!vm:n-word-bits))
 
-(deftransform replace ((string1 string2 &key (start1 0) (start2 0)
-				end1 end2)
-		       (simple-base-string simple-base-string &rest t)
-		       *
-		       ;; FIXME: consider replacing this policy test
-		       ;; with some tests for the STARTx and ENDx
-		       ;; indices being valid, conditional on high
-		       ;; SAFETY code.
-		       ;;
-		       ;; FIXME: It turns out that this transform is
-		       ;; critical for the performance of string
-		       ;; streams.  Make this more explicit.
-		       :policy (< (max safety space) 3))
-  `(locally
-     (declare (optimize (safety 0)))
-     (bit-bash-copy string2
-		    (the index
-			 (+ (the index (* start2 sb!vm:n-byte-bits))
-			    ,vector-data-bit-offset))
-		    string1
-		    (the index
-			 (+ (the index (* start1 sb!vm:n-byte-bits))
-			    ,vector-data-bit-offset))
-		    (the index
-			 (* (min (the index (- (or end1 (length string1))
-					       start1))
-				 (the index (- (or end2 (length string2))
-					       start2)))
-			    sb!vm:n-byte-bits)))
-     string1))
+(eval-when (:compile-toplevel)
+(defun valid-bit-bash-saetp-p (saetp)
+  ;; BIT-BASHing isn't allowed on simple vectors that contain pointers
+  (and (not (eq t (sb!vm:saetp-specifier saetp)))
+       ;; Due to limitations with the current BIT-BASHing code, we can't
+       ;; BIT-BASH reliably on arrays whose element types are larger
+       ;; than the word size.
+       (<= (sb!vm:saetp-n-bits saetp) sb!vm:n-word-bits)))
+) ; EVAL-WHEN
 
-;;; KLUDGE: This isn't the nicest way of achieving efficient string
-;;; streams, but it does work; a more general framework for this kind
-;;; of optimization, as well as better handling of the possible
-;;; keyword arguments, would be nice.
-#!+sb-unicode
-(deftransform replace ((string1 string2 &key (start1 0) (start2 0)
-				end1 end2)
-		       ((simple-array character (*))
-                        (simple-array character (*))
-                        &rest t)
-		       *
-		       ;; FIXME: consider replacing this policy test
-		       ;; with some tests for the STARTx and ENDx
-		       ;; indices being valid, conditional on high
-		       ;; SAFETY code.
-		       ;;
-		       ;; FIXME: It turns out that this transform is
-		       ;; critical for the performance of string
-		       ;; streams.  Make this more explicit.
-		       :policy (< (max safety space) 3))
-  `(sb!impl::simple-character-string-replace-from-simple-character-string*
-    string1 string2 start1 end1 start2 end2))
+;; FIXME: It turns out that this transform (for SIMPLE-BASE-STRINGS)
+;; is critical for the performance of string streams.  Make this
+;; more explicit.
+(macrolet
+    ((define-replace-transforms ()
+       (loop for saetp across sb!vm:*specialized-array-element-type-properties*
+             when (valid-bit-bash-saetp-p saetp)
+             collect
+             (let* ((sequence-type `(simple-array ,(sb!vm:saetp-specifier saetp) (*)))
+                    (n-element-bits (sb!vm:saetp-n-bits saetp))
+                    (bash-function (intern (format nil "UB~A-BASH-COPY" n-element-bits)
+                                            (find-package "SB!KERNEL"))))
+               `(deftransform replace ((seq1 seq2 &key (start1 0) (start2 0) end1 end2)
+                                       (,sequence-type ,sequence-type &rest t)
+                                       ,sequence-type
+                                       :node node)
+                 `(let* ((len1 (length seq1))
+                         (len2 (length seq2))
+                         (end1 (or end1 len1))
+                         (end2 (or end2 len2))
+                         (replace-len1 (- end1 start1))
+                         (replace-len2 (- end2 start2)))
+                   ,(unless (policy node (= safety 0))
+                     `(progn
+                       (unless (<= 0 start1 end1 len1)
+                         (sb!impl::signal-bounding-indices-bad-error seq1 start1 end1))
+                       (unless (<= 0 start2 end2 len2)
+                         (sb!impl::signal-bounding-indices-bad-error seq2 start2 end2))))
+                   (funcall (function ,',bash-function)
+                    seq2 start2
+                    seq1 start1
+                    (min replace-len1 replace-len2))
+                   seq1)))
+             into forms
+             finally (return `(progn ,@forms)))))
+  (define-replace-transforms))
+
+(macrolet
+    ((define-subseq-transforms ()
+       (loop for saetp across sb!vm:*specialized-array-element-type-properties*
+             when (valid-bit-bash-saetp-p saetp)
+             collect
+             (let* ((sequence-type `(simple-array ,(sb!vm:saetp-specifier saetp) (*)))
+                    (n-element-bits (sb!vm:saetp-n-bits saetp))
+                    (bash-function (intern (format nil "UB~A-BASH-COPY" n-element-bits)
+                                           (find-package "SB!KERNEL"))))
+               `(deftransform subseq ((seq start &optional end)
+                                      (,sequence-type t &optional t)
+                                      ,sequence-type :node node)
+                 `(let* ((length (length seq))
+                         (end (if end (min end length) length)))
+                   ,(unless (policy node (= safety 0))
+                     `(progn
+                       (unless (<= 0 start end length)
+                         (sb!impl::signal-bounding-indices-bad-error seq start end))))
+                   (let* ((size (- end start))
+                          (result (make-array size :element-type ',',(sb!vm:saetp-specifier saetp))))
+                     (funcall (function ,',bash-function)
+                              seq start result 0 size)
+                     result))))
+             into forms
+             finally (return `(progn ,@forms)))))
+  (define-subseq-transforms))
+
+(macrolet
+    ((define-copy-seq-transforms ()
+       (loop for saetp across sb!vm:*specialized-array-element-type-properties*
+             when (valid-bit-bash-saetp-p saetp)
+             collect
+             (let* ((sequence-type `(simple-array ,(sb!vm:saetp-specifier saetp) (*)))
+                    (n-element-bits (sb!vm:saetp-n-bits saetp))
+                    (bash-function (intern (format nil "UB~A-BASH-COPY" n-element-bits)
+                                           (find-package "SB!KERNEL"))))
+               `(deftransform copy-seq ((seq) (,sequence-type)
+                                        ,sequence-type)
+                 `(let* ((length (length seq))
+                         (result (make-array length :element-type ',',(sb!vm:saetp-specifier saetp))))
+                   (funcall (function ,',bash-function)
+                    seq 0 result 0 length)
+                   result)))
+             into forms
+             finally (return `(progn ,@forms)))))
+  (define-copy-seq-transforms))
 
 ;;; FIXME: this would be a valid transform for certain excluded cases:
 ;;;   * :TEST 'CHAR= or :TEST #'CHAR=

@@ -277,11 +277,7 @@ starting from offset into the given 16 word MD5 block."
    block (* vm:vector-data-offset vm:word-bits)
    (* 64 vm:byte-bits))
   #+(and :sbcl :little-endian)
-  (sb-kernel:bit-bash-copy
-   buffer (+ (* sb-vm:vector-data-offset sb-vm:n-word-bits)
-	     (* offset sb-vm:n-byte-bits))
-   block (* sb-vm:vector-data-offset sb-vm:n-word-bits)
-   (* 64 sb-vm:n-byte-bits))
+  (sb-kernel:ub8-bash-copy buffer offset block 0 64)
   #-(or (and :sbcl :little-endian) (and :cmu :little-endian))
   (loop for i of-type (integer 0 16) from 0
 	for j of-type (integer 0 #.most-positive-fixnum)
@@ -306,11 +302,7 @@ offset into the given 16 word MD5 block."
    block (* vm:vector-data-offset vm:word-bits)
    (* 64 vm:byte-bits))
   #+(and :sbcl :little-endian)
-  (sb-kernel:bit-bash-copy
-   buffer (+ (* sb-vm:vector-data-offset sb-vm:n-word-bits)
-	     (* offset sb-vm:n-byte-bits))
-   block (* sb-vm:vector-data-offset sb-vm:n-word-bits)
-   (* 64 sb-vm:n-byte-bits))
+  (sb-kernel:ub8-bash-copy buffer offset block 0 64)
   #-(or (and :sbcl :little-endian) (and :cmu :little-endian))
   (loop for i of-type (integer 0 16) from 0
 	for j of-type (integer 0 #.most-positive-fixnum)
@@ -380,12 +372,7 @@ starting at buffer-offset."
 	     (* buffer-offset vm:byte-bits))
    (* count vm:byte-bits))
   #+sbcl
-  (sb-kernel:bit-bash-copy
-   from (+ (* sb-vm:vector-data-offset sb-vm:n-word-bits)
-	   (* from-offset sb-vm:n-byte-bits))
-   buffer (+ (* sb-vm:vector-data-offset sb-vm:n-word-bits)
-	     (* buffer-offset sb-vm:n-byte-bits))
-   (* count sb-vm:n-byte-bits))
+  (sb-kernel:ub8-bash-copy from from-offset buffer buffer-offset count)
   #-(or cmu sbcl)
   (etypecase from
     (simple-string

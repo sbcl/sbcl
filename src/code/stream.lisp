@@ -394,13 +394,23 @@
 	       numbytes
 	       eof-error-p))
      ((<= numbytes num-buffered)
+      #+nil
+      (let ((copy-function (typecase buffer
+                             ((simple-array * (*)) #'ub8-bash-copy)
+                             (system-area-pointer #'copy-ub8-to-system-area))))
+        (funcall copy-function in-buffer index buffer start numbytes))
       (%byte-blt in-buffer index
 		 buffer start (+ start numbytes))
       (setf (ansi-stream-in-index stream) (+ index numbytes))
       numbytes)
      (t
       (let ((end (+ start num-buffered)))
-	(%byte-blt in-buffer index buffer start end)
+	#+nil
+        (let ((copy-function (typecase buffer
+                             ((simple-array * (*)) #'ub8-bash-copy)
+                             (system-area-pointer #'copy-ub8-to-system-area))))
+          (funcall copy-function in-buffer index buffer start num-buffered))
+        (%byte-blt in-buffer index buffer start end)
 	(setf (ansi-stream-in-index stream) +ansi-stream-in-buffer-length+)
 	(+ (funcall (ansi-stream-n-bin stream)
 		    stream
@@ -429,13 +439,7 @@
                          (- +ansi-stream-in-buffer-length+
                             +ansi-stream-in-buffer-extra+)
                          nil))
-         (start (- +ansi-stream-in-buffer-length+ count))
-         (n-character-array-bytes
-          #.(/ (sb!vm:saetp-n-bits
-                (find 'character
-                      sb!vm:*specialized-array-element-type-properties*
-                      :key #'sb!vm:saetp-specifier))
-               sb!vm:n-byte-bits)))
+         (start (- +ansi-stream-in-buffer-length+ count)))
     (declare (type index start count))
     (cond ((zerop count)
            (setf (ansi-stream-in-index stream)
@@ -443,19 +447,17 @@
            (funcall (ansi-stream-in stream) stream eof-error-p eof-value))
           (t
            (when (/= start +ansi-stream-in-buffer-extra+)
-             (bit-bash-copy ibuf (+ (* +ansi-stream-in-buffer-extra+
-                                       sb!vm:n-byte-bits
-                                       n-character-array-bytes)
-                                    (* sb!vm:vector-data-offset
-                                       sb!vm:n-word-bits))
-                            ibuf (+ (the index (* start
-                                                  sb!vm:n-byte-bits
-                                                  n-character-array-bytes))
-                                    (* sb!vm:vector-data-offset
-                                       sb!vm:n-word-bits))
-                            (* count
-                               sb!vm:n-byte-bits
-                               n-character-array-bytes)))
+             (#.(let* ((n-character-array-bits
+                        (sb!vm:saetp-n-bits
+                         (find 'character
+                               sb!vm:*specialized-array-element-type-properties*
+                               :key #'sb!vm:saetp-specifier)))
+                       (bash-function (intern (format nil "UB~A-BASH-COPY" n-character-array-bits)
+                                              (find-package "SB!KERNEL"))))
+                  bash-function)
+                ibuf +ansi-stream-in-buffer-extra+
+                ibuf start
+                count))
            (setf (ansi-stream-in-index stream) (1+ start))
            (aref ibuf start)))))
 
@@ -473,11 +475,9 @@
 	   (funcall (ansi-stream-bin stream) stream eof-error-p eof-value))
 	  (t
 	   (unless (zerop start)
-	     (bit-bash-copy ibuf (* sb!vm:vector-data-offset sb!vm:n-word-bits)
-			    ibuf (+ (the index (* start sb!vm:n-byte-bits))
-				    (* sb!vm:vector-data-offset
-				       sb!vm:n-word-bits))
-			    (* count sb!vm:n-byte-bits)))
+             (ub8-bash-copy ibuf 0
+                            ibuf start 
+                            count))
 	   (setf (ansi-stream-in-index stream) (1+ start))
 	   (aref ibuf start)))))
 
@@ -1069,14 +1069,16 @@
     (when (plusp copy)
       (setf (string-input-stream-current stream)
 	    (truly-the index (+ index copy)))
+      ;; FIXME: why are we VECTOR-SAP'ing things here?  what's the point?
+      ;; and are there SB-UNICODE issues here as well?  --njf, 2005-03-24
       (sb!sys:without-gcing
-       (system-area-copy (vector-sap string)
-			 (* index sb!vm:n-byte-bits)
-			 (if (typep buffer 'system-area-pointer)
-			     buffer
-			     (vector-sap buffer))
-			 (* start sb!vm:n-byte-bits)
-			 (* copy sb!vm:n-byte-bits))))
+       (system-area-ub8-copy (vector-sap string)
+                             index
+                             (if (typep buffer 'system-area-pointer)
+                                 buffer
+                                 (vector-sap buffer))
+                             start
+                             copy)))
     (if (and (> requested copy) eof-error-p)
 	(error 'end-of-file :stream stream)
 	copy)))
