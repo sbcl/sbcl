@@ -793,16 +793,7 @@
 			  (&rest streams &aux (current streams)))
 	    (:copier nil))
   ;; The car of this is the substream we are reading from now.
-  current
-  ;; This is a list of all the substreams there ever were. We need to
-  ;; remember them so that we can close them.
-  ;;
-  ;; FIXME: ANSI says this is supposed to be the list of streams that
-  ;; we still have to read from. So either this needs to become a
-  ;; private member %STREAM (with CONCATENATED-STREAM-STREAMS a wrapper
-  ;; around it which discards closed files from the head of the list)
-  ;; or we need to update it as we run out of files.
-  (streams nil :type list :read-only t))
+  (streams nil :type list))
 (def!method print-object ((x concatenated-stream) stream)
   (print-unreadable-object (x stream :type t :identity t)
     (format stream
@@ -822,19 +813,19 @@
 
 (macrolet ((in-fun (name fun)
 	     `(defun ,name (stream eof-error-p eof-value)
-		(do ((current (concatenated-stream-current stream)
-			      (cdr current)))
-		    ((null current)
+		(do ((streams (concatenated-stream-streams stream)
+			      (cdr streams)))
+		    ((null streams)
 		     (eof-or-lose stream eof-error-p eof-value))
-		  (let* ((stream (car current))
+		  (let* ((stream (car streams))
 			 (result (,fun stream nil nil)))
 		    (when result (return result)))
-		  (pop (concatenated-stream-current stream))))))
+		  (pop (concatenated-stream-streams stream))))))
   (in-fun concatenated-in read-char)
   (in-fun concatenated-bin read-byte))
 
 (defun concatenated-n-bin (stream buffer start numbytes eof-errorp)
-  (do ((current (concatenated-stream-current stream) (cdr current))
+  (do ((streams (concatenated-stream-streams stream) (cdr streams))
        (current-start start)
        (remaining-bytes numbytes))
       ((null current)
@@ -847,10 +838,10 @@
       (incf current-start bytes-read)
       (decf remaining-bytes bytes-read)
       (when (zerop remaining-bytes) (return numbytes)))
-    (setf (concatenated-stream-current stream) (cdr current))))
+    (setf (concatenated-stream-streams stream) (cdr streams))))
 
 (defun concatenated-misc (stream operation &optional arg1 arg2)
-  (let ((left (concatenated-stream-current stream)))
+  (let ((left (concatenated-stream-streams stream)))
     (when left
       (let* ((current (car left)))
 	(case operation
@@ -861,10 +852,10 @@
 				       :listen)
 			      (stream-misc-dispatch current :listen))))
 	       (cond ((eq stuff :eof)
-		      ;; Advance CURRENT, and try again.
-		      (pop (concatenated-stream-current stream))
+		      ;; Advance STREAMS, and try again.
+		      (pop (concatenated-stream-streams stream))
 		      (setf current
-			    (car (concatenated-stream-current stream)))
+			    (car (concatenated-stream-streams stream)))
 		      (unless current
 			;; No further streams. EOF.
 			(return :eof)))
