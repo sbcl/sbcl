@@ -294,11 +294,15 @@ The UNIX command line can be read from the variable
 @code{sb-ext:*posix-argv*}. The UNIX environment can be queried with
 the @code{sb-ext:posix-getenv} function.
 
-The SBCL system can be terminated with @code{sb-ext:quit}, (but see
-notes above about threads and sessions) optionally returning a
-specified numeric value to the calling Unix process. The normal Unix
-idiom of terminating on end of file on input is also supported.
+@include fun-sb-ext-posix-getenv.texinfo
 
+The SBCL system can be terminated with @code{sb-ext:quit}, (but see
+notes in @ref{Threading} about the interaction between this feature and
+sessions) optionally returning a specified numeric value to the
+calling Unix process. The normal Unix idiom of terminating on end of
+file on input is also supported.
+
+@include fun-sb-ext-quit.texinfo
 
 @node  Customization Hooks for Users, Tools To Help Developers, Support For Unix, Extensions
 @comment  node-name,  next,  previous,  up
@@ -384,9 +388,13 @@ addresses, a precondition for using copy-on-write to share code
 between multiple Lisp processes. it is less important with modern
 generational garbage collectors.
 
-@code{sb-ext:truly-the} declaration declares the type of the result of
-the operations, producing its argument; the declaration is not
+@include fun-sb-ext-purify.texinfo
+
+@code{sb-ext:truly-the} special form declares the type of the result
+of the operations, producing its argument; the declaration is not
 checked. In short: don't use it.
+
+@include special-operator-sb-ext-truly-the.texinfo
 
 The @code{sb-ext:freeze-type} declaration declares that a
 type will never change, which can make type testing

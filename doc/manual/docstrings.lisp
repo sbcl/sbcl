@@ -40,7 +40,8 @@
         (when docs (setf result (nconc docs result)))))
     (when package-doc
       (setf result (nconc (list (list (intern (package-name package) :keyword)
-                                      'package package-doc)) result)))))
+                                      'package package-doc)) result)))
+    result))
 
 ;;; Helpers for texinfo output
 
@@ -95,14 +96,15 @@
                                     (subseq name (1+ index))))))
     name))
 
-(defun unique-name (symbol kind)
+(defun unique-name (symbol package kind)
   (nstring-downcase
    (format nil "~A-~A-~A"
            (ecase kind
              (compiler-macro "compiler-macro")
-             (function (if (macro-function symbol)
-                           "macro"
-                           "fun"))
+             (function (cond
+			 ((macro-function symbol) "macro")
+			 ((special-operator-p symbol) "special-operator")
+			 (t "fun")))
              (method-combination "method-combination")
              (package "package")
              (setf "setf-expander")
@@ -112,20 +114,20 @@
 		       (structure-class "struct")
 		       (standard-class "class")
 		       (sb-pcl::condition-class "condition")
-		       (null "type"))))
+		       ((or built-in-class null) "type"))))
              (variable (if (constantp symbol)
                            "constant"
                            "var")))
-           (package-name (symbol-package symbol))
-           (alphanumize symbol)
-           )))
+           (package-name package)
+           (alphanumize symbol))))
 
 (defun def-begin (symbol kind)
   (ecase kind
     (compiler-macro "@deffn {Compiler Macro}")
-    (function (if (macro-function symbol)
-                  "@defmac"
-                  "@defun"))
+    (function (cond
+		((macro-function symbol) "@defmac")
+		((special-operator-p symbol) "@defspec")
+		(t "@defun")))
     (method-combination "@deffn {Method Combination}")
     (package "@deffn Package")
     (setf "@deffn {Setf Expander}")
@@ -135,7 +137,7 @@
 	      (structure-class "@deftp Structure")
 	      (standard-class "@deftp Class")
 	      (sb-pcl::condition-class "@deftp Condition")
-	      (null "@deftp Type"))))
+	      ((or built-in-class null) "@deftp Type"))))
     (variable (if (constantp symbol)
                   "@defvr Constant"
                   "@defvar"))))
@@ -164,9 +166,10 @@
 (defun def-end (symbol kind)
   (ecase kind
     (compiler-macro "@end deffn")
-    (function (if (macro-function symbol)
-                  "@end defmac"
-                  "@end defun"))
+    (function (cond
+		((macro-function symbol) "@end defmac")
+		((special-operator-p symbol) "@end defspec")
+		(t "@end defun")))
     (method-combination "@end deffn")
     (package "@end deffn")
     (setf "@end deffn")
@@ -193,7 +196,7 @@
                          :if-does-not-exist :create :if-exists :supersede)
       (loop for (symbol kind docstring) in docs
            do (format out "~&@anchor{~A}~%~A ~A~@[ ~A~]~%~A~%~A~%~%"
-                      (unique-name symbol kind)
+                      (unique-name symbol package kind)
                       (def-begin symbol kind)
                       (texinfoify symbol)
                       (def-rest symbol kind)
@@ -216,7 +219,7 @@
       (loop
          with docs = (collect-documentation (find-package package))
          for (symbol kind docstring) in docs
-         for doc-identifier = (unique-name symbol kind)
+         for doc-identifier = (unique-name symbol package kind)
          do (with-open-file (out
                              (merge-pathnames
                               (make-pathname :name doc-identifier :type "texinfo")
@@ -224,7 +227,7 @@
                              :direction :output
                              :if-does-not-exist :create :if-exists :supersede)
               (format out "~&@anchor{~A}~%~A ~A~@[ ~A~]~%~A~%~A~%~%"
-                      (unique-name symbol kind)
+                      (unique-name symbol package kind)
                       (def-begin symbol kind)
                       (texinfoify symbol)
                       (def-rest symbol kind)
