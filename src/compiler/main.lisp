@@ -917,8 +917,7 @@
 ;;; *TOP-LEVEL-LAMBDAS* instead.
 (defun convert-and-maybe-compile (form path)
   (declare (list path))
-  (let* ((*lexenv* (make-lexenv :policy *policy*
-				:interface-policy *interface-policy*))
+  (let* ((*lexenv* (make-lexenv :policy *policy*))
 	 (tll (ir1-top-level form path nil)))
     (cond ((eq *block-compile* t) (push tll *top-level-lambdas*))
 	  (t (compile-top-level (list tll) nil)))))
@@ -945,7 +944,7 @@
   (multiple-value-bind (forms decls) (sb!sys:parse-body (cdr form) nil)
     (let* ((*lexenv*
 	    (process-decls decls nil nil (make-continuation)))
-	   ;; Binding *xxx-POLICY* is pretty much of a hack, since it
+	   ;; Binding *POLICY* is pretty much of a hack, since it
 	   ;; causes LOCALLY to "capture" enclosed proclamations. It
 	   ;; is necessary because CONVERT-AND-MAYBE-COMPILE uses the
 	   ;; value of *POLICY* as the policy. The need for this hack
@@ -954,8 +953,7 @@
 	   ;; FIXME: Ideally, something should be done so that DECLAIM
 	   ;; inside LOCALLY works OK. Failing that, at least we could
 	   ;; issue a warning instead of silently screwing up.
-	   (*policy* (lexenv-policy *lexenv*))
-	   (*interface-policy* (lexenv-interface-policy *lexenv*)))
+	   (*policy* (lexenv-policy *lexenv*)))
       (process-top-level-progn forms path))))
 
 ;;; Force any pending top-level forms to be compiled and dumped so
@@ -1381,7 +1379,6 @@
 	 (*block-compile* *block-compile-argument*)
 	 (*package* (sane-package))
 	 (*policy* *policy*)
-	 (*interface-policy* *interface-policy*)
 	 (*lexenv* (make-null-lexenv))
 	 (*converting-for-interpreter* nil)
 	 (*source-info* info)

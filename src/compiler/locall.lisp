@@ -168,8 +168,7 @@
 ;;; then associate this lambda with FUN as its XEP. After the
 ;;; conversion, we iterate over the function's associated lambdas,
 ;;; redoing local call analysis so that the XEP calls will get
-;;; converted. We also bind *LEXENV* to change the compilation policy
-;;; over to the interface policy.
+;;; converted. 
 ;;;
 ;;; We set REANALYZE and REOPTIMIZE in the component, just in case we
 ;;; discover an XEP after the initial local call analyze pass.
@@ -177,14 +176,13 @@
   (declare (type functional fun))
   (aver (not (functional-entry-function fun)))
   (with-ir1-environment (lambda-bind (main-entry fun))
-    (let* ((*lexenv* (make-lexenv :policy (make-interface-policy *lexenv*)))
-	   (res (ir1-convert-lambda (make-xep-lambda fun))))
-      (setf (functional-kind res) :external)
-      (setf (leaf-ever-used res) t)
-      (setf (functional-entry-function res) fun)
-      (setf (functional-entry-function fun) res)
-      (setf (component-reanalyze *current-component*) t)
-      (setf (component-reoptimize *current-component*) t)
+    (let ((res (ir1-convert-lambda (make-xep-lambda fun))))
+      (setf (functional-kind res) :external
+	    (leaf-ever-used res) t
+	    (functional-entry-function res) fun
+	    (functional-entry-function fun) res
+	    (component-reanalyze *current-component*) t
+	    (component-reoptimize *current-component*) t)
       (etypecase fun
 	(clambda (local-call-analyze-1 fun))
 	(optional-dispatch

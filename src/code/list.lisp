@@ -506,8 +506,8 @@
     ;; KLUDGE: This declaration is a hack to make the closure ignore
     ;; all its arguments without consing a &REST list or anything.
     ;; Perhaps once DYNAMIC-EXTENT is implemented we won't need to
-    ;; screw around with this kind of thing.
-    (declare (optimize-interface (speed 3) (safety 0)))
+    ;; screw around with this kind of thing. -- WHN 2001-04-06
+    (declare (optimize (speed 3) (safety 0)))
     value))
 
 ;;;; macros for (&KEY (KEY #'IDENTITY) (TEST #'EQL TESTP) (TEST-NOT NIL NOTP))

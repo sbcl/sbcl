@@ -22,8 +22,7 @@
 	     (:constructor make-null-lexenv ())
 	     (:constructor internal-make-lexenv
 			   (functions variables blocks tags type-restrictions
-				      lambda cleanup policy
-				      interface-policy options)))
+				      lambda cleanup policy options)))
   ;; Alist (NAME . WHAT), where WHAT is either a Functional (a local function),
   ;; a DEFINED-FUNCTION, representing an INLINE/NOTINLINE declaration, or
   ;; a list (MACRO . <function>) (a local macro, with the specifier
@@ -63,10 +62,6 @@
   (cleanup nil)
   ;; the current OPTIMIZE policy
   (policy *policy* :type policy)
-  ;; the policy that takes effect in XEPs and related syntax parsing
-  ;; functions. Slots in this policy may be null to indicate that the
-  ;; normal value in effect.
-  (interface-policy *interface-policy* :type policy)
   ;; an alist of miscellaneous options that are associated with the
   ;; lexical environment
   (options nil :type list))

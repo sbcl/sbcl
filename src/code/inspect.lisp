@@ -9,7 +9,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB-INSPECT")
+(in-package "SB-IMPL")
 
 ;;; The inspector views LISP objects as being composed of parts. A
 ;;; list, for example, would be divided into its members, and a
@@ -46,8 +46,8 @@
       (input-loop object (describe-parts object) *standard-output*)
     (setf *inspect-object-stack* nil)))
 
-;;; When *ILLEGAL-OBJECT-MARKER* occurs in a parts list, it indicates that that
-;;; slot is unbound.
+;;; When *ILLEGAL-OBJECT-MARKER* occurs in a parts list, it indicates
+;;; that that slot is unbound.
 (defvar *illegal-object-marker* (cons nil nil))
 
 (defun input-loop (object parts s)
@@ -56,7 +56,8 @@
     (format s "~&> ")
     (force-output)
     (let ((command (read))
-	  ;; Use 2 less than length because first 2 elements are bookkeeping.
+	  ;; Use 2 less than the length because the first 2 elements
+	  ;; are bookkeeping.
 	  (parts-len-2 (- (length parts) 2)))
       (typecase command
 	(integer

@@ -16,9 +16,9 @@
 
 (declaim (optimize (debug 3) (speed 2) (space 1)))
 
-;;; Until version 0.6.9 or so, SBCL's version of Python couldn't this
-;;; correctly, due to the bug patched by Rob MacLachlan on the
-;;; cmucl-imp list 2000-06-21, and apply to SBCL by Martin Atzmueller.
+;;; Until version 0.6.9 or so, SBCL's version of Python couldn't do
+;;; this correctly, due to the bug patched by Rob MacLachlan on the
+;;; cmucl-imp list 2000-06-21, and applied to SBCL by Martin Atzmueller.
 ;;; (The effectiveness of the test also depends on the implicit
 ;;; function typing of Python (where DEFUN is like DECLAIM FTYPE),
 ;;; which violates the ANSI spec, and should be fixed. Once that
@@ -43,21 +43,28 @@
     (+ i f)))
 (assert (= (exercise-valuesify 1.25) 2.25))
 
-
 ;;; Don Geddis reported this test case 25 December 1999 on a CMU CL
 ;;; mailing list: dumping circular lists caused an infinite loop.
 ;;; Douglas Crosher reported a patch 27 Dec 1999. The patch was tested
 ;;; on SBCL by Martin Atzmueller 2 Nov 2000, and merged in
 ;;; sbcl-0.6.8.11.
-(defun q1 () (dolist (x '#1=("A" "B" . #1#)) x))
-(defun q2 () (dolist (x '#1=("C" "D" . #1#)) x))
-(defun q3 () (dolist (x '#1=("E" "F" . #1#)) x))
-(defun q4 () (dolist (x '#1=("C" "D" . #1#)) x))
-(defun never5 ())
-(defun useful (keys)
+(defun q-dg1999-1 () (dolist (x '#1=("A" "B" . #1#)) x))
+(defun q-dg1999-2 () (dolist (x '#1=("C" "D" . #1#)) x))
+(defun q-dg1999-3 () (dolist (x '#1=("E" "F" . #1#)) x))
+(defun q-dg1999-4 () (dolist (x '#1=("C" "D" . #1#)) x))
+(defun useful-dg1999 (keys)
   (declare (type list keys))
   (loop
       for c in '#1=("Red" "Blue" . #1#)
       for key in keys ))
+
+;;; An early version (sbcl-0.6.11.33) of code to check FTYPEs from DEFUN
+;;; against DECLAIMed FTYPEs blew up when an FTYPE was DECLAIMed
+;;; to be pure FUNCTION, because the internal representation of
+;;; FUNCTION itself (as opposed to subtypes of FUNCTION, such as
+;;; (FUNCTION () T)) is a BUILT-IN-CLASS object, not a FUNCTION-TYPE
+;;; object.
+(declaim (ftype function i-am-just-a-function))
+(defun i-am-just-a-function (x y) (+ x y 1))
 
 (sb-ext:quit :unix-status 104) ; success

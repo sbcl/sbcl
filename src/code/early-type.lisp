@@ -118,7 +118,7 @@
   ;; Lists of the type for each required and optional argument.
   (required nil :type list)
   (optional nil :type list)
-  ;; The type for the rest arg. NIL if there is no rest arg.
+  ;; The type for the rest arg. NIL if there is no &REST arg.
   (rest nil :type (or ctype null))
   ;; true if &KEY arguments are specified
   (keyp nil :type boolean)

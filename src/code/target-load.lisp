@@ -170,11 +170,19 @@
        source, the result of evaluating each top-level form is printed.
        The default is *LOAD-PRINT*."
 
-  (let ((sb!c::*policy* sb!c::*policy*)
-	(sb!c::*interface-policy* sb!c::*interface-policy*)
+  (let ((*load-depth* (1+ *load-depth*))
+	;; KLUDGE: I can't find in the ANSI spec where it says that
+	;; DECLAIM/PROCLAIM of optimization policy should have file
+	;; scope. CMU CL did this, and it seems reasonable, but it
+	;; might not be right; after all, things like (PROCLAIM '(TYPE
+	;; ..)) don't have file scope, and I can't find anything under
+	;; PROCLAIM or COMPILE-FILE or LOAD or OPTIMIZE which
+	;; justifies this behavior. Hmm. -- WHN 2001-04-06
+	(sb!c::*policy* sb!c::*policy*)
+	;; The ANSI spec for LOAD says "LOAD binds *READTABLE* and
+	;; *PACKAGE* to the values they held before loading the file."
 	(*package* (sane-package))
 	(*readtable* *readtable*)
-	(*load-depth* (1+ *load-depth*))
 	;; The old CMU CL LOAD function used an IF-DOES-NOT-EXIST argument of
 	;; (MEMBER :ERROR NIL) type. ANSI constrains us to accept a generalized
 	;; boolean argument value for this externally-visible function, but the

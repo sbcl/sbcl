@@ -512,7 +512,7 @@ like *STACK-TOP-HINT*"
 
              ;; extended declarations..
              "FREEZE-TYPE" "INHIBIT-WARNINGS"
-             "MAYBE-INLINE" "OPTIMIZE-INTERFACE"
+             "MAYBE-INLINE"
 
              ;; ..and variables to control compiler policy
              "*INLINE-EXPANSION-LIMIT*"
@@ -600,16 +600,6 @@ Lisp extension proposal by David N. Gray"
              "STREAM-READ-CHAR" "STREAM-READ-CHAR-NO-HANG" "STREAM-READ-LINE"
              "STREAM-START-LINE-P" "STREAM-TERPRI" "STREAM-UNREAD-CHAR"
              "STREAM-WRITE-BYTE" "STREAM-WRITE-CHAR" "STREAM-WRITE-STRING"))
-
- ;; FIXME: It looks as though it's no longer important to have INSPECT be
- ;; a separate package. INSPECT functionality is in the ANSI spec, and we
- ;; might as well implement it with everything else.
- #s(sb-cold:package-data
-    :name "SB!INSPECT"
-    :doc "private: implementation of INSPECT"
-    :use ("CL" "SB!KERNEL" "SB!EXT" "SB!INT")
-    :export ("*INTERFACE-STYLE*" "REMOVE-ALL-DISPLAYS"
-             "REMOVE-OBJECT-DISPLAY" "SHOW-OBJECT"))
 
  #s(sb-cold:package-data
     :name "SB!INT"
@@ -933,7 +923,9 @@ is a good idea, but see SB-SYS for blurring of boundaries."
              "CSUBTYPEP" "CTYPE" "TYPE-HASH-VALUE"
              "CTYPE-OF" "CTYPE-P" "CTYPEP" "CURRENT-FP" "CURRENT-SP"
              "DATA-VECTOR-REF" "DATA-VECTOR-SET" "DECODE-DOUBLE-FLOAT"
-             "DECODE-LONG-FLOAT" "DECODE-SINGLE-FLOAT" "DESCEND-INTO"
+             "DECODE-LONG-FLOAT" "DECODE-SINGLE-FLOAT"
+             "DEFINED-FTYPE-MATCHES-DECLARED-FTYPE-P"
+             "DESCEND-INTO"
              "DIVISION-BY-ZERO-ERROR"
              "DOUBLE-FLOAT-EXPONENT" "DOUBLE-FLOAT-HIGH-BITS"
              "DOUBLE-FLOAT-INT-EXPONENT" "DOUBLE-FLOAT-LOW-BITS"

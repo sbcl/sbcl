@@ -22,41 +22,26 @@
 ;;; alists instead.
 (def!type policy () 'list)
 
-;;; names of recognized optimization qualities which don't have
-;;; special defaulting behavior
-(defvar *policy-basic-qualities*) ; (initialized at cold init)
+;;; names of recognized optimization policy qualities
+(defvar *policy-qualities*) ; (initialized at cold init)
 
-;;; FIXME: I'd like to get rid of DECLAIM OPTIMIZE-INTERFACE in favor
-;;; of e.g. (DECLAIM (OPTIMIZE (INTERFACE-SPEED 2) (INTERFACE-SAFETY 3))).
-#|
-;;; a list of conses (DEFAULTING-QUALITY . DEFAULT-QUALITY) of qualities
-;;; which default to other qualities when undefined, e.g. interface
-;;; speed defaulting to basic speed
-(defvar *policy-defaulting-qualities*)
-|#
-
-(defun optimization-quality-p (name)
-  (or (member name *policy-basic-qualities*)
-      ;; FIXME: Uncomment this when OPTIMIZE-INTERFACE goes away.
-      #|(member name *policy-defaulting-qualities* :key #'car)|#))
+;;; Is X the name of an optimization quality?
+(defun policy-quality-name-p (x)
+  (memq x *policy-qualities*))
 
 ;;; *POLICY* holds the current global compiler policy information, as
 ;;; an alist mapping from optimization quality name to quality value.
 ;;; Inside the scope of declarations, new entries are added at the
 ;;; head of the alist.
-;;;
-;;; *INTERFACE-POLICY* holds global interface policy, represented the
-;;; same way as in *DEFAULT-POLICY*.
-(declaim (type policy *policy* *interface-policy*))
+(declaim (type policy *policy*))
 (defvar *policy*)	   ; initialized in cold init
-(defvar *interface-policy*) ; initialized in cold init
 
 ;;; This is to be called early in cold init to set things up, and may
 ;;; also be called again later in cold init in order to reset default
 ;;; optimization policy back to default values after toplevel PROCLAIM
 ;;; OPTIMIZE forms have messed with it.
 (defun !policy-cold-init-or-resanify ()
-  (setf *policy-basic-qualities*
+  (setf *policy-qualities*
 	'(;; ANSI standard qualities
 	  compilation-speed
 	  debug
@@ -72,27 +57,16 @@
 	  ;; behavior, and should probably become the exact behavior.
 	  ;; Perhaps INHIBIT-NOTES?
 	  inhibit-warnings))
-  #|
-  (setf *policy-defaulting-qualities*
-	'((interface-speed . speed)
-	  (interface-safety . safety)))
-  |#
   (setf *policy*
 	(mapcar (lambda (name)
 		  ;; CMU CL didn't use 1 as the default for everything,
 		  ;; but since ANSI says 1 is the ordinary value, we do.
 		  (cons name 1))
-		*policy-basic-qualities*))
-  (setf *interface-policy*
-	*policy*))
+		*policy-qualities*)))
 ;;; On the cross-compilation host, we initialize immediately (not
 ;;; waiting for "cold init", since cold init doesn't exist on
 ;;; cross-compilation host).
 #+sb-xc-host (!policy-cold-init-or-resanify)
-
-;;; Is X the name of an optimization quality?
-(defun policy-quality-name-p (x)
-  (memq x *policy-basic-qualities*))
 
 ;;; Look up a named optimization quality in POLICY. This is only
 ;;; called by compiler code for known-valid QUALITY-NAMEs, e.g. SPEED;

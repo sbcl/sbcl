@@ -78,7 +78,6 @@
 (defvar *current-path*)
 (defvar *current-component*)
 (defvar *policy*)
-(defvar *interface-policy*)
 (defvar *dynamic-counts-tn*)
 (defvar *elsewhere*)
 (defvar *event-info*)

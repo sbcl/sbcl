@@ -682,6 +682,12 @@ changes in sbcl-0.6.11 relative to sbcl-0.6.10:
   as per Daniel Barlow's suggestion and Martin Atzmueller's patch
 
 changes in sbcl-0.6.12 relative to sbcl-0.6.11:
+* incompatible change: The old SB-EXT:OPTIMIZE-INTERFACE declaration
+  is no longer recognized. I apologize for this, because it was
+  listed in SB-EXT as a supported extension, but I found that
+  its existing behavior was poorly specified, as well as incorrectly
+  specified, and it looked like too much of a mess to straighten it
+  out. I have enough on my hands trying to get ANSI stuff to work..
 * many patches ported from CMU CL by Martin Atzmueller, with 
   half a dozen bug fixes in pretty-printing and the debugger, and
   half a dozen others elsewhere
@@ -723,3 +729,6 @@ planned incompatible changes in 0.7.x:
   ANSI Common Lisp standard, may change to their ASCII symbolic
   names: #\Nul, #\Soh, #\Stx, etc.
 * INTERNAL-TIME-UNITS-PER-SECOND might increase, e.g. to 1000.
+* MAYBE-INLINE will probably go away at some point, maybe 0.7.x,
+  maybe later, in favor of the ANSI-recommended idiom for making
+  a function optionally inline.

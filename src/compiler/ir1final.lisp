@@ -58,8 +58,8 @@
 (defun finalize-xep-definition (fun)
   (let* ((leaf (functional-entry-function fun))
 	 (name (leaf-name leaf))
-	 (dtype (definition-type leaf)))
-    (setf (leaf-type leaf) dtype)
+	 (defined-ftype (definition-type leaf)))
+    (setf (leaf-type leaf) defined-ftype)
     (when (or (and name (symbolp name))
 	      (and (consp name) (eq (car name) 'setf)))
       (let* ((where (info :function :where-from name))
@@ -72,34 +72,28 @@
 	(ecase where
 	  (:assumed
 	   (let ((approx-type (info :function :assumed-type name)))
-	     (when (and approx-type (function-type-p dtype))
-	       (valid-approximate-type approx-type dtype))
-	     (setf (info :function :type name) dtype)
+	     (when (and approx-type (function-type-p defined-ftype))
+	       (valid-approximate-type approx-type defined-ftype))
+	     (setf (info :function :type name) defined-ftype)
 	     (setf (info :function :assumed-type name) nil))
 	   (setf (info :function :where-from name) :defined))
 	  (:declared
-	   ;; Check that derived type matches declared type.
-	   (let ((type (info :function :type name)))
-             (when (and type (function-type-p dtype))
-               (let ((type-returns (function-type-returns type))
-                     (dtype-returns (function-type-returns dtype))
-                     (*error-function* #'compiler-warning))
-                 (unless (values-types-equal-or-intersect type-returns
-							  dtype-returns)
-                   (note-lossage "The result type from previous declaration:~%  ~S~@
-                                  conflicts with the result type:~%  ~S"
-                                 (type-specifier type-returns)
-                                 (type-specifier dtype-returns))))))
-	   ;; (Regardless of what happens, we keep the declared type.)
-	   )
+	   (let ((declared-ftype (info :function :type name)))
+	     (unless (defined-ftype-matches-declared-ftype-p
+		       defined-ftype declared-ftype)
+	       (note-lossage "~@<The previously declared FTYPE~2I ~_~S~I ~_~
+                              conflicts with the definition type ~2I~_~S~:>"
+			     (type-specifier declared-ftype)
+			     (type-specifier defined-ftype)))))
 	  (:defined
            (when global-p
-             (setf (info :function :type name) dtype)))))))
+             (setf (info :function :type name) defined-ftype)))))))
   (values))
 
-;;; Find all calls in Component to assumed functions and update the assumed
-;;; type information. This is delayed until now so that we have the best
-;;; possible information about the actual argument types.
+;;; Find all calls in COMPONENT to assumed functions and update the
+;;; assumed type information. This is delayed until now so that we
+;;; have the best possible information about the actual argument
+;;; types.
 (defun note-assumed-types (component name var)
   (when (and (eq (leaf-where-from var) :assumed)
 	     (not (and (defined-function-p var)
@@ -115,8 +109,8 @@
 	    (setq atype (note-function-use dest atype)))))
       (setf (info :function :assumed-type name) atype))))
 
-;;; Do miscellaneous things that we want to do once all optimization has
-;;; been done:
+;;; Do miscellaneous things that we want to do once all optimization
+;;; has been done:
 ;;;  -- Record the derived result type before the back-end trashes the
 ;;;     flow graph.
 ;;;  -- Note definition of any entry points.

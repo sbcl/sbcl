@@ -42,8 +42,8 @@
 ;;; now we just don't worry about it. If for some reason it becomes
 ;;; worrisome and the magic value needs replacement:
 ;;;   * The replacement value needs to be LOADable with EQL preserved,
-;;;     so that macroexpansion for WITH-HASH-TABLE-ITERATOR will work
-;;;     when compiled into a file and loaded back into SBCL.
+;;;     so that the macroexpansion for WITH-HASH-TABLE-ITERATOR will
+;;;     work when compiled into a file and loaded back into SBCL.
 ;;;     (Thus, just uninterning %EMPTY-HT-SLOT% doesn't work.)
 ;;;   * The replacement value needs to be acceptable to the
 ;;;     low-level gencgc.lisp hash table scavenging code. 
@@ -62,13 +62,13 @@
 	   (label-2 (gensym)))
       ;; Check for illegal old-style DO.
       (when (or (not (listp varlist)) (atom endlist))
-	(error "Ill-formed ~S -- possibly illegal old style DO?" name))
+	(error "ill-formed ~S -- possibly illegal old style DO?" name))
       ;; Parse VARLIST to get R-INITS and R-STEPS.
       (dolist (v varlist)
-	(flet (;; (We avoid using CL:PUSH here so that CL:PUSH can be defined
-	       ;; in terms of CL:SETF, and CL:SETF can be defined in terms of
-	       ;; CL:DO, and CL:DO can be defined in terms of the current
-	       ;; function.)
+	(flet (;; (We avoid using CL:PUSH here so that CL:PUSH can be
+	       ;; defined in terms of CL:SETF, and CL:SETF can be
+	       ;; defined in terms of CL:DO, and CL:DO can be defined
+	       ;; in terms of the current function.)
 	       (push-on-r-inits (x)
 		 (setq r-inits (cons x r-inits)))
 	       ;; common error-handling
@@ -81,10 +81,10 @@
 			  name
 			  (first v)))
 		 (let ((lv (length v)))
-		   ;; (We avoid using CL:CASE here so that CL:CASE can be
-		   ;; defined in terms of CL:SETF, and CL:SETF can be defined
-		   ;; in terms of CL:DO, and CL:DO can be defined in terms of
-		   ;; the current function.)
+		   ;; (We avoid using CL:CASE here so that CL:CASE can
+		   ;; be defined in terms of CL:SETF, and CL:SETF can
+		   ;; be defined in terms of CL:DO, and CL:DO can be
+		   ;; defined in terms of the current function.)
 		   (cond ((= lv 1)
 			  (push-on-r-inits (first v)))
 			 ((= lv 2)

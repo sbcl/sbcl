@@ -242,15 +242,16 @@
 ;;; system area pointer to it.
 #!-sb-fluid (declaim (inline %make-alien))
 (defun %make-alien (bits)
-  (declare (type index bits) (optimize-interface (safety 2)))
-  (alien-funcall (extern-alien "malloc" (function system-area-pointer unsigned))
+  (declare (type index bits))
+  (alien-funcall (extern-alien "malloc"
+			       (function system-area-pointer unsigned))
 		 (ash (the index (+ bits 7)) -3)))
 
 #!-sb-fluid (declaim (inline free-alien))
 (defun free-alien (alien)
   #!+sb-doc
   "Dispose of the storage pointed to by ALIEN. ALIEN must have been allocated
-   by MAKE-ALIEN or ``malloc''."
+   by MAKE-ALIEN or malloc(3)."
   (alien-funcall (extern-alien "free" (function (values) system-area-pointer))
 		 (alien-sap alien))
   nil)
@@ -482,7 +483,7 @@
 (defun %cast (alien target-type)
   (declare (type alien-value alien)
 	   (type alien-type target-type)
-	   (optimize-interface (safety 2))
+	   (optimize (safety 2))
 	   (optimize (inhibit-warnings 3)))
   (if (or (alien-pointer-type-p target-type)
 	  (alien-array-type-p target-type)

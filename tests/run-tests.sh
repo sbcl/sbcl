@@ -47,9 +47,11 @@ done
 echo "  (sb-ext:quit :unix-status 104)) ; Return status=success."
 ) | $sbcl ; tenfour
 
-# *.impure.lisp files are Lisp code with side effects (e.g. doing DEFSTRUCT
-# or DEFTYPE or DEFVAR). Each one needs to be run as a separate
-# invocation of Lisp.
+# *.impure.lisp files are Lisp code with side effects (e.g. doing
+# DEFSTRUCT or DEFTYPE or DEFVAR, or messing with the read table).
+# Each one should be LOADed in a separate invocation of Lisp, so 
+# that we don't need to worry about them interfering with each
+# other.
 echo //running '*.impure.lisp' tests
 for f in *.impure.lisp; do
     if [ -f $f ]; then
@@ -58,8 +60,8 @@ for f in *.impure.lisp; do
     fi
 done
 
-# *.test.sh files are scripts to test stuff, typically stuff which can't
-# so easily be tested within Lisp itself. A file foo.test.sh
+# *.test.sh files are scripts to test stuff, typically stuff which 
+# can't so easily be tested within Lisp itself. A file foo.test.sh
 # may be associated with other files foo*, e.g. foo.lisp, foo-1.lisp,
 # or foo.pl.
 echo //running '*.test.sh' tests
@@ -84,6 +86,23 @@ done
 # can all be done in the same invocation of Lisp.
 echo //running '*.pure-cload.lisp' tests
 for f in *.pure-cload.lisp; do
+    # (Actually here we LOAD each one into a separate invocation
+    # of Lisp just because I haven't figured out a concise way
+    # to LOAD them all into the same Lisp.)
+    if [ -f $f ]; then
+	echo //running $f test
+	$sbcl <<EOF ; tenfour
+		(compile-file "$f")
+		(progn (load *) (sb-ext:quit :unix-status 104))
+EOF
+    fi
+done
+
+# *.impure-cload.lisp files want to be compiled, then loaded. They
+# can have side effects, so each one should be done in a separate
+# invocation of Lisp so that they don't interfere.
+echo //running '*.impure-cload.lisp' tests
+for f in *.impure-cload.lisp; do
     if [ -f $f ]; then
 	echo //running $f test
 	$sbcl <<EOF ; tenfour

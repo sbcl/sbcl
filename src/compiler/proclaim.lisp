@@ -219,9 +219,6 @@
 		   (setf (class-state subclass) :sealed))))))))
       (optimize
        (setq *policy* (process-optimize-decl form *policy*)))
-      (optimize-interface
-       (setq *interface-policy*
-	     (process-optimize-decl form *interface-policy*)))
       ((inline notinline maybe-inline)
        (dolist (name args)
 	 (proclaim-as-function-name name)

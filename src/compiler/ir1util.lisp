@@ -323,8 +323,7 @@
 			 options
 			 (lambda (lexenv-lambda default))
 			 (cleanup (lexenv-cleanup default))
-			 (policy (lexenv-policy default))
-			 (interface-policy (lexenv-interface-policy default)))
+			 (policy (lexenv-policy default)))
   (macrolet ((frob (var slot)
 	       `(let ((old (,slot default)))
 		  (if ,var
@@ -336,21 +335,8 @@
      (frob blocks lexenv-blocks)
      (frob tags lexenv-tags)
      (frob type-restrictions lexenv-type-restrictions)
-     lambda cleanup policy interface-policy
+     lambda cleanup policy 
      (frob options lexenv-options))))
-
-;;; Return a POLICY that defaults any unsupplied optimize qualities in
-;;; the INTERFACE-POLICY with the corresponding ones from the POLICY.
-(defun make-interface-policy (lexenv)
-  (declare (type lexenv lexenv))
-  (let ((ipolicy (lexenv-interface-policy lexenv))
-	(policy (lexenv-policy lexenv)))
-    (let ((result policy))
-      (dolist (quality '(speed safety space))
-	(let ((iquality-entry (assoc quality ipolicy)))
-	  (when iquality-entry
-	    (push iquality-entry result))))
-      result)))
 
 ;;;; flow/DFO/component hackery
 

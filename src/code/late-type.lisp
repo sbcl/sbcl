@@ -2132,6 +2132,41 @@
 
 ;;;; utilities shared between cross-compiler and target system
 
+;;; Does the type derived from compilation of an actual function
+;;; definition satisfy declarations of a function's type?
+(defun defined-ftype-matches-declared-ftype-p (defined-ftype declared-ftype)
+  (declare (type ctype defined-ftype declared-ftype))
+  (flet ((is-built-in-class-function-p (ctype)
+	   (and (built-in-class-p ctype)
+		(eq (built-in-class-%name ctype) 'function))))
+    (cond (;; DECLARED-FTYPE could certainly be #<BUILT-IN-CLASS FUNCTION>;
+	   ;; that's what happens when we (DECLAIM (FTYPE FUNCTION FOO)).
+	   (is-built-in-class-function-p declared-ftype)
+	   ;; In that case, any definition satisfies the declaration.
+	   t)
+	  (;; It's not clear whether or how DEFINED-FTYPE might be
+	   ;; #<BUILT-IN-CLASS FUNCTION>, but it's not obviously
+	   ;; invalid, so let's handle that case too, just in case.
+	   (is-built-in-class-function-p defined-ftype)
+	   ;; No matter what DECLARED-FTYPE might be, we can't prove
+	   ;; that an object of type FUNCTION doesn't satisfy it, so
+	   ;; we return success no matter what.
+	   t)
+	  (;; Otherwise both of them must be FUNCTION-TYPE objects.
+	   t
+	   ;; FIXME: For now we only check compatibility of the return
+	   ;; type, not argument types, and we don't even check the
+	   ;; return type very precisely (as per bug 94a). It would be
+	   ;; good to do a better job. Perhaps to check the
+	   ;; compatibility of the arguments, we should (1) redo
+	   ;; VALUES-TYPES-EQUAL-OR-INTERSECT as
+	   ;; ARGS-TYPES-EQUAL-OR-INTERSECT, and then (2) apply it to
+	   ;; the ARGS-TYPE slices of the FUNCTION-TYPEs. (ARGS-TYPE
+	   ;; is a base class both of VALUES-TYPE and of FUNCTION-TYPE.)
+	   (values-types-equal-or-intersect
+	    (function-type-returns defined-ftype)
+	    (function-type-returns declared-ftype))))))
+	   
 ;;; This messy case of CTYPE for NUMBER is shared between the
 ;;; cross-compiler and the target system.
 (defun ctype-of-number (x)

@@ -1018,12 +1018,6 @@
        (make-lexenv
 	:default res
 	:policy (process-optimize-decl spec (lexenv-policy res))))
-      (optimize-interface
-       (make-lexenv
-	:default res
-	:interface-policy (process-optimize-decl
-			   spec
-			   (lexenv-interface-policy res))))
       (type
        (process-type-decl (cdr spec) res vars))
       (values
@@ -1274,26 +1268,18 @@
 ;;; sequentially bind each AUX-VAR to the corresponding AUX-VAL before
 ;;; converting the body. If there are no bindings, just convert the
 ;;; body, otherwise do one binding and recurse on the rest.
-;;;
-;;; If INTERFACE is true, then we convert bindings with the interface
-;;; policy. For real &AUX bindings, and for implicit aux bindings
-;;; introduced by keyword bindings, this is always true. It is only
-;;; false when LET* directly calls this function.
-(defun ir1-convert-aux-bindings (start cont body aux-vars aux-vals interface)
+(defun ir1-convert-aux-bindings (start cont body aux-vars aux-vals)
   (declare (type continuation start cont) (list body aux-vars aux-vals))
   (if (null aux-vars)
       (ir1-convert-progn-body start cont body)
       (let ((fun-cont (make-continuation))
-	    (fun (ir1-convert-lambda-body body (list (first aux-vars))
-					  (rest aux-vars) (rest aux-vals)
-					  interface)))
+	    (fun (ir1-convert-lambda-body body
+					  (list (first aux-vars))
+					  :aux-vars (rest aux-vars)
+					  :aux-vals (rest aux-vals))))
 	(reference-leaf start fun-cont fun)
-	(let ((*lexenv* (if interface
-			    (make-lexenv
-			     :policy (make-interface-policy *lexenv*))
-			    *lexenv*)))
-	  (ir1-convert-combination-args fun-cont cont
-					(list (first aux-vals))))))
+	(ir1-convert-combination-args fun-cont cont
+				      (list (first aux-vals)))))
   (values))
 
 ;;; This is similar to IR1-CONVERT-PROGN-BODY except that code to bind
@@ -1307,13 +1293,12 @@
 ;;; will end up being the innermost one. We force CONT to start a
 ;;; block outside of this cleanup, causing cleanup code to be emitted
 ;;; when the scope is exited.
-(defun ir1-convert-special-bindings (start cont body aux-vars aux-vals
-					   interface svars)
+(defun ir1-convert-special-bindings (start cont body aux-vars aux-vals svars)
   (declare (type continuation start cont)
 	   (list body aux-vars aux-vals svars))
   (cond
    ((null svars)
-    (ir1-convert-aux-bindings start cont body aux-vars aux-vals interface))
+    (ir1-convert-aux-bindings start cont body aux-vars aux-vals))
    (t
     (continuation-starts-block cont)
     (let ((cleanup (make-cleanup :kind :special-bind))
@@ -1326,7 +1311,7 @@
       (let ((*lexenv* (make-lexenv :cleanup cleanup)))
 	(ir1-convert next-cont nnext-cont '(%cleanup-point))
 	(ir1-convert-special-bindings nnext-cont cont body aux-vars aux-vals
-				      interface (rest svars))))))
+				      (rest svars))))))
   (values))
 
 ;;; Create a lambda node out of some code, returning the result. The
@@ -1345,11 +1330,8 @@
 ;;;
 ;;; AUX-VARS is a list of VAR structures for variables that are to be
 ;;; sequentially bound. Each AUX-VAL is a form that is to be evaluated
-;;; to get the initial value for the corresponding AUX-VAR. Interface
-;;; is a flag as T when there are real aux values (see LET* and
-;;; IR1-CONVERT-AUX-BINDINGS.)
-(defun ir1-convert-lambda-body (body vars &optional aux-vars aux-vals
-				     interface result)
+;;; to get the initial value for the corresponding AUX-VAR. 
+(defun ir1-convert-lambda-body (body vars &key aux-vars aux-vals result)
   (declare (list body vars aux-vars aux-vals)
 	   (type (or continuation null) result))
   (let* ((bind (make-bind))
@@ -1381,7 +1363,7 @@
 	  (prev-link bind cont1)
 	  (use-continuation bind cont2)
 	  (ir1-convert-special-bindings cont2 result body aux-vars aux-vals
-					interface (svars)))
+					(svars)))
 
 	(let ((block (continuation-block result)))
 	  (when block
@@ -1409,8 +1391,6 @@
 ;;; then we mark the corresponding var as EVER-USED to inhibit
 ;;; "defined but not read" warnings for arguments that are only used
 ;;; by default forms.
-;;;
-;;; We bind *LEXENV* to change the policy to the interface policy.
 (defun convert-optional-entry (fun vars vals defaults)
   (declare (type clambda fun) (list vars vals defaults))
   (let* ((fvars (reverse vars))
@@ -1423,14 +1403,14 @@
 			      :where-from (leaf-where-from var)
 			      :specvar (lambda-var-specvar var)))
 			   fvars))
-	 (*lexenv* (make-lexenv :policy (make-interface-policy *lexenv*)))
 	 (fun
-	  (ir1-convert-lambda-body
-	   `((%funcall ,fun ,@(reverse vals) ,@defaults))
-	   arg-vars)))
-    (mapc #'(lambda (var arg-var)
-	      (when (cdr (leaf-refs arg-var))
-		(setf (leaf-ever-used var) t)))
+	  (ir1-convert-lambda-body `((%funcall ,fun
+					       ,@(reverse vals)
+					       ,@defaults))
+				   arg-vars)))
+    (mapc (lambda (var arg-var)
+	    (when (cdr (leaf-refs arg-var))
+	      (setf (leaf-ever-used var) t)))
 	  fvars arg-vars)
     fun))
 
@@ -1497,10 +1477,6 @@
 ;;;
 ;;; We deal with :ALLOW-OTHER-KEYS by delaying unknown keyword errors
 ;;; until we have scanned all the keywords.
-;;;
-;;; When converting the function, we bind *LEXENV* to change the
-;;; compilation policy over to the interface policy, so that keyword
-;;; args will be checked even when type checking isn't on in general.
 (defun convert-more-entry (res entry-vars entry-vals rest morep keys)
   (declare (type optional-dispatch res) (list entry-vars entry-vals keys))
   (collect ((arg-vars)
@@ -1517,8 +1493,7 @@
 	   (context-temp (make-lambda-var :name n-context))
 	   (n-count (gensym "N-COUNT-"))
 	   (count-temp (make-lambda-var :name n-count
-					:type (specifier-type 'index)))
-	   (*lexenv* (make-lexenv :policy (make-interface-policy *lexenv*))))
+					:type (specifier-type 'index))))
 
       (arg-vars context-temp count-temp)
 
@@ -1670,11 +1645,11 @@
 	       (main-vals (arg-info-default info))
 	       (bind-vals n-val)))))
 
-    (let* ((main-entry (ir1-convert-lambda-body body (main-vars)
-						(append (bind-vars) aux-vars)
-						(append (bind-vals) aux-vals)
-						t
-						cont))
+    (let* ((main-entry (ir1-convert-lambda-body
+			body (main-vars)
+			:aux-vars (append (bind-vars) aux-vars)
+			:aux-vals (append (bind-vals) aux-vals)
+			:result cont))
 	   (last-entry (convert-optional-entry main-entry default-vars
 					       (main-vals) ())))
       (setf (optional-dispatch-main-entry res) main-entry)
@@ -1734,7 +1709,9 @@
 			       nil nil nil vars supplied-p-p body aux-vars
 			       aux-vals cont)
 	     (let ((fun (ir1-convert-lambda-body body (reverse default-vars)
-						 aux-vars aux-vals t cont)))
+						 :aux-vars aux-vars
+						 :aux-vals aux-vals
+						 :result cont)))
 	       (setf (optional-dispatch-main-entry res) fun)
 	       (push (if supplied-p-p
 			 (convert-optional-entry fun entry-vars entry-vals ())
@@ -1781,7 +1758,7 @@
 
 ;;; This function deals with the case where we have to make an
 ;;; Optional-Dispatch to represent a lambda. We cons up the result and
-;;; call IR1-Convert-Hairy-Args to do the work. When it is done, we
+;;; call IR1-CONVERT-HAIRY-ARGS to do the work. When it is done, we
 ;;; figure out the min-args and max-args.
 (defun ir1-convert-hairy-lambda (body vars keyp allowp aux-vars aux-vals cont)
   (declare (list body vars aux-vars aux-vals) (type continuation cont))
@@ -1834,8 +1811,10 @@
 		      (ir1-convert-hairy-lambda forms vars keyp
 						allow-other-keys
 						aux-vars aux-vals cont)
-		      (ir1-convert-lambda-body forms vars aux-vars aux-vals
-					       t cont))))
+		      (ir1-convert-lambda-body forms vars
+					       :aux-vars aux-vars
+					       :aux-vals aux-vals
+					       :result cont))))
 	(setf (functional-inline-expansion res) form)
 	(setf (functional-arg-documentation res) (cadr form))
 	(setf (leaf-name res) name)
@@ -2453,7 +2432,7 @@
   (multiple-value-bind (forms decls) (sb!sys:parse-body body nil)
     (multiple-value-bind (vars values) (extract-let-variables bindings 'let*)
       (let ((*lexenv* (process-decls decls vars nil cont)))
-	(ir1-convert-aux-bindings start cont forms vars values nil)))))
+	(ir1-convert-aux-bindings start cont forms vars values)))))
 
 ;;; This is a lot like a LET* with no bindings. Unlike LET*, LOCALLY
 ;;; has to preserves top-level-formness, but we don't need to worry
@@ -2469,7 +2448,7 @@
   the Forms are also processed as top-level forms."
   (multiple-value-bind (forms decls) (sb!sys:parse-body body nil)
     (let ((*lexenv* (process-decls decls nil nil cont)))
-      (ir1-convert-aux-bindings start cont forms nil nil nil))))
+      (ir1-convert-aux-bindings start cont forms nil nil))))
 
 ;;;; FLET and LABELS
 
@@ -3019,8 +2998,7 @@
 				 `(,(car x) .
 				   (macro . ,(coerce (cdr x) 'function))))
 			     macros)
-		     :policy (lexenv-policy *lexenv*)
-		     :interface-policy (lexenv-interface-policy *lexenv*))))
+		     :policy (lexenv-policy *lexenv*))))
       (ir1-convert-lambda `(lambda ,@body) name))))
 
 ;;; Return a lambda that has been "closed" with respect to ENV,
