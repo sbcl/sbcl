@@ -263,18 +263,18 @@ bootstrapping.
          :definition-source `((defgeneric ,fun-name) ,*load-pathname*)
          initargs))
 
-;;; As per section 3.4.2 of the ANSI spec, generic function lambda
-;;; lists have some special limitations, which we check here.
+(define-condition generic-function-lambda-list-error
+    (reference-condition simple-program-error)
+  ()
+  (:default-initargs :references (list '(:ansi-cl :section (3 4 2)))))
+
 (defun check-gf-lambda-list (lambda-list)
   (flet ((ensure (arg ok)
            (unless ok
-	     (error
-	      ;; (s/invalid/non-ANSI-conforming/ because the old PCL
-	      ;; implementation allowed this, so people got used to
-	      ;; it, and maybe this phrasing will help them to guess
-	      ;; why their program which worked under PCL no longer works.)
-	      "~@<non-ANSI-conforming argument ~S ~_in the generic function lambda list ~S~:>"
-	      arg lambda-list))))
+	     (error 'generic-function-lambda-list-error
+		    :format-control
+		    "~@<invalid ~S ~_in the generic function lambda list ~S~:>"
+		    :format-arguments (list arg lambda-list)))))
     (multiple-value-bind (required optional restp rest keyp keys allowp
                           auxp aux morep more-context more-count)
 	(parse-lambda-list lambda-list)
@@ -2334,6 +2334,11 @@ bootstrapping.
     (declare (ignore ignore1 ignore2 ignore3))
     required-parameters))
 
+(define-condition specialized-lambda-list-error
+    (reference-condition simple-program-error)
+  ()
+  (:default-initargs :references (list '(:ansi-cl :section (3 4 3)))))
+
 (defun parse-specialized-lambda-list
     (arglist
      &optional supplied-keywords (allowed-keywords '(&optional &rest &key &aux))
@@ -2344,22 +2349,21 @@ bootstrapping.
 	  ((eq arg '&aux)
 	   (values nil arglist nil nil))
 	  ((memq arg lambda-list-keywords)
-	   ;; Now, since we try to conform to ANSI, non-standard
-	   ;; lambda-list-keywords should be treated as errors.
+	   ;; non-standard lambda-list-keywords are errors.
 	   (unless (memq arg specialized-lambda-list-keywords)
-	     (error 'simple-program-error
+	     (error 'specialized-lambda-list-error
 		    :format-control "unknown specialized-lambda-list ~
                                      keyword ~S~%"
 		    :format-arguments (list arg)))
 	   ;; no multiple &rest x &rest bla specifying
 	   (when (memq arg supplied-keywords)
-	     (error 'simple-program-error
+	     (error 'specialized-lambda-list-error
 		    :format-control "multiple occurrence of ~
                                      specialized-lambda-list keyword ~S~%"
 		    :format-arguments (list arg)))
 	   ;; And no placing &key in front of &optional, either.
 	   (unless (memq arg allowed-keywords)
-	     (error 'simple-program-error
+	     (error 'specialized-lambda-list-error
 		    :format-control "misplaced specialized-lambda-list ~
                                      keyword ~S~%"
 		    :format-arguments (list arg)))
@@ -2382,7 +2386,7 @@ bootstrapping.
 			    (not (or (null (cadr lambda-list))
 				     (memq (cadr lambda-list)
 					   specialized-lambda-list-keywords)))))
-	       (error 'simple-program-error
+	       (error 'specialized-lambda-list-error
 		      :format-control
 		      "in a specialized-lambda-list, excactly one ~
                        variable must follow &REST.~%"

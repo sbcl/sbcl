@@ -583,6 +583,9 @@
 
 (define-condition simple-error (simple-condition error) ())
 
+;;; not specified by ANSI, but too useful not to have around.
+(define-condition simple-style-warning (simple-condition style-warning) ())
+
 (define-condition storage-condition (serious-condition) ())
 
 (define-condition type-error (error)
@@ -717,133 +720,6 @@
 		 (reader-error-format-control condition)
 		 (reader-error-format-arguments condition)))))))
 
-;;;; various other (not specified by ANSI) CONDITIONs
-;;;;
-;;;; These might logically belong in other files; they're here, after
-;;;; setup of CONDITION machinery, only because that makes it easier to
-;;;; get cold init to work.
-
-(define-condition simple-style-warning (simple-condition style-warning) ())
-
-(define-condition values-type-error (type-error)
-  ()
-  (:report
-   (lambda (condition stream)
-     (format stream
-	     "~@<The values set ~2I~:_[~{~S~^ ~}] ~I~_is not of type ~2I~_~S.~:>"
-	     (type-error-datum condition)
-	     (type-error-expected-type condition)))))
-
-;;; KLUDGE: a condition for floating point errors when we can't or
-;;; won't figure out what type they are. (In FreeBSD and OpenBSD we
-;;; don't know how, at least as of sbcl-0.6.7; in Linux we probably
-;;; know how but the old code was broken by the conversion to POSIX
-;;; signal handling and hasn't been fixed as of sbcl-0.6.7.)
-;;;
-;;; FIXME: Perhaps this should also be a base class for all
-;;; floating point exceptions?
-(define-condition floating-point-exception (arithmetic-error)
-  ((flags :initarg :traps
-          :initform nil
-	  :reader floating-point-exception-traps))
-  (:report (lambda (condition stream)
-	     (format stream
-		     "An arithmetic error ~S was signalled.~%"
-		     (type-of condition))
-	     (let ((traps (floating-point-exception-traps condition)))
-	       (if traps
-		   (format stream
-			   "Trapping conditions are: ~%~{ ~S~^~}~%"
-			   traps)
-		   (write-line
-		    "No traps are enabled? How can this be?"
-		    stream))))))
-
-(define-condition index-too-large-error (type-error)
-  ()
-  (:report
-   (lambda (condition stream)
-     (format stream
-	     "The index ~S is too large."
-	     (type-error-datum condition)))))
-
-(define-condition bounding-indices-bad-error (type-error)
-  ((object :reader bounding-indices-bad-object :initarg :object))
-  (:report
-   (lambda (condition stream)
-     (let* ((datum (type-error-datum condition))
-	    (start (car datum))
-	    (end (cdr datum))
-	    (object (bounding-indices-bad-object condition)))
-       (etypecase object
-	 (sequence
-	  (format stream
-		  "The bounding indices ~S and ~S are bad for a sequence of length ~S."
-		  start end (length object)))
-	 (array
-	  ;; from WITH-ARRAY-DATA
-	  (format stream
-		  "The START and END parameters ~S and ~S are bad for an array of total size ~S."
-		  start end (array-total-size object))))))))
-
-(define-condition nil-array-accessed-error (type-error)
-  ()
-  (:report (lambda (condition stream)
-	     (declare (ignore condition))
-	     (format stream
-		     "An attempt to access an array of element-type ~
-                      NIL was made.  Congratulations!"))))
-
-(define-condition io-timeout (stream-error)
-  ((direction :reader io-timeout-direction :initarg :direction))
-  (:report
-   (lambda (condition stream)
-     (declare (type stream stream))
-     (format stream
-	     "I/O timeout ~(~A~)ing ~S"
-	     (io-timeout-direction condition)
-	     (stream-error-stream condition)))))
-
-(define-condition namestring-parse-error (parse-error)
-  ((complaint :reader namestring-parse-error-complaint :initarg :complaint)
-   (args :reader namestring-parse-error-args :initarg :args :initform nil)
-   (namestring :reader namestring-parse-error-namestring :initarg :namestring)
-   (offset :reader namestring-parse-error-offset :initarg :offset))
-  (:report
-   (lambda (condition stream)
-     (format stream
-	     "parse error in namestring: ~?~%  ~A~%  ~V@T^"
-	     (namestring-parse-error-complaint condition)
-	     (namestring-parse-error-args condition)
-	     (namestring-parse-error-namestring condition)
-	     (namestring-parse-error-offset condition)))))
-
-(define-condition simple-package-error (simple-condition package-error) ())
-
-(define-condition reader-package-error (reader-error) ())
-
-(define-condition reader-eof-error (end-of-file)
-  ((context :reader reader-eof-error-context :initarg :context))
-  (:report
-   (lambda (condition stream)
-     (format stream
-	     "unexpected end of file on ~S ~A"
-	     (stream-error-stream condition)
-	     (reader-eof-error-context condition)))))
-
-(define-condition reader-impossible-number-error (reader-error)
-  ((error :reader reader-impossible-number-error-error :initarg :error))
-  (:report
-   (lambda (condition stream)
-     (let ((error-stream (stream-error-stream condition)))
-       (format stream "READER-ERROR ~@[at ~W ~]on ~S:~%~?~%Original error: ~A"
-	       (file-position error-stream) error-stream
-	       (reader-error-format-control condition)
-	       (reader-error-format-arguments condition)
-	       (reader-impossible-number-error-error condition))))))
-
-(define-condition timeout (serious-condition) ())
-
 ;;;; special SBCL extension conditions
 
 ;;; an error apparently caused by a bug in SBCL itself
@@ -922,7 +798,8 @@
 	 (:special-operator (format stream "Special Operator ~S" data))
 	 (:macro (format stream "Macro ~S" data))
 	 (:section (format stream "Section ~{~D~^.~}" data))
-	 (:glossary (format stream "Glossary Entry ~S" data)))))
+	 (:glossary (format stream "Glossary entry for ~S" data))
+	 (:issue (format stream "writeup for Issue ~A" data)))))
     (:sbcl
      (format stream "The SBCL Manual")
      (format stream ", ")
@@ -978,8 +855,9 @@
     (reference-condition simple-warning)
   ()
   (:default-initargs 
-      :references (list '(:ansi-cl :function make-array) 
-			'(:ansi-cl :function upgraded-array-element-type))))
+      :references (list 
+		   '(:ansi-cl :function make-array) 
+		   '(:ansi-cl :function sb!xc:upgraded-array-element-type))))
 
 (define-condition displaced-to-array-too-small-error
     (reference-condition simple-error)
@@ -1008,6 +886,141 @@
 
 (define-condition extension-failure (reference-condition simple-error)
   ())
+
+;;;; various other (not specified by ANSI) CONDITIONs
+;;;;
+;;;; These might logically belong in other files; they're here, after
+;;;; setup of CONDITION machinery, only because that makes it easier to
+;;;; get cold init to work.
+
+(define-condition values-type-error (type-error)
+  ()
+  (:report
+   (lambda (condition stream)
+     (format stream
+	     "~@<The values set ~2I~:_[~{~S~^ ~}] ~I~_is not of type ~2I~_~S.~:>"
+	     (type-error-datum condition)
+	     (type-error-expected-type condition)))))
+
+;;; KLUDGE: a condition for floating point errors when we can't or
+;;; won't figure out what type they are. (In FreeBSD and OpenBSD we
+;;; don't know how, at least as of sbcl-0.6.7; in Linux we probably
+;;; know how but the old code was broken by the conversion to POSIX
+;;; signal handling and hasn't been fixed as of sbcl-0.6.7.)
+;;;
+;;; FIXME: Perhaps this should also be a base class for all
+;;; floating point exceptions?
+(define-condition floating-point-exception (arithmetic-error)
+  ((flags :initarg :traps
+          :initform nil
+	  :reader floating-point-exception-traps))
+  (:report (lambda (condition stream)
+	     (format stream
+		     "An arithmetic error ~S was signalled.~%"
+		     (type-of condition))
+	     (let ((traps (floating-point-exception-traps condition)))
+	       (if traps
+		   (format stream
+			   "Trapping conditions are: ~%~{ ~S~^~}~%"
+			   traps)
+		   (write-line
+		    "No traps are enabled? How can this be?"
+		    stream))))))
+
+(define-condition index-too-large-error (type-error)
+  ()
+  (:report
+   (lambda (condition stream)
+     (format stream
+	     "The index ~S is too large."
+	     (type-error-datum condition)))))
+
+(define-condition bounding-indices-bad-error (reference-condition type-error)
+  ((object :reader bounding-indices-bad-object :initarg :object))
+  (:report
+   (lambda (condition stream)
+     (let* ((datum (type-error-datum condition))
+	    (start (car datum))
+	    (end (cdr datum))
+	    (object (bounding-indices-bad-object condition)))
+       (etypecase object
+	 (sequence
+	  (format stream
+		  "The bounding indices ~S and ~S are bad ~
+                   for a sequence of length ~S."
+		  start end (length object)))
+	 (array
+	  ;; from WITH-ARRAY-DATA
+	  (format stream
+		  "The START and END parameters ~S and ~S are ~
+                   bad for an array of total size ~S."
+		  start end (array-total-size object)))))))
+  (:default-initargs 
+      :references 
+      (list '(:ansi-cl :glossary "bounding index designator")
+	    '(:ansi-cl :issue "SUBSEQ-OUT-OF-BOUNDS:IS-AN-ERROR"))))
+
+(define-condition nil-array-accessed-error (reference-condition type-error)
+  ()
+  (:report (lambda (condition stream)
+	     (declare (ignore condition))
+	     (format stream
+		     "An attempt to access an array of element-type ~
+                      NIL was made.  Congratulations!")))
+  (:default-initargs
+      :references (list '(:ansi-cl :function sb!xc:upgraded-array-element-type)
+			'(:ansi-cl :section (15 1 2 1))
+			'(:ansi-cl :section (15 1 2 2)))))
+
+(define-condition io-timeout (stream-error)
+  ((direction :reader io-timeout-direction :initarg :direction))
+  (:report
+   (lambda (condition stream)
+     (declare (type stream stream))
+     (format stream
+	     "I/O timeout ~(~A~)ing ~S"
+	     (io-timeout-direction condition)
+	     (stream-error-stream condition)))))
+
+(define-condition namestring-parse-error (parse-error)
+  ((complaint :reader namestring-parse-error-complaint :initarg :complaint)
+   (args :reader namestring-parse-error-args :initarg :args :initform nil)
+   (namestring :reader namestring-parse-error-namestring :initarg :namestring)
+   (offset :reader namestring-parse-error-offset :initarg :offset))
+  (:report
+   (lambda (condition stream)
+     (format stream
+	     "parse error in namestring: ~?~%  ~A~%  ~V@T^"
+	     (namestring-parse-error-complaint condition)
+	     (namestring-parse-error-args condition)
+	     (namestring-parse-error-namestring condition)
+	     (namestring-parse-error-offset condition)))))
+
+(define-condition simple-package-error (simple-condition package-error) ())
+
+(define-condition reader-package-error (reader-error) ())
+
+(define-condition reader-eof-error (end-of-file)
+  ((context :reader reader-eof-error-context :initarg :context))
+  (:report
+   (lambda (condition stream)
+     (format stream
+	     "unexpected end of file on ~S ~A"
+	     (stream-error-stream condition)
+	     (reader-eof-error-context condition)))))
+
+(define-condition reader-impossible-number-error (reader-error)
+  ((error :reader reader-impossible-number-error-error :initarg :error))
+  (:report
+   (lambda (condition stream)
+     (let ((error-stream (stream-error-stream condition)))
+       (format stream "READER-ERROR ~@[at ~W ~]on ~S:~%~?~%Original error: ~A"
+	       (file-position error-stream) error-stream
+	       (reader-error-format-control condition)
+	       (reader-error-format-arguments condition)
+	       (reader-impossible-number-error-error condition))))))
+
+(define-condition timeout (serious-condition) ())
 
 ;;;; restart definitions
 

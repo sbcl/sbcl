@@ -298,6 +298,12 @@
 
 ;; parse-method-group-specifiers parse the method-group-specifiers
 
+(define-condition long-method-combination-error 
+    (reference-condition simple-error)
+  ()
+  (:default-initargs 
+      :references (list '(:ansi-cl :macro define-method-combination))))
+
 (defun wrap-method-group-specifier-bindings
        (method-group-specifiers declarations real-body)
   (let (names
@@ -316,16 +322,19 @@
 		    (if (and (equal ,specializer-cache .specializers.)
 			     (not (null .specializers.)))
 			(return-from .long-method-combination-function.
-			  '(error "More than one method of type ~S ~
-				      with the same specializers."
-			           ',name))
+			  '(error 'long-method-combination-error
+			    :format-control "More than one method of type ~S ~
+				             with the same specializers."
+			    :format-arguments (list ',name)))
 			(setq ,specializer-cache .specializers.))
 		    (push .method. ,name))
 		  cond-clauses)
 	    (when required
 	      (push `(when (null ,name)
 			 (return-from .long-method-combination-function.
-			   '(error "No ~S methods." ',name)))
+			   '(error 'long-method-combination-error
+			     :format-control "No ~S methods." 
+			     :format-arguments (list ',name))))
 		      required-checks))
 	    (loop (unless (and (constantp order)
 			       (neq order (setq order (eval order))))

@@ -288,6 +288,11 @@
     (add-method generic-function new)
     new))
 
+(define-condition find-method-length-mismatch
+    (reference-condition simple-error)
+  ()
+  (:default-initargs :references '(:ansi-cl :function find-method)))
+
 (defun real-get-method (generic-function qualifiers specializers
 			&optional (errorp t) 
 			always-check-specializers)
@@ -299,9 +304,12 @@
 	;; instead we need to to this here or users may get hit by a
 	;; failed AVER instead of a sensible error message.
 	(when (/= lspec nreq)
-	  (error "~@<The generic function ~S takes ~D required argument~:P; ~
-                 was asked to find a method with specializers ~S~@:>"
-		 generic-function nreq specializers))))
+	  (error 
+	   'find-method-length-mismatch
+	   :format-control
+	   "~@<The generic function ~S takes ~D required argument~:P; ~
+            was asked to find a method with specializers ~S~@:>"
+	   :format-arguments (list generic-function nreq specializers)))))
     (let ((hit 
 	   (dolist (method methods)
 	     (let ((mspecializers (method-specializers method)))

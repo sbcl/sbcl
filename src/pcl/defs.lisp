@@ -665,7 +665,7 @@
     :initarg :documentation)
    ;; We need to make a distinction between the methods initially set
    ;; up by :METHOD options to DEFGENERIC and the ones set up later by
-   ;; DEFMETHOD, because ANSI's specifies that executing DEFGENERIC on
+   ;; DEFMETHOD, because ANSI specifies that executing DEFGENERIC on
    ;; an already-DEFGENERICed function clears the methods set by the
    ;; previous DEFGENERIC, but not methods set by DEFMETHOD. (Making
    ;; this distinction seems a little kludgy, but it has the positive
