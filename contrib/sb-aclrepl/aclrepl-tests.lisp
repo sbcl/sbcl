@@ -259,17 +259,12 @@
 
 (deftest tiny.double.0 (elements-count *double*) 0)
 
-(deftest tiny.double.skip1.0 (elements-count *double* nil 1) 1)
-(deftest tiny.double.skip1.1 (elements *double* nil 1)
-  #(nil))
+(deftest tiny.double.skip1.0 (elements-count *double* nil 1) 0)
+(deftest tiny.double.skip1.1 (elements *double* nil 0)
+  nil)
 (deftest tiny.doubel.skip1.2 (elements-labels *double* nil 1)
-  #(:ellipses))
+  nil)
 
-(deftest tiny.double.skip2.0 (elements-count *double* nil 2) 1)
-(deftest tiny.double.skip2.1 (elements *double* nil 2)
-  #(nil))
-(deftest tiny.double.skip2.2 (elements-labels *double* nil 2)
-  #(:ellipses))
 
 
 (do-tests)

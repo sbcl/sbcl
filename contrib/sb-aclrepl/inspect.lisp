@@ -452,21 +452,22 @@ and the last element."
 	 (first-to (if (first-element-ellipses-p parts skip) 1 0))
 	 (elements (when (plusp element-count) (make-array element-count)))
 	 (labels (when (plusp element-count) (make-array element-count))))
-    ;; possible first ellipses
-    (when (first-element-ellipses-p parts skip)
-      (set-element-values elements labels 0 nil :ellipses))
-    ;; main elements
-    (do ((i 0 (1+ i)))
-	((> i (- last-requested skip)))
-      (set-element elements labels parts (+ i first-to) (+ i skip)))
-    ;; last parts value if needed
-    (when (< last-requested last-part) 
-      (set-element elements labels parts (- element-count 1) last-part))
-    ;; ending ellipses or next to last parts value if needed
-    (when (< last-requested (1- last-part)) 
-      (if (= last-requested (- last-part 2))
-	  (set-element elements labels parts (- element-count 2) (1- last-part)) 
-	  (set-element-values elements labels (- element-count 2) nil :ellipses)))
+    (when (plusp element-count)
+      ;; possible first ellipses
+      (when (first-element-ellipses-p parts skip)
+	(set-element-values elements labels 0 nil :ellipses))
+      ;; main elements
+      (do* ((i 0 (1+ i)))
+	   ((> i (- last-requested skip)))
+	(set-element elements labels parts (+ i first-to) (+ i skip)))
+      ;; last parts value if needed
+      (when (< last-requested last-part) 
+	(set-element elements labels parts (- element-count 1) last-part))
+      ;; ending ellipses or next to last parts value if needed
+      (when (< last-requested (1- last-part)) 
+	(if (= last-requested (- last-part 2))
+	    (set-element elements labels parts (- element-count 2) (1- last-part)) 
+	    (set-element-values elements labels (- element-count 2) nil :ellipses))))
     (values elements labels element-count)))
 
 (defun last-requested (parts print skip)
@@ -477,8 +478,9 @@ and the last element."
 
 (defun compute-elements-count (parts length skip)
   "Compute the number of elements in parts given the print length and skip." 
-  (let ((element-count (min length (max 0 (- (parts-count parts) skip)))))
-    (when (plusp skip) ; starting ellipses
+  (let ((element-count (min (parts-count parts) length
+			    (max 0 (- (parts-count parts) skip)))))
+    (when (and (plusp (parts-count parts)) (plusp skip)) ; starting ellipses
       (incf element-count))
     (when (< (last-requested parts length skip)
 	     (last-part parts)) ; last value
