@@ -766,5 +766,16 @@
 (slot-boundp *obsoleted* 'a)
 (assert (= *obsoleted-counter* 1))
 
+;;; shared -> local slot transfers of inherited slots, reported by
+;;; Bruno Haible
+(let (i)
+  (defclass super-with-magic-slot () 
+    ((magic :initarg :size :initform 1 :allocation :class)))
+  (defclass sub-of-super-with-magic-slot (super-with-magic-slot) ())
+  (setq i (make-instance 'sub-of-super-with-magic-slot))
+  (defclass super-with-magic-slot () 
+    ((magic :initarg :size :initform 2)))
+  (assert (= 1 (slot-value i 'magic))))
+
 ;;;; success
 (sb-ext:quit :unix-status 104)

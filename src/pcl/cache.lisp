@@ -204,6 +204,7 @@
 (defmacro wrapper-no-of-instance-slots (wrapper)
   `(layout-length ,wrapper))
 
+;;; FIXME: Why are these macros?
 (defmacro wrapper-instance-slots-layout (wrapper)
   `(%wrapper-instance-slots-layout ,wrapper))
 (defmacro wrapper-class-slots (wrapper)

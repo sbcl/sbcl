@@ -2398,6 +2398,9 @@ changes in sbcl-0.8.10 relative to sbcl-0.8.9:
        to Bruno Haible)
 
 changes in sbcl-0.8.11 relative to sbcl-0.8.10:
+  * fixed bug 320: Shared to local slot value transfers in class 
+    redefinitions now happen corrently from superclasses as
+    well. (reported by Bruno Haible)
   * fixed bug 316: SHIFTF now accepts VALUES forms. (reported by Bruno
     Haible)
   * fixed bug 322: DEFSTRUCT :TYPE LIST type predicates now handle

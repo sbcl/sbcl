@@ -1380,6 +1380,7 @@
 	     (added ())
 	     (discarded ())
 	     (plist ()))
+
 	;; local  --> local	transfer value
 	;; local  --> shared    discard value, discard slot
 	;; local  -->  --	discard slot
@@ -1388,6 +1389,15 @@
 	;; shared -->  --	discard value
 	;;  --    --> local	add slot
 	;;  --    --> shared	--
+
+	;; Collect class slots from inherited wrappers. Needed for
+	;; shared -> local transfers of inherited slots.
+	(let ((inherited (layout-inherits owrapper)))
+	  (loop for i from (1- (length inherited)) downto 0
+		for layout = (aref inherited i)
+		when (typep layout 'wrapper)
+		do (dolist (slot (wrapper-class-slots layout))
+		     (pushnew slot oclass-slots :key #'car))))
 
 	;; Go through all the old local slots.
         (let ((opos 0))

@@ -1407,24 +1407,6 @@ WORKAROUND:
     #(1 2 ((SB-IMPL::|,|) + 2 2) 4)
   which probably isn't intentional.
 
-320: "shared to local slot in class redefinition"
-  reported by Bruno Haible sbcl-devel "various SBCL bugs" from CLISP
-  test suite.
-    ;; Shared slot becomes local.
-    ;; 4.3.6.1.: "The value of a slot that is specified as shared in
-    ;; the old class and as local in the new class is retained."
-    (multiple-value-bind (value condition)
-        (ignore-errors
-          (defclass foo85a () 
-            ((size :initarg :size :initform 1 :allocation :class)))
-          (defclass foo85b (foo85a) ())
-          (setq i (make-instance 'foo85b))
-          (defclass foo85a () ((size :initarg :size :initform 2) (other)))
-          (slot-value i 'size))
-      (list value (type-of condition)))
-  should return (1 NULL) but returns (2 NULL) in sbcl-0.8.10.  See
-  ensuing discussion sbcl-devel for how to deal with this.
-
 321: "DEFINE-METHOD-COMBINATION lambda list parsing"
   reported by Bruno Haible sbcl-devel "various SBCL bugs" from CLISP
   test suite.
