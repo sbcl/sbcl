@@ -478,8 +478,7 @@
   (unless (eq allocation :instance)
     (error "Structure slots must have :INSTANCE allocation.")))
 
-(defun make-structure-class-defstruct-form
-       (name direct-slots include)
+(defun make-structure-class-defstruct-form (name direct-slots include)
   (let* ((conc-name (intern (format nil "~S structure class " name)))
          (constructor (intern (format nil "~A constructor" conc-name)))
          (defstruct `(defstruct (,name

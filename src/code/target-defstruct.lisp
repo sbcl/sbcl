@@ -419,9 +419,9 @@
 ;;; Check that X is an instance of the structure class with layout LAYOUT.
 (defun %check-structure-type-from-layout (x layout)
   (unless (typep-to-layout x layout)
-    (error 'simple-type-error
+    (error 'type-error
 	   :datum x
-	   :expected-type (sb!xc:class-name (layout-class layout))))
+	   :expected-type (class-name (layout-class layout))))
   (values))
 
 (/show0 "target-defstruct.lisp end of file")

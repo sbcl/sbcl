@@ -109,9 +109,8 @@
                                        (fix-super (car supers)))
                                   (and (not (eq name 'structure-object))
                                        *the-class-structure-object*)))
-                     (defstruct-form (make-structure-class-defstruct-form name
-                                                                          slots
-                                                                          include)))
+                     (defstruct-form (make-structure-class-defstruct-form
+				      name slots include)))
                 `(progn
                   (eval-when (:compile-toplevel :load-toplevel :execute)
                     ,defstruct-form) ; really compile the defstruct-form

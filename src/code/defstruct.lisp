@@ -712,22 +712,6 @@
       (:include
        (when (dd-include dd)
 	 (error "more than one :INCLUDE option"))
-       ;; It's not particularly well-defined to :INCLUDE any of the
-       ;; CMU CL INSTANCE weirdosities like CONDITION or
-       ;; GENERIC-FUNCTION, and it's certainly not ANSI-compliant.
-       (let* ((included-class-name (first args))
-	      (included-class (sb!xc:find-class included-class-name))
-	      (included-layout (class-layout included-class))
-	      (included-dd (layout-info included-layout)))
-	 (when (dd-alternate-metaclass included-dd)
-	   ;; FIXME: It might actually be technically ANSI-compliant
-	   ;; to do (DEFSTRUCT (FOO (:INCLUDE STRUCTURE-OBJECT)) ..).
-	   ;; If so, we should test for that special case here and
-	   ;; avoid complaining even if (as in code copied mindlessly
-	   ;; from before the fork) STRUCTURE has a non-NIL
-	   ;; ALTERNATE-METACLASS.
-	   (error "can't :INCLUDE class ~S (has alternate metaclass)"
-		  included-class-name)))
        (setf (dd-include dd) args))
       (:print-function
        (require-no-print-options-so-far dd)
@@ -766,11 +750,11 @@
     (aver name) ; A null name doesn't seem to make sense here.
     (let ((dd (make-defstruct-description name)))
       (dolist (option options)
-	(cond ((consp option)
-	       (parse-1-dd-option option dd))
-	      ((eq option :named)
+	(cond ((eq option :named)
 	       (setf (dd-named dd) t))
-	      ((member option '(:constructor :copier :predicate :named))
+	      ((consp option)
+	       (parse-1-dd-option option dd))
+	      ((member option '(:conc-name :constructor :copier :predicate))
 	       (parse-1-dd-option (list option) dd))
 	      (t
 	       (error "unrecognized DEFSTRUCT option: ~S" option))))
@@ -780,6 +764,12 @@
 	 (when (dd-offset dd)
 	   (error ":OFFSET can't be specified unless :TYPE is specified."))
 	 (unless (dd-include dd)
+	   ;; FIXME: It'd be cleaner to treat no-:INCLUDE as defaulting
+	   ;; to :INCLUDE STRUCTURE-OBJECT, and then let the general-case
+	   ;; (INCF (DD-LENGTH DD) (DD-LENGTH included-DD)) logic take
+	   ;; care of this. (Except that the :TYPE VECTOR and :TYPE
+	   ;; LIST cases, with their :NAMED and un-:NAMED flavors,
+	   ;; make that messy, alas.)
 	   (incf (dd-length dd))))
 	(t
 	 (require-no-print-options-so-far dd)
@@ -962,11 +952,29 @@
 	    (if (dd-class-p dd)
 		(layout-info (compiler-layout-or-lose included-name))
 		(typed-structure-info-or-lose included-name))))
+
+      ;; checks on legality
       (unless (and (eq type (dd-type included-structure))
 		   (type= (specifier-type (dd-element-type included-structure))
 			  (specifier-type (dd-element-type dd))))
 	(error ":TYPE option mismatch between structures ~S and ~S"
 	       (dd-name dd) included-name))
+      (let ((included-class (sb!xc:find-class included-name nil)))
+	(when included-class
+	  ;; It's not particularly well-defined to :INCLUDE any of the
+	  ;; CMU CL INSTANCE weirdosities like CONDITION or
+	  ;; GENERIC-FUNCTION, and it's certainly not ANSI-compliant.
+	  (let* ((included-layout (class-layout included-class))
+		 (included-dd (layout-info included-layout)))
+	    (when (and (dd-alternate-metaclass included-dd)
+		       ;; As of sbcl-0.pre7.73, anyway, STRUCTURE-OBJECT
+		       ;; is represented with an ALTERNATE-METACLASS. But
+		       ;; it's specifically OK to :INCLUDE (and PCL does)
+		       ;; so in this one case, it's OK to include
+		       ;; something with :ALTERNATE-METACLASS after all.
+		       (not (eql included-name 'structure-object)))
+	      (error "can't :INCLUDE class ~S (has alternate metaclass)"
+		     included-name)))))
 
       (incf (dd-length dd) (dd-length included-structure))
       (when (dd-class-p dd)
