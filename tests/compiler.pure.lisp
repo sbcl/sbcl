@@ -1394,3 +1394,22 @@
   (frob (x y) (position-if x y))
   (frob (x y) (position-if-not x y))
   (frob (x) (aref x 0)))
+
+(macrolet ((frob (style-warn-p form)
+	     (if style-warn-p
+		 `(catch :got-style-warning
+		   (handler-case
+		       (eval ',form)
+		     (style-warning (e) (throw :got-style-warning nil)))
+		   (error "missing style-warning for ~S" ',form))
+		 `(handler-case
+		   (eval ',form)
+		   (style-warning (e)
+		    (error "bad style-warning for ~S: ~A" ',form e))))))
+  (frob t (lambda (x &optional y &key z) (list x y z)))
+  (frob nil (lambda (x &optional y z) (list x y z)))
+  (frob nil (lambda (x &key y z) (list x y z)))
+  (frob t (defgeneric #:foo (x &optional y &key z)))
+  (frob nil (defgeneric #:foo (x &optional y z)))
+  (frob nil (defgeneric #:foo (x &key y z)))
+  (frob t (defun #:foo (x) (flet ((foo (x &optional y &key z) (list x y z))) (foo x x :z x)))))
