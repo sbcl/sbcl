@@ -89,7 +89,7 @@
 ;;; that it is at least possible to define classes with that as a
 ;;; metaclass.
 (defclass gf-class (standard-generic-function) ()
-  (:metaclass sb-pcl::funcallable-standard-class))
+  (:metaclass funcallable-standard-class))
 (defgeneric g (a b c)
   (:generic-function-class gf-class))
 
@@ -109,15 +109,15 @@
 ;;; of all built-in-classes is of the relevant type)
 (assert (null (class-prototype (find-class 'null))))
 
-;;; simple consistency checks for the SB-PCL (perhaps AKA SB-MOP)
-;;; package: all of the functionality specified in AMOP is in
-;;; functions:
-(assert (null (loop for x being each external-symbol in "SB-PCL"
-		    unless (fboundp x) collect x)))
-;;; and all generic functions in SB-PCL have at least one specified
+;;; simple consistency checks for the SB-MOP package: all of the
+;;; functionality specified in AMOP is in functions and classes:
+(assert (null (loop for x being each external-symbol in "SB-MOP"
+		    unless (or (fboundp x) (find-class x)) collect x)))
+;;; and all generic functions in SB-MOP have at least one specified
 ;;; method, except for UPDATE-DEPENDENT
-(assert (null (loop for x being each external-symbol in "SB-PCL"
-		    unless (or (eq x 'update-dependent)
+(assert (null (loop for x being each external-symbol in "SB-MOP"
+		    unless (or (not (fboundp x))
+			       (eq x 'update-dependent)
 			       (not (typep (fdefinition x) 'generic-function))
 			       (> (length (generic-function-methods
 					   (fdefinition x)))

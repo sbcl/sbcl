@@ -118,12 +118,21 @@ whose instances can be used as Lisp streams (e.g. passed as the
 first argument to <function>format</>).</para>
 
 <para>&SBCL; supports a MetaObject Protocol which is intended to be
-compatible with &AMOP;; exceptions to this (as distinct from current
-bugs<!-- Such as the distinction between CL:FIND-CLASS and
-SB-PCL::FIND-CLASS :-( -->) are that
-<function>compute-effective-method</> only returns one value, not
-two<!-- FIXME: anything else? What about extensions? (e.g. COMPUTE-SLOTS
-behaviour) -->.</para>
+compatible with &AMOP;; present exceptions to this (as distinct from
+current bugs) are:
+<itemizedlist>
+  <listitem><para>the abstract <classname>metaobject</> class is not
+    present in the class hierarchy;</para></listitem>
+  <listitem><para>the <classname>standard-object</> and
+    <classname>funcallable-standard-object</> classes are
+    disjoint;</para></listitem>
+  <listitem><para><function>compute-effective-method</> only returns
+    one value, not two;</para></listitem>
+  <listitem><para>the system-supplied <property>:around</> method for
+    <function>compute-slots</> specialized on
+    <classname>funcallable-standard-class</> does not respect the
+    requested order from a user-supplied primary method.
+</itemizedlist>
 
 </sect2>
 
