@@ -13,6 +13,7 @@
 #include "target-arch-os.h"
 #include "os.h"
 #include "globals.h"
+#include "genesis/cons.h"
 #define ALIEN_STACK_SIZE (1*1024*1024) /* 1Mb size chosen at random */
 int dynamic_values_bytes=4096*sizeof(lispobj);	/* same for all threads */
 struct thread *all_threads;
@@ -33,9 +34,8 @@ int
 new_thread_trampoline(struct thread *th)
 {
     lispobj function;
-    /* tcsetpgrp(0,getpid()); */
     function = th->unbound_marker;
-    if(1 || go==0) {
+    if(go==0) {
 	fprintf(stderr, "/pausing 0x%lx(%d,%d) before new_thread_trampoline(0x%lx)\n",
 		(unsigned long)th,th->pid,getpid(),(unsigned long)function);
 	while(go==0) ;
@@ -194,3 +194,38 @@ struct thread *find_thread_by_pid(pid_t pid)
 	if(th->pid==pid) return th;
     return 0;
 }
+
+
+struct mutex {
+    lispobj header,type,*name,*value,*queuelock, *queue;
+};
+
+void spinlock_get(lispobj *word,int value)
+{
+    /* FIXME have to spend some time figuring out the gcc inline
+     * assembly syntax here.  Obviously this should be using
+     * some kind of atomic test and set */
+#if 0
+    while(*word)
+	;
+#endif
+    *word=value;			/* XXX !!! FIXME @@@##### */
+}
+
+void add_thread_to_queue(int pid, lispobj mutex_p)
+{
+    sigset_t oldset,newset;
+    struct mutex *mutex=native_pointer(mutex_p);
+    struct cons *cons;
+    sigemptyset(&newset);
+    sigaddset(&newset,SIGALRM);
+    sigprocmask(SIG_BLOCK, &newset, &oldset);
+    
+    spinlock_get(&(mutex->queuelock),pid);
+    cons=alloc_cons(make_fixnum(pid),mutex->queue);
+    mutex->queue=cons;
+    mutex->queuelock=0;
+    sigwaitinfo(&newset,0);
+    sigprocmask(SIG_SETMASK,&oldset,0);
+}
+

@@ -149,7 +149,7 @@
    currently active non-nil restart name, then a control-error is signalled."
   (let* ((real-restart (find-restart-or-lose restart))
 	 (args (interactive-restart-arguments real-restart)))
-    (apply function args)))
+    (apply (restart-function real-restart) args)))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
 ;;; Wrap the RESTART-CASE expression in a WITH-CONDITION-RESTARTS if

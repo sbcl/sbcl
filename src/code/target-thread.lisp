@@ -4,13 +4,9 @@
      sb!alien:unsigned-long
   (lisp-fun-address sb!alien:unsigned-long))
 
-(defun make-thread (function &key (background-p t))
-  (let ((real-function
-	 (if background-p
-	     (lambda () (sb!unix::unix-setpgid 0 0) (funcall function))
-	     function)))
-    (%create-thread
-     (sb!kernel:get-lisp-obj-address (coerce real-function 'function)))))
+(defun make-thread (function)
+  (%create-thread
+   (sb!kernel:get-lisp-obj-address (coerce function 'function))))
 
 (defun destroy-thread (thread-id)
   (sb!unix:unix-kill thread-id :sigterm)
@@ -37,6 +33,7 @@
 	  until (sb!sys:sap= thread (sb!sys:int-sap 0))
 	  collect (funcall function thread))))
 
+#+nil
 (defun thread-stopped-p (thread)
   (sb!kernel:make-lisp-obj
    (sb!sys:sap-ref-32 thread
@@ -44,25 +41,10 @@
  ; (declare (optimize (speed 3) (safety 0)))
 ;  (thread-stopped-p thread))
 
-;;;; job control
-(defun stopped-threads ()
-  (remove-if #'null
-	     (mapcar-threads
-	      (lambda (x)
-		(and (thread-stopped-p x)
-		     (sb!sys:sap-ref-32 x (* 4 sb!vm::thread-pid-slot)))))))
 
 (defvar *foreground-thread-stack* nil)
 
-(defun thread-to-tty (n)
-  (sb!unix::unix-tcsetpgrp 0 n)
-  ;; find_thread(n)->status = 0
-  (resume-thread n))
-
-(defun foreground-thread (n)
-  (push (current-thread-id) *foreground-thread-stack*)
-  (thread-to-tty n))
-
+#+nil
 (defun background-thread (&optional restart)
   (if restart
     (let* ((real-restart (sb!kernel::find-restart-or-lose restart))
@@ -71,6 +53,7 @@
       (apply (sb!kernel::restart-function real-restart) args))
     (thread-to-tty (pop *foreground-thread-stack*))))
 
+#+nil
 (defun make-listener-thread (tty-name)
   (assert (probe-file tty-name))
   (let* ((in (sb!unix:unix-open (namestring tty-name) sb!unix:o_rdwr #o666))
@@ -97,38 +80,87 @@
 
 ;;;; mutex and read/write locks, originally inspired by CMUCL multi-proc.lisp
 
-(defun sleep-a-bit (timeout)
-  (if (and timeout (> (get-internal-real-time) timeout))
-      t
-      (progn (sleep .1) nil)))
-
+;;; in true OOAOM style, this is also defined in C.  Don't change this
+;;; defn without referring also to add_thread_to_queue
 (defstruct mutex
   (name nil :type (or null simple-base-string))
-  (value nil))
+  (value nil)
+  (queuelock 0)
+  (queue nil))
+
+;;; add_thread_to_queue needs to do lots of sigmask manipulation 
+;;; which we don't have the right alien gubbins to do in lisp
+(sb!alien:define-alien-routine
+    ("add_thread_to_queue" add-thread-to-queue) void
+  (pid int) (mutex system-area-pointer))
+
+;; spinlocks use 0 as "free" value: higher-level locks use NIL
+(defun get-spinlock (lock offset new-value)
+  (declare (optimize (speed 3) (safety 0)))
+  (loop until
+	(eql (sb!vm::%instance-set-conditional lock offset 0 new-value) 0)))
 
 (defun get-mutex (lock &optional new-value  timeout)
   (declare (type mutex lock))
-  (let ((timeout (and timeout (+ (get-internal-real-time) timeout))))
-    (unless new-value (setf new-value (current-thread-id)))
+  (let ((timeout (and timeout (+ (get-internal-real-time) timeout)))
+	(pid (current-thread-id)))
+    (unless new-value (setf new-value pid))
     (loop
      (unless
 	 ;; args are object slot-num old-value new-value
 	 (sb!vm::%instance-set-conditional lock 2 nil new-value)
+       ;; success, remove us from the wait queue 
+       (get-spinlock lock 3 pid)
+       (when (eql (car (mutex-queue lock)) pid)
+	 ;; ... if we were there
+	 (setf (mutex-queue lock) (cdr (mutex-queue lock))))
+       (setf (mutex-queuelock lock) 0)
        (return t))
-     (sleep-a-bit timeout))))
+     (add-thread-to-queue
+      pid (sb!sys:int-sap (sb!kernel:get-lisp-obj-address lock))))))
 
 (defun free-mutex (lock &optional (new-value nil))
   (declare (type mutex lock))
   (let ((old-value (mutex-value lock))
+	(pid (current-thread-id))
 	(t1 nil))
     (loop
      (unless
 	 ;; args are object slot-num old-value new-value
 	 (eql old-value
 	      (setf t1
-		    (sb!vm::%instance-set-conditional lock 2 old-value new-value)))
+		    (sb!vm::%instance-set-conditional lock 2 old-value new-value)))       
+       (get-spinlock lock 3 pid)
+       (when (mutex-queue lock)
+	 (sb!unix:unix-kill (car (mutex-queue lock)) :sigalrm))
+       (setf (mutex-queuelock lock) 0)
        (return t))
      (setf old-value t1))))
+
+;;;; job control
+
+(defvar *background-threads-wait-for-debugger* t)
+;;; may be T, NIL, or a function called with sb-sys::*stdin* and thread id 
+;;; as its two arguments, returns NIL or T
+
+;;; called from top of invoke-debugger
+
+(defun maybe-wait-until-foreground-thread ()
+  (when (not (eql (mutex-value
+		   (sb!impl::fd-stream-owner-thread sb!sys::*stdin*))
+		  (CURRENT-THREAD-ID)))
+    (let* ((wait-p *background-threads-wait-for-debugger*)
+	   (*background-threads-wait-for-debugger* nil))
+      (when (functionp wait-p) 
+	(setf wait-p 
+	      (funcall wait-p sb!sys::*stdin* (CURRENT-THREAD-ID))))
+      (cond (wait-p
+	     (get-mutex (sb!impl::fd-stream-owner-thread sb!sys::*stdin*))
+	     #+nil
+	     (sb!sys:enable-interrupt :sigint *sigint-handler*))
+	    (t
+	     (invoke-restart (car (compute-restarts))))))))
+
 
 (defstruct rwlock
   (name nil :type (or null simple-base-string))

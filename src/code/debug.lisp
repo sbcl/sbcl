@@ -650,6 +650,10 @@ Other commands:
       (let ((*debugger-hook* nil))
 	(funcall old-hook condition old-hook))))
 
+  ;; If we're a background thread and *background-threads-wait-for-debugger*
+  ;; is NIL, this will invoke a restart
+  (sb!thread::maybe-wait-until-foreground-thread)
+
   ;; Note: CMU CL had (SB-UNIX:UNIX-SIGSETMASK 0) here. I deleted it
   ;; around sbcl-0.7.8.5 (by which time it had mutated to have a
   ;; #!-SUNOS prefix and a FIXME note observing that it wasn't needed

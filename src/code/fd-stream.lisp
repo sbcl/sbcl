@@ -88,7 +88,9 @@
   ;; timeout specified for this stream, or NIL if none
   (timeout nil :type (or index null))
   ;; pathname of the file this stream is opened to (returned by PATHNAME)
-  (pathname nil :type (or pathname null)))
+  (pathname nil :type (or pathname null))
+  (owner-thread nil :type sb!thread::mutex))
+
 (def!method print-object ((fd-stream file-stream) stream)
   (declare (type stream stream))
   (print-unreadable-object (fd-stream stream :type t :identity t)

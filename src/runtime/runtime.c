@@ -286,52 +286,17 @@ More information about SBCL is available at <http://sbcl.sourceforge.net/>.\n\
      * far enough along to install its own handler. */
     sigint_init();
 
-    stty_tostop(0,0);		/* ensure that all threads can print
-				   error messages without getting stopped */
     FSHOW((stderr, "/funcalling initial_function=0x%lx\n", initial_function));
     create_thread(initial_function);
 
-    if(setpgid(all_threads->pid,0)==-1) perror("setpgid child");
-    
-    /* we'd like to be able to print debug, error, and "thread
-     * stopped" messages from the runtime without getting mixed up in
-     * the "which is the foreground thread" mess
-     */
-
-    stdlog=fopen("/tmp/stderr","w");
-    setvbuf(stdlog,0,_IONBF,0);
-    if(isatty(fileno(stderr))) {
-#if 0
-	int err_no_ctty;
-	err_no_ctty=open(ttyname(fileno(stderr)),O_RDWR|O_NOCTTY,0666);
-	if(err_no_ctty>0) {
-	    fclose(stderr);
-	    dup2(err_no_ctty,2);
-	    stderr=fdopen(2,"w");
-	} else {
-	    fprintf(stderr,"Warning: can't reopen stderr in no-ctty mode\n");
-	}
-#endif
-	/* now we can start worrying about job control.  The first
-	   lisp thread should be the foreground process, not us */
-	stty_tostop(0,1);
-	thread_to_foreground(all_threads->pid);
-    } 
-	
     gc_thread_pid=getpid();
     parent_loop();
 }
 
 static void parent_sighandler(int signum) 
 {
-    fprintf(stdlog,"parent thread got signal %d , maybe_gc_pending=%d\n",
+    fprintf(stderr,"parent thread got signal %d , maybe_gc_pending=%d\n",
 	    signum, maybe_gc_pending);
-}
-
-void log_perror(char *msg) 
-{
-    fprintf(stdlog,"%s: %s\n",msg,strerror(errno));
-    fflush(stdlog);
 }
 
 static void parent_do_garbage_collect(void)
@@ -341,9 +306,9 @@ static void parent_do_garbage_collect(void)
     int status,p;
 
     for_each_thread(th) {
-	fprintf(stdlog,"attaching to %d ...",th->pid); 
+	fprintf(stderr,"attaching to %d ...",th->pid); 
 	if(ptrace(PTRACE_ATTACH,th->pid,0,0))
-	    log_perror("PTRACE_ATTACH");
+	    perror("PTRACE_ATTACH");
 	else waiting_threads++;
     }
     stop_the_world=1;
@@ -357,7 +322,7 @@ static void parent_do_garbage_collect(void)
 		if(WIFEXITED(status) || WIFSIGNALED(status)) 
 		    destroy_thread(find_thread_by_pid(p));
 		else {
-		    fprintf(stdlog, "wait returned pid %d\n",p);
+		    fprintf(stderr, "wait returned pid %d\n",p);
 		    waiting_threads--;
 		}
 	    }
@@ -367,10 +332,10 @@ static void parent_do_garbage_collect(void)
 		/* restart the child, sending it a signal that will cause it 
 		 * to go into interrupt_handle_pending as soon as it's
 		 * finished being pseudo_atomic */
-		fprintf(stdlog, "%d was pseudo-atomic, letting it resume\n",
+		fprintf(stderr, "%d was pseudo-atomic, letting it resume\n",
 			th->pid);
 		if(ptrace(PTRACE_CONT,th->pid,0,SIGCONT))
-		    log_perror("PTRACE_CONT");
+		    perror("PTRACE_CONT");
 		waiting_threads++;
 	    }
 	}
@@ -381,7 +346,7 @@ static void parent_do_garbage_collect(void)
     stop_the_world=0;
     for_each_thread(th) 
 	if(ptrace(PTRACE_DETACH,th->pid,0,0))
-	    log_perror("PTRACE_DETACH");
+	    perror("PTRACE_DETACH");
 }
 
 static void /* noreturn */ parent_loop(void)
@@ -391,7 +356,6 @@ static void /* noreturn */ parent_loop(void)
 
     sigemptyset(&sigset);
 
-    sigemptyset(&sigset);
     sigaddset(&sigset, SIGALRM);
     sigaddset(&sigset, SIGCHLD);
     sigprocmask(SIG_UNBLOCK,&sigset,0);
@@ -399,13 +363,14 @@ static void /* noreturn */ parent_loop(void)
     sa.sa_mask=sigset;
     sa.sa_flags=0;
     sigaction(SIGALRM, &sa, 0);
-    sigaction(SIGTTIN, &sa, 0);
-    sigaction(SIGTTOU, &sa, 0);
     sigaction(SIGCHLD, &sa, 0);
 
-    /* renounce sin, the world, and a controlling tty */
-    if(setpgid(0,0)==-1) 
-	fprintf(stdlog,"setgid parent : %s\n",strerror(errno));
+    sigemptyset(&sigset);
+    sa.sa_handler=SIG_IGN;
+    sa.sa_mask=sigset;
+    sa.sa_flags=0;
+    sigaction(SIGINT, &sa, 0);
+
     while(all_threads) {
 	int status;
 	pid_t pid=0;
@@ -415,32 +380,21 @@ static void /* noreturn */ parent_loop(void)
 	    if(pid==-1) {
 		if(errno == EINTR) continue;
 		if(errno == ECHILD) break;
-		fprintf(stdlog,"waitpid: %s\n",strerror(errno));
+		fprintf(stderr,"waitpid: %s\n",strerror(errno));
 		continue;
 	    }
 	    th=find_thread_by_pid(pid);
 	    if(!th) continue;
 	    if(WIFEXITED(status) || WIFSIGNALED(status)) {
 		struct thread *next=th->next;
-		fprintf(stdlog,"waitpid : child %d %x exited \n", pid,th);
+		fprintf(stderr,"waitpid : child %d %x exited \n", pid,th);
 		destroy_thread(th);		/* FIXME lock all_threads */
 
 		/* resume something, if anything can be found to resume */
+#if 0
 		if(!next) next=all_threads;
 		if(next) thread_to_foreground(next->pid);
-	    }else {
-		if(WIFSTOPPED(status)) {
-		    int signal=WSTOPSIG(status);
-		    fprintf(stdlog,
-			    "waitpid : child %d stopped on signal: %d\n",
-			    pid, signal);
-		    if(signal==SIGTSTP) {
-			kill(0,signal);
-			thread_to_foreground(pid);
-		    } else {
-			th->stopped_p=T;
-		    }
-		}
+#endif
 	    }
 	    status=0;
 	}
