@@ -324,12 +324,4 @@ and submit it as a patch."
   "Disable the garbage collector."
   (setq *gc-inhibit* 1)
   nil)
-
-;;;; initialization stuff
 
-(defun gc-reinit () 
-  #!-gencgc
-  (when *gc-trigger*
-    (if (< *gc-trigger* (dynamic-usage))
-	(sub-gc)
-	(set-auto-gc-trigger *gc-trigger*))))

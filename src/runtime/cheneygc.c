@@ -50,6 +50,8 @@ static void scavenge_newspace(void);
 static void scavenge_interrupt_contexts(void);
 extern struct interrupt_data * global_interrupt_data;
 
+extern unsigned long bytes_consed_between_gcs;
+
 
 /* collecting garbage */
 
@@ -116,8 +118,8 @@ collect_garbage(unsigned ignore)
     double real_time, system_time, user_time;
     double percent_retained, gc_rate;
     unsigned long size_discarded;
-    unsigned long size_retained;
 #endif
+    unsigned long size_retained;
     lispobj *current_static_space_free_pointer;
     unsigned long static_space_size; 
     unsigned long control_stack_size, binding_stack_size; 
@@ -241,15 +243,15 @@ collect_garbage(unsigned ignore)
 
 #ifdef PRINTNOISE
     size_discarded = (from_space_free_pointer - from_space) * sizeof(lispobj);
-    size_retained = (new_space_free_pointer - new_space) * sizeof(lispobj);
 #endif
+    size_retained = (new_space_free_pointer - new_space) * sizeof(lispobj);
 
     /* Zero stack. */
 #ifdef PRINTNOISE
     printf("Zeroing empty part of control stack ...\n");
 #endif
     zero_stack();
-
+    set_auto_gc_trigger(size_retained+bytes_consed_between_gcs);
     sigprocmask(SIG_SETMASK, &old, 0);
 
 
@@ -595,11 +597,13 @@ gc_initialize_pointers(void)
 
 /* noise to manipulate the gc trigger stuff */
 
+/* Functions that substantially change the dynamic space free pointer
+ * (collect_garbage, purify) are responsible also for resettting the
+ * auto_gc_trigger */
 void set_auto_gc_trigger(os_vm_size_t dynamic_usage)
 {
     os_vm_address_t addr=(os_vm_address_t)current_dynamic_space 
 	+ dynamic_usage;
-	
     long length = DYNAMIC_SPACE_SIZE - dynamic_usage;
 
     if (addr < (os_vm_address_t)dynamic_space_free_pointer) {

@@ -45,6 +45,7 @@
  */
 static lispobj *dynamic_space_free_pointer;
 #endif
+extern unsigned long bytes_consed_between_gcs;
 
 #define gc_abort() \
   lose("GC invariant lost, file \"%s\", line %d", __FILE__, __LINE__)
@@ -1482,6 +1483,7 @@ purify(lispobj static_roots, lispobj read_only_roots)
 
 #if !defined(__i386__)
     dynamic_space_free_pointer = current_dynamic_space;
+    set_auto_gc_trigger(bytes_consed_between_gcs);
 #else
 #if defined LISP_FEATURE_GENCGC
     gc_free_heap();
@@ -1494,6 +1496,5 @@ purify(lispobj static_roots, lispobj read_only_roots)
     printf(" done]\n");
     fflush(stdout);
 #endif
-
     return 0;
 }
