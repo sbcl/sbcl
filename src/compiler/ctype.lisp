@@ -265,7 +265,7 @@
 ;;;
 ;;; Due to the lack of a (LIST X) type specifier, we can't reconstruct
 ;;; the &REST type.
-(declaim (ftype (function (functional) fun-type) definition-type))
+(declaim (ftype (sfunction (functional) fun-type) definition-type))
 (defun definition-type (functional)
   (if (lambda-p functional)
       (make-fun-type

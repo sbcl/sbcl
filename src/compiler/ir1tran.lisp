@@ -141,7 +141,7 @@
 ;;; names a macro or special form, then we error out using the
 ;;; supplied context which indicates what we were trying to do that
 ;;; demanded a function.
-(declaim (ftype (function (t string) global-var) find-free-fun))
+(declaim (ftype (sfunction (t string) global-var) find-free-fun))
 (defun find-free-fun (name context)
   (or (let ((old-free-fun (gethash name *free-funs*)))
 	(and (not (invalid-free-fun-p old-free-fun))
@@ -173,7 +173,7 @@
 
 ;;; Return the LEAF structure for the lexically apparent function
 ;;; definition of NAME.
-(declaim (ftype (function (t string) leaf) find-lexically-apparent-fun))
+(declaim (ftype (sfunction (t string) leaf) find-lexically-apparent-fun))
 (defun find-lexically-apparent-fun (name context)
   (let ((var (lexenv-find name funs :test #'equal)))
     (cond (var
@@ -189,7 +189,7 @@
 ;;; corresponding value. Otherwise, we make a new leaf using
 ;;; information from the global environment and enter it in
 ;;; *FREE-VARS*. If the variable is unknown, then we emit a warning.
-(declaim (ftype (function (t) (or leaf cons heap-alien-info)) find-free-var))
+(declaim (ftype (sfunction (t) (or leaf cons heap-alien-info)) find-free-var))
 (defun find-free-var (name)
   (unless (symbolp name)
     (compiler-error "Variable name is not a symbol: ~S." name))
@@ -461,7 +461,7 @@
   ;; the creation using backquote of forms that contain leaf
   ;; references, without having to introduce dummy names into the
   ;; namespace.
-  (declaim (ftype (function (continuation continuation t) (values)) ir1-convert))
+  (declaim (ftype (sfunction (continuation continuation t) (values)) ir1-convert))
   (defun ir1-convert (start cont form)
     (ir1-error-bailout (start cont form)
       (let ((*current-path* (or (gethash form *source-paths*)
@@ -730,7 +730,7 @@
 
 ;;; Convert a bunch of forms, discarding all the values except the
 ;;; last. If there aren't any forms, then translate a NIL.
-(declaim (ftype (function (continuation continuation list) (values))
+(declaim (ftype (sfunction (continuation continuation list) (values))
 		ir1-convert-progn-body))
 (defun ir1-convert-progn-body (start cont body)
   (if (endp body)
@@ -753,7 +753,7 @@
 ;;; Convert a function call where the function FUN is a LEAF. FORM is
 ;;; the source for the call. We return the COMBINATION node so that
 ;;; the caller can poke at it if it wants to.
-(declaim (ftype (function (continuation continuation list leaf) combination)
+(declaim (ftype (sfunction (continuation continuation list leaf) combination)
 		ir1-convert-combination))
 (defun ir1-convert-combination (start cont form fun)
   (let ((fun-cont (make-continuation)))
@@ -882,7 +882,7 @@
 ;;; LAMBDA-VAR for that name, or NIL if it isn't found. We return the
 ;;; *last* variable with that name, since LET* bindings may be
 ;;; duplicated, and declarations always apply to the last.
-(declaim (ftype (function (list symbol) (or lambda-var list))
+(declaim (ftype (sfunction (list symbol) (or lambda-var list))
 		find-in-bindings))
 (defun find-in-bindings (vars name)
   (let ((found nil))

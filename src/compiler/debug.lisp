@@ -925,7 +925,7 @@
      (format stream "~S ~S" (type-of leaf) (functional-debug-name leaf)))))
 
 ;;; Attempt to find a block given some thing that has to do with it.
-(declaim (ftype (function (t) cblock) block-or-lose))
+(declaim (ftype (sfunction (t) cblock) block-or-lose))
 (defun block-or-lose (thing)
   (ctypecase thing
     (cblock thing)

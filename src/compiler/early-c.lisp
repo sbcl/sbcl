@@ -174,6 +174,7 @@ convention (names like *FOO*) for special variables" symbol))
 ;;; FIXME: This function seems to have a lot in common with
 ;;; STRINGIFY-FORM, and perhaps there's some way to merge the two
 ;;; functions.
+(declaim (ftype (sfunction (string &rest t) string) debug-namify))
 (defun debug-namify (format-string &rest format-arguments)
   (with-standard-io-syntax
    (let ((*print-readably* nil)

@@ -54,7 +54,7 @@
 ;;;; continuation use hacking
 
 ;;; Return a list of all the nodes which use Cont.
-(declaim (ftype (function (continuation) list) find-uses))
+(declaim (ftype (sfunction (continuation) list) find-uses))
 (defun find-uses (cont)
   (ecase (continuation-kind cont)
     ((:block-start :deleted-block-start)
@@ -77,7 +77,7 @@
 ;;; Note: if you call this function, you may have to do a
 ;;; REOPTIMIZE-CONTINUATION to inform IR1 optimization that something
 ;;; has changed.
-(declaim (ftype (function (node) (values)) delete-continuation-use))
+(declaim (ftype (sfunction (node) (values)) delete-continuation-use))
 (defun delete-continuation-use (node)
   (let* ((cont (node-cont node))
 	 (block (continuation-block cont)))
@@ -103,7 +103,7 @@
 ;;; Note: if you call this function, you may have to do a
 ;;; REOPTIMIZE-CONTINUATION to inform IR1 optimization that something
 ;;; has changed.
-(declaim (ftype (function (node continuation) (values)) add-continuation-use))
+(declaim (ftype (sfunction (node continuation) (values)) add-continuation-use))
 (defun add-continuation-use (node cont)
   (aver (not (node-cont node)))
   (let ((block (continuation-block cont)))
@@ -366,19 +366,20 @@
     (when (eq (lambda-home fun) fun)
       (return fun))))
 
+(declaim (ftype (sfunction (node) cblock) node-block))
 (defun node-block (node)
-  (declare (type node node))
-  (the cblock (continuation-block (node-prev node))))
+  (continuation-block (node-prev node)))
+(declaim (ftype (sfunction (node) component) node-component))
 (defun node-component (node)
-  (declare (type node node))
   (block-component (node-block node)))
+(declaim (ftype (sfunction (node) physenv) node-physenv))
 (defun node-physenv (node)
-  (declare (type node node))
-  (the physenv (lambda-physenv (node-home-lambda node))))
+  (lambda-physenv (node-home-lambda node)))
 
+(declaim (ftype (sfunction (clambda) cblock) lambda-block))
 (defun lambda-block (clambda)
-  (declare (type clambda clambda))
   (node-block (lambda-bind clambda)))
+(declaim (ftype (sfunction (clambda) component) lambda-component))
 (defun lambda-component (clambda)
   (block-component (lambda-block clambda)))
 
@@ -430,13 +431,13 @@
 	    nil))))
 
 ;;; Return the non-LET LAMBDA that holds BLOCK's code.
+(declaim (ftype (sfunction (cblock) clambda) block-home-lambda))
 (defun block-home-lambda (block)
-  (the clambda
-    (block-home-lambda-or-null block)))
+  (block-home-lambda-or-null block))
 
 ;;; Return the IR1 physical environment for BLOCK.
+(declaim (ftype (sfunction (cblock) physenv) block-physenv))
 (defun block-physenv (block)
-  (declare (type cblock block))
   (lambda-physenv (block-home-lambda block)))
 
 ;;; Return the Top Level Form number of PATH, i.e. the ordinal number
@@ -502,9 +503,10 @@
 	 (bug "confused about home lambda for ~S"))))
 
 ;;; Return the LAMBDA that is CONT's home.
+(declaim (ftype (sfunction (continuation) clambda)
+                continuation-home-lambda))
 (defun continuation-home-lambda (cont)
-  (the clambda
-    (continuation-home-lambda-or-null cont)))
+  (continuation-home-lambda-or-null cont))
 
 #!-sb-fluid (declaim (inline continuation-single-value-p))
 (defun continuation-single-value-p (cont)
@@ -667,7 +669,7 @@
 
 ;;; Unlink a block from the next/prev chain. We also null out the
 ;;; COMPONENT.
-(declaim (ftype (function (cblock) (values)) remove-from-dfo))
+(declaim (ftype (sfunction (cblock) (values)) remove-from-dfo))
 (defun remove-from-dfo (block)
   (let ((next (block-next block))
 	(prev (block-prev block)))
@@ -692,7 +694,7 @@
 
 ;;; Set the FLAG for all the blocks in COMPONENT to NIL, except for
 ;;; the head and tail which are set to T.
-(declaim (ftype (function (component) (values)) clear-flags))
+(declaim (ftype (sfunction (component) (values)) clear-flags))
 (defun clear-flags (component)
   (let ((head (component-head component))
 	(tail (component-tail component)))
@@ -704,7 +706,7 @@
 
 ;;; Make a component with no blocks in it. The BLOCK-FLAG is initially
 ;;; true in the head and tail blocks.
-(declaim (ftype (function nil component) make-empty-component))
+(declaim (ftype (sfunction () component) make-empty-component))
 (defun make-empty-component ()
   (let* ((head (make-block-key :start nil :component nil))
 	 (tail (make-block-key :start nil :component nil))
@@ -1490,7 +1492,7 @@
 
 ;;;; functional hackery
 
-(declaim (ftype (function (functional) clambda) main-entry))
+(declaim (ftype (sfunction (functional) clambda) main-entry))
 (defun main-entry (functional)
   (etypecase functional
     (clambda functional)
@@ -1501,7 +1503,7 @@
 ;;; MV-BIND when it appears in an MV-CALL. All fixed arguments must be
 ;;; optional with null default and no SUPPLIED-P. There must be a
 ;;; &REST arg with no references.
-(declaim (ftype (function (functional) boolean) looks-like-an-mv-bind))
+(declaim (ftype (sfunction (functional) boolean) looks-like-an-mv-bind))
 (defun looks-like-an-mv-bind (functional)
   (and (optional-dispatch-p functional)
        (do ((arg (optional-dispatch-arglist functional) (cdr arg)))
@@ -1607,7 +1609,7 @@
 ;;; return NIL as our second value to indicate this. NODE is used as
 ;;; the error context for any error message, and CONTEXT is a string
 ;;; that is spliced into the warning.
-(declaim (ftype (function ((or symbol function) list node function string)
+(declaim (ftype (sfunction ((or symbol function) list node function string)
 			  (values list boolean))
 		careful-call))
 (defun careful-call (function args node warn-fun context)
@@ -1652,7 +1654,7 @@
 ;;; list of continuations ARGS. It returns the continuation if the
 ;;; keyword is present, or NIL otherwise. The legality and
 ;;; constantness of the keywords should already have been checked.
-(declaim (ftype (function (list keyword) (or continuation null))
+(declaim (ftype (sfunction (list keyword) (or continuation null))
 		find-keyword-continuation))
 (defun find-keyword-continuation (args key)
   (do ((arg args (cddr arg)))
@@ -1663,7 +1665,7 @@
 ;;; This function is used by the result of PARSE-DEFTRANSFORM to
 ;;; verify that alternating continuations in ARGS are constant and
 ;;; that there is an even number of args.
-(declaim (ftype (function (list) boolean) check-key-args-constant))
+(declaim (ftype (sfunction (list) boolean) check-key-args-constant))
 (defun check-key-args-constant (args)
   (do ((arg args (cddr arg)))
       ((null arg) t)
@@ -1675,7 +1677,7 @@
 ;;; verify that the list of continuations ARGS is a well-formed &KEY
 ;;; arglist and that only keywords present in the list KEYS are
 ;;; supplied.
-(declaim (ftype (function (list list) boolean) check-transform-keys))
+(declaim (ftype (sfunction (list list) boolean) check-transform-keys))
 (defun check-transform-keys (args keys)
   (and (check-key-args-constant args)
        (do ((arg args (cddr arg)))
@@ -1686,7 +1688,7 @@
 ;;;; miscellaneous
 
 ;;; Called by the expansion of the EVENT macro.
-(declaim (ftype (function (event-info (or node null)) *) %event))
+(declaim (ftype (sfunction (event-info (or node null)) *) %event))
 (defun %event (info node)
   (incf (event-info-count info))
   (when (and (>= (event-info-level info) *event-note-threshold*)

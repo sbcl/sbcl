@@ -2262,11 +2262,7 @@
   (specifier-type 'base-char))
 
 (defoptimizer (values derive-type) ((&rest values))
-  (values-specifier-type
-   `(values ,@(mapcar (lambda (x)
-			(type-specifier (continuation-type x)))
-		      values)
-            &optional)))
+  (make-values-type :required (mapcar #'continuation-type values)))
 
 ;;;; byte operations
 ;;;;

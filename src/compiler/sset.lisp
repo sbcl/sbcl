@@ -39,7 +39,7 @@
 
 ;;; Destructively add ELEMENT to SET. If ELEMENT was not in the set,
 ;;; then we return true, otherwise we return false.
-(declaim (ftype (function (sset-element sset) boolean) sset-adjoin))
+(declaim (ftype (sfunction (sset-element sset) boolean) sset-adjoin))
 (defun sset-adjoin (element set)
   (let ((number (sset-element-number element))
 	(elements (sset-elements set)))
@@ -57,7 +57,7 @@
 
 ;;; Destructively remove ELEMENT from SET. If element was in the set,
 ;;; then return true, otherwise return false.
-(declaim (ftype (function (sset-element sset) boolean) sset-delete))
+(declaim (ftype (sfunction (sset-element sset) boolean) sset-delete))
 (defun sset-delete (element set)
   (let ((elements (sset-elements set)))
     (do ((prev elements current)
@@ -68,29 +68,29 @@
 	(return t)))))
 
 ;;; Return true if ELEMENT is in SET, false otherwise.
-(declaim (ftype (function (sset-element sset) boolean) sset-member))
+(declaim (ftype (sfunction (sset-element sset) boolean) sset-member))
 (defun sset-member (element set)
   (declare (inline member))
   (not (null (member element (cdr (sset-elements set)) :test #'eq))))
 
-(declaim (ftype (function (sset sset) boolean) sset=))
+(declaim (ftype (sfunction (sset sset) boolean) sset=))
 (defun sset= (set1 set2)
   (equal (sset-elements set1) (sset-elements set2)))
 
 ;;; Return true if SET contains no elements, false otherwise.
-(declaim (ftype (function (sset) boolean) sset-empty))
+(declaim (ftype (sfunction (sset) boolean) sset-empty))
 (defun sset-empty (set)
   (null (cdr (sset-elements set))))
 
 ;;; Return a new copy of SET.
-(declaim (ftype (function (sset) sset) copy-sset))
+(declaim (ftype (sfunction (sset) sset) copy-sset))
 (defun copy-sset (set)
   (make-sset :elements (copy-list (sset-elements set))))
 
 ;;; Perform the appropriate set operation on SET1 and SET2 by
 ;;; destructively modifying SET1. We return true if SET1 was modified,
 ;;; false otherwise.
-(declaim (ftype (function (sset sset) boolean) sset-union sset-intersection
+(declaim (ftype (sfunction (sset sset) boolean) sset-union sset-intersection
 		sset-difference))
 (defun sset-union (set1 set2)
   (let* ((prev-el1 (sset-elements set1))
@@ -158,7 +158,7 @@
 ;;; Destructively modify SET1 to include its union with the difference
 ;;; of SET2 and SET3. We return true if SET1 was modified, false
 ;;; otherwise.
-(declaim (ftype (function (sset sset sset) boolean) sset-union-of-difference))
+(declaim (ftype (sfunction (sset sset sset) boolean) sset-union-of-difference))
 (defun sset-union-of-difference (set1 set2 set3)
   (let* ((prev-el1 (sset-elements set1))
 	 (el1 (cdr prev-el1))

@@ -37,3 +37,9 @@
         3
         0)
   ("no" "maybe" "yes" "yes"))
+
+(define-optimization-quality insert-debug-catch
+    (if (> debug (max speed space))
+        3
+        0)
+  ("no" "maybe" "yes" "yes"))

@@ -489,7 +489,7 @@
                (when (policy cast (>= safety inhibit-warnings))
                  (compiler-note
                   "type assertion too complex to check:~% ~S."
-                  (type-specifier (cast-asserted-type cast)))))
+                  (type-specifier (coerce-to-values (cast-asserted-type cast))))))
              (setf (cast-type-to-check cast) *wild-type*)
              (setf (cast-%type-check cast) nil)))))))
   (values))

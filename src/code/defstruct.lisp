@@ -1442,17 +1442,26 @@
     (unless (or defaults boas)
       (push (symbolicate "MAKE-" (dd-name defstruct)) defaults))
 
-    (collect ((res))
+    (collect ((res) (names))
       (when defaults
-	(let ((cname (first defaults)))
-	  (setf (dd-default-constructor defstruct) cname)
-	  (res (create-keyword-constructor defstruct creator))
-	  (dolist (other-name (rest defaults))
-	    (res `(setf (fdefinition ',other-name) (fdefinition ',cname)))
-	    (res `(declaim (ftype function ',other-name))))))
+        (let ((cname (first defaults)))
+          (setf (dd-default-constructor defstruct) cname)
+          (res (create-keyword-constructor defstruct creator))
+          (names cname)
+          (dolist (other-name (rest defaults))
+            (res `(setf (fdefinition ',other-name) (fdefinition ',cname)))
+            (names other-name))))
 
       (dolist (boa boas)
-	(res (create-boa-constructor defstruct boa creator)))
+        (res (create-boa-constructor defstruct boa creator))
+        (names (first boa)))
+
+      (res `(declaim (ftype
+                      (sfunction *
+                                 ,(if (eq (dd-type defstruct) 'structure)
+                                      (dd-name defstruct)
+                                      '*))
+                      ,@(names))))
 
       (res))))
 

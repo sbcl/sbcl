@@ -207,7 +207,7 @@
 ;;; The name is slightly misleading, since some cases are memoized, so
 ;;; we might reuse a value which was made earlier instead of creating
 ;;; a new one from scratch.
-(declaim (ftype (function (t) function) typespec-typecheckfun))
+(declaim (ftype (sfunction (t) function) typespec-typecheckfun))
 (defun typespec-typecheckfun (typespec)
   ;; a general-purpose default case, hopefully overridden by the
   ;; DEFINE-COMPILER-MACRO implementation

@@ -869,7 +869,7 @@
 					(append aux-vars vars)
 					nil result-cont))
 	       (forms (if (and *allow-debug-catch-tag*
-			       (policy *lexenv* (> debug (max speed space))))
+			       (policy *lexenv* (= insert-debug-catch 3)))
 			  `((catch (make-symbol "SB-DEBUG-CATCH-TAG")
 			      ,@forms))
 			  forms))

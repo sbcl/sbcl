@@ -1778,14 +1778,17 @@ changes in sbcl-0.8.1 relative to sbcl-0.8.0:
     were silently accepted).
   * minor incompatible change: COMPILE-FILE now uses the freedom
     afforded (ANSI 3.2.2.3) to use derived function types for
-    functions defined in the same file.  This also permits the system
-    to warn on static type mismatches and function redefinition.
+    functions defined in the same file. This also permits the system
+    to warn on static type mismatches and function
+    redefinition.  (Currently it does not work with high DEBUG level.)
   * changes in type checking closed the following bugs:
     ** type checking of unused values (192b, 194d, 203);
     ** template selection based on unsafe type assertions (192c, 236);
     ** type checking in branches (194bc).
   * VALUES declaration is disabled.
-  * a short form of VALUES type specifier has ANSI meaning.
+  * a short form of VALUES type specifier has ANSI meaning (it has
+    increased the number of situations when SBCL cannot perform type
+    checking).
   * fixed bug in DEFSTRUCT: once again, naming structure slots with
     keywords or constants is permissible.
   * STREAM-READ-SEQUENCE and STREAM-WRITE-SEQUENCE now have methods
