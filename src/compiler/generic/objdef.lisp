@@ -10,6 +10,28 @@
 ;;;; files for more information.
 
 (in-package "SB!VM")
+
+;;;; KLUDGE: The primitive objects here may look like self-contained
+;;;; definitions, but in general they're not. In particular, if you
+;;;; try to add a slot to them, beware of the following:
+;;;;   * (mysterious crashes which occur after changing the length
+;;;;     of SIMPLE-FUN, just adding a new slot not even doing anything
+;;;;     with it, still dunno why)
+;;;;   * The GC scavenging code (and for all I know other GC code too)
+;;;;     is not automatically generated from these layouts, but instead
+;;;;     was hand-written to correspond to them. The offsets are
+;;;;     automatically propagated into the GC scavenging code, but the
+;;;;     existence of slots, and whether they should be scavenged, is
+;;;;     not automatically propagated. Thus e.g. if you add a
+;;;;     SIMPLE-FUN-DEBUG-INFO slot holding a tagged object which needs
+;;;;     to be GCed, you need to tweak scav_code_header() and
+;;;;     verify_space() in gencgc.c, and the corresponding code in gc.c.
+;;;;   * Various code (e.g. STATIC-FSET in genesis.lisp) is hard-wired
+;;;;     to know the name of the last slot of the object the code works
+;;;;     with, and implicitly to know that the last slot is special (being
+;;;;     the beginning of an arbitrary-length sequence of bytes following
+;;;;     the fixed-layout slots).
+;;;; -- WHN 2001-12-29
 
 ;;;; the primitive objects themselves
 

@@ -13,6 +13,7 @@ for 0.7.0:
 	** finished s/FUNCTION/FUN/
 	** s/VARIABLE/VAR/
 	** s/TOP-LEVEL/TOPLEVEL/
+	** perhaps s/DEF-FROB/DEF/ or s/DEF-FROB/DEFINE/
 * global style systematization:
 	** s/#'(lambda/(lambda/
 * pending patches and bug reports that go in (or else get handled

@@ -724,8 +724,8 @@ trans_code(struct code *code)
 	fheaderp = (struct simple_fun *) native_pointer(fheaderl);
 	gc_assert(widetag_of(fheaderp->header) == SIMPLE_FUN_HEADER_WIDETAG);
 
-	/* calcuate the new function pointer and the new */
-	/* function header */
+	/* Calculate the new function pointer and the new */
+	/* function header. */
 	nfheaderl = fheaderl + displacement;
 	nfheaderp = (struct simple_fun *) native_pointer(nfheaderl);
 

@@ -227,62 +227,62 @@
 (deftransform %setelt ((s i v) (list * *))
   '(setf (car (nthcdr i s)) v))
 
-;;; FIXME: I still think (DOLIST (..) (DEFTRANSFORM ..)) is weird.
-;;; For that matter, it would be nice to use DEF-FROB for these
-;;; sorts of things, so folks looking for the definitions of
-;;; FOO can search for '\(def.*\<foo\>' and have a chance in hell..
-(dolist (name '(member memq))
-  (deftransform name ((e l &key (test #'eql)) '* '* :node node :when :both
-		      :eval-name t)
-    (unless (constant-continuation-p l)
-      (give-up-ir1-transform))
+;;; FIXME: The MACROLET ... DEF-FROB ... DEFTRANSFORM idioms in this
+;;; file are literal translations of old CMU CL DOLIST ... DEFTRANSFORM,
+;;; and so use :EVAL-NAME for historical reasons. It'd be tidier to
+;;; just let macroexpansion substitution take care of everything,
+;;; and remove both :EVAL-NAME and the extra layer of quotes.
 
-    (let ((val (continuation-value l)))
-      (unless (policy node
-		      (or (= speed 3)
-			  (and (>= speed space)
-			       (<= (length val) 5))))
-	(give-up-ir1-transform))
+(macrolet ((def-frob (name)
+             `(deftransform ',name ((e l &key (test #'eql)) '* '* :node node :when :both
+                                    :eval-name t)
+                (unless (constant-continuation-p l)
+                  (give-up-ir1-transform))
 
-      (labels ((frob (els)
-		 (if els
-		     `(if (funcall test e ',(car els))
-			  ',els
-			  ,(frob (cdr els)))
-		     nil)))
-	(frob val)))))
+                (let ((val (continuation-value l)))
+                  (unless (policy node
+                                  (or (= speed 3)
+                                      (and (>= speed space)
+                                           (<= (length val) 5))))
+                    (give-up-ir1-transform))
 
-;;; FIXME: Rewrite this so that these definitions of DELETE, ASSOC, and MEMBER
-;;; are lexically findable:
-;;; (MACROLET ((DEF-FROB (X Y) ..))
-;;;   (DEF-FROB DELETE DELQ)
-;;;   (DEF-FROB ASSOC ASSQ)
-;;;   (DEF-FROB MEMBER MEMQ))
-;;; And while I'm at it, I could save a few byte by implementing the
-;;; transform body as call to a shared function instead of duplicated
-;;; macroexpanded code.
-(dolist (x '((delete delq)
-	     (assoc assq)
-	     (member memq)))
-  (destructuring-bind (fun eq-fun) x
-    (deftransform fun ((item list &key test) '(t list &rest t) '*
-			:eval-name t)
-      "convert to EQ test"
-      ;; FIXME: The scope of this transformation could be widened somewhat,
-      ;; letting it work whenever the test is 'EQL and we know from the
-      ;; type of ITEM that it #'EQ works like #'EQL on it. (E.g. types
-      ;; FIXNUM, CHARACTER, and SYMBOL.)
-      ;;   If TEST is EQ, apply transform, else
-      ;;   if test is not EQL, then give up on transform, else
-      ;;   if ITEM is not a NUMBER or is a FIXNUM, apply transform, else
-      ;;   give up on transform.
-      (cond (test
-	     (unless (continuation-function-is test '(eq))
-	       (give-up-ir1-transform)))
-	    ((types-equal-or-intersect (continuation-type item)
-				       (specifier-type 'number))
-	     (give-up-ir1-transform "Item might be a number.")))
-      `(,eq-fun item list))))
+                  (labels ((frob (els)
+                             (if els
+                                 `(if (funcall test e ',(car els))
+                                      ',els
+                                      ,(frob (cdr els)))
+                                 nil)))
+                    (frob val))))))
+  (def-frob member)
+  (def-frob memq))
+
+;;; FIXME: We have rewritten the original code that used DOLIST to this
+;;; more natural MACROLET.  However, the original code suggested that when
+;;; this was done, a few bytes could be saved by a call to a shared
+;;; function.  This remains to be done.
+(macrolet ((def-frob (fun eq-fun)
+             `(deftransform ',fun ((item list &key test) '(t list &rest t) '*
+                                   :eval-name t)
+                "convert to EQ test"
+                ;; FIXME: The scope of this transformation could be
+                ;; widened somewhat, letting it work whenever the test is
+                ;; 'EQL and we know from the type of ITEM that it #'EQ
+                ;; works like #'EQL on it. (E.g. types FIXNUM, CHARACTER,
+                ;; and SYMBOL.)
+                ;;   If TEST is EQ, apply transform, else
+                ;;   if test is not EQL, then give up on transform, else
+                ;;   if ITEM is not a NUMBER or is a FIXNUM, apply
+                ;;   transform, else give up on transform.
+                (cond (test
+                       (unless (continuation-function-is test '(eq))
+                         (give-up-ir1-transform)))
+                      ((types-equal-or-intersect (continuation-type item)
+                                                 (specifier-type 'number))
+                       (give-up-ir1-transform "Item might be a number.")))
+                `(,',eq-fun item list))))
+  (def-frob delete delq)
+  (def-frob assoc assq)
+  (def-frob member memq))
 
 (deftransform delete-if ((pred list) (t list))
   "open code"
@@ -542,57 +542,59 @@
 ;;; We transform the case-sensitive string predicates into a non-keyword
 ;;; version. This is an IR1 transform so that we don't have to worry about
 ;;; changing the order of evaluation.
-(dolist (stuff '((string< string<*)
-		 (string> string>*)
-		 (string<= string<=*)
-		 (string>= string>=*)
-		 (string= string=*)
-		 (string/= string/=*)))
-  (destructuring-bind (fun pred*) stuff
-    (deftransform fun ((string1 string2 &key (start1 0) end1
-				(start2 0) end2)
-		       '* '* :eval-name t)
-      `(,pred* string1 string2 start1 end1 start2 end2))))
+(macrolet ((def-frob (fun pred*)
+             `(deftransform ',fun ((string1 string2 &key (start1 0) end1
+                                                         (start2 0) end2)
+                                   '* '* :eval-name t)
+                `(,',pred* string1 string2 start1 end1 start2 end2))))
+  (def-frob string< string<*)
+  (def-frob string> string>*)
+  (def-frob string<= string<=*)
+  (def-frob string>= string>=*)
+  (def-frob string= string=*)
+  (def-frob string/= string/=*))
 
-;;; Return a form that tests the free variables STRING1 and STRING2 for the
-;;; ordering relationship specified by Lessp and Equalp. The start and end are
-;;; also gotten from the environment. Both strings must be simple strings.
-(dolist (stuff '((string<* t nil)
-		 (string<=* t t)
-		 (string>* nil nil)
-		 (string>=* nil t)))
-  (destructuring-bind (name lessp equalp) stuff
-    (deftransform name ((string1 string2 start1 end1 start2 end2)
-			'(simple-string simple-string t t t t) '*
-			:eval-name t)
-      `(let* ((end1 (if (not end1) (length string1) end1))
-	      (end2 (if (not end2) (length string2) end2))
-	      (index (sb!impl::%sp-string-compare
-		      string1 start1 end1 string2 start2 end2)))
-	 (if index
-	     (cond ((= index ,(if lessp 'end1 'end2)) index)
-		   ((= index ,(if lessp 'end2 'end1)) nil)
-		   ((,(if lessp 'char< 'char>)
-		     (schar string1 index)
-		     (schar string2
-			    (truly-the index
-				       (+ index
-					  (truly-the fixnum
-						     (- start2 start1))))))
-		    index)
-		   (t nil))
-	     ,(if equalp 'end1 nil))))))
+;;; Return a form that tests the free variables STRING1 and STRING2
+;;; for the ordering relationship specified by LESSP and EQUALP. The
+;;; start and end are also gotten from the environment. Both strings
+;;; must be SIMPLE-STRINGs.
+(macrolet ((def-frob (name lessp equalp)
+             `(deftransform ',name ((string1 string2 start1 end1 start2 end2)
+                                    '(simple-string simple-string t t t t) '*
+                                    :eval-name t)
+                `(let* ((end1 (if (not end1) (length string1) end1))
+                        (end2 (if (not end2) (length string2) end2))
+                        (index (sb!impl::%sp-string-compare
+                                string1 start1 end1 string2 start2 end2)))
+                  (if index
+                      (cond ((= index ,(if ',lessp 'end1 'end2)) index)
+                            ((= index ,(if ',lessp 'end2 'end1)) nil)
+                            ((,(if ',lessp 'char< 'char>)
+                               (schar string1 index)
+                               (schar string2
+                                      (truly-the index
+                                                 (+ index
+                                                    (truly-the fixnum
+                                                               (- start2 start1))))))
+                             index)
+                            (t nil))
+                      ,(if ',equalp 'end1 nil))))))
+  (def-frob string<* t nil)
+  (def-frob string<=* t t)
+  (def-frob string>* nil nil)
+  (def-frob string>=* nil t))
 
-(dolist (stuff '((string=* not)
-		 (string/=* identity)))
-  (destructuring-bind (name result-fun) stuff
-    (deftransform name ((string1 string2 start1 end1 start2 end2)
-			'(simple-string simple-string t t t t) '*
-			:eval-name t)
-      `(,result-fun
-	(sb!impl::%sp-string-compare
-	 string1 start1 (or end1 (length string1))
-	 string2 start2 (or end2 (length string2)))))))
+(macrolet ((def-frob (name result-fun)
+             `(deftransform ',name ((string1 string2 start1 end1 start2 end2)
+                                   '(simple-string simple-string t t t t) '*
+                                   :eval-name t)
+                `(,',result-fun
+                  (sb!impl::%sp-string-compare
+                   string1 start1 (or end1 (length string1))
+                   string2 start2 (or end2 (length string2)))))))
+  (def-frob string=* not)
+  (def-frob string/=* identity))
+
 
 ;;;; string-only transforms for sequence functions
 ;;;;

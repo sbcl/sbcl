@@ -2174,8 +2174,8 @@ trans_code(struct code *code)
 	fheaderp = (struct simple_fun *) native_pointer(fheaderl);
 	gc_assert(widetag_of(fheaderp->header) == SIMPLE_FUN_HEADER_WIDETAG);
 
-	/* Calculate the new function pointer and the new */
-	/* function header. */
+	/* Calculate the new function pointer and the new
+	 * function header. */
 	nfheaderl = fheaderl + displacement;
 	nfheaderp = (struct simple_fun *) native_pointer(nfheaderl);
 
@@ -2192,8 +2192,7 @@ trans_code(struct code *code)
 	prev_pointer = &nfheaderp->next;
     }
 
-    /*  sniff_code_object(new_code,displacement);*/
-    apply_code_fixups(code,new_code);
+    apply_code_fixups(code, new_code);
 
     return new_code;
 }
@@ -2215,8 +2214,8 @@ scav_code_header(lispobj *where, lispobj object)
     /* Scavenge the boxed section of the code data block. */
     scavenge(where + 1, n_header_words - 1);
 
-    /* Scavenge the boxed section of each function object in the */
-    /* code data block. */
+    /* Scavenge the boxed section of each function object in the
+     * code data block. */
     for (entry_point = code->entry_points;
 	 entry_point != NIL;
 	 entry_point = function_ptr->next) {
@@ -2224,7 +2223,7 @@ scav_code_header(lispobj *where, lispobj object)
 	gc_assert(is_lisp_pointer(entry_point));
 
 	function_ptr = (struct simple_fun *) native_pointer(entry_point);
-	gc_assert(widetag_of(function_ptr->header) == SIMPLE_FUN_HEADER_WIDETAG);
+	gc_assert(widetag_of(function_ptr->header)==SIMPLE_FUN_HEADER_WIDETAG);
 
 	scavenge(&function_ptr->name, 1);
 	scavenge(&function_ptr->arglist, 1);
@@ -5150,8 +5149,8 @@ verify_space(lispobj *start, size_t words)
 			/* Scavenge the boxed section of the code data block */
 			verify_space(start + 1, nheader_words - 1);
 
-			/* Scavenge the boxed section of each function object in
-			 * the code data block. */
+			/* Scavenge the boxed section of each function
+			 * object in the code data block. */
 			fheaderl = code->entry_points;
 			while (fheaderl != NIL) {
 			    fheaderp =

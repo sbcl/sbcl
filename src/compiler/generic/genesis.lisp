@@ -1403,7 +1403,8 @@
 				   sb!vm:word-shift))))
 			 (#.sb!vm:closure-header-widetag
 			  (make-random-descriptor
-			   (cold-foreign-symbol-address-as-integer "closure_tramp")))))
+			   (cold-foreign-symbol-address-as-integer
+			    "closure_tramp")))))
     fdefn))
 
 (defun initialize-static-fns ()
