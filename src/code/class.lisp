@@ -1,7 +1,6 @@
 ;;;; This file contains structures and functions for the maintenance of
 ;;;; basic information about defined types. Different object systems
-;;;; can be supported simultaneously. Some of the functions here are
-;;;; nominally generic, and are overwritten when CLOS is loaded.
+;;;; can be supported simultaneously. 
 
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
@@ -16,10 +15,13 @@
 
 (!begin-collecting-cold-init-forms)
 
-;;;; the CLASS structure
+;;;; the CLASSOID structure
 
-;;; The CLASS structure is a supertype of all class types. A CLASS is
-;;; also a CTYPE structure as recognized by the type system.
+;;; The CLASSOID structure is a supertype of all classoid types.  A
+;;; CLASSOID is also a CTYPE structure as recognized by the type
+;;; system.  (FIXME: It's also a type specifier, though this might go
+;;; away as with the merger of SB-PCL:CLASS and CL:CLASS it's no
+;;; longer necessary)
 (def!struct (classoid
 	     (:make-load-form-fun classoid-make-load-form-fun)
 	     (:include ctype
@@ -53,24 +55,26 @@
   (direct-superclasses () :type list)
   ;; representation of all of the subclasses (direct or indirect) of
   ;; this class. This is NIL if no subclasses or not initalized yet;
-  ;; otherwise, it's an EQ hash-table mapping CL:CLASS objects to the
+  ;; otherwise, it's an EQ hash-table mapping CLASSOID objects to the
   ;; subclass layout that was in effect at the time the subclass was
   ;; created.
   (subclasses nil :type (or null hash-table))
-  ;; the PCL class object for this class, or NIL if none assigned yet
+  ;; the PCL class (= CL:CLASS, but with a view to future flexibility
+  ;; we don't just call it the CLASS slot) object for this class, or
+  ;; NIL if none assigned yet
   (pcl-class nil))
 
 (defun classoid-make-load-form-fun (class)
-  (/show "entering %CLASSOID-MAKE-LOAD-FORM-FUN" class)
+  (/show "entering CLASSOID-MAKE-LOAD-FORM-FUN" class)
   (let ((name (classoid-name class)))
     (unless (and name (eq (find-classoid name nil) class))
       (/show "anonymous/undefined class case")
       (error "can't use anonymous or undefined class as constant:~%  ~S"
 	     class))
     `(locally
-       ;; KLUDGE: There's a FIND-CLASS DEFTRANSFORM for constant class
-       ;; names which creates fast but non-cold-loadable, non-compact
-       ;; code. In this context, we'd rather have compact,
+       ;; KLUDGE: There's a FIND-CLASSOID DEFTRANSFORM for constant
+       ;; class names which creates fast but non-cold-loadable,
+       ;; non-compact code. In this context, we'd rather have compact,
        ;; cold-loadable code. -- WHN 19990928
        (declare (notinline find-classoid))
        (find-classoid ',name))))
@@ -265,9 +269,9 @@
 	      (make-layout :classoid (or classoid
 					 (make-undefined-classoid name)))))))
 
-;;; If LAYOUT is uninitialized, initialize it with CLASS, LENGTH,
+;;; If LAYOUT is uninitialized, initialize it with CLASSOID, LENGTH,
 ;;; INHERITS, and DEPTHOID, otherwise require that it be consistent
-;;; with CLASS, LENGTH, INHERITS, and DEPTHOID.
+;;; with CLASSOID, LENGTH, INHERITS, and DEPTHOID.
 ;;;
 ;;; UNDEFINED-CLASS values are interpreted specially as "we don't know
 ;;; anything about the class", so if LAYOUT is initialized, any
@@ -715,14 +719,26 @@
      ;; PCL is integrated tighter into SBCL, this might need more work.
      nil)
     (:instance
-     #-sb-xc-host ; FIXME
+     ;; KLUDGE: The reason these clauses aren't directly parallel is
+     ;; that we need to use the internal CLASSOID structure ourselves,
+     ;; because we don't have CLASSes to work with until PCL is built.
+     ;; In the host, CLASSes have an approximately one-to-one
+     ;; correspondence with the target CLASSOIDs (as well as with the
+     ;; target CLASSes, modulo potential differences with respect to
+     ;; conditions).
+     #+sb-xc-host
+     (let ((old (class-of (find-classoid name)))
+	   (new (class-of new-value)))
+       (unless (eq old new)
+	 (bug "trying to change the metaclass of ~S from ~S to ~S in the ~
+               cross-compiler."
+	      name (class-name old) (class-name new))))
+     #-sb-xc-host
      (let ((old (classoid-of (find-classoid name)))
 	   (new (classoid-of new-value)))
        (unless (eq old new)
 	 (warn "changing meta-class of ~S from ~S to ~S"
-	       name
-	       (classoid-name old)
-	       (classoid-name new)))))
+	       name (classoid-name old) (classoid-name new)))))
     (:primitive
      (error "illegal to redefine standard type ~S" name))
     (:defined
