@@ -672,7 +672,7 @@
 	   (frob if-alternative)
            (when (eq (if-consequent last)
                      (if-alternative last))
-             (setf (component-reoptimize (block-component block)) t)))))
+             (reoptimize-component (block-component block) :maybe)))))
       (t
        (unless (memq new (block-succ block))
 	 (link-blocks block new)))))
@@ -1036,7 +1036,7 @@
     (do-uses (use lvar)
       (let ((prev (node-prev use)))
 	(let ((block (ctran-block prev)))
-          (setf (component-reoptimize (block-component block)) t)
+          (reoptimize-component (block-component block) t)
           (setf (block-attributep (block-flags block)
                                   flush-p type-asserted type-check)
                 t)))
@@ -1773,4 +1773,4 @@
              (do-uses (node lvar)
                (setf (node-reoptimize node) t)
                (setf (block-reoptimize (node-block node)) t)
-               (setf (component-reoptimize (node-component node)) t)))))))
+               (reoptimize-component (node-component node) :maybe)))))))

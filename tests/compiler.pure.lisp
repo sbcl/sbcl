@@ -1618,3 +1618,23 @@
        (elt '(102)
             (flet ((%f12 () (rem 0 -43)))
               (multiple-value-call #'%f12 (values))))))))))
+
+;;; MISC.437: lost reoptimization after FLUSH-DEST
+(assert (zerop (funcall
+  (compile
+   nil
+   '(lambda (a b c d e)
+     (declare (notinline values complex eql))
+     (declare
+      (optimize (compilation-speed 3)
+       (speed 3)
+       (debug 1)
+       (safety 1)
+       (space 0)))
+     (flet ((%f10
+                (f10-1 f10-2 f10-3
+                       &optional (f10-4 (ignore-errors 0)) (f10-5 0)
+                       &key &allow-other-keys)
+              (if (or (eql 0 0) t) 0 (if f10-1 0 0))))
+       (complex (multiple-value-call #'%f10 (values a c b 0 0)) 0))))
+   80043 74953652306 33658947 -63099937105 -27842393)))

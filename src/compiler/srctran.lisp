@@ -2580,7 +2580,7 @@
              (setf (lvar-%derived-type (node-lvar node)) nil)
              (setf (node-reoptimize node) t)
              (setf (block-reoptimize (node-block node)) t)
-             (setf (component-reoptimize (node-component node)) t))
+             (reoptimize-component (node-component node) :maybe))
            (cut-node (node &aux did-something)
              (when (and (not (block-delete-p (node-block node)))
                         (combination-p node)

@@ -107,6 +107,14 @@
 
 ;;;; interface routines used by optimizers
 
+(declaim (inline reoptimize-component))
+(defun reoptimize-component (component kind)
+  (declare (type component component)
+           (type (member nil :maybe t) kind))
+  (aver kind)
+  (unless (eq (component-reoptimize component) t)
+    (setf (component-reoptimize component) kind)))
+
 ;;; This function is called by optimizers to indicate that something
 ;;; interesting has happened to the value of LVAR. Optimizers must
 ;;; make sure that they don't call for reoptimization when nothing has
@@ -130,7 +138,7 @@
           (when (typep dest 'cif)
             (setf (block-test-modified block) t))
           (setf (block-reoptimize block) t)
-          (setf (component-reoptimize component) t))))
+          (reoptimize-component component :maybe))))
     (do-uses (node lvar)
       (setf (block-type-check (node-block node)) t)))
   (values))
@@ -140,7 +148,7 @@
   (do-uses (use lvar)
     (setf (node-reoptimize use) t)
     (setf (block-reoptimize (node-block use)) t)
-    (setf (component-reoptimize (node-component use)) t)))
+    (reoptimize-component (node-component use) :maybe)))
 
 ;;; Annotate NODE to indicate that its result has been proven to be
 ;;; TYPEP to RTYPE. After IR1 conversion has happened, this is the
@@ -213,7 +221,7 @@
 ;;; and doing IR1 optimizations. We can ignore all blocks that don't
 ;;; have the REOPTIMIZE flag set. If COMPONENT-REOPTIMIZE is true when
 ;;; we are done, then another iteration would be beneficial.
-(defun ir1-optimize (component)
+(defun ir1-optimize (component fastp)
   (declare (type component component))
   (setf (component-reoptimize component) nil)
   (loop with block = (block-next (component-head component))
@@ -255,7 +263,7 @@
                  (unless (join-successor-if-possible block)
                    (return)))
 
-              (when (and (block-reoptimize block) (block-component block))
+              (when (and (not fastp) (block-reoptimize block) (block-component block))
                 (aver (not (block-delete-p block)))
                 (ir1-optimize-block block))
 
@@ -1069,7 +1077,7 @@
  	      (setf (node-reoptimize node) t)
  	      (let ((block (node-block node)))
  		(setf (block-reoptimize block) t)
- 		(setf (component-reoptimize (block-component block)) t)))))))
+ 		(reoptimize-component (block-component block) :maybe)))))))
     reoptimize))
 
 ;;; Take the lambda-expression RES, IR1 convert it in the proper

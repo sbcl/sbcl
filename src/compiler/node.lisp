@@ -348,9 +348,10 @@
   ;; Between runs of local call analysis there may be some debris of
   ;; converted or even deleted functions in this list.
   (new-functionals () :type list)
-  ;; If this is true, then there is stuff in this component that could
-  ;; benefit from further IR1 optimization.
-  (reoptimize t :type boolean)
+  ;; If this is :MAYBE, then there is stuff in this component that
+  ;; could benefit from further IR1 optimization. T means that
+  ;; reoptimization is necessary.
+  (reoptimize t :type (member nil :maybe t))
   ;; If this is true, then the control flow in this component was
   ;; messed up by IR1 optimizations, so the DFO should be recomputed.
   (reanalyze nil :type boolean)

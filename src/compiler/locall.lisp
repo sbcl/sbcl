@@ -233,8 +233,8 @@
 	    (leaf-ever-used res) t
 	    (functional-entry-fun res) fun
 	    (functional-entry-fun fun) res
-	    (component-reanalyze *current-component*) t
-	    (component-reoptimize *current-component*) t)
+	    (component-reanalyze *current-component*) t)
+      (reoptimize-component *current-component* :maybe)
       (etypecase fun
 	(clambda
 	 (locall-analyze-fun-1 fun))
