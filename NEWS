@@ -2031,7 +2031,7 @@ changes in sbcl-0.8.4 relative to sbcl-0.8.3:
     simple-base-strings and simple-bit-vectors is improved.
   * optimization: the optimization of 32-bit logical and arithmetic
     functions introduced in version 0.8.3 on the x86 has been
-    implemented on the ppc.
+    implemented on the ppc and sparc platforms.
   * microoptimization: the compiler is better able to make use of the
     x86 LEA instruction for multiplication by constants.
   * bug fix: in some situations compiler did not report usage of
