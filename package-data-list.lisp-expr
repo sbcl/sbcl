@@ -1393,6 +1393,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
              "!PACKAGE-COLD-INIT" "SIGNAL-COLD-INIT-OR-REINIT"
              "!POLICY-COLD-INIT-OR-RESANIFY" "!VM-TYPE-COLD-INIT"
              "!BACKQ-COLD-INIT" "!SHARPM-COLD-INIT"
+	     "!EARLY-PROCLAIM-COLD-INIT" "!LATE-PROCLAIM-COLD-INIT"
              "!CLASS-FINALIZE" "GC-REINIT"
 
              ;; Note: These are out of lexicographical order because in CMU CL

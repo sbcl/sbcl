@@ -21,8 +21,7 @@
   ;; evaluations/compilations, though [e.g. the ignored variable in
   ;; (DEFUN FOO (X) 1)].  -- CSR, 2003-05-13
   (let ((fun (sb!c:compile-in-lexenv (gensym "EVAL-TMPFUN-")
-				     `(lambda ()
-				       ,expr)
+				     `(lambda () ,expr)
 				     lexenv)))
     (funcall fun)))
 
@@ -122,13 +121,12 @@
 		       (set (first args) (eval (second args)))))
 		  (let ((symbol (first name)))
 		    (case (info :variable :kind symbol)
-		      ;; FIXME: I took out the *TOPLEVEL-AUTO-DECLARE*
-		      ;; test here, and removed the
-		      ;; *TOPLEVEL-AUTO-DECLARE* variable; the code
-		      ;; should now act as though that variable is
-		      ;; NIL. This should be tested..
 		      (:special)
-		      (t (return (%eval original-exp lexenv))))))))
+		      (t (return (%eval original-exp lexenv))))
+		    (unless (type= (info :variable :type symbol)
+				   *universal-type*)
+		      ;; let the compiler deal with type checking
+		      (return (%eval original-exp lexenv)))))))
 	     ((progn)
 	      (eval-progn-body (rest exp) lexenv))
 	     ((eval-when)

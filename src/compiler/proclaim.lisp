@@ -80,6 +80,10 @@
 	    (t
 	     decl-spec)))))
 
+(!begin-collecting-cold-init-forms)
+(!cold-init-forms (defvar *queued-proclaims* nil))
+(!defun-from-collected-cold-init-forms !early-proclaim-cold-init)
+
 (defun sb!xc:proclaim (raw-form)
   #+sb-xc (/show0 "entering PROCLAIM, RAW-FORM=..")
   #+sb-xc (/hexstr raw-form)
@@ -96,50 +100,40 @@
 	 (clear-info :variable :constant-value name)
 	 (setf (info :variable :kind name) :special)))
       (type
-       (when *type-system-initialized*
-	 (let ((type (specifier-type (first args))))
-	   (dolist (name (rest args))
-	     (unless (symbolp name)
-	       (error "can't declare TYPE of a non-symbol: ~S" name))
-	     (when (eq (info :variable :where-from name) :declared)
-	       (let ((old-type (info :variable :type name)))
-		 (when (type/= type old-type)
-		   (style-warn "The new TYPE proclamation~%  ~S~@
-                               for ~S does not match the old TYPE~@
-                               proclamation ~S"
-			       type name old-type))))
-	     (setf (info :variable :type name) type)
-	     (setf (info :variable :where-from name) :declared)))))
+       (if *type-system-initialized*
+	   (let ((type (specifier-type (first args))))
+	     (dolist (name (rest args))
+	       (unless (symbolp name)
+		 (error "can't declare TYPE of a non-symbol: ~S" name))
+	       (when (eq (info :variable :where-from name) :declared)
+		 (let ((old-type (info :variable :type name)))
+		   (when (type/= type old-type)
+		     (style-warn "The new TYPE proclamation~%  ~S~@
+                                  for ~S does not match the old TYPE~@
+                                  proclamation ~S"
+				 type name old-type))))
+	       (setf (info :variable :type name) type)
+	       (setf (info :variable :where-from name) :declared)))
+	   (push raw-form *queued-proclaims*)))
       (ftype
-       ;; FIXME: Since currently *TYPE-SYSTEM-INITIALIZED* is not set
-       ;; until many toplevel forms have run, this condition on
-       ;; PROCLAIM (FTYPE ..) (and on PROCLAIM (TYPE ..), above) means
-       ;; that valid PROCLAIMs in cold code could get lost. Probably
-       ;; the cleanest way to deal with this would be to initialize
-       ;; the type system completely in special cold init forms,
-       ;; before any ordinary toplevel forms run. Failing that, we
-       ;; could queue up PROCLAIMs to be done after the type system is
-       ;; initialized. Failing that, we could at least issue a warning
-       ;; when we have to ignore a PROCLAIM because the type system is
-       ;; uninitialized.
-       (when *type-system-initialized*
-	 (let ((ctype (specifier-type (first args))))
-	   (unless (csubtypep ctype (specifier-type 'function))
-	     (error "not a function type: ~S" (first args)))
-	   (dolist (name (rest args))
-
-	     ;; KLUDGE: Something like the commented-out TYPE/=
-	     ;; check here would be nice, but it has been
-	     ;; commented out because TYPE/= doesn't support
-	     ;; function types. It could probably be made to do
-	     ;; so, but it might take some time, since function
-	     ;; types involve values types, which aren't
-	     ;; supported, and since the SUBTYPEP operator for
-	     ;; FUNCTION types is rather broken, e.g.
-	     ;;   (SUBTYPEP '(FUNCTION (T BOOLEAN) NIL)
-	     ;;             '(FUNCTION (FIXNUM FIXNUM) NIL)) => T, T
-	     ;; -- WHN 20000229
-	     #|
+       (if *type-system-initialized*
+	   (let ((ctype (specifier-type (first args))))
+	     (unless (csubtypep ctype (specifier-type 'function))
+	       (error "not a function type: ~S" (first args)))
+	     (dolist (name (rest args))
+	       
+	       ;; KLUDGE: Something like the commented-out TYPE/=
+	       ;; check here would be nice, but it has been
+	       ;; commented out because TYPE/= doesn't support
+	       ;; function types. It could probably be made to do
+	       ;; so, but it might take some time, since function
+	       ;; types involve values types, which aren't
+	       ;; supported, and since the SUBTYPEP operator for
+	       ;; FUNCTION types is rather broken, e.g.
+	       ;;   (SUBTYPEP '(FUNCTION (T BOOLEAN) NIL)
+	       ;;             '(FUNCTION (FIXNUM FIXNUM) NIL)) => T, T
+	       ;; -- WHN 20000229
+	       #|
 	     (when (eq (info :function :where-from name) :declared)
 	       (let ((old-type (info :function :type name)))
 		 (when (type/= ctype old-type)
@@ -149,20 +143,21 @@
                      for ~S does not match old FTYPE proclamation~@
                      ~S"
 		    (list ctype name old-type)))))
-             |#
+	       |#
 
-	     ;; Now references to this function shouldn't be warned
-	     ;; about as undefined, since even if we haven't seen a
-	     ;; definition yet, we know one is planned. 
-	     ;;
-	     ;; Other consequences of we-know-you're-a-function-now
-	     ;; are appropriate too, e.g. any MACRO-FUNCTION goes away.
-	     (proclaim-as-fun-name name)
-	     (note-name-defined name :function)
+	       ;; Now references to this function shouldn't be warned
+	       ;; about as undefined, since even if we haven't seen a
+	       ;; definition yet, we know one is planned. 
+	       ;;
+	       ;; Other consequences of we-know-you're-a-function-now
+	       ;; are appropriate too, e.g. any MACRO-FUNCTION goes away.
+	       (proclaim-as-fun-name name)
+	       (note-name-defined name :function)
 
-	     ;; the actual type declaration
-	     (setf (info :function :type name) ctype
-		   (info :function :where-from name) :declared)))))
+	       ;; the actual type declaration
+	       (setf (info :function :type name) ctype
+		     (info :function :where-from name) :declared)))
+	   (push raw-form *queued-proclaims*)))
       (freeze-type
        (dolist (type args)
 	 (let ((class (specifier-type type)))

@@ -649,6 +649,10 @@
  ;; DEFVAR or DEFPARAMETER.
  ("src/code/cl-specials")
 
+ ;; FIXME: here? earlier?  can probably be as late as possible.  Also
+ ;; maybe call it FORCE-DELAYED-PROCLAIMS?
+ ("src/compiler/late-proclaim")
+ 
  ;; fundamental target macros (e.g. CL:DO and CL:DEFUN) and support
  ;; for them
  ("src/code/defboot")

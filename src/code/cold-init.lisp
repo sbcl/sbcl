@@ -142,6 +142,8 @@
   (show-and-call !policy-cold-init-or-resanify)
   (/show0 "back from !POLICY-COLD-INIT-OR-RESANIFY")
 
+  (show-and-call !early-proclaim-cold-init)
+  
   ;; KLUDGE: Why are fixups mixed up with toplevel forms? Couldn't
   ;; fixups be done separately? Wouldn't that be clearer and better?
   ;; -- WHN 19991204
@@ -202,6 +204,9 @@
   ;; DEFTYPEs are.
   (setf *type-system-initialized* t)
 
+  ;; run the PROCLAIMs.
+  (show-and-call !late-proclaim-cold-init)
+  
   (show-and-call os-cold-init-or-reinit)
 
   (show-and-call stream-cold-init-or-reset)

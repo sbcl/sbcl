@@ -48,10 +48,10 @@
 
 ;;; This was a bug in SBCL until 0.6.12.40 (originally reported as a
 ;;; CMU CL bug by Erik Naggum on comp.lang.lisp).
-(loop for *print-base* from 2 to 36
+(loop for base from 2 to 36
       with *print-radix* = t
-      do
-      (assert (string= "#*101" (format nil "~S" #*101))))
+      do (let ((*print-base* base))
+	   (assert (string= "#*101" (format nil "~S" #*101)))))
 
 ;;; bug in sbcl-0.7.1.25, reported by DB sbcl-devel 2002-02-25
 (assert (string= "0.5" (format nil "~2D" 0.5)))

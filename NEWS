@@ -1772,6 +1772,10 @@ changes in sbcl-0.8.1 relative to sbcl-0.8.0:
   * minor incompatible change: some nonsensical specialized lambda
     lists (used in DEFMETHOD) which were previously ignored now signal
     errors.
+  * minor incompatible change: the system is now aware of the types of
+    variables in the COMMON-LISP package, and will signal errors for
+    most violations of these type constraints (where previously they
+    were silently accepted).
   * changes in type checking closed the following bugs:
     ** type checking of unused values (192b, 194d, 203);
     ** template selection based on unsafe type assertions (192c, 236);
