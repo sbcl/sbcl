@@ -1290,14 +1290,15 @@
 (defoptimizer (values-list ir2-convert) ((list) node block)
   (let* ((cont (node-cont node))
 	 (2cont (continuation-info cont)))
-    (when 2cont
-      (ecase (ir2-continuation-kind 2cont)
-	(:fixed (ir2-convert-full-call node block))
-	(:unknown
-	 (let ((locs (ir2-continuation-locs 2cont)))
-	   (vop* values-list node block
-		 ((continuation-tn node block list) nil)
-		 ((reference-tn-list locs t)))))))))
+    (cond ((and 2cont
+                (eq (ir2-continuation-kind 2cont) :unknown))
+           (let ((locs (ir2-continuation-locs 2cont)))
+             (vop* values-list node block
+                   ((continuation-tn node block list) nil)
+                   ((reference-tn-list locs t)))))
+          (t (aver (or (not 2cont) ; i.e. we want to check the argument
+                       (eq (ir2-continuation-kind 2cont) :fixed)))
+             (ir2-convert-full-call node block)))))
 
 (defoptimizer (%more-arg-values ir2-convert) ((context start count) node block)
   (let* ((cont (node-cont node))

@@ -1297,6 +1297,9 @@ changes in sbcl-0.7.8 relative to sbcl-0.7.7:
     incremented seemed like the simplest and most conservative
     thing to do.)
 
+changes in sbcl-0.7.9 relative to sbcl-0.7.8:
+  * fixed bug: VALUES-LIST is no longer optimized away
+
 planned incompatible changes in 0.7.x:
 * When the profiling interface settles down, maybe in 0.7.x, maybe
   later, it might impact TRACE. They both encapsulate functions, and

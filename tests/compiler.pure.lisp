@@ -186,7 +186,7 @@
   (assert (not (eval `(locally (declare (optimize (safety 0)))
                         (ignore-errors (progn ,form t)))))))
 
-(dolist (form '(#+nil(values-list '(1 . 2)) ; This case still fails
+(dolist (form '((values-list (car (list '(1 . 2))))
                 (fboundp '(set bet))
                 (atan #c(1 1) (car (list #c(2 2))))
                 (nthcdr (car (list (floor (cos 3)))) '(1 2 3 4 5))
