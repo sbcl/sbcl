@@ -1271,8 +1271,8 @@
   (when (and (<= width 64)
 	     (constant-lvar-p scale)
 	     (constant-lvar-p disp))
-    (cut-to-width base width)
-    (cut-to-width index width)
+    (cut-to-width base :unsigned width)
+    (cut-to-width index :unsigned width)
     'sb!vm::%lea-mod64))
 
 #+sb-xc-host

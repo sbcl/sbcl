@@ -41,7 +41,7 @@
                                        '(:relative :up :up "output")
                                        :name "ucd"
                                        :type "dat")
-                                      sb!xc:*compile-file-pathname*)
+                                      sb!xc:*compile-file-truename*)
                                      :direction :input
                                      :element-type '(unsigned-byte 8))
                (let* ((length (file-length stream))

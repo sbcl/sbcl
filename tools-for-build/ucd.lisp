@@ -5,7 +5,7 @@
 (defparameter *output-directory*
   (merge-pathnames
    (make-pathname :directory '(:relative :up "output"))
-   (make-pathname :directory (pathname-directory *load-pathname*))))
+   (make-pathname :directory (pathname-directory *load-truename*))))
 
 (defparameter *page-size-exponent* 8)
 
@@ -18,7 +18,7 @@
 ;;; Generator
 
 (defparameter *unicode-character-database*
-  (make-pathname :directory (pathname-directory *load-pathname*)))
+  (make-pathname :directory (pathname-directory *load-truename*)))
 
 (defparameter *ucd-base* nil)
 

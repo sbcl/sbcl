@@ -276,7 +276,7 @@
 
 ;;; a spot of random-testing for rational printing
 (defvar *seed-state* (make-random-state))
-(prin1 *seed-state*) ; so that we can reproduce errors
+(print *seed-state*) ; so that we can reproduce errors
 (let ((seed (make-random-state *seed-state*)))
   (loop repeat 42
      do (let ((n (random (ash 1 1000) seed))
