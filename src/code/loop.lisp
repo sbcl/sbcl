@@ -901,17 +901,26 @@ code to be loaded.
   (setq *loop-emitted-body* t)
   (loop-pseudo-body form))
 
-(defun loop-emit-final-value (form)
-  (push (loop-construct-return form) *loop-after-epilogue*)
+(defun loop-emit-final-value (&optional (form nil form-supplied-p))
+  (when form-supplied-p
+    (push (loop-construct-return form) *loop-after-epilogue*))
   (when *loop-final-value-culprit*
-    (loop-warn "The LOOP clause is providing a value for the iteration,~@
-		however one was already established by a ~S clause."
+    (loop-warn "The LOOP clause is providing a value for the iteration;~@
+		however, one was already established by a ~S clause."
 	       *loop-final-value-culprit*))
   (setq *loop-final-value-culprit* (car *loop-source-context*)))
 
 (defun loop-disallow-conditional (&optional kwd)
   (when *loop-inside-conditional*
     (loop-error "~:[This LOOP~;The LOOP ~:*~S~] clause is not permitted inside a conditional." kwd)))
+
+(defun loop-disallow-anonymous-collectors ()
+  (when (find-if-not 'loop-collector-name *loop-collection-cruft*)
+    (loop-error "This LOOP clause is not permitted with anonymous collectors.")))
+
+(defun loop-disallow-aggregate-booleans ()
+  (when (loop-tmember *loop-final-value-culprit* '(always never thereis))
+    (loop-error "This anonymous collection LOOP clause is not permitted with aggregate booleans.")))
 
 ;;;; loop types
 
@@ -1153,6 +1162,8 @@ code to be loaded.
 		(loop-pop-source))))
     (when (not (symbolp name))
       (loop-error "The value accumulation recipient name, ~S, is not a symbol." name))
+    (unless name
+      (loop-disallow-aggregate-booleans))
     (unless dtype
       (setq dtype (or (loop-optional-type) default-type)))
     (let ((cruft (find (the symbol name) *loop-collection-cruft*
@@ -1249,6 +1260,7 @@ code to be loaded.
 (defun loop-do-always (restrictive negate)
   (let ((form (loop-get-form)))
     (when restrictive (loop-disallow-conditional))
+    (loop-disallow-anonymous-collectors)
     (loop-emit-body `(,(if negate 'when 'unless) ,form
 		      ,(loop-construct-return nil)))
     (loop-emit-final-value t)))
@@ -1258,8 +1270,10 @@ code to be loaded.
 ;;; Under ANSI this is not permitted to appear under conditionalization.
 (defun loop-do-thereis (restrictive)
   (when restrictive (loop-disallow-conditional))
+  (loop-disallow-anonymous-collectors)
+  (loop-emit-final-value)
   (loop-emit-body `(when (setq ,(loop-when-it-var) ,(loop-get-form))
-		     ,(loop-construct-return *loop-when-it-var*))))
+		    ,(loop-construct-return *loop-when-it-var*))))
 
 (defun loop-do-while (negate kwd &aux (form (loop-get-form)))
   (loop-disallow-conditional kwd)

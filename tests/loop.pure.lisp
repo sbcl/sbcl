@@ -115,3 +115,35 @@
 (assert (= (loop with (nil a) = '(1 2) return a) 2))
 (assert (= (loop with (a . nil) = '(1 2) return a) 1))
 (assert (equal (loop with (nil . a) = '(1 2) return a) '(2)))
+
+(multiple-value-bind (result error)
+    (ignore-errors
+      (loop for i in '(1 2 3) collect i always (< i 4)))
+  (assert (null result))
+  (assert (typep error 'program-error)))
+(assert (equal
+	 (loop for i in '(1 2 3) collect i into foo always (< i 4)
+	       finally (return foo))
+	 '(1 2 3)))
+(assert (equal
+	 (loop for i in '(1 2 3) collect i into foo always (= i 4)
+	       finally (return foo))
+	 nil))
+(multiple-value-bind (result error)
+    (ignore-errors
+      (loop for i in '(1 2 3) always (< i 4) collect i))
+  (assert (null result))
+  (assert (typep error 'program-error)))
+(assert (equal
+	 (loop for i in '(1 2 3) always (< i 4) collect i into foo
+	       finally (return foo))
+	 '(1 2 3)))
+(assert (equal
+	 (loop for i in '(1 2 3) always (= i 4) collect i into foo
+	       finally (return foo))
+	 nil))
+(multiple-value-bind (result error)
+    (ignore-errors
+      (loop for i in '(1 2 3) thereis (= i 3) collect i))
+  (assert (null result))
+  (assert (typep error 'program-error)))
