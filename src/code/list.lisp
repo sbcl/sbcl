@@ -397,10 +397,10 @@
 
 (defun nreconc (x y)
   #!+sb-doc
-  "Return (nconc (nreverse x) y)."
+  "Return (NCONC (NREVERSE X) Y)."
   (do ((1st (cdr x) (if (atom 1st) 1st (cdr 1st)))
-       (2nd x 1st)		;2nd follows first down the list.
-       (3rd y 2nd))		;3rd follows 2nd down the list.
+       (2nd x 1st)              ;2nd follows first down the list.
+       (3rd y 2nd))             ;3rd follows 2nd down the list.
       ((atom 2nd) 3rd)
     (rplacd 2nd 3rd)))
 

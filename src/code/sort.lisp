@@ -31,7 +31,7 @@
   (let ((predicate-function (%coerce-callable-to-fun predicate))
 	(key-function (and key (%coerce-callable-to-fun key))))
     (typecase sequence
-      (list (sort-list sequence predicate-function key-function))
+      (list (stable-sort-list sequence predicate-function key-function))
       (vector
        (with-array-data ((vector (the vector sequence))
 			 (start 0)
@@ -49,13 +49,13 @@
 
 (defun stable-sort (sequence predicate &key key)
   #!+sb-doc
-  "Destructively sorts sequence. Predicate should return non-Nil if
-   Arg1 is to precede Arg2."
+  "Destructively sort SEQUENCE. PREDICATE should return non-NIL if
+   ARG1 is to precede ARG2."
   (typecase sequence
     (simple-vector
      (stable-sort-simple-vector sequence predicate key))
     (list
-     (sort-list sequence predicate key))
+     (stable-sort-list sequence predicate key))
     (vector
      (stable-sort-vector sequence predicate key))
     (t
@@ -64,31 +64,91 @@
 	    :expected-type 'sequence
 	    :format-control "~S is not a sequence."
 	    :format-arguments (list sequence)))))
+
+;;; APPLY-KEYED-PRED saves us a function call sometimes.
+(eval-when (:compile-toplevel :execute)
+  (sb!xc:defmacro apply-keyed-pred (one two pred key)
+    `(if ,key
+	 (funcall ,pred (funcall ,key ,one)
+		  (funcall ,key  ,two))
+	 (funcall ,pred ,one ,two)))
+) ; EVAL-WHEN
+
+;;;; stable sort of lists
 
-;;; stable sort of lists
+(defun last-cons-of (list)
+  (loop (let ((rest (rest list)))
+	  (if rest
+	      (setf list rest)
+	      (return list)))))
 
-;;; SORT-LIST uses a bottom up merge sort. First a pass is made over
-;;; the list grabbing one element at a time and merging it with the
-;;; next one form pairs of sorted elements. Then n is doubled, and
-;;; elements are taken in runs of two, merging one run with the next
-;;; to form quadruples of sorted elements. This continues until n is
-;;; large enough that the inner loop only runs for one iteration; that
-;;; is, there are only two runs that can be merged, the first run
+;;; Destructively merge LIST-1 with LIST-2 (given that they're already
+;;; sorted w.r.t. PRED-FUN on KEY-FUN, giving output sorted the same
+;;; way). In the resulting list, elements of LIST-1 are guaranteed to
+;;; come before equal elements of LIST-2.
+;;;
+;;; Return (VALUES HEAD TAILTAIL), where HEAD is the same value you'd
+;;; expect from MERGE, and TAILTAIL is the last cons in the list (i.e.
+;;; the last cons in the list which NRECONC calls TAIL).
+(defun merge-lists* (list-1 list-2 pred-fun key-fun)
+  (declare (type list list-1 list-2))
+  (declare (type function pred-fun key-fun))
+  (cond ((null list-1) (values list-2 (last-cons-of list-2)))
+        ((null list-2) (values list-1 (last-cons-of list-1)))
+        (t (let* ((reversed-result-so-far nil)
+                  (key-1 (funcall key-fun (car list-1)))
+                  (key-2 (funcall key-fun (car list-2))))
+             (loop
+              (macrolet ((frob (list-i key-i other-list)
+                           `(progn
+                              ;; basically
+                              ;;   (PUSH (POP ,LIST-I) REVERSED-RESULT-SO-FAR),
+                              ;; except doing some fancy footwork to
+                              ;; reuse the cons cell:
+                              (psetf (cdr ,list-i) reversed-result-so-far
+                                     reversed-result-so-far ,list-i
+                                     ,list-i (cdr ,list-i))
+                              ;; Now maybe we're done.
+                              (if (endp ,list-i)
+                                  (return (values (nreconc
+						   reversed-result-so-far
+						   ,other-list)
+						  (last-cons-of
+						   ,other-list)))
+                                  (setf ,key-i
+					(funcall key-fun (car ,list-i)))))))
+                ;; Note that by making KEY-2 the first arg to
+                ;; PRED-FUN, we arrange that if PRED-FUN is a function
+                ;; in the #'< style, the outcome is stably sorted.
+                (if (funcall pred-fun key-2 key-1)
+                    (frob list-2 key-2 list-1)
+                    (frob list-1 key-1 list-2))))))))
+
+;;; STABLE-SORT-LIST uses a bottom-up merge sort. First a pass is made
+;;; over the list grabbing one element at a time and merging it with
+;;; the next one to form pairs of sorted elements. Then N is doubled,
+;;; and elements are taken in runs of two, merging one run with the
+;;; next to form quadruples of sorted elements. This continues until N
+;;; is large enough that the inner loop only runs for one iteration;
+;;; that is, there are only two runs that can be merged, the first run
 ;;; starting at the beginning of the list, and the second being the
 ;;; remaining elements.
-
-(defun sort-list (list pred key)
+(defun stable-sort-list (list pred key)
   (let ((head (cons :header list))  ; head holds on to everything
 	(n 1)		            ; bottom-up size of lists to be merged
 	unsorted		    ; unsorted is the remaining list to be
 				    ;   broken into n size lists and merged
 	list-1			    ; list-1 is one length n list to be merged
-	last)			    ; last points to the last visited cell
+	last			    ; last points to the last visited cell
+	(pred-fun (%coerce-callable-to-fun pred))
+	(key-fun (if key
+		     (%coerce-callable-to-fun key)
+		     #'identity)))
     (declare (fixnum n))
     (loop
-     ;; start collecting runs of n at the first element
+     ;; Start collecting runs of N at the first element.
      (setf unsorted (cdr head))
-     ;; tack on the first merge of two n-runs to the head holder
+     ;; Tack on the first merge of two N-runs to the head holder.
      (setf last head)
      (let ((n-1 (1- n)))
        (declare (fixnum n-1))
@@ -97,21 +157,21 @@
 	(let ((temp (nthcdr n-1 list-1))
 	      list-2)
 	  (cond (temp
-		 ;; there are enough elements for a second run
+		 ;; There are enough elements for a second run.
 		 (setf list-2 (cdr temp))
 		 (setf (cdr temp) nil)
 		 (setf temp (nthcdr n-1 list-2))
 		 (cond (temp
 			(setf unsorted (cdr temp))
 			(setf (cdr temp) nil))
-		       ;; the second run goes off the end of the list
+		       ;; The second run goes off the end of the list.
 		       (t (setf unsorted nil)))
 		 (multiple-value-bind (merged-head merged-last)
-		     (merge-lists* list-1 list-2 pred key)
-		   (setf (cdr last) merged-head)
-		   (setf last merged-last))
+		     (merge-lists* list-1 list-2 pred-fun key-fun)
+		   (setf (cdr last) merged-head
+			 last merged-last))
 		 (if (null unsorted) (return)))
-		;; if there is only one run, then tack it on to the end
+		;; If there is only one run, then tack it on to the end.
 		(t (setf (cdr last) list-1)
 		   (return)))))
        (setf n (ash n 1)) ; (+ n n)
@@ -121,49 +181,8 @@
        ;; iteration to realize.
        (if (eq list-1 (cdr head))
 	   (return list-1))))))
-
-;;; APPLY-PRED saves us a function call sometimes.
-(eval-when (:compile-toplevel :execute)
-  (sb!xc:defmacro apply-pred (one two pred key)
-    `(if ,key
-	 (funcall ,pred (funcall ,key ,one)
-		  (funcall ,key  ,two))
-	 (funcall ,pred ,one ,two)))
-) ; EVAL-WHEN
-
-(defvar *merge-lists-header* (list :header))
-
-;;; MERGE-LISTS*   originally written by Jim Large.
-;;; 		   modified to return a pointer to the end of the result
-;;; 		      and to not cons header each time its called.
-;;; It destructively merges list-1 with list-2. In the resulting
-;;; list, elements of list-2 are guaranteed to come after equal elements
-;;; of list-1.
-(defun merge-lists* (list-1 list-2 pred key)
-  (let* ((result *merge-lists-header*)
-         (merge-lists-trailer (cdr *merge-lists-header*)))
-    (unwind-protect
-         (do ((P result))             ; points to last cell of result
-             ((or (null list-1) (null list-2)) ; done when either list used up
-              (if (null list-1)        ; in which case, append the
-                  (rplacd p list-2)    ;   other list
-                  (rplacd p list-1))
-              (do ((drag p lead)
-                   (lead (cdr p) (cdr lead)))
-                  ((null lead)
-                   (values (cdr result) ; Return the result sans header
-                           drag)))) ; and return pointer to last element.
-           (cond ((apply-pred (car list-2) (car list-1) pred key)
-                  (rplacd p list-2) ; Append the lesser list to last cell of
-                  (setq p (cdr p)) ; result. Note: test must be done for
-                  (pop list-2))     ; LIST-2 < LIST-1 so merge will be
-                 (T (rplacd p list-1)   ; stable for LIST-1.
-                    (setq p (cdr p))
-                    (pop list-1))))
-      (setf (cdr result) merge-lists-trailer) ; (free memory, be careful)
-      )))
-
-;;; stable sort of vectors
+
+;;;; stable sort of vectors
 
 ;;; Stable sorting vectors is done with the same algorithm used for
 ;;; lists, using a temporary vector to merge back and forth between it
@@ -201,9 +220,9 @@
 		     (incf ,target-i)
 		     (incf ,i))
 	       (return))
-	      ((apply-pred (,source-ref ,source ,j)
-			   (,source-ref ,source ,i)
-			   ,pred ,key)
+	      ((apply-keyed-pred (,source-ref ,source ,j)
+				 (,source-ref ,source ,i)
+				 ,pred ,key)
 	       (setf (,target-ref ,target ,target-i)
 		     (,source-ref ,source ,j))
 	       (incf ,j))
@@ -295,7 +314,7 @@
 
 (defun stable-sort-vector (vector pred key)
   (vector-merge-sort vector pred key aref))
-
+
 ;;;; merging
 
 (eval-when (:compile-toplevel :execute)
@@ -328,8 +347,8 @@
 		     (incf ,result-i)
 		     (incf ,i))
 	       (return ,result-vector))
-	      ((apply-pred (,access ,vector-2 ,j) (,access ,vector-1 ,i)
-			   ,pred ,key)
+	      ((apply-keyed-pred (,access ,vector-2 ,j) (,access ,vector-1 ,i)
+				 ,pred ,key)
 	       (setf (,access ,result-vector ,result-i)
 		     (,access ,vector-2 ,j))
 	       (incf ,j))
@@ -344,6 +363,14 @@
   #!+sb-doc
   "Merge the sequences SEQUENCE1 and SEQUENCE2 destructively into a
    sequence of type RESULT-TYPE using PREDICATE to order the elements."
+  ;; FIXME: This implementation is remarkably inefficient in various
+  ;; ways. In decreasing order of estimated user astonishment, I note:
+  ;; full calls to SPECIFIER-TYPE at runtime; copying input vectors
+  ;; to lists before doing MERGE-LISTS*; and walking input lists
+  ;; (because of the call to MERGE-LISTS*, which walks the list to
+  ;; find the last element for its second return value) even in cases
+  ;; like (MERGE 'LIST (LIST 1) (LIST 2 3 4 5 ... 1000)) where one list
+  ;; can be largely ignored. -- WHN 2003-01-05
   (let ((type (specifier-type result-type)))
     (cond
       ((csubtypep type (specifier-type 'list))
@@ -352,9 +379,13 @@
        ;; reimplementing everything, we can't do the same for the LIST
        ;; case, so do relevant length checking here:
        (let ((s1 (coerce sequence1 'list))
-	     (s2 (coerce sequence2 'list)))
+	     (s2 (coerce sequence2 'list))
+	     (pred-fun (%coerce-callable-to-fun predicate))
+	     (key-fun (if key
+			  (%coerce-callable-to-fun key)
+			  #'identity)))
 	 (when (type= type (specifier-type 'list))
-	   (return-from merge (values (merge-lists* s1 s2 predicate key))))
+	   (return-from merge (values (merge-lists* s1 s2 pred-fun key-fun))))
 	 (when (eq type *empty-type*)
 	   (bad-sequence-type-error nil))
 	 (when (type= type (specifier-type 'null))
@@ -368,7 +399,7 @@
 	 (if (csubtypep (specifier-type '(cons nil t)) type)
 	     (if (and (null s1) (null s2))
 		 (sequence-type-length-mismatch-error type 0)
-		 (values (merge-lists* s1 s2 predicate key)))
+		 (values (merge-lists* s1 s2 pred-fun key-fun)))
 	     (sequence-type-too-hairy result-type))))
       ((csubtypep type (specifier-type 'vector))
        (let* ((vector-1 (coerce sequence1 'vector))

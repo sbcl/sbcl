@@ -136,3 +136,22 @@
                                      (return-from compare nil))
                                    t))))))
                '(0 0 0 0 0)))
+
+;;; miscellaneous sanity checks on stuff which could've been broken by
+;;; changes in MERGE-LIST* in sbcl-0.7.11.*
+(assert (equal (merge 'list () () '<) ()))
+(assert (equal (merge 'list () (list 1) #'< :key 'identity) '(1)))
+(assert (equal (merge 'list (list 2) () '>) '(2)))
+(assert (equal (merge 'list (list 1 2 4) (list 2 3 7) '<) '(1 2 2 3 4 7)))
+(assert (equal (merge 'list (list 1 2 4) (list -2 3 7) #'<) '(-2 1 2 3 4 7)))
+(assert (equal (merge 'list (list 1 2 4) (vector -2 3 7) '< :key 'abs)
+	       '(1 2 -2 3 4 7)))
+(assert (equal (merge 'list (list 1 -2 4) (list -2 3 7) '< :key #'abs)
+	       '(1 -2 -2 3 4 7)))
+(assert (equal (stable-sort (list 1 10 2 12 13 3) '<) '(1 2 3 10 12 13)))
+(assert (equal (stable-sort (list 1 10 2 12 13 3) #'< :key '-)
+	       '(13 12 10 3 2 1)))
+(assert (equal (stable-sort (list 1 10 2 12 13 3) '> :key #'-)
+	       '(1 2 3 10 12 13)))
+(assert (equal (stable-sort (list 1 2 3 -3 -2 -1) '< :key 'abs)
+	       '(1 -1 2 -2 3 -3)))
