@@ -25,8 +25,26 @@
 
 ;;; bug 133, fixed in 0.7.0.5: Somewhere in 0.pre7.*, C void returns
 ;;; were broken ("unable to use values types here") when
-;;; auto-PROCLAIM-of-return-value was added to DEFINE-ALIEN_ROUTINE.
+;;; auto-PROCLAIM-of-return-value was added to DEFINE-ALIEN-ROUTINE.
 (sb-alien:define-alien-routine ("free" free) void (ptr (* t) :in))
+
+;;; Types of alien functions were being incorrectly DECLAIMED when
+;;; docstrings were included in the definition until sbcl-0.7.6.15.
+(sb-alien:define-alien-routine ("getenv" ftype-correctness) c-string
+  "docstring"
+  (name c-string))
+
+(multiple-value-bind (function warningsp failurep)
+    (compile nil '(lambda () (ftype-correctness)))
+  (assert warningsp))
+
+(multiple-value-bind (function warningsp failurep)
+    (compile nil '(lambda () (ftype-correctness "FOO")))
+  (assert (not warningsp)))
+
+(multiple-value-bind (function warningsp failurep)
+    (compile nil '(lambda () (ftype-correctness "FOO" "BAR")))
+  (assert warningsp))
 
 ;;; success
 (quit :unix-status 104)

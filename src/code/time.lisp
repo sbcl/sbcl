@@ -70,14 +70,6 @@
 
 ;;;; Encode and decode universal times.
 
-;;; Returns two values:
-;;;  - the minutes west of GMT.
-;;;  - T if daylight savings is in effect, NIL if not.
-(sb!alien:define-alien-routine get-timezone sb!alien:void
-  (when sb!alien:long :in)
-  (minutes-west sb!alien:int :out)
-  (daylight-savings-p sb!alien:boolean :out))
-
 ;;; Subtract from the returned Internal-Time to get the universal
 ;;; time. The offset between our time base and the Perq one is 2145
 ;;; weeks and five days.
@@ -124,15 +116,17 @@
 	   (year NIL)
 	   (day NIL)
 	   (daylight NIL)
-	   (timezone (if (null time-zone)
-			 (multiple-value-bind
-			     (ignore minwest dst)
-			     (get-timezone (- universal-time
-					      unix-to-universal-time))
-			   (declare (ignore ignore))
-			   (setf daylight dst)
-			   minwest)
-			 (* time-zone 60))))
+	   (timezone (cond
+		       ((null time-zone)
+			(multiple-value-bind
+			      (ignore minwest dst)
+			    (sb!unix::get-timezone (- universal-time
+						      unix-to-universal-time))
+			  (declare (ignore ignore))
+			  (declare (fixnum minwest))
+			  (setf daylight dst)
+			  minwest))
+		       (t (* time-zone 60)))))
       (declare (fixnum timezone))
       (multiple-value-bind (t1 seconds) (truncate secs 60)
 	(setq second seconds)
@@ -211,14 +205,12 @@
     (if time-zone
 	(+ second (* (+ minute (* (+ hours time-zone) 60)) 60))
 	(let* ((minwest-guess
-		(nth-value 1
-			   (get-timezone (- (* hours 60 60)
-					    unix-to-universal-time))))
+		(sb!unix::unix-get-minutes-west (- (* hours 60 60)
+						  unix-to-universal-time)))
 	       (guess (+ minute (* hours 60) minwest-guess))
 	       (minwest
-		(nth-value 1
-			   (get-timezone (- (* guess 60)
-					    unix-to-universal-time)))))
+		(sb!unix::unix-get-minutes-west (- (* guess 60)
+						  unix-to-universal-time))))
 	  (+ second (* (+ guess (- minwest minwest-guess)) 60))))))
 
 ;;;; TIME

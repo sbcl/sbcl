@@ -663,7 +663,7 @@
 		;; here, so e.g. an alien function of "int" and "char"
 		;; arguments would get Lisp arg types WORD and CHARACTER
 		;; or something. Meanwhile, for now we just punt.
-		(lisp-arg-types (mapcar (constantly t) args))
+		(lisp-arg-types (mapcar (constantly t) (lisp-args)))
 		;; KLUDGE: This is a quick hack to solve bug 133,
 		;; where PROCLAIM trying to translate alien void result
 		;; types would signal an error here ("cannot use values
