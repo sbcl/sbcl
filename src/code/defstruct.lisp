@@ -210,9 +210,7 @@
 	,@(let ((def-con (dd-default-constructor defstruct)))
 	    (when (and def-con (not (dd-alternate-metaclass defstruct)))
 	      `((setf (structure-class-constructor (sb!xc:find-class ',name))
-		      #',def-con))))
-	;; FIXME: MAKE-LOAD-FORM is supposed to be handled here, too.
-	))))
+		      #',def-con))))))))
 ;;; FIXME: I really would like to make structure accessors less special,
 ;;; just ordinary inline functions. (Or perhaps inline functions with special
 ;;; compact implementations of their expansions, to avoid bloating the system.)

@@ -72,7 +72,13 @@
     (setf (info :function :where-from name) :assumed))
 
   (let ((where (info :function :where-from name)))
-    (when (eq where :assumed)
+    (when (and (eq where :assumed)
+	       ;; In the ordinary target Lisp, it's silly to report
+	       ;; undefinedness when the function is defined in the
+	       ;; running Lisp. But at cross-compile time, the current
+	       ;; definedness of a function is irrelevant to the
+	       ;; definedness at runtime, which is what matters.
+	       #-sb-xc-host (not (fboundp name)))
       (note-undefined-reference name :function))
     (make-global-var :kind :global-function
 		     :name name

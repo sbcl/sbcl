@@ -35,3 +35,8 @@
 ;;; This is a slightly different way of getting the same symptoms out
 ;;; of the sbcl-0.6.11.13 byte compiler bug.
 (print (setq *print-level* *print-level*))
+
+
+;;; sbcl-0.6.11.25 or so had DEF!STRUCT/MAKE-LOAD-FORM/HOST screwed up
+;;; so that the compiler couldn't dump pathnames.
+(format t "Now the compiler can dump pathnames again: ~S ~S~%" #p"" #p"/x/y/z")

@@ -341,7 +341,7 @@
 
 (defun fmakunbound (name)
   #!+sb-doc
-  "Make Name have no global function definition."
+  "Make NAME have no global function definition."
   (let ((fdefn (fdefinition-object name nil)))
     (when fdefn
       (fdefn-makunbound fdefn)))

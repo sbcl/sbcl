@@ -37,14 +37,6 @@
 	  ;; information around, I'm not sure. -- WHN 2000-12-30
 	  %variable-rebinding))
 
-;;; FIXME: CONSTANTLY-FOO should be boosted up to SB-INT too.
-(macrolet ((def-constantly-fun (name constant-expr)
-	     `(setf (symbol-function ',name)
-		    (constantly ,constant-expr))))
-  (def-constantly-fun constantly-t t)
-  (def-constantly-fun constantly-nil nil)
-  (def-constantly-fun constantly-0 0))
-
 ;;; FIXME: This looks like SBCL's PARSE-BODY, and should be shared.
 (eval-when (:compile-toplevel :load-toplevel :execute)
 (defun extract-declarations (body &optional environment)

@@ -108,6 +108,17 @@
 						   (when defstruct-p
 						     '(:from-defclass-p t))
 						   other-initargs)))))))
+	  ;; FIXME: The way that we do things like (EVAL DEFCLASS-FORM)
+	  ;; here is un-ANSI-Common-Lisp-y and leads to problems
+	  ;; (like DEFUN for the type predicate being called more than
+	  ;; once when we do DEFCLASS at the interpreter prompt),
+	  ;; causing bogus style warnings. It would be better to
+	  ;; rewrite this so that the macroexpansion looks like e.g.
+	  ;; (PROGN
+	  ;;   (EVAL-WHEN (:COMPILE-TOPLEVEL :LOAD-TOPLEVEL :EXECUTE)
+	  ;;     (FROB1 ..))
+	  ;;   (EVAL-WHEN (:LOAD-TOPLEVEL :EXECUTE)
+	  ;;     (FROB2 ..)))
 	  (if defstruct-p
 	      (progn
 		(eval defclass-form) ; Define the class now, so that..
