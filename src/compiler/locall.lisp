@@ -941,7 +941,7 @@
 ;;; work. We change the CALL's CONT to be the continuation heading the
 ;;; BIND block, and also do REOPTIMIZE-CONTINUATION on the args and
 ;;; CONT so that LET-specific IR1 optimizations get a chance. We blow
-;;; away any entry for the function in *FREE-FUNCTIONS* so that nobody
+;;; away any entry for the function in *FREE-FUNS* so that nobody
 ;;; will create new references to it.
 (defun let-convert (fun call)
   (declare (type clambda fun) (type basic-combination call))

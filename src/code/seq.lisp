@@ -760,7 +760,7 @@
 ;;; length of the output sequence matches any length specified
 ;;; in RESULT-TYPE.
 (defun %map (result-type function first-sequence &rest more-sequences)
-  (let ((really-function (%coerce-callable-to-fun function)))
+  (let ((really-fun (%coerce-callable-to-fun function)))
     ;; Handle one-argument MAP NIL specially, using ETYPECASE to turn
     ;; it into something which can be DEFTRANSFORMed away. (It's
     ;; fairly important to handle this case efficiently, since
@@ -768,21 +768,21 @@
     ;; there's no consing overhead to dwarf our inefficiency.)
     (if (and (null more-sequences)
 	     (null result-type))
-	(%map-for-effect-arity-1 really-function first-sequence)
+	(%map-for-effect-arity-1 really-fun first-sequence)
 	;; Otherwise, use the industrial-strength full-generality
 	;; approach, consing O(N-ARGS) temporary storage (which can have
 	;; DYNAMIC-EXTENT), then using O(N-ARGS * RESULT-LENGTH) time.
 	(let ((sequences (cons first-sequence more-sequences)))
 	  (case (type-specifier-atom result-type)
-	    ((nil) (%map-for-effect really-function sequences))
-	    (list (%map-to-list really-function sequences))
+	    ((nil) (%map-for-effect really-fun sequences))
+	    (list (%map-to-list really-fun sequences))
 	    ((simple-vector simple-string vector string array simple-array
 	      bit-vector simple-bit-vector base-string simple-base-string)
-	     (%map-to-vector result-type really-function sequences))
+	     (%map-to-vector result-type really-fun sequences))
 	    (t
 	     (apply #'map
 		    (result-type-or-lose result-type t)
-		    really-function
+		    really-fun
 		    sequences)))))))
 
 (defun map (result-type function first-sequence &rest more-sequences)

@@ -140,7 +140,7 @@
 ;;; Unlike for an argument, we only clear the type check flag when the
 ;;; LTN-POLICY is unsafe, since the check for a valid function
 ;;; object must be done before the call.
-(defun annotate-function-continuation (cont ltn-policy &optional (delay t))
+(defun annotate-fun-continuation (cont ltn-policy &optional (delay t))
   (declare (type continuation cont) (type ltn-policy ltn-policy))
   (unless (ltn-policy-safe-p ltn-policy)
     (flush-type-check cont))
@@ -193,11 +193,11 @@
 (defun ltn-default-call (call ltn-policy)
   (declare (type combination call) (type ltn-policy ltn-policy))
   (let ((kind (basic-combination-kind call)))
-    (annotate-function-continuation (basic-combination-fun call) ltn-policy)
+    (annotate-fun-continuation (basic-combination-fun call) ltn-policy)
 
     (cond
-     ((and (function-info-p kind)
-	   (function-info-ir2-convert kind))
+     ((and (fun-info-p kind)
+	   (fun-info-ir2-convert kind))
       (setf (basic-combination-info call) :funny)
       (setf (node-tail-p call) nil)
       (dolist (arg (basic-combination-args call))
@@ -389,9 +389,9 @@
 	   (setf (node-tail-p call) nil))
 	  (t
 	   (setf (basic-combination-info call) :full)
-	   (annotate-function-continuation (basic-combination-fun call)
-					   ltn-policy
-					   nil)
+	   (annotate-fun-continuation (basic-combination-fun call)
+				      ltn-policy
+				      nil)
 	   (dolist (arg (reverse args))
 	     (annotate-unknown-values-continuation arg ltn-policy))
 	   (flush-full-call-tail-transfer call))))
@@ -679,7 +679,7 @@
   (declare (type combination call)
 	   (type ltn-policy ltn-policy))
   (let ((safe-p (ltn-policy-safe-p ltn-policy))
-	(current (function-info-templates (basic-combination-kind call)))
+	(current (fun-info-templates (basic-combination-kind call)))
 	(fallback nil)
 	(rejected nil))
     (loop
@@ -783,7 +783,7 @@
 			(or template
 			    (template-or-lose 'call-named)))
 		       *efficiency-note-cost-threshold*)))
-      (dolist (try (function-info-templates (basic-combination-kind call)))
+      (dolist (try (fun-info-templates (basic-combination-kind call)))
 	(when (> (template-cost try) max-cost) (return)) ; FIXME: UNLESS'd be cleaner.
 	(let ((guard (template-guard try)))
 	  (when (and (or (not guard) (funcall guard))
@@ -791,7 +791,7 @@
 			 (ltn-policy-safe-p (template-ltn-policy try)))
 		     (or verbose-p
 			 (and (template-note try)
-			      (valid-function-use
+			      (valid-fun-use
 			       call (template-type try)
 			       :argument-test #'types-equal-or-intersect
 			       :result-test
@@ -810,9 +810,9 @@
 	      (lose1 "etc.")
 	      (return))
 	    (let* ((type (template-type loser))
-		   (valid (valid-function-use call type))
-		   (strict-valid (valid-function-use call type
-						     :strict-result t)))
+		   (valid (valid-fun-use call type))
+		   (strict-valid (valid-fun-use call type
+						:strict-result t)))
 	      (lose1 "unable to do ~A (cost ~W) because:"
 		     (or (template-note loser) (template-name loser))
 		     (template-cost loser))
@@ -820,9 +820,9 @@
 	       ((and valid strict-valid)
 		(strange-template-failure loser call ltn-policy #'lose1))
 	       ((not valid)
-		(aver (not (valid-function-use call type
-					       :lossage-fun #'lose1
-					       :unwinnage-fun #'lose1))))
+		(aver (not (valid-fun-use call type
+					  :lossage-fun #'lose1
+					  :unwinnage-fun #'lose1))))
 	       (t
 		(aver (ltn-policy-safe-p ltn-policy))
 		(lose1 "can't trust output type assertion under safe policy")))
@@ -871,7 +871,7 @@
 (defun ltn-analyze-known-call (call ltn-policy)
   (declare (type combination call)
 	   (type ltn-policy ltn-policy))
-  (let ((method (function-info-ltn-annotate (basic-combination-kind call)))
+  (let ((method (fun-info-ltn-annotate (basic-combination-kind call)))
 	(args (basic-combination-args call)))
     (when method
       (funcall method call ltn-policy)
@@ -900,8 +900,8 @@
 		     (eq (continuation-fun-name (combination-fun call))
 			 (leaf-source-name funleaf))
 		     (let ((info (basic-combination-kind call)))
-		       (not (or (function-info-ir2-convert info)
-				(ir1-attributep (function-info-attributes info)
+		       (not (or (fun-info-ir2-convert info)
+				(ir1-attributep (fun-info-attributes info)
 						recursive))))))
 	  (let ((*compiler-error-context* call))
 	    (compiler-warn "~@<recursion in known function definition~2I ~

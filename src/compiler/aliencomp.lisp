@@ -470,7 +470,7 @@
   (let ((alien-node (continuation-use alien)))
     (typecase alien-node
       (combination
-       (extract-function-args alien '%sap-alien 2)
+       (extract-fun-args alien '%sap-alien 2)
        '(lambda (sap type)
 	  (declare (ignore type))
 	  sap))
@@ -582,7 +582,7 @@
 	(unless (and (constant-continuation-p inside-amount)
 		     (not (minusp (continuation-value inside-amount))))
 	  (give-up-ir1-transform)))))
-  (extract-function-args value 'ash 2)
+  (extract-fun-args value 'ash 2)
   '(lambda (value amount1 amount2)
      (ash value (+ amount1 amount2))))
 

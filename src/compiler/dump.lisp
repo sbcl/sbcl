@@ -1075,7 +1075,7 @@
   (dump-fop 'fop-sanctify-for-execution file)
   (dump-pop file))
 
-;;; Dump a function-entry data structure corresponding to ENTRY to
+;;; Dump a function entry data structure corresponding to ENTRY to
 ;;; FILE. CODE-HANDLE is the table offset of the code object for the
 ;;; component.
 (defun dump-one-entry (entry code-handle file)

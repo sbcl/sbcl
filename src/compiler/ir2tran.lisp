@@ -831,7 +831,7 @@
 ;;;   -- Known to be a function, no check needed: return the
 ;;;      continuation loc.
 ;;;   -- Not known what it is.
-(defun function-continuation-tn (node block cont)
+(defun fun-continuation-tn (node block cont)
   (declare (type continuation cont))
   (let ((2cont (continuation-info cont)))
     (if (eq (ir2-continuation-kind 2cont) :delayed)
@@ -885,7 +885,7 @@
 	 (return-pc (ir2-physenv-return-pc env)))
 
     (multiple-value-bind (fun-tn named)
-	(function-continuation-tn node block (basic-combination-fun node))
+	(fun-continuation-tn node block (basic-combination-fun node))
       (if named
 	  (vop* tail-call-named node block
 		(fun-tn old-fp return-pc pass-refs)
@@ -932,7 +932,7 @@
 	   (loc-refs (reference-tn-list locs t))
 	   (nvals (length locs)))
       (multiple-value-bind (fun-tn named)
-	  (function-continuation-tn node block (basic-combination-fun node))
+	  (fun-continuation-tn node block (basic-combination-fun node))
 	(if named
 	    (vop* call-named node block (fp fun-tn args) (loc-refs)
 		  arg-locs nargs nvals)
@@ -950,7 +950,7 @@
 	   (locs (ir2-continuation-locs (continuation-info cont)))
 	   (loc-refs (reference-tn-list locs t)))
       (multiple-value-bind (fun-tn named)
-	  (function-continuation-tn node block (basic-combination-fun node))
+	  (fun-continuation-tn node block (basic-combination-fun node))
 	(if named
 	    (vop* multiple-call-named node block (fp fun-tn args) (loc-refs)
 		  arg-locs nargs)
@@ -1229,7 +1229,7 @@
 	 (cont (node-cont node))
 	 (2cont (continuation-info cont)))
     (multiple-value-bind (fun named)
-	(function-continuation-tn node block (basic-combination-fun node))
+	(fun-continuation-tn node block (basic-combination-fun node))
       (aver (and (not named)
 		 (eq (ir2-continuation-kind start-cont) :unknown)))
       (cond
@@ -1610,7 +1610,7 @@
 			  (if name
 			      (emit-constant name)
 			      (multiple-value-bind (tn named)
-				  (function-continuation-tn last 2block fun)
+				  (fun-continuation-tn last 2block fun)
 				(aver (not named))
 				tn)))))))
 	      ((not (eq (ir2-block-next 2block) (block-info target)))
@@ -1637,7 +1637,7 @@
 	     (:full
 	      (ir2-convert-full-call node 2block))
 	     (t
-	      (let ((fun (function-info-ir2-convert kind)))
+	      (let ((fun (fun-info-ir2-convert kind)))
 		(cond (fun
 		       (funcall fun node 2block))
 		      ((eq (basic-combination-info node) :full)

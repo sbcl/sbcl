@@ -598,7 +598,7 @@
 (defun types-from-arguments (generic-function arguments
 			     &optional type-modifier)
   (multiple-value-bind (nreq applyp metatypes nkeys arg-info)
-      (get-generic-function-info generic-function)
+      (get-generic-fun-info generic-function)
     (declare (ignore applyp metatypes nkeys))
     (let ((types-rev nil))
       (dotimes-fixnum (i nreq)

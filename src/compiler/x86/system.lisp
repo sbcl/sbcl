@@ -61,8 +61,8 @@
     DONE
     (inst movzx result al-tn)))
 
-(define-vop (function-subtype)
-  (:translate function-subtype)
+(define-vop (fun-subtype)
+  (:translate fun-subtype)
   (:policy :fast-safe)
   (:args (function :scs (descriptor-reg)))
   (:temporary (:sc byte-reg :from (:eval 0) :to (:eval 1)) temp)
@@ -72,8 +72,8 @@
     (load-type temp function (- fun-pointer-lowtag))
     (inst movzx result temp)))
 
-(define-vop (set-function-subtype)
-  (:translate (setf function-subtype))
+(define-vop (set-fun-subtype)
+  (:translate (setf fun-subtype))
   (:policy :fast-safe)
   (:args (type :scs (unsigned-reg) :target eax)
 	 (function :scs (descriptor-reg)))
@@ -201,7 +201,7 @@
     (inst lea sap (make-ea :byte :base code :index sap :scale 4
 			   :disp (- other-pointer-lowtag)))))
 
-(define-vop (compute-function)
+(define-vop (compute-fun)
   (:args (code :scs (descriptor-reg) :to (:result 0))
 	 (offset :scs (signed-reg unsigned-reg) :to (:result 0)))
   (:arg-types * positive-fixnum)

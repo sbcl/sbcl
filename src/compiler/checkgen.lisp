@@ -29,7 +29,7 @@
   (let ((info (info :function :info name))
 	(call-cost (template-cost (template-or-lose 'call-named))))
     (if info
-	(let ((templates (function-info-templates info)))
+	(let ((templates (fun-info-templates info)))
 	  (if templates
 	      (template-cost (first templates))
 	      (case name
@@ -276,12 +276,12 @@
 	     (cond ((eq cont (basic-combination-fun dest)) t)
 		   ((eq kind :local) t)
 		   ((member kind '(:full :error)) nil)
-		   ((function-info-ir2-convert kind) t)
+		   ((fun-info-ir2-convert kind) t)
 		   (t
-		    (dolist (template (function-info-templates kind) nil)
+		    (dolist (template (fun-info-templates kind) nil)
 		      (when (eq (template-ltn-policy template) :fast-safe)
 			(multiple-value-bind (val win)
-			    (valid-function-use dest (template-type template))
+			    (valid-fun-use dest (template-type template))
 			  (when (or val (not win)) (return t)))))))))
 	  (t t))))
 
@@ -431,7 +431,7 @@
   (values))
 
 ;;; Mark CONT as being a continuation with a manifest type error. We
-;;; set the kind to :ERROR, and clear any FUNCTION-INFO if the
+;;; set the kind to :ERROR, and clear any FUN-INFO if the
 ;;; continuation is an argument to a known call. The last is done so
 ;;; that the back end doesn't have to worry about type errors in
 ;;; arguments to known functions. This clearing is inhibited for
@@ -444,8 +444,8 @@
     (when (and (combination-p dest)
 	       (let ((kind (basic-combination-kind dest)))
 		 (or (eq kind :full)
-		     (and (function-info-p kind)
-			  (not (function-info-ir2-convert kind))))))
+		     (and (fun-info-p kind)
+			  (not (fun-info-ir2-convert kind))))))
       (setf (basic-combination-kind dest) :error)))
   (values))
 

@@ -650,7 +650,7 @@ bug.~:@>")
     (unless (zerop (logand offset sb!vm:lowtag-mask))
       (error "internal error: unaligned function object, offset = #X~X"
 	     offset))
-    (let ((fun (%primitive sb!c:compute-function code-object offset)))
+    (let ((fun (%primitive sb!c:compute-fun code-object offset)))
       (setf (%simple-fun-self fun) fun)
       (setf (%simple-fun-next fun) (%code-entry-points code-object))
       (setf (%code-entry-points code-object) fun)

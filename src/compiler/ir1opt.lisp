@@ -268,13 +268,13 @@
 ;;; optimized. We dispatch off of the type of each node with its
 ;;; reoptimize flag set:
 
-;;; -- With a combination, we call Propagate-Function-Change whenever
-;;;    the function changes, and call IR1-Optimize-Combination if any
+;;; -- With a COMBINATION, we call PROPAGATE-FUN-CHANGE whenever
+;;;    the function changes, and call IR1-OPTIMIZE-COMBINATION if any
 ;;;    argument changes.
-;;; -- With an Exit, we derive the node's type from the Value's type.
-;;;    We don't propagate Cont's assertion to the Value, since if we
-;;;    did, this would move the checking of Cont's assertion to the
-;;;    exit. This wouldn't work with Catch and UWP, where the Exit
+;;; -- With an EXIT, we derive the node's type from the VALUE's type.
+;;;    We don't propagate CONT's assertion to the VALUE, since if we
+;;;    did, this would move the checking of CONT's assertion to the
+;;;    exit. This wouldn't work with CATCH and UWP, where the EXIT
 ;;;    node is just a placeholder for the actual unknown exit.
 ;;;
 ;;; Note that we clear the node & block reoptimize flags *before*
@@ -411,8 +411,8 @@
 	 (unlink-node node))
 	(combination
 	 (let ((info (combination-kind node)))
-	   (when (function-info-p info)
-	     (let ((attr (function-info-attributes info)))
+	   (when (fun-info-p info)
+	     (let ((attr (fun-info-attributes info)))
 	       (when (and (ir1-attributep attr flushable)
 			  (not (ir1-attributep attr call)))
 		 (flush-dest (combination-fun node))
@@ -650,7 +650,7 @@
 (declaim (ftype (function (combination) (values)) ir1-optimize-combination))
 (defun ir1-optimize-combination (node)
   (when (continuation-reoptimize (basic-combination-fun node))
-    (propagate-function-change node))
+    (propagate-fun-change node))
   (let ((args (basic-combination-args node))
 	(kind (basic-combination-kind node)))
     (case kind
@@ -668,7 +668,7 @@
 	 (when arg
 	   (setf (continuation-reoptimize arg) nil)))
 
-       (let ((attr (function-info-attributes kind)))
+       (let ((attr (fun-info-attributes kind)))
 	 (when (and (ir1-attributep attr foldable)
 		    ;; KLUDGE: The next test could be made more sensitive,
 		    ;; only suppressing constant-folding of functions with
@@ -692,16 +692,16 @@
 	   (constant-fold-call node)
 	   (return-from ir1-optimize-combination)))
 
-       (let ((fun (function-info-derive-type kind)))
+       (let ((fun (fun-info-derive-type kind)))
 	 (when fun
 	   (let ((res (funcall fun node)))
 	     (when res
 	       (derive-node-type node res)
 	       (maybe-terminate-block node nil)))))
 
-       (let ((fun (function-info-optimizer kind)))
+       (let ((fun (fun-info-optimizer kind)))
 	 (unless (and fun (funcall fun node))
-	   (dolist (x (function-info-transforms kind))
+	   (dolist (x (fun-info-transforms kind))
 	     #!+sb-show 
 	     (when *show-transforms-p*
 	       (let* ((cont (basic-combination-fun node))
@@ -786,7 +786,7 @@
 ;;; -- If it is a known function, mark it as such by setting the KIND.
 ;;;
 ;;; We return the leaf referenced (NIL if not a leaf) and the
-;;; FUNCTION-INFO assigned.
+;;; FUN-INFO assigned.
 ;;;
 ;;; FIXME: The IR1-CONVERTING-NOT-OPTIMIZING-P argument is what the
 ;;; old CMU CL code called IR1-P, without explanation. My (WHN
@@ -861,27 +861,27 @@
 		   (csubtypep type (specifier-type 'function))
 		 (or val (not win))))
 	 (recognize-known-call call ir1-converting-not-optimizing-p))
-	((valid-function-use call type
-			     :argument-test #'always-subtypep
-			     :result-test #'always-subtypep
-			     ;; KLUDGE: Common Lisp is such a dynamic
-			     ;; language that all we can do here in
-			     ;; general is issue a STYLE-WARNING. It
-			     ;; would be nice to issue a full WARNING
-			     ;; in the special case of of type
-			     ;; mismatches within a compilation unit
-			     ;; (as in section 3.2.2.3 of the spec)
-			     ;; but at least as of sbcl-0.6.11, we
-			     ;; don't keep track of whether the
-			     ;; mismatched data came from the same
-			     ;; compilation unit, so we can't do that.
-			     ;; -- WHN 2001-02-11
-			     ;;
-			     ;; FIXME: Actually, I think we could
-			     ;; issue a full WARNING if the call
-			     ;; violates a DECLAIM FTYPE.
-			     :lossage-fun #'compiler-style-warn
-			     :unwinnage-fun #'compiler-note)
+	((valid-fun-use call type
+			:argument-test #'always-subtypep
+			:result-test #'always-subtypep
+			;; KLUDGE: Common Lisp is such a dynamic
+			;; language that all we can do here in
+			;; general is issue a STYLE-WARNING. It
+			;; would be nice to issue a full WARNING
+			;; in the special case of of type
+			;; mismatches within a compilation unit
+			;; (as in section 3.2.2.3 of the spec)
+			;; but at least as of sbcl-0.6.11, we
+			;; don't keep track of whether the
+			;; mismatched data came from the same
+			;; compilation unit, so we can't do that.
+			;; -- WHN 2001-02-11
+			;;
+			;; FIXME: Actually, I think we could
+			;; issue a full WARNING if the call
+			;; violates a DECLAIM FTYPE.
+			:lossage-fun #'compiler-style-warn
+			:unwinnage-fun #'compiler-note)
 	 (assert-call-type call type)
 	 (maybe-terminate-block call ir1-converting-not-optimizing-p)
 	 (recognize-known-call call ir1-converting-not-optimizing-p))
@@ -896,7 +896,7 @@
 ;;; expansion, etc. If a call to a predicate in a non-conditional
 ;;; position or to a function with a source transform, then we
 ;;; reconvert the form to give IR1 another chance.
-(defun propagate-function-change (call)
+(defun propagate-fun-change (call)
   (declare (type combination call))
   (let ((*compiler-error-context* call)
 	(fun-cont (basic-combination-fun call)))
@@ -917,7 +917,7 @@
 	       ((not leaf))
 	       ((or (info :function :source-transform (leaf-source-name leaf))
 		    (and info
-			 (ir1-attributep (function-info-attributes info)
+			 (ir1-attributep (fun-info-attributes info)
 					 predicate)
 			 (let ((dest (continuation-dest (node-cont call))))
 			   (and dest (not (if-p dest))))))
@@ -987,7 +987,7 @@
 		      (eq when :native))))
 	   t)
 	  ((or (not constrained)
-	       (valid-function-use node type :strict-result t))
+	       (valid-fun-use node type :strict-result t))
 	   (multiple-value-bind (severity args)
 	       (catch 'give-up-ir1-transform
 		 (transform-call node (funcall fun node))
@@ -1013,11 +1013,10 @@
                  (remhash node table)
                  nil))))
 	  ((and flame
-		(valid-function-use node
-				    type
-				    :argument-test #'types-equal-or-intersect
-				    :result-test
-				    #'values-types-equal-or-intersect))
+		(valid-fun-use node
+			       type
+			       :argument-test #'types-equal-or-intersect
+			       :result-test #'values-types-equal-or-intersect))
 	   (record-optimization-failure node transform type)
 	   t)
 	  (t
@@ -1578,7 +1577,7 @@
 	       (eq (continuation-fun-name (combination-fun use))
 		   'list))
       (change-ref-leaf (continuation-use (combination-fun node))
-		       (find-free-function 'values "in a strange place"))
+		       (find-free-fun 'values "in a strange place"))
       (setf (combination-kind node) :full)
       (let ((args (combination-args use)))
 	(dolist (arg args)

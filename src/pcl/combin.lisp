@@ -171,7 +171,7 @@
 (defun expand-effective-method-function (gf effective-method &optional env)
   (declare (ignore env))
   (multiple-value-bind (nreq applyp metatypes nkeys arg-info)
-      (get-generic-function-info gf)
+      (get-generic-fun-info gf)
     (declare (ignore nreq nkeys arg-info))
     (let ((ll (make-fast-method-call-lambda-list metatypes applyp))
 	  ;; When there are no primary methods and a next-method call occurs
@@ -255,7 +255,7 @@
 (defun make-effective-method-function-internal
     (generic-function effective-method method-alist-p wrappers-p)
   (multiple-value-bind (nreq applyp metatypes nkeys arg-info)
-      (get-generic-function-info generic-function)
+      (get-generic-fun-info generic-function)
     (declare (ignore nkeys arg-info))
     (let* ((*rebound-effective-method-gensyms*
 	    *global-effective-method-gensyms*)

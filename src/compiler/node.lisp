@@ -1185,12 +1185,12 @@
   ;; the kind of function call being made. :LOCAL means that this is a
   ;; local call to a function in the same component, and that argument
   ;; syntax checking has been done, etc. Calls to known global
-  ;; functions are represented by storing the FUNCTION-INFO for the
+  ;; functions are represented by storing the FUN-INFO for the
   ;; function in this slot. :FULL is a call to an (as yet) unknown
   ;; function. :ERROR is like :FULL, but means that we have discovered
   ;; that the call contains an error, and should not be reconsidered
   ;; for optimization.
-  (kind :full :type (or (member :local :full :error) function-info))
+  (kind :full :type (or (member :local :full :error) fun-info))
   ;; some kind of information attached to this node by the back end
   (info nil))
 

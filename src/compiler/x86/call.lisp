@@ -125,7 +125,7 @@
   (:vop-var vop)
   (:generator 1
     (align n-lowtag-bits)
-    (trace-table-entry trace-table-function-prologue)
+    (trace-table-entry trace-table-fun-prologue)
     (emit-label start-lab)
     ;; Skip space for the function header.
     (inst simple-fun-header-word)
@@ -271,7 +271,7 @@
 	(let ((defaults (defaults)))
 	  (when defaults
 	    (assemble (*elsewhere*)
-	      (trace-table-entry trace-table-function-prologue)
+	      (trace-table-entry trace-table-fun-prologue)
 	      (emit-label default-stack-slots)
 	      (dolist (default defaults)
 		(emit-label (car default))
@@ -580,7 +580,7 @@
   (:ignore val-locs vals)
   (:vop-var vop)
   (:generator 6
-    (trace-table-entry trace-table-function-epilogue)
+    (trace-table-entry trace-table-fun-epilogue)
     ;; Save the return-pc in a register 'cause the frame-pointer is
     ;; going away. Note this not in the usual stack location so we
     ;; can't use RET
@@ -613,14 +613,15 @@
   (:ignore val-locs vals)
   (:vop-var vop)
   (:generator 6
-    (trace-table-entry trace-table-function-epilogue)
+    (trace-table-entry trace-table-fun-epilogue)
 
     #+nil (format t "*known-return: old-fp ~S, tn-kind ~S; ~S ~S~%"
 		  old-fp (sb!c::tn-kind old-fp) (sb!c::tn-save-tn old-fp)
 		  (sb!c::tn-kind (sb!c::tn-save-tn old-fp)))
 
     #+nil (format t "*known-return: return-pc ~S, tn-kind ~S; ~S ~S~%"
-		  return-pc (sb!c::tn-kind return-pc) (sb!c::tn-save-tn return-pc)
+		  return-pc (sb!c::tn-kind return-pc)
+		  (sb!c::tn-save-tn return-pc)
 		  (sb!c::tn-kind (sb!c::tn-save-tn return-pc)))
 
     ;; return-pc may be either in a register or on the stack.
@@ -953,7 +954,7 @@
   (:temporary (:sc unsigned-reg) ret)
   (:ignore value)
   (:generator 6
-    (trace-table-entry trace-table-function-epilogue)
+    (trace-table-entry trace-table-fun-epilogue)
     (move ret return-pc)
     ;; Clear the control stack
     (move ofp old-fp)
@@ -995,7 +996,7 @@
 		   :from :eval) a2)
 
   (:generator 6
-    (trace-table-entry trace-table-function-epilogue)
+    (trace-table-entry trace-table-fun-epilogue)
     ;; Establish the values pointer and values count.
     (move ebx ebp-tn)
     (if (zerop nvals)
@@ -1058,7 +1059,7 @@
   (:node-var node)
 
   (:generator 13
-    (trace-table-entry trace-table-function-epilogue)
+    (trace-table-entry trace-table-fun-epilogue)
     ;; Load the return-pc.
     (move eax return-pc)
     (unless (policy node (> space speed))

@@ -125,13 +125,13 @@
 	      (eql (continuation-value offset) 0))
 	 'sap)
 	(t
-	 (extract-function-args sap 'sap+ 2)
+	 (extract-fun-args sap 'sap+ 2)
 	 '(lambda (sap offset1 offset2)
 	    (sap+ sap (+ offset1 offset2))))))
 
 (macrolet ((def-frob (fun)
              `(deftransform ,fun ((sap offset) * *)
-                (extract-function-args sap 'sap+ 2)
+                (extract-fun-args sap 'sap+ 2)
                  `(lambda (sap offset1 offset2)
                    (,',fun sap (+ offset1 offset2))))))
   (def-frob sap-ref-8)

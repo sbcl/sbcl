@@ -65,9 +65,9 @@
 		     (values (get-lisp-obj-address code) t)))))
       (sb!vm:fixup-code-object code offset value kind))))
 
-;;; Stick a reference to the function Fun in Code-Object at index I. If the
-;;; function hasn't been compiled yet, make a note in the Patch-Table.
-(defun reference-core-function (code-obj i fun object)
+;;; Stick a reference to the function FUN in CODE-OBJECT at index I. If the
+;;; function hasn't been compiled yet, make a note in the patch table.
+(defun reference-core-fun (code-obj i fun object)
   (declare (type core-object object) (type functional fun)
 	   (type index i))
   (let* ((info (leaf-info fun))

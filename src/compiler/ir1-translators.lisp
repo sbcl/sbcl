@@ -422,7 +422,7 @@
 					     :debug-name (debug-namify
 							  "#'~S" thing))))
 	((setf)
-	 (let ((var (find-lexically-apparent-function
+	 (let ((var (find-lexically-apparent-fun
 		     thing "as the argument to FUNCTION")))
 	   (reference-leaf start cont var)))
 	((instance-lambda)
@@ -433,7 +433,7 @@
 	   (reference-leaf start cont res)))
 	(t
 	 (compiler-error "~S is not a legal function name." thing)))
-      (let ((var (find-lexically-apparent-function
+      (let ((var (find-lexically-apparent-fun
 		  thing "as the argument to FUNCTION")))
 	(reference-leaf start cont var))))
 
@@ -868,7 +868,7 @@
 ;;;
 ;;; Note that environment analysis replaces references to escape
 ;;; functions with references to the corresponding NLX-INFO structure.
-(def-ir1-translator %escape-function ((tag) start cont)
+(def-ir1-translator %escape-fun ((tag) start cont)
   (let ((fun (ir1-convert-lambda
 	      `(lambda ()
 		 (return-from ,tag (%unknown-values)))
@@ -879,7 +879,7 @@
 ;;; Yet another special special form. This one looks up a local
 ;;; function and smashes it to a :CLEANUP function, as well as
 ;;; referencing it.
-(def-ir1-translator %cleanup-function ((name) start cont)
+(def-ir1-translator %cleanup-fun ((name) start cont)
   (let ((fun (lexenv-find name functions)))
     (aver (lambda-p fun))
     (setf (functional-kind fun) :cleanup)
@@ -901,13 +901,13 @@
      `(block ,exit-block
 	(%within-cleanup
 	    :catch
-	    (%catch (%escape-function ,exit-block) ,tag)
+	    (%catch (%escape-fun ,exit-block) ,tag)
 	  ,@body)))))
 
 ;;; UNWIND-PROTECT is similar to CATCH, but hairier. We make the
 ;;; cleanup forms into a local function so that they can be referenced
 ;;; both in the case where we are unwound and in any local exits. We
-;;; use %CLEANUP-FUNCTION on this to indicate that reference by
+;;; use %CLEANUP-FUN on this to indicate that reference by
 ;;; %UNWIND-PROTECT isn't "real", and thus doesn't cause creation of
 ;;; an XEP.
 (def-ir1-translator unwind-protect ((protected &body cleanup) start cont)
@@ -927,15 +927,15 @@
      `(flet ((,cleanup-fun () ,@cleanup nil))
 	;; FIXME: If we ever get DYNAMIC-EXTENT working, then
 	;; ,CLEANUP-FUN should probably be declared DYNAMIC-EXTENT,
-	;; and something can be done to make %ESCAPE-FUNCTION have
+	;; and something can be done to make %ESCAPE-FUN have
 	;; dynamic extent too.
 	(block ,drop-thru-tag
 	  (multiple-value-bind (,next ,start ,count)
 	      (block ,exit-tag
 		(%within-cleanup
 		    :unwind-protect
-		    (%unwind-protect (%escape-function ,exit-tag)
-				     (%cleanup-function ,cleanup-fun))
+		    (%unwind-protect (%escape-fun ,exit-tag)
+				     (%cleanup-fun ,cleanup-fun))
 		  (return-from ,drop-thru-tag ,protected)))
 	    (,cleanup-fun)
 	    (%continue-unwind ,next ,start ,count)))))))
@@ -1078,7 +1078,7 @@
     (ecase (info :function :kind name)
       ((nil))
       (:function
-       (remhash name *free-functions*)
+       (remhash name *free-funs*)
        (undefine-fun-name name)
        (compiler-warn
 	"~S is being redefined as a macro when it was ~

@@ -2738,7 +2738,7 @@ initially undefined function references:~2%")
 (defparameter validate-entry-type-code 3845)
 (defparameter directory-entry-type-code 3841)
 (defparameter new-directory-entry-type-code 3861)
-(defparameter initial-function-entry-type-code 3863)
+(defparameter initial-fun-entry-type-code 3863)
 (defparameter end-entry-type-code 3840)
 
 (declaim (ftype (function (sb!vm:word) sb!vm:word) write-long))
@@ -2838,16 +2838,16 @@ initially undefined function references:~2%")
       (output-gspace *dynamic*)
 
       ;; Write the initial function.
-      (write-long initial-function-entry-type-code)
+      (write-long initial-fun-entry-type-code)
       (write-long 3)
       (let* ((cold-name (cold-intern '!cold-init))
 	     (cold-fdefn (cold-fdefinition-object cold-name))
-	     (initial-function (read-wordindexed cold-fdefn
-						 sb!vm:fdefn-fun-slot)))
+	     (initial-fun (read-wordindexed cold-fdefn
+					    sb!vm:fdefn-fun-slot)))
 	(format t
-		"~&/(DESCRIPTOR-BITS INITIAL-FUNCTION)=#X~X~%"
-		(descriptor-bits initial-function))
-	(write-long (descriptor-bits initial-function)))
+		"~&/(DESCRIPTOR-BITS INITIAL-FUN)=#X~X~%"
+		(descriptor-bits initial-fun))
+	(write-long (descriptor-bits initial-fun)))
 
       ;; Write the End entry.
       (write-long end-entry-type-code)

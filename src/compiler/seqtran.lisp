@@ -266,7 +266,7 @@
                 ;;   if ITEM is not a NUMBER or is a FIXNUM, apply
                 ;;   transform, else give up on transform.
                 (cond (test
-                       (unless (continuation-function-is test '(eq))
+                       (unless (continuation-fun-is test '(eq))
                          (give-up-ir1-transform)))
                       ((types-equal-or-intersect (continuation-type item)
                                                  (specifier-type 'number))
@@ -307,9 +307,9 @@
 
 ;;;; utilities
 
-;;; Return true if CONT's only use is a non-notinline reference to a
+;;; Return true if CONT's only use is a non-NOTINLINE reference to a
 ;;; global function with one of the specified NAMES.
-(defun continuation-function-is (cont names)
+(defun continuation-fun-is (cont names)
   (declare (type continuation cont) (list names))
   (let ((use (continuation-use cont)))
     (and (ref-p use)
@@ -332,6 +332,9 @@
 	(t
 	 (give-up-ir1-transform))))
 
+;;; FIXME: Why is this code commented out? (Why *was* it commented
+;;; out? We inherited this situation from cmucl-2.4.8, with no
+;;; explanation.) Should we just delete this code?
 #|
 ;;; This is a frob whose job it is to make it easier to pass around
 ;;; the arguments to IR1 transforms. It bundles together the name of
@@ -477,10 +480,10 @@
 (defun make-result-sequence-iterator (name type length)
   (declare (symbol name) (type ctype type))
 
-;;; Defines each Name as a local macro that will call the value of the
-;;; Fun-Arg with the given arguments. If the argument isn't known to be a
+;;; Define each NAME as a local macro that will call the value of the
+;;; function arg with the given arguments. If the argument isn't known to be a
 ;;; function, give them an efficiency note and reference a coerced version.
-(defmacro coerce-functions (specs &body body)
+(defmacro coerce-funs (specs &body body)
   #!+sb-doc
   "COERCE-FUNCTIONS ({(Name Fun-Arg Default)}*) Form*"
   (collect ((binds)
@@ -521,7 +524,7 @@
        (abort-ir1-transform "Both ~S and ~S were supplied."
 			    (arg-name ,test)
 			    (arg-name ,test-not)))
-     (coerce-functions ((,name (if not-p ,test-not ,test) eql))
+     (coerce-funs ((,name (if not-p ,test-not ,test) eql))
        ,@body)))
 |#
 

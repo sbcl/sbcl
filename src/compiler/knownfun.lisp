@@ -64,7 +64,7 @@
   ;; not be asserted when a definition is compiled.
   explicit-check)
 
-(defstruct (function-info #-sb-xc-host (:pure t))
+(defstruct (fun-info #-sb-xc-host (:pure t))
   ;; Boolean attributes of this function.
   (attributes (missing-arg) :type attributes)
   ;; A list of Transform structures describing transforms for this function.
@@ -101,7 +101,7 @@
   ;; compiler. If it returns NIL, then change the call to :full.
   (byte-annotate nil :type (or function null)))
 
-(defprinter (function-info)
+(defprinter (fun-info)
   (transforms :test transforms)
   (derive-type :test derive-type)
   (optimizer :test optimizer)
@@ -138,7 +138,7 @@
 
 (defprinter (transform) type note important when)
 
-;;; Grab the FUNCTION-INFO and enter the function, replacing any old
+;;; Grab the FUN-INFO and enter the function, replacing any old
 ;;; one with the same type and note.
 (declaim (ftype (function (t list function &optional (or string null)
 			     (member t nil) (member :native :byte :both))
@@ -147,22 +147,22 @@
 (defun %deftransform (name type fun &optional note important (when :native))
   (let* ((ctype (specifier-type type))
 	 (note (or note "optimize"))
-	 (info (function-info-or-lose name))
+	 (info (fun-info-or-lose name))
 	 (old (find-if (lambda (x)
 			 (and (type= (transform-type x) ctype)
 			      (string-equal (transform-note x) note)
 			      (eq (transform-important x) important)
 			      (eq (transform-when x) when)))
-		       (function-info-transforms info))))
+		       (fun-info-transforms info))))
     (if old
 	(setf (transform-function old) fun
 	      (transform-note old) note)
 	(push (make-transform :type ctype :function fun :note note
 			      :important important :when when)
-	      (function-info-transforms info)))
+	      (fun-info-transforms info)))
     name))
 
-;;; Make a FUNCTION-INFO structure with the specified type, attributes
+;;; Make a FUN-INFO structure with the specified type, attributes
 ;;; and optimizers.
 (declaim (ftype (function (list list attributes &key
 				(:derive-type (or function null))
@@ -171,13 +171,13 @@
 		%defknown))
 (defun %defknown (names type attributes &key derive-type optimizer)
   (let ((ctype (specifier-type type))
-	(info (make-function-info :attributes attributes
+	(info (make-fun-info :attributes attributes
 				  :derive-type derive-type
 				  :optimizer optimizer))
 	(target-env *info-environment*))
     (dolist (name names)
-      (let ((old-function-info (info :function :info name)))
-	(when old-function-info
+      (let ((old-fun-info (info :function :info name)))
+	(when old-fun-info
 	  ;; This is handled as an error because it's generally a bad
 	  ;; thing to blow away all the old optimization stuff. It's
 	  ;; also a potential source of sneaky bugs:
@@ -188,21 +188,21 @@
 	  ;; However, it's continuable because it might be useful to do
 	  ;; it when testing new optimization stuff interactively.
 	  (cerror "Go ahead, overwrite it."
-		  "~@<overwriting old FUNCTION-INFO ~2I~_~S ~I~_for ~S~:>"
-		  old-function-info name)))
+		  "~@<overwriting old FUN-INFO ~2I~_~S ~I~_for ~S~:>"
+		  old-fun-info name)))
       (setf (info :function :type name target-env) ctype)
       (setf (info :function :where-from name target-env) :declared)
       (setf (info :function :kind name target-env) :function)
       (setf (info :function :info name target-env) info)))
   names)
 
-;;; Return the FUNCTION-INFO for NAME or die trying. Since this is
+;;; Return the FUN-INFO for NAME or die trying. Since this is
 ;;; used by callers who want to modify the info, and the info may be
 ;;; shared, we copy it. We don't have to copy the lists, since each
 ;;; function that has generators or transforms has already been
 ;;; through here.
-(declaim (ftype (function (t) function-info) function-info-or-lose))
-(defun function-info-or-lose (name)
+(declaim (ftype (function (t) fun-info) fun-info-or-lose))
+(defun fun-info-or-lose (name)
   (let (;; FIXME: Do we need this rebinding here? It's a literal
 	;; translation of the old CMU CL rebinding to
 	;; (OR *BACKEND-INFO-ENVIRONMENT* *INFO-ENVIRONMENT*),
@@ -211,7 +211,7 @@
 	(*info-environment* *info-environment*))
     (let ((old (info :function :info name)))
       (unless old (error "~S is not a known function." name))
-      (setf (info :function :info name) (copy-function-info old)))))
+      (setf (info :function :info name) (copy-fun-info old)))))
 
 ;;;; generic type inference methods
 

@@ -52,10 +52,12 @@
 ;;; *SEEN-BLOCKS* is a hashtable with true values for all blocks which
 ;;; appear in the DFO for one of the specified components.
 ;;;
-;;; *SEEN-FUNCTIONS* is similar, but records all the lambdas we
+;;; *SEEN-FUNS* is similar, but records all the lambdas we
 ;;; reached by recursing on top level functions.
+;;; FIXME: Is it really only LAMBDAs, not e.g. FUNCTIONALs? Then
+;;; shouldn't it be *SEEN-LAMBDAS*?
 (defvar *seen-blocks* (make-hash-table :test 'eq))
-(defvar *seen-functions* (make-hash-table :test 'eq))
+(defvar *seen-funs* (make-hash-table :test 'eq))
 
 ;;; Barf if NODE is in a block which wasn't reached during the graph
 ;;; walk.
@@ -68,7 +70,7 @@
 ;;; Check everything that we can think of for consistency. When a
 ;;; definite inconsistency is detected, we BARF. Possible problems
 ;;; just cause us to BURP. Our argument is a list of components, but
-;;; we also look at the *FREE-VARIABLES*, *FREE-FUNCTIONS* and
+;;; we also look at the *FREE-VARIABLES*, *FREE-FUNS* and
 ;;; *CONSTANTS*.
 ;;;
 ;;; First we do a pre-pass which finds all the CBLOCKs and CLAMBDAs,
@@ -79,7 +81,7 @@
 (declaim (ftype (function (list) (values)) check-ir1-consistency))
 (defun check-ir1-consistency (components)
   (clrhash *seen-blocks*)
-  (clrhash *seen-functions*)
+  (clrhash *seen-funs*)
   (dolist (c components)
     (let* ((head (component-head c))
 	   (tail (component-tail c)))
@@ -142,11 +144,11 @@
 	     (unless (or (functional-p v)
 			 (and (global-var-p v)
 			      (eq (global-var-kind v) :global-function)))
-	       (barf "strange *FREE-FUNCTIONS* entry: ~S" v))
+	       (barf "strange *FREE-FUNS* entry: ~S" v))
 	     (dolist (n (leaf-refs v))
 	       (check-node-reached n)))
-	   *free-functions*)
-  (clrhash *seen-functions*)
+	   *free-funs*)
+  (clrhash *seen-funs*)
   (clrhash *seen-blocks*)
   (values))
 
@@ -154,15 +156,15 @@
 
 (defun observe-functional (x)
   (declare (type functional x))
-  (when (gethash x *seen-functions*)
+  (when (gethash x *seen-funs*)
     (barf "~S was seen more than once." x))
   (unless (eq (functional-kind x) :deleted)
-    (setf (gethash x *seen-functions*) t)))
+    (setf (gethash x *seen-funs*) t)))
 
 ;;; Check that the specified function has been seen.
 (defun check-fun-reached (fun where)
   (declare (type functional fun))
-  (unless (gethash fun *seen-functions*)
+  (unless (gethash fun *seen-funs*)
     (barf "unseen function ~S in ~S" fun where)))
 
 ;;; In a CLAMBDA, check that the associated nodes are in seen blocks.
@@ -926,7 +928,7 @@
     (integer (continuation-block (num-cont thing)))
     (functional (lambda-block (main-entry thing)))
     (null (error "Bad thing: ~S." thing))
-    (symbol (block-or-lose (gethash thing *free-functions*)))))
+    (symbol (block-or-lose (gethash thing *free-funs*)))))
 
 ;;; Print cN.
 (defun print-continuation (cont)
@@ -951,7 +953,7 @@
 	  (basic-combination
 	   (let ((kind (basic-combination-kind node)))
 	     (format t "~(~A ~A~) c~D"
-		     (if (function-info-p kind) "known" kind)
+		     (if (fun-info-p kind) "known" kind)
 		     (type-of node)
 		     (cont-num (basic-combination-fun node)))
 	     (dolist (arg (basic-combination-args node))

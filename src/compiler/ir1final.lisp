@@ -20,7 +20,7 @@
 (defun note-failed-optimization (node failures)
   (declare (type combination node) (list failures))
   (unless (or (node-deleted node)
-	      (not (function-info-p (combination-kind node))))
+	      (not (fun-info-p (combination-kind node))))
     (let ((*compiler-error-context* node))
       (dolist (failure failures)
 	(let ((what (cdr failure))
@@ -29,16 +29,16 @@
 	   ((consp what)
 	    (compiler-note "~@<unable to ~2I~_~A ~I~_because: ~2I~_~?~:>"
 			   note (first what) (rest what)))
-	   ((valid-function-use node what
-				:argument-test #'types-equal-or-intersect
-				:result-test #'values-types-equal-or-intersect)
+	   ((valid-fun-use node what
+			   :argument-test #'types-equal-or-intersect
+			   :result-test #'values-types-equal-or-intersect)
 	    (collect ((messages))
 	      (flet ((give-grief (string &rest stuff)
 		       (messages string)
 		       (messages stuff)))
-		(valid-function-use node what
-				    :unwinnage-fun #'give-grief
-				    :lossage-fun #'give-grief))
+		(valid-fun-use node what
+			       :unwinnage-fun #'give-grief
+			       :lossage-fun #'give-grief))
 	      (compiler-note "~@<unable to ~
                               ~2I~_~A ~
                               ~I~_due to type uncertainty: ~
@@ -53,7 +53,7 @@
 
 ;;; For each named function with an XEP, note the definition of that
 ;;; name, and add derived type information to the INFO environment. We
-;;; also delete the FUNCTIONAL from *FREE-FUNCTIONS* to eliminate the
+;;; also delete the FUNCTIONAL from *FREE-FUNS* to eliminate the
 ;;; possibility that new references might be converted to it.
 (defun finalize-xep-definition (fun)
   (let* ((leaf (functional-entry-fun fun))
@@ -63,11 +63,11 @@
       (let ((source-name (leaf-source-name leaf)))
 	(let* ((where (info :function :where-from source-name))
 	       (*compiler-error-context* (lambda-bind (main-entry leaf)))
-	       (global-def (gethash source-name *free-functions*))
+	       (global-def (gethash source-name *free-funs*))
 	       (global-p (defined-fun-p global-def)))
 	  (note-name-defined source-name :function)
 	  (when global-p
-	    (remhash source-name *free-functions*))
+	    (remhash source-name *free-funs*))
 	  (ecase where
 	    (:assumed
 	     (let ((approx-type (info :function :assumed-type source-name)))
@@ -128,5 +128,5 @@
 
   (maphash (lambda (k v)
 	     (note-assumed-types component k v))
-	   *free-functions*)
+	   *free-funs*)
   (values))

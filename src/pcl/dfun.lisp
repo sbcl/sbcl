@@ -378,7 +378,7 @@ And so, we are saved.
     (when (use-dispatch-dfun-p generic-function)
       (return-from make-checking-dfun (make-dispatch-dfun generic-function))))
   (multiple-value-bind (nreq applyp metatypes nkeys)
-      (get-generic-function-info generic-function)
+      (get-generic-fun-info generic-function)
     (declare (ignore nreq))
     (if (every (lambda (mt) (eq mt t)) metatypes)
 	(let ((dfun-info (default-method-only-dfun-info)))
@@ -412,7 +412,7 @@ And so, we are saved.
 
 (defun use-default-method-only-dfun-p (generic-function)
   (multiple-value-bind (nreq applyp metatypes nkeys)
-      (get-generic-function-info generic-function)
+      (get-generic-fun-info generic-function)
     (declare (ignore nreq applyp nkeys))
     (every (lambda (mt) (eq mt t)) metatypes)))
 
@@ -445,7 +445,7 @@ And so, we are saved.
       (return-from make-caching-dfun
 	(make-dispatch-dfun generic-function))))
   (multiple-value-bind (nreq applyp metatypes nkeys)
-      (get-generic-function-info generic-function)
+      (get-generic-fun-info generic-function)
     (declare (ignore nreq))
     (let* ((cache (or cache (get-cache nkeys t #'caching-limit-fn 2)))
 	   (dfun-info (caching-dfun-info cache)))
@@ -468,7 +468,7 @@ And so, we are saved.
 
 (defun insure-caching-dfun (gf)
   (multiple-value-bind (nreq applyp metatypes nkeys)
-      (get-generic-function-info gf)
+      (get-generic-fun-info gf)
     (declare (ignore nreq nkeys))
     (when (and metatypes
 	       (not (null (car metatypes)))
@@ -478,7 +478,7 @@ And so, we are saved.
 
 (defun use-constant-value-dfun-p (gf &optional boolean-values-p)
   (multiple-value-bind (nreq applyp metatypes nkeys)
-      (get-generic-function-info gf)
+      (get-generic-fun-info gf)
     (declare (ignore nreq metatypes nkeys))
     (let* ((early-p (early-gf-p gf))
 	   (methods (if early-p
@@ -505,7 +505,7 @@ And so, we are saved.
 
 (defun make-constant-value-dfun (generic-function &optional cache)
   (multiple-value-bind (nreq applyp metatypes nkeys)
-      (get-generic-function-info generic-function)
+      (get-generic-fun-info generic-function)
     (declare (ignore nreq applyp))
     (let* ((cache (or cache (get-cache nkeys t #'caching-limit-fn 2)))
 	   (dfun-info (constant-value-dfun-info cache)))
@@ -967,7 +967,7 @@ And so, we are saved.
 ;;;	       in the object argument.
 (defun cache-miss-values (gf args state)
   (multiple-value-bind (nreq applyp metatypes nkeys arg-info)
-      (get-generic-function-info gf)
+      (get-generic-fun-info gf)
     (declare (ignore nreq applyp nkeys))
     (with-dfun-wrappers (args metatypes)
       (dfun-wrappers invalid-wrapper-p wrappers classes types)

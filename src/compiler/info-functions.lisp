@@ -60,12 +60,12 @@
   ;; in EVAL-WHEN (:COMPILE) inside something like DEFSTRUCT, in which
   ;; case it's reasonable style. Either way, NAME is no longer a free
   ;; function.)
-  (when (boundp '*free-functions*) ; when compiling
-    (remhash name *free-functions*))
+  (when (boundp '*free-funs*) ; when compiling
+    (remhash name *free-funs*))
 
   ;; recording the ordinary case
   (setf (info :function :kind name) :function)
-  (note-if-setf-function-and-macro name)
+  (note-if-setf-fun-and-macro name)
 
   (values))
 
@@ -75,7 +75,7 @@
 ;;; warning. Due to the weak semantics of the (SETF FUNCTION) name, we
 ;;; can't assume that they aren't just naming a function (SETF FOO)
 ;;; for the heck of it. NAME is already known to be well-formed.
-(defun note-if-setf-function-and-macro (name)
+(defun note-if-setf-fun-and-macro (name)
   (when (consp name)
     (when (or (info :setf :inverse name)
 	      (info :setf :expander name))

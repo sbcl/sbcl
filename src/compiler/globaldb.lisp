@@ -1125,13 +1125,12 @@
   :type :ir1-transform
   :type-spec (or function null))
 
-;;; If a function is "known" to the compiler, then this is a
-;;; FUNCTION-INFO structure containing the info used to special-case
-;;; compilation.
+;;; If a function is "known" to the compiler, then this is a FUN-INFO
+;;; structure containing the info used to special-case compilation.
 (define-info-type
   :class :function
   :type :info
-  :type-spec (or function-info null)
+  :type-spec (or fun-info null)
   :default nil)
 
 (define-info-type

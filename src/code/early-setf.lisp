@@ -101,7 +101,7 @@ GET-SETF-EXPANSION directly."
 				 `(funcall #'(setf ,(car form)))
 				 t))))
 
-(defun get-setf-method-inverse (form inverse setf-function)
+(defun get-setf-method-inverse (form inverse setf-fun)
   (let ((new-var (gensym))
 	(vars nil)
 	(vals nil))
@@ -110,7 +110,7 @@ GET-SETF-EXPANSION directly."
       (push x vals))
     (setq vals (nreverse vals))
     (values vars vals (list new-var)
-	    (if setf-function
+	    (if setf-fun
 		`(,@inverse ,new-var ,@vars)
 		`(,@inverse ,@vars ,new-var))
 	    `(,(car form) ,@vars))))

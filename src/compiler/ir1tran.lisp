@@ -53,7 +53,7 @@
 
 ;;; Return a GLOBAL-VAR structure usable for referencing the global
 ;;; function NAME.
-(defun find-free-really-function (name)
+(defun find-free-really-fun (name)
   (unless (info :function :kind name)
     (setf (info :function :kind name) :function)
     (setf (info :function :where-from name) :assumed))
@@ -98,13 +98,13 @@
      :for class
      :slot slot)))
 
-;;; Has the *FREE-FUNCTIONS* entry FREE-FUNCTION become invalid?
+;;; Has the *FREE-FUNS* entry FREE-FUN become invalid?
 ;;;
 ;;; In CMU CL, the answer was implicitly always true, so this 
 ;;; predicate didn't exist.
 ;;;
 ;;; This predicate was added to fix bug 138 in SBCL. In some obscure
-;;; circumstances, it was possible for a *FREE-FUNCTIONS* to contain a
+;;; circumstances, it was possible for a *FREE-FUNS* to contain a
 ;;; DEFINED-FUN whose DEFINED-FUN-FUNCTIONAL object contained IR1
 ;;; stuff (NODEs, BLOCKs...) referring to an already compiled (aka
 ;;; "dead") component. When this IR1 stuff was reused in a new
@@ -113,12 +113,12 @@
 ;;; *CURRENT-COMPONENT*. At that point things got all confused, since
 ;;; IR1 conversion was sending code to a component which had already
 ;;; been compiled and would never be compiled again.
-(defun invalid-free-function-p (free-function)
-  ;; There might be other reasons that *FREE-FUNCTION* entries could
+(defun invalid-free-fun-p (free-fun)
+  ;; There might be other reasons that *FREE-FUN* entries could
   ;; become invalid, but the only one we've been bitten by so far
   ;; (sbcl-0.pre7.118) is this one:
-  (and (defined-fun-p free-function)
-       (let ((functional (defined-fun-functional free-function)))
+  (and (defined-fun-p free-fun)
+       (let ((functional (defined-fun-functional free-fun)))
 	 (and (lambda-p functional)
 	      (or
 	       ;; (The main reason for this first test is to bail out
@@ -138,18 +138,18 @@
 	       ;; confusion.
 	       (eql (component-info (lambda-component functional)) :dead))))))
 
-;;; If NAME already has a valid entry in *FREE-FUNCTIONS*, then return
+;;; If NAME already has a valid entry in *FREE-FUNS*, then return
 ;;; the value. Otherwise, make a new GLOBAL-VAR using information from
-;;; the global environment and enter it in *FREE-FUNCTIONS*. If NAME
+;;; the global environment and enter it in *FREE-FUNS*. If NAME
 ;;; names a macro or special form, then we error out using the
 ;;; supplied context which indicates what we were trying to do that
 ;;; demanded a function.
-(defun find-free-function (name context)
+(defun find-free-fun (name context)
   (declare (string context))
   (declare (values global-var))
-  (or (let ((old-free-function (gethash name *free-functions*)))
-	(and (not (invalid-free-function-p old-free-function))
-	     old-free-function))
+  (or (let ((old-free-fun (gethash name *free-funs*)))
+	(and (not (invalid-free-fun-p old-free-fun))
+	     old-free-fun))
       (ecase (info :function :kind name)
 	;; FIXME: The :MACRO and :SPECIAL-FORM cases could be merged.
 	(:macro
@@ -160,10 +160,10 @@
 			 context))
 	((:function nil)
 	 (check-fun-name name)
-	 (note-if-setf-function-and-macro name)
+	 (note-if-setf-fun-and-macro name)
 	 (let ((expansion (fun-name-inline-expansion name))
 	       (inlinep (info :function :inlinep name)))
-	   (setf (gethash name *free-functions*)
+	   (setf (gethash name *free-funs*)
 		 (if (or expansion inlinep)
 		     (make-defined-fun
 		      :%source-name name
@@ -171,12 +171,12 @@
 		      :inlinep inlinep
 		      :where-from (info :function :where-from name)
 		      :type (info :function :type name))
-		     (find-free-really-function name))))))))
+		     (find-free-really-fun name))))))))
 
 ;;; Return the LEAF structure for the lexically apparent function
 ;;; definition of NAME.
-(declaim (ftype (function (t string) leaf) find-lexically-apparent-function))
-(defun find-lexically-apparent-function (name context)
+(declaim (ftype (function (t string) leaf) find-lexically-apparent-fun))
+(defun find-lexically-apparent-fun (name context)
   (let ((var (lexenv-find name functions :test #'equal)))
     (cond (var
 	   (unless (leaf-p var)
@@ -184,7 +184,7 @@
 	     (compiler-error "found macro name ~S ~A" name context))
 	   var)
 	  (t
-	   (find-free-function name context)))))
+	   (find-free-fun name context)))))
 
 ;;; Return the LEAF node for a global variable reference to NAME. If
 ;;; NAME is already entered in *FREE-VARIABLES*, then we just return
@@ -629,8 +629,7 @@
     ((nil :function)
      (ir1-convert-srctran start
 			  cont
-			  (find-free-function fun
-					      "shouldn't happen! (no-cmacro)")
+			  (find-free-fun fun "shouldn't happen! (no-cmacro)")
 			  form))))
 
 (defun muffle-warning-or-die ()
@@ -801,7 +800,7 @@
   (declare (type continuation start cont) (list form) (type global-var var))
   (let ((info (info :function :info (leaf-source-name var))))
     (if (and info
-	     (ir1-attributep (function-info-attributes info) predicate)
+	     (ir1-attributep (fun-info-attributes info) predicate)
 	     (not (if-p (continuation-dest cont))))
 	(ir1-convert start cont `(if ,form t nil))
 	(ir1-convert-combination-checking-type start cont form var))))
@@ -932,7 +931,7 @@
 				    :unwinnage-fun #'compiler-note
 				    :where "FTYPE declaration"))
 	   (t
-	    (res (cons (find-lexically-apparent-function
+	    (res (cons (find-lexically-apparent-fun
 			name "in a function type declaration")
 		       type))))))
       (if (res)
@@ -996,7 +995,7 @@
 	(if fvar
 	    (setf (functional-inlinep fvar) sense)
 	    (let ((found
-		   (find-lexically-apparent-function
+		   (find-lexically-apparent-fun
 		    name "in an inline or notinline declaration")))
 	      (etypecase found
 		(functional
@@ -1980,7 +1979,7 @@
 ;;; substitute for the previous references.
 (defun get-defined-fun (name)
   (proclaim-as-fun-name name)
-  (let ((found (find-free-function name "shouldn't happen! (defined-fun)")))
+  (let ((found (find-free-fun name "shouldn't happen! (defined-fun)")))
     (note-name-defined name :function)
     (cond ((not (defined-fun-p found))
 	   (aver (not (info :function :inlinep name)))
@@ -1991,11 +1990,11 @@
 					:declared :defined)
 			:type (leaf-type found))))
 	     (substitute-leaf res found)
-	     (setf (gethash name *free-functions*) res)))
-	  ;; If *FREE-FUNCTIONS* has a previously converted definition
+	     (setf (gethash name *free-funs*) res)))
+	  ;; If *FREE-FUNS* has a previously converted definition
 	  ;; for this name, then blow it away and try again.
 	  ((defined-fun-functional found)
-	   (remhash name *free-functions*)
+	   (remhash name *free-funs*)
 	   (get-defined-fun name))
 	  (t found))))
 
@@ -2025,7 +2024,7 @@
      :really-assert
      (and for-real
 	  (not (and info
-		    (ir1-attributep (function-info-attributes info)
+		    (ir1-attributep (fun-info-attributes info)
 				    explicit-check))))
      :where (if for-real
 		"previous declaration"
@@ -2048,7 +2047,7 @@
       (setf (defined-fun-inline-expansion var) nil))
     (let* ((name (leaf-source-name var))
 	   (fun (funcall converter lambda :source-name name))
-	   (function-info (info :function :info name)))
+	   (fun-info (info :function :info name)))
       (setf (functional-inlinep fun) (defined-fun-inlinep var))
       (assert-new-definition var fun)
       (setf (defined-fun-inline-expansion var) var-expansion)
@@ -2056,10 +2055,10 @@
       ;; old references.
       (unless (or (eq (defined-fun-inlinep var) :notinline)
 		  (not *block-compile*)
-		  (and function-info
-		       (or (function-info-transforms function-info)
-			   (function-info-templates function-info)
-			   (function-info-ir2-convert function-info))))
+		  (and fun-info
+		       (or (fun-info-transforms fun-info)
+			   (fun-info-templates fun-info)
+			   (fun-info-ir2-convert fun-info))))
 	(substitute-leaf fun var)
 	;; If in a simple environment, then we can allow backward
 	;; references to this function from following top level forms.
@@ -2077,7 +2076,7 @@
     (when (boundp '*lexenv*) ; when in the compiler
       (when sb!xc:*compile-print*
 	(compiler-mumble "~&; recognizing DEFUN ~S~%" name))
-      (remhash name *free-functions*)
+      (remhash name *free-funs*)
       (setf defined-fun (get-defined-fun name)))
 
     (become-defined-fun-name name)

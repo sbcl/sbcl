@@ -56,10 +56,10 @@
   (sb!c::control-stack-pointer-sap))
 
 ;;; Return the header typecode for FUNCTION. Can be set with SETF.
-(defun function-subtype (function)
-  (function-subtype function))
-(defun (setf function-subtype) (type function)
-  (setf (function-subtype function) type))
+(defun fun-subtype (function)
+  (fun-subtype function))
+(defun (setf fun-subtype) (type function)
+  (setf (fun-subtype function) type))
 
 ;;; Extract the arglist from the function header FUNC.
 (defun %simple-fun-arglist (func)

@@ -1138,7 +1138,7 @@
 ;;; of arguments changes, the transform must be prepared to return a
 ;;; lambda with a new lambda-list with the correct number of
 ;;; arguments.
-(defun extract-function-args (cont fun num-args)
+(defun extract-fun-args (cont fun num-args)
   #!+sb-doc
   "If CONT is a call to FUN with NUM-ARGS args, change those arguments
    to feed directly to the continuation-dest of CONT, which must be
@@ -1167,7 +1167,7 @@
 	  (setf (combination-args outside)
 		(append before-args inside-args after-args))
 	  (change-ref-leaf (continuation-use inside-fun)
-			   (find-free-function 'list "???"))
+			   (find-free-fun 'list "???"))
 	  (setf (combination-kind inside) :full)
 	  (setf (node-derived-type inside) *wild-type*)
 	  (flush-dest cont)

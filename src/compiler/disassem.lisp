@@ -427,7 +427,7 @@
 		   (munge-fun-refs (cddr override) evalp)))
           overrides))
 
-(defparameter *arg-function-params*
+(defparameter *arg-fun-params*
   '((:printer . (value stream dstate))
     (:use-label . (value dstate))
     (:prefilter . (value dstate))))
@@ -438,7 +438,7 @@
          (wrapper-defs nil))
         ((null tail)
          (values params (nreverse wrapper-defs)))
-      (let ((fun-arg (assoc (car tail) *arg-function-params*)))
+      (let ((fun-arg (assoc (car tail) *arg-fun-params*)))
         (when fun-arg
           (let* ((fun-form (cadr tail))
                  (quoted-fun-form `',fun-form))
@@ -989,13 +989,13 @@
       (valsrc-value thing)
       thing))
 
-(defstruct (cached-function (:conc-name cached-fun-)
-                            (:copier nil))
+(defstruct (cached-fun (:conc-name cached-fun-)
+		       (:copier nil))
   (funstate nil :type (or null funstate))
   (constraint nil :type list)
   (name nil :type (or null symbol)))
 
-(defun find-cached-function (cached-funs args constraint)
+(defun find-cached-fun (cached-funs args constraint)
   (dolist (cached-fun cached-funs nil)
     (let ((funstate (cached-fun-funstate cached-fun)))
       (when (and (equal constraint (cached-fun-constraint cached-fun))
@@ -1003,29 +1003,29 @@
                      (funstate-compatible-p funstate args)))
         (return cached-fun)))))
 
-(defmacro !with-cached-function ((name-var
-				  funstate-var
-				  cache
-				  cache-slot
-				  args
-				  &key
-				  constraint
-				  (stem (missing-arg)))
-                                 &body defun-maker-forms)
+(defmacro !with-cached-fun ((name-var
+			     funstate-var
+			     cache
+			     cache-slot
+			     args
+			     &key
+			     constraint
+			     (stem (missing-arg)))
+			    &body defun-maker-forms)
   (let ((cache-var (gensym))
         (constraint-var (gensym)))
     `(let* ((,constraint-var ,constraint)
-            (,cache-var (find-cached-function (,cache-slot ,cache)
-                                              ,args ,constraint-var)))
+            (,cache-var (find-cached-fun (,cache-slot ,cache)
+					 ,args ,constraint-var)))
        (cond (,cache-var
               (values (cached-fun-name ,cache-var) nil))
              (t
               (let* ((,name-var (symbolicate "CACHED-FUN--" ,stem))
                      (,funstate-var (make-funstate ,args))
                      (,cache-var
-                      (make-cached-function :name ,name-var
-                                            :funstate ,funstate-var
-                                            :constraint ,constraint-var)))
+                      (make-cached-fun :name ,name-var
+				       :funstate ,funstate-var
+				       :constraint ,constraint-var)))
                 (values ,name-var
                         `(progn
                            ,(progn ,@defun-maker-forms)
@@ -1038,7 +1038,7 @@
   (if (null printer-source)
       (values nil nil)
       (let ((printer-source (preprocess-printer printer-source args)))
-	(!with-cached-function
+	(!with-cached-fun
 	   (name funstate cache fun-cache-printers args
 		 :constraint printer-source
 		 :stem (concatenate 'string
@@ -1411,7 +1411,7 @@
          (mapcar #'arg-name (remove-if-not #'arg-use-label args))))
     (if (null labelled-fields)
         (values nil nil)
-        (!with-cached-function
+        (!with-cached-fun
             (name funstate cache fun-cache-labellers args
              :stem (concatenate 'string "LABELLER-" (string %name))
              :constraint labelled-fields)
@@ -1449,7 +1449,7 @@
 			       (remove-if-not #'arg-prefilter args))))
     (if (null filtered-args)
         (values nil nil)
-        (!with-cached-function
+        (!with-cached-fun
             (name funstate cache fun-cache-prefilters args
              :stem (concatenate 'string
 				(string %name)

@@ -17,21 +17,21 @@
 (in-package "SB!C")
 
 ;;; Make a function entry, filling in slots from the ENTRY-INFO.
-(defun make-function-entry (entry code-obj object)
-  (declare (type entry-info entry) (type core-object object))
-  (let ((offset (label-position (entry-info-offset entry))))
+(defun make-fun-entry (entry-info code-obj object)
+  (declare (type entry-info entry-info) (type core-object object))
+  (let ((offset (label-position (entry-info-offset entry-info))))
     (declare (type index offset))
     (unless (zerop (logand offset sb!vm:lowtag-mask))
       (error "Unaligned function object, offset = #X~X." offset))
-    (let ((res (%primitive compute-function code-obj offset)))
+    (let ((res (%primitive compute-fun code-obj offset)))
       (setf (%simple-fun-self res) res)
       (setf (%simple-fun-next res) (%code-entry-points code-obj))
       (setf (%code-entry-points code-obj) res)
-      (setf (%simple-fun-name res) (entry-info-name entry))
-      (setf (%simple-fun-arglist res) (entry-info-arguments entry))
-      (setf (%simple-fun-type res) (entry-info-type entry))
+      (setf (%simple-fun-name res) (entry-info-name entry-info))
+      (setf (%simple-fun-arglist res) (entry-info-arguments entry-info))
+      (setf (%simple-fun-type res) (entry-info-type entry-info))
 
-      (note-fun entry res object))))
+      (note-fun entry-info res object))))
 
 ;;; Dump a component to core. We pass in the assembler fixups, code
 ;;; vector and node info.
@@ -74,7 +74,7 @@
       (do-core-fixups code-obj fixups)
 
       (dolist (entry (ir2-component-entries 2comp))
-	(make-function-entry entry code-obj object))
+	(make-fun-entry entry code-obj object))
 
       (sb!vm:sanctify-for-execution code-obj)
 
@@ -101,8 +101,7 @@
 	    (list
 	     (ecase (car const)
 	       (:entry
-		(reference-core-function code-obj index
-					 (cdr const) object))
+		(reference-core-fun code-obj index (cdr const) object))
 	       (:fdefinition
 		(setf (code-header-ref code-obj index)
 		      (fdefinition-object (cdr const) t))))))))))

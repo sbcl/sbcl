@@ -132,7 +132,7 @@
     ;; Make sure the function is aligned, and drop a label pointing to
     ;; this function header.
     (align n-lowtag-bits)
-    (trace-table-entry trace-table-function-prologue)
+    (trace-table-entry trace-table-fun-prologue)
     (emit-label start-lab)
     ;; Allocate function header.
     (inst simple-fun-header-word)
@@ -163,7 +163,7 @@
 	    (nfp :scs (any-reg)))
   (:info callee)
   (:generator 2
-    (trace-table-entry trace-table-function-prologue)
+    (trace-table-entry trace-table-fun-prologue)
     (move csp-tn res)
     (inst lda
 	  csp-tn
@@ -541,7 +541,7 @@ default-value-8
   (:ignore val-locs vals)
   (:vop-var vop)
   (:generator 6
-    (trace-table-entry trace-table-function-epilogue)
+    (trace-table-entry trace-table-fun-epilogue)
     (maybe-load-stack-tn ocfp-temp ocfp)
     (maybe-load-stack-tn return-pc-temp return-pc)
     (move cfp-tn csp-tn)
@@ -885,7 +885,7 @@ default-value-8
   (:vop-var vop)
   (:generator 6
     ;; Clear the number stack.
-    (trace-table-entry trace-table-function-epilogue)
+    (trace-table-entry trace-table-fun-epilogue)
     (let ((cur-nfp (current-nfp-tn vop)))
       (when cur-nfp
 	(inst addq cur-nfp (bytes-needed-for-non-descriptor-stack-frame)
@@ -936,7 +936,7 @@ default-value-8
   (:vop-var vop)
   (:generator 6
     ;; Clear the number stack.
-    (trace-table-entry trace-table-function-epilogue)
+    (trace-table-entry trace-table-fun-epilogue)
     (let ((cur-nfp (current-nfp-tn vop)))
       (when cur-nfp
 	(inst addq cur-nfp (bytes-needed-for-non-descriptor-stack-frame)
@@ -983,7 +983,7 @@ default-value-8
   (:vop-var vop)
 
   (:generator 13
-    (trace-table-entry trace-table-function-epilogue)
+    (trace-table-entry trace-table-fun-epilogue)
     (let ((not-single (gen-label)))
       ;; Clear the number stack.
       (let ((cur-nfp (current-nfp-tn vop)))

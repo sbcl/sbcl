@@ -547,8 +547,8 @@
 	    ,(parse-deftransform lambda-list body n-args
 				 `(return-from ,name nil))))
 	,@(when (consp what)
-	    `((setf (,(symbolicate "FUNCTION-INFO-" (second what))
-		     (function-info-or-lose ',(first what)))
+	    `((setf (,(symbolicate "FUN-INFO-" (second what))
+		     (fun-info-or-lose ',(first what)))
 		    #',name)))))))
 
 ;;;; IR groveling macros
@@ -695,7 +695,7 @@
 ;;; functions, etc. Also establish condition handlers.
 (defmacro with-ir1-namespace (&body forms)
   `(let ((*free-variables* (make-hash-table :test 'eq))
-	 (*free-functions* (make-hash-table :test 'equal))
+	 (*free-funs* (make-hash-table :test 'equal))
 	 (*constants* (make-hash-table :test 'equal))
 	 (*source-paths* (make-hash-table :test 'eq)))
      (handler-bind ((compiler-error #'compiler-error-handler)

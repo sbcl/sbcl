@@ -272,9 +272,9 @@
 (defknown code-header-ref (t index) t (flushable))
 (defknown code-header-set (t index t) t ())
 
-(defknown function-subtype (function) (unsigned-byte #.sb!vm:n-widetag-bits)
+(defknown fun-subtype (function) (unsigned-byte #.sb!vm:n-widetag-bits)
   (flushable))
-(defknown ((setf function-subtype))
+(defknown ((setf fun-subtype))
 	  ((unsigned-byte #.sb!vm:n-widetag-bits) function)
   (unsigned-byte #.sb!vm:n-widetag-bits)
   ())

@@ -36,7 +36,7 @@
 ;;;; internal state
 
 ;;; a hash table that maps each traced function to the TRACE-INFO. The
-;;; entry for a closure is the shared function-entry object.
+;;; entry for a closure is the shared function entry object.
 (defvar *traced-funs* (make-hash-table :test 'eq))
 
 ;;; A TRACE-INFO object represents all the information we need to

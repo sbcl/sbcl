@@ -1364,18 +1364,17 @@
 ;;; set the Predicate attribute for each translated function when the
 ;;; VOP is conditional, causing IR1 conversion to ensure that a call
 ;;; to the translated is always used in a predicate position.
-(defun set-up-function-translation (parse n-template)
+(defun !set-up-fun-translation (parse n-template)
   (declare (type vop-parse parse))
   (mapcar (lambda (name)
-	    `(let ((info (function-info-or-lose ',name)))
-	       (setf (function-info-templates info)
-		     (adjoin-template ,n-template
-				      (function-info-templates info)))
+	    `(let ((info (fun-info-or-lose ',name)))
+	       (setf (fun-info-templates info)
+		     (adjoin-template ,n-template (fun-info-templates info)))
 	       ,@(when (vop-parse-conditional-p parse)
-		   '((setf (function-info-attributes info)
+		   '((setf (fun-info-attributes info)
 			   (attributes-union
 			    (ir1-attributes predicate)
-			    (function-info-attributes info)))))))
+			    (fun-info-attributes info)))))))
 	  (vop-parse-translate parse)))
 
 ;;; Return a form that can be evaluated to get the TEMPLATE operand type
@@ -1669,7 +1668,7 @@
 	 (setf (gethash ',name *backend-template-names*) ,n-res)
 	 (setf (template-type ,n-res)
 	       (specifier-type (template-type-specifier ,n-res)))
-	 ,@(set-up-function-translation parse n-res))
+	 ,@(!set-up-fun-translation parse n-res))
        ',name)))
 
 ;;;; emission macros

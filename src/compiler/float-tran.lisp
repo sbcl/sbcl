@@ -319,7 +319,7 @@
 		 (sqrt (real 0.0))))
   (destructuring-bind (name type) stuff
     (let ((type (specifier-type type)))
-      (setf (function-info-derive-type (function-info-or-lose name))
+      (setf (fun-info-derive-type (fun-info-or-lose name))
 	    (lambda (call)
 	      (declare (type combination call))
 	      (when (csubtypep (continuation-type

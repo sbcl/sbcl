@@ -57,8 +57,8 @@
       
     DONE))
 
-(define-vop (function-subtype)
-  (:translate function-subtype)
+(define-vop (fun-subtype)
+  (:translate fun-subtype)
   (:policy :fast-safe)
   (:args (function :scs (descriptor-reg)))
   (:results (result :scs (unsigned-reg)))
@@ -66,8 +66,8 @@
   (:generator 6
     (load-type result function (- fun-pointer-lowtag))))
 
-(define-vop (set-function-subtype)
-  (:translate (setf function-subtype))
+(define-vop (set-fun-subtype)
+  (:translate (setf fun-subtype))
   (:policy :fast-safe)
   (:args (type :scs (unsigned-reg) :target result)
 	 (function :scs (descriptor-reg)))
@@ -199,7 +199,7 @@
     (inst subq ndescr other-pointer-lowtag ndescr)
     (inst addq code ndescr sap)))
 
-(define-vop (compute-function)
+(define-vop (compute-fun)
   (:args (code :scs (descriptor-reg))
 	 (offset :scs (signed-reg unsigned-reg)))
   (:arg-types * positive-fixnum)

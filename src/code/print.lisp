@@ -1575,7 +1575,7 @@
 	 (*print-level* 3)  ; ..print an interpreted function definition
 	 ;; FIXME: This find-the-function-name idiom ought to be
 	 ;; encapsulated in a function somewhere.
-	 (name (case (function-subtype object)
+	 (name (case (fun-subtype object)
 		 (#.sb!vm:closure-header-widetag "CLOSURE")
 		 (#.sb!vm:simple-fun-header-widetag (%simple-fun-name object))
 		 (t 'no-name-available)))

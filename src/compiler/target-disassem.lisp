@@ -384,11 +384,14 @@
   (declare (type sb!kernel:code-component code-component))
   (sb!sys:sap-int (sb!kernel:code-instructions code-component)))
 
+;;; unused as of sbcl-0.pre7.129
+#|
 ;;; Return the first function in CODE-COMPONENT.
 (defun code-first-function (code-component)
   (declare (type sb!kernel:code-component code-component))
   (sb!kernel:code-header-ref code-component
 			     sb!vm:code-trace-table-offset-slot))
+|#
 
 (defun segment-offs-to-code-offs (offset segment)
   (sb!sys:without-gcing

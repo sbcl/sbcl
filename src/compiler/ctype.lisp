@@ -102,12 +102,12 @@
 ;;; explain the result. We bind *COMPILER-ERROR-CONTEXT* to the
 ;;; combination node so that COMPILER-WARNING and related functions
 ;;; will do the right thing if they are supplied.
-(defun valid-function-use (call type &key
-				((:argument-test *ctype-test-fun*) #'csubtypep)
-				(result-test #'values-subtypep)
-				(strict-result nil)
-				((:lossage-fun *lossage-fun*))
-				((:unwinnage-fun *unwinnage-fun*)))
+(defun valid-fun-use (call type &key
+			   ((:argument-test *ctype-test-fun*) #'csubtypep)
+			   (result-test #'values-subtypep)
+			   (strict-result nil)
+			   ((:lossage-fun *lossage-fun*))
+			   ((:unwinnage-fun *unwinnage-fun*)))
   (declare (type function result-test) (type combination call)
 	   (type fun-type type))
   (let* ((*lossage-detected* nil)

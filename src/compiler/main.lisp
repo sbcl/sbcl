@@ -16,8 +16,8 @@
 ;;; FIXME: Doesn't this belong somewhere else, like early-c.lisp?
 (declaim (special *constants* *free-variables* *component-being-compiled*
 		  *code-vector* *next-location* *result-fixups*
-		  *free-functions* *source-paths*
-		  *seen-blocks* *seen-functions* *list-conflicts-table*
+		  *free-funs* *source-paths*
+		  *seen-blocks* *seen-funs* *list-conflicts-table*
 		  *continuation-number* *continuation-numbers*
 		  *number-continuations* *tn-id* *tn-ids* *id-tns*
 		  *label-ids* *label-id* *id-labels*
@@ -542,7 +542,7 @@
 	   (here-p (x)
 	     (eq (node-component x) component)))
     (blast *free-variables*)
-    (blast *free-functions*)
+    (blast *free-funs*)
     (blast *constants*))
   (values))
 
@@ -555,14 +555,14 @@
 (defun clear-stuff (&optional (debug-too t))
 
   ;; Clear global tables.
-  (when (boundp '*free-functions*)
-    (clrhash *free-functions*)
+  (when (boundp '*free-funs*)
+    (clrhash *free-funs*)
     (clrhash *free-variables*)
     (clrhash *constants*))
 
   ;; Clear debug counters and tables.
   (clrhash *seen-blocks*)
-  (clrhash *seen-functions*)
+  (clrhash *seen-funs*)
   (clrhash *list-conflicts-table*)
 
   (when debug-too

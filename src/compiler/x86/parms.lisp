@@ -204,8 +204,8 @@
 (defenum (:prefix trace-table-)
   normal
   call-site
-  function-prologue
-  function-epilogue)
+  fun-prologue
+  fun-epilogue)
 
 ;;;; static symbols
 

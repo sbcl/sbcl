@@ -242,7 +242,7 @@
 
 ;;; ### For functions with XEPs, name could be represented more simply
 ;;; and compactly as some sort of info about with how to find the
-;;; FUNCTION-ENTRY that this is a function for. Actually, you really
+;;; function entry that this is a function for. Actually, you really
 ;;; hardly need any info. You can just chain through the functions in
 ;;; the component until you find the right one. Well, I guess you need
 ;;; to at least know which function is an XEP for the real function

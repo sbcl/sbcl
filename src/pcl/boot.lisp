@@ -1794,7 +1794,7 @@ bootstrapping.
     (when lambda-list-p
       (proclaim (defgeneric-declaration fun-name lambda-list)))))
 
-(defun get-generic-function-info (gf)
+(defun get-generic-fun-info (gf)
   ;; values   nreq applyp metatypes nkeys arg-info
   (multiple-value-bind (applyp metatypes arg-info)
       (let* ((arg-info (if (early-gf-p gf)
