@@ -31,9 +31,10 @@
 			   (alien-type-type-alien-type type2))
 	  t))
 
-;;; KLUDGE: This DEFINE-SUPERCLASSES gets executed much later than the others
-;;; (toplevel form time instead of cold load init time) because ALIEN-VALUE
-;;; itself is a structure which isn't defined until fairly late.
+;;; KLUDGE: This DEFINE-SUPERCLASSES gets executed much later than the
+;;; others (toplevel form time instead of cold load init time) because
+;;; ALIEN-VALUE itself is a structure which isn't defined until fairly
+;;; late.
 ;;;
 ;;; FIXME: I'm somewhat tempted to just punt ALIEN from the type system.
 ;;; It's sufficiently unlike the others that it's a bit of a pain, and

@@ -83,7 +83,7 @@
 ;;; This is called by !PPRINT-COLD-INIT, fairly late, because
 ;;; SET-PPRINT-DISPATCH doesn't work until the compiler works.
 ;;;
-;;; FIXME: It might be cleaner to just make these toplevel forms and
+;;; FIXME: It might be cleaner to just make these be toplevel forms and
 ;;; enforce the delay by putting this file late in the build sequence.
 (defun !backq-pp-cold-init ()
   (set-pprint-dispatch '(cons (eql backq-list)) #'pprint-backquote)

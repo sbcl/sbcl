@@ -536,6 +536,15 @@ changes in sbcl-0.6.9 relative to sbcl-0.6.8:
   into everyone's system when I do a "cvs update".) When no
   customize-target-features.lisp file exists, the target *FEATURES* list
   should be constructed the same way as before.
+* The QUIT debugger command is gone, since it did something
+  rather different than the SB-EXT:QUIT command, and since it never
+  worked properly outside the main toplevel read/eval/print loop.
+  Invoking the new TOPLEVEL restart provides the same functionality.
+* The GO debugger command is also gone, since you can just invoke
+  the CONTINUE restart directly instead.
+* The TOP debugger command is also gone, since it's redundant with 
+  'f 0', and since it interfered with abbreviations for the TOPLEVEL
+  restart.
 ?? signal handling reliability
 ?? fixed some bugs mentioned in the man page:
   ?? DEFUN-vs.-DECLAIM

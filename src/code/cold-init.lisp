@@ -258,7 +258,7 @@
   (terpri)
   (/show0 "going into toplevel loop")
   (handling-end-of-the-world 
-    (toplevel)))
+    (toplevel-init)))
 
 (defun quit (&key recklessly-p
 		  (unix-code 0 unix-code-p)

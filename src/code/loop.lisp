@@ -913,16 +913,16 @@ a LET-like macro, and a SETQ-like macro, which perform LOOP-style destructuring.
 			    (loop-lookup-keyword keyword
 						 (loop-universe-keywords
 						  *loop-universe*)))
-		      ;; It's a "miscellaneous" toplevel LOOP keyword (do,
-		      ;; collect, named, etc.)
+		      ;; It's a "miscellaneous" toplevel LOOP keyword (DO,
+		      ;; COLLECT, NAMED, etc.)
 		      (apply (symbol-function (first tem)) (rest tem)))
 		     ((setq tem
 			    (loop-lookup-keyword keyword
 						 (loop-universe-iteration-keywords *loop-universe*)))
 		      (loop-hack-iteration tem))
 		     ((loop-tmember keyword '(and else))
-		      ;; Alternative is to ignore it, ie let it go around to
-		      ;; the next keyword...
+		      ;; The alternative is to ignore it, i.e. let it go
+		      ;; around to the next keyword...
 		      (loop-error "secondary clause misplaced at top level in LOOP macro: ~S ~S ~S ..."
 				  keyword
 				  (car *loop-source-code*)

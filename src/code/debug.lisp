@@ -22,10 +22,10 @@
   "*PRINT-LENGTH* for the debugger")
 
 (defvar *debug-readtable*
-  ;; KLUDGE: This can't be initialized in a cold toplevel form, because the
-  ;; *STANDARD-READTABLE* isn't initialized until after cold toplevel forms
-  ;; have run. So instead we initialize it immediately after
-  ;; *STANDARD-READTABLE*. -- WHN 20000205
+  ;; KLUDGE: This can't be initialized in a cold toplevel form,
+  ;; because the *STANDARD-READTABLE* isn't initialized until after
+  ;; cold toplevel forms have run. So instead we initialize it
+  ;; immediately after *STANDARD-READTABLE*. -- WHN 20000205
   nil
   #!+sb-doc
   "*READTABLE* for the debugger")
@@ -68,23 +68,19 @@ The debugger rebinds various special variables for controlling i/o, sometimes
   to defaults (much like WITH-STANDARD-IO-SYNTAX does) and sometimes to 
   its own special values, e.g. SB-DEBUG:*DEBUG-PRINT-LEVEL*.
 Debug commands do not affect * and friends, but evaluation in the debug loop
-  do affect these variables.
+  does affect these variables.
 SB-DEBUG:*FLUSH-DEBUG-ERRORS* controls whether errors at the debug prompt
   drop you into deeper into the debugger.
 
 Getting in and out of the debugger:
-  Q        throws to top level.
-  GO       calls CONTINUE which tries to proceed with the restart 'CONTINUE.
   RESTART  invokes restart numbered as shown (prompt if not given).
   ERROR    prints the error condition and restart cases.
-
   The name of any restart, or its number, is a valid command, and is the same
     as using RESTART to invoke that restart.
 
 Changing frames:
-  U     up frame     D  down frame
-  T     top frame    B  bottom frame
-  F n   frame n
+  U      up frame     D    down frame
+  B  bottom frame     F n  frame n (n=0 for top frame)
 
 Inspecting frames:
   BACKTRACE [n]  shows n frames going down the stack.
@@ -93,8 +89,8 @@ Inspecting frames:
   SOURCE [n]     displays frame's source form with n levels of enclosing forms.
 
 Breakpoints and steps:
-  LIST-LOCATIONS [{function | :c}]   List the locations for breakpoints.
-                                     Specify :c for the current frame.
+  LIST-LOCATIONS [{function | :C}]   List the locations for breakpoints.
+                                     Specify :C for the current frame.
     Abbreviation: LL
   LIST-BREAKPOINTS                   List the active breakpoints.
     Abbreviations: LB, LBP
@@ -722,7 +718,9 @@ Function and macro commands:
 	    ;; WITH-SIMPLE-RESTART.
 	    (let ((level *debug-command-level*)
 		  (restart-commands (make-restart-commands)))
-	      (with-simple-restart (abort "Return to debug level ~D." level)
+	      (with-simple-restart (abort
+				   "Reduce debugger level (to debug level ~D)."
+				    level)
 		(funcall *debug-prompt*)
 		(let ((input (sb!int:get-stream-command *debug-io*)))
 		  (cond (input
@@ -1051,12 +1049,15 @@ Function and macro commands:
 
 (def-debug-command-alias "D" "DOWN")
 
-(def-debug-command "TOP" ()
-  (do ((prev *current-frame* lead)
-       (lead (sb!di:frame-up *current-frame*) (sb!di:frame-up lead)))
-      ((null lead)
-       (setf *current-frame* prev)
-       (print-frame-call prev))))
+;;; CMU CL had this command, but SBCL doesn't, since
+;;; it's redundant with "FRAME 0", and it interferes with abbreviations
+;;; for the TOPLEVEL restart.
+;;;(def-debug-command "TOP" ()
+;;;  (do ((prev *current-frame* lead)
+;;;       (lead (sb!di:frame-up *current-frame*) (sb!di:frame-up lead)))
+;;;      ((null lead)
+;;;       (setf *current-frame* prev)
+;;;       (print-frame-call prev))))
 
 (def-debug-command "BOTTOM" ()
   (do ((prev *current-frame* lead)
@@ -1091,12 +1092,20 @@ Function and macro commands:
 
 ;;;; commands for entering and leaving the debugger
 
-(def-debug-command "QUIT" ()
-  (throw 'sb!impl::top-level-catcher nil))
+;;; CMU CL supported this QUIT debug command, but SBCL provides this
+;;; functionality with a restart instead. (The QUIT debug command was
+;;; removed because it's confusing to have "quit" mean two different
+;;; things in the system, "restart the top level REPL" in the debugger
+;;; and "terminate the Lisp system" as the SB-EXT:QUIT function.)
+;;;
+;;;(def-debug-command "QUIT" ()
+;;;  (throw 'sb!impl::top-level-catcher nil))
 
-(def-debug-command "GO" ()
-  (continue *debug-condition*)
-  (error "There is no restart named CONTINUE."))
+;;; CMU CL supported this GO debug command, but SBCL doesn't -- just
+;;; type the CONTINUE restart name.
+;;;(def-debug-command "GO" ()
+;;;  (continue *debug-condition*)
+;;;  (error "There is no restart named CONTINUE."))
 
 (def-debug-command "RESTART" ()
   (let ((num (read-if-available :prompt)))
@@ -1312,9 +1321,10 @@ Function and macro commands:
   (continue *debug-condition*)
   (error "couldn't continue"))
 
-;;; List possible breakpoint locations, which ones are active, and where GO
-;;; will continue. Set *POSSIBLE-BREAKPOINTS* to the code-locations which can
-;;; then be used by sbreakpoint.
+;;; List possible breakpoint locations, which ones are active, and
+;;; where the CONTINUE restart will transfer control. Set
+;;; *POSSIBLE-BREAKPOINTS* to the code-locations which can then be
+;;; used by sbreakpoint.
 (def-debug-command "LIST-LOCATIONS" ()
   (let ((df (read-if-available *default-breakpoint-debug-function*)))
     (cond ((consp df)

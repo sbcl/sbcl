@@ -602,9 +602,9 @@
     (sb!vm:sanctify-for-execution component)
     component))
 
-;;; This a no-op except in cold load. (In ordinary warm load, everything
-;;; involved with function definition can be handled nicely by ordinary
-;;; toplevel code.)
+;;; This a no-op except in cold load. (In ordinary warm load,
+;;; everything involved with function definition can be handled nicely
+;;; by ordinary toplevel code.)
 (define-fop (fop-fset 74 nil)
   (pop-stack)
   (pop-stack))

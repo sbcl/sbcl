@@ -24,11 +24,16 @@ but instead
 
 KNOWN BUGS RELATED TO THE IR1 INTERPRETER
 
-At some point, the pure interpreter (aka the "IR1 interpreter") will
-probably go away (replaced by constructs like
+(Note: At some point, the pure interpreter (aka the "IR1 interpreter")
+will probably go away (replaced by constructs like
   (DEFUN EVAL (X) (FUNCALL (COMPILE NIL (LAMBDA ..)))))
 and at that time these bugs should go away automatically. Until then,
 they'll probably remain, since they're not considered urgent.
+After the IR1 interpreter goes away is also the preferred time
+to start systematically exterminating cases where debugging
+functionality (backtrace, breakpoint, etc.) breaks down, since
+getting rid of the IR1 interpreter will reduce the number of
+special cases we need to support.)
 
 IR1-1:
   The FUNCTION special operator doesn't check properly whether its
@@ -44,18 +49,13 @@ IR1-2:
 	T
 
 
-OTHER KNOWN BUGS:
+KNOWN BUGS OF NO SPECIAL CLASS:
 
-(There is also some information on bugs in the manual page and in the
-TODO file. Eventually more such information may move here.)
-
-1:
-  Failure in initialization files is not handled gracefully -- it's 
-  a throw to TOP-LEVEL-CATCHER, which is not caught until we enter
-  TOPLEVEL-REPL. Code should be added to catch such THROWs even when
-  we're not in TOPLEVEL-REPL and do *something* with them (probably
-  complaining about an error outside TOPLEVEL-REPL, perhaps printing
-  a BACKTRACE, then terminating execution of SBCL).
+(Note:
+  * There is also some information on bugs in the manual page and
+    in the TODO file. Eventually more such information may move here.
+  * The gaps in the number sequence belong to old bugs which were
+    eliminated.)
 
 2:
   DEFSTRUCT should almost certainly overwrite the old LAYOUT information

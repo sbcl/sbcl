@@ -160,6 +160,14 @@ is also supported.</para>
 
 <para>The debugger supports a number of options. Its documentation is
 accessed by typing <userinput>help</> at the debugger prompt.</para>
+<!-- FIXME:
+     A true debugger section in the manual would be good. Start
+     with CMU CL's debugger section, but remember:
+       * no QUIT command (TOPLEVEL restart instead)
+       * no GO command (CONTINUE restart instead)
+       * Limitations of the x86 port of the debugger should be 
+         documented or fixed where possible.
+       * Discuss TRACE and its unification with PROFILE. -->
 
 <para>Documentation for <function>inspect</> is accessed by typing
 <userinput>help</> at the <function>inspect</> prompt.</para>

@@ -39,7 +39,7 @@
 ;;; image to make a running Lisp, the memory never gets reclaimed.
 ;;; (But with the PURIFY option it seems to work OK.)
 (defun save-lisp-and-die (core-file-name &key
-					 (toplevel #'toplevel)
+					 (toplevel #'toplevel-init)
 					 (purify nil)
 					 (root-structures ())
 					 (environment-name "auxiliary"))

@@ -65,7 +65,21 @@
   (let ((caught (gensym "CAUGHT")))
     `(let ((,caught (catch '%end-of-the-world
 		      (/show0 "inside CATCH '%END-OF-THE-WORLD")
-		      ,@body)))
+		      (restart-case (progn ,@body)
+			;; KLUDGE: I'd like to name this restart QUIT,
+			;; but then people would hate me, since in CMU
+			;; CL, even though they have essentially the
+			;; same QUIT function as SBCL, the "QUIT"
+			;; command in the debugger means to return to
+			;; the toplevel, not to actually call QUIT. Oh
+			;; well. -- WHN 2000-11-01
+			(end-of-the-world ()
+			  :report (lambda (s)
+				    (format s
+					    "Terminate the current Lisp, ~
+                                            like #'~S."
+					    'quit))
+			  (quit))))))
        (/show0 "back from CATCH '%END-OF-THE-WORLD, flushing output")
        (flush-standard-output-streams)
        (/show0 "calling UNIX-EXIT")
@@ -231,7 +245,7 @@
 	     (* (floor initial-offset sb!vm:word-bytes) sb!vm:word-bytes)
 	     0))))
 
-;;;; the default TOPLEVEL function
+;;;; the default toplevel function
 
 (defvar / nil
   #!+sb-doc
@@ -249,10 +263,6 @@
   #!+sb-doc
   "The top-level prompt string. This also may be a function of no arguments
    that returns a simple-string.")
-(defvar *in-top-level-catcher* nil
-  #!+sb-doc
-  "Are we within the Top-Level-Catcher? This is used by interrupt
-   handlers to see whether it is OK to throw.")
 
 (defun interactive-eval (form)
   "Evaluate FORM, returning whatever it returns and adjusting ***, **, *,
@@ -289,9 +299,9 @@
   (values))
 
 ;;; the default system top-level function
-(defun toplevel ()
+(defun toplevel-init ()
 
-  (/show0 "entering TOPLEVEL")
+  (/show0 "entering TOPLEVEL-INIT")
   
   (let ((sysinit nil)      ; value of --sysinit option
 	(userinit nil)     ; value of --userinit option
@@ -300,7 +310,7 @@
 	(noprogrammer nil) ; Has a --noprogammer option been seen?
 	(options (rest *posix-argv*))) ; skipping program name
 
-    (/show0 "done with outer LET in TOPLEVEL")
+    (/show0 "done with outer LET in TOPLEVEL-INIT")
   
     ;; FIXME: There are lots of ways for errors to happen around here (e.g. bad
     ;; command line syntax, or READ-ERROR while trying to READ an --eval
@@ -308,7 +318,7 @@
 
     ;; Parse command line options.
     (loop while options do
-	  (/show0 "at head of LOOP WHILE OPTIONS DO in TOPLEVEL")
+	  (/show0 "at head of LOOP WHILE OPTIONS DO in TOPLEVEL-INIT")
 	  (let ((option (first options)))
 	    (flet ((pop-option ()
 		     (if options
@@ -363,7 +373,7 @@
 			       :test #'string=)
 			 (error "bad toplevel option: ~S" (first options))
 			 (return)))))))
-    (/show0 "done with LOOP WHILE OPTIONS DO in TOPLEVEL")
+    (/show0 "done with LOOP WHILE OPTIONS DO in TOPLEVEL-INIT")
 
     ;; Excise all the options that we processed, so that only user-level
     ;; options are left visible to user code.
@@ -373,7 +383,7 @@
     ;; lead to reasonable behavior.
 
     ;; Handle initialization files.
-    (/show0 "handling initialization files in TOPLEVEL")
+    (/show0 "handling initialization files in TOPLEVEL-INIT")
     (flet (;; If any of POSSIBLE-INIT-FILE-NAMES names a real file,
 	   ;; return its truename.
 	   (probe-init-files (&rest possible-init-file-names)
@@ -426,9 +436,9 @@
 	(/show0 "loaded USERINIT-TRUENAME"))
 
       ;; Handle --eval options.
-      (/show0 "handling --eval options in TOPLEVEL")
+      (/show0 "handling --eval options in TOPLEVEL-INIT")
       (dolist (eval (reverse evals))
-	(/show0 "handling one --eval option in TOPLEVEL")
+	(/show0 "handling one --eval option in TOPLEVEL-INIT")
 	(eval eval)
 	(flush-standard-output-streams))
 
@@ -437,11 +447,11 @@
       ;; FIXME: When we do actually implement this, shouldn't it go
       ;; earlier in the sequence, so that its stream bindings will
       ;; affect the behavior of init files and --eval options?
-      (/show0 "handling --noprogrammer option in TOPLEVEL")
+      (/show0 "handling --noprogrammer option in TOPLEVEL-INIT")
       (when noprogrammer
 	(warn "stub: --noprogrammer option unimplemented")) ; FIXME
 
-      (/show0 "falling into TOPLEVEL-REPL from TOPLEVEL")
+      (/show0 "falling into TOPLEVEL-REPL from TOPLEVEL-INIT")
       (toplevel-repl noprint))))
 
 ;;; read-eval-print loop for the default system toplevel
@@ -453,56 +463,43 @@
 	(/// nil) (// nil) (/ nil)
 	(eof-marker (cons :eof nil)))
     (loop
-      ;; FIXME: This seems to be the source of one of the basic debugger
-      ;; choices in
-      ;;    Restarts:
-      ;;      0: [CONTINUE] Return from BREAK.
-      ;;      1: [ABORT   ] Return to toplevel.
-      ;; (The "Return from BREAK" choice is defined in BREAK.) I'd like to add
-      ;; another choice,
-      ;;      2: [TERMINATE] Terminate the current Lisp.
-      ;; That way, a user hitting ^C could get out of Lisp without knowing
-      ;; enough about the system to run (SB-EXT:QUIT).
-      ;;
-      ;; If I understand the documentation of WITH-SIMPLE-RESTART correctly,
-      ;; it shows how to replace this WITH-SIMPLE-RESTART with a RESTART-CASE
-      ;; with two choices (ABORT and QUIT). Or perhaps ABORT should be renamed
-      ;; TOPLEVEL?
-      ;;    Restarts:
-      ;;      0: [CONTINUE ] Return from BREAK, continuing calculation
-      ;;		     as though nothing happened.
-      ;;      1: [TOPLEVEL ] Transfer control to toplevel read/eval/print
-      ;;		     loop, aborting current calculation.
-      ;;      2: [TERMINATE] Terminate the current Lisp (equivalent to
-      ;;		     executing (SB-EXT:QUIT)).
       (/show0 "at head of outer LOOP in TOPLEVEL-REPL")
-      (with-simple-restart (abort "Return to toplevel.")
-	(catch 'top-level-catcher
-	  (sb!unix:unix-sigsetmask 0) ; FIXME: What is this for?
-	  (let ((*in-top-level-catcher* t))
-	    (/show0 "about to enter inner LOOP in TOPLEVEL-REPL")
-	    (loop			; FIXME: Do we need this inner LOOP?
-	     ;; FIXME: It seems bad to have GC behavior depend on scrubbing
-	     ;; the control stack before each interactive command. Isn't
-	     ;; there some way we can convince the GC to just ignore
-	     ;; dead areas of the control stack, so that we don't need to
-	     ;; rely on this half-measure?
-	     (scrub-control-stack)
-	     (unless noprint
-	       (fresh-line)
-	       (princ (if (functionp *prompt*)
-			  (funcall *prompt*)
-			  *prompt*))
-	       (flush-standard-output-streams))
-	     (let ((form (read *standard-input* nil eof-marker)))
-	       (if (eq form eof-marker)
-		   (quit)
-		   (let ((results
-			  (multiple-value-list (interactive-eval form))))
-		     (unless noprint
-		       (dolist (result results)
-			 (fresh-line)
-			 (prin1 result)))))))))))))
+      ;; There should only be one TOPLEVEL restart, and it's here, so
+      ;; restarting at TOPLEVEL always bounces you all the way out here.
+      (with-simple-restart (toplevel
+			    "Restart at toplevel READ/EVAL/PRINT loop.")
+	;; We add a new ABORT restart for every debugger level, so 
+	;; restarting at ABORT in a nested debugger gets you out to the
+        ;; innermost enclosing debugger, and only when you're in the
+        ;; outermost, unnested debugger level does restarting at ABORT 
+	;; get you out to here.
+        (with-simple-restart (abort
+			      "Reduce debugger level (leaving debugger).")
+	  (catch 'top-level-catcher
+	  (sb!unix:unix-sigsetmask 0)	; FIXME: What is this for?
+	  (/show0 "about to enter inner LOOP in TOPLEVEL-REPL")
+	  (loop				; FIXME: Do we need this inner LOOP?
+	   ;; FIXME: It seems bad to have GC behavior depend on scrubbing
+	   ;; the control stack before each interactive command. Isn't
+	   ;; there some way we can convince the GC to just ignore
+	   ;; dead areas of the control stack, so that we don't need to
+	   ;; rely on this half-measure?
+	   (scrub-control-stack)
+	   (unless noprint
+	     (fresh-line)
+	     (princ (if (functionp *prompt*)
+			(funcall *prompt*)
+			*prompt*))
+	     (flush-standard-output-streams))
+	   (let ((form (read *standard-input* nil eof-marker)))
+	     (if (eq form eof-marker)
+		 (quit)
+		 (let ((results
+			(multiple-value-list (interactive-eval form))))
+		   (unless noprint
+		     (dolist (result results)
+		       (fresh-line)
+		       (prin1 result)))))))))))))
 
 ;;; a convenient way to get into the assembly-level debugger
 (defun %halt ()
