@@ -1332,9 +1332,9 @@
   (:result-types unsigned-num)
   (:generator 50
     (inst mov k (make-ea :dword :base state
-			 :disp (- (* (+ 2 sb!vm:vector-data-offset)
-				     sb!vm:word-bytes)
-				  sb!vm:other-pointer-lowtag)))
+			 :disp (- (* (+ 2 vector-data-offset)
+				     n-word-bytes)
+				  other-pointer-lowtag)))
     (inst cmp k 624)
     (inst jmp :ne no-update)
     (inst mov tmp state)	; The state is passed in EAX.
@@ -1344,23 +1344,23 @@
     NO-UPDATE
     ;; y = ptgfsr[k++];
     (inst mov y (make-ea :dword :base state :index k :scale 4
-			 :disp (- (* (+ 3 sb!vm:vector-data-offset)
-				     sb!vm:word-bytes)
-				  sb!vm:other-pointer-lowtag)))
+			 :disp (- (* (+ 3 vector-data-offset)
+				     n-word-bytes)
+				  other-pointer-lowtag)))
     ;; y ^= (y >> 11);
     (inst shr y 11)
     (inst xor y (make-ea :dword :base state :index k :scale 4
-			 :disp (- (* (+ 3 sb!vm:vector-data-offset)
-				     sb!vm:word-bytes)
-				  sb!vm:other-pointer-lowtag)))
+			 :disp (- (* (+ 3 vector-data-offset)
+				     n-word-bytes)
+				  other-pointer-lowtag)))
     ;; y ^= (y << 7) & #x9d2c5680
     (inst mov tmp y)
     (inst inc k)
     (inst shl tmp 7)
     (inst mov (make-ea :dword :base state
-		       :disp (- (* (+ 2 sb!vm:vector-data-offset)
-				   sb!vm:word-bytes)
-				sb!vm:other-pointer-lowtag))
+		       :disp (- (* (+ 2 vector-data-offset)
+				   n-word-bytes)
+				other-pointer-lowtag))
 	  k)
     (inst and tmp #x9d2c5680)
     (inst xor y tmp)

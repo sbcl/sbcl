@@ -168,7 +168,7 @@
   (:temporary (:scs (non-descriptor-reg)) header)
   (:temporary (:scs (non-descriptor-reg)) bytes)
   (:generator 6
-    (inst lda bytes (* (1+ words) word-bytes) extra)
+    (inst lda bytes (* (1+ words) n-word-bytes) extra)
     (inst sll bytes (- n-widetag-bits 2) header)
     (inst lda header (+ (ash -2 n-widetag-bits) type) header)
     (inst srl bytes n-lowtag-bits bytes)

@@ -86,7 +86,7 @@
     ((t)
      (values #.sb!vm:simple-vector-widetag #.sb!vm:n-word-bits))
     ((character base-char standard-char)
-     (values #.sb!vm:simple-string-widetag #.sb!vm:byte-bits))
+     (values #.sb!vm:simple-string-widetag #.sb!vm:n-byte-bits))
     ((bit)
      (values #.sb!vm:simple-bit-vector-widetag 1))
     ;; OK, we have to wade into SUBTYPEPing after all.
@@ -94,7 +94,7 @@
      ;; FIXME: The data here are redundant with
      ;; *SPECIALIZED-ARRAY-ELEMENT-TYPE-PROPERTIES*.
      (pick-vector-type type
-       (base-char (values #.sb!vm:simple-string-widetag #.sb!vm:byte-bits))
+       (base-char (values #.sb!vm:simple-string-widetag #.sb!vm:n-byte-bits))
        (bit (values #.sb!vm:simple-bit-vector-widetag 1))
        ((unsigned-byte 2)
 	(values #.sb!vm:simple-array-unsigned-byte-2-widetag 2))

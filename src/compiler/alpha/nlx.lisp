@@ -94,7 +94,7 @@
   (:temporary (:scs (descriptor-reg)) temp)
   (:temporary (:scs (non-descriptor-reg)) ndescr)
   (:generator 22
-    (inst lda block (* (tn-offset tn) sb!vm:word-bytes) cfp-tn)
+    (inst lda block (* (tn-offset tn) sb!vm:n-word-bytes) cfp-tn)
     (load-symbol-value temp *current-unwind-protect-block*)
     (storew temp block sb!vm:unwind-block-current-uwp-slot)
     (storew cfp-tn block sb!vm:unwind-block-current-cont-slot)
@@ -114,7 +114,7 @@
   (:temporary (:scs (descriptor-reg) :target block :to (:result 0)) result)
   (:temporary (:scs (non-descriptor-reg)) ndescr)
   (:generator 44
-    (inst lda result (* (tn-offset tn) sb!vm:word-bytes) cfp-tn)
+    (inst lda result (* (tn-offset tn) sb!vm:n-word-bytes) cfp-tn)
     (load-symbol-value temp *current-unwind-protect-block*)
     (storew temp result sb!vm:catch-block-current-uwp-slot)
     (storew cfp-tn result sb!vm:catch-block-current-cont-slot)
@@ -135,7 +135,7 @@
   (:args (tn))
   (:temporary (:scs (descriptor-reg)) new-uwp)
   (:generator 7
-    (inst lda new-uwp (* (tn-offset tn) sb!vm:word-bytes) cfp-tn)
+    (inst lda new-uwp (* (tn-offset tn) sb!vm:n-word-bytes) cfp-tn)
     (store-symbol-value new-uwp *current-unwind-protect-block*)))
 
 (define-vop (unlink-catch-block)
@@ -249,10 +249,10 @@
       ;; Copy stuff on stack.
       (emit-label loop)
       (loadw temp src)
-      (inst lda src sb!vm:word-bytes src)
+      (inst lda src sb!vm:n-word-bytes src)
       (storew temp dst)
       (inst lda num (fixnumize -1) num)
-      (inst lda dst sb!vm:word-bytes dst)
+      (inst lda dst sb!vm:n-word-bytes dst)
       (inst bne num loop)
 
       (emit-label done)

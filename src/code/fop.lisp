@@ -423,13 +423,13 @@
 (define-fop (fop-single-float-vector 84)
   (let* ((length (read-arg 4))
 	 (result (make-array length :element-type 'single-float)))
-    (read-n-bytes *fasl-input-stream* result 0 (* length sb!vm:word-bytes))
+    (read-n-bytes *fasl-input-stream* result 0 (* length sb!vm:n-word-bytes))
     result))
 
 (define-fop (fop-double-float-vector 85)
   (let* ((length (read-arg 4))
 	 (result (make-array length :element-type 'double-float)))
-    (read-n-bytes *fasl-input-stream* result 0 (* length sb!vm:word-bytes 2))
+    (read-n-bytes *fasl-input-stream* result 0 (* length sb!vm:n-word-bytes 2))
     result))
 
 #!+long-float
@@ -439,19 +439,22 @@
     (read-n-bytes *fasl-input-stream*
 		  result
 		  0
-		  (* length sb!vm:word-bytes #!+x86 3 #!+sparc 4))
+		  (* length sb!vm:n-word-bytes #!+x86 3 #!+sparc 4))
     result))
 
 (define-fop (fop-complex-single-float-vector 86)
   (let* ((length (read-arg 4))
 	 (result (make-array length :element-type '(complex single-float))))
-    (read-n-bytes *fasl-input-stream* result 0 (* length sb!vm:word-bytes 2))
+    (read-n-bytes *fasl-input-stream* result 0 (* length sb!vm:n-word-bytes 2))
     result))
 
 (define-fop (fop-complex-double-float-vector 87)
   (let* ((length (read-arg 4))
 	 (result (make-array length :element-type '(complex double-float))))
-    (read-n-bytes *fasl-input-stream* result 0 (* length sb!vm:word-bytes 2 2))
+    (read-n-bytes *fasl-input-stream*
+		  result
+		  0
+		  (* length sb!vm:n-word-bytes 2 2))
     result))
 
 #!+long-float
@@ -459,13 +462,14 @@
   (let* ((length (read-arg 4))
 	 (result (make-array length :element-type '(complex long-float))))
     (read-n-bytes *fasl-input-stream* result 0
-		  (* length sb!vm:word-bytes #!+x86 3 #!+sparc 4 2))
+		  (* length sb!vm:n-word-bytes #!+x86 3 #!+sparc 4 2))
     result))
 
-;;; *** NOT *** the FOP-INT-VECTOR as currently documented in rtguts. Size
-;;; must be a directly supported I-vector element size, with no extra bits.
-;;; This must be packed according to the local byte-ordering, allowing us to
-;;; directly read the bits.
+;;; CMU CL comment:
+;;;   *** NOT *** the FOP-INT-VECTOR as currently documented in rtguts.
+;;;   Size must be a directly supported I-vector element size, with no
+;;;   extra bits. This must be packed according to the local
+;;;   byte-ordering, allowing us to directly read the bits.
 (define-fop (fop-int-vector 43)
   (prepare-for-fast-read-byte *fasl-input-stream*
     (let* ((len (fast-read-u-integer 4))
@@ -485,7 +489,7 @@
 		    res
 		    0
 		    (ceiling (the index (* size len))
-			     sb!vm:byte-bits))
+			     sb!vm:n-byte-bits))
       res)))
 
 ;;; This is the same as FOP-INT-VECTOR, except this is for signed
@@ -508,7 +512,7 @@
 		    0
  		    (ceiling (the index (* (if (= size 30)
 					       32 ; Adjust for (signed-byte 30)
-					       size) len)) sb!vm:byte-bits))
+					       size) len)) sb!vm:n-byte-bits))
       res)))
 
 (define-fop (fop-eval 53)

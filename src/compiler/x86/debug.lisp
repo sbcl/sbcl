@@ -43,7 +43,7 @@
     (move temp offset)
     (inst neg temp)
     (inst mov result
-	  (make-ea :dword :base sap :disp (- word-bytes) :index temp))))
+	  (make-ea :dword :base sap :disp (- n-word-bytes) :index temp))))
 
 (define-vop (read-control-stack-c)
   (:translate stack-ref)
@@ -55,7 +55,7 @@
   (:result-types *)
   (:generator 5
     (inst mov result (make-ea :dword :base sap
-			      :disp (- (* (1+ index) word-bytes))))))
+			      :disp (- (* (1+ index) n-word-bytes))))))
 
 (define-vop (write-control-stack)
   (:translate %set-stack-ref)
@@ -71,7 +71,7 @@
     (move temp offset)
     (inst neg temp)
     (inst mov
-	  (make-ea :dword :base sap :disp (- word-bytes) :index temp) value)
+	  (make-ea :dword :base sap :disp (- n-word-bytes) :index temp) value)
     (move result value)))
 
 (define-vop (write-control-stack-c)
@@ -85,7 +85,7 @@
   (:result-types *)
   (:generator 5
     (inst mov (make-ea :dword :base sap
-		       :disp (- (* (1+ index) word-bytes)))
+		       :disp (- (* (1+ index) n-word-bytes)))
 	  value)
     (move result value)))
 
@@ -101,7 +101,7 @@
       (loadw temp thing 0 lowtag)
       (inst shr temp n-widetag-bits)
       (inst jmp :z bogus)
-      (inst shl temp (1- (integer-length word-bytes)))
+      (inst shl temp (1- (integer-length n-word-bytes)))
       (unless (= lowtag other-pointer-lowtag)
 	(inst add temp (- lowtag other-pointer-lowtag)))
       (move code thing)

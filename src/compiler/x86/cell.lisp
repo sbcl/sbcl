@@ -34,17 +34,17 @@
 	      (integer
 	       (inst mov
 		     (make-ea :dword :base object
-			      :disp (- (* offset word-bytes) lowtag))
+			      :disp (- (* offset n-word-bytes) lowtag))
 		     (fixnumize val)))
 	      (symbol
 	       (inst mov
 		     (make-ea :dword :base object
-			      :disp (- (* offset word-bytes) lowtag))
+			      :disp (- (* offset n-word-bytes) lowtag))
 		     (+ nil-value (static-symbol-offset val))))
 	      (character
 	       (inst mov
 		     (make-ea :dword :base object
-			      :disp (- (* offset word-bytes) lowtag))
+			      :disp (- (* offset n-word-bytes) lowtag))
 		     (logior (ash (char-code val) n-widetag-bits)
 			     base-char-widetag)))))
        ;; Else, value not immediate.
@@ -157,7 +157,7 @@
     (load-type type function (- fun-pointer-lowtag))
     (inst lea raw
 	  (make-ea :byte :base function
-		   :disp (- (* simple-fun-code-offset word-bytes)
+		   :disp (- (* simple-fun-code-offset n-word-bytes)
 			    fun-pointer-lowtag)))
     (inst cmp type simple-fun-header-widetag)
     (inst jmp :e normal-fn)
@@ -191,7 +191,7 @@
   (:generator 5
     (load-symbol-value bsp *binding-stack-pointer*)
     (loadw temp symbol symbol-value-slot other-pointer-lowtag)
-    (inst add bsp (* binding-size word-bytes))
+    (inst add bsp (* binding-size n-word-bytes))
     (store-symbol-value bsp *binding-stack-pointer*)
     (storew temp bsp (- binding-value-slot binding-size))
     (storew symbol bsp (- binding-symbol-slot binding-size))
@@ -205,7 +205,7 @@
     (loadw value bsp (- binding-value-slot binding-size))
     (storew value symbol symbol-value-slot other-pointer-lowtag)
     (storew 0 bsp (- binding-symbol-slot binding-size))
-    (inst sub bsp (* binding-size word-bytes))
+    (inst sub bsp (* binding-size n-word-bytes))
     (store-symbol-value bsp *binding-stack-pointer*)))
 
 (define-vop (unbind-to-here)
@@ -225,7 +225,7 @@
     (storew 0 bsp (- binding-symbol-slot binding-size))
 
     SKIP
-    (inst sub bsp (* binding-size word-bytes))
+    (inst sub bsp (* binding-size n-word-bytes))
     (inst cmp where bsp)
     (inst jmp :ne loop)
     (store-symbol-value bsp *binding-stack-pointer*)
@@ -318,7 +318,7 @@
     (move eax old-value)
     (move temp new-value)
     (inst cmpxchg (make-ea :dword :base object :index slot :scale 1
-			   :disp (- (* instance-slots-offset word-bytes)
+			   :disp (- (* instance-slots-offset n-word-bytes)
 				    instance-pointer-lowtag))
 	  temp)
     (move result eax)))

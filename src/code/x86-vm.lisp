@@ -76,7 +76,7 @@
 			    new-fixups)))
 		   (t
 		    (unless (or (eq (get-type fixups)
-				    sb!vm:unbound-marker-widetag)
+				    unbound-marker-widetag)
 				(zerop fixups))
 		      (format t "** Init. code FU = ~S~%" fixups)) ; FIXME
 		    (setf (code-header-ref code code-constants-offset)
@@ -129,20 +129,20 @@
 #!+gencgc
 (defun !do-load-time-code-fixup (code offset fixup kind)
   (flet ((add-load-time-code-fixup (code offset)
-	   (let ((fixups (code-header-ref code sb!vm:code-constants-offset)))
+	   (let ((fixups (code-header-ref code code-constants-offset)))
 	     (cond ((typep fixups '(simple-array (unsigned-byte 32) (*)))
 		    (let ((new-fixups
 			   (adjust-array fixups (1+ (length fixups))
 					 :element-type '(unsigned-byte 32))))
 		      (setf (aref new-fixups (length fixups)) offset)
-		      (setf (code-header-ref code sb!vm:code-constants-offset)
+		      (setf (code-header-ref code code-constants-offset)
 			    new-fixups)))
 		   (t
 		    (unless (or (eq (get-type fixups)
-				    sb!vm:unbound-marker-widetag)
+				    unbound-marker-widetag)
 				(zerop fixups))
 		      (sb!impl::!cold-lose "Argh! can't process fixup"))
-		    (setf (code-header-ref code sb!vm:code-constants-offset)
+		    (setf (code-header-ref code code-constants-offset)
 			  (make-specializable-array
 			   1
 			   :element-type '(unsigned-byte 32)
@@ -275,10 +275,9 @@
       (/show0 "LENGTH,VECTOR,ERROR-NUMBER=..")
       (/hexstr length)
       (/hexstr vector)
-      (copy-from-system-area pc (* sb!vm:byte-bits 2)
-			     vector (* sb!vm:n-word-bits
-				       sb!vm:vector-data-offset)
-			     (* length sb!vm:byte-bits))
+      (copy-from-system-area pc (* n-byte-bits 2)
+			     vector (* n-word-bits vector-data-offset)
+			     (* length n-byte-bits))
       (let* ((index 0)
 	     (error-number (sb!c::read-var-integer vector index)))
 	(/hexstr error-number)

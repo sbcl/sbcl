@@ -118,10 +118,10 @@
   (ecase space
     (:static
      (values (int-sap static-space-start)
-	     (int-sap (* *static-space-free-pointer* word-bytes))))
+	     (int-sap (* *static-space-free-pointer* n-word-bytes))))
     (:read-only
      (values (int-sap read-only-space-start)
-	     (int-sap (* *read-only-space-free-pointer* word-bytes))))
+	     (int-sap (* *read-only-space-free-pointer* n-word-bytes))))
     (:dynamic
      (values (int-sap dynamic-space-start)
 	     (dynamic-space-free-pointer)))))
@@ -147,7 +147,7 @@
 		  (:string 1)))))
     (declare (type (integer -3 3) shift))
     (round-to-dualword
-     (+ (* vector-data-offset word-bytes)
+     (+ (* vector-data-offset n-word-bytes)
 	(the fixnum
 	     (if (minusp shift)
 		 (ash (the fixnum
@@ -176,7 +176,7 @@
 	    (cond
 	     ((or (not info)
 		  (eq (room-info-kind info) :lowtag))
-	      (let ((size (* cons-size word-bytes)))
+	      (let ((size (* cons-size n-word-bytes)))
 		(funcall fun
 			 (make-lisp-obj (logior (sap-int current)
 						list-pointer-lowtag))
@@ -188,14 +188,14 @@
 						 fun-pointer-lowtag)))
 		     (size (round-to-dualword
 			    (* (the fixnum (1+ (get-closure-length obj)))
-			       word-bytes))))
+			       n-word-bytes))))
 		(funcall fun obj header-widetag size)
 		(setq current (sap+ current size))))
 	     ((eq (room-info-kind info) :instance)
 	      (let* ((obj (make-lisp-obj
 			   (logior (sap-int current) instance-pointer-lowtag)))
 		     (size (round-to-dualword
-			    (* (+ (%instance-length obj) 1) word-bytes))))
+			    (* (+ (%instance-length obj) 1) n-word-bytes))))
 		(declare (fixnum size))
 		(funcall fun obj header-widetag size)
 		(aver (zerop (logand size lowtag-mask)))
@@ -213,18 +213,18 @@
 					       (1+ (get-header-data obj)))
 					  (floatp obj)))
 			      (round-to-dualword
-			       (* (room-info-length info) word-bytes)))
+			       (* (room-info-length info) n-word-bytes)))
 			     ((:vector :string)
 			      (vector-total-size obj info))
 			     (:header
 			      (round-to-dualword
-			       (* (1+ (get-header-data obj)) word-bytes)))
+			       (* (1+ (get-header-data obj)) n-word-bytes)))
 			     (:code
 			      (+ (the fixnum
-				      (* (get-header-data obj) word-bytes))
+				      (* (get-header-data obj) n-word-bytes))
 				 (round-to-dualword
 				  (* (the fixnum (%code-code-size obj))
-				     word-bytes)))))))
+				     n-word-bytes)))))))
 		(declare (fixnum size))
 		(funcall fun obj header-widetag size)
 		(aver (zerop (logand size lowtag-mask)))
@@ -397,7 +397,7 @@
 				 (%primitive code-instructions obj))))
 	     (incf code-words words)
 	     (dotimes (i words)
-	       (when (zerop (sap-ref-32 sap (* i sb!vm:word-bytes)))
+	       (when (zerop (sap-ref-32 sap (* i n-word-bytes)))
 		 (incf no-ops))))))
      space)
 
@@ -423,9 +423,9 @@
 	     (#.code-header-widetag
 	      (let ((inst-words (truly-the fixnum (%code-code-size obj))))
 		(declare (type fixnum inst-words))
-		(incf non-descriptor-bytes (* inst-words word-bytes))
+		(incf non-descriptor-bytes (* inst-words n-word-bytes))
 		(incf descriptor-words
-		      (- (truncate size word-bytes) inst-words))))
+		      (- (truncate size n-word-bytes) inst-words))))
 	     ((#.bignum-widetag
 	       #.single-float-widetag
 	       #.double-float-widetag
@@ -445,7 +445,7 @@
 	       #.simple-array-complex-single-float-widetag
 	       #.simple-array-complex-double-float-widetag)
 	      (incf non-descriptor-headers)
-	      (incf non-descriptor-bytes (- size word-bytes)))
+	      (incf non-descriptor-bytes (- size n-word-bytes)))
 	     ((#.list-pointer-lowtag
 	       #.instance-pointer-lowtag
 	       #.ratio-widetag
@@ -463,9 +463,9 @@
 	       #.sap-widetag
 	       #.weak-pointer-widetag
 	       #.instance-header-widetag)
-	      (incf descriptor-words (truncate size word-bytes)))
+	      (incf descriptor-words (truncate size n-word-bytes)))
 	     (t
-	      (error "Bogus type: ~D" type))))
+	      (error "bogus type: ~D" type))))
        space))
     (format t "~:D words allocated for descriptor objects.~%"
 	    descriptor-words)

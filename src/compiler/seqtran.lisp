@@ -623,18 +623,18 @@
      (declare (optimize (safety 0)))
      (bit-bash-copy string2
 		    (the index
-			 (+ (the index (* start2 sb!vm:byte-bits))
+			 (+ (the index (* start2 sb!vm:n-byte-bits))
 			    ,vector-data-bit-offset))
 		    string1
 		    (the index
-			 (+ (the index (* start1 sb!vm:byte-bits))
+			 (+ (the index (* start1 sb!vm:n-byte-bits))
 			    ,vector-data-bit-offset))
 		    (the index
 			 (* (min (the index (- (or end1 (length string1))
 					       start1))
 				 (the index (- (or end2 (length string2))
 					       start2)))
-			    sb!vm:byte-bits)))
+			    sb!vm:n-byte-bits)))
      string1))
 
 ;;; FIXME: It seems as though it should be possible to make a DEFUN
@@ -653,7 +653,7 @@
       (let ((n-seq (gensym))
 	    (n-length (gensym)))
 	(args n-seq)
-	(lets `(,n-length (the index (* (length ,n-seq) sb!vm:byte-bits))))
+	(lets `(,n-length (the index (* (length ,n-seq) sb!vm:n-byte-bits))))
 	(all-lengths n-length)
 	(forms `(bit-bash-copy ,n-seq ,vector-data-bit-offset
 			       res start
@@ -663,7 +663,7 @@
        (declare (ignore rtype))
        (let* (,@(lets)
 	      (res (make-string (truncate (the index (+ ,@(all-lengths)))
-					  sb!vm:byte-bits)))
+					  sb!vm:n-byte-bits)))
 	      (start ,vector-data-bit-offset))
 	 (declare (type index start ,@(all-lengths)))
 	 ,@(forms)

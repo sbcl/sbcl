@@ -23,7 +23,7 @@
   (:temporary (:scs (non-descriptor-reg)) header)
   (:results (result :scs (descriptor-reg)))
   (:generator 13
-    (inst addq rank (+ (* array-dimensions-offset word-bytes)
+    (inst addq rank (+ (* array-dimensions-offset n-word-bytes)
 		       lowtag-mask)
 	  bytes)
     (inst li (lognot lowtag-mask) header)
@@ -142,7 +142,7 @@
                                 (inst sll temp 2 temp)
                                 (inst addq object temp lip)
                                 (inst ldl result
-                                      (- (* vector-data-offset word-bytes)
+                                      (- (* vector-data-offset n-word-bytes)
                                          other-pointer-lowtag)
                                       lip)
                                 (inst and index ,(1- elements-per-word) temp)
@@ -161,7 +161,7 @@
                                  (integer 0
                                           ,(1- (* (1+ (- (floor (+ #x7fff
                                                                    other-pointer-lowtag)
-                                                                word-bytes)
+                                                                n-word-bytes)
                                                          vector-data-offset))
                                                   elements-per-word)))))
                     (:info index)
@@ -198,7 +198,7 @@
                                 (inst sll temp 2 temp)
                                 (inst addq object temp lip)
                                 (inst ldl old
-                                      (- (* vector-data-offset word-bytes)
+                                      (- (* vector-data-offset n-word-bytes)
                                          other-pointer-lowtag)
                                       lip)
                                 (inst and index ,(1- elements-per-word) shift)
@@ -227,7 +227,7 @@
                                   (inst sll temp shift temp)
                                   (inst bis old temp old))
                                 (inst stl old
-                                      (- (* vector-data-offset word-bytes)
+                                      (- (* vector-data-offset n-word-bytes)
                                          other-pointer-lowtag)
                                       lip)
                                 (sc-case value
@@ -248,7 +248,7 @@
                                  (integer 0
                                           ,(1- (* (1+ (- (floor (+ #x7fff
                                                                    other-pointer-lowtag)
-                                                                word-bytes)
+                                                                n-word-bytes)
                                                          vector-data-offset))
                                                   elements-per-word))))
                                 positive-fixnum)
@@ -261,7 +261,7 @@
 				    (floor index ,elements-per-word)
                                   (inst ldl object
                                         (- (* (+ word vector-data-offset)
-					      word-bytes)
+					      n-word-bytes)
                                            other-pointer-lowtag)
                                         old)
                                   (unless (and (sc-is value immediate)
@@ -298,7 +298,7 @@
                                             (inst bis old temp old)))
                                   (inst stl old
                                         (- (* (+ word vector-data-offset)
-					      word-bytes)
+					      n-word-bytes)
                                            other-pointer-lowtag)
                                         object)
                                   (sc-case value
@@ -355,7 +355,7 @@
   (:generator 20
     (inst addq object index lip)
     (inst lds value
-	  (- (* vector-data-offset word-bytes)
+	  (- (* vector-data-offset n-word-bytes)
 	     other-pointer-lowtag)
 	   lip)))
 
@@ -373,7 +373,7 @@
   (:generator 20
     (inst addq object index lip)
     (inst sts value
-	  (- (* vector-data-offset word-bytes)
+	  (- (* vector-data-offset n-word-bytes)
 	     other-pointer-lowtag)
 	  lip)
     (unless (location= result value)
@@ -393,7 +393,7 @@
     (inst addq object index lip)
     (inst addq lip index lip)
     (inst ldt value
-	  (- (* vector-data-offset word-bytes)
+	  (- (* vector-data-offset n-word-bytes)
 	     other-pointer-lowtag)
 	  lip)))
 
@@ -412,7 +412,7 @@
     (inst addq object index lip)
     (inst addq lip index lip)
     (inst stt value
-	  (- (* vector-data-offset word-bytes)
+	  (- (* vector-data-offset n-word-bytes)
 	     other-pointer-lowtag) lip)
     (unless (location= result value)
       (inst fmove value result))))
@@ -434,11 +434,11 @@
       (inst addq object index lip)
       (inst addq lip index lip)
       (inst lds real-tn
-	    (- (* vector-data-offset word-bytes) other-pointer-lowtag)
+	    (- (* vector-data-offset n-word-bytes) other-pointer-lowtag)
 	    lip))
     (let ((imag-tn (complex-single-reg-imag-tn value)))
       (inst lds imag-tn
-	    (- (* (1+ vector-data-offset) word-bytes) other-pointer-lowtag)
+	    (- (* (1+ vector-data-offset) n-word-bytes) other-pointer-lowtag)
 	    lip))))
 
 (define-vop (data-vector-set/simple-array-complex-single-float)
@@ -459,14 +459,14 @@
       (inst addq object index lip)
       (inst addq lip index lip)
       (inst sts value-real
-	    (- (* vector-data-offset word-bytes) other-pointer-lowtag)
+	    (- (* vector-data-offset n-word-bytes) other-pointer-lowtag)
 	    lip)
       (unless (location= result-real value-real)
 	(inst fmove value-real result-real)))
     (let ((value-imag (complex-single-reg-imag-tn value))
 	  (result-imag (complex-single-reg-imag-tn result)))
       (inst sts value-imag
-	    (- (* (1+ vector-data-offset) word-bytes) other-pointer-lowtag)
+	    (- (* (1+ vector-data-offset) n-word-bytes) other-pointer-lowtag)
 	    lip)
       (unless (location= result-imag value-imag)
 	(inst fmove value-imag result-imag)))))
@@ -488,11 +488,11 @@
       (inst addq lip index lip)
       (inst addq lip index lip)
       (inst ldt real-tn
-	    (- (* vector-data-offset word-bytes) other-pointer-lowtag)
+	    (- (* vector-data-offset n-word-bytes) other-pointer-lowtag)
 	    lip))
     (let ((imag-tn (complex-double-reg-imag-tn value)))
       (inst ldt imag-tn
-	    (- (* (+ vector-data-offset 2) word-bytes) other-pointer-lowtag)
+	    (- (* (+ vector-data-offset 2) n-word-bytes) other-pointer-lowtag)
 	    lip))))
 
 (define-vop (data-vector-set/simple-array-complex-double-float)
@@ -515,14 +515,14 @@
       (inst addq lip index lip)
       (inst addq lip index lip)
       (inst stt value-real
-	    (- (* vector-data-offset word-bytes) other-pointer-lowtag)
+	    (- (* vector-data-offset n-word-bytes) other-pointer-lowtag)
 	    lip)
       (unless (location= result-real value-real)
 	(inst fmove value-real result-real)))
     (let ((value-imag (complex-double-reg-imag-tn value))
 	  (result-imag (complex-double-reg-imag-tn result)))
       (inst stt value-imag
-	    (- (* (+ vector-data-offset 2) word-bytes) other-pointer-lowtag)
+	    (- (* (+ vector-data-offset 2) n-word-bytes) other-pointer-lowtag)
 	    lip)
       (unless (location= result-imag value-imag)
 	(inst fmove value-imag result-imag)))))

@@ -27,7 +27,7 @@
   ;; This is kinda sleezy, changing words like this.  But we can because
   ;; the vop thinks it is temporary.
   (inst addq words (+ (1- (ash 1 n-lowtag-bits))
-		      (* vector-data-offset word-bytes))
+		      (* vector-data-offset n-word-bytes))
 	words)
   (inst li (lognot lowtag-mask) ndescr)
   (inst and words ndescr words)
@@ -85,7 +85,7 @@
 
   ;; Get a pointer to the data.
   (inst addq string
-	(- (* vector-data-offset word-bytes) other-pointer-lowtag)
+	(- (* vector-data-offset n-word-bytes) other-pointer-lowtag)
 	lip)
   (move zero-tn accum)
   (inst br zero-tn test)

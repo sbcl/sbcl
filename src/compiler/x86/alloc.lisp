@@ -30,14 +30,14 @@
 	   (move result (tn-ref-tn things)))
 	  (t
 	   (macrolet
-	       ((store-car (tn list &optional (slot sb!vm:cons-car-slot))
+	       ((store-car (tn list &optional (slot cons-car-slot))
 		  `(let ((reg
 			  (sc-case ,tn
 			    ((any-reg descriptor-reg) ,tn)
 			    ((control-stack)
 			     (move temp ,tn)
 			     temp))))
-		     (storew reg ,list ,slot sb!vm:list-pointer-lowtag))))
+		     (storew reg ,list ,slot list-pointer-lowtag))))
 	     (let ((cons-cells (if star (1- num) num)))
 	       (pseudo-atomic
 		(allocation res (* (pad-data-block cons-size) cons-cells) node)
@@ -98,11 +98,11 @@
      ;;   -- WHN 19990916
      ;;
      ;; FIXME: should have a check for overflow of static space
-     (load-symbol-value temp sb!vm:*static-space-free-pointer*)
+     (load-symbol-value temp *static-space-free-pointer*)
      (inst lea result (make-ea :byte :base temp :disp other-pointer-lowtag))
      (inst add temp boxed)
      (inst add temp unboxed)
-     (store-symbol-value temp sb!vm:*static-space-free-pointer*)
+     (store-symbol-value temp *static-space-free-pointer*)
      (inst shl boxed (- n-widetag-bits word-shift))
      (inst or boxed code-header-widetag)
      (storew boxed result 0 other-pointer-lowtag)
@@ -213,7 +213,7 @@
   (:node-var node)
   (:generator 50
     (inst lea bytes
-	  (make-ea :dword :base extra :disp (* (1+ words) word-bytes)))
+	  (make-ea :dword :base extra :disp (* (1+ words) n-word-bytes)))
     (inst mov header bytes)
     (inst shl header (- n-widetag-bits 2)) ; w+1 to length field
     (inst lea header			; (w-1 << 8) | type

@@ -157,7 +157,7 @@
   (multiple-value-bind (slot-offset slot-type)
       (find-slot-offset-and-type alien slot)
     (/noshow "in DEFTRANSFORM %SLOT-ADDR, creating %SAP-ALIEN")
-    `(%sap-alien (sap+ (alien-sap alien) (/ ,slot-offset sb!vm:byte-bits))
+    `(%sap-alien (sap+ (alien-sap alien) (/ ,slot-offset sb!vm:n-byte-bits))
 		 ',(make-alien-pointer-type :to slot-type))))
 
 ;;;; DEREF support
@@ -280,7 +280,7 @@
       (compute-deref-guts alien indices)
     (/noshow "in DEFTRANSFORM %DEREF-ADDR, creating (LAMBDA .. %SAP-ALIEN)")
     `(lambda (alien ,@indices-args)
-       (%sap-alien (sap+ (alien-sap alien) (/ ,offset-expr sb!vm:byte-bits))
+       (%sap-alien (sap+ (alien-sap alien) (/ ,offset-expr sb!vm:n-byte-bits))
 		   ',(make-alien-pointer-type :to element-type)))))
 
 ;;;; support for aliens on the heap
@@ -350,11 +350,11 @@
       #!+x86 `(truly-the system-area-pointer
 			 (%primitive alloc-alien-stack-space
 				     ,(ceiling (alien-type-bits alien-type)
-					       sb!vm:byte-bits)))
+					       sb!vm:n-byte-bits)))
       #!-x86 `(truly-the system-area-pointer
 			 (%primitive alloc-number-stack-space
 				     ,(ceiling (alien-type-bits alien-type)
-					       sb!vm:byte-bits)))
+					       sb!vm:n-byte-bits)))
       (let* ((alien-rep-type-spec (compute-alien-rep-type alien-type))
 	     (alien-rep-type (specifier-type alien-rep-type-spec)))
 	(cond ((csubtypep (specifier-type 'system-area-pointer)
@@ -437,10 +437,10 @@
     (if (local-alien-info-force-to-memory-p info)
       #!+x86 `(%primitive dealloc-alien-stack-space
 			  ,(ceiling (alien-type-bits alien-type)
-				    sb!vm:byte-bits))
+				    sb!vm:n-byte-bits))
       #!-x86 `(%primitive dealloc-number-stack-space
 			  ,(ceiling (alien-type-bits alien-type)
-				    sb!vm:byte-bits))
+				    sb!vm:n-byte-bits))
       nil)))
 
 ;;;; %CAST

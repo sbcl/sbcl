@@ -235,7 +235,8 @@
   (:temporary (:scs (non-descriptor-reg)) count)
   (:generator 1
     (let ((offset
-	   (- (* (+ index vector-data-offset) word-bytes) other-pointer-lowtag)))
+	   (- (* (+ index vector-data-offset) n-word-bytes)
+	      other-pointer-lowtag)))
       (inst ldl count offset count-vector)
       (inst addq count 1 count)
       (inst stl count offset count-vector))))

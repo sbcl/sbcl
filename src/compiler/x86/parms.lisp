@@ -24,21 +24,18 @@
 
 ;;;; machine architecture parameters
 
-(defconstant n-word-bits 32
-  #!+sb-doc
-  "Number of bits per word where a word holds one lisp descriptor.")
+;;; the number of bits per word, where a word holds one lisp descriptor
+(defconstant n-word-bits 32)
 
-(defconstant byte-bits 8
-  #!+sb-doc
-  "Number of bits per byte where a byte is the smallest addressable object.")
+;;; the number of bits per byte, where a byte is the smallest
+;;; addressable object
+(defconstant n-byte-bits 8)
 
-(defconstant word-shift (1- (integer-length (/ n-word-bits byte-bits)))
-  #!+sb-doc
-  "Number of bits to shift between word addresses and byte addresses.")
+;;; the number of bits to shift between word addresses and byte addresses
+(defconstant word-shift (1- (integer-length (/ n-word-bits n-byte-bits))))
 
-(defconstant word-bytes (/ n-word-bits byte-bits)
-  #!+sb-doc
-  "Number of bytes in a word.")
+;;; the number of bytes in a word
+(defconstant n-word-bytes (/ n-word-bits n-byte-bits))
 
 (defconstant float-sign-shift 31)
 
@@ -255,7 +252,7 @@
     *current-catch-block*
     *current-unwind-protect-block*
     *eval-stack-top*
-    sb!vm::*alien-stack*
+    *alien-stack*
 
     ;; interrupt handling
     *pseudo-atomic-atomic*
@@ -264,23 +261,23 @@
     sb!unix::*interrupt-pending*
     *free-interrupt-context-index*
 
-    sb!vm::*allocation-pointer*
-    sb!vm::*binding-stack-pointer*
-    sb!vm::*internal-gc-trigger*   ; Not used.
+    *allocation-pointer*
+    *binding-stack-pointer*
+    *internal-gc-trigger*   ; Not used.
 
     ;; the floating point constants
-    sb!vm::*fp-constant-0d0*
-    sb!vm::*fp-constant-1d0*
-    sb!vm::*fp-constant-0s0*
-    sb!vm::*fp-constant-1s0*
+    *fp-constant-0d0*
+    *fp-constant-1d0*
+    *fp-constant-0s0*
+    *fp-constant-1s0*
     ;; The following are all long-floats.
-    sb!vm::*fp-constant-0l0*
-    sb!vm::*fp-constant-1l0*
-    sb!vm::*fp-constant-pi*
-    sb!vm::*fp-constant-l2t*
-    sb!vm::*fp-constant-l2e*
-    sb!vm::*fp-constant-lg2*
-    sb!vm::*fp-constant-ln2*
+    *fp-constant-0l0*
+    *fp-constant-1l0*
+    *fp-constant-pi*
+    *fp-constant-l2t*
+    *fp-constant-l2e*
+    *fp-constant-lg2*
+    *fp-constant-ln2*
 
     ;; The ..SLOT-UNBOUND.. symbol is static in order to optimise the
     ;; common slot unbound check.

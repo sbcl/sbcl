@@ -52,11 +52,11 @@
     (inst jmp done)
 
     FUNCTION-PTR
-    (load-type al-tn object (- sb!vm:fun-pointer-lowtag))
+    (load-type al-tn object (- fun-pointer-lowtag))
     (inst jmp done)
 
     OTHER-PTR
-    (load-type al-tn object (- sb!vm:other-pointer-lowtag))
+    (load-type al-tn object (- other-pointer-lowtag))
 
     DONE
     (inst movzx result al-tn)))
@@ -69,7 +69,7 @@
   (:results (result :scs (unsigned-reg)))
   (:result-types positive-fixnum)
   (:generator 6
-    (load-type temp function (- sb!vm:fun-pointer-lowtag))
+    (load-type temp function (- fun-pointer-lowtag))
     (inst movzx result temp)))
 
 (define-vop (set-function-subtype)
@@ -224,7 +224,7 @@
     (inst lea result
 	  (make-ea :byte :base result
 		   :disp (- fun-pointer-lowtag
-			    (* simple-fun-code-offset word-bytes))))))
+			    (* simple-fun-code-offset n-word-bytes))))))
 
 ;;; The closure function slot is a pointer to raw code on X86 instead
 ;;; of a pointer to the code function object itself. This VOP is used
@@ -295,5 +295,5 @@
   (:info index)
   (:generator 0
     (inst inc (make-ea :dword :base count-vector
-		       :disp (- (* (+ vector-data-offset index) word-bytes)
+		       :disp (- (* (+ vector-data-offset index) n-word-bytes)
 				other-pointer-lowtag)))))

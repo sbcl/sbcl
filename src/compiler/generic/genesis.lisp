@@ -94,9 +94,9 @@
   (bytes (make-array target-space-alignment :element-type '(unsigned-byte 8))
 	 :type (simple-array (unsigned-byte 8) 1))
   ;; the index of the next unwritten word (i.e. chunk of
-  ;; SB!VM:WORD-BYTES bytes) in BYTES, or equivalently the number of
+  ;; SB!VM:N-WORD-BYTES bytes) in BYTES, or equivalently the number of
   ;; words actually written in BYTES. In order to convert to an actual
-  ;; index into BYTES, thus must be multiplied by SB!VM:WORD-BYTES.
+  ;; index into BYTES, thus must be multiplied by SB!VM:N-WORD-BYTES.
   (free-word-index 0))
 
 (defun gspace-byte-address (gspace)
@@ -194,7 +194,7 @@
     ;; NEW-FREE-WORD-INDEX.
     (do ()
 	((>= (length (gspace-bytes gspace))
-	     (* new-free-word-index sb!vm:word-bytes)))
+	     (* new-free-word-index sb!vm:n-word-bytes)))
       (expand-gspace-bytes gspace))
     ;; Now that GSPACE is big enough, we can meaningfully grab a chunk of it.
     (setf (gspace-free-word-index gspace) new-free-word-index)
@@ -382,7 +382,7 @@
 (defun maybe-byte-swap (word)
   (declare (type (unsigned-byte 32) word))
   (aver (= sb!vm:n-word-bits 32))
-  (aver (= sb!vm:byte-bits 8))
+  (aver (= sb!vm:n-byte-bits 8))
   (if (not *genesis-byte-order-swap-p*)
       word
       (logior (ash (ldb (byte 8 0) word) 24)
@@ -393,7 +393,7 @@
 (defun maybe-byte-swap-short (short)
   (declare (type (unsigned-byte 16) short))
   (aver (= sb!vm:n-word-bits 32))
-  (aver (= sb!vm:byte-bits 8))
+  (aver (= sb!vm:n-byte-bits 8))
   (if (not *genesis-byte-order-swap-p*)
       short
       (logior (ash (ldb (byte 8 0) short) 8)
@@ -417,7 +417,7 @@
               `(progn
                  (defun ,name (byte-vector byte-index)
   (aver (= sb!vm:n-word-bits 32))
-  (aver (= sb!vm:byte-bits 8))
+  (aver (= sb!vm:n-byte-bits 8))
   (ecase sb!c:*backend-byte-order*
     (:little-endian
                       (logior ,@ash-list))
@@ -425,7 +425,7 @@
      (error "stub: no big-endian ports of SBCL (yet?)"))))
                  (defun (setf ,name) (new-value byte-vector byte-index)
   (aver (= sb!vm:n-word-bits 32))
-  (aver (= sb!vm:byte-bits 8))
+  (aver (= sb!vm:n-byte-bits 8))
   (ecase sb!c:*backend-byte-order*
     (:little-endian
                       (setf ,@setf-list))
@@ -521,9 +521,9 @@
   "Allocate LENGTH units of ELEMENT-BITS bits plus a header word in GSPACE and
   return an ``other-pointer'' descriptor to them. Initialize the header word
   with the resultant length and TYPE."
-  (let* ((bytes (/ (* element-bits length) sb!vm:byte-bits))
+  (let* ((bytes (/ (* element-bits length) sb!vm:n-byte-bits))
 	 (des (allocate-cold-descriptor gspace
-					(+ bytes sb!vm:word-bytes)
+					(+ bytes sb!vm:n-word-bytes)
 					sb!vm:other-pointer-lowtag)))
     (write-memory des
 		  (make-other-immediate-descriptor (ash bytes
@@ -537,9 +537,9 @@
   header word with TYPE and the length slot with LENGTH."
   ;; FIXME: Here and in ALLOCATE-UNBOXED-OBJECT, BYTES is calculated using
   ;; #'/ instead of #'CEILING, which seems wrong.
-  (let* ((bytes (/ (* element-bits length) sb!vm:byte-bits))
+  (let* ((bytes (/ (* element-bits length) sb!vm:n-byte-bits))
 	 (des (allocate-cold-descriptor gspace
-					(+ bytes (* 2 sb!vm:word-bytes))
+					(+ bytes (* 2 sb!vm:n-word-bytes))
 					sb!vm:other-pointer-lowtag)))
     (write-memory des (make-other-immediate-descriptor 0 type))
     (write-wordindexed des
@@ -556,11 +556,11 @@
   ;; extra null byte at the end to aid in call-out to C.)
   (let* ((length (length string))
 	 (des (allocate-vector-object gspace
-				      sb!vm:byte-bits
+				      sb!vm:n-byte-bits
 				      (1+ length)
 				      sb!vm:simple-string-widetag))
 	 (bytes (gspace-bytes gspace))
-	 (offset (+ (* sb!vm:vector-data-offset sb!vm:word-bytes)
+	 (offset (+ (* sb!vm:vector-data-offset sb!vm:n-word-bytes)
 		    (descriptor-byte-offset des))))
     (write-wordindexed des
 		       sb!vm:vector-length-slot
@@ -1062,7 +1062,7 @@
 	       0))
 	 (result (make-descriptor (descriptor-high des)
 				  (+ (descriptor-low des)
-				     (* 2 sb!vm:word-bytes)
+				     (* 2 sb!vm:n-word-bytes)
 				     (- sb!vm:list-pointer-lowtag
 					sb!vm:other-pointer-lowtag)))))
     (write-wordindexed des
@@ -1408,7 +1408,7 @@
       (let* ((fdefn (cold-fdefinition-object (cold-intern sym)))
 	     (offset (- (+ (- (descriptor-low fdefn)
 			      sb!vm:other-pointer-lowtag)
-			   (* sb!vm:fdefn-raw-addr-slot sb!vm:word-bytes))
+			   (* sb!vm:fdefn-raw-addr-slot sb!vm:n-word-bytes))
 			(descriptor-low *nil-descriptor*)))
 	     (desired (sb!vm:static-function-offset sym)))
 	(unless (= offset desired)
@@ -1644,7 +1644,7 @@
 	    (let ((fixed-up (- (+ value un-fixed-up)
 			       gspace-byte-address
 			       gspace-byte-offset
-			       sb!vm:word-bytes))) ; length of CALL argument
+			       sb!vm:n-word-bytes))) ; length of CALL argument
 	      (setf (byte-vector-ref-32 gspace-bytes gspace-byte-offset)
 		    fixed-up)
 	      ;; Note relative fixups that point outside the code
@@ -1954,7 +1954,7 @@
 		   (ash sb!vm:vector-data-offset sb!vm:word-shift)))
 	 (end (+ start
 		 (ceiling (* len sizebits)
-			  sb!vm:byte-bits))))
+			  sb!vm:n-byte-bits))))
     (read-sequence-or-die (descriptor-bytes result)
 			  *fasl-input-stream*
 			  :start start
@@ -1970,7 +1970,7 @@
 		  sb!vm:simple-array-single-float-widetag))
 	 (start (+ (descriptor-byte-offset result)
 		   (ash sb!vm:vector-data-offset sb!vm:word-shift)))
-	 (end (+ start (* len sb!vm:word-bytes))))
+	 (end (+ start (* len sb!vm:n-word-bytes))))
     (read-sequence-or-die (descriptor-bytes result)
 			  *fasl-input-stream*
 			  :start start
@@ -2306,7 +2306,7 @@
 		   "~&/raw code from code-fop ~D ~D:~%"
 		   nconst
 		   code-size)
-	   (do ((i start (+ i sb!vm:word-bytes)))
+	   (do ((i start (+ i sb!vm:n-word-bytes)))
 	       ((>= i end))
 	     (format *trace-output*
 		     "/#X~8,'0x: #X~8,'0x~%"
@@ -2636,7 +2636,7 @@
 	  (format t "#define ~A_~A_OFFSET ~D~%"
 		  (substitute #\_ #\- (string name))
 		  (substitute #\_ #\- (string (sb!vm:slot-name slot)))
-		  (- (* (sb!vm:slot-offset slot) sb!vm:word-bytes) lowtag)))
+		  (- (* (sb!vm:slot-offset slot) sb!vm:n-word-bytes) lowtag)))
 	(terpri))))
     (format t "#endif /* LANGUAGE_ASSEMBLY */~2%"))
 
@@ -2654,7 +2654,7 @@
 	      (descriptor-bits (cold-intern symbol))
 	      ;; We didn't run GENESIS, so guess at the address.
 	      (+ sb!vm:static-space-start
-		 sb!vm:word-bytes
+		 sb!vm:n-word-bytes
 		 sb!vm:other-pointer-lowtag
 		 (if symbol (sb!vm:static-symbol-offset symbol) 0)))))
 
@@ -2766,7 +2766,7 @@ initially undefined function references:~2%")
 (defun output-gspace (gspace)
   (force-output *core-file*)
   (let* ((posn (file-position *core-file*))
-	 (bytes (* (gspace-free-word-index gspace) sb!vm:word-bytes))
+	 (bytes (* (gspace-free-word-index gspace) sb!vm:n-word-bytes))
 	 (pages (ceiling bytes sb!c:*backend-page-size*))
 	 (total-bytes (* pages sb!c:*backend-page-size*)))
 

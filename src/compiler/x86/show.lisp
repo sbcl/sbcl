@@ -28,5 +28,5 @@
     (inst push object)
     (inst lea eax (make-fixup (extern-alien-name "debug_print") :foreign))
     (inst call (make-fixup (extern-alien-name "call_into_c") :foreign))
-    (inst add esp-tn word-bytes)
+    (inst add esp-tn n-word-bytes)
     (move result eax)))

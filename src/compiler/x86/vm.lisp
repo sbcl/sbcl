@@ -163,7 +163,7 @@
 ;;;
 ;;; (What a KLUDGE! Anyone who wants to come in and clean up this mess
 ;;; has my gratitude.) (FIXME: Maybe this should be me..)
-(defconstant sb!vm::kludge-nondeterministic-catch-block-size 6)
+(defconstant kludge-nondeterministic-catch-block-size 6)
 
 (define-storage-classes
 
@@ -322,8 +322,7 @@
 		    :alternate-scs (complex-long-stack))
 
   ;; a catch or unwind block
-  (catch-block stack
-	       :element-size sb!vm::kludge-nondeterministic-catch-block-size))
+  (catch-block stack :element-size kludge-nondeterministic-catch-block-size))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
 (defparameter *byte-sc-names* '(base-char-reg byte-reg base-char-stack))

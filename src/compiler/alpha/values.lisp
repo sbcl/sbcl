@@ -39,7 +39,7 @@
 	      start-temp)
   (:generator 20
     (move csp-tn start-temp)
-    (inst lda csp-tn (* nvals word-bytes) csp-tn)
+    (inst lda csp-tn (* nvals n-word-bytes) csp-tn)
     (do ((val vals (tn-ref-across val))
 	 (i 0 (1+ i)))
 	((null val))
@@ -75,7 +75,7 @@
     (inst bne temp done)
     (loadw temp list cons-car-slot list-pointer-lowtag)
     (loadw list list cons-cdr-slot list-pointer-lowtag)
-    (inst lda csp-tn word-bytes csp-tn)
+    (inst lda csp-tn n-word-bytes csp-tn)
     (storew temp csp-tn -1)
     (inst and list lowtag-mask ndescr)
     (inst xor ndescr list-pointer-lowtag ndescr)
@@ -103,7 +103,7 @@
       (zero
        (move context src))
       (immediate
-       (inst lda src (* (tn-value skip) word-bytes) context))
+       (inst lda src (* (tn-value skip) n-word-bytes) context))
       (any-reg
        (inst addq context skip src)))
     (move num count)

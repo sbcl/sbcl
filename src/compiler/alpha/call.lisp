@@ -104,7 +104,7 @@
 ;;; bytes on the PMAX.
 (defun bytes-needed-for-non-descriptor-stack-frame ()
   (* (logandc2 (1+ (sb-allocated-size 'non-descriptor-stack)) 1)
-     word-bytes))
+     n-word-bytes))
 
 ;;; This is used for setting up the Old-FP in local call.
 (define-vop (current-fp)
@@ -147,7 +147,10 @@
       ;; collector won't forget about us if we call anyone else.
       )
     ;; Build our stack frames.
-    (inst lda csp-tn (* word-bytes (sb-allocated-size 'control-stack)) cfp-tn)
+    (inst lda
+	  csp-tn
+	  (* n-word-bytes (sb-allocated-size 'control-stack))
+	  cfp-tn)
     (let ((nfp (current-nfp-tn vop)))
       (when nfp
 	(inst subq nsp-tn (bytes-needed-for-non-descriptor-stack-frame)
@@ -162,7 +165,10 @@
   (:generator 2
     (trace-table-entry trace-table-function-prologue)
     (move csp-tn res)
-    (inst lda csp-tn (* word-bytes (sb-allocated-size 'control-stack)) csp-tn)
+    (inst lda
+	  csp-tn
+	  (* n-word-bytes (sb-allocated-size 'control-stack))
+	  csp-tn)
     (when (ir2-physenv-number-stack-p callee)
       (inst subq nsp-tn (bytes-needed-for-non-descriptor-stack-frame)
 	    nsp-tn)
@@ -178,7 +184,7 @@
   (:generator 2
     (when (> nargs register-arg-count)
       (move csp-tn res)
-      (inst lda csp-tn (* nargs word-bytes) csp-tn))))
+      (inst lda csp-tn (* nargs n-word-bytes) csp-tn))))
 
 ;;; Emit code needed at the return-point from an unknown-values call
 ;;; for a fixed number of values. Values is the head of the TN-Ref
@@ -301,7 +307,7 @@ default-value-8
 		(defaults (cons default-lab tn))
 		
 		(inst blt temp default-lab)
-		(inst ldl move-temp (* i word-bytes) ocfp-tn)
+		(inst ldl move-temp (* i n-word-bytes) ocfp-tn)
 		(inst subq temp (fixnumize 1) temp)
 		(store-stack-tn tn move-temp)))
 	    
@@ -543,7 +549,7 @@ default-value-8
       (when cur-nfp
 	(inst addq cur-nfp (bytes-needed-for-non-descriptor-stack-frame)
 	      nsp-tn)))
-    (inst subq return-pc-temp (- other-pointer-lowtag word-bytes) lip)
+    (inst subq return-pc-temp (- other-pointer-lowtag n-word-bytes) lip)
     (move ocfp-temp cfp-tn)
     (inst ret zero-tn lip 1)
     (trace-table-entry trace-table-normal)))
@@ -891,7 +897,7 @@ default-value-8
     #!-gengc (lisp-return return-pc lip :offset 2)
     #!+gengc
     (progn
-      (inst addq return-pc (* 2 word-bytes) temp)
+      (inst addq return-pc (* 2 n-word-bytes) temp)
       (unless (location= ra return-pc)
 	(inst move ra return-pc))
       (inst ret zero-tn temp 1))
@@ -941,7 +947,7 @@ default-value-8
     ;; restore the frame pointer and clear as much of the control
     ;; stack as possible.
     (move ocfp cfp-tn)
-    (inst addq val-ptr (* nvals word-bytes) csp-tn)
+    (inst addq val-ptr (* nvals n-word-bytes) csp-tn)
     ;; pre-default any argument register that need it.
     (when (< nvals register-arg-count)
       (dolist (reg (subseq (list a0 a1 a2 a3 a4 a5) nvals))
@@ -1067,10 +1073,10 @@ default-value-8
 
       (emit-label loop)
       ;; *--dst = *--src, --count
-      (inst subq src word-bytes src)
+      (inst subq src n-word-bytes src)
       (inst subq count (fixnumize 1) count)
       (loadw temp src)
-      (inst subq dst word-bytes dst)
+      (inst subq dst n-word-bytes dst)
       (storew temp dst)
       (inst bgt count loop)
 
@@ -1127,13 +1133,13 @@ default-value-8
 
 	;; Store the current cons in the cdr of the previous cons.
 	(emit-label loop)
-	(inst addq dst (* 2 word-bytes) dst)
+	(inst addq dst (* 2 n-word-bytes) dst)
 	(storew dst dst -1 list-pointer-lowtag)
 
 	(emit-label enter)
 	;; Grab one value.
 	(loadw temp context)
-	(inst addq context word-bytes context)
+	(inst addq context n-word-bytes context)
 
 	;; Store the value in the car (in delay slot)
 	(storew temp dst 0 list-pointer-lowtag)

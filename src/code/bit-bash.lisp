@@ -14,7 +14,7 @@
 ;;;; constants and types
 
 ;;; the number of bits to process at a time
-(defconstant unit-bits sb!vm:n-word-bits)
+(defconstant unit-bits n-word-bits)
 
 ;;; the maximum number of bits that can be dealt with in a single call
 (defconstant max-bits (ash most-positive-fixnum -2))
@@ -111,7 +111,7 @@
   (let ((address (sap-int sap)))
     (values (int-sap #!-alpha (32bit-logical-andc2 address 3)
 		     #!+alpha (ash (ash address -2) 2))
-	    (+ (* (logand address 3) byte-bits) offset))))
+	    (+ (* (logand address 3) n-byte-bits) offset))))
 
 #!-sb-fluid (declaim (inline word-sap-ref %set-word-sap-ref))
 (defun word-sap-ref (sap offset)
@@ -501,7 +501,8 @@
 (defun copy-byte-vector-to-system-area (bv sap &optional (offset 0))
   ;; FIXME: There should be a type like SB!VM:BYTE so that we can write this
   ;; type as (SIMPLE-ARRAY SB!VM:BYTE 1). Except BYTE is an external symbol of
-  ;; package CL; so maybe SB!VM:VM-BYTE?
+  ;; package CL, and shadowing it would be too ugly; so maybe SB!VM:VMBYTE?
+  ;; (And then N-BYTE-BITS would be N-VMBYTE-BITS and so forth?)
   (declare (type (simple-array (unsigned-byte 8) 1) bv))
   (declare (type sap sap))
   (declare (type fixnum offset))
@@ -512,7 +513,7 @@
   ;; %BYTE-BLIT (and correspondingly rename the corresponding VOP) and
   ;; replace the DST-END argument with an N-BYTES argument?
   (copy-to-system-area bv
-		       (* sb!vm:vector-data-offset sb!vm:n-word-bits)
+		       (* vector-data-offset n-word-bits)
 		       sap
 		       offset
-		       (* (length bv) sb!vm:byte-bits)))
+		       (* (length bv) n-byte-bits)))

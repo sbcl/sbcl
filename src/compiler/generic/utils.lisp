@@ -61,4 +61,4 @@
        (pad-data-block (1- symbol-size))
        (- list-pointer-lowtag)
        (* static-function-index (pad-data-block fdefn-size))
-       (* fdefn-raw-addr-slot word-bytes))))
+       (* fdefn-raw-addr-slot n-word-bytes))))

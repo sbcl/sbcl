@@ -180,7 +180,7 @@
 		(look (sap+ ptr bytes-per-scrub-unit) 0 count))
 	       (t
 		(setf (sap-ref-32 ptr offset) 0)
-		(scrub ptr (+ offset sb!vm:word-bytes) count))))
+		(scrub ptr (+ offset sb!vm:n-word-bytes) count))))
        (look (ptr offset count)
 	 (declare (type system-area-pointer ptr)
 		  (type (unsigned-byte 16) offset)
@@ -189,14 +189,14 @@
 	 (cond ((= offset bytes-per-scrub-unit)
 		count)
 	       ((zerop (sap-ref-32 ptr offset))
-		(look ptr (+ offset sb!vm:word-bytes) count))
+		(look ptr (+ offset sb!vm:n-word-bytes) count))
 	       (t
-		(scrub ptr offset (+ count sb!vm:word-bytes))))))
+		(scrub ptr offset (+ count sb!vm:n-word-bytes))))))
     (let* ((csp (sap-int (sb!c::control-stack-pointer-sap)))
 	   (initial-offset (logand csp (1- bytes-per-scrub-unit))))
       (declare (type (unsigned-byte 32) csp))
       (scrub (int-sap (- csp initial-offset))
-	     (* (floor initial-offset sb!vm:word-bytes) sb!vm:word-bytes)
+	     (* (floor initial-offset sb!vm:n-word-bytes) sb!vm:n-word-bytes)
 	     0)))
 
   #!+x86 ;; (Stack grows downwards.)
@@ -206,13 +206,13 @@
 		  (type (unsigned-byte 16) offset)
 		  (type (unsigned-byte 20) count)
 		  (values (unsigned-byte 20)))
-	 (let ((loc (int-sap (- (sap-int ptr) (+ offset sb!vm:word-bytes)))))
+	 (let ((loc (int-sap (- (sap-int ptr) (+ offset sb!vm:n-word-bytes)))))
 	   (cond ((= offset bytes-per-scrub-unit)
 		  (look (int-sap (- (sap-int ptr) bytes-per-scrub-unit))
 			0 count))
 		 (t ;; need to fix bug in %SET-STACK-REF
 		  (setf (sap-ref-32 loc 0) 0)
-		  (scrub ptr (+ offset sb!vm:word-bytes) count)))))
+		  (scrub ptr (+ offset sb!vm:n-word-bytes) count)))))
        (look (ptr offset count)
 	 (declare (type system-area-pointer ptr)
 		  (type (unsigned-byte 16) offset)
@@ -222,14 +222,14 @@
 	   (cond ((= offset bytes-per-scrub-unit)
 		  count)
 		 ((zerop (sb!kernel::get-lisp-obj-address (stack-ref loc 0)))
-		  (look ptr (+ offset sb!vm:word-bytes) count))
+		  (look ptr (+ offset sb!vm:n-word-bytes) count))
 		 (t
-		  (scrub ptr offset (+ count sb!vm:word-bytes)))))))
+		  (scrub ptr offset (+ count sb!vm:n-word-bytes)))))))
     (let* ((csp (sap-int (sb!c::control-stack-pointer-sap)))
 	   (initial-offset (logand csp (1- bytes-per-scrub-unit))))
       (declare (type (unsigned-byte 32) csp))
       (scrub (int-sap (+ csp initial-offset))
-	     (* (floor initial-offset sb!vm:word-bytes) sb!vm:word-bytes)
+	     (* (floor initial-offset sb!vm:n-word-bytes) sb!vm:n-word-bytes)
 	     0))))
 
 ;;;; the default toplevel function

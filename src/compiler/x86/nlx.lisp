@@ -24,7 +24,7 @@
 (defun catch-block-ea (tn)
   (aver (sc-is tn catch-block))
   (make-ea :dword :base ebp-tn
-	   :disp (- (* (+ (tn-offset tn) catch-block-size) word-bytes))))
+	   :disp (- (* (+ (tn-offset tn) catch-block-size) n-word-bytes))))
 
 
 ;;;; Save and restore dynamic environment.
@@ -202,14 +202,14 @@
     (emit-label label)
     (note-this-location vop :non-local-entry)
 
-    (inst lea esi (make-ea :dword :base source :disp (- word-bytes)))
+    (inst lea esi (make-ea :dword :base source :disp (- n-word-bytes)))
     ;; The 'top' arg contains the %esp value saved at the time the
     ;; catch block was created and points to where the thrown values
     ;; should sit.
     (move edi top)
     (move result edi)
 
-    (inst sub edi word-bytes)
+    (inst sub edi n-word-bytes)
     (move ecx count)			; fixnum words == bytes
     (move num ecx)
     (inst shr ecx word-shift)		; word count for <rep movs>
@@ -222,7 +222,7 @@
 
     DONE
     ;; Reset the CSP at last moved arg.
-    (inst lea esp-tn (make-ea :dword :base edi :disp word-bytes))))
+    (inst lea esp-tn (make-ea :dword :base edi :disp n-word-bytes))))
 
 
 ;;; This VOP is just to force the TNs used in the cleanup onto the stack.

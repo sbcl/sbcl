@@ -281,43 +281,48 @@
 (defstruct (disassem-state (:conc-name dstate-)
 			   (:constructor %make-dstate)
 			   (:copier nil))
-  (cur-offs 0 :type offset)		; offset of current pos in segment
-  (next-offs 0 :type offset)		; offset of next position
-
+  ;; offset of current pos in segment
+  (cur-offs 0 :type offset)		
+  ;; offset of next position
+  (next-offs 0 :type offset)		
+  ;; a sap pointing to our segment
   (segment-sap (required-argument) :type sb!sys:system-area-pointer)
-					; a sap pointing to our segment
-  (segment nil :type (or null segment))	; the current segment
-
-  (alignment sb!vm:word-bytes :type alignment) ; what to align to in most cases
+  ;; the current segment					
+  (segment nil :type (or null segment))	
+  ;; what to align to in most cases
+  (alignment sb!vm:n-word-bytes :type alignment) 
   (byte-order :little-endian
 	      :type (member :big-endian :little-endian))
-
-  (properties nil :type list)		; for user code to hang stuff off of
+  ;; for user code to hang stuff off of
+  (properties nil :type list)
   (filtered-values (make-array max-filtered-value-index)
 		   :type filtered-value-vector)
-
-  (addr-print-len nil :type		; used for prettifying printing
-		  (or null (integer 0 20)))
+  ;; used for prettifying printing
+  (addr-print-len nil :type (or null (integer 0 20)))
   (argument-column 0 :type column)
-  (output-state :beginning		; to make output look nicer
+  ;; to make output look nicer
+  (output-state :beginning		
 		:type (member :beginning
 			      :block-boundary
 			      nil))
 
-  (labels nil :type list)		; alist of (address . label-number)
-  (label-hash (make-hash-table)		; same thing in a different form
-	      :type hash-table)
+  ;; alist of (address . label-number)
+  (labels nil :type list)		
+  ;; same as LABELS slot data, but in a different form
+  (label-hash (make-hash-table) :type hash-table)
+  ;; list of function
+  (fun-hooks nil :type list) 		
 
-  (fun-hooks nil :type list) 		; list of function
+  ;; alist of (address . label-number), popped as it's used
+  (cur-labels nil :type list)		; 
+  ;; list of offs-hook, popped as it's used
+  (cur-offs-hooks nil :type list) 	
 
-  ;; these next two are popped as they are used
-  (cur-labels nil :type list)		; alist of (address . label-number)
-  (cur-offs-hooks nil :type list) 	; list of offs-hook
+  ;; for the current location
+  (notes nil :type list)
 
-  (notes nil :type list)		; for the current location
-
-  (current-valid-locations nil		; currently active source variables
-			   :type (or null (vector bit))))
+  ;; currently active source variables
+  (current-valid-locations nil :type (or null (vector bit))))
 (def!method print-object ((dstate disassem-state) stream)
   (print-unreadable-object (dstate stream :type t)
     (format stream
@@ -421,7 +426,7 @@
 	   (type disassem-state dstate))
   (when (and (aligned-p (+ (seg-virtual-location (dstate-segment dstate))
 			   (dstate-cur-offs dstate))
-			(* 2 sb!vm:word-bytes))
+			(* 2 sb!vm:n-word-bytes))
 	     ;; Check type.
 	     (= (sb!sys:sap-ref-8 (dstate-segment-sap dstate)
 				  (if (eq (dstate-byte-order dstate)
@@ -532,7 +537,7 @@
   (let ((alignment (dstate-alignment dstate)))
     (unless (null stream)
       (multiple-value-bind (words bytes)
-	  (truncate alignment sb!vm:word-bytes)
+	  (truncate alignment sb!vm:n-word-bytes)
 	(when (> words 0)
 	  (print-words words stream dstate))
 	(when (> bytes 0)
@@ -805,18 +810,18 @@
       (unless (zerop word-offs)
 	(write-string ", " stream))
       (let ((word 0) (bit-shift 0))
-	(dotimes (byte-offs sb!vm:word-bytes)
+	(dotimes (byte-offs sb!vm:n-word-bytes)
 	  (let ((byte
 		 (sb!sys:sap-ref-8
 			sap
 			(+ start-offs
-			   (* word-offs sb!vm:word-bytes)
+			   (* word-offs sb!vm:n-word-bytes)
 			   byte-offs))))
 	    (setf word
 		  (if (eq byte-order :big-endian)
-		      (+ (ash word sb!vm:byte-bits) byte)
+		      (+ (ash word sb!vm:n-byte-bits) byte)
 		      (+ word (ash byte bit-shift))))
-	    (incf bit-shift sb!vm:byte-bits)))
+	    (incf bit-shift sb!vm:n-byte-bits)))
 	(format stream "#X~V,'0X" (ash sb!vm:n-word-bits -2) word)))))
 
 (defvar *default-dstate-hooks* (list #'lra-hook))
@@ -1742,7 +1747,7 @@
 ;;; access function of the slot.
 (defun grok-symbol-slot-ref (address)
   (declare (type address address))
-  (if (not (aligned-p address sb!vm:word-bytes))
+  (if (not (aligned-p address sb!vm:n-word-bytes))
       (values nil nil)
       (do ((slots-tail *grokked-symbol-slots* (cdr slots-tail)))
 	  ((null slots-tail)

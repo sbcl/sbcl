@@ -19,13 +19,13 @@
 
 ;;; The initialization of these streams is performed by
 ;;; STREAM-COLD-INIT-OR-RESET.
-(defvar *terminal-io* () #!+sb-doc "Terminal I/O stream.")
-(defvar *standard-input* () #!+sb-doc "Default input stream.")
-(defvar *standard-output* () #!+sb-doc "Default output stream.")
-(defvar *error-output* () #!+sb-doc "Error output stream.")
-(defvar *query-io* () #!+sb-doc "Query I/O stream.")
-(defvar *trace-output* () #!+sb-doc "Trace output stream.")
-(defvar *debug-io* () #!+sb-doc "Interactive debugging stream.")
+(defvar *terminal-io* () #!+sb-doc "terminal I/O stream")
+(defvar *standard-input* () #!+sb-doc "default input stream")
+(defvar *standard-output* () #!+sb-doc "default output stream")
+(defvar *error-output* () #!+sb-doc "error output stream")
+(defvar *query-io* () #!+sb-doc "query I/O stream")
+(defvar *trace-output* () #!+sb-doc "trace output stream")
+(defvar *debug-io* () #!+sb-doc "interactive debugging stream")
 
 (defun ill-in (stream &rest ignore)
   (declare (ignore ignore))
@@ -509,13 +509,13 @@
 	   (funcall (lisp-stream-in stream) stream eof-error-p eof-value))
 	  (t
 	   (when (/= start +in-buffer-extra+)
-	     (bit-bash-copy ibuf (+ (* +in-buffer-extra+ sb!vm:byte-bits)
+	     (bit-bash-copy ibuf (+ (* +in-buffer-extra+ sb!vm:n-byte-bits)
 				    (* sb!vm:vector-data-offset
 				       sb!vm:n-word-bits))
-			    ibuf (+ (the index (* start sb!vm:byte-bits))
+			    ibuf (+ (the index (* start sb!vm:n-byte-bits))
 				    (* sb!vm:vector-data-offset
 				       sb!vm:n-word-bits))
-			    (* count sb!vm:byte-bits)))
+			    (* count sb!vm:n-byte-bits)))
 	   (setf (lisp-stream-in-index stream) (1+ start))
 	   (code-char (aref ibuf start))))))
 
@@ -534,10 +534,10 @@
 	  (t
 	   (unless (zerop start)
 	     (bit-bash-copy ibuf (* sb!vm:vector-data-offset sb!vm:n-word-bits)
-			    ibuf (+ (the index (* start sb!vm:byte-bits))
+			    ibuf (+ (the index (* start sb!vm:n-byte-bits))
 				    (* sb!vm:vector-data-offset
 				       sb!vm:n-word-bits))
-			    (* count sb!vm:byte-bits)))
+			    (* count sb!vm:n-byte-bits)))
 	   (setf (lisp-stream-in-index stream) (1+ start))
 	   (aref ibuf start)))))
 
@@ -1120,12 +1120,12 @@
 	    (truly-the index (+ index copy)))
       (sb!sys:without-gcing
        (system-area-copy (vector-sap string)
-			 (* index sb!vm:byte-bits)
+			 (* index sb!vm:n-byte-bits)
 			 (if (typep buffer 'system-area-pointer)
 			     buffer
 			     (vector-sap buffer))
-			 (* start sb!vm:byte-bits)
-			 (* copy sb!vm:byte-bits))))
+			 (* start sb!vm:n-byte-bits)
+			 (* copy sb!vm:n-byte-bits))))
     (if (and (> requested copy) eof-error-p)
 	(error 'end-of-file :stream stream)
 	copy)))

@@ -415,7 +415,7 @@
 					 (* sb-vm:vector-data-offset
 					    sb-vm:n-word-bits)
 					 string-sap 0
-					 (* (1+ n) sb-vm:byte-bits))
+					 (* (1+ n) sb-vm:n-byte-bits))
 	  ;; Blast the pointer to the string into place.
 	  (setf (sap-ref-sap vec-sap i) string-sap)
 	  (setf string-sap (sap+ string-sap (round-bytes-to-words (1+ n))))
@@ -714,7 +714,7 @@
 				    (alien-sap buf) 0
 				    string (* sb-vm:vector-data-offset
 					      sb-vm:n-word-bits)
-				    (* count sb-vm:byte-bits))
+				    (* count sb-vm:n-byte-bits))
 				   (write-string string stream
 						 :end count)))))))))))
 

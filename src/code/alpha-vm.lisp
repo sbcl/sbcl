@@ -27,7 +27,7 @@
   "Alpha")
 
 (defun fixup-code-object (code offset value kind)
-  (unless (zerop (rem offset word-bytes))
+  (unless (zerop (rem offset n-word-bytes))
     (error "Unaligned instruction?  offset=#x~X." offset))
   (sb!sys:without-gcing
    (let ((sap (truly-the system-area-pointer
@@ -155,10 +155,9 @@
            (vector (make-array length :element-type '(unsigned-byte 8))))
       (declare (type (unsigned-byte 8) length)
                (type (simple-array (unsigned-byte 8) (*)) vector))
-      (copy-from-system-area pc (* sb!vm:byte-bits 5)
-                             vector (* sb!vm:n-word-bits
-                                       sb!vm:vector-data-offset)
-                             (* length sb!vm:byte-bits))
+      (copy-from-system-area pc (* n-byte-bits 5)
+                             vector (* n-word-bits vector-data-offset)
+                             (* length n-byte-bits))
       (let* ((index 0)
              (error-number (sb!c::read-var-integer vector index)))
         (collect ((sc-offsets))

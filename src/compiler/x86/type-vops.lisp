@@ -118,7 +118,7 @@
 		 3))
 	  ((sc-is value control-stack)
 	   (inst test (make-ea :byte :base ebp-tn
-			       :disp (- (* (1+ offset) sb!vm:word-bytes)))
+			       :disp (- (* (1+ offset) n-word-bytes)))
 		 3))
 	  (t
 	   (inst test value 3)))))

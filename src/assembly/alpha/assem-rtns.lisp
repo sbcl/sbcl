@@ -36,36 +36,36 @@
      (:temp a4 descriptor-reg a4-offset)
      (:temp a5 descriptor-reg a5-offset))
 
-  ;; Note, because of the way the return-multiple vop is written, we can
-  ;; assume that we are never called with nvals == 1 and that a0 has already
-  ;; been loaded.
+  ;; Note, because of the way the RETURN-MULTIPLE VOP is written, we
+  ;; can assume that we are never called with NVALS == 1 and that A0
+  ;; has already been loaded.
   (inst ble nvals default-a0-and-on)
-  (inst ldl a1 (* 1 word-bytes) vals)
+  (inst ldl a1 (* 1 n-word-bytes) vals)
   (inst subq nvals (fixnumize 2) count)
   (inst ble count default-a2-and-on)
-  (inst ldl a2 (* 2 word-bytes) vals)
+  (inst ldl a2 (* 2 n-word-bytes) vals)
   (inst subq nvals (fixnumize 3) count)
   (inst ble count default-a3-and-on)
-  (inst ldl a3 (* 3 word-bytes) vals)
+  (inst ldl a3 (* 3 n-word-bytes) vals)
   (inst subq nvals (fixnumize 4) count)
   (inst ble count default-a4-and-on)
-  (inst ldl a4 (* 4 word-bytes) vals)
+  (inst ldl a4 (* 4 n-word-bytes) vals)
   (inst subq nvals (fixnumize 5) count)
   (inst ble count default-a5-and-on)
-  (inst ldl a5 (* 5 word-bytes) vals)
+  (inst ldl a5 (* 5 n-word-bytes) vals)
   (inst subq nvals (fixnumize 6) count)
   (inst ble count done)
 
   ;; Copy the remaining args to the top of the stack.
-  (inst addq vals (* 6 word-bytes) vals)
-  (inst addq cfp-tn (* 6 word-bytes) dst)
+  (inst addq vals (* 6 n-word-bytes) vals)
+  (inst addq cfp-tn (* 6 n-word-bytes) dst)
 
   LOOP
   (inst ldl temp 0 vals)
-  (inst addq vals word-bytes vals)
+  (inst addq vals n-word-bytes vals)
   (inst stl temp 0 dst)
   (inst subq count (fixnumize 1) count)
-  (inst addq dst word-bytes dst)
+  (inst addq dst n-word-bytes dst)
   (inst bne count loop)
 		
   (inst br zero-tn done)
@@ -128,26 +128,26 @@
      
   ;; Load the argument regs (must do this now, 'cause the blt might
   ;; trash these locations)
-  (inst ldl a0 (* 0 word-bytes) args)
-  (inst ldl a1 (* 1 word-bytes) args)
-  (inst ldl a2 (* 2 word-bytes) args)
-  (inst ldl a3 (* 3 word-bytes) args)
-  (inst ldl a4 (* 4 word-bytes) args)
-  (inst ldl a5 (* 5 word-bytes) args)
+  (inst ldl a0 (* 0 n-word-bytes) args)
+  (inst ldl a1 (* 1 n-word-bytes) args)
+  (inst ldl a2 (* 2 n-word-bytes) args)
+  (inst ldl a3 (* 3 n-word-bytes) args)
+  (inst ldl a4 (* 4 n-word-bytes) args)
+  (inst ldl a5 (* 5 n-word-bytes) args)
 
   ;; Calc SRC, DST, and COUNT
   (inst subq nargs (fixnumize register-arg-count) count)
-  (inst addq args (* word-bytes register-arg-count) src)
+  (inst addq args (* n-word-bytes register-arg-count) src)
   (inst ble count done)
-  (inst addq cfp-tn (* word-bytes register-arg-count) dst)
+  (inst addq cfp-tn (* n-word-bytes register-arg-count) dst)
 	
   LOOP
   ;; Copy one arg.
   (inst ldl temp 0 src)
-  (inst addq src word-bytes src)
+  (inst addq src n-word-bytes src)
   (inst stl temp 0 dst)
   (inst subq count (fixnumize 1) count)
-  (inst addq dst word-bytes dst)
+  (inst addq dst n-word-bytes dst)
   (inst bgt count loop)
 	
   DONE

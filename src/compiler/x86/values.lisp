@@ -95,9 +95,10 @@
 	      (move count num))
 	     (t
 	      (inst lea src (make-ea :dword :base context
-				     :disp (- (* (tn-value skip) word-bytes))))
+				     :disp (- (* (tn-value skip)
+						 n-word-bytes))))
 	      (move count num)
-	      (inst sub count (* (tn-value skip) word-bytes)))))
+	      (inst sub count (* (tn-value skip) n-word-bytes)))))
 
       (any-reg
        (move src context)

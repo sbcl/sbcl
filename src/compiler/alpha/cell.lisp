@@ -153,7 +153,7 @@
   (:temporary (:scs (descriptor-reg)) temp)
   (:generator 5
     (loadw temp symbol symbol-value-slot other-pointer-lowtag)
-    (inst addq bsp-tn (* 2 word-bytes) bsp-tn)
+    (inst addq bsp-tn (* 2 n-word-bytes) bsp-tn)
     (storew temp bsp-tn (- binding-value-slot binding-size))
     (storew symbol bsp-tn (- binding-symbol-slot binding-size))
     (#+gengc storew-and-remember-slot #-gengc storew
@@ -168,7 +168,7 @@
     (#+gengc storew-and-remember-slot #-gengc storew
 	     value symbol symbol-value-slot other-pointer-lowtag)
     (storew zero-tn bsp-tn (- binding-symbol-slot binding-size))
-    (inst subq bsp-tn (* 2 word-bytes) bsp-tn)))
+    (inst subq bsp-tn (* 2 n-word-bytes) bsp-tn)))
 
 
 (define-vop (unbind-to-here)
@@ -193,7 +193,7 @@
       (storew zero-tn bsp-tn (- binding-symbol-slot binding-size))
 
       (emit-label skip)
-      (inst subq bsp-tn (* 2 word-bytes) bsp-tn)
+      (inst subq bsp-tn (* 2 n-word-bytes) bsp-tn)
       (inst cmpeq where bsp-tn temp)
       (inst beq temp loop)
 

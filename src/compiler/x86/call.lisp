@@ -122,7 +122,7 @@
     (emit-label start-lab)
     ;; Skip space for the function header.
     (inst simple-fun-header-word)
-    (dotimes (i (1- sb!vm:simple-fun-code-offset))
+    (dotimes (i (1- simple-fun-code-offset))
       (inst dword 0))
 
     ;; The start of the actual code.
@@ -136,7 +136,7 @@
       ;; The args fit within the frame so just allocate the frame.
       (inst lea esp-tn
 	    (make-ea :dword :base ebp-tn
-		     :disp (- (* sb!vm:word-bytes
+		     :disp (- (* n-word-bytes
 				 (max 3 (sb-allocated-size 'stack)))))))
 
     (trace-table-entry trace-table-normal)))
@@ -151,7 +151,7 @@
   (:ignore nfp callee)
   (:generator 2
     (move res esp-tn)
-    (inst sub esp-tn (* sb!vm:word-bytes (sb-allocated-size 'stack)))))
+    (inst sub esp-tn (* n-word-bytes (sb-allocated-size 'stack)))))
 
 ;;; Allocate a partial frame for passing stack arguments in a full
 ;;; call. NARGS is the number of arguments passed. We allocate at
@@ -162,7 +162,7 @@
   (:results (res :scs (any-reg control-stack)))
   (:generator 2
     (move res esp-tn)
-    (inst sub esp-tn (* (max nargs 3) sb!vm:word-bytes))))
+    (inst sub esp-tn (* (max nargs 3) n-word-bytes))))
 
 ;;; Emit code needed at the return-point from an unknown-values call
 ;;; for a fixed number of values. Values is the head of the TN-Ref
@@ -293,7 +293,7 @@
       (emit-label no-stack-args)
       (inst lea edi-tn
 	    (make-ea :dword :base ebp-tn
-		     :disp (* (- (1+ register-arg-count)) word-bytes)))
+		     :disp (* (- (1+ register-arg-count)) n-word-bytes)))
       ;; Load EAX with NIL so we can quickly store it, and set up
       ;; stuff for the loop.
       (inst mov eax-tn nil-value)
@@ -322,12 +322,12 @@
       ;; Compute a pointer to where the stack args go.
       (inst lea edi-tn
 	    (make-ea :dword :base ebp-tn
-		     :disp (* (- (1+ register-arg-count)) word-bytes)))
+		     :disp (* (- (1+ register-arg-count)) n-word-bytes)))
       ;; Save ESI, and compute a pointer to where the args come from.
       (storew esi-tn ebx-tn (- (1+ 2)))
       (inst lea esi-tn
 	    (make-ea :dword :base ebx-tn
-		     :disp (* (- (1+ register-arg-count)) word-bytes)))
+		     :disp (* (- (1+ register-arg-count)) n-word-bytes)))
       ;; Do the copy.
       (inst shr ecx-tn word-shift)		; make word count
       (inst std)
@@ -629,7 +629,7 @@
 		 ;; Zot all of the stack except for the old-fp.
 		 (inst lea esp-tn (make-ea :dword :base ebp-tn
 					   :disp (- (* (1+ ocfp-save-offset)
-						       word-bytes))))
+						       n-word-bytes))))
 		 ;; Restore the old fp from its save location on the stack,
 		 ;; and zot the stack.
 		 (inst pop ebp-tn))
@@ -656,14 +656,14 @@
        ;; Zot all of the stack except for the old-fp and return-pc.
        (inst lea esp-tn
 	     (make-ea :dword :base ebp-tn
-		      :disp (- (* (1+ (tn-offset return-pc)) word-bytes))))
+		      :disp (- (* (1+ (tn-offset return-pc)) n-word-bytes))))
        ;; Restore the old fp. old-fp may be either on the stack in its
        ;; save location or in a register, in either case this restores it.
        (move ebp-tn old-fp)
        ;; The return pops the return address (4 bytes), then we need
        ;; to pop all the slots before the return-pc which includes the
        ;; 4 bytes for the old-fp.
-       (inst ret (* (tn-offset return-pc) word-bytes))))
+       (inst ret (* (tn-offset return-pc) n-word-bytes))))
 
     (trace-table-entry trace-table-normal)))
 
@@ -874,9 +874,10 @@
 	       (inst ,(if (eq return :tail) 'jmp 'call)
 		     (make-ea :dword :base eax
 			      :disp ,(if named
-					 '(- (* fdefn-raw-addr-slot word-bytes)
+					 '(- (* fdefn-raw-addr-slot
+						n-word-bytes)
 					     other-pointer-lowtag)
-				       '(- (* closure-fun-slot word-bytes)
+				       '(- (* closure-fun-slot n-word-bytes)
 					   fun-pointer-lowtag))))
 	       ,@(ecase return
 		   (:fixed
@@ -993,13 +994,13 @@
     (if (zerop nvals)
 	(inst xor ecx ecx) ; smaller
       (inst mov ecx (fixnumize nvals)))
-    ;; restore the frame pointer.
+    ;; Restore the frame pointer.
     (move ebp-tn old-fp)
-    ;; clear as much of the stack as possible, but not past the return
+    ;; Clear as much of the stack as possible, but not past the return
     ;; address.
     (inst lea esp-tn (make-ea :dword :base ebx
-			      :disp (- (* (max nvals 2) word-bytes))))
-    ;; pre-default any argument register that need it.
+			      :disp (- (* (max nvals 2) n-word-bytes))))
+    ;; Pre-default any argument register that need it.
     (when (< nvals register-arg-count)
       (let* ((arg-tns (nthcdr nvals (list a0 a1 a2)))
 	     (first (first arg-tns)))
@@ -1011,7 +1012,7 @@
     ;; tell it to index off of EBX instead of EBP.
     (cond ((zerop nvals)
 	   ;; Return popping the return address and the OCFP.
-	   (inst ret word-bytes))
+	   (inst ret n-word-bytes))
 	  ((= nvals 1)
 	   ;; Return popping the return, leaving 1 slot. Can this
 	   ;; happen, or is a single value return handled elsewhere?
@@ -1019,7 +1020,7 @@
 	  (t
 	   (inst jmp (make-ea :dword :base ebx
 			      :disp (- (* (1+ (tn-offset return-pc))
-					  word-bytes))))))
+					  n-word-bytes))))))
 
     (trace-table-entry trace-table-normal)))
 
@@ -1134,7 +1135,7 @@
     (inst lea ebx-tn
 	  (make-ea :dword :base ebp-tn
 		   :disp (- (fixnumize fixed)
-			    (* sb!vm:word-bytes
+			    (* n-word-bytes
 			       (max 3 (sb-allocated-size 'stack))))))
     (inst sub ebx-tn ecx-tn)  ; Got the new stack in ebx
     (inst mov esp-tn ebx-tn)
@@ -1212,7 +1213,7 @@
     JUST-ALLOC-FRAME
     (inst lea esp-tn
 	  (make-ea :dword :base ebp-tn
-		   :disp (- (* sb!vm:word-bytes
+		   :disp (- (* n-word-bytes
 			       (max 3 (sb-allocated-size 'stack))))))
 
     DONE))
@@ -1244,7 +1245,7 @@
   (:result-types *)
   (:generator 4
    (inst mov value
-	 (make-ea :dword :base object :disp (- (* index word-bytes))))))
+	 (make-ea :dword :base object :disp (- (* index n-word-bytes))))))
 
 
 ;;; Turn more arg (context, count) into a list.
@@ -1285,7 +1286,7 @@
        (inst jmp enter)
        (emit-label loop)
        ;; Compute a pointer to the next cons.
-       (inst add dst (* cons-size word-bytes))
+       (inst add dst (* cons-size n-word-bytes))
        ;; Store a pointer to this cons in the CDR of the previous cons.
        (storew dst dst -1 list-pointer-lowtag)
        (emit-label enter)
@@ -1295,7 +1296,7 @@
        ;; Go back for more.
        (inst loop loop)
        ;; NIL out the last cons.
-       (storew nil-value dst 1 sb!vm:list-pointer-lowtag))
+       (storew nil-value dst 1 list-pointer-lowtag))
       (emit-label done))))
 
 ;;; Return the location and size of the &MORE arg glob created by

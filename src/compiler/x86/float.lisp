@@ -14,37 +14,37 @@
 (macrolet ((ea-for-xf-desc (tn slot)
 	     `(make-ea
 	       :dword :base ,tn
-	       :disp (- (* ,slot sb!vm:word-bytes)
-			sb!vm:other-pointer-lowtag))))
+	       :disp (- (* ,slot n-word-bytes)
+			other-pointer-lowtag))))
   (defun ea-for-sf-desc (tn)
-    (ea-for-xf-desc tn sb!vm:single-float-value-slot))
+    (ea-for-xf-desc tn single-float-value-slot))
   (defun ea-for-df-desc (tn)
-    (ea-for-xf-desc tn sb!vm:double-float-value-slot))
+    (ea-for-xf-desc tn double-float-value-slot))
   #!+long-float
   (defun ea-for-lf-desc (tn)
-    (ea-for-xf-desc tn sb!vm:long-float-value-slot))
+    (ea-for-xf-desc tn long-float-value-slot))
   ;; complex floats
   (defun ea-for-csf-real-desc (tn)
-    (ea-for-xf-desc tn sb!vm:complex-single-float-real-slot))
+    (ea-for-xf-desc tn complex-single-float-real-slot))
   (defun ea-for-csf-imag-desc (tn)
-    (ea-for-xf-desc tn sb!vm:complex-single-float-imag-slot))
+    (ea-for-xf-desc tn complex-single-float-imag-slot))
   (defun ea-for-cdf-real-desc (tn)
-    (ea-for-xf-desc tn sb!vm:complex-double-float-real-slot))
+    (ea-for-xf-desc tn complex-double-float-real-slot))
   (defun ea-for-cdf-imag-desc (tn)
-    (ea-for-xf-desc tn sb!vm:complex-double-float-imag-slot))
+    (ea-for-xf-desc tn complex-double-float-imag-slot))
   #!+long-float
   (defun ea-for-clf-real-desc (tn)
-    (ea-for-xf-desc tn sb!vm:complex-long-float-real-slot))
+    (ea-for-xf-desc tn complex-long-float-real-slot))
   #!+long-float
   (defun ea-for-clf-imag-desc (tn)
-    (ea-for-xf-desc tn sb!vm:complex-long-float-imag-slot)))
+    (ea-for-xf-desc tn complex-long-float-imag-slot)))
 
 (macrolet ((ea-for-xf-stack (tn kind)
 	     `(make-ea
 	       :dword :base ebp-tn
 	       :disp (- (* (+ (tn-offset ,tn)
 			      (ecase ,kind (:single 1) (:double 2) (:long 3)))
-			 sb!vm:word-bytes)))))
+			 n-word-bytes)))))
   (defun ea-for-sf-stack (tn)
     (ea-for-xf-stack tn :single))
   (defun ea-for-df-stack (tn)
@@ -78,7 +78,7 @@
 				   (:double 2)
 				   (:long 3))
 				 (ecase ,slot (:real 1) (:imag 2))))
-			 sb!vm:word-bytes)))))
+			 n-word-bytes)))))
   (defun ea-for-csf-real-stack (tn &optional (base ebp-tn))
     (ea-for-cxf-stack tn :single :real base))
   (defun ea-for-csf-imag-stack (tn &optional (base ebp-tn))
@@ -388,8 +388,8 @@
   (:note "float to pointer coercion")
   (:generator 13
      (with-fixed-allocation (y
-			     sb!vm:single-float-widetag
-			     sb!vm:single-float-size node)
+			     single-float-widetag
+			     single-float-size node)
        (with-tn@fp-top(x)
 	 (inst fst (ea-for-sf-desc y))))))
 (define-move-vop move-from-single :move
@@ -402,8 +402,8 @@
   (:note "float to pointer coercion")
   (:generator 13
      (with-fixed-allocation (y
-			     sb!vm:double-float-widetag
-			     sb!vm:double-float-size
+			     double-float-widetag
+			     double-float-size
 			     node)
        (with-tn@fp-top(x)
 	 (inst fstd (ea-for-df-desc y))))))
@@ -418,8 +418,8 @@
   (:note "float to pointer coercion")
   (:generator 13
      (with-fixed-allocation (y
-			     sb!vm:long-float-widetag
-			     sb!vm:long-float-size
+			     long-float-widetag
+			     long-float-size
 			     node)
        (with-tn@fp-top(x)
 	 (store-long-float (ea-for-lf-desc y))))))
@@ -494,8 +494,8 @@
   (:note "complex float to pointer coercion")
   (:generator 13
      (with-fixed-allocation (y
-			     sb!vm:complex-single-float-widetag
-			     sb!vm:complex-single-float-size
+			     complex-single-float-widetag
+			     complex-single-float-size
 			     node)
        (let ((real-tn (complex-single-reg-real-tn x)))
 	 (with-tn@fp-top(real-tn)
@@ -513,8 +513,8 @@
   (:note "complex float to pointer coercion")
   (:generator 13
      (with-fixed-allocation (y
-			     sb!vm:complex-double-float-widetag
-			     sb!vm:complex-double-float-size
+			     complex-double-float-widetag
+			     complex-double-float-size
 			     node)
        (let ((real-tn (complex-double-reg-real-tn x)))
 	 (with-tn@fp-top(real-tn)
@@ -533,8 +533,8 @@
   (:note "complex float to pointer coercion")
   (:generator 13
      (with-fixed-allocation (y
-			     sb!vm:complex-long-float-widetag
-			     sb!vm:complex-long-float-size
+			     complex-long-float-widetag
+			     complex-long-float-size
 			     node)
        (let ((real-tn (complex-long-reg-real-tn x)))
 	 (with-tn@fp-top(real-tn)
@@ -602,7 +602,7 @@
 				 (inst fxch x)))))
 		      (,stack-sc
 		       (if (= (tn-offset fp) esp-offset)
-			   (let* ((offset (* (tn-offset y) word-bytes))
+			   (let* ((offset (* (tn-offset y) n-word-bytes))
 				  (ea (make-ea :dword :base fp :disp offset)))
 			     (with-tn@fp-top(x)
 				,@(ecase format
@@ -617,7 +617,7 @@
 							    (:single 1)
 							    (:double 2)
 							    (:long 3)))
-						  sb!vm:word-bytes)))))
+						  n-word-bytes)))))
 			     (with-tn@fp-top(x)
 			       ,@(ecase format
 				    (:single '((inst fst  ea)))
@@ -1851,7 +1851,7 @@
       (storew lo-bits ebp-tn (- (1+ offset)))
       (with-empty-tn@fp-top(res)
 	(inst fldd (make-ea :dword :base ebp-tn
-			    :disp (- (* (1+ offset) word-bytes))))))))
+			    :disp (- (* (1+ offset) n-word-bytes))))))))
 
 #!+long-float
 (define-vop (make-long-float)
@@ -1872,7 +1872,7 @@
       (storew lo-bits ebp-tn (- (+ offset 2)))
       (with-empty-tn@fp-top(res)
 	(inst fldl (make-ea :dword :base ebp-tn
-			    :disp (- (* (+ offset 2) word-bytes))))))))
+			    :disp (- (* (+ offset 2) n-word-bytes))))))))
 
 (define-vop (single-float-bits)
   (:args (float :scs (single-reg descriptor-reg)
@@ -1896,8 +1896,8 @@
 	  (inst mov bits float))
 	 (descriptor-reg
 	  (loadw
-	   bits float sb!vm:single-float-value-slot
-	   sb!vm:other-pointer-lowtag))))
+	   bits float single-float-value-slot
+	   other-pointer-lowtag))))
       (signed-stack
        (sc-case float
 	 (single-reg
@@ -1920,14 +1920,14 @@
 	(with-tn@fp-top(float)
 	  (let ((where (make-ea :dword :base ebp-tn
 				:disp (- (* (+ 2 (tn-offset temp))
-					    word-bytes)))))
+					    n-word-bytes)))))
 	    (inst fstd where)))
 	(loadw hi-bits ebp-tn (- (1+ (tn-offset temp)))))
        (double-stack
 	(loadw hi-bits ebp-tn (- (1+ (tn-offset float)))))
        (descriptor-reg
-	(loadw hi-bits float (1+ sb!vm:double-float-value-slot)
-	       sb!vm:other-pointer-lowtag)))))
+	(loadw hi-bits float (1+ double-float-value-slot)
+	       other-pointer-lowtag)))))
 
 (define-vop (double-float-low-bits)
   (:args (float :scs (double-reg descriptor-reg)
@@ -1945,14 +1945,14 @@
 	(with-tn@fp-top(float)
 	  (let ((where (make-ea :dword :base ebp-tn
 				:disp (- (* (+ 2 (tn-offset temp))
-					    word-bytes)))))
+					    n-word-bytes)))))
 	    (inst fstd where)))
 	(loadw lo-bits ebp-tn (- (+ 2 (tn-offset temp)))))
        (double-stack
 	(loadw lo-bits ebp-tn (- (+ 2 (tn-offset float)))))
        (descriptor-reg
-	(loadw lo-bits float sb!vm:double-float-value-slot
-	       sb!vm:other-pointer-lowtag)))))
+	(loadw lo-bits float double-float-value-slot
+	       other-pointer-lowtag)))))
 
 #!+long-float
 (define-vop (long-float-exp-bits)
@@ -1971,21 +1971,21 @@
 	(with-tn@fp-top(float)
 	  (let ((where (make-ea :dword :base ebp-tn
 				:disp (- (* (+ 3 (tn-offset temp))
-					    word-bytes)))))
+					    n-word-bytes)))))
 	    (store-long-float where)))
 	(inst movsx exp-bits
 	      (make-ea :word :base ebp-tn
-		       :disp (* (- (1+ (tn-offset temp))) word-bytes))))
+		       :disp (* (- (1+ (tn-offset temp))) n-word-bytes))))
        (long-stack
 	(inst movsx exp-bits
 	      (make-ea :word :base ebp-tn
-		       :disp (* (- (1+ (tn-offset float))) word-bytes))))
+		       :disp (* (- (1+ (tn-offset float))) n-word-bytes))))
        (descriptor-reg
 	(inst movsx exp-bits
 	      (make-ea :word :base float
-		       :disp (- (* (+ 2 sb!vm:long-float-value-slot)
-				   word-bytes)
-				sb!vm:other-pointer-lowtag)))))))
+		       :disp (- (* (+ 2 long-float-value-slot)
+				   n-word-bytes)
+				other-pointer-lowtag)))))))
 
 #!+long-float
 (define-vop (long-float-high-bits)
@@ -2004,14 +2004,14 @@
 	(with-tn@fp-top(float)
 	  (let ((where (make-ea :dword :base ebp-tn
 				:disp (- (* (+ 3 (tn-offset temp))
-					    word-bytes)))))
+					    n-word-bytes)))))
 	    (store-long-float where)))
 	(loadw hi-bits ebp-tn (- (+ (tn-offset temp) 2))))
        (long-stack
 	(loadw hi-bits ebp-tn (- (+ (tn-offset float) 2))))
        (descriptor-reg
-	(loadw hi-bits float (1+ sb!vm:long-float-value-slot)
-	       sb!vm:other-pointer-lowtag)))))
+	(loadw hi-bits float (1+ long-float-value-slot)
+	       other-pointer-lowtag)))))
 
 #!+long-float
 (define-vop (long-float-low-bits)
@@ -2030,14 +2030,14 @@
 	(with-tn@fp-top(float)
 	  (let ((where (make-ea :dword :base ebp-tn
 				:disp (- (* (+ 3 (tn-offset temp))
-					    word-bytes)))))
+					    n-word-bytes)))))
 	    (store-long-float where)))
 	(loadw lo-bits ebp-tn (- (+ (tn-offset temp) 3))))
        (long-stack
 	(loadw lo-bits ebp-tn (- (+ (tn-offset float) 3))))
        (descriptor-reg
-	(loadw lo-bits float sb!vm:long-float-value-slot
-	       sb!vm:other-pointer-lowtag)))))
+	(loadw lo-bits float long-float-value-slot
+	       other-pointer-lowtag)))))
 
 ;;;; float mode hackery
 
@@ -2046,7 +2046,7 @@
 (defknown ((setf floating-point-modes)) (float-modes)
   float-modes)
 
-(defconstant npx-env-size (* 7 sb!vm:word-bytes))
+(defconstant npx-env-size (* 7 n-word-bytes))
 (defconstant npx-cw-offset 0)
 (defconstant npx-sw-offset 4)
 

@@ -49,7 +49,7 @@
   (:results (result :scs (descriptor-reg)))
   (:result-types *)
   (:generator 4
-    (inst ldl result (* offset word-bytes) object)))
+    (inst ldl result (* offset n-word-bytes) object)))
 
 (define-vop (write-control-stack)
   (:translate %set-stack-ref)
@@ -76,7 +76,7 @@
   (:results (result :scs (descriptor-reg)))
   (:result-types *)
   (:generator 1
-    (inst stl value (* offset word-bytes) sap)
+    (inst stl value (* offset n-word-bytes) sap)
     (move value result)))
 
 
@@ -92,7 +92,7 @@
       (loadw temp thing 0 lowtag)
       (inst srl temp sb!vm:n-widetag-bits temp)
       (inst beq temp bogus)
-      (inst sll temp (1- (integer-length sb!vm:word-bytes)) temp)
+      (inst sll temp (1- (integer-length sb!vm:n-word-bytes)) temp)
       (unless (= lowtag sb!vm:other-pointer-lowtag)
 	(inst subq temp (- sb!vm:other-pointer-lowtag lowtag) temp))
       (inst subq thing temp code)

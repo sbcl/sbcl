@@ -496,4 +496,6 @@
   (:result-types system-area-pointer)
   (:generator 2
     (move sap vector)
-    (inst add sap (- (* vector-data-offset word-bytes) other-pointer-lowtag))))
+    (inst add
+	  sap
+	  (- (* vector-data-offset n-word-bytes) other-pointer-lowtag))))

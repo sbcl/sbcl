@@ -316,60 +316,6 @@
              "SHORT" "UNSIGNED-CHAR" "UNSIGNED-INT"
              "UNSIGNED-LONG" "UNSIGNED-SHORT" "VOID"))
 
- #!+sb-dyncount
- #s(sb-cold:package-data
-    :name "SB!DYNCOUNT"
-    :doc "private: some somewhat-stale code for collecting runtime statistics"
-    :use ("CL" "SB!ALIEN-INTERNALS" "SB!ALIEN" "SB!BIGNUM"
-          "SB!EXT" "SB!INT" "SB!KERNEL" "SB!ASSEM" "SB!SYS")
-    :export ("*COLLECT-DYNAMIC-STATISTICS*" "COUNT-ME"
-             "DYNCOUNT-INFO-COUNTS" "DYNCOUNT-INFO-COSTS"
-             "IR2-COMPONENT-DYNCOUNT-INFO"
-             "DYNCOUNT-INFO" "DYNCOUNT-INFO-P"))
-
- #s(sb-cold:package-data
-    :name "SB!FASL"
-    :doc "private: stuff related to FASL load/dump logic (and GENESIS)"
-    :use ("CL" "SB!ALIEN" "SB!ASSEM" "SB!BIGNUM" "SB!C" "SB!C-CALL"
-          "SB!EXT" "SB!INT" "SB!KERNEL" "SB!SYS")
-    :export ("*ASSEMBLER-ROUTINES*"
-             "+BACKEND-FASL-FILE-IMPLEMENTATION+"
-             "*FASL-FILE-TYPE*"
-             "CLOSE-FASL-OUTPUT"
-             "DUMP-ASSEMBLER-ROUTINES"
-             "DUMP-OBJECT"
-             "FASL-CONSTANT-ALREADY-DUMPED-P"
-             "+FASL-FILE-VERSION+"
-             "FASL-DUMP-COLD-LOAD-FORM" "FASL-DUMP-COMPONENT"
-             "FASL-DUMP-COLD-FSET"
-             "FASL-DUMP-LOAD-TIME-VALUE" "FASL-DUMP-LOAD-TIME-VALUE-LAMBDA"
-             "FASL-DUMP-SOURCE-INFO" "FASL-DUMP-TOP-LEVEL-LAMBDA-CALL"
-             "FASL-NOTE-HANDLE-FOR-CONSTANT"
-             "FASL-OUTPUT" "FASL-OUTPUT-P"
-	     "FASL-OUTPUT-ENTRY-TABLE" "FASL-OUTPUT-STREAM"
-             "FASL-VALIDATE-STRUCTURE"
-             "*!LOAD-TIME-VALUES*"
-             "LOAD-TYPE-PREDICATE"
-             "OPEN-FASL-OUTPUT"
-             "*!REVERSED-COLD-TOPLEVELS*"
-             "*STATIC-FOREIGN-SYMBOLS*"))
-
- ;; This package is a grab bag for things which used to be internal
- ;; symbols in package COMMON-LISP. Lots of these symbols are accessed
- ;; with explicit SB!IMPL:: prefixes in the code. It would be nice to
- ;; reduce the use of this practice, so if symbols from here which are
- ;; accessed that way are found to belong more appropriately in
- ;; an existing package (e.g. KERNEL or SYS or EXT or FASL), I
- ;; (WHN 19990223) encourage maintainers to move them there..
- ;;
- ;; ..except that it's getting so big and crowded that maybe it
- ;; should be split up, too.
- #s(sb-cold:package-data
-    :name "SB!IMPL"
-    :doc "private: a grab bag of implementation details"
-    :use ("CL" "SB!ALIEN" "SB!BIGNUM" "SB!C-CALL" "SB!DEBUG" "SB!EXT"
-          "SB!FASL" "SB!GRAY" "SB!INT" "SB!KERNEL" "SB!SYS"))
-
  #s(sb-cold:package-data
     :name "SB!DEBUG"
     :doc
@@ -488,6 +434,60 @@ like *STACK-TOP-HINT*"
              "SET-LOCATION-PRINTING-RANGE" "MAKE-VECTOR-SEGMENT"
              "ADD-OFFS-NOTE-HOOK" "ADD-OFFS-COMMENT-HOOK"
              "DSTATE-CUR-ADDR" "DSTATE-NEXT-ADDR"))
+
+ #!+sb-dyncount
+ #s(sb-cold:package-data
+    :name "SB!DYNCOUNT"
+    :doc "private: some somewhat-stale code for collecting runtime statistics"
+    :use ("CL" "SB!ALIEN-INTERNALS" "SB!ALIEN" "SB!BIGNUM"
+          "SB!EXT" "SB!INT" "SB!KERNEL" "SB!ASSEM" "SB!SYS")
+    :export ("*COLLECT-DYNAMIC-STATISTICS*" "COUNT-ME"
+             "DYNCOUNT-INFO-COUNTS" "DYNCOUNT-INFO-COSTS"
+             "IR2-COMPONENT-DYNCOUNT-INFO"
+             "DYNCOUNT-INFO" "DYNCOUNT-INFO-P"))
+
+ #s(sb-cold:package-data
+    :name "SB!FASL"
+    :doc "private: stuff related to FASL load/dump logic (and GENESIS)"
+    :use ("CL" "SB!ALIEN" "SB!ASSEM" "SB!BIGNUM" "SB!C" "SB!C-CALL"
+          "SB!EXT" "SB!INT" "SB!KERNEL" "SB!SYS")
+    :export ("*ASSEMBLER-ROUTINES*"
+             "+BACKEND-FASL-FILE-IMPLEMENTATION+"
+             "*FASL-FILE-TYPE*"
+             "CLOSE-FASL-OUTPUT"
+             "DUMP-ASSEMBLER-ROUTINES"
+             "DUMP-OBJECT"
+             "FASL-CONSTANT-ALREADY-DUMPED-P"
+             "+FASL-FILE-VERSION+"
+             "FASL-DUMP-COLD-LOAD-FORM" "FASL-DUMP-COMPONENT"
+             "FASL-DUMP-COLD-FSET"
+             "FASL-DUMP-LOAD-TIME-VALUE" "FASL-DUMP-LOAD-TIME-VALUE-LAMBDA"
+             "FASL-DUMP-SOURCE-INFO" "FASL-DUMP-TOP-LEVEL-LAMBDA-CALL"
+             "FASL-NOTE-HANDLE-FOR-CONSTANT"
+             "FASL-OUTPUT" "FASL-OUTPUT-P"
+	     "FASL-OUTPUT-ENTRY-TABLE" "FASL-OUTPUT-STREAM"
+             "FASL-VALIDATE-STRUCTURE"
+             "*!LOAD-TIME-VALUES*"
+             "LOAD-TYPE-PREDICATE"
+             "OPEN-FASL-OUTPUT"
+             "*!REVERSED-COLD-TOPLEVELS*"
+             "*STATIC-FOREIGN-SYMBOLS*"))
+
+ ;; This package is a grab bag for things which used to be internal
+ ;; symbols in package COMMON-LISP. Lots of these symbols are accessed
+ ;; with explicit SB!IMPL:: prefixes in the code. It would be nice to
+ ;; reduce the use of this practice, so if symbols from here which are
+ ;; accessed that way are found to belong more appropriately in
+ ;; an existing package (e.g. KERNEL or SYS or EXT or FASL), I
+ ;; (WHN 19990223) encourage maintainers to move them there..
+ ;;
+ ;; ..except that it's getting so big and crowded that maybe it
+ ;; should be split up, too.
+ #s(sb-cold:package-data
+    :name "SB!IMPL"
+    :doc "private: a grab bag of implementation details"
+    :use ("CL" "SB!ALIEN" "SB!BIGNUM" "SB!C-CALL" "SB!DEBUG" "SB!EXT"
+          "SB!FASL" "SB!GRAY" "SB!INT" "SB!KERNEL" "SB!SYS"))
 
  #s(sb-cold:package-data
     :name "SB!EXT"
@@ -1671,7 +1671,7 @@ structure representations"
              "BASE-CHAR-STACK-SC-NUMBER" "BASE-CHAR-WIDETAG"
              "BIGNUM-DIGITS-OFFSET" "BIGNUM-WIDETAG" "BINDING-SIZE"
              "BINDING-SYMBOL-SLOT" "BINDING-VALUE-SLOT" "BREAKPOINT-TRAP"
-             "BYTE-BITS" "BYTE-REG-SC-NUMBER"
+             "N-BYTE-BITS" "BYTE-REG-SC-NUMBER"
              "CATCH-BLOCK-CURRENT-CODE-SLOT"
              "CATCH-BLOCK-CURRENT-CONT-SLOT" "CATCH-BLOCK-CURRENT-UWP-SLOT"
              "CATCH-BLOCK-ENTRY-PC-SLOT" "CATCH-BLOCK-PREVIOUS-CATCH-SLOT"
@@ -1755,11 +1755,16 @@ structure representations"
 	     "LONG-FLOAT-WIDETAG"
              "LONG-FLOAT-VALUE-SLOT" "LONG-REG-SC-NUMBER"
              "LONG-STACK-SC-NUMBER"
-             "N-LOWTAG-BITS" "LOWTAG-LIMIT" "LOWTAG-MASK"
+             "LOWTAG-LIMIT" "LOWTAG-MASK"
+	     "LRA-SAVE-OFFSET"
              "MEMORY-USAGE" "MOST-POSITIVE-COST"
-             "NEGATIVE-IMMEDIATE-SC-NUMBER" "NON-DESCRIPTOR-REG-SC-NUMBER"
+	     "N-LOWTAG-BITS" 
+             "NEGATIVE-IMMEDIATE-SC-NUMBER"
+	     "NFP-SAVE-OFFSET"
+	     "NON-DESCRIPTOR-REG-SC-NUMBER"
              "NULL-SC-NUMBER"
 	     "OBJECT-NOT-LIST-TRAP" "OBJECT-NOT-INSTANCE-TRAP"
+	     "OCFP-SAVE-OFFSET"
              "ODD-FIXNUM-LOWTAG"
 	     "OFFSET-STATIC-SYMBOL" "OTHER-IMMEDIATE-0-LOWTAG"
              "OTHER-IMMEDIATE-1-LOWTAG" "OTHER-POINTER-LOWTAG"
@@ -1839,7 +1844,7 @@ structure representations"
              "WEAK-POINTER-BROKEN-SLOT" "WEAK-POINTER-NEXT-SLOT"
              "WEAK-POINTER-SIZE" "WEAK-POINTER-WIDETAG"
 	     "WEAK-POINTER-VALUE-SLOT"
-             "WORD" "N-WORD-BITS" "WORD-BYTES"
+             "WORD" "N-WORD-BITS" "N-WORD-BYTES"
 	     "WORD-REG-SC-NUMBER" "WORD-SHIFT"
              "ZERO-SC-NUMBER"))
 

@@ -19,7 +19,7 @@
 
 (defconstant tt-bits-per-state 3)
 (defconstant tt-bytes-per-entry 2)
-(defconstant tt-bits-per-entry (* tt-bytes-per-entry sb!vm:byte-bits))
+(defconstant tt-bits-per-entry (* tt-bytes-per-entry sb!vm:n-byte-bits))
 (defconstant tt-bits-per-offset (- tt-bits-per-entry tt-bits-per-state))
 (defconstant tt-max-offset (1- (ash 1 tt-bits-per-offset)))
 

@@ -316,37 +316,37 @@
 	    ((<= bytes space)
 	     (if (system-area-pointer-p thing)
 		 (system-area-copy thing
-				   (* start sb!vm:byte-bits)
+				   (* start sb!vm:n-byte-bits)
 				   (fd-stream-obuf-sap fd-stream)
-				   (* tail sb!vm:byte-bits)
-				   (* bytes sb!vm:byte-bits))
+				   (* tail sb!vm:n-byte-bits)
+				   (* bytes sb!vm:n-byte-bits))
 		 ;; FIXME: There should be some type checking somewhere to
 		 ;; verify that THING here is a vector, not just <not a SAP>.
 		 (copy-to-system-area thing
-				      (+ (* start sb!vm:byte-bits)
+				      (+ (* start sb!vm:n-byte-bits)
 					 (* sb!vm:vector-data-offset
 					    sb!vm:n-word-bits))
 				      (fd-stream-obuf-sap fd-stream)
-				      (* tail sb!vm:byte-bits)
-				      (* bytes sb!vm:byte-bits)))
+				      (* tail sb!vm:n-byte-bits)
+				      (* bytes sb!vm:n-byte-bits)))
 	     (setf (fd-stream-obuf-tail fd-stream) newtail))
 	    ((<= bytes len)
 	     (flush-output-buffer fd-stream)
 	     (if (system-area-pointer-p thing)
 		 (system-area-copy thing
-				   (* start sb!vm:byte-bits)
+				   (* start sb!vm:n-byte-bits)
 				   (fd-stream-obuf-sap fd-stream)
 				   0
-				   (* bytes sb!vm:byte-bits))
+				   (* bytes sb!vm:n-byte-bits))
 		 ;; FIXME: There should be some type checking somewhere to
 		 ;; verify that THING here is a vector, not just <not a SAP>.
 		 (copy-to-system-area thing
-				      (+ (* start sb!vm:byte-bits)
+				      (+ (* start sb!vm:n-byte-bits)
 					 (* sb!vm:vector-data-offset
 					    sb!vm:n-word-bits))
 				      (fd-stream-obuf-sap fd-stream)
 				      0
-				      (* bytes sb!vm:byte-bits)))
+				      (* bytes sb!vm:n-byte-bits)))
 	     (setf (fd-stream-obuf-tail fd-stream) bytes))
 	    (t
 	     (flush-output-buffer fd-stream)
@@ -429,8 +429,8 @@
 	     (setf (fd-stream-ibuf-tail stream) 0))
 	    (t
 	     (decf tail head)
-	     (system-area-copy ibuf-sap (* head sb!vm:byte-bits)
-			       ibuf-sap 0 (* tail sb!vm:byte-bits))
+	     (system-area-copy ibuf-sap (* head sb!vm:n-byte-bits)
+			       ibuf-sap 0 (* tail sb!vm:n-byte-bits))
 	     (setf head 0)
 	     (setf (fd-stream-ibuf-head stream) 0)
 	     (setf (fd-stream-ibuf-tail stream) tail))))
@@ -580,10 +580,10 @@
   (declare (type index start end))
   (let* ((length (- end start))
 	 (string (make-string length)))
-    (copy-from-system-area sap (* start sb!vm:byte-bits)
+    (copy-from-system-area sap (* start sb!vm:n-byte-bits)
 			   string (* sb!vm:vector-data-offset
 				     sb!vm:n-word-bits)
-			   (* length sb!vm:byte-bits))
+			   (* length sb!vm:n-byte-bits))
     string))
 
 ;;; the N-BIN method for FD-STREAMs

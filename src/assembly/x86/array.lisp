@@ -25,9 +25,9 @@
 			  (:arg words any-reg ecx-offset)
 			  (:res result descriptor-reg edx-offset))
   (inst mov result (+ (1- (ash 1 n-lowtag-bits))
-		      (* vector-data-offset word-bytes)))
+		      (* vector-data-offset n-word-bytes)))
   (inst add result words)
-  (inst and result (lognot sb!vm:lowtag-mask))
+  (inst and result (lognot lowtag-mask))
   (pseudo-atomic
    (allocation result result)
    (inst lea result (make-ea :byte :base result :disp other-pointer-lowtag))

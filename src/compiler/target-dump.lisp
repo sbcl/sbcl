@@ -46,39 +46,43 @@
   (let ((length (length vec)))
     (dump-fop 'fop-single-float-vector file)
     (dump-unsigned-32 length file)
-    (dump-raw-bytes vec (* length sb!vm:word-bytes) file)))
+    (dump-raw-bytes vec (* length sb!vm:n-word-bytes) file)))
 
 (defun dump-double-float-vector (vec file)
   (let ((length (length vec)))
     (dump-fop 'fop-double-float-vector file)
     (dump-unsigned-32 length file)
-    (dump-raw-bytes vec (* length sb!vm:word-bytes 2) file)))
+    (dump-raw-bytes vec (* length sb!vm:n-word-bytes 2) file)))
 
 #!+long-float
 (defun dump-long-float-vector (vec file)
   (let ((length (length vec)))
     (dump-fop 'fop-long-float-vector file)
     (dump-unsigned-32 length file)
-    (dump-raw-bytes vec (* length sb!vm:word-bytes #!+x86 3 #!+sparc 4) file)))
+    (dump-raw-bytes vec
+		    (* length sb!vm:n-word-bytes #!+x86 3 #!+sparc 4)
+		    file)))
 
 (defun dump-complex-single-float-vector (vec file)
   (let ((length (length vec)))
     (dump-fop 'fop-complex-single-float-vector file)
     (dump-unsigned-32 length file)
-    (dump-raw-bytes vec (* length sb!vm:word-bytes 2) file)))
+    (dump-raw-bytes vec (* length sb!vm:n-word-bytes 2) file)))
 
 (defun dump-complex-double-float-vector (vec file)
   (let ((length (length vec)))
     (dump-fop 'fop-complex-double-float-vector file)
     (dump-unsigned-32 length file)
-    (dump-raw-bytes vec (* length sb!vm:word-bytes 2 2) file)))
+    (dump-raw-bytes vec (* length sb!vm:n-word-bytes 2 2) file)))
 
 #!+long-float
 (defun dump-complex-long-float-vector (vec file)
   (let ((length (length vec)))
     (dump-fop 'fop-complex-long-float-vector file)
     (dump-unsigned-32 length file)
-    (dump-raw-bytes vec (* length sb!vm:word-bytes #!+x86 3 #!+sparc 4 2) file)))
+    (dump-raw-bytes vec
+		    (* length sb!vm:n-word-bytes #!+x86 3 #!+sparc 4 2)
+		    file)))
 
 #!+(and long-float x86)
 (defun dump-long-float (float file)

@@ -38,7 +38,7 @@
 (declaim (type (or null inst-space) *disassem-inst-space*))
 
 ;;; minimum alignment of instructions, in bytes
-(defvar *disassem-inst-alignment-bytes* sb!vm:word-bytes)
+(defvar *disassem-inst-alignment-bytes* sb!vm:n-word-bytes)
 (declaim (type alignment *disassem-inst-alignment-bytes*))
 
 (defvar *disassem-location-column-width* 8)
@@ -1506,12 +1506,12 @@
 
 (defun bytes-to-bits (bytes)
   (declare (type length bytes))
-  (* bytes sb!vm:byte-bits))
+  (* bytes sb!vm:n-byte-bits))
 
 (defun bits-to-bytes (bits)
   (declare (type length bits))
   (multiple-value-bind (bytes rbits)
-      (truncate bits sb!vm:byte-bits)
+      (truncate bits sb!vm:n-byte-bits)
     (when (not (zerop rbits))
       (error "~D bits is not a byte-multiple." bits))
     bytes))

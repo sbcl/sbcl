@@ -79,7 +79,7 @@
   (:generator 4
     (move result value)
     (inst xadd (make-ea :dword :base object
-			:disp (- (* offset word-bytes) lowtag))
+			:disp (- (* offset n-word-bytes) lowtag))
 	  value)))
 
 ;;; SLOT-REF and SLOT-SET are used to define VOPs like CLOSURE-REF,
@@ -104,17 +104,17 @@
 	     (integer
 	      (inst mov
 		    (make-ea :dword :base object
-			     :disp (- (* (+ base offset) word-bytes) lowtag))
+			     :disp (- (* (+ base offset) n-word-bytes) lowtag))
 		    (fixnumize val)))
 	     (symbol
 	      (inst mov
 		    (make-ea :dword :base object
-			     :disp (- (* (+ base offset) word-bytes) lowtag))
+			     :disp (- (* (+ base offset) n-word-bytes) lowtag))
 		    (+ nil-value (static-symbol-offset val))))
 	     (character
 	      (inst mov
 		    (make-ea :dword :base object
-			     :disp (- (* (+ base offset) word-bytes) lowtag))
+			     :disp (- (* (+ base offset) n-word-bytes) lowtag))
 		    (logior (ash (char-code val) n-widetag-bits)
 			    base-char-widetag)))))
 	 ;; Else, value not immediate.
@@ -134,7 +134,7 @@
     (move eax old-value)
     (move temp new-value)
     (inst cmpxchg (make-ea :dword :base object
-			   :disp (- (* (+ base offset) word-bytes) lowtag))
+			   :disp (- (* (+ base offset) n-word-bytes) lowtag))
 	  temp)
     (move result eax)))
 
@@ -149,5 +149,5 @@
   (:generator 4
     (move result value)
     (inst xadd (make-ea :dword :base object
-			:disp (- (* (+ base offset) word-bytes) lowtag))
+			:disp (- (* (+ base offset) n-word-bytes) lowtag))
 	  value)))

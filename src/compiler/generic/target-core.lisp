@@ -47,7 +47,8 @@
 	   (trace-table (pack-trace-table trace-table))
 	   (trace-table-len (length trace-table))
 	   (trace-table-bits (* trace-table-len tt-bits-per-entry))
-	   (total-length (+ length (ceiling trace-table-bits sb!vm:byte-bits)))
+	   (total-length (+ length
+			    (ceiling trace-table-bits sb!vm:n-byte-bits)))
 	   (box-num (- (length constants) sb!vm:code-trace-table-offset-slot))
 	   (code-obj
 	    ;; FIXME: In CMU CL the X86 behavior here depended on

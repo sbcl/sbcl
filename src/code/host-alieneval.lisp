@@ -357,7 +357,7 @@
 
 (def-alien-type-method (system-area-pointer :extract-gen) (type sap offset)
   (declare (ignore type))
-  `(sap-ref-sap ,sap (/ ,offset sb!vm:byte-bits)))
+  `(sap-ref-sap ,sap (/ ,offset sb!vm:n-byte-bits)))
 
 ;;;; the ALIEN-VALUE type
 
@@ -559,7 +559,7 @@
 	    (32 'sap-ref-32)
 	    #!+alpha (64 'sap-ref-64)))))
     (if ref-fun
-	`(,ref-fun ,sap (/ ,offset sb!vm:byte-bits))
+	`(,ref-fun ,sap (/ ,offset sb!vm:n-byte-bits))
 	(error "cannot extract ~D bit integers"
 	       (alien-integer-type-bits type)))))
 
@@ -742,7 +742,7 @@
 
 (def-alien-type-method (single-float :extract-gen) (type sap offset)
   (declare (ignore type))
-  `(sap-ref-single ,sap (/ ,offset sb!vm:byte-bits)))
+  `(sap-ref-single ,sap (/ ,offset sb!vm:n-byte-bits)))
 
 (def-alien-type-class (double-float :include (float (:bits 64))
 				    :include-args (type)))
@@ -752,7 +752,7 @@
 
 (def-alien-type-method (double-float :extract-gen) (type sap offset)
   (declare (ignore type))
-  `(sap-ref-double ,sap (/ ,offset sb!vm:byte-bits)))
+  `(sap-ref-double ,sap (/ ,offset sb!vm:n-byte-bits)))
 
 #!+long-float
 (def-alien-type-class (long-float :include (float (:bits #!+x86 96
@@ -766,7 +766,7 @@
 #!+long-float
 (def-alien-type-method (long-float :extract-gen) (type sap offset)
   (declare (ignore type))
-  `(sap-ref-long ,sap (/ ,offset sb!vm:byte-bits)))
+  `(sap-ref-long ,sap (/ ,offset sb!vm:n-byte-bits)))
 
 ;;;; the POINTER type
 
@@ -832,7 +832,7 @@
 
 (def-alien-type-method (mem-block :extract-gen) (type sap offset)
   (declare (ignore type))
-  `(sap+ ,sap (/ ,offset sb!vm:byte-bits)))
+  `(sap+ ,sap (/ ,offset sb!vm:n-byte-bits)))
 
 (def-alien-type-method (mem-block :deposit-gen) (type sap offset value)
   (let ((bits (alien-mem-block-type-bits type)))

@@ -173,7 +173,7 @@
 	(exceptions (dpb (float-trap-mask traps) float-sticky-bits 0))
 	(trap-mask (dpb (lognot (float-trap-mask traps))
 			float-traps-byte #xffffffff))
-	(exception-mask (dpb (lognot (sb!vm::float-trap-mask traps))
+	(exception-mask (dpb (lognot (float-trap-mask traps))
 			     float-sticky-bits #xffffffff))
         (orig-modes (gensym)))
     `(let ((,orig-modes (floating-point-modes)))

@@ -11,12 +11,12 @@
 
 (in-package "SB!VM")
 
-;;; We can load/store into fp registers through the top of
-;;; stack %st(0) (fr0 here). Loads imply a push to an empty register
-;;; which then changes all the reg numbers. These macros help manage that.
+;;; We can load/store into fp registers through the top of stack
+;;; %st(0) (fr0 here). Loads imply a push to an empty register which
+;;; then changes all the reg numbers. These macros help manage that.
 
-;;; Use this when we don't have to load anything. It preserves old tos value,
-;;; but probably destroys tn with operation.
+;;; Use this when we don't have to load anything. It preserves old tos
+;;; value, but probably destroys tn with operation.
 (defmacro with-tn@fp-top((tn) &body body)
   `(progn
     (unless (zerop (tn-offset ,tn))
@@ -47,7 +47,7 @@
        (inst mov ,n-dst ,n-src))))
 
 (defmacro make-ea-for-object-slot (ptr slot lowtag)
-  `(make-ea :dword :base ,ptr :disp (- (* ,slot word-bytes) ,lowtag)))
+  `(make-ea :dword :base ,ptr :disp (- (* ,slot n-word-bytes) ,lowtag)))
 
 (defmacro loadw (value ptr &optional (slot 0) (lowtag 0))
   `(inst mov ,value (make-ea-for-object-slot ,ptr ,slot ,lowtag)))
@@ -264,7 +264,7 @@
 				 &rest forms)
   `(pseudo-atomic
     (allocation ,result-tn (pad-data-block ,size) ,inline)
-    (storew (logior (ash (1- ,size) sb!vm:n-widetag-bits) ,widetag)
+    (storew (logior (ash (1- ,size) n-widetag-bits) ,widetag)
 	    ,result-tn)
     (inst lea ,result-tn
      (make-ea :byte :base ,result-tn :disp other-pointer-lowtag))
@@ -434,7 +434,8 @@
        (:result-types ,el-type)
        (:generator 3			; pw was 5
 	 (inst mov value (make-ea :dword :base object :index index
-				  :disp (- (* ,offset word-bytes) ,lowtag)))))
+				  :disp (- (* ,offset n-word-bytes)
+					   ,lowtag)))))
      (define-vop (,(symbolicate name "-C"))
        ,@(when translate
 	   `((:translate ,translate)))
@@ -446,7 +447,7 @@
        (:result-types ,el-type)
        (:generator 2			; pw was 5
 	 (inst mov value (make-ea :dword :base object
-				  :disp (- (* (+ ,offset index) word-bytes)
+				  :disp (- (* (+ ,offset index) n-word-bytes)
 					   ,lowtag)))))))
 
 (defmacro define-full-setter (name type offset lowtag scs el-type &optional translate)
@@ -463,7 +464,7 @@
        (:result-types ,el-type)
        (:generator 4			; was 5
 	 (inst mov (make-ea :dword :base object :index index
-			    :disp (- (* ,offset word-bytes) ,lowtag))
+			    :disp (- (* ,offset n-word-bytes) ,lowtag))
 	       value)
 	 (move result value)))
      (define-vop (,(symbolicate name "-C"))
@@ -478,7 +479,8 @@
        (:result-types ,el-type)
        (:generator 3			; was 5
 	 (inst mov (make-ea :dword :base object
-			    :disp (- (* (+ ,offset index) word-bytes) ,lowtag))
+			    :disp (- (* (+ ,offset index) n-word-bytes)
+				     ,lowtag))
 	       value)
 	 (move result value)))))
 

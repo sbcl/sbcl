@@ -219,7 +219,10 @@
                                     (:single
                                      '((inst lds result offset object)))
                                     (:double
-                                     '((inst ldt result (+ offset word-bytes) object))))))
+                                     '((inst ldt
+					     result
+					     (+ offset n-word-bytes)
+					     object))))))
                   (define-vop (,set-name)
                     (:translate ,set-name)
                     (:policy :fast-safe)
@@ -351,5 +354,5 @@
   (:result-types system-area-pointer)
   (:generator 2
     (inst lda sap
-	  (- (* vector-data-offset word-bytes) other-pointer-lowtag)
+	  (- (* vector-data-offset n-word-bytes) other-pointer-lowtag)
 	  vector)))

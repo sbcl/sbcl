@@ -97,7 +97,7 @@
   "Return to RETURN-PC.  LIP is an interior-reg temporary."
   `(progn
      (inst lda ,lip  
-	   (- (* (1+ ,offset) word-bytes) other-pointer-lowtag)
+	   (- (* (1+ ,offset) n-word-bytes) other-pointer-lowtag)
 	    ,return-pc)
      ,@(when frob-code
 	 `((move ,return-pc code-tn)))
@@ -266,11 +266,11 @@
 (deftype load/store-index (scale lowtag min-offset
 				 &optional (max-offset min-offset))
   `(integer ,(- (truncate (+ (ash 1 16)
-			     (* min-offset word-bytes)
+			     (* min-offset n-word-bytes)
 			     (- lowtag))
 			  scale))
 	    ,(truncate (- (+ (1- (ash 1 16)) lowtag)
-			  (* max-offset word-bytes))
+			  (* max-offset n-word-bytes))
 		       scale)))
 
 (defmacro define-full-reffer (name type offset lowtag scs el-type
@@ -288,7 +288,7 @@
        (:result-types ,el-type)
        (:generator 5
 	 (inst addq object index lip)
-	 (inst ldl value (- (* ,offset word-bytes) ,lowtag) lip)
+	 (inst ldl value (- (* ,offset n-word-bytes) ,lowtag) lip)
 	 ,@(when (equal scs '(unsigned-reg))
 	     '((inst mskll value 4 value)))))
      (define-vop (,(symbolicate name "-C"))
@@ -298,12 +298,12 @@
        (:args (object :scs (descriptor-reg)))
        (:info index)
        (:arg-types ,type
-		   (:constant (load/store-index ,word-bytes ,(eval lowtag)
+		   (:constant (load/store-index ,n-word-bytes ,(eval lowtag)
 						,(eval offset))))
        (:results (value :scs ,scs))
        (:result-types ,el-type)
        (:generator 4
-	 (inst ldl value (- (* (+ ,offset index) word-bytes) ,lowtag)
+	 (inst ldl value (- (* (+ ,offset index) n-word-bytes) ,lowtag)
 	       object)
 	 ,@(when (equal scs '(unsigned-reg))
 	     '((inst mskll value 4 value)))))))
@@ -324,7 +324,7 @@
        (:result-types ,el-type)
        (:generator 2
 	 (inst addq index object lip)
-	 (inst stl value (- (* ,offset word-bytes) ,lowtag) lip)
+	 (inst stl value (- (* ,offset n-word-bytes) ,lowtag) lip)
 	 (move value result)))
      (define-vop (,(symbolicate name "-C"))
        ,@(when translate
@@ -334,13 +334,13 @@
 	      (value :scs ,scs))
        (:info index)
        (:arg-types ,type
-		   (:constant (load/store-index ,word-bytes ,(eval lowtag)
+		   (:constant (load/store-index ,n-word-bytes ,(eval lowtag)
 						,(eval offset)))
 		   ,el-type)
        (:results (result :scs ,scs))
        (:result-types ,el-type)
        (:generator 1
-	 (inst stl value (- (* (+ ,offset index) word-bytes) ,lowtag)
+	 (inst stl value (- (* (+ ,offset index) n-word-bytes) ,lowtag)
 	       object)
 	 (move value result)))))
 
@@ -368,28 +368,31 @@
 	   ,@(ecase size
 	       (:byte
 		(if signed
-		    `((inst ldq_u temp (- (* ,offset word-bytes) ,lowtag)
+		    `((inst ldq_u temp (- (* ,offset n-word-bytes) ,lowtag)
 			    lip)
-		      (inst lda temp1 (1+ (- (* ,offset word-bytes) ,lowtag))
+		      (inst lda temp1 (1+ (- (* ,offset n-word-bytes) ,lowtag))
 			    lip)
 		      (inst extqh temp temp1 temp)
 		      (inst sra temp 56 value))
-		    `((inst ldq_u temp (- (* ,offset word-bytes) ,lowtag) lip)
-		      (inst lda temp1 (- (* ,offset word-bytes) ,lowtag)
+		    `((inst ldq_u
+			    temp
+			    (- (* ,offset n-word-bytes) ,lowtag)
+			    lip)
+		      (inst lda temp1 (- (* ,offset n-word-bytes) ,lowtag)
 					  lip)
 		      (inst extbl temp temp1 value))))
 	       (:short
 		(if signed
-		    `((inst ldq_u temp (- (* ,offset word-bytes) ,lowtag)
+		    `((inst ldq_u temp (- (* ,offset n-word-bytes) ,lowtag)
 			    lip)
-		      (inst lda temp1 (- (* ,offset word-bytes) ,lowtag)
+		      (inst lda temp1 (- (* ,offset n-word-bytes) ,lowtag)
 			    lip)
 		      (inst extwl temp temp1 temp)
 		      (inst sll temp 48 temp)
 		      (inst sra temp 48 value))
-		    `((inst ldq_u temp (- (* ,offset word-bytes) ,lowtag)
+		    `((inst ldq_u temp (- (* ,offset n-word-bytes) ,lowtag)
 			    lip)
-		      (inst lda temp1 (- (* ,offset word-bytes) ,lowtag) lip)
+		      (inst lda temp1 (- (* ,offset n-word-bytes) ,lowtag) lip)
 		      (inst extwl temp temp1 value)))))))
        (define-vop (,(symbolicate name "-C"))
 	 ,@(when translate
@@ -409,36 +412,36 @@
 	   ,@(ecase size
 	       (:byte
 		(if signed
-		    `((inst ldq_u temp (- (+ (* ,offset word-bytes)
+		    `((inst ldq_u temp (- (+ (* ,offset n-word-bytes)
 					     (* index ,scale)) ,lowtag)
 			    object)
-		      (inst lda temp1 (1+ (- (+ (* ,offset word-bytes)
+		      (inst lda temp1 (1+ (- (+ (* ,offset n-word-bytes)
 						(* index ,scale)) ,lowtag))
 			    object)
 		      (inst extqh temp temp1 temp)
 		      (inst sra temp 56 value))
-		    `((inst ldq_u temp (- (+ (* ,offset word-bytes)
+		    `((inst ldq_u temp (- (+ (* ,offset n-word-bytes)
 					     (* index ,scale)) ,lowtag)
 			    object)
-		      (inst lda temp1 (- (+ (* ,offset word-bytes)
+		      (inst lda temp1 (- (+ (* ,offset n-word-bytes)
 					    (* index ,scale)) ,lowtag)
 			    object)
 		      (inst extbl temp temp1 value))))
 	       (:short
 		(if signed
-		    `((inst ldq_u temp (- (+ (* ,offset word-bytes)
+		    `((inst ldq_u temp (- (+ (* ,offset n-word-bytes)
 					     (* index ,scale)) ,lowtag)
 			    object)
-		      (inst lda temp1 (- (+ (* ,offset word-bytes)
+		      (inst lda temp1 (- (+ (* ,offset n-word-bytes)
 					    (* index ,scale)) ,lowtag)
 			    object)
 		      (inst extwl temp temp1 temp)
 		      (inst sll temp 48 temp)
 		      (inst sra temp 48 value))
-		    `((inst ldq_u temp (- (+ (* ,offset word-bytes)
+		    `((inst ldq_u temp (- (+ (* ,offset n-word-bytes)
 					     (* index ,scale)) ,lowtag)
 			    object)
-		      (inst lda temp1 (- (+ (* ,offset word-bytes)
+		      (inst lda temp1 (- (+ (* ,offset n-word-bytes)
 					    (* index ,scale)) ,lowtag)
 			    object)
 		      (inst extwl temp temp1 value))))))))))
@@ -467,19 +470,19 @@
 	       '((inst addq lip index lip)))
 	   ,@(ecase size
 	       (:byte
-		`((inst lda temp (- (* ,offset word-bytes) ,lowtag) lip)
-		  (inst ldq_u temp1 (- (* ,offset word-bytes) ,lowtag) lip)
+		`((inst lda temp (- (* ,offset n-word-bytes) ,lowtag) lip)
+		  (inst ldq_u temp1 (- (* ,offset n-word-bytes) ,lowtag) lip)
 		  (inst insbl value  temp temp2)
 		  (inst mskbl temp1 temp temp1)
 		  (inst bis temp1 temp2 temp1)
-		  (inst stq_u temp1 (- (* ,offset word-bytes) ,lowtag) lip)))
+		  (inst stq_u temp1 (- (* ,offset n-word-bytes) ,lowtag) lip)))
 	       (:short
-		`((inst lda temp (- (* ,offset word-bytes) ,lowtag) lip)
-		  (inst ldq_u temp1 (- (* ,offset word-bytes) ,lowtag) lip)
+		`((inst lda temp (- (* ,offset n-word-bytes) ,lowtag) lip)
+		  (inst ldq_u temp1 (- (* ,offset n-word-bytes) ,lowtag) lip)
 		  (inst mskwl temp1 temp temp1)
 		  (inst inswl value temp temp2)
 		  (inst bis temp1 temp2 temp)
-		  (inst stq_u temp (- (* ,offset word-bytes) ,lowtag) lip))))
+		  (inst stq_u temp (- (* ,offset n-word-bytes) ,lowtag) lip))))
 	   (move value result)))
        (define-vop (,(symbolicate name "-C"))
 	 ,@(when translate
@@ -501,27 +504,27 @@
 	 (:generator 5
 	   ,@(ecase size
 	       (:byte
-		`((inst lda temp (- (* ,offset word-bytes)
+		`((inst lda temp (- (* ,offset n-word-bytes)
 				    (* index ,scale) ,lowtag)
 			object)
-		  (inst ldq_u temp1 (- (* ,offset word-bytes) 
+		  (inst ldq_u temp1 (- (* ,offset n-word-bytes) 
 				       (* index ,scale) ,lowtag)
 			object)
 		  (inst insbl value temp temp2)
 		  (inst mskbl temp1 temp temp1)
 		  (inst bis temp1 temp2 temp1)
-		  (inst stq_u temp1 (- (* ,offset word-bytes)
+		  (inst stq_u temp1 (- (* ,offset n-word-bytes)
 				       (* index ,scale) ,lowtag) object)))
 	       (:short
-		`((inst lda temp (- (* ,offset word-bytes)
+		`((inst lda temp (- (* ,offset n-word-bytes)
 				    (* index ,scale) ,lowtag)
 			object)
-		  (inst ldq_u temp1 (- (* ,offset word-bytes)
+		  (inst ldq_u temp1 (- (* ,offset n-word-bytes)
 				       (* index ,scale) ,lowtag)
 			object)
 		  (inst mskwl temp1 temp temp1)
 		  (inst inswl value temp temp2)
 		  (inst bis temp1 temp2 temp)
-		  (inst stq_u temp (- (* ,offset word-bytes)
+		  (inst stq_u temp (- (* ,offset n-word-bytes)
 				      (* index ,scale) ,lowtag) object))))
 	   (move value result))))))

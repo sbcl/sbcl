@@ -42,15 +42,16 @@
   ;; Save the count, because the loop is going to destroy it.
   (inst mov edx ecx)
 
-  ;; Blit the values down the stack. Note: there might be overlap, so we have
-  ;; to be careful not to clobber values before we've read them. Because the
-  ;; stack builds down, we are coping to a larger address. Therefore, we need
-  ;; to iterate from larger addresses to smaller addresses.
-  ;; pfw-this says copy ecx words from esi to edi counting down.
+  ;; Blit the values down the stack. Note: there might be overlap, so
+  ;; we have to be careful not to clobber values before we've read
+  ;; them. Because the stack builds down, we are coping to a larger
+  ;; address. Therefore, we need to iterate from larger addresses to
+  ;; smaller addresses. pfw-this says copy ecx words from esi to edi
+  ;; counting down.
   (inst shr ecx 2)			; fixnum to raw word count
   (inst std)				; count down
   (inst sub esi 4)			; ?
-  (inst lea edi (make-ea :dword :base ebx :disp (- word-bytes)))
+  (inst lea edi (make-ea :dword :base ebx :disp (- n-word-bytes)))
   (inst rep)
   (inst movs :dword)
 
@@ -58,7 +59,7 @@
   (inst mov ecx edx)
 
   ;; Set the stack top to the last result.
-  (inst lea esp-tn (make-ea :dword :base edi :disp word-bytes))
+  (inst lea esp-tn (make-ea :dword :base edi :disp n-word-bytes))
 
   ;; Load the register args.
   (loadw edx ebx -1)
@@ -87,21 +88,21 @@
   (loadw edx esi -1)
   (loadw edi esi -2)
   (inst mov esi nil-value)
-  (inst lea esp-tn (make-ea :dword :base ebx :disp (* -2 word-bytes)))
+  (inst lea esp-tn (make-ea :dword :base ebx :disp (* -2 n-word-bytes)))
   (inst jmp eax)
 
   THREE-VALUES
   (loadw edx esi -1)
   (loadw edi esi -2)
   (loadw esi esi -3)
-  (inst lea esp-tn (make-ea :dword :base ebx :disp (* -3 word-bytes)))
+  (inst lea esp-tn (make-ea :dword :base ebx :disp (* -3 n-word-bytes)))
   (inst jmp eax))
 
 ;;;; TAIL-CALL-VARIABLE
 
-;;; For tail-call-variable, we have to copy the arguments from the end of our
-;;; stack frame (were args are produced) to the start of our stack frame
-;;; (were args are expected).
+;;; For tail-call-variable, we have to copy the arguments from the end
+;;; of our stack frame (were args are produced) to the start of our
+;;; stack frame (were args are expected).
 ;;;
 ;;; We take the function to call in EAX and a pointer to the arguments in
 ;;; ESI. EBP says the same over the jump, and the old frame pointer is
@@ -136,11 +137,12 @@
   (loadw ebx ebp-tn -2)
   (inst push ecx)
 
-  ;; Do the blit. Because we are coping from smaller addresses to larger
-  ;; addresses, we have to start at the largest pair and work our way down.
+  ;; Do the blit. Because we are coping from smaller addresses to
+  ;; larger addresses, we have to start at the largest pair and work
+  ;; our way down.
   (inst shr ecx 2)			; fixnum to raw words
   (inst std)				; count down
-  (inst lea edi (make-ea :dword :base ebp-tn :disp (- word-bytes)))
+  (inst lea edi (make-ea :dword :base ebp-tn :disp (- n-word-bytes)))
   (inst sub esi (fixnumize 1))
   (inst rep)
   (inst movs :dword)
@@ -153,7 +155,7 @@
   (popw ebp-tn -1)			; overwrites a0
 
   ;; Blow off the stack above the arguments.
-  (inst lea esp-tn (make-ea :dword :base edi :disp word-bytes))
+  (inst lea esp-tn (make-ea :dword :base edi :disp n-word-bytes))
 
   ;; remaining register args
   (loadw edi ebp-tn -2)
@@ -165,7 +167,7 @@
   ;; And jump into the function.
     (inst jmp
 	  (make-ea :byte :base eax
-		   :disp (- (* closure-fun-slot word-bytes)
+		   :disp (- (* closure-fun-slot n-word-bytes)
 			    fun-pointer-lowtag)))
 
   ;; All the arguments fit in registers, so load them.
@@ -176,14 +178,14 @@
 
   ;; Clear most of the stack.
   (inst lea esp-tn
-	(make-ea :dword :base ebp-tn :disp (* -3 word-bytes)))
+	(make-ea :dword :base ebp-tn :disp (* -3 n-word-bytes)))
 
   ;; Push the return-pc so it looks like we just called.
   (pushw ebp-tn -2)
 
   ;; And away we go.
   (inst jmp (make-ea :byte :base eax
-		     :disp (- (* closure-fun-slot word-bytes)
+		     :disp (- (* closure-fun-slot n-word-bytes)
 			      fun-pointer-lowtag))))
 
 (define-assembly-routine (throw
@@ -255,4 +257,4 @@
   ;; count in ecx-tn
 
   (inst jmp (make-ea :byte :base block
-		     :disp (* unwind-block-entry-pc-slot word-bytes))))
+		     :disp (* unwind-block-entry-pc-slot n-word-bytes))))

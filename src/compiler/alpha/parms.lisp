@@ -15,15 +15,15 @@
   #!+sb-doc
   "Number of bits per word where a word holds one lisp descriptor.")
 
-(defconstant byte-bits 8
+(defconstant n-byte-bits 8
   #!+sb-doc
   "Number of bits per byte where a byte is the smallest addressable object.")
 
-(defconstant word-shift (1- (integer-length (/ n-word-bits byte-bits)))
+(defconstant word-shift (1- (integer-length (/ n-word-bits n-byte-bits)))
   #!+sb-doc
   "Number of bits to shift between word addresses and byte addresses.")
 
-(defconstant word-bytes (/ n-word-bits byte-bits)
+(defconstant n-word-bytes (/ n-word-bits n-byte-bits)
   #!+sb-doc
   "Number of bytes in a word.")
 

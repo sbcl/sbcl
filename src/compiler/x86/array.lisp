@@ -26,7 +26,7 @@
   (:generator 13
     (inst lea bytes
 	  (make-ea :dword :base rank
-		   :disp (+ (* (1+ array-dimensions-offset) word-bytes)
+		   :disp (+ (* (1+ array-dimensions-offset) n-word-bytes)
 			    lowtag-mask)))
     (inst and bytes (lognot lowtag-mask))
     (inst lea header (make-ea :dword :base rank
@@ -139,7 +139,7 @@
 	   (inst shr ecx ,bit-shift)
 	   (inst mov result
 		 (make-ea :dword :base object :index ecx :scale 4
-			  :disp (- (* vector-data-offset word-bytes)
+			  :disp (- (* vector-data-offset n-word-bytes)
 				   other-pointer-lowtag)))
 	   (move ecx index)
 	   (inst and ecx ,(1- elements-per-word))
@@ -182,7 +182,7 @@
 	   (inst shr word-index ,bit-shift)
 	   (inst lea ptr
 		 (make-ea :dword :base object :index word-index :scale 4
-			  :disp (- (* vector-data-offset word-bytes)
+			  :disp (- (* vector-data-offset n-word-bytes)
 				   other-pointer-lowtag)))
 	   (loadw old ptr)
 	   (move ecx index)
@@ -220,7 +220,8 @@
 	   (multiple-value-bind (word extra) (floor index ,elements-per-word)
 	     (inst mov old
 		   (make-ea :dword :base object
-			    :disp (- (* (+ word vector-data-offset) word-bytes)
+			    :disp (- (* (+ word vector-data-offset)
+					n-word-bytes)
 				     other-pointer-lowtag)))
 	     (sc-case value
 	       (immediate
@@ -240,7 +241,7 @@
 		    (inst rol old shift)))))
 	     (inst mov (make-ea :dword :base object
 				:disp (- (* (+ word vector-data-offset)
-					    word-bytes)
+					    n-word-bytes)
 					 other-pointer-lowtag))
 		   old)
 	     (sc-case value
@@ -266,7 +267,8 @@
   (:generator 5
    (with-empty-tn@fp-top(value)
      (inst fld (make-ea	:dword :base object :index index :scale 1
-			:disp (- (* sb!vm:vector-data-offset sb!vm:word-bytes)
+			:disp (- (* sb!vm:vector-data-offset
+				    sb!vm:n-word-bytes)
 				 sb!vm:other-pointer-lowtag))))))
 
 (define-vop (data-vector-ref-c/simple-array-single-float)
@@ -282,7 +284,7 @@
    (with-empty-tn@fp-top(value)
      (inst fld (make-ea	:dword :base object
 			:disp (- (+ (* sb!vm:vector-data-offset
-				       sb!vm:word-bytes)
+				       sb!vm:n-word-bytes)
 				    (* 4 index))
 				 sb!vm:other-pointer-lowtag))))))
 
@@ -301,7 +303,7 @@
 	   ;; Value is in ST0.
 	   (inst fst (make-ea :dword :base object :index index :scale 1
 			      :disp (- (* sb!vm:vector-data-offset
-					  sb!vm:word-bytes)
+					  sb!vm:n-word-bytes)
 				       sb!vm:other-pointer-lowtag)))
 	   (unless (zerop (tn-offset result))
 		   ;; Value is in ST0 but not result.
@@ -311,7 +313,7 @@
 	   (inst fxch value)
 	   (inst fst (make-ea :dword :base object :index index :scale 1
 			      :disp (- (* sb!vm:vector-data-offset
-					  sb!vm:word-bytes)
+					  sb!vm:n-word-bytes)
 				       sb!vm:other-pointer-lowtag)))
 	   (cond ((zerop (tn-offset result))
 		  ;; The result is in ST0.
@@ -338,7 +340,7 @@
 	   ;; Value is in ST0.
 	   (inst fst (make-ea :dword :base object
 			      :disp (- (+ (* sb!vm:vector-data-offset
-					     sb!vm:word-bytes)
+					     sb!vm:n-word-bytes)
 					  (* 4 index))
 				       sb!vm:other-pointer-lowtag)))
 	   (unless (zerop (tn-offset result))
@@ -349,7 +351,7 @@
 	   (inst fxch value)
 	   (inst fst (make-ea :dword :base object
 			      :disp (- (+ (* sb!vm:vector-data-offset
-					     sb!vm:word-bytes)
+					     sb!vm:n-word-bytes)
 					  (* 4 index))
 				       sb!vm:other-pointer-lowtag)))
 	   (cond ((zerop (tn-offset result))
@@ -373,7 +375,8 @@
   (:generator 7
    (with-empty-tn@fp-top(value)
      (inst fldd (make-ea :dword :base object :index index :scale 2
-			 :disp (- (* sb!vm:vector-data-offset sb!vm:word-bytes)
+			 :disp (- (* sb!vm:vector-data-offset
+				     sb!vm:n-word-bytes)
 				  sb!vm:other-pointer-lowtag))))))
 
 (define-vop (data-vector-ref-c/simple-array-double-float)
@@ -389,7 +392,7 @@
    (with-empty-tn@fp-top(value)
      (inst fldd (make-ea :dword :base object
 			 :disp (- (+ (* sb!vm:vector-data-offset
-					sb!vm:word-bytes)
+					sb!vm:n-word-bytes)
 				     (* 8 index))
 				  sb!vm:other-pointer-lowtag))))))
 
@@ -408,7 +411,7 @@
 	   ;; Value is in ST0.
 	   (inst fstd (make-ea :dword :base object :index index :scale 2
 			       :disp (- (* sb!vm:vector-data-offset
-					   sb!vm:word-bytes)
+					   sb!vm:n-word-bytes)
 					sb!vm:other-pointer-lowtag)))
 	   (unless (zerop (tn-offset result))
 		   ;; Value is in ST0 but not result.
@@ -418,7 +421,7 @@
 	   (inst fxch value)
 	   (inst fstd (make-ea :dword :base object :index index :scale 2
 			       :disp (- (* sb!vm:vector-data-offset
-					   sb!vm:word-bytes)
+					   sb!vm:n-word-bytes)
 					sb!vm:other-pointer-lowtag)))
 	   (cond ((zerop (tn-offset result))
 		  ;; The result is in ST0.
@@ -445,7 +448,7 @@
 	   ;; Value is in ST0.
 	   (inst fstd (make-ea :dword :base object
 			       :disp (- (+ (* sb!vm:vector-data-offset
-					      sb!vm:word-bytes)
+					      sb!vm:n-word-bytes)
 					   (* 8 index))
 					sb!vm:other-pointer-lowtag)))
 	   (unless (zerop (tn-offset result))
@@ -456,7 +459,7 @@
 	   (inst fxch value)
 	   (inst fstd (make-ea :dword :base object
 			       :disp (- (+ (* sb!vm:vector-data-offset
-					      sb!vm:word-bytes)
+					      sb!vm:n-word-bytes)
 					   (* 8 index))
 					sb!vm:other-pointer-lowtag)))
 	   (cond ((zerop (tn-offset result))
@@ -485,7 +488,7 @@
     (with-empty-tn@fp-top(value)
       (inst fldl (make-ea :dword :base object :index temp :scale 1
 			  :disp (- (* sb!vm:vector-data-offset
-				      sb!vm:word-bytes)
+				      sb!vm:n-word-bytes)
 				   sb!vm:other-pointer-lowtag))))))
 
 #!+long-float
@@ -502,7 +505,7 @@
    (with-empty-tn@fp-top(value)
      (inst fldl (make-ea :dword :base object
 			 :disp (- (+ (* sb!vm:vector-data-offset
-					sb!vm:word-bytes)
+					sb!vm:n-word-bytes)
 				     (* 12 index))
 				  sb!vm:other-pointer-lowtag))))))
 
@@ -525,7 +528,7 @@
 	   ;; Value is in ST0.
 	   (store-long-float
 	    (make-ea :dword :base object :index temp :scale 1
-		     :disp (- (* sb!vm:vector-data-offset sb!vm:word-bytes)
+		     :disp (- (* sb!vm:vector-data-offset sb!vm:n-word-bytes)
 			      sb!vm:other-pointer-lowtag)))
 	   (unless (zerop (tn-offset result))
 		   ;; Value is in ST0 but not result.
@@ -535,7 +538,7 @@
 	   (inst fxch value)
 	   (store-long-float
 	    (make-ea :dword :base object :index temp :scale 1
-		     :disp (- (* sb!vm:vector-data-offset sb!vm:word-bytes)
+		     :disp (- (* sb!vm:vector-data-offset sb!vm:n-word-bytes)
 			      sb!vm:other-pointer-lowtag)))
 	   (cond ((zerop (tn-offset result))
 		  ;; The result is in ST0.
@@ -562,7 +565,7 @@
 	   ;; Value is in ST0.
 	   (store-long-float (make-ea :dword :base object
 				      :disp (- (+ (* sb!vm:vector-data-offset
-						     sb!vm:word-bytes)
+						     sb!vm:n-word-bytes)
 						  (* 12 index))
 					       sb!vm:other-pointer-lowtag)))
 	   (unless (zerop (tn-offset result))
@@ -573,7 +576,7 @@
 	   (inst fxch value)
 	   (store-long-float (make-ea :dword :base object
 				      :disp (- (+ (* sb!vm:vector-data-offset
-						     sb!vm:word-bytes)
+						     sb!vm:n-word-bytes)
 						  (* 12 index))
 					       sb!vm:other-pointer-lowtag)))
 	   (cond ((zerop (tn-offset result))
@@ -601,13 +604,13 @@
       (with-empty-tn@fp-top (real-tn)
 	(inst fld (make-ea :dword :base object :index index :scale 2
 			   :disp (- (* sb!vm:vector-data-offset
-				       sb!vm:word-bytes)
+				       sb!vm:n-word-bytes)
 				    sb!vm:other-pointer-lowtag)))))
     (let ((imag-tn (complex-single-reg-imag-tn value)))
       (with-empty-tn@fp-top (imag-tn)
 	(inst fld (make-ea :dword :base object :index index :scale 2
 			   :disp (- (* (1+ sb!vm:vector-data-offset)
-				       sb!vm:word-bytes)
+				       sb!vm:n-word-bytes)
 				    sb!vm:other-pointer-lowtag)))))))
 
 (define-vop (data-vector-ref-c/simple-array-complex-single-float)
@@ -624,14 +627,14 @@
       (with-empty-tn@fp-top (real-tn)
 	(inst fld (make-ea :dword :base object
 			   :disp (- (+ (* sb!vm:vector-data-offset
-					  sb!vm:word-bytes)
+					  sb!vm:n-word-bytes)
 				       (* 8 index))
 				    sb!vm:other-pointer-lowtag)))))
     (let ((imag-tn (complex-single-reg-imag-tn value)))
       (with-empty-tn@fp-top (imag-tn)
 	(inst fld (make-ea :dword :base object
 			   :disp (- (+ (* sb!vm:vector-data-offset
-					  sb!vm:word-bytes)
+					  sb!vm:n-word-bytes)
 				       (* 8 index) 4)
 				    sb!vm:other-pointer-lowtag)))))))
 
@@ -653,7 +656,7 @@
 	     ;; Value is in ST0.
 	     (inst fst (make-ea :dword :base object :index index :scale 2
 				:disp (- (* sb!vm:vector-data-offset
-					    sb!vm:word-bytes)
+					    sb!vm:n-word-bytes)
 					 sb!vm:other-pointer-lowtag)))
 	     (unless (zerop (tn-offset result-real))
 	       ;; Value is in ST0 but not result.
@@ -663,7 +666,7 @@
 	     (inst fxch value-real)
 	     (inst fst (make-ea :dword :base object :index index :scale 2
 				:disp (- (* sb!vm:vector-data-offset
-					    sb!vm:word-bytes)
+					    sb!vm:n-word-bytes)
 					 sb!vm:other-pointer-lowtag)))
 	     (cond ((zerop (tn-offset result-real))
 		    ;; The result is in ST0.
@@ -678,7 +681,7 @@
       (inst fxch value-imag)
       (inst fst (make-ea :dword :base object :index index :scale 2
 			 :disp (- (+ (* sb!vm:vector-data-offset
-					sb!vm:word-bytes)
+					sb!vm:n-word-bytes)
 				     4)
 				  sb!vm:other-pointer-lowtag)))
       (unless (location= value-imag result-imag)
@@ -703,7 +706,7 @@
 	     ;; Value is in ST0.
 	     (inst fst (make-ea :dword :base object
 				:disp (- (+ (* sb!vm:vector-data-offset
-					       sb!vm:word-bytes)
+					       sb!vm:n-word-bytes)
 					    (* 8 index))
 					 sb!vm:other-pointer-lowtag)))
 	     (unless (zerop (tn-offset result-real))
@@ -714,7 +717,7 @@
 	     (inst fxch value-real)
 	     (inst fst (make-ea :dword :base object
 				:disp (- (+ (* sb!vm:vector-data-offset
-					       sb!vm:word-bytes)
+					       sb!vm:n-word-bytes)
 					    (* 8 index))
 					 sb!vm:other-pointer-lowtag)))
 	     (cond ((zerop (tn-offset result-real))
@@ -730,7 +733,7 @@
       (inst fxch value-imag)
       (inst fst (make-ea :dword :base object
 			 :disp (- (+ (* sb!vm:vector-data-offset
-					sb!vm:word-bytes)
+					sb!vm:n-word-bytes)
 				     (* 8 index) 4)
 				  sb!vm:other-pointer-lowtag)))
       (unless (location= value-imag result-imag)
@@ -752,13 +755,13 @@
       (with-empty-tn@fp-top (real-tn)
 	(inst fldd (make-ea :dword :base object :index index :scale 4
 			    :disp (- (* sb!vm:vector-data-offset
-					sb!vm:word-bytes)
+					sb!vm:n-word-bytes)
 				     sb!vm:other-pointer-lowtag)))))
     (let ((imag-tn (complex-double-reg-imag-tn value)))
       (with-empty-tn@fp-top (imag-tn)
 	(inst fldd (make-ea :dword :base object :index index :scale 4
 			    :disp (- (+ (* sb!vm:vector-data-offset
-					   sb!vm:word-bytes)
+					   sb!vm:n-word-bytes)
 					8)
 				     sb!vm:other-pointer-lowtag)))))))
 
@@ -776,14 +779,14 @@
       (with-empty-tn@fp-top (real-tn)
 	(inst fldd (make-ea :dword :base object
 			    :disp (- (+ (* sb!vm:vector-data-offset
-					   sb!vm:word-bytes)
+					   sb!vm:n-word-bytes)
 					(* 16 index))
 				     sb!vm:other-pointer-lowtag)))))
     (let ((imag-tn (complex-double-reg-imag-tn value)))
       (with-empty-tn@fp-top (imag-tn)
 	(inst fldd (make-ea :dword :base object
 			    :disp (- (+ (* sb!vm:vector-data-offset
-					   sb!vm:word-bytes)
+					   sb!vm:n-word-bytes)
 					(* 16 index) 8)
 				     sb!vm:other-pointer-lowtag)))))))
 
@@ -805,7 +808,7 @@
 	     ;; Value is in ST0.
 	     (inst fstd (make-ea :dword :base object :index index :scale 4
 				 :disp (- (* sb!vm:vector-data-offset
-					     sb!vm:word-bytes)
+					     sb!vm:n-word-bytes)
 					  sb!vm:other-pointer-lowtag)))
 	     (unless (zerop (tn-offset result-real))
 	       ;; Value is in ST0 but not result.
@@ -815,7 +818,7 @@
 	     (inst fxch value-real)
 	     (inst fstd (make-ea :dword :base object :index index :scale 4
 				 :disp (- (* sb!vm:vector-data-offset
-					     sb!vm:word-bytes)
+					     sb!vm:n-word-bytes)
 					  sb!vm:other-pointer-lowtag)))
 	     (cond ((zerop (tn-offset result-real))
 		    ;; The result is in ST0.
@@ -830,7 +833,7 @@
       (inst fxch value-imag)
       (inst fstd (make-ea :dword :base object :index index :scale 4
 			  :disp (- (+ (* sb!vm:vector-data-offset
-					 sb!vm:word-bytes)
+					 sb!vm:n-word-bytes)
 				      8)
 				   sb!vm:other-pointer-lowtag)))
       (unless (location= value-imag result-imag)
@@ -855,7 +858,7 @@
 	     ;; Value is in ST0.
 	     (inst fstd (make-ea :dword :base object
 				 :disp (- (+ (* sb!vm:vector-data-offset
-						sb!vm:word-bytes)
+						sb!vm:n-word-bytes)
 					     (* 16 index))
 					  sb!vm:other-pointer-lowtag)))
 	     (unless (zerop (tn-offset result-real))
@@ -866,7 +869,7 @@
 	     (inst fxch value-real)
 	     (inst fstd (make-ea :dword :base object
 				 :disp (- (+ (* sb!vm:vector-data-offset
-						sb!vm:word-bytes)
+						sb!vm:n-word-bytes)
 					     (* 16 index))
 					  sb!vm:other-pointer-lowtag)))
 	     (cond ((zerop (tn-offset result-real))
@@ -882,7 +885,7 @@
       (inst fxch value-imag)
       (inst fstd (make-ea :dword :base object
 			  :disp (- (+ (* sb!vm:vector-data-offset
-					 sb!vm:word-bytes)
+					 sb!vm:n-word-bytes)
 				      (* 16 index) 8)
 				   sb!vm:other-pointer-lowtag)))
       (unless (location= value-imag result-imag)
@@ -908,13 +911,13 @@
       (with-empty-tn@fp-top (real-tn)
 	(inst fldl (make-ea :dword :base object :index temp :scale 2
 			    :disp (- (* sb!vm:vector-data-offset
-					sb!vm:word-bytes)
+					sb!vm:n-word-bytes)
 				     sb!vm:other-pointer-lowtag)))))
     (let ((imag-tn (complex-long-reg-imag-tn value)))
       (with-empty-tn@fp-top (imag-tn)
 	(inst fldl (make-ea :dword :base object :index temp :scale 2
 			    :disp (- (+ (* sb!vm:vector-data-offset
-					   sb!vm:word-bytes)
+					   sb!vm:n-word-bytes)
 					12)
 				     sb!vm:other-pointer-lowtag)))))))
 
@@ -933,14 +936,14 @@
       (with-empty-tn@fp-top (real-tn)
 	(inst fldl (make-ea :dword :base object
 			    :disp (- (+ (* sb!vm:vector-data-offset
-					   sb!vm:word-bytes)
+					   sb!vm:n-word-bytes)
 					(* 24 index))
 				     sb!vm:other-pointer-lowtag)))))
     (let ((imag-tn (complex-long-reg-imag-tn value)))
       (with-empty-tn@fp-top (imag-tn)
 	(inst fldl (make-ea :dword :base object
 			    :disp (- (+ (* sb!vm:vector-data-offset
-					   sb!vm:word-bytes)
+					   sb!vm:n-word-bytes)
 					(* 24 index) 12)
 				     sb!vm:other-pointer-lowtag)))))))
 
@@ -966,7 +969,7 @@
 	     ;; Value is in ST0.
 	     (store-long-float
 	      (make-ea :dword :base object :index temp :scale 2
-		       :disp (- (* sb!vm:vector-data-offset sb!vm:word-bytes)
+		       :disp (- (* sb!vm:vector-data-offset sb!vm:n-word-bytes)
 				sb!vm:other-pointer-lowtag)))
 	     (unless (zerop (tn-offset result-real))
 	       ;; Value is in ST0 but not result.
@@ -976,7 +979,7 @@
 	     (inst fxch value-real)
 	     (store-long-float
 	      (make-ea :dword :base object :index temp :scale 2
-		       :disp (- (* sb!vm:vector-data-offset sb!vm:word-bytes)
+		       :disp (- (* sb!vm:vector-data-offset sb!vm:n-word-bytes)
 				sb!vm:other-pointer-lowtag)))
 	     (cond ((zerop (tn-offset result-real))
 		    ;; The result is in ST0.
@@ -991,7 +994,7 @@
       (inst fxch value-imag)
       (store-long-float
        (make-ea :dword :base object :index temp :scale 2
-		:disp (- (+ (* sb!vm:vector-data-offset sb!vm:word-bytes) 12)
+		:disp (- (+ (* sb!vm:vector-data-offset sb!vm:n-word-bytes) 12)
 			 sb!vm:other-pointer-lowtag)))
       (unless (location= value-imag result-imag)
 	(inst fstd result-imag))
@@ -1017,7 +1020,7 @@
 	     (store-long-float
 	      (make-ea :dword :base object
 		       :disp (- (+ (* sb!vm:vector-data-offset
-				      sb!vm:word-bytes)
+				      sb!vm:n-word-bytes)
 				   (* 24 index))
 				sb!vm:other-pointer-lowtag)))
 	     (unless (zerop (tn-offset result-real))
@@ -1029,7 +1032,7 @@
 	     (store-long-float
 	      (make-ea :dword :base object
 		       :disp (- (+ (* sb!vm:vector-data-offset
-				      sb!vm:word-bytes)
+				      sb!vm:n-word-bytes)
 				   (* 24 index))
 				sb!vm:other-pointer-lowtag)))
 	     (cond ((zerop (tn-offset result-real))
@@ -1046,7 +1049,7 @@
       (store-long-float
        (make-ea :dword :base object
 		:disp (- (+ (* sb!vm:vector-data-offset
-			       sb!vm:word-bytes)
+			       sb!vm:n-word-bytes)
 			    ;; FIXME: There are so many of these bare constants
 			    ;; (24, 12..) in the LONG-FLOAT code that it's
 			    ;; ridiculous. I should probably just delete it all
@@ -1071,7 +1074,7 @@
   (:generator 5
     (inst movzx value
 	  (make-ea :byte :base object :index index :scale 1
-		   :disp (- (* vector-data-offset word-bytes)
+		   :disp (- (* vector-data-offset n-word-bytes)
 			    other-pointer-lowtag)))))
 
 (define-vop (data-vector-ref-c/simple-array-unsigned-byte-8)
@@ -1085,7 +1088,7 @@
   (:generator 4
     (inst movzx value
 	  (make-ea :byte :base object
-		   :disp (- (+ (* vector-data-offset word-bytes) index)
+		   :disp (- (+ (* vector-data-offset n-word-bytes) index)
 			    other-pointer-lowtag)))))
 
 (define-vop (data-vector-set/simple-array-unsigned-byte-8)
@@ -1103,7 +1106,7 @@
   (:generator 5
     (move eax value)
     (inst mov (make-ea :byte :base object :index index :scale 1
-		       :disp (- (* vector-data-offset word-bytes)
+		       :disp (- (* vector-data-offset n-word-bytes)
 				other-pointer-lowtag))
 	  al-tn)
     (move result eax)))
@@ -1124,7 +1127,7 @@
   (:generator 4
     (move eax value)
     (inst mov (make-ea :byte :base object
-		       :disp (- (+ (* vector-data-offset word-bytes) index)
+		       :disp (- (+ (* vector-data-offset n-word-bytes) index)
 				other-pointer-lowtag))
 	  al-tn)
     (move result eax)))
@@ -1142,7 +1145,7 @@
   (:generator 5
     (inst movzx value
 	  (make-ea :word :base object :index index :scale 2
-		   :disp (- (* vector-data-offset word-bytes)
+		   :disp (- (* vector-data-offset n-word-bytes)
 			    other-pointer-lowtag)))))
 
 (define-vop (data-vector-ref-c/simple-array-unsigned-byte-16)
@@ -1156,7 +1159,7 @@
   (:generator 4
     (inst movzx value
 	  (make-ea :word :base object
-		   :disp (- (+ (* vector-data-offset word-bytes) (* 2 index))
+		   :disp (- (+ (* vector-data-offset n-word-bytes) (* 2 index))
 			    other-pointer-lowtag)))))
 
 (define-vop (data-vector-set/simple-array-unsigned-byte-16)
@@ -1174,7 +1177,7 @@
   (:generator 5
     (move eax value)
     (inst mov (make-ea :word :base object :index index :scale 2
-		       :disp (- (* vector-data-offset word-bytes)
+		       :disp (- (* vector-data-offset n-word-bytes)
 				other-pointer-lowtag))
 	  ax-tn)
     (move result eax)))
@@ -1195,7 +1198,7 @@
   (:generator 4
     (move eax value)
     (inst mov (make-ea :word :base object
-		       :disp (- (+ (* vector-data-offset word-bytes)
+		       :disp (- (+ (* vector-data-offset n-word-bytes)
 				   (* 2 index))
 				other-pointer-lowtag))
 	  ax-tn)
@@ -1220,7 +1223,7 @@
   (:generator 5
     (inst mov al-tn
 	  (make-ea :byte :base object :index index :scale 1
-		   :disp (- (* vector-data-offset word-bytes)
+		   :disp (- (* vector-data-offset n-word-bytes)
 			    other-pointer-lowtag)))
     (move value al-tn)))
 
@@ -1239,7 +1242,7 @@
   (:generator 4
     (inst mov al-tn
 	  (make-ea :byte :base object
-		   :disp (- (+ (* vector-data-offset word-bytes) index)
+		   :disp (- (+ (* vector-data-offset n-word-bytes) index)
 			    other-pointer-lowtag)))
     (move value al-tn)))
 
@@ -1254,7 +1257,7 @@
   (:result-types base-char)
   (:generator 5
     (inst mov (make-ea :byte :base object :index index :scale 1
-		       :disp (- (* vector-data-offset word-bytes)
+		       :disp (- (* vector-data-offset n-word-bytes)
 				other-pointer-lowtag))
 	  value)
     (move result value)))
@@ -1270,7 +1273,7 @@
   (:result-types base-char)
   (:generator 4
    (inst mov (make-ea :byte :base object
-		      :disp (- (+ (* vector-data-offset word-bytes) index)
+		      :disp (- (+ (* vector-data-offset n-word-bytes) index)
 			       other-pointer-lowtag))
 	 value)
    (move result value)))
@@ -1288,7 +1291,7 @@
   (:generator 5
     (inst movsx value
 	  (make-ea :byte :base object :index index :scale 1
-		   :disp (- (* vector-data-offset word-bytes)
+		   :disp (- (* vector-data-offset n-word-bytes)
 			    other-pointer-lowtag)))))
 
 (define-vop (data-vector-ref-c/simple-array-signed-byte-8)
@@ -1302,7 +1305,7 @@
   (:generator 4
     (inst movsx value
 	  (make-ea :byte :base object
-		   :disp (- (+ (* vector-data-offset word-bytes) index)
+		   :disp (- (+ (* vector-data-offset n-word-bytes) index)
 			    other-pointer-lowtag)))))
 
 (define-vop (data-vector-set/simple-array-signed-byte-8)
@@ -1320,7 +1323,7 @@
   (:generator 5
     (move eax value)
     (inst mov (make-ea :byte :base object :index index :scale 1
-		       :disp (- (* vector-data-offset word-bytes)
+		       :disp (- (* vector-data-offset n-word-bytes)
 				other-pointer-lowtag))
 	  al-tn)
     (move result eax)))
@@ -1341,7 +1344,7 @@
   (:generator 4
     (move eax value)
     (inst mov (make-ea :byte :base object
-		       :disp (- (+ (* vector-data-offset word-bytes) index)
+		       :disp (- (+ (* vector-data-offset n-word-bytes) index)
 				other-pointer-lowtag))
 	  al-tn)
     (move result eax)))
@@ -1359,7 +1362,7 @@
   (:generator 5
     (inst movsx value
 	  (make-ea :word :base object :index index :scale 2
-		   :disp (- (* vector-data-offset word-bytes)
+		   :disp (- (* vector-data-offset n-word-bytes)
 			    other-pointer-lowtag)))))
 
 (define-vop (data-vector-ref-c/simple-array-signed-byte-16)
@@ -1373,7 +1376,7 @@
   (:generator 4
     (inst movsx value
 	  (make-ea :word :base object
-		   :disp (- (+ (* vector-data-offset word-bytes)
+		   :disp (- (+ (* vector-data-offset n-word-bytes)
 			       (* 2 index))
 			    other-pointer-lowtag)))))
 
@@ -1392,7 +1395,7 @@
   (:generator 5
     (move eax value)
     (inst mov (make-ea :word :base object :index index :scale 2
-		       :disp (- (* vector-data-offset word-bytes)
+		       :disp (- (* vector-data-offset n-word-bytes)
 				other-pointer-lowtag))
 	  ax-tn)
     (move result eax)))
@@ -1413,7 +1416,7 @@
     (move eax value)
     (inst mov
 	  (make-ea :word :base object
-		   :disp (- (+ (* vector-data-offset word-bytes)
+		   :disp (- (+ (* vector-data-offset n-word-bytes)
 			       (* 2 index))
 			    other-pointer-lowtag))
 	  ax-tn)

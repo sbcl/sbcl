@@ -42,11 +42,11 @@
           (current-dynamic-space-start))))
 
 (defun static-space-usage ()
-  (- (* sb!vm:*static-space-free-pointer* sb!vm:word-bytes)
+  (- (* sb!vm:*static-space-free-pointer* sb!vm:n-word-bytes)
      sb!vm:static-space-start))
 
 (defun read-only-space-usage ()
-  (- (* sb!vm::*read-only-space-free-pointer* sb!vm:word-bytes)
+  (- (* sb!vm::*read-only-space-free-pointer* sb!vm:n-word-bytes)
      sb!vm:read-only-space-start))
 
 (defun control-stack-usage ()

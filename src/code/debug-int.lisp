@@ -557,7 +557,7 @@
   (let ((component-ptr (component-ptr-from-pc pc)))
     (unless (sap= component-ptr (int-sap #x0))
        (let* ((code (component-from-component-ptr component-ptr))
-	      (code-header-len (* (get-header-data code) sb!vm:word-bytes))
+	      (code-header-len (* (get-header-data code) sb!vm:n-word-bytes))
 	      (pc-offset (- (sap-int pc)
 			    (- (get-lisp-obj-address code)
 			       sb!vm:other-pointer-lowtag)
@@ -599,11 +599,11 @@
     nil)
    (t
     ;; Check the two possible frame pointers.
-    (let ((lisp-ocfp (sap-ref-sap fp (- (* (1+ sb!vm::ocfp-save-offset) 4))))
-	  (lisp-ra (sap-ref-sap fp (- (* (1+ sb!vm::return-pc-save-offset)
+    (let ((lisp-ocfp (sap-ref-sap fp (- (* (1+ ocfp-save-offset) 4))))
+	  (lisp-ra (sap-ref-sap fp (- (* (1+ return-pc-save-offset)
 					 4))))
-	  (c-ocfp (sap-ref-sap fp (* 0 sb!vm:word-bytes)))
-	  (c-ra (sap-ref-sap fp (* 1 sb!vm:word-bytes))))
+	  (c-ocfp (sap-ref-sap fp (* 0 sb!vm:n-word-bytes)))
+	  (c-ra (sap-ref-sap fp (* 1 sb!vm:n-word-bytes))))
       (cond ((and (sap> lisp-ocfp fp) (cstack-pointer-valid-p lisp-ocfp)
 		  (ra-pointer-valid-p lisp-ra)
 		  (sap> c-ocfp fp) (cstack-pointer-valid-p c-ocfp)
@@ -697,10 +697,10 @@
 		     (compute-calling-frame
 		      (descriptor-sap
 		       (get-context-value
-			frame sb!vm::ocfp-save-offset
+			frame ocfp-save-offset
 			(sb!c::compiled-debug-fun-old-fp c-d-f)))
 		      (get-context-value
-		       frame sb!vm::lra-save-offset
+		       frame lra-save-offset
 		       (sb!c::compiled-debug-fun-return-pc c-d-f))
 		      frame)))
 		  (bogus-debug-fun
@@ -712,14 +712,14 @@
 			#!-x86
 		       (compute-calling-frame
 			#!-alpha
-			(sap-ref-sap fp (* sb!vm::ocfp-save-offset
-					   sb!vm:word-bytes))
+			(sap-ref-sap fp (* ocfp-save-offset
+					   sb!vm:n-word-bytes))
 			#!+alpha
 			(int-sap
-			 (sap-ref-32 fp (* sb!vm::ocfp-save-offset
-					   sb!vm:word-bytes)))
+			 (sap-ref-32 fp (* ocfp-save-offset
+					   sb!vm:n-word-bytes)))
 
-			(stack-ref fp sb!vm::lra-save-offset)
+			(stack-ref fp lra-save-offset)
 
 			frame)))))))
 	down)))
@@ -745,9 +745,9 @@
     (if escaped
 	(sub-access-debug-var-slot pointer loc escaped)
 	(ecase stack-slot
-	  (#.sb!vm::ocfp-save-offset
+	  (#.ocfp-save-offset
 	   (stack-ref pointer stack-slot))
-	  (#.sb!vm::lra-save-offset
+	  (#.lra-save-offset
 	   (sap-ref-sap pointer (- (* (1+ stack-slot) 4))))))))
 
 #!-x86
@@ -769,9 +769,9 @@
     (if escaped
 	(sub-set-debug-var-slot pointer loc value escaped)
 	(ecase stack-slot
-	  (#.sb!vm::ocfp-save-offset
+	  (#.ocfp-save-offset
 	   (setf (stack-ref pointer stack-slot) value))
-	  (#.sb!vm::lra-save-offset
+	  (#.lra-save-offset
 	   (setf (sap-ref-sap pointer (- (* (1+ stack-slot) 4))) value))))))
 
 ;;; This returns a frame for the one existing in time immediately
@@ -798,13 +798,13 @@
 		(if (fixnump lra)
 		    (let ((fp (frame-pointer up-frame)))
 		      (values lra
-			      (stack-ref fp (1+ sb!vm::lra-save-offset))))
+			      (stack-ref fp (1+ lra-save-offset))))
 		    (values (get-header-data lra)
 			    (lra-code-header lra)))
 	      (if code
 		  (values code
 			  (* (1+ (- word-offset (get-header-data code)))
-			     sb!vm:word-bytes)
+			     sb!vm:n-word-bytes)
 			  nil)
 		  (values :foreign-function
 			  0
@@ -902,7 +902,7 @@
 	     (when (null code)
 	       (return (values code 0 context)))
 	     (let* ((code-header-len (* (get-header-data code)
-					sb!vm:word-bytes))
+					sb!vm:n-word-bytes))
 		    (pc-offset
 		     (- (sap-int (sb!vm:context-pc context))
 			(- (get-lisp-obj-address code)
@@ -911,7 +911,7 @@
 	       (/show "got PC-OFFSET")
 	       (unless (<= 0 pc-offset
 			   (* (code-header-ref code sb!vm:code-code-size-slot)
-			      sb!vm:word-bytes))
+			      sb!vm:n-word-bytes))
 		 ;; We were in an assembly routine. Therefore, use the
 		 ;; LRA as the pc.
 		 ;;
@@ -937,7 +937,7 @@
             (when (symbolp code)
               (return (values code 0 scp)))
             (let* ((code-header-len (* (get-header-data code)
-                                       sb!vm:word-bytes))
+                                       sb!vm:n-word-bytes))
                    (pc-offset
                     (- (sap-int (sb!vm:context-pc scp))
                        (- (get-lisp-obj-address code)
@@ -947,10 +947,10 @@
               ;; delay slot.
               #!+(or pmax sgi) ; pmax only (and broken anyway)
               (when (logbitp 31 (sb!alien:slot scp '%mips::sc-cause))
-                (incf pc-offset sb!vm:word-bytes))
+                (incf pc-offset sb!vm:n-word-bytes))
               (unless (<= 0 pc-offset
                           (* (code-header-ref code sb!vm:code-code-size-slot)
-                             sb!vm:word-bytes))
+                             sb!vm:n-word-bytes))
                 ;; We were in an assembly routine. Therefore, use the
                 ;; LRA as the pc.
                 (setf pc-offset
@@ -1052,18 +1052,18 @@
 		  #!-alpha
 		  (sap-ref-sap catch
 				      (* sb!vm:catch-block-current-cont-slot
-					 sb!vm:word-bytes))
+					 sb!vm:n-word-bytes))
 		  #!+alpha
 		  (:int-sap
 		   (sap-ref-32 catch
 				      (* sb!vm:catch-block-current-cont-slot
-					 sb!vm:word-bytes))))
+					 sb!vm:n-word-bytes))))
 	(let* (#!-x86
 	       (lra (stack-ref catch sb!vm:catch-block-entry-pc-slot))
 	       #!+x86
 	       (ra (sap-ref-sap
 		    catch (* sb!vm:catch-block-entry-pc-slot
-			     sb!vm:word-bytes)))
+			     sb!vm:n-word-bytes)))
 	       #!-x86
 	       (component
 		(stack-ref catch sb!vm:catch-block-current-code-slot))
@@ -1074,18 +1074,18 @@
 		#!-x86
 		(* (- (1+ (get-header-data lra))
 		      (get-header-data component))
-		   sb!vm:word-bytes)
+		   sb!vm:n-word-bytes)
 		#!+x86
 		(- (sap-int ra)
 		   (- (get-lisp-obj-address component)
 		      sb!vm:other-pointer-lowtag)
-		   (* (get-header-data component) sb!vm:word-bytes))))
+		   (* (get-header-data component) sb!vm:n-word-bytes))))
 	  (push (cons #!-x86
 		      (stack-ref catch sb!vm:catch-block-tag-slot)
 		      #!+x86
 		      (make-lisp-obj
 		       (sap-ref-32 catch (* sb!vm:catch-block-tag-slot
-						   sb!vm:word-bytes)))
+						   sb!vm:n-word-bytes)))
 		      (make-compiled-code-location
 		       offset (frame-debug-fun frame)))
 		res)))
@@ -1093,12 +1093,12 @@
 	    #!-alpha
 	    (sap-ref-sap catch
 				(* sb!vm:catch-block-previous-catch-slot
-				   sb!vm:word-bytes))
+				   sb!vm:n-word-bytes))
 	    #!+alpha
 	    (:int-sap
 	     (sap-ref-32 catch
 				(* sb!vm:catch-block-previous-catch-slot
-				   sb!vm:word-bytes)))))))
+				   sb!vm:n-word-bytes)))))))
 
 ;;;; operations on DEBUG-FUNs
 
@@ -1202,7 +1202,7 @@
 	    (debug-fun-from-pc component
 			       (* (- (fun-word-offset fun)
 				     (get-header-data component))
-				  sb!vm:word-bytes)))))))
+				  sb!vm:n-word-bytes)))))))
 
 ;;; Return the kind of the function, which is one of :OPTIONAL,
 ;;; :EXTERNAL, TOP-level, :CLEANUP, or NIL.
@@ -1978,10 +1978,10 @@
 	    ;; routine in the C runtime support code
 	    (or (< sb!vm:read-only-space-start val
 		   (* sb!vm:*read-only-space-free-pointer*
-		      sb!vm:word-bytes))
+		      sb!vm:n-word-bytes))
 		(< sb!vm:static-space-start val
 		   (* sb!vm:*static-space-free-pointer*
-		      sb!vm:word-bytes))
+		      sb!vm:n-word-bytes))
 		(< sb!vm:dynamic-space-start val
 		   (sap-int (dynamic-space-free-pointer))))))
       (make-lisp-obj val)
@@ -2009,12 +2009,12 @@
                                  (sb!vm:context-register escaped
                                                          sb!vm::nfp-offset))
                                 #!-alpha
-                                (sb!sys:sap-ref-sap fp (* sb!vm::nfp-save-offset
-                                                          sb!vm:word-bytes))
+                                (sb!sys:sap-ref-sap fp (* nfp-save-offset
+                                                          sb!vm:n-word-bytes))
                                 #!+alpha
                                 (sb!vm::make-number-stack-pointer
-                                 (sb!sys:sap-ref-32 fp (* sb!vm::nfp-save-offset
-                                                          sb!vm:word-bytes))))))
+                                 (sb!sys:sap-ref-32 fp (* nfp-save-offset
+                                                          sb!vm:n-word-bytes))))))
                   ,@body)))
     (ecase (sb!c:sc-offset-scn sc-offset)
       ((#.sb!vm:any-reg-sc-number
@@ -2078,57 +2078,57 @@
       (#.sb!vm:single-stack-sc-number
        (with-nfp (nfp)
          (sb!sys:sap-ref-single nfp (* (sb!c:sc-offset-offset sc-offset)
-                                       sb!vm:word-bytes))))
+                                       sb!vm:n-word-bytes))))
       (#.sb!vm:double-stack-sc-number
        (with-nfp (nfp)
          (sb!sys:sap-ref-double nfp (* (sb!c:sc-offset-offset sc-offset)
-                                       sb!vm:word-bytes))))
+                                       sb!vm:n-word-bytes))))
       #!+long-float
       (#.sb!vm:long-stack-sc-number
        (with-nfp (nfp)
          (sb!sys:sap-ref-long nfp (* (sb!c:sc-offset-offset sc-offset)
-                                     sb!vm:word-bytes))))
+                                     sb!vm:n-word-bytes))))
       (#.sb!vm:complex-single-stack-sc-number
        (with-nfp (nfp)
          (complex
           (sb!sys:sap-ref-single nfp (* (sb!c:sc-offset-offset sc-offset)
-                                        sb!vm:word-bytes))
+                                        sb!vm:n-word-bytes))
           (sb!sys:sap-ref-single nfp (* (1+ (sb!c:sc-offset-offset sc-offset))
-                                        sb!vm:word-bytes)))))
+                                        sb!vm:n-word-bytes)))))
       (#.sb!vm:complex-double-stack-sc-number
        (with-nfp (nfp)
          (complex
           (sb!sys:sap-ref-double nfp (* (sb!c:sc-offset-offset sc-offset)
-                                        sb!vm:word-bytes))
+                                        sb!vm:n-word-bytes))
           (sb!sys:sap-ref-double nfp (* (+ (sb!c:sc-offset-offset sc-offset) 2)
-                                        sb!vm:word-bytes)))))
+                                        sb!vm:n-word-bytes)))))
       #!+long-float
       (#.sb!vm:complex-long-stack-sc-number
        (with-nfp (nfp)
          (complex
           (sb!sys:sap-ref-long nfp (* (sb!c:sc-offset-offset sc-offset)
-                                      sb!vm:word-bytes))
+                                      sb!vm:n-word-bytes))
           (sb!sys:sap-ref-long nfp (* (+ (sb!c:sc-offset-offset sc-offset)
                                          #!+sparc 4)
-                                      sb!vm:word-bytes)))))
+                                      sb!vm:n-word-bytes)))))
       (#.sb!vm:control-stack-sc-number
        (sb!kernel:stack-ref fp (sb!c:sc-offset-offset sc-offset)))
       (#.sb!vm:base-char-stack-sc-number
        (with-nfp (nfp)
          (code-char (sb!sys:sap-ref-32 nfp (* (sb!c:sc-offset-offset sc-offset)
-                                              sb!vm:word-bytes)))))
+                                              sb!vm:n-word-bytes)))))
       (#.sb!vm:unsigned-stack-sc-number
        (with-nfp (nfp)
          (sb!sys:sap-ref-32 nfp (* (sb!c:sc-offset-offset sc-offset)
-                                   sb!vm:word-bytes))))
+                                   sb!vm:n-word-bytes))))
       (#.sb!vm:signed-stack-sc-number
        (with-nfp (nfp)
          (sb!sys:signed-sap-ref-32 nfp (* (sb!c:sc-offset-offset sc-offset)
-                                          sb!vm:word-bytes))))
+                                          sb!vm:n-word-bytes))))
       (#.sb!vm:sap-stack-sc-number
        (with-nfp (nfp)
          (sb!sys:sap-ref-sap nfp (* (sb!c:sc-offset-offset sc-offset)
-                                    sb!vm:word-bytes)))))))
+                                    sb!vm:n-word-bytes)))))))
 
 #!+x86
 (defun sub-access-debug-var-slot (fp sc-offset &optional escaped)
@@ -2206,38 +2206,38 @@
       (#.sb!vm:single-stack-sc-number
        (/show0 "case of SINGLE-STACK-SC-NUMBER")
        (sap-ref-single fp (- (* (1+ (sb!c:sc-offset-offset sc-offset))
-				sb!vm:word-bytes))))
+				sb!vm:n-word-bytes))))
       (#.sb!vm:double-stack-sc-number
        (/show0 "case of DOUBLE-STACK-SC-NUMBER")
        (sap-ref-double fp (- (* (+ (sb!c:sc-offset-offset sc-offset) 2)
-				sb!vm:word-bytes))))
+				sb!vm:n-word-bytes))))
       #!+long-float
       (#.sb!vm:long-stack-sc-number
        (/show0 "case of LONG-STACK-SC-NUMBER")
        (sap-ref-long fp (- (* (+ (sb!c:sc-offset-offset sc-offset) 3)
-			      sb!vm:word-bytes))))
+			      sb!vm:n-word-bytes))))
       (#.sb!vm:complex-single-stack-sc-number
        (/show0 "case of COMPLEX-STACK-SC-NUMBER")
        (complex
 	(sap-ref-single fp (- (* (1+ (sb!c:sc-offset-offset sc-offset))
-				 sb!vm:word-bytes)))
+				 sb!vm:n-word-bytes)))
 	(sap-ref-single fp (- (* (+ (sb!c:sc-offset-offset sc-offset) 2)
-				 sb!vm:word-bytes)))))
+				 sb!vm:n-word-bytes)))))
       (#.sb!vm:complex-double-stack-sc-number
        (/show0 "case of COMPLEX-DOUBLE-STACK-SC-NUMBER")
        (complex
 	(sap-ref-double fp (- (* (+ (sb!c:sc-offset-offset sc-offset) 2)
-				 sb!vm:word-bytes)))
+				 sb!vm:n-word-bytes)))
 	(sap-ref-double fp (- (* (+ (sb!c:sc-offset-offset sc-offset) 4)
-				 sb!vm:word-bytes)))))
+				 sb!vm:n-word-bytes)))))
       #!+long-float
       (#.sb!vm:complex-long-stack-sc-number
        (/show0 "case of COMPLEX-LONG-STACK-SC-NUMBER")
        (complex
 	(sap-ref-long fp (- (* (+ (sb!c:sc-offset-offset sc-offset) 3)
-			       sb!vm:word-bytes)))
+			       sb!vm:n-word-bytes)))
 	(sap-ref-long fp (- (* (+ (sb!c:sc-offset-offset sc-offset) 6)
-			       sb!vm:word-bytes)))))
+			       sb!vm:n-word-bytes)))))
       (#.sb!vm:control-stack-sc-number
        (/show0 "case of CONTROL-STACK-SC-NUMBER")
        (stack-ref fp (sb!c:sc-offset-offset sc-offset)))
@@ -2245,19 +2245,19 @@
        (/show0 "case of BASE-CHAR-STACK-SC-NUMBER")
        (code-char
 	(sap-ref-32 fp (- (* (1+ (sb!c:sc-offset-offset sc-offset))
-			     sb!vm:word-bytes)))))
+			     sb!vm:n-word-bytes)))))
       (#.sb!vm:unsigned-stack-sc-number
        (/show0 "case of UNSIGNED-STACK-SC-NUMBER")
        (sap-ref-32 fp (- (* (1+ (sb!c:sc-offset-offset sc-offset))
-			    sb!vm:word-bytes))))
+			    sb!vm:n-word-bytes))))
       (#.sb!vm:signed-stack-sc-number
        (/show0 "case of SIGNED-STACK-SC-NUMBER")
        (signed-sap-ref-32 fp (- (* (1+ (sb!c:sc-offset-offset sc-offset))
-				   sb!vm:word-bytes))))
+				   sb!vm:n-word-bytes))))
       (#.sb!vm:sap-stack-sc-number
        (/show0 "case of SAP-STACK-SC-NUMBER")
        (sap-ref-sap fp (- (* (1+ (sb!c:sc-offset-offset sc-offset))
-			     sb!vm:word-bytes)))))))
+			     sb!vm:n-word-bytes)))))))
 
 ;;; This stores value as the value of DEBUG-VAR in FRAME. In the
 ;;; COMPILED-DEBUG-VAR case, access the current value to determine if
@@ -2311,13 +2311,13 @@
 							 sb!vm::nfp-offset))
 				#!-alpha
 				(sap-ref-sap fp
-					     (* sb!vm::nfp-save-offset
-						sb!vm:word-bytes))
+					     (* nfp-save-offset
+						sb!vm:n-word-bytes))
 				#!+alpha
 				(sb!vm::make-number-stack-pointer
 				 (sap-ref-32 fp
-					     (* sb!vm::nfp-save-offset
-						sb!vm:word-bytes))))))
+					     (* nfp-save-offset
+						sb!vm:n-word-bytes))))))
 		  ,@body)))
     (ecase (sb!c:sc-offset-scn sc-offset)
       ((#.sb!vm:any-reg-sc-number
@@ -2382,68 +2382,68 @@
       (#.sb!vm:single-stack-sc-number
        (with-nfp (nfp)
 	 (setf (sap-ref-single nfp (* (sb!c:sc-offset-offset sc-offset)
-				      sb!vm:word-bytes))
+				      sb!vm:n-word-bytes))
 	       (the single-float value))))
       (#.sb!vm:double-stack-sc-number
        (with-nfp (nfp)
 	 (setf (sap-ref-double nfp (* (sb!c:sc-offset-offset sc-offset)
-				      sb!vm:word-bytes))
+				      sb!vm:n-word-bytes))
 	       (the double-float value))))
       #!+long-float
       (#.sb!vm:long-stack-sc-number
        (with-nfp (nfp)
 	 (setf (sap-ref-long nfp (* (sb!c:sc-offset-offset sc-offset)
-				    sb!vm:word-bytes))
+				    sb!vm:n-word-bytes))
 	       (the long-float value))))
       (#.sb!vm:complex-single-stack-sc-number
        (with-nfp (nfp)
 	 (setf (sap-ref-single
-		nfp (* (sb!c:sc-offset-offset sc-offset) sb!vm:word-bytes))
+		nfp (* (sb!c:sc-offset-offset sc-offset) sb!vm:n-word-bytes))
 	       (the single-float (realpart value)))
 	 (setf (sap-ref-single
 		nfp (* (1+ (sb!c:sc-offset-offset sc-offset))
-		       sb!vm:word-bytes))
+		       sb!vm:n-word-bytes))
 	       (the single-float (realpart value)))))
       (#.sb!vm:complex-double-stack-sc-number
        (with-nfp (nfp)
 	 (setf (sap-ref-double
-		nfp (* (sb!c:sc-offset-offset sc-offset) sb!vm:word-bytes))
+		nfp (* (sb!c:sc-offset-offset sc-offset) sb!vm:n-word-bytes))
 	       (the double-float (realpart value)))
 	 (setf (sap-ref-double
 		nfp (* (+ (sb!c:sc-offset-offset sc-offset) 2)
-		       sb!vm:word-bytes))
+		       sb!vm:n-word-bytes))
 	       (the double-float (realpart value)))))
       #!+long-float
       (#.sb!vm:complex-long-stack-sc-number
        (with-nfp (nfp)
 	 (setf (sap-ref-long
-		nfp (* (sb!c:sc-offset-offset sc-offset) sb!vm:word-bytes))
+		nfp (* (sb!c:sc-offset-offset sc-offset) sb!vm:n-word-bytes))
 	       (the long-float (realpart value)))
 	 (setf (sap-ref-long
 		nfp (* (+ (sb!c:sc-offset-offset sc-offset) #!+sparc 4)
-		       sb!vm:word-bytes))
+		       sb!vm:n-word-bytes))
 	       (the long-float (realpart value)))))
       (#.sb!vm:control-stack-sc-number
        (setf (stack-ref fp (sb!c:sc-offset-offset sc-offset)) value))
       (#.sb!vm:base-char-stack-sc-number
        (with-nfp (nfp)
 	 (setf (sap-ref-32 nfp (* (sb!c:sc-offset-offset sc-offset)
-					 sb!vm:word-bytes))
+					 sb!vm:n-word-bytes))
 	       (char-code (the character value)))))
       (#.sb!vm:unsigned-stack-sc-number
        (with-nfp (nfp)
 	 (setf (sap-ref-32 nfp (* (sb!c:sc-offset-offset sc-offset)
-				  sb!vm:word-bytes))
+				  sb!vm:n-word-bytes))
 	       (the (unsigned-byte 32) value))))
       (#.sb!vm:signed-stack-sc-number
        (with-nfp (nfp)
 	 (setf (signed-sap-ref-32 nfp (* (sb!c:sc-offset-offset sc-offset)
-					 sb!vm:word-bytes))
+					 sb!vm:n-word-bytes))
 	       (the (signed-byte 32) value))))
       (#.sb!vm:sap-stack-sc-number
        (with-nfp (nfp)
 	 (setf (sap-ref-sap nfp (* (sb!c:sc-offset-offset sc-offset)
-				   sb!vm:word-bytes))
+				   sb!vm:n-word-bytes))
 	       (the system-area-pointer value)))))))
 
 #!+x86
@@ -2481,64 +2481,65 @@
       (#.sb!vm:single-stack-sc-number
        (setf (sap-ref-single
 	      fp (- (* (1+ (sb!c:sc-offset-offset sc-offset))
-		       sb!vm:word-bytes)))
+		       sb!vm:n-word-bytes)))
 	     (the single-float value)))
       (#.sb!vm:double-stack-sc-number
        (setf (sap-ref-double
 	      fp (- (* (+ (sb!c:sc-offset-offset sc-offset) 2)
-		       sb!vm:word-bytes)))
+		       sb!vm:n-word-bytes)))
 	     (the double-float value)))
       #!+long-float
       (#.sb!vm:long-stack-sc-number
        (setf (sap-ref-long
 	      fp (- (* (+ (sb!c:sc-offset-offset sc-offset) 3)
-		       sb!vm:word-bytes)))
+		       sb!vm:n-word-bytes)))
 	     (the long-float value)))
       (#.sb!vm:complex-single-stack-sc-number
        (setf (sap-ref-single
 	      fp (- (* (1+ (sb!c:sc-offset-offset sc-offset))
-		       sb!vm:word-bytes)))
+		       sb!vm:n-word-bytes)))
 	     (realpart (the (complex single-float) value)))
        (setf (sap-ref-single
 	      fp (- (* (+ (sb!c:sc-offset-offset sc-offset) 2)
-		       sb!vm:word-bytes)))
+		       sb!vm:n-word-bytes)))
 	     (imagpart (the (complex single-float) value))))
       (#.sb!vm:complex-double-stack-sc-number
        (setf (sap-ref-double
 	      fp (- (* (+ (sb!c:sc-offset-offset sc-offset) 2)
-		       sb!vm:word-bytes)))
+		       sb!vm:n-word-bytes)))
 	     (realpart (the (complex double-float) value)))
        (setf (sap-ref-double
 	      fp (- (* (+ (sb!c:sc-offset-offset sc-offset) 4)
-		       sb!vm:word-bytes)))
+		       sb!vm:n-word-bytes)))
 	     (imagpart (the (complex double-float) value))))
       #!+long-float
       (#.sb!vm:complex-long-stack-sc-number
        (setf (sap-ref-long
 	      fp (- (* (+ (sb!c:sc-offset-offset sc-offset) 3)
-		       sb!vm:word-bytes)))
+		       sb!vm:n-word-bytes)))
 	     (realpart (the (complex long-float) value)))
        (setf (sap-ref-long
 	      fp (- (* (+ (sb!c:sc-offset-offset sc-offset) 6)
-		       sb!vm:word-bytes)))
+		       sb!vm:n-word-bytes)))
 	     (imagpart (the (complex long-float) value))))
       (#.sb!vm:control-stack-sc-number
        (setf (stack-ref fp (sb!c:sc-offset-offset sc-offset)) value))
       (#.sb!vm:base-char-stack-sc-number
        (setf (sap-ref-32 fp (- (* (1+ (sb!c:sc-offset-offset sc-offset))
-					 sb!vm:word-bytes)))
+					 sb!vm:n-word-bytes)))
 	     (char-code (the character value))))
       (#.sb!vm:unsigned-stack-sc-number
        (setf (sap-ref-32 fp (- (* (1+ (sb!c:sc-offset-offset sc-offset))
-					 sb!vm:word-bytes)))
+					 sb!vm:n-word-bytes)))
 	     (the (unsigned-byte 32) value)))
       (#.sb!vm:signed-stack-sc-number
        (setf (signed-sap-ref-32
-	      fp (- (* (1+ (sb!c:sc-offset-offset sc-offset)) sb!vm:word-bytes)))
+	      fp (- (* (1+ (sb!c:sc-offset-offset sc-offset))
+		       sb!vm:n-word-bytes)))
 	     (the (signed-byte 32) value)))
       (#.sb!vm:sap-stack-sc-number
        (setf (sap-ref-sap fp (- (* (1+ (sb!c:sc-offset-offset sc-offset))
-					  sb!vm:word-bytes)))
+					  sb!vm:n-word-bytes)))
 	     (the system-area-pointer value))))))
 
 ;;; The method for setting and accessing COMPILED-DEBUG-VAR values use
@@ -2863,10 +2864,10 @@
 	(multiple-value-bind (lra component offset)
 	    (make-bogus-lra
 	     (get-context-value frame
-				sb!vm::lra-save-offset
+				lra-save-offset
 				lra-sc-offset))
 	  (setf (get-context-value frame
-				   sb!vm::lra-save-offset
+				   lra-save-offset
 				   lra-sc-offset)
 		lra)
 	  (let ((end-bpts (breakpoint-%info starter-bpt)))
@@ -2899,9 +2900,7 @@
 	((not frame) nil)
       (when (and (compiled-frame-p frame)
 		 (eq lra
-		     (get-context-value frame
-					sb!vm::lra-save-offset
-					lra-sc-offset)))
+		     (get-context-value frame lra-save-offset lra-sc-offset)))
 	(return t)))))
 
 ;;;; ACTIVATE-BREAKPOINT
@@ -3290,7 +3289,7 @@
        (setf (code-header-ref code-object (1+ real-lra-slot)) offset))
      (setf (code-header-ref code-object known-return-p-slot)
 	   known-return-p)
-     (system-area-copy src-start 0 dst-start 0 (* length sb!vm:byte-bits))
+     (system-area-copy src-start 0 dst-start 0 (* length sb!vm:n-byte-bits))
      (sb!vm:sanctify-for-execution code-object)
      #!+x86
      (values dst-start code-object (sap- trap-loc src-start))

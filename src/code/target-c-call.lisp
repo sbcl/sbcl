@@ -43,5 +43,5 @@
 	 (sb!kernel:copy-from-system-area (alien-sap ptr) 0
 					  result (* sb!vm:vector-data-offset
 						    sb!vm:n-word-bits)
-					  (* length sb!vm:byte-bits))
+					  (* length sb!vm:n-byte-bits))
 	 result)))))

@@ -611,7 +611,7 @@
   (let ((offset (fixup-offset fixup)))
     (if (label-p offset)
 	(emit-back-patch segment
-			 4 ; FIXME: sb!vm:word-bytes
+			 4 ; FIXME: sb!vm:n-word-bytes
 			 #'(lambda (segment posn)
 			     (declare (ignore posn))
 			     (emit-dword segment
@@ -678,7 +678,7 @@
 	(emit-mod-reg-r/m-byte segment #b11 reg (reg-tn-encoding thing)))
        (stack
 	;; Convert stack tns into an index off of EBP.
-	(let ((disp (- (* (1+ (tn-offset thing)) word-bytes))))
+	(let ((disp (- (* (1+ (tn-offset thing)) n-word-bytes))))
 	  (cond ((< -128 disp 127)
 		 (emit-mod-reg-r/m-byte segment #b01 reg #b101)
 		 (emit-byte segment disp))
@@ -693,7 +693,7 @@
 	(emit-absolute-fixup segment
 			     (make-fixup nil
 					 :code-object
-					 (- (* (tn-offset thing) word-bytes)
+					 (- (* (tn-offset thing) n-word-bytes)
 					    other-pointer-lowtag))))))
     (ea
      (let* ((base (ea-base thing))
@@ -1786,10 +1786,10 @@
     (cond (length-only
 	   (values 0 (1+ length) nil nil))
 	  (t
-	   (sb!kernel:copy-from-system-area sap (* byte-bits (1+ offset))
+	   (sb!kernel:copy-from-system-area sap (* n-byte-bits (1+ offset))
 					    vector (* n-word-bits
 						      vector-data-offset)
-					    (* length byte-bits))
+					    (* length n-byte-bits))
 	   (collect ((sc-offsets)
 		     (lengths))
 	     (lengths 1)		; the length byte
@@ -1826,19 +1826,19 @@
     ;; from first principles whether it's defined in some way that genesis
     ;; can't grok.
     (case (byte-imm-code chunk dstate)
-      (#.sb!vm:error-trap
+      (#.error-trap
        (nt "error trap")
        (sb!disassem:handle-break-args #'snarf-error-junk stream dstate))
-      (#.sb!vm:cerror-trap
+      (#.cerror-trap
        (nt "cerror trap")
        (sb!disassem:handle-break-args #'snarf-error-junk stream dstate))
-      (#.sb!vm:breakpoint-trap
+      (#.breakpoint-trap
        (nt "breakpoint trap"))
-      (#.sb!vm:pending-interrupt-trap
+      (#.pending-interrupt-trap
        (nt "pending interrupt trap"))
-      (#.sb!vm:halt-trap
+      (#.halt-trap
        (nt "halt trap"))
-      (#.sb!vm:fun-end-breakpoint-trap
+      (#.fun-end-breakpoint-trap
        (nt "function end breakpoint trap")))))
 
 (define-instruction break (segment code)

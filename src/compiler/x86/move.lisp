@@ -365,12 +365,12 @@
 	 (inst jmp :ns one-word-bignum)
 	 ;; two word bignum
 	 (inst mov y (logior (ash (1- (+ bignum-digits-offset 2))
-				  sb!vm:n-widetag-bits)
+				  n-widetag-bits)
 			     bignum-widetag))
 	 (inst jmp L1)
 	 (emit-label one-word-bignum)
 	 (inst mov y (logior (ash (1- (+ bignum-digits-offset 1))
-				  sb!vm:n-widetag-bits)
+				  n-widetag-bits)
 			     bignum-widetag))
 	 (emit-label L1)
 	 (pseudo-atomic
