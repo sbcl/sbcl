@@ -1020,16 +1020,24 @@ changes in sbcl-0.7.2 relative to sbcl-0.7.1:
   * new syntactic sugar for the Unix command line: --load foo.bar is now
     an alternate notation for --eval '(load "foo.bar")'.
   * bug fixes:
+    ?? The system now detects stack overflow and handles it gracefully,
+       at least for (OR (> SAFETY (MAX SPEED SPACE)) (= SAFETY 3))
+       optimization settings. (This is a good thing in general, and
+       its introduction in this version should be particularly timely
+       for anyone whose code fails because of suppression of tail
+       recursion!)
     ** The system now hunts for the C variable "environ" in a more
        devious way, to avoid segfaults when the C library version differs
        between compile time and run time. (thanks to Christophe Rhodes)
-    ** INTEGER-valued CATCH tags now work. (thanks to Alexey Dejneka)
+    ** INTEGER-valued CATCH tags now work. (thanks to Alexey Dejneka,
+       and also to Christophe Rhodes for porting the fix to non-X86 CPUs)
     ** The compiler no longer issues bogus style warnings for undefined
        classes in the same source file as the DEFCLASSes which defined
        them. (thanks to Stig E Sandoe for reporting and Martin Atzmueller
        for fixing this)
   * several changes related to debugging:
     ** suppression of tail recursion, as noted above
+    ** stack overflow detection, as noted above
     ** The default implementation of TRACE has changed. :ENCAPSULATE T
        is now the default. (For some time encapsulation has been more
        reliable than the breakpoint-based :ENCAPSULATE NIL

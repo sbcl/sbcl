@@ -58,7 +58,10 @@ $SBCL_XC_HOST <<-'EOF' || exit 1
 	    (sb-xc:proclaim `(optimize (compilation-speed 1)
 	                               (debug ,debug)
 				       (sb!ext:inhibit-warnings 2)
-                                       (safety 3)
+				       ;; SAFETY = SPEED (and < 3) should 
+				       ;; reasonable safety, but might skip 
+				       ;; some unreasonably expensive stuff.
+                                       (safety 2)
                                        (space 1)
 				       (speed 2)))))
         (compile 'proclaim-target-optimization)

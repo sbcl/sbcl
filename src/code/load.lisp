@@ -355,6 +355,7 @@
   (let ((prefixes
          #!+(or linux freebsd) #("" "ldso_stub__")
 	 #!+openbsd #("" "_")))    
+    (declare (notinline some)) ; to suppress bug 117 bogowarning
     (some (lambda (prefix)
 	    (gethash (concatenate 'string prefix name)
 		     table

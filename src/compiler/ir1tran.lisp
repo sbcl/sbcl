@@ -1463,8 +1463,26 @@
 	  (continuation-starts-block cont1)
 	  (link-node-to-previous-continuation bind cont1)
 	  (use-continuation bind cont2)
-	  (ir1-convert-special-bindings cont2 result body aux-vars aux-vals
-					(svars)))
+	  (ir1-convert-special-bindings cont2 result
+					(if (policy bind
+						    (or (> safety
+							   (max speed space))
+							(= safety 3)))
+					    ;; (Stuffing this in at IR1 level
+					    ;; like this is pretty crude. And
+					    ;; it's particularly inefficient
+					    ;; to execute it on *every* LAMBDA,
+					    ;; including LET-converted LAMBDAs.
+					    ;; But when SAFETY is high, it's
+					    ;; still arguably an improvement
+					    ;; over the old CMU CL approach of
+					    ;; doing nothing (proactively
+					    ;; waiting for evolution to breed
+					    ;; stronger programmers:-). -- WHN)
+					    `((%detect-stack-exhaustion)
+					      ,@body)
+					    body)
+					aux-vars aux-vals (svars)))
 
 	(let ((block (continuation-block result)))
 	  (when block
