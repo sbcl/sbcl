@@ -92,36 +92,26 @@
 
 ;;; sort of like ANY and EVERY, except:
 ;;;   * We handle two-VALUES predicate functions like SUBTYPEP. (And
-;;;     if the result is uncertain, then we return (VALUES NIL NIL).)
+;;;     if the result is uncertain, then we return (VALUES NIL NIL),
+;;;     just like SUBTYPEP.)
 ;;;   * THING is just an atom, and we apply OP (an arity-2 function)
 ;;;     successively to THING and each element of LIST.
 (defun any/type (op thing list)
   (declare (type function op))
   (let ((certain? t))
     (dolist (i list (values nil certain?))
-      (multiple-value-bind (sub-value sub-certain?)
-	  (funcall op thing i)
-	(unless sub-certain? (setf certain? nil))
-	(when sub-value (return (values t t)))))))
+      (multiple-value-bind (sub-value sub-certain?) (funcall op thing i)
+	(if sub-certain?
+	    (when sub-value (return (values t t)))
+	    (setf certain? nil))))))
 (defun every/type (op thing list)
   (declare (type function op))
-  (dolist (i list (values t t))
-    (multiple-value-bind (sub-value sub-certain?)
-	(funcall op thing i)
-      (unless sub-certain? (return (values nil nil)))
-      (unless sub-value (return (values nil t))))))
-
-;;; Return a function like FUN, but expecting its (two) arguments in
-;;; the opposite order that FUN does.
-;;;
-;;; (This looks like a sort of general utility, but currently it's
-;;; used only in the implementation of the type system, so it's
-;;; internal to SB-KERNEL. -- WHN 2001-02-13)
-(declaim (inline swapped-args-fun))
-(defun swapped-args-fun (fun)
-  (declare (type function fun))
-  (lambda (x y)
-    (funcall fun y x)))
+  (let ((certain? t))
+    (dolist (i list (if certain? (values t t) (values nil nil)))
+      (multiple-value-bind (sub-value sub-certain?) (funcall op thing i)
+	(if sub-certain?
+	    (unless sub-value (return (values nil t)))
+	    (setf certain? nil))))))
 
 ;;; Look for a nice intersection for types that intersect only when
 ;;; one is a hierarchical subtype of the other.

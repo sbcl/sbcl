@@ -380,6 +380,14 @@
 	;; a constant as long as the new value is EQL to the old
 	;; value.)
 	))
+
+;;; Return a function like FUN, but expecting its (two) arguments in
+;;; the opposite order that FUN does.
+(declaim (inline swapped-args-fun))
+(defun swapped-args-fun (fun)
+  (declare (type function fun))
+  (lambda (x y)
+    (funcall fun y x)))
 
 ;;;; DEFPRINTER
 

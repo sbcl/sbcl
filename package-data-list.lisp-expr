@@ -678,22 +678,25 @@ retained, possibly temporariliy, because it might be used internally."
              "SIMPLE-PROGRAM-ERROR" "SIMPLE-STYLE-WARNING"
              "STYLE-WARN"
 
-             ;; miscellaneous non-standard but widely useful user-level
-             ;; functions..
+             ;; bootstrapping magic, to make things happen both in
+             ;; the cross-compilation host compiler's environment and
+             ;; in the cross-compiler's environment
+             "DEF!MACRO" "DEF!METHOD" "DEF!STRUCT" "DEF!TYPE"
+
+             ;; miscellaneous non-standard but handy user-level functions..
              "ASSQ" "DELQ" "MEMQ" "POSQ" "NEQ"
 	     "%FIND-PACKAGE-OR-LOSE" "FIND-UNDELETED-PACKAGE-OR-LOSE"
              "SANE-PACKAGE"
              "CIRCULAR-LIST-P"
+             "SWAPPED-ARGS-FUN"
 
 	     ;; ..and macros..
              "COLLECT"
              "DO-ANONYMOUS" "DOHASH" "DOVECTOR"
              "NAMED-LET"
-             "LETF" "LETF*"
              "ONCE-ONLY"
              "DEFENUM"
              "DEFPRINTER"
-             "DEF!MACRO" "DEF!METHOD" "DEF!STRUCT" "DEF!TYPE"
 
              ;; ..and DEFTYPEs..
              "INDEX" 

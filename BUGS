@@ -525,8 +525,18 @@ Error in function C::GET-LAMBDA-TO-COMPILE:
    #<Closure Over Function "DEFUN (SETF MACRO-FUNCTION)" {480E21B1}> was defined in a non-null environment.
 
 58:
-  (SUBTYPEP '(AND ZILCH INTEGER) 'ZILCH)
-  => NIL, NIL
+  (SUBTYPEP '(AND ZILCH INTEGER) 'ZILCH) => NIL, NIL
+  Note: I looked into fixing this in 0.6.11.15, but gave up. The
+  problem seems to be that there are two relevant type methods for
+  the subtypep operation, HAIRY :COMPLEX-SUBTYPEP-ARG2 and
+  INTERSECTION :COMPLEX-SUBTYPEP-ARG1, and only the first is
+  called. This could be fixed, but type dispatch is messy and
+  confusing enough already, I don't want to complicate it further.
+  Perhaps someday we can make CLOS cross-compiled (instead of compiled
+  after bootstrapping) so that we don't need to have the type system
+  available before CLOS, and then we can rewrite the type methods to
+  CLOS methods, and then expressing the solutions to stuff like this
+  should become much more straightforward. -- WHN 2001-03-14
 
 59:
   CL:*DEFAULT-PATHNAME-DEFAULTS* doesn't behave as ANSI suggests (reflecting
@@ -814,6 +824,19 @@ Error in function C::GET-LAMBDA-TO-COMPILE:
   EQ type comparison in the NAMED :SIMPLE-= type method) return NIL.
   (I haven't tried to investigate this bug enough to guess whether
   there might be any user-level symptoms.)
+
+86:
+  The system doesn't know how to reduce
+    (specifier-type '(intersection (or number vector) real)),
+  it just ends up as a HAIRY-TYPE. Smarter INTERSECTION2 methods for
+  UNION-TYPE might help.
+
+87:
+  Despite what the manual says, (DECLAIM (SPEED 0)) doesn't cause
+  things to be byte compiled. This seems to be true in cmucl-2.4.19,
+  too: (COMPILE-FILE .. :BYTE-COMPILE T) causes byte-compilation,
+  but ordinary COMPILE-FILE of a file containing (DECLAIM (SPEED 0))
+  does not.
 
 
 KNOWN BUGS RELATED TO THE IR1 INTERPRETER

@@ -32,6 +32,11 @@
 ;;; types. For STRUCTURE- types, we require that the type be defined
 ;;; in both the current and compiler environments, and that the
 ;;; INCLUDES be the same.
+;;;
+;;; KLUDGE: This should probably be a type method instead of a big
+;;; ETYPECASE. But then the type method system should probably be CLOS
+;;; too, and until that happens wedging more stuff into it might be
+;;; messy. So I've left it a big ETYPECASE. -- 2001-03-16
 (defun ctypep (obj type)
   (declare (type ctype type))
   (etypecase type
@@ -52,16 +57,10 @@
 	     (values nil nil))
 	 (values nil t)))
     (compound-type
+     ;; REMOVEME: old version
+     #|
      (let ((certain? t))
        (etypecase type
-	 ;; FIXME: The cases here are very similar to #'EVERY/TYPE and
-	 ;; #'ANY/TYPE. It would be good to fix them so that they
-	 ;; share the same code. (That will require making sure that
-	 ;; the two-value return convention for CTYPEP really is
-	 ;; exactly compatible with the two-value convention the
-	 ;; quantifier/TYPE functions operate on, and probably also
-	 ;; making sure that things are inlined and defined early
-	 ;; enough that consing can be avoided.)
 	 (union-type
 	  (dolist (mem (union-type-types type) (values nil certain?))
 	    (multiple-value-bind (val win) (ctypep obj mem)
@@ -74,7 +73,12 @@
 	    (multiple-value-bind (val win) (ctypep obj mem)
 	      (if win
 		  (unless val (return (values nil t)))
-		  (setf certain? nil))))))))
+		  (setf certain? nil)))))))
+     |#
+     (let ((types (compound-type-types type)))
+       (etypecase type
+	 (intersection-type (every/type #'ctypep obj types))
+	 (union-type        (any/type   #'ctypep obj types)))))
     (function-type
      (values (functionp obj) t))
     (unknown-type

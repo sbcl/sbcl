@@ -202,10 +202,7 @@
   ;; to do with #'FORMAT), or NIL if not specified or not a float.
   ;; Formats which don't exist in a given implementation don't appear
   ;; here.
-  (format nil
-	  ;; FIXME: suppressed because of cold init problems under
-	  ;; hacked type system in sbcl-0.6.11.13, should be restored
-	  #+nil :type #+nil (or float-format null))
+  (format nil :type (or float-format null))
   ;; Is this a complex numeric type?  Null if unknown (only in NUMBER).
   ;;
   ;; FIXME: I'm bewildered by FOO-P names for things not intended to
@@ -248,12 +245,7 @@
 (defstruct (compound-type (:include ctype)
 			  (:constructor nil)
 			  (:copier nil))
-  (types nil
-	 ;; FIXME: This type declaration was suppresed as a temporary
-	 ;; hack to work around sbcl-0.6.11.13 cold init problems.
-	 ;; Restore it.
-	 #+nil :type #+nil list 
-	 :read-only t))
+  (types nil :type list :read-only t))
 
 ;;; A UNION-TYPE represents a use of the OR type specifier which we
 ;;; couldn't canonicalize to something simpler. Canonical form:

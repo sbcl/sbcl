@@ -1781,25 +1781,19 @@
   (type=-set (intersection-type-types type1)
 	     (intersection-type-types type2)))
 
-(!define-type-method (intersection :simple-subtypep) (type1 type2)
-  (let ((certain? t))
-    (dolist (t1 (intersection-type-types type1) (values nil certain?))
-      (multiple-value-bind (subtypep validp)
-	  (intersection-complex-subtypep-arg2 t1 type2)
-	(cond ((not validp)
-	       (setf certain? nil))
-	      (subtypep
-	       (return (values t t))))))))
+(flet ((intersection-complex-subtypep-arg1 (type1 type2)
+         (any/type (swapped-args-fun #'csubtypep)
+		   type2
+		   (intersection-type-types type1))))
+  (!define-type-method (intersection :simple-subtypep) (type1 type2)
+    (every/type #'intersection-complex-subtypep-arg1
+		type1
+		(intersection-type-types type2)))
+  (!define-type-method (intersection :complex-subtypep-arg1) (type1 type2)
+    (intersection-complex-subtypep-arg1 type1 type2)))
 
-(!define-type-method (intersection :complex-subtypep-arg1) (type1 type2)
-  (any/type (swapped-args-fun #'csubtypep)
-	    type2
-	    (intersection-type-types type1)))
-
-(defun intersection-complex-subtypep-arg2 (type1 type2)
-  (every/type #'csubtypep type1 (intersection-type-types type2)))
 (!define-type-method (intersection :complex-subtypep-arg2) (type1 type2)
-  (intersection-complex-subtypep-arg2 type1 type2))
+  (every/type #'csubtypep type1 (intersection-type-types type2)))
 
 (!def-type-translator and (&whole whole &rest type-specifiers)
   (apply #'type-intersection

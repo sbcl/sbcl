@@ -995,6 +995,22 @@
 		array sequence
 		generic-string generic-vector generic-array mutable-sequence
 		mutable-collection generic-sequence collection))
+    (list
+     :translation (or cons (member nil))
+     :inherits (sequence mutable-sequence mutable-collection
+		generic-sequence collection))
+    (cons
+     :codes (#.sb!vm:list-pointer-type)
+     :translation cons
+     :inherits (list sequence
+		mutable-sequence mutable-collection
+		generic-sequence collection))
+    (null
+     :translation (member nil)
+     :inherits (list sequence
+		mutable-sequence mutable-collection
+		generic-sequence collection symbol)
+     :direct-superclasses (list symbol))
     (generic-number :state :read-only)
     (number :translation number :inherits (generic-number))
     (complex
@@ -1034,28 +1050,6 @@
     (rational
      :translation rational
      :inherits (real number generic-number))
-
-    ;; FIXME: moved LIST, CONS, and NULL here to help with translation
-    ;; of RATIO now that sbcl-0.6.11.13 has real INTERSECTION-TYPE;
-    ;; but it would be tidier to move them further back, if possible,
-    ;; so that all the numeric types are in an uninterrupted sequence
-    (list
-     :translation (or cons (member nil))
-     :inherits (sequence mutable-sequence mutable-collection
-		generic-sequence collection))
-    (cons
-     :codes (#.sb!vm:list-pointer-type)
-     :translation cons
-     :inherits (list sequence
-		mutable-sequence mutable-collection
-		generic-sequence collection))
-    (null
-     :translation (member nil)
-     :inherits (list sequence
-		mutable-sequence mutable-collection
-		generic-sequence collection symbol)
-     :direct-superclasses (list symbol))
-
     (ratio
      :translation (and rational (not integer))
      :inherits (rational real number generic-number)

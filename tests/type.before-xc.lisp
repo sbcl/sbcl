@@ -106,7 +106,7 @@
 
     (assert (csubtypep *empty-type* ctype))
     (assert (csubtypep ctype *universal-type*))))
-(/show "done with identities-should-be-identities block")
+(/show "finished with identities-should-be-identities block")
 
 (assert (sb-xc:subtypep 'simple-vector 'vector))
 (assert (sb-xc:subtypep 'simple-vector 'simple-array))
@@ -126,6 +126,34 @@
   (assert-secondnil (sb-xc:subtypep '(or (satisfies foo) (satisfies bar))
 				    nil))
   |#)
+
+;;; tests of 2-value quantifieroids FOO/TYPE
+(macrolet ((2= (v1 v2 expr2)
+             (let ((x1 (gensym))
+		   (x2 (gensym)))
+	       `(multiple-value-bind (,x1 ,x2) ,expr2
+		  (unless (and (eql ,x1 ,v1) (eql ,x2 ,v2))
+		    (error "mismatch for EXPR2=~S" ',expr2))))))
+  (flet (;; SUBTYPEP running in the cross-compiler
+	 (xsubtypep (x y)
+	   (csubtypep (specifier-type x)
+		      (specifier-type y))))
+    (2=   t   t (any/type   #'xsubtypep 'fixnum '(real integer)))
+    (2=   t   t (any/type   #'xsubtypep 'fixnum '(real cons)))
+    (2= nil   t (any/type   #'xsubtypep 'fixnum '(cons vector)))
+    (2= nil nil (any/type   #'xsubtypep 'fixnum '(cons some-unknown-type-foo)))
+    (2= nil nil (any/type   #'xsubtypep 'fixnum '(some-unknown-type-foo cons)))
+    (2=   t   t (any/type   #'xsubtypep 'fixnum '(some-unknown-type-foo real)))
+    (2=   t   t (any/type   #'xsubtypep 'fixnum '(real some-unknown-type-foo)))
+    (2= nil   t (any/type   #'xsubtypep 'fixnum '()))
+    (2=   t   t (every/type #'xsubtypep 'fixnum '()))
+    (2= nil nil (every/type #'xsubtypep 'fixnum '(real some-unknown-type-foo)))
+    (2= nil nil (every/type #'xsubtypep 'fixnum '(some-unknown-type-foo real)))
+    (2= nil   t (every/type #'xsubtypep 'fixnum '(some-unknown-type-foo cons)))
+    (2= nil   t (every/type #'xsubtypep 'fixnum '(cons some-unknown-type-foo)))
+    (2=   t   t (every/type #'xsubtypep 'fixnum '(real integer)))
+    (2= nil   t (every/type #'xsubtypep 'fixnum '(real cons)))
+    (2= nil   t (every/type #'xsubtypep 'fixnum '(cons vector)))))
 
 ;;; various dead bugs
 (assert (union-type-p (type-intersection (specifier-type 'list)
