@@ -1210,3 +1210,19 @@ WORKAROUND:
   that this merely obscures, not solves, the underlying problem; as and when
   underlying problems are fixed, it would be worth trying again to provoke
   this problem.
+
+288: fundamental cross-compilation issues (from old UGLINESS file)
+  288a: Using host floating point numbers to represent target
+    floating point numbers, or host characters to represent
+    target characters, is theoretically shaky. (The characters
+    are OK as long as the characters are in the ANSI-guaranteed
+    character set, though, so they aren't a real problem as
+    long as the sources don't need anything but that.)
+  288b: The compiler still makes assumptions about cross-compilation-host
+    implementation of ANSI CL:
+    288b1: Simple bit vectors are distinct from simple vectors (in
+	DEFINE-STORAGE-BASE and elsewhere). (Actually, I'm not *sure*
+	that things would really break if this weren't so, but I 
+	strongly suspect that they would.)
+    288b2: SINGLE-FLOAT is distinct from DOUBLE-FLOAT. (This is 
+	in a sense just one aspect of bug 288a.)

@@ -3291,14 +3291,3 @@
     ;; (There used to be more cases back before sbcl-0.7.0, when
     ;; we did special tricks to debug the IR1 interpreter.)
     ))
-
-(defun print-code-locations (function)
-  (let ((debug-fun (fun-debug-fun function)))
-    (do-debug-fun-blocks (block debug-fun)
-      (do-debug-block-locations (loc block)
-	(fill-in-code-location loc)
-	(format t "~S code location at ~W"
-		(compiled-code-location-kind loc)
-		(compiled-code-location-pc loc))
-	(sb!debug::print-code-location-source-form loc 0)
-	(terpri)))))

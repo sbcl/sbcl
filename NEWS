@@ -2002,6 +2002,16 @@ changes in sbcl-0.8.3 relative to sbcl-0.8.2:
     obscure ANSI requirements
 
 changes in sbcl-0.8.4 relative to sbcl-0.8.3:
+  * incompatible change: The --disable-debugger command line
+    option now clobbers the debugger at a more fundamental
+    level, by redefining #'INVOKE-DEBUGGER instead of by 
+    rebinding *DEBUGGER-HOOK*. The main difference is that BREAK
+    is specified by ANSI to ignore *DEBUGGER-HOOK* and
+    INVOKE-DEBUGGER regardless. Under the old system, BREAK would
+    enter the debugger REPL and then suffer recursive errors
+    because *DEBUG-IO* is also messed up in --disable-debugger mode;
+    while under the new system, BREAK in --disable-debugger mode
+    terminates the system just as an unhandled error would.
   * fixed compiler performance when processing loops with a step >1;
   * bug fix: DOCUMENTATION now retrieves generic function
     documentation.  Also, DOCUMENTATION and (SETF DOCUMENTATION)

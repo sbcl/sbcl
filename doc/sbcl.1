@@ -326,18 +326,20 @@ makes it easier to write Lisp "scripts" which work cleanly in Unix
 pipelines.
 .TP 3
 .B --disable-debugger
-This is equivalent to --eval '(sb-ext:disable-debugger)'.
-By default, a Common Lisp system tries to ask the programmer for help
-when it gets in trouble (by printing a debug prompt on *DEBUG-IO*).
-However, this is not useful behavior for a system running with no
-programmer available, and this option tries to set up more appropriate
-behavior for that situation. This is implemented by modifying special
-variables: we set *DEBUG-IO* to send its output to *ERROR-OUTPUT*, and
-to raise an error if any input is requested from it, and we set
-*DEBUGGER-HOOK* to output a backtrace, then exit the process with a
-failure code. Because it is implemented by modifying special variables,
-its effects persist in .core files created by SB-EXT:SAVE-LISP-AND-DIE.
-(If you want to undo its effects, see the SB-EXT:ENABLE-DEBUGGER
+This is equivalent to --eval '(sb-ext:disable-debugger)'. By default,
+a Common Lisp system tries to ask the programmer for help when it gets
+in trouble (by printing a debug prompt, then listening, on
+*DEBUG-IO*). However, this is not useful behavior for a system running
+with no programmer available, and this option tries to set up more
+appropriate behavior for that situation. This is implemented by
+redefining INVOKE-DEBUGGER so that any call exits the process with a
+failure code after printing a backtrace, and by redefining *DEBUG-IO*
+to send its output to *ERROR-OUTPUT* and to raise an error if any
+input is requested from it. (Note that because it is implemented by
+modifying special variables and FDEFINITIONs, its effects persist in
+.core files created by SB-EXT:SAVE-LISP-AND-DIE. If you want to undo
+its effects, e.g. if you build a system unattended and then want to
+operate a derived system interactively, see the SB-EXT:ENABLE-DEBUGGER
 command.)
 .PP
 

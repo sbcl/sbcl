@@ -480,15 +480,6 @@
       ;; (classic CMU CL error message: "You're certainly a clever child.":-)
       (critically-unreachable "after TOPLEVEL-REPL"))))
 
-;;; halt-on-failures and prompt-on-failures modes, suitable for
-;;; noninteractive and interactive use respectively
-(defun disable-debugger ()
-  (setf *debugger-hook* 'noprogrammer-debugger-hook-fun
-	*debug-io* *error-output*))
-(defun enable-debugger ()
-  (setf *debugger-hook* nil
-	*debug-io* *query-io*))
-
 ;;; read-eval-print loop for the default system toplevel
 (defun toplevel-repl (noprint)
   (/show0 "entering TOPLEVEL-REPL")
@@ -577,59 +568,6 @@
        (dolist (result results)
 	 (fresh-line)
 	 (prin1 result))))))
-
-;;; suitable value for *DEBUGGER-HOOK* for a noninteractive Unix-y program
-(defun noprogrammer-debugger-hook-fun (condition old-debugger-hook)
-  (declare (ignore old-debugger-hook))
-  (flet ((failure-quit (&key recklessly-p)
-           (/show0 "in FAILURE-QUIT (in --disable-debugger debugger hook)")
-	   (quit :unix-status 1 :recklessly-p recklessly-p)))
-    ;; This HANDLER-CASE is here mostly to stop output immediately
-    ;; (and fall through to QUIT) when there's an I/O error. Thus,
-    ;; when we're run under a shell script or something, we can die
-    ;; cleanly when the script dies (and our pipes are cut), instead
-    ;; of falling into ldb or something messy like that.
-    (handler-case
-	(progn
-	  (format *error-output*
-		  "~&~@<unhandled condition (of type ~S): ~2I~_~A~:>~2%"
-		  (type-of condition)
-		  condition)
-	  ;; Flush *ERROR-OUTPUT* even before the BACKTRACE, so that
-	  ;; even if we hit an error within BACKTRACE (e.g. a bug in
-	  ;; the debugger's own frame-walking code, or a bug in a user
-	  ;; PRINT-OBJECT method) we'll at least have the CONDITION
-	  ;; printed out before we die.
-	  (finish-output *error-output*)
-	  ;; (Where to truncate the BACKTRACE is of course arbitrary, but
-	  ;; it seems as though we should at least truncate it somewhere.)
-	  (sb!debug:backtrace 128 *error-output*)
-	  (format
-	   *error-output*
-	   "~%unhandled condition in --disable-debugger mode, quitting~%")
-	  (finish-output *error-output*)
-	  (failure-quit))
-      (condition ()
-	;; We IGNORE-ERRORS here because even %PRIMITIVE PRINT can
-	;; fail when our output streams are blown away, as e.g. when
-	;; we're running under a Unix shell script and it dies somehow
-	;; (e.g. because of a SIGINT). In that case, we might as well
-	;; just give it up for a bad job, and stop trying to notify
-	;; the user of anything.
-        ;;
-        ;; Actually, the only way I've run across to exercise the
-	;; problem is to have more than one layer of shell script.
-	;; I have a shell script which does
-	;;   time nice -10 sh make.sh "$1" 2>&1 | tee make.tmp
-	;; and the problem occurs when I interrupt this with Ctrl-C
-	;; under Linux 2.2.14-5.0 and GNU bash, version 1.14.7(1).
-        ;; I haven't figured out whether it's bash, time, tee, Linux, or
-	;; what that is responsible, but that it's possible at all
-	;; means that we should IGNORE-ERRORS here. -- WHN 2001-04-24
-        (ignore-errors
-         (%primitive print
-		     "Argh! error within --disable-debugger error handling"))
-	(failure-quit :recklessly-p t)))))
 
 ;;; a convenient way to get into the assembly-level debugger
 (defun %halt ()
