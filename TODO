@@ -58,10 +58,6 @@ for early 0.7.x:
 			os_trunc_foo(), os_round_up_foo()
 		** removed various avoid-evaluating-C-macro-arg-twice
 			cruft
-* added mechanisms for automatically finding dead symbols in
-	package-data.lisp-expr (i.e. those symbols not bound,
-	fbound, defined as types, or whatever), and used them
-	to remove dead symbols
 * Either get rid of or at least rework the fdefinition/encapsulation
 	system so that (SYMBOL-FUNCTION 'FOO) is identically equal to
 	(FDEFINITION 'FOO).
