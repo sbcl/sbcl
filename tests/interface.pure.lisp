@@ -104,3 +104,8 @@
   (sb-ext:with-timeout 3
     (sleep 2)
     (sleep 2)))
+
+;;; DOCUMENTATION should return nil, not signal slot-unbound
+(documentation 'fixnum 'type)
+(documentation 'class 'type)
+(documentation (find-class 'class) 'type)

@@ -296,6 +296,7 @@
     (set-slot 'wrapper wrapper)
     (set-slot 'predicate-name (or (cadr (assoc name *early-class-predicates*))
 				  (make-class-predicate-name name)))
+    (set-slot 'documentation nil)
     (set-slot 'plist
 	      `(,@(and direct-default-initargs
 		       `(direct-default-initargs ,direct-default-initargs))
