@@ -76,7 +76,7 @@
 ;;; versions which break binary compatibility. But it certainly should
 ;;; be incremented for release versions which break binary
 ;;; compatibility.
-(def!constant +fasl-file-version+ 45)
+(def!constant +fasl-file-version+ 46)
 ;;; (record of versions before 2003 deleted in 2003-04-26/0.pre8.107 or so)
 ;;; 38: (2003-01-05) changed names of internal SORT machinery
 ;;; 39: (2003-02-20) in 0.7.12.1 a slot was added to
@@ -100,6 +100,8 @@
 ;;;     .fasl files could never possibly ever refer to the SB-C
 ;;;     CONTINUATION-related data types which were changed 
 ;;;     incompatibly in 0.8.3.62.
+;;; 46: (2003-11-11) Tim Daly, Jr. (and Christophe Rhodes) reported
+;;;     .fasl incompatibility on sbcl-devel 2003-11-09.
 
 ;;; the conventional file extension for our fasl files
 (declaim (type simple-string *fasl-file-type*))
