@@ -541,6 +541,14 @@
 		    ((oddp or-digits) (+ (* i digit-size) j))
 		  (declare (type (mod #.sb!vm:n-word-bits) j))))))))
 
+;;; Allocate a single word bignum that holds fixnum. This is useful when
+;;; we are trying to mix fixnum and bignum operands.
+#!-sb-fluid (declaim (inline make-small-bignum))
+(defun make-small-bignum (fixnum)
+  (let ((res (%allocate-bignum 1)))
+    (setf (%bignum-ref res 0) (%fixnum-to-digit fixnum))
+    res))
+
 (defun bignum-gcd (a b)
   (let* ((a (if (%bignum-0-or-plusp a (%bignum-length a))
 		a
@@ -570,7 +578,9 @@
 		(setf a (make-small-bignum rem))
 		(setf a rem))
 	    (rotatef a b)))
-    a))
+    (if (= (%bignum-length a) 1)
+	(%normalize-bignum a 1)
+	a)))
   
 (defun bignum-binary-gcd (a b)
   (declare (type bignum-type a b))
@@ -2262,14 +2272,6 @@ IS LESS EFFICIENT BUT EASIER TO MAINTAIN. BILL SAYS THIS CODE CERTAINLY WORKS!
 	    (return guess))))))
 
 ;;;; general utilities
-
-;;; Allocate a single word bignum that holds fixnum. This is useful when
-;;; we are trying to mix fixnum and bignum operands.
-#!-sb-fluid (declaim (inline make-small-bignum))
-(defun make-small-bignum (fixnum)
-  (let ((res (%allocate-bignum 1)))
-    (setf (%bignum-ref res 0) (%fixnum-to-digit fixnum))
-    res))
 
 ;;; Internal in-place operations use this to fixup remaining digits in the
 ;;; incoming data, such as in-place shifting. This is basically the same as
