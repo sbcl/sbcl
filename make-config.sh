@@ -50,6 +50,16 @@ if [ "$sbcl_arch" = "" ] ; then
     exit 1
 fi
 echo -n ":$sbcl_arch" >> $ltf 
+# KLUDGE: currently the x86 only works with the generational garbage
+# collector (indicated by the presence of :gencgc in *features*) and
+# alpha, sparc and ppc with the stop'n'copy collector (indicated by
+# the absence of :gencgc in *features*). This isn't a great
+# separation, but for now, rather than have :gencgc in
+# base-target-features.lisp-expr, we add it into local-target-features
+# if we're building for x86. -- CSR, 2002-02-21
+if [ "$sbcl_arch" = "x86" ] ; then
+    echo -n ' :gencgc' >> $ltf
+fi
 for d in src/compiler src/assembly; do
     echo //setting up symlink $d/target
     original_dir=`pwd`

@@ -40,13 +40,17 @@
  ;; our standard
  :ansi-cl :common-lisp
  ;; FIXME: Isn't there a :x3jsomething feature which we should set too?
+ ;; No. CLHS says ":x3j13 [...] A conforming implementation might or
+ ;; might not contain such a feature." -- CSR, 2002-02-21
 
  ;; our dialect
  :sbcl
 
  ;; Douglas Thomas Crosher's conservative generational GC (the only one
- ;; we currently support for X86)
- :gencgc
+ ;; we currently support for X86).
+ ;; :gencgc used to be here; CSR moved it into
+ ;; local-target-features.lisp-expr via make-config.sh, as alpha,
+ ;; sparc and ppc ports don't currently support it. -- CSR, 2002-02-21
 
  ;; We're running under a UNIX. This is sort of redundant, and it was also
  ;; sort of redundant under CMU CL, which we inherited it from: neither SBCL
