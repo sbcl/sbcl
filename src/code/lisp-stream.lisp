@@ -11,7 +11,14 @@
 
 (in-package "SB!IMPL")
 
-(defconstant in-buffer-length 512 "the size of a stream in-buffer")
+;;; the size of a stream in-buffer
+;;;
+;;; KLUDGE: The EVAL-WHEN wrapper isn't needed except when using CMU
+;;; CL as a cross-compilation host. cmucl-2.4.19 issues full WARNINGs
+;;; (not just STYLE-WARNINGs!) when processing this file, and when
+;;; processing other files which use LISP-STREAM. -- WHN 2000-12-13
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defconstant in-buffer-length 512))
 
 (deftype in-buffer-type ()
   `(simple-array (unsigned-byte 8) (,in-buffer-length)))

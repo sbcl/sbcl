@@ -2092,12 +2092,7 @@
       ;; conditional on #+CMU.)
       #+(and sb-xc-host (or sbcl cmu))
       (let (#+sbcl (sb-eval::*already-evaled-this* t)
-	    ;; KLUDGE: I thought this would be the right workaround
-	    ;; for CMUCL, but at least on cmucl-2.4.19 and
-	    ;; sbcl-0.6.9.5, it doesn't seem to work, at least
-	    ;; not for Martin Atzmueller and me. -- WHN 2000-12-12
-	    ;;#+cmu (common-lisp::*already-evaled-this* t)
-	    #+cmu (oops still do not know how to make this work))
+	    #+cmu (common-lisp::*already-evaled-this* t))
 	(eval `(eval-when (:compile-toplevel :load-toplevel :execute)
 		 ,@body))))
 

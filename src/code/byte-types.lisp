@@ -14,10 +14,11 @@
 ;;;; types
 
 (deftype stack-pointer ()
-  `(integer 0 ,(1- most-positive-fixnum)))
+  `(integer 0 ,(1- sb!vm:*target-most-positive-fixnum*)))
 
 ;;; KLUDGE: bare numbers, no documentation, ick.. -- WHN 19990701
-(defconstant max-pc (1- (ash 1 24)))
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defconstant max-pc (1- (ash 1 24))))
 
 (deftype pc ()
   `(integer 0 ,max-pc))

@@ -36,21 +36,22 @@
 	    #+cmu :reader #+cmu #.(gensym) ; (to stop bogus non-STYLE WARNING)
 	    )))
 
-;;; This warning refers to the flexibility in the ANSI spec with regard to
-;;; run-time distinctions between floating point types. (E.g. the
-;;; cross-compilation host might not even distinguish between SINGLE-FLOAT and
-;;; DOUBLE-FLOAT, so a DOUBLE-FLOAT number would test positive as
-;;; SINGLE-FLOAT.) If the target SBCL does make this distinction, then
-;;; information is lost. It's not too hard to contrive situations where this
-;;; would be a problem. In practice we don't tend to run into them because all
-;;; widely used Common Lisp environments do recognize the distinction between
-;;; SINGLE-FLOAT and DOUBLE-FLOAT, and we don't really need the other
-;;; distinctions (e.g. between SHORT-FLOAT and SINGLE-FLOAT), so we call
-;;; WARN-POSSIBLE-CROSS-TYPE-FLOAT-INFO-LOSS to test at runtime whether
-;;; we need to worry about this at all, and not warn unless we do. If we *do*
-;;; have to worry about this at runtime, my (WHN 19990808) guess is that
-;;; the system will break in multiple places, so this is a real
-;;; WARNING, not just a STYLE-WARNING.
+;;; This warning refers to the flexibility in the ANSI spec with
+;;; regard to run-time distinctions between floating point types.
+;;; (E.g. the cross-compilation host might not even distinguish
+;;; between SINGLE-FLOAT and DOUBLE-FLOAT, so a DOUBLE-FLOAT number
+;;; would test positive as SINGLE-FLOAT.) If the target SBCL does make
+;;; this distinction, then information is lost. It's not too hard to
+;;; contrive situations where this would be a problem. In practice we
+;;; don't tend to run into them because all widely used Common Lisp
+;;; environments do recognize the distinction between SINGLE-FLOAT and
+;;; DOUBLE-FLOAT, and we don't really need the other distinctions
+;;; (e.g. between SHORT-FLOAT and SINGLE-FLOAT), so we call
+;;; WARN-POSSIBLE-CROSS-TYPE-FLOAT-INFO-LOSS to test at runtime
+;;; whether we need to worry about this at all, and not warn unless we
+;;; do. If we *do* have to worry about this at runtime, my (WHN
+;;; 19990808) guess is that the system will break in multiple places,
+;;; so this is a real WARNING, not just a STYLE-WARNING.
 ;;;
 ;;; KLUDGE: If we ever try to support LONG-FLOAT or SHORT-FLOAT, this
 ;;; situation will get a lot more complicated.
@@ -60,9 +61,10 @@
     (warn "possible floating point information loss in ~S" call)))
 
 (defun sb!xc:type-of (object)
-  (labels (;; FIXME: This function is a no-op now that we no longer have a
-	   ;; distinct package T%CL to translate for-the-target-Lisp CL symbols
-	   ;; to, and should go away completely.
+  (labels (;; FIXME: This function is a no-op now that we no longer
+	   ;; have a distinct package T%CL to translate
+	   ;; for-the-target-Lisp CL symbols to, and should go away
+	   ;; completely.
 	   (translate (expr) expr))
     (let ((raw-result (type-of object)))
       (cond ((or (subtypep raw-result 'float)

@@ -14,11 +14,17 @@
 
 ;;;; utilities
 
-(defconstant max-hash most-positive-fixnum)
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defconstant max-hash most-positive-fixnum))
 
 (deftype hash ()
   `(integer 0 ,max-hash))
 
+;;; FIXME: Does this always make a nonnegative FIXNUM? If so, then
+;;; explain why. If not (or if the reason it always makes a
+;;; nonnegative FIXNUM is only the accident that pointers in supported
+;;; architectures happen to be in the lower half of the address
+;;; space), then fix it.
 #!-sb-fluid (declaim (inline pointer-hash))
 (defun pointer-hash (key)
   (declare (values hash))
