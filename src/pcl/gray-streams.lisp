@@ -226,6 +226,13 @@
                                  &optional (start 0) (end nil))
   (basic-io-type-stream-read-sequence stream seq start end
                                       #'stream-read-char))
+
+(defmethod stream-read-sequence ((stream fundamental-binary-input-stream)
+                                 (seq sequence)
+                                 &optional (start 0) (end nil))
+  (basic-io-type-stream-read-sequence stream seq start end
+                                      #'stream-read-byte))
+
 
 ;;; character output streams
 ;;;
@@ -430,6 +437,16 @@
   (:documentation
    "Implements WRITE-BYTE; writes the integer to the stream and
   returns the integer as the result."))
+
+;; Provide a reasonable default for binary Gray streams.  We might be
+;; able to do better by specializing on the sequence type, but at
+;; least the behaviour is reasonable. --tony 2003/05/08.
+(defmethod stream-write-sequence ((stream fundamental-binary-output-stream)
+                                  (seq sequence)
+                                  &optional (start 0) (end nil))
+  (basic-io-type-stream-write-sequence stream seq start end
+                                       #'stream-write-byte))
+
 
 ;;; This is not in the Gray stream proposal, so it is left here
 ;;; as example code.

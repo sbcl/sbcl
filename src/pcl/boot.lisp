@@ -2312,19 +2312,34 @@ bootstrapping.
     (declare (ignore ignore1 ignore2 ignore3))
     required-parameters))
 
-(defun parse-specialized-lambda-list (arglist &optional post-keyword)
-  ;;(declare (values parameters lambda-list specializers required-parameters))
+(defun parse-specialized-lambda-list
+    (arglist
+     &optional supplied-keywords (allowed-keywords '(&optional &rest &key &aux))
+     &aux (specialized-lambda-list-keywords
+	   '(&optional &rest &key &allow-other-keys &aux)))
   (let ((arg (car arglist)))
     (cond ((null arglist) (values nil nil nil nil))
 	  ((eq arg '&aux)
-	   (values nil arglist nil))
+	   (values nil arglist nil nil))
 	  ((memq arg lambda-list-keywords)
-	   (unless (memq arg '(&optional &rest &key &allow-other-keys &aux))
-	     ;; Now, since we try to conform to ANSI, non-standard
-             ;; lambda-list-keywords should be treated as errors.
+	   ;; Now, since we try to conform to ANSI, non-standard
+	   ;; lambda-list-keywords should be treated as errors.
+	   (unless (memq arg specialized-lambda-list-keywords)
 	     (error 'simple-program-error
-                    :format-control "unrecognized lambda-list keyword ~S ~
-                     in arglist.~%"
+		    :format-control "unknown specialized-lambda-list ~
+                                     keyword ~S~%"
+		    :format-arguments (list arg)))
+	   ;; no multiple &rest x &rest bla specifying
+	   (when (memq arg supplied-keywords)
+	     (error 'simple-program-error
+		    :format-control "multiple occurrence of ~
+                                     specialized-lambda-list keyword ~S~%"
+		    :format-arguments (list arg)))
+	   ;; And no placing &key in front of &optional, either.
+	   (unless (memq arg allowed-keywords)
+	     (error 'simple-program-error
+		    :format-control "misplaced specialized-lambda-list ~
+                                     keyword ~S~%"
 		    :format-arguments (list arg)))
 	   ;; When we are at a lambda-list keyword, the parameters
 	   ;; don't include the lambda-list keyword; the lambda-list
@@ -2332,22 +2347,34 @@ bootstrapping.
 	   ;; specializers are allowed to follow the lambda-list
 	   ;; keywords (at least for now).
 	   (multiple-value-bind (parameters lambda-list)
-	       (parse-specialized-lambda-list (cdr arglist) t)
-	     (when (eq arg '&rest)
-	       ;; check, if &rest is followed by a var ...
-	       (when (or (null lambda-list)
-			 (memq (car lambda-list) lambda-list-keywords))
-		 (error "Error in lambda-list:~%~
-                         After &REST, a DEFMETHOD lambda-list ~
-                         must be followed by at least one variable.")))
+	       (parse-specialized-lambda-list (cdr arglist)
+					      (cons arg supplied-keywords)
+					      (if (eq arg '&key)
+						  (cons '&allow-other-keys
+							(cdr (member arg allowed-keywords)))
+						(cdr (member arg allowed-keywords))))
+	     (when (and (eq arg '&rest)
+			(or (null lambda-list)
+			    (memq (car lambda-list)
+				  specialized-lambda-list-keywords)
+			    (not (or (null (cadr lambda-list))
+				     (memq (cadr lambda-list)
+					   specialized-lambda-list-keywords)))))
+	       (error 'simple-program-error
+		      :format-control
+		      "in a specialized-lambda-list, excactly one ~
+                       variable must follow &REST.~%"
+		      :format-arguments nil))
 	     (values parameters
 		     (cons arg lambda-list)
 		     ()
 		     ())))
-	  (post-keyword
+	  (supplied-keywords
 	   ;; After a lambda-list keyword there can be no specializers.
 	   (multiple-value-bind (parameters lambda-list)
-	       (parse-specialized-lambda-list (cdr arglist) t)
+	       (parse-specialized-lambda-list (cdr arglist)
+					      supplied-keywords
+					      allowed-keywords)
 	     (values (cons (if (listp arg) (car arg) arg) parameters)
 		     (cons arg lambda-list)
 		     ()

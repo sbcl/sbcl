@@ -1769,6 +1769,9 @@ changes in sbcl-0.8.0 relative to sbcl-0.8alpha.0
     they for GNU "make".
 
 changes in sbcl-0.8.1 relative to sbcl-0.8.0:
+  * minor incompatible change: some nonsensical specialized lambda
+    lists (used in DEFMETHOD) which were previously ignored now signal
+    errors.
   * changes in type checking closed the following bugs:
     ** type checking of unused values (192b, 194d, 203);
     ** template selection based on unsafe type assertions (192c, 236);
@@ -1777,6 +1780,9 @@ changes in sbcl-0.8.1 relative to sbcl-0.8.0:
   * a short form of VALUES type specifier has ANSI meaning.
   * fixed bug in DEFSTRUCT: once again, naming structure slots with
     keywords or constants is permissible.
+  * STREAM-READ-SEQUENCE and STREAM-WRITE-SEQUENCE now have methods
+    defined on the relevant FUNDAMENTAL-BINARY-{INPUT,OUTPUT}-STREAM
+    classes.  (thanks to Antonio Martinez)
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles

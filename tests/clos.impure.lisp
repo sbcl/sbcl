@@ -70,7 +70,7 @@
 (assert (expect-error (defgeneric foo2 (x a &rest))))
 (defgeneric foo3 (x &rest y))
 (defmethod foo3 ((x t) &rest y) nil)
-(defmethod foo4 ((x t) &key y &rest z) nil)
+(defmethod foo4 ((x t) &rest z &key y) nil)
 (defgeneric foo4 (x &rest z &key y))
 (assert (expect-error (defgeneric foo5 (x &rest))))
 (assert (expect-error (macroexpand-1 '(defmethod foo6 (x &rest)))))
@@ -333,7 +333,18 @@
 			  ((#1a() :initarg :a))))
   (assert-program-error (defclass foo012 ()
 			  ((t :initarg :t))))
-  (assert-program-error (defclass foo013 () ("a"))))
+  (assert-program-error (defclass foo013 () ("a")))
+  ;; specialized lambda lists have certain restrictions on ordering,
+  ;; repeating keywords, and the like:
+  (assert-program-error (defmethod foo014 ((foo t) &rest) nil))
+  (assert-program-error (defmethod foo015 ((foo t) &rest x y) nil))
+  (assert-program-error (defmethod foo016 ((foo t) &allow-other-keys) nil))
+  (assert-program-error (defmethod foo017 ((foo t)
+					   &optional x &optional y) nil))
+  (assert-program-error (defmethod foo018 ((foo t) &rest x &rest y) nil))
+  (assert-program-error (defmethod foo019 ((foo t) &rest x &optional y) nil))
+  (assert-program-error (defmethod foo020 ((foo t) &key x &optional y) nil))
+  (assert-program-error (defmethod foo021 ((foo t) &key x &rest y) nil)))
 
 ;;; DOCUMENTATION's argument-precedence-order wasn't being faithfully
 ;;; preserved through the bootstrap process until sbcl-0.7.8.39.

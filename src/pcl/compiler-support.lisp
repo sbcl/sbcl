@@ -51,8 +51,10 @@
   (let ((arg-pos (position-if #'listp stuff)))
     (if arg-pos
 	`(defmethod ,name ,@(subseq stuff 0 arg-pos)
-	   ,(nth-value 2 (sb-pcl::parse-specialized-lambda-list
-			  (elt stuff arg-pos))))
+	   ,(handler-case
+	        (nth-value 2 (sb-pcl::parse-specialized-lambda-list
+			      (elt stuff arg-pos)))
+	      (error () "<illegal syntax>")))
 	`(defmethod ,name "<illegal syntax>"))))
 
 (defvar sb-pcl::*internal-pcl-generalized-fun-name-symbols* nil)

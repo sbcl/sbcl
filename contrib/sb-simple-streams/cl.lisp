@@ -995,7 +995,7 @@ simple-streams proposal.")
 ;;;
 
 (defmethod shared-initialize :after ((instance simple-stream) slot-names
-				     &rest initargs &allow-other-keys)
+				     &rest initargs &key &allow-other-keys)
   (declare (ignore slot-names))
   (unless (slot-boundp instance 'melded-stream)
     (setf (slot-value instance 'melded-stream) instance)
