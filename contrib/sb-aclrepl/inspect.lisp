@@ -179,7 +179,7 @@ i set <name> <form>  set named component to evalated form
 					(1+ position)
 					(1- position))))
 		  (if (< -1 new-position (parts-count parts))
-		      (let* ((value (element-at parts new-position)))
+		      (let* ((value (component-at parts new-position)))
 			(setf (car (inspect-object-stack *current-inspect*))
 			      value)
 			(setf (car (inspect-select-stack *current-inspect*))
@@ -261,7 +261,7 @@ i set <name> <form>  set named component to evalated form
 			(let ((result (set-component-value (car (stack))
 							   id
 							   new-value
-							   (element-at
+							   (component-at
 							    parts position))))
 			  (typecase result
 			    (string
@@ -281,7 +281,7 @@ i set <name> <form>  set named component to evalated form
 	    (find-part-id (car (stack)) id)
 	  (cond
 	    ((integerp position)
-	     (let* ((value (element-at parts position)))
+	     (let* ((value (component-at parts position)))
 	       (cond ((eq value *inspect-unbound-object-marker*)
 		      (output-inspect-note stream "That slot is unbound"))
 		     (t
@@ -373,7 +373,7 @@ i set <name> <form>  set named component to evalated form
 ;;;
 ;;; FUNCTIONS TO CONSIDER FOR EXPORT
 ;;;   FIND-PART-ID
-;;;   ELEMENT-AT
+;;;   COMPONENT-AT
 ;;;   ID-AT
 ;;;   INSPECTED-ELEMENTS
 ;;;   INSPECTED-DESCRIPTION
@@ -404,19 +404,23 @@ POSITION is NIL if the id is invalid or not found."
 	   (:named
 	    (position name (the list (parts-components parts))
 		      :key #'car :test #'string-equal))
-	   (:improper-list
+	   ((:dotted-list :cyclic-list)
 	    (when (string-equal name "tail")
 	      (1- (parts-count parts))))))
      parts)))
 
-(defun element-at (parts position)
+(defun component-at (parts position)
   (let ((count (parts-count parts))
 	(components (parts-components parts)))
     (when (< -1 position count)
       (case (parts-seq-type parts)
-	(:improper-list
+	(:dotted-list
 	 (if (= position (1- count))
 	     (cdr (last components))
+	     (elt components position)))
+	(:cyclic-list
+	 (if (= position (1- count))
+	     components
 	     (elt components position)))
 	(:named
 	 (cdr (elt components position)))
@@ -429,7 +433,7 @@ POSITION is NIL if the id is invalid or not found."
   (let ((count (parts-count parts)))
     (when (< -1 position count)
       (case (parts-seq-type parts)
-	(:improper-list
+	((:dotted-list :cyclic-list)
 	 (if (= position (1- count))
 	     :tail
 	     position))
@@ -495,7 +499,7 @@ and the last element."
     element-count))
 
 (defun set-element (elements labels parts to-index from-index)
-  (set-element-values elements labels to-index (element-at parts from-index)
+  (set-element-values elements labels to-index (component-at parts from-index)
 		      (label-at parts from-index)))
 
 (defun set-element-values (elements labels index element label)
@@ -581,22 +585,30 @@ position with the label if the label is a string."
       "a cons cell"
       (inspected-description-of-nontrivial-list object)))
 
-(defun dotted-safe-length (object)
-  "Returns (VALUES LENGTH PROPER-P) where length is the number of cons cells"
-    (do ((length 0 (1+ length))
-	 (lst object (cdr lst)))
-	((not (consp lst))
-	 (if (null lst)
-	     (values length t)
-	     (values length nil)))
+(defun cons-safe-length (object)
+  "Returns (VALUES LENGTH LIST-TYPE) where length is the number of
+cons cells and LIST-TYPE is :normal, :dotted, or :cyclic"
+    (do ((length 1 (1+ length))
+	 (lst (cdr object) (cdr lst)))
+	((or (not(consp lst))
+	     (eq object lst))
+	 (cond
+	   ((null lst)
+	    (values length :normal))
+	   ((atom lst)
+	    (values length :dotted))
+	   ((eq object lst)
+	    (values length :cyclic))))
       ;; nothing to do in body
       ))
 
 (defun inspected-description-of-nontrivial-list (object)
-  (multiple-value-bind (length proper-p) (dotted-safe-length object)
-    (if proper-p
-	(format nil "a proper list with ~D element~:*~P" length)
-	(format nil "a dotted list with ~D element~:*~P + tail" length))))
+  (multiple-value-bind (length list-type) (cons-safe-length object)
+    (format nil "a ~A list with ~D element~:*~P~A"
+	    (string-downcase (symbol-name list-type)) length
+	    (case list-type
+	      ((:dotted :cyclic) "+tail")
+	      (t "")))))
 
 (defmethod inspected-description ((object double-float))
   (format nil "double-float ~W" object))
@@ -605,7 +617,11 @@ position with the label if the label is a string."
   (format nil "single-float ~W" object))
 
 (defmethod inspected-description ((object fixnum))
-  (format nil "fixnum ~W" object))
+  (format nil "fixnum ~W~A" object
+	  (if *skip-address-display*
+	      ""
+	      (format nil " [#x~8,'0X]" object
+		      (sb-kernel:get-lisp-obj-address object)))))
 
 (defmethod inspected-description ((object complex))
   (format nil "complex number ~W" object))
@@ -620,7 +636,11 @@ position with the label if the label is a string."
   (format nil "ratio ~W" object))
 
 (defmethod inspected-description ((object character))
-  (format nil "character ~W char-code #x~X" object (char-code object)))
+  (format nil "character ~W char-code~A" object (char-code object)
+	  (if *skip-address-display*
+	      ""
+	      (format nil " [#x~8,'0X]" object
+		      (sb-kernel:get-lisp-obj-address object)))))
 
 (defmethod inspected-description ((object t))
   (format nil "a generic object ~W" object))
@@ -642,9 +662,10 @@ position with the label if the label is a string."
 ;;;   SEQ-TYPE determines what representation is used for components
 ;;;   of COMPONENTS.
 ;;;      If SEQ-TYPE is :named, then each element is (CONS NAME VALUE)
-;;;      If SEQ-TYPE is :improper-list, then each element is just value,
+;;;      If SEQ-TYPE is :dotted-list, then each element is just value,
 ;;;        but the last element must be retrieved by
 ;;;        (cdr (last components))
+;;;      If SEQ-TYPE is :cylic-list, then each element is just value,
 ;;;      If SEQ-TYPE is :list, then each element is a value of an array
 ;;;      If SEQ-TYPE is :vector, then each element is a value of an vector
 ;;;      If SEQ-TYPE is :array, then each element is a value of an array
@@ -749,11 +770,15 @@ position with the label if the label is a string."
     (list components 2 :named nil)))
 
 (defun inspected-parts-of-nontrivial-list (object)
-    (multiple-value-bind (count proper-p) (dotted-safe-length object)
-      (if proper-p
-	  (list object count :list nil)
-	  ;; count tail element
-	  (list object (1+ count) :improper-list nil))))
+    (multiple-value-bind (count list-type) (cons-safe-length object)
+      (case list-type
+	(:normal
+	 (list object count :list nil))
+	(:cyclic
+	 (list object (1+ count) :cyclic-list nil))
+	(:dotted
+	 ;; count tail element
+	 (list object (1+ count) :dotted-list nil)))))
 
 (defmethod inspected-parts ((object complex))
   (let ((components (list (cons "real" (realpart object))

@@ -319,8 +319,14 @@
 	(setq last-files-loaded string-files)
 	(setq string-files last-files-loaded))
     (dolist (arg (string-to-list-skip-spaces string-files))
-      (format *repl-output* "loading ~a~%" arg)
-      (load arg)))
+      (let ((file 
+	     (if (string= arg "~/" :end1 1 :end2 1)
+		 (merge-pathnames (parse-namestring
+				   (string-left-trim "~/" arg))
+				  (user-homedir-pathname))
+		 arg)))
+	(format *repl-output* "loading ~S~%" file)
+	(load file))))
   (values))
 
 (defun cf-cmd (string-files)
