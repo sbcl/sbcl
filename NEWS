@@ -39,6 +39,7 @@ changes in sbcl-0.8.13 relative to sbcl-0.8.12:
     user-defined methods on SLOT-BOUNDP-USING-CLASS and (SETF
     SLOT-VALUE-USING-CLASS), and no longer causes errors with
     non-standard SLOT-DEFINITION-ALLOCATION values.
+  * optimization: improved performance of BIT and SBIT on bit-vectors.
 
 changes in sbcl-0.8.12 relative to sbcl-0.8.11:
   * minor incompatible change: the system no longer provides

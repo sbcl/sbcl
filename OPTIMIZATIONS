@@ -177,3 +177,11 @@ then cons up a bignum for it:
 It is commonly expected for Python to derive (FIXNUMP I). (If ``='' is
 replaced with ``>='', Python will do.)
 --------------------------------------------------------------------------------
+#17 
+Type tests for (ARRAY BIT), (ARRAY T) and similar go through full
+%TYPEP, even though it is relatively simple to establish the arrayness
+of an object and also to obtain the element type of an array.  As of
+sbcl-0.8.12.30, this affects at least DUMP-OBJECT through
+COMPOUND-OBJECT-P, and (LABELS MAYBE-EMIT-MAKE-LOAD-FORMS GROVEL)
+through TYPEP UNBOXED-ARRAY, within the compiler itself.
+--------------------------------------------------------------------------------

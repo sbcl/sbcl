@@ -650,14 +650,20 @@
 
 ;;; We convert all typed array accessors into AREF and %ASET with type
 ;;; assertions on the array.
-(macrolet ((define-frob (reffer setter type)
+(macrolet ((define-bit-frob (reffer setter simplep)
 	     `(progn
 		(define-source-transform ,reffer (a &rest i)
-		  `(aref (the ,',type ,a) ,@i))
+		  `(aref (the (,',(if simplep 'simple-array 'array)
+				  bit
+				  ,(mapcar (constantly '*) i))
+			   ,a) ,@i))
 		(define-source-transform ,setter (a &rest i)
-		  `(%aset (the ,',type ,a) ,@i)))))
-  (define-frob sbit %sbitset (simple-array bit))
-  (define-frob bit %bitset (array bit)))
+		  `(%aset (the (,',(if simplep 'simple-array 'array)
+				   bit
+				   ,(cdr (mapcar (constantly '*) i)))
+			    ,a) ,@i)))))
+  (define-bit-frob sbit %sbitset t)
+  (define-bit-frob bit %bitset nil))
 (macrolet ((define-frob (reffer setter type)
 	     `(progn
 		(define-source-transform ,reffer (a i)
