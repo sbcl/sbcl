@@ -906,17 +906,21 @@
 	((csubtypep y (specifier-type 'integer))
 	 ;; A real raised to an integer power is well-defined.
 	 (merged-interval-expt x y))
+	;; A real raised to a non-integral power can be a float or a
+	;; complex number.
+	((or (csubtypep x (specifier-type '(rational 0)))
+	     (csubtypep x (specifier-type '(float (0d0)))))
+	 ;; But a positive real to any power is well-defined.
+	 (merged-interval-expt x y))
+	((and (csubtypep x (specifier-type 'rational))
+	      (csubtypep x (specifier-type 'rational)))
+	 ;; A rational to the power of a rational could be a rational
+	 ;; or a possibly-complex single float
+	 (specifier-type '(or rational single-float (complex single-float))))
 	(t
-	 ;; A real raised to a non-integral power can be a float or a
-	 ;; complex number.
-	 (cond ((or (csubtypep x (specifier-type '(rational 0)))
-		    (csubtypep x (specifier-type '(float (0d0)))))
-		;; But a positive real to any power is well-defined.
-		(merged-interval-expt x y))
-	       (t
-		;; a real to some power. The result could be a real
-		;; or a complex.
-		(float-or-complex-float-type (numeric-contagion x y)))))))
+	 ;; a real to some power. The result could be a real or a
+	 ;; complex.
+	 (float-or-complex-float-type (numeric-contagion x y)))))
 
 (defoptimizer (expt derive-type) ((x y))
   (two-arg-derive-type x y #'expt-derive-type-aux #'expt))

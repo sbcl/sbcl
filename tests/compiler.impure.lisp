@@ -865,7 +865,12 @@
     (load source)
     (full-check)
     (delete-file fasl)))
-
+
+(defun expt-derive-type-bug (a b)
+  (unless (< a b)
+    (truncate (expt a b))))
+(assert (equal (multiple-value-list (expt-derive-type-bug 1 1))
+	       '(1 0)))
 
 ;;;; tests not in the problem domain, but of the consistency of the
 ;;;; compiler machinery itself

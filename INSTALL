@@ -133,10 +133,12 @@ To build the system binaries:
      where it can be found.
   3. If you like, you can tweak the *FEATURES* set for the resulting
      Lisp system, enabling or disabling features like documentation
-     strings or extra debugging code. The preferred way to do this is
-     by creating a file "customize-target-features.lisp", containing
-     a lambda expression which is applied to the default *FEATURES*
-     set and which returns the new *FEATURES* set, e.g.
+     strings, threads, or extra debugging code (see
+     "base-target-features.lisp-expr" for a list of recognized
+     *FEATURES*).  The preferred way to do this is by creating a file
+     "customize-target-features.lisp", containing a lambda expression
+     which is applied to the default *FEATURES* set and which returns
+     the new *FEATURES* set, e.g.
 	(LAMBDA (LIST)
 	  (ADJOIN :SB-SHOW
 		  (REMOVE :SB-DOC

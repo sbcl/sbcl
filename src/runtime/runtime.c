@@ -166,6 +166,7 @@ print_banner()
 {
     printf(
 "This is SBCL %s, an implementation of ANSI Common Lisp.\n\
+\n\
 More information about SBCL is available at <http://www.sbcl.org/>.\
 \n\
 SBCL is free software, provided as is, with absolutely no warranty.\n\
