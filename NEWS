@@ -1789,6 +1789,8 @@ changes in sbcl-0.8.1 relative to sbcl-0.8.0:
     classes.  (thanks to Antonio Martinez)
   * bug fix: APROPOS now respects the EXTERNAL-ONLY flag.  (reported
     by Teemu Kalvas)
+  * bug fix: NIL is now a valid destructuring argument in DEFMACRO
+    lambda lists.  (thanks to David Lichteblau)
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** NIL is now allowed as a structure slot name.
     ** arbitrary numbers, not just reals, are allowed in certain

@@ -106,7 +106,7 @@
 	((null rest-of-args))
       (macrolet ((process-sublist (var sublist-name path)
                    (once-only ((var var))
-                     `(if (consp ,var)
+                     `(if (listp ,var)
                           (let ((sub-list-name (gensym ,sublist-name)))
                             (push-sub-list-binding sub-list-name ,path ,var
                                                    name error-kind error-fun)
