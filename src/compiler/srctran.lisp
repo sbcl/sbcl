@@ -3105,19 +3105,27 @@
 
 ;;; similarly to the EQL transform above, we attempt to constant-fold
 ;;; or convert to a simpler predicate: mostly we have to be careful
-;;; with strings.
+;;; with strings and bit-vectors.
 (deftransform equal ((x y) * *)
   "convert to simpler equality predicate"
   (let ((x-type (lvar-type x))
 	(y-type (lvar-type y))
-	(string-type (specifier-type 'string)))
+	(string-type (specifier-type 'string))
+	(bit-vector-type (specifier-type 'bit-vector)))
     (cond
       ((same-leaf-ref-p x y) t)
       ((and (csubtypep x-type string-type)
 	    (csubtypep y-type string-type))
        '(string= x y))
-      ((and (or (not (types-equal-or-intersect x-type string-type))
-		(not (types-equal-or-intersect y-type string-type)))
+      ((and (csubtypep x-type bit-vector-type)
+	    (csubtypep y-type bit-vector-type))
+       '(bit-vector-= x y))
+      ;; if at least one is not a string, and at least one is not a
+      ;; bit-vector, then we can reason from types.
+      ((and (not (and (types-equal-or-intersect x-type string-type)
+		      (types-equal-or-intersect y-type string-type)))
+	    (not (and (types-equal-or-intersect x-type bit-vector-type)
+		      (types-equal-or-intersect y-type bit-vector-type)))
 	    (not (types-equal-or-intersect x-type y-type)))
        nil)
       (t (give-up-ir1-transform)))))

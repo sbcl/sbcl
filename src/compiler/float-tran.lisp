@@ -238,10 +238,18 @@
 	    (ex-hi (numeric-type-high ex))
 	    (new-lo nil)
 	    (new-hi nil))
-	(when (and f-hi ex-hi)
-	  (setf new-hi (scale-bound f-hi ex-hi)))
-	(when (and f-lo ex-lo)
-	  (setf new-lo (scale-bound f-lo ex-lo)))
+	(when f-hi
+	  (if (< (float-sign (type-bound-number f-hi)) 0.0)
+	      (when ex-lo
+		(setf new-hi (scale-bound f-hi ex-lo)))
+	      (when ex-hi
+		(setf new-hi (scale-bound f-hi ex-hi)))))
+	(when f-lo
+	  (if (< (float-sign (type-bound-number f-lo)) 0.0)
+	      (when ex-hi
+		(setf new-lo (scale-bound f-lo ex-hi)))
+	      (when ex-lo
+		(setf new-lo (scale-bound f-lo ex-lo)))))
 	(make-numeric-type :class (numeric-type-class f)
 			   :format (numeric-type-format f)
 			   :complexp :real
@@ -624,9 +632,7 @@
   (etypecase arg
     (numeric-type
      (cond ((eq (numeric-type-complexp arg) :complex)
-	    (make-numeric-type :class (numeric-type-class arg)
-			       :format (numeric-type-format arg)
-			       :complexp :complex))
+	    (complex-float-type arg))
 	   ((numeric-type-real-p arg)
 	    ;; The argument is real, so let's find the intersection
 	    ;; between the argument and the domain of the function.
@@ -1297,20 +1303,34 @@
 			   nil nil))
    #'tan))
 
-;;; CONJUGATE always returns the same type as the input type.
-;;;
-;;; FIXME: ANSI allows any subtype of REAL for the components of COMPLEX.
-;;; So what if the input type is (COMPLEX (SINGLE-FLOAT 0 1))?
-;;; Or (EQL #C(1 2))?
 (defoptimizer (conjugate derive-type) ((num))
-  (lvar-type num))
+  (one-arg-derive-type num
+    (lambda (arg)
+      (flet ((most-negative-bound (l h)
+	       (and l h
+		    (if (< (type-bound-number l) (- (type-bound-number h)))
+			l
+			(set-bound (- (type-bound-number h)) (consp h)))))
+	     (most-positive-bound (l h)
+	       (and l h
+		    (if (> (type-bound-number h) (- (type-bound-number l)))
+			h
+			(set-bound (- (type-bound-number l)) (consp l))))))
+	(if (numeric-type-real-p arg)
+	    (lvar-type num)
+	    (let ((low (numeric-type-low arg))
+		  (high (numeric-type-high arg)))
+	      (let ((new-low (most-negative-bound low high))
+		    (new-high (most-positive-bound low high)))
+	      (modified-numeric-type arg :low new-low :high new-high))))))
+    #'conjugate))
 
 (defoptimizer (cis derive-type) ((num))
   (one-arg-derive-type num
-     (lambda (arg)
-       (sb!c::specifier-type
-	`(complex ,(or (numeric-type-format arg) 'float))))
-     #'cis))
+    (lambda (arg)
+      (sb!c::specifier-type
+       `(complex ,(or (numeric-type-format arg) 'float))))
+    #'cis))
 
 ) ; PROGN
 

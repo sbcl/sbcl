@@ -1,10 +1,19 @@
 changes in sbcl-0.8.22 relative to sbcl-0.8.21:
   * fixed inference of the upper bound of an iteration variable.
     (reported by Rajat Datta).
+  * fixed bug 376: CONJUGATE type deriver.
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** MISC.549 and similar: late transformation of unsafe type
        assertions into derived types caused unexpected code
        transformations.
+    ** SCALE-FLOAT type deriver is less wrong.
+    ** type derivers for EXP, LOG and similar functions compute result
+       types for complex arguments better.
+    ** (MISC.563) CONJUGATE type deriver works for very restricted
+       complex types.
+    ** out-of-line type testers for character strings are available.
+    ** EQUAL compiler transform understands specialness of objects
+       of type BIT-VECTOR.
 
 changes in sbcl-0.8.21 (0.9alpha.1?) relative to sbcl-0.8.20:
   * incompatible change: thread support for non-NPTL systems has
