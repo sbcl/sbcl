@@ -11,13 +11,6 @@
 
 (in-package "SB!C")
 
-;;; FIXME: It would be good to implement SB!XC:DEFCONSTANT, and use
-;;; use that here, so that the compiler is born knowing this value.
-;;; FIXME: Add a comment telling whether this holds for all vectors
-;;; or only for vectors based on simple arrays (non-adjustable, etc.).
-(defconstant vector-data-bit-offset
-  (* sb!vm:vector-data-offset sb!vm:n-word-bits))
-
 ;;; We need to define these predicates, since the TYPEP source
 ;;; transform picks whichever predicate was defined last when there
 ;;; are multiple predicates for equivalent types.

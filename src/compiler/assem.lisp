@@ -201,7 +201,7 @@
 
 ;;;; the scheduler itself
 
-(defmacro without-scheduling ((&optional (segment '**current-segment**))
+(defmacro without-scheduling ((&optional (segment '(%%current-segment%%)))
 			      &body body)
   #!+sb-doc
   "Execute BODY (as a PROGN) without scheduling any of the instructions
@@ -1048,23 +1048,34 @@ p	    ;; the branch has two dependents and one of them dpends on
 ;;; This holds the current segment while assembling. Use ASSEMBLE to
 ;;; change it.
 ;;;
-;;; The double asterisks in the name are intended to suggest that this
+;;; The double parens in the name are intended to suggest that this
 ;;; isn't just any old special variable, it's an extra-special
 ;;; variable, because sometimes MACROLET is used to bind it. So be
 ;;; careful out there..
+;;;
+;;; (This used to be called **CURRENT-SEGMENT** in SBCL until 0.7.3,
+;;; and just *CURRENT-SEGMENT* in CMU CL. In both cases, the rebinding
+;;; now done with MACROLET was done with SYMBOL-MACROLET instead. The
+;;; rename-with-double-asterisks was because the SYMBOL-MACROLET made
+;;; it an extra-special variable. The change over to
+;;; %%CURRENT-SEGMENT%% was because ANSI forbids the use of
+;;; SYMBOL-MACROLET on special variable names, and CLISP correctly
+;;; complains about this when being used as a bootstrap host.)
+(defmacro %%current-segment%% () '**current-segment**)
 (defvar **current-segment**)
 
-;;; Just like **CURRENT-SEGMENT**, except this holds the current vop.
+;;; Just like %%CURRENT-SEGMENT%%, except this holds the current vop.
 ;;; Used only to keep track of which vops emit which insts.
 ;;;
 ;;; The double asterisks in the name are intended to suggest that this
 ;;; isn't just any old special variable, it's an extra-special
 ;;; variable, because sometimes MACROLET is used to bind it. So be
 ;;; careful out there..
+(defmacro %%current-vop%% () '**current-vop**)
 (defvar **current-vop** nil)
 
-;;; We also SYMBOL-MACROLET **CURRENT-SEGMENT** to a local holding the
-;;; segment so uses of **CURRENT-SEGMENT** inside the body don't have
+;;; We also MACROLET %%CURRENT-SEGMENT%% to a local holding the
+;;; segment so uses of %%CURRENT-SEGMENT%% inside the body don't have
 ;;; to keep dereferencing the symbol. Given that ASSEMBLE is the only
 ;;; interface to **CURRENT-SEGMENT**, we don't have to worry about the
 ;;; special value becomming out of sync with the lexical value. Unless
@@ -1104,24 +1115,24 @@ p	    ;; the branch has two dependents and one of them dpends on
       (when (intersection labels inherited-labels)
 	(error "duplicate nested labels: ~S"
 	       (intersection labels inherited-labels)))
-      `(let* ((,seg-var ,(or segment '**current-segment**))
-	      (,vop-var ,(or vop '**current-vop**))
-	      ,@(when segment
-		  `((**current-segment** ,seg-var)))
-	      ,@(when vop
-		  `((**current-vop** ,vop-var)))
+      `(let* ((,seg-var ,(or segment '(%%current-segment%%)))
+	      (,vop-var ,(or vop '(%%current-vop%%)))
+              ,@(when segment
+                  `((**current-segment** ,seg-var)))
+              ,@(when vop
+                  `((**current-vop** ,vop-var)))
 	      ,@(mapcar (lambda (name)
 			  `(,name (gen-label)))
 			new-labels))
-	 (symbol-macrolet ((**current-segment** ,seg-var)
-			   (**current-vop** ,vop-var)
-			   ,@(when (or inherited-labels nested-labels)
+	(macrolet ((%%current-segment%% () '**current-segment**)
+		   (%%current-vop%% () '**current-vop**))
+	 (symbol-macrolet (,@(when (or inherited-labels nested-labels)
 			       `((..inherited-labels.. ,nested-labels))))
 	   ,@(mapcar (lambda (form)
 		       (if (label-name-p form)
 			   `(emit-label ,form)
 			   form))
-		     body))))))
+		     body)))))))
 #+sb-xc-host
 (sb!xc:defmacro assemble ((&optional segment vop &key labels)
 			  &body body
@@ -1146,24 +1157,24 @@ p	    ;; the branch has two dependents and one of them dpends on
       (when (intersection labels inherited-labels)
 	(error "duplicate nested labels: ~S"
 	       (intersection labels inherited-labels)))
-      `(let* ((,seg-var ,(or segment '**current-segment**))
-	      (,vop-var ,(or vop '**current-vop**))
-	      ,@(when segment
-		  `((**current-segment** ,seg-var)))
-	      ,@(when vop
-		  `((**current-vop** ,vop-var)))
+      `(let* ((,seg-var ,(or segment '(%%current-segment%%)))
+	      (,vop-var ,(or vop '(%%current-vop%%)))
+              ,@(when segment
+                  `((**current-segment** ,seg-var)))
+              ,@(when vop
+                  `((**current-vop** ,vop-var)))
 	      ,@(mapcar (lambda (name)
 			  `(,name (gen-label)))
 			new-labels))
-	 (symbol-macrolet ((**current-segment** ,seg-var)
-			   (**current-vop** ,vop-var)
-			   ,@(when (or inherited-labels nested-labels)
+	(macrolet ((%%current-segment%% () '**current-segment**)
+		   (%%current-vop%% () '**current-vop**))
+	 (symbol-macrolet (,@(when (or inherited-labels nested-labels)
 			       `((..inherited-labels.. ,nested-labels))))
 	   ,@(mapcar (lambda (form)
 		       (if (label-name-p form)
 			   `(emit-label ,form)
 			   form))
-		     body))))))
+		     body)))))))
 
 (defmacro inst (&whole whole instruction &rest args &environment env)
   #!+sb-doc
@@ -1174,7 +1185,7 @@ p	    ;; the branch has two dependents and one of them dpends on
 	  ((functionp inst)
 	   (funcall inst (cdr whole) env))
 	  (t
-	   `(,inst **current-segment** **current-vop** ,@args)))))
+	   `(,inst (%%current-segment%%) (%%current-vop%%) ,@args)))))
 
 ;;; Note: The need to capture SYMBOL-MACROLET bindings of
 ;;; **CURRENT-SEGMENT* and **CURRENT-VOP** prevents this from being an
@@ -1182,20 +1193,20 @@ p	    ;; the branch has two dependents and one of them dpends on
 (defmacro emit-label (label)
   #!+sb-doc
   "Emit LABEL at this location in the current segment."
-  `(%emit-label **current-segment** **current-vop** ,label))
+  `(%emit-label (%%current-segment%%) (%%current-vop%%) ,label))
 
 ;;; Note: The need to capture SYMBOL-MACROLET bindings of
 ;;; **CURRENT-SEGMENT* prevents this from being an ordinary function.
 (defmacro emit-postit (function)
-  `(%emit-postit **current-segment** ,function))
+  `(%emit-postit (%%current-segment%%) ,function))
 
 ;;; Note: The need to capture SYMBOL-MACROLET bindings of
-;;; **CURRENT-SEGMENT* and **CURRENT-VOP** prevents this from being an
+;;; **CURRENT-SEGMENT* and (%%CURRENT-VOP%%) prevents this from being an
 ;;; ordinary function.
 (defmacro align (bits &optional (fill-byte 0))
   #!+sb-doc
   "Emit an alignment restriction to the current segment."
-  `(emit-alignment **current-segment** **current-vop** ,bits ,fill-byte))
+  `(emit-alignment (%%current-segment%%) (%%current-vop%%) ,bits ,fill-byte))
 ;;; FIXME: By analogy with EMIT-LABEL and EMIT-POSTIT, this should be
 ;;; called EMIT-ALIGNMENT, and the function that it calls should be
 ;;; called %EMIT-ALIGNMENT.
@@ -1586,22 +1597,9 @@ p	    ;; the branch has two dependents and one of them dpends on
 	       `((declare ,@decls)))
 	   (let ((,postits (segment-postits ,segment-name)))
 	     (setf (segment-postits ,segment-name) nil)
-	     (symbol-macrolet
-		 (;; Apparently this binding is intended to keep
-		  ;; anyone from accidentally using
-		  ;; **CURRENT-SEGMENT** within the body of the
-		  ;; emitter. The error message sorta suggests that
-		  ;; this can happen accidentally by including one
-		  ;; emitter inside another. But I dunno.. -- WHN
-		  ;; 19990323
-		  (**current-segment**
-		   ;; FIXME: I can't see why we have to use
-		   ;;   (MACROLET ((LOSE () (ERROR ..))) (LOSE))
-		   ;; instead of just (ERROR "..") here.
-		   (macrolet ((lose ()
-				(error "You can't use INST without an ~
-					ASSEMBLE inside emitters.")))
-		     (lose))))
+	     (macrolet ((%%current-segment%% ()
+			  (error "You can't use INST without an ~
+				  ASSEMBLE inside emitters.")))
 	       ,@emitter))
 	   (values))
 	 (eval-when (:compile-toplevel :load-toplevel :execute)

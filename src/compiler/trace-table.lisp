@@ -12,6 +12,7 @@
 (in-package "SB!C")
 
 (defun trace-table-entry (state)
+  (declare (special *trace-table-info*))
   (let ((label (gen-label)))
     (emit-label label)
     (push (cons label state) *trace-table-info*))

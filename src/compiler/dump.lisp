@@ -565,7 +565,7 @@
 ;;; should be made more consistent.
 (defun dump-package (pkg file)
   (declare (type package pkg) (type fasl-output file))
-  (declare (values index))
+  #+nil (declare (values index))
   (declare (inline assoc))
   (cond ((cdr (assoc pkg (fasl-output-packages file) :test #'eq)))
 	(t

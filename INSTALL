@@ -94,9 +94,6 @@ To build the system binaries:
      per the CAUTION note above. (As of version 0.6.0, the most
      memory-intensive operation in make.sh is the second call to
      GENESIS, which makes the Lisp image grow to nearly 128 Mb RAM+swap.
-     This will probably be reduced somewhat in some later version
-     by allowing cold load of byte-compiled files, so that the cold
-     image can be smaller.)
   2. If the GNU make command is not available under the name "gmake",
      then define the environment variable GNUMAKE to a name where it can
      be found.

@@ -126,7 +126,7 @@
 ;;; demanded a function.
 (defun find-free-fun (name context)
   (declare (string context))
-  (declare (values global-var))
+  #+nil (declare (values global-var))
   (or (let ((old-free-fun (gethash name *free-funs*)))
 	(and (not (invalid-free-fun-p old-free-fun))
 	     old-free-fun))
@@ -172,7 +172,7 @@
 ;;; information from the global environment and enter it in
 ;;; *FREE-VARS*. If the variable is unknown, then we emit a warning.
 (defun find-free-var (name)
-  (declare (values (or leaf cons heap-alien-info))) ; see FIXME comment
+  #+nil (declare (values (or leaf cons heap-alien-info))) ; see FIXME comment
   (unless (symbolp name)
     (compiler-error "Variable name is not a symbol: ~S." name))
   (or (gethash name *free-vars*)

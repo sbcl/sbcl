@@ -605,6 +605,15 @@
 ;;;; calls when all arguments are vectors with the same element type,
 ;;;; rather than restricting them to STRINGs only.
 
+;;; Moved here from generic/vm-tran.lisp to satisfy clisp
+;;;
+;;; FIXME: It would be good to implement SB!XC:DEFCONSTANT, and use
+;;; use that here, so that the compiler is born knowing this value.
+;;; FIXME: Add a comment telling whether this holds for all vectors
+;;; or only for vectors based on simple arrays (non-adjustable, etc.).
+(defconstant vector-data-bit-offset
+  (* sb!vm:vector-data-offset sb!vm:n-word-bits))
+
 ;;; FIXME: Shouldn't we be testing for legality of
 ;;;   * START1, START2, END1, and END2 indices?
 ;;;   * size of copied string relative to destination string?

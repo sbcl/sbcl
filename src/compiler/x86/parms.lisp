@@ -165,14 +165,14 @@
   (defconstant binding-stack-end     #x3ffff000)
 
   (defconstant control-stack-start
-    #+freebsd #x40000000
-    #+openbsd #x48000000)
+    #!+freebsd #x40000000
+    #!+openbsd #x48000000)
   (defconstant control-stack-end
-    #+freebsd #x47fff000
-    #+openbsd #x4ffff000)
+    #!+freebsd #x47fff000
+    #!+openbsd #x4ffff000)
   (defconstant dynamic-space-start
-    #+freebsd #x48000000
-    #+openbsd #x50000000)
+    #!+freebsd #x48000000
+    #!+openbsd #x50000000)
   (defconstant dynamic-space-end     #x88000000))
 
 ;;; Given that NIL is the first thing allocated in static space, we

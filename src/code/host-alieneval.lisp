@@ -115,7 +115,9 @@
 			       ,@(mapcar (lambda (x)
 					   (if (atom x) x (car x)))
 					 slots)
-			       ,@include-args)))
+			       ,@include-args
+			       ;; KLUDGE
+			       &aux (alignment (or alignment (guess-alignment bits))))))
 	   ,@slots)))))
 
 (def!macro define-alien-type-method ((class method) lambda-list &rest body)
@@ -322,10 +324,11 @@
 
 (def!struct (alien-type
 	     (:make-load-form-fun sb!kernel:just-dump-it-normally)
-	     (:constructor make-alien-type (&key class bits alignment)))
+	     (:constructor make-alien-type (&key class bits alignment
+					    &aux (alignment (or alignment (guess-alignment bits))))))
   (class 'root :type symbol)
   (bits nil :type (or null unsigned-byte))
-  (alignment (guess-alignment bits) :type (or null unsigned-byte)))
+  (alignment nil :type (or null unsigned-byte)))
 (def!method print-object ((type alien-type) stream)
   (print-unreadable-object (type stream :type t)
     (prin1 (unparse-alien-type type) stream)))
@@ -1137,14 +1140,15 @@
 (def!struct (local-alien-info
 	     (:make-load-form-fun sb!kernel:just-dump-it-normally)
 	     (:constructor make-local-alien-info
-			   (&key type force-to-memory-p)))
+			   (&key type force-to-memory-p
+			    &aux (force-to-memory-p (or force-to-memory-p
+							(alien-array-type-p type)
+							(alien-record-type-p type))))))
   ;; the type of the local alien
   (type (missing-arg) :type alien-type)
   ;; Must this local alien be forced into memory? Using the ADDR macro
   ;; on a local alien will set this.
-  (force-to-memory-p (or (alien-array-type-p type)
-			 (alien-record-type-p type))
-		     :type (member t nil)))
+  (force-to-memory-p nil :type (member t nil)))
 (def!method print-object ((info local-alien-info) stream)
   (print-unreadable-object (info stream :type t)
     (format stream
