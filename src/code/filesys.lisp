@@ -158,40 +158,16 @@
   (declare (type simple-base-string namestr)
 	   (type index start end))
   (let* ((last-dot (position #\. namestr :start (1+ start) :end end
-			     :from-end t))
-	 (second-to-last-dot (and last-dot
-				  (position #\. namestr :start (1+ start)
-					    :end last-dot :from-end t)))
-	 (version :newest))
-    ;; If there is a second-to-last dot, check to see whether there is
-    ;; a valid version after the last dot.
-    (when second-to-last-dot
-      (cond ((and (= (+ last-dot 2) end)
-		  (char= (schar namestr (1+ last-dot)) #\*))
-	     (setf version :wild))
-	    ((and (< (1+ last-dot) end)
-		  (do ((index (1+ last-dot) (1+ index)))
-		      ((= index end) t)
-		    (unless (char<= #\0 (schar namestr index) #\9)
-		      (return nil))))
-	     (setf version
-		   (parse-integer namestr :start (1+ last-dot) :end end)))
-	    (t
-	     (setf second-to-last-dot nil))))
-    (cond (second-to-last-dot
-	   (values (maybe-make-pattern namestr start second-to-last-dot)
-		   (maybe-make-pattern namestr
-				       (1+ second-to-last-dot)
-				       last-dot)
-		   version))
-	  (last-dot
-	   (values (maybe-make-pattern namestr start last-dot)
-		   (maybe-make-pattern namestr (1+ last-dot) end)
-		   version))
-	  (t
-	   (values (maybe-make-pattern namestr start end)
-		   nil
-		   version)))))
+			     :from-end t)))
+    (cond 
+      (last-dot
+       (values (maybe-make-pattern namestr start last-dot)
+	       (maybe-make-pattern namestr (1+ last-dot) end)
+	       :newest))
+      (t
+       (values (maybe-make-pattern namestr start end)
+	       nil
+	       :newest)))))
 
 (/show0 "filesys.lisp 200")
 
@@ -362,10 +338,15 @@
       ;; translating logical pathnames to a filesystem without
       ;; versions (like Unix).
       (when name
+	(when (and (null type) (position #\. name :start 1))
+	  (error "too many dots in the name: ~S" pathname))
 	(strings (unparse-unix-piece name)))
       (when type-supplied
 	(unless name
 	  (error "cannot specify the type without a file: ~S" pathname))
+	(when (typep type 'simple-base-string)
+	  (when (position #\. type)
+	    (error "type component can't have a #\. inside: ~S" pathname)))
 	(strings ".")
 	(strings (unparse-unix-piece type))))
     (apply #'concatenate 'simple-string (strings))))
@@ -403,13 +384,9 @@
 		     ;; We are a relative directory. So we lose.
 		     (lose)))))
 	(strings (unparse-unix-directory-list result-directory)))
-      (let* ((pathname-version (%pathname-version pathname))
-	     (version-needed (and pathname-version
-				  (not (eq pathname-version :newest))))
-	     (pathname-type (%pathname-type pathname))
-	     (type-needed (or version-needed
-			      (and pathname-type
-				   (not (eq pathname-type :unspecific)))))
+      (let* ((pathname-type (%pathname-type pathname))
+	     (type-needed (and pathname-type
+			       (not (eq pathname-type :unspecific))))
 	     (pathname-name (%pathname-name pathname))
 	     (name-needed (or type-needed
 			      (and pathname-name
@@ -418,20 +395,18 @@
 							    defaults)))))))
 	(when name-needed
 	  (unless pathname-name (lose))
+	  (when (and (null pathname-type)
+		     (position #\. pathname-name :start 1))
+	    (error "too many dots in the name: ~S" pathname))
 	  (strings (unparse-unix-piece pathname-name)))
 	(when type-needed
 	  (when (or (null pathname-type) (eq pathname-type :unspecific))
 	    (lose))
+	  (when (typep pathname-type 'simple-base-string)
+	    (when (position #\. pathname-type)
+	      (error "type component can't have a #\. inside: ~S" pathname)))
 	  (strings ".")
-	  (strings (unparse-unix-piece pathname-type)))
-	(when version-needed
-	  (typecase pathname-version
-	    ((member :wild)
-	     (strings ".*"))
-	    (integer
-	     (strings (format nil ".~D" pathname-version)))
-	    (t
-	     (lose)))))
+	  (strings (unparse-unix-piece pathname-type))))
       (apply #'concatenate 'simple-string (strings)))))
 
 ;;;; wildcard matching stuff
@@ -528,6 +503,13 @@
 					 verify-existence follow-links
 					 nodes function))))
 	    ((member :wild-inferiors)
+	     ;; now with extra error case handling from CLHS
+	     ;; 19.2.2.4.3 -- CSR, 2004-01-24
+	     (when (member (cadr tail) '(:up :back))
+	       (error 'simple-file-error
+		      :pathname pathname
+		      :format-control "~@<invalid use of ~S after :WILD-INFERIORS~@:>."
+		      :format-arguments (list (cadr tail))))
 	     (%enumerate-directories head (rest tail) pathname
 				     verify-existence follow-links
 				     nodes function)
@@ -563,13 +545,24 @@
 						 verify-existence follow-links
 						 nodes function))))))))
 	  ((member :up)
-	     (with-directory-node-removed (head)
+	   (when (string= head "/")
+	     (error 'simple-file-error
+		    :pathname pathname
+		    :format-control "~@<invalid use of :UP after :ABSOLUTE.~@:>"))
+	   (with-directory-node-removed (head)
 	     (let ((head (concatenate 'base-string head "..")))
 	       (with-directory-node-noted (head)
 		 (%enumerate-directories (concatenate 'base-string head "/")
 					 (rest tail) pathname
 					 verify-existence follow-links
-					 nodes function)))))))
+					 nodes function)))))
+	  ((member :back)
+	   ;; :WILD-INFERIORS is handled above, so the only case here
+	   ;; should be (:ABSOLUTE :BACK)
+	   (aver (string= head "/"))
+	   (error 'simple-file-error
+		  :pathname pathname
+		  :format-control "~@<invalid use of :BACK after :ABSOLUTE.~@:>"))))
 	(%enumerate-files head pathname verify-existence function))))
 
 ;;; Call FUNCTION on files.
@@ -677,8 +670,6 @@
 
 ;;; Convert PATHNAME into a string that can be used with UNIX system
 ;;; calls, or return NIL if no match is found. Wild-cards are expanded.
-;;; FIXME this should signal file-error if the pathname is wild, whether
-;;; or not it turns out to have only one match.  Fix post 0.7.2
 (defun unix-namestring (pathname-spec &optional (for-input t))
   (let* ((namestring (physicalize-pathname (merge-pathnames pathname-spec)))
 	 (matches nil)) ; an accumulator for actual matches

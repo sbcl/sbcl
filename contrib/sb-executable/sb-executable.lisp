@@ -30,7 +30,9 @@ exec sbcl --noinform ~{~A ~}--eval \"(with-open-file (i \\\"$0\\\" :element-type
 					      "--sysinit /dev/null"))
 			initial-function)
   "Write an executable called OUTPUT-FILE which can be run from the shell, by 'linking' together code from FASLS.  Actually works by concatenating them and prepending a #! header"
-  (with-open-file (out output-file :direction :output
+  (with-open-file (out output-file
+		       :direction :output
+		       :if-exists :supersede
 		       :element-type '(unsigned-byte 8))
     (write-sequence (map 'vector #'char-code
 			 (format nil *exec-header* runtime-flags

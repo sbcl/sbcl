@@ -63,7 +63,7 @@
 ;;; compelling reason for the implementors to choose case
 ;;; insensitivity and a canonical case.)
 (setf (logical-pathname-translations "FOO") 
-      '(("**;*.*.*" "/full/path/to/foo/**/*.*.*")))
+      '(("**;*.*.*" "/full/path/to/foo/**/*.*")))
 (let* ((pn1 (make-pathname :host "FOO" :directory "etc" :name "INETD" 
                            :type "conf"))
        (pn2 (make-pathname :host "foo" :directory "ETC" :name "inetd" 

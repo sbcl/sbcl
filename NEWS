@@ -2234,6 +2234,18 @@ changes in sbcl-0.8.7 relative to sbcl-0.8.6:
     ** VALUES tranformer lost derived type.
 
 changes in sbcl-0.8.8 relative to sbcl-0.8.7:
+  * minor incompatible change: parsing of namestrings on a physical
+    (Unix) host has changed; numbers after the final #\. in a
+    namestring are no longer interpreted as a version field.  This is
+    intented to be largely invisible to the user, except that the
+    meaning of the namestring "*.*.*" has changed: it now refers to a
+    pathname with :TYPE :WILD :NAME #<pattern "*.*">.  This namestring
+    should usually be replaced by 
+      (make-pathname :name :wild :type :wild :version :wild)
+    with the added benefit that this is more likely to be portable.
+    As a consequence of this change, the :IF-EXISTS :NEW-VERSION
+    option to OPEN now signals an error if the file being opened
+    exists; this may have an impact on existing code.
   * bug fix: DECODE-UNIVERSAL-TIME now accepts timezone arguments with
     second-resolution: integer multiples of 1/3600 between -24 and 24.
     (thanks to Vincent Arkesteijn)
@@ -2266,6 +2278,11 @@ changes in sbcl-0.8.8 relative to sbcl-0.8.7:
        or not a character is whitespace.
     ** MERGE-PATHNAMES handles the case when the pathname does not
        specify a name while the default-pathname specifies a version.
+    ** Pathnames now stand a better chance of respecting print/read
+       consistency.
+    ** Attempting to use standardized file system operators with a
+       pathname with invalid :DIRECTORY components signals a
+       FILE-ERROR.
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles

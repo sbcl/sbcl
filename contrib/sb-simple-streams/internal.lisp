@@ -482,11 +482,11 @@
 			 :new-version
 			 :error)))
 	     (case if-exists
-	       ((:error nil)
+	       ((:error nil :new-version)
 		(setf mask (logior mask sb-unix:o_excl)))
 	       ((:rename :rename-and-delete)
 		(setf mask (logior mask sb-unix:o_creat)))
-	       ((:new-version :supersede)
+	       ((:supersede)
 		(setf mask (logior mask sb-unix:o_trunc)))))
 	    (t
 	     (setf if-exists nil)))	; :ignore-this-arg

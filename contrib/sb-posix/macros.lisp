@@ -17,7 +17,8 @@
 	   (write-char #\/ s))
 	 (dolist (piece (cdr directory))
 	   (etypecase piece
-	     (string (write-string piece s) (write-char #\/ s))))))
+	     (string (write-string piece s) (write-char #\/ s))
+	     ((member :up) (write-string "../" s))))))
       (etypecase name
 	(null)
         (string (write-string name s)))

@@ -38,6 +38,18 @@
   (sb-posix:chdir *current-directory*)
   0)
 
+(deftest chdir.6
+  (sb-posix:chdir "/../")
+  0)
+
+(deftest chdir.7
+  (sb-posix:chdir #p"/../")
+  0)
+
+(deftest chdir.8
+  (sb-posix:chdir (make-pathname :directory '(:absolute :up)))
+  0)
+
 (deftest chdir.error.1
   (let ((dne (make-pathname :directory '(:relative "chdir.does-not-exist"))))
     (handler-case
@@ -187,6 +199,15 @@
     ;; FIXME: breaks if mounted noatime :-(
     (< (- atime unix-now) 10))
   t)
+
+(deftest stat.2
+  (let* ((stat (sb-posix:stat (make-pathname :directory '(:absolute :up))))
+	 (mode (sb-posix::stat-mode stat)))
+    ;; it's logically possible for / to be writeable by others... but
+    ;; if it is, either someone is playing with strange security
+    ;; modules or they want to know about it anyway.
+    (logand mode sb-posix::s-iwoth))
+  0)
 
 ;;; FIXME: add tests for carrying a stat structure around in the
 ;;; optional argument to SB-POSIX:STAT

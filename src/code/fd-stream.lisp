@@ -1120,11 +1120,11 @@
 				     :append :supersede nil)
 			    :if-exists)
 	     (case if-exists
-	       ((:error nil)
+	       ((:new-version :error nil)
 		(setf mask (logior mask sb!unix:o_excl)))
 	       ((:rename :rename-and-delete)
 		(setf mask (logior mask sb!unix:o_creat)))
-	       ((:new-version :supersede)
+	       ((:supersede)
 		(setf mask (logior mask sb!unix:o_trunc)))
 	       (:append
 		(setf mask (logior mask sb!unix:o_append)))))

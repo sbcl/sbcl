@@ -97,7 +97,9 @@
 				(upcase-maybe name)
 				(upcase-maybe type)
 				version)
-	(%make-pathname host device directory name type version))))
+	(progn
+	  (aver (eq host *unix-host*))
+	  (%make-pathname host device directory name type version)))))
 
 ;;; Hash table searching maps a logical pathname's host to its
 ;;; physical pathname translation.
@@ -267,8 +269,9 @@
 			  (%pathname-name pathname2))
        (compare-component (%pathname-type pathname1)
 			  (%pathname-type pathname2))
-       (compare-component (%pathname-version pathname1)
-			  (%pathname-version pathname2))))
+       (or (eq (%pathname-host pathname1) *unix-host*)
+	   (compare-component (%pathname-version pathname1)
+			      (%pathname-version pathname2)))))
 
 ;;; Convert PATHNAME-DESIGNATOR (a pathname, or string, or
 ;;; stream), into a pathname in pathname.
@@ -383,7 +386,8 @@
 	(flet ((add (dir)
 		 (if (and (eq dir :back)
 			  results
-			  (not (eq (car results) :back)))
+			  (not (member (car results)
+				       '(:back :wild-inferiors))))
 		     (pop results)
 		     (push dir results))))
 	  (dolist (dir (maybe-diddle-case dir2 diddle-case))
@@ -920,7 +924,8 @@ a host-structure or string."
 	     (frob %pathname-directory directory-components-match)
 	     (frob %pathname-name)
 	     (frob %pathname-type)
-	     (frob %pathname-version))))))
+	     (or (eq (%pathname-host wildname) *unix-host*)
+		 (frob %pathname-version)))))))
 
 ;;; Place the substitutions into the pattern and return the string or pattern
 ;;; that results. If DIDDLE-CASE is true, we diddle the result case as well,
@@ -979,7 +984,8 @@ a host-structure or string."
 	  did not match:~%  ~S ~S"
 	 source from))
 
-;;; Do TRANSLATE-COMPONENT for all components except host and directory.
+;;; Do TRANSLATE-COMPONENT for all components except host, directory
+;;; and version.
 (defun translate-component (source from to diddle-case)
   (typecase to
     (pattern
@@ -1116,6 +1122,7 @@ a host-structure or string."
     (with-pathname (from from-wildname)
       (with-pathname (to to-wildname)
 	  (let* ((source-host (%pathname-host source))
+		 (from-host (%pathname-host from))
 		 (to-host (%pathname-host to))
 		 (diddle-case
 		  (and source-host to-host
@@ -1135,7 +1142,11 @@ a host-structure or string."
 	       (frob %pathname-directory translate-directories)
 	       (frob %pathname-name)
 	       (frob %pathname-type)
-	       (frob %pathname-version))))))))
+	       (if (eq from-host *unix-host*)
+		   (if (eq (%pathname-version to) :wild)
+		       (%pathname-version from)
+		       (%pathname-version to))
+		   (frob %pathname-version)))))))))
 
 ;;;;  logical pathname support. ANSI 92-102 specification.
 ;;;;
