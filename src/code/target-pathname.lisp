@@ -716,9 +716,8 @@ a host-structure or string."
 			 host
 			 (defaults *default-pathname-defaults*)
 			 &key (start 0) end junk-allowed)
-  (declare (type pathname-designator thing)
+  (declare (type pathname-designator thing defaults)
 	   (type (or list host string (member :unspecific)) host)
-	   (type pathname defaults)
 	   (type index start)
 	   (type (or index null) end)
 	   (type (or t null) junk-allowed)
@@ -775,8 +774,18 @@ a host-structure or string."
                               supported in this implementation:~%  ~S"
 			      host))
 		      (host
-		       host))))
-    (declare (type (or null host) found-host))
+		       host)))
+	;; According to ANSI defaults may be any valid pathname designator
+	(defaults (etypecase defaults
+		    (pathname   
+		     defaults)
+		    (string
+		     (aver (pathnamep *default-pathname-defaults*))
+		     (parse-namestring defaults))
+		    (stream
+		     (truename defaults)))))
+    (declare (type (or null host) found-host)
+	     (type pathname defaults))
     (etypecase thing
       (simple-string
        (%parse-namestring thing found-host defaults start end junk-allowed))

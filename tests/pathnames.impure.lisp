@@ -314,5 +314,22 @@
 	  (assert (equal (read-from-string (format nil "~S" p)) p)))
       (print-not-readable () nil))))
 
+;;; BUG 330: "PARSE-NAMESTRING should accept namestrings as the default argument"
+;;; ...and streams as well
+(assert (equal (parse-namestring "foo" nil "/")
+	       (parse-namestring "foo" nil #P"/")))
+(let ((test "parse-namestring-test.tmp"))
+  (unwind-protect
+       (with-open-file (f test :direction :output)
+	 ;; FIXME: This test is a bit flaky, since we only check that
+	 ;; no error is signalled. The dilemma here is "what is the
+	 ;; correct result when defaults is a _file_, not a
+	 ;; directory". Currently (0.8.10.73) we get #P"foo" here (as
+	 ;; opposed to eg. #P"/path/to/current/foo"), which is
+	 ;; possibly mildly surprising but probably conformant.
+	 (assert (parse-namestring "foo" nil f)))
+    (when (probe-file test)
+      (delete-file test))))
+
 ;;;; success
 (quit :unix-status 104)

@@ -1428,13 +1428,6 @@ WORKAROUND:
      in the wrapper, and then to update the instance just run through
      all the old wrappers in order from oldest to newest.
 
-330: "PARSE-NAMESTRING should accept namestrings as the default argument"
-  (parse-namestring "foo" nil "/") 
-  debugger invoked on a TYPE-ERROR in thread 3138:
-    The value "/" is not of type PATHNAME.
-  According to the PARSE-NAMESTRING dictionary entry the
-  default-pathname parameter can be any pathname designator.
-
 331: "lazy creation of CLOS classes for user-defined conditions"
     (defstruct foo)
     (defstruct (bar (:include foo)))
