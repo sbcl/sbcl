@@ -50,31 +50,33 @@ WORKAROUND:
   believers in ANSI compatibility and all, (1) there's no obvious
   simple way to do it (short of disabling all warnings for type
   mismatches everywhere), and (2) there's a good portable
-  workaround. ANSI justifies this specification by saying 
+  workaround, and (3) by their own reasoning, it looks as though
+  ANSI may have gotten it wrong. ANSI justifies this specification
+  by saying 
     The restriction against issuing a warning for type mismatches
     between a slot-initform and the corresponding slot's :TYPE
     option is necessary because a slot-initform must be specified
     in order to specify slot options; in some cases, no suitable
     default may exist.
-  In SBCL, as in CMU CL (or, for that matter, any compiler which
-  really understands Common Lisp types) a suitable default does
-  exist, in all cases, because the compiler understands the concept
-  of functions which never return (i.e. has return type NIL, e.g.
-  ERROR). Thus, as a portable workaround, you can use a call to
-  some known-never-to-return function as the default. E.g.
+  However, in SBCL (as in CMU CL or, for that matter, any compiler
+  which really understands Common Lisp types) a suitable default
+  does exist, in all cases, because the compiler understands the
+  concept of functions which never return (i.e. has return type NIL).
+  Thus, as a portable workaround, you can use a call to some
+  known-never-to-return function as the default. E.g.
     (DEFSTRUCT FOO
       (BAR (ERROR "missing :BAR argument")
            :TYPE SOME-TYPE-TOO-HAIRY-TO-CONSTRUCT-AN-INSTANCE-OF))
   or 
-    (DECLAIM (FTYPE () NIL) MISSING-ARG) 
+    (DECLAIM (FTYPE (FUNCTION () NIL) MISSING-ARG))
     (DEFUN REQUIRED-ARG () ; workaround for SBCL non-ANSI slot init typing
       (ERROR "missing required argument")) 
     (DEFSTRUCT FOO
       (BAR (REQUIRED-ARG) :TYPE TRICKY-TYPE-OF-SOME-SORT)
       (BLETCH (REQUIRED-ARG) :TYPE TRICKY-TYPE-OF-SOME-SORT)
       (N-REFS-SO-FAR 0 :TYPE (INTEGER 0)))
-  Such code will compile without complaint and work correctly either
-  on SBCL or on a completely compliant Common Lisp system.
+  Such code should compile without complaint and work correctly either
+  on SBCL or on any other completely compliant Common Lisp system.
 
 6:
   bogus warnings about undefined functions for magic functions like
@@ -1249,16 +1251,6 @@ Error in function C::GET-LAMBDA-TO-COMPILE:
   types manually, allowing the special case (VALUES) but still excluding
   all more-complex VALUES types.
 
-134:
-  (reported by Alexey Dejneka sbcl-devel 2001-12-07)
-    (let ((s '((1 2 3))))
-      (eval (eval ``(vector ,@',@s))))
-      
-    should return #(1 2 3), instead of this it causes a reader error.
-      
-    Interior call of BACKQUOTIFY erroneously optimizes ,@': it immediately
-    splices the temporal representation of ,@S.
-    
 135:
   Ideally, uninterning a symbol would allow it, and its associated
   FDEFINITION and PROCLAIM data, to be reclaimed by the GC. However, 
@@ -1281,40 +1273,14 @@ Error in function C::GET-LAMBDA-TO-COMPILE:
 137:
   (SB-DEBUG:BACKTRACE) output should start with something
   including the name BACKTRACE, not (as in 0.pre7.88)
-  just "0: (\"hairy arg processor\" ...)". In general
-  the names in BACKTRACE are all screwed up compared to
-  the nice useful names in 0.6.13.
-
-  Note for those who observe that this is an annoying
-  bug and doesn't belong in a release: See the "note for the 
-  ambitious", below.
-
-  Note for the ambitious: This is an important bug and I'd
-  really like to fix it and spent many hours on it. The 
-  obvious ways to fix it are hard, because the underlying
-  infrastructure seems to be rather broken.
-  * There are two mostly-separate systems for storing names,
-    the in-the-function-object system used by e.g.
-    CL:FUNCTION-LAMBDA-EXPRESSION and the
-    in-the-DEBUG-FUN-object system used by e.g. BACKTRACE.
-    The code as of sbcl-0.pre7.94 is smart enough to set
-    up the first value, but not the second (because I naively
-    assumed that one mechanism is enough, and didn't proof
-    read the entire system to see whether there might be
-    another mechanism?! argh...)
-  * The systems are not quite separate, but instead weirdly and
-     fragilely coupled by the FUN-DEBUG-FUN algorithm.
-  * If you try to refactor this dain bramage away, reducing
-    things to a single system -- I tried to add a
-    %SIMPLE-FUN-DEBUG-FUN slot, planning eventually to get
-    rid of the old %SIMPLE-FUN-NAME slot in favor of indirection
-    through the new slot -- you get torpedoed by the fragility
-    of the SIMPLE-FUN primitive object. Just adding the
-    new slot, without making any other changes in the system,
-    is enough to make the system fail with what look like
-    memory corruption problems in warm init.
-  But please do fix some or all of the problem, I'm tired
-  of messing with it. -- WHN 2001-12-22
+  just "0: (\"hairy arg processor\" ...)". Until about
+  sbcl-0.pre7.109, the names in BACKTRACE were all screwed
+  up compared to the nice useful names in sbcl-0.6.13.
+  Around sbcl-0.pre7.109, they were mostly fixed by using
+  NAMED-LAMBDA to implement DEFUN. However, there are still
+  some screwups left, e.g. as of sbcl-0.pre7.109, there are
+  still some functions named "hairy arg processor" and
+  "SB-INT:&MORE processor".
 
 138:
   a cross-compiler bug in sbcl-0.pre7.107

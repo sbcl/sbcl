@@ -73,5 +73,124 @@ if [ $? != 52 ]; then
 fi
 rm -r $testdir
 
+# Test DIRECTORY on a tree structure of directories.
+mkdir $testdir
+cd $testdir
+touch water dirt
+mkdir animal plant
+mkdir animal/vertebrate animal/invertebrate
+mkdir animal/vertebrate/mammal
+mkdir animal/vertebrate/snake
+mkdir animal/vertebrate/bird
+mkdir animal/vertebrate/mammal/bear
+mkdir animal/vertebrate/mammal/mythical
+mkdir animal/vertebrate/mammal/rodent
+mkdir animal/vertebrate/mammal/ruminant
+touch animal/vertebrate/mammal/bear/grizzly
+touch animal/vertebrate/mammal/mythical/mermaid
+touch animal/vertebrate/mammal/mythical/unicorn
+touch animal/vertebrate/mammal/rodent/beaver
+touch animal/vertebrate/mammal/rodent/mouse
+touch animal/vertebrate/mammal/rodent/rabbit
+touch animal/vertebrate/mammal/rodent/rat
+touch animal/vertebrate/mammal/ruminant/cow
+touch animal/vertebrate/snake/python
+touch plant/kingsfoil plant/pipeweed
+$SBCL <<EOF
+(in-package :cl-user)
+(defun absolutify (pathname)
+  "Convert a possibly-relative pathname to absolute."
+  (merge-pathnames pathname
+		   (make-pathname :directory
+				  (pathname-directory
+				   *default-pathname-defaults*))))
+(defun sorted-truenamestrings (pathname-designators)
+  "Convert a collection of pathname designators into canonical form
+using TRUENAME, NAMESTRING, and SORT."
+  (sort (mapcar #'namestring
+		(mapcar #'truename
+			pathname-designators))
+	#'string<))
+(defun need-match-1 (directory-pathname result-sorted-truenamestrings)
+  "guts of NEED-MATCH"
+  (let ((directory-sorted-truenamestrings (sorted-truenamestrings
+					   (directory directory-pathname))))
+    (unless (equal directory-sorted-truenamestrings
+		   result-sorted-truenamestrings)
+      (format t "~&~@<DIRECTORY argument = ~_~2I~S~:>~%"
+	      directory-pathname)
+      (format t "~&~@<DIRECTORY result = ~_~2I~S~:>~%"
+	      directory-sorted-truenamestrings)
+      (format t "~&~@<expected result = ~_~2I~S.~:>~%"
+	      result-sorted-truenamestrings)
+      (error "mismatch between DIRECTORY and expected result"))))
+(defun need-match (directory-pathname result-pathnames)
+  "Require that (DIRECTORY DIRECTORY-PATHNAME) return RESULT-PATHNAMES
+(modulo TRUENAME and NAMESTRING applied to each RESULT-PATHNAME for
+convenience in e.g. converting Unix filename syntax idiosyncrasies to
+Lisp filename syntax idiosyncrasies)."
+  (let ((sorted-result-truenamestrings (sorted-truenamestrings
+                                        result-pathnames)))
+  ;; Relative and absolute pathnames should give the same result.
+  (need-match-1 directory-pathname
+                sorted-result-truenamestrings)
+  (need-match-1 (absolutify directory-pathname)
+                sorted-result-truenamestrings)))
+(defun need-matches ()
+  "lotso calls to NEED-MATCH"
+  ;; FIXME: As discussed on sbcl-devel ca. 2001-01-01, DIRECTORY should
+  ;; report Unix directory files contained within its output as e.g.
+  ;; "/usr/bin" instead of the CMU-CL-style "/usr/bin/". In that case,
+  ;; s:/":": in most or all the NEED-MATCHes here.
+  (need-match "./*.*" '("animal/" "dirt" "plant/" "water"))
+  ;; FIXME: (DIRECTORY "*.*") doesn't work (bug 139). And it looks as
+  ;; though the same problem affects (DIRECTORY "animal") too.
+  #+nil (need-match "*.*" '("animal/" "dirt" "plant/" "water"))
+  #+nil (need-match "animal" '("animal/"))
+  (need-match "./animal" '("animal/"))
+  (need-match "animal/*.*" '("animal/invertebrate/" "animal/vertebrate/"))
+  (need-match "animal/*/*.*"
+	      '("animal/vertebrate/bird/"
+		"animal/vertebrate/mammal/"
+		"animal/vertebrate/snake/"))
+  (need-match "plant/*.*" '("plant/kingsfoil" "plant/pipeweed"))
+  (need-match "plant/**/*.*" '("plant/kingsfoil" "plant/pipeweed"))
+  (need-match "plant/**/**/*.*" '("plant/kingsfoil" "plant/pipeweed"))
+  (let ((vertebrates (mapcar (lambda (stem)
+			       (concatenate 'string
+					    "animal/vertebrate/"
+					    stem))
+			     '("bird/"
+			       "mammal/"
+			       "mammal/bear/" "mammal/bear/grizzly"
+			       "mammal/mythical/" "mammal/mythical/mermaid"
+			       "mammal/mythical/unicorn"
+			       "mammal/platypus"
+			       "mammal/rodent/" "mammal/rodent/beaver"
+			       "mammal/rodent/mouse" "mammal/rodent/rabbit"
+			       "mammal/rodent/rat"
+			       "mammal/ruminant/" "mammal/ruminant/cow"
+			       "mammal/walrus"
+			       "snake/" "snake/python"))))
+    (need-match "animal/vertebrate/**/*.*" vertebrates)
+    ;; FIXME: In sbcl-0.pre7.109, DIRECTORY got confused on (I think...)
+    ;; absolute pathnames containing "../*" stuff. If I understood
+    ;; and remember correctly, CR's patch will fix this.
+    #|
+    (need-match "animal/vertebrate/mammal/../**/*.*" vertebrates)
+    (need-match "animal/vertebrate/mammal/../**/**/*.*" vertebrates)
+    (need-match "animal/vertebrate/mammal/mythical/../**/../**/*.*"
+		vertebrates)
+    |#
+    )
+  (need-match "animal/vertebrate/**/robot.*" nil)
+  (need-match "animal/vertebrate/mammal/../**/*.robot" nil)
+  (need-match "animal/vertebrate/mammal/../**/robot/*.*" nil)
+  (need-match "animal/vertebrate/mammal/robot/../**/../**/*.*" nil))
+(need-matches)
+EOF
+cd ..
+rm -r $testdir
+
 # success convention for script
 exit 104

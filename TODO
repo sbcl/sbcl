@@ -5,19 +5,17 @@ for 0.7.0:
 	leaving some filing for later:-) from the monster
 	EVAL/EVAL-WHEN/%COMPILE/DEFUN/DEFSTRUCT cleanup:
 	** made inlining DEFUN inside MACROLET work again
-	** whatever bug it is that causes s/#'(lambda/(lambda/ to 
-		cause compilation failure in condition.lisp
-	** perhaps function debug name quick fix, if there's an easy way
+	** bug 138 
 * more renaming in global external names:
 	** reserved DO-FOO-style names for iteration macros
 	** finished s/FUNCTION/FUN/
 	** s/VARIABLE/VAR/
-	** s/TOP-LEVEL/TOPLEVEL/
 	** perhaps s/DEF-FROB/DEF/ or s/DEF-FROB/DEFINE/
 * global style systematization:
 	** s/#'(lambda/(lambda/
 * pending patches and bug reports that go in (or else get handled
 	somehow, rejected/logged/whatever) before 0.7.0:
+	** DIRECTORY problems (bug 139, CR patch sbcl-devel 2001-12-31)
 =======================================================================
 for early 0.7.x:
 
