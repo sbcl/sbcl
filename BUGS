@@ -566,22 +566,6 @@ WORKAROUND:
   under OpenBSD 2.9 on my X86 laptop. Do be patient when you try it:
   it took more than two minutes (but less than five) for me.
 
-144: 
-  (This was once known as IR1-4, but it lived on even after the
-  IR1 interpreter went to the big bit bucket in the sky.)
-  The system accepts DECLAIM in most places where DECLARE would be 
-  accepted, without even issuing a warning. ANSI allows this, but since
-  it's fairly easy to mistype DECLAIM instead of DECLARE, and the
-  meaning is rather different, and it's unlikely that the user
-  has a good reason for doing DECLAIM not at top level, it would be 
-  good to issue a STYLE-WARNING when this happens. A possible
-  fix would be to issue STYLE-WARNINGs for DECLAIMs not at top level,
-  or perhaps to issue STYLE-WARNINGs for any EVAL-WHEN not at top level.
-  [This is considered an IR1-interpreter-related bug because until
-  EVAL-WHEN is rewritten, which won't happen until after the IR1
-  interpreter is gone, the system's notion of what's a top-level form
-  and what's not will remain too confused to fix this problem.]
-
 145:
   ANSI allows types `(COMPLEX ,FOO) to use very hairy values for
   FOO, e.g. (COMPLEX (AND REAL (SATISFIES ODDP))). The old CMU CL
@@ -636,7 +620,6 @@ WORKAROUND:
 
   (due to reordering of the compiler this example is compiled
   successfully by 0.7.14, but the bug probably remains)
-  (possibly exercised by bug 254 test case)
 
 162:
   (reported by Robert E. Brown 2002-04-16) 
@@ -1113,70 +1096,8 @@ WORKAROUND:
   does not cause a warning. (BTW: old SBCL issued a warning, but for a
   function, which was never called!)
 
-253: "type checking is embedded THEs"
-  Compiler cannot perform type checking in
-
-    (let () (list (the fixnum (the unsigned-byte (eval -1)))))
-
-  (fixed in 0.8.0.34)
-
-254: (possibly bug 148 in a new guise)
-  In sbcl-0.8.0.52, COMPILE-FILE on 
-    (cl:in-package :cl-user)
-    (declaim (optimize (safety 3) (debug 2) (speed 2) (space 1)))
-    (defstruct foo
-      (uhw2 nil :type (or package null)))
-    (macrolet ((defprojection (variant &key lexpr eexpr)
-                 (let ()
-                   `(defmethod uu ((foo foo))
-                        (let ((uhw2 (foo.uhw2 bar)))
-                          (let ()
-                            (u-flunt uhw2
-                                     (baz (funcall ,lexpr south east 1)))))))))
-      (defprojection h
-        :lexpr (lambda (south east sched)
-                 (flet ((bd (x) (bref x sched)))
-                   (let ((avecname (gafp)))
-                     (declare (type (vector t) avecname))
-                     (multiple-value-prog1
-                         (progn
-                           (setf (avec.count avecname) (length rest))
-                           (setf (aref avecname 0) (bd (h south)))
-                           (setf (aref avecname 1) (bd (h east)))
-                           (stub avecname))
-                       (paip avecname)))))
-        :eexpr (lambda (south east))))
-  fails with 
-    debugger invoked on condition of type TYPE-ERROR:
-      The value NIL is not of type SB-C::NODE.
-
-255: 
-  In sbcl-0.8.0.52, COMPILE-FILE on
-    (cl:in-package :cl-user)
-    (declaim (optimize (safety 3) (debug 2) (speed 2) (space 1)))
-    (defvar *1*)
-    (defvar *2*)
-    (defstruct v a b)
-    (defstruct w)
-    (defstruct yam (v nil :type (or v null)))
-    (defstruct un u)
-    (defstruct (bod (:include un)) bo)
-    (defstruct (bad (:include bod)) ba)
-    (declaim (ftype (function ((or w bad) (or w bad)) (values)) %ufm))
-    (defun %ufm (base bound) (froj base bound *1*) (values))
-    (declaim (ftype (function ((vector t)) (or w bad)) %pu))
-    (defun %pu (pds) *2*)
-    (defun uu (yam)
-      (let ((v (yam-v az)))
-        (%ufm v
-              (flet ((project (x) (frob x 0)))
-                (let ((avecname *1*))
-                  (multiple-value-prog1
-                      (progn (%pu avecname))
-                    (frob)))))))
-  fails with 
-    failed AVER:
-      "(AND (EQ (CONTINUATION-KIND START) INSIDE-BLOCK) (NOT (BLOCK-DELETE-P BLOCK)))"
+255:
+  (fixed in 0.8.0.57)
 
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:

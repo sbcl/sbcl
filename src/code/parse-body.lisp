@@ -50,7 +50,12 @@
                      t)))))
            (declaration-p (x)
              (if (consp x)
-               (eq (car x) 'declare))))
+                 (let ((name (car x)))
+                   (if (eq name 'declaim)
+                       (progn (style-warn
+                               "DECLAIM is met where DECLARE is expected.")
+                              nil)
+                       (eq name 'declare))))))
       (tagbody
         :again
         (if forms

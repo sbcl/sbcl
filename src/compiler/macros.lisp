@@ -616,7 +616,8 @@
          (declare (type node ,node-var))
 	 ,@body
 	 (when ,(if restart-p
-		    `(eq ,node-var (block-last ,n-block))
+		    `(or (eq ,node-var (block-last ,n-block))
+                         (block-delete-p ,n-block))
 		    `(eq ,cont-var ,n-last-cont))
 	   (return nil))))))
 ;;; like DO-NODES, only iterating in reverse order
