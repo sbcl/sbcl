@@ -11,13 +11,8 @@
 
 (in-package "SB!IMPL")
 
-;;; Like CMU CL, we use HEAPSORT. However, other than that, this code
-;;; isn't really related to the CMU CL code, since instead of trying
-;;; to generalize the CMU CL code to allow START and END values, this
-;;; code has been written from scratch following Chapter 7 of
-;;; _Introduction to Algorithms_ by Corman, Rivest, and Shamir.
-(defun sort-vector (vector start end predicate key)
-  (sort-vector vector start end predicate key))
+(defun sort-vector (vector start end predicate-fun key-fun-or-nil)
+  (sort-vector vector start end predicate-fun key-fun-or-nil))
 
 ;;; This is MAYBE-INLINE because it's not too hard to have an
 ;;; application where sorting is a major bottleneck, and inlining it
@@ -28,15 +23,18 @@
   #!+sb-doc
   "Destructively sort SEQUENCE. PREDICATE should return non-NIL if
    ARG1 is to precede ARG2."
-  (let ((predicate-function (%coerce-callable-to-fun predicate))
-	(key-function (and key (%coerce-callable-to-fun key))))
+  (let ((predicate-fun (%coerce-callable-to-fun predicate)))
     (typecase sequence
-      (list (stable-sort-list sequence predicate-function key-function))
+      (list
+       (stable-sort-list sequence
+                         predicate-fun
+                         (if key (%coerce-callable-to-fun key) #'identity)))
       (vector
-       (with-array-data ((vector (the vector sequence))
-			 (start 0)
-			 (end (length sequence)))
-         (sort-vector vector start end predicate-function key-function))
+       (let ((key-fun-or-nil (and key (%coerce-callable-to-fun key))))
+         (with-array-data ((vector (the vector sequence))
+                           (start 0)
+                           (end (length sequence)))
+           (sort-vector vector start end predicate-fun key-fun-or-nil)))
        sequence)
       (t
        (error 'simple-type-error
@@ -51,20 +49,27 @@
   #!+sb-doc
   "Destructively sort SEQUENCE. PREDICATE should return non-NIL if
    ARG1 is to precede ARG2."
-  (typecase sequence
-    (simple-vector
-     (stable-sort-simple-vector sequence predicate key))
-    (list
-     (stable-sort-list sequence predicate key))
-    (vector
-     (stable-sort-vector sequence predicate key))
-    (t
-     (error 'simple-type-error
-	    :datum sequence
-	    :expected-type 'sequence
-	    :format-control "~S is not a sequence."
-	    :format-arguments (list sequence)))))
-
+  (let ((predicate-fun (%coerce-callable-to-fun predicate)))
+    (typecase sequence
+      (simple-vector
+       (stable-sort-simple-vector sequence
+                                  predicate-fun
+                                  (and key (%coerce-callable-to-fun key))))
+      (list
+       (stable-sort-list sequence
+                         predicate-fun
+                         (if key (%coerce-callable-to-fun key) #'identity)))
+      (vector
+       (stable-sort-vector sequence
+                           predicate-fun
+                           (and key (%coerce-callable-to-fun key))))
+      (t
+       (error 'simple-type-error
+              :datum sequence
+              :expected-type 'sequence
+              :format-control "~S is not a sequence."
+              :format-arguments (list sequence))))))
+  
 ;;; APPLY-KEYED-PRED saves us a function call sometimes.
 (eval-when (:compile-toplevel :execute)
   (sb!xc:defmacro apply-keyed-pred (one two pred key)
@@ -133,18 +138,15 @@
 ;;; that is, there are only two runs that can be merged, the first run
 ;;; starting at the beginning of the list, and the second being the
 ;;; remaining elements.
-(defun stable-sort-list (list pred key)
+(defun stable-sort-list (list pred-fun key-fun)
   (let ((head (cons :header list))  ; head holds on to everything
 	(n 1)		            ; bottom-up size of lists to be merged
 	unsorted		    ; unsorted is the remaining list to be
 				    ;   broken into n size lists and merged
 	list-1			    ; list-1 is one length n list to be merged
-	last			    ; last points to the last visited cell
-	(pred-fun (%coerce-callable-to-fun pred))
-	(key-fun (if key
-		     (%coerce-callable-to-fun key)
-		     #'identity)))
-    (declare (fixnum n))
+	last)			    ; last points to the last visited cell
+    (declare (type function pred-fun key-fun)
+             (type fixnum n))
     (loop
      ;; Start collecting runs of N at the first element.
      (setf unsorted (cdr head))
@@ -309,10 +311,14 @@
 (declaim (simple-vector *merge-sort-temp-vector*))
 
 (defun stable-sort-simple-vector (vector pred key)
-  (declare (simple-vector vector))
+  (declare (type simple-vector vector)
+           (type function pred)
+           (type (or null function) key))
   (vector-merge-sort vector pred key svref))
 
 (defun stable-sort-vector (vector pred key)
+  (declare (type function pred)
+           (type (or null function) key))
   (vector-merge-sort vector pred key aref))
 
 ;;;; merging

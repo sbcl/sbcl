@@ -3583,6 +3583,11 @@
 	    (t
 	     *universal-type*)))))
 
+;;; Like CMU CL, we use HEAPSORT. However, other than that, this code
+;;; isn't really related to the CMU CL code, since instead of trying
+;;; to generalize the CMU CL code to allow START and END values, this
+;;; code has been written from scratch following Chapter 7 of
+;;; _Introduction to Algorithms_ by Corman, Rivest, and Shamir.
 (define-source-transform sb!impl::sort-vector (vector start end predicate key)
   `(macrolet ((%index (x) `(truly-the index ,x))
 	      (%parent (i) `(ash ,i -1))
@@ -3617,15 +3622,16 @@
 				      (%elt largest) i-elt
 				      i largest)))))))))
 	      (%sort-vector (keyfun &optional (vtype 'vector))
-	       `(macrolet (;; KLUDGE: In SBCL ca. 0.6.10, I had trouble getting
-			   ;; type inference to propagate all the way
-			   ;; through this tangled mess of
-			   ;; inlining. The TRULY-THE here works
-			   ;; around that. -- WHN
+	       `(macrolet (;; KLUDGE: In SBCL ca. 0.6.10, I had
+			   ;; trouble getting type inference to
+			   ;; propagate all the way through this
+			   ;; tangled mess of inlining. The TRULY-THE
+			   ;; here works around that. -- WHN
 			   (%elt (i)
 			    `(aref (truly-the ,',vtype ,',',vector)
 			      (%index (+ (%index ,i) start-1)))))
-		 (let ((start-1 (1- ,',start)) ; Heaps prefer 1-based addressing.
+		 (let (;; Heaps prefer 1-based addressing.
+		       (start-1 (1- ,',start)) 
 		       (current-heap-size (- ,',end ,',start))
 		       (keyfun ,keyfun))
 		   (declare (type (integer -1 #.(1- most-positive-fixnum))
