@@ -908,6 +908,7 @@
 ;;; (:ansi-cl :glossary "similar")
 ;;;
 ;;; (:sbcl :node "...")
+;;; (:sbcl :variable *ed-functions*)
 ;;;
 ;;; FIXME: this is not the right place for this.
 (defun print-reference (reference stream)
@@ -927,7 +928,8 @@
      (format stream ", ")
      (destructuring-bind (type data) (cdr reference)
        (ecase type
-	 (:node (format stream "Node ~S" data)))))
+	 (:node (format stream "Node ~S" data))
+	 (:variable (format stream "Variable ~S" data)))))
     ;; FIXME: other documents (e.g. AMOP, Franz documentation :-)
     ))
 (define-condition reference-condition ()
@@ -1002,6 +1004,9 @@
   ())
 (define-condition format-too-many-args-warning
     (format-args-mismatch simple-style-warning)
+  ())
+
+(define-condition extension-failure (reference-condition simple-error)
   ())
 
 ;;;; restart definitions

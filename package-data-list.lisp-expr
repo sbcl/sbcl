@@ -647,6 +647,7 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
 
              ;; miscellaneous useful supported extensions
              "QUIT"
+	     "*ED-FUNCTIONS*"
 	     "*MODULE-PROVIDER-FUNCTIONS*"
 	     "WITH-TIMEOUT" "TIMEOUT"
 	     
@@ -811,7 +812,7 @@ retained, possibly temporariliy, because it might be used internally."
 	     "PACKAGE-AT-VARIANCE" "ARRAY-INITIAL-ELEMENT-MISMATCH"
 	     "TYPE-WARNING" "LOCAL-ARGUMENT-MISMATCH"
 	     "FORMAT-ARGS-MISMATCH" "FORMAT-TOO-FEW-ARGS-WARNING"
-	     "FORMAT-TOO-MANY-ARGS-WARNING"
+	     "FORMAT-TOO-MANY-ARGS-WARNING" "EXTENSION-FAILURE"
 
              ;; ..and DEFTYPEs..
              "INDEX" "LOAD/STORE-INDEX"

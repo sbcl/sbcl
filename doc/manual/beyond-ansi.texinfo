@@ -319,6 +319,13 @@ following way:
 @include fun-common-lisp-require.texinfo
 @include var-sb-ext-star-module-provider-functions-star.texinfo
 
+Although SBCL does not provide a resident editor, the @code{ed}
+function can be customized to hook into user-provided editing
+mechanisms as follows:
+
+@include fun-common-lisp-ed.texinfo
+@include var-sb-ext-star-ed-functions-star.texinfo
+
 @node  Tools To Help Developers
 @comment  node-name,  next,  previous,  up
 @subsection Tools To Help Developers

@@ -24,7 +24,6 @@
 
 (defvar *module-provider-functions* '(module-provide-contrib)
   "See function documentation for REQUIRE")
-
 
 ;;;; PROVIDE and REQUIRE
 
@@ -55,7 +54,12 @@
 	    (t
 	     (unless (some (lambda (p) (funcall p module-name))
 			   *module-provider-functions*)
-	       (error "Don't know how to load ~A" module-name)))))
+	       (error 'extension-failure
+		      :format-control "Don't know how to ~S ~A"
+		      :format-arguments (list 'require module-name)
+		      :references
+		      (list
+		       '(:sbcl :variable *module-provider-functions*)))))))
     (set-difference *modules* saved-modules)))
 
 ;;;; miscellany

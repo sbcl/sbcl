@@ -151,6 +151,24 @@ are running on, or NIL if we can't find any useful information."
   "Return a string with the long form of the site name, or NIL if not known."
   *long-site-name*)
 
+;;;; ED
+(defvar *ed-functions* nil
+  "See function documentation for ED.")
+
+(defun ed (&optional x)
+  "Starts the editor (on a file or a function if named).  Functions
+from the list *ED-FUNCTIONS* are called in order with X as an argument
+until one of them returns non-NIL; these functions are responsible for
+signalling a FILE-ERROR to indicate failure to perform an operation on
+the file system."
+  (dolist (fun *ed-functions*
+	   (error 'extension-failure
+		  :format-control "Don't know how to ~S ~A"
+		  :format-arguments (list 'ed x)
+		  :references (list '(:sbcl :variable *ed-functions*))))
+    (when (funcall fun x)
+      (return t))))
+
 ;;;; dribble stuff
 
 ;;; Each time we start dribbling to a new stream, we put it in

@@ -1287,7 +1287,7 @@
 (defknown describe (t &optional (or stream (member t nil))) (values))
 (defknown inspect (t) (values))
 (defknown room (&optional (member t nil :default)) (values))
-(defknown ed (&optional (or symbol cons filename) &key (:init t) (:display t))
+(defknown ed (&optional (or symbol cons filename))
   t)
 (defknown dribble (&optional filename &key (:if-exists t)) (values))
 
