@@ -1297,3 +1297,11 @@ WORKAROUND:
   From Paul Dietz:
 
   (ash -1000000000000 -10000000000000000000) ==> 0  ;; should be -1
+
+296:
+  (reported by Adam Warner, sbcl-devel 2003-09-23)
+
+  The --load toplevel argument does not perform any sanitization of its
+  argument.  As a result, files with Lisp pathname pattern characters
+  (#\* or #\?, for instance) or quotation marks can cause the system
+  to perform arbitrary behaviour.

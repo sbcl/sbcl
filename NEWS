@@ -2074,6 +2074,9 @@ changes in sbcl-0.8.4 relative to sbcl-0.8.3:
     CONTINUATION is now called LVAR; corresponding functions are
     renamed (e.g. SB-C::CONTINUATION-TYPE has become SB-C::LVAR-TYPE).
   * added type deriver for ISQRT (thanks to Robert E. Brown).
+  * bug fix: better support for loading from the command line when an
+    initialization file sets (READTABLE-CASE *READTABLE*).  (thanks to
+    Adam Warner)
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** the RETURN clause in LOOP is now equivalent to DO (RETURN ...).
     ** ROUND and FROUND now give the right answer when given very
