@@ -637,6 +637,9 @@ Patrik Nordebo:
   He contributed to the port of SBCL to MacOS X, finding solutions for
   ABI and assembly syntax differences between Darwin and Linux.
 
+Scott Parish:
+  He ported SBCL to OpenBSD-with-ELF.
+
 Kevin M. Rosenberg:
   He provided the ACL-style toplevel (sb-aclrepl contrib module), and
   a number of MOP-related bug reports.  He also creates the official
