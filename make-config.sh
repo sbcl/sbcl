@@ -214,5 +214,9 @@ echo ')' >> $ltf
 
 # Make a unique ID for this build (to discourage people from
 # mismatching sbcl and *.core files).
-echo '"'`hostname`-`whoami`-`date +%F-%H-%M-%S`'"' > output/build-id.tmp
+if [ `uname` = "SunOS" ] ; then
+  # use /usr/xpg4/bin/id instead of /usr/bin/id
+  PATH=/usr/xpg4/bin:$PATH
+fi
+echo '"'`hostname`-`id -un`-`date +%Y-%m-%d-%H-%M-%S`'"' > output/build-id.tmp
 
