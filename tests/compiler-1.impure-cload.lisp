@@ -138,5 +138,39 @@
           #'objs.stale?))
   (call-next-method))
 
-(sb-ext:quit :unix-status 104) ; success
+;;; bugs 115, 226: compiler failure in lifetime analysis
+(defun bug115-1 ()
+  (declare (optimize (speed 2) (debug 3)))
+  (flet ((m1 ()
+           (unwind-protect nil)))
+    (if (catch nil)
+        (m1)
+        (m1))))
 
+(defun bug115-2 ()
+  (declare (optimize (speed 2) (debug 3)))
+  (flet ((m1 ()
+           (bar (if (foo) 1 2))
+           (let ((x (foo)))
+             (bar x (list x)))))
+    (if (catch nil)
+        (m1)
+        (m1))))
+
+(defun bug226 ()
+  (declare (optimize (speed 0) (safety 3) (debug 3)))
+  (flet ((safe-format (stream string &rest r)
+           (unless (ignore-errors (progn
+                                    (apply #'format stream string r)
+                                    t))
+             (format stream "~&foo ~S" string))))
+    (cond
+      ((eq my-result :ERROR)
+       (cond
+         ((ignore-errors (typep condition result))
+          (safe-format t "~&bar ~S" result))
+         (t
+          (safe-format t "~&baz ~S (~A) ~S" condition condition result)))))))
+
+
+(sb-ext:quit :unix-status 104) ; success
