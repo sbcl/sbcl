@@ -681,8 +681,8 @@ the <parameter>speed</> quality inhibits this notification. This can
 be useful to suppress notes about code which is known to be
 unavoidably inefficient. (For example, the compiler issues notes about
 having to use generic arithmetic instead of fixnum arithmetic, which
-is not useful for code which truly can't guarantee that its arguments
-will always be fixnums.)</para>
+is not helpful for code which by design supports arbitrary-sized
+integers instead of being limited to fixnums.)</para>
 
 <note><para>The basic functionality of the <parameter>optimize
 inhibit-warnings</> extension will probably be supported in all future
