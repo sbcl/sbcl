@@ -118,11 +118,11 @@ GNAME(call_into_lisp):
 Lstack:
 	/* FIXME x86 saves FPU state here */
 
-	push	%rbx  	/* these regs are callee-saved according to C
-	push	%r12	 * so must be preserved and restored when 
-	push	%r13     * the lisp function returns
-	push	%r14     *
-	push	%r15     */
+	push	%rbx  	# these regs are callee-saved according to C
+	push	%r12	# so must be preserved and restored when 
+	push	%r13    # the lisp function returns
+	push	%r14    #
+	push	%r15    #
 
 	mov	%rsp,%rbx	# remember current stack
 	push	%rbx		# Save entry stack on (maybe) new stack.
