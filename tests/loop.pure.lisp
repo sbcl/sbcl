@@ -54,3 +54,13 @@
 		      (print t))))
   (declare (ignore function warnings-p))
   (assert failure-p))
+
+;;; a bug reported by Paul F. Dietz (in his ANSI test suite):
+;;; duplicate bindings in LOOP must signal errors of type
+;;; PROGRAM-ERROR.
+(assert (typep (nth-value 1
+			  (ignore-errors
+			    (funcall (lambda ()
+				       (loop for (a . a) in '((1 . 2) (3 . 4))
+					     return a)))))
+	       'program-error))

@@ -737,10 +737,9 @@ code to be loaded.
       ((eq l (cdr *loop-source-code*)) (nreverse new))))
 
 (defun loop-error (format-string &rest format-args)
-  (error "~?~%current LOOP context:~{ ~S~}."
-	 format-string
-	 format-args
-	 (loop-context)))
+  (error 'sb!int:simple-program-error
+	 :format-control "~?~%current LOOP context:~{ ~S~}."
+	 :format-arguments (list format-string format-args (loop-context))))
 
 (defun loop-warn (format-string &rest format-args)
   (warn "~?~%current LOOP context:~{ ~S~}."
