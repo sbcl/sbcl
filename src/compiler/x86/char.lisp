@@ -15,18 +15,20 @@
 
 ;;; Move a tagged char to an untagged representation.
 (define-vop (move-to-character)
-  (:args (x :scs (any-reg control-stack) :target y))
-  (:results (y :scs (character-reg character-stack)))
+  (:args (x :scs (any-reg descriptor-reg) :target y
+            :load-if (not (location= x y))))
+  (:results (y :scs (character-reg)
+               :load-if (not (location= x y))))
   (:note "character untagging")
   (:generator 1
     (move y x)
     (inst shr y n-widetag-bits)))
 (define-move-vop move-to-character :move
-  (any-reg control-stack) (character-reg character-stack))
+  (any-reg descriptor-reg) (character-reg))
 
 ;;; Move an untagged char to a tagged representation.
 (define-vop (move-from-character)
-  (:args (x :scs (character-reg character-stack)))
+  (:args (x :scs (character-reg)))
   (:results (y :scs (any-reg descriptor-reg)))
   (:note "character tagging")
   (:generator 1
@@ -38,7 +40,7 @@
     (inst imul y x (ash 1 n-widetag-bits))
     (inst or y character-widetag)))
 (define-move-vop move-from-character :move
-  (character-reg character-stack) (any-reg descriptor-reg control-stack))
+  (character-reg) (any-reg descriptor-reg))
 
 ;;; Move untagged character values.
 (define-vop (character-move)
