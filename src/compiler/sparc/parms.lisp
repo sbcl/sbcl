@@ -86,15 +86,6 @@
 
 ); eval-when
 
-;;; NUMBER-STACK-DISPLACEMENT
-;;;
-;;; The number of bytes reserved above the number stack pointer.  These
-;;; slots are required by architecture for a place to spill register windows.
-;;;
-;;; FIXME: Where is this used?
-(def!constant number-stack-displacement
-  (* 16 n-word-bytes))
-
 
 ;;;; Description of the target address space.
 

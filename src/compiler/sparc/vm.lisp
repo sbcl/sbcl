@@ -10,7 +10,18 @@
 ;;;; files for more information.
 
 (in-package "SB!VM")
-
+
+;;;; Additional constants
+
+;;; NUMBER-STACK-DISPLACEMENT
+;;;
+;;; The number of bytes reserved above the number stack pointer.  These
+;;; slots are required by architecture for a place to spill register windows.
+;;;
+;;; FIXME: Where is this used?
+(def!constant number-stack-displacement
+  (* 16 n-word-bytes))
+
 ;;;; Define the registers
 
 (eval-when (:compile-toplevel :load-toplevel :execute)

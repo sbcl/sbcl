@@ -81,19 +81,7 @@
 
 (def!constant float-fast-bit 2)		; Non-IEEE mode
 
-
-;;; NUMBER-STACK-DISPLACEMENT
-;;;
-;;; The number of bytes reserved above the number stack pointer.  These
-;;; slots are required by architecture, mostly (?) to make C backtrace
-;;; work. This must be a power of 2 - see BYTES-REQUIRED-FOR-NUMBER-STACK.
-;;; 
-(def!constant number-stack-displacement
-  (* #!-darwin 2
-     #!+darwin 8
-     n-word-bytes))
 
-
 ;;; Where to put the different spaces.
 
 (def!constant read-only-space-start #x01000000)
