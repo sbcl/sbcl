@@ -59,7 +59,7 @@
 (defmacro posq (item list) `(position ,item ,list :test #'eq))
 (defmacro neq (x y) `(not (eq ,x ,y)))
 
-;;; FIXME: Rename these to CONSTANTLY-T, CONSTANTLY-NIL, and CONSTANTLY-0
+;;; FIXME: Rename these to CONSTANTLY-T, CONSTANTLY-NIL, and CONSTANTLY-0,
 ;;; and boost them up to SB-INT.
 (defun true (&rest ignore) (declare (ignore ignore)) t)
 (defun false (&rest ignore) (declare (ignore ignore)) nil)

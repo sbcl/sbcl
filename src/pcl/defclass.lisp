@@ -25,9 +25,9 @@
 
 ;;; MAKE-TOP-LEVEL-FORM is used by all PCL macros that appear `at top-level'.
 ;;;
-;;; The original motiviation for this function was to deal with the bug in
-;;; the Genera compiler that prevents lambda expressions in top-level forms
-;;; other than DEFUN from being compiled.
+;;; The original motiviation for this function was to deal with the
+;;; bug in the Genera compiler that prevents lambda expressions in
+;;; top-level forms other than DEFUN from being compiled.
 ;;;
 ;;; Now this function is used to grab other functionality as well. This
 ;;; includes:
@@ -68,15 +68,15 @@
       (collect-forms forms)
       (cons 'progn progn-form))))
 
-;;; Like the DEFMETHOD macro, the expansion of the DEFCLASS macro is fixed.
-;;; DEFCLASS always expands into a call to LOAD-DEFCLASS. Until the meta-
-;;; braid is set up, LOAD-DEFCLASS has a special definition which simply
-;;; collects all class definitions up, when the metabraid is initialized it
-;;; is done from those class definitions.
+;;; Like the DEFMETHOD macro, the expansion of the DEFCLASS macro is
+;;; fixed. DEFCLASS always expands into a call to LOAD-DEFCLASS. Until
+;;; the meta-braid is set up, LOAD-DEFCLASS has a special definition
+;;; which simply collects all class definitions up, when the metabraid
+;;; is initialized it is done from those class definitions.
 ;;;
-;;; After the metabraid has been setup, and the protocol for defining classes
-;;; has been defined, the real definition of LOAD-DEFCLASS is installed by the
-;;; file defclass.lisp
+;;; After the metabraid has been setup, and the protocol for defining
+;;; classes has been defined, the real definition of LOAD-DEFCLASS is
+;;; installed by the file defclass.lisp
 (defmacro defclass (name direct-superclasses direct-slots &rest options)
   (declare (indentation 2 4 3 1))
   (expand-defclass name direct-superclasses direct-slots options))
@@ -146,8 +146,8 @@
 				       ',*accessors*))))))
 	  (if defstruct-p
 	      (progn
-		(eval defclass-form) ; define the class now, so that
-		`(progn	      ; the defstruct can be compiled.
+		(eval defclass-form) ; Define the class now, so that..
+		`(progn	      ; ..the defstruct can be compiled.
 		   ,(class-defstruct-form (find-class name))
 		   ,defclass-form))
 	      (progn
@@ -326,49 +326,50 @@
 		    (nconc default-initargs (reverse (pop others)))))))
     (reverse default-initargs)))
 
-(defun bootstrap-slot-index (class-name slot-name)
+(defun !bootstrap-slot-index (class-name slot-name)
   (or (position slot-name (early-class-slots class-name))
       (error "~S not found" slot-name)))
 
-;;; bootstrap-get-slot and bootstrap-set-slot are used to access and change the
-;;; values of slots during bootstrapping. During bootstrapping, there are only
-;;; two kinds of objects whose slots we need to access, CLASSes and
-;;; SLOT-DEFINITIONs. The first argument to these functions tells whether the
-;;; object is a CLASS or a SLOT-DEFINITION.
+;;; !BOOTSTRAP-GET-SLOT and !BOOTSTRAP-SET-SLOT are used to access and
+;;; change the values of slots during bootstrapping. During
+;;; bootstrapping, there are only two kinds of objects whose slots we
+;;; need to access, CLASSes and SLOT-DEFINITIONs. The first argument
+;;; to these functions tells whether the object is a CLASS or a
+;;; SLOT-DEFINITION.
 ;;;
-;;; Note that the way this works it stores the slot in the same place in
-;;; memory that the full object system will expect to find it later. This
-;;; is critical to the bootstrapping process, the whole changeover to the
-;;; full object system is predicated on this.
+;;; Note that the way this works it stores the slot in the same place
+;;; in memory that the full object system will expect to find it
+;;; later. This is critical to the bootstrapping process, the whole
+;;; changeover to the full object system is predicated on this.
 ;;;
-;;; One important point is that the layout of standard classes and standard
-;;; slots must be computed the same way in this file as it is by the full
-;;; object system later.
-(defmacro bootstrap-get-slot (type object slot-name)
-  `(instance-ref (get-slots ,object) (bootstrap-slot-index ,type ,slot-name)))
-(defun bootstrap-set-slot (type object slot-name new-value)
-  (setf (bootstrap-get-slot type object slot-name) new-value))
+;;; One important point is that the layout of standard classes and
+;;; standard slots must be computed the same way in this file as it is
+;;; by the full object system later.
+(defmacro !bootstrap-get-slot (type object slot-name)
+  `(instance-ref (get-slots ,object) (!bootstrap-slot-index ,type ,slot-name)))
+(defun !bootstrap-set-slot (type object slot-name new-value)
+  (setf (!bootstrap-get-slot type object slot-name) new-value))
 
 (defun early-class-name (class)
-  (bootstrap-get-slot 'class class 'name))
+  (!bootstrap-get-slot 'class class 'name))
 
 (defun early-class-precedence-list (class)
-  (bootstrap-get-slot 'pcl-class class 'class-precedence-list))
+  (!bootstrap-get-slot 'pcl-class class 'class-precedence-list))
 
 (defun early-class-name-of (instance)
   (early-class-name (class-of instance)))
 
 (defun early-class-slotds (class)
-  (bootstrap-get-slot 'slot-class class 'slots))
+  (!bootstrap-get-slot 'slot-class class 'slots))
 
 (defun early-slot-definition-name (slotd)
-  (bootstrap-get-slot 'standard-effective-slot-definition slotd 'name))
+  (!bootstrap-get-slot 'standard-effective-slot-definition slotd 'name))
 
 (defun early-slot-definition-location (slotd)
-  (bootstrap-get-slot 'standard-effective-slot-definition slotd 'location))
+  (!bootstrap-get-slot 'standard-effective-slot-definition slotd 'location))
 
 (defun early-accessor-method-slot-name (method)
-  (bootstrap-get-slot 'standard-accessor-method method 'slot-name))
+  (!bootstrap-get-slot 'standard-accessor-method method 'slot-name))
 
 (unless (fboundp 'class-name-of)
   (setf (symbol-function 'class-name-of)
@@ -376,7 +377,7 @@
 ;;; FIXME: Can we then delete EARLY-CLASS-NAME-OF?
 
 (defun early-class-direct-subclasses (class)
-  (bootstrap-get-slot 'class class 'direct-subclasses))
+  (!bootstrap-get-slot 'class class 'direct-subclasses))
 
 (declaim (notinline load-defclass))
 (defun load-defclass

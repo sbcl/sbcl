@@ -12,7 +12,7 @@
 (in-package "SB!C")
 
 ;;; a value for an optimization declaration
-(def!type policy-quality () '(or (rational 0 3) null))
+(def!type policy-quality () '(rational 0 3))
 
 ;;; CMU CL used a special STRUCTURE-OBJECT type POLICY to represent
 ;;; the state of optimization policy at any point in compilation. This
@@ -88,14 +88,24 @@
 #+sb-xc-host (!policy-cold-init-or-resanify)
 
 ;;; Is X the name of an optimization quality?
-(defun policy-quality-p (x)
+(defun policy-quality-name-p (x)
   (memq x *policy-basic-qualities*))
 
-;;; Look up a named optimization quality in POLICY.
-(declaim (ftype (function (policy symbol) policy-quality)))
+;;; Look up a named optimization quality in POLICY. This is only
+;;; called by compiler code for known-valid QUALITY-NAMEs, e.g. SPEED;
+;;; it's an error if it's called for a quality which isn't defined.
+;;;
+;;; FIXME: After this is debugged, it should get a DEFKNOWN.
+#+nil (declaim (ftype (function (policy symbol) policy-quality)))
 (defun policy-quality (policy quality-name)
-  (the policy-quality
-       (cdr (assoc quality-name policy))))
+  (let ((acons (assoc quality-name policy)))
+    (unless acons
+      (error "Argh! no such optimization quality ~S in~%  ~S"
+	     quality-name policy))
+    (let ((result (cdr acons)))
+      (unless (typep result '(rational 0 3))
+	(error "Argh! bogus optimization quality ~S" acons))
+      result)))
 
 ;;; Return a list of symbols naming the optimization qualities which
 ;;; appear in EXPR.
@@ -104,7 +114,7 @@
     (labels ((recurse (x)
 	       (if (listp x)
 		   (map nil #'recurse x)
-		   (when (policy-quality-p x)
+		   (when (policy-quality-name-p x)
 		     (pushnew x result)))))
       (recurse expr)
       result)))
@@ -120,12 +130,14 @@
 ;;; them by name, e.g. (> SPEED SPACE).
 (defmacro policy (node expr)
   (let* ((n-policy (gensym))
+	 (used-qualities (policy-qualities-used-by expr))
 	 (binds (mapcar (lambda (name)
 			  `(,name (policy-quality ,n-policy ',name)))
-			(policy-qualities-used-by expr))))
-    (/show "in POLICY" expr binds)
+			used-qualities)))
+    (/show "in compile-time POLICY" expr binds)
     `(let* ((,n-policy (lexenv-policy ,(if node
 					   `(node-lexenv ,node)
 					   '*lexenv*)))
 	    ,@binds)
+       ;;(/show "in run-time POLICY" ,@used-qualities)
        ,expr)))

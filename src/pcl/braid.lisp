@@ -117,7 +117,7 @@
 			    (find-class ',class) ,class)))
 	      classes)))
 
-(defun bootstrap-meta-braid ()
+(defun !bootstrap-meta-braid ()
   (let* ((name 'class)
 	 (predicate-name (make-type-predicate-name name)))
     (setf (gdefinition predicate-name)
@@ -216,47 +216,47 @@
 			      (allocate-standard-instance wrapper)))
 
 	      (setq direct-slots
-		    (bootstrap-make-slot-definitions
+		    (!bootstrap-make-slot-definitions
 		     name class direct-slots
 		     standard-direct-slot-definition-wrapper nil))
 	      (setq slots
-		    (bootstrap-make-slot-definitions
+		    (!bootstrap-make-slot-definitions
 		     name class slots
 		     standard-effective-slot-definition-wrapper t))
 
 	      (case meta
 		((std-class standard-class funcallable-standard-class)
-		 (bootstrap-initialize-class
+		 (!bootstrap-initialize-class
 		  meta
 		  class name class-eq-specializer-wrapper source
 		  direct-supers direct-subclasses cpl wrapper proto
 		  direct-slots slots direct-default-initargs default-initargs))
 		(built-in-class		; *the-class-t*
-		 (bootstrap-initialize-class
+		 (!bootstrap-initialize-class
 		  meta
 		  class name class-eq-specializer-wrapper source
 		  direct-supers direct-subclasses cpl wrapper proto))
 		(slot-class		; *the-class-slot-object*
-		 (bootstrap-initialize-class
+		 (!bootstrap-initialize-class
 		  meta
 		  class name class-eq-specializer-wrapper source
 		  direct-supers direct-subclasses cpl wrapper proto))
 		(structure-class	; *the-class-structure-object*
-		 (bootstrap-initialize-class
+		 (!bootstrap-initialize-class
 		  meta
 		  class name class-eq-specializer-wrapper source
 		  direct-supers direct-subclasses cpl wrapper))))))))
 
     (let* ((smc-class (find-class 'standard-method-combination))
-	   (smc-wrapper (bootstrap-get-slot 'standard-class
-					    smc-class
-					    'wrapper))
+	   (smc-wrapper (!bootstrap-get-slot 'standard-class
+					     smc-class
+					     'wrapper))
 	   (smc (allocate-standard-instance smc-wrapper)))
       (flet ((set-slot (name value)
-	       (bootstrap-set-slot 'standard-method-combination
-				   smc
-				   name
-				   value)))
+	       (!bootstrap-set-slot 'standard-method-combination
+				    smc
+				    name
+				    value)))
 	(set-slot 'source *load-truename*)
 	(set-slot 'type 'standard)
 	(set-slot 'documentation "The standard method combination.")
@@ -267,14 +267,14 @@
 ;;;
 ;;; FIXME: This and most stuff in this file is probably only needed at init
 ;;; time.
-(defun bootstrap-initialize-class
+(defun !bootstrap-initialize-class
        (metaclass-name class name
 	class-eq-wrapper source direct-supers direct-subclasses cpl wrapper
 	&optional
 	proto direct-slots slots direct-default-initargs default-initargs)
   (flet ((classes (names) (mapcar #'find-class names))
 	 (set-slot (slot-name value)
-	   (bootstrap-set-slot metaclass-name class slot-name value)))
+	   (!bootstrap-set-slot metaclass-name class slot-name value)))
     (set-slot 'name name)
     (set-slot 'source source)
     (set-slot 'type (if (eq class (find-class 't))
@@ -282,10 +282,10 @@
 			`(class ,class)))
     (set-slot 'class-eq-specializer
 	      (let ((spec (allocate-standard-instance class-eq-wrapper)))
-		(bootstrap-set-slot 'class-eq-specializer spec 'type
-				    `(class-eq ,class))
-		(bootstrap-set-slot 'class-eq-specializer spec 'object
-				    class)
+		(!bootstrap-set-slot 'class-eq-specializer spec 'type
+				     `(class-eq ,class))
+		(!bootstrap-set-slot 'class-eq-specializer spec 'object
+				     class)
 		spec))
     (set-slot 'class-precedence-list (classes cpl))
     (set-slot 'can-precede-list (classes (cdr cpl)))
@@ -321,15 +321,15 @@
 	(set-slot 'prototype (or proto (allocate-standard-instance wrapper))))
     class))
 
-(defun bootstrap-make-slot-definitions (name class slots wrapper effective-p)
+(defun !bootstrap-make-slot-definitions (name class slots wrapper effective-p)
   (let ((index -1))
-    (mapcar #'(lambda (slot)
-		(incf index)
-		(bootstrap-make-slot-definition
-		  name class slot wrapper effective-p index))
+    (mapcar (lambda (slot)
+	      (incf index)
+	      (!bootstrap-make-slot-definition
+	       name class slot wrapper effective-p index))
 	    slots)))
 
-(defun bootstrap-make-slot-definition
+(defun !bootstrap-make-slot-definition
     (name class slot wrapper effective-p index)
   (let* ((slotd-class-name (if effective-p
 			       'standard-effective-slot-definition
@@ -338,15 +338,15 @@
 	 (slot-name (getf slot :name)))
     (flet ((get-val (name) (getf slot name))
 	   (set-val (name val)
-		    (bootstrap-set-slot slotd-class-name slotd name val)))
-      (set-val 'name	 slot-name)
+		    (!bootstrap-set-slot slotd-class-name slotd name val)))
+      (set-val 'name	     slot-name)
       (set-val 'initform     (get-val :initform))
       (set-val 'initfunction (get-val :initfunction))
       (set-val 'initargs     (get-val :initargs))
       (set-val 'readers      (get-val :readers))
       (set-val 'writers      (get-val :writers))
       (set-val 'allocation   :instance)
-      (set-val 'type	 (or (get-val :type) t))
+      (set-val 'type	     (or (get-val :type) t))
       (set-val 'documentation (or (get-val :documentation) ""))
       (set-val 'class	class)
       (when effective-p
@@ -371,7 +371,7 @@
 	(setq *the-eslotd-funcallable-standard-class-slots* slotd))
       slotd)))
 
-(defun bootstrap-accessor-definitions (early-p)
+(defun !bootstrap-accessor-definitions (early-p)
   (let ((*early-p* early-p))
     (dolist (definition *early-class-definitions*)
       (let ((name (ecd-class-name definition))
@@ -382,20 +382,20 @@
 	      (let ((slot-name (getf slotd :name))
 		    (readers (getf slotd :readers))
 		    (writers (getf slotd :writers)))
-		(bootstrap-accessor-definitions1
+		(!bootstrap-accessor-definitions1
 		 name
 		 slot-name
 		 readers
 		 writers
 		 nil)
-		(bootstrap-accessor-definitions1
+		(!bootstrap-accessor-definitions1
 		 'slot-object
 		 slot-name
 		 (list (slot-reader-symbol slot-name))
 		 (list (slot-writer-symbol slot-name))
 		 (list (slot-boundp-symbol slot-name)))))))))))
 
-(defun bootstrap-accessor-definition (class-name accessor-name slot-name type)
+(defun !bootstrap-accessor-definition (class-name accessor-name slot-name type)
   (multiple-value-bind (accessor-class make-method-function arglist specls doc)
       (ecase type
 	(reader (values 'standard-reader-method
@@ -429,31 +429,31 @@
 				     doc
 				     slot-name))))))
 
-(defun bootstrap-accessor-definitions1 (class-name
+(defun !bootstrap-accessor-definitions1 (class-name
 					slot-name
 					readers
 					writers
 					boundps)
   (flet ((do-reader-definition (reader)
-	   (bootstrap-accessor-definition class-name
-					  reader
-					  slot-name
-					  'reader))
+	   (!bootstrap-accessor-definition class-name
+					   reader
+					   slot-name
+					   'reader))
 	 (do-writer-definition (writer)
-	   (bootstrap-accessor-definition class-name
-					  writer
-					  slot-name
-					  'writer))
+	   (!bootstrap-accessor-definition class-name
+					   writer
+					   slot-name
+					   'writer))
 	 (do-boundp-definition (boundp)
-	   (bootstrap-accessor-definition class-name
-					  boundp
-					  slot-name
-					  'boundp)))
+	   (!bootstrap-accessor-definition class-name
+					   boundp
+					   slot-name
+					   'boundp)))
     (dolist (reader readers) (do-reader-definition reader))
     (dolist (writer writers) (do-writer-definition writer))
     (dolist (boundp boundps) (do-boundp-definition boundp))))
 
-(defun bootstrap-class-predicates (early-p)
+(defun !bootstrap-class-predicates (early-p)
   (let ((*early-p* early-p))
     (dolist (definition *early-class-definitions*)
       (let* ((name (ecd-class-name definition))
@@ -461,7 +461,7 @@
 	(setf (find-class-predicate name)
 	      (make-class-predicate class (class-predicate-name class)))))))
 
-(defun bootstrap-built-in-classes ()
+(defun !bootstrap-built-in-classes ()
 
   ;; First make sure that all the supers listed in
   ;; *BUILT-IN-CLASS-LATTICE* are themselves defined by
@@ -494,11 +494,11 @@
 	  (set (get-built-in-wrapper-symbol name) wrapper)
 	  (setf (sb-kernel:class-pcl-class lclass) class)
 
-	  (bootstrap-initialize-class 'built-in-class class
-				      name class-eq-wrapper nil
-				      supers subs
-				      (cons name cpl)
-				      wrapper prototype)))))
+	  (!bootstrap-initialize-class 'built-in-class class
+				       name class-eq-wrapper nil
+				       supers subs
+				       (cons name cpl)
+				       wrapper prototype)))))
 
   (dolist (e *built-in-classes*)
     (let* ((name (car e))
@@ -625,12 +625,12 @@
 (eval-when (:load-toplevel :execute)
 
   (clrhash *find-class*)
-  (bootstrap-meta-braid)
-  (bootstrap-accessor-definitions t)
-  (bootstrap-class-predicates t)
-  (bootstrap-accessor-definitions nil)
-  (bootstrap-class-predicates nil)
-  (bootstrap-built-in-classes)
+  (!bootstrap-meta-braid)
+  (!bootstrap-accessor-definitions t)
+  (!bootstrap-class-predicates t)
+  (!bootstrap-accessor-definitions nil)
+  (!bootstrap-class-predicates nil)
+  (!bootstrap-built-in-classes)
 
   (sb-int:dohash (name x *find-class*)
     (let* ((class (find-class-from-cell name x))

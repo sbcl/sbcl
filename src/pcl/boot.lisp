@@ -1426,7 +1426,7 @@ bootstrapping.
 	  (early-collect-inheritance 'standard-generic-function)))
 
 (defvar *sgf-method-class-index*
-  (bootstrap-slot-index 'standard-generic-function 'method-class))
+  (!bootstrap-slot-index 'standard-generic-function 'method-class))
 
 (defun early-gf-p (x)
   (and (fsc-instance-p x)
@@ -1434,19 +1434,19 @@ bootstrapping.
 	   +slot-unbound+)))
 
 (defvar *sgf-methods-index*
-  (bootstrap-slot-index 'standard-generic-function 'methods))
+  (!bootstrap-slot-index 'standard-generic-function 'methods))
 
 (defmacro early-gf-methods (gf)
   `(instance-ref (get-slots ,gf) *sgf-methods-index*))
 
 (defvar *sgf-arg-info-index*
-  (bootstrap-slot-index 'standard-generic-function 'arg-info))
+  (!bootstrap-slot-index 'standard-generic-function 'arg-info))
 
 (defmacro early-gf-arg-info (gf)
   `(instance-ref (get-slots ,gf) *sgf-arg-info-index*))
 
 (defvar *sgf-dfun-state-index*
-  (bootstrap-slot-index 'standard-generic-function 'dfun-state))
+  (!bootstrap-slot-index 'standard-generic-function 'dfun-state))
 
 (defstruct (arg-info
 	     (:conc-name nil)
@@ -1684,8 +1684,11 @@ bootstrapping.
 		 (error "The function of the funcallable-instance ~S~
 			 has not been set." fin)))))
     (setf (gdefinition spec) fin)
-    (bootstrap-set-slot 'standard-generic-function fin 'name spec)
-    (bootstrap-set-slot 'standard-generic-function fin 'source *load-truename*)
+    (!bootstrap-set-slot 'standard-generic-function fin 'name spec)
+    (!bootstrap-set-slot 'standard-generic-function
+			 fin
+			 'source
+			 *load-truename*)
     (set-function-name fin spec)
     (let ((arg-info (make-arg-info)))
       (setf (early-gf-arg-info fin) arg-info)
@@ -1722,7 +1725,7 @@ bootstrapping.
       (cons (cddr state)))))
 
 (defvar *sgf-name-index*
-  (bootstrap-slot-index 'standard-generic-function 'name))
+  (!bootstrap-slot-index 'standard-generic-function 'name))
 
 (defun early-gf-name (gf)
   (instance-ref (get-slots gf) *sgf-name-index*))

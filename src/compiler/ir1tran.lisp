@@ -1282,7 +1282,7 @@
 ;;; body, otherwise do one binding and recurse on the rest.
 ;;;
 ;;; If INTERFACE is true, then we convert bindings with the interface
-;;; policy. For real &AUX bindings, and implicit aux bindings
+;;; policy. For real &AUX bindings, and for implicit aux bindings
 ;;; introduced by keyword bindings, this is always true. It is only
 ;;; false when LET* directly calls this function.
 (defun ir1-convert-aux-bindings (start cont body aux-vars aux-vals interface)

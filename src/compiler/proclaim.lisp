@@ -78,7 +78,7 @@
 	      (values q-and-v-or-just-q 3)
 	      (destructuring-bind (quality raw-value) q-and-v-or-just-q
 		(values quality raw-value)))
-	(cond ((not (policy-quality-p quality))
+	(cond ((not (policy-quality-name-p quality))
 	       (compiler-warning "ignoring unknown optimization quality ~
                                  ~S in ~S"
 				 quality spec))

@@ -490,36 +490,36 @@
 (defun complement (function)
   #!+sb-doc
   "Builds a new function that returns T whenever FUNCTION returns NIL and
-   NIL whenever FUNCTION returns T."
-  #'(lambda (&optional (arg0 nil arg0-p) (arg1 nil arg1-p) (arg2 nil arg2-p)
-		       &rest more-args)
-      (not (cond (more-args (apply function arg0 arg1 arg2 more-args))
-		 (arg2-p (funcall function arg0 arg1 arg2))
-		 (arg1-p (funcall function arg0 arg1))
-		 (arg0-p (funcall function arg0))
-		 (t (funcall function))))))
+   NIL whenever FUNCTION returns non-NIL."
+  (lambda (&optional (arg0 nil arg0-p) (arg1 nil arg1-p) (arg2 nil arg2-p)
+		     &rest more-args)
+    (not (cond (more-args (apply function arg0 arg1 arg2 more-args))
+	       (arg2-p (funcall function arg0 arg1 arg2))
+	       (arg1-p (funcall function arg0 arg1))
+	       (arg0-p (funcall function arg0))
+	       (t (funcall function))))))
 
 (defun constantly (value &optional (val1 nil val1-p) (val2 nil val2-p)
 			 &rest more-values)
   #!+sb-doc
-  "Builds a function that always returns VALUE, and posisbly MORE-VALUES."
+  "Builds a function that always returns VALUE, and possibly MORE-VALUES."
   (cond (more-values
 	 (let ((list (list* value val1 val2 more-values)))
-	   #'(lambda ()
-	       (declare (optimize-interface (speed 3) (safety 0)))
-	       (values-list list))))
+	   (lambda ()
+	     (declare (optimize-interface (speed 3) (safety 0)))
+	     (values-list list))))
 	(val2-p
-	 #'(lambda ()
-	     (declare (optimize-interface (speed 3) (safety 0)))
-	     (values value val1 val2)))
+	 (lambda ()
+	   (declare (optimize-interface (speed 3) (safety 0)))
+	   (values value val1 val2)))
 	(val1-p
-	 #'(lambda ()
-	     (declare (optimize-interface (speed 3) (safety 0)))
-	     (values value val1)))
+	 (lambda ()
+	   (declare (optimize-interface (speed 3) (safety 0)))
+	   (values value val1)))
 	(t
-	 #'(lambda ()
-	     (declare (optimize-interface (speed 3) (safety 0)))
-	     value))))
+	 (lambda ()
+	   (declare (optimize-interface (speed 3) (safety 0)))
+	   value))))
 
 ;;;; macros for (&KEY (KEY #'IDENTITY) (TEST #'EQL TESTP) (TEST-NOT NIL NOTP))
 
