@@ -132,46 +132,46 @@
 (defun symbol+ (&rest rest)
   (values (intern (apply #'string+ rest))))
 
-(defun accessor-name (concname slotname)
-  (symbol+ concname slotname))
+(defun accessor-name (conc-name slot-name)
+  (symbol+ conc-name slot-name))
 
 ;;; Use the ordinary FDEFINITIONs of accessors (not inline expansions)
 ;;; to read and write a structure slot.
-(defun read-slot-notinline (concname slotname instance)
-  (funcall (accessor-name concname slotname) instance))
-(defun write-slot-notinline (new-value concname slotname instance)
-  (funcall (fdefinition `(setf ,(accessor-name concname slotname)))
+(defun read-slot-notinline (conc-name slot-name instance)
+  (funcall (accessor-name conc-name slot-name) instance))
+(defun write-slot-notinline (new-value conc-name slot-name instance)
+  (funcall (fdefinition `(setf ,(accessor-name conc-name slot-name)))
 	   new-value instance))
 
 ;;; Use inline expansions of slot accessors, if possible, to read and
 ;;; write a structure slot.
-(defun read-slot-inline (concname slotname instance)
+(defun read-slot-inline (conc-name slot-name instance)
   (funcall (compile nil
 		    `(lambda (instance)
-		       (,(accessor-name concname slotname) instance)))
+		       (,(accessor-name conc-name slot-name) instance)))
 	   instance))
-(defun write-slot-inline (new-value concname slotname instance)
+(defun write-slot-inline (new-value conc-name slot-name instance)
   (funcall (compile nil
 		    `(lambda (new-value instance)
-		       (setf (,(accessor-name concname slotname) instance)
+		       (setf (,(accessor-name conc-name slot-name) instance)
 			     new-value)))
 	   new-value
 	   instance))
 
 ;;; Read a structure slot, checking that the inline and out-of-line
 ;;; accessors give the same result.
-(defun read-slot (concname slotname instance)
-  (let ((inline-value (read-slot-inline concname slotname instance))
-	(notinline-value (read-slot-notinline concname slotname instance)))
+(defun read-slot (conc-name slot-name instance)
+  (let ((inline-value (read-slot-inline conc-name slot-name instance))
+	(notinline-value (read-slot-notinline conc-name slot-name instance)))
     (assert (eql inline-value notinline-value))
     inline-value))
 
 ;;; Write a structure slot, using INLINEP argument to decide
 ;;; on inlineness of accessor used.
-(defun write-slot (new-value concname slotname instance inlinep)
+(defun write-slot (new-value conc-name slot-name instance inlinep)
   (if inlinep
-      (write-slot-inline new-value concname slotname instance)
-      (write-slot-notinline new-value concname slotname instance)))
+      (write-slot-inline new-value conc-name slot-name instance)
+      (write-slot-notinline new-value conc-name slot-name instance)))
 
 ;;; bound during the tests so that we can get to it even if the
 ;;; debugger is having a bad day

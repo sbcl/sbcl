@@ -1,5 +1,4 @@
 ;;;; -*- Lisp -*-
-;;;; build order
 
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
@@ -28,11 +27,6 @@
 ;;; the dependency information manually, and the brittleness of the
 ;;; package system would help make most violations of the declared
 ;;; dependencies obvious at build time. -- WHN 20000803
-;;;
-;;; FIXME: Perhaps now that a significant number of files are built
-;;; in warm load instead of cold load, this file should now be called
-;;; cold-stems-and-flags.lisp-expr? Also, perhaps this file should move
-;;; into the src/cold directory?
 (
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;;; miscellaneous
@@ -309,8 +303,8 @@
  ;; of "code/class". Why?
  ("src/code/class")
 
- ;; The definitions for CONDITION and CONDITION-CLASS depend on
- ;; SLOT-CLASS, defined in classes.lisp.
+ ;; The definition of CONDITION-CLASS depends on SLOT-CLASS, defined
+ ;; in class.lisp.
  ("src/code/condition" :not-host)
 
  ("src/compiler/generic/primtype")
@@ -581,9 +575,10 @@
 
  ("src/code/debug" :not-host)
 
- ;; These can't be compiled until CONDITION and DEFINE-CONDITION
- ;; are defined, and they also use SB-DEBUG:*STACK-TOP-HINT*.
- ("src/code/parse-defmacro-errors" :not-host)
+ ;; The code here can't be compiled until CONDITION and
+ ;; DEFINE-CONDITION are defined and SB!DEBUG:*STACK-TOP-HINT* is
+ ;; declared special.
+ ("src/code/parse-defmacro-errors")
 
  ("src/code/bit-bash"    :not-host) ; needs %NEGATE from assembly/target/arith
 

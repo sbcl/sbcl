@@ -64,12 +64,11 @@
   ;; a list of stringified enclosing non-original source forms
   (source nil :type list)
   ;; the stringified form in the original source that expanded into SOURCE
-  (original-source (required-argument) :type simple-string)
+  (original-source (missing-arg) :type simple-string)
   ;; a list of prefixes of "interesting" forms that enclose original-source
   (context nil :type list)
   ;; the FILE-INFO-NAME for the relevant FILE-INFO
-  (file-name (required-argument)
-	     :type (or pathname (member :lisp :stream)))
+  (file-name (missing-arg) :type (or pathname (member :lisp :stream)))
   ;; the file position at which the top-level form starts, if applicable
   (file-position nil :type (or index null))
   ;; the original source part of the source path

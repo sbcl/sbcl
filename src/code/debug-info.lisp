@@ -89,7 +89,7 @@
 				#-sb-xc-host (:pure t))
   ;; The name of this function. If from a DEFUN, etc., then this is the
   ;; function name, otherwise it is a descriptive string.
-  (name (required-argument) :type (or simple-string cons symbol))
+  (name (missing-arg) :type (or simple-string cons symbol))
   ;; The kind of function (same as FUNCTIONAL-KIND):
   (kind nil :type (member nil :optional :external :top-level :cleanup))
   ;; a description of variable locations for this function, in alphabetical
@@ -171,16 +171,16 @@
   ;;    in order to save space, we elected not to store a vector.
   (returns :fixed :type (or (simple-array * (*)) (member :standard :fixed)))
   ;; SC-Offsets describing where the return PC and return FP are kept.
-  (return-pc (required-argument) :type sc-offset)
-  (old-fp (required-argument) :type sc-offset)
+  (return-pc (missing-arg) :type sc-offset)
+  (old-fp (missing-arg) :type sc-offset)
   ;; SC-Offset for the number stack FP in this function, or NIL if no NFP
   ;; allocated.
   (nfp nil :type (or sc-offset null))
   ;; The earliest PC in this function at which the environment is properly
   ;; initialized (arguments moved from passing locations, etc.)
-  (start-pc (required-argument) :type index)
+  (start-pc (missing-arg) :type index)
   ;; The start of elsewhere code for this function (if any.)
-  (elsewhere-pc (required-argument) :type index))
+  (elsewhere-pc (missing-arg) :type index))
 
 ;;;; minimal debug function
 
@@ -240,7 +240,7 @@
   ;; This slot indicates where the definition came from:
   ;;    :FILE - from a file (i.e. COMPILE-FILE)
   ;;    :LISP - from Lisp (i.e. COMPILE)
-  (from (required-argument) :type (member :file :lisp))
+  (from (missing-arg) :type (member :file :lisp))
   ;; If :FILE, the file name, if :LISP or :STREAM, then a vector of
   ;; the top-level forms. When from COMPILE, form 0 is #'(LAMBDA ...).
   (name nil)
@@ -248,7 +248,7 @@
   ;; unavailable
   (created nil :type (or unsigned-byte null))
   ;; the universal time that the source was compiled
-  (compiled (required-argument) :type unsigned-byte)
+  (compiled (missing-arg) :type unsigned-byte)
   ;; the source path root number of the first form read from this
   ;; source (i.e. the total number of forms converted previously in
   ;; this compilation)
@@ -265,7 +265,7 @@
 
 (def!struct debug-info
   ;; Some string describing something about the code in this component.
-  (name (required-argument) :type simple-string)
+  (name (missing-arg) :type simple-string)
   ;; A list of DEBUG-SOURCE structures describing where the code for this
   ;; component came from, in the order that they were read.
   ;;
@@ -290,4 +290,4 @@
   ;; always careful to put our code in low memory. Is that how it
   ;; works? Would this break if we used a more general memory map? --
   ;; WHN 20000120
-  (fun-map (required-argument) :type simple-vector :read-only t))
+  (fun-map (missing-arg) :type simple-vector :read-only t))

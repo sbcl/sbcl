@@ -21,8 +21,8 @@
 
 (def!struct (dyncount-info (:make-load-form-fun just-dump-it-normally))
   for
-  (costs (required-argument) :type (simple-array (unsigned-byte 32) (*)))
-  (counts (required-argument) :type (simple-array (unsigned-byte 32) (*))))
+  (costs (missing-arg) :type (simple-array (unsigned-byte 32) (*)))
+  (counts (missing-arg) :type (simple-array (unsigned-byte 32) (*))))
 
 (defprinter (dyncount-info)
   for

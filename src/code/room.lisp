@@ -15,13 +15,13 @@
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (def!struct (room-info (:make-load-form-fun just-dump-it-normally))
-    ;; The name of this type.
+    ;; the name of this type
     (name nil :type symbol)
-    ;; Kind of type (how we determine length).
-    (kind (required-argument)
+    ;; kind of type (how we determine length)
+    (kind (missing-arg)
 	  :type (member :lowtag :fixed :header :vector
 			:string :code :closure :instance))
-    ;; Length if fixed-length, shift amount for element size if :VECTOR.
+    ;; length if fixed-length, shift amount for element size if :VECTOR
     (length nil :type (or fixnum null))))
 
 (eval-when (:compile-toplevel :execute)

@@ -308,12 +308,12 @@
 	((null *circularity-counter*)
 	 (ecase (gethash object *circularity-hash-table*)
 	   ((nil)
-	    ;; First encounter.
+	    ;; first encounter
 	    (setf (gethash object *circularity-hash-table*) t)
 	    ;; We need to keep looking.
 	    nil)
 	   ((t)
-	    ;; Second encounter.
+	    ;; second encounter
 	    (setf (gethash object *circularity-hash-table*) 0)
 	    ;; It's a circular reference.
 	    t)
@@ -324,24 +324,25 @@
 	 (let ((value (gethash object *circularity-hash-table*)))
 	   (case value
 	     ((nil t)
-	      ;; If NIL, we found an object that wasn't there the first time
-	      ;; around. If T, exactly one occurance of this object appears.
-	      ;; Either way, just print the thing without any special
-	      ;; processing. Note: you might argue that finding a new object
-	      ;; means that something is broken, but this can happen. If
-	      ;; someone uses the ~@<...~:> format directive, it conses a
-	      ;; new list each time though format (i.e. the &REST list), so
-	      ;; we will have different cdrs.
+	      ;; If NIL, we found an object that wasn't there the
+	      ;; first time around. If T, this object appears exactly
+	      ;; once. Either way, just print the thing without any
+	      ;; special processing. Note: you might argue that
+	      ;; finding a new object means that something is broken,
+	      ;; but this can happen. If someone uses the ~@<...~:>
+	      ;; format directive, it conses a new list each time
+	      ;; though format (i.e. the &REST list), so we will have
+	      ;; different cdrs.
 	      nil)
 	     (0
 	      (if assign
 		  (let ((value (incf *circularity-counter*)))
-		    ;; First occurance of this object. Set the counter.
+		    ;; first occurrence of this object: Set the counter.
 		    (setf (gethash object *circularity-hash-table*) value)
 		    value)
 		  t))
 	     (t
-	      ;; Second or later occurance.
+	      ;; second or later occurrence
 	      (- value)))))))
 
 ;;; Handle the results of CHECK-FOR-CIRCULARITY. If this returns T then

@@ -141,7 +141,7 @@
   (wild-args nil :type boolean)
   ;; type describing the return values. This is a values type
   ;; when multiple values were specified for the return.
-  (returns (required-argument) :type ctype))
+  (returns (missing-arg) :type ctype))
 
 ;;; The CONSTANT-TYPE structure represents a use of the
 ;;; CONSTANT-ARGUMENT "type specifier", which is only meaningful in
@@ -153,7 +153,7 @@
 	    (:copier nil))
   ;; The type which the argument must be a constant instance of for this type
   ;; specifier to win.
-  (type (required-argument) :type ctype))
+  (type (missing-arg) :type ctype))
 
 ;;; The NAMED-TYPE is used to represent *, T and NIL. These types must be
 ;;; super- or sub-types of all types, not just classes and * and NIL aren't
@@ -286,7 +286,7 @@
   ;; Is this not a simple array type? (:MAYBE means that we don't know.)
   (complexp :maybe :type (member t nil :maybe))
   ;; the element type as originally specified
-  (element-type (required-argument) :type ctype)
+  (element-type (missing-arg) :type ctype)
   ;; the element type as it is specialized in this implementation
   (specialized-element-type *wild-type* :type ctype))
 
@@ -365,8 +365,8 @@
   ;; the CAR and CDR element types (to support ANSI (CONS FOO BAR) types)
   ;;
   ;; FIXME: Most or all other type structure slots could also be :READ-ONLY.
-  (car-type (required-argument) :type ctype :read-only t)
-  (cdr-type (required-argument) :type ctype :read-only t))
+  (car-type (missing-arg) :type ctype :read-only t)
+  (cdr-type (missing-arg) :type ctype :read-only t))
 
 ;;; Note that the type NAME has been (re)defined, updating the
 ;;; undefined warnings and VALUES-SPECIFIER-TYPE cache.

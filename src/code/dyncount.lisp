@@ -100,7 +100,7 @@ comments from CMU CL:
 	    (:constructor %make-vop-stats (name))
 	    (:constructor make-vop-stats-key)
 	    (:copier nil))
-  (name (required-argument) :type simple-string)
+  (name (missing-arg) :type simple-string)
   (data (make-array 2 :element-type 'double-float) :type count-vector))
 
 (defmacro vop-stats-count (x) `(aref (vop-stats-data ,x) 0))

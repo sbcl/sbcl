@@ -17,9 +17,11 @@
 
 ;;;; the CONDITION class
 
-(/show0 "late-target-error.lisp 20")
+(/show0 "condition.lisp 20")
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
+
+(/show0 "condition.lisp 24")
 
 (def!struct (condition-class (:include slot-class)
 			     (:constructor bare-make-condition-class))
@@ -33,8 +35,8 @@
   (report nil :type (or function null))
   ;; list of alternating initargs and initforms
   (default-initargs () :type list)
-  ;; class precedence list as a list of class objects, with all
-  ;; non-condition classes removed
+  ;; class precedence list as a list of CLASS objects, with all
+  ;; non-CONDITION classes removed
   (cpl () :type list)
   ;; a list of all the effective instance allocation slots of this
   ;; class that have a non-constant initform or default-initarg.
@@ -42,12 +44,18 @@
   ;; environment of MAKE-CONDITION.
   (hairy-slots nil :type list))
 
+(/show0 "condition.lisp 49")
+
 (defun make-condition-class (&rest rest)
   (apply #'bare-make-condition-class
 	 (rename-key-args '((:name :%name)) rest)))
 
+(/show0 "condition.lisp 53")
+
 ) ; EVAL-WHEN
 
+;;; REMOVEME
+#|
 (defstruct (condition
 	    (:constructor make-condition-object (actual-initargs))
 	    (:alternate-metaclass instance
@@ -55,23 +63,35 @@
 				  make-condition-class)
 	    (:copier nil))
   ;; actual initargs supplied to MAKE-CONDITION
-  (actual-initargs (required-argument) :type list)
+  (actual-initargs (missing-arg) :type list)
   ;; a plist mapping slot names to any values that were assigned or
   ;; defaulted after creation
   (assigned-slots () :type list))
+|#
+
+(!defstruct-with-alternate-metaclass condition
+  :slot-names (actual-initargs assigned-slots)
+  :boa-constructor %make-condition-object
+  :superclass-name instance
+  :metaclass-name condition-class
+  :metaclass-constructor make-condition-class
+  :dd-type structure)
+
+(defun make-condition-object (actual-initargs)
+  (%make-condition-object actual-initargs nil))
 
 (defstruct (condition-slot (:copier nil))
-  (name (required-argument) :type symbol)
+  (name (missing-arg) :type symbol)
   ;; list of all applicable initargs
-  (initargs (required-argument) :type list)
+  (initargs (missing-arg) :type list)
   ;; names of reader and writer functions
-  (readers (required-argument) :type list)
-  (writers (required-argument) :type list)
+  (readers (missing-arg) :type list)
+  (writers (missing-arg) :type list)
   ;; true if :INITFORM was specified
-  (initform-p (required-argument) :type (member t nil))
+  (initform-p (missing-arg) :type (member t nil))
   ;; If this is a function, call it with no args. Otherwise, it's the
   ;; actual value.
-  (initform (required-argument) :type t)
+  (initform (missing-arg) :type t)
   ;; allocation of this slot, or NIL until defaulted
   (allocation nil :type (member :instance :class nil))
   ;; If ALLOCATION is :CLASS, this is a cons whose car holds the value.
@@ -83,6 +103,7 @@
 ;;; from CMU CL, and didn't seem to be explained there, and I haven't
 ;;; figured out whether it's right. -- WHN 19990612
 (eval-when (:compile-toplevel :load-toplevel :execute)
+  (/show0 "condition.lisp 103")
   (let ((condition-class (locally
 			   ;; KLUDGE: There's a FIND-CLASS DEFTRANSFORM for
 			   ;; constant class names which creates fast but
@@ -92,7 +113,8 @@
 			   (declare (notinline sb!xc:find-class))
 			   (sb!xc:find-class 'condition))))
     (setf (condition-class-cpl condition-class)
-	  (list condition-class))))
+	  (list condition-class)))
+  (/show0 "condition.lisp 103"))
 
 (setf (condition-class-report (locally
 				;; KLUDGE: There's a FIND-CLASS DEFTRANSFORM
@@ -773,5 +795,5 @@
     "Transfer control and VALUE to a restart named USE-VALUE, or return NIL if
    none exists."))
 
-(/show0 "late-target-error.lisp end of file")
+(/show0 "condition.lisp end of file")
 

@@ -85,10 +85,10 @@
 (defstruct (gspace (:constructor %make-gspace)
 		   (:copier nil))
   ;; name and identifier for this GSPACE
-  (name (required-argument) :type symbol :read-only t)
-  (identifier (required-argument) :type fixnum :read-only t)
+  (name (missing-arg) :type symbol :read-only t)
+  (identifier (missing-arg) :type fixnum :read-only t)
   ;; the word address where the data will be loaded
-  (word-address (required-argument) :type unsigned-byte :read-only t)
+  (word-address (missing-arg) :type unsigned-byte :read-only t)
   ;; the data themselves. (Note that in CMU CL this was a pair
   ;; of fields SAP and WORDS-ALLOCATED, but that wasn't very portable.)
   (bytes (make-array target-space-alignment :element-type '(unsigned-byte 8))

@@ -223,7 +223,7 @@
 					 nil)))
 			      (:copier nil)
 			      (:constructor make-logical-hostname (name)))
-  (name (required-argument) :type simple-string))
+  (name (missing-arg) :type simple-string))
 
 (defun maybe-extract-logical-hostname (namestr start end)
   (declare (type simple-base-string namestr)

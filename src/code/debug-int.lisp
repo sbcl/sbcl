@@ -195,7 +195,7 @@
 (defstruct (debug-var (:constructor nil)
 		      (:copier nil))
   ;; the name of the variable
-  (symbol (required-argument) :type symbol)
+  (symbol (missing-arg) :type symbol)
   ;; a unique integer identification relative to other variables with the same
   ;; symbol
   (id 0 :type index)

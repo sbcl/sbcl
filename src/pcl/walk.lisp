@@ -105,6 +105,8 @@
 ;;; MACROEXPAND-1 is the only SBCL function that gets called with the
 ;;; constructed environment argument.
 
+(/show "walk.lisp 108")
+
 (defmacro with-augmented-environment
     ((new-env old-env &key functions macros) &body body)
   `(let ((,new-env (with-augmented-environment-internal ,old-env

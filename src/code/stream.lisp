@@ -809,8 +809,8 @@
 			  #!+high-security-support
 			  %make-two-way-stream (input-stream output-stream))
 	    (:copier nil))
-  (input-stream (required-argument) :type stream :read-only t)
-  (output-stream (required-argument) :type stream :read-only t))
+  (input-stream (missing-arg) :type stream :read-only t)
+  (output-stream (missing-arg) :type stream :read-only t))
 (defprinter (two-way-stream) input-stream output-stream)
 
 #!-high-security-support
@@ -1429,7 +1429,7 @@
 		      (:misc #'case-frob-misc))
 	    (:constructor %make-case-frob-stream (target out sout))
 	    (:copier nil))
-  (target (required-argument) :type stream))
+  (target (missing-arg) :type stream))
 
 (defun make-case-frob-stream (target kind)
   #!+sb-doc

@@ -222,7 +222,7 @@
   (typep (sb-kernel:layout-of x) 'wrapper))
 
 ;;; We define this as STANDARD-INSTANCE, since we're going to clobber
-;;; the layout with some standard-instance layout as soon as we make
+;;; the layout with some STANDARD-INSTANCE layout as soon as we make
 ;;; it, and we want the accessor to still be type-correct.
 (defstruct (standard-instance
 	    (:predicate nil)

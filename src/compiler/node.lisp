@@ -312,7 +312,7 @@
 (defstruct (block-annotation (:constructor nil)
 			     (:copier nil))
   ;; The IR1 block that this block is in the INFO for.
-  (block (required-argument) :type cblock)
+  (block (missing-arg) :type cblock)
   ;; the next and previous block in emission order (not DFO). This
   ;; determines which block we drop though to, and also used to chain
   ;; together overflow blocks that result from splitting of IR2 blocks
@@ -450,7 +450,7 @@
 ;;; change.
 (defstruct (cleanup (:copier nil))
   ;; the kind of thing that has to be cleaned up
-  (kind (required-argument)
+  (kind (missing-arg)
 	:type (member :special-bind :catch :unwind-protect :block :tagbody))
   ;; the node that messes things up. This is the last node in the
   ;; non-messed-up environment. Null only temporarily. This could be
@@ -488,7 +488,7 @@
 ;;; TNs, or eventually stack slots and registers). -- WHN 2001-09-29
 (defstruct (physenv (:copier nil))
   ;; the function that allocates this physical environment
-  (function (required-argument) :type clambda)
+  (function (missing-arg) :type clambda)
   #| ; seems not to be used as of sbcl-0.pre7.51
   ;; a list of all the lambdas that allocate variables in this
   ;; physical environment
@@ -549,7 +549,7 @@
   ;; and not the cleanup for the escape block. The CLEANUP-KIND of
   ;; this thus provides a good indication of what kind of exit is
   ;; being done.
-  (cleanup (required-argument) :type cleanup)
+  (cleanup (missing-arg) :type cleanup)
   ;; the continuation exited to (the CONT of the EXIT nodes). If this
   ;; exit is from an escape function (CATCH or UNWIND-PROTECT), then
   ;; physical environment analysis deletes the escape function and
@@ -561,7 +561,7 @@
   ;; For this purpose, the Entry must also be used to disambiguate,
   ;; since exits to different places may deliver their result to the
   ;; same continuation.
-  (continuation (required-argument) :type continuation)
+  (continuation (missing-arg) :type continuation)
   ;; the entry stub inserted by physical environment analysis. This is
   ;; a block containing a call to the %NLX-Entry funny function that
   ;; has the original exit destination as its successor. Null only
@@ -629,7 +629,7 @@
 ;;; constant, but don't know what the value is at compile time.
 (def!struct (global-var (:include basic-var))
   ;; kind of variable described
-  (kind (required-argument)
+  (kind (missing-arg)
 	:type (member :special :global-function :constant :global)))
 (defprinter (global-var :identity t)
   name
@@ -644,9 +644,9 @@
 				     (where-from :defined)
 				     (kind :global-function)))
   ;; The description of the structure that this is an accessor for.
-  (for (required-argument) :type sb!xc:class)
+  (for (missing-arg) :type sb!xc:class)
   ;; The slot description of the slot.
-  (slot (required-argument)))
+  (slot (missing-arg)))
 (defprinter (slot-accessor :identity t)
   name
   for
@@ -921,8 +921,9 @@
   (specialp nil :type boolean)
   ;; the kind of argument being described. Required args only have arg
   ;; info structures if they are special.
-  (kind (required-argument) :type (member :required :optional :keyword :rest
-					  :more-context :more-count))
+  (kind (missing-arg)
+	:type (member :required :optional :keyword :rest
+		      :more-context :more-count))
   ;; If true, this is the VAR for SUPPLIED-P variable of a keyword or
   ;; optional arg. This is true for keywords with non-constant
   ;; defaults even when there is no user-specified supplied-p var.
@@ -1005,11 +1006,11 @@
 		(:constructor make-if)
 		(:copier copy-if))
   ;; CONTINUATION for the predicate
-  (test (required-argument) :type continuation)
+  (test (missing-arg) :type continuation)
   ;; the blocks that we execute next in true and false case,
   ;; respectively (may be the same)
-  (consequent (required-argument) :type cblock)
-  (alternative (required-argument) :type cblock))
+  (consequent (missing-arg) :type cblock)
+  (alternative (missing-arg) :type cblock))
 (defprinter (cif :conc-name if- :identity t)
   (test :prin1 (continuation-use test))
   consequent
@@ -1022,9 +1023,9 @@
 		 (:constructor make-set)
 		 (:copier copy-set))
   ;; descriptor for the variable set
-  (var (required-argument) :type basic-var)
+  (var (missing-arg) :type basic-var)
   ;; continuation for the value form
-  (value (required-argument) :type continuation))
+  (value (missing-arg) :type continuation))
 (defprinter (cset :conc-name set- :identity t)
   var
   (value :prin1 (continuation-use value)))
@@ -1038,7 +1039,7 @@
 			      (:constructor nil)
 			      (:copier nil))
   ;; continuation for the function
-  (fun (required-argument) :type continuation)
+  (fun (missing-arg) :type continuation)
   ;; list of CONTINUATIONs for the args. In a local call, an argument
   ;; continuation may be replaced with NIL to indicate that the
   ;; corresponding variable is unreferenced, and thus no argument
@@ -1103,7 +1104,7 @@
   ;; ir1tran.
   (lambda nil :type (or clambda null))
   ;; the continuation which yields the value of the lambda
-  (result (required-argument) :type continuation)
+  (result (missing-arg) :type continuation)
   ;; the union of the node-derived-type of all uses of the result
   ;; other than by a local call, intersected with the result's
   ;; asserted-type. If there are no non-call uses, this is
@@ -1160,7 +1161,7 @@
   ;; the name of the unknown thing
   (name nil :type (or symbol list))
   ;; the kind of reference to NAME
-  (kind (required-argument) :type (member :function :type :variable))
+  (kind (missing-arg) :type (member :function :type :variable))
   ;; the number of times this thing was used
   (count 0 :type unsigned-byte)
   ;; a list of COMPILER-ERROR-CONTEXT structures describing places

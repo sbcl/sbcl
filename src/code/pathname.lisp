@@ -17,13 +17,13 @@
 ;;; pathname information into structure slot entries, and after
 ;;; translation the inverse (unparse) functions.
 (def!struct (host (:constructor nil))
-  (parse (required-argument) :type function)
-  (unparse (required-argument) :type function)
-  (unparse-host (required-argument) :type function)
-  (unparse-directory (required-argument) :type function)
-  (unparse-file (required-argument) :type function)
-  (unparse-enough (required-argument) :type function)
-  (customary-case (required-argument) :type (member :upper :lower)))
+  (parse (missing-arg) :type function)
+  (unparse (missing-arg) :type function)
+  (unparse-host (missing-arg) :type function)
+  (unparse-directory (missing-arg) :type function)
+  (unparse-file (missing-arg) :type function)
+  (unparse-enough (missing-arg) :type function)
+  (customary-case (missing-arg) :type (member :upper :lower)))
 
 (def!method print-object ((host host) stream)
   (print-unreadable-object (host stream :type t :identity t)))

@@ -13,26 +13,22 @@
 
 ;;;; structure frobbing primitives
 
+;;; Allocate a new instance with LENGTH data slots.
 (defun %make-instance (length)
-  #!+sb-doc
-  "Allocate a new instance with LENGTH data slots."
   (declare (type index length))
   (%make-instance length))
 
+;;; Given an instance, return its length.
 (defun %instance-length (instance)
-  #!+sb-doc
-  "Given an instance, return its length."
   (declare (type instance instance))
   (%instance-length instance))
 
+;;; Return the value from the INDEXth slot of INSTANCE. This is SETFable.
 (defun %instance-ref (instance index)
-  #!+sb-doc
-  "Return the value from the INDEXth slot of INSTANCE. This is SETFable."
   (%instance-ref instance index))
 
+;;; Set the INDEXth slot of INSTANCE to NEW-VALUE.
 (defun %instance-set (instance index new-value)
-  #!+sb-doc
-  "Set the INDEXth slot of INSTANCE to NEW-VALUE."
   (setf (%instance-ref instance index) new-value))
 
 (defun %raw-ref-single (vec index)
@@ -261,61 +257,68 @@
 
     res))
 
-;;; default PRINT and MAKE-LOAD-FORM methods
+;;; default PRINT-OBJECT and MAKE-LOAD-FORM methods
 
+(defun %default-structure-pretty-print (structure stream)
+  (let* ((layout (%instance-layout structure))
+	 (name (sb!xc:class-name (layout-class layout)))
+	 (dd (layout-info layout)))
+    (pprint-logical-block (stream nil :prefix "#S(" :suffix ")")
+      (prin1 name stream)
+      (let ((remaining-slots (dd-slots dd)))
+	(when remaining-slots
+	  (write-char #\space stream)
+	  ;; CMU CL had (PPRINT-INDENT :BLOCK 2 STREAM) here,
+	  ;; but I can't see why. -- WHN 20000205
+	  (pprint-newline :linear stream)
+	  (loop
+	   (pprint-pop)
+	   (let ((slot (pop remaining-slots)))
+	     (write-char #\: stream)
+	     (output-symbol-name (dsd-%name slot) stream)
+	     (write-char #\space stream)
+	     (pprint-newline :miser stream)
+	     (output-object (funcall (fdefinition (dsd-accessor-name slot))
+				     structure)
+			    stream)
+	     (when (null remaining-slots)
+	       (return))
+	     (write-char #\space stream)
+	     (pprint-newline :linear stream))))))))
+(defun %default-structure-ugly-print (structure stream)
+  (let* ((layout (%instance-layout structure))
+	 (name (sb!xc:class-name (layout-class layout)))
+	 (dd (layout-info layout)))
+    (descend-into (stream)
+      (write-string "#S(" stream)
+      (prin1 name stream)
+      (do ((index 0 (1+ index))
+	   (remaining-slots (dd-slots dd) (cdr remaining-slots)))
+	  ((or (null remaining-slots)
+	       (and (not *print-readably*)
+		    *print-length*
+		    (>= index *print-length*)))
+	   (if (null remaining-slots)
+	       (write-string ")" stream)
+	       (write-string " ...)" stream)))
+	(declare (type index index))
+	(write-char #\space stream)
+	(write-char #\: stream)
+	(let ((slot (first remaining-slots)))
+	  (output-symbol-name (dsd-%name slot) stream)
+	  (write-char #\space stream)
+	  (output-object
+	   (funcall (fdefinition (dsd-accessor-name slot))
+		    structure)
+	   stream))))))
 (defun default-structure-print (structure stream depth)
   (declare (ignore depth))
-  (if (funcallable-instance-p structure)
-      (print-unreadable-object (structure stream :identity t :type t))
-      (let* ((type (%instance-layout structure))
-	     (name (sb!xc:class-name (layout-class type)))
-	     (dd (layout-info type)))
-	(if *print-pretty*
-	    (pprint-logical-block (stream nil :prefix "#S(" :suffix ")")
-	      (prin1 name stream)
-	      (let ((slots (dd-slots dd)))
-		(when slots
-		  (write-char #\space stream)
-		  ;; CMU CL had (PPRINT-INDENT :BLOCK 2 STREAM) here,
-		  ;; but I can't see why. -- WHN 20000205
-		  (pprint-newline :linear stream)
-		  (loop
-		    (pprint-pop)
-		    (let ((slot (pop slots)))
-		      (write-char #\: stream)
-		      (output-symbol-name (dsd-%name slot) stream)
-		      (write-char #\space stream)
-		      (pprint-newline :miser stream)
-		      (output-object
-		       (funcall (fdefinition (dsd-accessor-name slot))
-				structure)
-		       stream)
-		      (when (null slots)
-			(return))
-		      (write-char #\space stream)
-		      (pprint-newline :linear stream))))))
-	    (descend-into (stream)
-	      (write-string "#S(" stream)
-	      (prin1 name stream)
-	      (do ((index 0 (1+ index))
-		   (slots (dd-slots dd) (cdr slots)))
-		  ((or (null slots)
-		       (and (not *print-readably*)
-			    *print-length*
-			    (>= index *print-length*)))
-		   (if (null slots)
-		       (write-string ")" stream)
-		       (write-string " ...)" stream)))
-		(declare (type index index))
-		(write-char #\space stream)
-		(write-char #\: stream)
-		(let ((slot (first slots)))
-		  (output-symbol-name (dsd-%name slot) stream)
-		  (write-char #\space stream)
-		  (output-object
-		   (funcall (fdefinition (dsd-accessor-name slot))
-			    structure)
-		   stream))))))))
+  (cond ((funcallable-instance-p structure)
+	 (print-unreadable-object (structure stream :identity t :type t)))
+	(*print-pretty*
+	 (%default-structure-pretty-print structure stream))
+	(t
+	 (%default-structure-ugly-print structure-stream))))
 (def!method print-object ((x structure-object) stream)
   (default-structure-print x stream *current-level*))
 

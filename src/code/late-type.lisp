@@ -131,10 +131,10 @@
 ;;; the description of a &KEY argument
 (defstruct (key-info #-sb-xc-host (:pure t)
 		     (:copier nil))
-  ;; the key (not necessarily a keyword in ANSI)
-  (name (required-argument) :type symbol)
+  ;; the key (not necessarily a keyword in ANSI Common Lisp)
+  (name (missing-arg) :type symbol)
   ;; the type of the argument value
-  (type (required-argument) :type ctype))
+  (type (missing-arg) :type ctype))
 
 (!define-type-method (values :simple-subtypep :complex-subtypep-arg1)
 		     (type1 type2)

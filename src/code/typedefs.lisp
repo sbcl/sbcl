@@ -69,7 +69,7 @@
   ;; named TYPE-CLASS-INFO which is an accessor for the CTYPE structure
   ;; even though the TYPE-CLASS structure also exists in the system.
   ;; Rename this slot: TYPE-CLASS or ASSOCIATED-TYPE-CLASS or something.
-  (class-info (required-argument) :type type-class)
+  (class-info (missing-arg) :type type-class)
   ;; True if this type has a fixed number of members, and as such
   ;; could possibly be completely specified in a MEMBER type. This is
   ;; used by the MEMBER type methods.

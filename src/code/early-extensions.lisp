@@ -682,10 +682,10 @@
 ;;; error indicating that a required &KEY argument was not supplied.
 ;;; This function is also useful for DEFSTRUCT slot defaults
 ;;; corresponding to required arguments.
-(declaim (ftype (function () nil) required-argument))
-(defun required-argument ()
+(declaim (ftype (function () nil) required-arg))
+(defun required-arg ()
   #!+sb-doc
-  (/show0 "entering REQUIRED-ARGUMENT")
+  (/show0 "entering REQUIRED-ARG")
   (error "A required &KEY or &OPTIONAL argument was not supplied."))
 
 ;;; like CL:ASSERT and CL:CHECK-TYPE, but lighter-weight

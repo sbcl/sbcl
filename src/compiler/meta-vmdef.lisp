@@ -458,7 +458,7 @@
   ;; name of the operand (which we bind to the TN)
   (name nil :type symbol)
   ;; the way this operand is used:
-  (kind (required-argument)
+  (kind (missing-arg)
 	:type (member :argument :result :temporary
 		      :more-argument :more-result))
   ;; If true, the name of an operand that this operand is targeted to.

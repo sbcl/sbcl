@@ -340,10 +340,10 @@
   ;; The keyword name of this argument. Although keyword names don't
   ;; have to be keywords, we only match on keywords when figuring an
   ;; approximate type.
-  (name (required-argument) :type keyword)
+  (name (missing-arg) :type keyword)
   ;; The position at which this keyword appeared. 0 if it appeared as the
   ;; first argument, etc.
-  (position (required-argument) :type fixnum)
+  (position (missing-arg) :type fixnum)
   ;; a list of all the argument types that have been used with this keyword
   (types nil :type list)
   ;; true if this keyword has appeared only in calls with an obvious

@@ -86,7 +86,32 @@
     (/show "about to TYPEP W 'SB-KERNEL:INSTANCE")
     (/show (typep w 'sb-kernel:instance))
     (/show "about to TYPEP W '(ARRAY T *)")
-    (/show (typep w '(array t *))))
+    (/show (typep w '(array t *)))
+
+    (/show "about to SPECIFIER-TYPE 'CONDITION")
+    (/show (sb-kernel:specifier-type 'condition))
+    (/show "about to TYPEP-TO-LAYOUT W (FIND-LAYOUT 'CONDITION)")
+    (/show (sb-kernel::typep-to-layout w (sb-kernel::find-layout 'condition)))
+    (/show "about to TYPEP W 'CONDITION")
+    (/show (typep w 'condition))
+
+    (/show *print-pretty*)
+    
+    (/show "about to PPRINT-D W")
+    (let ((ppdw (sb-pretty::pprint-d w)))
+      (/show "got PPRINT-D W..")
+      (/show ppdw))
+
+    (/show "about to DEFAULT-STRUCTURE-PRINT W")
+    (sb-kernel::default-structure-print w *standard-output* 0)
+
+    (/show "about to O-O W")
+    (sb-impl::o-o w *standard-output*)
+    (/show "back from OUTPUT-OBJECT W")
+
+    (/show "about to OUTPUT-OBJECT W")
+    (sb-impl::output-object w *standard-output*)
+    (/show "back from OUTPUT-OBJECT W"))
   (/show "about to MAKE-HASH-TABLE")
   (when (plusp (hash-table-count (make-hash-table)))
     (/show "oops! can't happen"))

@@ -29,7 +29,7 @@
 
 ;;; Delay looking for compiler-layout until the constructor is being
 ;;; compiled, since it doesn't exist until after the EVAL-WHEN (COMPILE)
-;;; is compiled.
+;;; stuff is compiled.
 (sb!xc:defmacro %delayed-get-compiler-layout (name)
   `',(compiler-layout-or-lose name))
 
@@ -53,7 +53,7 @@
 	     #-sb-xc-host (:pure t)
 	     (:constructor make-defstruct-description (name)))
   ;; name of the structure
-  (name (required-argument) :type symbol)
+  (name (missing-arg) :type symbol)
   ;; documentation on the structure
   (doc nil :type (or string null))
   ;; prefix for slot names. If NIL, none.
@@ -147,7 +147,7 @@
   ;; string name of slot
   %name	
   ;; its position in the implementation sequence
-  (index (required-argument) :type fixnum)
+  (index (missing-arg) :type fixnum)
   ;; the name of the accessor function
   ;;
   ;; (CMU CL had extra complexity here ("..or NIL if this accessor has
@@ -305,9 +305,11 @@
 	(structure
 	 #+sb-xc (/show0 "case of DSD-TYPE = STRUCTURE")
 	 (%native-slot-accessor-funs %instance-ref))
+	#| ; now moved to DEFSTRUCT-WITH-ALTERNATE-METACLASS
 	(funcallable-structure
 	 #+sb-xc (/show0 "case of DSD-TYPE = FUNCALLABLE-STRUCTURE")
 	 (%native-slot-accessor-funs %funcallable-instance-info))
+        |#
 				     
 	;; structures with the :TYPE option
 
@@ -607,25 +609,16 @@
 ;;; Return a list of forms which create a predicate for an untyped DEFSTRUCT.
 (defun predicate-definitions (dd)
   (let ((pred (dd-predicate-name dd))
-	(argname (gensym)))
-    (when pred
-      (if (eq (dd-type dd) 'funcallable-structure)
-	  ;; FIXME: Why does this need to be special-cased for
-	  ;; FUNCALLABLE-STRUCTURE? CMU CL did it, but without explanation.
-	  ;; Could we do without it? What breaks if we do? Or could we
-	  ;; perhaps get by with no predicates for funcallable structures?
-	  `((/show0 "beginning PREDICATE-DEFINITIONS forms for FIN")
-	    (declaim (inline ,pred))
-	    (defun ,pred (,argname) (typep ,argname ',(dd-name dd)))
-	    (/show0 "done with PREDICATE-DEFINITIONS forms for FIN"))
-	  `((/show0 "beginning PREDICATE-DEFINITIONS forms")
-	    (protect-cl ',pred)
-	    (declaim (inline ,pred))
-	    (defun ,pred (,argname)
-	      (declare (optimize (speed 3) (safety 0)))
-	      (typep-to-layout ,argname
-			       (compile-time-find-layout ,(dd-name dd))))
-	    (/show0 "done with PREDICATE-DEFINITIONS forms"))))))
+	(argname (gensym "ARG")))
+    (and pred
+	 `((/show0 "beginning PREDICATE-DEFINITIONS forms")
+	   (protect-cl ',pred)
+	   (declaim (inline ,pred))
+	   (defun ,pred (,argname)
+	     (declare (optimize (speed 3) (safety 0)))
+	     (typep-to-layout ,argname
+			      (compile-time-find-layout ,(dd-name dd))))
+	   (/show0 "done with PREDICATE-DEFINITIONS forms")))))
 
 ;;; Return a list of forms which create a predicate function for a typed
 ;;; DEFSTRUCT.
@@ -649,11 +642,7 @@
 #|
 ;;; Return the copier definition for an untyped DEFSTRUCT.
 (defun copier-definition (dd)
-  (when (and (dd-copier dd)
-	     ;; FUNCALLABLE-STRUCTUREs don't need copiers, and this
-	     ;; implementation wouldn't work for them anyway, since
-	     ;; COPY-STRUCTURE returns a STRUCTURE-OBJECT and they're not.
-	     (not (eq (dd-type info) 'funcallable-structure)))
+  (when (dd-copier dd)
     (let ((argname (gensym)))
       `(progn
 	 (protect-cl ',(dd-copier dd))
@@ -729,6 +718,22 @@
       (:include
        (when (dd-include dd)
 	 (error "more than one :INCLUDE option"))
+       ;; It's not particularly well-defined to :INCLUDE any of the
+       ;; CMU CL INSTANCE weirdosities like CONDITION or
+       ;; GENERIC-FUNCTION, and it's certainly not ANSI-compliant.
+       (let* ((included-class-name (first args))
+	      (included-class (sb!xc:find-class included-class-name))
+	      (included-layout (class-layout included-class))
+	      (included-dd (layout-info included-layout)))
+	 (when (dd-alternate-metaclass included-dd)
+	   ;; FIXME: It might actually be technically ANSI-compliant
+	   ;; to do (DEFSTRUCT (FOO (:INCLUDE STRUCTURE-OBJECT)) ..).
+	   ;; If so, we should test for that special case here and
+	   ;; avoid complaining even if (as in code copied mindlessly
+	   ;; from before the fork) STRUCTURE has a non-NIL
+	   ;; ALTERNATE-METACLASS.
+	   (error "can't :INCLUDE class ~S (has alternate metaclass)"
+		  included-class-name)))
        (setf (dd-include dd) args))
       (:alternate-metaclass
        (setf (dd-alternate-metaclass dd) args))
@@ -742,9 +747,7 @@
 	     (the (or symbol cons) args)))
       (:type
        (destructuring-bind (type) args
-	 (cond ((eq type 'funcallable-structure)
-		(setf (dd-type dd) type))
-	       ((member type '(list vector))
+	 (cond ((member type '(list vector))
 		(setf (dd-element-type dd) t)
 		(setf (dd-type dd) type))
 	       ((and (consp type) (eq (first type) 'vector))
@@ -786,7 +789,6 @@
 	   (error ":OFFSET can't be specified unless :TYPE is specified."))
 	 (unless (dd-include dd)
 	   (incf (dd-length dd))))
-	(funcallable-structure)
 	(t
 	 (require-no-print-options-so-far dd)
 	 (when (dd-named dd)
@@ -865,8 +867,9 @@
 	(style-warn
 	 "~@<The structure accessor name ~S is the same as the name of the ~
           structure type predicate. ANSI doesn't specify what to do in ~
-          this case; this implementation chooses to overwrite the type ~
-          predicate with the slot accessor.~@:>"
+          this case. We'll overwrite the type predicate with the slot ~
+          accessor, but you can't rely on this behavior, so it'd be wise to ~
+          remove the ambiguity in your code.~@:>"
 	 accessor-name)
 	(setf (dd-predicate-name defstruct) nil)))
 
@@ -1035,7 +1038,7 @@
 	   (unless (eq (class-layout class) layout)
 	     (register-layout layout)))
 	  (t
-	   (let ((old-dd (layout-dd old-layout)))
+	   (let ((old-dd (layout-info old-layout)))
 	     (when (defstruct-description-p old-dd)
 	       (dolist (slot (dd-slots old-dd))
 		 (fmakunbound (dsd-accessor-name slot))
@@ -1067,7 +1070,6 @@
 	;; the case of a raw slot, to read the vector of raw slots
 	(ref (ecase (dd-type dd)
 	       (structure '%instance-ref)
-	       (funcallable-structure '%funcallable-instance-info)
 	       (list 'nth-but-with-sane-arg-order)
 	       (vector 'aref)))
 	(raw-type (dsd-raw-type dsd)))
@@ -1109,10 +1111,21 @@
 	       (declare (type ,(dd-name dd) structure-object))
 	       (setf ,(%accessor-place-form dd dsd 'instance) new-value)))))
 
-;;; Do (COMPILE LOAD EVAL)-time actions for the defstruct described by DD.
-(defun %compiler-defstruct (dd inherits)
-  (declare (type defstruct-description dd))
-  #+sb-xc (/show0 "entering %COMPILER-DEFSTRUCT")
+;;; core compile-time setup of any class with a LAYOUT, used even by
+;;; !DEFSTRUCT-WITH-ALTERNATE-METACLASS weirdosities
+(defun %compiler-set-up-layout (dd
+				&optional
+				;; Several special cases (STRUCTURE-OBJECT
+				;; itself, and structures with alternate
+				;; metaclasses) call this function directly,
+				;; and they're all at the base of the
+				;; instance class structure, so this is
+				;; a handy default.
+				(inherits (vector (find-layout t)
+						  (find-layout 'instance))))
+
+  (/show "entering %COMPILER-SET-UP-LAYOUT for" (dd-name dd))
+
   (multiple-value-bind (class layout old-layout)
       (multiple-value-bind (clayout clayout-p)
 	  (info :type :compiler-layout (dd-name dd))
@@ -1122,6 +1135,7 @@
 				"compiled"
 				:compiler-layout clayout))
     (cond (old-layout
+	   (/show "non-NIL" old-layout)
 	   (undefine-structure (layout-class old-layout))
 	   (when (and (class-subclasses class)
 		      (not (eq layout old-layout)))
@@ -1139,7 +1153,24 @@
 	     (register-layout layout :invalidate nil))
 	   (setf (sb!xc:find-class (dd-name dd)) class)))
 
+    ;; At this point the class should be set up in the INFO database.
+    ;; But the logic that enforces this is a little tangled and
+    ;; scattered, so it's not obvious, so let's check.
+    (aver (sb!xc:find-class (dd-name dd) nil))
+
     (setf (info :type :compiler-layout (dd-name dd)) layout))
+
+  (/show0 "leaving %COMPILER-SET-UP-LAYOUT")
+
+  (values))
+
+;;; Do (COMPILE LOAD EVAL)-time actions for the normal (not
+;;; ALTERNATE-LAYOUT) DEFSTRUCT described by DD.
+(defun %compiler-defstruct (dd inherits)
+  (declare (type defstruct-description dd))
+  #+sb-xc (/show0 "entering %COMPILER-DEFSTRUCT")
+
+  (%compiler-set-up-layout dd inherits)
 
   (let* ((dd-name (dd-name dd))
 	 (dtype (dd-declarable-type dd))
@@ -1390,10 +1421,7 @@
        #!+long-float
        (complex-long-float '%raw-ref-complex-long)
        (unsigned-byte 'aref)
-       ((t)
-	(if (eq (dd-type defstruct) 'funcallable-structure)
-	    '%funcallable-instance-info
-	    '%instance-ref)))
+       ((t) '%instance-ref))
      (case rtype
        #!+long-float
        (complex-long-float
@@ -1422,16 +1450,15 @@
 ;;; specified name and arglist. VARS and TYPES are used for argument
 ;;; type declarations. VALUES are the values for the slots (in order.)
 ;;;
-;;; This is split four ways because:
-;;; 1] LIST & VECTOR structures need "name" symbols stuck in at
-;;;    various weird places, whereas STRUCTURE structures have
-;;;    a LAYOUT slot.
-;;; 2] We really want to use LIST to make list structures, instead of
-;;;    MAKE-LIST/(SETF ELT).
-;;; 3] STRUCTURE structures can have raw slots that must also be
-;;;    allocated and indirectly referenced. We use SLOT-ACCESSOR-FORM
-;;;    to compute how to set the slots, which deals with raw slots.
-;;; 4] Funcallable structures are weird.
+;;; This is split three ways because:
+;;;   * LIST & VECTOR structures need "name" symbols stuck in at
+;;;     various weird places, whereas STRUCTURE structures have
+;;;     a LAYOUT slot.
+;;;   * We really want to use LIST to make list structures, instead of
+;;;     MAKE-LIST/(SETF ELT).
+;;;   * STRUCTURE structures can have raw slots that must also be
+;;;     allocated and indirectly referenced. We use SLOT-ACCESSOR-FORM
+;;;     to compute how to set the slots, which deals with raw slots.
 (defun create-vector-constructor (dd cons-name arglist vars types values)
   (let ((temp (gensym))
 	(etype (dd-element-type dd)))
@@ -1481,22 +1508,6 @@
 		       `(setf (,accessor ,data ,index) ,value)))
 		   (dd-slots dd)
 		   values)
-	 ,temp))))
-(defun create-fin-constructor (dd cons-name arglist vars types values)
-  (let ((temp (gensym)))
-    `(defun ,cons-name ,arglist
-       (declare ,@(mapcar #'(lambda (var type) `(type ,type ,var))
-			  vars types))
-       (let ((,temp (truly-the
-		     ,(dd-name dd)
-		     (%make-funcallable-instance
-		      ,(dd-length dd)
-		      (%delayed-get-compiler-layout ,(dd-name dd))))))
-	 ,@(mapcar #'(lambda (dsd value)
-		       `(setf (%funcallable-instance-info
-			       ,temp ,(dsd-index dsd))
-			      ,value))
-		   (dd-slots dd) values)
 	 ,temp))))
 
 ;;; Create a default (non-BOA) keyword constructor.
@@ -1599,7 +1610,6 @@
 	(defaults ())
 	(creator (ecase (dd-type defstruct)
 		   (structure #'create-structure-constructor)
-		   (funcallable-structure #'create-fin-constructor)
 		   (vector #'create-vector-constructor)
 		   (list #'create-list-constructor))))
     (dolist (constructor (dd-constructors defstruct))
@@ -1633,10 +1643,184 @@
 	,@(res)
 	(/show0 "done with CONSTRUCTOR-DEFINITIONS forms")))))
 
+;;;; instances with ALTERNATE-METACLASS
+;;;;
+;;;; The CMU CL support for structures with ALTERNATE-METACLASS was a
+;;;; fairly general extension embedded in the main DEFSTRUCT code, and
+;;;; the result was an fairly impressive mess as ALTERNATE-METACLASS
+;;;; extension mixed with ANSI CL generality (e.g. :TYPE and :INCLUDE)
+;;;; and CMU CL implementation hairiness (esp. raw slots). This SBCL
+;;;; version is much less ambitious, noticing that ALTERNATE-METACLASS
+;;;; is only used to implement CONDITION, STANDARD-INSTANCE, and
+;;;; GENERIC-FUNCTION, and defining a simple specialized
+;;;; separate-from-DEFSTRUCT macro to provide only enough
+;;;; functionality to support those.
+;;;;
+;;;; KLUDGE: The defining macro here is so specialized that it's ugly
+;;;; in its own way. It also violates once-and-only-once by knowing
+;;;; much about structures and layouts that is already known by the
+;;;; main DEFSTRUCT macro. Hopefully it will go away presently
+;;;; (perhaps when CL:CLASS and SB-PCL:CLASS meet) as per FIXME below.
+;;;; -- WHN 2001-10-28
+;;;; 
+;;;; FIXME: There seems to be no good reason to shoehorn CONDITION,
+;;;; STANDARD-INSTANCE, and GENERIC-FUNCTION into mutated structures
+;;;; instead of just implementing them as primitive objects. (This
+;;;; reduced-functionality macro seems pretty close to the
+;;;; functionality of DEFINE-PRIMITIVE-OBJECT..)
+
+(defun make-dd-with-alternate-metaclass (&key (class-name (missing-arg))
+					      (superclass-name (missing-arg))
+					      (metaclass-name (missing-arg))
+					      (dd-type (missing-arg))
+					      metaclass-constructor
+					      slot-names)
+  (let* ((dd (make-defstruct-description class-name))
+	 (conc-name (concatenate 'string (symbol-name class-name) "-"))
+	 (dd-slots (let ((reversed-result nil)
+			 ;; The index starts at 1 for ordinary
+			 ;; named slots because slot 0 is
+			 ;; magical, used for LAYOUT in
+			 ;; CONDITIONS or for something (?) in
+			 ;; funcallable instances.
+			 (index 1))
+		     (dolist (slot-name slot-names)
+		       (push (make-defstruct-slot-description
+			      :%name (symbol-name slot-name)
+			      :index index
+			      :accessor-name (symbolicate conc-name slot-name))
+			     reversed-result)
+		       (incf index))
+		     (nreverse reversed-result))))
+    (setf (dd-alternate-metaclass dd) (list superclass-name
+					    metaclass-name
+					    metaclass-constructor)
+	  (dd-slots dd) dd-slots
+	  (dd-length dd) (1+ (length slot-names))
+	  (dd-type dd) dd-type)
+    dd))
+
+(sb!xc:defmacro !defstruct-with-alternate-metaclass
+    (class-name &key
+		(slot-names (missing-arg))
+		(boa-constructor (missing-arg))
+		(superclass-name (missing-arg))
+		(metaclass-name (missing-arg))
+		(metaclass-constructor (missing-arg))
+		(dd-type (missing-arg))
+		predicate
+		(runtime-type-checks-p t))
+
+  (declare (type (and list (not null)) slot-names))
+  (declare (type (and symbol (not null))
+		 boa-constructor
+		 superclass-name
+		 metaclass-name
+		 metaclass-constructor))
+  (declare (type symbol predicate))
+  (declare (type (member structure funcallable-structure) dd-type))
+
+  (/show "entering !DEFSTRUCT-WITH-ALTERNATE-METACLASS expander" class-name)
+  (let* ((dd (make-dd-with-alternate-metaclass
+	      :class-name class-name
+	      :slot-names slot-names
+	      :superclass-name superclass-name
+	      :metaclass-name metaclass-name
+	      :metaclass-constructor metaclass-constructor
+	      :dd-type dd-type))
+	 (conc-name (concatenate 'string (symbol-name class-name) "-"))
+	 (dd-slots (dd-slots dd))
+	 (dd-length (1+ (length slot-names)))
+	 (object-gensym (gensym "OBJECT"))
+	 (new-value-gensym (gensym "NEW-VALUE-"))
+	 (delayed-layout-form `(%delayed-get-compiler-layout ,class-name)))
+    (multiple-value-bind (raw-maker-form raw-reffer-operator)
+	(ecase dd-type
+	  (structure
+	   (values `(let ((,object-gensym (%make-instance ,dd-length)))
+		      (setf (%instance-layout ,object-gensym)
+			    ,delayed-layout-form)
+		      ,object-gensym)
+		   '%instance-ref))
+	  (funcallable-instance
+	   (values `(%make-funcallable-instance ,dd-length
+						,delayed-layout-form)
+		   '%funcallable-instance-ref)))
+      (/show dd raw-maker-form raw-reffer-operator)
+      `(progn
+
+	 (eval-when (:compile-toplevel :load-toplevel :execute)
+	   (%compiler-set-up-layout ',dd))
+
+	 ;; slot readers and writers
+	 (declaim (inline ,@(mapcar #'dsd-accessor-name dd-slots)))
+	 ,@(mapcar (lambda (dsd)
+		     `(defun ,(dsd-accessor-name dsd) (,object-gensym)
+			,@(when runtime-type-checks-p
+			    `((declare (type ,class-name ,object-gensym))))
+			(,raw-reffer-operator ,object-gensym
+					      ,(dsd-index dsd))))
+		   dd-slots)
+	 (declaim (inline ,@(mapcar (lambda (dsd)
+				      `(setf ,(dsd-accessor-name dsd)))
+				    dd-slots)))
+	 ,@(mapcar (lambda (dsd)
+		     `(defun (setf ,(dsd-accessor-name dsd)) (,new-value-gensym
+							      ,object-gensym)
+			,@(when runtime-type-checks-p
+			    `((declare (type ,class-name ,object-gensym))))
+			(setf (,raw-reffer-operator ,object-gensym
+						    ,(dsd-index dsd))
+			      ,new-value-gensym)))
+		   dd-slots)
+
+	 ;; constructor
+	 (defun ,boa-constructor ,slot-names
+	   (let ((,object-gensym ,raw-maker-form))
+	     ,@(mapcar (lambda (slot-name)
+			 (let ((dsd (find (symbol-name slot-name) dd-slots
+					  :key #'dsd-%name
+					  :test #'string=)))
+			   `(setf (,(dsd-accessor-name dsd) ,object-gensym)
+				  ,slot-name)))
+		       slot-names)
+	     ,object-gensym))
+			      
+	 ;; predicate
+	 ,@(when predicate
+	     ;; Just delegate to the compiler's type optimization
+	     ;; code, which knows how to generate inline type tests
+	     ;; for the whole CMU CL INSTANCE menagerie.
+	     `(defun ,predicate (,object-gensym)
+		(typep ,object-gensym ',class-name)))))))
+
 ;;;; finalizing bootstrapping
 
-;;; early structure placeholder definitions: Set up layout and class
-;;; data for structures which are needed early.
+;;; Set up DD and LAYOUT for STRUCTURE-OBJECT class itself.
+;;;
+;;; Ordinary structure classes effectively :INCLUDE STRUCTURE-OBJECT
+;;; when they have no explicit :INCLUDEs, so (1) it needs to be set up
+;;; before we can define ordinary structure classes, and (2) it's
+;;; special enough (and simple enough) that we just build it by hand
+;;; instead of trying to generalize the ordinary DEFSTRUCT code.
+(defun !set-up-structure-object-class ()
+  (/show0 "entering !SET-UP-STRUCTURE-OBJECT-CLASS")
+  (let ((dd (make-defstruct-description 'structure-object)))
+    (setf
+     ;; Note: This has an ALTERNATE-METACLASS only because of blind
+     ;; clueless imitation of the CMU CL code -- dunno if or why it's
+     ;; needed. -- WHN 
+     (dd-alternate-metaclass dd) '(instance)
+     (dd-slots dd) nil
+     (dd-length dd) 1
+     (dd-type dd) 'structure)
+    (/show0 "about to %COMPILER-SET-UP-LAYOUT")
+    (%compiler-set-up-layout dd))
+  (/show0 "leaving !SET-UP-STRUCTURE-OBJECT-CLASS"))
+(!set-up-structure-object-class)
+
+;;; early structure predeclarations: Set up DD and LAYOUT for ordinary
+;;; (non-ALTERNATE-METACLASS) structures which are needed early.
 (dolist (args
 	 '#.(sb-cold:read-from-file
 	     "src/code/early-defstruct-args.lisp-expr"))

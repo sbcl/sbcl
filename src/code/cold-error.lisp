@@ -88,14 +88,27 @@
 
 (defun error (datum &rest arguments)
   #!+sb-doc
-  "Invoke the signal facility on a condition formed from datum and arguments.
-   If the condition is not handled, the debugger is invoked."
+  "Invoke the signal facility on a condition formed from DATUM and ARGUMENTS.
+  If the condition is not handled, the debugger is invoked."
   (/show0 "entering ERROR, argument list=..")
   (/hexstr arguments)
-  (/show0 "printing ERROR arguments one by one..")
+
+  (/show0 "cold-printing ERROR arguments one by one..")
   #!+sb-show (dolist (argument arguments)
 	       (sb!impl::cold-print argument))
-  (/show0 "done printing ERROR arguments")
+  (/show0 "done cold-printing ERROR arguments")
+
+  ;; REMOVEME after fixing condition bug
+  (when (find-package :sb-kernel) ; i.e. after rename-packages in warm-init
+    (if (or (stringp datum) (symbolp datum))
+	(/show datum)
+	(/show (class-name (class-of datum)) (class-of datum)))
+    (sb!debug:backtrace)
+    (print "printing ERROR arguments one by one..")
+    (dolist (argument arguments)
+      (print argument))
+    (print "done printing ERROR arguments"))
+
   (sb!kernel:infinite-error-protect
     (let ((condition (coerce-to-condition datum arguments
 					  'simple-error 'error))
@@ -161,7 +174,7 @@
 	#!+sb-show (dolist (argument arguments)
 		     (sb!impl::cold-print argument)))
       (sb!kernel:infinite-error-protect
-       (/show0 "in INFINITE-ERROR-PROTECT, doing COERCE-TO-CONDITION")
+       (/show0 "doing COERCE-TO-CONDITION")
        (let ((condition (coerce-to-condition datum arguments
 					     'simple-warning 'warn)))
 	 (/show0 "back from COERCE-TO-CONDITION, doing ENFORCE-TYPE")

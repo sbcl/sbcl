@@ -206,10 +206,10 @@
 			`(list-of-length-at-least-p ,path-0 ,minimum)
 			`(proper-list-of-length-p ,path-0 ,minimum ,maximum))
 	     ,(if (eq error-fun 'error)
-		  `(do-arg-count-error ',error-kind ',name ,path-0
-				       ',lambda-list ,minimum
-				       ,(unless restp maximum))
-		  `(,error-fun 'defmacro-ll-arg-count-error
+		  `(arg-count-error ',error-kind ',name ,path-0
+				    ',lambda-list ,minimum
+				    ,(unless restp maximum))
+		  `(,error-fun 'arg-count-error
 			       :kind ',error-kind
 			       ,@(when name `(:name ',name))
 			       :argument ,path-0
