@@ -14,7 +14,7 @@ DIR=tools-for-build
 featurep() {
     bin="$DIR/$1-test"
     rm -f $bin
-    cc $DIR/$1-test.c $2 -o $bin 2>&1 > /dev/null && $bin 2>&1 /dev/null
+    cc $DIR/$1-test.c $2 -o $bin > /dev/null 2>&1 && $bin > /dev/null 2>&1
     if [ "$?" = 104 ]
     then
 	printf " :$1"
