@@ -1,6 +1,8 @@
 changes in sbcl-0.8.20 (0.9alpha.0?) relative to sbcl-0.8.19:
   * fixed disassembly of SHLD and SHRD on x86.  (thanks to David
     Lichteblau)
+  * fixed loading of multiply forward-referenced layouts. 
+    (thanks to Cheuksan Wang)
   * fixed bugs 19 and 317: fixed-format floating point printing is
     more accurate.  This also fixes a bug reported by Adam Warner
     related to the ~@F format directive.

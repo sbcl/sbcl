@@ -431,7 +431,7 @@
   (let ((layout (find-layout name)))
     (init-or-check-layout layout
 			  (or (find-classoid name nil)
-			      (make-undefined-classoid name))
+			      (layout-classoid layout))
 			  length
 			  inherits
 			  depthoid)))
