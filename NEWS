@@ -21,6 +21,8 @@ changes in sbcl-0.8.16 relative to sbcl-0.8.15:
     ** PPRINT-INDENT accepts a request for an indentation of any REAL.
     ** PPRINT-TAB (and the FORMAT ~T directive) now indent by the
        correct amounts.
+    ** The justification version of the FORMAT ~< directive treats
+       non-zero minpad parameter correctly.
 
 changes in sbcl-0.8.15 relative to sbcl-0.8.14:
   * incompatible change: SB-INT:*BEFORE-SAVE-INITIALIZATIONS* and

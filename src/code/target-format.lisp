@@ -1113,8 +1113,6 @@
 (defun format-justification (stream newline-prefix extra-space line-len strings
 			     pad-left pad-right mincol colinc minpad padchar)
   (setf strings (reverse strings))
-  (when (and (not pad-left) (not pad-right) (null (cdr strings)))
-    (setf pad-left t))
   (let* ((num-gaps (+ (1- (length strings))
 		      (if pad-left 1 0)
 		      (if pad-right 1 0)))
@@ -1125,18 +1123,19 @@
 	 (length (if (> chars mincol)
 		     (+ mincol (* (ceiling (- chars mincol) colinc) colinc))
 		     mincol))
-	 (padding (- length chars)))
+	 (padding (+ (- length chars) (* num-gaps minpad))))
     (when (and newline-prefix
 	       (> (+ (or (sb!impl::charpos stream) 0)
 		     length extra-space)
 		  line-len))
       (write-string newline-prefix stream))
     (flet ((do-padding ()
-	     (let ((pad-len (truncate padding num-gaps)))
+	     (let ((pad-len
+                    (if (zerop num-gaps) padding (truncate padding num-gaps))))
 	       (decf padding pad-len)
 	       (decf num-gaps)
 	       (dotimes (i pad-len) (write-char padchar stream)))))
-      (when pad-left
+      (when (or pad-left (and (not pad-right) (null (cdr strings))))
 	(do-padding))
       (when strings
 	(write-string (car strings) stream)
