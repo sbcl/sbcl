@@ -167,6 +167,17 @@
 (assert (not (equal (multiple-value-list
                      (subtypep '(function ()) '(function (&rest t))))
                     '(nil t))))
+
 (assert (not (equal (multiple-value-list
                      (subtypep '(function (&rest t)) '(function ())))
                     '(t t))))
+
+(assert (subtypep '(function)
+                  '(function (&optional * &rest t))))
+(assert (equal (multiple-value-list
+                (subtypep '(function)
+                          '(function (t &rest t))))
+               '(nil t)))
+#+nil
+(assert (and (subtypep 'function '(function))
+             (subtypep '(function) 'function)))

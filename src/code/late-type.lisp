@@ -241,7 +241,13 @@
      (3and (values-subtypep (fun-type-returns type1)
                             (fun-type-returns type2))
            (cond ((fun-type-wild-args type2) (values t t))
-                 ((fun-type-wild-args type1) (values nil t))
+                 ((fun-type-wild-args type1)
+                  (cond ((fun-type-keyp type2) (values nil nil))
+                        ((not (fun-type-rest type2)) (values nil t))
+                        ((not (null (fun-type-required type2))) (values nil t))
+                        (t (3and (type= *universal-type* (fun-type-rest type2))
+                                 (every/type #'type= *universal-type*
+                                             (fun-type-optional type2))))))
                  ((not (and (fun-type-simple-p type1)
                             (fun-type-simple-p type2)))
                   (values nil nil))
@@ -298,9 +304,12 @@
     (declare (ignore aux)) ; since we require AUXP=NIL
     (when auxp
       (error "&AUX in a FUNCTION or VALUES type: ~S." lambda-list))
-    (setf (args-type-required result) (mapcar #'specifier-type required))
-    (setf (args-type-optional result) (mapcar #'specifier-type optional))
-    (setf (args-type-rest result) (if restp (specifier-type rest) nil))
+    (setf (args-type-required result)
+          (mapcar #'single-value-specifier-type required))
+    (setf (args-type-optional result)
+          (mapcar #'single-value-specifier-type optional))
+    (setf (args-type-rest result)
+          (if restp (single-value-specifier-type rest) nil))
     (setf (args-type-keyp result) keyp)
     (collect ((key-info))
       (dolist (key keys)
@@ -311,7 +320,7 @@
 	    (error "~@<repeated keyword ~S in lambda list: ~2I~_~S~:>"
 		   kwd lambda-list))
 	  (key-info (make-key-info :name kwd
-				   :type (specifier-type (second key))))))
+				   :type (single-value-specifier-type (second key))))))
       (setf (args-type-keywords result) (key-info)))
     (setf (args-type-allowp result) allowp)
     (values)))
@@ -445,7 +454,7 @@
 				       :initial-element rest2)))
 	    exact)))
 
-;;; If Type isn't a values type, then make it into one:
+;;; If TYPE isn't a values type, then make it into one:
 ;;;    <type>  ==>  (values type &rest t)
 (defun coerce-to-values (type)
   (declare (type ctype type))

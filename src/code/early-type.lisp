@@ -364,6 +364,12 @@
       (error "VALUES type illegal in this context:~%  ~S" x))
     res))
 
+(defun single-value-specifier-type (x)
+  (let ((res (specifier-type x)))
+    (if (eq res *wild-type*)
+        *universal-type*
+        res)))
+
 ;;; Similar to MACROEXPAND, but expands DEFTYPEs. We don't bother
 ;;; returning a second value.
 (defun type-expand (form)

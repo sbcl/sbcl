@@ -1354,6 +1354,9 @@ WORKAROUND:
   but this first return value is not suitable for input to FUNCTION or
   COMPILE, as required by ANSI.
 
+229:
+  (subtypep 'function '(function)) => nil, t.
+
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:
     These labels were used for bugs related to the old IR1 interpreter.
