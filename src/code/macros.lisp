@@ -319,7 +319,8 @@
 ;;;; WITH-FOO i/o-related macros
 
 (defmacro-mundanely with-open-stream ((var stream) &body forms-decls)
-  (multiple-value-bind (forms decls) (parse-body forms-decls nil)
+  (multiple-value-bind (forms decls)
+      (parse-body forms-decls :doc-string-allowed nil)
     (let ((abortp (gensym)))
       `(let ((,var ,stream)
 	     (,abortp t))
@@ -338,7 +339,8 @@
 
 (defmacro-mundanely with-input-from-string ((var string &key index start end)
 					    &body forms-decls)
-  (multiple-value-bind (forms decls) (parse-body forms-decls nil)
+  (multiple-value-bind (forms decls)
+      (parse-body forms-decls :doc-string-allowed nil)
     ;; The ONCE-ONLY inhibits compiler note for unreachable code when
     ;; END is true.
     (once-only ((string string))
@@ -366,7 +368,8 @@
 (defmacro-mundanely with-output-to-string 
     ((var &optional string &key (element-type ''character))
      &body forms-decls)
-  (multiple-value-bind (forms decls) (parse-body forms-decls nil)
+  (multiple-value-bind (forms decls)
+      (parse-body forms-decls :doc-string-allowed nil)
     (if string
       `(let ((,var (make-fill-pointer-output-stream ,string)))
   	 ,@decls

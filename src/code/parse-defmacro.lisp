@@ -28,7 +28,7 @@
 (defvar *ignorable-vars*)
 (declaim (type list *ignorable-vars*))
 
-;;; Return, as multiple values, a body, possibly a declare form to put
+;;; Return, as multiple values, a body, possibly a DECLARE form to put
 ;;; where this code is inserted, the documentation for the parsed
 ;;; body, and bounds on the number of arguments.
 (defun parse-defmacro (lambda-list arg-list-name body name error-kind
@@ -40,7 +40,7 @@
 				   (error-fun 'error)
                                    (wrap-block t))
   (multiple-value-bind (forms declarations documentation)
-      (parse-body body doc-string-allowed)
+      (parse-body body :doc-string-allowed doc-string-allowed)
     (let ((*arg-tests* ())
 	  (*user-lets* ())
 	  (*system-lets* ())

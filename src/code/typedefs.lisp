@@ -43,7 +43,8 @@
       (if (eq '&whole (car arglist))
 	  (values (cadr arglist) (cddr arglist))
 	  (values (gensym) arglist))
-    (multiple-value-bind (forms decls) (parse-body body nil)
+    (multiple-value-bind (forms decls)
+	(parse-body body :doc-string-allowed nil)
       `(progn
 	 (!cold-init-forms
 	  (setf (info :type :translator ',name)

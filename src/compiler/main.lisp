@@ -835,7 +835,8 @@
 ;;; We parse declarations and then recursively process the body.
 (defun process-toplevel-locally (body path compile-time-too &key vars funs)
   (declare (list path))
-  (multiple-value-bind (forms decls) (parse-body body nil)
+  (multiple-value-bind (forms decls)
+      (parse-body body :doc-string-allowed nil :toplevel t)
     (let* ((*lexenv* (process-decls decls vars funs))
            ;; FIXME: VALUES declaration
            ;;

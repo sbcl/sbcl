@@ -77,7 +77,7 @@
 
 (sb!xc:defmacro define-sequence-traverser (name args &body body)
   (multiple-value-bind (body declarations docstring)
-      (parse-body body t)
+      (parse-body body :doc-string-allowed t)
     (collect ((new-args) (new-declarations) (adjustments))
       (dolist (arg args)
 	(case arg

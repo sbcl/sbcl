@@ -111,7 +111,8 @@
   "DO-SYMBOLS (VAR [PACKAGE [RESULT-FORM]]) {DECLARATION}* {TAG | FORM}*
    Executes the FORMs at least once for each symbol accessible in the given
    PACKAGE with VAR bound to the current symbol."
-  (multiple-value-bind (body decls) (parse-body body-decls nil)
+  (multiple-value-bind (body decls)
+      (parse-body body-decls :doc-string-allowed nil)
     (let ((flet-name (gensym "DO-SYMBOLS-")))
       `(block nil
 	 (flet ((,flet-name (,var)
@@ -146,7 +147,8 @@
   "DO-EXTERNAL-SYMBOLS (VAR [PACKAGE [RESULT-FORM]]) {DECL}* {TAG | FORM}*
    Executes the FORMs once for each external symbol in the given PACKAGE with
    VAR bound to the current symbol."
-  (multiple-value-bind (body decls) (parse-body body-decls nil)
+  (multiple-value-bind (body decls)
+      (parse-body body-decls :doc-string-allowed nil)
     (let ((flet-name (gensym "DO-SYMBOLS-")))
       `(block nil
 	 (flet ((,flet-name (,var)
@@ -171,7 +173,8 @@
   "DO-ALL-SYMBOLS (VAR [RESULT-FORM]) {DECLARATION}* {TAG | FORM}*
    Executes the FORMs once for each symbol in every package with VAR bound
    to the current symbol."
-  (multiple-value-bind (body decls) (parse-body body-decls nil)
+  (multiple-value-bind (body decls)
+      (parse-body body-decls :doc-string-allowed nil)
     (let ((flet-name (gensym "DO-SYMBOLS-")))
       `(block nil
 	 (flet ((,flet-name (,var)

@@ -499,11 +499,12 @@ bootstrapping.
 				 env))))
 
 (defun add-method-declarations (name qualifiers lambda-list body env)
+  (declare (ignore env))
   (multiple-value-bind (parameters unspecialized-lambda-list specializers)
       (parse-specialized-lambda-list lambda-list)
     (declare (ignore parameters))
     (multiple-value-bind (real-body declarations documentation)
-	(parse-body body env)
+	(parse-body body)
       (values `(lambda ,unspecialized-lambda-list
 		 ,@(when documentation `(,documentation))
 		 ;; (Old PCL code used a somewhat different style of
@@ -635,7 +636,7 @@ bootstrapping.
 	    is not a lambda form."
 	   method-lambda))
   (multiple-value-bind (real-body declarations documentation)
-      (parse-body (cddr method-lambda) env)
+      (parse-body (cddr method-lambda))
     (let* ((name-decl (get-declaration '%method-name declarations))
 	   (sll-decl (get-declaration '%method-lambda-list declarations))
 	   (method-name (when (consp name-decl) (car name-decl)))
@@ -725,7 +726,7 @@ bootstrapping.
 	    (multiple-value-bind (walked-lambda-body
 				  walked-declarations
 				  walked-documentation)
-		(parse-body (cddr walked-lambda) env)
+		(parse-body (cddr walked-lambda))
 	      (declare (ignore walked-documentation))
 	      (when (or next-method-p-p call-next-method-p)
 		(setq plist (list* :needs-next-methods-p t plist)))

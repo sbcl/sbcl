@@ -1013,8 +1013,8 @@
 ;;; body given, or return NIL if no %METHOD-NAME declaration is found.
 (defun body-method-name (body)
   (multiple-value-bind (real-body declarations documentation)
-      (parse-body body nil)
-    (declare (ignore documentation real-body))
+      (parse-body body)
+    (declare (ignore real-body documentation))
     (let ((name-decl (get-declaration '%method-name declarations)))
       (and name-decl
 	   (destructuring-bind (name) name-decl

@@ -370,7 +370,7 @@
 
 ;;; Iterate over the entries in a HASH-TABLE.
 (defmacro dohash ((key-var value-var table &optional result) &body body)
-  (multiple-value-bind (forms decls) (parse-body body nil)
+  (multiple-value-bind (forms decls) (parse-body body :doc-string-allowed nil)
     (let ((gen (gensym))
 	  (n-more (gensym)))
       `(with-hash-table-iterator (,gen ,table)

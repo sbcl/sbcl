@@ -1001,41 +1001,41 @@
 ;;; a function.
 ;;;
 ;;; Given the continuation ARG, derive the resulting type using the
-;;; DERIVE-FCN. DERIVE-FCN takes exactly one argument which is some
+;;; DERIVE-FUN. DERIVE-FUN takes exactly one argument which is some
 ;;; "atomic" continuation type like numeric-type or member-type
 ;;; (containing just one element). It should return the resulting
 ;;; type, which can be a list of types.
 ;;;
-;;; For the case of member types, if a member-fcn is given it is
+;;; For the case of member types, if a MEMBER-FUN is given it is
 ;;; called to compute the result otherwise the member type is first
-;;; converted to a numeric type and the derive-fcn is call.
-(defun one-arg-derive-type (arg derive-fcn member-fcn
+;;; converted to a numeric type and the DERIVE-FUN is called.
+(defun one-arg-derive-type (arg derive-fun member-fun
 				&optional (convert-type t))
-  (declare (type function derive-fcn)
-	   (type (or null function) member-fcn))
+  (declare (type function derive-fun)
+	   (type (or null function) member-fun))
   (let ((arg-list (prepare-arg-for-derive-type (continuation-type arg))))
     (when arg-list
       (flet ((deriver (x)
 	       (typecase x
 		 (member-type
-		  (if member-fcn
+		  (if member-fun
 		      (with-float-traps-masked
 			  (:underflow :overflow :divide-by-zero)
 			(make-member-type
 			 :members (list
-				   (funcall member-fcn
+				   (funcall member-fun
 					    (first (member-type-members x))))))
 		      ;; Otherwise convert to a numeric type.
 		      (let ((result-type-list
-			     (funcall derive-fcn (convert-member-type x))))
+			     (funcall derive-fun (convert-member-type x))))
 			(if convert-type
 			    (convert-back-numeric-type-list result-type-list)
 			    result-type-list))))
 		 (numeric-type
 		  (if convert-type
 		      (convert-back-numeric-type-list
-		       (funcall derive-fcn (convert-numeric-type x)))
-		      (funcall derive-fcn x)))
+		       (funcall derive-fun (convert-numeric-type x)))
+		      (funcall derive-fun x)))
 		 (t
 		  *universal-type*))))
 	;; Run down the list of args and derive the type of each one,
@@ -1051,14 +1051,14 @@
 	      (first results)))))))
 
 ;;; Same as ONE-ARG-DERIVE-TYPE, except we assume the function takes
-;;; two arguments. DERIVE-FCN takes 3 args in this case: the two
+;;; two arguments. DERIVE-FUN takes 3 args in this case: the two
 ;;; original args and a third which is T to indicate if the two args
 ;;; really represent the same continuation. This is useful for
 ;;; deriving the type of things like (* x x), which should always be
 ;;; positive. If we didn't do this, we wouldn't be able to tell.
-(defun two-arg-derive-type (arg1 arg2 derive-fcn fcn
+(defun two-arg-derive-type (arg1 arg2 derive-fun fun
 				 &optional (convert-type t))
-  (declare (type function derive-fcn fcn))
+  (declare (type function derive-fun fun))
   (flet ((deriver (x y same-arg)
 	   (cond ((and (member-type-p x) (member-type-p y))
 		  (let* ((x (first (member-type-members x)))
@@ -1066,7 +1066,7 @@
 			 (result (with-float-traps-masked
 				     (:underflow :overflow :divide-by-zero
 				      :invalid)
-				   (funcall fcn x y))))
+				   (funcall fun x y))))
 		    (cond ((null result))
 			  ((and (floatp result) (float-nan-p result))
 			   (make-numeric-type :class 'float
@@ -1077,21 +1077,21 @@
 		 ((and (member-type-p x) (numeric-type-p y))
 		  (let* ((x (convert-member-type x))
 			 (y (if convert-type (convert-numeric-type y) y))
-			 (result (funcall derive-fcn x y same-arg)))
+			 (result (funcall derive-fun x y same-arg)))
 		    (if convert-type
 			(convert-back-numeric-type-list result)
 			result)))
 		 ((and (numeric-type-p x) (member-type-p y))
 		  (let* ((x (if convert-type (convert-numeric-type x) x))
 			 (y (convert-member-type y))
-			 (result (funcall derive-fcn x y same-arg)))
+			 (result (funcall derive-fun x y same-arg)))
 		    (if convert-type
 			(convert-back-numeric-type-list result)
 			result)))
 		 ((and (numeric-type-p x) (numeric-type-p y))
 		  (let* ((x (if convert-type (convert-numeric-type x) x))
 			 (y (if convert-type (convert-numeric-type y) y))
-			 (result (funcall derive-fcn x y same-arg)))
+			 (result (funcall derive-fun x y same-arg)))
 		    (if convert-type
 			(convert-back-numeric-type-list result)
 			result)))
@@ -2226,10 +2226,10 @@
        (t
 	(specifier-type 'integer))))))
 
-(macrolet ((deffrob (logfcn)
-	     (let ((fcn-aux (symbolicate logfcn "-DERIVE-TYPE-AUX")))
-	     `(defoptimizer (,logfcn derive-type) ((x y))
-		(two-arg-derive-type x y #',fcn-aux #',logfcn)))))
+(macrolet ((deffrob (logfun)
+	     (let ((fun-aux (symbolicate logfun "-DERIVE-TYPE-AUX")))
+	     `(defoptimizer (,logfun derive-type) ((x y))
+		(two-arg-derive-type x y #',fun-aux #',logfun)))))
   (deffrob logand)
   (deffrob logior)
   (deffrob logxor))

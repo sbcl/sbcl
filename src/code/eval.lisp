@@ -47,7 +47,8 @@
 	(return (eval-in-lexenv (first i) lexenv)))))
 
 (defun eval-locally (exp lexenv &optional vars)
-  (multiple-value-bind (body decls) (parse-body (rest exp) nil)
+  (multiple-value-bind (body decls)
+      (parse-body (rest exp) :doc-string-allowed nil)
     (let ((lexenv
            ;; KLUDGE: Uh, yeah.  I'm not anticipating
            ;; winning any prizes for this code, which was

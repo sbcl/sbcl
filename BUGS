@@ -1117,6 +1117,62 @@ WORKAROUND:
 
   b. For the example above, the compiler does not issue a note.
 
+279: type propagation error -- correctly inferred type goes astray?
+  In sbcl-0.8.3 and sbcl-0.8.1.47, the warning
+       The binding of ABS-FOO is a (VALUES (INTEGER 0 0)
+       &OPTIONAL), not a (INTEGER 1 536870911)
+  is emitted when compiling this file:
+    (declaim (ftype (function ((integer 0 #.most-positive-fixnum))
+                              (integer #.most-negative-fixnum 0))
+                    foo))
+    (defun foo (x)
+      (- x))
+    (defun bar (x)
+      (let* (;; Uncomment this for a type mismatch warning indicating 
+             ;; that the type of (FOO X) is correctly understood.
+             #+nil (fs-foo (float-sign (foo x)))
+                   ;; Uncomment this for a type mismatch warning 
+                   ;; indicating that the type of (ABS (FOO X)) is
+                   ;; correctly understood.
+             #+nil (fs-abs-foo (float-sign (abs (foo x))))
+             ;; something wrong with this one though
+             (abs-foo (abs (foo x))))
+        (declare (type (integer 1 100) abs-foo))
+        (print abs-foo)))
+
+280: bogus WARNING about duplicate function definition 
+  In sbcl-0.8.3 and sbcl-0.8.1.47, if BS.MIN is defined inline,
+  e.g. by 
+     (declaim (inline bs.min))
+     (defun bs.min (bases) nil)
+  before compiling the file below, the compiler warns
+     Duplicate definition for BS.MIN found in one static
+     unit (usually a file).
+  when compiling 
+    (declaim (special *minus* *plus* *stagnant*))
+    (defun b.*.min (&optional (x () xp) (y () yp) &rest rest)
+      (bs.min avec))
+    (define-compiler-macro b.*.min (&rest rest)
+      `(bs.min ,@rest))
+    (defun afish-d-rbd (pd)
+      (if *stagnant* 
+          (b.*.min (foo-d-rbd *stagnant*))
+          (multiple-value-bind (reduce-fn initial-value)
+              (etypecase pd
+                (list (values #'bs.min 0))
+                (vector (values #'bs.min *plus*)))
+            (let ((cv-ks (cv (kpd.ks pd))))
+              (funcall reduce-fn d-rbds)))))
+    (defun bfish-d-rbd (pd)
+      (if *stagnant* 
+          (b.*.min (foo-d-rbd *stagnant*))
+          (multiple-value-bind (reduce-fn initial-value)
+              (etypecase pd
+                (list (values #'bs.min *minus*))
+                (vector (values #'bs.min 0)))
+            (let ((cv-ks (cv (kpd.ks pd))))
+              (funcall reduce-fn d-rbds)))))
+
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:
     These labels were used for bugs related to the old IR1 interpreter.

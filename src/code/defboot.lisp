@@ -105,19 +105,17 @@
 
 ;;;; various sequencing constructs
 
-(defmacro-mundanely prog (varlist &body body-decls)
-  (multiple-value-bind (body decls) (parse-body body-decls nil)
-    `(block nil
-       (let ,varlist
-	 ,@decls
-	 (tagbody ,@body)))))
-
-(defmacro-mundanely prog* (varlist &body body-decls)
-  (multiple-value-bind (body decls) (parse-body body-decls nil)
-    `(block nil
-       (let* ,varlist
-	 ,@decls
-	 (tagbody ,@body)))))
+(flet ((prog-expansion-from-let (varlist body-decls let)
+         (multiple-value-bind (body decls)
+	     (parse-body body-decls :doc-string-allowed nil)
+	   `(block nil
+	      (,let ,varlist
+		,@decls
+		(tagbody ,@body))))))
+  (defmacro-mundanely prog (varlist &body body-decls)
+    (prog-expansion-from-let varlist body-decls 'let))
+  (defmacro-mundanely prog* (varlist &body body-decls)
+    (prog-expansion-from-let varlist body-decls 'let*)))
 
 (defmacro-mundanely prog1 (result &body body)
   (let ((n-result (gensym)))
@@ -305,7 +303,7 @@
   ;; environment. We spuriously reference the gratuitous variable,
   ;; since we don't want to use IGNORABLE on what might be a special
   ;; var.
-  (multiple-value-bind (forms decls) (parse-body body nil)
+  (multiple-value-bind (forms decls) (parse-body body :doc-string-allowed nil)
     (let ((n-list (gensym)))
       `(do* ((,n-list ,list (cdr ,n-list)))
 	((endp ,n-list)
