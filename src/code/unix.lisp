@@ -390,12 +390,6 @@
 	     (cast buf c-string)
 	     (cast buf (* char)) 256)))
 
-;;; Write the core image of the file described by FD to disk.
-(defun unix-fsync (fd)
-  (declare (type unix-fd fd))
-  (void-syscall ("fsync" int) fd))
-
-
 (defun unix-setsid ()
   (int-syscall ("setsid")))
 

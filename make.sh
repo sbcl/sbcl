@@ -58,6 +58,10 @@
 # But in a year or so the --noprogrammer here can change to
 # --disable-debugger (and the deprecated --noprogrammer support can
 # go away completely).
+
+build_started=`date`
+echo "//starting build: $build_started"
+
 SBCL_XC_HOST="${1:-sbcl --noprogrammer}"
 export SBCL_XC_HOST
 echo //SBCL_XC_HOST=\"$SBCL_XC_HOST\"
@@ -115,4 +119,7 @@ echo "more extensive tests on the new SBCL, you can try"
 echo "  cd tests && sh ./run-tests.sh"
 echo "(but expect some failures on non-x86 platforms)."
 
-date
+build_finished=`date`
+echo
+echo "//build started:  $build_started"
+echo "//build finished: $build_finished"
