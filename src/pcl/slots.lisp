@@ -80,6 +80,7 @@
     (when (eql slot-name (slot-definition-name slot))
       (return slot))))
 
+(declaim (ftype (sfunction (t symbol) t) slot-value))
 (defun slot-value (object slot-name)
   (let* ((class (class-of object))
 	 (slot-definition (find-slot-definition class slot-name)))
@@ -279,7 +280,7 @@
 	 (value (funcall function object)))
     (declare (type function function))
     (if (eq value +slot-unbound+)
-	(slot-unbound class object (slot-definition-name slotd))
+	(values (slot-unbound class object (slot-definition-name slotd)))
 	value)))
 
 (defmethod (setf slot-value-using-class)

@@ -2126,6 +2126,8 @@ changes in sbcl-0.8.5 relative to sbcl-0.8.4:
     with values NIL and :ERROR.  (thanks to Milan Zamazal)
   * compiler enhancement: SIGNUM is now better able to derive the type
     of its result.
+  * type declarations inside WITH-SLOTS are checked.  (reported by
+    salex on #lisp)
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** incorrect optimization of TRUNCATE for a positive first
        argument and negative second.

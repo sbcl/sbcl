@@ -94,7 +94,8 @@
     `(let ((.ignore. (load-time-value
 		      (ensure-accessor 'reader ',reader-name ',slot-name))))
       (declare (ignore .ignore.))
-      (funcall #',reader-name ,object))))
+      (truly-the (values t &optional)
+                 (funcall #',reader-name ,object)))))
 
 (defmacro accessor-set-slot-value (object slot-name new-value &environment env)
   (aver (constantp slot-name))

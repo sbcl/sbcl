@@ -683,5 +683,22 @@
   (list x y))
 (assert (equal (bug262 1 2) '(1 2)))
 
+;;; salex on #lisp 2003-10-13 reported that type declarations inside
+;;; WITH-SLOTS are too hairy to be checked
+(defun ensure-no-notes (form)
+  (handler-case (compile nil `(lambda () ,form))
+    (sb-ext:compiler-note (c)
+      ;; FIXME: it would be better to check specifically for the "type
+      ;; is too hairy" note
+      (error c))))
+(defvar *x*)
+(ensure-no-notes '(with-slots (a) *x*
+                   (declare (integer a))
+                   a))
+(ensure-no-notes '(with-slots (a) *x*
+                   (declare (integer a))
+                   (declare (notinline slot-value))
+                   a))
+
 ;;;; success
 (sb-ext:quit :unix-status 104)
