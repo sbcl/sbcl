@@ -336,7 +336,7 @@
   (movable foldable flushable explicit-check))
 
 (defknown (ffloor fceiling fround ftruncate)
-  (real &optional real) (values float float)
+  (real &optional real) (values float real)
   (movable foldable flushable explicit-check))
 
 (defknown decode-float (float) (values float float-exponent float)

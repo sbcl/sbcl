@@ -64,3 +64,12 @@
                    (integer-decode-float f)
                  (scale-float (float signif f) expon))
                f)))
+
+;;; bug found by Paul Dietz: FFLOOR and similar did not work for integers
+(let ((tests '(((ffloor -8 3) (-3.0 1))
+               ((fround -8 3) (-3.0 1))
+               ((ftruncate -8 3) (-2.0 -2))
+               ((fceiling -8 3) (-2.0 -2)))))
+  (loop for (exp res) in tests
+        for real-res = (multiple-value-list (eval exp))
+        do (assert (equal real-res res))))

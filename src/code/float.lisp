@@ -314,6 +314,7 @@
 (defun float-radix (x)
   #!+sb-doc
   "Return (as an integer) the radix b of its floating-point argument."
+  (declare (ignore x))
   2)
 
 ;;;; INTEGER-DECODE-FLOAT and DECODE-FLOAT

@@ -129,3 +129,10 @@
   (assert (eq s (last s (* 1440 most-positive-fixnum))))
   (assert (null (butlast s (* 1440 most-positive-fixnum))))
   (assert (null (nbutlast s (* 1440 most-positive-fixnum)))))
+
+;;; Bug reported by Paul Dietz: ASSOC should ignore NIL elements in a
+;;; alist
+(let ((f (compile nil '(lambda (x)
+                        (assoc x '(nil (a . b) nil (nil . c) (c . d))
+                         :test #'eq)))))
+  (assert (equal (funcall f 'nil) '(nil . c))))

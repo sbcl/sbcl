@@ -1355,6 +1355,7 @@
                                collect `(prepare-argument ,arg)))))))
     (loop for infos being each hash-value of sb!c::*modular-funs*
           ;; FIXME: We need to process only "toplevel" functions
+          unless (eq infos :good)
           do (loop for info in infos
                    for name = (sb!c::modular-fun-info-name info)
                    and width = (sb!c::modular-fun-info-width info)

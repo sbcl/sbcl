@@ -2440,39 +2440,60 @@
      (logior (logand new mask)
 	     (logand int (lognot mask)))))
 
-;;; modular functions
+;;; Modular functions
+
+;;; (ldb (byte s 0) (foo x y ...)) =
+;;; (ldb (byte s 0) (foo (ldb (byte s 0) x) y ...))
 ;;;
-;;; -- lower N bits of a result depend only on lower N bits of
-;;; arguments.
+;;; and similar for other arguments. If
+;;;
+;;; (ldb (byte s 0) (foo x y ...)) =
+;;; (foo (ldb (byte s 0) x) (ldb (byte s 0) y) ...)
+;;;
+;;; the function FOO is :GOOD.
 
 ;;; Try to recursively cut all uses of the continuation CONT to WIDTH
 ;;; bits.
 (defun cut-to-width (cont width)
   (declare (type continuation cont) (type (integer 0) width))
-  (labels ((cut-node (node)
+  (labels ((reoptimize-node (node name)
+             (setf (node-derived-type node)
+                   (fun-type-returns
+                    (info :function :type name)))
+             (setf (continuation-%derived-type (node-cont node)) nil)
+             (setf (node-reoptimize node) t)
+             (setf (block-reoptimize (node-block node)) t)
+             (setf (component-reoptimize (node-component node)) t))
+           (cut-node (node &aux did-something)
              (when (and (combination-p node)
                         (fun-info-p (basic-combination-kind node)))
                (let* ((fun-ref (continuation-use (combination-fun node)))
                       (fun-name (leaf-source-name (ref-leaf fun-ref)))
                       (modular-fun (find-modular-version fun-name width))
-                      (name (and modular-fun
+                      (name (and (modular-fun-info-p modular-fun)
                                  (modular-fun-info-name modular-fun))))
-                 (when modular-fun
-                   (change-ref-leaf fun-ref
-                                    (find-free-fun name "in a strange place"))
-                   (setf (combination-kind node) :full)
-                   (setf (node-derived-type node)
-                         (fun-type-returns
-                          (info :function :type name)))
-                   (setf (continuation-%derived-type (node-cont node)) nil)
-                   (setf (node-reoptimize node) t)
-                   (setf (block-reoptimize (node-block node)) t)
-                   (setf (component-reoptimize (node-component node)) t)
+                 (when (and modular-fun
+                            (not (and (eq name 'logand)
+                                      (csubtypep
+                                       (single-value-type (node-derived-type node))
+                                       (specifier-type `(unsigned-byte ,width))))))
+                   (unless (eq modular-fun :good)
+                     (setq did-something t)
+                     (change-ref-leaf
+                        fun-ref
+                        (find-free-fun name "in a strange place"))
+                       (setf (combination-kind node) :full))
                    (dolist (arg (basic-combination-args node))
-                     (cut-continuation arg))))))
-           (cut-continuation (cont)
+                     (when (cut-continuation arg)
+                       (setq did-something t)))
+                   (when did-something
+                     (reoptimize-node node fun-name))
+                   did-something))))
+           (cut-continuation (cont &aux did-something)
              (do-uses (node cont)
-               (cut-node node))))
+               (when (cut-node node)
+                 (setq did-something t)))
+             did-something))
     (cut-continuation cont)))
 
 (defoptimizer (logand optimizer) ((x y) node)

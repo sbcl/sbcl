@@ -409,3 +409,6 @@
     (setf (node-derived-type node)
           (values-specifier-type '(values (unsigned-byte 32) &optional)))
     '(32bit-logical-not x)))
+
+(define-good-modular-fun logand)
+(define-good-modular-fun logior)

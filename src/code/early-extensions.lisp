@@ -288,7 +288,7 @@
   ;; just define ASSQ explicitly in terms of more primitive
   ;; operations:
   (dolist (pair alist)
-    (when (eq (car pair) item)
+    (when (and pair (eq (car pair) item))
       (return pair))))
 
 ;;; like (DELETE .. :TEST #'EQ):

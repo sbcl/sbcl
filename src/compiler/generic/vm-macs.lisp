@@ -152,7 +152,7 @@
 
 ;;; Modular functions
 
-;;; hash: name -> ({(width . fun)}*)
+;;; hash: name -> { ({(width . fun)}*) | :good }
 (defvar *modular-funs*
   (make-hash-table :test 'eq))
 
@@ -166,9 +166,11 @@
 
 (defun find-modular-version (fun-name width)
   (let ((infos (gethash fun-name *modular-funs*)))
-    (find-if (lambda (item-width) (>= item-width width))
-             infos
-             :key #'modular-fun-info-width)))
+    (if (eq infos :good)
+        :good
+        (find-if (lambda (item-width) (>= item-width width))
+                 infos
+                 :key #'modular-fun-info-width))))
 
 (defun %define-modular-fun (name lambda-list prototype width)
   (let* ((infos (the list (gethash prototype *modular-funs*)))
@@ -206,3 +208,11 @@
      (defknown ,name ,(mapcar (constantly 'integer) lambda-list)
                (unsigned-byte ,width)
                (foldable flushable movable))))
+
+(defun %define-good-modular-fun (name)
+  (setf (gethash name *modular-funs*) :good)
+  name)
+
+(defmacro define-good-modular-fun (name)
+  (check-type name symbol)
+  `(%define-good-modular-fun ',name))
