@@ -584,10 +584,8 @@
 					`(let ((,(caaddr annotated-case)
 						,var))
 					   ,@body))
-				       ((not (cdr body))
-					(car body))
 				       (t
-					`(progn ,@body)))))))
+					`(locally ,@body)))))))
 		   annotated-cases))))))))
 
 ;;;; miscellaneous

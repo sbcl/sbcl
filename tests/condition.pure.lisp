@@ -101,3 +101,8 @@
                                         :failed)))))
          (cerror (formatter "Continue from ~A") "bug ~A" :bug)))
      :passed))
+
+;;; clauses in HANDLER-CASE are allowed to have declarations (and
+;;; indeed, only declarations)
+(assert 
+ (null (handler-case (error "foo") (error () (declare (optimize speed))))))
