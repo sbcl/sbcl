@@ -141,11 +141,10 @@
 	(when (eq (block-info block) 2block)
 	  (unless (eql (source-path-tlf-number
 			(node-source-path
-			 (continuation-next
-			  (block-start block))))
+			 (block-start-node block)))
 		       res)
 	    (setq res nil)))
-	
+
 	(dolist (loc (ir2-block-locations 2block))
 	  (unless (eql (source-path-tlf-number
 			(node-source-path
@@ -163,7 +162,7 @@
       (write-var-integer (length locations) *byte-buffer*)
       (let ((2block (block-info block)))
 	(write-var-integer (+ (length locations) 1) *byte-buffer*)
-	(dump-1-location (continuation-next (block-start block))
+	(dump-1-location (block-start-node block)
 			 2block :block-start tlf-num
 			 (ir2-block-%label 2block)
 			 (ir2-block-live-out 2block)

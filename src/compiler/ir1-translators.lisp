@@ -14,43 +14,42 @@
 
 ;;;; special forms for control
 
-(def-ir1-translator progn ((&rest forms) start cont)
+(def-ir1-translator progn ((&rest forms) start next result)
   #!+sb-doc
   "Progn Form*
   Evaluates each Form in order, returning the values of the last form. With no
   forms, returns NIL."
-  (ir1-convert-progn-body start cont forms))
+  (ir1-convert-progn-body start next result forms))
 
-(def-ir1-translator if ((test then &optional else) start cont)
+(def-ir1-translator if ((test then &optional else) start next result)
   #!+sb-doc
   "If Predicate Then [Else]
   If Predicate evaluates to non-null, evaluate Then and returns its values,
   otherwise evaluate Else and return its values. Else defaults to NIL."
-  (let* ((pred (make-continuation))
-	 (then-cont (make-continuation))
-	 (then-block (continuation-starts-block then-cont))
-	 (else-cont (make-continuation))
-	 (else-block (continuation-starts-block else-cont))
-	 (dummy-cont (make-continuation))
-	 (node (make-if :test pred
+  (let* ((pred-ctran (make-ctran))
+         (pred-lvar (make-lvar))
+	 (then-ctran (make-ctran))
+	 (then-block (ctran-starts-block then-ctran))
+	 (else-ctran (make-ctran))
+	 (else-block (ctran-starts-block else-ctran))
+	 (node (make-if :test pred-lvar
 			:consequent then-block
 			:alternative else-block)))
     ;; IR1-CONVERT-MAYBE-PREDICATE requires DEST to be CIF, so the
     ;; order of the following two forms is important
-    (setf (continuation-dest pred) node)
-    (ir1-convert start pred test)
-    (link-node-to-previous-continuation node pred)
-    (use-continuation node dummy-cont)
+    (setf (lvar-dest pred-lvar) node)
+    (ir1-convert start pred-ctran pred-lvar test)
+    (link-node-to-previous-ctran node pred-ctran)
 
-    (let ((start-block (continuation-block pred)))
+    (let ((start-block (ctran-block pred-ctran)))
       (setf (block-last start-block) node)
-      (continuation-starts-block cont)
+      (ctran-starts-block next)
 
       (link-blocks start-block then-block)
       (link-blocks start-block else-block))
 
-    (ir1-convert then-cont cont then)
-    (ir1-convert else-cont cont else)))
+    (ir1-convert then-ctran next result then)
+    (ir1-convert else-ctran next result else)))
 
 ;;;; BLOCK and TAGBODY
 
@@ -62,7 +61,7 @@
 ;;; body in the modified environment. We make CONT start a block now,
 ;;; since if it was done later, the block would be in the wrong
 ;;; environment.
-(def-ir1-translator block ((name &rest forms) start cont)
+(def-ir1-translator block ((name &rest forms) start next result)
   #!+sb-doc
   "Block Name Form*
   Evaluate the Forms as a PROGN. Within the lexical scope of the body,
@@ -70,23 +69,22 @@
   result of Value-Form."
   (unless (symbolp name)
     (compiler-error "The block name ~S is not a symbol." name))
-  (continuation-starts-block cont)
-  (let* ((dummy (make-continuation))
+  (ctran-starts-block next)
+  (let* ((dummy (make-ctran))
 	 (entry (make-entry))
 	 (cleanup (make-cleanup :kind :block
 				:mess-up entry)))
     (push entry (lambda-entries (lexenv-lambda *lexenv*)))
     (setf (entry-cleanup entry) cleanup)
-    (link-node-to-previous-continuation entry start)
-    (use-continuation entry dummy)
+    (link-node-to-previous-ctran entry start)
+    (use-ctran entry dummy)
 
-    (let* ((env-entry (list entry cont))
+    (let* ((env-entry (list entry next result))
            (*lexenv* (make-lexenv :blocks (list (cons name env-entry))
 				  :cleanup cleanup)))
-      (push env-entry (continuation-lexenv-uses cont))
-      (ir1-convert-progn-body dummy cont forms))))
+      (ir1-convert-progn-body dummy next result forms))))
 
-(def-ir1-translator return-from ((name &optional value) start cont)
+(def-ir1-translator return-from ((name &optional value) start next result)
   #!+sb-doc
   "Return-From Block-Name Value-Form
   Evaluate the Value-Form, returning its values from the lexically enclosing
@@ -106,21 +104,23 @@
   ;; BLOCK-HOME-LAMBDA-OR-NULL) more obscure, and it might be better
   ;; to get rid of it, perhaps using a special placeholder value
   ;; to indicate the orphanedness of the code.
-  (continuation-starts-block cont)
+  (declare (ignore result))
+  (ctran-starts-block next)
   (let* ((found (or (lexenv-find name blocks)
 		    (compiler-error "return for unknown block: ~S" name)))
-	 (value-cont (make-continuation))
+	 (value-ctran (make-ctran))
+         (value-lvar (make-lvar))
 	 (entry (first found))
 	 (exit (make-exit :entry entry
-			  :value value-cont)))
+			  :value value-lvar)))
     (push exit (entry-exits entry))
-    (setf (continuation-dest value-cont) exit)
-    (ir1-convert start value-cont value)
-    (link-node-to-previous-continuation exit value-cont)
-    (let ((home-lambda (continuation-home-lambda-or-null start)))
+    (setf (lvar-dest value-lvar) exit)
+    (ir1-convert start value-ctran value-lvar value)
+    (link-node-to-previous-ctran exit value-ctran)
+    (let ((home-lambda (ctran-home-lambda-or-null start)))
       (when home-lambda
 	(push entry (lambda-calls-or-closes home-lambda))))
-    (use-continuation exit (second found))))
+    (use-continuation exit (second found) (third found))))
 
 ;;; Return a list of the segments of a TAGBODY. Each segment looks
 ;;; like (<tag> <form>* (go <next tag>)). That is, we break up the
@@ -153,7 +153,7 @@
 ;;; each tag, building up the tag list for LEXENV-TAGS as we go.
 ;;; Finally, convert each segment with the precomputed Start and Cont
 ;;; values.
-(def-ir1-translator tagbody ((&rest statements) start cont)
+(def-ir1-translator tagbody ((&rest statements) start next result)
   #!+sb-doc
   "Tagbody {Tag | Statement}*
   Define tags for used with GO. The Statements are evaluated in order
@@ -162,54 +162,55 @@
   to the next statement following that tag. A Tag must an integer or a
   symbol. A statement must be a list. Other objects are illegal within the
   body."
-  (continuation-starts-block cont)
-  (let* ((dummy (make-continuation))
+  (ctran-starts-block next)
+  (let* ((dummy (make-ctran))
 	 (entry (make-entry))
 	 (segments (parse-tagbody statements))
 	 (cleanup (make-cleanup :kind :tagbody
 				:mess-up entry)))
     (push entry (lambda-entries (lexenv-lambda *lexenv*)))
     (setf (entry-cleanup entry) cleanup)
-    (link-node-to-previous-continuation entry start)
-    (use-continuation entry dummy)
+    (link-node-to-previous-ctran entry start)
+    (use-ctran entry dummy)
 
     (collect ((tags)
 	      (starts)
-	      (conts))
+	      (ctrans))
       (starts dummy)
       (dolist (segment (rest segments))
-	(let* ((tag-cont (make-continuation))
-               (tag (list (car segment) entry tag-cont)))
-	  (conts tag-cont)
-	  (starts tag-cont)
-	  (continuation-starts-block tag-cont)
-          (tags tag)
-          (push (cdr tag) (continuation-lexenv-uses tag-cont))))
-      (conts cont)
+	(let* ((tag-ctran (make-ctran))
+               (tag (list (car segment) entry tag-ctran)))
+	  (ctrans tag-ctran)
+	  (starts tag-ctran)
+	  (ctran-starts-block tag-ctran)
+          (tags tag)))
+      (ctrans next)
 
       (let ((*lexenv* (make-lexenv :cleanup cleanup :tags (tags))))
-	(mapc (lambda (segment start cont)
-		(ir1-convert-progn-body start cont (rest segment)))
-	      segments (starts) (conts))))))
+	(mapc (lambda (segment start end)
+		(ir1-convert-progn-body start end
+                                        (when (eq end next) result)
+                                        (rest segment)))
+	      segments (starts) (ctrans))))))
 
 ;;; Emit an EXIT node without any value.
-(def-ir1-translator go ((tag) start cont)
+(def-ir1-translator go ((tag) start next result)
   #!+sb-doc
   "Go Tag
   Transfer control to the named Tag in the lexically enclosing TAGBODY. This
   is constrained to be used only within the dynamic extent of the TAGBODY."
-  (continuation-starts-block cont)
+  (ctran-starts-block next)
   (let* ((found (or (lexenv-find tag tags :test #'eql)
 		    (compiler-error "attempt to GO to nonexistent tag: ~S"
 				    tag)))
 	 (entry (first found))
 	 (exit (make-exit :entry entry)))
     (push exit (entry-exits entry))
-    (link-node-to-previous-continuation exit start)
-    (let ((home-lambda (continuation-home-lambda-or-null start)))
+    (link-node-to-previous-ctran exit start)
+    (let ((home-lambda (ctran-home-lambda-or-null start)))
       (when home-lambda
 	(push entry (lambda-calls-or-closes home-lambda))))
-    (use-continuation exit (second found))))
+    (use-ctran exit (second found))))
 
 ;;;; translators for compiler-magic special forms
 
@@ -225,14 +226,14 @@
 ;;;   eval-when specifying the :EXECUTE situation is treated as an
 ;;;   implicit PROGN including the forms in the body of the EVAL-WHEN
 ;;;   form; otherwise, the forms in the body are ignored.
-(def-ir1-translator eval-when ((situations &rest forms) start cont)
+(def-ir1-translator eval-when ((situations &rest forms) start next result)
   #!+sb-doc
   "EVAL-WHEN (Situation*) Form*
   Evaluate the Forms in the specified Situations (any of :COMPILE-TOPLEVEL,
   :LOAD-TOPLEVEL, or :EXECUTE, or (deprecated) COMPILE, LOAD, or EVAL)."
   (multiple-value-bind (ct lt e) (parse-eval-when-situations situations)
     (declare (ignore ct lt))
-    (ir1-convert-progn-body start cont (and e forms)))
+    (ir1-convert-progn-body start next result (and e forms)))
   (values))
 
 ;;; common logic for MACROLET and SYMBOL-MACROLET
@@ -297,7 +298,7 @@
    definitions
    fun))
 
-(def-ir1-translator macrolet ((definitions &rest body) start cont)
+(def-ir1-translator macrolet ((definitions &rest body) start next result)
   #!+sb-doc
   "MACROLET ({(Name Lambda-List Form*)}*) Body-Form*
   Evaluate the Body-Forms in an environment with the specified local macros
@@ -307,7 +308,7 @@
    definitions
    (lambda (&key funs)
      (declare (ignore funs))
-     (ir1-translate-locally body start cont))
+     (ir1-translate-locally body start next result))
    :compile))
 
 (defun symbol-macrolet-definitionize-fun (context)
@@ -336,7 +337,8 @@
    definitions
    fun))
 
-(def-ir1-translator symbol-macrolet ((macrobindings &body body) start cont)
+(def-ir1-translator symbol-macrolet
+    ((macrobindings &body body) start next result)
   #!+sb-doc
   "SYMBOL-MACROLET ({(Name Expansion)}*) Decl* Form*
   Define the Names as symbol macros with the given Expansions. Within the
@@ -344,7 +346,7 @@
   (funcall-in-symbol-macrolet-lexenv
    macrobindings
    (lambda (&key vars)
-     (ir1-translate-locally body start cont :vars vars))
+     (ir1-translate-locally body start next result :vars vars))
    :compile))
 
 ;;;; %PRIMITIVE
@@ -375,7 +377,7 @@
 ;;; BACKEND-TEMPLATE-NAMES to BACKEND-VOPS, and rename %PRIMITIVE to
 ;;; VOP or %VOP.. -- WHN 2001-06-11
 ;;; FIXME: Look at doing this ^, it doesn't look too hard actually.
-(def-ir1-translator %primitive ((name &rest args) start cont)
+(def-ir1-translator %primitive ((name &rest args) start next result)
   (declare (type symbol name))
   (let* ((template (or (gethash name *backend-template-names*)
 		       (bug "undefined primitive ~A" name)))
@@ -403,8 +405,7 @@
     (when (template-more-results-type template)
       (bug "%PRIMITIVE was used with an unknown values template."))
 
-    (ir1-convert start
-		 cont
+    (ir1-convert start next result
 		 `(%%primitive ',template
 			       ',(eval-info-args
 				  (subseq args required min))
@@ -413,11 +414,11 @@
 
 ;;;; QUOTE
 
-(def-ir1-translator quote ((thing) start cont)
+(def-ir1-translator quote ((thing) start next result)
   #!+sb-doc
   "QUOTE Value
   Return Value without evaluating it."
-  (reference-constant start cont thing))
+  (reference-constant start next result thing))
 
 ;;;; FUNCTION and NAMED-LAMBDA
 (defun fun-name-leaf (thing)
@@ -437,12 +438,12 @@
       (find-lexically-apparent-fun
        thing "as the argument to FUNCTION")))
 
-(def-ir1-translator function ((thing) start cont)
+(def-ir1-translator function ((thing) start next result)
   #!+sb-doc
   "FUNCTION Name
   Return the lexically apparent definition of the function Name. Name may also
   be a lambda expression."
-  (reference-leaf start cont (fun-name-leaf thing)))
+  (reference-leaf start next result (fun-name-leaf thing)))
 
 ;;;; FUNCALL
 
@@ -452,18 +453,20 @@
 (deftransform funcall ((function &rest args) * *)
   (let ((arg-names (make-gensym-list (length args))))
     `(lambda (function ,@arg-names)
-       (%funcall ,(if (csubtypep (continuation-type function)
+       (%funcall ,(if (csubtypep (lvar-type function)
 				 (specifier-type 'function))
 		      'function
 		      '(%coerce-callable-to-fun function))
 		 ,@arg-names))))
 
-(def-ir1-translator %funcall ((function &rest args) start cont)
+(def-ir1-translator %funcall ((function &rest args) start next result)
   (if (and (consp function) (eq (car function) 'function))
-      (ir1-convert start cont `(,(fun-name-leaf (second function)) ,@args))
-      (let ((fun-cont (make-continuation)))
-        (ir1-convert start fun-cont `(the function ,function))
-        (ir1-convert-combination-args fun-cont cont args))))
+      (ir1-convert start next result
+                   `(,(fun-name-leaf (second function)) ,@args))
+      (let ((fun-ctran (make-ctran))
+            (fun-lvar (make-lvar)))
+        (ir1-convert start fun-ctran fun-lvar `(the function ,function))
+        (ir1-convert-combination-args fun-ctran fun-lvar next result args))))
 
 ;;; This source transform exists to reduce the amount of work for the
 ;;; compiler. If the called function is a FUNCTION form, then convert
@@ -522,29 +525,31 @@
 
     (values (vars) (vals))))
 
-(def-ir1-translator let ((bindings &body body) start cont)
+(def-ir1-translator let ((bindings &body body) start next result)
   #!+sb-doc
   "LET ({(Var [Value]) | Var}*) Declaration* Form*
   During evaluation of the Forms, bind the Vars to the result of evaluating the
   Value forms. The variables are bound in parallel after all of the Values are
   evaluated."
   (if (null bindings)
-      (ir1-translate-locally  body start cont)
+      (ir1-translate-locally body start next result)
       (multiple-value-bind (forms decls)
-	  (parse-body body :doc-string-allowed nil)
+          (parse-body body :doc-string-allowed nil)
         (multiple-value-bind (vars values) (extract-let-vars bindings 'let)
-          (let* ((fun-cont (make-continuation))
-                 (cont (processing-decls (decls vars nil cont)
-                         (let ((fun (ir1-convert-lambda-body
-                                     forms vars
-                                     :debug-name (debug-namify "LET ~S"
-                                                               bindings))))
-                           (reference-leaf start fun-cont fun))
-                         cont)))
-            (ir1-convert-combination-args fun-cont cont values))))))
+          (binding* ((fun-ctran (make-ctran))
+                     (fun-lvar (make-lvar))
+                     ((next result)
+                      (processing-decls (decls vars nil next result)
+                        (let ((fun (ir1-convert-lambda-body
+                                    forms vars
+                                    :debug-name (debug-namify "LET ~S"
+                                                              bindings))))
+                          (reference-leaf start fun-ctran fun-lvar fun))
+                        (values next result))))
+            (ir1-convert-combination-args fun-ctran fun-lvar next result values))))))
 
 (def-ir1-translator let* ((bindings &body body)
-			  start cont)
+			  start next result)
   #!+sb-doc
   "LET* ({(Var [Value]) | Var}*) Declaration* Form*
   Similar to LET, but the variables are bound sequentially, allowing each Value
@@ -552,8 +557,8 @@
   (multiple-value-bind (forms decls)
       (parse-body body :doc-string-allowed nil)
     (multiple-value-bind (vars values) (extract-let-vars bindings 'let*)
-      (processing-decls (decls vars nil cont)
-        (ir1-convert-aux-bindings start cont forms vars values)))))
+      (processing-decls (decls vars nil start next)
+        (ir1-convert-aux-bindings start next result forms vars values)))))
 
 ;;; logic shared between IR1 translators for LOCALLY, MACROLET,
 ;;; and SYMBOL-MACROLET
@@ -562,19 +567,20 @@
 ;;; but we don't need to worry about that within an IR1 translator,
 ;;; since toplevel-formness is picked off by PROCESS-TOPLEVEL-FOO
 ;;; forms before we hit the IR1 transform level.
-(defun ir1-translate-locally (body start cont &key vars funs)
-  (declare (type list body) (type continuation start cont))
+(defun ir1-translate-locally (body start next result &key vars funs)
+  (declare (type ctran start next) (type (or lvar null) result)
+           (type list body))
   (multiple-value-bind (forms decls) (parse-body body :doc-string-allowed nil)
-    (processing-decls (decls vars funs cont)
-      (ir1-convert-progn-body start cont forms))))
+    (processing-decls (decls vars funs next result)
+      (ir1-convert-progn-body start next result forms))))
 
-(def-ir1-translator locally ((&body body) start cont)
+(def-ir1-translator locally ((&body body) start next result)
   #!+sb-doc
   "LOCALLY Declaration* Form*
   Sequentially evaluate the Forms in a lexical environment where the
   the Declarations have effect. If LOCALLY is a top level form, then
   the Forms are also processed as top level forms."
-  (ir1-translate-locally body start cont))
+  (ir1-translate-locally body start next result))
 
 ;;;; FLET and LABELS
 
@@ -603,7 +609,7 @@
     (values (names) (defs))))
 
 (def-ir1-translator flet ((definitions &body body)
-			  start cont)
+			  start next result)
   #!+sb-doc
   "FLET ({(Name Lambda-List Declaration* Form*)}*) Declaration* Body-Form*
   Evaluate the Body-Forms with some local function definitions. The bindings
@@ -620,11 +626,11 @@
                                                               "FLET ~S" n)
                                                  :allow-debug-catch-tag t))
                            names defs)))
-        (processing-decls (decls nil fvars cont)
+        (processing-decls (decls nil fvars next result)
           (let ((*lexenv* (make-lexenv :funs (pairlis names fvars))))
-            (ir1-convert-progn-body start cont forms)))))))
+            (ir1-convert-progn-body start next result forms)))))))
 
-(def-ir1-translator labels ((definitions &body body) start cont)
+(def-ir1-translator labels ((definitions &body body) start next result)
   #!+sb-doc
   "LABELS ({(Name Lambda-List Declaration* Form*)}*) Declaration* Body-Form*
   Evaluate the Body-Forms with some local function definitions. The bindings
@@ -664,19 +670,19 @@
 	      (setf (cdr placeholder-cons) real-fun))
 
         ;; Voila.
-	(processing-decls (decls nil real-funs cont)
+	(processing-decls (decls nil real-funs next result)
           (let ((*lexenv* (make-lexenv
                            ;; Use a proper FENV here (not the
                            ;; placeholder used earlier) so that if the
                            ;; lexical environment is used for inline
                            ;; expansion we'll get the right functions.
                            :funs (pairlis names real-funs))))
-            (ir1-convert-progn-body start cont forms)))))))
+            (ir1-convert-progn-body start next result forms)))))))
 
 ;;;; the THE special operator, and friends
 
 ;;; A logic shared among THE and TRULY-THE.
-(defun the-in-policy (type value policy start cont)
+(defun the-in-policy (type value policy start next result)
   (let ((type (if (ctype-p type) type
                    (compiler-values-specifier-type type))))
     (cond ((or (eq type *wild-type*)
@@ -687,33 +693,34 @@
                (and (sb!xc:constantp value)
                     (ctypep (constant-form-value value)
                             (single-value-type type))))
-           (ir1-convert start cont value))
-          (t (let ((value-cont (make-continuation)))
-               (ir1-convert start value-cont value)
-               (let ((cast (make-cast value-cont type policy)))
-                 (link-node-to-previous-continuation cast value-cont)
-                 (setf (continuation-dest value-cont) cast)
-                 (use-continuation cast cont)))))))
+           (ir1-convert start next result value))
+          (t (let ((value-ctran (make-ctran))
+                   (value-lvar (make-lvar)))
+               (ir1-convert start value-ctran value-lvar value)
+               (let ((cast (make-cast value-lvar type policy)))
+                 (link-node-to-previous-ctran cast value-ctran)
+                 (setf (lvar-dest value-lvar) cast)
+                 (use-continuation cast next result)))))))
 
 ;;; Assert that FORM evaluates to the specified type (which may be a
 ;;; VALUES type). TYPE may be a type specifier or (as a hack) a CTYPE.
-(def-ir1-translator the ((type value) start cont)
-  (the-in-policy type value (lexenv-policy *lexenv*) start cont))
+(def-ir1-translator the ((type value) start next result)
+  (the-in-policy type value (lexenv-policy *lexenv*) start next result))
 
 ;;; This is like the THE special form, except that it believes
 ;;; whatever you tell it. It will never generate a type check, but
 ;;; will cause a warning if the compiler can prove the assertion is
 ;;; wrong.
-(def-ir1-translator truly-the ((type value) start cont)
+(def-ir1-translator truly-the ((type value) start next result)
   #!+sb-doc
   ""
   (declare (inline member))
   #-nil
   (let ((type (coerce-to-values (compiler-values-specifier-type type)))
-	(old (find-uses cont)))
-    (ir1-convert start cont value)
-    (do-uses (use cont)
-      (unless (member use old :test #'eq)
+	(old (find-uses result)))
+    (ir1-convert start next result value)
+    (do-uses (use result)
+      (unless (memq use old)
 	(derive-node-type use type))))
   #+nil
   (the-in-policy type value '((type-check . 0)) start cont))
@@ -723,7 +730,7 @@
 ;;; If there is a definition in LEXENV-VARS, just set that, otherwise
 ;;; look at the global information. If the name is for a constant,
 ;;; then error out.
-(def-ir1-translator setq ((&whole source &rest things) start cont)
+(def-ir1-translator setq ((&whole source &rest things) start next result)
   (let ((len (length things)))
     (when (oddp len)
       (compiler-error "odd number of args to SETQ: ~S" source))
@@ -736,7 +743,7 @@
 	     (when (constant-p leaf)
 	       (compiler-error "~S is a constant and thus can't be set." name))
 	     (when (lambda-var-p leaf)
-	       (let ((home-lambda (continuation-home-lambda-or-null start)))
+	       (let ((home-lambda (ctran-home-lambda-or-null start)))
 		 (when home-lambda
 		   (pushnew leaf (lambda-calls-or-closes home-lambda))))
 	       (when (lambda-var-ignorep leaf)
@@ -745,46 +752,49 @@
 		 (compiler-style-warn
 		  "~S is being set even though it was declared to be ignored."
 		  name)))
-	     (setq-var start cont leaf (second things)))
+	     (setq-var start next result leaf (second things)))
 	    (cons
 	     (aver (eq (car leaf) 'MACRO))
              ;; FIXME: [Free] type declaration. -- APD, 2002-01-26
-	     (ir1-convert start cont `(setf ,(cdr leaf) ,(second things))))
+	     (ir1-convert start next result
+                          `(setf ,(cdr leaf) ,(second things))))
 	    (heap-alien-info
-	     (ir1-convert start cont
+	     (ir1-convert start next result
 			  `(%set-heap-alien ',leaf ,(second things))))))
 	(collect ((sets))
 	  (do ((thing things (cddr thing)))
 	      ((endp thing)
-	       (ir1-convert-progn-body start cont (sets)))
+	       (ir1-convert-progn-body start next result (sets)))
 	    (sets `(setq ,(first thing) ,(second thing))))))))
 
 ;;; This is kind of like REFERENCE-LEAF, but we generate a SET node.
 ;;; This should only need to be called in SETQ.
-(defun setq-var (start cont var value)
-  (declare (type continuation start cont) (type basic-var var))
-  (let ((dest (make-continuation))
+(defun setq-var (start next result var value)
+  (declare (type ctran start next) (type (or lvar null) result)
+           (type basic-var var))
+  (let ((dest-ctran (make-ctran))
+        (dest-lvar (make-lvar))
         (type (or (lexenv-find var type-restrictions)
                   (leaf-type var))))
-    (ir1-convert start dest `(the ,type ,value))
-    (let ((res (make-set :var var :value dest)))
-      (setf (continuation-dest dest) res)
+    (ir1-convert start dest-ctran dest-lvar `(the ,type ,value))
+    (let ((res (make-set :var var :value dest-lvar)))
+      (setf (lvar-dest dest-lvar) res)
       (setf (leaf-ever-used var) t)
       (push res (basic-var-sets var))
-      (link-node-to-previous-continuation res dest)
-      (use-continuation res cont))))
+      (link-node-to-previous-ctran res dest-ctran)
+      (use-continuation res next result))))
 
 ;;;; CATCH, THROW and UNWIND-PROTECT
 
 ;;; We turn THROW into a MULTIPLE-VALUE-CALL of a magical function,
 ;;; since as as far as IR1 is concerned, it has no interesting
 ;;; properties other than receiving multiple-values.
-(def-ir1-translator throw ((tag result) start cont)
+(def-ir1-translator throw ((tag result) start next result-lvar)
   #!+sb-doc
   "Throw Tag Form
   Do a non-local exit, return the values of Form from the CATCH whose tag
   evaluates to the same thing as Tag."
-  (ir1-convert start cont
+  (ir1-convert start next result-lvar
 	       `(multiple-value-call #'%throw ,tag ,result)))
 
 ;;; This is a special special form used to instantiate a cleanup as
@@ -794,18 +804,19 @@
 ;;; and introduce the cleanup into the lexical environment. We
 ;;; back-patch the ENTRY-CLEANUP for the current cleanup to be the new
 ;;; cleanup, since this inner cleanup is the interesting one.
-(def-ir1-translator %within-cleanup ((kind mess-up &body body) start cont)
-  (let ((dummy (make-continuation))
-	(dummy2 (make-continuation)))
-    (ir1-convert start dummy mess-up)
-    (let* ((mess-node (continuation-use dummy))
+(def-ir1-translator %within-cleanup
+    ((kind mess-up &body body) start next result)
+  (let ((dummy (make-ctran))
+	(dummy2 (make-ctran)))
+    (ir1-convert start dummy nil mess-up)
+    (let* ((mess-node (ctran-use dummy))
 	   (cleanup (make-cleanup :kind kind
 				  :mess-up mess-node))
 	   (old-cup (lexenv-cleanup *lexenv*))
 	   (*lexenv* (make-lexenv :cleanup cleanup)))
       (setf (entry-cleanup (cleanup-mess-up old-cup)) cleanup)
-      (ir1-convert dummy dummy2 '(%cleanup-point))
-      (ir1-convert-progn-body dummy2 cont body))))
+      (ir1-convert dummy dummy2 nil '(%cleanup-point))
+      (ir1-convert-progn-body dummy2 next result body))))
 
 ;;; This is a special special form that makes an "escape function"
 ;;; which returns unknown values from named block. We convert the
@@ -816,24 +827,24 @@
 ;;;
 ;;; Note that environment analysis replaces references to escape
 ;;; functions with references to the corresponding NLX-INFO structure.
-(def-ir1-translator %escape-fun ((tag) start cont)
+(def-ir1-translator %escape-fun ((tag) start next result)
   (let ((fun (ir1-convert-lambda
 	      `(lambda ()
 		 (return-from ,tag (%unknown-values)))
 	      :debug-name (debug-namify "escape function for ~S" tag))))
     (setf (functional-kind fun) :escape)
-    (reference-leaf start cont fun)))
+    (reference-leaf start next result fun)))
 
 ;;; Yet another special special form. This one looks up a local
 ;;; function and smashes it to a :CLEANUP function, as well as
 ;;; referencing it.
-(def-ir1-translator %cleanup-fun ((name) start cont)
+(def-ir1-translator %cleanup-fun ((name) start next result)
   (let ((fun (lexenv-find name funs)))
     (aver (lambda-p fun))
     (setf (functional-kind fun) :cleanup)
-    (reference-leaf start cont fun)))
+    (reference-leaf start next result fun)))
 
-(def-ir1-translator catch ((tag &body body) start cont)
+(def-ir1-translator catch ((tag &body body) start next result)
   #!+sb-doc
   "Catch Tag Form*
   Evaluate TAG and instantiate it as a catcher while the body forms are
@@ -844,7 +855,7 @@
   ;; "escape function" that does a lexical exit, and instantiate the
   ;; cleanup using %WITHIN-CLEANUP.
   (ir1-convert
-   start cont
+   start next result
    (with-unique-names (exit-block)
      `(block ,exit-block
 	(%within-cleanup
@@ -852,7 +863,8 @@
 	    (%catch (%escape-fun ,exit-block) ,tag)
 	  ,@body)))))
 
-(def-ir1-translator unwind-protect ((protected &body cleanup) start cont)
+(def-ir1-translator unwind-protect
+    ((protected &body cleanup) start next result)
   #!+sb-doc
   "Unwind-Protect Protected Cleanup*
   Evaluate the form PROTECTED, returning its values. The CLEANUP forms are
@@ -865,7 +877,7 @@
   ;; %UNWIND-PROTECT isn't "real", and thus doesn't cause creation of
   ;; an XEP.
   (ir1-convert
-   start cont
+   start next result
    (with-unique-names (cleanup-fun drop-thru-tag exit-tag next start count)
      `(flet ((,cleanup-fun () ,@cleanup nil))
 	;; FIXME: If we ever get DYNAMIC-EXTENT working, then
@@ -885,38 +897,40 @@
 
 ;;;; multiple-value stuff
 
-(def-ir1-translator multiple-value-call ((fun &rest args) start cont)
+(def-ir1-translator multiple-value-call ((fun &rest args) start next result)
   #!+sb-doc
   "MULTIPLE-VALUE-CALL Function Values-Form*
   Call FUNCTION, passing all the values of each VALUES-FORM as arguments,
   values from the first VALUES-FORM making up the first argument, etc."
-  (let* ((fun-cont (make-continuation))
+  (let* ((fun-ctran (make-ctran))
+         (fun-lvar (make-lvar))
 	 (node (if args
 		   ;; If there are arguments, MULTIPLE-VALUE-CALL
 		   ;; turns into an MV-COMBINATION.
-		   (make-mv-combination fun-cont)
+		   (make-mv-combination fun-lvar)
 		   ;; If there are no arguments, then we convert to a
 		   ;; normal combination, ensuring that a MV-COMBINATION
 		   ;; always has at least one argument. This can be
 		   ;; regarded as an optimization, but it is more
 		   ;; important for simplifying compilation of
 		   ;; MV-COMBINATIONS.
-		   (make-combination fun-cont))))
-    (ir1-convert start fun-cont
+		   (make-combination fun-lvar))))
+    (ir1-convert start fun-ctran fun-lvar
 		 (if (and (consp fun) (eq (car fun) 'function))
 		     fun
 		     `(%coerce-callable-to-fun ,fun)))
-    (setf (continuation-dest fun-cont) node)
-    (collect ((arg-conts))
-      (let ((this-start fun-cont))
+    (setf (lvar-dest fun-lvar) node)
+    (collect ((arg-lvars))
+      (let ((this-start fun-ctran))
 	(dolist (arg args)
-	  (let ((this-cont (make-continuation node)))
-	    (ir1-convert this-start this-cont arg)
-	    (setq this-start this-cont)
-	    (arg-conts this-cont)))
-	(link-node-to-previous-continuation node this-start)
-	(use-continuation node cont)
-	(setf (basic-combination-args node) (arg-conts))))))
+	  (let ((this-ctran (make-ctran))
+                (this-lvar (make-lvar node)))
+	    (ir1-convert this-start this-ctran this-lvar arg)
+	    (setq this-start this-ctran)
+	    (arg-lvars this-lvar)))
+	(link-node-to-previous-ctran node this-start)
+	(use-continuation node next result)
+	(setf (basic-combination-args node) (arg-lvars))))))
 
 ;;; MULTIPLE-VALUE-PROG1 is represented implicitly in IR1 by having a
 ;;; the result code use result continuation (CONT), but transfer
@@ -943,29 +957,15 @@
 ;;; Nested MV-PROG1's work because during conversion of the result
 ;;; form, we use dummy continuation whose block is the true control
 ;;; destination.
-(def-ir1-translator multiple-value-prog1 ((result &rest forms) start cont)
+(def-ir1-translator multiple-value-prog1
+    ((values-form &rest forms) start next result)
   #!+sb-doc
   "MULTIPLE-VALUE-PROG1 Values-Form Form*
   Evaluate Values-Form and then the Forms, but return all the values of
   Values-Form."
-  (continuation-starts-block cont)
-  (let* ((dummy-result (make-continuation))
-	 (dummy-start (make-continuation))
-	 (cont-block (continuation-block cont)))
-    (continuation-starts-block dummy-start)
-    (ir1-convert start dummy-start result)
-
-    (substitute-continuation-uses cont dummy-start)
-
-    (continuation-starts-block dummy-result)
-    (ir1-convert-progn-body dummy-start dummy-result forms)
-    (let ((end-block (continuation-block dummy-result)))
-      (dolist (pred (block-pred end-block))
-	(unlink-blocks pred end-block)
-	(link-blocks pred cont-block))
-      (aver (not (continuation-dest dummy-result)))
-      (delete-continuation dummy-result)
-      (remove-from-dfo end-block))))
+  (let ((dummy (make-ctran)))
+    (ir1-convert start dummy result values-form)
+    (ir1-convert-progn-body dummy next nil forms)))
 
 ;;;; interface to defining macros
 

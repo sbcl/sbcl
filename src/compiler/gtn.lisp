@@ -116,12 +116,11 @@
 	(block punt
 	  (dolist (fun funs t)
 	    (dolist (ref (leaf-refs fun))
-	      (let* ((cont (node-cont ref))
-		     (dest (continuation-dest cont)))
-		(when (and dest
+	      (let* ((lvar (node-lvar ref))
+		     (dest (and lvar (lvar-dest lvar))))
+		(when (and (basic-combination-p dest)
 			   (not (node-tail-p dest))
-			   (basic-combination-p dest)
-			   (eq (basic-combination-fun dest) cont)
+			   (eq (basic-combination-fun dest) lvar)
 			   (eq (basic-combination-kind dest) :local))
 		  (return-from punt nil)))))))))
 

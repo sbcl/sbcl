@@ -202,11 +202,13 @@
 ;;; FIXME: This could and probably should be converted to use
 ;;; SOURCE-NAME and DEBUG-NAME. But I (WHN) don't use &AUX bindings,
 ;;; so I'm not motivated. Patches will be accepted...
-(defun ir1-convert-aux-bindings (start cont body aux-vars aux-vals)
-  (declare (type continuation start cont) (list body aux-vars aux-vals))
+(defun ir1-convert-aux-bindings (start next result body aux-vars aux-vals)
+  (declare (type ctran start next) (type (or lvar null) result)
+           (list body aux-vars aux-vals))
   (if (null aux-vars)
-      (ir1-convert-progn-body start cont body)
-      (let ((fun-cont (make-continuation))
+      (ir1-convert-progn-body start next result body)
+      (let ((fun-ctran (make-ctran))
+            (fun-lvar (make-lvar))
 	    (fun (ir1-convert-lambda-body body
  					  (list (first aux-vars))
  					  :aux-vars (rest aux-vars)
@@ -214,8 +216,8 @@
  					  :debug-name (debug-namify
  						       "&AUX bindings ~S"
  						       aux-vars))))
-	(reference-leaf start fun-cont fun)
-	(ir1-convert-combination-args fun-cont cont
+	(reference-leaf start fun-ctran fun-lvar fun)
+	(ir1-convert-combination-args fun-ctran fun-lvar next result
 				      (list (first aux-vals)))))
   (values))
 
@@ -230,24 +232,26 @@
 ;;; will end up being the innermost one. We force CONT to start a
 ;;; block outside of this cleanup, causing cleanup code to be emitted
 ;;; when the scope is exited.
-(defun ir1-convert-special-bindings (start cont body aux-vars aux-vals svars)
-  (declare (type continuation start cont)
+(defun ir1-convert-special-bindings
+    (start next result body aux-vars aux-vals svars)
+  (declare (type ctran start next) (type (or lvar null) result)
 	   (list body aux-vars aux-vals svars))
   (cond
    ((null svars)
-    (ir1-convert-aux-bindings start cont body aux-vars aux-vals))
+    (ir1-convert-aux-bindings start next result body aux-vars aux-vals))
    (t
-    (continuation-starts-block cont)
+    (ctran-starts-block next)
     (let ((cleanup (make-cleanup :kind :special-bind))
 	  (var (first svars))
-	  (next-cont (make-continuation))
-	  (nnext-cont (make-continuation)))
-      (ir1-convert start next-cont
+	  (bind-ctran (make-ctran))
+	  (cleanup-ctran (make-ctran)))
+      (ir1-convert start bind-ctran nil
 		   `(%special-bind ',(lambda-var-specvar var) ,var))
-      (setf (cleanup-mess-up cleanup) (continuation-use next-cont))
+      (setf (cleanup-mess-up cleanup) (ctran-use bind-ctran))
       (let ((*lexenv* (make-lexenv :cleanup cleanup)))
-	(ir1-convert next-cont nnext-cont '(%cleanup-point))
-	(ir1-convert-special-bindings nnext-cont cont body aux-vars aux-vals
+	(ir1-convert bind-ctran cleanup-ctran nil '(%cleanup-point))
+	(ir1-convert-special-bindings cleanup-ctran next result
+                                      body aux-vars aux-vals
 				      (rest svars))))))
   (values))
 
@@ -267,7 +271,7 @@
 ;;;
 ;;; AUX-VARS is a list of VAR structures for variables that are to be
 ;;; sequentially bound. Each AUX-VAL is a form that is to be evaluated
-;;; to get the initial value for the corresponding AUX-VAR. 
+;;; to get the initial value for the corresponding AUX-VAR.
 (defun ir1-convert-lambda-body (body
 				vars
 				&key
@@ -286,7 +290,8 @@
                   :bind bind
                   :%source-name source-name
                   :%debug-name debug-name))
-	 (result (make-continuation)))
+	 (result-ctran (make-ctran))
+         (result-lvar (make-lvar)))
 
     ;; just to check: This function should fail internal assertions if
     ;; we didn't set up a valid debug name above.
@@ -320,26 +325,25 @@
 	(setf (bind-lambda bind) lambda)
 	(setf (node-lexenv bind) *lexenv*)
 
-	(let ((block (continuation-starts-block result)))
-	  (let ((return (make-return :result result :lambda lambda))
-                (tail-set (make-tail-set :funs (list lambda)))
-                (dummy (make-continuation)))
+	(let ((block (ctran-starts-block result-ctran)))
+	  (let ((return (make-return :result result-lvar :lambda lambda))
+                (tail-set (make-tail-set :funs (list lambda))))
             (setf (lambda-tail-set lambda) tail-set)
             (setf (lambda-return lambda) return)
-            (setf (continuation-dest result) return)
-            (setf (block-last block) return)
-            (link-node-to-previous-continuation return result)
-            (use-continuation return dummy))
+            (setf (lvar-dest result-lvar) return)
+            (link-node-to-previous-ctran return result-ctran)
+            (setf (block-last block) return))
           (link-blocks block (component-tail *current-component*)))
 
         (with-component-last-block (*current-component*
-                                    (continuation-block result))
-          (let ((cont1 (make-continuation))
-                (cont2 (make-continuation)))
-            (continuation-starts-block cont1)
-            (link-node-to-previous-continuation bind cont1)
-            (use-continuation bind cont2)
-            (ir1-convert-special-bindings cont2 result body
+                                    (ctran-block result-ctran))
+          (let ((prebind-ctran (make-ctran))
+                (postbind-ctran (make-ctran)))
+            (ctran-starts-block prebind-ctran)
+            (link-node-to-previous-ctran bind prebind-ctran)
+            (use-ctran bind postbind-ctran)
+            (ir1-convert-special-bindings postbind-ctran result-ctran result-lvar
+                                          body
                                           aux-vars aux-vals (svars))))))
 
     (link-blocks (component-head *current-component*) (node-block bind))
@@ -353,8 +357,7 @@
            (type optional-dispatch dispatcher))
   (setf (functional-kind entry) :optional)
   (setf (leaf-ever-used entry) t)
-  (setf (lambda-optional-dispatch entry)
-        dispatcher)
+  (setf (lambda-optional-dispatch entry) dispatcher)
   entry)
 
 ;;; Create the actual entry-point function for an optional entry

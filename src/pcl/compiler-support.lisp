@@ -38,7 +38,7 @@
   (movable foldable flushable explicit-check))
 
 (deftransform sb-pcl::pcl-instance-p ((object))
-  (let* ((otype (continuation-type object))
+  (let* ((otype (lvar-type object))
 	 (std-obj (specifier-type 'sb-pcl::std-object)))
     (cond
       ;; Flush tests whose result is known at compile time.

@@ -59,10 +59,10 @@
     ((:small :fast) nil)))
 
 ;;; an annotated continuation's primitive-type
-#!-sb-fluid (declaim (inline continuation-ptype))
-(defun continuation-ptype (cont)
-  (declare (type continuation cont))
-  (ir2-continuation-primitive-type (continuation-info cont)))
+#!-sb-fluid (declaim (inline lvar-ptype))
+(defun lvar-ptype (lvar)
+  (declare (type lvar lvar))
+  (ir2-lvar-primitive-type (lvar-info lvar)))
 
 ;;; Return true if a constant LEAF is of a type which we can legally
 ;;; directly reference in code. Named constants with arbitrary pointer
@@ -75,11 +75,11 @@
 	(symbol (symbol-package (constant-value leaf)))
 	(t nil))))
 
-;;; If CONT is used only by a REF to a leaf that can be delayed, then
+;;; If LVAR is used only by a REF to a leaf that can be delayed, then
 ;;; return the leaf, otherwise return NIL.
-(defun continuation-delayed-leaf (cont)
-  (declare (type continuation cont))
-  (let ((use (continuation-use cont)))
+(defun lvar-delayed-leaf (lvar)
+  (declare (type lvar lvar))
+  (let ((use (lvar-uses lvar)))
     (and (ref-p use)
 	 (let ((leaf (ref-leaf use)))
 	   (etypecase leaf
@@ -87,53 +87,54 @@
 	     (constant (if (legal-immediate-constant-p leaf) leaf nil))
 	     ((or functional global-var) nil))))))
 
-;;; Annotate a normal single-value continuation. If its only use is a
-;;; ref that we are allowed to delay the evaluation of, then we mark
-;;; the continuation for delayed evaluation, otherwise we assign a TN
-;;; to hold the continuation's value.
-(defun annotate-1-value-continuation (cont)
-  (declare (type continuation cont))
-  (let ((info (continuation-info cont)))
-    (aver (eq (ir2-continuation-kind info) :fixed))
+;;; Annotate a normal single-value lvar. If its only use is a ref that
+;;; we are allowed to delay the evaluation of, then we mark the lvar
+;;; for delayed evaluation, otherwise we assign a TN to hold the
+;;; lvar's value.
+(defun annotate-1-value-lvar (lvar)
+  (declare (type lvar lvar))
+  (let ((info (lvar-info lvar)))
+    (aver (eq (ir2-lvar-kind info) :fixed))
     (cond
-     ((continuation-delayed-leaf cont)
-      (setf (ir2-continuation-kind info) :delayed))
-     (t (setf (ir2-continuation-locs info)
-              (list (make-normal-tn (ir2-continuation-primitive-type info)))))))
-  (ltn-annotate-casts cont)
+     ((lvar-delayed-leaf lvar)
+      (setf (ir2-lvar-kind info) :delayed))
+     (t (setf (ir2-lvar-locs info)
+              (list (make-normal-tn (ir2-lvar-primitive-type info)))))))
+  (ltn-annotate-casts lvar)
   (values))
 
-;;; Make an IR2-CONTINUATION corresponding to the continuation type
-;;; and then do ANNOTATE-1-VALUE-CONTINUATION.
-(defun annotate-ordinary-continuation (cont)
-  (declare (type continuation cont))
-  (let ((info (make-ir2-continuation
-	       (primitive-type (continuation-type cont)))))
-    (setf (continuation-info cont) info)
-    (annotate-1-value-continuation cont))
+;;; Make an IR2-LVAR corresponding to the lvar type and then do
+;;; ANNOTATE-1-VALUE-LVAR.
+(defun annotate-ordinary-lvar (lvar)
+  (declare (type lvar lvar))
+  (let ((info (make-ir2-lvar
+	       (primitive-type (lvar-type lvar)))))
+    (setf (lvar-info lvar) info)
+    (annotate-1-value-lvar lvar))
   (values))
 
-;;; Annotate the function continuation for a full call. If the only
-;;; reference is to a global function and DELAY is true, then we delay
-;;; the reference, otherwise we annotate for a single value.
-(defun annotate-fun-continuation (cont &optional (delay t))
-  (declare (type continuation cont))
-  (let* ((tn-ptype (primitive-type (continuation-type cont)))
-	 (info (make-ir2-continuation tn-ptype)))
-    (setf (continuation-info cont) info)
-    (let ((name (continuation-fun-name cont t)))
+;;; Annotate the function lvar for a full call. If the only reference
+;;; is to a global function and DELAY is true, then we delay the
+;;; reference, otherwise we annotate for a single value.
+(defun annotate-fun-lvar (lvar &optional (delay t))
+  (declare (type lvar lvar))
+  (let* ((tn-ptype (primitive-type (lvar-type lvar)))
+	 (info (make-ir2-lvar tn-ptype)))
+    (setf (lvar-info lvar) info)
+    (let ((name (lvar-fun-name lvar t)))
       (if (and delay name)
-	  (setf (ir2-continuation-kind info) :delayed)
-	  (setf (ir2-continuation-locs info)
+	  (setf (ir2-lvar-kind info) :delayed)
+	  (setf (ir2-lvar-locs info)
 		(list (make-normal-tn tn-ptype))))))
-  (ltn-annotate-casts cont)
+  (ltn-annotate-casts lvar)
   (values))
 
-;;; If TAIL-P is true, then we check to see whether the call can really
-;;; be a tail call by seeing if this function's return convention is :UNKNOWN.
-;;; If so, we move the call block succssor link from the return block to
-;;; the component tail (after ensuring that they are in separate blocks.)
-;;; This allows the return to be deleted when there are no non-tail uses.
+;;; If TAIL-P is true, then we check to see whether the call can
+;;; really be a tail call by seeing if this function's return
+;;; convention is :UNKNOWN. If so, we move the call block successor
+;;; link from the return block to the component tail (after ensuring
+;;; that they are in separate blocks.) This allows the return to be
+;;; deleted when there are no non-tail uses.
 (defun flush-full-call-tail-transfer (call)
   (declare (type basic-combination call))
   (let ((tails (and (node-tail-p call)
@@ -151,36 +152,28 @@
 ;;; We set the kind to :FULL or :FUNNY, depending on whether there is
 ;;; an IR2-CONVERT method. If a funny function, then we inhibit tail
 ;;; recursion normally, since the IR2 convert method is going to want
-;;; to deliver values normally. We still annotate the function
-;;; continuation, since IR2tran might decide to call after all.
+;;; to deliver values normally. We still annotate the function lvar,
+;;; since IR2tran might decide to call after all.
 ;;;
 ;;; Note that args may already be annotated because template selection
 ;;; can bail out to here.
 (defun ltn-default-call (call)
   (declare (type combination call))
   (let ((kind (basic-combination-kind call)))
-    (annotate-fun-continuation (basic-combination-fun call))
+    (annotate-fun-lvar (basic-combination-fun call))
+
+    (dolist (arg (basic-combination-args call))
+      (unless (lvar-info arg)
+        (setf (lvar-info arg)
+              (make-ir2-lvar (primitive-type (lvar-type arg)))))
+      (annotate-1-value-lvar arg))
 
     (cond
       ((and (fun-info-p kind)
             (fun-info-ir2-convert kind))
        (setf (basic-combination-info call) :funny)
-       (setf (node-tail-p call) nil)
-       (dolist (arg (basic-combination-args call))
-         (unless (continuation-info arg)
-           (setf (continuation-info arg)
-                 (make-ir2-continuation
-                  (primitive-type
-                   (continuation-type arg)))))
-         (annotate-1-value-continuation arg)))
+       (setf (node-tail-p call) nil))
       (t
-       (dolist (arg (basic-combination-args call))
-         (unless (continuation-info arg)
-           (setf (continuation-info arg)
-                 (make-ir2-continuation
-                  (primitive-type
-                   (continuation-type arg)))))
-         (annotate-1-value-continuation arg))
        (when (eq kind :error)
          (setf (basic-combination-kind call) :full))
        (setf (basic-combination-info call) :full)
@@ -188,56 +181,56 @@
 
   (values))
 
-;;; Annotate a continuation for unknown multiple values:
-;;; -- Add the continuation to the IR2-BLOCK-POPPED if it is used
-;;;    across a block boundary.
-;;; -- Assign an :UNKNOWN IR2-CONTINUATION.
+;;; Annotate an lvar for unknown multiple values:
+;;; -- Add the lvar to the IR2-BLOCK-POPPED if it is used across a
+;;;    block boundary.
+;;; -- Assign an :UNKNOWN IR2-LVAR.
 ;;;
 ;;; Note: it is critical that this be called only during LTN analysis
-;;; of CONT's DEST, and called in the order that the continuations are
+;;; of LVAR's DEST, and called in the order that the lvarss are
 ;;; received. Otherwise the IR2-BLOCK-POPPED and
 ;;; IR2-COMPONENT-VALUES-FOO would get all messed up.
-(defun annotate-unknown-values-continuation (cont)
-  (declare (type continuation cont))
+(defun annotate-unknown-values-lvar (lvar)
+  (declare (type lvar lvar))
 
-  (let ((2cont (make-ir2-continuation nil)))
-    (setf (ir2-continuation-kind 2cont) :unknown)
-    (setf (ir2-continuation-locs 2cont) (make-unknown-values-locations))
-    (setf (continuation-info cont) 2cont))
+  (let ((2lvar (make-ir2-lvar nil)))
+    (setf (ir2-lvar-kind 2lvar) :unknown)
+    (setf (ir2-lvar-locs 2lvar) (make-unknown-values-locations))
+    (setf (lvar-info lvar) 2lvar))
 
-  ;; The CAST chain with corresponding continuations constitute the
-  ;; same "principal continuation", so we must preserve only inner
-  ;; annotation order and the order of the whole p.c. with other
-  ;; continiations. -- APD, 2002-02-27
-  (ltn-annotate-casts cont)
+  ;; The CAST chain with corresponding lvars constitute the same
+  ;; "principal lvar", so we must preserve only inner annotation order
+  ;; and the order of the whole p.l. with other lvars. -- APD,
+  ;; 2003-02-27
+  (ltn-annotate-casts lvar)
 
-  (let* ((block (node-block (continuation-dest cont)))
-	 (use (continuation-use cont))
+  (let* ((block (node-block (lvar-dest lvar)))
+	 (use (lvar-uses lvar))
 	 (2block (block-info block)))
-    (unless (and use (eq (node-block use) block))
+    (unless (and (not (listp use)) (eq (node-block use) block))
       (setf (ir2-block-popped 2block)
-	    (nconc (ir2-block-popped 2block) (list cont)))))
+	    (nconc (ir2-block-popped 2block) (list lvar)))))
 
   (values))
 
-;;; Annotate CONT for a fixed, but arbitrary number of values, of the
+;;; Annotate LVAR for a fixed, but arbitrary number of values, of the
 ;;; specified primitive TYPES.
-(defun annotate-fixed-values-continuation (cont types)
-  (declare (type continuation cont) (list types))
-  (let ((res (make-ir2-continuation nil)))
-    (setf (ir2-continuation-locs res) (mapcar #'make-normal-tn types))
-    (setf (continuation-info cont) res))
-  (ltn-annotate-casts cont)
+(defun annotate-fixed-values-lvar (lvar types)
+  (declare (type lvar lvar) (list types))
+  (let ((res (make-ir2-lvar nil)))
+    (setf (ir2-lvar-locs res) (mapcar #'make-normal-tn types))
+    (setf (lvar-info lvar) res))
+  (ltn-annotate-casts lvar)
   (values))
 
 ;;;; node-specific analysis functions
 
-;;; Annotate the result continuation for a function. We use the
-;;; RETURN-INFO computed by GTN to determine how to represent the
-;;; return values within the function:
-;;;  * If the TAIL-SET has a fixed values count, then use that
-;;;    many values.
-;;;  * If the actual uses of the result continuation in this function
+;;; Annotate the result lvar for a function. We use the RETURN-INFO
+;;; computed by GTN to determine how to represent the return values
+;;; within the function:
+;;;  * If the TAIL-SET has a fixed values count, then use that many
+;;;    values.
+;;;  * If the actual uses of the result lvar in this function
 ;;;    have a fixed number of values (after intersection with the
 ;;;    assertion), then use that number. We throw out TAIL-P :FULL
 ;;;    and :LOCAL calls, since we know they will truly end up as TR
@@ -247,14 +240,13 @@
 ;;;      If there are *no* non-tail-call uses, then it falls out
 ;;;    that we annotate for one value (type is NIL), but the return
 ;;;    will end up being deleted.
-;;;      In non-perverse code, the DFO walk will reach all uses of
-;;;    the result continuation before it reaches the RETURN. In
-;;;    perverse code, we may annotate for unknown values when we
-;;;    didn't have to.
-;;; * Otherwise, we must annotate the continuation for unknown values.
+;;;      In non-perverse code, the DFO walk will reach all uses of the
+;;;    result lvar before it reaches the RETURN. In perverse code, we
+;;;    may annotate for unknown values when we didn't have to.
+;;; * Otherwise, we must annotate the lvar for unknown values.
 (defun ltn-analyze-return (node)
   (declare (type creturn node))
-  (let* ((cont (return-result node))
+  (let* ((lvar (return-result node))
 	 (fun (return-lambda node))
 	 (returns (tail-set-info (lambda-tail-set fun)))
 	 (types (return-info-types returns)))
@@ -272,72 +264,69 @@
                     (values nil :unknown)
                     (values-types int))
 	      (if (eq kind :unknown)
-		  (annotate-unknown-values-continuation cont)
-		  (annotate-fixed-values-continuation
-		   cont (mapcar #'primitive-type types))))))
-	(annotate-fixed-values-continuation cont types)))
+		  (annotate-unknown-values-lvar lvar)
+		  (annotate-fixed-values-lvar
+		   lvar (mapcar #'primitive-type types))))))
+	(annotate-fixed-values-lvar lvar types)))
 
   (values))
 
-;;; Annotate the single argument continuation as a fixed-values
-;;; continuation. We look at the called lambda to determine number and
-;;; type of return values desired. It is assumed that only a function
-;;; that LOOKS-LIKE-AN-MV-BIND will be converted to a local call.
+;;; Annotate the single argument lvar as a fixed-values lvar. We look
+;;; at the called lambda to determine number and type of return values
+;;; desired. It is assumed that only a function that
+;;; LOOKS-LIKE-AN-MV-BIND will be converted to a local call.
 (defun ltn-analyze-mv-bind (call)
   (declare (type mv-combination call))
   (setf (basic-combination-kind call) :local)
   (setf (node-tail-p call) nil)
-  (annotate-fixed-values-continuation
+  (annotate-fixed-values-lvar
    (first (basic-combination-args call))
    (mapcar (lambda (var)
 	     (primitive-type (basic-var-type var)))
 	   (lambda-vars
-	    (ref-leaf
-	     (continuation-use
-	      (basic-combination-fun call))))))
+	    (ref-leaf (lvar-use (basic-combination-fun call))))))
   (values))
 
-;;; We force all the argument continuations to use the unknown values
-;;; convention. The continuations are annotated in reverse order,
-;;; since the last argument is on top, thus must be popped first. We
-;;; disallow delayed evaluation of the function continuation to
-;;; simplify IR2 conversion of MV call.
+;;; We force all the argument lvars to use the unknown values
+;;; convention. The lvars are annotated in reverse order, since the
+;;; last argument is on top, thus must be popped first. We disallow
+;;; delayed evaluation of the function lvar to simplify IR2 conversion
+;;; of MV call.
 ;;;
 ;;; We could be cleverer when we know the number of values returned by
-;;; the continuations, but optimizations of MV call are probably
-;;; unworthwhile.
+;;; the lvars, but optimizations of MV call are probably unworthwhile.
 ;;;
 ;;; We are also responsible for handling THROW, which is represented
 ;;; in IR1 as an MV call to the %THROW funny function. We annotate the
-;;; tag continuation for a single value and the values continuation
-;;; for unknown values.
+;;; tag lvar for a single value and the values lvar for unknown
+;;; values.
 (defun ltn-analyze-mv-call (call)
   (declare (type mv-combination call))
   (let ((fun (basic-combination-fun call))
 	(args (basic-combination-args call)))
-    (cond ((eq (continuation-fun-name fun) '%throw)
+    (cond ((eq (lvar-fun-name fun) '%throw)
 	   (setf (basic-combination-info call) :funny)
-	   (annotate-ordinary-continuation (first args))
-	   (annotate-unknown-values-continuation (second args))
+	   (annotate-ordinary-lvar (first args))
+	   (annotate-unknown-values-lvar (second args))
 	   (setf (node-tail-p call) nil))
 	  (t
 	   (setf (basic-combination-info call) :full)
-	   (annotate-fun-continuation (basic-combination-fun call)
+	   (annotate-fun-lvar (basic-combination-fun call)
 				      nil)
 	   (dolist (arg (reverse args))
-	     (annotate-unknown-values-continuation arg))
+	     (annotate-unknown-values-lvar arg))
 	   (flush-full-call-tail-transfer call))))
 
   (values))
 
-;;; Annotate the arguments as ordinary single-value continuations. And
-;;; check the successor.
+;;; Annotate the arguments as ordinary single-value lvars. And check
+;;; the successor.
 (defun ltn-analyze-local-call (call)
   (declare (type combination call))
   (setf (basic-combination-info call) :local)
   (dolist (arg (basic-combination-args call))
     (when arg
-      (annotate-ordinary-continuation arg)))
+      (annotate-ordinary-lvar arg)))
   (when (node-tail-p call)
     (set-tail-local-call-successor call))
   (values))
@@ -357,40 +346,39 @@
       (link-blocks block (lambda-block callee))))
   (values))
 
-;;; Annotate the value continuation.
+;;; Annotate the value lvar.
 (defun ltn-analyze-set (node)
   (declare (type cset node))
   (setf (node-tail-p node) nil)
-  (annotate-ordinary-continuation (set-value node))
+  (annotate-ordinary-lvar (set-value node))
   (values))
 
-;;; If the only use of the TEST continuation is a combination
-;;; annotated with a conditional template, then don't annotate the
-;;; continuation so that IR2 conversion knows not to emit any code,
-;;; otherwise annotate as an ordinary continuation. Since we only use
-;;; a conditional template if the call immediately precedes the IF
-;;; node in the same block, we know that any predicate will already be
-;;; annotated.
+;;; If the only use of the TEST lvar is a combination annotated with a
+;;; conditional template, then don't annotate the lvar so that IR2
+;;; conversion knows not to emit any code, otherwise annotate as an
+;;; ordinary lvar. Since we only use a conditional template if the
+;;; call immediately precedes the IF node in the same block, we know
+;;; that any predicate will already be annotated.
 (defun ltn-analyze-if (node)
   (declare (type cif node))
   (setf (node-tail-p node) nil)
   (let* ((test (if-test node))
-	 (use (continuation-use test)))
+	 (use (lvar-uses test)))
     (unless (and (combination-p use)
 		 (let ((info (basic-combination-info use)))
 		   (and (template-p info)
 			(eq (template-result-types info) :conditional))))
-      (annotate-ordinary-continuation test)))
+      (annotate-ordinary-lvar test)))
   (values))
 
-;;; If there is a value continuation, then annotate it for unknown
-;;; values. In this case, the exit is non-local, since all other exits
-;;; are deleted or degenerate by this point.
+;;; If there is a value lvar, then annotate it for unknown values. In
+;;; this case, the exit is non-local, since all other exits are
+;;; deleted or degenerate by this point.
 (defun ltn-analyze-exit (node)
   (setf (node-tail-p node) nil)
   (let ((value (exit-value node)))
     (when value
-      (annotate-unknown-values-continuation value)))
+      (annotate-unknown-values-lvar value)))
   (values))
 
 ;;; We need a special method for %UNWIND-PROTECT that ignores the
@@ -415,10 +403,10 @@
 ;;; be made, and by representation selection when it is deciding which
 ;;; move VOP to use. CONT and TN are used to test for constant
 ;;; arguments.
-(defun operand-restriction-ok (restr type &key cont tn (t-ok t))
+(defun operand-restriction-ok (restr type &key lvar tn (t-ok t))
   (declare (type (or (member *) cons) restr)
 	   (type primitive-type type)
-	   (type (or continuation null) cont)
+	   (type (or lvar null) lvar)
 	   (type (or tn null) tn))
   (if (eq restr '*)
       t
@@ -429,14 +417,14 @@
 		     (eq mem type))
 	     (return t))))
 	(:constant
-	 (cond (cont
-		(and (constant-continuation-p cont)
-		     (funcall (second restr) (continuation-value cont))))
+	 (cond (lvar
+		(and (constant-lvar-p lvar)
+		     (funcall (second restr) (lvar-value lvar))))
 	       (tn
 		(and (eq (tn-kind tn) :constant)
 		     (funcall (second restr) (tn-value tn))))
 	       (t
-		(error "Neither CONT nor TN supplied.")))))))
+		(error "Neither LVAR nor TN supplied.")))))))
 
 ;;; Check that the argument type restriction for TEMPLATE are
 ;;; satisfied in call. If an argument's TYPE-CHECK is :NO-CHECK and
@@ -453,13 +441,13 @@
 	       (t
 		(dolist (arg args t)
 		  (unless (operand-restriction-ok mtype
-						  (continuation-ptype arg))
+						  (lvar-ptype arg))
 		    (return nil))))))
       (when (null args) (return nil))
       (let ((arg (car args))
 	    (type (car types)))
-	(unless (operand-restriction-ok type (continuation-ptype arg)
-					:cont arg)
+	(unless (operand-restriction-ok type (lvar-ptype arg)
+					:lvar arg)
 	  (return nil))))))
 
 ;;; Check that TEMPLATE can be used with the specifed RESULT-TYPE.
@@ -514,7 +502,7 @@
 (defun is-ok-template-use (template call safe-p)
   (declare (type template template) (type combination call))
   (let* ((guard (template-guard template))
-	 (cont (node-cont call))
+	 (lvar (node-lvar call))
 	 (dtype (node-derived-type call)))
     (cond ((and guard (not (funcall guard)))
 	   (values nil :guard))
@@ -524,7 +512,7 @@
 		       :arg-check
 		       :arg-types)))
 	  ((eq (template-result-types template) :conditional)
-	   (let ((dest (continuation-dest cont)))
+	   (let ((dest (lvar-dest lvar)))
 	     (if (and (if-p dest)
 		      (immediately-used-p (if-test dest) call))
 		 (values t nil)
@@ -631,7 +619,7 @@
        (funcall frob "argument primitive types:~%  ~S"
 		(mapcar (lambda (x)
 			  (primitive-type-name
-			   (continuation-ptype x)))
+			   (lvar-ptype x)))
 			(combination-args call)))
        (funcall frob "argument type assertions:~%  ~S"
 		(mapcar (lambda (x)
@@ -740,9 +728,9 @@
   (values))
 
 ;;; If a function has a special-case annotation method use that,
-;;; otherwise annotate the argument continuations and try to find a
-;;; template corresponding to the type signature. If there is none,
-;;; convert a full call.
+;;; otherwise annotate the argument lvars and try to find a template
+;;; corresponding to the type signature. If there is none, convert a
+;;; full call.
 (defun ltn-analyze-known-call (call)
   (declare (type combination call))
   (let ((ltn-policy (node-ltn-policy call))
@@ -753,8 +741,8 @@
       (return-from ltn-analyze-known-call (values)))
 
     (dolist (arg args)
-      (setf (continuation-info arg)
-	    (make-ir2-continuation (primitive-type (continuation-type arg)))))
+      (setf (lvar-info arg)
+	    (make-ir2-lvar (primitive-type (lvar-type arg)))))
 
     (multiple-value-bind (template rejected)
 	(find-template-for-ltn-policy call ltn-policy)
@@ -772,7 +760,7 @@
       (unless template
 	(when (let ((funleaf (physenv-lambda (node-physenv call))))
 		(and (leaf-has-source-name-p funleaf)
-		     (eq (continuation-fun-name (combination-fun call))
+		     (eq (lvar-fun-name (combination-fun call))
 			 (leaf-source-name funleaf))
 		     (let ((info (basic-combination-kind call)))
 		       (not (or (fun-info-ir2-convert info)
@@ -783,7 +771,7 @@
                             ~_policy=~S ~_arg types=~S~:>"
 			   (lexenv-policy (node-lexenv call))
 			   (mapcar (lambda (arg)
-				     (type-specifier (continuation-type arg)))
+				     (type-specifier (lvar-type arg)))
 				   args))))
 	(ltn-default-call call)
 	(return-from ltn-analyze-known-call (values)))
@@ -791,46 +779,46 @@
       (setf (node-tail-p call) nil)
 
       (dolist (arg args)
-	(annotate-1-value-continuation arg))))
+	(annotate-1-value-lvar arg))))
 
   (values))
 
-;;; CASTs are merely continuation annotations than nodes. So we wait
-;;; until value consumer deside how values should be passed, and after
-;;; that we propagate this decision backwards through CAST chain. The
+;;; CASTs are merely lvar annotations than nodes. So we wait until
+;;; value consumer deside how values should be passed, and after that
+;;; we propagate this decision backwards through CAST chain. The
 ;;; exception is a dangling CAST with a type check, which we process
 ;;; immediately.
 (defun ltn-analyze-cast (cast)
   (declare (type cast cast))
   (setf (node-tail-p cast) nil)
   (when (and (cast-type-check cast)
-             (not (continuation-dest (node-cont cast))))
+             (not (node-lvar cast)))
     ;; FIXME
     (bug "IR2 type checking of unused values in not implemented.")
     )
   (values))
 
-(defun ltn-annotate-casts (cont)
-  (declare (type continuation cont))
-  (do-uses (node cont)
+(defun ltn-annotate-casts (lvar)
+  (declare (type lvar lvar))
+  (do-uses (node lvar)
     (when (cast-p node)
       (ltn-annotate-cast node))))
 
 (defun ltn-annotate-cast (cast)
   (declare (type cast))
-  (let ((2cont (continuation-info (node-cont cast)))
+  (let ((2lvar (lvar-info (node-lvar cast)))
         (value (cast-value cast)))
-    (aver 2cont)
+    (aver 2lvar)
     ;; XXX
-    (ecase (ir2-continuation-kind 2cont)
+    (ecase (ir2-lvar-kind 2lvar)
       (:unknown
-       (annotate-unknown-values-continuation value))
+       (annotate-unknown-values-lvar value))
       (:fixed
-       (let* ((count (length (ir2-continuation-locs 2cont)))
-              (ctype (continuation-derived-type value)))
+       (let* ((count (length (ir2-lvar-locs 2lvar)))
+              (ctype (lvar-derived-type value)))
          (multiple-value-bind (types rest)
              (values-type-types ctype (specifier-type 'null))
-           (annotate-fixed-values-continuation
+           (annotate-fixed-values-lvar
             value
             (mapcar #'primitive-type
                     (adjust-list types count rest))))))))
@@ -846,14 +834,16 @@
 ;;; block can be split out from underneath us, and DO-NODES would scan
 ;;; past the block end in that case.
 (defun ltn-analyze-block (block)
-  (do* ((node (continuation-next (block-start block))
-	      (continuation-next cont))
-	(cont (node-cont node) (node-cont node)))
+  (do* ((node (block-start-node block)
+	      (ctran-next ctran))
+        (ctran (node-next node) (node-next node)))
       (nil)
-    (let ((dest (continuation-dest cont)))
+    (let* ((lvar (when (valued-node-p node)
+                   (node-lvar node)))
+           (dest (and lvar (lvar-dest lvar))))
       (when (and (cast-p dest)
                  (not (cast-type-check dest))
-                 (immediately-used-p cont node))
+                 (immediately-used-p lvar node))
         (derive-node-type node (cast-asserted-type dest))))
     (etypecase node
       (ref)
@@ -883,7 +873,7 @@
 ;;; whether there are any unknown values receivers, making notations
 ;;; in the components' GENERATORS and RECEIVERS as appropriate.
 ;;;
-;;; If any unknown-values continations are received by this block (as
+;;; If any unknown-values lvars are received by this block (as
 ;;; indicated by IR2-BLOCK-POPPED), then we add the block to the
 ;;; IR2-COMPONENT-VALUES-RECEIVERS.
 ;;;

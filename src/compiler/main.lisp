@@ -1502,7 +1502,7 @@
 				    (namestring input-pathname))))
 	  (when trace-file
 	    (let* ((default-trace-file-pathname
-		     (make-pathname :type "trace" :defaults input-pathname))
+		     (make-pathname :type "ntrace" :defaults input-pathname))
 		   (trace-file-pathname
 		    (if (eql trace-file t)
 			default-trace-file-pathname

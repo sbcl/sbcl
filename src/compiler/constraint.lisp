@@ -120,12 +120,12 @@
 	       (lambda-var-constraints leaf))
       leaf)))
 
-;;; If CONT's USE is a REF, then return OK-REF-LAMBDA-VAR of the USE,
+;;; If LVAR's USE is a REF, then return OK-REF-LAMBDA-VAR of the USE,
 ;;; otherwise NIL.
-#!-sb-fluid (declaim (inline ok-cont-lambda-var))
-(defun ok-cont-lambda-var (cont)
-  (declare (type continuation cont))
-  (let ((use (continuation-use cont)))
+#!-sb-fluid (declaim (inline ok-lvar-lambda-var))
+(defun ok-lvar-lambda-var (lvar)
+  (declare (type lvar lvar))
+  (let ((use (lvar-uses lvar)))
     (when (ref-p use)
       (ok-ref-lambda-var use))))
 
@@ -169,49 +169,49 @@
     (combination
      (unless (eq (combination-kind use)
                  :error)
-       (let ((name (continuation-fun-name
+       (let ((name (lvar-fun-name
                     (basic-combination-fun use)))
              (args (basic-combination-args use)))
          (case name
            ((%typep %instance-typep)
             (let ((type (second args)))
-              (when (constant-continuation-p type)
-                (let ((val (continuation-value type)))
+              (when (constant-lvar-p type)
+                (let ((val (lvar-value type)))
                   (add-complement-constraints if 'typep
-                                              (ok-cont-lambda-var (first args))
+                                              (ok-lvar-lambda-var (first args))
                                               (if (ctype-p val)
                                                   val
                                                   (specifier-type val))
                                               nil)))))
            ((eq eql)
-            (let* ((var1 (ok-cont-lambda-var (first args)))
+            (let* ((var1 (ok-lvar-lambda-var (first args)))
                    (arg2 (second args))
-                   (var2 (ok-cont-lambda-var arg2)))
+                   (var2 (ok-lvar-lambda-var arg2)))
               (cond ((not var1))
                     (var2
                      (add-complement-constraints if 'eql var1 var2 nil))
-                    ((constant-continuation-p arg2)
+                    ((constant-lvar-p arg2)
                      (add-complement-constraints if 'eql var1
                                                  (ref-leaf
-                                                  (continuation-use arg2))
+                                                  (lvar-uses arg2))
                                                  nil)))))
            ((< >)
             (let* ((arg1 (first args))
-                   (var1 (ok-cont-lambda-var arg1))
+                   (var1 (ok-lvar-lambda-var arg1))
                    (arg2 (second args))
-                   (var2 (ok-cont-lambda-var arg2)))
+                   (var2 (ok-lvar-lambda-var arg2)))
               (when var1
-                (add-complement-constraints if name var1 (continuation-type arg2)
+                (add-complement-constraints if name var1 (lvar-type arg2)
                                             nil))
               (when var2
                 (add-complement-constraints if (if (eq name '<) '> '<)
-                                            var2 (continuation-type arg1)
+                                            var2 (lvar-type arg1)
                                             nil))))
            (t
             (let ((ptype (gethash name *backend-predicate-types*)))
               (when ptype
                 (add-complement-constraints if 'typep
-                                            (ok-cont-lambda-var (first args))
+                                            (ok-lvar-lambda-var (first args))
                                             ptype nil)))))))))
   (values))
 
@@ -221,8 +221,8 @@
   (declare (type cblock block))
   (let ((last (block-last block)))
     (when (if-p last)
-      (let ((use (continuation-use (if-test last))))
-	(when use
+      (let ((use (lvar-uses (if-test last))))
+	(when (node-p use)
 	  (add-test-constraints use last)))))
 
   (setf (block-test-modified block) nil)
@@ -371,17 +371,15 @@
 			      (constrain-float-type res y greater not-p)))))
 		   )))))
 
-      (let* ((cont (node-cont ref))
-	     (dest (continuation-dest cont)))
-	(cond ((and (if-p dest)
-		    (csubtypep (specifier-type 'null) not-res))
-	       (setf (node-derived-type ref) *wild-type*)
-	       (change-ref-leaf ref (find-constant t)))
-	      (t
-	       (derive-node-type ref
-                                 (make-single-value-type
-                                  (or (type-difference res not-res)
-                                      res))))))))
+      (cond ((and (if-p (node-dest ref))
+                  (csubtypep (specifier-type 'null) not-res))
+             (setf (node-derived-type ref) *wild-type*)
+             (change-ref-leaf ref (find-constant t)))
+            (t
+             (derive-node-type ref
+                               (make-single-value-type
+                                (or (type-difference res not-res)
+                                    res)))))))
 
   (values))
 
@@ -404,13 +402,12 @@
     (when test
       (sset-union gen test)))
 
-  (do-nodes (node cont block)
+  (do-nodes (node lvar block)
     (typecase node
       (bind
        (let ((fun (bind-lambda node)))
          (when (eq (functional-kind fun) :let)
-           (loop with call = (continuation-dest
-                              (node-cont (first (lambda-refs fun))))
+           (loop with call = (lvar-dest (node-lvar (first (lambda-refs fun))))
                  for var in (lambda-vars fun)
                  and val in (combination-args call)
                  when (and val
@@ -418,7 +415,7 @@
                            ;; if VAR has no SETs, type inference is
                            ;; fully performed by IR1 optimizer
                            (lambda-var-sets var))
-                 do (let* ((type (continuation-type val))
+                 do (let* ((type (lvar-type val))
                            (con (find-constraint 'typep var type nil)))
                       (sset-adjoin con gen))))))
       (ref
@@ -426,7 +423,7 @@
          (when var
            (when ref-preprocessor
              (funcall ref-preprocessor node gen))
-           (let ((dest (continuation-dest cont)))
+           (let ((dest (and lvar (lvar-dest lvar))))
              (when (cast-p dest)
                (let* ((atype (single-value-type (cast-derived-type dest))) ; FIXME
                       (con (find-constraint 'typep var atype nil)))

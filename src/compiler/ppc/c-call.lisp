@@ -240,8 +240,8 @@
 
 #!+darwin
 (deftransform %alien-funcall ((function type &rest args))
-  (assert (sb!c::constant-continuation-p type))
-  (let* ((type (sb!c::continuation-value type))
+  (assert (sb!c::constant-lvar-p type))
+  (let* ((type (sb!c::lvar-value type))
 	 (arg-types (alien-fun-type-arg-types type))
 	 (result-type (alien-fun-type-result-type type)))
     (assert (= (length arg-types) (length args)))

@@ -58,16 +58,16 @@
 ;;; spurious attempts at transformation (and possible repeated
 ;;; warnings.)
 (deftransform typep ((object type))
-  (unless (constant-continuation-p type)
+  (unless (constant-lvar-p type)
     (give-up-ir1-transform "can't open-code test of non-constant type"))
-  `(typep object ',(continuation-value type)))
+  `(typep object ',(lvar-value type)))
 
-;;; If the continuation OBJECT definitely is or isn't of the specified
+;;; If the lvar OBJECT definitely is or isn't of the specified
 ;;; type, then return T or NIL as appropriate. Otherwise quietly
 ;;; GIVE-UP-IR1-TRANSFORM.
 (defun ir1-transform-type-predicate (object type)
-  (declare (type continuation object) (type ctype type))
-  (let ((otype (continuation-type object)))
+  (declare (type lvar object) (type ctype type))
+  (let ((otype (lvar-type object)))
     (cond ((not (types-equal-or-intersect otype type))
 	   nil)
 	  ((csubtypep otype type)
@@ -79,11 +79,11 @@
 
 ;;; Flush %TYPEP tests whose result is known at compile time.
 (deftransform %typep ((object type))
-  (unless (constant-continuation-p type)
+  (unless (constant-lvar-p type)
     (give-up-ir1-transform))
   (ir1-transform-type-predicate
    object
-   (ir1-transform-specifier-type (continuation-value type))))
+   (ir1-transform-specifier-type (lvar-value type))))
 
 ;;; This is the IR1 transform for simple type predicates. It checks
 ;;; whether the single argument is known to (not) be of the
@@ -91,7 +91,7 @@
 (deftransform fold-type-predicate ((object) * * :node node :defun-only t)
   (let ((ctype (gethash (leaf-source-name
 			 (ref-leaf
-			  (continuation-use
+			  (lvar-uses
 			   (basic-combination-fun node))))
 			*backend-predicate-types*)))
     (aver ctype)
@@ -100,7 +100,7 @@
 ;;; If FIND-CLASS is called on a constant class, locate the CLASS-CELL
 ;;; at load time.
 (deftransform find-classoid ((name) ((constant-arg symbol)) *)
-  (let* ((name (continuation-value name))
+  (let* ((name (lvar-value name))
 	 (cell (find-classoid-cell name)))
     `(or (classoid-cell-classoid ',cell)
 	 (error "class not yet defined: ~S" name))))
@@ -353,11 +353,11 @@
 ;;; and signal an error if so. Otherwise, look up the indirect
 ;;; class-cell and call CLASS-CELL-TYPEP at runtime.
 (deftransform %instance-typep ((object spec) (* *) * :node node)
-  (aver (constant-continuation-p spec))
-  (let* ((spec (continuation-value spec))
+  (aver (constant-lvar-p spec))
+  (let* ((spec (lvar-value spec))
 	 (class (specifier-type spec))
 	 (name (classoid-name class))
-	 (otype (continuation-type object))
+	 (otype (lvar-type object))
 	 (layout (let ((res (info :type :compiler-layout name)))
 		   (if (and res (not (layout-invalid res)))
 		       res
@@ -456,7 +456,7 @@
   ;; KLUDGE: It looks bad to only do this on explicitly quoted forms,
   ;; since that would overlook other kinds of constants. But it turns
   ;; out that the DEFTRANSFORM for TYPEP detects any constant
-  ;; continuation, transforms it into a quoted form, and gives this
+  ;; lvar, transforms it into a quoted form, and gives this
   ;; source transform another chance, so it all works out OK, in a
   ;; weird roundabout way. -- WHN 2001-03-18
   (if (and (consp spec) (eq (car spec) 'quote))
@@ -500,14 +500,14 @@
 ;;;; coercion
 
 (deftransform coerce ((x type) (* *) * :node node)
-  (unless (constant-continuation-p type)
+  (unless (constant-lvar-p type)
     (give-up-ir1-transform))
-  (let ((tspec (ir1-transform-specifier-type (continuation-value type))))
-    (if (csubtypep (continuation-type x) tspec)
+  (let ((tspec (ir1-transform-specifier-type (lvar-value type))))
+    (if (csubtypep (lvar-type x) tspec)
 	'x
 	;; Note: The THE here makes sure that specifiers like
 	;; (SINGLE-FLOAT 0.0 1.0) can raise a TYPE-ERROR.
-	`(the ,(continuation-value type)
+	`(the ,(lvar-value type)
 	   ,(cond
 	     ((csubtypep tspec (specifier-type 'double-float))
 	      '(%double-float x))

@@ -29,10 +29,10 @@
 (defoptimizer (%rotate-byte derive-type) ((count size posn num))
   ;; FIXME: this looks fairly unwieldy.  I'm sure it can be made
   ;; simpler, and also be made to deal with negative integers too.
-  (let ((size (sb-c::continuation-type size)))
+  (let ((size (sb-c::lvar-type size)))
     (if (numeric-type-p size)
 	(let ((size-high (numeric-type-high size))
-	      (num-type (sb-c::continuation-type num)))
+	      (num-type (sb-c::lvar-type num)))
 	  (if (and size-high
 		   num-type
 		   (<= size-high sb-vm:n-word-bits)

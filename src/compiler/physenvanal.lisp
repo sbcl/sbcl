@@ -48,7 +48,7 @@
 		    (functional-has-external-references-p fun))
 	  (aver (member kind '(:optional :cleanup :escape)))
 	  (setf (functional-kind fun) nil)
-	  (delete-functional fun)))))
+          (delete-functional fun)))))
 
   (values))
 
@@ -246,14 +246,13 @@
   (declare (type physenv env) (type exit exit))
   (let* ((exit-block (node-block exit))
 	 (next-block (first (block-succ exit-block)))
-	 (cleanup (entry-cleanup (exit-entry exit)))
-	 (info (make-nlx-info :cleanup cleanup
-			      :continuation (node-cont exit)))
 	 (entry (exit-entry exit))
+	 (cleanup (entry-cleanup entry))
+	 (info (make-nlx-info cleanup exit))
 	 (new-block (insert-cleanup-code exit-block next-block
 					 entry
 					 `(%nlx-entry ',info)
-					 (entry-cleanup entry)))
+					 cleanup))
 	 (component (block-component new-block)))
     (unlink-blocks exit-block new-block)
     (link-blocks exit-block (component-tail component))
@@ -286,16 +285,15 @@
 ;;;    the NLX use.
 (defun note-non-local-exit (env exit)
   (declare (type physenv env) (type exit exit))
-  (let ((entry (exit-entry exit))
-	(cont (node-cont exit))
+  (let ((lvar (node-lvar exit))
 	(exit-fun (node-home-lambda exit)))
-    (if (find-nlx-info entry cont)
+    (if (find-nlx-info exit)
 	(let ((block (node-block exit)))
 	  (aver (= (length (block-succ block)) 1))
 	  (unlink-blocks block (first (block-succ block)))
 	  (link-blocks block (component-tail (block-component block))))
 	(insert-nlx-entry-stub exit env))
-    (let ((info (find-nlx-info entry cont)))
+    (let ((info (find-nlx-info exit)))
       (aver info)
       (close-over info (node-physenv exit) env)
       (when (eq (functional-kind exit-fun) :escape)
@@ -304,8 +302,9 @@
 	      (leaf-refs exit-fun))
 	(substitute-leaf (find-constant info) exit-fun)
 	(let ((node (block-last (nlx-info-target info))))
-	  (delete-continuation-use node)
-	  (add-continuation-use node (nlx-info-continuation info))))))
+	  (delete-lvar-use node)
+          (aver (eq lvar (node-lvar exit)))
+	  (add-lvar-use node lvar)))))
   (values))
 
 ;;; Iterate over the EXITs in COMPONENT, calling NOTE-NON-LOCAL-EXIT
@@ -355,12 +354,12 @@
 		       (basic-combination-args node))))
 	  (ecase (cleanup-kind cleanup)
 	    (:special-bind
-	     (code `(%special-unbind ',(continuation-value (first args)))))
+	     (code `(%special-unbind ',(lvar-value (first args)))))
 	    (:catch
 	     (code `(%catch-breakup)))
 	    (:unwind-protect
 	     (code `(%unwind-protect-breakup))
-	     (let ((fun (ref-leaf (continuation-use (second args)))))
+	     (let ((fun (ref-leaf (lvar-uses (second args)))))
 	       (reanalyze-funs fun)
 	       (code `(%funcall ,fun))))
 	    ((:block :tagbody)
@@ -418,9 +417,9 @@
 	(let ((result (return-result ret)))
 	  (do-uses (use result)
 	    (when (and (policy use merge-tail-calls)
+                       (basic-combination-p use)
 		       (immediately-used-p result use)
 		       (or (not (eq (node-derived-type use) *empty-type*))
-			   (not (basic-combination-p use))
 			   (eq (basic-combination-kind use) :local)))
 	      (setf (node-tail-p use) t)))))))
   (values))

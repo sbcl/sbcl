@@ -45,7 +45,7 @@
 ;;; START-VAR and CONT-VAR are bound to the start and result
 ;;; continuations for the resulting IR1. KIND is the function kind to
 ;;; associate with NAME.
-(defmacro def-ir1-translator (name (lambda-list start-var cont-var
+(defmacro def-ir1-translator (name (lambda-list start-var next-var result-var
 						&key (kind :special-form))
 				   &body body)
   (let ((fn-name (symbolicate "IR1-CONVERT-" name))
@@ -57,9 +57,9 @@
 			:error-fun 'convert-condition-into-compiler-error
                         :wrap-block nil)
       `(progn
-	 (declaim (ftype (function (continuation continuation t) (values))
+	 (declaim (ftype (function (ctran ctran (or lvar null) t) (values))
 			 ,fn-name))
-	 (defun ,fn-name (,start-var ,cont-var ,n-form)
+	 (defun ,fn-name (,start-var ,next-var ,result-var ,n-form)
 	   (let ((,n-env *lexenv*))
 	     ,@decls
 	     ,body
@@ -306,13 +306,13 @@
 	      (let* ((var (if (atom spec) spec (first spec)))
 		     (key (keywordicate var)))
 		(vars var)
-		(binds `(,var (find-keyword-continuation ,n-keys ,key)))
+		(binds `(,var (find-keyword-lvar ,n-keys ,key)))
 		(keywords key))
 	      (let* ((head (first spec))
 		     (var (second head))
 		     (key (first head)))
 		(vars var)
-		(binds `(,var (find-keyword-continuation ,n-keys ,key)))
+		(binds `(,var (find-keyword-lvar ,n-keys ,key)))
 		(keywords key))))
 
 	(let ((n-length (gensym))
@@ -422,7 +422,7 @@
 	       `((,n-node)
 		 (let* ((,n-args (basic-combination-args ,n-node))
 			,@(when result
-			    `((,result (node-cont ,n-node)))))
+			    `((,result (node-lvar ,n-node)))))
 		   (multiple-value-bind (,n-lambda ,n-decls)
 		       ,parsed-form
 		     (if (and (consp ,n-lambda) (eq (car ,n-lambda) 'lambda))
@@ -566,19 +566,15 @@
 ;;; successively.
 ;;;
 ;;; XXX Could change it not to replicate the code someday perhaps...
-(defmacro do-uses ((node-var continuation &optional result) &body body)
-  (once-only ((n-cont continuation))
-    `(ecase (continuation-kind ,n-cont)
-       (:unused)
-       (:inside-block
-	(block nil
-	  (let ((,node-var (continuation-use ,n-cont)))
-	    ,@body
-	    ,result)))
-       ((:block-start :deleted-block-start)
-	(dolist (,node-var (block-start-uses (continuation-block ,n-cont))
-			   ,result)
-	  ,@body)))))
+(defmacro do-uses ((node-var lvar &optional result) &body body)
+  (with-unique-names (uses)
+    `(let ((,uses (lvar-uses ,lvar)))
+       (if (listp ,uses)
+           (dolist (,node-var ,uses ,result)
+             ,@body)
+           (block nil
+             (let ((,node-var ,uses))
+               ,@body))))))
 
 ;;; Iterate over the nodes in BLOCK, binding NODE-VAR to the each node
 ;;; and CONT-VAR to the node's CONT. The only keyword option is
@@ -599,61 +595,62 @@
 ;;; the block start is deleted, we just punt. With RESTART-P, we are
 ;;; also more careful about termination, re-indirecting the BLOCK-LAST
 ;;; each time.
-(defmacro do-nodes ((node-var cont-var block &key restart-p) &body body)
-  (let ((n-block (gensym))
-	(n-last-cont (gensym)))
-    `(let* ((,n-block ,block)
-	    ,@(unless restart-p
-		`((,n-last-cont (node-cont (block-last ,n-block))))))
-       (do* ((,node-var (continuation-next (block-start ,n-block))
-			,(if restart-p
-			     `(cond
-			       ((eq (continuation-block ,cont-var) ,n-block)
-				(aver (continuation-next ,cont-var))
-				(continuation-next ,cont-var))
-			       (t
-				(let ((start (block-start ,n-block)))
-				  (unless (eq (continuation-kind start)
-					      :block-start)
-				    (return nil))
-				  (continuation-next start))))
-			     `(continuation-next ,cont-var)))
-	     (,cont-var (node-cont ,node-var) (node-cont ,node-var)))
-	    (())
-         (declare (type node ,node-var))
-	 ,@body
-	 (when ,(if restart-p
-		    `(or (eq ,node-var (block-last ,n-block))
-                         (eq ,cont-var (node-cont (block-last ,n-block)))
-                         (block-delete-p ,n-block))
-		    `(eq ,cont-var ,n-last-cont))
-	   (return nil))))))
+(defmacro do-nodes ((node-var lvar-var block &key restart-p)
+                    &body body)
+  (with-unique-names (n-block n-start)
+    `(do* ((,n-block ,block)
+           (,n-start (block-start ,n-block))
+
+           (,node-var (ctran-next ,n-start)
+                      ,(if restart-p
+                           `(let ((next (node-next ,node-var)))
+                              (cond
+                                ((not next)
+                                 (return))
+                                ((eq (ctran-block next) ,n-block)
+                                 (ctran-next next))
+                                (t
+                                 (let ((start (block-start ,n-block)))
+                                   (unless (eq (ctran-kind start)
+                                               :block-start)
+                                     (return nil))
+                                   (ctran-next start)))))
+                           `(acond ((node-next ,node-var)
+                                    (ctran-next it))
+                                   (t (return)))))
+           ,@(when lvar-var
+                   `((,lvar-var #1=(when (valued-node-p ,node-var)
+                                     (node-lvar ,node-var))
+                                #1#))))
+          (nil)
+       ,@body
+       ,@(when restart-p
+           `((when (block-delete-p ,n-block)
+               (return)))))))
+
 ;;; like DO-NODES, only iterating in reverse order
-(defmacro do-nodes-backwards ((node-var cont-var block) &body body)
+(defmacro do-nodes-backwards ((node-var lvar block) &body body)
   (let ((n-block (gensym))
 	(n-start (gensym))
-	(n-last (gensym))
-	(n-next (gensym)))
-    `(let* ((,n-block ,block)
-	    (,n-start (block-start ,n-block))
-	    (,n-last (block-last ,n-block)))
-       (do* ((,cont-var (node-cont ,n-last) ,n-next)
-	     (,node-var ,n-last (continuation-use ,cont-var))
-	     (,n-next (node-prev ,node-var) (node-prev ,node-var)))
-	    (())
-	 ,@body
-	 (when (eq ,n-next ,n-start)
-	   (return nil))))))
+	(n-prev (gensym)))
+    `(do* ((,n-block ,block)
+           (,n-start (block-start ,n-block))
+           (,node-var (block-last ,n-block) (ctran-use ,n-prev))
+           (,n-prev (node-prev ,node-var) (node-prev ,node-var))
+           (,lvar #1=(when (valued-node-p ,node-var) (node-lvar ,node-var))
+                  #1#))
+          (nil)
+       ,@body
+       (when (eq ,n-prev ,n-start)
+	   (return nil)))))
 
-(defmacro do-nodes-carefully ((node-var cont-var block) &body body)
-  (with-unique-names (n-block n-last)
+(defmacro do-nodes-carefully ((node-var block) &body body)
+  (with-unique-names (n-block n-ctran)
     `(loop with ,n-block = ,block
-           with ,n-last = (block-last ,n-block)
-           for ,cont-var = (block-start ,n-block) then (node-cont ,node-var)
-           for ,node-var = (and ,cont-var (continuation-next ,cont-var))
+           for ,n-ctran = (block-start ,n-block) then (node-next ,node-var)
+           for ,node-var = (and ,n-ctran (ctran-next ,n-ctran))
            while ,node-var
-           do (progn ,@body)
-           until (eq ,node-var ,n-last))))
+           do (progn ,@body))))
 
 ;;; Bind the IR1 context variables to the values associated with NODE,
 ;;; so that new, extra IR1 conversion related to NODE can be done

@@ -13,11 +13,11 @@
 
 ;;;; utilities for optimizing array operations
 
-;;; Return UPGRADED-ARRAY-ELEMENT-TYPE for CONTINUATION, or do
+;;; Return UPGRADED-ARRAY-ELEMENT-TYPE for LVAR, or do
 ;;; GIVE-UP-IR1-TRANSFORM if the upgraded element type can't be
 ;;; determined.
-(defun upgraded-element-type-specifier-or-give-up (continuation)
-  (let* ((element-ctype (extract-upgraded-element-type continuation))
+(defun upgraded-element-type-specifier-or-give-up (lvar)
+  (let* ((element-ctype (extract-upgraded-element-type lvar))
 	 (element-type-specifier (type-specifier element-ctype)))
     (if (eq element-type-specifier '*)
 	(give-up-ir1-transform
@@ -27,7 +27,7 @@
 ;;; Array access functions return an object from the array, hence its
 ;;; type is going to be the array upgraded element type.
 (defun extract-upgraded-element-type (array)
-  (let ((type (continuation-type array)))
+  (let ((type (lvar-type array)))
     ;; Note that this IF mightn't be satisfied even if the runtime
     ;; value is known to be a subtype of some specialized ARRAY, because
     ;; we can have values declared e.g. (AND SIMPLE-VECTOR UNKNOWN-TYPE),
@@ -42,7 +42,7 @@
 	*wild-type*)))
 
 (defun extract-declared-element-type (array)
-  (let ((type (continuation-type array)))
+  (let ((type (lvar-type array)))
     (if (array-type-p type)
 	(array-type-element-type type)
 	*wild-type*)))
@@ -51,39 +51,39 @@
 ;;; return type is going to be the same as the new-value for SETF
 ;;; functions.
 (defun assert-new-value-type (new-value array)
-  (let ((type (continuation-type array)))
+  (let ((type (lvar-type array)))
     (when (array-type-p type)
-      (assert-continuation-type
+      (assert-lvar-type
        new-value
        (array-type-specialized-element-type type)
-       (lexenv-policy (node-lexenv (continuation-dest new-value))))))
-  (continuation-type new-value))
+       (lexenv-policy (node-lexenv (lvar-dest new-value))))))
+  (lvar-type new-value))
 
 (defun assert-array-complex (array)
-  (assert-continuation-type
+  (assert-lvar-type
    array
    (make-array-type :complexp t
                     :element-type *wild-type*)
-   (lexenv-policy (node-lexenv (continuation-dest array))))
+   (lexenv-policy (node-lexenv (lvar-dest array))))
   nil)
 
-;;; Return true if ARG is NIL, or is a constant-continuation whose
+;;; Return true if ARG is NIL, or is a constant-lvar whose
 ;;; value is NIL, false otherwise.
 (defun unsupplied-or-nil (arg)
-  (declare (type (or continuation null) arg))
+  (declare (type (or lvar null) arg))
   (or (not arg)
-      (and (constant-continuation-p arg)
-	   (not (continuation-value arg)))))
+      (and (constant-lvar-p arg)
+	   (not (lvar-value arg)))))
 
 ;;;; DERIVE-TYPE optimizers
 
 ;;; Array operations that use a specific number of indices implicitly
 ;;; assert that the array is of that rank.
 (defun assert-array-rank (array rank)
-  (assert-continuation-type
+  (assert-lvar-type
    array
    (specifier-type `(array * ,(make-list rank :initial-element '*)))
-   (lexenv-policy (node-lexenv (continuation-dest array)))))
+   (lexenv-policy (node-lexenv (lvar-dest array)))))
 
 (defoptimizer (array-in-bounds-p derive-type) ((array &rest indices))
   (assert-array-rank array (length indices))
@@ -110,7 +110,7 @@
 ;;; Figure out the type of the data vector if we know the argument
 ;;; element type.
 (defoptimizer (%with-array-data derive-type) ((array start end))
-  (let ((atype (continuation-type array)))
+  (let ((atype (lvar-type array)))
     (when (array-type-p atype)
       (specifier-type
        `(simple-array ,(type-specifier
@@ -136,22 +136,22 @@
     (or (careful-specifier-type
          `(,(if simple 'simple-array 'array)
             ,(cond ((not element-type) t)
-                   ((constant-continuation-p element-type)
+                   ((constant-lvar-p element-type)
 		    (let ((ctype (careful-specifier-type
-				  (continuation-value element-type))))
+				  (lvar-value element-type))))
 		      (cond
 			((or (null ctype) (unknown-type-p ctype)) '*)
 			(t (sb!xc:upgraded-array-element-type
-			    (continuation-value element-type))))))
+			    (lvar-value element-type))))))
                    (t
                     '*))
-            ,(cond ((constant-continuation-p dims)
-                    (let* ((val (continuation-value dims))
+            ,(cond ((constant-lvar-p dims)
+                    (let* ((val (lvar-value dims))
 			   (cdims (if (listp val) val (list val))))
 		      (if simple
 			  cdims
 			  (length cdims))))
-                   ((csubtypep (continuation-type dims)
+                   ((csubtypep (lvar-type dims)
                                (specifier-type 'integer))
                     '(*))
                    (t
@@ -209,11 +209,11 @@
   (when (null initial-element)
     (give-up-ir1-transform))
   (let* ((eltype (cond ((not element-type) t)
-		       ((not (constant-continuation-p element-type))
+		       ((not (constant-lvar-p element-type))
 			(give-up-ir1-transform
 			 "ELEMENT-TYPE is not constant."))
 		       (t
-			(continuation-value element-type))))
+			(lvar-value element-type))))
 	 (eltype-type (ir1-transform-specifier-type eltype))
 	 (saetp (find-if (lambda (saetp)
 			   (csubtypep eltype-type (sb!vm:saetp-ctype saetp)))
@@ -228,16 +228,16 @@
     (unless saetp
       (give-up-ir1-transform "ELEMENT-TYPE not found in *SAETP*: ~S" eltype))
 
-    (cond ((and (constant-continuation-p initial-element)
-		(eql (continuation-value initial-element)
+    (cond ((and (constant-lvar-p initial-element)
+		(eql (lvar-value initial-element)
 		     (sb!vm:saetp-initial-element-default saetp)))
 	   creation-form)
 	  (t
 	   ;; error checking for target, disabled on the host because
 	   ;; (CTYPE-OF #\Null) is not possible.
 	   #-sb-xc-host
-	   (when (constant-continuation-p initial-element)
-	     (let ((value (continuation-value initial-element)))
+	   (when (constant-lvar-p initial-element)
+	     (let ((value (lvar-value initial-element)))
 	       (cond
 		 ((not (ctypep value (sb!vm:saetp-ctype saetp)))
 		  ;; this case will cause an error at runtime, so we'd
@@ -266,13 +266,13 @@
 (deftransform make-array ((length &key element-type)
 			  (integer &rest *))
   (let* ((eltype (cond ((not element-type) t)
-		       ((not (constant-continuation-p element-type))
+		       ((not (constant-lvar-p element-type))
 			(give-up-ir1-transform
 			 "ELEMENT-TYPE is not constant."))
 		       (t
-			(continuation-value element-type))))
-	 (len (if (constant-continuation-p length)
-		  (continuation-value length)
+			(lvar-value element-type))))
+	 (len (if (constant-lvar-p length)
+		  (lvar-value length)
 		  '*))
 	 (eltype-type (ir1-transform-specifier-type eltype))
 	 (result-type-spec
@@ -338,13 +338,13 @@
 ;;; CSR, 2002-07-01
 (deftransform make-array ((dims &key element-type)
 			  (list &rest *))
-  (unless (or (null element-type) (constant-continuation-p element-type))
+  (unless (or (null element-type) (constant-lvar-p element-type))
     (give-up-ir1-transform
      "The element-type is not constant; cannot open code array creation."))
-  (unless (constant-continuation-p dims)
+  (unless (constant-lvar-p dims)
     (give-up-ir1-transform
      "The dimension list is not constant; cannot open code array creation."))
-  (let ((dims (continuation-value dims)))
+  (let ((dims (lvar-value dims)))
     (unless (every #'integerp dims)
       (give-up-ir1-transform
        "The dimension list contains something other than an integer: ~S"
@@ -357,11 +357,11 @@
 	       (rank (length dims))
 	       (spec `(simple-array
 		       ,(cond ((null element-type) t)
-			      ((and (constant-continuation-p element-type)
+			      ((and (constant-lvar-p element-type)
 				    (ir1-transform-specifier-type
-				     (continuation-value element-type)))
+				     (lvar-value element-type)))
 			       (sb!xc:upgraded-array-element-type
-				(continuation-value element-type)))
+				(lvar-value element-type)))
 			      (t '*))
 			   ,(make-list rank :initial-element '*))))
 	  `(let ((header (make-array-header sb!vm:simple-array-widetag ,rank)))
@@ -387,7 +387,7 @@
 
 ;;; If we can tell the rank from the type info, use it instead.
 (deftransform array-rank ((array))
-  (let ((array-type (continuation-type array)))
+  (let ((array-type (lvar-type array)))
     (unless (array-type-p array-type)
       (give-up-ir1-transform))
     (let ((dims (array-type-dimensions array-type)))
@@ -403,10 +403,10 @@
 ;;; (if it's simple and a vector).
 (deftransform array-dimension ((array axis)
 			       (array index))
-  (unless (constant-continuation-p axis)
+  (unless (constant-lvar-p axis)
     (give-up-ir1-transform "The axis is not constant."))
-  (let ((array-type (continuation-type array))
-	(axis (continuation-value axis)))
+  (let ((array-type (lvar-type array))
+	(axis (lvar-value axis)))
     (unless (array-type-p array-type)
       (give-up-ir1-transform))
     (let ((dims (array-type-dimensions array-type)))
@@ -435,7 +435,7 @@
 ;;; If the length has been declared and it's simple, just return it.
 (deftransform length ((vector)
 		      ((simple-array * (*))))
-  (let ((type (continuation-type vector)))
+  (let ((type (lvar-type vector)))
     (unless (array-type-p type)
       (give-up-ir1-transform))
     (let ((dims (array-type-dimensions type)))
@@ -454,7 +454,7 @@
 ;;; If a simple array with known dimensions, then VECTOR-LENGTH is a
 ;;; compile-time constant.
 (deftransform vector-length ((vector))
-  (let ((vtype (continuation-type vector)))
+  (let ((vtype (lvar-type vector)))
     (if (and (array-type-p vtype)
 	     (not (array-type-complexp vtype)))
 	(let ((dim (first (array-type-dimensions vtype))))
@@ -469,7 +469,7 @@
 ;;; INDEX.
 (deftransform array-total-size ((array)
 				(array))
-  (let ((array-type (continuation-type array)))
+  (let ((array-type (lvar-type array)))
     (unless (array-type-p array-type)
       (give-up-ir1-transform))
     (let ((dims (array-type-dimensions array-type)))
@@ -484,7 +484,7 @@
 
 ;;; Only complex vectors have fill pointers.
 (deftransform array-has-fill-pointer-p ((array))
-  (let ((array-type (continuation-type array)))
+  (let ((array-type (lvar-type array)))
     (unless (array-type-p array-type)
       (give-up-ir1-transform))
     (let ((dims (array-type-dimensions array-type)))
@@ -506,10 +506,10 @@
 (deftransform %check-bound ((array dimension index) * * :node node)
   (cond ((policy node (and (> speed safety) (= safety 0)))
          'index)
-        ((not (constant-continuation-p dimension))
+        ((not (constant-lvar-p dimension))
          (give-up-ir1-transform))
         (t
-         (let ((dim (continuation-value dimension)))
+         (let ((dim (lvar-value dimension)))
            `(the (integer 0 (,dim)) index)))))
 
 ;;;; WITH-ARRAY-DATA
@@ -756,7 +756,7 @@
 
 ;;; Pick off some constant cases.
 (defoptimizer (array-header-p derive-type) ((array))
-  (let ((type (continuation-type array)))
+  (let ((type (lvar-type array)))
     (cond ((not (array-type-p type))
            nil)
           (t

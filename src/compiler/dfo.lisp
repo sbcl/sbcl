@@ -445,7 +445,7 @@
     ;; in the old LAMBDA into the new one (with LETs implicitly moved
     ;; by changing their home.)
     (do-blocks (block component)
-      (do-nodes (node cont block)
+      (do-nodes (node nil block)
 	(let ((lexenv (node-lexenv node)))
 	  (when (eq (lexenv-lambda lexenv) lambda)
 	    (setf (lexenv-lambda lexenv) result-lambda))))
@@ -506,14 +506,9 @@
       ;; Make sure the result's return node starts a block so that we
       ;; can splice code in before it.
       (let ((prev (node-prev
-		   (continuation-use
-		    (return-result result-return)))))
-	(when (continuation-use prev)
-	  (node-ends-block (continuation-use prev)))
-	(do-uses (use prev)
-	  (let ((new (make-continuation)))
-	    (delete-continuation-use use)
-	    (add-continuation-use use new))))
+		   (lvar-uses (return-result result-return)))))
+	(when (ctran-use prev)
+	  (node-ends-block (ctran-use prev))))
 
       (dolist (lambda (rest lambdas))
 	(merge-1-toplevel-lambda result-lambda lambda)))

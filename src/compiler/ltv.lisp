@@ -13,7 +13,8 @@
 
 (defknown %load-time-value (t) t (flushable movable))
 
-(def-ir1-translator load-time-value ((form &optional read-only-p) start cont)
+(def-ir1-translator load-time-value
+    ((form &optional read-only-p) start next result)
   #!+sb-doc
   "Arrange for FORM to be evaluated at load-time and use the value produced
    as if it were a constant. If READ-ONLY-P is non-NIL, then the resultant
@@ -25,7 +26,7 @@
 				       form
 				       `(make-value-cell ,form)))
 	(declare (ignore type))
-	(ir1-convert start cont
+	(ir1-convert start next result
 		     (if read-only-p
 			 `(%load-time-value ',handle)
 			 `(value-cell-ref (%load-time-value ',handle)))))
@@ -34,14 +35,14 @@
 	       (error (condition)
 		 (compiler-error "(during EVAL of LOAD-TIME-VALUE)~%~A"
 				 condition)))))
-	(ir1-convert start cont
+	(ir1-convert start next result
 		     (if read-only-p
 			 `',value
 			 `(value-cell-ref ',(make-value-cell value)))))))
 
 (defoptimizer (%load-time-value ir2-convert) ((handle) node block)
-  (aver (constant-continuation-p handle))
-  (let ((cont (node-cont node))
-	(tn (make-load-time-value-tn (continuation-value handle)
+  (aver (constant-lvar-p handle))
+  (let ((lvar (node-lvar node))
+	(tn (make-load-time-value-tn (lvar-value handle)
 				     *universal-type*)))
-    (move-continuation-result node block (list tn) cont)))
+    (move-lvar-result node block (list tn) lvar)))

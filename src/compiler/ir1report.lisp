@@ -499,7 +499,7 @@ has written, having proved that it is unreachable."))
     (aver ep) ; else no entry points??
     (multiple-value-bind (form context)
 	(find-original-source
-	 (node-source-path (continuation-next (block-start ep))))
+	 (node-source-path (block-start-node ep)))
       (declare (ignore form))
       (let ((*print-level* 2)
 	    (*print-pretty* nil))

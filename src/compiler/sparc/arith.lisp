@@ -1256,7 +1256,7 @@
 		 ((unsigned-byte 32) (constant-arg (unsigned-byte 32)))
 		 (unsigned-byte 32))
   "recode as shifts and adds"
-  (let ((y (continuation-value y)))
+  (let ((y (lvar-value y)))
     (multiple-value-bind (result adds shifts)
 	(ub32-strength-reduce-constant-multiply 'x y)
       (cond
@@ -1275,8 +1275,8 @@
 ;; instead of calling the inline ASH which has to check for the
 ;; direction of the shift at run-time.
 (deftransform ash ((num shift) (integer integer))
-  (let ((num-type (continuation-type num))
-	(shift-type (continuation-type shift)))
+  (let ((num-type (lvar-type num))
+	(shift-type (lvar-type shift)))
     ;; Can only handle right shifts
     (unless (csubtypep shift-type (specifier-type '(integer * 0)))
       (give-up-ir1-transform))

@@ -26,9 +26,9 @@
 ;;; continuation represents both, but the continuation can represent
 ;;; the case of a discarded result by having no DEST.
 
-(def!struct (continuation
+(def!struct (ctran
 	     (:make-load-form-fun ignore-it)
-	     (:constructor make-continuation (&optional dest)))
+	     (:constructor make-ctran))
   ;; an indication of the way that this continuation is currently used
   ;;
   ;; :UNUSED
@@ -40,45 +40,37 @@
   ;;	continuations. NEXT can have a non-null value if the next node
   ;;	has already been determined.
   ;;
-  ;; :DELETED
-  ;;	A continuation that has been deleted from IR1. Any pointers into
-  ;;	IR1 are cleared. There are two conditions under which a deleted
-  ;;	continuation may appear in code:
-  ;;	 -- The CONT of the LAST node in a block may be a deleted
-  ;;	    continuation when the original receiver of the continuation's
-  ;;	    value was deleted. Note that DEST in a deleted continuation is
-  ;;	    null, so it is easy to know not to attempt delivering any
-  ;;	    values to the continuation.
-  ;;	 -- Unreachable code that hasn't been deleted yet may receive
-  ;;	    deleted continuations. All such code will be in blocks that
-  ;;	    have DELETE-P set. All unreachable code is deleted by control
-  ;;	    optimization, so the backend doesn't have to worry about this.
-  ;;
   ;; :BLOCK-START
   ;;	The continuation that is the START of BLOCK. This is the only kind
   ;;	of continuation that can have more than one use. The BLOCK's
   ;;	START-USES is a list of all the uses.
   ;;
-  ;; :DELETED-BLOCK-START
-  ;;	Like :BLOCK-START, but BLOCK has been deleted. A block
-  ;;	starting continuation is made into a deleted block start when
-  ;;	the block is deleted, but the continuation still may have
-  ;;	value semantics. Since there isn't any code left, next is
-  ;;	null.
-  ;;
   ;; :INSIDE-BLOCK
-  ;;	A continuation that is the CONT of some node in BLOCK.
-  (kind :unused :type (member :unused :deleted :inside-block :block-start
-			      :deleted-block-start))
-  ;; The node which receives this value, if any. In a deleted
-  ;; continuation, this is null even though the node that receives
-  ;; this continuation may not yet be deleted.
-  (dest nil :type (or node null))
+  ;;	A continuation that is the NEXT of some node in BLOCK.
+  (kind :unused :type (member :unused :inside-block :block-start))
   ;; If this is a NODE, then it is the node which is to be evaluated
   ;; next. This is always null in :DELETED and :UNUSED continuations,
   ;; and will be null in a :INSIDE-BLOCK continuation when this is the
   ;; CONT of the LAST.
   (next nil :type (or node null))
+  ;; the node where this CTRAN is used, if unique. This is always null
+  ;; in :DELETED, :UNUSED and :BLOCK-START CTRANs, and is never null
+  ;; in :INSIDE-BLOCK continuations.
+  (use nil :type (or node null))
+  ;; the basic block this continuation is in. This is null only in
+  ;; :DELETED and :UNUSED continuations. Note that blocks that are
+  ;; unreachable but still in the DFO may receive deleted
+  ;; continuations, so it isn't o.k. to assume that any continuation
+  ;; that you pick up out of its DEST node has a BLOCK.
+  (block nil :type (or cblock null))
+  ;; something or other that the back end annotates this continuation with
+  (info nil))
+
+(def!struct (lvar
+	     (:make-load-form-fun ignore-it)
+	     (:constructor make-lvar (&optional dest)))
+  ;; The node which receives this value. NIL only temporarily.
+  (dest nil :type (or node null))
   ;; cached type of this continuation's value. If NIL, then this must
   ;; be recomputed: see CONTINUATION-DERIVED-TYPE.
   (%derived-type nil :type (or ctype null))
@@ -87,13 +79,7 @@
   ;; :INSIDE-BLOCK continuations. In a :BLOCK-START continuation, the
   ;; BLOCK's START-USES indicate whether NIL means no uses or more
   ;; than one use.
-  (use nil :type (or node null))
-  ;; the basic block this continuation is in. This is null only in
-  ;; :DELETED and :UNUSED continuations. Note that blocks that are
-  ;; unreachable but still in the DFO may receive deleted
-  ;; continuations, so it isn't o.k. to assume that any continuation
-  ;; that you pick up out of its DEST node has a BLOCK.
-  (block nil :type (or cblock null))
+  (uses nil :type (or node list))
   ;; set to true when something about this continuation's value has
   ;; changed. See REOPTIMIZE-CONTINUATION. This provides a way for IR1
   ;; optimize to determine which operands to a node have changed. If
@@ -104,12 +90,9 @@
   ;; recomputed: see CONTINUATION-EXTERNALLY-CHECKABLE-TYPE.
   (%externally-checkable-type nil :type (or null ctype))
   ;; something or other that the back end annotates this continuation with
-  (info nil)
-  ;; uses of this continuation in the lexical environment. They are
-  ;; recorded so that when one continuation is substituted for another
-  ;; the environment may be updated properly.
-  (lexenv-uses nil :type list))
+  (info nil))
 
+#+nil
 (def!method print-object ((x continuation) stream)
   (print-unreadable-object (x stream :type t :identity t)
     (format stream " #~D" (cont-num x))))
@@ -118,8 +101,6 @@
 		 (:copier nil))
   ;; unique ID for debugging
   #!+sb-show (id (new-object-id) :read-only t)
-  ;; the bottom-up derived type for this node.
-  (derived-type *wild-type* :type ctype)
   ;; True if this node needs to be optimized. This is set to true
   ;; whenever something changes about the value of a continuation
   ;; whose DEST is this node.
@@ -127,11 +108,11 @@
   ;; the continuation which receives the value of this node. This also
   ;; indicates what we do controlwise after evaluating this node. This
   ;; may be null during IR1 conversion.
-  (cont nil :type (or continuation null))
+  (next nil :type (or ctran null))
   ;; the continuation that this node is the NEXT of. This is null
   ;; during IR1 conversion when we haven't linked the node in yet or
   ;; in nodes that have been deleted from the IR1 by UNLINK-NODE.
-  (prev nil :type (or continuation null))
+  (prev nil :type (or ctran null))
   ;; the lexical environment this node was converted in
   (lexenv *lexenv* :type lexenv)
   ;; a representation of the source code responsible for generating
@@ -168,10 +149,19 @@
   ;; can null out this slot.
   (tail-p nil :type boolean))
 
+(defstruct (valued-node (:conc-name node-)
+                        (:include node)
+                        (:constructor nil)
+                        (:copier nil))
+  ;; the bottom-up derived type for this node.
+  (derived-type *wild-type* :type ctype)
+  ;; may be NIL if the value is unused.
+  (lvar nil :type (or lvar null)))
+
 ;;; Flags that are used to indicate various things about a block, such
 ;;; as what optimizations need to be done on it:
 ;;; -- REOPTIMIZE is set when something interesting happens the uses of a
-;;;    continuation whose DEST is in this block. This indicates that the
+;;;    lvar whose DEST is in this block. This indicates that the
 ;;;    value-driven (forward) IR1 optimizations should be done on this block.
 ;;; -- FLUSH-P is set when code in this block becomes potentially flushable,
 ;;;    usually due to a continuation's DEST becoming null.
@@ -218,8 +208,7 @@
 		   (:constructor make-block (start))
 		   (:constructor make-block-key)
 		   (:conc-name block-)
-		   (:predicate block-p)
-		   (:copier copy-block))
+		   (:predicate block-p))
   ;; a list of all the blocks that are predecessors/successors of this
   ;; block. In well-formed IR1, most blocks will have one successor.
   ;; The only exceptions are:
@@ -228,13 +217,11 @@
   ;;  3. blocks with DELETE-P set (zero)
   (pred nil :type list)
   (succ nil :type list)
-  ;; the continuation which heads this block (either a :BLOCK-START or
+  ;; the ctran which heads this block (either a :BLOCK-START or
   ;; :DELETED-BLOCK-START), or NIL when we haven't made the start
-  ;; continuation yet (and in the dummy component head and tail
+  ;; ctran yet (and in the dummy component head and tail
   ;; blocks)
-  (start nil :type (or continuation null))
-  ;; a list of all the nodes that have START as their CONT
-  (start-uses nil :type list)
+  (start nil :type (or ctran null))
   ;; the last node in this block. This is NIL when we are in the
   ;; process of building a block (and in the dummy component head and
   ;; tail blocks.)
@@ -489,11 +476,6 @@
 (defstruct (physenv (:copier nil))
   ;; the function that allocates this physical environment
   (lambda (missing-arg) :type clambda :read-only t)
-  #| ; seems not to be used as of sbcl-0.pre7.51
-  ;; a list of all the lambdas that allocate variables in this
-  ;; physical environment
-  (lambdas nil :type list)
-  |#
   ;; This ultimately converges to a list of all the LAMBDA-VARs and
   ;; NLX-INFOs needed from enclosing environments by code in this
   ;; physical environment. In the meantime, it may be
@@ -541,9 +523,11 @@
 
 ;;; An NLX-INFO structure is used to collect various information about
 ;;; non-local exits. This is effectively an annotation on the
-;;; CONTINUATION, although it is accessed by searching in the
+;;; continuation, although it is accessed by searching in the
 ;;; PHYSENV-NLX-INFO.
-(def!struct (nlx-info (:make-load-form-fun ignore-it))
+(def!struct (nlx-info (:constructor make-nlx-info
+                                    (cleanup exit &aux (lvar (node-lvar exit))))
+                      (:make-load-form-fun ignore-it))
   ;; the cleanup associated with this exit. In a catch or
   ;; unwind-protect, this is the :CATCH or :UNWIND-PROTECT cleanup,
   ;; and not the cleanup for the escape block. The CLEANUP-KIND of
@@ -561,7 +545,8 @@
   ;; For this purpose, the ENTRY must also be used to disambiguate,
   ;; since exits to different places may deliver their result to the
   ;; same continuation.
-  (continuation (missing-arg) :type continuation)
+  (exit (missing-arg) :type exit)
+  (lvar (missing-arg) :type (or lvar null))
   ;; the entry stub inserted by physical environment analysis. This is
   ;; a block containing a call to the %NLX-ENTRY funny function that
   ;; has the original exit destination as its successor. Null only
@@ -570,7 +555,7 @@
   ;; some kind of info used by the back end
   info)
 (defprinter (nlx-info :identity t)
-  continuation
+  exit
   target
   info)
 
@@ -1066,16 +1051,20 @@
 ;;; end must check for and ignore unreferenced variables. Note that a
 ;;; deleted LAMBDA-VAR may have sets; in this case the back end is
 ;;; still responsible for propagating the SET-VALUE to the set's CONT.
-(def!struct (lambda-var (:include basic-var))
+(!def-boolean-attribute lambda-var
   ;; true if this variable has been declared IGNORE
-  (ignorep nil :type boolean)
-  ;; the CLAMBDA that this var belongs to. This may be null when we are
-  ;; building a lambda during IR1 conversion.
-  (home nil :type (or null clambda))
+  ignore
   ;; This is set by physical environment analysis if it chooses an
   ;; indirect (value cell) representation for this variable because it
   ;; is both set and closed over.
-  (indirect nil :type boolean)
+  indirect)
+
+(def!struct (lambda-var (:include basic-var))
+  (flags (lambda-var-attributes)
+         :type attributes)
+  ;; the CLAMBDA that this var belongs to. This may be null when we are
+  ;; building a lambda during IR1 conversion.
+  (home nil :type (or null clambda))
   ;; The following two slots are only meaningful during IR1 conversion
   ;; of hairy lambda vars:
   ;;
@@ -1095,16 +1084,22 @@
   #!+sb-show id
   (type :test (not (eq type *universal-type*)))
   (where-from :test (not (eq where-from :assumed)))
-  (ignorep :test ignorep)
+  (flags :test (not (zerop flags))
+         :prin1 (decode-lambda-var-attributes flags))
   (arg-info :test arg-info)
   (specvar :test specvar))
+
+(defmacro lambda-var-ignorep (var)
+  `(lambda-var-attributep (lambda-var-flags ,var) ignore))
+(defmacro lambda-var-indirect (var)
+  `(lambda-var-attributep (lambda-var-flags ,var) indirect))
 
 ;;;; basic node types
 
 ;;; A REF represents a reference to a LEAF. REF-REOPTIMIZE is
 ;;; initially (and forever) NIL, since REFs don't receive any values
 ;;; and don't have any IR1 optimizer.
-(defstruct (ref (:include node (reoptimize nil))
+(defstruct (ref (:include valued-node (reoptimize nil))
 		(:constructor make-ref
                               (leaf
                                &aux (leaf-type (leaf-type leaf))
@@ -1125,18 +1120,18 @@
 		(:predicate if-p)
 		(:constructor make-if)
 		(:copier copy-if))
-  ;; CONTINUATION for the predicate
-  (test (missing-arg) :type continuation)
+  ;; LVAR for the predicate
+  (test (missing-arg) :type lvar)
   ;; the blocks that we execute next in true and false case,
   ;; respectively (may be the same)
   (consequent (missing-arg) :type cblock)
   (alternative (missing-arg) :type cblock))
 (defprinter (cif :conc-name if- :identity t)
-  (test :prin1 (continuation-use test))
+  (test :prin1 (lvar-uses test))
   consequent
   alternative)
 
-(defstruct (cset (:include node
+(defstruct (cset (:include valued-node
 			   (derived-type (make-single-value-type
                                           *universal-type*)))
 		 (:conc-name set-)
@@ -1145,26 +1140,25 @@
 		 (:copier copy-set))
   ;; descriptor for the variable set
   (var (missing-arg) :type basic-var)
-  ;; continuation for the value form
-  (value (missing-arg) :type continuation))
+  ;; LVAR for the value form
+  (value (missing-arg) :type lvar))
 (defprinter (cset :conc-name set- :identity t)
   var
-  (value :prin1 (continuation-use value)))
+  (value :prin1 (lvar-uses value)))
 
 ;;; The BASIC-COMBINATION structure is used to represent both normal
-;;; and multiple value combinations. In a local function call, this
+;;; and multiple value combinations. In a let-like function call, this
 ;;; node appears at the end of its block and the body of the called
 ;;; function appears as the successor. The NODE-CONT remains the
-;;; continuation which receives the value of the call.
-(defstruct (basic-combination (:include node)
+;;; continuation which receives the value of the call. XXX
+(defstruct (basic-combination (:include valued-node)
 			      (:constructor nil)
 			      (:copier nil))
-  ;; continuation for the function
-  (fun (missing-arg) :type continuation)
-  ;; list of CONTINUATIONs for the args. In a local call, an argument
-  ;; continuation may be replaced with NIL to indicate that the
-  ;; corresponding variable is unreferenced, and thus no argument
-  ;; value need be passed.
+  ;; LVAR for the function
+  (fun (missing-arg) :type lvar)
+  ;; list of LVARs for the args. In a local call, an argument lvar may
+  ;; be replaced with NIL to indicate that the corresponding variable
+  ;; is unreferenced, and thus no argument value need be passed.
   (args nil :type list)
   ;; the kind of function call being made. :LOCAL means that this is a
   ;; local call to a function in the same component, and that argument
@@ -1186,10 +1180,10 @@
 			(:copier nil)))
 (defprinter (combination :identity t)
   #!+sb-show id
-  (fun :prin1 (continuation-use fun))
+  (fun :prin1 (lvar-uses fun))
   (args :prin1 (mapcar (lambda (x)
 			 (if x
-			     (continuation-use x)
+			     (lvar-uses x)
 			     "<deleted>"))
 		       args)))
 
@@ -1208,8 +1202,8 @@
 			   (:constructor make-mv-combination (fun))
 			   (:copier nil)))
 (defprinter (mv-combination)
-  (fun :prin1 (continuation-use fun))
-  (args :prin1 (mapcar #'continuation-use args)))
+  (fun :prin1 (lvar-uses fun))
+  (args :prin1 (mapcar #'lvar-uses args)))
 
 ;;; The BIND node marks the beginning of a lambda body and represents
 ;;; the creation and initialization of the variables.
@@ -1233,8 +1227,8 @@
   ;; the lambda we are returning from. Null temporarily during
   ;; ir1tran.
   (lambda nil :type (or clambda null))
-  ;; the continuation which yields the value of the lambda
-  (result (missing-arg) :type continuation)
+  ;; the lvar which yields the value of the lambda
+  (result (missing-arg) :type lvar)
   ;; the union of the node-derived-type of all uses of the result
   ;; other than by a local call, intersected with the result's
   ;; asserted-type. If there are no non-call uses, this is
@@ -1247,7 +1241,7 @@
 ;;; The CAST node represents type assertions. The check for
 ;;; TYPE-TO-CHECK is performed and then the VALUE is declared to be of
 ;;; type ASSERTED-TYPE.
-(defstruct (cast (:include node)
+(defstruct (cast (:include valued-node)
                  (:constructor %make-cast))
   (asserted-type (missing-arg) :type ctype)
   (type-to-check (missing-arg) :type ctype)
@@ -1260,8 +1254,8 @@
   ;; T
   ;;    A type check is needed.
   (%type-check t :type (member t nil))
-  ;; the continuations which is checked
-  (value (missing-arg) :type continuation))
+  ;; the lvar which is checked
+  (value (missing-arg) :type lvar))
 (defprinter (cast :identity t)
   %type-check
   value
@@ -1291,16 +1285,16 @@
 ;;; the returned value being delivered directly to the exit
 ;;; continuation, it is delivered to our VALUE continuation. The
 ;;; original exit continuation is the exit node's CONT.
-(defstruct (exit (:include node)
+(defstruct (exit (:include valued-node)
 		 (:copier nil))
   ;; the ENTRY node that this is an exit for. If null, this is a
   ;; degenerate exit. A degenerate exit is used to "fill" an empty
   ;; block (which isn't allowed in IR1.) In a degenerate exit, Value
   ;; is always also null.
   (entry nil :type (or entry null))
-  ;; the continuation yielding the value we are to exit with. If NIL,
-  ;; then no value is desired (as in GO).
-  (value nil :type (or continuation null)))
+  ;; the lvar yielding the value we are to exit with. If NIL, then no
+  ;; value is desired (as in GO).
+  (value nil :type (or lvar null)))
 (defprinter (exit :identity t)
   #!+sb-show id
   (entry :test entry)
@@ -1344,5 +1338,5 @@
 ;;;; Freeze some structure types to speed type testing.
 
 #!-sb-fluid
-(declaim (freeze-type node leaf lexenv continuation cblock component cleanup
+(declaim (freeze-type node leaf lexenv ctran lvar cblock component cleanup
 		      physenv tail-set nlx-info))

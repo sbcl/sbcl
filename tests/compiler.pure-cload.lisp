@@ -96,6 +96,11 @@
 	   (optimize speed))
   (* x (* y x)))
 
+(defun #:foo (b)
+  (declare (type (integer -290488443 2) b)
+           (optimize (speed 3) (safety 1) (debug 1)))
+  (let ((v3 (min -1720 b))) (max v3 (logcount (if (= v3 b) b b)))))
+
 ;;; bug 282
 ;;;
 ;;; Verify type checking policy in full calls: the callee is supposed

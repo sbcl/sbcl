@@ -126,8 +126,8 @@
 
 
 (deftransform %alien-funcall ((function type &rest args) * * :node node)
-  (aver (sb!c::constant-continuation-p type))
-  (let* ((type (sb!c::continuation-value type))
+  (aver (sb!c::constant-lvar-p type))
+  (let* ((type (sb!c::lvar-value type))
 	 (env (sb!c::node-lexenv node))
          (arg-types (alien-fun-type-arg-types type))
          (result-type (alien-fun-type-result-type type)))

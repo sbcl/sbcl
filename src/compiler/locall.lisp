@@ -31,18 +31,16 @@
 ;;; the remaining args still match up with their vars.
 ;;;
 ;;; We also apply the declared variable type assertion to the argument
-;;; continuations.
+;;; lvars.
 (defun propagate-to-args (call fun)
   (declare (type combination call) (type clambda fun))
   (loop with policy = (lexenv-policy (node-lexenv call))
         for args on (basic-combination-args call)
         and var in (lambda-vars fun)
-        for arg =  (assert-continuation-type (car args)
-                                             (leaf-type var) policy)
+        do (assert-lvar-type (car args) (leaf-type var) policy)
         do (unless (leaf-refs var)
              (flush-dest (car args))
              (setf (car args) nil)))
-
   (values))
 
 ;;; This function handles merging the tail sets if CALL is potentially
@@ -56,11 +54,11 @@
 ;;; We destructively modify the set for the calling function to
 ;;; represent both, and then change all the functions in callee's set
 ;;; to reference the first. If we do merge, we reoptimize the
-;;; RETURN-RESULT continuation to cause IR1-OPTIMIZE-RETURN to
-;;; recompute the tail set type.
+;;; RETURN-RESULT lvar to cause IR1-OPTIMIZE-RETURN to recompute the
+;;; tail set type.
 (defun merge-tail-sets (call &optional (new-fun (combination-lambda call)))
   (declare (type basic-combination call) (type clambda new-fun))
-  (let ((return (continuation-dest (node-cont call))))
+  (let ((return (node-dest call)))
     (when (return-p return)
       (let ((call-set (lambda-tail-set (node-home-lambda call)))
 	    (fun-set (lambda-tail-set new-fun)))
@@ -70,7 +68,7 @@
 	      (setf (lambda-tail-set fun) call-set))
 	    (setf (tail-set-funs call-set)
 		  (nconc (tail-set-funs call-set) funs)))
-	  (reoptimize-continuation (return-result return))
+	  (reoptimize-lvar (return-result return))
 	  t)))))
 
 ;;; Convert a combination into a local call. We PROPAGATE-TO-ARGS, set
@@ -92,7 +90,7 @@
   (unless (call-full-like-p call)
     (dolist (arg (basic-combination-args call))
       (when arg
-        (flush-continuation-externally-checkable-type arg))))
+        (flush-lvar-externally-checkable-type arg))))
   (pushnew fun (lambda-calls-or-closes (node-home-lambda call)))
   (merge-tail-sets call fun)
   (change-ref-leaf ref fun)
@@ -221,11 +219,11 @@
 			       (make-xep fun))))))
 
 ;;; Attempt to convert all references to FUN to local calls. The
-;;; reference must be the function for a call, and the function
-;;; continuation must be used only once, since otherwise we cannot be
-;;; sure what function is to be called. The call continuation would be
-;;; multiply used if there is hairy stuff such as conditionals in the
-;;; expression that computes the function.
+;;; reference must be the function for a call, and the function lvar
+;;; must be used only once, since otherwise we cannot be sure what
+;;; function is to be called. The call lvar would be multiply used if
+;;; there is hairy stuff such as conditionals in the expression that
+;;; computes the function.
 ;;;
 ;;; If we cannot convert a reference, then we mark the referenced
 ;;; function as an entry-point, creating a new XEP if necessary. We
@@ -239,11 +237,11 @@
   (let ((refs (leaf-refs fun))
 	(first-time t))
     (dolist (ref refs)
-      (let* ((cont (node-cont ref))
-	     (dest (continuation-dest cont)))
+      (let* ((lvar (node-lvar ref))
+	     (dest (when lvar (lvar-dest lvar))))
 	(cond ((and (basic-combination-p dest)
-		    (eq (basic-combination-fun dest) cont)
-		    (eq (continuation-use cont) ref))
+		    (eq (basic-combination-fun dest) lvar)
+		    (eq (lvar-uses lvar) ref))
 
 	       (convert-call-if-possible ref dest)
 
@@ -427,7 +425,7 @@
 ;;; Attempt to convert a multiple-value call. The only interesting
 ;;; case is a call to a function that LOOKS-LIKE-AN-MV-BIND, has
 ;;; exactly one reference and no XEP, and is called with one values
-;;; continuation.
+;;; lvar.
 ;;;
 ;;; We change the call to be to the last optional entry point and
 ;;; change the call to be local. Due to our preconditions, the call
@@ -436,15 +434,15 @@
 ;;; optional defaulting code.
 ;;;
 ;;; We also use variable types for the called function to construct an
-;;; assertion for the values continuation.
+;;; assertion for the values lvar.
 ;;;
 ;;; See CONVERT-CALL for additional notes on MERGE-TAIL-SETS, etc.
 (defun convert-mv-call (ref call fun)
   (declare (type ref ref) (type mv-combination call) (type functional fun))
   (when (and (looks-like-an-mv-bind fun)
 	     (not (functional-entry-fun fun))
-	     (= (length (leaf-refs fun)) 1)
-	     (= (length (basic-combination-args call)) 1))
+	     (singleton-p (leaf-refs fun))
+	     (singleton-p (basic-combination-args call)))
     (let* ((*current-component* (node-component ref))
            (ep (optional-dispatch-entry-point-fun
                 fun (optional-dispatch-max-args fun))))
@@ -454,7 +452,7 @@
       (merge-tail-sets call ep)
       (change-ref-leaf ref ep)
 
-      (assert-continuation-type
+      (assert-lvar-type
        (first (basic-combination-args call))
        (make-short-values-type (mapcar #'leaf-type (lambda-vars ep)))
        (lexenv-policy (node-lexenv call)))))
@@ -467,8 +465,8 @@
 (defun convert-lambda-call (ref call fun)
   (declare (type ref ref) (type combination call) (type clambda fun))
   (let ((nargs (length (lambda-vars fun)))
-	(call-args (length (combination-args call))))
-    (cond ((= call-args nargs)
+	(n-call-args (length (combination-args call))))
+    (cond ((= n-call-args nargs)
 	   (convert-call ref call fun))
 	  (t
 	   ;; FIXME: ANSI requires in "3.2.5 Exceptional Situations in the
@@ -490,7 +488,7 @@
 	   ;; file. So maybe it deserves a full warning anyway.
 	   (compiler-warn
 	    "function called with ~R argument~:P, but wants exactly ~R"
-	    call-args nargs)
+	    n-call-args nargs)
 	   (setf (basic-combination-kind call) :error)))))
 
 ;;;; &OPTIONAL, &MORE and &KEYWORD calls
@@ -550,11 +548,11 @@
 	       (declare (ignorable ,@ignores))
 	       (%funcall ,entry ,@args))
 	    :debug-name (debug-namify "hairy function entry ~S"
-				      (continuation-fun-name
+				      (lvar-fun-name
 				       (basic-combination-fun call)))))))
     (convert-call ref call new-fun)
     (dolist (ref (leaf-refs entry))
-      (convert-call-if-possible ref (continuation-dest (node-cont ref))))))
+      (convert-call-if-possible ref (lvar-dest (node-lvar ref))))))
 
 ;;; Use CONVERT-HAIRY-FUN-ENTRY to convert a &MORE-arg call to a known
 ;;; function into a local call to the MAIN-ENTRY.
@@ -611,22 +609,22 @@
 	(do ((key more (cddr key))
 	     (temp more-temps (cddr temp)))
 	    ((null key))
-	  (let ((cont (first key)))
-	    (unless (constant-continuation-p cont)
+	  (let ((lvar (first key)))
+	    (unless (constant-lvar-p lvar)
 	      (when flame
 		(compiler-notify "non-constant keyword in keyword call"))
 	      (setf (basic-combination-kind call) :error)
 	      (return-from convert-more-call))
 
-	    (let ((name (continuation-value cont))
+	    (let ((name (lvar-value lvar))
 		  (dummy (first temp))
 		  (val (second temp)))
               ;; FIXME: check whether KEY was supplied earlier
               (when (and (eq name :allow-other-keys) (not allow-found))
                 (let ((val (second key)))
-                  (cond ((constant-continuation-p val)
+                  (cond ((constant-lvar-p val)
                          (setq allow-found t
-                               allowp (continuation-value val)))
+                               allowp (lvar-value val)))
                         (t (when flame
                              (compiler-notify "non-constant :ALLOW-OTHER-KEYS value"))
                            (setf (basic-combination-kind call) :error)
@@ -689,8 +687,8 @@
 ;;;;    corresponding combination node, making the control transfer
 ;;;;    explicit and allowing LETs to be mashed together into a single
 ;;;;    block. The value of the LET is delivered directly to the
-;;;;    original continuation for the call, eliminating the need to
-;;;;    propagate information from the dummy result continuation.
+;;;;    original lvar for the call, eliminating the need to
+;;;;    propagate information from the dummy result lvar.
 ;;;; -- As far as IR1 optimization is concerned, it is interesting in
 ;;;;    that there is only one expression that the variable can be bound
 ;;;;    to, and this is easily substituted for.
@@ -722,11 +720,8 @@
 	(join-components component clambda-component)))
     (let ((*current-component* component))
       (node-ends-block call))
-    ;; FIXME: Use DESTRUCTURING-BIND here, and grep for other
-    ;; uses of '=.*length' which could also be converted to use
-    ;; DESTRUCTURING-BIND or PROPER-LIST-OF-LENGTH-P.
-    (aver (= (length (block-succ call-block)) 1))
-    (let ((next-block (first (block-succ call-block))))
+    (destructuring-bind (next-block)
+        (block-succ call-block)
       (unlink-blocks call-block next-block)
       (link-blocks call-block bind-block)
       next-block)))
@@ -844,38 +839,29 @@
 
 ;;; Handle the value semantics of LET conversion. Delete FUN's return
 ;;; node, and change the control flow to transfer to NEXT-BLOCK
-;;; instead. Move all the uses of the result continuation to CALL's
-;;; CONT.
+;;; instead. Move all the uses of the result lvar to CALL's lvar.
 (defun move-return-uses (fun call next-block)
   (declare (type clambda fun) (type basic-combination call)
 	   (type cblock next-block))
   (let* ((return (lambda-return fun))
-	 (return-block (node-block return)))
+	 (return-block (progn
+                         (ensure-block-start (node-prev return))
+                         (node-block return))))
     (unlink-blocks return-block
 		   (component-tail (block-component return-block)))
     (link-blocks return-block next-block)
     (unlink-node return)
     (delete-return return)
     (let ((result (return-result return))
-	  (cont (node-cont call))
-	  (call-type (node-derived-type call)))
+          (lvar (if (node-tail-p call)
+                    (return-result (lambda-return (node-home-lambda call)))
+                    (node-lvar call)))
+          (call-type (node-derived-type call)))
       (unless (eq call-type *wild-type*)
-        ;; FIXME: Replace the call with unsafe CAST. -- APD, 2002-01-26
+        ;; FIXME: Replace the call with unsafe CAST. -- APD, 2003-01-26
         (do-uses (use result)
-	  (derive-node-type use call-type)))
-      (substitute-continuation-uses cont result)))
-  (values))
-
-;;; Change all CONT for all the calls to FUN to be the start
-;;; continuation for the bind node. This allows the blocks to be
-;;; joined if the caller count ever goes to one.
-(defun move-let-call-cont (fun)
-  (declare (type clambda fun))
-  (let ((new-cont (node-prev (lambda-bind fun))))
-    (dolist (ref (leaf-refs fun))
-      (let ((dest (continuation-dest (node-cont ref))))
-	(delete-continuation-use dest)
-	(add-continuation-use dest new-cont))))
+          (derive-node-type use call-type)))
+      (substitute-lvar-uses lvar result)))
   (values))
 
 ;;; We are converting FUN to be a LET when the call is in a non-tail
@@ -888,7 +874,7 @@
   (dolist (called (lambda-calls-or-closes fun))
     (when (lambda-p called)
       (dolist (ref (leaf-refs called))
-	(let ((this-call (continuation-dest (node-cont ref))))
+	(let ((this-call (node-dest ref)))
 	  (when (and this-call
 		     (node-tail-p this-call)
 		     (eq (node-home-lambda this-call) fun))
@@ -896,12 +882,11 @@
 	    (ecase (functional-kind called)
 	      ((nil :cleanup :optional)
 	       (let ((block (node-block this-call))
-		     (cont (node-cont call)))
-		 (ensure-block-start cont)
+		     (lvar (node-lvar call)))
 		 (unlink-blocks block (first (block-succ block)))
 		 (link-blocks block next-block)
-		 (delete-continuation-use this-call)
-		 (add-continuation-use this-call cont)))
+                 (aver (not (node-lvar this-call)))
+		 (add-lvar-use this-call lvar)))
 	      (:deleted)
 	      ;; The called function might be an assignment in the
 	      ;; case where we are currently converting that function.
@@ -930,7 +915,7 @@
 ;;;    tail-recursive local calls.
 ;;; -- If CALL is a non-tail call, or if both have returns, then
 ;;;    we delete the callee's return, move its uses to the call's
-;;;    result continuation, and transfer control to the appropriate
+;;;    result lvar, and transfer control to the appropriate
 ;;;    return point.
 ;;; -- If the callee has a return, but the caller doesn't, then we
 ;;;    move the return to the caller.
@@ -942,34 +927,29 @@
   (let* ((return (lambda-return fun))
 	 (call-fun (node-home-lambda call))
 	 (call-return (lambda-return call-fun)))
+    (when (and call-return
+               (block-delete-p (node-block call-return)))
+      (delete-return call-return)
+      (unlink-node call-return)
+      (setq call-return nil))
     (cond ((not return))
 	  ((or next-block call-return)
 	   (unless (block-delete-p (node-block return))
-             (when (and (node-tail-p call)
-                        call-return
-                        (not (eq (node-cont call)
-                                 (return-result call-return))))
-               ;; We do not care to give a meaningful continuation to
-               ;; a tail combination, but here we need it.
-               (delete-continuation-use call)
-               (add-continuation-use call (return-result call-return)))
-	     (move-return-uses fun call
-			       (or next-block
-                                   (let ((block (node-block call-return)))
-                                     (when (block-delete-p block)
-                                       (setf (block-delete-p block) nil))
-                                     block)))))
+             (unless next-block
+               (ensure-block-start (node-prev call-return))
+               (setq next-block (node-block call-return)))
+	     (move-return-uses fun call next-block)))
 	  (t
 	   (aver (node-tail-p call))
 	   (setf (lambda-return call-fun) return)
 	   (setf (return-lambda return) call-fun)
            (setf (lambda-return fun) nil))))
-  (move-let-call-cont fun)
+  (%delete-lvar-use call) ; LET call does not have value semantics
   (values))
 
 ;;; Actually do LET conversion. We call subfunctions to do most of the
 ;;; work. We change the CALL's CONT to be the continuation heading the
-;;; BIND block, and also do REOPTIMIZE-CONTINUATION on the args and
+;;; BIND block, and also do REOPTIMIZE-LVAR on the args and
 ;;; CONT so that LET-specific IR1 optimizations get a chance. We blow
 ;;; away any entry for the function in *FREE-FUNS* so that nobody
 ;;; will create new references to it.
@@ -986,8 +966,8 @@
   (declare (type basic-combination call))
   (dolist (arg (basic-combination-args call))
     (when arg
-      (reoptimize-continuation arg)))
-  (reoptimize-continuation (node-cont call))
+      (reoptimize-lvar arg)))
+  (reoptimize-lvar (node-lvar call))
   (values))
 
 ;;; Are there any declarations in force to say CLAMBDA shouldn't be
@@ -1045,19 +1025,18 @@
     (let ((refs (leaf-refs clambda)))
       (when (and refs
 		 (null (rest refs))
-		 (member (functional-kind clambda) '(nil :assignment))
+		 (memq (functional-kind clambda) '(nil :assignment))
 		 (not (functional-entry-fun clambda)))
-	(let* ((ref (first refs))
-               (ref-cont (node-cont ref))
-	       (dest (continuation-dest ref-cont)))
-	  (when (and dest
-		     (basic-combination-p dest)
-		     (eq (basic-combination-fun dest) ref-cont)
+	(binding* ((ref (first refs))
+                   (ref-lvar (node-lvar ref) :exit-if-null)
+                   (dest (lvar-dest ref-lvar)))
+	  (when (and (basic-combination-p dest)
+		     (eq (basic-combination-fun dest) ref-lvar)
 		     (eq (basic-combination-kind dest) :local)
 		     (not (block-delete-p (node-block dest)))
 		     (cond ((ok-initial-convert-p clambda) t)
 			   (t
-			    (reoptimize-continuation ref-cont)
+			    (reoptimize-lvar ref-lvar)
 			    nil)))
             (when (eq clambda (node-home-lambda dest))
               (delete-lambda clambda)
@@ -1091,30 +1070,28 @@
 ;;; If a potentially TR local call really is TR, then convert it to
 ;;; jump directly to the called function. We also call
 ;;; MAYBE-CONVERT-TO-ASSIGNMENT. The first value is true if we
-;;; tail-convert. The second is the value of M-C-T-A. We can switch
-;;; the succesor (potentially deleting the RETURN node) unless:
-;;; -- The call has already been converted.
-;;; -- The call isn't TR (some implicit MV PROG1.)
-;;; -- The call is in an XEP (thus we might decide to make it non-tail 
-;;;    so that we can use known return inside the component.)
-;;; -- There is a change in the cleanup between the call in the return, 
-;;;    so we might need to introduce cleanup code.
+;;; tail-convert. The second is the value of M-C-T-A.
 (defun maybe-convert-tail-local-call (call)
   (declare (type combination call))
-  (let ((return (continuation-dest (node-cont call))))
+  (let ((return (lvar-dest (node-lvar call))))
     (aver (return-p return))
-    (when (and (not (node-tail-p call))
+    (when (and (not (node-tail-p call)) ; otherwise already converted
+               ;; this is a tail call
 	       (immediately-used-p (return-result return) call)
-	       (not (eq (functional-kind (node-home-lambda call))
-			:external))
 	       (only-harmless-cleanups (node-block call)
-				       (node-block return)))
+				       (node-block return))
+               ;; If the call is in an XEP, we might decide to make it
+               ;; non-tail so that we can use known return inside the
+               ;; component.
+	       (not (eq (functional-kind (node-home-lambda call))
+			:external)))
       (node-ends-block call)
       (let ((block (node-block call))
 	    (fun (combination-lambda call)))
 	(setf (node-tail-p call) t)
 	(unlink-blocks block (first (block-succ block)))
 	(link-blocks block (lambda-block fun))
+        (delete-lvar-use call)
 	(values t (maybe-convert-to-assignment fun))))))
 
 ;;; This is called when we believe it might make sense to convert
@@ -1145,7 +1122,7 @@
     (let ((outside-non-tail-call nil)
 	  (outside-call nil))
       (when (and (dolist (ref (leaf-refs clambda) t)
-		   (let ((dest (continuation-dest (node-cont ref))))
+		   (let ((dest (lvar-dest (node-lvar ref))))
 		     (when (or (not dest)
                                (block-delete-p (node-block dest)))
                        (return nil))

@@ -1482,12 +1482,12 @@
   (foldable flushable))
 
 (defoptimizer (%lea derive-type) ((base index scale disp))
-  (when (and (constant-continuation-p scale)
-	     (constant-continuation-p disp))
-    (let ((scale (continuation-value scale))
-	  (disp (continuation-value disp))
-	  (base-type (continuation-type base))
-	  (index-type (continuation-type index)))
+  (when (and (constant-lvar-p scale)
+	     (constant-lvar-p disp))
+    (let ((scale (lvar-value scale))
+	  (disp (lvar-value disp))
+	  (base-type (lvar-type base))
+	  (index-type (lvar-type index)))
       (when (and (numeric-type-p base-type)
 		 (numeric-type-p index-type))
 	(let ((base-lo (numeric-type-low base-type))
@@ -1629,7 +1629,7 @@
 		 ((unsigned-byte 32) (constant-arg (unsigned-byte 32)))
 		 (unsigned-byte 32))
   "recode as leas, shifts and adds"
-  (let ((y (continuation-value y)))
+  (let ((y (lvar-value y)))
     (cond
       ((= y (ash 1 (integer-length y)))
        ;; there's a generic transform for y = 2^k

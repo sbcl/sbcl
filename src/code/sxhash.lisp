@@ -98,12 +98,12 @@
 ;;; easily do this optimization in the cross-compiler, and SBCL itself
 ;;; doesn't seem to need this optimization, so we don't try.
 (deftransform sxhash ((x) (simple-string))
-  (if #+sb-xc-host nil #-sb-xc-host (constant-continuation-p x)
-      (sxhash (continuation-value x))
+  (if #+sb-xc-host nil #-sb-xc-host (constant-lvar-p x)
+      (sxhash (lvar-value x))
       '(%sxhash-simple-string x)))
 (deftransform sxhash ((x) (symbol))
-  (if #+sb-xc-host nil #-sb-xc-host (constant-continuation-p x)
-      (sxhash (continuation-value x))
+  (if #+sb-xc-host nil #-sb-xc-host (constant-lvar-p x)
+      (sxhash (lvar-value x))
       '(%sxhash-simple-string (symbol-name x))))
 
 

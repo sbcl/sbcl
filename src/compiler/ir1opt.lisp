@@ -20,16 +20,16 @@
 
 ;;; Return true for a CONTINUATION whose sole use is a reference to a
 ;;; constant leaf.
-(defun constant-continuation-p (thing)
-  (and (continuation-p thing)
-       (let ((use (principal-continuation-use thing)))
+(defun constant-lvar-p (thing)
+  (and (lvar-p thing)
+       (let ((use (principal-lvar-use thing)))
          (and (ref-p use) (constant-p (ref-leaf use))))))
 
 ;;; Return the constant value for a continuation whose only use is a
 ;;; constant node.
-(declaim (ftype (function (continuation) t) continuation-value))
-(defun continuation-value (cont)
-  (let ((use (principal-continuation-use cont)))
+(declaim (ftype (function (lvar) t) lvar-value))
+(defun lvar-value (lvar)
+  (let ((use (principal-lvar-use lvar)))
     (constant-value (ref-leaf use))))
 
 ;;;; interface for obtaining results of type inference
@@ -51,108 +51,102 @@
 ;;; The result value is cached in the CONTINUATION-%DERIVED-TYPE slot.
 ;;; If the slot is true, just return that value, otherwise recompute
 ;;; and stash the value there.
-#!-sb-fluid (declaim (inline continuation-derived-type))
-(defun continuation-derived-type (cont)
-  (declare (type continuation cont))
-  (or (continuation-%derived-type cont)
-      (setf (continuation-%derived-type cont)
-            (%continuation-derived-type cont))))
-(defun %continuation-derived-type (cont)
-  (declare (type continuation cont))
-  (ecase (continuation-kind cont)
-    ((:block-start :deleted-block-start)
-     (let ((uses (block-start-uses (continuation-block cont))))
-       (if uses
-	   (do ((res (node-derived-type (first uses))
-		     (values-type-union (node-derived-type (first current))
-					res))
-		(current (rest uses) (rest current)))
-	       ((null current) res))
-	   *empty-type*)))
-    (:inside-block
-     (node-derived-type (continuation-use cont)))))
+#!-sb-fluid (declaim (inline lvar-derived-type))
+(defun lvar-derived-type (lvar)
+  (declare (type lvar lvar))
+  (or (lvar-%derived-type lvar)
+      (setf (lvar-%derived-type lvar)
+            (%lvar-derived-type lvar))))
+(defun %lvar-derived-type (lvar)
+  (declare (type lvar lvar))
+  (let ((uses (lvar-uses lvar)))
+    (cond ((null uses) *empty-type*)
+          ((listp uses)
+           (do ((res (node-derived-type (first uses))
+                     (values-type-union (node-derived-type (first current))
+                                        res))
+                (current (rest uses) (rest current)))
+               ((null current) res)))
+          (t
+           (node-derived-type (lvar-uses lvar))))))
 
 ;;; Return the derived type for CONT's first value. This is guaranteed
 ;;; not to be a VALUES or FUNCTION type.
-(declaim (ftype (sfunction (continuation) ctype) continuation-type))
-(defun continuation-type (cont)
-  (single-value-type (continuation-derived-type cont)))
+(declaim (ftype (sfunction (lvar) ctype) lvar-type))
+(defun lvar-type (lvar)
+  (single-value-type (lvar-derived-type lvar)))
 
 ;;; If CONT is an argument of a function, return a type which the
 ;;; function checks CONT for.
-#!-sb-fluid (declaim (inline continuation-externally-checkable-type))
-(defun continuation-externally-checkable-type (cont)
-  (or (continuation-%externally-checkable-type cont)
-      (%continuation-%externally-checkable-type cont)))
-(defun %continuation-%externally-checkable-type (cont)
-  (declare (type continuation cont))
-  (let ((dest (continuation-dest cont)))
-    (if (not (and dest
-                  (combination-p dest)))
+#!-sb-fluid (declaim (inline lvar-externally-checkable-type))
+(defun lvar-externally-checkable-type (lvar)
+  (or (lvar-%externally-checkable-type lvar)
+      (%lvar-%externally-checkable-type lvar)))
+(defun %lvar-%externally-checkable-type (lvar)
+  (declare (type lvar lvar))
+  (let ((dest (lvar-dest lvar)))
+    (if (not (and dest (combination-p dest)))
         ;; TODO: MV-COMBINATION
-        (setf (continuation-%externally-checkable-type cont) *wild-type*)
+        (setf (lvar-%externally-checkable-type lvar) *wild-type*)
         (let* ((fun (combination-fun dest))
                (args (combination-args dest))
-               (fun-type (continuation-type fun)))
-          (setf (continuation-%externally-checkable-type fun) *wild-type*)
+               (fun-type (lvar-type fun)))
+          (setf (lvar-%externally-checkable-type fun) *wild-type*)
           (if (or (not (call-full-like-p dest))
                   (not (fun-type-p fun-type))
                   ;; FUN-TYPE might be (AND FUNCTION (SATISFIES ...)).
                   (fun-type-wild-args fun-type))
               (dolist (arg args)
                 (when arg
-                  (setf (continuation-%externally-checkable-type arg)
+                  (setf (lvar-%externally-checkable-type arg)
                         *wild-type*)))
               (map-combination-args-and-types
                (lambda (arg type)
-                 (setf (continuation-%externally-checkable-type arg)
-                       (acond ((continuation-%externally-checkable-type arg)
+                 (setf (lvar-%externally-checkable-type arg)
+                       (acond ((lvar-%externally-checkable-type arg)
                                (values-type-intersection
                                 it (coerce-to-values type)))
                               (t (coerce-to-values type)))))
                dest)))))
-  (continuation-%externally-checkable-type cont))
-(declaim (inline flush-continuation-externally-checkable-type))
-(defun flush-continuation-externally-checkable-type (cont)
-  (declare (type continuation cont))
-  (setf (continuation-%externally-checkable-type cont) nil))
+  (lvar-%externally-checkable-type lvar))
+#!-sb-fluid(declaim (inline flush-lvar-externally-checkable-type))
+(defun flush-lvar-externally-checkable-type (lvar)
+  (declare (type lvar lvar))
+  (setf (lvar-%externally-checkable-type lvar) nil))
 
 ;;;; interface routines used by optimizers
 
 ;;; This function is called by optimizers to indicate that something
-;;; interesting has happened to the value of CONT. Optimizers must
+;;; interesting has happened to the value of LVAR. Optimizers must
 ;;; make sure that they don't call for reoptimization when nothing has
 ;;; happened, since optimization will fail to terminate.
 ;;;
-;;; We clear any cached type for the continuation and set the
-;;; reoptimize flags on everything in sight, unless the continuation
-;;; is deleted (in which case we do nothing.)
-;;;
-;;; Since this can get called during IR1 conversion, we have to be
-;;; careful not to fly into space when the DEST's PREV is missing.
-(defun reoptimize-continuation (cont)
-  (declare (type continuation cont))
-  (setf (continuation-%derived-type cont) nil)
-  (unless (member (continuation-kind cont) '(:deleted :unused))
-    (let ((dest (continuation-dest cont)))
+;;; We clear any cached type for the lvar and set the reoptimize flags
+;;; on everything in sight.
+(defun reoptimize-lvar (lvar)
+  (declare (type (or lvar null) lvar))
+  (when lvar
+    (setf (lvar-%derived-type lvar) nil)
+    (let ((dest (lvar-dest lvar)))
       (when dest
-	(setf (continuation-reoptimize cont) t)
-	(setf (node-reoptimize dest) t)
-	(let ((prev (node-prev dest)))
-	  (when prev
-	    (let* ((block (continuation-block prev))
-		   (component (block-component block)))
-	      (when (typep dest 'cif)
-		(setf (block-test-modified block) t))
-	      (setf (block-reoptimize block) t)
-	      (setf (component-reoptimize component) t))))))
-    (do-uses (node cont)
+        (setf (lvar-reoptimize lvar) t)
+        (setf (node-reoptimize dest) t)
+        (binding* (;; Since this may be called during IR1 conversion,
+                   ;; PREV may be missing.
+                   (prev (node-prev dest) :exit-if-null)
+                   (block (ctran-block prev))
+                   (component (block-component block)))
+          (when (typep dest 'cif)
+            (setf (block-test-modified block) t))
+          (setf (block-reoptimize block) t)
+          (setf (component-reoptimize component) t))))
+    (do-uses (node lvar)
       (setf (block-type-check (node-block node)) t)))
   (values))
 
-(defun reoptimize-continuation-uses (cont)
-  (declare (type continuation cont))
-  (dolist (use (find-uses cont))
+(defun reoptimize-lvar-uses (lvar)
+  (declare (type lvar lvar))
+  (do-uses (use lvar)
     (setf (node-reoptimize use) t)
     (setf (block-reoptimize (node-block use)) t)
     (setf (component-reoptimize (node-component use)) t)))
@@ -165,13 +159,13 @@
 ;;;
 ;;; What we do is intersect RTYPE with NODE's DERIVED-TYPE. If the
 ;;; intersection is different from the old type, then we do a
-;;; REOPTIMIZE-CONTINUATION on the NODE-CONT.
+;;; REOPTIMIZE-LVAR on the NODE-LVAR.
 (defun derive-node-type (node rtype)
-  (declare (type node node) (type ctype rtype))
+  (declare (type valued-node node) (type ctype rtype))
   (let ((node-type (node-derived-type node)))
     (unless (eq node-type rtype)
       (let ((int (values-type-intersection node-type rtype))
-            (cont (node-cont node)))
+            (lvar (node-lvar node)))
 	(when (type/= node-type int)
 	  (when (and *check-consistency*
 		     (eq int *empty-type*)
@@ -182,6 +176,8 @@
 		~%  ~S~%*** possible internal error? Please report this."
 	       (type-specifier rtype) (type-specifier node-type))))
 	  (setf (node-derived-type node) int)
+          ;; If the new type consists of only one object, replace the
+          ;; node with a constant reference.
           (when (and (ref-p node)
                      (lambda-var-p (ref-leaf node)))
             (let ((type (single-value-type int)))
@@ -189,33 +185,35 @@
                          (null (rest (member-type-members type))))
                 (change-ref-leaf node (find-constant
                                        (first (member-type-members type)))))))
-	  (reoptimize-continuation cont)))))
+	  (reoptimize-lvar lvar)))))
   (values))
 
 ;;; This is similar to DERIVE-NODE-TYPE, but asserts that it is an
-;;; error for CONT's value not to be TYPEP to TYPE. We implement it
-;;; splitting off DEST a new CAST node. If we improve the assertion,
-;;; we set TYPE-CHECK and TYPE-ASSERTED to guarantee that the new
-;;; assertion will be checked. We return the new "argument"
-;;; continuation of DEST.
-(defun assert-continuation-type (cont type policy)
-  (declare (type continuation cont) (type ctype type))
-  (if (values-subtypep (continuation-derived-type cont) type)
-      cont
-      (let* ((dest (continuation-dest cont))
-             (prev-cont (node-prev dest)))
-        (aver dest)
-        (with-ir1-environment-from-node dest
-          (let* ((cast (make-cast cont type policy))
-                 (checked-value (make-continuation)))
-            (setf (continuation-next prev-cont) cast
-                  (node-prev cast) prev-cont)
-            (use-continuation cast checked-value)
-            (link-node-to-previous-continuation dest checked-value)
-            (substitute-continuation checked-value cont)
-            (setf (continuation-dest cont) cast)
-            (reoptimize-continuation cont)
-            checked-value)))))
+;;; error for LVAR's value not to be TYPEP to TYPE. We implement it
+;;; splitting off DEST a new CAST node; old LVAR will deliver values
+;;; to CAST. If we improve the assertion, we set TYPE-CHECK and
+;;; TYPE-ASSERTED to guarantee that the new assertion will be checked.
+(defun assert-lvar-type (lvar type policy)
+  (declare (type lvar lvar) (type ctype type))
+  (unless (values-subtypep (lvar-derived-type lvar) type)
+    (let* ((dest (lvar-dest lvar))
+           (ctran (node-prev dest)))
+      (with-ir1-environment-from-node dest
+        (let* ((cast (make-cast lvar type policy))
+               (internal-lvar (make-lvar))
+               (internal-ctran (make-ctran)))
+          (setf (ctran-next ctran) cast
+                (node-prev cast) ctran)
+          (use-continuation cast internal-ctran internal-lvar)
+          (link-node-to-previous-ctran dest internal-ctran)
+          (substitute-lvar internal-lvar lvar)
+          (setf (lvar-dest lvar) cast)
+          (reoptimize-lvar lvar)
+          (when (return-p dest)
+            (node-ends-block cast))
+          (setf (block-attributep (block-flags (node-block cast))
+                                  type-check type-asserted)
+                t))))))
 
 
 ;;;; IR1-OPTIMIZE
@@ -285,7 +283,7 @@
   ;; optimization, not after. This ensures that the node or block will
   ;; be reoptimized if necessary.
   (setf (block-reoptimize block) nil)
-  (do-nodes (node cont block :restart-p t)
+  (do-nodes (node nil block :restart-p t)
     (when (node-reoptimize node)
       ;; As above, we clear the node REOPTIMIZE flag before optimizing.
       (setf (node-reoptimize node) nil)
@@ -309,14 +307,10 @@
 	 (ir1-optimize-mv-combination node))
 	(exit
 	 ;; With an EXIT, we derive the node's type from the VALUE's
-	 ;; type. We don't propagate CONT's assertion to the VALUE,
-	 ;; since if we did, this would move the checking of CONT's
-	 ;; assertion to the exit. This wouldn't work with CATCH and
-	 ;; UWP, where the EXIT node is just a placeholder for the
-	 ;; actual unknown exit.
+	 ;; type.
 	 (let ((value (exit-value node)))
 	   (when value
-	     (derive-node-type node (continuation-derived-type value)))))
+	     (derive-node-type node (lvar-derived-type value)))))
 	(cset
 	 (ir1-optimize-set node))
         (cast
@@ -329,91 +323,49 @@
 (defun join-successor-if-possible (block)
   (declare (type cblock block))
   (let ((next (first (block-succ block))))
-    (when (block-start next) ; NEXT is not an END-OF-COMPONENT marker
-      (let* ((last (block-last block))
-	     (last-cont (node-cont last))
-	     (next-cont (block-start next)))
-	(cond (;; We cannot combine with a successor block if:
-	       (or
-		;; The successor has more than one predecessor.
-		(rest (block-pred next))
-		;; The last node's CONT is also used somewhere else.
-                ;; (as in (IF <cond> (M-V-PROG1 ...) (M-V-PROG1 ...)))
-		(not (eq (continuation-use last-cont) last))
-		;; The successor is the current block (infinite loop).
-		(eq next block)
-		;; The next block has a different cleanup, and thus
-		;; we may want to insert cleanup code between the
-		;; two blocks at some point.
-		(not (eq (block-end-cleanup block)
-			 (block-start-cleanup next)))
-		;; The next block has a different home lambda, and
-		;; thus the control transfer is a non-local exit.
-		(not (eq (block-home-lambda block)
-			 (block-home-lambda next))))
-	       nil)
-	      ;; Joining is easy when the successor's START
-	      ;; continuation is the same from our LAST's CONT.
-	      ((eq last-cont next-cont)
-	       (join-blocks block next)
-	       t)
-	      ;; If they differ, then we can still join when the last
-	      ;; continuation has no next and the next continuation
-	      ;; has no uses.
-	      ((and (null (block-start-uses next))
-		    (eq (continuation-kind last-cont) :inside-block))
-	       ;; In this case, we replace the next
-	       ;; continuation with the last before joining the blocks.
-	       (let ((next-node (continuation-next next-cont)))
-		 ;; If NEXT-CONT does have a dest, it must be
-		 ;; unreachable, since there are no USES.
-		 ;; DELETE-CONTINUATION will mark the dest block as
-		 ;; DELETE-P [and also this block, unless it is no
-		 ;; longer backward reachable from the dest block.]
-		 (delete-continuation next-cont)
-		 (setf (node-prev next-node) last-cont)
-		 (setf (continuation-next last-cont) next-node)
-		 (setf (block-start next) last-cont)
-		 (join-blocks block next))
-	       t)
-              ((and (null (block-start-uses next))
-                    (not (typep (continuation-dest last-cont)
-                                '(or exit creturn)))
-                    (null (continuation-lexenv-uses last-cont)))
-               (assert (null (find-uses next-cont)))
-               (when (continuation-dest last-cont)
-                 (substitute-continuation next-cont last-cont))
-               (delete-continuation-use last)
-               (add-continuation-use last next-cont)
-               (setf (continuation-%derived-type next-cont) nil)
-               (join-blocks block next)
-               t)
-	      (t
-	       nil))))))
+    (when (block-start next)  ; NEXT is not an END-OF-COMPONENT marker
+      (cond ( ;; We cannot combine with a successor block if:
+             (or
+              ;; The successor has more than one predecessor.
+              (rest (block-pred next))
+              ;; The successor is the current block (infinite loop).
+              (eq next block)
+              ;; The next block has a different cleanup, and thus
+              ;; we may want to insert cleanup code between the
+              ;; two blocks at some point.
+              (not (eq (block-end-cleanup block)
+                       (block-start-cleanup next)))
+              ;; The next block has a different home lambda, and
+              ;; thus the control transfer is a non-local exit.
+              (not (eq (block-home-lambda block)
+                       (block-home-lambda next))))
+             nil)
+            (t
+             (join-blocks block next)
+             t)))))
 
-;;; Join together two blocks which have the same ending/starting
-;;; continuation. The code in BLOCK2 is moved into BLOCK1 and BLOCK2
-;;; is deleted from the DFO. We combine the optimize flags for the two
-;;; blocks so that any indicated optimization gets done.
+;;; Join together two blocks. The code in BLOCK2 is moved into BLOCK1
+;;; and BLOCK2 is deleted from the DFO. We combine the optimize flags
+;;; for the two blocks so that any indicated optimization gets done.
 (defun join-blocks (block1 block2)
   (declare (type cblock block1 block2))
-  (let* ((last (block-last block2))
-	 (last-cont (node-cont last))
+  (let* ((last1 (block-last block1))
+         (last2 (block-last block2))
 	 (succ (block-succ block2))
 	 (start2 (block-start block2)))
-    (do ((cont start2 (node-cont (continuation-next cont))))
-	((eq cont last-cont)
-	 (when (eq (continuation-kind last-cont) :inside-block)
-	   (setf (continuation-block last-cont) block1)))
-      (setf (continuation-block cont) block1))
+    (do ((ctran start2 (node-next (ctran-next ctran))))
+	((not ctran))
+      (setf (ctran-block ctran) block1))
 
     (unlink-blocks block1 block2)
     (dolist (block succ)
       (unlink-blocks block2 block)
       (link-blocks block1 block))
 
-    (setf (block-last block1) last)
-    (setf (continuation-kind start2) :inside-block))
+    (setf (ctran-kind start2) :inside-block)
+    (setf (node-next last1) start2)
+    (setf (ctran-use start2) last1)
+    (setf (block-last block1) last2))
 
   (setf (block-flags block1)
 	(attributes-union (block-flags block1)
@@ -432,8 +384,9 @@
 ;;; variable has no references.
 (defun flush-dead-code (block)
   (declare (type cblock block))
-  (do-nodes-backwards (node cont block)
-    (unless (continuation-dest cont)
+  (setf (block-flush-p block) nil)
+  (do-nodes-backwards (node lvar block)
+    (unless lvar
       (typecase node
 	(ref
 	 (delete-ref node)
@@ -472,14 +425,13 @@
 		      (null (leaf-refs var)))
 	     (flush-dest (set-value node))
 	     (setf (basic-var-sets var)
-		   (delete node (basic-var-sets var)))
+		   (delq node (basic-var-sets var)))
 	     (unlink-node node))))
         (cast
          (unless (cast-type-check node)
            (flush-dest (cast-value node))
            (unlink-node node))))))
 
-  (setf (block-flush-p block) nil)
   (values))
 
 ;;;; local call return type propagation
@@ -551,7 +503,7 @@
 	(setf (tail-set-type tails) (res))
 	(dolist (fun (tail-set-funs tails))
 	  (dolist (ref (leaf-refs fun))
-	    (reoptimize-continuation (node-cont ref)))))))
+	    (reoptimize-lvar (node-lvar ref)))))))
 
   (values))
 
@@ -566,18 +518,17 @@
   (let ((test (if-test node))
 	(block (node-block node)))
 
-    (when (and (eq (block-start block) test)
-	       (eq (continuation-next test) node)
-	       (rest (block-start-uses block)))
+    (when (and (eq (block-start-node block) node)
+	       (listp (lvar-uses test)))
       (do-uses (use test)
 	(when (immediately-used-p test use)
 	  (convert-if-if use node)
-	  (when (continuation-use test) (return)))))
+	  (when (not (listp (lvar-uses test))) (return)))))
 
-    (let* ((type (continuation-type test))
+    (let* ((type (lvar-type test))
            (victim
-            (cond ((constant-continuation-p test)
-                   (if (continuation-value test)
+            (cond ((constant-lvar-p test)
+                   (if (lvar-value test)
                        (if-alternative node)
                        (if-consequent node)))
                   ((not (types-equal-or-intersect type (specifier-type 'null)))
@@ -614,21 +565,19 @@
 	   (cblock (if-consequent node))
 	   (ablock (if-alternative node))
 	   (use-block (node-block use))
-	   (dummy-cont (make-continuation))
-	   (new-cont (make-continuation))
-	   (new-node (make-if :test new-cont
+	   (new-ctran (make-ctran))
+	   (new-lvar (make-lvar))
+	   (new-node (make-if :test new-lvar
 			      :consequent cblock
 			      :alternative ablock))
-	   (new-block (continuation-starts-block new-cont)))
-      (link-node-to-previous-continuation new-node new-cont)
-      (setf (continuation-dest new-cont) new-node)
-      (flush-continuation-externally-checkable-type new-cont)
-      (add-continuation-use new-node dummy-cont)
+	   (new-block (ctran-starts-block new-ctran)))
+      (link-node-to-previous-ctran new-node new-ctran)
+      (setf (lvar-dest new-lvar) new-node)
       (setf (block-last new-block) new-node)
 
       (unlink-blocks use-block block)
-      (delete-continuation-use use)
-      (add-continuation-use use new-cont)
+      (%delete-lvar-use use)
+      (add-lvar-use use new-lvar)
       (link-blocks use-block new-block)
 
       (link-blocks new-block cblock)
@@ -637,8 +586,8 @@
       (push "<IF Duplication>" (node-source-path node))
       (push "<IF Duplication>" (node-source-path new-node))
 
-      (reoptimize-continuation test)
-      (reoptimize-continuation new-cont)
+      (reoptimize-lvar test)
+      (reoptimize-lvar new-lvar)
       (setf (component-reanalyze *current-component*) t)))
   (values))
 
@@ -650,7 +599,7 @@
 ;;;    anything, since there is nothing to be done.
 ;;; -- If the exit node and its ENTRY have the same home lambda then
 ;;;    we know the exit is local, and can delete the exit. We change
-;;;    uses of the Exit-Value to be uses of the original continuation,
+;;;    uses of the Exit-Value to be uses of the original lvar,
 ;;;    then unlink the node. If the exit is to a TR context, then we
 ;;;    must do MERGE-TAIL-SETS on any local calls which delivered
 ;;;    their value to this exit.
@@ -663,13 +612,12 @@
 (defun maybe-delete-exit (node)
   (declare (type exit node))
   (let ((value (exit-value node))
-	(entry (exit-entry node))
-        (cont (node-cont node)))
+	(entry (exit-entry node)))
     (when (and entry
 	       (eq (node-home-lambda node) (node-home-lambda entry)))
-      (setf (entry-exits entry) (delete node (entry-exits entry)))
+      (setf (entry-exits entry) (delq node (entry-exits entry)))
       (if value
-          (delete-filter node cont value)
+          (delete-filter node (node-lvar node) value)
           (unlink-node node)))))
 
 
@@ -682,7 +630,7 @@
 ;;; Do IR1 optimizations on a COMBINATION node.
 (declaim (ftype (function (combination) (values)) ir1-optimize-combination))
 (defun ir1-optimize-combination (node)
-  (when (continuation-reoptimize (basic-combination-fun node))
+  (when (lvar-reoptimize (basic-combination-fun node))
     (propagate-fun-change node))
   (let ((args (basic-combination-args node))
 	(kind (basic-combination-kind node)))
@@ -695,11 +643,11 @@
       ((:full :error)
        (dolist (arg args)
 	 (when arg
-	   (setf (continuation-reoptimize arg) nil))))
+	   (setf (lvar-reoptimize arg) nil))))
       (t
        (dolist (arg args)
 	 (when arg
-	   (setf (continuation-reoptimize arg) nil)))
+	   (setf (lvar-reoptimize arg) nil)))
 
        (let ((attr (fun-info-attributes kind)))
 	 (when (and (ir1-attributep attr foldable)
@@ -708,8 +656,8 @@
 		    ;; CALL attributes when they're actually passed
 		    ;; function arguments. -- WHN 19990918
 		    (not (ir1-attributep attr call))
-		    (every #'constant-continuation-p args)
-		    (continuation-dest (node-cont node))
+		    (every #'constant-lvar-p args)
+		    (node-lvar node)
 		    ;; Even if the function is foldable in principle,
 		    ;; it might be one of our low-level
 		    ;; implementation-specific functions. Such
@@ -722,7 +670,7 @@
 		    (or (fboundp (combination-fun-source-name node))
                         (progn (format t ";;; !!! Unbound fun: (~S~{ ~S~})~%"
                                        (combination-fun-source-name node)
-                                       (mapcar #'continuation-value args))
+                                       (mapcar #'lvar-value args))
                                nil)))
 	   (constant-fold-call node)
 	   (return-from ir1-optimize-combination)))
@@ -739,8 +687,8 @@
 	   (dolist (x (fun-info-transforms kind))
 	     #!+sb-show
 	     (when *show-transforms-p*
-	       (let* ((cont (basic-combination-fun node))
-		      (fname (continuation-fun-name cont t)))
+	       (let* ((lvar (basic-combination-fun node))
+		      (fname (lvar-fun-name lvar t)))
 		 (/show "trying transform" x (transform-function x) "for" fname)))
 	     (unless (ir1-transform node x)
 	       #!+sb-show
@@ -765,39 +713,39 @@
 ;;; -- We are in IR1 conversion (where THE assertions are subject to
 ;;;    weakening.) FIXME: Now THE assertions are not weakened, but new
 ;;;    uses can(?) be added later. -- APD, 2003-07-17
+;;;
+;;; Why do we need to consider LVAR type? -- APD, 2003-07-30
 (defun maybe-terminate-block (node ir1-converting-not-optimizing-p)
   (declare (type (or basic-combination cast) node))
   (let* ((block (node-block node))
-	 (cont (node-cont node))
+	 (lvar (node-lvar node))
+         (ctran (node-next node))
 	 (tail (component-tail (block-component block)))
 	 (succ (first (block-succ block))))
     (unless (or (and (eq node (block-last block)) (eq succ tail))
 		(block-delete-p block))
-      (when (or (and (not (or ir1-converting-not-optimizing-p
-			      (eq (continuation-kind cont) :deleted)))
-		     (eq (continuation-derived-type cont) *empty-type*))
-		(eq (node-derived-type node) *empty-type*))
+      (when (eq (node-derived-type node) *empty-type*)
 	(cond (ir1-converting-not-optimizing-p
-	       (delete-continuation-use node)
 	       (cond
-		((block-last block)
-		 (aver (and (eq (block-last block) node)
-			    (eq (continuation-kind cont) :block-start))))
-		(t
-		 (setf (block-last block) node)
-		 (link-blocks block (continuation-starts-block cont)))))
+                 ((block-last block)
+                  (aver (eq (block-last block) node)))
+                 (t
+                  (setf (block-last block) node)
+                  (setf (ctran-use ctran) nil)
+                  (setf (ctran-kind ctran) :unused)
+                  (setf (ctran-block ctran) nil)
+                  (setf (node-next node) nil)
+                  (link-blocks block (ctran-starts-block ctran)))))
 	      (t
-	       (node-ends-block node)
-	       (delete-continuation-use node)
-	       (if (eq (continuation-kind cont) :unused)
-		   (delete-continuation cont)
-		   (reoptimize-continuation cont))))
+	       (node-ends-block node)))
 
 	(unlink-blocks block (first (block-succ block)))
 	(setf (component-reanalyze (block-component block)) t)
 	(aver (not (block-succ block)))
 	(link-blocks block tail)
-	(add-continuation-use node (make-continuation))
+        (if ir1-converting-not-optimizing-p
+            (%delete-lvar-use node)
+            (delete-lvar-use node))
 	t))))
 
 ;;; This is called both by IR1 conversion and IR1 optimization when
@@ -819,7 +767,7 @@
 ;;; FUN-INFO assigned.
 (defun recognize-known-call (call ir1-converting-not-optimizing-p)
   (declare (type combination call))
-  (let* ((ref (continuation-use (basic-combination-fun call)))
+  (let* ((ref (lvar-uses (basic-combination-fun call)))
 	 (leaf (when (ref-p ref) (ref-leaf ref)))
 	 (inlinep (if (defined-fun-p leaf)
 		      (defined-fun-inlinep leaf)
@@ -855,7 +803,7 @@
 	      (frob)
 	      (locall-analyze-component *current-component*))))
 
-      (values (ref-leaf (continuation-use (basic-combination-fun call)))
+      (values (ref-leaf (lvar-uses (basic-combination-fun call)))
 	      nil))
      (t
       (let ((info (info :function :info (leaf-source-name leaf))))
@@ -915,8 +863,8 @@
 (defun propagate-fun-change (call)
   (declare (type combination call))
   (let ((*compiler-error-context* call)
-	(fun-cont (basic-combination-fun call)))
-    (setf (continuation-reoptimize fun-cont) nil)
+	(fun-lvar (basic-combination-fun call)))
+    (setf (lvar-reoptimize fun-lvar) nil)
     (case (combination-kind call)
       (:local
        (let ((fun (combination-lambda call)))
@@ -925,10 +873,10 @@
 	   (derive-node-type call (tail-set-type (lambda-tail-set fun))))))
       (:full
        (multiple-value-bind (leaf info)
-	   (validate-call-type call (continuation-type fun-cont) nil)
+	   (validate-call-type call (lvar-type fun-lvar) nil)
 	 (cond ((functional-p leaf)
 		(convert-call-if-possible
-		 (continuation-use (basic-combination-fun call))
+		 (lvar-uses (basic-combination-fun call))
 		 call))
 	       ((not leaf))
 	       ((and (leaf-has-source-name-p leaf)
@@ -936,8 +884,8 @@
                          (and info
                               (ir1-attributep (fun-info-attributes info)
                                               predicate)
-                              (let ((dest (continuation-dest (node-cont call))))
-                                (and dest (not (if-p dest)))))))
+                              (let ((lvar (node-lvar call)))
+                                (and lvar (not (if-p (lvar-dest lvar))))))))
 		(let ((name (leaf-source-name leaf))
                       (dummies (make-gensym-list
                                 (length (combination-args call)))))
@@ -1021,7 +969,7 @@
 	   t))))
 
 ;;; When we don't like an IR1 transform, we throw the severity/reason
-;;; and args. 
+;;; and args.
 ;;;
 ;;; GIVE-UP-IR1-TRANSFORM is used to throw out of an IR1 transform,
 ;;; aborting this attempt to transform the call, but admitting the
@@ -1108,7 +1056,7 @@
 						(as-debug-name
 						 source-name
 						 "<unknown function>"))))
-	    (ref (continuation-use (combination-fun call))))
+	    (ref (lvar-use (combination-fun call))))
 	(change-ref-leaf ref new-fun)
 	(setf (combination-kind call) :full)
 	(locall-analyze-component *current-component*))))
@@ -1121,17 +1069,8 @@
 ;;;
 ;;; If there is more than one value, then we transform the call into a
 ;;; VALUES form.
-;;;
-;;; An old commentary also said:
-;;;
-;;;   We insert the resulting constant node after the call, stealing
-;;;   the call's continuation. We give the call a continuation with no
-;;;   DEST, which should cause it and its arguments to go away.
-;;;
-;;; This seems to be more efficient, than the current code. Maybe we
-;;; should really implement it? -- APD, 2002-12-23
 (defun constant-fold-call (call)
-  (let ((args (mapcar #'continuation-value (combination-args call)))
+  (let ((args (mapcar #'lvar-value (combination-args call)))
 	(fun-name (combination-fun-source-name call)))
     (multiple-value-bind (values win)
 	(careful-call fun-name
@@ -1172,22 +1111,18 @@
 		      "constant folding")
       (cond ((not win)
              (setf (combination-kind call) :error))
-            ((and (proper-list-of-length-p values 1)
-                  (eq (continuation-kind (node-cont call)) :inside-block))
+            ((and (proper-list-of-length-p values 1))
              (with-ir1-environment-from-node call
-               (let* ((cont (node-cont call))
-                      (next (continuation-next cont))
-                      (prev (make-continuation)))
-                 (delete-continuation-use call)
-                 (add-continuation-use call prev)
-                 (reference-constant prev cont (first values))
-                 (setf (continuation-next cont) next)
-                 (let ((block (node-block call)))
-                   (when (eq (block-last block) call)
-                     (setf (block-last block) (continuation-next prev))))
-                 ;; FIXME: type checking?
-                 (reoptimize-continuation cont)
-                 (reoptimize-continuation prev)
+               (let* ((lvar (node-lvar call))
+                      (prev (node-prev call))
+                      (intermediate-ctran (make-ctran)))
+                 (%delete-lvar-use call)
+                 (setf (ctran-next prev) nil)
+                 (setf (node-prev call) nil)
+                 (reference-constant prev intermediate-ctran lvar
+                                     (first values))
+                 (link-node-to-previous-ctran call intermediate-ctran)
+                 (reoptimize-lvar lvar)
                  (flush-combination call))))
             (t (let ((dummies (make-gensym-list (length args))))
                  (transform-call
@@ -1213,11 +1148,10 @@
 	  (setf (leaf-type leaf) int)
 	  (dolist (ref (leaf-refs leaf))
 	    (derive-node-type ref (make-single-value-type int))
-            (let* ((cont (node-cont ref))
-                   (dest (continuation-dest cont)))
-              ;; KLUDGE: LET var substitution
-              (when (combination-p dest)
-                (reoptimize-continuation cont))))))
+            ;; KLUDGE: LET var substitution
+            (let* ((lvar (node-lvar ref)))
+              (when (and lvar (combination-p (lvar-dest lvar)))
+                (reoptimize-lvar lvar))))))
       (values))))
 
 ;;; Iteration variable: exactly one SETQ of the form:
@@ -1230,20 +1164,20 @@
   (binding* ((sets (lambda-var-sets var) :exit-if-null)
              (set (first sets))
              (() (null (rest sets)) :exit-if-null)
-             (set-use (principal-continuation-use (set-value set)))
+             (set-use (principal-lvar-use (set-value set)))
              (() (and (combination-p set-use)
                       (fun-info-p (combination-kind set-use))
                       (eq (combination-fun-source-name set-use) '+))
                :exit-if-null)
              (+-args (basic-combination-args set-use))
              (() (and (proper-list-of-length-p +-args 2 2)
-                      (let ((first (principal-continuation-use
+                      (let ((first (principal-lvar-use
                                     (first +-args))))
                         (and (ref-p first)
                              (eq (ref-leaf first) var))))
                :exit-if-null)
-             (step-type (continuation-type (second +-args)))
-             (set-type (continuation-type (set-value set))))
+             (step-type (lvar-type (second +-args)))
+             (set-type (lvar-type (set-value set))))
     (when (and (numeric-type-p initial-type)
                (numeric-type-p step-type)
                (numeric-type-equal initial-type step-type))
@@ -1266,13 +1200,13 @@
                                :enumerable nil)))))
 (deftransform + ((x y) * * :result result)
   "check for iteration variable reoptimization"
-  (let ((dest (principal-continuation-end result))
-        (use (principal-continuation-use x)))
+  (let ((dest (principal-lvar-end result))
+        (use (principal-lvar-use x)))
     (when (and (ref-p use)
                (set-p dest)
                (eq (ref-leaf use)
                    (set-var dest)))
-      (reoptimize-continuation (set-value dest))))
+      (reoptimize-lvar (set-value dest))))
   (give-up-ir1-transform))
 
 ;;; Figure out the type of a LET variable that has sets. We compute
@@ -1281,7 +1215,7 @@
 (defun propagate-from-sets (var initial-type)
   (collect ((res initial-type type-union))
     (dolist (set (basic-var-sets var))
-      (let ((type (continuation-type (set-value set))))
+      (let ((type (lvar-type (set-value set))))
         (res type)
         (when (node-reoptimize set)
           (derive-node-type set (make-single-value-type type))
@@ -1302,12 +1236,12 @@
       (let ((home (lambda-var-home var)))
 	(when (eq (functional-kind home) :let)
 	  (let* ((initial-value (let-var-initial-value var))
-                 (initial-type (continuation-type initial-value)))
-	    (setf (continuation-reoptimize initial-value) nil)
+                 (initial-type (lvar-type initial-value)))
+	    (setf (lvar-reoptimize initial-value) nil)
             (propagate-from-sets var initial-type))))))
 
   (derive-node-type node (make-single-value-type
-                          (continuation-type (set-value node))))
+                          (lvar-type (set-value node))))
   (values))
 
 ;;; Return true if the value of REF will always be the same (and is
@@ -1332,47 +1266,48 @@
 
 ;;; If we have a non-set LET var with a single use, then (if possible)
 ;;; replace the variable reference's CONT with the arg continuation.
-;;; This is inhibited when:
-;;; -- CONT has other uses, or
-;;; -- the reference is in a different environment from the variable, or
-;;; -- CONT carries unknown number of values, or
-;;; -- DEST is return or exit, or
-;;; -- DEST is sensitive to the number of values and ARG return non-one value.
 ;;;
 ;;; We change the REF to be a reference to NIL with unused value, and
 ;;; let it be flushed as dead code. A side effect of this substitution
 ;;; is to delete the variable.
-(defun substitute-single-use-continuation (arg var)
-  (declare (type continuation arg) (type lambda-var var))
-  (let* ((ref (first (leaf-refs var)))
-	 (cont (node-cont ref))
-	 (dest (continuation-dest cont)))
-    (when (and (eq (continuation-use cont) ref)
-	       dest
-               (typecase dest
-                 (cast
-                  (and (type-single-value-p (continuation-derived-type arg))
-                       (multiple-value-bind (pdest pprev)
-                           (principal-continuation-end cont)
-                         (declare (ignore pdest))
-                         (continuation-single-value-p pprev))))
-                 (mv-combination
-                  (or (eq (basic-combination-fun dest) cont)
-                      (and (eq (basic-combination-kind dest) :local)
-                           (type-single-value-p (continuation-derived-type arg)))))
-                 ((or creturn exit)
-                  nil)
-                 (t
-                  ;; (AVER (CONTINUATION-SINGLE-VALUE-P CONT))
-                  t))
-	       (eq (node-home-lambda ref)
-		   (lambda-home (lambda-var-home var))))
-      (aver (member (continuation-kind arg)
-		    '(:block-start :deleted-block-start :inside-block)))
+(defun substitute-single-use-lvar (arg var)
+  (declare (type lvar arg) (type lambda-var var))
+  (binding* ((ref (first (leaf-refs var)))
+             (lvar (node-lvar ref) :exit-if-null)
+             (dest (lvar-dest lvar)))
+    (when (and
+           ;; Think about (LET ((A ...)) (IF ... A ...)): two
+           ;; LVAR-USEs should not be met on one path.
+           (eq (lvar-uses lvar) ref)
+           (typecase dest
+             ;; we should not change lifetime of unknown values lvars
+             (cast
+              (and (type-single-value-p (lvar-derived-type arg))
+                   (multiple-value-bind (pdest pprev)
+                       (principal-lvar-end lvar)
+                     (declare (ignore pdest))
+                     (lvar-single-value-p pprev))))
+             (mv-combination
+              (or (eq (basic-combination-fun dest) lvar)
+                  (and (eq (basic-combination-kind dest) :local)
+                       (type-single-value-p (lvar-derived-type arg)))))
+             ((or creturn exit)
+              ;; While CRETURN and EXIT nodes may be known-values,
+              ;; they have their own complications, such as
+              ;; substitution into CRETURN may create new tail calls.
+              nil)
+             (t
+              (aver (lvar-single-value-p lvar))
+              t))
+           (eq (node-home-lambda ref)
+               (lambda-home (lambda-var-home var))))
       (setf (node-derived-type ref) *wild-type*)
+      (substitute-lvar-uses lvar arg)
+      (delete-lvar-use ref)
       (change-ref-leaf ref (find-constant nil))
-      (substitute-continuation arg cont)
-      (reoptimize-continuation arg)
+      (delete-ref ref)
+      (unlink-node ref)
+      (reoptimize-lvar lvar)
       t)))
 
 ;;; Delete a LET, removing the call and bind nodes, and warning about
@@ -1410,40 +1345,40 @@
 ;;; If all of the variables are deleted (have no references) when we
 ;;; are done, then we delete the LET.
 ;;;
-;;; Note that we are responsible for clearing the
-;;; CONTINUATION-REOPTIMIZE flags.
+;;; Note that we are responsible for clearing the LVAR-REOPTIMIZE
+;;; flags.
 (defun propagate-let-args (call fun)
   (declare (type combination call) (type clambda fun))
   (loop for arg in (combination-args call)
 	and var in (lambda-vars fun) do
-    (when (and arg (continuation-reoptimize arg))
-      (setf (continuation-reoptimize arg) nil)
+    (when (and arg (lvar-reoptimize arg))
+      (setf (lvar-reoptimize arg) nil)
       (cond
-       ((lambda-var-sets var)
-	(propagate-from-sets var (continuation-type arg)))
-       ((let ((use (continuation-use arg)))
-	  (when (ref-p use)
-	    (let ((leaf (ref-leaf use)))
-	      (when (and (constant-reference-p use)
-                         (csubtypep (leaf-type leaf)
-                                    ;; (NODE-DERIVED-TYPE USE) would
-                                    ;; be better -- APD, 2003-05-15
-                                    (leaf-type var)))
-		(propagate-to-refs var (continuation-type arg))
-		(let ((use-component (node-component use)))
-		  (substitute-leaf-if
-		   (lambda (ref)
-		     (cond ((eq (node-component ref) use-component)
-			    t)
-			   (t
-			    (aver (lambda-toplevelish-p (lambda-home fun)))
-			    nil)))
-		   leaf var))
-		t)))))
-       ((and (null (rest (leaf-refs var)))
-             (substitute-single-use-continuation arg var)))
-       (t
-	(propagate-to-refs var (continuation-type arg))))))
+        ((lambda-var-sets var)
+         (propagate-from-sets var (lvar-type arg)))
+        ((let ((use (lvar-uses arg)))
+           (when (ref-p use)
+             (let ((leaf (ref-leaf use)))
+               (when (and (constant-reference-p use)
+                          (csubtypep (leaf-type leaf)
+                                     ;; (NODE-DERIVED-TYPE USE) would
+                                     ;; be better -- APD, 2003-05-15
+                                     (leaf-type var)))
+                 (propagate-to-refs var (lvar-type arg))
+                 (let ((use-component (node-component use)))
+                   (prog1 (substitute-leaf-if
+                           (lambda (ref)
+                             (cond ((eq (node-component ref) use-component)
+                                    t)
+                                   (t
+                                    (aver (lambda-toplevelish-p (lambda-home fun)))
+                                    nil)))
+                           leaf var)))
+                 t)))))
+        ((and (null (rest (leaf-refs var)))
+              (substitute-single-use-lvar arg var)))
+        (t
+         (propagate-to-refs var (lvar-type arg))))))
 
   (when (every #'not (combination-args call))
     (delete-let fun))
@@ -1458,10 +1393,10 @@
 ;;; If the function has an XEP, then we don't do anything, since we
 ;;; won't discover anything.
 ;;;
-;;; We can clear the CONTINUATION-REOPTIMIZE flags for arguments in
-;;; all calls corresponding to changed arguments in CALL, since the
-;;; only use in IR1 optimization of the REOPTIMIZE flag for local call
-;;; args is right here.
+;;; We can clear the LVAR-REOPTIMIZE flags for arguments in all calls
+;;; corresponding to changed arguments in CALL, since the only use in
+;;; IR1 optimization of the REOPTIMIZE flag for local call args is
+;;; right here.
 (defun propagate-local-call-args (call fun)
   (declare (type combination call) (type clambda fun))
 
@@ -1470,32 +1405,31 @@
     (let* ((vars (lambda-vars fun))
 	   (union (mapcar (lambda (arg var)
 			    (when (and arg
-				       (continuation-reoptimize arg)
+				       (lvar-reoptimize arg)
 				       (null (basic-var-sets var)))
-			      (continuation-type arg)))
+			      (lvar-type arg)))
 			  (basic-combination-args call)
 			  vars))
-	   (this-ref (continuation-use (basic-combination-fun call))))
+	   (this-ref (lvar-use (basic-combination-fun call))))
 
       (dolist (arg (basic-combination-args call))
 	(when arg
-	  (setf (continuation-reoptimize arg) nil)))
+	  (setf (lvar-reoptimize arg) nil)))
 
       (dolist (ref (leaf-refs fun))
-	(let ((dest (continuation-dest (node-cont ref))))
+	(let ((dest (node-dest ref)))
 	  (unless (or (eq ref this-ref) (not dest))
 	    (setq union
 		  (mapcar (lambda (this-arg old)
 			    (when old
-			      (setf (continuation-reoptimize this-arg) nil)
-			      (type-union (continuation-type this-arg) old)))
+			      (setf (lvar-reoptimize this-arg) nil)
+			      (type-union (lvar-type this-arg) old)))
 			  (basic-combination-args dest)
 			  union)))))
 
-      (mapc (lambda (var type)
-	      (when type
-		(propagate-to-refs var type)))
-	    vars union)))
+      (loop for var in vars
+            and type in union
+            when type do (propagate-to-refs var type))))
 
   (values))
 
@@ -1516,34 +1450,34 @@
 (defun ir1-optimize-mv-combination (node)
   (ecase (basic-combination-kind node)
     (:local
-     (let ((fun-cont (basic-combination-fun node)))
-       (when (continuation-reoptimize fun-cont)
-	 (setf (continuation-reoptimize fun-cont) nil)
+     (let ((fun-lvar (basic-combination-fun node)))
+       (when (lvar-reoptimize fun-lvar)
+	 (setf (lvar-reoptimize fun-lvar) nil)
 	 (maybe-let-convert (combination-lambda node))))
-     (setf (continuation-reoptimize (first (basic-combination-args node))) nil)
+     (setf (lvar-reoptimize (first (basic-combination-args node))) nil)
      (when (eq (functional-kind (combination-lambda node)) :mv-let)
        (unless (convert-mv-bind-to-let node)
 	 (ir1-optimize-mv-bind node))))
     (:full
      (let* ((fun (basic-combination-fun node))
-	    (fun-changed (continuation-reoptimize fun))
+	    (fun-changed (lvar-reoptimize fun))
 	    (args (basic-combination-args node)))
        (when fun-changed
-	 (setf (continuation-reoptimize fun) nil)
-	 (let ((type (continuation-type fun)))
+	 (setf (lvar-reoptimize fun) nil)
+	 (let ((type (lvar-type fun)))
 	   (when (fun-type-p type)
 	     (derive-node-type node (fun-type-returns type))))
-	 (maybe-terminate-block node nil)
-	 (let ((use (continuation-use fun)))
+         (maybe-terminate-block node nil)
+	 (let ((use (lvar-uses fun)))
 	   (when (and (ref-p use) (functional-p (ref-leaf use)))
 	     (convert-call-if-possible use node)
 	     (when (eq (basic-combination-kind node) :local)
 	       (maybe-let-convert (ref-leaf use))))))
        (unless (or (eq (basic-combination-kind node) :local)
-		   (eq (continuation-fun-name fun) '%throw))
+		   (eq (lvar-fun-name fun) '%throw))
 	 (ir1-optimize-mv-call node))
        (dolist (arg args)
-	 (setf (continuation-reoptimize arg) nil))))
+	 (setf (lvar-reoptimize arg) nil))))
     (:error))
   (values))
 
@@ -1554,14 +1488,14 @@
   (let* ((arg (first (basic-combination-args node)))
          (vars (lambda-vars (combination-lambda node)))
          (n-vars (length vars))
-         (types (values-type-in (continuation-derived-type arg)
+         (types (values-type-in (lvar-derived-type arg)
                                 n-vars)))
     (loop for var in vars
           and type in types
           do (if (basic-var-sets var)
                  (propagate-from-sets var type)
                  (propagate-to-refs var type)))
-    (setf (continuation-reoptimize arg) nil))
+    (setf (lvar-reoptimize arg) nil))
   (values))
 
 ;;; If possible, convert a general MV call to an MV-BIND. We can do
@@ -1594,7 +1528,7 @@
 (defun ir1-optimize-mv-call (node)
   (let ((fun (basic-combination-fun node))
 	(*compiler-error-context* node)
-	(ref (continuation-use (basic-combination-fun node)))
+	(ref (lvar-uses (basic-combination-fun node)))
 	(args (basic-combination-args node)))
 
     (unless (and (ref-p ref) (constant-reference-p ref)
@@ -1602,10 +1536,10 @@
       (return-from ir1-optimize-mv-call))
 
     (multiple-value-bind (min max)
-	(fun-type-nargs (continuation-type fun))
+	(fun-type-nargs (lvar-type fun))
       (let ((total-nvals
 	     (multiple-value-bind (types nvals)
-		 (values-types (continuation-derived-type (first args)))
+		 (values-types (lvar-derived-type (first args)))
 	       (declare (ignore types))
 	       (if (eq nvals :unknown) nil nvals))))
 
@@ -1657,14 +1591,13 @@
 ;;; What we actually do is convert the VALUES combination into a
 ;;; normal LET combination calling the original :MV-LET lambda. If
 ;;; there are extra args to VALUES, discard the corresponding
-;;; continuations. If there are insufficient args, insert references
-;;; to NIL.
+;;; lvars. If there are insufficient args, insert references to NIL.
 (defun convert-mv-bind-to-let (call)
   (declare (type mv-combination call))
   (let* ((arg (first (basic-combination-args call)))
-	 (use (continuation-use arg)))
+	 (use (lvar-uses arg)))
     (when (and (combination-p use)
-	       (eq (continuation-fun-name (combination-fun use))
+	       (eq (lvar-fun-name (combination-fun use))
 		   'values))
       (let* ((fun (combination-lambda call))
 	     (vars (lambda-vars fun))
@@ -1678,28 +1611,29 @@
 	       (with-ir1-environment-from-node use
 		 (let ((node-prev (node-prev use)))
 		   (setf (node-prev use) nil)
-		   (setf (continuation-next node-prev) nil)
+		   (setf (ctran-next node-prev) nil)
 		   (collect ((res vals))
-		     (loop for cont = (make-continuation use)
-			   and prev = node-prev then cont
-			   repeat (- nvars nvals)
-			   do (reference-constant prev cont nil)
-			      (res cont))
-		     (setq vals (res)))
-		   (link-node-to-previous-continuation use
-						       (car (last vals)))))))
+		     (loop for count below (- nvars nvals)
+			   for prev = node-prev then ctran
+                           for ctran = (make-ctran)
+                           and lvar = (make-lvar use)
+			   do (reference-constant prev ctran lvar nil)
+			      (res lvar)
+                           finally (link-node-to-previous-ctran
+                                    use ctran))
+		     (setq vals (res)))))))
 	(setf (combination-args use) vals)
 	(flush-dest (combination-fun use))
-	(let ((fun-cont (basic-combination-fun call)))
-	  (setf (continuation-dest fun-cont) use)
-          (setf (combination-fun use) fun-cont)
-	  (flush-continuation-externally-checkable-type fun-cont))
+	(let ((fun-lvar (basic-combination-fun call)))
+	  (setf (lvar-dest fun-lvar) use)
+          (setf (combination-fun use) fun-lvar)
+	  (flush-lvar-externally-checkable-type fun-lvar))
 	(setf (combination-kind use) :local)
 	(setf (functional-kind fun) :let)
 	(flush-dest (first (basic-combination-args call)))
 	(unlink-node call)
 	(when vals
-	  (reoptimize-continuation (first vals)))
+	  (reoptimize-lvar (first vals)))
 	(propagate-to-args use fun)
         (reoptimize-call use))
       t)))
@@ -1712,24 +1646,24 @@
 ;;;
 ;;; In implementation, this is somewhat similar to
 ;;; CONVERT-MV-BIND-TO-LET. We grab the args of LIST and make them
-;;; args of the VALUES-LIST call, flushing the old argument
-;;; continuation (allowing the LIST to be flushed.)
+;;; args of the VALUES-LIST call, flushing the old argument lvar
+;;; (allowing the LIST to be flushed.)
 ;;;
 ;;; FIXME: Thus we lose possible type assertions on (LIST ...).
 (defoptimizer (values-list optimizer) ((list) node)
-  (let ((use (continuation-use list)))
+  (let ((use (lvar-uses list)))
     (when (and (combination-p use)
-	       (eq (continuation-fun-name (combination-fun use))
+	       (eq (lvar-fun-name (combination-fun use))
 		   'list))
 
       ;; FIXME: VALUES might not satisfy an assertion on NODE-CONT.
-      (change-ref-leaf (continuation-use (combination-fun node))
+      (change-ref-leaf (lvar-uses (combination-fun node))
 		       (find-free-fun 'values "in a strange place"))
       (setf (combination-kind node) :full)
       (let ((args (combination-args use)))
 	(dolist (arg args)
-	  (setf (continuation-dest arg) node)
-          (flush-continuation-externally-checkable-type arg))
+	  (setf (lvar-dest arg) node)
+          (flush-lvar-externally-checkable-type arg))
 	(setf (combination-args use) nil)
 	(flush-dest list)
 	(setf (combination-args node) args))
@@ -1739,10 +1673,10 @@
 ;;; to a PROG1. This allows the computation of the additional values
 ;;; to become dead code.
 (deftransform values ((&rest vals) * * :node node)
-  (unless (continuation-single-value-p (node-cont node))
+  (unless (lvar-single-value-p (node-lvar node))
     (give-up-ir1-transform))
   (setf (node-derived-type node) *wild-type*)
-  (principal-continuation-single-valuify (node-cont node))
+  (principal-lvar-single-valuify (node-lvar node))
   (if vals
       (let ((dummies (make-gensym-list (length (cdr vals)))))
 	`(lambda (val ,@dummies)
@@ -1755,9 +1689,7 @@
 (defun ir1-optimize-cast (cast &optional do-not-optimize)
   (declare (type cast cast))
   (let* ((value (cast-value cast))
-         (value-type (continuation-derived-type value))
-         (cont (node-cont cast))
-         (dest (continuation-dest cont))
+         (value-type (lvar-derived-type value))
          (atype (cast-asserted-type cast))
          (int (values-type-intersection value-type atype)))
     (derive-node-type cast int)
@@ -1765,11 +1697,11 @@
       (unless (eq value-type *empty-type*)
 
         ;; FIXME: Do it in one step.
-        (filter-continuation
+        (filter-lvar
          value
          `(multiple-value-call #'list 'dummy))
-        (filter-continuation
-         value
+        (filter-lvar
+         (cast-value cast)
          ;; FIXME: Derived type.
          `(%compile-time-type-error 'dummy
                                     ',(type-specifier atype)
@@ -1778,8 +1710,9 @@
         ;; non-returning functions, so we declare the return type of
         ;; %COMPILE-TIME-TYPE-ERROR to be * and derive the real type
         ;; here.
-        (derive-node-type (continuation-use value) *empty-type*)
-        (maybe-terminate-block (continuation-use value) nil)
+        (setq value (cast-value cast))
+        (derive-node-type (lvar-uses value) *empty-type*)
+        (maybe-terminate-block (lvar-uses value) nil)
         ;; FIXME: Is it necessary?
         (aver (null (block-pred (node-block cast))))
         (setf (block-delete-p (node-block cast)) t)
@@ -1787,36 +1720,39 @@
     (when (eq (node-derived-type cast) *empty-type*)
       (maybe-terminate-block cast nil))
 
-    (when (and (not do-not-optimize)
-               (values-subtypep value-type
-                                (cast-asserted-type cast)))
-      (delete-filter cast cont value)
-      (reoptimize-continuation cont)
-      (when (continuation-single-value-p cont)
-        (note-single-valuified-continuation cont))
-      (when (not dest)
-        (reoptimize-continuation-uses cont))
-      (return-from ir1-optimize-cast t))
+    (when (not do-not-optimize)
+      (let ((lvar (node-lvar cast)))
+        (when (values-subtypep value-type (cast-asserted-type cast))
+          (delete-filter cast lvar value)
+          (when lvar
+            (reoptimize-lvar lvar)
+            (when (lvar-single-value-p lvar)
+              (note-single-valuified-lvar lvar)))
+          (return-from ir1-optimize-cast t))
 
-    (when (and (not do-not-optimize)
-               (not (continuation-use value))
-               dest)
-      (collect ((merges))
-        (do-uses (use value)
-          (when (and (values-subtypep (node-derived-type use) atype)
-                     (immediately-used-p value use))
-            (ensure-block-start cont)
-            (delete-continuation-use use)
-            (add-continuation-use use cont)
-            (unlink-blocks (node-block use) (node-block cast))
-            (link-blocks (node-block use)
-                         (first (block-succ (node-block cast))))
-            (when (and (return-p dest)
-                       (basic-combination-p use)
-                       (eq (basic-combination-kind use) :local))
-              (merges use))))
-        (dolist (use (merges))
-          (merge-tail-sets use))))
+        (when (and (listp (lvar-uses value))
+                   lvar)
+          ;; Pathwise removing of CAST
+          (let ((ctran (node-next cast))
+                (dest (lvar-dest lvar))
+                next-block)
+            (collect ((merges))
+              (do-uses (use value)
+                (when (and (values-subtypep (node-derived-type use) atype)
+                           (immediately-used-p value use))
+                  (unless next-block
+                    (when ctran (ensure-block-start ctran))
+                    (setq next-block (first (block-succ (node-block cast)))))
+                  (%delete-lvar-use use)
+                  (add-lvar-use use lvar)
+                  (unlink-blocks (node-block use) (node-block cast))
+                  (link-blocks (node-block use) next-block)
+                  (when (and (return-p dest)
+                             (basic-combination-p use)
+                             (eq (basic-combination-kind use) :local))
+                    (merges use))))
+              (dolist (use (merges))
+                (merge-tail-sets use)))))))
 
     (when (and (cast-%type-check cast)
                (values-subtypep value-type

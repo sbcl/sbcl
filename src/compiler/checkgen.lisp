@@ -160,10 +160,10 @@
 ;;; FIXME: I don't quite understand this, but it looks as though
 ;;; that means type checks are weakened when SPEED=3 regardless of
 ;;; the SAFETY level, which is not the right thing to do.
-(defun maybe-negate-check (cont types original-types force-hairy)
-  (declare (type continuation cont) (list types))
+(defun maybe-negate-check (lvar types original-types force-hairy)
+  (declare (type lvar lvar) (list types))
   (multiple-value-bind (ptypes count)
-      (no-fun-values-types (continuation-derived-type cont))
+      (no-fun-values-types (lvar-derived-type lvar))
     (if (eq count :unknown)
         (if (and (every #'type-check-template types) (not force-hairy))
             (values :simple types)
@@ -220,12 +220,12 @@
 ;;; negation of this type instead.
 (defun cast-check-types (cast force-hairy)
   (declare (type cast cast))
-  (let* ((cont (node-cont cast))
-         (ctype (coerce-to-values (cast-type-to-check cast)))
+  (let* ((ctype (coerce-to-values (cast-type-to-check cast)))
          (atype (coerce-to-values (cast-asserted-type cast)))
          (value (cast-value cast))
-         (vtype (continuation-derived-type value))
-         (dest (continuation-dest cont)))
+         (vtype (lvar-derived-type value))
+         (lvar (node-lvar cast))
+         (dest (and lvar (lvar-dest lvar))))
     (aver (not (eq ctype *wild-type*)))
     (multiple-value-bind (ctypes count) (no-fun-values-types ctype)
       (multiple-value-bind (atypes acount) (no-fun-values-types atype)
@@ -241,10 +241,10 @@
                                 (eq count :unknown))))
                      (maybe-negate-check value ctypes atypes t)
                      (maybe-negate-check value ctypes atypes force-hairy)))
-                ((and (continuation-single-value-p cont)
+                ((and (lvar-single-value-p lvar)
                       (or (not (args-type-rest ctype))
                           (eq (args-type-rest ctype) *universal-type*)))
-                 (principal-continuation-single-valuify cont)
+                 (principal-lvar-single-valuify lvar)
                  (let ((creq (car (args-type-required ctype))))
                    (multiple-value-setq (ctype atype)
                      (if creq
@@ -256,7 +256,7 @@
                                        force-hairy)))
                 ((and (mv-combination-p dest)
                       (eq (mv-combination-kind dest) :local))
-                 (let* ((fun-ref (continuation-use (mv-combination-fun dest)))
+                 (let* ((fun-ref (lvar-use (mv-combination-fun dest)))
                         (length (length (lambda-vars (ref-leaf fun-ref)))))
                    (maybe-negate-check value
                                        ;; FIXME
@@ -278,8 +278,8 @@
 ;;; Do we want to do a type check?
 (defun worth-type-check-p (cast)
   (declare (type cast cast))
-  (let* ((cont (node-cont cast))
-         (dest (continuation-dest cont)))
+  (let* ((lvar (node-lvar cast))
+         (dest (and lvar (lvar-dest lvar))))
     (cond ((not (cast-type-check cast))
            nil)
           ((and (combination-p dest)
@@ -294,8 +294,8 @@
                 ;; recompile all calls to a function when they
                 ;; were originally compiled with a bad
                 ;; declaration. (See also bug 35.)
-                (immediately-used-p cont cast)
-                (values-subtypep (continuation-externally-checkable-type cont)
+                (immediately-used-p lvar cast)
+                (values-subtypep (lvar-externally-checkable-type lvar)
                                  (cast-type-to-check cast)))
            nil)
           (t
@@ -313,8 +313,8 @@
 ;;;     compatible with the call's type.
 (defun probable-type-check-p (cast)
   (declare (type cast cast))
-  (let* ((cont (node-cont cast))
-         (dest (continuation-dest cont)))
+  (let* ((lvar (node-lvar cast))
+         (dest (and lvar (lvar-dest lvar))))
     (cond ((not dest) nil)
           (t t))
     #+nil
@@ -376,10 +376,10 @@
 ;;; passes them on to CONT.
 (defun convert-type-check (cast types)
   (declare (type cast cast) (type list types))
-  (let ((cont (cast-value cast))
+  (let ((value (cast-value cast))
         (length (length types)))
-    (filter-continuation cont (make-type-check-form types))
-    (reoptimize-continuation (cast-value cast))
+    (filter-lvar value (make-type-check-form types))
+    (reoptimize-lvar (cast-value cast))
     (setf (cast-type-to-check cast) *wild-type*)
     (setf (cast-%type-check cast) nil)
     (let* ((atype (cast-asserted-type cast))
@@ -404,8 +404,8 @@
 ;;; the value is a constant, we print it specially.
 (defun cast-check-uses (cast)
   (declare (type cast cast))
-  (let* ((cont (node-cont cast))
-         (dest (continuation-dest cont))
+  (let* ((lvar (node-lvar cast))
+         (dest (and lvar (lvar-dest lvar)))
          (value (cast-value cast))
          (atype (cast-asserted-type cast)))
     (do-uses (use value)
@@ -417,9 +417,9 @@
                                   (eq (combination-kind dest) :local))
                          (let ((lambda (combination-lambda dest))
                                (pos (position-or-lose
-                                     cont (combination-args dest))))
+                                     lvar (combination-args dest))))
                            (format nil "~:[A possible~;The~] binding of ~S"
-                                   (and (continuation-use cont)
+                                   (and (lvar-has-single-use-p lvar)
                                         (eq (functional-kind lambda) :let))
                                    (leaf-source-name (elt (lambda-vars lambda)
                                                           pos)))))))
@@ -465,7 +465,7 @@
   (collect ((casts))
     (do-blocks (block component)
       (when (block-type-check block)
-	(do-nodes (node cont block)
+	(do-nodes (node nil block)
           (when (and (cast-p node)
                      (cast-type-check node))
             (cast-check-uses node)

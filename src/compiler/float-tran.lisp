@@ -56,10 +56,10 @@
   ;; to let me scan for places that I made this mistake and didn't
   ;; catch myself.
   "use inline (UNSIGNED-BYTE 32) operations"
-  (let ((num-high (numeric-type-high (continuation-type num))))
+  (let ((num-high (numeric-type-high (lvar-type num))))
     (when (null num-high)
       (give-up-ir1-transform))
-    (cond ((constant-continuation-p num)
+    (cond ((constant-lvar-p num)
 	   ;; Check the worst case sum absolute error for the random number
 	   ;; expectations.
 	   (let ((rem (rem (expt 2 32) num-high)))
@@ -157,14 +157,14 @@
 
 (deftransform scale-float ((f ex) (single-float *) *)
   (if (and #!+x86 t #!-x86 nil
-	   (csubtypep (continuation-type ex)
+	   (csubtypep (lvar-type ex)
 		      (specifier-type '(signed-byte 32))))
       '(coerce (%scalbn (coerce f 'double-float) ex) 'single-float)
       '(scale-single-float f ex)))
 
 (deftransform scale-float ((f ex) (double-float *) *)
   (if (and #!+x86 t #!-x86 nil
-	   (csubtypep (continuation-type ex)
+	   (csubtypep (lvar-type ex)
 		      (specifier-type '(signed-byte 32))))
       '(%scalbn f ex)
       '(scale-double-float f ex)))
@@ -274,10 +274,10 @@
 ;;; rational arithmetic, or different float types, and fix it up. If
 ;;; we don't, he won't even get so much as an efficiency note.
 (deftransform float-contagion-arg1 ((x y) * * :defun-only t :node node)
-  `(,(continuation-fun-name (basic-combination-fun node))
+  `(,(lvar-fun-name (basic-combination-fun node))
     (float x y) y))
 (deftransform float-contagion-arg2 ((x y) * * :defun-only t :node node)
-  `(,(continuation-fun-name (basic-combination-fun node))
+  `(,(lvar-fun-name (basic-combination-fun node))
     x (float y x)))
 
 (dolist (x '(+ * / -))
@@ -298,10 +298,10 @@
 (macrolet ((frob (op)
 	     `(deftransform ,op ((x y) (float rational) *)
 		"open-code FLOAT to RATIONAL comparison"
-		(unless (constant-continuation-p y)
+		(unless (constant-lvar-p y)
 		  (give-up-ir1-transform
 		   "The RATIONAL value isn't known at compile time."))
-		(let ((val (continuation-value y)))
+		(let ((val (lvar-value y)))
 		  (unless (eql (rational (float val)) val)
 		    (give-up-ir1-transform
 		     "~S doesn't have a precise float representation."
@@ -326,17 +326,17 @@
       (setf (fun-info-derive-type (fun-info-or-lose name))
 	    (lambda (call)
 	      (declare (type combination call))
-	      (when (csubtypep (continuation-type
+	      (when (csubtypep (lvar-type
 				(first (combination-args call)))
 			       type)
 		(specifier-type 'float)))))))
 
 #+sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
 (defoptimizer (log derive-type) ((x &optional y))
-  (when (and (csubtypep (continuation-type x)
+  (when (and (csubtypep (lvar-type x)
 			(specifier-type '(real 0.0)))
 	     (or (null y)
-		 (csubtypep (continuation-type y)
+		 (csubtypep (lvar-type y)
 			    (specifier-type '(real 0.0)))))
     (specifier-type 'float)))
 
@@ -424,7 +424,7 @@
              (declare (ignorable prim-quick))
              `(progn
                 (deftransform ,name ((x) (single-float) *)
-                  #!+x86 (cond ((csubtypep (continuation-type x)
+                  #!+x86 (cond ((csubtypep (lvar-type x)
                                            (specifier-type '(single-float
                                                              (#.(- (expt 2f0 64)))
                                                              (#.(expt 2f0 64)))))
@@ -434,11 +434,11 @@
                                 (compiler-notify
                                  "unable to avoid inline argument range check~@
                                   because the argument range (~S) was not within 2^64"
-                                 (type-specifier (continuation-type x)))
+                                 (type-specifier (lvar-type x)))
                                 `(coerce (,',prim (coerce x 'double-float)) 'single-float)))
                   #!-x86 `(coerce (,',prim (coerce x 'double-float)) 'single-float))
                (deftransform ,name ((x) (double-float) *)
-                 #!+x86 (cond ((csubtypep (continuation-type x)
+                 #!+x86 (cond ((csubtypep (lvar-type x)
                                           (specifier-type '(double-float
                                                             (#.(- (expt 2d0 64)))
                                                             (#.(expt 2d0 64)))))
@@ -447,7 +447,7 @@
                                (compiler-notify
                                 "unable to avoid inline argument range check~@
                                  because the argument range (~S) was not within 2^64"
-                                (type-specifier (continuation-type x)))
+                                (type-specifier (lvar-type x)))
                                `(,',prim x)))
                  #!-x86 `(,',prim x)))))
   (def sin %sin %sin-quick)
@@ -1287,7 +1287,7 @@
 ;;; FIXME: ANSI allows any subtype of REAL for the components of COMPLEX.
 ;;; So what if the input type is (COMPLEX (SINGLE-FLOAT 0 1))?
 (defoptimizer (conjugate derive-type) ((num))
-  (continuation-type num))
+  (lvar-type num))
 
 (defoptimizer (cis derive-type) ((num))
   (one-arg-derive-type num

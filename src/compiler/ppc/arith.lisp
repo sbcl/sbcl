@@ -986,7 +986,7 @@
 		 ((unsigned-byte 32) (constant-arg (unsigned-byte 32)))
 		 (unsigned-byte 32))
   "recode as shifts and adds"
-  (let ((y (continuation-value y)))
+  (let ((y (lvar-value y)))
     (multiple-value-bind (result adds shifts)
 	(ub32-strength-reduce-constant-multiply 'x y)
       (cond

@@ -2530,27 +2530,27 @@
   (multiple-value-bind (definitely-< definitely->=)
       (ir1-transform-<-helper x y)
     (cond (definitely-<
-	      (continuation-type y))
+	      (lvar-type y))
 	  (definitely->=
-	      (continuation-type x))
+	      (lvar-type x))
 	  (t
-	   (make-canonical-union-type (list (continuation-type x)
-					    (continuation-type y)))))))
+	   (make-canonical-union-type (list (lvar-type x)
+					    (lvar-type y)))))))
 
 (defoptimizer (min derive-type) ((x y))
   (multiple-value-bind (definitely-< definitely->=)
       (ir1-transform-<-helper x y)
     (cond (definitely-<
-	      (continuation-type x))
+	      (lvar-type x))
 	  (definitely->=
-	      (continuation-type y))
+	      (lvar-type y))
 	  (t
-	   (make-canonical-union-type (list (continuation-type x)
-					    (continuation-type y)))))))
+	   (make-canonical-union-type (list (lvar-type x)
+					    (lvar-type y)))))))
 
 (deftransform max ((x y) (number number) *)
-  (let ((x-type (continuation-type x))
-	(y-type (continuation-type y))
+  (let ((x-type (lvar-type x))
+	(y-type (lvar-type y))
 	(signed (specifier-type '(signed-byte #.sb!vm:n-word-bits)))
 	(unsigned (specifier-type '(unsigned-byte #.sb!vm:n-word-bits)))
 	(d-float (specifier-type 'double-float))
@@ -2579,8 +2579,8 @@
 		   ,arg1 ,arg2)))))))
 
 (deftransform min ((x y) (real real) *)
-  (let ((x-type (continuation-type x))
-	(y-type (continuation-type y))
+  (let ((x-type (lvar-type x))
+	(y-type (lvar-type y))
 	(signed (specifier-type '(signed-byte #.sb!vm:n-word-bits)))
 	(unsigned (specifier-type '(unsigned-byte #.sb!vm:n-word-bits)))
 	(d-float (specifier-type 'double-float))

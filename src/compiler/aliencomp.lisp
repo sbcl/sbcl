@@ -86,16 +86,16 @@
 ;;;; SLOT support
 
 (defun find-slot-offset-and-type (alien slot)
-  (unless (constant-continuation-p slot)
+  (unless (constant-lvar-p slot)
     (give-up-ir1-transform
      "The slot is not constant, so access cannot be open coded."))
-  (let ((type (continuation-type alien)))
+  (let ((type (lvar-type alien)))
     (unless (alien-type-type-p type)
       (give-up-ir1-transform))
     (let ((alien-type (alien-type-type-alien-type type)))
       (unless (alien-record-type-p alien-type)
 	(give-up-ir1-transform))
-      (let* ((slot-name (continuation-value slot))
+      (let* ((slot-name (lvar-value slot))
 	     (field (find slot-name (alien-record-type-fields alien-type)
 			  :key #'alien-record-field-name)))
 	(unless field
@@ -130,7 +130,7 @@
 	  (find-slot-offset-and-type alien slot)
 	(declare (ignore slot-offset))
 	(let ((type (make-alien-type-type slot-type)))
-	  (assert-continuation-type value type)
+	  (assert-lvar-type value type)
 	  (return type))))
     *wild-type*))
 
@@ -162,7 +162,7 @@
 ;;;; DEREF support
 
 (defun find-deref-alien-type (alien)
-  (let ((alien-type (continuation-type alien)))
+  (let ((alien-type (lvar-type alien)))
     (unless (alien-type-type-p alien-type)
       (give-up-ir1-transform))
     (let ((alien-type (alien-type-type-alien-type alien-type)))
@@ -252,7 +252,7 @@
       (let ((type (make-alien-type-type
 		   (make-alien-pointer-type
 		    :to (find-deref-element-type alien)))))
-	(assert-continuation-type value type)
+	(assert-lvar-type value type)
 	(return type)))
     *wild-type*))
 
@@ -285,9 +285,9 @@
 ;;;; support for aliens on the heap
 
 (defun heap-alien-sap-and-type (info)
-  (unless (constant-continuation-p info)
+  (unless (constant-lvar-p info)
     (give-up-ir1-transform "info not constant; can't open code"))
-  (let ((info (continuation-value info)))
+  (let ((info (lvar-value info)))
     (values (heap-alien-info-sap-form info)
 	    (heap-alien-info-type info))))
 
@@ -311,7 +311,7 @@
       (multiple-value-bind (sap type) (heap-alien-sap-and-type info)
 	(declare (ignore sap))
 	(let ((type (make-alien-type-type type)))
-	  (assert-continuation-type value type)
+	  (assert-lvar-type value type)
 	  (return type))))
     *wild-type*))
 
@@ -335,9 +335,9 @@
 ;;;; support for local (stack or register) aliens
 
 (deftransform make-local-alien ((info) * * :important t)
-  (unless (constant-continuation-p info)
+  (unless (constant-lvar-p info)
     (abort-ir1-transform "Local alien info isn't constant?"))
-  (let* ((info (continuation-value info))
+  (let* ((info (lvar-value info))
 	 (alien-type (local-alien-info-type info))
 	 (bits (alien-type-bits alien-type)))
     (unless bits
@@ -370,13 +370,13 @@
 (deftransform note-local-alien-type ((info var) * * :important t)
   ;; FIXME: This test and error occur about a zillion times. They
   ;; could be factored into a function.
-  (unless (constant-continuation-p info)
+  (unless (constant-lvar-p info)
     (abort-ir1-transform "Local alien info isn't constant?"))
-  (let ((info (continuation-value info)))
+  (let ((info (lvar-value info)))
     (/noshow "in DEFTRANSFORM NOTE-LOCAL-ALIEN-TYPE" info)
     (/noshow (local-alien-info-force-to-memory-p info))
     (unless (local-alien-info-force-to-memory-p info)
-      (let ((var-node (continuation-use var)))
+      (let ((var-node (lvar-uses var)))
 	(/noshow var-node (ref-p var-node))
 	(when (ref-p var-node)
 	  (propagate-to-refs (ref-leaf var-node)
@@ -386,9 +386,9 @@
   nil)
 
 (deftransform local-alien ((info var) * * :important t)
-  (unless (constant-continuation-p info)
+  (unless (constant-lvar-p info)
     (abort-ir1-transform "Local alien info isn't constant?"))
-  (let* ((info (continuation-value info))
+  (let* ((info (lvar-value info))
 	 (alien-type (local-alien-info-type info)))
     (/noshow "in DEFTRANSFORM LOCAL-ALIEN" info alien-type)
     (/noshow (local-alien-info-force-to-memory-p info))
@@ -397,31 +397,31 @@
 	`(naturalize var ',alien-type))))
 
 (deftransform %local-alien-forced-to-memory-p ((info) * * :important t)
-  (unless (constant-continuation-p info)
+  (unless (constant-lvar-p info)
     (abort-ir1-transform "Local alien info isn't constant?"))
-  (let ((info (continuation-value info)))
+  (let ((info (lvar-value info)))
     (local-alien-info-force-to-memory-p info)))
 
 (deftransform %set-local-alien ((info var value) * * :important t)
-  (unless (constant-continuation-p info)
+  (unless (constant-lvar-p info)
     (abort-ir1-transform "Local alien info isn't constant?"))
-  (let* ((info (continuation-value info))
+  (let* ((info (lvar-value info))
 	 (alien-type (local-alien-info-type info)))
     (if (local-alien-info-force-to-memory-p info)
 	`(deposit-alien-value var 0 ',alien-type value)
 	'(error "This should be eliminated as dead code."))))
 
 (defoptimizer (%local-alien-addr derive-type) ((info var))
-  (if (constant-continuation-p info)
-      (let* ((info (continuation-value info))
+  (if (constant-lvar-p info)
+      (let* ((info (lvar-value info))
 	     (alien-type (local-alien-info-type info)))
 	(make-alien-type-type (make-alien-pointer-type :to alien-type)))
       *wild-type*))
 
 (deftransform %local-alien-addr ((info var) * * :important t)
-  (unless (constant-continuation-p info)
+  (unless (constant-lvar-p info)
     (abort-ir1-transform "Local alien info isn't constant?"))
-  (let* ((info (continuation-value info))
+  (let* ((info (lvar-value info))
 	 (alien-type (local-alien-info-type info)))
     (/noshow "in DEFTRANSFORM %LOCAL-ALIEN-ADDR, creating %SAP-ALIEN")
     (if (local-alien-info-force-to-memory-p info)
@@ -429,9 +429,9 @@
 	(error "This shouldn't happen."))))
 
 (deftransform dispose-local-alien ((info var) * * :important t)
-  (unless (constant-continuation-p info)
+  (unless (constant-lvar-p info)
     (abort-ir1-transform "Local alien info isn't constant?"))
-  (let* ((info (continuation-value info))
+  (let* ((info (lvar-value info))
 	 (alien-type (local-alien-info-type info)))
     (if (local-alien-info-force-to-memory-p info)
       #!+x86 `(%primitive dealloc-alien-stack-space
@@ -445,17 +445,17 @@
 ;;;; %CAST
 
 (defoptimizer (%cast derive-type) ((alien type))
-  (or (when (constant-continuation-p type)
-	(let ((alien-type (continuation-value type)))
+  (or (when (constant-lvar-p type)
+	(let ((alien-type (lvar-value type)))
 	  (when (alien-type-p alien-type)
 	    (make-alien-type-type alien-type))))
       *wild-type*))
 
 (deftransform %cast ((alien target-type) * * :important t)
-  (unless (constant-continuation-p target-type)
+  (unless (constant-lvar-p target-type)
     (give-up-ir1-transform
      "The alien type is not constant, so access cannot be open coded."))
-  (let ((target-type (continuation-value target-type)))
+  (let ((target-type (lvar-value target-type)))
     (cond ((or (alien-pointer-type-p target-type)
 	       (alien-array-type-p target-type)
 	       (alien-fun-type-p target-type))
@@ -466,7 +466,7 @@
 ;;;; ALIEN-SAP, %SAP-ALIEN, %ADDR, etc.
 
 (deftransform alien-sap ((alien) * * :important t)
-  (let ((alien-node (continuation-use alien)))
+  (let ((alien-node (lvar-uses alien)))
     (typecase alien-node
       (combination
        (extract-fun-args alien '%sap-alien 2)
@@ -478,8 +478,8 @@
 
 (defoptimizer (%sap-alien derive-type) ((sap type))
   (declare (ignore sap))
-  (if (constant-continuation-p type)
-      (make-alien-type-type (continuation-value type))
+  (if (constant-lvar-p type)
+      (make-alien-type-type (lvar-value type))
       *wild-type*))
 
 (deftransform %sap-alien ((sap type) * * :important t)
@@ -493,12 +493,12 @@
 
 (flet ((%computed-lambda (compute-lambda type)
 	 (declare (type function compute-lambda))
-	 (unless (constant-continuation-p type)
+	 (unless (constant-lvar-p type)
 	   (give-up-ir1-transform
 	    "The type is not constant at compile time; can't open code."))
 	 (handler-case
-	     (let ((result (funcall compute-lambda (continuation-value type))))
-	       (/noshow "in %COMPUTED-LAMBDA" (continuation-value type) result)
+	     (let ((result (funcall compute-lambda (lvar-value type))))
+	       (/noshow "in %COMPUTED-LAMBDA" (lvar-value type) result)
 	       result)
 	   (error (condition)
 		  (compiler-error "~A" condition)))))
@@ -515,33 +515,33 @@
 
 (defun count-low-order-zeros (thing)
   (typecase thing
-    (continuation
-     (if (constant-continuation-p thing)
-	 (count-low-order-zeros (continuation-value thing))
-	 (count-low-order-zeros (continuation-use thing))))
+    (lvar
+     (if (constant-lvar-p thing)
+	 (count-low-order-zeros (lvar-value thing))
+	 (count-low-order-zeros (lvar-uses thing))))
     (combination
-     (case (continuation-fun-name (combination-fun thing))
+     (case (lvar-fun-name (combination-fun thing))
        ((+ -)
 	(let ((min most-positive-fixnum)
 	      (itype (specifier-type 'integer)))
 	  (dolist (arg (combination-args thing) min)
-	    (if (csubtypep (continuation-type arg) itype)
+	    (if (csubtypep (lvar-type arg) itype)
 		(setf min (min min (count-low-order-zeros arg)))
 		(return 0)))))
        (*
 	(let ((result 0)
 	      (itype (specifier-type 'integer)))
 	  (dolist (arg (combination-args thing) result)
-	    (if (csubtypep (continuation-type arg) itype)
+	    (if (csubtypep (lvar-type arg) itype)
 		(setf result (+ result (count-low-order-zeros arg)))
 		(return 0)))))
        (ash
 	(let ((args (combination-args thing)))
 	  (if (= (length args) 2)
 	      (let ((amount (second args)))
-		(if (constant-continuation-p amount)
+		(if (constant-lvar-p amount)
 		    (max (+ (count-low-order-zeros (first args))
-			    (continuation-value amount))
+			    (lvar-value amount))
 			 0)
 		    0))
 	      0)))
@@ -557,9 +557,9 @@
      0)))
 
 (deftransform / ((numerator denominator) (integer integer))
-  (unless (constant-continuation-p denominator)
+  (unless (constant-lvar-p denominator)
     (give-up-ir1-transform))
-  (let* ((denominator (continuation-value denominator))
+  (let* ((denominator (lvar-value denominator))
 	 (bits (1- (integer-length denominator))))
     (unless (= (ash 1 bits) denominator)
       (give-up-ir1-transform))
@@ -569,17 +569,17 @@
       `(ash numerator ,(- bits)))))
 
 (deftransform ash ((value amount))
-  (let ((value-node (continuation-use value)))
+  (let ((value-node (lvar-uses value)))
     (unless (and (combination-p value-node)
-		 (eq (continuation-fun-name (combination-fun value-node))
+		 (eq (lvar-fun-name (combination-fun value-node))
 		     'ash))
       (give-up-ir1-transform))
     (let ((inside-args (combination-args value-node)))
       (unless (= (length inside-args) 2)
 	(give-up-ir1-transform))
       (let ((inside-amount (second inside-args)))
-	(unless (and (constant-continuation-p inside-amount)
-		     (not (minusp (continuation-value inside-amount))))
+	(unless (and (constant-lvar-p inside-amount)
+		     (not (minusp (lvar-value inside-amount))))
 	  (give-up-ir1-transform)))))
   (extract-fun-args value 'ash 2)
   '(lambda (value amount1 amount2)
@@ -596,7 +596,7 @@
        (alien-funcall (deref function) ,@names))))
 
 (deftransform alien-funcall ((function &rest args) * * :important t)
-  (let ((type (continuation-type function)))
+  (let ((type (lvar-type function)))
     (unless (alien-type-type-p type)
       (give-up-ir1-transform "can't tell function type at compile time"))
     (/noshow "entering second DEFTRANSFORM ALIEN-FUNCALL" function)
@@ -634,9 +634,9 @@
 
 (defoptimizer (%alien-funcall derive-type) ((function type &rest args))
   (declare (ignore function args))
-  (unless (constant-continuation-p type)
+  (unless (constant-lvar-p type)
     (error "Something is broken."))
-  (let ((type (continuation-value type)))
+  (let ((type (lvar-value type)))
     (unless (alien-fun-type-p type)
       (error "Something is broken."))
     (values-specifier-type
@@ -647,16 +647,16 @@
 	      ((function type &rest args) node ltn-policy)
   (setf (basic-combination-info node) :funny)
   (setf (node-tail-p node) nil)
-  (annotate-ordinary-continuation function)
+  (annotate-ordinary-lvar function)
   (dolist (arg args)
-    (annotate-ordinary-continuation arg)))
+    (annotate-ordinary-lvar arg)))
 
 (defoptimizer (%alien-funcall ir2-convert)
 	      ((function type &rest args) call block)
-  (let ((type (if (constant-continuation-p type)
-		  (continuation-value type)
+  (let ((type (if (constant-lvar-p type)
+		  (lvar-value type)
 		  (error "Something is broken.")))
-	(cont (node-cont call))
+	(lvar (node-lvar call))
 	(args args))
     (multiple-value-bind (nsp stack-frame-size arg-tns result-tns)
 	(make-call-out-tns type)
@@ -674,13 +674,13 @@
 	  #!+x86 (emit-move-arg-template call
 					 block
 					 (first move-arg-vops)
-					 (continuation-tn call block arg)
+					 (lvar-tn call block arg)
 					 nsp
 					 tn)
 	  #!-x86 (progn
 		   (emit-move call
 			      block
-			      (continuation-tn call block arg)
+			      (lvar-tn call block arg)
 			      temp-tn)
 		   (emit-move-arg-template call
 					   block
@@ -692,8 +692,8 @@
       (unless (listp result-tns)
 	(setf result-tns (list result-tns)))
       (vop* call-out call block
-	    ((continuation-tn call block function)
+	    ((lvar-tn call block function)
 	     (reference-tn-list arg-tns nil))
 	    ((reference-tn-list result-tns t)))
       (vop dealloc-number-stack-space call block stack-frame-size)
-      (move-continuation-result call block result-tns cont))))
+      (move-lvar-result call block result-tns lvar))))

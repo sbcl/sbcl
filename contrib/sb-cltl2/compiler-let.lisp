@@ -1,6 +1,6 @@
 (in-package :sb-cltl2)
 
-(def-ir1-translator compiler-let ((bindings &rest forms) start cont)
+(def-ir1-translator compiler-let ((bindings &rest forms) start next result)
   (loop for binding in bindings
      if (atom binding)
         collect binding into vars
@@ -9,7 +9,7 @@
         and collect (first binding) into vars
         and collect (eval (second binding)) into values
      finally (return (progv vars values
-                       (sb-c::ir1-convert-progn-body start cont forms)))))
+                       (sb-c::ir1-convert-progn-body start next result forms)))))
 
 (defun walk-compiler-let (form context env)
   (declare (ignore context))

@@ -44,15 +44,15 @@
 (deftransform complement ((fun) * * :node node)
   "open code"
   (multiple-value-bind (min max)
-      (fun-type-nargs (continuation-type fun))
+      (fun-type-nargs (lvar-type fun))
     (cond
      ((and min (eql min max))
       (let ((dums (make-gensym-list min)))
 	`#'(lambda ,dums (not (funcall fun ,@dums)))))
-     ((let* ((cont (node-cont node))
-	     (dest (continuation-dest cont)))
-	(and (combination-p dest)
-	     (eq (combination-fun dest) cont)))
+     ((awhen (node-lvar node)
+        (let ((dest (lvar-dest it)))
+          (and (combination-p dest)
+               (eq (combination-fun dest) it))))
       '#'(lambda (&rest args)
 	   (not (apply fun args))))
      (t
@@ -129,9 +129,9 @@
 
 (deftransform nthcdr ((n l) (unsigned-byte t) * :node node)
   "convert NTHCDR to CAxxR"
-  (unless (constant-continuation-p n)
+  (unless (constant-lvar-p n)
     (give-up-ir1-transform))
-  (let ((n (continuation-value n)))
+  (let ((n (lvar-value n)))
     (when (> n
 	     (if (policy node (and (= speed 3) (= space 0)))
 		 *extreme-nthcdr-open-code-limit*
@@ -730,9 +730,9 @@
 ;;; integer type with bounds determined Fun when applied to X and Y.
 ;;; Otherwise, we use Numeric-Contagion.
 (defun derive-integer-type (x y fun)
-  (declare (type continuation x y) (type function fun))
-  (let ((x (continuation-type x))
-	(y (continuation-type y)))
+  (declare (type lvar x y) (type function fun))
+  (let ((x (lvar-type x))
+	(y (lvar-type y)))
     (if (and (numeric-type-p x) (numeric-type-p y)
 	     (eq (numeric-type-class x) 'integer)
 	     (eq (numeric-type-class y) 'integer)
@@ -989,7 +989,7 @@
 				&optional (convert-type t))
   (declare (type function derive-fun)
 	   (type (or null function) member-fun))
-  (let ((arg-list (prepare-arg-for-derive-type (continuation-type arg))))
+  (let ((arg-list (prepare-arg-for-derive-type (lvar-type arg))))
     (when arg-list
       (flet ((deriver (x)
 	       (typecase x
@@ -1074,8 +1074,8 @@
 		 (t
 		  *universal-type*))))
     (let ((same-arg (same-leaf-ref-p arg1 arg2))
-	  (a1 (prepare-arg-for-derive-type (continuation-type arg1)))
-	  (a2 (prepare-arg-for-derive-type (continuation-type arg2))))
+	  (a1 (prepare-arg-for-derive-type (lvar-type arg1)))
+	  (a2 (prepare-arg-for-derive-type (lvar-type arg2))))
       (when (and a1 a2)
 	(let ((results nil))
 	  (if same-arg
@@ -1145,7 +1145,7 @@
 			    nil))))))))
 
 (defoptimizer (/ derive-type) ((x y))
-  (numeric-contagion (continuation-type x) (continuation-type y)))
+  (numeric-contagion (lvar-type x) (lvar-type y)))
 
 ) ; PROGN
 
@@ -1366,7 +1366,7 @@
 
 #+sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
 (defoptimizer (abs derive-type) ((num))
-  (let ((type (continuation-type num)))
+  (let ((type (lvar-type num)))
     (if (and (numeric-type-p type)
 	     (eq (numeric-type-class type) 'integer)
 	     (eq (numeric-type-complexp type) :real))
@@ -1419,8 +1419,8 @@
 
 #+sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
 (defoptimizer (truncate derive-type) ((number divisor))
-  (let ((number-type (continuation-type number))
-	(divisor-type (continuation-type divisor))
+  (let ((number-type (lvar-type number))
+	(divisor-type (lvar-type divisor))
 	(integer-type (specifier-type 'integer)))
     (if (and (numeric-type-p number-type)
 	     (csubtypep number-type integer-type)
@@ -2045,7 +2045,7 @@
 
 #+sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
 (defoptimizer (random derive-type) ((bound &optional state))
-  (let ((type (continuation-type bound)))
+  (let ((type (lvar-type bound)))
     (when (numeric-type-p type)
       (let ((class (numeric-type-class type))
 	    (high (numeric-type-high type))
@@ -2201,7 +2201,7 @@
 ;;;; miscellaneous derive-type methods
 
 (defoptimizer (integer-length derive-type) ((x))
-  (let ((x-type (continuation-type x)))
+  (let ((x-type (lvar-type x)))
     (when (and (numeric-type-p x-type)
                (csubtypep x-type (specifier-type 'integer)))
       ;; If the X is of type (INTEGER LO HI), then the INTEGER-LENGTH
@@ -2226,7 +2226,7 @@
   (specifier-type 'base-char))
 
 (defoptimizer (values derive-type) ((&rest values))
-  (make-values-type :required (mapcar #'continuation-type values)))
+  (make-values-type :required (mapcar #'lvar-type values)))
 
 ;;;; byte operations
 ;;;;
@@ -2277,7 +2277,7 @@
       `(%deposit-field ,newbyte ,size ,pos ,int))))
 
 (defoptimizer (%ldb derive-type) ((size posn num))
-  (let ((size (continuation-type size)))
+  (let ((size (lvar-type size)))
     (if (and (numeric-type-p size)
 	     (csubtypep size (specifier-type 'integer)))
 	(let ((size-high (numeric-type-high size)))
@@ -2287,8 +2287,8 @@
 	*universal-type*)))
 
 (defoptimizer (%mask-field derive-type) ((size posn num))
-  (let ((size (continuation-type size))
-	(posn (continuation-type posn)))
+  (let ((size (lvar-type size))
+	(posn (lvar-type posn)))
     (if (and (numeric-type-p size)
 	     (csubtypep size (specifier-type 'integer))
 	     (numeric-type-p posn)
@@ -2302,9 +2302,9 @@
 	*universal-type*)))
 
 (defun %deposit-field-derive-type-aux (size posn int)
-  (let ((size (continuation-type size))
-	(posn (continuation-type posn))
-	(int (continuation-type int)))
+  (let ((size (lvar-type size))
+	(posn (lvar-type posn))
+	(int (lvar-type int)))
     (when (and (numeric-type-p size)
                (numeric-type-p posn)
                (numeric-type-p int))
@@ -2409,20 +2409,20 @@
 ;;; replaced with the version, cutting its result to WIDTH or more
 ;;; bits. If we have changed anything, we need to flush old derived
 ;;; types, because they have nothing in common with the new code.
-(defun cut-to-width (cont width)
-  (declare (type continuation cont) (type (integer 0) width))
+(defun cut-to-width (lvar width)
+  (declare (type lvar lvar) (type (integer 0) width))
   (labels ((reoptimize-node (node name)
              (setf (node-derived-type node)
                    (fun-type-returns
                     (info :function :type name)))
-             (setf (continuation-%derived-type (node-cont node)) nil)
+             (setf (lvar-%derived-type (node-lvar node)) nil)
              (setf (node-reoptimize node) t)
              (setf (block-reoptimize (node-block node)) t)
              (setf (component-reoptimize (node-component node)) t))
            (cut-node (node &aux did-something)
              (when (and (combination-p node)
                         (fun-info-p (basic-combination-kind node)))
-               (let* ((fun-ref (continuation-use (combination-fun node)))
+               (let* ((fun-ref (lvar-use (combination-fun node)))
                       (fun-name (leaf-source-name (ref-leaf fun-ref)))
                       (modular-fun (find-modular-version fun-name width))
                       (name (and (modular-fun-info-p modular-fun)
@@ -2439,17 +2439,17 @@
                         (find-free-fun name "in a strange place"))
                        (setf (combination-kind node) :full))
                    (dolist (arg (basic-combination-args node))
-                     (when (cut-continuation arg)
+                     (when (cut-lvar arg)
                        (setq did-something t)))
                    (when did-something
                      (reoptimize-node node fun-name))
                    did-something))))
-           (cut-continuation (cont &aux did-something)
-             (do-uses (node cont)
+           (cut-lvar (lvar &aux did-something)
+             (do-uses (node lvar)
                (when (cut-node node)
                  (setq did-something t)))
              did-something))
-    (cut-continuation cont)))
+    (cut-lvar lvar)))
 
 (defoptimizer (logand optimizer) ((x y) node)
   (let ((result-type (single-value-type (node-derived-type node))))
@@ -2472,11 +2472,11 @@
 
 ;;; If a constant appears as the first arg, swap the args.
 (deftransform commutative-arg-swap ((x y) * * :defun-only t :node node)
-  (if (and (constant-continuation-p x)
-	   (not (constant-continuation-p y)))
-      `(,(continuation-fun-name (basic-combination-fun node))
+  (if (and (constant-lvar-p x)
+	   (not (constant-lvar-p y)))
+      `(,(lvar-fun-name (basic-combination-fun node))
 	y
-	,(continuation-value x))
+	,(lvar-value x))
       (give-up-ir1-transform)))
 
 (dolist (x '(= char= + * logior logand logxor))
@@ -2486,9 +2486,9 @@
 ;;; Handle the case of a constant BOOLE-CODE.
 (deftransform boole ((op x y) * *)
   "convert to inline logical operations"
-  (unless (constant-continuation-p op)
+  (unless (constant-lvar-p op)
     (give-up-ir1-transform "BOOLE code is not a constant."))
-  (let ((control (continuation-value op)))
+  (let ((control (lvar-value op)))
     (case control
       (#.boole-clr 0)
       (#.boole-set -1)
@@ -2515,9 +2515,9 @@
 ;;; If arg is a constant power of two, turn * into a shift.
 (deftransform * ((x y) (integer integer) *)
   "convert x*2^k to shift"
-  (unless (constant-continuation-p y)
+  (unless (constant-lvar-p y)
     (give-up-ir1-transform))
-  (let* ((y (continuation-value y))
+  (let* ((y (lvar-value y))
 	 (y-abs (abs y))
 	 (len (1- (integer-length y-abs))))
     (unless (= y-abs (ash 1 len))
@@ -2530,9 +2530,9 @@
 ;;; mask. If CEILING, add in (1- (ABS Y)), do FLOOR and correct a
 ;;; remainder.
 (flet ((frob (y ceil-p)
-	 (unless (constant-continuation-p y)
+	 (unless (constant-lvar-p y)
 	   (give-up-ir1-transform))
-	 (let* ((y (continuation-value y))
+	 (let* ((y (lvar-value y))
 		(y-abs (abs y))
 		(len (1- (integer-length y-abs))))
 	   (unless (= y-abs (ash 1 len))
@@ -2556,9 +2556,9 @@
 ;;; Do the same for MOD.
 (deftransform mod ((x y) (integer integer) *)
   "convert remainder mod 2^k to LOGAND"
-  (unless (constant-continuation-p y)
+  (unless (constant-lvar-p y)
     (give-up-ir1-transform))
-  (let* ((y (continuation-value y))
+  (let* ((y (lvar-value y))
 	 (y-abs (abs y))
 	 (len (1- (integer-length y-abs))))
     (unless (= y-abs (ash 1 len))
@@ -2571,9 +2571,9 @@
 ;;; If arg is a constant power of two, turn TRUNCATE into a shift and mask.
 (deftransform truncate ((x y) (integer integer))
   "convert division by 2^k to shift"
-  (unless (constant-continuation-p y)
+  (unless (constant-lvar-p y)
     (give-up-ir1-transform))
-  (let* ((y (continuation-value y))
+  (let* ((y (lvar-value y))
 	 (y-abs (abs y))
 	 (len (1- (integer-length y-abs))))
     (unless (= y-abs (ash 1 len))
@@ -2593,9 +2593,9 @@
 ;;; And the same for REM.
 (deftransform rem ((x y) (integer integer) *)
   "convert remainder mod 2^k to LOGAND"
-  (unless (constant-continuation-p y)
+  (unless (constant-lvar-p y)
     (give-up-ir1-transform))
-  (let* ((y (continuation-value y))
+  (let* ((y (lvar-value y))
 	 (y-abs (abs y))
 	 (len (1- (integer-length y-abs))))
     (unless (= y-abs (ash 1 len))
@@ -2623,11 +2623,11 @@
 
 (deftransform logand ((x y) (* (constant-arg t)) *)
   "fold identity operation"
-  (let ((y (continuation-value y)))
+  (let ((y (lvar-value y)))
     (unless (and (plusp y)
                  (= y (1- (ash 1 (integer-length y)))))
       (give-up-ir1-transform))
-    (unless (csubtypep (continuation-type x)
+    (unless (csubtypep (lvar-type x)
                        (specifier-type `(integer 0 ,y)))
       (give-up-ir1-transform))
     'x))
@@ -2647,8 +2647,8 @@
 #+nil
 (defun not-more-contagious (x y)
   (declare (type continuation x y))
-  (let ((x (continuation-type x))
-	(y (continuation-type y)))
+  (let ((x (lvar-type x))
+	(y (lvar-type y)))
     (values (type= (numeric-contagion x y)
 		   (numeric-contagion y y)))))
 ;;; Patched version by Raymond Toy. dtc: Should be safer although it
@@ -2656,7 +2656,7 @@
 ;;; specific to particular transform functions so the use of this
 ;;; function may need a re-think.
 (defun not-more-contagious (x y)
-  (declare (type continuation x y))
+  (declare (type lvar x y))
   (flet ((simple-numeric-type (num)
 	   (and (numeric-type-p num)
 		;; Return non-NIL if NUM is integer, rational, or a float
@@ -2668,8 +2668,8 @@
 		   (numeric-type-format num))
 		  (t
 		   nil)))))
-    (let ((x (continuation-type x))
-	  (y (continuation-type y)))
+    (let ((x (lvar-type x))
+	  (y (lvar-type y)))
       (if (and (simple-numeric-type x)
 	       (simple-numeric-type y))
 	  (values (type= (numeric-contagion x y)
@@ -2681,7 +2681,7 @@
 ;;; float +0.0 then give up.
 (deftransform + ((x y) (t (constant-arg t)) *)
   "fold zero arg"
-  (let ((val (continuation-value y)))
+  (let ((val (lvar-value y)))
     (unless (and (zerop val)
 		 (not (and (floatp val) (plusp (float-sign val))))
 		 (not-more-contagious y x))
@@ -2694,7 +2694,7 @@
 ;;; float -0.0 then give up.
 (deftransform - ((x y) (t (constant-arg t)) *)
   "fold zero arg"
-  (let ((val (continuation-value y)))
+  (let ((val (lvar-value y)))
     (unless (and (zerop val)
 		 (not (and (floatp val) (minusp (float-sign val))))
 		 (not-more-contagious y x))
@@ -2705,7 +2705,7 @@
 (macrolet ((def (name result minus-result)
              `(deftransform ,name ((x y) (t (constant-arg real)) *)
                 "fold identity operations"
-                (let ((val (continuation-value y)))
+                (let ((val (lvar-value y)))
                   (unless (and (= (abs val) 1)
                                (not-more-contagious y x))
                     (give-up-ir1-transform))
@@ -2718,7 +2718,7 @@
 ;;; N; convert (expt x 1/2) to sqrt.
 (deftransform expt ((x y) (t (constant-arg real)) *)
   "recode as multiplication or sqrt"
-  (let ((val (continuation-value y)))
+  (let ((val (lvar-value y)))
     ;; If Y would cause the result to be promoted to the same type as
     ;; Y, we give up. If not, then the result will be the same type
     ;; as X, so we can replace the exponentiation with simple
@@ -2726,7 +2726,7 @@
     (unless (not-more-contagious y x)
       (give-up-ir1-transform))
     (cond ((zerop val)
-           (let ((x-type (continuation-type x)))
+           (let ((x-type (lvar-type x)))
              (cond ((csubtypep x-type (specifier-type '(or rational
                                                         (complex rational))))
                     '1)
@@ -2802,9 +2802,9 @@
 ;;; reference to the same leaf, and the value of the leaf cannot
 ;;; change.
 (defun same-leaf-ref-p (x y)
-  (declare (type continuation x y))
-  (let ((x-use (principal-continuation-use x))
-	(y-use (principal-continuation-use y)))
+  (declare (type lvar x y))
+  (let ((x-use (principal-lvar-use x))
+	(y-use (principal-lvar-use y)))
     (and (ref-p x-use)
 	 (ref-p y-use)
 	 (eq (ref-leaf x-use) (ref-leaf y-use))
@@ -2817,8 +2817,8 @@
 					 :defun-only t)
   (cond ((same-leaf-ref-p x y)
 	 t)
-	((not (types-equal-or-intersect (continuation-type x)
-					(continuation-type y)))
+	((not (types-equal-or-intersect (lvar-type x)
+					(lvar-type y)))
 	 nil)
 	(t
 	 (give-up-ir1-transform))))
@@ -2844,8 +2844,8 @@
 ;;;    handle that case, otherwise give an efficiency note.
 (deftransform eql ((x y) * *)
   "convert to simpler equality predicate"
-  (let ((x-type (continuation-type x))
-	(y-type (continuation-type y))
+  (let ((x-type (lvar-type x))
+	(y-type (lvar-type y))
 	(char-type (specifier-type 'character))
 	(number-type (specifier-type 'number)))
     (cond ((same-leaf-ref-p x y)
@@ -2858,8 +2858,8 @@
 	  ((or (not (types-equal-or-intersect x-type number-type))
 	       (not (types-equal-or-intersect y-type number-type)))
 	   '(eq x y))
-	  ((and (not (constant-continuation-p y))
-		(or (constant-continuation-p x)
+	  ((and (not (constant-lvar-p y))
+		(or (constant-lvar-p x)
 		    (and (csubtypep x-type y-type)
 			 (not (csubtypep y-type x-type)))))
 	   '(eql y x))
@@ -2870,8 +2870,8 @@
 ;;; and the same for both.
 (deftransform = ((x y) * *)
   "open code"
-  (let ((x-type (continuation-type x))
-	(y-type (continuation-type y)))
+  (let ((x-type (lvar-type x))
+	(y-type (lvar-type y)))
     (if (and (csubtypep x-type (specifier-type 'number))
 	     (csubtypep y-type (specifier-type 'number)))
 	(cond ((or (and (csubtypep x-type (specifier-type 'float))
@@ -2898,9 +2898,9 @@
 
 ;;; If CONT's type is a numeric type, then return the type, otherwise
 ;;; GIVE-UP-IR1-TRANSFORM.
-(defun numeric-type-or-lose (cont)
-  (declare (type continuation cont))
-  (let ((res (continuation-type cont)))
+(defun numeric-type-or-lose (lvar)
+  (declare (type lvar lvar))
+  (let ((res (lvar-type lvar)))
     (unless (numeric-type-p res) (give-up-ir1-transform))
     res))
 
@@ -2925,8 +2925,8 @@
 	       t)
 	      ((and y-hi x-lo (>= x-lo y-hi))
 	       nil)
-	      ((and (constant-continuation-p first)
-		    (not (constant-continuation-p second)))
+	      ((and (constant-lvar-p first)
+		    (not (constant-lvar-p second)))
 	       `(,inverse y x))
 	      (t
 	       (give-up-ir1-transform))))))
@@ -2940,8 +2940,8 @@
 	       t)
 	      ((interval->= xi yi)
 	       nil)
-	      ((and (constant-continuation-p first)
-		    (not (constant-continuation-p second)))
+	      ((and (constant-lvar-p first)
+		    (not (constant-lvar-p second)))
 	       `(,inverse y x))
 	      (t
 	       (give-up-ir1-transform))))))
@@ -2967,8 +2967,8 @@
     ;; might eventually have to to support 2^21 characters, then here
     ;; we could do some compile-time computation as in IR1-TRANSFORM-<
     ;; above.  -- CSR, 2003-07-01
-    ((and (constant-continuation-p first)
-	  (not (constant-continuation-p second)))
+    ((and (constant-lvar-p first)
+	  (not (constant-lvar-p second)))
      `(,inverse y x))
     (t (give-up-ir1-transform))))
 
@@ -3112,7 +3112,7 @@
 ;;; ensure (with THE) that the argument in one-argument calls is.
 (defun source-transform-transitive (fun args identity
 				    &optional one-arg-result-type)
-  (declare (symbol fun leaf-fun) (list args))
+  (declare (symbol fun) (list args))
   (case (length args)
     (0 identity)
     (1 (if one-arg-result-type
@@ -3232,19 +3232,19 @@
 	    nargs fun string max)))))))
 
 (defoptimizer (format optimizer) ((dest control &rest args))
-  (when (constant-continuation-p control)
-    (let ((x (continuation-value control)))
+  (when (constant-lvar-p control)
+    (let ((x (lvar-value control)))
       (when (stringp x)
 	(check-format-args x args 'format)))))
 
 (deftransform format ((dest control &rest args) (t simple-string &rest t) *
 		      :policy (> speed space))
-  (unless (constant-continuation-p control)
+  (unless (constant-lvar-p control)
     (give-up-ir1-transform "The control string is not a constant."))
   (let ((arg-names (make-gensym-list (length args))))
     `(lambda (dest control ,@arg-names)
        (declare (ignore control))
-       (format dest (formatter ,(continuation-value control)) ,@arg-names))))
+       (format dest (formatter ,(lvar-value control)) ,@arg-names))))
 
 (deftransform format ((stream control &rest args) (stream function &rest t) *
 		      :policy (> speed space))
@@ -3264,8 +3264,8 @@
 (macrolet
     ((def (name)
 	 `(defoptimizer (,name optimizer) ((control &rest args))
-	    (when (constant-continuation-p control)
-	      (let ((x (continuation-value control)))
+	    (when (constant-lvar-p control)
+	      (let ((x (lvar-value control)))
 		(when (stringp x)
 		  (check-format-args x args ',name)))))))
   (def error)
@@ -3282,10 +3282,10 @@
     (def bug)))
 
 (defoptimizer (cerror optimizer) ((report control &rest args))
-  (when (and (constant-continuation-p control)
-	     (constant-continuation-p report))
-    (let ((x (continuation-value control))
-	  (y (continuation-value report)))
+  (when (and (constant-lvar-p control)
+	     (constant-lvar-p report))
+    (let ((x (lvar-value control))
+	  (y (lvar-value report)))
       (when (and (stringp x) (stringp y))
 	(multiple-value-bind (min1 max1)
 	    (handler-case
@@ -3317,12 +3317,12 @@
 
 (defoptimizer (coerce derive-type) ((value type))
   (cond
-    ((constant-continuation-p type)
+    ((constant-lvar-p type)
      ;; This branch is essentially (RESULT-TYPE-SPECIFIER-NTH-ARG 2),
      ;; but dealing with the niggle that complex canonicalization gets
      ;; in the way: (COERCE 1 'COMPLEX) returns 1, which is not of
      ;; type COMPLEX.
-     (let* ((specifier (continuation-value type))
+     (let* ((specifier (lvar-value type))
 	    (result-typeoid (careful-specifier-type specifier)))
        (cond
 	 ((null result-typeoid) nil)
@@ -3358,7 +3358,7 @@
 	     ;; case, we will return a complex or an object of the
 	     ;; provided type if it's rational:
 	     (type-union result-typeoid
-			 (type-intersection (continuation-type value)
+			 (type-intersection (lvar-type value)
 					    (specifier-type 'rational))))))
 	 (t result-typeoid))))
     (t
@@ -3371,8 +3371,8 @@
      ;; the basis that it's unlikely that other uses are both
      ;; time-critical and get to this branch of the COND (non-constant
      ;; second argument to COERCE).  -- CSR, 2002-12-16
-     (let ((value-type (continuation-type value))
-	   (type-type (continuation-type type)))
+     (let ((value-type (lvar-type value))
+	   (type-type (lvar-type type)))
        (labels
 	   ((good-cons-type-p (cons-type)
 	      ;; Make sure the cons-type we're looking at is something
@@ -3462,7 +3462,7 @@
 		*universal-type*)))))))
 
 (defoptimizer (compile derive-type) ((nameoid function))
-  (when (csubtypep (continuation-type nameoid)
+  (when (csubtypep (lvar-type nameoid)
 		   (specifier-type 'null))
     (values-specifier-type '(values function boolean boolean))))
 
@@ -3470,7 +3470,7 @@
 ;;; treatment along these lines? (See discussion in COERCE DERIVE-TYPE
 ;;; optimizer, above).
 (defoptimizer (array-element-type derive-type) ((array))
-  (let ((array-type (continuation-type array)))
+  (let ((array-type (lvar-type array)))
     (labels ((consify (list)
               (if (endp list)
                   '(eql nil)
@@ -3586,13 +3586,13 @@
 ;;; and the function doesn't do anything at all.)
 #!+sb-show
 (progn
-  (defknown /report-continuation (t t) null)
-  (deftransform /report-continuation ((x message) (t t))
-    (format t "~%/in /REPORT-CONTINUATION~%")
-    (format t "/(CONTINUATION-TYPE X)=~S~%" (continuation-type x))
-    (when (constant-continuation-p x)
-      (format t "/(CONTINUATION-VALUE X)=~S~%" (continuation-value x)))
-    (format t "/MESSAGE=~S~%" (continuation-value message))
+  (defknown /report-lvar (t t) null)
+  (deftransform /report-lvar ((x message) (t t))
+    (format t "~%/in /REPORT-LVAR~%")
+    (format t "/(LVAR-TYPE X)=~S~%" (lvar-type x))
+    (when (constant-lvar-p x)
+      (format t "/(LVAR-VALUE X)=~S~%" (lvar-value x)))
+    (format t "/MESSAGE=~S~%" (lvar-value message))
     (give-up-ir1-transform "not a real transform"))
-  (defun /report-continuation (x message)
+  (defun /report-lvar (x message)
     (declare (ignore x message))))

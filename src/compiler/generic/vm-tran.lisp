@@ -42,7 +42,7 @@
 ;;;; simplifying HAIRY-DATA-VECTOR-REF and HAIRY-DATA-VECTOR-SET
 
 (deftransform hairy-data-vector-ref ((string index) (simple-string t))
-  (let ((ctype (continuation-type string)))
+  (let ((ctype (lvar-type string)))
     (if (array-type-p ctype)
 	;; the other transform will kick in, so that's OK
 	(give-up-ir1-transform)
@@ -74,7 +74,7 @@
 
 (deftransform data-vector-ref ((array index)
                                (simple-array t))
-  (let ((array-type (continuation-type array)))
+  (let ((array-type (lvar-type array)))
     (unless (array-type-p array-type)
       (give-up-ir1-transform))
     (let ((dims (array-type-dimensions array-type)))
@@ -91,7 +91,7 @@
 
 (deftransform hairy-data-vector-set ((string index new-value)
 				     (simple-string t t))
-  (let ((ctype (continuation-type string)))
+  (let ((ctype (lvar-type string)))
     (if (array-type-p ctype)
 	;; the other transform will kick in, so that's OK
 	(give-up-ir1-transform)
@@ -126,7 +126,7 @@
 
 (deftransform data-vector-set ((array index new-value)
                                (simple-array t t))
-  (let ((array-type (continuation-type array)))
+  (let ((array-type (lvar-type array)))
     (unless (array-type-p array-type)
       (give-up-ir1-transform))
     (let ((dims (array-type-dimensions array-type)))
@@ -143,7 +143,7 @@
                           new-value)))))
 
 (defoptimizer (%data-vector-and-index derive-type) ((array index))
-  (let ((atype (continuation-type array)))
+  (let ((atype (lvar-type array)))
     (when (array-type-p atype)
       (values-specifier-type
        `(values (simple-array ,(type-specifier
@@ -343,8 +343,8 @@
 
 (deftransform fill ((sequence item) (simple-bit-vector bit) *
 		    :policy (>= speed space))
-  (let ((value (if (constant-continuation-p item)
-		   (if (= (continuation-value item) 0)
+  (let ((value (if (constant-lvar-p item)
+		   (if (= (lvar-value item) 0)
 		       0
 		       #.(1- (ash 1 32)))
 		   `(if (= item 0) 0 #.(1- (ash 1 32))))))
@@ -368,8 +368,8 @@
 
 (deftransform fill ((sequence item) (simple-base-string base-char) *
 		    :policy (>= speed space))
-  (let ((value (if (constant-continuation-p item)
-		   (let* ((char (continuation-value item))
+  (let ((value (if (constant-lvar-p item)
+		   (let* ((char (lvar-value item))
 			  (code (sb!xc:char-code char)))
 		     (logior code (ash code 8) (ash code 16) (ash code 24)))
 		   `(let ((code (sb!xc:char-code item)))
@@ -445,13 +445,13 @@
                       :node node
                       :result result)
   "32-bit implementation"
-  (let ((dest (continuation-dest result)))
+  (let ((dest (lvar-dest result)))
     (unless (and (combination-p dest)
-                 (eq (continuation-fun-name (combination-fun dest))
+                 (eq (lvar-fun-name (combination-fun dest))
                      'logand))
       (give-up-ir1-transform))
     (unless (some (lambda (arg)
-                    (csubtypep (continuation-type arg)
+                    (csubtypep (lvar-type arg)
                                (specifier-type '(unsigned-byte 32))))
                   (combination-args dest))
       (give-up-ir1-transform))

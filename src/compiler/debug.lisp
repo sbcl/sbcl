@@ -63,7 +63,7 @@
 ;;; walk.
 (declaim (ftype (function (node) (values)) check-node-reached))
 (defun check-node-reached (node)
-  (unless (gethash (continuation-block (node-prev node)) *seen-blocks*)
+  (unless (gethash (ctran-block (node-prev node)) *seen-blocks*)
     (barf "~S was not reached." node))
   (values))
 
@@ -460,7 +460,7 @@
 
 ;;; Check that the DEST for CONT is the specified NODE. We also mark
 ;;; the block CONT is in as SEEN.
-(declaim (ftype (function (continuation node) (values)) check-dest))
+#+nil(declaim (ftype (function (continuation node) (values)) check-dest))
 (defun check-dest (cont node)
   (let ((kind (continuation-kind cont)))
     (ecase kind
@@ -935,11 +935,11 @@
     (ir2-block (ir2-block-block thing))
     (vop (block-or-lose (vop-block thing)))
     (tn-ref (block-or-lose (tn-ref-vop thing)))
-    (continuation (continuation-block thing))
+    (ctran (ctran-block thing))
     (node (node-block thing))
     (component (component-head thing))
 #|    (cloop (loop-head thing))|#
-    (integer (continuation-block (num-cont thing)))
+    (integer (ctran-block (num-cont thing)))
     (functional (lambda-block (main-entry thing)))
     (null (error "Bad thing: ~S." thing))
     (symbol (block-or-lose (gethash thing *free-funs*)))))
@@ -950,73 +950,86 @@
   (format t " c~D" (cont-num cont))
   (values))
 
+(defun print-ctran (cont)
+  (declare (type ctran cont))
+  (format t "c~D " (cont-num cont))
+  (values))
+(defun print-lvar (cont)
+  (declare (type lvar cont))
+  (format t "v~D " (cont-num cont))
+  (values))
+
 ;;; Print out the nodes in BLOCK in a format oriented toward
 ;;; representing what the code does.
 (defun print-nodes (block)
   (setq block (block-or-lose block))
   (pprint-logical-block (nil nil)
     (format t "~:@_IR1 block ~D start c~D"
-           (block-number block) (cont-num (block-start block)))
+            (block-number block) (cont-num (block-start block)))
     (when (block-delete-p block)
       (format t " <deleted>"))
 
-    (let ((last (block-last block)))
-     (pprint-newline :mandatory)
-     (do ((cont (block-start block) (node-cont (continuation-next cont))))
-         ((not cont))
-       (let ((node (continuation-next cont)))
-         (format t "~3D: " (cont-num (node-cont node)))
-         (etypecase node
-           (ref (print-leaf (ref-leaf node)))
-           (basic-combination
-            (let ((kind (basic-combination-kind node)))
-              (format t "~(~A~A ~A~) c~D"
-                      (if (node-tail-p node) "tail " "")
-                      (if (fun-info-p kind) "known" kind)
-                      (type-of node)
-                      (cont-num (basic-combination-fun node)))
-              (dolist (arg (basic-combination-args node))
-                (if arg
-                    (print-continuation arg)
-                    (format t " <none>")))))
-           (cset
-            (write-string "set ")
-            (print-leaf (set-var node))
-            (print-continuation (set-value node)))
-           (cif
-            (format t "if c~D" (cont-num (if-test node)))
-            (print-continuation (block-start (if-consequent node)))
-            (print-continuation (block-start (if-alternative node))))
-           (bind
-            (write-string "bind ")
-            (print-leaf (bind-lambda node))
-            (when (functional-kind (bind-lambda node))
-              (format t " ~S ~S" :kind (functional-kind (bind-lambda node)))))
-           (creturn
-            (format t "return c~D " (cont-num (return-result node)))
-            (print-leaf (return-lambda node)))
-           (entry
-            (format t "entry ~S" (entry-exits node)))
-           (exit
-            (let ((value (exit-value node)))
-              (cond (value
-                     (format t "exit c~D" (cont-num value)))
-                    ((exit-entry node)
-                     (format t "exit <no value>"))
-                    (t
-                     (format t "exit <degenerate>")))))
-           (cast
-            (let ((value (cast-value node)))
-              (format t "cast c~D ~A[~S -> ~S]" (cont-num value)
-                      (if (cast-%type-check node) #\+ #\-)
-                      (cast-type-to-check node)
-                      (cast-asserted-type node)))))
-         (pprint-newline :mandatory)
-         (when (eq node last) (return)))))
+    (pprint-newline :mandatory)
+    (do ((ctran (block-start block) (node-next (ctran-next ctran))))
+        ((not ctran))
+      (let ((node (ctran-next ctran)))
+        (format t "~:[    ~;~:*~3D:~] "
+                (when (and (valued-node-p node) (node-lvar node))
+                  (cont-num (node-lvar node))))
+        (etypecase node
+          (ref (print-leaf (ref-leaf node)))
+          (basic-combination
+           (let ((kind (basic-combination-kind node)))
+             (format t "~(~A~A ~A~) "
+                     (if (node-tail-p node) "tail " "")
+                     (if (fun-info-p kind) "known" kind)
+                     (type-of node))
+             (print-lvar (basic-combination-fun node))
+             (dolist (arg (basic-combination-args node))
+               (if arg
+                   (print-lvar arg)
+                   (format t "<none> ")))))
+          (cset
+           (write-string "set ")
+           (print-leaf (set-var node))
+           (write-char #\space)
+           (print-lvar (set-value node)))
+          (cif
+           (write-string "if ")
+           (print-lvar (if-test node))
+           (print-ctran (block-start (if-consequent node)))
+           (print-ctran (block-start (if-alternative node))))
+          (bind
+           (write-string "bind ")
+           (print-leaf (bind-lambda node))
+           (when (functional-kind (bind-lambda node))
+             (format t " ~S ~S" :kind (functional-kind (bind-lambda node)))))
+          (creturn
+           (write-string "return ")
+           (print-lvar (return-result node))
+           (print-leaf (return-lambda node)))
+          (entry
+           (format t "entry ~S" (entry-exits node)))
+          (exit
+           (let ((value (exit-value node)))
+             (cond (value
+                    (format t "exit ")
+                    (print-lvar value))
+                   ((exit-entry node)
+                    (format t "exit <no value>"))
+                   (t
+                    (format t "exit <degenerate>")))))
+          (cast
+           (let ((value (cast-value node)))
+             (format t "cast v~D ~A[~S -> ~S]" (cont-num value)
+                     (if (cast-%type-check node) #\+ #\-)
+                     (cast-type-to-check node)
+                     (cast-asserted-type node)))))
+        (pprint-newline :mandatory)))
 
-   (let ((succ (block-succ block)))
-     (format t "successors~{ c~D~}~%"
-             (mapcar (lambda (x) (cont-num (block-start x))) succ))))
+    (let ((succ (block-succ block)))
+      (format t "successors~{ c~D~}~%"
+              (mapcar (lambda (x) (cont-num (block-start x))) succ))))
   (values))
 
 ;;; Print the guts of a TN. (logic shared between PRINT-OBJECT (TN T)

@@ -79,14 +79,14 @@
 (deftransform map ((result-type-arg fun seq &rest seqs) * * :node node)
   (let* ((seq-names (make-gensym-list (1+ (length seqs))))
 	 (bare `(%map result-type-arg fun ,@seq-names))
-	 (constant-result-type-arg-p (constant-continuation-p result-type-arg))
+	 (constant-result-type-arg-p (constant-lvar-p result-type-arg))
 	 ;; what we know about the type of the result. (Note that the
 	 ;; "result type" argument is not necessarily the type of the
 	 ;; result, since NIL means the result has NULL type.)
 	 (result-type (if (not constant-result-type-arg-p)
 			  'consed-sequence
 			  (let ((result-type-arg-value
-				 (continuation-value result-type-arg)))
+				 (lvar-value result-type-arg)))
 			    (if (null result-type-arg-value)
 				'null
 				result-type-arg-value)))))
@@ -142,9 +142,9 @@
                  (bindings `(index 0 (1+ index)))
                  (declarations `(type index index)))
                (vector-lengths length)))
-        (loop for seq of-type continuation in seqs
+        (loop for seq of-type lvar in seqs
            for seq-name in seq-names
-           for type = (continuation-type seq)
+           for type = (lvar-type seq)
            do (cond ((csubtypep type (specifier-type 'list))
 		     (with-unique-names (index)
                        (bindings `(,index ,seq-name (cdr ,index)))
@@ -184,7 +184,7 @@
 (deftransform %map ((result-type fun seq &rest seqs) * *
 		    :policy (>= speed space))
   "open code"
-  (unless (constant-continuation-p result-type)
+  (unless (constant-lvar-p result-type)
     (give-up-ir1-transform "RESULT-TYPE argument not constant"))
   (labels ( ;; 1-valued SUBTYPEP, fails unless second value of SUBTYPEP is true
 	   (fn-1subtypep (fn x y)
@@ -194,7 +194,7 @@
 		   (give-up-ir1-transform
 		    "can't analyze sequence type relationship"))))
 	   (1subtypep (x y) (fn-1subtypep #'sb!xc:subtypep x y)))
-    (let* ((result-type-value (continuation-value result-type))
+    (let* ((result-type-value (lvar-value result-type))
 	   (result-supertype (cond ((null result-type-value) 'null)
 				   ((1subtypep result-type-value 'vector)
 				    'vector)
@@ -293,10 +293,10 @@
 (macrolet ((def (name)
              `(deftransform ,name ((e l &key (test #'eql)) * *
 				   :node node)
-                (unless (constant-continuation-p l)
+                (unless (constant-lvar-p l)
                   (give-up-ir1-transform))
 
-                (let ((val (continuation-value l)))
+                (let ((val (lvar-value l)))
                   (unless (policy node
                                   (or (= speed 3)
                                       (and (>= speed space)
@@ -330,9 +330,9 @@
                 ;;   if ITEM is not a NUMBER or is a FIXNUM, apply
                 ;;   transform, else give up on transform.
                 (cond (test
-                       (unless (continuation-fun-is test '(eq))
+                       (unless (lvar-fun-is test '(eq))
                          (give-up-ir1-transform)))
-                      ((types-equal-or-intersect (continuation-type item)
+                      ((types-equal-or-intersect (lvar-type item)
                                                  (specifier-type 'number))
                        (give-up-ir1-transform "Item might be a number.")))
                 `(,',eq-fun item list))))
@@ -378,9 +378,9 @@
 
 ;;; Return true if CONT's only use is a non-NOTINLINE reference to a
 ;;; global function with one of the specified NAMES.
-(defun continuation-fun-is (cont names)
-  (declare (type continuation cont) (list names))
-  (let ((use (continuation-use cont)))
+(defun lvar-fun-is (lvar names)
+  (declare (type lvar lvar) (list names))
+  (let ((use (lvar-uses lvar)))
     (and (ref-p use)
 	 (let ((leaf (ref-leaf use)))
 	   (and (global-var-p leaf)
@@ -393,11 +393,11 @@
 ;;; IR1 transform.
 ;;;
 ;;; ### Probably should take an ARG and flame using the NAME.
-(defun constant-value-or-lose (cont &optional default)
-  (declare (type (or continuation null) cont))
-  (cond ((not cont) default)
-	((constant-continuation-p cont)
-	 (continuation-value cont))
+(defun constant-value-or-lose (lvar &optional default)
+  (declare (type (or lvar null) lvar))
+  (cond ((not lvar) default)
+	((constant-lvar-p lvar)
+	 (lvar-value lvar))
 	(t
 	 (give-up-ir1-transform))))
 
@@ -755,7 +755,7 @@
 ;;;; CONS accessor DERIVE-TYPE optimizers
 
 (defoptimizer (car derive-type) ((cons))
-  (let ((type (continuation-type cons))
+  (let ((type (lvar-type cons))
 	(null-type (specifier-type 'null)))
     (cond ((eq type null-type)
 	   null-type)
@@ -763,7 +763,7 @@
 	   (cons-type-car-type type)))))
 
 (defoptimizer (cdr derive-type) ((cons))
-  (let ((type (continuation-type cons))
+  (let ((type (lvar-type cons))
 	(null-type (specifier-type 'null)))
     (cond ((eq type null-type)
 	   null-type)
@@ -776,12 +776,12 @@
 ;;; %FIND-POSITION-IF only when %FIND-POSITION-IF has an inline
 ;;; expansion, so we factor out the condition into this function.
 (defun check-inlineability-of-find-position-if (sequence from-end)
-  (let ((ctype (continuation-type sequence)))
+  (let ((ctype (lvar-type sequence)))
     (cond ((csubtypep ctype (specifier-type 'vector))
 	   ;; It's not worth trying to inline vector code unless we
 	   ;; know a fair amount about it at compile time.
 	   (upgraded-element-type-specifier-or-give-up sequence)
-	   (unless (constant-continuation-p from-end)
+	   (unless (constant-lvar-p from-end)
 	     (give-up-ir1-transform
 	      "FROM-END argument value not known at compile time")))
 	  ((csubtypep ctype (specifier-type 'list))
@@ -836,7 +836,7 @@
 		     (incf index))))))
   (def %find-position-if when)
   (def %find-position-if-not unless))
-		      
+
 ;;; %FIND-POSITION for LIST data can be expanded into %FIND-POSITION-IF
 ;;; without loss of efficiency. (I.e., the optimizer should be able
 ;;; to straighten everything out.)

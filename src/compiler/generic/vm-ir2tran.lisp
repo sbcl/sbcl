@@ -10,27 +10,27 @@
 (in-package "SB!C")
 
 (defoptimizer ir2-convert-reffer ((object) node block name offset lowtag)
-  (let* ((cont (node-cont node))
-	 (locs (continuation-result-tns cont
+  (let* ((lvar (node-lvar node))
+	 (locs (lvar-result-tns lvar
 					(list *backend-t-primitive-type*)))
 	 (res (first locs)))
-    (vop slot node block (continuation-tn node block object)
+    (vop slot node block (lvar-tn node block object)
 	 name offset lowtag res)
-    (move-continuation-result node block locs cont)))
+    (move-lvar-result node block locs lvar)))
 
 (defoptimizer ir2-convert-setter ((object value) node block name offset lowtag)
-  (let ((value-tn (continuation-tn node block value)))
-    (vop set-slot node block (continuation-tn node block object) value-tn
+  (let ((value-tn (lvar-tn node block value)))
+    (vop set-slot node block (lvar-tn node block object) value-tn
 	 name offset lowtag)
-    (move-continuation-result node block (list value-tn) (node-cont node))))
+    (move-lvar-result node block (list value-tn) (node-lvar node))))
 
 ;;; FIXME: Isn't there a name for this which looks less like a typo?
 ;;; (The name IR2-CONVERT-SETTER is used for something else, just above.)
 (defoptimizer ir2-convert-setfer ((value object) node block name offset lowtag)
-  (let ((value-tn (continuation-tn node block value)))
-    (vop set-slot node block (continuation-tn node block object) value-tn
+  (let ((value-tn (lvar-tn node block value)))
+    (vop set-slot node block (lvar-tn node block object) value-tn
 	 name offset lowtag)
-    (move-continuation-result node block (list value-tn) (node-cont node))))
+    (move-lvar-result node block (list value-tn) (node-lvar node))))
 
 (defun do-inits (node block name result lowtag inits args)
   (let ((unbound-marker-tn nil))
@@ -41,7 +41,7 @@
 	     (ecase kind
 	       (:arg
 		(aver args)
-		(continuation-tn node block (pop args)))
+		(lvar-tn node block (pop args)))
 	       (:unbound
 		(or unbound-marker-tn
 		    (setf unbound-marker-tn
@@ -60,27 +60,27 @@
 
 (defoptimizer ir2-convert-fixed-allocation
 	      ((&rest args) node block name words type lowtag inits)
-  (let* ((cont (node-cont node))
-	 (locs (continuation-result-tns cont
+  (let* ((lvar (node-lvar node))
+	 (locs (lvar-result-tns lvar
 					(list *backend-t-primitive-type*)))
 	 (result (first locs)))
     (do-fixed-alloc node block name words type lowtag result)
     (do-inits node block name result lowtag inits args)
-    (move-continuation-result node block locs cont)))
+    (move-lvar-result node block locs lvar)))
 
 (defoptimizer ir2-convert-variable-allocation
 	      ((extra &rest args) node block name words type lowtag inits)
-  (let* ((cont (node-cont node))
-	 (locs (continuation-result-tns cont
+  (let* ((lvar (node-lvar node))
+	 (locs (lvar-result-tns lvar
 					(list *backend-t-primitive-type*)))
 	 (result (first locs)))
-    (if (constant-continuation-p extra)
-	(let ((words (+ (continuation-value extra) words)))
+    (if (constant-lvar-p extra)
+	(let ((words (+ (lvar-value extra) words)))
 	  (do-fixed-alloc node block name words type lowtag result))
-	(vop var-alloc node block (continuation-tn node block extra) name words
+	(vop var-alloc node block (lvar-tn node block extra) name words
 	     type lowtag result))
     (do-inits node block name result lowtag inits args)
-    (move-continuation-result node block locs cont)))
+    (move-lvar-result node block locs lvar)))
 
 ;;; :SET-TRANS (in objdef.lisp DEFINE-PRIMITIVE-OBJECT) doesn't quite
 ;;; cut it for symbols, where under certain compilation options
@@ -92,8 +92,8 @@
 	(lambda (node block)
 	  (let ((args (basic-combination-args node)))
 	    (destructuring-bind (symbol value) args
-	      (let ((value-tn (continuation-tn node block value)))
+	      (let ((value-tn (lvar-tn node block value)))
 		(vop set node block
-		     (continuation-tn node block symbol) value-tn)
-		(move-continuation-result
-		 node block (list value-tn) (node-cont node))))))))
+		     (lvar-tn node block symbol) value-tn)
+		(move-lvar-result
+		 node block (list value-tn) (node-lvar node))))))))

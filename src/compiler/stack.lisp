@@ -17,26 +17,26 @@
 ;;; Scan through BLOCK looking for uses of :UNKNOWN continuations that
 ;;; have their DEST outside of the block. We do some checking to
 ;;; verify the invariant that all pushes come after the last pop.
-(defun find-pushed-continuations (block)
+(defun find-pushed-lvars (block)
   (let* ((2block (block-info block))
 	 (popped (ir2-block-popped 2block))
 	 (last-pop (if popped
-		       (continuation-dest (car (last popped)))
+		       (lvar-dest (car (last popped)))
 		       nil)))
     (collect ((pushed))
       (let ((saw-last nil))
-	(do-nodes (node cont block)
+	(do-nodes (node lvar block)
 	  (when (eq node last-pop)
 	    (setq saw-last t))
 
-	  (let ((dest (continuation-dest cont))
-		(2cont (continuation-info cont)))
-	    (when (and dest
-		       (not (eq (node-block dest) block))
-		       2cont
-		       (eq (ir2-continuation-kind 2cont) :unknown))
-	      (aver (or saw-last (not last-pop)))
-	      (pushed cont)))))
+	  (when lvar
+            (let ((dest (lvar-dest lvar))
+                  (2lvar (lvar-info lvar)))
+              (when (and (not (eq (node-block dest) block))
+                         2lvar
+                         (eq (ir2-lvar-kind 2lvar) :unknown))
+                (aver (or saw-last (not last-pop)))
+                (pushed lvar))))))
 
       (setf (ir2-block-pushed 2block) (pushed))))
   (values))
@@ -131,14 +131,14 @@
   (let* ((2block (block-info block))
 	 (stack (ir2-block-end-stack 2block))
 	 (last (block-last block))
-	 (tailp-cont (if (node-tail-p last) (node-cont last))))
+	 (tailp-lvar (if (node-tail-p last) (node-lvar last))))
     (do ((pushes (ir2-block-pushed 2block) (rest pushes))
 	 (popping nil))
 	((null pushes))
       (let ((push (first pushes)))
 	(cond ((member push stack)
 	       (aver (not popping)))
-	      ((eq push tailp-cont)
+	      ((eq push tailp-lvar)
 	       (aver (null (rest pushes))))
 	      (t
 	       (push push (ir2-block-end-stack 2block))
@@ -172,7 +172,7 @@
     (aver (tailp block2-stack block1-stack))
 
     (let* ((block (insert-cleanup-code block1 block2
-				       (continuation-next (block-start block2))
+				       (block-start-node block2)
 				       `(%pop-values ',last-popped)))
 	   (2block (make-ir2-block block)))
       (setf (block-info block) 2block)
@@ -214,7 +214,7 @@
 	 (generators (find-values-generators receivers)))
 
     (dolist (block generators)
-      (find-pushed-continuations block))
+      (find-pushed-lvars block))
 
     (dolist (block receivers)
       (unless (ir2-block-start-stack (block-info block))

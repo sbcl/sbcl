@@ -68,9 +68,9 @@
 ;;; COMPONENT-INFO
 ;;;    Holds the IR2-COMPONENT structure.
 ;;;
-;;; CONTINUATION-INFO
-;;;    Holds the IR2-CONTINUATION structure. Continuations whose
-;;;    values aren't used won't have any.
+;;; LVAR-INFO
+;;;    Holds the IR2-LVAR structure. LVARs whose values aren't used
+;;;    won't have any. XXX
 ;;;
 ;;; CLEANUP-INFO
 ;;;    If non-null, then a TN in which the affected dynamic
@@ -111,22 +111,21 @@
   ;; the IR2-BLOCK's number, which differs from BLOCK's BLOCK-NUMBER
   ;; if any blocks are split. This is assigned by lifetime analysis.
   (number nil :type (or index null))
-  ;; information about unknown-values continuations that is used by
-  ;; stack analysis to do stack simulation. An UNKNOWN-VALUES
-  ;; continuation is PUSHED if its DEST is in another block.
-  ;; Similarly, a continuation is POPPED if its DEST is in this block
-  ;; but has its uses elsewhere. The continuations are in the order
-  ;; that are pushed/popped in the block. Note that the args to a
-  ;; single MV-COMBINATION appear reversed in POPPED, since we must
-  ;; effectively pop the last argument first. All pops must come
-  ;; before all pushes (although internal MV uses may be interleaved.)
-  ;; POPPED is computed by LTN, and PUSHED is computed by stack
-  ;; analysis.
+  ;; information about unknown-values LVARs that is used by stack
+  ;; analysis to do stack simulation. An UNKNOWN-VALUES LVAR is PUSHED
+  ;; if its DEST is in another block. Similarly, a LVAR is POPPED if
+  ;; its DEST is in this block but has its uses elsewhere. The LVARs
+  ;; are in the order that are pushed/popped in the block. Note that
+  ;; the args to a single MV-COMBINATION appear reversed in POPPED,
+  ;; since we must effectively pop the last argument first. All pops
+  ;; must come before all pushes (although internal MV uses may be
+  ;; interleaved.) POPPED is computed by LTN, and PUSHED is computed
+  ;; by stack analysis.
   (pushed () :type list)
   (popped () :type list)
   ;; the result of stack analysis: lists of all the unknown-values
-  ;; continuations on the stack at the block start and end, topmost
-  ;; continuation first.
+  ;; LVARs on the stack at the block start and end, topmost LVAR
+  ;; first.
   (start-stack () :type list)
   (end-stack () :type list)
   ;; the first and last VOP in this block. If there are none, both
@@ -180,45 +179,44 @@
   (local-tn-count :test (not (zerop local-tn-count)))
   (%label :test %label))
 
-;;; An IR2-CONTINUATION structure is used to annotate continuations
-;;; that are used as a function result continuation or that receive MVs.
-(defstruct (ir2-continuation
-	    (:constructor make-ir2-continuation (primitive-type))
+;;; An IR2-LVAR structure is used to annotate LVARs that are used as a
+;;; function result LVARs or that receive MVs.
+(defstruct (ir2-lvar
+	    (:constructor make-ir2-lvar (primitive-type))
 	    (:copier nil))
-  ;; If this is :DELAYED, then this is a single value continuation for
-  ;; which the evaluation of the use is to be postponed until the
-  ;; evaluation of destination. This can be done for ref nodes or
-  ;; predicates whose destination is an IF.
+  ;; If this is :DELAYED, then this is a single value LVAR for which
+  ;; the evaluation of the use is to be postponed until the evaluation
+  ;; of destination. This can be done for ref nodes or predicates
+  ;; whose destination is an IF.
   ;;
-  ;; If this is :FIXED, then this continuation has a fixed number of
-  ;; values, with the TNs in LOCS.
+  ;; If this is :FIXED, then this LVAR has a fixed number of values,
+  ;; with the TNs in LOCS.
   ;;
-  ;; If this is :UNKNOWN, then this is an unknown-values continuation,
-  ;; using the passing locations in LOCS.
+  ;; If this is :UNKNOWN, then this is an unknown-values LVAR, using
+  ;; the passing locations in LOCS.
   ;;
-  ;; If this is :UNUSED, then this continuation should never actually
-  ;; be used as the destination of a value: it is only used
-  ;; tail-recursively.
+  ;; If this is :UNUSED, then this LVAR should never actually be used
+  ;; as the destination of a value: it is only used tail-recursively.
   (kind :fixed :type (member :delayed :fixed :unknown :unused))
-  ;; The primitive-type of the first value of this continuation. This
-  ;; is primarily for internal use during LTN, but it also records the
+  ;; The primitive-type of the first value of this LVAR. This is
+  ;; primarily for internal use during LTN, but it also records the
   ;; type restriction on delayed references. In multiple-value
   ;; contexts, this is null to indicate that it is meaningless. This
-  ;; is always (primitive-type (continuation-type cont)), which may be
-  ;; more restrictive than the tn-primitive-type of the value TN. This
-  ;; is becase the value TN must hold any possible type that could be
-  ;; computed (before type checking.)
+  ;; is always (primitive-type (lvar-type cont)), which may be more
+  ;; restrictive than the tn-primitive-type of the value TN. This is
+  ;; becase the value TN must hold any possible type that could be
+  ;; computed (before type checking.) XXX
   (primitive-type nil :type (or primitive-type null))
-  ;; Locations used to hold the values of the continuation. If the
-  ;; number of values if fixed, then there is one TN per value. If the
-  ;; number of values is unknown, then this is a two-list of TNs
-  ;; holding the start of the values glob and the number of values.
-  ;; Note that since type checking is the responsibility of the values
-  ;; receiver, these TNs primitive type is only based on the proven
-  ;; type information.
+  ;; Locations used to hold the values of the LVAR. If the number of
+  ;; values if fixed, then there is one TN per value. If the number of
+  ;; values is unknown, then this is a two-list of TNs holding the
+  ;; start of the values glob and the number of values. Note that
+  ;; since type checking is the responsibility of the values receiver,
+  ;; these TNs primitive type is only based on the proven type
+  ;; information.
   (locs nil :type list))
 
-(defprinter (ir2-continuation)
+(defprinter (ir2-lvar)
   kind
   primitive-type
   locs)
@@ -309,9 +307,10 @@
 
 ;;; An ENTRY-INFO condenses all the information that the dumper needs
 ;;; to create each XEP's function entry data structure. ENTRY-INFO
-;;; structures are somtimes created before they are initialized, since
-;;; IR2 conversion may need to compile a forward reference. In this
-;;; case the slots aren't actually initialized until entry analysis runs.
+;;; structures are sometimes created before they are initialized,
+;;; since IR2 conversion may need to compile a forward reference. In
+;;; this case the slots aren't actually initialized until entry
+;;; analysis runs.
 (defstruct (entry-info (:copier nil))
   ;; Does this function have a non-null closure environment?
   (closure-p nil :type boolean)

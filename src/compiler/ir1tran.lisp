@@ -304,11 +304,11 @@
 
 ;;; This function sets up the back link between the node and the
 ;;; continuation which continues at it.
-(defun link-node-to-previous-continuation (node cont)
-  (declare (type node node) (type continuation cont))
-  (aver (not (continuation-next cont)))
-  (setf (continuation-next cont) node)
-  (setf (node-prev node) cont))
+(defun link-node-to-previous-ctran (node ctran)
+  (declare (type node node) (type ctran ctran))
+  (aver (not (ctran-next ctran)))
+  (setf (ctran-next ctran) node)
+  (setf (node-prev node) ctran))
 
 ;;; This function is used to set the continuation for a node, and thus
 ;;; determine what receives the value and what is evaluated next. If
@@ -317,23 +317,21 @@
 ;;; our block and link it to that block. If the continuation is not
 ;;; currently used, then we set the DERIVED-TYPE for the continuation
 ;;; to that of the node, so that a little type propagation gets done.
-#!-sb-fluid (declaim (inline use-continuation))
-(defun use-continuation (node cont)
-  (declare (type node node) (type continuation cont))
-  (let ((node-block (continuation-block (node-prev node))))
-    (case (continuation-kind cont)
-      (:unused
-       (setf (continuation-block cont) node-block)
-       (setf (continuation-kind cont) :inside-block)
-       (setf (continuation-use cont) node)
-       (setf (node-cont node) cont))
-      (t
-       (%use-continuation node cont)))))
-(defun %use-continuation (node cont)
-  (declare (type node node) (type continuation cont) (inline member))
-  (let ((block (continuation-block cont))
-	(node-block (continuation-block (node-prev node))))
-    (aver (eq (continuation-kind cont) :block-start))
+#!-sb-fluid (declaim (inline use-ctran))
+(defun use-ctran (node ctran)
+  (declare (type node node) (type ctran ctran))
+  (if (eq (ctran-kind ctran) :unused)
+      (let ((node-block (ctran-block (node-prev node))))
+        (setf (ctran-block ctran) node-block)
+        (setf (ctran-kind ctran) :inside-block)
+        (setf (ctran-use ctran) node)
+        (setf (node-next node) ctran))
+      (%use-ctran node ctran)))
+(defun %use-ctran (node ctran)
+  (declare (type node node) (type ctran ctran) (inline member))
+  (let ((block (ctran-block ctran))
+	(node-block (ctran-block (node-prev node))))
+    (aver (eq (ctran-kind ctran) :block-start))
     (when (block-last node-block)
       (error "~S has already ended." node-block))
     (setf (block-last node-block) node)
@@ -343,8 +341,27 @@
     (when (memq node-block (block-pred block))
       (error "~S is already a predecessor of ~S." node-block block))
     (push node-block (block-pred block))
-    (add-continuation-use node cont)
-    (reoptimize-continuation cont)))
+    #+nil(reoptimize-ctran ctran))) ; XXX
+
+(defun use-lvar (node lvar)
+  (declare (type valued-node node) (type (or lvar null) lvar))
+  (aver (not (node-lvar node)))
+  (when lvar
+    (setf (node-lvar node) lvar)
+    (cond ((null (lvar-uses lvar))
+           (setf (lvar-uses lvar) node))
+          ((listp (lvar-uses lvar))
+           (aver (not (memq node (lvar-uses lvar))))
+           (push node (lvar-uses lvar)))
+          (t
+           (aver (neq node (lvar-uses lvar)))
+           (setf (lvar-uses lvar) (list node (lvar-uses lvar)))))
+    (reoptimize-lvar lvar)))
+
+#!-sb-fluid(declaim (inline use-continuation))
+(defun use-continuation (node ctran lvar)
+  (use-ctran node ctran)
+  (use-lvar node lvar))
 
 ;;;; exported functions
 
@@ -431,12 +448,11 @@
 
 ;;;; IR1-CONVERT, macroexpansion and special form dispatching
 
-(declaim (ftype (sfunction (continuation continuation t) (values))
+(declaim (ftype (sfunction (ctran ctran (or lvar null) t) (values))
 		ir1-convert))
 (macrolet (;; Bind *COMPILER-ERROR-BAILOUT* to a function that throws
 	   ;; out of the body and converts a proxy form instead.
-	   (ir1-error-bailout ((start
-				cont
+	   (ir1-error-bailout ((start next result
 				form
 				&optional
 				(proxy ``(error 'simple-program-error
@@ -451,47 +467,49 @@
 					      (throw 'ir1-error-abort nil))))
 				       ,@body
 				       (return-from ,skip nil)))
-				   (ir1-convert ,start ,cont ,proxy)))))
+				   (ir1-convert ,start ,next ,result ,proxy)))))
 
   ;; Translate FORM into IR1. The code is inserted as the NEXT of the
-  ;; continuation START. CONT is the continuation which receives the
-  ;; value of the FORM to be translated. The translators call this
-  ;; function recursively to translate their subnodes.
+  ;; CTRAN START. RESULT is the LVAR which receives the value of the
+  ;; FORM to be translated. The translators call this function
+  ;; recursively to translate their subnodes.
   ;;
   ;; As a special hack to make life easier in the compiler, a LEAF
   ;; IR1-converts into a reference to that LEAF structure. This allows
   ;; the creation using backquote of forms that contain leaf
   ;; references, without having to introduce dummy names into the
   ;; namespace.
-  (defun ir1-convert (start cont form)
-    (ir1-error-bailout (start cont form)
+  (defun ir1-convert (start next result form)
+    (ir1-error-bailout (start next result form)
       (let ((*current-path* (or (gethash form *source-paths*)
 				(cons form *current-path*))))
 	(if (atom form)
 	    (cond ((and (symbolp form) (not (keywordp form)))
-		   (ir1-convert-var start cont form))
+		   (ir1-convert-var start next result form))
 		  ((leaf-p form)
-		   (reference-leaf start cont form))
+		   (reference-leaf start next result form))
 		  (t
-		   (reference-constant start cont form)))
+		   (reference-constant start next result form)))
 	    (let ((opname (car form)))
 	      (cond ((or (symbolp opname) (leaf-p opname))
 		     (let ((lexical-def (if (leaf-p opname)
                                             opname
                                             (lexenv-find opname funs))))
 		       (typecase lexical-def
-			 (null (ir1-convert-global-functoid start cont form))
+			 (null
+                          (ir1-convert-global-functoid start next result
+                                                       form))
 			 (functional
-			  (ir1-convert-local-combination start
-							 cont
+			  (ir1-convert-local-combination start next result
 							 form
 							 lexical-def))
 			 (global-var
-			  (ir1-convert-srctran start cont lexical-def form))
+			  (ir1-convert-srctran start next result
+                                               lexical-def form))
 			 (t
 			  (aver (and (consp lexical-def)
 				     (eq (car lexical-def) 'macro)))
-			  (ir1-convert start cont
+			  (ir1-convert start next result
 				       (careful-expand-macro (cdr lexical-def)
 							     form))))))
 		    ((or (atom opname) (not (eq (car opname) 'lambda)))
@@ -499,8 +517,7 @@
 		    (t
 		     ;; implicitly (LAMBDA ..) because the LAMBDA
 		     ;; expression is the CAR of an executed form
-		     (ir1-convert-combination start
-					      cont
+		     (ir1-convert-combination start next result
 					      form
 					      (ir1-convert-lambda
 					       opname
@@ -514,18 +531,19 @@
   ;; if necessary. If we are producing a fasl file, make sure that
   ;; MAKE-LOAD-FORM gets used on any parts of the constant that it
   ;; needs to be.
-  (defun reference-constant (start cont value)
-    (declare (type continuation start cont)
+  (defun reference-constant (start next result value)
+    (declare (type ctran start next)
+             (type (or lvar null) result)
 	     (inline find-constant))
     (ir1-error-bailout
-     (start cont value '(error "attempt to reference undumpable constant"))
+     (start next result value '(error "attempt to reference undumpable constant"))
      (when (producing-fasl-file)
        (maybe-emit-make-load-forms value))
      (let* ((leaf (find-constant value))
 	    (res (make-ref leaf)))
        (push res (leaf-refs leaf))
-       (link-node-to-previous-continuation res start)
-       (use-continuation res cont)))
+       (link-node-to-previous-ctran res start)
+       (use-continuation res next result)))
     (values)))
 
 ;;; Add FUNCTIONAL to the COMPONENT-REANALYZE-FUNCTIONALS, unless it's
@@ -555,8 +573,8 @@
 ;;; needed. If LEAF represents a defined function which has already
 ;;; been converted, and is not :NOTINLINE, then reference the
 ;;; functional instead.
-(defun reference-leaf (start cont leaf)
-  (declare (type continuation start cont) (type leaf leaf))
+(defun reference-leaf (start next result leaf)
+  (declare (type ctran start next) (type (or lvar null) result) (type leaf leaf))
   (when (functional-p leaf)
     (assure-functional-live-p leaf))
   (let* ((type (lexenv-find leaf type-restrictions))
@@ -575,54 +593,55 @@
          (ref (make-ref leaf)))
     (push ref (leaf-refs leaf))
     (setf (leaf-ever-used leaf) t)
-    (link-node-to-previous-continuation ref start)
-    (cond (type (let* ((ref-cont (make-continuation))
-                       (cast (make-cast ref-cont
+    (link-node-to-previous-ctran ref start)
+    (cond (type (let* ((ref-ctran (make-ctran))
+                       (ref-lvar (make-lvar))
+                       (cast (make-cast ref-lvar
                                         (make-single-value-type type)
                                         (lexenv-policy *lexenv*))))
-                  (setf (continuation-dest ref-cont) cast)
-                  (use-continuation ref ref-cont)
-                  (link-node-to-previous-continuation cast ref-cont)
-                  (use-continuation cast cont)))
-          (t (use-continuation ref cont)))))
+                  (setf (lvar-dest ref-lvar) cast)
+                  (use-continuation ref ref-ctran ref-lvar)
+                  (link-node-to-previous-ctran cast ref-ctran)
+                  (use-continuation cast next result)))
+          (t (use-continuation ref next result)))))
 
 ;;; Convert a reference to a symbolic constant or variable. If the
 ;;; symbol is entered in the LEXENV-VARS we use that definition,
 ;;; otherwise we find the current global definition. This is also
 ;;; where we pick off symbol macro and alien variable references.
-(defun ir1-convert-var (start cont name)
-  (declare (type continuation start cont) (symbol name))
+(defun ir1-convert-var (start next result name)
+  (declare (type ctran start next) (type (or lvar null) result) (symbol name))
   (let ((var (or (lexenv-find name vars) (find-free-var name))))
     (etypecase var
       (leaf
        (when (lambda-var-p var)
-	 (let ((home (continuation-home-lambda-or-null start)))
+	 (let ((home (ctran-home-lambda-or-null start)))
 	   (when home
 	     (pushnew var (lambda-calls-or-closes home))))
 	 (when (lambda-var-ignorep var)
 	   ;; (ANSI's specification for the IGNORE declaration requires
 	   ;; that this be a STYLE-WARNING, not a full WARNING.)
 	   (compiler-style-warn "reading an ignored variable: ~S" name)))
-       (reference-leaf start cont var))
+       (reference-leaf start next result var))
       (cons
        (aver (eq (car var) 'MACRO))
        ;; FIXME: [Free] type declarations. -- APD, 2002-01-26
-       (ir1-convert start cont (cdr var)))
+       (ir1-convert start next result (cdr var)))
       (heap-alien-info
-       (ir1-convert start cont `(%heap-alien ',var)))))
+       (ir1-convert start next result `(%heap-alien ',var)))))
   (values))
 
 ;;; Convert anything that looks like a special form, global function
 ;;; or compiler-macro call.
-(defun ir1-convert-global-functoid (start cont form)
-  (declare (type continuation start cont) (list form))
+(defun ir1-convert-global-functoid (start next result form)
+  (declare (type ctran start next) (type (or lvar null) result) (list form))
   (let* ((fun-name (first form))
 	 (translator (info :function :ir1-convert fun-name))
 	 (cmacro-fun (sb!xc:compiler-macro-function fun-name *lexenv*)))
     (cond (translator
 	   (when cmacro-fun
 	     (compiler-warn "ignoring compiler macro for special form"))
-	   (funcall translator start cont form))
+	   (funcall translator start next result form))
 	  ((and cmacro-fun
 		;; gotcha: If you look up the DEFINE-COMPILER-MACRO
 		;; macro in the ANSI spec, you might think that
@@ -634,28 +653,28 @@
 	   (let ((res (careful-expand-macro cmacro-fun form)))
 	     (if (eq res form)
 		 (ir1-convert-global-functoid-no-cmacro
-		  start cont form fun-name)
-		 (ir1-convert start cont res))))
+		  start next result form fun-name)
+		 (ir1-convert start next result res))))
 	  (t
-	   (ir1-convert-global-functoid-no-cmacro start cont form fun-name)))))
+	   (ir1-convert-global-functoid-no-cmacro start next result
+                                                  form fun-name)))))
 
 ;;; Handle the case of where the call was not a compiler macro, or was
 ;;; a compiler macro and passed.
-(defun ir1-convert-global-functoid-no-cmacro (start cont form fun)
-  (declare (type continuation start cont) (list form))
+(defun ir1-convert-global-functoid-no-cmacro (start next result form fun)
+  (declare (type ctran start next) (type (or lvar null) result)
+           (list form))
   ;; FIXME: Couldn't all the INFO calls here be converted into
   ;; standard CL functions, like MACRO-FUNCTION or something?
   ;; And what happens with lexically-defined (MACROLET) macros
   ;; here, anyway?
   (ecase (info :function :kind fun)
     (:macro
-     (ir1-convert start
-		  cont
+     (ir1-convert start next result
 		  (careful-expand-macro (info :function :macro-function fun)
 					form)))
     ((nil :function)
-     (ir1-convert-srctran start
-			  cont
+     (ir1-convert-srctran start next result
 			  (find-free-fun fun "shouldn't happen! (no-cmacro)")
 			  form))))
 
@@ -733,21 +752,21 @@
 
 ;;; Convert a bunch of forms, discarding all the values except the
 ;;; last. If there aren't any forms, then translate a NIL.
-(declaim (ftype (sfunction (continuation continuation list) (values))
+(declaim (ftype (sfunction (ctran ctran (or lvar null) list) (values))
 		ir1-convert-progn-body))
-(defun ir1-convert-progn-body (start cont body)
+(defun ir1-convert-progn-body (start next result body)
   (if (endp body)
-      (reference-constant start cont nil)
+      (reference-constant start next result nil)
       (let ((this-start start)
 	    (forms body))
 	(loop
 	  (let ((form (car forms)))
 	    (when (endp (cdr forms))
-	      (ir1-convert this-start cont form)
+	      (ir1-convert this-start next result form)
 	      (return))
-	    (let ((this-cont (make-continuation)))
-	      (ir1-convert this-start this-cont form)
-	      (setq this-start this-cont
+	    (let ((this-ctran (make-ctran)))
+	      (ir1-convert this-start this-ctran nil form)
+	      (setq this-start this-ctran
 		    forms (cdr forms)))))))
   (values))
 
@@ -756,31 +775,36 @@
 ;;; Convert a function call where the function FUN is a LEAF. FORM is
 ;;; the source for the call. We return the COMBINATION node so that
 ;;; the caller can poke at it if it wants to.
-(declaim (ftype (sfunction (continuation continuation list leaf) combination)
+(declaim (ftype (sfunction (ctran ctran (or lvar null) list leaf) combination)
 		ir1-convert-combination))
-(defun ir1-convert-combination (start cont form fun)
-  (let ((fun-cont (make-continuation)))
-    (ir1-convert start fun-cont `(the (or function symbol) ,fun))
-    (ir1-convert-combination-args fun-cont cont (cdr form))))
+(defun ir1-convert-combination (start next result form fun)
+  (let ((fun-ctran (make-ctran))
+        (fun-lvar (make-lvar)))
+    (ir1-convert start fun-ctran fun-lvar `(the (or function symbol) ,fun))
+    (ir1-convert-combination-args fun-ctran fun-lvar next result (cdr form))))
 
 ;;; Convert the arguments to a call and make the COMBINATION
 ;;; node. FUN-CONT is the continuation which yields the function to
 ;;; call. ARGS is the list of arguments for the call, which defaults
 ;;; to the cdr of source. We return the COMBINATION node.
-(defun ir1-convert-combination-args (fun-cont cont args)
-  (declare (type continuation fun-cont cont) (list args))
-  (let ((node (make-combination fun-cont)))
-    (setf (continuation-dest fun-cont) node)
-    (collect ((arg-conts))
-      (let ((this-start fun-cont))
+(defun ir1-convert-combination-args (fun-ctran fun-lvar next result args)
+  (declare (type ctran fun-ctran next)
+           (type lvar fun-lvar)
+           (type (or lvar null) result)
+           (list args))
+  (let ((node (make-combination fun-lvar)))
+    (setf (lvar-dest fun-lvar) node)
+    (collect ((arg-lvars))
+      (let ((this-start fun-ctran))
 	(dolist (arg args)
-	  (let ((this-cont (make-continuation node)))
-	    (ir1-convert this-start this-cont arg)
-	    (setq this-start this-cont)
-	    (arg-conts this-cont)))
-	(link-node-to-previous-continuation node this-start)
-	(use-continuation node cont)
-	(setf (combination-args node) (arg-conts))))
+	  (let ((this-ctran (make-ctran))
+                (this-lvar (make-lvar node)))
+	    (ir1-convert this-start this-ctran this-lvar arg)
+	    (setq this-start this-ctran)
+	    (arg-lvars this-lvar)))
+	(link-node-to-previous-ctran node this-start)
+	(use-continuation node next result)
+	(setf (combination-args node) (arg-lvars))))
     node))
 
 ;;; Convert a call to a global function. If not :NOTINLINE, then we do
@@ -788,21 +812,22 @@
 ;;; expansion, but is :INLINE, then give an efficiency note (unless a
 ;;; known function which will quite possibly be open-coded.) Next, we
 ;;; go to ok-combination conversion.
-(defun ir1-convert-srctran (start cont var form)
-  (declare (type continuation start cont) (type global-var var))
+(defun ir1-convert-srctran (start next result var form)
+  (declare (type ctran start next) (type (or lvar null) result)
+           (type global-var var))
   (let ((inlinep (when (defined-fun-p var)
 		   (defined-fun-inlinep var))))
     (if (eq inlinep :notinline)
-	(ir1-convert-combination start cont form var)
+	(ir1-convert-combination start next result form var)
 	(let ((transform (info :function
 			       :source-transform
 			       (leaf-source-name var))))
           (if transform
-              (multiple-value-bind (result pass) (funcall transform form)
+              (multiple-value-bind (transformed pass) (funcall transform form)
                 (if pass
-                    (ir1-convert-maybe-predicate start cont form var)
-		    (ir1-convert start cont result)))
-              (ir1-convert-maybe-predicate start cont form var))))))
+                    (ir1-convert-maybe-predicate start next result form var)
+		    (ir1-convert start next result transformed)))
+              (ir1-convert-maybe-predicate start next result form var))))))
 
 ;;; If the function has the PREDICATE attribute, and the CONT's DEST
 ;;; isn't an IF, then we convert (IF <form> T NIL), ensuring that a
@@ -810,14 +835,17 @@
 ;;;
 ;;; If the function isn't a predicate, then we call
 ;;; IR1-CONVERT-COMBINATION-CHECKING-TYPE.
-(defun ir1-convert-maybe-predicate (start cont form var)
-  (declare (type continuation start cont) (list form) (type global-var var))
+(defun ir1-convert-maybe-predicate (start next result form var)
+  (declare (type ctran start next)
+           (type (or lvar null) result)
+           (list form)
+           (type global-var var))
   (let ((info (info :function :info (leaf-source-name var))))
     (if (and info
 	     (ir1-attributep (fun-info-attributes info) predicate)
-	     (not (if-p (continuation-dest cont))))
-	(ir1-convert start cont `(if ,form t nil))
-	(ir1-convert-combination-checking-type start cont form var))))
+	     (not (if-p (and result (lvar-dest result)))))
+	(ir1-convert start next result `(if ,form t nil))
+	(ir1-convert-combination-checking-type start next result form var))))
 
 ;;; Actually really convert a global function call that we are allowed
 ;;; to early-bind.
@@ -833,15 +861,17 @@
 ;;; function type to the arg and result continuations. We do this now
 ;;; so that IR1 optimize doesn't have to redundantly do the check
 ;;; later so that it can do the type propagation.
-(defun ir1-convert-combination-checking-type (start cont form var)
-  (declare (type continuation start cont) (list form) (type leaf var))
-  (let* ((node (ir1-convert-combination start cont form var))
-	 (fun-cont (basic-combination-fun node))
+(defun ir1-convert-combination-checking-type (start next result form var)
+  (declare (type ctran start next) (type (or lvar null) result)
+           (list form)
+           (type leaf var))
+  (let* ((node (ir1-convert-combination start next result form var))
+	 (fun-lvar (basic-combination-fun node))
 	 (type (leaf-type var)))
     (when (validate-call-type node type t)
-      (setf (continuation-%derived-type fun-cont)
+      (setf (lvar-%derived-type fun-lvar)
             (make-single-value-type type))
-      (setf (continuation-reoptimize fun-cont) nil)))
+      (setf (lvar-reoptimize fun-lvar) nil)))
   (values))
 
 ;;; Convert a call to a local function, or if the function has already
@@ -849,10 +879,9 @@
 ;;; LOCALL-ALREADY-LET-CONVERTED. The THROW should only happen when we
 ;;; are converting inline expansions for local functions during
 ;;; optimization.
-(defun ir1-convert-local-combination (start cont form functional)
+(defun ir1-convert-local-combination (start next result form functional)
   (assure-functional-live-p functional)
-  (ir1-convert-combination start
-			   cont
+  (ir1-convert-combination start next result
 			   form
 			   (maybe-reanalyze-functional functional)))
 
@@ -1085,7 +1114,7 @@
 
 ;;; Process a single declaration spec, augmenting the specified LEXENV
 ;;; RES. Return RES and result type. VARS and FVARS are as described
-;;; in PROCESS-DECLS.
+;;; PROCESS-DECLS.
 (defun process-1-decl (raw-spec res vars fvars)
   (declare (type list raw-spec vars fvars))
   (declare (type lexenv res))
@@ -1154,24 +1183,26 @@
                   (values-type-intersection result-type new-result-type))))))
     (values env result-type)))
 
-(defun %processing-decls (decls vars fvars cont fun)
+(defun %processing-decls (decls vars fvars ctran lvar fun)
   (multiple-value-bind (*lexenv* result-type)
       (process-decls decls vars fvars)
     (cond ((eq result-type *wild-type*)
-           (funcall fun cont))
+           (funcall fun ctran lvar))
           (t
-           (let ((value-cont (make-continuation)))
+           (let ((value-ctran (make-ctran))
+                 (value-lvar (make-lvar)))
              (multiple-value-prog1
-                 (funcall fun value-cont)
-               (let ((cast (make-cast value-cont result-type
+                 (funcall fun value-ctran value-lvar)
+               (let ((cast (make-cast value-lvar result-type
                                       (lexenv-policy *lexenv*))))
-                 (link-node-to-previous-continuation cast value-cont)
-                 (setf (continuation-dest value-cont) cast)
-                 (use-continuation cast cont))))))))
-(defmacro processing-decls ((decls vars fvars cont) &body forms)
-  (check-type cont symbol)
-  `(%processing-decls ,decls ,vars ,fvars ,cont
-                      (lambda (,cont) ,@forms)))
+                 (link-node-to-previous-ctran cast value-ctran)
+                 (setf (lvar-dest value-lvar) cast)
+                 (use-continuation cast ctran lvar))))))))
+(defmacro processing-decls ((decls vars fvars ctran lvar) &body forms)
+  (check-type ctran symbol)
+  (check-type lvar symbol)
+  `(%processing-decls ,decls ,vars ,fvars ,ctran ,lvar
+                      (lambda (,ctran ,lvar) ,@forms)))
 
 ;;; Return the SPECVAR for NAME to use when we see a local SPECIAL
 ;;; declaration. If there is a global variable of that name, then

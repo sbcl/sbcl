@@ -113,10 +113,10 @@
 ;;; Convert a REF node. The reference must not be delayed.
 (defun ir2-convert-ref (node block)
   (declare (type ref node) (type ir2-block block))
-  (let* ((cont (node-cont node))
+  (let* ((lvar (node-lvar node))
 	 (leaf (ref-leaf node))
-	 (locs (continuation-result-tns
-		cont (list (primitive-type (leaf-type leaf)))))
+	 (locs (lvar-result-tns
+		lvar (list (primitive-type (leaf-type leaf)))))
 	 (res (first locs)))
     (etypecase leaf
       (lambda-var
@@ -149,7 +149,7 @@
 	      (if unsafe
 		  (vop fdefn-fun node block fdefn-tn res)
 		  (vop safe-fdefn-fun node block fdefn-tn res))))))))
-    (move-continuation-result node block locs cont))
+    (move-lvar-result node block locs lvar))
   (values))
 
 ;;; some sanity checks for a CLAMBDA passed to IR2-CONVERT-CLOSURE
@@ -239,12 +239,12 @@
 ;;; the variable has been deleted.
 (defun ir2-convert-set (node block)
   (declare (type cset node) (type ir2-block block))
-  (let* ((cont (node-cont node))
+  (let* ((lvar (node-lvar node))
 	 (leaf (set-var node))
-	 (val (continuation-tn node block (set-value node)))
-	 (locs (if (continuation-info cont)
-		   (continuation-result-tns
-		    cont (list (primitive-type (leaf-type leaf))))
+	 (val (lvar-tn node block (set-value node)))
+	 (locs (if lvar
+		   (lvar-result-tns
+		    lvar (list (primitive-type (leaf-type leaf))))
 		   nil)))
     (etypecase leaf
       (lambda-var
@@ -260,7 +260,7 @@
 	  (vop set node block (emit-constant (leaf-source-name leaf)) val)))))
     (when locs
       (emit-move node block val (first locs))
-      (move-continuation-result node block locs cont)))
+      (move-lvar-result node block locs lvar)))
   (values))
 
 ;;;; utilities for receiving fixed values
@@ -276,23 +276,23 @@
 ;;; and move the actual continuation TN into it. This happens when we
 ;;; delete a type check in unsafe code or when we locally know
 ;;; something about the type of an argument variable.
-(defun continuation-tn (node block cont)
-  (declare (type node node) (type ir2-block block) (type continuation cont))
-  (let* ((2cont (continuation-info cont))
-	 (cont-tn
-	  (ecase (ir2-continuation-kind 2cont)
+(defun lvar-tn (node block lvar)
+  (declare (type node node) (type ir2-block block) (type lvar lvar))
+  (let* ((2lvar (lvar-info lvar))
+	 (lvar-tn
+	  (ecase (ir2-lvar-kind 2lvar)
 	    (:delayed
-	     (let ((ref (continuation-use cont)))
+	     (let ((ref (lvar-uses lvar)))
 	       (leaf-tn (ref-leaf ref) (node-physenv ref))))
 	    (:fixed
-	     (aver (= (length (ir2-continuation-locs 2cont)) 1))
-	     (first (ir2-continuation-locs 2cont)))))
-	 (ptype (ir2-continuation-primitive-type 2cont)))
+	     (aver (= (length (ir2-lvar-locs 2lvar)) 1))
+	     (first (ir2-lvar-locs 2lvar)))))
+	 (ptype (ir2-lvar-primitive-type 2lvar)))
 
-    (cond ((eq (tn-primitive-type cont-tn) ptype) cont-tn)
+    (cond ((eq (tn-primitive-type lvar-tn) ptype) lvar-tn)
 	  (t
 	   (let ((temp (make-normal-tn ptype)))
-	     (emit-move node block cont-tn temp)
+	     (emit-move node block lvar-tn temp)
 	     temp)))))
 
 ;;; This is similar to CONTINUATION-TN, but hacks multiple values. We
@@ -303,10 +303,10 @@
 ;;; If the continuation has a type check, check the values into temps
 ;;; and return the temps. When we have more values than assertions, we
 ;;; move the extra values with no check.
-(defun continuation-tns (node block cont ptypes)
+(defun lvar-tns (node block lvar ptypes)
   (declare (type node node) (type ir2-block block)
-	   (type continuation cont) (list ptypes))
-  (let* ((locs (ir2-continuation-locs (continuation-info cont)))
+	   (type lvar lvar) (list ptypes))
+  (let* ((locs (ir2-lvar-locs (lvar-info lvar)))
 	 (nlocs (length locs)))
     (aver (= nlocs (length ptypes)))
 
@@ -337,14 +337,14 @@
 ;;; necessary by discarded TNs. We always return a TN of the specified
 ;;; type, using the continuation locs only when they are of the
 ;;; correct type.
-(defun continuation-result-tns (cont types)
-  (declare (type continuation cont) (type list types))
-  (let ((2cont (continuation-info cont)))
-    (if (not 2cont)
-	(mapcar #'make-normal-tn types)
-	(ecase (ir2-continuation-kind 2cont)
+(defun lvar-result-tns (lvar types)
+  (declare (type (or lvar null) lvar) (type list types))
+  (if (not lvar)
+      (mapcar #'make-normal-tn types)
+      (let ((2lvar (lvar-info lvar)))
+        (ecase (ir2-lvar-kind 2lvar)
 	  (:fixed
-	   (let* ((locs (ir2-continuation-locs 2cont))
+	   (let* ((locs (ir2-lvar-locs 2lvar))
 		  (nlocs (length locs))
 		  (ntypes (length types)))
 	     (if (and (= nlocs ntypes)
@@ -385,14 +385,14 @@
 ;;; returning an empty list of temporaries.
 ;;;
 ;;; If the continuation is annotated, then it must be :FIXED.
-(defun standard-result-tns (cont)
-  (declare (type continuation cont))
-  (let ((2cont (continuation-info cont)))
-    (if 2cont
-	(ecase (ir2-continuation-kind 2cont)
-	  (:fixed
-	   (make-standard-value-tns (length (ir2-continuation-locs 2cont)))))
-	())))
+(defun standard-result-tns (lvar)
+  (declare (type (or lvar null) lvar))
+  (if lvar
+      (let ((2lvar (lvar-info lvar)))
+        (ecase (ir2-lvar-kind 2lvar)
+          (:fixed
+           (make-standard-value-tns (length (ir2-lvar-locs 2lvar))))))
+      nil))
 
 ;;; Just move each SRC TN into the corresponding DEST TN, defaulting
 ;;; any unsupplied source values to NIL. We let EMIT-MOVE worry about
@@ -442,55 +442,54 @@
 ;;; the continuation locations. If the continuation is unknown values,
 ;;; then do the moves into the standard value locations, and use
 ;;; PUSH-VALUES to put the values on the stack.
-(defun move-continuation-result (node block results cont)
+(defun move-lvar-result (node block results lvar)
   (declare (type node node) (type ir2-block block)
-	   (list results) (type continuation cont))
-  (let* ((2cont (continuation-info cont)))
-    (when 2cont
-      (ecase (ir2-continuation-kind 2cont)
-	(:fixed
-	 (let ((locs (ir2-continuation-locs 2cont)))
-	   (unless (eq locs results)
-	     (move-results-coerced node block results locs))))
-	(:unknown
-	 (let* ((nvals (length results))
-		(locs (make-standard-value-tns nvals)))
-	   (move-results-coerced node block results locs)
-	   (vop* push-values node block
-		 ((reference-tn-list locs nil))
-		 ((reference-tn-list (ir2-continuation-locs 2cont) t))
-		 nvals))))))
+	   (list results) (type (or lvar null) lvar))
+  (when lvar
+    (let ((2lvar (lvar-info lvar)))
+      (ecase (ir2-lvar-kind 2lvar)
+        (:fixed
+         (let ((locs (ir2-lvar-locs 2lvar)))
+           (unless (eq locs results)
+             (move-results-coerced node block results locs))))
+        (:unknown
+         (let* ((nvals (length results))
+                (locs (make-standard-value-tns nvals)))
+           (move-results-coerced node block results locs)
+           (vop* push-values node block
+                 ((reference-tn-list locs nil))
+                 ((reference-tn-list (ir2-lvar-locs 2lvar) t))
+                 nvals))))))
   (values))
 
 ;;; CAST
 (defun ir2-convert-cast (node block)
   (declare (type cast node)
            (type ir2-block block))
-  (let* ((cont (node-cont node))
-         (2cont (continuation-info cont))
-         (value (cast-value node))
-         (2value (continuation-info value)))
-    (cond ((not 2cont))
-          ((eq (ir2-continuation-kind 2cont) :unused))
-          ((eq (ir2-continuation-kind 2cont) :unknown)
-           (aver (eq (ir2-continuation-kind 2value) :unknown))
+  (binding* ((lvar (node-lvar node) :exit-if-null)
+             (2lvar (lvar-info lvar))
+             (value (cast-value node))
+             (2value (lvar-info value)))
+    (cond ((eq (ir2-lvar-kind 2lvar) :unused))
+          ((eq (ir2-lvar-kind 2lvar) :unknown)
+           (aver (eq (ir2-lvar-kind 2value) :unknown))
            (aver (not (cast-type-check node)))
            (move-results-coerced node block
-                                 (ir2-continuation-locs 2value)
-                                 (ir2-continuation-locs 2cont)))
-          ((eq (ir2-continuation-kind 2cont) :fixed)
-           (aver (eq (ir2-continuation-kind 2value) :fixed))
+                                 (ir2-lvar-locs 2value)
+                                 (ir2-lvar-locs 2lvar)))
+          ((eq (ir2-lvar-kind 2lvar) :fixed)
+           (aver (eq (ir2-lvar-kind 2value) :fixed))
            (if (cast-type-check node)
                (move-results-checked node block
-                                     (ir2-continuation-locs 2value)
-                                     (ir2-continuation-locs 2cont)
+                                     (ir2-lvar-locs 2value)
+                                     (ir2-lvar-locs 2lvar)
                                      (multiple-value-bind (check types)
                                          (cast-check-types node nil)
                                        (aver (eq check :simple))
                                        types))
                (move-results-coerced node block
-                                     (ir2-continuation-locs 2value)
-                                     (ir2-continuation-locs 2cont))))
+                                     (ir2-lvar-locs 2value)
+                                     (ir2-lvar-locs 2lvar))))
           (t (bug "CAST cannot be :DELAYED.")))))
 
 ;;;; template conversion
@@ -512,8 +511,8 @@
 	(let ((type (first types))
 	      (arg (first args)))
 	  (if (and (consp type) (eq (car type) ':constant))
-	      (info-args (continuation-value arg))
-	      (let ((ref (reference-tn (continuation-tn node block arg) nil)))
+	      (info-args (lvar-value arg))
+	      (let ((ref (reference-tn (lvar-tn node block arg) nil)))
 		(if last
 		    (setf (tn-ref-across last) ref)
 		    (setf first ref))
@@ -546,7 +545,7 @@
 (defun ir2-convert-if (node block)
   (declare (type ir2-block block) (type cif node))
   (let* ((test (if-test node))
-	 (test-ref (reference-tn (continuation-tn node block test) nil))
+	 (test-ref (reference-tn (lvar-tn node block test) nil))
 	 (nil-ref (reference-tn (emit-constant nil) nil)))
     (setf (tn-ref-across test-ref) nil-ref)
     (ir2-convert-conditional node block (template-or-lose 'if-eq)
@@ -558,8 +557,8 @@
 ;;; that was done in initially selecting the template, so we know that
 ;;; the types we find are allowed by the template output type
 ;;; restrictions.
-(defun find-template-result-types (call cont template rtypes)
-  (declare (type combination call) (type continuation cont)
+(defun find-template-result-types (call template rtypes)
+  (declare (type combination call)
 	   (type template template) (list rtypes))
   (let* ((dtype (node-derived-type call))
 	 (type dtype)
@@ -584,12 +583,12 @@
 ;;; where the continuation is fixed values and has locations that
 ;;; satisfy the result restrictions. This can fail when there is a
 ;;; type check or a values count mismatch.
-(defun make-template-result-tns (call cont template rtypes)
-  (declare (type combination call) (type continuation cont)
+(defun make-template-result-tns (call lvar template rtypes)
+  (declare (type combination call) (type (or lvar null) lvar)
 	   (type template template) (list rtypes))
-  (let ((2cont (continuation-info cont)))
-    (if (and 2cont (eq (ir2-continuation-kind 2cont) :fixed))
-	(let ((locs (ir2-continuation-locs 2cont)))
+  (let ((2lvar (when lvar (lvar-info lvar))))
+    (if (and 2lvar (eq (ir2-lvar-kind 2lvar) :fixed))
+	(let ((locs (ir2-lvar-locs 2lvar)))
 	  (if (and (= (length rtypes) (length locs))
 		   (do ((loc locs (cdr loc))
 			(rtype rtypes (cdr rtype)))
@@ -600,34 +599,34 @@
 			      :t-ok nil)
 		       (return nil))))
 	      locs
-	      (continuation-result-tns
-	       cont
-	       (find-template-result-types call cont template rtypes))))
-	(continuation-result-tns
-	 cont
-	 (find-template-result-types call cont template rtypes)))))
+	      (lvar-result-tns
+	       lvar
+	       (find-template-result-types call template rtypes))))
+	(lvar-result-tns
+	 lvar
+	 (find-template-result-types call template rtypes)))))
 
 ;;; Get the operands into TNs, make TN-REFs for them, and then call
 ;;; the template emit function.
 (defun ir2-convert-template (call block)
   (declare (type combination call) (type ir2-block block))
   (let* ((template (combination-info call))
-	 (cont (node-cont call))
+	 (lvar (node-lvar call))
 	 (rtypes (template-result-types template)))
     (multiple-value-bind (args info-args)
 	(reference-args call block (combination-args call) template)
       (aver (not (template-more-results-type template)))
       (if (eq rtypes :conditional)
 	  (ir2-convert-conditional call block template args info-args
-				   (continuation-dest cont) nil)
-	  (let* ((results (make-template-result-tns call cont template rtypes))
+				   (lvar-dest lvar) nil)
+	  (let* ((results (make-template-result-tns call lvar template rtypes))
 		 (r-refs (reference-tn-list results t)))
 	    (aver (= (length info-args)
 		     (template-info-arg-count template)))
 	    (if info-args
 		(emit-template call block template args r-refs info-args)
 		(emit-template call block template args r-refs))
-	    (move-continuation-result call block results cont)))))
+	    (move-lvar-result call block results lvar)))))
   (values))
 
 ;;; We don't have to do much because operand count checking is done by
@@ -635,11 +634,11 @@
 ;;; case of IR2-CONVERT-TEMPLATE is that there can be codegen-info
 ;;; arguments.
 (defoptimizer (%%primitive ir2-convert) ((template info &rest args) call block)
-  (let* ((template (continuation-value template))
-	 (info (continuation-value info))
-	 (cont (node-cont call))
+  (let* ((template (lvar-value template))
+	 (info (lvar-value info))
+	 (lvar (node-lvar call))
 	 (rtypes (template-result-types template))
-	 (results (make-template-result-tns call cont template rtypes))
+	 (results (make-template-result-tns call lvar template rtypes))
 	 (r-refs (reference-tn-list results t)))
     (multiple-value-bind (args info-args)
 	(reference-args call block (cddr (combination-args call)) template)
@@ -651,7 +650,7 @@
 	  (emit-template call block template args r-refs info)
 	  (emit-template call block template args r-refs))
 
-      (move-continuation-result call block results cont)))
+      (move-lvar-result call block results lvar)))
   (values))
 
 ;;;; local call
@@ -665,7 +664,7 @@
   (declare (type combination node) (type ir2-block block) (type clambda fun))
   (mapc (lambda (var arg)
 	  (when arg
-	    (let ((src (continuation-tn node block arg))
+	    (let ((src (lvar-tn node block arg))
 		  (dest (leaf-info var)))
 	      (if (lambda-var-indirect var)
 		  (do-make-value-cell node block src dest)
@@ -690,7 +689,7 @@
 	   (type (or tn null) old-fp))
   (let ((actuals (mapcar (lambda (x)
 			   (when x
-			     (continuation-tn node block x)))
+			     (lvar-tn node block x)))
 			 (combination-args node))))
     (collect ((temps)
 	      (locs))
@@ -776,9 +775,9 @@
 
 ;;; Handle a non-TR known-values local call. We emit the call, then
 ;;; move the results to the continuation's destination.
-(defun ir2-convert-local-known-call (node block fun returns cont start)
+(defun ir2-convert-local-known-call (node block fun returns lvar start)
   (declare (type node node) (type ir2-block block) (type clambda fun)
-	   (type return-info returns) (type continuation cont)
+	   (type return-info returns) (type (or lvar null) lvar)
 	   (type label start))
   (multiple-value-bind (fp nfp temps arg-locs)
       (ir2-convert-local-call-args node block fun)
@@ -787,7 +786,7 @@
 	    (fp nfp (reference-tn-list temps nil))
 	    ((reference-tn-list locs t))
 	    arg-locs (physenv-info (lambda-physenv fun)) start)
-      (move-continuation-result node block locs cont)))
+      (move-lvar-result node block locs lvar)))
   (values))
 
 ;;; Handle a non-TR unknown-values local call. We do different things
@@ -800,24 +799,24 @@
 ;;; Otherwise, we use STANDARD-RESULT-TNS to get wired result TNs, and
 ;;; then call MOVE-CONTINUATION-RESULT to do any necessary type checks
 ;;; or coercions.
-(defun ir2-convert-local-unknown-call (node block fun cont start)
+(defun ir2-convert-local-unknown-call (node block fun lvar start)
   (declare (type node node) (type ir2-block block) (type clambda fun)
-	   (type continuation cont) (type label start))
+	   (type (or lvar null) lvar) (type label start))
   (multiple-value-bind (fp nfp temps arg-locs)
       (ir2-convert-local-call-args node block fun)
-    (let ((2cont (continuation-info cont))
+    (let ((2lvar (and lvar (lvar-info lvar)))
 	  (env (physenv-info (lambda-physenv fun)))
 	  (temp-refs (reference-tn-list temps nil)))
-      (if (and 2cont (eq (ir2-continuation-kind 2cont) :unknown))
+      (if (and 2lvar (eq (ir2-lvar-kind 2lvar) :unknown))
 	  (vop* multiple-call-local node block (fp nfp temp-refs)
-		((reference-tn-list (ir2-continuation-locs 2cont) t))
+		((reference-tn-list (ir2-lvar-locs 2lvar) t))
 		arg-locs env start)
-	  (let ((locs (standard-result-tns cont)))
+	  (let ((locs (standard-result-tns lvar)))
 	    (vop* call-local node block
 		  (fp nfp temp-refs)
 		  ((reference-tn-list locs t))
 		  arg-locs env start (length locs))
-	    (move-continuation-result node block locs cont)))))
+	    (move-lvar-result node block locs lvar)))))
   (values))
 
 ;;; Dispatch to the appropriate function, depending on whether we have
@@ -826,7 +825,7 @@
 ;;; tail call, but that might seem confusing in the debugger.
 (defun ir2-convert-local-call (node block)
   (declare (type combination node) (type ir2-block block))
-  (let* ((fun (ref-leaf (continuation-use (basic-combination-fun node))))
+  (let* ((fun (ref-leaf (lvar-uses (basic-combination-fun node))))
 	 (kind (functional-kind fun)))
     (cond ((eq kind :let)
 	   (ir2-convert-let node block fun))
@@ -837,15 +836,15 @@
 	  (t
 	   (let ((start (block-label (lambda-block fun)))
 		 (returns (tail-set-info (lambda-tail-set fun)))
-		 (cont (node-cont node)))
+		 (lvar (node-lvar node)))
 	     (ecase (if returns
 			(return-info-kind returns)
 			:unknown)
 	       (:unknown
-		(ir2-convert-local-unknown-call node block fun cont start))
+		(ir2-convert-local-unknown-call node block fun lvar start))
 	       (:fixed
 		(ir2-convert-local-known-call node block fun returns
-					      cont start)))))))
+					      lvar start)))))))
   (values))
 
 ;;;; full call
@@ -858,17 +857,17 @@
 ;;;   -- We know it's a function. No check needed: return the
 ;;;      continuation LOC.
 ;;;   -- We don't know what it is.
-(defun fun-continuation-tn (node block cont)
-  (declare (type continuation cont))
-  (let ((2cont (continuation-info cont)))
-    (if (eq (ir2-continuation-kind 2cont) :delayed)
-	(let ((name (continuation-fun-name cont t)))
+(defun fun-lvar-tn (node block lvar)
+  (declare (type lvar lvar))
+  (let ((2lvar (lvar-info lvar)))
+    (if (eq (ir2-lvar-kind 2lvar) :delayed)
+	(let ((name (lvar-fun-name lvar t)))
 	  (aver name)
 	  (values (make-load-time-constant-tn :fdefinition name) t))
-	(let* ((locs (ir2-continuation-locs 2cont))
+	(let* ((locs (ir2-lvar-locs 2lvar))
 	       (loc (first locs))
 	       (function-ptype (primitive-type-or-lose 'function)))
-	  (aver (and (eq (ir2-continuation-kind 2cont) :fixed)
+	  (aver (and (eq (ir2-lvar-kind 2lvar) :fixed)
 		     (= (length locs) 1)))
           (aver (eq (tn-primitive-type loc) function-ptype))
 	  (values loc nil)))))
@@ -882,7 +881,7 @@
 	(first nil))
     (dotimes (num (length args))
       (let ((loc (standard-arg-location num)))
-	(emit-move node block (continuation-tn node block (elt args num)) loc)
+	(emit-move node block (lvar-tn node block (elt args num)) loc)
 	(let ((ref (reference-tn loc nil)))
 	  (if last
 	      (setf (tn-ref-across last) ref)
@@ -902,7 +901,7 @@
 	 (return-pc (ir2-physenv-return-pc env)))
 
     (multiple-value-bind (fun-tn named)
-	(fun-continuation-tn node block (basic-combination-fun node))
+	(fun-lvar-tn node block (basic-combination-fun node))
       (if named
 	  (vop* tail-call-named node block
 		(fun-tn old-fp return-pc pass-refs)
@@ -927,7 +926,7 @@
 	    (first nil))
 	(dotimes (num nargs)
 	  (locs (standard-arg-location num))
-	  (let ((ref (reference-tn (continuation-tn node block (elt args num))
+	  (let ((ref (reference-tn (lvar-tn node block (elt args num))
 				   nil)))
 	    (if last
 		(setf (tn-ref-across last) ref)
@@ -944,18 +943,18 @@
   (declare (type combination node) (type ir2-block block))
   (multiple-value-bind (fp args arg-locs nargs)
       (ir2-convert-full-call-args node block)
-    (let* ((cont (node-cont node))
-	   (locs (standard-result-tns cont))
+    (let* ((lvar (node-lvar node))
+	   (locs (standard-result-tns lvar))
 	   (loc-refs (reference-tn-list locs t))
 	   (nvals (length locs)))
       (multiple-value-bind (fun-tn named)
-	  (fun-continuation-tn node block (basic-combination-fun node))
+	  (fun-lvar-tn node block (basic-combination-fun node))
 	(if named
 	    (vop* call-named node block (fp fun-tn args) (loc-refs)
 		  arg-locs nargs nvals)
 	    (vop* call node block (fp fun-tn args) (loc-refs)
 		  arg-locs nargs nvals))
-	(move-continuation-result node block locs cont))))
+	(move-lvar-result node block locs lvar))))
   (values))
 
 ;;; Do full call when unknown values are desired.
@@ -963,11 +962,11 @@
   (declare (type combination node) (type ir2-block block))
   (multiple-value-bind (fp args arg-locs nargs)
       (ir2-convert-full-call-args node block)
-    (let* ((cont (node-cont node))
-	   (locs (ir2-continuation-locs (continuation-info cont)))
+    (let* ((lvar (node-lvar node))
+	   (locs (ir2-lvar-locs (lvar-info lvar)))
 	   (loc-refs (reference-tn-list locs t)))
       (multiple-value-bind (fun-tn named)
-	  (fun-continuation-tn node block (basic-combination-fun node))
+	  (fun-lvar-tn node block (basic-combination-fun node))
 	(if named
 	    (vop* multiple-call-named node block (fp fun-tn args) (loc-refs)
 		  arg-locs nargs)
@@ -1017,8 +1016,8 @@
 ;;;   * Is this a full call to (SETF FOO) which might conflict with
 ;;;     a DEFSETF or some such thing elsewhere in the program?
 (defun ponder-full-call (node)
-  (let* ((cont (basic-combination-fun node))
-	 (fname (continuation-fun-name cont t)))
+  (let* ((lvar (basic-combination-fun node))
+	 (fname (lvar-fun-name lvar t)))
     (declare (type (or symbol cons) fname))
 
     #!+sb-show (unless (gethash fname *full-called-fnames*)
@@ -1028,11 +1027,10 @@
 		 (/show (basic-combination-args node))
 		 (/show (policy node speed) (policy node safety))
 		 (/show (policy node compilation-speed))
-		 (let ((arg-types (mapcar (lambda (maybe-continuation)
-					    (when maybe-continuation
+		 (let ((arg-types (mapcar (lambda (lvar)
+					    (when lvar
 					      (type-specifier
-					       (continuation-type
-						maybe-continuation))))
+					       (lvar-type lvar))))
 					  (basic-combination-args node))))
 		   (/show arg-types)))
 
@@ -1060,14 +1058,14 @@
 (defun ir2-convert-full-call (node block)
   (declare (type combination node) (type ir2-block block))
   (ponder-full-call node)
-  (let ((2cont (continuation-info (node-cont node))))
-    (cond ((node-tail-p node)
-	   (ir2-convert-tail-full-call node block))
-	  ((and 2cont
-		(eq (ir2-continuation-kind 2cont) :unknown))
-	   (ir2-convert-multiple-full-call node block))
-	  (t
-	   (ir2-convert-fixed-full-call node block))))
+  (cond ((node-tail-p node)
+         (ir2-convert-tail-full-call node block))
+        ((let ((lvar (node-lvar node)))
+           (and lvar
+                (eq (ir2-lvar-kind (lvar-info lvar)) :unknown)))
+         (ir2-convert-multiple-full-call node block))
+        (t
+         (ir2-convert-fixed-full-call node block)))
   (values))
 
 ;;;; entering functions
@@ -1163,9 +1161,9 @@
 ;;; RETURN-MULTIPLE.
 (defun ir2-convert-return (node block)
   (declare (type creturn node) (type ir2-block block))
-  (let* ((cont (return-result node))
-	 (2cont (continuation-info cont))
-	 (cont-kind (ir2-continuation-kind 2cont))
+  (let* ((lvar (return-result node))
+	 (2lvar (lvar-info lvar))
+	 (lvar-kind (ir2-lvar-kind 2lvar))
 	 (fun (return-lambda node))
 	 (env (physenv-info (lambda-physenv fun)))
 	 (old-fp (ir2-physenv-old-fp env))
@@ -1174,20 +1172,20 @@
     (cond
      ((and (eq (return-info-kind returns) :fixed)
 	   (not (xep-p fun)))
-      (let ((locs (continuation-tns node block cont
+      (let ((locs (lvar-tns node block lvar
 				    (return-info-types returns))))
 	(vop* known-return node block
 	      (old-fp return-pc (reference-tn-list locs nil))
 	      (nil)
 	      (return-info-locations returns))))
-     ((eq cont-kind :fixed)
-      (let* ((types (mapcar #'tn-primitive-type (ir2-continuation-locs 2cont)))
-	     (cont-locs (continuation-tns node block cont types))
-	     (nvals (length cont-locs))
+     ((eq lvar-kind :fixed)
+      (let* ((types (mapcar #'tn-primitive-type (ir2-lvar-locs 2lvar)))
+	     (lvar-locs (lvar-tns node block lvar types))
+	     (nvals (length lvar-locs))
 	     (locs (make-standard-value-tns nvals)))
 	(mapc (lambda (val loc)
 		(emit-move node block val loc))
-	      cont-locs
+	      lvar-locs
 	      locs)
 	(if (= nvals 1)
 	    (vop return-single node block old-fp return-pc (car locs))
@@ -1196,10 +1194,10 @@
 		  (nil)
 		  nvals))))
      (t
-      (aver (eq cont-kind :unknown))
+      (aver (eq lvar-kind :unknown))
       (vop* return-multiple node block
 	    (old-fp return-pc
-		    (reference-tn-list (ir2-continuation-locs 2cont) nil))
+		    (reference-tn-list (ir2-lvar-locs 2lvar) nil))
 	    (nil)))))
 
   (values))
@@ -1211,21 +1209,21 @@
 ;;; function as multiple values.
 (defoptimizer (sb!kernel:%caller-frame-and-pc ir2-convert) (() node block)
   (let ((ir2-physenv (physenv-info (node-physenv node))))
-    (move-continuation-result node block
+    (move-lvar-result node block
 			      (list (ir2-physenv-old-fp ir2-physenv)
 				    (ir2-physenv-return-pc ir2-physenv))
-			      (node-cont node))))
+			      (node-lvar node))))
 
 ;;;; multiple values
 
 ;;; This is almost identical to IR2-CONVERT-LET. Since LTN annotates
-;;; the continuation for the correct number of values (with the
+;;; the lvarinuation for the correct number of values (with the
 ;;; continuation user responsible for defaulting), we can just pick
 ;;; them up from the continuation.
 (defun ir2-convert-mv-bind (node block)
   (declare (type mv-combination node) (type ir2-block block))
-  (let* ((cont (first (basic-combination-args node)))
-	 (fun (ref-leaf (continuation-use (basic-combination-fun node))))
+  (let* ((lvar (first (basic-combination-args node)))
+	 (fun (ref-leaf (lvar-uses (basic-combination-fun node))))
 	 (vars (lambda-vars fun)))
     (aver (eq (functional-kind fun) :mv-let))
     (mapc (lambda (src var)
@@ -1234,7 +1232,7 @@
 		(if (lambda-var-indirect var)
 		    (do-make-value-cell node block src dest)
 		    (emit-move node block src dest)))))
-	  (continuation-tns node block cont
+	  (lvar-tns node block lvar
 			    (mapcar (lambda (x)
 				      (primitive-type (leaf-type x)))
 				    vars))
@@ -1249,47 +1247,47 @@
 (defun ir2-convert-mv-call (node block)
   (declare (type mv-combination node) (type ir2-block block))
   (aver (basic-combination-args node))
-  (let* ((start-cont (continuation-info (first (basic-combination-args node))))
-	 (start (first (ir2-continuation-locs start-cont)))
+  (let* ((start-lvar (lvar-info (first (basic-combination-args node))))
+	 (start (first (ir2-lvar-locs start-lvar)))
 	 (tails (and (node-tail-p node)
 		     (lambda-tail-set (node-home-lambda node))))
-	 (cont (node-cont node))
-	 (2cont (continuation-info cont)))
+	 (lvar (node-lvar node))
+	 (2lvar (and lvar (lvar-info lvar))))
     (multiple-value-bind (fun named)
-	(fun-continuation-tn node block (basic-combination-fun node))
+	(fun-lvar-tn node block (basic-combination-fun node))
       (aver (and (not named)
-		 (eq (ir2-continuation-kind start-cont) :unknown)))
+		 (eq (ir2-lvar-kind start-lvar) :unknown)))
       (cond
        (tails
 	(let ((env (physenv-info (node-physenv node))))
 	  (vop tail-call-variable node block start fun
 	       (ir2-physenv-old-fp env)
 	       (ir2-physenv-return-pc env))))
-       ((and 2cont
-	     (eq (ir2-continuation-kind 2cont) :unknown))
+       ((and 2lvar
+	     (eq (ir2-lvar-kind 2lvar) :unknown))
 	(vop* multiple-call-variable node block (start fun nil)
-	      ((reference-tn-list (ir2-continuation-locs 2cont) t))))
+	      ((reference-tn-list (ir2-lvar-locs 2lvar) t))))
        (t
-	(let ((locs (standard-result-tns cont)))
+	(let ((locs (standard-result-tns lvar)))
 	  (vop* call-variable node block (start fun nil)
 		((reference-tn-list locs t)) (length locs))
-	  (move-continuation-result node block locs cont)))))))
+	  (move-lvar-result node block locs lvar)))))))
 
 ;;; Reset the stack pointer to the start of the specified
 ;;; unknown-values continuation (discarding it and all values globs on
 ;;; top of it.)
-(defoptimizer (%pop-values ir2-convert) ((continuation) node block)
-  (let ((2cont (continuation-info (continuation-value continuation))))
-    (aver (eq (ir2-continuation-kind 2cont) :unknown))
+(defoptimizer (%pop-values ir2-convert) ((lvar) node block)
+  (let ((2lvar (lvar-info (lvar-value lvar))))
+    (aver (eq (ir2-lvar-kind 2lvar) :unknown))
     (vop reset-stack-pointer node block
-	 (first (ir2-continuation-locs 2cont)))))
+	 (first (ir2-lvar-locs 2lvar)))))
 
 ;;; Deliver the values TNs to CONT using MOVE-CONTINUATION-RESULT.
 (defoptimizer (values ir2-convert) ((&rest values) node block)
   (let ((tns (mapcar (lambda (x)
-		       (continuation-tn node block x))
+		       (lvar-tn node block x))
 		     values)))
-    (move-continuation-result node block tns (node-cont node))))
+    (move-lvar-result node block tns (node-lvar node))))
 
 ;;; In the normal case where unknown values are desired, we use the
 ;;; VALUES-LIST VOP. In the relatively unimportant case of VALUES-LIST
@@ -1298,40 +1296,39 @@
 ;;; defaulting any unsupplied values. It seems unworthwhile to
 ;;; optimize this case.
 (defoptimizer (values-list ir2-convert) ((list) node block)
-  (let* ((cont (node-cont node))
-	 (2cont (continuation-info cont)))
-    (cond ((and 2cont
-                (eq (ir2-continuation-kind 2cont) :unknown))
-           (let ((locs (ir2-continuation-locs 2cont)))
+  (let* ((lvar (node-lvar node))
+	 (2lvar (and lvar (lvar-info lvar))))
+    (cond ((and 2lvar
+                (eq (ir2-lvar-kind 2lvar) :unknown))
+           (let ((locs (ir2-lvar-locs 2lvar)))
              (vop* values-list node block
-                   ((continuation-tn node block list) nil)
+                   ((lvar-tn node block list) nil)
                    ((reference-tn-list locs t)))))
-          (t (aver (or (not 2cont) ; i.e. we want to check the argument
-                       (eq (ir2-continuation-kind 2cont) :fixed)))
+          (t (aver (or (not 2lvar) ; i.e. we want to check the argument
+                       (eq (ir2-lvar-kind 2lvar) :fixed)))
              (ir2-convert-full-call node block)))))
 
 (defoptimizer (%more-arg-values ir2-convert) ((context start count) node block)
-  (let* ((cont (node-cont node))
-	 (2cont (continuation-info cont)))
-    (when 2cont
-      (ecase (ir2-continuation-kind 2cont)
-	(:fixed (ir2-convert-full-call node block))
-	(:unknown
-	 (let ((locs (ir2-continuation-locs 2cont)))
-	   (vop* %more-arg-values node block
-		 ((continuation-tn node block context)
-		  (continuation-tn node block start)
-		  (continuation-tn node block count)
-		  nil)
-		 ((reference-tn-list locs t)))))))))
+  (binding* ((lvar (node-lvar node) :exit-if-null)
+             (2lvar (lvar-info lvar)))
+    (ecase (ir2-lvar-kind 2lvar)
+      (:fixed (ir2-convert-full-call node block))
+      (:unknown
+       (let ((locs (ir2-lvar-locs 2lvar)))
+         (vop* %more-arg-values node block
+               ((lvar-tn node block context)
+                (lvar-tn node block start)
+                (lvar-tn node block count)
+                nil)
+               ((reference-tn-list locs t))))))))
 
 ;;;; special binding
 
 ;;; This is trivial, given our assumption of a shallow-binding
 ;;; implementation.
 (defoptimizer (%special-bind ir2-convert) ((var value) node block)
-  (let ((name (leaf-source-name (continuation-value var))))
-    (vop bind node block (continuation-tn node block value)
+  (let ((name (leaf-source-name (lvar-value var))))
+    (vop bind node block (lvar-tn node block value)
 	 (emit-constant name))))
 (defoptimizer (%special-unbind ir2-convert) ((var) node block)
   (vop unbind node block))
@@ -1340,9 +1337,10 @@
 ;;; should really be done this way, but this is the least violation of
 ;;; abstraction in the current setup. We don't want to wire
 ;;; shallow-binding assumptions into IR1tran.
-(def-ir1-translator progv ((vars vals &body body) start cont)
+(def-ir1-translator progv
+    ((vars vals &body body) start next result)
   (ir1-convert
-   start cont
+   start next result
    (with-unique-names (bind unbind)
      (once-only ((n-save-bs '(%primitive current-binding-pointer)))
                 `(unwind-protect
@@ -1373,14 +1371,13 @@
 ;;; IR2 converted.
 (defun ir2-convert-exit (node block)
   (declare (type exit node) (type ir2-block block))
-  (let ((loc (find-in-physenv (find-nlx-info (exit-entry node)
-					     (node-cont node))
+  (let ((loc (find-in-physenv (find-nlx-info node)
 			      (node-physenv node)))
 	(temp (make-stack-pointer-tn))
 	(value (exit-value node)))
     (vop value-cell-ref node block loc temp)
     (if value
-	(let ((locs (ir2-continuation-locs (continuation-info value))))
+	(let ((locs (ir2-lvar-locs (lvar-info value))))
 	  (vop unwind node block temp (first locs) (second locs)))
 	(let ((0-tn (emit-constant 0)))
 	  (vop unwind node block temp 0-tn 0-tn))))
@@ -1396,7 +1393,7 @@
 ;;; cell that holds the closed unwind block.
 (defoptimizer (%lexical-exit-breakup ir2-convert) ((info) node block)
   (vop value-cell-set node block
-       (find-in-physenv (continuation-value info) (node-physenv node))
+       (find-in-physenv (lvar-value info) (node-physenv node))
        (emit-constant 0)))
 
 ;;; We have to do a spurious move of no values to the result
@@ -1406,12 +1403,12 @@
   (let ((args (basic-combination-args node)))
     (check-catch-tag-type (first args))
     (vop* throw node block
-	  ((continuation-tn node block (first args))
+	  ((lvar-tn node block (first args))
 	   (reference-tn-list
-	    (ir2-continuation-locs (continuation-info (second args)))
+	    (ir2-lvar-locs (lvar-info (second args)))
 	    nil))
 	  (nil)))
-  (move-continuation-result node block () (node-cont node))
+  (move-lvar-result node block () (node-lvar node))
   (values))
 
 ;;; Emit code to set up a non-local exit. INFO is the NLX-INFO for the
@@ -1420,7 +1417,7 @@
 ;;; is responsible for building a return-PC object.
 (defun emit-nlx-start (node block info tag)
   (declare (type node node) (type ir2-block block) (type nlx-info info)
-	   (type (or continuation null) tag))
+	   (type (or lvar null) tag))
   (let* ((2info (nlx-info-info info))
 	 (kind (cleanup-kind (nlx-info-cleanup info)))
 	 (block-tn (physenv-live-tn
@@ -1439,7 +1436,7 @@
     (ecase kind
       (:catch
        (vop make-catch-block node block block-tn
-	    (continuation-tn node block tag) target-label res))
+	    (lvar-tn node block tag) target-label res))
       ((:unwind-protect :block :tagbody)
        (vop make-unwind-block node block block-tn target-label res)))
 
@@ -1456,7 +1453,7 @@
 (defun ir2-convert-entry (node block)
   (declare (type entry node) (type ir2-block block))
   (dolist (exit (entry-exits node))
-    (let ((info (find-nlx-info node (node-cont exit))))
+    (let ((info (find-nlx-info exit)))
       (when (and info
 		 (member (cleanup-kind (nlx-info-cleanup info))
 			 '(:block :tagbody)))
@@ -1464,11 +1461,11 @@
   (values))
 
 ;;; Set up the unwind block for these guys.
-(defoptimizer (%catch ir2-convert) ((info-cont tag) node block)
+(defoptimizer (%catch ir2-convert) ((info-lvar tag) node block)
   (check-catch-tag-type tag)
-  (emit-nlx-start node block (continuation-value info-cont) tag))
-(defoptimizer (%unwind-protect ir2-convert) ((info-cont cleanup) node block)
-  (emit-nlx-start node block (continuation-value info-cont) nil))
+  (emit-nlx-start node block (lvar-value info-lvar) tag))
+(defoptimizer (%unwind-protect ir2-convert) ((info-lvar cleanup) node block)
+  (emit-nlx-start node block (lvar-value info-lvar) nil))
 
 ;;; Emit the entry code for a non-local exit. We receive values and
 ;;; restore dynamic state.
@@ -1490,10 +1487,9 @@
 ;;; UNWIND-PROTECT case, the values receiving restores the stack
 ;;; pointer. In an UNWIND-PROTECT cleanup, we want to leave the stack
 ;;; pointer alone, since the thrown values are still out there.
-(defoptimizer (%nlx-entry ir2-convert) ((info-cont) node block)
-  (let* ((info (continuation-value info-cont))
-	 (cont (nlx-info-continuation info))
-	 (2cont (continuation-info cont))
+(defoptimizer (%nlx-entry ir2-convert) ((info-lvar) node block)
+  (let* ((info (lvar-value info-lvar))
+	 (lvar (nlx-info-lvar info))
 	 (2info (nlx-info-info info))
 	 (top-loc (ir2-nlx-info-save-sp 2info))
 	 (start-loc (make-nlx-entry-arg-start-location))
@@ -1502,25 +1498,26 @@
 
     (ecase (cleanup-kind (nlx-info-cleanup info))
       ((:catch :block :tagbody)
-       (if (and 2cont (eq (ir2-continuation-kind 2cont) :unknown))
-	   (vop* nlx-entry-multiple node block
-		 (top-loc start-loc count-loc nil)
-		 ((reference-tn-list (ir2-continuation-locs 2cont) t))
-		 target)
-	   (let ((locs (standard-result-tns cont)))
-	     (vop* nlx-entry node block
-		   (top-loc start-loc count-loc nil)
-		   ((reference-tn-list locs t))
-		   target
-		   (length locs))
-	     (move-continuation-result node block locs cont))))
+       (let ((2lvar (and lvar (lvar-info lvar))))
+         (if (and 2lvar (eq (ir2-lvar-kind 2lvar) :unknown))
+             (vop* nlx-entry-multiple node block
+                   (top-loc start-loc count-loc nil)
+                   ((reference-tn-list (ir2-lvar-locs 2lvar) t))
+                   target)
+             (let ((locs (standard-result-tns lvar)))
+               (vop* nlx-entry node block
+                     (top-loc start-loc count-loc nil)
+                     ((reference-tn-list locs t))
+                     target
+                     (length locs))
+               (move-lvar-result node block locs lvar)))))
       (:unwind-protect
        (let ((block-loc (standard-arg-location 0)))
 	 (vop uwp-entry node block target block-loc start-loc count-loc)
-	 (move-continuation-result
+	 (move-lvar-result
 	  node block
 	  (list block-loc start-loc count-loc)
-	  cont))))
+	  lvar))))
 
     #!+sb-dyncount
     (when *collect-dynamic-statistics*
@@ -1538,13 +1535,13 @@
 (macrolet ((def (name)
 	     `(defoptimizer (,name ir2-convert) ((&rest args) node block)
 		(let* ((refs (move-tail-full-call-args node block))
-		       (cont (node-cont node))
-		       (res (continuation-result-tns
-			     cont
+		       (lvar (node-lvar node))
+		       (res (lvar-result-tns
+			     lvar
 			     (list (primitive-type (specifier-type 'list))))))
 		  (vop* ,name node block (refs) ((first res) nil)
 			(length args))
-		  (move-continuation-result node block res cont)))))
+		  (move-lvar-result node block res lvar)))))
   (def list)
   (def list*))
 
@@ -1577,11 +1574,11 @@
 	    (setf (block-number block) num)
 	    #!+sb-dyncount
 	    (when *collect-dynamic-statistics*
-	      (let ((first-node (continuation-next (block-start block))))
+	      (let ((first-node (block-start-node block)))
 		(unless (or (and (bind-p first-node)
 				 (xep-p (bind-lambda first-node)))
-			    (eq (continuation-fun-name
-				 (node-cont first-node))
+			    (eq (lvar-fun-name
+				 (node-lvar first-node))
 				'%nlx-entry))
 		  (vop count-me
 		       first-node
@@ -1609,7 +1606,7 @@
 	       (when (and (basic-combination-p last)
 			  (eq (basic-combination-kind last) :full))
 		 (let* ((fun (basic-combination-fun last))
-			(use (continuation-use fun))
+			(use (lvar-uses fun))
 			(name (and (ref-p use)
 				   (leaf-has-source-name-p (ref-leaf use))
 				   (leaf-source-name (ref-leaf use)))))
@@ -1620,7 +1617,7 @@
 			  (if name
 			      (emit-constant name)
 			      (multiple-value-bind (tn named)
-				  (fun-continuation-tn last 2block fun)
+				  (fun-lvar-tn last 2block fun)
 				(aver (not named))
 				tn)))))))
 	      ((not (eq (ir2-block-next 2block) (block-info target)))
@@ -1632,13 +1629,14 @@
 (defun ir2-convert-block (block)
   (declare (type cblock block))
   (let ((2block (block-info block)))
-    (do-nodes (node cont block)
+    (do-nodes (node lvar block)
       (etypecase node
 	(ref
-	 (let ((2cont (continuation-info cont)))
-	   (when (and 2cont
-		      (not (eq (ir2-continuation-kind 2cont) :delayed)))
-	     (ir2-convert-ref node 2block))))
+         (when lvar
+           (let ((2lvar (lvar-info lvar)))
+             ;; function REF in a local call is not annotated
+             (when (and 2lvar (not (eq (ir2-lvar-kind 2lvar) :delayed)))
+               (ir2-convert-ref node 2block)))))
 	(combination
 	 (let ((kind (basic-combination-kind node)))
 	   (case kind
@@ -1655,7 +1653,7 @@
 		      (t
 		       (ir2-convert-template node 2block))))))))
 	(cif
-	 (when (continuation-info (if-test node))
+	 (when (lvar-info (if-test node))
 	   (ir2-convert-if node 2block)))
 	(bind
 	 (let ((fun (bind-lambda node)))
@@ -1669,13 +1667,13 @@
          (ir2-convert-cast node 2block))
 	(mv-combination
 	 (cond
-	  ((eq (basic-combination-kind node) :local)
-	   (ir2-convert-mv-bind node 2block))
-	  ((eq (continuation-fun-name (basic-combination-fun node))
-	       '%throw)
-	   (ir2-convert-throw node 2block))
-	  (t
-	   (ir2-convert-mv-call node 2block))))
+           ((eq (basic-combination-kind node) :local)
+            (ir2-convert-mv-bind node 2block))
+           ((eq (lvar-fun-name (basic-combination-fun node))
+                '%throw)
+            (ir2-convert-throw node 2block))
+           (t
+            (ir2-convert-mv-call node 2block))))
 	(exit
 	 (when (exit-entry node)
 	   (ir2-convert-exit node 2block)))

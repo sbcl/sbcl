@@ -120,8 +120,8 @@
 ;;;; transforms for optimizing SAP+
 
 (deftransform sap+ ((sap offset))
-  (cond ((and (constant-continuation-p offset)
-	      (eql (continuation-value offset) 0))
+  (cond ((and (constant-lvar-p offset)
+	      (eql (lvar-value offset) 0))
 	 'sap)
 	(t
 	 (extract-fun-args sap 'sap+ 2)

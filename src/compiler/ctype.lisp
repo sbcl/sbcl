@@ -171,18 +171,18 @@
           (*unwinnage-detected* (values nil nil))
           (t (values t t)))))
 
-;;; Check that the derived type of the continuation CONT is compatible
-;;; with TYPE. N is the arg number, for error message purposes. We
-;;; return true if arg is definitely o.k. If the type is a magic
-;;; CONSTANT-TYPE, then we check for the argument being a constant
-;;; value of the specified type. If there is a manifest type error
-;;; (DERIVED-TYPE = NIL), then we flame about the asserted type even
-;;; when our type is satisfied under the test.
-(defun check-arg-type (cont type n)
-  (declare (type continuation cont) (type ctype type) (type index n))
+;;; Check that the derived type of the LVAR is compatible with TYPE. N
+;;; is the arg number, for error message purposes. We return true if
+;;; arg is definitely o.k. If the type is a magic CONSTANT-TYPE, then
+;;; we check for the argument being a constant value of the specified
+;;; type. If there is a manifest type error (DERIVED-TYPE = NIL), then
+;;; we flame about the asserted type even when our type is satisfied
+;;; under the test.
+(defun check-arg-type (lvar type n)
+  (declare (type lvar lvar) (type ctype type) (type index n))
   (cond
    ((not (constant-type-p type))
-    (let ((ctype (continuation-type cont)))
+    (let ((ctype (lvar-type lvar)))
       (multiple-value-bind (int win) (funcall *ctype-test-fun* ctype type)
 	(cond ((not win)
 	       (note-unwinnage "can't tell whether the ~:R argument is a ~S"
@@ -196,11 +196,11 @@
 	       (note-unwinnage "The ~:R argument never returns a value." n)
 	       nil)
 	      (t t)))))
-    ((not (constant-continuation-p cont))
+    ((not (constant-lvar-p lvar))
      (note-unwinnage "The ~:R argument is not a constant." n)
      nil)
     (t
-     (let ((val (continuation-value cont))
+     (let ((val (lvar-value lvar))
 	   (type (constant-type-type type)))
        (multiple-value-bind (res win) (ctypep val type)
 	 (cond ((not win)
@@ -244,12 +244,12 @@
     (let ((k (car key)))
       (cond
        ((not (check-arg-type k (specifier-type 'symbol) n)))
-       ((not (constant-continuation-p k))
+       ((not (constant-lvar-p k))
 	(note-unwinnage "The ~:R argument (in keyword position) is not a ~
                         constant."
 			n))
        (t
-	(let* ((name (continuation-value k))
+	(let* ((name (lvar-value k))
 	       (info (find name (fun-type-keywords type)
 			   :key #'key-info-name)))
 	  (cond ((not info)
@@ -354,8 +354,8 @@
 	 (args (combination-args call))
 	 (nargs (length args))
 	 (allowp (some (lambda (x)
-			 (and (constant-continuation-p x)
-			      (eq (continuation-value x) :allow-other-keys)))
+			 (and (constant-lvar-p x)
+			      (eq (lvar-value x) :allow-other-keys)))
 		       args)))
 
     (setf (approximate-fun-type-min-args type)
@@ -369,10 +369,10 @@
 	 (setf (approximate-fun-type-types type)
 	       (nconc types
 		      (mapcar (lambda (x)
-				(list (continuation-type x)))
+				(list (lvar-type x)))
 			      arg))))
       (when (null arg) (return))
-      (pushnew (continuation-type (car arg))
+      (pushnew (lvar-type (car arg))
 	       (car old)
 	       :test #'type=))
 
@@ -383,8 +383,8 @@
 	   (setf (approximate-fun-type-keys type) (keys)))
 	(let ((key (first arg))
 	      (val (second arg)))
-	  (when (constant-continuation-p key)
-	    (let ((name (continuation-value key)))
+	  (when (constant-lvar-p key)
+	    (let ((name (lvar-value key)))
 	      (when (keywordp name)
 		(let ((old (find-if
 			    (lambda (x)
@@ -392,7 +392,7 @@
 				   (= (approximate-key-info-position x)
 				      pos)))
 			    (keys)))
-		      (val-type (continuation-type val)))
+		      (val-type (lvar-type val)))
 		  (cond (old
 			 (pushnew val-type
 				  (approximate-key-info-types old)
@@ -726,7 +726,7 @@
       (let* ((type-returns (fun-type-returns type))
 	     (return (lambda-return (main-entry functional)))
 	     (dtype (when return
-                      (continuation-derived-type (return-result return)))))
+                      (lvar-derived-type (return-result return)))))
 	(cond
           ((and dtype (not (values-types-equal-or-intersect dtype
                                                             type-returns)))
@@ -740,23 +740,23 @@
           (t
            (let ((policy (lexenv-policy (functional-lexenv functional))))
              (when (policy policy (> type-check 0))
-               (assert-continuation-type (return-result return) type-returns
-                                         policy)))
+               (assert-lvar-type (return-result return) type-returns
+                                 policy)))
            (loop for var in vars and type in types do
-                (cond ((basic-var-sets var)
-                       (when (and unwinnage-fun
-                                  (not (csubtypep (leaf-type var) type)))
-                         (funcall unwinnage-fun
-                                  "Assignment to argument: ~S~%  ~
+                 (cond ((basic-var-sets var)
+                        (when (and unwinnage-fun
+                                   (not (csubtypep (leaf-type var) type)))
+                          (funcall unwinnage-fun
+                                   "Assignment to argument: ~S~%  ~
 			       prevents use of assertion from function ~
 			       type ~A:~%  ~S~%"
-                                  (leaf-debug-name var)
-                                  where
-                                  (type-specifier type))))
-                      (t
-                       (setf (leaf-type var) type)
-                       (dolist (ref (leaf-refs var))
-                         (derive-node-type ref (make-single-value-type type))))))
+                                   (leaf-debug-name var)
+                                   where
+                                   (type-specifier type))))
+                       (t
+                        (setf (leaf-type var) type)
+                        (dolist (ref (leaf-refs var))
+                          (derive-node-type ref (make-single-value-type type))))))
            t))))))
 
 ;;; FIXME: This is quite similar to ASSERT-NEW-DEFINITION.
@@ -774,10 +774,10 @@
                              (ir1-attributep (fun-info-attributes it)
                                              explicit-check)))))))
 
-;;; Call FUN with (arg-continuation arg-type)
+;;; Call FUN with (arg-lvar arg-type)
 (defun map-combination-args-and-types (fun call)
   (declare (type function fun) (type combination call))
-  (binding* ((type (continuation-type (combination-fun call)))
+  (binding* ((type (lvar-type (combination-fun call)))
              (nil (fun-type-p type) :exit-if-null)
              (args (combination-args call)))
     (dolist (req (fun-type-required type))
@@ -798,7 +798,7 @@
       (let ((name (key-info-name key)))
         (do ((arg args (cddr arg)))
             ((null arg))
-          (when (eq (continuation-value (first arg)) name)
+          (when (eq (lvar-value (first arg)) name)
             (funcall fun (second arg) (key-info-type key))))))))
 
 ;;; Assert that CALL is to a function of the specified TYPE. It is
@@ -810,20 +810,20 @@
   (let ((policy (lexenv-policy (node-lexenv call))))
     (map-combination-args-and-types
      (lambda (arg type)
-       (assert-continuation-type arg type policy))
+       (assert-lvar-type arg type policy))
      call))
   (values))
 
 ;;;; FIXME: Move to some other file.
 (defun check-catch-tag-type (tag)
-  (declare (type continuation tag))
-  (let ((ctype (continuation-type tag)))
+  (declare (type lvar tag))
+  (let ((ctype (lvar-type tag)))
     (when (csubtypep ctype (specifier-type '(or number character)))
       (compiler-style-warn "~@<using ~S of type ~S as a catch tag (which ~
                             tends to be unportable because THROW and CATCH ~
                             use EQ comparison)~@:>"
-			   (continuation-source tag)
-			   (type-specifier (continuation-type tag))))))
+			   (lvar-source tag)
+			   (type-specifier (lvar-type tag))))))
 
 (defun %compile-time-type-error (values atype dtype)
   (declare (ignore dtype))
@@ -840,8 +840,8 @@
     (destructuring-bind (values atype dtype)
         (basic-combination-args node)
       (declare (ignore values))
-      (let ((atype (continuation-value atype))
-            (dtype (continuation-value dtype)))
+      (let ((atype (lvar-value atype))
+            (dtype (lvar-value dtype)))
       (unless (eq atype nil)
         (compiler-warn
          "~@<Asserted type ~S conflicts with derived type ~S.~@:>"

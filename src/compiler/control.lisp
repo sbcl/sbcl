@@ -200,7 +200,7 @@
 
     (do-blocks (block component)
       (unless (block-flag block)
-	(event control-deleted-block (continuation-next (block-start block)))
+	(event control-deleted-block (block-start-node block))
 	(delete-block block))))
 
   (let ((2comp (component-info component)))

@@ -233,12 +233,12 @@
 ;;; only be done when the result value is that argument.
 (defun result-type-first-arg (call)
   (declare (type combination call))
-  (let ((cont (first (combination-args call))))
-    (when cont (continuation-type cont))))
+  (let ((lvar (first (combination-args call))))
+    (when lvar (lvar-type lvar))))
 (defun result-type-last-arg (call)
   (declare (type combination call))
-  (let ((cont (car (last (combination-args call)))))
-    (when cont (continuation-type cont))))
+  (let ((lvar (car (last (combination-args call)))))
+    (when lvar (lvar-type lvar))))
 
 ;;; Derive the result type according to the float contagion rules, but
 ;;; always return a float. This is used for irrational functions that
@@ -246,7 +246,7 @@
 (defun result-type-float-contagion (call)
   (declare (type combination call))
   (reduce #'numeric-contagion (combination-args call)
-	  :key #'continuation-type
+	  :key #'lvar-type
 	  :initial-value (specifier-type 'single-float)))
 
 ;;; Return a closure usable as a derive-type method for accessing the
@@ -255,9 +255,9 @@
 (defun sequence-result-nth-arg (n)
   (lambda (call)
     (declare (type combination call))
-    (let ((cont (nth (1- n) (combination-args call))))
-      (when cont
-	(let ((type (continuation-type cont)))
+    (let ((lvar (nth (1- n) (combination-args call))))
+      (when lvar
+	(let ((type (lvar-type lvar)))
 	  (if (array-type-p type)
 	      (specifier-type
 	       `(vector ,(type-specifier (array-type-element-type type))))
@@ -269,9 +269,9 @@
 (defun result-type-specifier-nth-arg (n)
   (lambda (call)
     (declare (type combination call))
-    (let ((cont (nth (1- n) (combination-args call))))
-      (when (and cont (constant-continuation-p cont))
-	(careful-specifier-type (continuation-value cont))))))
+    (let ((lvar (nth (1- n) (combination-args call))))
+      (when (and lvar (constant-lvar-p lvar))
+	(careful-specifier-type (lvar-value lvar))))))
 
 ;;; Derive the type to be the type specifier which is the Nth arg,
 ;;; with the additional restriptions noted in the CLHS for STRING and
@@ -280,9 +280,9 @@
 (defun creation-result-type-specifier-nth-arg (n)
   (lambda (call)
     (declare (type combination call))
-    (let ((cont (nth (1- n) (combination-args call))))
-      (when (and cont (constant-continuation-p cont))
-	(let* ((specifier (continuation-value cont))
+    (let ((lvar (nth (1- n) (combination-args call))))
+      (when (and lvar (constant-lvar-p lvar))
+	(let* ((specifier (lvar-value lvar))
 	       (lspecifier (if (atom specifier) (list specifier) specifier)))
 	  (cond
 	    ((eq (car lspecifier) 'string)
