@@ -31,7 +31,7 @@
     (write-line "@end menu" out)
     (terpri out)
     (dolist (texi-file texi-files)
-      (format out "@include ~A~%"
+      (format out "@page~%@include ~A~%"
               (namestring (make-pathname
                            :directory (list* :relative :up :up
                                              (last

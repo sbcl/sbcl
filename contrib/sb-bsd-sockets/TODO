@@ -17,4 +17,3 @@ options are in but need odd ones, plus tcp, udp, ip
 
 - write tests for socket-name and socket-peername
 
-- documentation: see doc.lisp, but beware: it's grotty.

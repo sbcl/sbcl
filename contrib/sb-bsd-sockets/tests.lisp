@@ -1,18 +1,6 @@
 (defpackage "SB-BSD-SOCKETS-TEST"
   (:use "CL" "SB-BSD-SOCKETS" "SB-RT"))
 
-#||
-
-<H1>Tests</h1>
-
-There should be at least one test for pretty much everything you can do
-with the package.  In some places I've been more diligent than others; more
-tests gratefully accepted.
-
-Tests are in the file <tt>tests.lisp</tt> and also make good examples.
-
-||#
-
 (in-package :sb-bsd-sockets-test)
 
 ;;; a real address

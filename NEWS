@@ -2,6 +2,8 @@ changes in sbcl-0.8.14 relative to sbcl-0.8.13:
   * new feature: on platforms where "dladdr" is available foreign
     function names now appear in backtraces.  (based on Helmut Eller's
     work for CMUCL)
+  * documentation: networking interface SB-BSD-SOCKETS' documentation
+    has been integrated into the user manual.
   * bug fix: backtraces involving undefined functions or assembly
     routines are more informative.  (thanks to Brian Downing)
   * bug fix: mutually referent alien structures now work correctly.

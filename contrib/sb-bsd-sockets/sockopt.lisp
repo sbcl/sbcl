@@ -1,16 +1,5 @@
 (in-package :sb-bsd-sockets)
 
-#||
-<H2> Socket Options </h2>
-<a name="sockopt"> </a>
-<p> A subset of socket options are supported, using a fairly
-general framework which should make it simple to add more as required 
-- see sockopt.lisp for details.  The name mapping from C is fairly
-straightforward: <tt>SO_RCVLOWAT</tt> becomes
-<tt>sockopt-receive-low-water</tt> and <tt>(setf
-sockopt-receive-low-water)</tt>.
-||#
-
 #|
 getsockopt(socket, level, int optname, void *optval, socklen_t *optlen)
 setsockopt(socket, level, int optname, void *optval, socklen_t optlen)
@@ -20,7 +9,7 @@ In terms of providing a useful interface, we have to face up to the
 fact that most of these take different data types - some are integers,
 some are booleans, some are foreign struct instances, etc etc
 
- (define-socket-option lisp-name level number mangle-arg size mangle-return)
+ (define-socket-option lisp-name doc level number mangle-arg size mangle-return)
 
 macro-expands to two functions that define lisp-name and (setf ,lisp-name)
 and calls the functions mangle-arg and mangle-return on outgoing and incoming
@@ -42,14 +31,13 @@ something that the caller will want.
 Code for options that not every system has should be conditionalised:
 
  (if (boundp 'sockint::IP_RECVIF)
-     (define-socket-option so-receive-interface (getprotobyname "ip")
+     (define-socket-option so-receive-interface nil (getprotobyname "ip")
        sockint::IP_RECVIF  ...  ))
-
-
 |#
 
 (defmacro define-socket-option
-  (lisp-name level number buffer-type mangle-arg mangle-return mangle-setf-buffer)
+    (lisp-name documentation
+     level number buffer-type mangle-arg mangle-return mangle-setf-buffer)
   (let ((find-level
 	 (if (numberp (eval level))
 	     level
@@ -57,6 +45,7 @@ Code for options that not every system has should be conditionalised:
     `(progn
       (export ',lisp-name)
       (defun ,lisp-name (socket &aux (fd (socket-file-descriptor socket)))
+	,@(when documentation (list documentation))
 	(sb-alien:with-alien ((size sb-alien:integer)
 			      (buffer ,buffer-type))
 	  (setf size (sb-alien:alien-size ,buffer-type :bytes))
@@ -85,7 +74,7 @@ Code for options that not every system has should be conditionalised:
   buffer)
 
 (defmacro define-socket-option-int (name level number)
-  `(define-socket-option ,name ,level ,number
+  `(define-socket-option ,name nil ,level ,number
      sb-alien:integer nil foreign-int-to-integer sb-alien:addr))
 
 (define-socket-option-int
@@ -111,8 +100,10 @@ Code for options that not every system has should be conditionalised:
 (defun bool-to-foreign-int (val)
   (if val 1 0))
 
-(defmacro define-socket-option-bool (name level number)
-  `(define-socket-option ,name ,level ,number
+(defmacro define-socket-option-bool (name level c-name)
+  `(define-socket-option ,name
+    ,(format nil "Return the value of the ~A socket option for SOCKET.  This can also be updated with SETF." (symbol-name c-name))
+    ,level ,c-name
      sb-alien:integer bool-to-foreign-int foreign-int-to-bool sb-alien:addr))
 
 (define-socket-option-bool
@@ -138,7 +129,7 @@ Code for options that not every system has should be conditionalised:
   (declare (ignore args))
   x)
 
-#+linux(define-socket-option sockopt-bind-to-device sockint::sol-socket
+#+linux(define-socket-option sockopt-bind-to-device nil sockint::sol-socket
   sockint::so-bindtodevice sb-alien:c-string identity identity-1 identity)
 
 ;;; other kinds of socket option

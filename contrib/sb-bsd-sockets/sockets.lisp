@@ -3,19 +3,25 @@
 ;;;; Methods, classes, functions for sockets.  Protocol-specific stuff
 ;;;; is deferred to inet.lisp, unix.lisp, etc
 
-#|| <h2>SOCKETs</h2>
-
-|#
-
 (eval-when (:load-toplevel :compile-toplevel :execute)
 (defclass socket ()
   ((file-descriptor :initarg :descriptor
 		    :reader socket-file-descriptor)
-   (family :initform (error "No socket family") :reader socket-family)
-   (protocol :initarg :protocol :reader socket-protocol)
-   (type  :initarg :type :reader socket-type)
-   (stream))))
-  
+   (family :initform (error "No socket family")
+	   :reader socket-family)
+   (protocol :initarg :protocol
+	     :reader socket-protocol
+	     :documentation "Protocol used by the socket. If a
+keyword, the symbol-name of the keyword will be passed to
+GET-PROTOCOL-BY-NAME downcased, and the returned value used as
+protocol. Other values are used as-is.")
+   (type  :initarg :type
+	  :reader socket-type
+	  :documentation "Type of the socket: :STREAM or :DATAGRAM.")
+   (stream))
+  (:documentation "Common base class of all sockets, not ment to be
+directly instantiated.")))
+
 (defmethod print-object ((object socket) stream)
   (print-unreadable-object (object stream :type t :identity t)
                            (princ "descriptor " stream)
@@ -205,8 +211,6 @@ small"))
 						 (bits-of-sockaddr socket sockaddr)))))))
 	  (sb-alien:free-alien copy-buffer))))))
 
-
-
 (defgeneric socket-listen (socket backlog)
   (:documentation "Mark SOCKET as willing to accept incoming connections.  BACKLOG
 defines the maximum length that the queue of pending connections may
@@ -285,7 +289,8 @@ SB-SYS:MAKE-FD-STREAM."))
                        (socket-error-syscall c)
                        (or (socket-error-symbol c) (socket-error-errno c))
                        #+cmu (sb-unix:get-unix-error-msg num)
-                       #+sbcl (sb-int:strerror num))))))
+                       #+sbcl (sb-int:strerror num)))))
+  (:documentation "Common base class of socket related conditions."))
 
 ;;; watch out for slightly hacky symbol punning: we use both the value
 ;;; and the symbol-name of sockint::efoo
@@ -333,6 +338,9 @@ SB-SYS:MAKE-FD-STREAM."))
 
 #+sbcl
 (defun socket-error (where)
+  ;; FIXME: Our Texinfo documentation extracter need at least his to spit
+  ;; out the signature. Real documentation would be better...
+  ""
   (let* ((errno  (sb-unix::get-errno))
          (condition (condition-for-errno errno)))
     (error condition :errno errno  :syscall where)))

@@ -1,21 +1,18 @@
 (in-package :sb-bsd-sockets)
 
-#|| <h2>INET-domain sockets</h2>
-
-<p>The TCP and UDP sockets that you know and love.  Some representation issues:
-<ul>
-<li>These functions do not accept hostnames directly: see <a href="#name-service">name resolution</a>
-<li>Internet <b>addresses</b> are represented by sequences of <tt>(unsigned-byte 8)</tt> - viz. <tt>#(127 0 0 1)</tt>.  <b>Ports</b> are just integers: <tt>6010</tt>.  No conversion between network- and host-order data is needed from the user of this package.
-<li><b><i>socket addresses</i></b> are represented by the two values for <b>address</b> and <b>port</b>, so for example, <tt>(<a href="#SOCKET-CONNECT">socket-connect</a> s #(192 168 1 1) 80)</tt>
-</ul>
-
-|#
-
 ;;; Our class and constructor
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defclass inet-socket (socket)
-    ((family :initform sockint::AF-INET))))
+    ((family :initform sockint::AF-INET))
+    (:documentation "Class representing TCP and UDP sockets.
+
+Examples:
+
+ (make-instance 'inet-socket :type :stream :protocol :tcp)
+
+ (make-instance 'inet-socket :type :datagram :protocol :udp)
+")))
 
 ;;; XXX should we *...* this?
 (defparameter inet-address-any (vector 0 0 0 0))

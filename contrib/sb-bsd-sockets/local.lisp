@@ -1,21 +1,12 @@
 (in-package :sb-bsd-sockets)
 
-#|| <h2>Local (unix) domain sockets</h2>
-
-Local domain (AF_LOCAL) sockets are also known as Unix-domain sockets, but were
-renamed by POSIX presumably on the basis that they may be
-available on other systems too.  
-
-A local socket address is a string, which is used to create a node
-in the local filesystem.  This means of course that they cannot be used across
-a network.
-
-||#
-
 (defclass local-socket (socket)
-  ((family :initform sockint::af-local)))
+  ((family :initform sockint::af-local))
+  (:documentation "Class representing local domain (AF_LOCAL) sockets,
+also known as unix-domain sockets."))
 
-(defmethod make-sockaddr-for ((socket local-socket) &optional sockaddr &rest address &aux (filename (first address)))
+(defmethod make-sockaddr-for ((socket local-socket)
+			      &optional sockaddr &rest address &aux (filename (first address)))
   (let ((sockaddr (or sockaddr (sockint::allocate-sockaddr-un))))
     (setf (sockint::sockaddr-un-family sockaddr) sockint::af-local)
     (when filename

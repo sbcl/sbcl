@@ -1,25 +1,21 @@
 (in-package :sb-bsd-sockets)
-#|| <a name="name-service"><h2>Name Service</h2></a>
-
-<p>Presently name service is implemented by calling whatever
-gethostbyname(2) uses.  This may be any or all of /etc/hosts, NIS, DNS,
-or something completely different.  Typically it's controlled by
-/etc/nsswitch.conf
-
-<p> Direct links to the asynchronous resolver(3) routines would be nice to have
-eventually, so that we can do DNS lookups in parallel with other things
-|#
 
 (defclass host-ent ()
   ((name :initarg :name :accessor host-ent-name)
    (aliases :initarg :aliases :accessor host-ent-aliases)
    (address-type :initarg :type :accessor host-ent-address-type)
 					; presently always AF_INET
-   (addresses :initarg :addresses :accessor host-ent-addresses)))
+   (addresses :initarg :addresses :accessor host-ent-addresses))
+  ;; FIXME: Our Texinfo documentation extracter need at least his to spit
+  ;; out the signature. Real documentation would be better...
+  (:documentation ""))
 
-(defgeneric host-ent-address (host-ent))
+(defgeneric host-ent-address (host-ent)
+  ;; FIXME: Our Texinfo documentation extracter need at least his to spit
+  ;; out the signature. Real documentation would be better...
+  (:documentation ""))
 
-(defmethod host-ent-address ((host-ent host-ent))
+(defmethod host-ent-address ((host-ent host-ent))  
   (car (host-ent-addresses host-ent)))
 
 ;(define-condition host-not-found-error (socket-error)) ; host unknown
@@ -79,6 +75,9 @@ grisly details."
 GET-NAME-SERVICE-ERRNO")
 
 (defun name-service-error (where)
+  ;; FIXME: Our Texinfo documentation extracter need at least his to spit
+  ;; out the signature. Real documentation would be better...
+  ""
   (get-name-service-errno)
   ;; Comment next to NETDB_INTERNAL in netdb.h says "See errno.".
   ;; This special case treatment hasn't actually been tested yet.

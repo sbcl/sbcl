@@ -217,7 +217,6 @@
                       line))
       offset)))
 
-
 (defun collect-maybe-table-section (lines starting-line arglist-symbols)
   ;; Return index of next line to be processed outside
   (let ((this-offset (maybe-table-offset (svref lines starting-line)))
@@ -257,9 +256,6 @@
      (values lines-consumed
              `("" "@table @code" ,@(reverse result) "@end table" ""))
      nil)))
-
-
-
 
 (defun string-as-lines (string)
   (coerce (with-input-from-string (s string)
@@ -312,7 +308,6 @@
 
 (defvar *characters-to-drop* '(#\\ #\` #\')
   "Characters that should be removed by `alphanumize'.")
-
 
 (defun alphanumize (symbol)
   "Construct a string without characters like *`' that will
@@ -412,6 +407,60 @@
      (format nil "~{~A~^ ~}" 
              (mapcar #'texinfoify-arglist-part (argument-list symbol))))))
 
+(defun hidden-superclass-name-p (class-name superclass-name)
+  (let ((super-package (symbol-package superclass-name)))
+    (or
+     ;; KLUDGE: We assume that we don't want to advertise internal
+     ;; classes in CP-lists, unless the symbol we're documenting is
+     ;; internal as well.
+     (and (member super-package #.'(mapcar #'find-package '(sb-pcl sb-int sb-kernel)))
+	     (not (eq super-package (symbol-package class-name))))
+     ;; KLUDGE: We don't generally want to advertise SIMPLE-ERROR or
+     ;; SIMPLE-CONDITION in the CPLs of conditions that inherit them
+     ;; simply as a matter of convenience. The assumption here is
+     ;; that the inheritance is incidental unless the name of the
+     ;; condition begins with SIMPLE-.
+     (and (member superclass-name '(simple-error simple-condition))
+	  (let ((prefix "SIMPLE-"))
+	    (mismatch prefix (string class-name) :end2 (length prefix)))
+	  t ; don't return number from MISMATCH
+	  ))))
+
+(defun hidden-slot-p (symbol slot)
+  ;; FIXME: There is no pricipal reason to avoid the slot docs fo
+  ;; structures and conditions, but their DOCUMENTATION T doesn't
+  ;; currently work with them the way we'd like.
+  (not (and (typep (find-class symbol nil) 'standard-class)
+	    (documentation slot t))))
+
+(defun classlike-p (symbol kind)
+  (and (eq 'type kind)
+       (let ((class (find-class symbol nil))) 
+	 (some (lambda (type)
+		 (typep class type))
+	       '(structure-class standard-class sb-pcl::condition-class)))))
+
+(defun def-body (symbol kind docstring)
+  (with-output-to-string (s)
+    (when (classlike-p symbol kind)
+      (format s "Class precedence list: @code{~(~{@w{~A}~^, ~}~)}~%~%"
+	      (remove-if (lambda (super)
+			   (hidden-superclass-name-p symbol super))
+			 (mapcar #'class-name
+				 (sb-mop:class-precedence-list (find-class symbol)))))
+      (let ((documented-slots (remove-if (lambda (slot)
+					   (hidden-slot-p symbol slot))
+					 (sb-mop:class-direct-slots (find-class symbol)))))
+	(when documented-slots
+	  (format s "Slots:~%@itemize~%")
+	  (dolist (slot documented-slots)
+	    (format s "@item ~(@code{~A} ~@[--- initargs: @code{~{@w{~S}~^, ~}}~]~)~%~%~A~%"
+		    (sb-mop:slot-definition-name slot)
+		    (sb-mop:slot-definition-initargs slot)
+		    (frob-docstring (documentation slot t) nil)))
+	  (format s "@end itemize~%~%"))))
+    (write-string (frob-docstring docstring (ignore-errors (argument-list symbol))) s)))
+
 (defun def-end (symbol kind)
   (declare (ignore symbol))
   (ecase kind
@@ -436,15 +485,7 @@
     (with-open-file (out filename :direction :output
                          :if-does-not-exist :create :if-exists :supersede)
       (loop for (symbol kind docstring) in docs
-           do (format out "~&@anchor{~A}~%~A ~A:~A~@[ ~A~]~%~A~&~A~%~A~%~%"
-                      (unique-name symbol package kind)
-                      (def-begin symbol kind)
-                      (texinfoify (package-name package))
-                      (texinfoify symbol)
-                      (def-arglist symbol kind)
-                      (def-index symbol kind)
-                      (frob-docstring docstring (argument-list symbol))
-                      (def-end symbol kind))))
+           do (write-texinfo out package symbol kind docstring)))
     filename))
 
 (defun docstrings-to-texinfo (directory &rest packages)
@@ -469,13 +510,16 @@
                               directory)
                              :direction :output
                              :if-does-not-exist :create :if-exists :supersede)
-              (format out "~&@anchor{~A}~%~A ~A:~A~@[ ~A~]~%~A~&~A~%~A~%~%"
-                      (unique-name symbol package kind)
-                      (def-begin symbol kind)
-                      (texinfoify (package-name package))
-                      (texinfoify symbol)
-                      (def-arglist symbol kind)
-                      (def-index symbol kind)
-                      (frob-docstring docstring (ignore-errors (argument-list symbol)))
-                      (def-end symbol kind)))))
+	      (write-texinfo out package symbol kind docstring))))
     directory))
+
+(defun write-texinfo (stream package symbol kind docstring)
+  (format stream "~&@anchor{~A}~%~A ~A:~A~@[ ~A~]~%~A~&~A~%~A~%~%"
+	  (unique-name symbol package kind)
+	  (def-begin symbol kind)
+	  (texinfoify (package-name package))
+	  (texinfoify symbol)
+	  (def-arglist symbol kind)
+	  (def-index symbol kind)
+	  (def-body symbol kind docstring)
+	  (def-end symbol kind)))

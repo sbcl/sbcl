@@ -1,3 +1,8 @@
+;;;; the old documentation extracted / generator for db-sockets / sb-bsd-sockets
+;;;;
+;;;; Not used anymore as the documentation is now integrated into the user manual,
+;;;; but I didn't have heart yet to delete this. -- NS 20040801
+
 (eval-when (:load-toplevel :compile-toplevel :execute)
   (defpackage :db-doc (:use  :cl :asdf #+sbcl :sb-ext #+cmu :ext )))
 (in-package :db-doc)
