@@ -45,7 +45,7 @@
 
 (defun binding-stack-usage ()
   (- (sb!sys:sap-int (sb!c::binding-stack-pointer-sap))
-     (sb!vm:binding-stack-start)))
+     sb!vm:binding-stack-start))
 
 ;;;; ROOM
 

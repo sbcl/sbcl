@@ -139,30 +139,44 @@
 ;;;     stomping on an address range that the dynamic libraries want to use. 
 ;;;     (They want to use this address range even if we try to reserve it
 ;;;     with a call to validate() as the first operation in main().)
+
 #!+linux
 (progn
 
   (defconstant read-only-space-start #x01000000)
+  (defconstant read-only-space-end   #x037ff000)
 
   (defconstant static-space-start    #x05000000)
+  (defconstant static-space-end      #x07fff000)
 
   (defconstant dynamic-space-start   #x09000000)
+  (defconstant dynamic-space-end     #x29000000)
 
   (defconstant control-stack-start   #x50000000)
-  (defconstant control-stack-end     #x57fff000))
+  (defconstant control-stack-end     #x57fff000)
+
+  (defconstant binding-stack-start   #x60000000)
+  (defconstant binding-stack-end     #x67fff000))
+
 #!+bsd
 (progn
 
   (defconstant read-only-space-start #x10000000)
+  (defconstant read-only-space-end   #x1ffff000)
 
   (defconstant static-space-start
     #!+freebsd #x30000000
     #!+openbsd #x28000000)
+  (defconstant static-space-end      #x37fff000)
+
+  (defconstant binding-stack-start   #x38000000)
+  (defconstant binding-stack-end     #x3ffff000)
 
   (defconstant control-stack-start   #x40000000)
-  (defconstant control-stack-end     #x07fff000)
+  (defconstant control-stack-end     #x47fff000)
 
-  (defconstant dynamic-space-start   #x48000000))
+  (defconstant dynamic-space-start   #x48000000)
+  (defconstant dynamic-space-end     #x88000000))
 
 ;;; Given that NIL is the first thing allocated in static space, we
 ;;; know its value at compile time:
@@ -274,9 +288,6 @@
 
     ;; used by gencgc
     sb!vm::*scavenge-read-only-space*
-
-    ;; multi-process support
-    sb!vm::*control-stacks*
 
     ;; The ..SLOT-UNBOUND.. symbol is static in order to optimise the
     ;; common slot unbound check.

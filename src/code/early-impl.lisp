@@ -45,7 +45,6 @@
 		  sb!vm::*fp-constant-lg2*
 		  sb!vm::*fp-constant-ln2*
 		  sb!vm::*scavenge-read-only-space*
-		  sb!vm::*control-stacks*
 		  sb!pcl::..slot-unbound..
 		  sb!vm::*x86-cgc-active-p*
 		  sb!vm::*static-blue-bag*))
