@@ -1530,7 +1530,7 @@
 
 (defun case-frob-upcase-out (stream char)
   (declare (type case-frob-stream stream)
-	   (type base-char char))
+	   (type character char))
   (let ((target (case-frob-stream-target stream))
 	(char (char-upcase char)))
     (if (ansi-stream-p target)
@@ -1555,7 +1555,7 @@
 
 (defun case-frob-downcase-out (stream char)
   (declare (type case-frob-stream stream)
-	   (type base-char char))
+	   (type character char))
   (let ((target (case-frob-stream-target stream))
 	(char (char-downcase char)))
     (if (ansi-stream-p target)
@@ -1580,7 +1580,7 @@
 
 (defun case-frob-capitalize-out (stream char)
   (declare (type case-frob-stream stream)
-	   (type base-char char))
+	   (type character char))
   (let ((target (case-frob-stream-target stream)))
     (cond ((alphanumericp char)
 	   (let ((char (char-upcase char)))
@@ -1624,7 +1624,7 @@
 
 (defun case-frob-capitalize-aux-out (stream char)
   (declare (type case-frob-stream stream)
-	   (type base-char char))
+	   (type character char))
   (let ((target (case-frob-stream-target stream)))
     (cond ((alphanumericp char)
 	   (let ((char (char-downcase char)))
@@ -1669,7 +1669,7 @@
 
 (defun case-frob-capitalize-first-out (stream char)
   (declare (type case-frob-stream stream)
-	   (type base-char char))
+	   (type character char))
   (let ((target (case-frob-stream-target stream)))
     (cond ((alphanumericp char)
 	   (let ((char (char-upcase char)))

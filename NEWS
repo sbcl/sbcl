@@ -47,6 +47,8 @@ changes in sbcl-0.8.17 relative to sbcl-0.8.16:
     ** CERROR, given a condition as condition designator, passes its
        remaining arguments to the continue format control without
        complaint.
+    ** Case-altering FORMAT directives work correctly on non-ASCII
+       characters.
 
 changes in sbcl-0.8.16 relative to sbcl-0.8.15:
   * enhancement: saving cores with foreign code loaded is now
