@@ -126,7 +126,7 @@ os_validate(os_vm_address_t addr, os_vm_size_t len)
     under_2gb_free_pointer+=len;
 #endif
 
-    return addr;
+    return actual;
 }
 
 void

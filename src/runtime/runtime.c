@@ -461,6 +461,10 @@ static void /* noreturn */ parent_loop(void)
     sa.sa_flags=0;
     sigaction(SIGINT, &sa, 0);
 
+    while(!all_threads) {
+	sched_yield();
+    }
+
     while(all_threads) {
 	pid_t pid=0;
 	while(pid=waitpid(-1,&status,__WALL|WUNTRACED)) {
