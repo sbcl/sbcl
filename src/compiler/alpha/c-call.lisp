@@ -67,8 +67,6 @@
 			  'single-stack
 			  (* 2 (- stack-frame-size 6))))))
 
-
-
 (define-alien-type-method (integer :result-tn) (type state)
   (declare (ignore state))
   (multiple-value-bind
@@ -113,7 +111,7 @@
   (:translate foreign-symbol-address)
   (:policy :fast-safe)
   (:args)
-  (:arg-types (:constant simple-base-string))
+  (:arg-types (:constant simple-string))
   (:info foreign-symbol)
   (:results (res :scs (sap-reg)))
   (:result-types system-area-pointer)

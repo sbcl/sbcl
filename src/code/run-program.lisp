@@ -347,7 +347,9 @@
 	(declare (simple-string s))
 	(let ((n (length s)))
 	  ;; Blast the string into place.
-	  (sb-kernel:copy-to-system-area (the simple-string s)
+	  (sb-kernel:copy-to-system-area (the simple-base-string
+                                           ;; FIXME
+                                           (coerce s 'simple-base-string))
 					 (* sb-vm:vector-data-offset
 					    sb-vm:n-word-bits)
 					 string-sap 0
@@ -615,7 +617,7 @@
 ;;; stream.
 (defun copy-descriptor-to-stream (descriptor stream cookie)
   (incf (car cookie))
-  (let ((string (make-string 256))
+  (let ((string (make-string 256 :element-type 'base-char))
 	handler)
     (setf handler
 	  (sb-sys:add-fd-handler
@@ -684,7 +686,7 @@
 	 ;; Use /dev/null.
 	 (multiple-value-bind
 	       (fd errno)
-	     (sb-unix:unix-open "/dev/null"
+	     (sb-unix:unix-open #.(coerce "/dev/null" 'base-string)
 				(case direction
 				  (:input sb-unix:o_rdonly)
 				  (:output sb-unix:o_wronly)
@@ -736,7 +738,7 @@
 	    (dotimes (count
 		       256
 		      (error "could not open a temporary file in /tmp"))
-	      (let* ((name (format nil "/tmp/.run-program-~D" count))
+	      (let* ((name (coerce (format nil "/tmp/.run-program-~D" count) 'base-string))
 		     (fd (sb-unix:unix-open name
 					    (logior sb-unix:o_rdwr
 						    sb-unix:o_creat

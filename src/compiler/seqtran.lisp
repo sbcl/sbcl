@@ -771,7 +771,8 @@
              (declare (ignore rtype))
              (let* (,@lets
                       (res (make-string (truncate (the index (+ ,@all-lengths))
-                                                  sb!vm:n-byte-bits))))
+                                                  sb!vm:n-byte-bits)
+                                        :element-type 'base-char)))
                (declare (type index ,@all-lengths))
                (let (,@(mapcar (lambda (name) `(,name 0)) starts))
                  (declare (type index ,@starts))

@@ -608,9 +608,10 @@
 
 ;;;; copying simple objects into the cold core
 
-(defun string-to-core (string &optional (gspace *dynamic*))
+(defun base-string-to-core (string &optional (gspace *dynamic*))
   #!+sb-doc
-  "Copy string into the cold core and return a descriptor to it."
+  "Copy STRING (which must only contain STANDARD-CHARs) into the cold
+core and return a descriptor to it."
   ;; (Remember that the system convention for storage of strings leaves an
   ;; extra null byte at the end to aid in call-out to C.)
   (let* ((length (length string))
@@ -808,7 +809,7 @@
 		       (make-fixnum-descriptor 0))
     (write-wordindexed symbol sb!vm:symbol-plist-slot *nil-descriptor*)
     (write-wordindexed symbol sb!vm:symbol-name-slot
-		       (string-to-core name *dynamic*))
+		       (base-string-to-core name *dynamic*))
     (write-wordindexed symbol sb!vm:symbol-package-slot *nil-descriptor*)
     symbol))
 
@@ -1194,7 +1195,7 @@
 		       ;; because that's the way CMU CL did it; I'm
 		       ;; not sure whether there's an underlying
 		       ;; reason. -- WHN 1990826
-		       (string-to-core "NIL" *dynamic*))
+		       (base-string-to-core "NIL" *dynamic*))
     (write-wordindexed des
 		       (+ 1 sb!vm:symbol-package-slot)
 		       result)
@@ -1279,7 +1280,7 @@
       (let* ((cold-package (car cold-package-symbols-entry))
 	     (symbols (cdr cold-package-symbols-entry))
 	     (shadows (package-shadowing-symbols cold-package))
-	     (documentation (string-to-core (documentation cold-package t)))
+	     (documentation (base-string-to-core (documentation cold-package t)))
 	     (internal *nil-descriptor*)
 	     (external *nil-descriptor*)
 	     (imported-internal *nil-descriptor*)
@@ -1359,7 +1360,7 @@
 	 (res *nil-descriptor*))
     (dolist (u (package-use-list pkg))
       (when (assoc u *cold-package-symbols*)
-	(cold-push (string-to-core (package-name u)) use)))
+	(cold-push (base-string-to-core (package-name u)) use)))
     (let* ((pkg-name (package-name pkg))
 	   ;; Make the package nickname lists for the standard packages
 	   ;; be the minimum specified by ANSI, regardless of what value
@@ -1380,7 +1381,7 @@
 				 (t
 				  (package-nicknames pkg)))))
       (dolist (warm-nickname warm-nicknames)
-	(cold-push (string-to-core warm-nickname) cold-nicknames)))
+	(cold-push (base-string-to-core warm-nickname) cold-nicknames)))
 
     (cold-push (number-to-core (truncate (package-internal-symbol-count pkg)
 					 0.8))
@@ -1397,7 +1398,7 @@
     (cold-push use res)
     (cold-push (cold-intern :use) res)
 
-    (cold-push (string-to-core (package-name pkg)) res)
+    (cold-push (base-string-to-core (package-name pkg)) res)
     res))
 
 ;;;; functions and fdefinition objects
@@ -1850,7 +1851,7 @@
 (defun foreign-symbols-to-core ()
   (let ((result *nil-descriptor*))
     (maphash (lambda (symbol value)
-	       (cold-push (cold-cons (string-to-core symbol)
+	       (cold-push (cold-cons (base-string-to-core symbol)
 				     (number-to-core value))
 			  result))
 	     *cold-foreign-symbol-table*)
@@ -2103,7 +2104,7 @@
   (let* ((len (clone-arg))
 	 (string (make-string len)))
     (read-string-as-bytes *fasl-input-stream* string)
-    (string-to-core string)))
+    (base-string-to-core string)))
 
 (clone-cold-fop (fop-vector)
 		(fop-small-vector)

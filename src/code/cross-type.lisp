@@ -82,6 +82,9 @@
 		  'fixnum)
 		 (t
 		  'integer)))
+          ((subtypep raw-result 'simple-string)
+           `(simple-base-string ,(length object)))
+          ((subtypep raw-result 'string) 'base-string)
 	  ((some (lambda (type) (subtypep raw-result type))
 		 '(array character list symbol))
 	   raw-result)

@@ -332,11 +332,19 @@
       (immediate-constant "Immed"))))
 
 ;;; The loader uses this to convert alien names to the form they
-;;; occur in the symbol table.  This is ELF, so do nothing.
+;;; occur in the symbol table.
 
 (defun extern-alien-name (name)
-  (declare (type simple-base-string name))
-  ;; Darwin is non-ELF, and needs a _ prefix
-  #!+darwin (concatenate 'string "_" name)
-  ;; The other (ELF) ports currently don't need any prefix
-  #!-darwin name)
+  (declare (type string name))
+  ;; Darwin is non-ELF, and needs a _ prefix. The other (ELF) ports
+  ;; currently don't need any prefix.
+  (flet ((maybe-prefix (name)
+            #!+darwin (concatenate 'simple-base-string "_" name)
+            #!-darwin name))
+    (typecase name
+      (simple-base-string (maybe-prefix name))
+      (base-string (coerce (maybe-prefix name) 'simple-base-string))
+      (t
+       (handler-case (coerce (maybe-prefix name) 'simple-base-string)
+        (type-error ()
+          (error "invalid external alien name: ~S" name)))))))

@@ -352,5 +352,10 @@
       (immediate-constant "Immed"))))
 
 (defun extern-alien-name (name)
-  (declare (type simple-base-string name))
-  name)
+  (declare (type string name))
+  ;; ELF ports currently don't need any prefix
+  (typecase name
+    (simple-base-string name)
+    (base-string (coerce name 'simple-base-string))
+    (t (handler-case (coerce name 'simple-base-string)
+	 (type-error () (error "invalid external alien name: ~S" name))))))

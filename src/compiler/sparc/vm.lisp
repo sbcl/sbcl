@@ -372,5 +372,10 @@
 ;;; occure in the symbol table (for example, prepending an
 ;;; underscore).  On the SPARC, we don't prepend an underscore.
 (defun extern-alien-name (name)
-  (declare (type simple-base-string name))
-  (concatenate 'string #+nil "_" name))
+  (declare (type string name))
+  ;; ELF ports currently don't need any prefix
+  (typecase name
+    (simple-base-string name)
+    (base-string (coerce name 'simple-base-string))
+    (t (handler-case (coerce name 'simple-base-string)
+	 (type-error () (error "invalid external alien name: ~S" name))))))

@@ -1,3 +1,14 @@
+;;;; VOPs and other machine-specific support routines for call-out to C
+
+;;;; This software is part of the SBCL system. See the README file for
+;;;; more information.
+;;;;
+;;;; This software is derived from the CMU CL system, which was
+;;;; written at Carnegie Mellon University and released into the
+;;;; public domain. The software is in the public domain and is
+;;;; provided with absolutely no warranty. See the COPYING and CREDITS
+;;;; files for more information.
+
 (in-package "SB!VM")
 
 (defun my-make-wired-tn (prim-type-name sc-name offset)
@@ -101,12 +112,11 @@
 	     :result-tn
 	     (alien-fun-type-result-type type)))))
 
-
 (define-vop (foreign-symbol-address)
   (:translate foreign-symbol-address)
   (:policy :fast-safe)
   (:args)
-  (:arg-types (:constant simple-base-string))
+  (:arg-types (:constant simple-string))
   (:info foreign-symbol)
   (:results (res :scs (sap-reg)))
   (:result-types system-area-pointer)
@@ -135,7 +145,6 @@
       (inst nop)
       (when cur-nfp
 	(load-stack-tn cur-nfp nfp-save)))))
-
 
 (define-vop (alloc-number-stack-space)
   (:info amount)
