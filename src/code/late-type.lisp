@@ -22,14 +22,8 @@
 
 ;;; ### Remaining incorrectnesses:
 ;;;
-;;; TYPE-UNION (and the OR type) doesn't properly canonicalize an
-;;; exhaustive partition or coalesce contiguous ranges of numeric
-;;; types.
-;;;
 ;;; There are all sorts of nasty problems with open bounds on FLOAT
 ;;; types (and probably FLOAT types in general.)
-;;;
-;;; RATIO and BIGNUM are not recognized as numeric types.
 
 ;;; FIXME: This really should go away. Alas, it doesn't seem to be so
 ;;; simple to make it go away.. (See bug 123 in BUGS file.)
@@ -1349,6 +1343,39 @@
 	      (mapcar #'(lambda (x)
 			  (specifier-type `(not ,(type-specifier x))))
 		      (union-type-types not-type))))
+      ((member-type-p not-type)
+       (let ((members (member-type-members not-type)))
+	 (if (some #'floatp members)
+	     (let (floats)
+	       (dolist (pair '((0.0f0 . -0.0f0) (0.0d0 . -0.0d0)
+			       #!+long-float (0.0l0 . -0.0l0)))
+		 (when (member (car pair) members)
+		   (aver (not (member (cdr pair) members)))
+		   (push (cdr pair) floats)
+		   (setf members (remove (car pair) members)))
+		 (when (member (cdr pair) members)
+		   (aver (not (member (car pair) members)))
+		   (push (car pair) floats)
+		   (setf members (remove (cdr pair) members))))
+	       (apply #'type-intersection
+		      (if (null members)
+			  *universal-type*
+			  (make-negation-type
+			   :type (make-member-type :members members)))
+		      (mapcar
+		       (lambda (x)
+			 (let ((type (ctype-of x)))
+			   (type-union
+			    (make-negation-type
+			     :type (modified-numeric-type type
+							  :low nil :high nil))
+			    (modified-numeric-type type
+						   :low nil :high (list x))
+			    (make-member-type :members (list x))
+			    (modified-numeric-type type
+						   :low (list x) :high nil))))
+		       floats)))
+	     (make-negation-type :type not-type))))
       ((and (cons-type-p not-type)
 	    (eq (cons-type-car-type not-type) *universal-type*)
 	    (eq (cons-type-cdr-type not-type) *universal-type*))
@@ -2356,6 +2383,10 @@
       (let (ms numbers)
 	(dolist (m (remove-duplicates members))
 	  (typecase m
+	    #!-negative-zero-is-not-zero
+	    (float (if (zerop m)
+		       (push m ms)
+		       (push (ctype-of m) numbers)))
 	    (number (push (ctype-of m) numbers))
 	    (t (push m ms))))
 	(apply #'type-union

@@ -246,9 +246,41 @@
 				  (class-info (type-class-or-lose 'member))
 				  (enumerable t))
 			(:copier nil)
+			(:constructor %make-member-type (members))
 			#-sb-xc-host (:pure nil))
   ;; the things in the set, with no duplications
   (members nil :type list))
+(defun make-member-type (&key members)
+  (declare (type list members))
+  ;; make sure that we've removed duplicates
+  (aver (= (length members) (length (remove-duplicates members))))
+  ;; if we have a pair of zeros (e.g. 0.0d0 and -0.0d0), then we can
+  ;; canonicalize to (DOUBLE-FLOAT 0.0d0 0.0d0), because numeric
+  ;; ranges are compared by arithmetic operators (while MEMBERship is
+  ;; compared by EQL).  -- CSR, 2003-04-23
+  (let ((singlep (subsetp '(-0.0f0 0.0f0) members))
+	(doublep (subsetp '(-0.0d0 0.0d0) members))
+	#!+long-float
+	(longp (subsetp '(-0.0l0 0.0l0) members)))
+    (if (or singlep doublep #!+long-float longp)
+	(let (union-types)
+	  (when singlep
+	    (push (ctype-of 0.0f0) union-types)
+	    (setf members (set-difference members '(-0.0f0 0.0f0))))
+	  (when doublep
+	    (push (ctype-of 0.0d0) union-types)
+	    (setf members (set-difference members '(-0.0d0 0.0d0))))
+	  #!+long-float
+	  (when longp
+	    (push (ctype-of 0.0l0) union-types)
+	    (setf members (set-difference members '(-0.0l0 0.0l0))))
+	  (aver (not (null union-types)))
+	  (make-union-type t
+			   (if (null members)
+			       union-types
+			       (cons (%make-member-type members)
+				     union-types))))
+	(%make-member-type members))))
 
 ;;; A COMPOUND-TYPE is a type defined out of a set of types, the
 ;;; common parent of UNION-TYPE and INTERSECTION-TYPE.

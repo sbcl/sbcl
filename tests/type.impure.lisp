@@ -198,6 +198,32 @@
 ;;; uncertainty, to wit:
 (assert-t-t (subtypep '(and (mod 536870911) (or (integer 0 0) (integer 2 536870912)))
 		      '(mod 536870911))) ; aka SB-INT:INDEX.
+;;; floating point types can be tricky.
+(assert-t-t (subtypep '(member 0.0) '(single-float 0.0 0.0)))
+(assert-t-t (subtypep '(member -0.0) '(single-float 0.0 0.0)))
+(assert-t-t (subtypep '(member 0.0) '(single-float -0.0 0.0)))
+(assert-t-t (subtypep '(member -0.0) '(single-float 0.0 -0.0)))
+(assert-t-t (subtypep '(member 0.0d0) '(double-float 0.0d0 0.0d0)))
+(assert-t-t (subtypep '(member -0.0d0) '(double-float 0.0d0 0.0d0)))
+(assert-t-t (subtypep '(member 0.0d0) '(double-float -0.0d0 0.0d0)))
+(assert-t-t (subtypep '(member -0.0d0) '(double-float 0.0d0 -0.0d0)))
+
+(assert-nil-t (subtypep '(single-float 0.0 0.0) '(member 0.0)))
+(assert-nil-t (subtypep '(single-float 0.0 0.0) '(member -0.0)))
+(assert-nil-t (subtypep '(single-float -0.0 0.0) '(member 0.0)))
+(assert-nil-t (subtypep '(single-float 0.0 -0.0) '(member -0.0)))
+(assert-nil-t (subtypep '(double-float 0.0d0 0.0d0) '(member 0.0d0)))
+(assert-nil-t (subtypep '(double-float 0.0d0 0.0d0) '(member -0.0d0)))
+(assert-nil-t (subtypep '(double-float -0.0d0 0.0d0) '(member 0.0d0)))
+(assert-nil-t (subtypep '(double-float 0.0d0 -0.0d0) '(member -0.0d0)))
+
+(assert-t-t (subtypep '(member 0.0 -0.0) '(single-float 0.0 0.0)))
+(assert-t-t (subtypep '(single-float 0.0 0.0) '(member 0.0 -0.0)))
+(assert-t-t (subtypep '(member 0.0d0 -0.0d0) '(double-float 0.0d0 0.0d0)))
+(assert-t-t (subtypep '(double-float 0.0d0 0.0d0) '(member 0.0d0 -0.0d0)))
+
+(assert-t-t (subtypep '(not (single-float 0.0 0.0)) '(not (member 0.0))))
+(assert-t-t (subtypep '(not (double-float 0.0d0 0.0d0)) '(not (member 0.0d0))))
 
 ;;;; Douglas Thomas Crosher rewrote the CMU CL type test system to
 ;;;; allow inline type tests for CONDITIONs and STANDARD-OBJECTs, and

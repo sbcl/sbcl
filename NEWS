@@ -1668,6 +1668,9 @@ changes in sbcl-0.8.0 relative to sbcl-0.7.14
     this you were probably losing anyway.
   * sb-aclrepl module improvements: an integrated inspector, added
     repl features, and a bug fix to :trace command.
+  * fixed bug in MEMBER type: (MEMBER 0.0) is not the same as
+    (SINGLE-FLOAT 0.0 0.0), because of the existence of -0.0 which is
+    TYPEP the latter but not the former.
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** COPY-ALIST now signals an error if its argument is a dotted
        list;

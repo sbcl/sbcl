@@ -55,7 +55,7 @@
   (declare (type single-float x))
   (assert (= (float-radix x) 2))
   (if (zerop x)
-      0 ; known property of IEEE floating point: 0.0 is represented as 0.
+      (if (eql x 0.0f0) 0 #x-80000000)
       (multiple-value-bind (lisp-significand lisp-exponent lisp-sign)
 	  (integer-decode-float x)
 	(assert (plusp lisp-significand))
@@ -117,7 +117,7 @@
   (declare (type double-float x))
   (assert (= (float-radix x) 2))
   (if (zerop x)
-      0 ; known property of IEEE floating point: 0.0d0 is represented as 0.
+      (if (eql x 0.0d0) 0 #x-8000000000000000)
       ;; KLUDGE: As per comments in SINGLE-FLOAT-BITS, above.
       (multiple-value-bind (lisp-significand lisp-exponent lisp-sign)
 	  (integer-decode-float x)
@@ -177,7 +177,7 @@
 (defun double-float-high-bits (x)
   (declare (type double-float x))
   (if (zerop x)
-      0
+      (if (eql x 0.0d0) 0 #x-80000000)
       (mask-and-sign-extend (ash (double-float-bits x) -32) 32)))
 
 ;;; KLUDGE: This is a hack to work around a bug in CMU CL 18c which
@@ -210,26 +210,30 @@
 ;;; workarounds *do* look messy to me, which is why I just went
 ;;; with this quick kludge instead.) -- WHN 19990711
 (defun make-single-float (bits)
-  (if (zerop bits) ; IEEE float special case
-      0.0
-      (let ((sign (ecase (ldb (byte 1 31) bits)
-		    (0  1.0)
-		    (1 -1.0)))
-	    (expt (- (ldb (byte 8 23) bits) 127))
-	    (mant (* (logior (ldb (byte 23 0) bits)
-			     (ash 1 23))
-		     (expt 0.5 23))))
-	(* sign (kludge-opaque-expt 2.0 expt) mant))))
+  (cond
+    ;; IEEE float special cases
+    ((zerop bits) 0.0)
+    ((= bits #x-80000000) -0.0)
+    (t (let ((sign (ecase (ldb (byte 1 31) bits)
+		     (0  1.0)
+		     (1 -1.0)))
+	     (expt (- (ldb (byte 8 23) bits) 127))
+	     (mant (* (logior (ldb (byte 23 0) bits)
+			      (ash 1 23))
+		      (expt 0.5 23))))
+	 (* sign (kludge-opaque-expt 2.0 expt) mant)))))
 
 (defun make-double-float (hi lo)
-  (if (and (zerop hi) (zerop lo)) ; IEEE float special case
-      0.0d0
-      (let* ((bits (logior (ash hi 32) lo))
-	     (sign (ecase (ldb (byte 1 63) bits)
-		     (0  1.0d0)
-		     (1 -1.0d0)))
-	     (expt (- (ldb (byte 11 52) bits) 1023))
-	     (mant (* (logior (ldb (byte 52 0) bits)
-			      (ash 1 52))
-		      (expt 0.5d0 52))))
-	(* sign (kludge-opaque-expt 2.0d0 expt) mant))))
+  (cond
+    ;; IEEE float special cases
+    ((and (zerop hi) (zerop lo)) 0.0d0)
+    ((and (= hi #x-80000000) (zerop lo)) -0.0d0)
+    (t (let* ((bits (logior (ash hi 32) lo))
+	      (sign (ecase (ldb (byte 1 63) bits)
+		      (0  1.0d0)
+		      (1 -1.0d0)))
+	      (expt (- (ldb (byte 11 52) bits) 1023))
+	      (mant (* (logior (ldb (byte 52 0) bits)
+			       (ash 1 52))
+		       (expt 0.5d0 52))))
+	 (* sign (kludge-opaque-expt 2.0d0 expt) mant)))))

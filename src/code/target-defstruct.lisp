@@ -401,6 +401,15 @@
   (let* ((layout (%instance-layout structure))
 	 (name (classoid-name (layout-classoid layout)))
 	 (dd (layout-info layout)))
+    ;; KLUDGE: during the build process with SB-SHOW, we can sometimes
+    ;; attempt to print out a PCL object (with null LAYOUT-INFO).
+    #!+sb-show
+    (when (null dd)
+      (pprint-logical-block (stream nil :prefix "#<" :suffix ">")
+	(prin1 name stream)
+	(write-char #\space stream)
+	(write-string "(no LAYOUT-INFO)"))
+      (return-from %default-structure-pretty-print nil))
     (pprint-logical-block (stream nil :prefix "#S(" :suffix ")")
       (prin1 name stream)
       (let ((remaining-slots (dd-slots dd)))
