@@ -61,7 +61,7 @@
 (defun emit-n-n-readers ()
   (emit-one-or-n-index-reader/writer :reader t nil))
 
-(defun emit-n-n-boundp ()
+(defun emit-n-n-boundps ()
   (emit-one-or-n-index-reader/writer :boundp t nil))
 
 (defun emit-n-n-writers ()
