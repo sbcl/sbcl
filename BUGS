@@ -1434,3 +1434,9 @@ WORKAROUND:
     The value "/" is not of type PATHNAME.
   According to the PARSE-NAMESTRING dictionary entry the
   default-pathname parameter can be any pathname designator.
+
+331: "lazy creation of CLOS classes for user-defined conditions"
+    (defstruct foo)
+    (defstruct (bar (:include foo)))
+    (sb-mop:class-direct-subclasses (find-class 'foo))
+  returns NIL, rather than a singleton list containing the BAR class.
