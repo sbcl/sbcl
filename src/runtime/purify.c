@@ -611,80 +611,82 @@ ptrans_vector(lispobj thing, int bits, int extra,
 static void
 apply_code_fixups_during_purify(struct code *old_code, struct code *new_code)
 {
-  int nheader_words, ncode_words, nwords;
-  void  *constants_start_addr, *constants_end_addr;
-  void  *code_start_addr, *code_end_addr;
-  lispobj fixups = NIL;
-  unsigned  displacement = (unsigned)new_code - (unsigned)old_code;
-  struct vector *fixups_vector;
+    int nheader_words, ncode_words, nwords;
+    void  *constants_start_addr, *constants_end_addr;
+    void  *code_start_addr, *code_end_addr;
+    lispobj fixups = NIL;
+    unsigned  displacement = (unsigned)new_code - (unsigned)old_code;
+    struct vector *fixups_vector;
 
-  ncode_words = fixnum_value(new_code->code_size);
-  nheader_words = HeaderValue(*(lispobj *)new_code);
-  nwords = ncode_words + nheader_words;
+    ncode_words = fixnum_value(new_code->code_size);
+    nheader_words = HeaderValue(*(lispobj *)new_code);
+    nwords = ncode_words + nheader_words;
 
-  constants_start_addr = (void *)new_code + 5*4;
-  constants_end_addr = (void *)new_code + nheader_words*4;
-  code_start_addr = (void *)new_code + nheader_words*4;
-  code_end_addr = (void *)new_code + nwords*4;
+    constants_start_addr = (void *)new_code + 5*4;
+    constants_end_addr = (void *)new_code + nheader_words*4;
+    code_start_addr = (void *)new_code + nheader_words*4;
+    code_end_addr = (void *)new_code + nwords*4;
 
-  /* The first constant should be a pointer to the fixups for this
-   * code objects. Check. */
-  fixups = new_code->constants[0];
+    /* The first constant should be a pointer to the fixups for this
+     * code objects. Check. */
+    fixups = new_code->constants[0];
 
-  /* It will be 0 or the unbound-marker if there are no fixups, and
-   * will be an other-pointer to a vector if it is valid. */
-  if ((fixups==0) ||
-      (fixups==UNBOUND_MARKER_WIDETAG) ||
-      !is_lisp_pointer(fixups)) {
+    /* It will be 0 or the unbound-marker if there are no fixups, and
+     * will be an other-pointer to a vector if it is valid. */
+    if ((fixups==0) ||
+	(fixups==UNBOUND_MARKER_WIDETAG) ||
+	!is_lisp_pointer(fixups)) {
 #ifdef GENCGC
-    /* Check for a possible errors. */
-    sniff_code_object(new_code,displacement);
+	/* Check for a possible errors. */
+	sniff_code_object(new_code,displacement);
 #endif
-    return;
-  }
-
-  fixups_vector = (struct vector *)native_pointer(fixups);
-
-  /* Could be pointing to a forwarding pointer. */
-  if (is_lisp_pointer(fixups) && (dynamic_pointer_p(fixups))
-      && forwarding_pointer_p(*(lispobj *)fixups_vector)) {
-    /* If so then follow it. */
-    fixups_vector = (struct vector *)native_pointer(*(lispobj *)fixups_vector);
-  }
-
-  if (widetag_of(fixups_vector->header) ==
-      SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG) {
-    /* We got the fixups for the code block. Now work through the vector,
-     * and apply a fixup at each address. */
-    int length = fixnum_value(fixups_vector->length);
-    int i;
-    for (i=0; i<length; i++) {
-      unsigned offset = fixups_vector->data[i];
-      /* Now check the current value of offset. */
-      unsigned  old_value = *(unsigned *)((unsigned)code_start_addr + offset);
-
-      /* If it's within the old_code object then it must be an
-       * absolute fixup (relative ones are not saved) */
-      if ((old_value>=(unsigned)old_code)
-	  && (old_value<((unsigned)old_code + nwords*4)))
-	/* So add the dispacement. */
-	*(unsigned *)((unsigned)code_start_addr + offset) = old_value
-	  + displacement;
-      else
-	/* It is outside the old code object so it must be a relative
-	 * fixup (absolute fixups are not saved). So subtract the
-	 * displacement. */
-	*(unsigned *)((unsigned)code_start_addr + offset) = old_value
-	  - displacement;
+	return;
     }
-  }
 
-  /* No longer need the fixups. */
-  new_code->constants[0] = 0;
+    fixups_vector = (struct vector *)native_pointer(fixups);
+
+    /* Could be pointing to a forwarding pointer. */
+    if (is_lisp_pointer(fixups) && (dynamic_pointer_p(fixups))
+	&& forwarding_pointer_p(*(lispobj *)fixups_vector)) {
+	/* If so then follow it. */
+	fixups_vector =
+	    (struct vector *)native_pointer(*(lispobj *)fixups_vector);
+    }
+
+    if (widetag_of(fixups_vector->header) ==
+	SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG) {
+	/* We got the fixups for the code block. Now work through the
+	 * vector, and apply a fixup at each address. */
+	int length = fixnum_value(fixups_vector->length);
+	int i;
+	for (i=0; i<length; i++) {
+	    unsigned offset = fixups_vector->data[i];
+	    /* Now check the current value of offset. */
+	    unsigned old_value =
+		*(unsigned *)((unsigned)code_start_addr + offset);
+
+	    /* If it's within the old_code object then it must be an
+	     * absolute fixup (relative ones are not saved) */
+	    if ((old_value>=(unsigned)old_code)
+		&& (old_value<((unsigned)old_code + nwords*4)))
+		/* So add the dispacement. */
+		*(unsigned *)((unsigned)code_start_addr + offset) = old_value
+		    + displacement;
+	    else
+		/* It is outside the old code object so it must be a relative
+		 * fixup (absolute fixups are not saved). So subtract the
+		 * displacement. */
+		*(unsigned *)((unsigned)code_start_addr + offset) = old_value
+		    - displacement;
+	}
+    }
+
+    /* No longer need the fixups. */
+    new_code->constants[0] = 0;
 
 #ifdef GENCGC
-  /* Check for possible errors. */
-  sniff_code_object(new_code,displacement);
+    /* Check for possible errors. */
+    sniff_code_object(new_code,displacement);
 #endif
 }
 #endif

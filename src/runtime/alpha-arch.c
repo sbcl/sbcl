@@ -99,7 +99,7 @@ arch_skip_instruction(os_context_t *context)
 unsigned char *
 arch_internal_error_arguments(os_context_t *context)
 {
-  return (unsigned char *)(*os_context_pc_addr(context)+4);
+    return (unsigned char *)(*os_context_pc_addr(context)+4);
 }
 
 boolean
@@ -124,9 +124,9 @@ void arch_set_pseudo_atomic_interrupted(os_context_t *context)
      * didn't use that */
 
 #ifdef __linux__
-  *os_context_register_addr(context,reg_ALLOC) |=  (1L<<63);
+    *os_context_register_addr(context,reg_ALLOC) |=  (1L<<63);
 #else
-  *os_context_register_addr(context,reg_ALLOC) |=  2;
+    *os_context_register_addr(context,reg_ALLOC) |=  2;
 #endif
 }
 
@@ -144,11 +144,11 @@ unsigned long arch_install_breakpoint(void *pc)
 
 void arch_remove_breakpoint(void *pc, unsigned long orig_inst)
 {
-  /* was (unsigned int) but gcc complains.  Changed to mirror
-   * install_breakpoint() above */
-  unsigned long *ptr=(unsigned long *)pc;
-  *ptr = orig_inst;
-  os_flush_icache((os_vm_address_t)pc, sizeof(unsigned long));
+    /* was (unsigned int) but gcc complains.  Changed to mirror
+     * install_breakpoint() above */
+    unsigned long *ptr=(unsigned long *)pc;
+    *ptr = orig_inst;
+    os_flush_icache((os_vm_address_t)pc, sizeof(unsigned long));
 }
 
 static unsigned int *skipped_break_addr, displaced_after_inst,
@@ -156,75 +156,81 @@ static unsigned int *skipped_break_addr, displaced_after_inst,
 
 
 /* This returns a PC value.  Lisp code is all in the 32-bit-addressable
- * space,so we should be ok with an unsigned int. */
+ * space, so we should be ok with an unsigned int. */
 unsigned int
 emulate_branch(os_context_t *context,unsigned long orig_inst)
 {
-  int op = orig_inst >> 26;
-  int reg_a = (orig_inst >> 21) & 0x1f;
-  int reg_b = (orig_inst >> 16) & 0x1f;
-  int disp = (orig_inst&(1<<20)) ? orig_inst | (-1 << 21) : orig_inst&0x1fffff;
-  int next_pc = *os_context_pc_addr(context);
-  int branch = 0; /* was NULL;	       */
+    int op = orig_inst >> 26;
+    int reg_a = (orig_inst >> 21) & 0x1f;
+    int reg_b = (orig_inst >> 16) & 0x1f;
+    int disp =
+	(orig_inst&(1<<20)) ?
+	orig_inst | (-1 << 21) :
+	orig_inst&0x1fffff;
+    int next_pc = *os_context_pc_addr(context);
+    int branch = 0; /* was NULL;	       */
 
-  switch(op) {
-  case 0x1a: /* jmp, jsr, jsr_coroutine, ret */
-    *os_context_register_addr(context,reg_a)=*os_context_pc_addr(context);
-    *os_context_pc_addr(context)=*os_context_register_addr(context,reg_b)& ~3;
-    break;
-  case 0x30: /* br */
-    *os_context_register_addr(context,reg_a)=*os_context_pc_addr(context);
-    branch = 1;
-    break;
-  case 0x31: /* fbeq */
-    if(*(os_context_fpregister_addr(context,reg_a))==0) branch = 1;
-    break;
-  case 0x32: /* fblt */
-    if(*os_context_fpregister_addr(context,reg_a)<0) branch = 1;
-    break;
-  case 0x33: /* fble */
-    if(*os_context_fpregister_addr(context,reg_a)<=0) branch = 1;
-    break;
-  case 0x34: /* bsr */
-    *os_context_register_addr(context,reg_a)=*os_context_pc_addr(context);
-    branch = 1;
-    break;
-  case 0x35: /* fbne */
-    if(*os_context_register_addr(context,reg_a)!=0) branch = 1;
-    break;
-  case 0x36: /* fbge */
-    if(*os_context_fpregister_addr(context,reg_a)>=0) branch = 1;
-    break;
-  case 0x37: /* fbgt */
-    if(*os_context_fpregister_addr(context,reg_a)>0) branch = 1;
-    break;
-  case 0x38: /* blbc */
-    if((*os_context_register_addr(context,reg_a)&1) == 0) branch = 1;
-    break;
-  case 0x39: /* beq */
-    if(*os_context_register_addr(context,reg_a)==0) branch = 1;
-    break;
-  case 0x3a: /* blt */
-    if(*os_context_register_addr(context,reg_a)<0) branch = 1;
-    break;
-  case 0x3b: /* ble */
-    if(*os_context_register_addr(context,reg_a)<=0) branch = 1;
-    break;
-  case 0x3c: /* blbs */
-    if((*os_context_register_addr(context,reg_a)&1)!=0) branch = 1;
-    break;
-  case 0x3d: /* bne */
-    if(*os_context_register_addr(context,reg_a)!=0) branch = 1;
-    break;
-  case 0x3e: /* bge */
-    if(*os_context_register_addr(context,reg_a)>=0) branch = 1;
-    break;
-  case 0x3f: /* bgt */
-    if(*os_context_register_addr(context,reg_a)>0) branch = 1;
-    break;
-  }
-  if(branch) next_pc += disp*4;
-  return next_pc;
+    switch(op) {
+    case 0x1a: /* jmp, jsr, jsr_coroutine, ret */
+	*os_context_register_addr(context,reg_a) =
+	    *os_context_pc_addr(context);
+	*os_context_pc_addr(context) =
+	    *os_context_register_addr(context,reg_b)& ~3;
+	break;
+    case 0x30: /* br */
+	*os_context_register_addr(context,reg_a)=*os_context_pc_addr(context);
+	branch = 1;
+	break;
+    case 0x31: /* fbeq */
+	if(*(os_context_fpregister_addr(context,reg_a))==0) branch = 1;
+	break;
+    case 0x32: /* fblt */
+	if(*os_context_fpregister_addr(context,reg_a)<0) branch = 1;
+	break;
+    case 0x33: /* fble */
+	if(*os_context_fpregister_addr(context,reg_a)<=0) branch = 1;
+	break;
+    case 0x34: /* bsr */
+	*os_context_register_addr(context,reg_a)=*os_context_pc_addr(context);
+	branch = 1;
+	break;
+    case 0x35: /* fbne */
+	if(*os_context_register_addr(context,reg_a)!=0) branch = 1;
+	break;
+    case 0x36: /* fbge */
+	if(*os_context_fpregister_addr(context,reg_a)>=0) branch = 1;
+	break;
+    case 0x37: /* fbgt */
+	if(*os_context_fpregister_addr(context,reg_a)>0) branch = 1;
+	break;
+    case 0x38: /* blbc */
+	if((*os_context_register_addr(context,reg_a)&1) == 0) branch = 1;
+	break;
+    case 0x39: /* beq */
+	if(*os_context_register_addr(context,reg_a)==0) branch = 1;
+	break;
+    case 0x3a: /* blt */
+	if(*os_context_register_addr(context,reg_a)<0) branch = 1;
+	break;
+    case 0x3b: /* ble */
+	if(*os_context_register_addr(context,reg_a)<=0) branch = 1;
+	break;
+    case 0x3c: /* blbs */
+	if((*os_context_register_addr(context,reg_a)&1)!=0) branch = 1;
+	break;
+    case 0x3d: /* bne */
+	if(*os_context_register_addr(context,reg_a)!=0) branch = 1;
+	break;
+    case 0x3e: /* bge */
+	if(*os_context_register_addr(context,reg_a)>=0) branch = 1;
+	break;
+    case 0x3f: /* bgt */
+	if(*os_context_register_addr(context,reg_a)>0) branch = 1;
+	break;
+    }
+    if (branch)
+	next_pc += disp*4;
+    return next_pc;
 }
 
 static sigset_t orig_sigmask;
@@ -258,17 +264,17 @@ void arch_do_displaced_inst(os_context_t *context,unsigned int orig_inst)
      * at the BPT instruction itself.  This is good, because this is
      * where we want to restart execution when we do that */
 
-  unsigned int *pc=(unsigned int *)(*os_context_pc_addr(context));
-  unsigned int *next_pc;
-  int op = orig_inst >> 26;;
+    unsigned int *pc=(unsigned int *)(*os_context_pc_addr(context));
+    unsigned int *next_pc;
+    int op = orig_inst >> 26;;
 
-  orig_sigmask = *os_context_sigmask_addr(context);
-  sigaddset_blockable(os_context_sigmask_addr(context));
+    orig_sigmask = *os_context_sigmask_addr(context);
+    sigaddset_blockable(os_context_sigmask_addr(context));
 
-  /* Put the original instruction back. */
-  *pc = orig_inst;
-  os_flush_icache((os_vm_address_t)pc, sizeof(unsigned long));
-  skipped_break_addr = pc;
+    /* Put the original instruction back. */
+    *pc = orig_inst;
+    os_flush_icache((os_vm_address_t)pc, sizeof(unsigned long));
+    skipped_break_addr = pc;
 
     /* Figure out where we will end up after running the displaced 
      * instruction */
@@ -278,11 +284,11 @@ void arch_do_displaced_inst(os_context_t *context,unsigned int orig_inst)
     else
 	next_pc = pc+1;
     
-  /* Set the after breakpoint. */
-  displaced_after_inst = *next_pc;
-  *next_pc = BREAKPOINT_INST;
-  after_breakpoint=1;
-  os_flush_icache((os_vm_address_t)next_pc, sizeof(unsigned long));
+    /* Set the after breakpoint. */
+    displaced_after_inst = *next_pc;
+    *next_pc = BREAKPOINT_INST;
+    after_breakpoint=1;
+    os_flush_icache((os_vm_address_t)next_pc, sizeof(unsigned long));
 }
 
 static void

@@ -22,7 +22,7 @@
 
 #define GET_FREE_POINTER() dynamic_space_free_pointer
 #define SET_FREE_POINTER(new_value) \
-  (dynamic_space_free_pointer = (new_value))
+    (dynamic_space_free_pointer = (new_value))
 #define GET_GC_TRIGGER() current_auto_gc_trigger
 #define SET_GC_TRIGGER(new_value) \
     clear_auto_gc_trigger(); set_auto_gc_trigger(new_value);
