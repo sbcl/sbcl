@@ -1080,7 +1080,7 @@
       :inherits (vector simple-array array sequence)
       :prototype-form (make-array 0 :element-type '(unsigned-byte 8)))
      (simple-array-unsigned-byte-15
-      :translation (simple-array (unsigned-byte 7) (*))
+      :translation (simple-array (unsigned-byte 15) (*))
       :codes (#.sb!vm:simple-array-unsigned-byte-15-widetag)
       :direct-superclasses (vector simple-array)
       :inherits (vector simple-array array sequence)

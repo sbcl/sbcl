@@ -206,3 +206,7 @@
 ;;; bug 46c
 (dolist (fun '(and if))
   (assert (raises-error? (coerce fun 'function) type-error)))
+
+(dotimes (i 100)
+  (let ((x (make-array 0 :element-type `(unsigned-byte ,(1+ i)))))
+    (eval `(typep ,x (class-of ,x)))))
