@@ -1,12 +1,25 @@
-SBCL is -- ahem! -- not completely documented at this point.
-What can I say? Help with documentation might not be refused.:-)
+SBCL is -- ahem! -- not completely documented at this point. What can
+I say? Help with documentation might not be refused.:-)
 
-There is a user manual in DocBook format, in user-manual.sgml.
-It's based on the CMU CL user manual, and some of its chapters
-aren't done, just notes that "this is similar to chapter such-and-such
-of the CMU CL user manual".
+There is a Unix man page, sbcl.1.
 
-The old CMU CL documentation can still be useful both for
-missing chapters of the user manual and for documentation of
-the internals of the system. It's available from SourceForge
-by anonymous ftp.
+There is a user manual in DocBook format, in user-manual.sgml. (In
+binary distributions, the compiled-into-HTML translations are also
+included.) Several free software packages are available to compile
+DocBook into HTML or other formats. The commands to use 'jade' to
+translate the manual into HTML are in make-doc.sh.
+
+Much of the documentation for supported extensions is in their Lisp
+doc strings. For example, to find out how to use the SAVE-LISP-AND-DIE
+function in the SB-EXT package, you can execute
+  (documentation 'sb-ext:save-lisp-and-die 'function)
+or
+  (describe 'sb-ext:save-lisp-and-die)
+in SBCL.
+
+The user manual is incomplete, and some of its chapters are just notes
+that "this is similar to chapter such-and-such of the CMU CL user
+manual". The old CMU CL documentation can still be useful both for
+missing chapters of the user manual and for documentation of the
+internals of the system. It can be downloaded from
+<ftp://sbcl.sourceforge.net/pub/sbcl/cmucl-docs.tar.bz2>.
