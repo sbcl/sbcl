@@ -553,6 +553,10 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
 	     "DEFCONSTANT-UNEQL" "DEFCONSTANT-UNEQL-NAME"
 	     "DEFCONSTANT-UNEQL-NEW-VALUE" "DEFCONSTANT-UNEQL-OLD-VALUE"
 
+	     ;; error signalled when attempt to load an invalid fasl
+	     ;; is made, so that user code can try to recompile, etc.
+ 	     "INVALID-FASL"
+
 	     ;; conditions that can be handled to reduce compiler
 	     ;; verbosity
 	     "CODE-DELETION-NOTE" "COMPILER-NOTE"
@@ -590,11 +594,6 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
              ;; customized toplevel might well want. It seems perverse
              ;; to hide it from them..
              "INTERACTIVE-EVAL"
-
-	     ;; Subtype of SIMPLE-ERROR signalled when attempt to
- 	     ;; load an invalid fasl is made, so that user-code can
- 	     ;; try to recompile, etc.
- 	     "INVALID-FASL"
 
              ;; weak pointers and finalization
              "CANCEL-FINALIZATION"

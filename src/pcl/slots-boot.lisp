@@ -78,8 +78,12 @@
                                              (slot-missing-fun slot-name type)
                                              "generated slot-missing method"
                                              slot-name)))))
-        (unless (fboundp fun-name)
-      (let ((gf (ensure-generic-function fun-name)))
+    (unless (fboundp fun-name)
+      (let ((gf (ensure-generic-function
+		 fun-name
+		 :lambda-list (ecase type
+				((reader boundp) '(object))
+				(writer '(new-value object))))))
         (ecase type
           (reader (add-slot-missing-method gf slot-name 'slot-value))
           (boundp (add-slot-missing-method gf slot-name 'slot-boundp))

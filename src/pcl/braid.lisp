@@ -436,7 +436,8 @@
 			(list class-name)
 			(list class-name)
 			"automatically generated boundp method")))
-    (let ((gf (ensure-generic-function accessor-name)))
+    (let ((gf (ensure-generic-function accessor-name
+				       :lambda-list arglist)))
       (if (find specls (early-gf-methods gf)
 		:key #'early-method-specializers
 		:test 'equal)
@@ -601,7 +602,7 @@
 (pushnew 'maybe-reinitialize-structure-class sb-kernel::*defstruct-hooks*)
 
 (defun make-class-predicate (class name)
-  (let* ((gf (ensure-generic-function name))
+  (let* ((gf (ensure-generic-function name :lambda-list '(object)))
 	 (mlist (if (eq *boot-state* 'complete)
 		    (generic-function-methods gf)
 		    (early-gf-methods gf))))

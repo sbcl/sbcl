@@ -720,5 +720,17 @@
 		   :font 'baskerville :pixel-size 10)
 	    'baskerville))
 
+;;; class redefinition shouldn't give any warnings, in the usual case
+(defclass about-to-be-redefined () ((some-slot :accessor some-slot)))
+(handler-bind ((warning #'error))
+  (defclass about-to-be-redefined () ((some-slot :accessor some-slot))))
+
+;;; attempts to add accessorish methods to generic functions with more
+;;; complex lambda lists should fail
+(defgeneric accessoroid (object &key &allow-other-keys))
+(assert (raises-error?
+	 (defclass accessoroid-class () ((slot :accessor accessoroid)))
+	 program-error))
+
 ;;;; success
 (sb-ext:quit :unix-status 104)

@@ -211,7 +211,7 @@
 ;;;; make only condition INVALID-FASL part of the public interface,
 ;;;; and keep the guts internal.
 
-(define-condition sb!ext::invalid-fasl (error)
+(define-condition invalid-fasl (error)
   ((stream :reader invalid-fasl-stream :initarg :stream)
    (expected :reader invalid-fasl-expected :initarg :expected))
   (:report
@@ -219,7 +219,7 @@
      (format stream "~S is an invalid fasl file."
 	     (invalid-fasl-stream condition)))))
 
-(define-condition invalid-fasl-header (sb!ext::invalid-fasl)
+(define-condition invalid-fasl-header (invalid-fasl)
   ((byte :reader invalid-fasl-byte :initarg :byte)
    (byte-nr :reader invalid-fasl-byte-nr :initarg :byte-nr))
   (:report
@@ -231,7 +231,7 @@
 	     (invalid-fasl-byte condition)
 	     (invalid-fasl-expected condition)))))
 
-(define-condition invalid-fasl-version (sb!ext::invalid-fasl)
+(define-condition invalid-fasl-version (invalid-fasl)
   ((variant :reader invalid-fasl-variant :initarg :variant)
    (version :reader invalid-fasl-version :initarg :version))
   (:report
@@ -243,7 +243,7 @@
 	     (invalid-fasl-version condition)
 	     (invalid-fasl-expected condition)))))
 
-(define-condition invalid-fasl-implementation (sb!ext::invalid-fasl)
+(define-condition invalid-fasl-implementation (invalid-fasl)
   ((implementation :reader invalid-fasl-implementation
 		   :initarg :implementation))
   (:report 
@@ -253,7 +253,7 @@
 	     (invalid-fasl-implementation condition)
 	     (invalid-fasl-expected condition)))))
 
-(define-condition invalid-fasl-features (sb!ext::invalid-fasl)
+(define-condition invalid-fasl-features (invalid-fasl)
   ((potential-features :reader invalid-fasl-potential-features
 		       :initarg :potential-features)
    (features :reader invalid-fasl-features :initarg :features))

@@ -42,7 +42,7 @@
 
 ;;;; LOAD itself
 
-(define-condition fasl-header-missing (sb!ext::invalid-fasl)
+(define-condition fasl-header-missing (invalid-fasl)
   ((fhsss :reader invalid-fasl-fhsss :initarg :fhsss))
   (:report
    (lambda (condition stream)

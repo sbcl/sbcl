@@ -797,7 +797,10 @@
 
 (defun fix-slot-accessors (class dslotds add/remove)
   (flet ((fix (gfspec name r/w)
-	   (let ((gf (ensure-generic-function gfspec)))
+	   (let* ((ll (case r/w (r '(object)) (w '(new-value object))))
+		  (gf (if (fboundp gfspec)
+			  (ensure-generic-function gfspec)
+			  (ensure-generic-function gfspec :lambda-list ll))))
 	     (case r/w
 	       (r (if (eq add/remove 'add)
 		      (add-reader-method class gf name)
