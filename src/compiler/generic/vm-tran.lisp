@@ -78,28 +78,22 @@
 	 (declare (type (simple-array ,element-type-specifier 1) array))
 	 (data-vector-ref array index)))))
 
-;;; MNA: open-coded-simple-array patch
 (deftransform data-vector-ref ((array index)
                                (simple-array t))
   (let ((array-type (continuation-type array)))
-    ;; FIXME: How could this happen? Doesn't the limitation to arg
-    ;; type SIMPLE-ARRAY guarantee that ARRAY-TYPE is an ARRAY-TYPE?
     (unless (array-type-p array-type)
       (give-up-ir1-transform))
     (let ((dims (array-type-dimensions array-type)))
-      (when (and (consp dims) (= (length dims) 1))
+      (when (or (atom dims) (= (length dims) 1))
         (give-up-ir1-transform))
-      (let* ((el-type (array-type-element-type array-type))
-             (total-size (if (or (atom dims) (member '* dims))
-			     '*
-			     (reduce #'* dims)))
-             (type-sp `(simple-array ,(type-specifier el-type)
-                        (,total-size))))
-        (if (atom dims)
-          `(let ((a (truly-the ,type-sp (%array-simp array))))
-            (data-vector-ref a index))
-          `(let ((a (truly-the ,type-sp (%array-data-vector array))))
-            (data-vector-ref a index)))))))
+      (let ((el-type (array-type-element-type array-type))
+            (total-size (if (member '* dims)
+                            '*
+                            (reduce #'* dims))))
+        `(data-vector-ref (truly-the (simple-array ,(type-specifier el-type)
+                                                   (,total-size))
+                                     (%array-data-vector array))
+                          index)))))
 
 (deftransform hairy-data-vector-set ((array index new-value)
 				     (array t t)
@@ -132,28 +126,23 @@
 			  index
 			  new-value)))))
 
-;;; MNA: open-coded-simple-array patch
 (deftransform data-vector-set ((array index new-value)
-			       (simple-array t t))
+                               (simple-array t t))
   (let ((array-type (continuation-type array)))
-    ;; FIXME: How could this happen? Doesn't the limitation to arg
-    ;; type SIMPLE-ARRAY guarantee that ARRAY-TYPE is an ARRAY-TYPE?
     (unless (array-type-p array-type)
       (give-up-ir1-transform))
     (let ((dims (array-type-dimensions array-type)))
-      (when (and (consp dims) (= (length dims) 1))
-	(give-up-ir1-transform))
-      (let* ((el-type (array-type-element-type array-type))
-             (total-size (if (or (atom dims) (member '* dims))
-			     '*
-			     (reduce #'* dims)))
-             (type-sp `(simple-array ,(type-specifier el-type)
-                        (,total-size))))
-	(if (atom dims)
-	    `(let ((a (truly-the ,type-sp (%array-simp array))))
-	       (data-vector-set a index new-value))
-	    `(let ((a (truly-the ,type-sp (%array-data-vector array))))
-	       (data-vector-set a index new-value)))))))
+      (when (or (atom dims) (= (length dims) 1))
+        (give-up-ir1-transform))
+      (let ((el-type (array-type-element-type array-type))
+            (total-size (if (member '* dims)
+                            '*
+                            (reduce #'* dims))))
+        `(data-vector-set (truly-the (simple-array ,(type-specifier el-type)
+                                                   (,total-size))
+                                     (%array-data-vector array))
+                          index
+                          new-value)))))
 
 ;;; transforms for getting at simple arrays of (UNSIGNED-BYTE N) when (< N 8)
 ;;;

@@ -119,10 +119,10 @@
   (process-pid proc))
 
 (defun process-kill (proc signal &optional (whom :pid))
-  "Hand SIGNAL to PROC.  If whom is :pid, use the kill Unix system call.  If
-   whom is :process-group, use the killpg Unix system call.  If whom is
-   :pty-process-group deliver the signal to whichever process group is currently
-   in the foreground."
+  "Hand SIGNAL to PROC. If WHOM is :PID, use the kill Unix system call. If
+   WHOM is :PROCESS-GROUP, use the killpg Unix system call. If WHOM is
+   :PTY-PROCESS-GROUP deliver the signal to whichever process group is
+   currently in the foreground."
   (let ((pid (ecase whom
 	       ((:pid :process-group)
 		(process-pid proc))

@@ -26,7 +26,7 @@
 ;;; a helper function for various macros which expect clauses of a
 ;;; given length, etc.
 ;;;
-;;; KLUDGE: This implementation will hang on circular list structure.
+;;; FIXME: This implementation will hang on circular list structure.
 ;;; Since this is an error-checking utility, i.e. its job is to deal
 ;;; with screwed-up input, it'd be good style to fix it so that it can
 ;;; deal with circular list structure.
