@@ -108,9 +108,13 @@ SB-PCL::*SLOT-NAME-LISTS-OUTER*
 SB-PCL::*THE-WRAPPER-OF-T* 
 SB-PCL::*CREATE-CLASSES-FROM-INTERNAL-STRUCTURE-DEFINITIONS-P* 
 SB-PCL::*WRITERS-FOR-THIS-DEFCLASS*
-SB-PCL::*BOOT-STATE* 
+SB-PCL::*BOOT-STATE* ; pseudoconstant in finished lisp (not in bootstrap)
 SB-PCL::*THE-WRAPPER-OF-BIT-VECTOR* 
-SB-PCL::*EFFECTIVE-METHOD-TABLE* 
+;;; global, frobbed on generic function
+;;; initialization/reinitialization, method precomputation, and
+;;; compute-effective-method.  Potentially unsafe, may be OK because
+;;; of *pcl-lock*, but could easily be liable to races.
+SB-PCL::*EFFECTIVE-METHOD-CACHE* 
 SB-PCL::*THE-WRAPPER-OF-COMPLEX-DOUBLE-FLOAT* 
 SB-PCL::*THE-CLASS-COMPLEX-DOUBLE-FLOAT* 
 SB-PCL::*THE-WRAPPER-OF-SIMPLE-ARRAY-SINGLE-FLOAT* 

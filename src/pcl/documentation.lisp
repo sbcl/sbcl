@@ -101,12 +101,12 @@
   (setf (random-documentation x 'method-combination) new-value))
 
 ;;; methods
-(defmethod documentation ((method standard-method) (doc-type (eql 't)))
-  (slot-value slotd 'documentation))
+(defmethod documentation ((x standard-method) (doc-type (eql 't)))
+  (slot-value x 'documentation))
 
 (defmethod (setf documentation)
-    (new-value (method standard-method) (doc-type (eql 't)))
-  (setf (slot-value method 'documentation) new-value))
+    (new-value (x standard-method) (doc-type (eql 't)))
+  (setf (slot-value x 'documentation) new-value))
 
 ;;; packages
 

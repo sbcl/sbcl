@@ -1617,17 +1617,11 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
 		    (find-class root)
 		    root)))))
 
-;;; NOTE: We are assuming a restriction on user code that the method
-;;;       combination must not change once it is connected to the
-;;;       generic function.
-;;;
-;;;       This has to be legal, because otherwise any kind of method
-;;;       lookup caching couldn't work. See this by saying that this
-;;;       cache, is just a backing cache for the fast cache. If that
-;;;       cache is legal, this one must be too.
-;;;
-;;; Don't clear this table!
-(defvar *effective-method-table* (make-hash-table :test 'eq))
+(defvar *effective-method-cache* (make-hash-table :test 'eq))
+
+(defun flush-effective-method-cache (generic-function)
+  (dolist (method (generic-function-methods generic-function))
+    (remhash method *effective-method-cache*)))
 
 (defun get-secondary-dispatch-function (gf methods types &optional
 							 method-alist wrappers)
@@ -1655,8 +1649,8 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
 	    (lambda (&rest args)
 	      (apply #'no-applicable-method gf args))))
       (let* ((key (car methods))
-	     (ht-value (or (gethash key *effective-method-table*)
-			   (setf (gethash key *effective-method-table*)
+	     (ht-value (or (gethash key *effective-method-cache*)
+			   (setf (gethash key *effective-method-cache*)
 				 (cons nil nil)))))
 	(if (and (null (cdr methods)) all-applicable-p ; the most common case
 		 (null method-alist-p) wrappers-p (not function-p))

@@ -409,8 +409,7 @@
 (defmethod initialize-instance :after ((gf standard-generic-function)
 				       &key (lambda-list nil lambda-list-p)
 				       argument-precedence-order)
-  (with-slots (arg-info)
-    gf
+  (with-slots (arg-info) gf
     (if lambda-list-p
 	(set-arg-info gf
 		      :lambda-list lambda-list
@@ -419,25 +418,25 @@
     (when (arg-info-valid-p arg-info)
       (update-dfun gf))))
 
-(defmethod reinitialize-instance :after ((gf standard-generic-function)
-					 &rest args
-					 &key (lambda-list nil lambda-list-p)
-					 (argument-precedence-order
-					  nil argument-precedence-order-p))
-  (with-slots (arg-info)
-    gf
-    (if lambda-list-p
-	(if argument-precedence-order-p
-	    (set-arg-info gf
-			  :lambda-list lambda-list
-			  :argument-precedence-order argument-precedence-order)
-	    (set-arg-info gf
-			  :lambda-list lambda-list))
-	(set-arg-info gf))
-    (when (and (arg-info-valid-p arg-info)
-	       args
-	       (or lambda-list-p (cddr args)))
-      (update-dfun gf))))
+(defmethod reinitialize-instance :around
+    ((gf standard-generic-function) &rest args &key
+     (lambda-list nil lambda-list-p) (argument-precedence-order nil apo-p))
+  (let ((old-mc (generic-function-method-combination gf)))
+    (prog1 (call-next-method)
+      ;; KLUDGE: EQ is too strong a test.
+      (unless (eq old-mc (generic-function-method-combination gf))
+	(flush-effective-method-cache gf))
+      (cond
+	((and lambda-list-p apo-p)
+	 (set-arg-info gf
+		       :lambda-list lambda-list
+		       :argument-precedence-order argument-precedence-order))
+	(lambda-list-p (set-arg-info gf :lambda-list lambda-list))
+	(t (set-arg-info gf)))
+      (when (and (arg-info-valid-p (gf-arg-info gf))
+		 (not (null args))
+		 (or lambda-list-p (cddr args)))
+	(update-dfun gf)))))
 
 (declaim (special *lazy-dfun-compute-p*))
 
