@@ -2246,6 +2246,10 @@ changes in sbcl-0.8.8 relative to sbcl-0.8.7:
     As a consequence of this change, the :IF-EXISTS :NEW-VERSION
     option to OPEN now signals an error if the file being opened
     exists; this may have an impact on existing code.
+  * fixed bug 190: RUN-PROGRAM should now work properly, respecting
+    signals received, on the PowerPC platforms (both Linux and
+    Darwin).  (thanks to Pierre Mai for pointing out the location of
+    the error)
   * bug fix: DECODE-UNIVERSAL-TIME now accepts timezone arguments with
     second-resolution: integer multiples of 1/3600 between -24 and 24.
     (thanks to Vincent Arkesteijn)

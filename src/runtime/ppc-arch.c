@@ -185,9 +185,11 @@ sigtrap_handler(int signal, siginfo_t *siginfo, os_context_t *context)
 	    interrupt_handle_now(signal, code, context);
 	    break;
 	}
+	return;
     }
     if (((code >> 26) == 3) && (((code >> 21) & 31) == 24)) {
 	interrupt_internal_error(signal, code, context, 0);
+	return;
     }
     
     interrupt_handle_now(signal, code, context);

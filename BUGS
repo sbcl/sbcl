@@ -616,12 +616,6 @@ WORKAROUND:
   The careful type of X is {2k} :-(. Is it really important to be
   able to work with unions of many intervals?
 
-190: "PPC/Linux pipe? buffer? bug"
-  In sbcl-0.7.6, the run-program.test.sh test script sometimes hangs
-  on the PPC/Linux platform, waiting for a zombie env process.  This
-  is a classic symptom of buffer filling and deadlock, but it seems
-  only sporadically reproducible.
-
 191: "Miscellaneous PCL deficiencies"
   (reported by Alexey Dejneka sbcl-devel 2002-08-04)
   a. DEFCLASS does not inform the compiler about generated
