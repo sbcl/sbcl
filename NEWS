@@ -15,6 +15,10 @@ changes in sbcl-0.8.19 relative to sbcl-0.8.18:
     directories works correctly.  (thanks to Artem V. Andreev)
   * build fix: fixed the dependence on *LOAD-PATHNAME* and
     *COMPILE-FILE-PATHNAME* being absolute pathnames.
+  * fixed some bugs related to Unicode integration:
+    ** encoding and decoding errors are now much more robustly
+       handled; it should now be possible to recover even from invalid
+       input or output to the terminal.  (thanks to Teemu Kalvas)
   * fixed some bugs revealed by Paul Dietz' test suite:
     ** the FORMATTER-generated functions for ~V[ conditionals require
        the correct number of arguments.

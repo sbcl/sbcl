@@ -89,7 +89,7 @@
 
 (define-condition character-coding-error (error) ())
 (define-condition character-encoding-error (character-coding-error)
-  ((character :initarg :character :reader character-encoding-error-character)))
+  ((code :initarg :code :reader character-encoding-error-code)))
 (define-condition character-decoding-error (character-coding-error)
   ((octets :initarg :octets :reader character-decoding-error-octets)))
 (define-condition stream-encoding-error (stream-error character-encoding-error)
@@ -97,11 +97,11 @@
   (:report
    (lambda (c s)
      (let ((stream (stream-error-stream c))
-           (character (character-encoding-error-character c)))
+           (code (character-encoding-error-code c)))
        (format s "~@<encoding error on stream ~S (~S ~S): ~2I~_~
                   the character with code ~D cannot be encoded.~@:>"
                stream ':external-format (stream-external-format stream)
-               (char-code character))))))
+               code)))))
 (define-condition stream-decoding-error (stream-error character-decoding-error)
   ()
   (:report

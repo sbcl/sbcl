@@ -795,8 +795,9 @@ retained, possibly temporariliy, because it might be used internally."
                ;; FIXME: potential SB!EXT exports
 	       "CHARACTER-CODING-ERROR"
                "CHARACTER-DECODING-ERROR" "CHARACTER-DECODING-ERROR-OCTETS"
-               "CHARACTER-ENCODING-ERROR" "CHARACTER-ENCODING-ERROR-CHARACTER"
+               "CHARACTER-ENCODING-ERROR" "CHARACTER-ENCODING-ERROR-CODE"
                "STREAM-DECODING-ERROR" "STREAM-ENCODING-ERROR"
+	       "ATTEMPT-RESYNC" "FORCE-END-OF-FILE"
 
 	       ;; bootstrapping magic, to make things happen both in
 	       ;; the cross-compilation host compiler's environment and
