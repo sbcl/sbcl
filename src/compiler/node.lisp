@@ -1172,14 +1172,6 @@
 			     "<deleted>"))
 		       args)))
 
-(defun call-full-like-p (call)
-  (declare (type combination call))
-  (let ((kind (basic-combination-kind call)))
-    (or (eq kind :full)
-        (and (fun-info-p kind)
-             (null (fun-info-templates kind))
-             (not (fun-info-ir2-convert kind))))))
-
 ;;; An MV-COMBINATION is to MULTIPLE-VALUE-CALL as a COMBINATION is to
 ;;; FUNCALL. This is used to implement all the multiple-value
 ;;; receiving forms.
@@ -1236,9 +1228,12 @@
   ;; NIL
   ;;    No type check is necessary (VALUE type is a subtype of the TYPE-TO-CHECK.)
   ;;
+  ;; :EXTERNAL
+  ;;    Type check will be performed by NODE-DEST.
+  ;;
   ;; T
   ;;    A type check is needed.
-  (%type-check t :type (member t nil))
+  (%type-check t :type (member t :external nil))
   ;; the lvar which is checked
   (value (missing-arg) :type lvar))
 (defprinter (cast :identity t)

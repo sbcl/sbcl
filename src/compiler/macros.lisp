@@ -628,21 +628,18 @@
            `((when (block-delete-p ,n-block)
                (return)))))))
 
-;;; like DO-NODES, only iterating in reverse order
+;;; Like DO-NODES, only iterating in reverse order. Should be careful
+;;; with block being split under us.
 (defmacro do-nodes-backwards ((node-var lvar block) &body body)
   (let ((n-block (gensym))
-	(n-start (gensym))
 	(n-prev (gensym)))
-    `(do* ((,n-block ,block)
-           (,n-start (block-start ,n-block))
-           (,node-var (block-last ,n-block) (ctran-use ,n-prev))
-           (,n-prev (node-prev ,node-var) (node-prev ,node-var))
-           (,lvar #1=(when (valued-node-p ,node-var) (node-lvar ,node-var))
-                  #1#))
-          (nil)
-       ,@body
-       (when (eq ,n-prev ,n-start)
-	   (return nil)))))
+    `(loop with ,n-block = ,block
+           for ,node-var = (block-last ,n-block) then (ctran-use ,n-prev)
+           while ,node-var ; FIXME: this is non-ANSI
+           for ,n-prev = (node-prev ,node-var)
+           and ,lvar = (when (valued-node-p ,node-var) (node-lvar ,node-var))
+           do (progn
+                ,@body))))
 
 (defmacro do-nodes-carefully ((node-var block) &body body)
   (with-unique-names (n-block n-ctran)

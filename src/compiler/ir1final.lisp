@@ -115,6 +115,20 @@
 	    (setq atype (note-fun-use dest atype)))))
       (setf (info :function :assumed-type name) atype))))
 
+;;; Merge CASTs with preceding/following nodes.
+(defun ir1-merge-casts (component)
+  (do-blocks-backwards (block component)
+    (do-nodes-backwards (node lvar block)
+      (let ((dest (when lvar (lvar-dest lvar))))
+        (cond ((and (cast-p dest)
+                    (not (cast-type-check dest))
+                    (immediately-used-p lvar node))
+               (derive-node-type node (cast-asserted-type dest)))
+              ((and (cast-p node)
+                    (eq (cast-type-check node) :external))
+               (aver (basic-combination-p dest))
+               (delete-filter node lvar (cast-value node))))))))
+
 ;;; Do miscellaneous things that we want to do once all optimization
 ;;; has been done:
 ;;;  -- Record the derived result type before the back-end trashes the
@@ -136,4 +150,7 @@
   (maphash (lambda (k v)
 	     (note-assumed-types component k v))
 	   *free-funs*)
+
+  (ir1-merge-casts component)
+
   (values))

@@ -750,7 +750,7 @@
 ;;; a utility for defining derive-type methods of integer operations. If
 ;;; the types of both X and Y are integer types, then we compute a new
 ;;; integer type with bounds determined Fun when applied to X and Y.
-;;; Otherwise, we use Numeric-Contagion.
+;;; Otherwise, we use NUMERIC-CONTAGION.
 (defun derive-integer-type-aux (x y fun)
   (declare (type function fun))
   (if (and (numeric-type-p x) (numeric-type-p y)
@@ -773,13 +773,12 @@
 
 ;;; simple utility to flatten a list
 (defun flatten-list (x)
-  (labels ((flatten-helper (x r);; 'r' is the stuff to the 'right'.
-	     (cond ((null x) r)
-		   ((atom x)
-		    (cons x r))
-		   (t (flatten-helper (car x)
-				      (flatten-helper (cdr x) r))))))
-    (flatten-helper x nil)))
+  (labels ((flatten-and-append (tree list)
+	     (cond ((null tree) list)
+		   ((atom tree) (cons tree list))
+		   (t (flatten-and-append
+                       (car tree) (flatten-and-append (cdr tree) list))))))
+    (flatten-and-append x nil)))
 
 ;;; Take some type of lvar and massage it so that we get a list of the
 ;;; constituent types. If ARG is *EMPTY-TYPE*, return NIL to indicate
@@ -1065,11 +1064,12 @@
 	   (cond ((and (member-type-p x) (member-type-p y))
 		  (let* ((x (first (member-type-members x)))
 			 (y (first (member-type-members y)))
-			 (result (with-float-traps-masked
-				     (:underflow :overflow :divide-by-zero
-				      :invalid)
-				   (funcall fun x y))))
-		    (cond ((null result))
+			 (result (ignore-errors
+                                   (with-float-traps-masked
+                                       (:underflow :overflow :divide-by-zero
+                                                   :invalid)
+                                     (funcall fun x y)))))
+		    (cond ((null result) *empty-type*)
 			  ((and (floatp result) (float-nan-p result))
 			   (make-numeric-type :class 'float
 					      :format (type-of result)
@@ -2660,7 +2660,7 @@
 			`(- (ash (- x) ,shift)))
 		   (- (logand (- x) ,mask)))
 	   (values ,(if (minusp y)
-			`(- (ash (- x) ,shift))
+			`(ash (- ,mask x) ,shift)
 			`(ash x ,shift))
 		   (logand x ,mask))))))
 

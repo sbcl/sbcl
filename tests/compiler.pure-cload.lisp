@@ -125,7 +125,6 @@
 ;;; Verify type checking policy in full calls: the callee is supposed
 ;;; to perform check, but the results should not be used before the
 ;;; check will be actually performed.
-#+nil
 (locally
     (declare (optimize (safety 3)))
   (flet ((bar (f a)

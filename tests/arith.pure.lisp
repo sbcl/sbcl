@@ -69,17 +69,31 @@
 
 ;;; (CEILING x 2^k) was optimized incorrectly
 (loop for divisor in '(-4 4)
-   for ceiler = (compile nil `(lambda (x)
-                                (declare (fixnum x))
-                                (declare (optimize (speed 3)))
-                                (ceiling x ,divisor)))
-   do (loop for i from -5 to 5
-         for exact-q = (/ i divisor)
-         do (multiple-value-bind (q r)
-                (funcall ceiler i)
-              (assert (= (+ (* q divisor) r) i))
-              (assert (<= exact-q q))
-              (assert (< q (1+ exact-q))))))
+      for ceiler = (compile nil `(lambda (x)
+                                   (declare (fixnum x))
+                                   (declare (optimize (speed 3)))
+                                   (ceiling x ,divisor)))
+      do (loop for i from -5 to 5
+               for exact-q = (/ i divisor)
+               do (multiple-value-bind (q r)
+                      (funcall ceiler i)
+                    (assert (= (+ (* q divisor) r) i))
+                    (assert (<= exact-q q))
+                    (assert (< q (1+ exact-q))))))
+
+;;; (TRUNCATE x 2^k) was optimized incorrectly
+(loop for divisor in '(-4 4)
+      for truncater = (compile nil `(lambda (x)
+                                      (declare (fixnum x))
+                                      (declare (optimize (speed 3)))
+                                      (truncate x ,divisor)))
+      do (loop for i from -9 to 9
+               for exact-q = (/ i divisor)
+               do (multiple-value-bind (q r)
+                      (funcall truncater i)
+                    (assert (= (+ (* q divisor) r) i))
+                    (assert (<= (abs q) (abs exact-q)))
+                    (assert (< (abs exact-q) (1+ (abs q)))))))
 
 ;;; CEILING had a corner case, spotted by Paul Dietz
 (assert (= (ceiling most-negative-fixnum (1+ most-positive-fixnum)) -1))

@@ -28,6 +28,7 @@
                          (stub avecname))
                      (paip avecname)))))
       :eexpr (lambda (south east))))
+(in-package :cl-user)
 (delete-package :bug254)
 
 ;;; bug 255
@@ -54,6 +55,7 @@
               (multiple-value-prog1
                   (progn (%pu avecname))
                 (frob)))))))
+(in-package :cl-user)
 (delete-package :bug255)
 
 ;;; bug 148
@@ -120,6 +122,7 @@
 (assert (equal (eval '(bug148-4 '(1 2 3)))
                '((1 2 3) (7 14 21) (21 14 7))))
 
+(in-package :cl-user)
 (delete-package :bug148)
 
 ;;; bug 258
@@ -141,9 +144,8 @@
 (assert (equal (u-b-sra '(4 9 7))
                '((4 9 7) (3 8 6) (6 8 3))))
 
-(delete-package :bug258)
-
 (in-package :cl-user)
+(delete-package :bug258)
 
 ;;;
 (defun bug233a (x)
@@ -305,6 +307,23 @@
     (if (not (or (= -67399 b) b))
         (deposit-field (%f2) (byte 11 8) -3)
         c)))
+
+;;; bug 214: compiler failure
+(defun bug214a1 ()
+  (declare (optimize (sb-ext:inhibit-warnings 0) (compilation-speed 2)))
+  (flet ((foo (&key (x :vx x-p)) (list x x-p)))
+    (foo :x 2)))
+
+(defun bug214a2 ()
+  (declare (optimize (sb-ext:inhibit-warnings 0) (compilation-speed 2)))
+  (lambda (x) (declare (fixnum x)) (if (< x 0) 0 (1- x))))
+
+;;; this one was reported by rydis on #lisp
+(defun 214b (n)
+  (declare (fixnum n))
+  (declare (optimize (speed 2) (space 3)))
+  (dotimes (k n)
+    (princ k)))
 
 
 (sb-ext:quit :unix-status 104)

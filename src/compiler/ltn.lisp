@@ -676,6 +676,12 @@
 	  (when (and (or (not guard) (funcall guard))
 		     (or (not safe-p)
 			 (ltn-policy-safe-p (template-ltn-policy try)))
+                     ;; :SAFE is also considered to be :SMALL-SAFE,
+                     ;; while the template cost describes time cost;
+                     ;; so the fact that (< (t-cost try) (t-cost
+                     ;; template)) does not mean that TRY is better
+                     (not (and (eq ltn-policy :safe)
+                               (eq (template-ltn-policy try) :fast-safe)))
 		     (or verbose-p
 			 (and (template-note try)
 			      (valid-fun-use
@@ -838,13 +844,6 @@
 	      (ctran-next ctran))
         (ctran (node-next node) (node-next node)))
       (nil)
-    (let* ((lvar (when (valued-node-p node)
-                   (node-lvar node)))
-           (dest (and lvar (lvar-dest lvar))))
-      (when (and (cast-p dest)
-                 (not (cast-type-check dest))
-                 (immediately-used-p lvar node))
-        (derive-node-type node (cast-asserted-type dest))))
     (etypecase node
       (ref)
       (combination

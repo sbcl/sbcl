@@ -606,6 +606,35 @@
                   (+ 359749 35728422))))
             -24076)))
 
+;;; bug 294 reported by Paul Dietz: miscompilation of REM and MOD
+(assert (= (funcall (compile nil `(lambda (b)
+                                    (declare (optimize (speed 3))
+                                             (type (integer 2 152044363) b))
+                                    (rem b (min -16 0))))
+                    108251912)
+           8))
+
+(assert (= (funcall (compile nil `(lambda (c)
+                                    (declare (optimize (speed 3))
+                                             (type (integer 23062188 149459656) c))
+                                    (mod c (min -2 0))))
+                    95019853)
+           -1))
+
+;;; bug reported by Paul Dietz: block splitting inside FLUSH-DEAD-CODE
+(compile nil
+         '(LAMBDA (A B C)
+           (BLOCK B6
+             (LOGEQV (REM C -6758)
+                     (REM B (MAX 44 (RETURN-FROM B6 A)))))))
+
+(compile nil '(lambda ()
+               (block nil
+                 (flet ((foo (x y) (if (> x y) (print x) (print y))))
+                   (foo 1 2)
+                   (bar)
+                   (foo (return 14) 2)))))
+
 ;;; bug in Alpha backend: not enough sanity checking of arguments to
 ;;; instructions
 (assert (= (funcall (compile nil 

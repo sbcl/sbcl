@@ -2107,6 +2107,23 @@ changes in sbcl-0.8.4 relative to sbcl-0.8.3:
     been incremented (because of the changes to internal compiler
     data structures referred to above).
 
+changes in sbcl-0.8.5 relative to sbcl-0.8.4:
+  * in full calls compiler does not generate checks for declared
+    argument types for all arguments.
+  * fix bug 282: compiler does not trust type assertions while passing
+    arguments to a full call.
+  * fix bug 261: compiler allows NIL or "no value" to be accepted for
+    &OPTIONAL VALUES type parameter.
+  * fix bug 214: algorithm for noting rejected templates is now more
+    similar to that of template seletion. (also reported by rydis on
+    #lisp)
+  * fixed some bugs revealed by Paul Dietz' test suite:
+    ** incorrect optimization of TRUNCATE for a positive first
+       argument and negative second.
+    ** compiler failure in let-convertion during flushing dead code.
+    ** compiler failure while deriving type of TRUNCATE on an
+       interval, containing 0.
+
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles
     down, it might impact TRACE. They both encapsulate functions, and

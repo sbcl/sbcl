@@ -943,7 +943,8 @@
     (do ((ctran (block-start block) (node-next (ctran-next ctran))))
         ((not ctran))
       (let ((node (ctran-next ctran)))
-        (format t "~:[    ~;~:*~3D:~] "
+        (format t "~3D>~:[    ~;~:*~3D:~] "
+                (cont-num ctran)
                 (when (and (valued-node-p node) (node-lvar node))
                   (cont-num (node-lvar node))))
         (etypecase node

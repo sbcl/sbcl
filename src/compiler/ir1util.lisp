@@ -1514,6 +1514,18 @@
               ;; LET-converted functionals are even worse.
               (eql (functional-kind functional) :deleted)))
     (throw 'locall-already-let-converted functional)))
+
+(defun call-full-like-p (call)
+  (declare (type combination call))
+  (let ((kind (basic-combination-kind call)))
+    (or (eq kind :full)
+        (and (fun-info-p kind)
+             (not (fun-info-ir2-convert kind))
+             (dolist (template (fun-info-templates kind) t)
+               (when (eq (template-ltn-policy template) :fast-safe)
+                 (multiple-value-bind (val win)
+                     (valid-fun-use call (template-type template))
+                   (when (or val (not win)) (return nil)))))))))
 
 ;;;; careful call
 

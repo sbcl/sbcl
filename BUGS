@@ -753,20 +753,6 @@ WORKAROUND:
        (INTEGERP (CAR (MAKE-SEQUENCE '(CONS INTEGER *) 2)))
      can erroneously return T.
 
-214:
-  SBCL 0.6.12.43 fails to compile
-
-  (locally
-      (declare (optimize (inhibit-warnings 0) (compilation-speed 2)))
-    (flet ((foo (&key (x :vx x-p)) (list x x-p)))
-      (foo 1 2)))
-
-  or a more simple example:
-
-  (locally
-      (declare (optimize (inhibit-warnings 0) (compilation-speed 2)))
-    (lambda (x) (declare (fixnum x)) (if (< x 0) 0 (1- x))))
-
 215: ":TEST-NOT handling by functions"
   a. FIND and POSITION currently signal errors when given non-NIL for
      both their :TEST and (deprecated) :TEST-NOT arguments, but by
@@ -1170,16 +1156,6 @@ WORKAROUND:
   The issue seems to be that construction of a discriminating function
   calls COMPUTE-EFFECTIVE-METHOD with methods that are not all applicable.
 
-282: "type checking in full calls"
-  In current (0.8.3.6) implementation a CAST in a full call argument
-  is not checked; but the continuation between the CAST and the
-  combination has the "checked" type and CAST performs unsafe
-  coercion; this may lead to errors: if FOO is declared to take a
-  FIXNUM, this code will produce garbage on a machine with 30-bit
-  fixnums:
-
-    (foo (aref (the (array (unsigned-byte 32)) x)))
-
 283: Thread safety: libc functions
   There are places that we call unsafe-for-threading libc functions
   that we should find alternatives for, or put locks around.  Known or
@@ -1255,43 +1231,6 @@ WORKAROUND:
   denormalized float, in general, we mask out that bit when we restore
   the control word; however, this clobbers any change the user might
   have made.
-
-293:
-  From Paul Dietz:
-
-  (defparameter *f1*
-     (compile nil '(LAMBDA (C)
-  			(TRUNCATE (LOGORC1 -996082 C) -2))))
-
-  (defparameter *f2*
-     (compile nil '(LAMBDA (C) (DECLARE (NOTINLINE TRUNCATE))
-  			(TRUNCATE (LOGORC1 -996082 C) -2))))
-
-  (print (funcall *f1* 25337234)) ==> 13099002
-  (print (funcall *f2* 25337234)) ==> -13099001
-
-294:
-  From Paul Dietz:
-
-  * (funcall (compile nil `(lambda (c)
-                              (declare (optimize (speed 3))
-                                       (type (integer 23062188 149459656) c))
-                              (mod c (min -2 0))))
-              95019853)
-
-  debugger invoked on condition of type SB-INT:SIMPLE-PROGRAM-ERROR:
-     invalid number of arguments: 1
-
-  [...]
-
-  * (funcall (compile nil `(lambda (b)
-                              (declare (optimize (speed 3))
-                                       (type (integer 2 152044363) b))
-                               (rem b (min -16 0))))
-              108251912)
-
-  debugger invoked on condition of type SB-INT:SIMPLE-PROGRAM-ERROR:
-     invalid number of arguments: 1
 
 295:
   From Paul Dietz:
