@@ -1037,6 +1037,41 @@
     (move ecx amount)
     (inst shl r :cl)))
 
+;;;; Modular functions
+
+(define-modular-fun +-mod32 (x y) + 32)
+(define-vop (fast-+-mod32/unsigned=>unsigned fast-+/unsigned=>unsigned)
+  (:translate +-mod32))
+(define-vop (fast-+-mod32-c/unsigned=>unsigned fast-+-c/unsigned=>unsigned)
+  (:translate +-mod32))
+
+;;; logical operations
+(define-modular-fun lognot-mod32 (x) lognot 32)
+(define-vop (lognot-mod32/unsigned=>unsigned)
+  (:translate lognot-mod32)
+  (:args (x :scs (unsigned-reg unsigned-stack) :target r
+	    :load-if (not (and (sc-is x unsigned-stack)
+			       (sc-is r unsigned-stack)
+			       (location= x r)))))
+  (:arg-types unsigned-num)
+  (:results (r :scs (unsigned-reg)
+	       :load-if (not (and (sc-is x unsigned-stack)
+				  (sc-is r unsigned-stack)
+				  (location= x r)))))
+  (:result-types unsigned-num)
+  (:policy :fast-safe)
+  (:generator 1
+    (move r x)
+    (inst not r)))
+
+(define-modular-fun logxor-mod32 (x y) logxor 32)
+(define-vop (fast-logxor-mod32/unsigned=>unsigned
+             fast-logxor/unsigned=>unsigned)
+  (:translate logxor-mod32))
+(define-vop (fast-logxor-mod32-c/unsigned=>unsigned
+             fast-logxor-c/unsigned=>unsigned)
+  (:translate logxor-mod32))
+
 ;;;; bignum stuff
 
 (define-vop (bignum-length get-header-data)
@@ -1176,17 +1211,8 @@
     (move hi edx)
     (move lo eax)))
 
-(define-vop (bignum-lognot)
-  (:translate sb!bignum::%lognot)
-  (:policy :fast-safe)
-  (:args (x :scs (unsigned-reg unsigned-stack) :target r))
-  (:arg-types unsigned-num)
-  (:results (r :scs (unsigned-reg)
-	       :load-if (not (location= x r))))
-  (:result-types unsigned-num)
-  (:generator 1
-    (move r x)
-    (inst not r)))
+(define-vop (bignum-lognot lognot-mod32/unsigned=>unsigned)
+  (:translate sb!bignum::%lognot))
 
 (define-vop (fixnum-to-digit)
   (:translate sb!bignum::%fixnum-to-digit)
@@ -1347,37 +1373,3 @@
     (inst mov tmp y)
     (inst shr tmp 18)
     (inst xor y tmp)))
-
-;;;; Modular functions
-(define-modular-fun +-mod32 (x y) + 32)
-(define-vop (fast-+-mod32/unsigned=>unsigned fast-+/unsigned=>unsigned)
-  (:translate +-mod32))
-(define-vop (fast-+-mod32-c/unsigned=>unsigned fast-+-c/unsigned=>unsigned)
-  (:translate +-mod32))
-
-;;; logical operations
-(define-modular-fun lognot-mod32 (x) lognot 32)
-(define-vop (lognot-mod32/unsigned=>unsigned)
-  (:translate lognot-mod32)
-  (:args (x :scs (unsigned-reg) :target r
-	    :load-if (not (and (sc-is x unsigned-stack)
-			       (sc-is r unsigned-stack)
-			       (location= x r)))))
-  (:arg-types unsigned-num)
-  (:results (r :scs (unsigned-reg)
-	       :load-if (not (and (sc-is x unsigned-stack)
-				  (sc-is r unsigned-stack)
-				  (location= x r)))))
-  (:result-types unsigned-num)
-  (:policy :fast-safe)
-  (:generator 1
-    (move r x)
-    (inst not r)))
-
-(define-modular-fun logxor-mod32 (x y) logxor 32)
-(define-vop (fast-logxor-mod32/unsigned=>unsigned
-             fast-logxor/unsigned=>unsigned)
-  (:translate logxor-mod32))
-(define-vop (fast-logxor-mod32-c/unsigned=>unsigned
-             fast-logxor-c/unsigned=>unsigned)
-  (:translate logxor-mod32))

@@ -753,7 +753,11 @@
 		    ;; cross-compiler can't fold it because the
 		    ;; cross-compiler doesn't know how to evaluate it.
 		    #+sb-xc-host
-		    (fboundp (combination-fun-source-name node)))
+		    (or (fboundp (combination-fun-source-name node))
+                        (progn (format t ";;; !!! Unbound fun: (~S~{ ~S~})~%"
+                                       (combination-fun-source-name node)
+                                       (mapcar #'continuation-value args))
+                               nil)))
 	   (constant-fold-call node)
 	   (return-from ir1-optimize-combination)))
 

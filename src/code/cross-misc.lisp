@@ -119,3 +119,19 @@
 (defun symbol-hash (symbol)
   (declare (type symbol symbol))
   (sxhash symbol))
+
+;;; These functions are needed for constant-folding.
+(defun sb!kernel:simple-array-nil-p (object)
+  (typep object '(simple-array nil)))
+
+(defun sb!kernel:%negate (number)
+  (- number))
+
+(defun sb!kernel:%single-float (number)
+  (coerce number 'single-float))
+
+(defun sb!kernel:%double-float (number)
+  (coerce number 'double-float))
+
+(defun sb!kernel:%ldb (size posn integer)
+  (ldb (byte size posn) integer))

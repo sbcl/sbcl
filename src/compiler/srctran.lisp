@@ -2442,18 +2442,20 @@
 
 ;;; Modular functions
 
-;;; (ldb (byte s 0) (foo x y ...)) =
+;;; (ldb (byte s 0) (foo                 x  y ...)) =
 ;;; (ldb (byte s 0) (foo (ldb (byte s 0) x) y ...))
 ;;;
-;;; and similar for other arguments. If
-;;;
-;;; (ldb (byte s 0) (foo x y ...)) =
-;;; (foo (ldb (byte s 0) x) (ldb (byte s 0) y) ...)
-;;;
-;;; the function FOO is :GOOD.
+;;; and similar for other arguments.
 
 ;;; Try to recursively cut all uses of the continuation CONT to WIDTH
 ;;; bits.
+;;;
+;;; For good functions, we just recursively cut arguments; their
+;;; "goodness" means that the result will not increase (in the
+;;; (unsigned-byte +infinity) sense). An ordinary modular function is
+;;; replaced with the version, cutting its result to WIDTH or more
+;;; bits. If we have changed anything, we need to flush old derived
+;;; types, because they have nothing in common with the new code.
 (defun cut-to-width (cont width)
   (declare (type continuation cont) (type (integer 0) width))
   (labels ((reoptimize-node (node name)
