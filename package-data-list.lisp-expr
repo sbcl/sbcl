@@ -325,7 +325,8 @@
  #s(sb-cold:package-data
     :name "SB!IMPL"
     :doc "private: a grab bag of implementation details"
-    :use ("CL" "SB!EXT" "SB!INT" "SB!SYS" "SB!DEBUG" "SB!KERNEL" "SB!BIGNUM"))
+    :use ("CL" "SB!EXT" "SB!INT" "SB!SYS" "SB!DEBUG" "SB!KERNEL" "SB!BIGNUM"
+          "SB!GRAY"))
 
  ;; FIXME: It seems to me that this could go away, with its contents moved
  ;; into SB!KERNEL, like the implementation of the rest of the class system.
@@ -474,7 +475,7 @@ like *STACK-TOP-HINT*"
     :name "SB!EXT"
     :doc "public: miscellaneous supported extensions to the ANSI Lisp spec"
     ;; FIXME: Why don't we just USE-PACKAGE %KERNEL here instead of importing?
-    :use ("CL" "SB!ALIEN" "SB!C-CALL" "SB!INT" "SB!SYS")
+    :use ("CL" "SB!ALIEN" "SB!C-CALL" "SB!INT" "SB!SYS" "SB!GRAY")
     ;; FIXME: If we advertise these as extensions, they should be in the
     ;; SB!EXT package (and perhaps re-exported from the %KERNEL
     ;; package) rather than in some other package and reexported from
@@ -631,7 +632,7 @@ Lisp extension proposal by David N. Gray"
 "private: miscellaneous unsupported extensions to the ANSI spec. Most of
 the stuff in here originated in CMU CL's EXTENSIONS package and is
 retained, possibly temporariliy, because it might be used internally."
-    :use ("CL" "SB!ALIEN" "SB!C-CALL" "SB!SYS")
+    :use ("CL" "SB!ALIEN" "SB!C-CALL" "SB!SYS" "SB!GRAY")
     ;; FIXME: RATIOP should probably not go through this package but be
     ;; called directly from SB!KERNEL, unless it's implemented as
     ;; TYPEP X 'RATIO in which case it doesn't need to be in SB!KERNEL.
@@ -829,7 +830,7 @@ retained, possibly temporariliy, because it might be used internally."
 integration' (said CMU CL architecture.tex) and that probably was and
 is a good idea, but see SB-SYS for blurring of boundaries."
     :use ("CL" "SB!ALIEN" "SB!ALIEN-INTERNALS" "SB!BIGNUM"
-          "SB!EXT" "SB!INT" "SB!SYS")
+          "SB!EXT" "SB!INT" "SB!SYS" "SB!GRAY")
     :import-from (("SB!C-CALL" "VOID"))
     :reexport ("DEF!STRUCT" "DEF!MACRO" "VOID")
     :export ("%ACOS" "%ACOSH" "%ARRAY-AVAILABLE-ELEMENTS"
@@ -1733,7 +1734,7 @@ structure representations"
              "VARIABLE-GLOBALLY-SPECIAL-P"
              "*VARIABLE-DECLARATIONS*" "VARIABLE-DECLARATION"
 
-             ;; These were expored from the original PCL version of this 
+             ;; These were exported from the original PCL version of this 
              ;; package, but aren't used in SBCL.
              ;;"NESTED-WALK-FORM" "MACROEXPAND-ALL"
              )))

@@ -599,6 +599,9 @@ changes in sbcl-0.6.9 relative to sbcl-0.6.8:
 * gave up on fixing bug 3 (forbidden-by-ANSI warning for type mismatch
   in structure slot initforms) for now, wrote workaround instead:-|
 * fixed bug 4 (no WARNING for DECLAIM FTYPE of slot accessor function)
+* fixed bug 5: added stubs for various Gray stream functions called
+  in the not-a-CL:STREAM case, so that even when Gray streams aren't
+  installed, at least appropriate type errors are generated
 * removed bug 21 from BUGS, since Martin Atzmueller points out that 
   it doesn't seem to affect SBCL after all
 

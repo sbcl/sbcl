@@ -271,7 +271,7 @@
 
 ;;; This prints a representation of the return values delivered.
 ;;; First, this checks to see that cookie is at the top of
-;;; *traced-entries*; if it is not, then we need to adjust this list
+;;; *TRACED-ENTRIES*; if it is not, then we need to adjust this list
 ;;; to determine the correct indentation for output. We then check to
 ;;; see whether the function is still traced and that the condition
 ;;; succeeded before printing anything.

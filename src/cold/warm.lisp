@@ -208,7 +208,8 @@
 		;; our DESCRIBE facility is compiled and loaded.
 		"src/pcl/describe" ; FIXME: should probably be byte compiled
 		;; FIXME: What about Gray streams? e.g. "gray-streams.lisp"
-		;; and "gray-streams-class.lisp"?
+		;; and "gray-streams-class.lisp"? For now, we just
+		;; have stubs (installed in cold load).
 		))
   (let ((fullname (concatenate 'string stem ".lisp")))
     (sb-int:/show "about to compile" fullname)
