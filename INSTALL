@@ -111,10 +111,10 @@ To build the system binaries:
   1. Make sure that you have enough RAM+swap to build SBCL, as
      per the CAUTION note above. (As of version 0.6.0, the most
      memory-intensive operation in make.sh is the second call to
-     GENESIS, which makes the Lisp image grow to nearly 128 Mb RAM+swap.
-  2. If the GNU make command is not available under the name "gmake",
-     then define the environment variable GNUMAKE to a name where it can
-     be found.
+     GENESIS, which makes the Lisp image grow to around 128 Mb RAM+swap.
+  2. If the GNU make command is not available under the names "gmake"
+     or "make", then define the environment variable GNUMAKE to a name
+     where it can be found.
   3. If you like, you can tweak the *FEATURES* set for the resulting
      Lisp system, enabling or disabling features like documentation
      strings or extra debugging code. The preferred way to do this is
