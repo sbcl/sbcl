@@ -184,9 +184,8 @@
 ;;; deliver values normally. We still annotate the function continuation,
 ;;; since IR2tran might decide to call after all.
 ;;;
-;;; If not funny, we always flush arg type checks, but do it after
-;;; annotation when the LTN-POLICY is safe, since we don't want to
-;;; choose the TNs according to a type assertions that may not hold.
+;;; If not funny, we flush arg type checks, when LTN-POLICY is not
+;;; safe.
 ;;;
 ;;; Note that args may already be annotated because template selection can
 ;;; bail out to here.
@@ -216,8 +215,7 @@
 		  (make-ir2-continuation
 		   (primitive-type
 		    (continuation-type arg)))))
-	  (annotate-1-value-continuation arg)
-	  (when safe-p (flush-type-check arg))))
+	  (annotate-1-value-continuation arg)))
       (when (eq kind :error)
 	(setf (basic-combination-kind call) :full))
       (setf (basic-combination-info call) :full)

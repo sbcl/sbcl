@@ -372,7 +372,6 @@ BUG 48c, not yet fixed:
     (ignore-errors (the-in-arguments-1 1))
   (assert (null result))
   (assert (typep condition 'type-error)))
-#+nil
 (multiple-value-bind (result condition)
     (ignore-errors (the-in-arguments-2 1))
   (assert (null result))
