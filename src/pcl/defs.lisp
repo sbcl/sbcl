@@ -178,7 +178,7 @@
   (if (atom type)
       (if (eq type t)
 	  *the-class-t*
-	  (error "bad argument to type-class"))
+	  (error "bad argument to TYPE-CLASS"))
       (case (car type)
 	(eql (class-of (cadr type)))
 	(prototype (class-of (cadr type))) ;?

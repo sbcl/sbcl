@@ -45,13 +45,10 @@
 ;;; After the metabraid has been setup, and the protocol for defining
 ;;; classes has been defined, the real definition of LOAD-DEFCLASS is
 ;;; installed by the file std-class.lisp
-(defmacro defclass (name direct-superclasses direct-slots &rest options)
-  (expand-defclass name direct-superclasses direct-slots options))
-
-(defun expand-defclass (name supers slots options)
-  (setq supers  (copy-tree supers)
-	slots   (copy-tree slots)
-	options (copy-tree options))
+(defmacro defclass (name %direct-superclasses %direct-slots &rest %options)
+  (setq supers  (copy-tree %direct-superclasses)
+	slots   (copy-tree %direct-slots)
+	options (copy-tree %options))
   (let ((metaclass 'standard-class))
     (dolist (option options)
       (if (not (listp option))
@@ -81,6 +78,7 @@
 	      (mapcar #'(lambda (option)
 			  (canonicalize-defclass-option name option))
 		      options))
+	    ;; FIXME: What does this flag mean?
 	    (defstruct-p (and (eq *boot-state* 'complete)
 			      (let ((mclass (find-class metaclass nil)))
 				(and mclass
@@ -104,43 +102,42 @@
 						   (when defstruct-p
 						     '(:from-defclass-p t))
 						   other-initargs)))))))
-	  ;; FIXME: The way that we do things like (EVAL DEFCLASS-FORM)
-	  ;; here is un-ANSI-Common-Lisp-y and leads to problems
-	  ;; (like DEFUN for the type predicate being called more than
-	  ;; once when we do DEFCLASS at the interpreter prompt),
-	  ;; causing bogus style warnings. It would be better to
-	  ;; rewrite this so that the macroexpansion looks like e.g.
-	  ;; (PROGN
-	  ;;   (EVAL-WHEN (:COMPILE-TOPLEVEL :LOAD-TOPLEVEL :EXECUTE)
-	  ;;     (FROB1 ..))
-	  ;;   (EVAL-WHEN (:LOAD-TOPLEVEL :EXECUTE)
-	  ;;     (FROB2 ..)))
 	  (if defstruct-p
 	      (progn
-		(eval defclass-form) ; Define the class now, so that..
-		`(progn	      ; ..the defstruct can be compiled.
-		   ,(class-defstruct-form (find-class name))
-		   ,defclass-form))
-	      (progn
-		(when (eq *boot-state* 'complete)
-		  ;; FIXME: MNA (on sbcl-devel 2001-05-30) reported
-		  ;; (if I understand correctly -- WHN) that this call
-		  ;; is directly responsible for defining
-		  ;; class-predicates which always return
-		  ;; CONSTANTLY-NIL in the compile-time environment,
-		  ;; and is indirectly responsible for bogus warnings
-		  ;; about redefinitions when making definitions in
-		  ;; the interpreter. I didn't like his fix (deleting
-		  ;; the call) since I think the type system *should*
-		  ;; be informed about class definitions here. And I'm
-		  ;; not eager to look too deeply into this sort of
-		  ;; done-too-many-times-in-the-interpreter problem
-		  ;; right now, since it should be easier to make a
-		  ;; clean fix when EVAL-WHEN is made more ANSI (as
-		  ;; per the IR1 section in the BUGS file). But
-		  ;; at some point this should be cleaned up.
-		  (inform-type-system-about-std-class name))
-		defclass-form)))))))
+		;; FIXME: The ANSI way to do this is with EVAL-WHEN
+		;; forms, not by side-effects at macroexpansion time.
+		;; But I (WHN 2001-09-02) am not even sure how to
+		;; reach this code path with ANSI (or art-of-the-MOP)
+		;; code, so I haven't tried to update it, since for
+		;; all I know maybe it could just be deleted instead.
+                (eval defclass-form) ; Define the class now, so that..
+                `(progn       ; ..the defstruct can be compiled.
+                   ,(class-defstruct-form (find-class name))
+                   ,defclass-form))
+	      `(progn
+		 ;; By telling the type system at compile time about
+		 ;; the existence of a class named NAME, we can avoid
+		 ;; various bogus warnings about "type isn't defined yet".
+		 ,(when (and
+			 ;; But it's not so important to get rid of
+			 ;; "not defined yet" warnings during
+			 ;; bootstrapping, and machinery like
+			 ;; INFORM-TYPE-SYSTEM-ABOUT-STD-CLASS
+			 ;; mightn't be defined yet. So punt then.
+			 (eq *boot-state* 'complete)
+			 ;; And although we know enough about
+			 ;; STANDARD-CLASS, and ANSI imposes enough
+			 ;; restrictions on the user overloading its
+			 ;; methods, that (1) we can shortcut the
+			 ;; method dispatch and do an ordinary
+			 ;; function call, and (2) be sure we're getting
+			 ;; it right even when we do it at compile
+			 ;; time; we don't in general know how to do
+			 ;; that for other classes. So punt then too.
+			 (eq metaclass 'standard-class))
+		    `(eval-when (:compile-toplevel :load-toplevel :execute)
+		       (inform-type-system-about-std-class ',name)))
+		 ,defclass-form)))))))
 
 (defun make-initfunction (initform)
   (declare (special *initfunctions*))
