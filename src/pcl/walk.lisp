@@ -704,21 +704,6 @@
     (relist*
      form locally walked-body)))
 
-(defun walk-let-if (form context env)
-  (let ((test (cadr form))
-	(bindings (caddr form))
-	(body (cdddr form)))
-    (walk-form-internal
-      `(let ()
-	 (declare (special ,@(mapcar (lambda (x) (if (listp x) (car x) x))
-				     bindings)))
-	 (flet ((.let-if-dummy. () ,@body))
-	   (if ,test
-	       (let ,bindings (.let-if-dummy.))
-	       (.let-if-dummy.))))
-      context
-      env)))
-
 (defun walk-multiple-value-setq (form context env)
   (let ((vars (cadr form)))
     (if (some (lambda (var)

@@ -678,7 +678,7 @@
 	 ;; alien values) both messy to do by hand and very important
 	 ;; for performance of later code which uses the return value.
 	 (declaim (ftype (function ,(lisp-arg-types)
-                                   (values ,@(lisp-result-types)))
+                                   (values ,@(lisp-result-types) &optional))
                          ,lisp-name))
 	 (defun ,lisp-name ,(lisp-args)
 	   ,@(docs)

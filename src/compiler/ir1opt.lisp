@@ -1720,6 +1720,7 @@
   (unless (continuation-single-value-p (node-cont node))
     (give-up-ir1-transform))
   (setf (node-derived-type node) *wild-type*)
+  (principal-continuation-single-valuify (node-cont node))
   (if vals
       (let ((dummies (make-gensym-list (length (cdr vals)))))
 	`(lambda (val ,@dummies)

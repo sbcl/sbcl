@@ -515,11 +515,6 @@
       (mv-combination
        (eq (basic-combination-fun dest) cont))
       (cast
-       nil
-       ;; The following property means that the cast chain allows
-       ;; changing number of values, produced by the USE of CONT, but
-       ;; derived types of the casts must be updated (TODO: how?).
-       #+nil
        (locally
            (declare (notinline continuation-single-value-p))
          (and (not (values-type-p (cast-asserted-type dest)))
@@ -532,6 +527,15 @@
         for dest = (continuation-dest prev)
         while (cast-p dest)
         finally (return (values dest prev))))
+
+(defun principal-continuation-single-valuify (cont)
+  (loop for prev = cont then (node-cont dest)
+     for dest = (continuation-dest prev)
+     while (cast-p dest)
+     do (setf (node-derived-type dest)
+              (make-short-values-type (list (single-value-type
+                                             (node-derived-type dest)))))
+     (reoptimize-continuation prev)))
 
 ;;; Return a new LEXENV just like DEFAULT except for the specified
 ;;; slot values. Values for the alist slots are NCONCed to the

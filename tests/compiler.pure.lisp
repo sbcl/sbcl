@@ -402,3 +402,10 @@
                                 :external-format '#:nonsense)))
 
 (assert (= (the (values integer symbol) (values 1 'foo 13)) 1))
+
+(let ((f (compile nil
+                  '(lambda (v)
+                    (declare (optimize (safety 3)))
+                    (list (the fixnum (the (real 0) (eval v))))))))
+  (assert (raises-error? (funcall f 0.1) type-error))
+  (assert (raises-error? (funcall f -1) type-error)))

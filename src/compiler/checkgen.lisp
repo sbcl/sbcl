@@ -244,6 +244,7 @@
                 ((and (continuation-single-value-p cont)
                       (or (not (args-type-rest ctype))
                           (eq (args-type-rest ctype) *universal-type*)))
+                 (principal-continuation-single-valuify cont)
                  (let ((creq (car (args-type-required ctype))))
                    (multiple-value-setq (ctype atype)
                      (if creq
