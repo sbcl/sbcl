@@ -686,7 +686,7 @@
 (defknown list-length (list) (or index null) (foldable unsafely-flushable))
 (defknown nth (index list) t (foldable flushable))
 (defknown nthcdr (index list) t (foldable unsafely-flushable))
-(defknown last (list &optional index) list (foldable flushable))
+(defknown last (list &optional index) t (foldable flushable))
 (defknown list (&rest t) list (movable flushable unsafe))
 (defknown list* (t &rest t) t (movable flushable unsafe))
 (defknown make-list (index &key (:initial-element t)) list
@@ -706,7 +706,7 @@
 ;;; not check it now :-).
 (defknown nconc (&rest t) t ())
 
-(defknown nreconc (list t) list ())
+(defknown nreconc (list t) t ())
 (defknown butlast (list &optional index) list (flushable))
 (defknown nbutlast (list &optional index) list ())
 (defknown ldiff (list t) list (flushable))
@@ -714,15 +714,15 @@
 
 (defknown (nsubst subst) (t t t &key (:key callable) (:test callable)
 			    (:test-not callable))
-  list (flushable unsafe call))
+  t (flushable unsafe call))
 
 (defknown (subst-if subst-if-not nsubst-if nsubst-if-not)
-	  (t t t &key (:key callable))
-  list (flushable unsafe call))
+	  (t callable t &key (:key callable))
+  t (flushable unsafe call))
 
 (defknown (sublis nsublis) (list t &key (:key callable) (:test callable)
 				 (:test-not callable))
-  list (flushable unsafe call))
+  t (flushable unsafe call))
 
 (defknown member (t list &key (:key callable) (:test callable)
 		    (:test-not callable))
@@ -1066,9 +1066,10 @@
 			   (member nil :host :device
 				   :directory :name
 				   :type :version))
-  t
+  generalized-boolean
   ())
-(defknown pathname-match-p (pathname-designator pathname-designator) t
+(defknown pathname-match-p (pathname-designator pathname-designator)
+  generalized-boolean
   ())
 (defknown translate-pathname (pathname-designator
 			      pathname-designator

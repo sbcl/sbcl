@@ -101,6 +101,9 @@
 ;;;; some private types that we use in defining the standard functions,
 ;;;; or implementing declarations in standard compiler transforms
 
+;;; semistandard types
+(sb!xc:deftype generalized-boolean () t)
+
 ;;; a type specifier
 ;;;
 ;;; FIXME: The SB!KERNEL:INSTANCE here really means CL:CLASS.

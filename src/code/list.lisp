@@ -637,7 +637,7 @@
                        ((atom subtree) subtree)
                        (t (let ((car (s (car subtree)))
                                 (cdr (s (cdr subtree))))
-                            (if (and (eq car (car subtreE))
+                            (if (and (eq car (car subtree))
                                      (eq cdr (cdr subtree)))
                                 subtree
                                 (cons car cdr))))))))
