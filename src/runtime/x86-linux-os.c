@@ -121,7 +121,7 @@ struct thread *arch_os_get_current_thread() {
 #ifdef LISP_FEATURE_SB_THREAD
     register struct thread *me=0;
     if(all_threads)
-	__asm__ ("movl %%fs:%c1,%0" : "=r" (me)
+	__asm__ __volatile__ ("movl %%fs:%c1,%0" : "=r" (me)
 		 : "i" (offsetof (struct thread,this)));
     return me;
 #else
@@ -130,7 +130,7 @@ struct thread *arch_os_get_current_thread() {
 }
 struct thread *debug_get_fs() {
     register u32 fs;
-    __asm__("movl %%fs,%0" : "=r" (fs)  : );
+    __asm__ __volatile__ ("movl %%fs,%0" : "=r" (fs)  : );
     return fs;
 }
 
