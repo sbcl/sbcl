@@ -1421,6 +1421,41 @@ WORKAROUND:
       ;; go away.) 
       (sb-c::%dvai v i))
 
+188: "compiler performance fiasco involving type inference and UNION-TYPE"
+  In sbcl-0.7.5.11 on a 700 MHz Pentium III, 
+    (time (compile
+           nil
+           '(lambda ()
+              (declare (optimize (safety 3)))
+              (declare (optimize (compilation-speed 2)))
+              (declare (optimize (speed 1) (debug 1) (space 1)))
+              (let ((fn "if-this-file-exists-the-universe-is-strange"))
+                (load fn :if-does-not-exist nil)
+                (load (concatenate 'string fn ".lisp") :if-does-not-exist nil)
+                (load (concatenate 'string fn ".fasl") :if-does-not-exist nil)
+                (load (concatenate 'string fn ".misc-garbage")
+                      :if-does-not-exist nil)))))
+  reports  
+  		 134.552 seconds of real time
+  		 133.35156 seconds of user run time
+  		 0.03125 seconds of system run time
+                   [Run times include 2.787 seconds GC run time.]
+  		 0 page faults and
+  		 246883368 bytes consed.
+  BACKTRACE from Ctrl-C in the compilation shows that the compiler is
+  thinking about type relationships involving types like
+     #<UNION-TYPE
+       (OR (INTEGER 576 576)
+           (INTEGER 1192 1192)
+           (INTEGER 2536 2536)
+           (INTEGER 1816 1816)
+           (INTEGER 2752 2752)
+           (INTEGER 1600 1600)
+           (INTEGER 2640 2640)
+           (INTEGER 1808 1808)
+           (INTEGER 1296 1296)
+           ...)>)[:EXTERNAL]
+
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:
     These labels were used for bugs related to the old IR1 interpreter.

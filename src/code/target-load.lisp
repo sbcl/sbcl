@@ -42,7 +42,8 @@
 
 ;;;; LOAD itself
 
-;;; a helper function for LOAD: Load the stuff in a file when we have the name.
+;;; a helper function for LOAD: Load the stuff in a file when we have
+;;; the name.
 (defun internal-load (pathname truename if-does-not-exist verbose print
 		      &optional contents)
   (declare (type (member nil :error) if-does-not-exist))
@@ -184,14 +185,15 @@
 	     (load-as-fasl filespec verbose print)
 	     (load-as-source filespec verbose print))
 	 (let* ((pathname (pathname filespec))
-		(physical-pathname (translate-logical-pathname pathname)))
-	   (if (or (probe-file physical-pathname) (pathname-type physical-pathname))
+		(physical-pathname (translate-logical-pathname pathname))
+		(probed-file (probe-file physical-pathname)))
+	   (if (or probed-file
+		   (pathname-type physical-pathname))
 	       (internal-load physical-pathname
-			      (truename physical-pathname)
+			      probed-file
 			      internal-if-does-not-exist
 			      verbose
 			      print)
-	       
 	       (internal-load-default-type pathname
 					   internal-if-does-not-exist
 					   verbose

@@ -1162,6 +1162,12 @@ changes in sbcl-0.7.5 relative to sbcl-0.7.4:
     a wild pathname to load, loads all files matching that pathname.
     Instead, an error of type FILE-ERROR is signalled.
 
+changes in sbcl-0.7.6 relative to sbcl-0.7.5:
+  * bug fix: LOAD :IF-DOES-NOT-EXIST NIL now works when file type is
+    specified. (This was at the root of some bad interactions between
+    SBCL and ILISP: thanks to Gregory Wright for diagnosing this and
+    reporting the bug.)
+
 planned incompatible changes in 0.7.x:
 * When the profiling interface settles down, maybe in 0.7.x, maybe
   later, it might impact TRACE. They both encapsulate functions, and
