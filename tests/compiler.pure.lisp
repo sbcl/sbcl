@@ -1675,3 +1675,19 @@
                         (with-simple-restart (blah "blah") (error "blah"))))))
   (handler-bind ((error (lambda (c) (invoke-restart 'blah))))
     (assert (equal (multiple-value-list (funcall f)) '(nil t)))))
+
+;;; Bug reported by Timmy Douglas: overflow in bit vector setter with
+;;; constant index and value.
+(let* ((n (* 2 sb-vm::n-word-bits))
+       (array1 (make-array n :element-type 'bit))
+       (array2 (make-array n :element-type 'bit)))
+  (dotimes (i n)
+    (dotimes (v 2)
+      (let ((f (compile nil `(lambda (a)
+                               (declare (type (simple-array bit (,n)) a))
+                               (setf (bit a ,i) ,v)))))
+        (fill array1 (- 1 v))
+        (fill array2 (- 1 v))
+        (funcall f array1)
+        (setf (aref array2 i) v)
+        (assert (equal array1 array2))))))

@@ -25,6 +25,8 @@ changes in sbcl-0.8.19 relative to sbcl-0.8.18:
   * bug fixed: functions with &REST arguments sometimes failed with
     "Undefined function" when compiled with (DEBUG 3). (reported by
     Robert J. Macomber)
+  * bug fix: overflow during compiling of setting element of a bit
+    vector with constant index and value. (reported by Timmy Douglas)
   * build fix: fixed the dependence on *LOAD-PATHNAME* and
     *COMPILE-FILE-PATHNAME* being absolute pathnames.
   * on x86 compiler partially supports stack allocation of dynamic-extent
