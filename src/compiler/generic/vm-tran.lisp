@@ -446,24 +446,26 @@
 
 #!-alpha
 (progn
-  (defknown sb!vm::ash-left-mod32 (integer (integer 0)) (unsigned-byte 32)
+  (defknown #1=sb!vm::ash-left-mod32 (integer (integer 0)) (unsigned-byte 32)
             (foldable flushable movable))
   (define-modular-fun-optimizer ash ((integer count) :width width)
     (when (and (<= width 32)
                (constant-lvar-p count)  ; ?
                (plusp (lvar-value count)))
       (cut-to-width integer width)
-      'sb!vm::ash-left-mod32)))
+      '#1#))
+  (setf (gethash '#1# *modular-versions*) '(ash 32)))
 #!+alpha
 (progn
-  (defknown sb!vm::ash-left-mod64 (integer (integer 0)) (unsigned-byte 64)
+  (defknown #1=sb!vm::ash-left-mod64 (integer (integer 0)) (unsigned-byte 64)
             (foldable flushable movable))
   (define-modular-fun-optimizer ash ((integer count) :width width)
     (when (and (<= width 64)
                (constant-lvar-p count)  ; ?
                (plusp (lvar-value count)))
       (cut-to-width integer width)
-      'sb!vm::ash-left-mod64)))
+      '#1#)
+    (setf (gethash '#1# *modular-versions*) '(ash 64))))
 
 
 ;;; There are two different ways the multiplier can be recoded. The

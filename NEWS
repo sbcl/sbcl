@@ -2363,6 +2363,10 @@ changes in sbcl-0.8.9 relative to sbcl-0.8.8:
     ** Printing with *PRINT-READABLY* targets the standard readtable, not
        the readtable currently in effect.
 
+changes in sbcl-0.8.10 relative to sbcl-0.8.9:
+  * bug fix: compiler emitted division in optimized DEREF.  (thanks for
+    the test case to Dave Roberts)
+
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles
     down, it might impact TRACE. They both encapsulate functions, and

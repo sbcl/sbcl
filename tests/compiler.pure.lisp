@@ -1152,3 +1152,14 @@
                                 (return :minus)))))))))
   (assert (eql (funcall f -1d0) :minus))
   (assert (eql (funcall f 4d0) 2d0)))
+
+;;; bug 304: SBCL produced something similar to (/ (ASH x 4) 8)
+(handler-case
+    (compile nil '(lambda (a i)
+                   (locally
+                     (declare (optimize (speed 3) (safety 0) (space 0) (debug 0)
+                                        (inhibit-warnings 0)))
+                     (declare (type (alien (* (unsigned 8))) a)
+                              (type (unsigned-byte 32) i))
+                     (deref a i))))
+  (compiler-note () (error "The code is not optimized.")))

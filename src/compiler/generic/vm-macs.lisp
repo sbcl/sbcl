@@ -158,6 +158,12 @@
 (defvar *modular-funs*
   (make-hash-table :test 'eq))
 
+;;; hash: modular-variant -> (prototype width)
+;;;
+;;; FIXME: Reimplement with generic function names of kind
+;;; (MODULAR-VERSION prototype width)
+(defvar *modular-versions* (make-hash-table :test 'eq))
+
 ;;; List of increasing widths
 (defvar *modular-funs-widths* nil)
 (defstruct modular-fun-info
@@ -173,6 +179,10 @@
                  infos
                  :key #'modular-fun-info-width)
         infos)))
+
+;;; Return (VALUES prototype-name width)
+(defun modular-version-info (name)
+  (values-list (gethash name *modular-versions*)))
 
 (defun %define-modular-fun (name lambda-list prototype width)
   (let* ((infos (the list (gethash prototype *modular-funs*)))
@@ -193,7 +203,9 @@
                                                   :lambda-list lambda-list
                                                   :prototype prototype))
                      infos
-                     #'< :key #'modular-fun-info-width))))
+                     #'< :key #'modular-fun-info-width)
+              (gethash name *modular-versions*)
+              (list prototype width))))
   (setq *modular-funs-widths*
         (merge 'list (list width) *modular-funs-widths* #'<)))
 

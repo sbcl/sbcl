@@ -61,9 +61,9 @@
   (flushable movable))
 (defknown deport (alien alien-type) t
   (flushable movable))
-(defknown extract-alien-value (system-area-pointer index alien-type) t
+(defknown extract-alien-value (system-area-pointer unsigned-byte alien-type) t
   (flushable))
-(defknown deposit-alien-value (system-area-pointer index alien-type t) t
+(defknown deposit-alien-value (system-area-pointer unsigned-byte alien-type t) t
   ())
 
 (defknown alien-funcall (alien-value &rest *) *
@@ -520,7 +520,8 @@
 	 (count-low-order-zeros (lvar-value thing))
 	 (count-low-order-zeros (lvar-uses thing))))
     (combination
-     (case (lvar-fun-name (combination-fun thing))
+     (case (let ((name (lvar-fun-name (combination-fun thing))))
+             (or (modular-version-info name) name))
        ((+ -)
 	(let ((min most-positive-fixnum)
 	      (itype (specifier-type 'integer)))
@@ -553,10 +554,13 @@
 	 (do ((result 0 (1+ result))
 	      (num thing (ash num -1)))
 	     ((logbitp 0 num) result))))
+    (cast
+     (count-low-order-zeros (cast-value thing)))
     (t
      0)))
 
 (deftransform / ((numerator denominator) (integer integer))
+  "convert x/2^k to shift"
   (unless (constant-lvar-p denominator)
     (give-up-ir1-transform))
   (let* ((denominator (lvar-value denominator))
@@ -570,20 +574,29 @@
 
 (deftransform ash ((value amount))
   (let ((value-node (lvar-uses value)))
-    (unless (and (combination-p value-node)
-		 (eq (lvar-fun-name (combination-fun value-node))
-		     'ash))
+    (unless (combination-p value-node)
       (give-up-ir1-transform))
-    (let ((inside-args (combination-args value-node)))
-      (unless (= (length inside-args) 2)
-	(give-up-ir1-transform))
-      (let ((inside-amount (second inside-args)))
-	(unless (and (constant-lvar-p inside-amount)
-		     (not (minusp (lvar-value inside-amount))))
-	  (give-up-ir1-transform)))))
-  (extract-fun-args value 'ash 2)
-  '(lambda (value amount1 amount2)
-     (ash value (+ amount1 amount2))))
+    (let ((inside-fun-name (lvar-fun-name (combination-fun value-node))))
+      (multiple-value-bind (prototype width)
+          (modular-version-info inside-fun-name)
+        (unless (eq (or prototype inside-fun-name) 'ash)
+          (give-up-ir1-transform))
+        (when (and width (not (constant-lvar-p amount)))
+          (give-up-ir1-transform))
+        (let ((inside-args (combination-args value-node)))
+          (unless (= (length inside-args) 2)
+            (give-up-ir1-transform))
+          (let ((inside-amount (second inside-args)))
+            (unless (and (constant-lvar-p inside-amount)
+                         (not (minusp (lvar-value inside-amount))))
+              (give-up-ir1-transform)))
+          (extract-fun-args value inside-fun-name 2)
+          (if width
+              `(lambda (value amount1 amount2)
+                 (logand (ash value (+ amount1 amount2))
+                         ,(1- (ash 1 (+ width (lvar-value amount))))))
+              `(lambda (value amount1 amount2)
+                 (ash value (+ amount1 amount2)))))))))
 
 ;;;; ALIEN-FUNCALL support
 
