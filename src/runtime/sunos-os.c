@@ -50,9 +50,11 @@ void os_init(void)
 	lose("sunos major version=%d (which isn't 5!)", major_version);
     }
     minor_version = atoi(name.release+2);
-    if ((minor_version == 8) || (minor_version == 9)) {
+    if ((minor_version == 8) || 
+	(minor_version == 9) || 
+	(minor_version == 10)) {
 	KLUDGE_MAYBE_MAP_ANON = 0x100;
-    } else if (minor_version > 9) {
+    } else if (minor_version > 10) {
 	FSHOW((stderr, "os_init: Solaris version greater than 9?\nUnknown MAP_ANON behaviour.\n"));
 	lose("Unknown mmap() interaction with MAP_ANON");
     } else { /* minor_version < 8 */

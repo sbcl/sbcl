@@ -1,6 +1,8 @@
 changes in sbcl-0.8.18 relative to sbcl-0.8.17:
   * new feature: reloading changed shared object files with
     LOAD-SHARED-OBJECT now causes the new definitions to take effect.
+  * Solaris 10 (aka SunOS 5.10) on the SPARC platform is now
+    supported.  (thanks to Dan Debertin)
   * fixed bug #331: structure-class instances corresponding to
     DEFSTRUCT forms are now created eagerly.
   * bug fix: lambda-list parsing is now stricter vrt. order and number
