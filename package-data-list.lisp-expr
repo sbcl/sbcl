@@ -77,7 +77,7 @@
  #s(sb-cold:package-data
     :name "SB!ASSEM"
     :doc "private: the assembler, used by the compiler"
-    :use ("CL")
+    :use ("CL" "SB!INT" "SB!EXT")
     :export ("ASSEMBLY-UNIT"
 
              "*ASSEM-SCHEDULER-P*"
@@ -98,11 +98,11 @@
              "VARIABLE-LENGTH"
              "SEGMENT-COLLECT-DYNAMIC-STATISTICS"
 
-             ;; In classic CMU CL, these symbols were explicitly imported by
-             ;; package C. Since package C uses package ASSEM (and no
-             ;; other package does) it seems cleaner to export these symbols
-             ;; from package ASSEM instead. I hope nothing breaks..
-             ;;   -- WHN 19990220
+	     ;; FIXME: These are in the SB-ASSEM package now, but
+             ;; (left over from CMU CL) are defined in files which
+             ;; are IN-PACKAGE SB-C. It would probably be cleaner
+             ;; to move at least most of them to files which are
+             ;; IN-PACKAGE SB-ASSEM.
              "BRANCH" "DO-SSET-ELEMENTS" "FLUSHABLE" "MAKE-SSET" "SSET"
              "SSET-ADJOIN" "SSET-DELETE" "SSET-ELEMENT" "SSET-EMPTY"))
 
@@ -685,6 +685,9 @@ retained, possibly temporariliy, because it might be used internally."
              "BELL-CHAR-CODE" "ESCAPE-CHAR-CODE" "FORM-FEED-CHAR-CODE"
              "RETURN-CHAR-CODE" "RUBOUT-CHAR-CODE" "TAB-CHAR-CODE"
 
+             ;; handy user-level/basically-portable DEFTYPEs
+             "INDEX" 
+
              ;; nonstandard type predicates
              "INSTANCEP"
              "DOUBLE-FLOATP"
@@ -706,8 +709,9 @@ retained, possibly temporariliy, because it might be used internally."
              ;; FIXME: maybe belongs in %KERNEL with other typesystem stuff?
              "CONSTANT-ARGUMENT"
 
-             ;; not used any more? (and not appropriate in SB!EXT, since
-             ;; SPECIAL things are so obnoxious in Common Lisp)
+             ;; FIXME: Maybe this isn't used any more? And if it is,
+             ;; it probably needs a better name, since SPECIAL things
+             ;; are so obnoxious in Common Lisp.
              "E"
 
              ;; various internal defaults
@@ -720,7 +724,9 @@ retained, possibly temporariliy, because it might be used internally."
              "DEFUN-CACHED"
 
              ;; time
-             "FORMAT-DECODED-TIME" "FORMAT-UNIVERSAL-TIME" "PARSE-TIME"
+             "FORMAT-DECODED-TIME"
+             "FORMAT-UNIVERSAL-TIME"
+             "PARSE-TIME"
 
              ;; indenting
              "MAKE-INDENTING-STREAM"
@@ -764,12 +770,13 @@ retained, possibly temporariliy, because it might be used internally."
              "REQUIRED-ARGUMENT"
              "UNIX-NAMESTRING" ; FIXME: perhaps belongs in package %UNIX
              "FEATUREP"
-             "FLUSH-STANDARD-OUTPUT"
+             "FLUSH-STANDARD-OUTPUT-STREAMS"
+             "MAKE-GENSYM-LIST"
 
-             ;; These could be moved back into SB!EXT if someone has compelling
-             ;; reasons, but hopefully we can get by without supporting them,
-             ;; at least not as publicly accessible things with fixed
-             ;; interfaces.
+             ;; These could be moved back into SB!EXT if someone has
+             ;; compelling reasons, but hopefully we can get by
+             ;; without supporting them, at least not as publicly
+             ;; accessible things with fixed interfaces.
              "DEFAULT-DIRECTORY"
              "FILE-COMMENT"
              "GET-FLOATING-POINT-MODES" "SET-FLOATING-POINT-MODES"
@@ -830,7 +837,7 @@ is a good idea, but see SB-SYS for blurring of boundaries."
              "%HYPOT" "%INSTANCE-SET-CONDITIONAL" "%LDB"
              "%LOG" "%LOGB" "%LOG10" "%LOG1P" "%LONG-FLOAT"
              "%MAKE-COMPLEX" "%MAKE-FUNCALLABLE-INSTANCE" "%MAKE-RATIO"
-	     "%MAP-TO-SIMPLE-VECTOR-ARITY-1" "%MAP-TO-LIST-ARITY-1"
+             "%MAP" "%MAP-TO-SIMPLE-VECTOR-ARITY-1" "%MAP-TO-LIST-ARITY-1"
 	     "%MAP-TO-NIL-ON-SEQUENCE" "%MAP-TO-NIL-ON-SIMPLE-VECTOR"
              "%MAP-TO-NIL-ON-VECTOR" "%MASK-FIELD" "%NEGATE" "%POW"
              "%RAW-BITS" "%RAW-REF-COMPLEX-DOUBLE"
@@ -937,7 +944,7 @@ is a good idea, but see SB-SYS for blurring of boundaries."
              "HAIRY-DATA-VECTOR-REF" "HAIRY-DATA-VECTOR-SET" "HAIRY-TYPE"
              "HAIRY-TYPE-CHECK-TEMPLATE-NAME" "HAIRY-TYPE-SPECIFIER"
              "HANDLE-CIRCULARITY" "IGNORE-IT"
-             "INDEX" "INDEX-TOO-LARGE-ERROR" "INTEGER-DECODE-DOUBLE-FLOAT"
+             "INDEX-TOO-LARGE-ERROR" "INTEGER-DECODE-DOUBLE-FLOAT"
              "INTEGER-DECODE-LONG-FLOAT" "INTEGER-DECODE-SINGLE-FLOAT"
              "INTERNAL-ERROR" "INTERNAL-TIME"
              "INVALID-ARGUMENT-COUNT-ERROR" "INVALID-ARRAY-INDEX-ERROR"
@@ -1026,7 +1033,8 @@ is a good idea, but see SB-SYS for blurring of boundaries."
              #!+gengc "*SAVED-STATE-CHAIN*"
              "SCALE-DOUBLE-FLOAT" "SCALE-LONG-FLOAT"
              "SCALE-SINGLE-FLOAT"
-             "SEQUENCE-END" "SET-HEADER-DATA" "SHIFT-TOWARDS-END"
+             "SEQUENCE-END" "SEQUENCE-OF-CHECKED-LENGTH-GIVEN-TYPE"
+             "SET-HEADER-DATA" "SHIFT-TOWARDS-END"
              "SHIFT-TOWARDS-START" "SHRINK-VECTOR" "SIGNED-BYTE-32-P"
              "SIMPLE-ARRAY-COMPLEX-DOUBLE-FLOAT-P"
              "SIMPLE-ARRAY-COMPLEX-LONG-FLOAT-P"
@@ -1084,12 +1092,14 @@ is a good idea, but see SB-SYS for blurring of boundaries."
              "VALUES-TYPES" "VALUES-TYPES-INTERSECT" "VECTOR-T-P"
              "VECTOR-TO-VECTOR*" "VECTOR-TO-SIMPLE-STRING*"
              "VECTOR-TO-BIT-VECTOR*" "VECTOR-TO-SIMPLE-BIT-VECTOR*"
+             "VECTOR-OF-CHECKED-LENGTH-GIVEN-LENGTH"
              "WITH-CIRCULARITY-DETECTION" "WITH-TYPE-CACHES"
              "WRONG-NUMBER-OF-INDICES-ERROR"
 
              "FDEFN" "MAKE-FDEFN" "FDEFN-P"
              "FDEFN-NAME" "FDEFN-FUNCTION"
              "FDEFN-MAKUNBOUND" "%COERCE-NAME-TO-FUNCTION"
+             "%COERCE-CALLABLE-TO-FUNCTION"
              "FUNCTION-SUBTYPE" "*MAXIMUM-ERROR-DEPTH*"
              "%SET-SYMBOL-PLIST" "INFINITE-ERROR-PROTECT"
              "FIND-CALLER-NAME"

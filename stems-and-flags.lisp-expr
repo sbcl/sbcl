@@ -75,6 +75,17 @@
  ("code/uncross")
  ("code/early-defbangmethod")
 
+ ("code/defbangtype")
+ ("code/defbangmacro")
+
+ ;; for various constants e.g. SB!VM:*TARGET-MOST-POSITIVE-FIXNUM* and
+ ;; SB!VM:LOWTAG-BITS, needed by "early-objdef" and others
+ ("compiler/generic/early-vm")
+ ("compiler/generic/early-vm-macs")
+ ("compiler/generic/early-objdef")
+ ("compiler/target/parms")
+ ("code/early-array") ; needs "early-vm" numbers
+
  ("code/parse-body")       ; on host for PARSE-BODY
  ("code/parse-defmacro")   ; on host for PARSE-DEFMACRO
  ("code/early-defboot")    ; on host for FILE-COMMENT, DO-ANONYMOUS, etc.
@@ -87,13 +98,6 @@
 
  ("code/specializable-array")
 
- ;; for various constants e.g. SB!VM:*TARGET-MOST-POSITIVE-FIXNUM* and
- ;; SB!VM:LOWTAG-BITS, needed by "early-objdef" and others
- ("compiler/generic/early-vm")
- ("compiler/generic/early-vm-macs")
- ("compiler/generic/early-objdef")
- ("compiler/target/parms")
- ("code/early-array") ; needs "early-vm" numbers
  ("code/early-cl")
  ("code/early-load")
 
@@ -256,21 +260,12 @@
  ;;; compiler (and a few miscellaneous :NOT-HOST files whose
  ;;; dependencies make it convenient to stick them here)
 
-; replaced with defbangtype.lisp in sbcl-0.6.2
-; ;; There are some things (e.g. the type SB!KERNEL:INDEX) which are
-; ;; used early in the compiler in both host and target forms (i.e.
-; ;; SB!KERNEL:INDEX defined to cross-compilation host and
-; ;; SB!KERNEL:INDEX defined to cross-compiler itself).
-; ("code/early-ugly-duplicates")
-
- ("code/defbangtype")
-
  ("compiler/early-c")
  ("code/numbers")
 
  ("code/typedefs")
 
- ("code/defbangmacro")
+ ;; ("code/defbangmacro" was here until sbcl-0.6.7.3.)
 
  ("compiler/macros")
  ("compiler/generic/vm-macs")
@@ -500,9 +495,6 @@
   ;; compilation, for now we blithely ignore them and press on to more
   ;; pressing problems. Someday, though, it would be nice to figure out
   ;; what the problem is and fix it.. -- WHN 19990323
-  ;; FIXME: This problem doesn't seem to occur in the cross-compiler. 
-  ;; Check whether it occurs when compiling with the final target SBCL.
-  ;; If it doesn't, we can punt the KLUDGE message.
   :ignore-failure-p)
  ("compiler/target/pred")
  ("compiler/target/type-vops")
@@ -592,8 +584,6 @@
  #!+sb-interpreter ("compiler/eval"      :not-host)
 
  ("code/debug" :not-host) ; maybe should be :BYTE-COMPILE T
- ;; FIXME: This has been moved to warm init, and should be deleted here.
- #+nil ("code/ntrace" :not-host) ; maybe should be :BYTE-COMPILE T
 
  ;; These can't be compiled until CONDITION and DEFINE-CONDITION
  ;; are defined, and they also use SB-DEBUG:*STACK-TOP-HINT*.

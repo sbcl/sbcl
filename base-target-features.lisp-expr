@@ -97,7 +97,7 @@
  ;; If you want to be able to use the extra debugging information,
  ;; therefore, be sure to keep the sources around, and run with the
  ;; readtable configured so that the system sources can be read.
- ;:sb-show
+ ; :sb-show
 
  ;; Enable extra debugging output in the assem.lisp assembler/scheduler
  ;; code. (This is the feature which was called :DEBUG in the

@@ -11,7 +11,8 @@ that someone reading it can reproduce the problem, i.e. don't write
      PRINT-OBJECT doesn't seem to work with *PRINT-LENGTH*. Is this a bug?
 but instead
      Subject: apparent bug in PRINT-OBJECT (or *PRINT-LENGTH*?)
-     Under sbcl-1.2.3, when I compile and load the file
+     In sbcl-1.2.3 running under OpenBSD 4.5 on my Alpha box, when
+     I compile and load the file
        (DEFSTRUCT (FOO (:PRINT-OBJECT (LAMBDA (X Y)
 					(LET ((*PRINT-LENGTH* 4))
 					  (PRINT X Y)))))
@@ -31,14 +32,10 @@ KNOWN BUGS
 (There is also some information on bugs in the manual page and in the
 TODO file. Eventually more such information may move here.)
 
-* (DESCRIBE NIL) causes an endless loop.
-
 * The FUNCTION special operator doesn't check properly whether its
   argument is a function name. E.g. (FUNCTION (X Y)) returns a value
-  instead of failing with an error.
-
-* (DESCRIBE 'GF) fails where GF is the name of a generic function:
-  The function SB-IMPL::DESCRIBE-INSTANCE is undefined.
+  instead of failing with an error. (Later attempting to funcall the
+  value does cause an error.)
 
 * Failure in initialization files is not handled gracefully -- it's 
   a throw to TOP-LEVEL-CATCHER, which is not caught until we enter
@@ -52,8 +49,6 @@ TODO file. Eventually more such information may move here.)
 	FOO
 	* (COMPILED-FUNCTION-P #'FOO)
 	T
-
-* The CL:STEP macro is undefined.
 
 * DEFSTRUCT should almost certainly overwrite the old LAYOUT information
   instead of just punting when a contradictory structure definition
@@ -777,3 +772,33 @@ SBCL: (("blah") ("blah2"))
 	:LET fell through ECASE expression.
   Very likely the patch discussed there is appropriate for SBCL
   as well, but I don't understand it, so I didn't apply it.
+
+* The implementation of #'+ returns its single argument without
+  type checking, e.g. (+ "illegal") => "illegal".
+
+* In sbcl-0.6.7, there is no doc string for CL:PUSH, probably 
+  because it's defined with the DEFMACRO-MUNDANELY macro and something
+  is wrong with doc string setting in that macro.
+
+* Attempting to use COMPILE on something defined by DEFMACRO fails:
+	(DEFMACRO FOO (X) (CONS X X))
+	(COMPILE 'FOO)
+Error in function C::GET-LAMBDA-TO-COMPILE:
+   #<Closure Over Function "DEFUN (SETF MACRO-FUNCTION)" {480E21B1}> was defined in a non-null environment.
+
+* In sbcl-0.6.7, the compiler accepted a bogus declaration
+  (TYPE INDEX LENGTH) in the definition of BUTLAST, and then died
+  with infinite regress of errors when the BUTLAST function was
+  executed with a LIST=NIL which would cause LENGTH to be -1.
+  I fixed the bogus declaration, but I should come back and see
+  whether the system's inability to recover from the bogus declaration
+  (by signalling a TYPE-ERROR and dropping into the debugger) was 
+  a compiler problem which remains to be fixed, or one of the 
+  unrelated infinite-regress-errors problems, many related to 
+  revised signal handling, which were fixed around the same time.
+
+* Even when FINISH-OUTPUT is called, the system doesn't in general
+  flush the last line of output unless it's terminated by a newline.
+  (This is particularly annoying because several Lisp functions like
+  PRINT *precede* their output with a newline, instead of following
+  it with a newline.)

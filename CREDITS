@@ -491,3 +491,6 @@ Raymond Wiker ported sbcl-0.6.3 back to FreeBSD, restoring the
 ancestral CMU CL support for FreeBSD and updating it for the changes
 made from FreeBSD version 3 to FreeBSD version 4.
 
+Colin Walters' O(N) implementation of the general case of MAP on the
+cmucl-imp@cons.org mailing list was the inspiration for similar MAP
+code in sbcl-0.6.8.

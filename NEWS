@@ -476,7 +476,9 @@ changes in sbcl-0.6.8 relative to sbcl-0.6.7:
   and that caused the system to bomb out with infinite regress
   when trying to recover from type errors involving signed values,
   e.g. (BUTLAST '(1 2 3) -1).)
-?? The system now uses code based on Colin Walters' O(N)
+* (BUTLAST NIL) and (NBUTLAST NIL) now return NIL as they should.
+  (This was one of the bugs Peter Van Eynde reported back in July.)
+* The system now uses code inspired by Colin Walters' O(N)
   implementation of MAP (from the cmucl-imp@cons.org mailing
   list, 2 September 2000) when it can't use a DEFTRANSFORM to
   inline the MAP operation, and there is more than one
@@ -486,8 +488,7 @@ changes in sbcl-0.6.8 relative to sbcl-0.6.7:
   of the general M-argument sequence-of-length-N case required
   O(M*N*N) time when any of the sequence arguments were LISTs.)
 ?? Raymond Wiker's port of CMU CL's RUN-PROGRAM has been added.
-(?? Don't forget to mention Colin Walters and Raymond Wiker in the
-  CREDITS file.)
+(?? Don't forget to mention Raymond Wiker in the CREDITS file.)
 ?? The debugger now flushes standard output streams before it begins
   its output ("debugger invoked" and so forth).
 ?? The patch for the SUBSEQ bug reported on the cmucl-imp mailing
@@ -497,6 +498,10 @@ changes in sbcl-0.6.8 relative to sbcl-0.6.7:
   a bug in SUBSEQ and <a bug in ??>.)
 ?? A bug in signal handling which kept TRACE from working on OpenBSD
   has been fixed.
+  ?? Remember to remove this from the port-specific section of BUGS.
 ?? The signal handling bug reported by Martin Atzmueller on 
   sbcl-devel 13 September 2000, which caused the debugger to 
   get confused after a Ctrl-C interrupt under ILISP, has been fixed.
+?? The QUIT :UNIX-CODE keyword argument has been renamed to 
+  QUIT :UNIX-STATUS. (The old name is still supported, but 
+  deprecated.)
