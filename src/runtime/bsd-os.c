@@ -37,7 +37,6 @@
 #include <signal.h>
 /* #include <sys/sysinfo.h> */
 #include "validate.h"
-
 
 os_vm_size_t os_vm_page_size;
 

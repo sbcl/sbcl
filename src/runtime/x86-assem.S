@@ -22,16 +22,29 @@
 #include "genesis/symbol.h"
 #include "genesis/thread.h"
 	
-/* Minimize conditionalization for different OS naming schemes. */
-#if defined __linux__  || defined __FreeBSD__ || defined __NetBSD__ /* (but *not* OpenBSD) */
+/* Minimize conditionalization for different OS naming schemes. 
+ *
+ * (As of sbcl-0.8.10, this seems no longer to be much of an issue, 
+ * since everyone has converged on ELF. If this generality really 
+ * turns out not to matter, perhaps it's just clutter we could get
+ * rid of? -- WHN 2004-04-18)
+ */
+#if defined __linux__  || defined __FreeBSD__ || defined __NetBSD__ || defined __OpenBSD__
 #define GNAME(var) var
 #else
 #define GNAME(var) _##var
 #endif
 
 /* Get the right type of alignment. Linux, FreeBSD and NetBSD (but not OpenBSD)
- * want alignment in bytes. */
-#if defined(__linux__) || defined(__FreeBSD__) || defined(__NetBSD__)
+ * want alignment in bytes. 
+ *
+ * (As in the GNAME() definitions above, as of sbcl-0.8.10, this seems 
+ * no longer to be much of an issue, since everyone has converged on
+ * the same value. If this generality really turns out not to 
+ * matter any more, perhaps it's just clutter we could get
+ * rid of? -- WHN 2004-04-18)
+ */
+#if defined(__linux__) || defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__)
 #define align_4byte	4
 #define align_8byte	8
 #define align_16byte	16
@@ -44,7 +57,6 @@
 	.text
 	.global	GNAME(foreign_function_call_active)
 	.global	GNAME(all_threads)
-	
 
 /*
  * A call to call_into_c preserves esi, edi, and ebp.	

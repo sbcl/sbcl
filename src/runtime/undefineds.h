@@ -160,7 +160,7 @@ F(sigvec)
 F(socket)
 F(socketpair)
 F(stat)
-#ifndef SVR4
+#if !defined(SVR4) && !defined(__OpenBSD__)
 F(swapon)
 #endif
 F(symlink)

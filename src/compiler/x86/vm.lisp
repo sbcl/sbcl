@@ -451,7 +451,5 @@
 ;;; the symbol table (for example, prepending an underscore).
 (defun extern-alien-name (name)
   (declare (type simple-base-string name))
-  ;; OpenBSD is non-ELF, and needs a _ prefix
-  #!+openbsd (concatenate 'string "_" name)
-  ;; The other (ELF) ports currently don't need any prefix
-  #!-openbsd name)
+  ;; non-ELF ports currently don't need any prefix
+  name)

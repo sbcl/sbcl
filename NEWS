@@ -2367,6 +2367,9 @@ changes in sbcl-0.8.10 relative to sbcl-0.8.9:
   * Support for the forthcoming 2.0 version of the NetBSD kernel
     running on x86 hardware has been added.  (thanks to Perry
     E. Metzger most immediately, and others for their past work)
+  * SBCL now runs on OpenBSD 3.4. (Thanks to Scott Parish; 3.4 is the
+    current release version; SBCL's OpenBSD support had been broken 
+    since about the time of OpenBSD's switch to ELF binary format.)
   * [placeholder for DX summary]
     ** user code with &REST lists declared dynamic-extent, under high
        speed or space and low safety and debug optimization policy.

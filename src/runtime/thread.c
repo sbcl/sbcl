@@ -48,6 +48,7 @@ initial_thread_trampoline(struct thread *th)
  * whatever other bookkeeping needs to be done
  */
 
+#ifdef LISP_FEATURE_SB_THREAD
 int
 new_thread_trampoline(struct thread *th)
 {
@@ -62,6 +63,7 @@ new_thread_trampoline(struct thread *th)
     th->state=STATE_RUNNING;
     return funcall0(function);
 }
+#endif /* LISP_FEATURE_SB_THREAD */
 
 /* this is called from any other thread to create the new one, and
  * initialize all parts of it that can be initialized from another 

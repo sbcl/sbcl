@@ -164,18 +164,26 @@
 #!+(or freebsd openbsd)
 (progn
 
-  (def!constant read-only-space-start #x10000000)
-  (def!constant read-only-space-end   #x1ffff000)
+  (def!constant read-only-space-start
+    #!+freebsd #x10000000
+    #!+openbsd #x40000000)
+  (def!constant read-only-space-end
+    #!+freebsd #x1ffff000
+    #!+openbsd #x47fff000)
 
   (def!constant static-space-start
     #!+freebsd #x30000000
-    #!+openbsd #x28000000)
-  (def!constant static-space-end      #x37fff000)
+    #!+openbsd #x50000000)
+  (def!constant static-space-end
+    #!+freebsd #x37fff000
+    #!+openbsd #x5ffff000)
 
   (def!constant dynamic-space-start
-    #!+freebsd                             #x48000000
-    #!+openbsd                             #x50000000)
-  (def!constant dynamic-space-end          #x88000000))
+    #!+freebsd  #x48000000
+    #!+openbsd  #x80000000)
+  (def!constant dynamic-space-end
+    #!+freebsd #x88000000
+    #!+openbsd #xA0000000))
 
 #!+netbsd
 (progn

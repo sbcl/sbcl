@@ -13,7 +13,7 @@
 # this script (including "gmake clean" in the src/runtime directory)
 # several times in a row without failure.. so we leave the output/
 # directory in place.)
-rm -rf obj/* output/* doc/user-manual \
+rm -rf obj/* output/* src/runtime/genesis/ doc/user-manual \
   doc/user-manual.junk doc/DBTOHTML_OUTPUT_DIR*
 # (The doc/user-manual.junk and doc/DBTOHTML_OUTPUT_DIR* directories
 # are created by the Cygnus db2html script when it formats the the

@@ -18,8 +18,10 @@
 #include <sys/signal.h>
 
 typedef caddr_t os_vm_address_t;
-#ifdef __NetBSD__
+#if defined __NetBSD__
 typedef vsize_t os_vm_size_t;
+#elif defined __OpenBSD__
+typedef size_t os_vm_size_t;
 #else
 typedef vm_size_t os_vm_size_t;
 #endif
