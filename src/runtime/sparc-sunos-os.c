@@ -30,7 +30,6 @@
 
 #include <sys/types.h>
 #include <signal.h>
-/* #include <sys/sysinfo.h> */
 #include <sys/time.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -63,23 +62,23 @@ os_context_register_addr(os_context_t *context, int offset)
 os_context_register_t *
 os_context_pc_addr(os_context_t *context)
 {
-  return &(context->uc_mcontext.gregs[REG_PC]);
+    return &(context->uc_mcontext.gregs[REG_PC]);
 }
 
 os_context_register_t *
 os_context_npc_addr(os_context_t *context)
 {
-  return &(context->uc_mcontext.gregs[REG_nPC]);
+    return &(context->uc_mcontext.gregs[REG_nPC]);
 }
 
 sigset_t *
 os_context_sigmask_addr(os_context_t *context)
 {
-  return &(context->uc_sigmask);
+    return &(context->uc_sigmask);
 }
 
 void os_flush_icache(os_vm_address_t address, os_vm_size_t length)
 {
-  /* FIXME.  There's a bit of stuff in the CMUCL version. It may or
-     may not be needed */
+    /* see sparc-assem.S */
+    sparc_flush_icache(address, length);
 }

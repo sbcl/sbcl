@@ -387,3 +387,4 @@ lispobj funcall3(lispobj function, lispobj arg0, lispobj arg1, lispobj arg2)
 
     return call_into_lisp(function, args, 3);
 }
+

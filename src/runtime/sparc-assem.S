@@ -266,9 +266,9 @@ fun_end_breakpoint_trap:
 	.global	fun_end_breakpoint_end
 fun_end_breakpoint_end:
 
-	.global flush_icache
-	FUNCDEF(flush_icache)
-flush_icache:
+	.global sparc_flush_icache
+	FUNCDEF(sparc_flush_icache)
+sparc_flush_icache:
         add %o0,%o1,%o2
 1:      iflush %o0			! flush instruction cache
         add %o0,8,%o0
@@ -284,3 +284,4 @@ save_context:
 	ta	ST_FLUSH_WINDOWS	! flush register windows
 	retl				! return from leaf routine
 	nop 
+

@@ -14,7 +14,19 @@
 
 (in-package :sb!vm)
 
+;;; The comments in some of the cmucl source read that "the i and d
+;;; caches are unified, and so there is no need to flush them."
+;;;
+;;; Other bits of the cmucl source say that this is not true for
+;;; "newer machines, such as the SuperSPARC and MicroSPARC based
+;;; ones". Welcome to the 21st century... -- CSR, 2002-05-06
 (defun sanctify-for-execution (component)
-  (declare (ignore component))
+  (without-gcing
+   (alien-funcall (extern-alien "os_flush_icache"
+				(function void
+					  system-area-pointer
+					  unsigned-long))
+		  (code-instructions component)
+		  (* (code-header-ref component code-code-size-slot)
+		     n-word-bytes)))
   nil)
-
