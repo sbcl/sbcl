@@ -1266,7 +1266,7 @@ bootstrapping.
 		   ((eq (car form) 'next-method-p)
 		    (setq next-method-p-p t)
 		    form)
-		   ((eq (car form) 'setq)
+		   ((memq (car form) '(setq multiple-value-setq))
 		    ;; FIXME: this is possibly a little strong as
 		    ;; conditions go.  Ideally we would want to detect
 		    ;; which, if any, of the method parameters are

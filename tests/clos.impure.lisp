@@ -843,6 +843,10 @@
   (write-line "Break, you sucker!" *faa*)
   'ok)
 (assert (eq 'ok (faa (make-string-output-stream))))
+(defmethod fex ((x fixnum) (y fixnum))
+  (multiple-value-setq (x y) (values (/ x y) (/ y x)))
+  (list x y))
+(assert (equal (fex 5 3) '(5/3 3/5)))
 
 ;;; Bug reported by Zach Beane; incorrect return of (function
 ;;; ',fun-name) in defgeneric

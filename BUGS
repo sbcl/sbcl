@@ -887,6 +887,14 @@ WORKAROUND:
 
   (fixed in 0.8.2.51, but a test case would be good)
 
+276:
+  b. The same as in a., but using MULTIPLE-VALUE-SETQ instead of SETQ.
+  c. (defvar *faa*)
+     (defmethod faa ((*faa* double-float))
+           (set '*faa* (when (< *faa* 0) (- *faa*)))
+           (1+ *faa*))
+     (faa 1d0) => type error
+
 278:
   a.
     (defun foo ()
