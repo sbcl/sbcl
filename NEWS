@@ -1662,6 +1662,11 @@ changes in sbcl-0.8.0 relative to sbcl-0.7.14
     compiled in by default: you need to add :SB-THREAD to the target
     features.  See the "Beyond ANSI" chapter of the manual for
     details.
+  * Garbage collection refactoring: user-visible change is that a
+    call to the GC function during WITHOUT-GCING will not do garbage
+    collection until the end of the WITHOUT-GCING.  If you were doing 
+    this you were probably losing anyway.
+
   * sb-aclrepl module improvements: an integrated inspector, added
     repl features, and a bug fix to :trace command.
   * fixed some bugs revealed by Paul Dietz' test suite:

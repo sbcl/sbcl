@@ -211,49 +211,9 @@ and submit it as a patch."
 ;;; When >0, inhibits garbage collection.
 (defvar *gc-inhibit*) ; initialized in cold init
 
-;;; This flag is used to prevent recursive entry into the garbage
-;;; collector.
-(defvar *already-maybe-gcing*) ; initialized in cold init
-
-;;; When T, indicates that the dynamic usage has exceeded the value
-;;; *GC-TRIGGER*.
+;;; When T, indicates that a GC should have happened but did not due to 
+;;; *GC-INHIBIT*. 
 (defvar *need-to-collect-garbage* nil) ; initialized in cold init
-
-(defun default-gc-notify-before (notify-stream bytes-in-use)
-  (declare (type stream notify-stream))
-  (format
-   notify-stream
-   "~&; GC is beginning with ~:D bytes in use at internal runtime ~:D.~%"
-   bytes-in-use
-   (get-internal-run-time))
-  (finish-output notify-stream))
-(defparameter *gc-notify-before* #'default-gc-notify-before
-  #!+sb-doc
-  "The function bound to this variable is invoked before GC'ing (unless
-  *GC-NOTIFY-STREAM* is NIL) with the value of *GC-NOTIFY-STREAM* and
-  current amount of dynamic usage (in bytes). It should notify the
-  user that the system is going to GC.")
-
-(defun default-gc-notify-after (notify-stream
-				bytes-retained
-				bytes-freed
-				new-trigger)
-  (declare (type stream notify-stream))
-  (format notify-stream
-	  "~&; GC has finished with ~:D bytes in use (~:D bytes freed)~@
-           ; at internal runtime ~:D. The new GC trigger is ~:D bytes.~%"
-	  bytes-retained
-	  bytes-freed
-	  (get-internal-run-time)
-	  new-trigger)
-  (finish-output notify-stream))
-(defparameter *gc-notify-after* #'default-gc-notify-after
-  #!+sb-doc
-  "The function bound to this variable is invoked after GC'ing with the
-value of *GC-NOTIFY-STREAM*, the amount of dynamic usage (in bytes) now
-free, the number of bytes freed by the GC, and the new GC trigger
-threshold; or if *GC-NOTIFY-STREAM* is NIL, it's not invoked. The
-function should notify the user that the system has finished GC'ing.")
 
 ;;;; internal GC
 
@@ -291,102 +251,61 @@ function should notify the user that the system has finished GC'ing.")
 	      (warn "(FUNCALL ~S~{ ~S~}) lost:~%~A" ',function ',args cond)
 	      nil))))
 
-;;; SUB-GC decides when and if to do a garbage collection. The FORCE-P
-;;; flags controls whether a GC should occur even if the dynamic usage
-;;; is not greater than *GC-TRIGGER*.
+;;; SUB-GC does a garbage collection.  This is called from three places:
+;;; (1) The C runtime will call here when it detects that we've consed 
+;;;     enough to exceed the gc trigger threshold
+;;; (2) The user may request a collection using GC, below
+;;; (3) At the end of a WITHOUT-GCING section, we are called if
+;;;     *NEED-TO-COLLECT-GARBAGE* is true
 ;;;
+;;; This is different from the behaviour in 0.7 and earlier: it no
+;;; longer decides whether to GC based on thresholds.  If you call
+;;; SUB-GC you will definitely get a GC either now or when the
+;;; WITHOUT-GCING is over
+
 ;;; For GENCGC all generations < GEN will be GC'ed.
 
-;;; XXX need (1) some kind of locking to ensure that only one thread
-;;; at a time is trying to GC, (2) to look at all these specials and
-;;; work out how much of this "do we really need to GC now?" stuff is
-;;; actually necessary: I think we actually end up GCing every time we
-;;; hit this code
+(defvar *gc-mutex* (sb!thread:make-mutex :name "GC Mutex"))
 
-(defun sub-gc (&key force-p (gen 0))
-  (/show0 "entering SUB-GC")
-  (unless *already-maybe-gcing*
-    (let* ((*already-maybe-gcing* t)
-	   (start-time (get-internal-run-time))
-	   (pre-gc-dynamic-usage (dynamic-usage)))      
-      (when (and *gc-trigger* (> pre-gc-dynamic-usage *gc-trigger*))
-	(setf *need-to-collect-garbage* t))
-      (when (or force-p
-		(and *need-to-collect-garbage* (zerop *gc-inhibit*)))
-	;; KLUDGE: Wow, we really mask interrupts all the time we're
-	;; collecting garbage? That seems like a long time.. -- WHN 19991129
+(defun sub-gc (&key (gen 0))
+  (when (sb!thread::mutex-value *gc-mutex*) (return-from sub-gc nil))
+  (sb!thread:with-mutex (*gc-mutex* :wait-p nil)
+    (let* ((start-time (get-internal-run-time)))
+      (setf *need-to-collect-garbage* t)
+      (when (zerop *gc-inhibit*)
 	(without-interrupts
-	 ;; FIXME: We probably shouldn't do this evil thing to
-	 ;; *STANDARD-OUTPUT* in a binding which is wrapped around
-	 ;; calls to user-settable GC hook functions.
-	  (let ((*standard-output* *terminal-io*))
-	    (when *gc-notify-stream*
-	      (if (streamp *gc-notify-stream*)
-		  (carefully-funcall *gc-notify-before*
-				     *gc-notify-stream*
-				     pre-gc-dynamic-usage)
-	          (warn
-		   "*GC-NOTIFY-STREAM* is set, but not a STREAM -- ignored.")))
-	    (dolist (hook *before-gc-hooks*)
-	      (carefully-funcall hook))
-	    (when *gc-trigger*
-	      (clear-auto-gc-trigger))
-	    (let* (;; We do DYNAMIC-USAGE once more here in order to
-		   ;; get a more accurate measurement of the space
-		   ;; actually freed, since the messing around, e.g.
-		   ;; GC-notify stuff, since the DYNAMIC-USAGE which
-		   ;; triggered GC could've done a fair amount of
-		   ;; consing.)
-		   (pre-internal-gc-dynamic-usage (dynamic-usage))
-		   (ignore-me (funcall *internal-gc* gen))
-		   (post-gc-dynamic-usage (dynamic-usage))
-		   (n-bytes-freed (- pre-internal-gc-dynamic-usage
-				     post-gc-dynamic-usage))
-		   ;; In sbcl-0.6.12.39, the raw N-BYTES-FREED from
-		   ;; GENCGC could sometimes be substantially negative
-		   ;; (e.g. -5872). I haven't looked into what causes
-		   ;; that, but I suspect it has to do with
-		   ;; fluctuating inefficiency in the way that the
-		   ;; GENCGC packs things into page boundaries.
-		   ;; Bumping the raw result up to 0 is a little ugly,
-		   ;; but shouldn't be a problem, and it's even
-		   ;; possible to sort of justify it: the packing
-		   ;; inefficiency which has caused (DYNAMIC-USAGE) to
-		   ;; grow is effectively consing, or at least
-		   ;; overhead of consing, so it's sort of correct to
-		   ;; add it to the running total of consing. ("Man
-		   ;; isn't a rational animal, he's a rationalizing
-		   ;; animal.":-) -- WHN 2001-06-23
-		   (eff-n-bytes-freed (max 0 n-bytes-freed)))
-	      (declare (ignore ignore-me))
-	      (incf *n-bytes-freed-or-purified*
-		    eff-n-bytes-freed)
-	      (setf *need-to-collect-garbage* nil)
-	      (setf *gc-trigger*  (+ post-gc-dynamic-usage
-				     *bytes-consed-between-gcs*))
-	      (set-auto-gc-trigger *gc-trigger*)
-	      (dolist (hook *after-gc-hooks*)
-		(/show0 "doing a hook from *AFTER-GC--HOOKS*")
-		;; FIXME: This hook should be called with the same
-		;; kind of information as *GC-NOTIFY-AFTER*. In
-		;; particular, it would be nice for the hook function
-		;; to be able to adjust *GC-TRIGGER* intelligently to
-		;; e.g. 108% of total memory usage.
-		(carefully-funcall hook))
-	      (when *gc-notify-stream*
-		(if (streamp *gc-notify-stream*)
-		    (carefully-funcall *gc-notify-after*
-				       *gc-notify-stream*
-				       post-gc-dynamic-usage
-				       eff-n-bytes-freed
-				       *gc-trigger*)
-		    (warn
-		     "*GC-NOTIFY-STREAM* is set, but not a stream -- ignored.")))))
-	  (scrub-control-stack)))       ;XXX again?  we did this from C ...
-      (incf *gc-run-time* (- (get-internal-run-time)
-			     start-time))))
-  ;; FIXME: should probably return (VALUES), here and in RETURN-FROM
+	 (dolist (hook  *before-gc-hooks*)  (carefully-funcall hook))
+	 (when *gc-trigger*
+	   (clear-auto-gc-trigger))
+	 (let* ((pre-internal-gc-dynamic-usage (dynamic-usage))
+		(ignore-me (funcall *internal-gc* gen))
+		(post-gc-dynamic-usage (dynamic-usage))
+		(n-bytes-freed (- pre-internal-gc-dynamic-usage
+				  post-gc-dynamic-usage))
+		;; the raw N-BYTES-FREED from GENCGC can sometimes be
+		;; substantially negative (e.g. -5872).  This is
+		;; probably due to fluctuating inefficiency in the way
+		;; that the GENCGC packs things into page boundaries.
+		;; We bump the raw result up to 0: the space is
+		;; allocated even if unusable, so should be counted
+		;; for deciding when we've allocated enough to GC
+		;; next.  ("Man isn't a rational animal, he's a
+		;; rationalizing animal.":-) -- WHN 2001-06-23)
+		(eff-n-bytes-freed (max 0 n-bytes-freed)))
+	   (declare (ignore ignore-me))
+	   (incf *n-bytes-freed-or-purified*  eff-n-bytes-freed)
+	   (setf *need-to-collect-garbage* nil)
+	   (setf *gc-trigger*  (+ post-gc-dynamic-usage
+				  *bytes-consed-between-gcs*))
+	   (set-auto-gc-trigger *gc-trigger*)
+	   (dolist (hook *after-gc-hooks*)
+	     (carefully-funcall hook))))
+	(scrub-control-stack))       ;XXX again?  we did this from C ...
+      (incf *gc-run-time* (- (get-internal-run-time) start-time))))
   nil)
+
+
+
 
 ;;; This is the user-advertised garbage collection function.
 (defun gc (&key (gen 0) (full nil) &allow-other-keys)
@@ -396,7 +315,7 @@ function should notify the user that the system has finished GC'ing.")
   #!+(and sb-doc (not gencgc))
   "Initiate a garbage collection. GEN may be provided for compatibility with
   generational garbage collectors, but is ignored in this implementation."
-  (sub-gc :force-p t :gen (if full 6 gen)))
+  (sub-gc  :gen (if full 6 gen)))
 
 
 ;;;; auxiliary functions
