@@ -42,7 +42,7 @@ KNOWN BUGS OF NO SPECIAL CLASS:
   program, even if you know or guess enough about the internals of
   SBCL to wager that this (undefined in ANSI) operation would be safe.
 
-3:
+3: "type checking of structure slots"
   a:
   ANSI specifies that a type mismatch in a structure slot
   initialization value should not cause a warning.
@@ -83,6 +83,23 @@ WORKAROUND:
      "do not initilize this slot" and does not cause type error. But
      an error may be signalled at read time and it would be good if
      SBCL did it.
+
+  c: Reading of not initialized slot sometimes causes SEGV.
+
+  d:
+    (declaim (optimize (safety 3) (speed 1) (space 1)))
+    (defstruct foo
+      x y)
+    (defstruct (stringwise-foo (:include foo
+                                         (x "x" :type simple-string)
+                                         (y "y" :type simple-string))))
+    (defparameter *stringwise-foo*
+      (make-stringwise-foo))
+    (setf (foo-x *stringwise-foo*) 0)
+    (defun frob-stringwise-foo (sf)
+      (aref (stringwise-foo-x sf) 0))
+    (frob-stringwise-foo *stringwise-foo*)
+  SEGV.
 
 6:
   bogus warnings about undefined functions for magic functions like
