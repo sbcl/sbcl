@@ -68,7 +68,7 @@ struct interrupt_data * global_interrupt_data;
  *
  * In the case of most signals, when Lisp asks us to handle the
  * signal, the outermost handler (the one actually passed to UNIX) is
- * either interrupt_handle_now(..) or interrupt_handle_later(..).
+ * either interrupt_handle_now(..) or maybe_now_maybe_later(..).
  * In that case, the Lisp-level handler is stored in interrupt_handlers[..]
  * and interrupt_low_level_handlers[..] is cleared.
  *
@@ -512,7 +512,7 @@ gc_trigger_hit(int signal, siginfo_t *info, os_context_t *context)
 
 extern lispobj call_into_lisp(lispobj fun, lispobj *args, int nargs);
 extern void post_signal_tramp(void);
-void return_to_lisp_function(os_context_t *context, lispobj function)
+void arrange_return_to_lisp_function(os_context_t *context, lispobj function)
 {
     void * fun=native_pointer(function);
     char *code = &(((struct simple_fun *) fun)->code);
@@ -526,7 +526,6 @@ void return_to_lisp_function(os_context_t *context, lispobj function)
      * would see, then arrange to have it called directly.  post_signal_tramp
      * is the second half of this function
      */
-    
     u32 *sp=(u32 *)*os_context_register_addr(context,reg_ESP);
 
     *(sp-14) = post_signal_tramp; /* return address for call_into_lisp */
@@ -573,20 +572,16 @@ void return_to_lisp_function(os_context_t *context, lispobj function)
     *os_context_register_addr(context,reg_CODE) = 
 	fun + FUN_POINTER_LOWTAG;
 #endif
-#ifdef LISP_FEATURE_LINUX
-    /* Under Linux on some architectures it seems we have to restore
-       the FPU control word from the context, as after the signal is
-       delivered we have a null FPU control word. */
-    os_restore_fp_control(context);
-#endif 
 }
 
+#ifdef LISP_FEATURE_SB_THREAD
 boolean handle_rt_signal(int num, siginfo_t *info, void *v_context)
 {
     struct 
 	os_context_t *context = (os_context_t*)arch_os_get_context(&v_context);
-    return_to_lisp_function(context,info->si_value.sival_int);
+    arrange_return_to_lisp_function(context,info->si_value.sival_int);
 }
+#endif
 
 boolean handle_control_stack_guard_triggered(os_context_t *context,void *addr)
 {
@@ -599,7 +594,7 @@ boolean handle_control_stack_guard_triggered(os_context_t *context,void *addr)
 	 * temporarily so the error handler has some headroom */
 	protect_control_stack_guard_page(th->pid,0L);
 	
-	return_to_lisp_function
+	arrange_return_to_lisp_function
 	    (context, SymbolFunction(CONTROL_STACK_EXHAUSTED_ERROR));
 	return 1;
     }
@@ -704,8 +699,11 @@ undoably_install_low_level_interrupt_handler (int signal,
     sigaddset_blockable(&sa.sa_mask);
     sa.sa_flags = SA_SIGINFO | SA_RESTART;
 #ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
-    if((signal==SIG_MEMORY_FAULT) ||
-       (signal==SIG_INTERRUPT_THREAD))
+    if((signal==SIG_MEMORY_FAULT) 
+#ifdef SIG_INTERRUPT_THREAD
+       || (signal==SIG_INTERRUPT_THREAD)
+#endif
+       )
 	sa.sa_flags|= SA_ONSTACK;
 #endif
     

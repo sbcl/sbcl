@@ -283,7 +283,7 @@ by Bill Chiles to add encapsulation, and modified more by William Lott
 to add FDEFN objects.
 
 The CMU CL condition system (code/error.lisp) was based on
-some prototyping code written by Ken Pitman at Symbolics.
+some prototyping code written by Kent Pitman at Symbolics.
 
 The CMU CL HASH-TABLE system was originally written by Skef Wholey
 for Spice Lisp, then rewritten by William Lott, then rewritten
@@ -452,8 +452,9 @@ Aronson, and Steve Handerson.
 
 Douglas Crosher wrote code to support Gray streams, added X86 support
 for the debugger and relocatable code, wrote a conservative
-generational GC for the X86 port, and added X86-specific extensions to
-support stack groups and multiprocessing.
+generational GC for the X86 port.  He also added X86-specific
+extensions to support stack groups and multiprocessing, but these are
+not present in SBCL
 
 The CMU CL user manual credits Robert MacLachlan as editor. A chapter
 on the CMU CL interprocess communication extensions (not supported in
@@ -506,15 +507,15 @@ Martin Atzmueller:
   I've lost count. See the CVS logs.)
 
 Daniel Barlow:
-  He made SBCL play nicely with ILISP. He figured out how to get the
-  CMU CL dynamic object file loading code to work under SBCL. He
-  ported CMU CL's support for Alpha and PPC CPUs to SBCL, and then
-  continued to improve the ports. He wrote code (e.g. grovel_headers.c
-  and stat_wrapper stuff) to handle machine-dependence and
-  OS-dependence automatically, reducing the amount of hand-tweaking
-  required to keep ports synchronized. He's also provided support
-  for SBCL (as well as for free Common Lisp in general) through
-  his CLiki website.
+  His contributions have included support for shared object loading
+  (from CMUCL), the Cheney GC for non-x86 ports (from CMUCL), Alpha
+  and PPC ports (from CMUCL), control stack exhaustion checking (new)
+  and native threads support for x86 Linux (new).  He also refactored
+  the garbage collectors for understandability, wrote code
+  (e.g. grovel_headers.c and stat_wrapper stuff) to find
+  machine-dependent and OS-dependent constants automatically, and was
+  original author of the asdf, asdf-install, sb-bsd-sockets,
+  sb-executable, sb-grovel and sb-posix contrib packages.
 
 Robert E. Brown:
   He has reported various bugs and submitted several patches, 
@@ -546,6 +547,10 @@ Paul Dietz
   requirements of the ANSI Common Lisp standard.  Already, at the
   halfway stage, it has caught many tens of bugs in SBCL, and provided
   simple test cases for them.
+
+Miles Egan
+  He creates binary packages of SBCL releases for Red Hat and other
+  (which?) platforms
 
 Nathan Froyd:
   He has fixed various bugs, and also done a lot of internal
@@ -583,7 +588,9 @@ Pierre Mai:
 
 Eric Marsden:
   Some of his fixes to CMU CL since the SBCL fork have been ported
-  to SBCL.
+  to SBCL.  He also maintains the cl-benchmark package, which gives
+  us some idea of how our performance changes compared to earlier
+  releases and to other implementations.
 
 Antonio Martinez-Shotton:
   He has contributed a number of bug fixes and bug reports to SBCL.
@@ -615,8 +622,9 @@ Patrik Nordebo:
   ABI and assembly syntax differences between Darwin and Linux.
 
 Kevin M. Rosenberg:
-  He provided the ACL-style toplevel, and a number of MOP-related bug
-  reports.
+  He provided the ACL-style toplevel (sb-aclrepl contrib module), and
+  a number of MOP-related bug reports.  He also creates the official
+  Debian packages of SBCL.
 
 Christophe Rhodes:
   He ported SBCL to SPARC, made various port-related and SPARC-related
@@ -664,7 +672,7 @@ Raymond Wiker:
 INITIALS GLOSSARY (helpful when reading comments, CVS commit logs, etc.)
 
 MNA  Martin Atzmueller
-DB   Daniel Barlow
+DB   Daniel Barlow (also "dan")
 DTC  Douglas Crosher
 APD  Alexey Dejneka
 NJF  Nathan Froyd

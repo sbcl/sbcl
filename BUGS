@@ -223,12 +223,6 @@ WORKAROUND:
   crashes SBCL. In general tracing anything which is used in the 
   implementation of TRACE is likely to have the same problem.
 
-75:
-  As reported by Martin Atzmueller on sbcl-devel 26 Dec 2000,
-  ANSI says that WITH-OUTPUT-TO-STRING should have a keyword
-  :ELEMENT-TYPE, but in sbcl-0.6.9 this is not defined for
-  WITH-OUTPUT-TO-STRING.
-
 78:
   ANSI says in one place that type declarations can be abbreviated even
   when the type name is not a symbol, e.g.
@@ -1076,6 +1070,11 @@ WORKAROUND:
 271:
   Cross-compiler cannot perform constant folding of some internal
   functions, such as %NEGATE.
+
+272:
+  All forms of GC hooks (including notifiers and finalisers) are currently
+  (since 0.8.0) broken for gencgc (i.e. x86) users 
+
 
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:
