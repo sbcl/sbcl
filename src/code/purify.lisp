@@ -59,6 +59,5 @@
 	 #'(lambda (notify-stream &rest ignore)
 	     (declare (ignore ignore))
 	     (write-line "done]" notify-stream))))
-    #!-gencgc (gc t)
-    #!+gencgc (gc :verbose t))
+    (gc))
   nil)

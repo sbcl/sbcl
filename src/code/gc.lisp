@@ -153,10 +153,6 @@
   usage. The function should return NIL if garbage collection should
   continue and non-NIL if it should be inhibited. Use with caution.")
 
-(defvar *gc-verbose* nil ; (actually initialized in cold init)
-  #!+sb-doc
-  "Should low-level GC functions produce verbose diagnostic output?")
-
 (defvar *gc-notify-stream* nil ; (actually initialized in cold init)
   #!+sb-doc
   "When non-NIL, this must be a STREAM; and the functions bound to
@@ -264,15 +260,13 @@
 	      (warn "(FUNCALL ~S~{ ~S~}) lost:~%~A" ',function ',args cond)
 	      nil))))
 
-;;; SUB-GC decides when and if to do a garbage collection. The
-;;; VERBOSE-P flag controls whether or not the notify functions are
-;;; called. The FORCE-P flags controls if a GC should occur even if
+;;; SUB-GC decides when and if to do a garbage collection.
+;;; The FORCE-P flags controls if a GC should occur even if
 ;;; the dynamic usage is not greater than *GC-TRIGGER*.
 ;;;
 ;;; For GENCGC all generations < GEN will be GC'ed.
 ;;;
-;;; FIXME: The VERBOSE-P stuff is no longer used.
-(defun sub-gc (&key (verbose-p *gc-verbose*) force-p #!+gencgc (gen 0))
+(defun sub-gc (&key force-p #!+gencgc (gen 0))
   (/show0 "entering SUB-GC")
   (unless *already-maybe-gcing*
     (/show0 "not *ALREADY-MAYBE-GCING*")
@@ -414,20 +408,18 @@
 ;;; KLUDGE: GC shouldn't have different parameters depending on what
 ;;; garbage collector we use. -- WHN 19991020
 #!-gencgc
-(defun gc (&optional (verbose-p *gc-verbose*))
+(defun gc ()
   #!+sb-doc
-  "Initiates a garbage collection. VERBOSE-P controls
-  whether or not GC statistics are printed."
-  (sub-gc :verbose-p verbose-p :force-p t))
+  "Initiates a garbage collection."
+  (sub-gc :force-p t))
 #!+gencgc
-(defun gc (&key (verbose *gc-verbose*) (gen 0) (full nil))
+(defun gc (&key (gen 0) (full nil))
   #!+sb-doc
-  "Initiates a garbage collection. VERBOSE controls whether or not GC
-  statistics are printed. GEN controls the number of generations to garbage
-  collect."
+  "Initiates a garbage collection.
+  GEN controls the number of generations to garbage collect."
   ;; FIXME: The bare 6 here (corresponding to a bare 6 in
   ;; the gencgc.c sources) is nasty.
-  (sub-gc :verbose-p verbose :force-p t :gen (if full 6 gen)))
+  (sub-gc :force-p t :gen (if full 6 gen)))
 
 ;;;; auxiliary functions
 

@@ -132,8 +132,7 @@
 (defun convert-interpreted-fun (fun)
   (declare (type interpreted-function fun))
   (let* ((new (interpreted-function-definition
-	       (internal-eval `#',(interpreted-function-lambda fun)
-			      (interpreted-function-converted-once fun)))))
+	       (internal-eval `#',(interpreted-function-lambda fun)))))
     (setf (interpreted-function-definition fun) new)
     (setf (interpreted-function-converted-once fun) t)
     (let ((name (interpreted-function-%name fun)))
@@ -577,8 +576,8 @@
 ;;; APPLY on it. If *ALREADY-EVALED-THIS* is true, then we bind it to
 ;;; NIL around the apply to limit the inhibition to the lexical scope
 ;;; of the EVAL-WHEN.
-(defun internal-eval (form &optional quietly)
-  (let ((res (sb!c:compile-for-eval form quietly)))
+(defun internal-eval (form)
+  (let ((res (sb!c:compile-for-eval form)))
     (if *already-evaled-this*
 	(let ((*already-evaled-this* nil))
 	  (internal-apply res nil '#()))

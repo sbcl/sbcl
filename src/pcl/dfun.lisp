@@ -137,10 +137,12 @@ And so, we are saved.
 		 (metatypes (car args))
 		 (gfs (when dfun-type (gfs-of-type dfun-type))))
 	    (dolist (gf gfs)
-	      (when (and (equal metatypes (arg-info-metatypes (gf-arg-info gf)))
+	      (when (and (equal metatypes
+				(arg-info-metatypes (gf-arg-info gf)))
 			 (let ((gf-name (generic-function-name gf)))
 			   (and (not (eq gf-name 'slot-value-using-class))
-				(not (equal gf-name '(setf slot-value-using-class)))
+				(not (equal gf-name
+					    '(setf slot-value-using-class)))
 				(not (eq gf-name 'slot-boundp-using-class)))))
 		(update-dfun gf)))
 	    (setf (second args-entry) constructor)
@@ -168,39 +170,39 @@ And so, we are saved.
                     ,(apply (fdefinition (car generator-entry))
                             (car args-entry)))))))))))
 
-;;; When all the methods of a generic function are automatically generated
-;;; reader or writer methods a number of special optimizations are possible.
-;;; These are important because of the large number of generic functions of
-;;; this type.
+;;; When all the methods of a generic function are automatically
+;;; generated reader or writer methods a number of special
+;;; optimizations are possible. These are important because of the
+;;; large number of generic functions of this type.
 ;;;
 ;;; There are a number of cases:
 ;;;
 ;;;   ONE-CLASS-ACCESSOR
-;;;     In this case, the accessor generic function has only been called
-;;;     with one class of argument. There is no cache vector, the wrapper
-;;;     of the one class, and the slot index are stored directly as closure
-;;;     variables of the discriminating function. This case can convert to
-;;;     either of the next kind.
+;;;     In this case, the accessor generic function has only been
+;;;     called with one class of argument. There is no cache vector,
+;;;     the wrapper of the one class, and the slot index are stored
+;;;     directly as closure variables of the discriminating function.
+;;;     This case can convert to either of the next kind.
 ;;;
 ;;;   TWO-CLASS-ACCESSOR
-;;;     Like above, but two classes. This is common enough to do specially.
-;;;     There is no cache vector. The two classes are stored a separate
-;;;     closure variables.
+;;;     Like above, but two classes. This is common enough to do
+;;;     specially. There is no cache vector. The two classes are
+;;;     stored a separate closure variables.
 ;;;
 ;;;   ONE-INDEX-ACCESSOR
-;;;     In this case, the accessor generic function has seen more than one
-;;;     class of argument, but the index of the slot is the same for all
-;;;     the classes that have been seen. A cache vector is used to store
-;;;     the wrappers that have been seen, the slot index is stored directly
-;;;     as a closure variable of the discriminating function. This case
-;;;     can convert to the next kind.
+;;;     In this case, the accessor generic function has seen more than
+;;;     one class of argument, but the index of the slot is the same
+;;;     for all the classes that have been seen. A cache vector is
+;;;     used to store the wrappers that have been seen, the slot index
+;;;     is stored directly as a closure variable of the discriminating
+;;;     function. This case can convert to the next kind.
 ;;;
 ;;;   N-N-ACCESSOR
-;;;     This is the most general case. In this case, the accessor generic
-;;;     function has seen more than one class of argument and more than one
-;;;     slot index. A cache vector stores the wrappers and corresponding
-;;;     slot indexes. Because each cache line is more than one element
-;;;     long, a cache lock count is used.
+;;;     This is the most general case. In this case, the accessor
+;;;     generic function has seen more than one class of argument and
+;;;     more than one slot index. A cache vector stores the wrappers
+;;;     and corresponding slot indexes. Because each cache line is
+;;;     more than one element long, a cache lock count is used.
 (defstruct (dfun-info (:constructor nil)
 		      (:copier nil))
   (cache nil))
@@ -539,33 +541,9 @@ And so, we are saved.
 (defparameter *structure-typep-cost* 1)
 (defparameter *built-in-typep-cost* 0)
 
-;;; The execution time of this version is exponential to some function
-;;; of number of gf methods and argument lists. It was taking
-;;; literally hours to load the presentation methods from the
-;;; cl-http w3p kit.
-#+nil
-(defun dispatch-dfun-cost (gf)
-  (generate-discrimination-net-internal
-   gf (generic-function-methods gf) nil
-   #'(lambda (methods known-types)
-       (declare (ignore methods known-types))
-       0)
-   #'(lambda (position type true-value false-value)
-       (declare (ignore position))
-       (+ (max true-value false-value)
-	  (if (eq 'class (car type))
-	      (let ((cpl (class-precedence-list (class-of (cadr type)))))
-		(cond((memq *the-class-built-in-class* cpl)
-		      *built-in-typep-cost*)
-		     ((memq *the-class-structure-class* cpl)
-		      *structure-typep-cost*)
-		     (t
-		      *non-built-in-typep-cost*)))
-	      0)))
-   #'identity))
-
-;;; This version is from the pcl found in the gcl-2.1 distribution.
-;;; Someone added a cost limit so as to keep the execution time controlled
+;;; According to comments in the original CMU CL version of PCL,
+;;; the cost LIMIT is important to cut off exponential growth for
+;;; large numbers of gf methods and argument lists.
 (defun dispatch-dfun-cost (gf &optional limit)
   (generate-discrimination-net-internal
    gf (generic-function-methods gf) nil
@@ -672,16 +650,16 @@ And so, we are saved.
      (invoke-emf ,nemf ,args)))
 
 ;;; The dynamically adaptive method lookup algorithm is implemented is
-;;; implemented as a kind of state machine. The kinds of discriminating
-;;; function is the state, the various kinds of reasons for a cache miss
-;;; are the state transitions.
+;;; implemented as a kind of state machine. The kinds of
+;;; discriminating function is the state, the various kinds of reasons
+;;; for a cache miss are the state transitions.
 ;;;
-;;; The code which implements the transitions is all in the miss handlers
-;;; for each kind of dfun. Those appear here.
+;;; The code which implements the transitions is all in the miss
+;;; handlers for each kind of dfun. Those appear here.
 ;;;
-;;; Note that within the states that cache, there are dfun updates which
-;;; simply select a new cache or cache field. Those are not considered
-;;; as state transitions.
+;;; Note that within the states that cache, there are dfun updates
+;;; which simply select a new cache or cache field. Those are not
+;;; considered as state transitions.
 (defvar *lazy-dfun-compute-p* t)
 (defvar *early-p* nil)
 
@@ -954,8 +932,8 @@ And so, we are saved.
 		 (dfun-update generic-function
 			      #'make-constant-value-dfun ncache))))))))
 
-;;; Given a generic function and a set of arguments to that generic function,
-;;; returns a mess of values.
+;;; Given a generic function and a set of arguments to that generic
+;;; function, return a mess of values.
 ;;;
 ;;;  <function>   The compiled effective method function for this set of
 ;;;	       arguments.
@@ -997,7 +975,8 @@ And so, we are saved.
 	  (error "The function ~S requires at least ~D arguments"
 		 gf (length metatypes))
 	  (multiple-value-bind (emf methods accessor-type index)
-	      (cache-miss-values-internal gf arg-info wrappers classes types state)
+	      (cache-miss-values-internal
+	       gf arg-info wrappers classes types state)
 	    (values emf methods
 		    dfun-wrappers
 		    invalid-wrapper-p
@@ -1014,7 +993,8 @@ And so, we are saved.
 	    (compute-applicable-methods-using-classes gf classes))
       (let ((emf (if (or cam-std-p all-applicable-and-sorted-p)
 		     (function-funcall (get-secondary-dispatch-function1
-					gf methods types nil (and for-cache-p wrappers)
+					gf methods types nil (and for-cache-p
+								  wrappers)
 					all-applicable-and-sorted-p)
 				       nil (and for-cache-p wrappers))
 		     (default-secondary-dispatch-function gf))))
@@ -1053,8 +1033,10 @@ And so, we are saved.
 			       (early-method-standard-accessor-slot-name meth))
 			  (and (member *the-class-std-object*
 				       (if early-p
-					   (early-class-precedence-list accessor-class)
-					   (class-precedence-list accessor-class)))
+					   (early-class-precedence-list
+					    accessor-class)
+					   (class-precedence-list
+					    accessor-class)))
 			       (if early-p
 				   (not (eq *the-class-standard-method*
 					    (early-method-class meth)))
@@ -1065,7 +1047,8 @@ And so, we are saved.
 	 (slotd (and accessor-class
 		     (if early-p
 			 (dolist (slot (early-class-slotds accessor-class) nil)
-			   (when (eql slot-name (early-slot-definition-name slot))
+			   (when (eql slot-name
+				      (early-slot-definition-name slot))
 			     (return slot)))
 			 (find-slot-definition accessor-class slot-name)))))
     (when (and slotd
@@ -1101,7 +1084,8 @@ And so, we are saved.
 	     (so-p (member *the-class-std-object* specl-cpl))
 	     (slot-name (if (consp method)
 			    (and (early-method-standard-accessor-p method)
-				 (early-method-standard-accessor-slot-name method))
+				 (early-method-standard-accessor-slot-name
+				  method))
 			    (accessor-method-slot-name method))))
 	(when (or (null specl-cpl)
 		  (member *the-class-structure-object* specl-cpl))
@@ -1164,8 +1148,10 @@ And so, we are saved.
 	  (unless applicable-p (setq definite-p nil))
 	  (push method possibly-applicable-methods))))
     (let ((precedence (arg-info-precedence (if (early-gf-p generic-function)
-					       (early-gf-arg-info generic-function)
-					       (gf-arg-info generic-function)))))
+					       (early-gf-arg-info
+						generic-function)
+					       (gf-arg-info
+						generic-function)))))
       (values (sort-applicable-methods precedence
 				       (nreverse possibly-applicable-methods)
 				       types)
@@ -1186,10 +1172,12 @@ And so, we are saved.
   (flet ((sorter (method1 method2)
 	   (dolist (index precedence)
 	     (let* ((specl1 (nth index (if (listp method1)
-					   (early-method-specializers method1 t)
+					   (early-method-specializers method1
+								      t)
 					   (method-specializers method1))))
 		    (specl2 (nth index (if (listp method2)
-					   (early-method-specializers method2 t)
+					   (early-method-specializers method2
+								      t)
 					   (method-specializers method2))))
 		    (order (order-specializers
 			     specl1 specl2 index compare-classes-function)))
@@ -1213,10 +1201,12 @@ And so, we are saved.
 	  (t
 	   (case (car type1)
 	     (class    (case (car type2)
-			 (class (funcall compare-classes-function specl1 specl2 index))
+			 (class (funcall compare-classes-function
+					 specl1 specl2 index))
 			 (t specl2)))
 	     (prototype (case (car type2)
-			 (class (funcall compare-classes-function specl1 specl2 index))
+			 (class (funcall compare-classes-function
+					 specl1 specl2 index))
 			 (t specl2)))
 	     (class-eq (case (car type2)
 			 (eql specl2)
@@ -1247,7 +1237,10 @@ And so, we are saved.
 			       (list class2 class1 t)
 			       (let ((name1 (class-name class1))
 				     (name2 (class-name class2)))
-				 (if (and name1 name2 (symbolp name1) (symbolp name2)
+				 (if (and name1
+					  name2
+					  (symbolp name1)
+					  (symbolp name2)
 					  (string< (symbol-name name1)
 						   (symbol-name name2)))
 				     (list class1 class2 t)
@@ -1255,7 +1248,9 @@ And so, we are saved.
 		 (push choice choices))
 	       (car choice))))
       (loop (funcall function
-		     (sort-methods methods precedence #'compare-classes-function))
+		     (sort-methods methods
+				   precedence
+				   #'compare-classes-function))
 	    (unless (dolist (c choices nil)
 		      (unless (third c)
 			(rotatef (car c) (cadr c))
@@ -1361,12 +1356,13 @@ And so, we are saved.
 			 (memq (cadr specl)
 			       (if (eq *boot-state* 'complete)
 				   (class-precedence-list (cadr type))
-				   (early-class-precedence-list (cadr type)))))))))
+				   (early-class-precedence-list
+				    (cadr type)))))))))
 	(values pred pred))))
 
 (defun saut-prototype (specl type)
   (declare (ignore specl type))
-  (values nil nil)) ; fix this someday
+  (values nil nil)) ; XXX original PCL comment: fix this someday
 
 (defun saut-eql (specl type)
   (let ((pred (case (car specl)
@@ -1376,14 +1372,15 @@ And so, we are saved.
 				  (let ((class (class-of (cadr type))))
 				    (if (eq *boot-state* 'complete)
 					(class-precedence-list class)
-					(early-class-precedence-list class))))))))
+					(early-class-precedence-list
+					 class))))))))
     (values pred pred)))
 
 (defun specializer-applicable-using-type-p (specl type)
   (setq specl (type-from-specializer specl))
   (when (eq specl t)
     (return-from specializer-applicable-using-type-p (values t t)))
-  ;; This is used by c-a-m-u-t and generate-discrimination-net-internal,
+  ;; This is used by C-A-M-U-T and GENERATE-DISCRIMINATION-NET-INTERNAL,
   ;; and has only what they need.
   (if (or (atom type) (eq (car type) t))
       (values nil t)
@@ -1432,9 +1429,12 @@ And so, we are saved.
 		     (not (methods-contain-eql-specializer-p methods)))
 		    method-alist wrappers))
 
-(defun get-secondary-dispatch-function1 (gf methods types method-alist-p wrappers-p
-					    &optional all-applicable-p
-					    (all-sorted-p t) function-p)
+(defun get-secondary-dispatch-function1 (gf methods types method-alist-p
+					    wrappers-p
+					    &optional
+					    all-applicable-p
+					    (all-sorted-p t)
+					    function-p)
   (if (null methods)
       (if function-p
 	  #'(lambda (method-alist wrappers)
@@ -1466,20 +1466,24 @@ And so, we are saved.
 		    (push (cons akey value) (cdr ht-value))
 		    value)))))))
 
-(defun get-secondary-dispatch-function2 (gf methods types method-alist-p wrappers-p
-					    all-applicable-p all-sorted-p function-p)
+(defun get-secondary-dispatch-function2 (gf methods types method-alist-p
+					    wrappers-p all-applicable-p
+					    all-sorted-p function-p)
   (if (and all-applicable-p all-sorted-p (not function-p))
       (if (eq *boot-state* 'complete)
 	  (let* ((combin (generic-function-method-combination gf))
 		 (effective (compute-effective-method gf combin methods)))
-	    (make-effective-method-function1 gf effective method-alist-p wrappers-p))
+	    (make-effective-method-function1 gf effective method-alist-p
+					     wrappers-p))
 	  (let ((effective (standard-compute-effective-method gf nil methods)))
-	    (make-effective-method-function1 gf effective method-alist-p wrappers-p)))
+	    (make-effective-method-function1 gf effective method-alist-p
+					     wrappers-p)))
       (let ((net (generate-discrimination-net
 		  gf methods types all-sorted-p)))
 	(compute-secondary-dispatch-function1 gf net function-p))))
 
-(defun get-effective-method-function (gf methods &optional method-alist wrappers)
+(defun get-effective-method-function (gf methods
+					 &optional method-alist wrappers)
   (function-funcall (get-secondary-dispatch-function1 gf methods nil
 						      (not (null method-alist))
 						      (not (null wrappers))
@@ -1520,6 +1524,11 @@ And so, we are saved.
 (defvar *dfun-list* nil)
 (defvar *minimum-cache-size-to-list*)
 
+;;; These functions aren't used in SBCL, or documented anywhere that
+;;; I'm aware of, but they look like they might be useful for
+;;; debugging or performance tweaking or something, so I've just
+;;; commented them out instead of deleting them. -- WHN 2001-03-28
+#|
 (defun list-dfun (gf)
   (let* ((sym (type-of (gf-dfun-info gf)))
 	 (a (assq sym *dfun-list*)))
@@ -1548,7 +1557,7 @@ And so, we are saved.
 (defun list-large-caches (&optional (*minimum-cache-size-to-list* 130))
   (setq *dfun-list* nil)
   (map-all-generic-functions #'list-large-cache)
-  (setq *dfun-list* (sort dfun-list #'< :key #'car))
+  (setq *dfun-list* (sort *dfun-list* #'< :key #'car))
   (mapc #'print *dfun-list*)
   (values))
 
@@ -1582,11 +1591,13 @@ And so, we are saved.
 	    (format t "~%   ~S~%" (caddr type+count+sizes)))
 	*dfun-count*)
   (values))
+|#
 
 (defun gfs-of-type (type)
   (unless (consp type) (setq type (list type)))
   (let ((gf-list nil))
     (map-all-generic-functions #'(lambda (gf)
-				   (when (memq (type-of (gf-dfun-info gf)) type)
+				   (when (memq (type-of (gf-dfun-info gf))
+					       type)
 				     (push gf gf-list))))
     gf-list))

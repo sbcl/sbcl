@@ -128,6 +128,7 @@
 ;;; Signal the appropriate condition when we get a floating-point error.
 (defun sigfpe-handler (signal info context)
   (declare (ignore signal info))
+  (declare (ignore context)) ; stub!
   (declare (type system-area-pointer context))
   ;; FIXME: The find-the-detailed-problem code below went stale with
   ;; the big switchover to POSIX signal handling and signal contexts
@@ -174,15 +175,16 @@
 	(trap-mask (dpb (lognot (float-trap-mask traps))
 			float-traps-byte #xffffffff))
 	(exception-mask (dpb (lognot (sb!vm::float-trap-mask traps))
-			     float-sticky-bits #xffffffff)))
-    `(let ((orig-modes (floating-point-modes)))
+			     float-sticky-bits #xffffffff))
+        (orig-modes (gensym)))
+    `(let ((,orig-modes (floating-point-modes)))
       (unwind-protect
 	   (progn
 	     (setf (floating-point-modes)
-		   (logand orig-modes ,(logand trap-mask exception-mask)))
+		   (logand ,orig-modes ,(logand trap-mask exception-mask)))
 	     ,@body)
 	;; Restore the original traps and exceptions.
 	(setf (floating-point-modes)
-	      (logior (logand orig-modes ,(logior traps exceptions))
+	      (logior (logand ,orig-modes ,(logior traps exceptions))
 		      (logand (floating-point-modes)
 			      ,(logand trap-mask exception-mask))))))))

@@ -35,7 +35,7 @@
 ;;; Translate form into the compiler's IR1 and perform environment
 ;;; analysis. This is sort of a combination of COMPILE-FILE,
 ;;; SUB-COMPILE-FILE, COMPILE-TOP-LEVEL, and COMPILE-COMPONENT.
-(defun compile-for-eval (form quietly)
+(defun compile-for-eval (form)
   (with-ir1-namespace
     (let* ((*block-compile* nil)
 	   (*lexenv* (make-null-lexenv))

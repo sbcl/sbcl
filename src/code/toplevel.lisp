@@ -37,7 +37,7 @@
 (declaim
   #!-gengc
   (special *gc-inhibit* *already-maybe-gcing*
-	   *need-to-collect-garbage* *gc-verbose*
+	   *need-to-collect-garbage*
 	   *gc-notify-stream*
 	   *before-gc-hooks* *after-gc-hooks*
 	   #!+x86 *pseudo-atomic-atomic*
@@ -46,7 +46,7 @@
 	   sb!unix::*interrupt-pending*
 	   *type-system-initialized*)
   #!+gengc
-  (special *gc-verbose* *before-gc-hooks* *after-gc-hooks*
+  (special *before-gc-hooks* *after-gc-hooks*
 	   *gc-notify-stream*
 	   *type-system-initialized*))
 

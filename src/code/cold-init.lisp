@@ -90,7 +90,6 @@
   ;; !UNIX-COLD-INIT. And *TYPE-SYSTEM-INITIALIZED* could be changed to
   ;; *TYPE-SYSTEM-INITIALIZED-WHEN-BOUND* so that it doesn't need to
   ;; be explicitly set in order to be meaningful.
-  (setf *gc-verbose* nil)
   (setf *gc-notify-stream* nil)
   (setf *before-gc-hooks* nil)
   (setf *after-gc-hooks* nil)

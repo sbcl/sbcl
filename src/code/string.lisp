@@ -83,7 +83,7 @@
   (setf (schar string index) new-el))
 
 (defun string=* (string1 string2 start1 end1 start2 end2)
-  (with-two-strings string1 string2 start1 end1 offset1 start2 end2
+  (with-two-strings string1 string2 start1 end1 nil start2 end2
     (not (%sp-string-compare string1 start1 end1 string2 start2 end2))))
 
 (defun string/=* (string1 string2 start1 end1 start2 end2)
@@ -217,7 +217,7 @@
   start2, end1 and end2, compares characters in string1 to characters in
   string2 (using char-equal)."
   (declare (fixnum start1 start2))
-  (with-two-strings string1 string2 start1 end1 offset1 start2 end2
+  (with-two-strings string1 string2 start1 end1 nil start2 end2
     (let ((slen1 (- (the fixnum end1) start1))
 	  (slen2 (- (the fixnum end2) start2)))
       (declare (fixnum slen1 slen2))

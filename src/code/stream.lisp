@@ -318,7 +318,7 @@
 			    (stream *standard-input*)
 			    (eof-error-p t)
 			    eof-value recursive-p)
-
+  (declare (ignore recursive-p))
   (let ((stream (in-synonym-of stream)))
     (if (lisp-stream-p stream)
 	(let ((char (read-char stream eof-error-p eof-value)))

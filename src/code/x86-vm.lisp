@@ -237,6 +237,7 @@
   ;; POSIXness and (at the Lisp level) opaque signal contexts,
   ;; this is stubified. It needs to be rewritten as an
   ;; alien function.
+  (declare (ignore context)) ; stub!
   (warn "stub CONTEXT-FLOATING-POINT-MODES")
 
   ;; old code for Linux:
