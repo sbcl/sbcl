@@ -27,6 +27,8 @@
   "maximum number of components to print") 
 (defparameter *inspect-skip* 0
   "number of initial components to skip when displaying an object") 
+(defparameter *skip-address-display* nil
+  "Skip displaying addresses of objects.")
 
 (defvar *inspect-help*
   ":istep takes between 0 to 3 arguments.
@@ -61,7 +63,8 @@ i set <name> <form>  set named component to evalated form
 (let ((*current-inspect* nil)
       (*inspect-raw* nil)
       (*inspect-length* +default-inspect-length+)
-      (*inspect-skip* 0))
+      (*inspect-skip* 0)
+      (*skip-address-display* nil))
   
   (defun inspector (object input-stream output-stream)
     (declare (ignore input-stream))
@@ -71,7 +74,7 @@ i set <name> <form>  set named component to evalated form
     (reset-stack)
     (setf (inspect-object-stack *current-inspect*) (list object))
     (setf (inspect-select-stack *current-inspect*)
-	  (list (format nil "(inspect ~S)" object)))
+	  (list (format nil "(inspect ...)")))
     (redisplay output-stream))
 
   (setq sb-impl::*inspect-fun* #'inspector)
@@ -308,7 +311,7 @@ i set <name> <form>  set named component to evalated form
     (let ((object (eval form)))
       (setf (inspect-object-stack *current-inspect*) (list object))
       (setf (inspect-select-stack *current-inspect*)
-	    (list (format nil ":i ~S" object))))
+	    (list (format nil ":i ..."))))
     (set-break-inspect *current-inspect*)
     (redisplay stream))
 
@@ -329,13 +332,14 @@ i set <name> <form>  set named component to evalated form
   ) ;; end binding for multithreading
 
 
-(defun display-inspect (object stream &optional length skip)
+(defun display-inspect (object stream &optional length (skip 0))
   (multiple-value-bind (elements labels count)
       (inspected-elements object length skip)
-    (format stream "~&~A" (inspected-description object))
-    (unless (or (characterp object) (typep object 'fixnum))
+    (fresh-line stream)
+    (format stream "~A" (inspected-description object))
+    (unless (or *skip-address-display*
+		(characterp object) (typep object 'fixnum))
       (format stream " at #x~X" (sb-kernel:get-lisp-obj-address object)))
-    (princ #\newline stream)
     (dotimes (i count)
       (fresh-line stream)
       (display-labeled-element (elt elements i) (elt labels i) stream))))
@@ -392,7 +396,7 @@ i set <name> <form>  set named component to evalated form
 Returns (VALUES POSITION PARTS).
 POSITION is NIL if the id is invalid or not found."
   (let* ((parts (inspected-parts object))
-	 (name (when (symbolp id) (symbol-name id) id)))
+	 (name (if (symbolp id) (symbol-name id) id)))
     (values
      (if (numberp id)
 	 (when (< -1 id (parts-count parts)) id)
@@ -786,4 +790,3 @@ position with the label if the label is a string."
 
 (defmethod set-component-value ((object t) id value element)
   (format nil "Object does not support setting of component ~A" id))
-

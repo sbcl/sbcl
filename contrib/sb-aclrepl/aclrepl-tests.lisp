@@ -7,9 +7,14 @@
 	  sb-aclrepl::inspected-elements sb-aclrepl::parts-count
 	  sb-aclrepl::parts-seq-type sb-aclrepl::find-part-id
 	  sb-aclrepl::element-at sb-aclrepl::label-at
+	  sb-aclrepl::reset-cmd
+	  sb-aclrepl::inspector
+	  sb-aclrepl::display-inspect
 	  sb-aclrepl::display-inspected-parts
 	  sb-aclrepl::display-labeled-element
-	  sb-aclrepl::*inspect-unbound-object-marker*))
+	  sb-aclrepl::*inspect-unbound-object-marker*
+	  sb-aclrepl::*skip-address-display*
+	  ))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (unless (find-package 'regression-test)
@@ -84,6 +89,21 @@
      (aref (the simple-vector (elements object print skip)) pos)
      (aref (the simple-vector (elements-labels object print skip)) pos)
      strm)))
+
+(defun display (object &optional print (skip 0))
+  (with-output-to-string (strm)
+    (let ((*skip-address-display* t))
+      (display-inspect object strm print skip))))
+
+(defun inspect (object)
+  (with-output-to-string (strm)
+    (let ((*skip-address-display* t))
+      (inspector `(quote ,object) nil strm))))
+
+(defun istep (args)
+  (with-output-to-string (strm)
+    (let ((*skip-address-display* t))
+      (sb-aclrepl::istep args strm))))
 
 (deftest find.list.0 (find-position *normal-list* 0) 0)
 (deftest find.list.1 (find-position *normal-list* 0) 0)
@@ -190,66 +210,66 @@
   #((0 . "FIRST") (1 . "SLOT-2")
     (2 . "REALLY-LONG-STRUCT-SLOT-NAME")))
 
-(deftest display.simple-struct.0 (labeled-element *simple-struct* 0)
+(deftest label.simple-struct.0 (labeled-element *simple-struct* 0)
   "   0 FIRST ----------> the symbol NIL")
-(deftest display.simple-struct.1 (labeled-element *simple-struct* 1)
+(deftest label.simple-struct.1 (labeled-element *simple-struct* 1)
   "   1 SLOT-2 ---------> the symbol A-VALUE")
-(deftest display.simple-struct.2 (labeled-element *simple-struct* 2)
+(deftest label.simple-struct.2 (labeled-element *simple-struct* 2)
   "   2 REALLY-LONG-STRUCT-SLOT-NAME -> a simple-string (4) \"defg\"")
 
-(deftest display.simple-class.0 (labeled-element *simple-class* 0)
+(deftest label.simple-class.0 (labeled-element *simple-class* 0)
   "   0 A --------------> ..unbound..")
-(deftest display.simple-class.1 (labeled-element *simple-class* 1)
+(deftest label.simple-class.1 (labeled-element *simple-class* 1)
   "   1 SECOND ---------> fixnum 0")
-(deftest display.simple-class.2 (labeled-element *simple-class* 2)
+(deftest label.simple-class.2 (labeled-element *simple-class* 2)
   "   2 REALLY-LONG-SLOT-NAME -> a simple-string (3) \"abc\"")
 
-(deftest display.complex.0 (labeled-element *complex* 0)
+(deftest label.complex.0 (labeled-element *complex* 0)
   "   0 real -----------> fixnum 1")
-(deftest display.complex.1 (labeled-element *complex* 1)
+(deftest label.complex.1 (labeled-element *complex* 1)
   "   1 imag -----------> fixnum 2")
 
-(deftest display.ratio.0 (labeled-element *ratio* 0)
+(deftest label.ratio.0 (labeled-element *ratio* 0)
   "   0 numerator ------> fixnum 22")
-(deftest display.ratio.1 (labeled-element *ratio* 1)
+(deftest label.ratio.1 (labeled-element *ratio* 1)
   "   1 denominator ----> fixnum 7")
 
-(deftest display.dotted-list.0 (labeled-element *dotted-list* 0)
+(deftest label.dotted-list.0 (labeled-element *dotted-list* 0)
   "   0-> the symbol A")
-(deftest display.dotted-list.1 (labeled-element *dotted-list* 1)
+(deftest label.dotted-list.1 (labeled-element *dotted-list* 1)
   "   1-> the symbol B")
-(deftest display.dotted-list.2 (labeled-element *dotted-list* 2)
+(deftest label.dotted-list.2 (labeled-element *dotted-list* 2)
   "tail-> fixnum 3")
 
-(deftest display.normal-list.0
+(deftest label.normal-list.0
     (labeled-element *normal-list* 0)
   "   0-> the symbol A")
-(deftest display.normal-list.1 (labeled-element *normal-list* 1)
+(deftest label.normal-list.1 (labeled-element *normal-list* 1)
   "   1-> the symbol B")
-(deftest display.normal-list.2 (labeled-element *normal-list* 2)
+(deftest label.normal-list.2 (labeled-element *normal-list* 2)
   "   2-> fixnum 3")
 
 
-(deftest display.vector.0 (labeled-element *vector* 0)
+(deftest label.vector.0 (labeled-element *vector* 0)
   "   0-> fixnum 0")
-(deftest display.vector.1 (labeled-element *vector* 1)
+(deftest label.vector.1 (labeled-element *vector* 1)
   "   1-> fixnum 1")
 
-(deftest display.vector.skip1.0 (labeled-element *vector* 0 nil 2)
+(deftest label.vector.skip1.0 (labeled-element *vector* 0 nil 2)
   "   ...")
-(deftest display.vector.skip1.1 (labeled-element *vector* 1 nil 2)
+(deftest label.vector.skip1.1 (labeled-element *vector* 1 nil 2)
   "   2-> fixnum 2")
 
-(deftest display.consp.0 (labeled-element *cons-pair* 0)
+(deftest label.consp.0 (labeled-element *cons-pair* 0)
   "   0 car ------------> complex number #C(1 2)")
-(deftest display.consp.1 (labeled-element *cons-pair* 1)
+(deftest label.consp.1 (labeled-element *cons-pair* 1)
   "   1 cdr ------------> the symbol A-SYMBOL")
 
 (deftest nil.parts.0 (elements-count nil) 5)
 
 (deftest tiny.struct.0 (elements-count *tiny-struct*) 1)
 (deftest tiny.struct.1 (elements *tiny-struct*) #(10))
-(deftest tiny.struct.1 (elements-labels *tiny-struct*) #((0 . "FIRST")))
+(deftest tiny.struct.2 (elements-labels *tiny-struct*) #((0 . "FIRST")))
 
 (deftest tiny.struct.skip1.0 (elements-count *tiny-struct* nil 1) 1)
 (deftest tiny.struct.skip1.1 (elements *tiny-struct* nil 1)
@@ -265,7 +285,107 @@
 (deftest tiny.doubel.skip1.2 (elements-labels *double* nil 1)
   nil)
 
+(deftest display.consp.0 (display *cons-pair*)
+  "a cons cell
+   0 car ------------> complex number #C(1 2)
+   1 cdr ------------> the symbol A-SYMBOL")
 
+(deftest display.struct.0 (display *simple-struct*)
+ "#<STRUCTURE-CLASS SIMPLE-STRUCT>
+   0 FIRST ----------> the symbol NIL
+   1 SLOT-2 ---------> the symbol A-VALUE
+   2 REALLY-LONG-STRUCT-SLOT-NAME -> a simple-string (4) \"defg\"")
+
+(deftest display.struct.1 (display *simple-struct* nil 2 )
+  "#<STRUCTURE-CLASS SIMPLE-STRUCT>
+   ...
+   2 REALLY-LONG-STRUCT-SLOT-NAME -> a simple-string (4) \"defg\"")
+
+(deftest display.vector.0 (display *vector* 5 6)
+  "a simple T vector (20)
+   ...
+   6-> fixnum 6
+   7-> fixnum 7
+   8-> fixnum 8
+   9-> fixnum 9
+  10-> fixnum 10
+   ...
+  19-> fixnum 19")
+
+#+ignore
+(deftest inspect.0 (prog1 (inspect *simple-struct*))
+  "#<STRUCTURE-CLASS SIMPLE-STRUCT>
+   0 FIRST ----------> the symbol NIL
+   1 SLOT-2 ---------> the symbol A-VALUE
+   2 REALLY-LONG-STRUCT-SLOT-NAME -> a simple-string (4) \"defg\"")
+
+(deftest istep.0 (prog1
+		     (progn (inspect *simple-struct*) (istep '("=")))
+		   (reset-cmd))
+    "#<STRUCTURE-CLASS SIMPLE-STRUCT>
+   0 FIRST ----------> the symbol NIL
+   1 SLOT-2 ---------> the symbol A-VALUE
+   2 REALLY-LONG-STRUCT-SLOT-NAME -> a simple-string (4) \"defg\"")
+
+(deftest istep.1 (prog1
+		     (progn (inspect *simple-struct*) (istep '("first")))
+		   (reset-cmd))
+"the symbol NIL
+   0 NAME -----------> a simple-string (3) \"NIL\"
+   1 PACKAGE --------> the COMMON-LISP package
+   2 VALUE ----------> the symbol NIL
+   3 FUNCTION -------> ..unbound..
+   4 PLIST ----------> the symbol NIL")
+
+(deftest istep.2 (prog1
+		     (progn (inspect *simple-struct*) (istep '("first"))
+			    (istep '(">")))
+		   (reset-cmd))
+"the symbol A-VALUE
+   0 NAME -----------> a simple-string (7) \"A-VALUE\"
+   1 PACKAGE --------> the ACLREPL-TESTS package
+   2 VALUE ----------> ..unbound..
+   3 FUNCTION -------> ..unbound..
+   4 PLIST ----------> the symbol NIL")
+
+(deftest istep.3 (prog1
+		     (progn (inspect *simple-struct*) (istep '("first"))
+			    (istep '(">")) (istep '("<")))
+		   (reset-cmd))
+"the symbol NIL
+   0 NAME -----------> a simple-string (3) \"NIL\"
+   1 PACKAGE --------> the COMMON-LISP package
+   2 VALUE ----------> the symbol NIL
+   3 FUNCTION -------> ..unbound..
+   4 PLIST ----------> the symbol NIL")
+
+(deftest istep.4 (prog1
+		     (progn (inspect *simple-struct*) (istep '("first"))
+			    (istep '(">")) (istep '("<")) (istep '("tree")))
+		   (reset-cmd))
+"The current object is:
+the symbol NIL, which was selected by FIRST
+#<STRUCTURE-CLASS SIMPLE-STRUCT>, which was selected by (inspect ...)
+")
+
+(deftest istep.5 (prog1
+		     (progn (inspect *simple-struct*) (istep '("first"))
+			    (istep '(">")) (istep '("<")) (istep '("-")))
+		   (reset-cmd))
+  "#<STRUCTURE-CLASS SIMPLE-STRUCT>
+   0 FIRST ----------> the symbol NIL
+   1 SLOT-2 ---------> the symbol A-VALUE
+   2 REALLY-LONG-STRUCT-SLOT-NAME -> a simple-string (4) \"defg\"")
+
+(deftest istep.6 (prog1
+		     (progn (inspect *dotted-list*) (istep '("tail")))
+		   (reset-cmd))
+"fixnum 3")
+
+(deftest istep.7 (prog1
+		     (progn (inspect *dotted-list*) (istep '("2")))
+		   (reset-cmd))
+"fixnum 3")
 
 (do-tests)
 
