@@ -42,7 +42,10 @@
   import-from
   ;; a tree of string designators for package names of other packages
   ;; which this package uses
-  use)
+  use
+  ;; a list of string designators for symbols that will be shadowed in
+  ;; this package
+  shadow)
 
 (let ((package-data-list (read-from-file "package-data-list.lisp-expr")))
 
@@ -65,6 +68,8 @@
 	(progn
 	  #!+sb-doc (setf (documentation package t)
 			  (package-data-doc package-data)))
+	;; set up shadows
+	(shadow (package-data-shadow package-data) package)
 	;; Walk the tree of exported names, exporting each name.
 	(labels ((recurse (tree)
 		   (etypecase tree

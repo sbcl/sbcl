@@ -62,23 +62,6 @@
 
 ;;;; compiling and loading more of the system
 
-;;; KLUDGE: In SBCL, almost all in-the-flow-of-control package hacking has
-;;; gone away in favor of package setup controlled by tables. However, that
-;;; mechanism isn't smart enough to handle shadowing, and since this shadowing
-;;; is inherently a non-ANSI KLUDGE anyway (i.e. there ought to be no
-;;; difference between e.g. CL:CLASS and SB-PCL:CLASS) there's not much
-;;; point in trying to polish it by implementing a non-KLUDGEy way of
-;;; setting it up. -- WHN 19991203
-(let ((*package* (the package (find-package "SB-PCL"))))
-  (shadow '(;; CLASS itself and operations thereon
-	    "CLASS" "CLASS-NAME" "CLASS-OF" "FIND-CLASS"
-	    ;; some system classes
-	    "BUILT-IN-CLASS" "STANDARD-CLASS" "STRUCTURE-CLASS"))
-  ;; Of the shadowing symbols above, these are external symbols in CMU CL ca.
-  ;; 19991203. I'm not sure what's the basis of the decision to export some and
-  ;; not others; we'll just follow along..
-  (export (mapcar #'intern '("CLASS-NAME" "CLASS-OF" "FIND-CLASS"))))
-
 ;;; FIXME: CMU CL's pclcom.lisp had extra optional stuff wrapped around
 ;;; COMPILE-PCL, at least some of which we should probably have too:
 ;;;
@@ -116,9 +99,9 @@
 		;; order dependencies from the old PCL defsys.lisp
 		;; dependency database.
 		#+nil "src/pcl/walk" ; #+NIL = moved to build-order.lisp-expr
-		"src/pcl/early-low"
-		"src/pcl/macros"
-                "src/pcl/compiler-support"
+		#+nil "src/pcl/early-low"
+		#+nil "src/pcl/macros"
+                #+nil "src/pcl/compiler-support"
 		"src/pcl/low"
                 "src/pcl/slot-name"
 		"src/pcl/defclass"
@@ -204,11 +187,6 @@
 	       "public: the default package for user code and data")
 #+sb-doc (setf (documentation (find-package "KEYWORD") t)
 	       "public: home of keywords")
-
-;;; KLUDGE: It'd be nicer to do this in the table with the other
-;;; non-standard packages. -- WHN 19991206
-#+sb-doc (setf (documentation (find-package "SB-SLOT-ACCESSOR-NAME") t)
-	       "private: home of CLOS slot accessor internal names")
 
 ;;; FIXME: There doesn't seem to be any easy way to get package doc strings
 ;;; through the cold boot process. They need to be set somewhere. Maybe the

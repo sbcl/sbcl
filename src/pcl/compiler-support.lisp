@@ -29,28 +29,28 @@
 ;;;; warranty about the software, its performance or its conformity to any
 ;;;; specification.
 
-(in-package "SB-C")
+(in-package "SB!C")
 
 ;;;; very low-level representation of instances with meta-class
 ;;;; STANDARD-CLASS
 
-(defknown sb-pcl::pcl-instance-p (t) boolean
+(defknown sb!pcl::pcl-instance-p (t) boolean
   (movable foldable flushable explicit-check))
 
-(deftransform sb-pcl::pcl-instance-p ((object))
+(deftransform sb!pcl::pcl-instance-p ((object))
   (let* ((otype (continuation-type object))
-	 (std-obj (specifier-type 'sb-pcl::std-object)))
+	 (std-obj (specifier-type 'sb!pcl::std-object)))
     (cond
       ;; Flush tests whose result is known at compile time.
       ((csubtypep otype std-obj) t)
       ((not (types-equal-or-intersect otype std-obj)) nil)
       (t
-       `(typep (sb-kernel:layout-of object) 'sb-pcl::wrapper)))))
+       `(typep (sb!kernel:layout-of object) 'sb!pcl::wrapper)))))
 
 (define-source-context defmethod (name &rest stuff)
   (let ((arg-pos (position-if #'listp stuff)))
     (if arg-pos
 	`(defmethod ,name ,@(subseq stuff 0 arg-pos)
-	   ,(nth-value 2 (sb-pcl::parse-specialized-lambda-list
+	   ,(nth-value 2 (sb!pcl::parse-specialized-lambda-list
 			  (elt stuff arg-pos))))
 	`(defmethod ,name "<illegal syntax>"))))

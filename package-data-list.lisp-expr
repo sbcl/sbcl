@@ -1419,6 +1419,8 @@ definitely not guaranteed to be present in later versions of SBCL."
     ;; is unscrewed, since until it is there are too many things which
     ;; conflict between the two packages.
     :use ("CL" "SB!INT" "SB!EXT" "SB!WALKER")
+    :shadow ("CLASS" "CLASS-NAME" "CLASS-OF" "FIND-CLASS"
+	     "BUILT-IN-CLASS" "STANDARD-CLASS" "STRUCTURE-CLASS")
     :import-from (("SB!KERNEL" "FUNCALLABLE-INSTANCE-P" "%FUN-DOC"
                    "PACKAGE-DOC-STRING"
                    "PACKAGE-HASHTABLE-SIZE" "PACKAGE-HASHTABLE-FREE"
@@ -1494,7 +1496,13 @@ definitely not guaranteed to be present in later versions of SBCL."
              "STANDARD-INSTANCE-ACCESS"
              "UPDATE-DEPENDENT"
              "VALIDATE-SUPERCLASS"
-             "WRITER-METHOD-CLASS"))
+             "WRITER-METHOD-CLASS"
+
+	     ;; FIXME: When the stupid SB-PCL/CL CLASS distinction is
+	     ;; fixed, we can remove these exports (and the shadows)
+	     "CLASS" "CLASS-NAME" "CLASS-OF" "FIND-CLASS"
+	     "BUILT-IN-CLASS" "STANDARD-CLASS" "STRUCTURE-CLASS"
+	     ))
 
  #s(sb-cold:package-data
     :name "SB!PRETTY"

@@ -658,4 +658,8 @@
  ;; anything else in cold build because after all it used to be
  ;; postponed 'til warm init with no problems.
 
- ("src/pcl/walk"))
+ ("src/pcl/walk")
+ ("src/pcl/early-low")
+ ("src/pcl/macros")
+ ("src/pcl/compiler-support")
+ )

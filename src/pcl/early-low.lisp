@@ -24,7 +24,7 @@
 ;;;; warranty about the software, its performance or its conformity to any
 ;;;; specification.
 
-(in-package "SB-PCL")
+(in-package "SB!PCL")
 
 (/show "starting early-low.lisp")
 
@@ -42,7 +42,7 @@
 ;;;     #-SB-FLUID (FIND-PACKAGE NAME)
 ;;;     #+SB-FLUID `(FIND-PACKAGE ,NAME))
 ;;; and use that to replace all three variables.)
-(defvar *pcl-package*		     (find-package "SB-PCL"))
+(defvar *pcl-package* (find-package "SB!PCL"))
 
 ;;; This excludes structure types created with the :TYPE option to
 ;;; DEFSTRUCT. It also doesn't try to deal with types created by
@@ -53,9 +53,9 @@
 ;;; it needs a more mnemonic name. -- WHN 19991204
 (defun structure-type-p (type)
   (and (symbolp type)
-       (let ((class  (cl:find-class type nil)))
+       (let ((class (sb!xc:find-class type nil)))
 	 (and class
-	      (typep (sb-kernel:layout-info (sb-kernel:class-layout class))
-		     'sb-kernel:defstruct-description)))))
+	      (typep (sb!kernel:layout-info (sb!kernel:class-layout class))
+		     'sb!kernel:defstruct-description)))))
 
 (/show "finished with early-low.lisp")

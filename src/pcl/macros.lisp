@@ -24,7 +24,7 @@
 ;;;; warranty about the software, its performance or its conformity to any
 ;;;; specification.
 
-(in-package "SB-PCL")
+(in-package "SB!PCL")
 
 (/show "starting pcl/macros.lisp")
 
@@ -77,7 +77,7 @@
 ;;;;
 ;;;; This is documented in the CLOS specification. FIXME: Except that
 ;;;; SBCL deviates from the spec by having CL:FIND-CLASS distinct from
-;;;; PCL:FIND-CLASS, alas.
+;;;; SB!PCL:FIND-CLASS, alas.
 
 (/show "pcl/macros.lisp 119")
 
@@ -166,8 +166,8 @@
 	   (or (find-class-cell-class ,class-cell)
 	       ,(if errorp
 		    `(find-class-from-cell ',symbol ,class-cell t)
-		    `(and (sb-kernel:class-cell-class
-			   ',(sb-kernel:find-class-cell symbol))
+		    `(and (sb!kernel:class-cell-class
+			   ',(sb!kernel:find-class-cell symbol))
 			  (find-class-from-cell ',symbol ,class-cell nil))))))
       form))
 
