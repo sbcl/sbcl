@@ -130,6 +130,27 @@ cat > $tmpfilename <<EOF
 EOF
 fail_on_compiler_note $tmpfilename
 
+# test case from Rudi for some CLOS WARNINGness that shouldn't have
+# been there
+cat > $tmpfilename <<EOF
+    (eval-when (:compile-toplevel :load-toplevel :execute)
+      (defstruct buffer-state 
+        (output-index 0)))
+    
+    (defclass buffered-stream-mixin ()
+      ((buffer-state :initform (make-buffer-state))))
+    
+    (defgeneric frob (stream))
+    (defmethod frob ((stream t))
+      nil)
+    (defmethod frob ((stream buffered-stream-mixin))
+      (symbol-macrolet
+            ((index (buffer-state-output-index (slot-value stream 'buffer-state))))
+          (setf index 0))
+      (call-next-method))
+EOF
+expect_clean_compile $tmpfilename
+
 rm $tmpfilename
 rm $compiled_tmpfilename
 

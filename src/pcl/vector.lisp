@@ -665,8 +665,21 @@
 	`(locally (declare #.*optimize-speed*)
 	  (let ((,index (pvref ,pv ,pv-offset)))
 	    (setq ,value (typecase ,index
+			   ;; FIXME: the line marked by KLUDGE below
+			   ;; (and the analogous spot in
+			   ;; INSTANCE-WRITE-INTERNAL) is there purely
+			   ;; to suppress a type mismatch warning that
+			   ;; propagates through to user code.
+			   ;; Presumably SLOTS at this point can never
+			   ;; actually be NIL, but the compiler seems
+			   ;; to think it could, so we put this here
+			   ;; to shut it up.  (see also mail Rudi
+			   ;; Schlatte sbcl-devel 2003-09-21) -- CSR,
+			   ;; 2003-11-30
 			   ,@(when (or (null type) (eq type :instance))
-			       `((fixnum (clos-slots-ref ,slots ,index))))
+			       `((fixnum
+				  (and ,slots ; KLUDGE
+				   (clos-slots-ref ,slots ,index)))))
 			   ,@(when (or (null type) (eq type :class))
 			       `((cons (cdr ,index))))
 			   (t +slot-unbound+)))
@@ -700,8 +713,9 @@
 	  (let ((,index (pvref ,pv ,pv-offset)))
 	    (typecase ,index
 	      ,@(when (or (null type) (eq type :instance))
-                      `((fixnum (setf (clos-slots-ref ,slots ,index)
-				      ,new-value))))
+                  `((fixnum (and ,slots
+			     (setf (clos-slots-ref ,slots ,index)
+				   ,new-value)))))
 	      ,@(when (or (null type) (eq type :class))
 		  `((cons (setf (cdr ,index) ,new-value))))
 	      (t ,default)))))))
