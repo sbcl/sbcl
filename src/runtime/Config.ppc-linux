@@ -1,0 +1,22 @@
+# This software is part of the SBCL system. See the README file for
+# more information.
+#
+# This software is derived from the CMU CL system, which was
+# written at Carnegie Mellon University and released into the
+# public domain. The software is in the public domain and is
+# provided with absolutely no warranty. See the COPYING and CREDITS
+# files for more information.
+
+CFLAGS += -g -Dppc
+LD = ld #-taso
+LINKFLAGS = -v -g # -Wl,-T  -Wl,ld-script.alpha-linux
+NM = nm -p
+
+ASSEM_SRC = ppc-assem.S ldso-stubs.S
+ARCH_SRC = ppc-arch.c
+
+OS_SRC = linux-os.c  ppc-linux-os.c os-common.c 
+LINKFLAGS+=-rdynamic # -static
+OS_LIBS= -ldl
+
+GC_SRC= gc.c
