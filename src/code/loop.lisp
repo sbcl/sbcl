@@ -928,12 +928,12 @@ code to be loaded.
 
 ;;;; loop types
 
-(defun loop-typed-init (data-type)
+(defun loop-typed-init (data-type &optional step-var-p)
   (when (and data-type (sb!xc:subtypep data-type 'number))
     (if (or (sb!xc:subtypep data-type 'float)
 	    (sb!xc:subtypep data-type '(complex float)))
-	(coerce 0 data-type)
-	0)))
+	(coerce (if step-var-p 1 0) data-type)
+	(if step-var-p 1 0))))
 
 (defun loop-optional-type (&optional variable)
   ;; No variable specified implies that no destructuring is permissible.
@@ -1024,7 +1024,7 @@ code to be loaded.
       ((null entry) (return nil))
       ((assoc name (caar entry) :test #'eq) (return t)))))
 
-(defun loop-make-var (name initialization dtype &optional iteration-var-p)
+(defun loop-make-var (name initialization dtype &optional iteration-var-p step-var-p)
   (cond ((null name)
 	 (setq name (gensym "LOOP-IGNORE-"))
 	 (push (list name initialization) *loop-vars*)
@@ -1041,10 +1041,10 @@ code to be loaded.
 			    name)))
 	 (unless (symbolp name)
 	   (loop-error "bad variable ~S somewhere in LOOP" name))
-	 (loop-declare-var name dtype)
+	 (loop-declare-var name dtype step-var-p)
 	 ;; We use ASSOC on this list to check for duplications (above),
 	 ;; so don't optimize out this list:
-	 (push (list name (or initialization (loop-typed-init dtype)))
+	 (push (list name (or initialization (loop-typed-init dtype step-var-p)))
 	       *loop-vars*))
 	(initialization
 	 (let ((newvar (gensym "LOOP-DESTRUCTURE-")))
@@ -1063,11 +1063,11 @@ code to be loaded.
 (defun loop-make-iteration-var (name initialization dtype)
   (loop-make-var name initialization dtype t))
 
-(defun loop-declare-var (name dtype)
+(defun loop-declare-var (name dtype &optional step-var-p)
   (cond ((or (null name) (null dtype) (eq dtype t)) nil)
 	((symbolp name)
 	 (unless (sb!xc:subtypep t dtype)
-	   (let ((dtype (let ((init (loop-typed-init dtype)))
+	   (let ((dtype (let ((init (loop-typed-init dtype step-var-p)))
 			  (if (sb!xc:typep init dtype)
 			      dtype
 			      `(or (member ,init) ,dtype)))))
@@ -1700,7 +1700,7 @@ code to be loaded.
 	 (limit-value nil)
 	 )
      (flet ((assert-index-for-arithmetic (index)
-	      (unless (atom indexv)
+	      (unless (atom index)
 		(loop-error "Arithmetic index must be an atom."))))
        (when variable (loop-make-iteration-var variable nil variable-type))
        (do ((l prep-phrases (cdr l)) (prep) (form) (odir)) ((null l))
@@ -1742,7 +1742,8 @@ code to be loaded.
 	    (unless stepby-constantp
 	      (loop-make-var (setq stepby (gensym "LOOP-STEP-BY-"))
 		 form
-		 `(and ,indexv-type (real (0))))))
+		 `(and ,indexv-type (real (0)))
+		 nil t)))
 	   (t (loop-error
 		 "~S invalid preposition in sequencing or sequence path;~@
 	      maybe invalid prepositions were specified in iteration path descriptor?"

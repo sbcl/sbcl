@@ -203,3 +203,14 @@
 	     `(lambda ()
 		(loop for (i j) to 6 collect nil)))
   (assert failure-p))
+
+(assert
+ (equal
+  (let ((x 2d0))
+    (loop for d of-type double-float from 0d0 to 10d0 by x collect d))
+  '(0d0 2d0 4d0 6d0 8d0 10d0)))
+(assert
+ (equal
+  (let ((x 2d0))
+    (loop for d of-type double-float downfrom 10d0 to 0d0 by x collect d))
+  '(10d0 8d0 6d0 4d0 2d0 0d0)))

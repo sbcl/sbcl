@@ -1190,3 +1190,12 @@ WORKAROUND:
   argument.  As a result, files with Lisp pathname pattern characters
   (#\* or #\?, for instance) or quotation marks can cause the system
   to perform arbitrary behaviour.
+
+297:
+  LOOP with non-constant arithmetic step clauses suffers from overzealous
+  type constraint: code of the form 
+    (loop for d of-type double-float from 0d0 to 10d0 by x collect d)
+  compiles to a type restriction on X of (AND DOUBLE-FLOAT (REAL
+  (0))).  However, an integral value of X should be legal, because
+  successive adds of integers to double-floats produces double-floats,
+  so none of the type restrictions in the code is violated.
