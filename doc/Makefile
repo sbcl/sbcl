@@ -1,17 +1,25 @@
 # Makefile for SBCL document generation
 
+# This file is part of the SBCL system. It was copied from UFFI and
+# placed into the public domain by the original author, Kevin
+# Rosenberg.
+
 DOCFILE_BASE_DEFAULT:=user-manual
 DOCFILE_EXT_DEFAULT:=xml
-
-# Standard docfile processing as copied from UFFI
-# Placed into public domain by author Kevin Rosenberg
 
 SYSTEM:=$(shell uname)
 
 ifeq ($(SYSTEM),Linux) 
   ifneq ($(shell expr "`cat /etc/issue`" : '.*Debian.*'),0)
-    OS:=debian
+    # Old Debian used /usr/share/sgml/docbook, new Debian uses
+    # /usr/share/xml/docbook. 
+    ifneq ($(shell expr "`ls -d /usr/share/xml`" : '.*/usr/share/xml.*'),0)
+      OS:=debian
     else
+      # Evidently it's not a new-style Debian DocBook setup, ergo:
+      OS:=debian-old
+    endif
+  else
     ifneq ($(shell expr "`cat /etc/issue`" : '.*SuSE.*'),0)
       OS=suse
     else   
