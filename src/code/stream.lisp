@@ -597,8 +597,20 @@
 (defun broadcast-misc (stream operation &optional arg1 arg2)
   (let ((streams (broadcast-stream-streams stream)))
     (case operation
+      ;; FIXME: This may not be the best place to note this, but I
+      ;; think the :CHARPOS protocol needs revision.  Firstly, I think
+      ;; this is the last place where a NULL return value was possible
+      ;; (before adjusting it to be 0), so a bunch of conditionals IF
+      ;; CHARPOS can be removed; secondly, it is my belief that
+      ;; FD-STREAMS, when running FILE-POSITION, do not update the
+      ;; CHARPOS, and consequently there will be much wrongness.
+      ;;
+      ;; FIXME: see also TWO-WAY-STREAM treatment of :CHARPOS -- why
+      ;; is it testing the :charpos of an input stream?
+      ;;
+      ;; -- CSR, 2004-02-04
       (:charpos
-       (dolist (stream streams)
+       (dolist (stream streams 0)
 	 (let ((charpos (charpos stream)))
 	   (if charpos (return charpos)))))
       (:line-length
@@ -607,10 +619,18 @@
 	   (let ((res (line-length stream)))
 	     (when res (setq min (if min (min res min) res)))))))
       (:element-type
+       #+nil ; old, arguably more logical, version
        (let (res)
-	 (dolist (stream streams (if (> (length res) 1) `(and ,@res) res))
-	   (pushnew (stream-element-type stream) res :test #'equal))))
-      (:close)
+	 (dolist (stream streams (if (> (length res) 1) `(and ,@res) t))
+	   (pushnew (stream-element-type stream) res :test #'equal)))
+       ;; ANSI-specified version (under System Class BROADCAST-STREAM)
+       (let ((res t))
+	 (do ((streams streams (cdr streams)))
+	     ((null streams) res)
+	   (when (null (cdr streams))
+	     (setq res (stream-element-type (car streams)))))))
+      (:close
+       (set-closed-flame stream))
       (t
        (let ((res nil))
 	 (dolist (stream streams res)
@@ -1402,7 +1422,8 @@
 (defun case-frob-misc (stream op &optional arg1 arg2)
   (declare (type case-frob-stream stream))
   (case op
-    (:close)
+    (:close
+     (set-closed-flame stream))
     (t
      (let ((target (case-frob-stream-target stream)))
        (if (ansi-stream-p target)

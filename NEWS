@@ -2294,8 +2294,10 @@ changes in sbcl-0.8.8 relative to sbcl-0.8.7:
        signal a TYPE-ERROR if their argument is not a stream.
     ** READ-BYTE and WRITE-BYTE signal a TYPE-ERROR if their stream
        designator argument does not designate a stream.
-    ** OPEN-STREAM-P and INPUT-STREAM-P on synonym streams work by examining 
-       the synonym.
+    ** OPEN-STREAM-P and INPUT-STREAM-P on synonym streams work by
+       examining the synonym.
+    ** STREAM-ELEMENT-TYPE and FRESH-LINE on broadcast-streams now
+       work as specified.
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles
