@@ -17,14 +17,21 @@
 ;;; indicates that that a slot is unbound.
 (defvar *inspect-unbound-object-marker* (gensym "INSPECT-UNBOUND-OBJECT-"))
 
-(defun inspect (object)
+(defun inspector (object input-stream output-stream)
+  (declare (ignore input-stream))
   (catch 'quit-inspect
-    (%inspect object *standard-output*))
+    (%inspect object output-stream))
   (values))
+
+(defvar *inspect-fun* #'inspector
+  "a function of three arguments OBJECT, INPUT, and OUTPUT which starts an interactive inspector.")
 
 (defvar *inspected*)
 (setf (documentation '*inspected* 'variable)
       "the value currently being inspected in CL:INSPECT")
+
+(defun inspect (object)
+  (funcall *inspect-fun* object *standard-input* *standard-output*))
 
 (defvar *help-for-inspect*
   "
