@@ -685,12 +685,7 @@
 ;;;
 ;;; FIXME: This should use the data in *RAW-SLOT-DATA-LIST*.
 (defun structure-raw-slot-type-and-size (type)
-  (cond #+nil
-	(;; FIXME: For now we suppress raw slots, since there are various
-	 ;; issues about the way that the cross-compiler handles them.
-	 (not (boundp '*dummy-placeholder-to-stop-compiler-warnings*))
-	 (values nil nil nil))
-	((and (sb!xc:subtypep type '(unsigned-byte 32))
+  (cond ((and (sb!xc:subtypep type '(unsigned-byte 32))
 	      (multiple-value-bind (fixnum? fixnum-certain?)
 		  (sb!xc:subtypep type 'fixnum)
 		;; (The extra test for FIXNUM-CERTAIN? here is
@@ -889,8 +884,20 @@
 	  (multiple-value-bind (scaled-dsd-index misalignment)
 	      (floor (dsd-index dsd) raw-n-words)
 	    (aver (zerop misalignment))
-	    `(,raw-slot-accessor (,ref ,instance-name ,(dd-raw-index dd))
-				 ,scaled-dsd-index))))))
+	    (let* ((raw-vector-bare-form
+		    `(,ref ,instance-name ,(dd-raw-index dd)))
+		   (raw-vector-form
+		    (if (eq raw-type 'unsigned-byte)
+			(progn
+			  (aver (= raw-n-words 1))
+			  (aver (eq raw-slot-accessor 'aref))
+			  ;; FIXME: when the 64-bit world rolls
+			  ;; around, this will need to be reviewed,
+			  ;; along with the whole RAW-SLOT thing.
+			  `(truly-the (simple-array (unsigned-byte 32) (*))
+			              ,raw-vector-bare-form))
+			raw-vector-bare-form)))
+	      `(,raw-slot-accessor ,raw-vector-form ,scaled-dsd-index)))))))
 
 ;;; Return source transforms for the reader and writer functions of
 ;;; the slot described by DSD. They should be inline expanded, but

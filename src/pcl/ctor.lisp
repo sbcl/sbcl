@@ -285,6 +285,7 @@
     ;; together with the system-defined ones in what
     ;; COMPUTE-APPLICABLE-METHODS returns.
     (or (and (not (structure-class-p class))
+	     (not (condition-class-p class))
 	     (null (cdr make-instance-methods))
 	     (null (cdr allocate-instance-methods))
 	     (null (check-initargs-1 class (plist-keys (ctor-initargs ctor))
