@@ -1437,7 +1437,8 @@
 				aux-vals
 				result
 				(source-name '.anonymous.)
-				debug-name)
+				debug-name
+                                (note-lexical-bindings t))
   (declare (list body vars aux-vars aux-vals)
 	   (type (or continuation null) result))
 
@@ -1473,7 +1474,8 @@
 		 (svars var)
 		 (new-venv (cons (leaf-source-name specvar) specvar)))
 		(t
-		 (note-lexical-binding (leaf-source-name var))
+                 (when note-lexical-bindings
+                   (note-lexical-binding (leaf-source-name var)))
 		 (new-venv (cons (leaf-source-name var) var))))))
 
       (let ((*lexenv* (make-lexenv :vars (new-venv)
@@ -1481,7 +1483,7 @@
 				   :cleanup nil)))
 	(setf (bind-lambda bind) lambda)
 	(setf (node-lexenv bind) *lexenv*)
-	
+
 	(let ((cont1 (make-continuation))
 	      (cont2 (make-continuation)))
 	  (continuation-starts-block cont1)
@@ -1522,8 +1524,6 @@
   (declare (type clambda fun) (list vars vals defaults))
   (let* ((fvars (reverse vars))
 	 (arg-vars (mapcar (lambda (var)
-			     (unless (lambda-var-specvar var)
-			       (note-lexical-binding (leaf-source-name var)))
 			     (make-lambda-var
 			      :%source-name (leaf-source-name var)
 			      :type (leaf-type var)
@@ -1534,7 +1534,8 @@
 						   ,@(reverse vals)
 						   ,@defaults))
 				       arg-vars
-				       :debug-name "&OPTIONAL processor")))
+				       :debug-name "&OPTIONAL processor"
+                                       :note-lexical-bindings nil)))
     (mapc (lambda (var arg-var)
 	    (when (cdr (leaf-refs arg-var))
 	      (setf (leaf-ever-used var) t)))
@@ -1705,7 +1706,8 @@
 		     (%funcall ,(optional-dispatch-main-entry res)
 			       ,@(arg-vals))))
 		 (arg-vars)
-		 :debug-name (debug-namify "~S processing" '&more))))
+		 :debug-name (debug-namify "~S processing" '&more)
+                 :note-lexical-bindings nil)))
 	(setf (optional-dispatch-more-entry res) ep))))
 
   (values))

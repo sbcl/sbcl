@@ -321,3 +321,14 @@
     (assert (= i 1))
     (assert (= (funcall fn) 1))
     (assert (= i 1))))
+
+;;; Bug 240 reported by tonyms on #lisp IRC 2003-02-25 (modified version)
+(loop for (fun warns-p) in
+     '(((lambda (&optional *x*) *x*) t)
+       ((lambda (&optional *x* &rest y) (values *x* y)) t)
+       ((lambda (&optional *print-base*) (values *print-base*)) nil)
+       ((lambda (&optional *print-base* &rest y) (values *print-base* y)) nil)
+       ((lambda (&optional *x*) (declare (special *x*)) (values *x*)) nil)
+       ((lambda (&optional *x* &rest y) (declare (special *x*)) (values *x* y)) nil))
+   for real-warns-p = (nth-value 1 (compile nil fun))
+   do (assert (eq warns-p real-warns-p)))
