@@ -1345,7 +1345,7 @@ changes in sbcl-0.7.9 relative to sbcl-0.7.8:
   * compiler no longer signals WARNING on unknown keyword
     :ALLOW-OTHER-KEYS
 
-changes in sbcl-0.7.9 relative to sbcl-0.7.8:
+changes in sbcl-0.7.10 relative to sbcl-0.7.9:
   * minor incompatible change: PCL now records the pathname of a file
     in which methods and the like are defined, rather than its
     truename.
@@ -1357,7 +1357,13 @@ changes in sbcl-0.7.9 relative to sbcl-0.7.8:
        primary methods with no specializers;
     ** the MOP generic function GENERIC-FUNCTION-DECLARATIONS is now
        implemented;
-    
+   * fixed some bugs, shown by Paul Dietz' test suite:
+     ** DOLIST puts its body in TAGBODY
+     ** SET-EXCLUSIVE-OR sends arguments to :TEST function in the
+        correct order
+     ** MULTIPLE-VALUE-SETQ evaluates side-effectful places before
+        value producing form
+
 planned incompatible changes in 0.7.x:
 * When the profiling interface settles down, maybe in 0.7.x, maybe
   later, it might impact TRACE. They both encapsulate functions, and

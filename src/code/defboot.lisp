@@ -47,22 +47,9 @@
     (error "Vars is not a list of symbols: ~S" vars)))
 
 (defmacro-mundanely multiple-value-setq (vars value-form)
-  (cond ((null vars)
-	 ;; The ANSI spec says that the primary value of VALUE-FORM must be
-	 ;; returned. The general-case-handling code below doesn't do this
-	 ;; correctly in the special case when there are no vars bound, so we
-	 ;; handle this special case separately here.
-	 (let ((g (gensym)))
-	   `(multiple-value-bind (,g) ,value-form
-	      ,g)))
-	((list-of-symbols-p vars)
-	 (let ((temps (make-gensym-list (length vars))))
-	   `(multiple-value-bind ,temps ,value-form
-	      ,@(mapcar (lambda (var temp)
-			  `(setq ,var ,temp))
-			vars temps)
-	      ,(car temps))))
-	(t (error "Vars is not a list of symbols: ~S" vars))))
+  (unless (list-of-symbols-p vars)
+    (error "Vars is not a list of symbols: ~S" vars))
+  `(values (setf (values ,@vars) ,value-form)))
 
 (defmacro-mundanely multiple-value-list (value-form)
   `(multiple-value-call #'list ,value-form))
@@ -336,8 +323,8 @@
 		  (declare (type unsigned-byte ,var))
 		  ,@body))))))
 (defmacro-mundanely dolist (var-list-result &body body)
-  (multiple-value-bind ; to roll our own destructuring
-      (var list result)
+  (multiple-value-bind                 ; to roll our own destructuring
+        (var list result)
       (apply (lambda (var list &optional (result nil))
 	       (values var list result))
 	     var-list-result)
@@ -347,18 +334,21 @@
     ;; form, we introduce a gratuitous binding of the variable to NIL
     ;; without the declarations, then evaluate the result form in that
     ;; environment. We spuriously reference the gratuitous variable,
-    ;; since since we don't want to use IGNORABLE on what might be a
-    ;; special var.
-    (let ((n-list (gensym)))
-      `(do ((,n-list ,list (cdr ,n-list)))
-	   ((endp ,n-list)
-	    ,@(if result
-		`((let ((,var nil))
-		    ,var
-		    ,result))
-		'(nil)))
-	 (let ((,var (car ,n-list)))
-	   ,@body)))))
+    ;; since we don't want to use IGNORABLE on what might be a special
+    ;; var.
+    (multiple-value-bind (forms decls) (parse-body body nil)
+      (let ((n-list (gensym)))
+        `(do* ((,n-list ,list (cdr ,n-list)))
+              ((endp ,n-list)
+               ,@(if result
+                     `((let ((,var nil))
+                         ,var
+                         ,result))
+                     '(nil)))
+           (let ((,var (car ,n-list)))
+             ,@decls
+             (tagbody
+                ,@forms)))))))
 
 ;;;; miscellaneous
 
@@ -367,7 +357,7 @@
 
 (defmacro-mundanely psetq (&rest pairs)
   #!+sb-doc
-  "SETQ {var value}*
+  "PSETQ {var value}*
    Set the variables to the values, like SETQ, except that assignments
    happen in parallel, i.e. no assignments take place until all the
    forms have been evaluated."

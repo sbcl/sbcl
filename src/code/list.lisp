@@ -792,17 +792,28 @@
     res))
 
 (defun set-exclusive-or (list1 list2 &key key
-			       (test #'eql testp) (test-not nil notp))
+                         (test #'eql testp) (test-not nil notp))
   #!+sb-doc
   "Return new list of elements appearing exactly once in LIST1 and LIST2."
   (declare (inline member))
-  (let ((result nil))
+  (let ((result nil)
+        (key (when key (coerce key 'function)))
+        (test (coerce test 'function))
+        (test-not (if test-not (coerce test-not 'function) #'eql)))
+    (declare (type (or function null) key)
+             (type function test test-not))
     (dolist (elt list1)
       (unless (with-set-keys (member (apply-key key elt) list2))
 	(setq result (cons elt result))))
-    (dolist (elt list2)
-      (unless (with-set-keys (member (apply-key key elt) list1))
-	(setq result (cons elt result))))
+    (let ((test (if testp
+                    (lambda (x y) (funcall test y x))
+                    test))
+          (test-not (if notp
+                        (lambda (x y) (funcall test-not y x))
+                        test-not)))
+      (dolist (elt list2)
+        (unless (with-set-keys (member (apply-key key elt) list1))
+          (setq result (cons elt result)))))
     result))
 
 ;;; The outer loop examines list1 while the inner loop examines list2.
