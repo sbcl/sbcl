@@ -50,9 +50,9 @@
     (/noshow0 "returning from SIGNAL")
     nil))
 
-;;; COERCE-TO-CONDITION is used in SIGNAL, ERROR, CERROR, WARN, and
-;;; INVOKE-DEBUGGER for parsing the hairy argument conventions into a
-;;; single argument that's directly usable by all the other routines.
+;;; a utility for SIGNAL, ERROR, CERROR, WARN, and INVOKE-DEBUGGER:
+;;; Parse the hairy argument conventions into a single argument that's
+;;; directly usable by all the other routines.
 (defun coerce-to-condition (datum arguments default-type fun-name)
   (cond ((typep datum 'condition)
 	 (if arguments
@@ -97,17 +97,6 @@
   #!+sb-show (dolist (argument arguments)
 	       (sb!impl::cold-print argument))
   (/show0 "done cold-printing ERROR arguments")
-
-  ;; REMOVEME after fixing condition bug
-  (when (find-package :sb-kernel) ; i.e. after rename-packages in warm-init
-    (if (or (stringp datum) (symbolp datum))
-	(/show datum)
-	(/show (class-name (class-of datum)) (class-of datum)))
-    (sb!debug:backtrace)
-    (print "printing ERROR arguments one by one..")
-    (dolist (argument arguments)
-      (print argument))
-    (print "done printing ERROR arguments"))
 
   (sb!kernel:infinite-error-protect
     (let ((condition (coerce-to-condition datum arguments

@@ -132,7 +132,7 @@
 (defun walker-info-to-bogo-function (walker-info)
   (lambda (magic-tag &rest rest)
     (aver (not rest)) ; else someone is using me in an unexpected way
-    (aver (eql magictag *bogo-function-magic-tag*)) ; else ditto
+    (aver (eql magic-tag *bogo-function-magic-tag*)) ; else ditto
     walker-info))
 (defun bogo-function-to-walker-info (bogo-function)
   (declare (type function bogo-function))
