@@ -83,12 +83,18 @@
 				(primitive-type-scs
 				 (tn-primitive-type arg-tn)))
 		       (let ((leaf (tn-leaf tn)))
-			 ;; Do we not care about preserving this this
-			 ;; TN for debugging?
 			 (or (not leaf)
-			     (not (symbol-package (leaf-debug-name leaf)))
-			     (policy (vop-node vop)
-				     (or (= speed 3) (< debug 2)))))
+                             (and
+                              ;; Do we not care about preserving this this
+                              ;; TN for debugging?
+                              (or
+                               (not (symbol-package (leaf-debug-name leaf)))
+                               (policy (vop-node vop)
+                                       (or (= speed 3) (< debug 2))))
+                              ;; arguments of local functions have hidden write
+                              (not (and (lambda-var-p leaf)
+                                        (memq (functional-kind (lambda-var-home leaf))
+                                                   '(nil :optional)))))))
 		       arg-tn)))))))
 
 ;;; Init the sets in BLOCK for copy propagation. To find GEN, we just
@@ -107,8 +113,9 @@
 		     (when (tn-is-copy-of y)
 		       (sset-adjoin y gen)
 		       t)))
+        ;; WANTED: explanation of UNLESS above.
 	(do ((res (vop-results vop) (tn-ref-across res)))
-	    ((null res))
+	    ((not res))
 	  (let ((res-tn (tn-ref-tn res)))
 	    (do ((read (tn-reads res-tn) (tn-ref-next read)))
 		((null read))
@@ -118,7 +125,6 @@
 		    (when (tn-is-copy-of y)
 		      (sset-delete y gen)
 		      (sset-adjoin y kill))))))))))
-
     (setf (block-out block) (copy-sset gen))
     (setf (block-kill block) kill)
     (setf (block-gen block) gen))

@@ -447,7 +447,9 @@ WORKAROUND:
     * '``(FOO ,@',@S)
     ``(FOO SB-IMPL::BACKQ-COMMA-AT S)
 
-  b. (fixed in 0.8.4.7)
+  c. (reported by Paul F. Dietz)
+     * '`(lambda ,x)
+     `(LAMBDA (SB-IMPL::BACKQ-COMMA X))
 
 143:
   (reported by Jesse Bouwman 2001-10-24 through the unfortunately

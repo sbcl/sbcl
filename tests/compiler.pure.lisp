@@ -940,3 +940,29 @@
                        -32326608))))
               1 2 3)
              -32326608))
+
+;;; MISC.177, 182: IR2 copy propagation missed a hidden write to a
+;;; local lambda argument
+(assert
+ (equal
+  (funcall
+   (compile nil
+            '(lambda (a b c)
+              (declare (type (integer 804561 7640697) a))
+              (declare (type (integer -1 10441401) b))
+              (declare (type (integer -864634669 55189745) c))
+              (declare (ignorable a b c))
+              (declare (optimize (speed 3)))
+              (declare (optimize (safety 1)))
+              (declare (optimize (debug 1)))
+              (flet ((%f11
+                         (f11-1 f11-2)
+                       (labels ((%f4 () (round 200048 (max 99 c))))
+                         (logand
+                          f11-1
+                          (labels ((%f3 (f3-1) -162967612))
+                            (%f3 (let* ((v8 (%f4)))
+                                   (setq f11-1 (%f4)))))))))
+                (%f11 -120429363 (%f11 62362 b)))))
+   6714367 9645616 -637681868)
+  -264223548))
