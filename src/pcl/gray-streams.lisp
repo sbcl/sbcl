@@ -492,11 +492,21 @@
    "Used by READ-BYTE; returns either an integer, or the symbol :EOF
   if the stream is at end-of-file."))
 
+(defmethod stream-read-byte ((stream stream))
+  (bug-or-error stream 'stream-read-byte))
+(defmethod stream-read-byte ((non-stream t))
+  (error 'type-error :datum non-stream :expected-type 'stream))
+
 (defgeneric stream-write-byte (stream integer)
   #+sb-doc
   (:documentation
    "Implements WRITE-BYTE; writes the integer to the stream and
   returns the integer as the result."))
+
+(defmethod stream-write-byte ((stream stream) integer)
+  (bug-or-error stream 'stream-write-byte))
+(defmethod stream-write-byte ((non-stream t) integer)
+  (error 'type-error :datum non-stream :expected-type 'stream))
 
 ;; Provide a reasonable default for binary Gray streams.  We might be
 ;; able to do better by specializing on the sequence type, but at

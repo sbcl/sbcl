@@ -2288,6 +2288,8 @@ changes in sbcl-0.8.8 relative to sbcl-0.8.7:
     ** DIRECTORY on logical pathnames is more correct.
     ** CLEAR-INPUT, CLEAR-OUTPUT, FINISH-OUTPUT and FORCE-OUTPUT
        signal a TYPE-ERROR if their argument is not a stream.
+    ** READ-BYTE and WRITE-BYTE signal a TYPE-ERROR if their stream
+       designator argument does not designate a stream.
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles
