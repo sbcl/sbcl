@@ -1325,6 +1325,10 @@ changes in sbcl-0.7.9 relative to sbcl-0.7.8:
     so it can be non-toplevel.
   * The fasl file version number has changed (because of the new
     implementation of DEFMACRO).
+  * (mostly) fixed bugs 46b and 46c: sequence functions now check, in
+    safe code, that any length requirement by their type-specifier
+    argument is valid.  The exceptions to this are described in bug
+    213.
   * fixed bugs 46h and 46i: TWO-WAY- and CONCATENATED-STREAM creation
     functions now check the types of their inputs as required by ANSI.
   * fixed bug 48c: SYMBOL-MACROLET signals PROGRAM-ERROR when an

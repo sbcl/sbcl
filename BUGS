@@ -1330,6 +1330,23 @@ WORKAROUND:
       (declare (optimize (inhibit-warnings 0) (compilation-speed 2)))
     (lambda (x) (declare (fixnum x)) (if (< x 0) 0 (1- x))))
 
+215: ":TEST-NOT handling by functions"
+  a. FIND and POSITION currently signal errors when given non-NIL for
+     both their :TEST and (deprecated) :TEST-NOT arguments, but by
+     ANSI 17.2 "the consequences are unspecified", which by ANSI 1.4.2
+     means that the effect is "unpredictable but harmless.  It's not
+     clear what that actually means; it may preclude conforming
+     implementations from signalling errors.
+  b. COUNT, REMOVE and the like give priority to a :TEST-NOT argument
+     when conflict occurs.  As a quality of implementation issue, it
+     might be preferable to treat :TEST and :TEST-NOT as being in some
+     sense the same &KEY, and effectively take the first test function in
+     the argument list.
+  c. Again, a quality of implementation issue: it would be good to issue a
+     STYLE-WARNING at compile-time for calls with :TEST-NOT, and a
+     WARNING for calls with both :TEST and :TEST-NOT; possibly this
+     latter should be WARNed about at execute-time too.
+
 DEFUNCT CATEGORIES OF BUGS
   IR1-#:
     These labels were used for bugs related to the old IR1 interpreter.
