@@ -1166,15 +1166,6 @@ WORKAROUND:
   would be to put the check between evaluation of arguments, but it
   could be tricky to check result types of PROG1, IF etc.
 
-228: "function-lambda-expression problems"
-  in sbcl-0.7.9.6x, from the REPL:
-    * (progn (declaim (inline foo)) (defun foo (x) x))
-    FOO
-    * (function-lambda-expression #'foo)
-    (SB-C:LAMBDA-WITH-LEXENV NIL NIL NIL (X) (BLOCK FOO X)), NIL, FOO
-  but this first return value is not suitable for input to FUNCTION or
-  COMPILE, as required by ANSI.
-
 229:
   (subtypep 'function '(function)) => nil, t.
 

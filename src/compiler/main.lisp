@@ -871,7 +871,7 @@
     (setf (component-name component)
 	  (debug-namify "~S initial component" name))
     (setf (component-kind component) :initial)
-    (let* ((locall-fun (ir1-convert-lambda
+    (let* ((locall-fun (ir1-convert-lambdalike
                         definition
                         :debug-name (debug-namify "top level local call ~S"
                                                   name)

@@ -752,6 +752,17 @@ BUG 48c, not yet fixed:
   (declare (type (vector (unsigned-byte 8)) x))
   (setq *y* (the (unsigned-byte 8) (aref x 4))))
 
+;;; FUNCTION-LAMBDA-EXPRESSION should return something that's COMPILE
+;;; can understand.  Here's a simple test for that on a function
+;;; that's likely to return a hairier list than just a lambda:
+(macrolet ((def (fn) `(progn
+		       (declaim (inline ,fn))
+		       (defun ,fn (x) (1+ x)))))
+  (def bug228))
+(let ((x (function-lambda-expression #'bug228)))
+  (when x
+    (assert (= (funcall (compile nil x) 1) 2))))
+
 ;;;; tests not in the problem domain, but of the consistency of the
 ;;;; compiler machinery itself
 

@@ -35,6 +35,9 @@
                  (values (svref (sb!c::debug-source-name source) 0)
                          nil
 			 name))
+		;; FIXME: shouldn't these two clauses be the other way
+		;; round?  Using VALID-FUNCTION-NAME-P to see if we
+		;; want to find an inline-expansion?
                 ((stringp name)
                  (values nil t name))
                 (t

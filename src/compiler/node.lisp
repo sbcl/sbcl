@@ -744,6 +744,12 @@
   ;; Unlike the SOURCE-NAME slot, this slot's value should never
   ;; affect ordinary code behavior, only debugging/diagnostic behavior.
   ;;
+  ;; Ha.  Ah, the starry-eyed idealism of the writer of the above
+  ;; paragraph.  FUNCTION-LAMBDA-EXPRESSION's behaviour, as of
+  ;; sbcl-0.7.11.x, differs if the name of the a function is a string
+  ;; or not, as if it is a valid function name then it can look for an
+  ;; inline expansion.
+  ;;
   ;; The value of this slot can be anything, except that it shouldn't
   ;; be a legal function name, since otherwise debugging gets
   ;; confusing. (If a legal function name is a good name for the

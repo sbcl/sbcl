@@ -346,3 +346,13 @@
 (defmacro-mundanely lambda (&whole whole args &body body)
   (declare (ignore args body))
   `#',whole)
+
+(defmacro-mundanely named-lambda (&whole whole name args &body body)
+  (declare (ignore name args body))
+  `#',whole)
+
+(defmacro-mundanely lambda-with-lexenv (&whole whole
+					declarations macros symbol-macros
+					&body body)
+  (declare (ignore declarations macros symbol-macros body))
+  `#',whole)

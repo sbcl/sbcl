@@ -1993,6 +1993,37 @@
 	  (setf (functional-inline-expansion res) form)
 	  (setf (functional-arg-documentation res) (cadr form))
 	  res)))))
+
+;;; helper for LAMBDA-like things, to massage them into a form
+;;; suitable for IR1-CONVERT-LAMBDA.
+;;;
+;;; KLUDGE: We cons up a &REST list here, maybe for no particularly
+;;; good reason.  It's probably lost in the noise of all the other
+;;; consing, but it's still inelegant.  And we force our called
+;;; functions to do full runtime keyword parsing, ugh.  -- CSR,
+;;; 2003-01-25
+(defun ir1-convert-lambdalike (thing &rest args
+			       &key (source-name '.anonymous.)
+			       debug-name allow-debug-catch-tag)
+  (ecase (car thing)
+    ((lambda) (apply #'ir1-convert-lambda thing args))
+    ((instance-lambda)
+     (let ((res (apply #'ir1-convert-lambda
+		       `(lambda ,@(cdr thing)) args)))
+       (setf (getf (functional-plist res) :fin-function) t)
+       res))
+    ((named-lambda)
+     (let ((name (cadr thing)))
+       (if (legal-fun-name-p name)
+	   (let ((res (apply #'ir1-convert-lambda `(lambda ,@(cddr thing))
+			     :source-name name
+			     :debug-name nil
+			     args)))
+	     (assert-global-function-definition-type name res)
+	     res)
+	   (apply #'ir1-convert-lambda `(lambda ,@(cddr thing))
+		  :debug-name name args))))
+    ((lambda-with-lexenv) (apply #'ir1-convert-inline-lambda thing args))))
 
 ;;;; defining global functions
 
@@ -2002,7 +2033,8 @@
 ;;; reflect the state at the definition site.
 (defun ir1-convert-inline-lambda (fun &key
 				      (source-name '.anonymous.)
-				      debug-name)
+				      debug-name
+				      allow-debug-catch-tag)
   (destructuring-bind (decls macros symbol-macros &rest body)
 		      (if (eq (car fun) 'lambda-with-lexenv)
 			  (cdr fun)
@@ -2019,7 +2051,8 @@
 		     :policy (lexenv-policy *lexenv*))))
       (ir1-convert-lambda `(lambda ,@body)
 			  :source-name source-name
-			  :debug-name debug-name))))
+			  :debug-name debug-name
+			  :allow-debug-catch-tag nil))))
 
 ;;; Get a DEFINED-FUN object for a function we are about to define. If
 ;;; the function has been forward referenced, then substitute for the
