@@ -98,7 +98,8 @@
 	    :definition-source `((define-method-combination ,type) ,pathname)))
     (when old-method
       (remove-method #'find-method-combination old-method))
-    (add-method #'find-method-combination new-method)))
+    (add-method #'find-method-combination new-method)
+    type))
 
 (defun short-combine-methods (type options operator ioa method doc)
   (cond ((null options) (setq options '(:most-specific-first)))
@@ -218,7 +219,8 @@
 				  ,*load-pathname*))))
     (setf (gethash type *long-method-combination-functions*) function)
     (when old-method (remove-method #'find-method-combination old-method))
-    (add-method #'find-method-combination new-method)))
+    (add-method #'find-method-combination new-method)
+    type))
 
 (defmethod compute-effective-method ((generic-function generic-function)
 				     (combin long-method-combination)

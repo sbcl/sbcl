@@ -365,6 +365,27 @@
 	   k)
 
 (dmc-test-mc :k 1)
+;;; While I'm at it, DEFINE-METHOD-COMBINATION is defined to return
+;;; the NAME argument, not some random method object. So:
+(assert (eq (define-method-combination dmc-test-return-foo)
+	    'dmc-test-return-foo))
+(assert (eq (define-method-combination dmc-test-return-bar :operator and)
+	    'dmc-test-return-bar))
+(assert (eq (define-method-combination dmc-test-return
+		(&optional (order :most-specific-first))
+	      ((around (:around))
+	       (primary (dmc-test-return) :order order :required t))
+	      (let ((form (if (rest primary)
+			      `(and ,@(mapcar #'(lambda (method)
+						  `(call-method ,method))
+					      primary))
+			      `(call-method ,(first primary)))))
+		(if around
+		    `(call-method ,(first around)
+		      (,@(rest around)
+		       (make-method ,form)))
+		    form)))
+	    'dmc-test-return))
 
 ;;;; success
 
