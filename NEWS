@@ -2022,6 +2022,8 @@ changes in sbcl-0.8.4 relative to sbcl-0.8.3:
   * optimization: compiler-internal data structure use has been
     reviewed, and changes have been made that should improve the
     performance of the compiler by about 20%.
+  * optimization: performance of FILL (and :INITIAL-ELEMENT) on
+    simple-base-strings and simple-bit-vectors is improved.
   * microoptimization: the compiler is better able to make use of the
     x86 LEA instruction for multiplication by constants.
   * bug fix: in some situations compiler did not report usage of
