@@ -136,8 +136,6 @@
 		     (compile-file #'compile-file)
 		     ignore-failure-p)
 
-  (format t "~&/entering COMPILE-STEM~%") ; REMOVEME
-
   (let* (;; KLUDGE: Note that this CONCATENATE 'STRING stuff is not The Common
 	;; Lisp Way, although it works just fine for common UNIX environments.
 	;; Should it come to pass that the system is ported to environments
@@ -198,8 +196,6 @@
     ;; If we get to here, compilation succeeded, so it's OK to rename
     ;; the temporary output file to the permanent object file.
     (rename-file-a-la-unix tmp-obj obj)
-
-    (format t "~&/nearly done with COMPILE-STEM~%") ; REMOVEME
 
     ;; nice friendly traditional return value
     (pathname obj)))
@@ -310,21 +306,21 @@
 					      :sb-propagate-fun-type))))
     (with-additional-nickname ("SB-XC" "SB!XC")
       (funcall fn))))
-;;; FIXME: This COMPILE caused problems in sbcl-0.6.11.26. (bug 93)
-;;;(compile 'in-host-compilation-mode)
+(compile 'in-host-compilation-mode)
 
 ;;; Process a file as source code for the cross-compiler, compiling it
 ;;; (if necessary) in the appropriate environment, then loading it
 ;;; into the cross-compilation host Common lisp.
 (defun host-cload-stem (stem &key ignore-failure-p)
-  (format t "~&/entering HOST-CLOAD-STEM ~S ~S" stem ignore-failure-p) ; REMOVEME
-  (load (in-host-compilation-mode
-	 (lambda ()
-	   (compile-stem stem
-			 :obj-prefix *host-obj-prefix*
-			 :obj-suffix *host-obj-suffix*
-			 :compile-file #'cl:compile-file
-			 :ignore-failure-p ignore-failure-p)))))
+  (let ((compiled-filename (in-host-compilation-mode
+			    (lambda ()
+			      (compile-stem
+			       stem
+			       :obj-prefix *host-obj-prefix*
+			       :obj-suffix *host-obj-suffix*
+			       :compile-file #'cl:compile-file
+			       :ignore-failure-p ignore-failure-p)))))
+    (load compiled-filename)))
 (compile 'host-cload-stem)
 
 ;;; Like HOST-CLOAD-STEM, except that we don't bother to compile.

@@ -18,7 +18,7 @@
 
 ;;; the feature list for the target system
 (export '*shebang-features*)
-(declaim (type symbol *shebang-features*))
+(declaim (type list *shebang-features*))
 (defvar *shebang-features*)
 
 (defun feature-in-list-p (feature list)

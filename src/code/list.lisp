@@ -673,7 +673,7 @@
 (defun member (item list &key key (test #'eql testp) (test-not nil notp))
   #!+sb-doc
   "Returns tail of list beginning with first element satisfying EQLity,
-   :test, or :test-not with a given item."
+   :TEST, or :TEST-NOT with a given item."
   (do ((list list (cdr list)))
       ((null list) nil)
     (let ((car (car list)))
@@ -682,7 +682,7 @@
 
 (defun member-if (test list &key key)
   #!+sb-doc
-  "Returns tail of list beginning with first element satisfying test(element)"
+  "Return tail of LIST beginning with first element satisfying TEST."
   (do ((list list (Cdr list)))
       ((endp list) nil)
     (if (funcall test (apply-key key (car list)))
@@ -690,7 +690,7 @@
 
 (defun member-if-not (test list &key key)
   #!+sb-doc
-  "Returns tail of list beginning with first element not satisfying test(el)"
+  "Return tail of LIST beginning with first element not satisfying TEST."
   (do ((list list (cdr list)))
       ((endp list) ())
     (if (not (funcall test (apply-key key (car list))))
@@ -698,8 +698,8 @@
 
 (defun tailp (object list)
   #!+sb-doc
-  "Returns true if Object is the same as some tail of List, otherwise
-   returns false. List must be a proper list or a dotted list."
+  "Return true if OBJECT is the same as some tail of LIST, otherwise
+   returns false. LIST must be a proper list or a dotted list."
   (do ((list list (cdr list)))
       ((atom list) (eql list object))
     (if (eql object list)
@@ -707,7 +707,7 @@
 
 (defun adjoin (item list &key key (test #'eql) (test-not nil notp))
   #!+sb-doc
-  "Add item to list unless it is already a member"
+  "Add ITEM to LIST unless it is already a member"
   (declare (inline member))
   (if (let ((key-val (apply-key key item)))
 	(if notp
@@ -722,7 +722,7 @@
 ;;; order.
 (defun union (list1 list2 &key key (test #'eql testp) (test-not nil notp))
   #!+sb-doc
-  "Returns the union of list1 and list2."
+  "Return the union of LIST1 and LIST2."
   (declare (inline member))
   (when (and testp notp) (error "Test and test-not both supplied."))
   (let ((res list2))
@@ -731,8 +731,8 @@
 	(push elt res)))
     res))
 
-;;; Destination and source are setf-able and many-evaluable. Sets the source
-;;; to the cdr, and "conses" the 1st elt of source to destination.
+;;; Destination and source are SETF-able and many-evaluable. Set the
+;;; SOURCE to the CDR, and "cons" the 1st elt of source to DESTINATION.
 ;;;
 ;;; FIXME: needs a more mnemonic name
 (defmacro steve-splice (source destination)
@@ -743,10 +743,10 @@
 
 (defun nunion (list1 list2 &key key (test #'eql testp) (test-not nil notp))
   #!+sb-doc
-  "Destructively returns the union list1 and list2."
+  "Destructively return the union of LIST1 and LIST2."
   (declare (inline member))
   (if (and testp notp)
-      (error "Test and test-not both supplied."))
+      (error ":TEST and :TEST-NOT were both supplied."))
   (let ((res list2)
 	(list1 list1))
     (do ()
@@ -759,7 +759,7 @@
 (defun intersection (list1 list2 &key key
 			   (test #'eql testp) (test-not nil notp))
   #!+sb-doc
-  "Returns the intersection of list1 and list2."
+  "Return the intersection of LIST1 and LIST2."
   (declare (inline member))
   (if (and testp notp)
       (error "Test and test-not both supplied."))
@@ -772,7 +772,7 @@
 (defun nintersection (list1 list2 &key key
 			    (test #'eql testp) (test-not nil notp))
   #!+sb-doc
-  "Destructively returns the intersection of list1 and list2."
+  "Destructively return the intersection of LIST1 and LIST2."
   (declare (inline member))
   (if (and testp notp)
       (error "Test and test-not both supplied."))
@@ -787,7 +787,7 @@
 (defun set-difference (list1 list2 &key key
 			     (test #'eql testp) (test-not nil notp))
   #!+sb-doc
-  "Returns the elements of list1 which are not in list2."
+  "Return the elements of LIST1 which are not in LIST2."
   (declare (inline member))
   (if (and testp notp)
       (error "Test and test-not both supplied."))
@@ -802,7 +802,7 @@
 (defun nset-difference (list1 list2 &key key
 			      (test #'eql testp) (test-not nil notp))
   #!+sb-doc
-  "Destructively returns the elements of list1 which are not in list2."
+  "Destructively return the elements of LIST1 which are not in LIST2."
   (declare (inline member))
   (if (and testp notp)
       (error "Test and test-not both supplied."))
@@ -817,7 +817,7 @@
 (defun set-exclusive-or (list1 list2 &key key
 			       (test #'eql testp) (test-not nil notp))
   #!+sb-doc
-  "Returns new list of elements appearing exactly once in list1 and list2."
+  "Return new list of elements appearing exactly once in LIST1 and LIST2."
   (declare (inline member))
   (let ((result nil))
     (dolist (elt list1)
@@ -828,18 +828,17 @@
 	(setq result (cons elt result))))
     result))
 
-;;; The outer loop examines list1 while the inner loop examines list2. If an
-;;; element is found in list2 "equal" to the element in list1, both are
-;;; spliced out. When the end of list1 is reached, what is left of list2 is
-;;; tacked onto what is left of list1. The splicing operation ensures that
-;;; the correct operation is performed depending on whether splice is at the
-;;; top of the list or not
-
+;;; The outer loop examines list1 while the inner loop examines list2.
+;;; If an element is found in list2 "equal" to the element in list1,
+;;; both are spliced out. When the end of list1 is reached, what is
+;;; left of list2 is tacked onto what is left of list1. The splicing
+;;; operation ensures that the correct operation is performed
+;;; depending on whether splice is at the top of the list or not
 (defun nset-exclusive-or (list1 list2 &key (test #'eql) (test-not nil notp)
 				key)
   #!+sb-doc
-  "Destructively return a list with elements which appear but once in list1
-   and list2."
+  "Destructively return a list with elements which appear but once in LIST1
+   and LIST2."
   (do ((list1 list1)
        (list2 list2)
        (x list1 (cdr x))
@@ -868,7 +867,7 @@
 
 (defun subsetp (list1 list2 &key key (test #'eql testp) (test-not nil notp))
   #!+sb-doc
-  "Returns T if every element in list1 is also in list2."
+  "Return T if every element in LIST1 is also in LIST2."
   (declare (inline member))
   (dolist (elt list1)
     (unless (with-set-keys (member (apply-key key elt) list2))
@@ -879,12 +878,12 @@
 
 (defun acons (key datum alist)
   #!+sb-doc
-  "Construct a new alist by adding the pair (key . datum) to alist"
+  "Construct a new alist by adding the pair (KEY . DATUM) to ALIST."
   (cons (cons key datum) alist))
 
 (defun pairlis (keys data &optional (alist '()))
   #!+sb-doc
-  "Construct an association list from keys and data (adding to alist)"
+  "Construct an association list from KEYS and DATA (adding to ALIST)."
   (do ((x keys (cdr x))
        (y data (cdr y)))
       ((and (endp x) (endp y)) alist)

@@ -119,7 +119,7 @@
 	       (format t "~&~4D:" index))
 	     (next-byte ()
 	       (let ((byte (sap-ref-8 sap index)))
-		 (format t " ~2,'0X" byte)
+		 (format t " ~2,'0X " byte)
 		 (incf index)
 		 byte))
 	     (extract-24-bits ()

@@ -109,12 +109,10 @@
   where if NAME is NIL, THING is the result of compilation, and
   otherwise THING is NAME. When NAME is not NIL, the compiled function
   is also set into (FDEFINITION NAME)."
-  ;;(format t "~&/in COMPILE NAME=~S DEFINITION=~S" name definition) ; REMOVEME
   (multiple-value-bind (compiled-definition warnings-p failure-p)
       (if (compiled-function-p definition)
 	  (values definition nil nil)
 	  (actually-compile name definition))
-    ;;(format t "~&/COMPILED-DEFINITION=~S~%" compiled-definition) ; REMOVEME
     (cond (name
 	   (unless failure-p
 	     (setf (fdefinition name) compiled-definition))

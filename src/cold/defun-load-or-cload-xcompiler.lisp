@@ -13,8 +13,6 @@
 ;;; cross-compilation host Common Lisp.
 (defun load-or-cload-xcompiler (load-or-cload-stem)
 
-  (format t "~&/entering LOAD-OR-CLOAD-XCOMPILER~%") ; REMOVEME
-
   ;; The running-in-the-host-Lisp Python cross-compiler defines its
   ;; own versions of a number of functions which should not overwrite
   ;; host-Lisp functions. Instead we put them in a special package.
@@ -122,8 +120,6 @@
 		    "WITH-COMPILATION-UNIT"))
       (export (intern name package-name) package-name)))
 
-  (format t "~&/made SB-XC~%") ; REMOVEME
-
   ;; Build a version of Python to run in the host Common Lisp, to be
   ;; used only in cross-compilation.
   ;;
@@ -134,13 +130,10 @@
   ;; order to make the compiler aware of the definitions of assembly
   ;; routines.
   (do-stems-and-flags (stem flags)
-    (format t "~&/STEM=~S FLAGS=~S~%" stem flags) ; REMOVEME
     (unless (find :not-host flags)
-      (format t "~&/FUNCALLing ~S~%" load-or-cload-stem) ; REMOVEME
       (funcall load-or-cload-stem
 	       stem
 	       :ignore-failure-p (find :ignore-failure-p flags))
-      (format t "~&/back from FUNCALL~%") ; REMOVEME
       #!+sb-show (warn-when-cl-snapshot-diff *cl-snapshot*)))
 
   ;; If the cross-compilation host is SBCL itself, we can use the
@@ -151,7 +144,6 @@
   ;; (in the ordinary build procedure anyway) essentially everything
   ;; which is reachable at this point will remain reachable for the
   ;; entire run.
-  (format t "~&/doing PURIFY~%") ; REMOVEME
   #+sbcl (sb-ext:purify)
 
   (values))
