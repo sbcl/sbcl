@@ -134,17 +134,12 @@ static int scav_lose(lispobj *where, lispobj object); /* forward decl */
 /* FIXME: Most calls end up going to some trouble to compute an
  * 'n_words' value for this function. The system might be a little
  * simpler if this function used an 'end' parameter instead. */
-#define PAGE_SIZE 4096
 void
 scavenge(lispobj *start, long n_words)
 {
     lispobj *end = start + n_words;
     lispobj *object_ptr;
     int n_words_scavenged;
-    if((((unsigned int)start & (PAGE_SIZE-1))==0) &&
-       (n_words>(PAGE_SIZE/4))) {
-       	madvise(start, n_words*4, MADV_SEQUENTIAL|MADV_WILLNEED);
-    }
     for (object_ptr = start;
 	 object_ptr < end;
 	 object_ptr += n_words_scavenged) {
