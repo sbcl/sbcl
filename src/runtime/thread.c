@@ -145,7 +145,7 @@ struct thread * create_thread_struct(lispobj initial_function) {
 #else
     th->alien_stack_pointer=((void *)th->alien_stack_start);
 #endif
-#ifdef LISP_FEATURE_X86 || defined (LISP_FEATURE_X86_64)
+#if defined(LISP_FEATURE_X86) || defined (LISP_FEATURE_X86_64)
     th->pseudo_atomic_interrupted=0;
     th->pseudo_atomic_atomic=0;
 #endif

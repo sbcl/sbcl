@@ -175,7 +175,7 @@
 	   (move ecx index)
 	   (inst shr ecx ,bit-shift)
 	   (inst mov result
-		 (make-ea :qword :base object :index ecx :scale 4
+		 (make-ea :qword :base object :index ecx :scale n-word-bytes
 			  :disp (- (* vector-data-offset n-word-bytes)
 				   other-pointer-lowtag)))
 	   (move ecx index)
@@ -278,7 +278,7 @@
                   (inst or old value)
 		  (unless (zerop shift)
                     (inst rol old shift)))))
-	     (inst mov (make-ea :dword :base object
+	     (inst mov (make-ea :qword :base object
 				:disp (- (* (+ word vector-data-offset)
 					    n-word-bytes)
 					 other-pointer-lowtag))

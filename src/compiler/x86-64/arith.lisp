@@ -1062,7 +1062,7 @@
 
 (define-vop (fast-conditional-c/signed fast-conditional/signed)
   (:args (x :scs (signed-reg signed-stack)))
-  (:arg-types signed-num (:constant (signed-byte 32)))
+  (:arg-types signed-num (:constant (signed-byte 31)))
   (:info target not-p y))
 
 (define-vop (fast-conditional/unsigned fast-conditional)
@@ -1075,9 +1075,8 @@
 
 (define-vop (fast-conditional-c/unsigned fast-conditional/unsigned)
   (:args (x :scs (unsigned-reg unsigned-stack)))
-  (:arg-types unsigned-num (:constant (unsigned-byte 32)))
+  (:arg-types unsigned-num (:constant (unsigned-byte 31)))
   (:info target not-p y))
-
 
 (macrolet ((define-conditional-vop (tran cond unsigned not-cond not-unsigned)
 	     `(progn

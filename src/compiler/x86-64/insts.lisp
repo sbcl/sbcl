@@ -1094,7 +1094,7 @@
 
 ;;; this is not a real amd64 instruction, of course
 (define-instruction movzxd (segment dst src)
-  (:printer reg-reg/mem ((op #x63) (reg nil :type 'word-reg)))
+  ; (:printer reg-reg/mem ((op #x63) (reg nil :type 'word-reg)))
   (:emitter (emit-move-with-extension segment dst src nil)))
 
 (define-instruction push (segment src)
@@ -1168,9 +1168,11 @@
      (maybe-emit-operand-size-prefix segment size)
      (labels ((xchg-acc-with-something (acc something)
 		(if (and (not (eq size :byte)) (register-p something))
-		    (emit-byte-with-reg segment
-					#b10010
-					(reg-tn-encoding something))
+		    (progn
+		      (maybe-emit-rex-for-ea segment acc something)
+		      (emit-byte-with-reg segment
+					  #b10010
+					  (reg-tn-encoding something)))
 		    (xchg-reg-with-something acc something)))
 	      (xchg-reg-with-something (reg something)
 		(emit-byte segment (if (eq size :byte) #b10000110 #b10000111))
@@ -1293,7 +1295,8 @@
 	     (emit-byte segment #b10000011)
 	     (emit-ea segment dst opcode allow-constants)
 	     (emit-byte segment src))
-	    ((accumulator-p dst)
+	    ((accumulator-p dst)  
+	     (maybe-emit-rex-for-ea segment dst nil)
 	     (emit-byte segment
 			(dpb opcode
 			     (byte 3 3)
@@ -1374,7 +1377,8 @@
   (:emitter
    (let ((size (operand-size dst)))
      (maybe-emit-operand-size-prefix segment size)
-     (cond ((and (not (eq size :byte)) (register-p dst))
+     (cond #+nil
+	   ((and (not (eq size :byte)) (register-p dst))
 	    (emit-byte-with-reg segment #b01001 (reg-tn-encoding dst)))
 	   (t
 	    (maybe-emit-rex-for-ea segment dst nil)
@@ -1389,26 +1393,6 @@
      (maybe-emit-rex-for-ea segment dst nil)
      (emit-byte segment (if (eq size :byte) #b11110110 #b11110111))
      (emit-ea segment dst #b011))))
-
-(define-instruction aaa (segment)
-  (:printer byte ((op #b00110111)))
-  (:emitter
-   (emit-byte segment #b00110111)))
-
-(define-instruction aas (segment)
-  (:printer byte ((op #b00111111)))
-  (:emitter
-   (emit-byte segment #b00111111)))
-
-(define-instruction daa (segment)
-  (:printer byte ((op #b00100111)))
-  (:emitter
-   (emit-byte segment #b00100111)))
-
-(define-instruction das (segment)
-  (:printer byte ((op #b00101111)))
-  (:emitter
-   (emit-byte segment #b00101111)))
 
 (define-instruction mul (segment dst src)
   (:printer accum-reg/mem ((op '(#b1111011 #b100))))
@@ -1485,19 +1469,6 @@
      (emit-byte segment #x0f)
      (emit-byte-with-reg segment #b11001 (reg-tn-encoding dst)))))
 
-
-(define-instruction aad (segment)
-  (:printer two-bytes ((op '(#b11010101 #b00001010))))
-  (:emitter
-   (emit-byte segment #b11010101)
-   (emit-byte segment #b00001010)))
-
-(define-instruction aam (segment)
-  (:printer two-bytes ((op '(#b11010100 #b00001010))))
-  (:emitter
-   (emit-byte segment #b11010100)
-   (emit-byte segment #b00001010)))
-
 ;;; CBW -- Convert Byte to Word. AX <- sign_xtnd(AL)
 (define-instruction cbw (segment)
   (:emitter
@@ -1525,7 +1496,6 @@
 
 ;;; CQO -- Convert Quad or Octaword. RDX:RAX <- sign_xtnd(RAX)
 (define-instruction cqo (segment)
-  (:printer byte ((op #b10011001)))
   (:emitter
    (maybe-emit-rex-prefix segment :qword nil nil nil)
    (emit-byte segment #b10011001)))
@@ -2882,7 +2852,7 @@
 ;; movsd andpd comisd comiss
 
 (define-instruction movsd (segment dst src)
-  (:printer reg-reg/mem ((op #x10) (width 1))) ;wrong
+;  (:printer reg-reg/mem ((op #x10) (width 1))) ;wrong
   (:emitter
    (cond ((typep src 'tn) 
 	  (emit-byte segment #xf2)
@@ -2898,7 +2868,7 @@
 	  (emit-ea segment src (reg-tn-encoding dst))))))
 
 (define-instruction movss (segment dst src)
-  (:printer reg-reg/mem ((op #x10) (width 1))) ;wrong
+;  (:printer reg-reg/mem ((op #x10) (width 1))) ;wrong
   (:emitter
    (cond ((tn-p src)
 	  (emit-byte segment #xf3)
@@ -2914,7 +2884,7 @@
 	  (emit-ea segment src (reg-tn-encoding dst))))))
 
 (define-instruction andpd (segment dst src)
-  (:printer reg-reg/mem ((op #x10) (width 1))) ;wrong
+;  (:printer reg-reg/mem ((op #x10) (width 1))) ;wrong
   (:emitter
    (emit-byte segment #x66)
    (maybe-emit-rex-for-ea segment src dst)
@@ -2923,7 +2893,7 @@
    (emit-ea segment src (reg-tn-encoding dst))))
 
 (define-instruction comisd (segment dst src)
-  (:printer reg-reg/mem ((op #x10) (width 1))) ;wrong
+;  (:printer reg-reg/mem ((op #x10) (width 1))) ;wrong
   (:emitter
    (emit-byte segment #x66)
    (maybe-emit-rex-for-ea segment src dst)
@@ -2932,7 +2902,7 @@
    (emit-ea segment src (reg-tn-encoding dst))))
 
 (define-instruction comiss (segment dst src)
-  (:printer reg-reg/mem ((op #x10) (width 1))) ;wrong
+;  (:printer reg-reg/mem ((op #x10) (width 1))) ;wrong
   (:emitter
    (maybe-emit-rex-for-ea segment src dst)
    (emit-byte segment #x0f)
@@ -2943,7 +2913,7 @@
 
 ;; we only do the xmm version of movd
 (define-instruction movd (segment dst src)
-  (:printer reg-reg/mem ((op #x10) (width 1))) ;wrong
+;  (:printer reg-reg/mem ((op #x10) (width 1))) ;wrong
   (:emitter
    (cond ((typep dst 'tn)
 	  (emit-byte segment #x66)
@@ -2959,7 +2929,7 @@
 	  (emit-ea segment dst (reg-tn-encoding src))))))
 
 (define-instruction movq (segment dst src)
-  (:printer reg-reg/mem ((op #x10) (width 1))) ;wrong
+;  (:printer reg-reg/mem ((op #x10) (width 1))) ;wrong
   (:emitter
    (cond ((typep dst 'tn)
 	  (emit-byte segment #xf3)
@@ -2975,7 +2945,7 @@
 	  (emit-ea segment dst (reg-tn-encoding src))))))
 
 (define-instruction xorpd (segment dst src)
-  (:printer reg-reg/mem ((op #x10) (width 1))) ;wrong
+;  (:printer reg-reg/mem ((op #x10) (width 1))) ;wrong
   (:emitter
    (emit-byte segment #x66)
    (maybe-emit-rex-for-ea segment src dst)
@@ -2984,7 +2954,7 @@
    (emit-ea segment src (reg-tn-encoding dst))))
 
 (define-instruction xorps (segment dst src)
-  (:printer reg-reg/mem ((op #x10) (width 1))) ;wrong
+;  (:printer reg-reg/mem ((op #x10) (width 1))) ;wrong
   (:emitter
    (maybe-emit-rex-for-ea segment src dst)
    (emit-byte segment #x0f)
@@ -2992,7 +2962,7 @@
    (emit-ea segment src (reg-tn-encoding dst))))
 
 (define-instruction cvtsd2si (segment dst src)
-  (:printer reg-reg/mem ((op #x10) (width 1))) ;wrong
+;  (:printer reg-reg/mem ((op #x10) (width 1))) ;wrong
   (:emitter
    (emit-byte segment #xf2)
    (maybe-emit-rex-for-ea segment src dst)
@@ -3001,7 +2971,7 @@
    (emit-ea segment src (reg-tn-encoding dst))))
 
 (define-instruction cvtsd2ss (segment dst src)
-  (:printer reg-reg/mem ((op #x10) (width 1))) ;wrong
+;  (:printer reg-reg/mem ((op #x10) (width 1))) ;wrong
   (:emitter
    (emit-byte segment #xf2)
    (maybe-emit-rex-for-ea segment src dst)
@@ -3010,7 +2980,7 @@
    (emit-ea segment src (reg-tn-encoding dst))))
 
 (define-instruction cvtss2si (segment dst src)
-  (:printer reg-reg/mem ((op #x10) (width 1))) ;wrong
+;  (:printer reg-reg/mem ((op #x10) (width 1))) ;wrong
   (:emitter
    (emit-byte segment #xf3)
    (maybe-emit-rex-for-ea segment src dst)
@@ -3019,7 +2989,7 @@
    (emit-ea segment src (reg-tn-encoding dst))))
 
 (define-instruction cvtss2sd (segment dst src)
-  (:printer reg-reg/mem ((op #x10) (width 1))) ;wrong
+;  (:printer reg-reg/mem ((op #x10) (width 1))) ;wrong
   (:emitter
    (emit-byte segment #xf3)
    (maybe-emit-rex-for-ea segment src dst)
@@ -3028,7 +2998,7 @@
    (emit-ea segment src (reg-tn-encoding dst))))
 
 (define-instruction cvtsi2ss (segment dst src)
-  (:printer reg-reg/mem ((op #x10) (width 1))) ;wrong
+;  (:printer reg-reg/mem ((op #x10) (width 1))) ;wrong
   (:emitter
    (emit-byte segment #xf3)
    (maybe-emit-rex-for-ea segment src dst)
@@ -3037,7 +3007,7 @@
    (emit-ea segment src (reg-tn-encoding dst))))
 
 (define-instruction cvtsi2sd (segment dst src)
-  (:printer reg-reg/mem ((op #x10) (width 1))) ;wrong
+;  (:printer reg-reg/mem ((op #x10) (width 1))) ;wrong
   (:emitter
    (emit-byte segment #xf2)
    (maybe-emit-rex-for-ea segment src dst)
@@ -3046,7 +3016,7 @@
    (emit-ea segment src (reg-tn-encoding dst))))
 
 (define-instruction cvtdq2pd (segment dst src)
-  (:printer reg-reg/mem ((op #x10) (width 1))) ;wrong
+;  (:printer reg-reg/mem ((op #x10) (width 1))) ;wrong
   (:emitter
    (emit-byte segment #xf3)
    (maybe-emit-rex-for-ea segment src dst)
@@ -3055,7 +3025,7 @@
    (emit-ea segment src (reg-tn-encoding dst))))
 
 (define-instruction cvtdq2ps (segment dst src)
-  (:printer reg-reg/mem ((op #x10) (width 1))) ;wrong
+;  (:printer reg-reg/mem ((op #x10) (width 1))) ;wrong
   (:emitter
    (maybe-emit-rex-for-ea segment src dst)
    (emit-byte segment #x0f)
@@ -3065,7 +3035,7 @@
 ;; CVTTSD2SI CVTTSS2SI
 
 (define-instruction cvttsd2si (segment dst src)
-  (:printer reg-reg/mem ((op #x10) (width 1))) ;wrong
+;  (:printer reg-reg/mem ((op #x10) (width 1))) ;wrong
   (:emitter
    (emit-byte segment #xf2)
    (maybe-emit-rex-for-ea segment src dst)
@@ -3074,7 +3044,7 @@
    (emit-ea segment src (reg-tn-encoding dst))))
 
 (define-instruction cvttss2si (segment dst src)
-  (:printer reg-reg/mem ((op #x10) (width 1))) ;wrong
+;  (:printer reg-reg/mem ((op #x10) (width 1))) ;wrong
   (:emitter
    (emit-byte segment #xf3)
    (maybe-emit-rex-for-ea segment src dst)
@@ -3083,7 +3053,7 @@
    (emit-ea segment src (reg-tn-encoding dst))))
 
 (define-instruction addsd (segment dst src)
-  (:printer reg-reg/mem ((op #x10) (width 1))) ;wrong
+;  (:printer reg-reg/mem ((op #x10) (width 1))) ;wrong
   (:emitter
    (emit-byte segment #xf2)
    (maybe-emit-rex-for-ea segment src dst)
@@ -3092,7 +3062,7 @@
    (emit-ea segment src (reg-tn-encoding dst))))
 
 (define-instruction addss (segment dst src)
-  (:printer reg-reg/mem ((op #x10) (width 1))) ;wrong
+;  (:printer reg-reg/mem ((op #x10) (width 1))) ;wrong
   (:emitter
    (emit-byte segment #xf3)
    (maybe-emit-rex-for-ea segment src dst)
@@ -3101,7 +3071,7 @@
    (emit-ea segment src (reg-tn-encoding dst))))
 
 (define-instruction divsd (segment dst src)
-  (:printer reg-reg/mem ((op #x10) (width 1))) ;wrong
+;  (:printer reg-reg/mem ((op #x10) (width 1))) ;wrong
   (:emitter
    (emit-byte segment #xf2)
    (maybe-emit-rex-for-ea segment src dst)
@@ -3110,7 +3080,7 @@
    (emit-ea segment src (reg-tn-encoding dst))))
 
 (define-instruction divss (segment dst src)
-  (:printer reg-reg/mem ((op #x10) (width 1))) ;wrong
+;  (:printer reg-reg/mem ((op #x10) (width 1))) ;wrong
   (:emitter
    (emit-byte segment #xf3)
    (maybe-emit-rex-for-ea segment src dst)
@@ -3119,7 +3089,7 @@
    (emit-ea segment src (reg-tn-encoding dst))))
 
 (define-instruction mulsd (segment dst src)
-  (:printer reg-reg/mem ((op #x10) (width 1))) ;wrong
+;  (:printer reg-reg/mem ((op #x10) (width 1))) ;wrong
   (:emitter
    (emit-byte segment #xf2)
    (maybe-emit-rex-for-ea segment src dst)
@@ -3128,7 +3098,7 @@
    (emit-ea segment src (reg-tn-encoding dst))))
 
 (define-instruction mulss (segment dst src)
-  (:printer reg-reg/mem ((op #x10) (width 1))) ;wrong
+;  (:printer reg-reg/mem ((op #x10) (width 1))) ;wrong
   (:emitter
    (emit-byte segment #xf3)
    (maybe-emit-rex-for-ea segment src dst)
@@ -3137,7 +3107,7 @@
    (emit-ea segment src (reg-tn-encoding dst))))
 
 (define-instruction subsd (segment dst src)
-  (:printer reg-reg/mem ((op #x10) (width 1))) ;wrong
+;  (:printer reg-reg/mem ((op #x10) (width 1))) ;wrong
   (:emitter
    (emit-byte segment #xf2)
    (maybe-emit-rex-for-ea segment src dst)
@@ -3146,7 +3116,7 @@
    (emit-ea segment src (reg-tn-encoding dst))))
 
 (define-instruction subss (segment dst src)
-  (:printer reg-reg/mem ((op #x10) (width 1))) ;wrong
+;  (:printer reg-reg/mem ((op #x10) (width 1))) ;wrong
   (:emitter
    (emit-byte segment #xf3)
    (maybe-emit-rex-for-ea segment src dst)
