@@ -963,7 +963,8 @@
            (ref (print-leaf (ref-leaf node)))
            (basic-combination
             (let ((kind (basic-combination-kind node)))
-              (format t "~(~A ~A~) c~D"
+              (format t "~(~A~A ~A~) c~D"
+                      (if (node-tail-p node) "tail " "")
                       (if (fun-info-p kind) "known" kind)
                       (type-of node)
                       (cont-num (basic-combination-fun node)))
@@ -981,7 +982,9 @@
             (print-continuation (block-start (if-alternative node))))
            (bind
             (write-string "bind ")
-            (print-leaf (bind-lambda node)))
+            (print-leaf (bind-lambda node))
+            (when (functional-kind (bind-lambda node))
+              (format t " ~S ~S" :kind (functional-kind (bind-lambda node)))))
            (creturn
             (format t "return c~D " (cont-num (return-result node)))
             (print-leaf (return-lambda node)))

@@ -202,4 +202,27 @@
 (assert (raises-error? (bug231b 0 1.5) type-error))
 (assert (raises-error? (bug231b 0 0) type-error))
 
+;;; A bug appeared in flaky7_branch. Python got lost in unconverting
+;;; embedded tail calls during let-convertion.
+(defun bug239 (bit-array-2 &optional result-bit-array)
+  (declare (type (array bit) bit-array-2)
+           (type (or (array bit) (member t nil)) result-bit-array))
+  (unless (simple-bit-vector-p bit-array-2)
+    (multiple-value-call
+        (lambda (data1 start1)
+          (multiple-value-call
+              (lambda (data2 start2)
+                (multiple-value-call
+                    (lambda (data3 start3)
+                      (declare (ignore start3))
+                      (print (list data1 data2)))
+                  (values 0 0)))
+            (values bit-array-2 0)))
+      (values 444 0))))
+(assert (equal (bug239 (make-array 4 :element-type 'bit
+                                   :adjustable t
+                                   :initial-element 0)
+                       nil)
+               '(444 #*0000)))
+
 (sb-ext:quit :unix-status 104) ; success

@@ -1273,27 +1273,6 @@ WORKAROUND:
   compiler gets its hands on the code needing compilation from the REPL,
   it has been macroexpanded several times.
 
-239:
-  Since 0.7.0:
-  (defun foo (bit-array-2 &optional result-bit-array)
-    (declare (type (array bit) bit-array-2)
-             (type (or (array bit) (member t nil)) result-bit-array))
-    (unless (simple-bit-vector-p bit-array-2)
-      (multiple-value-call
-          (lambda (data1 start1)
-            (multiple-value-call
-                (lambda (data2 start2)
-                  (multiple-value-call
-                      (lambda (data3 start3)
-                        (declare (ignore start3))
-                        (print (list data1 data2)))
-                    (values 0 0)))
-              (values bit-array-2 0)))
-        (values 444 0))))
-
-  Then (foo (make-array 4 :element-type 'bit :adjustable t) nil)
-  must return the same value as it prints, but it returns random garbage.
-
 240:
   "confused lexical/special warnings in MULTIPLE-VALUE-BIND"
   (from tonyms on #lisp IRC 2003-02-25)
