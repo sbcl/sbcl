@@ -50,6 +50,8 @@
        ;; Else, value not immediate.
        (storew value object offset lowtag))))
 
+
+
 ;;;; symbol hacking VOPs
 
 ;;; these next two cf the sparc version, by jrd.
@@ -78,10 +80,32 @@
   (:vop-var vop)
   (:save-p :compute-only)
   (:generator 9
+    (let* ((err-lab (generate-error-code vop unbound-symbol-error object))
+	   (ret-lab (gen-label)))
+      (loadw value object symbol-tls-index-slot other-pointer-lowtag)
+      (inst gs-segment-prefix)
+      (inst mov value (make-ea :dword :base value))
+      (inst cmp value unbound-marker-widetag)
+      (inst jmp :ne ret-lab)
+      (loadw value object symbol-value-slot other-pointer-lowtag)
+      (inst cmp value unbound-marker-widetag)
+      (inst jmp :e err-lab)
+      (emit-label ret-lab))))
+
+#+nil
+(define-vop (symbol-value)
+  (:translate symbol-value)
+  (:policy :fast-safe)
+  (:args (object :scs (descriptor-reg) :to (:result 1)))
+  (:results (value :scs (descriptor-reg any-reg)))
+  (:vop-var vop)
+  (:save-p :compute-only)
+  (:generator 9
     (let ((err-lab (generate-error-code vop unbound-symbol-error object)))
       (loadw value object symbol-value-slot other-pointer-lowtag)
       (inst cmp value unbound-marker-widetag)
       (inst jmp :e err-lab))))
+
 
 (define-vop (fast-symbol-value cell-ref)
   (:variant symbol-value-slot other-pointer-lowtag)

@@ -1,0 +1,34 @@
+Some notes about the threading implementation
+
+1) dynamic bindings
+
+dynamic symbol bindings ("special variables") are per-thread.  We
+implement this using a thread-local storage area which is pointed to
+(on x86) using the GS segment register.
+
+Every symbol gets a new slot tls-index, which is an index into a
+per-thread vector which contains thread-local values.  The symbol
+retains its global value slot as well, which is used if the
+thread-local value in the current thread is set to the magic "unbound"
+marker.  The thread-local vector is initially filled with unbound
+markers.  When new threads are collected the current thread's tlv is
+duplicated for the new one.
+
+The zeroth entry in the TLV is not used: always set to unbound-marker.
+New symbols get a tls-offset of 0, so that works out
+
+When a symbol is first bound, it is assigned the next available offset
+in the thread-local variable vector.  Also we push it onto the binding
+stack _twice_: first with the previous real (global) binding, then
+with an unbound-marker.
+
+Symbol value lookup looks first in the TLV at the sppropriate offset,
+then at the global value if the TLV offset is unbound.
+
+When a symbol is unbound, we check 
+1) if the tlv value is unbound, we assign the new value to the
+symbol's global value slot
+2) if the new value is unbound, we assign the new value to the 
+tlv value, then unbind again
+3) otherwise we  assign the new value to the  tlv value
+

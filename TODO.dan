@@ -1,0 +1,18 @@
+1) fill tlv with unbound markers
+
+2) grow tlv when full
+
+3) implement bind vop
+
+4) implement unbind vop
+
+5) implement set-symbol-value
+
+6) figure out all the places using fast variants of symbol values
+
+7) work out what to do with static symbols, some of which
+ may have bindings that are expected to be visible across thread switches
+ (e.g. without-preemption)
+
+8) reintroduce per-thread stacks and stuff from the last time we did
+   this

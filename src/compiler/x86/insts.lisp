@@ -602,6 +602,7 @@
 
 (define-bitfield-emitter emit-sib-byte 8
   (byte 2 6) (byte 3 3) (byte 3 0))
+
 
 ;;;; fixup emitters
 
@@ -1036,6 +1037,12 @@
      (emit-ea segment dst (reg-tn-encoding src)))))
 
 
+
+(define-instruction gs-segment-prefix (segment)
+  (:printer byte ((op #x65)))
+  (:emitter
+   (emit-byte segment #x65)))
+
 ;;;; flag control instructions
 
 ;;; CLC -- Clear Carry Flag.

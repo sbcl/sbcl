@@ -336,7 +336,8 @@
   (name :ref-trans symbol-name :init :arg)
   (package :ref-trans symbol-package
 	   :set-trans %set-symbol-package
-	   :init :null))
+	   :init :null)
+  (tls-index))
 
 (define-primitive-object (complex-single-float
 			  :lowtag other-pointer-lowtag
