@@ -1261,3 +1261,18 @@
   (compiler-note () (error "IDENTITY derive-type not applied.")))
 
 (assert (null (funcall (compile nil '(lambda (x) (funcall #'cddr x))) nil)))
+
+;;; MISC.293 = easy variant of bug 303: repeated write to the same
+;;; LVAR; here the first write may be cleared before the second is
+;;; made.
+(assert
+ (zerop
+  (funcall
+   (compile
+    nil
+    '(lambda ()
+      (declare (notinline complex))
+      (declare (optimize (speed 1) (space 0) (safety 1)
+                (debug 3) (compilation-speed 3)))
+      (flet ((%f () (multiple-value-prog1 0 (return-from %f 0))))
+        (complex (%f) 0)))))))

@@ -337,7 +337,11 @@
               (not (eq (block-home-lambda block)
                        (block-home-lambda next)))
               ;; Stack analysis phase wants ENTRY to start a block.
-              (entry-p (block-start-node next)))
+              (entry-p (block-start-node next))
+              (let ((last (block-last block)))
+                (and (valued-node-p last)
+                     (awhen (node-lvar last)
+                       (consp (lvar-uses it))))))
              nil)
             (t
              (join-blocks block next)

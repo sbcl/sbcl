@@ -941,6 +941,7 @@
   Evaluate Values-Form and then the Forms, but return all the values of
   Values-Form."
   (let ((dummy (make-ctran)))
+    (ctran-starts-block dummy)
     (ir1-convert start dummy result values-form)
     (ir1-convert-progn-body dummy next nil forms)))
 
