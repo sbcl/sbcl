@@ -156,8 +156,11 @@
   (do ((plist place (cddr plist)))
       ((null plist) default)
     (cond ((atom (cdr plist))
-	   (error "~S is a malformed property list."
-		  place))
+	   (error 'simple-type-error
+		  :format-control "malformed property list: ~S."
+		  :format-arguments (list place)
+		  :datum (cdr plist)
+		  :expected-type 'cons))
 	  ((eq (car plist) indicator)
 	   (return (cadr plist))))))
 
@@ -178,8 +181,11 @@
   (do ((plist place (cddr plist)))
       ((null plist) (values nil nil nil))
     (cond ((atom (cdr plist))
-	   (error "~S is a malformed proprty list."
-		  place))
+	   (error 'simple-type-error
+		  :format-control "malformed property list: ~S."
+		  :format-arguments (list place)
+		  :datum (cdr plist)
+		  :expected-type 'cons))
 	  ((memq (car plist) indicator-list)
 	   (return (values (car plist) (cadr plist) plist))))))
 

@@ -1596,6 +1596,8 @@ changes in sbcl-0.7.14 relative to sbcl-0.7.13:
     ** APPEND checks its arguments for being proper lists;
     ** An array specialized to be unable to hold elements has been
        implemented (as required -- yes, really) by ANSI;
+    ** GETF and GET-PROPERTIES throw a TYPE-ERROR, not a SIMPLE-ERROR,
+       on malformed property lists;
 
 planned incompatible changes in 0.7.x:
   * (not done yet, but planned:) When the profiling interface settles
