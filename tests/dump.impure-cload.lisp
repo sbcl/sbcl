@@ -49,4 +49,14 @@
 (assert (equalp (foo-x *foo*) '("X")))
 (assert (eql (foo-y *foo*) *foo*))
 
+;;; Logical pathnames should be dumpable, too, but what does it mean?
+;;; As of sbcl-0.7.7.16, we've taken dumping the host part to mean
+;;; dumping a reference to the name of the host (much as dumping a
+;;; symbol involves dumping a reference to the name of its package).
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (setf (logical-pathname-translations "MY-LOGICAL-HOST")
+	(list '("**;*.*.*" "/tmp/*.*"))))
+
+(defparameter *path* #p"MY-LOGICAL-HOST:FOO;BAR.LISP")
+
 (sb-ext:quit :unix-status 104) ; success

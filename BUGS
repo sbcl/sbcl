@@ -582,25 +582,6 @@ WORKAROUND:
   type declarations are supposed to be treated as assertions unless
   SAFETY 0, so we should be getting a TYPE-ERROR.
 
-113:
-  reported by Martin Atzmueller 2001-06-25; originally from CMU CL bugs
-  collection:
-    (in-package :cl-user)
-    ;;; From: David Gadbois <gadbois@cyc.com>
-    ;;;
-    ;;; Logical pathnames aren't externalizable.
-    ;;; Test case:
-    (let ((tempfile "/tmp/test.lisp"))
-      (setf (logical-pathname-translations "XXX")
-            '(("XXX:**;*.*" "/tmp/**/*.*")))
-      (with-open-file (out tempfile :direction :output)
-        (write-string "(defvar *path* #P\"XXX:XXX;FOO.LISP\")" out))
-      (compile-file tempfile))
-  The error message in sbcl-0.6.12.42 is
-    ; caught ERROR:
-    ;   (while making load form for #<SB-IMPL::LOGICAL-HOST "XXX">)
-    ; A logical host can't be dumped as a constant: #<SB-IMPL::LOGICAL-HOST "XXX">
-
 115:
   reported by Martin Atzmueller 2001-06-25; originally from CMU CL bugs
   collection:
@@ -1086,19 +1067,6 @@ WORKAROUND:
   COMPILE and COMPILE-FILE returned FAILURE-P=T for perfectly legal
   code. Since then the warning has been downgraded to STYLE-WARNING, 
   so it's still a bug but at least it's a little less annoying.
-
-174:
-  The error message from attempting to use a #\Return format
-  directive:
-    (format nil "~^M") ; replace "^M" with a literal #\Return
-      debugger invoked on condition of type SB-FORMAT::FORMAT-ERROR:
-      error in format: 		 unknown format directive
-      ~
-       ^
-  is not terribly helpful; this is more noticeable than parallel cases
-  with e.g. #\Backspace because of the differing newline conventions
-  on various operating systems. (reported by Harald Hanche-Olsen on
-  cmucl-help 2002-05-31)
 
 176:
   reported by Alexey Dejneka 08 Jun 2002 in sbcl-devel:

@@ -250,6 +250,11 @@
       (inst mov (make-fixup (extern-alien-name "fast_random_state") :foreign)
 	    temp)
       ;; We want a positive fixnum for the hash value, so discard the LS bits.
+      ;;
+      ;; FIXME: OK, who wants to tell me (CSR) why these two
+      ;; instructions aren't replaced by (INST AND TEMP #x8FFFFFFC)?
+      ;; Are the following two instructions actually faster?  Does the
+      ;; difference in behaviour really matter?
       (inst shr temp 1)
       (inst and temp #xfffffffc)
       (storew temp result symbol-hash-slot other-pointer-lowtag)

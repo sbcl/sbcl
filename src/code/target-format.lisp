@@ -74,15 +74,16 @@
 	   (interpret-directive-list stream (cdr directives) orig-args args))
 	  (format-directive
 	   (multiple-value-bind (new-directives new-args)
-	       (let ((function
-		      (svref *format-directive-interpreters*
-			     (char-code (format-directive-character
-					 directive))))
-		     (*default-format-error-offset*
-		      (1- (format-directive-end directive))))
+	       (let* ((character (format-directive-character directive))
+		      (function
+		       (svref *format-directive-interpreters*
+			      (char-code character)))
+		      (*default-format-error-offset*
+		       (1- (format-directive-end directive))))
 		 (unless function
 		   (error 'format-error
-			  :complaint "unknown format directive"))
+			  :complaint "unknown format directive ~@[(character: ~A)~]"
+			  :args (list (char-name character))))
 		 (multiple-value-bind (new-directives new-args)
 		     (funcall function stream directive
 			      (cdr directives) orig-args args)
@@ -228,13 +229,6 @@
   (let* ((name (char-name char)))
     (cond (name
 	   (write-string (string-capitalize name) stream))
-	  ((<= 0 (char-code char) 31)
-	   ;; Print control characters as "^"<char>. (This seems to be
-	   ;; old pre-ANSI behavior, but ANSI just says that the "#^"
-	   ;; sequence is undefined and not reserved for the user, so
-	   ;; this behavior should be ANSI-compliant.)
-	   (write-char #\^ stream)
-	   (write-char (code-char (+ 64 (char-code char))) stream))
 	  (t
 	   (write-char char stream)))))
 

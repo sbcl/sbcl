@@ -27,6 +27,17 @@
 ;;; code for it, but mostly we need it for GENESIS, which doesn't in
 ;;; general have our C runtime code running to ask, so instead we set
 ;;; it by hand. -- WHN 2001-04-15
+;;;
+;;; Though note that POSIX specifies (as far as I can tell)
+;;;
+;;;   sysconf(_SC_PAGE_SIZE);
+;;;
+;;; as a portable way of retrieving this information; a call to this
+;;; could be made in grovel-headers (which, strictly speaking, would
+;;; no longer solely be grovelling headers), though the question of
+;;; how to make this information appear in GENESIS, which is built and
+;;; run from host-1 files (which are made before grovel-headers runs)
+;;; would remain.  -- CSR, 2002-09-01
 (setf *backend-page-size* 4096)
 ;;; comment from CMU CL:
 ;;;

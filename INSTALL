@@ -33,7 +33,7 @@ So: the standard installation procedure is
   2. Copy sbcl to /usr/bin or /usr/local/bin.
   3. Optionally copy sbcl.1 to /usr/man/man1 or /usr/local/man/man1.
 The script install.sh does these for you (choosing the /usr/local
-subdirectory) in each case.
+subdirectory in each case).
 
 
 IF YOU HAVE A SOURCE DISTRIBUTION:
@@ -50,6 +50,11 @@ This software has been built successfully on these systems:
 			host lisp = SBCL itself
 		os = OpenBSD 2.6, 2.7, 2.8, 2.9, and 3.0
 			host lisp = SBCL itself
+	cpu = alpha
+		os = Debian GNU/Linux 2.2 with libc >= 2.1
+			host lisp = SBCL itself
+		os = Tru64 5.1
+			host lisp = SBCL itself
 	cpu = sparc
 		os = Debian GNU/Linux 2.2 with libc >= 2.2
 			host lisp = SBCL itself
@@ -60,8 +65,8 @@ This software has been built successfully on these systems:
 			host lisp = OpenMCL 0.12
 			host lisp = SBCL itself
 
-It is known not to build under CLISP because of (as of early June 2002)
-bugs in the CLISP garbage collector.
+It is known not to build under CLISP (as of early June 2002) because
+of bugs in the CLISP garbage collector.
 
 Reports of other systems that it works on (or doesn't work on, for
 that matter), or help in making it run on more systems, would be

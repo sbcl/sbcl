@@ -225,7 +225,8 @@
        (if expander
 	   (funcall expander directive more-directives)
 	   (error 'format-error
-		  :complaint "unknown directive"))))
+		  :complaint "unknown directive ~@[(character: ~A)~]"
+		  :args (list (char-name (format-directive-character directive)))))))
     (simple-string
      (values `(write-string ,directive stream)
 	     more-directives))))

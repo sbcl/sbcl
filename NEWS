@@ -1254,6 +1254,11 @@ changes in sbcl-0.7.8 relative to sbcl-0.7.7:
   * fixed bug 120a: The compiler now deals correctly with IFs where
     the consequent is the same as the alternative, instead of
     misderiving the return type. (thanks to Alexey Dejneka)
+  * fixed bug 113: Logical pathnames are now dumpable (the logical
+    host is resolved at load-time, throwing an error if it is not
+    found).
+  * fixed bug 174: FORMAT's error message is slightly clearer when a
+    non-printing character is used in a format directive.
 
 planned incompatible changes in 0.7.x:
 * When the profiling interface settles down, maybe in 0.7.x, maybe
