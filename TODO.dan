@@ -6,20 +6,14 @@
 ** What API to export?  
 
 Not interested, really, in supporting the full symbolics stack-groups
-crud (whostate, run-reasons, etc).  Basic thread control functions
-would be nice
-
-make-thread, we already have.  {kill,suspend,resume}-thread are simple
-wrappers around corresponding unix-foo functions
-
-Even if we don't provide one, some higher level process glue will want
-to slap extra stuff (thread names, for example) around us.  One
-possible approach is that taken by corman, where the acl-like
-MP package keeps a hash table of thread id -> 'process' 
+crud (whostate, run-reasons, etc).  Someone else can slap extra stuff
+(thread names, for example) around us.  One possible approach is that
+taken by corman, where the acl-like MP package keeps a hash table of
+thread id -> 'process'
 
 We're going to use "smallish integer" as thread id from Lisp.  For
 Linux, because we can, it will be the PID.  Note that the tls base
-register already to the current thread, so we have most of the
+register already points to the current thread, so we have most of the
 usually-relevant details at hand already.
 
 ** locking for library functions
@@ -64,12 +58,10 @@ we would like some mechanism to sleep and be woken on lock contention.
 sys_futex will be in 2.6, but is not in 2.4 (though there are patches,
 and it may be that the red hat kernel has merged them).  In the
 meantime, we probably have to fake something with signals and maybe
-sigwait() (looks like a good way to sleep for signals without having a
-signal handler be called).  This means we need to manage our own
-queues too
+sigwait().  This means we need to manage our own queues too
 
-We _could_ do something a bit less sophisticated, and just loop
-calling sched_yield() while we wwait.  Tuning spin retry attempts vs
+We presently do something a bit less sophisticated: just loop calling
+sleep(.1) while we wait.  Tuning spin retry attempts vs
 scheduler-friendly attempts is not possible without knowing the lock
 contention.  So, we could just pass that decision onto the user.  If
 2.6 is going to be widely used in the next six months or so, this
@@ -78,7 +70,6 @@ could be a win.
 14) allocation locking still not completely done: we're not sure what
 happens if two threads simultaneously create a new region, but the
 desired effect is "nothing bad"
-
 
 setup_i386_stack_scav in purify.c needs doing for multiple threads?
 

@@ -532,13 +532,13 @@
 	 (control-stack-end
 	  (sap+
 	   (descriptor-sap sb!vm::*binding-stack-start*) -4)))
-  #!-stack-grows-downward-not-upward
-  (and (sap< x (current-sp))
+    #!-stack-grows-downward-not-upward
+    (and (sap< x (current-sp))
 	 (sap<= control-stack-start
-	      x)
-       (zerop (logand (sap-int x) #b11)))
-  #!+stack-grows-downward-not-upward
-  (and (sap>= x (current-sp))
+		x)
+	 (zerop (logand (sap-int x) #b11)))
+    #!+stack-grows-downward-not-upward
+    (and (sap>= x (current-sp))
 	 (sap> control-stack-end x)
 	 (zerop (logand (sap-int x) #b11)))))
 

@@ -31,7 +31,7 @@
 	 (sb!impl::*tty* 
 	  (sb!sys:make-fd-stream err :input t :output t :buffering :line)))
     (labels ((thread-repl () 
-	       (handling-end-of-the-world
+	       (sb!impl::handling-end-of-the-world
 		(with-simple-restart 
 		    (destroy-thread
 		     (format nil "~~@<Destroy this thread (~A)~~@:>"
@@ -39,11 +39,10 @@
 		  (sb!impl::toplevel-repl nil)))))
       (make-thread #'thread-repl))))
 
-
 ;;;; mutex and read/write locks, originally inspired by CMUCL multi-proc.lisp
 
 (defun sleep-a-bit (timeout)
-  (if (> (get-internal-real-time) timeout)
+  (if (and timeout (> (get-internal-real-time) timeout))
       t
       (progn (sleep .1) nil)))
 
@@ -71,7 +70,7 @@
 	 ;; args are object slot-num old-value new-value
 	 (eql old-value
 	      (setf t1
-		    (sb!vm::%instance-set-conditional lock 2 nil new-value)))
+		    (sb!vm::%instance-set-conditional lock 2 old-value new-value)))
        (return t))
      (setf old-value t1))))
 
@@ -200,3 +199,4 @@
 		  ,lock 2 *current-process* nil)
 	  #-i486 (when (eq (lock-process ,lock) *current-process*)
 		   (setf (lock-process ,lock) nil)))))))
+
