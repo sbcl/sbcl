@@ -45,6 +45,7 @@
  (:integer f-ok "F_OK")
 
  ;; mmap()
+ (:type off-t "off_t")
  (:integer prot-none "PROT_NONE" "mmap: no protection")
  (:integer prot-read "PROT_READ" "mmap: read protection")
  (:integer prot-write "PROT_WRITE" "mmap: write protection")

@@ -104,26 +104,18 @@
     (setf (result-state-num-results state) (1+ num-results))
     (my-make-wired-tn 'single-float 'single-reg (* num-results 2))))
 
-#+nil ;;pfw obsolete now?
-(define-alien-type-method (values :result-tn) (type state)
-  (mapcar (lambda (type)
-	    (invoke-alien-type-method :result-tn type state))
-	  (alien-values-type-values type)))
-
-;;; pfw - from alpha
 (define-alien-type-method (values :result-tn) (type state)
   (let ((values (alien-values-type-values type)))
-    (when (cdr values)
+    (when (> (length values) 2)
       (error "Too many result values from c-call."))
-    (when values
-      (invoke-alien-type-method :result-tn (car values) state))))
+    (mapcar (lambda (type)
+	      (invoke-alien-type-method :result-tn type state))
+	    values)))
 
 (!def-vm-support-routine make-call-out-tns (type)
   (let ((arg-state (make-arg-state)))
     (collect ((arg-tns))
-      (dolist #+nil ;; this reversed list seems to cause the alien botches!!
-	(arg-type (reverse (alien-fun-type-arg-types type)))
-	(arg-type (alien-fun-type-arg-types type))
+      (dolist (arg-type (alien-fun-type-arg-types type))
 	(arg-tns (invoke-alien-type-method :arg-tn arg-type arg-state)))
       (values (my-make-wired-tn 'positive-fixnum 'any-reg esp-offset)
 	      (* (arg-state-stack-frame-size arg-state) n-word-bytes)

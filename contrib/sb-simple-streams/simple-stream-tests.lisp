@@ -87,8 +87,6 @@
     result)
   t)
 
-;;; FIXME
-#-darwin
 (deftest create-read-mapped-file-1
   ;; Read data via a mapped-file-simple-stream object.
   (let ((result t)

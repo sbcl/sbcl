@@ -1951,6 +1951,8 @@ changes in sbcl-0.8.3 relative to sbcl-0.8.2:
     Kalle Olavi Niemitalo)
   * bug fix: the CLASS-PROTOTYPE of the GENERIC-FUNCTION class is now
     printable.  (reported by Eric Marsden)
+  * bug fix in sb-posix: mmap() now works on systems with a 64-bit
+    off_t, including Darwin and FreeBSD.  (thanks to Andreas Fuchs)
 
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles

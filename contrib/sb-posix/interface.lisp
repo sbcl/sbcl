@@ -83,7 +83,7 @@
   (lambda (res)
     (= (sb-sys:sap-int res) #-alpha #XFFFFFFFF #+alpha #xffffffffffffffff))
   (addr sap-or-nil) (length unsigned) (prot unsigned)
-  (flags unsigned) (fd file-descriptor) (offset int))
+  (flags unsigned) (fd file-descriptor) (offset sb-posix::off-t))
 
 (define-call "munmap" int minusp
   (start sb-sys:system-area-pointer) (length unsigned))
