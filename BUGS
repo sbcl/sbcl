@@ -343,11 +343,6 @@ WORKAROUND:
 	   MERGE also have the same problem.
 	c: (COERCE 'AND 'FUNCTION) returns something related to
 	   (MACRO-FUNCTION 'AND), but ANSI says it should raise an error.
-	d: ELT signals SIMPLE-ERROR if its index argument
-	   isn't a valid index for its sequence argument, but should 
-	   signal TYPE-ERROR instead.
-	e: FILE-LENGTH is supposed to signal a type error when its
-	   argument is not a stream associated with a file, but doesn't.
 	f: (FLOAT-RADIX 2/3) should signal an error instead of 
 	   returning 2.
 	g: (LOAD "*.lsp") should signal FILE-ERROR.
@@ -389,10 +384,6 @@ WORKAROUND:
 
 50:
   type system errors reported by Peter Van Eynde July 25, 2000:
-	a: (SUBTYPEP 'BIGNUM 'INTEGER) => NIL, NIL
-	   but should be (VALUES T T) instead.
-	b: (SUBTYPEP 'EXTENDED-CHAR 'CHARACTER) => NIL, NIL
-	   but should be (VALUES T T) instead.
 	c: (SUBTYPEP '(INTEGER (0) (0)) 'NIL) dies with nested errors.
 	d: In general, the system doesn't like '(INTEGER (0) (0)) -- it
 	   blows up at the level of SPECIFIER-TYPE with
@@ -402,8 +393,6 @@ WORKAROUND:
 	   "Component type for Complex is not numeric: (EQL 0)."
 	   This might be easy to fix; the type system already knows
 	   that (SUBTYPEP '(EQL 0) 'NUMBER) is true.
-	f: The type system doesn't know about the condition system,
-	   so that e.g. (TYPEP 'SIMPLE-ERROR 'ERROR)=>NIL.
 	g: The type system isn't all that smart about relationships
 	   between hairy types, as shown in the type.erg test results,
 	   e.g. (SUBTYPEP 'CONS '(NOT ATOM)) => NIL, NIL.
@@ -429,14 +418,6 @@ WORKAROUND:
   several metaobject protocol "errors". (In order to fix them, we might
   need to document exactly what metaobject protocol specification
   we're following -- the current code is just inherited from PCL.)
-
-53:
-  another error from Peter Van Eynde 5 September 2000:
-  (FORMAT NIL "~F" "FOO") should work, but instead reports an error.
-  PVE submitted a patch to deal with this bug, but it exposes other
-  comparably serious bugs, so I didn't apply it. It looks as though
-  the FORMAT code needs a fair amount of rewriting in order to comply
-  with the various details of the ANSI spec.
 
 54:
   The implementation of #'+ returns its single argument without
@@ -653,21 +634,6 @@ Error in function C::GET-LAMBDA-TO-COMPILE:
 72:
   (DECLAIM (OPTIMIZE ..)) doesn't work properly inside LOCALLY forms.
 
-74:
-  As noted in the ANSI specification for COERCE, (COERCE 3 'COMPLEX)
-  gives a result which isn't COMPLEX. The result type optimizer
-  for COERCE doesn't know this, perhaps because it was written before
-  ANSI threw this curveball: the optimizer thinks that COERCE always
-  returns a result of the specified type. Thus while the interpreted
-  function
-     (DEFUN TRICKY (X) (TYPEP (COERCE X 'COMPLEX) 'COMPLEX))
-  returns the correct result,
-     (TRICKY 3) => NIL
-  the compiled function
-     (COMPILE 'TRICKY)
-  does not:
-     (TRICKY 3) => T
-
 75:
   As reported by Martin Atzmueller on sbcl-devel 26 Dec 2000,
   ANSI says that WITH-OUTPUT-TO-STRING should have a keyword
@@ -693,9 +659,6 @@ Error in function C::GET-LAMBDA-TO-COMPILE:
   despite Unix" documents, and it would be good to (1) fix this in 
   LOAD-FOREIGN, and (2) hunt for any other code which uses temporary
   files and make it share the same new safe logic.
-
-80:
-  (fixed early Feb 2001 by MNA)
 
 82: 
   Functions are assigned names based on the context in which they're
@@ -866,16 +829,6 @@ Error in function C::GET-LAMBDA-TO-COMPILE:
   the first time around, until regression tests are written I'm not 
   comfortable merging the patches in the CVS version of SBCL.
 
-101:
-  The error message for calls to structure accessors with the
-  wrong number of arguments is confusing and of the wrong
-  condition class (TYPE-ERROR instead of PROGRAM-ERROR):
-    * (defstruct foo x y)
-    * (foo-x)
-    debugger invoked on condition of type SIMPLE-TYPE-ERROR:
-    Structure for accessor FOO-X is not a FOO:
-    301988783
-
 102:
   As reported by Arthur Lemmens sbcl-devel 2001-05-05, ANSI
   requires that SYMBOL-MACROLET refuse to rebind special variables,
@@ -884,13 +837,6 @@ Error in function C::GET-LAMBDA-TO-COMPILE:
   itself, because of the way that **CURRENT-SEGMENT** was implemented.
   As of sbcl-0.6.12.x, this dependence on the nonconforming behavior
   has been fixed, but the nonconforming behavior remains.)
-
-103:
-  As reported by Arthur Lemmens sbcl-devel 2001-05-05, ANSI's
-  definition of (LOOP .. DO ..) requires that the terms following
-  DO all be compound forms. SBCL's implementation of LOOP allows
-  non-compound forms (like the bare symbol COUNT, in his example)
-  here.
 
 104:
   (DESCRIBE 'SB-ALIEN:DEF-ALIEN-TYPE) reports the macro argument list
@@ -909,12 +855,8 @@ Error in function C::GET-LAMBDA-TO-COMPILE:
 
 106:
   (reported by Eric Marsden on cmucl-imp 2001-06-15)
-  Executing 
-    (TYPEP 0 '(COMPLEX (EQL 0)))
-  signals an error in sbcl-0.6.12.34, 
-    The component type for COMPLEX is not numeric: (EQL 0)
-  This is funny since sbcl-0.6.12.34 knows
-    (SUBTYPEP '(EQL 0) 'NUMBER) => T
+  (and APD pointed out on sbcl-devel 2001-12-29 that it's the same
+  as bug 50e)
 
 108:
   (TIME (ROOM T)) reports more than 200 Mbytes consed even for
