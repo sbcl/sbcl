@@ -48,6 +48,8 @@
 
 ;;;; PCL's view of funcallable instances
 
+;;; REMOVEME: old CMU-CL-style code
+#| 
 (defstruct (pcl-funcallable-instance
 	    (:alternate-metaclass sb-kernel:funcallable-instance
 				  sb-kernel:random-pcl-class
@@ -62,6 +64,26 @@
   (pcl-funcallable-instance-slots nil)
   ;; The debug-name for this function.
   (funcallable-instance-name nil))
+|#
+
+(sb-kernel:!defstruct-with-alternate-metaclass pcl-funcallable-instance
+  ;; KLUDGE: Note that neither of these slots is ever accessed by its
+  ;; accessor name as of sbcl-0.pre7.63. Presumably everything works
+  ;; by puns based on absolute locations. Fun fun fun.. -- WHN 2001-10-30
+  :slot-names (clos-slots name)
+  :boa-constructor %make-pcl-funcallable-instance
+  :superclass-name sb-kernel:funcallable-instance
+  :metaclass-name sb-kernel:random-pcl-class
+  :metaclass-constructor sb-kernel:make-random-pcl-class
+  :dd-type sb-kernel:funcallable-structure
+  ;; Only internal implementation code will access these, and these
+  ;; accesses (slot readers in particular) could easily be a
+  ;; bottleneck, so it seems reasonable to suppress runtime type
+  ;; checks.
+  ;;
+  ;; (Except note KLUDGE above that these accessors aren't used at all
+  ;; (!) as of sbcl-0.pre7.63, so for now it's academic.)
+  :runtime-type-checks-p nil)
 
 (import 'sb-kernel:funcallable-instance-p)
 

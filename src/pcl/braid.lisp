@@ -63,7 +63,7 @@
 
 (defun allocate-funcallable-instance (wrapper &optional
 					      (slots-init nil slots-init-p))
-  (let ((fin (allocate-funcallable-instance-1)))
+  (let ((fin (%make-pcl-funcallable-instance nil nil)))
     (set-funcallable-instance-fun
      fin
      #'(sb-kernel:instance-lambda (&rest args)

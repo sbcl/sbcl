@@ -1742,10 +1742,10 @@
 			    ,delayed-layout-form)
 		      ,object-gensym)
 		   '%instance-ref))
-	  (funcallable-instance
+	  (funcallable-structure
 	   (values `(%make-funcallable-instance ,dd-length
 						,delayed-layout-form)
-		   '%funcallable-instance-ref)))
+		   '%funcallable-instance-info)))
       (/show dd raw-maker-form raw-reffer-operator)
       `(progn
 

@@ -22,7 +22,7 @@
    ARGUMENTS. If the condition is not handled, NIL is returned. If
    (TYPEP condition *BREAK-ON-SIGNALS*) is true, the debugger is invoked
    before any signalling is done."
-  (/show0 "entering SIGNAL")
+  (/noshow0 "entering SIGNAL")
   (let ((condition (coerce-to-condition datum
 					arguments
 					'simple-condition
@@ -31,23 +31,23 @@
     (let ((old-bos *break-on-signals*)
 	  (*break-on-signals* nil))
       (when (typep condition old-bos)
-	(/show0 "doing BREAK in because of *BREAK-ON-SIGNALS*")
+	(/noshow0 "doing BREAK in because of *BREAK-ON-SIGNALS*")
 	(break "~A~%BREAK was entered because of *BREAK-ON-SIGNALS* (now NIL)."
 	       condition)))
     (loop
       (unless *handler-clusters*
-	(/show0 "leaving LOOP because of unbound *HANDLER-CLUSTERS*")
+	(/noshow0 "leaving LOOP because of unbound *HANDLER-CLUSTERS*")
 	(return))
       (let ((cluster (pop *handler-clusters*)))
-	(/show0 "got CLUSTER=..")
-	(/hexstr cluster)
+	(/noshow0 "got CLUSTER=..")
+	(/nohexstr cluster)
 	(dolist (handler cluster)
-	  (/show0 "looking at HANDLER=..")
-	  (/hexstr handler)
+	  (/noshow0 "looking at HANDLER=..")
+	  (/nohexstr handler)
 	  (when (typep condition (car handler))
 	    (funcall (cdr handler) condition)))))
     
-    (/show0 "returning from SIGNAL")
+    (/noshow0 "returning from SIGNAL")
     nil))
 
 ;;; COERCE-TO-CONDITION is used in SIGNAL, ERROR, CERROR, WARN, and

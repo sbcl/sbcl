@@ -766,10 +766,14 @@
 ;;; Macroexpand FORM in the current environment with an error handler.
 ;;; We only expand one level, so that we retain all the intervening
 ;;; forms in the source path.
-(defun preprocessor-macroexpand (form)
+(defun preprocessor-macroexpand-1 (form)
   (handler-case (sb!xc:macroexpand-1 form *lexenv*)
     (error (condition)
-       (compiler-error "(during macroexpansion)~%~A" condition))))
+      (compiler-error "(during macroexpansion of ~A)~%~A"
+		      (let ((*print-level* 1)
+			    (*print-length* 2))
+			(format nil "~S" form))
+		      condition))))
 
 ;;; Process a PROGN-like portion of a top-level form. FORMS is a list of
 ;;; the forms, and PATH is the source path of the FORM they came out of.
@@ -1048,7 +1052,7 @@
 		      ;; cross-compilation host.)
 		      (slightly-uncrossed (cons (uncross (first form))
 						(rest form)))
-		      (expanded (preprocessor-macroexpand slightly-uncrossed)))
+		      (expanded (preprocessor-macroexpand-1 slightly-uncrossed)))
 		 (if (eq expanded slightly-uncrossed)
 		     ;; (Now that we're no longer processing toplevel
 		     ;; forms, and hence no longer need to worry about
@@ -1066,7 +1070,7 @@
 	      ;; Top Level Forms".
 	      #-sb-xc-host
 	      (t
-	       (let ((expanded (preprocessor-macroexpand form)))
+	       (let ((expanded (preprocessor-macroexpand-1 form)))
 		 (cond ((eq expanded form)
 			(when compile-time-too
 			  (eval form))
