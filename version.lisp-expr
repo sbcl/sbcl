@@ -16,4 +16,4 @@
 ;;; four numeric fields, is used for versions which aren't released
 ;;; but correspond only to CVS tags or snapshots.
 
-"0.6.12.43"
+"0.6.12.44"
