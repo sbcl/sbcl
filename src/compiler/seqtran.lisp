@@ -751,8 +751,28 @@
 			      :important t)
   "expand inline"
   '(%find-position-if (let ((test-fun (%coerce-callable-to-function test)))
+			;; I'm having difficulty believing I'm
+			;; reading it right, but as far as I can see,
+			;; the only guidance that ANSI gives for the
+			;; order of arguments to asymmetric tests is
+			;; the character-set dependent example from
+			;; the definition of FIND,
+			;;   (find #\d "here are some.." :test #'char>)
+			;;     => #\Space
+			;; (In ASCII, we have (CHAR> #\d #\SPACE)=>T.)
+			;; (Neither the POSITION definition page nor
+			;; section 17.2 ("Rules about Test Functions")
+			;; seem to consider the possibility of
+			;; asymmetry.)
+			;;
+			;; So, judging from the example, we want to
+			;; do (FUNCALL TEST-FUN ITEM I), because
+			;; (FUNCALL #'CHAR> #\d #\SPACE)=>T.
+			;;
+			;; -- WHN (whose attention was drawn to it by
+			;;         Alexey Dejneka's bug report/fix)
 			(lambda (i)
-			  (funcall test-fun i item)))
+			  (funcall test-fun item i)))
 		      sequence
 		      from-end
 		      start
@@ -810,6 +830,9 @@
      start
      end
      element
+     ;; (See the LIST transform for a discussion of the correct
+     ;; argument order, i.e. whether the searched-for ,ITEM goes before
+     ;; or after the checked sequence element.)
      `(funcall ,test ,item (funcall ,key ,element)))))
 
 (def!macro %find-position-if-vector-macro (predicate sequence

@@ -868,24 +868,28 @@
   (when (fboundp symbol)
     (write-string " (fbound)")))
 
-(defun apropos-list (string-designator &optional package external-only)
+(defun apropos-list (string-designator
+		     &optional
+		     package-designator
+		     external-only)
   #!+sb-doc
   "Like APROPOS, except that it returns a list of the symbols found instead
   of describing them."
-  (if package
-    (let ((string (stringify-name string-designator "APROPOS search"))
-	  (result nil))
-      (do-symbols (symbol package)
-	(when (and (eq (symbol-package symbol) package)
-		   (or (not external-only)
-		       (eq (find-symbol (symbol-name symbol) package)
-			   :external))
-		   (search string (symbol-name symbol) :test #'char-equal))
-	  (push symbol result)))
-      result)
-    (mapcan (lambda (package)
-	      (apropos-list string-designator package external-only))
-	    (list-all-packages))))
+  (if package-designator
+      (let ((package (find-undeleted-package-or-lose package-designator))
+	    (string (stringify-name string-designator "APROPOS search"))
+	    (result nil))
+	(do-symbols (symbol package)
+	  (when (and (eq (symbol-package symbol) package)
+		     (or (not external-only)
+			 (eq (find-symbol (symbol-name symbol) package)
+			     :external))
+		     (search string (symbol-name symbol) :test #'char-equal))
+	    (push symbol result)))
+	result)
+      (mapcan (lambda (package)
+		(apropos-list string-designator package external-only))
+	      (list-all-packages))))
 
 (defun apropos (string-designator &optional package external-only)
   #!+sb-doc

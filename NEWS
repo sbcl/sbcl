@@ -893,7 +893,8 @@ changes in sbcl-0.7.0 relative to sbcl-0.6.13:
 * Martin Atzmueller fixed several other bugs:
   ** correct ERROR type for various file operations
   ** removing dead code
-* Alexey Dejneka fixed many bugs:
+* Alexey Dejneka fixed many bugs, both classic bugs and bugs he
+  discovered himself:
   ** misbehavior of WRITE-STRING/WRITE-LINE
   ** LOOP over keys of a hash table, LOOP bugs 49b and 81 and 103, and
      several other LOOP problems as well
@@ -901,6 +902,8 @@ changes in sbcl-0.7.0 relative to sbcl-0.6.13:
   ** DEFGENERIC with :METHOD options
   ** bug 126, in (MAKE-STRING N :INITIAL-ELEMENT #\SPACE))
   ** bug in the optimization of ARRAY-ELEMENT-TYPE
+  ** argument ordering in FIND with :TEST option
+  ** mishandled package designator argument in APROPOS-LIST
   He also pointed out some bogus old entries in BUGS, and fixed 
   a number of bugs which came into existence in the pre7 branch
   (internal to the CVS repository), so that they never showed

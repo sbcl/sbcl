@@ -94,6 +94,15 @@
 (defun indiscriminate (fun)
   (lambda (&rest rest) (apply fun rest)))
   
+;;; asymmetric test arg order example from ANSI FIND definition page
+(assert (eql #\space ; original example, depends on ASCII character ordering
+	     (find #\d "here are some letters that can be looked at"
+		   :test #'char>)))
+(assert (eql #\e ; modified example, depends only on standard a-z ordering
+	     (find #\f "herearesomeletters" :test #'char>)))
+(assert (eql 4 ; modified more, avoids charset technicalities completely
+	     (find 5 '(6 4) :test '>)))
+
 ;;; tests of FIND, POSITION, FIND-IF, and POSITION-IF (and a few for
 ;;; deprecated FIND-IF-NOT and POSITION-IF-NOT too)
 (for-every-seq #()
@@ -109,6 +118,9 @@
     (null (position-if-not #'packagep seq :key nil))))
 (for-every-seq #(1)
   '((null (find 2 seq))
+    ;; Get the argument ordering for asymmetric tests like #'> right.
+    ;; (bug reported and fixed by Alexey Dejneka sbcl-devel 2001-10-17)
+    (eql 1 (find 2 seq :test #'>))
     (find 2 seq :key #'1+)
     (find 1 seq :from-end t)
     (null (find 1 seq :from-end t :start 1))
@@ -122,6 +134,7 @@
 (for-every-seq #(1 2 3 2 1)
   '((find 3 seq)
     (find 3 seq :from-end 'yes)
+    (eql 1 (position 1.5 seq :test #'<))
     (eql 0 (position 0 seq :key '1-))
     (eql 4 (position 0 seq :key '1- :from-end t))
     (eql 2 (position 4 seq :key '1+))
