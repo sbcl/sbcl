@@ -36,16 +36,19 @@ that it's indirected through a page on CLiki, any malicious third party
 doesn't even need to hack the distribution server to replace the
 package with something else: he can just edit the link.  
 
-For this reason, we encourage package providers to crypto-sign their
-packages (see details at the URL in the PACKAGE CREATION section) and
-users to check the signatures.  asdf-install has three levels of
-automatic signature checking: "on", "off" and "unknown sites", which
-can be set using the configuration variables described in
-CUSTOMIZATION below.  The default is "unknown sites", which will
-expect a GPG signature on all downloads except those from
-presumed-good sites.  The current default presumed-good sites are
-CCLAN nodes, and two web sites run by SBCL maintainers: again, see
-below for customization details
+For this reason, we strongly recommend that package providers use PGP
+or GPG to crypto-sign their packages (see details at the URL in the
+PACKAGE CREATION section) and that users check the signatures.
+asdf-install makes three checks
+
+ 1) that the signature exists
+
+ 2) that there is a GPG trust relationship between the package signer
+    and the installer (i.e. that the package comes from someone whose
+    key you've signed, or someone else you have GPG trust with has signed)
+
+ 3) that the signature is one of the ones listed in
+    $HOME/.sbcl/trusted-uids.lisp as a valid supplier of Lisp code.
 
 
 = CUSTOMIZATION
@@ -62,16 +65,9 @@ Presently these are
 *SBCL-HOME*
    Set from $SBCL_HOME environment variable.  This should already be 
    correct for whatever SBCL is running, if it's been installed correctly
-*VERIFY-GPG-SIGNATURES*
-   Verify GPG signatures for the downloaded packages?
-   NIL - no, T - yes, :UNKNOWN-LOCATIONS - only for URLs which aren't in CCLAN
-   and don't begin with one of the prefixes in *SAFE-URL-PREFIXES*
 *LOCATIONS*
    Possible places in the filesystem to install packages into.  See default
    value for format
-*SAFE-URL-PREFIXES* 
-   List of locations for which GPG signature checking /won't/ be done when
-   *verify-gpg-signatures* is :unknown-locations
 
 
 = PACKAGE CREATION

@@ -326,6 +326,7 @@
 			     (unless restart-p (return))))))))
 	     (one-iter packages)))
       (let ((p (merge-pathnames "trusted-uids.lisp" *dot-sbcl*)))
+	(ensure-directories-exist p)
 	(with-open-file (out p :direction :output)
 	  (with-standard-io-syntax
 	    (prin1 *trusted-uids* out))))
