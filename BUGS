@@ -1294,3 +1294,84 @@ WORKAROUND:
        ,@(loop for x across sb-vm:*specialized-array-element-type-properties*
                collect `(array ,(sb-vm:saetp-specifier x)))))
     => NIL, T (when it should be T, T)
+
+307: "Problem in obsolete instance protocol"
+    (reported by Bruno Haible as the fourth problem in sbcl-devel 
+    "installing sbcl" 2004-04-15)
+
+  (progn
+    (defclass foo92b (foo92a) ((s :initarg :s)))
+    (defclass foo92a () ())
+    (let ((x (make-instance 'foo92b :s 5)) (update-counter 0))
+      (defclass foo92b (foo92a) ((s) (s1) (s2))) ; still subclass of foo92a
+      (slot-value x 's)
+      (defmethod update-instance-for-redefined-class 
+          ((object foo92b) added-slots discarded-slots plist &rest initargs)
+        (incf update-counter))
+      (make-instances-obsolete 'foo92a)
+      (slot-value x 's)
+      update-counter))
+  => 0 ; should be 1
+
+308: "Characters without names"
+    (reported by Bruno Haible sbcl-devel "character names are missing"
+    2004-04-19)
+  (graphic-char-p (code-char 255))
+  => NIL
+  (char-name (code-char 255))
+  => NIL
+
+  SBCL is unsure of what to do about characters with codes in the
+  range 128-255.  Currently they are treated as non-graphic, but don't
+  have names, which is not compliant with the standard.  Various fixes
+  are possible, such as
+  * giving them names such as NON-ASCII-128;
+  * reducing CHAR-CODE-LIMIT to 127 (almost certainly unpopular);
+  * making the characters graphic (makes a certain amount of sense);
+  * biting the bullet and implementing Unicode (probably quite hard).
+
+309: "Dubious values for implementation limits"
+    (reported by Bruno Haible sbcl-devel "Incorrect value of
+    multiple-values-limit" 2004-04-19)
+  (values-list (make-list 1000000)), on x86/linux, signals a stack
+  exhaustion condition, despite MULTIPLE-VALUES-LIMIT being
+  significantly larger than 1000000.  There are probably similar
+  dubious values for CALL-ARGUMENTS-LIMIT (see cmucl-help/cmucl-imp
+  around the same time regarding a call to LIST on sparc with 1000
+  arguments) and other implementation limit constants.
+
+310: "Floating point printing inaccuracy"
+    (reported by Bruno Haible sbcl-devel "print-read consistency for 
+    floating point numbers" 2004-04-19)
+  (let ((x (/ -9.349640046247849d-21 -9.381494249123696d-11)))
+    (let ((y (read-from-string (write-to-string x :readably t))))
+      (eql x y)))
+  should return T but, as of sbcl-0.8.9.51, returns NIL.
+
+  That this is a bug in the printer is demonstrated by
+    (setq x1 (float -5496527/100000000000000000))
+    (setq x2 (float -54965272/1000000000000000000))
+    (integer-decode-float x1) => 15842660 -58 -1
+    (integer-decode-float x2) => 15842661 -58 -1
+    (prin1-to-string x1) => "-5.496527e-11"
+    (prin1-to-string x2) => "-5.496527e-11" ; should be different!
+
+  Note also the following comment from src/code/print.lisp:
+    ;;; NOTE: When a number is to be printed in exponential format, it is
+    ;;; scaled in floating point. Since precision may be lost in this
+    ;;; process, the guaranteed accuracy properties of FLONUM-TO-STRING
+    ;;; are lost. The difficulty is that FLONUM-TO-STRING performs
+    ;;; extensive computations with integers of similar magnitude to that
+    ;;; of the number being printed. For large exponents, the bignums
+    ;;; really get out of hand. If bignum arithmetic becomes reasonably
+    ;;; fast and the exponent range is not too large, then it might become
+    ;;; attractive to handle exponential notation with the same accuracy
+    ;;; as non-exponential notation, using the method described in the
+    ;;; Steele and White paper.
+
+311: "Tokeniser not thread-safe"
+    (see also Robert Marlow sbcl-help "Multi threaded read chucking a
+    spak" 2004-04-19)
+  The tokenizer's use of *read-buffer* and *read-buffer-length* causes
+  spurious errors should two threads attempt to tokenise at the same
+  time.
