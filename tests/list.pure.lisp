@@ -117,3 +117,10 @@
                                                            (list 4 1 3 3))
                                         #'<))
                '(2 4)))
+
+;;; Bug reported by Adam Warner: valid list index designator is not
+;;; necessary a fixnum
+(let ((s (read-from-string "(a . #1=(b c . #1#))")))
+  (assert (eq (nth (* 1440 most-positive-fixnum) s) 'c))
+  (setf (nth (* 1440 most-positive-fixnum) s) 14)
+  (assert (eq (nth (* 1440 most-positive-fixnum) s) 14)))

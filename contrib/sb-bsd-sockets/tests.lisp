@@ -135,7 +135,7 @@ Tests are in the file <tt>tests.lisp</tt> and also make good examples.
 
 #-sunos
 (deftest simple-local-client
-    (let ((s (make-instance 'local-socket :type :datagram)))
+    (let ((s (make-instance 'local-socket :type :stream)))
       (format t "~A~%" s)
       (socket-connect s "/dev/log")
       (let ((stream (socket-make-stream s :input t :output t :buffering :none)))

@@ -684,8 +684,8 @@
   (foldable flushable call))
 (defknown endp (list) boolean (foldable flushable movable))
 (defknown list-length (list) (or index null) (foldable unsafely-flushable))
-(defknown nth (index list) t (foldable flushable))
-(defknown nthcdr (index list) t (foldable unsafely-flushable))
+(defknown nth (unsigned-byte list) t (foldable flushable))
+(defknown nthcdr (unsigned-byte list) t (foldable unsafely-flushable))
 (defknown last (list &optional index) t (foldable flushable))
 (defknown list (&rest t) list (movable flushable unsafe))
 (defknown list* (t &rest t) t (movable flushable unsafe))
@@ -1413,7 +1413,7 @@
 (defknown (setf fdocumentation) ((or string null) t symbol)
   (or string null)
   ())
-(defknown %setnth (index list t) t (unsafe))
+(defknown %setnth (unsigned-byte list t) t (unsafe))
 (defknown %set-fill-pointer (vector index) index (unsafe))
 
 ;;;; miscellaneous internal utilities

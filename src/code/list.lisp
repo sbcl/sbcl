@@ -211,13 +211,22 @@
   (cdr list))
 
 (defun nthcdr (n list)
-  (declare (type index n))
   #!+sb-doc
   "Performs the cdr function n times on a list."
-  (do ((i n (1- i))
-       (result list (cdr result)))
-      ((not (plusp i)) result)
-      (declare (type index i))))
+  (flet ((fast-nthcdr (n list)
+           (declare (type index n))
+           (do ((i n (1- i))
+                (result list (cdr result)))
+               ((not (plusp i)) result)
+             (declare (type index i)))))
+    (typecase n
+      (index (fast-nthcdr n list))
+      (t (do ((i 0 (1+ i))
+              (r-i list (cdr r-i))
+              (r-2i list (cddr r-2i)))
+             ((and (eq r-i r-2i) (not (zerop i)))
+              (fast-nthcdr (mod n i) r-i))
+           (declare (type index i)))))))
 
 (defun last (list &optional (n 1))
   #!+sb-doc
@@ -468,15 +477,21 @@
 
 ;;; Set the Nth element of LIST to NEWVAL.
 (defun %setnth (n list newval)
-  (declare (type index n))
-  (do ((count n (1- count))
-       (list list (cdr list)))
-      ((endp list)
-       (error "~S is too large an index for SETF of NTH." n))
-    (declare (type fixnum count))
-    (when (<= count 0)
-      (rplaca list newval)
-      (return newval))))
+  (typecase n
+    (index
+     (do ((count n (1- count))
+          (list list (cdr list)))
+         ((endp list)
+          (error "~S is too large an index for SETF of NTH." n))
+       (declare (type fixnum count))
+       (when (<= count 0)
+         (rplaca list newval)
+         (return newval))))
+    (t (let ((cons (nthcdr n list)))
+         (when (endp cons)
+           (error "~S is too large an index for SETF of NTH." n))
+         (rplaca cons newval)
+         newval))))
 
 ;;;; :KEY arg optimization to save funcall of IDENTITY
 
