@@ -170,7 +170,12 @@
   (assert (null (ignore-errors
                   (setf (slot-value (make-condition 'condition-foo1) 'x)
                           11))))
-  
+  (assert (subtypep 'error 't))
+  (assert (subtypep 'simple-condition 'condition))
+  (assert (subtypep 'simple-error 'simple-condition))
+  (assert (subtypep 'simple-error 'error))
+  (assert (not (subtypep 'condition 'simple-condition)))
+  (assert (not (subtypep 'error 'simple-error)))
   (assert (eq (car (sb-kernel:class-direct-superclasses (find-class
                                                          'simple-condition)))
               (find-class 'condition)))
@@ -183,6 +188,7 @@
                                                   'simple-condition))
                  (mapcar #'sb-pcl:find-class '(simple-type-error simple-error
                                                sb-int:simple-style-warning)))))
+
   ;; precedence lists
   (assert (equal (sb-pcl:class-precedence-list
                   (sb-pcl:find-class 'simple-condition))
@@ -217,7 +223,10 @@
 					       standard-object
                                                sb-pcl::std-object
                                                sb-pcl::slot-object stream
-                                               sb-kernel:instance t)))))
+                                               sb-kernel:instance t))))
+  (assert (subtypep (find-class 'stream) (find-class t)))
+  (assert (subtypep (find-class 'fundamental-stream) 'stream))
+  (assert (not (subtypep 'stream 'fundamental-stream))))
 
 ;;; inline-type tests:
 ;;; Test the interpreted version.

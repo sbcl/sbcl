@@ -514,7 +514,130 @@
 
   (values))
 ); EVAL-WHEN
+
+;;; Arrange the inherited layouts to appear at their expected depth,
+;;; ensuring that hierarchical type tests succeed. Layouts with a
+;;; specific depth are placed first, then the non- hierarchical
+;;; layouts fill remaining elements. Any empty elements are filled
+;;; with layout copies ensuring that all elements have a valid layout.
+;;; This re-ordering may destroy CPL ordering so the inherits should
+;;; not be read as being in CPL order, and further duplicates may be
+;;; introduced.
+(defun order-layout-inherits (layouts)
+  (declare (simple-vector layouts))
+  (let ((length (length layouts))
+	(max-depth -1))
+    (dotimes (i length)
+      (let ((depth (layout-depthoid (svref layouts i))))
+	(when (> depth max-depth)
+	  (setf max-depth depth))))
+    (let* ((new-length (max (1+ max-depth) length))
+	   (inherits (make-array new-length)))
+      (dotimes (i length)
+	(let* ((layout (svref layouts i))
+	       (depth (layout-depthoid layout)))
+	  (unless (eql depth -1)
+	    (let ((old-layout (svref inherits depth)))
+	      (unless (or (eql old-layout 0) (eq old-layout layout))
+		(error "layout depth conflict: ~S~%" layouts)))
+	    (setf (svref inherits depth) layout))))
+      (do ((i 0 (1+ i))
+	   (j 0))
+	  ((>= i length))
+	(declare (type index i j))
+	(let* ((layout (svref layouts i))
+	       (depth (layout-depthoid layout)))
+	  (when (eql depth -1)
+	    (loop (when (eql (svref inherits j) 0)
+		    (return))
+		  (incf j))
+	    (setf (svref inherits j) layout))))
+      (do ((i (1- new-length) (1- i)))
+	  ((< i 0))
+	(declare (type fixnum i))
+	(when (eql (svref inherits i) 0)
+	  (setf (svref inherits i) (svref inherits (1+ i)))))
+      inherits)))
 
+;;;; class precedence lists
+
+;;; Topologically sort the list of objects to meet a set of ordering
+;;; constraints given by pairs (A . B) constraining A to precede B.
+;;; When there are multiple objects to choose, the tie-breaker
+;;; function is called with both the list of object to choose from and
+;;; the reverse ordering built so far.
+(defun topological-sort (objects constraints tie-breaker)
+  (declare (list objects constraints)
+	   (function tie-breaker))
+  (let ((obj-info (make-hash-table :size (length objects)))
+	(free-objs nil)
+	(result nil))
+    (dolist (constraint constraints)
+      (let ((obj1 (car constraint))
+	    (obj2 (cdr constraint)))
+	(let ((info2 (gethash obj2 obj-info)))
+	  (if info2
+	      (incf (first info2))
+	      (setf (gethash obj2 obj-info) (list 1))))
+	(let ((info1 (gethash obj1 obj-info)))
+	  (if info1
+	      (push obj2 (rest info1))
+	      (setf (gethash obj1 obj-info) (list 0 obj2))))))
+    (dolist (obj objects)
+      (let ((info (gethash obj obj-info)))
+	(when (or (not info) (zerop (first info)))
+	  (push obj free-objs))))
+    (loop
+     (flet ((next-result (obj)
+	      (push obj result)
+	      (dolist (successor (rest (gethash obj obj-info)))
+		(let* ((successor-info (gethash successor obj-info))
+		       (count (1- (first successor-info))))
+		  (setf (first successor-info) count)
+		  (when (zerop count)
+		    (push successor free-objs))))))
+       (cond ((endp free-objs)
+	      (dohash (obj info obj-info)
+		(unless (zerop (first info))
+		  (error "Topological sort failed due to constraint on ~S."
+			 obj)))
+	      (return (nreverse result)))
+	     ((endp (rest free-objs))
+	      (next-result (pop free-objs)))
+	     (t
+	      (let ((obj (funcall tie-breaker free-objs result)))
+		(setf free-objs (remove obj free-objs))
+		(next-result obj))))))))
+
+
+;;; standard class precedence list computation
+(defun std-compute-class-precedence-list (class)
+  (let ((classes nil)
+	(constraints nil))
+    (labels ((note-class (class)
+	       (unless (member class classes)
+		 (push class classes)
+		 (let ((superclasses (class-direct-superclasses class)))
+		   (do ((prev class)
+			(rest superclasses (rest rest)))
+		       ((endp rest))
+		     (let ((next (first rest)))
+		       (push (cons prev next) constraints)
+		       (setf prev next)))
+		   (dolist (class superclasses)
+		     (note-class class)))))
+	     (std-cpl-tie-breaker (free-classes rev-cpl)
+	       (dolist (class rev-cpl (first free-classes))
+		 (let* ((superclasses (class-direct-superclasses class))
+			(intersection (intersection free-classes
+						    superclasses)))
+		   (when intersection
+		     (return (first intersection)))))))
+      (note-class class)
+      (topological-sort classes constraints #'std-cpl-tie-breaker))))
+
+;;;; object types to represent classes
+
 ;;; An UNDEFINED-CLASS is a cookie we make up to stick in forward
 ;;; referenced layouts. Users should never see them.
 (def!struct (undefined-class (:include #-sb-xc sb!xc:class
@@ -1069,9 +1192,9 @@
 		generic-number)
      :codes (#.sb!vm:bignum-type))
     (stream
-     :hierarchical-p nil
      :state :read-only
-     :inherits (instance t)))))
+     :depth 3
+     :inherits (instance)))))
 
 ;;; comment from CMU CL:
 ;;;   See also type-init.lisp where we finish setting up the
@@ -1086,6 +1209,7 @@
 	      codes
 	      enumerable
 	      state
+              depth
 	      (hierarchical-p t) ; might be modified below
 	      (direct-superclasses (if inherits
 				     (list (car inherits))
@@ -1108,7 +1232,7 @@
 	(unless trans-p
 	  (setf (info :type :builtin name) class))
 	(let* ((inherits-vector
-		(map 'vector
+		(map 'simple-vector
 		     (lambda (x)
 		       (let ((super-layout
 			      (class-layout (sb!xc:find-class x))))
@@ -1116,7 +1240,9 @@
 			   (setf hierarchical-p nil))
 			 super-layout))
 		     inherits-list))
-	       (depthoid (if hierarchical-p (length inherits-vector) -1)))
+	       (depthoid (if hierarchical-p
+                           (or depth (length inherits-vector))
+                           -1)))
 	  (register-layout
 	   (find-and-init-or-check-layout name
 					  0
@@ -1130,7 +1256,18 @@
 ;;; is loaded and the class defined.
 (!cold-init-forms
   (/show0 "about to define temporary STANDARD-CLASSes")
-  (dolist (x '((fundamental-stream (t instance stream))))
+  (dolist (x '(;; FIXME: The mysterious duplication of STREAM in the
+	       ;; list here here was introduced in sbcl-0.6.12.33, in
+	       ;; MNA's port of DTC's inline-type-tests patches for
+	       ;; CMU CL. I'm guessing that it has something to do
+	       ;; with preallocating just enough space in a table
+	       ;; later used by the final definition of
+	       ;; FUNDAMENTAL-STREAM (perhaps for Gray stream stuff?).
+	       ;; It'd be good to document this weirdness both here
+	       ;; and in the REGISTER-LAYOUT code which has to do the
+	       ;; right thing with the duplicates-containing
+	       ;; INHERITS-LIST.
+	       (fundamental-stream (t instance stream stream))))
     (/show0 "defining temporary STANDARD-CLASS")
     (let* ((name (first x))
 	   (inherits-list (second x))
@@ -1139,7 +1276,7 @@
       (setf (class-cell-class class-cell) class
 	    (info :type :class name) class-cell
 	    (info :type :kind name) :instance)
-      (let ((inherits (map 'vector
+      (let ((inherits (map 'simple-vector
 			   (lambda (x)
 			     (class-layout (sb!xc:find-class x)))
 			   inherits-list)))

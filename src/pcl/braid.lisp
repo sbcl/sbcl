@@ -92,14 +92,8 @@
 ;;;; BOOTSTRAP-META-BRAID
 ;;;;
 ;;;; This function builds the base metabraid from the early class definitions.
-;;;;
-;;;; FIXME: This, like lotso the other stuff in PCL, is not needed in target
-;;;; Lisp, only at bootstrap time. Perhaps we should do something kludgy like
-;;;; putting a special character (#\$, perhaps) at the beginning of each
-;;;; needed-only-at-bootstrap-time symbol and then UNINTERN them all once we're
-;;;; done bootstrapping?
 
-(defmacro initial-classes-and-wrappers (&rest classes)
+(defmacro !initial-classes-and-wrappers (&rest classes)
   `(progn
      ,@(mapcar #'(lambda (class)
 		   (let ((wr (intern (format nil "~A-WRAPPER" class)
@@ -131,7 +125,7 @@
 	 standard-effective-slot-definition
 	 class-eq-specializer-wrapper class-eq-specializer
 	 standard-generic-function-wrapper standard-generic-function)
-    (initial-classes-and-wrappers
+    (!initial-classes-and-wrappers
      standard-class funcallable-standard-class
      slot-class built-in-class structure-class std-class
      standard-direct-slot-definition standard-effective-slot-definition
@@ -536,19 +530,9 @@
 			:metaclass 'structure-class
 			:name symbol
 			:direct-superclasses
-			(cond ;; Handle our CMU-CL-ish structure-based
-			      ;; conditions.
-			      ((cl:subtypep symbol 'condition)
-			       (mapcar #'cl:class-name
-				       (sb-kernel:class-direct-superclasses
-					(cl:find-class symbol))))
-			      ;; a hack to add the STREAM class as a
-			      ;; mixin to the LISP-STREAM class.
-			      ((eq symbol 'sb-kernel:lisp-stream)
-			       '(structure-object stream))
-			      ((structure-type-included-type-name symbol)
-			       (list (structure-type-included-type-name
-				      symbol))))
+                        (mapcar #'cl:class-name
+                                (sb-kernel:class-direct-superclasses
+                                 (cl:find-class symbol)))
 			:direct-slots
 			(mapcar #'slot-initargs-from-structure-slotd
 				(structure-type-slot-description-list
@@ -565,12 +549,13 @@
 	(let* ((default-method-function #'constantly-nil)
 	       (default-method-initargs (list :function
 					      default-method-function))
-	       (default-method (make-a-method 'standard-method
-					      ()
-					      (list 'object)
-					      (list *the-class-t*)
-					      default-method-initargs
-					      "class predicate default method")))
+	       (default-method (make-a-method
+				'standard-method
+				()
+				(list 'object)
+				(list *the-class-t*)
+				default-method-initargs
+				"class predicate default method")))
 	  (setf (method-function-get default-method-function :constant-value)
 		nil)
 	  (add-method gf default-method)))
@@ -593,8 +578,9 @@
   (let ((lclass (sb-kernel:layout-class layout)))
     (unless (eq (sb-kernel:class-layout lclass) layout)
       (setf (sb-kernel:layout-inherits layout)
-	    (map 'vector #'class-wrapper
-		 (reverse (rest (class-precedence-list class)))))
+              (sb-kernel:order-layout-inherits
+               (map 'simple-vector #'class-wrapper
+                    (reverse (rest (class-precedence-list class))))))
       (sb-kernel:register-layout layout :invalidate nil)
 
       ;; Subclasses of formerly forward-referenced-class may be

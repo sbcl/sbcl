@@ -1262,7 +1262,8 @@ is a good idea, but see SB-SYS for blurring of boundaries."
              "MAKE-UNDEFINED-CLASS" "CLASS-DIRECT-SUPERCLASSES" "MAKE-LAYOUT"
              "BYTE-FUNCTION-TYPE"
              "REDEFINE-LAYOUT-WARNING" "SLOT-CLASS"
-             "INSURED-FIND-CLASS"
+             "INSURED-FIND-CLASS" "ORDER-LAYOUT-INHERITS"
+             "STD-COMPUTE-CLASS-PRECEDENCE-LIST"
 
              ;; symbols from former SB!CONDITIONS
              "*HANDLER-CLUSTERS*" "*RESTART-CLUSTERS*"

@@ -44,7 +44,7 @@
 ;;;
 ;;; After the metabraid has been setup, and the protocol for defining
 ;;; classes has been defined, the real definition of LOAD-DEFCLASS is
-;;; installed by the file defclass.lisp
+;;; installed by the file std-class.lisp
 (defmacro defclass (name direct-superclasses direct-slots &rest options)
   (expand-defclass name direct-superclasses direct-slots options))
 

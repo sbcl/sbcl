@@ -266,10 +266,3 @@
 		     (safety 1)
 		     (space 1)
 		     (speed 1)))
-
-;;; FIXME: It would be good to unintern stuff we will no longer need
-;;; before we go on to PURIFY. E.g.
-;;;  * various PCL stuff like INITIAL-CLASSES-AND-WRAPPERS; and
-;;;  * *BUILT-IN-CLASSES* (which can't actually be freed by UNINTERN at
-;;;    this point, since it passed through another PURIFY earlier
-;;;    at cold init time).

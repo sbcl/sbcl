@@ -117,10 +117,15 @@
 				parent-types)))))
 	 (cond-layout (info :type :compiler-layout 'condition))
 	 (olayout (info :type :compiler-layout name))
+	 ;; FIXME: Does this do the right thing in case of multiple
+	 ;; inheritance? A quick look at DEFINE-CONDITION didn't make
+	 ;; it obvious what ANSI intends to be done in the case of
+	 ;; multiple inheritance, so it's not actually clear what the
+	 ;; right thing is..
 	 (new-inherits
-	  (concatenate 'simple-vector
-		       (layout-inherits cond-layout)
-		       (mapcar #'class-layout cpl))))
+	  (order-layout-inherits (concatenate 'simple-vector
+					      (layout-inherits cond-layout)
+					      (mapcar #'class-layout cpl)))))
     (if (and olayout
 	     (not (mismatch (layout-inherits olayout) new-inherits)))
 	olayout
@@ -299,19 +304,10 @@
 
     (setf (sb!xc:find-class name) class)
 
-    ;; Initialize CPL slot from layout.
-    (collect ((cpl))
-      (cpl class)
-      (let ((inherits (layout-inherits layout)))
-	(do ((i (1- (length inherits)) (1- i)))
-	    ((minusp i))
-	  (let ((super (sb!xc:find-class
-			(sb!xc:class-name
-			 (layout-class (svref inherits i))))))
-	    (when (typep super 'condition-class)
-	      (cpl super)))))
-      (setf (condition-class-cpl class) (cpl))))
-
+    ;; Initialize CPL slot.
+    (setf (condition-class-cpl class)
+	  (remove-if-not #'condition-class-p 
+			 (std-compute-class-precedence-list class))))
   (values))
 
 ) ; EVAL-WHEN
