@@ -181,6 +181,15 @@
 ;;; return is NIL, T, because that's completely wrong. ]
 (assert (subtypep '(or integer ratio) 'rational))
 (assert (subtypep 'rational '(or integer ratio)))
-;;; Likewise, these are allowed to return NIL, NIL:
+;;; Likewise, these are allowed to return NIL, NIL, but shouldn't
+;;; return NIL, T:
 (assert (subtypep t '(or real (not real))))
 (assert (subtypep t '(or keyword (not keyword))))
+(assert (subtypep '(and cons (not (cons symbol integer)))
+		  '(or (cons (not symbol) *) (cons * (not integer)))))
+(assert (subtypep '(or (cons (not symbol) *) (cons * (not integer)))
+		  '(and cons (not (cons symbol integer)))))
+(assert (subtypep '(or (eql 0) (rational (0) 10))
+		  '(rational 0 10)))
+(assert (subtypep '(rational 0 10)
+		  '(or (eql 0) (rational (0) 10))))

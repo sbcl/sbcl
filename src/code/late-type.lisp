@@ -1233,9 +1233,9 @@
 
 (!define-type-method (negation :complex-=) (type1 type2)
   ;; (NOT FOO) isn't equivalent to anything that's not a negation
-  ;; type, except possibly a hairy type.
+  ;; type, except possibly a type that might contain it in disguise.
   (declare (ignore type2))
-  (if (hairy-type-p type1)
+  (if (type-might-contain-other-types-p type1)
       (values nil nil)
       (values nil t)))
 
@@ -1336,6 +1336,36 @@
 	      (mapcar #'(lambda (x)
 			  (specifier-type `(not ,(type-specifier x))))
 		      (union-type-types not-type))))
+      ((and (cons-type-p not-type)
+	    (eq (cons-type-car-type not-type) *universal-type*)
+	    (eq (cons-type-cdr-type not-type) *universal-type*))
+       (make-negation-type :type not-type))
+      ((cons-type-p not-type)
+       (type-union
+	(make-negation-type :type (specifier-type 'cons))
+	(cond
+	  ((and (not (eq (cons-type-car-type not-type) *universal-type*))
+		(not (eq (cons-type-cdr-type not-type) *universal-type*)))
+	   (type-union
+	    (make-cons-type
+	     (specifier-type `(not ,(type-specifier
+				     (cons-type-car-type not-type))))
+	     *universal-type*)
+	    (make-cons-type
+	     *universal-type*
+	     (specifier-type `(not ,(type-specifier
+				     (cons-type-cdr-type not-type)))))))
+	  ((not (eq (cons-type-car-type not-type) *universal-type*))
+	   (make-cons-type
+	    (specifier-type `(not ,(type-specifier
+				    (cons-type-car-type not-type))))
+	    *universal-type*))
+	  ((not (eq (cons-type-cdr-type not-type) *universal-type*))
+	   (make-cons-type
+	    *universal-type*
+	    (specifier-type `(not ,(type-specifier
+				    (cons-type-cdr-type not-type))))))
+	  (t (bug "Weird CONS type ~S" not-type)))))
       (t (make-negation-type :type not-type)))))
 
 ;;;; numeric types
@@ -1505,11 +1535,13 @@
 		    (null complexp2)))
 	   (values nil t))
 	  ;; If the classes are specified and different, the types are
-	  ;; disjoint unless type2 is rational and type1 is integer.
+	  ;; disjoint unless type2 is RATIONAL and type1 is INTEGER.
+	  ;; [ or type1 is INTEGER and type2 is of the form (RATIONAL
+	  ;; X X) for integral X, but this is dealt with in the
+	  ;; canonicalization inside MAKE-NUMERIC-TYPE ]
 	  ((not (or (eq class1 class2)
 		    (null class2)
-		    (and (eq class1 'integer)
-			 (eq class2 'rational))))
+		    (and (eq class1 'integer) (eq class2 'rational))))
 	   (values nil t))
 	  ;; If the float formats are specified and different, the types
 	  ;; are disjoint.
@@ -1563,8 +1595,10 @@
 
 ;;; Return a numeric type that is a supertype for both TYPE1 and TYPE2.
 ;;;
-;;; ### Note: we give up early to keep from dropping lots of information on
-;;; the floor by returning overly general types.
+;;; Old comment, probably no longer applicable:
+;;;
+;;;   ### Note: we give up early to keep from dropping lots of
+;;;   information on the floor by returning overly general types.
 (!define-type-method (number :simple-union2) (type1 type2)
   (declare (type numeric-type type1 type2))
   (cond ((csubtypep type1 type2) type2)
@@ -1576,22 +1610,65 @@
 	       (class2 (numeric-type-class type2))
 	       (format2 (numeric-type-format type2))
 	       (complexp2 (numeric-type-complexp type2)))
-	   (when (and (eq class1 class2)
-		      (eq format1 format2)
-		      (eq complexp1 complexp2)
-		      (or (numeric-types-intersect type1 type2)
-			  (numeric-types-adjacent type1 type2)
-			  (numeric-types-adjacent type2 type1)))
-	     (make-numeric-type
-	      :class class1
-	      :format format1
-	      :complexp complexp1
-	      :low (numeric-bound-max (numeric-type-low type1)
-				      (numeric-type-low type2)
-				      <= < t)
-	      :high (numeric-bound-max (numeric-type-high type1)
-				       (numeric-type-high type2)
-				       >= > t)))))))
+	   (cond
+	     ((and (eq class1 class2)
+		   (eq format1 format2)
+		   (eq complexp1 complexp2)
+		   (or (numeric-types-intersect type1 type2)
+		       (numeric-types-adjacent type1 type2)
+		       (numeric-types-adjacent type2 type1)))
+	      (make-numeric-type
+	       :class class1
+	       :format format1
+	       :complexp complexp1
+	       :low (numeric-bound-max (numeric-type-low type1)
+				       (numeric-type-low type2)
+				       <= < t)
+	       :high (numeric-bound-max (numeric-type-high type1)
+					(numeric-type-high type2)
+					>= > t)))
+	     ;; FIXME: These two clauses are almost identical, and the
+	     ;; consequents are in fact identical in every respect.
+	     ((and (eq class1 'rational)
+		   (eq class2 'integer)
+		   (eq format1 format2)
+		   (eq complexp1 complexp2)
+		   (integerp (numeric-type-low type2))
+		   (integerp (numeric-type-high type2))
+		   (= (numeric-type-low type2) (numeric-type-high type2))
+		   (or (numeric-types-adjacent type1 type2)
+		       (numeric-types-adjacent type2 type1)))
+	      (make-numeric-type
+	       :class 'rational
+	       :format format1
+	       :complexp complexp1
+	       :low (numeric-bound-max (numeric-type-low type1)
+				       (numeric-type-low type2)
+				       <= < t)
+	       :high (numeric-bound-max (numeric-type-high type1)
+					(numeric-type-high type2)
+					>= > t)))
+	     ((and (eq class1 'integer)
+		   (eq class2 'rational)
+		   (eq format1 format2)
+		   (eq complexp1 complexp2)
+		   (integerp (numeric-type-low type1))
+		   (integerp (numeric-type-high type1))
+		   (= (numeric-type-low type1) (numeric-type-high type1))
+		   (or (numeric-types-adjacent type1 type2)
+		       (numeric-types-adjacent type2 type1)))
+	      (make-numeric-type
+	       :class 'rational
+	       :format format1
+	       :complexp complexp1
+	       :low (numeric-bound-max (numeric-type-low type1)
+				       (numeric-type-low type2)
+				       <= < t)
+	       :high (numeric-bound-max (numeric-type-high type1)
+					(numeric-type-high type2)
+					>= > t)))
+	     (t nil))))))
+	      
 
 (!cold-init-forms
   (setf (info :type :kind 'number)
@@ -1701,9 +1778,6 @@
 	 (h (canonicalized-bound high 'integer))
 	 (hb (if (consp h) (1- (car h)) h)))
     (if (and hb lb (< hb lb))
-	;; previously we threw an error here:
-	;; (error "Lower bound ~S is greater than upper bound ~S." l h))
-	;; but ANSI doesn't say anything about that, so:
 	*empty-type*
       (make-numeric-type :class 'integer
 			 :complexp :real
@@ -1716,9 +1790,6 @@
      (let ((lb (canonicalized-bound low ',type))
 	   (hb (canonicalized-bound high ',type)))
        (if (not (numeric-bound-test* lb hb <= <))
-	   ;; as above, previously we did
-	   ;; (error "Lower bound ~S is not less than upper bound ~S." low high))
-	   ;; but it is correct to do
 	   *empty-type*
 	 (make-numeric-type :class ',class
 			    :format ',format
@@ -2448,7 +2519,9 @@
 
 (!define-type-method (union :complex-=) (type1 type2)
   (declare (ignore type1))
-  (if (some #'hairy-type-p (union-type-types type2))
+  (if (some #'(lambda (x) (or (hairy-type-p x)
+			      (negation-type-p x)))
+	    (union-type-types type2))
       (values nil nil)
       (values nil t)))
 
@@ -2575,10 +2648,7 @@
 (!def-type-translator cons (&optional (car-type-spec '*) (cdr-type-spec '*))
   (let ((car-type (specifier-type car-type-spec))
 	(cdr-type (specifier-type cdr-type-spec)))
-    (if (or (eq car-type *empty-type*)
-	    (eq cdr-type *empty-type*))
-	*empty-type*
-	(make-cons-type car-type cdr-type))))
+    (make-cons-type car-type cdr-type)))
  
 (!define-type-method (cons :unparse) (type)
   (let ((car-eltype (type-specifier (cons-type-car-type type)))

@@ -195,6 +195,11 @@
 	    (t 
 	     ;; no canonicalization necessary
 	     (values low high)))
+	(when (and (eq class 'rational)
+		   (integerp canonical-low)
+		   (integerp canonical-high)
+		   (= canonical-low canonical-high))
+	  (setf class 'integer))
 	(%make-numeric-type :class class
 			    :format format
 			    :complexp complexp
@@ -302,17 +307,22 @@
 		       ;; possibly elsewhere, we slam all CONS-TYPE
 		       ;; objects into canonical form w.r.t. this
 		       ;; equivalence at creation time.
-		       make-cons-type (car-raw-type
-				       cdr-raw-type
-				       &aux
-				       (car-type (type-*-to-t car-raw-type))
-				       (cdr-type (type-*-to-t cdr-raw-type))))
+		       %make-cons-type (car-raw-type
+					cdr-raw-type
+					&aux
+					(car-type (type-*-to-t car-raw-type))
+					(cdr-type (type-*-to-t cdr-raw-type))))
 		      (:copier nil))
   ;; the CAR and CDR element types (to support ANSI (CONS FOO BAR) types)
   ;;
   ;; FIXME: Most or all other type structure slots could also be :READ-ONLY.
   (car-type (missing-arg) :type ctype :read-only t)
   (cdr-type (missing-arg) :type ctype :read-only t))
+(defun make-cons-type (car-type cdr-type)
+  (if (or (eq car-type *empty-type*)
+	  (eq cdr-type *empty-type*))
+      *empty-type*
+      (%make-cons-type car-type cdr-type)))
 
 ;;;; type utilities
 
