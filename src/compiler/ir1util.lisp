@@ -1458,7 +1458,7 @@
                (flet ((frob (l)
                         (find home l
                               :key #'node-home-lambda
-                              :test-not #'eq)))
+                              :test #'neq)))
                  (or (frob (leaf-refs var))
                      (frob (basic-var-sets var)))))))))
 

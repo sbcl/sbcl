@@ -1056,8 +1056,8 @@
 ;;;     perhaps it's worth optimizing the -if-not versions in the same
 ;;;     way as the others?
 ;;;
-;;; FIXME: Maybe remove uses of these deprecated functions (and
-;;; definitely of :TEST-NOT) within the implementation of SBCL.
+;;; FIXME: Maybe remove uses of these deprecated functions within the
+;;; implementation of SBCL.
 (macrolet ((define-find-position-if-not (fun-name values-index)
 	       `(deftransform ,fun-name ((predicate sequence &key
 					  from-end (start 0)

@@ -498,7 +498,7 @@
 			dupes)))
     (let* ((slot (car slots))
 	   (oslots (remove (slot-definition-name slot) (cdr slots)
-			   :test-not #'string= :key #'slot-definition-name)))
+			   :test #'string/= :key #'slot-definition-name)))
       (when oslots
 	(pushnew (cons (slot-definition-name slot)
 		       (mapcar #'slot-definition-name oslots))

@@ -969,6 +969,7 @@
 
 (defmacro def-bit-array-op (name function)
   `(defun ,name (bit-array-1 bit-array-2 &optional result-bit-array)
+     #!+sb-doc
      ,(format nil
 	      "Perform a bit-wise ~A on the elements of BIT-ARRAY-1 and ~
 	      BIT-ARRAY-2,~%  putting the results in RESULT-BIT-ARRAY. ~

@@ -120,9 +120,9 @@
 	`(:target ,(reg-spec-temp reg)))))
 
 (defun emit-vop (name options vars)
-  (let* ((args (remove :arg vars :key #'reg-spec-kind :test-not #'eq))
-	 (temps (remove :temp vars :key #'reg-spec-kind :test-not #'eq))
-	 (results (remove :res vars :key #'reg-spec-kind :test-not #'eq))
+  (let* ((args (remove :arg vars :key #'reg-spec-kind :test #'neq))
+	 (temps (remove :temp vars :key #'reg-spec-kind :test #'neq))
+	 (results (remove :res vars :key #'reg-spec-kind :test #'neq))
 	 (return-style (or (cadr (assoc :return-style options)) :raw))
 	 (cost (or (cadr (assoc :cost options)) 247))
 	 (vop (make-symbol "VOP")))
@@ -164,7 +164,7 @@
 		  ,@(apply #'append
 			   (mapcar #'cdr
 				   (remove :ignore call-temps
-					   :test-not #'eq :key #'car))))
+					   :test #'neq :key #'car))))
 	 ,@(remove-if (lambda (x)
 			(member x '(:return-style :cost)))
 		      options

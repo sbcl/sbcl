@@ -62,11 +62,17 @@
 ;;;
 ;;; NOTE-NEXT-INSTRUCTION, if supplied, is to be passed to
 ;;; #'NOTE-NEXT-INSTRUCTION.
+;;;
+;;; Until 2004-03-15, the implementation of this was buggy; it
+;;; unconditionally emitted the WAIT instruction.  It turns out that
+;;; this is the right thing to do anyway; omitting them can lead to
+;;; system corruption on conforming code.  -- CSR
 (defun maybe-fp-wait (node &optional note-next-instruction)
+  #+nil
   (when (policy node (or (= debug 3) (> safety speed))))
-    (when note-next-instruction
-      (note-next-instruction note-next-instruction :internal-error))
-    (inst wait))
+  (when note-next-instruction
+    (note-next-instruction note-next-instruction :internal-error))
+  (inst wait))
 
 ;;; complex float stack EAs
 (macrolet ((ea-for-cxf-stack (tn kind slot &optional base)

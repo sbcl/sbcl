@@ -216,7 +216,7 @@
 
 	(dolist (kind '(:variable :function :type))
 	  (let ((summary (mapcar #'undefined-warning-name
-				 (remove kind undefs :test-not #'eq
+				 (remove kind undefs :test #'neq
 					 :key #'undefined-warning-kind))))
 	    (when summary
 	      (if (eq kind :variable)

@@ -61,7 +61,7 @@
   ;; This table parallels the KV table, and can be used to store the
   ;; hash associated with the key, saving recalculation. Could be
   ;; useful for EQL, and EQUAL hash tables. This table is not needed
-  ;; for EQ hash tables, and when present the value of #x8000000
+  ;; for EQ hash tables, and when present the value of #x80000000
   ;; represents EQ-based hashing on the respective key.
   (hash-vector nil :type (or null (simple-array (unsigned-byte 32) (*)))))
 
