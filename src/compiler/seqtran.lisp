@@ -26,25 +26,29 @@
 	  (tests `(endp ,v))
 	  (args-to-fn (if take-car `(car ,v) v))))
 
-      (let ((call `(funcall ,fn . ,(args-to-fn)))
-	    (endtest `(or ,@(tests))))
+      (let* ((fn-sym (gensym))  ; for ONCE-ONLY-ish purposes
+	     (call `(funcall ,fn-sym . ,(args-to-fn)))
+	     (endtest `(or ,@(tests))))
 	(ecase accumulate
 	  (:nconc
 	   (let ((temp (gensym))
 		 (map-result (gensym)))
-	     `(let ((,map-result (list nil)))
+	     `(let ((,fn-sym ,fn)
+		    (,map-result (list nil)))
 		(do-anonymous ((,temp ,map-result) . ,(do-clauses))
 			      (,endtest (cdr ,map-result))
 		  (setq ,temp (last (nconc ,temp ,call)))))))
 	  (:list
 	   (let ((temp (gensym))
 		 (map-result (gensym)))
-	     `(let ((,map-result (list nil)))
+	     `(let ((,fn-sym ,fn)
+		    (,map-result (list nil)))
 		(do-anonymous ((,temp ,map-result) . ,(do-clauses))
 			      (,endtest (cdr ,map-result))
 		  (rplacd ,temp (setq ,temp (list ,call)))))))
 	  ((nil)
-	   `(let ((,n-first ,(first arglists)))
+	   `(let ((,fn-sym ,fn)
+		  (,n-first ,(first arglists)))
 	      (do-anonymous ,(do-clauses)
 			    (,endtest ,n-first) ,call))))))))
 
@@ -933,44 +937,48 @@
 ;;; logic to unravel :TEST, :TEST-NOT, and :KEY options in FIND,
 ;;; POSITION-IF, etc.
 (define-source-transform effective-find-position-test (test test-not)
-  `(cond
-    ((and ,test ,test-not)
-     (error "can't specify both :TEST and :TEST-NOT"))
-    (,test (%coerce-callable-to-fun ,test))
-    (,test-not
-     ;; (Without DYNAMIC-EXTENT, this is potentially horribly
-     ;; inefficient, but since the TEST-NOT option is deprecated
-     ;; anyway, we don't care.)
-     (complement (%coerce-callable-to-fun ,test-not)))
-    (t #'eql)))
+  (once-only ((test test)
+	      (test-not test-not))
+    `(cond
+      ((and ,test ,test-not)
+       (error "can't specify both :TEST and :TEST-NOT"))
+      (,test (%coerce-callable-to-fun ,test))
+      (,test-not
+       ;; (Without DYNAMIC-EXTENT, this is potentially horribly
+       ;; inefficient, but since the TEST-NOT option is deprecated
+       ;; anyway, we don't care.)
+       (complement (%coerce-callable-to-fun ,test-not)))
+      (t #'eql))))
 (define-source-transform effective-find-position-key (key)
-  `(if ,key
-       (%coerce-callable-to-fun ,key)
-       #'identity))
+  (once-only ((key key))
+    `(if ,key
+	 (%coerce-callable-to-fun ,key)
+	 #'identity)))
 
 (macrolet ((define-find-position (fun-name values-index)
-	       `(define-source-transform ,fun-name (item sequence &key
-						    from-end (start 0) end
-						    key test test-not)
-		 `(nth-value ,,values-index
-		   (%find-position ,item ,sequence
-		    ,from-end ,start
-		    ,end
-		    (effective-find-position-key ,key)
-		    (effective-find-position-test ,test ,test-not))))))
+	     `(deftransform ,fun-name ((item sequence &key
+					     from-end (start 0) end
+					     key test test-not))
+		'(nth-value ,values-index
+			    (%find-position item sequence
+					    from-end start
+					    end
+					    (effective-find-position-key key)
+					    (effective-find-position-test
+					     test test-not))))))
   (define-find-position find 0)
   (define-find-position position 1))
 
 (macrolet ((define-find-position-if (fun-name values-index)
-	       `(define-source-transform ,fun-name (predicate sequence &key
-						    from-end (start 0)
-						    end key)
-		 `(nth-value
-		   ,,values-index
-		   (%find-position-if (%coerce-callable-to-fun ,predicate)
-		    ,sequence ,from-end
-		    ,start ,end
-		    (effective-find-position-key ,key))))))
+	     `(deftransform ,fun-name ((predicate sequence &key
+						  from-end (start 0)
+						  end key))
+		'(nth-value
+		  ,values-index
+		  (%find-position-if (%coerce-callable-to-fun predicate)
+				     sequence from-end
+				     start end
+				     (effective-find-position-key key))))))
   (define-find-position-if find-if 0)
   (define-find-position-if position-if 1))
 
@@ -995,14 +1003,14 @@
 ;;; FIXME: Maybe remove uses of these deprecated functions (and
 ;;; definitely of :TEST-NOT) within the implementation of SBCL.
 (macrolet ((define-find-position-if-not (fun-name values-index)
-	       `(define-source-transform ,fun-name (predicate sequence &key
-						    from-end (start 0)
-						    end key)
-		 `(nth-value
-		   ,,values-index
-		   (%find-position-if-not (%coerce-callable-to-fun ,predicate)
-		    ,sequence ,from-end
-		    ,start ,end
-		    (effective-find-position-key ,key))))))
+	       `(deftransform ,fun-name ((predicate sequence &key
+					  from-end (start 0)
+					  end key))
+		 '(nth-value
+		   ,values-index
+		   (%find-position-if-not (%coerce-callable-to-fun predicate)
+		    sequence from-end
+		    start end
+		    (effective-find-position-key key))))))
   (define-find-position-if-not find-if-not 0)
   (define-find-position-if-not position-if-not 1))

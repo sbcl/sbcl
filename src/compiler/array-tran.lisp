@@ -187,13 +187,13 @@
 	 ,n-vec))))
 
 ;;; Just convert it into a MAKE-ARRAY.
-(define-source-transform make-string (length &key
-					     (element-type ''base-char)
-					     (initial-element
-					      '#.*default-init-char-form*))
-  `(make-array (the index ,length)
-	       :element-type ,element-type
-	       :initial-element ,initial-element))
+(deftransform make-string ((length &key
+				   (element-type 'base-char)
+				   (initial-element
+				    #.*default-init-char-form*)))
+  '(make-array (the index length)
+               :element-type element-type
+               :initial-element initial-element))
 
 (defstruct (specialized-array-element-type-properties
 	    (:conc-name saetp-)
