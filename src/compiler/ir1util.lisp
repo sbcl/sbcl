@@ -1247,6 +1247,15 @@
 	  (setf (continuation-asserted-type cont) *wild-type*)
           (setf (continuation-type-to-check cont) *wild-type*)
 	  (values))))))
+
+(defun flush-combination (combination)
+  (declare (type combination combination))
+  (flush-dest (combination-fun combination))
+  (dolist (arg (combination-args combination))
+    (flush-dest arg))
+  (unlink-node combination)
+  (values))
+
 
 ;;;; leaf hackery
 

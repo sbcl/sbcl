@@ -520,10 +520,7 @@
                                                   :lossage-fun nil
                                                   :unwinnage-fun nil))
                               (ir1-attributep attr unsafely-flushable)))
-		 (flush-dest (combination-fun node))
-		 (dolist (arg (combination-args node))
-		   (flush-dest arg))
-		 (unlink-node node))))))
+                 (flush-combination node))))))
 	(mv-combination
 	 (when (eq (basic-combination-kind node) :local)
 	   (let ((fun (combination-lambda node)))
@@ -1272,7 +1269,8 @@
                  (setf (continuation-next cont) next)
                  ;; FIXME: type checking?
                  (reoptimize-continuation cont)
-                 (reoptimize-continuation prev))))
+                 (reoptimize-continuation prev)
+                 (flush-combination call))))
             (t (let ((dummies (make-gensym-list (length args))))
                  (transform-call
                   call
