@@ -2397,6 +2397,13 @@ changes in sbcl-0.8.10 relative to sbcl-0.8.9:
     ** RATIONALIZE works more according to its specification.  (thanks
        to Bruno Haible)
 
+changes in sbcl-0.8.11 relative to sbcl-0.8.10:
+  * fixed bug 313: source-transform for <fun-name> was erroneously
+    applied to a call of a value of a variable with name <fun-name>.
+    (reported by Antonio Menezes Leitao)
+  * on X86 fixed bug 298, revealed by Paul F. Dietz' test suite: SBCL
+    can remove dead unknown-values globs from the middle of the stack.
+
 planned incompatible changes in 0.8.x:
   * (not done yet, but planned:) When the profiling interface settles
     down, it might impact TRACE. They both encapsulate functions, and

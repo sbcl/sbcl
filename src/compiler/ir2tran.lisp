@@ -1210,16 +1210,16 @@
 (defoptimizer (sb!kernel:%caller-frame-and-pc ir2-convert) (() node block)
   (let ((ir2-physenv (physenv-info (node-physenv node))))
     (move-lvar-result node block
-			      (list (ir2-physenv-old-fp ir2-physenv)
-				    (ir2-physenv-return-pc ir2-physenv))
-			      (node-lvar node))))
+                      (list (ir2-physenv-old-fp ir2-physenv)
+                            (ir2-physenv-return-pc ir2-physenv))
+                      (node-lvar node))))
 
 ;;;; multiple values
 
 ;;; This is almost identical to IR2-CONVERT-LET. Since LTN annotates
-;;; the lvarinuation for the correct number of values (with the lvar
-;;; user responsible for defaulting), we can just pick them up from
-;;; the lvar.
+;;; the lvar for the correct number of values (with the lvar user
+;;; responsible for defaulting), we can just pick them up from the
+;;; lvar.
 (defun ir2-convert-mv-bind (node block)
   (declare (type mv-combination node) (type ir2-block block))
   (let* ((lvar (first (basic-combination-args node)))
@@ -1281,6 +1281,28 @@
     (aver (eq (ir2-lvar-kind 2lvar) :unknown))
     (vop reset-stack-pointer node block
 	 (first (ir2-lvar-locs 2lvar)))))
+
+(defoptimizer (%nip-values ir2-convert) ((last-nipped last-preserved &rest moved)
+                                         node block)
+  #!-x86
+  (bug "%NIP-VALUES is not implemented on this platform.")
+  #!+x86
+  (let ((2after (lvar-info (lvar-value last-nipped)))
+                                        ; pointer immediately after the nipped block
+        (2first (lvar-info (lvar-value last-preserved)))
+                                        ; pointer to the first nipped word
+        (moved-tns (loop for lvar-ref in moved
+                         for lvar = (lvar-value lvar-ref)
+                         for 2lvar = (lvar-info lvar)
+                         ;when 2lvar
+                         collect (first (ir2-lvar-locs 2lvar)))))
+    (aver (eq (ir2-lvar-kind 2after) :unknown))
+    (aver (eq (ir2-lvar-kind 2first) :unknown))
+    (vop* %%nip-values node block
+	 ((first (ir2-lvar-locs 2after))
+          (first (ir2-lvar-locs 2first))
+          (reference-tn-list moved-tns nil))
+         ((reference-tn-list moved-tns t)))))
 
 ;;; Deliver the values TNs to LVAR using MOVE-LVAR-RESULT.
 (defoptimizer (values ir2-convert) ((&rest values) node block)

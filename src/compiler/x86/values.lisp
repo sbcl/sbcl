@@ -16,6 +16,35 @@
   (:generator 1
     (move esp-tn ptr)))
 
+(define-vop (%%nip-values)
+  (:args (last-nipped-ptr :scs (any-reg) :target edi)
+         (last-preserved-ptr :scs (any-reg) :target esi)
+         (moved-ptrs :scs (any-reg) :more t))
+  (:results (r-moved-ptrs :scs (any-reg) :more t)
+            ;; same as MOVED-PTRS
+            )
+  (:temporary (:sc any-reg :offset esi-offset) esi)
+  (:temporary (:sc any-reg :offset edi-offset) edi)
+  (:ignore r-moved-ptrs)
+  (:generator 1
+    (move edi last-nipped-ptr)
+    (move esi last-preserved-ptr)
+    (inst sub esi n-word-bytes)
+    (inst sub edi n-word-bytes)
+    (inst cmp esp-tn esi)
+    (inst jmp :a done)
+    (inst std)
+    LOOP
+    (inst movs :dword)
+    (inst cmp esp-tn esi)
+    (inst jmp :be loop)
+    DONE
+    (inst lea esp-tn (make-ea :dword :base edi :disp n-word-bytes))
+    (inst sub edi esi)
+    (loop for moved = moved-ptrs then (tn-ref-across moved)
+          while moved
+          do (inst add (tn-ref-tn moved) edi))))
+
 ;;; Push some values onto the stack, returning the start and number of values
 ;;; pushed as results. It is assumed that the Vals are wired to the standard
 ;;; argument locations. Nvals is the number of values to push.
