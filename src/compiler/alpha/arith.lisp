@@ -172,6 +172,17 @@
 (define-binop logorc2 1 3 ornot (unsigned-byte 6) (unsigned-byte 8) nil t)
 (define-binop logxor 1 3 xor (unsigned-byte 6) (unsigned-byte 8))
 (define-binop logeqv 1 3 eqv (unsigned-byte 6) (unsigned-byte 8) nil t)
+
+;;; special cases for LOGAND where we can use a mask operation
+(define-vop (fast-logand-c-mask/unsigned=>unsigned fast-unsigned-c-binop)
+  (:translate logand)
+  (:arg-types unsigned-num
+	      (:constant (or (integer #xffffffff #xffffffff)
+			     (integer #xffffffff00000000 #xffffffff00000000))))
+  (:generator 1
+    (ecase y
+      (#xffffffff (inst mskll x 4 r))
+      (#xffffffff00000000 (inst mskll x 0 r)))))
 
 ;;;; shifting
 
@@ -527,62 +538,42 @@
       (emit-label done)
       (move res result))))
 
+(define-source-transform 32bit-logical-not (x)
+  `(logand (lognot (the (unsigned-byte 32) ,x)) #.(1- (ash 1 32))))
 
-(define-vop (32bit-logical)
-  (:args (x :scs (unsigned-reg))
-	 (y :scs (unsigned-reg)))
-  (:arg-types unsigned-num unsigned-num)
-  (:results (r :scs (unsigned-reg)))
-  (:result-types unsigned-num)
-  (:policy :fast-safe))
+(deftransform 32bit-logical-and ((x y))
+  '(logand x y))
 
-(define-vop (32bit-logical-not 32bit-logical)
-  (:translate 32bit-logical-not)
-  (:args (x :scs (unsigned-reg)))
-  (:arg-types unsigned-num)
-  (:generator 2
-    (inst not x r)
-    (inst mskll r 4 r)))
+(define-source-transform 32bit-logical-nand (x y)
+  `(32bit-logical-not (32bit-logical-and ,x ,y)))
 
-(define-vop (32bit-logical-and 32bit-logical)
-  (:translate 32bit-logical-and)
-  (:generator 1
-    (inst and x y r)))
+(deftransform 32bit-logical-or ((x y))
+  '(logior x y))
 
-(deftransform 32bit-logical-nand ((x y) (* *))
-  '(32bit-logical-not (32bit-logical-and x y)))
+(define-source-transform 32bit-logical-nor (x y)
+  `(logand (lognor (the (unsigned-byte 32) ,x) (the (unsigned-byte 32) ,y))
+           #.(1- (ash 1 32))))
 
-(define-vop (32bit-logical-or 32bit-logical)
-  (:translate 32bit-logical-or)
-  (:generator 1
-    (inst bis x y r)))
+(deftransform 32bit-logical-xor ((x y))
+  '(logxor x y))
 
-(define-vop (32bit-logical-nor 32bit-logical)
-  (:translate 32bit-logical-nor)
-  (:generator 2
-    (inst ornot x y r)
-    (inst mskll r 4 r)))
+(define-source-transform 32bit-logical-eqv (x y)
+  `(logand (logeqv (the (unsigned-byte 32) ,x) (the (unsigned-byte 32) ,y))
+	   #.(1- (ash 1 32))))
 
-(define-vop (32bit-logical-xor 32bit-logical)
-  (:translate 32bit-logical-xor)
-  (:generator 1
-    (inst xor x y r)))
+(define-source-transform 32bit-logical-orc1 (x y)
+  `(logand (logorc1 (the (unsigned-byte 32) ,x) (the (unsigned-byte 32) ,y))
+	   #.(1- (ash 1 32))))
 
-(deftransform 32bit-logical-eqv ((x y) (* *))
-  '(32bit-logical-not (32bit-logical-xor x y)))
+(define-source-transform 32bit-logical-orc2 (x y)
+  `(logand (logorc2 (the (unsigned-byte 32) ,x) (the (unsigned-byte 32) ,y))
+	   #.(1- (ash 1 32))))
 
-(deftransform 32bit-logical-andc1 ((x y) (* *))
-  '(32bit-logical-and (32bit-logical-not x) y))
+(define-source-transform 32bit-logical-andc1 (x y)
+  `(logandc1 (the (unsigned-byte 32) ,x) (the (unsigned-byte 32) ,y)))
 
-(deftransform 32bit-logical-andc2 ((x y) (* *))
-  '(32bit-logical-and x (32bit-logical-not y)))
-
-(deftransform 32bit-logical-orc1 ((x y) (* *))
-  '(32bit-logical-or (32bit-logical-not x) y))
-
-(deftransform 32bit-logical-orc2 ((x y) (* *))
-  '(32bit-logical-or x (32bit-logical-not y)))
-
+(define-source-transform 32bit-logical-andc2 (x y)
+  `(logandc2 (the (unsigned-byte 32) ,x) (the (unsigned-byte 32) ,y)))
 
 (define-vop (shift-towards-someplace)
   (:policy :fast-safe)
