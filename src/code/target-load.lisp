@@ -13,18 +13,9 @@
 
 (in-package "SB!IMPL")
 
-(defvar *load-source-types* '("lisp" "l" "cl" "lsp")
+(defvar *load-source-default-type* "lisp"
   #!+sb-doc
-  "The source file types which LOAD recognizes.")
-
-(defvar *load-object-types*
-  '(#.sb!c:*backend-fasl-file-type*
-    #.(sb!c:backend-byte-fasl-file-type)
-    "fasl")
-  #!+sb-doc
-  "A list of the object file types recognized by LOAD.")
-
-(declaim (list *load-source-types* *load-object-types*))
+  "The source file types which LOAD looks for by default.")
 
 (defvar *load-truename* nil
   #!+sb-doc
@@ -91,41 +82,34 @@
 	   (internal-load pathname truename if-does-not-exist verbose print
 			  :binary))
 	  (t
-	   (when (member (pathname-type truename)
-			 *load-object-types*
-			 :test #'string=)
+	   (when (string= (pathname-type truename)
+			  sb!c:*backend-fasl-file-type*)
 	     (error "File has a fasl file type, but no fasl file header:~%  ~S"
 		    (namestring truename)))
 	   (internal-load pathname truename if-does-not-exist verbose print
 			  :source))))))))
 
-;;; a helper function for INTERNAL-LOAD-DEFAULT-TYPE
-(defun try-default-types (pathname types lp-type)
-  ;; Modified 18-Jan-97/pw for logical-pathname support.
-  ;;
-  ;; FIXME: How does logical-pathname support interact with
-  ;; *LOAD-SOURCE-TYPES* and *LOAD-OBJECT-TYPES*?
-  (flet ((frob (pathname type)
-	   (let* ((pn (make-pathname :type type :defaults pathname))
-		  (tn (probe-file pn)))
-	     (values pn tn))))
-    (if (typep pathname 'logical-pathname)
-	(frob pathname lp-type)
-	(dolist (type types (values nil nil))
-	  (multiple-value-bind (pn tn) (frob pathname type)
-	    (when tn
-	      (return (values pn tn))))))))
+;;; a helper function for INTERNAL-LOAD-DEFAULT-TYPE: Try the default
+;;; file type TYPE and return (VALUES PATHNAME TRUENAME) for a match,
+;;; or (VALUES PATHNAME NIL) if the file doesn't exist.
+;;;
+;;; This is analogous to CMU CL's TRY-DEFAULT-TYPES, but we only try a
+;;; single type. By avoiding CMU CL's generality here, we avoid having
+;;; to worry about some annoying ambiguities. (E.g. what if the
+;;; possible types are ".lisp" and ".cl", and both "foo.lisp" and
+;;; "foo.cl" exist?)
+(defun try-default-type (pathname type)
+  (let ((pn (make-pathname :type type :defaults pathname)))
+    (values pn (probe-file pn))))
 
-;;; a helper function for LOAD: Handle the case of INTERNAL-LOAD where the file
-;;; does not exist.
+;;; a helper function for LOAD: Handle the case of INTERNAL-LOAD where
+;;; the file does not exist.
 (defun internal-load-default-type (pathname if-does-not-exist verbose print)
   (declare (type (member nil :error) if-does-not-exist))
-  ;; FIXME: How do the fixed "LISP" and "FASL" types interact with the
-  ;; *LOAD-SOURCE-TYPES* and *LOAD-OBJECT-TYPES* values?
   (multiple-value-bind (src-pn src-tn)
-      (try-default-types pathname *load-source-types* "LISP")
+      (try-default-type pathname *load-source-default-type*)
     (multiple-value-bind (obj-pn obj-tn)
-	(try-default-types pathname *load-object-types* "FASL")
+	(try-default-type pathname sb!c:*backend-fasl-file-type*)
       (cond
        ((and obj-tn
 	     src-tn
@@ -152,10 +136,11 @@
        (t
 	(internal-load pathname nil if-does-not-exist verbose print nil))))))
 
-;;; This function mainly sets up special bindings and then calls sub-functions.
-;;; We conditionally bind the switches with PROGV so that people can set them
-;;; in their init files and have the values take effect. If the compiler is
-;;; loaded, we make the compiler-policy local to LOAD by binding it to itself.
+;;; This function mainly sets up special bindings and then calls
+;;; sub-functions. We conditionally bind the switches with PROGV so
+;;; that people can set them in their init files and have the values
+;;; take effect. If the compiler is loaded, we make the
+;;; compiler-policy local to LOAD by binding it to itself.
 ;;;
 ;;; FIXME: ANSI specifies an EXTERNAL-FORMAT keyword argument.
 ;;;

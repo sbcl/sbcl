@@ -256,7 +256,6 @@
               "BLOCK-NUMBER"
               "BACKEND"
               "BACKEND-BYTE-FASL-FILE-IMPLEMENTATION"
-              "BACKEND-BYTE-FASL-FILE-TYPE"
               "IR2-BLOCK-BLOCK"
               "DISASSEM-BYTE-COMPONENT"
               "FUNCALLABLE-INSTANCE-LEXENV"
@@ -731,7 +730,7 @@ retained, possibly temporariliy, because it might be used internally."
              ;; various internal defaults
              "*DEFAULT-PACKAGE-USE-LIST*"
              "DEFAULT-INIT-CHAR"
-             "*LOAD-SOURCE-TYPES*" "*LOAD-OBJECT-TYPES*"
+             "*LOAD-SOURCE-DEFAULT-TYPE*"
 
              ;; hash caches
              "DEFINE-HASH-CACHE"

@@ -247,8 +247,3 @@
 
 (defun backend-byte-fasl-file-implementation ()
   *backend-byte-order*)
-
-(defun backend-byte-fasl-file-type ()
-  (ecase *backend-byte-order*
-    (:big-endian "bytef")
-    (:little-endian "lbytef")))

@@ -581,9 +581,10 @@ a host-structure or string."
 	  (namestring-parse-error-namestring condition)
 	  (namestring-parse-error-offset condition)))
 
-;;; Handle the case where parse-namestring is actually parsing a namestring.
-;;; We pick off the :JUNK-ALLOWED case then find a host to use for parsing,
-;;; call the parser, then check whether the host matches.
+;;; Handle the case where PARSE-NAMESTRING is actually parsing a
+;;; namestring. We pick off the :JUNK-ALLOWED case then find a host to
+;;; use for parsing, call the parser, then check whether the host
+;;; matches.
 (defun %parse-namestring (namestr host defaults start end junk-allowed)
   (declare (type (or host null) host) (type string namestr)
 	   (type index start) (type (or index null) end))
@@ -603,7 +604,7 @@ a host-structure or string."
 	(multiple-value-bind (new-host device directory file type version)
 	    (funcall (host-parse parse-host) namestr start end)
 	  (when (and host new-host (not (eq new-host host)))
-	    (error "Host in namestring: ~S~@
+	    (error "The host in the namestring, ~S,~@
 		    does not match explicit host argument: ~S"
 		   host))
 	  (let ((pn-host (or new-host parse-host)))
@@ -654,7 +655,7 @@ a host-structure or string."
       (stream
        (let ((name (file-name thing)))
 	 (unless name
-	   (error "Can't figure out the file associated with stream:~%  ~S"
+	   (error "can't figure out the file associated with stream:~%  ~S"
 		  thing))
 	 name))))
 
@@ -667,7 +668,7 @@ a host-structure or string."
     (when pathname
       (let ((host (%pathname-host pathname)))
 	(unless host
-	  (error "Cannot determine the namestring for pathnames with no ~
+	  (error "can't determine the namestring for pathnames with no ~
 		  host:~%  ~S" pathname))
 	(funcall (host-unparse host) pathname)))))
 
@@ -681,7 +682,7 @@ a host-structure or string."
       (if host
 	  (funcall (host-unparse-host host) pathname)
 	  (error
-	   "Cannot determine the namestring for pathnames with no host:~%  ~S"
+	   "can't determine the namestring for pathnames with no host:~%  ~S"
 	   pathname)))))
 
 (defun directory-namestring (pathname)
@@ -694,7 +695,7 @@ a host-structure or string."
       (if host
 	  (funcall (host-unparse-directory host) pathname)
 	  (error
-	   "Cannot determine the namestring for pathnames with no host:~%  ~S"
+	   "can't determine the namestring for pathnames with no host:~%  ~S"
 	   pathname)))))
 
 (defun file-namestring (pathname)
@@ -707,7 +708,7 @@ a host-structure or string."
       (if host
 	  (funcall (host-unparse-file host) pathname)
 	  (error
-	   "Cannot determine the namestring for pathnames with no host:~%  ~S"
+	   "can't determine the namestring for pathnames with no host:~%  ~S"
 	   pathname)))))
 
 (defun enough-namestring (pathname
@@ -723,7 +724,7 @@ a host-structure or string."
 	  (with-pathname (defaults defaults)
 	    (funcall (host-unparse-enough host) pathname defaults))
 	  (error
-	   "Cannot determine the namestring for pathnames with no host:~%  ~S"
+	   "can't determine the namestring for pathnames with no host:~%  ~S"
 	   pathname)))))
 
 ;;;; wild pathnames
@@ -790,7 +791,7 @@ a host-structure or string."
 	    (t
 	     (setf in-wildcard t)
 	     (unless subs
-	       (error "Not enough wildcards in FROM pattern to match ~
+	       (error "not enough wildcards in FROM pattern to match ~
 		       TO pattern:~%  ~S"
 		      pattern))
 	     (let ((sub (pop subs)))
@@ -805,7 +806,7 @@ a host-structure or string."
 		 (simple-string
 		  (push sub strings))
 		 (t
-		  (error "Can't substitute this into the middle of a word:~
+		  (error "can't substitute this into the middle of a word:~
 			  ~%  ~S"
 			 sub)))))))
 
@@ -1132,7 +1133,7 @@ a host-structure or string."
       (funcall function pathname))
      ((not (search-list-defined search-list))
       (/show0 "undefined search list")
-      (error "Undefined search list: ~A"
+      (error "undefined search list: ~A"
 	     (search-list-name search-list)))
      (t
       (/show0 "general case")
@@ -1163,7 +1164,7 @@ a host-structure or string."
       (let ((ch (schar word i)))
 	(unless (or (alpha-char-p ch) (digit-char-p ch) (char= ch #\-))
 	  (error 'namestring-parse-error
-		 :complaint "Logical namestring character ~
+		 :complaint "logical namestring character which ~
 			     is not alphanumeric or hyphen:~%  ~S"
 		 :arguments (list ch)
 		 :namestring word :offset i))))
@@ -1180,7 +1181,7 @@ a host-structure or string."
 	   found
 	   (error 'simple-file-error
 		  :pathname thing
-		  :format-control "Logical host not yet defined: ~S"
+		  :format-control "logical host not yet defined: ~S"
 		  :format-arguments (list thing)))))
     (logical-host thing)))
 
@@ -1209,7 +1210,7 @@ a host-structure or string."
 	    (if (= pos last-pos)
 		(when (pattern)
 		  (error 'namestring-parse-error
-			 :complaint "Double asterisk inside of logical ~
+			 :complaint "double asterisk inside of logical ~
 				     word: ~S"
 			 :arguments (list chunk)
 			 :namestring namestring
@@ -1244,7 +1245,7 @@ a host-structure or string."
 	  (setq prev (1+ i))
 	  (unless (member ch '(#\; #\: #\.))
 	    (error 'namestring-parse-error
-		   :complaint "Illegal character for logical pathname:~%  ~S"
+		   :complaint "illegal character for logical pathname:~%  ~S"
 		   :arguments (list ch)
 		   :namestring namestr
 		   :offset i))
@@ -1263,7 +1264,7 @@ a host-structure or string."
       (labels ((expecting (what chunks)
 		 (unless (and chunks (simple-string-p (caar chunks)))
 		   (error 'namestring-parse-error
-			  :complaint "Expecting ~A, got ~:[nothing~;~S~]."
+			  :complaint "expecting ~A, got ~:[nothing~;~S~]."
 			  :arguments (list what (caar chunks))
 			  :namestring namestr
 			  :offset (if chunks (cdar chunks) end)))
@@ -1305,7 +1306,7 @@ a host-structure or string."
 		 (when chunks
 		   (unless (eql (caar chunks) #\.)
 		     (error 'namestring-parse-error
-			    :complaint "Expecting a dot, got ~S."
+			    :complaint "expecting a dot, got ~S."
 			    :arguments (list (caar chunks))
 			    :namestring namestr
 			    :offset (cdar chunks)))
@@ -1327,7 +1328,7 @@ a host-structure or string."
 			 (parse-integer str :junk-allowed t)
 		       (unless (and res (plusp res))
 			 (error 'namestring-parse-error
-				:complaint "Expected a positive integer, ~
+				:complaint "expected a positive integer, ~
 					    got ~S"
 				:arguments (list str)
 				:namestring namestr
@@ -1335,7 +1336,7 @@ a host-structure or string."
 		       (setq version res)))))
 		 (when (cdr chunks)
 		   (error 'namestring-parse-error
-			  :complaint "Extra stuff after end of file name."
+			  :complaint "extra stuff after end of file name"
 			  :namestring namestr
 			  :offset (cdadr chunks)))))
 	(parse-host (logical-chunkify namestr start end)))
@@ -1356,7 +1357,7 @@ a host-structure or string."
       (let ((res (parse-namestring pathspec nil *logical-pathname-defaults*)))
 	(when (eq (%pathname-host res)
 		  (%pathname-host *logical-pathname-defaults*))
-	  (error "Logical namestring does not specify a host:~%  ~S"
+	  (error "This logical namestring does not specify a host:~%  ~S"
 		 pathspec))
 	res)))
 
@@ -1379,7 +1380,7 @@ a host-structure or string."
 		((eq dir :wild-inferiors)
 		 (pieces "**;"))
 		(t
-		 (error "Invalid directory component: ~S" dir))))))
+		 (error "invalid directory component: ~S" dir))))))
     (apply #'concatenate 'simple-string (pieces))))
 
 (defun unparse-logical-piece (thing)
@@ -1395,7 +1396,7 @@ a host-structure or string."
 		   (strings "**"))
 		  ((eq piece :multi-char-wild)
 		   (strings "*"))
-		  (t (error "Invalid keyword: ~S" piece))))))
+		  (t (error "invalid keyword: ~S" piece))))))
        (apply #'concatenate 'simple-string (strings))))))
 
 (defun unparse-logical-namestring (pathname)
@@ -1416,7 +1417,7 @@ a host-structure or string."
   (collect ((res))
     (dolist (tr transl-list)
       (unless (and (consp tr) (= (length tr) 2))
-	(error "Logical pathname translation is not a two-list:~%  ~S"
+	(error "This logical pathname translation is not a two-list:~%  ~S"
 	       tr))
       (let ((from (first tr)))
 	(res (list (if (typep from 'logical-pathname)
@@ -1479,7 +1480,7 @@ a host-structure or string."
      (dolist (x (logical-host-canon-transls (%pathname-host pathname))
 		(error 'simple-file-error
 		       :pathname pathname
-		       :format-control "No translation for ~S"
+		       :format-control "no translation for ~S"
 		       :format-arguments (list pathname)))
        (destructuring-bind (from to) x
 	 (when (pathname-match-p pathname from)

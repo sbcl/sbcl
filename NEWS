@@ -615,14 +615,20 @@ changes in sbcl-0.6.10 relative to sbcl-0.6.9:
 * A patch from Martin Atzmueller seems to have solved the SIGINT
   problem, and as far as we know, signal-handling now works cleanly.
   (If you find any new bugs, please report them!)
+* The system no longer defaults Lisp source file names to types
+  ".l", ".cl", or ".lsp", but only to ".lisp". 
+* The compiler no longer uses special default file extensions for
+  byte-compiled code. (The ANSI definition of COMPILE-FILE-PATHNAME
+  seems to expect a single default extension for all compiled code,
+  and there's no compelling reason to try to stretch the standard
+  to allow two different extensions.) Instead, byte-compiled files
+  default to the same extension as native-compiled files.
+?? #'(SETF DOCUMENTATION) is now defined.
+* Bug #17 (differing COMPILE-FILE behavior between logical and 
+  physical pathnames) has been fixed, and some related misbehavior too,
+  thanks to a patch from Martin Atzmueller.
 * More compiler warnings in src/runtime/ are gone, thanks to 
   patches from Martin Atzmueller.
-* The compiler no longer uses special file extensions for
-  byte-compiled code. (The ANSI definition of COMPILE-FILE-PATHNAME
-  seems to require a single default extension for compiled code,
-  and there's no compelling reason to try to stretch the standard
-  to allow two different extensions.)
-* #'(SETF DOCUMENTATION) is now defined.
 
 planned incompatible changes in 0.7.x:
 * The debugger prompt sequence now goes "5]", "5[2]", "5[3]", etc.
