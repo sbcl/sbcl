@@ -103,7 +103,12 @@ os_restore_fp_control(os_context_t *context)
 	FLOAT_TRAPS_BYTE_MASK;
     
     d = *((double *) &control);
+    /* Hmp.  Apparently the following doesn't work either:
+       
     asm volatile ("mtfsf 0xff,%0" : : "f" (d));
+
+    causing segfaults at the first GC.
+    */
 }
 
 void 

@@ -32,6 +32,6 @@ cd ../..
 # Use a little C program to grab stuff from the C header files and
 # smash it into Lisp source code.
 cd tools-for-build
-$GNUMAKE grovel_headers || exit 1
+$GNUMAKE -I../src/runtime grovel_headers || exit 1
 cd ..
 tools-for-build/grovel_headers > output/stuff-groveled-from-headers.lisp
