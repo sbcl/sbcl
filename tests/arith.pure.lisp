@@ -137,3 +137,11 @@
 	     (65 (ash most-negative-fixnum 36) t)))
   (destructuring-bind (index int result) x
     (assert (eq (eval `(logbitp ,index ,int)) result))))
+
+;;; off-by-1 type inference error for %DPB and %DEPOSIT-FIELD:
+(let ((f (compile nil '(lambda (b)
+                        (integer-length (dpb b (byte 4 28) -1005))))))
+  (assert (= (funcall f 1230070) 32)))
+(let ((f (compile nil '(lambda (b)
+                        (integer-length (deposit-field b (byte 4 28) -1005))))))
+  (assert (= (funcall f 1230070) 32)))
